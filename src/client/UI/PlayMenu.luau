@@ -231,7 +231,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		TextSize = 15,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
-		Size = UDim2.new(1, 0, 0, 0),
+		Size = UDim2.fromScale(1, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		RichText = true,
 	})

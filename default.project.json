@@ -50,6 +50,9 @@
         "PlayerCharacterDestroyBehavior": "Disabled",
         "SignalBehavior": "Deferred",
         "FallenPartsDestroyHeight": -200
+      },
+      "Town": {
+        "$path": { "optional": "build/Town.rbxm" }
       }
     },
 

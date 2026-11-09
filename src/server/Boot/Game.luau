@@ -49,7 +49,7 @@ Game.PICK_COOLDOWN = 0.75
 
 type PState = {
 	role: string?,
-	power: PowerRules.State,
+	power: any, -- Rodent/PowerRules.State (types do not cross Import)
 	bites: number,
 	lastKick: number,
 	lastPick: number,
@@ -467,15 +467,12 @@ function Game.start(opts: Opts?): any
 		local target = byId[hitId]
 		local h, dead = PlayRules.damage(healthOf(hitId), PlayRules.KICK_DAMAGE)
 		health[hitId] = h
-		fire(
-			player,
-			{
-				kind = "kick",
-				hit = true,
-				target = if target.variant == "spicy" then "rodent" else "squirrel",
-				health = h,
-			}
-		)
+		fire(player, {
+			kind = "kick",
+			hit = true,
+			target = if target.variant == "spicy" then "rodent" else "squirrel",
+			health = h,
+		})
 		local driver = possession:controllerOf(target)
 		if driver ~= "ai" and driver ~= nil then
 			local ds = stateOf(driver)
@@ -641,7 +638,9 @@ function Game.start(opts: Opts?): any
 	table.insert(
 		conns,
 		pickRemote.OnServerEvent:Connect(function(player: Player, choice: any)
-			local ok, err = pcall(pick, player, choice)
+			local ok, err = pcall(function()
+				pick(player, choice)
+			end)
 			if not ok then
 				warn(`[SpicyRodents] pick {choice} failed: {err}`)
 				fire(player, { kind = "refused", text = "Something went wrong; try again" })
@@ -651,7 +650,9 @@ function Game.start(opts: Opts?): any
 	table.insert(
 		conns,
 		kickRemote.OnServerEvent:Connect(function(player: Player)
-			local ok, err = pcall(kick, player)
+			local ok, err = pcall(function()
+				kick(player)
+			end)
 			if not ok then
 				warn(`[SpicyRodents] kick failed: {err}`)
 			end
@@ -667,7 +668,9 @@ function Game.start(opts: Opts?): any
 		table.insert(
 			conns,
 			RunService.Heartbeat:Connect(function(dt: number)
-				local ok, err = pcall(step, math.min(dt, 0.1))
+				local ok, err = pcall(function()
+					step(math.min(dt, 0.1))
+				end)
 				if not ok then
 					warn(`[SpicyRodents] step failed: {err}`)
 				end
