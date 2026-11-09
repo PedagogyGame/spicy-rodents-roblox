@@ -245,6 +245,10 @@ for name, id in CLIPS do
 			return animator:LoadAnimation(a)
 		end)
 		if okTrack then
+			local deadline = os.clock() + 5
+			while (track :: AnimationTrack).Length == 0 and os.clock() < deadline do
+				task.wait(0.1)
+			end
 			info.trackLength = math.round((track :: AnimationTrack).Length * 1000) / 1000
 			info.trackLooped = (track :: AnimationTrack).Looped
 		else

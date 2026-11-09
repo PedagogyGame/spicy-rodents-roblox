@@ -282,11 +282,15 @@ def pattern_field(c, n, dom, variant="squirrel"):
     # belly and chest by position (the belly's dominant bones are often the legs'): low, facing
     # down, near the midline; the line rises toward the chest and the throat
     ds = dom.astype(str)
-    trunk = (~np.char.startswith(ds, "Tail") & ~np.isin(ds, ["Head", "Jaw", "EarL", "EarR"]) & ~np.char.endswith(ds, "_Lower")
-             & ~np.char.endswith(ds, "_Foot") & ~np.char.endswith(ds, "_Toe") & (y > -0.75) & (y < 0.5) & (z > 0.42))
+    legs = np.char.startswith(ds, "Front") | np.char.startswith(ds, "Back")
+    trunk = (~np.char.startswith(ds, "Tail") & ~np.isin(ds, ["Head", "Jaw", "EarL", "EarR"]) & ~legs
+             & (y > -0.75) & (y < 0.5) & (z > 0.42))
+    # the inside of the upper legs carries the belly colour; the outside is coat
+    inner_leg = np.char.endswith(ds, "_Upper") & (-np.sign(x) * n[:, 0] > 0.35) & (z > 0.45)
     line = 0.68 + 0.08 * _sstep(0.2, -0.5, y) + wob
     belly = _sstep(0.1, 0.45, -n[:, 2] * 0.8 + (line - z) * 2.5 - np.abs(x) * 1.5 + 0.15)
     out[trunk] = belly[trunk]
+    out[inner_leg] = _sstep(0.35, 0.6, (-np.sign(x) * n[:, 0])[inner_leg] - n[inner_leg, 2] * 0.3 + wob[inner_leg])
     neck = dom == "Neck"
     out[neck] = _sstep(0.0, 0.4, -n[neck, 2] + (0.9 - z[neck]) * 1.5 + wob[neck])
     head = dom == "Head"
@@ -428,10 +432,10 @@ def paint(tx, variant, tools):
     # inner ears: thin pinkish skin with fine hairs
     # inner ears: thin warm skin with fine hairs, the fur coming over the rim
     ec = np.where(P[:, :1] > 0, lm["earL"], lm["earR"])
-    rim = 1 - sst(0.025, 0.055, np.linalg.norm(P - ec, axis=1))
+    rim = 1 - sst(0.02, 0.045, np.linalg.norm(P - ec, axis=1))
     inner = ear & (N[:, 1] < -0.2)
     skin_e = (_hex("#7a4a40") if rodent else _hex("#9a6a5a")) * (0.85 + 0.3 * fine)[:, None]
-    override(ear, skin_e, r=0.5, k=sst(-0.2, -0.5, N[:, 1]) * inner * rim * 0.9)
+    override(ear, skin_e * 0.85, r=0.5, k=sst(-0.25, -0.6, N[:, 1]) * inner * rim * 0.6)
     # foot pads
     override(feet, _hex("#5c4440"), r=0.5, k=sst(-0.4, -0.75, N[:, 2]) * feet)
     # claws and teeth

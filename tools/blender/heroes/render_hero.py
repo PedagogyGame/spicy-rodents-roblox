@@ -202,7 +202,7 @@ def main(argv):
             written.append(scene.render.filepath)
     if opts.turntable:
         for i in range(opts.turntable):
-            place(cam, center, size * 5.0, -90 + 360.0 * i / opts.turntable, 14)
+            place(cam, center + Vector((0, 0, 0.22 * size)), size * 6.3, -90 + 360.0 * i / opts.turntable, 12)
             scene.render.filepath = os.path.join(opts.out, f"{tag}_turntable_{i:02d}.png")
             bpy.ops.render.render(write_still=True)
             written.append(scene.render.filepath)
