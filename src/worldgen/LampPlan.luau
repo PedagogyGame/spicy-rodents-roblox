@@ -264,7 +264,7 @@ function LampPlan.plan(
 			color = METAL,
 			material = "Metal",
 			role = "Post",
-			attrs = { Lamp = l.id, Flicker = l.flicker },
+			attrs = { Lamp = l.id, Flicker = l.flicker, Embedded = true },
 		})
 		list:add(ORIGIN, "Base_" .. l.id, l.x, l.y + 0.4, l.z, 1.6, 1.5, 1.5, {
 			roll = math.pi / 2,
@@ -273,7 +273,7 @@ function LampPlan.plan(
 			material = "Metal",
 			canCollide = false,
 			role = "Trim",
-			attrs = { Lamp = l.id },
+			attrs = { Lamp = l.id, Embedded = true },
 		})
 		list:add(ORIGIN, "Finial_" .. l.id, l.x, l.top + 0.15, l.z, 1.0, 1.0, 1.0, {
 			shape = "Ball",

@@ -222,7 +222,13 @@ local function modelRow(m: any, folder: string)
 			lo = if lo then lo:Min(a) else a
 			hi = if hi then hi:Max(b) else b
 			local c = d.CFrame.Position
-			gap = math.min(gap, a.Y - Height.at(c.X, c.Z))
+			local g = a.Y - Height.at(c.X, c.Z)
+			if d:GetAttribute("Embedded") == true and g < 0 then
+				-- seated in the ground on purpose (foundations, pole and post feet, piers, pilings, root
+				-- flares): it touches the ground; a floating Embedded part still counts as floating
+				g = 0
+			end
+			gap = math.min(gap, g)
 			n += 1
 		end
 	end

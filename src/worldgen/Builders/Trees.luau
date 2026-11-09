@@ -122,7 +122,7 @@ local hex = Palette.hex
 local GREENS = {
 	default = { hex("#769377"), hex("#6a8c3e"), hex("#586f5b"), hex("#7d9a4f") },
 	warm = { hex("#6a8c3e"), hex("#89ab55"), hex("#7d9a4f"), hex("#586f5b") },
-	cool = { hex("#769377"), hex("#95a580"), hex("#586f5b"), hex("#6a8c3e") },
+	cool = { hex("#769377"), hex("#586f5b"), hex("#6a8c3e"), hex("#7d9a4f") },
 	willow = { hex("#769377"), hex("#95a580"), hex("#586f5b") },
 	oak = { hex("#6a8c3e"), hex("#89ab55"), hex("#a4bb66"), hex("#586f5b") },
 }
@@ -182,7 +182,15 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		local a = at(trunkLine, tc, tl * (k - 1) / nT)
 		local b = at(trunkLine, tc, tl * k / nT)
 		local r = trunkRadius(trunk, (k - 0.5) / nT)
-		cylinder(list, `Trunk_{k}`, a, b, r, if k == 1 then 0 else r * 0.25, barkOpts)
+		cylinder(
+			list,
+			`Trunk_{k}`,
+			a,
+			b,
+			r,
+			if k == 1 then 0 else r * 0.25,
+			if k == 1 then { color = barkColor, material = "Wood", role = "Limb", attrs = { Embedded = true } } else barkOpts
+		)
 	end
 	-- root flare (skipped where the trunk stands at a kerb, road or sidewalk: no bark on the paving)
 	local g, paved = opts.groundAt(foot[1], foot[3], foot[2] + 2)
@@ -195,11 +203,17 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			canQuery = false,
 			castShadow = true,
 			role = "Twig",
+			attrs = { Embedded = true },
 		})
 	end
 	if g < foot[2] - 0.05 then
 		-- the trunk route starts above the ground: carry the bark down into it
-		cylinder(list, "TrunkFoot", { foot[1], g - 1, foot[3] }, foot, r0, 0, barkOpts)
+		cylinder(list, "TrunkFoot", { foot[1], g - 1, foot[3] }, foot, r0, 0, {
+			color = barkColor,
+			material = "Wood",
+			role = "Limb",
+			attrs = { Embedded = true },
+		})
 	end
 
 	-- trunk radius at a height (for bough bases and the trunk tunnel)

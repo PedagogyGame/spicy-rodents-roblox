@@ -99,6 +99,26 @@
       "pos": [-40, 6, 150], "look": [-85, 6, 205], "fov": 70, "aboveGround": true
     },
     {
+      "name": "n_quay_street",
+      "desc": "Street level on the Quay promenade (game-west bank, between the river and the east quay row) looking at the stone bridge: banks, embankment walls, arches, deck, towers, parapets.",
+      "pos": [2300, 5, -150], "look": [2140, 30, 0], "fov": 65, "aboveGround": true
+    },
+    {
+      "name": "o_lamp_close",
+      "desc": "A street lamp close up (rd_010 R31 at x 81.5 z 24.3): vertical dark post on the verge, base, curved arm and head over the kerb.",
+      "pos": [98, 5, 48], "look": [81.5, 9, 24.3], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "p_outer_homes",
+      "desc": "Outer homes with their gable roofs (outer_home_05 at x 155 z -520) from the street.",
+      "pos": [105, 6, -455], "look": [155, 9, -520], "fov": 65, "aboveGround": true
+    },
+    {
+      "name": "q_willow",
+      "desc": "A Quay willow (QUAY WILLOW trunk at x 1787.5 z -70): trunk and drooping crown.",
+      "pos": [1850, 6, -15], "look": [1787.5, 22, -70], "fov": 70, "aboveGround": true
+    },
+    {
       "name": "axes_check",
       "debug": true,
       "desc": "Orientation test: red +X, green +Y, blue +Z bars from the origin, a WedgePart at (-4,1,0) (tall face at its +Z), a cylinder at (0,1,-5) (axis X) a ball at (-4,1,-5) and two black Beam wires (wedge top -> ball top, green bar top -> ball top). From (+X,+Y,+Z) a correct render shows red going down-RIGHT and blue going down-LEFT.",

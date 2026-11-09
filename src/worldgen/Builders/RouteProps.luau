@@ -353,6 +353,7 @@ function RouteProps.plans(
 			color = LOOK.pole.color,
 			material = "Wood",
 			role = "Post",
+			attrs = { Embedded = true },
 		})
 		RouteProps.crossarm(list, r, byLook.wire)
 		table.insert(out, newPlan(`Pole_{r.id}`, "pole", props, { Route = r.id }, list))
@@ -369,7 +370,7 @@ function RouteProps.plans(
 			local yaw = if dxz[1] * dxz[1] + dxz[2] * dxz[2] > 1 then math.atan2(dxz[1], dxz[2]) else 0
 			local sx, sz = math.cos(yaw), -math.sin(yaw)
 			local w = 1.1
-			local wood = { color = { 120, 92, 66 }, material = "Wood", role = "Pipe" }
+			local wood = { color = { 120, 92, 66 }, material = "Wood", role = "Pipe", attrs = { Embedded = true } }
 			local rails = table.clone(line)
 			if foot == line[1] then
 				table.insert(rails, 1, { foot[1], g - 0.3, foot[3] })
@@ -412,6 +413,7 @@ function RouteProps.plans(
 					material = "Metal",
 					canCollide = false,
 					role = "Pipe",
+					attrs = { Embedded = true },
 				})
 			end
 			cyl(list, "Shoe", { foot[1], math.min(g, foot[2]) + 0.35, foot[3] }, {
@@ -455,6 +457,7 @@ function RouteProps.plans(
 						color = if parapet then STONE else LOOK.fence.color,
 						material = if parapet then "Limestone" else LOOK.fence.material,
 						role = "Fence",
+						attrs = { Embedded = true },
 					})
 				end
 			end
@@ -472,6 +475,7 @@ function RouteProps.plans(
 					material = "Metal",
 					canCollide = false,
 					role = "Post",
+					attrs = { Embedded = true },
 				})
 			end
 			for k = 1, n do
@@ -544,6 +548,7 @@ function RouteProps.plans(
 					color = { 52, 58, 60 },
 					material = "Metal",
 					role = "Post",
+					attrs = { Embedded = true },
 				})
 			end
 			for k = 2, #line - 1, 2 do
