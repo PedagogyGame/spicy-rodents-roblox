@@ -23,6 +23,7 @@
 -- are collected in `SquirrelMotor.params` so the Tunables tree can take them over in W1.
 
 local Curve = require("../Routes/Curve")
+local Trampoline = require("./Trampoline")
 local Motion = require("../Routes/Motion")
 local Registry = require("../Routes/Registry")
 local SpatialIndex = require("../Routes/SpatialIndex")
@@ -41,6 +42,8 @@ export type World = Motion.World & {
 	-- optional segment test for validators: does the straight move (x0,z0)->(x1,z1) at height y cross
 	-- a wall collider? (Colliders in W1)
 	crosses: ((x0: number, z0: number, x1: number, z1: number, y: number) -> boolean)?,
+	-- optional trampoline sites (Movement/Trampoline, from the registry's trampoline routes)
+	trampolines: { Trampoline.Site }?,
 }
 
 export type Input = {
@@ -802,7 +805,11 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 		state.z += state.vz * dt
 		resolveWalls(state, world, oldX, oldZ)
 		local ground = world.groundAt(state.x, state.z, state.y)
-		if state.y <= ground then
+		local tramps = world.trampolines
+		if tramps and Trampoline.attemptAny(tramps, state :: any, oldY, input.cameraYaw) then
+			-- v5.4 L6752: the bounce keeps its vertical impulse and airborne control
+			push(events, "bounce")
+		elseif state.y <= ground then
 			state.y = ground
 			state.vy = 0
 			if not state.grounded then
