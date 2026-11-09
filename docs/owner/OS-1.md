@@ -114,7 +114,16 @@ S8 picture checks (these are looked at, then thrown away):
 
 ## Part C: fly the test drone (OS-1c, Roblox app, about 10 minutes)
 
-Only after Claude says "OS-1c ready".
+**Changed 2026-11-09:** Claude's safety settings do not allow it to publish to your live place, so Part C runs **in Studio** instead of the Roblox app. The drone test town is saved as **CI place version 13**.
+
+Studio route (use this):
+1. create.roblox.com -> Creations -> Spicy Rodent -> Places -> **CI** -> **Edit in Studio** (newest version = the drone town).
+2. **Test** tab -> **Play**. Then follow steps 2-5 below. Studio cannot show SLIM far-building shapes, so mark box 3 "n/a in Studio".
+3. When done: Stop, close with **Don't Save**, and tell Claude "C done". Claude then re-saves the possession place for Part A.
+
+(Optional, for the full check: in Studio with the drone town open, File -> Publish to Roblox As -> Spicy Rodent -> the **Spicy Rodent** place -> Overwrite. Then use the Roblox-app steps below. It is your private place, so only you can join. Publish your real game over it later.)
+
+Roblox-app route (only if you published it yourself):
 
 1. Open the link Claude gave you (the Spicy Rodent experience page) and click the green **Play**
    button. The Roblox app opens the test town. You stand on a small pad; wait about 10 seconds
