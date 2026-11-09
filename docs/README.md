@@ -3,7 +3,8 @@
 This branch holds the research and planning for the Roblox rebuild. It contains no game code yet.
 
 - `reference/`: the source material.
-  - The owner's brief: `Roblox_Rebuild_Brief.pdf`, plus a `.txt` copy.
+  - The owner's brief, **version 2** (live Claude Doc, captured 2026-11-09): `Roblox_Rebuild_Brief_v2.md`. This is authoritative; its section 15 answers the build-plan decisions.
+  - The original brief: `Roblox_Rebuild_Brief.pdf`, plus a `.txt` copy (superseded by v2).
   - The canonical v5.4 HTML game: `Spicy_Rodents_v5_4_Living_Town.html`, SHA-256 fc48b387…6227, verified against the brief.
   - Older versions v0.5, v4.1 and v5.2, for features lost after v4.1.
   - Pretty-printed `v5_4_game.js` and `v4_1_game.js`. All spec line numbers refer to these files.
