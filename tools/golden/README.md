@@ -2,7 +2,7 @@
 
 Runs byte-exact copies of the v5.4 functions (lifted from `reference/v5_4_game.js` by line range)
 in Node with `three@0.160.1` from npm and writes fixed, seeded input/output vectors to
-`data/golden/*.json`. The Luau ports (`World/Height`, `Routes/Curve`, `Routes/Motion`,
+`tests/golden/*.json`. The Luau ports (`World/Height`, `Routes/Curve`, `Routes/Motion`,
 `Traffic/Swept`, `Combat/CombatRules`, `Actors/Perception`) must reproduce them (BUILD_PLAN 6.2, 6.3).
 Also writes `docs/reports/golden_report.md`.
 
@@ -15,7 +15,7 @@ cd tools/golden && npm_config_cache=/root/.cache/npm npm install --no-audit --no
 # generate (about 5 s); needs data/harvest/routes.json and route_samples.json from tools/harvest
 node tools/golden/src/golden.js
 node tools/golden/src/golden.js --reference /home/user/spicy-rodents/reference/v5_4_game.js \
-  --harvest data/harvest --out data/golden --report docs/reports/golden_report.md
+  --harvest data/harvest --out tests/golden --report docs/reports/golden_report.md
 
 # regenerate src/original.js from the reference (only needed if the block table changes)
 python3 -I tools/golden/gen_original.py
@@ -39,7 +39,7 @@ Catmull-Rom comes from the npm `three` package. `golden.js` rebuilds all 1,332 h
 it and compares against the harvest (inlined r160): max length difference 6e-14, max sample point
 difference 3e-13, so the two builds are the same curve code.
 
-## Outputs (`data/golden/`)
+## Outputs (`tests/golden/`)
 
 Large sets use `columns` + `rows` (one row per line) to stay compact; small sets use objects.
 Non-finite numbers are encoded as the strings `"NaN"`, `"Infinity"`, `"-Infinity"`. All random draws
@@ -59,7 +59,7 @@ use the game's own `rng(seed)`; seeds are in each file and in `manifest.json`.
 | `junction.json` | 49 | `RouteJunction.inward/canTransfer/ease` at the thresholds |
 | `manifest.json` | | three version, verbatim block hashes, cross-check numbers, seeds, file hashes |
 
-BUILD_PLAN 6.3 names `tests/golden/`; this tool writes to `data/golden/` (the path assigned to it).
+BUILD_PLAN 6.3 names `tests/golden/`; this tool writes to `tests/golden/` (the path assigned to it).
 Moving the directory needs no other change.
 
 ## Files

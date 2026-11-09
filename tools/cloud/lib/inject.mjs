@@ -57,12 +57,17 @@ function resolvePath(spec) {
 	return null;
 }
 
-export function buildTree(projectFile) {
+// `exclude` lists project-relative `$path` directories to leave out of the injected tree (for
+// example "generated": 1.3 MB of compiled data that would push the task script past the Luau
+// Execution limit of 1 MiB, measured 2026-11-09: "Script too large ... limit is 1048576 bytes").
+export function buildTree(projectFile, { exclude = [] } = {}) {
 	const project = JSON.parse(fs.readFileSync(projectFile, "utf8"));
 	const root = path.dirname(path.resolve(projectFile));
 	const instances = [];
 	const properties = [];
 	const skipped = [];
+	const excluded = [];
+	const excludeDirs = new Set(exclude.filter(Boolean).map((e) => path.resolve(root, e)));
 
 	function walkNode(node, instPath) {
 		const spec = resolvePath(node.$path);
@@ -73,7 +78,9 @@ export function buildTree(projectFile) {
 		}
 		if (spec) {
 			const dir = path.resolve(root, spec.dir);
-			if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+			if (excludeDirs.has(dir)) {
+				excluded.push(spec.dir);
+			} else if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
 				walkDir(dir, instPath, instances, skipped);
 			} else if (!spec.optional) {
 				throw new Error(`project path ${spec.dir} does not exist`);
@@ -91,7 +98,7 @@ export function buildTree(projectFile) {
 	}
 	// Service roots themselves are never created (GetService), only their descendants.
 	const filtered = instances.filter((i) => i.p.length > 1);
-	return { instances: filtered, properties, skipped, name: project.name };
+	return { instances: filtered, properties, skipped, excluded, name: project.name };
 }
 
 function longBracket(payload) {
@@ -102,8 +109,8 @@ function longBracket(payload) {
 
 // Returns the Luau bootstrap followed by the user's script. The user script's top-level return is
 // the task's return value.
-export function wrapScript(projectFile, userScript) {
-	const tree = buildTree(projectFile);
+export function wrapScript(projectFile, userScript, opts = {}) {
+	const tree = buildTree(projectFile, opts);
 	const payload = JSON.stringify({ instances: tree.instances, properties: tree.properties });
 	const eq = longBracket(payload);
 	const bootstrap = `-- [inject bootstrap] rebuilds the Rojo tree of ${path.basename(projectFile)} (${tree.instances.length} instances) inside this task.

@@ -458,7 +458,7 @@ function writeReport(file, m, swept) {
   const L = [];
   L.push("# Golden vectors report");
   L.push("");
-  L.push(`Generated ${m.generatedAt} by \`tools/golden\` (Node, three@${m.three.npm}, REVISION ${m.three.revision}). Output: \`data/golden/\`. Re-run: \`node tools/golden/src/golden.js\` (see \`tools/golden/README.md\`).`);
+  L.push(`Generated ${m.generatedAt} by \`tools/golden\` (Node, three@${m.three.npm}, REVISION ${m.three.revision}). Output: \`tests/golden/\`. Re-run: \`node tools/golden/src/golden.js\` (see \`tools/golden/README.md\`).`);
   L.push("");
   L.push("## Provenance");
   L.push("");
@@ -500,7 +500,7 @@ function writeReport(file, m, swept) {
   L.push("");
   L.push("## Location note");
   L.push("");
-  L.push("BUILD_PLAN 6.3 names `tests/golden/*.json`; this task wrote them to `data/golden/` (assigned path). The Lune golden tests can read `data/golden/` directly or the lead can move the directory; nothing else depends on the location.");
+  L.push("BUILD_PLAN 6.3 names `tests/golden/*.json`; this task wrote them to `tests/golden/` (assigned path). The Lune golden tests can read `tests/golden/` directly or the lead can move the directory; nothing else depends on the location.");
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, L.join("\n") + "\n");
 }

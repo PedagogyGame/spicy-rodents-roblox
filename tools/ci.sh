@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tools/ci.sh: the local CI gate (BUILD_PLAN §4.3 item 1, §6.7).
-#   stylua --check -> selene -> Lune unit tests -> rojo build (.rbxl + .rbxlx, default and ci
-#   projects) -> Lune place tests -> rojo sourcemap.
+#   stylua --check -> selene -> Lune unit tests -> compile check (generated/ not stale) ->
+#   rojo build (.rbxl + .rbxlx, default and ci projects) -> Lune place tests -> rojo sourcemap.
 # Exit code is non-zero on the first failing step. Each step prints its wall time.
 # Usage: tools/ci.sh            (from anywhere; runs at the repo root)
 #        tools/ci.sh --no-build (skip rojo build and place tests: formatting, lint, unit only)
@@ -38,11 +38,13 @@ done_step() {
 	printf -- "-- ok (%.1fs)\n" "$(echo "$end - $STEP_START" | bc)"
 }
 
-LUAU_DIRS=(src tests tools/cloud/tasks)
+LUAU_DIRS=(src tests tools/cloud/tasks tools/compile)
 
 step "stylua --check (StyLua $(stylua --version | awk '{print $2}'), Luau syntax)"
 stylua --check "${LUAU_DIRS[@]}"
 done_step
+
+mkdir -p build
 
 step "selene (Selene $(selene --version | awk '{print $2}'), std = roblox, committed roblox.yml)"
 selene --no-summary "${LUAU_DIRS[@]}"
@@ -52,13 +54,15 @@ step "lune tests (Lune $(lune --version | awk '{print $2}'))"
 lune run tests/run.luau
 done_step
 
+step "compile check (tools/compile: validate data/authored + data/harvest, regenerate into build/compile-check, diff against generated/)"
+lune run tools/compile/main.luau check
+done_step
+
 if [ "$NO_BUILD" -eq 1 ]; then
 	echo
 	echo "ci: --no-build given; skipping rojo build, place tests and sourcemap"
 	exit 0
 fi
-
-mkdir -p build
 
 step "rojo build (Rojo $(rojo --version | awk '{print $2}')): default -> build/SpicyRodents.rbxl + .rbxlx"
 rojo build default.project.json -o build/SpicyRodents.rbxl

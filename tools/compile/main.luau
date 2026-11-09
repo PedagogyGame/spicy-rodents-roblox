@@ -643,7 +643,7 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 				"`check` writes to `build/compile-check/` (gitignored) and diffs against `generated/`; wire it into `tools/ci.sh` after the unit tests.",
 				"Generated files are StyLua-formatted (repo `stylua.toml`) and excluded from Selene by `selene.toml`.",
 				"Authored data lives under `data/authored/` (the path assigned to this task); BUILD_PLAN 1.2 names `data/town/`, `data/cast/`, `data/wildlife/` directly under `data/`. Moving the directories means changing the paths in `tools/compile/main.luau` and the `$schema` relative links; nothing else depends on them.",
-				"`data/harvest/` (6.6 MB) and `data/golden/` (11 MB) are machine output; consider Git LFS rules for `*.json` under those two directories if the repository size matters.",
+				"`data/harvest/` (6.6 MB) and `tests/golden/` (11 MB) are machine output; consider Git LFS rules for `*.json` under those two directories if the repository size matters.",
 			},
 		})
 		local reportPath = repo .. "/docs/reports/compile_report.md"

@@ -11,7 +11,20 @@ if not engineTests then
 	error("ServerStorage.EngineTests missing: this version was not built from ci.project.json")
 end
 
-local BootSmoke = require(engineTests:FindFirstChild("BootSmoke") :: ModuleScript)
+-- Dynamic instance require: luau-lsp cannot resolve it statically, so the type is declared here.
+local BootSmokeModule = engineTests:FindFirstChild("BootSmoke") :: ModuleScript
+local BootSmoke = (require :: any)(BootSmokeModule) :: {
+	run: (
+	) -> {
+		ok: boolean,
+		injected: boolean,
+		required: number,
+		failed: { { path: string, err: string } },
+		warnings: { string },
+		unreadableProperties: { string },
+		properties: any,
+	},
+}
 local started = os.clock()
 local result = BootSmoke.run()
 

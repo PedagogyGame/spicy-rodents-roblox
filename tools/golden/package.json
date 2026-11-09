@@ -2,7 +2,7 @@
   "name": "spicy-rodents-golden",
   "private": true,
   "version": "0.1.0",
-  "description": "Golden vectors from the original v5.4 functions (verbatim copies from reference/v5_4_game.js) run in Node with three.js r160.1; output in data/golden/.",
+  "description": "Golden vectors from the original v5.4 functions (verbatim copies from reference/v5_4_game.js) run in Node with three.js r160.1; output in tests/golden/.",
   "license": "UNLICENSED",
   "type": "commonjs",
   "engines": { "node": ">=22" },

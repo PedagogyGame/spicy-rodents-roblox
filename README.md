@@ -39,8 +39,9 @@ with cargo, plus the bpy 5.2.3 venv. Lint: `selene.toml` with the committed `rob
 ## Everyday commands
 
 ```bash
-tools/ci.sh                   # stylua --check, selene, Lune unit tests, rojo build (.rbxl/.rbxlx,
-                              # default/ci/build projects), Lune place tests, sourcemap (< 2 s)
+tools/ci.sh                   # stylua --check, selene, Lune unit tests, compile check, rojo build
+                              # (.rbxl/.rbxlx, default/ci/build projects), Lune place tests, sourcemap (< 3 s)
+lune run tools/compile/main.luau compile   # data/authored + data/harvest -> generated/ (then commit)
 lune run tests/run.luau       # unit tests only (add words to filter: lune run tests/run.luau moon)
 rojo build ci.project.json -o build/test.rbxl
 lune run tests/place/check_place.luau build/test.rbxl ci.project.json

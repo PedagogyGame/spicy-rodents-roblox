@@ -40,9 +40,11 @@ function help() {
   universe                         read the universe and its owner (a 200 proves the key path works)
   save_place <file.rbxl> [--place ci] [--legacy] [--allow-main-place] [--out file.json]
                                    upload a new SAVED (unpublished) version; prints the version id
-  run_engine_tests <task.luau> --version <v> [--place ci] [--timeout 300s] [--out file.json]
+  run_engine_tests <task.luau> --version <v> [--place ci] [--inject ci.project.json [--inject-exclude generated]]
+                                   [--timeout 300s] [--out file.json]
                                    create a Luau Execution task pinned to /versions/<v>, poll, print logs,
-                                   parse the JSON result; exit 1 on failure
+                                   parse the JSON result; exit 1 on failure. Scripts are capped at 1 MiB by the API;
+                                   --inject rebuilds the code tree in the task, --inject-exclude leaves $path dirs out
   upload_asset <file> --type Image|Model|Animation --name <n> [--description <d>] [--creator-user id|--creator-group id]
                                    Assets API create with operation polling (creator = universe owner)
   harvest_ids [--place art_inbox] --version <v>   stub (W0): reads asset IDs from a place version

@@ -1,6 +1,6 @@
 # Golden vectors report
 
-Generated 2026-11-09T06:10:16.846Z by `tools/golden` (Node, three@0.160.1, REVISION 160). Output: `data/golden/`. Re-run: `node tools/golden/src/golden.js` (see `tools/golden/README.md`).
+Generated 2026-11-09T06:10:16.846Z by `tools/golden` (Node, three@0.160.1, REVISION 160). Output: `tests/golden/`. Re-run: `node tools/golden/src/golden.js` (see `tools/golden/README.md`).
 
 ## Provenance
 
@@ -52,4 +52,4 @@ All random draws use the game's own `rng(seed)` (L80-89), so the sets regenerate
 
 ## Location note
 
-BUILD_PLAN 6.3 names `tests/golden/*.json`; this task wrote them to `data/golden/` (assigned path). The Lune golden tests can read `data/golden/` directly or the lead can move the directory; nothing else depends on the location.
+BUILD_PLAN 6.3 names `tests/golden/*.json`; this task wrote them to `tests/golden/` (assigned path). The Lune golden tests can read `tests/golden/` directly or the lead can move the directory; nothing else depends on the location.

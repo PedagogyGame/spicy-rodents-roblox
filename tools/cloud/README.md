@@ -21,7 +21,7 @@ node tools/cloud/cloud.mjs help
 node tools/cloud/cloud.mjs universe [--places]            # universe + owner (creator for uploads); a 200 proves the key path
 node tools/cloud/cloud.mjs save_place build/test.rbxl --place ci [--legacy] [--out build/save.json]
 node tools/cloud/cloud.mjs run_engine_tests tools/cloud/tasks/boot_smoke.luau --version <v> [--place ci] [--out build/r.json]
-node tools/cloud/cloud.mjs run_engine_tests tools/cloud/tasks/boot_smoke.luau --version 1 --inject ci.project.json
+node tools/cloud/cloud.mjs run_engine_tests tools/cloud/tasks/boot_smoke.luau --version 1 --inject ci.project.json --inject-exclude generated
 node tools/cloud/cloud.mjs upload_asset path/to.png --type Image --name "name" [--description ...]
 node tools/cloud/cloud.mjs harvest_ids [--place art_inbox] [--run --version <v>]      # W0 stub
 node tools/cloud/cloud.mjs publish build/owner.rbxl --place main --i-really-mean-it   # never in CI
@@ -42,6 +42,7 @@ Exit codes: 0 pass, 1 failure (HTTP error, task FAILED, or the task's JSON has `
 - `save_place` always saves an **unpublished** version (`published: false` on the Assets API, or
   `versionType=Saved` with `--legacy`). Only `publish` can publish, and only with the flag.
 - Every engine-test task is **pinned to a version** (`/versions/{v}`); `--version` is mandatory.
+- Task scripts over 1 MiB are refused locally (the live API limit), so no task create is wasted.
 
 ### Shared lock and token buckets
 
@@ -61,9 +62,14 @@ Verified in S1: a Luau Execution task may `Instance.new("ModuleScript")`, set `S
 `.model.json`/`.rbxm` are skipped) inside the task's DataModel and applies `$properties` with pcall
 (read-only ones such as `Players.MaxPlayers` are recorded under `InjectedPropertyFailures`), then
 runs the task script. It marks `ServerStorage.EngineTests` with the attribute `Injected = true`
-so suites can soften property checks. Script size counts against the 4 MB task limit (the W0
-tree is 76 KB). This is the path to use until a real save works, and it stays useful for quick
-loops because it needs no upload.
+so suites can soften property checks. **The task script is limited to 1 MiB** (measured
+2026-11-09 by the W0 checker: `400 INVALID_ARGUMENT "Script too large: was 1502344 bytes, limit is
+1048576 bytes"`; the plan's "4 MB" is the return-value cap, not the script cap). The W0 code tree
+is 76 KB, but `generated/` (compiled data, 1.26 MB) pushes the injected script to 1.47 MB, so pass
+`--inject-exclude generated` (comma-separated project-relative `$path` directories to leave out);
+the CLI refuses an oversize script before spending a task create. Suites that need the compiled
+data (`DataIntegrity`, `WorldBuild`) therefore need a real saved version. This is the path to use
+until a real save works, and it stays useful for quick loops because it needs no upload.
 
 ## Measured timings (2026-11-09, from the container; CI place version 1)
 
@@ -78,6 +84,8 @@ loops because it needs no upload.
 | `lock_test` from two shells (hold 2000 ms / 500 ms) | B acquired 1810 ms after requesting, right after A released | n/a |
 | inject experiment (set `Source`, require) | `canSetSource=true canRequire=true answer=42` | 3.3 s |
 | `run_engine_tests tasks/boot_smoke.luau --version 1 --inject ci.project.json` (76 KB script, 174 instances) | COMPLETE: 112 ModuleScripts required, 0 failures, string requires OK | create 0.9-2.3 s, total 3.5-3.6 s |
+| same, after `generated/` landed (187 instances, 1.47 MB script) | **400 "Script too large ... limit is 1048576 bytes"** (checker, 06:4x) | 0.7 s to the refusal |
+| same with `--inject-exclude generated` (174 instances, 76 KB) | COMPLETE: 112 required, 0 failures, `placeVersion = 1` (checker re-run) | create 0.8 s, total 3.3 s |
 
 Scriptable from a task: `Workspace.StreamingEnabled`, `StreamOutBehavior`, `Players.CharacterAutoLoads`,
 `Players.MaxPlayers` (read-only). Not readable from any script: `ModelStreamingBehavior`,
