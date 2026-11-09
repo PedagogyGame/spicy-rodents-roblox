@@ -206,7 +206,7 @@ return {
 		{
 			id = "garden_wheelbarrow_perch",
 			action = "keep_off_geometry",
-			cite = "wildlife_foraging §353 (v5.4 L12619-12650 garden plots); BUILD_PLAN §3.4 backyards",
+			cite = "wildlife_foraging §11 garden plots (v5.4 L12619-12650); BUILD_PLAN §3.4 backyards",
 			reason = "The garden wheelbarrow watch perch rides on the decorative wheelbarrow accent of the v3.5 garden plot, which is yard-prop kit content; the W1 greybox has no yard props, so the perch floats until the yard kits land.",
 			routes = { 743 },
 			["until"] = "W3 yard kits",

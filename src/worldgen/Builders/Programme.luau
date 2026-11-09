@@ -26,18 +26,15 @@ function Programme.build(ctx: Spec.LotCtx)
 	end
 	local doors: { Shell.Door } = {}
 	for _, d in b.doors do
-		table.insert(
-			doors,
-			{
-				id = d.id,
-				a = d.a,
-				b = d.b,
-				x = d.at[1] * spu,
-				z = -d.at[2] * spu,
-				w = d.width * spu,
-				lockable = d.lockable,
-			}
-		)
+		table.insert(doors, {
+			id = d.id,
+			a = d.a,
+			b = d.b,
+			x = d.at[1] * spu,
+			z = -d.at[2] * spu,
+			w = d.width * spu,
+			lockable = d.lockable,
+		})
 	end
 	local extras = {}
 	for _, s in b.stations do
