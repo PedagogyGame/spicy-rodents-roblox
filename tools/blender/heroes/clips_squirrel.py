@@ -114,7 +114,7 @@ def idle(rig, n=90):
         return build_pose(rig, P, CFG)
 
     return {"name": "Idle", "frames": n, "pose": pose, "loop": True, "priority": "Idle",
-            "keys": [0, 20, 40, 64], "view": [-62, 8], "brief": "idle"}
+            "keys": [0, 20, 40, 64], "brief": "idle"}
 
 
 def walk(rig, n=24):
@@ -196,7 +196,7 @@ def climb(rig, n=18):
         return build_pose(rig, P, CFG)
 
     return {"name": "Climb", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(0.9 / (n / 30), 2), "keys": [0, 5, 9, 14], "view": [-35, 55], "brief": "climb"}
+            "nominal_speed": round(0.9 / (n / 30), 2), "keys": [0, 5, 9, 14], "view": [-25, 58], "brief": "climb"}
 
 
 def wire(rig, n=30):
@@ -223,7 +223,7 @@ def wire(rig, n=30):
         return build_pose(rig, P, CFG)
 
     return {"name": "Wire", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(0.55 / (n / 30), 2), "keys": [0, 8, 15, 23], "view": [-20, 30], "brief": "wire traversal"}
+            "nominal_speed": round(0.55 / (n / 30), 2), "keys": [0, 8, 15, 23], "view": [-30, 24], "brief": "wire traversal"}
 
 
 def stalk(rig, n=36):

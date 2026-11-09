@@ -14,10 +14,17 @@
 local MinigameUI = {}
 MinigameUI.__index = MinigameUI
 
-local NAVY = Color3.fromRGB(16, 20, 44)
-local GOLD = Color3.fromRGB(255, 214, 92)
-local CYAN = Color3.fromRGB(140, 236, 236)
-local WHITE = Color3.fromRGB(245, 245, 245)
+-- colours are built on first use (requiring this module must not touch the engine: Lune loads it)
+local RGB: { [string]: { number } } =
+	{ NAVY = { 16, 20, 44 }, GOLD = { 255, 214, 92 }, CYAN = { 140, 236, 236 }, WHITE = { 245, 245, 245 } }
+local C: { [string]: Color3 } = setmetatable({}, {
+	__index = function(t: any, k: string): Color3
+		local v = RGB[k]
+		local c = Color3.fromRGB(v[1], v[2], v[3])
+		rawset(t, k, c)
+		return c
+	end,
+}) :: any
 
 local function corner(parent: Instance, r: number)
 	local c = Instance.new("UICorner")
@@ -38,7 +45,7 @@ local function label(
 	t.Size = size
 	t.Position = pos
 	t.Text = text
-	t.TextColor3 = color or WHITE
+	t.TextColor3 = color or C.WHITE
 	t.Font = font or Enum.Font.GothamMedium
 	t.TextScaled = true
 	t.TextWrapped = true
@@ -61,14 +68,14 @@ function MinigameUI.new(): any
 	-- how to play (left)
 	local help = Instance.new("Frame")
 	help.Name = "Help"
-	help.BackgroundColor3 = NAVY
+	help.BackgroundColor3 = C.NAVY
 	help.BackgroundTransparency = 0.12
 	help.Size = UDim2.fromOffset(300, 300)
 	help.Position = UDim2.new(0, 12, 0.5, -150)
 	help.Parent = gui
 	corner(help, 12)
 	self.helpFrame = help
-	self.title = label(help, "", UDim2.new(1, -20, 0, 34), UDim2.fromOffset(10, 8), GOLD, Enum.Font.FredokaOne)
+	self.title = label(help, "", UDim2.new(1, -20, 0, 34), UDim2.fromOffset(10, 8), C.GOLD, Enum.Font.FredokaOne)
 	local list = Instance.new("TextLabel")
 	list.BackgroundTransparency = 1
 	list.Size = UDim2.new(1, -20, 1, -54)
@@ -79,13 +86,13 @@ function MinigameUI.new(): any
 	list.RichText = true
 	list.TextSize = 15
 	list.Font = Enum.Font.Gotham
-	list.TextColor3 = WHITE
+	list.TextColor3 = C.WHITE
 	list.Text = ""
 	list.Parent = help
 	self.helpText = list
 
 	-- banner (top centre) and status
-	local banner = label(gui, "", UDim2.new(0.6, 0, 0, 64), UDim2.new(0.2, 0, 0, 70), GOLD, Enum.Font.FredokaOne)
+	local banner = label(gui, "", UDim2.new(0.6, 0, 0, 64), UDim2.new(0.2, 0, 0, 70), C.GOLD, Enum.Font.FredokaOne)
 	banner.TextStrokeTransparency = 0.3
 	banner.TextStrokeColor3 = Color3.new(0, 0, 0)
 	banner.TextTransparency = 1
@@ -93,12 +100,12 @@ function MinigameUI.new(): any
 	self.bannerLabel = banner
 	self.bannerUntil = 0
 	local status = Instance.new("TextLabel")
-	status.BackgroundColor3 = NAVY
+	status.BackgroundColor3 = C.NAVY
 	status.BackgroundTransparency = 0.2
 	status.Size = UDim2.fromOffset(520, 34)
 	status.Position = UDim2.new(0.5, -260, 0, 138)
 	status.Font = Enum.Font.GothamBold
-	status.TextColor3 = CYAN
+	status.TextColor3 = C.CYAN
 	status.TextScaled = true
 	status.Text = ""
 	status.Parent = gui
@@ -108,7 +115,7 @@ function MinigameUI.new(): any
 	-- scorecard (bottom right)
 	local card = Instance.new("Frame")
 	card.Name = "Scorecard"
-	card.BackgroundColor3 = NAVY
+	card.BackgroundColor3 = C.NAVY
 	card.BackgroundTransparency = 0.1
 	card.Size = UDim2.fromOffset(560, 170)
 	card.Position = UDim2.new(1, -572, 1, -182)
@@ -132,18 +139,18 @@ function MinigameUI.new(): any
 	sweet.Visible = false
 	sweet.Parent = meter
 	local fill = Instance.new("Frame")
-	fill.BackgroundColor3 = GOLD
+	fill.BackgroundColor3 = C.GOLD
 	fill.BorderSizePixel = 0
 	fill.Size = UDim2.fromScale(0, 1)
 	fill.Parent = meter
 	corner(fill, 8)
 	local needle = Instance.new("Frame")
-	needle.BackgroundColor3 = WHITE
+	needle.BackgroundColor3 = C.WHITE
 	needle.BorderSizePixel = 0
 	needle.Size = UDim2.new(0, 4, 1, 8)
 	needle.Position = UDim2.fromOffset(-2, -4)
 	needle.Parent = meter
-	local meterLabel = label(meter, "", UDim2.new(1, 0, 0, 22), UDim2.fromOffset(0, -26), WHITE, Enum.Font.GothamBold)
+	local meterLabel = label(meter, "", UDim2.new(1, 0, 0, 22), UDim2.fromOffset(0, -26), C.WHITE, Enum.Font.GothamBold)
 	self.meterFrame, self.meterFill, self.meterSweet, self.meterNeedle, self.meterLabel =
 		meter, fill, sweet, needle, meterLabel
 
@@ -263,7 +270,7 @@ end
 function MinigameUI.banner(self: any, text: string, big: boolean?)
 	local b = self.bannerLabel
 	b.Text = text
-	b.TextColor3 = if big then GOLD else WHITE
+	b.TextColor3 = if big then C.GOLD else C.WHITE
 	b.Size = if big then UDim2.new(0.6, 0, 0, 64) else UDim2.new(0.6, 0, 0, 40)
 	b.TextTransparency = 0
 	b.TextStrokeTransparency = 0.3
@@ -300,7 +307,7 @@ local function makeButton(parent: Instance, text: string, width: number): TextBu
 	local b = Instance.new("TextButton")
 	b.Size = UDim2.new(0, width, 1, 0)
 	b.BackgroundColor3 = Color3.fromRGB(36, 150, 150)
-	b.TextColor3 = WHITE
+	b.TextColor3 = C.WHITE
 	b.Font = Enum.Font.GothamBold
 	b.TextScaled = true
 	b.Text = text
@@ -382,11 +389,11 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 			tostring(f),
 			UDim2.new(fw, -2, 0, 18),
 			UDim2.new(0.16 + (f - 1) * fw, 0, 0, 4),
-			CYAN,
+			C.CYAN,
 			Enum.Font.GothamBold
 		)
 	end
-	label(self.card, "TOTAL", UDim2.new(0.08, 0, 0, 18), UDim2.new(0.91, 0, 0, 4), CYAN, Enum.Font.GothamBold)
+	label(self.card, "TOTAL", UDim2.new(0.08, 0, 0, 18), UDim2.new(0.91, 0, 0, 4), C.CYAN, Enum.Font.GothamBold)
 	for s, seat in seats do
 		local y = 24 + (s - 1) * 38
 		local gs = if g then g.seats[s] else nil
@@ -403,7 +410,7 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 			name,
 			UDim2.fromScale(0.15, 0.8),
 			UDim2.fromScale(0.005, 0.1),
-			if up then GOLD else WHITE,
+			if up then C.GOLD else C.WHITE,
 			Enum.Font.GothamBold
 		)
 		for f = 1, 10 do
@@ -421,7 +428,7 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 					m,
 					UDim2.fromScale(1 / boxes, 0.5),
 					UDim2.fromScale((b - 1) / boxes, 0),
-					if m == "X" or m == "/" then GOLD else WHITE,
+					if m == "X" or m == "/" then C.GOLD else C.WHITE,
 					Enum.Font.Code
 				)
 			end
@@ -430,7 +437,7 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 				tostring(if gs then gs.totals[f] else ""),
 				UDim2.fromScale(1, 0.5),
 				UDim2.fromScale(0, 0.5),
-				CYAN,
+				C.CYAN,
 				Enum.Font.GothamBold
 			)
 		end
@@ -439,7 +446,7 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 			if gs then tostring(gs.total) else "0",
 			UDim2.fromScale(0.08, 0.8),
 			UDim2.fromScale(0.91, 0.1),
-			GOLD,
+			C.GOLD,
 			Enum.Font.FredokaOne
 		)
 	end
@@ -459,7 +466,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 	if mode == "cricket" then
 		self.card.Size = UDim2.fromOffset(120 + n * 110, 250)
 		self.card.Position = UDim2.new(1, -(132 + n * 110), 1, -262)
-		label(self.card, "CRICKET", UDim2.fromOffset(110, 24), UDim2.fromOffset(6, 4), GOLD, Enum.Font.FredokaOne)
+		label(self.card, "CRICKET", UDim2.fromOffset(110, 24), UDim2.fromOffset(6, 4), C.GOLD, Enum.Font.FredokaOne)
 		for i, seat in seats do
 			local x = 116 + (i - 1) * 110
 			local up = view.turn == i
@@ -468,7 +475,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 				seat.name .. (if i == you then "*" else ""),
 				UDim2.fromOffset(104, 22),
 				UDim2.fromOffset(x, 4),
-				if up then GOLD else WHITE,
+				if up then C.GOLD else C.WHITE,
 				Enum.Font.GothamBold
 			)
 			for r, lab in CRICKET do
@@ -478,7 +485,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 					cricketMark(m),
 					UDim2.fromOffset(104, 22),
 					UDim2.fromOffset(x, 4 + r * 26),
-					WHITE,
+					C.WHITE,
 					Enum.Font.GothamBold
 				)
 			end
@@ -487,7 +494,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 				if g then tostring(g.seats[i].score) else "0",
 				UDim2.fromOffset(104, 24),
 				UDim2.fromOffset(x, 214),
-				GOLD,
+				C.GOLD,
 				Enum.Font.FredokaOne
 			)
 		end
@@ -497,7 +504,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 				if lab == "25" then "BULL" else lab,
 				UDim2.fromOffset(90, 22),
 				UDim2.fromOffset(10, 4 + r * 26),
-				CYAN,
+				C.CYAN,
 				Enum.Font.GothamBold
 			)
 		end
@@ -509,7 +516,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 			"501  (finish on a double)",
 			UDim2.new(1, -12, 0, 24),
 			UDim2.fromOffset(6, 4),
-			GOLD,
+			C.GOLD,
 			Enum.Font.FredokaOne
 		)
 		for i, seat in seats do
@@ -521,7 +528,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 				(if up then "> " else "") .. seat.name .. (if i == you then " (you)" else ""),
 				UDim2.new(0.42, 0, 0, 30),
 				UDim2.fromOffset(6, y),
-				if up then GOLD else WHITE,
+				if up then C.GOLD else C.WHITE,
 				Enum.Font.GothamBold
 			)
 			label(
@@ -529,7 +536,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 				if gs then tostring(gs.score) else "501",
 				UDim2.new(0.22, 0, 0, 34),
 				UDim2.new(0.44, 0, 0, y - 2),
-				GOLD,
+				C.GOLD,
 				Enum.Font.FredokaOne
 			)
 			label(
@@ -537,7 +544,7 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 				if gs and gs.darts then table.concat(gs.darts, "  ") else "",
 				UDim2.new(0.32, 0, 0, 26),
 				UDim2.new(0.67, 0, 0, y + 2),
-				CYAN,
+				C.CYAN,
 				Enum.Font.GothamBold
 			)
 		end

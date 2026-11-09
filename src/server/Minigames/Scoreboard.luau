@@ -9,12 +9,23 @@
 
 local Scoreboard = {}
 
-local NAVY = Color3.fromRGB(14, 18, 40)
-local CELL = Color3.fromRGB(26, 32, 66)
-local LIT = Color3.fromRGB(28, 96, 104)
-local GOLD = Color3.fromRGB(255, 214, 92)
-local CYAN = Color3.fromRGB(140, 236, 236)
-local WHITE = Color3.fromRGB(240, 240, 240)
+-- colours are built on first use (requiring this module must not touch the engine: Lune loads it)
+local RGB: { [string]: { number } } = {
+	NAVY = { 14, 18, 40 },
+	CELL = { 26, 32, 66 },
+	LIT = { 28, 96, 104 },
+	GOLD = { 255, 214, 92 },
+	CYAN = { 140, 236, 236 },
+	WHITE = { 240, 240, 240 },
+}
+local C: { [string]: Color3 } = setmetatable({}, {
+	__index = function(t: any, k: string): Color3
+		local v = RGB[k]
+		local c = Color3.fromRGB(v[1], v[2], v[3])
+		rawset(t, k, c)
+		return c
+	end,
+}) :: any
 
 local function clear(gui: Instance)
 	for _, c in gui:GetChildren() do
@@ -29,7 +40,7 @@ local function frame(parent: Instance, x: number, y: number, w: number, h: numbe
 	f.Position = UDim2.fromScale(x, y)
 	f.Size = UDim2.fromScale(w, h)
 	f.BorderSizePixel = 0
-	f.BackgroundColor3 = color or CELL
+	f.BackgroundColor3 = color or C.CELL
 	f.BackgroundTransparency = if color then 0 else 1
 	f.Parent = parent
 	return f
@@ -51,7 +62,7 @@ local function text(
 	t.BackgroundTransparency = 1
 	t.Text = s
 	t.TextScaled = true
-	t.TextColor3 = color or WHITE
+	t.TextColor3 = color or C.WHITE
 	t.Font = font or Enum.Font.GothamBold
 	t.Parent = parent
 	return t
@@ -59,15 +70,15 @@ end
 
 function Scoreboard.idle(gui: Instance, title: string, line: string)
 	clear(gui)
-	local root = frame(gui, 0, 0, 1, 1, NAVY)
-	text(root, title, 0, 0.08, 1, 0.45, GOLD, Enum.Font.FredokaOne)
-	text(root, line, 0.04, 0.6, 0.92, 0.25, CYAN)
+	local root = frame(gui, 0, 0, 1, 1, C.NAVY)
+	text(root, title, 0, 0.08, 1, 0.45, C.GOLD, Enum.Font.FredokaOne)
+	text(root, line, 0.04, 0.6, 0.92, 0.25, C.CYAN)
 end
 
 -- view = Session.view(...) with view.game = Bowling.view(...)
 function Scoreboard.bowling(gui: Instance, lane: number, view: { [string]: any })
 	clear(gui)
-	local root = frame(gui, 0, 0, 1, 1, NAVY)
+	local root = frame(gui, 0, 0, 1, 1, C.NAVY)
 	local g = view.game
 	local phase = view.phase
 	local status: string
@@ -84,11 +95,11 @@ function Scoreboard.bowling(gui: Instance, lane: number, view: { [string]: any }
 	else
 		status = "OPEN"
 	end
-	text(root, `LANE {lane}`, 0.01, 0.01, 0.3, 0.14, GOLD, Enum.Font.FredokaOne)
-	text(root, status, 0.32, 0.02, 0.67, 0.12, CYAN)
+	text(root, `LANE {lane}`, 0.01, 0.01, 0.3, 0.14, C.GOLD, Enum.Font.FredokaOne)
+	text(root, status, 0.32, 0.02, 0.67, 0.12, C.CYAN)
 	local rows = #view.seats
 	if rows == 0 then
-		text(root, "Walk up to the lane and press E to bowl", 0.04, 0.45, 0.92, 0.2, WHITE)
+		text(root, "Walk up to the lane and press E to bowl", 0.04, 0.45, 0.92, 0.2, C.WHITE)
 		return
 	end
 	local rowH = math.min(0.2, 0.82 / rows)
@@ -97,12 +108,12 @@ function Scoreboard.bowling(gui: Instance, lane: number, view: { [string]: any }
 		local gs = if g then g.seats[s] else nil
 		local y = 0.17 + (s - 1) * (rowH + 0.005)
 		local up = view.turn == s and phase == "playing"
-		local row = frame(root, 0.005, y, 0.99, rowH, if up then LIT else CELL)
+		local row = frame(root, 0.005, y, 0.99, rowH, if up then C.LIT else C.CELL)
 		local name = seat.name
 		if seat.gone then
 			name ..= " (left)"
 		end
-		text(row, name, 0.01, 0.1, 0.16, 0.8, if up then GOLD else WHITE)
+		text(row, name, 0.01, 0.1, 0.16, 0.8, if up then C.GOLD else C.WHITE)
 		local fx0, fw = 0.18, 0.066
 		for f = 1, 10 do
 			local cell = frame(row, fx0 + (f - 1) * fw, 0, fw - 0.004, 1, Color3.fromRGB(18, 22, 46))
@@ -118,14 +129,14 @@ function Scoreboard.bowling(gui: Instance, lane: number, view: { [string]: any }
 					0.02,
 					bw,
 					0.48,
-					if m == "X" or m == "/" then GOLD else WHITE,
+					if m == "X" or m == "/" then C.GOLD else C.WHITE,
 					Enum.Font.Code
 				)
 			end
 			local tot = if gs then gs.totals[f] else ""
-			text(cell, tostring(tot or ""), 0, 0.5, 1, 0.48, CYAN)
+			text(cell, tostring(tot or ""), 0, 0.5, 1, 0.48, C.CYAN)
 		end
-		text(row, if gs then tostring(gs.total) else "0", 0.85, 0.1, 0.14, 0.8, GOLD, Enum.Font.FredokaOne)
+		text(row, if gs then tostring(gs.total) else "0", 0.85, 0.1, 0.14, 0.8, C.GOLD, Enum.Font.FredokaOne)
 	end
 end
 

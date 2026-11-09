@@ -99,6 +99,8 @@ function Pool8Ball.shot(state: State, firstHit: number, pocketed: { number }, sc
 	state.shots += 1
 	state.broken = true
 	state.ballInHand = false
+	-- on the 8 means the group was cleared before this shot (the last ball and the 8 together lose)
+	local onEight = cleared(state, seat)
 	local eight = false
 	local ownPot = false
 	local anyPot = #pocketed > 0
@@ -113,7 +115,6 @@ function Pool8Ball.shot(state: State, firstHit: number, pocketed: { number }, sc
 		end
 	end
 	-- was the first contact legal?
-	local onEight = cleared(state, seat)
 	local legalFirst: boolean
 	if firstHit == 0 then
 		legalFirst = false

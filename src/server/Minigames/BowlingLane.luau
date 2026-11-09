@@ -35,10 +35,10 @@ BowlingLane.RANGES = {
 BowlingLane.EFFECTIVE_GRAVITY = 85 -- studs/s^2 felt by the ball and pins (VectorForce lifts the rest)
 BowlingLane.STAND_COS = math.cos(math.rad(20))
 BowlingLane.MAX_ROLL = 8
-BowlingLane.SETTLE_MIN = 1.2
+BowlingLane.SETTLE_MIN = 1.0
 BowlingLane.SETTLE_MAX = 4.5
 BowlingLane.SET_TIME = 2.6
-BowlingLane.RETURN_TIME = 3.4
+BowlingLane.RETURN_TIME = 2.6
 
 export type Params = { offset: number, angle: number, power: number, spin: number }
 

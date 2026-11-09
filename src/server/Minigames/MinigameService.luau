@@ -561,7 +561,15 @@ function MinigameService._afterDart(self: any, st: Station, seat: number?)
 	local g = s.game
 	local hit = g and g.state.lastHit
 	if hit and st.hw then
-		st.hw:land(hit.x, hit.y, seat)
+		-- the dart leaves the thrower's hand when there is one
+		local from: Vector3? = nil
+		local key = seat and s.seats[seat]
+		local body = key and self.opts.bodyOf and self.opts.bodyOf(key)
+		local hand = body and (body:FindFirstChild("RightHand") or body:FindFirstChild("Right Arm"))
+		if hand and hand:IsA("BasePart") then
+			from = hand.Position + Vector3.new(0, 0.6, 0)
+		end
+		st.hw:land(hit.x, hit.y, seat, from)
 		local text: string
 		if hit.event == "bust" then
 			text = `BUST! ({hit.label})`

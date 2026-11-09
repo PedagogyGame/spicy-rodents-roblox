@@ -91,12 +91,7 @@ local function place(m: Model, cf: CFrame)
 	end
 end
 
-local SEAT_COLORS = {
-	Color3.fromRGB(220, 40, 40),
-	Color3.fromRGB(40, 90, 220),
-	Color3.fromRGB(40, 170, 80),
-	Color3.fromRGB(240, 190, 40),
-}
+local SEAT_COLORS = { { 220, 40, 40 }, { 40, 90, 220 }, { 40, 170, 80 }, { 240, 190, 40 } }
 
 -- land: a dart flies from `from` (the thrower's hand; default the oche at shoulder height) to (xmm, ymm).
 function Dartboard.land(self: any, xmm: number, ymm: number, seat: number?, from: Vector3?)
@@ -108,7 +103,8 @@ function Dartboard.land(self: any, xmm: number, ymm: number, seat: number?, from
 		local x, y, z = AlleyLayout.toWorld(self.place, b.ocheX + 0.4, 4.8, b.d + 0.6)
 		startPos = Vector3.new(x, y, z)
 	end
-	local dart = makeDart(self.folder, SEAT_COLORS[seat or 1] or SEAT_COLORS[1])
+	local rgb = SEAT_COLORS[seat or 1] or SEAT_COLORS[1]
+	local dart = makeDart(self.folder, Color3.fromRGB(rgb[1], rgb[2], rgb[3]))
 	table.insert(self.darts, dart)
 	-- stuck pose: point into the board, tail out along the normal (tilted a touch upward)
 	local stuck = CFrame.lookAt(target + n * 0.18, target - n + Vector3.new(0, -0.12, 0))

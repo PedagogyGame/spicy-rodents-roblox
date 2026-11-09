@@ -188,7 +188,7 @@ def main(argv):
         sh.light = "STUDIO"
         sh.color_type = "TEXTURE"
         sh.show_cavity = True
-        sh.show_shadows = True
+        sh.show_shadows = False  # shadow volumes streak on the open region meshes
     tag = meta.get("variant", "hero")
     written = []
     hero_pose = meta.get("turntable_pose")
@@ -215,11 +215,11 @@ def main(argv):
         for clip, info in clips.items():
             if only and clip not in only:
                 continue
-            view = info.get("view", [-60, 10])
+            view = info.get("view", [-28, 8])
             for k, f in enumerate(info["key_frames"]):
                 set_action(arm, f"{clip}", f)
-                c = Vector(info.get("center", list(center)))
-                place(cam, c, size * info.get("dist", 3.6), view[0], view[1])
+                c = Vector(info.get("center", list(center + Vector((0, 0, 0.12)))))
+                place(cam, c, size * info.get("dist", 5.2), view[0], view[1])
                 scene.render.filepath = os.path.join(opts.out, f"{tag}_pose_{clip}_{k}.png")
                 bpy.ops.render.render(write_still=True)
                 written.append(scene.render.filepath)
