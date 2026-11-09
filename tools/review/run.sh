@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # tools/review/run.sh: visual review renders of the baked town and the placeholder puppets (no Studio needed).
 #   1. bake    lune run tools/bake/main.luau; lune run tools/bake/editor_ground.luau  (build/Town.rbxm, EditorGround.rbxm)
+#              and tools/placeholders/build.luau into build/review/placeholders (the committed assets are untouched)
 #   2. export  lune run tools/review/export.luau  -> build/review/scene.json (+ ground-contact and z-fight summary)
 #   3. render  tools/review/render.py (bpy, Cycles CPU, 2 threads) -> build/review/<view>.png, timing.json
 #   4. sheet   tools/review/sheet.py (system python3 + Pillow) -> build/review/contact_sheet.png
@@ -55,11 +56,20 @@ if [ "$BAKE" -eq 1 ]; then
 	echo "== bake"
 	lune run tools/bake/main.luau
 	lune run tools/bake/editor_ground.luau
+	# puppets from the current PuppetSpec / VehiclePuppet source (the committed assets/placeholders can lag)
+	if lune run tools/placeholders/build.luau "$OUT/placeholders" >"$OUT/placeholders.log" 2>&1; then
+		tail -n 1 "$OUT/placeholders.log"
+	else
+		echo "placeholders: rebuild failed (see $OUT/placeholders.log); the lineup uses assets/placeholders"
+		rm -rf "$OUT/placeholders"
+	fi
 	lap bake
 fi
+PLACEHOLDERS=assets/placeholders
+[ -f "$OUT/placeholders/squirrel.rbxm" ] && PLACEHOLDERS="$OUT/placeholders"
 
-echo "== export"
-lune run tools/review/export.luau --out "$OUT/scene.json"
+echo "== export (puppets from $PLACEHOLDERS)"
+lune run tools/review/export.luau --out "$OUT/scene.json" --placeholders "$PLACEHOLDERS"
 lap export
 
 echo "== render (cpus $REVIEW_CPUS; full log $OUT/render.log)"
@@ -85,9 +95,8 @@ echo
 echo "== PNGs"
 python3 -I -c '
 import json, sys
-t = json.load(open(sys.argv[1]))
-for v in t["views"]:
-    print(f"{v[\"seconds\"]:7.1f}s  {v[\"png\"]}")
+for v in json.load(open(sys.argv[1]))["views"]:
+    print("%7.1fs  %s" % (v["seconds"], v["png"]))
 ' "$OUT/timing.json"
 [ -f "$OUT/contact_sheet.png" ] && echo "  sheet   $ROOT/$OUT/contact_sheet.png"
 printf "total %.1fs\n" "$(echo "$(now) - $T0" | bc)"

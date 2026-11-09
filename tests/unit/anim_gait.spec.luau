@@ -2,8 +2,13 @@
 -- Procedural gait (Client/Animation/Gait): squirrels bound (front pair together, back pair opposite),
 -- fox and deer trot (diagonal pairs together); the swing grows with speed and is still at rest; the
 -- phase advances one cycle per stride; the tail sways at rest and while running; climbing speed
--- (3D) animates the same as ground speed. Also Client/Render/TownView's nearest-lamp selection.
+-- (3D) animates the same as ground speed. The bob is smooth (no cusps) and small, the head cancels the
+-- rock, a hovering speed never pops the pose, and AnimationDriver.settle (the visual root height)
+-- follows slopes without lag while easing steps and jitter. Also Client/Render/TownView's
+-- nearest-lamp selection and Squirrel.hipOf.
 local Gait = require("@client/Animation/Gait")
+local AnimationDriver = require("@client/Animation/AnimationDriver")
+local Squirrel = require("@client/Controllers/Squirrel")
 local TownView = require("@client/Render/TownView")
 
 return function(t)
@@ -43,6 +48,101 @@ return function(t)
 		t.eq(Gait.advance(1, 0, 1, p), 1)
 		t.truthy(Gait.PROCEDURAL.squirrel and Gait.PROCEDURAL.deer and Gait.PROCEDURAL.fox)
 		t.eq(Gait.PROCEDURAL.human, nil)
+	end)
+
+	t.test("bob: smooth and small, never below rest; the head holds its line; no pop near zero speed", function()
+		for _, species in { "squirrel", "fox", "deer" } do
+			local hip = if species == "squirrel" then 0.9 elseif species == "fox" then 2.05 else 3.8
+			local p = Gait.params(species, hip)
+			local n = 720
+			local prev: number? = nil
+			local prevSlope: number? = nil
+			local maxBob = 0
+			for i = 0, n do
+				local phase = 2 * math.pi * i / n
+				local pose = Gait.pose(phase, p.runSpeed, 0, p, 3)
+				maxBob = math.max(maxBob, pose.bob)
+				t.truthy(pose.bob >= -1e-9, `{species} bob below rest`)
+				t.near(pose.head, -pose.rock, 0.035, `{species} head follows the rock`)
+				if prev then
+					local slope = (pose.bob - prev) * n
+					if prevSlope then
+						-- a cusp (abs(sin)) flips the slope's sign in one step (about 9000 x bob here); a
+						-- raised cosine bends at most 4 pi^2 x 2 x bob (about 80 x bob) per step
+						t.truthy(math.abs(slope - prevSlope) * n < p.bob * 300, `{species} bob has a cusp at {i}`)
+					end
+					prevSlope = slope
+				end
+				prev = pose.bob
+			end
+			t.truthy(maxBob <= hip * 0.06 + 1e-9, `{species} bob {maxBob} studs is small`)
+			-- speed hovering around the old 0.3 threshold changes the pose only a little
+			local a = Gait.pose(1.2, 0.29, 5, p, 3)
+			local b = Gait.pose(1.2, 0.31, 5, p, 3)
+			t.truthy(math.abs(a.legs.FrontL.upper - b.legs.FrontL.upper) < 0.02, `{species} legs pop`)
+			t.truthy(math.abs(a.bob - b.bob) < 0.01, `{species} bob pops`)
+			t.truthy(math.abs(a.tail[1].yaw - b.tail[1].yaw) < 0.03, `{species} tail pops`)
+		end
+		t.eq(Gait.moving(0), 0)
+		t.eq(Gait.moving(5), 1)
+		t.truthy(Gait.params("squirrel", 0.9).tailLift > 0, "a running squirrel streams its tail back")
+		t.truthy(Gait.params("deer", 3.8).tailLift < 0, "a running deer flags its tail up")
+	end)
+
+	t.test("settle: slopes without lag, steps eased (rising fast), jitter damped, teleports snap", function()
+		local dt = 1 / 60
+		local function fresh(): AnimationDriver.Settle
+			return { y = 0, v = 0, rootV = 0, lastY = 0, live = false }
+		end
+		-- a steady climb at 5 st/s: the visual height converges onto the root
+		local st = fresh()
+		local off = 0
+		for i = 0, 120 do
+			off = AnimationDriver.settle(st, 10 + 5 * i * dt, dt)
+		end
+		t.truthy(math.abs(off) < 0.01, `slope lag {off}`)
+		-- a 0.5 st kerb: below the root at first, never more than MAX_LAG, gone in a quarter second
+		st = fresh()
+		AnimationDriver.settle(st, 0, dt)
+		local first = AnimationDriver.settle(st, 0.5, dt)
+		t.truthy(first < -0.3 and first >= -AnimationDriver.MAX_LAG, `kerb first frame {first}`)
+		for _ = 1, 15 do
+			off = AnimationDriver.settle(st, 0.5, dt)
+		end
+		t.truthy(math.abs(off) < 0.05, `kerb after 0.25 s {off}`)
+		-- a step down eases more slowly (the body stays above the ground on the way)
+		st = fresh()
+		AnimationDriver.settle(st, 0.5, dt)
+		local down = AnimationDriver.settle(st, 0, dt)
+		t.truthy(down > 0.3, `step down first frame {down}`)
+		-- 11 Hz ground-sampling jitter of +/-0.08 st: the visual body moves a fraction of it
+		st = fresh()
+		local lo, hi = math.huge, -math.huge
+		for i = 0, 600 do
+			local y = 0.08 * (if math.floor(i * dt * 22) % 2 == 0 then 1 else -1)
+			AnimationDriver.settle(st, y, dt)
+			if i > 120 then
+				lo, hi = math.min(lo, st.y), math.max(hi, st.y)
+			end
+		end
+		t.truthy(hi - lo < 0.16 * 0.35, `jitter {hi - lo} of 0.16`)
+		-- a teleport snaps
+		st = fresh()
+		AnimationDriver.settle(st, 0, dt)
+		t.eq(AnimationDriver.settle(st, 40, dt), 0)
+	end)
+
+	t.test("Squirrel.hipOf: the body's HipHeight, else the measured gap", function()
+		local attrs: { [string]: any } = { HipHeight = 0.9 }
+		local body: any = {
+			GetAttribute = function(_self: any, k: string): any
+				return attrs[k]
+			end,
+		}
+		t.eq(Squirrel.hipOf(body, 0.1), 0.9)
+		attrs.HipHeight = nil
+		t.eq(Squirrel.hipOf(body, 0.5), 0.5)
+		t.eq(Squirrel.hipOf(body, 9), 3)
 	end)
 
 	t.test("TownView.nearest: nearest first, within the radius, at most max", function()

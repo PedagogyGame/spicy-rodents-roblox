@@ -2,6 +2,8 @@
 -- W1 #10 placeholders: every puppet (squirrel, rodent, fox, deer doe/buck/fawn, drone, a block R15 per role
 -- palette) and every vehicle kind passes Actors/RigSpec.validate (final bone, socket and region names);
 -- vehicles sit exactly at their logical boxes; roots are anchored and limbs are not (HANDOFF rule 4);
+-- animals are rounded (Ball / Cylinder) with their soles exactly at HipHeight below the root and
+-- nothing lower, decoration never collides or answers queries, the rodent's eyes glow red;
 -- tools/placeholders/build.luau output matches its manifest (deterministic .rbxm).
 local roblox = require("@lune/roblox")
 local fs = require("@lune/fs")
@@ -47,6 +49,67 @@ return function(t)
 				end
 			end
 		end
+	end)
+
+	t.test("animal puppets: rounded parts, soles on the ground at HipHeight, decoration never collides", function()
+		local cases = {
+			PuppetSpec.spec("squirrel"),
+			PuppetSpec.spec("rodent"),
+			PuppetSpec.spec("fox"),
+			PuppetSpec.spec("deer", { variant = "doe" }),
+			PuppetSpec.spec("deer", { variant = "buck" }),
+			PuppetSpec.spec("deer", { variant = "fawn" }),
+		}
+		for _, spec in cases do
+			t.truthy(#spec.parts <= 42, `{spec.name}: {#spec.parts} parts (budget about 40)`)
+			local hip = (spec.attributes :: any).HipHeight
+			local model = PartBuilder.instantiate(spec, lib)
+			local lowest, rounded, fur = math.huge, 0, 0
+			for _, d in model:GetDescendants() do
+				if not d:IsA("BasePart") then
+					continue
+				end
+				-- the lowest corner of the part's oriented box (what GetBoundingBox sees)
+				local cf, size = d.CFrame, d.Size
+				local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+				local low = cf.Position.Y
+					- math.abs(r.Y) * size.X / 2
+					- math.abs(u.Y) * size.Y / 2
+					- math.abs(l.Y) * size.Z / 2
+				lowest = math.min(lowest, low)
+				if string.sub(d.Name, -4) == "_Toe" then
+					t.near(cf.Position.Y - size.Y / 2, -hip, 1e-4, `{spec.name}.{d.Name} sole on the ground`)
+				end
+				if d ~= model.PrimaryPart then
+					t.falsy(d.CanCollide, `{spec.name}.{d.Name} CanCollide`)
+					t.falsy(d.CanQuery, `{spec.name}.{d.Name} CanQuery`)
+					t.falsy(d.CanTouch, `{spec.name}.{d.Name} CanTouch`)
+				end
+				if d.Shape == roblox.Enum.PartType.Ball or d.Shape == roblox.Enum.PartType.Cylinder then
+					rounded += 1
+					if d.Shape == roblox.Enum.PartType.Ball then
+						t.near(d.Size.X, d.Size.Y, 1e-4, `{spec.name}.{d.Name} ball is round`)
+						t.near(d.Size.X, d.Size.Z, 1e-4, `{spec.name}.{d.Name} ball is round`)
+					else
+						t.near(d.Size.Y, d.Size.Z, 1e-4, `{spec.name}.{d.Name} cylinder is round`)
+					end
+				end
+				if d:GetAttribute("Region") == "Body" then
+					fur += 1
+				end
+			end
+			t.truthy(lowest >= -hip - 1e-3, `{spec.name}: nothing below the soles ({lowest} < {-hip})`)
+			t.truthy(rounded >= 20, `{spec.name}: {rounded} rounded parts`)
+			t.truthy(fur >= 10, `{spec.name}: {fur} fur parts shade with the Body region`)
+		end
+		-- the spicy rodent: glowing red eyes, red at the muzzle; the squirrel's eyes stay dark
+		local rodent = PartBuilder.instantiate(PuppetSpec.spec("rodent"), lib)
+		local eyes = rodent:FindFirstChild("Eyes")
+		t.eq(eyes.Material, roblox.Enum.Material.Neon, "rodent eyes glow")
+		t.truthy(eyes.Color.R > 0.8 and eyes.Color.G < 0.3, "rodent eyes are red")
+		t.truthy(rodent:FindFirstChild("Blood").Color.R > rodent:FindFirstChild("Blood").Color.G * 3)
+		local sqEyes = PartBuilder.instantiate(PuppetSpec.spec("squirrel"), lib):FindFirstChild("Eyes")
+		t.truthy(sqEyes.Material ~= roblox.Enum.Material.Neon and sqEyes.Color.R < 0.2, "squirrel eyes dark")
 	end)
 
 	t.test("squirrel stands 1.2 st at the shoulder; deer variants scale; the rodent alone has Blood", function()

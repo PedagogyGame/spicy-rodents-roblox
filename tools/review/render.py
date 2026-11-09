@@ -50,7 +50,7 @@ def rb_to_bl(v):
     return Vector((v[0], -v[2], v[1]))
 
 
-JITTER = 0.0015  # studs per step (13 steps): see parts_mesh
+LIFT_STEP, LIFT_LEVELS = 0.0006, 40  # studs: see coplanar_lift
 
 # Roblox Material name -> (roughness, metallic)
 SURFACE = {
@@ -203,9 +203,7 @@ def srgb_to_linear(c):
 def parts_mesh(name, parts, templates):
     """One mesh for a list of part dicts (Roblox frame): per-face col, rough, metal, alpha attributes.
 
-    Every part is lifted by a tiny deterministic amount (0 to 0.018 st, JITTER) so exactly coplanar faces do not
-    shadow each other into black patches in Cycles. Roblox would z-fight (flicker) there instead: export.luau
-    lists those overlaps under `zfight`.
+    A part's optional "_dy" (coplanar_lift) raises it a hair so coincident faces do not render black.
     """
     by_shape = {}
     for p in parts:
@@ -225,7 +223,7 @@ def parts_mesh(name, parts, templates):
             size = np.repeat(size[:, :1], 3, axis=1)
         local = t["v"][None, :, :] * size[:, None, :]  # (n, k, 3)
         world = np.einsum("nij,nkj->nki", rot, local) + pos[:, None, :]
-        world[:, :, 1] += (((np.arange(n) + base // 7) * 7) % 13)[:, None] * JITTER
+        world[:, :, 1] += np.array([p.get("_dy", 0.0) for p in plist])[:, None]
         bl = world @ AXES.T
         k = len(t["v"])
         vs.append(bl.reshape(-1, 3))
@@ -257,6 +255,27 @@ def parts_mesh(name, parts, templates):
         },
         np.concatenate(sm),
     )
+
+
+def coplanar_lift(plist):
+    """Give parts whose top faces sit at the same height (to 0.01 st) distinct tiny lifts (LIFT_STEP apart, up to
+    0.024 st) so Cycles does not shade exactly coplanar faces black. Roblox z-fights (flickers) there instead:
+    export.luau lists the overlaps that differ in colour or material under `zfight`."""
+    if not plist:
+        return
+    pos = np.array([p["pos"] for p in plist], dtype=np.float64)
+    rot = np.abs(np.array([p["rot"] for p in plist], dtype=np.float64).reshape(-1, 3, 3))
+    size = np.array([p["size"] for p in plist], dtype=np.float64)
+    top = pos[:, 1] + 0.5 * np.einsum("nj,nj->n", rot[:, 1, :], size)
+    key = np.round(top * 100).astype(np.int64)
+    order = np.argsort(key, kind="stable")
+    ks = key[order]
+    starts = np.r_[0, np.flatnonzero(np.diff(ks)) + 1]
+    rank = np.arange(len(ks)) - np.repeat(starts, np.diff(np.r_[starts, len(ks)]))
+    lift = np.empty(len(plist))
+    lift[order] = (rank % LIFT_LEVELS) * LIFT_STEP
+    for p, d in zip(plist, lift):
+        p["_dy"] = float(d)
 
 
 def beam_parts(beams):
@@ -462,6 +481,7 @@ def build_scene(scene_data, debug):
     }
     for g, plist in groups.items():
         plist = plist + beam_parts(beams_by_group.get(g, []))
+        coplanar_lift(plist)
         split = {"opaque": [], "trans": [], "neon": []}
         for p in plist:
             if p["m"] == "Neon":
