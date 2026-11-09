@@ -45,7 +45,12 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 	check(ReplicatedStorage:GetAttribute("BootReady") == true, "BootReady not set")
 	check(ReplicatedStorage:GetAttribute("BootProgress") == 1, "BootProgress not 1")
 	local Lighting = game:GetService("Lighting")
-	check(math.abs(Lighting.ClockTime - 15.25) < 0.01, `ClockTime {Lighting.ClockTime}`)
+	-- the preset owns the time of day (Task A moved golden hour to 16:00): compare with it, not a literal
+	local LightingPreset = (require :: any)(
+		ReplicatedStorage:WaitForChild("Shared"):WaitForChild("World"):WaitForChild("LightingPreset")
+	)
+	local wantClock = LightingPreset.GOLDEN.clockTime :: number
+	check(math.abs(Lighting.ClockTime - wantClock) < 0.01, `ClockTime {Lighting.ClockTime} (preset {wantClock})`)
 	check(Lighting:FindFirstChildOfClass("Atmosphere") ~= nil, "no Atmosphere")
 	local town = workspace:FindFirstChild("Town")
 	local townParts = 0
