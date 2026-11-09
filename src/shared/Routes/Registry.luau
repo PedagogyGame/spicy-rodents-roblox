@@ -214,7 +214,9 @@ end
 
 -- all(): every route, id order (loads every chunk).
 function Registry.all(self: Registry): { Route }
-	while self:_loadNext() do
+	local more = true
+	while more do
+		more = self:_loadNext()
 	end
 	return self._all
 end

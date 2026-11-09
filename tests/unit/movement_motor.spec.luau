@@ -93,7 +93,8 @@ return function(t)
 		local g = serde.decode("json", fs.readFile("tests/golden/pounce.json"))
 		t.eq(#g.rows, 5200)
 		for _, row in g.rows do
-			local yaw, railKind, trunkNormal, pitch, focus, moveSpeed, boost = row[1], row[2], row[3], row[4], row[5], row[6], row[7]
+			local yaw, railKind, trunkNormal, pitch, focus, moveSpeed, boost =
+				row[1], row[2], row[3], row[4], row[5], row[6], row[7]
 			local onTrunk = railKind == "trunk"
 			local nx: number? = nil
 			local nz: number? = nil
@@ -117,32 +118,35 @@ return function(t)
 	local world = TestWorld.build()
 	local input = SquirrelMotor.idleInput
 
-	t.test("leap apex is 2.73 u continuous and about 0.1 u lower at 60 Hz (routes_movement §13, verifier 10)", function()
-		t.near(Units.u(SquirrelMotor.leapApex()), 2.7306666, 1e-5)
-		local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
-		local inp = input()
-		inp.leap = true
-		local maxY = s.y
-		local airtime = 0
-		SquirrelMotor.step(s, inp, 1 / 60, world)
-		inp.leap = false
-		for _ = 1, 120 do
-			if s.grounded then
-				break
-			end
-			maxY = math.max(maxY, s.y)
-			airtime += 1 / 60
+	t.test(
+		"leap apex is 2.73 u continuous and about 0.1 u lower at 60 Hz (routes_movement §13, verifier 10)",
+		function()
+			t.near(Units.u(SquirrelMotor.leapApex()), 2.7306666, 1e-5)
+			local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+			local inp = input()
+			inp.leap = true
+			local maxY = s.y
+			local airtime = 0
 			SquirrelMotor.step(s, inp, 1 / 60, world)
+			inp.leap = false
+			for _ = 1, 120 do
+				if s.grounded then
+					break
+				end
+				maxY = math.max(maxY, s.y)
+				airtime += 1 / 60
+				SquirrelMotor.step(s, inp, 1 / 60, world)
+			end
+			local apex = Units.u(maxY - world.groundHeight)
+			print(`      simulated apex {apex} u, airtime {airtime} s`)
+			t.truthy(apex > 2.55 and apex < 2.74, `apex {apex}`)
+			t.truthy(airtime > 0.75 and airtime < 0.95, `airtime {airtime}`)
+			t.truthy(s.grounded)
+			-- flat-ground leap distance with no input: about 8.97 u (§13)
+			local dx = Units.u(math.sqrt((s.x - Units.st(300)) ^ 2 + (s.z - Units.st(300)) ^ 2))
+			t.truthy(dx > 8.3 and dx < 9.3, `leap distance {dx} u`)
 		end
-		local apex = Units.u(maxY - world.groundHeight)
-		print(`      simulated apex {apex} u, airtime {airtime} s`)
-		t.truthy(apex > 2.55 and apex < 2.74, `apex {apex}`)
-		t.truthy(airtime > 0.75 and airtime < 0.95, `airtime {airtime}`)
-		t.truthy(s.grounded)
-		-- flat-ground leap distance with no input: about 8.97 u (§13)
-		local dx = Units.u(math.sqrt((s.x - Units.st(300)) ^ 2 + (s.z - Units.st(300)) ^ 2))
-		t.truthy(dx > 8.3 and dx < 9.3, `leap distance {dx} u`)
-	end)
+	)
 
 	t.test("ground run: speed caps at walk 8 / sprint 16.8 / boost x1.6 u/s and velocity follows the camera", function()
 		local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
@@ -283,30 +287,33 @@ return function(t)
 		t.near(s1.clock - before, 0.08, 1e-12)
 	end)
 
-	t.test("Q drop leaves the rail with a 3.3 u/s hop from the visible position; E in the air grabs within 3.4 u", function()
-		local trunk = world.registry:get(220) :: Registry.Route
-		local p = world.registry:pointAt(trunk, 0.5)
-		local s = SquirrelMotor.new(p.x, p.y, p.z)
-		local inp = input(math.pi)
-		inp.grab = true
-		local _, ev = SquirrelMotor.step(s, inp, 1 / 60, world)
-		inp.grab = false
-		t.eq(ev[1].kind, "attach")
-		t.eq(s.routeId, 220)
-		inp.drop = true
-		SquirrelMotor.step(s, inp, 1 / 60, world)
-		inp.drop = false
-		t.eq(s.routeId, nil)
-		t.truthy(s.vy > 0 and s.vy <= Units.st(3.3), "hop")
-		t.truthy(s.committedAirborne)
-		local off = math.sqrt((s.x - p.x) ^ 2 + (s.z - p.z) ^ 2)
-		t.truthy(off > Units.st(0.4) and off < Units.st(2.5), `launched from the bark, offset {off} st`)
-		-- mid-air E re-grabs the trunk (within 3.4 u)
-		inp.grab = true
-		local _, ev2 = SquirrelMotor.step(s, inp, 1 / 60, world)
-		t.eq(ev2[1].kind, "attach")
-		t.eq(s.routeId, 220)
-	end)
+	t.test(
+		"Q drop leaves the rail with a 3.3 u/s hop from the visible position; E in the air grabs within 3.4 u",
+		function()
+			local trunk = world.registry:get(220) :: Registry.Route
+			local p = world.registry:pointAt(trunk, 0.5)
+			local s = SquirrelMotor.new(p.x, p.y, p.z)
+			local inp = input(math.pi)
+			inp.grab = true
+			local _, ev = SquirrelMotor.step(s, inp, 1 / 60, world)
+			inp.grab = false
+			t.eq(ev[1].kind, "attach")
+			t.eq(s.routeId, 220)
+			inp.drop = true
+			SquirrelMotor.step(s, inp, 1 / 60, world)
+			inp.drop = false
+			t.eq(s.routeId, nil)
+			t.truthy(s.vy > 0 and s.vy <= Units.st(3.3), "hop")
+			t.truthy(s.committedAirborne)
+			local off = math.sqrt((s.x - p.x) ^ 2 + (s.z - p.z) ^ 2)
+			t.truthy(off > Units.st(0.4) and off < Units.st(2.5), `launched from the bark, offset {off} st`)
+			-- mid-air E re-grabs the trunk (within 3.4 u)
+			inp.grab = true
+			local _, ev2 = SquirrelMotor.step(s, inp, 1 / 60, world)
+			t.eq(ev2[1].kind, "attach")
+			t.eq(s.routeId, 220)
+		end
+	)
 
 	t.test("rail end without a link pins at the end; a pole top auto-switches onto a wire", function()
 		-- Chili's roof (id 0) is a singleton: walking off its end pins railT

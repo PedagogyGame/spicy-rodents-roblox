@@ -9,7 +9,8 @@
 -- Height: the port measures the target's height ABOVE LOCAL GROUND (target.groundY), as the spec's
 -- porting note demands [humans_actors §15]; with groundY = 0 it reproduces the HTML's absolute-Y test.
 
-local Units = require("../../shared/Config/Units")
+local Import = require("../AI/Import")
+local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 
 export type Observer = {
 	x: number,

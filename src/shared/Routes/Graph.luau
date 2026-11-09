@@ -369,6 +369,66 @@ function Graph.related(self: Graph, a: number, b: number): boolean
 	return false
 end
 
+-- relation(a, b): the strongest structural relation between two routes, or nil:
+-- "linked" (a sample pair within 1.7 u), "end" (an automatic end link), "fork" (trunk and one of
+-- its boughs) or "sibling" (two boughs of one trunk). Validators use it to price a transfer.
+function Graph.relation(self: Graph, a: number, b: number): string?
+	if a == b then
+		return "same"
+	end
+	if self:linked(a, b) then
+		return "linked"
+	end
+	for _, atStart in { true, false } do
+		for _, l in self:endLinks(a, atStart) do
+			if l.to == b then
+				return "end"
+			end
+		end
+	end
+	local fa, fb = self._forkByBranch[a], self._forkByBranch[b]
+	if (fa and fa.trunk == b) or (fb and fb.trunk == a) then
+		return "fork"
+	end
+	if fa and fb and fa.trunk == fb.trunk then
+		return "sibling"
+	end
+	return nil
+end
+
+-- neighbours(id): every route with some relation to id (linked, end link, fork parent or child,
+-- sibling), deduplicated and sorted.
+function Graph.neighbours(self: Graph, routeId: number): { number }
+	local set: { [number]: boolean } = {}
+	for _, other in self:transfers(routeId) do
+		set[other] = true
+	end
+	for _, atStart in { true, false } do
+		for _, l in self:endLinks(routeId, atStart) do
+			set[l.to] = true
+		end
+	end
+	local parent = self._forkByBranch[routeId]
+	if parent then
+		set[parent.trunk] = true
+		for _, f in self:forks(parent.trunk) do
+			if f.branch ~= routeId then
+				set[f.branch] = true
+			end
+		end
+	end
+	for _, f in self:forks(routeId) do
+		set[f.branch] = true
+	end
+	set[routeId] = nil
+	local out: { number } = {}
+	for id in set do
+		table.insert(out, id)
+	end
+	table.sort(out)
+	return out
+end
+
 function Graph.islands(self: Graph): { { number } }
 	return self._islands
 end

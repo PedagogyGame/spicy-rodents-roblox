@@ -8,7 +8,8 @@
 -- W1 replaces the polyline data with Shared/Routes (Curve, Registry, Graph, Motion).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
-local Units = require("../../../shared/Config/Units")
+local Import = require("../../AI/Import")
+local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 
 export type RouteLike = {
@@ -70,10 +71,34 @@ function Methods.think(self: Brain, _dt: number, ctx: Common.Ctx)
 		return
 	end
 	if intent.railEnd then
-		-- end of the route: reverse (end links are also covered by the proximity links)
+		-- end of the route: take a link at this end if there is one (the v5.4 auto-switch,
+		-- routes_movement §11.1), else reverse
 		intent.railEnd = false
-		intent.dir = -intent.dir
-		intent.s = math.clamp(intent.s, 0, self.route.length)
+		local atEnd = intent.s
+		local taken = false
+		for _, link in self.route.links do
+			if math.abs(link.s - atEnd) < LINK_REACH then
+				local to = self.params.routes.byId(link.to)
+				if to then
+					self.route = to
+					intent.routeId = to.id
+					intent.s = math.clamp(link.toS, 0, to.length)
+					intent.dir = if link.toS < to.length / 2 then 1 else -1
+					intent.speed = railSpeed(to, self.sprint)
+					self.lastLinkS = intent.s
+					taken = true
+					break
+				end
+			end
+		end
+		if not taken then
+			intent.dir = -intent.dir
+			intent.s = math.clamp(intent.s, 0, self.route.length)
+		end
+	end
+	-- a link we already rolled becomes eligible again once we have moved away from it
+	if self.lastLinkS ~= -math.huge and math.abs(intent.s - self.lastLinkS) > LINK_REACH * 2 then
+		self.lastLinkS = -math.huge
 	end
 	if ctx.now >= self.runUntil then
 		if intent.speed > 0 then
@@ -86,7 +111,7 @@ function Methods.think(self: Brain, _dt: number, ctx: Common.Ctx)
 	end
 	-- transfer at a link we are passing
 	for _, link in self.route.links do
-		if math.abs(link.s - intent.s) < LINK_REACH and math.abs(link.s - self.lastLinkS) > LINK_REACH * 2 then
+		if math.abs(link.s - intent.s) < LINK_REACH and self.lastLinkS == -math.huge then
 			if rng() < TRANSFER_CHANCE then
 				local to = self.params.routes.byId(link.to)
 				if to then
@@ -95,7 +120,7 @@ function Methods.think(self: Brain, _dt: number, ctx: Common.Ctx)
 					intent.s = math.clamp(link.toS, 0, to.length)
 					intent.dir = if rng() < 0.5 then 1 else -1
 					intent.speed = railSpeed(to, self.sprint)
-					self.lastLinkS = -math.huge
+					self.lastLinkS = intent.s
 					return
 				end
 			end

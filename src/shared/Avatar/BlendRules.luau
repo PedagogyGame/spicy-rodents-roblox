@@ -59,8 +59,9 @@ export type Traits = {
 	face: number,
 	headIsDynamic: boolean,
 	hairAccessory: number?,
+	hairIsLayered: boolean, -- a WrapLayer hair: fine on an R15 human, never on an animal's HeadSocket
 	headAccessory: number?,
-	signatureAccessory: number?,
+	signatureAccessory: number?, -- always rigid (the animal HeadSocket path)
 	dominant: Rgb,
 	shirt: Rgb?,
 	pants: Rgb?,
@@ -106,8 +107,8 @@ BlendRules.MAX_SATURATION = 0.55
 BlendRules.MIN_VALUE = 0.39
 BlendRules.MAX_VALUE = 0.91
 BlendRules.AVATAR_WEIGHT = 0.3 -- the capped 30 % (A3 "70% stock character 30% Roblox avatar")
-BlendRules.NEON_SATURATION = 0.8
-BlendRules.NEON_VALUE = 0.85
+BlendRules.NEON_SATURATION = 0.85
+BlendRules.NEON_VALUE = 0.9
 -- The single surviving neon accent is softened, not flattened, so "neon-tipped ears and tail" reads.
 BlendRules.ACCENT_MAX_SATURATION = 0.8
 BlendRules.ACCENT_MAX_VALUE = 0.95
@@ -133,21 +134,21 @@ local COLOUR_WORDS: { { word: string, c: Rgb } } = {
 	{ word = "sky blue", c = { r = 0.53, g = 0.81, b = 0.92 } },
 	{ word = "navy", c = { r = 0.1, g = 0.12, b = 0.35 } },
 	{ word = "teal", c = { r = 0.0, g = 0.5, b = 0.5 } },
-	{ word = "turquoise", c = { r = 0.25, g = 0.88, b = 0.82 } },
-	{ word = "cyan", c = { r = 0.0, g = 0.9, b = 0.9 } },
-	{ word = "aqua", c = { r = 0.0, g = 0.9, b = 0.9 } },
-	{ word = "blue", c = { r = 0.2, g = 0.35, b = 0.85 } },
-	{ word = "lime", c = { r = 0.5, g = 1.0, b = 0.0 } },
-	{ word = "green", c = { r = 0.2, g = 0.6, b = 0.25 } },
+	{ word = "turquoise", c = { r = 0.25, g = 0.78, b = 0.72 } },
+	{ word = "cyan", c = { r = 0.2, g = 0.75, b = 0.78 } },
+	{ word = "aqua", c = { r = 0.2, g = 0.75, b = 0.78 } },
+	{ word = "blue", c = { r = 0.2, g = 0.33, b = 0.72 } },
+	{ word = "lime", c = { r = 0.55, g = 0.85, b = 0.2 } },
+	{ word = "green", c = { r = 0.22, g = 0.55, b = 0.26 } },
 	{ word = "olive", c = { r = 0.5, g = 0.5, b = 0.1 } },
-	{ word = "yellow", c = { r = 1.0, g = 0.9, b = 0.2 } },
+	{ word = "yellow", c = { r = 0.88, g = 0.8, b = 0.25 } },
 	{ word = "gold", c = { r = 0.85, g = 0.65, b = 0.13 } },
-	{ word = "orange", c = { r = 1.0, g = 0.55, b = 0.1 } },
-	{ word = "red", c = { r = 0.85, g = 0.15, b = 0.15 } },
+	{ word = "orange", c = { r = 0.88, g = 0.5, b = 0.15 } },
+	{ word = "red", c = { r = 0.72, g = 0.16, b = 0.16 } },
 	{ word = "crimson", c = { r = 0.7, g = 0.05, b = 0.15 } },
 	{ word = "maroon", c = { r = 0.5, g = 0.0, b = 0.1 } },
 	{ word = "pink", c = { r = 1.0, g = 0.6, b = 0.75 } },
-	{ word = "magenta", c = { r = 1.0, g = 0.0, b = 1.0 } },
+	{ word = "magenta", c = { r = 0.8, g = 0.2, b = 0.8 } },
 	{ word = "purple", c = { r = 0.5, g = 0.2, b = 0.7 } },
 	{ word = "violet", c = { r = 0.55, g = 0.3, b = 0.85 } },
 	{ word = "lavender", c = { r = 0.7, g = 0.6, b = 0.9 } },
@@ -359,14 +360,20 @@ function BlendRules.traits(desc: DescriptionLike, productInfo: ProductInfo?, tab
 		return nil
 	end
 
+	-- Skin: the nearest of the 8 tones. A neutral (grey, unsaturated) head colour is a blank or
+	-- classic default avatar and simply snaps to a tone; only a coloured head far from every tone
+	-- (yellow blocky heads, green or blue skins) counts as non-human for the bizarre pick.
 	local skinIndex, skinTone, skinDist = BlendRules.nearestSkinTone(desc.HeadColor)
-	local skinIsHuman = skinDist < 0.25
+	local headHsv = BlendRules.rgbToHsv(desc.HeadColor)
+	local skinIsHuman = skinDist < 0.25 or headHsv.s < 0.25
 	sources.skin = "body"
 
 	local shirt = itemColour(desc.Shirt, "shirt")
 	local pants = itemColour(desc.Pants, "pants")
 
 	local hair: number? = nil
+	local hairLayered = false
+	local rigidHair: number? = nil
 	local headAcc: number? = nil
 	local oversized: number? = nil
 	local accessoryColours: { Rgb } = {}
@@ -376,6 +383,11 @@ function BlendRules.traits(desc: DescriptionLike, productInfo: ProductInfo?, tab
 		if c then
 			table.insert(accessoryColours, c)
 		end
+		-- hair comes across layered or rigid (most modern hair is a WrapLayer accessory, measured in S9)
+		if acc.accessoryType == "Hair" and not hair then
+			hair = acc.assetId
+			hairLayered = acc.isLayered
+		end
 		if acc.isLayered then
 			-- jackets, sweaters, shirts count as shirts for the pattern colour (D13)
 			if
@@ -384,8 +396,8 @@ function BlendRules.traits(desc: DescriptionLike, productInfo: ProductInfo?, tab
 				layeredShirt = layeredShirt or c
 			end
 		else
-			if acc.accessoryType == "Hair" and not hair then
-				hair = acc.assetId
+			if acc.accessoryType == "Hair" and not rigidHair then
+				rigidHair = acc.assetId
 			elseif HEAD_TYPES[acc.accessoryType] and not headAcc then
 				headAcc = acc.assetId
 			end
@@ -483,8 +495,9 @@ function BlendRules.traits(desc: DescriptionLike, productInfo: ProductInfo?, tab
 		face = desc.Face,
 		headIsDynamic = desc.HeadIsDynamic == true or (desc.Head ~= 0 and desc.HeadIsDynamic ~= false),
 		hairAccessory = hair,
+		hairIsLayered = hairLayered,
 		headAccessory = headAcc,
-		signatureAccessory = oversized or hair or headAcc,
+		signatureAccessory = oversized or rigidHair or headAcc,
 		dominant = dominant,
 		shirt = shirt,
 		pants = pants,

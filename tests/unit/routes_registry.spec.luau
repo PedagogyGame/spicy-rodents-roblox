@@ -79,7 +79,15 @@ return function(t)
 		t.eq(total, 81613)
 		-- an explicit record field wins over the derivation
 		local custom = Registry.fromRecords({
-			{ id = 1, name = "x", kind = "wire", points = { { 0, 0, 0 }, { 10, 0, 0 } }, length = 10, surfaceRadius = 1, sampleCount = 77 },
+			{
+				id = 1,
+				name = "x",
+				kind = "wire",
+				points = { { 0, 0, 0 }, { 10, 0, 0 } },
+				length = 10,
+				surfaceRadius = 1,
+				sampleCount = 77,
+			},
 		})
 		t.eq((custom:get(1) :: Registry.Route).sampleCount, 77)
 	end)

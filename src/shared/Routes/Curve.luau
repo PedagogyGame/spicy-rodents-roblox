@@ -74,7 +74,14 @@ function Curve.new(points: { Vec3 }): Curve
 	local copy = table.create(#points)
 	for i, p in points do
 		local x, y, z = p.x, p.y, p.z
-		if x ~= x or y ~= y or z ~= z or math.abs(x) == math.huge or math.abs(y) == math.huge or math.abs(z) == math.huge then
+		if
+			x ~= x
+			or y ~= y
+			or z ~= z
+			or math.abs(x) == math.huge
+			or math.abs(y) == math.huge
+			or math.abs(z) == math.huge
+		then
 			error(`Curve.new: non-finite control point #{i}`)
 		end
 		copy[i] = vec3(x, y, z)

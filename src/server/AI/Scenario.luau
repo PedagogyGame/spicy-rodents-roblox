@@ -8,9 +8,10 @@
 -- Interface: build(opts) -> World, stepFrame(world, dt) -> FrameMetrics, liveness(world) -> Report
 -- Pure; studs via Config/Units. The frame order mirrors §1.3: brains -> AI motors -> traffic.
 
-local Units = require("../../shared/Config/Units")
-local Species = require("../../shared/Actors/Species")
-local Population = require("../../shared/Actors/Population")
+local Import = require("./Import")
+local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local Species = Import.shared("Actors/Species") :: typeof(require("../../shared/Actors/Species"))
+local Population = Import.shared("Actors/Population") :: typeof(require("../../shared/Actors/Population"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
 local Perception = require("../Actors/Perception")
@@ -273,14 +274,11 @@ function Scenario.build(opts: Opts): World
 					counts.Staff = (counts.Staff or 0) + 1
 					register(
 						actor,
-						Staff.new(
-							actor,
-							{
-								stationX = Units.st(STATION.x + 4),
-								stationZ = Units.st(STATION.z - 6),
-								index = officerIndex,
-							}
-						)
+						Staff.new(actor, {
+							stationX = Units.st(STATION.x + 4),
+							stationZ = Units.st(STATION.z - 6),
+							index = officerIndex,
+						})
 					)
 				end
 			elseif post == "shopWorker" or post == "attractionStaff" then
@@ -309,14 +307,11 @@ function Scenario.build(opts: Opts): World
 		local actor = add("squirrel", "normal", "Squirrel", squirrelDef.hipHeight)
 		register(
 			actor,
-			SquirrelBrain.new(
-				actor,
-				{
-					routes = SpikeRoutes,
-					rng = rng,
-					startRoute = SpikeRoutes.routes[(i * 7) % #SpikeRoutes.routes + 1].id,
-				}
-			)
+			SquirrelBrain.new(actor, {
+				routes = SpikeRoutes,
+				rng = rng,
+				startRoute = SpikeRoutes.routes[(i * 7) % #SpikeRoutes.routes + 1].id,
+			})
 		)
 	end
 	do

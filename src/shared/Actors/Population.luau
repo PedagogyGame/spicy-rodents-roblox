@@ -29,7 +29,8 @@ export type PostState = { ai: number, player: number }
 
 export type State = {
 	bodies: { [string]: PostState },
-	reserveLeft: number,
+	reserveLeft: number, -- bodies that may still be deployed before the hard cap
+	prebuilt: number, -- reserve bodies parked at boot (config.reserve); beyond them a body is built
 	deployed: number, -- reserve bodies brought out so far
 	atCap: boolean,
 }
@@ -63,12 +64,28 @@ local function totalBodies(state: State): number
 	return n
 end
 
+-- The reserve pool runs to the hard cap: `reserve` bodies are parked at boot and the rest are
+-- built on demand (bodies are created once and never destroyed, §1.5), so at the cap with the
+-- hard-cap floors the plan's 90 - 33 = 57 servable players holds.
 function Population.newState(config: Config): State
 	local bodies: { [string]: PostState } = {}
+	local standing = 0
 	for _, post in config.posts do
 		bodies[post.id] = { ai = post.standing, player = 0 }
+		standing += post.standing
 	end
-	return { bodies = bodies, reserveLeft = config.reserve, deployed = 0, atCap = false }
+	return {
+		bodies = bodies,
+		reserveLeft = math.max(0, config.hardCap - standing),
+		prebuilt = config.reserve,
+		deployed = 0,
+		atCap = false,
+	}
+end
+
+-- Reserve bodies that had to be built at runtime (beyond the parked ones).
+function Population.builtAtRuntime(state: State): number
+	return math.max(0, state.deployed - state.prebuilt)
 end
 
 function Population.totalBodies(state: State): number
@@ -162,9 +179,8 @@ function Population.apply(state: State, decision: Decision)
 			post.ai -= 1
 		end
 		post.player += 1
-	elseif decision.kind == "wait" then
-		-- nothing changes; the join waits on the flyover camera
 	end
+	-- "wait" changes nothing: the join waits on the flyover camera
 end
 
 -- A player leaves (or is promoted away): the body returns to the AI at its post.

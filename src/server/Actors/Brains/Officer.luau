@@ -6,7 +6,8 @@
 -- officers (2.3 u/s walk, 5.5 u/s chase); the patrol car itself is a device, not this brain.
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
-local Units = require("../../../shared/Config/Units")
+local Import = require("../../AI/Import")
+local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 
 export type Params = {

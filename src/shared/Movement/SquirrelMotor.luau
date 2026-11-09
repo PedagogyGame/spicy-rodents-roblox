@@ -25,6 +25,7 @@
 local Curve = require("../Routes/Curve")
 local Motion = require("../Routes/Motion")
 local Registry = require("../Routes/Registry")
+local SpatialIndex = require("../Routes/SpatialIndex")
 local Units = require("../Config/Units")
 
 local SquirrelMotor = {}
@@ -37,6 +38,9 @@ export type World = Motion.World & {
 	blocked: ((x: number, z: number, y: number) -> boolean)?,
 	-- optional world clamp (studs); defaults to the v5.4 rectangle
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number }?,
+	-- optional segment test for validators: does the straight move (x0,z0)->(x1,z1) at height y cross
+	-- a wall collider? (Colliders in W1)
+	crosses: ((x0: number, z0: number, x1: number, z1: number, y: number) -> boolean)?,
 }
 
 export type Input = {
@@ -209,7 +213,12 @@ function SquirrelMotor.idleInput(cameraYaw: number?): Input
 end
 
 -- attackHeading() (L5900-5906): straight out from the bark on a trunk, else the body yaw.
-function SquirrelMotor.attackHeading(onTrunk: boolean, trunkNormalX: number?, trunkNormalZ: number?, yaw: number): number
+function SquirrelMotor.attackHeading(
+	onTrunk: boolean,
+	trunkNormalX: number?,
+	trunkNormalZ: number?,
+	yaw: number
+): number
 	if onTrunk then
 		return math.atan2(trunkNormalX or 0, trunkNormalZ or 1)
 	end
@@ -231,8 +240,12 @@ function SquirrelMotor.pounceVelocity(
 	heading: number
 ): (number, number, number)
 	local p = math.clamp(pitch, P.pouncePitchMin, P.pouncePitchMax)
-	local speed = (if focus then P.pounceSpeedFocus elseif moveSpeed > P.pounceFastAbove then P.pounceSpeedFast else P.pounceSpeedSlow)
-		* (if boosted then P.pounceBoostMult else 1)
+	local speed = (
+		if focus
+			then P.pounceSpeedFocus
+			elseif moveSpeed > P.pounceFastAbove then P.pounceSpeedFast
+			else P.pounceSpeedSlow
+	) * (if boosted then P.pounceBoostMult else 1)
 	local vertical = P.pounceUpBase + math.sin(p) * P.pounceUpPitch
 	return math.sin(heading) * speed * math.cos(p), vertical, math.cos(heading) * speed * math.cos(p)
 end
@@ -346,7 +359,7 @@ local function clearPendingFork(state: State)
 end
 
 -- enterRoute(found) (L5826-5869). Returns false when the transfer is refused.
-local function enterRoute(state: State, world: World, spec: Motion.EnterSpec, input: Input, events: { Event}): boolean
+local function enterRoute(state: State, world: World, spec: Motion.EnterSpec, input: Input, events: { Event }): boolean
 	local target = route(world, spec.routeId)
 	if not target or spec.t ~= spec.t then
 		return false
@@ -415,7 +428,14 @@ local function visualPosition(state: State, world: World): Vec3
 	if not r then
 		return Curve.vec3(state.x, state.y, state.z)
 	end
-	return Motion.visualPose(world, r, state.railT, Curve.vec3(state.x, state.y, state.z), state.trunkNormalX, state.trunkNormalZ)
+	return Motion.visualPose(
+		world,
+		r,
+		state.railT,
+		Curve.vec3(state.x, state.y, state.z),
+		state.trunkNormalX,
+		state.trunkNormalZ
+	)
 end
 
 -- launchFromVisibleRoute (L5891-5897): a leap starts at the visible position, not the centreline.
@@ -444,7 +464,8 @@ end
 
 local function doLeap(state: State, world: World, events: { Event })
 	if state.routeId or state.grounded then
-		local heading = SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
+		local heading =
+			SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
 		local vx, vy, vz = SquirrelMotor.jumpVelocity(heading, state.boostRemaining > 0)
 		local from = state.routeId
 		launchFromVisibleRoute(state, world)
@@ -473,8 +494,10 @@ local function doPounce(state: State, world: World, input: Input, events: { Even
 	if state.cooldown > 0 then
 		return
 	end
-	local heading = SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
-	local vx, vy, vz = SquirrelMotor.pounceVelocity(input.cameraPitch, state.focus, state.moveSpeed, state.boostRemaining > 0, heading)
+	local heading =
+		SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
+	local vx, vy, vz =
+		SquirrelMotor.pounceVelocity(input.cameraPitch, state.focus, state.moveSpeed, state.boostRemaining > 0, heading)
 	local from = state.routeId
 	state.cooldown = P.pounceCooldown
 	state.attack = P.pounceAttack
@@ -510,7 +533,16 @@ local function doChoose(state: State, world: World, input: Input, events: { Even
 			return
 		end
 	end
-	local picked = Motion.chooseRouteJunction(world, r, state.railT, state.railDir, input.cameraYaw, state.yaw, side, state.selectedJunction)
+	local picked = Motion.chooseRouteJunction(
+		world,
+		r,
+		state.railT,
+		state.railDir,
+		input.cameraYaw,
+		state.yaw,
+		side,
+		state.selectedJunction
+	)
 	state.selectedJunction = picked
 	if picked then
 		push(events, "junctionChosen", picked, r.id)
@@ -535,7 +567,15 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 				end
 			end
 		end
-		local junction = Motion.takeSelectedJunction(world, r, state.railT, state.railDir, input.cameraYaw, state.yaw, state.selectedJunction)
+		local junction = Motion.takeSelectedJunction(
+			world,
+			r,
+			state.railT,
+			state.railDir,
+			input.cameraYaw,
+			state.yaw,
+			state.selectedJunction
+		)
 		if junction then
 			if enterRoute(state, world, junction, input, events) then
 				return
@@ -634,7 +674,9 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 		* (if state.boostRemaining > 0 and not state.focus then P.boostMult else 1)
 		* (if treeTravel then P.treeTravelMult else 1)
 	local target = if moving then base else 0
-	state.moveSpeed += (target - state.moveSpeed) * (1 - math.exp(-dt * (if state.focus then P.speedSmoothFocus else P.speedSmooth)))
+	state.moveSpeed += (target - state.moveSpeed) * (1 - math.exp(
+		-dt * (if state.focus then P.speedSmoothFocus else P.speedSmooth)
+	))
 
 	local oldX, oldY, oldZ = state.x, state.y, state.z
 
@@ -663,7 +705,8 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 			end
 		else
 			if not state.routeWasMoving and fw ~= 0 then
-				state.railDir = Motion.directionFromView(world, rs, state.railT, input.cameraYaw, state.yaw, state.railDir)
+				state.railDir =
+					Motion.directionFromView(world, rs, state.railT, input.cameraYaw, state.yaw, state.railDir)
 			end
 			state.routeWasMoving = fw ~= 0
 			local railSpeed = Motion.railSpeed(rs.flags.treeTravel, sprint, state.focus, state.boostRemaining > 0)
@@ -714,7 +757,8 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 				state.x, state.y, state.z = p.x, p.y, p.z
 			end
 			local tangent = reg:tangentAt(current, state.railT)
-			if tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z > 0.1
+			if
+				tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z > 0.1
 				and math.abs(tangent.x) + math.abs(tangent.z) > C.tangentYawMin
 			then
 				local sense = if fw ~= 0 then math.sign(fw) * state.railDir else state.railDir
@@ -738,7 +782,12 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 			local a = 1 - math.exp(-dt * (if state.grounded then P.accelGround else P.accelAir))
 			state.vx += (dx * state.moveSpeed - state.vx) * a
 			state.vz += (dz * state.moveSpeed - state.vz) * a
-			state.yaw = Motion.turnToward(state.yaw, math.atan2(dx, dz), if state.focus then P.turnRateFocus else P.turnRate, dt)
+			state.yaw = Motion.turnToward(
+				state.yaw,
+				math.atan2(dx, dz),
+				if state.focus then P.turnRateFocus else P.turnRate,
+				dt
+			)
 		elseif state.attackWindow == 0 then
 			local friction = math.exp(-dt * (if state.grounded then P.dragGround else P.dragAir))
 			state.vx *= friction
@@ -828,6 +877,365 @@ end
 -- Leap apex (routes_movement §13): v^2 / 2g, continuous.
 function SquirrelMotor.leapApex(): number
 	return P.leapUp * P.leapUp / (2 * P.gravity)
+end
+
+-- Envelope ----------------------------------------------------------------------------------------------
+-- envelope(prev, next, dt, world, boosted) -> violations: is the move from one accepted motor state to
+-- the next one an honest client could have produced in `dt` seconds? Shared by the server
+-- MoveValidator (verdicts) and, later, by the client (to predict a rejection). Every bound is the
+-- motor's own constant times a tolerance plus one substep of slack; `boosted` is the SERVER's knowledge
+-- of the chili boost (the packet's boostRemaining is never trusted). Position is checked against the
+-- rail, speeds against the per-kind caps, arcs against gravity, launches against jump/pounce, rail
+-- changes against the route graph and the transfer gaps, and ground moves against world.crosses.
+
+export type Violation = { code: string, severity: number, detail: string }
+
+SquirrelMotor.envelopeParams = {
+	speedTol = 1.15, -- ground and air horizontal speed tolerance (latency, substep rounding)
+	railTol = 1.05, -- rail parameter speed tolerance (deterministic advance)
+	launchTol = 1.1, -- leap / pounce launch velocities
+	posSlack = st(0.05), -- on-rail position agreement (the client runs the same curve)
+	gravityEps = 0.03, -- seconds of gravity the vertical speed may deviate by
+	maxDt = 0.5, -- larger gaps are resynced, not judged
+	forkEnterMaxT = 0.06, -- a fork or sibling hop lands near the bough start (0.018 / 0.03)
+	pounceMinInterval = 0.7 / 1.15, -- cooldown with tolerance (launches in the air)
+	shortDt = 0.05, -- up to three ticks: nothing can hide between packets; longer gaps relax
+}
+local E = SquirrelMotor.envelopeParams
+
+local function hypot2(x: number, z: number): number
+	return math.sqrt(x * x + z * z)
+end
+
+local function add(list: { Violation }, code: string, severity: number, detail: string)
+	table.insert(list, { code = code, severity = math.clamp(severity, 0, 1), detail = detail })
+end
+
+-- Caps in studs/s.
+function SquirrelMotor.groundCap(boosted: boolean): number
+	return P.sprint * (if boosted then P.boostMult else 1)
+end
+
+function SquirrelMotor.railCap(treeTravel: boolean, boosted: boolean): number
+	return Motion.railSpeed(treeTravel, true, false, boosted)
+end
+
+function SquirrelMotor.launchCapXZ(boosted: boolean): number
+	return math.max(
+		if boosted then P.leapForwardBoost else P.leapForward,
+		P.pounceSpeedFast * (if boosted then P.pounceBoostMult else 1)
+	)
+end
+
+-- Returns the violations and whether a launch (leap or pounce) was needed to explain the move.
+function SquirrelMotor.envelope(
+	prev: State,
+	next: State,
+	dt: number,
+	world: World,
+	boosted: boolean
+): ({ Violation }, boolean)
+	local out: { Violation } = {}
+	local launchUsed = false
+	if dt <= 0 then
+		add(out, "clock", 1, `non-positive dt {dt}`)
+		return out, false
+	end
+	local reg = world.registry
+	local prevRoute = route(world, prev.routeId)
+	local nextRoute = route(world, next.routeId)
+	if next.routeId and not nextRoute then
+		add(out, "route", 1, `unknown route {next.routeId}`)
+		return out, false
+	end
+	local groundCap = SquirrelMotor.groundCap(boosted) * E.speedTol
+	local launchXZ = SquirrelMotor.launchCapXZ(boosted) * E.launchTol
+	local launchUp = P.leapUp * E.launchTol
+	local pounceUp = (P.pounceUpBase + P.pounceUpPitch * math.sin(P.pouncePitchMax)) * E.launchTol
+	local pounceUpMin = (P.pounceUpBase + P.pounceUpPitch * math.sin(P.pouncePitchMin)) / E.launchTol
+	local pounceXZ = P.pounceSpeedFast * (if boosted then P.pounceBoostMult else 1) * E.launchTol
+
+	-- 1. Position agreement with the claimed rail.
+	if nextRoute then
+		local dest = reg:pointAt(nextRoute, next.railT)
+		local b = next.bridge
+		if b then
+			if hypot2(b.tx - dest.x, b.tz - dest.z) > E.posSlack or math.abs(b.ty - dest.y) > E.posSlack then
+				add(out, "railPose", 1, "transfer target off the rail")
+			end
+			if b.elapsed > b.duration + 1e-9 or b.duration < C.bridgeMin - 1e-9 or b.duration > C.bridgeMax + 1e-9 then
+				add(out, "railPose", 1, "transfer easing out of range")
+			end
+			-- the body lies on the from->to segment at the eased fraction
+			local p = Motion.ease(b.elapsed / b.duration)
+			local ex, ey, ez = b.fx + (b.tx - b.fx) * p, b.fy + (b.ty - b.fy) * p, b.fz + (b.tz - b.fz) * p
+			if hypot2(ex - next.x, ez - next.z) > E.posSlack or math.abs(ey - next.y) > E.posSlack then
+				add(out, "railPose", 1, "body off the transfer segment")
+			end
+		else
+			local off = math.sqrt((dest.x - next.x) ^ 2 + (dest.y - next.y) ^ 2 + (dest.z - next.z) ^ 2)
+			if off > E.posSlack then
+				add(out, "railPose", math.min(1, Units.u(off)), `body {off} st off the rail centreline`)
+			end
+		end
+		if next.railT < -1e-9 or next.railT > 1 + 1e-9 then
+			add(out, "railPose", 1, "railT outside [0, 1]")
+		end
+	end
+
+	-- Could the body have visited a rail between the two packets? Long gaps (loss, reordering) hide
+	-- attach/detach pairs, so some checks relax when a route lies within the grab radius of the path.
+	local shortGap = dt <= E.shortDt
+	local function railWithinReach(): boolean
+		local vPrev = math.sqrt(prev.vx ^ 2 + prev.vy ^ 2 + prev.vz ^ 2)
+		local reach = C.airGrab + math.max(groundCap, vPrev) * dt + E.posSlack
+		return world.index:nearest(prev.x, prev.y, prev.z, reach) ~= nil
+			or world.index:nearest(next.x, next.y, next.z, reach) ~= nil
+	end
+
+	-- 2. Rail-to-rail: speed along the same route, or a legal transfer.
+	if prevRoute and nextRoute then
+		local railCap = SquirrelMotor.railCap(prevRoute.flags.treeTravel, boosted)
+		if prevRoute.id == nextRoute.id then
+			local allowed = railCap * E.railTol * dt + railCap * P.substep
+			if not shortGap then
+				-- a long gap can hide a leap or drop off this route and a grab back onto it further along
+				allowed += C.airGrab + launchXZ * dt
+			end
+			local moved = math.abs(next.railT - prev.railT) * prevRoute.length
+			if moved > allowed then
+				add(
+					out,
+					"railSpeed",
+					math.min(1, moved / allowed - 1),
+					`{moved} st along the rail in {dt} s (cap {allowed})`
+				)
+			end
+		else
+			local dest = if next.bridge
+				then Curve.vec3(next.bridge.tx, next.bridge.ty, next.bridge.tz)
+				else reg:pointAt(nextRoute, next.railT)
+			-- the honest body left the old rail somewhere it could reach within dt: the gap is measured
+			-- from the closest point of that reachable stretch (sampled), not from the stale position
+			local reachT = railCap * E.railTol * dt / math.max(prevRoute.length, 1e-6)
+			local gap = math.huge
+			for k = -4, 4 do
+				local tt = math.clamp(prev.railT + reachT * k / 4, 0, 1)
+				local q = reg:pointAt(prevRoute, tt)
+				gap = math.min(gap, math.sqrt((dest.x - q.x) ^ 2 + (dest.y - q.y) ^ 2 + (dest.z - q.z) ^ 2))
+			end
+			local travel = E.posSlack + railCap * E.railTol * dt / 4 -- between the sampled points
+			local graph = world.graph
+			local relation = graph:relation(prevRoute.id, nextRoute.id)
+			-- a hidden intermediate route B (two transfers inside one long gap) is legal when B passes within
+			-- the transfer limit of the stretch of A the body could reach, and the destination lies within
+			-- B's own reach of that point (geometry, not just graph relation)
+			local twoHop = false
+			if relation == nil and not shortGap then
+				local mids: { number } = graph:transfers(prevRoute.id)
+				for _, atStart in { true, false } do
+					for _, l in graph:endLinks(prevRoute.id, atStart) do
+						table.insert(mids, l.to)
+					end
+				end
+				local parentFork = graph:forkOf(prevRoute.id)
+				if parentFork then
+					table.insert(mids, parentFork.trunk)
+				end
+				for _, f in graph:forks(prevRoute.id) do
+					table.insert(mids, f.branch)
+				end
+				for _, mid in mids do
+					local midRelation = graph:relation(mid, nextRoute.id)
+					local midRoute = if midRelation then reg:get(mid) else nil
+					if midRoute then
+						local best: SpatialIndex.Hit? = nil
+						for k = -4, 4 do
+							local tt = math.clamp(prev.railT + reachT * k / 4, 0, 1)
+							local q = reg:pointAt(prevRoute, tt)
+							local hit = world.index:nearestOnRoute(mid, q.x, q.y, q.z, C.explicitGap + travel)
+							if hit and (best == nil or hit.d < (best :: SpatialIndex.Hit).d) then
+								best = hit
+							end
+						end
+						if best then
+							local b = best :: SpatialIndex.Hit
+							local capB = SquirrelMotor.railCap(midRoute.flags.treeTravel, boosted) * E.railTol * dt
+							local d = math.sqrt((dest.x - b.x) ^ 2 + (dest.y - b.y) ^ 2 + (dest.z - b.z) ^ 2)
+							local allow = capB
+								+ E.posSlack
+								+ (
+									if midRelation == "linked" or midRelation == "end"
+										then C.explicitGap
+										else C.enterMaxGap
+								)
+							if d <= allow then
+								twoHop = true
+								break
+							end
+						end
+					end
+				end
+			end
+			if gap > C.enterMaxGap + travel + (if twoHop then C.enterMaxGap else 0) then
+				add(out, "transfer", 1, `transfer gap {gap} st > 3.15 u (+travel)`)
+			elseif relation == "fork" or relation == "sibling" then
+				local nextCap = SquirrelMotor.railCap(nextRoute.flags.treeTravel, boosted)
+				if next.railT > E.forkEnterMaxT + nextCap * E.railTol * dt / nextRoute.length then
+					add(out, "transfer", 1, `{relation} hop landed at t {next.railT}`)
+				end
+			elseif relation == nil and not twoHop and gap > C.explicitGap + travel then
+				add(out, "transfer", 1, `unrelated routes {prevRoute.id} -> {nextRoute.id}, gap {gap} st`)
+			end
+		end
+	end
+
+	-- 3. Off rail onto a rail: the grab radius (3.4 u) plus what the body could have moved first.
+	if not prevRoute and nextRoute then
+		local dest = reg:pointAt(nextRoute, next.railT)
+		local gap = math.sqrt((dest.x - prev.x) ^ 2 + (dest.y - prev.y) ^ 2 + (dest.z - prev.z) ^ 2)
+		local vPrev = math.sqrt(prev.vx ^ 2 + prev.vy ^ 2 + prev.vz ^ 2)
+		local travel = math.max(groundCap, vPrev, launchXZ) * dt + E.posSlack
+		if gap > C.airGrab + travel then
+			-- a long gap can hide a first rail B: grabbed within reach of prev, related to the new route,
+			-- and the destination within B's own reach (plus the transfer or fork allowance) of that point
+			local explained = false
+			if not shortGap then
+				local graph = world.graph
+				for _, mid in graph:neighbours(nextRoute.id) do
+					local midRoute = reg:get(mid)
+					if midRoute then
+						local hit = world.index:nearestOnRoute(mid, prev.x, prev.y, prev.z, C.airGrab + travel)
+						if hit then
+							local relation = graph:relation(mid, nextRoute.id)
+							local capB = SquirrelMotor.railCap(midRoute.flags.treeTravel, boosted) * E.railTol * dt
+							local d = math.sqrt((dest.x - hit.x) ^ 2 + (dest.y - hit.y) ^ 2 + (dest.z - hit.z) ^ 2)
+							local allow = capB + E.posSlack
+							if relation == "fork" then
+								allow += C.enterMaxGap + C.forkTakeForced
+							elseif relation == "sibling" then
+								allow += C.enterMaxGap
+							else
+								allow += C.explicitGap
+							end
+							if d <= allow then
+								explained = true
+								break
+							end
+						end
+					end
+				end
+			end
+			if not explained then
+				add(out, "grab", 1, `grabbed a rail {gap} st away (> 3.4 u + travel)`)
+			end
+		end
+	end
+
+	-- 4. Off the rail (leap, drop, pounce, knockback): the launch point is the visible position.
+	if prevRoute and not nextRoute then
+		local vis = Motion.visualPose(
+			world,
+			prevRoute,
+			prev.railT,
+			Curve.vec3(prev.x, prev.y, prev.z),
+			prev.trunkNormalX,
+			prev.trunkNormalZ
+		)
+		local railCap = SquirrelMotor.railCap(prevRoute.flags.treeTravel, boosted)
+		local launchSpeed = math.sqrt(launchXZ * launchXZ + launchUp * launchUp)
+		local allowed = railCap * dt
+			+ launchSpeed * dt
+			+ Units.st(0.5)
+			+ E.posSlack
+			+ (if shortGap then 0 else C.airGrab)
+		local moved = math.sqrt((next.x - vis.x) ^ 2 + (next.y - vis.y) ^ 2 + (next.z - vis.z) ^ 2)
+		if moved > allowed then
+			add(out, "teleport", 1, `left the rail {moved} st from the visible position (allowed {allowed})`)
+		end
+		if hypot2(next.vx, next.vz) > launchXZ then
+			add(out, "launch", 1, `horizontal launch {hypot2(next.vx, next.vz)} st/s`)
+		end
+		if next.vy > launchUp then
+			add(out, "launch", 1, `vertical launch {next.vy} st/s`)
+		end
+	end
+
+	-- 5. Off rail to off rail: ground and air motion.
+	if not prevRoute and not nextRoute then
+		local vxz = hypot2(next.vx, next.vz)
+		local launched = next.vy > prev.vy + P.gravity * 0.5 * P.substep and not next.grounded
+		local railPlausible: boolean? = nil
+		local function plausible(): boolean
+			if railPlausible == nil then
+				railPlausible = railWithinReach()
+			end
+			return railPlausible :: boolean
+		end
+		if launched then
+			launchUsed = true
+			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce
+			local fromGroundOrRail = prev.grounded or plausible()
+			local capUp = if fromGroundOrRail then launchUp else pounceUp
+			local capXZ = if fromGroundOrRail then launchXZ else pounceXZ
+			if next.vy > capUp then
+				add(out, "launch", 1, `vertical launch {next.vy} st/s (cap {capUp})`)
+			end
+			if vxz > capXZ then
+				add(out, "launch", 1, `horizontal launch {vxz} st/s (cap {capXZ})`)
+			end
+		else
+			if vxz > groundCap then
+				add(out, "speed", math.min(1, vxz / groundCap - 1), `horizontal speed {vxz} st/s (cap {groundCap})`)
+			end
+			-- gravity: airborne at both ends and no launch -> vy drops by exactly g*dt (semi-implicit
+			-- Euler) unless a rail within reach could have been visited in between
+			if not prev.grounded and not next.grounded then
+				local expected = prev.vy - P.gravity * dt
+				local eps = P.gravity * E.gravityEps
+				if math.abs(next.vy - expected) > eps then
+					-- a mid-air pounce REPLACES the velocity (vy 2.37..5.09 u, |v_xz| <= 13.5 u x1.12) at any
+					-- tick inside the gap, so it can lower a rising vy; a rail visit zeroes and relaunches it
+					local pounce = next.vy <= pounceUp
+						and next.vy >= pounceUpMin - P.gravity * dt - eps
+						and vxz <= pounceXZ
+					if pounce then
+						launchUsed = true
+					elseif not plausible() then
+						add(out, "gravity", 1, `vertical speed {next.vy}, expected {expected}`)
+					end
+				end
+			end
+		end
+		-- horizontal displacement against the fastest plausible speed
+		local dxz = hypot2(next.x - prev.x, next.z - prev.z)
+		local fastest = math.max(groundCap, if launched then launchXZ else 0, hypot2(prev.vx, prev.vz) * E.speedTol)
+		local allowedXZ = fastest * dt + E.posSlack
+		if dxz > allowedXZ and not (not shortGap and plausible() and dxz <= allowedXZ + C.airGrab) then
+			add(out, "teleport", math.min(1, dxz / allowedXZ - 1), `moved {dxz} st in {dt} s (allowed {allowedXZ})`)
+		end
+		-- vertical displacement: within what the start and end vertical speeds allow
+		local dy = next.y - prev.y
+		local upCap = math.max(prev.vy, next.vy, if launched then launchUp else 0, 0) * dt + E.posSlack
+		local downCap = math.min(prev.vy, next.vy, 0) * dt - E.posSlack - P.gravity * dt * dt
+		if dy > upCap or dy < downCap then
+			-- landing snaps to the ground (a step either way); a hidden rail visit climbs or descends
+			local landing = next.grounded and math.abs(dy) <= Units.st(1.4)
+			local railVisit = not shortGap
+				and plausible()
+				and math.abs(dy) <= SquirrelMotor.railCap(false, boosted) * dt + C.airGrab
+			if not landing and not railVisit then
+				add(out, "teleport", 1, `vertical move {dy} st in {dt} s`)
+			end
+		end
+		-- walls: the straight move must not cross a collider
+		local crosses = world.crosses
+		if crosses and crosses(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y)) then
+			add(out, "wall", 1, "move crosses a wall collider")
+		end
+	end
+
+	return out, launchUsed
 end
 
 return SquirrelMotor

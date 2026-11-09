@@ -11,7 +11,8 @@
 -- Interface: build(species, variant, index, parent) -> Rig, buildVehicle(...), move(rigs, poses, mode),
 -- anchorAll(rigs, anchored), partCount(rigs), checkFollow(rig)
 
-local Units = require("../../shared/Config/Units")
+local Import = require("./Import")
+local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 
 export type Rig = {
 	model: Model,

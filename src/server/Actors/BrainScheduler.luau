@@ -126,6 +126,9 @@ function Methods.register(self: Scheduler, id: number, brain: Common.Brain, acto
 	end
 	local n = #self.entries + 1
 	local phase = (n * GOLDEN) % 1
+	if self.focusFn then
+		self.focus = self.focusFn()
+	end
 	local tier = self:tierOf(actor)
 	actor.tier = tier
 	local entry: Entry = {
@@ -180,7 +183,7 @@ function Methods.step(self: Scheduler, dt: number, now: number, ctx: Common.Ctx)
 		local i = start
 		for _ = 1, n do
 			local entry = entries[i]
-			if entry.nextDue <= now then
+			if entry.nextDue <= now + 1e-9 then
 				if thinkTotal >= budget then
 					deferred += 1
 				else
@@ -200,7 +203,14 @@ function Methods.step(self: Scheduler, dt: number, now: number, ctx: Common.Ctx)
 					local tier = self:tierOf(actor)
 					entry.tier = tier
 					actor.tier = tier
-					entry.nextDue = now + intervalFor(self, tier)
+					-- keep the cadence anchored to the previous due time so 10 Hz stays 10 Hz at 60 fps
+					-- (frame-time rounding would otherwise slip a frame); catch up if far behind
+					local interval = intervalFor(self, tier)
+					local due = entry.nextDue + interval
+					if due <= now then
+						due = now + interval
+					end
+					entry.nextDue = due
 				end
 			end
 			i += 1
