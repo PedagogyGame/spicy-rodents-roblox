@@ -16,6 +16,7 @@ local LuauEmit = require("./lib/LuauEmit")
 local Migrate = require("./lib/Migrate")
 local Report = require("./lib/Report")
 local W1 = require("./lib/W1")
+local Attractions = require("./lib/Attractions")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -423,6 +424,21 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 		end,
 		warnings = warnings,
 	})
+	-- data/attractions.json: buildings baked on their own (Workspace.Attractions) and their routes
+	local attractionsModule = Attractions.compile({
+		repo = repo,
+		routeIds = routeIds,
+		invariant = invariant,
+		compare = compare,
+		schemaError = function(path: string, errs: { Schema.Error })
+			errorsTotal += #errs
+			filesValidated += 1
+			stdio.ewrite("compile: schema errors in " .. path .. "\n" .. Schema.formatErrors(path, errs) .. "\n")
+		end,
+	})
+	if attractionsModule then
+		table.insert(w1.modules, attractionsModule)
+	end
 
 	for _, c in comparisons do
 		if c.status ~= "match" then

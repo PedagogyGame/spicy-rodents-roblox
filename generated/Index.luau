@@ -5,6 +5,10 @@
 return {
 	harvestPin = { sha256 = "fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227" },
 	modules = {
+		Attractions = {
+			count = 1,
+			chunks = { "Attractions" },
+		},
 		Buildings = {
 			count = 1,
 			chunks = { "Buildings" },

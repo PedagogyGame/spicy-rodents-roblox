@@ -146,6 +146,14 @@ function Data.new(loader: Loader): Data
 			else
 				self._missing.Routes = true
 			end
+			-- attraction routes (data/attractions.json: the bowling alley's ball-return vents and tunnels),
+			-- world-space records after the harvest's chunks
+			if self:index().modules.Attractions then
+				table.insert(loaders, function()
+					local a = loadName(self, "Attractions")
+					return if a and a.routes then a.routes else {}
+				end)
+			end
 			self._routes = Registry.new({ loaders = loaders, studsPerUnit = self:index().studsPerUnit })
 		end
 		return self._routes :: Registry.Registry

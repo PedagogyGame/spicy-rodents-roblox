@@ -134,7 +134,15 @@ return function(t)
 	t.test("RouteAdapter: every harvested route with arc length and graph links", function()
 		local rail = RailWorld.get(data, Height.at)
 		local a = RouteAdapter.new(rail)
-		t.eq(a.count, 1332)
+		-- 1,332 harvested plus the attraction routes (data/attractions.json: the bowling alley's vents and tunnels)
+		local harvested = 0
+		for _, r in rail.registry:all() do
+			if r.origin ~= "attraction" then
+				harvested += 1
+			end
+		end
+		t.eq(harvested, 1332)
+		t.eq(a.count, #rail.registry:all())
 		local linked = 0
 		for i = 1, 200 do
 			local r = a.routes[i]

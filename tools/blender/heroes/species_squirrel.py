@@ -38,11 +38,11 @@ FRONT = {  # left side (+X); right is mirrored
     "End": (0.14, -0.67, 0.012),  # finger tips
 }
 BACK = {
-    "Upper": (0.17, 0.36, 0.82),  # hip joint
-    "Lower": (0.21, 0.09, 0.55),  # knee (points forward, inside the haunch)
-    "Foot": (0.19, 0.44, 0.11),  # hock (heel, a little off the ground)
-    "Toe": (0.18, 0.03, 0.032),  # ball of the foot
-    "End": (0.18, -0.09, 0.012),  # toe tips
+    "Upper": (0.17, 0.36, 0.84),  # hip joint
+    "Lower": (0.215, 0.06, 0.44),  # knee (points forward, inside the haunch)
+    "Foot": (0.19, 0.38, 0.10),  # hock (heel, a little off the ground)
+    "Toe": (0.18, 0.0, 0.032),  # ball of the foot
+    "End": (0.18, -0.12, 0.012),  # toe tips
 }
 
 
@@ -55,8 +55,8 @@ def skeleton():
         J.append((name, tuple(float(c) for c in head), parent, tuple(float(c) for c in tail)))
 
     add("Root", (0, 0, 0), None, (0, 0, 0.3))
-    add("Hips", (0, 0.40, 0.98), "Root", (0, 0.18, 1.04))
-    add("Spine1", (0, 0.18, 1.04), "Hips", (0, -0.04, 1.05))
+    add("Hips", (0, 0.40, 1.02), "Root", (0, 0.18, 1.06))
+    add("Spine1", (0, 0.18, 1.06), "Hips", (0, -0.04, 1.05))
     add("Spine2", (0, -0.04, 1.05), "Spine1", (0, -0.24, 1.03))
     add("Spine3", (0, -0.24, 1.03), "Spine2", (0, -0.44, 0.99))
     add("Chest", (0, -0.44, 0.99), "Spine3", (0, -0.60, 1.02))
@@ -122,11 +122,13 @@ def sculpt(variant="squirrel"):
     dz = -0.03 if rodent else 0.0  # and carries its head low
     P = []
     # --- torso: rib cage, belly, pelvis, the dorsal line and the chest -----------------------------
-    P.append(Ellipsoid((0, -0.26, 0.86), (0.245, 0.36, 0.30), tag="ribs"))
-    P.append(Ellipsoid((0, 0.08, 0.84), (0.235 * lean, 0.30, 0.27 * lean), k=0.12, tag="belly"))
-    P.append(Ellipsoid((0, 0.36, 0.88), (0.25, 0.28, 0.28), k=0.10, tag="pelvis"))
-    P.append(RoundCone((0, 0.48, 1.00), (0, -0.44, 0.99), 0.16, 0.16, k=0.12, tag="back"))
-    P.append(Ellipsoid((0, -0.50, 0.80), (0.17, 0.15, 0.21), k=0.08, tag="brisket"))
+    P.append(Ellipsoid((0, -0.25, 0.83), (0.25, 0.35, 0.31), tag="ribs"))
+    P.append(Ellipsoid((0, 0.08, 0.82), (0.24 * lean, 0.30, 0.29 * lean), k=0.12, tag="belly"))
+    P.append(Ellipsoid((0, 0.36, 0.88), (0.255, 0.28, 0.31), k=0.10, tag="pelvis"))
+    # the dorsal line arches: highest over the loins, lower at the withers and the croup
+    P.append(RoundCone((0, 0.46, 1.03), (0, 0.10, 1.07), 0.16, 0.165, k=0.12, tag="back"))
+    P.append(RoundCone((0, 0.10, 1.07), (0, -0.44, 0.98), 0.165, 0.16, k=0.12, tag="back"))
+    P.append(Ellipsoid((0, -0.50, 0.78), (0.17, 0.15, 0.22), k=0.08, tag="brisket"))
     P.append(Ellipsoid((0, 0.54, 0.92), (0.19, 0.13, 0.19), k=0.08, tag="rump"))
     # --- neck and head ------------------------------------------------------------------------------
     hz = HZ + dz
@@ -147,18 +149,18 @@ def sculpt(variant="squirrel"):
     # ears: short, broad, rounded leaves tilted out and back, cupped on the front
     tilt = rot_y(0.32) @ rot_x(-0.12)
     base = np.array([0.11, -0.80, 1.33 + dz])
-    c = base + tilt @ np.array([0, 0, 0.06])
-    P += mirror_pair([Ellipsoid(c, (0.056, 0.021, 0.072), axes=tilt, k=0.03, tag="ear")])
-    cup = c + tilt @ np.array([0, -0.015, 0.012])
-    P += mirror_pair([Ellipsoid(cup, (0.038, 0.012, 0.052), axes=tilt, k=0.006, op="sub", tag="earcup")])
+    c = base + tilt @ np.array([0, 0, 0.07])
+    P += mirror_pair([Ellipsoid(c, (0.06, 0.022, 0.085), axes=tilt, k=0.03, tag="ear")])
+    cup = c + tilt @ np.array([0, -0.016, 0.014])
+    P += mirror_pair([Ellipsoid(cup, (0.041, 0.012, 0.062), axes=tilt, k=0.006, op="sub", tag="earcup")])
     # --- forelegs ---------------------------------------------------------------------------------------
     sh, el, wr, kn = (np.array(FRONT[k]) for k in ("Upper", "Lower", "Foot", "Toe"))
     P += mirror_pair([
         Ellipsoid(sh + [-0.015, 0.02, 0.13], (0.11, 0.16, 0.19), axes=rot_x(0.35), k=0.07, tag="scapula"),
         _limb(sh, el, 0.115 * lean, 0.07, 0.07, "arm"),
         Ellipsoid((sh + el) / 2 + [0.0, 0.05, 0.0], (0.075, 0.075, 0.125), axes=rot_x(-0.3), k=0.05, tag="triceps"),
-        _limb(el, wr, 0.066, 0.036, 0.04, "forearm"),
-        Ellipsoid(el + (wr - el) * 0.3, (0.05, 0.05, 0.09), axes=frame_from(wr - el), k=0.03, tag="forearmmuscle"),
+        _limb(el, wr, 0.07, 0.038, 0.05, "forearm"),
+        Ellipsoid(el + (wr - el) * 0.3, (0.052, 0.05, 0.11), axes=frame_from(wr - el), k=0.06, tag="forearmmuscle"),
         _limb(wr, kn, 0.037, 0.030, 0.02, "hand"),
     ])
     for dx, dy in ((-0.034, 0.0), (-0.012, 0.013), (0.012, 0.013), (0.034, 0.0)):
@@ -168,8 +170,8 @@ def sculpt(variant="squirrel"):
     P += mirror_pair([
         _limb(hp + [0.0, 0.02, 0.02], kn2, 0.21 * lean, 0.11, 0.10, "thigh"),
         Ellipsoid(hp + [0.035, -0.06, -0.12], (0.14, 0.24, 0.22), axes=rot_x(0.55), k=0.10, tag="haunch"),
-        _limb(kn2, hk, 0.10, 0.048, 0.06, "shank"),
-        Ellipsoid(kn2 + (hk - kn2) * 0.3 + [0.0, 0.03, 0.02], (0.07, 0.08, 0.12), axes=frame_from(hk - kn2), k=0.05, tag="calf"),
+        _limb(kn2, hk, 0.11, 0.05, 0.07, "shank"),
+        Ellipsoid(kn2 + (hk - kn2) * 0.3 + [0.0, 0.035, 0.03], (0.08, 0.10, 0.14), axes=frame_from(hk - kn2), k=0.07, tag="calf"),
         _limb(hk, ba, 0.048, 0.031, 0.03, "foot"),
     ])
     for dx, dy in ((-0.038, 0.006), (-0.018, 0.016), (0.0, 0.02), (0.018, 0.016), (0.038, 0.006)):
@@ -184,7 +186,7 @@ def sculpt(variant="squirrel"):
         for f in (0.25, 0.75):
             m = a + (b - a) * f
             s = plume[i] * (1 - f) + plume[i + 1] * f
-            P.append(Ellipsoid(m, (0.19 * s + 0.035, 0.13, 0.15 * s + 0.035), axes=frame_from(b - a), k=0.10, tag="plume"))
+            P.append(Ellipsoid(m, (0.21 * s + 0.035, 0.13, 0.13 * s + 0.035), axes=frame_from(b - a), k=0.10, tag="plume"))
     P.append(Ellipsoid(np.array(TAIL[8]) + [0, -0.03, 0.0], (0.08 * plume[-1] + 0.03, 0.08, 0.07 * plume[-1] + 0.03), k=0.06, tag="plume"))
     if rodent:
         # ribs: four ridges along each flank, with grooves between them

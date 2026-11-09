@@ -297,9 +297,11 @@ return function(t)
 				for _, b in poles do
 					t.truthy(math.sqrt((a.cx - b.cx) ^ 2 + (a.cz - b.cz) ^ 2) >= 25, `{a.name} near a pole`)
 				end
-				-- never on a sidewalk, footpath or street strip
+				-- never on a sidewalk, footpath or street strip (the bridge's own lamps stand on its deck)
 				for _, rp in plans do
-					if rp.kind == "road" then
+					local ownBridge = string.find(rp.id, "bridge", 1, true) ~= nil
+						and string.find(a.name, rp.id, 1, true) ~= nil
+					if rp.kind == "road" and not ownBridge then
 						for _, seg in rp.parts do
 							if seg.role ~= "Paint" then
 								t.truthy(not Geometry.containsXZ(seg, a.cx, a.cz, 0), `{a.name} on {rp.id}`)
