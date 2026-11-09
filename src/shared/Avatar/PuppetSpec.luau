@@ -365,6 +365,49 @@ function PuppetSpec.spec(species: string, opts: Opts?): ModelSpec
 	error(`PuppetSpec: unknown species {species}`)
 end
 
+-- finishStockR15(model, lib): engine R15s from CreateHumanoidModelFromDescription arrive with Roblox's rig
+-- attachments but, where no simulation runs (Luau Execution, a model not yet stepped), without their
+-- Motor6Ds; Humanoid:BuildRigFromAttachments makes them (named Root, Waist, Neck, ... as RigSpec.human
+-- expects). Then our custom sockets are added. Returns the number of sockets added.
+function PuppetSpec.finishStockR15(model: any, lib: { Instance: any, CFrame: any }): number
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local lower = model:FindFirstChild("LowerTorso")
+	if humanoid and not (lower and lower:FindFirstChild("Root")) then
+		pcall(function()
+			humanoid:BuildRigFromAttachments()
+		end)
+	end
+	-- any joint still missing is made from the matching <Joint>RigAttachment pair (deterministic)
+	local converted: { [string]: number } = {}
+	for _, r in R15 do
+		local name, joint, parentName = r[1] :: string, r[4] :: string, r[5] :: string
+		local part1, part0 = model:FindFirstChild(name), model:FindFirstChild(parentName)
+		local existing = if part1 then part1:FindFirstChild(joint) else nil
+		if existing and not existing:IsA("Motor6D") then
+			-- the avatar joint upgrade builds AnimationConstraints (plus ball sockets) under these names;
+			-- AI and puppet bodies drive Motor6Ds (HANDOFF rule 4), so swap the joint for a Motor6D
+			converted[existing.ClassName] = (converted[existing.ClassName] or 0) + 1
+			existing:Destroy()
+			existing = nil
+		end
+		if part1 and part0 and not existing then
+			local a0 = part0:FindFirstChild(`{joint}RigAttachment`)
+			local a1 = part1:FindFirstChild(`{joint}RigAttachment`)
+			local m = lib.Instance.new("Motor6D")
+			m.Name = joint
+			m.Part0 = part0
+			m.Part1 = part1
+			m.C0 = if a0 then a0.CFrame else lib.CFrame.new()
+			m.C1 = if a1 then a1.CFrame else lib.CFrame.new()
+			m.Parent = part1
+		end
+	end
+	for className, n in converted do
+		model:SetAttribute(`Converted{className}`, n)
+	end
+	return PuppetSpec.addHumanSockets(model, lib)
+end
+
 -- Engine R15s from CreateHumanoidModelFromDescription carry Roblox's attachments but not our custom
 -- sockets (Badge, Mask, ChestRig, Pads): add whichever are missing, at the block-R15 offsets.
 function PuppetSpec.addHumanSockets(model: any, lib: { Instance: any, CFrame: any }): number

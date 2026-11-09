@@ -53,7 +53,7 @@ export type FrameMetrics = { brainMs: number, motorMs: number, gridMs: number, t
 
 export type World = {
 	opts: Opts,
-	config: Population.Config,
+	config: any, -- Actors/Population.Config
 	actors: { Common.Actor },
 	actorsById: { [number]: Common.Actor },
 	brains: { [number]: Common.Brain },
@@ -61,7 +61,7 @@ export type World = {
 	grid: Perception.Grid,
 	ctx: Common.Ctx,
 	nav: Nav.Nav,
-	town: Town.Town,
+	town: any, -- World/Town.Town
 	rail: any,
 	routes: RouteAdapter.Adapter,
 	now: number,

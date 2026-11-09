@@ -62,11 +62,11 @@ local function yawOf(dx: number, dz: number): number
 end
 
 local function cumulative(route: Route): { number }
-	local cum = route.cum
-	if cum then
-		return cum
+	local existing = route.cum
+	if existing then
+		return existing
 	end
-	cum = { 0 }
+	local cum: { number } = { 0 }
 	local pts = route.points
 	for i = 2, #pts do
 		local a, b = pts[i - 1], pts[i]

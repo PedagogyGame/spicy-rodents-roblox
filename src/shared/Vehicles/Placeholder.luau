@@ -14,6 +14,15 @@ local VehicleKinds = require("./VehicleKinds")
 
 local Placeholder = {}
 
+type Wheel = { name: string, sx: number, sz: number }
+local WHEELS4: { Wheel } = {
+	{ name = "WheelFL", sx = -1, sz = -1 },
+	{ name = "WheelFR", sx = 1, sz = -1 },
+	{ name = "WheelBL", sx = -1, sz = 1 },
+	{ name = "WheelBR", sx = 1, sz = 1 },
+}
+local WHEELS2: { Wheel } = { { name = "WheelF", sx = 0, sz = -1 }, { name = "WheelB", sx = 0, sz = 1 } }
+
 local function part(
 	parent: Instance,
 	name: string,
@@ -96,29 +105,24 @@ function Placeholder.build(kindId: string, name: string?): Model
 		weld(root, glass)
 	end
 	if k.wheels == 4 then
-		for _, spec in { { "WheelFL", -1, -1 }, { "WheelFR", 1, -1 }, { "WheelBL", -1, 1 }, { "WheelBR", 1, 1 } } do
+		for _, spec in WHEELS4 do
 			local wheel = part(
 				model,
-				spec[1] :: string,
+				spec.name,
 				Vector3.new(wheelR * 0.8, wheelR * 2, wheelR * 2),
-				origin
-					* CFrame.new(
-						(spec[2] :: number) * (w / 2 - wheelR * 0.3),
-						-h / 2 + wheelR,
-						(spec[3] :: number) * l * 0.32
-					),
+				origin * CFrame.new(spec.sx * (w / 2 - wheelR * 0.3), -h / 2 + wheelR, spec.sz * l * 0.32),
 				Color3.new(0.08, 0.08, 0.08)
 			)
 			wheel.Shape = Enum.PartType.Cylinder
 			weld(root, wheel)
 		end
 	elseif k.wheels == 2 then
-		for _, spec in { { "WheelF", -1 }, { "WheelB", 1 } } do
+		for _, spec in WHEELS2 do
 			local wheel = part(
 				model,
-				spec[1] :: string,
+				spec.name,
 				Vector3.new(wheelR * 0.4, wheelR * 2, wheelR * 2),
-				origin * CFrame.new(0, -h / 2 + wheelR, (spec[2] :: number) * l * 0.38),
+				origin * CFrame.new(0, -h / 2 + wheelR, spec.sz * l * 0.38),
 				Color3.new(0.08, 0.08, 0.08)
 			)
 			wheel.Shape = Enum.PartType.Cylinder

@@ -33,7 +33,7 @@ export type Opts = {
 }
 
 export type Service = {
-	fleet: PlayerVehicles.Fleet,
+	fleet: any, -- Vehicles/PlayerVehicles.Fleet
 	models: { [string]: Model },
 	interact: (self: Service, player: Player) -> (boolean, string?),
 	exitAll: (self: Service, player: Player) -> (),
@@ -236,7 +236,7 @@ function DeviceService.start(opts: Opts): Service
 				granted:FireClient(player, { device = "drone", model = model, kind = "drone" })
 				return true, nil
 			end
-			local v = PlayerVehicles.get(fleet, best) :: PlayerVehicles.Vehicle
+			local v = PlayerVehicles.get(fleet, best) :: any
 			if openKeys and v.parked and v.driver == nil then
 				v.key = player.UserId
 			end

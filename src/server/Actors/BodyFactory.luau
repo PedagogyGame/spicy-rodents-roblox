@@ -12,18 +12,16 @@
 --   applyLook(body, look) (stock colours by species look; the blend is AvatarBlendService's)
 -- Engine only inside the functions. No side effects on require.
 
-local Import = require("../Import")
-local Species = Import.shared("Actors/Species") :: typeof(require("../../shared/Actors/Species"))
 local ActorService = require("./ActorService")
 local Puppets = require("../AI/Puppets")
 
 local BodyFactory = {}
 
 -- role palettes for stock humans [hospital_police_infection §5.1, §8.2]: shirt hue per post
-local POST_SHIRTS: { [string]: Color3 } = {
-	hospital_staff = Color3.fromRGB(120, 190, 200),
-	ambulance_crew = Color3.fromRGB(230, 120, 40),
-	police = Color3.fromRGB(35, 50, 110),
+local POST_SHIRTS: { [string]: { number } } = {
+	hospital_staff = { 120, 190, 200 },
+	ambulance_crew = { 230, 120, 40 },
+	police = { 35, 50, 110 },
 }
 
 function BodyFactory.template(species: string): Model?
@@ -51,7 +49,8 @@ local function stockHuman(index: number, post: string?): Model
 	local Players = game:GetService("Players")
 	local desc = Instance.new("HumanoidDescription")
 	local skin = Color3.fromHSV(0.07, 0.3 + (index % 4) * 0.1, 0.45 + (index % 5) * 0.1)
-	local shirt = POST_SHIRTS[post or ""] or Color3.fromHSV((index * 0.137) % 1, 0.55, 0.8)
+	local rgb = POST_SHIRTS[post or ""]
+	local shirt = if rgb then Color3.fromRGB(rgb[1], rgb[2], rgb[3]) else Color3.fromHSV((index * 0.137) % 1, 0.55, 0.8)
 	local pants = Color3.fromHSV((index * 0.291 + 0.5) % 1, 0.4, 0.4)
 	desc.HeadColor = skin
 	desc.LeftArmColor = skin
@@ -88,7 +87,7 @@ function BodyFactory.build(species: string, variant: string, index: number, post
 end
 
 -- applyLook(body, look): the species stock look (fur / skin base colour on the body parts).
-function BodyFactory.applyLook(body: Model, look: Species.StockLook)
+function BodyFactory.applyLook(body: Model, look: any)
 	local c = Color3.new(look.body.r, look.body.g, look.body.b)
 	for _, d in body:GetDescendants() do
 		if d:IsA("BasePart") and d.Transparency < 1 and d.Name ~= "HumanoidRootPart" then

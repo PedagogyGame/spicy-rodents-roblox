@@ -105,7 +105,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 	local townIdOf: { [string]: number } = {}
 	local offsets: { [number]: number } = {}
 	local roots: { [number]: BasePart } = {}
-	local history: { [string]: Recovery.History } = {}
+	local history: { [string]: any } = {}
 	local t0 = workspace:GetServerTimeNow()
 
 	for _, a in world.actors do
@@ -141,12 +141,12 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		onGranted = function(player: any, payload: any)
 			payload.variant = (byTownId[townIdOf[payload.actorId]] or {}).variant
 			if typeof(player) == "Instance" then
-				granted:FireClient(player, payload)
+				granted:FireClient(player :: Player, payload)
 			end
 		end,
 		onReleased = function(player: any, actorId: string, why: string)
 			if typeof(player) == "Instance" and player.Parent == Players then
-				released:FireClient(player, actorId, why)
+				released:FireClient(player :: Player, actorId, why)
 			end
 		end,
 		onHandoff = function(actor: any, player: any?, kind: "possess" | "release")

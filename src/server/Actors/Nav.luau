@@ -97,14 +97,17 @@ function Nav.build(town: any, interiors: { [string]: any }?): Nav
 		nav.stripNodes[i] = ids
 	end
 	-- interior room graphs
-	for id, t in interiors or {} do
+	local templates: { [string]: any } = interiors or {}
+	for id, t in templates do
 		local rooms, adj = {}, {}
-		for _, r in t.rooms or {} do
+		local roomList: { any } = t.rooms or {}
+		local doorList: { any } = t.doors or {}
+		for _, r in roomList do
 			table.insert(rooms, r.id)
 			adj[r.id] = {}
 		end
 		adj.outside = adj.outside or {}
-		for _, d in t.doors or {} do
+		for _, d in doorList do
 			adj[d.a] = adj[d.a] or {}
 			adj[d.b] = adj[d.b] or {}
 			table.insert(adj[d.a], d.b)
@@ -232,7 +235,8 @@ function Nav.roomPath(nav: Nav, key: string, from: string, to: string): { string
 			end
 			return out
 		end
-		for _, nxt in g.adj[cur] or {} do
+		local nexts: { string } = g.adj[cur] or {}
+		for _, nxt in nexts do
 			if not seen[nxt] then
 				seen[nxt] = true
 				prev[nxt] = cur

@@ -82,6 +82,21 @@ return function(t)
 		end
 	end)
 
+	t.test("finishStockR15: a stock R15 without joints or our sockets is completed to RigSpec.human", function()
+		local model = PartBuilder.instantiate(PuppetSpec.human("nurse", 2, lib), lib)
+		for _, d in model:GetDescendants() do
+			if
+				d:IsA("Motor6D")
+				or (d:IsA("Attachment") and (d.Name == "BadgeAttachment" or d.Name == "PadAttachmentL"))
+			then
+				d:Destroy()
+			end
+		end
+		t.falsy(RigSpec.validate(model, "human").ok)
+		t.eq(PuppetSpec.finishStockR15(model, lib), 2, "two sockets re-added")
+		t.truthy(RigSpec.validate(model, "human").ok)
+	end)
+
 	t.test("role palettes: stock HumanoidDescriptions carry the uniform colours", function()
 		local desc = RolePalettes.description("officer", 1, lib)
 		local look = RolePalettes.look("officer", 1)

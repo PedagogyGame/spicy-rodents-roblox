@@ -105,8 +105,9 @@ function InputMap.start(): Sampler
 	end)
 
 	local nameSets: { [string]: { [string]: boolean } } = {}
-	for verb, names in InputMap.BINDINGS do
-		local set = {}
+	local bindings: { [string]: { string } } = InputMap.BINDINGS :: any
+	for verb, names in bindings do
+		local set: { [string]: boolean } = {}
 		for _, n in names do
 			set[n] = true
 		end

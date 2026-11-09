@@ -278,7 +278,7 @@ local function runScenario(opts: ScenarioOpts, deadline: number): { [string]: an
 end
 
 function AIScale.run(options: Options?): { [string]: any }
-	local opts = options or {}
+	local opts: Options = options or {}
 	local started = os.clock()
 	local deadline = started + (opts.wallLimitSeconds or 200)
 	local scenarios = opts.scenarios
@@ -287,7 +287,7 @@ function AIScale.run(options: Options?): { [string]: any }
 			{ name = "s5_72_humans_allNear", humans = 72, frames = 900, allNear = true, moveMode = "all" },
 			{ name = "s19_90_humans", humans = 90, frames = 1200, moveMode = "roots" },
 		}
-	local results = {}
+	local results: { { [string]: any } } = {}
 	local ok = true
 	for _, sc in scenarios do
 		if os.clock() > deadline - 20 then

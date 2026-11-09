@@ -64,7 +64,6 @@ export type Brain = {
 	suspend: (self: Brain) -> Snapshot,
 	resume: (self: Brain, snapshot: Snapshot) -> (),
 	onEvent: (self: Brain, evt: { [string]: any }) -> (),
-	[string]: any,
 }
 
 local Common = {}

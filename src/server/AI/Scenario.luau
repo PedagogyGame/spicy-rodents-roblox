@@ -123,7 +123,7 @@ end
 local LANES = Pedestrian.defaultLanes()
 
 -- Vehicle lanes (traffic §4 table): residential N-S at x = +/-5.4, the E-W grid roads, the boulevard.
-local VEHICLE_LANES = {
+local VEHICLE_LANES: { { axis: "x" | "z", fixed: number, dir: number, min: number, max: number } } = {
 	{ axis = "z", fixed = -5.4, dir = 1, min = -260, max = 260 },
 	{ axis = "z", fixed = 5.4, dir = -1, min = -260, max = 260 },
 	{ axis = "x", fixed = -5.6, dir = 1, min = -260, max = 260 },
