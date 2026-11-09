@@ -51,7 +51,7 @@ local function process(self: Handler, receipt: ReceiptLedger.Receipt): Decision
 		return "NotProcessedYet"
 	end
 	local id = receipt.PurchaseId
-	local key = `{profile.key}/{id}`
+	local key = `{profile.session}/{id}`
 	if ReceiptLedger.has(profile.data, id) then
 		local rev = self.pending[key]
 		if rev == nil or profile.savedRevision >= rev then
