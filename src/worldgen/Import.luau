@@ -10,7 +10,7 @@
 --   local Units = Import.shared("Config/Units") :: typeof(require("../shared/Config/Units"))  -- from a file at the root
 --   (one ../ more per folder level below the root)
 -- so the value comes from here (engine or Lune) and the type from the on-disk path.
--- Interface: shared(path) -> module. Engine-only branches run only when `script` exists.
+-- Interface: shared(path) -> module; generated(name) -> compiled data module (W1). Engine-only branches run only when `script` exists.
 -- STANDARD (W0, lead decision): every cross-root require goes through the Import module of its
 -- own root (src/server/Import.luau, src/client/Import.luau, src/worldgen/Import.luau). Within a root,
 -- plain relative string requires ("./Sibling", "../Up") are used; they resolve identically on disk and
@@ -39,6 +39,14 @@ function Import.shared(path: string): any
 		return engineShared(path)
 	end
 	return (require :: any)(LUNE_SHARED_PREFIX .. path)
+end
+
+-- `name` is a module in generated/ (Rojo: ReplicatedStorage.Shared.Generated): "LotTypes", "Routes_01".
+function Import.generated(name: string): any
+	if script ~= nil then
+		return engineShared("Generated/" .. name)
+	end
+	return (require :: any)("../../generated/" .. name)
 end
 
 return Import
