@@ -1,17 +1,27 @@
 {
-  "name": "roblox-rojo-game",
+  "name": "SpicyRodents",
+  "globIgnorePaths": ["**/*.spec.luau", "**/README.md", "**/.gitkeep"],
   "tree": {
     "$className": "DataModel",
 
     "ReplicatedStorage": {
       "Shared": {
-        "$path": "src/shared"
+        "$path": "src/shared",
+        "Generated": {
+          "$path": { "optional": "generated" }
+        }
+      },
+      "Assets": {
+        "$path": "assets"
       }
     },
 
     "ServerScriptService": {
       "Server": {
-        "$path": "src/server"
+        "$path": "src/server",
+        "WorldGen": {
+          "$path": "src/worldgen"
+        }
       }
     },
 
@@ -23,46 +33,33 @@
       }
     },
 
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false,
+        "MaxPlayers": 49
+      }
+    },
+
     "Workspace": {
       "$properties": {
-        "FilteringEnabled": true
-      },
-      "Baseplate": {
-        "$className": "Part",
-        "$properties": {
-          "Anchored": true,
-          "Color": [
-            0.38823,
-            0.37254,
-            0.38823
-          ],
-          "Locked": true,
-          "Position": [
-            0,
-            -10,
-            0
-          ],
-          "Size": [
-            512,
-            20,
-            512
-          ]
-        }
+        "StreamingEnabled": true,
+        "ModelStreamingBehavior": "Improved",
+        "StreamOutBehavior": "Opportunistic",
+        "StreamingMinRadius": 64,
+        "StreamingTargetRadius": 1024,
+        "PlayerCharacterDestroyBehavior": "Disabled",
+        "SignalBehavior": "Deferred",
+        "FallenPartsDestroyHeight": -200
       }
     },
+
     "Lighting": {
       "$properties": {
-        "Ambient": [
-          0,
-          0,
-          0
-        ],
-        "Brightness": 2,
-        "GlobalShadows": true,
-        "Outlines": false,
-        "Technology": "Voxel"
+        "Technology": "Future",
+        "GeographicLatitude": 39
       }
     },
+
     "SoundService": {
       "$properties": {
         "RespectFilteringEnabled": true

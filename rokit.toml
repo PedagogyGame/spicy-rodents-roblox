@@ -1,0 +1,9 @@
+# Toolchain pins (BUILD_PLAN §1.2). `rokit install` on a dev machine; the cloud container
+# installs the same versions through cargo (docs/ENVIRONMENT_SETUP.sh) because GitHub release
+# downloads are blocked there. StyLua must carry the Luau feature (release binaries do).
+[tools]
+rojo = "rojo-rbx/rojo@7.7.1"
+lune = "lune-org/lune@0.11.1"
+stylua = "JohnnyMorganz/StyLua@2.6.0"
+selene = "Kampfkarren/selene@0.31.0"
+luau-lsp = "JohnnyMorganz/luau-lsp@1.70.1"

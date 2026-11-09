@@ -1,0 +1,10 @@
+# Selene lint config. `roblox.yml` is committed: stock Selene cannot download the Roblox API
+# dump through this container's proxy (see docs/spec/roblox_feasibility.md A, Selene row).
+# Regenerate with a Selene built with ureq features `proxy-from-env` + `native-certs`:
+#   selene generate-roblox-std
+std = "roblox"
+exclude = ["generated/**", "art_captures/**", "build/**", "node_modules/**"]
+
+[lints]
+# Lune scripts and engine-test tasks legitimately shadow `_` style loop variables; keep the
+# defaults otherwise so new code starts clean.

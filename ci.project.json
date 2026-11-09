@@ -1,0 +1,78 @@
+{
+  "name": "SpicyRodentsCI",
+  "globIgnorePaths": ["**/*.spec.luau", "**/README.md", "**/.gitkeep"],
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared",
+        "Generated": {
+          "$path": { "optional": "generated" }
+        }
+      },
+      "Assets": {
+        "$path": "assets"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server",
+        "WorldGen": {
+          "$path": "src/worldgen"
+        }
+      }
+    },
+
+    "ServerStorage": {
+      "EngineTests": {
+        "$path": "tests/engine"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false,
+        "MaxPlayers": 49
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": true,
+        "ModelStreamingBehavior": "Improved",
+        "StreamOutBehavior": "Opportunistic",
+        "StreamingMinRadius": 64,
+        "StreamingTargetRadius": 1024,
+        "PlayerCharacterDestroyBehavior": "Disabled",
+        "SignalBehavior": "Deferred",
+        "FallenPartsDestroyHeight": -200
+      },
+      "Town": {
+        "$path": { "optional": "build/Town.rbxm" }
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "Technology": "Future",
+        "GeographicLatitude": 39
+      }
+    },
+
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    }
+  }
+}

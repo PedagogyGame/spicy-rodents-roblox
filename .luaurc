@@ -1,0 +1,11 @@
+{
+  "languageMode": "strict",
+  "lint": { "*": true },
+  "aliases": {
+    "shared": "src/shared",
+    "server": "src/server",
+    "worldgen": "src/worldgen",
+    "client": "src/client",
+    "tests": "tests"
+  }
+}
