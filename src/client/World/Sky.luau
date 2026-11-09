@@ -19,7 +19,7 @@
 --     harbour lights and the lighthouse flash at dusk and night, NightLight parts glow at night, fog cards take
 --     the hour's haze colour, impostor cars run on the distant road (headlights at night).
 --   * Lighting attribute StreetLamps (0..1) for Render/TownView's lamp pool.
--- Interface: start() -> stop(); step(gameTime) (one Clock.game() reading -> Lighting); lampLevel() -> number
+-- Interface: start() -> stop(); step(gameTime, customMoon?) (one Clock.game() reading -> Lighting); lampLevel()
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -63,8 +63,9 @@ local function child(parent: Instance, class: string, name: string): any
 	return i
 end
 
--- Applies one game-time reading to Lighting and its effects. Returns the state used.
-function Sky.step(gt: GameTime): any
+-- Applies one game-time reading to Lighting and its effects (customMoon false: the engine moon stands in, its
+-- size following the phase). Returns the state used.
+function Sky.step(gt: GameTime, customMoon: boolean?): any
 	local Lighting = game:GetService("Lighting")
 	local s = SkyKeys.stateAt(gt.hour)
 	local k = SkyKeys.illumination(Moon.phase(gt.day + gt.dayFrac))
@@ -102,7 +103,8 @@ function Sky.step(gt: GameTime): any
 	sky.CelestialBodiesShown = true
 	sky.StarCount = 5000 -- the engine's maximum; stars show only once the sky is dark
 	sky.SunAngularSize = s.sunSize
-	sky.MoonAngularSize = 0 -- the custom moon below shows the phase
+	-- the custom moon shows the phase; without it the engine moon at least shrinks and vanishes toward new
+	sky.MoonAngularSize = if customMoon ~= false then 0 elseif k < 0.03 then 0 else 4 + 7 * k
 	return s
 end
 
@@ -403,9 +405,10 @@ function Sky.start(): () -> ()
 		RunService.RenderStepped:Connect(function(dt: number)
 			acc += dt
 			local gt = clock:game()
+			Lighting.ClockTime = SkyKeys.clockTimeAt(gt.hour) -- every frame: the sun moves smoothly
 			if acc >= 1 / Sky.LIGHT_HZ or state == nil then
 				acc = 0
-				local ok, res = pcall(Sky.step, gt)
+				local ok, res = pcall(Sky.step, gt, moon ~= nil)
 				if ok then
 					state = res
 				end

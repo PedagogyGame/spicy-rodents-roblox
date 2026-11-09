@@ -98,8 +98,16 @@ def _texts(texts):
         if mat is None:
             mat = _text_material(f"att_text_mat_{len(cache)}", T["color"])
             cache[key] = mat
-        ob = bpy.data.objects.new(cu.name, cu)
-        ob.data.materials.append(mat)
+        tmp = bpy.data.objects.new(cu.name, cu)
+        tmp.data.materials.append(mat)
+        bpy.context.scene.collection.objects.link(tmp)
+        # as a mesh: render.py's setup_render turns every FONT object toward the camera (the lineup labels)
+        dg = bpy.context.evaluated_depsgraph_get()
+        me = bpy.data.meshes.new_from_object(tmp.evaluated_get(dg))
+        bpy.data.objects.remove(tmp, do_unlink=True)
+        ob = bpy.data.objects.new(f"att_text_{i}", me)
+        if not me.materials:
+            me.materials.append(mat)
         bpy.context.scene.collection.objects.link(ob)
         r, u, n = _bl(T["right"]).normalized(), _bl(T["up"]).normalized(), _bl(T["normal"]).normalized()
         m = Matrix(((r.x, u.x, n.x), (r.y, u.y, n.y), (r.z, u.z, n.z))).to_4x4()

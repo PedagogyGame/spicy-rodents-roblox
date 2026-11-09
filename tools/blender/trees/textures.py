@@ -185,11 +185,11 @@ def bark_maps(family, seed=1, tint=None):
     dark, mid, light = (srgb_to_lin(hex_rgb(c)) for c in BARK_COLOURS[family])
     lichen = srgb_to_lin(hex_rgb("#8d9a6c"))
     moss = srgb_to_lin(hex_rgb("#55663a"))
-    if family in ("oak", "elm", "willow", "maple"):
+    if family in ("oak", "elm", "willow", "maple", "apple"):
         warp = fbm(u, v, 3, 2, 4, rng)
         warp2 = fbm(u, v, 2, 3, 3, rng)
-        fx = {"oak": 9, "elm": 11, "willow": 8, "maple": 13}[family]
-        fy = {"oak": 2, "elm": 3, "willow": 1, "maple": 2}[family]
+        fx = {"oak": 9, "elm": 11, "willow": 8, "maple": 13, "apple": 12}[family]
+        fy = {"oak": 2, "elm": 3, "willow": 1, "maple": 2, "apple": 3}[family]
         wu = u + (warp - 0.5) * (0.10 if family == "elm" else 0.06) + np.sin(v * 2 * math.pi * fy * 2) * (0.015 if family == "elm" else 0.0)
         n1 = fbm(wu, v + (warp2 - 0.5) * 0.08, fx, fy, 5, rng, gain=0.55)
         ridge = 1.0 - np.abs(2 * n1 - 1)
@@ -197,7 +197,7 @@ def bark_maps(family, seed=1, tint=None):
         # horizontal cracks break ridges into long plates
         f1, f2, cid = worley(wu % 1.0, v, max(3, fx // 2), max(2, fy + 1), rng, jitter=0.9)
         crack = 0.6 + 0.4 * smoothstep(0.0, 0.05, f2 - f1)
-        depth = {"oak": 1.0, "elm": 0.85, "willow": 1.0, "maple": 0.55}[family]
+        depth = {"oak": 1.0, "elm": 0.85, "willow": 1.0, "maple": 0.55, "apple": 0.8}[family]
         h = ridge * (0.65 + 0.35 * crack) * depth + fbm(u, v, 32, 32, 3, rng) * 0.18
         h = (h - h.min()) / (h.max() - h.min())
         t = smoothstep(0.15, 0.85, h)
@@ -208,7 +208,7 @@ def bark_maps(family, seed=1, tint=None):
         mossm = smoothstep(0.72, 0.86, fbm(u, v, 3, 4, 4, rng)) * (1 - smoothstep(0.1, 0.5, h))
         col = mix(col, moss, mossm * 0.3)
         rough = 0.97 - 0.18 * t
-        nstr = {"oak": 7.0, "elm": 6.0, "willow": 7.5, "maple": 4.0}[family]
+        nstr = {"oak": 7.0, "elm": 6.0, "willow": 7.5, "maple": 4.0, "apple": 5.5}[family]
     elif family == "sycamore":
         # smooth pale bark shedding in rounded, irregular patches (cream, olive, grey-brown)
         wu = u + (fbm(u, v, 4, 4, 4, rng) - 0.5) * 0.16

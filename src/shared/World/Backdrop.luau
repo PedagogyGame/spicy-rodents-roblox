@@ -20,7 +20,8 @@
 -- Interface: constants (SEA_Y, OCEAN_Y, OCEAN_NEAR_Z, OCEAN_FAR_Z, WATER_TO_Z, NORTH_FROM_Z, BAND,
 --   MESH_INSET, CENTRE, SUN_TILT, SUNSET, TOWER); reset(); clamp(); shoreZ(x); coastProfile(t);
 --   outside(x, z) -> (d, px, pz); hills(x, z); mesh() -> Mesh; meshHeight(x, z); groundAt(x, z);
---   sample(x, z) -> (h, land, t, d); materialAt(x, z, h) -> material name; terrainRects() -> { Rect };
+--   sample(x, z) -> (h, land, t, d); materialAt(x, z, h) -> material name; materialFor(x, z, h, land, t, d)
+--   (the same from a sample in hand); terrainRects() -> { Rect };
 --   sunDirection(clockTime, tilt?) -> (x, y, z); moonClockTime(clockTime, phase01) -> clockTime
 -- No side effects on require.
 
@@ -286,6 +287,11 @@ end
 -- headland, otherwise World/Height's own rule inside the clamp and grass beyond).
 function Backdrop.materialAt(x: number, z: number, h: number): string
 	local _, land, t, d = Backdrop.sample(x, z)
+	return Backdrop.materialFor(x, z, h, land, t, d)
+end
+
+-- materialAt from a sample already taken (h, land, t, d as Backdrop.sample returns them).
+function Backdrop.materialFor(x: number, z: number, h: number, land: number, t: number, d: number): string
 	if t > -160 and h < Backdrop.SEA_Y + 3.2 then
 		return "Sand"
 	end

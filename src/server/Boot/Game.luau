@@ -27,7 +27,8 @@
 -- Engine only inside the functions; no side effects on require.
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, pick(player, choice) -> (ok, why?),
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
---   kill(actor, cause), step(dt), stateOf(player), health(actorId), stop() }
+--   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
+--   the bowling alley's MinigameService; nil without Workspace.Attractions), stop() }
 
 local Import = require("../Import")
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
@@ -42,6 +43,7 @@ local PlayerVehicles =
 local ActorsRuntime = require("../Actors/ActorsRuntime")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
+local AttractionService = require("../Attractions/AttractionService")
 local DayClock = require("./DayClock")
 
 export type Opts = {
@@ -776,6 +778,38 @@ function Game.start(opts: Opts?): any
 		)
 	end
 
+	-- 5. the bowling alley and its minigames (Workspace.Attractions; people only; brief v2 §13a)
+	stage(0.96, "Opening the bowling alley")
+	local attractions: any = nil
+	local okA, errA = pcall(function()
+		attractions = AttractionService.start({
+			net = net,
+			heartbeat = o.heartbeat ~= false,
+			physics = o.heartbeat ~= false,
+			terrain = o.terrain ~= false,
+			canPlay = function(player: any): (boolean, string?)
+				local actor = possession:actorOf(player)
+				if actor == nil then
+					return false, "Pick a person from the menu first (M)"
+				end
+				if actor.species ~= "human" then
+					return false, "Only people can play. Animals can watch (or sneak through the ball return)"
+				end
+				if devices and type(player.UserId) == "number" and PlayerVehicles.vehicleOf(devices.fleet, player.UserId) then
+					return false, "Get out of the vehicle first (E)"
+				end
+				return true
+			end,
+			bodyOf = function(player: any): Model?
+				local actor = possession:actorOf(player)
+				return if actor then actor.body :: Model else nil
+			end,
+		})
+	end)
+	if not okA then
+		warn(`[SpicyRodents] bowling alley failed to open: {errA}`)
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -793,12 +827,19 @@ function Game.start(opts: Opts?): any
 		step = function(dt: number)
 			rt.step(dt)
 			step(dt)
+			if attractions and o.heartbeat == false then
+				attractions.step(dt)
+			end
 		end,
 		stateOf = stateOf,
 		health = healthOf,
 		placeAI = placeAI,
+		attractions = attractions,
 		stop = function()
 			rt.stop()
+			if attractions then
+				attractions.stop()
+			end
 			for _, c in conns do
 				c:Disconnect()
 			end

@@ -388,6 +388,8 @@ class TreeBuilder:
             self.build_bough(m)
         self.collect_foreign_tunnels()
         self._tun = self.tunnel_arrays()
+        if self.cat == "giant":
+            self.build_decor_limbs()
         self.build_roots()
         self.build_twigs_and_leaves()
         return self
@@ -399,7 +401,7 @@ class TreeBuilder:
         L = arclen(P)[-1]
         self.trunkL = L
         self.rails.append((P, 0.0, "trunk", trunk["name"], trunk["id"]))
-        Q, s, t = resample(P, 2.4)
+        Q, s, t = resample(P, 3.6 if self.cat == "giant" else 2.4)
         # carry the trunk down into the ground (pivot y = 0 is the ground at the root)
         foot = Q[0]
         below = [np.array([foot[0], y, foot[2]]) for y in (-3.0, -1.6, -0.6) if y < foot[1] - 0.2]
@@ -417,10 +419,11 @@ class TreeBuilder:
         if lead_len > Rtop * 1.5:
             d = norm(ttan * 0.4 + np.array([0, 1.0, 0]) + 0.35 * norm(away + 1e-9) * (np.linalg.norm(away) > 0.1))
             k = max(3, int(lead_len / 2.5))
+            p1 = top + ttan * lead_len * 0.45
+            p2 = top + d * lead_len
             for j in range(1, k + 1):
                 f = j / k
-                bend = np.array([math.sin(f * 2.1 + self.rec["seed"]) * 0.08, 0, math.cos(f * 1.7 + self.rec["seed"]) * 0.08]) * lead_len
-                leader.append(top + d * lead_len * f + bend * f)
+                leader.append((1 - f) ** 2 * top + 2 * (1 - f) * f * p1 + f * f * p2)
         C = np.concatenate([np.array(below).reshape(-1, 3), Q, np.array(leader).reshape(-1, 3)])
         nb, nq, nl = len(below), len(Q), len(leader)
         # route parameter per ring (below: 0, leader: >1)
@@ -485,7 +488,7 @@ class TreeBuilder:
         on_trunk = dtrunk < 3.5
         rt = self.trunk_r_at_y(start[1]) if on_trunk else 1.2
         cat = self.cat
-        r_base = {"named": 1.75, "outer": 1.15, "giant": 2.3, "apple": 0.8, "estate": 1.8}[cat]
+        r_base = {"named": 1.75, "outer": 1.15, "giant": 2.3, "apple": 0.6, "estate": 1.8}[cat]
         if kind == "bridge":
             r_base *= 0.85
         if kind == "lookout":
@@ -500,7 +503,7 @@ class TreeBuilder:
         tan_end = norm(Q[-1] - Q[-2])
         coll = 0.9 * rt if on_trunk else 0.6
         prof = r_tip + (r_base - r_tip) * (1 - u) ** 1.25
-        collar = 1 + (0.55 * np.exp(-s / max(coll, 0.3)) if on_trunk else 0.0)
+        collar = 1 + ((0.25 if cat == "apple" else 0.55) * np.exp(-s / max(coll, 0.3)) if on_trunk else 0.0)
         radii = prof * collar
         tq = np.gradient(Q, axis=0)
         cos_t = np.sqrt(tq[:, 0] ** 2 + tq[:, 2] ** 2) / np.maximum(np.linalg.norm(tq, axis=1), 1e-9)
@@ -523,6 +526,45 @@ class TreeBuilder:
         self.add_tunnel_polyline(P, 2.5, lift_up=lift + 0.9)
         self.boughs.append({"route": route, "P": P, "Q": centers, "radii": radii, "L": L, "lift": lift, "kind": kind,
                             "on_trunk": on_trunk, "mesh": (V, F)})
+
+    def build_decor_limbs(self):
+        """Giants: non-walkable limbs from the trunk top into the gaps between the lookout boughs,
+        leaving level for 8+ studs (clear of the trunk climb) and then drooping, so the crown has depth."""
+        rng = self.rng
+        top = self.trunkP[-1]
+        walk = [b for b in self.boughs if b["kind"] == "branch"]
+        if not walk:
+            return
+        az = sorted(math.atan2(b["P"][-1][2] - top[2], b["P"][-1][0] - top[0]) for b in walk)
+        reach = float(np.mean([np.hypot(b["P"][-1][0] - top[0], b["P"][-1][2] - top[2]) for b in walk]))
+        gaps = [(az[(i + 1) % len(az)] - az[i]) % (2 * math.pi) for i in range(len(az))]
+        mids = [az[i] + gaps[i] / 2 for i in range(len(az))]
+        for a0 in mids:
+            out = np.array([math.cos(a0), 0, math.sin(a0)])
+            ctrl = [top + np.array([0, -0.5, 0]), top + out * 9 + np.array([0, 1.0, 0]),
+                    top + out * reach * 0.45 + np.array([0, -self.H * 0.06, 0]),
+                    top + out * reach * 0.68 + np.array([0, -self.H * 0.13, 0])]
+            ctrl = np.array(ctrl)
+            # Catmull-Rom-ish densify
+            pts = []
+            for i in range(len(ctrl) - 1):
+                p0 = ctrl[max(i - 1, 0)]
+                p1, p2 = ctrl[i], ctrl[i + 1]
+                p3 = ctrl[min(i + 2, len(ctrl) - 1)]
+                for f in np.linspace(0, 1, 5)[:-1]:
+                    pts.append(0.5 * ((2 * p1) + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f ** 3))
+            pts.append(ctrl[-1])
+            P = np.array(pts)
+            if self.clearance(P[3:]).min() < 0.5:
+                continue
+            L = arclen(P)[-1]
+            s = arclen(P)
+            r0, r1 = 2.0, 0.55
+            radii = r1 + (r0 - r1) * (1 - s / L) ** 1.2
+            V, F, UV, N = tube(P, lambda i, ang, radii=radii: np.full_like(ang, radii[i]), 8, 2, 6.0, cap_end=True)
+            self.bark.add(V, F, UV, N)
+            self.boughs.append({"route": {"name": "decor", "id": -1, "kind": "decor"}, "P": P, "Q": P, "radii": radii, "L": L,
+                                "lift": 0.0, "kind": "decor", "on_trunk": True, "mesh": (V, F)})
 
     def build_lookout_pad(self, P, lift):
         mid = P.mean(axis=0)
@@ -634,7 +676,7 @@ class TreeBuilder:
 
     # .. canopy: a shell of leaf clumps on a lobed envelope around the bough tips ..
     def crown_frame(self):
-        ends = [b["P"][-1] for b in self.boughs if b["kind"] in ("branch", "lookout")]
+        ends = [b["P"][-1] for b in self.boughs if b["kind"] in ("branch", "lookout", "decor")]
         if not ends:
             ends = [self.trunkP[-1]]
         E = np.array(ends)
@@ -658,7 +700,7 @@ class TreeBuilder:
         if sp == "willow":
             R_tip = float(np.clip(0.55 * rh, 6.0, 14.0))
         if sp == "apple":
-            R_tip = float(np.clip(0.75 * rh, 4.0, 7.0))
+            R_tip = float(np.clip(0.85 * rh, 5.0, 8.0))
         lobes = []
         top = self.trunkP[-1]
         for b in self.boughs:
@@ -667,8 +709,8 @@ class TreeBuilder:
             if kind == "bridge":
                 # a leafy sleeve over the inner part of a living bridge (the limb stays readable)
                 sP = arclen(P)
-                rb = max(4.0, R_tip * 0.5)
-                n = max(1, int(L * 0.78 / (rb * 1.1)))
+                rb = max(3.5, R_tip * 0.45)
+                n = max(1, int(L * 0.8 / (rb * 1.0)))
                 for k in range(n):
                     sv = L * (0.06 + 0.78 * (k + 0.5) / n)
                     j = int(np.searchsorted(sP, sv).clip(0, len(P) - 1))
@@ -679,7 +721,7 @@ class TreeBuilder:
             out = norm(out) if np.linalg.norm(out) > 1e-3 else np.array([1.0, 0, 0])
             k = 0.18 if kind != "lookout" else 0.0
             lobes.append((tip + out * R_tip * k + np.array([0, R_tip * 0.22, 0]), R_tip * rng.uniform(0.95, 1.1), "tip"))
-            if L > R_tip * 1.6 and kind == "branch":
+            if L > R_tip * 1.6 and kind in ("branch", "decor"):
                 sP = arclen(P)
                 j = int(np.searchsorted(sP, L * 0.55).clip(0, len(P) - 1))
                 lobes.append((P[j] + np.array([0, R_tip * 0.42, 0]), R_tip * 0.85, "mid"))
@@ -729,13 +771,14 @@ class TreeBuilder:
         # priority: top and sides before the underside; bridge sleeves last
         def prio(cd):
             p, d, li = cd
-            return (lobes[li][2] == "bridge", -d[1] - 0.3 * rng.random())
+            return (-d[1] - 0.3 * rng.random(),)
         cands.sort(key=prio)
         A, B, Rt = self._tun
         accepted = []
         acc_pts = np.zeros((0, 3))
         for p, d, li in cands:
-            r = rho * (1.25 if d[1] < -0.45 else 1.0) * rng.uniform(0.85, 1.15)
+            is_bridge = lobes[li][2] == "bridge"
+            r = rho * (0.62 if is_bridge else (1.2 if d[1] < -0.45 else 1.0)) * rng.uniform(0.85, 1.15)
             ctr = p - d * r * 0.42
             if len(acc_pts):
                 if np.min(np.linalg.norm(acc_pts - ctr[None], axis=1)) < 1.05 * r:
@@ -746,18 +789,19 @@ class TreeBuilder:
                 if cl >= r * 1.18:
                     ok = True
                     break
-                if cl > rho * 0.55 * 1.18:
+                if cl > r * 0.55 * 1.18:
                     r = cl / 1.18
                     ok = True
                     break
                 ctr = ctr + d * (r * 1.18 - cl + 0.3)  # push outward along the envelope normal
             if not ok:
                 continue
-            if ctr[1] - r * 0.8 < self.min_leaf_y or self.box_clear(ctr[None])[0] < r * 0.55:
+            floor = 6.0 if is_bridge else self.min_leaf_y
+            if ctr[1] - r * 0.8 < floor or self.box_clear(ctr[None])[0] < r * 0.55:
                 continue
             accepted.append((ctr, r, d, li))
             acc_pts = np.vstack([acc_pts, ctr[None]])
-        budget = self.opts.get("max_clumps") or int(np.clip(self.leaf_budget() / 110, 20, 140))
+        budget = self.opts.get("max_clumps") or int(np.clip(self.leaf_budget() / 55, 20, 190))
         if len(accepted) > budget:
             # keep the silhouette: drop the most interior / underside first
             score = [a[2][1] + 0.5 * (lobes[a[3]][2] != "bridge") for a in accepted]
@@ -777,7 +821,7 @@ class TreeBuilder:
             self.build_apples()
 
     def leaf_budget(self):
-        return {"giant": 11500, "named": 10000, "estate": 9000, "outer": 6500, "apple": 2800}.get(self.cat, 8000) * (0.6 if self.sp == "willow" else 1.0)
+        return {"giant": 11500, "named": 10000, "estate": 9000, "outer": 6500, "apple": 2800}.get(self.cat, 8000) * (0.5 if self.sp == "willow" else 1.0)
 
     def build_twigs(self):
         """Branchlets from the boughs (or the leader) into the lower and outer clumps."""
@@ -799,7 +843,10 @@ class TreeBuilder:
         owner = np.array(owner)
         tris = 0
         made = 0
-        for (ctr, r, d, li) in self.clump_info:
+        cap = 30 if self.cat in ("giant", "named", "estate") else 20
+        for (ctr, r, d, li) in sorted(self.clump_info, key=lambda a: a[2][1]):
+            if made >= cap:
+                break
             if d[1] > 0.25 or (d[1] > -0.2 and rng.random() < 0.4):
                 continue  # top clumps are seen from above: no branchlet needed
             dist = np.linalg.norm(pts - ctr[None], axis=1)
@@ -822,7 +869,7 @@ class TreeBuilder:
                 def radius(i, ang, r0=r0):
                     return np.full_like(ang, max(0.14, r0 * (1 - 0.42 * i)))
 
-                V, F, UV, N = tube(path, radius, 5, 1, 3.0, cap_end=True)
+                V, F, UV, N = tube(path, radius, 4, 1, 3.0, cap_end=True)
                 self.bark.add(V, F, UV, N)
                 tris += len(F)
                 made += 1
@@ -865,7 +912,7 @@ class TreeBuilder:
             return
         # silhouette-weighted resolution: side clumps draw the outline, the underside is seen least
         def weight(d):
-            return 1.35 if abs(d[1]) < 0.45 else (1.0 if d[1] >= 0.45 else 0.6)
+            return 1.25 if abs(d[1]) < 0.45 else (1.0 if d[1] >= 0.45 else 0.85)
         wts = [weight(a[2]) for a in self.clump_info]
         base = self.leaf_budget() / max(sum(wts), 1e-6)
         levels = {}
@@ -910,36 +957,48 @@ class TreeBuilder:
             self.leaf[layer].add(V2, F2, UV2, N2)
 
     def build_willow_fronds(self):
+        """Weeping curtains: flattened, tapering fronds hanging from the side and lower clumps, longest
+        at the rim (nearly to the ground), shorter under bridges; none through a walking tunnel."""
         rng = self.rng
         c, rh, ylo, yhi = self.crown
         n = 0
-        for (ctr, r, d, li) in self.clump_info:
-            if d[1] > 0.2:
+        cand = sorted(self.clump_info, key=lambda a: a[2][1])
+        for (ctr, r, d, li) in cand:
+            if d[1] > 0.55 or n >= 80:
                 continue
-            m = 2 if r > 3 else 1
+            bridge = self.lobes[li][2] == "bridge"
+            out = np.array([d[0], 0, d[2]])
+            out = norm(out) if np.linalg.norm(out) > 0.2 else norm(np.array([ctr[0] - c[0], 0, ctr[2] - c[2]]) + 1e-6)
+            radial = min(1.0, np.hypot(ctr[0] - c[0], ctr[2] - c[2]) / max(rh, 1.0))
+            m = 1 if bridge else (3 if r > 3.5 else 2)
             for k in range(m):
-                a = rng.random() * 6.28
-                out = norm(np.array([d[0], 0, d[2]]) + 1e-6)
-                spread = norm(out * 0.8 + np.array([math.cos(a), 0, math.sin(a)]) * 0.6)
-                top = ctr + spread * r * 0.7 + np.array([0, -r * 0.2, 0])
-                length = rng.uniform(12, 22)
-                bottom_y = max(4.0, top[1] - length)
-                if top[1] - bottom_y < 5:
+                a = (k - (m - 1) / 2) * 0.9 + rng.normal(0, 0.25)
+                side = np.array([-out[2], 0, out[0]])
+                spread = norm(out * 0.85 + side * math.sin(a) * 0.9)
+                top = ctr + spread * r * 0.62 + np.array([0, -r * 0.4, 0])
+                if bridge:
+                    bottom_y = max(9.0, top[1] - rng.uniform(5, 9))
+                else:
+                    bottom_y = max(5.0, 6.0 + (1 - radial) * 12 + rng.uniform(0, 4))
+                if top[1] - bottom_y < 4:
                     continue
-                drift = out * rng.uniform(0.8, 2.5)
-                pts = np.array([top, top + np.array([0, -(top[1] - bottom_y) * 0.45, 0]) + drift * 0.5,
-                                np.array([top[0], bottom_y, top[2]]) + drift])
-                if self.clearance(pts[1:]).min() < 0.6:
+                drift = out * rng.uniform(0.6, 2.2) + side * rng.normal(0, 0.6)
+                h = top[1] - bottom_y
+                pts = np.array([top, top + np.array([0, -h * 0.35, 0]) + drift * 0.35,
+                                top + np.array([0, -h * 0.7, 0]) + drift * 0.75, np.array([top[0], bottom_y, top[2]]) + drift])
+                if self.clearance(pts[1:]).min() < 0.4:
                     continue
-                w = rng.uniform(1.1, 1.8)
+                w = rng.uniform(1.2, 1.9) * (0.75 if bridge else 1.0)
 
                 def radius(i, ang, w=w):
-                    f = i / 2
-                    rr = w * (1.0 - 0.6 * f)
-                    return rr * (1 + 0.35 * np.cos(2 * ang))
+                    f = i / 3
+                    rr = w * (1.0 - 0.62 * f)
+                    return rr * (1 - 0.45 * np.cos(2 * ang))  # wide across the curtain, thin radially
 
-                V, F, UV, N = tube(pts, radius, 6, 1, self.leaf_tile * 1.4, cap_end=True, cap_start=True)
-                self.leaf["mid" if k % 2 else "sun"].add(V, F, UV, N)
+                V, F, UV, N = tube(pts, radius, 5, 1, self.leaf_tile * 1.4, start_normal=out, cap_end=True, cap_start=True)
+                # soften: bend normals toward the outside of the crown
+                N = norm(N * 0.5 + out[None] * 0.5)
+                self.leaf["mid" if (n % 3 == 0) else "sun"].add(V, F, UV, N)
                 n += 1
         self.log["willow_fronds"] = n
 
@@ -948,14 +1007,14 @@ class TreeBuilder:
         n = 0
         for (ctr, r, d, li) in self.clump_info:
             for k in range(2):
-                if n >= 34:
+                if n >= 28:
                     break
                 dd = norm(d * 0.7 + rng.normal(size=3) * np.array([0.6, 0.3, 0.6]) + np.array([0, -0.35, 0]))
                 cpos = ctr + dd * r * np.array([0.95, 0.82, 0.95])
                 if self.clearance(cpos[None])[0] < 0.6 or cpos[1] < 2.5:
                     continue
                 ra = 0.62
-                lat, lon = 5, 7
+                lat, lon = 4, 6
                 V, UV, N = [], [], []
                 red = n % 3 != 2
                 for i in range(lat + 1):
@@ -970,7 +1029,7 @@ class TreeBuilder:
                 for i in range(lat):
                     for j in range(lon):
                         a, b, c2, d2 = i * (lon + 1) + j, i * (lon + 1) + j + 1, (i + 1) * (lon + 1) + j + 1, (i + 1) * (lon + 1) + j
-                        F += [(a, c2, b), (a, d2, c2)]
+                        F += [(a, b, c2), (a, c2, d2)]
                 self.fruit.add(np.array(V), np.array(F), np.array(UV), np.array(N))
                 n += 1
         self.log["apples"] = n

@@ -484,3 +484,93 @@ def paint(tx, variant, tools):
         "tints_hex": tints,
         "ao_strength": 0.7,
     }
+
+
+# ---- fur cards, blood ---------------------------------------------------------------------------------
+
+SCALE = 1.0
+VIEW_CENTER = (0.0, 0.45, 0.85)
+
+
+def card_density(c, n, dom, variant):
+    dom = np.asarray(dom).astype(str)
+    d = np.zeros(len(c))
+    tail = np.char.startswith(dom, "Tail")
+    torso = np.isin(dom, list(TORSO))
+    d[tail] = 3.2 if variant != "rodent" else 1.6
+    d[torso] = 0.5 + 0.9 * np.clip(n[torso, 2] + 0.3, 0, 1)
+    d[dom == "Neck"] = 1.2
+    d[np.isin(dom, ["BackL_Upper", "BackR_Upper"])] = 1.1
+    d[np.isin(dom, ["FrontL_Upper", "FrontR_Upper"])] = 0.5
+    d[np.isin(dom, ["BackL_Lower", "BackR_Lower", "FrontL_Lower", "FrontR_Lower"])] = 0.25
+    head = dom == "Head"
+    d[head] = 0.55 * np.clip(np.abs(n[head, 0]) * 1.3, 0, 1) * (c[head, 1] > -1.02)  # cheeks, not the face
+    d[dom == "Jaw"] = 0.25
+    if variant == "rodent":
+        # no tufts on or near the stitched patches
+        for pt in RODENT_PATCHES:
+            d[np.linalg.norm(c - np.array(pt["c"]), axis=1) < pt["r"] * 1.3] = 0
+    return d
+
+
+def card_shape(P, N, F, dom, variant, rng):
+    dom = np.asarray(dom).astype(str)
+    k = len(P)
+    tail = np.char.startswith(dom, "Tail")
+    head = np.isin(dom, ["Head", "Jaw"])
+    rodent = variant == "rodent"
+    L = np.where(tail, rng.uniform(0.13, 0.22, k), np.where(head, rng.uniform(0.04, 0.06, k), rng.uniform(0.065, 0.105, k)))
+    W = np.where(tail, rng.uniform(0.06, 0.10, k), np.where(head, rng.uniform(0.028, 0.04, k), rng.uniform(0.035, 0.055, k)))
+    lift = np.where(tail, rng.uniform(0.35, 0.75, k), rng.uniform(0.22, 0.45, k))
+    roll = np.where(tail, rng.uniform(-1.3, 1.3, k), rng.uniform(-0.6, 0.6, k))
+    droop = np.full(k, 0.28)
+    if rodent:
+        L *= rng.uniform(0.6, 1.0, k)
+        W *= 0.8
+        lift = lift + rng.uniform(-0.1, 0.5, k)  # ragged, sticking out at odd angles
+        droop = rng.uniform(0.1, 0.6, k)
+    return {"length": L, "width": W, "lift": lift, "roll": roll, "droop": droop}
+
+
+def blood_faces(lo, co, W, bone_names):
+    """Faces under the rodent's blood shell: mouth corners and chin, the front claws and fingers."""
+    me = lo.data
+    lm = landmarks("rodent")
+    hz = HZ - 0.03
+    spots = [np.array([0.075, -0.985, hz - 0.15]), np.array([-0.075, -0.985, hz - 0.15]),
+             np.array([0.0, -1.09, hz - 0.17]), np.array([0.0, -1.03, hz - 0.2])]
+    kind = np.empty(len(me.polygons), dtype=np.int32)
+    me.attributes["hard_kind"].data.foreach_get("value", kind)
+    cen = np.empty(len(me.polygons) * 3, dtype=np.float32)
+    me.polygons.foreach_get("center", cen)
+    cen = cen.reshape(-1, 3)
+    near = np.min([np.linalg.norm(cen - s, axis=1) for s in spots], axis=0) < 0.05
+    domv = np.array(bone_names)[np.argmax(W, axis=1)]
+    lv = np.empty(len(me.loops), dtype=np.int64)
+    me.loops.foreach_get("vertex_index", lv)
+    ls = np.empty(len(me.polygons), dtype=np.int64)
+    me.polygons.foreach_get("loop_start", ls)
+    fdom = domv[lv[ls]]
+    paws = np.isin(fdom, ["FrontL_Toe", "FrontR_Toe"]) & (cen[:, 2] < 0.06)
+    return (near | paws) & ~(kind == 2)
+
+
+def blood_mask(P, tools):
+    sst = tools["sstep"]
+    vn = tools["vnoise"]
+    hz = HZ - 0.03
+    m = np.zeros(len(P), dtype=np.float32)
+    for sx in (1, -1):
+        c = np.array([0.075 * sx, -0.985, hz - 0.15])
+        d = np.linalg.norm(P - c, axis=1)
+        m = np.maximum(m, 1 - sst(0.012, 0.03, d))
+        # a drip or two running down from the corner
+        drip = (np.abs(P[:, 0] - (0.07 * sx + 0.01 * vn(P * 30.0, 3 + (sx > 0)))) < 0.009) & (P[:, 2] < c[2]) & (P[:, 2] > c[2] - 0.06)
+        m = np.maximum(m, drip * (1 - sst(0.0, 0.06, c[2] - P[:, 2])) * 0.9)
+    chin = np.linalg.norm(P - np.array([0.0, -1.06, hz - 0.19]), axis=1)
+    m = np.maximum(m, (1 - sst(0.008, 0.03, chin)) * 0.8)
+    paw = P[:, 2] < 0.08
+    m = np.where(paw, np.maximum(m, sst(0.55, 0.7, vn(P * 60.0, 9)) * (1 - sst(0.02, 0.06, P[:, 2]))), m)
+    speck = sst(0.72, 0.8, vn(P * 140.0, 13))
+    m = np.maximum(m, speck * 0.85 * (m > 0.05))
+    return np.clip(m * (0.7 + 0.3 * vn(P * 200.0, 17)), 0, 1).astype(np.float32)

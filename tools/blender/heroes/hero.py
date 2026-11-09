@@ -237,5 +237,17 @@ def finish(sp, variant, skel, bone_names, body, hi, lo, opts, log):
         o.data.materials[0] if o.data.materials else None
     report["fbx"] = {"path": fbx, "bytes": export_fbx(fbx, [arm] + meshes)}
     log(f"fbx {report['fbx']['bytes']} bytes")
+    clips_meta = report["clips"] if isinstance(report["clips"], dict) else {}
+    meta = {
+        "variant": variant,
+        "species": sp.SPECIES,
+        "size": getattr(sp, "SCALE", 1.0),
+        "center": list(getattr(sp, "VIEW_CENTER", (0, 0.3, 0.85))),
+        "tints": dict(tex.get("tint", {})),
+        "glow": variant == "rodent",
+        "clips": {k: v for k, v in clips_meta.items() if isinstance(v, dict) and "key_frames" in v},
+        "turntable_pose": ["Idle", 1] if "Idle" in clips_meta else None,
+    }
+    bpy.context.scene["hero_meta"] = json.dumps(meta)
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, f"{variant}.blend"))
     return report

@@ -66,7 +66,7 @@ local function doors(root: Instance, conns: { RBXScriptConnection }): { step: (d
 				local side = (m:GetAttribute("Side") :: number?) or 1
 				-- the hinge edge: the leaf's end toward its HingeX (local X across the building)
 				local half = leaf.Size.X / 2
-				local hinge = (leaf.CFrame * CFrame.new(-side * half, 0, 0)).Position
+				local hinge = (leaf.CFrame * CFrame.new(side * half, 0, 0)).Position
 				table.insert(leaves, { model = m, home = home, hinge = hinge, side = side })
 			end
 		end
@@ -80,7 +80,7 @@ local function doors(root: Instance, conns: { RBXScriptConnection }): { step: (d
 		local leaf = l.model.PrimaryPart :: BasePart
 		local att = Instance.new("Attachment")
 		att.Name = "PushPoint"
-		att.CFrame = CFrame.new(0, -0.2, -0.4) -- just inside the building (the leaf's -Z face)
+		att.CFrame = CFrame.new(0, -0.2, 0.4) -- just inside the building (the leaf's +Z face, local -D)
 		att.Parent = leaf
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "DoorPrompt"
@@ -108,7 +108,7 @@ local function doors(root: Instance, conns: { RBXScriptConnection }): { step: (d
 				local a = t * t * (3 - 2 * t)
 				for _, l in leaves do
 					-- out toward the alley: the leaf's +Z side (local +D); left leaf turns one way, right the other
-					local angle = a * math.rad(100) * l.side
+					local angle = -a * math.rad(100) * l.side
 					local rot = CFrame.new(l.hinge) * CFrame.Angles(0, angle, 0) * CFrame.new(-l.hinge)
 					l.model:PivotTo(rot * l.home)
 				end

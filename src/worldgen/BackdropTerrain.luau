@@ -48,8 +48,18 @@ function BackdropTerrain.write(terrain: Terrain, opts: { chunk: number? }?): { [
 		Grass = Enum.Material.Grass,
 		Rock = Enum.Material.Rock,
 	}
+	-- TerrainBake asks for a column's height and then its material: one sample serves both
+	local lx, lz, lland, lt, ld = math.huge, math.huge, 0, 0, 0
+	local function heightAt(x: number, z: number): number
+		local h, land, t, d = Backdrop.sample(x, z)
+		lx, lz, lland, lt, ld = x, z, land, t, d
+		return h
+	end
 	local function materialAt(x: number, z: number, h: number): Enum.Material
-		return materials[Backdrop.materialAt(x, z, h)] or Enum.Material.Grass
+		if x ~= lx or z ~= lz then
+			heightAt(x, z)
+		end
+		return materials[Backdrop.materialFor(x, z, h, lland, lt, ld)] or Enum.Material.Grass
 	end
 	local sea = Backdrop.SEA_Y
 	local function waterTopAt(_x: number, _z: number): number?
@@ -59,7 +69,7 @@ function BackdropTerrain.write(terrain: Terrain, opts: { chunk: number? }?): { [
 	for _, r in Backdrop.terrainRects() do
 		local st = TerrainBake.write(terrain, {
 			rect = { minX = r.minX, maxX = r.maxX, minZ = r.minZ, maxZ = r.maxZ },
-			heightAt = Backdrop.groundAt,
+			heightAt = heightAt,
 			waterTopAt = if r.water then waterTopAt else nil,
 			materialAt = materialAt,
 			chunk = o.chunk,
