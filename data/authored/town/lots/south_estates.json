@@ -37,6 +37,10 @@
       },
       "hasInterior": false,
       "notes": "facing: entrance door/portico/steps at local +z (z 16..28); comment \"north frontage faces the road\". yaw=0 rad (front=(sin yaw,0,cos yaw)). base_y 7.37. Main block 46x14x29 + two wings 19x10.2x24 at local x=+-30 (z+2). Projecting portico 19x15.8x4 at z=15 with pyramid pediment (cone r11), 4 columns at z=20.3, rooftop dormers x=+-19. Rear garden glass doors at local -z. Collider commercialBounds w81 d35 (solid, not enterable). Roof route at y+14.7 (x+-22).",
+      "params": {
+        "eaveU": 14.62,
+        "roof": "flat"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -59,6 +63,10 @@
       },
       "hasInterior": false,
       "notes": "facing: glass and door at local z=+7.6, porch columns at +11.6. yaw=0 rad (front=(sin yaw,0,cos yaw)). Box 20x6.7x15, roof slab 22x0.73x17; commercialBounds w20 d15; roof route y+7.48.",
+      "params": {
+        "eaveU": 7.45,
+        "roof": "flat"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -166,6 +174,10 @@
       },
       "hasInterior": false,
       "notes": "facing: entrance door/portico/steps at local +z (z 16..28); comment \"north frontage faces the road\". yaw=0 rad (front=(sin yaw,0,cos yaw)). base_y 2.27. Main block 46x14x29 + two wings 19x10.2x24 at local x=+-30 (z+2). Roof terrace 17x1.1x11, parapets, 2 columns at x=+-6.3 z=18, canopy 17x7 at y 11.95. Rear garden glass doors at local -z. Collider commercialBounds w81 d35 (solid, not enterable). Roof route at y+14.7 (x+-22).",
+      "params": {
+        "eaveU": 14.62,
+        "roof": "flat"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -188,6 +200,10 @@
       },
       "hasInterior": false,
       "notes": "facing: glass and door at local z=+7.6, porch columns at +11.6. yaw=0 rad (front=(sin yaw,0,cos yaw)). Box 20x6.7x15, roof slab 22x0.73x17; commercialBounds w20 d15; roof route y+7.48.",
+      "params": {
+        "eaveU": 7.45,
+        "roof": "flat"
+      },
       "routes": {
         "source": "harvest"
       },

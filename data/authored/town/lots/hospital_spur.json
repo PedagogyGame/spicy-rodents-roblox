@@ -15,6 +15,9 @@
       },
       "hasInterior": true,
       "notes": "facing: sliding glass doors at local z=-48 (HOSP_D/2) facing the z=283 road via driveway x=-356. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Landmark entry only - full spec belongs to the hospital extractor. Floor y=HOSP_BASE+0.42, roof surface +13.34. Driveway x=-356 (z 284..305). Signs at z=303.5; \"HOSPITAL ←\" road guide at (-232,298). HUD tag \"HOSPITAL DISTRICT\" for x<-270 & z>245.",
+      "params": {
+        "sign": "HOSPITAL"
+      },
       "routes": {
         "source": "harvest"
       },

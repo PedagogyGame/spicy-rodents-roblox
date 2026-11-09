@@ -169,6 +169,11 @@
       },
       "hasInterior": false,
       "notes": "facing: glass entrance, \"WEST TOPEKA POLICE\" sign at local z=+15.4..15.7, patrol pads at z+26. yaw=0 rad (front=(sin yaw,0,cos yaw)). Landmark entry - full spec belongs to the police extractor. Slab 46x31, walls 8.8, roof 9.25; reception desk inside but station is NEVER enterable (guarded; commercialBounds w45.8 d30.8 at 11224). Patrol pads 9x15 at (-525,-81) and (-495,-81) with parked cruisers. Roof route y+9.7.",
+      "params": {
+        "eaveU": 9.25,
+        "roof": "flat",
+        "sign": "WEST TOPEKA POLICE"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -213,6 +218,9 @@
       },
       "hasInterior": false,
       "notes": "facing: \"WESTSIDE STORAGE\" sign at local z=-37. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Door rows are free-standing facades with roof strips at z=+-30; no collision.",
+      "params": {
+        "sign": "WESTSIDE STORAGE"
+      },
       "routes": {
         "source": "harvest"
       },

@@ -14,7 +14,19 @@
         "w": 18.04
       },
       "hasInterior": true,
+      "home": {
+        "backExit": true,
+        "claimable": true,
+        "hideSpots": 3,
+        "interior": "frb_victorian"
+      },
       "notes": "facing: buildHouse faceSign=-1; front wall local z = -faceSign*d/2 = +d/2, i.e. toward the z=0 street. yaw=0 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 7.3, gable peak 11.07 (ridge along X, roof route y=11.33); walls #ded7b7, trim #f5ecd5, roof #63524c. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=-44.18, threshold z=-45.21, inside z=-46.97 (x=-56). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=-56 to z=+-16; driveway 5.3x26 at x=-73; mailbox at (-52, toward street); parked car at x=-73. Parcel roughly x -83..-13.75, z -91..-13.75. Backyard (house 0 is the \"covered porch / barbecue\" lot): 20x9 deck + 20x9 porch roof at y=4.9 with 3 posts and rail; barbecues at (-62,-81) and (-57,-81, scale .67); steel drum (-38,-83); picnic tables x4 at random (x -76..-24, z -87..-71). Perimeter fences: wood x=-83 (z -91..-40), wood z=-91 (x -83..-20). Yard cat 0 at (-45,-76). Living-event barbecue gathering centre (-66,-84).",
+      "params": {
+        "eaveU": 7.298,
+        "peakU": 11.07,
+        "ridge": "x",
+        "roof": "gable"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -36,7 +48,19 @@
         "w": 19.68
       },
       "hasInterior": true,
+      "home": {
+        "backExit": true,
+        "claimable": true,
+        "hideSpots": 3,
+        "interior": "frb_bungalow"
+      },
       "notes": "facing: buildHouse faceSign=-1; front wall local z = -faceSign*d/2 = +d/2, i.e. toward the z=0 street. yaw=0 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 6.07, gable peak 8.53 (ridge along X, roof route y=8.79); walls #b6c1b1, trim #f2ecdf, roof #686a60. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=-49.77, threshold z=-50.8, inside z=-52.56 (x=51). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=51 to z=+-16; driveway 5.3x26 at x=68; mailbox at (55, toward street); parked car at x=68. Parcel roughly x 13.75..84, z -91..-13.75. Backyard pool lot: coping 14x20 at (55,-84), water 11.2x17.1; 4 loungers at x=41..51.5, z=-75 (rot PI/2); pool ladder rails x=49, z=-82/-76. Fences: chain z=-91 (x 20..84), chain x=84 (z -91..-42). Yard cat 2 at (40,-79).",
+      "params": {
+        "eaveU": 6.068,
+        "peakU": 8.528,
+        "ridge": "x",
+        "roof": "gable"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -58,7 +82,19 @@
         "w": 18.04
       },
       "hasInterior": true,
+      "home": {
+        "backExit": true,
+        "claimable": true,
+        "hideSpots": 3,
+        "interior": "frb_brick"
+      },
       "notes": "facing: buildHouse faceSign=1; front wall local z = -faceSign*d/2 = -d/2, i.e. toward the z=0 street. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 7.46, gable peak 10.74 (ridge along X, roof route y=11); walls #bb8e71, trim #e4d6c5, roof #615653. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=41.78, threshold z=42.8, inside z=44.56 (x=-53). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=-53 to z=+-16; driveway 5.3x26 at x=-70; mailbox at (-49, toward street); parked car at x=-70. Parcel roughly x -83..-13.75, z 13.75..94. Guesthouse / trampoline lot: guest cottage (-58,83) and trampoline (-33,80) are separate lots. Fences: wood x=-83 (z 42..94), chain z=94 (x -82..-22). Visual-only v3.5 wood rail fence z=38 x -58..-22 crosses this front walk (no collision).",
+      "params": {
+        "eaveU": 7.462,
+        "peakU": 10.742,
+        "ridge": "x",
+        "roof": "gable"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -80,7 +116,19 @@
         "w": 17.22
       },
       "hasInterior": true,
+      "home": {
+        "backExit": true,
+        "claimable": true,
+        "hideSpots": 3,
+        "interior": "frb_cottage"
+      },
       "notes": "facing: buildHouse faceSign=1; front wall local z = -faceSign*d/2 = -d/2, i.e. toward the z=0 street. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 6.56, gable peak 9.51 (ridge along X, roof route y=9.77); walls #aebbc4, trim #f4e8cf, roof #6f6f75. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=47.6, threshold z=48.62, inside z=50.38 (x=58). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=58 to z=+-16; driveway 5.3x26 at x=75; mailbox at (62, toward street); parked car at x=75. Parcel roughly x 13.75..84, z 13.75..94. Doghouse / mower lot: doghouse (39,80), bowl (44,78), ride-on mower (76,80). Fences: wood z=92 (x 20..84), chain x=84 (z 39..92). Yard cat 1 at (48,79).",
+      "params": {
+        "eaveU": 6.56,
+        "peakU": 9.512,
+        "ridge": "x",
+        "roof": "gable"
+      },
       "routes": {
         "source": "harvest"
       },

@@ -1,0 +1,1447 @@
+{
+  "$schema": "../../tools/compile/schema/lot_types.schema.json",
+  "src": "BUILD_PLAN §3.3 (W1 v0): greybox kit per lot type; heights read off the v5.4 notes (S6 Kits table), builder families in src/worldgen/Builders",
+  "types": {
+    "house": {
+      "category": "building",
+      "builder": "House",
+      "heightU": 11,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "gable",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "quay_building": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 12,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "gable",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "QUAY"
+    },
+    "mall": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 22.94,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "GALLERIA"
+    },
+    "mall_shop": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 6.35,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "guesthouse": {
+      "category": "building",
+      "builder": "House",
+      "heightU": 6,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "gable",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "restaurant": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 7,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "RESTAURANT"
+    },
+    "restaurant_icecream": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 5,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "ICE CREAM"
+    },
+    "shop": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 6,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "SHOP"
+    },
+    "hospital": {
+      "category": "building",
+      "builder": "Hospital",
+      "heightU": 13.34,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "HOSPITAL"
+    },
+    "police_station": {
+      "category": "building",
+      "builder": "PoliceStation",
+      "heightU": 9,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "POLICE"
+    },
+    "gas_station": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 6,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "FUEL"
+    },
+    "estate_mansion": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 14,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "chapel_crypt": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 9,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "shelter_house": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 5,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "storage_units": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 4,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": true,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "STORAGE"
+    },
+    "triage_bay": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 4.4,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "treatment_ward": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 4.4,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "waiting_room": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 4.4,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "reception": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 4.4,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "supply_room": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 4.4,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "observation_room": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 4.4,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "atrium": {
+      "category": "building",
+      "builder": "Building",
+      "heightU": 14,
+      "lod": "SLIM",
+      "streaming": "Atomic",
+      "skyline": "box",
+      "roof": "flat",
+      "door": false,
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eaveU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 40
+          },
+          "peakU": {
+            "type": "number",
+            "x-unit": "u",
+            "minimum": 0.5,
+            "maximum": 50
+          },
+          "roof": {
+            "enum": [
+              "gable",
+              "flat"
+            ]
+          },
+          "ridge": {
+            "enum": [
+              "x",
+              "z"
+            ]
+          },
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      }
+    },
+    "landmark_tower": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 30,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "bridge_tower": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 20,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "shed": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 3,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "doghouse": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 1.5,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "backyard_doghouse": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 1.5,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "treehouse": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 4,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "gazebo": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 4,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "pergola_summer_kitchen": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 3.5,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "transit_stop": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 3,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "shelter": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 1.5,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "market_stall": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 4,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "fountain": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 1.12,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "backyard_trampoline": {
+      "category": "structure",
+      "builder": "Structure",
+      "heightU": 1.65,
+      "lod": "Automatic",
+      "streaming": "Atomic",
+      "skyline": "box"
+    },
+    "gas_canopy": {
+      "category": "slab",
+      "builder": "Slab",
+      "heightU": 10.74,
+      "lod": "Automatic",
+      "streaming": "Atomic"
+    },
+    "porte_cochere": {
+      "category": "slab",
+      "builder": "Slab",
+      "heightU": 8.1,
+      "lod": "Automatic",
+      "streaming": "Atomic"
+    },
+    "dock": {
+      "category": "slab",
+      "builder": "Slab",
+      "heightU": 0.5,
+      "lod": "Automatic",
+      "streaming": "Atomic"
+    },
+    "footbridge": {
+      "category": "slab",
+      "builder": "Slab",
+      "heightU": 0.78,
+      "lod": "Automatic",
+      "streaming": "Atomic"
+    },
+    "district_ground": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "lawn": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "plaza": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "garden": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "community_garden": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "park": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "playground": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "parking": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "sports_field": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "tennis_court": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "cemetery": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "intersection": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "path": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "river": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "stream": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "pond": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "estate_parcel": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "estate_pool": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "backyard_pool": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "ambulance_bay": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "bridge": {
+      "category": "plate",
+      "builder": "Plate",
+      "heightU": 0,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "tree": {
+      "category": "prop",
+      "builder": "Prop",
+      "heightU": 19,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "detail": {
+      "category": "prop",
+      "builder": "Prop",
+      "heightU": 1.2,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "sign": {
+      "category": "prop",
+      "builder": "Sign",
+      "heightU": 3.2,
+      "lod": "Disabled",
+      "streaming": "Default",
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sign": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          }
+        }
+      },
+      "signText": "SIGN"
+    },
+    "shrub_cluster": {
+      "category": "prop",
+      "builder": "Prop",
+      "heightU": 1.5,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "fence_run": {
+      "category": "prop",
+      "builder": "Prop",
+      "heightU": 1.2,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "backyard_prop": {
+      "category": "prop",
+      "builder": "Prop",
+      "heightU": 1,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "overhead_lines": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 15,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "ambient_npcs": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 2,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "street_furniture": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 4,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "roof": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 0.75,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "stair": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 6.46,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "mezzanine": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 0.5,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "duct": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 1.76,
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "sewer": {
+      "category": "marker",
+      "builder": "Marker",
+      "heightU": 2,
+      "lod": "Disabled",
+      "streaming": "Default"
+    }
+  },
+  "routeProps": {
+    "tree": {
+      "generators": [
+        "makeTree",
+        "makeOuterTree",
+        "makeAppleTree",
+        "makeLookoutTree",
+        "estateGateOak"
+      ],
+      "look": "bark",
+      "lod": "Automatic",
+      "streaming": "Default"
+    },
+    "pole": {
+      "generators": [
+        "pole"
+      ],
+      "look": "pole",
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "wire": {
+      "kinds": [
+        "wire"
+      ],
+      "look": "wire",
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "pipe": {
+      "kinds": [
+        "trunk"
+      ],
+      "maxRadiusU": 0.5,
+      "look": "pipe",
+      "lod": "Disabled",
+      "streaming": "Default"
+    },
+    "fence": {
+      "kinds": [
+        "fence",
+        "trampoline"
+      ],
+      "look": "fence",
+      "lod": "Disabled",
+      "streaming": "Default"
+    }
+  },
+  "lamp": {
+    "heightU": 5.5,
+    "lod": "Disabled",
+    "streaming": "Default"
+  }
+}

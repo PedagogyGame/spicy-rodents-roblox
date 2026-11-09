@@ -120,6 +120,9 @@
       },
       "hasInterior": false,
       "notes": "facing: flatSign unrotated. yaw=0 rad (front=(sin yaw,0,cos yaw)). Road-guide regex shrinks it to <=8.1x1.32 at eye level y+2.68 on two posts.",
+      "params": {
+        "sign": "SYCAMORE PARK"
+      },
       "routes": {
         "source": "harvest"
       },

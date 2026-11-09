@@ -1,6 +1,7 @@
 --!strict
 -- ReplicatedStorage.Shared.Time.Calendar
 -- Weeks, winter (week 6 of each 6-week cycle) and raid week (BUILD_PLAN §1.4, D19).
+-- Interface: week(day), isWinter(day), raidWeek(day), lunarAge(day), configure(weeksPerCycle, winterWeek)
 -- The cycle numbers below are placeholders until Tunables lands (§3.8: clock.weeksPerCycle,
 -- clock.winterWeek); Calendar.configure() lets Tunables override them without a re-require.
 --
@@ -28,6 +29,12 @@ end
 
 function Calendar.isWinter(day: number): boolean
 	return Calendar.week(day) == Calendar.WINTER_WEEK
+end
+
+-- Raid cycle (brief 7-18, 12-2: premium gardens and feeders are raided about once per in-game week):
+-- the absolute week index since the epoch, so a raid can be keyed "once per raidWeek".
+function Calendar.raidWeek(day: number): number
+	return math.floor(day / Calendar.DAYS_PER_WEEK)
 end
 
 -- Lunar age is part of the calendar read-out the Clock exposes (§1.4 Clock.game()).

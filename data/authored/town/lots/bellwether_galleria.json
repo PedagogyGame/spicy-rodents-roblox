@@ -15,6 +15,9 @@
       },
       "hasInterior": true,
       "notes": "MALL const 14191: floor y 8.14, gallery y 14.6, roof top 22.94, front z 284, back z 392. Perimeter walls 1 thick x 14.6 tall (solid, camera-blocking). Front facade z=284.5: wall segments 32.5 wide either side of a 13-wide x 6.8-tall entrance (lintel 13x7.8 above), 2 sliding glass doors 5.8x6.4 (slide to x = 1102 +/- (2.9 + open*6.1); open when player within 16 of (1102,284) and y < floor+5; lerp rate 5/s) (updateMall 15027), entrance canopy 16x0.3x7 at y+6.9 z 281.5 with glass top, sign 'BELLWETHER GALLERIA' 58x2.1 at y+12.3, 'COME ON IN' 8x0.7 at y+5.8, 3 window bays per side (blue panels 5.8x7 with brass frames) at x+/-15,27,35, pilasters at x+/-7,20,38. Long side walls: clerestory windows 10 long x 4.6 tall at y+9.2, z -40..40 step 20, brass mullions. Dark cornice band at y+14.35. Roof: 8 glass skylight panels 25.3x11.5 over the atrium at y+14.63 (z -42..42 step 12) with dark beams; stone roof slabs 25.5x108 over both shop ranges; roof is a landing surface at 23.12 (mallRoofAt). Interior lighting: 4 PointLights #ffdfa9 intensity 38, distance 46, decay 2 at (+/-25, +5.4, +/-30) (off in performance tier / when far), 3 glowing ceiling strips 11x2.2 at y+12.9 (z -35,-3,29), per-shop glow strips. Floor: canvas checker tile (#e3d8be/#c4ccbf) roughness .32 metal .12. Atrium columns 0.65x14.4 at x +/-12, z -44,-12,20,44. Routes: brass downspouts at x 1062.4 and 1141.6, z 288 (kind 'trunk', r .15) up to y 23.19, rooftop routes to z 388 (kind 'roof'). Visible only within 190 of the mall centre or atMall (pad 24 / fountain radius 18). Exposure 1.15 inside; sky stays visible through the glass roof. Start-at-mall spawn (1102, 8.32, 238) yaw PI.",
+      "params": {
+        "sign": "BELLWETHER GALLERIA"
+      },
       "routes": {
         "source": "harvest"
       },

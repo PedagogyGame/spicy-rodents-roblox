@@ -15,6 +15,11 @@
       },
       "hasInterior": false,
       "notes": "facing: glazed front at local z=+15.62, comment \"looks toward the main commercial road (+z)\". yaw=0 rad (front=(sin yaw,0,cos yaw)). base_y 9.35 (on a hill). Box 52x10.2x31 + brick band + cap to y=11.4; roof route at +11.62 (x 449..499). Signs \"CHILI'S\" and \"GRILL & BAR\" at z=-65.3. 6 glass panes front (local x -20..20 step 8), door 5x6.8. Patio: 5 tables at (432+14i, -48 or -43), 3 parasols. Parking bays: 8 lines x=438..508 step 10 at z=-24; parked cars (462,-29) & (493,-29). commercialBounds collider w52 d31.",
+      "params": {
+        "eaveU": 11.5,
+        "roof": "flat",
+        "sign": "CHILI'S"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -37,6 +42,10 @@
       },
       "hasInterior": false,
       "notes": "facing: shop glass/door at local z=-11.65 facing the pump islands; code comment says \"north-facing\". yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Shop 33x8.2x23, parapet to ~9.95; roof route at +9.62 (x 506..538). Doors \"visible but not enterable\" (803). Signs FUEL MARKET / OPEN at z~97.7. Air/water station (505,91), waste container (535,93). Static tall delivery van at (604,110) 3x3.45x5.9 (tallVehicles). commercialBounds w33 d23.",
+      "params": {
+        "eaveU": 9.5,
+        "roof": "flat"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -79,6 +88,9 @@
       },
       "hasInterior": false,
       "notes": "flatSign panels unrotated (face +-Z).",
+      "params": {
+        "sign": "FUEL"
+      },
       "routes": {
         "source": "harvest"
       },
@@ -101,6 +113,11 @@
       },
       "hasInterior": false,
       "notes": "facing: 3 storefront panes at z=-79.8 and sign at z=-79.4 face the z=0 road. yaw=0 rad (front=(sin yaw,0,cos yaw)). \"One more diner / storefront\". Box 36x9.1x28; roof route at y+10.9 (x 589..621). Sign \"CORNER SHOPS\". Note shopY samples terrain at x=609 not 605. Parked car (586,-33). commercialBounds w36 d28.",
+      "params": {
+        "eaveU": 10.688,
+        "roof": "flat",
+        "sign": "CORNER SHOPS"
+      },
       "routes": {
         "source": "harvest"
       },
