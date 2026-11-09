@@ -106,6 +106,10 @@ local function newBuilder(k: number): Builder
 	end
 	local function add(name: string, shape: string, size: { number }, pos: { number }, color: string, extra: Extra?)
 		local e: Extra = extra or {}
+		local attributes: { [string]: any }? = nil
+		if e.region then
+			attributes = { Region = e.region }
+		end
 		local p: PartSpec = {
 			name = name,
 			size = size,
@@ -118,7 +122,7 @@ local function newBuilder(k: number): Builder
 			material = e.material,
 			transparency = e.transparency,
 			reflectance = e.reflectance,
-			attributes = if e.region then { Region = e.region } else nil,
+			attributes = attributes,
 		}
 		table.insert(parts, p)
 	end
@@ -299,14 +303,11 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 	b.motor("Jaw", "Head", { 0, hy - 0.08, hz - 0.14 })
 	local eyeD = if rodent then 0.17 else 0.13 -- the rodent's slightly oversized and glowing red
 	local eyeHalf = if rodent then 0.28 else 0.272
-	b.cyl(
-		"Eyes",
-		{ -eyeHalf, hy + 0.06, hz - 0.1 },
-		{ eyeHalf, hy + 0.06, hz - 0.1 },
-		eyeD,
-		c.eyes,
-		if rodent then { material = "Neon", overlap = 0 } else { reflectance = 0.15, overlap = 0 }
-	)
+	local eyeLook: Extra = { reflectance = 0.15, overlap = 0 }
+	if rodent then
+		eyeLook = { material = "Neon", overlap = 0 }
+	end
+	b.cyl("Eyes", { -eyeHalf, hy + 0.06, hz - 0.1 }, { eyeHalf, hy + 0.06, hz - 0.1 }, eyeD, c.eyes, eyeLook)
 	b.weld("Eyes", "Head")
 	for _, side in { { name = "EarL", sx = -1 }, { name = "EarR", sx = 1 } } do
 		local torn = rodent and side.sx > 0 -- one ragged, drooping ear

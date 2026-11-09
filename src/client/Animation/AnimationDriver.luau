@@ -22,10 +22,11 @@
 --     are followed without lag while ground-sampling steps, kerbs, jitter and replication steps are
 --     eased out; it rises faster than it settles, so feet do not hang in a kerb for long.
 --   * Ground contact: AI bodies (anchored roots, placed on World/Height's analytic ground by the
---     server) are lifted or lowered onto what is really under their feet: a short downward ray from
---     just above the feet, a few times a second, against collidable town parts and the voxel terrain
---     (whose surface can sit up to about a stud above the analytic height). Possessed bodies stand
---     on their own motor's raycast ground or Humanoid, so they get smoothing only (people none).
+--     server) standing near the terrain are lifted or lowered onto what is really under their feet: a
+--     short downward ray from just above the feet, a few times a second, against collidable town parts
+--     and the voxel terrain (whose surface can sit up to about a stud above the analytic height).
+--     Possessed bodies stand on their own motor's raycast ground or Humanoid, so they get smoothing
+--     only (people none); squirrels up trees and on roofs keep their route heights.
 -- No side effects on require.
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure)
 
@@ -33,6 +34,7 @@ local Gait = require("./Gait")
 local Import = require("../Import")
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
+local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 
 export type ClipSet = {
 	idle: string?,
@@ -115,6 +117,7 @@ AnimationDriver.PROBE_UP = 1.6 -- the ray starts this far above the soles (start
 AnimationDriver.FIX_MIN = -0.75
 AnimationDriver.FIX_MAX = 1.4
 AnimationDriver.CLEARANCE = 0.04 -- soles rest this much above the surface found
+AnimationDriver.NEAR_GROUND = 2 -- only soles this close to the terrain are probed (not squirrels up trees)
 
 local SHORT, BASE, MEDIAN_N = 3, 12, 7 -- frames: short and long velocity baselines; median window
 local scratch: { number } = table.create(MEDIAN_N, 0)
@@ -423,8 +426,11 @@ function AnimationDriver.start(opts: Opts): Driver
 			if now >= e.nextProbe then
 				e.nextProbe = now + AnimationDriver.PROBE_EVERY
 				local target = 0
-				if (pos - camPos).Magnitude < AnimationDriver.PROBE_RANGE then
-					local sole = pos.Y - e.footDrop
+				local sole = pos.Y - e.footDrop
+				if
+					(pos - camPos).Magnitude < AnimationDriver.PROBE_RANGE
+					and math.abs(sole - Height.at(pos.X, pos.Z)) < AnimationDriver.NEAR_GROUND
+				then
 					local hit =
 						workspace:Raycast(Vector3.new(pos.X, sole + AnimationDriver.PROBE_UP, pos.Z), DOWN, probe)
 					if hit and hit.Normal.Y > 0.6 then
