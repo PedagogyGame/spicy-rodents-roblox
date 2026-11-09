@@ -243,7 +243,7 @@
       "id": "xp_church_lot",
       "family": "F2",
       "kind": "parking",
-      "rect": { "x0": 1404, "z0": -900, "x1": 1480, "z1": -808 },
+      "rect": { "x0": 1276, "z0": -900, "x1": 1350, "z1": -808 },
       "notes": "church car park beside the nave"
     },
     {
@@ -299,15 +299,15 @@
     { "id": "xpath_corner_side", "family": "F1", "kind": "concrete", "width": 4, "points": [[933, 76], [915, 76]], "notes": "" },
     { "id": "xpath_museum_steps", "family": "F2", "kind": "steps", "width": 14, "points": [[1000, -706], [1000, -727], [1000, -727.9]], "notes": "" },
     { "id": "xpath_doctor_walk", "family": "F2", "kind": "concrete", "width": 5, "points": [[1100, -712], [1100, -726], [1100, -727.9]], "notes": "" },
-    { "id": "xpath_school_walk", "family": "F2", "kind": "concrete", "width": 8, "points": [[1225, -805], [1225, -799], [1225, -797.1]], "notes": "" },
+    { "id": "xpath_school_walk", "family": "F2", "kind": "concrete", "width": 8, "points": [[1560, -805], [1560, -799], [1560, -797.1]], "notes": "" },
     { "id": "xpath_home_1_walk", "family": "F2", "kind": "concrete", "width": 3, "points": [[818, -895], [834, -895]], "notes": "" },
     { "id": "xpath_home_2_walk", "family": "F2", "kind": "concrete", "width": 3, "points": [[818, -965], [834, -965]], "notes": "" },
     { "id": "xpath_home_3_walk", "family": "F2", "kind": "concrete", "width": 3, "points": [[818, -1035], [834, -1035]], "notes": "" },
     { "id": "xpath_home_4_walk", "family": "F2", "kind": "concrete", "width": 3, "points": [[917, -960], [901, -960]], "notes": "" },
     { "id": "xpath_home_5_walk", "family": "F2", "kind": "concrete", "width": 3, "points": [[917, -1030], [901, -1030]], "notes": "" },
     { "id": "xpath_home_6_walk", "family": "F2", "kind": "concrete", "width": 3, "points": [[917, -1100], [901, -1100]], "notes": "" },
-    { "id": "xpath_church_walk", "family": "F2", "kind": "concrete", "width": 8, "points": [[1368, -808], [1368, -797]], "notes": "" },
-    { "id": "xpath_church_lot", "family": "F2", "kind": "concrete", "width": 4, "points": [[1396, -890], [1404, -890]], "notes": "" },
+    { "id": "xpath_church_walk", "family": "F2", "kind": "concrete", "width": 8, "points": [[1240, -808], [1240, -797]], "notes": "" },
+    { "id": "xpath_church_lot", "family": "F2", "kind": "concrete", "width": 4, "points": [[1268, -890], [1276, -890]], "notes": "" },
     { "id": "xpath_mall_back", "family": "F3", "kind": "concrete", "width": 8, "points": [[1510, 306], [1510, 313]], "notes": "" },
     { "id": "xpath_tv_walk", "family": "F3", "kind": "concrete", "width": 8, "points": [[2080, -815], [2080, -796]], "notes": "" },
     { "id": "xpath_lift_front", "family": "F4", "kind": "concrete", "width": 8, "points": [[-760.19, -905.1], [-748.83, -908.97]], "notes": "" }
@@ -1331,15 +1331,15 @@
       "district": "liberty_quarter",
       "status": "new",
       "approval": "school with playground",
-      "position": { "x": 1225, "z": -845 },
+      "position": { "x": 1560, "z": -845 },
       "facing": "+Z",
       "yaw": 0,
       "footprint": { "w": 170, "d": 80 },
       "site": { "x0": -86, "x1": 86, "d0": -46, "d1": 150 },
       "storeys": 2,
       "height": 30,
-      "floorY": 15.4,
-      "ground": { "min": 5.39, "max": 14.84 },
+      "floorY": 20.9,
+      "ground": { "min": 16.93, "max": 20.31 },
       "entrances": [
         { "id": "front", "at": [0, -40], "width": 10, "kind": "double_door", "path": "xpath_school_walk" },
         { "id": "yard", "at": [0, 40], "width": 8, "kind": "double_door", "path": "inside" }
@@ -1360,7 +1360,7 @@
       ],
       "features": ["two_storey_brick", "bell", "flagpole", "classrooms_2", "hall", "playground_6_toys", "fenced_yard"],
       "partBudget": 1500,
-      "notes": ""
+      "notes": "On the flattest stretch of Chapel Street (3.4 st of relief under the building); the playground behind follows the slope (equipment on the ground, the fence stepped)."
     },
     {
       "id": "f2_home_1",
@@ -1562,15 +1562,15 @@
       "district": "liberty_quarter",
       "status": "new",
       "approval": "church",
-      "position": { "x": 1368, "z": -860 },
+      "position": { "x": 1240, "z": -860 },
       "facing": "+Z",
       "yaw": 0,
       "footprint": { "w": 56, "d": 104 },
       "site": { "x0": -30, "x1": 30, "d0": -62, "d1": 56 },
       "storeys": 1,
       "height": 30,
-      "floorY": 20.4,
-      "ground": { "min": 13.12, "max": 19.81 },
+      "floorY": 13,
+      "ground": { "min": 8.68, "max": 12.47 },
       "entrances": [
         { "id": "front", "at": [0, -52], "width": 8, "kind": "double_door", "path": "xpath_church_walk" },
         { "id": "vestry", "at": [28, 30], "width": 4, "kind": "door", "path": "xpath_church_lot" }
@@ -1591,7 +1591,7 @@
       ],
       "features": ["steeple", "stained_glass", "pews_8", "organ", "bell_rope", "lawn_and_lot"],
       "partBudget": 950,
-      "notes": ""
+      "notes": "Faces Liberty Green across Chapel Street; car park on its east side (xp_church_lot)."
     },
     {
       "id": "f3_steakhouse",
@@ -2147,7 +2147,7 @@
     { "id": "veh_pickup_4", "kind": "pickup", "x": 1660, "z": 1375, "yaw": 3.141593, "at": "xp_marina_lot", "family": "F4" },
     { "id": "veh_pickup_5", "kind": "pickup", "x": 950, "z": -446, "yaw": 0, "at": "f3_steakhouse/parking", "family": "F4" },
     { "id": "veh_pickup_6", "kind": "pickup", "x": 909, "z": -986, "yaw": -1.570796, "at": "f2_home_4/driveway", "family": "F4" },
-    { "id": "veh_suv_1", "kind": "suv", "x": 1440, "z": -850, "yaw": 0, "at": "xp_church_lot", "family": "F4" },
+    { "id": "veh_suv_1", "kind": "suv", "x": 1313, "z": -850, "yaw": 0, "at": "xp_church_lot", "family": "F4" },
     { "id": "veh_suv_2", "kind": "suv", "x": 1580, "z": 400, "yaw": 3.141593, "at": "xp_mall_parking", "family": "F4" },
     { "id": "veh_suv_3", "kind": "suv", "x": -722, "z": -940, "yaw": 3.141593, "at": "xp_lift_lot", "family": "F4" },
     { "id": "veh_suv_4", "kind": "suv", "x": 1740, "z": 1375, "yaw": 3.141593, "at": "xp_marina_lot", "family": "F4" }

@@ -34,7 +34,10 @@ local function category(path: string, name: string, height: number): string?
 	if string.sub(path, 1, 10) == "Town/Roads" then
 		return "road"
 	elseif string.find(path, "Tree_", 1, true) then
-		return if string.sub(name, 1, 6) == "Leaves" then "canopy" elseif string.sub(name, 1, 5) == "Trunk" then "trunk" else nil
+		return if string.sub(name, 1, 6) == "Leaves"
+			then "canopy"
+			elseif string.sub(name, 1, 5) == "Trunk" then "trunk"
+			else nil
 	elseif string.find(path, "Town/Props/Pole_", 1, true) then
 		return if name == "Pole_1" then "pole" else nil
 	elseif string.sub(path, 1, 10) == "Town/Lamps" then
@@ -64,7 +67,10 @@ local function walk(inst: any, path: string, depth: number)
 			local cat = category(p, c.Name, 2 * hy)
 			if cat then
 				local pos = cf.Position
-				table.insert(boxes, { cat, r1(pos.X - hx), r1(pos.Z - hz), r1(pos.X + hx), r1(pos.Z + hz), r1(pos.Y + hy) })
+				table.insert(
+					boxes,
+					{ cat, r1(pos.X - hx), r1(pos.Z - hz), r1(pos.X + hx), r1(pos.Z + hz), r1(pos.Y + hy) }
+				)
 			end
 		end
 		walk(c, p, depth + 1)
@@ -89,7 +95,8 @@ for k = 0, nz - 1 do
 	for i = 0, nx - 1 do
 		local x, z = B.x0 + i * B.step, B.z0 + k * B.step
 		local h = if z >= Backdrop.NORTH_FROM_Z then Backdrop.groundAt(x, z) else Height.at(x, z)
-		local water = Height.insideRiverWater(x, z) or h < Backdrop.SEA_Y - 0.4
+		-- water: the river, and the sea north of the coast rewrite (inland dips below 0, e.g. in the back field, stay dry)
+		local water = Height.insideRiverWater(x, z) or (z >= Backdrop.NORTH_FROM_Z and h < Backdrop.SEA_Y - 0.2)
 		table.insert(heights, { r1(h), if water then 1 else 0 })
 	end
 end
