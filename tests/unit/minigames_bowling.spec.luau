@@ -53,7 +53,7 @@ return function(t)
 		t.deepEq(Bowling.marks(s2.rolls[1])[10], { "9", "/", "9" })
 	end)
 
-	t.test("a known game: 168 with pending bonuses shown as blanks", function()
+	t.test("a known game: 167 with pending bonuses shown as blanks", function()
 		-- X, 7/, 9-, X, -8, 8/, -6, X, X, X81
 		local rolls = { 10, 7, 3, 9, 0, 10, 0, 8, 8, 2, 0, 6, 10, 10, 10, 8, 1 }
 		local s = play(rolls)

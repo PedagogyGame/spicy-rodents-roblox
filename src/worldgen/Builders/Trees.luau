@@ -215,6 +215,10 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 	-- root flare (skipped where the trunk stands at a kerb, road or sidewalk: no bark on the paving)
 	local g, paved = opts.groundAt(foot[1], foot[3], foot[2] + 2)
 	local r0 = trunkRadius(trunk, 0)
+	for _, o in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+		local _, p2 = opts.groundAt(foot[1] + o[1] * r0 * 1.35, foot[3] + o[2] * r0 * 1.35, foot[2] + 2)
+		paved = paved or p2
+	end
 	if not paved then
 		cylinder(list, "Flare", { foot[1], g - 1.2, foot[3] }, { foot[1], g + 0.9 * scale, foot[3] }, r0 * 1.16, 0, {
 			color = barkColor,

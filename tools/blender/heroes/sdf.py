@@ -330,33 +330,3 @@ def surface_nets(F, origin, h):
     quads = np.concatenate(quads, axis=0) if quads else np.zeros((0, 4), dtype=np.int64)
     quads = quads[(quads >= 0).all(axis=1)]
     return verts.astype(F32), quads
-
-
-def keep_largest(verts, quads):
-    """Drop floating specks: keep connected components with at least 2 % of the largest's faces."""
-    n = len(verts)
-    parent = np.arange(n)
-
-    def find(x):
-        root = x
-        while parent[root] != root:
-            root = parent[root]
-        while parent[x] != root:
-            parent[x], x = root, parent[x]
-        return root
-
-    for a, b in ((0, 1), (1, 2), (2, 3)):
-        for u, v in zip(quads[:, a], quads[:, b]):
-            ru, rv = find(u), find(v)
-            if ru != rv:
-                parent[ru] = rv
-    roots = np.array([find(i) for i in range(n)])
-    fr = roots[quads[:, 0]]
-    ids, counts = np.unique(fr, return_counts=True)
-    keep_roots = ids[counts >= 0.02 * counts.max()]
-    fk = np.isin(fr, keep_roots)
-    quads = quads[fk]
-    used = np.unique(quads)
-    remap = np.full(n, -1)
-    remap[used] = np.arange(len(used))
-    return verts[used], remap[quads]
