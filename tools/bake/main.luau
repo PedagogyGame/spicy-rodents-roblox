@@ -28,8 +28,7 @@ while i <= #process.args do
 end
 
 local t0 = os.clock()
-local lots = require("../../generated/Lots") :: any
-local roads = require("../../generated/Roads") :: any
+local data = Bake.data()
 local tRequire = os.clock() - t0
 
 local factory = Factory.new({
@@ -38,9 +37,11 @@ local factory = Factory.new({
 	CFrame = roblox.CFrame,
 	Color3 = roblox.Color3,
 	Enum = roblox.Enum,
+	UDim2 = roblox.UDim2,
+	ColorSequence = roblox.ColorSequence,
 })
 local t1 = os.clock()
-local town = Bake.run({ lots = lots, roads = roads }, factory)
+local town = Bake.run(data, factory)
 local tBake = os.clock() - t1
 local t2 = os.clock()
 local bytes = roblox.serializeModel({ town })
@@ -56,6 +57,8 @@ local result = {
 	lots = town:GetAttribute("LotCount"),
 	roads = town:GetAttribute("RoadCount"),
 	parts = town:GetAttribute("PartCount"),
+	props = town:GetAttribute("PropCount"),
+	lampModels = town:GetAttribute("LampModels"),
 	bakeHash = town:GetAttribute("BakeHash"),
 	instanceHash = town:GetAttribute("InstanceHash"),
 	seconds = { require = tRequire, bake = tBake, serialize = tWrite, total = os.clock() - t0 },

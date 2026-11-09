@@ -1,10 +1,12 @@
 --!strict
 -- ServerScriptService.Server.WorldGen.Bake
--- Entry point: walks lots and roads in data order, plans them (Plan), builds them (Builders), and
--- stamps BakeHash (D6, spike S6). The same code runs in Lune (tools/bake -> build/Town.rbxm) and
--- in the engine (tests/engine/WorldBuild, BakeParity).
+-- Entry point: walks lots and roads in data order, plans them (Plan and the builder families), adds
+-- the route props (trees, poles, wires, pipes, fences), street lamps (LampPlan) and the Skyline
+-- layer, builds them (Builders/Greybox) and stamps BakeHash (D6, spike S6, W1 #7). The same code
+-- runs in Lune (tools/bake -> build/Town.rbxm) and in the engine (tests/engine/WorldBuild, BakeParity).
 -- Interface (BUILD_PLAN §1.4, D6):
---   run(data, factory) -> Town Model     data = { lots = generated Lots, roads = generated Roads }
+--   data() -> Data (every generated module the bake reads, via Import.generated)
+--   run(data, factory) -> Town Model     data = { lots, roads, routes?, lighting? }
 --   plans(data) -> { BuildPlan }; hash(plans) -> hex; instanceHash(town) -> hex
 -- BakeHash hashes the plan with every number rounded to 1e-3 studs, so libm ulp differences
 -- between Lune and the engine cannot flip it. InstanceHash hashes the built Instances' structure
@@ -15,14 +17,53 @@
 
 local Factory = require("./Factory")
 local Greybox = require("./Builders/Greybox")
+local Import = require("./Import")
+local Kits = require("./Kits")
+local LampPlan = require("./LampPlan")
 local Plan = require("./Plan")
 local RoadBuilder = require("./Builders/Road")
+local RouteProps = require("./Builders/RouteProps")
+local Skyline = require("./Skyline")
+local Curve = Import.shared("Routes/Curve") :: typeof(require("../shared/Routes/Curve"))
+local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
 
 local Bake = {}
 
-Bake.VERSION = 1
+Bake.VERSION = 2
 
-export type Data = { lots: { Plan.Lot }, roads: { Plan.Road } }
+export type Data = { lots: { Plan.Lot }, roads: { Plan.Road }, routes: { any }?, lighting: any? }
+
+-- Every generated module the bake reads (Lune: generated/*.luau; engine: Shared.Generated).
+function Bake.data(): Data
+	local index = Import.generated("Index")
+	local routes = {}
+	for _, chunk in index.modules.Routes.chunks do
+		for _, r in Import.generated(chunk) do
+			table.insert(routes, r)
+		end
+	end
+	return {
+		lots = Import.generated("Lots"),
+		roads = Import.generated("Roads"),
+		routes = routes,
+		lighting = Import.generated("Lighting"),
+	}
+end
+
+-- The solid lot boxes lamps must avoid (every collidable lot part).
+local function solidBoxes(plans: { Plan.BuildPlan }): { any }
+	local out = {}
+	for _, p in plans do
+		if p.kind == "lot" then
+			for _, s in p.parts do
+				if s.canCollide then
+					table.insert(out, s)
+				end
+			end
+		end
+	end
+	return out
+end
 
 function Bake.plans(data: Data): { Plan.BuildPlan }
 	local parents = Plan.containment(data.lots)
@@ -31,9 +72,32 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 		table.insert(out, Plan.plan(lot, lot.type, { parentId = parents[lot.id] }))
 	end
 	Plan.attachSlabs(out)
+	local lotPlans = table.clone(out)
+	local roadPlans = {}
 	for _, road in data.roads do
-		table.insert(out, Plan.road(road))
+		local rp = Plan.road(road)
+		table.insert(out, rp)
+		table.insert(roadPlans, rp)
 	end
+	if data.routes then
+		local props = RouteProps.plans(data.routes, Kits.routeProps, Curve, Height.at)
+		for _, p in props do
+			table.insert(out, p)
+		end
+	end
+	local lamps = {}
+	if data.lighting then
+		local lampPlans
+		lampPlans, lamps = LampPlan.plan(data.roads, roadPlans, solidBoxes(lotPlans), data.lighting, Kits.lamp, Height.at)
+		for _, p in lampPlans do
+			table.insert(out, p)
+		end
+	end
+	local skylineTypes: { [string]: boolean } = {}
+	for _, lot in data.lots do
+		skylineTypes[lot.type] = Kits.get(lot.type).skyline
+	end
+	table.insert(out, Skyline.plan(lotPlans, lamps, skylineTypes))
 	return out
 end
 
@@ -67,6 +131,22 @@ local function attrString(v: any, fmt: string): string
 	return tostring(v)
 end
 
+local function attrList(attrs: { [string]: any }?): string
+	if not attrs then
+		return ""
+	end
+	local keys: { string } = {}
+	for k in attrs do
+		table.insert(keys, k)
+	end
+	table.sort(keys)
+	local out: { string } = {}
+	for _, k in keys do
+		table.insert(out, k .. "=" .. attrString(attrs[k], "%.3f"))
+	end
+	return table.concat(out, ",")
+end
+
 function Bake.serialize(plans: { Plan.BuildPlan }): string
 	local lines: { string } = {}
 	for _, p in plans do
@@ -97,7 +177,21 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 					s.material,
 					tostring(s.canCollide),
 					q(s.transparency, "%.2f"),
+					q(s.roll or 0, "%.4f"),
+					s.shape or "",
+					s.role or "",
+					attrList(s.attrs),
 				}, "|")
+			)
+		end
+		for _, e in p.extras or {} do
+			local nums: { string } = {}
+			for _, v in e.offset or {} do
+				table.insert(nums, q(v, "%.3f"))
+			end
+			table.insert(
+				lines,
+				`  +{e.kind}|{e.part}|{e.name}|{e.text or ""}|{e.a or ""}|{e.b or ""}|{table.concat(nums, ",")}|{attrList(e.attrs)}`
 			)
 		end
 	end
@@ -108,28 +202,32 @@ function Bake.hash(plans: { Plan.BuildPlan }): string
 	return fnv(Bake.serialize(plans))
 end
 
+local FOLDER = { lot = "Lots", road = "Roads", props = "Props", lamps = "Lamps" }
+
 function Bake.run(data: Data, factory: Factory.Factory): any
 	local plans = Bake.plans(data)
 	local town = factory.instance("Model", "Town")
-	local lotsFolder = factory.instance("Folder", "Lots")
-	local roadsFolder = factory.instance("Folder", "Roads")
-	local lotCount, roadCount, partCount = 0, 0, 0
+	local folders: { [string]: any } = {}
+	for _, name in { "Lots", "Roads", "Props", "Lamps" } do
+		folders[name] = factory.instance("Folder", name)
+	end
+	local counts = { lot = 0, road = 0, props = 0, lamps = 0, skyline = 0 }
+	local partCount = 0
 	for _, p in plans do
-		if p.kind == "lot" then
-			Greybox.build(p, factory).Parent = lotsFolder
-			lotCount += 1
-		else
-			RoadBuilder.build(p, factory).Parent = roadsFolder
-			roadCount += 1
-		end
+		local model = if p.kind == "road" then RoadBuilder.build(p, factory) else Greybox.build(p, factory)
+		model.Parent = if p.kind == "skyline" then town else folders[FOLDER[p.kind]]
+		counts[p.kind] += 1
 		partCount += #p.parts
 	end
-	lotsFolder.Parent = town
-	roadsFolder.Parent = town
+	for _, name in { "Lots", "Roads", "Props", "Lamps" } do
+		folders[name].Parent = town
+	end
 	town:SetAttribute("BakeHash", Bake.hash(plans))
 	town:SetAttribute("BakeVersion", Bake.VERSION)
-	town:SetAttribute("LotCount", lotCount)
-	town:SetAttribute("RoadCount", roadCount)
+	town:SetAttribute("LotCount", counts.lot)
+	town:SetAttribute("RoadCount", counts.road)
+	town:SetAttribute("PropCount", counts.props)
+	town:SetAttribute("LampModels", counts.lamps)
 	town:SetAttribute("PartCount", partCount)
 	town:SetAttribute("InstanceHash", Bake.instanceHash(town))
 	return town
@@ -160,6 +258,16 @@ function Bake.instanceLines(town: any): { string }
 						q(child.Transparency, "%.2f"),
 					}, "|")
 				)
+			elseif child:IsA("SurfaceGui") or child:IsA("ProximityPrompt") or child:IsA("Attachment") or child:IsA("Beam") or child:IsA("TextLabel") then
+				local extra = ""
+				if child:IsA("TextLabel") then
+					extra = child.Text
+				elseif child:IsA("ProximityPrompt") then
+					extra = child.ActionText .. "/" .. tostring(child.Enabled)
+				elseif child:IsA("Beam") then
+					extra = (if child.Attachment0 then child.Attachment0.Name else "") .. ">" .. (if child.Attachment1 then child.Attachment1.Name else "")
+				end
+				table.insert(lines, `{p}|{child.ClassName}|{extra}`)
 			elseif child:IsA("Model") then
 				local keys: { string } = {}
 				local attrs = child:GetAttributes()

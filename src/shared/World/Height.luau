@@ -6,8 +6,12 @@
 -- tolerance 1e-9 in HTML units; tests/unit/world_height.spec.luau).
 -- Interface (BUILD_PLAN §1.4): base(x, z), at(x, z) in STUDS (runtime code sees studs only, D21);
 -- the `*U` functions are the verbatim HTML-unit originals the stud wrappers scale around.
--- D32 extensions (terrain_extensions.json) are W1: outside the v5.4 rectangle this is still v5.4.
--- Pure: no state, no side effects on require.
+-- D32 extensions (W1 #7): `configure(generated TerrainExtensions)` adds the authored patches (hill,
+-- ridge, back field, long beach) OUTSIDE the verbatim rectangle, blended in over `blendU` so the
+-- ground stays continuous; inside the rectangle `at` is the verbatim port, bit for bit. Until
+-- configure is called (Data/WorldBoot does it once at boot), `at` is the v5.4 function everywhere.
+-- Interface additions: configure(ext?), terrainU(x, z), extensionMaterial(x, z), worldClamp()
+-- State: the configured extension table only; no side effects on require.
 
 local Height = {}
 
@@ -109,13 +113,120 @@ function Height.atU(x: number, z: number): number
 	return original * (1 - t) + RIVER.bankY * t
 end
 
+-- D32 terrain extensions (HTML units). `ext` is generated/TerrainExtensions or nil.
+local ext: any = nil
+
+function Height.configure(e: any?)
+	ext = e
+end
+
+local function smooth01(t: number): number
+	t = math.clamp(t, 0, 1)
+	return t * t * (3 - 2 * t)
+end
+
+local function rectMask(p: any, x: number, z: number): number
+	if x < p.minX or x > p.maxX or z < p.minZ or z > p.maxZ then
+		return 0
+	end
+	local d = math.min(x - p.minX, p.maxX - x, z - p.minZ, p.maxZ - z)
+	return smooth01(d / p.edge)
+end
+
+-- Strength of one patch at (x, z) in [0, 1] and the value it contributes (height to add, or target).
+local function patchAt(p: any, x: number, z: number): (number, number)
+	if p.shape == "dome" then
+		local d = math.sqrt((x - p.cx) ^ 2 + (z - p.cz) ^ 2)
+		return smooth01(1 - d / p.radius), p.height
+	elseif p.shape == "ridge" then
+		local ax, az, bx, bz = p.from[1], p.from[2], p.to[1], p.to[2]
+		local abx, abz = bx - ax, bz - az
+		local t = math.clamp(((x - ax) * abx + (z - az) * abz) / (abx * abx + abz * abz), 0, 1)
+		local d = math.sqrt((x - ax - abx * t) ^ 2 + (z - az - abz * t) ^ 2)
+		return smooth01(1 - d / p.halfWidth), p.height
+	elseif p.shape == "field" then
+		local m = rectMask(p, x, z)
+		local w = 2 * math.pi / p.wavelength
+		return m, p.base + p.amplitude * math.sin(x * w) * math.cos(z * w)
+	elseif p.shape == "beach" then
+		local m = rectMask(p, x, z)
+		local t = math.clamp((z - p.minZ) / (p.maxZ - p.minZ), 0, 1)
+		return m, p.fromY + (p.toY - p.fromY) * t
+	end
+	return 0, 0
+end
+
+-- Distance (HTML units) outside the verbatim rectangle; 0 inside.
+local function outside(x: number, z: number): number
+	local r = ext.verbatimRect
+	local dx = math.max(r.minX - x, 0, x - r.maxX)
+	local dz = math.max(r.minZ - z, 0, z - r.maxZ)
+	return math.sqrt(dx * dx + dz * dz)
+end
+
+-- The ground with the extensions (HTML units): verbatim inside the rectangle.
+function Height.terrainU(x: number, z: number): number
+	local h = Height.atU(x, z)
+	if ext == nil then
+		return h
+	end
+	local d = outside(x, z)
+	if d <= 0 then
+		return h
+	end
+	local w = smooth01(d / ext.blendU)
+	for _, p in ext.patches do
+		local m, v = patchAt(p, x, z)
+		if m > 0 then
+			if p.mode == "set" then
+				h = h + (v - h) * m * w
+			else
+				h += v * m * w
+			end
+		end
+	end
+	return h
+end
+
+-- Surface material name of the strongest patch at (x, z) (studs), or nil (v5.4 grass/mud rules).
+function Height.extensionMaterial(x: number, z: number): string?
+	if ext == nil then
+		return nil
+	end
+	local xu, zu = x / STUDS_PER_UNIT, z / STUDS_PER_UNIT
+	local d = outside(xu, zu)
+	if d <= 0 then
+		return nil
+	end
+	local w = smooth01(d / ext.blendU)
+	local best, bestM = nil, 0.5
+	for _, p in ext.patches do
+		local m = patchAt(p, xu, zu)
+		if m * w > bestM then
+			best, bestM = p.material, m * w
+		end
+	end
+	return best
+end
+
+-- World clamp in studs (grown by D32 when configured; the v5.4 playable rectangle otherwise).
+function Height.worldClamp(): { minX: number, maxX: number, minZ: number, maxZ: number }
+	local r = if ext then ext.worldClampU else Height.PLAYABLE_U
+	return {
+		minX = r.minX * STUDS_PER_UNIT,
+		maxX = r.maxX * STUDS_PER_UNIT,
+		minZ = r.minZ * STUDS_PER_UNIT,
+		maxZ = r.maxZ * STUDS_PER_UNIT,
+	}
+end
+
 -- Stud wrappers (the runtime interface).
 function Height.base(x: number, z: number): number
 	return Height.baseU(x / STUDS_PER_UNIT, z / STUDS_PER_UNIT) * STUDS_PER_UNIT
 end
 
 function Height.at(x: number, z: number): number
-	return Height.atU(x / STUDS_PER_UNIT, z / STUDS_PER_UNIT) * STUDS_PER_UNIT
+	return Height.terrainU(x / STUDS_PER_UNIT, z / STUDS_PER_UNIT) * STUDS_PER_UNIT
 end
 
 function Height.insideRiverWater(x: number, z: number): boolean

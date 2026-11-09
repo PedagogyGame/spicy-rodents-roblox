@@ -50,7 +50,7 @@ return function(t)
 			end,
 		})
 		local got = {}
-		net:on("Action", function(p, payload)
+		net:on("Action", function(_p, payload)
 			table.insert(got, payload.verb)
 		end)
 		local p = { UserId = 2 }

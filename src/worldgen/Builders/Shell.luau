@@ -92,11 +92,13 @@ local function doorLeaf(ctx: Spec.LotCtx, d: Door, axis: string, y0: number, doo
 	}
 	local name = "Door_" .. d.id
 	local leafT = math.max(t * 0.5, 0.2)
-	if axis == "x" then
-		ctx.list:add(ctx.frame, name, d.x, y0 + doorH / 2, d.z, d.w, doorH, leafT, { color = DOOR, role = "Door", attrs = attrs })
-	else
-		ctx.list:add(ctx.frame, name, d.x, y0 + doorH / 2, d.z, leafT, doorH, d.w, { color = DOOR, role = "Door", attrs = attrs })
-	end
+	-- size along the wall in local X so the part's local Z is the door normal (DoorReach, Doors)
+	ctx.list:add(ctx.frame, name, d.x, y0 + doorH / 2, d.z, d.w, doorH, leafT, {
+		yaw = if axis == "z" then math.pi / 2 else 0,
+		color = DOOR,
+		role = "Door",
+		attrs = attrs,
+	})
 	ctx.list:extra({
 		kind = "Prompt",
 		part = name,
