@@ -2,6 +2,8 @@
 /build/
 *.rbxl
 *.rbxlx
+# the owner-facing play build is committed on purpose (docs/owner/PLAY_FIRST_BUILD.md)
+!docs/owner/files/*.rbxl
 *.rbxl.lock
 *.rbxlx.lock
 # assets/*.rbxm are committed content; build output .rbxm lives in build/ only
