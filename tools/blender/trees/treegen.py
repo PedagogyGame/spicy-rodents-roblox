@@ -839,7 +839,7 @@ class TreeBuilder:
             self.build_apples()
 
     def leaf_budget(self):
-        return {"giant": 11500, "named": 10000, "estate": 9000, "outer": 6500, "apple": 2800}.get(self.cat, 8000) * (0.5 if self.sp == "willow" else 1.0)
+        return {"giant": 11500, "named": 10000, "estate": 9000, "outer": 6500, "apple": 2800}.get(self.cat, 8000) * (0.45 if self.sp == "willow" else 1.0)
 
     def build_twigs(self):
         """Branchlets from the boughs (or the leader) into the lower and outer clumps."""
@@ -975,51 +975,50 @@ class TreeBuilder:
             self.leaf[layer].add(V2, F2, UV2, N2)
 
     def build_willow_fronds(self):
-        """Weeping curtains: flattened, tapering fronds hanging from the side and lower clumps, longest
-        at the rim (nearly to the ground), shorter under bridges; none through a walking tunnel."""
+        """Weeping curtains: thin tapering strands that start on the upper outer side of a crown clump,
+        drape over it and hang, longest at the rim (nearly to the ground), short under the living
+        bridges; none crosses a walking tunnel."""
         rng = self.rng
         c, rh, ylo, yhi = self.crown
         n = 0
-        cand = sorted(self.clump_info, key=lambda a: a[2][1] + rng.random() * 0.3)
-
-        def bridge_lobe(li):
-            return self.lobes[li][2] == "bridge"
+        cand = sorted(self.clump_info, key=lambda a: -a[2][1] + rng.random() * 0.6)
         for (ctr, r, d, li) in cand:
-            if (d[1] > 0.55 and not bridge_lobe(li)) or n >= 110:
-                continue
+            if n >= 120:
+                break
             bridge = self.lobes[li][2] == "bridge"
             out = np.array([d[0], 0, d[2]])
-            out = norm(out) if np.linalg.norm(out) > 0.2 else norm(np.array([ctr[0] - c[0], 0, ctr[2] - c[2]]) + 1e-6)
+            out = norm(out) if np.linalg.norm(out) > 0.25 else norm(np.array([ctr[0] - c[0], 0, ctr[2] - c[2]]) + 1e-6)
             radial = min(1.0, np.hypot(ctr[0] - c[0], ctr[2] - c[2]) / max(rh, 1.0))
-            m = 2 if bridge else (4 if r > 3.5 else 3)
+            if not bridge and (radial < 0.3 or d[1] < -0.5):
+                continue
+            m = 1 if bridge else (3 if r > 3.5 else 2)
+            side = np.array([-out[2], 0, out[0]])
             for k in range(m):
-                a = (k - (m - 1) / 2) * 0.9 + rng.normal(0, 0.25)
-                side = np.array([-out[2], 0, out[0]])
-                spread = norm(out * 0.85 + side * math.sin(a) * 0.9)
-                top = ctr + spread * r * 0.62 + np.array([0, -r * 0.4, 0])
+                a = (k - (m - 1) / 2) * 0.75 + rng.normal(0, 0.2)
+                o = norm(out * math.cos(a) + side * math.sin(a))
+                start = ctr + o * r * 0.45 + np.array([0, r * 0.55, 0])
+                arc = ctr + o * r * 1.08 + np.array([0, r * 0.05, 0])
                 if bridge:
-                    bottom_y = max(9.0, top[1] - rng.uniform(5, 12))
+                    bottom_y = max(9.0, arc[1] - rng.uniform(4, 9))
                 else:
-                    bottom_y = max(4.5, 5.0 + (1 - radial) * 10 + rng.uniform(0, 9))
-                if top[1] - bottom_y < 4:
+                    bottom_y = max(4.5, 5.0 + (1 - radial) * 9 + rng.uniform(0, 8))
+                h = arc[1] - bottom_y
+                if h < 3.5:
                     continue
-                drift = out * rng.uniform(0.6, 2.2) + side * rng.normal(0, 0.6)
-                h = top[1] - bottom_y
-                pts = np.array([top, top + np.array([0, -h * 0.3, 0]) + drift * 0.45,
-                                top + np.array([0, -h * 0.65, 0]) + drift * 0.8, top + np.array([0, -h * 0.9, 0]) + drift * 0.95,
-                                np.array([top[0], bottom_y, top[2]]) + drift])
+                drift = o * rng.uniform(0.5, 1.8)
+                pts = np.array([start, arc, arc + np.array([0, -h * 0.35, 0]) + drift * 0.5,
+                                arc + np.array([0, -h * 0.7, 0]) + drift * 0.85, np.array([arc[0], bottom_y, arc[2]]) + drift])
                 if self.clearance(pts[1:]).min() < 0.4:
                     continue
-                w = rng.uniform(0.8, 1.3) * (0.8 if bridge else 1.0)
+                w = rng.uniform(0.55, 0.85) * (0.8 if bridge else 1.0)
 
                 def radius(i, ang, w=w):
-                    f = i / 4
-                    rr = w * (1.0 - 0.55 * f) * (0.25 if i == 4 else 1.0)
-                    return rr * (1 - 0.5 * np.cos(2 * ang))  # wide across the curtain, thin radially
+                    f = max(0, i - 1) / 3
+                    rr = w * (1.0 - 0.5 * f) * (0.3 if i == 4 else 1.0)
+                    return rr * (1 - 0.45 * np.cos(2 * ang))  # wider across the curtain than radially
 
-                V, F, UV, N = tube(pts, radius, 4, 1, self.leaf_tile * 1.2, start_normal=out, cap_end=True, cap_start=True)
-                # soften: bend normals toward the outside of the crown
-                N = norm(N * 0.5 + out[None] * 0.5)
+                V, F, UV, N = tube(pts, radius, 4, 1, self.leaf_tile * 1.1, start_normal=o, cap_end=True, cap_start=True)
+                N = norm(N * 0.6 + o[None] * 0.4)
                 self.leaf["mid" if (n % 3 == 0) else "sun"].add(V, F, UV, N)
                 n += 1
         self.log["willow_fronds"] = n

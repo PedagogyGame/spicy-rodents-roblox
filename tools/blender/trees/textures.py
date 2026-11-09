@@ -372,7 +372,7 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
     lum = 0.88 + 0.22 * bright
     if layer == "sun":
         warm = np.array([1.16, 1.08, 0.70])
-        col = col * warm * 1.12
+        col = col * warm * 1.04
     elif layer == "shade":
         cool = np.array([0.86, 0.95, 1.02])
         col = col * cool * 0.80
