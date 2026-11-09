@@ -84,7 +84,7 @@ function PossessionClient.start(opts: Opts): Client
 		end
 	end
 
-	granted.OnClientEvent:Connect(function(payload: PossessionState.GrantPayload)
+	granted.OnClientEvent:Connect(function(payload: { [string]: any })
 		local t0 = os.clock()
 		stop()
 		local found = player.Character

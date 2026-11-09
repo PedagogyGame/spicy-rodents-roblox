@@ -24,8 +24,10 @@ local ActorServiceT = require("./ActorService")
 
 type Actor = ActorServiceT.Actor
 type Registry = ActorServiceT.Registry
-type Snapshot = PossessionState.Snapshot
-type GrantPayload = PossessionState.GrantPayload
+-- Shapes of Shared/Actors/PossessionState.Snapshot and GrantPayload (exported types do not
+-- cross the Import shim, so they are restated loosely here).
+type Snapshot = { [string]: any }
+type GrantPayload = { [string]: any }
 
 export type Engine = {
 	-- Ask the client to stream around a position before the handoff (may yield; must not error).
@@ -71,7 +73,7 @@ export type Stats = {
 export type Service = {
 	deps: Deps,
 	engine: Engine,
-	ledger: PossessionState.Ledger,
+	ledger: { byActor: { [string]: number }, byDriver: { [number]: string } },
 	drivers: { [number]: any }, -- userId -> player
 	owners: { [string]: number }, -- actorId -> userId whose SetNetworkOwner succeeded (bookkeeping)
 	stats: Stats,

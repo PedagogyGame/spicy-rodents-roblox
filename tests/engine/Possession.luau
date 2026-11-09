@@ -23,7 +23,7 @@ local RoleService = (require :: any)(server:WaitForChild("Roles"):WaitForChild("
 local LoopWalker = (require :: any)(
 	ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Actors"):WaitForChild("LoopWalker")
 )
-local Soak = (require :: any)(script.Parent:WaitForChild("PossessionSoak"))
+local Soak = (require :: any)((script.Parent :: Instance):WaitForChild("PossessionSoak"))
 
 local PossessionSuite = {}
 

@@ -151,7 +151,7 @@ function AnimationDriver.start(opts: Opts): Driver
 	end
 
 	local function choose(e: Entry): string
-		local set = clips[e.species] or {}
+		local set: ClipSet = clips[e.species] or {}
 		if e.speed < walkAbove then
 			return if set.idle then "idle" elseif set.run then "hold" else "none"
 		end
@@ -176,7 +176,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			end
 			e.speed += (inst - e.speed) * alpha
 			local want = choose(e)
-			local set = clips[e.species] or {}
+			local set: ClipSet = clips[e.species] or {}
 			if want == "hold" then
 				-- squirrel puppet stopped: freeze the run clip where it is (no snap to the rest pose)
 				local t = e.tracks.run

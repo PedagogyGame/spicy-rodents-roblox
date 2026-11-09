@@ -12,16 +12,12 @@
 -- No side effects on require.
 -- Interface: start(body, payload, metrics, opts?) -> stop()
 
-local Import = require("../Import")
-local PossessionState =
-	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
-
 export type Metrics = { [string]: any }
 export type Opts = { walk: number?, sprint: number?, accel: number?, ignore: { Instance }? }
 
 local Squirrel = {}
 
-function Squirrel.start(body: Model, payload: PossessionState.GrantPayload, metrics: Metrics, opts: Opts?): () -> ()
+function Squirrel.start(body: Model, payload: { [string]: any }, metrics: Metrics, opts: Opts?): () -> ()
 	local RunService = game:GetService("RunService")
 	local UserInputService = game:GetService("UserInputService")
 	local Players = game:GetService("Players")

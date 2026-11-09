@@ -9,10 +9,6 @@
 -- No side effects on require.
 -- Interface: start(body, payload, metrics) -> stop()
 
-local Import = require("../Import")
-local PossessionState =
-	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
-
 export type Metrics = { [string]: any }
 
 local Human = {}
@@ -40,7 +36,7 @@ local function controls(): any?
 	return if ok then mod else nil
 end
 
-function Human.start(body: Model, payload: PossessionState.GrantPayload, metrics: Metrics): () -> ()
+function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics): () -> ()
 	local RunService = game:GetService("RunService")
 	local UserInputService = game:GetService("UserInputService")
 	local humanoid = body:FindFirstChildOfClass("Humanoid")
