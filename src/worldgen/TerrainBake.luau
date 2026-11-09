@@ -2,8 +2,8 @@
 -- ServerScriptService.Server.WorldGen.TerrainBake (engine only: Lune cannot write voxels)
 -- Writes smooth Terrain from a height function with Terrain:WriteVoxels in square chunks
 -- (BUILD_PLAN D6, spike S6). Each chunk samples the height at column centres, sizes its vertical
--- range to the chunk's own max height, and fills occupancy as the solid fraction of each 4-stud
--- voxel; columns with a water top (the v5.4 river) fill Water up to it. Axis-aligned paint
+-- range to the chunk's own max height, and fills occupancy so the drawn surface lands on the height
+-- (see SURFACE_BIAS); columns with a water top (the v5.4 river) fill Water up to it. Axis-aligned paint
 -- rectangles (roads, gardens) override the column's surface material.
 -- Interface (BUILD_PLAN §1.4, D6): write(terrain, opts) -> Stats
 -- No side effects on require; yields (task.wait) every `yieldEvery` seconds of work so a long
@@ -12,6 +12,13 @@
 local TerrainBake = {}
 
 local RES = 4
+-- The engine draws (and collides) a column's surface half a voxel above its solid fraction: a column
+-- full to y with air above meets a ray at y + 2, and a partly filled top voxel at yb + 4 * occupancy + 2
+-- (tools/cloud/tasks/terrain_calib.luau, measured 2026-11-09: error 0.000 st on flats once the half
+-- voxel is taken off, against exactly +2.000 st before). So the fill level is the height minus RES / 2.
+-- Water is the exception: its surface sits at the fill level itself (tools/cloud/tasks/ground_probe.luau:
+-- a river filled to WATER_Y - 2 met the ray at WATER_Y - 2), so water columns take no bias.
+local SURFACE_BIAS = RES / 2
 
 export type Rect = { minX: number, maxX: number, minZ: number, maxZ: number }
 export type PaintRect = { minX: number, maxX: number, minZ: number, maxZ: number, material: Enum.Material }
@@ -125,7 +132,7 @@ function TerrainBake.write(terrain: Terrain, opts: Opts): Stats
 					local mj: { Enum.Material } = table.create(nz)
 					local oj: { number } = table.create(nz)
 					for k = 1, nz do
-						local occ = (hcol[k] - yb) / RES
+						local occ = (hcol[k] - SURFACE_BIAS - yb) / RES
 						if occ >= 0.5 then
 							mj[k] = mcol[k]
 							oj[k] = if occ > 1 then 1 else occ

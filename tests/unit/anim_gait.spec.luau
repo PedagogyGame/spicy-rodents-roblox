@@ -12,6 +12,15 @@ local Squirrel = require("@client/Controllers/Squirrel")
 local TownView = require("@client/Render/TownView")
 
 return function(t)
+	t.test("AnimationDriver.DEFAULT_CLIPS exists: start() falls back to it (lost once in a checkpoint)", function()
+		local clips = AnimationDriver.DEFAULT_CLIPS
+		t.truthy(clips and clips.human, "human clip set")
+		for _, k in { "idle", "walk", "run", "jump", "fall", "sit" } do
+			t.truthy(string.find((clips.human :: any)[k], "^rbxassetid://%d+$"), k)
+		end
+		t.eq(clips.squirrel, nil) -- animals take the procedural gait path in add()
+	end)
+
 	t.test("bound vs trot: which legs move together", function()
 		local sq = Gait.params("squirrel", 0.9)
 		local pose = Gait.pose(math.pi / 2, 16, 0, sq, 3)

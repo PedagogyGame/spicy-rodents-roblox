@@ -184,6 +184,23 @@ function AnimationDriver.settle(st: Settle, y: number, dt: number): number
 	return off
 end
 
+-- Roblox's stock R15 animations (public, owned by Roblox: the default Animate script's IDs). The
+-- animals use the procedural Gait (the S7 test clip 92005834447457 stays for the clip pipeline only).
+-- start() falls back to this table, so it must exist: without it every body's add() and the whole
+-- per-frame step throw (tests/unit/anim_gait.spec.luau pins it).
+AnimationDriver.DEFAULT_CLIPS = {
+	human = {
+		idle = "rbxassetid://507766388",
+		walk = "rbxassetid://507777826",
+		run = "rbxassetid://507767714",
+		jump = "rbxassetid://507765000",
+		fall = "rbxassetid://507767968",
+		sit = "rbxassetid://2506281703", -- the stock R15 Animate sit
+		nominalWalk = 6, -- the stock walk reads right at about 6 st/s
+		nominalRun = 16,
+	},
+} :: { [string]: ClipSet }
+
 -- The Motor6Ds the gait drives, by RigSpec bone name.
 local function gaitJoints(model: Model): ({ Joint }, number)
 	local joints: { Joint } = {}
