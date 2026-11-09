@@ -1,0 +1,974 @@
+{
+  "format": "spicy-heroes/1",
+  "species": {
+    "squirrel": {
+      "rig": "squirrel",
+      "model": {
+        "assetId": "99050824695337",
+        "moderation": "Approved",
+        "fbxBytes": 3911660,
+        "sha": "8a4fb6077e3f3e70"
+      },
+      "bones": 35,
+      "bonesMatchRigSpec": true,
+      "weights": {
+        "Body": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Pattern": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Eyes": {
+          "maxInfluences": 1,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "FurCards": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        }
+      },
+      "tris": {
+        "total": 12724,
+        "Body": 6631,
+        "Pattern": 1061,
+        "Eyes": 448,
+        "FurCards": 4584
+      },
+      "regions": {
+        "Body": {
+          "tris": 6631,
+          "alphaMode": "TintMask",
+          "tint": "#c27442"
+        },
+        "Pattern": {
+          "tris": 1061,
+          "alphaMode": "TintMask",
+          "tint": "#f5d8ac"
+        },
+        "Eyes": {
+          "tris": 448,
+          "alphaMode": "Overlay"
+        },
+        "FurCards": {
+          "tris": 4584,
+          "alphaMode": "Transparency",
+          "tint": "#c27442"
+        }
+      },
+      "sockets": {
+        "HeadSocket": {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            0.24,
+            -0.12
+          ]
+        },
+        "MouthSocket": {
+          "bone": "Jaw",
+          "offset": [
+            0.0,
+            0.02,
+            -0.24
+          ]
+        },
+        "TailTip": {
+          "bone": "Tail8",
+          "offset": [
+            0.0,
+            -0.03,
+            0.18
+          ]
+        },
+        "ChestCenter": {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.13,
+            0.04
+          ]
+        }
+      },
+      "hipHeight": 0.9,
+      "clips": {
+        "Idle": {
+          "assetId": "105503374404579",
+          "moderation": "Approved",
+          "brief": "idle",
+          "duration": 3.0,
+          "loop": true,
+          "keyframes": 91,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [],
+          "rbxmBytes": 74606
+        },
+        "Walk": {
+          "assetId": "116913388697883",
+          "moderation": "Approved",
+          "brief": "walk",
+          "duration": 0.8,
+          "loop": true,
+          "keyframes": 25,
+          "poseCount": 36,
+          "nominalSpeed": 0.4125,
+          "markers": [],
+          "rbxmBytes": 20566
+        },
+        "Run": {
+          "assetId": "139575297291535",
+          "moderation": "Approved",
+          "brief": "run",
+          "duration": 0.466667,
+          "loop": true,
+          "keyframes": 15,
+          "poseCount": 36,
+          "nominalSpeed": 3.43,
+          "markers": [
+            {
+              "time": 0.0,
+              "name": "Commit",
+              "value": "stride"
+            }
+          ],
+          "rbxmBytes": 14035
+        },
+        "Climb": {
+          "assetId": "71499561784767",
+          "moderation": "Approved",
+          "brief": "climb",
+          "duration": 0.6,
+          "loop": true,
+          "keyframes": 19,
+          "poseCount": 36,
+          "nominalSpeed": 1.5,
+          "markers": [],
+          "rbxmBytes": 17946
+        },
+        "Wire": {
+          "assetId": "73868896883976",
+          "moderation": "Approved",
+          "brief": "wire traversal",
+          "duration": 1.0,
+          "loop": true,
+          "keyframes": 31,
+          "poseCount": 36,
+          "nominalSpeed": 0.55,
+          "markers": [],
+          "rbxmBytes": 25671
+        },
+        "Leap": {
+          "assetId": "133390368063518",
+          "moderation": "Approved",
+          "brief": "leap",
+          "duration": 0.766667,
+          "loop": false,
+          "keyframes": 24,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [
+            {
+              "time": 0.16666666666666666,
+              "name": "Commit",
+              "value": "takeoff"
+            },
+            {
+              "time": 0.6333333333333333,
+              "name": "Recover",
+              "value": "land"
+            }
+          ],
+          "rbxmBytes": 23962
+        },
+        "Pounce": {
+          "assetId": "99761231177400",
+          "moderation": "Approved",
+          "brief": "pounce",
+          "duration": 0.966667,
+          "loop": false,
+          "keyframes": 30,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [
+            {
+              "time": 0.4,
+              "name": "Commit",
+              "value": "lunge"
+            },
+            {
+              "time": 0.7,
+              "name": "Recover",
+              "value": "land"
+            }
+          ],
+          "rbxmBytes": 30085
+        },
+        "Bite": {
+          "assetId": "75926607099862",
+          "moderation": "Approved",
+          "brief": "bite dance",
+          "duration": 2.066667,
+          "loop": false,
+          "keyframes": 63,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [],
+          "rbxmBytes": 64405
+        },
+        "Stalk": {
+          "assetId": "95165052119916",
+          "moderation": "Approved",
+          "brief": "sneak (stalk)",
+          "duration": 1.2,
+          "loop": true,
+          "keyframes": 37,
+          "poseCount": 36,
+          "nominalSpeed": 0.19,
+          "markers": [],
+          "rbxmBytes": 28475
+        }
+      },
+      "clipsShared": false
+    },
+    "rodent": {
+      "rig": "squirrel",
+      "model": {
+        "assetId": "117655261191645",
+        "moderation": "Approved",
+        "fbxBytes": 3931148,
+        "sha": "61eaf414df418b7d"
+      },
+      "bones": 35,
+      "bonesMatchRigSpec": true,
+      "weights": {
+        "Body": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Pattern": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Eyes": {
+          "maxInfluences": 1,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "FurCards": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Blood": {
+          "maxInfluences": 3,
+          "unweighted": 0,
+          "rootWeighted": false
+        }
+      },
+      "tris": {
+        "total": 10422,
+        "Body": 6511,
+        "Pattern": 1181,
+        "Eyes": 448,
+        "FurCards": 1768,
+        "Blood": 514
+      },
+      "regions": {
+        "Body": {
+          "tris": 6511,
+          "alphaMode": "TintMask",
+          "tint": "#7d5d46"
+        },
+        "Pattern": {
+          "tris": 1181,
+          "alphaMode": "TintMask",
+          "tint": "#a08a74"
+        },
+        "Eyes": {
+          "tris": 448,
+          "alphaMode": "Overlay",
+          "glow": {
+            "material": "Neon",
+            "color": "#ff2a1a",
+            "note": "the eyes glow: remove the Eyes SurfaceAppearance or add a PointLight; red eyes survive the avatar blend"
+          }
+        },
+        "FurCards": {
+          "tris": 1768,
+          "alphaMode": "Transparency",
+          "tint": "#7d5d46"
+        },
+        "Blood": {
+          "tris": 514,
+          "alphaMode": "Transparency"
+        }
+      },
+      "sockets": {
+        "HeadSocket": {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            0.24,
+            -0.12
+          ]
+        },
+        "MouthSocket": {
+          "bone": "Jaw",
+          "offset": [
+            0.0,
+            0.02,
+            -0.24
+          ]
+        },
+        "TailTip": {
+          "bone": "Tail8",
+          "offset": [
+            0.0,
+            -0.03,
+            0.18
+          ]
+        },
+        "ChestCenter": {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.13,
+            0.04
+          ]
+        }
+      },
+      "hipHeight": 0.9,
+      "clips": {
+        "Idle": {
+          "assetId": "105503374404579",
+          "moderation": "Approved",
+          "brief": "idle",
+          "duration": 3.0,
+          "loop": true,
+          "keyframes": 91,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [],
+          "rbxmBytes": 74606
+        },
+        "Walk": {
+          "assetId": "116913388697883",
+          "moderation": "Approved",
+          "brief": "walk",
+          "duration": 0.8,
+          "loop": true,
+          "keyframes": 25,
+          "poseCount": 36,
+          "nominalSpeed": 0.4125,
+          "markers": [],
+          "rbxmBytes": 20566
+        },
+        "Run": {
+          "assetId": "139575297291535",
+          "moderation": "Approved",
+          "brief": "run",
+          "duration": 0.466667,
+          "loop": true,
+          "keyframes": 15,
+          "poseCount": 36,
+          "nominalSpeed": 3.43,
+          "markers": [
+            {
+              "time": 0.0,
+              "name": "Commit",
+              "value": "stride"
+            }
+          ],
+          "rbxmBytes": 14035
+        },
+        "Climb": {
+          "assetId": "71499561784767",
+          "moderation": "Approved",
+          "brief": "climb",
+          "duration": 0.6,
+          "loop": true,
+          "keyframes": 19,
+          "poseCount": 36,
+          "nominalSpeed": 1.5,
+          "markers": [],
+          "rbxmBytes": 17946
+        },
+        "Wire": {
+          "assetId": "73868896883976",
+          "moderation": "Approved",
+          "brief": "wire traversal",
+          "duration": 1.0,
+          "loop": true,
+          "keyframes": 31,
+          "poseCount": 36,
+          "nominalSpeed": 0.55,
+          "markers": [],
+          "rbxmBytes": 25671
+        },
+        "Leap": {
+          "assetId": "133390368063518",
+          "moderation": "Approved",
+          "brief": "leap",
+          "duration": 0.766667,
+          "loop": false,
+          "keyframes": 24,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [
+            {
+              "time": 0.16666666666666666,
+              "name": "Commit",
+              "value": "takeoff"
+            },
+            {
+              "time": 0.6333333333333333,
+              "name": "Recover",
+              "value": "land"
+            }
+          ],
+          "rbxmBytes": 23962
+        },
+        "Pounce": {
+          "assetId": "99761231177400",
+          "moderation": "Approved",
+          "brief": "pounce",
+          "duration": 0.966667,
+          "loop": false,
+          "keyframes": 30,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [
+            {
+              "time": 0.4,
+              "name": "Commit",
+              "value": "lunge"
+            },
+            {
+              "time": 0.7,
+              "name": "Recover",
+              "value": "land"
+            }
+          ],
+          "rbxmBytes": 30085
+        },
+        "Bite": {
+          "assetId": "75926607099862",
+          "moderation": "Approved",
+          "brief": "bite dance",
+          "duration": 2.066667,
+          "loop": false,
+          "keyframes": 63,
+          "poseCount": 36,
+          "nominalSpeed": null,
+          "markers": [],
+          "rbxmBytes": 64405
+        },
+        "Stalk": {
+          "assetId": "95165052119916",
+          "moderation": "Approved",
+          "brief": "sneak (stalk)",
+          "duration": 1.2,
+          "loop": true,
+          "keyframes": 37,
+          "poseCount": 36,
+          "nominalSpeed": 0.19,
+          "markers": [],
+          "rbxmBytes": 28475
+        }
+      },
+      "clipsShared": true
+    },
+    "fox": {
+      "rig": "fox",
+      "model": {
+        "assetId": "113638418740779",
+        "moderation": "Approved",
+        "fbxBytes": 3601356,
+        "sha": "79a74c708e881b15"
+      },
+      "bones": 33,
+      "bonesMatchRigSpec": true,
+      "weights": {
+        "Body": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Pattern": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Eyes": {
+          "maxInfluences": 1,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "FurCards": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        }
+      },
+      "tris": {
+        "total": 7686,
+        "Body": 5006,
+        "Pattern": 640,
+        "Eyes": 448,
+        "FurCards": 1592
+      },
+      "regions": {
+        "Body": {
+          "tris": 5006,
+          "alphaMode": "TintMask",
+          "tint": "#d8763a"
+        },
+        "Pattern": {
+          "tris": 640,
+          "alphaMode": "TintMask",
+          "tint": "#fbf6ee"
+        },
+        "Eyes": {
+          "tris": 448,
+          "alphaMode": "Overlay"
+        },
+        "FurCards": {
+          "tris": 1592,
+          "alphaMode": "Transparency",
+          "tint": "#d8763a"
+        }
+      },
+      "sockets": {
+        "HeadSocket": {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            0.28,
+            -0.12
+          ]
+        },
+        "MouthSocket": {
+          "bone": "Jaw",
+          "offset": [
+            0.0,
+            -0.04,
+            -0.45
+          ]
+        },
+        "TailTip": {
+          "bone": "Tail6",
+          "offset": [
+            0.0,
+            0.0,
+            0.34
+          ]
+        },
+        "ChestCenter": {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.26,
+            0.05
+          ]
+        }
+      },
+      "hipHeight": 1.58,
+      "clips": {
+        "Idle": {
+          "assetId": "72120055872549",
+          "moderation": "Approved",
+          "brief": "idle",
+          "duration": 3.0,
+          "loop": true,
+          "keyframes": 91,
+          "poseCount": 34,
+          "nominalSpeed": null,
+          "markers": [],
+          "rbxmBytes": 60797
+        },
+        "Walk": {
+          "assetId": "111397040978360",
+          "moderation": "Approved",
+          "brief": "walk",
+          "duration": 1.2,
+          "loop": true,
+          "keyframes": 37,
+          "poseCount": 34,
+          "nominalSpeed": 0.83,
+          "markers": [],
+          "rbxmBytes": 30728
+        },
+        "Trot": {
+          "assetId": "84052432329881",
+          "moderation": "Approved",
+          "brief": "trot",
+          "duration": 0.666667,
+          "loop": true,
+          "keyframes": 21,
+          "poseCount": 34,
+          "nominalSpeed": 4.05,
+          "markers": [],
+          "rbxmBytes": 12553
+        },
+        "Run": {
+          "assetId": "115177612358899",
+          "moderation": "Approved",
+          "brief": "run",
+          "duration": 0.466667,
+          "loop": true,
+          "keyframes": 15,
+          "poseCount": 34,
+          "nominalSpeed": 8.49,
+          "markers": [],
+          "rbxmBytes": 12425
+        }
+      },
+      "clipsShared": false
+    },
+    "doe": {
+      "rig": "deer",
+      "model": {
+        "assetId": "92696060198865",
+        "moderation": "Approved",
+        "fbxBytes": 3497756,
+        "sha": "c607312549972c61"
+      },
+      "bones": 31,
+      "bonesMatchRigSpec": true,
+      "weights": {
+        "Body": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Pattern": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Eyes": {
+          "maxInfluences": 1,
+          "unweighted": 0,
+          "rootWeighted": false
+        }
+      },
+      "tris": {
+        "total": 8320,
+        "Body": 7375,
+        "Pattern": 497,
+        "Eyes": 448
+      },
+      "regions": {
+        "Body": {
+          "tris": 7375,
+          "alphaMode": "TintMask",
+          "tint": "#c99a68"
+        },
+        "Pattern": {
+          "tris": 497,
+          "alphaMode": "TintMask",
+          "tint": "#fffaf2"
+        },
+        "Eyes": {
+          "tris": 448,
+          "alphaMode": "Overlay"
+        }
+      },
+      "sockets": {
+        "HeadSocket": {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            0.24,
+            -0.08
+          ]
+        },
+        "MouthSocket": {
+          "bone": "Jaw",
+          "offset": [
+            0.0,
+            -0.31,
+            -0.47
+          ]
+        },
+        "TailTip": {
+          "bone": "Tail2",
+          "offset": [
+            0.0,
+            -0.32,
+            0.16
+          ]
+        },
+        "ChestCenter": {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.52,
+            0.2
+          ]
+        }
+      },
+      "hipHeight": 3.1,
+      "clips": {
+        "Idle": {
+          "assetId": "91659912346522",
+          "moderation": "Approved",
+          "brief": "idle",
+          "duration": 4.0,
+          "loop": true,
+          "keyframes": 121,
+          "poseCount": 32,
+          "nominalSpeed": null,
+          "markers": [],
+          "rbxmBytes": 69985
+        },
+        "Walk": {
+          "assetId": "94520791486751",
+          "moderation": "Approved",
+          "brief": "walk",
+          "duration": 1.333333,
+          "loop": true,
+          "keyframes": 41,
+          "poseCount": 32,
+          "nominalSpeed": 1.2,
+          "markers": [],
+          "rbxmBytes": 27977
+        },
+        "Trot": {
+          "assetId": "87419472926595",
+          "moderation": "Approved",
+          "brief": "trot",
+          "duration": 0.8,
+          "loop": true,
+          "keyframes": 25,
+          "poseCount": 32,
+          "nominalSpeed": 5.0,
+          "markers": [],
+          "rbxmBytes": 13508
+        },
+        "Run": {
+          "assetId": "86082833838391",
+          "moderation": "Approved",
+          "brief": "run (bolt)",
+          "duration": 0.6,
+          "loop": true,
+          "keyframes": 19,
+          "poseCount": 32,
+          "nominalSpeed": 10.27,
+          "markers": [],
+          "rbxmBytes": 13812
+        },
+        "Leap": {
+          "assetId": "77923165549164",
+          "moderation": "Approved",
+          "brief": "leap",
+          "duration": 1.166667,
+          "loop": false,
+          "keyframes": 36,
+          "poseCount": 32,
+          "nominalSpeed": null,
+          "markers": [
+            {
+              "time": 0.2,
+              "name": "Commit",
+              "value": "takeoff"
+            },
+            {
+              "time": 0.9666666666666667,
+              "name": "Recover",
+              "value": "land"
+            }
+          ],
+          "rbxmBytes": 25847
+        }
+      },
+      "clipsShared": false
+    },
+    "buck": {
+      "rig": "deer",
+      "model": {
+        "assetId": "90236219122388",
+        "moderation": "Approved",
+        "fbxBytes": 3664604,
+        "sha": "8e45bf9efad05cad"
+      },
+      "bones": 31,
+      "bonesMatchRigSpec": true,
+      "weights": {
+        "Body": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Pattern": {
+          "maxInfluences": 4,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Eyes": {
+          "maxInfluences": 1,
+          "unweighted": 0,
+          "rootWeighted": false
+        },
+        "Antlers": {
+          "maxInfluences": 1,
+          "unweighted": 0,
+          "rootWeighted": false
+        }
+      },
+      "tris": {
+        "total": 8732,
+        "Body": 7375,
+        "Pattern": 497,
+        "Eyes": 448,
+        "Antlers": 412
+      },
+      "regions": {
+        "Body": {
+          "tris": 7375,
+          "alphaMode": "TintMask",
+          "tint": "#b98a5c"
+        },
+        "Pattern": {
+          "tris": 497,
+          "alphaMode": "TintMask",
+          "tint": "#fffaf2"
+        },
+        "Eyes": {
+          "tris": 448,
+          "alphaMode": "Overlay"
+        },
+        "Antlers": {
+          "tris": 412,
+          "alphaMode": "Overlay"
+        }
+      },
+      "sockets": {
+        "HeadSocket": {
+          "bone": "Head",
+          "offset": [
+            0.0,
+            0.24,
+            -0.08
+          ]
+        },
+        "MouthSocket": {
+          "bone": "Jaw",
+          "offset": [
+            0.0,
+            -0.31,
+            -0.47
+          ]
+        },
+        "TailTip": {
+          "bone": "Tail2",
+          "offset": [
+            0.0,
+            -0.32,
+            0.16
+          ]
+        },
+        "ChestCenter": {
+          "bone": "Chest",
+          "offset": [
+            0.0,
+            -0.52,
+            0.2
+          ]
+        }
+      },
+      "hipHeight": 3.1,
+      "clips": {
+        "Idle": {
+          "assetId": "91659912346522",
+          "moderation": "Approved",
+          "brief": "idle",
+          "duration": 4.0,
+          "loop": true,
+          "keyframes": 121,
+          "poseCount": 32,
+          "nominalSpeed": null,
+          "markers": [],
+          "rbxmBytes": 69985
+        },
+        "Walk": {
+          "assetId": "94520791486751",
+          "moderation": "Approved",
+          "brief": "walk",
+          "duration": 1.333333,
+          "loop": true,
+          "keyframes": 41,
+          "poseCount": 32,
+          "nominalSpeed": 1.2,
+          "markers": [],
+          "rbxmBytes": 27977
+        },
+        "Trot": {
+          "assetId": "87419472926595",
+          "moderation": "Approved",
+          "brief": "trot",
+          "duration": 0.8,
+          "loop": true,
+          "keyframes": 25,
+          "poseCount": 32,
+          "nominalSpeed": 5.0,
+          "markers": [],
+          "rbxmBytes": 13508
+        },
+        "Run": {
+          "assetId": "86082833838391",
+          "moderation": "Approved",
+          "brief": "run (bolt)",
+          "duration": 0.6,
+          "loop": true,
+          "keyframes": 19,
+          "poseCount": 32,
+          "nominalSpeed": 10.27,
+          "markers": [],
+          "rbxmBytes": 13812
+        },
+        "Leap": {
+          "assetId": "77923165549164",
+          "moderation": "Approved",
+          "brief": "leap",
+          "duration": 1.166667,
+          "loop": false,
+          "keyframes": 36,
+          "poseCount": 32,
+          "nominalSpeed": null,
+          "markers": [
+            {
+              "time": 0.2,
+              "name": "Commit",
+              "value": "takeoff"
+            },
+            {
+              "time": 0.9666666666666667,
+              "name": "Recover",
+              "value": "land"
+            }
+          ],
+          "rbxmBytes": 25847
+        }
+      },
+      "clipsShared": true,
+      "scale": 1.1
+    }
+  },
+  "generated": "2026-11-09T20:29:41Z",
+  "notes": [
+    "Models: Open Cloud Model uploads of the FBX (tools/blender/heroes). InsertService:LoadAsset gives a Model with a Part named RootPart (transparent, at the origin = the ground under the body centre) carrying the Bone tree (Root > Hips > ...), one skinned MeshPart per region joined to RootPart by a Motor6D, and an AnimationController.",
+    "Every Bone arrives with an identity rest rotation, so the clips (spicy-clip/1: Pose.CFrame = local delta in an axis-aligned joint frame) play unchanged on these rigs and on the part-built puppets.",
+    "Regions: set SurfaceAppearance.AlphaMode per region (alphaMode below) and SurfaceAppearance.Color to the tint at load; Body and Pattern colour maps are greyscale where the avatar tint applies (alpha = the tint mask); the 30 % avatar blend is Color = lerp(tint, avatarColour, 0.3).",
+    "Sockets are not in the FBX: create an Attachment per socket under the named Bone at `offset` (studs, bone frame = model axes at rest).",
+    "The rodent shares the squirrel's skeleton and clips; the buck is the doe with an Antlers MeshPart (scale it 1.1 with Model:ScaleTo, RigSpec scaleVariants)."
+  ]
+}

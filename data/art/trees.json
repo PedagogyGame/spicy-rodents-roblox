@@ -44,12 +44,12 @@
     "Bark": {
      "center": [
       -1.757,
-      31.546,
+      31.532,
       -4.503
      ],
      "size": [
       106.992,
-      69.093,
+      69.064,
       91.61
      ]
     },
@@ -91,16 +91,16 @@
     }
    },
    "tris": {
-    "bark": 4098,
+    "bark": 4174,
     "leaves_shade": 1780,
     "leaves_mid": 2300,
     "leaves_sun": 4350,
     "fruit": 0,
-    "total": 12528
+    "total": 12604
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.165,
-    "boughFeetToBarkP95": 0.143,
+    "boughFeetToBarkP95": 0.099,
     "leafTunnelMinMargin": 0.212
    }
   },
@@ -135,12 +135,12 @@
     "Bark": {
      "center": [
       7.036,
-      36.483,
+      36.508,
       -0.403
      ],
      "size": [
       117.562,
-      78.967,
+      79.016,
       109.582
      ]
     },
@@ -182,16 +182,16 @@
     }
    },
    "tris": {
-    "bark": 4192,
+    "bark": 4260,
     "leaves_shade": 880,
     "leaves_mid": 2790,
     "leaves_sun": 4410,
     "fruit": 0,
-    "total": 12272
+    "total": 12340
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.119,
-    "boughFeetToBarkP95": 0.11,
+    "boughFeetToBarkP95": 0.106,
     "leafTunnelMinMargin": 0.235
    }
   },
@@ -273,16 +273,16 @@
     }
    },
    "tris": {
-    "bark": 4156,
+    "bark": 4224,
     "leaves_shade": 1920,
     "leaves_mid": 2580,
     "leaves_sun": 3540,
     "fruit": 0,
-    "total": 12196
+    "total": 12264
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.131,
-    "boughFeetToBarkP95": 0.136,
+    "boughFeetToBarkP95": 0.106,
     "leafTunnelMinMargin": 0.276
    }
   },
@@ -366,16 +366,16 @@
     }
    },
    "tris": {
-    "bark": 4256,
+    "bark": 4340,
     "leaves_shade": 2230,
     "leaves_mid": 2920,
     "leaves_sun": 3360,
     "fruit": 0,
-    "total": 12766
+    "total": 12850
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.12,
-    "boughFeetToBarkP95": 0.148,
+    "boughFeetToBarkP95": 0.112,
     "leafTunnelMinMargin": 0.227
    }
   },
@@ -407,12 +407,12 @@
     "Bark": {
      "center": [
       1.967,
-      32.574,
+      32.573,
       0.468
      ],
      "size": [
       49.455,
-      71.148,
+      71.145,
       53.748
      ]
     },
@@ -454,16 +454,16 @@
     }
    },
    "tris": {
-    "bark": 2216,
+    "bark": 2252,
     "leaves_shade": 1260,
     "leaves_mid": 1350,
     "leaves_sun": 2860,
     "fruit": 0,
-    "total": 7686
+    "total": 7722
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.114,
-    "boughFeetToBarkP95": 0.1,
+    "boughFeetToBarkP95": 0.083,
     "leafTunnelMinMargin": 0.133
    }
   },
@@ -495,12 +495,12 @@
    "parts": {
     "Bark": {
      "center": [
-      8.667,
+      8.706,
       40.605,
       5.884
      ],
      "size": [
-      51.623,
+      51.543,
       87.21,
       59.702
      ]
@@ -543,16 +543,16 @@
     }
    },
    "tris": {
-    "bark": 2550,
+    "bark": 2592,
     "leaves_shade": 260,
     "leaves_mid": 2220,
     "leaves_sun": 3170,
     "fruit": 0,
-    "total": 8200
+    "total": 8242
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.142,
-    "boughFeetToBarkP95": 0.123,
+    "boughFeetToBarkP95": 0.07,
     "leafTunnelMinMargin": 0.106
    }
   },
@@ -585,13 +585,13 @@
     "Bark": {
      "center": [
       2.753,
-      33.323,
-      -5.666
+      33.326,
+      -5.689
      ],
      "size": [
       49.855,
-      72.646,
-      60.515
+      72.651,
+      60.468
      ]
     },
     "LeavesShade": {
@@ -632,16 +632,16 @@
     }
    },
    "tris": {
-    "bark": 2414,
+    "bark": 2456,
     "leaves_shade": 810,
     "leaves_mid": 2540,
     "leaves_sun": 2470,
     "fruit": 0,
-    "total": 8234
+    "total": 8276
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.109,
-    "boughFeetToBarkP95": 0.153,
+    "boughFeetToBarkP95": 0.077,
     "leafTunnelMinMargin": 0.208
    }
   },
@@ -722,16 +722,16 @@
     }
    },
    "tris": {
-    "bark": 2486,
+    "bark": 2534,
     "leaves_shade": 540,
     "leaves_mid": 2030,
     "leaves_sun": 3200,
     "fruit": 0,
-    "total": 8256
+    "total": 8304
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.106,
-    "boughFeetToBarkP95": 0.165,
+    "boughFeetToBarkP95": 0.108,
     "leafTunnelMinMargin": 0.229
    }
   },
@@ -767,12 +767,12 @@
     "Bark": {
      "center": [
       5.316,
-      31.79,
+      31.798,
       0.057
      ],
      "size": [
       67.961,
-      69.579,
+      69.595,
       65.283
      ]
     },
@@ -814,16 +814,16 @@
     }
    },
    "tris": {
-    "bark": 2918,
+    "bark": 2978,
     "leaves_shade": 1240,
     "leaves_mid": 1910,
     "leaves_sun": 2730,
     "fruit": 0,
-    "total": 8798
+    "total": 8858
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.091,
-    "boughFeetToBarkP95": 0.135,
+    "boughFeetToBarkP95": 0.122,
     "leafTunnelMinMargin": 0.15
    }
   },
@@ -902,16 +902,16 @@
     }
    },
    "tris": {
-    "bark": 2180,
+    "bark": 2216,
     "leaves_shade": 1130,
     "leaves_mid": 1720,
     "leaves_sun": 2960,
     "fruit": 0,
-    "total": 7990
+    "total": 8026
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.389,
-    "boughFeetToBarkP95": 0.151,
+    "boughFeetToBarkP95": 0.108,
     "leafTunnelMinMargin": 0.162
    }
   },
@@ -991,16 +991,16 @@
     }
    },
    "tris": {
-    "bark": 2702,
+    "bark": 2744,
     "leaves_shade": 1330,
     "leaves_mid": 1830,
     "leaves_sun": 2450,
     "fruit": 0,
-    "total": 8312
+    "total": 8354
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.106,
-    "boughFeetToBarkP95": 0.145,
+    "boughFeetToBarkP95": 0.119,
     "leafTunnelMinMargin": 0.175
    }
   },
@@ -1081,16 +1081,16 @@
     }
    },
    "tris": {
-    "bark": 2582,
+    "bark": 2630,
     "leaves_shade": 1230,
     "leaves_mid": 2060,
     "leaves_sun": 2480,
     "fruit": 0,
-    "total": 8352
+    "total": 8400
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.177,
-    "boughFeetToBarkP95": 0.131,
+    "boughFeetToBarkP95": 0.092,
     "leafTunnelMinMargin": 0.156
    }
   },
@@ -1171,16 +1171,16 @@
     }
    },
    "tris": {
-    "bark": 2672,
+    "bark": 2720,
     "leaves_shade": 1020,
     "leaves_mid": 2150,
     "leaves_sun": 2640,
     "fruit": 0,
-    "total": 8482
+    "total": 8530
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.11,
-    "boughFeetToBarkP95": 0.139,
+    "boughFeetToBarkP95": 0.079,
     "leafTunnelMinMargin": 0.187
    }
   },
@@ -1263,16 +1263,16 @@
     }
    },
    "tris": {
-    "bark": 2882,
+    "bark": 2942,
     "leaves_shade": 1010,
     "leaves_mid": 2640,
     "leaves_sun": 2280,
     "fruit": 0,
-    "total": 8812
+    "total": 8872
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.107,
-    "boughFeetToBarkP95": 0.153,
+    "boughFeetToBarkP95": 0.135,
     "leafTunnelMinMargin": 0.185
    }
   },
@@ -1304,12 +1304,12 @@
     "Bark": {
      "center": [
       3.07,
-      23.206,
+      23.242,
       -0.798
      ],
      "size": [
       50.494,
-      52.412,
+      52.483,
       68.847
      ]
     },
@@ -1351,16 +1351,16 @@
     }
    },
    "tris": {
-    "bark": 2078,
+    "bark": 2114,
     "leaves_shade": 990,
     "leaves_mid": 1860,
     "leaves_sun": 2930,
     "fruit": 0,
-    "total": 7858
+    "total": 7894
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.142,
-    "boughFeetToBarkP95": 0.16,
+    "boughFeetToBarkP95": 0.105,
     "leafTunnelMinMargin": 0.19
    }
   },
@@ -1398,7 +1398,7 @@
      ],
      "size": [
       56.126,
-      83.857,
+      83.855,
       55.478
      ]
     },
@@ -1440,16 +1440,16 @@
     }
    },
    "tris": {
-    "bark": 2582,
+    "bark": 2624,
     "leaves_shade": 620,
     "leaves_mid": 2090,
     "leaves_sun": 2970,
     "fruit": 0,
-    "total": 8262
+    "total": 8304
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.114,
-    "boughFeetToBarkP95": 0.114,
+    "boughFeetToBarkP95": 0.1,
     "leafTunnelMinMargin": 0.15
    }
   },
@@ -1483,12 +1483,12 @@
     "Bark": {
      "center": [
       -1.459,
-      32.07,
+      32.072,
       0.962
      ],
      "size": [
       60.144,
-      70.139,
+      70.144,
       52.826
      ]
     },
@@ -1530,16 +1530,16 @@
     }
    },
    "tris": {
-    "bark": 2540,
+    "bark": 2588,
     "leaves_shade": 1070,
     "leaves_mid": 1890,
     "leaves_sun": 3060,
     "fruit": 0,
-    "total": 8560
+    "total": 8608
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.217,
-    "boughFeetToBarkP95": 0.145,
+    "boughFeetToBarkP95": 0.118,
     "leafTunnelMinMargin": 0.157
    }
   },
@@ -1573,12 +1573,12 @@
     "Bark": {
      "center": [
       0.682,
-      28.043,
+      28.031,
       1.667
      ],
      "size": [
       62.861,
-      62.086,
+      62.062,
       45.578
      ]
     },
@@ -1620,16 +1620,16 @@
     }
    },
    "tris": {
-    "bark": 2516,
+    "bark": 2564,
     "leaves_shade": 770,
     "leaves_mid": 2240,
     "leaves_sun": 2700,
     "fruit": 0,
-    "total": 8226
+    "total": 8274
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.139,
-    "boughFeetToBarkP95": 0.156,
+    "boughFeetToBarkP95": 0.111,
     "leafTunnelMinMargin": 0.217
    }
   },
@@ -1664,12 +1664,12 @@
     "Bark": {
      "center": [
       -0.619,
-      33.576,
+      33.592,
       -6.598
      ],
      "size": [
       51.431,
-      73.152,
+      73.184,
       55.317
      ]
     },
@@ -1711,16 +1711,16 @@
     }
    },
    "tris": {
-    "bark": 2738,
+    "bark": 2792,
     "leaves_shade": 990,
     "leaves_mid": 1400,
     "leaves_sun": 3290,
     "fruit": 0,
-    "total": 8418
+    "total": 8472
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.116,
-    "boughFeetToBarkP95": 0.139,
+    "boughFeetToBarkP95": 0.127,
     "leafTunnelMinMargin": 0.205
    }
   },
@@ -1751,14 +1751,14 @@
    "parts": {
     "Bark": {
      "center": [
-      -1.393,
+      -1.409,
       38.157,
-      -2.505
+      -2.473
      ],
      "size": [
-      54.454,
+      54.423,
       82.314,
-      43.377
+      43.442
      ]
     },
     "LeavesShade": {
@@ -1799,16 +1799,16 @@
     }
    },
    "tris": {
-    "bark": 2450,
+    "bark": 2486,
     "leaves_shade": 1040,
     "leaves_mid": 2150,
     "leaves_sun": 2730,
     "fruit": 0,
-    "total": 8370
+    "total": 8406
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.105,
-    "boughFeetToBarkP95": 0.132,
+    "boughFeetToBarkP95": 0.082,
     "leafTunnelMinMargin": 0.131
    }
   },
@@ -1887,16 +1887,16 @@
     }
    },
    "tris": {
-    "bark": 2138,
+    "bark": 2174,
     "leaves_shade": 1020,
     "leaves_mid": 1760,
     "leaves_sun": 2820,
     "fruit": 0,
-    "total": 7738
+    "total": 7774
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.282,
-    "boughFeetToBarkP95": 0.138,
+    "boughFeetToBarkP95": 0.102,
     "leafTunnelMinMargin": 0.213
    }
   },
@@ -1976,16 +1976,16 @@
     }
    },
    "tris": {
-    "bark": 2360,
+    "bark": 2402,
     "leaves_shade": 1350,
     "leaves_mid": 1310,
     "leaves_sun": 3160,
     "fruit": 0,
-    "total": 8180
+    "total": 8222
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.096,
-    "boughFeetToBarkP95": 0.134,
+    "boughFeetToBarkP95": 0.126,
     "leafTunnelMinMargin": 0.203
    }
   },
@@ -2067,16 +2067,16 @@
     }
    },
    "tris": {
-    "bark": 2510,
+    "bark": 2564,
     "leaves_shade": 300,
     "leaves_mid": 2590,
     "leaves_sun": 2890,
     "fruit": 0,
-    "total": 8290
+    "total": 8344
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.299,
-    "boughFeetToBarkP95": 0.143,
+    "boughFeetToBarkP95": 0.085,
     "leafTunnelMinMargin": 0.18
    }
   },
@@ -2159,16 +2159,16 @@
     }
    },
    "tris": {
-    "bark": 2750,
+    "bark": 2810,
     "leaves_shade": 1050,
     "leaves_mid": 1030,
     "leaves_sun": 3810,
     "fruit": 0,
-    "total": 8640
+    "total": 8700
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.251,
-    "boughFeetToBarkP95": 0.148,
+    "boughFeetToBarkP95": 0.108,
     "leafTunnelMinMargin": 0.187
    }
   },
@@ -2246,16 +2246,16 @@
     }
    },
    "tris": {
-    "bark": 1892,
+    "bark": 1922,
     "leaves_shade": 1200,
     "leaves_mid": 1330,
     "leaves_sun": 3150,
     "fruit": 0,
-    "total": 7572
+    "total": 7602
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.166,
-    "boughFeetToBarkP95": 0.159,
+    "boughFeetToBarkP95": 0.074,
     "leafTunnelMinMargin": 0.224
    }
   },
@@ -2335,16 +2335,16 @@
     }
    },
    "tris": {
-    "bark": 2852,
+    "bark": 2894,
     "leaves_shade": 1010,
     "leaves_mid": 1930,
     "leaves_sun": 2690,
     "fruit": 0,
-    "total": 8482
+    "total": 8524
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.109,
-    "boughFeetToBarkP95": 0.112,
+    "boughFeetToBarkP95": 0.086,
     "leafTunnelMinMargin": 0.176
    }
   },
@@ -2425,16 +2425,16 @@
     }
    },
    "tris": {
-    "bark": 2654,
+    "bark": 2702,
     "leaves_shade": 800,
     "leaves_mid": 2100,
     "leaves_sun": 2660,
     "fruit": 0,
-    "total": 8214
+    "total": 8262
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.11,
-    "boughFeetToBarkP95": 0.108,
+    "boughFeetToBarkP95": 0.088,
     "leafTunnelMinMargin": 0.144
    }
   },
@@ -2469,12 +2469,12 @@
     "Bark": {
      "center": [
       -0.874,
-      25.11,
+      25.146,
       -1.209
      ],
      "size": [
       62.496,
-      56.22,
+      56.292,
       66.079
      ]
     },
@@ -2516,16 +2516,16 @@
     }
    },
    "tris": {
-    "bark": 2648,
+    "bark": 2702,
     "leaves_shade": 630,
     "leaves_mid": 1770,
     "leaves_sun": 3350,
     "fruit": 0,
-    "total": 8398
+    "total": 8452
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.149,
-    "boughFeetToBarkP95": 0.152,
+    "boughFeetToBarkP95": 0.12,
     "leafTunnelMinMargin": 0.179
    }
   },
@@ -2608,16 +2608,16 @@
     }
    },
    "tris": {
-    "bark": 2822,
+    "bark": 2882,
     "leaves_shade": 1050,
     "leaves_mid": 2210,
     "leaves_sun": 2710,
     "fruit": 0,
-    "total": 8792
+    "total": 8852
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.217,
-    "boughFeetToBarkP95": 0.12,
+    "boughFeetToBarkP95": 0.092,
     "leafTunnelMinMargin": 0.129
    }
   },
@@ -2695,16 +2695,16 @@
     }
    },
    "tris": {
-    "bark": 2024,
+    "bark": 2054,
     "leaves_shade": 1260,
     "leaves_mid": 1240,
     "leaves_sun": 3400,
     "fruit": 0,
-    "total": 7924
+    "total": 7954
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.129,
-    "boughFeetToBarkP95": 0.162,
+    "boughFeetToBarkP95": 0.151,
     "leafTunnelMinMargin": 0.211
    }
   },
@@ -2737,12 +2737,12 @@
     "Bark": {
      "center": [
       26.133,
-      23.516,
+      23.565,
       -1.257
      ],
      "size": [
       92.468,
-      53.031,
+      53.13,
       59.452
      ]
     },
@@ -2784,16 +2784,16 @@
     }
    },
    "tris": {
-    "bark": 2372,
+    "bark": 2414,
     "leaves_shade": 1440,
     "leaves_mid": 1650,
     "leaves_sun": 2630,
     "fruit": 0,
-    "total": 8092
+    "total": 8134
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.156,
-    "boughFeetToBarkP95": 0.136,
+    "boughFeetToBarkP95": 0.093,
     "leafTunnelMinMargin": 0.138
    }
   },
@@ -2826,12 +2826,12 @@
    "parts": {
     "Bark": {
      "center": [
-      -5.015,
+      -5.016,
       43.182,
       0.411
      ],
      "size": [
-      46.586,
+      46.583,
       92.363,
       64.668
      ]
@@ -2874,16 +2874,16 @@
     }
    },
    "tris": {
-    "bark": 2768,
+    "bark": 2816,
     "leaves_shade": 860,
     "leaves_mid": 2810,
     "leaves_sun": 2160,
     "fruit": 0,
-    "total": 8598
+    "total": 8646
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.248,
-    "boughFeetToBarkP95": 0.143,
+    "boughFeetToBarkP95": 0.128,
     "leafTunnelMinMargin": 0.146
    }
   },
@@ -2917,12 +2917,12 @@
    "parts": {
     "Bark": {
      "center": [
-      -0.163,
+      -0.168,
       40.369,
       0.081
      ],
      "size": [
-      57.045,
+      57.035,
       86.739,
       66.264
      ]
@@ -2965,16 +2965,16 @@
     }
    },
    "tris": {
-    "bark": 2850,
+    "bark": 2904,
     "leaves_shade": 50,
     "leaves_mid": 2640,
     "leaves_sun": 3060,
     "fruit": 0,
-    "total": 8600
+    "total": 8654
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.11,
-    "boughFeetToBarkP95": 0.142,
+    "boughFeetToBarkP95": 0.087,
     "leafTunnelMinMargin": 0.217
    }
   },
@@ -3056,16 +3056,16 @@
     }
    },
    "tris": {
-    "bark": 2588,
+    "bark": 2642,
     "leaves_shade": 1340,
     "leaves_mid": 1440,
     "leaves_sun": 3140,
     "fruit": 0,
-    "total": 8508
+    "total": 8562
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.118,
-    "boughFeetToBarkP95": 0.142,
+    "boughFeetToBarkP95": 0.106,
     "leafTunnelMinMargin": 0.229
    }
   },
@@ -3097,12 +3097,12 @@
     "Bark": {
      "center": [
       -3.151,
-      23.627,
+      23.672,
       1.239
      ],
      "size": [
       56.562,
-      53.254,
+      53.344,
       44.057
      ]
     },
@@ -3144,16 +3144,16 @@
     }
    },
    "tris": {
-    "bark": 2222,
+    "bark": 2258,
     "leaves_shade": 1170,
     "leaves_mid": 1800,
     "leaves_sun": 2650,
     "fruit": 0,
-    "total": 7842
+    "total": 7878
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.291,
-    "boughFeetToBarkP95": 0.172,
+    "boughFeetToBarkP95": 0.138,
     "leafTunnelMinMargin": 0.166
    }
   },
@@ -3186,13 +3186,13 @@
     "Bark": {
      "center": [
       2.784,
-      39.611,
-      -6.475
+      39.612,
+      -6.472
      ],
      "size": [
-      44.903,
-      85.222,
-      57.087
+      44.904,
+      85.224,
+      57.094
      ]
     },
     "LeavesShade": {
@@ -3233,16 +3233,16 @@
     }
    },
    "tris": {
-    "bark": 2696,
+    "bark": 2738,
     "leaves_shade": 1130,
     "leaves_mid": 1740,
     "leaves_sun": 2750,
     "fruit": 0,
-    "total": 8316
+    "total": 8358
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.117,
-    "boughFeetToBarkP95": 0.13,
+    "boughFeetToBarkP95": 0.127,
     "leafTunnelMinMargin": 0.137
    }
   },
@@ -3276,12 +3276,12 @@
      "center": [
       0.702,
       34.284,
-      5.405
+      5.398
      ],
      "size": [
       62.781,
       74.567,
-      55.913
+      55.925
      ]
     },
     "LeavesShade": {
@@ -3322,16 +3322,16 @@
     }
    },
    "tris": {
-    "bark": 2444,
+    "bark": 2486,
     "leaves_shade": 1110,
     "leaves_mid": 2350,
     "leaves_sun": 2500,
     "fruit": 0,
-    "total": 8404
+    "total": 8446
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.308,
-    "boughFeetToBarkP95": 0.158,
+    "boughFeetToBarkP95": 0.097,
     "leafTunnelMinMargin": 0.208
    }
   },
@@ -3413,16 +3413,16 @@
     }
    },
    "tris": {
-    "bark": 2744,
+    "bark": 2798,
     "leaves_shade": 1210,
     "leaves_mid": 1670,
     "leaves_sun": 2810,
     "fruit": 0,
-    "total": 8434
+    "total": 8488
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.219,
-    "boughFeetToBarkP95": 0.161,
+    "boughFeetToBarkP95": 0.093,
     "leafTunnelMinMargin": 0.194
    }
   },
@@ -3505,16 +3505,16 @@
     }
    },
    "tris": {
-    "bark": 3134,
+    "bark": 3194,
     "leaves_shade": 870,
     "leaves_mid": 1900,
     "leaves_sun": 3060,
     "fruit": 0,
-    "total": 8964
+    "total": 9024
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.108,
-    "boughFeetToBarkP95": 0.131,
+    "boughFeetToBarkP95": 0.096,
     "leafTunnelMinMargin": 0.171
    }
   },
@@ -3593,16 +3593,16 @@
     }
    },
    "tris": {
-    "bark": 2318,
+    "bark": 2354,
     "leaves_shade": 620,
     "leaves_mid": 2190,
     "leaves_sun": 2760,
     "fruit": 0,
-    "total": 7888
+    "total": 7924
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.14,
-    "boughFeetToBarkP95": 0.095,
+    "boughFeetToBarkP95": 0.088,
     "leafTunnelMinMargin": 0.134
    }
   },
@@ -3684,12 +3684,12 @@
     }
    },
    "tris": {
-    "bark": 5296,
+    "bark": 5352,
     "leaves_shade": 3190,
     "leaves_mid": 1850,
     "leaves_sun": 4690,
     "fruit": 0,
-    "total": 15026
+    "total": 15082
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.162,
@@ -3775,12 +3775,12 @@
     }
    },
    "tris": {
-    "bark": 5712,
+    "bark": 5768,
     "leaves_shade": 2190,
     "leaves_mid": 2830,
     "leaves_sun": 4540,
     "fruit": 0,
-    "total": 15272
+    "total": 15328
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.35,
@@ -3866,12 +3866,12 @@
     }
    },
    "tris": {
-    "bark": 4478,
+    "bark": 4534,
     "leaves_shade": 1440,
     "leaves_mid": 3160,
     "leaves_sun": 5260,
     "fruit": 0,
-    "total": 14338
+    "total": 14394
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.19,
@@ -3955,12 +3955,12 @@
     }
    },
    "tris": {
-    "bark": 3432,
+    "bark": 3488,
     "leaves_shade": 2040,
     "leaves_mid": 1990,
     "leaves_sun": 3770,
     "fruit": 0,
-    "total": 11232
+    "total": 11288
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.298,
@@ -4002,7 +4002,7 @@
      ],
      "size": [
       75.522,
-      71.705,
+      71.704,
       153.034
      ]
     },
@@ -4044,16 +4044,16 @@
     }
    },
    "tris": {
-    "bark": 3384,
+    "bark": 3440,
     "leaves_shade": 1590,
     "leaves_mid": 2260,
     "leaves_sun": 3860,
     "fruit": 0,
-    "total": 11094
+    "total": 11150
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.297,
-    "boughFeetToBarkP95": 0.076,
+    "boughFeetToBarkP95": 0.077,
     "leafTunnelMinMargin": 0.174
    }
   },
@@ -4132,16 +4132,16 @@
     }
    },
    "tris": {
-    "bark": 2964,
+    "bark": 3012,
     "leaves_shade": 1200,
     "leaves_mid": 2530,
     "leaves_sun": 4050,
     "fruit": 0,
-    "total": 10744
+    "total": 10792
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.294,
-    "boughFeetToBarkP95": 0.123,
+    "boughFeetToBarkP95": 0.089,
     "leafTunnelMinMargin": 0.38
    }
   },
@@ -4220,16 +4220,16 @@
     }
    },
    "tris": {
-    "bark": 2944,
+    "bark": 2992,
     "leaves_shade": 1920,
     "leaves_mid": 1640,
     "leaves_sun": 4350,
     "fruit": 0,
-    "total": 10854
+    "total": 10902
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.263,
-    "boughFeetToBarkP95": 0.079,
+    "boughFeetToBarkP95": 0.072,
     "leafTunnelMinMargin": 0.339
    }
   },
@@ -4308,16 +4308,16 @@
     }
    },
    "tris": {
-    "bark": 2258,
+    "bark": 2294,
     "leaves_shade": 1480,
     "leaves_mid": 1780,
     "leaves_sun": 2520,
     "fruit": 0,
-    "total": 8038
+    "total": 8074
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.273,
-    "boughFeetToBarkP95": 0.152,
+    "boughFeetToBarkP95": 0.099,
     "leafTunnelMinMargin": 0.221
    }
   },
@@ -4396,16 +4396,16 @@
     }
    },
    "tris": {
-    "bark": 2582,
+    "bark": 2618,
     "leaves_shade": 610,
     "leaves_mid": 1990,
     "leaves_sun": 3080,
     "fruit": 0,
-    "total": 8262
+    "total": 8298
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.103,
-    "boughFeetToBarkP95": 0.121,
+    "boughFeetToBarkP95": 0.077,
     "leafTunnelMinMargin": 0.193
    }
   },
@@ -4486,16 +4486,16 @@
     }
    },
    "tris": {
-    "bark": 2588,
+    "bark": 2636,
     "leaves_shade": 1350,
     "leaves_mid": 1690,
     "leaves_sun": 2750,
     "fruit": 0,
-    "total": 8378
+    "total": 8426
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.141,
-    "boughFeetToBarkP95": 0.145,
+    "boughFeetToBarkP95": 0.081,
     "leafTunnelMinMargin": 0.228
    }
   },
@@ -4576,16 +4576,16 @@
     }
    },
    "tris": {
-    "bark": 2492,
+    "bark": 2540,
     "leaves_shade": 700,
     "leaves_mid": 1890,
     "leaves_sun": 3180,
     "fruit": 0,
-    "total": 8262
+    "total": 8310
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.206,
-    "boughFeetToBarkP95": 0.146,
+    "boughFeetToBarkP95": 0.086,
     "leafTunnelMinMargin": 0.239
    }
   },
@@ -4620,12 +4620,12 @@
     "Bark": {
      "center": [
       0.969,
-      29.836,
+      29.869,
       0.22
      ],
      "size": [
       52.197,
-      65.672,
+      65.738,
       58.386
      ]
     },
@@ -4667,16 +4667,16 @@
     }
    },
    "tris": {
-    "bark": 2696,
+    "bark": 2750,
     "leaves_shade": 1140,
     "leaves_mid": 2340,
     "leaves_sun": 2310,
     "fruit": 0,
-    "total": 8486
+    "total": 8540
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.104,
-    "boughFeetToBarkP95": 0.151,
+    "boughFeetToBarkP95": 0.075,
     "leafTunnelMinMargin": 0.204
    }
   },
@@ -4755,16 +4755,16 @@
     }
    },
    "tris": {
-    "bark": 2384,
+    "bark": 2420,
     "leaves_shade": 1020,
     "leaves_mid": 1910,
     "leaves_sun": 2940,
     "fruit": 0,
-    "total": 8254
+    "total": 8290
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.105,
-    "boughFeetToBarkP95": 0.13,
+    "boughFeetToBarkP95": 0.087,
     "leafTunnelMinMargin": 0.201
    }
   },
@@ -4796,12 +4796,12 @@
     "Bark": {
      "center": [
       -3.325,
-      26.84,
+      26.842,
       -0.108
      ],
      "size": [
       57.709,
-      59.679,
+      59.684,
       48.687
      ]
     },
@@ -4843,16 +4843,16 @@
     }
    },
    "tris": {
-    "bark": 2168,
+    "bark": 2204,
     "leaves_shade": 840,
     "leaves_mid": 1900,
     "leaves_sun": 3130,
     "fruit": 0,
-    "total": 8038
+    "total": 8074
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.188,
-    "boughFeetToBarkP95": 0.133,
+    "boughFeetToBarkP95": 0.096,
     "leafTunnelMinMargin": 0.168
    }
   },
@@ -4932,16 +4932,16 @@
     }
    },
    "tris": {
-    "bark": 2408,
+    "bark": 2450,
     "leaves_shade": 1130,
     "leaves_mid": 2120,
     "leaves_sun": 2520,
     "fruit": 0,
-    "total": 8178
+    "total": 8220
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.16,
-    "boughFeetToBarkP95": 0.153,
+    "boughFeetToBarkP95": 0.083,
     "leafTunnelMinMargin": 0.195
    }
   },
@@ -4979,13 +4979,13 @@
     "Bark": {
      "center": [
       -1.385,
-      24.418,
-      1.897
+      24.41,
+      1.886
      ],
      "size": [
       25.498,
-      54.836,
-      25.012
+      54.82,
+      25.035
      ]
     },
     "LeavesShade": {
@@ -5026,16 +5026,16 @@
     }
    },
    "tris": {
-    "bark": 3706,
+    "bark": 3800,
     "leaves_shade": 1580,
     "leaves_mid": 2650,
     "leaves_sun": 4090,
     "fruit": 0,
-    "total": 12026
+    "total": 12120
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.189,
-    "boughFeetToBarkP95": 0.152,
+    "boughFeetToBarkP95": 0.146,
     "leafTunnelMinMargin": 0.076
    }
   },
@@ -5120,16 +5120,16 @@
     }
    },
    "tris": {
-    "bark": 3976,
+    "bark": 4070,
     "leaves_shade": 1780,
     "leaves_mid": 2700,
     "leaves_sun": 3850,
     "fruit": 0,
-    "total": 12306
+    "total": 12400
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.126,
-    "boughFeetToBarkP95": 0.137,
+    "boughFeetToBarkP95": 0.132,
     "leafTunnelMinMargin": 0.09
    }
   },
@@ -5169,12 +5169,12 @@
     "Bark": {
      "center": [
       -0.477,
-      29.609,
+      29.586,
       43.188
      ],
      "size": [
       41.13,
-      65.217,
+      65.172,
       118.151
      ]
     },
@@ -5216,16 +5216,16 @@
     }
    },
    "tris": {
-    "bark": 4682,
+    "bark": 4792,
     "leaves_shade": 720,
     "leaves_mid": 2730,
     "leaves_sun": 4580,
     "fruit": 0,
-    "total": 12712
+    "total": 12822
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.176,
-    "boughFeetToBarkP95": 0.125,
+    "boughFeetToBarkP95": 0.115,
     "leafTunnelMinMargin": 0.087
    }
   },
@@ -5262,13 +5262,13 @@
     "Bark": {
      "center": [
       1.136,
-      26.963,
-      20.216
+      26.98,
+      20.193
      ],
      "size": [
       38.798,
-      59.926,
-      104.335
+      59.959,
+      104.381
      ]
     },
     "LeavesShade": {
@@ -5309,16 +5309,16 @@
     }
    },
    "tris": {
-    "bark": 3412,
+    "bark": 3496,
     "leaves_shade": 750,
     "leaves_mid": 2280,
     "leaves_sun": 4850,
     "fruit": 0,
-    "total": 11292
+    "total": 11376
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.214,
-    "boughFeetToBarkP95": 0.159,
+    "boughFeetToBarkP95": 0.122,
     "leafTunnelMinMargin": 0.058
    }
   },
@@ -5357,12 +5357,12 @@
    "parts": {
     "Bark": {
      "center": [
-      7.95,
+      7.949,
       31.534,
       -7.411
      ],
      "size": [
-      44.733,
+      44.735,
       69.067,
       55.619
      ]
@@ -5405,16 +5405,16 @@
     }
    },
    "tris": {
-    "bark": 4632,
+    "bark": 4742,
     "leaves_shade": 1360,
     "leaves_mid": 3050,
     "leaves_sun": 3560,
     "fruit": 0,
-    "total": 12602
+    "total": 12712
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.16,
-    "boughFeetToBarkP95": 0.127,
+    "boughFeetToBarkP95": 0.125,
     "leafTunnelMinMargin": 0.082
    }
   },
@@ -5452,12 +5452,12 @@
     "Bark": {
      "center": [
       -36.458,
-      28.241,
+      28.23,
       -2.533
      ],
      "size": [
       107.899,
-      62.482,
+      62.459,
       210.574
      ]
     },
@@ -5499,16 +5499,16 @@
     }
    },
    "tris": {
-    "bark": 3968,
+    "bark": 4060,
     "leaves_shade": 870,
     "leaves_mid": 1670,
     "leaves_sun": 5270,
     "fruit": 0,
-    "total": 11778
+    "total": 11870
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.157,
-    "boughFeetToBarkP95": 0.118,
+    "boughFeetToBarkP95": 0.117,
     "leafTunnelMinMargin": 0.073
    }
   },
@@ -5548,12 +5548,12 @@
     "Bark": {
      "center": [
       -1.287,
-      31.863,
+      31.864,
       0.147
      ],
      "size": [
       36.916,
-      69.725,
+      69.728,
       36.102
      ]
     },
@@ -5595,16 +5595,16 @@
     }
    },
    "tris": {
-    "bark": 4616,
+    "bark": 4728,
     "leaves_shade": 1660,
     "leaves_mid": 2320,
     "leaves_sun": 3960,
     "fruit": 0,
-    "total": 12556
+    "total": 12668
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.161,
-    "boughFeetToBarkP95": 0.125,
+    "boughFeetToBarkP95": 0.128,
     "leafTunnelMinMargin": 0.114
    }
   },
@@ -5641,12 +5641,12 @@
     "Bark": {
      "center": [
       0.882,
-      26.908,
+      26.914,
       -0.776
      ],
      "size": [
       30.396,
-      59.816,
+      59.828,
       29.159
      ]
     },
@@ -5688,16 +5688,16 @@
     }
    },
    "tris": {
-    "bark": 3870,
+    "bark": 3958,
     "leaves_shade": 1230,
     "leaves_mid": 2650,
     "leaves_sun": 4150,
     "fruit": 0,
-    "total": 11900
+    "total": 11988
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.139,
-    "boughFeetToBarkP95": 0.137,
+    "boughFeetToBarkP95": 0.127,
     "leafTunnelMinMargin": 0.086
    }
   },
@@ -5737,12 +5737,12 @@
     "Bark": {
      "center": [
       -0.905,
-      30.603,
+      30.62,
       1.626
      ],
      "size": [
       35.756,
-      67.206,
+      67.24,
       31.458
      ]
     },
@@ -5784,16 +5784,16 @@
     }
    },
    "tris": {
-    "bark": 4368,
+    "bark": 4480,
     "leaves_shade": 1450,
     "leaves_mid": 2660,
     "leaves_sun": 3850,
     "fruit": 0,
-    "total": 12328
+    "total": 12440
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.14,
-    "boughFeetToBarkP95": 0.131,
+    "boughFeetToBarkP95": 0.127,
     "leafTunnelMinMargin": 0.101
    }
   },
@@ -5831,13 +5831,13 @@
     "Bark": {
      "center": [
       -1.338,
-      29.12,
-      1.405
+      29.135,
+      1.399
      ],
      "size": [
       34.427,
-      64.24,
-      27.477
+      64.27,
+      27.489
      ]
     },
     "LeavesShade": {
@@ -5878,16 +5878,16 @@
     }
    },
    "tris": {
-    "bark": 4088,
+    "bark": 4184,
     "leaves_shade": 1420,
     "leaves_mid": 2810,
     "leaves_sun": 4140,
     "fruit": 0,
-    "total": 12458
+    "total": 12554
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.141,
-    "boughFeetToBarkP95": 0.134,
+    "boughFeetToBarkP95": 0.126,
     "leafTunnelMinMargin": 0.091
    }
   },
@@ -5928,12 +5928,12 @@
     "Bark": {
      "center": [
       -1.979,
-      34.284,
+      34.277,
       54.298
      ],
      "size": [
       42.846,
-      74.568,
+      74.554,
       141.687
      ]
     },
@@ -5975,16 +5975,16 @@
     }
    },
    "tris": {
-    "bark": 4740,
+    "bark": 4856,
     "leaves_shade": 360,
     "leaves_mid": 2860,
     "leaves_sun": 4670,
     "fruit": 0,
-    "total": 12630
+    "total": 12746
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.16,
-    "boughFeetToBarkP95": 0.12,
+    "boughFeetToBarkP95": 0.122,
     "leafTunnelMinMargin": 0.103
    }
   },
@@ -6065,16 +6065,16 @@
     }
    },
    "tris": {
-    "bark": 3720,
+    "bark": 3784,
     "leaves_shade": 1240,
     "leaves_mid": 2440,
     "leaves_sun": 4640,
     "fruit": 0,
-    "total": 12040
+    "total": 12104
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.13,
-    "boughFeetToBarkP95": 0.119,
+    "boughFeetToBarkP95": 0.124,
     "leafTunnelMinMargin": 0.265
    }
   },
@@ -6110,12 +6110,12 @@
     "Bark": {
      "center": [
       -0.98,
-      38.305,
+      38.283,
       6.235
      ],
      "size": [
       100.469,
-      82.611,
+      82.567,
       91.723
      ]
     },
@@ -6157,16 +6157,16 @@
     }
    },
    "tris": {
-    "bark": 4274,
+    "bark": 4354,
     "leaves_shade": 1920,
     "leaves_mid": 1380,
     "leaves_sun": 5020,
     "fruit": 0,
-    "total": 12594
+    "total": 12674
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.123,
-    "boughFeetToBarkP95": 0.115,
+    "boughFeetToBarkP95": 0.109,
     "leafTunnelMinMargin": 0.302
    }
   },
@@ -6248,16 +6248,16 @@
     }
    },
    "tris": {
-    "bark": 4112,
+    "bark": 4184,
     "leaves_shade": 1680,
     "leaves_mid": 1990,
     "leaves_sun": 4530,
     "fruit": 0,
-    "total": 12312
+    "total": 12384
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.114,
-    "boughFeetToBarkP95": 0.115,
+    "boughFeetToBarkP95": 0.097,
     "leafTunnelMinMargin": 0.302
    }
   },
@@ -6292,13 +6292,13 @@
     "Bark": {
      "center": [
       2.088,
-      45.058,
-      -0.767
+      45.027,
+      -0.772
      ],
      "size": [
       96.603,
-      96.116,
-      81.281
+      96.053,
+      81.271
      ]
     },
     "LeavesShade": {
@@ -6339,16 +6339,16 @@
     }
    },
    "tris": {
-    "bark": 4470,
+    "bark": 4542,
     "leaves_shade": 1660,
     "leaves_mid": 2130,
     "leaves_sun": 4450,
     "fruit": 0,
-    "total": 12710
+    "total": 12782
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.128,
-    "boughFeetToBarkP95": 0.123,
+    "boughFeetToBarkP95": 0.098,
     "leafTunnelMinMargin": 0.323
    }
   },
@@ -6384,12 +6384,12 @@
     "Bark": {
      "center": [
       -2.703,
-      50.165,
+      50.162,
       -3.15
      ],
      "size": [
       105.469,
-      106.33,
+      106.325,
       111.835
      ]
     },
@@ -6431,16 +6431,16 @@
     }
    },
    "tris": {
-    "bark": 4994,
+    "bark": 5074,
     "leaves_shade": 1300,
     "leaves_mid": 2530,
     "leaves_sun": 4240,
     "fruit": 0,
-    "total": 13064
+    "total": 13144
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.13,
-    "boughFeetToBarkP95": 0.121,
+    "boughFeetToBarkP95": 0.094,
     "leafTunnelMinMargin": 0.357
    }
   },
@@ -6477,12 +6477,12 @@
     "Bark": {
      "center": [
       0.572,
-      37.18,
+      37.167,
       5.104
      ],
      "size": [
       74.974,
-      80.36,
+      80.334,
       91.425
      ]
     },
@@ -6524,16 +6524,16 @@
     }
    },
    "tris": {
-    "bark": 4572,
+    "bark": 4660,
     "leaves_shade": 1670,
     "leaves_mid": 2060,
     "leaves_sun": 4420,
     "fruit": 0,
-    "total": 12722
+    "total": 12810
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.15,
-    "boughFeetToBarkP95": 0.124,
+    "boughFeetToBarkP95": 0.109,
     "leafTunnelMinMargin": 0.279
    }
   },
@@ -6614,16 +6614,16 @@
     }
    },
    "tris": {
-    "bark": 3820,
+    "bark": 3884,
     "leaves_shade": 1520,
     "leaves_mid": 3040,
     "leaves_sun": 3860,
     "fruit": 0,
-    "total": 12240
+    "total": 12304
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.139,
-    "boughFeetToBarkP95": 0.117,
+    "boughFeetToBarkP95": 0.099,
     "leafTunnelMinMargin": 0.279
    }
   },
@@ -6657,12 +6657,12 @@
     "Bark": {
      "center": [
       3.749,
-      32.098,
+      32.099,
       2.119
      ],
      "size": [
       72.564,
-      70.197,
+      70.198,
       54.193
      ]
     },
@@ -6704,16 +6704,16 @@
     }
    },
    "tris": {
-    "bark": 3440,
+    "bark": 3502,
     "leaves_shade": 1760,
     "leaves_mid": 2340,
     "leaves_sun": 3860,
     "fruit": 0,
-    "total": 11400
+    "total": 11462
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.141,
-    "boughFeetToBarkP95": 0.124,
+    "boughFeetToBarkP95": 0.119,
     "leafTunnelMinMargin": 0.145
    }
   },
@@ -6796,16 +6796,16 @@
     }
    },
    "tris": {
-    "bark": 4356,
+    "bark": 4434,
     "leaves_shade": 1140,
     "leaves_mid": 3240,
     "leaves_sun": 3770,
     "fruit": 0,
-    "total": 12506
+    "total": 12584
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.117,
-    "boughFeetToBarkP95": 0.106,
+    "boughFeetToBarkP95": 0.111,
     "leafTunnelMinMargin": 0.148
    }
   },
@@ -6841,12 +6841,12 @@
     "Bark": {
      "center": [
       1.245,
-      32.131,
+      32.137,
       -2.042
      ],
      "size": [
       77.57,
-      70.262,
+      70.274,
       71.12
      ]
     },
@@ -6888,16 +6888,16 @@
     }
    },
    "tris": {
-    "bark": 3904,
+    "bark": 3982,
     "leaves_shade": 1560,
     "leaves_mid": 2570,
     "leaves_sun": 4100,
     "fruit": 0,
-    "total": 12134
+    "total": 12212
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.123,
-    "boughFeetToBarkP95": 0.127,
+    "boughFeetToBarkP95": 0.113,
     "leafTunnelMinMargin": 0.158
    }
   },
@@ -6933,12 +6933,12 @@
     "Bark": {
      "center": [
       12.781,
-      39.974,
+      39.988,
       2.518
      ],
      "size": [
       99.854,
-      85.948,
+      85.976,
       55.235
      ]
     },
@@ -6980,16 +6980,16 @@
     }
    },
    "tris": {
-    "bark": 4146,
+    "bark": 4224,
     "leaves_shade": 1430,
     "leaves_mid": 3040,
     "leaves_sun": 3610,
     "fruit": 0,
-    "total": 12226
+    "total": 12304
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.113,
-    "boughFeetToBarkP95": 0.12,
+    "boughFeetToBarkP95": 0.107,
     "leafTunnelMinMargin": 0.142
    }
   },
@@ -7022,12 +7022,12 @@
     "Bark": {
      "center": [
       -48.495,
-      20.791,
+      20.811,
       0.146
      ],
      "size": [
       143.563,
-      47.582,
+      47.623,
       47.578
      ]
     },
@@ -7069,16 +7069,16 @@
     }
    },
    "tris": {
-    "bark": 2702,
+    "bark": 2756,
     "leaves_shade": 520,
     "leaves_mid": 2908,
     "leaves_sun": 6292,
     "fruit": 0,
-    "total": 12422
+    "total": 12476
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.149,
-    "boughFeetToBarkP95": 0.125,
+    "boughFeetToBarkP95": 0.109,
     "leafTunnelMinMargin": 0.144
    }
   },
@@ -7110,12 +7110,12 @@
     "Bark": {
      "center": [
       46.323,
-      19.592,
+      19.584,
       15.738
      ],
      "size": [
       123.167,
-      45.185,
+      45.169,
       69.697
      ]
     },
@@ -7157,16 +7157,16 @@
     }
    },
    "tris": {
-    "bark": 2516,
+    "bark": 2562,
     "leaves_shade": 720,
     "leaves_mid": 3166,
     "leaves_sun": 5882,
     "fruit": 0,
-    "total": 12284
+    "total": 12330
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.142,
-    "boughFeetToBarkP95": 0.124,
+    "boughFeetToBarkP95": 0.115,
     "leafTunnelMinMargin": 0.137
    }
   },
@@ -7199,12 +7199,12 @@
     "Bark": {
      "center": [
       13.428,
-      21.214,
+      21.196,
       5.857
      ],
      "size": [
       71.858,
-      48.429,
+      48.393,
       66.072
      ]
     },
@@ -7246,16 +7246,16 @@
     }
    },
    "tris": {
-    "bark": 2486,
+    "bark": 2540,
     "leaves_shade": 300,
     "leaves_mid": 2662,
     "leaves_sun": 6036,
     "fruit": 0,
-    "total": 11484
+    "total": 11538
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.217,
-    "boughFeetToBarkP95": 0.13,
+    "boughFeetToBarkP95": 0.12,
     "leafTunnelMinMargin": 0.163
    }
   },
@@ -7287,12 +7287,12 @@
     "Bark": {
      "center": [
       0.84,
-      21.38,
+      21.365,
       1.776
      ],
      "size": [
       45.484,
-      48.759,
+      48.729,
       31.794
      ]
     },
@@ -7334,12 +7334,12 @@
     }
    },
    "tris": {
-    "bark": 2432,
+    "bark": 2480,
     "leaves_shade": 520,
     "leaves_mid": 2710,
     "leaves_sun": 5230,
     "fruit": 0,
-    "total": 10892
+    "total": 10940
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.199,
@@ -7376,12 +7376,12 @@
      "center": [
       -0.767,
       18.647,
-      -0.57
+      -0.583
      ],
      "size": [
       47.936,
       43.295,
-      35.9
+      35.876
      ]
     },
     "LeavesShade": {
@@ -7422,16 +7422,16 @@
     }
    },
    "tris": {
-    "bark": 2236,
+    "bark": 2284,
     "leaves_shade": 410,
     "leaves_mid": 2620,
     "leaves_sun": 5330,
     "fruit": 0,
-    "total": 10596
+    "total": 10644
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.231,
-    "boughFeetToBarkP95": 0.129,
+    "boughFeetToBarkP95": 0.131,
     "leafTunnelMinMargin": 0.149
    }
   },
@@ -7462,12 +7462,12 @@
     "Bark": {
      "center": [
       -0.334,
-      21.166,
+      21.17,
       0.614
      ],
      "size": [
       54.985,
-      48.332,
+      48.34,
       42.796
      ]
     },
@@ -7509,16 +7509,16 @@
     }
    },
    "tris": {
-    "bark": 2164,
+    "bark": 2204,
     "leaves_shade": 410,
     "leaves_mid": 2550,
     "leaves_sun": 5450,
     "fruit": 0,
-    "total": 10574
+    "total": 10614
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.207,
-    "boughFeetToBarkP95": 0.132,
+    "boughFeetToBarkP95": 0.129,
     "leafTunnelMinMargin": 0.157
    }
   },
@@ -7550,13 +7550,13 @@
     "Bark": {
      "center": [
       -0.828,
-      9.382,
-      0.21
+      9.383,
+      0.212
      ],
      "size": [
-      23.874,
-      24.765,
-      18.863
+      23.873,
+      24.766,
+      18.859
      ]
     },
     "LeavesShade": {
@@ -7609,16 +7609,16 @@
     }
    },
    "tris": {
-    "bark": 1194,
+    "bark": 1230,
     "leaves_shade": 300,
     "leaves_mid": 900,
     "leaves_sun": 1620,
     "fruit": 768,
-    "total": 4782
+    "total": 4818
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.075,
-    "boughFeetToBarkP95": 0.066,
+    "boughFeetToBarkP95": 0.058,
     "leafTunnelMinMargin": 0.127
    }
   },
@@ -7709,16 +7709,16 @@
     }
    },
    "tris": {
-    "bark": 1134,
+    "bark": 1170,
     "leaves_shade": 310,
     "leaves_mid": 660,
     "leaves_sun": 1860,
     "fruit": 768,
-    "total": 4732
+    "total": 4768
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.077,
-    "boughFeetToBarkP95": 0.08,
+    "boughFeetToBarkP95": 0.069,
     "leafTunnelMinMargin": 0.13
    }
   },
@@ -7756,7 +7756,7 @@
      "size": [
       21.425,
       24.331,
-      19.876
+      19.875
      ]
     },
     "LeavesShade": {
@@ -7809,16 +7809,16 @@
     }
    },
    "tris": {
-    "bark": 1182,
+    "bark": 1218,
     "leaves_shade": 340,
     "leaves_mid": 490,
     "leaves_sun": 1600,
     "fruit": 1152,
-    "total": 4764
+    "total": 4800
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.077,
-    "boughFeetToBarkP95": 0.088,
+    "boughFeetToBarkP95": 0.082,
     "leafTunnelMinMargin": 0.122
    }
   },
@@ -7855,7 +7855,7 @@
      ],
      "size": [
       22.602,
-      23.741,
+      23.742,
       21.504
      ]
     },
@@ -7909,16 +7909,16 @@
     }
    },
    "tris": {
-    "bark": 1182,
+    "bark": 1218,
     "leaves_shade": 430,
     "leaves_mid": 840,
     "leaves_sun": 1560,
     "fruit": 864,
-    "total": 4876
+    "total": 4912
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.097,
-    "boughFeetToBarkP95": 0.096,
+    "boughFeetToBarkP95": 0.067,
     "leafTunnelMinMargin": 0.12
    }
   },
@@ -8009,16 +8009,16 @@
     }
    },
    "tris": {
-    "bark": 1194,
+    "bark": 1230,
     "leaves_shade": 480,
     "leaves_mid": 780,
     "leaves_sun": 1560,
     "fruit": 576,
-    "total": 4590
+    "total": 4626
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.089,
-    "boughFeetToBarkP95": 0.047,
+    "boughFeetToBarkP95": 0.046,
     "leafTunnelMinMargin": 0.119
    }
   },
@@ -8049,13 +8049,13 @@
    "parts": {
     "Bark": {
      "center": [
-      -0.736,
-      7.891,
+      -0.743,
+      7.892,
       -0.772
      ],
      "size": [
-      23.157,
-      21.781,
+      23.144,
+      21.784,
       22.617
      ]
     },
@@ -8109,16 +8109,16 @@
     }
    },
    "tris": {
-    "bark": 1158,
+    "bark": 1194,
     "leaves_shade": 180,
     "leaves_mid": 960,
     "leaves_sun": 1680,
     "fruit": 480,
-    "total": 4458
+    "total": 4494
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.073,
-    "boughFeetToBarkP95": 0.101,
+    "boughFeetToBarkP95": 0.076,
     "leafTunnelMinMargin": 0.126
    }
   },
@@ -8149,14 +8149,14 @@
    "parts": {
     "Bark": {
      "center": [
-      1.135,
+      1.134,
       8.846,
-      -0.251
+      -0.24
      ],
      "size": [
-      22.919,
+      22.917,
       23.692,
-      19.343
+      19.331
      ]
     },
     "LeavesShade": {
@@ -8209,16 +8209,16 @@
     }
    },
    "tris": {
-    "bark": 1170,
+    "bark": 1206,
     "leaves_shade": 360,
     "leaves_mid": 660,
     "leaves_sun": 1800,
     "fruit": 768,
-    "total": 4758
+    "total": 4794
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.091,
-    "boughFeetToBarkP95": 0.073,
+    "boughFeetToBarkP95": 0.057,
     "leafTunnelMinMargin": 0.131
    }
   },
@@ -8309,16 +8309,16 @@
     }
    },
    "tris": {
-    "bark": 1170,
+    "bark": 1206,
     "leaves_shade": 510,
     "leaves_mid": 850,
     "leaves_sun": 1050,
     "fruit": 864,
-    "total": 4444
+    "total": 4480
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.072,
-    "boughFeetToBarkP95": 0.07,
+    "boughFeetToBarkP95": 0.068,
     "leafTunnelMinMargin": 0.122
    }
   },
@@ -8351,12 +8351,12 @@
      "center": [
       1.04,
       8.2,
-      -1.02
+      -1.016
      ],
      "size": [
       22.035,
-      22.4,
-      19.997
+      22.399,
+      20.004
      ]
     },
     "LeavesShade": {
@@ -8409,12 +8409,12 @@
     }
    },
    "tris": {
-    "bark": 1158,
+    "bark": 1194,
     "leaves_shade": 360,
     "leaves_mid": 790,
     "leaves_sun": 1680,
     "fruit": 672,
-    "total": 4660
+    "total": 4696
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.076,
@@ -8509,16 +8509,16 @@
     }
    },
    "tris": {
-    "bark": 1194,
+    "bark": 1230,
     "leaves_shade": 240,
     "leaves_mid": 960,
     "leaves_sun": 1620,
     "fruit": 288,
-    "total": 4302
+    "total": 4338
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.096,
-    "boughFeetToBarkP95": 0.064,
+    "boughFeetToBarkP95": 0.062,
     "leafTunnelMinMargin": 0.126
    }
   },
@@ -8551,12 +8551,12 @@
      "center": [
       0.233,
       9.324,
-      1.369
+      1.367
      ],
      "size": [
       23.064,
       24.648,
-      19.921
+      19.925
      ]
     },
     "LeavesShade": {
@@ -8609,16 +8609,16 @@
     }
    },
    "tris": {
-    "bark": 1182,
+    "bark": 1218,
     "leaves_shade": 360,
     "leaves_mid": 840,
     "leaves_sun": 1620,
     "fruit": 480,
-    "total": 4482
+    "total": 4518
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.077,
-    "boughFeetToBarkP95": 0.072,
+    "boughFeetToBarkP95": 0.057,
     "leafTunnelMinMargin": 0.125
    }
   },
@@ -8709,12 +8709,12 @@
     }
    },
    "tris": {
-    "bark": 1170,
+    "bark": 1206,
     "leaves_shade": 220,
     "leaves_mid": 460,
     "leaves_sun": 1750,
     "fruit": 960,
-    "total": 4560
+    "total": 4596
    },
    "checks": {
     "trunkRadiusMaxAbsErr": 0.079,
