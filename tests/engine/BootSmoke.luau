@@ -45,11 +45,11 @@ local ROOTS: { { name: string, get: () -> Instance? } } = {
 -- StreamOutBehavior, PlayerCharacterDestroyBehavior, SignalBehavior, Lighting.Technology): the
 -- engine refuses to read them from a script, so the Lune place test (tests/place/check_place.luau)
 -- is authoritative for those. Here every read is pcall-wrapped; unreadable ones are listed, not failed.
-local function checkProperties(): ({ [string]: boolean }, { string })
+local function checkProperties(): ({ [string]: boolean }, { string }, { [string]: boolean })
 	local ws = game:GetService("Workspace")
 	local players = game:GetService("Players")
 	local lighting = game:GetService("Lighting")
-	local checks: { { name: string, read: () -> boolean } } = {
+	local checks: { { name: string, read: () -> boolean, warnOnly: boolean? } } = {
 		{
 			name = "StreamingEnabled",
 			read = function()
@@ -87,7 +87,10 @@ local function checkProperties(): ({ [string]: boolean }, { string })
 			end,
 		},
 		{
+			-- Players.MaxPlayers in the place file is overridden at runtime by the Place's serverSize
+			-- (Creator Hub "Max players" / cloud v2 PATCH), so a mismatch is a warning, not a failure.
 			name = "MaxPlayers49",
+			warnOnly = true,
 			read = function()
 				return players.MaxPlayers == 49
 			end,
@@ -101,7 +104,11 @@ local function checkProperties(): ({ [string]: boolean }, { string })
 	}
 	local results: { [string]: boolean } = {}
 	local unreadable: { string } = {}
+	local warnOnly: { [string]: boolean } = {}
 	for _, check in checks do
+		if check.warnOnly then
+			warnOnly[check.name] = true
+		end
 		local ok, pass = pcall(check.read)
 		if ok then
 			results[check.name] = pass == true
@@ -109,14 +116,14 @@ local function checkProperties(): ({ [string]: boolean }, { string })
 			table.insert(unreadable, check.name)
 		end
 	end
-	return results, unreadable
+	return results, unreadable, warnOnly
 end
 
 function BootSmoke.run(): Result
 	-- tools/cloud run_engine_tests --inject rebuilds the tree inside the task instead of using a
 	-- saved version; read-only properties (Players.MaxPlayers) cannot be set there.
 	local injected = script.Parent ~= nil and script.Parent:GetAttribute("Injected") == true
-	local properties, unreadable = checkProperties()
+	local properties, unreadable, warnOnly = checkProperties()
 	local result: Result = {
 		ok = true,
 		injected = injected,
@@ -171,6 +178,8 @@ function BootSmoke.run(): Result
 		if not pass then
 			if injected then
 				table.insert(result.warnings, "property not applied in inject mode: " .. name)
+			elseif warnOnly[name] then
+				table.insert(result.warnings, "property differs at runtime (serverSize overrides the file): " .. name)
 			else
 				result.ok = false
 				table.insert(result.failed, { path = "property:" .. name, err = "unexpected value" })
