@@ -6,14 +6,15 @@
 -- assembly is simulated, on this client). Input is the default PlayerModule move vector, made
 -- camera-relative; Shift sprints. The motor resumes where the body is rendered on this client
 -- with the snapshot's heading and momentum, holding the AI's direction for up to 0.75 s or until
--- the first input, so the handoff shows no visual jump for the possessor; the gap between the
--- rendered and the server's snapshot position is recorded (metrics.gap) for the S2 checklist.
+-- the first input, and closes the gap to the server's snapshot track over `catchUp` seconds
+-- (0.25 s), so neither the possessor (no snap) nor other clients (no long slide back) see a jump.
+-- The raw gap is recorded by PossessionClient (metrics.gap) for the S2 checklist.
 -- W1 replaces this with Shared/Movement/SquirrelMotor (rails, S3) behind the same start/stop.
 -- No side effects on require.
 -- Interface: start(body, payload, metrics, opts?) -> stop()
 
 export type Metrics = { [string]: any }
-export type Opts = { walk: number?, sprint: number?, accel: number?, ignore: { Instance }? }
+export type Opts = { walk: number?, sprint: number?, accel: number?, catchUp: number?, ignore: { Instance }? }
 
 local Squirrel = {}
 
@@ -25,6 +26,7 @@ function Squirrel.start(body: Model, payload: { [string]: any }, metrics: Metric
 	local walk = o.walk or 20 -- 8 u/s (Species.squirrel.speeds.walk)
 	local sprint = o.sprint or 42 -- 16.8 u/s
 	local accel = o.accel or 10 -- 1/s approach rate
+	local catchUp = o.catchUp or 0.25 -- seconds to close the rendered-vs-snapshot gap
 	local root = body.PrimaryPart
 	if root == nil then
 		return function() end
@@ -33,6 +35,8 @@ function Squirrel.start(body: Model, payload: { [string]: any }, metrics: Metric
 
 	local snap = payload.snapshot
 	local pos = rootPart.Position
+	-- horizontal offset from where this client renders the body to the server's snapshot
+	local offset = Vector3.new(payload.snapshot.x - pos.X, 0, payload.snapshot.z - pos.Z)
 	local yaw = snap.yaw
 	local vel = Vector3.new(snap.vx, 0, snap.vz)
 	local holdUntil = os.clock() + payload.holdSeconds
@@ -92,6 +96,11 @@ function Squirrel.start(body: Model, payload: { [string]: any }, metrics: Metric
 			end
 			vel += (target - vel) * math.min(1, accel * dt)
 			pos += vel * dt
+			if offset.Magnitude > 1e-3 then
+				local corr = offset * math.min(1, dt / catchUp)
+				pos += corr
+				offset -= corr
+			end
 			if vel.Magnitude > 0.5 then
 				yaw = math.atan2(-vel.X, -vel.Z)
 			end
