@@ -1,0 +1,260 @@
+95:// v5 rendering foundation. All gameplay routes and collisions remain independent
+96:// of render meshes; immutable geometry can therefore be shared and batched safely.
+262:// ROUTE REGISTRY — one owner of every navigable route and its spatial index.
+263:// Route creation continues after the main neighborhood is built (treehouse,
+264:// western homes, park). Index those later routes as they are created.
+265:// Movement math is deliberately stateless: input and route geometry in, new
+266:// route parameter out. No character, camera or NPC is allowed to own this value.
+398:// 520 x 520 playable neighborhood: more than four times the original land area.
+401:// The original test intersection is graded. Beyond it Topeka-like ridges, hollows,
+402:// and asymmetric rolling streets rise several meters instead of stretching flat.
+418:// water channel, bridge approach, and collision surfaces.
+472:// All street surfaces are ribbons conforming to the terrain, including gradients.
+489:// Match the two rendered triangles in every road strip, including hillside grades.
+579:// Core raised curbs, pavement joints and a striped crossing at the intersection.
+600:// ------ v0.6 EAST COMMERCIAL DISTRICT (contiguous playable ground) ------
+601:// Continues the residential arterial eastward. The old neighborhood is untouched.
+642:// Central turn lanes, dashed paint, accessible zebra walks and signal heads.
+721:// Chili's-style restaurant, with distinctive roof, patio, big readable sign and parking.
+738:// Visible glazed restaurant front looks toward the main commercial road (+z).
+749:// Long red billboard on the restaurant roof with white legible lettering.
+777:// price tower, low-poly pump detail, and a reachable rooftop traversal course.
+790:// Raised parapet and shop entrance are on the side facing the fuel islands.
+803:// Doors are visible but are not represented as enterable rooms in this build.
+810:// The apron uses small terrain-following panels, not a single hovering slab.
+817:// Four columns visually support the canopy, with readable safety paint.
+830:// Actual walkable roof routes cross on the slab instead of floating above it.
+866:// Two pump islands with six dispensers, nozzles, hoses and protective bollards.
+889:// Scale the roadside information tower to match the human-sized forecourt.
+897:// Air/water station and waste container near the building, away from pumps.
+902:// One more diner / storefront creates depth behind the commercial strip.
+910:// A modest parking lot and painted bays between gas station and restaurant.
+917:// A vast bright sky with thin high cirrus cloud bands.
+1252:// Yard plants, hedge shapes, pavement, paths, flowerbeds, benches, planters.
+1364:// The previous cross-driveway fence segments at z=±40 trapped parked cars.
+1365:// Leave both side driveways open; perimeter/backyard fences remain intact.
+1366:// Backyard functional objects: covered porch / barbecue, pool / loungers, guesthouse / trampoline, doghouse / mower.
+1395:// Swimming pool cutout illusion: inset water framed by coping and a pale floor.
+1464:// Doghouse with roof, food bowl, and lawnmower waiting to become a rideable prop later.
+1487:// Yard miscellany, bins, hoses, outdoor sinks, picnic tables, tire swing.
+1541:// Park inside each property, beyond the sidewalk and clear of fence corners.
+1542:// Cars are aligned to their own driveways, never placed on fences.
+1566:// Grounded commercial parking and traffic along the new eastern arterial.
+1604:// Utility poles, ceramic insulators and many webbed aerial cables.
+1613:// Every support is built at its FINAL position.  The pole mesh, trunk route and
+1614:// all cable endpoints share that coordinate; no post-hoc mesh relocation.
+1652:// Verge-side rows and columns. No supports at road centerlines (x=0,
+1653:// z=0, x=-180/178, z=-174/171). Long wire spans cross those streets overhead.
+1654:// Where rows and columns meet, they share an actual pole and identical endpoints.
+1669:// Door drops start at actual street-side support heads (not old abandoned x=0 poles).
+1681:// Commercial road is wider: supports stand beyond its sidewalks, at z=±21.2.
+1682:// The first span bends smoothly from the residential line into the district.
+1692:// Four individually seeded, asymmetrical trees. Distinct branch bones, bark fissures,
+1693:// irregular exposed roots, crown spread and leaves + acorns (oak only).
+1743:// Supports the original lowercase `h` tree specs as well as later `H` specs.
+1744:// A missing height used to produce NaN branch geometry and crash startup in Three.js.
+2048:// Homes do not mirror each other and terrain changes gradually by up to several meters.
+2363:// Litter, driveway stones, and a few little landscaped earth banks.
+2374:// Lower shrubs, sidewalk cracks, distant additional small vegetation, scattered leaf litter.
+2404:// Exactly THREE giant lookout trees. Distinct silhouettes and true climbable paths.
+2544:// ------ SOUTH ESTATE DISTRICT / v1.1 ------
+2545:// Beyond the existing neighborhood's south boundary, across an east-west access street.
+2546:// Two architecturally distinct parcels; not more copies of the four starting homes.
+2556:// Connect the older southern residential street to the estate avenue.
+2821:// Additional elevated canopy routes at the gate: a few strong climbable limbs,
+2822:// numerous smaller decorative twigs and clusters instead of dozens of new rails.
+2908:// There is intentionally no pole at x=0, where the north/south driveway meets
+2909:// the estate avenue. A cable spans that intersection overhead.
+2939:// Actual wood-to-cable contacts at the two estate front oaks: intersections
+2940:// use the cable's sampled vertices, not nearby imaginary transfer locations.
+2975:// Exactly one radio lattice tower and one cellular monopole on the far skyline.
+3029:// ---- Nineteen kinds of detailed neighborhood objects, each with variations. ----
+3030:// Set dressing is sparse per property rather than mirrored or cloned into rows.
+3242:// Every type appears at least twice, across different homes and terrain heights.
+3250:// Additional believable public fixtures and random-looking commercial landscaping.
+3269:// --- v0.7 ADDITIVE NORTHERN EXPANSION. Existing houses, commercial district, and routes preserved. ---
+3270:// Final bounded level footprint: x=-270..687, z=-270..444. ~35% more modeled area than v0.6.
+3307:// Exit the original neighborhood at its north edge, then divide into two meaningful destinations.
+3357:// Pond is deliberately shallow: its surface is above ground, rather than an accidental terrain hole.
+3367:// Footbridge at the pond rim; valid overhead squirrel route at the actual deck height.
+3394:// Park shade trees, some arranged beside paths, all asymmetrical, all climbable.
+3406:// Select park trees get a raised perch with an additional cross-bough.
+3464:// Gazebo and park's visible name board; distinct from the nearby cemetery.
+3479:// Cemetery east of the park: stone wall, entry gate, curving path, monuments and chapel.
+3572:// Living evergreen hedges break sightlines without cloning entire fence lines.
+3589:// The plot is a concealment spot and part of the *existing* eight-chili hunt.
+3656:// Wheelbarrow is above ground and doubles as a lookout perch.
+3670:// Hanging ristra, one and only one, on the park shed's porch beam.
+3696:// Tiny enterable indoor pocket behind doorway, not an entire house interior.
+3702:// Hollowed logs, hollow tree pocket and simple shelter markers feed the predator test.
+3726:// L-shaped accessible sewer. ENTER through E at either labeled grate, exit using E.
+3779:// Little freestanding sewer outfitter at the elbow. No extra shop interior.
+3788:// Slightly busier yards on the *new* northern edge; dogs are handled in the update loop.
+3800:// --- v0.8 WEST HOSPITAL SPUR: additive to north park + Cedar Rest cemetery. ---
+3801:// Compact west spur increases total land ~8%, far below the double-area ceiling.
+3824:// Walls are individual panels; the front doors show the lit entry from outside.
+3864:// Eight hospital beds with their own curtains and believable treatment bays.
+3865:// Zoned emergency wing.  Partition breaks preserve central passages and sightlines.
+3871:// Waiting / triage / treatment are physically distinguishable rooms. Open doors at the center.
+3889:// Color-coded hospital circulation: leave a clear central spine and cross aisle.
+3905:// Floor stripes guide the eye along the public path, away from the gurneys.
+3930:// Supply shelving and mobile clinical carts are set against the walls.
+3956:// Surgical lamps, cardiac monitors, hanging IV bags and wall rails give each bay detail.
+3966:// Keep the central aisle open; furniture bounds apply to the player without
+3967:// accidentally changing the staff's partition-based circuits.
+3986:// v1.0 hospital readable micro-spaces: triage benches, intake desk, fluid bags,
+3987:// colored treatment screens and a small central isolation curtain. Decorative only;
+3988:// pathways stay clear of the real partition collision bounds.
+4034:// A clearly marked emergency sign and a deliberately straight-faced squirrel-bite notice.
+4048:// Stretcher trolley props, gurney rail and visitor silhouettes can be seen through glass.
+4074:// Purpose-built connected ventilation path with a climbing section to an overhead ward hatch.
+4075:// Nodes are WORLD coordinates. The first four preserve the existing duct layout.
+4118:// low wall grilles are reachable from the hospital floor; the raised hatch is IN-DUCT only.
+4206:// Accent lights give each duct bend and the elevated hatch a readable destination.
+4212:// Overhead attack landing indicator: only visible from the opened upper hatch.
+4253:// Muted playground, deliberately beside the already-grown trees rather than a new park.
+4291:// Vertical downspouts are traversable gutter climbs, with real material and a roof join.
+4317:// Overhead wires between branches and homes become the skeleton of the traversal network.
+4318:// Index sampled route points spatially so 40 trees and long wires remain responsive.
+4321:// Squirrel-readable tree forks: built ONLY from existing routes, not new playable branches.
+4322:// Each bough begins at the trunk; this registers its attachment even between sampled points.
+4358:// Registration happens once, after all world zones are created.
+4527:// The entire rim/spoke assembly spins about X; use actual travel distance for rotation.
+4902:// Show active cast for review; everyone is scheduled to rotate into the scene.
+4909:// Place a small cross-section of the cast in view immediately, rather than waiting
+4910:// for the entire resident-only group to rotate through before special roles appear.
+4964:// Hospital cast is fixed to the hospital and must not enter the roaming NPC scheduler.
+5049:// Smooth, cached character geometry keeps ears, muzzle and tail readable up close.
+5060:// Seven normal squirrels with independent 25-minute bite-triggered infection timers.
+5102:// Four rabbits, each circling a distinct bush/yard anchor; evasion is guaranteed.
+5154:// Model is exactly 50% of the v0.4 squirrel size; movement speed stays agile.
+5175:// Warm countershading separates the tiny animal from near-identical bark colors.
+5180:// The entire face turns as one assembly; eyes cannot drift away from the head.
+5248:// Dense overlapping tapered sections make a flexible tail without spherical beads.
+5269:// Cache contact corners once; animate the real transforms before resolving feet.
+5307:// independent of the stable neighborhood seed so refreshing changes hiding places.
+5529:// Human-readable status messages and camera orientation.
+5584:// Pounce works in normal traversal as well as in stalking view; one event per button-down.
+5740:// TRUNK ACQUISITION — stable contact-point selection instead of an invisible
+5741:// high-altitude nearest-route search. Returns a route at its physical foot.
+5779:// A route is both geometry and a path through a junction. The player's position
+5780:// travels across the gap over a few frames; a branch swap cannot teleport them.
+5781:// These helpers are intentionally pure so they can be unit-tested independently.
+5795:// Route input is camera-relative; preserve direction during a held key so a
+5796:// bending cable can't reverse W half-way through a curve.
+5889:// The camera shows the squirrel OUTSIDE the bark or sitting atop a branch.
+5890:// A leap begins at that visible position rather than the hidden route centerline.
+5898:// Every committed leap faces the way the ANIMAL is facing, not the camera's
+5899:// independent orbit. Reposition the camera behind that heading immediately.
+5987:// Dedicated wire / rooftop junction choices. A/D previews paths on the
+5988:// visible left/right of the camera; E enters exactly the highlighted route.
+6078:// Vehicle bodies share world-space footprints with jumping, not magical pass-throughs.
+6109:// the current frame's height.  This prevents high-speed leaps from tunneling
+6110:// beneath the gables and into house shells.
+6321:// v2.3 — grounded swept 2D motion with per-axis sliding.
+6322:// Ground motion has physical momentum, but colliders no longer cancel a
+6323:// diagonal stride just because its forward component grazes a fence or car.
+6468:// Pounce uses an actual launch vector. The same velocity is used by the subtle
+6469:// first-person arc, so the guidance predicts the committed trajectory.
+6470:// Low, forward-biased squirrel bound: capped vertical takeoff, much flatter
+6471:// than the exaggerated v0.4 vault. Aim still changes the leap direction.
+6884:// A resident only retreats through a real, hinged doorway. Other walkers must
+6885:// respect the solid footprints and never ghost through any house wall.
+6975:// A shared clearance rule for pedestrians and squirrel interior transitions.
+6976:// The collision/visual animation may lag the interaction trigger on slow frames.
+7236:// Faint first-person ballistic sightline, rendered in world space (not an opaque UI).
+7289:// Predator mode places the eye at the squirrel's head; committing the jump
+7290:// immediately cuts to a wider, trailing camera for spatial awareness.
+7483:// ============================================================================
+7484:// v3.8 — Two street vehicles; deliberately independent from the pedestrian,
+7485:// ambulance and general car schedulers. Each has one world-space position owner.
+7487://   actual customer stops and an animated service awning.
+7489://   the eastern commercial boulevard with station dwell and sliding doors.
+7490:// Both register honest rectangular hitboxes and yield to people ahead.
+7491:// ============================================================================
+7823:// ============================================================================
+7829:// Fixed capped dt for animation stability, plus default orbit and idle NPC simulation behind menu.
+7830:// --- v0.7 ACTIVE SYSTEMS: no changes to original bite/pepper/Power rules. ---
+7950:// Small collection of recognizable, independently moving yard dogs.
+7975:// Police patrol uses a normal car in the existing vehicle system, but manages its own stops.
+8025:// A chase is fast, but a visible baton wind-up keeps a dodge possible.
+8081:// Police are not magically bite-proof: stealth and height can overcome even
+8082:// the toughest officers, but a direct approach is exceptionally unlikely.
+8136:// No instant NPC kicking. Brave characters telegraph a readable wind-up first.
+8185:// Independent 13-minute *movement* watchdog with a one-second warning and contextual predators.
+8232:// The sewer stand sells independently selectable outfit slots; no ten-costume locks.
+8412:// --- v0.8 hospital, duct chase, patient treatment and unobtrusive community infection. ---
+8678:// Defenders take the open triage doorway when crossing between lobby and wards.
+8691:// Hospital circulation stays within each department; patients make short trips
+8692:// along the foot of their beds rather than crossing through partitions.
+8764:// Defenders still respond to squirrel incursions, without breaking normal patrols.
+8847:// Hospital treatment is independent of the player's victims; they're already busy.
+8979:// The ambulance follows the new arterial, slows around pedestrians and pulls into Emergency.
+9147:// --- v1.2 ADDITIVE PATCH: denser canopy, treehouse, and crime-scene aftermath ---
+9351:// Skip wounded victims in the normal roaming update.
+9370:// Extra canopy around the commercial district and estates.
+9560:// Small number of motorcycles riding real road lanes; separate from the 26 pedestrian schedules.
+9683:// The crowd is small and comes from different points; it does not appear in a full ring at once.
+9791:// Slightly denser commercial / mansion reaction to hospital-style scene response
+9801:// Display groups and compact layouts can be changed without interrupting gameplay.
+9873:// =====================================================================
+9874:// v1.5 — WESTSIDE EXTENSION / INTERIORS / RESPONDERS / ANIMATION
+9875:// =====================================================================
+9879:// 7 real individual older properties across a newly connected street.
+9891:// Westside wooden poles and their overhead lines share exact attachment points.
+9999:// Additional natural canopy along the road, carefully away from the road center.
+10049:// Police station has accessible reception, marked patrol parking and a dispatch courtyard.
+10078:// Local patrol actors appear in daylight and respond to nearby bites via the existing officer chase AI.
+10094:// A weathered neighborhood gas station and rows of outdoor storage doors beyond it.
+10128:// Low hanging shop opening awning reads clearly from the driveway.
+10171:// Small slow turtles along the garden, estate pondside and park walkways.
+10329:// E works at open-house garage entrances as well as existing sewer/vent interactions.
+10335:// Count actual bites only, not button clicks; time towards gas closure runs during sustained attacks.
+10345:// Each decade of successful bites triggers a brief non-blocking dance animation.
+10393:// Exactly eight pepper locations are retained. Accessible route/ground-space audit,
+10394:// with a corrective shift when a candidate was generated inside a wall or solid car.
+10437:// --- v1.8 LIVING COMMUNITY, CONTROLLED ENCOUNTERS & EMERGENCY CARE ---
+10438:// Medical response is routine; police response is intentionally rare (18% single,
+10439:// 5% two cruisers / three officers; all other incidents receive no routine police).
+10564:// Collision-aware sidewalk walking. The corners are intentionally spaced from
+10565:// walls, so two medics pushing a stretcher have room to turn without clipping.
+10673:// Each truck carries two caregivers; one can assess while the other handles equipment.
+11223:// Existing police station geometry cannot be entered: it is guarded continuously.
+11226:// Wanted notices materialize after 15 successful bites, near actual footpaths.
+11264:// Every seventh actual telephone pole gets a poster, with no separate post
+11265:// planted in the road.  The signs appear after NINE successful bites.
+11307:// Two community routines repeating every 40 minutes, 20 minutes apart.
+11308:// Each gathering lasts 10 minutes. No day/night changes or cinematic teleportation.
+11642:// --- end v1.9 additions ---
+11644:// Hospital occupants occasionally chart, examine displays or sit beside the ward.
+11645:// Each schedule is offset, avoiding synchronized NPC motions and route changes.
+11679:// ============================================================================
+11680:// v2.1 — FOUR WALK-IN HOMES / STREET-BASED EMERGENCY RESPONDERS
+11681:// ============================================================================
+11793:// and shared with the house visibility group; no new real-time lights or shadows.
+12073:// Emergency characters should not walk straight through homes or shops.
+12129:// ============================================================================
+12131:// ============================================================================
+12132:// v3.6 — Extraordinary street cast: a juggling mime on an oversize unicycle,
+12133:// and a handful of young cyclists. One update owner, one state machine each.
+12134:// They do NOT use the generic pedestrian goal/spawn scheduler.
+12135:// ============================================================================
+12209:// Black-and-white mime clothing, stripes, beret, white gloves and red scarf.
+12220:// The high wheel is a real visible prop, and the juggling balls follow parabolic arcs.
+12244:// Smaller independent bicycle riders: they do not occupy ordinary adult spawn slots.
+12555:// ===== v3.5 environment pass: poles, shrubs, fences, gardens, stream, ice cream shops =====
+12808:// v5 presentation and resilience systems. No network resource is required to play.
+13060:// Fetches are bounded and can be cancelled. Every replacement is atomic: the
+13061:// procedural material stays in place until its full downloaded set is ready.
+13427:// BELLWETHER QUAY — an additive, traversable eastern district.
+14190:// BELLWETHER GALLERIA — continuous interior, gallery and fountain plaza.
+14427:// Segment/AABB camera collision also runs after damping, so a corner cannot
+14428:// interpolate the camera through a shop wall or through the gallery floor.
+15508:// One visual-only airliner. No audio, effects sound, speech, or announcements.
+15758:// Run-over detection covers every actual vehicle mover, including emergency
+15759:// vehicles whose legacy `moving` flag is false. No collision is inferred from speed.
+15908:// GAME FRAME — central scheduler. The movement/camera core is never silently
+15909:// swallowed; peripheral NPC and scenery subsystems are isolated and report errors.
+16032:// Fail safely on a malformed climbing route rather than quietly poisoning the
+16033:// whole spatial index or having the camera jump to an invalid coordinate.
+16051:// Final registry rebuild includes westside trees and the later treehouse.

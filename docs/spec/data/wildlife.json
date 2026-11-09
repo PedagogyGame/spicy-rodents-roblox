@@ -1,0 +1,3951 @@
+{
+ "_meta": {
+  "title": "Spicy Rodents wildlife & foraging data (extracted for Roblox rebuild)",
+  "units": "HTML world units; multiply by 2.5 for Roblox studs. +Y up. Positions are world-space x,z (y = terrain/base height where given).",
+  "sources": {
+   "v54": "reference/v5_4_game.js (line refs inline)",
+   "v41": "reference/v4_1_game.js (line refs inline)"
+  },
+  "provenance": "Static arrays are copied from code. Fields marked runtime:true were computed by executing the v5.4 / v4.1 code headlessly (seeded RNGs: neighborhood rng(20261008), livingRand rng(540811)); they are deterministic but should be spot-checked in the browser.",
+  "studsPerUnit": 2.5
+ },
+ "v54": {
+  "normalSquirrels": {
+   "lines": "5060-5101 (create), 8898-8916 (updateWildlife), 8957-8977 (pounce), 8849-8865 (infection)",
+   "count": 7,
+   "hides": [
+    [
+     -74,
+     -71
+    ],
+    [
+     84,
+     70
+    ],
+    [
+     -196,
+     97
+    ],
+    [
+     217,
+     -111
+    ],
+    [
+     -105,
+     321
+    ],
+    [
+     103,
+     409
+    ],
+    [
+     414,
+     332
+    ]
+   ],
+   "hideGroundY": [
+    -0.07,
+    -0.07,
+    0.03,
+    0.43,
+    7.369999999999999,
+    3.87,
+    0.03
+   ],
+   "furs": [
+    "#b78453",
+    "#9a6b47",
+    "#b19b7b",
+    "#675e4d",
+    "#a48c68",
+    "#8c7463",
+    "#c19c66"
+   ],
+   "eyeColor": "#29302f (M.black)",
+   "infectedTorso": "#83544d",
+   "infectedHeadAndSharedFur": "#a67860",
+   "model": {
+    "torso": {
+     "r": 0.3,
+     "y": 0.27,
+     "scale": [
+      0.72,
+      0.68,
+      1.35
+     ]
+    },
+    "head": {
+     "r": 0.2,
+     "pos": [
+      0,
+      0.47,
+      0.31
+     ]
+    },
+    "ears": {
+     "r": 0.07,
+     "pos": [
+      0.13,
+      0.65,
+      0.3
+     ]
+    },
+    "eyes": {
+     "r": 0.039,
+     "pos": [
+      0.12,
+      0.49,
+      0.49
+     ]
+    },
+    "tail": {
+     "r": 0.3,
+     "pos": [
+      0,
+      0.71,
+      -0.48
+     ],
+     "scale": [
+      0.46,
+      1.7,
+      0.5
+     ]
+    },
+    "paws": {
+     "r": 0.068,
+     "pos": [
+      0.18,
+      0.14,
+      0.28
+     ]
+    },
+    "yOffset": -0.06
+   },
+   "wander": {
+    "phaseRate": 1,
+    "phaseRateInfected": 1.3,
+    "amplitude": 8,
+    "amplitudeInfected": 6,
+    "xFreq": 0.83,
+    "zFreq": 0.63,
+    "zPhaseMul": 1.3,
+    "initialPhase": "i*1.7",
+    "lerpRate": 2,
+    "footProbe": {
+     "side": 0.24,
+     "front": 0.36,
+     "lift": -0.05
+    },
+    "tailWag": {
+     "freq": 7,
+     "amp": 0.17
+    }
+   },
+   "pounce": {
+    "radius3D": 1.42,
+    "rewardPower": 90,
+    "rewardCoins": 10,
+    "message": "ANOTHER SQUIRREL TURNS! +90 Power · +10 Coins",
+    "messageSeconds": 3,
+    "sfx": [
+     810,
+     0.12,
+     "triangle",
+     0.04
+    ]
+   },
+   "infection": {
+    "perSquirrelMaxPercent": 3.5714285714285716,
+    "totalCapPercent": 25,
+    "matureSeconds": 1500,
+    "advanceRequires": "infectionOwn >= 25 AND secondsSinceBite < 600",
+    "capWhenOwnBelow25": 0.92,
+    "dtClamp": 0.2
+   }
+  },
+  "rabbits": {
+   "lines": "5102-5124 (create), 8918-8944 (update), 8946-8956 (pounce)",
+   "list": [
+    {
+     "i": 0,
+     "x": -64,
+     "z": 93,
+     "color": "#ab9d87"
+    },
+    {
+     "i": 1,
+     "x": 72,
+     "z": 96,
+     "color": "#c2b39c"
+    },
+    {
+     "i": 2,
+     "x": -97,
+     "z": -70,
+     "color": "#786d62"
+    },
+    {
+     "i": 3,
+     "x": 206,
+     "z": 325,
+     "color": "#a88e78",
+     "groundY": 4.09
+    }
+   ],
+   "bush": {
+    "radius": 2,
+    "color": "#496c42",
+    "centerYAboveGround": 1.8,
+    "scale": [
+     1.7,
+     1,
+     1.2
+    ],
+    "collider": false
+   },
+   "model": {
+    "body": {
+     "r": 0.36,
+     "y": 0.3,
+     "scale": [
+      0.8,
+      0.7,
+      1.65
+     ]
+    },
+    "head": {
+     "r": 0.24,
+     "pos": [
+      0,
+      0.45,
+      0.43
+     ]
+    },
+    "ears": {
+     "r": 0.13,
+     "pos": [
+      0.15,
+      0.75,
+      0.47
+     ],
+     "scale": [
+      0.5,
+      2.5,
+      0.64
+     ]
+    },
+    "eyes": {
+     "r": 0.045,
+     "pos": [
+      0.16,
+      0.5,
+      0.6
+     ]
+    },
+    "tail": {
+     "r": 0.21,
+     "pos": [
+      0,
+      0.34,
+      -0.6
+     ],
+     "color": "#efecdc (M.white)"
+    }
+   },
+   "behaviour": {
+    "phaseRate": 1.6,
+    "dangerRadiusXZ": 12,
+    "dangerPhaseBoost": 9.5,
+    "escapeSeconds": 2.5,
+    "orbitCalm": [
+     7,
+     9
+    ],
+    "orbitEscape": [
+     15,
+     14
+    ],
+    "xFreq": 0.66,
+    "zFreq": 0.43,
+    "lerpCalm": 2,
+    "lerpEscape": 10,
+    "hop": {
+     "base": 0.13,
+     "amp": 0.12,
+     "freq": 4
+    },
+    "initialPhase": "i*1.4"
+   },
+   "pounce": {
+    "radius3D": 2.25,
+    "alwaysEscapes": true,
+    "escapeSeconds": 4,
+    "phaseKick": 4,
+    "message": "Too quick! The rabbit slipped away. No reward.",
+    "messageSeconds": 2
+   }
+  },
+  "yardCats": {
+   "lines": "11514-11641 (owned by humans/neighbourhood extractor; stats only here)",
+   "list": [
+    {
+     "i": 0,
+     "home": [
+      -45,
+      -76
+     ],
+     "anchor": "hNW (-56,-53) + (11,-23)",
+     "fur": "#80614b",
+     "legs": "#bd9f7e"
+    },
+    {
+     "i": 1,
+     "home": [
+      48,
+      79
+     ],
+     "anchor": "hSE (58,56) + (-10,23)",
+     "fur": "#454647",
+     "legs": "#ddd3bd"
+    },
+    {
+     "i": 2,
+     "home": [
+      40,
+      -79
+     ],
+     "anchor": "hNE (51,-59) + (-11,-20)",
+     "fur": "#a19e88",
+     "legs": "#ddd3bd"
+    }
+   ],
+   "eyes": "#d7e36e",
+   "nose": "#bb8b89",
+   "speeds": {
+    "wander": 1.6,
+    "stalk": 3.1,
+    "chase": 8.5
+   },
+   "turnRate": 5,
+   "territoryRadius": 26,
+   "sightRadius": 17.5,
+   "maxTargetHeightAboveGround": 2.8,
+   "chaseRadius": 8,
+   "wanderOrbit": {
+    "x": 7,
+    "z": 6,
+    "xFreq": 0.31,
+    "zFreq": 0.23
+   },
+   "windup": {
+    "triggerRadius": 3,
+    "seconds": 0.68,
+    "crouchScaleY": 0.72
+   },
+   "hit": {
+    "radius": 2.75,
+    "maxHeight": 2.4,
+    "knockback": 10.5,
+    "minUpVel": 3.9,
+    "powerLoss": 12,
+    "cooldownHit": 7,
+    "cooldownMiss": 4
+   },
+   "voice": {
+    "windupCooldown": 4.5,
+    "ambientCooldown": 6,
+    "ambientRadius": 10
+   },
+   "houseClearance": 1,
+   "messages": [
+    "A yard cat crouches to pounce — JUMP!",
+    "CAT SWAT! It knocked the squirrel backward. Leap or climb to escape!",
+    "The cat lunged and missed!"
+   ]
+  },
+  "adjacentFauna": {
+   "note": "Not in this extractor's scope; listed so the Wildlife module can own or delegate them.",
+   "turtles": {
+    "lines": "10171-10199, 10279-10287",
+    "list": [
+     [
+      -125,
+      328
+     ],
+     [
+      -104,
+      349
+     ],
+     [
+      -25,
+      84
+     ],
+     [
+      164,
+      -448
+     ],
+     [
+      -406,
+      180
+     ]
+    ],
+    "shells": [
+     "#596e3d",
+     "#6e7750",
+     "#5a6341",
+     "#877958",
+     "#73804e"
+    ],
+    "wander": {
+     "phaseRate": 0.15,
+     "ampX": 2.3,
+     "ampZ": 2,
+     "lerp": 0.35
+    }
+   },
+   "yardDogs": {
+    "lines": "7950-7974, 9091-9111",
+    "list": [
+     [
+      203,
+      363
+     ],
+     [
+      240,
+      402
+     ],
+     [
+      98,
+      311
+     ],
+     [
+      55,
+      345
+     ]
+    ],
+    "barkRadius": 10,
+    "barkMaxPlayerY": 5,
+    "barkCooldown": 8,
+    "alertsHumansRadius": 12,
+    "message": "WOOF! A yard dog spotted the squirrel.",
+    "barkYIsAbsoluteWorldY": true,
+    "note": "Verifier: the bark test is world y < 5 (9102). Dog 0 (203,363) sits on ground 4.9-6.4 and dog 1 (240,402) on 7.6-8.1, so they almost never or never bark at a squirrel on the ground. Dogs 2 and 3 work."
+   },
+   "chainedDogs": {
+    "lines": "10013-10047, 10288+",
+    "list": [
+     [
+      -403,
+      -206
+     ],
+     [
+      -404,
+      -75
+     ],
+     [
+      -418,
+      63
+     ],
+     [
+      -403,
+      134
+     ]
+    ],
+    "radius": 3.4,
+    "stakeOffset": [
+     4,
+     2
+    ]
+   },
+   "idlePredators": {
+    "lines": "8185-8230",
+    "idleSeconds": 779,
+    "gameOverSeconds": 780,
+    "byPlace": {
+     "hospital": "hospital security guard",
+     "sewer": "small alligator",
+     "shed/house shelter": "cat",
+     "other shelter": "snake",
+     "outdoors": "eagle"
+    }
+   }
+  },
+  "shelterZones": {
+   "lines": "3702-3725 (built), 8189 (predator), 9119 (fog enclosure)",
+   "list": [
+    {
+     "type": "log",
+     "x": -19,
+     "z": 376,
+     "r": 4,
+     "model": "bark cylinder r2.3-2.4 len9.2 on its side, black cavity r1.3"
+    },
+    {
+     "type": "bridge",
+     "x": -116,
+     "z": 371,
+     "r": 4
+    },
+    {
+     "type": "hollow",
+     "x": 95,
+     "z": 359,
+     "r": 4,
+     "model": "bark stump cyl r1.7 top / 2.3 base, h8; black opening r1.2 at y1.9 on -Z face"
+    },
+    {
+     "type": "shed",
+     "x": 203,
+     "z": 328,
+     "r": 6
+    },
+    {
+     "type": "house",
+     "x": 255,
+     "z": 328,
+     "r": 7
+    }
+   ],
+   "enclosedTest": "dist < 2 and y < ground+3 -> fog near 15 / far 53"
+  },
+  "trees": {
+   "count": 95,
+   "runtime": true,
+   "list": [
+    {
+     "idx": 0,
+     "name": "BUR OAK",
+     "builder": "makeTree core (treeSpec, line 1694)",
+     "x": -34,
+     "z": -33,
+     "baseY": 0,
+     "H": 29,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 1,
+     "name": "AMERICAN ELM",
+     "builder": "makeTree core (treeSpec, line 1694)",
+     "x": 32,
+     "z": -37,
+     "baseY": 0,
+     "H": 34,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 2,
+     "name": "SYCAMORE",
+     "builder": "makeTree core (treeSpec, line 1694)",
+     "x": -37,
+     "z": 29,
+     "baseY": 0,
+     "H": 32,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 3,
+     "name": "RED MAPLE",
+     "builder": "makeTree core (treeSpec, line 1694)",
+     "x": 34,
+     "z": 34,
+     "baseY": 0,
+     "H": 27,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 4,
+     "name": "outer 0",
+     "builder": "makeOuterTree 'outer 0' (line 2222/2358)",
+     "x": -145.51,
+     "z": -119.23,
+     "baseY": 1.02,
+     "H": 30.67,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 5,
+     "name": "outer 1",
+     "builder": "makeOuterTree 'outer 1' (line 2222/2358)",
+     "x": -222.64,
+     "z": -30.79,
+     "baseY": 2.83,
+     "H": 36.22,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 6,
+     "name": "outer 2",
+     "builder": "makeOuterTree 'outer 2' (line 2222/2358)",
+     "x": -231.07,
+     "z": -207.11,
+     "baseY": 4.41,
+     "H": 30.64,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 7,
+     "name": "outer 3",
+     "builder": "makeOuterTree 'outer 3' (line 2222/2358)",
+     "x": -97.74,
+     "z": -230.07,
+     "baseY": 0.1,
+     "H": 26.91,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 8,
+     "name": "outer 4",
+     "builder": "makeOuterTree 'outer 4' (line 2222/2358)",
+     "x": -32.11,
+     "z": -205.53,
+     "baseY": 0.1,
+     "H": 29.93,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 9,
+     "name": "outer 5",
+     "builder": "makeOuterTree 'outer 5' (line 2222/2358)",
+     "x": 27.43,
+     "z": -232.94,
+     "baseY": 3.44,
+     "H": 23.65,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 10,
+     "name": "outer 6",
+     "builder": "makeOuterTree 'outer 6' (line 2222/2358)",
+     "x": 109.1,
+     "z": -123.95,
+     "baseY": 0.59,
+     "H": 35.76,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 11,
+     "name": "outer 7",
+     "builder": "makeOuterTree 'outer 7' (line 2222/2358)",
+     "x": 159.94,
+     "z": -119.33,
+     "baseY": 1.91,
+     "H": 33.23,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 12,
+     "name": "outer 8",
+     "builder": "makeOuterTree 'outer 8' (line 2222/2358)",
+     "x": 230.7,
+     "z": -207.32,
+     "baseY": 5.97,
+     "H": 35.35,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 13,
+     "name": "outer 9",
+     "builder": "makeOuterTree 'outer 9' (line 2222/2358)",
+     "x": 232.26,
+     "z": -25.77,
+     "baseY": 0.1,
+     "H": 36.04,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 14,
+     "name": "outer 10",
+     "builder": "makeOuterTree 'outer 10' (line 2222/2358)",
+     "x": 157.89,
+     "z": -29.95,
+     "baseY": 1.32,
+     "H": 22.13,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 15,
+     "name": "outer 11",
+     "builder": "makeOuterTree 'outer 11' (line 2222/2358)",
+     "x": 100.4,
+     "z": 27.58,
+     "baseY": 0,
+     "H": 38.21,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 16,
+     "name": "outer 12",
+     "builder": "makeOuterTree 'outer 12' (line 2222/2358)",
+     "x": 237.94,
+     "z": 12.97,
+     "baseY": 0.51,
+     "H": 29.7,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 17,
+     "name": "outer 13",
+     "builder": "makeOuterTree 'outer 13' (line 2222/2358)",
+     "x": 239,
+     "z": 224.83,
+     "baseY": 3.09,
+     "H": 26.06,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 18,
+     "name": "outer 14",
+     "builder": "makeOuterTree 'outer 14' (line 2222/2358)",
+     "x": 109.83,
+     "z": 241.19,
+     "baseY": 0.1,
+     "H": 31.73,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 19,
+     "name": "outer 15",
+     "builder": "makeOuterTree 'outer 15' (line 2222/2358)",
+     "x": 12.31,
+     "z": 220.59,
+     "baseY": 3.97,
+     "H": 35.05,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 20,
+     "name": "outer 16",
+     "builder": "makeOuterTree 'outer 16' (line 2222/2358)",
+     "x": -107.21,
+     "z": 229.54,
+     "baseY": 6.47,
+     "H": 27.58,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 21,
+     "name": "outer 17",
+     "builder": "makeOuterTree 'outer 17' (line 2222/2358)",
+     "x": -231.8,
+     "z": 223.84,
+     "baseY": 3.34,
+     "H": 28.06,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 22,
+     "name": "outer 18",
+     "builder": "makeOuterTree 'outer 18' (line 2222/2358)",
+     "x": -232.42,
+     "z": 28.2,
+     "baseY": 0.1,
+     "H": 25.89,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 23,
+     "name": "outer 19",
+     "builder": "makeOuterTree 'outer 19' (line 2222/2358)",
+     "x": -154.16,
+     "z": 25.18,
+     "baseY": 0.98,
+     "H": 32.93,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 24,
+     "name": "outer 20",
+     "builder": "makeOuterTree 'outer 20' (line 2222/2358)",
+     "x": -109.42,
+     "z": -111.41,
+     "baseY": 0.05,
+     "H": 22.59,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 25,
+     "name": "outer 21",
+     "builder": "makeOuterTree 'outer 21' (line 2222/2358)",
+     "x": -95.25,
+     "z": 119.88,
+     "baseY": 0.35,
+     "H": 38.44,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 26,
+     "name": "outer 22",
+     "builder": "makeOuterTree 'outer 22' (line 2222/2358)",
+     "x": -24.59,
+     "z": 140.95,
+     "baseY": 1.26,
+     "H": 30.34,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 27,
+     "name": "outer 23",
+     "builder": "makeOuterTree 'outer 23' (line 2222/2358)",
+     "x": 24.32,
+     "z": 103.03,
+     "baseY": 0,
+     "H": 24.07,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 28,
+     "name": "outer 24",
+     "builder": "makeOuterTree 'outer 24' (line 2222/2358)",
+     "x": 92.61,
+     "z": 116.84,
+     "baseY": 0.24,
+     "H": 28.38,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 29,
+     "name": "outer 25",
+     "builder": "makeOuterTree 'outer 25' (line 2222/2358)",
+     "x": -241.4,
+     "z": -236.26,
+     "baseY": 4.08,
+     "H": 23.98,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 30,
+     "name": "outer 26",
+     "builder": "makeOuterTree 'outer 26' (line 2222/2358)",
+     "x": -45.28,
+     "z": -125.1,
+     "baseY": 0.16,
+     "H": 22.9,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 31,
+     "name": "outer 27",
+     "builder": "makeOuterTree 'outer 27' (line 2222/2358)",
+     "x": 150.38,
+     "z": 123.31,
+     "baseY": 1.01,
+     "H": 38.93,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 32,
+     "name": "outer 28",
+     "builder": "makeOuterTree 'outer 28' (line 2222/2358)",
+     "x": -162.5,
+     "z": 128.64,
+     "baseY": 0.08,
+     "H": 36.01,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 33,
+     "name": "outer 29",
+     "builder": "makeOuterTree 'outer 29' (line 2222/2358)",
+     "x": 97.64,
+     "z": -235.69,
+     "baseY": 6.56,
+     "H": 28.12,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 34,
+     "name": "outer 30",
+     "builder": "makeOuterTree 'outer 30' (line 2222/2358)",
+     "x": -97.74,
+     "z": 15.73,
+     "baseY": 0,
+     "H": 22.37,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 35,
+     "name": "outer 31",
+     "builder": "makeOuterTree 'outer 31' (line 2222/2358)",
+     "x": 9.94,
+     "z": -106.77,
+     "baseY": 0.01,
+     "H": 37.54,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 36,
+     "name": "outer 32",
+     "builder": "makeOuterTree 'outer 32' (line 2222/2358)",
+     "x": 230.44,
+     "z": -96.36,
+     "baseY": 0.1,
+     "H": 31.5,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 37,
+     "name": "outer 33",
+     "builder": "makeOuterTree 'outer 33' (line 2222/2358)",
+     "x": -23.46,
+     "z": 244.28,
+     "baseY": 6.1,
+     "H": 29.53,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 38,
+     "name": "outer 34",
+     "builder": "makeOuterTree 'outer 34' (line 2222/2358)",
+     "x": -231.45,
+     "z": 124.06,
+     "baseY": 1.08,
+     "H": 35.1,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 39,
+     "name": "outer 35",
+     "builder": "makeOuterTree 'outer 35' (line 2222/2358)",
+     "x": 159.2,
+     "z": 231.96,
+     "baseY": 0.21,
+     "H": 30.38,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 40,
+     "name": "SENTINEL OAK",
+     "builder": "makeLookoutTree giant (line 2405)",
+     "x": -101,
+     "z": -146,
+     "baseY": 0.05,
+     "H": 61,
+     "trunkBaseRadius": 2.05,
+     "acorns": 0
+    },
+    {
+     "idx": 41,
+     "name": "HIGHLAND ELM",
+     "builder": "makeLookoutTree giant (line 2405)",
+     "x": 88,
+     "z": 139,
+     "baseY": 1.02,
+     "H": 70,
+     "trunkBaseRadius": 1.87,
+     "acorns": 0
+    },
+    {
+     "idx": 42,
+     "name": "OLD WATCH SYCAMORE",
+     "builder": "makeLookoutTree giant (line 2405)",
+     "x": 216,
+     "z": -109,
+     "baseY": 0.35,
+     "H": 65,
+     "trunkBaseRadius": 2.1,
+     "acorns": 0
+    },
+    {
+     "idx": 43,
+     "name": "estate gate oak 0",
+     "builder": "estateGateOak (line 2824/2900)",
+     "x": -230,
+     "z": -329,
+     "baseY": 5.48,
+     "H": 28,
+     "trunkBaseRadius": 1.65,
+     "acorns": 0
+    },
+    {
+     "idx": 44,
+     "name": "estate gate oak 1",
+     "builder": "estateGateOak (line 2824/2900)",
+     "x": 230,
+     "z": -329,
+     "baseY": 3.83,
+     "H": 28,
+     "trunkBaseRadius": 1.65,
+     "acorns": 0
+    },
+    {
+     "idx": 45,
+     "name": "estate gate oak 2",
+     "builder": "estateGateOak (line 2824/2900)",
+     "x": -219,
+     "z": -453,
+     "baseY": 5.62,
+     "H": 28,
+     "trunkBaseRadius": 1.65,
+     "acorns": 0
+    },
+    {
+     "idx": 46,
+     "name": "estate gate oak 3",
+     "builder": "estateGateOak (line 2824/2900)",
+     "x": 219,
+     "z": -456,
+     "baseY": 5.85,
+     "H": 28,
+     "trunkBaseRadius": 1.65,
+     "acorns": 0
+    },
+    {
+     "idx": 47,
+     "name": "park outer 90",
+     "builder": "makeOuterTree park 'outer 90' (line 3395)",
+     "x": -221,
+     "z": 355,
+     "baseY": 2.4,
+     "H": 27.32,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 48,
+     "name": "park outer 91",
+     "builder": "makeOuterTree park 'outer 91' (line 3395)",
+     "x": -185,
+     "z": 313,
+     "baseY": 4.28,
+     "H": 38.2,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 49,
+     "name": "park outer 92",
+     "builder": "makeOuterTree park 'outer 92' (line 3395)",
+     "x": -115,
+     "z": 412,
+     "baseY": 2.69,
+     "H": 28.76,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 50,
+     "name": "park outer 93",
+     "builder": "makeOuterTree park 'outer 93' (line 3395)",
+     "x": -64,
+     "z": 317,
+     "baseY": 7.03,
+     "H": 26.1,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 51,
+     "name": "park outer 94",
+     "builder": "makeOuterTree park 'outer 94' (line 3395)",
+     "x": 14,
+     "z": 395,
+     "baseY": 0.76,
+     "H": 27.34,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 52,
+     "name": "park outer 95",
+     "builder": "makeOuterTree park 'outer 95' (line 3395)",
+     "x": 90,
+     "z": 358,
+     "baseY": 5.01,
+     "H": 33.32,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 53,
+     "name": "park outer 96",
+     "builder": "makeOuterTree park 'outer 96' (line 3395)",
+     "x": -15,
+     "z": 426,
+     "baseY": 0.28,
+     "H": 25.03,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 54,
+     "name": "park outer 97",
+     "builder": "makeOuterTree park 'outer 97' (line 3395)",
+     "x": -238,
+     "z": 397,
+     "baseY": 3.16,
+     "H": 32.54,
+     "trunkBaseRadius": 0.85,
+     "acorns": 0
+    },
+    {
+     "idx": 55,
+     "name": "Shop Oak A",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 332,
+     "z": -24,
+     "baseY": 1.36,
+     "H": 22,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 56,
+     "name": "Shop Oak B",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 362,
+     "z": 24,
+     "baseY": 4.58,
+     "H": 24,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 57,
+     "name": "Chilis Sycamore",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 412,
+     "z": -62,
+     "baseY": 5.49,
+     "H": 27,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 58,
+     "name": "Pump Elm",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 468,
+     "z": 34,
+     "baseY": 1.47,
+     "H": 25,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 59,
+     "name": "Estate Oak South 1",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 118,
+     "z": -356,
+     "baseY": 3.02,
+     "H": 29,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 60,
+     "name": "Estate Oak South 2",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 166,
+     "z": -327,
+     "baseY": 4.81,
+     "H": 26,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 61,
+     "name": "Estate Sycamore South",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 228,
+     "z": -346,
+     "baseY": 3.82,
+     "H": 30,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 62,
+     "name": "Villa Elm South",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 324,
+     "z": -333,
+     "baseY": 0.46,
+     "H": 25,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 63,
+     "name": "Villa Oak South",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 377,
+     "z": -354,
+     "baseY": 0.26,
+     "H": 28,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 64,
+     "name": "Villa Sycamore South",
+     "builder": "makeTree addExtraCanopy (line 9371)",
+     "x": 438,
+     "z": -327,
+     "baseY": 1.13,
+     "H": 27,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 65,
+     "name": "Treehouse Oak",
+     "builder": "makeTree treehouse (line 9504)",
+     "x": -142,
+     "z": 154,
+     "baseY": 1.52,
+     "H": 31,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 66,
+     "name": "Westside 0 shade oak",
+     "builder": "makeTree westside shade oak (line 9985)",
+     "x": -403,
+     "z": -238,
+     "baseY": 2.37,
+     "H": 34,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 67,
+     "name": "Westside 1 shade oak",
+     "builder": "makeTree westside shade oak (line 9985)",
+     "x": -401,
+     "z": -144,
+     "baseY": 4.69,
+     "H": 37,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 68,
+     "name": "Westside 2 shade oak",
+     "builder": "makeTree westside shade oak (line 9985)",
+     "x": -399,
+     "z": -116,
+     "baseY": 4.07,
+     "H": 40,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 69,
+     "name": "Westside 3 shade oak",
+     "builder": "makeTree westside shade oak (line 9985)",
+     "x": -403,
+     "z": -22,
+     "baseY": 3.15,
+     "H": 43,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 70,
+     "name": "Westside 4 shade oak",
+     "builder": "makeTree westside shade oak (line 9985)",
+     "x": -401,
+     "z": 6,
+     "baseY": 4.15,
+     "H": 46,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 71,
+     "name": "Westside 5 shade oak",
+     "builder": "makeTree westside shade oak (line 9985)",
+     "x": -399,
+     "z": 100,
+     "baseY": 7.34,
+     "H": 35,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 72,
+     "name": "Westside 6 shade oak",
+     "builder": "makeTree westside shade oak (line 9985)",
+     "x": -403,
+     "z": 128,
+     "baseY": 7.67,
+     "H": 38,
+     "trunkBaseRadius": 1.3,
+     "acorns": 55
+    },
+    {
+     "idx": 73,
+     "name": "Westside street elm 0",
+     "builder": "makeTree westside street elm (line 10003)",
+     "x": -319,
+     "z": -185,
+     "baseY": 6.88,
+     "H": 30,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 74,
+     "name": "Westside street elm 1",
+     "builder": "makeTree westside street elm (line 10003)",
+     "x": -328,
+     "z": -90,
+     "baseY": 6.24,
+     "H": 37,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 75,
+     "name": "Westside street elm 2",
+     "builder": "makeTree westside street elm (line 10003)",
+     "x": -319,
+     "z": 5,
+     "baseY": 3.4,
+     "H": 30,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 76,
+     "name": "Westside street elm 3",
+     "builder": "makeTree westside street elm (line 10003)",
+     "x": -328,
+     "z": 100,
+     "baseY": 4.21,
+     "H": 37,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 77,
+     "name": "QUAY WILLOW",
+     "builder": "makeTree QUAY WILLOW (line 14068)",
+     "x": 715,
+     "z": -28,
+     "baseY": 6.66,
+     "H": 19,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 78,
+     "name": "QUAY WILLOW",
+     "builder": "makeTree QUAY WILLOW (line 14068)",
+     "x": 715,
+     "z": 43,
+     "baseY": 7.43,
+     "H": 19,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 79,
+     "name": "QUAY WILLOW",
+     "builder": "makeTree QUAY WILLOW (line 14068)",
+     "x": 1004,
+     "z": 79,
+     "baseY": 8,
+     "H": 19,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 80,
+     "name": "QUAY WILLOW",
+     "builder": "makeTree QUAY WILLOW (line 14068)",
+     "x": 1108,
+     "z": 52,
+     "baseY": 8,
+     "H": 19,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 81,
+     "name": "QUAY WILLOW",
+     "builder": "makeTree QUAY WILLOW (line 14068)",
+     "x": 1094,
+     "z": 192,
+     "baseY": 8,
+     "H": 19,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 82,
+     "name": "QUAY WILLOW",
+     "builder": "makeTree QUAY WILLOW (line 14068)",
+     "x": 1015,
+     "z": 370,
+     "baseY": 8,
+     "H": 19,
+     "trunkBaseRadius": 1.3,
+     "acorns": 0
+    },
+    {
+     "idx": 83,
+     "name": "APPLE 1",
+     "builder": "makeAppleTree (line 15172)",
+     "x": -84,
+     "z": -24,
+     "baseY": 0,
+     "H": 9.68,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 84,
+     "name": "APPLE 2",
+     "builder": "makeAppleTree (line 15172)",
+     "x": -24,
+     "z": -84,
+     "baseY": 0,
+     "H": 8.53,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 85,
+     "name": "APPLE 3",
+     "builder": "makeAppleTree (line 15172)",
+     "x": -24,
+     "z": 80,
+     "baseY": 0,
+     "H": 9.6,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 86,
+     "name": "APPLE 4",
+     "builder": "makeAppleTree (line 15172)",
+     "x": 80,
+     "z": 24,
+     "baseY": 0,
+     "H": 9.35,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 87,
+     "name": "APPLE 5",
+     "builder": "makeAppleTree (line 15172)",
+     "x": -85,
+     "z": 352,
+     "baseY": 6.43,
+     "H": 9.45,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 88,
+     "name": "APPLE 6",
+     "builder": "makeAppleTree (line 15172)",
+     "x": -58,
+     "z": 382,
+     "baseY": 3.24,
+     "H": 8.96,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 89,
+     "name": "APPLE 7",
+     "builder": "makeAppleTree (line 15172)",
+     "x": -28,
+     "z": 399,
+     "baseY": 1,
+     "H": 9.37,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 90,
+     "name": "APPLE 8",
+     "builder": "makeAppleTree (line 15172)",
+     "x": 38,
+     "z": 410,
+     "baseY": 1.16,
+     "H": 8.85,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 91,
+     "name": "APPLE 9",
+     "builder": "makeAppleTree (line 15172)",
+     "x": 988,
+     "z": -214,
+     "baseY": 8,
+     "H": 9.01,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 92,
+     "name": "APPLE 10",
+     "builder": "makeAppleTree (line 15172)",
+     "x": 1018,
+     "z": -214,
+     "baseY": 8,
+     "H": 9.21,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 93,
+     "name": "APPLE 11",
+     "builder": "makeAppleTree (line 15172)",
+     "x": 1048,
+     "z": -214,
+     "baseY": 8,
+     "H": 9.66,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    },
+    {
+     "idx": 94,
+     "name": "APPLE 12",
+     "builder": "makeAppleTree (line 15172)",
+     "x": 1078,
+     "z": -214,
+     "baseY": 8,
+     "H": 8.68,
+     "trunkBaseRadius": 0.58,
+     "acorns": 0
+    }
+   ]
+  },
+  "acornTrees": {
+   "perTree": 55,
+   "acornColor": "#886641",
+   "capColor": "#6c4c2c",
+   "acornRadius": 0.15,
+   "lines": "2015-2025",
+   "collectible": false,
+   "names": [
+    "BUR OAK",
+    "Shop Oak A",
+    "Shop Oak B",
+    "Estate Oak South 1",
+    "Villa Oak South",
+    "Treehouse Oak",
+    "Westside 0 shade oak",
+    "Westside 2 shade oak",
+    "Westside 4 shade oak",
+    "Westside 6 shade oak"
+   ]
+  },
+  "knotholesDecorative": {
+   "lines": "2001-2013",
+   "perMakeTree": 5,
+   "radius": [
+    0.12,
+    0.21
+   ],
+   "color": "#282521",
+   "heightRange": "2..trunkH (trunkH = H*0.61)"
+  },
+  "appleTrees": {
+   "lines": "15131-15329",
+   "runtime": true,
+   "list": [
+    {
+     "name": "APPLE 1",
+     "x": -84,
+     "z": -24,
+     "H": 9.68,
+     "base": 0
+    },
+    {
+     "name": "APPLE 2",
+     "x": -24,
+     "z": -84,
+     "H": 8.53,
+     "base": 0
+    },
+    {
+     "name": "APPLE 3",
+     "x": -24,
+     "z": 80,
+     "H": 9.6,
+     "base": 0
+    },
+    {
+     "name": "APPLE 4",
+     "x": 80,
+     "z": 24,
+     "H": 9.35,
+     "base": 0
+    },
+    {
+     "name": "APPLE 5",
+     "x": -85,
+     "z": 352,
+     "H": 9.45,
+     "base": 6.43
+    },
+    {
+     "name": "APPLE 6",
+     "x": -58,
+     "z": 382,
+     "H": 8.96,
+     "base": 3.24
+    },
+    {
+     "name": "APPLE 7",
+     "x": -28,
+     "z": 399,
+     "H": 9.37,
+     "base": 1
+    },
+    {
+     "name": "APPLE 8",
+     "x": 38,
+     "z": 410,
+     "H": 8.85,
+     "base": 1.16
+    },
+    {
+     "name": "APPLE 9",
+     "x": 988,
+     "z": -214,
+     "H": 9.01,
+     "base": 8
+    },
+    {
+     "name": "APPLE 10",
+     "x": 1018,
+     "z": -214,
+     "H": 9.21,
+     "base": 8
+    },
+    {
+     "name": "APPLE 11",
+     "x": 1048,
+     "z": -214,
+     "H": 9.66,
+     "base": 8
+    },
+    {
+     "name": "APPLE 12",
+     "x": 1078,
+     "z": -214,
+     "H": 8.68,
+     "base": 8
+    }
+   ],
+   "candidateSectors": [
+    [
+     [
+      -84,
+      -24
+     ],
+     [
+      -24,
+      -84
+     ],
+     [
+      -24,
+      80
+     ],
+     [
+      80,
+      24
+     ],
+     [
+      -94,
+      24
+     ],
+     [
+      24,
+      -94
+     ],
+     [
+      94,
+      -24
+     ],
+     [
+      24,
+      94
+     ],
+     [
+      -102,
+      42
+     ],
+     [
+      42,
+      103
+     ],
+     [
+      -110,
+      -45
+     ],
+     [
+      110,
+      43
+     ]
+    ],
+    [
+     [
+      -85,
+      352
+     ],
+     [
+      -58,
+      382
+     ],
+     [
+      -28,
+      399
+     ],
+     [
+      12,
+      381
+     ],
+     [
+      38,
+      410
+     ],
+     [
+      -97,
+      414
+     ],
+     [
+      -117,
+      345
+     ],
+     [
+      86,
+      402
+     ],
+     [
+      123,
+      414
+     ],
+     [
+      142,
+      348
+     ],
+     [
+      -82,
+      296
+     ],
+     [
+      -108,
+      282
+     ]
+    ],
+    [
+     [
+      988,
+      -214
+     ],
+     [
+      1018,
+      -214
+     ],
+     [
+      1048,
+      -214
+     ],
+     [
+      1078,
+      -214
+     ],
+     [
+      1108,
+      -214
+     ],
+     [
+      1078,
+      -187
+     ],
+     [
+      1108,
+      -182
+     ],
+     [
+      1039,
+      405
+     ],
+     [
+      1051,
+      362
+     ],
+     [
+      733,
+      373
+     ]
+    ]
+   ],
+   "perSectorMax": 4,
+   "total": 12,
+   "fallbackRow": {
+    "xFrom": 982,
+    "xStep": 24,
+    "xTo": 1120,
+    "z": [
+     -226,
+     -192
+    ]
+   },
+   "siteClear": {
+    "pavement": 8,
+    "mallMargin": 14,
+    "hospitalMargin": 15,
+    "houseMargin": 9,
+    "oldHomeMargin": 9,
+    "commercialMargin": 10,
+    "riverBuilding": 24,
+    "otherTree": 15,
+    "utilitySupport": 8,
+    "solidProbeGrid": "3x3 at 3-unit spacing"
+   },
+   "model": {
+    "H": "8.8 + U(-0.5,1.0)",
+    "trunkRadius": [
+     0.58,
+     0.45
+    ],
+    "wood": "#766047",
+    "boughs": 6,
+    "boughReach": [
+     3.7,
+     5
+    ],
+    "twigsPerBough": 3,
+    "leaves": "3 x 230 instanced, colours #617f3c #829e4d #4e7138",
+    "fruitHanging": 40,
+    "fruitColors": [
+     "#bf3e30",
+     "#d5b54b"
+    ],
+    "appleRadius": 0.205,
+    "fallenApples": 5,
+    "fallenRing": [
+     2.2,
+     4.2
+    ],
+    "routes": "trunk (surfaceRadius 0.5) + 6 'bough' branch routes (visualOffset 0.3)"
+   },
+   "collectible": false,
+   "selectionNote": "Verifier: sectors 1 and 3 use their first four candidates. In sector 2 candidate (12,381) is rejected (14.1 from park tree (14,395), inside the 15-unit tree clearance), so the fifth candidate (38,410) becomes APPLE 8. The fallback row is not used.",
+   "rejectedCandidates": [
+    {
+     "x": 12,
+     "z": 381,
+     "reason": "within 15 of park tree (14,395)"
+    }
+   ]
+  },
+  "nests": {
+   "lines": "15385-15434",
+   "runtime": true,
+   "count": 24,
+   "routeT": 0.66,
+   "yOffset": 0.48,
+   "yOffsetApple": 0.3,
+   "eggs": 3,
+   "eggColors": [
+    "#c7d8cc",
+    "#e4d7b9"
+   ],
+   "bowl": "#5c4934",
+   "rim": "#8b7048",
+   "list": [
+    {
+     "route": "BUR OAK bough 1",
+     "x": -26.39,
+     "y": 17.57,
+     "z": -34.37
+    },
+    {
+     "route": "RED MAPLE bough 8",
+     "x": 34.51,
+     "y": 19.06,
+     "z": 28.37
+    },
+    {
+     "route": "outer 4 bough 2",
+     "x": -29.26,
+     "y": 22.95,
+     "z": -200.6
+    },
+    {
+     "route": "outer 8 bough 5",
+     "x": 228.84,
+     "y": 30.36,
+     "z": -211.4
+    },
+    {
+     "route": "outer 13 bough 0",
+     "x": 243.65,
+     "y": 23.46,
+     "z": 224.96
+    },
+    {
+     "route": "outer 17 bough 1",
+     "x": -230.53,
+     "y": 25.16,
+     "z": 226.53
+    },
+    {
+     "route": "outer 21 bough 2",
+     "x": -98.11,
+     "y": 25.85,
+     "z": 125.09
+    },
+    {
+     "route": "outer 25 bough 2",
+     "x": -244.88,
+     "y": 23.78,
+     "z": -234.82
+    },
+    {
+     "route": "outer 29 bough 6",
+     "x": 95.55,
+     "y": 26.31,
+     "z": -242.7
+    },
+    {
+     "route": "outer 34 bough 1",
+     "x": -225.9,
+     "y": 26.8,
+     "z": 129.26
+    },
+    {
+     "route": "OLD WATCH SYCAMORE high lookout bough 3",
+     "x": 207.49,
+     "y": 49.96,
+     "z": -95.89
+    },
+    {
+     "route": "outer 90 bough 1",
+     "x": -219.66,
+     "y": 22.86,
+     "z": 361.37
+    },
+    {
+     "route": "outer 94 bough 5",
+     "x": 9.63,
+     "y": 20.93,
+     "z": 394.84
+    },
+    {
+     "route": "Shop Oak A bough 9",
+     "x": 329.94,
+     "y": 18.49,
+     "z": -25.83
+    },
+    {
+     "route": "Pump Elm bough 4",
+     "x": 465.52,
+     "y": 16.58,
+     "z": 36.43
+    },
+    {
+     "route": "Estate Sycamore South bough 1",
+     "x": 229.95,
+     "y": 24.36,
+     "z": -347.59
+    },
+    {
+     "route": "Villa Oak South bough 6",
+     "x": 374.54,
+     "y": 19.05,
+     "z": -351.47
+    },
+    {
+     "route": "Treehouse Oak bough 10",
+     "x": -142.53,
+     "y": 26.3,
+     "z": 150.24
+    },
+    {
+     "route": "Westside 2 shade oak bough 9",
+     "x": -393.16,
+     "y": 33.78,
+     "z": -121.96
+    },
+    {
+     "route": "Westside 5 shade oak bough 11",
+     "x": -390.5,
+     "y": 30.61,
+     "z": 95.52
+    },
+    {
+     "route": "Westside street elm 2 bough 5",
+     "x": -326.59,
+     "y": 23.83,
+     "z": 4.62
+    },
+    {
+     "route": "QUAY WILLOW bough 6",
+     "x": 1005.41,
+     "y": 23.44,
+     "z": 74.21
+    },
+    {
+     "route": "APPLE 3 bough 1",
+     "x": -21.72,
+     "y": 6.36,
+     "z": 80.43
+    },
+    {
+     "route": "APPLE 8 bough 1",
+     "x": 39.93,
+     "y": 6.97,
+     "z": 409.95
+    }
+   ]
+  },
+  "birds": {
+   "lines": "15330-15384 (model), 15435-15506 (populate/update)",
+   "nestBirds": {
+    "everyOtherNest": true,
+    "count": 12,
+    "scale": 0.75,
+    "colors": [
+     "#8f4d35",
+     "#536b7a",
+     "#64594c"
+    ],
+    "perchOffset": [
+     0.28,
+     0.35,
+     0.08
+    ],
+    "cycleSeconds": 48,
+    "perchSeconds": 12,
+    "flySeconds": 36,
+    "loopRadius": "15 + 12*sin(u*pi)",
+    "loopHeight": "20*sin(u*pi)^0.7",
+    "zSquash": 0.55,
+    "cycleOffset": "U(0,36)"
+   },
+   "flocks": {
+    "count": 5,
+    "birdsPerFlock": 4,
+    "anchors": [
+     {
+      "x": -42,
+      "y": 44,
+      "z": 42
+     },
+     {
+      "x": 50,
+      "y": 48,
+      "z": 345
+     },
+     {
+      "x": 460,
+      "y": 46,
+      "z": 95
+     },
+     {
+      "x": 782,
+      "y": 49,
+      "z": 125
+     },
+     {
+      "x": 998,
+      "y": 53,
+      "z": 110
+     }
+    ],
+    "radius": "24 + 2*flock",
+    "angularSpeed": 0.095,
+    "offsetPerBird": 0.38,
+    "bob": 2.5,
+    "zSquash": 0.7,
+    "bank": -0.17,
+    "colors": [
+     "#536b7a",
+     "#785d43",
+     "#4d5350"
+    ],
+    "scale": "1 + U(-0.1,0.15)"
+   },
+   "total": 32,
+   "wingFlap": {
+    "freq": 10,
+    "amp": 0.55,
+    "bias": 0.1,
+    "folded": 1.1
+   },
+   "visibility": {
+    "radius": 210,
+    "nestRadius": 165,
+    "hiddenIndoors": true,
+    "performanceTierEveryOther": true
+   },
+   "model": {
+    "body": "sphere r0.19 scale (0.85,1,1.8)",
+    "head": "r0.15",
+    "belly": "#d4c9a7",
+    "beak": "#c3a564",
+    "dark": "#34413d",
+    "wingSpanEach": 0.96
+   },
+   "interactions": "none (no collision, no reaction to squirrels)"
+  },
+  "overflight": {
+   "lines": "15508-15633",
+   "initialWait": 34,
+   "duration": 48,
+   "halfPath": 630,
+   "altitude": [
+    165,
+    205
+   ],
+   "centerJitter": {
+    "x": 95,
+    "z": 75
+   },
+   "relativeTo": "player position",
+   "headingJitter": 1.1,
+   "alternatesHeading": true,
+   "nextWait": [
+    90,
+    150
+   ],
+   "speed": 26.25,
+   "contrailSegments": 18,
+   "silent": true
+  },
+  "forage": {
+   "note": "In v5.4 none of these objects can be eaten or interacted with; they are set dressing. The Tabasco garden hides one chili spot and is meant to conceal the squirrel, but its concealment test never fires (see tabascoGarden.concealment).",
+   "gardenPlots": {
+    "lines": "12619-12650, 12781-12784",
+    "list": [
+     {
+      "x": -36,
+      "z": 52,
+      "w": 7,
+      "d": 4,
+      "variant": 0,
+      "plantColor": "#5d9c41"
+     },
+     {
+      "x": 116,
+      "z": -24,
+      "w": 6.5,
+      "d": 4.5,
+      "variant": 1,
+      "plantColor": "#c94f2d"
+     },
+     {
+      "x": -104,
+      "z": -18,
+      "w": 7.5,
+      "d": 3.8,
+      "variant": 2,
+      "plantColor": "#7bbf53"
+     }
+    ],
+    "soil": "#7a5132",
+    "border": "#6f5339",
+    "note": "root placed at y=0 (not terrain-following)"
+   },
+   "tabascoGarden": {
+    "lines": "3589-3655, 7034-7042",
+    "center": [
+     115,
+     341
+    ],
+    "groundY": 5.1,
+    "beds": "4 earth tiles 4.5x24 at x=102+6.2*col",
+    "corn": 16,
+    "cabbages": 14,
+    "tabascoPlants": 9,
+    "sign": "TABASCO GARDEN",
+    "concealment": {
+     "halfX": 27,
+     "halfZ": 15,
+     "maxY": 2.4,
+     "maxMoveSpeed": 3.4,
+     "yIsAbsoluteWorldY": true,
+     "terrainRangeInBox": [
+      3.94,
+      5.66
+     ],
+     "effectiveInV54": false,
+     "note": "Verifier: the test is player.pos.y < 2.4 (world y, 7035), but the ground inside |dx|<27,|dz|<15 is 3.9-5.7, so it can never trigger for a squirrel on the ground. Rebuild as height above ground."
+    },
+    "wheelbarrowPerch": [
+     139,
+     342
+    ]
+   },
+   "hedgePatches": {
+    "lines": "3573-3586",
+    "list": [
+     [
+      125,
+      303,
+      14,
+      2.3
+     ],
+     [
+      118,
+      372,
+      11,
+      3
+     ],
+     [
+      -104,
+      305,
+      18,
+      2.4
+     ],
+     [
+      290,
+      306,
+      22,
+      2.6
+     ],
+     [
+      613,
+      421,
+      15,
+      2.2
+     ]
+    ],
+    "fields": "x,z,length,height",
+    "maxPlayerY": 2.8,
+    "yIsAbsoluteWorldY": true,
+    "blindBox": "|dx| < length/2 + 1.8 and |dz| < height + 1.1, moveSpeed < 3.4 (7036-7042)",
+    "effectiveInV54": [
+     true,
+     false,
+     false,
+     false,
+     false
+    ],
+    "note": "Verifier: only hedge (125,303) has ground (2.0-2.7) below the absolute 2.8 limit; the other four sit on ground 3.5-7.7 and never conceal."
+   },
+   "birdFeeders": {
+    "lines": "3121-3129, 3243-3249",
+    "runtime": true,
+    "list": [
+     {
+      "type": "bird feeder",
+      "x": -198,
+      "z": 49,
+      "y": 0.1,
+      "v": 0
+     },
+     {
+      "type": "bird feeder",
+      "x": 50,
+      "z": -221,
+      "y": 4.28,
+      "v": 1
+     }
+    ],
+    "model": "post 4.8 high, 1.9 tray at 3.7, red cone roof"
+   },
+   "trashCans": {
+    "lines": "3085-3091, 3256-3257, 3450-3455",
+    "runtime": true,
+    "list": [
+     {
+      "type": "trash can",
+      "x": 150,
+      "z": -220,
+      "y": 7.88,
+      "v": 2
+     },
+     {
+      "type": "trash can",
+      "x": 120,
+      "z": 194,
+      "y": 0.1,
+      "v": 3
+     },
+     {
+      "type": "trash can",
+      "x": 538,
+      "z": -38,
+      "y": 4.86,
+      "v": 2
+     },
+     {
+      "type": "trash can",
+      "x": 419,
+      "z": 77,
+      "y": 4.35,
+      "v": 3
+     },
+     {
+      "type": "trash can",
+      "x": -201,
+      "z": 331,
+      "y": 2.83,
+      "v": 2
+     },
+     {
+      "type": "trash can",
+      "x": -30,
+      "z": 405,
+      "y": 0.8,
+      "v": 0
+     },
+     {
+      "type": "trash can",
+      "x": 82,
+      "z": 311,
+      "y": 2.93,
+      "v": 3
+     }
+    ],
+    "model": "cyl r0.72/0.62 h1.58, lid r0.78"
+   },
+   "compostBins": {
+    "runtime": true,
+    "list": [
+     {
+      "type": "compost bin",
+      "x": 227,
+      "z": -70,
+      "y": 0.1,
+      "v": 1
+     },
+     {
+      "type": "compost bin",
+      "x": -74,
+      "z": 200,
+      "y": 5.51,
+      "v": 2
+     }
+    ]
+   },
+   "coreYardBins": {
+    "lines": "1487-1492",
+    "list": [
+     [
+      -74,
+      -76
+     ],
+     [
+      71,
+      -76
+     ],
+     [
+      -74,
+      77
+     ],
+     [
+      71,
+      77
+     ]
+    ],
+    "y": 0.62,
+    "size": "cyl r0.6 h1.1",
+    "colors": [
+     "#285b4a",
+     "#3a5366",
+     "#555850"
+    ]
+   },
+   "oldHouseBins": {
+    "lines": "9948-9956",
+    "list": [
+     {
+      "x": -383.5,
+      "z": -232,
+      "house": 0,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -356.5,
+      "z": -232,
+      "house": 0,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -379.5,
+      "z": -171,
+      "house": 1,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -350.5,
+      "z": -171,
+      "house": 1,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -375.5,
+      "z": -110,
+      "house": 2,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -344.5,
+      "z": -110,
+      "house": 2,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -383.5,
+      "z": -49,
+      "house": 3,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -356.5,
+      "z": -49,
+      "house": 3,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -379.5,
+      "z": 12,
+      "house": 4,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -350.5,
+      "z": 12,
+      "house": 4,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -375.5,
+      "z": 73,
+      "house": 5,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -344.5,
+      "z": 73,
+      "house": 5,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -383.5,
+      "z": 134,
+      "house": 6,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     },
+     {
+      "x": -356.5,
+      "z": 134,
+      "house": 6,
+      "size": [
+       0.75,
+       1.35,
+       0.85
+      ],
+      "color": "#686a61"
+     }
+    ]
+   },
+   "gasStationWasteContainer": {
+    "lines": "897-901",
+    "x": 535,
+    "z": 93,
+    "size": [
+     2.3,
+     2.8,
+     2
+    ],
+    "color": "#61756a"
+   },
+   "restaurants": {
+    "note": "No dumpsters exist in v5.4. Proposed dumpster spots were checked clear of pavement/solids in a headless run.",
+    "list": [
+     {
+      "name": "Chili's-style restaurant",
+      "center": [
+       474,
+       -82
+      ],
+      "footprint": [
+       52,
+       31
+      ],
+      "frontFaces": "+Z",
+      "proposedDumpster": [
+       474,
+       -101
+      ]
+     },
+     {
+      "name": "Ice cream (standalone)",
+      "center": [
+       152,
+       56
+      ],
+      "proposedDumpster": [
+       152,
+       66
+      ]
+     },
+     {
+      "name": "Ice cream (strip)",
+      "center": [
+       -154,
+       -66
+      ],
+      "proposedDumpster": [
+       -154,
+       -76
+      ]
+     },
+     {
+      "name": "Corner shops / diner",
+      "center": [
+       605,
+       -94
+      ],
+      "footprint": [
+       36,
+       28
+      ]
+     },
+     {
+      "name": "Copper Cup Cafe (Galleria)",
+      "note": "mall shop, east side slot 2"
+     }
+    ]
+   },
+   "mallPlaza": {
+    "lines": "14984-15001, 14191-14203",
+    "bounds": {
+     "x": [
+      1061,
+      1145
+     ],
+     "z": [
+      234,
+      415
+     ]
+    },
+    "y": 8.12,
+    "fountain": [
+     1102,
+     252
+    ],
+    "mall": {
+     "x": 1102,
+     "z": 338,
+     "w": 78,
+     "d": 108,
+     "floor": 8.14
+    }
+   }
+  }
+ },
+ "v41_restore": {
+  "note": "Lost after v4.1. Code lines refer to reference/v4_1_game.js. Positions are after v4.1's lifeFindGrass relocation (runtime:true). check54 = validity of the same spot in the v5.4 world (headless).",
+  "helpersMissingInV54": [
+   "lifeSafeSpot (12242)",
+   "lifeFindGrass (12249)",
+   "lifePutAt (12261)",
+   "adjustHeading (12558)",
+   "createNutCache/tryInspectNutCache (12266/12296)",
+   "buildDecorativeGarden (12317)",
+   "createButterfly/createDragonfly (12347/12365)",
+   "createBirdFeeder (12394)",
+   "createTrashCan/tryScavengeTrashCan (12410/12425)",
+   "createFloweringBush (12445)",
+   "createDeer (12472)",
+   "createFox (12520)",
+   "updateLifeEnhancements (12564)",
+   "tryNewWildlifePounce (12651)",
+   "createWorldLifeEnhancements (12736)"
+  ],
+  "lifeSafeSpot": {
+   "bounds": {
+    "x": [
+     -255,
+     252
+    ],
+    "z": [
+     -240,
+     422
+    ]
+   },
+   "defaultMinRoad": 4,
+   "buildingMargin": 4,
+   "relocationSearch": {
+    "rings": 12,
+    "perRing": 20,
+    "ringStep": 3.2,
+    "ringAngleOffset": 0.34
+   }
+  },
+  "nutCaches": {
+   "lines": "12266-12316, 12737-12749, hook 7613",
+   "runtime": true,
+   "list": [
+    {
+     "index": 0,
+     "x": -78,
+     "z": -88,
+     "y": 0,
+     "coins": 3,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @39.18"
+     }
+    },
+    {
+     "index": 1,
+     "x": -111,
+     "z": 44,
+     "y": 0.02,
+     "coins": 5,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @31.22"
+     }
+    },
+    {
+     "index": 2,
+     "x": 61.67,
+     "z": 67.39,
+     "y": 0,
+     "coins": 7,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "RED MAPLE @43.36"
+     }
+    },
+    {
+     "index": 3,
+     "x": 93,
+     "z": 118,
+     "y": 0.27,
+     "coins": 3,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": true,
+      "nearestTree": "neighborhood canopy @1.22"
+     }
+    },
+    {
+     "index": 4,
+     "x": -158,
+     "z": 116,
+     "y": 0.07,
+     "coins": 5,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @13.42"
+     }
+    },
+    {
+     "index": 5,
+     "x": -225,
+     "z": -103,
+     "y": 6.13,
+     "coins": 7,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @72.25"
+     }
+    },
+    {
+     "index": 6,
+     "x": -215,
+     "z": 265,
+     "y": 4.5,
+     "coins": 3,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @44.45"
+     }
+    },
+    {
+     "index": 7,
+     "x": -112,
+     "z": 386,
+     "y": 4.07,
+     "coins": 5,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @26.17"
+     }
+    },
+    {
+     "index": 8,
+     "x": 119,
+     "z": 326,
+     "y": 4.19,
+     "coins": 7,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @43.19"
+     }
+    },
+    {
+     "index": 9,
+     "x": 233,
+     "z": 205,
+     "y": 3.2,
+     "coins": 3,
+     "check54": {
+      "safe": "ok",
+      "blockedInV54": false,
+      "nearestTree": "neighborhood canopy @20.71"
+     }
+    }
+   ],
+   "nominal": [
+    [
+     -78,
+     -88
+    ],
+    [
+     -111,
+     44
+    ],
+    [
+     62,
+     61
+    ],
+    [
+     93,
+     118
+    ],
+    [
+     -158,
+     116
+    ],
+    [
+     -225,
+     -103
+    ],
+    [
+     -215,
+     265
+    ],
+    [
+     -112,
+     386
+    ],
+    [
+     119,
+     326
+    ],
+    [
+     233,
+     205
+    ]
+   ],
+   "minRoad": 3.6,
+   "interact": {
+    "key": "E",
+    "radiusXZ": 2.85,
+    "maxDy": 2.8,
+    "notOnRoute": true,
+    "notIndoors": true,
+    "oneTimePerRun": true,
+    "coins": "3 + (index % 3) * 2",
+    "power": 5
+   },
+   "message": "NUT CACHE {n}/10 FOUND · +{coins} Squirrel Coins · +5 Power",
+   "messageSeconds": 3.5,
+   "sfx": [
+    690,
+    0.14,
+    "triangle",
+    0.023
+   ],
+   "model": {
+    "rim": "cyl r0.89/1.1 h0.28 #5c4b35",
+    "pebbles": "6 x r0.22 alternating #777b6e / #6c8751",
+    "lid": "r0.69 #6c8751 scale (1.05,0.25,1.0)",
+    "acorns": "4 x r0.15 #a77b41 scale (0.85,1.45,0.85) at radius 0.38, y 0.34; hidden when found"
+   }
+  },
+  "deer": {
+   "lines": "12472-12519 (create), 12576-12601 (update), 12676-12701 (pounce), 12782-12788 (spawn)",
+   "runtime": true,
+   "list": [
+    {
+     "name": "Willow",
+     "x": 117,
+     "z": 365,
+     "y": 5.79,
+     "size": 1,
+     "child": false,
+     "sex": "doe",
+     "nominal": [
+      117,
+      365
+     ]
+    },
+    {
+     "name": "Hazel",
+     "x": 145,
+     "z": 385,
+     "y": 6.17,
+     "size": 0.95,
+     "child": false,
+     "sex": "doe",
+     "nominal": [
+      145,
+      385
+     ]
+    },
+    {
+     "name": "Bracken",
+     "x": 195.18,
+     "z": 314.98,
+     "y": 3.59,
+     "size": 1.18,
+     "child": false,
+     "sex": "buck",
+     "nominal": [
+      187,
+      320
+     ]
+    },
+    {
+     "name": "Ash",
+     "x": -204,
+     "z": 353,
+     "y": 2.35,
+     "size": 1.13,
+     "child": false,
+     "sex": "buck",
+     "nominal": [
+      -204,
+      353
+     ]
+    },
+    {
+     "name": "Fawn",
+     "x": 137,
+     "z": 366,
+     "y": 5.83,
+     "size": 0.55,
+     "child": true,
+     "sex": "doe",
+     "nominal": [
+      137,
+      366
+     ]
+    }
+   ],
+   "colors": {
+    "doe": "#ad845e",
+    "buck": "#946f4e",
+    "fawn": "#b99a70",
+    "white": "#dfd1b3",
+    "hoof": "#48443b",
+    "eye": "#25221e",
+    "antler": "#c2ac82"
+   },
+   "minRoad": 7,
+   "threat": {
+    "radiusXZ": 21,
+    "maxPlayerHeightAboveDeerGround": 5,
+    "scareSeconds": 3.4
+   },
+   "roam": {
+    "desiredHeading": "sin(phase*0.37 + origin.x) * 1.3 (absolute yaw)",
+    "turnRate": 1.2,
+    "speed": 1.25,
+    "speedDamp": 1.3,
+    "minRoad": 5.1
+   },
+   "flee": {
+    "headingAwayFromPlayer": true,
+    "turnRate": 5.6,
+    "speedAdult": 11.8,
+    "speedFawn": 9,
+    "speedDamp": 6,
+    "minRoad": 2.6
+   },
+   "leash": 95,
+   "blockedTurn": "heading += 0.67*pi, speed = 0",
+   "gait": {
+    "calmFreq": 3,
+    "calmAmp": 0.015,
+    "fleeFreq": 13,
+    "fleeAmp": 0.065
+   },
+   "pounce": {
+    "radiusXZ": "1.6 + size*0.35",
+    "maxDy": 2.8,
+    "cooldownOnAttempt": 7,
+    "successChance": 0.15,
+    "success": {
+     "scare": 12,
+     "cooldown": 75,
+     "power": 32,
+     "hits": 1,
+     "resetsSecondsSinceBite": true
+    },
+    "failScare": 10,
+    "requiresFox": "tryNewWildlifePounce returns false at once when foxCreature is null (v4.1:12652), so deer can be bitten only while the fox exists"
+   },
+   "messages": {
+    "success": "LUCKY DEER BITE ({name}) · +32 Power · Deer bolts away!",
+    "fail": "{name} dodged the pounce! Deer bites succeed only 15% of the time."
+   }
+  },
+  "fox": {
+   "lines": "12520-12556 (create), 12603-12649 (update), 12652-12674 (pounce), 12789 (spawn)",
+   "runtime": true,
+   "spawn": {
+    "x": 65,
+    "z": 313,
+    "y": 2.94
+   },
+   "nominal": [
+    65,
+    313
+   ],
+   "minRoad": 7,
+   "colors": {
+    "fur": "#b8663c",
+    "bright": "#e4d6bc",
+    "dark": "#302c29"
+   },
+   "validTarget": "player not in sewer/hospital/duct/house interior AND player height above ground < 2.5",
+   "huntRadius": 24,
+   "huntSpeed": 8.8,
+   "huntTurnRate": 7,
+   "roam": {
+    "desiredHeading": "sin(phase*0.58) * 0.85 (absolute yaw)",
+    "speed": 2,
+    "turnRate": 1.5
+   },
+   "moveConstraint": {
+    "minRoad": 2.3,
+    "leash": 115,
+    "onBlocked": "stays in place (no heading change)"
+   },
+   "warning": {
+    "radius": 6,
+    "cooldown": 6,
+    "message": "FOX NEARBY · Keep your distance or escape into the trees!",
+    "seconds": 2.1
+   },
+   "lunge": {
+    "radius": 2.15,
+    "cooldown": 4.8,
+    "powerLoss": 17,
+    "knockback": 9,
+    "minUpVel": 3.5,
+    "detachesFromRoute": true,
+    "message": "FOX LUNGE! −17 Power · Climb, dodge or surprise it!",
+    "seconds": 2.9,
+    "sfx": [
+     180,
+     0.2,
+     "square",
+     0.04
+    ]
+   },
+   "pouncedByPlayer": {
+    "radiusXZ": 1.75,
+    "maxDy": 2.2,
+    "behindTest": "cos(player.yaw - fox.facing) > 0.35",
+    "chanceAdvantaged": 0.7,
+    "chanceOtherwise": 0.18,
+    "advantagedIf": "stalk/focus mode OR player >1.5 above fox OR behind",
+    "success": {
+     "stun": 9,
+     "attackCooldown": 9,
+     "power": 55,
+     "message": "FOX SURPRISED! +55 Power · 9 seconds to escape."
+    },
+    "fail": {
+     "attackCooldown": 0,
+     "message": "The fox dodged your attack!"
+    }
+   },
+   "tailWag": {
+    "freq": 7,
+    "amp": 0.17
+   }
+  },
+  "gardens": {
+   "lines": "12317-12346, 12750-12757",
+   "runtime": true,
+   "list": [
+    {
+     "nominal": [
+      67,
+      58
+     ],
+     "kind": 0,
+     "placed": [
+      71.98,
+      62.02
+     ],
+     "y": 0
+    },
+    {
+     "nominal": [
+      -113,
+      72
+     ],
+     "kind": 1,
+     "placed": [
+      -113,
+      72
+     ],
+     "y": 0.04
+    },
+    {
+     "nominal": [
+      107,
+      264
+     ],
+     "kind": 2,
+     "placed": [
+      107,
+      264
+     ],
+     "y": 0.1
+    },
+    {
+     "nominal": [
+      -234,
+      96
+     ],
+     "kind": 1,
+     "placed": [
+      -234,
+      96
+     ],
+     "y": 0.1
+    },
+    {
+     "nominal": [
+      221,
+      132
+     ],
+     "kind": 0,
+     "placed": [
+      221,
+      132
+     ],
+     "y": 2.95
+    }
+   ],
+   "size": [
+    5.8,
+    3.9
+   ],
+   "soil": "#55412e",
+   "border": "#7f6141",
+   "plants": "4 rows x 5",
+   "fruitByKind": {
+    "0": "#7e314c",
+    "1": "#d94b36",
+    "2": [
+     "#dd9a67",
+     "#a7abc9",
+     "#b47eb3"
+    ]
+   },
+   "minRoad": 4.5
+  },
+  "insects": {
+   "lines": "12343-12392 (create), 12566-12575 (update)",
+   "perGarden": {
+    "butterflies": 4,
+    "dragonflies": 2
+   },
+   "total": 30,
+   "butterfly": {
+    "heightAboveGround": 1.8,
+    "colors": [
+     "#e8bd51",
+     "#a8c5f0",
+     "#dd9dbb",
+     "#ecd68c",
+     "#bdc3d2"
+    ],
+    "colorIndex": "(kind*4+i) % 5",
+    "body": "#4a4545",
+    "wingFlapMul": 4,
+    "index": "kind*4 + i (per garden kind, i = 0..3; v4.1:12344)",
+    "initialPhase": "index*2.12"
+   },
+   "dragonfly": {
+    "heightAboveGround": 2.1,
+    "wingColors": [
+     "#adcbb8",
+     "#c0dce4"
+    ],
+    "body": "#315253",
+    "wingFlapMul": 10,
+    "index": "kind*3 + i (per garden kind, i = 0..1; v4.1:12345)",
+    "initialPhase": "index*1.31 + 0.9",
+    "wingColorRule": "index odd -> #c0dce4, even -> #adcbb8"
+   },
+   "motion": {
+    "phaseRate": 4,
+    "x": "x0 + sin(phase*0.35)*0.65",
+    "z": "z0 + cos(phase*0.25)*0.53",
+    "y": "y0 + sin(phase*0.57)*0.48",
+    "wingAngle": "sin(phase*flapMul)*0.78",
+    "spin": "rotation.y = phase*0.17"
+   },
+   "interactions": "none",
+   "list": [
+    {
+     "kind": "butterfly",
+     "x": 70.59,
+     "z": 61.02,
+     "y": 1.8
+    },
+    {
+     "kind": "butterfly",
+     "x": 72.71,
+     "z": 62.11,
+     "y": 1.8
+    },
+    {
+     "kind": "butterfly",
+     "x": 71.13,
+     "z": 60.85,
+     "y": 1.8
+    },
+    {
+     "kind": "butterfly",
+     "x": 73.32,
+     "z": 60.4,
+     "y": 1.8
+    },
+    {
+     "kind": "dragonfly",
+     "x": 72.91,
+     "z": 61.61,
+     "y": 2.1
+    },
+    {
+     "kind": "dragonfly",
+     "x": 71.92,
+     "z": 61.7,
+     "y": 2.1
+    },
+    {
+     "kind": "butterfly",
+     "x": -112.86,
+     "z": 71.56,
+     "y": 1.84
+    },
+    {
+     "kind": "butterfly",
+     "x": -113.87,
+     "z": 70.76,
+     "y": 1.85
+    },
+    {
+     "kind": "butterfly",
+     "x": -111.3,
+     "z": 73.65,
+     "y": 1.83
+    },
+    {
+     "kind": "butterfly",
+     "x": -112.81,
+     "z": 72.63,
+     "y": 1.84
+    },
+    {
+     "kind": "dragonfly",
+     "x": -113.67,
+     "z": 70.96,
+     "y": 2.14
+    },
+    {
+     "kind": "dragonfly",
+     "x": -113.3,
+     "z": 71.03,
+     "y": 2.14
+    },
+    {
+     "kind": "butterfly",
+     "x": 106.08,
+     "z": 264.52,
+     "y": 1.9
+    },
+    {
+     "kind": "butterfly",
+     "x": 106.93,
+     "z": 263.11,
+     "y": 1.9
+    },
+    {
+     "kind": "butterfly",
+     "x": 108.5,
+     "z": 265.61,
+     "y": 1.9
+    },
+    {
+     "kind": "butterfly",
+     "x": 107.95,
+     "z": 265.42,
+     "y": 1.9
+    },
+    {
+     "kind": "dragonfly",
+     "x": 106.94,
+     "z": 265.08,
+     "y": 2.2
+    },
+    {
+     "kind": "dragonfly",
+     "x": 105.56,
+     "z": 263.1,
+     "y": 2.2
+    },
+    {
+     "kind": "butterfly",
+     "x": -233.99,
+     "z": 94.86,
+     "y": 1.9
+    },
+    {
+     "kind": "butterfly",
+     "x": -234.25,
+     "z": 95.07,
+     "y": 1.9
+    },
+    {
+     "kind": "butterfly",
+     "x": -234.07,
+     "z": 95.43,
+     "y": 1.9
+    },
+    {
+     "kind": "butterfly",
+     "x": -234.16,
+     "z": 94.62,
+     "y": 1.9
+    },
+    {
+     "kind": "dragonfly",
+     "x": -234.72,
+     "z": 95.33,
+     "y": 2.2
+    },
+    {
+     "kind": "dragonfly",
+     "x": -232.21,
+     "z": 96.68,
+     "y": 2.2
+    },
+    {
+     "kind": "butterfly",
+     "x": 222.41,
+     "z": 133.04,
+     "y": 4.86
+    },
+    {
+     "kind": "butterfly",
+     "x": 221.19,
+     "z": 131.99,
+     "y": 4.77
+    },
+    {
+     "kind": "butterfly",
+     "x": 219.49,
+     "z": 131.65,
+     "y": 4.63
+    },
+    {
+     "kind": "butterfly",
+     "x": 223.01,
+     "z": 130.77,
+     "y": 4.94
+    },
+    {
+     "kind": "dragonfly",
+     "x": 221.92,
+     "z": 133.05,
+     "y": 5.12
+    },
+    {
+     "kind": "dragonfly",
+     "x": 219.34,
+     "z": 131.78,
+     "y": 4.91
+    }
+   ]
+  },
+  "birdFeeders": {
+   "lines": "12394-12409, 12758-12765",
+   "list": [
+    {
+     "nominal": [
+      -89,
+      70
+     ],
+     "placed": [
+      -89,
+      70
+     ]
+    },
+    {
+     "nominal": [
+      88,
+      75
+     ],
+     "placed": [
+      88,
+      75
+     ]
+    },
+    {
+     "nominal": [
+      -219,
+      215
+     ],
+     "placed": [
+      -219,
+      215
+     ]
+    },
+    {
+     "nominal": [
+      132,
+      333
+     ],
+     "placed": [
+      132,
+      333
+     ]
+    },
+    {
+     "nominal": [
+      237,
+      308
+     ],
+     "placed": [
+      237,
+      308
+     ]
+    }
+   ],
+   "model": "post r0.085-0.11 h3.7 #8b6445, tray 1.15 at y3.22, roof cone #6f8c55 at 3.8, seed cylinder #bd8f5d at 3.4",
+   "interactions": "none (decorative)"
+  },
+  "scavengeTrashCans": {
+   "lines": "12410-12444, 12766-12775, hook 7614",
+   "list": [
+    {
+     "index": 0,
+     "x": -71,
+     "z": 68,
+     "coins": 2
+    },
+    {
+     "index": 1,
+     "x": 53,
+     "z": -76,
+     "coins": 3
+    },
+    {
+     "index": 2,
+     "x": 221,
+     "z": 61,
+     "coins": 4
+    },
+    {
+     "index": 3,
+     "x": -238,
+     "z": 140,
+     "coins": 5
+    },
+    {
+     "index": 4,
+     "x": 107,
+     "z": 204,
+     "coins": 2
+    },
+    {
+     "index": 5,
+     "x": 134,
+     "z": 392,
+     "coins": 3
+    }
+   ],
+   "minRoad": 3.6,
+   "interact": {
+    "key": "E",
+    "radiusXZ": 2.5,
+    "maxDy": 2.6,
+    "notOnRoute": true,
+    "notIndoors": true,
+    "oneTimePerCan": true,
+    "chance": 0.35,
+    "coins": "2 + (index % 4)"
+   },
+   "messages": {
+    "hit": "TRASH CAN TREASURE! +{coins} Squirrel Coins",
+    "miss": "Nothing edible in this trash can. Keep searching."
+   },
+   "model": "cyl r0.59/0.48 h1.16 #64756b, lid #364a41, 6 ribs #899d90"
+  },
+  "floweringBushes": {
+   "lines": "12445-12471, 12776-12780",
+   "attempts": 76,
+   "placed": 43,
+   "area": {
+    "x": [
+     -245,
+     243
+    ],
+    "z": [
+     -215,
+     407
+    ]
+   },
+   "scale": [
+    0.62,
+    1.32
+   ],
+   "flowersEvery": 5,
+   "flowerColor": "#e3c6dc",
+   "foliage": [
+    "#587844",
+    "#6a8850",
+    "#4e714c",
+    "#789557"
+   ],
+   "list": [
+    [
+     -120,
+     256,
+     0.95,
+     1
+    ],
+    [
+     230,
+     116,
+     1.22,
+     5
+    ],
+    [
+     -96,
+     -21,
+     0.85,
+     6
+    ],
+    [
+     240,
+     26,
+     0.77,
+     10
+    ],
+    [
+     -104,
+     -204,
+     0.91,
+     14
+    ],
+    [
+     -240,
+     204,
+     0.87,
+     15
+    ],
+    [
+     -214,
+     108,
+     1.1,
+     19
+    ],
+    [
+     231,
+     -209,
+     0.99,
+     20
+    ],
+    [
+     101,
+     -72,
+     0.8,
+     21
+    ],
+    [
+     -160,
+     -29,
+     1.08,
+     22
+    ],
+    [
+     121,
+     347,
+     0.82,
+     24
+    ],
+    [
+     36,
+     -22,
+     1.24,
+     26
+    ],
+    [
+     -74,
+     -133,
+     1.1,
+     28
+    ],
+    [
+     57,
+     204,
+     0.77,
+     29
+    ],
+    [
+     50,
+     -26,
+     0.88,
+     30
+    ],
+    [
+     -33,
+     -117,
+     0.75,
+     32
+    ],
+    [
+     151,
+     364,
+     1.21,
+     33
+    ],
+    [
+     214,
+     234,
+     1.11,
+     34
+    ],
+    [
+     -102,
+     357,
+     0.78,
+     36
+    ],
+    [
+     126,
+     127,
+     0.81,
+     37
+    ],
+    [
+     -56,
+     -19,
+     0.65,
+     38
+    ],
+    [
+     -44,
+     38,
+     0.71,
+     39
+    ],
+    [
+     -139,
+     345,
+     1.19,
+     42
+    ],
+    [
+     -64,
+     -143,
+     0.82,
+     43
+    ],
+    [
+     48,
+     -99,
+     1.3,
+     45
+    ],
+    [
+     -37,
+     225,
+     0.89,
+     46
+    ],
+    [
+     193,
+     361,
+     0.72,
+     47
+    ],
+    [
+     120,
+     321,
+     0.91,
+     48
+    ],
+    [
+     84,
+     123,
+     1.31,
+     49
+    ],
+    [
+     53,
+     361,
+     1.11,
+     51
+    ],
+    [
+     -7,
+     382,
+     0.66,
+     52
+    ],
+    [
+     -26,
+     -99,
+     0.78,
+     54
+    ],
+    [
+     -147,
+     65,
+     1.21,
+     58
+    ],
+    [
+     98,
+     317,
+     0.83,
+     59
+    ],
+    [
+     233,
+     -127,
+     1.19,
+     61
+    ],
+    [
+     34,
+     351,
+     1.29,
+     62
+    ],
+    [
+     -236,
+     391,
+     1.1,
+     63
+    ],
+    [
+     72,
+     307,
+     1.19,
+     64
+    ],
+    [
+     -134,
+     265,
+     1.09,
+     65
+    ],
+    [
+     37,
+     238,
+     1.17,
+     69
+    ],
+    [
+     -32,
+     236,
+     1.1,
+     72
+    ],
+    [
+     73,
+     198,
+     0.99,
+     73
+    ],
+    [
+     -109,
+     264,
+     0.72,
+     75
+    ]
+   ],
+   "listFields": "x,z,scale,variant",
+   "variantRule": "variant = attempt index i (0..75): foliage colour = foliage[i % 4]; pink flowers when i % 5 == 0 (v4.1:12460)"
+  },
+  "handlerOrder": {
+   "interactE": [
+    "hospital",
+    "nut cache",
+    "trash can",
+    "...rest"
+   ],
+   "pounce": [
+    "humans",
+    "police",
+    "fox",
+    "deer",
+    "rabbits",
+    "normal squirrels"
+   ]
+  }
+ },
+ "proposals": {
+  "note": "Designer proposals for brief section 3/7 (not present in either HTML version). All coordinates checked against v5.4 geometry in a headless run unless marked inferred.",
+  "hollowTrees": {
+   "premium": [
+    {
+     "id": "H1",
+     "tree": "park outer 95",
+     "x": 90,
+     "z": 358,
+     "groundY": 5.01,
+     "H": 33.32,
+     "why": "Beside Tabasco community garden (115,341); merges the existing shelter 'hollow' stump at (95,359); has the park high-watch perch; restored v4.1 feeder (132,333) and cache (119,326) nearby",
+     "replaceModel": true,
+     "premiumGarden": [
+      115,
+      341
+     ],
+     "premiumFeeder": [
+      105,
+      330
+     ]
+    },
+    {
+     "id": "H2",
+     "tree": "SYCAMORE",
+     "x": -37,
+     "z": 29,
+     "groundY": 0,
+     "H": 32,
+     "why": "Core district; sycamores are the classic hollow tree; garden plot (-36,52) 23 units away; densest backyards; apple 3 (-24,80)",
+     "replaceModel": true,
+     "premiumGarden": [
+      -36,
+      52
+     ],
+     "premiumFeeder": [
+      -45,
+      68
+     ]
+    }
+   ],
+   "knothole": [
+    {
+     "id": "H3",
+     "tree": "BUR OAK",
+     "x": -34,
+     "z": -33,
+     "H": 29,
+     "district": "core (player spawn oak, acorns)"
+    },
+    {
+     "id": "H4",
+     "tree": "HIGHLAND ELM",
+     "x": 88,
+     "z": 139,
+     "H": 70,
+     "district": "north residential (giant)"
+    },
+    {
+     "id": "H5",
+     "tree": "OLD WATCH SYCAMORE",
+     "x": 216,
+     "z": -109,
+     "H": 65,
+     "district": "east residential (giant; v5.4 squirrel hide 3 at its foot)"
+    },
+    {
+     "id": "H6",
+     "tree": "SENTINEL OAK",
+     "x": -101,
+     "z": -146,
+     "H": 61,
+     "district": "southwest residential (giant)"
+    },
+    {
+     "id": "H7",
+     "tree": "Treehouse Oak",
+     "x": -142,
+     "z": 154,
+     "H": 31,
+     "district": "west stream / treehouse (acorns)"
+    },
+    {
+     "id": "H8",
+     "tree": "Chilis Sycamore",
+     "x": 412,
+     "z": -62,
+     "H": 27,
+     "district": "east commercial (restaurant dumpsters)"
+    },
+    {
+     "id": "H9",
+     "tree": "Estate Oak South 1",
+     "x": 118,
+     "z": -356,
+     "H": 29,
+     "district": "south estates (acorns)"
+    },
+    {
+     "id": "H10",
+     "tree": "Westside 4 shade oak",
+     "x": -401,
+     "z": 6,
+     "H": 46,
+     "district": "westside old houses (acorns)"
+    },
+    {
+     "id": "H11",
+     "tree": "QUAY WILLOW",
+     "x": 1094,
+     "z": 192,
+     "H": 19,
+     "district": "riverside, next to Galleria plaza"
+    }
+   ],
+   "alternates": [
+    "RED MAPLE (34,34)",
+    "park outer 90 (-221,355)",
+    "estate gate oak 0 (-230,-329)",
+    "Shop Oak B (362,24)"
+   ]
+  },
+  "nutCacheFix": {
+   "index": 3,
+   "from": [
+    93,
+    118
+   ],
+   "to": [
+    97,
+    118
+   ],
+   "reason": "In the v5.4 world (93,118) is 1.2 units from the trunk of 'outer 24' and reports outdoorBlocked"
+  }
+ }
+}

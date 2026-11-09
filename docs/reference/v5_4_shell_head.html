@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#101b19" />
+<title>Spicy Rodents v5.4 — Orchard, Birds & Traffic</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+:root{--lime:#d1ee83;--cream:#f5f2df;--muted:#a3b8af;--dark:#0d1715}*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#98c6e5;color:var(--cream);font-family:'DM Sans',Arial,sans-serif;user-select:none}
+canvas#world{display:block;width:100%;height:100%;outline:none}#hud{position:fixed;inset:0;pointer-events:none}
+#hudTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:25px 27px}
+.brand{font:800 26px/0.85 'Barlow Condensed',Impact,sans-serif;letter-spacing:2px;text-shadow:0 2px 12px #09231c77}.brand small{font:700 10px 'DM Sans',sans-serif;display:block;letter-spacing:2.5px;margin-top:10px;color:#fff8}
+.hudpanel{border:1px solid #ffffff33;border-radius:10px;background:#0c2521bf;box-shadow:0 8px 28px #0002;backdrop-filter:blur(12px)}.scores{display:flex;gap:23px;padding:12px 17px;align-items:center}.score-item small{display:block;font-size:9px;letter-spacing:1.5px;color:#c9d9d0a9}.score-item b{font:700 24px 'Barlow Condensed',sans-serif;letter-spacing:1px}.score-item b.accent{color:var(--lime)}
+#hints{position:absolute;left:25px;bottom:24px;max-width:520px;padding:13px 16px;font-size:11px;line-height:2;background:#0d211cc4}.key{display:inline-block;min-width:19px;text-align:center;color:#f4f7e6;border:1px solid #ffffff55;background:#ffffff1a;border-radius:4px;padding:0 5px;font-weight:700;margin:0 3px 0 8px}
+#hints .key:first-child{margin-left:0}#status{position:absolute;top:110px;left:50%;transform:translateX(-50%);font:700 12px 'DM Sans',sans-serif;letter-spacing:.5px;background:#0c2420bb;border:1px solid #ffffff21;border-radius:12px;padding:10px 16px;text-align:center;max-width:74vw;opacity:0;transition:opacity .25s}
+#status.show{opacity:1}#focusLabel{position:absolute;right:26px;bottom:28px;text-align:right;max-width:240px;padding:13px 16px;font-size:11px;line-height:1.75;background:#0d211cc7}.focusHeader{color:#d5f496;font:800 18px 'Barlow Condensed',sans-serif;letter-spacing:2px}.focusHeader.dim{color:#d9e0d8}
+#crosshair{position:absolute;left:50%;top:50%;width:23px;height:23px;transform:translate(-50%,-50%);opacity:0;transition:opacity .16s}#crosshair:before,#crosshair:after{content:'';position:absolute;inset:4px;border:1px solid var(--lime);border-radius:50%}#crosshair:after{inset:10px;background:var(--lime)}body.focus #crosshair,body.hatch-aim #crosshair{opacity:.86}body.focus #focusVignette{opacity:1}#focusVignette{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 40%,#06120e4a 115%);transition:opacity .23s}body.focus #crosshair:before,body.hatch-aim #crosshair:before{inset:0;border-color:#edf6d7b0;border-width:1px}body.focus #crosshair:after,body.hatch-aim #crosshair:after{inset:10px;background:#f3f6df;box-shadow:0 0 4px #eff7ea88}#aimState{position:absolute;top:calc(50% + 25px);left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:1.7px;color:#e6f3ceaa;text-shadow:0 1px 5px #0008;white-space:nowrap;opacity:0;transition:opacity .23s}body.focus #aimState,body.hatch-aim #aimState{opacity:1}
+#bubbleLayer{position:fixed;inset:0;pointer-events:none;overflow:hidden}.bubble{position:absolute;max-width:230px;transform:translate(-50%,-100%);background:#fcf9e9;color:#263632;font:700 12px/1.3 'DM Sans',sans-serif;border:2px solid #273c34;border-radius:12px 12px 12px 1px;padding:8px 11px;box-shadow:0 6px 22px #0004;text-align:center}.bubble i{display:block;font:600 9px/1.5 'DM Sans',sans-serif;color:#5b8273;margin-bottom:1px;font-style:normal;text-transform:uppercase;letter-spacing:1px}
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(120deg,#081512d9,#0a241fae 58%,#09261965);backdrop-filter:blur(5px);padding:15px;z-index:5;transition:opacity .25s}#start.hidden{pointer-events:none;opacity:0}.modal{width:min(590px,100%);padding:38px 42px 30px;background:#101f1ae8;box-shadow:0 16px 80px #0008;border:1px solid #ebf4d538;border-radius:16px}.eyebrow{color:#d1ee83;letter-spacing:3px;font-weight:700;font-size:10px}.modal h1{font:800 clamp(48px,9vw,83px)/.86 'Barlow Condensed',Impact,sans-serif;letter-spacing:1px;margin:15px 0 20px}.modal p{color:#cad6c8;font-size:13px;line-height:1.85;max-width:485px}.modal .intro{font-size:15px;color:#f1efd9}.startButton{pointer-events:auto;border:0;background:var(--lime);color:#13251c;padding:15px 24px;border-radius:6px;font:800 15px 'Barlow Condensed',sans-serif;letter-spacing:2px;cursor:pointer;margin:20px 0}.startButton:hover{background:#e9ffb8}.disclaimer{color:#b7c9c0aa;font-size:10px;line-height:1.65}.modalgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px 22px;padding-top:15px;border-top:1px solid #c8d0be2b;margin-top:14px;font-size:12px;color:#b5cec1}.modalgrid b{color:#fff}
+#reticleHint{position:absolute;left:50%;top:56%;transform:translateX(-50%);font-size:10px;letter-spacing:1px;color:#f5fae8;text-shadow:0 2px 6px #0008;opacity:0}body.focus #reticleHint,body.hatch-aim #reticleHint{opacity:.8}#graphics{position:absolute;top:92px;right:28px;display:flex;gap:8px;pointer-events:auto}.chip{border:1px solid #ffffff51;background:#13241cc9;color:#ecf4e4;padding:7px 10px;border-radius:6px;font-size:10px;cursor:pointer;backdrop-filter:blur(10px)}.chip:hover{background:#355745}
+/* Tapering Power, a limited hunt, and a time-limited heat rush. */
+.power-stat{min-width:78px}.powerTrack{width:92px;height:3px;background:#e1e9cb35;border-radius:8px;margin-top:4px;overflow:hidden}#powerFill{height:100%;width:0%;background:#d1ee83;transition:width .35s}
+#boostBadge{position:absolute;top:106px;right:28px;display:flex;align-items:center;gap:10px;padding:9px 13px;opacity:.70;transition:opacity .2s,box-shadow .2s}#boostBadge.active{opacity:1;border-color:#f4a054ba;box-shadow:0 0 19px #dc592944}.pepperIcon{font-size:21px;filter:saturate(1.2)}#boostBadge b{display:block;font:800 15px 'Barlow Condensed',sans-serif;letter-spacing:1.1px}#boostBadge small{font-size:9px;letter-spacing:.45px;color:#dcebc4}
+#graphics{top:164px}#fadeTimer{font-size:21px}#chiliCount{font-size:21px}
+@media(max-width:650px){#hudTop{padding:12px 9px;flex-wrap:wrap}.scores{gap:9px;flex-wrap:wrap}.score-item small{font-size:8px}.powerTrack{width:65px}#boostBadge{top:auto;bottom:124px;right:10px;padding:5px 8px}#graphics{top:140px;right:10px}}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#112822;color:#e9f8ca;font:700 20px 'Barlow Condensed';z-index:8;letter-spacing:2px}#loading.done{display:none}
+@media(max-width:650px){#hudTop{padding:12px 10px;flex-wrap:wrap}.brand{font-size:19px}.scores{gap:9px;padding:8px;flex-wrap:wrap}.score-item b{font-size:18px}#hints{left:10px;right:10px;bottom:10px;font-size:9px;line-height:1.6}#focusLabel{bottom:100px;right:10px}#graphics{top:146px;right:10px}.modal{padding:26px}}
+#helpToggle{position:fixed;bottom:21px;left:24px;z-index:4;background:#0e2c26dd;color:#f2f8e6;border:1px solid #cde7bb66;border-radius:7px;padding:10px 12px;font:800 11px 'DM Sans',sans-serif;cursor:pointer;pointer-events:auto}#hints{transition:opacity .2s,transform .2s;pointer-events:none}#hints.collapsed{opacity:0;transform:translateY(22px);visibility:hidden}#helpToggle{bottom:23px}
+#districtTag{position:fixed;top:76px;left:27px;color:#f7ffe9;text-shadow:0 2px 5px #000b;font:800 11px 'DM Sans',sans-serif;letter-spacing:2px;pointer-events:none}
+#shopHint{display:none;position:fixed;left:50%;bottom:115px;transform:translateX(-50%);padding:15px 19px;border:1px solid #f3df924e;border-radius:11px;background:#142722ed;color:#f6ebcd;max-width:510px;text-align:center;font-size:12px;z-index:3;pointer-events:none}#shopHint strong{font-family:'Barlow Condensed',sans-serif;font-size:20px;letter-spacing:1px}#shopHint div{margin-top:7px;color:#e4e2d5;line-height:1.7}
+#dangerOverlay{position:fixed;inset:0;background:#080f10de;z-index:11;display:grid;place-items:center}#dangerOverlay.hidden{display:none}#dangerCard{background:#1a2924;border:1px solid #deab655e;border-radius:15px;padding:36px;max-width:500px;text-align:center}#dangerCard h2{font:800 60px/1 'Barlow Condensed',sans-serif;color:#e6ebc6;margin:14px 0}#dangerCard p{font-size:14px;line-height:1.8;color:#d6d9cf}#dangerCard small{display:block;color:#9daa9e}
+@media(max-width:850px){.scores{gap:8px}.score-item b{font-size:18px}#districtTag{top:128px}}
+#infectionFill{height:100%;width:0%;background:#e6b265;transition:width .3s}
+.infection-stat{min-width:83px}#infectionScore{font-size:19px}
+#chewPanel{display:none;position:fixed;bottom:22%;left:50%;transform:translateX(-50%);padding:12px 18px;border:1px solid #e5e8be88;background:#132923eb;color:#ffe6ad;font:bold 13px Arial,sans-serif;letter-spacing:.8px;z-index:4;pointer-events:none}
+@media(max-width:1100px){.scores{gap:11px;padding:9px 11px}.score-item b{font-size:19px}}
+
+/* v1.4 adaptive HUD: gameplay signals stay visible even when panels are collapsed */
+#compass{position:fixed;top:110px;left:50%;transform:translateX(-50%);z-index:3;pointer-events:none;background:#10241ed9;border:1px solid #e2eac342;border-radius:18px;padding:6px 15px 5px;min-width:214px;text-align:center;color:#f2f8e7;box-shadow:0 7px 24px #0002}
+#compassTrack{height:17px;position:relative;overflow:hidden;white-space:nowrap;font:800 12px 'DM Sans',sans-serif;letter-spacing:1px}
+#compassLetters{display:block;position:absolute;left:50%;width:780px;transform:translateX(-50%);transition:none}
+#compassNeedle{position:absolute;left:50%;top:0;color:var(--lime);transform:translateX(-50%);text-shadow:0 0 5px #152c23;z-index:2;font-weight:900}
+#compassHeading{font:700 9px 'DM Sans',sans-serif;letter-spacing:1.2px;color:#d5e0d2}
+#hudDock{position:fixed;top:122px;left:15px;z-index:7;pointer-events:auto;display:flex;gap:5px;align-items:center}
+#hudDock button{font:700 10px 'DM Sans',sans-serif;color:#edf9db;background:#142a23e0;border:1px solid #d4edb75a;border-radius:5px;padding:6px 9px;cursor:pointer}
+#hudDock button:hover{background:#315345}
+#hudMode{color:#e8f5dbba;font-size:9px;letter-spacing:.5px;margin-left:4px;text-shadow:0 1px 3px #000}
+#hudChooser{position:fixed;top:155px;left:15px;z-index:7;background:#11271fee;color:#fff;border:1px solid #dde6c95c;border-radius:10px;padding:13px;display:none;box-shadow:0 10px 30px #0004;pointer-events:auto;min-width:190px}
+#hudChooser.open{display:block}
+#hudChooser label{display:flex;gap:8px;align-items:center;padding:5px 2px;font-size:11px;cursor:pointer}
+#hudChooser input{accent-color:#c9e884}
+#status{top:173px}
+body.hud-hide-stats #hudTop .scores,body.hud-hide-stats #hudTop .brand{visibility:hidden!important;pointer-events:none!important}
+body.hud-hide-hunt #boostBadge,body.hud-hide-hunt #focusLabel{visibility:hidden!important;pointer-events:none!important}
+body.hud-hide-help #hints,body.hud-hide-help #helpToggle{visibility:hidden!important;pointer-events:none!important}
+body.hud-hide-compass #compass{visibility:hidden!important}
+body.hud-hide-world #branchGuide,body.hud-hide-world #districtTag,body.hud-hide-world #status{visibility:hidden!important}
+body.hud-hide-settings #graphics{visibility:hidden!important;pointer-events:none!important}
+@media(max-width:850px){#compass{top:145px}#hudDock{top:180px}#hudChooser{top:215px}#status{top:236px}}
+/* v2.8: start screen always fits the window; start action never scrolls away. */
+#start{align-items:center;justify-content:center;padding:clamp(10px,2.5vh,22px);overflow:hidden;overscroll-behavior:contain}
+#start .modal{width:min(720px,100%);max-width:calc(100vw - 20px);height:auto;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);min-height:0;display:flex;flex-direction:column;padding:0;overflow:hidden;background:#12231eeF;border:1px solid #d8eac44f;border-radius:18px;box-shadow:0 22px 90px #000a;flex-shrink:1}
+#start .start-head{padding:clamp(14px,3vh,27px) clamp(17px,3.6vw,32px) 8px;flex:0 0 auto}
+#start .start-brand-row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+#start .eyebrow{font-size:10px;letter-spacing:2px}
+#start .start-build{font:700 9px 'DM Sans',Arial,sans-serif;letter-spacing:1.2px;color:#bbd1c8}
+#start h1{color:#f5f2df;font:800 clamp(37px,6.2vw,65px)/.95 'Barlow Condensed',Impact,Arial,sans-serif;letter-spacing:.6px;margin:11px 0 7px;white-space:normal}
+#start h1 span{white-space:nowrap}
+#start h1 .start-dot{color:#d1ee83}
+#start .start-subtitle{font-size:clamp(12px,1.6vw,14px);line-height:1.45;color:#e4f0e1;margin:0;max-width:620px}
+#start .start-scroll{padding:0 clamp(17px,3.6vw,32px) 8px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#8aaa7c66 transparent;min-height:0;flex:1 1 auto}
+#start .start-blurb{font-size:12px;line-height:1.55;color:#c3d4c9;margin:9px 0 12px;max-width:650px}
+#start .start-keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px;margin:12px 0 13px}
+#start .start-keys>div{display:flex;gap:9px;align-items:center;min-width:0;font:600 11px 'DM Sans',Arial,sans-serif;color:#ecf2e9}
+#start kbd{display:inline-block;background:#e4f5c416;color:#f7ffe9;border:1px solid #e2f6c351;border-bottom-color:#e4f7d078;border-radius:5px;padding:4px 6px;font:800 10px 'DM Sans',Arial,sans-serif;white-space:nowrap;min-width:30px;text-align:center}
+#start .start-details{background:#213a30a6;border:1px solid #b3d39d42;border-radius:9px;margin-top:6px;overflow:hidden}
+#start .start-details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:38px;padding:9px 12px;color:#dcf8b4;font:700 11px 'DM Sans',Arial,sans-serif}
+#start .start-details>summary::-webkit-details-marker{display:none}
+#start .start-details>summary:hover{background:#d1ee8310}
+#start .start-details[open] .start-chevron{transform:rotate(180deg)}
+#start .start-chevron{font-size:18px;line-height:1;transition:transform .2s}
+#start .start-detail-content{border-top:1px solid #c6debc28;padding:3px 14px 10px}
+#start .start-detail-content h2{font-size:11px;color:#e4f6b9;letter-spacing:.4px;margin:12px 0 4px}
+#start .start-detail-content p{font-size:11px;line-height:1.7;color:#d4ddd3;margin:0 0 6px;max-width:none}
+#start .start-detail-content kbd{font-size:9px;padding:2px 4px}
+#start .start-footer{flex:0 0 auto;border-top:1px solid #d6e8c52b;background:#0c1b16f5;padding:12px clamp(17px,3.6vw,32px) 13px;box-shadow:0 -5px 16px #08130f29}
+#start .startButton{margin:0;display:flex;justify-content:space-between;align-items:center;width:100%;min-height:49px;padding:12px 17px;background:#d1ee83;color:#15261b;font:800 17px 'Barlow Condensed',Impact,Arial,sans-serif;letter-spacing:1.8px;text-align:left;border-radius:8px;box-shadow:0 6px 20px #0003;touch-action:manipulation}
+#start .startButton:focus-visible{outline:3px solid white;outline-offset:3px}
+#start .startButton>span{font-size:24px;font-weight:500;line-height:1}
+#start .start-footer-notes{display:flex;gap:6px 18px;justify-content:space-between;flex-wrap:wrap;margin-top:8px;color:#b5c9ba;font-size:10px;line-height:1.35}
+@media(max-width:550px){#start .start-keys{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#start .start-head{padding-bottom:5px}#start .start-build{display:none}#start .start-footer{padding-top:9px;padding-bottom:10px}#start .start-blurb{margin:8px 0}#start h1{font-size:42px}}
+@media(max-height:535px){#start .start-head{padding-top:10px}#start h1{font-size:38px;margin:5px 0}#start .start-scroll{padding-bottom:2px}#start .start-blurb{margin:4px 0 8px}#start .start-footer{padding-top:7px;padding-bottom:8px}#start .start-footer-notes{display:none}}
+
+
+/* Recovery diagnostic visible only when explicitly enabled. */
+#spicyDiagnostic{position:fixed;left:15px;bottom:67px;z-index:9;pointer-events:none;padding:8px 10px;border-radius:7px;background:#0d1d19d9;color:#e6f6cb;font:11px/1.5 monospace;display:none;max-width:70vw;white-space:pre-line}
+#spicyDiagnostic.open{display:block}
+/* v5: warm paper, forest green, and pepper orange. Existing controls are retained. */
+:root{--lime:#dbf28a;--cream:#fff7e2}
+#start{background:linear-gradient(115deg,#102722e8,#10272296 55%,#273d262e);backdrop-filter:blur(2px)}
+#start .modal{border-radius:7px;border:1px solid #dce6b94a;background:linear-gradient(135deg,#18362df5,#11241ff7);box-shadow:0 30px 100px #061c1599}
+#start h1{font-size:clamp(60px,10vw,96px);letter-spacing:-1px;line-height:.84;color:#fff1d7;margin-top:19px}
+#start h1>span{color:#ddf391}#start .start-dot{color:#ee8056}
+#start .start-head{padding-top:27px}#start .start-subtitle{font-size:14px;color:#e1ddc4;margin-top:16px}
+#start .start-build{border:1px solid #edbb714a;border-radius:3px;color:#f0c699;letter-spacing:1.4px}
+.revival-strip{border-left:3px solid #e68b5e;padding:5px 0 5px 14px;margin:8px 0 17px;display:grid;gap:4px}
+.revival-strip>span{font:700 9px 'DM Sans',sans-serif;letter-spacing:2px;color:#d9b69a}
+.revival-strip>b{font:800 21px 'Barlow Condensed',sans-serif;letter-spacing:.8px;color:#f7ebce}
+.revival-strip>small{font-size:11px;color:#afc7b9}
+#start .startButton{border-radius:3px;min-height:53px}#start .start-keys{gap:8px}#start .start-keys>div{background:#e0edb407;border-color:#d2edbd26}
+body:not(.started) #hud,body:not(.started) #compass,body:not(.started) #hudDock,body:not(.started) #districtTag{visibility:hidden}
+.hudpanel{border-radius:6px;background:#122b24cb;border-color:#d7e6b630}.chip{border-radius:4px;font-weight:600}
+#graphics{max-width:380px;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+#graphicsPanel,#pauseShield{position:fixed;inset:0;z-index:24;display:grid;place-items:center;padding:18px;background:#071b15ba;backdrop-filter:blur(6px)}
+#graphicsPanel[hidden],#pauseShield[hidden]{display:none}
+.display-card{width:min(480px,100%);max-height:calc(100dvh - 36px);overflow:auto;background:#122c23;border:1px solid #d7e6b64d;padding:28px;border-radius:9px;box-shadow:0 20px 90px #0006;color:#f5ecd9}
+.display-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.display-top>button{border:1px solid #dcf0bd33;color:#edebd4;background:#ffffff09;border-radius:5px;width:32px;height:32px;cursor:pointer}
+.display-card h2{font:800 37px/.98 'Barlow Condensed',Impact,sans-serif;letter-spacing:.1px;margin:14px 0 25px}.display-card>label{display:block;font-size:12px;font-weight:700;margin:18px 0 8px}
+.display-card select{color:#f6eed9;background:#203e30;border:1px solid #b8d49f55;border-radius:5px;padding:12px;width:100%;font:500 13px 'DM Sans',sans-serif}
+.display-card .online-choice{display:flex;align-items:flex-start;gap:10px;margin:23px 0 14px}.online-choice input{accent-color:#d8ed8e;width:17px;height:17px}.online-choice small{display:block;color:#a4bcac;font-size:11px;font-weight:400;line-height:1.7;margin-top:5px}
+#assetStatus{font-size:11px;color:#dfebac;margin:18px 0 6px}#graphicsReadout{font-size:10px;color:#a9c2b0}.credits{font-size:10px;color:#b0c5b3;margin-top:23px;border-top:1px solid #aec3a42b;padding-top:12px}.credits summary{cursor:pointer}.credits p{line-height:1.65}.credits a{color:#e3efab}.display-note{font-size:10px;line-height:1.6;color:#a6bba9;margin-top:18px}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid #f3d28b;outline-offset:3px}
+@media(max-height:760px){#start .start-head{padding-top:16px}#start h1{font-size:64px}.revival-strip{margin-bottom:10px}.revival-strip>small{display:none}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+
+.river-start{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin-top:9px;border:1px solid #aabdb26b;background:#274c45;color:#f5e7c9;border-radius:4px;padding:12px 16px;cursor:pointer;font:800 15px 'Barlow Condensed',Arial,sans-serif;letter-spacing:1.2px}.river-start:hover{background:#346159}.river-start span{font:500 11px 'DM Sans',Arial,sans-serif;letter-spacing:0;color:#cbdcc7}
+@media(max-width:470px){.river-start{font-size:13px}.river-start span{font-size:10px}}
+</style>
+</head>
+<body>
+<div id="loading">GROWING THE NEIGHBORHOOD...</div>
+<canvas id="world" tabindex="0" aria-label="Spicy Rodents 3D game"></canvas><div id="focusVignette"></div>
+<div id="hud"><div id="hudTop"><div class="brand">SPICY<br>RODENTS<small>TOPEKA · OLD TOWN / PARK / HOSPITAL</small></div><div class="hudpanel scores"><div class="score-item power-stat"><small>POWER</small><b class="accent" id="score">0000</b><div class="powerTrack" aria-hidden="true"><div id="powerFill"></div></div></div><div class="score-item"><small>SUCCESSFUL BITES</small><b id="hits">0</b></div><div class="score-item"><small>HIDDEN CHILIS</small><b id="chiliCount">0 / 8</b></div><div class="score-item"><small>NEXT POWER FADE</small><b id="fadeTimer">10:00</b></div><div class="score-item"><small>SQUIRREL COINS</small><b id="coinScore">0</b></div><div class="score-item"><small>GOLD</small><b id="goldScore">0</b></div><div class="score-item infection-stat"><small>INFECTION</small><b id="infectionScore">0.0%</b><div class="powerTrack"><div id="infectionFill"></div></div></div><div class="score-item"><small>STATE</small><b id="evolution">FERAL</b></div></div></div>
+<div id="boostBadge" class="hudpanel"><span class="pepperIcon">🌶</span><div><b id="boostLabel">CHILI RUSH</b><small id="boostTime">FIND A HIDDEN PEPPER</small></div></div>
+<div id="graphics"><button class="chip" id="crowdBtn">NPC FLOW: DEMO</button><button class="chip" id="qualityBtn">GRAPHICS: AUTO</button><button class="chip" id="voiceBtn">VOICES: ON</button><button class="chip" id="graphicsBtn">G · DISPLAY</button></div>
+<div id="branchGuide" aria-live="polite" style="position:fixed;bottom:116px;left:50%;transform:translateX(-50%);z-index:8;max-width:min(560px,90vw);padding:8px 15px;border-radius:18px;background:#102b1abb;color:#edffd4;border:1px solid #c8f9a44d;box-shadow:0 4px 15px #10271c88;font-size:12px;letter-spacing:.45px;text-align:center;pointer-events:none;display:none"></div><div id="status" class="show">A rolling, connected neighborhood: climb, cross branches, and run the lines.</div><div id="crosshair"></div><div id="aimState">ESTIMATED LEAP / POUNCE PATH</div><div id="reticleHint">SPACE TO LEAP · LEFT CLICK TO POUNCE</div>
+<button id="helpToggle" type="button" aria-label="Toggle controls" title="Toggle controls">? CONTROLS</button><div id="hints" class="hudpanel"><span class="key">W A S D</span> Move <span class="key">SHIFT</span> Sprint <span class="key">SPACE</span> Leap <span class="key">E</span> Grab / selected branch <span class="key">A / D</span> Choose bough while climbing <span class="key">Q</span> Drop from route <span class="key">RIGHT MOUSE</span> First-person stalk <span class="key">LEFT CLICK</span> Pounce anytime <span class="key">ESC</span> Cursor <span class="key">P</span> Pause <span class="key">1 / 2 / 3</span> Fashion choice near sewer stand <span class="key">E HOLD</span> Chew vent <span class="key">SPACE / CLICK</span> Drop from upper hatch <span class="key">M</span> HUD all <span class="key">TAB</span> HUD mode <span class="key">K</span> HUD panels</div>
+<div id="focusLabel" class="hudpanel"><div class="focusHeader dim" id="focusHeader">SCOUTING</div><span id="scoutText">Find eight hidden, one-time chili peppers.<br>Hunt to build Power; it fades after ten minutes without a bite.</span></div></div>
+<div id="compass" aria-label="Camera compass"><div id="compassTrack"><span id="compassLetters"></span><span id="compassNeedle">▲</span></div><div id="compassHeading">N · 000°</div></div>
+<div id="hudDock"><button type="button" id="allHudBtn" title="M: show/hide panels">M · HUD</button><button type="button" id="hudCycleBtn" title="Tab: next layout">TAB · VIEW</button><button type="button" id="hudCustomBtn" title="K: choose panels">K · EDIT</button><span id="hudMode">FULL</span></div>
+<div id="hudChooser" aria-label="HUD visibility settings"><strong style="font:800 12px 'DM Sans',sans-serif">DISPLAY PANELS</strong>
+<label><input type="checkbox" data-hud="stats" checked>Power and scores</label>
+<label><input type="checkbox" data-hud="compass" checked>Compass</label>
+<label><input type="checkbox" data-hud="world" checked>Route and location tips</label>
+<label><input type="checkbox" data-hud="hunt" checked>Stalking and chili</label>
+<label><input type="checkbox" data-hud="help" checked>Controls reference</label>
+<label><input type="checkbox" data-hud="settings" checked>Graphics / voices</label>
+<small style="display:block;margin-top:8px;line-height:1.6;color:#e5eccc">M show/hide all · Tab presets · K edit · H controls</small></div>
+<div id="bubbleLayer"></div>
+<div id="districtTag" aria-live="polite">OLD TOWN</div>
+<div id="chewPanel" aria-live="polite"></div><div id="shopHint"><strong>🐿 SEWER FASHION STAND</strong><div id="shopDetails">Earn 150 total Squirrel Coins to unlock. Choose hat (1), jacket (2) or pants (3), then E to buy.</div></div>
+<div id="dangerOverlay" class="hidden"><div id="dangerCard"><div class="eyebrow">SPICY RODENTS</div><h2 id="dangerTitle">RUN OVER</h2><p id="dangerText"></p><button class="startButton" id="restartGame">RESTART RUN ↗</button><small>Your equipped clothing is saved on this browser.</small></div></div>
+<div id="start" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+  <div class="modal" role="document">
+    <header class="start-head">
+      <div class="start-brand-row"><div class="eyebrow">SPICY RODENTS · v5.4</div><span class="start-build">ORCHARD, BIRDS &amp; TRAFFIC</span></div>
+      <h1 id="startTitle">SPICY <span>RODENTS<span class="start-dot">.</span></span></h1>
+      <p class="start-subtitle">A little squirrel. A very big neighborhood. A whole lot of trouble.</p>
+    </header>
+    <div class="start-scroll" id="startInstructions">
+      <div class="revival-strip"><span>05.4 / LIVING TOWN</span><b>MORE LIFE ABOVE THE STREETS.</b><small>Apple trees, nesting birds, distant planes, and new traffic.</small></div><p class="start-blurb">Run through the streets, leap between trees and telephone wires, sneak up on people, and escape the neighbors who fight back. Explore the houses, park, cemetery, shops, estates, and hospital. Follow the eastern road past the shops to Willow River and Bellwether Quay: a stone bridge, riverside market, and an old town of timber-framed houses. Beyond the market, Bellwether Galleria has six walk-in shops, twin stairs to an upper gallery, collectible coins, and a wishing fountain. Walk through the automatic doors; press E beside the fountain to toss one Squirrel Coin. Look for apple trees and nests, birds in flight, and an occasional silent airplane with a short white trail. Dump trucks and RVs now travel the streets.</p>
+      <div class="start-keys" aria-label="Essential controls">
+        <div><kbd>W A S D</kbd><span>Move</span></div>
+        <div><kbd>SHIFT</kbd><span>Sprint</span></div>
+        <div><kbd>SPACE</kbd><span>Jump</span></div>
+        <div><kbd>MOUSE</kbd><span>Look</span></div>
+        <div><kbd>E</kbd><span>Grab / enter</span></div>
+        <div><kbd>CLICK</kbd><span>Pounce</span></div>
+      </div>
+      <details class="start-details" id="startHelp">
+        <summary>How to play, climbing &amp; more controls <span class="start-chevron" aria-hidden="true">⌄</span></summary>
+        <div class="start-detail-content">
+          <h2>Climbing &amp; movement</h2>
+          <p>Hold <kbd>W</kbd> as you approach a tree trunk, or press <kbd>E</kbd> beside it to grab on. Use <kbd>W</kbd>/<kbd>S</kbd> to climb or descend. Select branches and wire junctions with <kbd>A</kbd>/<kbd>D</kbd>, then press <kbd>E</kbd> to transfer. <kbd>Q</kbd> drops you from an elevated route.</p>
+          <h2>Stealth &amp; survival</h2>
+          <p>Hold the right mouse button to stalk, then left-click to pounce. Unaware people are easier to surprise. People may evade or defend themselves after an attack. Being run over by a moving vehicle ends your run; jump clear or travel above the street. <kbd>P</kbd> pauses the game.</p>
+          <h2>Places &amp; objectives</h2>
+          <p>Find eight hidden chili peppers for temporary speed boosts. Bites earn Power and Squirrel Coins; Power decays after long stretches without a bite. Sycamore Park and Cedar Rest Cemetery are north; the hospital is west of the park, while older homes, estates, stores, and other locations spread across town. Some doors, garages, and vents use <kbd>E</kbd>.</p>
+          <h2>Display &amp; sound</h2><p>Choose Golden Hour, Clear Day, or Blue Hour lighting in Display. Auto graphics adjusts detail to your device. Online detail adds bark textures, sky reflections and soft light bloom; the built-in world is always available.</p>
+          <p><kbd>M</kbd> toggles the HUD, <kbd>TAB</kbd> cycles layouts, <kbd>K</kbd> chooses visible panels, and <kbd>H</kbd> toggles the control legend; <kbd>C</kbd> recenters the camera; <kbd>L</kbd> shows diagnostics; <kbd>G</kbd> opens display settings. Use the VOICES button to mute or enable speech. <kbd>ESC</kbd> releases the mouse cursor.</p>
+        </div>
+      </details>
+    </div>
+    <footer class="start-footer">
+      <button type="button" class="startButton" id="playButton" aria-label="Start playing Spicy Rodents">START PLAYING <span aria-hidden="true">↗</span></button>
+      <button type="button" class="river-start" id="mallPlayButton">EXPLORE THE MALL <span>Shops, upper gallery &amp; coin fountain ↗</span></button>
+      <button type="button" class="river-start" id="riverPlayButton">EXPLORE THE RIVER <span>Bridge &amp; riverside old town ↗</span></button>
+      <div class="start-footer-notes"><span>Desktop mouse &amp; keyboard recommended</span><span>3D engine included · optional online detail</span></div>
+    </footer>
+  </div>
+</div>
+<section id="graphicsPanel" role="dialog" aria-modal="true" aria-labelledby="graphicsTitle" hidden>
+ <div class="display-card"><div class="display-top"><span class="eyebrow">MAKE YOURSELF AT HOME</span><button id="closeGraphics" aria-label="Close display settings">✕</button></div>
+ <h2 id="graphicsTitle">Your neighborhood.<br>Your atmosphere.</h2>
+ <label for="renderQuality">Graphics quality</label><select id="renderQuality"><option value="auto">Auto · adapts to your device</option><option value="high">High · balanced detail</option><option value="ultra">Ultra · sharper shadows</option><option value="performance">Performance · lighter rendering</option></select>
+ <label for="lightPreset">Time of day</label><select id="lightPreset"><option value="golden">Golden Hour</option><option value="daylight">Clear Day</option><option value="dusk">Blue Hour</option></select>
+ <label class="online-choice"><input id="onlineAssets" type="checkbox" checked><span>Online detail<small>Richer bark, sky reflections and soft bloom.<br>Built-in graphics stay available offline.</small></span></label>
+ <p id="assetStatus" role="status">Ready</p><small id="graphicsReadout"></small>
+ <details class="credits"><summary>Graphics credits</summary><p>Three.js r160 · MIT. Optional CC0 bark and sky assets by <a href="https://polyhaven.com" target="_blank" rel="noopener noreferrer">Poly Haven</a>. Fonts: Barlow Condensed &amp; DM Sans. The 3D engine is included in this file. Online detail downloads are optional.</p></details>
+ <p class="display-note">Close this panel, then click the world to look around.</p>
+ </div></section>
+<section id="pauseShield" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden><div class="display-card"><span class="eyebrow">TAKE A BREATHER</span><h2 id="pauseTitle">Your run is paused.</h2><p id="pauseMessage">The neighborhood will wait for you.</p><button id="resumeAfterBlur" class="startButton">BACK TO THE STREETS ↗</button></div></section>
+<script>
+(function(){
+ const indicator=document.getElementById('loading');
+ const info=document.createElement('div');
+ info.id='spicyBootError';
+ info.style.cssText='display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:520px;max-height:80vh;overflow:auto;width:90%;z-index:100000;padding:24px;background:#182722;color:#f6efdf;border:2px solid #d1ee83;border-radius:12px;box-shadow:0 15px 55px #000a;font:15px/1.6 Arial,sans-serif;text-align:left';
+ info.innerHTML='<strong style="font-size:23px">Spicy Rodents could not start</strong><p id="spicyBootReason" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 ui-monospace,monospace">An unexpected initialization problem occurred.</p><p style="font-size:12px;color:#cbd9c8">Try reloading. If this continues, please send the error message shown here.</p><button style="padding:9px 18px;cursor:pointer;border-radius:6px;border:0;background:#d1ee83;color:#102018" onclick="location.reload()">RELOAD GAME</button>';
+ document.body.appendChild(info);
+ function show(reason){
+   if(window.__spicyBootOk)return;
+   if(info.dataset.shown)return;info.dataset.shown='true';const msg=String(reason||'Unknown startup issue').slice(0,500);
+   document.getElementById('spicyBootReason').textContent=msg;
+   info.style.display='block';
+   if(indicator)indicator.style.display='none';
+ }
+ window.addEventListener('error',e=>{if(!window.__spicyBootOk){const place=e.filename?` (${e.filename.split('/').pop()}:${e.lineno||'?'}:${e.colno||'?'})`:'';show((e.message||'Failed to load a game script or 3D dependency.')+place+(e.error?.stack?'\n'+e.error.stack.split('\n').slice(0,5).join('\n'):''));}});
+ window.addEventListener('unhandledrejection',e=>{if(!window.__spicyBootOk)show((e.reason?.message||e.reason||'A game script was rejected.')+(e.reason?.stack?'\n'+e.reason.stack.split('\n').slice(0,5).join('\n'):''))});
+ setTimeout(()=>{if(!window.__spicyBootOk)show('The neighborhood is taking too long to initialize. Try reloading in a browser with WebGL enabled.')},30000);
+})();
+</script>
+<div id="spicyDiagnostic" role="status" aria-live="polite"></div>

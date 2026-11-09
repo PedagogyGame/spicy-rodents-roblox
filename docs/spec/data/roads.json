@@ -1,0 +1,1374 @@
+[
+ {
+  "id": "rd_001_grid_ns_x0",
+  "axis": "z",
+  "coord": 0,
+  "width": 18,
+  "start": -270,
+  "end": 270,
+  "kind": "asphalt",
+  "src_line": 572,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.055 over terrain; 104 terrain-following segments; central N-S street, flat (y=0) inside |z|<=104"
+ },
+ {
+  "id": "rd_002_sidewalk_x-12.1",
+  "axis": "z",
+  "coord": -12.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 573,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk (NPC sidewalk lane at same coord)"
+ },
+ {
+  "id": "rd_003_sidewalk_x12.1",
+  "axis": "z",
+  "coord": 12.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 573,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk (NPC sidewalk lane at same coord)"
+ },
+ {
+  "id": "rd_004_grid_ns_x-180",
+  "axis": "z",
+  "coord": -180,
+  "width": 18,
+  "start": -270,
+  "end": 270,
+  "kind": "asphalt",
+  "src_line": 572,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.055 over terrain; 104 terrain-following segments"
+ },
+ {
+  "id": "rd_005_sidewalk_x-192.1",
+  "axis": "z",
+  "coord": -192.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 573,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk (NPC sidewalk lane at same coord)"
+ },
+ {
+  "id": "rd_006_sidewalk_x-167.9",
+  "axis": "z",
+  "coord": -167.9,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 573,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk (NPC sidewalk lane at same coord)"
+ },
+ {
+  "id": "rd_007_grid_ns_x178",
+  "axis": "z",
+  "coord": 178,
+  "width": 18,
+  "start": -270,
+  "end": 270,
+  "kind": "asphalt",
+  "src_line": 572,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.055 over terrain; 104 terrain-following segments"
+ },
+ {
+  "id": "rd_008_sidewalk_x165.9",
+  "axis": "z",
+  "coord": 165.9,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 573,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk (NPC sidewalk lane at same coord)"
+ },
+ {
+  "id": "rd_009_sidewalk_x190.1",
+  "axis": "z",
+  "coord": 190.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 573,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk (NPC sidewalk lane at same coord)"
+ },
+ {
+  "id": "rd_010_grid_ew_z0",
+  "axis": "x",
+  "coord": 0,
+  "width": 18,
+  "start": -270,
+  "end": 270,
+  "kind": "asphalt",
+  "src_line": 576,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.055 over terrain; 104 terrain-following segments; residential arterial, continues east as the 26-wide commercial road from x=247"
+ },
+ {
+  "id": "rd_011_sidewalk_z-12.1",
+  "axis": "x",
+  "coord": -12.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 577,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_012_sidewalk_z12.1",
+  "axis": "x",
+  "coord": 12.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 577,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_013_grid_ew_z-174",
+  "axis": "x",
+  "coord": -174,
+  "width": 18,
+  "start": -270,
+  "end": 270,
+  "kind": "asphalt",
+  "src_line": 576,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.055 over terrain; 104 terrain-following segments"
+ },
+ {
+  "id": "rd_014_sidewalk_z-186.1",
+  "axis": "x",
+  "coord": -186.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 577,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_015_sidewalk_z-161.9",
+  "axis": "x",
+  "coord": -161.9,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 577,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_016_grid_ew_z171",
+  "axis": "x",
+  "coord": 171,
+  "width": 18,
+  "start": -270,
+  "end": 270,
+  "kind": "asphalt",
+  "src_line": 576,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.055 over terrain; 104 terrain-following segments"
+ },
+ {
+  "id": "rd_017_sidewalk_z158.9",
+  "axis": "x",
+  "coord": 158.9,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 577,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_018_sidewalk_z183.1",
+  "axis": "x",
+  "coord": 183.1,
+  "width": 3.3,
+  "start": -270,
+  "end": 270,
+  "kind": "concrete",
+  "src_line": 577,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.09 over terrain; 104 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_019_commercial_blvd",
+  "axis": "x",
+  "coord": 0,
+  "width": 26,
+  "start": 247,
+  "end": 681,
+  "kind": "asphalt",
+  "src_line": 638,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.065 over terrain; 95 terrain-following segments; widened commercial boulevard; amber centre dashes 7x0.13 every 15 from x=275 (skip |x-347|<=28); trolley rails at z=7.38/9.92"
+ },
+ {
+  "id": "rd_020_commercial_sidewalk_z-17.4",
+  "axis": "x",
+  "coord": -17.4,
+  "width": 3.3,
+  "start": 249,
+  "end": 679,
+  "kind": "concrete",
+  "src_line": 639,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.13 over terrain; 95 terrain-following segments; commercial sidewalk (NPC commercial lane)"
+ },
+ {
+  "id": "rd_021_commercial_sidewalk_z17.4",
+  "axis": "x",
+  "coord": 17.4,
+  "width": 3.3,
+  "start": 249,
+  "end": 679,
+  "kind": "concrete",
+  "src_line": 639,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.13 over terrain; 95 terrain-following segments; commercial sidewalk (NPC commercial lane)"
+ },
+ {
+  "id": "rd_022_commercial_cross_x347",
+  "axis": "z",
+  "coord": 347,
+  "width": 29,
+  "start": -215,
+  "end": 219,
+  "kind": "asphalt",
+  "src_line": 640,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.075 over terrain; 95 terrain-following segments; commercial cross street; white dashes 0.13x6 every 14 (skip |z|<=27); signals at its intersection with z=0; does NOT reach the z=283 road (gap z 219..277.5, inferred)"
+ },
+ {
+  "id": "rd_023_commercial_sidewalk_x329.5",
+  "axis": "z",
+  "coord": 329.5,
+  "width": 3.4,
+  "start": -212,
+  "end": 216,
+  "kind": "concrete",
+  "src_line": 641,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.135 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_024_commercial_sidewalk_x364.5",
+  "axis": "z",
+  "coord": 364.5,
+  "width": 3.4,
+  "start": -212,
+  "end": 216,
+  "kind": "concrete",
+  "src_line": 641,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.135 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_025_trolley_track",
+  "axis": "x",
+  "coord": 8.65,
+  "width": 2.54,
+  "start": 263,
+  "end": 675,
+  "kind": "rail",
+  "src_line": 7695,
+  "notes": "Heritage trolley track: two 0.12-wide metal ribbons at z=7.38 and z=9.92 (districtRibbon, offset 0.15, NOT registered as pavement) plus ties 0.14x2.82 every 3.2 from x=265; owned by street-vehicles extractor"
+ },
+ {
+  "id": "rd_026_trolley_stop_310",
+  "axis": "x",
+  "coord": 20.2,
+  "width": 1.95,
+  "start": 305.15,
+  "end": 314.85,
+  "kind": "concrete",
+  "src_line": 7700,
+  "notes": "Trolley stop pad box 9.7x0.12x1.95 at terrain+0.14 (not registered pavement)"
+ },
+ {
+  "id": "rd_027_trolley_stop_465",
+  "axis": "x",
+  "coord": 20.2,
+  "width": 1.95,
+  "start": 460.15,
+  "end": 469.85,
+  "kind": "concrete",
+  "src_line": 7700,
+  "notes": "Trolley stop pad box 9.7x0.12x1.95 at terrain+0.14 (not registered pavement)"
+ },
+ {
+  "id": "rd_028_trolley_stop_616",
+  "axis": "x",
+  "coord": 20.2,
+  "width": 1.95,
+  "start": 611.15,
+  "end": 620.85,
+  "kind": "concrete",
+  "src_line": 7700,
+  "notes": "Trolley stop pad box 9.7x0.12x1.95 at terrain+0.14 (not registered pavement)"
+ },
+ {
+  "id": "rd_029_fuel_apron",
+  "axis": "x",
+  "coord": 63,
+  "width": 39.85,
+  "start": 440.58,
+  "end": 512.43,
+  "kind": "concrete",
+  "src_line": 812,
+  "notes": "Fuel forecourt apron: grid of 8.85x7.85 panels (x 445..508 step 9, z 47..79 step 8) at terrain+0.08; not registered pavement"
+ },
+ {
+  "id": "rd_030_quay_approach",
+  "axis": "x",
+  "coord": 0,
+  "width": 16,
+  "start": 650,
+  "end": 744,
+  "kind": "asphalt",
+  "src_line": 13594,
+  "notes": "groundPatch at terrain+0.10 carrying the z=0 road to the bridge ramp (x=744); not in pavementZones (river district has its own surface rules); owned by Quay extractor"
+ },
+ {
+  "id": "rd_031_quay_approach_walk_z-11",
+  "axis": "x",
+  "coord": -11,
+  "width": 3.4,
+  "start": 650,
+  "end": 744,
+  "kind": "cobble",
+  "src_line": 13596,
+  "notes": "riverCobble groundPatch at terrain+0.13; owned by Quay extractor"
+ },
+ {
+  "id": "rd_032_quay_approach_walk_z11",
+  "axis": "x",
+  "coord": 11,
+  "width": 3.4,
+  "start": 650,
+  "end": 744,
+  "kind": "cobble",
+  "src_line": 13596,
+  "notes": "riverCobble groundPatch at terrain+0.13; owned by Quay extractor"
+ },
+ {
+  "id": "rd_033_stone_bridge",
+  "axis": "x",
+  "coord": 0,
+  "width": 15.6,
+  "start": 744,
+  "end": 956,
+  "kind": "cobble",
+  "src_line": 13756,
+  "notes": "Bridge ramps+deck: height riverDeckAt (8 -> 15.8 between x 744..790, flat 15.8 to 910, down to 8 at 956); |z|<=7.8; owned by Quay extractor"
+ },
+ {
+  "id": "rd_034_estate_connector_x0",
+  "axis": "z",
+  "coord": 0,
+  "width": 18,
+  "start": -329,
+  "end": -263,
+  "kind": "asphalt",
+  "src_line": 2557,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.07 over terrain; 95 terrain-following segments; connector from the grid x=0 street across the estate avenue to a stub at z=-329; white dashes 0.14x5.2 every 13 (z -322..-264)"
+ },
+ {
+  "id": "rd_035_estate_connector_sidewalk_x-12.1",
+  "axis": "z",
+  "coord": -12.1,
+  "width": 3.3,
+  "start": -329,
+  "end": -263,
+  "kind": "concrete",
+  "src_line": 2558,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.12 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_036_estate_connector_sidewalk_x12.1",
+  "axis": "z",
+  "coord": 12.1,
+  "width": 3.3,
+  "start": -329,
+  "end": -263,
+  "kind": "concrete",
+  "src_line": 2558,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.12 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_037_estate_avenue",
+  "axis": "x",
+  "coord": -305,
+  "width": 20,
+  "start": -258,
+  "end": 258,
+  "kind": "asphalt",
+  "src_line": 2559,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.07 over terrain; 95 terrain-following segments; estate avenue; dashes 7x0.15 every 19 from x=-246; only physically joined to the grid via x=0 (grid roads x=-180/178 end at z=-270, inferred gap)"
+ },
+ {
+  "id": "rd_038_estate_sidewalk_z-317.1",
+  "axis": "x",
+  "coord": -317.1,
+  "width": 3.5,
+  "start": -258,
+  "end": 258,
+  "kind": "concrete",
+  "src_line": 2560,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.12 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_039_estate_sidewalk_z-292.9",
+  "axis": "x",
+  "coord": -292.9,
+  "width": 3.5,
+  "start": -258,
+  "end": 258,
+  "kind": "concrete",
+  "src_line": 2560,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.12 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_040_estate0_drive",
+  "axis": "z",
+  "coord": -130,
+  "width": 9,
+  "start": -376.95,
+  "end": -328.05,
+  "kind": "concrete",
+  "src_line": 2762,
+  "notes": "Estate 0 paver drive: tiles #bfae9a 9x5.9 (z -331..-349 step 6) then 8.7x5.9 (centres z -350..-374 step 6; loop bound -379) at terrain+0.14; not registered; width 9 for the first 4 tiles, 8.7 for the last 5; drive spans z -376.95..-328.05"
+ },
+ {
+  "id": "rd_041_estate0_walk_guest",
+  "axis": "free",
+  "coord": null,
+  "width": 2.1,
+  "start": [
+   -130,
+   -402
+  ],
+  "end": [
+   -63,
+   -455
+  ],
+  "kind": "path",
+  "src_line": 2796,
+  "notes": "Estate 0 stepping-stone walk to guesthouse: 16 tiles 2.1x2.15"
+ },
+ {
+  "id": "rd_042_estate0_walk_court",
+  "axis": "free",
+  "coord": null,
+  "width": 2.1,
+  "start": [
+   -130,
+   -402
+  ],
+  "end": [
+   -177,
+   -490
+  ],
+  "kind": "path",
+  "src_line": 2796,
+  "notes": "Estate 0 stepping-stone walk to tennis court: 16 tiles 2.1x2.15"
+ },
+ {
+  "id": "rd_043_estate1_drive",
+  "axis": "z",
+  "coord": 130,
+  "width": 9,
+  "start": -376.95,
+  "end": -328.05,
+  "kind": "concrete",
+  "src_line": 2762,
+  "notes": "Estate 1 paver drive: tiles #c7c6b4 9x5.9 (z -331..-349 step 6) then 8.7x5.9 (centres z -350..-374 step 6; loop bound -379) at terrain+0.14; not registered; width 9 for the first 4 tiles, 8.7 for the last 5; drive spans z -376.95..-328.05"
+ },
+ {
+  "id": "rd_044_estate1_walk_guest",
+  "axis": "free",
+  "coord": null,
+  "width": 2.1,
+  "start": [
+   130,
+   -402
+  ],
+  "end": [
+   63,
+   -455
+  ],
+  "kind": "path",
+  "src_line": 2796,
+  "notes": "Estate 1 stepping-stone walk to guesthouse: 16 tiles 2.1x2.15"
+ },
+ {
+  "id": "rd_045_estate1_walk_court",
+  "axis": "free",
+  "coord": null,
+  "width": 2.1,
+  "start": [
+   130,
+   -402
+  ],
+  "end": [
+   177,
+   -490
+  ],
+  "kind": "path",
+  "src_line": 2796,
+  "notes": "Estate 1 stepping-stone walk to tennis court: 16 tiles 2.1x2.15"
+ },
+ {
+  "id": "rd_046_north_access_x175",
+  "axis": "z",
+  "coord": 175,
+  "width": 12.5,
+  "start": 233,
+  "end": 422,
+  "kind": "asphalt",
+  "src_line": 3308,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.12 over terrain; 95 terrain-following segments; leaves the grid at its north edge (overlaps grid road x=178 from z=233) and runs to the park/cemetery split; the only paved link from the grid to the z=283 road (grid x=-180 and x=0 end at z=270, inferred 7.5-unit gaps)"
+ },
+ {
+  "id": "rd_047_north_access_sidewalk_x165",
+  "axis": "z",
+  "coord": 165,
+  "width": 2.8,
+  "start": 248,
+  "end": 421,
+  "kind": "concrete",
+  "src_line": 3309,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.17 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_048_north_access_sidewalk_x185",
+  "axis": "z",
+  "coord": 185,
+  "width": 2.8,
+  "start": 248,
+  "end": 421,
+  "kind": "concrete",
+  "src_line": 3309,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.17 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_049_north_cross_z283",
+  "axis": "x",
+  "coord": 283,
+  "width": 11,
+  "start": -241,
+  "end": 651,
+  "kind": "asphalt",
+  "src_line": 3311,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.14 over terrain; 95 terrain-following segments; northern cross road between park (z>296) and grid; tan dashes 6x0.12 at x=-220,-176,...,602 (skip |x-175|<=24)"
+ },
+ {
+  "id": "rd_050_north_cross_sidewalk_z273.7",
+  "axis": "x",
+  "coord": 273.7,
+  "width": 2.2,
+  "start": -241,
+  "end": 650,
+  "kind": "concrete",
+  "src_line": 3313,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.18 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_051_north_cross_sidewalk_z292.3",
+  "axis": "x",
+  "coord": 292.3,
+  "width": 2.2,
+  "start": -241,
+  "end": 650,
+  "kind": "concrete",
+  "src_line": 3313,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.18 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_052_park_path_0_0",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   -216,
+   320
+  ],
+  "end": [
+   -132,
+   336
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 0 seg 0: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_053_park_path_0_1",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   -132,
+   336
+  ],
+  "end": [
+   -56,
+   355
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 0 seg 1: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_054_park_path_1_0",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   -56,
+   355
+  ],
+  "end": [
+   11,
+   329
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 1 seg 0: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_055_park_path_1_1",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   11,
+   329
+  ],
+  "end": [
+   106,
+   312
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 1 seg 1: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_056_park_path_2_0",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   -56,
+   355
+  ],
+  "end": [
+   -15,
+   411
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 2 seg 0: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_057_park_path_2_1",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   -15,
+   411
+  ],
+  "end": [
+   98,
+   414
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 2 seg 1: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_058_park_path_3_0",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   -203,
+   409
+  ],
+  "end": [
+   -137,
+   376
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 3 seg 0: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_059_park_path_3_1",
+  "axis": "free",
+  "coord": null,
+  "width": 3.2,
+  "start": [
+   -137,
+   376
+  ],
+  "end": [
+   -56,
+   355
+  ],
+  "kind": "path",
+  "src_line": 3356,
+  "notes": "Sycamore Park path 3 seg 1: pavedSegment, single flat plank box (0.12 thick) at centre-terrain+0.12, colour #bcae90; NOT terrain-following along its length and NOT registered pavement"
+ },
+ {
+  "id": "rd_060_park_footbridge",
+  "axis": "x",
+  "coord": 371,
+  "width": 4.3,
+  "start": -122.6,
+  "end": -108.4,
+  "kind": "path",
+  "src_line": 3368,
+  "notes": "Pond footbridge: 11 wooden planks 1.25x4.3 at terrain+0.65 (bridge route at +0.78)"
+ },
+ {
+  "id": "rd_061_cemetery_path_0",
+  "axis": "free",
+  "coord": null,
+  "width": 5.5,
+  "start": [
+   451,
+   307
+  ],
+  "end": [
+   447,
+   333
+  ],
+  "kind": "path",
+  "src_line": 3514,
+  "notes": "Cedar Rest cemetery drive seg 0: pavedSegment colour #b4aea1 (flat plank box, not registered)"
+ },
+ {
+  "id": "rd_062_cemetery_path_1",
+  "axis": "free",
+  "coord": null,
+  "width": 5.5,
+  "start": [
+   447,
+   333
+  ],
+  "end": [
+   464,
+   356
+  ],
+  "kind": "path",
+  "src_line": 3514,
+  "notes": "Cedar Rest cemetery drive seg 1: pavedSegment colour #b4aea1 (flat plank box, not registered)"
+ },
+ {
+  "id": "rd_063_cemetery_path_2",
+  "axis": "free",
+  "coord": null,
+  "width": 5.5,
+  "start": [
+   464,
+   356
+  ],
+  "end": [
+   484,
+   394
+  ],
+  "kind": "path",
+  "src_line": 3514,
+  "notes": "Cedar Rest cemetery drive seg 2: pavedSegment colour #b4aea1 (flat plank box, not registered)"
+ },
+ {
+  "id": "rd_064_cemetery_path_3",
+  "axis": "free",
+  "coord": null,
+  "width": 5.5,
+  "start": [
+   484,
+   394
+  ],
+  "end": [
+   513,
+   411
+  ],
+  "kind": "path",
+  "src_line": 3514,
+  "notes": "Cedar Rest cemetery drive seg 3: pavedSegment colour #b4aea1 (flat plank box, not registered)"
+ },
+ {
+  "id": "rd_065_hospital_road_z283",
+  "axis": "x",
+  "coord": 283,
+  "width": 12,
+  "start": -417,
+  "end": -238,
+  "kind": "asphalt",
+  "src_line": 3809,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.14 over terrain; 95 terrain-following segments; westward continuation of the z=283 road to the hospital"
+ },
+ {
+  "id": "rd_066_hospital_sidewalk_z273.5",
+  "axis": "x",
+  "coord": 273.5,
+  "width": 2.7,
+  "start": -421,
+  "end": -238,
+  "kind": "concrete",
+  "src_line": 3810,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.18 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_067_hospital_sidewalk_z292.5",
+  "axis": "x",
+  "coord": 292.5,
+  "width": 2.7,
+  "start": -421,
+  "end": -238,
+  "kind": "concrete",
+  "src_line": 3810,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.18 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_068_hospital_drive",
+  "axis": "z",
+  "coord": -356,
+  "width": 8,
+  "start": 284,
+  "end": 305,
+  "kind": "asphalt",
+  "src_line": 3811,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.16 over terrain; 95 terrain-following segments; hospital entrance driveway to the -Z doors"
+ },
+ {
+  "id": "rd_069_hospital_drive_sidewalk_x-362.5",
+  "axis": "z",
+  "coord": -362.5,
+  "width": 1.7,
+  "start": 283,
+  "end": 306,
+  "kind": "concrete",
+  "src_line": 3812,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.2 over terrain; 95 terrain-following segments; driveway sidewalk"
+ },
+ {
+  "id": "rd_070_hospital_drive_sidewalk_x-349.5",
+  "axis": "z",
+  "coord": -349.5,
+  "width": 1.7,
+  "start": 283,
+  "end": 306,
+  "kind": "concrete",
+  "src_line": 3812,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.2 over terrain; 95 terrain-following segments; driveway sidewalk"
+ },
+ {
+  "id": "rd_071_westside_street",
+  "axis": "z",
+  "coord": -289,
+  "width": 15,
+  "start": -244,
+  "end": 267,
+  "kind": "asphalt",
+  "src_line": 9882,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.19 over terrain; 95 terrain-following segments; Westside street (WEST_X); ends at z=267, ~10 units short of the hospital road z=283 (inferred gap); a darker westAsphalt material is declared but unused"
+ },
+ {
+  "id": "rd_072_westside_sidewalk_x-299",
+  "axis": "z",
+  "coord": -299,
+  "width": 2.5,
+  "start": -249,
+  "end": 272,
+  "kind": "concrete",
+  "src_line": 9883,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.23 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_073_westside_sidewalk_x-279",
+  "axis": "z",
+  "coord": -279,
+  "width": 2.5,
+  "start": -249,
+  "end": 272,
+  "kind": "concrete",
+  "src_line": 9883,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.23 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_074_westside_connector",
+  "axis": "x",
+  "coord": -179,
+  "width": 12,
+  "start": -296,
+  "end": -176,
+  "kind": "asphalt",
+  "src_line": 9884,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.18 over terrain; 95 terrain-following segments; connector: effectively extends the grid z=-174 street west (offset 5) to the Westside street"
+ },
+ {
+  "id": "rd_075_westside_connector_sidewalk_z-187",
+  "axis": "x",
+  "coord": -187,
+  "width": 2.1,
+  "start": -299,
+  "end": -178,
+  "kind": "concrete",
+  "src_line": 9885,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.2 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_076_westside_connector_sidewalk_z-171",
+  "axis": "x",
+  "coord": -171,
+  "width": 2.1,
+  "start": -299,
+  "end": -178,
+  "kind": "concrete",
+  "src_line": 9885,
+  "notes": "registered pavement (pavementZones; drives outdoorSurfaceAt/pavementDistance); vertical offset +0.2 over terrain; 95 terrain-following segments; sidewalk"
+ },
+ {
+  "id": "rd_077_core0_front_walk",
+  "axis": "z",
+  "coord": -56,
+  "width": 2.7,
+  "start": -45.21,
+  "end": -16,
+  "kind": "concrete",
+  "src_line": 1279,
+  "notes": "Core house 0 front walk (box at y=0.14) from front wall to z=+-16; ~2.25 grass gap to the sidewalk edge at +-13.75 (inferred)"
+ },
+ {
+  "id": "rd_078_core1_front_walk",
+  "axis": "z",
+  "coord": 51,
+  "width": 2.7,
+  "start": -50.8,
+  "end": -16,
+  "kind": "concrete",
+  "src_line": 1279,
+  "notes": "Core house 1 front walk (box at y=0.14) from front wall to z=+-16; ~2.25 grass gap to the sidewalk edge at +-13.75 (inferred)"
+ },
+ {
+  "id": "rd_079_core2_front_walk",
+  "axis": "z",
+  "coord": -53,
+  "width": 2.7,
+  "start": 16,
+  "end": 42.8,
+  "kind": "concrete",
+  "src_line": 1279,
+  "notes": "Core house 2 front walk (box at y=0.14) from front wall to z=+-16; ~2.25 grass gap to the sidewalk edge at +-13.75 (inferred)"
+ },
+ {
+  "id": "rd_080_core3_front_walk",
+  "axis": "z",
+  "coord": 58,
+  "width": 2.7,
+  "start": 16,
+  "end": 48.62,
+  "kind": "concrete",
+  "src_line": 1279,
+  "notes": "Core house 3 front walk (box at y=0.14) from front wall to z=+-16; ~2.25 grass gap to the sidewalk edge at +-13.75 (inferred)"
+ },
+ {
+  "id": "rd_081_core0_driveway",
+  "axis": "z",
+  "coord": -73,
+  "width": 5.3,
+  "start": -53,
+  "end": -27,
+  "kind": "concrete",
+  "src_line": 1289,
+  "notes": "Core house 0 driveway (#b6b5a8, 6 joint lines); stops ~13 short of the sidewalk (inferred)"
+ },
+ {
+  "id": "rd_082_core1_driveway",
+  "axis": "z",
+  "coord": 68,
+  "width": 5.3,
+  "start": -59,
+  "end": -33,
+  "kind": "concrete",
+  "src_line": 1289,
+  "notes": "Core house 1 driveway (#b6b5a8, 6 joint lines); stops ~13 short of the sidewalk (inferred)"
+ },
+ {
+  "id": "rd_083_core2_driveway",
+  "axis": "z",
+  "coord": -70,
+  "width": 5.3,
+  "start": 25,
+  "end": 51,
+  "kind": "concrete",
+  "src_line": 1289,
+  "notes": "Core house 2 driveway (#b6b5a8, 6 joint lines); stops ~13 short of the sidewalk (inferred)"
+ },
+ {
+  "id": "rd_084_core3_driveway",
+  "axis": "z",
+  "coord": 75,
+  "width": 5.3,
+  "start": 30,
+  "end": 56,
+  "kind": "concrete",
+  "src_line": 1289,
+  "notes": "Core house 3 driveway (#b6b5a8, 6 joint lines); stops ~13 short of the sidewalk (inferred)"
+ },
+ {
+  "id": "rd_085_outer00_walk",
+  "axis": "x",
+  "coord": -69,
+  "width": 2.3,
+  "start": -176,
+  "end": -135,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 0 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_086_outer01_walk",
+  "axis": "x",
+  "coord": -67,
+  "width": 2.3,
+  "start": -217,
+  "end": -184,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 1 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_087_outer02_walk",
+  "axis": "x",
+  "coord": -125,
+  "width": 2.3,
+  "start": -217,
+  "end": -184,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 2 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_088_outer03_walk",
+  "axis": "z",
+  "coord": -123.75,
+  "width": 2.3,
+  "start": -209,
+  "end": -178,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 3 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_089_outer04_walk",
+  "axis": "z",
+  "coord": -59.25,
+  "width": 2.3,
+  "start": -215,
+  "end": -178,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 4 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_090_outer05_walk",
+  "axis": "z",
+  "coord": 65,
+  "width": 2.3,
+  "start": -208,
+  "end": -178,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 5 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_091_outer06_walk",
+  "axis": "z",
+  "coord": 142.5,
+  "width": 2.3,
+  "start": -207,
+  "end": -178,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 6 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_092_outer07_walk",
+  "axis": "z",
+  "coord": 220,
+  "width": 2.3,
+  "start": -170,
+  "end": -136,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 7 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_093_outer08_walk",
+  "axis": "x",
+  "coord": -52,
+  "width": 2.3,
+  "start": 182,
+  "end": 216,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 8 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_094_outer09_walk",
+  "axis": "x",
+  "coord": -67,
+  "width": 2.3,
+  "start": 124,
+  "end": 174,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 9 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_095_outer10_walk",
+  "axis": "x",
+  "coord": 74,
+  "width": 2.3,
+  "start": 127,
+  "end": 174,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 10 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_096_outer11_walk",
+  "axis": "x",
+  "coord": 81,
+  "width": 2.3,
+  "start": 182,
+  "end": 211,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 11 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_097_outer12_walk",
+  "axis": "z",
+  "coord": 220,
+  "width": 2.3,
+  "start": 142,
+  "end": 167,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 12 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_098_outer13_walk",
+  "axis": "z",
+  "coord": 135.25,
+  "width": 2.3,
+  "start": 175,
+  "end": 207,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 13 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_099_outer14_walk",
+  "axis": "z",
+  "coord": 51.75,
+  "width": 2.3,
+  "start": 175,
+  "end": 216,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 14 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_100_outer15_walk",
+  "axis": "z",
+  "coord": -59,
+  "width": 2.3,
+  "start": 175,
+  "end": 213,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 15 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_101_outer16_walk",
+  "axis": "z",
+  "coord": -135.5,
+  "width": 2.3,
+  "start": 175,
+  "end": 204,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 16 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_102_outer17_walk",
+  "axis": "z",
+  "coord": -212,
+  "width": 2.3,
+  "start": 140,
+  "end": 167,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 17 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_103_outer18_walk",
+  "axis": "x",
+  "coord": 67,
+  "width": 2.3,
+  "start": -209,
+  "end": -184,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 18 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_104_outer19_walk",
+  "axis": "x",
+  "coord": 77,
+  "width": 2.3,
+  "start": -176,
+  "end": -128,
+  "kind": "concrete",
+  "src_line": 2148,
+  "notes": "Outer home 19 walkway box at house base_y+0.055 (not terrain-following); runs from the house centre to 4 units short of the nearest grid road centreline, so it overlaps that road's asphalt edge"
+ },
+ {
+  "id": "rd_105_old0_drive",
+  "axis": "x",
+  "coord": -219.38,
+  "width": 4.2,
+  "start": -359.4,
+  "end": -303.9,
+  "kind": "concrete",
+  "src_line": 9949,
+  "notes": "Westside old house 0 single-car drive: 12 overlapping tiles 4.9x4.2 (#aba89d) at terrain+0.16, step 4.6"
+ },
+ {
+  "id": "rd_106_old1_drive",
+  "axis": "x",
+  "coord": -157.94,
+  "width": 4.2,
+  "start": -352.9,
+  "end": -297.4,
+  "kind": "concrete",
+  "src_line": 9949,
+  "notes": "Westside old house 1 single-car drive: 12 overlapping tiles 4.9x4.2 (#aba89d) at terrain+0.16, step 4.6"
+ },
+ {
+  "id": "rd_107_old2_drive",
+  "axis": "x",
+  "coord": -96.5,
+  "width": 4.2,
+  "start": -349.4,
+  "end": -293.9,
+  "kind": "concrete",
+  "src_line": 9949,
+  "notes": "Westside old house 2 single-car drive: 12 overlapping tiles 4.9x4.2 (#aba89d) at terrain+0.16, step 4.6"
+ },
+ {
+  "id": "rd_108_old3_drive",
+  "axis": "x",
+  "coord": -36.38,
+  "width": 4.2,
+  "start": -357.9,
+  "end": -302.4,
+  "kind": "concrete",
+  "src_line": 9949,
+  "notes": "Westside old house 3 single-car drive: 12 overlapping tiles 4.9x4.2 (#aba89d) at terrain+0.16, step 4.6"
+ },
+ {
+  "id": "rd_109_old4_drive",
+  "axis": "x",
+  "coord": 25.06,
+  "width": 4.2,
+  "start": -354.4,
+  "end": -298.9,
+  "kind": "concrete",
+  "src_line": 9949,
+  "notes": "Westside old house 4 single-car drive: 12 overlapping tiles 4.9x4.2 (#aba89d) at terrain+0.16, step 4.6"
+ },
+ {
+  "id": "rd_110_old5_drive",
+  "axis": "x",
+  "coord": 86.5,
+  "width": 4.2,
+  "start": -347.9,
+  "end": -292.4,
+  "kind": "concrete",
+  "src_line": 9949,
+  "notes": "Westside old house 5 single-car drive: 12 overlapping tiles 4.9x4.2 (#aba89d) at terrain+0.16, step 4.6"
+ },
+ {
+  "id": "rd_111_old6_drive",
+  "axis": "x",
+  "coord": 146.62,
+  "width": 4.2,
+  "start": -359.4,
+  "end": -303.9,
+  "kind": "concrete",
+  "src_line": 9949,
+  "notes": "Westside old house 6 single-car drive: 12 overlapping tiles 4.9x4.2 (#aba89d) at terrain+0.16, step 4.6"
+ },
+ {
+  "id": "rd_112_police_pad_-525",
+  "axis": "z",
+  "coord": -525,
+  "width": 9,
+  "start": -88.5,
+  "end": -73.5,
+  "kind": "concrete",
+  "src_line": 10067,
+  "notes": "Police patrol parking pad 9x15 with a parked cruiser"
+ },
+ {
+  "id": "rd_113_police_pad_-495",
+  "axis": "z",
+  "coord": -495,
+  "width": 9,
+  "start": -88.5,
+  "end": -73.5,
+  "kind": "concrete",
+  "src_line": 10067,
+  "notes": "Police patrol parking pad 9x15 with a parked cruiser"
+ },
+ {
+  "id": "rd_114_police_slab",
+  "axis": "x",
+  "coord": -107,
+  "width": 31,
+  "start": -533,
+  "end": -487,
+  "kind": "concrete",
+  "src_line": 10057,
+  "notes": "Police station slab 46x31 (building plinth)"
+ },
+ {
+  "id": "rd_115_westside_fuel_slab",
+  "axis": "x",
+  "coord": 229,
+  "width": 25,
+  "start": -414,
+  "end": -380,
+  "kind": "concrete",
+  "src_line": 10098,
+  "notes": "Westside Fuel forecourt slab 34x25 (local y 0.1)"
+ },
+ {
+  "id": "rd_116_westside_storage_slab",
+  "axis": "x",
+  "coord": 213,
+  "width": 79,
+  "start": -560,
+  "end": -466,
+  "kind": "concrete",
+  "src_line": 10160,
+  "notes": "Westside Storage slab 94x79"
+ }
+]

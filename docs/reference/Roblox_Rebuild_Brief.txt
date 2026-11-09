@@ -1,0 +1,391 @@
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+  Spicy Rodents — Roblox Rebuild Brief
+  This is the complete brief for the coding and Blender session. Build the whole game in one
+  pass. Do not ship a walkable-town-first milestone; every role below must be test-playable
+  from the first runnable build.
+
+
+
+  1. Source of truth
+         Canonical spec: Spicy_Rodents_v5_4_Living_Town.html , SHA-256
+          fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227 . It is live
+         at pedagogygame.com and in the GitHub Pages repo.
+         v5.4 is a clean superset of v5.2: 46 functions added, none removed. It contains the
+         Bellwether Galleria mall (v5.3) and apple trees, bird nests, town birds, silent
+         overflights, heavy vehicles, and fatal traffic (v5.4).
+         The HTML is the reference for layout, climbing routes, traffic lanes, districts, and
+         mechanics. The Roblox build is a from-scratch rewrite in Luau that reproduces and
+         extends it; it does not transpile it.
+         Lost in earlier HTML lineage and to be restored here: nut caches, deer, foxes,
+         butterflies, garden insects.
+
+
+  2. Toolchain and repository
+         Rojo project under git, one repo, Roblox Studio syncing from the filesystem. No zip
+         handoffs.
+         Blender for all character and prop assets, exported as FBX with animations, imported
+         via the Studio animation importer.
+         Code organized by concern, one module per system, under
+         ReplicatedStorage/Shared , ServerScriptService/Server ,
+          StarterPlayerScripts/Client :
+
+                  WorldGen — builds the town from data, never from hand-placed parts
+
+                  Routes — climbing route registry (trees, poles, wires, rooftops)
+                  Traffic — lanes, vehicles, yielding, swept collision
+
+                  Actors — the single actor model (section 4)
+                  Roles — hierarchy, queue, promotion ladder
+
+                  Infection — bite, spread, cure, win condition
+
+
+
+
+                                                                                            Page 1 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+                  Hospital , Police , Drone — job systems
+                  Seasons — in-game calendar, winter
+
+                  Foraging — gardens, feeders, trash, hollows, nut meter
+                  Wildlife — fox, deer, birds, insects
+         The town is a data file: a list of lots, each with a type, footprint, facing, and lot-specific
+         parameters. Adding a barber shop later must be a data entry, not surgery.
+          StreamingEnabled on. The map is several thousand studs end to end at the chosen
+         scale.
+         Scale: HTML units to studs at roughly 2.5. Squirrel stands about 1.2 studs at the
+         shoulder; humans standard R15 height.
+
+
+  3. The world
+
+  Districts (from v5.4, all retained)
+         Old town core with streets, sidewalks, houses, utility poles and wires, trees
+         Hospital (west) — expanded, see section 8
+         Police station — expanded, see section 9
+         Riverside old town across the river (east): stone arch bridge, cobbled quays, rooftops
+         Bellwether Galleria mall (far east): six shops, upper gallery, coin fountain, interior
+         lighting and camera constraints
+         Sewer and duct interiors, house interiors
+
+
+  Neighborhood expansion (new)
+  The town should read as a real society, not a backdrop. Add, as data-driven lots:
+
+         Restaurants: roughly double the current count. Mix of diner, pizza, taco, Chinese, café,
+         bakery, ice cream, bar and grill, each with outdoor seating or a back-alley dumpster
+         (foraging value).
+         Barber shop, music store, hardware store, laundromat, bookshop, pet store, gas
+         station, corner grocery, school with playground, church, park with gazebo, community
+         garden, a small marina on the ocean side.
+         Residential variety: at least eight distinct house models (bungalow, two-storey,
+         Victorian, ranch, split-level, cottage, apartment block, large older house), and every
+         individual house gets its own flair through paint, trim, porch, roof, and yard variants so
+
+
+
+                                                                                                   Page 2 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+         no two read the same. Backyards with gardens, bird feeders, sheds, fences, dog
+         houses.
+         Each lot type defines what squirrels can forage there and how risky it is.
+
+
+  Backdrop
+  The drone role sees the whole town from above, so the backdrop must hold up at altitude,
+  not just from squirrel height.
+
+         One side: mountains falling to rolling hills and plains, with tree line, a distant road, and
+         fog layering.
+         Other side: ocean with a beach, pier, marina, and a horizon that reads correctly from
+         300 studs up.
+         Sky with a full day cycle: sunrise and sunset as their own graphic moments, clouds,
+         the silent overflights from v5.4, and a genuinely beautiful night sky with stars, and a
+         moon that runs through real phases tied to the in-game calendar (new, waxing, full,
+         waning over a roughly 29.5-day lunar month), never a permanent full moon. A radio or
+         cell tower in the distance with blinking red lights, placed to silhouette against the
+         sunset.
+
+
+  Hollow trees
+         11 hollow trees across the town, each a claimable squirrel territory with a nut meter.
+         Two premium trees have an interior pathway running up the entire center of the trunk,
+         with chambers at several heights, and sit next to the best gardens and bird feeders.
+         The other nine have a single hollow chamber reachable from a knothole.
+
+
+  4. The actor model (hard architectural rule)
+  There is no distinction in code between a player character and an NPC. There is one kind
+  of actor per species (human, squirrel, fox, deer), and the only question is who is driving it:
+  the AI brain or a player's controller.
+
+         Every human and squirrel in the town is AI-driven by default.
+         A player joining takes control of an existing actor mid-stride. A player leaving hands
+         control back and the AI carries on.
+         Promotion in the queue is the same handoff: release one body, possess another.
+
+
+
+
+                                                                                                 Page 3 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+         This single mechanism implements the queue, NPC backfill, role switching, and
+         session reset.
+         The town always has more human bodies than the 35 player slots, because the
+         hospital, police station, shops, and streets need to be staffed and walked regardless
+         of player count.
+
+
+  5. Server population
+         Max players 50 (Roblox default). Target population per server: 35 humans, 7 squirrels,
+         1 spicy rodent. Any slot not held by a player is AI.
+         Squirrel population may float between 10 and 14 actors; 7 is the player-slot count, not
+         the body count.
+         Optional voluntary roles, chosen instead of a promotion: deer (several slots), fox (one
+         slot, Easter egg; see section 11).
+         Limited server count so that a real queue exists for the spicy rodent slot.
+
+
+  6. Roles and the promotion ladder
+  State this ladder in one place in code ( Roles ), and nowhere else.
+
+     1. Human, lowest level. Walks the town. Earns credits by working. Can be bitten.
+     2. Hospital staff (5 player slots) and Police (5 player slots, expandable to 8). Hospital
+         ranks slightly above police; privileges are nearly equal.
+     3. Regular squirrel (7 player slots). Forages, stores nuts, claims a hollow.
+     4. Spicy rodent (1 slot). The zombie squirrel. The role everyone wants.
+
+  Movement between rungs:
+
+         Base rank among humans = time logged in and playing on this server, modified by job
+         credits.
+         Squirrel rank = 90% nut count, 10% momentary stink-gland percentage. The highest-
+         ranked squirrel becomes the next spicy rodent when the slot opens.
+         When the spicy rodent dies (run over, killed by police or hospital staff, etc.), that
+         player restarts as a lowest-level human.
+         A human who kills the spicy rodent is promoted to the lowest-rank uninfected squirrel
+         if a squirrel body is free; otherwise to the police station, or to the hospital if the
+         rodent had infected more than 30% of the town.
+
+
+
+
+                                                                                                 Page 4 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+         Hospital staff who kill the spicy rodent when it enters the hospital instantly become a
+         lowest-rank uninfected squirrel.
+         A regular squirrel cannot kill the spicy rodent; it can only be infected by it.
+         A regular squirrel that gets infected loses heavily (points and nuts) and drops in the
+         queue.
+         Squirrels that die in winter restart as humans.
+         Deer and fox are side exits a player may choose instead of a promotion; leaving them
+         returns the player to human at their previous human rank.
+
+
+  7. Squirrel play
+
+  Movement
+  Port the v5.4 route registry: curves, sampled points, kind (branch, pole, wire, lookout,
+  roof), speed, surface radius, and the per-route visualOffset . Climbing is rail-based as in
+  the HTML, with free running on the ground and leaps between rails.
+
+
+  Animation (Blender)
+  Seven individually authored clips on a single rig:
+
+     1. Run
+     2. Climb
+     3. Wire traversal
+     4. Leap
+     5. Pounce
+     6. Bite dance
+     7. Sneak (stalk)
+
+  The squirrel must have weight and presence: fur that catches light, muscle under the skin,
+  a tail that lags the body. This is a modelling and rigging requirement, not a lighting one.
+  Treat the three-stacked-spheres squirrel from the HTML as a placeholder to be replaced
+  entirely.
+
+
+  Foraging and territory
+         Sources: gardens, bird feeders (risky — birds and homeowners), trash cans and
+         restaurant dumpsters, apple trees, the mall plaza.
+
+
+
+                                                                                                Page 5 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+         Nuts stored in a claimed hollow raise its meter. Above 70%, the squirrel owns the tree
+         and other squirrels cannot take its nuts.
+         Premium gardens and feeders near the two big hollow trees can be raided about once
+         per in-game week.
+
+
+  Stink gland
+  A slow-filling meter that counts for 10% of rank. It can only be fired at 95% or above,
+  which is hard to reach, and firing it drops the meter by 30 points. The burst repels foxes
+  and humans briefly.
+
+
+  8. Spicy rodent play
+         Stalk (hold), pounce, bite as in v5.4. Unaware people are easier.
+         Biting humans infects them; biting regular squirrels raises town-wide infection rate.
+         Fatal traffic from v5.4 ports as a relative swept collision test on the server, not a
+         Touched event. Being run over ends the spicy rodent's run.
+         Hidden win path: infecting hospital staff slows cures. Critical mass of infection wins
+         the session for the rodent. Do not surface this in the UI; let players discover it.
+         Session resets when everyone is infected.
+
+
+  Combat dynamics
+  The fight between rodent and human is a real duel, not a single pounce. Build these as
+  tunable systems:
+
+         Timing: a pounce has a wind-up, a commit point, and a recovery; biting during the
+         human's reaction window lands, biting into a raised arm or a kick does not.
+         Approach: zig-zag movement raises the human's miss chance but costs speed; a
+         straight sprint is fast and readable.
+         Feint: a pretend lunge that forces the human to flinch or swing early, opening a real
+         window. Feints cost stamina and, if read correctly, hand the human a free hit.
+         Humans respond: flinch, swing, kick, back away, or flee, chosen by awareness and
+         nerve. Vigilantes never flee.
+         Every option that shows off should carry a trade-off, so psyching out a human is a skill,
+         not a free win.
+
+
+
+
+                                                                                                 Page 6 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+  Vigilantes
+  8% of all human actors on the map at any moment have a vigilante streak. On sighting the
+  spicy rodent they move to kick it rather than evade, and they answer the drone's call.
+
+
+  Health and house defenders
+         The spicy rodent has a health meter. A kick does not kill; roughly two kicks without
+         proper recovery do. Health regenerates slowly while sneaking or resting in a hollow.
+         Three houses have a defender who bursts out when the rodent chases someone
+         inside: two older housewives (different demographic appearances) with rolling pins,
+         one man with a broom. Their blows hit 50% harder, so one blow at low health kills.
+
+
+  House interiors
+         40 houses have full interiors the rodent can burst into. Humans can run inside and
+         hide; whether they escape or get bitten depends on the chase. This must actually run
+         and be tested, not be stubbed.
+         These 40 houses are also the homes a human player can claim (35 player slots, so
+         there is slack). Each real day of play earns remodel points; remodels persist for the life
+         of that server instance.
+
+
+  9. Hospital
+  Needs far more elaboration than the HTML. Build it as a real building: reception, triage,
+  two wards, an isolation ward, pharmacy, staff room, ambulance bay, roof access (a squirrel
+  route).
+
+         Infected humans are delivered or walk in. Staff disinfect them through a short
+         interaction loop at treatment stations.
+         Hospital performance = speed of disinfection. Good performance raises staff rank
+         and unlocks station upgrades.
+         Staff can kill the spicy rodent if it enters the building (section 6 reward).
+         Infected staff cure slower, feeding the hidden win path.
+
+
+
+  10. Police
+         Five officer player slots at start. Officers pursue and can kill the spicy rodent.
+
+
+
+
+                                                                                              Page 7 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+         Good performance unlocks additional officers one at a time up to eight total; later
+         officers are more aggressive and better coordinated.
+         At eight officers, the next upgrade unlocks a drone: one player flies it. Full flight
+         controls, camera feed, a spot-and-mark ability that reveals the spicy rodent to
+         officers for a short window and calls nearby vigilante neighbors to the spot. Make this
+         as good as it can be; it is the role that justifies the backdrop.
+
+
+  11. Wildlife and voluntary roles
+         Fox: one player slot, Easter egg. Hunts regular squirrels; cannot harm the spicy rodent.
+         Repelled by the stink gland.
+         Deer: several player slots. Peaceful, wanders, can be startled by traffic and the drone.
+         Purely for players who want it.
+         AI-only: birds and nests (from v5.4), butterflies, garden insects, and restored deer
+         and foxes when no player holds them.
+
+
+  12. Seasons
+         In-game calendar. A week is the raid cycle for premium gardens. Time scale is one
+         tunable constant (real seconds per in-game day); pick a sensible default and tune it in
+         playtest. Rough targets mentioned: a winter cycle every 50 real minutes or so, with
+         visible day and night.
+         Every five in-game weeks, winter arrives and lasts one week: snow, bare trees,
+         dimmer light, reduced foraging.
+         At winter's end, squirrels whose hollow meter is below the survival threshold die and
+         restart as humans, opening squirrel slots.
+
+
+  13. Credits and upgrades
+         Humans earn credits by working: hospital, police, and shop jobs.
+         Credits raise rank in the queue toward the squirrel and spicy rodent slots and buy the
+         station upgrades in sections 9 and 10.
+
+
+
+
+                                                                                               Page 8 of 9
+Spicy Rodents — Roblox Rebuild Brief
+
+
+
+
+  14. Deliverables
+         A runnable Roblox place with every role above test-playable: human, hospital staff,
+         police, drone, regular squirrel, spicy rodent, fox, deer.
+         Blender source files and exported FBX for the squirrel (rigged, seven clips), human
+         variants, fox, deer, and key props.
+         The town data file with every lot, including the full restaurant and shop expansion.
+         A short README describing the module layout and how to add a lot type, a route, or a
+         role.
+
+
+
+
+                                                                                            Page 9 of 9
+
