@@ -280,7 +280,7 @@ def leap(rig, n=24):
         0: dict(bob=0.0, surge=0.0, pitch=0.0, arch=0.12, hy=0.0, hz=0.0, hp=0.2, ht=0.15, fy=0.0, fz=0.0, fp=0.78, ft=0.15, tl=0.0, head=-0.08, ear=0.0),
         5: dict(bob=-0.13, surge=0.04, pitch=0.06, arch=0.3, hy=-0.06, hp=0.15, fy=0.04, fp=1.0, tl=-0.35, head=0.04, ear=-0.2),
         9: dict(bob=0.08, surge=-0.1, pitch=-0.28, arch=-0.32, hy=0.42, hz=0.05, hp=1.45, ht=0.1, fy=-0.36, fz=0.32, fp=2.1, ft=0.6, tl=-0.1, head=-0.16, ear=-0.5),
-        14: dict(bob=0.12, surge=-0.12, pitch=-0.06, arch=-0.36, hy=0.62, hz=0.22, hp=1.6, ht=0.5, fy=-0.46, fz=0.36, fp=1.1, ft=0.2, tl=0.35, head=-0.06, ear=-0.55),
+        14: dict(bob=0.12, surge=-0.12, pitch=-0.06, arch=-0.36, hy=0.62, hz=0.22, hp=1.6, ht=0.5, fy=-0.46, fz=0.36, fp=1.1, ft=0.2, tl=-0.05, head=-0.06, ear=-0.55),
         19: dict(bob=0.05, surge=-0.06, pitch=0.16, arch=0.0, hy=0.2, hz=0.3, hp=1.1, ht=0.6, fy=-0.34, fz=0.08, fp=0.55, ft=0.05, tl=0.1, head=0.02, ear=-0.4),
         23: dict(bob=-0.04, surge=0.0, pitch=0.07, arch=0.16, hy=-0.04, hz=0.04, hp=0.4, ht=0.15, fy=-0.06, fz=0.0, fp=0.95, ft=0.15, tl=-0.05, head=-0.06, ear=-0.1),
     })

@@ -536,6 +536,10 @@ class TreeBuilder:
         prof = r_tip + (r_base - r_tip) * (1 - u) ** 1.25
         collar = 1 + ((0.25 if cat == "apple" else 0.55) * np.exp(-s / max(coll, 0.3)) if on_trunk else 0.0)
         radii = prof * collar
+        if on_trunk:
+            # inside the trunk the bough stays thinner than the trunk and centred on the rail (no open
+            # tube end or collar lip may show outside the bark), then blends to the feet construction
+            radii = np.minimum(radii, 0.82 * rt + 0.55 * s)
         # the feet line (rail + lift) is the tube's top generator at any slope: centre = feet - r * up_perp,
         # up_perp = world up made perpendicular to the tangent (continued through vertical stretches)
         T = norm(np.gradient(Q, axis=0))
@@ -551,6 +555,10 @@ class TreeBuilder:
             prev = u
         ups = np.array(ups)
         centers = Q + Y[None] * lift - ups * radii[:, None]
+        if on_trunk:
+            w = np.clip(s / (1.3 * rt), 0.0, 1.0)
+            w = (w * w * (3 - 2 * w))[:, None]
+            centers = Q + w * (centers - Q)
         rng = self.rng
         wob_ph = rng.random() * 6.28
 
@@ -562,7 +570,7 @@ class TreeBuilder:
         circ = 2 * math.pi * r_base
         u_rep = max(1, int(round(circ / 4.0)))
         v_tile = circ / u_rep * 1.3
-        V, F, UV, N = tube(centers, radius, sides, u_rep, v_tile, cap_end=True)
+        V, F, UV, N = tube(centers, radius, sides, u_rep, v_tile, cap_end=True, cap_start=True)
         self.bark.add(V, F, UV, N)
         # tunnel above the rail where the squirrel's body is (feet = rail + lift)
         self.add_tunnel_polyline(P, 2.5, lift_up=lift + 0.9)

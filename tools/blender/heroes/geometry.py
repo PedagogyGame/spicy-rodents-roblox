@@ -219,7 +219,7 @@ def _dijkstra(adj, sources, targets, wv):
     return []
 
 
-def unwrap_parts(obj, face_part, cuts, margin=0.004):
+def unwrap_parts(obj, face_part, cuts, margin=0.004, hard_kind=None):
     """Seams on part boundaries plus cuts, then an angle-based unwrap (holes filled virtually),
     islands scaled to equal texel density and packed.
     face_part: int per face (-1 = leave alone, e.g. claws: they are separate islands anyway).
@@ -269,14 +269,41 @@ def unwrap_parts(obj, face_part, cuts, margin=0.004):
                 e.seam = True
     bm.to_mesh(me)
     bm.free()
+    # unwrap and pack the skin only; the closed hard parts (claws, teeth, hooves: part -1) are solid
+    # colours and go into reserved blocks along the right edge of the atlas
+    hard = np.asarray(face_part) < 0
     bl.select_only([obj])
+    me.polygons.foreach_set("select", ~hard)
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.select_mode(type="FACE")
     bpy.ops.uv.unwrap(method="ANGLE_BASED", fill_holes=True, correct_aspect=True, margin=margin)
     bpy.ops.uv.average_islands_scale()
     bpy.ops.uv.pack_islands(rotate=True, margin=margin)
     bpy.ops.object.mode_set(mode="OBJECT")
+    uv = np.empty(len(me.loops) * 2, dtype=np.float32)
+    me.uv_layers.active.data.foreach_get("uv", uv)
+    uv = uv.reshape(-1, 2)
+    ls = np.empty(len(me.polygons), dtype=np.int64)
+    me.polygons.foreach_get("loop_start", ls)
+    lt = np.empty(len(me.polygons), dtype=np.int64)
+    me.polygons.foreach_get("loop_total", lt)
+    loop_face = np.repeat(np.arange(len(me.polygons)), lt)
+    skin = ~hard[loop_face]
+    uv[skin] *= RESERVE  # leave a strip at u > RESERVE for the hard parts
+    kind = hard_kind if hard_kind is not None else np.zeros(len(me.polygons), dtype=np.int32)
+    for k, (u0, v0) in HARD_BLOCKS.items():
+        sel = np.nonzero(hard & (kind == k))[0]
+        for f in sel:
+            n = lt[f]
+            for j in range(n):
+                a = 2 * np.pi * j / n
+                uv[ls[f] + j] = (u0 + 0.004 * np.cos(a), v0 + 0.004 * np.sin(a))
+    me.uv_layers.active.data.foreach_set("uv", uv.reshape(-1))
     return nseam
+
+
+RESERVE = 0.972
+HARD_BLOCKS = {1: (0.986, 0.985), 2: (0.986, 0.955), 0: (0.986, 0.925)}  # claw/hoof, tooth, other
 
 
 def smooth_labels(obj, labels, iters=3):

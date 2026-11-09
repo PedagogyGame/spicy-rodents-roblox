@@ -157,7 +157,7 @@ def quadruped_uv(lo, W, bone_names):
     for leg in ("FrontL", "FrontR", "BackL", "BackR"):
         cuts.append((P[leg], ring(P[leg], P["torso"]), lowest(0.02), inner))
     cuts.append((P["tail"], ring(P["tail"], P["torso"], 0.5), farthest_back, ventral))
-    return geometry.unwrap_parts(lo, fl, cuts)
+    return geometry.unwrap_parts(lo, fl, cuts, hard_kind=kind)
 
 
 def separate_pattern(lo):

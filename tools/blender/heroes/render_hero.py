@@ -215,7 +215,7 @@ def main(argv):
         for clip, info in clips.items():
             if only and clip not in only:
                 continue
-            view = info.get("view", [-28, 8])
+            view = info.get("view", [-14, 6])
             for k, f in enumerate(info["key_frames"]):
                 set_action(arm, f"{clip}", f)
                 c = Vector(info.get("center", list(center + Vector((0, 0, 0.12)))))

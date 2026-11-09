@@ -56,7 +56,7 @@ def poses(d, tag, out, scale=1.0, meta=None):
             sheet.paste(im, (x, r * h))
             if c < len(keys):
                 dr.text((x + 6, r * h + 4), f"f{keys[c] - 1}  {(keys[c] - 1) / 30:.2f}s", fill=(250, 250, 250), font=f2)
-    sheet.save(out, optimize=True)
+    sheet.save(out, quality=86, optimize=True) if out.endswith(".jpg") else sheet.save(out, optimize=True)
     return out
 
 
@@ -73,7 +73,7 @@ def turntable(d, tag, out, cols=4, scale=0.5):
         im = Image.open(f).convert("RGB").resize((w, h), Image.LANCZOS)
         sheet.paste(im, ((i % cols) * w, (i // cols) * h))
         dr.text(((i % cols) * w + 6, (i // cols) * h + 4), f"{i * 360 // len(files)} deg", fill=(240, 240, 240), font=font(14))
-    sheet.save(out, optimize=True)
+    sheet.save(out, quality=86, optimize=True) if out.endswith(".jpg") else sheet.save(out, optimize=True)
     return out
 
 

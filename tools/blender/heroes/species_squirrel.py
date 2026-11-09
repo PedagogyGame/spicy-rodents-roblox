@@ -258,7 +258,8 @@ def hard_parts(variant="squirrel"):
     return out
 
 
-BUDGET = {"body_tris": 7300, "cards_tris": 6000, "rodent_cards_tris": 3000}
+# RigSpec budgets: squirrel 13,000 tris (body + claws/teeth ~7.7k, cards 4.6k, eyes 0.45k), rodent 11,000
+BUDGET = {"body_tris": 7100, "cards_tris": 4600, "rodent_cards_tris": 2200}
 # RootPart: the puppet's hidden root block (PuppetSpec: 0.66 x 0.66 x 1.4 st at hip height 0.9)
 ROOT_PART = ((0.0, 0.0, 0.9), (0.33, 0.7, 0.33))
 HIP_HEIGHT = 0.9
