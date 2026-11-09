@@ -1167,8 +1167,8 @@ local function backOfHouse(kit: any, root: any)
 				collide = false,
 			}
 		)
-		if k % 2 == 1 then
-			kit:light(tube, "PointLight", { Range = 20, Brightness = 1.0, Color = { 236, 246, 255 } })
+		if k % 2 == 1 or x < 0 then
+			kit:light(tube, "PointLight", { Range = 20, Brightness = 1.1, Color = { 236, 246, 255 } })
 		end
 	end
 	local sign = kit:box(

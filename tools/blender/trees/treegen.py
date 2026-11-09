@@ -468,7 +468,7 @@ class TreeBuilder:
         circ = 2 * math.pi * R0
         u_rep = max(2, int(round(circ / 4.5)))
         v_tile = circ / u_rep * 1.3
-        sides = 16 if R0 > 2.4 else (14 if R0 > 1.6 else 12)
+        sides = 14 if R0 > 2.4 else 12
         V, F, UV, N = tube(C, radius, sides, u_rep, v_tile, start_normal=[1.0, 0.0, 0.0], cap_end=True, v0=0.0)
         self.bark.add(V, F, UV, N)
         self.trunk_mesh = (V, F)
@@ -516,10 +516,21 @@ class TreeBuilder:
         prof = r_tip + (r_base - r_tip) * (1 - u) ** 1.25
         collar = 1 + ((0.25 if cat == "apple" else 0.55) * np.exp(-s / max(coll, 0.3)) if on_trunk else 0.0)
         radii = prof * collar
-        tq = np.gradient(Q, axis=0)
-        cos_t = np.sqrt(tq[:, 0] ** 2 + tq[:, 2] ** 2) / np.maximum(np.linalg.norm(tq, axis=1), 1e-9)
-        r_vert = radii / np.maximum(cos_t, 0.45)
-        centers = Q + np.array([0.0, 1.0, 0.0])[None] * (lift - r_vert)[:, None]
+        # the feet line (rail + lift) is the tube's top generator at any slope: centre = feet - r * up_perp,
+        # up_perp = world up made perpendicular to the tangent (continued through vertical stretches)
+        T = norm(np.gradient(Q, axis=0))
+        Y = np.array([0.0, 1.0, 0.0])
+        ups = []
+        prev = None
+        for t in T:
+            u = Y - t * np.dot(Y, t)
+            if np.linalg.norm(u) < 0.15 and prev is not None:
+                u = prev - t * np.dot(prev, t)
+            u = norm(u)
+            ups.append(u)
+            prev = u
+        ups = np.array(ups)
+        centers = Q + Y[None] * lift - ups * radii[:, None]
         rng = self.rng
         wob_ph = rng.random() * 6.28
 
@@ -841,7 +852,7 @@ class TreeBuilder:
             self.build_apples()
 
     def leaf_budget(self):
-        return {"giant": 11500, "named": 10000, "estate": 9000, "outer": 6500, "apple": 2800}.get(self.cat, 8000) * (0.45 if self.sp == "willow" else 1.0)
+        return {"giant": 10000, "named": 8200, "estate": 7800, "outer": 5800, "apple": 2600}.get(self.cat, 8000) * (0.45 if self.sp == "willow" else 1.0)
 
     def build_twigs(self):
         """Branchlets from the boughs (or the leader) into the lower and outer clumps."""
@@ -863,7 +874,7 @@ class TreeBuilder:
         owner = np.array(owner)
         tris = 0
         made = 0
-        cap = 30 if self.cat in ("giant", "named", "estate") else 20
+        cap = 24 if self.cat in ("giant", "named", "estate") else 16
         for (ctr, r, d, li) in sorted(self.clump_info, key=lambda a: a[2][1]):
             if made >= cap:
                 break

@@ -158,7 +158,7 @@ def main():
             "parts": info["parts"], "tris": info["tris"],
             "checks": {
                 "trunkRadiusMaxAbsErr": info.get("checks", {}).get("trunk", {}).get("bark_minus_gameplay_radius_st", {}).get("max_abs"),
-                "boughTopP95AbsErr": info.get("checks", {}).get("boughs", {}).get("bark_top_minus_feet_st", {}).get("p95_abs"),
+                "boughFeetToBarkP95": info.get("checks", {}).get("boughs", {}).get("feet_to_bark_surface_st", {}).get("p95_abs"),
                 "leafTunnelMinMargin": info.get("checks", {}).get("leaves", {}).get("min_tunnel_margin_st"),
             },
         })

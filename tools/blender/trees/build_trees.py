@@ -222,16 +222,17 @@ def alignment_checks(tb, bark_obj):
             elif sv < 4.0:  # inside the trunk / collar
                 continue
             feet = p + np.array([0, lift, 0])
-            origin = feet + np.array([0, 1.5, 0])
-            hit = bvh.ray_cast(to_b(origin), Vector((0, 0, -1)), 4.0)
             n += 1
-            if hit[0] is None:
+            near = bvh.find_nearest(to_b(feet), 6.0)
+            if near[0] is None:
                 misses += 1
                 continue
-            hy = hit[0][2]
-            berrs.append(hy - feet[1])
+            # signed: + when the feet float above the bark, - when they sink into it
+            dvec = to_b(feet) - near[0]
+            sign = 1.0 if dvec.dot(near[1]) >= 0 else -1.0
+            berrs.append(sign * near[3])
     berrs = np.array(berrs) if berrs else np.zeros(1)
-    out["boughs"] = {"samples": n, "misses": misses, "bark_top_minus_feet_st": {"mean": round(float(berrs.mean()), 3),
+    out["boughs"] = {"samples": n, "misses": misses, "feet_to_bark_surface_st": {"mean": round(float(berrs.mean()), 3),
                      "max_abs": round(float(np.abs(berrs).max()), 3), "p95_abs": round(float(np.percentile(np.abs(berrs), 95)), 3)}}
     # leaves vs tunnels (clump centres): minimum clearance margin
     if tb.clumps:
@@ -534,7 +535,7 @@ def main(argv):
         line = {k: info[k] for k in ("index", "label", "tris")}
         if "checks" in info:
             line["trunkErr"] = info["checks"]["trunk"]["bark_minus_gameplay_radius_st"]["max_abs"]
-            line["boughErr"] = info["checks"]["boughs"]["bark_top_minus_feet_st"]["p95_abs"]
+            line["boughErr"] = info["checks"]["boughs"]["feet_to_bark_surface_st"]["p95_abs"]
             line["boughMiss"] = info["checks"]["boughs"]["misses"]
         print(json.dumps(line), flush=True)
         summary.append(info)

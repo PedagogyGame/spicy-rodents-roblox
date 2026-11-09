@@ -1,0 +1,287 @@
+{
+ "$schema": "art/trees v1",
+ "src": "tools/blender/trees (build_trees.py geometry + textures, upload_trees.py upload). Procedural Blender only.",
+ "units": "studs, Roblox axes (+Y up). pivot = the tree's root on the ground (data/harvest/trees.json root x 2.5).",
+ "placement": "InsertService:LoadAsset(assetId) returns a Model with MeshParts named as in `parts` (each with a SurfaceAppearance). parts[name].center is that MeshPart's bounding-box centre relative to the pivot (identity rotation), so place a tree with: for each MeshPart p, p.Anchored = true, p.CFrame = CFrame.new(pivot + center). Bark carries the climbing surfaces (trunk radius = the squirrel's tapered radius, bough tops = rail + lift); leaves and apples should be CanCollide/CanQuery false.",
+ "partRoles": {
+  "Bark": "trunk, roots, boughs, bridges, twigs, lookout pads (collide)",
+  "LeavesShade": "under-canopy clumps (no collide)",
+  "LeavesMid": "mid clumps (no collide)",
+  "LeavesSun": "sunlit top clumps, willow curtains (no collide)",
+  "Apples": "fruit (no collide)"
+ },
+ "count": 3,
+ "trees": [
+  {
+   "index": 0,
+   "label": "BUR OAK",
+   "species": "oak",
+   "category": "named",
+   "assetId": "131089684511311",
+   "displayName": "SR tree 000 BUR OAK",
+   "moderation": "Approved",
+   "trunkRoute": 220,
+   "routes": [
+    220,
+    221,
+    224,
+    225,
+    227,
+    223,
+    226,
+    228,
+    222,
+    229,
+    230
+   ],
+   "pivot": [
+    -85.0,
+    0.0,
+    -82.5
+   ],
+   "parts": {
+    "Bark": {
+     "center": [
+      -1.737,
+      31.544,
+      -4.5
+     ],
+     "size": [
+      107.027,
+      69.088,
+      91.612
+     ]
+    },
+    "LeavesShade": {
+     "center": [
+      -0.681,
+      48.806,
+      -4.629
+     ],
+     "size": [
+      122.389,
+      38.518,
+      95.334
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -7.308,
+      60.575,
+      3.692
+     ],
+     "size": [
+      114.297,
+      41.992,
+      122.035
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -7.783,
+      64.571,
+      7.574
+     ],
+     "size": [
+      119.093,
+      43.097,
+      117.273
+     ]
+    }
+   },
+   "tris": {
+    "bark": 3934,
+    "leaves_shade": 1780,
+    "leaves_mid": 2300,
+    "leaves_sun": 4350,
+    "fruit": 0,
+    "total": 12364
+   },
+   "checks": {
+    "trunkRadiusMaxAbsErr": 0.165,
+    "boughFeetToBarkP95": 0.181,
+    "leafTunnelMinMargin": 0.212
+   }
+  },
+  {
+   "index": 1,
+   "label": "AMERICAN ELM",
+   "species": "elm",
+   "category": "named",
+   "assetId": null,
+   "displayName": null,
+   "moderation": null,
+   "trunkRoute": 231,
+   "routes": [
+    231,
+    237,
+    238,
+    232,
+    233,
+    234,
+    235,
+    236,
+    239,
+    240
+   ],
+   "pivot": [
+    80.0,
+    0.0,
+    -92.5
+   ],
+   "parts": {
+    "Bark": {
+     "center": [
+      7.035,
+      36.357,
+      -0.399
+     ],
+     "size": [
+      117.565,
+      78.713,
+      109.575
+     ]
+    },
+    "LeavesShade": {
+     "center": [
+      13.203,
+      55.079,
+      -9.76
+     ],
+     "size": [
+      138.6,
+      47.682,
+      104.4
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      4.177,
+      66.44,
+      4.875
+     ],
+     "size": [
+      157.046,
+      59.156,
+      138.489
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      4.038,
+      74.625,
+      5.891
+     ],
+     "size": [
+      153.636,
+      58.667,
+      135.787
+     ]
+    }
+   },
+   "tris": {
+    "bark": 4004,
+    "leaves_shade": 880,
+    "leaves_mid": 2790,
+    "leaves_sun": 4410,
+    "fruit": 0,
+    "total": 12084
+   },
+   "checks": {
+    "trunkRadiusMaxAbsErr": 0.119,
+    "boughFeetToBarkP95": 0.142,
+    "leafTunnelMinMargin": 0.235
+   }
+  },
+  {
+   "index": 2,
+   "label": "SYCAMORE",
+   "species": "sycamore",
+   "category": "named",
+   "assetId": null,
+   "displayName": null,
+   "moderation": null,
+   "trunkRoute": 241,
+   "routes": [
+    241,
+    242,
+    243,
+    244,
+    245,
+    247,
+    246,
+    248,
+    249,
+    250
+   ],
+   "pivot": [
+    -92.5,
+    0.0,
+    72.5
+   ],
+   "parts": {
+    "Bark": {
+     "center": [
+      -0.162,
+      34.525,
+      4.508
+     ],
+     "size": [
+      115.188,
+      75.051,
+      101.324
+     ]
+    },
+    "LeavesShade": {
+     "center": [
+      -3.474,
+      54.101,
+      1.725
+     ],
+     "size": [
+      128.211,
+      44.15,
+      128.653
+     ]
+    },
+    "LeavesMid": {
+     "center": [
+      -3.355,
+      70.623,
+      -7.072
+     ],
+     "size": [
+      131.965,
+      51.623,
+      131.969
+     ]
+    },
+    "LeavesSun": {
+     "center": [
+      -4.128,
+      72.051,
+      7.562
+     ],
+     "size": [
+      157.333,
+      51.233,
+      124.088
+     ]
+    }
+   },
+   "tris": {
+    "bark": 3996,
+    "leaves_shade": 1920,
+    "leaves_mid": 2580,
+    "leaves_sun": 3540,
+    "fruit": 0,
+    "total": 12036
+   },
+   "checks": {
+    "trunkRadiusMaxAbsErr": 0.131,
+    "boughFeetToBarkP95": 0.155,
+    "leafTunnelMinMargin": 0.276
+   }
+  }
+ ]
+}
