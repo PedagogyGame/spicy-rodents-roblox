@@ -304,6 +304,9 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 			Props.dress(lot, kit, body, list, seat)
 		end
 	end
+	if not isChild and (kit.category == "building" or kit.category == "structure") then
+		Plan.foundation(lot, kit, seat, list)
+	end
 	return {
 		kind = "lot",
 		id = lot.id,
@@ -314,6 +317,44 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 		parts = list.parts,
 		extras = list.extras,
 	}
+end
+
+-- A stone foundation under buildings and structures on a slope (review 2026-11-09: nothing floats):
+-- from the lowest terrain under the footprint up to the seat, visual only (no collision, so the
+-- overlap, door and route checks see the same massing). Lots on harvested absolute seats in the air
+-- (bridge towers) and the treehouse are skipped.
+local FOUNDATION = { 150, 144, 132 }
+function Plan.foundation(lot: Lot, kit: Kits.Kit, seat: number, list: Spec.PartList)
+	if kit.builder == "Treehouse" or kit.builder == "BridgeTower" then
+		return
+	end
+	local x0, x1, z0, z1 = Plan.bounds(lot)
+	local lo = math.huge
+	for i = 0, 8 do
+		for j = 0, 8 do
+			lo = math.min(lo, Height.at(x0 + (x1 - x0) * i / 8, z0 + (z1 - z0) * j / 8))
+		end
+	end
+	if seat - lo > 0.25 and seat - lo < 30 then
+		local bottom = lo - 0.6
+		list:world({
+			name = "Foundation",
+			cx = (x0 + x1) / 2,
+			cy = (bottom + seat - 0.02) / 2,
+			cz = (z0 + z1) / 2,
+			yaw = 0,
+			pitch = 0,
+			sx = x1 - x0 + 0.3,
+			sy = seat - 0.02 - bottom,
+			sz = z1 - z0 + 0.3,
+			color = FOUNDATION,
+			material = "Concrete",
+			canCollide = false,
+			transparency = 0,
+			castShadow = false,
+			role = "Trim",
+		})
+	end
 end
 
 -- World-axis box of a plan's first part (yaws are quarter turns for lots): x0, x1, z0, z1.
@@ -450,13 +491,15 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 		h: number,
 		l: number,
 		color: { number },
-		pitch: number
+		pitch: number,
+		ySurface: number?
 	)
 		-- a thin visual strip on the road surface at fraction t, offset `across` to the road's right
+		-- (ySurface: the segment's own centre height there, so the strip rides on its tilted top)
 		table.insert(parts, {
 			name = name,
 			cx = x0 + dx * t - uz * across,
-			cy = yAt(t) + ROAD_THICKNESS / 2 + lift,
+			cy = (ySurface or yAt(t)) + ROAD_THICKNESS / 2 + lift,
 			cz = z0 + dz * t + ux * across,
 			yaw = yaw,
 			pitch = pitch,
@@ -497,17 +540,19 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 		if road.kind == "asphalt" and road.width >= 10 and seg > 4 then
 			-- dashed centre line: two dashes per segment (v5.4 lane paint, as parts on the segment)
 			for k = 1, 2 do
-				local t = (i - 1 + (k - 0.5) / 2) / n
+				local f = (k - 0.5) / 2
+				local t = (i - 1 + f) / n
 				strip(
 					string.format("Dash%03d_%d", i, k),
 					t,
 					0,
-					0.02,
+					0.03,
 					0.5,
 					0.05,
 					math.min(seg * 0.3, 8),
 					Palette.ROAD.paint,
-					pitch
+					pitch,
+					yPrev + (yNext - yPrev) * f
 				)
 			end
 		elseif road.kind == "concrete" and curb then
@@ -523,7 +568,8 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 					0.3,
 					math.max(slopeLen, 0.2),
 					Palette.ROAD.curb,
-					pitch
+					pitch,
+					(yPrev + yNext) / 2
 				)
 			end
 		end

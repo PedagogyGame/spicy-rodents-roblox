@@ -15,6 +15,7 @@ local Spec = require("../Spec")
 local Building = {}
 
 local SIGN = { 48, 76, 68 }
+Building.SIGN_TEAL = { 51, 95, 103 } -- v5.4 hospital sign #335f67
 local PLINTH = { 170, 166, 151 }
 local CHIMNEY = { 132, 92, 78 }
 local PLATE = 0.4
@@ -212,6 +213,80 @@ function Building.windows(
 						end
 					end
 				end
+			end
+		end
+	end
+end
+
+-- Continuous ribbon windows (hospital, review 2026-11-09 "a plain box"): one glass band per floor on
+-- every face, broken around the ground-floor door openings in `avoid`, with an accent floor line under
+-- each band. Visual only.
+function Building.bands(
+	ctx: Spec.LotCtx,
+	base: number,
+	top: number,
+	avoid: { [string]: { { c: number, w: number } } }?
+)
+	local pal = Building.look(ctx)
+	local W, D = ctx.W, ctx.D
+	local height = top - base
+	if height < 5 then
+		return
+	end
+	local floors = math.clamp(math.floor(height / 10 + 0.3), 1, 4)
+	local floorH = height / floors
+	local bandH = math.min(4.2, floorH * 0.42)
+	local faces = {
+		{ id = "F", len = W, fixed = -D / 2, out = -1, alongX = true },
+		{ id = "B", len = W, fixed = D / 2, out = 1, alongX = true },
+		{ id = "L", len = D, fixed = -W / 2, out = -1, alongX = false },
+		{ id = "R", len = D, fixed = W / 2, out = 1, alongX = false },
+	}
+	local function piece(name: string, f: any, a: number, b: number, y: number, h: number, depth: number, color: { number }, material: string)
+		if b - a < 1 then
+			return
+		end
+		local off = f.fixed + f.out * depth / 2
+		local mx, mz, sx, sz
+		if f.alongX then
+			mx, mz, sx, sz = (a + b) / 2, off, b - a, depth
+		else
+			mx, mz, sx, sz = off, (a + b) / 2, depth, b - a
+		end
+		ctx.list:add(ctx.frame, name, mx, y, mz, sx, h, sz, {
+			color = color,
+			material = material,
+			canCollide = false,
+			castShadow = false,
+			role = "Window",
+		})
+	end
+	for _, f in faces do
+		local margin = math.min(6, f.len * 0.08)
+		for fl = 1, floors do
+			local y = base + (fl - 0.5) * floorH + 0.4
+			local spans = { { -f.len / 2 + margin, f.len / 2 - margin } }
+			if fl == 1 and avoid and avoid[f.id] then
+				for _, g in avoid[f.id] do
+					local nextSpans = {}
+					for _, sp in spans do
+						local g0, g1 = g.c - g.w / 2 - 2.5, g.c + g.w / 2 + 2.5
+						if g1 <= sp[1] or g0 >= sp[2] then
+							table.insert(nextSpans, sp)
+						else
+							table.insert(nextSpans, { sp[1], g0 })
+							table.insert(nextSpans, { g1, sp[2] })
+						end
+					end
+					spans = nextSpans
+				end
+			end
+			for k, sp in spans do
+				piece(`Win{f.id}{fl}_{k}`, f, sp[1], sp[2], y, bandH, 0.36, pal.window, "Glass")
+				piece(`Sill{f.id}{fl}_{k}`, f, sp[1] - 0.3, sp[2] + 0.3, y - bandH / 2 - 0.3, 0.6, 0.5, pal.trim, "SmoothPlastic")
+			end
+			if fl > 1 then
+				piece(`FloorLine{f.id}{fl}`, f, -f.len / 2, f.len / 2, base + (fl - 1) * floorH, 0.9, 0.24, pal.accent, "SmoothPlastic")
 			end
 		end
 	end

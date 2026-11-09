@@ -63,6 +63,7 @@ function Programme.build(ctx: Spec.LotCtx)
 		floorTop = floorTop,
 		roof = "flat",
 		extras = extras,
+		windows = if b.id == "hospital" then "bands" else nil,
 	})
 	for _, s in b.stations do
 		ctx.list:add(ctx.frame, "Station_" .. s.id, s.at[1] * spu, floorTop + 1.5, -s.at[2] * spu, 6, 3, 2.5, {

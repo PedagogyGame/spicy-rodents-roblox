@@ -197,7 +197,7 @@ function Ground.district(ctx: Ctx)
 					ctx,
 					if first then "Greybox" else `Bank{side}_{k}`,
 					(span[1] + span[2]) / 2,
-					BANK_Y + THIN / 2,
+					BANK_Y + 0.1 - THIN / 2, -- top 0.1 over the bank: under the asphalt approach (+0.14)
 					(a + b) / 2,
 					span[2] - span[1],
 					THIN,
@@ -230,7 +230,7 @@ function Ground.river(ctx: Ctx)
 		for _, side in { -1, 1 } do
 			-- the wall's water face 3.5 st inside the bank line covers the 4-stud terrain voxel cliff
 			local wallC = (ca + cb) / 2 + side * (HALF - 1.25)
-			local h = BANK_Y - (BED_Y - 1)
+			local h = BANK_Y - 0.1 - (BED_Y - 1) -- just under the coping and the dock decks
 			world(ctx, `Wall{if side < 0 then "W" else "E"}_{k}`, wallC, (BED_Y - 1) + h / 2, (a + b) / 2, 4.5, h, len, {
 				yaw = yaw,
 				color = STONE_DARK,

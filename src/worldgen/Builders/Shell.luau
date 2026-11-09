@@ -32,6 +32,7 @@ export type Layout = {
 	floorTop: number, -- above the seat
 	roof: string,
 	extras: { { id: string, kind: string, room: string, x: number, z: number } },
+	windows: string?, -- "bands" (ribbon windows, hospital) or nil (window grid)
 }
 
 -- One straight wall along local X (axis "x", at mz = fixed) or local Z (axis "z", at mx = fixed), from
@@ -212,7 +213,8 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 		)
 	end
 	-- windows on the exterior walls, clear of the door openings; plinth, cornice, chimney
-	Building.windows(ctx, y0, h, {
+	local glaze = if L.windows == "bands" then Building.bands else Building.windows
+	glaze(ctx, y0, h, {
 		F = gapsOn("x", -D / 2, t + EPS, -W / 2, W / 2),
 		B = gapsOn("x", D / 2, t + EPS, -W / 2, W / 2),
 		L = gapsOn("z", -W / 2, t + EPS, -D / 2, D / 2),

@@ -14,12 +14,12 @@
         "w": 10
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 4. Solid box 12x5.2x10 (local), gable to +8 (abs peak y=8.84); base_y=0.84; wall #c1b5a2, roof #5e5d5d, door #4b6d61; porch depth 2.5; side wing (0.3w x 3 x 0.47d), chimney, dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 45. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 4. Solid box 12x5.2x10 (local), gable to +8 (abs peak y=8.84); base_y=0.84; wall #c1b5a2, roof #5e5d5d, door #4b6d61; porch depth 2.5; side wing (0.3w x 3 x 0.47d), chimney, dark-tinted windows. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 45. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 5.2,
         "peakU": 8,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -43,12 +43,12 @@
         "w": 11
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 5. Solid box 14x6x11 (local), gable to +9.35 (abs peak y=13.91); base_y=4.56; wall #b7c5c1, roof #71625c, door #6e5144; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 37. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 5. Solid box 14x6x11 (local), gable to +9.35 (abs peak y=13.91); base_y=4.56; wall #b7c5c1, roof #71625c, door #6e5144; porch depth 3.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 37. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6,
         "peakU": 9.35,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -72,12 +72,12 @@
         "w": 12
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 6. Solid box 16x6.8x12 (local), gable to +10.7 (abs peak y=16.5); base_y=5.8; wall #d4b998, roof #5d6b65, door #3d5e78; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 37. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 6. Solid box 16x6.8x12 (local), gable to +10.7 (abs peak y=16.5); base_y=5.8; wall #d4b998, roof #5d6b65, door #3d5e78; porch depth 4.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 37. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6.8,
         "peakU": 10.7,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -101,12 +101,12 @@
         "w": 13
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 7. Solid box 13x5.2x13 (local), gable to +8 (abs peak y=8.1); base_y=0.1; wall #a69f8b, roof #755a50, door #a3835b; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 35. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 7. Solid box 13x5.2x13 (local), gable to +8 (abs peak y=8.1); base_y=0.1; wall #a69f8b, roof #755a50, door #a3835b; porch depth 2.5; chimney. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 35. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 5.2,
         "peakU": 8,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -130,12 +130,12 @@
         "w": 15
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 8. Solid box 15x6x10 (local), gable to +9.35 (abs peak y=9.45); base_y=0.1; wall #dfd6ba, roof #5e5d5d, door #4b6d61; porch depth 3.5; side wing (0.3w x 3 x 0.47d). Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 41. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 8. Solid box 15x6x10 (local), gable to +9.35 (abs peak y=9.45); base_y=0.1; wall #dfd6ba, roof #5e5d5d, door #4b6d61; porch depth 3.5; side wing (0.3w x 3 x 0.47d). v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 41. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6,
         "peakU": 9.35,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -159,12 +159,12 @@
         "w": 12
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 9. Solid box 12x6.8x11 (local), gable to +10.7 (abs peak y=14.92); base_y=4.22; wall #a6b5ac, roof #71625c, door #6e5144; porch depth 4.5; dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 34. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 9. Solid box 12x6.8x11 (local), gable to +10.7 (abs peak y=14.92); base_y=4.22; wall #a6b5ac, roof #71625c, door #6e5144; porch depth 4.5; dark-tinted windows. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 34. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6.8,
         "peakU": 10.7,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -188,12 +188,12 @@
         "w": 14
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 10. Solid box 14x5.2x12 (local), gable to +8 (abs peak y=14.99); base_y=6.99; wall #c1b5a2, roof #5d6b65, door #3d5e78; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 33. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 10. Solid box 14x5.2x12 (local), gable to +8 (abs peak y=14.99); base_y=6.99; wall #c1b5a2, roof #5d6b65, door #3d5e78; porch depth 2.5; chimney. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 33. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 5.2,
         "peakU": 8,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -217,12 +217,12 @@
         "w": 16
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 11. Solid box 16x6x13 (local), gable to +9.35 (abs peak y=11.98); base_y=2.63; wall #b7c5c1, roof #755a50, door #a3835b; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 38. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 11. Solid box 16x6x13 (local), gable to +9.35 (abs peak y=11.98); base_y=2.63; wall #b7c5c1, roof #755a50, door #a3835b; porch depth 3.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 38. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6,
         "peakU": 9.35,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -246,12 +246,12 @@
         "w": 10
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 12. Solid box 13x6.8x10 (local), gable to +10.7 (abs peak y=10.8); base_y=0.1; wall #d4b998, roof #5e5d5d, door #4b6d61; porch depth 4.5; side wing (0.3w x 3 x 0.47d). Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 38. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 12. Solid box 13x6.8x10 (local), gable to +10.7 (abs peak y=10.8); base_y=0.1; wall #d4b998, roof #5e5d5d, door #4b6d61; porch depth 4.5; side wing (0.3w x 3 x 0.47d). v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 38. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6.8,
         "peakU": 10.7,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -275,12 +275,12 @@
         "w": 11
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 13. Solid box 15x5.2x11 (local), gable to +8 (abs peak y=8.58); base_y=0.58; wall #a69f8b, roof #71625c, door #6e5144; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 54. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 13. Solid box 15x5.2x11 (local), gable to +8 (abs peak y=8.58); base_y=0.58; wall #a69f8b, roof #71625c, door #6e5144; porch depth 2.5; chimney. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 54. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 5.2,
         "peakU": 8,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -304,12 +304,12 @@
         "w": 12
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 14. Solid box 12x6x12 (local), gable to +9.35 (abs peak y=10.04); base_y=0.69; wall #dfd6ba, roof #5d6b65, door #3d5e78; porch depth 3.5; dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 51. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 14. Solid box 12x6x12 (local), gable to +9.35 (abs peak y=10.04); base_y=0.69; wall #dfd6ba, roof #5d6b65, door #3d5e78; porch depth 3.5; dark-tinted windows. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 51. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6,
         "peakU": 9.35,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -333,12 +333,12 @@
         "w": 13
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 15. Solid box 14x6.8x13 (local), gable to +10.7 (abs peak y=14.02); base_y=3.32; wall #a6b5ac, roof #755a50, door #a3835b; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 33. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 15. Solid box 14x6.8x13 (local), gable to +10.7 (abs peak y=14.02); base_y=3.32; wall #a6b5ac, roof #755a50, door #a3835b; porch depth 4.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 33. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6.8,
         "peakU": 10.7,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -362,12 +362,12 @@
         "w": 16
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 16. Solid box 16x5.2x10 (local), gable to +8 (abs peak y=10.41); base_y=2.41; wall #c1b5a2, roof #5e5d5d, door #4b6d61; porch depth 2.5; side wing (0.3w x 3 x 0.47d), chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 29. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 16. Solid box 16x5.2x10 (local), gable to +8 (abs peak y=10.41); base_y=2.41; wall #c1b5a2, roof #5e5d5d, door #4b6d61; porch depth 2.5; side wing (0.3w x 3 x 0.47d), chimney. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 29. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 5.2,
         "peakU": 8,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -391,12 +391,12 @@
         "w": 13
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 17. Solid box 13x6x11 (local), gable to +9.35 (abs peak y=9.45); base_y=0.1; wall #b7c5c1, roof #71625c, door #6e5144; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 36. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 17. Solid box 13x6x11 (local), gable to +9.35 (abs peak y=9.45); base_y=0.1; wall #b7c5c1, roof #71625c, door #6e5144; porch depth 3.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 36. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6,
         "peakU": 9.35,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -420,12 +420,12 @@
         "w": 15
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 18. Solid box 15x6.8x12 (local), gable to +10.7 (abs peak y=11.77); base_y=1.07; wall #d4b998, roof #5d6b65, door #3d5e78; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 45. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 18. Solid box 15x6.8x12 (local), gable to +10.7 (abs peak y=11.77); base_y=1.07; wall #d4b998, roof #5d6b65, door #3d5e78; porch depth 4.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 45. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6.8,
         "peakU": 10.7,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -449,12 +449,12 @@
         "w": 12
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 19. Solid box 12x5.2x13 (local), gable to +8 (abs peak y=13.5); base_y=5.5; wall #a69f8b, roof #755a50, door #a3835b; porch depth 2.5; chimney, dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 42. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 19. Solid box 12x5.2x13 (local), gable to +8 (abs peak y=13.5); base_y=5.5; wall #a69f8b, roof #755a50, door #a3835b; porch depth 2.5; chimney, dark-tinted windows. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 42. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 5.2,
         "peakU": 8,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -478,12 +478,12 @@
         "w": 14
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 20. Solid box 14x6x10 (local), gable to +9.35 (abs peak y=15.44); base_y=6.09; wall #dfd6ba, roof #5e5d5d, door #4b6d61; porch depth 3.5; side wing (0.3w x 3 x 0.47d). Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 33. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 20. Solid box 14x6x10 (local), gable to +9.35 (abs peak y=15.44); base_y=6.09; wall #dfd6ba, roof #5e5d5d, door #4b6d61; porch depth 3.5; side wing (0.3w x 3 x 0.47d). v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 33. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6,
         "peakU": 9.35,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -507,12 +507,12 @@
         "w": 16
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 21. Solid box 16x6.8x11 (local), gable to +10.7 (abs peak y=11.56); base_y=0.86; wall #a6b5ac, roof #71625c, door #6e5144; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 31. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 21. Solid box 16x6.8x11 (local), gable to +10.7 (abs peak y=11.56); base_y=0.86; wall #a6b5ac, roof #71625c, door #6e5144; porch depth 4.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 31. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6.8,
         "peakU": 10.7,
         "ridge": "x",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -536,12 +536,12 @@
         "w": 12
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 22. Solid box 13x5.2x12 (local), gable to +8 (abs peak y=8.1); base_y=0.1; wall #c1b5a2, roof #5d6b65, door #3d5e78; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 29. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 22. Solid box 13x5.2x12 (local), gable to +8 (abs peak y=8.1); base_y=0.1; wall #c1b5a2, roof #5d6b65, door #3d5e78; porch depth 2.5; chimney. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 29. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 5.2,
         "peakU": 8,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -565,12 +565,12 @@
         "w": 13
       },
       "hasInterior": false,
-      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 23. Solid box 15x6x13 (local), gable to +9.35 (abs peak y=9.5); base_y=0.15; wall #b7c5c1, roof #755a50, door #a3835b; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 52. Built by buildOuterHome 2071.",
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 23. Solid box 15x6x13 (local), gable to +9.35 (abs peak y=9.5); base_y=0.15; wall #b7c5c1, roof #755a50, door #a3835b; porch depth 3.5. v5.4 draws a gable to the peak (its physics treated the roof as flat at the peak); the port builds the gable (review 2026-11-09), the ridge route runs along it. Distance to road centreline 52. Built by buildOuterHome 2071.",
       "params": {
         "eaveU": 6,
         "peakU": 9.35,
         "ridge": "z",
-        "roof": "flat"
+        "roof": "gable"
       },
       "routes": {
         "source": "harvest"
@@ -670,7 +670,15 @@
     },
     {
       "id": "outer_treehouse",
-      "params": {"floorU": 13.2, "deck": [5.9, 0, 4.2, 3.2]},
+      "params": {
+        "floorU": 13.2,
+        "deck": [
+          5.9,
+          0,
+          4.2,
+          3.2
+        ]
+      },
       "seat": "absolute:1.52",
       "district": "old_town_outer",
       "type": "treehouse",
