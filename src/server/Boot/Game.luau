@@ -168,6 +168,11 @@ function Game.start(opts: Opts?): any
 		if mod and mod:IsA("ModuleScript") then
 			local WorldTerrain = (require :: any)(mod)
 			WorldTerrain.write(workspace.Terrain)
+			-- the editor-only grass skin (tools/bake/editor_ground) is replaced by the real terrain
+			local editorGround = workspace:FindFirstChild("EditorGround")
+			if editorGround then
+				editorGround:Destroy()
+			end
 		else
 			warn("[SpicyRodents] WorldGen.WorldTerrain missing: no terrain")
 		end

@@ -59,6 +59,9 @@
       },
       "Town": {
         "$path": { "optional": "build/Town.rbxm" }
+      },
+      "EditorGround": {
+        "$path": { "optional": "build/EditorGround.rbxm" }
       }
     },
 
