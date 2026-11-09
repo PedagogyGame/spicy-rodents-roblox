@@ -1,0 +1,260 @@
+{
+  "files": [
+    {
+      "bytes": 3556,
+      "file": "deer_buck.rbxm",
+      "joints": 34,
+      "parts": 35,
+      "rigspec": true,
+      "sha": "bbb4e0373c118c393b952aaabd25129f41e00d8d0ddc80f3af9cdedf292f0e4f",
+      "sockets": 4,
+      "species": "deer"
+    },
+    {
+      "bytes": 3532,
+      "file": "deer_doe.rbxm",
+      "joints": 34,
+      "parts": 35,
+      "rigspec": true,
+      "sha": "fffa0dabc96a4cdba568ffc94e80b7304327d820d1aee416c673042776b96300",
+      "sockets": 4,
+      "species": "deer"
+    },
+    {
+      "bytes": 3541,
+      "file": "deer_fawn.rbxm",
+      "joints": 34,
+      "parts": 35,
+      "rigspec": true,
+      "sha": "6b109e90eb229847973a38e742614adf161da5ca2ac6023fca408d967cfc0aa4",
+      "sockets": 4,
+      "species": "deer"
+    },
+    {
+      "bytes": 1919,
+      "file": "drone.rbxm",
+      "joints": 5,
+      "parts": 6,
+      "rigspec": true,
+      "sha": "b701af9bec6f827e337d0d8b60312776df5acdfe8b12dbd10110e1ac27b0430a",
+      "sockets": 1,
+      "species": "drone"
+    },
+    {
+      "bytes": 3946,
+      "file": "fox.rbxm",
+      "joints": 37,
+      "parts": 38,
+      "rigspec": true,
+      "sha": "c7f8d96d855d46b2108cb54a572a333ca80cd04f17e884993a554eeccfe9b55b",
+      "sockets": 4,
+      "species": "fox"
+    },
+    {
+      "bytes": 2553,
+      "file": "human_doctor.rbxm",
+      "joints": 15,
+      "parts": 16,
+      "rigspec": true,
+      "sha": "36c9522a7d7d9e088903322cd9873441b37bc3c536adbdb188e6a2bdd2a32609",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 2829,
+      "file": "human_driver.rbxm",
+      "joints": 16,
+      "parts": 17,
+      "rigspec": true,
+      "sha": "10e88886d62b39b19eadfe5b79d73ec554006e1e64e94d79d98470d81906e511",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 2828,
+      "file": "human_guard.rbxm",
+      "joints": 16,
+      "parts": 17,
+      "rigspec": true,
+      "sha": "71c7729dfea1500f3ff8f25f6f4129baf767f804fd8209a11ebe40fa844158a7",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 2548,
+      "file": "human_mime.rbxm",
+      "joints": 15,
+      "parts": 16,
+      "rigspec": true,
+      "sha": "0158705f3be2b3737f7d153499dd5efa51f4987fbbc6a3642ecc09886ab7cb07",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 2548,
+      "file": "human_nurse.rbxm",
+      "joints": 15,
+      "parts": 16,
+      "rigspec": true,
+      "sha": "6dc20e59504cbb4be26dd5808f69b9b67b60e8f9b4d585e319dcbb31da9b4491",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 2832,
+      "file": "human_officer.rbxm",
+      "joints": 16,
+      "parts": 17,
+      "rigspec": true,
+      "sha": "4f4abb10f260e0ac56a14a648c50b91c18fbaaf2c4cedc95352e252e0e85ca22",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 2555,
+      "file": "human_orderly.rbxm",
+      "joints": 15,
+      "parts": 16,
+      "rigspec": true,
+      "sha": "df5c00aff5ac35d616ced3d829e5211fdfb6f7c68923391f2fd2c873430f8e70",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 2556,
+      "file": "human_townsperson.rbxm",
+      "joints": 15,
+      "parts": 16,
+      "rigspec": true,
+      "sha": "2f5a35d26e057cf089c4dbb9eec0078a1cb9cfd4f6d45764c95ed67968b1a74b",
+      "sockets": 8,
+      "species": "human"
+    },
+    {
+      "bytes": 4167,
+      "file": "rodent.rbxm",
+      "joints": 40,
+      "parts": 41,
+      "rigspec": true,
+      "sha": "507303795caa638ae74c2e27cd9080a2ed5be9d4a97d93e8f2d61e35a54c01da",
+      "sockets": 4,
+      "species": "rodent"
+    },
+    {
+      "bytes": 4097,
+      "file": "squirrel.rbxm",
+      "joints": 39,
+      "parts": 40,
+      "rigspec": true,
+      "sha": "70f14226480621ec166c224f251194849bb824ec65d174321f522013cd39e1dc",
+      "sockets": 4,
+      "species": "squirrel"
+    },
+    {
+      "bytes": 25171,
+      "file": "town_map.svg",
+      "sha": "038d514751b37dfdfb3bb6c71cefac18318fc93a46adf42ee829578d2fc0a958"
+    },
+    {
+      "bytes": 2376,
+      "file": "vehicle_ambulance.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "680887a61d7b5504f238b06dd554cc0476ae0d83393b07818b6d25c858006c3c",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2371,
+      "file": "vehicle_cart.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "3df49ed57ddfb4cef6a681eb7a1c67bafec5540f97687fa1d663835053c9953a",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2388,
+      "file": "vehicle_delivery_van.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "e379faa8c09d20ee1f5b074aa79135555ce28eb74ffded041af02ffd48bb447d",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2384,
+      "file": "vehicle_dump_truck.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "730cbf8f47db66e313ab16c20c7df8259feee3039c2d5e6ae2f3c658c530c6e8",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2388,
+      "file": "vehicle_ice_cream_van.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "b3e327250218a68602bf018109e43e7e2a92d39ee1b04370973a9e1c9e0fc700",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2352,
+      "file": "vehicle_motorcycle.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "e858c00f61c012b48be1b8da905585884ed46cc20a7245a1f3fb32968d417e2b",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2377,
+      "file": "vehicle_patrol_car.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "9f2bde207d0f5ae7aa91cea9eaeb3dc68f7945f319886757ddc237365b369a9b",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2357,
+      "file": "vehicle_rv.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "47bc4be29e2d3c824ffaeb14c86ebd337e25c115497e586f0feb609cd65dd0a8",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2373,
+      "file": "vehicle_sedan.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "91396b5f4c83f36f1667a30c1e6c51c38d0e8aba471cc5459be917d7757ad22a",
+      "sockets": 3,
+      "species": "car"
+    },
+    {
+      "bytes": 2374,
+      "file": "vehicle_trolley.rbxm",
+      "joints": 9,
+      "parts": 10,
+      "rigspec": true,
+      "sha": "6843c5fc6e78f2d31ebcd216cb6398be243c9da936836bd0e3e19c52083fc96a",
+      "sockets": 3,
+      "species": "car"
+    }
+  ],
+  "generator": "tools/placeholders/build.luau"
+}

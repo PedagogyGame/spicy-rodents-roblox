@@ -8,9 +8,15 @@
 -- and building roofs; in Roblox those become real collidable geometry baked from data
 -- [worldgen_districts_art §16 "the analytic riverRoofAt and riverDeckAt disappear"], so roofAt
 -- stays nil here until W1's Colliders land.
+-- W1 (§4.4 #2) adds `Ground.world(opts)`: the full v5.4 getGroundAt order (6227-6247) over data:
+-- max(terrain or deck, pavement and curbs from World/Town), roofs from World/Colliders (the body is
+-- within 0.47 u below the roof), and the trampoline bed (Movement/Trampoline sites). The static
+-- functions below stay the terrain-and-deck subset (golden-tested against tests/golden/terrain.json).
 -- Pure: no state, no side effects on require.
 
 local Height = require("./Height")
+local Colliders = require("./Colliders")
+local Trampoline = require("../Movement/Trampoline")
 
 local Ground = {}
 
@@ -46,6 +52,62 @@ function Ground.surfaceKind(x: number, z: number): SurfaceKind
 		return "water"
 	end
 	return "terrain"
+end
+
+export type GroundWorld = {
+	groundAt: (x: number, z: number, refY: number) -> number,
+	roofAt: (x: number, z: number, refY: number) -> number?,
+	surfaceKind: (x: number, z: number, refY: number?) -> string,
+}
+
+export type WorldOpts = {
+	town: any?, -- World/Town (pavementAt)
+	colliders: any?, -- World/Colliders (roofAt)
+	trampolines: { any }?, -- Movement/Trampoline sites (bedAt)
+}
+
+-- world(opts): closures over the data-driven layers; every layer is optional.
+function Ground.world(opts: WorldOpts): GroundWorld
+	local town = opts.town
+	local colliders = opts.colliders
+	local tramps = opts.trampolines
+	local function roofAt(x: number, z: number, refY: number): number?
+		if colliders then
+			return Colliders.roofAt(colliders, x, z, refY)
+		end
+		return nil
+	end
+	local function groundAt(x: number, z: number, refY: number): number
+		local y = Ground.groundAt(x, z, refY)
+		if town then
+			local p = town:pavementAt(x, z)
+			if p and p > y then
+				y = p
+			end
+		end
+		local roof = roofAt(x, z, refY)
+		if roof and roof > y then
+			y = roof
+		end
+		if tramps then
+			local bed = Trampoline.bedAt(tramps, x, z, refY)
+			if bed and bed > y then
+				y = bed
+			end
+		end
+		return y
+	end
+	local function surfaceKind(x: number, z: number, refY: number?): string
+		if refY and roofAt(x, z, refY) then
+			return "roof"
+		end
+		local k = Ground.surfaceKind(x, z)
+		if k == "terrain" and town and town:pavementAt(x, z) then
+			return "pavement"
+		end
+		return k
+	end
+	return { groundAt = groundAt, roofAt = roofAt, surfaceKind = surfaceKind }
 end
 
 return Ground
