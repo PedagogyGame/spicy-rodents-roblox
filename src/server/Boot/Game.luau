@@ -162,6 +162,9 @@ function Game.start(opts: Opts?): any
 	local tt = os.clock()
 	if o.terrain ~= false then
 		stage(0.12, "Shaping the ground, the river, the hills and the beach (a few seconds)")
+		-- Roblox's animated grass blades stand as tall as a squirrel's legs and made the animals look
+		-- half buried (owner feedback 2026-11-09); v5.4's grass was a flat texture.
+		workspace.Terrain.Decoration = false
 		local server = script.Parent and script.Parent.Parent
 		local worldGen = server and server:FindFirstChild("WorldGen")
 		local mod = worldGen and worldGen:FindFirstChild("WorldTerrain")

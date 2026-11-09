@@ -39,7 +39,7 @@ end
 
 local function bind(fn: (dt: number) -> ())
 	unbind()
-	game:GetService("RunService"):BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value + 1, fn)
+	game:GetService("RunService"):BindToRenderStep(BIND, Enum.RenderPriority.Camera.Value - 1, fn)
 	bound = true
 end
 
@@ -61,15 +61,70 @@ local function setFirstPerson(on: boolean)
 	end
 end
 
+-- A smoothed, client-only focus part for bodies without a Humanoid (squirrels, the rodent, fox,
+-- deer, vehicles, the drone). Following the rig's Head or raw root made the camera bounce with the
+-- gait's head nod and body bob (owner feedback 2026-11-09): the focus tracks the root quickly in X/Z
+-- and slowly in Y, so running is steady while climbing still follows.
+local focus: BasePart? = nil
+local function focusPart(): BasePart
+	local f = focus
+	if f and f.Parent then
+		return f
+	end
+	local p = Instance.new("Part")
+	p.Name = "SpicyCameraFocus"
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Transparency = 1
+	p.Size = Vector3.new(0.2, 0.2, 0.2)
+	p.Parent = workspace.CurrentCamera -- local to this client, never replicated
+	focus = p
+	return p
+end
+
 function CameraRig.follow(body: Model)
 	unbind()
 	local camera = workspace.CurrentCamera
-	local subject = CameraRig.subjectOf(body)
-	if subject == nil then
+	local humanoid = body:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		camera.CameraType = Enum.CameraType.Custom
+		camera.CameraSubject = humanoid
 		return
 	end
+	local root = body.PrimaryPart
+	if root == nil then
+		local subject = CameraRig.subjectOf(body)
+		if subject then
+			camera.CameraType = Enum.CameraType.Custom
+			camera.CameraSubject = subject :: any
+		end
+		return
+	end
+	local rootPart = root :: BasePart
+	local f = focusPart()
+	local _, size = body:GetBoundingBox()
+	local lift = math.max(0.6, size.Y * 0.6) -- look slightly above the body, not at its feet
+	local pos = rootPart.Position + Vector3.new(0, lift, 0)
+	f.CFrame = CFrame.new(pos)
 	camera.CameraType = Enum.CameraType.Custom
-	camera.CameraSubject = subject :: any
+	camera.CameraSubject = f
+	bind(function(dt: number)
+		if rootPart.Parent == nil then
+			return
+		end
+		local target = rootPart.Position + Vector3.new(0, lift, 0)
+		local a = 1 - math.exp(-dt * 25) -- horizontal: tight
+		local b = 1 - math.exp(-dt * 7) -- vertical: smooths bob and terrain steps
+		pos =
+			Vector3.new(pos.X + (target.X - pos.X) * a, pos.Y + (target.Y - pos.Y) * b, pos.Z + (target.Z - pos.Z) * a)
+		-- never lag more than 3 studs (teleports, respawns, long drops)
+		if (target - pos).Magnitude > 3 then
+			pos = target
+		end
+		f.CFrame = CFrame.new(pos)
+	end)
 end
 
 function CameraRig.overview(position: Vector3, lookAt: Vector3)
