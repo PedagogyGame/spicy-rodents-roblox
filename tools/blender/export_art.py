@@ -59,6 +59,7 @@ def export_clip(arm, action_name, out_dir, rig_id="squirrel", markers=()):
             "parent": b.parent.name if b.parent else None,
             "deform": bool(b.use_deform),
             "head": [r6(c) for c in (M @ b.head_local)],
+            "tail": [r6(c) for c in (M @ b.tail_local)],
             "restRotation": [r6(x) for row in (M @ rest @ MT) for x in row],
         })
 

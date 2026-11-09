@@ -19,7 +19,14 @@ local Instance = roblox.Instance
 local CFrame = roblox.CFrame
 local Enum = roblox.Enum
 
-export type ClipBone = { name: string, parent: string?, deform: boolean?, head: { number }?, restRotation: { number }? }
+export type ClipBone = {
+	name: string,
+	parent: string?,
+	deform: boolean?,
+	head: { number }?,
+	tail: { number }?,
+	restRotation: { number }?,
+}
 export type ClipKeyframe = { time: number, frame: number?, poses: { [string]: { number } } }
 export type ClipMarker = { time: number, name: string, value: string? }
 export type Clip = {

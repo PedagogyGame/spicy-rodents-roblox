@@ -96,7 +96,7 @@ end
 function Plan.footprint(lot: Lot): (number, number)
 	local fp = lot.footprint
 	if fp then
-		return math.max(fp.w, 0.5), math.max(fp.d, 0.5)
+		return math.max(fp.w, 0.05), math.max(fp.d, 0.05)
 	end
 	return 2, 2
 end
@@ -214,6 +214,70 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 		attributes = attributes,
 		parts = { part },
 	}
+end
+
+-- World-axis box of a plan's first part (yaws are quarter turns for lots): x0, x1, z0, z1.
+function Plan.worldBox(spec: PartSpec): (number, number, number, number)
+	local q = math.floor(spec.yaw / HALF_PI + 0.5) % 2
+	local wx, wz = spec.sx, spec.sz
+	if q == 1 then
+		wx, wz = spec.sz, spec.sx
+	end
+	return spec.cx - wx / 2, spec.cx + wx / 2, spec.cz - wz / 2, spec.cz + wz / 2
+end
+
+-- Slabs (canopies, porte-cocheres, docks) abut a building wall in v5.4; their inferred footprints
+-- poke into it. Trim each slab back to the wall along the axis of least penetration and record
+-- `AttachedTo`, so the greybox has no solid overlap and the canopy still meets the facade.
+function Plan.attachSlabs(plans: { BuildPlan })
+	for _, slab in plans do
+		if
+			slab.kind == "lot"
+			and slab.attributes.Solid
+			and Kits.get(slab.attributes.LotType :: string).category == "slab"
+		then
+			local s = slab.parts[1]
+			for _, b in plans do
+				if b ~= slab and b.kind == "lot" and b.category == "building" then
+					local ax0, ax1, az0, az1 = Plan.worldBox(s)
+					local bx0, bx1, bz0, bz1 = Plan.worldBox(b.parts[1])
+					local ox = math.min(ax1, bx1) - math.max(ax0, bx0)
+					local oz = math.min(az1, bz1) - math.max(az0, bz0)
+					if ox > 0 and oz > 0 then
+						local q = math.floor(s.yaw / HALF_PI + 0.5) % 2
+						if oz <= ox then
+							local nz0, nz1 = az0, az1
+							if s.cz < (bz0 + bz1) / 2 then
+								nz1 = bz0
+							else
+								nz0 = bz1
+							end
+							s.cz = (nz0 + nz1) / 2
+							if q == 1 then
+								s.sx = nz1 - nz0
+							else
+								s.sz = nz1 - nz0
+							end
+						else
+							local nx0, nx1 = ax0, ax1
+							if s.cx < (bx0 + bx1) / 2 then
+								nx1 = bx0
+							else
+								nx0 = bx1
+							end
+							s.cx = (nx0 + nx1) / 2
+							if q == 1 then
+								s.sz = nx1 - nx0
+							else
+								s.sx = nx1 - nx0
+							end
+						end
+						slab.attributes.AttachedTo = b.id
+					end
+				end
+			end
+		end
+	end
 end
 
 local function endpoints(road: Road): (number, number, number, number)
