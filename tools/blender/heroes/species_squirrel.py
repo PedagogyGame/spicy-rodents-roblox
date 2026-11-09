@@ -80,9 +80,9 @@ def skeleton():
 
 
 HZ = 1.19  # skull centre height
-EYE_L = np.array([0.118, -0.935, 1.245])
-EYE_R_RODENT = 0.074
-EYE_R = 0.062
+EYE_L = np.array([0.110, -0.93, 1.245])
+EYE_R_RODENT = 0.064
+EYE_R = 0.052
 NOSE = np.array([0.0, -1.165, 1.10])
 
 
@@ -90,10 +90,17 @@ def eye_radius(variant):
     return EYE_R_RODENT if variant == "rodent" else EYE_R
 
 
+def eye_gaze(side):
+    return np.array([side * 0.86, -0.48, 0.16])
+
+
+EYE_STYLE = "squirrel"
+
+
 def eye_centre(variant, side=1):
     c = EYE_L.copy()
     if variant == "rodent":
-        c = c + [0.010, 0.006, -0.026]  # the rodent carries its head lower
+        c = c + [0.012, 0.004, -0.026]  # the rodent carries its head lower; its eyes bulge a little
     c[0] *= side
     return c
 
@@ -237,8 +244,8 @@ def hard_parts(variant="squirrel"):
             tip = (ba + [dx, -0.115 + dy, -0.02]) * [sx, 1, 1]
             v, f = curved_spike(tip + [0, 0.004, 0.006], (0, -1, -0.3), 0.04 if rodent else 0.034, 0.009, curl=(0, 0.2, -1), curl_amt=0.9)
             out.append((f"claw_B{side}{i}", v, f, f"Back{side}_Toe", "claw"))
-    up_len = 0.062 if rodent else 0.034
-    lo_len = 0.04 if rodent else 0.022
+    up_len = 0.062 if rodent else 0.026
+    lo_len = 0.04 if rodent else 0.014
     for sx in (1, -1):
         crooked = 0.12 * sx if rodent else 0.0
         v, f = curved_spike((0.0095 * sx, -1.118, hz - 0.118), (crooked, -0.25, -1), up_len, 0.0105, curl=(0, 0.6, 0), curl_amt=0.35, sides=4, flat=1.5)
@@ -280,10 +287,6 @@ def pattern_field(c, n, dom, variant="squirrel"):
     out[head] = _sstep(0.15, 0.45, -n[head, 2] + (hz - 0.09 - z[head]) * 4 + wob[head]) * (y[head] < -0.86)
     jaw = dom == "Jaw"
     out[jaw] = _sstep(-0.3, 0.1, -n[jaw, 2] + wob[jaw])
-    # the inside of the upper forelegs continues the chest
-    fl = np.isin(dom, ["FrontL_Upper", "FrontR_Upper"])
-    inward = -np.sign(x) * n[:, 0]
-    out[fl] = _sstep(0.2, 0.6, inward[fl] - n[fl, 2] * 0.5 + wob[fl])
     tail = np.char.startswith(dom.astype(str), "Tail")
     tip = _sstep(1.86, 1.98, y + wob * 2)
     out[tail] = np.maximum(out[tail], tip[tail])
@@ -391,17 +394,9 @@ def paint(tx, variant, tools):
     # --- natural (untinted) colours and the tint mask ---------------------------------------------
     tints = TINTS[variant]
     tb, tp = _hex(tints["Body"]), _hex(tints["Pattern"])
-    pat = pattern_field(P, N, tx["dom"], variant)
-    alpha = np.ones(n, dtype=np.float32)
-    grey = np.where(region == 1, gp, g)
-    nat_body = np.clip(g, 0, 1)[:, None] * tb
-    nat_pat = np.clip(gp, 0, 1)[:, None] * tp
-    nat = np.where((region == 1)[:, None], nat_pat, nat_body)
-    # soft border between Body and Pattern: both sides fade to untinted natural colour at the seam
-    near = 1 - sst(0.0, 0.16, np.abs(pat - 0.5))
-    blend = sst(0.3, 0.7, pat)[:, None]
-    nat = np.where((near > 0)[:, None], nat_body * (1 - blend) + nat_pat * blend, nat)
-    alpha = np.minimum(alpha, 1 - near)
+    pat = pattern_field(P, N, tx["dom"], variant) + (fine - 0.5) * 0.3  # a furry, broken border
+    m = sst(0.38, 0.62, pat)
+    grey, alpha, nat = tools["region_colours"](region, m, g, gp, tb, tp)
     rough = 0.64 - 0.12 * (H - 0.5) + 0.08 * (1 - dorsal) + (big - 0.5) * 0.06
     rough = np.where(tail, rough + 0.04, rough)
     ov = np.zeros(n, dtype=bool)  # texels whose natural colour is overridden (alpha forced to 0)
@@ -465,12 +460,7 @@ def paint(tx, variant, tools):
         override(hard == 0, _hex("#4a2620"), r=0.45, k=sc)
         # reddened, sore eyelids and nose
         override(head, _hex("#8a3030"), r=0.4, k=(1 - sst(r_eye + 0.006, r_eye + 0.02, d_eye)) * 0.7)
-    # RGB in the map: grey where tinted; natural colour divided by the partial tint elsewhere
-    tint_reg = np.where((region == 1)[:, None], tp, tb)
-    denom = 1 - alpha[:, None] + alpha[:, None] * tint_reg
-    rgb = np.where(alpha[:, None] > 0.999, np.clip(grey, 0, 1)[:, None].repeat(3, 1), natv / np.maximum(denom, 1e-3))
-    # untouched texels (border fade only) keep a greyscale ramp as alpha rises
-    rgb = np.clip(rgb, 0, 1)
+    rgb = tools["finish_rgb"](grey, alpha, natv, region, tb, tp)
     # flatter relief on bare skin, claws and teeth
     flat = (alpha < 0.5) & ov
     gT = np.where(flat, gT * 0.25, gT)

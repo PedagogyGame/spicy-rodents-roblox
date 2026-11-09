@@ -97,6 +97,29 @@ def fur_relief(P, F, N, T, B, layers, eps=None, lscale=None):
     return H, gT, gB
 
 
+def region_colours(region, m, g_body, g_pat, tb, tp, sstep_fn=None):
+    """Seamless Body/Pattern colouring. m (0..1) is the continuous pattern weight; region the face's
+    region (0 Body, 1 Pattern). The natural colour follows m smoothly; the tint mask is 1 where the
+    texel's natural colour is its region's own (grey x that region's tint), fading to 0 where it
+    belongs to the other region, so at the stock tint the border follows m, not the face edges.
+    Returns (grey, alpha, natural rgb)."""
+    m = np.clip(m, 0, 1)
+    nat = (np.clip(g_body, 0, 1)[:, None] * tb) * (1 - m[:, None]) + (np.clip(g_pat, 0, 1)[:, None] * tp) * m[:, None]
+    own = np.where(region == 1, 1 - m, m)  # how much of the other region shows here
+    alpha = 1 - sstep(0.02, 0.25, own)
+    grey = np.where(region == 1, g_pat, g_body)
+    return grey, alpha.astype(F32), nat.astype(F32)
+
+
+def finish_rgb(grey, alpha, natv, region, tb, tp):
+    """Map RGB: grey where fully tinted; elsewhere natural / lerp(1, tint, alpha), so the engine's
+    TintMask (rgb x lerp(1, Color, alpha)) shows the natural colour at the stock Color."""
+    tint_reg = np.where((region == 1)[:, None], tp, tb)
+    denom = 1 - alpha[:, None] + alpha[:, None] * tint_reg
+    rgb = np.where(alpha[:, None] > 0.999, np.clip(grey, 0, 1)[:, None].repeat(3, 1), natv / np.maximum(denom, 1e-3))
+    return np.clip(rgb, 0, 1).astype(F32)
+
+
 def sstep(a, b, x):
     t = np.clip((np.asarray(x, dtype=F32) - a) / (b - a), 0, 1)
     return t * t * (3 - 2 * t)
@@ -327,7 +350,8 @@ def paint_body(sp, variant, lo, hi, W, bone_names, opts, log):
         "W": interp_vertex(A, ids, b, W), "bone_names": bone_names,
     }
     log(f"rasterised {filled.sum()} texels ({100 * filled.mean():.0f} % of {res}^2)")
-    paint = sp.paint(texels, variant, {"vnoise": vnoise, "fbm": fbm, "strands": strands, "sstep": sstep, "fur_relief": fur_relief})
+    paint = sp.paint(texels, variant, {"vnoise": vnoise, "fbm": fbm, "strands": strands, "sstep": sstep, "fur_relief": fur_relief,
+                                       "region_colours": region_colours, "finish_rgb": finish_rgb})
     log("painted")
     ext = getattr(sp, "BAKE_EXTRUSION", 0.03)
     nb = bake(lo, hi, "NORMAL", res, None, ext, ext * 2, samples=2)

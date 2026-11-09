@@ -27,7 +27,7 @@ def _uv_from_corners(obj, corner_uvs):
 
 # ---- eyes -------------------------------------------------------------------------------------------
 
-def eye_textures(variant, out_dir, res=256):
+def eye_textures(variant, out_dir, res=256, name=None):
     """Colour and roughness maps for the eyeballs; UV v = 1 at the pupil (sphere pole)."""
     ys, xs = np.mgrid[0:res, 0:res]
     u = (xs + 0.5) / res
@@ -38,7 +38,22 @@ def eye_textures(variant, out_dir, res=256):
     col = np.zeros((res, res, 4), F32)
     col[..., 3] = 1
     rough = np.full((res, res), 0.06, F32)
-    if variant == "rodent":
+    if variant == "fox":
+        ph = u * 2 * math.pi
+        iris = 62.0
+        c = np.array([0.80, 0.52, 0.12]) * (0.75 + 0.5 * rad[..., None]) * (1 - 0.45 * np.clip(th / iris, 0, 1))[..., None]
+        slit = (th * np.abs(np.cos(ph)) < 5.5) & (th < 30)
+        c = np.where(slit[..., None], np.array([0.02, 0.015, 0.01]), c)
+        ring = np.exp(-((th - iris) / 3.0) ** 2)
+        c = c * (1 - 0.8 * ring[..., None])
+        c = np.where((th >= iris)[..., None], np.array([0.06, 0.04, 0.03]), c)
+    elif variant == "deer":
+        pupil, iris = 30.0, 68.0
+        c = np.zeros((res, res, 3)) + np.array([0.015, 0.012, 0.01])
+        irisc = np.array([0.12, 0.07, 0.035]) * (0.6 + 0.8 * rad[..., None])
+        c = np.where(((th > pupil) & (th < iris))[..., None], irisc, c)
+        c = np.where((th >= iris)[..., None], np.array([0.04, 0.03, 0.025]), c)
+    elif variant == "rodent":
         pupil, iris = 11.0, 40.0
         # sclera: yellowed with red veins running in toward the iris
         sclera = np.array([0.86, 0.80, 0.66])
@@ -63,7 +78,8 @@ def eye_textures(variant, out_dir, res=256):
         c = np.where((th >= iris)[..., None], np.array([0.05, 0.035, 0.03]), c)
     col[..., :3] = np.clip(c, 0, 1)
     rgba_r = np.stack([rough] * 3 + [np.ones_like(rough)], -1)
-    paths = {"color": os.path.join(out_dir, f"{variant}_eyes_color.png"), "roughness": os.path.join(out_dir, f"{variant}_eyes_roughness.png")}
+    name = name or variant
+    paths = {"color": os.path.join(out_dir, f"{name}_eyes_color.png"), "roughness": os.path.join(out_dir, f"{name}_eyes_roughness.png")}
     bl.save_png(paths["color"], col)
     bl.save_png(paths["roughness"], rgba_r, colorspace="Non-Color")
     return paths
@@ -75,7 +91,7 @@ def build_eyes(sp, variant, arm, bone_names, out_dir):
     off = 0
     for side in (1, -1):
         c = sp.eye_centre(variant, side)
-        gaze = np.array([side * 0.86, -0.48, 0.16])
+        gaze = sp.eye_gaze(side)
         v, f, uv = geometry.uv_sphere(c, sp.eye_radius(variant), gaze, segs=14, rings=8)
         allv.extend(v.tolist())
         allf.extend([tuple(i + off for i in face) for face in f])
@@ -87,7 +103,7 @@ def build_eyes(sp, variant, arm, bone_names, out_dir):
     W[:, bone_names.index("Head")] = 1
     _assign(obj, bone_names, W)
     rig.bind(obj, arm)
-    paths = eye_textures(variant, out_dir)
+    paths = eye_textures(variant if variant == "rodent" else getattr(sp, "EYE_STYLE", "squirrel"), out_dir, name=variant)
     mat = tx.principled_material("Eyes", paths)
     obj.data.materials.append(mat)
     if variant == "rodent":
@@ -131,9 +147,8 @@ def card_atlas(variant, out_dir, res=512):
                 cx = x0 + bend * t * t + (0.5 - x0) * 0.25 * t
                 width = w0 * (1 - t) ** 0.6 + 0.003
                 d = (xx - cx) / width
-                cov = np.clip(1 - np.abs(d), 0, 1) * (yy <= h) * (1 - 0.6 * t ** 3)
-                tone = level * (0.72 + 0.28 * t) * rng.uniform(0.85, 1.12)
-                tone = tone * (1 - 0.25 * np.exp(-((t - 0.78) / 0.07) ** 2))  # dark sub-tip band (agouti)
+                cov = np.clip(1 - np.abs(d), 0, 1) * (yy <= h) * (1 - 0.75 * t ** 2) * (0.55 + 0.45 * np.clip(yy * 6, 0, 1))
+                tone = level * (0.86 + 0.18 * t) * rng.uniform(0.9, 1.1)
                 take = cov > a
                 g = np.where(take, tone, g)
                 nx = np.where(take, np.clip(d, -1, 1) * 0.8, nx)
@@ -141,7 +156,7 @@ def card_atlas(variant, out_dir, res=512):
             y0 = (CELLS_Y - 1 - j) * ch
             x0p = i * cw
             col[y0 : y0 + ch, x0p : x0p + cw, :3] = np.clip(g, 0, 1)[..., None]
-            col[y0 : y0 + ch, x0p : x0p + cw, 3] = np.clip(a * 1.25, 0, 1)
+            col[y0 : y0 + ch, x0p : x0p + cw, 3] = np.clip(a * 0.95, 0, 1)
             nz = np.sqrt(np.clip(1 - nx * nx, 0, 1))
             nrm[y0 : y0 + ch, x0p : x0p + cw] = np.stack([nx * 0.5 + 0.5, np.full_like(nx, 0.5), nz * 0.5 + 0.5], -1)
     # colour under transparent texels: dilate so filtering never pulls in black

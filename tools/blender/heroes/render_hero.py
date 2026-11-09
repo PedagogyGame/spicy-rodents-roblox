@@ -196,7 +196,7 @@ def main(argv):
         rest(arm)
     if opts.still:
         for i, (az, el) in enumerate(((-58, 12), (-150, 18), (0, 4))):
-            place(cam, center, size * 5.0, az, el)
+            place(cam, center + Vector((0, 0, 0.15 * size)), size * 5.6, az, el)
             scene.render.filepath = os.path.join(opts.out, f"{tag}_still_{i}.png")
             bpy.ops.render.render(write_still=True)
             written.append(scene.render.filepath)

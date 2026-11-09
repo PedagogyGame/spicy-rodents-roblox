@@ -82,6 +82,9 @@ type Station = {
 	dirty: boolean,
 	lastBroadcast: number,
 	seen: { [any]: boolean }, -- players told they are seated
+	screenSig: string?, -- what the world scoreboard shows now
+	aiAt: number?, -- when the computer player acts
+	clearAt: number?, -- when the thrown darts come out of the board
 }
 
 local function nameOf(player: any): string
