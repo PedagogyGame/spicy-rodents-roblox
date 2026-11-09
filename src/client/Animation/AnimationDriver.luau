@@ -13,8 +13,21 @@
 -- Speed is the body's observed speed (smoothed; horizontal for humans, 3D for animals so climbing
 -- animates), which works the same for anchored AI bodies moved by the server and for client-owned
 -- bodies. For AI bodies the server's `ClipT0` attribute aligns the clip phase across clients when a
--- track starts. No side effects on require.
--- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS
+-- track starts.
+-- Visual root (owner playtest 2026-11-09: bodies bounced up and down and stood half in the grass):
+-- the visible body hangs off the root through the Motor6D named Root, so its C0 carries a client-only
+-- vertical offset and the root itself (the gameplay position the server sees) never moves.
+--   * Height smoothing: a critically damped follower with velocity feed-forward tracks the rendered
+--     root height (read in RenderStepped, after physics), so slopes are followed with no lag while
+--     ground-sampling steps, kerbs and replication steps are eased out; it rises fast and settles
+--     slowly, so a body rides the top of any jitter instead of dipping into the ground.
+--   * Ground contact: AI bodies (anchored roots, placed on World/Height's analytic ground by the
+--     server) are lifted or lowered onto what is really under their feet: a short downward ray from
+--     just above the feet, a few times a second, against collidable town parts and the voxel terrain
+--     (whose surface can sit up to about a stud above the analytic height). Possessed bodies stand
+--     on their own motor's raycast ground or Humanoid, so they get smoothing only (people none).
+-- No side effects on require.
+-- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; settle(state, y, dt) (pure)
 
 local Gait = require("./Gait")
 local Import = require("../Import")
@@ -62,9 +75,56 @@ type Entry = {
 	joints: { Joint },
 	tailN: number,
 	phase: number,
+	-- visual root (Root joint C0 offset)
+	rootJoint: Motor6D?,
+	baseC0: CFrame,
+	footDrop: number, -- studs from the root down to the soles at rest
+	settle: Settle,
+	fix: number, -- studs, the ground-contact correction now (eased)
+	fixTarget: number,
+	nextProbe: number,
+	anchored: boolean,
+	applied: number,
 }
 
+export type Settle = { y: number, v: number, rootV: number, lastY: number, live: boolean }
+
 local AnimationDriver = {}
+
+-- Visual root tuning (studs, seconds, rad/s).
+AnimationDriver.RISE = 30 -- omega while the visual body is below the root (catch up fast)
+AnimationDriver.FALL = 11 -- omega while it is above (settle smoothly)
+AnimationDriver.VELOCITY_TAU = 0.08 -- low-pass on the root's vertical velocity (feed-forward)
+AnimationDriver.MAX_LAG = 0.6 -- the visual body never strays further than this from the root
+AnimationDriver.SNAP = 6 -- a jump bigger than this in one frame is a teleport: no easing
+AnimationDriver.PROBE_EVERY = 0.25
+AnimationDriver.PROBE_RANGE = 320 -- only bodies this close to the camera are probed
+AnimationDriver.PROBE_UP = 1.6 -- the ray starts this far above the soles (starts inside a hedge: ignored)
+AnimationDriver.FIX_MIN = -0.75
+AnimationDriver.FIX_MAX = 1.4
+AnimationDriver.CLEARANCE = 0.04 -- soles rest this much above the surface found
+
+-- settle(state, y, dt): one frame of the critically damped follower towards the rendered root height
+-- y. Pure (Lune-tested). Returns the offset (visual - root) to apply this frame.
+function AnimationDriver.settle(st: Settle, y: number, dt: number): number
+	if not st.live or dt <= 0 or math.abs(y - st.y) > AnimationDriver.SNAP then
+		st.y, st.v, st.rootV, st.lastY, st.live = y, 0, 0, y, true
+		return 0
+	end
+	local rawV = (y - st.lastY) / dt
+	st.lastY = y
+	st.rootV += (rawV - st.rootV) * (1 - math.exp(-dt / AnimationDriver.VELOCITY_TAU))
+	-- error relative to the moving target; exact critically damped decay over dt
+	local w = if st.y < y then AnimationDriver.RISE else AnimationDriver.FALL
+	local err, errV = st.y - y, st.v - st.rootV
+	local decay = math.exp(-w * dt)
+	local k = (errV + w * err) * dt
+	err = (err + k) * decay
+	errV = (errV - w * k) * decay
+	err = math.clamp(err, -AnimationDriver.MAX_LAG, AnimationDriver.MAX_LAG)
+	st.y, st.v = y + err, st.rootV + errV
+	return err
+end
 
 -- Roblox's stock R15 animations (public, owned by Roblox: the default Animate script's IDs). The
 -- animals use the procedural Gait (the S7 test clip 92005834447457 stays for the clip pipeline only).
@@ -102,6 +162,28 @@ local function gaitJoints(model: Model): ({ Joint }, number)
 		end
 	end
 	return joints, tailN
+end
+
+-- The Motor6D named Root that hangs the visible body off the root part (animals: RootPart -> Pelvis;
+-- R15: HumanoidRootPart -> LowerTorso).
+local function rootJointOf(model: Model, root: BasePart): Motor6D?
+	for _, d in model:GetDescendants() do
+		if d:IsA("Motor6D") and d.Name == "Root" and d.Part0 == root then
+			return d
+		end
+	end
+	return nil
+end
+
+-- Studs from the root's centre down to the soles: the puppet's HipHeight attribute (the root's
+-- height above the ground), else the model's bounding box at rest.
+local function footDropOf(model: Model, root: BasePart): number
+	local hip = model:GetAttribute("HipHeight")
+	if type(hip) == "number" and model:FindFirstChildOfClass("Humanoid") == nil then
+		return hip
+	end
+	local cf, size = model:GetBoundingBox()
+	return root.Position.Y - (cf.Position.Y - size.Y / 2)
 end
 
 local function ensureAnimator(body: Model): Animator?
@@ -187,6 +269,7 @@ function AnimationDriver.start(opts: Opts): Driver
 				return
 			end
 		end
+		local rootJoint = rootJointOf(model, root)
 		entries[model] = {
 			body = model,
 			root = root,
@@ -202,6 +285,15 @@ function AnimationDriver.start(opts: Opts): Driver
 			joints = joints,
 			tailN = tailN,
 			phase = (#model.Name * 0.37) % (2 * math.pi),
+			rootJoint = rootJoint,
+			baseC0 = if rootJoint then rootJoint.C0 else CFrame.identity,
+			footDrop = footDropOf(model, root),
+			settle = { y = 0, v = 0, rootV = 0, lastY = 0, live = false },
+			fix = 0,
+			fixTarget = 0,
+			nextProbe = os.clock() + ((#model.Name * 0.173) % 1) * AnimationDriver.PROBE_EVERY,
+			anchored = root.Anchored,
+			applied = 0,
 		}
 		count += 1
 	end
@@ -214,6 +306,10 @@ function AnimationDriver.start(opts: Opts): Driver
 			end
 			for _, j in e.joints do
 				j.motor.Transform = CFrame.identity
+			end
+			local rj = e.rootJoint
+			if rj and e.applied ~= 0 then
+				rj.C0 = e.baseC0
 			end
 			entries[child :: any] = nil
 			count -= 1
@@ -240,11 +336,69 @@ function AnimationDriver.start(opts: Opts): Driver
 		return if set.run then "run" else "walk"
 	end
 
+	-- ground probe: collidable parts and terrain, never bodies, the camera's own parts or water
+	local probe = RaycastParams.new()
+	probe.FilterType = Enum.RaycastFilterType.Exclude
+	probe.RespectCanCollide = true
+	probe.IgnoreWater = true
+	probe.FilterDescendantsInstances = { opts.container, workspace.CurrentCamera }
+	local DOWN = Vector3.new(0, -(AnimationDriver.PROBE_UP - AnimationDriver.FIX_MIN + 0.5), 0)
+
+	-- the visual root of one body this frame (after physics: root.Position is what renders)
+	local function visualRoot(e: Entry, pos: Vector3, dt: number, now: number, camPos: Vector3)
+		local rj = e.rootJoint
+		if rj == nil or rj.Parent == nil then
+			return
+		end
+		local anchored = e.root.Anchored
+		if anchored ~= e.anchored then
+			-- possession or release: carry the ground correction into the smoothed height so the
+			-- body does not jump when the root takes over (or gives up) the real ground
+			e.anchored = anchored
+			e.settle.y += e.fix
+			e.fix, e.fixTarget = 0, 0
+		end
+		local off = 0
+		if not (e.humanoid and not anchored) then -- a possessed person stands on its Humanoid
+			off = AnimationDriver.settle(e.settle, pos.Y, dt)
+		end
+		if anchored then
+			if now >= e.nextProbe then
+				e.nextProbe = now + AnimationDriver.PROBE_EVERY
+				local target = 0
+				if (pos - camPos).Magnitude < AnimationDriver.PROBE_RANGE then
+					local sole = pos.Y - e.footDrop
+					local hit =
+						workspace:Raycast(Vector3.new(pos.X, sole + AnimationDriver.PROBE_UP, pos.Z), DOWN, probe)
+					if hit and hit.Normal.Y > 0.6 then
+						local lift = hit.Position.Y + AnimationDriver.CLEARANCE - sole
+						if lift >= AnimationDriver.FIX_MIN and lift <= AnimationDriver.FIX_MAX then
+							target = lift
+						end
+					end
+				end
+				e.fixTarget = target
+			end
+		else
+			e.fixTarget = 0
+		end
+		e.fix += (e.fixTarget - e.fix) * (1 - math.exp(-dt * 8))
+		off += e.fix
+		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) then
+			e.applied = off
+			local up = e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))
+			rj.C0 = CFrame.new(up) * e.baseC0
+		end
+	end
+
 	local function step(dt: number)
 		if dt <= 0 then
 			return
 		end
 		local alpha = math.min(1, dt / 0.15)
+		local now = os.clock()
+		local camera = workspace.CurrentCamera
+		local camPos = if camera then camera.CFrame.Position else Vector3.zero
 		for _, e in entries do
 			local pos = e.root.Position
 			local d = pos - e.lastPos
@@ -258,6 +412,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			end
 			e.speed += (inst - e.speed) * alpha
 			e.vy += (vy - e.vy) * alpha
+			visualRoot(e, pos, dt, now, camPos)
 			if e.gait then
 				continue -- posed in Stepped (gaitStep)
 			end

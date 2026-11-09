@@ -2,7 +2,9 @@
 -- tools/review/export: flatten the baked rbxm files into build/review/scene.json for tools/review/render.py
 -- (visual review renders for a developer who cannot open Studio; nothing here ships or touches the game).
 -- Usage (repo root): lune run tools/review/export.luau [--out build/review/scene.json] [--step 4] [--no-terrain]
--- Inputs: build/Town.rbxm and build/EditorGround.rbxm (run tools/bake first) and assets/placeholders/*.rbxm.
+--   [--placeholders assets/placeholders]
+-- Inputs: build/Town.rbxm and build/EditorGround.rbxm (run tools/bake first) and <placeholders>/*.rbxm (run.sh
+-- rebuilds them from the current PuppetSpec into build/review/placeholders; the committed set is the default).
 --
 -- Everything is written in ROBLOX coordinates (studs, Y up, right-handed, -Z forward); render.py converts.
 --   parts[]  : { g = group, p = path, s = shape, size = {x,y,z}, pos = {x,y,z},
@@ -37,6 +39,7 @@ local Height = require("../../src/shared/World/Height")
 local out = "build/review/scene.json"
 local step = 4
 local withTerrain = true
+local placeholders = "assets/placeholders"
 local i = 1
 while i <= #process.args do
 	local a = process.args[i]
@@ -48,6 +51,9 @@ while i <= #process.args do
 		i += 1
 	elseif a == "--no-terrain" then
 		withTerrain = false
+	elseif a == "--placeholders" then
+		placeholders = process.args[i + 1]
+		i += 1
 	else
 		error("unknown argument: " .. a)
 	end
@@ -257,7 +263,10 @@ for _, d in town:GetDescendants() do
 		if math.abs(d.CFrame.YVector.Y) > 0.9999 then
 			local lo, hi = aabb(d)
 			local c = rgb(d.Color)
-			table.insert(tops, { part = d, top = hi.Y, lo = lo, hi = hi, look = `{c[1]},{c[2]},{c[3]}/{d.Material.Name}` })
+			table.insert(
+				tops,
+				{ part = d, top = hi.Y, lo = lo, hi = hi, look = `{c[1]},{c[2]},{c[3]}/{d.Material.Name}` }
+			)
 		end
 	end
 end
@@ -326,7 +335,7 @@ local LINEUP = {
 local lineup = { ground = { y = 0 }, items = {} :: { any }, labels = {} :: { any } }
 local cursorX = 0
 for _, name in LINEUP do
-	local file = `assets/placeholders/{name}.rbxm`
+	local file = `{placeholders}/{name}.rbxm`
 	if fs.isFile(file) then
 		local model = load(file)[1]
 		local hip = model:GetAttribute("HipHeight") or model:GetAttribute("BaseOffset") or 0
