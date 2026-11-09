@@ -338,12 +338,21 @@ function Game.start(opts: Opts?): any
 				ok = true
 			else
 				ok, why = rt.become(player, "squirrel", variant)
+				if not ok and why and string.find(why, "no free", 1, true) then
+					-- there is one Spicy Rodent in town (brief v2): say so instead of "no free squirrel"
+					why = if choice == "rodent"
+						then "Someone else is already the Spicy Rodent. Pick another body."
+						else "Every squirrel is taken. Pick another body."
+				end
 			end
 		elseif choice == "townsperson" then
 			if current and current.species == "human" and s.role == "townsperson" then
 				ok = true
 			else
 				ok, why = rt.become(player, "human", nil)
+				if not ok and why and string.find(why, "no free", 1, true) then
+					why = "Every townsperson is taken. Pick another body."
+				end
 			end
 		else -- police, drone
 			local officer = if current
@@ -353,6 +362,7 @@ function Game.start(opts: Opts?): any
 				else freeOfficer()
 			local target = deviceModel(if choice == "drone" then "drone_" else "car_")
 			if officer == nil then
+				fire(player, { kind = "refused", text = "Every police officer is taken. Pick another body." })
 				return false, "no free officer"
 			end
 			local root = if target then target.PrimaryPart else nil

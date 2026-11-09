@@ -488,7 +488,9 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 					return false
 				end
 				stageLabel.Text = st
-				elapsedLabel.Text = `{secs} s   ·   the first start can take up to a minute`
+				elapsedLabel.Text = if secs < 90
+					then `{secs} s   ·   the first start can take up to a minute`
+					else `{secs} s   ·   still waiting for the server: if this does not move, press Stop and send the View > Output text`
 				if ReplicatedStorage:GetAttribute("BootReady") == true then
 					ready = true
 					break
