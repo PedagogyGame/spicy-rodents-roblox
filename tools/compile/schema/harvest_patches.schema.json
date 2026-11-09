@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/harvest_patches",
+  "title": "Harvest patches (data/harvest_patches.json), BUILD_PLAN 3.12 and 4.4 #7 (S-2): every harvested route the rebuild changes, drops or locks, with a reason.",
+  "type": "object",
+  "required": ["patches", "src"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" }, "src": { "type": "string" },
+    "lots": { "type": "array", "items": { "type": "object", "required": ["lot", "action", "reason", "cite"], "additionalProperties": false,
+      "properties": { "lot": { "type": "string" }, "action": { "enum": ["harvest_lock"] }, "reason": { "type": "string", "minLength": 12 }, "cite": { "type": "string", "minLength": 4 }, "until": { "type": "string" } } } },
+    "patches": { "type": "array", "items": { "type": "object", "required": ["id", "routes", "action", "reason", "cite"], "additionalProperties": false,
+      "properties": { "id": { "type": "string" }, "routes": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 0 } },
+        "action": { "enum": ["keep_off_geometry", "reseat", "drop", "harvest_lock"] }, "reason": { "type": "string", "minLength": 12 },
+        "cite": { "type": "string", "minLength": 4 }, "until": { "type": "string" } } } }
+  }
+}

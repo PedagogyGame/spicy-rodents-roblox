@@ -77,10 +77,88 @@ local function regexToLuau(re: string): string
 		end
 		return "%" .. c
 	end)
+	-- an unescaped "-" outside a class is a literal in regex but a lazy quantifier in Luau
+	local buf, inClass, k = {}, false, 1
+	while k <= #out do
+		local c = string.sub(out, k, k)
+		if c == "%" then
+			table.insert(buf, string.sub(out, k, k + 1))
+			k += 2
+		else
+			if c == "[" then
+				inClass = true
+			elseif c == "]" then
+				inClass = false
+			end
+			table.insert(buf, if c == "-" and not inClass then "%-" else c)
+			k += 1
+		end
+	end
+	out = table.concat(buf)
 	if string.find(out, "[|{}]") then
 		error("unsupported regex feature in pattern: " .. re)
 	end
 	return out
+end
+
+-- Expand groups and alternation into plain alternatives: "^(a|b(\\.c)?)$" -> { "^a$", "^b$", "^b\\.c$" }.
+-- Handles nested "( | )" groups with an optional trailing "?" (W1: the lot `seat` pattern).
+local function expandRegex(re: string): { string }
+	local i, n = 1, #re
+	while i <= n do
+		local c = string.sub(re, i, i)
+		if c == "\\" then
+			i += 2
+		elseif c == "[" then
+			local close = string.find(re, "]", i + 1, true) or n
+			i = close + 1
+		elseif c == "(" then
+			local depth, j = 1, i + 1
+			local alts: { string } = {}
+			local start = j
+			while j <= n and depth > 0 do
+				local d = string.sub(re, j, j)
+				if d == "\\" then
+					j += 1
+				elseif d == "(" then
+					depth += 1
+				elseif d == ")" then
+					depth -= 1
+					if depth == 0 then
+						table.insert(alts, string.sub(re, start, j - 1))
+					end
+				elseif d == "|" and depth == 1 then
+					table.insert(alts, string.sub(re, start, j - 1))
+					start = j + 1
+				end
+				j += 1
+			end
+			local prefix, rest = string.sub(re, 1, i - 1), string.sub(re, j)
+			if string.sub(rest, 1, 1) == "?" then
+				rest = string.sub(rest, 2)
+				table.insert(alts, "")
+			end
+			local out: { string } = {}
+			for _, a in alts do
+				for _, e in expandRegex(prefix .. a .. rest) do
+					table.insert(out, e)
+				end
+			end
+			return out
+		else
+			i += 1
+		end
+	end
+	return { re }
+end
+
+local function matchesPattern(str: string, re: string): boolean
+	for _, alt in expandRegex(re) do
+		if string.find(str, regexToLuau(alt)) then
+			return true
+		end
+	end
+	return false
 end
 
 local function resolveRef(ref: string, root: any): any
@@ -197,7 +275,7 @@ validate = function(schema: any, value: any, path: string, root: any, errors: { 
 		if s.maxLength and #str > s.maxLength then
 			push(errors, path, string.format("string longer than %d", s.maxLength))
 		end
-		if s.pattern and not string.find(str, regexToLuau(s.pattern)) then
+		if s.pattern and not matchesPattern(str, s.pattern) then
 			push(errors, path, string.format("%s does not match pattern %s", describe(value), s.pattern))
 		end
 	elseif tv == "table" then

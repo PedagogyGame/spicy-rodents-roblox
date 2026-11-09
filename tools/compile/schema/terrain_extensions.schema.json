@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/terrain_extensions",
+  "title": "Terrain extensions (data/terrain_extensions.json), BUILD_PLAN D32. HTML units.",
+  "type": "object",
+  "required": ["verbatimRect", "blendU", "worldClampU", "patches", "districts", "src"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" }, "src": { "type": "string" },
+    "verbatimRect": { "$ref": "#/$defs/rect" }, "worldClampU": { "$ref": "#/$defs/rect" },
+    "blendU": { "type": "number", "exclusiveMinimum": 0 },
+    "patches": { "type": "array", "items": { "type": "object", "required": ["id", "shape", "mode", "material"],
+      "properties": { "id": { "type": "string" }, "shape": { "enum": ["dome", "ridge", "field", "beach"] }, "mode": { "enum": ["add", "set"] },
+        "material": { "enum": ["Grass", "Sand", "Rock", "Ground"] } } } },
+    "districts": { "type": "array", "items": { "type": "object", "required": ["id", "jurisdiction", "terrain", "minX", "maxX", "minZ", "maxZ"],
+      "properties": { "id": { "type": "string" }, "jurisdiction": { "type": "boolean" }, "terrain": { "enum": ["v54", "extension"] } } } }
+  },
+  "$defs": { "rect": { "type": "object", "required": ["minX", "maxX", "minZ", "maxZ"], "additionalProperties": false,
+    "properties": { "minX": { "type": "number" }, "maxX": { "type": "number" }, "minZ": { "type": "number" }, "maxZ": { "type": "number" } } } }
+}

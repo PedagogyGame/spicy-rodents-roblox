@@ -5,6 +5,10 @@
 return {
 	harvestPin = { sha256 = "fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227" },
 	modules = {
+		Buildings = {
+			count = 1,
+			chunks = { "Buildings" },
+		},
 		Cast = {
 			count = 87,
 			chunks = { "Cast" },
@@ -13,13 +17,37 @@ return {
 			count = 95,
 			chunks = { "Forks" },
 		},
+		HarvestPatches = {
+			count = 1,
+			chunks = { "HarvestPatches" },
+		},
+		Hollows = {
+			count = 1,
+			chunks = { "Hollows" },
+		},
+		Interiors = {
+			count = 1,
+			chunks = { "Interiors" },
+		},
 		Lanes = {
 			count = 25,
 			chunks = { "Lanes" },
 		},
+		Lighting = {
+			count = 1,
+			chunks = { "Lighting" },
+		},
+		LotTypes = {
+			count = 1,
+			chunks = { "LotTypes" },
+		},
 		Lots = {
 			count = 243,
 			chunks = { "Lots" },
+		},
+		Population = {
+			count = 1,
+			chunks = { "Population" },
 		},
 		Roads = {
 			count = 116,
@@ -32,6 +60,10 @@ return {
 		RoutesCatalog = {
 			count = 60,
 			chunks = { "RoutesCatalog" },
+		},
+		TerrainExtensions = {
+			count = 1,
+			chunks = { "TerrainExtensions" },
 		},
 		Wildlife = {
 			count = 1,

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/lighting",
+  "title": "Street lighting (data/authored/town/lighting.json), BUILD_PLAN 3.19. HTML units.",
+  "type": "object",
+  "required": ["lamps", "porch", "shopFront", "flicker", "client", "skyline", "src"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" }, "src": { "type": "string" },
+    "lamps": { "type": "object", "required": ["perBlockSide", "spacingMaxU", "height", "setbackU"],
+      "properties": { "perBlockSide": { "type": "integer", "minimum": 1 }, "spacingMaxU": { "type": "number", "exclusiveMinimum": 0 }, "height": { "type": "number" }, "setbackU": { "type": "number" } } },
+    "porch": { "type": "object" }, "shopFront": { "type": "object" }, "client": { "type": "object" }, "skyline": { "type": "object" },
+    "flicker": { "type": "object", "required": ["fraction", "seed"], "properties": { "fraction": { "type": "number", "minimum": 0.05, "maximum": 0.1 }, "seed": { "type": "integer" } } }
+  }
+}

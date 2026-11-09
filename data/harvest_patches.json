@@ -1,0 +1,6 @@
+{
+  "$schema": "../tools/compile/schema/harvest_patches.schema.json",
+  "src": "BUILD_PLAN §3.12, §4.4 #7 (S-2)",
+  "lots": [],
+  "patches": []
+}

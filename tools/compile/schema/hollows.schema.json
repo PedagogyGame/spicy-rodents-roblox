@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/hollows",
+  "title": "Hollows (data/hollows.json), BUILD_PLAN 3.5 and 5.5: 12 claimable + the log. HTML units.",
+  "type": "object",
+  "required": ["hollows", "log", "meterDefaults", "src"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" }, "src": { "type": "string" },
+    "meterDefaults": { "type": "object", "required": ["capacity", "ownAt"], "additionalProperties": false,
+      "properties": { "capacity": { "type": "number", "exclusiveMinimum": 0 }, "ownAt": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 } } },
+    "hollows": { "type": "array", "items": { "$ref": "#/$defs/hollow" } },
+    "log": { "type": "object", "required": ["id", "variant", "claimable", "x", "z", "exits", "routeKind", "src"], "additionalProperties": false,
+      "properties": { "id": { "type": "string" }, "variant": { "const": "log" }, "claimable": { "const": false }, "x": { "type": "number" }, "z": { "type": "number" },
+        "lengthU": { "type": "number" }, "yaw": { "type": "number" }, "exits": { "type": "integer", "minimum": 2 },
+        "nook": { "type": "object" }, "routeKind": { "const": "tunnel" }, "src": { "type": "string" } } }
+  },
+  "$defs": {
+    "hollow": { "type": "object", "required": ["id", "tier", "variant", "tree", "x", "z", "chambers", "knotholes", "claimable", "src"], "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^H\\d+$" }, "tier": { "enum": ["premium", "escape", "single"] },
+        "variant": { "enum": ["spiral", "shaft", "escape", "knothole"] }, "tree": { "type": "string" },
+        "x": { "type": "number" }, "z": { "type": "number" }, "girth": { "type": "number" }, "asset": { "type": "string" },
+        "chambers": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["id", "h", "cap"], "additionalProperties": false,
+          "properties": { "id": { "type": "string" }, "h": { "type": "number", "minimum": 0, "maximum": 1 }, "cap": { "type": "number", "exclusiveMinimum": 0 },
+            "lookout": { "type": "boolean" }, "hideout": { "type": "boolean" } } } },
+        "knotholes": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["h", "bearing", "chamber", "exitTo"], "additionalProperties": false,
+          "properties": { "h": { "type": "number", "minimum": 0, "maximum": 1 }, "bearing": { "type": "number", "minimum": 0, "maximum": 360 },
+            "chamber": { "type": "string" }, "exitTo": { "type": "string" } } } },
+        "interiorRoute": { "type": "object" },
+        "meter": { "type": "object", "required": ["capacity", "ownAt"], "properties": { "capacity": { "type": "number" }, "ownAt": { "type": "number" } } },
+        "claimable": { "type": "boolean" },
+        "premiumForage": { "type": "array", "items": { "type": "object", "required": ["id", "kind", "x", "z"], "additionalProperties": false,
+          "properties": { "id": { "type": "string" }, "kind": { "enum": ["garden", "feeder"] }, "x": { "type": "number" }, "z": { "type": "number" } } } },
+        "note": { "type": "string" }, "src": { "type": "string" }
+      } }
+  }
+}

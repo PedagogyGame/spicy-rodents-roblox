@@ -15,6 +15,7 @@ local Units = require("./lib/Units")
 local LuauEmit = require("./lib/LuauEmit")
 local Migrate = require("./lib/Migrate")
 local Report = require("./lib/Report")
+local W1 = require("./lib/W1")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -180,6 +181,7 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	local lots: { any } = {}
 	local lotsPerDistrict = {}
 	local lotIds: { [string]: boolean } = {}
+	local lotsHtml: { [string]: any } = {}
 	for _, f in lotFiles do
 		local doc = loadValidated(authored .. "/town/lots/" .. f, lotsSchema)
 		local conv = Units.convert(doc, lotsSchema)
@@ -199,6 +201,7 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 				row.interiors += 1
 			end
 			table.insert(lots, conv.lots[i])
+			lotsHtml[lot.id] = lot
 		end
 		table.insert(lotsPerDistrict, row)
 	end
@@ -405,6 +408,22 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 		#(wildlife.hollows.premium :: { any }) + #(wildlife.hollows.knothole :: { any })
 	)
 
+	-- W1 data (lot types, buildings, interiors, patches, population, hollows, terrain, lighting)
+	local w1 = W1.compile({
+		repo = repo,
+		lots = lots,
+		lotsHtml = lotsHtml,
+		routeIds = routeIds,
+		invariant = invariant,
+		compare = compare,
+		schemaError = function(path: string, errs: { Schema.Error })
+			errorsTotal += #errs
+			filesValidated += 1
+			stdio.ewrite("compile: schema errors in " .. path .. "\n" .. Schema.formatErrors(path, errs) .. "\n")
+		end,
+		warnings = warnings,
+	})
+
 	for _, c in comparisons do
 		if c.status ~= "match" then
 			errorsTotal += 1
@@ -550,6 +569,11 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 			Forks = { count = #forkRecords, chunks = { "Forks" } },
 		},
 	}
+	for _, m in w1.modules do
+		emitModule(m.name, m.value, m.records, m.source, m.header)
+		generated[#generated].map = m.map
+		index.modules[m.name] = { count = 1, chunks = { m.name } }
+	end
 	emitModule("Index", index, 1, "tools/compile (module list, counts and the harvest pin)")
 
 	-- stylua pass so the generated files match the repository formatting
@@ -587,7 +611,7 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 			fail("generated module does not load under Lune: " .. g.name .. ": " .. tostring(result))
 		end
 		local n = if type(result) == "table" then #result else 0
-		if g.name ~= "Index" and g.name ~= "Wildlife" and n ~= g.records then
+		if g.name ~= "Index" and g.name ~= "Wildlife" and not g.map and n ~= g.records then
 			fail(string.format("generated module %s has %d records, expected %d", g.name, n, g.records))
 		end
 		if #text > largest.bytes then
