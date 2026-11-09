@@ -205,7 +205,8 @@ function DartsClient.onState(self: any, msg: { [string]: any })
 		self.ctx.setButtons({
 			{ "501", "501" },
 			{ "cricket", "Cricket" },
-			{ "start", "Start now" },
+			{ "addai", "+ Computer" },
+			{ "start", "Start" },
 			{ "leave", "Leave (Q)" },
 		})
 	elseif view.phase == "playing" then

@@ -122,16 +122,14 @@ def _terrain(scene, g):
     if not bd:
         return
     minx, maxx, minz, maxz = bd["clamp"]
-    north = bd["northFrom"]
-
-    st = bd["step"]
 
     def keep(x, z):
-        # one cell of overlap with the town's coarse grid (drawn 0.3 st lower) so no seam opens at the clamp edge
-        return (x < minx + st) | (x > maxx - st) | (z < minz + st) | (z > north - st)
+        # quads beyond the town's coarse grid (World/Height over the clamp, its north strip already replaced by the
+        # export): the two meet exactly at the coarse grid's outer column centres, both 0.3 st down, so no seam
+        return (x < minx) | (x >= maxx) | (z < minz) | (z >= maxz)
 
     tmat = bpy.data.materials.get("terrain") or g["material_terrain"]("terrain")
-    g["link_object"]("terrain_backdrop", g["grid_mesh"]("terrain_backdrop", bd, t["colors"], keep=keep), "backdrop_terrain", tmat)
+    g["link_object"]("terrain_backdrop", g["grid_mesh"]("terrain_backdrop", bd, t["colors"], keep=keep, drop=0.3), "backdrop_terrain", tmat)
     me = g["water_mesh"]("sea_water", bd, bd["seaY"])
     if me:
         wmat = g["material_simple"]("sea_water", (0.05, 0.17, 0.19), rough=0.16, alpha=0.86)

@@ -225,9 +225,65 @@ function MinigameService.fire(self: any, player: any, payload: { [string]: any }
 		if self.net and (player :: Player).Parent ~= nil then
 			self.net:fire(player, "Minigame.State", payload)
 		end
-	elseif type(player) == "table" then
+	elseif type(player) == "table" and not player.ai then
 		player.events = player.events or {}
 		table.insert(player.events, payload)
+	end
+end
+
+-- Computer players (AI fill: "Add a computer" in a bowling or darts lobby) ----------------------------------------
+MinigameService.AI_NAMES = { "Bowlbot", "Gutter Gus", "Strike Sally" }
+MinigameService.AI_DELAY = 2.2
+
+function MinigameService._addAi(self: any, st: Station): (boolean, string?)
+	local s = st.session
+	if s.phase ~= "lobby" then
+		return false, "Computers join in the lobby, before the game starts"
+	end
+	if st.kind ~= "lane" and st.kind ~= "dartboard" then
+		return false, "No computer players for this game"
+	end
+	self.aiCount = (self.aiCount or 0) + 1
+	local name = MinigameService.AI_NAMES[(self.aiCount - 1) % #MinigameService.AI_NAMES + 1] .. " (computer)"
+	local key = { ai = true, Name = name, UserId = -self.aiCount }
+	local ok, why = Session.join(s, key, name, self.clock)
+	st.dirty = true
+	return ok, why
+end
+
+-- the computer's go: a decent bowler (aims at the pocket with a little error) or a pub darts player (T20 or the
+-- bull, timing near the sweet spot)
+function MinigameService._aiTurn(self: any, st: Station, key: any)
+	if st.aiAt == nil then
+		st.aiAt = self.clock + MinigameService.AI_DELAY
+		return
+	end
+	if self.clock < st.aiAt then
+		return
+	end
+	local rng = Random.new(math.floor(self.clock * 1000) + (st.lane or 7))
+	if st.kind == "lane" and st.hw and st.hw:ready() then
+		st.aiAt = nil
+		local offset = rng:NextNumber(-0.25, 0.35)
+		local rx = AlleyLayout.release(st.lane :: number, offset)
+		local pocketX = AlleyLayout.laneX(st.lane :: number) + 0.3
+		local angle = math.atan((pocketX - rx) / AlleyLayout.HEAD_D) + rng:NextNumber(-0.014, 0.014)
+		st.hw:release({ offset = offset, angle = angle, power = rng:NextNumber(0.5, 0.85), spin = 0 })
+		Session.touch(st.session, self.clock)
+		st.dirty = true
+	elseif st.kind == "dartboard" and st.hw and not st.hw:busy() then
+		st.aiAt = self.clock + 1.1
+		local s = st.session
+		local seat = Session.seatOf(s, key)
+		local g = s.game and s.game.state
+		local aimX, aimY = 0, 103 -- T20
+		if g and g.mode == "501" and g.players[seat or 1].score <= 50 then
+			aimX, aimY = 0, 0
+		end
+		local ok = Session.apply(s, key, "throw", { aimX, aimY, 0.5 + rng:NextNumber(-0.09, 0.09) }, self.clock)
+		if ok then
+			self:_afterDart(st, seat)
+		end
 	end
 end
 
@@ -290,7 +346,24 @@ function MinigameService._refresh(self: any, st: Station)
 		return
 	end
 	local view = Session.view(s, self.clock)
-	if st.screen then
+	-- the world screen is rebuilt only when what it shows changed (it replicates to every player)
+	local sig = nil
+	pcall(function()
+		local g = view.game
+		sig = game:GetService("HttpService"):JSONEncode({
+			view.phase,
+			view.lobbyLeft,
+			view.turn,
+			view.seats,
+			g and g.seats,
+			g and g.dart,
+			g and g.mode,
+			view.mode,
+			view.result and view.result.winner,
+		})
+	end)
+	if st.screen and (sig == nil or sig ~= st.screenSig) then
+		st.screenSig = sig
 		local ok, err = pcall(function()
 			if st.kind == "lane" then
 				if s.phase == "idle" then
@@ -507,6 +580,8 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 			st.dirty = true
 		end
 		return ok, if ok then nil else why
+	elseif verb == "addai" then
+		return self:_addAi(st)
 	elseif verb == "mode" then
 		local ok, why = Session.apply(s, player, "mode", { args[1] }, self.clock)
 		st.dirty = true
@@ -774,8 +849,37 @@ function MinigameService.step(self: any, dt: number)
 				st.dirty = true
 			end
 		end
+		-- only computers left at the table: it resets
+		if s.phase ~= "idle" then
+			local human = false
+			for _, p in self:_seated(st) do
+				if not (type(p) == "table" and p.ai) then
+					human = true
+				end
+			end
+			if not human then
+				Session.reset(s)
+				if st.kind == "lane" and st.hw then
+					st.hw:reset(true)
+				elseif st.kind == "dartboard" and st.hw then
+					st.hw:clear()
+					st.hw:idle(true)
+				end
+				st.dirty = true
+			end
+		end
+		-- a computer player's turn
+		local turnKey = Session.turnKey(s)
+		if type(turnKey) == "table" and turnKey.ai and s.phase == "playing" then
+			self:_aiTurn(st, turnKey)
+		else
+			st.aiAt = nil
+		end
 		-- seated players who stopped being a person, or wandered off
 		for _, p in self:_seated(st) do
+			if type(p) == "table" and p.ai then
+				continue
+			end
 			local canPlay = self.opts.canPlay
 			local ok = true
 			if canPlay then

@@ -109,12 +109,25 @@ function MinigameClient.start(opts: { [string]: any }): any
 		InputMap.setCharacterControls(on)
 	end
 
+	local lastButtons = ""
 	local function setButtons(list: { { string } })
+		-- the same buttons again (every state message) leave the bar alone
+		local ids = {}
+		for _, b in list do
+			table.insert(ids, b[1] .. "=" .. b[2])
+		end
+		local sig = table.concat(ids, ",")
+		if sig == lastButtons and ui:isOpen() then
+			return
+		end
+		lastButtons = sig
 		ui:buttons(list, function(id: string)
 			if id == "leave" then
 				send("leave")
 			elseif id == "start" then
 				send("start")
+			elseif id == "addai" then
+				send("addai")
 			elseif id == "again" then
 				send("again")
 			elseif id == "501" or id == "cricket" then
@@ -126,6 +139,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 	local function close()
 		local a = active
 		active = nil
+		lastButtons = ""
 		player:SetAttribute("InMinigame", nil)
 		if a and a.controller then
 			a.controller:stop()
@@ -160,14 +174,15 @@ function MinigameClient.start(opts: { [string]: any }): any
 		if msg.game == "bowling" and p then
 			ui:open("bowling", `Bowling - {msg.label}`, BowlingClient.HELP);
 			(active :: any).controller = BowlingClient.new(ctx)
-			setButtons({ { "start", "Start now" }, { "leave", "Leave (Q)" } })
+			setButtons({ { "start", "Start now" }, { "addai", "Add a computer" }, { "leave", "Leave (Q)" } })
 		elseif msg.game == "darts" and p then
 			ui:open("darts", "Darts", DartsClient.HELP);
 			(active :: any).controller = DartsClient.new(ctx)
 			setButtons({
 				{ "501", "501" },
 				{ "cricket", "Cricket" },
-				{ "start", "Start now" },
+				{ "addai", "+ Computer" },
+				{ "start", "Start" },
 				{ "leave", "Leave (Q)" },
 			})
 		elseif msg.game == "fortune_machine" then
@@ -320,6 +335,15 @@ function MinigameClient.start(opts: { [string]: any }): any
 					if prompt.Enabled ~= want then
 						prompt.Enabled = want
 					end
+				end
+			end
+		end
+		-- the push-bar doors are for people too (a squirrel's E is its grab)
+		local doors = alley and alley:FindFirstChild("Doors")
+		if doors then
+			for _, d in doors:GetDescendants() do
+				if d:IsA("ProximityPrompt") and d.Enabled ~= person then
+					d.Enabled = person
 				end
 			end
 		end

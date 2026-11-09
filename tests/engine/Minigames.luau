@@ -269,6 +269,31 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	step(1)
 	check(s.phase == "idle", `lane idle after everyone left ({s.phase})`)
 
+	-- a computer fills the second seat: it takes its own turns (no physics here: its balls count zero)
+	standAt(p1, AlleyLayout.laneX(3), -9)
+	check(svc:join(p1, LANE), "p1 joins for the computer game")
+	ok, why = input(p1, LANE, "addai")
+	check(ok, `add a computer: {why}`)
+	check(#s.seats == 2 and type(s.seats[2]) == "table" and s.seats[2].ai, "computer seated")
+	check(input(p1, LANE, "start"), "start vs computer")
+	guard = 0
+	while s.phase == "playing" and guard < 3000 do
+		guard += 1
+		step(0.2)
+		local seat = (s.game :: any).rules.turn((s.game :: any).state)
+		if s.phase == "playing" and seat == 1 and laneHw:ready() then
+			svc:debugRoll(LANE, 10)
+			step(0.2)
+		end
+	end
+	check(s.phase == "done", `vs computer phase {s.phase}`)
+	check(s.result and s.result.scores[1] == 300, `vs computer: human {s.result and s.result.scores[1]}`)
+	check(#(s.game :: any).state.rolls[2] >= 20, "the computer bowled its frames")
+	numbers.computerRolls = #(s.game :: any).state.rolls[2]
+	svc:leave(p1, "done")
+	step(1)
+	check(s.phase == "idle", `lane idle after the human left the computer ({s.phase})`)
+
 	-- darts --------------------------------------------------------------------------------------------------------
 	local DARTS = "darts_1"
 	local b = AlleyLayout.board()
