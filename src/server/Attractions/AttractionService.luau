@@ -122,7 +122,9 @@ function AttractionService.start(opts: Opts?): any?
 	local folder = workspace:FindFirstChild("Attractions")
 	local alley = folder and folder:FindFirstChild("BowlingAlley")
 	if alley == nil then
-		warn("[Attractions] Workspace.Attractions.BowlingAlley missing (run lune run tools/bake/attractions.luau and rebuild): no bowling alley")
+		warn(
+			"[Attractions] Workspace.Attractions.BowlingAlley missing (run lune run tools/bake/attractions.luau and rebuild): no bowling alley"
+		)
 		return nil
 	end
 	collisionGroups()

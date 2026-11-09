@@ -795,7 +795,11 @@ function Game.start(opts: Opts?): any
 				if actor.species ~= "human" then
 					return false, "Only people can play. Animals can watch (or sneak through the ball return)"
 				end
-				if devices and type(player.UserId) == "number" and PlayerVehicles.vehicleOf(devices.fleet, player.UserId) then
+				if
+					devices
+					and type(player.UserId) == "number"
+					and PlayerVehicles.vehicleOf(devices.fleet, player.UserId)
+				then
 					return false, "Get out of the vehicle first (E)"
 				end
 				return true

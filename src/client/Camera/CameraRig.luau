@@ -9,6 +9,7 @@
 --                            limits sized to the body (the subject is set from a LocalScript because
 --                            the engine only auto-assigns Humanoid subjects)
 --   chaseLock                scriptable: behind the body along its facing, looking forward
+--   tunnelChase              scriptable: low behind a squirrel in the bowling alley's ball-return tunnel
 --   vehicleFirst             scriptable at the vehicle's EyeSocket; mouse/right-stick look within
 --                            +/-110 degrees of the nose; vehicleThird follows the vehicle root
 --   drone                    the follow camera on the drone root
@@ -180,6 +181,41 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				local back = cf.Position - cf.LookVector * dist + Vector3.new(0, dist * 0.45, 0)
 				camera.CFrame = CFrame.lookAt(back, cf.Position + cf.LookVector * dist)
 			end)
+		end
+	elseif mode == "tunnelChase" then
+		-- the bowling alley's ball-return tunnel: low behind the squirrel along its heading, pulled in front of
+		-- any wall or ceiling between (raycasts against the duct), smoothed so the climb up the riser reads
+		local body = targets.body
+		local root = body and body.PrimaryPart
+		if root then
+			setFirstPerson(false)
+			camera.CameraType = Enum.CameraType.Scriptable
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = { body :: Model }
+			local current = camera.CFrame
+			bind(function(dt: number)
+				local cf = root.CFrame
+				local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z)
+				look = if look.Magnitude > 0.05 then look.Unit else Vector3.zAxis
+				local head = cf.Position + Vector3.new(0, 0.35, 0)
+				local want = head - look * 3.2 + Vector3.new(0, 0.55, 0)
+				local hit = workspace:Raycast(head, want - head, params)
+				if hit then
+					want = hit.Position + (head - want).Unit * 0.25
+				end
+				local up = workspace:Raycast(want, Vector3.new(0, 0.4, 0), params)
+				if up then
+					want = Vector3.new(want.X, up.Position.Y - 0.2, want.Z)
+				end
+				local target = CFrame.lookAt(want, head + look * 3.5)
+				current = current:Lerp(target, 1 - math.exp(-dt * 10))
+				camera.CFrame = current
+				camera.FieldOfView = 75
+			end)
+			onUnbind = function()
+				camera.FieldOfView = 70
+			end
 		end
 	elseif mode == "vehicleFirst" then
 		local vehicle = targets.vehicle

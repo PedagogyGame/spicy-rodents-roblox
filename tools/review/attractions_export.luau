@@ -98,7 +98,10 @@ return function(scene: any, path: string?)
 			end
 			for _, child in d:GetChildren() do
 				if child:IsA("PointLight") or child:IsA("SpotLight") or child:IsA("SurfaceLight") then
-					local kind = if child:IsA("PointLight") then "point" elseif child:IsA("SpotLight") then "spot" else "area"
+					local kind = if child:IsA("PointLight")
+						then "point"
+						elseif child:IsA("SpotLight") then "spot"
+						else "area"
 					local fname = if kind == "point" then "Front" else child.Face.Name
 					local c, n, right, up, w, h = face(d, fname)
 					table.insert(lights, {

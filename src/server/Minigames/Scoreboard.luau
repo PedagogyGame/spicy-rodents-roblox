@@ -111,7 +111,16 @@ function Scoreboard.bowling(gui: Instance, lane: number, view: { [string]: any }
 			for b = 1, boxes do
 				local m = marks[b] or ""
 				local bw = 1 / boxes
-				text(cell, m, (b - 1) * bw, 0.02, bw, 0.48, if m == "X" or m == "/" then GOLD else WHITE, Enum.Font.Code)
+				text(
+					cell,
+					m,
+					(b - 1) * bw,
+					0.02,
+					bw,
+					0.48,
+					if m == "X" or m == "/" then GOLD else WHITE,
+					Enum.Font.Code
+				)
 			end
 			local tot = if gs then gs.totals[f] else ""
 			text(cell, tostring(tot or ""), 0, 0.5, 1, 0.48, CYAN)
@@ -160,13 +169,31 @@ function Scoreboard.darts(gui: Instance, view: { [string]: any })
 		local colW = 0.8 / n
 		for i = 1, n do
 			text(root, view.seats[i].name, 0.18 + (i - 1) * colW, 0.18, colW, 0.1, chalk, Enum.Font.PermanentMarker)
-			text(root, tostring(g.seats[i].score), 0.18 + (i - 1) * colW, 0.88, colW, 0.1, Color3.fromRGB(236, 220, 120), Enum.Font.PermanentMarker)
+			text(
+				root,
+				tostring(g.seats[i].score),
+				0.18 + (i - 1) * colW,
+				0.88,
+				colW,
+				0.1,
+				Color3.fromRGB(236, 220, 120),
+				Enum.Font.PermanentMarker
+			)
 		end
 		for r, label in CRICKET_ROWS do
 			local y = 0.28 + (r - 1) * 0.085
 			text(root, if label == "25" then "B" else label, 0.02, y, 0.14, 0.08, chalk, Enum.Font.PermanentMarker)
 			for i = 1, n do
-				text(root, cricketMark(g.seats[i].marks[label] or 0), 0.18 + (i - 1) * colW, y, colW, 0.08, chalk, Enum.Font.PermanentMarker)
+				text(
+					root,
+					cricketMark(g.seats[i].marks[label] or 0),
+					0.18 + (i - 1) * colW,
+					y,
+					colW,
+					0.08,
+					chalk,
+					Enum.Font.PermanentMarker
+				)
 			end
 		end
 	else
@@ -175,7 +202,16 @@ function Scoreboard.darts(gui: Instance, view: { [string]: any })
 			local score = if g then tostring(g.seats[i].score) else "501"
 			local darts = if g and g.seats[i].darts then table.concat(g.seats[i].darts, " ") else ""
 			local up = view.turn == i
-			text(root, (if up then "> " else "") .. view.seats[i].name, 0.02, y, 0.42, 0.15, chalk, Enum.Font.PermanentMarker)
+			text(
+				root,
+				(if up then "> " else "") .. view.seats[i].name,
+				0.02,
+				y,
+				0.42,
+				0.15,
+				chalk,
+				Enum.Font.PermanentMarker
+			)
 			text(root, score, 0.45, y, 0.25, 0.15, Color3.fromRGB(236, 220, 120), Enum.Font.PermanentMarker)
 			text(root, darts, 0.7, y + 0.02, 0.28, 0.11, chalk, Enum.Font.PermanentMarker)
 		end

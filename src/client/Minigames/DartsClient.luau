@@ -10,8 +10,7 @@
 -- Interface: new(ctx) -> Thrower; Thrower:onState(msg); Thrower:onDart(msg); Thrower:stop(); HELP; HELP_CRICKET
 
 local Import = require("../Import")
-local AlleyLayout =
-	Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Darts =
 	Import.shared("Minigames/MinigameRules/Darts") :: typeof(require("../../shared/Minigames/MinigameRules/Darts"))
 
@@ -71,7 +70,11 @@ function DartsClient.new(ctx: { [string]: any }): any
 			if processed and io.UserInputType ~= Enum.UserInputType.Keyboard then
 				return
 			end
-			if io.UserInputType == Enum.UserInputType.MouseButton1 or io.KeyCode == Enum.KeyCode.Space or io.KeyCode == Enum.KeyCode.ButtonR2 then
+			if
+				io.UserInputType == Enum.UserInputType.MouseButton1
+				or io.KeyCode == Enum.KeyCode.Space
+				or io.KeyCode == Enum.KeyCode.ButtonR2
+			then
 				self:_charge(true)
 			end
 		end)
@@ -79,7 +82,11 @@ function DartsClient.new(ctx: { [string]: any }): any
 	table.insert(
 		self.conns,
 		UIS.InputEnded:Connect(function(io: InputObject)
-			if io.UserInputType == Enum.UserInputType.MouseButton1 or io.KeyCode == Enum.KeyCode.Space or io.KeyCode == Enum.KeyCode.ButtonR2 then
+			if
+				io.UserInputType == Enum.UserInputType.MouseButton1
+				or io.KeyCode == Enum.KeyCode.Space
+				or io.KeyCode == Enum.KeyCode.ButtonR2
+			then
 				self:_charge(false)
 			end
 		end)
@@ -169,7 +176,11 @@ function DartsClient._frame(self: any, dt: number)
 	self.ring.Transparency = 0.6
 	if self.charging then
 		self.chargeT += dt
-		ctx.ui:meter(Darts.meter(self.chargeT), { Darts.SWEET - Darts.SWEET_HALF, Darts.SWEET + Darts.SWEET_HALF }, "let go in the green")
+		ctx.ui:meter(
+			Darts.meter(self.chargeT),
+			{ Darts.SWEET - Darts.SWEET_HALF, Darts.SWEET + Darts.SWEET_HALF },
+			"let go in the green"
+		)
 	end
 	local hit = Darts.scoreAt(self.aim.x + wx, self.aim.y + wy)
 	ctx.ui:status(`Your throw - aiming at {Darts.label(hit)}. Hold the mouse button, let go in the green`)
@@ -191,7 +202,12 @@ function DartsClient.onState(self: any, msg: { [string]: any })
 	if view.phase == "lobby" then
 		local mode = view.mode or "501"
 		self.ctx.ui:status(`Starting in {view.lobbyLeft or 0} - game: {mode} (pick below; Space starts now)`)
-		self.ctx.setButtons({ { "501", "501" }, { "cricket", "Cricket" }, { "start", "Start now" }, { "leave", "Leave (Q)" } })
+		self.ctx.setButtons({
+			{ "501", "501" },
+			{ "cricket", "Cricket" },
+			{ "start", "Start now" },
+			{ "leave", "Leave (Q)" },
+		})
 	elseif view.phase == "playing" then
 		self.ctx.setButtons({ { "leave", "Leave (Q)" } })
 		if not mine and view.turn then
@@ -203,7 +219,7 @@ function DartsClient.onState(self: any, msg: { [string]: any })
 	end
 end
 
-function DartsClient.onDart(self: any, _msg: { [string]: any }) end
+function DartsClient.onDart(_self: any, _msg: { [string]: any }) end
 
 function DartsClient.stop(self: any)
 	for _, c in self.conns do

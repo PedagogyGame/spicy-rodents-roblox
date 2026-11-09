@@ -149,6 +149,17 @@ function Squirrel.start(
 			lastSaid, lastText = t, say
 			ctx.toast(say, 2.5)
 		end
+		-- the bowling alley's ball-return tunnel (and its vent): the camera rides low behind (CameraPolicy zone)
+		local zone = nil
+		if state.routeId then
+			local r = rail.registry:get(state.routeId)
+			if r and r.origin == "attraction" then
+				zone = "tunnel"
+			end
+		end
+		if body:GetAttribute("CameraZone") ~= zone then
+			body:SetAttribute("CameraZone", zone)
+		end
 		local v = SquirrelMotor.visualPose(state, motorWorld :: any)
 		local p = Vector3.new(v.x, v.y + hip, v.z)
 		local vel = if dt > 0 then (p - last) / dt else Vector3.zero

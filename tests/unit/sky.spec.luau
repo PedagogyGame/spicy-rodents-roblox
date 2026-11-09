@@ -9,6 +9,7 @@ local DayCurve = require("@shared/Time/DayCurve")
 local Clock = require("@shared/Time/Clock")
 local Moon = require("@shared/Time/Moon")
 local DayClock = require("@server/Boot/DayClock")
+local Sky = require("@client/World/Sky")
 
 local function hex(s: string): { number }
 	return {
@@ -116,6 +117,9 @@ return function(t)
 		now = 500 + 72
 		t.near(a:game().hour, DayClock.START_HOUR, 1e-6)
 		t.eq(a:game().day, DayClock.START_DAY + 1)
+		-- before the server publishes, the client shows the same opening moment
+		t.eq(Sky.FALLBACK_DAY, DayClock.START_DAY)
+		t.eq(Sky.FALLBACK_HOUR, DayClock.START_HOUR)
 	end)
 
 	t.test("weather: slow cloud cover within Roblox's range", function()

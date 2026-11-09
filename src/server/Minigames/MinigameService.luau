@@ -22,15 +22,14 @@
 --   Service:stop(); GAMES
 
 local Import = require("../Import")
-local AlleyLayout =
-	Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Session = Import.shared("Minigames/Session") :: typeof(require("../../shared/Minigames/Session"))
 local Bowling =
 	Import.shared("Minigames/MinigameRules/Bowling") :: typeof(require("../../shared/Minigames/MinigameRules/Bowling"))
 local Darts =
 	Import.shared("Minigames/MinigameRules/Darts") :: typeof(require("../../shared/Minigames/MinigameRules/Darts"))
-local FortuneMachine = Import.shared("Minigames/MinigameRules/FortuneMachine")
-	:: typeof(require("../../shared/Minigames/MinigameRules/FortuneMachine"))
+local FortuneMachine =
+	Import.shared("Minigames/MinigameRules/FortuneMachine") :: typeof(require("../../shared/Minigames/MinigameRules/FortuneMachine"))
 local BowlingLane = require("./BowlingLane")
 local Dartboard = require("./Dartboard")
 local FortuneCabinet = require("./FortuneCabinet")
@@ -231,7 +230,7 @@ function MinigameService.fire(self: any, player: any, payload: { [string]: any }
 	end
 end
 
-function MinigameService._seated(self: any, st: Station): { any }
+function MinigameService._seated(_self: any, st: Station): { any }
 	local out = {}
 	local s = st.session
 	if s then
@@ -546,7 +545,8 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 			return false, nil
 		end
 		local seat = Session.seatOf(s, player)
-		local ok, why = Session.apply(s, player, "throw", { num(args[1], 0), num(args[2], 0), num(args[3], 0.5) }, self.clock)
+		local ok, why =
+			Session.apply(s, player, "throw", { num(args[1], 0), num(args[2], 0), num(args[3], 0.5) }, self.clock)
 		if ok then
 			self:_afterDart(st, seat)
 		end
@@ -707,7 +707,10 @@ function MinigameService.step(self: any, dt: number)
 					})
 				end
 			elseif e.kind == "timeout" then
-				self:_broadcast(st, { kind = "event", station = st.id, text = `{s.names[e.seat] or "?"} took too long: turn skipped` })
+				self:_broadcast(
+					st,
+					{ kind = "event", station = st.id, text = `{s.names[e.seat] or "?"} took too long: turn skipped` }
+				)
 				if st.kind == "lane" and st.hw then
 					st.hw:hold(nil)
 					st.hw.heldBy = nil

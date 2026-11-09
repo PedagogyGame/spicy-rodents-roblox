@@ -54,22 +54,28 @@ return function(t)
 		t.near((z1 - z0) / 10, dz, 1e-9)
 	end)
 
-	t.test("placement: the floor is above the ground under the building; the alley paving above the alley ground", function()
-		local fp = alley.footprint
-		local worst, alleyWorst = -math.huge, -math.huge
-		for X = AlleyLayout.X0, AlleyLayout.X1, 2 do
-			for D = AlleyLayout.FRONT_D, AlleyLayout.REAR_WALL_D, 2 do
-				local x, _, z = AlleyLayout.toWorld(place, X, 0, D)
-				worst = math.max(worst, Height.at(x, z))
+	t.test(
+		"placement: the floor is above the ground under the building; the alley paving above the alley ground",
+		function()
+			local fp = alley.footprint
+			local worst, alleyWorst = -math.huge, -math.huge
+			for X = AlleyLayout.X0, AlleyLayout.X1, 2 do
+				for D = AlleyLayout.FRONT_D, AlleyLayout.REAR_WALL_D, 2 do
+					local x, _, z = AlleyLayout.toWorld(place, X, 0, D)
+					worst = math.max(worst, Height.at(x, z))
+				end
+				for D = AlleyLayout.REAR_WALL_D + 1, fp.d1, 2 do
+					local x, _, z = AlleyLayout.toWorld(place, X, 0, D)
+					alleyWorst = math.max(alleyWorst, Height.at(x, z))
+				end
 			end
-			for D = AlleyLayout.REAR_WALL_D + 1, fp.d1, 2 do
-				local x, _, z = AlleyLayout.toWorld(place, X, 0, D)
-				alleyWorst = math.max(alleyWorst, Height.at(x, z))
-			end
+			t.truthy(place.floorY > worst + 0.3, `floor {place.floorY} vs ground {worst}`)
+			t.truthy(
+				place.floorY + AlleyLayout.ALLEY_Y > alleyWorst,
+				`alley {place.floorY + AlleyLayout.ALLEY_Y} vs {alleyWorst}`
+			)
 		end
-		t.truthy(place.floorY > worst + 0.3, `floor {place.floorY} vs ground {worst}`)
-		t.truthy(place.floorY + AlleyLayout.ALLEY_Y > alleyWorst, `alley {place.floorY + AlleyLayout.ALLEY_Y} vs {alleyWorst}`)
-	end)
+	)
 
 	t.test("routes: three vents and three tunnels, in the ducts under each pair, ending on the rack", function()
 		t.eq(#mod.routes, 6)
@@ -98,7 +104,10 @@ return function(t)
 				local X, Y, D = AlleyLayout.toLocal(place, s.x, s.y, s.z)
 				t.truthy(math.abs(X - px) < AlleyLayout.DUCT_W / 2, "inside the duct across")
 				if D > AlleyLayout.SHAFT_D1 then
-					t.truthy(Y >= AlleyLayout.DUCT_FLOOR - 0.05 and Y < AlleyLayout.PIT_DUCT_CEIL - 1.0, `under the floor at D {D}: Y {Y}`)
+					t.truthy(
+						Y >= AlleyLayout.DUCT_FLOOR - 0.05 and Y < AlleyLayout.PIT_DUCT_CEIL - 1.0,
+						`under the floor at D {D}: Y {Y}`
+					)
 				end
 			end
 			local endP = reg:pointAt(tunnel, 1)
@@ -112,74 +121,77 @@ return function(t)
 		end
 	end)
 
-	t.test("a squirrel runs it: alley -> vent -> under the lane -> out on the rack; Space leaps at the bowler", function()
-		local alleyY = place.floorY + AlleyLayout.ALLEY_Y
-		local function groundAt(x: number, z: number, _refY: number?): number
-			local _, _, D = AlleyLayout.toLocal(place, x, 0, z)
-			if D > AlleyLayout.REAR_WALL_D then
-				return alleyY
+	t.test(
+		"a squirrel runs it: alley -> vent -> under the lane -> out on the rack; Space leaps at the bowler",
+		function()
+			local alleyY = place.floorY + AlleyLayout.ALLEY_Y
+			local function groundAt(x: number, z: number, _refY: number?): number
+				local _, _, D = AlleyLayout.toLocal(place, x, 0, z)
+				if D > AlleyLayout.REAR_WALL_D then
+					return alleyY
+				end
+				return math.max(Height.at(x, z), place.floorY)
 			end
-			return math.max(Height.at(x, z), place.floorY)
-		end
-		local rail = RailWorld.build(data, function(x: number, z: number): number
-			return groundAt(x, z)
-		end)
-		local world = {
-			registry = rail.registry,
-			index = rail.index,
-			graph = rail.graph,
-			trampolines = {},
-			groundAt = groundAt,
-			blocked = function(_x: number, _z: number, _y: number): boolean
-				return false
-			end,
-			clamp = nil,
-		}
-		local p = 2
-		local px = AlleyLayout.pairX(p)
-		local sx, sy, sz = AlleyLayout.toWorld(place, px, AlleyLayout.ALLEY_Y, 88)
-		local state = SquirrelMotor.new(sx, sy, sz)
-		state.yaw = 0
-		-- the camera behind the squirrel looking toward the building: moving "forward" goes to local -D
-		local dX, dZ = AlleyLayout.dirToWorld(place, 0, -1)
-		local camYaw = math.atan2(-dX, -dZ)
-		local seen: { [string]: boolean } = {}
-		local routesSeen: { [number]: boolean } = {}
-		local frames = 0
-		for _ = 1, 60 * 30 do
-			frames += 1
-			local input = SquirrelMotor.idleInput(camYaw)
-			input.fw = 1
-			local _, events = SquirrelMotor.step(state, input, 1 / 60, world :: any)
-			for _, e in events do
-				seen[e.kind] = true
-				if e.routeId then
-					routesSeen[e.routeId] = true
+			local rail = RailWorld.build(data, function(x: number, z: number): number
+				return groundAt(x, z)
+			end)
+			local world = {
+				registry = rail.registry,
+				index = rail.index,
+				graph = rail.graph,
+				trampolines = {},
+				groundAt = groundAt,
+				blocked = function(_x: number, _z: number, _y: number): boolean
+					return false
+				end,
+				clamp = nil,
+			}
+			local p = 2
+			local px = AlleyLayout.pairX(p)
+			local sx, sy, sz = AlleyLayout.toWorld(place, px, AlleyLayout.ALLEY_Y, 88)
+			local state = SquirrelMotor.new(sx, sy, sz)
+			state.yaw = 0
+			-- the camera behind the squirrel looking toward the building: moving "forward" goes to local -D
+			local dX, dZ = AlleyLayout.dirToWorld(place, 0, -1)
+			local camYaw = math.atan2(-dX, -dZ)
+			local seen: { [string]: boolean } = {}
+			local routesSeen: { [number]: boolean } = {}
+			local frames = 0
+			for _ = 1, 60 * 30 do
+				frames += 1
+				local input = SquirrelMotor.idleInput(camYaw)
+				input.fw = 1
+				local _, events = SquirrelMotor.step(state, input, 1 / 60, world :: any)
+				for _, e in events do
+					seen[e.kind] = true
+					if e.routeId then
+						routesSeen[e.routeId] = true
+					end
+				end
+				if state.routeId == 9000 + 2 * p and state.railT >= 1 then
+					break
 				end
 			end
-			if state.routeId == 9000 + 2 * p and state.railT >= 1 then
-				break
+			t.truthy(routesSeen[9000 + 2 * p - 1], "walked into the vent (walk-in grab)")
+			t.truthy(seen.autoSwitch, "switched into the tunnel at the vent's end")
+			t.eq(state.routeId, 9000 + 2 * p, "on the tunnel")
+			t.near(state.railT, 1, 1e-6)
+			local X, Y, D = AlleyLayout.toLocal(place, state.x, state.y, state.z)
+			t.truthy(D < AlleyLayout.HOOD_D1 and math.abs(X - px) < 0.5 and Y > 1, `out on the rack ({X}, {Y}, {D})`)
+			local seconds = frames / 60
+			t.truthy(seconds > 3 and seconds < 20, `the run took {seconds} s`)
+			-- pop out: Space leaps along the body's heading (toward the bowlers' end), not back into the hood
+			local leap = SquirrelMotor.idleInput(camYaw)
+			leap.leap = true
+			SquirrelMotor.step(state, leap, 1 / 60, world :: any)
+			t.eq(state.routeId, nil)
+			local fx = 0
+			for _ = 1, 30 do
+				SquirrelMotor.step(state, SquirrelMotor.idleInput(camYaw), 1 / 60, world :: any)
 			end
+			local _, _, D2 = AlleyLayout.toLocal(place, state.x, state.y, state.z)
+			t.truthy(D2 < D - 1, `leapt toward the bowlers (D {D} -> {D2})`)
+			local _ = fx
 		end
-		t.truthy(routesSeen[9000 + 2 * p - 1], "walked into the vent (walk-in grab)")
-		t.truthy(seen.autoSwitch, "switched into the tunnel at the vent's end")
-		t.eq(state.routeId, 9000 + 2 * p, "on the tunnel")
-		t.near(state.railT, 1, 1e-6)
-		local X, Y, D = AlleyLayout.toLocal(place, state.x, state.y, state.z)
-		t.truthy(D < AlleyLayout.HOOD_D1 and math.abs(X - px) < 0.5 and Y > 1, `out on the rack ({X}, {Y}, {D})`)
-		local seconds = frames / 60
-		t.truthy(seconds > 3 and seconds < 20, `the run took {seconds} s`)
-		-- pop out: Space leaps along the body's heading (toward the bowlers' end), not back into the hood
-		local leap = SquirrelMotor.idleInput(camYaw)
-		leap.leap = true
-		SquirrelMotor.step(state, leap, 1 / 60, world :: any)
-		t.eq(state.routeId, nil)
-		local fx = 0
-		for _ = 1, 30 do
-			SquirrelMotor.step(state, SquirrelMotor.idleInput(camYaw), 1 / 60, world :: any)
-		end
-		local _, _, D2 = AlleyLayout.toLocal(place, state.x, state.y, state.z)
-		t.truthy(D2 < D - 1, `leapt toward the bowlers (D {D} -> {D2})`)
-		local _ = fx
-	end)
+	)
 end

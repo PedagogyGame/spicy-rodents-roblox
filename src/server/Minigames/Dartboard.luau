@@ -9,8 +9,7 @@
 --   Board:step(dt); Board:worldPoint(xmm, ymm) -> Vector3
 
 local Import = require("../Import")
-local AlleyLayout =
-	Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 
 local Dartboard = {}
 Dartboard.__index = Dartboard
@@ -63,8 +62,20 @@ local function makeDart(parent: Instance, color: Color3): Model
 		return p
 	end
 	-- along local -Z (the point leads)
-	part("Barrel", Vector3.new(0.06, 0.06, 0.2), CFrame.new(0, 0, -0.08), Color3.fromRGB(190, 190, 196), Enum.Material.Metal)
-	part("Point", Vector3.new(0.02, 0.02, 0.12), CFrame.new(0, 0, -0.24), Color3.fromRGB(220, 220, 225), Enum.Material.Metal)
+	part(
+		"Barrel",
+		Vector3.new(0.06, 0.06, 0.2),
+		CFrame.new(0, 0, -0.08),
+		Color3.fromRGB(190, 190, 196),
+		Enum.Material.Metal
+	)
+	part(
+		"Point",
+		Vector3.new(0.02, 0.02, 0.12),
+		CFrame.new(0, 0, -0.24),
+		Color3.fromRGB(220, 220, 225),
+		Enum.Material.Metal
+	)
 	part("Shaft", Vector3.new(0.03, 0.03, 0.18), CFrame.new(0, 0, 0.1), color, Enum.Material.SmoothPlastic)
 	part("FlightA", Vector3.new(0.16, 0.005, 0.12), CFrame.new(0, 0, 0.2), color, Enum.Material.SmoothPlastic)
 	part("FlightB", Vector3.new(0.005, 0.16, 0.12), CFrame.new(0, 0, 0.2), color, Enum.Material.SmoothPlastic)
@@ -144,7 +155,8 @@ function Dartboard.step(self: any, dt: number)
 		if a >= 1 then
 			place(f.dart, f.to)
 		else
-			local ahead = f.from:Lerp(to, math.min(1, a + 0.05)) + Vector3.new(0, math.sin(math.min(1, a + 0.05) * math.pi) * 0.35, 0)
+			local ahead = f.from:Lerp(to, math.min(1, a + 0.05))
+				+ Vector3.new(0, math.sin(math.min(1, a + 0.05) * math.pi) * 0.35, 0)
 			place(f.dart, CFrame.lookAt(p, ahead))
 			table.insert(keep, f)
 		end

@@ -65,6 +65,7 @@ def main(argv):
     opts = ap.parse_args(argv)
     variant = opts.variant or opts.species
     sp = importlib.import_module(SPECIES_MODULES[opts.species])
+    opts.out = os.path.abspath(opts.out)
     os.makedirs(opts.out, exist_ok=True)
     log = Log()
     scale = getattr(sp, "SCALE", 1.0)

@@ -12,8 +12,7 @@
 --   HELP; aimDots(offset, angle, spin, power, lane, place) -> { {X, D} } (pure)
 
 local Import = require("../Import")
-local AlleyLayout =
-	Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 
 local BowlingClient = {}
 BowlingClient.__index = BowlingClient
@@ -96,17 +95,21 @@ function BowlingClient.new(ctx: { [string]: any }): any
 			self:_frame(dt)
 		end)
 	)
-	ctx.ui:touch({ { "left", "<" }, { "right", ">" }, { "aimL", "<<" }, { "aimR", ">>" }, { "bowl", "HOLD TO BOWL" } }, function(id)
-		self.held[id] = true
-		if id == "bowl" then
-			self:_charge(true)
+	ctx.ui:touch(
+		{ { "left", "<" }, { "right", ">" }, { "aimL", "<<" }, { "aimR", ">>" }, { "bowl", "HOLD TO BOWL" } },
+		function(id)
+			self.held[id] = true
+			if id == "bowl" then
+				self:_charge(true)
+			end
+		end,
+		function(id)
+			self.held[id] = nil
+			if id == "bowl" then
+				self:_charge(false)
+			end
 		end
-	end, function(id)
-		self.held[id] = nil
-		if id == "bowl" then
-			self:_charge(false)
-		end
-	end)
+	)
 	return self
 end
 
@@ -171,7 +174,13 @@ function BowlingClient._clearDots(self: any)
 end
 
 function BowlingClient._drawDots(self: any)
-	local pts = BowlingClient.aimDots(self.offset, self.angle, self.spin, if self.charging then powerAt(self.chargeT) else 0.6, self.lane)
+	local pts = BowlingClient.aimDots(
+		self.offset,
+		self.angle,
+		self.spin,
+		if self.charging then powerAt(self.chargeT) else 0.6,
+		self.lane
+	)
 	local cam = workspace.CurrentCamera
 	for i, p in pts do
 		local dot = self.dots[i]
@@ -259,7 +268,8 @@ function BowlingClient._frame(self: any, dt: number)
 		ctx.ui:status(`Your turn - aim with the mouse, hold Space to bowl ({spinText})`)
 		-- camera: behind and above the bowler, down the lane
 		local cx, cy, cz = AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane) + self.offset * 0.8, 5.6, -12.5)
-		local lx, ly, lz = AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane) + math.tan(self.angle) * 30, 0.4, 38)
+		local lx, ly, lz =
+			AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane) + math.tan(self.angle) * 30, 0.4, 38)
 		ctx.camera(CFrame.lookAt(Vector3.new(cx, cy, cz), Vector3.new(lx, ly, lz)), 50)
 	else
 		if #self.dots > 0 then
@@ -288,7 +298,9 @@ function BowlingClient._frame(self: any, dt: number)
 			local _, _, D = AlleyLayout.toLocal(self.place, p.X, p.Y, p.Z)
 			local fx, fz = AlleyLayout.dirToWorld(self.place, 0, 1)
 			local fwd = Vector3.new(fx, 0, fz)
-			local laneMid = Vector3.new(AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane), 0.8, AlleyLayout.HEAD_D + 1.5))
+			local laneMid = Vector3.new(
+				AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane), 0.8, AlleyLayout.HEAD_D + 1.5)
+			)
 			if D < 40 and D > -2 then
 				ctx.camera(CFrame.lookAt(p - fwd * 7 + Vector3.new(0, 2.6, 0), p + fwd * 12), 55)
 			else
@@ -330,7 +342,9 @@ function BowlingClient.onState(self: any, msg: { [string]: any })
 	self.myTurn = canBowl
 	if not canBowl then
 		if view.phase == "lobby" then
-			self.ctx.ui:status(`Starting in {view.lobbyLeft or 0}... friends can walk up and press E (Space: start now)`)
+			self.ctx.ui:status(
+				`Starting in {view.lobbyLeft or 0}... friends can walk up and press E (Space: start now)`
+			)
 		elseif view.phase == "playing" and view.turn then
 			local s = view.seats[view.turn]
 			if turnMine then

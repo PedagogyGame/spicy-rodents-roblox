@@ -188,13 +188,13 @@ def main(argv):
         rest(arm)
     if opts.still:
         for i, (az, el) in enumerate(((-58, 12), (-150, 18), (0, 4))):
-            place(cam, center, size * 4.2, az, el)
+            place(cam, center, size * 5.0, az, el)
             scene.render.filepath = os.path.join(opts.out, f"{tag}_still_{i}.png")
             bpy.ops.render.render(write_still=True)
             written.append(scene.render.filepath)
     if opts.turntable:
         for i in range(opts.turntable):
-            place(cam, center, size * 4.4, -90 + 360.0 * i / opts.turntable, 14)
+            place(cam, center, size * 5.0, -90 + 360.0 * i / opts.turntable, 14)
             scene.render.filepath = os.path.join(opts.out, f"{tag}_turntable_{i:02d}.png")
             bpy.ops.render.render(write_still=True)
             written.append(scene.render.filepath)

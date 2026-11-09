@@ -25,7 +25,14 @@ local function corner(parent: Instance, r: number)
 	c.Parent = parent
 end
 
-local function label(parent: Instance, text: string, size: UDim2, pos: UDim2, color: Color3?, font: Enum.Font?): TextLabel
+local function label(
+	parent: Instance,
+	text: string,
+	size: UDim2,
+	pos: UDim2,
+	color: Color3?,
+	font: Enum.Font?
+): TextLabel
 	local t = Instance.new("TextLabel")
 	t.BackgroundTransparency = 1
 	t.Size = size
@@ -56,16 +63,16 @@ function MinigameUI.new(): any
 	help.Name = "Help"
 	help.BackgroundColor3 = NAVY
 	help.BackgroundTransparency = 0.12
-	help.Size = UDim2.new(0, 300, 0, 300)
+	help.Size = UDim2.fromOffset(300, 300)
 	help.Position = UDim2.new(0, 12, 0.5, -150)
 	help.Parent = gui
 	corner(help, 12)
 	self.helpFrame = help
-	self.title = label(help, "", UDim2.new(1, -20, 0, 34), UDim2.new(0, 10, 0, 8), GOLD, Enum.Font.FredokaOne)
+	self.title = label(help, "", UDim2.new(1, -20, 0, 34), UDim2.fromOffset(10, 8), GOLD, Enum.Font.FredokaOne)
 	local list = Instance.new("TextLabel")
 	list.BackgroundTransparency = 1
 	list.Size = UDim2.new(1, -20, 1, -54)
-	list.Position = UDim2.new(0, 10, 0, 46)
+	list.Position = UDim2.fromOffset(10, 46)
 	list.TextXAlignment = Enum.TextXAlignment.Left
 	list.TextYAlignment = Enum.TextYAlignment.Top
 	list.TextWrapped = true
@@ -88,7 +95,7 @@ function MinigameUI.new(): any
 	local status = Instance.new("TextLabel")
 	status.BackgroundColor3 = NAVY
 	status.BackgroundTransparency = 0.2
-	status.Size = UDim2.new(0, 520, 0, 34)
+	status.Size = UDim2.fromOffset(520, 34)
 	status.Position = UDim2.new(0.5, -260, 0, 138)
 	status.Font = Enum.Font.GothamBold
 	status.TextColor3 = CYAN
@@ -103,7 +110,7 @@ function MinigameUI.new(): any
 	card.Name = "Scorecard"
 	card.BackgroundColor3 = NAVY
 	card.BackgroundTransparency = 0.1
-	card.Size = UDim2.new(0, 560, 0, 170)
+	card.Size = UDim2.fromOffset(560, 170)
 	card.Position = UDim2.new(1, -572, 1, -182)
 	card.Parent = gui
 	corner(card, 10)
@@ -113,7 +120,7 @@ function MinigameUI.new(): any
 	local meter = Instance.new("Frame")
 	meter.Name = "Meter"
 	meter.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-	meter.Size = UDim2.new(0, 380, 0, 26)
+	meter.Size = UDim2.fromOffset(380, 26)
 	meter.Position = UDim2.new(0.5, -190, 1, -260)
 	meter.Visible = false
 	meter.Parent = gui
@@ -134,15 +141,16 @@ function MinigameUI.new(): any
 	needle.BackgroundColor3 = WHITE
 	needle.BorderSizePixel = 0
 	needle.Size = UDim2.new(0, 4, 1, 8)
-	needle.Position = UDim2.new(0, -2, 0, -4)
+	needle.Position = UDim2.fromOffset(-2, -4)
 	needle.Parent = meter
-	local meterLabel = label(meter, "", UDim2.new(1, 0, 0, 22), UDim2.new(0, 0, 0, -26), WHITE, Enum.Font.GothamBold)
-	self.meterFrame, self.meterFill, self.meterSweet, self.meterNeedle, self.meterLabel = meter, fill, sweet, needle, meterLabel
+	local meterLabel = label(meter, "", UDim2.new(1, 0, 0, 22), UDim2.fromOffset(0, -26), WHITE, Enum.Font.GothamBold)
+	self.meterFrame, self.meterFill, self.meterSweet, self.meterNeedle, self.meterLabel =
+		meter, fill, sweet, needle, meterLabel
 
 	-- buttons (bottom left)
 	local buttons = Instance.new("Frame")
 	buttons.BackgroundTransparency = 1
-	buttons.Size = UDim2.new(0, 420, 0, 46)
+	buttons.Size = UDim2.fromOffset(420, 46)
 	buttons.Position = UDim2.new(0, 12, 1, -58)
 	buttons.Parent = gui
 	local layout = Instance.new("UIListLayout")
@@ -153,7 +161,7 @@ function MinigameUI.new(): any
 	-- touch controls (above the buttons)
 	local touch = Instance.new("Frame")
 	touch.BackgroundTransparency = 1
-	touch.Size = UDim2.new(0, 420, 0, 64)
+	touch.Size = UDim2.fromOffset(420, 64)
 	touch.Position = UDim2.new(0, 12, 1, -132)
 	touch.Parent = gui
 	local tl = Instance.new("UIListLayout")
@@ -165,7 +173,7 @@ function MinigameUI.new(): any
 	-- the fortune card
 	local fcard = Instance.new("Frame")
 	fcard.BackgroundColor3 = Color3.fromRGB(246, 236, 210)
-	fcard.Size = UDim2.new(0, 460, 0, 200)
+	fcard.Size = UDim2.fromOffset(460, 200)
 	fcard.Position = UDim2.new(0.5, -230, 0.5, -60)
 	fcard.Visible = false
 	fcard.Parent = gui
@@ -174,8 +182,22 @@ function MinigameUI.new(): any
 	stroke.Color = Color3.fromRGB(150, 110, 60)
 	stroke.Thickness = 3
 	stroke.Parent = fcard
-	self.fortuneTitle = label(fcard, "", UDim2.new(1, -24, 0, 36), UDim2.new(0, 12, 0, 10), Color3.fromRGB(110, 40, 120), Enum.Font.Fantasy)
-	self.fortuneText = label(fcard, "", UDim2.new(1, -40, 1, -64), UDim2.new(0, 20, 0, 50), Color3.fromRGB(60, 30, 60), Enum.Font.Fantasy)
+	self.fortuneTitle = label(
+		fcard,
+		"",
+		UDim2.new(1, -24, 0, 36),
+		UDim2.fromOffset(12, 10),
+		Color3.fromRGB(110, 40, 120),
+		Enum.Font.Fantasy
+	)
+	self.fortuneText = label(
+		fcard,
+		"",
+		UDim2.new(1, -40, 1, -64),
+		UDim2.fromOffset(20, 50),
+		Color3.fromRGB(60, 30, 60),
+		Enum.Font.Fantasy
+	)
 	self.fortuneCard = fcard
 	self.fortuneUntil = 0
 
@@ -351,11 +373,18 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 	local g = view.game
 	local seats = view.seats or {}
 	local n = math.max(1, #seats)
-	self.card.Size = UDim2.new(0, 600, 0, 26 + n * 38)
+	self.card.Size = UDim2.fromOffset(600, 26 + n * 38)
 	self.card.Position = UDim2.new(1, -612, 1, -(38 + n * 38))
 	local fw = 1 / 13.2
 	for f = 1, 10 do
-		label(self.card, tostring(f), UDim2.new(fw, -2, 0, 18), UDim2.new(0.16 + (f - 1) * fw, 0, 0, 4), CYAN, Enum.Font.GothamBold)
+		label(
+			self.card,
+			tostring(f),
+			UDim2.new(fw, -2, 0, 18),
+			UDim2.new(0.16 + (f - 1) * fw, 0, 0, 4),
+			CYAN,
+			Enum.Font.GothamBold
+		)
 	end
 	label(self.card, "TOTAL", UDim2.new(0.08, 0, 0, 18), UDim2.new(0.91, 0, 0, 4), CYAN, Enum.Font.GothamBold)
 	for s, seat in seats do
@@ -365,11 +394,18 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 		local row = Instance.new("Frame")
 		row.BackgroundColor3 = if up then Color3.fromRGB(28, 96, 104) else Color3.fromRGB(26, 32, 66)
 		row.Size = UDim2.new(1, -8, 0, 34)
-		row.Position = UDim2.new(0, 4, 0, y)
+		row.Position = UDim2.fromOffset(4, y)
 		row.Parent = self.card
 		corner(row, 6)
 		local name = seat.name .. (if s == you then " (you)" else "") .. (if seat.gone then " (left)" else "")
-		label(row, name, UDim2.new(0.15, 0, 0.8, 0), UDim2.new(0.005, 0, 0.1, 0), if up then GOLD else WHITE, Enum.Font.GothamBold)
+		label(
+			row,
+			name,
+			UDim2.fromScale(0.15, 0.8),
+			UDim2.fromScale(0.005, 0.1),
+			if up then GOLD else WHITE,
+			Enum.Font.GothamBold
+		)
 		for f = 1, 10 do
 			local cell = Instance.new("Frame")
 			cell.BackgroundColor3 = Color3.fromRGB(16, 20, 44)
@@ -380,11 +416,32 @@ function MinigameUI.scoreBowling(self: any, view: { [string]: any }, you: number
 			local boxes = if f == 10 then 3 else 2
 			for b = 1, boxes do
 				local m = marks[b] or ""
-				label(cell, m, UDim2.new(1 / boxes, 0, 0.5, 0), UDim2.new((b - 1) / boxes, 0, 0, 0), if m == "X" or m == "/" then GOLD else WHITE, Enum.Font.Code)
+				label(
+					cell,
+					m,
+					UDim2.fromScale(1 / boxes, 0.5),
+					UDim2.fromScale((b - 1) / boxes, 0),
+					if m == "X" or m == "/" then GOLD else WHITE,
+					Enum.Font.Code
+				)
 			end
-			label(cell, tostring(if gs then gs.totals[f] else ""), UDim2.new(1, 0, 0.5, 0), UDim2.new(0, 0, 0.5, 0), CYAN, Enum.Font.GothamBold)
+			label(
+				cell,
+				tostring(if gs then gs.totals[f] else ""),
+				UDim2.fromScale(1, 0.5),
+				UDim2.fromScale(0, 0.5),
+				CYAN,
+				Enum.Font.GothamBold
+			)
 		end
-		label(row, if gs then tostring(gs.total) else "0", UDim2.new(0.08, 0, 0.8, 0), UDim2.new(0.91, 0, 0.1, 0), GOLD, Enum.Font.FredokaOne)
+		label(
+			row,
+			if gs then tostring(gs.total) else "0",
+			UDim2.fromScale(0.08, 0.8),
+			UDim2.fromScale(0.91, 0.1),
+			GOLD,
+			Enum.Font.FredokaOne
+		)
 	end
 end
 
@@ -400,33 +457,89 @@ function MinigameUI.scoreDarts(self: any, view: { [string]: any }, you: number?)
 	local n = math.max(1, #seats)
 	local mode = (g and g.mode) or view.mode or "501"
 	if mode == "cricket" then
-		self.card.Size = UDim2.new(0, 120 + n * 110, 0, 250)
+		self.card.Size = UDim2.fromOffset(120 + n * 110, 250)
 		self.card.Position = UDim2.new(1, -(132 + n * 110), 1, -262)
-		label(self.card, "CRICKET", UDim2.new(0, 110, 0, 24), UDim2.new(0, 6, 0, 4), GOLD, Enum.Font.FredokaOne)
+		label(self.card, "CRICKET", UDim2.fromOffset(110, 24), UDim2.fromOffset(6, 4), GOLD, Enum.Font.FredokaOne)
 		for i, seat in seats do
 			local x = 116 + (i - 1) * 110
 			local up = view.turn == i
-			label(self.card, seat.name .. (if i == you then "*" else ""), UDim2.new(0, 104, 0, 22), UDim2.new(0, x, 0, 4), if up then GOLD else WHITE, Enum.Font.GothamBold)
+			label(
+				self.card,
+				seat.name .. (if i == you then "*" else ""),
+				UDim2.fromOffset(104, 22),
+				UDim2.fromOffset(x, 4),
+				if up then GOLD else WHITE,
+				Enum.Font.GothamBold
+			)
 			for r, lab in CRICKET do
 				local m = if g then g.seats[i].marks[lab] or 0 else 0
-				label(self.card, cricketMark(m), UDim2.new(0, 104, 0, 22), UDim2.new(0, x, 0, 4 + r * 26), WHITE, Enum.Font.GothamBold)
+				label(
+					self.card,
+					cricketMark(m),
+					UDim2.fromOffset(104, 22),
+					UDim2.fromOffset(x, 4 + r * 26),
+					WHITE,
+					Enum.Font.GothamBold
+				)
 			end
-			label(self.card, if g then tostring(g.seats[i].score) else "0", UDim2.new(0, 104, 0, 24), UDim2.new(0, x, 0, 214), GOLD, Enum.Font.FredokaOne)
+			label(
+				self.card,
+				if g then tostring(g.seats[i].score) else "0",
+				UDim2.fromOffset(104, 24),
+				UDim2.fromOffset(x, 214),
+				GOLD,
+				Enum.Font.FredokaOne
+			)
 		end
 		for r, lab in CRICKET do
-			label(self.card, if lab == "25" then "BULL" else lab, UDim2.new(0, 90, 0, 22), UDim2.new(0, 10, 0, 4 + r * 26), CYAN, Enum.Font.GothamBold)
+			label(
+				self.card,
+				if lab == "25" then "BULL" else lab,
+				UDim2.fromOffset(90, 22),
+				UDim2.fromOffset(10, 4 + r * 26),
+				CYAN,
+				Enum.Font.GothamBold
+			)
 		end
 	else
-		self.card.Size = UDim2.new(0, 420, 0, 34 + n * 40)
+		self.card.Size = UDim2.fromOffset(420, 34 + n * 40)
 		self.card.Position = UDim2.new(1, -432, 1, -(46 + n * 40))
-		label(self.card, "501  (finish on a double)", UDim2.new(1, -12, 0, 24), UDim2.new(0, 6, 0, 4), GOLD, Enum.Font.FredokaOne)
+		label(
+			self.card,
+			"501  (finish on a double)",
+			UDim2.new(1, -12, 0, 24),
+			UDim2.fromOffset(6, 4),
+			GOLD,
+			Enum.Font.FredokaOne
+		)
 		for i, seat in seats do
 			local y = 32 + (i - 1) * 40
 			local gs = if g then g.seats[i] else nil
 			local up = view.turn == i
-			label(self.card, (if up then "> " else "") .. seat.name .. (if i == you then " (you)" else ""), UDim2.new(0.42, 0, 0, 30), UDim2.new(0, 6, 0, y), if up then GOLD else WHITE, Enum.Font.GothamBold)
-			label(self.card, if gs then tostring(gs.score) else "501", UDim2.new(0.22, 0, 0, 34), UDim2.new(0.44, 0, 0, y - 2), GOLD, Enum.Font.FredokaOne)
-			label(self.card, if gs and gs.darts then table.concat(gs.darts, "  ") else "", UDim2.new(0.32, 0, 0, 26), UDim2.new(0.67, 0, 0, y + 2), CYAN, Enum.Font.GothamBold)
+			label(
+				self.card,
+				(if up then "> " else "") .. seat.name .. (if i == you then " (you)" else ""),
+				UDim2.new(0.42, 0, 0, 30),
+				UDim2.fromOffset(6, y),
+				if up then GOLD else WHITE,
+				Enum.Font.GothamBold
+			)
+			label(
+				self.card,
+				if gs then tostring(gs.score) else "501",
+				UDim2.new(0.22, 0, 0, 34),
+				UDim2.new(0.44, 0, 0, y - 2),
+				GOLD,
+				Enum.Font.FredokaOne
+			)
+			label(
+				self.card,
+				if gs and gs.darts then table.concat(gs.darts, "  ") else "",
+				UDim2.new(0.32, 0, 0, 26),
+				UDim2.new(0.67, 0, 0, y + 2),
+				CYAN,
+				Enum.Font.GothamBold
+			)
 		end
 	end
 end

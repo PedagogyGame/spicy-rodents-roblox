@@ -9,8 +9,8 @@
 --   SHOW_SECONDS
 
 local Import = require("../Import")
-local FortuneMachine = Import.shared("Minigames/MinigameRules/FortuneMachine")
-	:: typeof(require("../../shared/Minigames/MinigameRules/FortuneMachine"))
+local FortuneMachine =
+	Import.shared("Minigames/MinigameRules/FortuneMachine") :: typeof(require("../../shared/Minigames/MinigameRules/FortuneMachine"))
 
 local FortuneCabinet = {}
 FortuneCabinet.__index = FortuneCabinet

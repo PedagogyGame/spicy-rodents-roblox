@@ -17,7 +17,7 @@
 -- its driver); the default character controls are on for a person on foot and off in a vehicle or the
 -- drone (the standing officer no longer walks off while the drone flies); E, V and Reset always answer
 -- on screen; device refusals are said in plain words (reasonText).
--- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(),
+-- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(), Client.refreshCamera(),
 --   Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure);
 --   reasonText(why) -> string? (pure; nil = say nothing)
 
@@ -44,6 +44,7 @@ export type Client = {
 	metrics: { [string]: any },
 	markRequest: () -> (),
 	current: () -> Model?,
+	refreshCamera: () -> (),
 	state: () -> { [string]: any },
 }
 
@@ -188,6 +189,7 @@ function PossessionClient.start(opts: Opts): Client
 	local device: { device: string, model: Model, kind: string? }? = nil
 	local fpToggle = false
 	local decision: { [string]: any } = CameraPolicy.modeFor({})
+	local zoneConn: RBXScriptConnection? = nil
 
 	local function stop()
 		local s = stopController
@@ -291,6 +293,15 @@ function PossessionClient.start(opts: Opts): Client
 		fpToggle = false
 		startBodyController(model, payload)
 		applyCamera()
+		-- zone changes (the squirrel entering the bowling alley's tunnel) re-pick the camera
+		if zoneConn then
+			zoneConn:Disconnect()
+		end
+		zoneConn = model:GetAttributeChangedSignal("CameraZone"):Connect(function()
+			if body == model and device == nil then
+				applyCamera()
+			end
+		end)
 		local r = requestAt
 		metrics.requestToControlMs = if r then math.floor((os.clock() - r) * 1000 + 0.5) else nil
 		metrics.grantToControlMs = math.floor((os.clock() - t0) * 1000 + 0.5)
@@ -393,6 +404,10 @@ function PossessionClient.start(opts: Opts): Client
 		-- its grab (InputMap). F is the townsperson's kick (Client/Main, PlayNet.Kick).
 		local onFoot = payloadNow ~= nil and payloadNow.species == "human"
 		if name == "E" or name == "ButtonY" then
+			-- a minigame or door prompt on screen (or a game in progress) owns E (Client/Minigames)
+			if device == nil and (player:GetAttribute("PromptVisible") or player:GetAttribute("InMinigame")) then
+				return
+			end
 			if device ~= nil or onFoot then
 				if deviceRequest and body then
 					deviceRequest:FireServer("interact")
@@ -431,6 +446,9 @@ function PossessionClient.start(opts: Opts): Client
 		end,
 		current = function(): Model?
 			return body
+		end,
+		refreshCamera = function()
+			applyCamera()
 		end,
 		state = function(): { [string]: any }
 			return {

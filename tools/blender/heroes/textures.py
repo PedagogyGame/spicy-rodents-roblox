@@ -392,7 +392,7 @@ def opts_samples(opts):
 
 def image_node(nt, path, colorspace, x, y):
     n = nt.nodes.new("ShaderNodeTexImage")
-    n.image = bpy.data.images.load(path, check_existing=True)
+    n.image = bpy.data.images.load(os.path.abspath(path), check_existing=True)
     n.image.colorspace_settings.name = colorspace
     n.location = (x, y)
     return n

@@ -13,7 +13,7 @@ export type Ctx = {
 	species: string?, -- the possessed body's species ("human", "squirrel", "fox", "deer"); nil = none
 	vehicle: string?, -- VehicleKinds id while driving, or "gondola"
 	drone: boolean?, -- piloting the drone
-	zone: string?, -- "lockFirstPerson" inside the arena and the lounges
+	zone: string?, -- "lockFirstPerson" inside the arena and the lounges; "tunnel" in the bowling alley's ball return
 	chase: boolean?, -- squirrel chase lock (a pursuer is on this squirrel)
 	outbreak: boolean?, -- the outbreak cinematic's pull-out
 	firstPersonToggle: boolean?, -- the player's toggle (V); honoured only where allowed
@@ -25,6 +25,7 @@ export type Decision = {
 		| "humanFirst"
 		| "animalThird"
 		| "chaseLock"
+		| "tunnelChase"
 		| "vehicleFirst"
 		| "vehicleThird"
 		| "lockFirst"
@@ -43,6 +44,7 @@ CameraPolicy.MODES = table.freeze({
 	"humanFirst",
 	"animalThird",
 	"chaseLock",
+	"tunnelChase",
 	"vehicleFirst",
 	"vehicleThird",
 	"lockFirst",
@@ -76,7 +78,12 @@ function CameraPolicy.modeFor(ctx: Ctx): Decision
 		end
 		return { mode = "humanThird", firstPerson = false, toggleAllowed = true, subject = "body" }
 	end
-	-- animals: third person only; the squirrel chase locks the camera forward
+	-- animals: third person only; inside the bowling alley's ball-return tunnel a low chase camera rides
+	-- behind the squirrel (the default camera would be squashed against the duct ceiling); the squirrel
+	-- chase locks the camera forward
+	if ctx.zone == "tunnel" and (ctx.species == "squirrel" or ctx.species == "rodent") then
+		return { mode = "tunnelChase", firstPerson = false, toggleAllowed = false, subject = "body" }
+	end
 	if ctx.chase and (ctx.species == "squirrel" or ctx.species == "rodent") then
 		return { mode = "chaseLock", firstPerson = false, toggleAllowed = false, subject = "body" }
 	end

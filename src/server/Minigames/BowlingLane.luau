@@ -20,8 +20,7 @@
 --   Lane.state; RANGES
 
 local Import = require("../Import")
-local AlleyLayout =
-	Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Curve = Import.shared("Routes/Curve") :: typeof(require("../../shared/Routes/Curve"))
 
 local BowlingLane = {}
@@ -147,11 +146,10 @@ function BowlingLane.new(opts: { [string]: any }): any
 		push((liftX + px) / 2, AlleyLayout.PIT_Y - 0.6, AlleyLayout.CUSHION_D - 1.2)
 		push(px, AlleyLayout.DUCT_FLOOR + 0.14 + r, AlleyLayout.CUSHION_D - 2)
 		for _, p in tunnel do
-			local X, Y, D = AlleyLayout.toLocal(place, p[1], p[2], p[3])
+			local _, _, D = AlleyLayout.toLocal(place, p[1], p[2], p[3])
 			if D < AlleyLayout.CUSHION_D - 3 then
 				table.insert(pts, Curve.vec3(p[1], p[2] + r + (if D > AlleyLayout.SHAFT_D1 then 0.14 else 0), p[3]))
 			end
-			local _ = X
 		end
 		local sx, sy, sd = AlleyLayout.rackSlot(lane)
 		push(sx, sy + 0.1, AlleyLayout.HOOD_D1 - 0.3)
@@ -178,7 +176,7 @@ local function anchorPin(pin: Pin, on: boolean)
 	end
 end
 
-function BowlingLane._release(self: any, pin: Pin)
+function BowlingLane._release(_self: any, pin: Pin)
 	anchorPin(pin, false)
 	local body = pin.body
 	pcall(function()
@@ -202,8 +200,8 @@ function BowlingLane._release(self: any, pin: Pin)
 			mass += p:GetMass()
 		end
 	end
-	local g = workspace.Gravity
-	;(pin.force :: VectorForce).Force = Vector3.new(0, mass * math.max(0, g - BowlingLane.EFFECTIVE_GRAVITY), 0)
+	local g = workspace.Gravity;
+	(pin.force :: VectorForce).Force = Vector3.new(0, mass * math.max(0, g - BowlingLane.EFFECTIVE_GRAVITY), 0)
 end
 
 local function upright(pin: Pin): boolean
@@ -313,7 +311,17 @@ function BowlingLane.release(self: any, p: Params): (boolean, string?)
 	ball.Transparency = 0
 	ball.CanCollide = true
 	ball.CFrame = CFrame.new(x, y, z)
-	self.roll = { t = 0, spin = spin, dir = dir, slow = 0, inPit = false, speed = speed, offset = offset, angle = angle, power = power }
+	self.roll = {
+		t = 0,
+		spin = spin,
+		dir = dir,
+		slow = 0,
+		inPit = false,
+		speed = speed,
+		offset = offset,
+		angle = angle,
+		power = power,
+	}
 	self.result = nil
 	self.state = "rolling"
 	if self.physics then
@@ -323,7 +331,7 @@ function BowlingLane.release(self: any, p: Params): (boolean, string?)
 		end)
 		local r = ball.Size.X / 2
 		ball.AssemblyLinearVelocity = dir * speed
-		ball.AssemblyAngularVelocity = Vector3.yAxis:Cross(dir * speed) / r
+		ball.AssemblyAngularVelocity = Vector3.new(0, 1, 0):Cross(dir * speed) / r
 		local mass = ball:GetMass()
 		if self.ballForce == nil then
 			local att = Instance.new("Attachment")
@@ -339,7 +347,7 @@ function BowlingLane.release(self: any, p: Params): (boolean, string?)
 		self.ballForce.Force = Vector3.new(0, mass * math.max(0, workspace.Gravity - BowlingLane.EFFECTIVE_GRAVITY), 0)
 		for _, pin in self.pins do
 			if pin.up and not pin.hidden then
-				self:_release(pin)
+				BowlingLane._release(self, pin)
 			end
 		end
 	end
@@ -594,7 +602,10 @@ function BowlingLane.step(self: any, dt: number)
 		local resting = true
 		for _, pin in self.pins do
 			if pin.up and not pin.hidden and not pin.body.Anchored then
-				if pin.body.AssemblyLinearVelocity.Magnitude > 0.3 or pin.body.AssemblyAngularVelocity.Magnitude > 0.6 then
+				if
+					pin.body.AssemblyLinearVelocity.Magnitude > 0.3
+					or pin.body.AssemblyAngularVelocity.Magnitude > 0.6
+				then
 					resting = false
 				end
 			end

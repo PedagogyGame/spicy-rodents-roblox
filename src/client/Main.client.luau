@@ -28,6 +28,7 @@ local AnimationDriver = require("./Animation/AnimationDriver")
 local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local ClientWorld = require("./World/ClientWorld")
+local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
 
 local Players = game:GetService("Players")
@@ -108,6 +109,19 @@ if not started then
 	return
 end
 local client = clientOrErr :: PossessionClient.Client
+
+-- the bowling alley's games: walk up to a lane, the dartboard or the fortune teller and press E
+task.spawn(function()
+	local okM, errM = pcall(MinigameClient.start, {
+		state = client.state,
+		current = client.current,
+		toast = menu.toast,
+		refreshCamera = client.refreshCamera,
+	})
+	if not okM then
+		warn(`Client: MinigameClient failed: {errM}`)
+	end
+end)
 
 -- keep the help panel in step with vehicles and the drone
 local lastDevice: string? = nil

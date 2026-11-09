@@ -25,6 +25,7 @@
 local Import = require("../Import")
 local Clock = Import.shared("Time/Clock") :: typeof(require("../../shared/Time/Clock"))
 local Moon = Import.shared("Time/Moon") :: typeof(require("../../shared/Time/Moon"))
+local DayCurve = Import.shared("Time/DayCurve") :: typeof(require("../../shared/Time/DayCurve"))
 local SkyKeys = Import.shared("World/SkyKeys") :: typeof(require("../../shared/World/SkyKeys"))
 local Backdrop = Import.shared("World/Backdrop") :: typeof(require("../../shared/World/Backdrop"))
 
@@ -35,6 +36,9 @@ Sky.MOON_DISTANCE = 900 -- studs from the camera (inside the haze; nearer scener
 Sky.MOON_ROWS = 40
 Sky.LIGHT_HZ = 30
 Sky.CARS = 10
+-- until the server publishes its clock (Server/Boot/DayClock): its own opening moment, a golden afternoon
+Sky.FALLBACK_DAY = 9
+Sky.FALLBACK_HOUR = 16.75
 
 local lamps = 0
 
@@ -340,7 +344,18 @@ function Sky.start(): () -> ()
 	local clock: any
 	local function rebuild()
 		local rspd = ReplicatedStorage:GetAttribute("ClockRealSecondsPerDay")
-		clock = Clock.fromEngine(if type(rspd) == "number" then rspd else nil)
+		local perDay = if type(rspd) == "number" then rspd else 72
+		if type(ReplicatedStorage:GetAttribute("ClockEpoch")) == "number" then
+			clock = Clock.fromEngine(perDay)
+		else
+			clock = Clock.new({
+				serverTime = function(): number
+					return workspace:GetServerTimeNow()
+				end,
+				base = (Sky.FALLBACK_DAY + DayCurve.dayFracAt(Sky.FALLBACK_HOUR)) * perDay,
+				realSecondsPerDay = perDay,
+			})
+		end
 	end
 	rebuild()
 	for _, name in { "ClockEpoch", "ClockBase", "ClockRate", "ClockRealSecondsPerDay" } do

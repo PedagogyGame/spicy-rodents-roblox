@@ -279,7 +279,8 @@ function Bowling.roll(state: State, seat: number, pins: number): (string, string
 				event, frameOver = "open", true
 			end
 		else
-			event = if pins == before and before == Bowling.PINS then "strike"
+			event = if pins == before and before == Bowling.PINS
+				then "strike"
 				elseif pins == before then "spare"
 				else "open"
 			frameOver = true
