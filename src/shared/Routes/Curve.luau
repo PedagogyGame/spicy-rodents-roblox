@@ -3,7 +3,8 @@
 -- Centripetal Catmull-Rom (alpha 0.5, three.js r160 phantom ends, 200 arc divisions).
 -- Interface (BUILD_PLAN routes_movement §1-§14): new(points), getPointAt(u), getSpacedPoints(n), length()
 --
--- A line-for-line port of three.js r160 `CatmullRomCurve3` (curveType "centripetal", closed = false)
+-- A line-for-line port of three.js r160 `CatmullRomCurve3` (curveType "centripetal"; open for routes,
+-- closed for the ice-cream loop lane)
 -- and the arc-length machinery of `Curve` (`getLengths` with 200 divisions, `getUtoTmapping` bisection,
 -- `getPointAt`, `getTangent` with delta 1e-4, `getTangentAt`, `getSpacedPoints`). v5.4 builds every
 -- climbing route this way (`addRoute`, reference/v5_4_game.js L302-311; routes_movement §1.1), so the
@@ -21,6 +22,7 @@ export type Vec3 = { x: number, y: number, z: number }
 export type Curve = typeof(setmetatable(
 	{} :: {
 		points: { Vec3 },
+		closed: boolean,
 		arcLengthDivisions: number,
 		_lengths: { number }?,
 	},
@@ -63,11 +65,12 @@ local function distanceSquared(a: Vec3, b: Vec3): number
 end
 
 --[[
-	new(points): an open centripetal Catmull-Rom through the control points (>= 2, all finite).
+	new(points, closed?): a centripetal Catmull-Rom through the control points (>= 2, all finite),
+	open unless `closed` (three.js wraps the indices instead of extrapolating).
 	Errors exactly where v5.4's addRoute throws (routes_movement §1.1): fewer than 2 points or a
 	non-finite coordinate.
 ]]
-function Curve.new(points: { Vec3 }): Curve
+function Curve.new(points: { Vec3 }, closed: boolean?): Curve
 	if #points < 2 then
 		error(`Curve.new: need at least 2 control points, got {#points}`)
 	end
@@ -88,6 +91,7 @@ function Curve.new(points: { Vec3 }): Curve
 	end
 	local self = setmetatable({
 		points = copy :: { Vec3 },
+		closed = closed == true,
 		arcLengthDivisions = Curve.ARC_LENGTH_DIVISIONS,
 		_lengths = nil :: { number }?,
 	}, Curve)
@@ -107,11 +111,16 @@ end
 function Curve.getPoint(self: Curve, t: number): Vec3
 	local points = self.points
 	local l = #points
-	local p = (l - 1) * t
+	local closed = self.closed
+	local p = (l - (if closed then 0 else 1)) * t
 	local intPoint = math.floor(p)
 	local weight = p - intPoint
 
-	if weight == 0 and intPoint == l - 1 then
+	if closed then
+		if intPoint <= 0 then
+			intPoint += (math.floor(math.abs(intPoint) / l) + 1) * l
+		end
+	elseif weight == 0 and intPoint == l - 1 then
 		intPoint = l - 2
 		weight = 1
 	end
@@ -119,7 +128,7 @@ function Curve.getPoint(self: Curve, t: number): Vec3
 	-- three.js indexes points 0..l-1; Luau arrays are 1-based.
 	local p0: Vec3
 	local p0Extrapolated = false
-	if intPoint > 0 then
+	if closed or intPoint > 0 then
 		p0 = points[((intPoint - 1) % l) + 1]
 	else
 		-- extrapolate first point: points[0] - points[1] + points[0]
@@ -130,7 +139,7 @@ function Curve.getPoint(self: Curve, t: number): Vec3
 	local p1 = points[(intPoint % l) + 1]
 	local p2 = points[((intPoint + 1) % l) + 1]
 	local p3: Vec3
-	if intPoint + 2 < l then
+	if closed or intPoint + 2 < l then
 		p3 = points[((intPoint + 2) % l) + 1]
 	else
 		-- extrapolate last point: points[l-1] - points[l-2] + points[l-1]
