@@ -11,9 +11,9 @@ pass: `n_quay_street`, `o_lamp_close`, `p_outer_homes` and `q_willow`.
 | Check | Result |
 |---|---|
 | `lune run tools/bake/check.luau` (WorldBuild exit checks in Lune) | ok: 1,332 routes / 81,613 samples, 0 off geometry (4 patched still off, as before), 83 doors reachable, 110 solids, 0 overlaps |
-| `tools/ci.sh` | every step passes on this work: StyLua check of the worldgen, tests and tools (and of every file this pass touched), Selene, 362 Lune tests (0 failed), compile check (generated/ up to date), 4 Rojo builds, 4 place tests (0 failures), sourcemap. **One caveat:** `stylua --check` currently flags `src/shared/Minigames/MinigameRules/Bowling.luau`, a file another task created during this session (18:51); it was left untouched. |
-| CI place version **38** (`rojo build ci.project.json` + `cloud.mjs save_place --place ci`) | |
-| `tools/cloud/tasks/world_build.luau` (WorldBuild + BakeParity) | **PASS**: ok, 0 failures; routes 0 off geometry; doors 0 unreachable; 0 overlaps; engine plan hash = Lune BakeHash (`66ad35c5b201e463`); placed and engine-baked InstanceHash = Lune (`1bea8a0bbec17ff5`); geometry max delta 1.4e-5 st; engine bake 1.6 s |
+| `tools/ci.sh` steps | Selene clean; Lune tests 386 passed, 0 failed (54 spec files); compile check up to date; 4 Rojo builds; 4 place tests, 0 failures; sourcemap. StyLua passes on every file this pass touched (`src/worldgen`, `tools/bake`, `tools/review/export.luau`, the two specs). **Caveat:** `stylua --check` over the whole tree currently fails on files other tasks created during this session and were still editing (`src/shared/Minigames/MinigameRules/Bowling.luau`, `src/shared/World/Backdrop.luau`, `tests/unit/attractions_alley.spec.luau`, `tools/cloud/tasks/heroes_rig_probe.luau`); they were left untouched. |
+| CI place version **39** (`rojo build ci.project.json` + `cloud.mjs save_place --place ci`) | |
+| `tools/cloud/tasks/world_build.luau` (WorldBuild + BakeParity) | **PASS**: 0 failures; routes 1,332 / 81,613 samples, 0 off geometry; doors 83, 0 unreachable; 0 overlaps; engine plan hash = Lune BakeHash (`66ad35c5b201e463`); placed and engine-baked InstanceHash = Lune (`1bea8a0bbec17ff5`); geometry max delta 1.4e-5 st; engine bake 2.0 s |
 | `tools/cloud/tasks/playtest_smoke.luau` | **PASS** (Playtest ok, 0 failures) |
 | `tools/cloud/tasks/play_smoke.luau` | **PASS** (PlayBuild ok, 0 failures) |
 

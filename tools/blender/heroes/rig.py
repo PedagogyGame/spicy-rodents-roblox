@@ -1,11 +1,14 @@
 """Armatures, skin weights and their checks for the hero animals.
 
 Two armatures share the RigSpec bone names:
-  * the EXPORTED armature: every bone points straight up (+Z) with its roll set so its rest matrix is
-    M = Blender->Roblox axes. FBX export (axis_forward Z, axis_up Y) maps Blender to Roblox by M, so in
-    Roblox every Bone's rest orientation is the identity: Pose.CFrame / Bone.Transform is then exactly
-    the spicy-clip/1 delta (axis-aligned joint frame at the bone head), the same numbers the part-built
-    puppets' Motor6Ds take. Only the heads matter (joint positions); tails are a fixed short stub.
+  * the EXPORTED armature: every bone points straight up (+Z) with roll 0, rest matrix R_EXPORT
+    (X->X, Y->Z, Z->-Y). Measured on an Open Cloud Model upload (tools/cloud/tasks/heroes_rig_probe.luau):
+    bones exported with rest matrix M (Blender->Roblox axes) arrive with a constant 180-degree yaw, so
+    the importer maps a bone frame R to M @ R @ Ry(pi); R_EXPORT = M @ Ry(pi) therefore arrives as the
+    identity. Every Roblox Bone then has an identity rest rotation (CFrame = a pure offset from its
+    parent), so Pose.CFrame / Bone.Transform is exactly the spicy-clip/1 delta (axis-aligned joint frame
+    at the bone head), the same numbers the part-built puppets' Motor6Ds take. Only the heads matter
+    (joint positions); tails are a fixed short stub.
   * a PROXY armature with anatomical segments (joint -> next joint) used only to compute heat
     (bone-glow) weights, then deleted. Its vertex groups carry over by name.
 Weights: at most 4 influences per vertex, normalised, nothing on Root (non-deform, at the origin).
@@ -17,6 +20,7 @@ from mathutils import Vector
 import bl
 
 STUB = 0.06  # exported bone length (studs); cosmetic
+R_EXPORT = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], dtype=np.float64)  # = M @ Ry(pi)
 
 
 def build_armature(skel, name, stub=STUB):
@@ -29,18 +33,18 @@ def build_armature(skel, name, stub=STUB):
         eb = arm.edit_bones.new(bname)
         eb.head = head
         eb.tail = (head[0], head[1], head[2] + stub)
-        eb.align_roll(Vector((0, 1, 0)))
+        eb.roll = 0.0
         eb.use_deform = bname != "Root"
         eb.use_connect = False
     for bname, _head, parent, _tail in skel:
         if parent:
             arm.edit_bones[bname].parent = arm.edit_bones[parent]
     bpy.ops.object.mode_set(mode="OBJECT")
-    # every rest matrix must be M (so Roblox sees identity rotations)
+    # every rest matrix must be R_EXPORT (so Roblox sees identity rotations)
     worst = 0.0
     for b in arm.bones:
         r = np.array(b.matrix_local.to_3x3())
-        worst = max(worst, float(np.abs(r - bl.M_NP).max()))
+        worst = max(worst, float(np.abs(r - R_EXPORT).max()))
     assert worst < 1e-5, f"bone rest frames are not axis-aligned in Roblox space (err {worst})"
     return obj
 

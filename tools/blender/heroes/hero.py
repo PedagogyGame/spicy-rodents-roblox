@@ -139,9 +139,9 @@ def finish(sp, variant, skel, bone_names, body, hi, lo, opts, log):
 
     extra = parts.build(sp, variant, lo, arm, W, bone_names, opts, log)
     body_obj, pat_obj = separate_pattern(lo)
-    rp = root_part(sp)
+    # no RootPart mesh: the importer makes a Part named RootPart for the bone tree (probe, 2026-11-09)
     bpy.data.objects.remove(hi)
-    meshes = [body_obj, pat_obj] + extra + [rp]
+    meshes = [body_obj, pat_obj] + extra
     report["regions"] = {o.name: bl.tri_count(o.data) for o in meshes}
     report["weights"] = {o.name: rig.check_weights(o) for o in meshes if o.vertex_groups}
     report["bones"] = len(arm.data.bones)
