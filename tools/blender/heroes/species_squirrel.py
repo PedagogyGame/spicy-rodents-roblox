@@ -288,3 +288,199 @@ def pattern_field(c, n, dom, variant="squirrel"):
     if variant == "rodent":
         out *= 0.92  # a dingier, narrower belly
     return out
+
+
+# ---- fur flow and painting (textures.py calls these) ------------------------------------------------
+
+# Tints (sRGB hex) for SurfaceAppearance.Color in TintMask mode: the colour map is greyscale where the
+# tint applies, averaging about 0.78 (body) / 0.93 (pattern), so tint x map lands on the PuppetSpec
+# stock colours (#9a5a32 rust back, #e4c9a0 cream belly; rodent #5a4231 / #857160).
+TINTS = {
+    "squirrel": {"Body": "#c27442", "Pattern": "#f5d8ac", "FurCards": "#c27442"},
+    "rodent": {"Body": "#7d5d46", "Pattern": "#a08a74", "FurCards": "#7d5d46"},
+}
+BAKE_EXTRUSION = 0.03
+
+
+def flow_dir(name, head, tail, co, n, variant):
+    seg = np.asarray(tail, float) - np.asarray(head, float)
+    seg = seg / max(np.linalg.norm(seg), 1e-9)
+    lat = np.abs(n[:, 0:1])
+    if name in TORSO or name in ("Neck", "Head", "Jaw"):
+        d = np.tile(-seg, (len(co), 1))
+        d[:, 1] = np.maximum(d[:, 1], 0.6)  # always backward
+        d = d + np.array([0, 0, -0.9]) * lat
+        if name in ("Head", "Jaw"):
+            d = d + np.array([0, 0.3, 0.25]) * (1 - lat)
+        return d
+    if name.startswith("Ear"):
+        return np.tile(seg, (len(co), 1))
+    if name.startswith("Tail"):
+        rel = co - head
+        along = rel @ seg
+        perp = rel - along[:, None] * seg
+        pn = perp / np.maximum(np.linalg.norm(perp, axis=1, keepdims=True), 1e-9)
+        return seg + 0.9 * pn
+    if name.startswith("Back") and name.endswith("Upper"):
+        return seg + np.array([0, 0.6, -0.6])
+    return np.tile(seg, (len(co), 1))
+
+
+def _hex(h):
+    h = h.lstrip("#")
+    return np.array([int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4)], dtype=np.float32)
+
+
+def _seg_dist(P, a, b):
+    a, b = np.asarray(a, np.float32), np.asarray(b, np.float32)
+    ab = b - a
+    t = np.clip((P - a) @ ab / max(float(ab @ ab), 1e-9), 0, 1)
+    q = a + t[:, None] * ab
+    return np.linalg.norm(P - q, axis=1), t
+
+
+def paint(tx, variant, tools):
+    """Colour (greyscale + TintMask alpha, natural colours where alpha is 0), roughness and strand
+    relief for every texel of the Body/Pattern atlas."""
+    rodent = variant == "rodent"
+    sst = tools["sstep"]
+    vn = tools["vnoise"]
+    fbm = tools["fbm"]
+    P, N, F, T, B = tx["P"], tx["N"], tx["F"], tx["T"], tx["B"]
+    n = len(P)
+    dom = tx["dom"].astype(str)
+    region = tx["region"]
+    hard = tx["hard"]
+    lm = landmarks(variant)
+    tail = np.char.startswith(dom, "Tail")
+    ear = np.char.startswith(dom, "Ear")
+    feet = np.char.endswith(dom, "_Toe") | np.char.endswith(dom, "_Foot")
+    head = np.isin(dom, ["Head", "Jaw"])
+    # --- strands: fine hairs, locks and clumps; the tail's are longer and coarser -------------------
+    lscale = np.where(tail, 1.8, np.where(head | feet, 0.6, 1.0)).astype(np.float32)
+    layers = [(0.0042, 0.045, 1.0, 0.0012, 11), (0.011, 0.09, 0.7, 0.0018, 12), (0.028, 0.16, 0.45, 0.0022, 13)]
+    if rodent:
+        layers = [(0.0045, 0.04, 1.0, 0.0014, 21), (0.013, 0.08, 0.8, 0.0026, 22), (0.035, 0.12, 0.7, 0.0035, 23)]
+    H, gT, gB = tools["fur_relief"](P, F, N, T, B, layers, lscale=lscale)
+    fine = tools["strands"](P, F * lscale[:, None], 0.0042, 0.045, seed=11)
+    big = fbm(P * 9.0, 3, seed=5)
+    dorsal = sst(0.15, 0.85, N[:, 2])
+    # --- greyscale under the tint ------------------------------------------------------------------
+    g = 0.80 - 0.09 * dorsal
+    g = g + (fine - 0.5) * (0.26 + 0.22 * dorsal)  # agouti: banded guard hairs grizzle the back
+    g = g * (0.86 + 0.26 * H)
+    g = g + (big - 0.5) * 0.12
+    g = np.where(feet, g * 0.86, g)
+    # face: pale eye ring, lighter cheeks and muzzle
+    r_eye = eye_radius(variant)
+    d_eye = np.minimum(np.linalg.norm(P - lm["eyeL"], axis=1), np.linalg.norm(P - lm["eyeR"], axis=1))
+    ring = sst(r_eye + 0.004, r_eye + 0.016, d_eye) * (1 - sst(r_eye + 0.03, r_eye + 0.055, d_eye))
+    g = np.where(head, g + 0.10 * (1 - dorsal) * (1 - ring), g)
+    g = g * (1 - 0.0 * ring) + ring * (0.98 - g) * 0.85
+    # tail: darker core, a dark band, then the frosted fringe at the plume's edges
+    lat = np.abs(N[:, 0])
+    tg = 0.66 + (fine - 0.5) * 0.42
+    tg = tg - 0.16 * sst(0.45, 0.65, lat) * (1 - sst(0.72, 0.86, lat))
+    tg = np.where(lat > 0.72, tg + (1.0 - tg) * sst(0.74, 0.92, lat) * 0.9, tg)
+    g = np.where(tail, tg, g)
+    # pattern region (cream belly, throat, tail tip): bright with soft strands
+    gp = 0.93 + (fine - 0.5) * 0.14 + (H - 0.5) * 0.06
+    gp = np.where(tail, 0.95 + (fine - 0.5) * 0.12, gp)
+    # --- natural (untinted) colours and the tint mask ---------------------------------------------
+    tints = TINTS[variant]
+    tb, tp = _hex(tints["Body"]), _hex(tints["Pattern"])
+    pat = pattern_field(P, N, tx["dom"], variant)
+    alpha = np.ones(n, dtype=np.float32)
+    grey = np.where(region == 1, gp, g)
+    nat_body = np.clip(g, 0, 1)[:, None] * tb
+    nat_pat = np.clip(gp, 0, 1)[:, None] * tp
+    nat = np.where((region == 1)[:, None], nat_pat, nat_body)
+    # soft border between Body and Pattern: both sides fade to untinted natural colour at the seam
+    near = 1 - sst(0.0, 0.16, np.abs(pat - 0.5))
+    blend = sst(0.3, 0.7, pat)[:, None]
+    nat = np.where((near > 0)[:, None], nat_body * (1 - blend) + nat_pat * blend, nat)
+    alpha = np.minimum(alpha, 1 - near)
+    rough = 0.64 - 0.12 * (H - 0.5) + 0.08 * (1 - dorsal) + (big - 0.5) * 0.06
+    rough = np.where(tail, rough + 0.04, rough)
+    ov = np.zeros(n, dtype=bool)  # texels whose natural colour is overridden (alpha forced to 0)
+    natv = nat.copy()
+
+    def override(mask, col, a=0.0, r=None, k=None):
+        m = mask if k is None else mask & (k > 0)
+        w = (np.ones(n) if k is None else k)[m]
+        natv[m] = natv[m] * (1 - w[:, None]) + np.asarray(col, np.float32) * w[:, None]
+        alpha[m] = alpha[m] * (1 - w) + a * w
+        if r is not None:
+            rough[m] = rough[m] * (1 - w) + r * w
+        ov[m] = True
+
+    # nose pad (rhinarium) and the dark lip line under it
+    d_nose = np.linalg.norm(P - lm["nose"], axis=1)
+    override(head, _hex("#4e3530") * (0.85 + 0.3 * vn(P * 300.0, 3))[:, None] if False else _hex("#503631"), r=0.32, k=1 - sst(0.026, 0.036, d_nose))
+    # eyelid rims: bare dark skin right around the eyeball
+    lid = 1 - sst(r_eye + 0.002, r_eye + 0.009, d_eye)
+    override(head, _hex("#7a2a2a") if rodent else _hex("#2a1e1a"), r=0.4, k=lid)
+    # inner ears: thin pinkish skin with fine hairs
+    inner = ear & (N[:, 1] < -0.15)
+    override(ear, _hex("#9c6a60") if rodent else _hex("#b88a7c"), r=0.5, k=sst(-0.15, -0.45, N[:, 1]) * inner)
+    # foot pads
+    override(feet, _hex("#5c4440"), r=0.5, k=sst(-0.4, -0.75, N[:, 2]) * feet)
+    # claws and teeth
+    override(hard == 1, _hex("#2b2320") * 1.0, r=0.28)
+    override(hard == 2, _hex("#e0b05a") if not rodent else _hex("#d8b25e"), r=0.22)
+    if rodent:
+        # mange: patchy thin fur showing grey-pink skin, bigger toward the haunches and the tail
+        skin = _hex("#9e827c")
+        bruise = _hex("#6e5560")
+        mn = fbm(P * 14.0, 3, seed=31)
+        thin = sst(0.56, 0.68, mn + 0.08 * tail + 0.05 * sst(0.0, 0.4, P[:, 1]))
+        sk = skin * (0.8 + 0.4 * vn(P * 90.0, 32))[:, None] * (1 - 0.0)
+        sk = sk * (1 - 0.35 * sst(0.5, 0.8, fbm(P * 30.0, 2, seed=33)))[:, None] + bruise * 0.0
+        override(hard == 0, sk, r=0.55, k=thin * 0.85)
+        # ribs: the fur is thin over them
+        ribs = np.isin(dom, list(TORSO)) & (np.abs(P[:, 0]) > 0.17) & (P[:, 1] > -0.42) & (P[:, 1] < -0.02) & (P[:, 2] < 1.02) & (P[:, 2] > 0.6)
+        override(ribs, skin * 0.92, r=0.55, k=ribs * 0.55 * sst(0.4, 0.7, np.abs(N[:, 0])))
+        # stitched bald patches: bare bruised skin, a dark incision and cross stitches
+        for i, pt in enumerate(RODENT_PATCHES):
+            c = np.array(pt["c"], np.float32)
+            d = np.linalg.norm(P - c, axis=1)
+            edge = pt["r"] * (0.85 + 0.3 * vn(P * 40.0, 40 + i))
+            k = 1 - sst(edge * 0.8, edge, d)
+            col = skin * (0.85 + 0.3 * vn(P * 120.0, 50 + i))[:, None]
+            col = col * (1 - 0.3 * sst(0.4, 0.9, d / pt["r"]))[:, None] + bruise * 0.3 * sst(0.4, 0.9, d / pt["r"])[:, None]
+            override(hard == 0, col, r=0.5, k=k)
+            a, b = pt["stitch"]
+            ds, ts = _seg_dist(P, a, b)
+            cut = 1 - sst(0.002, 0.005, ds)
+            override(hard == 0, _hex("#4a1f1c"), r=0.4, k=cut * (k > 0.3))
+            L = float(np.linalg.norm(np.array(b) - np.array(a)))
+            ph = (ts * L / 0.022) % 1.0
+            cross = (np.abs(ph - 0.5) < 0.12) & (ds < 0.016)
+            override(hard == 0, _hex("#1c1714"), r=0.6, k=cross.astype(np.float32))
+            gT = np.where(cross, gT + 0.4 * np.sign(vn(P * 500.0, 7) - 0.5), gT)
+        # scabs here and there
+        sc = sst(0.78, 0.86, fbm(P * 25.0, 2, seed=44)) * (hard == 0)
+        override(hard == 0, _hex("#4a2620"), r=0.45, k=sc)
+        # reddened, sore eyelids and nose
+        override(head, _hex("#8a3030"), r=0.4, k=(1 - sst(r_eye + 0.006, r_eye + 0.02, d_eye)) * 0.7)
+    # RGB in the map: grey where tinted; natural colour divided by the partial tint elsewhere
+    tint_reg = np.where((region == 1)[:, None], tp, tb)
+    denom = 1 - alpha[:, None] + alpha[:, None] * tint_reg
+    rgb = np.where(alpha[:, None] > 0.999, np.clip(grey, 0, 1)[:, None].repeat(3, 1), natv / np.maximum(denom, 1e-3))
+    # untouched texels (border fade only) keep a greyscale ramp as alpha rises
+    rgb = np.clip(rgb, 0, 1)
+    # flatter relief on bare skin, claws and teeth
+    flat = (alpha < 0.5) & ov
+    gT = np.where(flat, gT * 0.25, gT)
+    gB = np.where(flat, gB * 0.25, gB)
+    return {
+        "rgb": rgb.astype(np.float32),
+        "alpha": np.clip(alpha, 0, 1).astype(np.float32),
+        "rough": np.clip(rough, 0.05, 1).astype(np.float32),
+        "height": H,
+        "slope_T": gT.astype(np.float32),
+        "slope_B": gB.astype(np.float32),
+        "tint_by_region": [tb, tp],
+        "tints_hex": tints,
+        "ao_strength": 0.7,
+    }

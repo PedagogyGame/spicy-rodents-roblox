@@ -3,8 +3,11 @@
 -- The first playable build (owner directive 2026-11-09, docs/owner/PLAY_FIRST_BUILD.md): assembles what
 -- W0 and W1 built into one game. Boot, in order, publishing progress for the client's loading screen
 -- (ReplicatedStorage attributes BootStage, BootProgress, BootReady, BootError):
---   1. Lighting: World/LightingPreset (the v5.4 golden preset as pleasant daylight).
---   2. Terrain: WorldGen/WorldTerrain (river, roads, hills, beach; Workspace.Town is baked into the place).
+--   1. Lighting: World/LightingPreset (the v5.4 golden preset as pleasant daylight); Boot/DayClock publishes the
+--      day clock (ClockEpoch/Base/Rate attributes) that every client turns into the day cycle (Client/World/Sky).
+--   2. Terrain: WorldGen/WorldTerrain (river, roads, hills, beach; Workspace.Town is baked into the place), then
+--      WorldGen/BackdropTerrain (the band beyond the world clamp, the coast and the near sea; Workspace.Backdrop
+--      is baked into the place too).
 --   3. Data, TrafficService (25 AI vehicles on the lanes; the exact swept test), MovementService
 --      (log-only validator, rule 12 seams: onHandoff marks the actor teleported in the traffic sweep).
 --   4. Actors/ActorsRuntime: 102 bodies (people, squirrels, deer, the fox, the rodent), Possession,
@@ -39,6 +42,7 @@ local PlayerVehicles =
 local ActorsRuntime = require("../Actors/ActorsRuntime")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
+local DayClock = require("./DayClock")
 
 export type Opts = {
 	players: boolean?, -- connect joins (default true; the engine smoke drives PlayerLike stubs)
@@ -147,6 +151,7 @@ function Game.start(opts: Opts?): any
 	-- 1. sky ------------------------------------------------------------------------------------
 	stage(0.03, "Setting up the sky and the afternoon sun")
 	LightingPreset.apply(game:GetService("Lighting"))
+	DayClock.publish(ReplicatedStorage) -- the day cycle: every client derives it (Client/World/Sky)
 	local town = workspace:FindFirstChild("Town")
 	local townParts = 0
 	if town then
@@ -171,6 +176,16 @@ function Game.start(opts: Opts?): any
 		if mod and mod:IsA("ModuleScript") then
 			local WorldTerrain = (require :: any)(mod)
 			WorldTerrain.write(workspace.Terrain)
+			-- the band beyond the world clamp, the north coast and the near sea (WorldGen/BackdropTerrain)
+			local backdrop = worldGen and worldGen:FindFirstChild("BackdropTerrain")
+			if backdrop and backdrop:IsA("ModuleScript") then
+				local ok, err = pcall(function()
+					(require :: any)(backdrop).write(workspace.Terrain)
+				end)
+				if not ok then
+					warn(`[SpicyRodents] backdrop terrain failed: {err}`)
+				end
+			end
 			-- the editor-only grass skin (tools/bake/editor_ground) is replaced by the real terrain
 			local editorGround = workspace:FindFirstChild("EditorGround")
 			if editorGround then

@@ -321,7 +321,9 @@ local function walls(kit: any, root: any, data: any)
 	kit:box(w, "StoreDoorHead", sx0 + 2.2, sx0 + 5.6, 7.2, L.CEILING_Y, L.GAME_ROOM_D1, L.GAME_ROOM_D1 + 0.6, C.wallLow, "Plaster")
 	kit:box(w, "StoreSideWall", L.LANE_BLOCK_X + 0.4, L.LANE_BLOCK_X + 1.0, 0, L.CEILING_Y, L.GAME_ROOM_D1, L.MACHINE_D1, C.wallLow, "Plaster")
 	-- left aisle: the machine room door at the end (open doorway, a sign over it)
-	kit:box(w, "MachineWallL", L.X0, -L.LANE_BLOCK_X - 0.4, 0, L.CEILING_Y, L.MACHINE_D1 - 0.6, L.MACHINE_D1, C.wallLow, "Plaster", {})
+	kit:box(w, "MachineWallL", L.X0, -24.2, 0, L.CEILING_Y, L.MACHINE_D1 - 0.6, L.MACHINE_D1, C.wallLow, "Plaster")
+	kit:box(w, "MachineWallR", -20.8, -L.LANE_BLOCK_X - 0.4, 0, L.CEILING_Y, L.MACHINE_D1 - 0.6, L.MACHINE_D1, C.wallLow, "Plaster")
+	kit:box(w, "MachineDoorHead", -24.2, -20.8, 7.2, L.CEILING_Y, L.MACHINE_D1 - 0.6, L.MACHINE_D1, C.wallLow, "Plaster")
 	-- interior finish on the long walls (dado and band), only where people see them
 	kit:box(w, "LeftDado", L.X0, L.X0 + 0.08, 0, 3.4, L.FRONT_D, L.MACHINE_D1 - 0.6, C.wallLow, "Plaster", { collide = false })
 	kit:box(w, "LeftUpper", L.X0, L.X0 + 0.06, 3.4, L.CEILING_Y, L.FRONT_D, L.MACHINE_D1 - 0.6, C.wallHigh, "Plaster", { collide = false })
@@ -385,7 +387,7 @@ local function outside(kit: any, root: any, data: any)
 		fx = fx1
 	end
 	-- the stoop at the exit doors: landing, steps down to the alley, pipe railings
-	local sx0, sx1 = -25.4, -19.6
+	local sx0, sx1 = -27.4, -17.6
 	kit:box(o, "Stoop", sx0, sx1, ay - 1, 0, D1, D1 + 3.4, C.concrete, "Concrete")
 	local steps = 6
 	local rise = -ay / steps

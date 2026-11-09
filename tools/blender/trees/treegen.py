@@ -831,15 +831,16 @@ class TreeBuilder:
         self.log["twigs"] = made
         self.log["twig_tris"] = tris
 
-    def clump_templates(self):
-        """A few lumpy unit clumps (icosphere 3, decimated in Blender when available)."""
-        key = ("tpl", self.opts.get("tpl_tris", 0))
-        if hasattr(self, "_tpl"):
-            return self._tpl
+    def clump_templates(self, target):
+        """Lumpy unit clumps (icosphere 3 with 8 bulges, flat-ish underside), decimated in Blender to
+        about `target` triangles; cached per target."""
+        cache = self.__dict__.setdefault("_tpl", {})
+        if target in cache:
+            return cache[target]
         rng = np.random.default_rng(77)
         V0, F0 = icosphere(3)
         tpls = []
-        for t in range(6):
+        for t in range(5):
             nl = 8
             dirs = norm(rng.normal(size=(nl, 3)) + np.array([0, 0.4, 0]))
             amps = rng.uniform(0.16, 0.30, nl)
@@ -850,40 +851,46 @@ class TreeBuilder:
             flat = np.where(V0[:, 1] < -0.25, 1 - 0.3 * (-V0[:, 1] - 0.25), 1.0)
             V = V0 * (disp * flat)[:, None]
             dec = self.opts.get("decimate")
-            target = self.opts.get("tpl_tris", 0)
-            if dec is not None and target:
+            if dec is not None and target < len(F0):
                 V, F = dec(V, F0, target)
             else:
                 V, F = V, F0
             tpls.append((V, F))
-        self._tpl = tpls
+        cache[target] = tpls
         return tpls
 
     def build_clump_meshes(self):
         rng = self.rng
         if not self.clump_info:
             return
-        n = len(self.clump_info)
-        per = self.leaf_budget() / n
-        lvl = 1 if per < 150 else 2
-        if self.opts.get("decimate") is not None:
-            self.opts["tpl_tris"] = int(np.clip(per, 60, 420))
-            tpls = self.clump_templates()
-        else:
-            V0, F0 = icosphere(lvl)
-            tpls = [(V0, F0)]
+        # silhouette-weighted resolution: side clumps draw the outline, the underside is seen least
+        def weight(d):
+            return 1.35 if abs(d[1]) < 0.45 else (1.0 if d[1] >= 0.45 else 0.6)
+        wts = [weight(a[2]) for a in self.clump_info]
+        base = self.leaf_budget() / max(sum(wts), 1e-6)
+        levels = {}
+        for w in sorted(set(wts)):
+            tgt = int(np.clip(round(base * w / 10) * 10, 50, 600))
+            if self.opts.get("decimate") is not None:
+                levels[w] = self.clump_templates(tgt)
+            else:
+                V0, F0 = icosphere(2 if tgt > 200 else 1)
+                levels[w] = [(V0, F0)]
         tile = float(np.clip(self.H * 0.06, 2.8, 5.0))
         self.leaf_tile = tile
         Cs = np.array([a[0] for a in self.clump_info])
         yl, yh = Cs[:, 1].min(), Cs[:, 1].max()
-        for (ctr, r, d, li) in self.clump_info:
+        for (ctr, r, d, li), w in zip(self.clump_info, wts):
+            tpls = levels[w]
             Vt, Ft = tpls[int(rng.integers(0, len(tpls)))]
-            # random rotation about Y and a small tilt
             a = rng.random() * 6.28
             ca, sa = math.cos(a), math.sin(a)
             Rm = np.array([[ca, 0, -sa], [0, 1, 0], [sa, 0, ca]])
-            V = (Vt @ Rm.T) * r
-            V[:, 1] *= 0.86
+            tilt = rng.normal(0, 0.18)
+            ct, st = math.cos(tilt), math.sin(tilt)
+            Rt = np.array([[1, 0, 0], [0, ct, -st], [0, st, ct]])
+            V = (Vt @ (Rt @ Rm).T) * r
+            V[:, 1] *= 0.84
             V = V + ctr[None]
             ng, _ = vertex_normals(V, Ft)
             lc, lr, lk = self.lobes[li]
@@ -897,8 +904,7 @@ class TreeBuilder:
                 layer = "shade"
             else:
                 layer = "mid"
-            roll = rng.random()
-            if roll < 0.12:
+            if rng.random() < 0.12:
                 layer = {"sun": "mid", "mid": "sun", "shade": "mid"}[layer]
             V2, F2, UV2, N2 = triplanar_split(V, Ft, N, tile, rot=rng.random() * 6.28, offset=tuple(rng.random(2)))
             self.leaf[layer].add(V2, F2, UV2, N2)
