@@ -162,7 +162,30 @@ local function trunkRadius(route: any, t: number): number
 	return math.max(0.32 * SPU, r * (1 - 0.48 * t))
 end
 
-export type Opts = { groundAt: (number, number, number?) -> (number, boolean), maxLeaves: number? }
+-- A generated/TreeArt record: the Blender model built round this trunk's routes (tools/blender/trees).
+export type ArtPart = {
+	name: string,
+	meshId: string,
+	size: { number },
+	offset: { number },
+	colorMap: string?,
+	normalMap: string?,
+	roughnessMap: string?,
+	alphaMode: string?,
+	color: { number },
+	material: string,
+	doubleSided: boolean?,
+}
+export type Art = { trunkRoute: number, assetId: string?, pivot: { number }, parts: { ArtPart } }
+
+export type Opts = {
+	groundAt: (number, number, number?) -> (number, boolean),
+	maxLeaves: number?,
+	art: Art?, -- the tree's mesh model: bark cylinders become invisible proxies under it, no procedural crown
+}
+
+-- How far the Blender bark carries below the model pivot (tools/blender/trees/treegen.py), in studs.
+local ART_ROOT_DEPTH = 3
 
 function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts: Opts): number
 	local rand = rng(trunk.id + 7)
@@ -180,7 +203,24 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 
 	-- sizes scale with the tree (apples ~16 st, outer trees ~40, giants ~120)
 	local scale = math.clamp(H / 44, 0.55, 1.45)
-	local barkOpts: Spec.Opts = { color = barkColor, material = "Wood", role = "Limb" }
+	-- With a mesh model the bark cylinders stay as invisible proxies: they keep the trunk and boughs solid,
+	-- answer raycasts and stand for the bark in RouteCheck, while the mesh is what the player sees.
+	local art = opts.art
+	local barkOpts: Spec.Opts = if art
+		then {
+			color = barkColor,
+			material = "Wood",
+			role = "Limb",
+			transparency = 1,
+			canQuery = true,
+			castShadow = false,
+		}
+		else { color = barkColor, material = "Wood", role = "Limb" }
+	local function embedded(o: Spec.Opts): Spec.Opts
+		local c = table.clone(o)
+		c.attrs = { Embedded = true }
+		return c
+	end
 
 	local trunkLine: { { number } } = {}
 	for _, m in members do
@@ -207,9 +247,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			b,
 			r,
 			if k == 1 then 0 else r * 0.25,
-			if k == 1
-				then { color = barkColor, material = "Wood", role = "Limb", attrs = { Embedded = true } }
-				else barkOpts
+			if k == 1 then embedded(barkOpts) else barkOpts
 		)
 	end
 	-- root flare (skipped where the trunk stands at a kerb, road or sidewalk: no bark on the paving)
@@ -219,7 +257,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		local _, p2 = opts.groundAt(foot[1] + o[1] * r0 * 1.35, foot[3] + o[2] * r0 * 1.35, foot[2] + 2)
 		paved = paved or p2
 	end
-	if not paved then
+	if not paved and not art then
 		cylinder(list, "Flare", { foot[1], g - 1.2, foot[3] }, { foot[1], g + 0.9 * scale, foot[3] }, r0 * 1.16, 0, {
 			color = barkColor,
 			material = "Wood",
@@ -230,7 +268,18 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			attrs = { Embedded = true },
 		})
 	end
-	if g < foot[2] - 0.05 then
+	if art then
+		-- the model's bark carries ART_ROOT_DEPTH below its pivot; where the ground is lower still, a
+		-- visible bark foot closes the gap
+		if g < art.pivot[2] - ART_ROOT_DEPTH + 0.3 then
+			cylinder(list, "TrunkFoot", { foot[1], g - 1, foot[3] }, { foot[1], art.pivot[2], foot[3] }, r0, 0, {
+				color = barkColor,
+				material = "Wood",
+				role = "Limb",
+				attrs = { Embedded = true },
+			})
+		end
+	elseif g < foot[2] - 0.05 then
 		-- the trunk route starts above the ground: carry the bark down into it
 		cylinder(list, "TrunkFoot", { foot[1], g - 1, foot[3] }, foot, r0, 0, {
 			color = barkColor,
@@ -276,7 +325,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				cylinder(list, `R{b.route.id}_{piece}`, p0, p1, r, r * 0.6, barkOpts)
 			end
 		end
-		if b.route.kind == "branch" then
+		if b.route.kind == "branch" and not art then
 			local e = b.line[#b.line]
 			local _, d = at(b.line, b.c, b.L)
 			local side = unit(cross(d, { 0, 1, 0 }))
@@ -309,6 +358,45 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				)
 			end
 		end
+	end
+
+	-- 2. the mesh model (bark, three leaf layers, apples): placed at its pivot, visual only ----------
+	if art then
+		local leaves = 0
+		for _, m in art.parts do
+			local isLeaf = string.sub(m.name, 1, 6) == "Leaves"
+			if isLeaf then
+				leaves += 1
+			end
+			list:world({
+				name = m.name,
+				cx = art.pivot[1] + m.offset[1],
+				cy = art.pivot[2] + m.offset[2],
+				cz = art.pivot[3] + m.offset[3],
+				yaw = 0,
+				pitch = 0,
+				sx = m.size[1],
+				sy = m.size[2],
+				sz = m.size[3],
+				color = m.color,
+				material = m.material,
+				canCollide = false,
+				transparency = 0,
+				castShadow = true,
+				role = if isLeaf then "Leaves" elseif m.name == "Bark" then "Twig" else "Fruit",
+				canQuery = false,
+				attrs = if m.name == "Bark" then { Embedded = true } else nil,
+				mesh = {
+					id = m.meshId,
+					colorMap = m.colorMap,
+					normalMap = m.normalMap,
+					roughnessMap = m.roughnessMap,
+					alphaMode = m.alphaMode,
+					doubleSided = m.doubleSided,
+				},
+			})
+		end
+		return leaves
 	end
 
 	-- 2. leaf clusters ---------------------------------------------------------------------------

@@ -91,6 +91,7 @@ result.bones = bones
 result.parts = parts
 local primary = (model :: Model):FindFirstChildWhichIsA("Model")
 result.innerModel = primary and primary.Name or nil
-result.innerPrimary = primary and (primary :: Model).PrimaryPart and ((primary :: Model).PrimaryPart :: BasePart).Name or nil
+result.innerPrimary = primary and (primary :: Model).PrimaryPart and ((primary :: Model).PrimaryPart :: BasePart).Name
+	or nil
 print(`heroes_rig_probe: {#tree} instances, {#bones} bones, {#parts} parts/attachments`)
 return result

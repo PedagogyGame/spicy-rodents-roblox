@@ -114,17 +114,23 @@ for _, d in model:GetChildren() do
 			skinned = (d :: any).HasSkinnedMesh,
 			surfaceAppearance = sa ~= nil,
 			alphaMode = sa and tostring(sa.AlphaMode) or nil,
-			size = { math.round(d.Size.X * 1000) / 1000, math.round(d.Size.Y * 1000) / 1000, math.round(d.Size.Z * 1000) / 1000 },
+			size = {
+				math.round(d.Size.X * 1000) / 1000,
+				math.round(d.Size.Y * 1000) / 1000,
+				math.round(d.Size.Z * 1000) / 1000,
+			},
 		}
 	end
 end
 result.regions = regions
-result.rootPart = rootPart and {
-	class = rootPart.ClassName,
-	size = { (rootPart :: BasePart).Size.X, (rootPart :: BasePart).Size.Y, (rootPart :: BasePart).Size.Z },
-	transparency = (rootPart :: BasePart).Transparency,
-} or nil
-model.PrimaryPart = (rootPart :: BasePart?)
+result.rootPart = rootPart
+		and {
+			class = rootPart.ClassName,
+			size = { (rootPart :: BasePart).Size.X, (rootPart :: BasePart).Size.Y, (rootPart :: BasePart).Size.Z },
+			transparency = (rootPart :: BasePart).Transparency,
+		}
+	or nil
+model.PrimaryPart = rootPart :: BasePart?
 local before = RigSpec.validate(model, "squirrel")
 result.validateBefore = {
 	ok = before.ok,

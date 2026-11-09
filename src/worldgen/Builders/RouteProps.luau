@@ -267,8 +267,13 @@ function RouteProps.plans(
 	props: { [string]: any },
 	Curve: any,
 	heightAt: (number, number) -> number,
-	groundAtIn: ((number, number, number?) -> (number, boolean))?
+	groundAtIn: ((number, number, number?) -> (number, boolean))?,
+	treeArt: { Trees.Art }?
 ): ({ Spec.BuildPlan }, { [number]: string })
+	local artByTrunk: { [number]: Trees.Art } = {}
+	for _, a in treeArt or {} do
+		artByTrunk[a.trunkRoute] = a
+	end
 	local groundAt: (number, number, number?) -> (number, boolean) = groundAtIn
 		or function(x: number, z: number, _maxY: number?): (number, boolean)
 			return heightAt(x, z), false
@@ -328,16 +333,19 @@ function RouteProps.plans(
 		for _, r in members[t.id] do
 			table.insert(ms, { route = r, line = polyline(r, Curve) })
 		end
-		local leaves = Trees.build(list, t, ms, { groundAt = groundAt })
+		local art = artByTrunk[t.id]
+		local leaves = Trees.build(list, t, ms, { groundAt = groundAt, art = art })
 		table.insert(
 			out,
-			newPlan(
-				`Tree_{t.id}`,
-				"tree",
-				props,
-				{ TrunkRoute = t.id, Name = t.name, Routes = #members[t.id], LeafClusters = leaves },
-				list
-			)
+			newPlan(`Tree_{t.id}`, "tree", props, {
+				TrunkRoute = t.id,
+				Name = t.name,
+				Routes = #members[t.id],
+				LeafClusters = leaves,
+				Mesh = art ~= nil,
+				-- the uploaded Model the meshes came from: Server/Assets/TreeArt loads it for its PBR maps
+				ArtAsset = if art then art.assetId else nil,
+			}, list)
 		)
 	end
 

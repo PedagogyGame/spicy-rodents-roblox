@@ -150,10 +150,14 @@ for _, spec in TREES do
 	local bark = tree:FindFirstChild("Bark", true)
 	if bark and bark:IsA("BasePart") then
 		local side = workspace:Raycast(pivot + Vector3.new(30, 6, 0), Vector3.new(-60, 0, 0), params)
-		entry.sideRayAt6Studs = if side then { instance = side.Instance.Name, x = r3(side.Position.X - pivot.X) } else false
+		entry.sideRayAt6Studs = if side
+			then { instance = side.Instance.Name, x = r3(side.Position.X - pivot.X) }
+			else false
 	end
 	table.insert(result.trees, entry)
-	print(`tree {spec.index} {spec.label}: {meshParts} MeshParts, {surfaceAppearances} SurfaceAppearances, load {entry.loadSeconds}s`)
+	print(
+		`tree {spec.index} {spec.label}: {meshParts} MeshParts, {surfaceAppearances} SurfaceAppearances, load {entry.loadSeconds}s`
+	)
 end
 
 holder:Destroy()

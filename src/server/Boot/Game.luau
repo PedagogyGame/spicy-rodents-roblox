@@ -45,6 +45,7 @@ local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local DayClock = require("./DayClock")
+local TreeArt = require("../Assets/TreeArt")
 
 export type Opts = {
 	players: boolean?, -- connect joins (default true; the engine smoke drives PlayerLike stubs)
@@ -818,6 +819,23 @@ function Game.start(opts: Opts?): any
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
 	ReplicatedStorage:SetAttribute("BootReady", true)
+
+	-- The trees' normal and roughness maps arrive after the town is playable (each tree already shows
+	-- its colour texture): Assets/TreeArt loads the uploaded models one by one, off the boot path.
+	if town and o.heartbeat ~= false then
+		task.spawn(function()
+			local okT, report = pcall(TreeArt.run, town)
+			if okT then
+				print(
+					`[SpicyRodents] tree art: {report.upgraded}/{report.trees} trees with full maps, {report.failed} failed, {math.floor(
+						report.seconds
+					)} s`
+				)
+			else
+				warn(`[SpicyRodents] tree art failed: {report}`)
+			end
+		end)
+	end
 
 	return {
 		runtime = rt,

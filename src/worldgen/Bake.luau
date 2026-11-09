@@ -33,7 +33,7 @@ local Bake = {}
 
 Bake.VERSION = 2
 
-export type Data = { lots: { Plan.Lot }, roads: { Plan.Road }, routes: { any }?, lighting: any? }
+export type Data = { lots: { Plan.Lot }, roads: { Plan.Road }, routes: { any }?, lighting: any?, treeArt: { any }? }
 
 -- Every generated module the bake reads (Lune: generated/*.luau; engine: Shared.Generated).
 function Bake.data(): Data
@@ -49,6 +49,7 @@ function Bake.data(): Data
 		roads = Import.generated("Roads"),
 		routes = routes,
 		lighting = Import.generated("Lighting"),
+		treeArt = if index.modules.TreeArt then Import.generated("TreeArt") else nil,
 	}
 end
 
@@ -92,7 +93,7 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 	Yield.breathe()
 	local obstacles: { { number } } = {}
 	if data.routes then
-		local props = RouteProps.plans(data.routes, Kits.routeProps, Curve, Height.at, groundAt)
+		local props = RouteProps.plans(data.routes, Kits.routeProps, Curve, Height.at, groundAt, data.treeArt)
 		for _, p in props do
 			table.insert(out, p)
 			-- lamps keep clear of utility poles and tree trunks
@@ -208,7 +209,7 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 					s.shape or "",
 					if s.castShadow == nil then "" else tostring(s.castShadow),
 					s.role or "",
-					attrList(s.attrs),
+					attrList(s.attrs) .. (if s.mesh then "|mesh:" .. s.mesh.id else ""),
 				}, "|")
 			)
 		end

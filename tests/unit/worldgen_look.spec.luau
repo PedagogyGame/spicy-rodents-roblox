@@ -104,16 +104,26 @@ return function(t)
 		for _, p in plans do
 			if p.kind == "props" and p.category == "tree" then
 				trees += 1
+				-- the Blender model (generated/TreeArt): three leaf layers and the bark as visual-only meshes
+				-- with their PBR maps; the bark cylinders under them are invisible proxies
 				local leaves = parts(p, "Leaves")
-				if #leaves >= 2 then
+				if #leaves >= 3 and #parts(p, "Bark") == 1 then
 					crowned += 1
 				end
-				for _, b in leaves do
-					t.eq(b.shape, "Ball")
-					t.eq(b.canCollide, false)
-					t.eq(b.canQuery, false)
-					t.eq(b.sx, b.sz)
+				for _, b in p.parts do
+					if b.mesh then
+						t.truthy(string.find(b.mesh.id, "^rbxassetid://%d+$"), b.name)
+						t.truthy(b.mesh.colorMap and b.mesh.normalMap and b.mesh.roughnessMap, b.name)
+						t.eq(b.canCollide, false)
+						t.eq(b.canQuery, false)
+						t.eq(b.yaw, 0)
+					else
+						t.eq(b.transparency, 1, b.name)
+						t.eq(b.role, "Limb", b.name)
+					end
 				end
+				t.eq(p.parts[1].name, "Trunk_1") -- lamps keep clear of parts[1] (Bake)
+				t.eq(p.attributes.Mesh, true)
 			elseif p.kind == "props" and p.category == "pole" then
 				poles += 1
 				arms += #parts(p, "Crossarm")
@@ -135,7 +145,7 @@ return function(t)
 		t.eq(armParts, heads)
 	end)
 
-	t.test("Town: WedgeParts and balls survive the .rbxm round trip; part budget", function()
+	t.test("Town: WedgeParts, balls and tree MeshParts survive the .rbxm round trip; part budget", function()
 		local town = Bake.run(
 			data,
 			Factory.new({
@@ -150,19 +160,26 @@ return function(t)
 		)
 		local back = roblox.deserializeModel(roblox.serializeModel({ town }))[1]
 		t.eq(Bake.instanceHash(back), town:GetAttribute("InstanceHash"))
-		local wedges, balls, total = 0, 0, 0
+		local wedges, balls, meshes, total = 0, 0, 0, 0
 		for _, d in back:GetDescendants() do
 			if d:IsA("BasePart") then
 				total += 1
 				if d.ClassName == "WedgePart" then
 					wedges += 1
+				elseif d.ClassName == "MeshPart" then
+					meshes += 1
+					-- the colour map is the part's texture; no SurfaceAppearance is baked (BUILD_PLAN D12)
+					-- (Lune reads the texture back under its file name, TextureContent)
+					t.truthy(string.find(tostring(d.TextureContent), "rbxassetid://%d+"), d.Name)
+					t.eq(d:FindFirstChildOfClass("SurfaceAppearance"), nil)
 				elseif d.Shape == roblox.Enum.PartType.Ball then
 					balls += 1
 				end
 			end
 		end
 		t.truthy(wedges >= 100, `wedges {wedges}`)
-		t.truthy(balls >= 500, `balls {balls}`)
+		print(`      balls {balls}, tree meshes {meshes}`)
+		t.eq(meshes, 392) -- 95 trees: bark + three leaf layers (+ apples on the 12 apple trees)
 		t.eq(total, town:GetAttribute("PartCount"))
 		t.truthy(total <= 30000, `part budget: {total}`) -- review 2026-11-09: full tree crowns, under ~30k
 	end)

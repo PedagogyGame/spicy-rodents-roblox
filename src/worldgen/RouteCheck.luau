@@ -33,7 +33,9 @@ function RouteCheck.index(plans: { Spec.BuildPlan }): Geometry.Index
 	for _, p in plans do
 		if p.kind ~= "skyline" then
 			for _, s in p.parts do
-				if not SKIP_ROLES[s.role or ""] and s.transparency < 1 then
+				-- invisible Limb proxies stand where a tree mesh's bark is (Builders/Trees): they count
+				-- and a mesh's bounding box is not geometry
+				if not SKIP_ROLES[s.role or ""] and not s.mesh and (s.transparency < 1 or s.role == "Limb") then
 					Geometry.add(ix, { box = s :: any, owner = p.id })
 				end
 			end

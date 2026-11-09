@@ -73,6 +73,10 @@ return {
 			count = 1,
 			chunks = { "TerrainExtensions" },
 		},
+		TreeArt = {
+			count = 1,
+			chunks = { "TreeArt" },
+		},
 		Wildlife = {
 			count = 1,
 			chunks = { "Wildlife" },

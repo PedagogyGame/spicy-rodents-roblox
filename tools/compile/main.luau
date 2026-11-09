@@ -17,6 +17,7 @@ local Migrate = require("./lib/Migrate")
 local Report = require("./lib/Report")
 local W1 = require("./lib/W1")
 local Attractions = require("./lib/Attractions")
+local TreeArt = require("./lib/TreeArt")
 local Expansion = require("./lib/Expansion")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
@@ -465,6 +466,11 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	})
 	if expansionModule then
 		table.insert(w1.modules, expansionModule)
+	end
+	-- data/art/tree_meshes.json: the Blender tree models the bake places (WorldGen/Builders/Trees)
+	local treeArtModule = TreeArt.compile({ repo = repo, invariant = invariant, compare = compare })
+	if treeArtModule then
+		table.insert(w1.modules, treeArtModule)
 	end
 
 	for _, c in comparisons do

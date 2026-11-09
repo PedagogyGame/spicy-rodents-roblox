@@ -12,6 +12,17 @@ local Geometry = require("./Geometry")
 
 local Spec = {}
 
+-- A file-authored mesh (the Blender tree models): Factory makes a MeshPart of the part's size with a
+-- SurfaceAppearance. Content ids are rbxassetid:// strings. The part's size is the mesh's own size.
+export type MeshSpec = {
+	id: string,
+	colorMap: string?,
+	normalMap: string?,
+	roughnessMap: string?,
+	alphaMode: string?, -- Enum.AlphaMode name (default Overlay)
+	doubleSided: boolean?,
+}
+
 export type PartSpec = {
 	name: string,
 	cx: number,
@@ -32,6 +43,7 @@ export type PartSpec = {
 	role: string?, -- Body, Roof, Wall, Floor, Door, Sign, Room, Station, Shelf, Pad, Furniture, Limb, Pipe, Rail, Post, Anchor, Skyline
 	canQuery: boolean?, -- default: transparency < 1
 	attrs: { [string]: string | number | boolean }?,
+	mesh: MeshSpec?, -- a MeshPart instead of a Part (shape is ignored)
 }
 
 -- Non-part instances, parented to the named part of the same model.
@@ -80,6 +92,7 @@ export type Opts = {
 	role: string?,
 	canQuery: boolean?,
 	attrs: { [string]: string | number | boolean }?,
+	mesh: MeshSpec?,
 }
 
 export type PartList = {
@@ -147,6 +160,7 @@ local function add(
 		role = opts.role,
 		canQuery = opts.canQuery,
 		attrs = opts.attrs,
+		mesh = opts.mesh,
 	})
 end
 

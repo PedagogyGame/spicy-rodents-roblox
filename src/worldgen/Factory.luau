@@ -64,10 +64,28 @@ function Factory.new(env: Env): Factory
 	end
 
 	function self.part(spec: Spec.PartSpec): any
-		local p = env.Instance.new(if spec.shape == "Wedge" then "WedgePart" else "Part")
+		local mesh = spec.mesh
+		local p = env.Instance.new(if mesh then "MeshPart" elseif spec.shape == "Wedge" then "WedgePart" else "Part")
 		p.Name = spec.name
 		p.Anchored = true
-		if spec.shape == "Cylinder" then
+		if mesh then
+			-- File-authored mesh: Lune writes the mesh content and its own size into the .rbxm. In the engine a
+			-- script may not assign MeshId, so there the part keeps its class and size only (BakeParity
+			-- compares structure, not mesh content); the baked file is what ships.
+			pcall(function()
+				p.MeshId = mesh.id
+			end)
+			pcall(function()
+				p.InitialSize = env.Vector3.new(spec.sx, spec.sy, spec.sz)
+			end)
+			pcall(function()
+				p.DoubleSided = mesh.doubleSided == true
+			end)
+			pcall(function()
+				-- visual only (CanCollide and CanQuery are off): no collision geometry is authored
+				p.CollisionFidelity = env.Enum.CollisionFidelity.Box
+			end)
+		elseif spec.shape == "Cylinder" then
 			p.Shape = env.Enum.PartType.Cylinder
 		elseif spec.shape == "Ball" then
 			p.Shape = env.Enum.PartType.Ball
@@ -94,6 +112,15 @@ function Factory.new(env: Env): Factory
 		p.TopSurface = env.Enum.SurfaceType.Smooth
 		p.BottomSurface = env.Enum.SurfaceType.Smooth
 		setAttrs(p, spec.attrs)
+		if mesh and mesh.colorMap then
+			-- The colour map rides on MeshPart.TextureID, a plain property the Open Cloud place publisher
+			-- keeps. A SurfaceAppearance is never written into the place (the publisher does not update
+			-- them, BUILD_PLAN D12): Server/Assets/TreeArt moves the uploaded model's own SurfaceAppearance
+			-- (normal and roughness maps) onto these parts at runtime.
+			pcall(function()
+				p.TextureID = mesh.colorMap
+			end)
+		end
 		return p
 	end
 
