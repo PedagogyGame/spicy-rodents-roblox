@@ -198,7 +198,7 @@ local function placeMoon(m: MoonGui, cam: Camera, clockTime: number, phase: numb
 	local D = Sky.MOON_DISTANCE
 	m.part.CFrame = CFrame.new(camCf.Position + moonDir * D)
 	local size = 2 * D * math.tan(math.rad(Sky.MOON_DEGREES / 2))
-	m.gui.Size = UDim2.new(size, 0, size, 0)
+	m.gui.Size = UDim2.fromScale(size, size)
 	-- fade in above the horizon (and the foothills' skyline); pale and earthshine-free by day
 	local up = math.clamp((my - 0.03) / 0.06, 0, 1)
 	local k = SkyKeys.illumination(phase)
@@ -295,7 +295,8 @@ type Car = { body: BasePart, head: BasePart, tail: BasePart, speed: number, offs
 
 local function makeCars(folder: Instance): { Car }
 	local cars: { Car } = {}
-	local colours = { "b34c45", "e9e6dc", "477b88", "2f3a3d", "c9b27c", "6f8a52", "dfe2de", "5b6d82", "9a4a3c", "f0ece0" }
+	local colours =
+		{ "b34c45", "e9e6dc", "477b88", "2f3a3d", "c9b27c", "6f8a52", "dfe2de", "5b6d82", "9a4a3c", "f0ece0" }
 	local function bit(name: string, size: Vector3, colour: Color3): BasePart
 		local b = Instance.new("Part")
 		b.Name = name

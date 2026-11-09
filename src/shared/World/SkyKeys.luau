@@ -333,7 +333,10 @@ SkyKeys.KEYS = {
 	},
 	{
 		hour = 20.5,
-		state = with(NIGHT, { brightness = 0.5, exposure = -0.15, outdoor = "343b58", atmColor = "2c3346", fog = "2d3446" }),
+		state = with(
+			NIGHT,
+			{ brightness = 0.5, exposure = -0.15, outdoor = "343b58", atmColor = "2c3346", fog = "2d3446" }
+		),
 	},
 }
 
@@ -421,7 +424,10 @@ end
 -- The moon disc as n horizontal rows in [0, 1] scale units, the lit limb toward +x (the client rotates the disc
 -- so +x points at the sun on screen). Each row spans [darkFrom, litTo]; the lit part is [litFrom, litTo]: on a
 -- row at height y (-1..1) with half-width s, the terminator is at x = s cos(phase angle).
-function SkyKeys.moonRows(phase01: number, n: number): { { top: number, height: number, darkFrom: number, litFrom: number, litTo: number } }
+function SkyKeys.moonRows(
+	phase01: number,
+	n: number
+): { { top: number, height: number, darkFrom: number, litFrom: number, litTo: number } }
 	local c = math.cos(2 * math.pi * phase01)
 	local rows = {}
 	for j = 1, n do

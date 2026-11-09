@@ -148,5 +148,7 @@ return function(scene: any, path: string?)
 			terrain.coarseReplacedNorth = replaced
 		end
 	end
-	print(`backdrop: {parts} parts, {#cards} fog cards, terrain band {if terrain then "added" else "skipped"} from {file}`)
+	print(
+		`backdrop: {parts} parts, {#cards} fog cards, terrain band {if terrain then "added" else "skipped"} from {file}`
+	)
 end

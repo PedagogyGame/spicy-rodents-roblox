@@ -4,7 +4,11 @@ Owner feedback: "it looks bad" (trees with bare noodle branches and tiny lollipo
 telephone and lamp poles, leaning lamps). This pass fixes the town's look without moving any climbing
 route. Renders: `tools/review/run.sh --debug` (every view, full bake) writes
 `build/review/<view>.png` and **`build/review/contact_sheet.png`**. Four views were added for this
-pass: `n_quay_street`, `o_lamp_close`, `p_outer_homes` and `q_willow`.
+pass: `n_quay_street`, `o_lamp_close`, `p_outer_homes` and `q_willow`. The final pass rendered all 24
+town, lineup and debug views from a fresh bake (BakeHash `66ad35c5b201e463`) in 21 minutes (2 CPUs shared
+with another task's Blender job); the sheet is `build/review/contact_sheet.png`. Other tasks added their
+own `bd_*` (backdrop) and `bw_*` (bowling) views to `views.json` while this pass ran; they are not part
+of this review.
 
 ## Checks (all on the final code)
 

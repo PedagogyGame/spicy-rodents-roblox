@@ -56,7 +56,8 @@ do
 	end
 end
 
-local Instance, Vector3, CFrame, Color3, Enum = roblox.Instance, roblox.Vector3, roblox.CFrame, roblox.Color3, roblox.Enum
+local Instance, Vector3, CFrame, Color3, Enum =
+	roblox.Instance, roblox.Vector3, roblox.CFrame, roblox.Color3, roblox.Enum
 local NumberSequence, NumberSequenceKeypoint = roblox.NumberSequence, roblox.NumberSequenceKeypoint
 
 local MAX_AXIS = 2048
@@ -67,10 +68,11 @@ local FAR_Y, COAST_FAR_Y = 16, 5 -- far land tile tops (inland, coastal row)
 type RGB = { number }
 
 local function hex(s: string): RGB
-	return { tonumber(string.sub(s, 1, 2), 16) :: number, tonumber(string.sub(s, 3, 4), 16) :: number, tonumber(
-		string.sub(s, 5, 6),
-		16
-	) :: number }
+	return {
+		tonumber(string.sub(s, 1, 2), 16) :: number,
+		tonumber(string.sub(s, 3, 4), 16) :: number,
+		tonumber(string.sub(s, 5, 6), 16) :: number,
+	}
 end
 
 local function mix(a: RGB, b: RGB, t: number): RGB
@@ -160,18 +162,47 @@ local function part(
 	return p
 end
 
-local function block(parent: any, name: string, size: any, cf: any, rgb: RGB, material: string, group: string, o: PartOpts?): any
+local function block(
+	parent: any,
+	name: string,
+	size: any,
+	cf: any,
+	rgb: RGB,
+	material: string,
+	group: string,
+	o: PartOpts?
+): any
 	return part("Part", parent, name, size, cf, rgb, material, group, o)
 end
 
 -- A beam-like block from p0 to p1 (square section `w`).
-local function strut(parent: any, name: string, p0: any, p1: any, w: number, rgb: RGB, material: string, group: string, o: PartOpts?): any
+local function strut(
+	parent: any,
+	name: string,
+	p0: any,
+	p1: any,
+	w: number,
+	rgb: RGB,
+	material: string,
+	group: string,
+	o: PartOpts?
+): any
 	local len = (p1 - p0).Magnitude
 	return block(parent, name, Vector3.new(w, w, len), CFrame.lookAt((p0 + p1) / 2, p1), rgb, material, group, o)
 end
 
 -- A vertical cylinder (Roblox cylinders run along local X).
-local function pillar(parent: any, name: string, base: any, height: number, d: number, rgb: RGB, material: string, group: string, o: PartOpts?): any
+local function pillar(
+	parent: any,
+	name: string,
+	base: any,
+	height: number,
+	d: number,
+	rgb: RGB,
+	material: string,
+	group: string,
+	o: PartOpts?
+): any
 	local opts: PartOpts = o or {}
 	opts.shape = "Cylinder"
 	return part(
@@ -187,7 +218,16 @@ local function pillar(parent: any, name: string, base: any, height: number, d: n
 	)
 end
 
-local function ball(parent: any, name: string, centre: any, d: number, rgb: RGB, material: string, group: string, o: PartOpts?): any
+local function ball(
+	parent: any,
+	name: string,
+	centre: any,
+	d: number,
+	rgb: RGB,
+	material: string,
+	group: string,
+	o: PartOpts?
+): any
 	local opts: PartOpts = o or {}
 	opts.shape = "Ball"
 	return part("Part", parent, name, Vector3.new(d, d, d), CFrame.new(centre), rgb, material, group, opts)
@@ -204,7 +244,17 @@ end
 
 -- A triangle as two WedgeParts (verified against the WedgePart geometry: corners in the triangle's plane,
 -- areas summing to the triangle's). `thick` is the wedges' thickness, centred on the triangle's plane.
-local function triangle(parent: any, name: string, a: any, b: any, c: any, rgb: RGB, material: string, group: string, thick: number)
+local function triangle(
+	parent: any,
+	name: string,
+	a: any,
+	b: any,
+	c: any,
+	rgb: RGB,
+	material: string,
+	group: string,
+	thick: number
+)
 	local ab, ac, bc = b - a, c - a, c - b
 	local abd, acd, bcd = ab:Dot(ab), ac:Dot(ac), bc:Dot(bc)
 	if abd > acd and abd > bcd then
@@ -226,15 +276,43 @@ local function triangle(parent: any, name: string, a: any, b: any, c: any, rgb: 
 		return
 	end
 	if d1 > 0.05 then
-		part("WedgePart", parent, name, Vector3.new(thick, height, d1), CFrame.fromMatrix((a + b) / 2, right, up, back), rgb, material, group)
+		part(
+			"WedgePart",
+			parent,
+			name,
+			Vector3.new(thick, height, d1),
+			CFrame.fromMatrix((a + b) / 2, right, up, back),
+			rgb,
+			material,
+			group
+		)
 	end
 	if d2 > 0.05 then
-		part("WedgePart", parent, name, Vector3.new(thick, height, d2), CFrame.fromMatrix((a + c) / 2, -right, up, -back), rgb, material, group)
+		part(
+			"WedgePart",
+			parent,
+			name,
+			Vector3.new(thick, height, d2),
+			CFrame.fromMatrix((a + c) / 2, -right, up, -back),
+			rgb,
+			material,
+			group
+		)
 	end
 end
 
 -- Triangles whose longest edge exceeds `limit` are split into four (midpoints) until they fit.
-local function triangleFit(parent: any, name: string, a: any, b: any, c: any, rgb: RGB, material: string, group: string, thick: number)
+local function triangleFit(
+	parent: any,
+	name: string,
+	a: any,
+	b: any,
+	c: any,
+	rgb: RGB,
+	material: string,
+	group: string,
+	thick: number
+)
 	local limit = 1900
 	local longest = math.max((b - a).Magnitude, (c - b).Magnitude, (a - c).Magnitude)
 	if longest <= limit then
@@ -249,14 +327,36 @@ local function triangleFit(parent: any, name: string, a: any, b: any, c: any, rg
 end
 
 -- Flat tiles (<= 2048 st) covering [x0, x1] x [z0, z1] with their top at y.
-local function tiles(parent: any, name: string, x0: number, x1: number, z0: number, z1: number, y: number, thick: number, colour: (number, number) -> RGB, material: string, group: string, o: PartOpts?)
+local function tiles(
+	parent: any,
+	name: string,
+	x0: number,
+	x1: number,
+	z0: number,
+	z1: number,
+	y: number,
+	thick: number,
+	colour: (number, number) -> RGB,
+	material: string,
+	group: string,
+	o: PartOpts?
+)
 	local nx = math.ceil((x1 - x0) / MAX_AXIS)
 	local nz = math.ceil((z1 - z0) / MAX_AXIS)
 	local sx, sz = (x1 - x0) / nx, (z1 - z0) / nz
 	for i = 0, nx - 1 do
 		for k = 0, nz - 1 do
 			local cx, cz = x0 + (i + 0.5) * sx, z0 + (k + 0.5) * sz
-			block(parent, name, Vector3.new(sx, thick, sz), CFrame.new(cx, y - thick / 2, cz), colour(cx, cz), material, group, o)
+			block(
+				parent,
+				name,
+				Vector3.new(sx, thick, sz),
+				CFrame.new(cx, y - thick / 2, cz),
+				colour(cx, cz),
+				material,
+				group,
+				o
+			)
 		end
 	end
 end
@@ -274,7 +374,8 @@ local function outsideOf(x: number, z: number): number
 end
 
 ---------------------------------------------------------------------------------------------- land mesh
-local FIELDS = { hex("8fa266"), hex("a4ad6b"), hex("7f9a5c"), hex("b5ad77"), hex("93a46d"), hex("6f8a52"), hex("9fa978") }
+local FIELDS =
+	{ hex("8fa266"), hex("a4ad6b"), hex("7f9a5c"), hex("b5ad77"), hex("93a46d"), hex("6f8a52"), hex("9fa978") }
 local GRASS, FOREST, MEADOW, SAND = hex("8a9f63"), hex("55683f"), hex("7d9160"), hex("d8c9a3")
 do
 	local land = model(root, "Land")
@@ -392,7 +493,10 @@ local RANGES: { Range } = {
 		rows = { -950, -430, 0, 750 },
 		taper = 24,
 		crest = function(u: number, j: number): number
-			return 330 + 90 * math.sin(u / 1900 + 0.4) + 80 * math.abs(math.sin(u / 830 + 1.1)) + 45 * (hash(j, 1) - 0.5)
+			return 330
+				+ 90 * math.sin(u / 1900 + 0.4)
+				+ 80 * math.abs(math.sin(u / 830 + 1.1))
+				+ 45 * (hash(j, 1) - 0.5)
 		end,
 		rowHeight = function(r: number, crest: number, base: number, j: number): number
 			if r == 2 then
@@ -426,7 +530,10 @@ local RANGES: { Range } = {
 		rows = { -1500, -650, 0, 1100 },
 		taper = 22,
 		crest = function(u: number, j: number): number
-			return 980 + 240 * math.sin(u / 2600 + 2.0) + 220 * math.abs(math.sin(u / 1150 + 0.3)) + 90 * (hash(j, 11) - 0.5)
+			return 980
+				+ 240 * math.sin(u / 2600 + 2.0)
+				+ 220 * math.abs(math.sin(u / 1150 + 0.3))
+				+ 90 * (hash(j, 11) - 0.5)
 		end,
 		rowHeight = function(r: number, crest: number, base: number, j: number): number
 			if r == 2 then
@@ -460,7 +567,10 @@ local RANGES: { Range } = {
 		rows = { -2100, -900, -260, 0, 1500 },
 		taper = 14,
 		crest = function(u: number, j: number): number
-			return 1850 + 380 * math.sin(u / 3100 + 1.0) + 320 * math.abs(math.sin(u / 1400)) + 140 * (hash(j, 21) - 0.5)
+			return 1850
+				+ 380 * math.sin(u / 3100 + 1.0)
+				+ 320 * math.abs(math.sin(u / 1400))
+				+ 140 * (hash(j, 21) - 0.5)
 		end,
 		rowHeight = function(r: number, crest: number, base: number, j: number): number
 			if r == 2 then
@@ -540,8 +650,18 @@ do
 					local top = math.max(tri[1].Y, tri[2].Y, tri[3].Y)
 					local col, material = r.colour(top, math.max(crests[j], crests[j + 1]), ri, j * 2 + ti)
 					local mid = (tri[1] + tri[2] + tri[3]) / 3
-					col = shade(col, 0.93 + 0.14 * hash(j, ri, ti))
-					triangleFit(m, "Tri", tri[1], tri[2], tri[3], aerial(col, mid.X, mid.Z, r.aerial), material, "ranges", r.thick)
+					col = shade(col, 0.84 + 0.26 * hash(j, ri, ti))
+					triangleFit(
+						m,
+						"Tri",
+						tri[1],
+						tri[2],
+						tri[3],
+						aerial(col, mid.X, mid.Z, r.aerial),
+						material,
+						"ranges",
+						r.thick
+					)
 				end
 			end
 		end
@@ -565,14 +685,54 @@ do
 end
 
 ---------------------------------------------------------------------------------------------- fog cards
-type FogLayer = { range: string, offset: number, height: number, sink: number, colour: string, bottom: number, mid: number, layer: number, onLand: boolean }
+type FogLayer = {
+	range: string,
+	offset: number,
+	height: number,
+	sink: number,
+	colour: string,
+	bottom: number,
+	mid: number,
+	layer: number,
+	onLand: boolean,
+}
 local FOG: { FogLayer } = {
 	-- at the foot of the foothills, in front of them
-	{ range = "R1", offset = -1180, height = 240, sink = 40, colour = "cfd6c4", bottom = 0.42, mid = 0.8, layer = 1, onLand = true },
+	{
+		range = "R1",
+		offset = -1180,
+		height = 240,
+		sink = 40,
+		colour = "cfd6c4",
+		bottom = 0.42,
+		mid = 0.8,
+		layer = 1,
+		onLand = true,
+	},
 	-- behind the foothill crest, over the foot of the mountains
-	{ range = "R1", offset = 850, height = 720, sink = 60, colour = "c6d1d3", bottom = 0.3, mid = 0.72, layer = 2, onLand = false },
+	{
+		range = "R1",
+		offset = 850,
+		height = 720,
+		sink = 60,
+		colour = "c6d1d3",
+		bottom = 0.3,
+		mid = 0.72,
+		layer = 2,
+		onLand = false,
+	},
 	-- behind the mountains, over the foot of the snowy peaks
-	{ range = "R2", offset = 750, height = 1300, sink = 60, colour = "c2cfda", bottom = 0.22, mid = 0.66, layer = 3, onLand = false },
+	{
+		range = "R2",
+		offset = 750,
+		height = 1300,
+		sink = 60,
+		colour = "c2cfda",
+		bottom = 0.22,
+		mid = 0.66,
+		layer = 3,
+		onLand = false,
+	},
 }
 do
 	local cards = model(root, "FogCards")
@@ -593,6 +753,12 @@ do
 			local x1, z1 = ellipsePoint(rr, degs[j + 1], f.offset)
 			local len = math.sqrt((x1 - x0) ^ 2 + (z1 - z0) ^ 2)
 			local mx, mz = (x0 + x1) / 2, (z0 + z1) / 2
+			-- only where the range stands tall: none at its coastal ends, lower toward them
+			local midDeg = (degs[j] + degs[j + 1]) / 2
+			local e = Backdrop.smooth01((math.min(midDeg - rr.from, rr.to - midDeg) - rr.taper * 0.6) / rr.taper)
+			if e < 0.25 or mz > 700 then
+				continue
+			end
 			-- horizontal normal of the chord, toward the town
 			local nx, nz = -(z1 - z0) / len, (x1 - x0) / len
 			if nx * (CX - mx) + nz * (CZ - mz) < 0 then
@@ -602,10 +768,19 @@ do
 				then math.min(onLand(x0, z0), onLand(mx, mz), onLand(x1, z1))
 				else (if mz > 480 then COAST_FAR_Y else FAR_Y)
 			local y0 = ground - f.sink
-			local h = f.height + f.sink
+			local h = f.height * (0.45 + 0.55 * e) + f.sink
 			local centre = Vector3.new(mx, y0 + h / 2, mz)
 			local cf = CFrame.lookAt(centre, centre + Vector3.new(nx, 0, nz))
-			local card = block(layerModel, "Card", Vector3.new(math.min(len + 2, MAX_AXIS), h, 0.2), cf, hex(f.colour), "SmoothPlastic", "fogcards", { transparency = 1 })
+			local card = block(
+				layerModel,
+				"Card",
+				Vector3.new(math.min(len, MAX_AXIS), h, 0.2),
+				cf,
+				hex(f.colour),
+				"SmoothPlastic",
+				"fogcards",
+				{ transparency = 1 }
+			)
 			card:SetAttribute("FogLayer", f.layer)
 			local gui = Instance.new("SurfaceGui")
 			gui.Name = "Fog"
@@ -631,6 +806,7 @@ do
 				NumberSequenceKeypoint.new(1 - sinkT, f.bottom),
 				NumberSequenceKeypoint.new(1, f.bottom),
 			})
+			card:SetAttribute("Strength", e)
 			grad.Parent = frame
 		end
 	end
@@ -706,8 +882,20 @@ do
 				local hgt = 38 + 52 * big * big
 				local wide = 60 + 90 * hash(j, s, 54)
 				local along = math.atan2(b.X - a.X, b.Z - a.Z) + 0.6 * (hash(j, s, 55) - 0.5)
-				local col = aerial(shade(TREE[1 + math.floor(hash(j, s, 53) * #TREE)], 0.9 + 0.15 * hash(j, s, 56)), p.X, p.Z, 0.9)
-				ellipsoid(trees, "Crest", Vector3.new(wide * 0.7, hgt, wide), CFrame.new(p.X, p.Y + hgt * 0.2, p.Z) * CFrame.Angles(0, along, 0), col, "trees")
+				local col = aerial(
+					shade(TREE[1 + math.floor(hash(j, s, 53) * #TREE)], 0.9 + 0.15 * hash(j, s, 56)),
+					p.X,
+					p.Z,
+					0.9
+				)
+				ellipsoid(
+					trees,
+					"Crest",
+					Vector3.new(wide * 0.7, hgt, wide),
+					CFrame.new(p.X, p.Y + hgt * 0.2, p.Z) * CFrame.Angles(0, along, 0),
+					col,
+					"trees"
+				)
 			end
 		end
 	end
@@ -730,7 +918,15 @@ do
 	for j = 1, #roadPts - 1 do
 		local a, b = roadPts[j], roadPts[j + 1]
 		local len = (b - a).Magnitude + 2
-		local seg = block(road, string.format("Seg_%03d", j), Vector3.new(22, 1, len), CFrame.lookAt((a + b) / 2, b), hex("55595a"), "Asphalt", "road")
+		local seg = block(
+			road,
+			string.format("Seg_%03d", j),
+			Vector3.new(22, 1, len),
+			CFrame.lookAt((a + b) / 2, b),
+			hex("55595a"),
+			"Asphalt",
+			"road"
+		)
 		seg:SetAttribute("Index", j)
 	end
 end
@@ -738,7 +934,16 @@ end
 ---------------------------------------------------------------------------------------------- farms
 do
 	local farms = model(root, "Farms")
-	local spots = { { -1200, -2900 }, { 1500, -2750 }, { 3900, -3150 }, { -3600, -2800 }, { 5600, -1400 }, { -4300, 300 }, { 5900, 500 }, { -400, -3250 } }
+	local spots = {
+		{ -1200, -2900 },
+		{ 1500, -2750 },
+		{ 3900, -3150 },
+		{ -3600, -2800 },
+		{ 5600, -1400 },
+		{ -4300, 300 },
+		{ 5900, 500 },
+		{ -400, -3250 },
+	}
 	for f, s in spots do
 		local x, z = s[1], s[2]
 		local y = Backdrop.meshHeight(x, z)
@@ -749,29 +954,85 @@ do
 		local cream = aerial(hex("e4dac3"), x, z, 0.8)
 		-- barn with a pitched roof (two wedges)
 		block(farms, "Barn", Vector3.new(34, 18, 52), base * CFrame.new(0, 7, 0), red, "WoodPlanks", "farms")
-		part("WedgePart", farms, "Roof", Vector3.new(52, 9, 18), base * CFrame.new(-9, 20.5, 0) * CFrame.Angles(0, math.pi / 2, 0), roofCol, "Slate", "farms")
-		part("WedgePart", farms, "Roof", Vector3.new(52, 9, 18), base * CFrame.new(9, 20.5, 0) * CFrame.Angles(0, -math.pi / 2, 0), roofCol, "Slate", "farms")
+		part(
+			"WedgePart",
+			farms,
+			"Roof",
+			Vector3.new(52, 9, 18),
+			base * CFrame.new(-9, 20.5, 0) * CFrame.Angles(0, math.pi / 2, 0),
+			roofCol,
+			"Slate",
+			"farms"
+		)
+		part(
+			"WedgePart",
+			farms,
+			"Roof",
+			Vector3.new(52, 9, 18),
+			base * CFrame.new(9, 20.5, 0) * CFrame.Angles(0, -math.pi / 2, 0),
+			roofCol,
+			"Slate",
+			"farms"
+		)
 		-- farmhouse and silo
 		block(farms, "House", Vector3.new(22, 14, 18), base * CFrame.new(46, 5, 18), cream, "Plaster", "farms")
 		block(farms, "HouseRoof", Vector3.new(24, 4, 20), base * CFrame.new(46, 14, 18), roofCol, "Slate", "farms")
-		pillar(farms, "Silo", (base * CFrame.new(-28, -2, -30)).Position, 34, 11, aerial(hex("b9bdb8"), x, z, 0.8), "Metal", "farms")
+		pillar(
+			farms,
+			"Silo",
+			(base * CFrame.new(-28, -2, -30)).Position,
+			34,
+			11,
+			aerial(hex("b9bdb8"), x, z, 0.8),
+			"Metal",
+			"farms"
+		)
 	end
 end
 
 ---------------------------------------------------------------------------------------------- ocean
 do
 	local ocean = model(root, "Ocean")
+	local NEAR_SEA, MID_SEA, FAR_SEA = hex("2b5a66"), hex("36696f"), hex("5a8690")
 	local function col(_x: number, z: number): RGB
-		local d = z - 1490
-		local c = if d < 1600 then hex("2d5d69") elseif d < 5000 then hex("33666f") elseif d < 9500 then hex("44747d") else hex("5b8791")
-		return c
+		local d = math.max(0, z - 1490)
+		if d < 6000 then
+			return mix(NEAR_SEA, MID_SEA, d / 6000)
+		end
+		return mix(MID_SEA, FAR_SEA, (d - 6000) / 9000)
 	end
 	local X0, X1, Z1 = -16400, 18400, 16200
 	local bx0, bx1 = clamp.minX - Backdrop.BAND, clamp.maxX + Backdrop.BAND
 	local opts: PartOpts = { reflectance = 0.12 }
 	tiles(ocean, "Sea", X0, X1, Backdrop.OCEAN_NEAR_Z, Z1, Backdrop.OCEAN_Y, 2, col, "SmoothPlastic", "ocean", opts)
-	tiles(ocean, "Sea", X0, bx0, Backdrop.OCEAN_FAR_Z, Backdrop.OCEAN_NEAR_Z, Backdrop.OCEAN_Y, 2, col, "SmoothPlastic", "ocean", opts)
-	tiles(ocean, "Sea", bx1, X1, Backdrop.OCEAN_FAR_Z, Backdrop.OCEAN_NEAR_Z, Backdrop.OCEAN_Y, 2, col, "SmoothPlastic", "ocean", opts)
+	tiles(
+		ocean,
+		"Sea",
+		X0,
+		bx0,
+		Backdrop.OCEAN_FAR_Z,
+		Backdrop.OCEAN_NEAR_Z,
+		Backdrop.OCEAN_Y,
+		2,
+		col,
+		"SmoothPlastic",
+		"ocean",
+		opts
+	)
+	tiles(
+		ocean,
+		"Sea",
+		bx1,
+		X1,
+		Backdrop.OCEAN_FAR_Z,
+		Backdrop.OCEAN_NEAR_Z,
+		Backdrop.OCEAN_Y,
+		2,
+		col,
+		"SmoothPlastic",
+		"ocean",
+		opts
+	)
 end
 
 ---------------------------------------------------------------------------------------------- coast: pier, marina, boats, lighthouse
@@ -792,29 +1053,93 @@ do
 	local pier = model(coast, "Pier")
 	local PX, Z0, Z1, DECK = -150, 1440, 1850, SEA + 5.5
 	local shoreY = Backdrop.groundAt(PX, Z0 - 30)
-	part("WedgePart", pier, "Ramp", Vector3.new(12, math.max(0.5, DECK - shoreY), 30), CFrame.new(PX, (DECK + shoreY) / 2, Z0 - 15), WOOD, "WoodPlanks", "pier", NEAR)
+	part(
+		"WedgePart",
+		pier,
+		"Ramp",
+		Vector3.new(12, math.max(0.5, DECK - shoreY), 30),
+		CFrame.new(PX, (DECK + shoreY) / 2, Z0 - 15),
+		WOOD,
+		"WoodPlanks",
+		"pier",
+		NEAR
+	)
 	local span = (Z1 - Z0) / 4
 	for s = 0, 3 do
 		local zc = Z0 + (s + 0.5) * span
 		block(pier, "Deck", Vector3.new(12, 1, span), CFrame.new(PX, DECK - 0.5, zc), WOOD, "WoodPlanks", "pier", NEAR)
-		block(pier, "Rail", Vector3.new(0.6, 0.6, span), CFrame.new(PX - 5.7, DECK + 3, zc), WOOD_DARK, "Wood", "pier", NEAR)
-		block(pier, "Rail", Vector3.new(0.6, 0.6, span), CFrame.new(PX + 5.7, DECK + 3, zc), WOOD_DARK, "Wood", "pier", NEAR)
+		block(
+			pier,
+			"Rail",
+			Vector3.new(0.6, 0.6, span),
+			CFrame.new(PX - 5.7, DECK + 3, zc),
+			WOOD_DARK,
+			"Wood",
+			"pier",
+			NEAR
+		)
+		block(
+			pier,
+			"Rail",
+			Vector3.new(0.6, 0.6, span),
+			CFrame.new(PX + 5.7, DECK + 3, zc),
+			WOOD_DARK,
+			"Wood",
+			"pier",
+			NEAR
+		)
 	end
 	block(pier, "Head", Vector3.new(60, 1, 26), CFrame.new(PX, DECK - 0.5, Z1 + 13), WOOD, "WoodPlanks", "pier", NEAR)
 	block(pier, "Rail", Vector3.new(60, 0.6, 0.6), CFrame.new(PX, DECK + 3, Z1 + 25.7), WOOD_DARK, "Wood", "pier", NEAR)
 	for z = Z0 + 10, Z1 + 20, 30 do
 		for _, dx in { -5.2, 5.2 } do
-			pillar(pier, "Pile", Vector3.new(PX + dx, SEA - 12, z), DECK - 0.5 - (SEA - 12), 1.6, WOOD_DARK, "Wood", "pier")
+			pillar(
+				pier,
+				"Pile",
+				Vector3.new(PX + dx, SEA - 12, z),
+				DECK - 0.5 - (SEA - 12),
+				1.6,
+				WOOD_DARK,
+				"Wood",
+				"pier"
+			)
 		end
 	end
 	for _, dx in { -27, 27 } do
-		pillar(pier, "Pile", Vector3.new(PX + dx, SEA - 12, Z1 + 13), DECK - 0.5 - (SEA - 12), 1.6, WOOD_DARK, "Wood", "pier")
+		pillar(
+			pier,
+			"Pile",
+			Vector3.new(PX + dx, SEA - 12, Z1 + 13),
+			DECK - 0.5 - (SEA - 12),
+			1.6,
+			WOOD_DARK,
+			"Wood",
+			"pier"
+		)
 	end
 	for z = Z0 + 40, Z1, 100 do
 		lampPost(pier, Vector3.new(PX + 5.5, DECK, z), "pier")
 	end
-	block(pier, "Hut", Vector3.new(14, 9, 10), CFrame.new(PX + 16, DECK + 4.5, Z1 + 16), hex("d9cba8"), "WoodPlanks", "pier", NEAR)
-	block(pier, "HutRoof", Vector3.new(16, 1.4, 12), CFrame.new(PX + 16, DECK + 9.7, Z1 + 16), hex("4c5a60"), "Slate", "pier", NEAR)
+	block(
+		pier,
+		"Hut",
+		Vector3.new(14, 9, 10),
+		CFrame.new(PX + 16, DECK + 4.5, Z1 + 16),
+		hex("d9cba8"),
+		"WoodPlanks",
+		"pier",
+		NEAR
+	)
+	block(
+		pier,
+		"HutRoof",
+		Vector3.new(16, 1.4, 12),
+		CFrame.new(PX + 16, DECK + 9.7, Z1 + 16),
+		hex("4c5a60"),
+		"Slate",
+		"pier",
+		NEAR
+	)
 
 	-- marina at the river mouth: breakwaters of tumbled rock, pontoons, moored boats, harbour lights
 	local marina = model(coast, "Marina")
@@ -825,9 +1150,22 @@ do
 			local f = s / n
 			local x, z = x0 + (x1 - x0) * f, z0 + (z1 - z0) * f
 			local cf = CFrame.new(x, SEA + 1.2 + 1.5 * hash(seed, s), z)
-				* CFrame.Angles(0.15 * (hash(seed, s, 1) - 0.5), math.pi * hash(seed, s, 2), 0.15 * (hash(seed, s, 3) - 0.5))
+				* CFrame.Angles(
+					0.15 * (hash(seed, s, 1) - 0.5),
+					math.pi * hash(seed, s, 2),
+					0.15 * (hash(seed, s, 3) - 0.5)
+				)
 			local col = shade(hex("8f8b80"), 0.86 + 0.22 * hash(seed, s, 4))
-			block(marina, "Rock", Vector3.new(24 + 10 * hash(seed, s, 5), 12, 18 + 8 * hash(seed, s, 6)), cf, col, "Slate", "marina", NEAR)
+			block(
+				marina,
+				"Rock",
+				Vector3.new(24 + 10 * hash(seed, s, 5), 12, 18 + 8 * hash(seed, s, 6)),
+				cf,
+				col,
+				"Slate",
+				"marina",
+				NEAR
+			)
 		end
 	end
 	local WX, EX, NZ = 1820, 2720, 1870
@@ -836,20 +1174,67 @@ do
 	rocks(EX, Backdrop.shoreZ(EX) - 15, EX, 1790, 3)
 	rocks(EX, 1790, 2585, 1805, 4)
 	for _, hl in { { 2420, NZ, "3fd66b" }, { 2585, 1805, "ff3b30" } } do
-		pillar(marina, "LightPost", Vector3.new(hl[1] :: number, SEA + 6, hl[2] :: number), 9, 1.2, WHITE, "SmoothPlastic", "marina")
-		local l = ball(marina, "HarbourLight", Vector3.new(hl[1] :: number, SEA + 16, hl[2] :: number), 2.2, hex(hl[3] :: string), "Neon", "marina")
+		pillar(
+			marina,
+			"LightPost",
+			Vector3.new(hl[1] :: number, SEA + 6, hl[2] :: number),
+			9,
+			1.2,
+			WHITE,
+			"SmoothPlastic",
+			"marina"
+		)
+		local l = ball(
+			marina,
+			"HarbourLight",
+			Vector3.new(hl[1] :: number, SEA + 16, hl[2] :: number),
+			2.2,
+			hex(hl[3] :: string),
+			"Neon",
+			"marina"
+		)
 		l:SetAttribute("Blink", "harbour")
 	end
 	local PY = SEA + 1.6
 	local pz = 1532
-	block(marina, "Pontoon", Vector3.new(800, 1.2, 8), CFrame.new(2260, PY - 0.6, pz), hex("9c8f7c"), "WoodPlanks", "marina", NEAR)
+	block(
+		marina,
+		"Pontoon",
+		Vector3.new(800, 1.2, 8),
+		CFrame.new(2260, PY - 0.6, pz),
+		hex("9c8f7c"),
+		"WoodPlanks",
+		"marina",
+		NEAR
+	)
 	local gz0 = Backdrop.shoreZ(2000) - 25
 	local gy0 = Backdrop.groundAt(2000, gz0)
-	strut(marina, "Gangway", Vector3.new(2000, gy0 + 0.6, gz0), Vector3.new(2000, PY, pz - 4), 5, WOOD, "WoodPlanks", "marina", NEAR)
+	do
+		local a, b = Vector3.new(2000, gy0 + 0.4, gz0), Vector3.new(2000, PY - 0.3, pz - 4)
+		block(
+			marina,
+			"Gangway",
+			Vector3.new(5, 0.6, (b - a).Magnitude),
+			CFrame.lookAt((a + b) / 2, b),
+			WOOD,
+			"WoodPlanks",
+			"marina",
+			NEAR
+		)
+	end
 	local hullCols = { WHITE, hex("2f4a66"), WHITE, hex("477b88"), WHITE, hex("8a3b33") }
 	for f = 0, 8 do
 		local fx = 1900 + 88 * f
-		block(marina, "Finger", Vector3.new(4, 1, 62), CFrame.new(fx, PY - 0.5, pz + 35), hex("9c8f7c"), "WoodPlanks", "marina", NEAR)
+		block(
+			marina,
+			"Finger",
+			Vector3.new(4, 1, 62),
+			CFrame.new(fx, PY - 0.5, pz + 35),
+			hex("9c8f7c"),
+			"WoodPlanks",
+			"marina",
+			NEAR
+		)
 		if f < 8 then
 			local bx = fx + 44
 			local hull = hullCols[1 + f % #hullCols]
@@ -857,33 +1242,119 @@ do
 			if f % 2 == 0 then
 				-- sailboat: hull, bow, cabin, mast, boom
 				block(marina, "Hull", Vector3.new(8, 3, 22), boatCf, hull, "SmoothPlastic", "boats")
-				part("WedgePart", marina, "Bow", Vector3.new(8, 3, 8), boatCf * CFrame.new(0, 0, 15) * CFrame.Angles(0, math.pi, 0), hull, "SmoothPlastic", "boats")
-				block(marina, "Cabin", Vector3.new(5, 2.4, 8), boatCf * CFrame.new(0, 2.6, -2), CREAM, "SmoothPlastic", "boats")
+				part(
+					"WedgePart",
+					marina,
+					"Bow",
+					Vector3.new(8, 3, 8),
+					boatCf * CFrame.new(0, 0, 15) * CFrame.Angles(0, math.pi, 0),
+					hull,
+					"SmoothPlastic",
+					"boats"
+				)
+				block(
+					marina,
+					"Cabin",
+					Vector3.new(5, 2.4, 8),
+					boatCf * CFrame.new(0, 2.6, -2),
+					CREAM,
+					"SmoothPlastic",
+					"boats"
+				)
 				pillar(marina, "Mast", (boatCf * CFrame.new(0, 1.5, 3)).Position, 34, 0.7, WHITE, "Metal", "boats")
-				strut(marina, "Boom", (boatCf * CFrame.new(0, 5, 3)).Position, (boatCf * CFrame.new(0, 5, -9)).Position, 0.5, WHITE, "Metal", "boats")
+				strut(
+					marina,
+					"Boom",
+					(boatCf * CFrame.new(0, 5, 3)).Position,
+					(boatCf * CFrame.new(0, 5, -9)).Position,
+					0.5,
+					WHITE,
+					"Metal",
+					"boats"
+				)
 			else
 				-- motor boat: hull, bow, cabin, windscreen
 				block(marina, "Hull", Vector3.new(7, 3, 18), boatCf, hull, "SmoothPlastic", "boats")
-				part("WedgePart", marina, "Bow", Vector3.new(7, 3, 6), boatCf * CFrame.new(0, 0, 12) * CFrame.Angles(0, math.pi, 0), hull, "SmoothPlastic", "boats")
-				block(marina, "Cabin", Vector3.new(6, 3.2, 7), boatCf * CFrame.new(0, 3.1, -1), CREAM, "SmoothPlastic", "boats")
-				block(marina, "Screen", Vector3.new(5.6, 2, 0.3), boatCf * CFrame.new(0, 3.4, 3), hex("8db9bf"), "Glass", "boats", { transparency = 0.35 })
+				part(
+					"WedgePart",
+					marina,
+					"Bow",
+					Vector3.new(7, 3, 6),
+					boatCf * CFrame.new(0, 0, 12) * CFrame.Angles(0, math.pi, 0),
+					hull,
+					"SmoothPlastic",
+					"boats"
+				)
+				block(
+					marina,
+					"Cabin",
+					Vector3.new(6, 3.2, 7),
+					boatCf * CFrame.new(0, 3.1, -1),
+					CREAM,
+					"SmoothPlastic",
+					"boats"
+				)
+				block(
+					marina,
+					"Screen",
+					Vector3.new(5.6, 2, 0.3),
+					boatCf * CFrame.new(0, 3.4, 3),
+					hex("8db9bf"),
+					"Glass",
+					"boats",
+					{ transparency = 0.35 }
+				)
 			end
 		end
 	end
 	-- harbour office on the beach
 	local oy = Backdrop.groundAt(2250, 1430)
 	block(marina, "Office", Vector3.new(34, 12, 20), CFrame.new(2250, oy + 5.5, 1430), CREAM, "Plaster", "marina", NEAR)
-	block(marina, "OfficeRoof", Vector3.new(37, 1.6, 23), CFrame.new(2250, oy + 12.3, 1430), hex("4c5a60"), "Slate", "marina", NEAR)
+	block(
+		marina,
+		"OfficeRoof",
+		Vector3.new(37, 1.6, 23),
+		CFrame.new(2250, oy + 12.3, 1430),
+		hex("4c5a60"),
+		"Slate",
+		"marina",
+		NEAR
+	)
 	pillar(marina, "Flagpole", Vector3.new(2275, oy, 1452), 28, 0.5, WHITE, "Metal", "marina")
-	block(marina, "Flag", Vector3.new(0.2, 4, 7), CFrame.new(2275, oy + 25.5, 1448.3), hex("477b88"), "Fabric", "marina")
+	block(
+		marina,
+		"Flag",
+		Vector3.new(0.2, 4, 7),
+		CFrame.new(2275, oy + 25.5, 1448.3),
+		hex("477b88"),
+		"Fabric",
+		"marina"
+	)
 
 	-- boats at sea
 	local boats = model(coast, "Boats")
 	for b, s in { { -1400, 2900, 0.6 }, { 3700, 3500, -0.4 }, { 900, 5200, 1.9 }, { 5400, 2400, 2.6 } } do
 		local cf = CFrame.new(s[1], SEA + 1.2, s[2]) * CFrame.Angles(0, s[3], 0)
-		block(boats, "Hull", Vector3.new(8, 3, 22), cf, if b % 2 == 0 then hex("2f4a66") else WHITE, "SmoothPlastic", "boats")
+		block(
+			boats,
+			"Hull",
+			Vector3.new(8, 3, 22),
+			cf,
+			if b % 2 == 0 then hex("2f4a66") else WHITE,
+			"SmoothPlastic",
+			"boats"
+		)
 		pillar(boats, "Mast", (cf * CFrame.new(0, 1.5, 2)).Position, 34, 0.7, WHITE, "Metal", "boats")
-		part("WedgePart", boats, "Sail", Vector3.new(0.3, 30, 13), cf * CFrame.new(0, 18, -5), hex("f4f1e6"), "Fabric", "boats")
+		part(
+			"WedgePart",
+			boats,
+			"Sail",
+			Vector3.new(0.3, 30, 13),
+			cf * CFrame.new(0, 18, -5),
+			hex("f4f1e6"),
+			"Fabric",
+			"boats"
+		)
 	end
 	-- a coaster at anchor offshore (its riding light shows at night)
 	local ship = CFrame.new(-2600, SEA, 6400) * CFrame.Angles(0, 0.35, 0)
@@ -891,7 +1362,8 @@ do
 	block(boats, "ShipDeck", Vector3.new(42, 2, 250), ship * CFrame.new(0, 17.5, 0), hex("4a4d4c"), "Metal", "boats")
 	block(boats, "Bridge", Vector3.new(36, 20, 30), ship * CFrame.new(0, 28, -100), WHITE, "SmoothPlastic", "boats")
 	block(boats, "Containers", Vector3.new(36, 14, 150), ship * CFrame.new(0, 25, 20), hex("477b88"), "Metal", "boats")
-	local riding = ball(boats, "ShipLight", (ship * CFrame.new(0, 46, -100)).Position, 3, hex("fff4d6"), "Neon", "boats")
+	local riding =
+		ball(boats, "ShipLight", (ship * CFrame.new(0, 46, -100)).Position, 3, hex("fff4d6"), "Neon", "boats")
 	riding:SetAttribute("NightLight", true)
 
 	-- lighthouse on a skerry north-east of the marina
@@ -899,11 +1371,28 @@ do
 	local LX, LZ = 6300, 2050
 	for s = 1, 4 do
 		local a = s * 1.7
-		block(lh, "Skerry", Vector3.new(60 - 8 * s, 10 + 3 * s, 46 - 6 * s), CFrame.new(LX + 10 * math.cos(a), SEA + 1 + s, LZ + 10 * math.sin(a)) * CFrame.Angles(0, a, 0.06), shade(hex("8a877e"), 0.85 + 0.05 * s), "Slate", "lighthouse")
+		block(
+			lh,
+			"Skerry",
+			Vector3.new(60 - 8 * s, 10 + 3 * s, 46 - 6 * s),
+			CFrame.new(LX + 10 * math.cos(a), SEA + 1 + s, LZ + 10 * math.sin(a)) * CFrame.Angles(0, a, 0.06),
+			shade(hex("8a877e"), 0.85 + 0.05 * s),
+			"Slate",
+			"lighthouse"
+		)
 	end
 	local ly = SEA + 8
 	for s = 0, 4 do
-		pillar(lh, "TowerBand", Vector3.new(LX, ly + s * 13, LZ), 13, 14 - s * 1.2, if s % 2 == 0 then WHITE else hex("b34c45"), "SmoothPlastic", "lighthouse")
+		pillar(
+			lh,
+			"TowerBand",
+			Vector3.new(LX, ly + s * 13, LZ),
+			13,
+			14 - s * 1.2,
+			if s % 2 == 0 then WHITE else hex("b34c45"),
+			"SmoothPlastic",
+			"lighthouse"
+		)
 	end
 	local top = ly + 65
 	pillar(lh, "Gallery", Vector3.new(LX, top, LZ), 1.5, 15, hex("2f3a3d"), "Metal", "lighthouse")
@@ -959,8 +1448,24 @@ do
 			ball(tower, "SideLight", p + outward * 2.5, 5, hex("ff351e"), "Neon", "tower")
 		end
 	end
-	block(tower, "Hut", Vector3.new(20, 10, 14), CFrame.new(T.x + 34, y0 + 5, T.z - 10), hex("9ea39d"), "Concrete", "tower")
-	block(tower, "HutRoof", Vector3.new(22, 1.4, 16), CFrame.new(T.x + 34, y0 + 10.7, T.z - 10), hex("5d6366"), "Metal", "tower")
+	block(
+		tower,
+		"Hut",
+		Vector3.new(20, 10, 14),
+		CFrame.new(T.x + 34, y0 + 5, T.z - 10),
+		hex("9ea39d"),
+		"Concrete",
+		"tower"
+	)
+	block(
+		tower,
+		"HutRoof",
+		Vector3.new(22, 1.4, 16),
+		CFrame.new(T.x + 34, y0 + 10.7, T.z - 10),
+		hex("5d6366"),
+		"Metal",
+		"tower"
+	)
 end
 
 ---------------------------------------------------------------------------------------------- write

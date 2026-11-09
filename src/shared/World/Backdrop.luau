@@ -39,7 +39,8 @@ Backdrop.MESH_INSET = 40 -- the land mesh starts this far beyond the clamp, unde
 Backdrop.CENTRE = table.freeze({ x = 700, z = -150 }) -- middle of the v5.4 town (studs)
 Backdrop.SUN_TILT = math.asin(0.267) -- measured: Z of GetSunDirection() at latitude 39
 -- horizontal unit vector toward the setting sun (x, z), from the measured direction at ClockTime 18
-Backdrop.SUNSET = table.freeze({ x = -0.964 / math.sqrt(0.964 ^ 2 + 0.267 ^ 2), z = 0.267 / math.sqrt(0.964 ^ 2 + 0.267 ^ 2) })
+Backdrop.SUNSET =
+	table.freeze({ x = -0.964 / math.sqrt(0.964 ^ 2 + 0.267 ^ 2), z = 0.267 / math.sqrt(0.964 ^ 2 + 0.267 ^ 2) })
 -- the radio tower: on the sunset azimuth from CENTRE, 3.75 km out (beyond the -X band), on a knoll
 Backdrop.TOWER = table.freeze({
 	x = 700 + 3750 * Backdrop.SUNSET.x,

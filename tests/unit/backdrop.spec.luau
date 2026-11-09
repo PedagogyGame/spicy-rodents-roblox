@@ -11,11 +11,23 @@ local Backdrop = require("@shared/World/Backdrop")
 
 return function(t)
 	local ext = require("../../generated/TerrainExtensions") :: any
-	Height.configure(ext)
-	Backdrop.reset()
-	local c = Backdrop.clamp()
+	local c: any = nil
+	-- every case runs with World/Height configured (the D32 world clamp) and restores it afterwards
+	local function case(name: string, fn: () -> ())
+		t.test(name, function()
+			Height.configure(ext)
+			Backdrop.reset()
+			c = Backdrop.clamp()
+			local ok, err = pcall(fn)
+			Backdrop.reset()
+			Height.configure(nil)
+			if not ok then
+				error(err, 0)
+			end
+		end)
+	end
 
-	t.test("band: continuous with World/Height at the clamp edge, identical inside", function()
+	case("band: continuous with World/Height at the clamp edge, identical inside", function()
 		local worst = 0
 		for x = c.minX, c.maxX, 97 do
 			worst = math.max(worst, math.abs(Backdrop.groundAt(x, c.minZ - 0.5) - Height.at(x, c.minZ)))
@@ -30,7 +42,7 @@ return function(t)
 		end
 	end)
 
-	t.test("band: the terrain stays above the drawn land mesh (no plastic poking through the grass)", function()
+	case("band: the terrain stays above the drawn land mesh (no plastic poking through the grass)", function()
 		local m = Backdrop.mesh()
 		local worst, n = math.huge, 0
 		for _, r in Backdrop.terrainRects() do
@@ -59,7 +71,7 @@ return function(t)
 		t.truthy(worst >= 0.4, `clearance {worst}`)
 	end)
 
-	t.test("coast: the waterline at shoreZ, the shelf under the ocean plane where the plane starts", function()
+	case("coast: the waterline at shoreZ, the shelf under the ocean plane where the plane starts", function()
 		for x = c.minX - 300, c.maxX + 300, 211 do
 			t.near(Backdrop.groundAt(x, Backdrop.shoreZ(x)), Backdrop.SEA_Y, 1e-6, `waterline at x {x}`)
 			t.truthy(Backdrop.groundAt(x, Backdrop.OCEAN_NEAR_Z) < Backdrop.OCEAN_Y, `shelf at x {x}`)
@@ -72,7 +84,7 @@ return function(t)
 		end
 	end)
 
-	t.test("sun model: matches the engine's GetSunDirection at latitude 39 (CI v32 probe)", function()
+	case("sun model: matches the engine's GetSunDirection at latitude 39 (CI v32 probe)", function()
 		local probe = {
 			{ 6, 0.964, 0, 0.267 },
 			{ 9, 0.681, 0.681, 0.267 },
@@ -96,7 +108,7 @@ return function(t)
 		t.near(Backdrop.moonClockTime(18, 0.25), 12, 1e-9)
 	end)
 
-	t.test("tower: on the measured sunset azimuth, beyond the band, on its knoll", function()
+	case("tower: on the measured sunset azimuth, beyond the band, on its knoll", function()
 		local T = Backdrop.TOWER
 		local dx, dz = T.x - Backdrop.CENTRE.x, T.z - Backdrop.CENTRE.z
 		local dist = math.sqrt(dx * dx + dz * dz)
@@ -107,9 +119,12 @@ return function(t)
 		t.truthy(Backdrop.meshHeight(T.x, T.z) > 40, "on a knoll")
 	end)
 
-	t.test("bake: build/Backdrop.rbxm parts fit Roblox's limits and stream as Persistent", function()
+	case("bake: build/Backdrop.rbxm parts fit Roblox's limits and stream as Persistent", function()
 		local out = "build/test_backdrop.rbxm"
-		local res = process.exec("lune", { "run", "tools/bake/backdrop.luau", "--out", out, "--report", "build/test_backdrop.json" })
+		local res = process.exec(
+			"lune",
+			{ "run", "tools/bake/backdrop.luau", "--out", out, "--report", "build/test_backdrop.json" }
+		)
 		t.truthy(res.ok, res.stderr)
 		local root = roblox.deserializeModel(fs.readFile(out))[1]
 		t.eq(root.Name, "Backdrop")
@@ -149,14 +164,12 @@ return function(t)
 		t.truthy(beacon ~= nil, "tower beacon")
 		if beacon then
 			local T = Backdrop.TOWER
-			t.near(beacon.Position.X, T.x, 0.01)
-			t.near(beacon.Position.Z, T.z, 0.01)
-			t.truthy(beacon.Position.Y > T.height + 30, "beacon at the top")
+			local bp = beacon.CFrame.Position
+			t.near(bp.X, T.x, 0.01)
+			t.near(bp.Z, T.z, 0.01)
+			t.truthy(bp.Y > T.height + 30, "beacon at the top")
 		end
 		fs.removeFile(out)
 		fs.removeFile("build/test_backdrop.json")
 	end)
-
-	Backdrop.reset()
-	Height.configure(nil)
 end
