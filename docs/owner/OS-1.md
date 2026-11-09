@@ -11,7 +11,7 @@ Studio menus move between versions; if a label differs slightly, pick the closes
 
 - [ ] Claude saves the possession test place (`build/s2.rbxl`) as the newest version of the **CI**
       place and tells you "OS-1a ready" (today: CI version 12).
-- [ ] Claude tells you the name and download link of `squirrel_test_rig.fbx` for Part B.
+- [ ] Claude tells you the name and download link of `squirrel_test_rig.fbx (in the repo at docs/owner/files/, also sent to you in chat)` for Part B.
 - [ ] For Part C: Claude asks you first, publishes the test town to the main place, then tells you
       "OS-1c ready" with the experience link.
 
@@ -81,10 +81,10 @@ Studio menus move between versions; if a label differs slightly, pick the closes
 
 ## Part B: one test-rig import (OS-1b, Studio, about 12 minutes)
 
-1. Download `squirrel_test_rig.fbx` from the link Claude gave you into your **Downloads** folder.
+1. Download `squirrel_test_rig.fbx (in the repo at docs/owner/files/, also sent to you in chat)` from the link Claude gave you into your **Downloads** folder.
 2. In the browser: **create.roblox.com -> Creations -> Spicy Rodent -> Places -> Art Inbox ->
    Edit in Studio**.
-3. In Studio: **File -> Import 3D**. Pick `squirrel_test_rig.fbx` in Downloads. Click **Open**.
+3. In Studio: **File -> Import 3D**. Pick `squirrel_test_rig.fbx (in the repo at docs/owner/files/, also sent to you in chat)` in Downloads. Click **Open**.
 4. In the import window, find **Rig Type** (under the rig settings) and choose **Custom**. Click
    **Import**. The squirrel appears in the 3D view and in the **Explorer** under Workspace.
    - [ ] The squirrel imported (one model in Workspace).
