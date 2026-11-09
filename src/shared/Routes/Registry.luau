@@ -67,6 +67,7 @@ export type Route = {
 	origin: string,
 	lotId: string?,
 	flags: RouteFlags,
+	patched: string?, -- the harvest_patches action applied (Routes/Patches), nil when as harvested
 	_curve: Curve.Curve?,
 	_samples: { Vec3 }?,
 }
@@ -76,6 +77,7 @@ export type Loader = () -> { RouteRecord }
 export type Options = {
 	loaders: { Loader }, -- one per chunk, in id order (Routes_01, Routes_02, ...)
 	studsPerUnit: number?, -- scale of the data's lengths per HTML unit (default Units.STUDS_PER_UNIT)
+	transform: ((route: Route) -> ())?, -- applied to every route as its chunk loads (Routes/Patches)
 }
 
 export type Registry = typeof(setmetatable(
@@ -85,6 +87,7 @@ export type Registry = typeof(setmetatable(
 		_byId: { [number]: Route },
 		_all: { Route },
 		_studsPerUnit: number,
+		_transform: ((route: Route) -> ())?,
 	},
 	Registry
 ))
@@ -148,8 +151,20 @@ function Registry.new(opts: Options): Registry
 		_byId = {} :: { [number]: Route },
 		_all = {} :: { Route },
 		_studsPerUnit = opts.studsPerUnit or Units.STUDS_PER_UNIT,
+		_transform = opts.transform,
 	}, Registry)
 	return self
+end
+
+-- setTransform(fn): install a per-route transform (W1 #8: harvest_patches) on an existing registry;
+-- routes already loaded are transformed now (their cached curve and samples are dropped).
+function Registry.setTransform(self: Registry, fn: (route: Route) -> ())
+	self._transform = fn
+	for _, route in self._all do
+		fn(route)
+		route._curve = nil
+		route._samples = nil
+	end
 end
 
 -- fromRecords(records): a registry over an in-memory list (tests, templates, engine subsets).
@@ -194,6 +209,9 @@ function Registry._loadNext(self: Registry): boolean
 	local records = self._loaders[self._loaded]()
 	for _, rec in records do
 		local route = toRoute(rec, self._studsPerUnit)
+		if self._transform then
+			self._transform(route)
+		end
 		if self._byId[route.id] then
 			error(`Registry: duplicate route id {route.id}`)
 		end

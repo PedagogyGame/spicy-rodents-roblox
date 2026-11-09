@@ -261,6 +261,13 @@ function PossessionClient.start(opts: Opts): Client
 	end
 	if deviceReleased then
 		deviceReleased.OnClientEvent:Connect(function(why: string)
+			if device == nil then
+				-- a refused request ("no vehicle within reach", "needs the key"): say so
+				if hud then
+					hud.toast(why, 2.5)
+				end
+				return
+			end
 			stop()
 			device = nil
 			setJump(true)
