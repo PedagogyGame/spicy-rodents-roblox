@@ -180,6 +180,8 @@ def build_cards(sp, variant, lo, arm, W, bone_names, opts, out_dir, body_color_p
     rng = np.random.default_rng(1234 if variant != "rodent" else 4321)
     budget = sp.BUDGET["rodent_cards_tris" if variant == "rodent" else "cards_tris"]
     ncards = budget // 4
+    if ncards <= 0:
+        return None
     me = lo.data
     A = tx.mesh_arrays(lo)
     skel = sp.skeleton()
@@ -310,6 +312,38 @@ def build_blood(sp, variant, lo, arm, W, bone_names, out_dir, res=256):
     return obj
 
 
+def build_antlers(sp, variant, arm, bone_names, out_dir, res=256):
+    """The buck's rack as its own MeshPart ("Antlers"), skinned to Head; bony beige darkening to
+    brown at the burr, polished pale tips."""
+    obj, owner = geometry.object_from_parts("Antlers", sp.antlers())
+    W = np.zeros((len(obj.data.vertices), len(bone_names)))
+    W[:, bone_names.index("Head")] = 1
+    _assign(obj, bone_names, W)
+    geometry.uv_unwrap(obj, angle=60, margin=0.02)
+    A = tx.mesh_arrays(obj)
+    tri, bary = tx.rasterize(A, res)
+    filled = tri >= 0
+    P = tx.interp_vertex(A, tri[filled], bary[filled], A["co"]).astype(F32)
+    head = np.array(sp.skeleton()[[b[0] for b in sp.skeleton()].index("Head")][1], F32)
+    h = np.clip((P[:, 2] - 5.3) / 0.9, 0, 1)
+    base = np.array([0.42, 0.31, 0.21]) * (1 - h[:, None]) + np.array([0.80, 0.72, 0.58]) * h[:, None]
+    rid = tx.strands(P, np.tile(np.array([[0, 0, 1.0]], F32), (len(P), 1)), 0.01, 0.08, seed=81)
+    col = np.zeros((res, res, 4), F32)
+    col[filled, :3] = np.clip(base * (0.8 + 0.35 * rid)[:, None], 0, 1)
+    col[filled, 3] = 1
+    col = tx.dilate(col, filled, iters=8)
+    col[..., 3] = 1
+    rough = np.full((res, res, 4), 0.72, F32)
+    rough[filled, 0] = rough[filled, 1] = rough[filled, 2] = 0.75 - 0.3 * h
+    rough[..., 3] = 1
+    paths = {"color": os.path.join(out_dir, f"{variant}_antlers_color.png"), "roughness": os.path.join(out_dir, f"{variant}_antlers_roughness.png")}
+    bl.save_png(paths["color"], col[::-1])
+    bl.save_png(paths["roughness"], rough[::-1], colorspace="Non-Color")
+    obj.data.materials.append(tx.principled_material("Antlers", paths))
+    rig.bind(obj, arm)
+    return obj
+
+
 def build(sp, variant, lo, arm, W, bone_names, opts, log):
     out_dir = os.path.join(opts.out, "tex")
     objs = [build_eyes(sp, variant, arm, bone_names, out_dir)]
@@ -319,6 +353,10 @@ def build(sp, variant, lo, arm, W, bone_names, opts, log):
     if cards is not None:
         objs.append(cards)
         log(f"fur cards: {bl.tri_count(cards.data)} tris")
+    if variant == "buck" and hasattr(sp, "antlers"):
+        ant = build_antlers(sp, variant, arm, bone_names, out_dir)
+        objs.append(ant)
+        log(f"antlers: {bl.tri_count(ant.data)} tris")
     if variant == "rodent":
         blood = build_blood(sp, variant, lo, arm, W, bone_names, out_dir)
         if blood is not None:

@@ -847,7 +847,12 @@ local function fortune(kit: any, parent: any)
 	end
 	at("Base", 0, 1.6, 0, 3.0, 3.2, 2.4, purple, "Wood")
 	at("BaseTrim", 0, 3.25, 0, 3.1, 0.15, 2.5, gold, "Metal")
-	at("Booth", 0, 5.6, 0.2, 3.0, 4.5, 2.0, purple, "Wood")
+	-- the booth is hollow (the seer sits inside behind the glass): back, sides, floor and top
+	at("BoothBack", 0, 5.6, 1.15, 3.0, 4.5, 0.1, purple, "Wood")
+	at("BoothSideL", -1.45, 5.6, 0.2, 0.1, 4.5, 2.0, purple, "Wood")
+	at("BoothSideR", 1.45, 5.6, 0.2, 0.1, 4.5, 2.0, purple, "Wood")
+	at("BoothFloor", 0, 3.4, 0.2, 3.0, 0.1, 2.0, { 50, 20, 30 }, "Fabric")
+	at("BoothTop", 0, 7.8, 0.2, 3.0, 0.1, 2.0, purple, "Wood")
 	at(
 		"BoothGlass",
 		0,

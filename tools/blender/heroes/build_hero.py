@@ -63,7 +63,7 @@ def main(argv):
     ap.add_argument("--quick", action="store_true", help="coarse grids, 512 px maps, fewer samples")
     ap.add_argument("--stages", default="all")
     opts = ap.parse_args(argv)
-    variant = opts.variant or opts.species
+    variant = opts.variant or {"deer": "doe"}.get(opts.species, opts.species)
     sp = importlib.import_module(SPECIES_MODULES[opts.species])
     opts.out = os.path.abspath(opts.out)
     os.makedirs(opts.out, exist_ok=True)
