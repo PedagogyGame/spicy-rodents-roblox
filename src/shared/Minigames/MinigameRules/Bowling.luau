@@ -299,6 +299,17 @@ function Bowling.roll(state: State, seat: number, pins: number): (string, string
 	return event, rack
 end
 
+-- skipTurn: play out the current seat's frame as misses (an idle turn or a player who walked away).
+function Bowling.skipTurn(state: State)
+	local seat = state.seat
+	local frame = state.frameOf[seat]
+	local guard = 0
+	while not state.done and state.seat == seat and state.frameOf[seat] == frame and guard < 4 do
+		Bowling.roll(state, seat, 0)
+		guard += 1
+	end
+end
+
 -- What the pinsetter sets before the next ball: "full" for a new frame (or a fresh tenth-frame rack).
 function Bowling.rackFor(state: State): string
 	return if state.pinsUp == Bowling.PINS then "full" else "keep"

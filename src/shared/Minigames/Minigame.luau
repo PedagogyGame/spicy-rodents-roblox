@@ -7,9 +7,13 @@
 -- (MinigameRules/FortuneMachine: no money in or out, Q20). Pure.
 -- Interface: CLASSES; check(rules) -> (ok, err?); start(rules, seats, seed) -> Game; input(game, seat, verb, args)
 --            -> (ok, err?); result(game) -> Result?
+-- W4b (Minigames/Session, Server/Minigames/MinigameService): a turn-based rules module also exports turn(state)
+-- -> seat?, skipTurn(state) (an idle or vacated turn played out as a miss) and view(state) (the JSON-friendly
+-- scoreboard); serverVerbs lists the verbs only the server may send (bowling's "roll" is the lane's pinfall).
 
 export type Def = {
 	game: string,
+	title: string?,
 	class: "shared_table" | "no_stakes" | "arena",
 	seats: number,
 	authority: string,
@@ -22,6 +26,10 @@ export type Rules = {
 	input: (state: any, seat: number, verb: string, args: { any }?) -> (boolean, string?),
 	result: (state: any) -> Result?,
 	verbs: { [string]: boolean },
+	serverVerbs: { [string]: boolean }?,
+	turn: ((state: any) -> number?)?,
+	skipTurn: ((state: any) -> ())?,
+	view: ((state: any) -> { [string]: any })?,
 }
 export type Game = { rules: Rules, state: any, seats: number }
 

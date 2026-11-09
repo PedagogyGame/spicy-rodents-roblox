@@ -339,6 +339,16 @@ function Darts.throwAt(state: State, x: number, y: number): (Hit, string)
 	return hit, event
 end
 
+-- skipTurn: the rest of the current turn as misses (an idle turn or a player who walked away).
+function Darts.skipTurn(state: State)
+	local seat, round = state.seat, state.round
+	local guard = 0
+	while not state.done and state.seat == seat and state.round == round and guard < 4 do
+		Darts.throwAt(state, 999, 999)
+		guard += 1
+	end
+end
+
 -- input: "throw" { aimX, aimY, timing } (server resolves the scatter) or "throwAt" handled by the service
 -- for scripted landings; "mode" { "501" | "cricket" } before the first dart.
 function Darts.input(state: State, seat: number, verb: string, args: { any }?): (boolean, string?)

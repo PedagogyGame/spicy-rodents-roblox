@@ -169,7 +169,7 @@ BARK_FAMILIES = ("oak", "elm", "sycamore", "maple", "willow", "apple")
 # base (furrow, ridge, highlight) colours, sRGB hex: v5.4 M.bark #736354 x tint #b6a99b, sycamore
 # #a3a089 / #a5a394 / #a3a48f, apple wood #766047, estate oak #716050.
 BARK_COLOURS = {
-    "oak": ("#2f261f", "#6e5d4c", "#9a8a74"),
+    "oak": ("#2a231d", "#5f5245", "#8c806f"),
     "elm": ("#2b231d", "#625244", "#8a7a68"),
     "sycamore": ("#6f6a55", "#a3a089", "#e4dfcc"),
     "maple": ("#3a332c", "#7b6f62", "#a89d8d"),
@@ -195,8 +195,8 @@ def bark_maps(family, seed=1, tint=None):
         ridge = 1.0 - np.abs(2 * n1 - 1)
         ridge = ridge ** (1.6 if family in ("oak", "willow") else 1.2)
         # horizontal cracks break ridges into long plates
-        f1, f2, cid = worley(u, v, fx, max(2, fy * 3), rng, jitter=0.9)
-        crack = smoothstep(0.0, 0.10, f2 - f1)
+        f1, f2, cid = worley(wu % 1.0, v, max(3, fx // 2), max(2, fy + 1), rng, jitter=0.9)
+        crack = 0.6 + 0.4 * smoothstep(0.0, 0.05, f2 - f1)
         depth = {"oak": 1.0, "elm": 0.85, "willow": 1.0, "maple": 0.55}[family]
         h = ridge * (0.65 + 0.35 * crack) * depth + fbm(u, v, 32, 32, 3, rng) * 0.18
         h = (h - h.min()) / (h.max() - h.min())
@@ -210,34 +210,38 @@ def bark_maps(family, seed=1, tint=None):
         rough = 0.97 - 0.18 * t
         nstr = {"oak": 7.0, "elm": 6.0, "willow": 7.5, "maple": 4.0}[family]
     elif family == "sycamore":
-        f1, f2, cid = worley(u, v, 5, 7, rng, jitter=0.95)
-        g1, g2, gid = worley(u + 0.13, v + 0.37, 9, 12, rng, jitter=0.95)
-        edge = smoothstep(0.0, 0.06, f2 - f1)
-        edge2 = smoothstep(0.0, 0.05, g2 - g1)
-        pal = [srgb_to_lin(hex_rgb(c)) for c in ("#e8e3d1", "#cfd0bb", "#a3a089", "#8f8a6a", "#b9b39a", "#7e7a60")]
+        # smooth pale bark shedding in rounded, irregular patches (cream, olive, grey-brown)
+        wu = u + (fbm(u, v, 4, 4, 4, rng) - 0.5) * 0.16
+        wv = v + (fbm(u, v, 4, 4, 4, rng) - 0.5) * 0.16
+        f1, f2, cid = worley(wu % 1.0, wv % 1.0, 4, 5, rng, jitter=0.95)
+        g1, g2, gid = worley((wu + 0.31) % 1.0, (wv + 0.17) % 1.0, 7, 9, rng, jitter=0.95)
+        edge = smoothstep(0.0, 0.12, f2 - f1)
+        edge2 = smoothstep(0.0, 0.10, g2 - g1)
+        pal = np.stack([srgb_to_lin(hex_rgb(c)) for c in ("#ddd8c4", "#c9c7ad", "#a8a68a", "#8f8a6e", "#b3ae92", "#7f8463")])
         pid = np.minimum((cid * len(pal)).astype(int), len(pal) - 1)
         sid = np.minimum((gid * len(pal)).astype(int), len(pal) - 1)
-        palarr = np.stack(pal)
-        col = palarr[pid]
-        top = np.where((gid > 0.55)[..., None], palarr[sid], col)
-        col = mix(col, top, (gid > 0.55) * 0.85)
-        col = col * (0.9 + 0.2 * fbm(u, v, 8, 8, 4, rng))[..., None]
-        col = mix(col, dark, (1 - edge) * 0.55)
-        h = 0.55 + 0.25 * edge * edge2 + 0.2 * (gid > 0.55) * edge2 + 0.08 * fbm(u, v, 24, 24, 3, rng)
+        col = pal[pid]
+        top = gid > 0.6
+        col = np.where(top[..., None], mix(col, pal[sid], 0.9 * edge2), col)
+        col = col * (0.9 + 0.2 * fbm(u, v, 10, 10, 4, rng))[..., None]
+        col = mix(col, srgb_to_lin(hex_rgb("#6b6550")), (1 - edge) * 0.35)
+        h = 0.5 + 0.2 * edge + 0.2 * top * edge2 + 0.1 * fbm(u, v, 24, 24, 3, rng)
         h = (h - h.min()) / (h.max() - h.min())
-        rough = 0.85 - 0.15 * edge
-        nstr = 3.5
-    else:  # apple: scaly flakes
-        f1, f2, cid = worley(u, v, 9, 14, rng, jitter=0.95)
-        edge = smoothstep(0.0, 0.09, f2 - f1)
-        curl = smoothstep(0.1, 0.6, f1)
-        h = 0.5 * edge + 0.3 * curl + 0.2 * fbm(u, v, 16, 16, 3, rng)
+        rough = 0.8 - 0.12 * edge
+        nstr = 3.0
+    else:  # apple: scaly, vertically elongated flakes
+        wu = u + (fbm(u, v, 4, 4, 4, rng) - 0.5) * 0.08
+        f1, f2, cid = worley(wu % 1.0, v, 8, 5, rng, jitter=0.95)
+        edge = smoothstep(0.0, 0.10, f2 - f1)
+        curl = smoothstep(0.05, 0.7, f1)
+        ridge = 1.0 - np.abs(2 * fbm(wu % 1.0, v, 10, 2, 4, rng) - 1)
+        h = 0.35 * edge + 0.25 * curl + 0.3 * ridge + 0.1 * fbm(u, v, 16, 16, 3, rng)
         h = (h - h.min()) / (h.max() - h.min())
         col = mix(dark, mid, smoothstep(0.1, 0.6, h))
-        col = mix(col, light, smoothstep(0.65, 1.0, h) * 0.7)
-        col = col * (0.85 + 0.3 * cid)[..., None]
+        col = mix(col, light, smoothstep(0.7, 1.0, h) * 0.6)
+        col = col * (0.88 + 0.24 * cid)[..., None]
         lich = smoothstep(0.66, 0.8, fbm(u, v, 5, 5, 5, rng))
-        col = mix(col, lichen, lich * 0.45)
+        col = mix(col, lichen, lich * 0.4)
         rough = 0.95 - 0.12 * edge
         nstr = 5.0
     if tint is not None:
@@ -339,7 +343,7 @@ def leaf_layout(shape, seed=1, n=N):
             "tone": rng.random(count), "bright": rng.random(count)}
 
 
-def leaf_normal_rough(layout, strength=10.0):
+def leaf_normal_rough(layout, strength=70.0):
     H, ID, S, T = layout["H"], layout["ID"], layout["S"], layout["T"]
     gap = ID < 0
     # Detail height: each leaf's own relief plus a small step per stacking order, so edges read.
