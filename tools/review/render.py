@@ -34,10 +34,13 @@ import math
 import os
 import sys
 import time
+import warnings
 
 import bpy
 import numpy as np
 from mathutils import Matrix, Vector
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)  # Material/World.use_nodes (Blender 6)
 
 # Roblox -> Blender: (x, y, z) -> (x, -z, y)
 AXES = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]])
