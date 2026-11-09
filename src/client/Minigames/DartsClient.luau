@@ -125,8 +125,9 @@ end
 
 -- world point on the board face <-> board mm
 function DartsClient._world(self: any, xmm: number, ymm: number): Vector3
-	local b, mm = self.board, AlleyLayout.DART_MM
-	return Vector3.new(AlleyLayout.toWorld(self.place, b.x - 0.075, b.y + ymm * mm, b.d + xmm * mm))
+	local b = self.board
+	local _, Y, D = AlleyLayout.boardPoint(xmm, ymm)
+	return Vector3.new(AlleyLayout.toWorld(self.place, b.x - 0.075, Y, D))
 end
 
 function DartsClient._frame(self: any, dt: number)
@@ -163,9 +164,9 @@ function DartsClient._frame(self: any, dt: number)
 		if t > 0 then
 			local hit = ray.Origin + ray.Direction * t
 			local _, Y, D = AlleyLayout.toLocal(self.place, hit.X, hit.Y, hit.Z)
-			local mm = AlleyLayout.DART_MM
-			self.aim.x = math.clamp((D - b.d) / mm, -Darts.MAX_AIM, Darts.MAX_AIM)
-			self.aim.y = math.clamp((Y - b.y) / mm, -Darts.MAX_AIM, Darts.MAX_AIM)
+			local ax, ay = AlleyLayout.boardFromLocal(Y, D)
+			self.aim.x = math.clamp(ax, -Darts.MAX_AIM, Darts.MAX_AIM)
+			self.aim.y = math.clamp(ay, -Darts.MAX_AIM, Darts.MAX_AIM)
 		end
 	end
 	local wx, wy = Darts.wobble(self.wobbleT)

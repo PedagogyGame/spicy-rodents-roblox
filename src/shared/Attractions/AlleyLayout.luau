@@ -13,7 +13,8 @@
 -- Pure. Interface: constants below; laneX(i), pairX(p), pairOf(lane), sideOf(lane), pinSpots() -> { {x, d} },
 --   pinLocal(lane, n) -> (X, D), rackSlot(lane) -> (X, Y, D), release(lane, offset) -> (X, Y, D),
 --   toWorld(place, X, Y, D) -> (x, y, z), toLocal(place, x, y, z) -> (X, Y, D), dirToWorld(place, dX, dD) ->
---   (dx, dz), yawOf(place) -> world yaw of local +D, board(): dartboard frame, stations() -> { Station }
+--   (dx, dz), yawOf(place) -> world yaw of local +D, board(): dartboard frame, boardPoint(xmm, ymm) -> (X, Y, D),
+--   boardFromLocal(Y, D) -> (xmm, ymm), stations() -> { Station }
 
 local AlleyLayout = {}
 
@@ -176,6 +177,20 @@ function AlleyLayout.board(): { [string]: any }
 		ocheX = wallX - 0.25 - 9,
 		radius = 225 * AlleyLayout.DART_MM,
 	}
+end
+
+-- boardPoint(xmm, ymm): local (X, Y, D) of a point on the board face, millimetres from the bull with +x to
+-- the thrower's right and +y up. The thrower faces local +X (yaw 0: world +X), whose right is world +Z, which
+-- is local -D: so +x runs toward -D.
+function AlleyLayout.boardPoint(xmm: number, ymm: number): (number, number, number)
+	local b = AlleyLayout.board()
+	return b.x, b.y + ymm * AlleyLayout.DART_MM, b.d - xmm * AlleyLayout.DART_MM
+end
+
+-- boardFromLocal(Y, D): the board millimetres of a local point on the face (the inverse of boardPoint).
+function AlleyLayout.boardFromLocal(Y: number, D: number): (number, number)
+	local b = AlleyLayout.board()
+	return (b.d - D) / AlleyLayout.DART_MM, (Y - b.y) / AlleyLayout.DART_MM
 end
 
 AlleyLayout.POOL_TABLES = { { x = 41, d = -31 }, { x = 41, d = -9 } }

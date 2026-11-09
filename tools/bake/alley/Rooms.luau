@@ -254,6 +254,22 @@ local function concourse(kit: any, root: any)
 		{ collide = false }
 	)
 	kit:light(l3, "PointLight", { Range = 24, Brightness = 0.9, Color = { 255, 244, 226 } })
+	local l4 = kit:box(
+		m,
+		"ConcourseTroffer2",
+		-6,
+		6,
+		L.CEILING_Y - 0.12,
+		L.CEILING_Y,
+		-29,
+		-27,
+		{ 250, 248, 238 },
+		"Neon",
+		{
+			collide = false,
+		}
+	)
+	kit:light(l4, "PointLight", { Range = 24, Brightness = 0.9, Color = { 255, 244, 226 } })
 end
 
 -- A pool table: frame, felt, cushions, pockets, legs; the 15 balls racked and the cue ball spotted.
@@ -434,6 +450,7 @@ local function poolTable(kit: any, parent: any, name: string, cx: number, cd: nu
 		"SurfaceLight",
 		{ Face = "Bottom", Range = 9, Angle = 90, Brightness = 2.2, Color = { 255, 238, 200 } }
 	)
+	kit:light(glow, "PointLight", { Range = 13, Brightness = 0.9, Color = { 255, 236, 200 }, Shadows = false })
 	return m
 end
 
@@ -443,9 +460,10 @@ local function dartboard(kit: any, parent: any)
 	local mm = L.DART_MM
 	local fx, by, bd = b.x, b.y, b.d
 	-- the board hangs on the games room's right wall facing -X; the thrower faces +X, so the thrower's right is
-	-- +D and up is +Y. (x mm right, y mm up) -> local (fx, by + y, bd + x).
+	-- -D and up is +Y (AlleyLayout.boardPoint).
 	local function boardAt(xmm: number, ymm: number): (number, number)
-		return by + ymm * mm, bd + xmm * mm
+		local _, Y, D = L.boardPoint(xmm, ymm)
+		return Y, D
 	end
 	kit:box(m, "Cabinet", fx + 0.05, fx + 0.3, by - 1.3, by + 1.3, bd - 1.3, bd + 1.3, WOOD_DARK, "Wood")
 	for side = -1, 1, 2 do
@@ -508,7 +526,7 @@ local function dartboard(kit: any, parent: any)
 		)
 	end
 	-- black singles (every other segment) as thin plates laid over the cream singles; a plate's long side runs
-	-- out from the bull: rotating about X by -angle points local Y along (up cos a, right sin a)
+	-- out from the bull: rotating about X by +angle points local Y along (up cos a, -D sin a) = (up, right)
 	for sgm = 0, 19 do
 		local ang = math.rad(sgm * 18)
 		if sgm % 2 == 1 then
@@ -520,7 +538,7 @@ local function dartboard(kit: any, parent: any)
 				kit:at(m, "Segment", fx - 0.05, py, pd, 0.004, (r1 - r0) * mm, width, BLACK, "SmoothPlastic", {
 					collide = false,
 					query = false,
-					rot = kit.roblox.CFrame.Angles(-ang, 0, 0),
+					rot = kit.roblox.CFrame.Angles(ang, 0, 0),
 				})
 			end
 		end
@@ -529,7 +547,7 @@ local function dartboard(kit: any, parent: any)
 		kit:at(m, "Wire", fx - 0.065, wy, wd, 0.006, 170 * mm, 0.008, { 200, 200, 205 }, "Metal", {
 			collide = false,
 			query = false,
-			rot = kit.roblox.CFrame.Angles(-wa, 0, 0),
+			rot = kit.roblox.CFrame.Angles(wa, 0, 0),
 		})
 	end
 	local order = { 20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5 }
@@ -838,10 +856,14 @@ local function fortune(kit: any, parent: any)
 		2.6,
 		4.0,
 		0.06,
-		{ 160, 200, 220 },
+		{ 180, 210, 225 },
 		"Glass",
-		{ transparency = 0.55, reflectance = 0.2 }
+		{ transparency = 0.8, reflectance = 0.08, shadow = false }
 	)
+	at("Velvet", 0, 5.6, 1.12, 2.7, 4.2, 0.08, { 120, 20, 40 }, "Fabric", { collide = false })
+	local boothLamp = at("BoothLamp", 0, 7.65, 0.2, 2.4, 0.08, 1.4, { 255, 220, 150 }, "Neon", { collide = false })
+	kit:light(boothLamp, "PointLight", { Range = 7, Brightness = 1.6, Color = { 255, 214, 160 } })
+	at("ReelTrim", 0, 3.05, -1.22, 2.4, 0.06, 0.03, { 255, 200, 80 }, "Neon", { collide = false })
 	at("Crown", 0, 8.1, 0.2, 3.3, 0.5, 2.3, gold, "Metal")
 	at("Dome", 0, 8.6, 0.2, 2.0, 0.6, 1.4, purple, "Wood")
 	local sign = at("Marquee", 0, 9.2, -0.2, 3.0, 0.8, 0.12, { 30, 10, 40 }, "SmoothPlastic", { collide = false })
@@ -1019,6 +1041,55 @@ local function gamesRoom(kit: any, root: any)
 		"WoodPlanks",
 		{ collide = false }
 	)
+	-- knotty-pine panelling above the wainscot (a 70s rec room) on the right and back walls
+	local PINE = { 186, 152, 106 }
+	kit:box(m, "PinePanel", L.X1 - 0.06, L.X1, 3.2, L.CEILING_Y, L.FRONT_D, L.GAME_ROOM_D1, PINE, "WoodPlanks", {
+		collide = false,
+	})
+	kit:box(
+		m,
+		"PinePanelBack",
+		L.GAME_ROOM_X0,
+		L.X1,
+		3.2,
+		L.CEILING_Y,
+		L.GAME_ROOM_D1 - 0.06,
+		L.GAME_ROOM_D1,
+		PINE,
+		"WoodPlanks",
+		{
+			collide = false,
+		}
+	)
+	kit:box(
+		m,
+		"ChairRail",
+		L.X1 - 0.12,
+		L.X1,
+		3.1,
+		3.35,
+		L.FRONT_D,
+		L.GAME_ROOM_D1,
+		WOOD_DARK,
+		"Wood",
+		{ collide = false }
+	)
+	local midLight = kit:box(
+		m,
+		"GamesTroffer2",
+		34,
+		48,
+		L.CEILING_Y - 0.12,
+		L.CEILING_Y,
+		-21,
+		-19,
+		{ 250, 240, 220 },
+		"Neon",
+		{
+			collide = false,
+		}
+	)
+	kit:light(midLight, "PointLight", { Range = 24, Brightness = 0.9, Color = { 255, 236, 210 } })
 	local sign = kit:box(
 		m,
 		"GamesSign",
@@ -1046,7 +1117,7 @@ local function gamesRoom(kit: any, root: any)
 		"Neon",
 		{ collide = false }
 	)
-	kit:light(roomLight, "PointLight", { Range = 26, Brightness = 0.9, Color = { 255, 236, 210 } })
+	kit:light(roomLight, "PointLight", { Range = 28, Brightness = 1.1, Color = { 255, 236, 210 } })
 	local cornerLight = kit:box(
 		m,
 		"CornerLamp",
@@ -1060,7 +1131,7 @@ local function gamesRoom(kit: any, root: any)
 		"Neon",
 		{ collide = false }
 	)
-	kit:light(cornerLight, "PointLight", { Range = 14, Brightness = 1.0, Color = { 255, 196, 140 } })
+	kit:light(cornerLight, "PointLight", { Range = 16, Brightness = 1.4, Color = { 255, 196, 140 } })
 end
 
 local function backOfHouse(kit: any, root: any)

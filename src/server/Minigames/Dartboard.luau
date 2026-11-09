@@ -33,8 +33,8 @@ end
 -- The world point of a board position (mm), on the face.
 function Dartboard.worldPoint(self: any, xmm: number, ymm: number): Vector3
 	local b = self.board
-	local mm = AlleyLayout.DART_MM
-	local x, y, z = AlleyLayout.toWorld(self.place, b.x - 0.07, b.y + ymm * mm, b.d + xmm * mm)
+	local _, Y, D = AlleyLayout.boardPoint(xmm, ymm)
+	local x, y, z = AlleyLayout.toWorld(self.place, b.x - 0.07, Y, D)
 	return Vector3.new(x, y, z)
 end
 

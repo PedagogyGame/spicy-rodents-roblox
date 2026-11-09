@@ -77,6 +77,23 @@ return function(t)
 		end
 	)
 
+	t.test("dartboard: 20 at the top, +x on the thrower's right, round trip through boardFromLocal", function()
+		local b = AlleyLayout.board()
+		local X, Y, D = AlleyLayout.boardPoint(0, 100)
+		t.near(X, b.x, 1e-9)
+		t.truthy(Y > b.y, "+y is up")
+		-- the thrower stands at the oche facing the board (local +X); their right is forward x up in world axes
+		local fx, fz = AlleyLayout.dirToWorld(place, 1, 0)
+		local rightX, rightZ = -fz, fx
+		local _, _, Dr = AlleyLayout.boardPoint(100, 0)
+		local wx0, _, wz0 = AlleyLayout.toWorld(place, b.x, b.y, b.d)
+		local wx1, _, wz1 = AlleyLayout.toWorld(place, b.x, b.y, Dr)
+		t.truthy((wx1 - wx0) * rightX + (wz1 - wz0) * rightZ > 0, "+x lies to the thrower's right")
+		local xmm, ymm = AlleyLayout.boardFromLocal(Y, D)
+		t.near(xmm, 0, 1e-6)
+		t.near(ymm, 100, 1e-6)
+	end)
+
 	t.test("routes: three vents and three tunnels, in the ducts under each pair, ending on the rack", function()
 		t.eq(#mod.routes, 6)
 		local reg = data:routes()

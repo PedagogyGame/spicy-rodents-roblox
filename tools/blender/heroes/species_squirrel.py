@@ -160,8 +160,8 @@ def sculpt(variant="squirrel"):
     base = np.array([0.11, -0.80, 1.33 + dz])
     c = base + tilt @ np.array([0, 0, 0.07])
     P += mirror_pair([Ellipsoid(c, (0.06, 0.022, 0.085), axes=tilt, k=0.03, tag="ear")])
-    cup = c + tilt @ np.array([0, -0.016, 0.014])
-    P += mirror_pair([Ellipsoid(cup, (0.041, 0.012, 0.062), axes=tilt, k=0.006, op="sub", tag="earcup")])
+    cup = c + tilt @ np.array([0, -0.019, 0.014])
+    P += mirror_pair([Ellipsoid(cup, (0.040, 0.009, 0.060), axes=tilt, k=0.005, op="sub", tag="earcup")])
     # --- forelegs ---------------------------------------------------------------------------------------
     sh, el, wr, kn = (np.array(FRONT[k]) for k in ("Upper", "Lower", "Foot", "Toe"))
     P += mirror_pair([
@@ -284,12 +284,9 @@ def pattern_field(c, n, dom, variant="squirrel"):
     out[neck] = _sstep(0.0, 0.4, -n[neck, 2] + (0.9 - z[neck]) * 1.5 + wob[neck])
     head = dom == "Head"
     hz = HZ + (-0.03 if variant == "rodent" else 0.0)
-    out[head] = _sstep(0.15, 0.45, -n[head, 2] + (hz - 0.09 - z[head]) * 4 + wob[head]) * (y[head] < -0.86)
+    out[head] = _sstep(0.35, 0.7, -n[head, 2] + (hz - 0.12 - z[head]) * 3 + wob[head]) * (y[head] < -0.86)
     jaw = dom == "Jaw"
-    out[jaw] = _sstep(-0.3, 0.1, -n[jaw, 2] + wob[jaw])
-    tail = np.char.startswith(dom.astype(str), "Tail")
-    tip = _sstep(1.86, 1.98, y + wob * 2)
-    out[tail] = np.maximum(out[tail], tip[tail])
+    out[jaw] = _sstep(0.25, 0.6, -n[jaw, 2] + wob[jaw])
     if variant == "rodent":
         out *= 0.92  # a dingier, narrower belly
     return out
@@ -363,17 +360,20 @@ def paint(tx, variant, tools):
     head = np.isin(dom, ["Head", "Jaw"])
     # --- strands: fine hairs, locks and clumps; the tail's are longer and coarser -------------------
     lscale = np.where(tail, 1.8, np.where(head | feet, 0.6, 1.0)).astype(np.float32)
-    layers = [(0.0042, 0.045, 1.0, 0.0012, 11), (0.011, 0.09, 0.7, 0.0018, 12), (0.028, 0.16, 0.45, 0.0022, 13)]
+    layers = [(0.0058, 0.06, 1.0, 0.0016, 11), (0.014, 0.11, 0.8, 0.0024, 12), (0.032, 0.18, 0.6, 0.003, 13)]
     if rodent:
         layers = [(0.0045, 0.04, 1.0, 0.0014, 21), (0.013, 0.08, 0.8, 0.0026, 22), (0.035, 0.12, 0.7, 0.0035, 23)]
     H, gT, gB = tools["fur_relief"](P, F, N, T, B, layers, lscale=lscale)
-    fine = tools["strands"](P, F * lscale[:, None], 0.0042, 0.045, seed=11)
+    fine = tools["strands"](P, F * lscale[:, None], 0.0058, 0.06, seed=11)
+    guard = tools["strands"](P, F * lscale[:, None], 0.009, 0.05, seed=14)
     big = fbm(P * 9.0, 3, seed=5)
     dorsal = sst(0.15, 0.85, N[:, 2])
     # --- greyscale under the tint ------------------------------------------------------------------
     g = 0.80 - 0.09 * dorsal
-    g = g + (fine - 0.5) * (0.26 + 0.22 * dorsal)  # agouti: banded guard hairs grizzle the back
-    g = g * (0.86 + 0.26 * H)
+    g = g + (fine - 0.5) * (0.30 + 0.25 * dorsal)  # agouti: banded guard hairs grizzle the back
+    g = g - 0.22 * sst(0.62, 0.78, guard) * (0.4 + 0.6 * dorsal)  # dark-tipped guard hairs
+    g = g + 0.10 * sst(0.25, 0.1, guard) * dorsal  # pale bands
+    g = g * (0.80 + 0.36 * H)
     g = g + (big - 0.5) * 0.12
     g = np.where(feet, g * 0.86, g)
     # face: pale eye ring, lighter cheeks and muzzle
