@@ -16,6 +16,11 @@
 -- people and the player-held squirrels (RunOver kills: "RUN OVER"), poses stream to clients at 15 Hz
 -- (Net VehiclePoses, rendered by Client/Render/VehicleView), the rodent bites people it touches
 -- (Combat/PlayRules; Power per Rodent/PowerRules, brief v2 §15), Power fades while playing.
+-- Streaming and input (W1 client review): the device fleet (patrol cars, carts, bikes, the drone) is
+-- ModelStreamingMode Persistent, so a DeviceGranted model is never nil on the driver's client; the body a
+-- player holds is PersistentPerPlayer for that player (persist), so the client always finds its body;
+-- Shift Lock is off (StarterPlayer.EnableMouseLockOption, Player.DevEnableMouseLock) because Shift is
+-- sprint. A "picked" event carries a `note` when the police car or the drone was not free.
 -- Engine only inside the functions; no side effects on require.
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, pick(player, choice) -> (ok, why?),
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
@@ -122,6 +127,17 @@ function Game.start(opts: Opts?): any
 		print(`[SpicyRodents] {math.floor(p * 100 + 0.5)}% {text}`)
 	end
 	ReplicatedStorage:SetAttribute("BootReady", false)
+	pcall(function()
+		(game:GetService("StarterPlayer") :: any).EnableMouseLockOption = false
+	end)
+	local function noShiftLock(player: Player)
+		pcall(function()
+			(player :: any).DevEnableMouseLock = false
+		end)
+	end
+	for _, p in Players:GetPlayers() do
+		noShiftLock(p)
+	end
 	local t0 = os.clock()
 	local timings: { [string]: number } = {}
 	local function mark(name: string, since: number)
@@ -202,6 +218,40 @@ function Game.start(opts: Opts?): any
 	local world = rt.world
 	local possession = rt.possession
 	local devices = rt.devices
+	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
+	if devices then
+		for _, model in devices.models do
+			pcall(function()
+				(model :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+			end)
+		end
+	end
+	-- the held body is always streamed to its driver (PersistentPerPlayer), whatever the radius
+	local persisted: { [any]: Model? } = {}
+	local function persist(player: any)
+		if typeof(player) ~= "Instance" then
+			return
+		end
+		local actor = possession:actorOf(player)
+		local body: Model? = if actor then actor.body :: Model else nil
+		local old = persisted[player]
+		if old == body then
+			return
+		end
+		local ok, err = pcall(function()
+			if old and old.Parent then
+				old:RemovePersistentPlayer(player :: Player)
+			end
+			if body then
+				body.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer
+				body:AddPersistentPlayer(player :: Player)
+			end
+		end)
+		if not ok then
+			warn(`[SpicyRodents] persist body failed: {err}`)
+		end
+		persisted[player] = body
+	end
 	local townIdOf: { [string]: number } = {}
 	local spawn: { [number]: { number } } = {}
 	for townId, actor in rt.byTownId do
@@ -332,6 +382,7 @@ function Game.start(opts: Opts?): any
 		s.lastPick = clock
 		local current = possession:actorOf(player)
 		local ok, why = false, nil :: string?
+		local noDevice = false
 		if choice == "rodent" or choice == "squirrel" then
 			local variant = if choice == "rodent" then "spicy" else "normal"
 			if current and current.species == "squirrel" and current.variant == variant then
@@ -361,6 +412,7 @@ function Game.start(opts: Opts?): any
 				then current
 				else freeOfficer()
 			local target = deviceModel(if choice == "drone" then "drone_" else "car_")
+			noDevice = target == nil
 			if officer == nil then
 				fire(player, { kind = "refused", text = "Every police officer is taken. Pick another body." })
 				return false, "no free officer"
@@ -402,6 +454,7 @@ function Game.start(opts: Opts?): any
 				end)
 			end
 		end
+		persist(player)
 		if ok then
 			s.role = choice
 			local actor = possession:actorOf(player)
@@ -409,7 +462,13 @@ function Game.start(opts: Opts?): any
 				health[actor.id] = PlayRules.HEALTH
 			end
 			publish(player)
-			fire(player, { kind = "picked", role = choice })
+			local note = nil
+			if choice == "police" and noDevice then
+				note = "Every patrol car is in use: you are an officer on foot"
+			elseif choice == "drone" and noDevice then
+				note = "Someone else is flying the drone: you are an officer on foot"
+			end
+			fire(player, { kind = "picked", role = choice, note = note })
 		else
 			fire(player, { kind = "refused", text = why or "that body is busy" })
 		end
@@ -428,6 +487,7 @@ function Game.start(opts: Opts?): any
 			s.role = nil
 			possession:release(driver, if cause == "traffic" then "run over" else "knocked out")
 			publish(driver)
+			persist(driver)
 		end
 		local townId = townIdOf[actor.id]
 		local sp = spawn[townId]
@@ -631,6 +691,7 @@ function Game.start(opts: Opts?): any
 		if fadeAcc >= 1 then
 			-- a joining player is handed a townsperson by RoleService (Ladder: lowest rank)
 			for _, player in Players:GetPlayers() do
+				persist(player) -- the join's townsperson and any body change made elsewhere
 				local actor = possession:actorOf(player)
 				local s = stateOf(player)
 				if s.role == nil and actor and actor.species == "human" then
@@ -674,8 +735,10 @@ function Game.start(opts: Opts?): any
 		conns,
 		Players.PlayerRemoving:Connect(function(player: Player)
 			states[player] = nil
+			persisted[player] = nil
 		end)
 	)
+	table.insert(conns, Players.PlayerAdded:Connect(noShiftLock))
 	if o.heartbeat ~= false then
 		table.insert(
 			conns,

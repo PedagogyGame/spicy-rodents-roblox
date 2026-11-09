@@ -75,7 +75,7 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 	local lotPlans = table.clone(out)
 	local roadPlans = {}
 	for _, road in data.roads do
-		local rp = Plan.road(road)
+		local rp = Plan.road(road, data.roads)
 		table.insert(out, rp)
 		table.insert(roadPlans, rp)
 	end

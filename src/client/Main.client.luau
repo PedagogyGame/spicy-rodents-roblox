@@ -61,7 +61,10 @@ local world = ClientWorld.get() -- starts building the rail world in the backgro
 if not menu.loading(function(): boolean
 	return world.railReady
 end) then
-	hud.set("Spicy Rodents: the server did not start", "Press F9 (Developer Console, Server tab) and send the red lines")
+	hud.set(
+		"Spicy Rodents: the server did not start",
+		"Press F9 (Developer Console, Server tab) and send the red lines"
+	)
 	return
 end
 
@@ -140,7 +143,7 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 			police = "You are a police officer. Your patrol car is right here: press E.",
 			drone = "Police drone: launching…",
 		}
-		menu.toast(names[msg.role] or "Here you go", 4)
+		menu.toast(if msg.note then tostring(msg.note) else (names[msg.role] or "Here you go"), 4)
 	elseif kind == "refused" then
 		menu.toast(tostring(msg.text), 3)
 	elseif kind == "bite" then

@@ -19,6 +19,7 @@ local Hospital = require("./Builders/Hospital")
 local House = require("./Builders/House")
 local Import = require("./Import")
 local Kits = require("./Kits")
+local Palette = require("./Palette")
 local PoliceStation = require("./Builders/PoliceStation")
 local Sign = require("./Builders/Sign")
 local Treehouse = require("./Builders/Treehouse")
@@ -181,6 +182,29 @@ local function blockPart(
 		sy = math.max(h, 0.4)
 		cy = seat + sy / 2
 	end
+	local color, material = kit.color, kit.material
+	local shape: string? = nil
+	if kit.category == "plate" then
+		local pt
+		color, material, pt = Palette.plate(lot.type, (lot :: any).style)
+		transparency = math.max(transparency, pt)
+	elseif kit.category ~= "marker" and not isChild then
+		local look = Palette.forLot(lot, kit)
+		color = look.wall
+		material = if kit.category == "slab" then "WoodPlanks" else "SmoothPlastic"
+		if lot.type == "tree" or lot.type == "shrub_cluster" then
+			-- crowns as a leafy ball (the climbable trunks are route props)
+			color, material, shape = Palette.LEAVES[(#lot.id % #Palette.LEAVES) + 1], "Grass", "Ball"
+			local r = math.min(sx, sz, math.max(sy, 2))
+			sx, sz = r, r
+			sy = r
+			cy = seat + (if lot.type == "tree" then kit.heightU * SPU - r / 2 else r / 2)
+		elseif lot.type == "fence_run" then
+			material = "WoodPlanks"
+		end
+	elseif isChild then
+		color = Palette.forLot(lot, kit).wall
+	end
 	return {
 		name = "Greybox",
 		cx = lot.x,
@@ -191,10 +215,11 @@ local function blockPart(
 		sx = sx,
 		sy = sy,
 		sz = sz,
-		color = kit.color,
-		material = kit.material,
+		color = color,
+		material = material,
 		canCollide = solid,
 		transparency = transparency,
+		shape = shape,
 		role = "Body",
 	}
 end
@@ -248,6 +273,7 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 			building = BUILDING_BY_LOT[lot.id],
 			interior = home and home.interior and Interiors[home.interior],
 			attributes = attributes,
+			palette = Palette.forLot(lot, kit),
 		}
 		if (kit.builder == "Hospital" or kit.builder == "PoliceStation") and not lctx.building then
 			Building.plan(lctx)
@@ -347,7 +373,30 @@ end
 
 -- A road is a chain of flat parts following the terrain (v5.4 draws 104 terrain-following
 -- segments per grid street at the kind's vertical offset).
-function Plan.road(road: Road): BuildPlan
+-- The world-axis sign (+1 / -1 along x for z roads, along z for x roads) from a sidewalk toward the
+-- parallel asphalt street it borders, or nil.
+local function curbSide(road: Road, others: { Road }?): number?
+	if not others or (road.axis ~= "x" and road.axis ~= "z") then
+		return nil
+	end
+	local c = road.coord :: number
+	local a0, a1 =
+		math.min(road.start :: number, road["end"] :: number), math.max(road.start :: number, road["end"] :: number)
+	for _, o in others do
+		if o.kind == "asphalt" and o.axis == road.axis then
+			local oc = o.coord :: number
+			local o0, o1 =
+				math.min(o.start :: number, o["end"] :: number), math.max(o.start :: number, o["end"] :: number)
+			local gap = math.abs(oc - c) - o.width / 2 - road.width / 2
+			if gap > -0.5 and gap < 3 and o0 < a1 and o1 > a0 then
+				return if oc > c then 1 else -1
+			end
+		end
+	end
+	return nil
+end
+
+function Plan.road(road: Road, others: { Road }?): BuildPlan
 	local look = Kits.ROAD[road.kind] or Kits.ROAD.concrete
 	local x0, z0, x1, z1 = endpoints(road)
 	local dx, dz = x1 - x0, z1 - z0
@@ -359,28 +408,97 @@ function Plan.road(road: Road): BuildPlan
 	local function yAt(t: number): number
 		return Height.at(x0 + dx * t, z0 + dz * t) + offset - ROAD_THICKNESS / 2
 	end
+	local surface = Palette.ROAD[road.kind] or look.color
+	local material = look.material
 	local yPrev = yAt(0)
+	local ux, uz = if len > 0 then dx / len else 0, if len > 0 then dz / len else 0
+	local curb = curbSide(road, others)
+	local function strip(
+		name: string,
+		t: number,
+		across: number,
+		lift: number,
+		w: number,
+		h: number,
+		l: number,
+		color: { number },
+		pitch: number
+	)
+		-- a thin visual strip on the road surface at fraction t, offset `across` to the road's right
+		table.insert(parts, {
+			name = name,
+			cx = x0 + dx * t - uz * across,
+			cy = yAt(t) + ROAD_THICKNESS / 2 + lift,
+			cz = z0 + dz * t + ux * across,
+			yaw = yaw,
+			pitch = pitch,
+			sx = w,
+			sy = h,
+			sz = l,
+			color = color,
+			material = "SmoothPlastic",
+			canCollide = false,
+			transparency = 0,
+			canQuery = false,
+			castShadow = false,
+			role = "Paint",
+		})
+	end
 	for i = 1, n do
 		local yNext = yAt(i / n)
 		local seg = len / n
 		local rise = yNext - yPrev
 		local slopeLen = math.sqrt(seg * seg + rise * rise)
 		local tm = (i - 0.5) / n
+		local pitch = math.atan2(rise, seg)
 		table.insert(parts, {
 			name = string.format("Seg%03d", i),
 			cx = x0 + dx * tm,
 			cy = (yPrev + yNext) / 2,
 			cz = z0 + dz * tm,
 			yaw = yaw,
-			pitch = math.atan2(rise, seg),
+			pitch = pitch,
 			sx = road.width,
 			sy = ROAD_THICKNESS,
 			sz = math.max(slopeLen, 0.2),
-			color = look.color,
-			material = look.material,
+			color = surface,
+			material = material,
 			canCollide = look.canCollide,
 			transparency = 0,
 		})
+		if road.kind == "asphalt" and road.width >= 10 and seg > 4 then
+			-- dashed centre line: two dashes per segment (v5.4 lane paint, as parts on the segment)
+			for k = 1, 2 do
+				local t = (i - 1 + (k - 0.5) / 2) / n
+				strip(
+					string.format("Dash%03d_%d", i, k),
+					t,
+					0,
+					0.02,
+					0.5,
+					0.05,
+					math.min(seg * 0.3, 8),
+					Palette.ROAD.paint,
+					pitch
+				)
+			end
+		elseif road.kind == "concrete" and curb then
+			-- the curb on the sidewalk's street edge
+			local side = if road.axis == "z" then -uz * curb else ux * curb
+			do
+				strip(
+					string.format("Curb%03d_%s", i, if side < 0 then "L" else "R"),
+					tm,
+					side * (road.width / 2 - 0.2),
+					0.12,
+					0.4,
+					0.3,
+					math.max(slopeLen, 0.2),
+					Palette.ROAD.curb,
+					pitch
+				)
+			end
+		end
 		yPrev = yNext
 	end
 	return {

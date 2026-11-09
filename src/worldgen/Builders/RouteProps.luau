@@ -10,12 +10,13 @@
 -- Pure.
 
 local Geometry = require("../Geometry")
+local Palette = require("../Palette")
 local Spec = require("../Spec")
 
 local RouteProps = {}
 
 local LOOK = {
-	bark = { color = { 106, 84, 62 }, material = "Wood" },
+	bark = { color = Palette.BARK, material = "Wood" },
 	pole = { color = { 92, 74, 58 }, material = "Wood" },
 	pipe = { color = { 140, 140, 140 }, material = "Metal" },
 	fence = { color = { 150, 120, 90 }, material = "WoodPlanks" },
@@ -168,6 +169,78 @@ local function newPlan(
 	}
 end
 
+-- Leafy crown around a tree's routes (v5.4 makeTree crowns): one ball at the outer end of each bough
+-- (up to MAX_BALLS, spread over the members) plus two over the trunk top, in the v5.4 greens. The
+-- balls neither collide nor take queries, so climbing (rails), the camera and raycasts see only the
+-- bark; they do cast shadows.
+local MAX_BALLS = 9
+function RouteProps.canopy(list: Spec.PartList, trunk: Route, members: { Route })
+	local top = trunk.points[#trunk.points]
+	local foot = trunk.points[1]
+	local height = math.max(top[2] - foot[2], 4)
+	local tips: { { number } } = {}
+	for _, r in members do
+		if r ~= trunk then
+			table.insert(tips, r.points[#r.points])
+		end
+	end
+	local stride = math.max(1, math.ceil(#tips / MAX_BALLS))
+	local n = 0
+	local function ball(p: { number }, radius: number)
+		n += 1
+		local c = Palette.LEAVES[((trunk.id + n) % #Palette.LEAVES) + 1]
+		list:add(ORIGIN, `Leaves{n}`, p[1], p[2], p[3], radius * 2, radius * 2, radius * 2, {
+			shape = "Ball",
+			color = c,
+			material = "Grass",
+			canCollide = false,
+			canQuery = false,
+			castShadow = true,
+			role = "Leaves",
+		})
+	end
+	local base = math.clamp(height * 0.16, 2.5, 8)
+	for k = 1, #tips, stride do
+		local p = tips[k]
+		ball({ p[1], p[2] + base * 0.35, p[3] }, base * (0.85 + 0.1 * (k % 3)))
+	end
+	ball({ top[1], top[2] + base * 0.5, top[3] }, base * 1.25)
+	ball({ top[1] + base * 0.6, top[2] - base * 0.2, top[3] - base * 0.4 }, base)
+end
+
+-- A crossarm across the pole top, square to the first wire that leaves it (or along world X).
+function RouteProps.crossarm(list: Spec.PartList, pole: Route, wires: { Route })
+	local top = pole.points[#pole.points]
+	local bottom = pole.points[1]
+	if top[2] < bottom[2] then
+		top, bottom = bottom, top
+	end
+	local yaw = 0
+	for _, w in wires do
+		for _, e in { 1, #w.points } do
+			local p = w.points[e]
+			if (p[1] - top[1]) ^ 2 + (p[3] - top[3]) ^ 2 < 36 then
+				local q = w.points[if e == 1 then 2 else #w.points - 1]
+				local dx, dz = q[1] - p[1], q[3] - p[3]
+				if dx * dx + dz * dz > 1e-6 then
+					yaw = math.atan2(-dx, -dz) -- the arm's length (local X) is then across the wire
+				end
+				break
+			end
+		end
+		if yaw ~= 0 then
+			break
+		end
+	end
+	list:add(ORIGIN, "Crossarm", top[1], top[2] - 0.8, top[3], 6, 0.45, 0.45, {
+		yaw = yaw,
+		color = LOOK.pole.color,
+		material = "Wood",
+		canCollide = false,
+		role = "Post",
+	})
+end
+
 -- One BuildPlan per tree (trunk), pole, wire, pipe and fence. `Curve` is Routes/Curve (passed in so
 -- this module needs no cross-root require); heightAt(x, z) is World/Height.at in studs.
 function RouteProps.plans(
@@ -215,6 +288,7 @@ function RouteProps.plans(
 		for _, r in members[t.id] do
 			cylinders(list, `R{r.id}`, polyline(r, Curve), r.surfaceRadius, "bark", "Limb")
 		end
+		RouteProps.canopy(list, t, members[t.id])
 		table.insert(
 			out,
 			newPlan(`Tree_{t.id}`, "tree", props, { TrunkRoute = t.id, Name = t.name, Routes = #members[t.id] }, list)
@@ -229,6 +303,7 @@ function RouteProps.plans(
 	for _, r in byLook.pole do
 		local list = Spec.list()
 		cylinders(list, "Pole", polyline(r, Curve), r.surfaceRadius, "pole", "Post")
+		RouteProps.crossarm(list, r, byLook.wire)
 		table.insert(out, newPlan(`Pole_{r.id}`, "pole", props, { Route = r.id }, list))
 	end
 	for _, r in byLook.pipe do

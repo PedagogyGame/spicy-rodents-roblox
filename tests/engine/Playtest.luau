@@ -9,6 +9,10 @@
 -- the AI no longer moves the held body, the help panel has keys for the role, police/drone stand within
 -- reach of the right device (E picks the nearest free one). Plus: a junk choice is refused (not an
 -- error), F through the Kick handler, and every client ModuleScript requires without error.
+-- Client review additions (W1): the device fleet is ModelStreamingMode Persistent (E never hands the
+-- client a nil model), Shift Lock is off (Shift is sprint), every device refusal has plain words
+-- (PossessionClient.reasonText), the squirrel's E / Q / motor hints answer on screen (Squirrel.feedback),
+-- and the menu scales to fit common laptop screens (PlayMenu.scaleFor).
 -- Interface: run(opts?) -> Result (JSON-friendly)
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -36,6 +40,8 @@ function Playtest.run(_opts: { [string]: any }?): { [string]: any }
 	client = client and client:FindFirstChild("Client")
 	check(client ~= nil, "no StarterPlayerScripts.Client")
 	local PlayMenu: any = nil
+	local PossessionClient: any = nil
+	local Squirrel: any = nil
 	if client then
 		local required, scripts = 0, {}
 		for _, d in client:GetDescendants() do
@@ -45,6 +51,10 @@ function Playtest.run(_opts: { [string]: any }?): { [string]: any }
 					required += 1
 					if d.Name == "PlayMenu" then
 						PlayMenu = mod
+					elseif d.Name == "PossessionClient" then
+						PossessionClient = mod
+					elseif d.Name == "Squirrel" then
+						Squirrel = mod
 					end
 				else
 					table.insert(failures, `client require {d:GetFullName()}: {mod}`)
@@ -123,12 +133,16 @@ function Playtest.run(_opts: { [string]: any }?): { [string]: any }
 			return
 		end
 		local body = actor.body :: Model
+		if body.PrimaryPart == nil then
+			table.insert(failures, `{label}: body has no root`)
+			return
+		end
 		local root = body.PrimaryPart :: BasePart
 		local got = if actor.species == "human" then "human" else `{actor.species}/{actor.variant or "-"}`
 		r.body = got
 		check(got == EXPECT[choice], `{label}: got a {got}`)
 		check(player.Character == body, `{label}: Character is not the body`)
-		check(root ~= nil and not root.Anchored, `{label}: body root anchored (cannot move)`)
+		check(not root.Anchored, `{label}: body root anchored (cannot move)`)
 		check(player.attrs.PlayRole == choice, `{label}: PlayRole {player.attrs.PlayRole}`)
 		if PlayMenu then
 			local lines = PlayMenu.helpLines(choice, nil)
@@ -234,6 +248,54 @@ function Playtest.run(_opts: { [string]: any }?): { [string]: any }
 	local k = b.events[1]
 	numbers.kickEvent = if k then `{k.kind} hit={k.hit}` else "none"
 	check(k ~= nil and k.kind == "kick", `F as police gave {numbers.kickEvent}`)
+
+	-- 3. client review: streaming, Shift Lock, on-screen answers ----------------------------------------
+	local notPersistent = {}
+	for id, model in rt.devices.models do
+		if (model :: Model).ModelStreamingMode ~= Enum.ModelStreamingMode.Persistent then
+			table.insert(notPersistent, id)
+		end
+	end
+	numbers.devicesPersistent = #notPersistent == 0
+	check(
+		#notPersistent == 0,
+		`devices not Persistent (a nil model on the client): {table.concat(notPersistent, ", ")}`
+	)
+	local mouseLock = (StarterPlayer :: any).EnableMouseLockOption
+	numbers.shiftLockOption = mouseLock
+	check(mouseLock == false, "Shift Lock is still offered (it takes Shift, the sprint key)")
+	if PossessionClient then
+		for _, why in { "no vehicle within reach", "only people drive", "the drone is in use", "no body", "cannot" } do
+			local t = PossessionClient.reasonText(why)
+			check(type(t) == "string" and #t > 10, `reasonText({why}) = {t}`)
+		end
+		check(PossessionClient.reasonText("exit") == nil, "a normal exit should say nothing")
+		check(PossessionClient.reasonText("needs the key") ~= nil, "a locked car says nothing")
+	else
+		table.insert(failures, "PossessionClient module not found")
+	end
+	if Squirrel then
+		local fb = Squirrel.feedback
+		check(fb({ grab = true }, {}, false) ~= nil, "squirrel E with nothing near is silent")
+		check(fb({ grab = true }, { { kind = "attach" } }, false) == nil, "squirrel E that grabbed still complains")
+		check(fb({ drop = true }, {}, false) ~= nil, "squirrel Q on the ground is silent")
+		check(fb({ drop = true }, { { kind = "drop" } }, true) == nil, "squirrel Q off a branch complains")
+		check(fb({}, { { kind = "hint", reason = "noTransfer" } }, true) ~= nil, "motor hint noTransfer is silent")
+		check(fb({}, {}, false) == nil, "squirrel idle frame says something")
+	else
+		table.insert(failures, "Squirrel controller module not found")
+	end
+	if PlayMenu then
+		local fits = {}
+		for _, v in { { 1280, 720 }, { 1366, 768 }, { 1024, 600 }, { 800, 600 }, { 1920, 1080 } } do
+			local sc = PlayMenu.scaleFor(v[1], v[2])
+			-- the menu panel is 600 x 520 and must fit below the Roblox top bar (58 px)
+			local ok = 600 * sc <= v[1] - 16 and 520 * sc <= v[2] - 58
+			table.insert(fits, `{v[1]}x{v[2]}:{math.floor(sc * 100) / 100}{if ok then "" else "!"}`)
+			check(ok, `menu does not fit a {v[1]} x {v[2]} screen (scale {sc})`)
+		end
+		numbers.menuScale = table.concat(fits, " ")
+	end
 
 	local okLedger, errors = possession:check()
 	check(okLedger, `possession ledger: {table.concat(errors, "; ")}`)

@@ -68,6 +68,7 @@ function Interior.build(ctx: Spec.LotCtx)
 	if peak > eave + 0.05 then
 		Building.roof(ctx, eave, peak, alongX)
 	end
+	Building.dress(ctx, eave, peak, false, false)
 	for _, f in tpl.furniture do
 		local sx, sy, sz = f.size[1] * spu, f.size[2] * spu, f.size[3] * spu
 		local x, z = mx(f.at[1]), mz(f.at[2])

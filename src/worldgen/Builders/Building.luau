@@ -149,7 +149,7 @@ function Building.windows(
 	if height < 5 then
 		return
 	end
-	local floors = math.clamp(math.floor(height / 9 + 0.3), 1, 4)
+	local floors = math.clamp(math.floor(height / 9 + 0.3), 1, 3)
 	local floorH = height / floors
 	local winH = math.min(4.4, floorH * 0.5)
 	local winW = 3.2
@@ -160,8 +160,10 @@ function Building.windows(
 		{ id = "R", len = D, fixed = W / 2, out = 1, alongX = false },
 	}
 	for _, f in faces do
-		if f.len >= 9 then
-			local bays = math.clamp(math.floor(f.len / 11), 1, 8)
+		-- terraced quay rows hide their side walls: front and back only there
+		local side = not f.alongX
+		if f.len >= 9 and not (side and (pal.timber or f.len < 14)) then
+			local bays = math.clamp(math.floor(f.len / 12), 1, 5)
 			local gaps = avoid and avoid[f.id] or {}
 			for fl = 1, floors do
 				local y = base + (fl - 0.5) * floorH + 0.3
@@ -176,7 +178,9 @@ function Building.windows(
 						end
 					end
 					if clear then
-						for k, layer in { { d = 0.08, w = winW + 0.7, h = winH + 0.7 }, { d = 0.16, w = winW, h = winH } } do
+						for k, layer in
+							{ { d = 0.08, w = winW + 0.7, h = winH + 0.7 }, { d = 0.16, w = winW, h = winH } }
+						do
 							local depth = layer.d * 2
 							local off = f.fixed + f.out * (layer.d - depth / 2)
 							local mx, mz, sx, sz
@@ -213,20 +217,31 @@ end
 -- Facade dressing: a stone plinth, a cornice strip under a flat roof, Tudor timber bands (quay) and
 -- a chimney (houses with one in v5.4). Visual only (no collision), so physics and the checks are
 -- unchanged.
-function Building.dress(ctx: Spec.LotCtx, eave: number, peak: number, flat: boolean)
+function Building.dress(ctx: Spec.LotCtx, eave: number, peak: number, flat: boolean, plinth: boolean?)
 	local pal = Building.look(ctx)
 	local W, D = ctx.W, ctx.D
-	local visual = { canCollide = false, castShadow = false }
-	local function add(name: string, mx: number, my: number, mz: number, sx: number, sy: number, sz: number, color, material: string?)
+	local function add(
+		name: string,
+		mx: number,
+		my: number,
+		mz: number,
+		sx: number,
+		sy: number,
+		sz: number,
+		color: { number },
+		material: string?
+	)
 		ctx.list:add(ctx.frame, name, mx, my, mz, sx, sy, sz, {
 			color = color,
 			material = material or "SmoothPlastic",
-			canCollide = visual.canCollide,
-			castShadow = visual.castShadow,
+			canCollide = false,
+			castShadow = false,
 			role = "Trim",
 		})
 	end
-	add("Plinth", 0, 0.6, 0, W + 0.4, 1.2, D + 0.4, PLINTH, "Concrete")
+	if plinth ~= false then
+		add("Plinth", 0, 0.6, 0, W + 0.4, 1.2, D + 0.4, PLINTH, "Concrete")
+	end
 	if flat then
 		local c = if ctx.lot.type == "mall" or ctx.lot.type == "hospital" then pal.accent else pal.trim
 		add("CorniceF", 0, eave - 0.4, -D / 2 - 0.15, W + 0.6, 0.8, 0.3, c)

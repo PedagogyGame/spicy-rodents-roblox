@@ -7,6 +7,7 @@
 -- Builders/PoliceStation are the named families; both call this.
 -- Interface: build(ctx) (ctx.building is the generated/Buildings record). Pure.
 
+local Building = require("./Building")
 local Shell = require("./Shell")
 local Spec = require("../Spec")
 
@@ -108,6 +109,7 @@ function Programme.build(ctx: Spec.LotCtx)
 			attrs = { PadKind = p.kind, PadId = p.id },
 		})
 	end
+	Building.dress(ctx, wallH + 0.6, wallH + 0.6, true, false)
 	ctx.attributes.Building = b.id
 	ctx.attributes.Enterable = true
 end

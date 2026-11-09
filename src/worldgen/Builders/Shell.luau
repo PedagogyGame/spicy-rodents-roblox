@@ -9,13 +9,13 @@
 --   (rooms: { id, name, x0, x1, z0, z1, exterior? }; doors: { id, a, b, x, z, w, lockable }).
 -- Pure (adds PartSpecs/ExtraSpecs to ctx.list).
 
+local Building = require("./Building")
 local RoomGraph = require("../RoomGraph")
 local Spec = require("../Spec")
 
 local Shell = {}
 
 local EPS = 1e-3
-local WALL = { 226, 220, 205 }
 local PARTITION = { 236, 233, 224 }
 local FLOOR = { 160, 152, 140 }
 local DOOR = { 120, 86, 60 }
@@ -71,7 +71,7 @@ local function wall(
 	for i, p in pieces do
 		local len, mid = p[2] - p[1], (p[1] + p[2]) / 2
 		local ph, py = p[4] - p[3], y0 + (p[3] + p[4]) / 2
-		local opts = { color = color, role = "Wall" }
+		local opts = { color = color, material = if ctx.palette then ctx.palette.material else nil, role = "Wall" }
 		if axis == "x" then
 			ctx.list:add(ctx.frame, `{name}_{i}`, mid, py, fixed, len, ph, t, opts)
 		else
@@ -95,7 +95,8 @@ local function doorLeaf(ctx: Spec.LotCtx, d: Door, axis: string, y0: number, doo
 	-- size along the wall in local X so the part's local Z is the door normal (DoorReach, Doors)
 	ctx.list:add(ctx.frame, name, d.x, y0 + doorH / 2, d.z, d.w, doorH, leafT, {
 		yaw = if axis == "z" then math.pi / 2 else 0,
-		color = DOOR,
+		color = if ctx.palette then ctx.palette.door else DOOR,
+		material = "Wood",
 		role = "Door",
 		attrs = attrs,
 	})
@@ -111,6 +112,8 @@ end
 
 function Shell.build(ctx: Spec.LotCtx, L: Layout)
 	local W, D, t = ctx.W, ctx.D, L.thick
+	local pal = Building.look(ctx)
+	local WALL = pal.wall
 	local y0 = L.floorTop
 	ctx.list:add(
 		ctx.frame,
@@ -196,8 +199,25 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 		WALL
 	)
 	if L.roof == "flat" then
-		ctx.list:add(ctx.frame, "Roof", 0, h + 0.3, 0, W, 0.6, D, { color = WALL, role = "Roof" })
+		ctx.list:add(
+			ctx.frame,
+			"Roof",
+			0,
+			h + 0.3,
+			0,
+			W,
+			0.6,
+			D,
+			{ color = pal.roof, material = pal.roofMaterial, role = "Roof" }
+		)
 	end
+	-- windows on the exterior walls, clear of the door openings; plinth, cornice, chimney
+	Building.windows(ctx, y0, h, {
+		F = gapsOn("x", -D / 2, t + EPS, -W / 2, W / 2),
+		B = gapsOn("x", D / 2, t + EPS, -W / 2, W / 2),
+		L = gapsOn("z", -W / 2, t + EPS, -D / 2, D / 2),
+		R = gapsOn("z", W / 2, t + EPS, -D / 2, D / 2),
+	})
 
 	-- partitions between adjacent interior rooms
 	local inner: { Room } = {}
