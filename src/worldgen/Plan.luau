@@ -15,6 +15,7 @@
 local BridgeTower = require("./Builders/BridgeTower")
 local Building = require("./Builders/Building")
 local Geometry = require("./Geometry")
+local Ground = require("./Builders/Ground")
 local Hospital = require("./Builders/Hospital")
 local House = require("./Builders/House")
 local Import = require("./Import")
@@ -22,6 +23,7 @@ local Kits = require("./Kits")
 local Palette = require("./Palette")
 local PoliceStation = require("./Builders/PoliceStation")
 local Sign = require("./Builders/Sign")
+local Props = require("./Builders/Props")
 local Treehouse = require("./Builders/Treehouse")
 local Spec = require("./Spec")
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
@@ -192,18 +194,30 @@ local function blockPart(
 		local look = Palette.forLot(lot, kit)
 		color = look.wall
 		material = if kit.category == "slab" then "WoodPlanks" else "SmoothPlastic"
-		if lot.type == "tree" or lot.type == "shrub_cluster" then
-			-- crowns as a leafy ball (the climbable trunks are route props)
-			color, material, shape = Palette.LEAVES[(#lot.id % #Palette.LEAVES) + 1], "Grass", "Ball"
+		if lot.type == "tree" then
+			-- every tree lot (the six Quay willows) stands on a harvested trunk route: RouteProps draws
+			-- the whole tree (bark and crown) there, so the lot itself is only an invisible marker
+			-- (review 2026-11-09: the trunkless 45-stud balls)
+			transparency = 1
+			local r = math.min(sx, sz, math.max(sy, 2))
+			sx, sz, sy = r, r, r
+			cy = seat + r / 2
+		elseif lot.type == "shrub_cluster" then
+			-- crowns as a leafy ball
+			color, material, shape = Palette.LEAVES[(#lot.id % #Palette.LEAVES) + 1], "LeafyGrass", "Ball"
 			local r = math.min(sx, sz, math.max(sy, 2))
 			sx, sz = r, r
 			sy = r
-			cy = seat + (if lot.type == "tree" then kit.heightU * SPU - r / 2 else r / 2)
+			cy = seat + r / 2
 		elseif lot.type == "fence_run" then
 			material = "WoodPlanks"
 		end
 	elseif isChild then
 		color = Palette.forLot(lot, kit).wall
+	end
+	if lot.type == "dock" and Height.insideRiverWater(lot.x, lot.z) then
+		-- Quay docks: the deck top at bank level over the water (v5.4 quayDock: deck top y 8 u)
+		cy = Height.RIVER.bankY * SPU - sy / 2
 	end
 	return {
 		name = "Greybox",
@@ -219,6 +233,7 @@ local function blockPart(
 		material = material,
 		canCollide = solid,
 		transparency = transparency,
+		canQuery = if transparency >= 1 then false else nil,
 		shape = shape,
 		role = "Body",
 	}
@@ -258,6 +273,9 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 	end
 	local list = Spec.list()
 	local family = if isChild then nil else FAMILIES[kit.builder]
+	if not isChild and kit.category == "plate" then
+		family = Ground.plan -- terrain-aware plates, the Quay banks, river and bridge
+	end
 	if family then
 		local frame = Geometry.frame(lot.x, seat, lot.z, q * HALF_PI + math.pi)
 		local home = lot.home
@@ -281,7 +299,10 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 			family(lctx)
 		end
 	else
-		list:world(blockPart(lot, kit, seat, q, sx, sz, isChild))
+		local body = list:world(blockPart(lot, kit, seat, q, sx, sz, isChild))
+		if not isChild then
+			Props.dress(lot, kit, body, list, seat)
+		end
 	end
 	return {
 		kind = "lot",
@@ -406,7 +427,14 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 	local offset = look.offsetU * SPU
 	local parts: { PartSpec } = {}
 	local function yAt(t: number): number
-		return Height.at(x0 + dx * t, z0 + dz * t) + offset - ROAD_THICKNESS / 2
+		local x, z = x0 + dx * t, z0 + dz * t
+		-- the Quay bridge: on its deck and ramps, not on the river bed under it
+		local deck = Height.riverDeckAt(x, z)
+		local ground = Height.at(x, z)
+		if deck and deck > ground then
+			ground = deck
+		end
+		return ground + offset - ROAD_THICKNESS / 2
 	end
 	local surface = Palette.ROAD[road.kind] or look.color
 	local material = look.material
