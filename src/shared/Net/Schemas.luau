@@ -28,7 +28,7 @@ Schemas.ACTION_VERBS = {
 	"Sit", "Vote",
 }
 
--- About 36 bytes (§1.6: "seq, client time, mode, routeId (u16), s (u16 quantised), dir, pos, vel").
+-- 38 bytes (§1.6: "seq, client time, mode, routeId (u16), s (u16 quantised), dir, pos, vel").
 Schemas.MotorState = BufferCodec.layout({
 	{ name = "seq", kind = "u32" },
 	{ name = "clientTime", kind = "f32" },
@@ -56,13 +56,16 @@ Schemas.VehiclePose = BufferCodec.layout({
 
 local id = Schema.str({ max = 64 })
 local num = Schema.num()
-local args = Schema.opt(Schema.arr(Schema.custom(function(v: any): boolean
-	local t = type(v)
-	if t == "number" then
-		return v == v and v ~= math.huge and v ~= -math.huge
-	end
-	return (t == "string" and #v <= 200) or t == "boolean"
-end, "scalar argument"), 8))
+local args = Schema.opt(Schema.arr(
+	Schema.custom(function(v: any): boolean
+		local t = type(v)
+		if t == "number" then
+			return v == v and v ~= math.huge and v ~= -math.huge
+		end
+		return (t == "string" and #v <= 200) or t == "boolean"
+	end, "scalar argument"),
+	8
+))
 
 -- stylua: ignore
 Schemas.REMOTES = {

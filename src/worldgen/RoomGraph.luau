@@ -34,7 +34,16 @@ function RoomGraph.build(rooms: { any }, doors: { any }, extras: { any }): Graph
 	local rectOf: { [string]: { number } } = {}
 	for _, r in rooms do
 		rectOf[r.id] = r.rect
-		add(g, { id = "room:" .. r.id, kind = "room", room = r.id, x = (r.rect[1] + r.rect[2]) / 2, z = (r.rect[3] + r.rect[4]) / 2 })
+		add(
+			g,
+			{
+				id = "room:" .. r.id,
+				kind = "room",
+				room = r.id,
+				x = (r.rect[1] + r.rect[2]) / 2,
+				z = (r.rect[3] + r.rect[4]) / 2,
+			}
+		)
 		if r.exterior then
 			link(g, "room:" .. r.id, "outside") -- exterior rooms (ambulance bay) open onto the street
 		end

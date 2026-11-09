@@ -8,7 +8,13 @@
 -- Interface: CLASSES; check(rules) -> (ok, err?); start(rules, seats, seed) -> Game; input(game, seat, verb, args)
 --            -> (ok, err?); result(game) -> Result?
 
-export type Def = { game: string, class: "shared_table" | "no_stakes" | "arena", seats: number, authority: string, money: string? }
+export type Def = {
+	game: string,
+	class: "shared_table" | "no_stakes" | "arena",
+	seats: number,
+	authority: string,
+	money: string?,
+}
 export type Result = { done: boolean, scores: { [number]: number }, winner: number?, [string]: any }
 export type Rules = {
 	def: Def,

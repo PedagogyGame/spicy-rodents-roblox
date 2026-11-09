@@ -174,7 +174,12 @@ end
 
 function Tunables.meta(path: string): { unit: string?, src: string?, default: any, studs: boolean }
 	local leaf = leafOf(path)
-	return { unit = leaf.unit, src = leaf.src, default = deepCopy(defaults[path]), studs = TunableMeta.isLength(leaf.unit) }
+	return {
+		unit = leaf.unit,
+		src = leaf.src,
+		default = deepCopy(defaults[path]),
+		studs = TunableMeta.isLength(leaf.unit),
+	}
 end
 
 function Tunables.paths(): { string }

@@ -9,7 +9,8 @@
 -- engine folder or the Lune path. No side effects on require.
 -- Interface: new(loader) -> Data; default() -> Data; Data:index(); lots(); lot(id); lotType(t); routes()
 --            (Routes/Registry); lanes(); roads(); cast(); forks(); wildlife(); nav(); colliders(); forage();
---            hollows(); quests(); markers(); assets(); bakeHash(); has(name); missing()
+--            hollows(); quests(); markers(); assets(); population(); buildings(); bakeHash(); has(name);
+--            missing(); module(name) for any other compiled module
 
 local Registry = require("./Routes/Registry")
 
@@ -40,6 +41,8 @@ export type Data = {
 	quests: (self: Data) -> { any },
 	markers: (self: Data) -> { any },
 	assets: (self: Data) -> any,
+	population: (self: Data) -> any,
+	buildings: (self: Data) -> any,
 	bakeHash: (self: Data) -> string?,
 	has: (self: Data, name: string) -> boolean,
 	missing: (self: Data) -> { string },
@@ -178,6 +181,12 @@ function Data.new(loader: Loader): Data
 	end
 	function data.assets(self: Data)
 		return self:module("Assets")
+	end
+	function data.population(self: Data)
+		return self:module("Population")
+	end
+	function data.buildings(self: Data)
+		return self:module("Buildings")
 	end
 	function data.bakeHash(self: Data): string?
 		local idx = self:index()

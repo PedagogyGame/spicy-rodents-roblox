@@ -39,7 +39,8 @@ for _, d in ItemRules.CATALOG do
 	byId[d.id] = d
 end
 
-ItemRules.FORBIDDEN_EFFECTS = { lottery = true, gamble = true, scratch_card = true, raffle = true } :: { [string]: boolean }
+ItemRules.FORBIDDEN_EFFECTS =
+	{ lottery = true, gamble = true, scratch_card = true, raffle = true } :: { [string]: boolean }
 
 function ItemRules.def(itemId: string): Def?
 	return byId[itemId]

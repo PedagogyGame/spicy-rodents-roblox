@@ -466,10 +466,16 @@ local function rodentDied(ctx: Ctx, out: { Transition })
 	end
 	for _, p in sortedPlayers(ctx) do
 		if p.rung == "squirrel" and p.infected then
-			table.insert(out, { rule = "rodent.died.infected", player = p.id, to = "human", rank = "lowest", release = true })
+			table.insert(
+				out,
+				{ rule = "rodent.died.infected", player = p.id, to = "human", rank = "lowest", release = true }
+			)
 		end
 	end
-	table.insert(out, { rule = "rodent.died.infection", infection = "resetToNewRodent", cure = "instantIfRecentOrEnRoute" })
+	table.insert(
+		out,
+		{ rule = "rodent.died.infection", infection = "resetToNewRodent", cure = "instantIfRecentOrEnRoute" }
+	)
 end
 
 local STAFF = { hospital = true, police = true }
@@ -512,10 +518,16 @@ handlers["afk"] = function(event, ctx, out)
 		rank = "keep"
 	end
 	if rank then
-		table.insert(out, { rule = "afk", player = p.id, release = true, to = "human", rank = rank, loseSubrole = p.subrole })
+		table.insert(
+			out,
+			{ rule = "afk", player = p.id, release = true, to = "human", rank = rank, loseSubrole = p.subrole }
+		)
 	elseif p.subrole then
 		-- a human driver idle with the keys: loses the key, stays a townsperson
-		table.insert(out, { rule = "afk", player = p.id, release = true, to = p.rung, rank = "keep", loseSubrole = p.subrole })
+		table.insert(
+			out,
+			{ rule = "afk", player = p.id, release = true, to = p.rung, rank = "keep", loseSubrole = p.subrole }
+		)
 	end
 end
 
@@ -588,7 +600,10 @@ handlers["squirrel.killed"] = function(event, ctx, out)
 	local exclude: { [any]: boolean } = {}
 	if victim then
 		exclude[victim.id] = true
-		table.insert(out, { rule = "squirrel.killed", player = victim.id, to = "human", rank = "lowest", release = true })
+		table.insert(
+			out,
+			{ rule = "squirrel.killed", player = victim.id, to = "human", rank = "lowest", release = true }
+		)
 	end
 	table.insert(out, {
 		rule = "squirrel.killed.slot",
@@ -603,7 +618,10 @@ handlers["winter.end.belowThreshold"] = function(event, ctx, out)
 	for _, id in ids do
 		local p = ctx.players[id]
 		if p and p.rung == "squirrel" then
-			table.insert(out, { rule = "winter.end", player = id, to = "human", rank = "rememberedHuman", release = true })
+			table.insert(
+				out,
+				{ rule = "winter.end", player = id, to = "human", rank = "rememberedHuman", release = true }
+			)
 		end
 	end
 end

@@ -185,7 +185,11 @@ function RoleService.new(deps: Deps): Roles
 			lo.retryAt = clock() + o.retry
 			return
 		end
-		notify(self.members[o.candidates[1]], "offer", { id = id, rung = o.rung, choices = o.choices, timeout = o.timeout })
+		notify(
+			self.members[o.candidates[1]],
+			"offer",
+			{ id = id, rung = o.rung, choices = o.choices, timeout = o.timeout }
+		)
 	end
 
 	local function apply(self: Roles, t: Transition)

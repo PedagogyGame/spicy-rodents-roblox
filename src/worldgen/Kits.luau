@@ -1,11 +1,13 @@
 --!strict
 -- ServerScriptService.Server.WorldGen.Kits
--- Greybox kit registry (spike S6, W0): one entry per lot type present in generated/Lots, giving the
--- greybox category, height and look. Heights are HTML units read off the v5.4 notes (eaves, roof
--- tops, slab heights) and converted to studs here; they are greybox massing, not final geometry.
--- W1 replaces this table with data/lot_types/*.json (BUILD_PLAN §3.2-§3.3); the categories stay.
--- Interface: get(lotType) -> Kit (unknown types fall back to "marker" so the bake never fails).
--- Pure data, no side effects on require.
+-- Greybox kit registry (spike S6; W1 #7): one entry per lot type, read from generated/LotTypes
+-- (data/authored/lot_types.json, BUILD_PLAN §3.3) plus the greybox look per category. Heights are HTML
+-- units read off the v5.4 notes; builders convert to studs. Greybox massing, not final geometry.
+-- Interface: get(lotType) -> Kit (unknown types fall back to "marker" so the bake never fails);
+--   isSolid(category); known(lotType); routeProps; lamp; ROAD; STUDS_PER_UNIT
+-- Pure data (requires generated/LotTypes), no side effects on require.
+
+local Import = require("./Import")
 
 local Kits = {}
 
@@ -24,6 +26,11 @@ export type Kit = {
 	material: string, -- Enum.Material name
 	lod: string, -- Enum.ModelLevelOfDetail name
 	streaming: string, -- Enum.ModelStreamingMode name
+	builder: string, -- builder family (Builders/<family>.luau via Plan)
+	roof: string?, -- "gable" | "flat" (buildings)
+	door: boolean,
+	signText: string?,
+	skyline: boolean,
 }
 
 local STUDS_PER_UNIT = 2.5
@@ -38,89 +45,11 @@ local LOOK: { [Category]: { color: { number }, material: string, lod: string, st
 	marker = { color = { 255, 0, 255 }, material = "ForceField", lod = "Disabled", streaming = "Default" },
 }
 
--- type -> { category, heightU }
-local TYPES: { [string]: { any } } = {
-	-- buildings
-	house = { "building", 11 },
-	quay_building = { "building", 12 },
-	mall = { "building", 22.94 },
-	mall_shop = { "building", 6.35 },
-	guesthouse = { "building", 6 },
-	restaurant = { "building", 7 },
-	restaurant_icecream = { "building", 5 },
-	shop = { "building", 6 },
-	hospital = { "building", 13.34 },
-	police_station = { "building", 9 },
-	gas_station = { "building", 6 },
-	estate_mansion = { "building", 14 },
-	chapel_crypt = { "building", 9 },
-	shelter_house = { "building", 5 },
-	storage_units = { "building", 4 },
-	triage_bay = { "building", 4.4 },
-	treatment_ward = { "building", 4.4 },
-	waiting_room = { "building", 4.4 },
-	reception = { "building", 4.4 },
-	supply_room = { "building", 4.4 },
-	observation_room = { "building", 4.4 },
-	atrium = { "building", 14 },
-	-- structures
-	landmark_tower = { "structure", 30 },
-	bridge_tower = { "structure", 20 },
-	shed = { "structure", 3 },
-	doghouse = { "structure", 1.5 },
-	backyard_doghouse = { "structure", 1.5 },
-	treehouse = { "structure", 4 },
-	gazebo = { "structure", 4 },
-	pergola_summer_kitchen = { "structure", 3.5 },
-	transit_stop = { "structure", 3 },
-	shelter = { "structure", 1.5 },
-	market_stall = { "structure", 4 },
-	fountain = { "structure", 1.12 },
-	backyard_trampoline = { "structure", 1.65 },
-	-- slabs
-	gas_canopy = { "slab", 10.74 },
-	porte_cochere = { "slab", 8.1 },
-	dock = { "slab", 0.5 },
-	footbridge = { "slab", 0.78 },
-	-- plates
-	district_ground = { "plate", 0 },
-	lawn = { "plate", 0 },
-	plaza = { "plate", 0 },
-	garden = { "plate", 0 },
-	community_garden = { "plate", 0 },
-	park = { "plate", 0 },
-	playground = { "plate", 0 },
-	parking = { "plate", 0 },
-	sports_field = { "plate", 0 },
-	tennis_court = { "plate", 0 },
-	cemetery = { "plate", 0 },
-	intersection = { "plate", 0 },
-	path = { "plate", 0 },
-	river = { "plate", 0 },
-	stream = { "plate", 0 },
-	pond = { "plate", 0 },
-	estate_parcel = { "plate", 0 },
-	estate_pool = { "plate", 0 },
-	backyard_pool = { "plate", 0 },
-	ambulance_bay = { "plate", 0 },
-	bridge = { "plate", 0 },
-	-- props
-	tree = { "prop", 19 },
-	detail = { "prop", 1.2 },
-	sign = { "prop", 3.2 },
-	shrub_cluster = { "prop", 1.5 },
-	fence_run = { "prop", 1.2 },
-	backyard_prop = { "prop", 1 },
-	-- markers
-	overhead_lines = { "marker", 15 },
-	ambient_npcs = { "marker", 2 },
-	street_furniture = { "marker", 4 },
-	roof = { "marker", 0.75 },
-	stair = { "marker", 6.46 },
-	mezzanine = { "marker", 0.5 },
-	duct = { "marker", 1.76 },
-	sewer = { "marker", 2 },
-}
+-- Lot types are data (W1): generated/LotTypes from data/authored/lot_types.json (category, builder
+-- family, height in HTML units, roof, door, sign text, Skyline and the LevelOfDetail/streaming flags).
+local LotTypes = Import.generated("LotTypes") :: any
+Kits.routeProps = LotTypes.routeProps :: { [string]: any }
+Kits.lamp = LotTypes.lamp :: { heightU: number, lod: string, streaming: string }
 
 local cache: { [string]: Kit } = {}
 
@@ -129,16 +58,21 @@ function Kits.get(lotType: string): Kit
 	if hit then
 		return hit
 	end
-	local entry = TYPES[lotType] or { "marker", 1 }
-	local category = entry[1] :: Category
+	local entry = LotTypes.types[lotType]
+	local category: Category = if entry then entry.category else "marker"
 	local look = LOOK[category]
 	local kit: Kit = {
 		category = category,
-		heightU = entry[2] :: number,
+		heightU = if entry then entry.heightU else 1,
 		color = look.color,
 		material = look.material,
-		lod = look.lod,
-		streaming = look.streaming,
+		lod = if entry then entry.lod else look.lod,
+		streaming = if entry then entry.streaming else look.streaming,
+		builder = if entry then entry.builder else "Marker",
+		roof = entry and entry.roof,
+		door = entry ~= nil and entry.door == true,
+		signText = entry and entry.signText,
+		skyline = entry ~= nil and entry.skyline == "box",
 	}
 	cache[lotType] = kit
 	return kit
@@ -149,7 +83,7 @@ function Kits.isSolid(category: Category): boolean
 end
 
 function Kits.known(lotType: string): boolean
-	return TYPES[lotType] ~= nil
+	return LotTypes.types[lotType] ~= nil
 end
 
 -- Road kinds -> look; heights are the v5.4 vertical offsets over terrain [worldgen_core §5].
