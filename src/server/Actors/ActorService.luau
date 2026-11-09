@@ -11,6 +11,8 @@
 -- table bodies. Requiring has no side effects.
 -- Interface: new(ops?) -> Registry; Registry:register(actor), get(id), all(), count(),
 -- setBodyMode(actor, mode, snapshot?), poseOf(actor); engineOps(); signals via onModeChanged.
+-- Engine body helpers (W0 stand-ins for BodyFactory): prepareBody(model, id, species),
+-- buildHuman(index, parent?), groundOffset(model).
 
 export type Brain = {
 	-- Freezes the brain and returns snapshot fields (x, z, yaw, vx, vz, mode, brain, clip, clipT).
@@ -175,6 +177,75 @@ function ActorService.actor(
 		possessions = 0,
 		releasedAt = nil,
 	}
+end
+
+-- Readies a body Model for the actor model (engine only): strips scripts and any server-side
+-- Animator (D3: each client makes its own, so no track replicates), anchors the root only (limbs
+-- hang off Motor6Ds and follow BulkMoveTo, rule 4), turns the Humanoid's state machine off with
+-- Dead disabled, makes the model Atomic for streaming and stamps the replicated attributes.
+-- Non-Humanoid bodies (the squirrel puppet) lose collision: their client motor ground-snaps.
+function ActorService.prepareBody(model: Model, actorId: string, species: string): Model
+	for _, d in model:GetDescendants() do
+		if d:IsA("BaseScript") or d:IsA("ModuleScript") or d:IsA("Animator") then
+			d:Destroy()
+		end
+	end
+	local root = model.PrimaryPart
+		or model:FindFirstChild("HumanoidRootPart") :: BasePart?
+		or model:FindFirstChild("RootPart") :: BasePart?
+	if root == nil then
+		error(`ActorService.prepareBody: {model.Name} has no root part`)
+	end
+	model.PrimaryPart = root
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = d == root
+			if humanoid == nil then
+				d.CanCollide = false
+				d.CanTouch = false
+				d.CanQuery = d == root
+				d.Massless = d ~= root
+			end
+		end
+	end
+	if humanoid then
+		humanoid.BreakJointsOnDeath = false
+		humanoid.RequiresNeck = false
+		humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+		humanoid.EvaluateStateMachine = false
+		humanoid.AutoRotate = false
+	end
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	model.Name = actorId
+	model:SetAttribute("ActorId", actorId)
+	model:SetAttribute("Species", species)
+	model:SetAttribute("DriverUserId", 0)
+	return model
+end
+
+-- A stock R15 body from a blank HumanoidDescription with tinted clothes-free colours (S9: 1-17 ms
+-- per blank build in the engine).
+function ActorService.buildHuman(index: number): Model
+	local Players = game:GetService("Players")
+	local desc = Instance.new("HumanoidDescription")
+	local skin = Color3.fromHSV(0.07, 0.35 + (index % 3) * 0.1, 0.55 + (index % 4) * 0.1)
+	local shirt = Color3.fromHSV((index * 0.137) % 1, 0.55, 0.8)
+	local pants = Color3.fromHSV((index * 0.291 + 0.5) % 1, 0.4, 0.45)
+	desc.HeadColor = skin
+	desc.LeftArmColor = skin
+	desc.RightArmColor = skin
+	desc.TorsoColor = shirt
+	desc.LeftLegColor = pants
+	desc.RightLegColor = pants
+	return Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
+end
+
+-- Studs from the bottom of the model's bounding box up to its pivot: place a body on a floor at
+-- height h by pivoting it to y = h + groundOffset(model).
+function ActorService.groundOffset(model: Model): number
+	local cf, size = model:GetBoundingBox()
+	return model:GetPivot().Y - (cf.Y - size.Y / 2)
 end
 
 return ActorService

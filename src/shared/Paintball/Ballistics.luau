@@ -26,7 +26,7 @@ local function clamp01(v: number): number
 end
 
 -- Closest approach between segment P0->P1 (the ball's step) and the vertical capsule axis
--- (cx, cyLow, cz)-(cx, cyHigh, cz); returns the parameter s in [0, 1] along the ball's step when the
+-- (cx, cyLow, cz)-(cx, cyHigh, cz); returns the parameter s in [0, 1] of closest approach along the step when the
 -- distance is within r, else nil.
 function Ballistics.segmentCapsule(
 	p0x: number,
