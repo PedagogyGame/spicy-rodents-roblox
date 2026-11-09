@@ -43,13 +43,19 @@ end
 -- Which routeProps entry draws this route ("tree", "pole", "wire", "pipe", "fence"), or nil.
 function RouteProps.classify(r: Route, props: { [string]: any }): string?
 	local gen = generatorName(r)
-	local order = { "tree", "pole", "wire", "fence", "pipe" }
+	local order = { "tree", "limb", "pole", "wire", "fence", "pipe" }
 	for _, look in order do
 		local p = props[look]
 		if p then
 			local ok = true
 			if p.generators then
 				ok = table.find(p.generators, gen) ~= nil
+			end
+			if ok and p.names then
+				ok = false
+				for _, n in p.names do
+					ok = ok or string.find(r.name, n, 1, true) ~= nil
+				end
 			end
 			if ok and p.kinds then
 				ok = table.find(p.kinds, r.kind) ~= nil
@@ -144,7 +150,7 @@ end
 function RouteProps.plans(routes: { Route }, props: { [string]: any }, Curve: any, heightAt: (number, number) -> number): ({ Spec.BuildPlan }, { [number]: string })
 	local looks: { [number]: string } = {}
 	local trunks: { Route } = {}
-	local byLook: { [string]: { Route } } = { tree = {}, pole = {}, wire = {}, pipe = {}, fence = {} }
+	local byLook: { [string]: { Route } } = { tree = {}, limb = {}, pole = {}, wire = {}, pipe = {}, fence = {} }
 	for _, r in routes do
 		local look = RouteProps.classify(r, props)
 		if look then
@@ -184,6 +190,11 @@ function RouteProps.plans(routes: { Route }, props: { [string]: any }, Curve: an
 		table.insert(out, newPlan(`Tree_{t.id}`, "tree", props, { TrunkRoute = t.id, Name = t.name, Routes = #members[t.id] }, list))
 	end
 
+	for _, r in byLook.limb do
+		local list = Spec.list()
+		cylinders(list, "Limb", polyline(r, Curve), r.surfaceRadius, "bark", "Limb")
+		table.insert(out, newPlan(`Limb_{r.id}`, "limb", props, { Route = r.id }, list))
+	end
 	for _, r in byLook.pole do
 		local list = Spec.list()
 		cylinders(list, "Pole", polyline(r, Curve), r.surfaceRadius, "pole", "Post")

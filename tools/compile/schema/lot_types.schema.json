@@ -3,47 +3,188 @@
   "$id": "spicy-rodents/lot_types",
   "title": "Lot types (data/authored/lot_types.json), BUILD_PLAN 3.3 W1 v0. Heights stay in HTML units (U suffix).",
   "type": "object",
-  "required": ["types", "routeProps", "lamp"],
+  "required": [
+    "types",
+    "routeProps",
+    "lamp"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "src": { "type": "string" },
-    "types": { "type": "object", "additionalProperties": { "$ref": "#/$defs/lotType" } },
-    "routeProps": { "type": "object", "additionalProperties": { "$ref": "#/$defs/routeProp" } },
-    "lamp": { "type": "object", "required": ["heightU", "lod", "streaming"], "additionalProperties": false,
-      "properties": { "heightU": { "type": "number", "minimum": 1 }, "lod": { "$ref": "#/$defs/lod" }, "streaming": { "$ref": "#/$defs/streaming" } } }
-  },
-  "$defs": {
-    "lod": { "enum": ["SLIM", "Automatic", "Disabled", "StreamingMesh"] },
-    "streaming": { "enum": ["Atomic", "Persistent", "Default", "Nonatomic", "PersistentPerPlayer"] },
-    "lotType": {
+    "$schema": {
+      "type": "string"
+    },
+    "src": {
+      "type": "string"
+    },
+    "types": {
       "type": "object",
-      "required": ["category", "builder", "heightU", "lod", "streaming"],
+      "additionalProperties": {
+        "$ref": "#/$defs/lotType"
+      }
+    },
+    "routeProps": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/routeProp"
+      }
+    },
+    "lamp": {
+      "type": "object",
+      "required": [
+        "heightU",
+        "lod",
+        "streaming"
+      ],
       "additionalProperties": false,
       "properties": {
-        "category": { "enum": ["building", "structure", "slab", "plate", "prop", "marker"] },
-        "builder": { "enum": ["Building", "House", "Hospital", "PoliceStation", "Structure", "Slab", "Plate", "Prop", "Sign", "Marker"] },
-        "heightU": { "type": "number", "minimum": 0, "maximum": 60 },
-        "lod": { "$ref": "#/$defs/lod" },
-        "streaming": { "$ref": "#/$defs/streaming" },
-        "skyline": { "enum": ["box"] },
-        "roof": { "enum": ["gable", "flat"] },
-        "door": { "type": "boolean" },
-        "signText": { "type": "string", "maxLength": 24 },
-        "paramSchema": { "type": "object" }
+        "heightU": {
+          "type": "number",
+          "minimum": 1
+        },
+        "lod": {
+          "$ref": "#/$defs/lod"
+        },
+        "streaming": {
+          "$ref": "#/$defs/streaming"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "lod": {
+      "enum": [
+        "SLIM",
+        "Automatic",
+        "Disabled",
+        "StreamingMesh"
+      ]
+    },
+    "streaming": {
+      "enum": [
+        "Atomic",
+        "Persistent",
+        "Default",
+        "Nonatomic",
+        "PersistentPerPlayer"
+      ]
+    },
+    "lotType": {
+      "type": "object",
+      "required": [
+        "category",
+        "builder",
+        "heightU",
+        "lod",
+        "streaming"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "enum": [
+            "building",
+            "structure",
+            "slab",
+            "plate",
+            "prop",
+            "marker"
+          ]
+        },
+        "builder": {
+          "enum": [
+            "Building",
+            "House",
+            "Hospital",
+            "PoliceStation",
+            "Structure",
+            "Slab",
+            "Plate",
+            "Prop",
+            "Sign",
+            "Marker",
+            "BridgeTower",
+            "Treehouse"
+          ]
+        },
+        "heightU": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "lod": {
+          "$ref": "#/$defs/lod"
+        },
+        "streaming": {
+          "$ref": "#/$defs/streaming"
+        },
+        "skyline": {
+          "enum": [
+            "box"
+          ]
+        },
+        "roof": {
+          "enum": [
+            "gable",
+            "flat"
+          ]
+        },
+        "door": {
+          "type": "boolean"
+        },
+        "signText": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "paramSchema": {
+          "type": "object"
+        }
       }
     },
     "routeProp": {
       "type": "object",
-      "required": ["look", "lod", "streaming"],
+      "required": [
+        "look",
+        "lod",
+        "streaming"
+      ],
       "additionalProperties": false,
       "properties": {
-        "generators": { "type": "array", "items": { "type": "string" } },
-        "kinds": { "type": "array", "items": { "type": "string" } },
-        "maxRadiusU": { "type": "number", "exclusiveMinimum": 0 },
-        "look": { "enum": ["bark", "pole", "wire", "pipe", "fence"] },
-        "lod": { "$ref": "#/$defs/lod" },
-        "streaming": { "$ref": "#/$defs/streaming" }
+        "generators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "maxRadiusU": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "look": {
+          "enum": [
+            "bark",
+            "pole",
+            "wire",
+            "pipe",
+            "fence"
+          ]
+        },
+        "lod": {
+          "$ref": "#/$defs/lod"
+        },
+        "streaming": {
+          "$ref": "#/$defs/streaming"
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     }
   }

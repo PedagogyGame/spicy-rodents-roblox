@@ -62,7 +62,7 @@ function Net.decodeStream(layout: BufferCodec.Layout, b: buffer): { { [string]: 
 end
 
 function Net.new(transport: Transport, opts: { clock: (() -> number)? }?): Net
-	local o = opts or {}
+	local o = (opts or {}) :: { clock: (() -> number)? }
 	local net = {
 		transport = transport,
 		clock = o.clock or os.clock,
@@ -134,7 +134,7 @@ function Net.new(transport: Transport, opts: { clock: (() -> number)? }?): Net
 		self._stats.received += 1
 		local handler = self.handlers[name]
 		if handler then
-			local ok, err = pcall(handler, player, value)
+			local ok, err = pcall(handler :: any, player, value)
 			if not ok then
 				self.log:every(`handler:{name}`, 5, "error", `handler {name} errored: {err}`)
 				return false, "handler error"

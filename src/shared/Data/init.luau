@@ -107,15 +107,17 @@ function Data.new(loader: Loader): Data
 	end
 
 	function data.byId(self: Data, name: string, id: string): any?
-		local map = self._byId[name]
+		local map: { [string]: any }? = self._byId[name]
 		if not map then
-			map = {}
-			for _, rec in self:module(name) do
+			local built: { [string]: any } = {}
+			local list: { any } = self:module(name)
+			for _, rec in list do
 				if type(rec) == "table" and rec.id ~= nil then
-					map[rec.id] = rec
+					built[rec.id] = rec
 				end
 			end
-			self._byId[name] = map
+			self._byId[name] = built
+			return built[id]
 		end
 		return map[id]
 	end
@@ -236,8 +238,9 @@ function Data.default(): Data
 			return (require :: any)("../../generated/" .. name)
 		end
 	end
-	defaultData = Data.new(loader)
-	return defaultData :: Data
+	local d = Data.new(loader)
+	defaultData = d
+	return d
 end
 
 return Data

@@ -21,10 +21,11 @@ local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require(
 local MoveValidator = {}
 MoveValidator.__index = MoveValidator
 
-export type Snapshot = SquirrelMotor.Snapshot
-export type State = SquirrelMotor.State
-export type Violation = SquirrelMotor.Violation
-export type World = SquirrelMotor.World
+-- Exported types do not cross the Import shim (rule 1): restated loosely from Shared/Movement/SquirrelMotor.
+export type Snapshot = { [string]: number | boolean }
+export type State = any
+export type Violation = { [string]: any }
+export type World = any
 
 export type Packet = { seq: number, snapshot: Snapshot }
 

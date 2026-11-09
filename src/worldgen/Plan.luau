@@ -12,6 +12,7 @@
 -- the box axis-aligned and record the exact yaw as an attribute.
 -- Pure: no Instances, no state, no side effects on require.
 
+local BridgeTower = require("./Builders/BridgeTower")
 local Building = require("./Builders/Building")
 local Geometry = require("./Geometry")
 local Hospital = require("./Builders/Hospital")
@@ -20,6 +21,7 @@ local Import = require("./Import")
 local Kits = require("./Kits")
 local PoliceStation = require("./Builders/PoliceStation")
 local Sign = require("./Builders/Sign")
+local Treehouse = require("./Builders/Treehouse")
 local Spec = require("./Spec")
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
 local Buildings = Import.generated("Buildings") :: { [string]: any }
@@ -151,6 +153,8 @@ local FAMILIES: { [string]: (ctx: Spec.LotCtx) -> () } = {
 	Hospital = Hospital.plan,
 	PoliceStation = PoliceStation.plan,
 	Sign = Sign.plan,
+	BridgeTower = BridgeTower.plan,
+	Treehouse = Treehouse.plan,
 }
 
 -- The S6 single block (structures, slabs, plates, props, markers and interior children).

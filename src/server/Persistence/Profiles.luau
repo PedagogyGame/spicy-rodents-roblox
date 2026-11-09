@@ -41,7 +41,7 @@ function Profiles.key(userId: number): string
 end
 
 function Profiles.new(opts: Options?): Profiles
-	local o = opts or {}
+	local o: Options = opts or {} :: Options
 	local profiles = ProfileStore.new(o.store or MemoryStore.new() :: any, {
 		jobId = o.jobId or "lune",
 		now = o.now or os.time,
@@ -65,7 +65,7 @@ function Profiles.new(opts: Options?): Profiles
 			profile = ProfileStore.readOnly(self.profiles, key)
 		end
 		self.loaded[id] = profile :: ProfileStore.Profile
-		return (profile :: ProfileStore.Profile).data, status
+		return (profile :: ProfileStore.Profile).data, status :: ProfileStore.Status
 	end
 
 	function p.data(self: Profiles, player: any): ProfileSchema.Data?

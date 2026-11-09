@@ -13,7 +13,7 @@ export type Layout = { fields: { Field }, size: number }
 
 local BufferCodec = {}
 
-local SIZE: { [Kind]: number } = { u8 = 1, u16 = 2, u32 = 4, i8 = 1, i16 = 2, i32 = 4, f32 = 4, f64 = 8, q16 = 2 }
+local SIZE: { [string]: number } = { u8 = 1, u16 = 2, u32 = 4, i8 = 1, i16 = 2, i32 = 4, f32 = 4, f64 = 8, q16 = 2 }
 
 function BufferCodec.layout(fields: { Field }): Layout
 	local size = 0

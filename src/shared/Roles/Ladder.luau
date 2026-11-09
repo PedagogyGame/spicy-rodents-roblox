@@ -69,7 +69,7 @@ Ladder.params = {
 }
 
 -- One row per brief rule; `id` is what each Transition cites (tests prove every row fires).
-Ladder.rules = {
+local RULES: { { [string]: any } } = {
 	{ id = "admit", on = "admit", when = "playersAtMax", kick = "serverFull" },                                -- B4
 	{ id = "join", on = "join", to = "human", rank = "lowest" },                                               -- §4, §6
 	{ id = "leave", on = "leave", release = true },
@@ -107,6 +107,7 @@ Ladder.rules = {
 	{ id = "session.reset", on = "cinematic.finished|everyoneInfected", all = true, to = "human", rank = "lowest", reset = true,
 	  except = { "winnerKeepsRodent", "infectedSquirrelsAliveKeepSquirrel" } },                                -- §8; v2 §13a
 }
+Ladder.rules = RULES
 -- stylua: ignore end
 
 export type Rung = string
@@ -569,14 +570,19 @@ handlers["rodent.killed"] = function(event, ctx, out)
 		if not chosen then
 			chosen, extra = options[#options], true -- the brief promotes regardless; over cap until a slot frees
 		end
-		table.insert(out, {
+		local tr: Transition = {
 			rule = "rodent.killed",
 			player = killer.id,
 			to = chosen,
 			rank = if chosen == "squirrel" then "lowestUninfected" else "keep",
-			remember = killer.rung == "human" and chosen == "squirrel" or nil,
-			extraSlot = extra or nil,
-		})
+		}
+		if killer.rung == "human" and chosen == "squirrel" then
+			tr.remember = true
+		end
+		if extra then
+			tr.extraSlot = true
+		end
+		table.insert(out, tr)
 	end
 	rodentDied(ctx, out)
 end
@@ -750,14 +756,12 @@ local function sessionReset(event: { [string]: any }, ctx: Ctx, out: { Transitio
 		if keep then
 			table.insert(out, { rule = "session.reset", player = p.id, to = p.rung, rank = "keep", reset = true })
 		else
-			table.insert(out, {
-				rule = "session.reset",
-				player = p.id,
-				to = "human",
-				rank = "lowest",
-				reset = true,
-				release = p.rung ~= "human" or nil,
-			})
+			local tr: Transition =
+				{ rule = "session.reset", player = p.id, to = "human", rank = "lowest", reset = true }
+			if p.rung ~= "human" then
+				tr.release = true
+			end
+			table.insert(out, tr)
 		end
 	end
 end

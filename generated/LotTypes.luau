@@ -12,6 +12,12 @@ return {
 			look = "fence",
 			streaming = "Default",
 		},
+		limb = {
+			lod = "Automatic",
+			look = "bark",
+			names = { "living utility bridge", "park high watch perch" },
+			streaming = "Default",
+		},
 		pipe = {
 			kinds = { "trunk" },
 			lod = "Disabled",
@@ -88,10 +94,19 @@ return {
 		},
 		bridge = { builder = "Plate", category = "plate", heightU = 0, lod = "Disabled", streaming = "Default" },
 		bridge_tower = {
-			builder = "Structure",
+			builder = "BridgeTower",
 			category = "structure",
-			heightU = 20,
+			heightU = 17.7,
 			lod = "Automatic",
+			paramSchema = {
+				["type"] = "object",
+				additionalProperties = false,
+				properties = {
+					pierDU = { ["type"] = "number" },
+					pierWU = { ["type"] = "number" },
+					pierZU = { ["type"] = "number" },
+				},
+			},
 			skyline = "box",
 			streaming = "Atomic",
 		},
@@ -723,10 +738,23 @@ return {
 		},
 		tree = { builder = "Prop", category = "prop", heightU = 19, lod = "Disabled", streaming = "Default" },
 		treehouse = {
-			builder = "Structure",
+			builder = "Treehouse",
 			category = "structure",
 			heightU = 4,
 			lod = "Automatic",
+			paramSchema = {
+				["type"] = "object",
+				additionalProperties = false,
+				properties = {
+					deck = {
+						["type"] = "array",
+						items = { ["type"] = "number" },
+						maxItems = 4,
+						minItems = 4,
+					},
+					floorU = { ["type"] = "number" },
+				},
+			},
 			skyline = "box",
 			streaming = "Atomic",
 		},

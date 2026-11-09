@@ -52,7 +52,7 @@ function Signal.new(): Signal
 		local snapshot = table.clone(self._slots)
 		for _, slot in snapshot do
 			if slot.conn.connected then
-				local ok, err = pcall(slot.fn, ...)
+				local ok, err = pcall(slot.fn :: any, ...)
 				if not ok then
 					if self.onError then
 						self.onError(err)

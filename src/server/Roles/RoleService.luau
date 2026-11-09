@@ -26,8 +26,26 @@ local ReputationRules =
 	Import.shared("Reputation/ReputationRules") :: typeof(require("../../shared/Reputation/ReputationRules"))
 local Log = Import.shared("Util/Log") :: typeof(require("../../shared/Util/Log"))
 
-type Transition = Ladder.Transition
-type LadderPlayer = Ladder.Player
+-- Exported types do not cross the Import shim (rule 1), so the Ladder shapes are restated loosely.
+type Transition = { [string]: any }
+type LadderPlayer = {
+	id: any,
+	rung: string,
+	subrole: string?,
+	stats: { [string]: any },
+	infected: boolean?,
+	noOffers: boolean?,
+	remembered: { [string]: any }?,
+}
+type Offer = { [string]: any }
+type Ctx = { [string]: any }
+type Stats = { [string]: any }
+type Purse = {
+	cents: number,
+	history: { any },
+	credit: (any, number, string) -> (boolean, string?),
+	debit: (any, number, string) -> (boolean, string?),
+}
 
 export type JoinResult = "admitted" | "possessed" | "kicked"
 
@@ -41,11 +59,11 @@ export type Deps = {
 	onTransition: ((t: Transition) -> ())?, -- InfectionService, PoliceService, HUD hooks
 }
 
-export type Member = LadderPlayer & { player: any, purse: Wallet.Purse, jailedUntil: number? }
+export type Member = LadderPlayer & { player: any, purse: Purse, jailedUntil: number? }
 
 export type LiveOffer = {
 	id: string,
-	offer: Ladder.Offer,
+	offer: Offer,
 	index: number, -- current candidate
 	sentAt: number,
 	retryAt: number?, -- set once the cascade is exhausted
@@ -64,16 +82,16 @@ export type Roles = {
 	live: { [string]: LiveOffer }, -- by rung
 	lastInput: { [number]: number },
 	warned: { [number]: boolean },
-	log: Log.Logger,
+	log: any,
 	history: { Transition },
 	onJoin: (self: Roles, player: any) -> JoinResult,
 	onLeave: (self: Roles, player: any) -> (),
 	admittedCount: (self: Roles) -> number,
-	ctx: (self: Roles) -> Ladder.Ctx,
+	ctx: (self: Roles) -> Ctx,
 	member: (self: Roles, userId: number) -> Member?,
 	report: (self: Roles, event: { [string]: any }) -> { Transition },
 	roleOf: (self: Roles, player: any) -> (string?, string?),
-	stats: (self: Roles, player: any) -> Ladder.Stats?,
+	stats: (self: Roles, player: any) -> Stats?,
 	queue: (self: Roles, rung: string) -> { any },
 	offers: (self: Roles) -> { [string]: LiveOffer },
 	reply: (self: Roles, player: any, offerId: string, choice: string) -> (boolean, string?),
@@ -116,7 +134,7 @@ function RoleService.new(deps: Deps): Roles
 		return self.members :: any
 	end
 
-	function roles.ctx(self: Roles): Ladder.Ctx
+	function roles.ctx(self: Roles): Ctx
 		return {
 			players = players(self),
 			admitted = self.admittedN,
@@ -172,7 +190,7 @@ function RoleService.new(deps: Deps): Roles
 
 	local resolveAndApply: (self: Roles, event: { [string]: any }) -> { Transition }
 
-	local function openOffer(self: Roles, o: Ladder.Offer)
+	local function openOffer(self: Roles, o: Offer)
 		local live = self.live[o.rung]
 		if live and not live.retryAt then
 			return -- one live offer per rung
@@ -348,7 +366,7 @@ function RoleService.new(deps: Deps): Roles
 		return m.rung, m.subrole
 	end
 
-	function roles.stats(self: Roles, player: any): Ladder.Stats?
+	function roles.stats(self: Roles, player: any): Stats?
 		local m = self.members[player.UserId]
 		return if m then m.stats else nil
 	end

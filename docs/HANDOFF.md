@@ -54,7 +54,7 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 10. **BakeParity.** Compare plan hashes exactly, structure by hash, geometry with tolerance; never hash float32 sizes across Lune and the engine.
 
 ## 4. Next steps, in order
-0. **Owner gate G0** (docs/owner/G0_SPIKE_REPORT.md): waiting for (1) go for Wave 1, (2) OK to publish the S11 test town to the private main place, (3) optional key scopes (asset-delivery read, DataStore read). Owner session sheet: docs/owner/OS-1.md (CI place v12 holds the S2 test place).
+0. **Gate G0: owner said GO (2026-11-09).** Publishing to the live main place is blocked by Claude's safety classifier: never publish from the container; the owner publishes. OS-1 spike sessions are CANCELLED (see docs/owner/OS-1.md): S2 feel, S8 visuals and S11 far view move into the FRB playtest. **Owner-facing build rule:** every build the owner opens must say on screen what they are looking at and what to press, show progress while loading, and never ignore input silently.
 1. If `BUILD_PLAN.md`'s header does not yet say the rev-3 critique was applied, apply `critique_rev3.md`. Its gaps include B3/B4 absent from the plan, floor arithmetic, regen vs drain, queue weights, ProcessReceipt NotProcessedYet, no runtime audio synthesis, and the already-created CI and Art Inbox places.
 2. Run the remaining spikes. Headless first: S6 bake/terrain, S7 headless animation upload, S8 model upload/runtime art, S15 receipts+DataStore logic, S18 paintball hit-reg, S19 body budget. Then those needing the owner: S2 possession (OS-1a), S11 drone far view (OS-1c), S13/S14/S16/S17.
 3. Write the one-page G0 spike report for the owner. Merge to `main` on go.

@@ -1,3 +1,5 @@
+> **CANCELLED 2026-11-09 (owner feedback).** The owner tried Part C: the grey-box test town was confusing without explanation and the drone did not respond (the server writes 7 s+ of hill terrain before creating the drone remotes, with no on-screen "please wait", and F is ignored until then). Decision: the owner does no abstract spike sessions. The possession feel (S2), art-import visuals (S8) and drone far view (S11) are checked in the FIRST RUNNABLE BUILD playtest instead, which must have on-screen instructions and loading feedback for every test. Lesson for every owner-facing build: show what the player is looking at and what to press, show progress while anything loads, and never let input do nothing silently.
+
 # OS-1: one owner session in three parts (about 42 minutes)
 
 For Ben, on a Mac. Three parts, any order once Claude says each is ready: **A** possession test in

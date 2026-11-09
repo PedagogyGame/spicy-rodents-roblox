@@ -670,6 +670,8 @@
     },
     {
       "id": "outer_treehouse",
+      "params": {"floorU": 13.2, "deck": [5.9, 0, 4.2, 3.2]},
+      "seat": "absolute:1.52",
       "district": "old_town_outer",
       "type": "treehouse",
       "x": -142,

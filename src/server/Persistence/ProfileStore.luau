@@ -82,7 +82,7 @@ ProfileStore.DEFAULTS = {
 local function withRetries(self: Store, fn: () -> ()): (boolean, string?)
 	local lastErr: string? = nil
 	for attempt = 1, self.retries + 1 do
-		local ok, err = pcall(fn)
+		local ok, err = pcall(fn :: any)
 		if ok then
 			return true, nil
 		end

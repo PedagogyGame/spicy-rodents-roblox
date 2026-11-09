@@ -22,12 +22,12 @@ export type Schema = {
 local Schema = {}
 
 function Schema.num(o: { min: number?, max: number?, int: boolean? }?): Schema
-	local opts = o or {}
+	local opts = (o or {}) :: { min: number?, max: number?, int: boolean? }
 	return { kind = "number", min = opts.min, max = opts.max, int = opts.int }
 end
 
 function Schema.str(o: { max: number?, enum: { string }? }?): Schema
-	local opts = o or {}
+	local opts = (o or {}) :: { max: number?, enum: { string }? }
 	local values: { [string]: boolean }? = nil
 	if opts.enum then
 		local set: { [string]: boolean } = {}

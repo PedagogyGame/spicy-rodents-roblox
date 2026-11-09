@@ -1011,11 +1011,26 @@
     },
     "bridge_tower": {
       "category": "structure",
-      "builder": "Structure",
-      "heightU": 20,
+      "builder": "BridgeTower",
+      "heightU": 17.7,
       "lod": "Automatic",
       "streaming": "Atomic",
-      "skyline": "box"
+      "skyline": "box",
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pierZU": {
+            "type": "number"
+          },
+          "pierWU": {
+            "type": "number"
+          },
+          "pierDU": {
+            "type": "number"
+          }
+        }
+      }
     },
     "shed": {
       "category": "structure",
@@ -1043,11 +1058,28 @@
     },
     "treehouse": {
       "category": "structure",
-      "builder": "Structure",
+      "builder": "Treehouse",
       "heightU": 4,
       "lod": "Automatic",
       "streaming": "Atomic",
-      "skyline": "box"
+      "skyline": "box",
+      "paramSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "floorU": {
+            "type": "number"
+          },
+          "deck": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 4,
+            "maxItems": 4
+          }
+        }
+      }
     },
     "gazebo": {
       "category": "structure",
@@ -1399,6 +1431,15 @@
         "makeAppleTree",
         "makeLookoutTree",
         "estateGateOak"
+      ],
+      "look": "bark",
+      "lod": "Automatic",
+      "streaming": "Default"
+    },
+    "limb": {
+      "names": [
+        "living utility bridge",
+        "park high watch perch"
       ],
       "look": "bark",
       "lod": "Automatic",

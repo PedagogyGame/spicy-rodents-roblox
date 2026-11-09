@@ -26,7 +26,7 @@ export type Store = {
 local MockDataStore = {}
 
 local function takeFault(self: Store): Fault?
-	return table.remove(self.faults, 1)
+	return table.remove(self.faults, 1) :: Fault?
 end
 
 local function updateAsync(self: Store, key: string, transform: (any, any) -> any): (any, any)

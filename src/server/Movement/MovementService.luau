@@ -37,7 +37,7 @@ export type Movement = {
 	deps: Deps,
 	histories: { [any]: PoseHistory.History },
 	last: { [any]: GenericPacket },
-	log: Log.Logger,
+	log: any,
 	_stats: Stats,
 	onHandoff: (self: Movement, actor: any, player: any?, kind: string) -> (),
 	packet: (self: Movement, actorId: any, kind: string, packet: any, now: number) -> any,

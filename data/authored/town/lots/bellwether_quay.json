@@ -67,6 +67,8 @@
     },
     {
       "id": "quay_bridge_tower_west",
+      "params": {"pierZU": 10.7, "pierWU": 8, "pierDU": 7.2},
+      "seat": "absolute:15.8",
       "district": "bellwether_quay",
       "type": "bridge_tower",
       "x": 814,
@@ -88,6 +90,8 @@
     },
     {
       "id": "quay_bridge_tower_east",
+      "params": {"pierZU": 10.7, "pierWU": 8, "pierDU": 7.2},
+      "seat": "absolute:15.8",
       "district": "bellwether_quay",
       "type": "bridge_tower",
       "x": 886,
