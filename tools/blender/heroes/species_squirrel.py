@@ -15,6 +15,8 @@ import numpy as np
 from sdf import Ellipsoid, RoundCone, frame_from, mirror_pair, rot_x, rot_y, rot_z
 
 SPECIES = "squirrel"
+RIG_ID = "squirrel"  # the rodent shares the rig and every clip
+CLIPS_MODULE = "clips_squirrel"
 
 # ---- skeleton (bone head positions) ---------------------------------------------------------------
 # name: (head xyz, parent, proxy tail xyz or a child name the proxy bone points at)

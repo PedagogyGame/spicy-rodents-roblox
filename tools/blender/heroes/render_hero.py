@@ -166,6 +166,7 @@ def main(argv):
     ap.add_argument("--pose-res", default="480x300")
     ap.add_argument("--clips", default="")
     ap.add_argument("--hide-cards", action="store_true")
+    ap.add_argument("--workbench", action="store_true", help="fast shape-only pose check")
     opts = ap.parse_args(argv)
     bpy.ops.wm.open_mainfile(filepath=opts.blend)
     scene = bpy.context.scene
@@ -181,6 +182,13 @@ def main(argv):
     arm = bpy.data.objects.get("Rig")
     res = tuple(int(x) for x in opts.res.split("x"))
     setup_render(scene, res, opts.samples)
+    if opts.workbench:
+        scene.render.engine = "BLENDER_WORKBENCH"
+        sh = scene.display.shading
+        sh.light = "STUDIO"
+        sh.color_type = "TEXTURE"
+        sh.show_cavity = True
+        sh.show_shadows = True
     tag = meta.get("variant", "hero")
     written = []
     hero_pose = meta.get("turntable_pose")

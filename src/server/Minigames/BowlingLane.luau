@@ -30,7 +30,7 @@ BowlingLane.RANGES = {
 	angle = 0.1, -- radians either side of straight
 	speedMin = 16, -- studs/s at zero power
 	speedMax = 34,
-	hook = 9, -- studs/s^2 of lateral pull at full hook on the back end
+	hook = 3.2, -- studs/s^2 of lateral pull at full hook on the back end (about 2 studs of break)
 }
 BowlingLane.EFFECTIVE_GRAVITY = 85 -- studs/s^2 felt by the ball and pins (VectorForce lifts the rest)
 BowlingLane.STAND_COS = math.cos(math.rad(20))

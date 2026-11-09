@@ -173,15 +173,18 @@ local function ducts(kit: any, root: any)
 			)
 			d += 4
 		end
-		-- small amber maintenance lamps every 16 studs (the run is dark otherwise) and a cool glow at the riser
-		local lampD = 6
-		while lampD < L.REAR_WALL_D - 4 do
+		-- small amber maintenance lamps every 10 studs, alternating walls (the run is dark otherwise), and a cool
+		-- glow at the riser where the light at the end of the tunnel comes from
+		local lampD = 4
+		local lampSide = 1
+		while lampD < L.REAR_WALL_D - 3 do
 			local ceil = if lampD > L.DECK_END and lampD < L.PIT_END then L.PIT_Y - 0.15 else L.DUCT_CEIL
+			local lx0 = if lampSide > 0 then b - 0.18 else a + 0.06
 			local lamp = kit:box(
 				m,
 				"Lamp",
-				b - 0.18,
-				b - 0.06,
+				lx0,
+				lx0 + 0.12,
 				ceil - 0.5,
 				ceil - 0.3,
 				lampD - 0.15,
@@ -190,8 +193,9 @@ local function ducts(kit: any, root: any)
 				"Neon",
 				{ collide = false }
 			)
-			kit:light(lamp, "PointLight", { Range = 9, Brightness = 0.9, Color = { 255, 176, 96 }, Shadows = false })
-			lampD += 16
+			kit:light(lamp, "PointLight", { Range = 11, Brightness = 1.25, Color = { 255, 176, 96 }, Shadows = false })
+			lampD += 10
+			lampSide = -lampSide
 		end
 		-- odds and ends a squirrel would notice: a lost sock, popcorn, a gum wrapper, a spare pin on its side
 		kit:box(
@@ -913,13 +917,7 @@ local function outside(kit: any, root: any, data: any)
 			"Metal",
 			{ collide = false }
 		)
-		local run = p1d - (D1 + 3.4)
-		local drop = 3.2 - (3.2 + ay + 0.4)
-		local len = math.sqrt(run * run + drop * drop)
-		kit:cyl(o, "RailSlope", rx, 3.2 - drop / 2, D1 + 3.4 + run / 2, len, 0.12, "D", { 70, 74, 80 }, "Metal", {
-			collide = false,
-			rot = kit.roblox.CFrame.Angles(math.atan2(drop, run), 0, 0),
-		})
+		kit:rod(o, "RailSlope", rx, 3.2, D1 + 3.4, rx, 3.2 + ay + 0.4, p1d, 0.12, { 70, 74, 80 }, "Metal")
 	end
 	-- wall pack light over the door
 	local wallPack = kit:box(o, "WallPack", -23.2, -21.8, 8.2, 8.9, D1, D1 + 0.5, { 60, 60, 62 }, "Metal")

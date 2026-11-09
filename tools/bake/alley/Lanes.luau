@@ -511,10 +511,10 @@ local function kickbacksAndMasking(kit: any, root: any)
 		local num = kit:box(
 			m,
 			`LaneNumber{lane}`,
-			L.laneX(lane) - 0.8,
-			L.laneX(lane) + 0.8,
-			L.MASK_BOTTOM + 5.2,
-			L.MASK_BOTTOM + 6.8,
+			L.laneX(lane) - 1.2,
+			L.laneX(lane) + 1.2,
+			L.MASK_BOTTOM + 5.0,
+			L.MASK_BOTTOM + 7.4,
 			front - 0.45,
 			front - 0.41,
 			{ 20, 20, 40 },
@@ -981,20 +981,27 @@ local function ceilingLights(kit: any, root: any)
 			)
 		end
 	end
-	local mid = kit:box(
-		m,
-		"LaneWash",
-		-2,
-		2,
-		L.CEILING_Y - 0.1,
-		L.CEILING_Y,
-		26,
-		27,
-		{ 190, 200, 255 },
-		"Neon",
-		{ collide = false }
-	)
-	kit:light(mid, "PointLight", { Range = 40, Brightness = 0.6, Color = { 200, 210, 255 }, Shadows = false })
+	-- a soft wash down the lanes (two lights per pair: the heads and the middle)
+	for p = 1, 3 do
+		for _, d in { 12, 30 } do
+			local wash = kit:cyl(
+				m,
+				"LaneWash",
+				L.pairX(p),
+				L.CEILING_Y - 0.12,
+				d,
+				0.1,
+				1.4,
+				"Y",
+				{ 200, 210, 255 },
+				"Neon",
+				{
+					collide = false,
+				}
+			)
+			kit:light(wash, "PointLight", { Range = 20, Brightness = 0.85, Color = { 214, 222, 255 }, Shadows = false })
+		end
+	end
 	-- ceiling tiles grid over the lane block
 	for d = -15, 52, 8 do
 		kit:box(

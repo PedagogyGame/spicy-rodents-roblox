@@ -235,6 +235,36 @@ function Kit.wedge(
 	return self:at(parent, name, cx, cy, cd, sx, sy, sd, color, material, o)
 end
 
+-- A round rod (cylinder) between two local points.
+function Kit.rod(
+	self: Kit,
+	parent: any,
+	name: string,
+	x0: number,
+	y0: number,
+	d0: number,
+	x1: number,
+	y1: number,
+	d1: number,
+	diameter: number,
+	color: { number },
+	material: string,
+	opts: Opts?
+): any
+	local CFrame = self.roblox.CFrame
+	local a = self:cf(x0, y0, d0).Position
+	local b = self:cf(x1, y1, d1).Position
+	local len = (b - a).Magnitude
+	local o: Opts = table.clone(opts or {})
+	o.shape = "Cylinder"
+	if o.collide == nil then
+		o.collide = false
+	end
+	local p = self:at(parent, name, 0, 0, 0, len, diameter, diameter, color, material, o)
+	p.CFrame = CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.pi / 2, 0)
+	return p
+end
+
 function Kit.light(self: Kit, part: any, class: string, props: { [string]: any }): any
 	local l = self.roblox.Instance.new(class)
 	for k, v in props do

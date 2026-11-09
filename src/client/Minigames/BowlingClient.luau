@@ -259,7 +259,7 @@ function BowlingClient._frame(self: any, dt: number)
 		local root = body and body.PrimaryPart
 		if root then
 			local X = AlleyLayout.laneX(self.lane) + self.offset * (AlleyLayout.LANE_W / 2 - 0.5)
-			local x, _, z = AlleyLayout.toWorld(self.place, X + 0.35, 0, -4.4)
+			local x, _, z = AlleyLayout.toWorld(self.place, X - 0.35, 0, -4.4)
 			local yaw = AlleyLayout.yawOf(self.place) - self.angle
 			root.CFrame = CFrame.new(x, root.Position.Y, z) * CFrame.Angles(0, yaw, 0)
 			root.AssemblyLinearVelocity = Vector3.zero
@@ -283,7 +283,7 @@ function BowlingClient._frame(self: any, dt: number)
 		local root = body and body.PrimaryPart
 		if root and self.slideT < 0.45 then
 			local X = AlleyLayout.laneX(self.lane) + self.offset * (AlleyLayout.LANE_W / 2 - 0.5)
-			local x, _, z = AlleyLayout.toWorld(self.place, X + 0.35, 0, -4.4 + 3.2 * math.min(1, self.slideT / 0.45))
+			local x, _, z = AlleyLayout.toWorld(self.place, X - 0.35, 0, -4.4 + 3.2 * math.min(1, self.slideT / 0.45))
 			root.CFrame = CFrame.new(x, root.Position.Y, z) * root.CFrame.Rotation
 			root.AssemblyLinearVelocity = Vector3.zero
 		elseif self.slideT >= 0.45 then
