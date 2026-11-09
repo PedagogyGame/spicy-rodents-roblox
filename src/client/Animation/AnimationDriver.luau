@@ -17,17 +17,17 @@
 -- Visual root (owner playtest 2026-11-09: bodies bounced up and down and stood half in the grass):
 -- the visible body hangs off the root through the Motor6D named Root, so its C0 carries a client-only
 -- vertical offset and the root itself (the gameplay position the server sees) never moves.
---   * Height smoothing: a critically damped follower with velocity feed-forward tracks the rendered
---     root height (read in RenderStepped, after physics), so slopes are followed with no lag while
---     ground-sampling steps, kerbs and replication steps are eased out; it rises fast and settles
---     slowly, so a body rides the top of any jitter instead of dipping into the ground.
+--   * Height smoothing (settle): a critically damped follower with limited velocity feed-forward
+--     tracks the rendered root height (read in RenderStepped, after physics), so slopes and climbs
+--     are followed without lag while ground-sampling steps, kerbs, jitter and replication steps are
+--     eased out; it rises faster than it settles, so feet do not hang in a kerb for long.
 --   * Ground contact: AI bodies (anchored roots, placed on World/Height's analytic ground by the
 --     server) are lifted or lowered onto what is really under their feet: a short downward ray from
 --     just above the feet, a few times a second, against collidable town parts and the voxel terrain
 --     (whose surface can sit up to about a stud above the analytic height). Possessed bodies stand
 --     on their own motor's raycast ground or Humanoid, so they get smoothing only (people none).
 -- No side effects on require.
--- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; settle(state, y, dt) (pure)
+-- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure)
 
 local Gait = require("./Gait")
 local Import = require("../Import")
@@ -88,14 +88,25 @@ type Entry = {
 	applied: number,
 }
 
-export type Settle = { y: number, v: number, rootV: number, lastY: number, live: boolean }
+-- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
+-- rings of the last root heights (with their times) and short-baseline velocities.
+export type Settle = {
+	y: number,
+	v: number,
+	live: boolean,
+	clock: number,
+	hy: { number },
+	ht: { number },
+	head: number,
+	vel: { number },
+	vi: number,
+}
 
 local AnimationDriver = {}
 
 -- Visual root tuning (studs, seconds, rad/s).
 AnimationDriver.RISE = 30 -- omega while the visual body is below the root (catch up fast)
-AnimationDriver.FALL = 11 -- omega while it is above (settle smoothly)
-AnimationDriver.VELOCITY_TAU = 0.08 -- low-pass on the root's vertical velocity (feed-forward)
+AnimationDriver.FALL = 12 -- omega while it is above (settle smoothly)
 AnimationDriver.MAX_LAG = 0.6 -- the visual body never strays further than this from the root
 AnimationDriver.SNAP = 6 -- a jump bigger than this in one frame is a teleport: no easing
 AnimationDriver.PROBE_EVERY = 0.25
@@ -105,26 +116,68 @@ AnimationDriver.FIX_MIN = -0.75
 AnimationDriver.FIX_MAX = 1.4
 AnimationDriver.CLEARANCE = 0.04 -- soles rest this much above the surface found
 
--- settle(state, y, dt): one frame of the critically damped follower towards the rendered root height
--- y. Pure (Lune-tested). Returns the offset (visual - root) to apply this frame.
+local SHORT, BASE, MEDIAN_N = 3, 12, 7 -- frames: short and long velocity baselines; median window
+local scratch: { number } = table.create(MEDIAN_N, 0)
+
+function AnimationDriver.newSettle(): Settle
+	return {
+		y = 0,
+		v = 0,
+		live = false,
+		clock = 0,
+		hy = table.create(BASE + 1, 0),
+		ht = table.create(BASE + 1, 0),
+		head = 1,
+		vel = table.create(MEDIAN_N, 0),
+		vi = 1,
+	}
+end
+
+-- settle(state, y, dt): one frame of the visual-height follower towards the rendered root height y;
+-- returns the offset (visual - root) to apply. Pure (Lune-tested; tuned against simulated slopes,
+-- kerbs, drops, ground-sampling jitter, the squirrel motor's downhill hop seen through BodyDriver's
+-- one-frame extrapolation, and network-update staircases). A critically damped spring (faster while
+-- the body is below the root) with velocity feed-forward, so slopes and trunk climbs are followed
+-- without lag; the feed-forward is minmod(median of 3-frame velocities, 12-frame velocity): a
+-- one-frame step or a back-and-forth jitter feeds nothing forward, so it is eased, not overshot.
 function AnimationDriver.settle(st: Settle, y: number, dt: number): number
+	local ring = BASE + 1
 	if not st.live or dt <= 0 or math.abs(y - st.y) > AnimationDriver.SNAP then
-		st.y, st.v, st.rootV, st.lastY, st.live = y, 0, 0, y, true
+		st.y, st.v, st.live = y, 0, true
+		for i = 1, ring do
+			st.hy[i], st.ht[i] = y, st.clock
+		end
+		for i = 1, MEDIAN_N do
+			st.vel[i] = 0
+		end
 		return 0
 	end
-	local yPrev = st.lastY
-	st.lastY = y
-	st.rootV += ((y - yPrev) / dt - st.rootV) * (1 - math.exp(-dt / AnimationDriver.VELOCITY_TAU))
-	-- the target moves at rootV through the frame: relative to it the error decays as an exact
-	-- critically damped spring; whatever the root did beyond that (a step) becomes new error
+	st.clock += dt
+	st.head = st.head % ring + 1
+	st.hy[st.head], st.ht[st.head] = y, st.clock
+	local s = (st.head - 1 - SHORT) % ring + 1
+	local b = (st.head - 1 - BASE) % ring + 1
+	local ds, db = st.clock - st.ht[s], st.clock - st.ht[b]
+	st.vi = st.vi % MEDIAN_N + 1
+	st.vel[st.vi] = if ds > 0 then (y - st.hy[s]) / ds else 0
+	table.move(st.vel, 1, MEDIAN_N, 1, scratch)
+	table.sort(scratch)
+	local short = scratch[(MEDIAN_N + 1) // 2]
+	local long = if db > 0 then (y - st.hy[b]) / db else 0
+	local rv = if short * long > 0 then (if math.abs(short) < math.abs(long) then short else long) else 0
+	-- the target moves at rv through the frame; semi-implicit substeps (stable for any frame time)
 	local w = if st.y < y then AnimationDriver.RISE else AnimationDriver.FALL
-	local err, errV = st.y - yPrev, st.v - st.rootV
-	local decay = math.exp(-w * dt)
-	local k = (errV + w * err) * dt
-	err = (err + k) * decay
-	errV = (errV - w * k) * decay
-	local off = math.clamp(yPrev + st.rootV * dt + err - y, -AnimationDriver.MAX_LAG, AnimationDriver.MAX_LAG)
-	st.y, st.v = y + off, st.rootV + errV
+	local span = math.min(dt, 0.1)
+	local n = math.clamp(math.ceil(span * 480), 1, 48)
+	local h = span / n
+	local yv, v = st.y, st.v
+	for j = 1, n do
+		local target = y - rv * (span - j * h)
+		v += (w * w * (target - yv) + 2 * w * (rv - v)) * h
+		yv += v * h
+	end
+	local off = math.clamp(yv - y, -AnimationDriver.MAX_LAG, AnimationDriver.MAX_LAG)
+	st.y, st.v = y + off, v
 	return off
 end
 
@@ -286,7 +339,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			rootAttach = rootAttach,
 			baseC0 = if rootJoint then rootJoint.C0 elseif rootAttach then rootAttach.CFrame else CFrame.identity,
 			footDrop = footDropOf(model, root),
-			settle = { y = 0, v = 0, rootV = 0, lastY = 0, live = false },
+			settle = AnimationDriver.newSettle(),
 			fix = 0,
 			fixTarget = 0,
 			nextProbe = os.clock() + ((#model.Name * 0.173) % 1) * AnimationDriver.PROBE_EVERY,

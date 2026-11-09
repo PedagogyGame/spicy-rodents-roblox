@@ -23,7 +23,9 @@ Beams are cylinders of diameter = width between their attachments' world points.
 
 Materials: one attribute-driven principled shader for opaque parts (colour, roughness and metallic per face
 from the Roblox Material name), an emission shader for Neon, an alpha shader for Transparency > 0. Glass at
-Transparency 0 renders opaque and glossy, as Roblox draws it. Terrain is a heightfield of World/Height
+Transparency 0 renders opaque and glossy, as Roblox draws it. Parts whose top faces coincide get distinct
+hair-thin lifts (coplanar_lift, <= 0.024 st) so Cycles does not shade them black; Roblox z-fights there, and
+export.luau reports those overlaps (`zfight`). Terrain is a heightfield of World/Height
 (export.luau) coloured with the WorldTerrain material colours; river columns get a water sheet.
 Light: a warm sun plus a gradient sky, roughly LightingPreset.GOLDEN (16:00 sun from the south-west with
 the game's North = +Z, i.e. from +X/-Z); approximate, not the engine's exact sun.

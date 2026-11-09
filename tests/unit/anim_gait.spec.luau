@@ -91,16 +91,14 @@ return function(t)
 
 	t.test("settle: slopes without lag, steps eased (rising fast), jitter damped, teleports snap", function()
 		local dt = 1 / 60
-		local function fresh(): AnimationDriver.Settle
-			return { y = 0, v = 0, rootV = 0, lastY = 0, live = false }
-		end
+		local fresh = AnimationDriver.newSettle
 		-- a steady climb at 5 st/s: the visual height converges onto the root
 		local st = fresh()
 		local off = 0
 		for i = 0, 120 do
 			off = AnimationDriver.settle(st, 10 + 5 * i * dt, dt)
 		end
-		t.truthy(math.abs(off) < 0.01, `slope lag {off}`)
+		t.truthy(math.abs(off) < 0.02, `slope lag {off}`)
 		-- a 0.5 st kerb: below the root at first, never more than MAX_LAG, gone in a quarter second
 		st = fresh()
 		AnimationDriver.settle(st, 0, dt)
@@ -115,17 +113,38 @@ return function(t)
 		AnimationDriver.settle(st, 0.5, dt)
 		local down = AnimationDriver.settle(st, 0, dt)
 		t.truthy(down > 0.3, `step down first frame {down}`)
-		-- 11 Hz ground-sampling jitter of +/-0.08 st: the visual body moves a fraction of it
-		st = fresh()
-		local lo, hi = math.huge, -math.huge
-		for i = 0, 600 do
-			local y = 0.08 * (if math.floor(i * dt * 22) % 2 == 0 then 1 else -1)
-			AnimationDriver.settle(st, y, dt)
-			if i > 120 then
-				lo, hi = math.min(lo, st.y), math.max(hi, st.y)
-			end
+		local lowest = down
+		for _ = 1, 60 do
+			lowest = math.min(lowest, AnimationDriver.settle(st, 0, dt))
 		end
-		t.truthy(hi - lo < 0.16 * 0.35, `jitter {hi - lo} of 0.16`)
+		t.truthy(lowest > -0.01, `a step down never dips below the ground ({lowest})`)
+		-- a kerb never overshoots above the new level
+		st = fresh()
+		AnimationDriver.settle(st, 0, dt)
+		local highest = -math.huge
+		for _ = 1, 60 do
+			highest = math.max(highest, AnimationDriver.settle(st, 0.5, dt))
+		end
+		t.truthy(highest < 0.01, `kerb overshoot {highest}`)
+		-- +/-0.08 st jitter at several frame periods: the visual body moves a fraction of it
+		for _, half in { 1, 2, 3, 4 } do
+			st = fresh()
+			local lo, hi = math.huge, -math.huge
+			for i = 0, 600 do
+				local y = 0.08 * (if (i // half) % 2 == 0 then 1 else -1)
+				AnimationDriver.settle(st, y, dt)
+				if i > 120 then
+					lo, hi = math.min(lo, st.y), math.max(hi, st.y)
+				end
+			end
+			t.truthy(hi - lo < 0.16 * 0.2, `jitter every {half} frames: {hi - lo} of 0.16`)
+		end
+		-- a climb at 18 st/s seen as network updates every third frame: followed, barely lagging
+		st = fresh()
+		for i = 0, 240 do
+			off = AnimationDriver.settle(st, 18 * (i - i % 3) * dt, dt)
+		end
+		t.truthy(math.abs(off) < 0.25, `staircase climb lag {off}`)
 		-- a teleport snaps
 		st = fresh()
 		AnimationDriver.settle(st, 0, dt)
