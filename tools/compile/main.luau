@@ -17,6 +17,7 @@ local Migrate = require("./lib/Migrate")
 local Report = require("./lib/Report")
 local W1 = require("./lib/W1")
 local Attractions = require("./lib/Attractions")
+local Expansion = require("./lib/Expansion")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -438,6 +439,32 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	})
 	if attractionsModule then
 		table.insert(w1.modules, attractionsModule)
+	end
+	-- data/expansion.json: the batch 2 town expansion layout (docs/waves/BATCH2_SPEC.md), checked against the town
+	local terrainExtensions = nil
+	for _, m in w1.modules do
+		if m.name == "TerrainExtensions" then
+			terrainExtensions = m.value
+		end
+	end
+	local expansionModule = Expansion.compile({
+		repo = repo,
+		lots = lots,
+		roads = roads,
+		routes = routesConv,
+		trees = wildlife.trees.trees,
+		appleTrees = wildlife.apple_trees.appleTrees,
+		terrainExtensions = terrainExtensions,
+		invariant = invariant,
+		compare = compare,
+		schemaError = function(path: string, errs: { Schema.Error })
+			errorsTotal += #errs
+			filesValidated += 1
+			stdio.ewrite("compile: schema errors in " .. path .. "\n" .. Schema.formatErrors(path, errs) .. "\n")
+		end,
+	})
+	if expansionModule then
+		table.insert(w1.modules, expansionModule)
 	end
 
 	for _, c in comparisons do

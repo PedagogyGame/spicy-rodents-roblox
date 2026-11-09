@@ -5,7 +5,8 @@ Conventions (clips.py): Blender axes, front -Y, left +X; Rx(+) tips a forward-po
 and lifts a backward-pointing one (the tail); Root carries the whole body about PIVOT.
 Timing references: v5.4's bite dance (2.1 s: spin 0.78 sin 12t, roll 0.17 sin 15t, hops |sin 10t|,
 head 0.24 sin 7t, eased in and out over 1/6 s); the game drives playback rate from speed
-(routes_movement §14), so `nominal_speed` is the speed (studs/s) at which a cycle plays at 1x.
+(routes_movement §14), so `nominal_speed` is the no-slide ground speed (studs/s) at 1x: the hind
+stride over the stance time, stride / (duty x cycle).
 """
 import math
 
@@ -137,7 +138,7 @@ def walk(rig, n=24):
         return build_pose(rig, P, CFG)
 
     return {"name": "Walk", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": 0.33 / (n / 30) * 1.0, "keys": [0, 6, 12, 18], "brief": "walk"}
+            "nominal_speed": round(0.34 / (0.62 * n / 30), 2), "keys": [0, 6, 12, 18], "brief": "walk"}
 
 
 def run(rig, n=14):
@@ -162,9 +163,8 @@ def run(rig, n=14):
         }
         return build_pose(rig, P, CFG)
 
-    stride = 1.6  # studs travelled per cycle at 1x (about a body length: a lively bound)
     return {"name": "Run", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(stride / (n / 30), 2), "keys": [0, 4, 7, 11], "brief": "run",
+            "nominal_speed": round(0.64 / (0.3 * n / 30), 2), "keys": [0, 4, 7, 11], "brief": "run",
             "markers": ((0.0, "Commit", "stride"),)}
 
 
@@ -196,7 +196,7 @@ def climb(rig, n=18):
         return build_pose(rig, P, CFG)
 
     return {"name": "Climb", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(0.9 / (n / 30), 2), "keys": [0, 5, 9, 14], "view": [-25, 58], "brief": "climb"}
+            "nominal_speed": round(0.4 / (0.5 * n / 30), 2), "keys": [0, 5, 9, 14], "view": [-25, 58], "brief": "climb"}
 
 
 def wire(rig, n=30):
@@ -223,7 +223,7 @@ def wire(rig, n=30):
         return build_pose(rig, P, CFG)
 
     return {"name": "Wire", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(0.55 / (n / 30), 2), "keys": [0, 8, 15, 23], "view": [-30, 24], "brief": "wire traversal"}
+            "nominal_speed": round(0.28 / (0.55 * n / 60), 2), "keys": [0, 8, 15, 23], "view": [-30, 24], "brief": "wire traversal"}
 
 
 def stalk(rig, n=36):
@@ -252,7 +252,7 @@ def stalk(rig, n=36):
         return build_pose(rig, P, CFG)
 
     return {"name": "Stalk", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(0.23 / (n / 30), 2), "keys": [0, 9, 18, 27], "brief": "sneak (stalk)"}
+            "nominal_speed": round(0.24 / (0.76 * n / 30), 2), "keys": [0, 9, 18, 27], "brief": "sneak (stalk)"}
 
 
 # ---- one-shots --------------------------------------------------------------------------------------

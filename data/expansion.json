@@ -142,6 +142,7 @@
       "family": "F2",
       "kind": "concrete",
       "rect": { "x0": 1394, "z0": 118, "x1": 1610, "z1": 130 },
+      "keeps": ["detail_41_park_bench"],
       "notes": "service alley behind the north-east shop row (dumpsters)"
     },
     {
@@ -163,6 +164,7 @@
       "family": "F2",
       "kind": "forecourt",
       "rect": { "x0": 915.5, "z0": 47.6, "x1": 1099, "z1": 61.5 },
+      "keeps": ["detail_45_streetlight"],
       "notes": "paved forecourt between the north sidewalk and the north-west shop fronts (poles 208/210 stand in it)"
     },
     {
@@ -184,6 +186,7 @@
       "family": "F2",
       "kind": "forecourt",
       "rect": { "x0": 915.5, "z0": -61.5, "x1": 1092, "z1": -47.6 },
+      "keeps": ["detail_39_fire_hydrant"],
       "notes": "paved forecourt in front of the diner and the laundromat (pole 194/196, hydrant detail_39)"
     },
     {
@@ -191,6 +194,7 @@
       "family": "F2",
       "kind": "forecourt",
       "rect": { "x0": 1374, "z0": -61.5, "x1": 1660, "z1": -47.6 },
+      "keeps": ["detail_46_streetlight"],
       "notes": "paved forecourt in front of the south-east row (poles 200/202, streetlight detail_46)"
     },
     {
@@ -247,6 +251,7 @@
       "family": "F2",
       "kind": "plaza",
       "rect": { "x0": 994, "z0": -110, "x1": 1058, "z1": -62 },
+      "keeps": ["detail_40_park_bench"],
       "notes": "Elm Corner: the pocket park around Tree_818 and the v5.4 bench (detail_40) between the diner and the laundromat"
     }
   ],
@@ -363,7 +368,7 @@
         { "id": "shelf_21", "kind": "item_shelf", "at": [-20, 3, -16], "yaw": 90, "owner": "F1" },
         { "id": "shelf_22", "kind": "item_shelf", "at": [-12, 3, 20], "yaw": 90, "owner": "F1" },
         { "id": "cooler", "kind": "cooler", "at": [-20, 0, 16], "yaw": 90, "owner": "F1" },
-        { "id": "dumpster", "kind": "dumpster", "at": [-12, 0, 27], "yaw": 0, "owner": "F1", "forage": "dumpster" },
+        { "id": "dumpster", "kind": "dumpster", "at": [-12, 0, 36], "yaw": 0, "owner": "F1", "forage": "dumpster" },
         { "id": "bench_front", "kind": "seat", "at": [14, 0, -26], "yaw": 180, "owner": "F1" }
       ],
       "features": ["1970s_layout", "checkout_counter", "22_shelf_items", "price_tags", "bell_on_door", "dumpster"],
@@ -398,7 +403,7 @@
         { "id": "pole", "kind": "barber_pole", "at": [-15, 6, -20.5], "yaw": 0, "owner": "F1" },
         { "id": "register", "kind": "counter", "at": [8, 0, -12], "yaw": 0, "owner": "F1" },
         { "id": "staff", "kind": "staff_post", "at": [-3, 0, 3], "yaw": -90, "owner": "F1" },
-        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 25], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 34], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["two_chairs", "spinning_pole", "waiting_bench", "radio", "mirror_wall", "haircut_interaction"],
       "partBudget": 700,
@@ -430,7 +435,7 @@
         { "id": "staff", "kind": "staff_post", "at": [0, 0, -2], "yaw": 180, "owner": "F1" },
         { "id": "table_1", "kind": "seat", "at": [-9, 0, -27], "yaw": 0, "owner": "F1" },
         { "id": "table_2", "kind": "seat", "at": [9, 0, -27], "yaw": 0, "owner": "F1" },
-        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 27], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 36], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["display_cases", "counter_service", "sidewalk_tables", "dumpster"],
       "partBudget": 500,
@@ -466,7 +471,7 @@
         { "id": "seat_4", "kind": "seat", "at": [8, 0, -10], "yaw": 0, "owner": "F1", "reputation": true },
         { "id": "seat_5", "kind": "seat", "at": [12, 0, 0], "yaw": 0, "owner": "F1", "reputation": true },
         { "id": "seat_6", "kind": "seat", "at": [-12, 0, -8], "yaw": 0, "owner": "F1", "reputation": true },
-        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 27], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 36], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["espresso_bar", "reputation_seats", "sidewalk_tables", "armchairs", "dumpster"],
       "partBudget": 550,
@@ -565,7 +570,7 @@
         { "id": "table_1", "kind": "seat", "at": [-10, 0, -30], "yaw": 0, "owner": "F1" },
         { "id": "table_2", "kind": "seat", "at": [10, 0, -30], "yaw": 0, "owner": "F1" },
         { "id": "delivery", "kind": "gig_post", "at": [-14, 0, 18], "yaw": 0, "owner": "F1", "gig": "gig_delivery" },
-        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 30], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 39], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["brick_oven", "red_check_tables", "delivery_gig_post", "sidewalk_tables", "dumpster"],
       "partBudget": 550,
@@ -599,7 +604,7 @@
         { "id": "table_1", "kind": "seat", "at": [-8, 0, 4], "yaw": 0, "owner": "F1" },
         { "id": "table_2", "kind": "seat", "at": [8, 0, 10], "yaw": 0, "owner": "F1" },
         { "id": "delivery", "kind": "gig_post", "at": [14, 0, 18], "yaw": 0, "owner": "F1", "gig": "gig_delivery" },
-        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 30], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 39], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["round_tables_lazy_susan", "fish_tank", "lanterns", "delivery_gig_post", "dumpster"],
       "partBudget": 600,
@@ -674,7 +679,7 @@
         { "id": "booth_3", "kind": "seat", "at": [12, 0, -12], "yaw": 0, "owner": "F1" },
         { "id": "booth_4", "kind": "seat", "at": [22, 0, -12], "yaw": 0, "owner": "F1" },
         { "id": "pie_case", "kind": "display", "at": [8, 3, 4], "yaw": 0, "owner": "F1" },
-        { "id": "dumpster", "kind": "dumpster", "at": [20, 0, 25], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [20, 0, 34], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["chrome_diner_car", "counter_stools", "booths", "jukebox", "pie_case", "dumpster"],
       "partBudget": 650,
@@ -706,7 +711,7 @@
         { "id": "staff", "kind": "staff_post", "at": [-6, 0, 12], "yaw": 180, "owner": "F1" },
         { "id": "patio_1", "kind": "seat", "at": [-10, 0, -31], "yaw": 0, "owner": "F1" },
         { "id": "patio_2", "kind": "seat", "at": [8, 0, -31], "yaw": 0, "owner": "F1" },
-        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 31], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 40], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["papel_picado_lights", "salsa_bar", "patio_tables", "dumpster"],
       "partBudget": 550,
@@ -809,7 +814,7 @@
         { "id": "patio_2", "kind": "seat", "at": [43, 0, -18], "yaw": 0, "owner": "F1" },
         { "id": "patio_3", "kind": "seat", "at": [32, 0, -2], "yaw": 0, "owner": "F1" },
         { "id": "patio_4", "kind": "seat", "at": [43, 0, -2], "yaw": 0, "owner": "F1" },
-        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 33], "yaw": 0, "owner": "F1", "forage": "dumpster" }
+        { "id": "dumpster", "kind": "dumpster", "at": [0, 0, 42], "yaw": 0, "owner": "F1", "forage": "dumpster" }
       ],
       "features": ["bar_counter", "open_grill", "side_patio", "string_lights", "dumpster"],
       "partBudget": 700,
@@ -1369,7 +1374,7 @@
       "facing": "+X",
       "yaw": 1.570796,
       "footprint": { "w": 36, "d": 34 },
-      "site": { "x0": -34, "x1": 34, "d0": -17, "d1": 60 },
+      "site": { "x0": -34, "x1": 34, "d0": -31.5, "d1": 60 },
       "storeys": 1,
       "height": 16,
       "floorY": 4.2,
@@ -1401,7 +1406,7 @@
       "facing": "+X",
       "yaw": 1.570796,
       "footprint": { "w": 36, "d": 34 },
-      "site": { "x0": -34, "x1": 34, "d0": -17, "d1": 60 },
+      "site": { "x0": -34, "x1": 34, "d0": -31.5, "d1": 60 },
       "storeys": 2,
       "height": 26,
       "floorY": 7.5,
@@ -1433,7 +1438,7 @@
       "facing": "+X",
       "yaw": 1.570796,
       "footprint": { "w": 36, "d": 34 },
-      "site": { "x0": -34, "x1": 34, "d0": -17, "d1": 60 },
+      "site": { "x0": -34, "x1": 34, "d0": -31.5, "d1": 60 },
       "storeys": 2,
       "height": 26,
       "floorY": 11.8,
@@ -1465,7 +1470,7 @@
       "facing": "-X",
       "yaw": -1.570796,
       "footprint": { "w": 36, "d": 34 },
-      "site": { "x0": -34, "x1": 34, "d0": -17, "d1": 60 },
+      "site": { "x0": -34, "x1": 34, "d0": -31.5, "d1": 60 },
       "storeys": 1,
       "height": 16,
       "floorY": 9.1,
@@ -1497,7 +1502,7 @@
       "facing": "-X",
       "yaw": -1.570796,
       "footprint": { "w": 36, "d": 34 },
-      "site": { "x0": -34, "x1": 34, "d0": -17, "d1": 60 },
+      "site": { "x0": -34, "x1": 34, "d0": -31.5, "d1": 60 },
       "storeys": 2,
       "height": 26,
       "floorY": 12.9,
@@ -1529,7 +1534,7 @@
       "facing": "-X",
       "yaw": -1.570796,
       "footprint": { "w": 36, "d": 34 },
-      "site": { "x0": -34, "x1": 34, "d0": -17, "d1": 60 },
+      "site": { "x0": -34, "x1": 34, "d0": -31.5, "d1": 60 },
       "storeys": 1,
       "height": 16,
       "floorY": 14,
@@ -2117,7 +2122,7 @@
       "id": "zone_jetski",
       "kind": "jetski_water",
       "family": "F4",
-      "rect": { "x0": 900, "z0": 1500, "x1": 1780, "z1": 1720 },
+      "rect": { "x0": 900, "z0": 1520, "x1": 1780, "z1": 1720 },
       "notes": "jet-ski riding water, buoyed; the marina breakwater (x 1798) and the pier (x -150) stay outside"
     },
     {

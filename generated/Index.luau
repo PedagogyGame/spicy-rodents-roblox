@@ -17,6 +17,10 @@ return {
 			count = 87,
 			chunks = { "Cast" },
 		},
+		Expansion = {
+			count = 1,
+			chunks = { "Expansion" },
+		},
 		Forks = {
 			count = 95,
 			chunks = { "Forks" },

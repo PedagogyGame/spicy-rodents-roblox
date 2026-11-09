@@ -32,7 +32,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^xp_[a-z0-9_]+$" }, "family": { "$ref": "#/$defs/family" },
         "kind": { "enum": ["asphalt", "concrete", "forecourt", "parking", "plaza"] },
-        "rect": { "$ref": "#/$defs/rect" }, "notes": { "type": "string" }
+        "rect": { "$ref": "#/$defs/rect" }, "keeps": { "type": "array", "items": { "type": "string" } }, "notes": { "type": "string" }
       }
     },
     "path": {

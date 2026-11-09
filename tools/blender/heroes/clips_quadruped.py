@@ -4,7 +4,7 @@ the body about PIVOT, legs by IK to a toe (fox: ball of the paw; deer: fetlock) 
 
 Gaits (footfall phases, fraction of the cycle): walk = lateral sequence (LH 0, LF .25, RH .5, RF .75);
 trot = diagonal pairs (LF+RH, RF+LH); run = rotary gallop (fox) / bounding gallop with the white flag up
-(deer). `nominal_speed` = studs per second at which the cycle plays at 1x.
+(deer). `nominal_speed` = the no-slide ground speed at 1x, stride / (duty x cycle), studs/s.
 """
 import math
 
@@ -147,7 +147,7 @@ def walk(S, n):
         return build_pose(S.rig, P, S.cfg)
 
     return {"name": "Walk", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(stride * 1.1 / (n / 30), 2), "keys": [0, n // 4, n // 2, 3 * n // 4], "brief": "walk"}
+            "nominal_speed": round(stride / (0.64 * n / 30), 2), "keys": [0, n // 4, n // 2, 3 * n // 4], "brief": "walk"}
 
 
 def trot(S, n):
@@ -169,7 +169,7 @@ def trot(S, n):
         return build_pose(S.rig, P, S.cfg)
 
     return {"name": "Trot", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(stride * 2 / (n / 30), 2), "keys": [0, n // 4, n // 2, 3 * n // 4], "brief": "trot"}
+            "nominal_speed": round(stride / (0.42 * n / 30), 2), "keys": [0, n // 4, n // 2, 3 * n // 4], "brief": "trot"}
 
 
 def run(S, n):
@@ -194,7 +194,7 @@ def run(S, n):
         return build_pose(S.rig, P, S.cfg)
 
     return {"name": "Run", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(stride * 2.2 / (n / 30), 2), "keys": [0, n // 4, n // 2, 3 * n // 4], "brief": "run" if fox else "run (bolt)"}
+            "nominal_speed": round(stride / (0.3 * n / 30), 2), "keys": [0, n // 4, n // 2, 3 * n // 4], "brief": "run" if fox else "run (bolt)"}
 
 
 def leap(S, n=36):

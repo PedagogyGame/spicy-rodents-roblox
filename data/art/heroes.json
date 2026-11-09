@@ -4,10 +4,10 @@
     "squirrel": {
       "rig": "squirrel",
       "model": {
-        "assetId": "99050824695337",
+        "assetId": "125654770584412",
         "moderation": "Approved",
-        "fbxBytes": 3911660,
-        "sha": "8a4fb6077e3f3e70"
+        "fbxBytes": 3864940,
+        "sha": "72cc1b10e456fed0"
       },
       "bones": 35,
       "bonesMatchRigSpec": true,
@@ -34,20 +34,20 @@
         }
       },
       "tris": {
-        "total": 12724,
-        "Body": 6631,
-        "Pattern": 1061,
+        "total": 12732,
+        "Body": 7267,
+        "Pattern": 425,
         "Eyes": 448,
-        "FurCards": 4584
+        "FurCards": 4592
       },
       "regions": {
         "Body": {
-          "tris": 6631,
+          "tris": 7267,
           "alphaMode": "TintMask",
           "tint": "#c27442"
         },
         "Pattern": {
-          "tris": 1061,
+          "tris": 425,
           "alphaMode": "TintMask",
           "tint": "#f5d8ac"
         },
@@ -56,7 +56,7 @@
           "alphaMode": "Overlay"
         },
         "FurCards": {
-          "tris": 4584,
+          "tris": 4592,
           "alphaMode": "Transparency",
           "tint": "#c27442"
         }
@@ -239,10 +239,10 @@
     "rodent": {
       "rig": "squirrel",
       "model": {
-        "assetId": "117655261191645",
+        "assetId": "86042493224567",
         "moderation": "Approved",
-        "fbxBytes": 3931148,
-        "sha": "61eaf414df418b7d"
+        "fbxBytes": 3904844,
+        "sha": "50fe9e3e1b3c1f1e"
       },
       "bones": 35,
       "bonesMatchRigSpec": true,
@@ -274,21 +274,21 @@
         }
       },
       "tris": {
-        "total": 10422,
-        "Body": 6511,
-        "Pattern": 1181,
+        "total": 10498,
+        "Body": 7222,
+        "Pattern": 470,
         "Eyes": 448,
-        "FurCards": 1768,
+        "FurCards": 1844,
         "Blood": 514
       },
       "regions": {
         "Body": {
-          "tris": 6511,
+          "tris": 7222,
           "alphaMode": "TintMask",
           "tint": "#7d5d46"
         },
         "Pattern": {
-          "tris": 1181,
+          "tris": 470,
           "alphaMode": "TintMask",
           "tint": "#a08a74"
         },
@@ -302,7 +302,7 @@
           }
         },
         "FurCards": {
-          "tris": 1768,
+          "tris": 1844,
           "alphaMode": "Transparency",
           "tint": "#7d5d46"
         },
@@ -963,7 +963,7 @@
       "scale": 1.1
     }
   },
-  "generated": "2026-11-09T20:29:41Z",
+  "generated": "2026-11-09T20:44:28Z",
   "notes": [
     "Models: Open Cloud Model uploads of the FBX (tools/blender/heroes). InsertService:LoadAsset gives a Model with a Part named RootPart (transparent, at the origin = the ground under the body centre) carrying the Bone tree (Root > Hips > ...), one skinned MeshPart per region joined to RootPart by a Motor6D, and an AnimationController.",
     "Every Bone arrives with an identity rest rotation, so the clips (spicy-clip/1: Pose.CFrame = local delta in an axis-aligned joint frame) play unchanged on these rigs and on the part-built puppets.",
