@@ -17,18 +17,18 @@ return function(t)
 	local lanes, skipped = LaneMath.load(records)
 
 	t.test(
-		"lanes: 18 straight + 1 loop from the 25 compiled records (6 polyline/segment/template lanes are W1); poses and yaws (traffic.md §3)",
+		"lanes: all 25 compiled records load as 36 lanes (W1 expands the polyline, segment, template and lane-set records); poses and yaws (traffic.md §3)",
 		function()
 			local n = 0
 			for _ in lanes do
 				n += 1
 			end
-			t.eq(n, 19)
+			t.eq(n, 36)
 			local skippedN = 0
 			for _ in skipped do
 				skippedN += 1
 			end
-			t.eq(skippedN, 6, "polyline/segment/template lanes are W1")
+			t.eq(skippedN, 0, "no record is skipped")
 			local nb = lanes["res_main_ns_northbound"]
 			t.near(nb.length, Units.st(520), 1e-9)
 			local p = LaneMath.pointAt(nb, Units.st(10))

@@ -1,129 +1,101 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Controllers.Squirrel
--- W0 (spike S2) ground motor for a possessed non-Humanoid squirrel body (the AnimationController
--- puppet). The client owns the unanchored assembly and writes its root CFrame and velocity every
--- PreSimulation; a local VectorForce cancels gravity between writes (it exists only where the
--- assembly is simulated, on this client). Input is the default PlayerModule move vector, made
--- camera-relative; Shift sprints. The motor resumes where the body is rendered on this client
--- with the snapshot's heading and momentum, holding the AI's direction for up to 0.75 s or until
--- the first input, and closes the gap to the server's snapshot track over `catchUp` seconds
--- (0.25 s), so neither the possessor (no snap) nor other clients (no long slide back) see a jump.
--- The raw gap is recorded by PossessionClient (metrics.gap) for the S2 checklist.
--- W1 replaces this with Shared/Movement/SquirrelMotor (rails, S3) behind the same start/stop.
+-- Controller for a held squirrel (and the rodent, a squirrel actor with Variant "spicy"):
+-- Shared/Movement/SquirrelMotor (the v5.4 updatePlayer port: ground, rails, leap, drop, grab, fork
+-- and junction choice, pounce; plus the trampoline bounce) driven by InputMap through BodyDriver
+-- (BUILD_PLAN §1.4 Controllers, D2, §4.4 #5; the S2 ground-only controller is replaced behind the
+-- same start/stop). The rail world (Movement/RailWorld) builds in the background on the client;
+-- until it is ready the body runs on the ground with QuadrupedMotor's squirrel parameters.
+-- Possession carry-over (§1.5 step 5): the motor starts at the rendered pose with the snapshot's
+-- heading and momentum; an AI squirrel suspended on a rail (snapshot.brain.routeId, s, dir) resumes
+-- on that rail at the same arc position; the AI's direction is held for up to holdSeconds or until
+-- the first input.
+-- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input }
 -- No side effects on require.
--- Interface: start(body, payload, metrics, opts?) -> stop()
 
-export type Metrics = { [string]: any }
-export type Opts = { walk: number?, sprint: number?, accel: number?, catchUp: number?, ignore: { Instance }? }
+local Import = require("../Import")
+local SquirrelMotor =
+	Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
+local BodyDriver = require("./BodyDriver")
+local Quadruped = require("./Quadruped")
 
 local Squirrel = {}
 
-function Squirrel.start(body: Model, payload: { [string]: any }, metrics: Metrics, opts: Opts?): () -> ()
-	local RunService = game:GetService("RunService")
-	local UserInputService = game:GetService("UserInputService")
-	local Players = game:GetService("Players")
-	local o = opts or {}
-	local walk = o.walk or 20 -- 8 u/s (Species.squirrel.speeds.walk)
-	local sprint = o.sprint or 42 -- 16.8 u/s
-	local accel = o.accel or 10 -- 1/s approach rate
-	local catchUp = o.catchUp or 0.25 -- seconds to close the rendered-vs-snapshot gap
+function Squirrel.start(body: Model, payload: { [string]: any }, metrics: { [string]: any }, ctx: { [string]: any }): () -> ()
 	local root = body.PrimaryPart
 	if root == nil then
 		return function() end
 	end
-	local rootPart = root :: BasePart
-
+	local world = ctx.world
+	local rail = world.rail()
+	if rail == nil then
+		-- rail world still building: ground only until the next possession
+		metrics.squirrelGroundOnly = true
+		return Quadruped.start(body, payload, metrics, { world = world, input = ctx.input, species = "squirrel" })
+	end
+	local input = ctx.input
+	local pos = root.Position
+	local ground = world.groundAt(pos.X, pos.Z, pos.Y)
+	local hip = math.clamp(pos.Y - ground, 0.1, 3)
 	local snap = payload.snapshot
-	local pos = rootPart.Position
-	-- horizontal offset from where this client renders the body to the server's snapshot
-	local offset = Vector3.new(payload.snapshot.x - pos.X, 0, payload.snapshot.z - pos.Z)
-	local yaw = snap.yaw
-	local vel = Vector3.new(snap.vx, 0, snap.vz)
-	local holdUntil = os.clock() + payload.holdSeconds
-	local holding = vel.Magnitude > 0.1
-
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = o.ignore or { body }
-	local function groundY(p: Vector3): number?
-		local hit = workspace:Raycast(p + Vector3.new(0, 6, 0), Vector3.new(0, -40, 0), params)
-		return if hit then hit.Position.Y else nil
-	end
-	local g0 = groundY(pos)
-	local hip = if g0 then pos.Y - g0 else 0.5
-
-	local antiGravity = Instance.new("VectorForce")
-	local attach = Instance.new("Attachment")
-	attach.Parent = rootPart
-	antiGravity.Attachment0 = attach
-	antiGravity.RelativeTo = Enum.ActuatorRelativeTo.World
-	antiGravity.ApplyAtCenterOfMass = true
-	antiGravity.Force = Vector3.new(0, rootPart.AssemblyMass * workspace.Gravity, 0)
-	antiGravity.Parent = rootPart
-
-	local ctl: any? = nil
-	pcall(function()
-		local ps = (Players.LocalPlayer :: any).PlayerScripts :: Instance
-		ctl = (require :: any)(ps:WaitForChild("PlayerModule", 5)):GetControls()
-	end)
-	local inputAt: number? = nil
-	local inputVel = Vector3.zero
-
-	local conns = {}
-	table.insert(
-		conns,
-		RunService.PreSimulation:Connect(function(dt: number)
-			local move = if ctl then ctl:GetMoveVector() :: Vector3 else Vector3.zero
-			local target: Vector3
-			if move.Magnitude > 0.05 then
-				holding = false
-				if inputAt == nil then
-					inputAt = os.clock()
-					inputVel = vel
-				end
-				local cam = workspace.CurrentCamera.CFrame
-				local fwd = Vector3.new(cam.LookVector.X, 0, cam.LookVector.Z)
-				fwd = if fwd.Magnitude > 1e-3 then fwd.Unit else Vector3.new(0, 0, -1)
-				local right = Vector3.new(-fwd.Z, 0, fwd.X)
-				local wish = right * move.X - fwd * move.Z
-				local speed = if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then sprint else walk
-				target = (if wish.Magnitude > 1 then wish.Unit else wish) * speed
-			elseif holding and os.clock() < holdUntil then
-				target = vel
-			else
-				holding = false
-				target = Vector3.zero
-			end
-			vel += (target - vel) * math.min(1, accel * dt)
-			pos += vel * dt
-			if offset.Magnitude > 1e-3 then
-				local corr = offset * math.min(1, dt / catchUp)
-				pos += corr
-				offset -= corr
-			end
-			if vel.Magnitude > 0.5 then
-				yaw = math.atan2(-vel.X, -vel.Z)
-			end
-			local gy = groundY(pos)
-			if gy then
-				pos = Vector3.new(pos.X, gy + hip, pos.Z)
-			end
-			rootPart.CFrame = CFrame.new(pos) * CFrame.Angles(0, yaw, 0)
-			rootPart.AssemblyLinearVelocity = vel
-			rootPart.AssemblyAngularVelocity = Vector3.zero
-			local t0 = inputAt
-			if t0 and metrics.inputToMoveMs == nil and (vel - inputVel).Magnitude > 1 then
-				metrics.inputToMoveMs = math.floor((os.clock() - t0) * 1000 + 0.5)
-			end
-		end)
-	)
-	return function()
-		for _, c in conns do
-			c:Disconnect()
+	local state = SquirrelMotor.new(pos.X, ground, pos.Z)
+	state.yaw = (snap.yaw or 0) + math.pi
+	state.vx, state.vz = snap.vx or 0, snap.vz or 0
+	local b = snap.brain
+	if b and b.routeId and b.routeId ~= 0 then
+		local route = rail.registry:get(b.routeId)
+		if route and route.length > 0 then
+			state.routeId = b.routeId
+			state.railT = math.clamp((b.s or 0) / route.length, 0, 1)
+			state.railDir = if (b.dir or 1) >= 0 then 1 else -1
+			state.grounded = false
 		end
-		antiGravity:Destroy()
-		attach:Destroy()
 	end
+	local motorWorld = {
+		registry = rail.registry,
+		index = rail.index,
+		graph = rail.graph,
+		trampolines = rail.trampolines,
+		groundAt = world.groundAt,
+		blocked = world.blocked,
+		clamp = world.clamp,
+	}
+	local holdUntil = os.clock() + (payload.holdSeconds or 0.75)
+	local holding = state.routeId ~= nil or math.abs(state.vx) + math.abs(state.vz) > 0.1
+	local last = Vector3.new(pos.X, pos.Y, pos.Z)
+	return BodyDriver.drive(root, function(dt: number)
+		local f = input:sample(BodyDriver.cameraYawHtml())
+		local mi = {
+			fw = f.fw,
+			side = f.side,
+			sprint = f.sprint,
+			focus = f.focus,
+			cameraYaw = f.cameraYaw,
+			cameraPitch = 0.12,
+			leap = f.leap,
+			drop = f.drop,
+			grab = f.grab,
+			choose = if state.routeId then f.choose else 0,
+			pounce = f.pounce,
+		}
+		local any = f.fw ~= 0 or f.side ~= 0 or f.leap or f.drop or f.grab or f.pounce
+		if any then
+			holding = false
+		elseif holding and os.clock() < holdUntil then
+			-- keep the AI's stride: forward along the current heading (camera behind the body)
+			mi.fw = 1
+			mi.cameraYaw = state.yaw + math.pi
+		end
+		local _, events = SquirrelMotor.step(state, mi, dt, motorWorld :: any)
+		for _, e in events do
+			metrics.lastEvent = e.kind
+		end
+		local v = SquirrelMotor.visualPose(state, motorWorld :: any)
+		local p = Vector3.new(v.x, v.y + hip, v.z)
+		local vel = if dt > 0 then (p - last) / dt else Vector3.zero
+		last = p
+		return p, state.yaw, vel, nil
+	end)
 end
 
 return Squirrel

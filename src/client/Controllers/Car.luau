@@ -1,12 +1,7 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Controllers.Car
--- Patrol-car controller.
--- Interface (BUILD_PLAN §1.4): start, stop, packet
--- W0 skeleton stub: no behaviour yet. Requiring this module must have no side effects
--- (rule 4: requiring never starts a thread; services expose init(ctx) and step(dt, now)).
+-- W0 skeleton name kept for the place tests and BootSmoke; W1's vehicle controller is
+-- Controllers/Vehicle (every kind, CarMotor + VehicleKinds). This module re-exports it.
+-- Interface: same as Controllers/Vehicle. No side effects on require.
 
-local Car = {}
-
-Car.__skeleton = true
-
-return Car
+return require("./Vehicle")
