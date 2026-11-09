@@ -428,6 +428,7 @@ type Range = {
 	rowHeight: (r: number, crest: number, base: number, j: number) -> number,
 	base: (x: number, z: number) -> number,
 	endHeight: number,
+	backRise: number?, -- the back row's height as a fraction of the crest above its base (hidden from the bay)
 	colour: (top: number, crest: number, row: number, j: number) -> (RGB, string),
 	thick: number,
 	aerial: number,
@@ -564,7 +565,8 @@ local RANGES: { Range } = {
 		from = 190,
 		to = 350,
 		step = 1000,
-		rows = { -2100, -900, -260, 0, 1500 },
+		rows = { -2100, -900, -260, 0, 900 },
+		backRise = 0.4,
 		taper = 14,
 		crest = function(u: number, j: number): number
 			return 1850
@@ -623,6 +625,8 @@ do
 				local y
 				if ri == crestRow then
 					y = crest
+				elseif ri == #r.rows and r.backRise then
+					y = base + (crest - base) * r.backRise
 				elseif ri == 1 or ri == #r.rows then
 					y = base
 				else

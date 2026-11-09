@@ -377,6 +377,7 @@ function Sky.start(): () -> ()
 
 	local pieces: Pieces? = nil
 	local cars: { Car } = {}
+	local traffic: Folder? = nil
 	task.spawn(function()
 		local root = workspace:WaitForChild("Backdrop", 60)
 		if not alive or root == nil then
@@ -393,6 +394,7 @@ function Sky.start(): () -> ()
 			folder.Name = "BackdropTraffic"
 			folder.Parent = workspace.CurrentCamera
 			table.insert(owned, folder)
+			traffic = folder
 			cars = makeCars(folder)
 		end
 	end)
@@ -439,6 +441,13 @@ function Sky.start(): () -> ()
 			local now = workspace:GetServerTimeNow()
 			local cam = workspace.CurrentCamera
 			local m = moon
+			-- camera-local pieces follow a replaced CurrentCamera
+			if cam and m and m.part.Parent ~= cam then
+				m.part.Parent = cam
+			end
+			if cam and traffic and traffic.Parent ~= cam then
+				traffic.Parent = cam
+			end
 			if m and cam then
 				local phase = Moon.phase(gt.day + gt.dayFrac)
 				local tilt = math.asin(math.clamp(Lighting:GetSunDirection().Z, -1, 1))
