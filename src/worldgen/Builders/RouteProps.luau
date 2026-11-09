@@ -363,31 +363,45 @@ function RouteProps.plans(
 		local foot = if line[1][2] <= line[#line][2] then line[1] else line[#line]
 		local g = groundAt(foot[1], foot[3], foot[2] + 0.25)
 		if isLadder(r) then
-			-- two wooden rails either side of the route and rungs every 1.4 studs
+			-- two wooden rails either side of the route (following its polyline) and rungs every 1.4 studs
 			local topP = if foot == line[1] then line[#line] else line[1]
-			local yaw = math.atan2(topP[1] - foot[1], topP[3] - foot[3])
+			local dxz = { topP[1] - foot[1], topP[3] - foot[3] }
+			local yaw = if dxz[1] * dxz[1] + dxz[2] * dxz[2] > 1 then math.atan2(dxz[1], dxz[2]) else 0
 			local sx, sz = math.cos(yaw), -math.sin(yaw)
 			local w = 1.1
 			local wood = { color = { 120, 92, 66 }, material = "Wood", role = "Pipe" }
-			for k, s in { -1, 1 } do
-				cyl(list, `Rail{k}`, { foot[1] + sx * s * w, g - 0.3, foot[3] + sz * s * w }, {
-					topP[1] + sx * s * w,
-					topP[2] + 1,
-					topP[3] + sz * s * w,
-				}, 0.22, 0, wood)
+			local rails = table.clone(line)
+			if foot == line[1] then
+				table.insert(rails, 1, { foot[1], g - 0.3, foot[3] })
+			else
+				table.insert(rails, { foot[1], g - 0.3, foot[3] })
 			end
-			local n = math.floor((topP[2] - g) / 1.4)
-			for k = 1, n do
-				local f = k / (n + 1)
-				local x = foot[1] + (topP[1] - foot[1]) * f
-				local y = g + (topP[2] + 1 - g) * f
-				local z = foot[3] + (topP[3] - foot[3]) * f
-				cyl(list, `Rung{k}`, { x - sx * w, y, z - sz * w }, { x + sx * w, y, z + sz * w }, 0.14, 0.1, {
-					color = { 120, 92, 66 },
-					material = "Wood",
-					canCollide = false,
-					role = "Pipe",
-				})
+			for k, s in { -1, 1 } do
+				for j = 1, #rails - 1 do
+					local a, b = rails[j], rails[j + 1]
+					cyl(list, `Rail{k}_{j}`, { a[1] + sx * s * w, a[2], a[3] + sz * s * w }, {
+						b[1] + sx * s * w,
+						b[2],
+						b[3] + sz * s * w,
+					}, 0.22, 0.15, wood)
+				end
+			end
+			local c = 0
+			for j = 1, #rails - 1 do
+				local a, b = rails[j], rails[j + 1]
+				local seg = math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2 + (b[3] - a[3]) ^ 2)
+				local n = math.floor(seg / 1.4)
+				for k = 1, n do
+					local f = k / (n + 1)
+					local x, y, z = a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f
+					c += 1
+					cyl(list, `Rung{c}`, { x - sx * w, y, z - sz * w }, { x + sx * w, y, z + sz * w }, 0.14, 0.1, {
+						color = { 120, 92, 66 },
+						material = "Wood",
+						canCollide = false,
+						role = "Pipe",
+					})
+				end
 			end
 		else
 			cylinders(list, "Pipe", line, r.surfaceRadius, "pipe", "Pipe")

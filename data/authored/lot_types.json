@@ -1446,8 +1446,11 @@
       "streaming": "Default"
     },
     "pole": {
-      "generators": [
-        "pole"
+      "names": [
+        "telephone pole"
+      ],
+      "kinds": [
+        "trunk"
       ],
       "look": "pole",
       "lod": "Disabled",
@@ -1481,7 +1484,7 @@
     }
   },
   "lamp": {
-    "heightU": 5.5,
+    "heightU": 6,
     "lod": "Disabled",
     "streaming": "Default"
   }

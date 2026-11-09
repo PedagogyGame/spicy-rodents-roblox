@@ -1,6 +1,6 @@
 {
-  "src": "BUILD_PLAN §3.19 (brief v2 §15 street lighting). W1 places greybox posts and Skyline heads only (no lights).",
-  "lamps": { "perBlockSide": 1, "spacingMaxU": 60, "height": 5.5, "setbackU": 1.2, "warmth": [0.95, 0.75, 0.45], "range": 18, "brightness": 1.2, "minRoadLengthU": 12 },
+  "src": "BUILD_PLAN §3.19 (brief v2 §15 street lighting). One row of lamps per street, alternating sides block by block, spacingU apart (~105 st), none within minGapU (25 st) of another lamp or a utility pole, crossClearU from a crossing kerb (review 2026-11-09). Posts and Skyline heads are baked; the client lights the nearest heads at night.",
+  "lamps": { "perBlockSide": 1, "spacingMaxU": 60, "spacingU": 42, "minGapU": 10, "crossClearU": 4.8, "height": 6, "setbackU": 1.2, "warmth": [0.95, 0.75, 0.45], "range": 18, "brightness": 1.2, "minRoadLengthU": 12 },
   "porch": { "everyHouse": true, "range": 8 },
   "shopFront": { "emissive": true, "openOnly": true },
   "flicker": { "fraction": 0.07, "seed": 7 },

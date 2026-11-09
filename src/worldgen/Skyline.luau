@@ -3,7 +3,7 @@
 -- The far-view layer (BUILD_PLAN §4.4 #7, D6, S11): one non-colliding, non-queryable massing part per
 -- building and structure (the envelope of its solid parts, roof peak included; baked transparent, shown
 -- by the client only while the lot itself is streamed out) and one emissive
--- head per street lamp (with its arm and housing), in a single Persistent model so the drone sees the
+-- head per street lamp (with its curved arm and housing), in a single Persistent model so the drone sees the
 -- whole town. The client lights the nearest heads (Client/Render/LampLights).
 -- Interface: plan(lotPlans, lamps, lampKit) -> BuildPlan. Pure.
 
@@ -49,30 +49,43 @@ function Skyline.plan(
 			end
 		end
 	end
-	for _, l in lamps do
-		-- the arm from the post top over the kerb and the dark housing over the lit lens
-		local dx, dz = l.hx - l.x, l.hz - l.z
-		local arm = math.sqrt(dx * dx + dz * dz)
-		local armYaw = math.atan2(-dx, -dz)
-		if arm > 0.1 then
-			list:add(ORIGIN, "Arm_" .. l.id, (l.x + l.hx) / 2, l.top - 0.2, (l.z + l.hz) / 2, 0.3, 0.3, arm, {
-				yaw = armYaw,
-				canCollide = false,
-				canQuery = false,
-				color = { 60, 62, 64 },
-				material = "Metal",
-				role = "Skyline",
-			})
-		end
-		list:add(ORIGIN, "Housing_" .. l.id, l.hx, l.top + 0.05, l.hz, 1.3, 0.35, 1.0, {
-			yaw = armYaw,
+	local function arm(name: string, a: { number }, b: { number })
+		local d = { b[1] - a[1], b[2] - a[2], b[3] - a[3] }
+		local len = math.sqrt(d[1] * d[1] + d[2] * d[2] + d[3] * d[3])
+		local yaw, roll = Geometry.axisAngles(d)
+		list:add(ORIGIN, name, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2, len + 0.25, 0.4, 0.4, {
+			yaw = yaw,
+			roll = roll,
+			shape = "Cylinder",
 			canCollide = false,
 			canQuery = false,
-			color = { 52, 58, 60 },
+			color = { 44, 48, 50 },
 			material = "Metal",
 			role = "Skyline",
 		})
-		list:add(ORIGIN, "Head_" .. l.id, l.hx, l.top - 0.25, l.hz, 1.0, 0.25, 0.8, {
+	end
+	for _, l in lamps do
+		-- the curved arm from just under the post's finial out over the kerb, the dark housing and the
+		-- lit lens under it (the head is what the client lights)
+		local ox, oz = l.ox, l.oz
+		local p0 = { l.x, l.top - 0.9, l.z }
+		local p1 = { p0[1] + ox * 1.3, p0[2] + 1.1, p0[3] + oz * 1.3 }
+		local p2 = { p1[1] + ox * 1.8, p1[2] + 0.25, p1[3] + oz * 1.8 }
+		local p3 = { l.hx, p2[2] - 0.55, l.hz }
+		arm("Arm_" .. l.id, p0, p1)
+		arm("ArmB_" .. l.id, p1, p2)
+		arm("ArmC_" .. l.id, p2, p3)
+		local armYaw = math.atan2(-ox, -oz)
+		list:add(ORIGIN, "Housing_" .. l.id, l.hx + ox * 0.3, p3[2] - 0.2, l.hz + oz * 0.3, 1.2, 0.5, 2.0, {
+			yaw = armYaw,
+			canCollide = false,
+			canQuery = false,
+			color = { 40, 44, 46 },
+			material = "Metal",
+			role = "Skyline",
+		})
+		list:add(ORIGIN, "Head_" .. l.id, l.hx + ox * 0.3, p3[2] - 0.52, l.hz + oz * 0.3, 0.9, 0.16, 1.5, {
+			yaw = armYaw,
 			canCollide = false,
 			canQuery = false,
 			color = { 255, 228, 170 },

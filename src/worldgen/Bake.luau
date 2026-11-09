@@ -24,6 +24,7 @@ local Plan = require("./Plan")
 local RoadBuilder = require("./Builders/Road")
 local RouteProps = require("./Builders/RouteProps")
 local Skyline = require("./Skyline")
+local Surface = require("./Surface")
 local Yield = require("./Yield")
 local Curve = Import.shared("Routes/Curve") :: typeof(require("../shared/Routes/Curve"))
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
@@ -82,18 +83,38 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 		table.insert(roadPlans, rp)
 		Yield.breathe()
 	end
+	-- what stands under a point: terrain, paving, plates, decks and roofs (poles, pipes, fences, lamps)
+	local surface = Surface.new(out, Height.at)
+	local function groundAt(x: number, z: number, maxY: number?): (number, boolean)
+		return Surface.at(surface, x, z, maxY)
+	end
+	Yield.breathe()
+	local obstacles: { { number } } = {}
 	if data.routes then
-		local props = RouteProps.plans(data.routes, Kits.routeProps, Curve, Height.at)
+		local props = RouteProps.plans(data.routes, Kits.routeProps, Curve, Height.at, groundAt)
 		for _, p in props do
 			table.insert(out, p)
+			-- lamps keep clear of utility poles and tree trunks
+			if p.category == "pole" or p.category == "tree" then
+				local s = p.parts[1]
+				table.insert(obstacles, { s.cx, s.cz, if p.category == "tree" then 3 else 0 })
+			end
 		end
 	end
 	Yield.breathe()
 	local lamps = {}
 	if data.lighting then
+		local function baseAt(x: number, z: number): number
+			local ref = Height.at(x, z)
+			local deck = Height.riverDeckAt(x, z)
+			if deck and deck > ref then
+				ref = deck
+			end
+			return (Surface.at(surface, x, z, ref + 1))
+		end
 		local lampPlans
 		lampPlans, lamps =
-			LampPlan.plan(data.roads, roadPlans, solidBoxes(lotPlans), data.lighting, Kits.lamp, Height.at)
+			LampPlan.plan(data.roads, roadPlans, solidBoxes(lotPlans), data.lighting, Kits.lamp, baseAt, obstacles)
 		for _, p in lampPlans do
 			table.insert(out, p)
 		end

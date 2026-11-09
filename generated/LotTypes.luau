@@ -4,7 +4,7 @@
 -- Source: data/authored/lot_types.json
 -- HTML units: heightU (and every U-suffixed field) is not converted; builders scale by 2.5.
 return {
-	lamp = { heightU = 5.5, lod = "Disabled", streaming = "Default" },
+	lamp = { heightU = 6, lod = "Disabled", streaming = "Default" },
 	routeProps = {
 		fence = {
 			kinds = { "fence", "trampoline" },
@@ -26,9 +26,10 @@ return {
 			streaming = "Default",
 		},
 		pole = {
-			generators = { "pole" },
+			kinds = { "trunk" },
 			lod = "Disabled",
 			look = "pole",
+			names = { "telephone pole" },
 			streaming = "Default",
 		},
 		tree = {
