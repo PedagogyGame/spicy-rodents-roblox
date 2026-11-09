@@ -527,12 +527,12 @@ local function deer(opts: Opts): ModelSpec
 	if variant == "buck" then
 		for _, sx in { -1, 1 } do
 			local s = if sx < 0 then "L" else "R"
-			b.cyl(`Antler{s}`, { sx * 0.18, hy + 0.42, hz + 0.05 }, { sx * 0.65, hy + 1.25, hz - 0.2 }, 0.12, c.antler)
+			b.cyl(`Antler{s}`, { sx * 0.18, hy + 0.42, hz + 0.05 }, { sx * 0.62, hy + 0.98, hz - 0.22 }, 0.12, c.antler)
 			b.weld(`Antler{s}`, "Head")
 			b.cyl(
 				`Antler{s}Tine`,
-				{ sx * 0.42, hy + 0.85, hz - 0.08 },
-				{ sx * 0.36, hy + 1.3, hz - 0.45 },
+				{ sx * 0.4, hy + 0.7, hz - 0.1 },
+				{ sx * 0.34, hy + 1.02, hz - 0.42 },
 				0.09,
 				c.antler
 			)
@@ -661,9 +661,22 @@ function PuppetSpec.human(role: string, index: number, lib: { Instance: any, Col
 			{ name = joint :: string, kind = "Motor6D", part0 = parent :: string, part1 = name :: string }
 		)
 	end
+	-- a simple face on the head's front (-Z) and hair or the role's cap (review 2026-11-09: faceless
+	-- blocks); the engine's stock R15s have a textured dynamic head of their own
+	local face = {
+		{ name = "EyeL", size = { 0.16, 0.2, 0.05 }, pos = { -0.24, 2.3, -0.61 }, color = hex("#1f1b18") },
+		{ name = "EyeR", size = { 0.16, 0.2, 0.05 }, pos = { 0.24, 2.3, -0.61 }, color = hex("#1f1b18") },
+		{ name = "Mouth", size = { 0.42, 0.08, 0.05 }, pos = { 0, 1.95, -0.61 }, color = hex("#6a3530") },
+	}
 	if look.cap then
-		table.insert(parts, { name = "Cap", size = { 1.3, 0.3, 1.4 }, pos = { 0, 2.95, -0.05 }, color = look.cap })
-		table.insert(joints, { name = "CapWeld", kind = "Weld", part0 = "Head", part1 = "Cap" })
+		table.insert(face, { name = "Cap", size = { 1.3, 0.3, 1.4 }, pos = { 0, 2.95, -0.05 }, color = look.cap })
+	else
+		table.insert(face, { name = "Hair", size = { 1.26, 0.28, 1.26 }, pos = { 0, 2.92, 0.02 }, color = look.hair })
+		table.insert(face, { name = "HairBack", size = { 1.26, 0.7, 0.16 }, pos = { 0, 2.55, 0.6 }, color = look.hair })
+	end
+	for _, f in face do
+		table.insert(parts, { name = f.name, size = f.size, pos = f.pos, color = f.color })
+		table.insert(joints, { name = `{f.name}Weld`, kind = "Weld", part0 = "Head", part1 = f.name })
 	end
 	-- R15 HipHeight is the gap from the root part's bottom (-1) to the ground (the feet's bottom, -3.2);
 	-- AI bodies show no name label (ActorService.prepareBody hides it in the engine as well)

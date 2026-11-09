@@ -112,6 +112,79 @@ return function(t)
 		t.truthy(sqEyes.Material ~= roblox.Enum.Material.Neon and sqEyes.Color.R < 0.2, "squirrel eyes dark")
 	end)
 
+	t.test("believable sizes next to a 6 st person: deer under head height, the fox a third of a person", function()
+		local function top(spec: PartBuilder.ModelSpec): number
+			local model = PartBuilder.instantiate(spec, lib)
+			local hip = (spec.attributes :: any).HipHeight
+			local high = -math.huge
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") and d.Transparency < 1 then
+					local cf, size = d.CFrame, d.Size
+					local r, u, l = cf.RightVector, cf.UpVector, cf.LookVector
+					high = math.max(
+						high,
+						cf.Position.Y
+							+ math.abs(r.Y) * size.X / 2
+							+ math.abs(u.Y) * size.Y / 2
+							+ math.abs(l.Y) * size.Z / 2
+					)
+				end
+			end
+			return high + hip -- above the ground
+		end
+		local doe = PuppetSpec.spec("deer", { variant = "doe" })
+		t.near((doe.attributes :: any).ShoulderHeight, 4, 0.25, "doe shoulder")
+		t.truthy(top(doe) < 6, `doe stands {top(doe)} st (a person is 6)`)
+		t.truthy(top(PuppetSpec.spec("deer", { variant = "buck" })) < 7, "buck with antlers under 7 st")
+		local fox = PuppetSpec.spec("fox")
+		t.near((fox.attributes :: any).ShoulderHeight, 2, 0.15, "fox shoulder")
+		t.truthy(top(fox) < 3.2, `fox stands {top(fox)} st`)
+		t.truthy(top(PuppetSpec.spec("human", { role = "townsperson" })) > 5.9, "a person is about 6 st")
+	end)
+
+	t.test("people: a face and hair or cap on every placeholder; no shirt reads as bare skin", function()
+		for _, role in RolePalettes.ROLES do
+			local model = PartBuilder.instantiate(PuppetSpec.human(role, 1, lib), lib)
+			for _, name in { "EyeL", "EyeR", "Mouth" } do
+				local part = model:FindFirstChild(name)
+				t.truthy(part, `{role} has {name}`)
+				t.truthy(part.CFrame.Position.Z < -0.55, `{role}.{name} on the face (front, -Z)`)
+			end
+			t.truthy(model:FindFirstChild("Hair") or model:FindFirstChild("Cap"), `{role} hair or cap`)
+			for i = 1, 8 do
+				local look = RolePalettes.look(role, i)
+				t.falsy(RolePalettes.readsAsSkin(look.shirt, look.skin), `{role} {i} looks shirtless`)
+			end
+		end
+		-- the v5.4 cast's tan and brown shirts are swapped; real colours pass through
+		local skin = PartBuilder.hex("#986c51")
+		local tan = PartBuilder.hex("#c99c83")
+		t.truthy(RolePalettes.readsAsSkin(tan, skin))
+		t.falsy(RolePalettes.readsAsSkin(RolePalettes.clothed(tan, skin, 3), skin))
+		local blue = PartBuilder.hex("#758ba0")
+		t.eq(RolePalettes.clothed(blue, skin, 3), blue)
+	end)
+
+	t.test("beacons: the patrol car's bar is bright red and blue Neon, the ambulance's red and white", function()
+		for _, kind in { "patrol_car", "ambulance" } do
+			local model = PartBuilder.instantiate(VehiclePuppet.spec(kind), lib)
+			local a, b = model:FindFirstChild("LightBar"), model:FindFirstChild("LightBarB")
+			t.truthy(a and b, `{kind} bar halves`)
+			t.eq(a.Material, roblox.Enum.Material.Neon)
+			t.eq(b.Material, roblox.Enum.Material.Neon)
+			t.truthy(a.Color.R > 0.9 and a.Color.G < 0.3, `{kind} red half`)
+			t.eq(a.Transparency, 0)
+			if kind == "patrol_car" then
+				t.truthy(b.Color.B > 0.9 and b.Color.R < 0.3, "patrol blue half")
+			else
+				t.truthy(b.Color.R > 0.9 and b.Color.G > 0.9 and b.Color.B > 0.85, "ambulance white half")
+			end
+		end
+		local sedan = PartBuilder.instantiate(VehiclePuppet.spec("sedan"), lib)
+		t.eq(sedan:FindFirstChild("LightBar").Transparency, 1, "plain cars show no bar")
+		t.eq(sedan:FindFirstChild("LightBarB"), nil)
+	end)
+
 	t.test("squirrel stands 1.2 st at the shoulder; deer variants scale; the rodent alone has Blood", function()
 		local sq = PuppetSpec.spec("squirrel")
 		t.near((sq.attributes :: any).ShoulderHeight, 1.25, 0.06)

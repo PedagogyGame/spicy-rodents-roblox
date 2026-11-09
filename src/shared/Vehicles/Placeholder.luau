@@ -161,14 +161,23 @@ function Placeholder.build(kindId: string, name: string?): Model
 	seatSocket.Position = v(int.seat)
 	seatSocket.Parent = root
 	if kindId == "car" then
-		local bar = part(
-			model,
-			"LightBar",
-			Vector3.new(w * 0.6, 0.3, 0.6),
-			origin * CFrame.new(0, h / 2 + 0.15, 0),
-			Color3.new(0.2, 0.2, 0.9)
-		)
-		weld(root, bar)
+		-- the patrol car's beacon bar: bright red and blue Neon halves (review 2026-11-09)
+		for _, half in
+			{
+				{ name = "LightBar", x = -1, color = Color3.fromRGB(255, 42, 42) },
+				{ name = "LightBarB", x = 1, color = Color3.fromRGB(47, 107, 255) },
+			}
+		do
+			local bar = part(
+				model,
+				half.name,
+				Vector3.new(w * 0.3, 0.3, 0.6),
+				origin * CFrame.new(half.x * w * 0.15, h / 2 + 0.15, 0),
+				half.color
+			)
+			bar.Material = Enum.Material.Neon
+			weld(root, bar)
+		end
 	end
 	return model
 end
