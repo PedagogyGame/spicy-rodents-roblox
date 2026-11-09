@@ -514,7 +514,8 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 					local ground = (opts.groundAt(x, z, y1))
 					local rim = math.clamp(dist / rh, 0, 1)
 					local y0 = math.max(ground + 2.5, y1 - (8 + 14 * rim + 4 * rand()))
-					if y1 - y0 > 2 then
+					local mid = { x, (y0 + y1) / 2, z }
+					if y1 - y0 > 2 and clear({ x, y0, z }, 1.2) and clear(mid, 1.2) then
 						strands += 1
 						local rr = 1.0 + 0.6 * rand()
 						cylinder(list, `Strand{strands}`, { x, y0, z }, { x, y1, z }, rr, 0, {

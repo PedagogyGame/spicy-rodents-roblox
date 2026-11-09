@@ -101,7 +101,7 @@
     {
       "name": "n_quay_street",
       "desc": "Street level on the Quay promenade (game-west bank, between the river and the east quay row) looking at the stone bridge: banks, embankment walls, arches, deck, towers, parapets.",
-      "pos": [2300, 5, -150], "look": [2140, 30, 0], "fov": 65, "aboveGround": true
+      "pos": [2330, 6, -95], "look": [2150, 22, 0], "fov": 65, "aboveGround": true
     },
     {
       "name": "o_lamp_close",
