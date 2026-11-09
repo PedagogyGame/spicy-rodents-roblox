@@ -28,6 +28,7 @@ export type PartSpec = {
 	material: string?, -- Enum.Material name (default SmoothPlastic)
 	transparency: number?,
 	reflectance: number?,
+	attributes: { [string]: any }?, -- e.g. Region = "Body" on the extra fur parts of a part-built animal
 }
 
 export type JointSpec = { name: string, kind: string?, part0: string, part1: string, at: { number }? }
@@ -123,6 +124,9 @@ function PartBuilder.instantiate(spec: ModelSpec, lib: Lib, origin: any?): any
 		inst.CanQuery = p.name == spec.primary
 		inst.Massless = p.name ~= spec.primary
 		inst.Anchored = p.name == spec.primary
+		for k, v in (p.attributes or {}) :: { [string]: any } do
+			inst:SetAttribute(k, v)
+		end
 		inst.Parent = model
 		parts[p.name] = inst
 	end

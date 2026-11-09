@@ -21,8 +21,9 @@
 --   terrain  : World/Height.at sampled at the TerrainBake column centres (4 st) over the playable rectangle,
 --              with the WorldTerrain surface material per column and the river water mask, plus a coarse
 --              grid over the D32 world clamp (the boot terrain the player stands on; Lune cannot read voxels).
---   lineup   : placement of each placeholder puppet in a row on a ground plane at y = 0 (root at HipHeight or
---              BaseOffset above it, authored facing -Z kept), with labels and the measured foot gap.
+--   lineup   : placement of each placeholder puppet in a row toward -X on a ground plane at y = 0 (root at
+--              HipHeight or BaseOffset above it, authored facing -Z kept, so a camera at -Z reads the row left to
+--              right), with labels and the measured foot gap.
 local fs = require("@lune/fs")
 local luau = require("@lune/luau")
 local process = require("@lune/process")
@@ -257,7 +258,7 @@ for _, root in editorGround do
 	end
 end
 
--- Placeholder lineup: one row along +X, every puppet facing -Z (authored), ground plane at y = 0.
+-- Placeholder lineup: one row toward -X, every puppet facing -Z (authored), ground plane at y = 0.
 local LINEUP = {
 	"squirrel",
 	"rodent",
@@ -290,7 +291,7 @@ for _, name in LINEUP do
 		end
 		local width = hi.X - lo.X
 		local gapX = math.max(1.2, 0.35 * width)
-		local slotX = cursorX + gapX - (lo.X - rootPos.X)
+		local slotX = cursorX - gapX - (hi.X - rootPos.X)
 		local offset = roblox.Vector3.new(slotX - rootPos.X, hip - rootPos.Y, -rootPos.Z)
 		walk("lineup", model, offset)
 		local footGap = lo.Y + offset.Y -- ground is y = 0
@@ -306,14 +307,14 @@ for _, name in LINEUP do
 		table.insert(lineup.labels, {
 			text = name,
 			pos = { r4(slotX), r4(hi.Y + offset.Y + 0.35 + 0.06 * (hi.Y - lo.Y)), r4(lo.Z + offset.Z) },
-			size = r4(math.clamp(0.12 * (hi.X - lo.X + hi.Y - lo.Y), 0.22, 0.9)),
+			size = r4(math.clamp(0.12 * (hi.X - lo.X + hi.Y - lo.Y), 0.32, 0.9)),
 		})
-		cursorX = hi.X + offset.X + gapX
+		cursorX = lo.X + offset.X - gapX
 	else
 		print(`lineup: {file} missing, skipped`)
 	end
 end
-lineup.ground = { y = 0, minX = -4, maxX = r4(cursorX + 4), minZ = -14, maxZ = 14 } :: any
+lineup.ground = { y = 0, minX = r4(cursorX - 4), maxX = 4, minZ = -14, maxZ = 14 } :: any
 
 -- Terrain heightfield at the TerrainBake column centres (WorldTerrain.write: grass, mud under the river
 -- water, axis roads painted, D32 extension sand). Colours: WorldTerrain MATERIAL_COLORS.

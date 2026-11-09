@@ -20,7 +20,7 @@
     },
     {
       "name": "d_poles_lamps",
-      "desc": "Along the north sidewalk of rd_010 (z = 0) looking west->east... i.e. toward -X: telephone poles at z -41.2 on the right, street lamps along the kerbs and sidewalks.",
+      "desc": "On the south sidewalk of rd_010 (z = 0) looking east (-X): telephone poles at z -41.2 on the right, street lamps along the kerbs and sidewalks.",
       "pos": [300, 5.5, -33], "look": [-200, 9, -24], "fov": 60, "aboveGround": true
     },
     {
@@ -41,17 +41,17 @@
     {
       "name": "f1_lineup_all",
       "desc": "Placeholder puppets side by side on a 1-stud checker, front three-quarter (authored facing -Z toward the camera).",
-      "pos": [8, 11, -46], "look": [27, 3, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
+      "pos": [-8, 11, -46], "look": [-27, 3, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
     },
     {
       "name": "f2_lineup_small",
       "desc": "Close-up of squirrel, rodent and fox (1-stud checker).",
-      "pos": [1.0, 2.9, -9.5], "look": [5.0, 1.0, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
+      "pos": [-1.0, 2.9, -9.5], "look": [-5.0, 1.0, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
     },
     {
       "name": "f3_lineup_rear",
       "desc": "The lineup from behind (+Z) three-quarter: tails, backs, rear lights.",
-      "pos": [50, 10, 42], "look": [27, 3, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
+      "pos": [-50, 10, 42], "look": [-27, 3, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
     },
     {
       "name": "g_editor_view",
@@ -60,7 +60,7 @@
     },
     {
       "name": "h_quay_bridge",
-      "desc": "The quay: stone bridge over the river at x 2125 z 0, bridge towers, embankment (looking west->east toward -X from the east bank).",
+      "desc": "The quay: stone bridge over the river at x 2125 z 0, bridge towers, embankment (from the west bank, looking east toward -X).",
       "pos": [2470, 30, -170], "look": [2125, 30, 0], "fov": 60
     },
     {
