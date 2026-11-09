@@ -84,7 +84,18 @@ export type PartList = {
 	parts: { PartSpec },
 	extras: { ExtraSpec },
 	names: { [string]: boolean },
-	add: (self: PartList, f: Geometry.Frame, name: string, mx: number, my: number, mz: number, sx: number, sy: number, sz: number, o: Opts?) -> PartSpec,
+	add: (
+		self: PartList,
+		f: Geometry.Frame,
+		name: string,
+		mx: number,
+		my: number,
+		mz: number,
+		sx: number,
+		sy: number,
+		sz: number,
+		o: Opts?
+	) -> PartSpec,
 	world: (self: PartList, spec: PartSpec) -> PartSpec,
 	extra: (self: PartList, e: ExtraSpec) -> (),
 }

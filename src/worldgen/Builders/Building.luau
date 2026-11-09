@@ -100,7 +100,14 @@ function Building.door(ctx: Spec.LotCtx, width: number, height: number)
 		role = "Door",
 		attrs = { DoorId = ctx.lot.id .. ":front", ServerOwned = true, Lockable = true, Open = false, Locked = false },
 	})
-	ctx.list:extra({ kind = "Prompt", part = "Door", name = "Prompt", action = "Open", offset = { 0, 0, -0.3 }, attrs = { Placeholder = true } })
+	ctx.list:extra({
+		kind = "Prompt",
+		part = "Door",
+		name = "Prompt",
+		action = "Open",
+		offset = { 0, 0, -0.3 },
+		attrs = { Placeholder = true },
+	})
 	ctx.attributes.DoorOutside = true
 end
 

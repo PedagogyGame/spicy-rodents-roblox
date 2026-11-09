@@ -158,7 +158,15 @@ local FAMILIES: { [string]: (ctx: Spec.LotCtx) -> () } = {
 }
 
 -- The S6 single block (structures, slabs, plates, props, markers and interior children).
-local function blockPart(lot: Lot, kit: Kits.Kit, seat: number, q: number, sx: number, sz: number, isChild: boolean): PartSpec
+local function blockPart(
+	lot: Lot,
+	kit: Kits.Kit,
+	seat: number,
+	q: number,
+	sx: number,
+	sz: number,
+	isChild: boolean
+): PartSpec
 	local solid = Kits.isSolid(kit.category) and not isChild
 	local transparency = if isChild then 0.7 elseif kit.category == "marker" then 1 else 0
 	local h = kit.heightU * SPU

@@ -80,7 +80,11 @@ return function(t)
 			local p = byId[lot.id]
 			local s = p.parts[1]
 			local fam = p.attributes.Builder
-			if (fam == "Block" or fam == "Building" or fam == "House") and lot.footprint and not p.attributes.AttachedTo then
+			if
+				(fam == "Block" or fam == "Building" or fam == "House")
+				and lot.footprint
+				and not p.attributes.AttachedTo
+			then
 				local x0, x1, z0, z1 = Plan.worldBox(s)
 				t.near(x1 - x0, lot.footprint.w, 1e-9, lot.id)
 				t.near(z1 - z0, lot.footprint.d, 1e-9, lot.id)
@@ -132,35 +136,40 @@ return function(t)
 		t.eq(part(outer, "RoofA"), nil)
 	end)
 
-	t.test("doors, prompts and signs: every building with a door has a prompt placeholder; quay names on SurfaceGuis", function()
-		local doors, signs = 0, 0
-		for _, p in plans do
-			if p.kind == "lot" then
-				for _, e in p.extras or {} do
-					if e.kind == "Prompt" then
-						doors += 1
-					elseif e.kind == "SurfaceGui" then
-						signs += 1
-						t.truthy(e.text and #e.text > 0, p.id)
+	t.test(
+		"doors, prompts and signs: every building with a door has a prompt placeholder; quay names on SurfaceGuis",
+		function()
+			local doors, signs = 0, 0
+			for _, p in plans do
+				if p.kind == "lot" then
+					for _, e in p.extras or {} do
+						if e.kind == "Prompt" then
+							doors += 1
+						elseif e.kind == "SurfaceGui" then
+							signs += 1
+							t.truthy(e.text and #e.text > 0, p.id)
+						end
 					end
 				end
 			end
+			t.truthy(doors >= 80, `prompts {doors}`)
+			t.truthy(signs >= 40, `signs {signs}`)
+			local anchor = byId.quay_bldg_w_00
+			local found = false
+			for _, e in anchor.extras do
+				found = found or (e.kind == "SurfaceGui" and e.text == "THE OLD ANCHOR")
+			end
+			t.truthy(found, "THE OLD ANCHOR sign")
 		end
-		t.truthy(doors >= 80, `prompts {doors}`)
-		t.truthy(signs >= 40, `signs {signs}`)
-		local anchor = byId.quay_bldg_w_00
-		local found = false
-		for _, e in anchor.extras do
-			found = found or (e.kind == "SurfaceGui" and e.text == "THE OLD ANCHOR")
-		end
-		t.truthy(found, "THE OLD ANCHOR sign")
-	end)
+	)
 
 	t.test("hospital: 8 brief rooms as volumes, 4 stations, 36 pharmacy item slots, enterable", function()
 		local h = byId.hospital_main
 		t.eq(h.attributes.Builder, "Hospital")
 		t.eq(h.attributes.Enterable, true)
-		for _, id in { "reception", "triage", "ward_a", "ward_b", "isolation", "pharmacy", "staff_room", "ambulance_bay" } do
+		for _, id in
+			{ "reception", "triage", "ward_a", "ward_b", "isolation", "pharmacy", "staff_room", "ambulance_bay" }
+		do
 			local v = part(h, "Room_" .. id)
 			t.truthy(v, id)
 			t.eq(v.canCollide, false, id)
@@ -203,25 +212,28 @@ return function(t)
 		t.eq(ai, 1)
 	end)
 
-	t.test("FRB interiors: 4 houses with rooms, server-owned lockable doors, hide spots and a connected room graph", function()
-		local n = 0
-		for _, p in plans do
-			if p.kind == "lot" and p.attributes.Interior then
-				n += 1
-				t.eq(part(p, "Nav").attrs.NavUnreached, 0, p.id)
-				local front, back, hides = part(p, "Door_front"), part(p, "Door_back"), 0
-				t.truthy(front and front.attrs.ServerOwned and front.attrs.Lockable, p.id)
-				t.truthy(back, p.id)
-				for _, e in p.extras do
-					if e.kind == "Attachment" and e.attrs and e.attrs.HideType then
-						hides += 1
+	t.test(
+		"FRB interiors: 4 houses with rooms, server-owned lockable doors, hide spots and a connected room graph",
+		function()
+			local n = 0
+			for _, p in plans do
+				if p.kind == "lot" and p.attributes.Interior then
+					n += 1
+					t.eq(part(p, "Nav").attrs.NavUnreached, 0, p.id)
+					local front, back, hides = part(p, "Door_front"), part(p, "Door_back"), 0
+					t.truthy(front and front.attrs.ServerOwned and front.attrs.Lockable, p.id)
+					t.truthy(back, p.id)
+					for _, e in p.extras do
+						if e.kind == "Attachment" and e.attrs and e.attrs.HideType then
+							hides += 1
+						end
 					end
+					t.truthy(hides >= 3, `{p.id} hides {hides}`)
 				end
-				t.truthy(hides >= 3, `{p.id} hides {hides}`)
 			end
+			t.eq(n, 4)
 		end
-		t.eq(n, 4)
-	end)
+	)
 
 	t.test("route props: trees around their curves, poles, Beam wires, pipes and fences, LOD from data", function()
 		local kinds: { [string]: number } = {}
@@ -245,30 +257,33 @@ return function(t)
 		t.truthy(beams >= 150, `beams {beams}`)
 	end)
 
-	t.test("lamps: greybox posts on both sides of the streets, a 5-10 % flicker set, Skyline heads for every lamp and building", function()
-		local posts, flicker = 0, 0
-		local sky
-		for _, p in plans do
-			if p.kind == "lamps" then
-				for _, s in p.parts do
-					posts += 1
-					if s.attrs.Flicker then
-						flicker += 1
+	t.test(
+		"lamps: greybox posts on both sides of the streets, a 5-10 % flicker set, Skyline heads for every lamp and building",
+		function()
+			local posts, flicker = 0, 0
+			local sky
+			for _, p in plans do
+				if p.kind == "lamps" then
+					for _, s in p.parts do
+						posts += 1
+						if s.attrs.Flicker then
+							flicker += 1
+						end
 					end
+				elseif p.kind == "skyline" then
+					sky = p
 				end
-			elseif p.kind == "skyline" then
-				sky = p
+			end
+			t.truthy(posts >= 300, `posts {posts}`)
+			local f = flicker / posts
+			t.truthy(f >= 0.05 and f <= 0.1, `flicker {f}`)
+			t.eq(sky.attributes.LampHeads, posts)
+			t.eq(sky.streaming, "Persistent")
+			for _, s in sky.parts do
+				t.eq(s.canCollide, false, s.name)
 			end
 		end
-		t.truthy(posts >= 300, `posts {posts}`)
-		local f = flicker / posts
-		t.truthy(f >= 0.05 and f <= 0.1, `flicker {f}`)
-		t.eq(sky.attributes.LampHeads, posts)
-		t.eq(sky.streaming, "Persistent")
-		for _, s in sky.parts do
-			t.eq(s.canCollide, false, s.name)
-		end
-	end)
+	)
 
 	t.test("Town Model: counts, attributes, InstanceHash survives the .rbxm round trip", function()
 		local town = Bake.run(data, factory())

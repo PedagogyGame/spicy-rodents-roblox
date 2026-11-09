@@ -17,7 +17,13 @@ local RouteCheck = {}
 local SKIP_ROLES = { Room = true, Anchor = true, Skyline = true }
 
 export type Failure = { id: number, name: string, kind: string, generator: string, worst: number, at: { number } }
-export type Result = { checked: number, samples: number, failures: { Failure }, patchedFailing: number, patchedPassing: { number } }
+export type Result = {
+	checked: number,
+	samples: number,
+	failures: { Failure },
+	patchedFailing: number,
+	patchedPassing: { number },
+}
 
 function RouteCheck.index(plans: { Spec.BuildPlan }): Geometry.Index
 	local ix = Geometry.index(16)
@@ -80,7 +86,13 @@ function RouteCheck.run(plans: { Spec.BuildPlan }, routes: { any }, opts: any): 
 			})
 		end
 	end
-	return { checked = #routes, samples = samples, failures = failures, patchedFailing = patchedFailing, patchedPassing = patchedPassing }
+	return {
+		checked = #routes,
+		samples = samples,
+		failures = failures,
+		patchedFailing = patchedFailing,
+		patchedPassing = patchedPassing,
+	}
 end
 
 return RouteCheck

@@ -21,7 +21,17 @@ function BridgeTower.plan(ctx: Spec.LotCtx)
 	ctx.list:add(ctx.frame, "Gallery", 0, h - gallery / 2, 0, ctx.W, gallery, ctx.D, { color = STONE, role = "Roof" })
 	for i, s in { -1, 1 } do
 		-- piers stand along the lot's depth axis (world z for these unrotated lots)
-		ctx.list:add(ctx.frame, `Pier{i}`, 0, (h - gallery) / 2, s * pz, pw, h - gallery, pd, { color = STONE, role = "Body" })
+		ctx.list:add(
+			ctx.frame,
+			`Pier{i}`,
+			0,
+			(h - gallery) / 2,
+			s * pz,
+			pw,
+			h - gallery,
+			pd,
+			{ color = STONE, role = "Body" }
+		)
 	end
 end
 

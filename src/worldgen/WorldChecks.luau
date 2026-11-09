@@ -25,7 +25,13 @@ local WorldChecks = {}
 local function solidParts(p: Spec.BuildPlan): { Spec.PartSpec }
 	local out = {}
 	for _, s in p.parts do
-		if s.canCollide and s.role ~= "Door" and s.role ~= "Furniture" and s.role ~= "Station" and s.role ~= "Shelf" then
+		if
+			s.canCollide
+			and s.role ~= "Door"
+			and s.role ~= "Furniture"
+			and s.role ~= "Station"
+			and s.role ~= "Shelf"
+		then
 			table.insert(out, s)
 		end
 	end
@@ -53,7 +59,11 @@ function WorldChecks.overlaps(plans: { Spec.BuildPlan }): ({ string }, number)
 		for j = i + 1, #solids do
 			local B = solids[j]
 			local a, b = A.box, B.box
-			if math.min(a[2], b[2]) - math.max(a[1], b[1]) > tol and math.min(a[6], b[6]) - math.max(a[5], b[5]) > tol and math.min(a[4], b[4]) - math.max(a[3], b[3]) > tol then
+			if
+				math.min(a[2], b[2]) - math.max(a[1], b[1]) > tol
+				and math.min(a[6], b[6]) - math.max(a[5], b[5]) > tol
+				and math.min(a[4], b[4]) - math.max(a[3], b[3]) > tol
+			then
 				-- envelopes meet: test the parts (oriented boxes, by corner containment both ways)
 				local hit = false
 				for _, pa in A.parts do
@@ -65,8 +75,15 @@ function WorldChecks.overlaps(plans: { Spec.BuildPlan }): ({ string }, number)
 						local oz = math.min(pc1, qc1) - math.max(pc0, qc0)
 						if ox > tol and oy > tol and oz > tol then
 							-- sample the overlap box centre against both oriented boxes
-							local c = { (math.max(pa0, qa0) + math.min(pa1, qa1)) / 2, (math.max(pb0, qb0) + math.min(pb1, qb1)) / 2, (math.max(pc0, qc0) + math.min(pc1, qc1)) / 2 }
-							if Geometry.boxDistance(pa :: any, c) <= 1e-6 and Geometry.boxDistance(pb :: any, c) <= 1e-6 then
+							local c = {
+								(math.max(pa0, qa0) + math.min(pa1, qa1)) / 2,
+								(math.max(pb0, qb0) + math.min(pb1, qb1)) / 2,
+								(math.max(pc0, qc0) + math.min(pc1, qc1)) / 2,
+							}
+							if
+								Geometry.boxDistance(pa :: any, c) <= 1e-6
+								and Geometry.boxDistance(pb :: any, c) <= 1e-6
+							then
 								hit = true
 								break
 							end
@@ -193,7 +210,10 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 	local reach = DoorReach.run(plans, Height.at, Height.insideRiverWater)
 	r.doors = reach
 	if #reach.unreachable > 0 then
-		table.insert(failures, `{#reach.unreachable} doors not reachable from a sidewalk: {table.concat(reach.unreachable, ", ")}`)
+		table.insert(
+			failures,
+			`{#reach.unreachable} doors not reachable from a sidewalk: {table.concat(reach.unreachable, ", ")}`
+		)
 	end
 
 	-- routes on geometry
@@ -206,7 +226,11 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 			end
 		end
 		local registry = Registry.fromRecords(data.routes, 2.5)
-		local rc = RouteCheck.run(plans, data.routes, { registry = registry, heightAt = Height.at, slackU = 0.3, patched = patched })
+		local rc = RouteCheck.run(
+			plans,
+			data.routes,
+			{ registry = registry, heightAt = Height.at, slackU = 0.3, patched = patched }
+		)
 		r.routes = rc
 		if #rc.failures > 0 then
 			table.insert(failures, `{#rc.failures} routes off geometry and not in harvest_patches.json`)

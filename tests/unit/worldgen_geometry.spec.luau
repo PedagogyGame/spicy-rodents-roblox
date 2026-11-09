@@ -17,7 +17,9 @@ return function(t)
 		for _ = 1, 200 do
 			local yaw, pitch, roll = rnd(-4, 4), rnd(-2, 2), rnd(-2, 2)
 			local v = { rnd(-5, 5), rnd(-5, 5), rnd(-5, 5) }
-			local cf = roblox.CFrame.Angles(0, yaw, 0) * roblox.CFrame.Angles(pitch, 0, 0) * roblox.CFrame.Angles(0, 0, roll)
+			local cf = roblox.CFrame.Angles(0, yaw, 0)
+				* roblox.CFrame.Angles(pitch, 0, 0)
+				* roblox.CFrame.Angles(0, 0, roll)
 			local w = cf * roblox.Vector3.new(v[1], v[2], v[3])
 			local g = Geometry.rotate(v, yaw, pitch, roll)
 			t.near(g[1], w.X, 1e-4)
@@ -58,7 +60,10 @@ return function(t)
 
 	t.test("room graph: connected layouts pass, an isolated room is reported", function()
 		local rooms = { { id = "a", rect = { 0, 1, 0, 1 } }, { id = "b", rect = { 1, 2, 0, 1 } } }
-		local doors = { { id = "front", a = "a", b = "outside", at = { 0.5, 0 } }, { id = "ab", a = "a", b = "b", at = { 1, 0.5 } } }
+		local doors = {
+			{ id = "front", a = "a", b = "outside", at = { 0.5, 0 } },
+			{ id = "ab", a = "a", b = "b", at = { 1, 0.5 } },
+		}
 		local g = RoomGraph.build(rooms, doors, { { id = "hide", room = "b" } })
 		t.eq(#RoomGraph.unreached(g, "outside"), 0)
 		local g2 = RoomGraph.build(rooms, { doors[1] }, {})

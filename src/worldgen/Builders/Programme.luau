@@ -26,14 +26,31 @@ function Programme.build(ctx: Spec.LotCtx)
 	end
 	local doors: { Shell.Door } = {}
 	for _, d in b.doors do
-		table.insert(doors, { id = d.id, a = d.a, b = d.b, x = d.at[1] * spu, z = -d.at[2] * spu, w = d.width * spu, lockable = d.lockable })
+		table.insert(
+			doors,
+			{
+				id = d.id,
+				a = d.a,
+				b = d.b,
+				x = d.at[1] * spu,
+				z = -d.at[2] * spu,
+				w = d.width * spu,
+				lockable = d.lockable,
+			}
+		)
 	end
 	local extras = {}
 	for _, s in b.stations do
-		table.insert(extras, { id = "station_" .. s.id, kind = "station", room = s.room, x = s.at[1] * spu, z = -s.at[2] * spu })
+		table.insert(
+			extras,
+			{ id = "station_" .. s.id, kind = "station", room = s.room, x = s.at[1] * spu, z = -s.at[2] * spu }
+		)
 	end
 	for _, s in b.shelves do
-		table.insert(extras, { id = "shelf_" .. s.id, kind = "shelf", room = s.room, x = s.at[1] * spu, z = -s.at[2] * spu })
+		table.insert(
+			extras,
+			{ id = "shelf_" .. s.id, kind = "shelf", room = s.room, x = s.at[1] * spu, z = -s.at[2] * spu }
+		)
 	end
 	local params = ctx.params
 	local wallH = (b.wallHeightU or params.eaveU or ctx.kit.heightU) * spu
@@ -55,7 +72,14 @@ function Programme.build(ctx: Spec.LotCtx)
 			role = "Station",
 			attrs = { Station = s.kind, StationId = s.id, Room = s.room },
 		})
-		ctx.list:extra({ kind = "Prompt", part = "Station_" .. s.id, name = "Prompt", action = "Use", offset = { 0, 1.5, 0 }, attrs = { Placeholder = true } })
+		ctx.list:extra({
+			kind = "Prompt",
+			part = "Station_" .. s.id,
+			name = "Prompt",
+			action = "Use",
+			offset = { 0, 1.5, 0 },
+			attrs = { Placeholder = true },
+		})
 	end
 	for _, s in b.shelves do
 		local len, levels = s.lengthU * spu, s.levels

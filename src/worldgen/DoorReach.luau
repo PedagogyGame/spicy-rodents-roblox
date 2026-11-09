@@ -16,7 +16,11 @@ local DoorReach = {}
 local CELL = 2.5
 local PASS_ROLES = { Door = true, Floor = true, Room = true, Anchor = true, Skyline = true, Sign = true, Pad = true }
 
-function DoorReach.run(plans: { Spec.BuildPlan }, heightAt: (number, number) -> number, isWater: (number, number) -> boolean): { [string]: any }
+function DoorReach.run(
+	plans: { Spec.BuildPlan },
+	heightAt: (number, number) -> number,
+	isWater: (number, number) -> boolean
+): { [string]: any }
 	local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
 	for _, p in plans do
 		if p.kind == "lot" or p.kind == "road" then
@@ -113,7 +117,11 @@ function DoorReach.run(plans: { Spec.BuildPlan }, heightAt: (number, number) -> 
 			local centre = p.parts[1]
 			for _, s in p.parts do
 				local a = s.attrs
-				if s.role == "Door" and a and (a.RoomB == "outside" or a.RoomA == "outside" or (a.RoomA == nil and a.DoorId ~= nil)) then
+				if
+					s.role == "Door"
+					and a
+					and (a.RoomB == "outside" or a.RoomA == "outside" or (a.RoomA == nil and a.DoorId ~= nil))
+				then
 					doors += 1
 					-- door normal (the part's local Z), pointing away from the lot centre
 					local n = Geometry.rotate({ 0, 0, 1 }, s.yaw, 0, 0)

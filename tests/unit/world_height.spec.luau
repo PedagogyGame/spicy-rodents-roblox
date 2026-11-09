@@ -91,7 +91,9 @@ return function(t)
 				patched += 1 -- outside the rectangle the authored patches apply (atU stays verbatim)
 			end
 		end
-		print(`      {inside} of {rows} golden rows inside the verbatim rectangle; {patched} outside rows under a patch`)
+		print(
+			`      {inside} of {rows} golden rows inside the verbatim rectangle; {patched} outside rows under a patch`
+		)
 		t.truthy(inside > 0)
 		-- the hill rises, the beach flattens toward its target, the field rolls
 		t.truthy(Height.terrainU(-420, -680) > Height.atU(-420, -680) + 30, "hill")

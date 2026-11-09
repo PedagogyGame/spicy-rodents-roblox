@@ -13,7 +13,11 @@ local Skyline = {}
 
 local ORIGIN = Geometry.frame(0, 0, 0, 0)
 
-function Skyline.plan(lotPlans: { Spec.BuildPlan }, lamps: { LampPlan.Lamp }, skylineTypes: { [string]: boolean }): Spec.BuildPlan
+function Skyline.plan(
+	lotPlans: { Spec.BuildPlan },
+	lamps: { LampPlan.Lamp },
+	skylineTypes: { [string]: boolean }
+): Spec.BuildPlan
 	local list = Spec.list()
 	local buildings = 0
 	for _, p in lotPlans do

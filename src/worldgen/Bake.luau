@@ -88,7 +88,8 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 	local lamps = {}
 	if data.lighting then
 		local lampPlans
-		lampPlans, lamps = LampPlan.plan(data.roads, roadPlans, solidBoxes(lotPlans), data.lighting, Kits.lamp, Height.at)
+		lampPlans, lamps =
+			LampPlan.plan(data.roads, roadPlans, solidBoxes(lotPlans), data.lighting, Kits.lamp, Height.at)
 		for _, p in lampPlans do
 			table.insert(out, p)
 		end
@@ -191,7 +192,9 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 			end
 			table.insert(
 				lines,
-				`  +{e.kind}|{e.part}|{e.name}|{e.text or ""}|{e.a or ""}|{e.b or ""}|{table.concat(nums, ",")}|{attrList(e.attrs)}`
+				`  +{e.kind}|{e.part}|{e.name}|{e.text or ""}|{e.a or ""}|{e.b or ""}|{table.concat(nums, ",")}|{attrList(
+					e.attrs
+				)}`
 			)
 		end
 	end
@@ -258,14 +261,22 @@ function Bake.instanceLines(town: any): { string }
 						q(child.Transparency, "%.2f"),
 					}, "|")
 				)
-			elseif child:IsA("SurfaceGui") or child:IsA("ProximityPrompt") or child:IsA("Attachment") or child:IsA("Beam") or child:IsA("TextLabel") then
+			elseif
+				child:IsA("SurfaceGui")
+				or child:IsA("ProximityPrompt")
+				or child:IsA("Attachment")
+				or child:IsA("Beam")
+				or child:IsA("TextLabel")
+			then
 				local extra = ""
 				if child:IsA("TextLabel") then
 					extra = child.Text
 				elseif child:IsA("ProximityPrompt") then
 					extra = child.ActionText .. "/" .. tostring(child.Enabled)
 				elseif child:IsA("Beam") then
-					extra = (if child.Attachment0 then child.Attachment0.Name else "") .. ">" .. (if child.Attachment1 then child.Attachment1.Name else "")
+					extra = (if child.Attachment0 then child.Attachment0.Name else "")
+						.. ">"
+						.. (if child.Attachment1 then child.Attachment1.Name else "")
 				end
 				table.insert(lines, `{p}|{child.ClassName}|{extra}`)
 			elseif child:IsA("Model") then

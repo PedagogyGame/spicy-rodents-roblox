@@ -38,12 +38,18 @@ function Interior.build(ctx: Spec.LotCtx)
 	end
 	local doors: { Shell.Door } = {}
 	for _, d in tpl.doors do
-		table.insert(doors, { id = d.id, a = d.a, b = d.b, x = mx(d.at[1]), z = mz(d.at[2]), w = d.width * spu, lockable = d.lockable })
+		table.insert(
+			doors,
+			{ id = d.id, a = d.a, b = d.b, x = mx(d.at[1]), z = mz(d.at[2]), w = d.width * spu, lockable = d.lockable }
+		)
 	end
 	local extras = {}
 	for _, f in tpl.furniture do
 		if f.hide then
-			table.insert(extras, { id = "hide_" .. f.id, kind = "hide", room = f.room, x = mx(f.at[1]), z = mz(f.at[2]) })
+			table.insert(
+				extras,
+				{ id = "hide_" .. f.id, kind = "hide", room = f.room, x = mx(f.at[1]), z = mz(f.at[2]) }
+			)
 		end
 	end
 	local eave, peak, _kind, alongX = Building.heights(ctx)
@@ -85,7 +91,13 @@ function Interior.build(ctx: Spec.LotCtx)
 		end
 	end
 	local ds = tpl.defenderSpawn
-	ctx.list:extra({ kind = "Attachment", part = "Nav", name = "DefenderSpawn", offset = { mx(ds.at[1]), 0, mz(ds.at[2]) }, attrs = { Room = ds.room } })
+	ctx.list:extra({
+		kind = "Attachment",
+		part = "Nav",
+		name = "DefenderSpawn",
+		offset = { mx(ds.at[1]), 0, mz(ds.at[2]) },
+		attrs = { Room = ds.room },
+	})
 	for i, r in tpl.squirrelRoutes do
 		ctx.list:extra({
 			kind = "Attachment",

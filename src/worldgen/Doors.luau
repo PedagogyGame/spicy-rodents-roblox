@@ -35,7 +35,10 @@ function Doors.setOpen(leaf: any, open: boolean, C: any?): boolean
 	local closed = leaf.CFrame
 	if was then
 		-- open = closed * T(-w/2) * Ry(s*swing) * T(w/2), so closed = open * T(-w/2) * Ry(-s*swing) * T(w/2)
-		closed = leaf.CFrame * CF.new(-leaf.Size.X / 2, 0, 0) * CF.Angles(0, -sign * Doors.SWING, 0) * CF.new(leaf.Size.X / 2, 0, 0)
+		closed = leaf.CFrame
+			* CF.new(-leaf.Size.X / 2, 0, 0)
+			* CF.Angles(0, -sign * Doors.SWING, 0)
+			* CF.new(leaf.Size.X / 2, 0, 0)
 	end
 	leaf.CFrame = Doors.pose(closed, leaf.Size, open, sign, CF)
 	leaf.CanCollide = not open

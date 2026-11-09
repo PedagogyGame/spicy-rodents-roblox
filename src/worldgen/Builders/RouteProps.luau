@@ -111,7 +111,14 @@ end
 
 local ORIGIN = Geometry.frame(0, 0, 0, 0)
 
-local function cylinders(list: Spec.PartList, prefix: string, line: { { number } }, radius: number, look: string, role: string)
+local function cylinders(
+	list: Spec.PartList,
+	prefix: string,
+	line: { { number } },
+	radius: number,
+	look: string,
+	role: string
+)
 	local L = LOOK[look]
 	for k = 1, #line - 1 do
 		local a, b = line[k], line[k + 1]
@@ -119,19 +126,35 @@ local function cylinders(list: Spec.PartList, prefix: string, line: { { number }
 		local len = math.sqrt(d[1] * d[1] + d[2] * d[2] + d[3] * d[3])
 		if len > 1e-4 then
 			local yaw, roll = Geometry.axisAngles(d)
-			list:add(ORIGIN, `{prefix}_{k}`, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2, len + radius * 0.5, radius * 2, radius * 2, {
-				yaw = yaw,
-				roll = roll,
-				shape = "Cylinder",
-				color = L.color,
-				material = L.material,
-				role = role,
-			})
+			list:add(
+				ORIGIN,
+				`{prefix}_{k}`,
+				(a[1] + b[1]) / 2,
+				(a[2] + b[2]) / 2,
+				(a[3] + b[3]) / 2,
+				len + radius * 0.5,
+				radius * 2,
+				radius * 2,
+				{
+					yaw = yaw,
+					roll = roll,
+					shape = "Cylinder",
+					color = L.color,
+					material = L.material,
+					role = role,
+				}
+			)
 		end
 	end
 end
 
-local function newPlan(id: string, look: string, props: { [string]: any }, attrs: { [string]: any }, list: Spec.PartList): Spec.BuildPlan
+local function newPlan(
+	id: string,
+	look: string,
+	props: { [string]: any },
+	attrs: { [string]: any },
+	list: Spec.PartList
+): Spec.BuildPlan
 	local p = props[look]
 	return {
 		kind = "props",
@@ -147,7 +170,12 @@ end
 
 -- One BuildPlan per tree (trunk), pole, wire, pipe and fence. `Curve` is Routes/Curve (passed in so
 -- this module needs no cross-root require); heightAt(x, z) is World/Height.at in studs.
-function RouteProps.plans(routes: { Route }, props: { [string]: any }, Curve: any, heightAt: (number, number) -> number): ({ Spec.BuildPlan }, { [number]: string })
+function RouteProps.plans(
+	routes: { Route },
+	props: { [string]: any },
+	Curve: any,
+	heightAt: (number, number) -> number
+): ({ Spec.BuildPlan }, { [number]: string })
 	local looks: { [number]: string } = {}
 	local trunks: { Route } = {}
 	local byLook: { [string]: { Route } } = { tree = {}, limb = {}, pole = {}, wire = {}, pipe = {}, fence = {} }
@@ -187,7 +215,10 @@ function RouteProps.plans(routes: { Route }, props: { [string]: any }, Curve: an
 		for _, r in members[t.id] do
 			cylinders(list, `R{r.id}`, polyline(r, Curve), r.surfaceRadius, "bark", "Limb")
 		end
-		table.insert(out, newPlan(`Tree_{t.id}`, "tree", props, { TrunkRoute = t.id, Name = t.name, Routes = #members[t.id] }, list))
+		table.insert(
+			out,
+			newPlan(`Tree_{t.id}`, "tree", props, { TrunkRoute = t.id, Name = t.name, Routes = #members[t.id] }, list)
+		)
 	end
 
 	for _, r in byLook.limb do
@@ -234,9 +265,24 @@ function RouteProps.plans(routes: { Route }, props: { [string]: any }, Curve: an
 		local list = Spec.list()
 		local line = polyline(r, Curve)
 		local o = line[1]
-		list:add(ORIGIN, "Anchor", o[1], o[2], o[3], 0.2, 0.2, 0.2, { canCollide = false, transparency = 1, role = "Anchor" })
+		list:add(
+			ORIGIN,
+			"Anchor",
+			o[1],
+			o[2],
+			o[3],
+			0.2,
+			0.2,
+			0.2,
+			{ canCollide = false, transparency = 1, role = "Anchor" }
+		)
 		for k, p in line do
-			list:extra({ kind = "Attachment", part = "Anchor", name = `A{k}`, offset = { p[1] - o[1], p[2] - o[2], p[3] - o[3] } })
+			list:extra({
+				kind = "Attachment",
+				part = "Anchor",
+				name = `A{k}`,
+				offset = { p[1] - o[1], p[2] - o[2], p[3] - o[3] },
+			})
 		end
 		for k = 1, #line - 1 do
 			list:extra({

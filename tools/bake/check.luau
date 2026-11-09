@@ -29,7 +29,19 @@ for _, f in r.failures do
 end
 if list then
 	for _, f in r.routes.failures do
-		print(string.format("  route %d %s [%s %s] worst %.2f st at %.1f,%.1f,%.1f", f.id, f.name, f.kind, f.generator, f.worst, f.at[1], f.at[2], f.at[3]))
+		print(
+			string.format(
+				"  route %d %s [%s %s] worst %.2f st at %.1f,%.1f,%.1f",
+				f.id,
+				f.name,
+				f.kind,
+				f.generator,
+				f.worst,
+				f.at[1],
+				f.at[2],
+				f.at[3]
+			)
+		)
 	end
 end
 if not r.ok then

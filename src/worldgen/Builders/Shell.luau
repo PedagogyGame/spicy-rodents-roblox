@@ -112,7 +112,17 @@ end
 function Shell.build(ctx: Spec.LotCtx, L: Layout)
 	local W, D, t = ctx.W, ctx.D, L.thick
 	local y0 = L.floorTop
-	ctx.list:add(ctx.frame, "Floor", 0, y0 - 0.2, 0, W, 0.4, D, { color = FLOOR, role = "Floor", material = "Concrete" })
+	ctx.list:add(
+		ctx.frame,
+		"Floor",
+		0,
+		y0 - 0.2,
+		0,
+		W,
+		0.4,
+		D,
+		{ color = FLOOR, role = "Floor", material = "Concrete" }
+	)
 
 	-- doors onto each wall line
 	local function gapsOn(axis: string, fixed: number, tol: number, a: number, b: number): { { c: number, w: number } }
@@ -129,10 +139,62 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 
 	-- exterior walls, inside the footprint
 	local h = L.wallH
-	wall(ctx, "WallFront", "x", -D / 2 + t / 2, -W / 2, W / 2, gapsOn("x", -D / 2, t + EPS, -W / 2, W / 2), y0, h - y0, L.doorH, t, WALL)
-	wall(ctx, "WallBack", "x", D / 2 - t / 2, -W / 2, W / 2, gapsOn("x", D / 2, t + EPS, -W / 2, W / 2), y0, h - y0, L.doorH, t, WALL)
-	wall(ctx, "WallLeft", "z", -W / 2 + t / 2, -D / 2 + t, D / 2 - t, gapsOn("z", -W / 2, t + EPS, -D / 2, D / 2), y0, h - y0, L.doorH, t, WALL)
-	wall(ctx, "WallRight", "z", W / 2 - t / 2, -D / 2 + t, D / 2 - t, gapsOn("z", W / 2, t + EPS, -D / 2, D / 2), y0, h - y0, L.doorH, t, WALL)
+	wall(
+		ctx,
+		"WallFront",
+		"x",
+		-D / 2 + t / 2,
+		-W / 2,
+		W / 2,
+		gapsOn("x", -D / 2, t + EPS, -W / 2, W / 2),
+		y0,
+		h - y0,
+		L.doorH,
+		t,
+		WALL
+	)
+	wall(
+		ctx,
+		"WallBack",
+		"x",
+		D / 2 - t / 2,
+		-W / 2,
+		W / 2,
+		gapsOn("x", D / 2, t + EPS, -W / 2, W / 2),
+		y0,
+		h - y0,
+		L.doorH,
+		t,
+		WALL
+	)
+	wall(
+		ctx,
+		"WallLeft",
+		"z",
+		-W / 2 + t / 2,
+		-D / 2 + t,
+		D / 2 - t,
+		gapsOn("z", -W / 2, t + EPS, -D / 2, D / 2),
+		y0,
+		h - y0,
+		L.doorH,
+		t,
+		WALL
+	)
+	wall(
+		ctx,
+		"WallRight",
+		"z",
+		W / 2 - t / 2,
+		-D / 2 + t,
+		D / 2 - t,
+		gapsOn("z", W / 2, t + EPS, -D / 2, D / 2),
+		y0,
+		h - y0,
+		L.doorH,
+		t,
+		WALL
+	)
 	if L.roof == "flat" then
 		ctx.list:add(ctx.frame, "Roof", 0, h + 0.3, 0, W, 0.6, D, { color = WALL, role = "Roof" })
 	end
@@ -157,7 +219,20 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 					if z1 - z0 > EPS and math.abs(pair[1]) < W / 2 - t then
 						n += 1
 						local zz0, zz1 = math.max(z0, -D / 2 + t), math.min(z1, D / 2 - t)
-						wall(ctx, `Part{n}`, "z", pair[1], zz0, zz1, gapsOn("z", pair[1], EPS, zz0, zz1), y0, L.partH, L.doorH, pt, PARTITION)
+						wall(
+							ctx,
+							`Part{n}`,
+							"z",
+							pair[1],
+							zz0,
+							zz1,
+							gapsOn("z", pair[1], EPS, zz0, zz1),
+							y0,
+							L.partH,
+							L.doorH,
+							pt,
+							PARTITION
+						)
 					end
 				end
 			end
@@ -168,7 +243,20 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 					if x1 - x0 > EPS and math.abs(pair[1]) < D / 2 - t then
 						n += 1
 						local xx0, xx1 = math.max(x0, -W / 2 + t), math.min(x1, W / 2 - t)
-						wall(ctx, `Part{n}`, "x", pair[1], xx0, xx1, gapsOn("x", pair[1], EPS, xx0, xx1), y0, L.partH, L.doorH, pt, PARTITION)
+						wall(
+							ctx,
+							`Part{n}`,
+							"x",
+							pair[1],
+							xx0,
+							xx1,
+							gapsOn("x", pair[1], EPS, xx0, xx1),
+							y0,
+							L.partH,
+							L.doorH,
+							pt,
+							PARTITION
+						)
 					end
 				end
 			end
@@ -202,14 +290,24 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 	-- room-name volumes (non-solid, queryable)
 	for _, r in L.rooms do
 		local hgt = if r.exterior then 4 else L.partH
-		ctx.list:add(ctx.frame, "Room_" .. r.id, (r.x0 + r.x1) / 2, y0 + hgt / 2, (r.z0 + r.z1) / 2, r.x1 - r.x0, hgt, r.z1 - r.z0, {
-			canCollide = false,
-			transparency = 1,
-			canQuery = true,
-			role = "Room",
-			color = { 255, 255, 255 },
-			attrs = { RoomId = r.id, RoomName = r.name, Exterior = r.exterior == true },
-		})
+		ctx.list:add(
+			ctx.frame,
+			"Room_" .. r.id,
+			(r.x0 + r.x1) / 2,
+			y0 + hgt / 2,
+			(r.z0 + r.z1) / 2,
+			r.x1 - r.x0,
+			hgt,
+			r.z1 - r.z0,
+			{
+				canCollide = false,
+				transparency = 1,
+				canQuery = true,
+				role = "Room",
+				color = { 255, 255, 255 },
+				attrs = { RoomId = r.id, RoomName = r.name, Exterior = r.exterior == true },
+			}
+		)
 	end
 
 	-- nav anchor: one Attachment per room-graph node (room centres, door midpoints, extras)

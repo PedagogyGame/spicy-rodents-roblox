@@ -17,7 +17,16 @@ local KINDS = { asphalt = true, concrete = true, cobble = true }
 local POST_R = 0.375 -- studs (0.15 u)
 local ORIGIN = Geometry.frame(0, 0, 0, 0)
 
-export type Lamp = { id: string, road: string, side: number, x: number, z: number, y: number, top: number, flicker: boolean }
+export type Lamp = {
+	id: string,
+	road: string,
+	side: number,
+	x: number,
+	z: number,
+	y: number,
+	top: number,
+	flicker: boolean,
+}
 
 local function hash(s: string): number
 	local h = 2166136261

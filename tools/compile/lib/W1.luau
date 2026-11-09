@@ -114,18 +114,26 @@ function W1.compile(ctx: Ctx): { modules: { Module } }
 			ctx.invariant("lot params have a paramSchema: " .. lot.id, t.paramSchema ~= nil)
 			if t.paramSchema then
 				local errs = Schema.validate(t.paramSchema, html.params)
-				ctx.invariant("lot params validate (invariant 1): " .. lot.id, #errs == 0, Schema.formatErrors(lot.id, errs))
+				ctx.invariant(
+					"lot params validate (invariant 1): " .. lot.id,
+					#errs == 0,
+					Schema.formatErrors(lot.id, errs)
+				)
 				paramsChecked += 1
 			end
 		end
 	end
-	ctx.compare("lot types (one per v5.4 type in the data)", 74, (function()
-		local n = 0
-		for _ in lotTypes.types do
-			n += 1
-		end
-		return n
-	end)())
+	ctx.compare(
+		"lot types (one per v5.4 type in the data)",
+		74,
+		(function()
+			local n = 0
+			for _ in lotTypes.types do
+				n += 1
+			end
+			return n
+		end)()
+	)
 	table.insert(modules, {
 		name = "LotTypes",
 		value = lotTypes,
@@ -280,11 +288,17 @@ function W1.compile(ctx: Ctx): { modules: { Module } }
 			ctx.invariant(`population {phase}: floor <= standing ({p.id})`, p.floor[phase] <= p.standing[phase])
 			ctx.invariant(`population {phase}: full floor <= floor ({p.id})`, p.fullFloor[phase] <= p.floor[phase])
 			if p.neverCut then
-				ctx.invariant(`population {phase}: {p.id} floor unchanged at a full server`, p.fullFloor[phase] == p.floor[phase])
+				ctx.invariant(
+					`population {phase}: {p.id} floor unchanged at a full server`,
+					p.fullFloor[phase] == p.floor[phase]
+				)
 			end
 		end
 		local reserve, cap = pop.reserve[phase], pop.hardCap[phase]
-		ctx.invariant(`inv 11 {phase}: standing {standing} >= human slots + normal floors {humanSlots + floor}`, standing >= humanSlots + floor)
+		ctx.invariant(
+			`inv 11 {phase}: standing {standing} >= human slots + normal floors {humanSlots + floor}`,
+			standing >= humanSlots + floor
+		)
 		ctx.invariant(
 			`inv 11 {phase}: standing + reserve {standing + reserve} >= max players + full floors {maxPlayers + full}`,
 			standing + reserve >= maxPlayers + full
@@ -298,7 +312,10 @@ function W1.compile(ctx: Ctx): { modules: { Module } }
 	end
 	local hs, pol, amb = postsById.hospital_staff, postsById.police, postsById.ambulance_crew
 	ctx.invariant("inv 11: hospital floor >= 10", hs ~= nil and hs.floor.frb >= 10 and hs.floor.w3c >= 10)
-	ctx.invariant("inv 11: police officer floor >= 6", pol ~= nil and (pol.officerFloor or 0) >= 6 and pol.floor.frb >= 6)
+	ctx.invariant(
+		"inv 11: police officer floor >= 6",
+		pol ~= nil and (pol.officerFloor or 0) >= 6 and pol.floor.frb >= 6
+	)
 	ctx.invariant("inv 11: ambulance crew on a separate post", amb ~= nil and amb.floor.frb > 0)
 	ctx.invariant("inv 11: squirrel float 10-14", pop.animals.squirrel.min == 10 and pop.animals.squirrel.max == 14)
 	ctx.invariant("inv 11: deer bodies >= 5", pop.animals.deer.bodies >= 5)
@@ -335,7 +352,10 @@ function W1.compile(ctx: Ctx): { modules: { Module } }
 			ctx.invariant("hollow " .. h.id .. ": knothole chamber exists", chambers[k.chamber] == true)
 			local rid = string.match(k.exitTo, "^route:(%d+)$")
 			if rid then
-				ctx.invariant("hollow " .. h.id .. ": exit route exists " .. rid, ctx.routeIds[tonumber(rid) :: number] == true)
+				ctx.invariant(
+					"hollow " .. h.id .. ": exit route exists " .. rid,
+					ctx.routeIds[tonumber(rid) :: number] == true
+				)
 			end
 		end
 		if h.tier == "premium" then
@@ -359,7 +379,10 @@ function W1.compile(ctx: Ctx): { modules: { Module } }
 				end
 				exits[k.exitTo] = true
 			end
-			ctx.invariant("inv 5: escape " .. h.id .. " has 3 knotholes with distinct exits", #h.knotholes == 3 and n == 3)
+			ctx.invariant(
+				"inv 5: escape " .. h.id .. " has 3 knotholes with distinct exits",
+				#h.knotholes == 3 and n == 3
+			)
 		else
 			single += 1
 			ctx.invariant("inv 5: single-chamber " .. h.id, #h.chambers == 1)
