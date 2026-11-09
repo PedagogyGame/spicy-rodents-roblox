@@ -32,8 +32,8 @@ FRONT = {"Upper": (0.36, -1.15, 3.05), "Lower": (0.35, -0.95, 2.42), "Foot": (0.
 BACK = {"Upper": (0.38, 1.40, 3.22), "Lower": (0.41, 0.92, 2.42), "Foot": (0.37, 1.58, 1.42),
         "Toe": (0.35, 1.42, 0.40), "End": (0.35, 1.22, 0.02)}
 NOSE = np.array([0.0, -3.10, 4.66])
-EYE_L = np.array([0.255, -2.62, 5.06])
-EYE_R = 0.088
+EYE_L = np.array([0.205, -2.60, 5.06])
+EYE_R = 0.082
 
 
 def skeleton():
@@ -94,14 +94,14 @@ def _limb(a, b, ra, rb, k, tag=""):
 def sculpt(variant="doe"):
     P = []
     # barrel, withers, rump
-    P.append(Ellipsoid((0, -0.45, 3.22), (0.62, 1.05, 0.70), tag="ribs"))
-    P.append(Ellipsoid((0, 0.45, 3.18), (0.56, 0.9, 0.6), k=0.25, tag="belly"))
+    P.append(Ellipsoid((0, -0.45, 3.20), (0.70, 1.1, 0.78), tag="ribs"))
+    P.append(Ellipsoid((0, 0.45, 3.16), (0.62, 0.95, 0.68), k=0.25, tag="belly"))
     P.append(Ellipsoid((0, 1.38, 3.42), (0.58, 0.62, 0.6), k=0.22, tag="rump"))
-    P.append(RoundCone((0, 1.72, 3.62), (0, -1.05, 3.62), 0.38, 0.42, k=0.25, tag="back"))
+    P.append(RoundCone((0, 1.72, 3.62), (0, -1.05, 3.62), 0.42, 0.46, k=0.25, tag="back"))
     P.append(Ellipsoid((0, -1.0, 3.78), (0.26, 0.45, 0.30), k=0.2, tag="withers"))
     P.append(Ellipsoid((0, -1.32, 2.98), (0.44, 0.40, 0.55), k=0.22, tag="brisket"))
     # neck: thick at the shoulders, slim under the head
-    P.append(RoundCone((0, -1.22, 3.42), (0, -2.15, 4.78), 0.50, 0.29, k=0.22, tag="neck"))
+    P.append(RoundCone((0, -1.22, 3.42), (0, -2.15, 4.78), 0.56, 0.31, k=0.22, tag="neck"))
     P.append(Ellipsoid((0, -1.95, 4.15), (0.26, 0.30, 0.42), axes=rot_x(-0.6), k=0.2, tag="throat"))
     # head: a slim tapered skull and long face
     P.append(Ellipsoid((0, -2.38, 5.05), (0.30, 0.36, 0.28), k=0.12, tag="skull"))
@@ -114,9 +114,9 @@ def sculpt(variant="doe"):
     # ears: big, oval, held out to the sides and up
     tilt = rot_y(0.95) @ rot_x(-0.15)
     base = np.array([0.22, -2.32, 5.34])
-    c = base + tilt @ np.array([0, 0, 0.27])
-    P += mirror_pair([Ellipsoid(c, (0.15, 0.045, 0.30), axes=tilt, k=0.06, tag="ear")])
-    P += mirror_pair([Ellipsoid(c + tilt @ np.array([0, -0.035, 0.03]), (0.11, 0.025, 0.24), axes=tilt, k=0.01, op="sub", tag="earcup")])
+    c = base + tilt @ np.array([0, 0, 0.30])
+    P += mirror_pair([Ellipsoid(c, (0.18, 0.05, 0.34), axes=tilt, k=0.06, tag="ear")])
+    P += mirror_pair([Ellipsoid(c + tilt @ np.array([0, -0.04, 0.03]), (0.13, 0.026, 0.27), axes=tilt, k=0.01, op="sub", tag="earcup")])
     # legs
     sh, el, kn, fe = (np.array(FRONT[k]) for k in ("Upper", "Lower", "Foot", "Toe"))
     end = np.array(FRONT["End"])
@@ -171,7 +171,8 @@ def pattern_field(c, n, dom, variant="doe"):
     wob = 0.05 * np.sin(y * 5.0 + x * 3.0) + 0.04 * np.sin(z * 7.0)
     out = np.zeros(len(c))
     # white belly running back between the hind legs
-    trunk = (y > -1.3) & (y < 1.7) & (z > 2.0) & ~np.char.startswith(ds, "Tail")
+    legs = np.char.startswith(ds, "Front") | np.char.startswith(ds, "Back")
+    trunk = (y > -1.3) & (y < 1.7) & (z > 2.3) & ~np.char.startswith(ds, "Tail") & ~legs
     belly = _sstep(0.2, 0.5, -n[:, 2] * 0.9 + (2.75 - z) * 1.5 - np.abs(x) * 0.6 + wob)
     out[trunk] = belly[trunk]
     # throat patch
@@ -224,7 +225,8 @@ def paint(tx, variant, tools):
     fine = tools["strands"](P, F, 0.012, 0.06, seed=71)
     big = fbm(P * 2.0, 3, seed=7)
     dorsal = sst(0.4, 0.95, N[:, 2])
-    g = 0.84 - 0.16 * dorsal * sst(1.5, 3.0, P[:, 2]) + (fine - 0.5) * 0.14 + (big - 0.5) * 0.10
+    g = 0.86 - 0.22 * dorsal * sst(1.5, 3.0, P[:, 2]) + (fine - 0.5) * 0.18 + (big - 0.5) * 0.14
+    g = g - 0.12 * sst(0.75, 0.95, N[:, 2]) * sst(3.0, 3.8, P[:, 2])  # the darker dorsal stripe
     g = g * (0.92 + 0.12 * H)
     lowleg = np.char.endswith(dom, "_Foot") | np.char.endswith(dom, "_Toe")
     g = np.where(lowleg, g * 0.9, g)
@@ -252,7 +254,7 @@ def paint(tx, variant, tools):
     d_eye = np.minimum(np.linalg.norm(P - lm["eyeL"], axis=1), np.linalg.norm(P - lm["eyeR"], axis=1))
     override(head, _hex("#1b1411"), r=0.4, k=1 - sst(EYE_R + 0.006, EYE_R + 0.02, d_eye))
     ring = sst(EYE_R + 0.02, EYE_R + 0.035, d_eye) * (1 - sst(EYE_R + 0.05, EYE_R + 0.08, d_eye))
-    override(head, _hex("#f4ede2"), r=0.65, k=ring * 0.9)  # pale eye ring
+    override(head, _hex("#e9dccb"), r=0.65, k=ring * 0.55)  # pale eye ring
     # ears: dark rims, pale furred insides
     ec = np.where(P[:, :1] > 0, lm["earL"], lm["earR"])
     dist_e = np.linalg.norm(P - ec, axis=1)

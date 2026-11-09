@@ -31,8 +31,8 @@ BACK = {"Upper": (0.24, 0.80, 1.50), "Lower": (0.27, 0.42, 1.00), "Foot": (0.25,
         "Toe": (0.24, 0.73, 0.065), "End": (0.24, 0.60, 0.02)}
 HEAD_C = np.array([0.0, -1.52, 2.20])
 NOSE = np.array([0.0, -2.10, 2.06])
-EYE_L = np.array([0.135, -1.74, 2.27])
-EYE_R = 0.052
+EYE_L = np.array([0.118, -1.665, 2.265])
+EYE_R = 0.05
 
 
 def skeleton():
@@ -75,7 +75,7 @@ def eye_centre(variant, side=1):
 
 
 def eye_gaze(side):
-    return np.array([side * 0.55, -0.82, 0.12])
+    return np.array([side * 0.5, -0.85, 0.12])
 
 
 def landmarks(variant):
@@ -98,14 +98,14 @@ def sculpt(variant="fox"):
     # neck with its ruff, and the head
     P.append(RoundCone((0, -0.80, 1.68), (0, -1.40, 2.10), 0.30, 0.20, k=0.12, tag="neck"))
     P.append(Ellipsoid((0, -1.18, 1.72), (0.22, 0.20, 0.28), k=0.12, tag="ruff"))
-    P.append(Ellipsoid(HEAD_C, (0.21, 0.24, 0.19), k=0.08, tag="skull"))
+    P.append(Ellipsoid(HEAD_C, (0.23, 0.26, 0.205), k=0.08, tag="skull"))
     P += mirror_pair([Ellipsoid((0.15, -1.58, 2.10), (0.12, 0.15, 0.12), k=0.08, tag="cheekruff")])
     P.append(RoundCone((0, -1.66, 2.15), (0, -2.02, 2.07), 0.135, 0.055, k=0.08, tag="snout"))
     P.append(Ellipsoid((0, -2.075, 2.07), (0.05, 0.045, 0.042), k=0.03, tag="nose"))
     P.append(RoundCone((0, -1.55, 2.01), (0, -1.96, 1.98), 0.09, 0.035, k=0.06, tag="jaw"))
     P += mirror_pair([RoundCone((0.07, -1.80, 2.0), (0.0, -2.0, 2.0), 0.009, 0.007, k=0.012, op="sub", tag="mouth")])
     P += mirror_pair([Ellipsoid(EYE_L, (EYE_R + 0.004,) * 3, k=0.025, op="sub", tag="eyesocket")])
-    P += mirror_pair([Ellipsoid(EYE_L + [-0.02, 0.02, 0.06], (0.07, 0.09, 0.03), k=0.03, tag="brow")])
+    P += mirror_pair([Ellipsoid(EYE_L + [-0.025, 0.02, 0.055], (0.06, 0.08, 0.026), k=0.03, tag="brow")])
     # ears: big pointed triangles leaning out
     tilt = rot_y(0.22) @ rot_x(-0.10)
     base = np.array([0.155, -1.42, 2.36])
@@ -259,7 +259,7 @@ def paint(tx, variant, tools):
     override(lower_leg | np.char.endswith(dom, "_Upper"), black, r=0.6, k=stock)
     # black ear backs, pale inside
     override(ear, black, r=0.6, k=sst(-0.1, 0.25, N[:, 1]))
-    override(ear, _hex("#e8dccd"), r=0.6, k=sst(-0.15, -0.45, N[:, 1]))
+    override(ear, _hex("#cdb9a3") * (0.8 + 0.4 * fine)[:, None], r=0.65, k=sst(-0.2, -0.55, N[:, 1]) * 0.85)
     # nose and lips
     lm = landmarks(variant)
     d_nose = np.linalg.norm(P - lm["nose"], axis=1)
