@@ -13,6 +13,9 @@
 local Import = require("../Import")
 local MapModel = Import.shared("Map/MapModel") :: typeof(require("../../shared/Map/MapModel"))
 
+-- Exported types do not cross Import (W1 Track A note): the map is restated loosely.
+type Map = any
+
 export type Layout = { canvasW: number, canvasH: number, offsetX: number, offsetY: number, dotX: number, dotY: number }
 
 local Minimap = {}
@@ -20,7 +23,7 @@ Minimap.__index = Minimap
 
 -- layout(map, cx, cz, radius, size): the canvas size in pixels so `radius` studs fill `size` pixels, and
 -- the canvas offset that puts (cx, cz) at the panel centre.
-function Minimap.layout(map: MapModel.Map, cx: number, cz: number, radius: number, size: number): Layout
+function Minimap.layout(map: Map, cx: number, cz: number, radius: number, size: number): Layout
 	local b = map.bounds
 	local scale = size / (2 * radius) -- pixels per stud
 	local canvasW = (b.maxX - b.minX) * scale
@@ -42,7 +45,7 @@ end
 
 export type Minimap = typeof(setmetatable(
 	{} :: {
-		map: MapModel.Map,
+		map: Map,
 		size: number,
 		radius: number,
 		full: boolean,
@@ -55,8 +58,8 @@ export type Minimap = typeof(setmetatable(
 	Minimap
 ))
 
-function Minimap.new(map: MapModel.Map, opts: { size: number?, radius: number? }?): Minimap
-	local o = opts or {}
+function Minimap.new(map: Map, opts: { size: number?, radius: number? }?): Minimap
+	local o: { size: number?, radius: number? } = opts or {}
 	return setmetatable({
 		map = map,
 		size = o.size or 220,
@@ -147,12 +150,13 @@ function Minimap.setMarkers(self: Minimap, list: { { kind: string, x: number, z:
 	for i, m in list do
 		local f = self.markers[i]
 		if not f then
-			f = Instance.new("Frame")
-			f.Size = UDim2.fromOffset(6, 6)
-			f.AnchorPoint = Vector2.new(0.5, 0.5)
-			f.ZIndex = 3
-			f.Parent = canvas
-			self.markers[i] = f
+			local made = Instance.new("Frame")
+			made.Size = UDim2.fromOffset(6, 6)
+			made.AnchorPoint = Vector2.new(0.5, 0.5)
+			made.ZIndex = 3
+			made.Parent = canvas
+			self.markers[i] = made
+			f = made
 		end
 		local frame = f :: Frame
 		local u, v = MapModel.project(self.map, m.x, m.z)

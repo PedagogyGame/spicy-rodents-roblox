@@ -247,11 +247,11 @@ function Motion.nearestRoute(
 end
 
 local function trunkFeet(world: World): { TrunkFoot }
-	local feet = world._trunkFeet
-	if feet then
-		return feet
+	local cached = world._trunkFeet
+	if cached then
+		return cached
 	end
-	feet = {}
+	local feet: { TrunkFoot } = {}
 	for _, route in world.registry:all() do
 		if route.kind == "trunk" and not route.flags.autoGrabExcluded then
 			local foot = world.registry:foot(route)

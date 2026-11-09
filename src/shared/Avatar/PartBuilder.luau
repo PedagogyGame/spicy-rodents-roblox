@@ -98,7 +98,7 @@ function PartBuilder.instantiate(spec: ModelSpec, lib: Lib, origin: any?): any
 	model.Name = spec.name
 	model:SetAttribute("Species", spec.species)
 	model:SetAttribute("Placeholder", true)
-	for k, v in spec.attributes or {} do
+	for k, v in (spec.attributes or {}) :: { [string]: any } do
 		model:SetAttribute(k, v)
 	end
 	local parts: { [string]: any } = {}
@@ -117,7 +117,7 @@ function PartBuilder.instantiate(spec: ModelSpec, lib: Lib, origin: any?): any
 		inst.Reflectance = p.reflectance or 0
 		inst.TopSurface = Enum.SurfaceType.Smooth
 		inst.BottomSurface = Enum.SurfaceType.Smooth
-		inst.CastShadow = p.name == spec.primary and false or (p.transparency or 0) < 1
+		inst.CastShadow = if p.name == spec.primary then false else (p.transparency or 0) < 1
 		inst.CanCollide = false
 		inst.CanTouch = false
 		inst.CanQuery = p.name == spec.primary
@@ -148,10 +148,10 @@ function PartBuilder.instantiate(spec: ModelSpec, lib: Lib, origin: any?): any
 		att.CFrame = local_[a.part]:Inverse() * CFrame.new(a.pos[1], a.pos[2], a.pos[3])
 		att.Parent = host
 	end
-	for _, c in spec.children or {} do
+	for _, c in (spec.children or {}) :: { ChildSpec } do
 		local inst = Instance.new(c.className)
 		inst.Name = c.name
-		for k, v in c.props or {} do
+		for k, v in (c.props or {}) :: { [string]: any } do
 			(inst :: any)[k] = v
 		end
 		inst.Parent = model

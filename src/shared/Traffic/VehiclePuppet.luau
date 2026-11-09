@@ -44,7 +44,7 @@ function VehiclePuppet.baseOffset(kind: string): number
 end
 
 function VehiclePuppet.spec(kind: string, opts: Opts?): PartBuilder.ModelSpec
-	local o = opts or {}
+	local o: Opts = opts or {}
 	local d = DEFAULTS[kind] or error(`VehiclePuppet: unknown kind {kind}`)
 	local b = Boxes.get(kind)
 	local W, L, H = b.width, b.length, b.height
@@ -106,8 +106,15 @@ function VehiclePuppet.spec(kind: string, opts: Opts?): PartBuilder.ModelSpec
 	}
 	local wx = W / 2 - wheelW / 2
 	local wz = L / 2 - math.max(wheelR * 1.3, L * 0.16)
-	for _, w in { { "WheelFL", -1, -1 }, { "WheelFR", 1, -1 }, { "WheelBL", -1, 1 }, { "WheelBR", 1, 1 } } do
-		local name, sx, sz = w[1] :: string, w[2] :: number, w[3] :: number
+	for _, w in
+		{
+			{ name = "WheelFL", sx = -1, sz = -1 },
+			{ name = "WheelFR", sx = 1, sz = -1 },
+			{ name = "WheelBL", sx = -1, sz = 1 },
+			{ name = "WheelBR", sx = 1, sz = 1 },
+		}
+	do
+		local name, sx, sz = w.name, w.sx, w.sz
 		table.insert(parts, {
 			name = name,
 			size = { wheelW, wheelR * 2, wheelR * 2 },

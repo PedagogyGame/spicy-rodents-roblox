@@ -95,7 +95,7 @@ function AICarMotor.new(
 	lane: LaneMath.Lane,
 	opts: Opts?
 ): Vehicle
-	local o = opts or {}
+	local o: Opts = opts or {}
 	local dir = if lane.dir == 0 then 1 else lane.dir
 	local s = 0
 	if o.at and lane.shape == "straight" then

@@ -88,7 +88,7 @@ local function lerpAngle(a: number, b: number, t: number): number
 end
 
 function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
-	local o = opts or {}
+	local o: { delay: number?, keep: number? } = opts or {}
 	local keep = o.keep or 12
 	local buf: Buffer = {
 		delay = o.delay or Ghost.DELAY,
@@ -166,9 +166,10 @@ function Ghost.render(
 		local k = kinds[id]
 		if not model and k then
 			local spec = VehiclePuppet.spec(k.kind, { color = k.color, name = `Ghost_{id}` })
-			model = PartBuilder.instantiate(spec, lib) :: Model
-			model.Parent = folder
-			models[id] = model
+			local built = PartBuilder.instantiate(spec, lib) :: Model
+			built.Parent = folder
+			models[id] = built
+			model = built
 		end
 		if model and model.PrimaryPart and k then
 			local y = if p.visible then heightAt(p.x, p.z) + VehiclePuppet.baseOffset(k.kind) else -500

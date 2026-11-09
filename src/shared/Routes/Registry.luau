@@ -114,12 +114,9 @@ local function toRoute(rec: RouteRecord, studsPerUnit: number): Route
 	for i, p in rec.points do
 		pts[i] = Curve.vec3(p[1], p[2], p[3])
 	end
-	local sampleCount = rec.sampleCount
-	if sampleCount == nil then
-		-- The harvested length in HTML units reproduces the game's own ceil(3L) for every route
-		-- (verified in tests/unit/routes_registry.spec.luau against data/harvest/routes.json).
-		sampleCount = Curve.sampleSteps(rec.length / studsPerUnit) + 1
-	end
+	-- Without a record count, the harvested length in HTML units reproduces the game's own ceil(3L) for
+	-- every route (verified in tests/unit/routes_registry.spec.luau against data/harvest/routes.json).
+	local sampleCount: number = rec.sampleCount or (Curve.sampleSteps(rec.length / studsPerUnit) + 1)
 	local center: Vec3? = nil
 	if rec.center then
 		center = Curve.vec3(rec.center[1], rec.center[2], rec.center[3])
@@ -139,6 +136,7 @@ local function toRoute(rec: RouteRecord, studsPerUnit: number): Route
 		origin = rec.origin or "harvest",
 		lotId = rec.lotId,
 		flags = rec.flags or Registry.deriveFlags(rec.name, rec.kind),
+		patched = nil,
 		_curve = nil,
 		_samples = nil,
 	}
@@ -253,21 +251,23 @@ end
 
 -- curve(route): the centripetal Catmull-Rom, built once.
 function Registry.curve(_self: Registry, route: Route): Curve.Curve
-	local curve = route._curve
-	if not curve then
-		curve = Curve.new(route.points)
-		route._curve = curve
+	local cached = route._curve
+	if cached then
+		return cached
 	end
+	local curve = Curve.new(route.points)
+	route._curve = curve
 	return curve
 end
 
 -- samples(route): route.sampled, the sampleCount arc-length-spaced points (built once).
 function Registry.samples(self: Registry, route: Route): { Vec3 }
-	local samples = route._samples
-	if not samples then
-		samples = self:curve(route):getSpacedPoints(route.sampleCount - 1)
-		route._samples = samples
+	local cached = route._samples
+	if cached then
+		return cached
 	end
+	local samples = self:curve(route):getSpacedPoints(route.sampleCount - 1)
+	route._samples = samples
 	return samples
 end
 

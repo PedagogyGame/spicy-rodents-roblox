@@ -25,12 +25,21 @@ local BlendRules = Import.shared("Avatar/BlendRules") :: typeof(require("../../s
 local DevSamples = Import.shared("Avatar/DevSamples") :: typeof(require("../../shared/Avatar/DevSamples"))
 local PartBuilder = Import.shared("Avatar/PartBuilder") :: typeof(require("../../shared/Avatar/PartBuilder"))
 
-type Rgb = BlendRules.Rgb
+-- Exported types do not cross Import (W1 Track A note): BlendRules' types are restated loosely here.
+type Rgb = { r: number, g: number, b: number }
+type DescriptionLike = any
+type ProductInfo = { [number]: { name: string } }
+type ColourTable = { [number]: Rgb }
+type Traits = any
+type StockLook = { body: Rgb, pattern: Rgb, eyes: Rgb, eyesLocked: boolean }
+type Look = any
+type HumanLook = any
+type AnimalLook = any
 
 export type Deps = {
-	describe: ((userId: number) -> BlendRules.DescriptionLike?)?,
+	describe: ((userId: number) -> DescriptionLike?)?,
 	productInfo: ((assetId: number) -> { name: string }?)?,
-	colourTable: BlendRules.ColourTable?,
+	colourTable: ColourTable?,
 	accessory: ((assetId: number) -> Instance?)?, -- an Accessory with a Handle (engine: from the avatar model)
 	faceTexture: ((faceId: number) -> string?)?, -- classic face asset -> decal texture (S9: LoadAsset)
 	color3: ((r: number, g: number, b: number) -> any)?, -- Color3.new (engine or @lune/roblox)
@@ -52,14 +61,14 @@ AvatarBlendService.STOCK = {
 	rodent = { body = hex("#83544d"), pattern = hex("#c9a38c"), eyes = hex("#b0242a"), eyesLocked = true },
 	fox = { body = hex("#b8663c"), pattern = hex("#efe6da"), eyes = hex("#2a1d12"), eyesLocked = false },
 	deer = { body = hex("#ad845e"), pattern = hex("#eadfcc"), eyes = hex("#1a1512"), eyesLocked = false },
-} :: { [string]: BlendRules.StockLook }
+} :: { [string]: StockLook }
 
 local HUMAN_SKIN = { "Head", "LeftHand", "RightHand", "LeftLowerArm", "RightLowerArm" } -- RigSpec.human.regions
 
 export type Service = typeof(setmetatable(
 	{} :: {
 		deps: Deps,
-		_traits: { [number]: BlendRules.Traits },
+		_traits: { [number]: Traits },
 		_info: { [number]: { name: string } | false },
 		_applied: { [Instance]: { ops: { { inst: Instance, prop: string, old: any } }, added: { Instance } } },
 	},
@@ -76,8 +85,8 @@ function AvatarBlendService.new(deps: Deps?): Service
 end
 
 -- Product info through the cache: a failed fetch is remembered as "no info" (S9 finding 5).
-local function infoFor(self: Service, desc: BlendRules.DescriptionLike): BlendRules.ProductInfo
-	local out: BlendRules.ProductInfo = {}
+local function infoFor(self: Service, desc: DescriptionLike): ProductInfo
+	local out: ProductInfo = {}
 	local fetch = self.deps.productInfo
 	local ids = { desc.Shirt, desc.Pants, desc.GraphicTShirt }
 	for _, a in desc.accessories do
@@ -85,11 +94,12 @@ local function infoFor(self: Service, desc: BlendRules.DescriptionLike): BlendRu
 	end
 	for _, id in ids do
 		if id and id ~= 0 then
-			local cached = self._info[id]
+			local cached: { name: string } | false | nil = self._info[id]
 			if cached == nil and fetch then
 				local ok, info = pcall(fetch, id)
-				cached = if ok and info then info else false
-				self._info[id] = cached
+				local value: { name: string } | false = if ok and info then info else false
+				self._info[id] = value
+				cached = value
 			end
 			if cached then
 				out[id] = cached :: { name: string }
@@ -99,7 +109,7 @@ local function infoFor(self: Service, desc: BlendRules.DescriptionLike): BlendRu
 	return out
 end
 
-function AvatarBlendService.traitsFor(self: Service, userId: number): BlendRules.Traits?
+function AvatarBlendService.traitsFor(self: Service, userId: number): Traits?
 	local cached = self._traits[userId]
 	if cached then
 		return cached
@@ -117,12 +127,7 @@ function AvatarBlendService.traitsFor(self: Service, userId: number): BlendRules
 	return traits
 end
 
-function AvatarBlendService.lookFor(
-	self: Service,
-	userId: number,
-	species: string,
-	stock: BlendRules.StockLook?
-): BlendRules.Look?
+function AvatarBlendService.lookFor(self: Service, userId: number, species: string, stock: StockLook?): Look?
 	local traits = self:traitsFor(userId)
 	if not traits then
 		return nil
@@ -141,7 +146,7 @@ local function colourTarget(part: Instance): (Instance, string)
 end
 
 -- ops(model, species, look): the colour operations a look implies on this body (pure over the tree).
-function AvatarBlendService.ops(model: Instance, species: string, look: BlendRules.Look): { Op }
+function AvatarBlendService.ops(model: Instance, species: string, look: Look): { Op }
 	local out: { Op } = {}
 	local function add(name: string, value: Rgb)
 		local part = model:FindFirstChild(name, true)
@@ -151,13 +156,13 @@ function AvatarBlendService.ops(model: Instance, species: string, look: BlendRul
 		end
 	end
 	if look.kind == "human" then
-		local h = look :: BlendRules.HumanLook
+		local h = look :: HumanLook
 		for _, name in HUMAN_SKIN do
 			add(name, h.skinTone)
 		end
 		return out
 	end
-	local a = look :: BlendRules.AnimalLook
+	local a = look :: AnimalLook
 	add("Body", a.bodyTint)
 	add("FurCards", a.bodyTint)
 	add("Pattern", a.patternColour)
@@ -184,19 +189,19 @@ local function color3(self: Service, c: Rgb): any
 end
 
 -- apply(model, species, look): colour ops plus face and accessory; reverts any earlier blend first.
-function AvatarBlendService.apply(self: Service, model: Instance, species: string, look: BlendRules.Look): number
+function AvatarBlendService.apply(self: Service, model: Instance, species: string, look: Look): number
 	self:revert(model)
 	local record = { ops = {}, added = {} }
 	for _, op in AvatarBlendService.ops(model, species, look) do
 		table.insert(record.ops, { inst = op.inst, prop = op.prop, old = (op.inst :: any)[op.prop] });
 		(op.inst :: any)[op.prop] = color3(self, op.value)
 	end
-	local newInstance = self.deps.newInstance
+	local newInstance: (className: string) -> Instance = self.deps.newInstance
 		or function(className: string): Instance
 			return Instance.new(className :: any)
 		end
 	if look.kind == "human" then
-		local h = look :: BlendRules.HumanLook
+		local h = look :: HumanLook
 		local head = model:FindFirstChild("Head")
 		if head and h.face ~= 0 and self.deps.faceTexture then
 			local texture = self.deps.faceTexture(h.face)
@@ -223,7 +228,7 @@ function AvatarBlendService.apply(self: Service, model: Instance, species: strin
 			end
 		end
 	else
-		local a = look :: BlendRules.AnimalLook
+		local a = look :: AnimalLook
 		local socket = model:FindFirstChild("HeadSocket", true)
 		if a.accessory and self.deps.accessory and socket and socket.Parent then
 			local acc = self.deps.accessory(a.accessory)
@@ -268,12 +273,7 @@ function AvatarBlendService.revert(self: Service, model: Instance): boolean
 end
 
 -- preview(model, species, sampleIndex): Role Lab's blend preview on a dev sample (DevSamples, D13).
-function AvatarBlendService.preview(
-	self: Service,
-	model: Instance,
-	species: string,
-	sampleIndex: number
-): BlendRules.Look
+function AvatarBlendService.preview(self: Service, model: Instance, species: string, sampleIndex: number): Look
 	local sample = DevSamples.SAMPLES[((sampleIndex - 1) % #DevSamples.SAMPLES) + 1]
 	local traits = BlendRules.traits(sample.desc, DevSamples.PRODUCT_INFO, self.deps.colourTable)
 	local look =
@@ -290,7 +290,7 @@ function AvatarBlendService.engineDeps(): Deps
 		return { r = c.R, g = c.G, b = c.B }
 	end
 	return {
-		describe = function(userId: number): BlendRules.DescriptionLike?
+		describe = function(userId: number): DescriptionLike?
 			local desc = Players:GetHumanoidDescriptionFromUserId(userId)
 			local accessories = {}
 			for _, a in desc:GetAccessories(true) do

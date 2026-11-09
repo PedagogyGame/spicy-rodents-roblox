@@ -79,7 +79,7 @@ function Staff.new(actor: Common.Actor, params: Params): Common.Brain
 	local i = params.index
 	local dir = if i % 2 == 1 then 1 else -1
 	local st = Units.st
-	local localCircuit = params.circuit
+	local localCircuit: { { number } } = params.circuit
 		or {
 			{ 0, 0 },
 			{ dir * st(2.6), -st(0.65) },

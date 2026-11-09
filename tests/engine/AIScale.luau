@@ -281,7 +281,7 @@ function AIScale.run(options: Options?): { [string]: any }
 	local opts: Options = options or {}
 	local started = os.clock()
 	local deadline = started + (opts.wallLimitSeconds or 200)
-	local scenarios = opts.scenarios
+	local scenarios: { ScenarioOpts } = opts.scenarios
 		or {
 			{ name = "s5_72_humans", humans = 72, frames = 1800, moveMode = "all" },
 			{ name = "s5_72_humans_allNear", humans = 72, frames = 900, allNear = true, moveMode = "all" },

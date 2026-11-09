@@ -32,7 +32,7 @@ local TrafficSim = {}
 export type Options = { minutes: number?, userIds: { number }? }
 
 function TrafficSim.run(opts: Options?): { [string]: any }
-	local o = opts or {}
+	local o: Options = opts or {}
 	local Data = req(shared, "Data")
 	local Height = req(shared, "World/Height")
 	local Ghost = req(shared, "Traffic/Ghost")
@@ -190,7 +190,7 @@ function TrafficSim.run(opts: Options?): { [string]: any }
 	-- avatar ----------------------------------------------------------------------------------
 	local blend = AvatarBlendService.new(AvatarBlendService.engineDeps())
 	local applied = {}
-	for _, uid in o.userIds or { 1, 156 } do
+	for _, uid in (o.userIds or { 1, 156 }) :: { number } do
 		local ok, err = pcall(function()
 			local sq = PartBuilder.instantiate(PuppetSpec.spec("squirrel"), lib)
 			sq.Parent = folder

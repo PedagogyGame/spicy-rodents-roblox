@@ -82,7 +82,7 @@ end
 SweptCollision.BOXES = BOXES
 
 function SweptCollision.new(opts: { boxes: { [string]: Box }?, scale: number? }?): SweptCollision
-	local o = opts or {}
+	local o: { boxes: { [string]: Box }?, scale: number? } = opts or {}
 	local self = setmetatable({
 		boxes = o.boxes or SweptCollision.BOXES,
 		scale = o.scale or Units.STUDS_PER_UNIT,

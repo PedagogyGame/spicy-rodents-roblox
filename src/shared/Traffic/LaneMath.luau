@@ -101,7 +101,7 @@ end
 
 local function rangesOf(rec: LaneRecord): { [string]: { number } }
 	local out: { [string]: { number } } = {}
-	for user, v in rec.speed or {} do
+	for user, v in (rec.speed or {}) :: { [string]: any } do
 		if type(v) == "table" then
 			out[user] = { math.min(v[1], v[2]), math.max(v[1], v[2]) }
 		end

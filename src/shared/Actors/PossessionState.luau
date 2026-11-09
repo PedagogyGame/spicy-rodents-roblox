@@ -9,6 +9,8 @@
 -- Interface: ATTR, NET, HOLD_SECONDS, MAX_PLAYERS, newLedger(), bind, unbind, actorOf, driverOf,
 -- count, check(ledger) -> (ok, errors), admits(admittedCount, max?) -> boolean
 
+local Ladder = require("../Roles/Ladder")
+
 local PossessionState = {}
 
 -- Attributes on a body Model (server-written, replicated). MoveState/Clip/ClipT0 are D3's
@@ -38,8 +40,9 @@ PossessionState.NET = table.freeze({
 -- Humans keep the AI's last move direction for up to this long, or until the first input (§1.5 step 5).
 PossessionState.HOLD_SECONDS = 0.75
 -- Addendum B4: the place stays at Roblox's 50; the server turns the 50th arrival away.
-PossessionState.MAX_PLAYERS = 49
-PossessionState.FULL_MESSAGE = "This town is full (49 players). Please try another server."
+-- Both read Roles/Ladder, the only place the ladder is stated (§3.7; round-1 hand-off).
+PossessionState.MAX_PLAYERS = Ladder.server.maxPlayers
+PossessionState.FULL_MESSAGE = Ladder.FULL_MESSAGE
 
 -- Snapshot taken from the brain at possession (§1.5 step 2). Positions in studs, yaw in radians
 -- about +Y (Roblox convention: yaw 0 faces -Z).

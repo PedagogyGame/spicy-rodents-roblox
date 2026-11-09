@@ -464,7 +464,7 @@ function BlendRules.traits(desc: DescriptionLike, productInfo: ProductInfo?, tab
 		table.insert(reasons, "extreme_scale")
 	end
 	local bundleWord: string? = nil
-	for _, w in desc.bundleWords or {} do
+	for _, w in (desc.bundleWords or {}) :: { string } do
 		bundleWord = bundleWord or hasWord(w, BIZARRE_WORDS)
 	end
 	if bundleWord then
@@ -545,8 +545,9 @@ local function composeAnimal(_species: string, stock: StockLook, traits: Traits)
 	local accent: Rgb? = nil
 	if traits.signature == "neon_tips" and #traits.neon > 0 then
 		-- the one neon accent: ear tips and tail tip, softened to the accent clamp
-		accent = BlendRules.clampAccent(traits.neon[1])
-		tailTip = accent
+		local soft = BlendRules.clampAccent(traits.neon[1])
+		accent = soft
+		tailTip = soft
 	elseif traits.signature == "patterned_fur" then
 		-- non-human skin becomes the pattern colour, inside the palette
 		patternColour = BlendRules.clampPalette(traits.skinTone)

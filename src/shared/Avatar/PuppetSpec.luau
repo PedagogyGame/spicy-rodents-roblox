@@ -94,7 +94,7 @@ local function animal(species: string, opts: Opts): ModelSpec
 		extra: { [string]: any }?
 	)
 		local p: any = { name = name, size = size, pos = pos, color = color }
-		for key, v in extra or {} do
+		for key, v in (extra or {}) :: { [string]: any } do
 			p[key] = v
 		end
 		table.insert(parts, p)
@@ -112,16 +112,16 @@ local function animal(species: string, opts: Opts): ModelSpec
 	part("RootPart", { W, H, L }, { 0, 0, 0 }, fur, hidden)
 	-- torso chain (hidden inside the Body region), back (+Z) to front (-Z)
 	local chain = {
-		{ "Pelvis", 0.45 },
-		{ "Hips", 0.35 },
-		{ "Spine1", 0.18 },
-		{ "Spine2", 0.0 },
-		{ "Spine3", -0.18 },
-		{ "Chest", -0.35 },
+		{ name = "Pelvis", f = 0.45 },
+		{ name = "Hips", f = 0.35 },
+		{ name = "Spine1", f = 0.18 },
+		{ name = "Spine2", f = 0.0 },
+		{ name = "Spine3", f = -0.18 },
+		{ name = "Chest", f = -0.35 },
 	}
 	local prev = "RootPart"
 	for _, c in chain do
-		local name, f = c[1] :: string, c[2] :: number
+		local name, f = c.name, c.f
 		part(name, { thin, thin, thin }, { 0, 0, L * f }, fur, hidden)
 		if name == "Pelvis" then
 			table.insert(joints, { name = "Root", kind = "Motor6D", part0 = "RootPart", part1 = "Pelvis" })
@@ -153,8 +153,8 @@ local function animal(species: string, opts: Opts): ModelSpec
 	motor("Jaw", "Head")
 	part("Eyes", { a.head * 0.7, a.head * 0.16, a.head * 0.1 }, { 0, hy + a.head * 0.12, hz - a.head * 0.5 }, eyes)
 	weld("Eyes", "Head")
-	for _, side in { { "EarL", -1 }, { "EarR", 1 } } do
-		local name, sx = side[1] :: string, side[2] :: number
+	for _, side in { { name = "EarL", sx = -1 }, { name = "EarR", sx = 1 } } do
+		local name, sx = side.name, side.sx
 		part(
 			name,
 			{ a.head * 0.18, a.head * 0.4, a.head * 0.12 },
@@ -200,8 +200,15 @@ local function animal(species: string, opts: Opts): ModelSpec
 	-- legs: Upper / Lower / Foot / Toe stacked under shoulders (Chest) and hips (Hips)
 	local legW = math.max(0.12, W * 0.22)
 	local fractions = { Upper = 0.42, Lower = 0.36, Foot = 0.16, Toe = 0.06 }
-	for _, leg in { { "FrontL", -1, -1 }, { "FrontR", 1, -1 }, { "BackL", -1, 1 }, { "BackR", 1, 1 } } do
-		local name, sx, sz = leg[1] :: string, leg[2] :: number, leg[3] :: number
+	for _, leg in
+		{
+			{ name = "FrontL", sx = -1, sz = -1 },
+			{ name = "FrontR", sx = 1, sz = -1 },
+			{ name = "BackL", sx = -1, sz = 1 },
+			{ name = "BackR", sx = 1, sz = 1 },
+		}
+	do
+		local name, sx, sz = leg.name, leg.sx, leg.sz
 		local x, z = sx * W * 0.3, sz * L * 0.36
 		local y = -H / 2 + H * 0.1
 		prev = if sz < 0 then "Chest" else "Hips"
@@ -272,23 +279,24 @@ local function drone(opts: Opts): ModelSpec
 end
 
 -- Block R15 (RigSpec.human part and Motor6D names; Roblox's own attachment names plus our sockets).
+type R15Row = { name: string, size: { number }, pos: { number }, joint: string, parent: string, tone: string }
 -- stylua: ignore
-local R15 = {
-	{ "LowerTorso", { 2, 0.4, 1 }, { 0, -0.2, 0 }, "Root", "HumanoidRootPart", "pants" },
-	{ "UpperTorso", { 2, 1.6, 1 }, { 0, 0.8, 0 }, "Waist", "LowerTorso", "shirt" },
-	{ "Head", { 1.2, 1.2, 1.2 }, { 0, 2.2, 0 }, "Neck", "UpperTorso", "skin" },
-	{ "LeftUpperArm", { 1, 1.2, 1 }, { -1.5, 1.0, 0 }, "LeftShoulder", "UpperTorso", "shirt" },
-	{ "LeftLowerArm", { 1, 1.2, 1 }, { -1.5, -0.2, 0 }, "LeftElbow", "LeftUpperArm", "skin" },
-	{ "LeftHand", { 1, 0.4, 1 }, { -1.5, -1.0, 0 }, "LeftWrist", "LeftLowerArm", "skin" },
-	{ "RightUpperArm", { 1, 1.2, 1 }, { 1.5, 1.0, 0 }, "RightShoulder", "UpperTorso", "shirt" },
-	{ "RightLowerArm", { 1, 1.2, 1 }, { 1.5, -0.2, 0 }, "RightElbow", "RightUpperArm", "skin" },
-	{ "RightHand", { 1, 0.4, 1 }, { 1.5, -1.0, 0 }, "RightWrist", "RightLowerArm", "skin" },
-	{ "LeftUpperLeg", { 1, 1.2, 1 }, { -0.5, -1.0, 0 }, "LeftHip", "LowerTorso", "pants" },
-	{ "LeftLowerLeg", { 1, 1.2, 1 }, { -0.5, -2.2, 0 }, "LeftKnee", "LeftUpperLeg", "pants" },
-	{ "LeftFoot", { 1, 0.4, 1 }, { -0.5, -3.0, 0 }, "LeftAnkle", "LeftLowerLeg", "shoe" },
-	{ "RightUpperLeg", { 1, 1.2, 1 }, { 0.5, -1.0, 0 }, "RightHip", "LowerTorso", "pants" },
-	{ "RightLowerLeg", { 1, 1.2, 1 }, { 0.5, -2.2, 0 }, "RightKnee", "RightUpperLeg", "pants" },
-	{ "RightFoot", { 1, 0.4, 1 }, { 0.5, -3.0, 0 }, "RightAnkle", "RightLowerLeg", "shoe" },
+local R15: { R15Row } = {
+	{ name = "LowerTorso", size = { 2, 0.4, 1 }, pos = { 0, -0.2, 0 }, joint = "Root", parent = "HumanoidRootPart", tone = "pants" },
+	{ name = "UpperTorso", size = { 2, 1.6, 1 }, pos = { 0, 0.8, 0 }, joint = "Waist", parent = "LowerTorso", tone = "shirt" },
+	{ name = "Head", size = { 1.2, 1.2, 1.2 }, pos = { 0, 2.2, 0 }, joint = "Neck", parent = "UpperTorso", tone = "skin" },
+	{ name = "LeftUpperArm", size = { 1, 1.2, 1 }, pos = { -1.5, 1.0, 0 }, joint = "LeftShoulder", parent = "UpperTorso", tone = "shirt" },
+	{ name = "LeftLowerArm", size = { 1, 1.2, 1 }, pos = { -1.5, -0.2, 0 }, joint = "LeftElbow", parent = "LeftUpperArm", tone = "skin" },
+	{ name = "LeftHand", size = { 1, 0.4, 1 }, pos = { -1.5, -1.0, 0 }, joint = "LeftWrist", parent = "LeftLowerArm", tone = "skin" },
+	{ name = "RightUpperArm", size = { 1, 1.2, 1 }, pos = { 1.5, 1.0, 0 }, joint = "RightShoulder", parent = "UpperTorso", tone = "shirt" },
+	{ name = "RightLowerArm", size = { 1, 1.2, 1 }, pos = { 1.5, -0.2, 0 }, joint = "RightElbow", parent = "RightUpperArm", tone = "skin" },
+	{ name = "RightHand", size = { 1, 0.4, 1 }, pos = { 1.5, -1.0, 0 }, joint = "RightWrist", parent = "RightLowerArm", tone = "skin" },
+	{ name = "LeftUpperLeg", size = { 1, 1.2, 1 }, pos = { -0.5, -1.0, 0 }, joint = "LeftHip", parent = "LowerTorso", tone = "pants" },
+	{ name = "LeftLowerLeg", size = { 1, 1.2, 1 }, pos = { -0.5, -2.2, 0 }, joint = "LeftKnee", parent = "LeftUpperLeg", tone = "pants" },
+	{ name = "LeftFoot", size = { 1, 0.4, 1 }, pos = { -0.5, -3.0, 0 }, joint = "LeftAnkle", parent = "LeftLowerLeg", tone = "shoe" },
+	{ name = "RightUpperLeg", size = { 1, 1.2, 1 }, pos = { 0.5, -1.0, 0 }, joint = "RightHip", parent = "LowerTorso", tone = "pants" },
+	{ name = "RightLowerLeg", size = { 1, 1.2, 1 }, pos = { 0.5, -2.2, 0 }, joint = "RightKnee", parent = "RightUpperLeg", tone = "pants" },
+	{ name = "RightFoot", size = { 1, 0.4, 1 }, pos = { 0.5, -3.0, 0 }, joint = "RightAnkle", parent = "RightLowerLeg", tone = "shoe" },
 }
 
 -- stylua: ignore
@@ -311,7 +319,7 @@ function PuppetSpec.human(role: string, index: number, lib: { Instance: any, Col
 	}
 	local joints: { JointSpec } = {}
 	for _, r in R15 do
-		local name, size, pos, joint, parent, tone = r[1], r[2], r[3], r[4], r[5], r[6]
+		local name, size, pos, joint, parent, tone = r.name, r.size, r.pos, r.joint, r.parent, r.tone
 		table.insert(
 			parts,
 			{ name = name :: string, size = size :: { number }, pos = pos :: { number }, color = (colors :: any)[tone] }
@@ -354,7 +362,7 @@ function PuppetSpec.human(role: string, index: number, lib: { Instance: any, Col
 end
 
 function PuppetSpec.spec(species: string, opts: Opts?): ModelSpec
-	local o = opts or {}
+	local o: Opts = opts or {}
 	if ANIMALS[species] then
 		return animal(species, o)
 	elseif species == "drone" then
@@ -380,7 +388,7 @@ function PuppetSpec.finishStockR15(model: any, lib: { Instance: any, CFrame: any
 	-- any joint still missing is made from the matching <Joint>RigAttachment pair (deterministic)
 	local converted: { [string]: number } = {}
 	for _, r in R15 do
-		local name, joint, parentName = r[1] :: string, r[4] :: string, r[5] :: string
+		local name, joint, parentName = r.name, r.joint, r.parent
 		local part1, part0 = model:FindFirstChild(name), model:FindFirstChild(parentName)
 		local existing = if part1 then part1:FindFirstChild(joint) else nil
 		if existing and not existing:IsA("Motor6D") then
@@ -417,8 +425,8 @@ function PuppetSpec.addHumanSockets(model: any, lib: { Instance: any, CFrame: an
 		if host and not host:FindFirstChild(s.name) then
 			local ref = nil
 			for _, r in R15 do
-				if r[1] == s.part then
-					ref = r[3] :: { number }
+				if r.name == s.part then
+					ref = r.pos
 				end
 			end
 			local o = ref or { 0, 0, 0 }

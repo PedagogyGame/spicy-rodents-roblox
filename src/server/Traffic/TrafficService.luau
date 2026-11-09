@@ -25,10 +25,21 @@ local Signal = Import.shared("Util/Signal") :: typeof(require("../../shared/Util
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local SweptCollision = require("./SweptCollision")
 
+-- Exported types do not cross Import (W1 Track A note): the shared types are restated loosely here.
+type Person =
+	{ x: number, y: number, z: number, kind: string, visible: boolean?, hospital: boolean?, injured: boolean? }
+type Vehicle = any
+type Lane = any
+type Entry = any
+type ControlData = any
+type StopLine = any
+type Ctx = any
+type Signal = any
+
 local st = Units.st
 
 export type Squirrel = { id: any, x: number, y: number, z: number, teleported: boolean? }
-export type World = { people: { AICarMotor.Person }?, squirrels: { Squirrel }? }
+export type World = { people: { Person }?, squirrels: { Squirrel }? }
 
 export type Stats = {
 	ticks: number,
@@ -49,22 +60,22 @@ export type Opts = {
 	heightAt: ((x: number, z: number) -> number)?,
 	seed: number?,
 	tickHz: number?,
-	entries: { Fleet.Entry }?,
-	control: Control.ControlData?,
+	entries: { Entry }?,
+	control: ControlData?,
 	sceneSecs: number?,
 }
 
 export type TrafficService = typeof(setmetatable(
 	{} :: {
-		lanes: { [string]: LaneMath.Lane },
+		lanes: { [string]: Lane },
 		records: { [string]: any },
-		vehicles: { AICarMotor.Vehicle },
-		byId: { [number]: AICarMotor.Vehicle },
+		vehicles: { Vehicle },
+		byId: { [number]: Vehicle },
 		prev: { [number]: { x: number, y: number, z: number, yaw: number, visible: boolean } },
 		prevActors: { [any]: { x: number, y: number, z: number } },
 		swept: SweptCollision.SweptCollision,
-		stops: { [string]: { Control.StopLine } },
-		control: Control.ControlData,
+		stops: { [string]: { StopLine } },
+		control: ControlData,
 		heightAt: (x: number, z: number) -> number,
 		tick: number,
 		acc: number,
@@ -73,7 +84,7 @@ export type TrafficService = typeof(setmetatable(
 		sceneSecs: number,
 		_stuckRun: { [number]: number },
 		_stats: Stats,
-		RunOver: Signal.Signal,
+		RunOver: Signal,
 		unified: { string },
 	},
 	TrafficService
@@ -144,12 +155,12 @@ function TrafficService.new(opts: Opts): TrafficService
 	return self
 end
 
-local function ctxFor(self: TrafficService, world: World): AICarMotor.Ctx
-	local people: { AICarMotor.Person } = {}
-	for _, p in world.people or {} do
+local function ctxFor(self: TrafficService, world: World): Ctx
+	local people: { Person } = {}
+	for _, p in (world.people or {}) :: { Person } do
 		table.insert(people, p)
 	end
-	for _, s in world.squirrels or {} do
+	for _, s in (world.squirrels or {}) :: { Squirrel } do
 		table.insert(people, { x = s.x, y = s.y, z = s.z, kind = "squirrel", visible = true })
 	end
 	local bodies = table.create(#self.vehicles)
@@ -209,7 +220,7 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 	end
 	-- the fatal test
 	local actors: { SweptCollision.ActorPose } = {}
-	for _, s in world.squirrels or {} do
+	for _, s in (world.squirrels or {}) :: { Squirrel } do
 		local p = self.prevActors[s.id]
 		table.insert(actors, {
 			id = s.id,
@@ -223,7 +234,7 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 		})
 		self.prevActors[s.id] = { x = s.x, y = s.y, z = s.z }
 	end
-	local hits = {}
+	local hits: { SweptCollision.Hit } = {}
 	if #actors > 0 then
 		hits = self.swept:step(actors, self:poses(), dt)
 		for _, h in hits do
@@ -312,7 +323,7 @@ end
 
 -- dispatchResponder(dest): the first idle responder drives the trunk plus a leg to dest {x, z} (studs;
 -- traffic.md §5.9 makeRoadTrip, trunk prefix). Returns the vehicle or nil when all three are busy.
-function TrafficService.dispatchResponder(self: TrafficService, dest: { number }): AICarMotor.Vehicle?
+function TrafficService.dispatchResponder(self: TrafficService, dest: { number }): Vehicle?
 	local rec = self.records.responder_ambulance_trunk
 	for _, v in self.vehicles do
 		if v.class == "responder" and v.phase == "idle" then

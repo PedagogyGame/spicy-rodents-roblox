@@ -78,7 +78,7 @@ function Patches.transform(patches: PatchData, lots: { any }, studsPerUnit: numb
 	local spu = studsPerUnit or 2.5
 	local actions = Patches.actions(patches)
 	local locked: { [string]: boolean } = {}
-	for _, l in patches.lots or {} do
+	for _, l in (patches.lots or {}) :: { any } do
 		locked[l.lot] = true
 	end
 	local candidates = {}
