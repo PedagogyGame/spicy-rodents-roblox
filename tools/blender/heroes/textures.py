@@ -433,6 +433,9 @@ def principled_material(name, maps, alpha_from_color=False, emission=None):
             nt.nodes.remove(n)
     bsdf = nt.nodes.get("Principled BSDF")
     c = image_node(nt, maps["color"], "sRGB", -600, 300)
+    if not alpha_from_color:
+        # alpha is the TintMask, not opacity: keep RGB where alpha is 0 (no premultiply round trip)
+        c.image.alpha_mode = "CHANNEL_PACKED"
     nt.links.new(c.outputs["Color"], bsdf.inputs["Base Color"])
     if alpha_from_color:
         nt.links.new(c.outputs["Alpha"], bsdf.inputs["Alpha"])

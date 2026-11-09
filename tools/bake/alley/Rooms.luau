@@ -856,9 +856,9 @@ local function fortune(kit: any, parent: any)
 		2.6,
 		4.0,
 		0.06,
-		{ 180, 210, 225 },
-		"Glass",
-		{ transparency = 0.8, reflectance = 0.08, shadow = false }
+		{ 190, 214, 228 },
+		"SmoothPlastic",
+		{ transparency = 0.9, reflectance = 0.05, shadow = false }
 	)
 	at("Velvet", 0, 5.6, 1.12, 2.7, 4.2, 0.08, { 120, 20, 40 }, "Fabric", { collide = false })
 	local boothLamp = at("BoothLamp", 0, 7.65, 0.2, 2.4, 0.08, 1.4, { 255, 220, 150 }, "Neon", { collide = false })
