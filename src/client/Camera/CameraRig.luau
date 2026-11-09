@@ -21,11 +21,17 @@ local CameraRig = {}
 
 local BIND = "SpicyCameraRig"
 local bound = false
+local onUnbind: (() -> ())? = nil
 
 local function unbind()
 	if bound then
 		game:GetService("RunService"):UnbindFromRenderStep(BIND)
 		bound = false
+	end
+	local f = onUnbind
+	onUnbind = nil
+	if f then
+		f()
 	end
 	local UIS = game:GetService("UserInputService")
 	UIS.MouseBehavior = Enum.MouseBehavior.Default
@@ -127,7 +133,21 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			setFirstPerson(false)
 			camera.CameraType = Enum.CameraType.Scriptable
 			local yaw, pitch = 0, 0
+			-- the eye sits where the driver's head is: hide the driver's own body on this screen
+			-- (the default camera does this only for its own first person)
+			local hidden: { BasePart } = {}
+			local driver = targets.body
 			bind(function()
+				if driver and #hidden == 0 then
+					for _, d in driver:GetDescendants() do
+						if d:IsA("BasePart") then
+							table.insert(hidden, d)
+						end
+					end
+				end
+				for _, part in hidden do
+					part.LocalTransparencyModifier = 1
+				end
 				if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
 					UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
 					local d = UIS:GetMouseDelta()
@@ -140,6 +160,11 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				end
 				camera.CFrame = eye.WorldCFrame * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
 			end)
+			onUnbind = function()
+				for _, part in hidden do
+					part.LocalTransparencyModifier = 0
+				end
+			end
 		elseif vehicle then
 			CameraRig.follow(vehicle)
 		end

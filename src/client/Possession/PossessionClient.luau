@@ -12,8 +12,14 @@
 -- server's recovery through StarterGui:SetCore("ResetButtonCallback", BindableEvent): it never kills
 -- or respawns a body.
 -- No side effects on require.
+-- Robustness (W1 client review): remotes are awaited with timeouts and a missing one is said on
+-- screen; the body is awaited up to 15 s while it streams in (the server also makes it persistent for
+-- its driver); the default character controls are on for a person on foot and off in a vehicle or the
+-- drone (the standing officer no longer walks off while the drone flies); E, V and Reset always answer
+-- on screen; device refusals are said in plain words (reasonText).
 -- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(),
---   Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure)
+--   Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure);
+--   reasonText(why) -> string? (pure; nil = say nothing)
 
 local Import = require("../Import")
 local PossessionState =
@@ -61,17 +67,59 @@ function PossessionClient.controllerFor(species: string, variant: string?): stri
 	return "quadruped"
 end
 
-local function findBody(bodies: Instance, actorId: string, timeout: number): Model?
+-- Plain words for the server's device and release reasons (pure; Lune and the Playtest smoke check
+-- it). nil means say nothing (a normal exit).
+local REASONS: { [string]: string } = {
+	exit = "",
+	swap = "",
+	release = "",
+	["no vehicle within reach"] = "No car or drone within reach: walk right up to it, then press E",
+	["only people drive"] = "Only people can drive. Pick Townsperson or Police from the menu (M)",
+	["the drone is in use"] = "Someone else is flying the drone",
+	["no body"] = "Pick a body from the menu first (M)",
+	["cannot"] = "You cannot get in right now",
+}
+function PossessionClient.reasonText(why: string?): string?
+	if why == nil then
+		return nil
+	end
+	local t = REASONS[why]
+	if t == "" then
+		return nil
+	end
+	if t then
+		return t
+	end
+	if string.find(why, "key", 1, true) then
+		return "That car is locked: police cars are for officers (pick Police)"
+	end
+	return `Cannot do that: {why}`
+end
+
+local function findBody(player: Player, bodies: Instance, actorId: string, timeout: number): Model?
 	local deadline = os.clock() + timeout
 	repeat
+		local c = player.Character
+		if c and c:GetAttribute(PossessionState.ATTR.ActorId) == actorId then
+			return c
+		end
 		for _, child in bodies:GetChildren() do
 			if child:IsA("Model") and child:GetAttribute(PossessionState.ATTR.ActorId) == actorId then
 				return child
 			end
 		end
-		task.wait()
+		task.wait(0.05)
 	until os.clock() > deadline
 	return nil
+end
+
+-- the body's root (parts of a streamed model can arrive a moment after the model)
+local function rootOf(model: Model, timeout: number): BasePart?
+	local deadline = os.clock() + timeout
+	while model.PrimaryPart == nil and os.clock() < deadline and model.Parent ~= nil do
+		task.wait(0.05)
+	end
+	return model.PrimaryPart
 end
 
 -- SetCore fails until the CoreScripts have registered the callback; retry for a while.
@@ -101,10 +149,20 @@ function PossessionClient.start(opts: Opts): Client
 	if hud then
 		hud.set("Connecting to the town…", "Waiting for the server to hand you a body")
 	end
-	local net = ReplicatedStorage:WaitForChild(PossessionState.NET.folder)
-	local granted = net:WaitForChild(PossessionState.NET.Granted) :: RemoteEvent
-	local released = net:WaitForChild(PossessionState.NET.Released) :: RemoteEvent
-	local recover = net:WaitForChild(PossessionState.NET.Recover) :: RemoteEvent
+	local function need(parent: Instance?, name: string): Instance
+		local found = if parent then parent:WaitForChild(name, 30) else nil
+		if found == nil then
+			if hud then
+				hud.set("The game did not finish starting", `Missing {name}: press F9 and send the red lines`)
+			end
+			error(`PossessionClient: {name} missing after 30 s`)
+		end
+		return found :: Instance
+	end
+	local net = need(ReplicatedStorage, PossessionState.NET.folder)
+	local granted = need(net, PossessionState.NET.Granted) :: RemoteEvent
+	local released = need(net, PossessionState.NET.Released) :: RemoteEvent
+	local recover = need(net, PossessionState.NET.Recover) :: RemoteEvent
 	local deviceGranted = net:FindFirstChild(PossessionState.NET.DeviceGranted) :: RemoteEvent?
 	local deviceReleased = net:FindFirstChild(PossessionState.NET.DeviceReleased) :: RemoteEvent?
 	local deviceRequest = net:FindFirstChild(PossessionState.NET.DeviceRequest) :: RemoteEvent?
@@ -112,6 +170,15 @@ function PossessionClient.start(opts: Opts): Client
 	local world = ClientWorld.get()
 	world.ignore({ opts.bodies })
 	local input = InputMap.start()
+	local function toast(text: string, seconds: number?)
+		if hud then
+			hud.toast(text, seconds)
+		end
+	end
+	-- no body yet (the join hands a townsperson; until then): a parked view of the town, never the void
+	if player.Character == nil and opts.overview then
+		CameraRig.overview(opts.overview.position, opts.overview.lookAt)
+	end
 
 	local metrics: { [string]: any } = { handoffs = 0, resets = 0 }
 	local requestAt: number? = nil
@@ -170,11 +237,18 @@ function PossessionClient.start(opts: Opts): Client
 
 	local function startBodyController(model: Model, payload: { [string]: any })
 		local kind = PossessionClient.controllerFor(payload.species, payload.variant)
-		local ctx = { world = world, input = input, species = payload.species }
+		local ctx = { world = world, input = input, species = payload.species, toast = toast }
+		-- the default controls walk and jump a Humanoid; motor-driven bodies have none, so this is
+		-- harmless for them and needed for a person (a vehicle or the drone turned them off)
+		InputMap.setCharacterControls(true)
 		if kind == "human" then
 			stopController = Human.start(model, payload, metrics)
 		elseif kind == "squirrel" then
+			metrics.squirrelGroundOnly = nil
 			stopController = Squirrel.start(model, payload, metrics, ctx)
+			if metrics.squirrelGroundOnly then
+				toast("Climbing routes are still loading: run on the ground, then pick Squirrel again", 5)
+			end
 		else
 			stopController = Quadruped.start(model, payload, metrics, ctx)
 		end
@@ -189,12 +263,13 @@ function PossessionClient.start(opts: Opts): Client
 			if hud then
 				hud.set("Loading your body…", "Streaming the town around it")
 			end
-			found = findBody(opts.bodies, payload.actorId, 3)
+			found = findBody(player, opts.bodies, payload.actorId, 15)
 		end
-		if found == nil then
+		if found == nil or rootOf(found :: Model, 5) == nil then
 			warn(`PossessionClient: body {payload.actorId} did not stream in`)
+			toast("Your body did not load. Press M and pick again.", 6)
 			if hud then
-				hud.toast("Your body did not load; press Reset (Esc menu) to try again", 5)
+				hud.set("Your body did not load", "Press M and pick again")
 			end
 			return
 		end
@@ -242,18 +317,31 @@ function PossessionClient.start(opts: Opts): Client
 	if deviceGranted then
 		deviceGranted.OnClientEvent:Connect(function(info: { [string]: any })
 			local model = info.model :: Model?
-			if model == nil then
+			if model == nil or rootOf(model :: Model, 3) == nil then
+				-- not streamed in on this computer: get out again rather than drive nothing
+				toast("The vehicle has not loaded on your screen yet: try E again in a moment", 4)
+				if deviceRequest then
+					deviceRequest:FireServer("interact")
+				end
 				return
 			end
+			local m = model :: Model
 			stop()
-			device = { device = info.device, model = model, kind = info.kind }
+			device = { device = info.device, model = m, kind = info.kind }
 			setJump(false) -- Space is the handbrake / climb: never unseat the driver
+			InputMap.setCharacterControls(false) -- the seated or standing body must not walk or jump
+			local hum = if body then body:FindFirstChildOfClass("Humanoid") else nil
+			if hum then
+				hum:Move(Vector3.zero)
+			end
 			local ctx = { world = world, input = input }
+			world.ignore({ m })
 			if info.device == "drone" then
-				stopController = Drone.start(model, metrics, ctx)
+				stopController = Drone.start(m, metrics, ctx)
+				toast("Flying the police drone. WASD fly, Space up, Q down, E lands.", 4)
 			else
-				world.ignore({ model })
-				stopController = Vehicle.start(model, info.kind or "car", metrics, ctx)
+				stopController = Vehicle.start(m, info.kind or "car", metrics, ctx)
+				toast("Driving. W gas, S brake, A/D steer, V view, E gets out.", 4)
 			end
 			fpToggle = true -- first person on entry; V flips it (brief v2 §14)
 			applyCamera()
@@ -263,8 +351,9 @@ function PossessionClient.start(opts: Opts): Client
 		deviceReleased.OnClientEvent:Connect(function(why: string)
 			if device == nil then
 				-- a refused request ("no vehicle within reach", "needs the key"): say so
-				if hud then
-					hud.toast(why, 2.5)
+				local text = PossessionClient.reasonText(why)
+				if text then
+					toast(text, 3)
 				end
 				return
 			end
@@ -273,12 +362,22 @@ function PossessionClient.start(opts: Opts): Client
 			setJump(true)
 			local b, p = body, payloadNow
 			if b and p then
-				startBodyController(b, p)
+				local hum = b:FindFirstChildOfClass("Humanoid")
+				if hum then
+					hum.Sit = false
+				end
+				-- back on foot where the server put us: no AI stride to carry on
+				local fresh = table.clone(p)
+				fresh.snapshot = table.clone(p.snapshot or {})
+				fresh.snapshot.vx, fresh.snapshot.vz = 0, 0
+				fresh.holdSeconds = 0
+				startBodyController(b, fresh)
 			end
 			fpToggle = false
 			applyCamera()
-			if hud and why ~= "exit" then
-				hud.toast(why, 3)
+			local text = PossessionClient.reasonText(why)
+			if text then
+				toast(text, 3)
 			end
 		end)
 	end
@@ -286,32 +385,43 @@ function PossessionClient.start(opts: Opts): Client
 	-- verbs that are not motor input: E (enter / exit), V (first-person toggle)
 	local UIS = game:GetService("UserInputService")
 	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
-		if processed then
+		if InputMap.ignore(io, processed) then
 			return
 		end
 		local name = io.KeyCode.Name
 		-- E (pad Y) enters or leaves a vehicle or the drone; only people drive, and a squirrel's E is
 		-- its grab (InputMap). F is the townsperson's kick (Client/Main, PlayNet.Kick).
 		local onFoot = payloadNow ~= nil and payloadNow.species == "human"
-		if (name == "E" or name == "ButtonY") and (device ~= nil or onFoot) then
-			if deviceRequest and body then
-				deviceRequest:FireServer("interact")
-			elseif hud then
-				hud.toast(if body then "No vehicles in this build yet" else "You need a body first", 2)
+		if name == "E" or name == "ButtonY" then
+			if device ~= nil or onFoot then
+				if deviceRequest and body then
+					deviceRequest:FireServer("interact")
+				else
+					toast(if body then "No vehicles in this build yet" else "Pick a body from the menu first (M)", 2)
+				end
+			elseif body == nil then
+				toast("Pick a body from the menu first (M)", 2)
 			end
 		elseif name == "V" or name == "ButtonR3" then
 			if decision.toggleAllowed then
 				fpToggle = not fpToggle
 				applyCamera()
-			elseif hud and body then
-				hud.toast("This camera is fixed here", 1.5)
+			elseif body then
+				toast("Animals keep the camera behind them (V is for people and cars)", 2)
+			else
+				toast("Pick a body from the menu first (M)", 2)
 			end
 		end
 	end)
 
 	routeReset(function()
 		metrics.resets += 1
+		if body == nil then
+			toast("Nothing to reset: pick a body from the menu (M)", 3)
+			return
+		end
 		recover:FireServer()
+		toast("Moved you to a safe spot", 2)
 	end)
 
 	return {

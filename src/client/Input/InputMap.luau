@@ -7,7 +7,14 @@
 -- [squirrel_abilities §26]. The tilt labyrinth's fixed bindings are recorded in LABYRINTH and never
 -- remapped [brief v2 §13a].
 -- Pure part: BINDINGS, LABYRINTH, HINTS(role), fromMoveVector(x, z). Engine part: start() -> Sampler
--- with sample(cameraYaw) -> Frame (edges cleared on read) and stop().
+-- with sample(cameraYaw) -> Frame (edges cleared on read) and stop(); typing(), ignore(io, processed),
+-- setCharacterControls(on).
+-- Robustness (W1 client review): the default ControlModule binds WASD and Space through
+-- ContextActionService, so those keys arrive with gameProcessed = true; keyboard input is therefore
+-- accepted unless the player is typing (chat bar or a TextBox) or the Roblox menu is open, and held
+-- keys are polled with IsKeyDown. Movement reads the ControlModule vector (touch, gamepad), then the
+-- keyboard, then the left stick, so it keeps working while the ControlModule is disabled (vehicles and
+-- the drone disable it so the seated or standing body does not walk or jump).
 -- No side effects on require (services are looked up inside start()).
 
 export type Frame = {
@@ -89,21 +96,117 @@ function InputMap.fromMoveVector(x: number, z: number): (number, number)
 	return math.clamp(fw, -1, 1), math.clamp(side, -1, 1)
 end
 
+-- engine helpers ------------------------------------------------------------------------------------
+
+-- True while the player types in the chat bar or any TextBox (keys then belong to the text).
+function InputMap.typing(): boolean
+	local UIS = game:GetService("UserInputService")
+	if UIS:GetFocusedTextBox() ~= nil then
+		return true
+	end
+	local ok, focused = pcall(function()
+		local cfg = game:GetService("TextChatService"):FindFirstChildOfClass("ChatInputBarConfiguration")
+		return cfg ~= nil and (cfg :: any).IsFocused == true
+	end)
+	return ok and focused == true
+end
+
+-- Whether a gameplay key handler should skip this input. Keyboard keys count even when
+-- gameProcessed (the ControlModule's ContextActionService bindings mark WASD and Space processed)
+-- unless the player is typing or the Roblox menu is open; mouse, touch and gamepad input respect
+-- gameProcessed (a click on a button is not a pounce).
+function InputMap.ignore(io: InputObject, processed: boolean): boolean
+	if InputMap.typing() then
+		return true
+	end
+	local ok, menuOpen = pcall(function()
+		return game:GetService("GuiService").MenuIsOpen
+	end)
+	if ok and menuOpen then
+		return true
+	end
+	if io.UserInputType == Enum.UserInputType.Keyboard then
+		return false
+	end
+	return processed
+end
+
+local controlsCache: any = nil
+local function playerControls(timeout: number): any?
+	if controlsCache then
+		return controlsCache
+	end
+	local ok, mod = pcall(function()
+		local ps = game:GetService("Players").LocalPlayer:WaitForChild("PlayerScripts", timeout)
+		local pm = ps and ps:WaitForChild("PlayerModule", timeout)
+		return if pm then (require :: any)(pm):GetControls() else nil
+	end)
+	if ok and mod then
+		controlsCache = mod
+	end
+	return controlsCache
+end
+
+-- Enable or disable the default character controls (Humanoid walking and jumping). Bodies driven by
+-- our own motors in a vehicle or the drone switch them off; a person on foot switches them on.
+function InputMap.setCharacterControls(on: boolean)
+	task.spawn(function()
+		local c = playerControls(10)
+		if c then
+			pcall(function()
+				if on then
+					c:Enable()
+				else
+					c:Disable()
+				end
+			end)
+		end
+	end)
+end
+
+local KEY_FW = { "W", "Up" }
+local KEY_BACK = { "S", "Down" }
+local KEY_RIGHT = { "D", "Right" }
+local KEY_LEFT = { "A", "Left" }
+
 function InputMap.start(): Sampler
-	local Players = game:GetService("Players")
 	local UserInputService = game:GetService("UserInputService")
 
 	local controls: any = nil
 	task.spawn(function()
-		local ps = Players.LocalPlayer:WaitForChild("PlayerScripts")
-		local pm = ps:WaitForChild("PlayerModule", 10)
-		if pm then
-			local ok, mod = pcall(require, pm :: ModuleScript)
-			if ok and mod and mod.GetControls then
-				controls = mod:GetControls()
+		controls = playerControls(10)
+	end)
+	-- keyboard KeyCodes by name (MouseButton1 and gamepad names are not polled)
+	local keyCodes: { [string]: Enum.KeyCode } = {}
+	for _, item in Enum.KeyCode:GetEnumItems() do
+		local v = item.Value
+		if v >= 8 and v < 1000 then
+			keyCodes[item.Name] = item
+		end
+	end
+	local function keyDown(names: { string }): boolean
+		for _, n in names do
+			local code = keyCodes[n]
+			if code and UserInputService:IsKeyDown(code) then
+				return true
 			end
 		end
-	end)
+		return false
+	end
+	local function stick(): (number, number)
+		local ok, x, y = pcall(function()
+			for _, io in UserInputService:GetGamepadState(Enum.UserInputType.Gamepad1) do
+				if io.KeyCode == Enum.KeyCode.Thumbstick1 then
+					return io.Position.X, io.Position.Y
+				end
+			end
+			return 0, 0
+		end)
+		if ok then
+			return x, y
+		end
+		return 0, 0
+	end
 
 	local nameSets: { [string]: { [string]: boolean } } = {}
 	local bindings: { [string]: { string } } = InputMap.BINDINGS :: any
@@ -125,7 +228,7 @@ function InputMap.start(): Sampler
 		return input.KeyCode.Name
 	end
 	local began = UserInputService.InputBegan:Connect(function(input, processed)
-		if processed then
+		if InputMap.ignore(input, processed) then
 			return
 		end
 		local n = codeName(input)
@@ -141,9 +244,15 @@ function InputMap.start(): Sampler
 		held[codeName(input)] = nil
 	end)
 
+	local typingNow = false
 	local function isHeld(verb: string): boolean
 		for n in nameSets[verb] do
 			if held[n] then
+				return true
+			end
+			-- poll the keyboard too: a key pressed while gameProcessed or before this sampler started
+			local code = if typingNow then nil else keyCodes[n]
+			if code and UserInputService:IsKeyDown(code) then
 				return true
 			end
 		end
@@ -153,13 +262,23 @@ function InputMap.start(): Sampler
 	self = {
 		lastInputAt = os.clock(),
 		sample = function(s: Sampler, cameraYaw: number): Frame
+			typingNow = InputMap.typing()
 			local fw, side = 0, 0
 			if controls then
-				local mv = controls:GetMoveVector()
-				fw, side = InputMap.fromMoveVector(mv.X, mv.Z)
-			else
-				fw = (if held.W or held.Up then 1 else 0) - (if held.S or held.Down then 1 else 0)
-				side = (if held.D or held.Right then 1 else 0) - (if held.A or held.Left then 1 else 0)
+				local ok, mv = pcall(function()
+					return controls:GetMoveVector()
+				end)
+				if ok and typeof(mv) == "Vector3" then
+					fw, side = InputMap.fromMoveVector(mv.X, mv.Z)
+				end
+			end
+			if fw == 0 and side == 0 and not typingNow then
+				fw = (if keyDown(KEY_FW) then 1 else 0) - (if keyDown(KEY_BACK) then 1 else 0)
+				side = (if keyDown(KEY_RIGHT) then 1 else 0) - (if keyDown(KEY_LEFT) then 1 else 0)
+			end
+			if fw == 0 and side == 0 then
+				local x, y = stick()
+				fw, side = InputMap.fromMoveVector(x, -y)
 			end
 			if fw ~= 0 or side ~= 0 then
 				s.lastInputAt = os.clock()

@@ -27,7 +27,8 @@ export type PartSpec = {
 	material: string,
 	canCollide: boolean,
 	transparency: number,
-	shape: string?, -- "Block" (default) | "Cylinder"
+	shape: string?, -- "Block" (default) | "Cylinder" | "Ball" | "Wedge" (a WedgePart: slope rises toward local +Z)
+	castShadow: boolean?, -- default: canCollide
 	role: string?, -- Body, Roof, Wall, Floor, Door, Sign, Room, Station, Shelf, Pad, Furniture, Limb, Pipe, Rail, Post, Anchor, Skyline
 	canQuery: boolean?, -- default: transparency < 1
 	attrs: { [string]: string | number | boolean }?,
@@ -75,6 +76,7 @@ export type Opts = {
 	pitch: number?,
 	roll: number?,
 	shape: string?,
+	castShadow: boolean?,
 	role: string?,
 	canQuery: boolean?,
 	attrs: { [string]: string | number | boolean }?,
@@ -141,6 +143,7 @@ local function add(
 		canCollide = if opts.canCollide == nil then true else opts.canCollide,
 		transparency = opts.transparency or 0,
 		shape = opts.shape,
+		castShadow = opts.castShadow,
 		role = opts.role,
 		canQuery = opts.canQuery,
 		attrs = opts.attrs,
@@ -165,6 +168,7 @@ export type LotCtx = {
 	building: any?, -- generated/Buildings record (Hospital, PoliceStation)
 	interior: any?, -- generated/Interiors template (FRB houses)
 	attributes: { [string]: string | number | boolean },
+	palette: any?, -- Palette.Look (the v5.4 colours and materials for this lot)
 }
 
 Spec.SPU = 2.5 -- studs per HTML unit (Config/Units; W1 data stays in HTML units, builders scale here)

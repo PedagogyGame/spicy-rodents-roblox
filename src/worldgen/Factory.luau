@@ -64,11 +64,13 @@ function Factory.new(env: Env): Factory
 	end
 
 	function self.part(spec: Spec.PartSpec): any
-		local p = env.Instance.new("Part")
+		local p = env.Instance.new(if spec.shape == "Wedge" then "WedgePart" else "Part")
 		p.Name = spec.name
 		p.Anchored = true
 		if spec.shape == "Cylinder" then
 			p.Shape = env.Enum.PartType.Cylinder
+		elseif spec.shape == "Ball" then
+			p.Shape = env.Enum.PartType.Ball
 		end
 		p.CanCollide = spec.canCollide
 		p.CanTouch = false
@@ -77,7 +79,7 @@ function Factory.new(env: Env): Factory
 		else
 			p.CanQuery = spec.transparency < 1
 		end
-		p.CastShadow = spec.canCollide
+		p.CastShadow = if spec.castShadow ~= nil then spec.castShadow else spec.canCollide
 		p.Size = env.Vector3.new(spec.sx, spec.sy, spec.sz)
 		local cf = env.CFrame.new(spec.cx, spec.cy, spec.cz)
 			* env.CFrame.Angles(0, spec.yaw, 0)

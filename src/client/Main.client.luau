@@ -8,6 +8,10 @@
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
 -- bites, kicks, RUN OVER, KICKED OUT. The S2 test place runs its own S2Client and this script steps
 -- aside there.
+-- Live-server robustness (W1 client review): Shift Lock is switched off (Shift is sprint); the Roblox
+-- Reset button does nothing until a body is handed over (then PossessionClient routes it to the safe-
+-- spot recovery); every wait on the server has a timeout and an on-screen message that works outside
+-- Studio (F9 opens the Developer Console); every toast goes to the one toast line at the top.
 
 local container = script.Parent
 if container and container.Parent and container.Parent:FindFirstChild("S2Client") then
@@ -17,12 +21,32 @@ end
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UIS = game:GetService("UserInputService")
 
+local InputMap = require("./Input/InputMap")
 local Hud = require("./UI/Hud")
 local PlayMenu = require("./UI/PlayMenu")
 local AnimationDriver = require("./Animation/AnimationDriver")
 local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local ClientWorld = require("./World/ClientWorld")
+
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+
+-- Shift is sprint: Shift Lock would also grab it (and sink it) when a player has it on in Settings
+pcall(function()
+	(Players.LocalPlayer :: any).DevEnableMouseLock = false
+end)
+-- the Roblox Reset button would kill the body before PossessionClient routes it: off until then
+task.spawn(function()
+	for _ = 1, 50 do
+		if pcall(function()
+			StarterGui:SetCore("ResetButtonCallback", false)
+		end) then
+			return
+		end
+		task.wait(0.2)
+	end
+end)
 
 local pickRemote: RemoteEvent? = nil
 local menu = PlayMenu.start(function(choice: string)
@@ -37,20 +61,23 @@ local world = ClientWorld.get() -- starts building the rail world in the backgro
 if not menu.loading(function(): boolean
 	return world.railReady
 end) then
-	hud.set("Spicy Rodents: the server did not start", "See View > Output in Studio")
+	hud.set("Spicy Rodents: the server did not start", "Press F9 (Developer Console, Server tab) and send the red lines")
 	return
 end
 
 local playNet = ReplicatedStorage:WaitForChild("PlayNet", 30)
 local bodies = workspace:WaitForChild("Bodies", 30)
-if playNet == nil or bodies == nil then
-	hud.set("Spicy Rodents", "The server did not create the town's bodies (see View > Output)")
-	menu.toast("The server did not finish starting: see View > Output", 30)
+local pickR = playNet and playNet:WaitForChild("Pick", 10)
+local kickR = playNet and playNet:WaitForChild("Kick", 10)
+local eventR = playNet and playNet:WaitForChild("Event", 10)
+if bodies == nil or pickR == nil or kickR == nil or eventR == nil then
+	hud.set("Spicy Rodents", "The server did not create the town (press F9 and send the red lines)")
+	menu.toast("The server did not finish starting: press F9 and send the red lines", 30)
 	return
 end
-pickRemote = playNet:WaitForChild("Pick") :: RemoteEvent
-local kickRemote = playNet:WaitForChild("Kick") :: RemoteEvent
-local eventRemote = playNet:WaitForChild("Event") :: RemoteEvent
+pickRemote = pickR :: RemoteEvent
+local kickRemote = kickR :: RemoteEvent
+local eventRemote = eventR :: RemoteEvent
 
 AnimationDriver.start({ container = bodies })
 task.spawn(function()
@@ -60,11 +87,17 @@ task.spawn(function()
 		world.ignore({ ghosts })
 	end
 end)
-local client = PossessionClient.start({
-	bodies = bodies,
+local started, clientOrErr = pcall(PossessionClient.start, {
+	bodies = bodies :: Instance,
 	overview = { position = Vector3.new(0, 120, 260), lookAt = Vector3.zero },
-	hud = hud,
+	hud = { set = hud.set, toast = menu.toast },
 })
+if not started then
+	warn(`Client: PossessionClient failed: {clientOrErr}`)
+	menu.toast("The controls did not start: press F9 and send the red lines", 30)
+	return
+end
+local client = clientOrErr :: PossessionClient.Client
 
 -- keep the help panel in step with vehicles and the drone
 local lastDevice: string? = nil
@@ -77,7 +110,7 @@ game:GetService("RunService").Heartbeat:Connect(function()
 end)
 
 UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
-	if processed then
+	if InputMap.ignore(io, processed) then
 		return
 	end
 	if io.KeyCode == Enum.KeyCode.F or io.KeyCode == Enum.KeyCode.ButtonX then
@@ -85,7 +118,13 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 		if st.species == "human" and st.device == nil then
 			kickRemote:FireServer()
 		elseif io.KeyCode == Enum.KeyCode.F then
-			menu.toast(if st.species then "Only people can kick" else "Pick a body from the menu first", 2)
+			menu.toast(
+				if st.device
+					then "Get out first (E), then F kicks"
+					elseif st.species then "Only people can kick: animals pounce with a left click"
+					else "Pick a body from the menu first (M)",
+				2
+			)
 		end
 	end
 end)

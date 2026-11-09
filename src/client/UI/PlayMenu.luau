@@ -10,7 +10,12 @@
 --   * Help panel (top left, always visible): the keys for the current role and device.
 --   * Status (top centre): role, health bar for the rodent and squirrels, bites and Power for the rodent.
 --   * Banners: big centred messages (RUN OVER!, KICKED OUT!) and short toasts for bites, kicks, refusals.
--- Pure part (Lune-tested): CHOICES, helpLines(role, device) -> { string }, statusLine(attrs) -> string.
+-- Layout (W1 client review): the help panel sits bottom-left and the Menu button bottom-right, clear of
+-- the Roblox chat window (top-left) and player list (top-right); the menu, banner and help panel scale
+-- down on small laptop screens (UIScale from the viewport, scaleFor); toasts wrap. Error lines name F9
+-- (the Developer Console), which works in a live game as well as Studio.
+-- Pure part (Lune-tested): CHOICES, helpLines(role, device) -> { string }, statusLine(attrs) -> string,
+--   scaleFor(width, height) -> number.
 -- Engine part: start() -> Menu { loading(prepare) (yields until ready), open(), close(), isOpen(),
 --   setDevice(device?), banner(title, line, seconds?), toast(text, seconds?) }.
 -- No side effects on require.
@@ -28,6 +33,8 @@ export type Menu = {
 }
 
 local PlayMenu = {}
+
+local InputMap = require("../Input/InputMap")
 
 PlayMenu.CHOICES = table.freeze({
 	{
@@ -117,6 +124,11 @@ function PlayMenu.statusLine(attrs: { [string]: any }): string
 		return "POLICE DRONE PILOT"
 	end
 	return "No body yet: pick one from the menu"
+end
+
+-- The UI scale for a viewport (pure): 1 on a 1280 x 720 screen or larger, down to 0.6 on a small one.
+function PlayMenu.scaleFor(width: number, height: number): number
+	return math.clamp(math.min(width / 1100, height / 680), 0.6, 1)
 end
 
 -- engine ------------------------------------------------------------------------------------------
@@ -214,7 +226,8 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	-- help panel, status, menu button ------------------------------------------------------------
 	local help = Instance.new("Frame")
 	help.Name = "Help"
-	help.Position = UDim2.fromOffset(12, 60)
+	help.AnchorPoint = Vector2.new(0, 1)
+	help.Position = UDim2.new(0, 12, 1, -96)
 	help.Size = UDim2.fromOffset(340, 40)
 	help.AutomaticSize = Enum.AutomaticSize.Y
 	help.BackgroundColor3 = Color3.new(0, 0, 0)
@@ -243,7 +256,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		TextSize = 20,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 52),
-		Size = UDim2.fromOffset(560, 28),
+		Size = UDim2.new(0.7, 0, 0, 28),
 		BackgroundTransparency = 0.45,
 		BackgroundColor3 = Color3.new(0, 0, 0),
 		Visible = false,
@@ -272,8 +285,8 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 
 	local menuButton = Instance.new("TextButton")
 	menuButton.Name = "MenuButton"
-	menuButton.AnchorPoint = Vector2.new(1, 0)
-	menuButton.Position = UDim2.new(1, -12, 0, 60)
+	menuButton.AnchorPoint = Vector2.new(1, 1)
+	menuButton.Position = UDim2.new(1, -12, 1, -96)
 	menuButton.Size = UDim2.fromOffset(130, 40)
 	menuButton.BackgroundColor3 = Color3.fromRGB(255, 140, 60)
 	menuButton.TextColor3 = Color3.new(1, 1, 1)
@@ -313,13 +326,20 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		TextSize = 22,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 108),
-		Size = UDim2.fromOffset(620, 36),
+		Size = UDim2.new(0.9, 0, 0, 36),
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 0.3,
 		BackgroundColor3 = Color3.fromRGB(40, 20, 10),
 		Visible = false,
 		ZIndex = 30,
 	})
 	corner(toast, 10)
+	local toastLimit = Instance.new("UISizeConstraint")
+	toastLimit.MaxSize = Vector2.new(640, 200)
+	toastLimit.Parent = toast
+	local statusLimit = Instance.new("UISizeConstraint")
+	statusLimit.MaxSize = Vector2.new(560, 28)
+	statusLimit.Parent = status
 
 	-- menu -------------------------------------------------------------------------------------------
 	local menu = Instance.new("Frame")
@@ -367,6 +387,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		b.Size = UDim2.new(1, 0, 0, 66)
 		b.BackgroundColor3 = rgb(c.color)
 		b.AutoButtonColor = true
+		b.Modal = true -- frees a first-person mouse while the menu is up
 		b.Text = ""
 		b.ZIndex = 23
 		b.Parent = list
@@ -404,6 +425,26 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	back.ZIndex = 23
 	back.Parent = panel
 	corner(back, 10)
+
+	-- scale the fixed-size pieces down on small screens (a laptop browser window)
+	local scales: { UIScale } = {}
+	for _, target in { panel, banner, help, menuButton, hpBack } :: { GuiObject } do
+		local sc = Instance.new("UIScale")
+		sc.Parent = target
+		table.insert(scales, sc)
+	end
+	local function rescale()
+		local cam = workspace.CurrentCamera
+		local v = if cam then cam.ViewportSize else Vector2.new(1280, 720)
+		local k = PlayMenu.scaleFor(v.X, v.Y)
+		for _, sc in scales do
+			sc.Scale = k
+		end
+	end
+	rescale()
+	if workspace.CurrentCamera then
+		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
+	end
 
 	gui.Parent = playerGui
 
@@ -463,7 +504,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		setOpen(true)
 	end)
 	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
-		if processed then
+		if InputMap.ignore(io, processed) then
 			return
 		end
 		if io.KeyCode == Enum.KeyCode.M and not loading.Visible then
@@ -484,13 +525,13 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 				if err then
 					stageLabel.TextColor3 = Color3.fromRGB(255, 110, 110)
 					stageLabel.Text = `{st}\n{string.sub(tostring(err), 1, 200)}`
-					elapsedLabel.Text = "Press Stop and send the Output window text to the developer."
+					elapsedLabel.Text = "Press F9 (Developer Console), open the Server tab and send the red lines."
 					return false
 				end
 				stageLabel.Text = st
 				elapsedLabel.Text = if secs < 90
 					then `{secs} s   ·   the first start can take up to a minute`
-					else `{secs} s   ·   still waiting for the server: if this does not move, press Stop and send the View > Output text`
+					else `{secs} s   ·   still waiting for the server: if this does not move, press F9 and send the red lines (or leave and rejoin)`
 				if ReplicatedStorage:GetAttribute("BootReady") == true then
 					ready = true
 					break

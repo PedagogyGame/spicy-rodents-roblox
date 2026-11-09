@@ -180,6 +180,7 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 					q(s.transparency, "%.2f"),
 					q(s.roll or 0, "%.4f"),
 					s.shape or "",
+					if s.castShadow == nil then "" else tostring(s.castShadow),
 					s.role or "",
 					attrList(s.attrs),
 				}, "|")

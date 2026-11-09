@@ -10,7 +10,10 @@
 -- heading and momentum; an AI squirrel suspended on a rail (snapshot.brain.routeId, s, dir) resumes
 -- on that rail at the same arc position; the AI's direction is held for up to holdSeconds or until
 -- the first input.
--- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input }
+-- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
+-- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
+-- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast? };
+--   feedback(frame, events, onRoute) -> string? (pure)
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -19,6 +22,37 @@ local BodyDriver = require("./BodyDriver")
 local Quadruped = require("./Quadruped")
 
 local Squirrel = {}
+
+local HINTS: { [string]: string } = {
+	climbCloser = "Climb closer to the fork, then press E",
+	noTransfer = "Nothing to grab within reach: get right under a branch or wire",
+	nothingNear = "Nothing to grab here: run into a tree, pole or downspout to climb",
+	junctionAhead = "Junction ahead: A or D picks the way",
+}
+
+-- What to tell the player about this frame's verbs (pure; nil = nothing to say). `frame` is the
+-- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now.
+function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any } }, onRoute: boolean): string?
+	for _, e in events do
+		if e.kind == "hint" and e.reason and HINTS[e.reason] then
+			return HINTS[e.reason]
+		end
+	end
+	local attached = false
+	for _, e in events do
+		local k = e.kind
+		if k == "attach" or k == "transfer" or k == "forkTaken" or k == "branchHop" or k == "junctionChosen" then
+			attached = true
+		end
+	end
+	if frame.grab and not attached and not onRoute then
+		return "Nothing to grab here: run into a tree, pole or downspout to climb"
+	end
+	if frame.drop and not onRoute then
+		return "Q lets go of a branch: you are already on the ground"
+	end
+	return nil
+end
 
 function Squirrel.start(
 	body: Model,
@@ -67,6 +101,7 @@ function Squirrel.start(
 	local holdUntil = os.clock() + (payload.holdSeconds or 0.75)
 	local holding = state.routeId ~= nil or math.abs(state.vx) + math.abs(state.vz) > 0.1
 	local last = Vector3.new(pos.X, pos.Y, pos.Z)
+	local lastSaid, lastText = -math.huge, ""
 	return BodyDriver.drive(root, function(dt: number)
 		local f = input:sample(BodyDriver.cameraYawHtml())
 		local mi = {
@@ -90,9 +125,16 @@ function Squirrel.start(
 			mi.fw = 1
 			mi.cameraYaw = state.yaw + math.pi
 		end
+		local wasOnRoute = state.routeId ~= nil
 		local _, events = SquirrelMotor.step(state, mi, dt, motorWorld :: any)
 		for _, e in events do
 			metrics.lastEvent = e.kind
+		end
+		local say = if ctx.toast then Squirrel.feedback(f :: any, events :: any, wasOnRoute) else nil
+		local t = os.clock()
+		if say and t - lastSaid > 1.5 and (say ~= lastText or t - lastSaid > 8) then
+			lastSaid, lastText = t, say
+			ctx.toast(say, 2.5)
 		end
 		local v = SquirrelMotor.visualPose(state, motorWorld :: any)
 		local p = Vector3.new(v.x, v.y + hip, v.z)
