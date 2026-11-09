@@ -49,3 +49,10 @@ When a player possesses an actor, the actor's look is **70% the stock role chara
   - Read the avatar server-side with `Players:GetHumanoidDescriptionFromUserId`.
   - Body colours and accessory IDs are available. Reading pixels of other users' clothing images is likely restricted, so derive colours from body colours, accessory metadata, or a curated mapping. **(feasibility to verify)**
   - The blend is reversible: when the player leaves, the AI-driven actor returns to 100% stock.
+
+## Addendum B (owner answers, 2026-11-09)
+
+Brief v2 (`reference/Roblox_Rebuild_Brief_v2.md`) is authoritative. Two questions it left open, answered by the owner:
+
+- **B1. Animal avatar blend: YES.** Players who possess a squirrel, spicy rodent, fox or deer still get the 30% blend from A3 (fur tint and markings from the avatar's colours, capped; one rigid accessory on the head socket). Human bodies follow brief v2 §13a: build and clothes stay the role's; the player's face, hair and skin tone come across through appearance properties scripts can set, not tinting.
+- **B2. The owner's Roblox account is ID-verified and has Premium.** Audio upload cap is therefore 100 per month (not 10); 13+ experience settings and other verified-only features are available.
