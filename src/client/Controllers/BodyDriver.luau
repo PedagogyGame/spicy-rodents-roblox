@@ -5,8 +5,15 @@
 -- gravity (it exists only where the assembly simulates, on this client), and every PreSimulation the
 -- controller's step function returns the pose the pure motor computed; the root's CFrame and
 -- velocities are written from it. The S2 squirrel controller's proven pattern, factored out.
+-- driveRender is the kinematic variant (squirrel, owner rule 2026-11-09 "a kinematic body glued to the
+-- ground and to rails"): the step runs in the render step, just before the camera, and the CFrame it
+-- returns is the one that frame draws. A pose written in PreSimulation is drawn one physics step later
+-- (pose + velocity x dt), which is what made a running squirrel hop at every change of slope; here physics
+-- only carries the body between frames (for the server's and other clients' copies) and never decides
+-- what is seen.
 -- Interface: drive(root, step: (dt) -> (pos: Vector3, htmlYaw: number, vel: Vector3, tilt: CFrame?))
---   -> stop(); rootYawHtml(root) -> number; cameraYawHtml() -> number
+--   -> stop(); driveRender(root, step: (dt) -> (cf: CFrame, vel: Vector3)) -> stop();
+--   rootYawHtml(root) -> number; cameraYawHtml() -> number
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -14,8 +21,10 @@ local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Conf
 
 local BodyDriver = {}
 
-function BodyDriver.drive(root: BasePart, step: (dt: number) -> (Vector3, number, Vector3, CFrame?)): () -> ()
-	local RunService = game:GetService("RunService")
+local renderSeq = 0
+
+-- The local force that cancels gravity on the client-owned assembly; returns its remover.
+local function antiGravity(root: BasePart): () -> ()
 	local attach = Instance.new("Attachment")
 	attach.Name = "BodyDriverAttachment"
 	attach.Parent = root
@@ -26,6 +35,15 @@ function BodyDriver.drive(root: BasePart, step: (dt: number) -> (Vector3, number
 	anti.ApplyAtCenterOfMass = true
 	anti.Force = Vector3.new(0, root.AssemblyMass * workspace.Gravity, 0)
 	anti.Parent = root
+	return function()
+		anti:Destroy()
+		attach:Destroy()
+	end
+end
+
+function BodyDriver.drive(root: BasePart, step: (dt: number) -> (Vector3, number, Vector3, CFrame?)): () -> ()
+	local RunService = game:GetService("RunService")
+	local release = antiGravity(root)
 	local conn = RunService.PreSimulation:Connect(function(dt: number)
 		local ok, pos, yaw, vel, tilt = pcall(step, dt)
 		if not ok then
@@ -42,8 +60,29 @@ function BodyDriver.drive(root: BasePart, step: (dt: number) -> (Vector3, number
 	end)
 	return function()
 		conn:Disconnect()
-		anti:Destroy()
-		attach:Destroy()
+		release()
+	end
+end
+
+function BodyDriver.driveRender(root: BasePart, step: (dt: number) -> (CFrame, Vector3)): () -> ()
+	local RunService = game:GetService("RunService")
+	local release = antiGravity(root)
+	renderSeq += 1
+	local name = `SpicyBodyDriver{renderSeq}`
+	-- before the camera rig (Camera - 1) and the engine camera, so both follow this frame's pose
+	RunService:BindToRenderStep(name, Enum.RenderPriority.Camera.Value - 2, function(dt: number)
+		local ok, cf, vel = pcall(step, dt)
+		if not ok then
+			warn(`BodyDriver: controller step failed: {cf}`)
+			return
+		end
+		root.CFrame = cf
+		root.AssemblyLinearVelocity = vel
+		root.AssemblyAngularVelocity = Vector3.zero
+	end)
+	return function()
+		RunService:UnbindFromRenderStep(name)
+		release()
 	end
 end
 

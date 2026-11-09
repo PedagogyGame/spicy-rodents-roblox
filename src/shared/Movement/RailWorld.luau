@@ -4,7 +4,8 @@
 -- SpatialIndex, the Graph with the compiled canopy forks, and the trampoline sites from the
 -- registry's trampoline routes (BUILD_PLAN §1.4 Routes/*, §4.4 #3 "squirrels run routes", #5).
 -- The server's AI (Server/AI/TownAI) and the client's squirrel controller call `get(data)`.
--- Interface: build(data, groundAt?) -> World; get(data, groundAt?) -> World (cached per data)
+-- Interface: build(data, groundAt?) -> World; get(data, groundAt?) -> World (cached per data);
+--   empty() -> World (no routes: what the squirrel motor runs on while the real one is still building)
 -- Pure; studs. No side effects on require.
 
 local Registry = require("../Routes/Registry")
@@ -36,6 +37,19 @@ function RailWorld.build(data: any, groundAt: ((x: number, z: number) -> number)
 		graph = graph,
 		trampolines = Trampoline.sitesFromRegistry(registry, groundAt),
 		buildMs = (os.clock() - t0) * 1000,
+	}
+end
+
+-- A rail world with no routes: the motor runs its ground, leap and wall code against it unchanged.
+function RailWorld.empty(): World
+	local registry = Registry.fromRecords({})
+	local index = SpatialIndex.build(registry)
+	return {
+		registry = registry,
+		index = index,
+		graph = Graph.build(registry, index, nil),
+		trampolines = {},
+		buildMs = 0,
 	}
 end
 

@@ -27,10 +27,16 @@
 --     and the voxel terrain (whose surface can sit up to about a stud above the analytic height).
 --     Possessed bodies stand on their own motor's raycast ground or Humanoid, so they get smoothing
 --     only (people none); squirrels up trees and on roofs keep their route heights.
+--   * Kinematic bodies (Controllers/KinematicPose: the held squirrel) draw their own eased pose, so
+--     nothing is layered on it: no height smoothing, no probe; the stride phase advances at the motor's
+--     cadence and the swing follows the motor's speed, never the observed displacement. Whatever
+--     offset the body carried as an AI decays at v5.4's 23/s, the same rate the controller's drawn point
+--     eases onto its own ground, so a possession hands over without a step.
 -- No side effects on require.
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure)
 
 local Gait = require("./Gait")
+local KinematicPose = require("../Controllers/KinematicPose")
 local Import = require("../Import")
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
@@ -88,6 +94,7 @@ type Entry = {
 	nextProbe: number,
 	anchored: boolean,
 	applied: number,
+	kin: boolean, -- a kinematic controller drew this body last frame
 }
 
 -- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
@@ -118,6 +125,7 @@ AnimationDriver.FIX_MIN = -0.75
 AnimationDriver.FIX_MAX = 1.4
 AnimationDriver.CLEARANCE = 0.04 -- soles rest this much above the surface found
 AnimationDriver.NEAR_GROUND = 2 -- only soles this close to the terrain are probed (not squirrels up trees)
+AnimationDriver.KIN_RATE = 23 -- 1/s: a kinematic body sheds its carried offset at v5.4's visual easing rate
 
 local SHORT, BASE, MEDIAN_N = 3, 12, 7 -- frames: short and long velocity baselines; median window
 local scratch: { number } = table.create(MEDIAN_N, 0)
@@ -365,6 +373,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			nextProbe = os.clock() + ((#model.Name * 0.173) % 1) * AnimationDriver.PROBE_EVERY,
 			anchored = root.Anchored,
 			applied = 0,
+			kin = false,
 		}
 		count += 1
 	end
@@ -419,6 +428,20 @@ function AnimationDriver.start(opts: Opts): Driver
 	probe.FilterDescendantsInstances = { opts.container, workspace.CurrentCamera }
 	local DOWN = Vector3.new(0, -(AnimationDriver.PROBE_UP - AnimationDriver.FIX_MIN + 0.5), 0)
 
+	-- the visible body's vertical offset from its root (world up, whatever the root's attitude)
+	local function applyOffset(e: Entry, off: number)
+		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) then
+			e.applied = off
+			local shifted = CFrame.new(e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))) * e.baseC0
+			local rj, ra = e.rootJoint, e.rootAttach
+			if rj then
+				rj.C0 = shifted
+			elseif ra then
+				ra.CFrame = shifted
+			end
+		end
+	end
+
 	-- the visual root of one body this frame (after physics: root.Position is what renders)
 	local function visualRoot(e: Entry, pos: Vector3, dt: number, now: number, camPos: Vector3)
 		local rj, ra = e.rootJoint, e.rootAttach
@@ -426,6 +449,25 @@ function AnimationDriver.start(opts: Opts): Driver
 			return
 		end
 		local anchored = e.root.Anchored
+		if KinematicPose.get(e.body) then
+			if not e.kin then
+				e.kin = true
+				e.fix, e.fixTarget = e.applied, 0
+				e.settle.live = false
+			end
+			e.anchored = anchored
+			e.fix *= math.exp(-dt * AnimationDriver.KIN_RATE)
+			if math.abs(e.fix) < 0.001 then
+				e.fix = 0
+			end
+			applyOffset(e, e.fix)
+			return
+		elseif e.kin then
+			-- the controller let go: the smoothing starts again from the height drawn now
+			e.kin = false
+			e.settle.live = false
+			e.fix, e.fixTarget = 0, 0
+		end
 		if anchored ~= e.anchored then
 			-- possession or release: carry the ground correction into the smoothed height so the
 			-- body does not jump when the root takes over (or gives up) the real ground
@@ -464,15 +506,7 @@ function AnimationDriver.start(opts: Opts): Driver
 		end
 		e.fix += (e.fixTarget - e.fix) * (1 - math.exp(-dt * 8))
 		off += e.fix
-		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) then
-			e.applied = off
-			local shifted = CFrame.new(e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))) * e.baseC0
-			if rj then
-				rj.C0 = shifted
-			elseif ra then
-				ra.CFrame = shifted
-			end
-		end
+		applyOffset(e, off)
 	end
 
 	local function step(dt: number)
@@ -494,8 +528,14 @@ function AnimationDriver.start(opts: Opts): Driver
 				inst = e.speed -- a teleport or recovery, not motion
 				vy = 0
 			end
-			e.speed += (inst - e.speed) * alpha
-			e.vy += (vy - e.vy) * alpha
+			local kin = KinematicPose.get(e.body)
+			if kin then
+				-- the motor's own speed: what the body is seen to do never feeds the animation
+				e.speed, e.vy = kin.moveSpeed, 0
+			else
+				e.speed += (inst - e.speed) * alpha
+				e.vy += (vy - e.vy) * alpha
+			end
 			visualRoot(e, pos, dt, now, camPos)
 			if e.gait then
 				continue -- posed in Stepped (gaitStep)
@@ -547,8 +587,13 @@ function AnimationDriver.start(opts: Opts): Driver
 			if p == nil or #e.joints == 0 then
 				continue
 			end
-			e.phase = Gait.advance(e.phase, e.speed, dt, p)
-			local pose = Gait.pose(e.phase, e.speed, clock, p, e.tailN)
+			local kin = KinematicPose.get(e.body)
+			if kin then
+				e.phase = (e.phase + kin.cadence * dt) % (2 * math.pi)
+			else
+				e.phase = Gait.advance(e.phase, e.speed, dt, p)
+			end
+			local pose = Gait.pose(e.phase, e.speed, clock, p, e.tailN, if kin then kin.climb else 0)
 			for _, j in e.joints do
 				local cf = CFrame.identity
 				local leg = if j.leg then pose.legs[j.leg] else nil

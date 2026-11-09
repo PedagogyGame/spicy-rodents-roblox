@@ -1,15 +1,20 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Controllers.Squirrel
--- Controller for a held squirrel (and the rodent, a squirrel actor with Variant "spicy"):
--- Shared/Movement/SquirrelMotor (the v5.4 updatePlayer port: ground, rails, leap, drop, grab, fork
--- and junction choice, pounce; plus the trampoline bounce) driven by InputMap through BodyDriver
--- (BUILD_PLAN §1.4 Controllers, D2, §4.4 #5; the S2 ground-only controller is replaced behind the
--- same start/stop). The rail world (Movement/RailWorld) builds in the background on the client;
--- until it is ready the body runs on the ground with QuadrupedMotor's squirrel parameters.
--- Possession carry-over (§1.5 step 5): the motor starts at the rendered pose with the snapshot's
--- heading and momentum; an AI squirrel suspended on a rail (snapshot.brain.routeId, s, dir) resumes
--- on that rail at the same arc position; the AI's direction is held for up to holdSeconds or until
--- the first input.
+-- Controller for a held squirrel (and the rodent, a squirrel actor with Variant "spicy"). The body is
+-- kinematic (owner rule 2026-11-09): every render frame Shared/Movement/SquirrelMotor (the v5.4
+-- updatePlayer port: ground glue, rails, leap, drop, grab, fork and junction choice, pounce, trampoline)
+-- advances the authoritative point from InputMap, Shared/Movement/SquirrelVisual eases the drawn pose
+-- after it (v5.4's render layer: 23/s position easing, ground contact under the drawn point, bark-facing
+-- nose-up pose on a trunk, lean into turns), and BodyDriver.driveRender writes that pose as the root's
+-- CFrame for the frame being drawn. No Humanoid, no physics settling, no root motion: the animation layer
+-- reads the motor's speed and stride rate from KinematicPose and only poses the mesh.
+-- The rail world (Movement/RailWorld) builds in the background on the client; until it is ready the same
+-- motor runs against an empty rail world (ground, leap, walls), and the routes appear under it the first
+-- frame they exist, with no second possession needed.
+-- Possession carry-over (BUILD_PLAN 1.5 step 5): the motor starts at the rendered pose with the snapshot's
+-- heading and momentum; an AI squirrel suspended on a rail (snapshot.brain.routeId, s, dir) resumes on
+-- that rail at the same arc position; the AI's direction is held for up to holdSeconds or until the
+-- first input.
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
 -- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast? };
@@ -18,8 +23,12 @@
 
 local Import = require("../Import")
 local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
+local SquirrelVisual =
+	Import.shared("Movement/SquirrelVisual") :: typeof(require("../../shared/Movement/SquirrelVisual"))
+local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
+local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local BodyDriver = require("./BodyDriver")
-local Quadruped = require("./Quadruped")
+local KinematicPose = require("./KinematicPose")
 
 local Squirrel = {}
 
@@ -74,27 +83,32 @@ function Squirrel.start(
 		return function() end
 	end
 	local world = ctx.world
-	local rail = world.rail()
-	if rail == nil then
-		-- rail world still building: ground only until the next possession
-		metrics.squirrelGroundOnly = true
-		return Quadruped.start(body, payload, metrics, { world = world, input = ctx.input, species = "squirrel" })
-	end
 	local input = ctx.input
+	local rw = world.rail()
+	local railLive = rw ~= nil
+	local first = rw or RailWorld.empty()
+	local motorWorld = {
+		registry = first.registry,
+		index = first.index,
+		graph = first.graph,
+		trampolines = first.trampolines,
+		groundAt = world.groundAt,
+		blocked = world.blocked,
+		clamp = world.clamp,
+	}
 	local pos = root.Position
 	local ground = world.groundAt(pos.X, pos.Z, pos.Y)
 	-- the root's height above the soles is the body's own HipHeight (PuppetSpec), not the gap to the
-	-- ground at the handoff: the AI stood on World/Height's analytic ground, which can sit up to a stud
-	-- under the voxel surface the motor's raycast finds (the old measure buried the squirrel), and a
-	-- squirrel taken on a trunk is nowhere near the ground
+	-- ground at the handoff: a squirrel taken on a trunk or in the air is nowhere near the ground
 	local hip = Squirrel.hipOf(body, pos.Y - ground)
-	local snap = payload.snapshot
+	local feet = pos.Y - hip
+	local snap = payload.snapshot or {}
 	local state = SquirrelMotor.new(pos.X, ground, pos.Z)
 	state.yaw = (snap.yaw or 0) + math.pi
 	state.vx, state.vz = snap.vx or 0, snap.vz or 0
 	local b = snap.brain
-	if b and b.routeId and b.routeId ~= 0 then
-		local route = rail.registry:get(b.routeId)
+	if railLive and b and b.routeId and b.routeId ~= 0 then
+		local route = motorWorld.registry:get(b.routeId)
 		if route and route.length > 0 then
 			state.routeId = b.routeId
 			state.railT = math.clamp((b.s or 0) / route.length, 0, 1)
@@ -102,20 +116,33 @@ function Squirrel.start(
 			state.grounded = false
 		end
 	end
-	local motorWorld = {
-		registry = rail.registry,
-		index = rail.index,
-		graph = rail.graph,
-		trampolines = rail.trampolines,
-		groundAt = world.groundAt,
-		blocked = world.blocked,
-		clamp = world.clamp,
-	}
+	if state.routeId == nil and feet - ground > SquirrelMotor.params.glueMin then
+		-- taken in the air (or off a rail that is not built yet): fall from where the body is drawn
+		state.y = feet
+		state.grounded = false
+	end
+	-- the drawn pose starts exactly where the body is drawn now and eases onto the motor from there
+	local visual = SquirrelVisual.new()
+	visual.x, visual.y, visual.z = pos.X, feet, pos.Z
+	visual.live = true
+	visual.yaw = state.yaw
+	local kin: KinematicPose.Pose = { moveSpeed = 0, cadence = 0, climb = 0 }
+	KinematicPose.set(body, kin)
+
 	local holdUntil = os.clock() + (payload.holdSeconds or 0.75)
 	local holding = state.routeId ~= nil or math.abs(state.vx) + math.abs(state.vz) > 0.1
-	local last = Vector3.new(pos.X, pos.Y, pos.Z)
+	local last = pos
 	local lastSaid, lastText = -math.huge, ""
-	return BodyDriver.drive(root, function(dt: number)
+	local stopDrive = BodyDriver.driveRender(root, function(frameDt: number)
+		local dt = math.min(frameDt, 0.08)
+		if not railLive and state.routeId == nil then
+			local built = world.rail()
+			if built then
+				motorWorld.registry, motorWorld.index = built.registry, built.index
+				motorWorld.graph, motorWorld.trampolines = built.graph, built.trampolines
+				railLive = true
+			end
+		end
 		local f = input:sample(BodyDriver.cameraYawHtml())
 		local mi = {
 			fw = f.fw,
@@ -152,7 +179,7 @@ function Squirrel.start(
 		-- the bowling alley's ball-return tunnel (and its vent): the camera rides low behind (CameraPolicy zone)
 		local zone = nil
 		if state.routeId then
-			local r = rail.registry:get(state.routeId)
+			local r = motorWorld.registry:get(state.routeId)
 			if r and r.origin == "attraction" then
 				zone = "tunnel"
 			end
@@ -160,12 +187,21 @@ function Squirrel.start(
 		if body:GetAttribute("CameraZone") ~= zone then
 			body:SetAttribute("CameraZone", zone)
 		end
-		local v = SquirrelMotor.visualPose(state, motorWorld :: any)
-		local p = Vector3.new(v.x, v.y + hip, v.z)
-		local vel = if dt > 0 then (p - last) / dt else Vector3.zero
+		-- what is drawn: the eased pose, about the feet point (yaw, then nose-up pitch and lean, then the hip)
+		local snapped = SquirrelVisual.frame(visual, state, motorWorld :: any, dt, world.groundAt)
+		kin.moveSpeed, kin.cadence, kin.climb = visual.moveSpeed, visual.cadence, visual.climb
+		local cf = Units.yawCFrame(visual.yaw or state.yaw, Vector3.new(visual.x, visual.y, visual.z))
+			* CFrame.Angles(visual.pitch, 0, -visual.lean)
+			* CFrame.new(0, hip, 0)
+		local p = cf.Position
+		local vel = if snapped or dt <= 0 then Vector3.zero else (p - last) / dt
 		last = p
-		return p, state.yaw, vel, nil
+		return cf, vel
 	end)
+	return function()
+		stopDrive()
+		KinematicPose.clear(body)
+	end
 end
 
 return Squirrel

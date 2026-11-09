@@ -15,7 +15,8 @@
 --   drone                    the follow camera on the drone root
 --   overview / outbreak      a parked scriptable shot
 -- Interface: apply(decision, targets) where targets = { body?, vehicle?, drone? }; follow(body);
---   overview(position, lookAt); subjectOf(body); stop()
+--   overview(position, lookAt); subjectOf(body); stop();
+--   focusStep(px, py, pz, tx, ty, tz, dt, lx?, ly?, lz?) -> x, y, z (pure); FOCUS
 -- No side effects on require (services are looked up inside the functions).
 
 local CameraRig = {}
@@ -85,6 +86,56 @@ local function focusPart(): BasePart
 	return p
 end
 
+CameraRig.FOCUS = {
+	rateXZ = 25, -- 1/s, horizontal: tight
+	rateY = 7, -- 1/s, vertical: smooths terrain steps and landings
+	maxLagXZ = 3, -- studs the focus may trail the body horizontally
+	maxLagY = 4, -- studs it may trail vertically (a long fall, a fast climb)
+	snap = 20, -- studs: beyond this the body teleported and the focus cuts with it
+}
+
+-- One frame of the focus point (px, py, pz) following the body point (tx, ty, tz). The lag limits are
+-- continuous: the focus is held at the limit, never thrown onto the target, so a long fall or a leap
+-- is one smooth move (the old rule snapped to the target whenever the lag passed 3 studs, which made
+-- a sawtooth of the camera on every drop). Pure numbers.
+-- (lx, ly, lz) is the body point of the last frame: with it the ease is integrated for a body moving at a
+-- steady speed through the frame, so the distance trailed does not change with the frame time.
+function CameraRig.focusStep(
+	px: number,
+	py: number,
+	pz: number,
+	tx: number,
+	ty: number,
+	tz: number,
+	dt: number,
+	lx: number?,
+	ly: number?,
+	lz: number?
+): (number, number, number)
+	local F = CameraRig.FOCUS
+	local dx, dy, dz = tx - px, ty - py, tz - pz
+	if dx * dx + dy * dy + dz * dz > F.snap * F.snap then
+		return tx, ty, tz
+	end
+	if dt > 0 then
+		local function follow(x: number, t0: number, t1: number, rate: number): number
+			local lead = (t1 - t0) / (rate * dt)
+			return t1 - (lead + (t0 - x - lead) * math.exp(-rate * dt))
+		end
+		px = follow(px, lx or tx, tx, F.rateXZ)
+		py = follow(py, ly or ty, ty, F.rateY)
+		pz = follow(pz, lz or tz, tz, F.rateXZ)
+	end
+	local ox, oz = tx - px, tz - pz
+	local lag = math.sqrt(ox * ox + oz * oz)
+	if lag > F.maxLagXZ then
+		local k = F.maxLagXZ / lag
+		px, pz = tx - ox * k, tz - oz * k
+	end
+	py = math.clamp(py, ty - F.maxLagY, ty + F.maxLagY)
+	return px, py, pz
+end
+
 function CameraRig.follow(body: Model)
 	unbind()
 	local camera = workspace.CurrentCamera
@@ -108,6 +159,7 @@ function CameraRig.follow(body: Model)
 	local _, size = body:GetBoundingBox()
 	local lift = math.max(0.6, size.Y * 0.6) -- look slightly above the body, not at its feet
 	local pos = rootPart.Position + Vector3.new(0, lift, 0)
+	local last = pos
 	f.CFrame = CFrame.new(pos)
 	camera.CameraType = Enum.CameraType.Custom
 	camera.CameraSubject = f
@@ -116,14 +168,10 @@ function CameraRig.follow(body: Model)
 			return
 		end
 		local target = rootPart.Position + Vector3.new(0, lift, 0)
-		local a = 1 - math.exp(-dt * 25) -- horizontal: tight
-		local b = 1 - math.exp(-dt * 7) -- vertical: smooths bob and terrain steps
-		pos =
-			Vector3.new(pos.X + (target.X - pos.X) * a, pos.Y + (target.Y - pos.Y) * b, pos.Z + (target.Z - pos.Z) * a)
-		-- never lag more than 3 studs (teleports, respawns, long drops)
-		if (target - pos).Magnitude > 3 then
-			pos = target
-		end
+		pos = Vector3.new(
+			CameraRig.focusStep(pos.X, pos.Y, pos.Z, target.X, target.Y, target.Z, dt, last.X, last.Y, last.Z)
+		)
+		last = target
 		f.CFrame = CFrame.new(pos)
 	end)
 end

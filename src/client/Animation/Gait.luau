@@ -12,8 +12,12 @@
 -- jumps when the speed wobbles). Running streams the squirrel's tail back (a deer flags its tail up).
 -- Pure numbers (Lune-testable); AnimationDriver turns a Pose into Motor6D.Transform values on the
 -- RigSpec bone names (FrontL_Upper, ..., Tail1..n, Head, Root).
+-- The squirrel follows v5.4's own numbers (owner rule 2026-11-09, "if it visibly bobs while running on
+-- flat ground, the motor is wrong"): no body bob at all, a 0.022 rad rock, one stride per 2.2 HTML units
+-- (5.5 studs), and on a trunk or pole (`climb` 0..1) the legs reach up and push down around a smaller
+-- swing (v5.4 L6861: front -0.26, back +0.22, amplitude 0.16) with no rock.
 -- Interface: PROCEDURAL; params(species, hipHeight?) -> Params; advance(phase, speed, dt, params) -> phase;
---   moving(speed) -> 0..1; pose(phase, speed, t, params, tailN) -> Pose
+--   moving(speed) -> 0..1; pose(phase, speed, t, params, tailN, climb?) -> Pose
 
 local Gait = {}
 
@@ -25,6 +29,7 @@ export type Params = {
 	runSpeed: number, -- studs/s at which the swing reaches full amplitude
 	swing: number, -- radians, full leg swing amplitude
 	bob: number, -- studs, body bob at a full run (peak; the body never dips below its rest height)
+	rock: number, -- radians, body pitch rock at a full run
 	tailLift: number, -- radians on Tail1 at a full run (+ streams it back, - raises it)
 }
 
@@ -43,10 +48,11 @@ function Gait.params(species: string, hipHeight: number?): Params
 	if species == "squirrel" or species == "rodent" then
 		return {
 			bound = true,
-			stride = math.max(hip * 3.2, 1.6),
+			stride = 5.5,
 			runSpeed = 16,
-			swing = 0.75,
-			bob = hip * 0.05,
+			swing = 0.42,
+			bob = 0,
+			rock = 0.022,
 			tailLift = 0.7,
 		}
 	elseif species == "fox" then
@@ -56,6 +62,7 @@ function Gait.params(species: string, hipHeight: number?): Params
 			runSpeed = 18,
 			swing = 0.6,
 			bob = hip * 0.025,
+			rock = 0,
 			tailLift = -0.1,
 		}
 	end
@@ -65,6 +72,7 @@ function Gait.params(species: string, hipHeight: number?): Params
 		runSpeed = 22,
 		swing = 0.5,
 		bob = hip * 0.02,
+		rock = 0,
 		tailLift = -1.2,
 	}
 end
@@ -87,10 +95,16 @@ function Gait.moving(speed: number): number
 	return w * w * (3 - 2 * w)
 end
 
-function Gait.pose(phase: number, speed: number, t: number, p: Params, tailN: number): Pose
+-- Legs reach (front) and push (back) by this much, radians, when gripping a trunk; the swing shrinks to
+-- CLIMB_SWING of its running amplitude.
+local CLIMB_FRONT, CLIMB_BACK, CLIMB_SWING = 0.26, -0.22, 0.45
+
+function Gait.pose(phase: number, speed: number, t: number, p: Params, tailN: number, climb: number?): Pose
 	local e = Gait.effort(speed, p)
 	local w = Gait.moving(speed)
-	local amp = if speed > 0 then p.swing * math.max(e, 0.35 * w) else 0
+	local c = math.clamp(climb or 0, 0, 1)
+	local level = 1 - c
+	local amp = if speed > 0 then p.swing * math.max(e, 0.35 * w) * (1 - (1 - CLIMB_SWING) * c) else 0
 	local offsets: { [string]: number }
 	if p.bound then
 		offsets = { FrontL = 0, FrontR = 0.25, BackL = math.pi, BackR = math.pi + 0.25 }
@@ -101,13 +115,14 @@ function Gait.pose(phase: number, speed: number, t: number, p: Params, tailN: nu
 	for name, off in offsets do
 		local a = phase + off
 		-- positive pitch about the bone's X swings the foot forward (-Z is forward in RigSpec)
-		local upper = amp * math.sin(a)
+		local front = string.sub(name, 1, 5) == "Front"
+		local upper = amp * math.sin(a) + c * (if front then CLIMB_FRONT else CLIMB_BACK)
 		-- the lower leg folds while the foot swings forward (the recovery half, d(upper)/da > 0):
 		-- a front leg's foot tucks back (+Z), a hind leg's hock folds the other way; (1 + cos) / 2
 		-- squared is the smooth version of max(0, cos)
 		local fold = (1 + math.cos(a)) / 2
 		local lower = amp * 0.9 * fold * fold
-		if string.sub(name, 1, 5) == "Front" then
+		if front then
 			lower = -lower
 		end
 		legs[name] = { upper = upper, lower = lower }
@@ -116,8 +131,8 @@ function Gait.pose(phase: number, speed: number, t: number, p: Params, tailN: nu
 	-- cycle, two per trot cycle), plus a faint breath when standing
 	local bobFreq = if p.bound then 1 else 2
 	local rise = (1 - math.cos(phase * bobFreq)) / 2
-	local bob = w * p.bob * e * rise + (1 - w) * p.bob * 0.08 * (1 + math.sin(t * 2.2)) / 2
-	local rock = if p.bound then w * 0.05 * e * math.sin(phase) else 0
+	local bob = level * (w * p.bob * e * rise + (1 - w) * p.bob * 0.08 * (1 + math.sin(t * 2.2)) / 2)
+	local rock = level * w * p.rock * e * math.sin(phase)
 	-- the head holds its line: it cancels the rock and adds only a small, smooth nod
 	local head = -rock + w * 0.03 * e * math.sin(phase * bobFreq) + (1 - w) * 0.04 * math.sin(t * 0.9)
 	local tail = {}

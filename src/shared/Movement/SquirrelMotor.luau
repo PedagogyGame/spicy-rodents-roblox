@@ -153,6 +153,10 @@ SquirrelMotor.params = {
 	sweepStep = st(0.24),
 	sweepMaxSteps = 18,
 	blockedDamp = 0.28,
+	-- ground glue: the drop a grounded body follows without leaving the ground, per substep: the larger of
+	-- glueMin (a kerb, a plate lip) and glueSlope x the horizontal distance moved (a 50-degree slope)
+	glueMin = 0.75,
+	glueSlope = 1.2,
 	-- frame timing (§6)
 	frameDtCap = 0.08,
 	substep = 1 / 60,
@@ -614,7 +618,10 @@ end
 
 -- Substep ----------------------------------------------------------------------------------------------
 
--- resolveOutdoorMovement (L6411-6447): swept per-axis sliding against world.blocked.
+-- resolveOutdoorMovement (L6411-6447), line for line: the displacement is swept in steps of <= sweepStep;
+-- each step tries X from the current point, then Z from where X left it, and takes the diagonal only when
+-- both axes were refused. Velocity is damped once per blocked axis after the sweep (never per step), so a
+-- body sliding along a wall keeps its speed along it.
 local function resolveWalls(state: State, world: World, oldX: number, oldZ: number)
 	local blocked = world.blocked
 	if not blocked then
@@ -629,31 +636,35 @@ local function resolveWalls(state: State, world: World, oldX: number, oldZ: numb
 	local sx, sz = dx / steps, dz / steps
 	local x, z = oldX, oldZ
 	local y = state.y
+	local bx, bz = false, false
 	for _ = 1, steps do
-		local okX = not blocked(x + sx, z, y)
-		local okZ = not blocked(x, z + sz, y)
-		if okX and okZ then
-			if not blocked(x + sx, z + sz, y) then
+		local px, pz = x, z
+		if math.abs(sx) > 1e-7 then
+			if not blocked(x + sx, z, y) then
 				x += sx
+			else
+				bx = true
+			end
+		end
+		if math.abs(sz) > 1e-7 then
+			if not blocked(x, z + sz, y) then
 				z += sz
 			else
-				-- the diagonal is blocked although each axis is free: slide on one axis
-				x += sx
-				state.vz *= P.blockedDamp
+				bz = true
 			end
-		elseif okX then
-			x += sx
-			state.vz *= P.blockedDamp
-		elseif okZ then
-			z += sz
-			state.vx *= P.blockedDamp
-		else
-			state.vx *= P.blockedDamp
-			state.vz *= P.blockedDamp
-			break
+		end
+		if x == px and z == pz and not blocked(px + sx, pz + sz, y) then
+			x, z = px + sx, pz + sz
+			bx, bz = false, false
 		end
 	end
 	state.x, state.z = x, z
+	if bx then
+		state.vx *= P.blockedDamp
+	end
+	if bz then
+		state.vz *= P.blockedDamp
+	end
 end
 
 local function substep(state: State, input: Input, dt: number, world: World, events: { Event })
@@ -820,6 +831,20 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 				state.committedAirborne = false
 				state.cameraCommit = math.max(state.cameraCommit, P.cameraCommitLand)
 			end
+		elseif
+			state.grounded
+			and state.vy <= 0
+			and state.y - ground
+				<= math.max(P.glueMin, P.glueSlope * math.sqrt((state.x - oldX) ^ 2 + (state.z - oldZ) ^ 2))
+		then
+			-- Ground glue (owner rule 2026-11-09: "a kinematic body glued to the ground"; a deliberate step
+			-- past v5.4, whose body left the ground for a frame on every downhill sample and only its drawn
+			-- copy was pinned). A grounded body follows the ground down a slope, a kerb or a plate lip
+			-- without becoming airborne: no "land" event, no air acceleration, no fall. Leap, pounce, drop
+			-- and the trampoline clear `grounded` or set vy > 0 first, so they stay ballistic; a real ledge
+			-- (deeper than the allowance) still drops.
+			state.y = ground
+			state.vy = 0
 		else
 			state.grounded = false
 		end

@@ -75,7 +75,7 @@ return function(t)
 				t.near(pose.head, -pose.rock, 0.035, `{species} head follows the rock`)
 				if prev then
 					local slope = (pose.bob - prev) * n
-					if prevSlope then
+					if prevSlope and p.bob > 0 then
 						-- a cusp (abs(sin)) flips the slope's sign in one step (about 9000 x bob here); a
 						-- raised cosine bends at most 4 pi^2 x 2 x bob (about 80 x bob) per step
 						t.truthy(math.abs(slope - prevSlope) * n < p.bob * 300, `{species} bob has a cusp at {i}`)

@@ -246,11 +246,7 @@ function PossessionClient.start(opts: Opts): Client
 		if kind == "human" then
 			stopController = Human.start(model, payload, metrics)
 		elseif kind == "squirrel" then
-			metrics.squirrelGroundOnly = nil
 			stopController = Squirrel.start(model, payload, metrics, ctx)
-			if metrics.squirrelGroundOnly then
-				toast("Climbing routes are still loading: run on the ground, then pick Squirrel again", 5)
-			end
 		else
 			stopController = Quadruped.start(model, payload, metrics, ctx)
 		end
