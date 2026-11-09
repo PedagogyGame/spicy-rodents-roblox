@@ -27,7 +27,7 @@ export default async function uploadAsset(argv) {
 	const result = await createAsset({
 		assetType: flags.type,
 		filePath: file,
-		displayName: String(flags.name),
+		displayName: String(flags.name).slice(0, 50), // Assets API caps displayName at 50 chars
 		description: String(flags.description || ""),
 		creator,
 	});

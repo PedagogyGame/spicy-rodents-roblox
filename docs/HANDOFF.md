@@ -15,7 +15,7 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
   - IDs are in `docs/spec/PROJECT_IDS.md`.
   - The key can read and write assets (save place versions, upload) and run Luau Execution.
   - It cannot write universe-places. Workaround B4: the place stays at 50 and Roles kicks the 50th player.
-  - Test artefacts: CI place versions 2-3 and Decal 89657770904034.
+  - Test artefacts (all named "spicy-rodents pipeline test ... (safe to delete)"): Decal 89657770904034, Animation 92005834447457, Model 126862471025988 (+ mesh 114250471754267); CI place versions 2-9 (unpublished).
 
 ## 2. Wave 0 status (spike reports in `docs/spikes/`)
 | Spike | Verdict | Key numbers / carry-forward |
@@ -27,7 +27,10 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 | S9 avatar APIs | GO | descriptions 16/16; classic face via LoadAsset decal; dynamic heads need a stock-expression map; product-name colour words only 42 % → curated `item_colours.json` |
 | S10 type check | GO | GitHub Actions strict luau-lsp green |
 | S12 renders | GO | Cycles CPU 64 spp + denoise: 13.5 s/frame at 512 px on 2 threads (~8 min per turntable) |
-| S2, S6, S7, S8, S11, S13-S20 | open | see BUILD_PLAN §4.3 (rev 3 adds S13-S20 for brief v2) |
+| S6 bake/terrain | GO | Height port exact (11,060 vectors); Lune bake of 243 lots/116 roads in 0.2 s; BakeParity identical Lune vs engine; terrain WriteVoxels whole town ~1 s, near-hill bands 3-4 s |
+| S7 headless animation | GO (headless) | Blender → clip JSON → KeyframeSequence rbxm (byte-identical rebuilds) → Open Cloud Animation → loads in engine with exact pose names; visual leg-swing check in OS-1a |
+| S8 models/runtime art | PARTIAL | FBX via Open Cloud arrives as MeshPart + SurfaceAppearance (1 BU = 1 stud); SurfaceAppearance.Color writable at runtime (fur tint path alive); map carry and tint visuals → OS-1b; place download (syncback) refused: needs asset-delivery read on the key |
+| S2, S11, S13-S20 | open | S2/S11 need OS-1a/OS-1c; S13-S20 per BUILD_PLAN rev 3 §4.3 |
 
 ## 3. Engineering rules learned (apply everywhere)
 1. **Requires.** Within a root use relative string requires ("./X", "../Y"). Across roots (server/client/worldgen → shared) use the root's `Import.luau`:
@@ -40,6 +43,8 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 6. **Audio.** There is no runtime synthesis in Roblox. Use library sounds plus Audio API effects; budget 40/50 uploads per month (B3). Keep the tally in `docs/AUDIO_BUDGET.md`.
 7. **Luau Execution** runs no physics, has no players and auto-runs no scripts. Physics feel, camera and fps checks need the owner's Studio (critique SQ-1, FE-1).
 8. **Commit and push at every task boundary.** The container is ephemeral.
+9. **Art lanes.** FBX export: axis_forward=Z, axis_up=Y, FBX_SCALE_ALL (1 Blender unit = 1 stud). Clips use convention spicy-clip/1 (Pose.CFrame = local joint delta in an axis-aligned joint frame) and export the cycle plus one closing key. Assets API displayName max 50 chars (enforced in upload_asset). SurfaceAppearance maps are not script-readable, so rigs load whole by asset ID; lune-baked kits use Box collision.
+10. **BakeParity.** Compare plan hashes exactly, structure by hash, geometry with tolerance; never hash float32 sizes across Lune and the engine.
 
 ## 4. Next steps, in order
 1. If `BUILD_PLAN.md`'s header does not yet say the rev-3 critique was applied, apply `critique_rev3.md`. Its gaps include B3/B4 absent from the plan, floor arithmetic, regen vs drain, queue weights, ProcessReceipt NotProcessedYet, no runtime audio synthesis, and the already-created CI and Art Inbox places.
