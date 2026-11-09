@@ -5,7 +5,7 @@
 #   2. export  lune run tools/review/export.luau  -> build/review/scene.json (+ ground-contact and z-fight summary)
 #   3. render  tools/review/render.py (bpy, Cycles CPU, 2 threads) -> build/review/<view>.png, timing.json
 #   4. sheet   tools/review/sheet.py (system python3 + Pillow) -> build/review/contact_sheet.png
-# Views: tools/review/views.json. Total about 7 minutes on 2 CPUs (about 20 s per 960x540 view).
+# Views: tools/review/views.json. Total about 6 minutes on 2 CPUs (10-28 s per 960x540 view, 19 views).
 # Usage: tools/review/run.sh [--no-bake] [--only name1,name2] [--debug] [--samples N]
 # Env:   REVIEW_PY   bpy interpreter (default /root/.cache/spicy-rodents/venv/bin/python)
 #        REVIEW_CPUS taskset CPU list for the render (default 2,3 on 4+ cores)
