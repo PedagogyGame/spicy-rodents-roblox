@@ -210,9 +210,9 @@ function Population.validate(config: Config): (boolean, { string })
 		end
 		if post.id == "police" then
 			police = post.floorAtCap
-		elseif post.id == "hospitalStaff" then
+		elseif post.id == "hospitalStaff" or post.id == "hospital_staff" then
 			hospital = post.floorAtCap
-		elseif post.id == "ambulanceCrew" then
+		elseif post.id == "ambulanceCrew" or post.id == "ambulance_crew" then
 			ambulance = post.floorAtCap
 		end
 	end
@@ -296,15 +296,18 @@ function Population.fromData(gen: any, phase: string?): Config
 	local ph = phase or "frb"
 	local posts: { Post } = {}
 	for _, p in gen.posts do
-		table.insert(posts, {
-			id = p.id,
-			standing = p.standing[ph],
-			floor = p.floor[ph],
-			floorAtCap = p.fullFloor[ph],
-			protected = p.neverCut == true or nil,
-			site = p.site,
-			officerFloor = p.officerFloor,
-		} :: any)
+		table.insert(
+			posts,
+			{
+				id = p.id,
+				standing = p.standing[ph],
+				floor = p.floor[ph],
+				floorAtCap = p.fullFloor[ph],
+				protected = p.neverCut == true or nil,
+				site = p.site,
+				officerFloor = p.officerFloor,
+			} :: any
+		)
 	end
 	local sq = gen.animals and gen.animals.squirrel or {}
 	return {

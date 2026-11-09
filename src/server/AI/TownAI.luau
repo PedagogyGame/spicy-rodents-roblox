@@ -22,8 +22,7 @@ local Height = Import.shared("World/Height") :: typeof(require("../../shared/Wor
 local Ground = Import.shared("World/Ground") :: typeof(require("../../shared/World/Ground"))
 local Town = Import.shared("World/Town") :: typeof(require("../../shared/World/Town"))
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
-local HumanAIMotor =
-	Import.shared("Movement/HumanAIMotor") :: typeof(require("../../shared/Movement/HumanAIMotor"))
+local HumanAIMotor = Import.shared("Movement/HumanAIMotor") :: typeof(require("../../shared/Movement/HumanAIMotor"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
 local Perception = require("../Actors/Perception")
@@ -173,7 +172,14 @@ function TownAI.build(opts: Opts): World
 	}
 	local counts = world.counts
 
-	local function add(species: string, variant: string, brainKind: string, hip: number, x: number, z: number): Common.Actor
+	local function add(
+		species: string,
+		variant: string,
+		brainKind: string,
+		hip: number,
+		x: number,
+		z: number
+	): Common.Actor
 		world.nextId += 1
 		local id = world.nextId
 		local actor = Common.newActor(id, species, variant, brainKind, x, z, hip)
@@ -413,7 +419,12 @@ function TownAI.liveness(world: World): Liveness
 		end
 		if
 			actor.intent.mode ~= "rail"
-			and (actor.x < b.minX - 1e-6 or actor.x > b.maxX + 1e-6 or actor.z < b.minZ - 1e-6 or actor.z > b.maxZ + 1e-6)
+			and (
+				actor.x < b.minX - 1e-6
+				or actor.x > b.maxX + 1e-6
+				or actor.z < b.minZ - 1e-6
+				or actor.z > b.maxZ + 1e-6
+			)
 		then
 			outside += 1
 		end

@@ -54,13 +54,9 @@ return function(t)
 			local world = { groundAt = flat }
 			local input = QuadrupedMotor.idleInput(0) -- camera yaw 0: forward is -Z
 			input.fw, input.sprint = 1, true
-			local events = {}
 			for _ = 1, 120 do
 				local prev = QuadrupedMotor.deserialize(QuadrupedMotor.serialize(s))
-				local _, ev = QuadrupedMotor.step(s, input, 1 / 60, world, p)
-				for _, e in ev do
-					table.insert(events, e.kind)
-				end
+				QuadrupedMotor.step(s, input, 1 / 60, world, p)
 				local ok, why = QuadrupedMotor.envelope(prev, s, 1 / 60, p)
 				t.truthy(ok, `{species} envelope {why}`)
 			end

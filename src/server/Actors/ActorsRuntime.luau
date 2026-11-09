@@ -36,6 +36,7 @@ export type Opts = {
 	players: boolean?, -- connect PlayerAdded / PlayerRemoving (default true)
 	movement: any?, -- Movement/MovementService instance (onHandoff)
 	roles: any?, -- a RoleService constructor module (default Server/Roles/RoleService)
+	engine: any?, -- Possession.Engine override (engine tests drive PlayerLike stubs)
 }
 
 export type Runtime = {
@@ -136,12 +137,15 @@ function ActorsRuntime.start(opts: Opts): Runtime
 	local movement = opts.movement
 	local possession = Possession.new({
 		actors = actors,
+		engine = opts.engine,
 		onGranted = function(player: any, payload: any)
 			payload.variant = (byTownId[townIdOf[payload.actorId]] or {}).variant
-			granted:FireClient(player, payload)
+			if typeof(player) == "Instance" then
+				granted:FireClient(player, payload)
+			end
 		end,
 		onReleased = function(player: any, actorId: string, why: string)
-			if player.Parent == Players then
+			if typeof(player) == "Instance" and player.Parent == Players then
 				released:FireClient(player, actorId, why)
 			end
 		end,
@@ -276,7 +280,14 @@ function ActorsRuntime.start(opts: Opts): Runtime
 					h = Recovery.newHistory()
 					history[actor.id] = h
 				end
-				Recovery.record(h, now, p.X, p.Y, p.Z, r.AssemblyLinearVelocity.Y > -1 and r.AssemblyLinearVelocity.Y < 1)
+				Recovery.record(
+					h,
+					now,
+					p.X,
+					p.Y,
+					p.Z,
+					r.AssemblyLinearVelocity.Y > -1 and r.AssemblyLinearVelocity.Y < 1
+				)
 				local qx = Recovery.riverFall(p.X, p.Y, p.Z)
 				if qx or not Recovery.isSane(p.X, p.Y, p.Z) then
 					local driver = possession:controllerOf(actor)

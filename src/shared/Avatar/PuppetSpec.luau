@@ -86,7 +86,13 @@ local function animal(species: string, opts: Opts): ModelSpec
 	local parts: { PartSpec } = {}
 	local joints: { JointSpec } = {}
 	local attachments: { AttachmentSpec } = {}
-	local function part(name: string, size: { number }, pos: { number }, color: PartBuilder.Rgb, extra: { [string]: any }?)
+	local function part(
+		name: string,
+		size: { number },
+		pos: { number },
+		color: PartBuilder.Rgb,
+		extra: { [string]: any }?
+	)
 		local p: any = { name = name, size = size, pos = pos, color = color }
 		for key, v in extra or {} do
 			p[key] = v
@@ -149,11 +155,21 @@ local function animal(species: string, opts: Opts): ModelSpec
 	weld("Eyes", "Head")
 	for _, side in { { "EarL", -1 }, { "EarR", 1 } } do
 		local name, sx = side[1] :: string, side[2] :: number
-		part(name, { a.head * 0.18, a.head * 0.4, a.head * 0.12 }, { sx * a.head * 0.28, hy + a.head * 0.55, hz + a.head * 0.1 }, fur)
+		part(
+			name,
+			{ a.head * 0.18, a.head * 0.4, a.head * 0.12 },
+			{ sx * a.head * 0.28, hy + a.head * 0.55, hz + a.head * 0.1 },
+			fur
+		)
 		motor(name, "Head")
 	end
 	if a.blood then
-		part("Blood", { a.head * 0.52, a.head * 0.08, a.head * 0.3 }, { 0, hy - a.head * 0.3, hz - a.head * 0.42 }, hex("#8e1b1b"))
+		part(
+			"Blood",
+			{ a.head * 0.52, a.head * 0.08, a.head * 0.3 },
+			{ 0, hy - a.head * 0.3, hz - a.head * 0.42 },
+			hex("#8e1b1b")
+		)
 		weld("Blood", "Jaw")
 	end
 	-- tail: an arc rising up and back from the hips (+Z)
@@ -200,7 +216,10 @@ local function animal(species: string, opts: Opts): ModelSpec
 		end
 	end
 	table.insert(attachments, { name = "HeadSocket", part = "Head", pos = { 0, hy + a.head * 0.42, hz } })
-	table.insert(attachments, { name = "MouthSocket", part = "Jaw", pos = { 0, hy - a.head * 0.42, hz - a.head * 0.55 } })
+	table.insert(
+		attachments,
+		{ name = "MouthSocket", part = "Jaw", pos = { 0, hy - a.head * 0.42, hz - a.head * 0.55 } }
+	)
 	table.insert(attachments, { name = "TailTip", part = `Tail{a.tailN}`, pos = tip })
 	table.insert(attachments, { name = "ChestCenter", part = "Chest", pos = { 0, 0, -L * 0.35 } })
 	local name = opts.name or (if variant then `{species}_{variant}` else species)
@@ -219,7 +238,13 @@ local function drone(opts: Opts): ModelSpec
 	local body = hex("#2e3338")
 	local parts: { PartSpec } = {
 		{ name = "RootPart", size = { 2.0, 0.8, 2.0 }, pos = { 0, 0, 0 }, color = body },
-		{ name = "Lens", size = { 0.35, 0.35, 0.35 }, pos = { 0, -0.45, -0.7 }, color = hex("#111417"), shape = "Ball" },
+		{
+			name = "Lens",
+			size = { 0.35, 0.35, 0.35 },
+			pos = { 0, -0.45, -0.7 },
+			color = hex("#111417"),
+			shape = "Ball",
+		},
 	}
 	local joints: { JointSpec } = { { name = "LensWeld", kind = "Weld", part0 = "RootPart", part1 = "Lens" } }
 	for i, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
@@ -287,8 +312,14 @@ function PuppetSpec.human(role: string, index: number, lib: { Instance: any, Col
 	local joints: { JointSpec } = {}
 	for _, r in R15 do
 		local name, size, pos, joint, parent, tone = r[1], r[2], r[3], r[4], r[5], r[6]
-		table.insert(parts, { name = name :: string, size = size :: { number }, pos = pos :: { number }, color = (colors :: any)[tone] })
-		table.insert(joints, { name = joint :: string, kind = "Motor6D", part0 = parent :: string, part1 = name :: string })
+		table.insert(
+			parts,
+			{ name = name :: string, size = size :: { number }, pos = pos :: { number }, color = (colors :: any)[tone] }
+		)
+		table.insert(
+			joints,
+			{ name = joint :: string, kind = "Motor6D", part0 = parent :: string, part1 = name :: string }
+		)
 	end
 	if look.cap then
 		table.insert(parts, { name = "Cap", size = { 1.3, 0.3, 1.4 }, pos = { 0, 2.95, -0.05 }, color = look.cap })

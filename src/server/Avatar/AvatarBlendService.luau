@@ -191,9 +191,10 @@ function AvatarBlendService.apply(self: Service, model: Instance, species: strin
 		table.insert(record.ops, { inst = op.inst, prop = op.prop, old = (op.inst :: any)[op.prop] });
 		(op.inst :: any)[op.prop] = color3(self, op.value)
 	end
-	local newInstance = self.deps.newInstance or function(className: string): Instance
-		return Instance.new(className :: any)
-	end
+	local newInstance = self.deps.newInstance
+		or function(className: string): Instance
+			return Instance.new(className :: any)
+		end
 	if look.kind == "human" then
 		local h = look :: BlendRules.HumanLook
 		local head = model:FindFirstChild("Head")
@@ -206,7 +207,7 @@ function AvatarBlendService.apply(self: Service, model: Instance, species: strin
 					(decal :: any).Texture = texture
 				else
 					local d = newInstance("Decal")
-					d.Name = "FaceDecal";
+					d.Name = "FaceDecal"
 					(d :: any).Texture = texture
 					d.Parent = head
 					table.insert(record.added, d)
@@ -233,7 +234,7 @@ function AvatarBlendService.apply(self: Service, model: Instance, species: strin
 				handle.CanCollide = false
 				handle.Massless = true
 				local weld = newInstance("Weld")
-				weld.Name = "AccessoryWeld";
+				weld.Name = "AccessoryWeld"
 				(weld :: any).Part0 = socket.Parent;
 				(weld :: any).Part1 = handle;
 				(weld :: any).C0 = (socket :: any).CFrame
@@ -267,10 +268,16 @@ function AvatarBlendService.revert(self: Service, model: Instance): boolean
 end
 
 -- preview(model, species, sampleIndex): Role Lab's blend preview on a dev sample (DevSamples, D13).
-function AvatarBlendService.preview(self: Service, model: Instance, species: string, sampleIndex: number): BlendRules.Look
+function AvatarBlendService.preview(
+	self: Service,
+	model: Instance,
+	species: string,
+	sampleIndex: number
+): BlendRules.Look
 	local sample = DevSamples.SAMPLES[((sampleIndex - 1) % #DevSamples.SAMPLES) + 1]
 	local traits = BlendRules.traits(sample.desc, DevSamples.PRODUCT_INFO, self.deps.colourTable)
-	local look = BlendRules.compose(species, AvatarBlendService.STOCK[species] or AvatarBlendService.STOCK.squirrel, traits)
+	local look =
+		BlendRules.compose(species, AvatarBlendService.STOCK[species] or AvatarBlendService.STOCK.squirrel, traits)
 	self:apply(model, species, look)
 	return look
 end

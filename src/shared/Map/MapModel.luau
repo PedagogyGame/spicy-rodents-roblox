@@ -89,22 +89,40 @@ function MapModel.fromData(d: { lots: { any }, roads: { any }, lotTypes: any?, e
 		local hw = r.width / 2
 		if type(r.coord) ~= "number" then
 			continue -- "free" paths (estate stepping stones) are yard detail, not map roads
-		elseif r.axis == "x" then
-			table.insert(roads, { x0 = r.start, z0 = r.coord - hw, x1 = r["end"], z1 = r.coord + hw, kind = r.kind or "road", id = r.id })
-		else
-			table.insert(roads, { x0 = r.coord - hw, z0 = r.start, x1 = r.coord + hw, z1 = r["end"], kind = r.kind or "road", id = r.id })
 		end
+		local rect: Rect
+		if r.axis == "x" then
+			rect = { x0 = r.start, z0 = r.coord - hw, x1 = r["end"], z1 = r.coord + hw, kind = "road", id = r.id }
+		else
+			rect = { x0 = r.coord - hw, z0 = r.start, x1 = r.coord + hw, z1 = r["end"], kind = "road", id = r.id }
+		end
+		table.insert(roads, rect)
 	end
 	local st = Height.STUDS_PER_UNIT
 	local river = Height.RIVER
 	local water: { Rect } = {
-		{ x0 = (river.centerX - river.halfWidth) * st, z0 = river.zMin * st, x1 = (river.centerX + river.halfWidth) * st, z1 = river.zMax * st, kind = "water", id = "river" },
+		{
+			x0 = (river.centerX - river.halfWidth) * st,
+			z0 = river.zMin * st,
+			x1 = (river.centerX + river.halfWidth) * st,
+			z1 = river.zMax * st,
+			kind = "water",
+			id = "river",
+		},
 	}
 	local areas: { Rect } = {}
 	local labels: { Label } = {}
 	for _, dist in (d.extensions and d.extensions.districts) or {} do
-		table.insert(areas, { x0 = dist.minX, z0 = dist.minZ, x1 = dist.maxX, z1 = dist.maxZ, kind = "area", id = dist.id })
-		table.insert(labels, { text = dist.label or prettify(dist.id), x = (dist.minX + dist.maxX) / 2, z = (dist.minZ + dist.maxZ) / 2, kind = "district" })
+		table.insert(
+			areas,
+			{ x0 = dist.minX, z0 = dist.minZ, x1 = dist.maxX, z1 = dist.maxZ, kind = "area", id = dist.id }
+		)
+		table.insert(labels, {
+			text = dist.label or prettify(dist.id),
+			x = (dist.minX + dist.maxX) / 2,
+			z = (dist.minZ + dist.maxZ) / 2,
+			kind = "district",
+		})
 	end
 	local names = {}
 	for name in sums do
@@ -128,7 +146,14 @@ function MapModel.fromData(d: { lots: { any }, roads: { any }, lotTypes: any?, e
 		end
 		b = { minX = minX, maxX = maxX, minZ = minZ, maxZ = maxZ }
 	end
-	return { bounds = { minX = b.minX, maxX = b.maxX, minZ = b.minZ, maxZ = b.maxZ }, lots = lots, roads = roads, water = water, areas = areas, labels = labels }
+	return {
+		bounds = { minX = b.minX, maxX = b.maxX, minZ = b.minZ, maxZ = b.maxZ },
+		lots = lots,
+		roads = roads,
+		water = water,
+		areas = areas,
+		labels = labels,
+	}
 end
 
 -- project(map, x, z) -> u, v in 0..1 (u to the right on screen, v down); +Z is up, +X is left.
@@ -159,7 +184,12 @@ end
 
 -- view(map, cx, cz, radius): the minimap window around a player as a sub-rectangle in map space
 -- (u0, v0, u1, v1), clamped to the map.
-function MapModel.view(map: Map, cx: number, cz: number, radius: number): { u0: number, v0: number, u1: number, v1: number }
+function MapModel.view(
+	map: Map,
+	cx: number,
+	cz: number,
+	radius: number
+): { u0: number, v0: number, u1: number, v1: number }
 	local u0, v0 = MapModel.project(map, cx + radius, cz + radius)
 	local u1, v1 = MapModel.project(map, cx - radius, cz - radius)
 	return { u0 = math.max(0, u0), v0 = math.max(0, v0), u1 = math.min(1, u1), v1 = math.min(1, v1) }
@@ -185,7 +215,10 @@ function MapModel.svg(map: Map, opts: { width: number? }?): string
 		local w, h = math.abs(ub - ua) * width, math.abs(vb - va) * height
 		local color = (MapModel.COLORS :: any)[r.kind] or MapModel.COLORS.road
 		local extra = if r.kind == "area" then ` fill-opacity="0.35"` else ""
-		table.insert(out, `<rect x="{fmt(x)}" y="{fmt(y)}" width="{fmt(math.max(w, 0.5))}" height="{fmt(math.max(h, 0.5))}" fill="{color}"{extra}/>`)
+		table.insert(
+			out,
+			`<rect x="{fmt(x)}" y="{fmt(y)}" width="{fmt(math.max(w, 0.5))}" height="{fmt(math.max(h, 0.5))}" fill="{color}"{extra}/>`
+		)
 	end
 	for _, r in MapModel.layers(map) do
 		rect(r)

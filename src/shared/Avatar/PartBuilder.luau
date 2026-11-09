@@ -62,7 +62,11 @@ function PartBuilder.partCount(spec: ModelSpec): number
 end
 
 -- Every name the spec will create, by instance kind (what RigSpec.validate looks for).
-function PartBuilder.names(spec: ModelSpec): { parts: { [string]: boolean }, joints: { [string]: boolean }, attachments: { [string]: boolean } }
+function PartBuilder.names(spec: ModelSpec): {
+	parts: { [string]: boolean },
+	joints: { [string]: boolean },
+	attachments: { [string]: boolean },
+}
 	local out = { parts = {}, joints = {}, attachments = {} }
 	for _, p in spec.parts do
 		out.parts[p.name] = true

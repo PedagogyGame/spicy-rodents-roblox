@@ -336,7 +336,8 @@ function TrafficService.dispatchIncident(self: TrafficService, scene: { number }
 		if v.class == "incident" and v.phase == "idle" then
 			local car = if v.id % 2 == 0 then 0 else 1
 			local start = rec.path.resolved_start[car + 1]
-			local route = LaneMath.makeRoute(`incident_{v.id}`, LaneMath.incidentRoute(car, start, scene), v.lane.speeds)
+			local route =
+				LaneMath.makeRoute(`incident_{v.id}`, LaneMath.incidentRoute(car, start, scene), v.lane.speeds)
 			AICarMotor.dispatch(v, route, ctxFor(self, {}))
 			n += 1
 		end

@@ -90,7 +90,11 @@ local VAN_STOPS = { 0.16, 0.59 } -- §5.3, fraction of the loop
 
 export type Opts = { at: number?, cruise: number?, wait: number?, offset: number? }
 
-function AICarMotor.new(e: { id: number, name: string, kind: string, class: string }, lane: LaneMath.Lane, opts: Opts?): Vehicle
+function AICarMotor.new(
+	e: { id: number, name: string, kind: string, class: string },
+	lane: LaneMath.Lane,
+	opts: Opts?
+): Vehicle
 	local o = opts or {}
 	local dir = if lane.dir == 0 then 1 else lane.dir
 	local s = 0
@@ -295,7 +299,8 @@ stepClass.sedan = function(v, ctx, dt, events)
 		end
 	end
 	if not danger then
-		danger = LaneMath.vehicleAhead(AICarMotor.body(v), fx, fz, st(9) + 0.65 * v.speed, st(1.2), sameWay(v, ctx, fx, fz))
+		danger =
+			LaneMath.vehicleAhead(AICarMotor.body(v), fx, fz, st(9) + 0.65 * v.speed, st(1.2), sameWay(v, ctx, fx, fz))
 	end
 	local cap = stopCap(v, ctx, st(9), dt, events)
 	local desired = if danger then 0 else math.min(v.cruise, cap)
@@ -314,7 +319,16 @@ stepClass.sedan = function(v, ctx, dt, events)
 	advanceLane(v, ctx, dt, events)
 end
 
-local function yielding(v: Vehicle, ctx: Ctx, dt: number, events: { string }, range: number, tva: number, up: number, down: number)
+local function yielding(
+	v: Vehicle,
+	ctx: Ctx,
+	dt: number,
+	events: { string },
+	range: number,
+	tva: number,
+	up: number,
+	down: number
+)
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
 	local hw = v.box.width / 2
 	local danger = LaneMath.seesHazard(v.x, v.z, fx, fz, range, hw, hazards(v, ctx, fx, fz, true)) ~= nil
@@ -433,7 +447,14 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 end
 
 -- polyline drive shared by the emergency classes: hard stop for people within r; returns true at the end
-local function drivePolyline(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, speed: number, stopR: number, dt: number): boolean
+local function drivePolyline(
+	v: Vehicle,
+	ctx: Ctx,
+	lane: LaneMath.Lane,
+	speed: number,
+	stopR: number,
+	dt: number
+): boolean
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
 	if personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true) then
 		v.speed = 0
@@ -469,7 +490,9 @@ stepClass.legacy_ambulance = function(v, ctx, dt, events)
 	end
 	local lane = v.lane
 	local lastLeg = v.s > LaneMath.length(lane) - st(32)
-	local speed = if lastLeg then (lane.speeds.ambulance_drive or st(10.625)) else (lane.speeds.ambulance_arterial or st(12.5))
+	local speed = if lastLeg
+		then (lane.speeds.ambulance_drive or st(10.625))
+		else (lane.speeds.ambulance_arterial or st(12.5))
 	if drivePolyline(v, ctx, lane, speed, st(5), dt) then
 		v.phase, v.timer = "park", 16
 		table.insert(events, "park")
@@ -485,7 +508,15 @@ function AICarMotor.dispatch(v: Vehicle, route: LaneMath.Lane, ctx: Ctx)
 	appear(v, ctx, route, 0)
 end
 
-local function trip(v: Vehicle, ctx: Ctx, dt: number, events: { string }, outSpeed: number, backSpeed: number, holdSecs: number)
+local function trip(
+	v: Vehicle,
+	ctx: Ctx,
+	dt: number,
+	events: { string },
+	outSpeed: number,
+	backSpeed: number,
+	holdSecs: number
+)
 	local route = v.route
 	if v.phase == "idle" or not route then
 		v.visible = false

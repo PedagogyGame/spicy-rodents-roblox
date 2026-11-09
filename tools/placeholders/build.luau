@@ -22,7 +22,13 @@ local MapModel = require("../../src/shared/Map/MapModel")
 local outDir = process.args[1] or "assets/placeholders"
 fs.writeDir(outDir)
 
-local lib = { Instance = roblox.Instance, Vector3 = roblox.Vector3, CFrame = roblox.CFrame, Color3 = roblox.Color3, Enum = roblox.Enum }
+local lib = {
+	Instance = roblox.Instance,
+	Vector3 = roblox.Vector3,
+	CFrame = roblox.CFrame,
+	Color3 = roblox.Color3,
+	Enum = roblox.Enum,
+}
 
 local manifest = { generator = "tools/placeholders/build.luau", files = {} :: { any } }
 local failures = 0
