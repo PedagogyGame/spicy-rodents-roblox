@@ -128,7 +128,9 @@ function Factory.new(env: Env): Factory
 		elseif e.kind == "Prompt" then
 			inst = env.Instance.new("Attachment")
 			local o = e.offset or { 0, 0, 0 }
-			inst.Position = env.Vector3.new(o[1], o[2], o[3])
+			-- CFrame, not Position: Lune (@lune/roblox) drops writes to the derived Position property, so
+			-- every Attachment would sit at its part's origin in the baked .rbxm (review 2026-11-09)
+			inst.CFrame = env.CFrame.new(o[1], o[2], o[3])
 			local prompt = env.Instance.new("ProximityPrompt")
 			prompt.Name = "ProximityPrompt"
 			prompt.ActionText = e.action or "Use"
@@ -138,7 +140,7 @@ function Factory.new(env: Env): Factory
 		elseif e.kind == "Attachment" then
 			inst = env.Instance.new("Attachment")
 			local o = e.offset or { 0, 0, 0 }
-			inst.Position = env.Vector3.new(o[1], o[2], o[3])
+			inst.CFrame = env.CFrame.new(o[1], o[2], o[3])
 		elseif e.kind == "Beam" then
 			inst = env.Instance.new("Beam")
 			inst.Attachment0 = host:FindFirstChild(e.a :: string)

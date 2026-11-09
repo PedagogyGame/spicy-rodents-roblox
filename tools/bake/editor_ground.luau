@@ -19,7 +19,7 @@ if process.args[1] == "--out" and process.args[2] then
 	out = process.args[2]
 end
 
-local Instance, Vector3, Color3, Enum = roblox.Instance, roblox.Vector3, roblox.Color3, roblox.Enum
+local Instance, Vector3, CFrame, Color3, Enum = roblox.Instance, roblox.Vector3, roblox.CFrame, roblox.Color3, roblox.Enum
 local CELL = 60 -- studs
 local THICK = 6
 local SINK = 0.6 -- top sits just below the true ground so lots never look buried
@@ -51,7 +51,8 @@ while x < clamp.maxX do
 		p.CastShadow = false
 		p.Locked = true
 		p.Size = Vector3.new(CELL, THICK, CELL)
-		p.Position = Vector3.new(cx, h - SINK - THICK / 2, cz)
+		-- CFrame, not Position: Lune drops writes to the derived Position property (every cell sat at the origin)
+		p.CFrame = CFrame.new(cx, h - SINK - THICK / 2, cz)
 		if water then
 			p.Material = Enum.Material.Glass
 			p.Color = Color3.fromRGB(64, 112, 120)
