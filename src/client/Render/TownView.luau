@@ -71,10 +71,11 @@ function TownView.start(): () -> ()
 			end
 		end
 		-- Skyline massing only where the lot itself is not streamed in
-		local lots = town:FindFirstChild("Lots")
+		-- (the Lots folder can replicate a moment after the Skyline: without it every box would show)
+		local lots = town:WaitForChild("Lots", 30)
 		local function refresh(lotId: string)
 			local box = massing[lotId]
-			if box then
+			if box and lots then
 				box.Transparency = if lots and lots:FindFirstChild(lotId) then 1 else 0
 			end
 		end

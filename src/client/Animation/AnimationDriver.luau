@@ -6,7 +6,8 @@
 -- body and one's own, so "mid-stride" is continuous by construction (BUILD_PLAN §1.5 step 5).
 -- Humans: Roblox's own default R15 animations (the stock Animate script's idle 507766388, walk
 -- 507777826, run 507767714, jump 507765000, fall 507767968; public, owned by Roblox, referenced not
--- uploaded) chosen by speed, the walk/run rate scaled to the speed so feet do not slide.
+-- uploaded; a seated driver plays the stock sit 2506281703) chosen by speed, the walk/run rate
+-- scaled to the speed so feet do not slide.
 -- Four-legged bodies (squirrel, Spicy Rodent, fox, deer): the procedural gait (Animation/Gait) on
 -- their RigSpec Motor6Ds (leg swing, knee bend, body bob, head nod, tail sway) set every Stepped.
 -- Speed is the body's observed speed (smoothed; horizontal for humans, 3D for animals so climbing
@@ -26,6 +27,7 @@ export type ClipSet = {
 	run: string?,
 	jump: string?,
 	fall: string?,
+	sit: string?,
 	nominalRun: number?,
 	nominalWalk: number?,
 }
@@ -48,6 +50,7 @@ type Entry = {
 	body: Model,
 	root: BasePart,
 	animator: Animator?,
+	humanoid: Humanoid?, -- seated in a car (SeatPart set): the sit clip, not a run at car speed
 	species: string,
 	tracks: { [string]: AnimationTrack },
 	current: string?,
@@ -72,6 +75,7 @@ AnimationDriver.DEFAULT_CLIPS = {
 		run = "rbxassetid://507767714",
 		jump = "rbxassetid://507765000",
 		fall = "rbxassetid://507767968",
+		sit = "rbxassetid://2506281703", -- the stock R15 Animate sit
 		nominalWalk = 6, -- the stock walk reads right at about 6 st/s
 		nominalRun = 16,
 	},
@@ -187,6 +191,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			body = model,
 			root = root,
 			animator = animator,
+			humanoid = model:FindFirstChildOfClass("Humanoid"),
 			species = species,
 			tracks = {},
 			current = nil,
@@ -217,6 +222,10 @@ function AnimationDriver.start(opts: Opts): Driver
 
 	local function choose(e: Entry): string
 		local set: ClipSet = clips[e.species] or {}
+		local hum = e.humanoid
+		if set.sit and hum and hum.SeatPart ~= nil then
+			return "sit"
+		end
 		if set.jump and e.vy > 6 then
 			return "jump"
 		elseif set.fall and e.vy < -10 then
@@ -303,10 +312,11 @@ function AnimationDriver.start(opts: Opts): Driver
 			local pose = Gait.pose(e.phase, e.speed, clock, p, e.tailN)
 			for _, j in e.joints do
 				local cf = CFrame.identity
-				if j.kind == "Upper" then
-					cf = CFrame.Angles(pose.legs[j.leg :: string].upper, 0, 0)
-				elseif j.kind == "Lower" then
-					cf = CFrame.Angles(pose.legs[j.leg :: string].lower, 0, 0)
+				local leg = if j.leg then pose.legs[j.leg] else nil
+				if j.kind == "Upper" and leg then
+					cf = CFrame.Angles(leg.upper, 0, 0)
+				elseif j.kind == "Lower" and leg then
+					cf = CFrame.Angles(leg.lower, 0, 0)
 				elseif j.kind == "Tail" then
 					local seg = pose.tail[j.index :: number]
 					if seg then
