@@ -6,6 +6,7 @@
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 local Swept = require("@shared/Traffic/Swept")
+local PreciseJson = require("@tests/lib/PreciseJson")
 
 local function num(v: any): number
 	if type(v) == "string" then
@@ -19,7 +20,7 @@ local function vec(a: { any }): Swept.Vec3
 end
 
 return function(t)
-	local swept = serde.decode("json", fs.readFile("tests/golden/swept.json"))
+	local swept = PreciseJson.decode(fs.readFile("tests/golden/swept.json"))
 
 	t.test("golden swept.json: 100 % agreement on 10,126 cases (4,715 hits)", function()
 		t.eq(swept.count, 10126)
