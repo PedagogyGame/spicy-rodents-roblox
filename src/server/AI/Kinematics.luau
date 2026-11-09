@@ -7,8 +7,7 @@
 -- Interface: step(actor, dt, ctx), railPose(route, s) -> x, y, z. Pure; studs.
 
 local Import = require("../Import")
-local HumanAIMotor =
-	Import.shared("Movement/HumanAIMotor") :: typeof(require("../../shared/Movement/HumanAIMotor"))
+local HumanAIMotor = Import.shared("Movement/HumanAIMotor") :: typeof(require("../../shared/Movement/HumanAIMotor"))
 local Common = require("../Actors/Brains/Common")
 
 local Kinematics = {}

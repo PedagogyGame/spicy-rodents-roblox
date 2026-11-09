@@ -15,7 +15,12 @@ local BodyDriver = require("./BodyDriver")
 
 local Quadruped = {}
 
-function Quadruped.start(body: Model, payload: { [string]: any }, metrics: { [string]: any }, ctx: { [string]: any }): () -> ()
+function Quadruped.start(
+	body: Model,
+	payload: { [string]: any },
+	metrics: { [string]: any },
+	ctx: { [string]: any }
+): () -> ()
 	local root = body.PrimaryPart
 	if root == nil then
 		return function() end

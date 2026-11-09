@@ -153,7 +153,15 @@ end
 
 -- blocked(c, x0, z0, x1, z1, r, refY): does a circle of radius r moving from (x0,z0) to (x1,z1) at
 -- height refY enter any box below its roof? Sampled at r/2 steps (exact enough for motors at 60 Hz).
-function Colliders.blocked(c: Colliders, x0: number, z0: number, x1: number, z1: number, r: number, refY: number): boolean
+function Colliders.blocked(
+	c: Colliders,
+	x0: number,
+	z0: number,
+	x1: number,
+	z1: number,
+	r: number,
+	refY: number
+): boolean
 	local dx, dz = x1 - x0, z1 - z0
 	local len = math.sqrt(dx * dx + dz * dz)
 	local n = math.max(1, math.ceil(len / math.max(0.25, r * 0.5)))

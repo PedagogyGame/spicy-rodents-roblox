@@ -14,7 +14,14 @@ local VehicleKinds = require("./VehicleKinds")
 
 local Placeholder = {}
 
-local function part(parent: Instance, name: string, size: Vector3, cf: CFrame, color: Color3, transparency: number?): Part
+local function part(
+	parent: Instance,
+	name: string,
+	size: Vector3,
+	cf: CFrame,
+	color: Color3,
+	transparency: number?
+): Part
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
@@ -73,18 +80,19 @@ function Placeholder.build(kindId: string, name: string?): Model
 
 	local wheelR = if k.wheels > 0 then math.min(h * 0.22, 1.6) else 0
 	local bodyH = if k.interior.open then h * 0.45 else h - wheelR
-	local body = part(
-		model,
-		"Body",
-		Vector3.new(w, bodyH, l),
-		origin * CFrame.new(0, -h / 2 + wheelR + bodyH / 2, 0),
-		color
-	)
+	local body =
+		part(model, "Body", Vector3.new(w, bodyH, l), origin * CFrame.new(0, -h / 2 + wheelR + bodyH / 2, 0), color)
 	weld(root, body)
 	if not k.interior.open then
 		-- cabin glass band so the interior reads from outside
-		local glass =
-			part(model, "Glass", Vector3.new(w * 0.96, h * 0.3, l * 0.5), origin * CFrame.new(0, h * 0.28, 0), Color3.new(0.6, 0.75, 0.85), 0.55)
+		local glass = part(
+			model,
+			"Glass",
+			Vector3.new(w * 0.96, h * 0.3, l * 0.5),
+			origin * CFrame.new(0, h * 0.28, 0),
+			Color3.new(0.6, 0.75, 0.85),
+			0.55
+		)
 		weld(root, glass)
 	end
 	if k.wheels == 4 then
@@ -93,7 +101,12 @@ function Placeholder.build(kindId: string, name: string?): Model
 				model,
 				spec[1] :: string,
 				Vector3.new(wheelR * 0.8, wheelR * 2, wheelR * 2),
-				origin * CFrame.new((spec[2] :: number) * (w / 2 - wheelR * 0.3), -h / 2 + wheelR, (spec[3] :: number) * l * 0.32),
+				origin
+					* CFrame.new(
+						(spec[2] :: number) * (w / 2 - wheelR * 0.3),
+						-h / 2 + wheelR,
+						(spec[3] :: number) * l * 0.32
+					),
 				Color3.new(0.08, 0.08, 0.08)
 			)
 			wheel.Shape = Enum.PartType.Cylinder
@@ -144,7 +157,13 @@ function Placeholder.build(kindId: string, name: string?): Model
 	seatSocket.Position = v(int.seat)
 	seatSocket.Parent = root
 	if kindId == "car" then
-		local bar = part(model, "LightBar", Vector3.new(w * 0.6, 0.3, 0.6), origin * CFrame.new(0, h / 2 + 0.15, 0), Color3.new(0.2, 0.2, 0.9))
+		local bar = part(
+			model,
+			"LightBar",
+			Vector3.new(w * 0.6, 0.3, 0.6),
+			origin * CFrame.new(0, h / 2 + 0.15, 0),
+			Color3.new(0.2, 0.2, 0.9)
+		)
 		weld(root, bar)
 	end
 	return model

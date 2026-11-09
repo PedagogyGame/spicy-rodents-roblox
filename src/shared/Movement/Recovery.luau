@@ -52,7 +52,14 @@ end
 
 function Recovery.newHistory(capacity: number?, interval: number?): History
 	local cap = capacity or 20
-	return { capacity = cap, interval = interval or 0.5, ring = table.create(cap), head = 0, count = 0, lastT = -math.huge }
+	return {
+		capacity = cap,
+		interval = interval or 0.5,
+		ring = table.create(cap),
+		head = 0,
+		count = 0,
+		lastT = -math.huge,
+	}
 end
 
 -- record(h, t, x, y, z, grounded): keeps a grounded, sane, dry sample at most every `interval` s.
@@ -118,10 +125,17 @@ function Recovery.onVehicleMoved(car: CarBox, riders: { Rider }): { { id: string
 	for _, r in riders do
 		local dx, dz = r.x - car.x, r.z - car.z
 		local along, across = dx * fx + dz * fz, dx * rx + dz * rz
-		if math.abs(along) <= car.length * 0.5 and math.abs(across) <= car.width * 0.5 and math.abs(r.y - car.top) < 1.5 then
+		if
+			math.abs(along) <= car.length * 0.5
+			and math.abs(across) <= car.width * 0.5
+			and math.abs(r.y - car.top) < 1.5
+		then
 			local side = if across >= 0 then 1 else -1
 			local off = car.width * 0.5 + 1.2
-			table.insert(out, { id = r.id, x = car.x + fx * along + rx * side * off, z = car.z + fz * along + rz * side * off })
+			table.insert(
+				out,
+				{ id = r.id, x = car.x + fx * along + rx * side * off, z = car.z + fz * along + rz * side * off }
+			)
 		end
 	end
 	return out

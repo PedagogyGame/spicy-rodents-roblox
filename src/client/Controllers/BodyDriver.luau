@@ -14,10 +14,7 @@ local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Conf
 
 local BodyDriver = {}
 
-function BodyDriver.drive(
-	root: BasePart,
-	step: (dt: number) -> (Vector3, number, Vector3, CFrame?)
-): () -> ()
+function BodyDriver.drive(root: BasePart, step: (dt: number) -> (Vector3, number, Vector3, CFrame?)): () -> ()
 	local RunService = game:GetService("RunService")
 	local attach = Instance.new("Attachment")
 	attach.Name = "BodyDriverAttachment"

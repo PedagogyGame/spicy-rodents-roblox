@@ -201,7 +201,6 @@ function HumanAIMotor.step(actor: Actor, dt: number, ctx: Ctx)
 	actor.moved += math.sqrt(mx * mx + my * my + mz * mz)
 end
 
-
 -- Flat snapshot for possession (BUILD_PLAN §1.5 step 2): position, yaw, velocity, intent rail state.
 function HumanAIMotor.serialize(actor: Actor): { [string]: any }
 	local i = actor.intent

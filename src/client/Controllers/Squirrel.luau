@@ -14,14 +14,18 @@
 -- No side effects on require.
 
 local Import = require("../Import")
-local SquirrelMotor =
-	Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
+local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
 local BodyDriver = require("./BodyDriver")
 local Quadruped = require("./Quadruped")
 
 local Squirrel = {}
 
-function Squirrel.start(body: Model, payload: { [string]: any }, metrics: { [string]: any }, ctx: { [string]: any }): () -> ()
+function Squirrel.start(
+	body: Model,
+	payload: { [string]: any },
+	metrics: { [string]: any },
+	ctx: { [string]: any }
+): () -> ()
 	local root = body.PrimaryPart
 	if root == nil then
 		return function() end

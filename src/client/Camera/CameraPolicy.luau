@@ -20,7 +20,16 @@ export type Ctx = {
 }
 
 export type Decision = {
-	mode: "overview" | "humanThird" | "humanFirst" | "animalThird" | "chaseLock" | "vehicleFirst" | "vehicleThird" | "lockFirst" | "drone" | "outbreak",
+	mode: "overview"
+		| "humanThird"
+		| "humanFirst"
+		| "animalThird"
+		| "chaseLock"
+		| "vehicleFirst"
+		| "vehicleThird"
+		| "lockFirst"
+		| "drone"
+		| "outbreak",
 	firstPerson: boolean,
 	toggleAllowed: boolean,
 	subject: "body" | "vehicle" | "drone" | "none",

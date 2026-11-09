@@ -91,13 +91,7 @@ local function turnToward(yaw: number, desired: number, rate: number, dt: number
 end
 
 -- step(state, input, dt, world): substeps of <= 1/60 s (dt capped at 0.1 s). Root y = ground + hip.
-function QuadrupedMotor.step(
-	state: State,
-	input: Input,
-	dt: number,
-	world: World,
-	params: Params
-): (State, { Event })
+function QuadrupedMotor.step(state: State, input: Input, dt: number, world: World, params: Params): (State, { Event })
 	local events: { Event } = {}
 	local frameDt = math.min(dt, 0.1)
 	local steps = math.clamp(math.ceil(frameDt * 60 - 1e-9), 1, 6)

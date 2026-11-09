@@ -61,7 +61,7 @@ export type Lane = {
 
 export type Pose = { x: number, y: number, z: number, yaw: number }
 
-export type Body = { x: number, z: number, yaw: number, width: number, length: number, visible: boolean? }
+export type Body = { x: number, z: number, yaw: number, width: number, length: number, visible: boolean?, id: any? }
 
 -- headingYaw(axis, dir): HTML yaw for travel along an axis (traffic.md §2.6: axis x -> dir*pi/2;
 -- axis z -> 0 if dir > 0 else pi).
@@ -190,6 +190,30 @@ local function polylineLane(rec: LaneRecord, id: string, pts: { { number } }, di
 		poly = poly,
 		polyRev = LaneMath.poly(reversed(pts)),
 		vehicle = LaneMath.isVehicleLane(rec.id),
+	}
+end
+
+-- makeRoute(id, pts, speeds, offset?): an ad-hoc polyline vehicle lane (a dispatched trip), kept right
+-- by `offset` (default POLY_OFFSET) in both directions like a unified record polyline.
+function LaneMath.makeRoute(id: string, pts: { { number } }, speeds: { [string]: number }, offset: number?): Lane
+	local d = offset or LaneMath.POLY_OFFSET
+	local poly = LaneMath.poly(LaneMath.offsetRight(pts, d))
+	return {
+		id = id,
+		source = nil,
+		shape = "polyline",
+		axis = nil,
+		coord = nil,
+		startAt = 0,
+		endAt = poly.length,
+		dir = 1,
+		length = poly.length,
+		curve = nil,
+		speeds = speeds,
+		poly = poly,
+		polyRev = LaneMath.poly(LaneMath.offsetRight(reversed(pts), d)),
+		vehicle = true,
+		mirrored = d ~= 0,
 	}
 end
 

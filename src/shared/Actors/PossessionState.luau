@@ -29,6 +29,10 @@ PossessionState.NET = table.freeze({
 	Granted = "Granted", -- server -> client: GrantPayload
 	Released = "Released", -- server -> client: (actorId, why)
 	Recover = "Recover", -- client -> server: the Roblox menu's Reset, routed to recovery
+	-- Devices (§1.5 Devices; W1): vehicles and the drone. The body stays possessed.
+	DeviceGranted = "DeviceGranted", -- server -> client: { device: "vehicle" | "drone", model, kind }
+	DeviceReleased = "DeviceReleased", -- server -> client: (why)
+	DeviceRequest = "DeviceRequest", -- client -> server: ("interact") enter the nearest vehicle or get out
 })
 
 -- Humans keep the AI's last move direction for up to this long, or until the first input (§1.5 step 5).
