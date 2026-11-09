@@ -1,0 +1,378 @@
+--!strict
+-- ServerScriptService.Server.Traffic.TrafficService
+-- The AI fleet on its lanes: fixed-tick simulation, the fatal test, the pose stream (BUILD_PLAN §4.4
+-- W1 #9, D9, §1.6 VehiclePoses; traffic.md §5, §8, §13).
+-- Interface: new(opts) -> TrafficService; :step(dt, world) -> { Hit }; :poses() -> { VehiclePose };
+--            :poseRecords() -> stream records; :dispatchResponder(dest) ; :dispatchIncident(scene);
+--            :markTeleported(actorId) (HANDOFF rule 12); :stats(); RunOver (Util/Signal);
+--            :start(ctx) (engine only: Heartbeat loop + Net stream at posesHz; never called on require).
+--
+-- Pure and steppable: `step(dt, world)` runs whole 1/tickHz ticks (Tunables traffic.tickHz, default 30)
+-- and carries the remainder. Each tick: (1) every vehicle's AICarMotor steps against the people and the
+-- previous tick's fleet bodies; (2) every squirrel actor's move this tick is swept against every visible,
+-- moving vehicle's move with the exact Shared/Traffic/Swept maths (Server/Traffic/SweptCollision); hits
+-- fire RunOver(actorId, vehicle). Lanes are the compiled records with handedness unified (drive on the
+-- right), stop lines from Traffic/Control at the existing sign sites, the fleet from Traffic/Fleet.
+-- Vehicles are server state only; clients render ghosts from `poseRecords()` (Traffic/Ghost).
+
+local Import = require("../Import")
+local AICarMotor = Import.shared("Traffic/AICarMotor") :: typeof(require("../../shared/Traffic/AICarMotor"))
+local Control = Import.shared("Traffic/Control") :: typeof(require("../../shared/Traffic/Control"))
+local Fleet = Import.shared("Traffic/Fleet") :: typeof(require("../../shared/Traffic/Fleet"))
+local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Traffic/Ghost"))
+local LaneMath = Import.shared("Traffic/LaneMath") :: typeof(require("../../shared/Traffic/LaneMath"))
+local Signal = Import.shared("Util/Signal") :: typeof(require("../../shared/Util/Signal"))
+local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local SweptCollision = require("./SweptCollision")
+
+local st = Units.st
+
+export type Squirrel = { id: any, x: number, y: number, z: number, teleported: boolean? }
+export type World = { people: { AICarMotor.Person }?, squirrels: { Squirrel }? }
+
+export type Stats = {
+	ticks: number,
+	ms: number, -- total simulation ms (os.clock)
+	maxTickMs: number,
+	hits: number,
+	stuck: { [number]: number }, -- longest continuous seconds a vehicle that should move did not
+	events: { [string]: number },
+	violations: { [string]: number },
+}
+
+local TrafficService = {}
+TrafficService.__index = TrafficService
+
+export type Opts = {
+	lanes: { any }, -- generated/Lanes records
+	roads: { any }, -- generated/Roads records
+	heightAt: ((x: number, z: number) -> number)?,
+	seed: number?,
+	tickHz: number?,
+	entries: { Fleet.Entry }?,
+	control: Control.ControlData?,
+	sceneSecs: number?,
+}
+
+export type TrafficService = typeof(setmetatable(
+	{} :: {
+		lanes: { [string]: LaneMath.Lane },
+		records: { [string]: any },
+		vehicles: { AICarMotor.Vehicle },
+		byId: { [number]: AICarMotor.Vehicle },
+		prev: { [number]: { x: number, y: number, z: number, yaw: number, visible: boolean } },
+		prevActors: { [any]: { x: number, y: number, z: number } },
+		swept: SweptCollision.SweptCollision,
+		stops: { [string]: { Control.StopLine } },
+		control: Control.ControlData,
+		heightAt: (x: number, z: number) -> number,
+		tick: number,
+		acc: number,
+		now: number,
+		rngState: number,
+		sceneSecs: number,
+		_stuckRun: { [number]: number },
+		_stats: Stats,
+		RunOver: Signal.Signal,
+		unified: { string },
+	},
+	TrafficService
+))
+
+-- mulberry32 (v5.4's generator; Util/Rng has the bit-exact one, this keeps the service self-contained)
+local function nextRand(self: TrafficService): number
+	self.rngState = (self.rngState + 0x6D2B79F5) % 4294967296
+	local t = self.rngState
+	t = bit32.bxor(t, bit32.rshift(t, 15))
+	t = (t * bit32.bor(t, 1)) % 4294967296
+	t = bit32.bxor(t, (t + ((bit32.bxor(t, bit32.rshift(t, 7)) * bit32.bor(t, 61)) % 4294967296)) % 4294967296)
+	return bit32.bxor(t, bit32.rshift(t, 14)) / 4294967296
+end
+
+function TrafficService.new(opts: Opts): TrafficService
+	local lanes = LaneMath.load(opts.lanes)
+	local unified = LaneMath.unify(lanes, opts.roads, opts.lanes)
+	local records = {}
+	for _, r in opts.lanes do
+		records[r.id] = r
+	end
+	local control = opts.control or Control.DEFAULT
+	local self = setmetatable({
+		lanes = lanes,
+		records = records,
+		vehicles = {},
+		byId = {},
+		prev = {},
+		prevActors = {},
+		swept = SweptCollision.new(),
+		stops = Control.resolve(control, lanes),
+		control = control,
+		heightAt = opts.heightAt or function(_x: number, _z: number): number
+			return 0
+		end,
+		tick = 1 / (opts.tickHz or 30),
+		acc = 0,
+		now = 0,
+		rngState = (opts.seed or 5401) % 4294967296,
+		sceneSecs = opts.sceneSecs or 30,
+		_stuckRun = {},
+		_stats = { ticks = 0, ms = 0, maxTickMs = 0, hits = 0, stuck = {}, events = {}, violations = {} },
+		RunOver = Signal.new(),
+		unified = unified,
+	}, TrafficService)
+	for _, e in opts.entries or Fleet.ENTRIES do
+		local lane = lanes[e.lane] or error(`TrafficService: fleet entry {e.id} names missing lane {e.lane}`)
+		local cruise = 0
+		if e.speedKey then
+			local range = lane.speedRanges and lane.speedRanges[e.speedKey]
+			if range then
+				cruise = range[1] + (range[2] - range[1]) * nextRand(self)
+			else
+				cruise = lane.speeds[e.speedKey] or 0
+			end
+		end
+		if e.class == "van" then
+			cruise = st(7.6)
+		elseif e.class == "trolley" then
+			cruise = st(10.7)
+		end
+		local v = AICarMotor.new(e, lane, { at = e.at, cruise = cruise, wait = e.wait, offset = e.offset })
+		v.y = self.heightAt(v.x, v.z) + st(0.04)
+		table.insert(self.vehicles, v)
+		self.byId[v.id] = v
+	end
+	return self
+end
+
+local function ctxFor(self: TrafficService, world: World): AICarMotor.Ctx
+	local people: { AICarMotor.Person } = {}
+	for _, p in world.people or {} do
+		table.insert(people, p)
+	end
+	for _, s in world.squirrels or {} do
+		table.insert(people, { x = s.x, y = s.y, z = s.z, kind = "squirrel", visible = true })
+	end
+	local bodies = table.create(#self.vehicles)
+	for _, v in self.vehicles do
+		table.insert(bodies, AICarMotor.body(v))
+	end
+	return {
+		now = self.now,
+		people = people,
+		bodies = bodies,
+		heightAt = self.heightAt,
+		rand = function(): number
+			return nextRand(self)
+		end,
+		stops = self.stops,
+		rates = self.control.violationRates,
+		sceneSecs = self.sceneSecs,
+	}
+end
+
+-- markTeleported(actorId): the actor's previous pose is invalid next tick (rule 12 seam).
+function TrafficService.markTeleported(self: TrafficService, actorId: any)
+	self.swept:markTeleported(actorId)
+	self.prevActors[actorId] = nil
+end
+
+local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit }
+	local t0 = os.clock()
+	local dt = self.tick
+	self.now += dt
+	for _, v in self.vehicles do
+		self.prev[v.id] = { x = v.x, y = v.y, z = v.z, yaw = v.yaw, visible = v.visible }
+	end
+	local ctx = ctxFor(self, world)
+	local stats = self._stats
+	for _, v in self.vehicles do
+		local wasStopped = v.phase
+		local events = AICarMotor.step(v, ctx, dt)
+		for _, ev in events do
+			stats.events[ev] = (stats.events[ev] or 0) + 1
+			if ev == "rollingStop" then
+				stats.violations.rollingStop = (stats.violations.rollingStop or 0) + 1
+			end
+		end
+		-- stuck: visible, in a driving phase, not dwelling or waiting at a stop line, and not moving
+		local driving = v.visible
+			and (v.phase == "drive" or v.phase == "ride" or v.phase == "out" or v.phase == "back")
+			and v.stop.phase ~= "waiting"
+			and wasStopped ~= "dwell"
+		if driving and not v.moving then
+			local run = (self._stuckRun[v.id] or 0) + dt
+			self._stuckRun[v.id] = run
+			stats.stuck[v.id] = math.max(stats.stuck[v.id] or 0, run)
+		else
+			self._stuckRun[v.id] = 0
+		end
+	end
+	-- the fatal test
+	local actors: { SweptCollision.ActorPose } = {}
+	for _, s in world.squirrels or {} do
+		local p = self.prevActors[s.id]
+		table.insert(actors, {
+			id = s.id,
+			x = s.x,
+			y = s.y,
+			z = s.z,
+			prevX = if p then p.x else s.x,
+			prevY = if p then p.y else s.y,
+			prevZ = if p then p.z else s.z,
+			teleported = s.teleported or p == nil,
+		})
+		self.prevActors[s.id] = { x = s.x, y = s.y, z = s.z }
+	end
+	local hits = {}
+	if #actors > 0 then
+		hits = self.swept:step(actors, self:poses(), dt)
+		for _, h in hits do
+			stats.hits += 1
+			self.RunOver:fire(h.actorId, self.byId[h.vehicleId :: number])
+		end
+	end
+	local ms = (os.clock() - t0) * 1000
+	stats.ticks += 1
+	stats.ms += ms
+	stats.maxTickMs = math.max(stats.maxTickMs, ms)
+	return hits
+end
+
+-- step(dt, world) -> hits: run every whole tick in dt (plus the carried remainder).
+function TrafficService.step(self: TrafficService, dt: number, world: World?): { SweptCollision.Hit }
+	local w = world or {}
+	self.acc += math.min(dt, 0.25)
+	local all = {}
+	while self.acc >= self.tick - 1e-9 do
+		self.acc -= self.tick
+		for _, h in oneTick(self, w) do
+			table.insert(all, h)
+		end
+	end
+	return all
+end
+
+-- poses(): the fleet as SweptCollision.VehiclePose (previous tick -> this tick).
+function TrafficService.poses(self: TrafficService): { SweptCollision.VehiclePose }
+	local out = table.create(#self.vehicles)
+	for _, v in self.vehicles do
+		local p = self.prev[v.id] or { x = v.x, y = v.y, z = v.z, yaw = v.yaw, visible = v.visible }
+		table.insert(out, {
+			id = v.id,
+			kind = v.kind,
+			x = v.x,
+			y = v.y,
+			z = v.z,
+			yaw = v.yaw,
+			prevX = p.x,
+			prevY = p.y,
+			prevZ = p.z,
+			prevYaw = p.yaw,
+			visible = v.visible,
+			prevVisible = p.visible,
+			teleported = v.teleported,
+			label = v.name,
+		})
+	end
+	return out
+end
+
+-- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them).
+function TrafficService.poseRecords(self: TrafficService): { { [string]: number } }
+	local out = table.create(#self.vehicles)
+	for _, v in self.vehicles do
+		table.insert(
+			out,
+			Ghost.encode({
+				id = v.id,
+				x = v.x,
+				z = v.z,
+				yaw = v.yaw,
+				speed = v.speed,
+				visible = v.visible,
+				beacons = v.class == "responder" or v.class == "incident" or v.class == "legacy_ambulance",
+				teleported = v.teleported,
+				stopped = v.speed < 0.05,
+			})
+		)
+	end
+	return out
+end
+
+-- kinds(): id -> {kind, color} for the client ghost renderer.
+function TrafficService.kinds(self: TrafficService): { [number]: { kind: string, color: string? } }
+	local out = {}
+	for _, e in Fleet.ENTRIES do
+		if self.byId[e.id] then
+			out[e.id] = { kind = e.kind, color = e.color }
+		end
+	end
+	return out
+end
+
+-- dispatchResponder(dest): the first idle responder drives the trunk plus a leg to dest {x, z} (studs;
+-- traffic.md §5.9 makeRoadTrip, trunk prefix). Returns the vehicle or nil when all three are busy.
+function TrafficService.dispatchResponder(self: TrafficService, dest: { number }): AICarMotor.Vehicle?
+	local rec = self.records.responder_ambulance_trunk
+	for _, v in self.vehicles do
+		if v.class == "responder" and v.phase == "idle" then
+			local pts = table.clone(rec.path.points)
+			local last = pts[#pts]
+			table.insert(pts, { dest[1], last[2] })
+			table.insert(pts, { dest[1], dest[2] })
+			local route = LaneMath.makeRoute(`responder_{v.id}`, pts, v.lane.speeds)
+			AICarMotor.dispatch(v, route, ctxFor(self, {}))
+			return v
+		end
+	end
+	return nil
+end
+
+-- dispatchIncident(scene): both incident cars from the station to the scene {x, z} (traffic.md §5.10).
+function TrafficService.dispatchIncident(self: TrafficService, scene: { number }): number
+	local rec = self.records.incident_police_route
+	local n = 0
+	for _, v in self.vehicles do
+		if v.class == "incident" and v.phase == "idle" then
+			local car = if v.id % 2 == 0 then 0 else 1
+			local start = rec.path.resolved_start[car + 1]
+			local route = LaneMath.makeRoute(`incident_{v.id}`, LaneMath.incidentRoute(car, start, scene), v.lane.speeds)
+			AICarMotor.dispatch(v, route, ctxFor(self, {}))
+			n += 1
+		end
+	end
+	return n
+end
+
+function TrafficService.stats(self: TrafficService): Stats
+	return self._stats
+end
+
+-- Engine binder: Heartbeat drives `step` with the world from `ctx.world()`; poses stream at posesHz
+-- through `ctx.net:stream(nil, "VehiclePoses", records)`. Returns a disconnect function.
+function TrafficService.start(
+	self: TrafficService,
+	ctx: { world: () -> World, net: any?, posesHz: number?, onHit: ((hit: any) -> ())? }
+): () -> ()
+	local RunService = game:GetService("RunService")
+	local period = 1 / (ctx.posesHz or 15)
+	local since = 0
+	local conn = RunService.Heartbeat:Connect(function(dt: number)
+		local hits = self:step(dt, ctx.world())
+		if ctx.onHit then
+			for _, h in hits do
+				ctx.onHit(h)
+			end
+		end
+		since += dt
+		if ctx.net and since >= period then
+			since = 0
+			ctx.net:stream(nil, "VehiclePoses", self:poseRecords())
+		end
+	end)
+	return function()
+		conn:Disconnect()
+	end
+end
+
+return TrafficService

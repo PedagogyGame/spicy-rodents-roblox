@@ -289,4 +289,32 @@ function Population.spikeS5(): Config
 	}
 end
 
+-- fromData(gen, phase): the compiled data/population.json (generated/Population) as a Config for
+-- the given phase ("frb" | "w3c"; default "frb"). Post ids stay the data's snake_case ids; `site`
+-- (a lot id or a site tag) is carried for the AI's post placement (Server/AI/TownAI).
+function Population.fromData(gen: any, phase: string?): Config
+	local ph = phase or "frb"
+	local posts: { Post } = {}
+	for _, p in gen.posts do
+		table.insert(posts, {
+			id = p.id,
+			standing = p.standing[ph],
+			floor = p.floor[ph],
+			floorAtCap = p.fullFloor[ph],
+			protected = p.neverCut == true or nil,
+			site = p.site,
+			officerFloor = p.officerFloor,
+		} :: any)
+	end
+	local sq = gen.animals and gen.animals.squirrel or {}
+	return {
+		posts = posts,
+		reserve = gen.reserve[ph],
+		hardCap = gen.hardCap[ph],
+		squirrelFloat = { min = sq.min or 10, max = sq.max or 14 },
+		deerBodies = gen.animals and gen.animals.deer and gen.animals.deer.bodies or 6,
+		playerSlots = 49,
+	}
+end
+
 return Population
