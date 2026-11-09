@@ -135,6 +135,10 @@ end
 -- Hash of the built Instances (engine or Lune): one line per BasePart / Model, sorted by path.
 -- Town's own attributes are excluded (InstanceHash is stored there).
 function Bake.instanceHash(town: any): string
+	return fnv(table.concat(Bake.instanceLines(town), "\n"))
+end
+
+function Bake.instanceLines(town: any): { string }
 	local lines: { string } = {}
 	local function walk(inst: any, path: string)
 		for _, child in inst:GetChildren() do
@@ -185,7 +189,7 @@ function Bake.instanceHash(town: any): string
 	end
 	walk(town, "Town")
 	table.sort(lines)
-	return fnv(table.concat(lines, "\n"))
+	return lines
 end
 
 return Bake
