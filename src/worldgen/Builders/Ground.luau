@@ -105,10 +105,22 @@ local function world(
 	})
 end
 
+-- The lot's own frame for a world-axis box: its yaw (so the PrimaryPart keeps the lot's facing) and
+-- local sizes (odd quarter turns swap the world extents).
+local function framed(ctx: Ctx, wx: number, wz: number): (number, number, number)
+	local yaw = ctx.frame.yaw
+	if math.abs(math.cos(yaw)) < 0.5 then
+		return yaw, wz, wx
+	end
+	return yaw, wx, wz
+end
+
 -- An invisible placeholder (keeps the lot's Model and PrimaryPart; nothing to see or hit).
-local function hidden(ctx: Ctx, why: string)
+local function hidden(ctx: Ctx, why: string, name: string?)
 	local x0, x1, z0, z1 = extents(ctx)
-	world(ctx, "Greybox", (x0 + x1) / 2, ctx.seat + THIN / 2, (z0 + z1) / 2, x1 - x0, THIN, z1 - z0, {
+	local yaw, sx, sz = framed(ctx, x1 - x0, z1 - z0)
+	world(ctx, name or "Greybox", (x0 + x1) / 2, ctx.seat + THIN / 2, (z0 + z1) / 2, sx, THIN, sz, {
+		yaw = yaw,
 		transparency = 1,
 		canQuery = false,
 		castShadow = false,
@@ -119,6 +131,11 @@ end
 -- Terrain-following tiles (tilted to the local slope, 1 stud thick so their edges overlap).
 local function drape(ctx: Ctx, color: { number }, material: string, lift: number)
 	local x0, x1, z0, z1 = extents(ctx)
+	local marker = ctx.lot.facing ~= nil or ctx.lot.yaw ~= nil
+	if marker then
+		-- the PrimaryPart keeps the lot's facing; the tilted tiles follow it
+		hidden(ctx, "draped")
+	end
 	local nx = math.max(1, math.ceil((x1 - x0) / TILE))
 	local nz = math.max(1, math.ceil((z1 - z0) / TILE))
 	local dx, dz = (x1 - x0) / nx, (z1 - z0) / nz
@@ -137,14 +154,21 @@ local function drape(ctx: Ctx, color: { number }, material: string, lift: number
 			local pitch = math.asin(math.clamp(-gz / (L * math.cos(roll)), -1, 1))
 			world(
 				ctx,
-				if i == 0 and j == 0 then "Greybox" else `Tile_{i}_{j}`,
+				if i == 0 and j == 0 and not marker then "Greybox" else `Tile_{i}_{j}`,
 				(ax + bx) / 2,
 				hc + lift - thick / 2,
 				(az + bz) / 2,
 				dx * math.sqrt(1 + gx * gx) + 0.4,
 				thick,
 				dz * math.sqrt(1 + gz * gz) + 0.4,
-				{ color = color, material = material, pitch = pitch, roll = roll, castShadow = false, attrs = { Embedded = true } }
+				{
+					color = color,
+					material = material,
+					pitch = pitch,
+					roll = roll,
+					castShadow = false,
+					attrs = { Embedded = true },
+				}
 			)
 		end
 	end
@@ -153,7 +177,9 @@ end
 
 local function flat(ctx: Ctx, y: number, color: { number }, material: string, transparency: number)
 	local x0, x1, z0, z1 = extents(ctx)
-	world(ctx, "Greybox", (x0 + x1) / 2, y - THIN / 2, (z0 + z1) / 2, x1 - x0, THIN, z1 - z0, {
+	local yaw, sx, sz = framed(ctx, x1 - x0, z1 - z0)
+	world(ctx, "Greybox", (x0 + x1) / 2, y - THIN / 2, (z0 + z1) / 2, sx, THIN, sz, {
+		yaw = yaw,
 		color = color,
 		material = material,
 		transparency = transparency,
@@ -231,13 +257,23 @@ function Ground.river(ctx: Ctx)
 			-- the wall's water face 3.5 st inside the bank line covers the 4-stud terrain voxel cliff
 			local wallC = (ca + cb) / 2 + side * (HALF - 1.25)
 			local h = BANK_Y - 0.1 - (BED_Y - 1) -- just under the coping and the dock decks
-			world(ctx, `Wall{if side < 0 then "W" else "E"}_{k}`, wallC, (BED_Y - 1) + h / 2, (a + b) / 2, 4.5, h, len, {
-				yaw = yaw,
-				color = STONE_DARK,
-				material = "Cobblestone",
-				canCollide = true,
-				role = "Wall",
-			})
+			world(
+				ctx,
+				`Wall{if side < 0 then "W" else "E"}_{k}`,
+				wallC,
+				(BED_Y - 1) + h / 2,
+				(a + b) / 2,
+				4.5,
+				h,
+				len,
+				{
+					yaw = yaw,
+					color = STONE_DARK,
+					material = "Cobblestone",
+					canCollide = true,
+					role = "Wall",
+				}
+			)
 			world(
 				ctx,
 				`Coping{if side < 0 then "W" else "E"}_{k}`,
@@ -280,12 +316,22 @@ function Ground.bridge(ctx: Ctx)
 	})
 	-- string course under the parapets
 	for _, s in { -1, 1 } do
-		world(ctx, `Course{if s < 0 then "S" else "N"}`, (x0 + x1) / 2, slabBottom + 0.4, zc + s * (halfD + 0.3), x1 - x0 + 8, 0.9, 0.7, {
-			color = STONE_MID,
-			material = "Limestone",
-			role = "Trim",
-			castShadow = false,
-		})
+		world(
+			ctx,
+			`Course{if s < 0 then "S" else "N"}`,
+			(x0 + x1) / 2,
+			slabBottom + 0.4,
+			zc + s * (halfD + 0.3),
+			x1 - x0 + 8,
+			0.9,
+			0.7,
+			{
+				color = STONE_MID,
+				material = "Limestone",
+				role = "Trim",
+				castShadow = false,
+			}
+		)
 	end
 	-- piers (bed to the deck slab), at x 790..910 u every 24 u; the 2nd and 5th carry the towers
 	local piers = {}
@@ -305,24 +351,44 @@ function Ground.bridge(ctx: Ctx)
 		local top = R.waterY * SPU + 5
 		for _, s in { -1, 1 } do
 			local w = pierW / math.sqrt(2)
-			world(ctx, `Cutwater{i}{if s < 0 then "S" else "N"}`, px, (bed + top) / 2, zc + s * halfD, w, top - bed, w, {
-				yaw = math.pi / 4,
-				color = STONE_DARK,
-				material = "Limestone",
-				canCollide = true,
-				role = "Wall",
-			})
+			world(
+				ctx,
+				`Cutwater{i}{if s < 0 then "S" else "N"}`,
+				px,
+				(bed + top) / 2,
+				zc + s * halfD,
+				w,
+				top - bed,
+				w,
+				{
+					yaw = math.pi / 4,
+					color = STONE_DARK,
+					material = "Limestone",
+					canCollide = true,
+					role = "Wall",
+				}
+			)
 		end
 		if i == 2 or i == 5 then
 			-- tower base: the bridge towers' piers (z +-10.7 u, 7.2 u deep) stand on these
 			for _, s in { -1, 1 } do
 				local inner, outer = halfD, (10.7 + 3.6) * SPU + 1.5
-				world(ctx, `TowerBase{i}{if s < 0 then "S" else "N"}`, px, (bed + deck) / 2, zc + s * (inner + outer) / 2, 8 * SPU + 2, deck - bed, outer - inner, {
-					color = STONE_MID,
-					material = "Limestone",
-					canCollide = true,
-					role = "Wall",
-				})
+				world(
+					ctx,
+					`TowerBase{i}{if s < 0 then "S" else "N"}`,
+					px,
+					(bed + deck) / 2,
+					zc + s * (inner + outer) / 2,
+					8 * SPU + 2,
+					deck - bed,
+					outer - inner,
+					{
+						color = STONE_MID,
+						material = "Limestone",
+						canCollide = true,
+						role = "Wall",
+					}
+				)
 			end
 		end
 	end
@@ -337,13 +403,23 @@ function Ground.bridge(ctx: Ctx)
 			local th = math.pi * (k + 0.5) / N -- 0 at the east springing, pi at the west
 			local rm = r0 + ring / 2
 			local len = 2 * (r0 + ring) * math.sin(math.pi / N / 2) + 0.3
-			world(ctx, `Arch{a}_{k}`, ax + rm * math.cos(th), spring + rm * math.sin(th), zc, len, ring, 2 * halfD + 0.4, {
-				roll = th - math.pi / 2,
-				color = if k % 3 == 0 then STONE_DARK else STONE_LIGHT,
-				material = "Limestone",
-				canCollide = true,
-				role = "Wall",
-			})
+			world(
+				ctx,
+				`Arch{a}_{k}`,
+				ax + rm * math.cos(th),
+				spring + rm * math.sin(th),
+				zc,
+				len,
+				ring,
+				2 * halfD + 0.4,
+				{
+					roll = th - math.pi / 2,
+					color = if k % 3 == 0 then STONE_DARK else STONE_LIGHT,
+					material = "Limestone",
+					canCollide = true,
+					role = "Wall",
+				}
+			)
 		end
 		-- spandrels: slices whose bottoms stay above the opening and below the ring's back
 		local outer = r0
@@ -358,20 +434,40 @@ function Ground.bridge(ctx: Ctx)
 		for k, sl in slices do
 			local inner, out, y = sl[1], sl[2], sl[3]
 			if inner <= 0 then
-				world(ctx, `Spandrel{a}_{k}`, ax, (y + slabBottom) / 2, zc, 2 * out + 0.2, slabBottom - y + 0.1, 2 * halfD, {
-					color = STONE_LIGHT,
-					material = "Limestone",
-					canCollide = true,
-					role = "Wall",
-				})
-			else
-				for _, s in { -1, 1 } do
-					world(ctx, `Spandrel{a}_{k}{if s < 0 then "W" else "E"}`, ax + s * (inner + out) / 2, (y + slabBottom) / 2, zc, out - inner + 0.2, slabBottom - y + 0.1, 2 * halfD, {
+				world(
+					ctx,
+					`Spandrel{a}_{k}`,
+					ax,
+					(y + slabBottom) / 2,
+					zc,
+					2 * out + 0.2,
+					slabBottom - y + 0.1,
+					2 * halfD,
+					{
 						color = STONE_LIGHT,
 						material = "Limestone",
 						canCollide = true,
 						role = "Wall",
-					})
+					}
+				)
+			else
+				for _, s in { -1, 1 } do
+					world(
+						ctx,
+						`Spandrel{a}_{k}{if s < 0 then "W" else "E"}`,
+						ax + s * (inner + out) / 2,
+						(y + slabBottom) / 2,
+						zc,
+						out - inner + 0.2,
+						slabBottom - y + 0.1,
+						2 * halfD,
+						{
+							color = STONE_LIGHT,
+							material = "Limestone",
+							canCollide = true,
+							role = "Wall",
+						}
+					)
 				end
 			end
 		end
@@ -381,14 +477,24 @@ function Ground.bridge(ctx: Ctx)
 	for _, s in { -1, 1 } do
 		local mid = if s < 0 then (R.rampStart * SPU + x0) / 2 else (x1 + R.rampEnd * SPU) / 2
 		-- 0.3 st narrower than the piers each side: no coplanar side faces (they z-fight in Roblox)
-		world(ctx, `Ramp{if s < 0 then "W" else "E"}`, mid, (BANK_Y - 0.1 + deck) / 2, zc, 2 * halfD - 0.6, deck - (BANK_Y - 0.1), rampLen, {
-			yaw = if s < 0 then math.pi / 2 else -math.pi / 2,
-			shape = "Wedge",
-			color = STONE_MID,
-			material = "Limestone",
-			canCollide = true,
-			role = "Wall",
-		})
+		world(
+			ctx,
+			`Ramp{if s < 0 then "W" else "E"}`,
+			mid,
+			(BANK_Y - 0.1 + deck) / 2,
+			zc,
+			2 * halfD - 0.6,
+			deck - (BANK_Y - 0.1),
+			rampLen,
+			{
+				yaw = if s < 0 then math.pi / 2 else -math.pi / 2,
+				shape = "Wedge",
+				color = STONE_MID,
+				material = "Limestone",
+				canCollide = true,
+				role = "Wall",
+			}
+		)
 	end
 	ctx.attributes.GroundStyle = "bridge"
 	ctx.attributes.DeckY = deck

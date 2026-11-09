@@ -10,6 +10,7 @@ local roblox = require("@lune/roblox")
 local Bake = require("@worldgen/Bake")
 local Factory = require("@worldgen/Factory")
 local Plan = require("@worldgen/Plan")
+local Geometry = require("@worldgen/Geometry")
 local Kits = require("@worldgen/Kits")
 local Height = require("@shared/World/Height")
 
@@ -62,7 +63,7 @@ return function(t)
 		t.eq(n.road, 116)
 		t.eq(n.skyline, 1)
 		t.truthy(n.props >= 400, `props {n.props}`)
-		t.truthy(n.lamps >= 80, `lamp models {n.lamps}`)
+		t.truthy(n.lamps >= 15, `lamp models {n.lamps}`) -- one model per street with lamps
 		for _, lot in lots do
 			t.truthy(Kits.known(lot.type), lot.type)
 			t.eq(Kits.get(lot.type).lod, LotTypes.types[lot.type].lod, lot.type)
@@ -112,7 +113,7 @@ return function(t)
 		end
 	end)
 
-	t.test("houses: harvested eave and peak, gable plates meet at the ridge; outer homes land flat", function()
+	t.test("houses: harvested eave and peak, gable plates meet at the ridge; outer homes have gables", function()
 		local core = byId.core_house_1_bungalow
 		t.eq(core.attributes.Interior, "frb_bungalow")
 		t.near(core.attributes.EaveY :: number, 6.068 * 2.5, 1e-9)
@@ -123,8 +124,9 @@ return function(t)
 		local seat = core.attributes.SeatY :: number
 		t.near(a.cy - seat, (6.068 + 8.528) / 2 * 2.5, 0.25)
 		t.truthy(math.abs(a.pitch) > 0.1, "pitched")
+		-- outer homes (review 2026-11-09): the v5.4 gable to the harvested peak, body to the eave
 		local outer = byId.outer_home_05
-		t.eq(outer.attributes.Roof, "flat")
+		t.eq(outer.attributes.Roof, "gable")
 		local body = part(outer, "Body")
 		local outerLot
 		for _, l in lots do
@@ -132,8 +134,9 @@ return function(t)
 				outerLot = l
 			end
 		end
-		t.near(body.sy, outerLot.params.peakU * 2.5, 1e-6)
-		t.eq(part(outer, "RoofA"), nil)
+		t.near(body.sy, outerLot.params.eaveU * 2.5, 1e-6)
+		t.near(outer.attributes.PeakY :: number, outerLot.params.peakU * 2.5, 1e-6)
+		t.truthy(part(outer, "RoofA") and part(outer, "RoofB"), "outer home roof plates")
 	end)
 
 	t.test(
@@ -250,7 +253,7 @@ return function(t)
 			end
 		end
 		t.eq(kinds.tree, 95) -- one model per harvested tree trunk (trees.json: 95)
-		t.eq(kinds.pole, 97)
+		t.eq(kinds.pole, 110) -- the 97 grid poles plus 7 Westside and 6 estate-avenue telephone poles
 		t.eq(kinds.wire, 150)
 		t.truthy((kinds.pipe or 0) >= 60, `pipes {kinds.pipe}`)
 		t.truthy((kinds.fence or 0) >= 12, `fences {kinds.fence}`)
@@ -258,23 +261,53 @@ return function(t)
 	end)
 
 	t.test(
-		"lamps: greybox posts on both sides of the streets, a 5-10 % flicker set, Skyline heads for every lamp and building",
+		"lamps: one row per street, 25 st clear of lamps and poles, vertical posts, a 5-10 % flicker set, Skyline heads",
 		function()
 			local posts, flicker = 0, 0
 			local sky
+			local at: { any } = {}
+			local poles: { any } = {}
 			for _, p in plans do
 				if p.kind == "lamps" then
 					for _, s in p.parts do
-						posts += 1
-						if s.attrs.Flicker then
-							flicker += 1
+						if string.sub(s.name, 1, 5) == "Post_" then
+							posts += 1
+							table.insert(at, s)
+							if s.attrs.Flicker then
+								flicker += 1
+							end
+							-- vertical: a cylinder whose axis (local X) is turned straight up
+							t.near(s.roll, math.pi / 2, 1e-9, s.name)
+							t.eq(s.pitch, 0, s.name)
+							t.truthy(s.sx >= 14 and s.sx <= 17, `{s.name} height {s.sx}`)
 						end
 					end
 				elseif p.kind == "skyline" then
 					sky = p
+				elseif p.kind == "props" and p.category == "pole" then
+					table.insert(poles, p.parts[1])
 				end
 			end
-			t.truthy(posts >= 300, `posts {posts}`)
+			t.truthy(posts >= 100 and posts <= 200, `posts {posts}`)
+			for i, a in at do
+				for j = i + 1, #at do
+					local b = at[j]
+					t.truthy(math.sqrt((a.cx - b.cx) ^ 2 + (a.cz - b.cz) ^ 2) >= 25, `{a.name} near {b.name}`)
+				end
+				for _, b in poles do
+					t.truthy(math.sqrt((a.cx - b.cx) ^ 2 + (a.cz - b.cz) ^ 2) >= 25, `{a.name} near a pole`)
+				end
+				-- never on a sidewalk, footpath or street strip
+				for _, rp in plans do
+					if rp.kind == "road" then
+						for _, seg in rp.parts do
+							if seg.role ~= "Paint" then
+								t.truthy(not Geometry.containsXZ(seg, a.cx, a.cz, 0), `{a.name} on {rp.id}`)
+							end
+						end
+					end
+				end
+			end
 			local f = flicker / posts
 			t.truthy(f >= 0.05 and f <= 0.1, `flicker {f}`)
 			t.eq(sky.attributes.LampHeads, posts)

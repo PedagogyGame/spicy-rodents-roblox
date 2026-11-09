@@ -24,7 +24,17 @@ function Hospital.facade(ctx: Spec.LotCtx)
 	local W, D = ctx.W, ctx.D
 	local wallH = (b.wallHeightU or ctx.params.eaveU or ctx.kit.heightU) * spu
 	local roofTop = wallH + 0.6
-	local function add(name: string, mx: number, my: number, mz: number, sx: number, sy: number, sz: number, color: { number }, o: Spec.Opts?)
+	local function add(
+		name: string,
+		mx: number,
+		my: number,
+		mz: number,
+		sx: number,
+		sy: number,
+		sz: number,
+		color: { number },
+		o: Spec.Opts?
+	)
 		local opts: Spec.Opts = o or {}
 		opts.color = color
 		opts.material = opts.material or "SmoothPlastic"
@@ -64,7 +74,17 @@ function Hospital.facade(ctx: Spec.LotCtx)
 			add(`EntrancePier{i}_{k}`, d.x + s * (half - 0.8), top / 2, -D / 2 - 0.7, 1.6, top, 1.4, pal.accent)
 		end
 		add(`EntranceLintel{i}`, d.x, top - 0.7, -D / 2 - 0.8, 2 * half, 1.4, 1.6, pal.accent)
-		add(`EntranceTransom{i}`, d.x, floorTop + doorH + 1.6, -D / 2 - 0.25, d.w + 1.2, 3.0, 0.3, pal.window, { material = "Glass" })
+		add(
+			`EntranceTransom{i}`,
+			d.x,
+			floorTop + doorH + 1.6,
+			-D / 2 - 0.25,
+			d.w + 1.2,
+			3.0,
+			0.3,
+			pal.window,
+			{ material = "Glass" }
+		)
 		if i == 1 then
 			mainX = d.x
 		end
@@ -72,15 +92,41 @@ function Hospital.facade(ctx: Spec.LotCtx)
 	-- the v5.4 sign above the roofline over the main entrance, with a red cross beside it
 	local text = ctx.params.sign or ctx.kit.signText or "HOSPITAL"
 	local signY = roofTop + ph + 4.2
-	add("SignPost1", mainX - 16, roofTop + (ph + 6.6) / 2, -D / 2 + 1.2, 0.8, ph + 6.6, 0.8, { 90, 94, 96 }, { material = "Metal" })
-	add("SignPost2", mainX + 16, roofTop + (ph + 6.6) / 2, -D / 2 + 1.2, 0.8, ph + 6.6, 0.8, { 90, 94, 96 }, { material = "Metal" })
+	add(
+		"SignPost1",
+		mainX - 16,
+		roofTop + (ph + 6.6) / 2,
+		-D / 2 + 1.2,
+		0.8,
+		ph + 6.6,
+		0.8,
+		{ 90, 94, 96 },
+		{ material = "Metal" }
+	)
+	add(
+		"SignPost2",
+		mainX + 16,
+		roofTop + (ph + 6.6) / 2,
+		-D / 2 + 1.2,
+		0.8,
+		ph + 6.6,
+		0.8,
+		{ 90, 94, 96 },
+		{ material = "Metal" }
+	)
 	ctx.list:add(ctx.frame, "SignBoard", mainX, signY, -D / 2 + 0.6, 44, 6.6, 0.5, {
 		color = Building.SIGN_TEAL,
 		canCollide = false,
 		role = "Sign",
 		attrs = { SignText = text .. "  ·  EMERGENCY" },
 	})
-	ctx.list:extra({ kind = "SurfaceGui", part = "SignBoard", name = "Sign", text = text .. "  ·  EMERGENCY", face = "Front" })
+	ctx.list:extra({
+		kind = "SurfaceGui",
+		part = "SignBoard",
+		name = "Sign",
+		text = text .. "  ·  EMERGENCY",
+		face = "Front",
+	})
 	add("CrossBack", mainX + 27, signY, -D / 2 + 0.6, 7.2, 7.2, 0.5, WHITE)
 	add("CrossV", mainX + 27, signY, -D / 2 + 0.2, 1.8, 5.6, 0.4, RED, { material = "Neon" })
 	add("CrossH", mainX + 27, signY, -D / 2 + 0.15, 5.6, 1.8, 0.4, RED, { material = "Neon" })

@@ -119,7 +119,18 @@ local function dockPilings(body: Spec.PartSpec, list: Spec.PartList)
 	for _, fx in { 0.08, 0.92 } do
 		for _, fz in { 0.08, 0.5, 0.92 } do
 			i += 1
-			post(list, `Piling{i}`, x0 + (x1 - x0) * fx, z0 + (z1 - z0) * fz, bed - 1, bottom + 2.2, 0.7, { 92, 76, 60 }, "Wood", true)
+			post(
+				list,
+				`Piling{i}`,
+				x0 + (x1 - x0) * fx,
+				z0 + (z1 - z0) * fz,
+				bed - 1,
+				bottom + 2.2,
+				0.7,
+				{ 92, 76, 60 },
+				"Wood",
+				true
+			)
 		end
 	end
 end
@@ -173,8 +184,25 @@ local function detail(lot: any, body: Spec.PartSpec, list: Spec.PartList, seat: 
 		return
 	elseif kind == "fire_hydrant" then
 		reshape(1.5, 2.6, 1.5, { 196, 52, 44 }, "Metal", "Cylinder")
-		add(list, "Cap", x, seat + 2.7, z, 1.3, 1.3, 1.3, { shape = "Ball", color = { 196, 52, 44 }, material = "Metal", canCollide = false, role = "Trim" })
-		add(list, "Nozzle", x, seat + 1.8, z, 2.2, 0.6, 0.6, { roll = 0, shape = "Cylinder", color = { 170, 44, 38 }, material = "Metal", canCollide = false, role = "Trim" })
+		add(
+			list,
+			"Cap",
+			x,
+			seat + 2.7,
+			z,
+			1.3,
+			1.3,
+			1.3,
+			{ shape = "Ball", color = { 196, 52, 44 }, material = "Metal", canCollide = false, role = "Trim" }
+		)
+		add(list, "Nozzle", x, seat + 1.8, z, 2.2, 0.6, 0.6, {
+			roll = 0,
+			shape = "Cylinder",
+			color = { 170, 44, 38 },
+			material = "Metal",
+			canCollide = false,
+			role = "Trim",
+		})
 	elseif kind == "park_bench" then
 		local along = body.sx >= body.sz
 		local L = math.max(body.sx, body.sz) * 0.7
@@ -190,16 +218,33 @@ local function detail(lot: any, body: Spec.PartSpec, list: Spec.PartList, seat: 
 		})
 		for k, s in { -1, 1 } do
 			local lx, lz = if along then s * L * 0.4 else 0, if along then 0 else s * L * 0.4
-			add(list, `Leg{k}`, x + lx, seat + 0.75, z + lz, if along then 0.35 else 2.2, 1.5, if along then 2.2 else 0.35, {
-				color = METAL,
-				material = "Metal",
-				canCollide = false,
-				role = "Trim",
-			})
+			add(
+				list,
+				`Leg{k}`,
+				x + lx,
+				seat + 0.75,
+				z + lz,
+				if along then 0.35 else 2.2,
+				1.5,
+				if along then 2.2 else 0.35,
+				{
+					color = METAL,
+					material = "Metal",
+					canCollide = false,
+					role = "Trim",
+				}
+			)
 		end
 	elseif kind == "trash_can" then
 		reshape(2.4, 3.2, 2.4, { 52, 78, 62 }, "Metal", "Cylinder")
-		add(list, "Lid", x, seat + 3.3, z, 0.25, 2.7, 2.7, { roll = math.pi / 2, shape = "Cylinder", color = { 40, 60, 48 }, material = "Metal", canCollide = false, role = "Trim" })
+		add(list, "Lid", x, seat + 3.3, z, 0.25, 2.7, 2.7, {
+			roll = math.pi / 2,
+			shape = "Cylinder",
+			color = { 40, 60, 48 },
+			material = "Metal",
+			canCollide = false,
+			role = "Trim",
+		})
 	elseif kind == "stop_sign" then
 		reshape(0.35, 7, 0.35, { 150, 150, 152 }, "Metal", "Cylinder")
 		add(list, "Sign", x, seat + 7.4, z, 0.15, 2.8, 2.8, {
@@ -213,30 +258,97 @@ local function detail(lot: any, body: Spec.PartSpec, list: Spec.PartList, seat: 
 		})
 	elseif kind == "driveway_basketball_hoop" then
 		reshape(0.5, 10, 0.5, { 70, 72, 76 }, "Metal", "Cylinder")
-		add(list, "Board", x, seat + 10.5, z, 4, 2.8, 0.25, { color = { 236, 236, 232 }, canCollide = false, role = "Trim" })
-		add(list, "Rim", x, seat + 9.4, z - 1.0, 0.15, 1.8, 1.8, { roll = math.pi / 2, shape = "Cylinder", color = { 214, 96, 40 }, material = "Metal", canCollide = false, role = "Trim" })
+		add(
+			list,
+			"Board",
+			x,
+			seat + 10.5,
+			z,
+			4,
+			2.8,
+			0.25,
+			{ color = { 236, 236, 232 }, canCollide = false, role = "Trim" }
+		)
+		add(list, "Rim", x, seat + 9.4, z - 1.0, 0.15, 1.8, 1.8, {
+			roll = math.pi / 2,
+			shape = "Cylinder",
+			color = { 214, 96, 40 },
+			material = "Metal",
+			canCollide = false,
+			role = "Trim",
+		})
 	elseif kind == "bird_feeder" or kind == "porch_light" or kind == "wind_chime" then
 		reshape(0.3, 5, 0.3, WOOD, "Wood", "Cylinder")
-		add(list, "Top", x, seat + 5.3, z, 1.4, 1.0, 1.4, { color = { 150, 120, 84 }, material = "WoodPlanks", canCollide = false, role = "Trim" })
+		add(
+			list,
+			"Top",
+			x,
+			seat + 5.3,
+			z,
+			1.4,
+			1.0,
+			1.4,
+			{ color = { 150, 120, 84 }, material = "WoodPlanks", canCollide = false, role = "Trim" }
+		)
 	elseif kind == "rain_barrel" or kind == "compost_bin" then
-		reshape(2.6, 3.2, 2.6, if kind == "rain_barrel" then { 74, 96, 120 } else { 70, 86, 58 }, "SmoothPlastic", "Cylinder")
+		reshape(
+			2.6,
+			3.2,
+			2.6,
+			if kind == "rain_barrel" then { 74, 96, 120 } else { 70, 86, 58 },
+			"SmoothPlastic",
+			"Cylinder"
+		)
 	elseif kind == "lawn_flamingo" then
 		reshape(0.15, 2.2, 0.15, { 225, 120, 160 }, "SmoothPlastic", "Cylinder")
-		add(list, "Bird", x, seat + 2.5, z, 0.9, 0.9, 0.9, { shape = "Ball", color = { 232, 128, 168 }, canCollide = false, role = "Trim" })
+		add(
+			list,
+			"Bird",
+			x,
+			seat + 2.5,
+			z,
+			0.9,
+			0.9,
+			0.9,
+			{ shape = "Ball", color = { 232, 128, 168 }, canCollide = false, role = "Trim" }
+		)
 	elseif kind == "garden_gnome" then
 		reshape(0.8, 1.0, 0.8, { 70, 100, 160 }, "SmoothPlastic", "Cylinder")
-		add(list, "Hat", x, seat + 1.35, z, 0.7, 0.7, 0.7, { shape = "Ball", color = { 196, 50, 44 }, canCollide = false, role = "Trim" })
+		add(
+			list,
+			"Hat",
+			x,
+			seat + 1.35,
+			z,
+			0.7,
+			0.7,
+			0.7,
+			{ shape = "Ball", color = { 196, 50, 44 }, canCollide = false, role = "Trim" }
+		)
 	elseif kind == "sprinkler_head" then
 		reshape(0.5, 0.4, 0.5, { 90, 90, 90 }, "Metal", "Cylinder")
 	elseif kind == "kids_bike" or kind == "wheelbarrow" or kind == "garden_hose_reel" then
 		body.sx, body.sz = math.min(body.sx, 3.2), math.min(body.sz, 5.5)
 		body.sy, body.cy = 1.8, seat + 0.9
-		body.color = if kind == "kids_bike" then { 60, 120, 170 } elseif kind == "wheelbarrow" then { 150, 60, 50 } else { 70, 130, 70 }
+		body.color = if kind == "kids_bike"
+			then { 60, 120, 170 }
+			elseif kind == "wheelbarrow" then { 150, 60, 50 }
+			else { 70, 130, 70 }
 	elseif kind == "porch_swing" or kind == "window_box" then
 		body.sy, body.cy = 1.2, seat + 1.4
 		body.color, body.material = WOOD, "WoodPlanks"
 		if kind == "window_box" then
-			add(list, "Flowers", x, seat + 2.3, z, body.sx * 0.9, 0.8, body.sz * 0.9, { color = { 196, 84, 104 }, material = "LeafyGrass", canCollide = false, role = "Trim" })
+			add(
+				list,
+				"Flowers",
+				x,
+				seat + 2.3,
+				z,
+				body.sx * 0.9,
+				0.8,
+				body.sz * 0.9,
+				{ color = { 196, 84, 104 }, material = "LeafyGrass", canCollide = false, role = "Trim" }
+			)
 		end
 	end
 end

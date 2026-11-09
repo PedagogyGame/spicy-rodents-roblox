@@ -164,6 +164,6 @@ return function(t)
 		t.truthy(wedges >= 100, `wedges {wedges}`)
 		t.truthy(balls >= 500, `balls {balls}`)
 		t.eq(total, town:GetAttribute("PartCount"))
-		t.truthy(total <= 16000, `part budget: {total}`)
+		t.truthy(total <= 30000, `part budget: {total}`) -- review 2026-11-09: full tree crowns, under ~30k
 	end)
 end

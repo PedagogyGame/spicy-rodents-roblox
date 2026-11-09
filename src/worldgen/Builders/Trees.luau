@@ -97,7 +97,15 @@ local function at(line: { { number } }, c: { number }, s: number): ({ number }, 
 end
 
 -- A cylinder from a to b (axis = local X), radius r, extended `ext` at both ends to close joints.
-local function cylinder(list: Spec.PartList, name: string, a: { number }, b: { number }, r: number, ext: number, o: Spec.Opts)
+local function cylinder(
+	list: Spec.PartList,
+	name: string,
+	a: { number },
+	b: { number },
+	r: number,
+	ext: number,
+	o: Spec.Opts
+)
 	local d = sub(b, a)
 	local l = len3(d)
 	if l < 1e-4 then
@@ -107,7 +115,17 @@ local function cylinder(list: Spec.PartList, name: string, a: { number }, b: { n
 	local yaw = math.atan2(-d[3], d[1])
 	local opts = table.clone(o)
 	opts.yaw, opts.roll, opts.shape = yaw, roll, "Cylinder"
-	list:add(ORIGIN :: any, name, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2, l + 2 * ext, 2 * r, 2 * r, opts)
+	list:add(
+		ORIGIN :: any,
+		name,
+		(a[1] + b[1]) / 2,
+		(a[2] + b[2]) / 2,
+		(a[3] + b[3]) / 2,
+		l + 2 * ext,
+		2 * r,
+		2 * r,
+		opts
+	)
 end
 
 local function shade(c: { number }, f: number): { number }
@@ -189,7 +207,9 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			b,
 			r,
 			if k == 1 then 0 else r * 0.25,
-			if k == 1 then { color = barkColor, material = "Wood", role = "Limb", attrs = { Embedded = true } } else barkOpts
+			if k == 1
+				then { color = barkColor, material = "Wood", role = "Limb", attrs = { Embedded = true } }
+				else barkOpts
 		)
 	end
 	-- root flare (skipped where the trunk stands at a kerb, road or sidewalk: no bark on the paving)
@@ -263,18 +283,26 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 					d[2] * 0.75 + 0.35,
 					d[3] * 0.75 + side[3] * s * 0.6,
 				})
-				cylinder(list, `Twig{b.route.id}_{k}`, e, {
-					e[1] + dir[1] * twigLen,
-					e[2] + dir[2] * twigLen,
-					e[3] + dir[3] * twigLen,
-				}, math.max(0.22, tip * 0.45), 0.1, {
-					color = barkColor,
-					material = "Wood",
-					canCollide = false,
-					canQuery = false,
-					castShadow = false,
-					role = "Twig",
-				})
+				cylinder(
+					list,
+					`Twig{b.route.id}_{k}`,
+					e,
+					{
+						e[1] + dir[1] * twigLen,
+						e[2] + dir[2] * twigLen,
+						e[3] + dir[3] * twigLen,
+					},
+					math.max(0.22, tip * 0.45),
+					0.1,
+					{
+						color = barkColor,
+						material = "Wood",
+						canCollide = false,
+						canQuery = false,
+						castShadow = false,
+						role = "Twig",
+					}
+				)
 			end
 		end
 	end
@@ -537,15 +565,25 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			if n2 < 9 and rand() < 0.45 then
 				n2 += 1
 				local a = rand() * 2 * math.pi
-				list:add(ORIGIN :: any, `Apple{n2}`, c.p[1] + math.cos(a) * c.r * 0.92, c.p[2] - c.r * 0.25, c.p[3] + math.sin(a) * c.r * 0.92, 0.9, 0.9, 0.9, {
-					shape = "Ball",
-					color = { 186, 52, 44 },
-					material = "SmoothPlastic",
-					canCollide = false,
-					canQuery = false,
-					castShadow = false,
-					role = "Leaves",
-				})
+				list:add(
+					ORIGIN :: any,
+					`Apple{n2}`,
+					c.p[1] + math.cos(a) * c.r * 0.92,
+					c.p[2] - c.r * 0.25,
+					c.p[3] + math.sin(a) * c.r * 0.92,
+					0.9,
+					0.9,
+					0.9,
+					{
+						shape = "Ball",
+						color = { 186, 52, 44 },
+						material = "SmoothPlastic",
+						canCollide = false,
+						canQuery = false,
+						castShadow = false,
+						role = "Leaves",
+					}
+				)
 				leaves += 1
 			end
 		end

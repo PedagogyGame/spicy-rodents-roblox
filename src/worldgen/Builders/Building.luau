@@ -221,12 +221,7 @@ end
 -- Continuous ribbon windows (hospital, review 2026-11-09 "a plain box"): one glass band per floor on
 -- every face, broken around the ground-floor door openings in `avoid`, with an accent floor line under
 -- each band. Visual only.
-function Building.bands(
-	ctx: Spec.LotCtx,
-	base: number,
-	top: number,
-	avoid: { [string]: { { c: number, w: number } } }?
-)
+function Building.bands(ctx: Spec.LotCtx, base: number, top: number, avoid: { [string]: { { c: number, w: number } } }?)
 	local pal = Building.look(ctx)
 	local W, D = ctx.W, ctx.D
 	local height = top - base
@@ -242,7 +237,17 @@ function Building.bands(
 		{ id = "L", len = D, fixed = -W / 2, out = -1, alongX = false },
 		{ id = "R", len = D, fixed = W / 2, out = 1, alongX = false },
 	}
-	local function piece(name: string, f: any, a: number, b: number, y: number, h: number, depth: number, color: { number }, material: string)
+	local function piece(
+		name: string,
+		f: any,
+		a: number,
+		b: number,
+		y: number,
+		h: number,
+		depth: number,
+		color: { number },
+		material: string
+	)
 		if b - a < 1 then
 			return
 		end
@@ -283,10 +288,30 @@ function Building.bands(
 			end
 			for k, sp in spans do
 				piece(`Win{f.id}{fl}_{k}`, f, sp[1], sp[2], y, bandH, 0.36, pal.window, "Glass")
-				piece(`Sill{f.id}{fl}_{k}`, f, sp[1] - 0.3, sp[2] + 0.3, y - bandH / 2 - 0.3, 0.6, 0.5, pal.trim, "SmoothPlastic")
+				piece(
+					`Sill{f.id}{fl}_{k}`,
+					f,
+					sp[1] - 0.3,
+					sp[2] + 0.3,
+					y - bandH / 2 - 0.3,
+					0.6,
+					0.5,
+					pal.trim,
+					"SmoothPlastic"
+				)
 			end
 			if fl > 1 then
-				piece(`FloorLine{f.id}{fl}`, f, -f.len / 2, f.len / 2, base + (fl - 1) * floorH, 0.9, 0.24, pal.accent, "SmoothPlastic")
+				piece(
+					`FloorLine{f.id}{fl}`,
+					f,
+					-f.len / 2,
+					f.len / 2,
+					base + (fl - 1) * floorH,
+					0.9,
+					0.24,
+					pal.accent,
+					"SmoothPlastic"
+				)
 			end
 		end
 	end

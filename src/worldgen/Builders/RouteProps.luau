@@ -123,7 +123,15 @@ end
 local ORIGIN = Geometry.frame(0, 0, 0, 0)
 
 -- One cylinder from a to b (axis local X), radius r, lengthened by `ext` studs at each end.
-local function cyl(list: Spec.PartList, name: string, a: { number }, b: { number }, r: number, ext: number, o: Spec.Opts)
+local function cyl(
+	list: Spec.PartList,
+	name: string,
+	a: { number },
+	b: { number },
+	r: number,
+	ext: number,
+	o: Spec.Opts
+)
 	local d = { b[1] - a[1], b[2] - a[2], b[3] - a[3] }
 	local len = math.sqrt(d[1] * d[1] + d[2] * d[2] + d[3] * d[3])
 	if len <= 1e-4 then
@@ -416,17 +424,25 @@ function RouteProps.plans(
 					attrs = { Embedded = true },
 				})
 			end
-			cyl(list, "Shoe", { foot[1], math.min(g, foot[2]) + 0.35, foot[3] }, {
-				foot[1] + 0.9,
-				math.min(g, foot[2]) + 0.15,
-				foot[3],
-			}, r.surfaceRadius * 1.05, 0.1, {
-				color = LOOK.pipe.color,
-				material = "Metal",
-				canCollide = false,
-				castShadow = false,
-				role = "Pipe",
-			})
+			cyl(
+				list,
+				"Shoe",
+				{ foot[1], math.min(g, foot[2]) + 0.35, foot[3] },
+				{
+					foot[1] + 0.9,
+					math.min(g, foot[2]) + 0.15,
+					foot[3],
+				},
+				r.surfaceRadius * 1.05,
+				0.1,
+				{
+					color = LOOK.pipe.color,
+					material = "Metal",
+					canCollide = false,
+					castShadow = false,
+					role = "Pipe",
+				}
+			)
 		end
 		table.insert(out, newPlan(`Pipe_{r.id}`, "pipe", props, { Route = r.id }, list))
 	end

@@ -19,7 +19,8 @@ if process.args[1] == "--out" and process.args[2] then
 	out = process.args[2]
 end
 
-local Instance, Vector3, CFrame, Color3, Enum = roblox.Instance, roblox.Vector3, roblox.CFrame, roblox.Color3, roblox.Enum
+local Instance, Vector3, CFrame, Color3, Enum =
+	roblox.Instance, roblox.Vector3, roblox.CFrame, roblox.Color3, roblox.Enum
 local CELL = 60 -- studs
 local THICK = 6
 local SINK = 0.6 -- top sits just below the true ground so lots never look buried
