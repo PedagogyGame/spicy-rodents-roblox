@@ -1,0 +1,88 @@
+{
+  "name": "S11DroneFarView",
+  "globIgnorePaths": ["**/*.spec.luau", "**/README.md", "**/.gitkeep"],
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "../../src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "../../src/server",
+        "WorldGen": {
+          "$path": "../../src/worldgen"
+        }
+      },
+      "S11": {
+        "$path": "server"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "../../src/client"
+        },
+        "S11Client": {
+          "$path": "client/S11Client.client.luau"
+        }
+      }
+    },
+
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": true
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": true,
+        "ModelStreamingBehavior": "Improved",
+        "StreamOutBehavior": "Opportunistic",
+        "StreamingMinRadius": 64,
+        "StreamingTargetRadius": 1024,
+        "SignalBehavior": "Deferred",
+        "FallenPartsDestroyHeight": -200
+      },
+      "Town": {
+        "$path": "../../build/Town.rbxm"
+      },
+      "S11Layers": {
+        "$path": "../../build/s11_skyline.rbxm"
+      },
+      "Station": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "Size": [8, 1, 8],
+          "Position": [700, 40, -100],
+          "Neutral": true,
+          "Duration": 0
+        }
+      },
+      "DroneConsole": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [3, 4, 2],
+          "Position": [706, 42, -100],
+          "Color": [0.2, 0.25, 0.35],
+          "Material": "Metal"
+        }
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "Technology": "Future",
+        "GeographicLatitude": 39,
+        "ClockTime": 14
+      }
+    }
+  }
+}
