@@ -160,7 +160,7 @@ local function makeMoon(): MoonGui
 	disc.BackgroundTransparency = 1
 	disc.BorderSizePixel = 0
 	disc.Parent = gui
-	local lit, dark = {}, {}
+	local lit: { Frame }, dark: { Frame } = {}, {}
 	for j = 1, Sky.MOON_ROWS do
 		for _, kind in { "Dark", "Lit" } do
 			local f = Instance.new("Frame")

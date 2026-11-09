@@ -18,7 +18,8 @@
 -- Steppable: step(dt) (Heartbeat in the game; by hand in Luau Execution, where debugRoll stands in for physics).
 -- Interface: new(opts) -> Service; Service:join(player, stationId) -> (ok, why?); Service:leave(player, why?);
 --   Service:input(player, payload) -> (ok, why?); Service:step(dt); Service:sessionOf(stationId);
---   Service:stationOf(player) -> id?; Service:debugRoll(stationId, pins) -> (ok, why?); Service:stations();
+--   Service:stationOf(player) -> id?; Service:debugRoll(stationId, pins) -> (ok, why?); Service:debugDart(stationId,
+--   xmm, ymm) -> (ok, why?) (scripted throws for the engine smoke); Service:stations();
 --   Service:stop(); GAMES
 
 local Import = require("../Import")
@@ -605,6 +606,21 @@ function MinigameService.debugRoll(self: any, id: string, pins: number): (boolea
 		return false, "lane busy"
 	end
 	return st.hw:debugRoll(pins)
+end
+
+-- debugDart: a dart landed exactly at (xmm, ymm) for whoever is throwing (the rules' server verb "land"; tests).
+function MinigameService.debugDart(self: any, id: string, xmm: number, ymm: number): (boolean, string?)
+	local st = self.stations[id] :: Station?
+	if st == nil or st.kind ~= "dartboard" then
+		return false, "no dartboard"
+	end
+	local s = st.session
+	local seat = Session.turn(s)
+	local ok, why = Session.apply(s, "server", "land", { xmm, ymm }, self.clock)
+	if ok then
+		self:_afterDart(st, seat)
+	end
+	return ok, why
 end
 
 -- Per frame -------------------------------------------------------------------------------------------------------

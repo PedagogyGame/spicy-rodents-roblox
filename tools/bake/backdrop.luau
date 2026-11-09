@@ -1007,7 +1007,7 @@ do
 	end
 	local X0, X1, Z1 = -16400, 18400, 16200
 	local bx0, bx1 = clamp.minX - Backdrop.BAND, clamp.maxX + Backdrop.BAND
-	local opts: PartOpts = { reflectance = 0.12 }
+	local opts: PartOpts = { reflectance = 0.28 } -- near terrain water's WaterReflectance 0.4 over the same teal
 	tiles(ocean, "Sea", X0, X1, Backdrop.OCEAN_NEAR_Z, Z1, Backdrop.OCEAN_Y, 2, col, "SmoothPlastic", "ocean", opts)
 	tiles(
 		ocean,

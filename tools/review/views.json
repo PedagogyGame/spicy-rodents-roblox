@@ -168,8 +168,8 @@
     },
     {
       "name": "bd_sunset", "optIn": "backdrop",
-      "desc": "Backdrop: sunset approximation (sun about 2 degrees up on the measured azimuth) from the north-east of town at eye 6 st: the tower silhouetted against the low sun.",
-      "pos": [0, 19.4, 600], "look": [-2914, 230, 851], "fov": 60, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "desc": "Backdrop: sunset approximation (sun about 2 degrees up on the measured azimuth) from the open field at the east edge of town (eye 6 st, 45 degree lens): the tower silhouetted against the low sun.",
+      "pos": [-1450, 14.4, 650], "look": [-2914, 210, 851], "fov": 45, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
       "light": {"sun": [-0.963, 0.038, 0.267], "sunStrength": 2.4, "sunColor": [1.0, 0.52, 0.26], "sky": {"zenith": [0.1, 0.15, 0.36], "mid": [0.5, 0.36, 0.42], "horizon": [1.0, 0.5, 0.22], "ground": [0.3, 0.2, 0.16]}, "haze": {"color": [0.78, 0.5, 0.38], "start": 300, "half": 4200, "max": 0.92}, "cardTint": [1.0, 0.72, 0.6], "cardStrength": 0.95}
     },
     {

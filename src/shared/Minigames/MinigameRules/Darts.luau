@@ -28,7 +28,10 @@ Darts.def = {
 	authority = "server_deterministic",
 	money = "none",
 }
-Darts.verbs = { throw = true, mode = true }
+Darts.verbs = { throw = true, mode = true, land = true }
+-- "land" { x, y } puts a dart exactly there: the server's own verb (scripted throws in the engine smoke);
+-- clients cannot send it (Net's verb list does not have it and the service never forwards it)
+Darts.serverVerbs = { land = true }
 Darts.MODES = { "501", "cricket" }
 Darts.DARTS_PER_TURN = 3
 Darts.MAX_ROUNDS = 20
@@ -356,7 +359,7 @@ function Darts.input(state: State, seat: number, verb: string, args: { any }?): 
 	if verb == "mode" then
 		return Darts.setMode(state, tostring(a[1]))
 	end
-	if verb ~= "throw" then
+	if verb ~= "throw" and verb ~= "land" then
 		return false, "verb"
 	end
 	if state.done then
@@ -364,6 +367,14 @@ function Darts.input(state: State, seat: number, verb: string, args: { any }?): 
 	end
 	if seat ~= state.seat then
 		return false, "not your turn"
+	end
+	if verb == "land" then
+		local x, y = a[1], a[2]
+		if type(x) ~= "number" or type(y) ~= "number" or x ~= x or y ~= y then
+			return false, "args"
+		end
+		Darts.throwAt(state, x, y)
+		return true
 	end
 	local ax, ay, timing = a[1], a[2], a[3]
 	if type(ax) ~= "number" or type(ay) ~= "number" or type(timing) ~= "number" then
