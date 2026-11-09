@@ -15,7 +15,7 @@ local Yield = require("./Yield")
 
 local RouteCheck = {}
 
-local SKIP_ROLES = { Room = true, Anchor = true, Skyline = true }
+local SKIP_ROLES = { Room = true, Anchor = true, Skyline = true, Leaves = true }
 
 export type Failure = { id: number, name: string, kind: string, generator: string, worst: number, at: { number } }
 export type Result = {
