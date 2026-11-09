@@ -127,7 +127,7 @@ local function pickWaypoint(h: Harness, b: Body)
 	local layout = h.layout
 	-- now and then take the stairs up or down
 	if h.rand() < 0.15 then
-		local up, down
+		local up: Layout.Stair?, down: Layout.Stair? = nil, nil
 		for _, s in layout.stairs do
 			if s.floor == b.floor then
 				up = s

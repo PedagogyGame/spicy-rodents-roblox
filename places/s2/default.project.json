@@ -1,0 +1,99 @@
+{
+  "name": "S2Possession",
+  "globIgnorePaths": ["**/*.spec.luau", "**/README.md", "**/.gitkeep"],
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "../../src/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "../../src/server",
+        "WorldGen": {
+          "$path": "../../src/worldgen"
+        }
+      },
+      "S2": {
+        "$path": "server"
+      }
+    },
+
+    "ServerStorage": {
+      "S2Templates": {
+        "$className": "Folder",
+        "squirrel_puppet_s7": {
+          "$path": "../../assets/test/squirrel_puppet_s7.rbxm"
+        }
+      },
+      "EngineTests": {
+        "$path": "../../tests/engine"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "../../src/client"
+        },
+        "S2Client": {
+          "$path": "client/S2Client.client.luau"
+        }
+      }
+    },
+
+    "Players": {
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": true,
+        "ModelStreamingBehavior": "Improved",
+        "StreamingMinRadius": 64,
+        "StreamingTargetRadius": 512,
+        "PlayerCharacterDestroyBehavior": "Disabled",
+        "SignalBehavior": "Deferred",
+        "FallenPartsDestroyHeight": -200
+      },
+      "Floor": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [400, 2, 400],
+          "Position": [0, -1, 0],
+          "Material": "Grass",
+          "Color": [0.42, 0.6, 0.33],
+          "TopSurface": "Smooth",
+          "BottomSurface": "Smooth"
+        }
+      },
+      "Sidewalk": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [140, 0.2, 140],
+          "Position": [0, 0.1, 0],
+          "Material": "Concrete",
+          "Color": [0.75, 0.75, 0.72],
+          "TopSurface": "Smooth",
+          "BottomSurface": "Smooth"
+        }
+      },
+      "Bodies": {
+        "$className": "Folder"
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "ClockTime": 14
+      }
+    }
+  }
+}
