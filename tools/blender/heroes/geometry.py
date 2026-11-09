@@ -274,6 +274,15 @@ def unwrap_parts(obj, face_part, cuts, margin=0.004, hard_kind=None):
     hard = np.asarray(face_part) < 0
     bl.select_only([obj])
     me.polygons.foreach_set("select", ~hard)
+    vsel = np.zeros(len(me.vertices), dtype=bool)
+    for p in me.polygons:
+        if not hard[p.index]:
+            vsel[list(p.vertices)] = True
+    me.vertices.foreach_set("select", vsel)
+    ev = np.empty(len(me.edges) * 2, dtype=np.int64)
+    me.edges.foreach_get("vertices", ev)
+    ev = ev.reshape(-1, 2)
+    me.edges.foreach_set("select", vsel[ev[:, 0]] & vsel[ev[:, 1]])
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_mode(type="FACE")
     bpy.ops.uv.unwrap(method="ANGLE_BASED", fill_holes=True, correct_aspect=True, margin=margin)

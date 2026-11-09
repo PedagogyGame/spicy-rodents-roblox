@@ -78,6 +78,18 @@ def upload(path, kind, name, desc, tag, skip):
     return res
 
 
+def rigspec_bones(rig):
+    """The bone lists exactly as src/shared/Actors/RigSpec.luau builds them."""
+    legs = [f"{l}_{s}" for l in ("FrontL", "FrontR", "BackL", "BackR") for s in ("Upper", "Lower", "Foot", "Toe")]
+    base = ["Root", "Hips", "Spine1", "Spine2", "Spine3", "Chest", "Neck", "Head", "Jaw", "EarL", "EarR"]
+    if rig == "squirrel":
+        return base + [f"Tail{i}" for i in range(1, 9)] + legs
+    if rig == "fox":
+        return base + [f"Tail{i}" for i in range(1, 7)] + legs
+    return ["Root", "Hips", "Spine1", "Spine2", "Spine3", "Chest", "Neck1", "Neck2", "Neck3", "Head", "Jaw", "EarL", "EarR",
+            "Tail1", "Tail2"] + legs
+
+
 def sockets(mod):
     skel = {b[0]: b for b in mod.skeleton()}
     out = {}
@@ -120,6 +132,10 @@ def main():
             rep = json.load(fh)
         mod = importlib.import_module(cfg["module"])
         print(f"== {variant}", flush=True)
+        names = [b[0] for b in mod.skeleton()]
+        want = rigspec_bones(cfg["rig"])
+        if sorted(names) != sorted(want):
+            raise SystemExit(f"{variant}: bones differ from RigSpec: {set(names) ^ set(want)}")
         fbx = rep["fbx"]["path"]
         model = upload(fbx, "Model", f"Spicy Rodents hero {variant}",
                        f"Hero {variant} for Spicy Rodents: skinned rig (RigSpec {cfg['rig']} bone names), regions {', '.join(rep['regions'])}. Built by tools/blender/heroes.",
@@ -166,6 +182,8 @@ def main():
             "rig": cfg["rig"],
             "model": {"assetId": model.get("assetId"), "moderation": model.get("moderationState"), "fbxBytes": os.path.getsize(fbx), "sha": sha(fbx)},
             "bones": rep.get("bones"),
+            "bonesMatchRigSpec": True,
+            "weights": {k: {"maxInfluences": v["max_influences"], "unweighted": v["unweighted"], "rootWeighted": v["root_group"]} for k, v in rep.get("weights", {}).items()},
             "tris": {"total": sum(rep["regions"].values()), **rep["regions"]},
             "regions": regions,
             "sockets": sockets(mod),
