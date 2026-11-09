@@ -26,7 +26,7 @@ local Ladder = {}
 
 -- Addendum B4: the place stays at 50; admit turns the 50th arrival away before any body or profile.
 Ladder.server = table.freeze({ maxPlayers = 49, liveServerSize = 50 })
-Ladder.FULL_MESSAGE = "This server is full (49 players). Please join another server - thanks for stopping by!"
+Ladder.FULL_MESSAGE = "This town is full (49 players). Please try another server."
 -- brief v2 §5: 35 human-species player slots INCLUDING hospital and police (decision 28).
 Ladder.humanSlots = table.freeze({ total = 35 })
 

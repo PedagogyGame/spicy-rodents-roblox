@@ -58,7 +58,7 @@ function Building.roof(ctx: Spec.LotCtx, eave: number, peak: number, alongLocalX
 	for side = -1, 1, 2 do
 		-- plate centre on the slope line (offset half a plate thickness up the normal)
 		local u = side * half / 2 -- across-ridge coordinate of the plate centre
-		local nx, ny = -side * math.sin(phi), math.cos(phi) -- outward normal in (across, up)
+		local nx, ny = side * math.sin(phi), math.cos(phi) -- outward (upper) normal in (across, up)
 		local cu, cy = u + nx * PLATE / 2, eave + rise / 2 + ny * PLATE / 2
 		local mx, mz, yaw = 0, cu, 0
 		if not alongLocalX then

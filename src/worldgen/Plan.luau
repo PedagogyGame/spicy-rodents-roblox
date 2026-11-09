@@ -1,18 +1,29 @@
 --!strict
 -- ServerScriptService.Server.WorldGen.Plan
--- Lots and roads to a deterministic, pure-data BuildPlan (spike S6 greybox). The same plan is built
--- in Lune (tools/bake) and in the engine (tests/engine/WorldBuild); BakeParity hashes it.
+-- Lots and roads to a deterministic, pure-data BuildPlan (spike S6 greybox; W1 #7 builder families).
+-- The same plan is built in Lune (tools/bake) and in the engine (tests/engine/WorldBuild); BakeParity
+-- hashes it. Each lot's lot type names a builder family (Builders/Building, House, Hospital,
+-- PoliceStation, Sign; structures, slabs, plates, props and markers stay single greybox blocks).
 -- Interface (BUILD_PLAN §1.4): plan(lot, lotType, ctx) -> BuildPlan; road(road) -> BuildPlan;
---   containment(lots) -> { [childId]: parentId }
+--   containment(lots) -> { [childId]: parentId }; seat(lot) -> studs; lotFrame(lot) -> frame, W, D
 -- Units: studs in and out (generated/ is already in studs). Facing: a cardinal `facing` or `yaw`
 -- (HTML radians) becomes the model's LookVector through Units' single +pi (D21). The footprint is
 -- a world-axis box [worldgen_core §1 "already rotated into world axes"], so non-cardinal yaws keep
 -- the box axis-aligned and record the exact yaw as an attribute.
 -- Pure: no Instances, no state, no side effects on require.
 
+local Building = require("./Builders/Building")
+local Geometry = require("./Geometry")
+local Hospital = require("./Builders/Hospital")
+local House = require("./Builders/House")
 local Import = require("./Import")
 local Kits = require("./Kits")
+local PoliceStation = require("./Builders/PoliceStation")
+local Sign = require("./Builders/Sign")
+local Spec = require("./Spec")
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
+local Buildings = Import.generated("Buildings") :: { [string]: any }
+local Interiors = Import.generated("Interiors") :: { [string]: any }
 
 local Plan = {}
 
@@ -23,31 +34,9 @@ local CONTAIN_TOLERANCE = 0.5 -- studs: a child may poke this far out of its par
 local ROAD_SEGMENT = 40 -- studs: roads follow the terrain in straight segments this long or less
 local ROAD_THICKNESS = 0.4
 
-export type PartSpec = {
-	name: string,
-	cx: number,
-	cy: number,
-	cz: number,
-	yaw: number, -- Roblox rotation about +Y (radians), LookVector = (-sin, 0, -cos)
-	pitch: number, -- rotation about the part's own X after yaw (roads on slopes)
-	sx: number,
-	sy: number,
-	sz: number,
-	color: { number },
-	material: string,
-	canCollide: boolean,
-	transparency: number,
-}
-
-export type BuildPlan = {
-	kind: "lot" | "road",
-	id: string,
-	category: string,
-	lod: string,
-	streaming: string,
-	attributes: { [string]: string | number | boolean },
-	parts: { PartSpec },
-}
+export type PartSpec = Spec.PartSpec
+export type ExtraSpec = Spec.ExtraSpec
+export type BuildPlan = Spec.BuildPlan
 
 export type Lot = {
 	id: string,
@@ -59,6 +48,9 @@ export type Lot = {
 	yaw: number?,
 	footprint: { w: number, d: number }?,
 	hasInterior: boolean?,
+	seat: string?,
+	params: { [string]: any }?,
+	home: { [string]: any }?,
 }
 
 export type Road = {
@@ -139,25 +131,32 @@ function Plan.containment(lots: { Lot }): { [string]: string }
 	return out
 end
 
-function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
-	local kit = Kits.get(lotType)
-	local w, d = Plan.footprint(lot)
-	local yawH, given = htmlYaw(lot)
-	local q = quarter(yawH)
-	-- local size: X across the front, Z front-to-back; odd quarter turns swap the world extents
-	local sx, sz = w, d
-	if q % 2 == 1 then
-		sx, sz = d, w
+-- Seat height in studs: `seat = "absolute:<y>"` (HTML units, harvested v5.4 bases) or World/Height.
+function Plan.seat(lot: Lot): number
+	local abs = lot.seat and string.match(lot.seat, "^absolute:(%-?[%d%.]+)$")
+	if abs then
+		return (tonumber(abs) :: number) * SPU
 	end
-	local seat = Height.at(lot.x, lot.z)
-	local category: string = kit.category
-	local solid = Kits.isSolid(kit.category)
-	local transparency = 0
-	if ctx.parentId then
-		category = "interior"
-		solid = false
-		transparency = 0.7
-	end
+	return Height.at(lot.x, lot.z)
+end
+
+local BUILDING_BY_LOT: { [string]: any } = {}
+for _, b in Buildings do
+	BUILDING_BY_LOT[b.lot] = b
+end
+
+local FAMILIES: { [string]: (ctx: Spec.LotCtx) -> () } = {
+	Building = Building.plan,
+	House = House.plan,
+	Hospital = Hospital.plan,
+	PoliceStation = PoliceStation.plan,
+	Sign = Sign.plan,
+}
+
+-- The S6 single block (structures, slabs, plates, props, markers and interior children).
+local function blockPart(lot: Lot, kit: Kits.Kit, seat: number, q: number, sx: number, sz: number, isChild: boolean): PartSpec
+	local solid = Kits.isSolid(kit.category) and not isChild
+	local transparency = if isChild then 0.7 elseif kit.category == "marker" then 1 else 0
 	local h = kit.heightU * SPU
 	local cy, sy
 	if kit.category == "plate" then
@@ -170,10 +169,7 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 		sy = math.max(h, 0.4)
 		cy = seat + sy / 2
 	end
-	if kit.category == "marker" then
-		transparency = 1
-	end
-	local part: PartSpec = {
+	return {
 		name = "Greybox",
 		cx = lot.x,
 		cy = cy,
@@ -187,7 +183,24 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 		material = kit.material,
 		canCollide = solid,
 		transparency = transparency,
+		role = "Body",
 	}
+end
+
+function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
+	local kit = Kits.get(lotType)
+	local w, d = Plan.footprint(lot)
+	local yawH, given = htmlYaw(lot)
+	local q = quarter(yawH)
+	-- local size: X across the front, Z front-to-back; odd quarter turns swap the world extents
+	local sx, sz = w, d
+	if q % 2 == 1 then
+		sx, sz = d, w
+	end
+	local seat = Plan.seat(lot)
+	local isChild = ctx.parentId ~= nil
+	local category: string = if isChild then "interior" else kit.category
+	local solid = Kits.isSolid(kit.category) and not isChild
 	local attributes: { [string]: string | number | boolean } = {
 		LotId = lot.id,
 		LotType = lotType,
@@ -198,12 +211,39 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 		FacingYaw = yawH,
 		FacingGiven = given,
 		LevelOfDetail = kit.lod,
+		Builder = if isChild then "Block" else kit.builder,
 	}
 	if ctx.parentId then
 		attributes.ParentLot = ctx.parentId
 	end
 	if not Kits.known(lotType) then
 		attributes.UnknownType = true
+	end
+	local list = Spec.list()
+	local family = if isChild then nil else FAMILIES[kit.builder]
+	if family then
+		local frame = Geometry.frame(lot.x, seat, lot.z, q * HALF_PI + math.pi)
+		local home = lot.home
+		local lctx: Spec.LotCtx = {
+			lot = lot,
+			kit = kit,
+			frame = frame,
+			W = sx,
+			D = sz,
+			seat = seat,
+			params = lot.params or {},
+			list = list,
+			building = BUILDING_BY_LOT[lot.id],
+			interior = home and home.interior and Interiors[home.interior],
+			attributes = attributes,
+		}
+		if (kit.builder == "Hospital" or kit.builder == "PoliceStation") and not lctx.building then
+			Building.plan(lctx)
+		else
+			family(lctx)
+		end
+	else
+		list:world(blockPart(lot, kit, seat, q, sx, sz, isChild))
 	end
 	return {
 		kind = "lot",
@@ -212,7 +252,8 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 		lod = kit.lod,
 		streaming = kit.streaming,
 		attributes = attributes,
-		parts = { part },
+		parts = list.parts,
+		extras = list.extras,
 	}
 end
 

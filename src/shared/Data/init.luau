@@ -127,7 +127,9 @@ function Data.new(loader: Loader): Data
 		return self:byId("Lots", id)
 	end
 	function data.lotType(self: Data, t: string)
-		return self:byId("LotTypes", t)
+		-- compiled as a map keyed by type name (data/authored/lot_types.json); arrays by id also work
+		local m = self:module("LotTypes") :: any
+		return m[t] or self:byId("LotTypes", t)
 	end
 	function data.routes(self: Data): Registry.Registry
 		if not self._routes then
