@@ -169,7 +169,16 @@ def object_from_parts(name, parts, smooth=True):
         owner.extend([i] * len(v))
         off += len(v)
     obj = bl.mesh_from_arrays(name, np.array(allv), allf, smooth=smooth)
+    triangulate_ngons(obj)
     return obj, np.array(owner)
+
+
+def triangulate_ngons(obj):
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+    bm.to_mesh(obj.data)
+    bm.free()
 
 
 def join_into(target, others):

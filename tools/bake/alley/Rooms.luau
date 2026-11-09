@@ -914,7 +914,7 @@ local function fortune(kit: any, parent: any)
 			`Reel{r}`,
 			(r - 2) * 0.7,
 			2.6,
-			-1.18,
+			-1.26,
 			0.6,
 			0.66,
 			0.04,
