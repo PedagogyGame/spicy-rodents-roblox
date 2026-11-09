@@ -30,7 +30,12 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 | S6 bake/terrain | GO | Height port exact (11,060 vectors); Lune bake of 243 lots/116 roads in 0.2 s; BakeParity identical Lune vs engine; terrain WriteVoxels whole town ~1 s, near-hill bands 3-4 s |
 | S7 headless animation | GO (headless) | Blender → clip JSON → KeyframeSequence rbxm (byte-identical rebuilds) → Open Cloud Animation → loads in engine with exact pose names; visual leg-swing check in OS-1a |
 | S8 models/runtime art | PARTIAL | FBX via Open Cloud arrives as MeshPart + SurfaceAppearance (1 BU = 1 stud); SurfaceAppearance.Color writable at runtime (fur tint path alive); map carry and tint visuals → OS-1b; place download (syncback) refused: needs asset-delivery read on the key |
-| S2, S11, S13-S20 | open | S2/S11 need OS-1a/OS-1c; S13-S20 per BUILD_PLAN rev 3 §4.3 |
+| S2 possession | PARTIAL (headless GO) | 1,008 possess/release incl. swaps, leaves, recovers: 0 errors, 0 leaked bodies; AI resumes next frame; 50th arrival kicked (B4); feel checks in OS-1a |
+| S11 drone far view | PREPARED | test town builds (SLIM, Skyline, lamp heads, terrain 7 s); needs owner OK to publish to main, then OS-1c |
+| S15 receipts + DataStore | PARTIAL (headless GO) | 2,000 faulty deliveries credited exactly once; DataStoreService works in Luau Execution; Open Cloud DataStore read needs a key scope; real purchase test in Studio |
+| S18 paintball hit-reg | GO | 99.8 % agreement at 150 ms with timestamp rewind; <0.2 ms/frame beside the full town |
+| S19 body budget (brief v2) | GO | 109 bodies + 45 vehicles: 0.51 ms/frame total; 160 bodies 0.65 ms |
+| S13, S14, S16, S17 | deferred | need Studio/live server; run in the waves that build those features (plan rev 4) |
 
 ## 3. Engineering rules learned (apply everywhere)
 1. **Requires.** Within a root use relative string requires ("./X", "../Y"). Across roots (server/client/worldgen → shared) use the root's `Import.luau`:
@@ -44,9 +49,12 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 7. **Luau Execution** runs no physics, has no players and auto-runs no scripts. Physics feel, camera and fps checks need the owner's Studio (critique SQ-1, FE-1).
 8. **Commit and push at every task boundary.** The container is ephemeral.
 9. **Art lanes.** FBX export: axis_forward=Z, axis_up=Y, FBX_SCALE_ALL (1 Blender unit = 1 stud). Clips use convention spicy-clip/1 (Pose.CFrame = local joint delta in an axis-aligned joint frame) and export the cycle plus one closing key. Assets API displayName max 50 chars (enforced in upload_asset). SurfaceAppearance maps are not script-readable, so rigs load whole by asset ID; lune-baked kits use Box collision.
+11. **No Git LFS.** lfs.github.com is unreachable from the container; binary art is committed as normal blobs (keep files small).
+12. **Possession seams.** Keep Possession's Engine/BodyOps seams; on handoff call SweptCollision.markTeleported and MoveValidator.reset; brains implement { suspend(), resume(x, y, z) }.
 10. **BakeParity.** Compare plan hashes exactly, structure by hash, geometry with tolerance; never hash float32 sizes across Lune and the engine.
 
 ## 4. Next steps, in order
+0. **Owner gate G0** (docs/owner/G0_SPIKE_REPORT.md): waiting for (1) go for Wave 1, (2) OK to publish the S11 test town to the private main place, (3) optional key scopes (asset-delivery read, DataStore read). Owner session sheet: docs/owner/OS-1.md (CI place v12 holds the S2 test place).
 1. If `BUILD_PLAN.md`'s header does not yet say the rev-3 critique was applied, apply `critique_rev3.md`. Its gaps include B3/B4 absent from the plan, floor arithmetic, regen vs drain, queue weights, ProcessReceipt NotProcessedYet, no runtime audio synthesis, and the already-created CI and Art Inbox places.
 2. Run the remaining spikes. Headless first: S6 bake/terrain, S7 headless animation upload, S8 model upload/runtime art, S15 receipts+DataStore logic, S18 paintball hit-reg, S19 body budget. Then those needing the owner: S2 possession (OS-1a), S11 drone far view (OS-1c), S13/S14/S16/S17.
 3. Write the one-page G0 spike report for the owner. Merge to `main` on go.
