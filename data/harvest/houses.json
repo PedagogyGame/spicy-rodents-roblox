@@ -1,0 +1,1340 @@
+{
+  "$schema": "harvest/houses v1",
+  "units": "HTML world units (1 u = 2.5 studs), +Y up, exactly as the page computed them",
+  "houseCount": 24,
+  "houses": [
+    {
+      "id": 0,
+      "g": {
+        "$object3d": "Group",
+        "position": [-56,0,-53],
+        "rotationY": 0,
+        "scale": [0.82,0.82,0.82],
+        "visible": true,
+        "children": 143
+      },
+      "x": -56,
+      "z": -53,
+      "cfg": {
+        "wall": "#ded7b7",
+        "trim": "#f5ecd5",
+        "roof": "#63524c",
+        "w": 22,
+        "d": 19,
+        "h": 7.298,
+        "peak": 11.069999999999999,
+        "kind": "VICTORIAN"
+      },
+      "w": 18.04,
+      "d": 15.579999999999998,
+      "backZ": -60.79,
+      "frontZ": -45.21,
+      "frontSign": -1,
+      "indoorCeiling": {
+        "$object3d": "Mesh",
+        "position": [0,8.780000000000001,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "indoorRoof": {
+        "$object3d": "Mesh",
+        "position": [0,0,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "interiorObstacles": [],
+      "indoorName": "Victorian"
+    },
+    {
+      "id": 1,
+      "g": {
+        "$object3d": "Group",
+        "position": [51,0,-59],
+        "rotationY": 0,
+        "scale": [0.82,0.82,0.82],
+        "visible": true,
+        "children": 91
+      },
+      "x": 51,
+      "z": -59,
+      "cfg": {
+        "wall": "#b6c1b1",
+        "trim": "#f2ecdf",
+        "roof": "#686a60",
+        "w": 24,
+        "d": 20,
+        "h": 6.068,
+        "peak": 8.528,
+        "kind": "BUNGALOW"
+      },
+      "w": 19.68,
+      "d": 16.4,
+      "backZ": -67.2,
+      "frontZ": -50.8,
+      "frontSign": -1,
+      "indoorCeiling": {
+        "$object3d": "Mesh",
+        "position": [0,7.28,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "indoorRoof": {
+        "$object3d": "Mesh",
+        "position": [0,0,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "interiorObstacles": [],
+      "indoorName": "Bungalow"
+    },
+    {
+      "id": 2,
+      "g": {
+        "$object3d": "Group",
+        "position": [-53,0,51],
+        "rotationY": 0,
+        "scale": [0.82,0.82,0.82],
+        "visible": true,
+        "children": 349
+      },
+      "x": -53,
+      "z": 51,
+      "cfg": {
+        "wall": "#bb8e71",
+        "trim": "#e4d6c5",
+        "roof": "#615653",
+        "w": 22,
+        "d": 20,
+        "h": 7.461999999999999,
+        "peak": 10.741999999999999,
+        "kind": "BRICK HOUSE"
+      },
+      "w": 18.04,
+      "d": 16.4,
+      "backZ": 59.2,
+      "frontZ": 42.8,
+      "frontSign": 1,
+      "indoorCeiling": {
+        "$object3d": "Mesh",
+        "position": [0,8.98,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "indoorRoof": {
+        "$object3d": "Mesh",
+        "position": [0,0,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "interiorObstacles": [],
+      "indoorName": "Brick House"
+    },
+    {
+      "id": 3,
+      "g": {
+        "$object3d": "Group",
+        "position": [58,0,56],
+        "rotationY": 0,
+        "scale": [0.82,0.82,0.82],
+        "visible": true,
+        "children": 93
+      },
+      "x": 58,
+      "z": 56,
+      "cfg": {
+        "wall": "#aebbc4",
+        "trim": "#f4e8cf",
+        "roof": "#6f6f75",
+        "w": 21,
+        "d": 18,
+        "h": 6.56,
+        "peak": 9.511999999999999,
+        "kind": "BLUE COTTAGE"
+      },
+      "w": 17.22,
+      "d": 14.76,
+      "backZ": 63.38,
+      "frontZ": 48.62,
+      "frontSign": 1,
+      "indoorCeiling": {
+        "$object3d": "Mesh",
+        "position": [0,7.88,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "indoorRoof": {
+        "$object3d": "Mesh",
+        "position": [0,0,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "interiorObstacles": [],
+      "indoorName": "Blue Cottage"
+    },
+    {
+      "id": 4,
+      "g": {
+        "$object3d": "Group",
+        "position": [-135,0.836457617725435,-74],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 26
+      },
+      "x": -135,
+      "z": -74,
+      "cfg": {
+        "h": 6.036457617725436,
+        "peak": 8.836457617725436
+      },
+      "w": 10,
+      "d": 12,
+      "frontZ": -74,
+      "backZ": -74,
+      "frontSign": 1
+    },
+    {
+      "id": 5,
+      "g": {
+        "$object3d": "Group",
+        "position": [-217,4.5627288997740365,-72],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": -217,
+      "z": -72,
+      "cfg": {
+        "h": 10.562728899774037,
+        "peak": 13.912728899774038
+      },
+      "w": 11,
+      "d": 14,
+      "frontZ": -72,
+      "backZ": -72,
+      "frontSign": -1
+    },
+    {
+      "id": 6,
+      "g": {
+        "$object3d": "Group",
+        "position": [-217,5.801466382472484,-130],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": -217,
+      "z": -130,
+      "cfg": {
+        "h": 12.601466382472484,
+        "peak": 16.501466382472486
+      },
+      "w": 12,
+      "d": 16,
+      "frontZ": -130,
+      "backZ": -130,
+      "frontSign": -1
+    },
+    {
+      "id": 7,
+      "g": {
+        "$object3d": "Group",
+        "position": [-127,0.1,-209],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 33
+      },
+      "x": -127,
+      "z": -209,
+      "cfg": {
+        "h": 5.3,
+        "peak": 8.1
+      },
+      "w": 13,
+      "d": 13,
+      "frontZ": -209,
+      "backZ": -209,
+      "frontSign": -1
+    },
+    {
+      "id": 8,
+      "g": {
+        "$object3d": "Group",
+        "position": [-63,0.1,-215],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 33
+      },
+      "x": -63,
+      "z": -215,
+      "cfg": {
+        "h": 6.1,
+        "peak": 9.45
+      },
+      "w": 15,
+      "d": 10,
+      "frontZ": -215,
+      "backZ": -215,
+      "frontSign": -1
+    },
+    {
+      "id": 9,
+      "g": {
+        "$object3d": "Group",
+        "position": [62,4.2237363375668675,-208],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 24
+      },
+      "x": 62,
+      "z": -208,
+      "cfg": {
+        "h": 11.023736337566868,
+        "peak": 14.923736337566867
+      },
+      "w": 12,
+      "d": 11,
+      "frontZ": -208,
+      "backZ": -208,
+      "frontSign": -1
+    },
+    {
+      "id": 10,
+      "g": {
+        "$object3d": "Group",
+        "position": [139,6.9862905490397065,-207],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 33
+      },
+      "x": 139,
+      "z": -207,
+      "cfg": {
+        "h": 12.186290549039708,
+        "peak": 14.986290549039708
+      },
+      "w": 14,
+      "d": 12,
+      "frontZ": -207,
+      "backZ": -207,
+      "frontSign": -1
+    },
+    {
+      "id": 11,
+      "g": {
+        "$object3d": "Group",
+        "position": [216,2.6290729054693083,-136],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": 216,
+      "z": -136,
+      "cfg": {
+        "h": 8.629072905469307,
+        "peak": 11.979072905469309
+      },
+      "w": 16,
+      "d": 13,
+      "frontZ": -136,
+      "backZ": -136,
+      "frontSign": 1
+    },
+    {
+      "id": 12,
+      "g": {
+        "$object3d": "Group",
+        "position": [216,0.1,-57],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 33
+      },
+      "x": 216,
+      "z": -57,
+      "cfg": {
+        "h": 6.9,
+        "peak": 10.799999999999999
+      },
+      "w": 10,
+      "d": 13,
+      "frontZ": -57,
+      "backZ": -57,
+      "frontSign": 1
+    },
+    {
+      "id": 13,
+      "g": {
+        "$object3d": "Group",
+        "position": [124,0.5763843979552219,-72],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 33
+      },
+      "x": 124,
+      "z": -72,
+      "cfg": {
+        "h": 5.776384397955222,
+        "peak": 8.576384397955222
+      },
+      "w": 11,
+      "d": 15,
+      "frontZ": -72,
+      "backZ": -72,
+      "frontSign": -1
+    },
+    {
+      "id": 14,
+      "g": {
+        "$object3d": "Group",
+        "position": [127,0.6924605249777765,69],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 24
+      },
+      "x": 127,
+      "z": 69,
+      "cfg": {
+        "h": 6.692460524977776,
+        "peak": 10.042460524977777
+      },
+      "w": 12,
+      "d": 12,
+      "frontZ": 69,
+      "backZ": 69,
+      "frontSign": -1
+    },
+    {
+      "id": 15,
+      "g": {
+        "$object3d": "Group",
+        "position": [211,3.3175410687059697,76],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": 211,
+      "z": 76,
+      "cfg": {
+        "h": 10.11754106870597,
+        "peak": 14.017541068705968
+      },
+      "w": 13,
+      "d": 14,
+      "frontZ": 76,
+      "backZ": 76,
+      "frontSign": 1
+    },
+    {
+      "id": 16,
+      "g": {
+        "$object3d": "Group",
+        "position": [216,2.413868246110393,142],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 34
+      },
+      "x": 216,
+      "z": 142,
+      "cfg": {
+        "h": 7.613868246110393,
+        "peak": 10.413868246110393
+      },
+      "w": 16,
+      "d": 10,
+      "frontZ": 142,
+      "backZ": 142,
+      "frontSign": -1
+    },
+    {
+      "id": 17,
+      "g": {
+        "$object3d": "Group",
+        "position": [132,0.1,207],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": 132,
+      "z": 207,
+      "cfg": {
+        "h": 6.1,
+        "peak": 9.45
+      },
+      "w": 13,
+      "d": 11,
+      "frontZ": 207,
+      "backZ": 207,
+      "frontSign": 1
+    },
+    {
+      "id": 18,
+      "g": {
+        "$object3d": "Group",
+        "position": [48,1.0669943061310905,216],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": 48,
+      "z": 216,
+      "cfg": {
+        "h": 7.866994306131091,
+        "peak": 11.76699430613109
+      },
+      "w": 15,
+      "d": 12,
+      "frontZ": 216,
+      "backZ": 216,
+      "frontSign": 1
+    },
+    {
+      "id": 19,
+      "g": {
+        "$object3d": "Group",
+        "position": [-62,5.502509387983319,213],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 25
+      },
+      "x": -62,
+      "z": 213,
+      "cfg": {
+        "h": 10.70250938798332,
+        "peak": 13.50250938798332
+      },
+      "w": 12,
+      "d": 13,
+      "frontZ": 213,
+      "backZ": 213,
+      "frontSign": 1
+    },
+    {
+      "id": 20,
+      "g": {
+        "$object3d": "Group",
+        "position": [-139,6.0936640304631355,204],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 33
+      },
+      "x": -139,
+      "z": 204,
+      "cfg": {
+        "h": 12.093664030463135,
+        "peak": 15.443664030463136
+      },
+      "w": 14,
+      "d": 10,
+      "frontZ": 204,
+      "backZ": 204,
+      "frontSign": 1
+    },
+    {
+      "id": 21,
+      "g": {
+        "$object3d": "Group",
+        "position": [-216,0.8640630324433498,140],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": -216,
+      "z": 140,
+      "cfg": {
+        "h": 7.664063032443351,
+        "peak": 11.56406303244335
+      },
+      "w": 16,
+      "d": 11,
+      "frontZ": 140,
+      "backZ": 140,
+      "frontSign": -1
+    },
+    {
+      "id": 22,
+      "g": {
+        "$object3d": "Group",
+        "position": [-209,0.1,62],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 33
+      },
+      "x": -209,
+      "z": 62,
+      "cfg": {
+        "h": 5.3,
+        "peak": 8.1
+      },
+      "w": 12,
+      "d": 13,
+      "frontZ": 62,
+      "backZ": 62,
+      "frontSign": -1
+    },
+    {
+      "id": 23,
+      "g": {
+        "$object3d": "Group",
+        "position": [-128,0.1453581918599682,72],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 32
+      },
+      "x": -128,
+      "z": 72,
+      "cfg": {
+        "h": 6.145358191859968,
+        "peak": 9.495358191859967
+      },
+      "w": 13,
+      "d": 15,
+      "frontZ": 72,
+      "backZ": 72,
+      "frontSign": 1
+    }
+  ],
+  "outerHomesTable": [[-135,-74,0],[-217,-72,2],[-217,-130,1],[-127,-209,3],[-63,-215,2],[62,-208,1],[139,-207,0],[216,-136,2],[216,-57,3],[124,-72,1],[127,69,3],[211,76,0],[216,142,1],[132,207,2],[48,216,3],[-62,213,0],[-139,204,1],[-216,140,3],[-209,62,2],[-128,72,0]],
+  "commercialBounds": [
+    {
+      "x": 474,
+      "z": -82,
+      "w": 52,
+      "d": 31,
+      "roof": 20.85003715436434
+    },
+    {
+      "x": 522,
+      "z": 110,
+      "w": 33,
+      "d": 23,
+      "roof": 9.6
+    },
+    {
+      "x": 605,
+      "z": -94,
+      "w": 36,
+      "d": 28,
+      "roof": 13.666781468515241
+    },
+    {
+      "x": -130,
+      "z": -370,
+      "w": 81,
+      "d": 35,
+      "roof": 21.99169843168717
+    },
+    {
+      "x": -63,
+      "z": -463,
+      "w": 20,
+      "d": 15,
+      "roof": 10.61778841858318
+    },
+    {
+      "x": 130,
+      "z": -370,
+      "w": 81,
+      "d": 35,
+      "roof": 16.89286301525061
+    },
+    {
+      "x": 63,
+      "z": -463,
+      "w": 20,
+      "d": 15,
+      "roof": 7.55
+    },
+    {
+      "x": -510,
+      "z": -107,
+      "w": 45.8,
+      "d": 30.8,
+      "roof": 9.35
+    }
+  ],
+  "houseDoors": [
+    {
+      "id": 0,
+      "pivot": {
+        "$object3d": "Group",
+        "position": [-1.12,0,9.66],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "open": 0,
+      "hold": 0,
+      "sign": -1,
+      "homeX": -56,
+      "homeZ": -53,
+      "outside": [-56,0.13,-44.185],
+      "threshold": [-56,0.13,-45.21],
+      "inside": [-56,0.13,-46.973]
+    },
+    {
+      "id": 1,
+      "pivot": {
+        "$object3d": "Group",
+        "position": [-1.12,0,10.16],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "open": 0,
+      "hold": 0,
+      "sign": -1,
+      "homeX": 51,
+      "homeZ": -59,
+      "outside": [51,0.13,-49.775],
+      "threshold": [51,0.13,-50.8],
+      "inside": [51,0.13,-52.563]
+    },
+    {
+      "id": 2,
+      "pivot": {
+        "$object3d": "Group",
+        "position": [-1.12,0,-10.16],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "open": 0,
+      "hold": 0,
+      "sign": 1,
+      "homeX": -53,
+      "homeZ": 51,
+      "outside": [-53,0.13,41.775],
+      "threshold": [-53,0.13,42.8],
+      "inside": [-53,0.13,44.563]
+    },
+    {
+      "id": 3,
+      "pivot": {
+        "$object3d": "Group",
+        "position": [-1.12,0,-9.16],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "open": 0,
+      "hold": 0,
+      "sign": 1,
+      "homeX": 58,
+      "homeZ": 56,
+      "outside": [58,0.13,47.595],
+      "threshold": [58,0.13,48.62],
+      "inside": [58,0.13,50.383]
+    }
+  ],
+  "riverBuildings": [
+    {
+      "x": 758,
+      "z": -162,
+      "rotation": -1.5707963267948966,
+      "w": 15,
+      "d": 12,
+      "h": 10,
+      "rise": 4,
+      "base": 8,
+      "name": "THE OLD ANCHOR",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,-162],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 758,
+      "z": -141,
+      "rotation": -1.5707963267948966,
+      "w": 16.8,
+      "d": 14,
+      "h": 11.25,
+      "rise": 4.6,
+      "base": 8,
+      "name": "QUAYSIDE BOOKS",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,-141],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 758,
+      "z": -120,
+      "rotation": -1.5707963267948966,
+      "w": 18.6,
+      "d": 12,
+      "h": 12.5,
+      "rise": 5.2,
+      "base": 8,
+      "name": "WILLOW BAKERY",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,-120],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 758,
+      "z": -99,
+      "rotation": -1.5707963267948966,
+      "w": 15,
+      "d": 14,
+      "h": 13.75,
+      "rise": 4,
+      "base": 8,
+      "name": "FERRY & FINCH",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,-99],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 758,
+      "z": 63,
+      "rotation": -1.5707963267948966,
+      "w": 16.8,
+      "d": 12,
+      "h": 10,
+      "rise": 4.6,
+      "base": 8,
+      "name": "COPPER KETTLE",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,63],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 758,
+      "z": 84,
+      "rotation": -1.5707963267948966,
+      "w": 18.6,
+      "d": 14,
+      "h": 11.25,
+      "rise": 5.2,
+      "base": 8,
+      "name": "RIVER APOTHECARY",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,84],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 758,
+      "z": 105,
+      "rotation": -1.5707963267948966,
+      "w": 15,
+      "d": 12,
+      "h": 12.5,
+      "rise": 4,
+      "base": 8,
+      "name": "THE LANTERN",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,105],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 758,
+      "z": 126,
+      "rotation": -1.5707963267948966,
+      "w": 16.8,
+      "d": 14,
+      "h": 13.75,
+      "rise": 4.6,
+      "base": 8,
+      "name": "BRIDGE HOUSE",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,126],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 758,
+      "z": 147,
+      "rotation": -1.5707963267948966,
+      "w": 18.6,
+      "d": 12,
+      "h": 10,
+      "rise": 5.2,
+      "base": 8,
+      "name": "TIDE & TIMBER",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,147],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 758,
+      "z": 168,
+      "rotation": -1.5707963267948966,
+      "w": 15,
+      "d": 14,
+      "h": 11.25,
+      "rise": 4,
+      "base": 8,
+      "name": "THE COBBLER",
+      "group": {
+        "$object3d": "Group",
+        "position": [758,8,168],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 950,
+      "z": -166,
+      "rotation": 1.5707963267948966,
+      "w": 18.6,
+      "d": 12,
+      "h": 12.5,
+      "rise": 5.2,
+      "base": 8,
+      "name": "FERRY & FINCH",
+      "group": {
+        "$object3d": "Group",
+        "position": [950,8,-166],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 952,
+      "z": -144,
+      "rotation": 1.5707963267948966,
+      "w": 15,
+      "d": 14,
+      "h": 13.75,
+      "rise": 4,
+      "base": 8,
+      "name": "COPPER KETTLE",
+      "group": {
+        "$object3d": "Group",
+        "position": [952,8,-144],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 954,
+      "z": -122,
+      "rotation": 1.5707963267948966,
+      "w": 16.8,
+      "d": 12,
+      "h": 10,
+      "rise": 4.6,
+      "base": 8,
+      "name": "RIVER APOTHECARY",
+      "group": {
+        "$object3d": "Group",
+        "position": [954,8,-122],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 950,
+      "z": -100,
+      "rotation": 1.5707963267948966,
+      "w": 18.6,
+      "d": 14,
+      "h": 11.25,
+      "rise": 5.2,
+      "base": 8,
+      "name": "THE LANTERN",
+      "group": {
+        "$object3d": "Group",
+        "position": [950,8,-100],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 952,
+      "z": 62,
+      "rotation": 1.5707963267948966,
+      "w": 15,
+      "d": 12,
+      "h": 12.5,
+      "rise": 4,
+      "base": 8,
+      "name": "BRIDGE HOUSE",
+      "group": {
+        "$object3d": "Group",
+        "position": [952,8,62],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 954,
+      "z": 84,
+      "rotation": 1.5707963267948966,
+      "w": 16.8,
+      "d": 14,
+      "h": 13.75,
+      "rise": 4.6,
+      "base": 8,
+      "name": "TIDE & TIMBER",
+      "group": {
+        "$object3d": "Group",
+        "position": [954,8,84],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 950,
+      "z": 106,
+      "rotation": 1.5707963267948966,
+      "w": 18.6,
+      "d": 12,
+      "h": 10,
+      "rise": 5.2,
+      "base": 8,
+      "name": "THE COBBLER",
+      "group": {
+        "$object3d": "Group",
+        "position": [950,8,106],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 952,
+      "z": 128,
+      "rotation": 1.5707963267948966,
+      "w": 15,
+      "d": 14,
+      "h": 11.25,
+      "rise": 4,
+      "base": 8,
+      "name": "WREN COTTAGE",
+      "group": {
+        "$object3d": "Group",
+        "position": [952,8,128],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 954,
+      "z": 150,
+      "rotation": 1.5707963267948966,
+      "w": 16.8,
+      "d": 12,
+      "h": 12.5,
+      "rise": 4.6,
+      "base": 8,
+      "name": "THE TEA ROOM",
+      "group": {
+        "$object3d": "Group",
+        "position": [954,8,150],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 950,
+      "z": 172,
+      "rotation": 1.5707963267948966,
+      "w": 18.6,
+      "d": 14,
+      "h": 13.75,
+      "rise": 5.2,
+      "base": 8,
+      "name": "THE OLD ANCHOR",
+      "group": {
+        "$object3d": "Group",
+        "position": [950,8,172],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 952,
+      "z": 194,
+      "rotation": 1.5707963267948966,
+      "w": 15,
+      "d": 12,
+      "h": 10,
+      "rise": 4,
+      "base": 8,
+      "name": "QUAYSIDE BOOKS",
+      "group": {
+        "$object3d": "Group",
+        "position": [952,8,194],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 954,
+      "z": 216,
+      "rotation": 1.5707963267948966,
+      "w": 16.8,
+      "d": 14,
+      "h": 11.25,
+      "rise": 4.6,
+      "base": 8,
+      "name": "WILLOW BAKERY",
+      "group": {
+        "$object3d": "Group",
+        "position": [954,8,216],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 1008,
+      "z": -164,
+      "rotation": 0,
+      "w": 15,
+      "d": 12,
+      "h": 12.5,
+      "rise": 4,
+      "base": 8,
+      "name": "BRIDGE HOUSE",
+      "group": {
+        "$object3d": "Group",
+        "position": [1008,8,-164],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 1032,
+      "z": -118,
+      "rotation": 3.141592653589793,
+      "w": 16.8,
+      "d": 14,
+      "h": 13.75,
+      "rise": 4.6,
+      "base": 8,
+      "name": "TIDE & TIMBER",
+      "group": {
+        "$object3d": "Group",
+        "position": [1032,8,-118],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 1008,
+      "z": -72,
+      "rotation": 0,
+      "w": 18.6,
+      "d": 12,
+      "h": 10,
+      "rise": 5.2,
+      "base": 8,
+      "name": "THE COBBLER",
+      "group": {
+        "$object3d": "Group",
+        "position": [1008,8,-72],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 1032,
+      "z": 91,
+      "rotation": 3.141592653589793,
+      "w": 15,
+      "d": 14,
+      "h": 11.25,
+      "rise": 4,
+      "base": 8,
+      "name": "WREN COTTAGE",
+      "group": {
+        "$object3d": "Group",
+        "position": [1032,8,91],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 1008,
+      "z": 137,
+      "rotation": 0,
+      "w": 16.8,
+      "d": 12,
+      "h": 12.5,
+      "rise": 4.6,
+      "base": 8,
+      "name": "THE TEA ROOM",
+      "group": {
+        "$object3d": "Group",
+        "position": [1008,8,137],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 1032,
+      "z": 183,
+      "rotation": 3.141592653589793,
+      "w": 18.6,
+      "d": 14,
+      "h": 13.75,
+      "rise": 5.2,
+      "base": 8,
+      "name": "THE OLD ANCHOR",
+      "group": {
+        "$object3d": "Group",
+        "position": [1032,8,183],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    },
+    {
+      "x": 1008,
+      "z": 229,
+      "rotation": 0,
+      "w": 15,
+      "d": 12,
+      "h": 10,
+      "rise": 4,
+      "base": 8,
+      "name": "QUAYSIDE BOOKS",
+      "group": {
+        "$object3d": "Group",
+        "position": [1008,8,229],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 13
+      }
+    },
+    {
+      "x": 1032,
+      "z": 275,
+      "rotation": 3.141592653589793,
+      "w": 16.8,
+      "d": 14,
+      "h": 11.25,
+      "rise": 4.6,
+      "base": 8,
+      "name": "WILLOW BAKERY",
+      "group": {
+        "$object3d": "Group",
+        "position": [1032,8,275],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 12
+      }
+    }
+  ]
+}

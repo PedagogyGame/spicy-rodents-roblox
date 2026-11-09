@@ -1,0 +1,209 @@
+{
+  "$schema": "golden/manifest v1",
+  "generatedAt": "2026-11-09T06:10:16.846Z",
+  "tool": "tools/golden v0.1.0",
+  "three": {
+    "npm": "0.160.1",
+    "revision": "160"
+  },
+  "reference": {
+    "path": "/home/user/spicy-rodents/reference/v5_4_game.js",
+    "verbatimBlocks": [
+      {
+        "name": "RNG",
+        "from": 80,
+        "to": 89,
+        "sha256": "e8323f5485d4267609b022cae27f73cb9ab10de7a8620e36f788863528b90385",
+        "what": "mulberry32-style seeded RNG; every random vector set below is drawn with it"
+      },
+      {
+        "name": "ROUTE_MOTION",
+        "from": 267,
+        "to": 272,
+        "sha256": "5676a4aeadea9c9a4f509b7bc575a563fd83f5e4c6774da501eea08fa456c434",
+        "what": "RouteMotion.advance(t, dir, forward, seconds, speed, length)"
+      },
+      {
+        "name": "SMOOTHSTEP",
+        "from": 403,
+        "to": 406,
+        "sha256": "5996a0fb1dc7f3f3a364fb181fcb56b73dfb31a0349fa4a90b3328d9aa661a78",
+        "what": "smoothstep used by baseTerrainHeight (THREE.MathUtils.clamp)"
+      },
+      {
+        "name": "BASE_TERRAIN_HEIGHT",
+        "from": 407,
+        "to": 416,
+        "sha256": "c1fb60e2a2d1d893dc1b57382fbe20023b2cb0c504d69873c82e107e98189b7a",
+        "what": "baseTerrainHeight(x, z)"
+      },
+      {
+        "name": "RIVER",
+        "from": 419,
+        "to": 435,
+        "sha256": "9bc3be47945511823a90a30977e09e8f1495b91c842317db306e45135da8f975",
+        "what": "RIVER constants"
+      },
+      {
+        "name": "RIVER_FUNCTIONS",
+        "from": 436,
+        "to": 457,
+        "sha256": "2b07bb93b6979ec24278e566f9ed288a33683a65e45c0b26b2d540bf188dff86",
+        "what": "riverCenter, inRiverDistrict, insideRiverWater, riverDeckAt"
+      },
+      {
+        "name": "TERRAIN_HEIGHT",
+        "from": 458,
+        "to": 464,
+        "sha256": "948b159420c107eff63763251386b4d9f6d37de2487578c2ce8228a0826a5b1a",
+        "what": "terrainHeight(x, z) (uses THREE.MathUtils.smoothstep)"
+      },
+      {
+        "name": "HEDGE_PATCHES",
+        "from": 3573,
+        "to": 3579,
+        "sha256": "6901501f15dd8344a0a3178a0fd8e5fc6655d24efb3299716aa3ea2ceec63829",
+        "what": "hedgePatches table read by the spotted predicate"
+      },
+      {
+        "name": "GARDEN",
+        "from": 3590,
+        "to": 3591,
+        "sha256": "589f1a099cf0ab0fb7b162a1d92813a39243a8313df5df3a1897fbb70148529d",
+        "what": "GARDEN_X / GARDEN_Z read by the spotted predicate"
+      },
+      {
+        "name": "ROUTE_JUNCTION",
+        "from": 5782,
+        "to": 5793,
+        "sha256": "27e4e90a05e1775648109db17a6787235154ba3fb8b2da71b9457d529184add7",
+        "what": "RouteJunction.inward / canTransfer / ease"
+      },
+      {
+        "name": "ATTACK_HEADING",
+        "from": 5900,
+        "to": 5906,
+        "sha256": "e2d951513869797332fd38a8b7d0a363645a75aa49a101f0b04913fe36353c95",
+        "what": "attackHeading() (reads player.rail, player.trunkNormal, player.yaw)"
+      },
+      {
+        "name": "JUMP_VELOCITY",
+        "from": 5915,
+        "to": 5921,
+        "sha256": "05dc62110b837b20f2d41faa7862f9d3fe3b304913b7b7de95c037891fb3ae10",
+        "what": "jumpVelocity() (reads player.boostRemaining)"
+      },
+      {
+        "name": "SQUIRREL_GRAVITY",
+        "from": 6472,
+        "to": 6472,
+        "sha256": "5cf8731552ec15ed4a7423c2168d68afcf28aa18d44b91e86df65b62867ac914",
+        "what": "SQUIRREL_GRAVITY = 30"
+      },
+      {
+        "name": "POUNCE_VELOCITY",
+        "from": 6473,
+        "to": 6481,
+        "sha256": "dd4160c29a618d24ca1d04cf51500a76701a264c81bf38e1836dc4bc03ef32ef",
+        "what": "pounceVelocity() (reads pitch, player.focus, player.moveSpeed, player.boostRemaining)"
+      },
+      {
+        "name": "SPOTTED",
+        "from": 7027,
+        "to": 7051,
+        "sha256": "55638b0d5a0afef74a868d01b289d4dc39c9b2da389c08a3e6718f6f3f34000f",
+        "what": "the spotted predicate statements inside updateHumans (reads player, pos, n, activeHouseInterior, time, crimeScenes)"
+      },
+      {
+        "name": "SEGMENT_BOX_ENTRY",
+        "from": 15786,
+        "to": 15807,
+        "sha256": "ae7d0fbcd8c8393a21a092c08c60886f1c7844cccc60082722bf218d5578b6b8",
+        "what": "segmentBoxEntry(a, b, halfWidth, halfLength, minY, maxY)"
+      },
+      {
+        "name": "SWEPT_VEHICLE_HIT",
+        "from": 15808,
+        "to": 15851,
+        "sha256": "9e141962e5defd4f36d30397dfbe3df88233cbec914fb841da146dc51164c432",
+        "what": "sweptVehicleHit(p0, p1, v0, v1, yaw0, yaw1, width, length, height)"
+      }
+    ],
+    "verified": {
+      "verified": true,
+      "blocks": 17
+    }
+  },
+  "harvest": {
+    "dir": "/home/user/spicy-rodents-roblox/data/harvest",
+    "routes": 1332
+  },
+  "threeCrossCheck": {
+    "routesChecked": 1332,
+    "maxLengthDiff": 5.684341886080802e-14,
+    "maxSamplePointDiff": 2.308990589380062e-13,
+    "sampleCountMismatch": 2
+  },
+  "seeds": {
+    "terrain": 4101,
+    "curves": 4102,
+    "advance": 4103,
+    "railMotion": 4104,
+    "swept": 4105,
+    "segmentBox": 4106,
+    "spotted": 4107
+  },
+  "sweptHits": 4715,
+  "files": {
+    "terrain.json": {
+      "bytes": 1125583,
+      "sha256": "a19fc0101c53d34ea4b69fe7d3a83d67245a3b22afe1ded4598c9a87391962d7",
+      "count": 11060
+    },
+    "curves.json": {
+      "bytes": 3339531,
+      "sha256": "ebcae176d9ffb80094fbd7ff5f69f556573c35d88ee6ecb14245e5af65ccb27c",
+      "count": 200
+    },
+    "advance.json": {
+      "bytes": 154739,
+      "sha256": "7cf633eaffda02f0f1588ebb9eee6a07db24b4edb57c5c123acdde7e9d1c8180",
+      "count": 2000
+    },
+    "rail_motion.json": {
+      "bytes": 706289,
+      "sha256": "6cba14be53dc3756d8cd1b1940924c9b0c70cbfae8c0a8b137fc04c0e5bec614",
+      "count": 60
+    },
+    "swept.json": {
+      "bytes": 3288450,
+      "sha256": "8bfed8c7c1582a028e7736513dd088084fc69faabd099c9534404821c8df01bb",
+      "count": 10126
+    },
+    "segment_box_entry.json": {
+      "bytes": 575787,
+      "sha256": "4ac21f71bc20c0cacc4f6bf83dc6a160613293f5ffdd0da2f485c9849de70eea",
+      "count": 3000
+    },
+    "travel_filter.json": {
+      "bytes": 5800,
+      "sha256": "8d9fe7b09bdc2d00530101bef9f4c353cc4ed92b08f4971a6fd801b5491be31d",
+      "count": 72
+    },
+    "pounce.json": {
+      "bytes": 732593,
+      "sha256": "74d024d472e0ce2ee9a97ba3a3c1f0f0267c8ebb8e6bb976cc992ee2305a087b",
+      "count": 5200
+    },
+    "spotted.json": {
+      "bytes": 747187,
+      "sha256": "8960891dca480fe7d27edb0c73c86975694fdb6c4368413ceb847067b19af422",
+      "count": 3010
+    },
+    "junction.json": {
+      "bytes": 4675,
+      "sha256": "4bd6ca11d47910ffd750f2c42511e0e9a9323dab2833d890055cd28a70bcc93f",
+      "count": 49
+    }
+  }
+}

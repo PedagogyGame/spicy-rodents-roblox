@@ -1,0 +1,547 @@
+{
+  "$schema": "harvest/world v1",
+  "units": "HTML world units (1 u = 2.5 studs), +Y up, exactly as the page computed them",
+  "buildInfo": {
+    "version": "5.4",
+    "engine": "0.160.1",
+    "name": "River & Old Town"
+  },
+  "worldHalf": 270,
+  "river": {
+    "startX": 687,
+    "endX": 1150,
+    "zMin": -244,
+    "zMax": 443,
+    "centerX": 850,
+    "halfWidth": 52,
+    "bankY": 8,
+    "waterY": 2.4,
+    "bedY": -2,
+    "bridgeZ": 0,
+    "deckY": 15.8,
+    "bridgeStart": 790,
+    "bridgeEnd": 910,
+    "rampStart": 744,
+    "rampEnd": 956
+  },
+  "pavementZones": [
+    {
+      "axis": "z",
+      "coord": 0,
+      "width": 18,
+      "start": -270,
+      "end": 270,
+      "offset": 0.055,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": -12.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": 12.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": -180,
+      "width": 18,
+      "start": -270,
+      "end": 270,
+      "offset": 0.055,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": -192.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": -167.9,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": 178,
+      "width": 18,
+      "start": -270,
+      "end": 270,
+      "offset": 0.055,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": 165.9,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "z",
+      "coord": 190.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": 0,
+      "width": 18,
+      "start": -270,
+      "end": 270,
+      "offset": 0.055,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": -12.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": 12.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": -174,
+      "width": 18,
+      "start": -270,
+      "end": 270,
+      "offset": 0.055,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": -186.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": -161.9,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": 171,
+      "width": 18,
+      "start": -270,
+      "end": 270,
+      "offset": 0.055,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": 158.9,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": 183.1,
+      "width": 3.3,
+      "start": -270,
+      "end": 270,
+      "offset": 0.09,
+      "segments": 104
+    },
+    {
+      "axis": "x",
+      "coord": 0,
+      "width": 26,
+      "start": 247,
+      "end": 681,
+      "offset": 0.065,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": -17.4,
+      "width": 3.3,
+      "start": 249,
+      "end": 679,
+      "offset": 0.13,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": 17.4,
+      "width": 3.3,
+      "start": 249,
+      "end": 679,
+      "offset": 0.13,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 347,
+      "width": 29,
+      "start": -215,
+      "end": 219,
+      "offset": 0.075,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 329.5,
+      "width": 3.4,
+      "start": -212,
+      "end": 216,
+      "offset": 0.135,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 364.5,
+      "width": 3.4,
+      "start": -212,
+      "end": 216,
+      "offset": 0.135,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 0,
+      "width": 18,
+      "start": -329,
+      "end": -263,
+      "offset": 0.07,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": -12.1,
+      "width": 3.3,
+      "start": -329,
+      "end": -263,
+      "offset": 0.12,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 12.1,
+      "width": 3.3,
+      "start": -329,
+      "end": -263,
+      "offset": 0.12,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": -305,
+      "width": 20,
+      "start": -258,
+      "end": 258,
+      "offset": 0.07,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": -317.1,
+      "width": 3.5,
+      "start": -258,
+      "end": 258,
+      "offset": 0.12,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": -292.9,
+      "width": 3.5,
+      "start": -258,
+      "end": 258,
+      "offset": 0.12,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 175,
+      "width": 12.5,
+      "start": 233,
+      "end": 422,
+      "offset": 0.12,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 165,
+      "width": 2.8,
+      "start": 248,
+      "end": 421,
+      "offset": 0.17,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": 185,
+      "width": 2.8,
+      "start": 248,
+      "end": 421,
+      "offset": 0.17,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": 283,
+      "width": 11,
+      "start": -241,
+      "end": 651,
+      "offset": 0.14,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": 273.7,
+      "width": 2.2,
+      "start": -241,
+      "end": 650,
+      "offset": 0.18,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": 292.3,
+      "width": 2.2,
+      "start": -241,
+      "end": 650,
+      "offset": 0.18,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": 283,
+      "width": 12,
+      "start": -417,
+      "end": -238,
+      "offset": 0.14,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": 273.5,
+      "width": 2.7,
+      "start": -421,
+      "end": -238,
+      "offset": 0.18,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": 292.5,
+      "width": 2.7,
+      "start": -421,
+      "end": -238,
+      "offset": 0.18,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": -356,
+      "width": 8,
+      "start": 284,
+      "end": 305,
+      "offset": 0.16,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": -362.5,
+      "width": 1.7,
+      "start": 283,
+      "end": 306,
+      "offset": 0.2,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": -349.5,
+      "width": 1.7,
+      "start": 283,
+      "end": 306,
+      "offset": 0.2,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": -289,
+      "width": 15,
+      "start": -244,
+      "end": 267,
+      "offset": 0.19,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": -299,
+      "width": 2.5,
+      "start": -249,
+      "end": 272,
+      "offset": 0.23,
+      "segments": 95
+    },
+    {
+      "axis": "z",
+      "coord": -279,
+      "width": 2.5,
+      "start": -249,
+      "end": 272,
+      "offset": 0.23,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": -179,
+      "width": 12,
+      "start": -296,
+      "end": -176,
+      "offset": 0.18,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": -187,
+      "width": 2.1,
+      "start": -299,
+      "end": -178,
+      "offset": 0.2,
+      "segments": 95
+    },
+    {
+      "axis": "x",
+      "coord": -171,
+      "width": 2.1,
+      "start": -299,
+      "end": -178,
+      "offset": 0.2,
+      "segments": 95
+    }
+  ],
+  "concealment": {
+    "hedgePatches": [[125,303,14,2.3],[118,372,11,3],[-104,305,18,2.4],[290,306,22,2.6],[613,421,15,2.2]],
+    "garden": {
+      "x": 115,
+      "z": 341
+    }
+  },
+  "tabascoPlants": [
+    {
+      "$object3d": "Group",
+      "position": [125,4.492293544353186,331],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [127.6,4.467416405199792,331],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [130.2,4.438281070093098,331],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [125,4.822923440210775,336.5],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [127.6,4.795997224800594,336.5],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [130.2,4.763993372102242,336.5],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [125,5.114063674292199,342],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [127.6,5.08752987392044,342],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    },
+    {
+      "$object3d": "Group",
+      "position": [130.2,5.055260304146223,342],
+      "rotationY": 0,
+      "scale": [1,1,1],
+      "visible": true,
+      "children": 16
+    }
+  ],
+  "counts": {
+    "humanoids": 77,
+    "noveltyCast": 6,
+    "birds": 32
+  }
+}

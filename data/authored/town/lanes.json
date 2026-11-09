@@ -1,0 +1,648 @@
+{
+  "$schema": "../../schema/lanes.schema.json",
+  "lanes": [
+    {
+      "id": "res_main_ns_northbound",
+      "roads": ["rd_001_grid_ns_x0"],
+      "roadNote": "rd_001_grid_ns_x0 (18 wide, x=0)",
+      "path": {
+        "axis": "z",
+        "coord": -5.4,
+        "start": -260,
+        "end": 260
+      },
+      "dir": "+z",
+      "users": ["sedan (updateCars mover, spawned at z=115, yaw 0)"],
+      "speed": {
+        "sedan": [6.5, 9.5]
+      },
+      "notes": "Right-hand running (heading +z, kerb side is -x). Shares the lane with the ice cream van between z=-127 and z=127. No signals or stop logic at the z=0 / z=-174 / z=171 crossings.",
+      "src": ["v5.4 L1564", "v5.4 L7435"],
+      "wrap": "z > 260 -> z = -260 (teleport; never fatal)",
+      "yieldsTo": ["visible non-hospital humanoids in corridor", "any visible humanoid within 3.1 of next position (hard stop)", "fleet vehicle ahead (trafficVehicleAhead)"]
+    },
+    {
+      "id": "res_main_ns_southbound",
+      "roads": ["rd_001_grid_ns_x0"],
+      "roadNote": "rd_001_grid_ns_x0 (18 wide, x=0)",
+      "path": {
+        "axis": "z",
+        "coord": 5.4,
+        "start": -260,
+        "end": 260
+      },
+      "dir": "-z",
+      "users": ["sedan (updateCars mover, spawned at z=-86, yaw PI)", "RV (heavy, spawned at z=180, yaw PI)"],
+      "speed": {
+        "rv": 7.5,
+        "sedan": [6.5, 9.5]
+      },
+      "notes": "Right-hand running. Terrain on this lane rises to about 5.4 near the north and south ends, so the RV's absolute squirrel-visibility test (player.pos.y < 4.8) fails there (computed).",
+      "src": ["v5.4 L1565", "v5.4 L15904"],
+      "wrap": "sedan: z < -260 -> 260; RV: z < -250 -> 250",
+      "yieldsTo": ["sedan: as res_main_ns_northbound", "RV: seesHazard(range 10, halfWidth 1.6) incl. the squirrel, plus trafficVehicleAhead(range 11)"]
+    },
+    {
+      "id": "res_west_ns_x-180_northbound",
+      "roads": ["rd_004_grid_ns_x-180"],
+      "roadNote": "rd_004_grid_ns_x-180 (18 wide, x=-180)",
+      "path": {
+        "axis": "z",
+        "coord": -185.4,
+        "start": -250,
+        "end": 250
+      },
+      "dir": "+z",
+      "users": ["dump truck (heavy, spawned at z=-210, yaw 0)"],
+      "speed": {
+        "dump": 6.7
+      },
+      "notes": "Only vehicle on this street. Terrain reaches about 7.15 on this lane, so the absolute squirrel test (y < 4.8) is blind wherever terrain + 0.18 >= 4.8, which is about 11% of the lane (computed).",
+      "src": ["v5.4 L15902"],
+      "wrap": "z > 250 -> -250",
+      "yieldsTo": ["seesHazard(range 10, halfWidth 1.675)", "trafficVehicleAhead(range 11, halfWidth 1.675)"]
+    },
+    {
+      "id": "icecream_loop",
+      "roads": ["rd_001_grid_ns_x0"],
+      "roadNote": "rd_001_grid_ns_x0",
+      "path": {
+        "closed": true,
+        "interpolation": "THREE.CatmullRomCurve3 closed, centripetal (alpha 0.5), arc-length parameterised",
+        "length": 519.92,
+        "points": [
+          [-5.7, -120],
+          [-5.7, -45],
+          [-5.7, 45],
+          [-5.7, 120],
+          [-4, 125],
+          [0, 127],
+          [4, 125],
+          [5.7, 120],
+          [5.7, 45],
+          [5.7, -45],
+          [5.7, -120],
+          [4, -125],
+          [0, -127],
+          [-4, -125]
+        ]
+      },
+      "dir": "loop: northbound (+z) on x=-5.7, U-turn through (0,127), southbound (-z) on x=+5.7, U-turn through (0,-127)",
+      "users": ["ice cream van 'SCOOP MOBILE'"],
+      "speed": {
+        "ice_cream_van": 7.6
+      },
+      "dwellSeconds": "5.8 + (deliveries mod 3) -> 5.8, 6.8, 7.8 repeating",
+      "notes": "Stop positions and loop length computed by re-implementing THREE's centripetal Catmull-Rom with 200 arc-length divisions. Lateral overshoot reaches |x| = 6.45 near the stops/turns.",
+      "src": ["v5.4 L7591", "v5.4 L7730"],
+      "stops": [
+        {
+          "at": [-5.7, -36.86],
+          "distance": 83.19,
+          "fraction": 0.16,
+          "heading": "+z"
+        },
+        {
+          "at": [6.06, 73.24],
+          "distance": 306.75,
+          "fraction": 0.59,
+          "heading": "-z"
+        }
+      ]
+    },
+    {
+      "id": "blvd_eastbound",
+      "roads": ["rd_019_commercial_blvd"],
+      "roadNote": "rd_019_commercial_blvd (26 wide, z=0, x 247..681)",
+      "path": {
+        "axis": "x",
+        "coord": -5.6,
+        "start": 280,
+        "end": 660
+      },
+      "dir": "+x",
+      "users": ["sedan (updateCars mover, spawned at x=287)", "dump truck (heavy, spawned at x=383)", "motorcycle #0 'Morgan Rider' (z=-5.7, enters at x=296, despawns past x=657)"],
+      "speed": {
+        "dump": 6.7,
+        "motorcycle_0": 10.4,
+        "sedan": [6.5, 8.6]
+      },
+      "notes": "Left-hand running relative to the residential streets (heading +x, the vehicle's right is +z, but it drives at z<0). The patrol car also uses z=-5.6 in BOTH directions (see patrol_beat). Crosses the x=347 signalised intersection without stopping.",
+      "src": ["v5.4 L1577", "v5.4 L15901", "v5.4 L9662"],
+      "wrap": "sedan and dump: x > 660 -> 280. Motorcycle: deactivates when x > 657 (or < 283) and respawns after 53 s at x=296.",
+      "yieldsTo": ["sedan: humanoid corridor + hard stop + trafficVehicleAhead", "dump: seesHazard + trafficVehicleAhead", "motorcycle: nothing"]
+    },
+    {
+      "id": "blvd_westbound",
+      "roads": ["rd_019_commercial_blvd"],
+      "roadNote": "rd_019_commercial_blvd",
+      "path": {
+        "axis": "x",
+        "coord": 5.6,
+        "start": 280,
+        "end": 660
+      },
+      "dir": "-x",
+      "users": ["sedan (updateCars mover, spawned at x=620)", "RV (heavy, spawned at x=579)", "motorcycle #1 'Alex Rider' (z=5.7, enters at x=650, despawns below x=283)"],
+      "speed": {
+        "motorcycle_1": 11.9,
+        "rv": 7.5,
+        "sedan": [6.5, 8.6]
+      },
+      "notes": "Centreline is only 3.05 from the trolley track (z=8.65); the lateral test in trafficVehicleAhead treats the trolley as in-lane, so an eastbound trolley and a westbound sedan or RV meeting head-on both stop (deadlock inferred from code, not observed).",
+      "src": ["v5.4 L1578", "v5.4 L15903", "v5.4 L9662"],
+      "wrap": "sedan and RV: x < 280 -> 660. Motorcycle: respawns after 75 s at x=650.",
+      "yieldsTo": ["as blvd_eastbound"]
+    },
+    {
+      "id": "patrol_beat",
+      "roads": ["rd_010_grid_ew_z0", "rd_019_commercial_blvd"],
+      "roadNote": "rd_010_grid_ew_z0 (x 55..270) continuing onto rd_019_commercial_blvd (x 247..645)",
+      "path": {
+        "axis": "x",
+        "coord": -5.6,
+        "start": 55,
+        "end": 645
+      },
+      "dir": "both (ping-pong; yaw flips instantly PI/2 <-> -PI/2 at the ends)",
+      "users": ["patrol car (makeCar, white #e0e6de with blue/red light bar)"],
+      "speed": {
+        "patrol_car": 10.5
+      },
+      "notes": "Moves only while no officer is deployed (copState.out false). Dispatch teleports it beside an incident (pathPoint(p.x+12, p.z+7) or (p.x+17, p.z+12)) and nothing restores z=-5.6 afterwards, so later patrols run along x at the teleported z (HTML bug). Runs in the eastbound lane in both directions and yields to nobody.",
+      "src": ["v5.4 L7976", "v5.4 L8029"],
+      "wrap": "none; reverses at x>645 and x<55",
+      "yieldsTo": []
+    },
+    {
+      "id": "trolley_track",
+      "roads": ["rd_025_trolley_track"],
+      "roadNote": "rd_025_trolley_track (rails at z=7.38 and 9.92, x 263..675, ties every 3.2 from x=265 to 669)",
+      "path": {
+        "axis": "x",
+        "coord": 8.65,
+        "start": 283,
+        "end": 657
+      },
+      "dir": "both (shuttle; body never rotates, yaw fixed PI/2)",
+      "users": ["heritage trolley 'CITY TROLLEY'"],
+      "speed": {
+        "trolley": 10.7
+      },
+      "dwellSeconds": {
+        "stations": 4.2,
+        "termini_283_657": 2.3
+      },
+      "notes": "Starts at x=283 with nextStop 0 (x=310).",
+      "schedule": [310, 465, 616, 657, 616, 465, 310, 283],
+      "src": ["v5.4 L7692", "v5.4 L7713", "v5.4 L7776"],
+      "stations": [
+        {
+          "x": 310,
+          "platform_z": 20.2
+        },
+        {
+          "x": 465,
+          "platform_z": 20.2
+        },
+        {
+          "x": 616,
+          "platform_z": 20.2
+        }
+      ],
+      "wrap": "none",
+      "yieldsTo": ["seesHazard(range 11, halfWidth 1.85) incl. the squirrel"]
+    },
+    {
+      "id": "north_arterial_legacy_ambulance",
+      "roads": ["rd_049_north_cross_z283", "rd_065_hospital_road_z283", "rd_068_hospital_drive"],
+      "roadNote": "rd_049_north_cross_z283 + rd_065_hospital_road_z283, then rd_068_hospital_drive (x=-356)",
+      "path": {
+        "closed": false,
+        "points": [
+          [639, 283],
+          [-356, 283],
+          [-356, 295]
+        ]
+      },
+      "dir": "-x along z=283, then +z up the hospital drive",
+      "users": ["legacy ambulance (makeCar #f0eee6 with box and stripes)"],
+      "speed": {
+        "ambulance_arterial": 12.5,
+        "ambulance_drive": 10.625
+      },
+      "notes": "Drives the road centreline, no lane offset. Siren chirp every 1.45 s while not parked.",
+      "src": ["v5.4 L8980", "v5.4 L8996", "v5.4 L9008", "v5.4 L9015"],
+      "wrap": "appears at (639,283) after a wait; vanishes after parking 16 s; waits 145 s; repeats",
+      "yieldsTo": ["arterial leg only: stops dead (no deceleration) while any visible non-hospital humanoid is within radius 5"]
+    },
+    {
+      "id": "responder_ambulance_trunk",
+      "roads": [],
+      "roadNote": "hospital drive, z=283 hospital road, westside street x=-289, westside connector z=-179, grid streets",
+      "path": {
+        "closed": false,
+        "continues": "dynamic tail from makeRoadTrip(stage.stop), see traffic.md 5.9",
+        "points": [
+          [-356, 295],
+          [-356, 283],
+          [-289, 283],
+          [-289, -179],
+          [-180, -179]
+        ]
+      },
+      "dir": "outbound forward, return by walking the same polyline in reverse",
+      "users": ["responder ambulance x3 (#f4f0ea, flashing red/blue bars)"],
+      "speed": {
+        "outbound": 24,
+        "outbound_responseStyle_2": 27,
+        "return": 25
+      },
+      "notes": "Polyline follows road centrelines. If the stage is west of x=-255 the route goes (-289,283) -> (-289,tz) -> stop instead of the trunk tail. Yaw snaps to each leg heading.",
+      "src": ["v5.4 L10450", "v5.4 L10820", "v5.4 L10902"],
+      "wrap": "none (appears at medicalHome after a 9-19 s wait, hidden when idle)",
+      "yieldsTo": []
+    },
+    {
+      "id": "incident_police_route",
+      "roads": [],
+      "roadNote": "x=-300 runs just west of the westside street (x=-289); last leg is a straight diagonal to the scene",
+      "path": {
+        "closed": false,
+        "points_template": [
+          ["policeStation.x - 15 (car 0) or + 15 (car 1)", "policeStation.z + 26"],
+          [-300, "policeStation.z + 26"],
+          [-300, "p.z + 10"],
+          ["p.x - 9 (car 0) or + 9 (car 1)", "p.z + 10"]
+        ],
+        "resolved_start": [
+          [-525, -81],
+          [-495, -81]
+        ]
+      },
+      "dir": "arrive forward, depart in reverse",
+      "users": ["incident police car x2 (#e4e8e5, flashing blue/red bars)"],
+      "speed": {
+        "police_car": 23
+      },
+      "notes": "Used only for the 5% 'multi' police roll per crime scene. p = crime scene centre.",
+      "src": ["v5.4 L10993", "v5.4 L11037", "v5.4 L11054", "v5.4 L11069"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "event_barbecue_cars",
+      "roads": [],
+      "roadNote": "none (yard/kerb glide near barbecue centre (-66,-84))",
+      "path": {
+        "segments": [
+          [
+            [-74, -120],
+            [-74, -106]
+          ],
+          [
+            [-66, -120],
+            [-66, -106]
+          ],
+          [
+            [-58, -120],
+            [-58, -106]
+          ]
+        ]
+      },
+      "dir": "+z on arrival (cars face -z, so they reverse in), -z on departure",
+      "users": ["event sedan x3 (#7c8e8b, #977c65, #627789)"],
+      "speed": {
+        "arrive": 0.2917,
+        "depart": 0.28
+      },
+      "notes": "Linear lerp home->parked over 48 s while phase < 600 of a 2400 s cycle (offset 0); back over 50 s for phase 600..650; hidden otherwise. Still counts as moving for fatal traffic.",
+      "src": ["v5.4 L11395", "v5.4 L11403", "v5.4 L11494"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "event_softball_cars",
+      "roads": [],
+      "roadNote": "none (north park edge, softball centre (66,356))",
+      "path": {
+        "segments": [
+          [
+            [58, 396],
+            [58, 382]
+          ],
+          [
+            [66, 396],
+            [66, 382]
+          ],
+          [
+            [74, 396],
+            [74, 382]
+          ]
+        ]
+      },
+      "dir": "-z on arrival, +z on departure (cars face -z)",
+      "users": ["event sedan x3 (#7c8e8b, #977c65, #627789)"],
+      "speed": {
+        "arrive": 0.2917,
+        "depart": 0.28
+      },
+      "notes": "Same timing as barbecue but cycle offset 1200 s.",
+      "src": ["v5.4 L11395", "v5.4 L11404", "v5.4 L11494"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "novelty_mime_unicycle",
+      "roads": ["rd_010_grid_ew_z0"],
+      "roadNote": "rd_010_grid_ew_z0 (rides in the road, 1 unit inside the south edge)",
+      "path": {
+        "axis": "x",
+        "coord": -8,
+        "start": -94,
+        "end": 80
+      },
+      "dir": "both (ping-pong, turns when within 3 of the end point)",
+      "users": ["Marcel the Mime on a 1.63-radius unicycle (humanoid road user, not a vehicle)"],
+      "speed": {
+        "entering_station": 4,
+        "escape": 18.4,
+        "ride": 5.9
+      },
+      "notes": "Has no vehicle checks. Vehicles yield to him because he is a visible non-hospital humanoid.",
+      "src": ["v5.4 L12199"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "novelty_kid_ellie",
+      "roads": [],
+      "roadNote": "verge north of sidewalk z=12.1 (inferred: off the asphalt)",
+      "path": {
+        "axis": "x",
+        "coord": 17,
+        "start": -54,
+        "end": 66
+      },
+      "dir": "both (ping-pong)",
+      "users": ["child cyclist Ellie"],
+      "speed": {
+        "escape": 12.8,
+        "ride": 4.6
+      },
+      "notes": "Kid riders: body scale 0.76, bike scale 0.82, helmet colour #ef9e58.",
+      "src": ["v5.4 L12246"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "novelty_kid_theo",
+      "roads": [],
+      "roadNote": "verge south of sidewalk z=-12.1 (inferred)",
+      "path": {
+        "axis": "x",
+        "coord": -17,
+        "start": -88,
+        "end": 37
+      },
+      "dir": "both (ping-pong, starts heading -x)",
+      "users": ["child cyclist Theo"],
+      "speed": {
+        "escape": 13.25,
+        "ride": 4.95
+      },
+      "notes": "Helmet #64a2cf.",
+      "src": ["v5.4 L12247"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "novelty_kid_jules",
+      "roads": [],
+      "roadNote": "verge north of sidewalk z=12.1 (inferred)",
+      "path": {
+        "axis": "x",
+        "coord": 18,
+        "start": -152,
+        "end": -32
+      },
+      "dir": "both (ping-pong)",
+      "users": ["child cyclist Jules"],
+      "speed": {
+        "escape": 13.7,
+        "ride": 5.3
+      },
+      "notes": "Helmet #ce719f.",
+      "src": ["v5.4 L12248"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "novelty_kid_avery",
+      "roads": ["rd_071_westside_street"],
+      "roadNote": "rd_071_westside_street (x=-289, 15 wide): rides in the road",
+      "path": {
+        "axis": "z",
+        "coord": -294,
+        "start": -126,
+        "end": 92
+      },
+      "dir": "both (ping-pong, starts heading -z)",
+      "users": ["child cyclist Avery"],
+      "speed": {
+        "escape": 14.15,
+        "ride": 5.65
+      },
+      "notes": "Helmet #68aa8d.",
+      "src": ["v5.4 L12249"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "novelty_kid_riley",
+      "roads": ["rd_071_westside_street"],
+      "roadNote": "rd_071_westside_street: rides in the road",
+      "path": {
+        "axis": "z",
+        "coord": -288,
+        "start": -173,
+        "end": 102
+      },
+      "dir": "both (ping-pong, starts heading +z)",
+      "users": ["child cyclist Riley"],
+      "speed": {
+        "escape": 14.6,
+        "ride": 6
+      },
+      "notes": "Helmet #b98b55.",
+      "src": ["v5.4 L12250"],
+      "wrap": "none",
+      "yieldsTo": []
+    },
+    {
+      "id": "sidewalk_x_zm12.1",
+      "roads": ["rd_011_sidewalk_z-12.1"],
+      "roadNote": "rd_011_sidewalk_z-12.1",
+      "path": {
+        "axis": "x",
+        "coord": -12.1,
+        "start": -260,
+        "end": 260
+      },
+      "dir": "both (pedestrian goals 37-95 ahead)",
+      "users": ["NPC cyclists Miles/Ari (role cyclist)", "NPC skater Parker", "pedestrians"],
+      "speed": {
+        "cyclist_after_flee": 4.2,
+        "cyclist_flee": 8.25,
+        "cyclist_skater_walk": [3.2, 5.2],
+        "skater_flee": 7.1
+      },
+      "notes": "sidewalkLanes[0]. The first four sidewalkLanes are picked 80% of the time; spawn u in [-115,115].",
+      "src": ["v5.4 L4818", "v5.4 L4885", "v5.4 L4898"],
+      "wrap": "none",
+      "yieldsTo": ["moving updateCars sedan within 3.25 of next step", "ice cream van / trolley footprint + 0.55"]
+    },
+    {
+      "id": "sidewalk_x_z12.1",
+      "roads": ["rd_012_sidewalk_z12.1"],
+      "roadNote": "rd_012_sidewalk_z12.1",
+      "path": {
+        "axis": "x",
+        "coord": 12.1,
+        "start": -260,
+        "end": 260
+      },
+      "dir": "both",
+      "users": ["NPC cyclists", "NPC skater", "pedestrians"],
+      "speed": {
+        "cyclist_flee": 8.25,
+        "cyclist_skater_walk": [3.2, 5.2],
+        "skater_flee": 7.1
+      },
+      "notes": "sidewalkLanes[1].",
+      "src": ["v5.4 L4819"],
+      "wrap": "none",
+      "yieldsTo": ["as sidewalk_x_zm12.1"]
+    },
+    {
+      "id": "sidewalk_z_xm12.1",
+      "roads": ["rd_002_sidewalk_x-12.1"],
+      "roadNote": "rd_002_sidewalk_x-12.1",
+      "path": {
+        "axis": "z",
+        "coord": -12.1,
+        "start": -260,
+        "end": 260
+      },
+      "dir": "both",
+      "users": ["NPC cyclists", "NPC skater", "pedestrians"],
+      "speed": {
+        "cyclist_flee": 8.25,
+        "cyclist_skater_walk": [3.2, 5.2],
+        "skater_flee": 7.1
+      },
+      "notes": "sidewalkLanes[2].",
+      "src": ["v5.4 L4820"],
+      "wrap": "none",
+      "yieldsTo": ["as sidewalk_x_zm12.1"]
+    },
+    {
+      "id": "sidewalk_z_x12.1",
+      "roads": ["rd_003_sidewalk_x12.1"],
+      "roadNote": "rd_003_sidewalk_x12.1",
+      "path": {
+        "axis": "z",
+        "coord": 12.1,
+        "start": -260,
+        "end": 260
+      },
+      "dir": "both",
+      "users": ["NPC cyclists", "NPC skater", "pedestrians"],
+      "speed": {
+        "cyclist_flee": 8.25,
+        "cyclist_skater_walk": [3.2, 5.2],
+        "skater_flee": 7.1
+      },
+      "notes": "sidewalkLanes[3].",
+      "src": ["v5.4 L4821"],
+      "wrap": "none",
+      "yieldsTo": ["as sidewalk_x_zm12.1"]
+    },
+    {
+      "id": "sidewalk_outer_set",
+      "roads": [],
+      "roadNote": "outer grid sidewalks (rd_005..rd_018)",
+      "path": {
+        "start": -260,
+        "end": 260,
+        "lanes": [
+          {
+            "axis": "x",
+            "coord": -161.9
+          },
+          {
+            "axis": "x",
+            "coord": -186.1
+          },
+          {
+            "axis": "x",
+            "coord": 158.9
+          },
+          {
+            "axis": "x",
+            "coord": 183.1
+          },
+          {
+            "axis": "z",
+            "coord": -167.9
+          },
+          {
+            "axis": "z",
+            "coord": -192.1
+          },
+          {
+            "axis": "z",
+            "coord": 165.9
+          },
+          {
+            "axis": "z",
+            "coord": 190.1
+          }
+        ]
+      },
+      "dir": "both",
+      "users": ["NPC cyclists", "NPC skater", "pedestrians"],
+      "speed": {
+        "cyclist_flee": 8.25,
+        "cyclist_skater_walk": [3.2, 5.2],
+        "skater_flee": 7.1
+      },
+      "notes": "sidewalkLanes[4..11] (8 lanes). Chosen only in the 20% branch, which picks from all 12 lanes (4885).",
+      "src": ["v5.4 L4822", "v5.4 L4829"],
+      "wrap": "none",
+      "yieldsTo": ["as sidewalk_x_zm12.1"]
+    },
+    {
+      "id": "sidewalk_commercial_z17.4",
+      "roads": ["rd_021_commercial_sidewalk_z17.4"],
+      "roadNote": "rd_021_commercial_sidewalk_z17.4",
+      "path": {
+        "axis": "x",
+        "coord": 17.4,
+        "start": 390,
+        "end": 651
+      },
+      "dir": "both (turns back above 615 / below 424)",
+      "users": ["NPC cyclist Zoe (idx 21) always uses this lane", "pedestrians Ray (idx 15) and June (idx 25)"],
+      "speed": {
+        "cyclist_flee": 8.25,
+        "cyclist_walk": [3.2, 5.2]
+      },
+      "notes": "Spawn u in [400,635]; flee clamp [385,655]. The side is chosen by idx % 2 (odd -> 17.4, 4872), so the mirror lane z=-17.4 carries only walker Dale (idx 18), no wheeled users.",
+      "src": ["v5.4 L4872", "v5.4 L4849"],
+      "wrap": "none",
+      "yieldsTo": ["as sidewalk_x_zm12.1"]
+    }
+  ],
+  "src": "spec/data/traffic_lanes.json (traffic 3); HTML units, speeds u/s"
+}

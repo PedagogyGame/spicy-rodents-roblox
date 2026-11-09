@@ -1,0 +1,1282 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "bellwether_quay",
+  "lots": [
+    {
+      "id": "quay_willow_river",
+      "district": "bellwether_quay",
+      "type": "river",
+      "x": 850,
+      "z": 99.5,
+      "footprint": {
+        "d": 687,
+        "w": 122
+      },
+      "hasInterior": false,
+      "notes": "Channel centre line x = 850 + 9*sin(0.009*z) (riverCenter 436); half-width 52 (water where |x-centre|<52); runs z -244..443 (RIVER.zMin/zMax). Water surface y=2.4 (RIVER.waterY), bed y=-2 (bedY), quay/bank level y=8 (bankY). Footprint w = 104 + 2*9 meander envelope. Water mesh 20x150 grid with vertex wave sin(0.24x+0.08z+0.65t)*0.10 + sin(0.39z-0.8t)*0.035; colours deep #315c61 / glint #b7d2c1, fresnel + flow threads (makeRiverWater 13614). Embankment walls both sides: 1.3 thick x 7.8 tall stone (#777b70) segments every 6 units along z, rotated to follow the meander, with 1.9-wide light coping (#d1c7ae) at y 8.02 (13578). Falling in (y <= 2.85 inside water, not on a rail) teleports the squirrel to the nearer bank at centre +/- 57, y 8.18, z clamped -225..425, flash 'SPLASH!' (cooldown 2 s) (recoverRiverFall 14116). No swimming, no boats moving.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L419",
+      "style": "Willow River channel (animated water shader)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_district_ground",
+      "district": "bellwether_quay",
+      "type": "district_ground",
+      "x": 918.5,
+      "z": 99.5,
+      "footprint": {
+        "d": 687,
+        "w": 463
+      },
+      "hasInterior": false,
+      "notes": "inRiverDistrict: x 687..1150, z -244..443. terrainHeight ramps the original hills to bank level 8 via smoothstep over x 687..735, flat 8 beyond, -2 in the channel (terrainHeight 458). Both bank meshes (128x20 grid) use the cobble material over the WHOLE district (makeRiverBanks 13547). Grass overlays: quay_grass_east and quay_grass_west. Player world clamp ends at x = 1146 (RIVER.endX-4, 6765). District group only visible when player.x > 610 (updateRiverDistrict 14142). Start-at-river spawn (780, 8.18, 51), yaw -0.94 (startAtRiver 14169).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13547",
+      "style": "cobblestone quay ground (riverCobble canvas texture, tint #c4bdab)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_stone_bridge",
+      "district": "bellwether_quay",
+      "type": "bridge",
+      "x": 850,
+      "z": 0,
+      "footprint": {
+        "d": 15.6,
+        "w": 212
+      },
+      "hasInterior": false,
+      "notes": "Deck/ramps (riverDeckAt 445): |z|<=7.8; x 744..790 ramps 8 -> 15.8; flat 15.8 over x 790..910; ramps down to 8 at x 956. Cobble deck groundPatch (13756). Arches (bridgeArch 13657): 5 at centres x 802,826,850,874,898, each 24 wide, inner radius 9.6, springing y 3.5 (crown 13.1), body y 1..15.5, depth 15.7; 15 voussoir blocks per face, every third (i%3==0) dark #777b70, the rest light #d1c7ae; 4-sided cutwater piers r 2.3/3.0 x 3.6 tall at x 790,814,838,862,886 (scaled z 3.2, rotated 45 deg). Parapets: stone tube r 0.2 at deck+1.1, z +/-7.7, registered as kind 'fence' routes; posts 0.32x1.05x0.3 every 4 units with 4x0.3 colliders. Suspension chains (#4e7c87) through (772,14),(814,34),(850,25),(886,34),(928,14) at z +/-8.7, kind 'wire' routes; vertical hangers r 0.055 to deck+0.7 wherever 790<x<910 (45 samples). 12 lamps at x 752,777,838,862,925,947 on both sides z +/-6.45. Side faces block walking if height < deck-0.55 (riverBlocked 13488). Road approach from x 650 is in roads.json (rd_030..rd_033).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13754",
+      "style": "five-arch stone bridge with two towers and blue suspension chains (London Tower-Bridge-like)",
+      "v54": {
+        "facing": "spans X"
+      }
+    },
+    {
+      "id": "quay_bridge_tower_west",
+      "district": "bellwether_quay",
+      "type": "bridge_tower",
+      "x": 814,
+      "z": 0,
+      "footprint": {
+        "d": 29,
+        "w": 9.2
+      },
+      "hasInterior": false,
+      "notes": "Group origin (814, 15.8 deck, 0) (makeBridgeTower 13698). Two piers at z +/-10.7, each 8 x 19 x 7.2 (#d1c7ae) on a 9.2x0.8x8.4 plinth, string courses at +3.5/+9/+14.5, glass slit windows 1.05x2.2, four corner turrets per pier, 8 per tower (cyl r .72-.86, 20.4 tall, at x +/-3.7, z +/-3.3 from each pier centre) with cone caps (r 1.04, h 3.1, #4c5a60), pyramid roof cone r 5.5 h 4.5 (apex about deck+23.6 = y 39.3). Overhead arch box 8 x 3.4 x 15.5 at deck+15.2 (clearance 13.4 over deck) with 8.6x0.45x15.8 cap. Colliders: each pier 8.4x7.6 y 15.8..35.1; arch 8x14 y 29.2..33.2. Banner 0.05x4x1.6 #af5949 at local (4.5, 11.6, -8.2) flapping rotation.x = 0.1*sin(1.8t+phase). Routes: copper downspout at (818.5, z=7) from deck+0.25 to deck+17.7 (kind 'trunk', surfaceRadius 0.15) and 'tower gallery' (kind 'roof') at y 33.5 from z=7 to z=-7.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13698",
+      "style": "stone gothic bridge tower pair with overhead walkway",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_bridge_tower_east",
+      "district": "bellwether_quay",
+      "type": "bridge_tower",
+      "x": 886,
+      "z": 0,
+      "footprint": {
+        "d": 29,
+        "w": 9.2
+      },
+      "hasInterior": false,
+      "notes": "Group origin (886, 15.8 deck, 0) (makeBridgeTower 13698). Two piers at z +/-10.7, each 8 x 19 x 7.2 (#d1c7ae) on a 9.2x0.8x8.4 plinth, string courses at +3.5/+9/+14.5, glass slit windows 1.05x2.2, four corner turrets per pier, 8 per tower (cyl r .72-.86, 20.4 tall, at x +/-3.7, z +/-3.3 from each pier centre) with cone caps (r 1.04, h 3.1, #4c5a60), pyramid roof cone r 5.5 h 4.5 (apex about deck+23.6 = y 39.3). Overhead arch box 8 x 3.4 x 15.5 at deck+15.2 (clearance 13.4 over deck) with 8.6x0.45x15.8 cap. Colliders: each pier 8.4x7.6 y 15.8..35.1; arch 8x14 y 29.2..33.2. Banner 0.05x4x1.6 #af5949 at local (4.5, 11.6, +8.2) flapping rotation.x = 0.1*sin(1.8t+phase). Routes: copper downspout at (890.5, z=7) from deck+0.25 to deck+17.7 (kind 'trunk', surfaceRadius 0.15) and 'tower gallery' (kind 'roof') at y 33.5 from z=7 to z=-7.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13698",
+      "style": "stone gothic bridge tower pair with overhead walkway",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_bldg_w_00",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": -162,
+      "facing": "+X",
+      "footprint": {
+        "d": 15,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 0, yaw -1.57 rad. Local w=15 (along front) d=12 (depth), wall height h=10, roof rise 4, base y=8; ridge route y=22.22. Plaster #d8c6a1, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #b26d52 (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 12.7 x 15.9 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'THE OLD ANCHOR'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_01",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": -141,
+      "facing": "+X",
+      "footprint": {
+        "d": 16.8,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 1, yaw -1.57 rad. Local w=16.8 (along front) d=14 (depth), wall height h=11.25, roof rise 4.6, base y=8; ridge route y=24.07. Plaster #c0b9a0, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 14.7 x 17.7 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'QUAYSIDE BOOKS'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_02",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": -120,
+      "facing": "+X",
+      "footprint": {
+        "d": 18.6,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 2, yaw -1.57 rad. Local w=18.6 (along front) d=12 (depth), wall height h=12.5, roof rise 5.2, base y=8; ridge route y=25.92. Plaster #d7b399, roof #71695b, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 12.7 x 19.5 from y 8 to 20.45. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'WILLOW BAKERY'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_03",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": -99,
+      "facing": "+X",
+      "footprint": {
+        "d": 15,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 3, yaw -1.57 rad. Local w=15 (along front) d=14 (depth), wall height h=13.75, roof rise 4, base y=8; ridge route y=25.97. Plaster #b9c2b0, roof #72615b, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #80987a (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 14.7 x 15.9 from y 8 to 21.7. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'FERRY & FINCH'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_04",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": 63,
+      "facing": "+X",
+      "footprint": {
+        "d": 16.8,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 4, yaw -1.57 rad. Local w=16.8 (along front) d=12 (depth), wall height h=10, roof rise 4.6, base y=8; ridge route y=22.82. Plaster #c9bda7, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 12.7 x 17.7 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'COPPER KETTLE'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_05",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": 84,
+      "facing": "+X",
+      "footprint": {
+        "d": 18.6,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 5, yaw -1.57 rad. Local w=18.6 (along front) d=14 (depth), wall height h=11.25, roof rise 5.2, base y=8; ridge route y=24.67. Plaster #d8c6a1, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 14.7 x 19.5 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'RIVER APOTHECARY'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_06",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": 105,
+      "facing": "+X",
+      "footprint": {
+        "d": 15,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 6, yaw -1.57 rad. Local w=15 (along front) d=12 (depth), wall height h=12.5, roof rise 4, base y=8; ridge route y=24.72. Plaster #c0b9a0, roof #71695b, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #b26d52 (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 12.7 x 15.9 from y 8 to 20.45. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'THE LANTERN'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_07",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": 126,
+      "facing": "+X",
+      "footprint": {
+        "d": 16.8,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 7, yaw -1.57 rad. Local w=16.8 (along front) d=14 (depth), wall height h=13.75, roof rise 4.6, base y=8; ridge route y=26.57. Plaster #d7b399, roof #72615b, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 14.7 x 17.7 from y 8 to 21.7. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'BRIDGE HOUSE'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_08",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": 147,
+      "facing": "+X",
+      "footprint": {
+        "d": 18.6,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 8, yaw -1.57 rad. Local w=18.6 (along front) d=12 (depth), wall height h=10, roof rise 5.2, base y=8; ridge route y=23.42. Plaster #b9c2b0, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 12.7 x 19.5 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'TIDE & TIMBER'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_w_09",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 758,
+      "z": 168,
+      "facing": "+X",
+      "footprint": {
+        "d": 15,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 9, yaw -1.57 rad. Local w=15 (along front) d=14 (depth), wall height h=11.25, roof rise 4, base y=8; ridge route y=23.47. Plaster #c9bda7, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #80987a (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 14.7 x 15.9 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14035",
+      "style": "Tudor half-timbered townhouse, sign 'THE COBBLER'",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_00",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 950,
+      "z": -166,
+      "facing": "-X",
+      "footprint": {
+        "d": 18.6,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 2, yaw 1.57 rad. Local w=18.6 (along front) d=12 (depth), wall height h=12.5, roof rise 5.2, base y=8; ridge route y=25.92. Plaster #d7b399, roof #71695b, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 12.7 x 19.5 from y 8 to 20.45. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'FERRY & FINCH'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_01",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 952,
+      "z": -144,
+      "facing": "-X",
+      "footprint": {
+        "d": 15,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 3, yaw 1.57 rad. Local w=15 (along front) d=14 (depth), wall height h=13.75, roof rise 4, base y=8; ridge route y=25.97. Plaster #b9c2b0, roof #72615b, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #80987a (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 14.7 x 15.9 from y 8 to 21.7. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'COPPER KETTLE'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_02",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 954,
+      "z": -122,
+      "facing": "-X",
+      "footprint": {
+        "d": 16.8,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 4, yaw 1.57 rad. Local w=16.8 (along front) d=12 (depth), wall height h=10, roof rise 4.6, base y=8; ridge route y=22.82. Plaster #c9bda7, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 12.7 x 17.7 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'RIVER APOTHECARY'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_03",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 950,
+      "z": -100,
+      "facing": "-X",
+      "footprint": {
+        "d": 18.6,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 5, yaw 1.57 rad. Local w=18.6 (along front) d=14 (depth), wall height h=11.25, roof rise 5.2, base y=8; ridge route y=24.67. Plaster #d8c6a1, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 14.7 x 19.5 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'THE LANTERN'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_04",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 952,
+      "z": 62,
+      "facing": "-X",
+      "footprint": {
+        "d": 15,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 6, yaw 1.57 rad. Local w=15 (along front) d=12 (depth), wall height h=12.5, roof rise 4, base y=8; ridge route y=24.72. Plaster #c0b9a0, roof #71695b, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #b26d52 (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 12.7 x 15.9 from y 8 to 20.45. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'BRIDGE HOUSE'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_05",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 954,
+      "z": 84,
+      "facing": "-X",
+      "footprint": {
+        "d": 16.8,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 7, yaw 1.57 rad. Local w=16.8 (along front) d=14 (depth), wall height h=13.75, roof rise 4.6, base y=8; ridge route y=26.57. Plaster #d7b399, roof #72615b, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 14.7 x 17.7 from y 8 to 21.7. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'TIDE & TIMBER'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_06",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 950,
+      "z": 106,
+      "facing": "-X",
+      "footprint": {
+        "d": 18.6,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 8, yaw 1.57 rad. Local w=18.6 (along front) d=12 (depth), wall height h=10, roof rise 5.2, base y=8; ridge route y=23.42. Plaster #b9c2b0, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 12.7 x 19.5 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'THE COBBLER'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_07",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 952,
+      "z": 128,
+      "facing": "-X",
+      "footprint": {
+        "d": 15,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 9, yaw 1.57 rad. Local w=15 (along front) d=14 (depth), wall height h=11.25, roof rise 4, base y=8; ridge route y=23.47. Plaster #c9bda7, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #80987a (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 14.7 x 15.9 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'WREN COTTAGE'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_08",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 954,
+      "z": 150,
+      "facing": "-X",
+      "footprint": {
+        "d": 16.8,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 10, yaw 1.57 rad. Local w=16.8 (along front) d=12 (depth), wall height h=12.5, roof rise 4.6, base y=8; ridge route y=25.32. Plaster #d8c6a1, roof #71695b, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 12.7 x 17.7 from y 8 to 20.45. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'THE TEA ROOM'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_09",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 950,
+      "z": 172,
+      "facing": "-X",
+      "footprint": {
+        "d": 18.6,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 11, yaw 1.57 rad. Local w=18.6 (along front) d=14 (depth), wall height h=13.75, roof rise 5.2, base y=8; ridge route y=27.17. Plaster #c0b9a0, roof #72615b, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 14.7 x 19.5 from y 8 to 21.7. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'THE OLD ANCHOR'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_10",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 952,
+      "z": 194,
+      "facing": "-X",
+      "footprint": {
+        "d": 15,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 12, yaw 1.57 rad. Local w=15 (along front) d=12 (depth), wall height h=10, roof rise 4, base y=8; ridge route y=22.22. Plaster #d7b399, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #b26d52 (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 12.7 x 15.9 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'QUAYSIDE BOOKS'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_e_11",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 954,
+      "z": 216,
+      "facing": "-X",
+      "footprint": {
+        "d": 16.8,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 13, yaw 1.57 rad. Local w=16.8 (along front) d=14 (depth), wall height h=11.25, roof rise 4.6, base y=8; ridge route y=24.07. Plaster #b9c2b0, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 14.7 x 17.7 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14038",
+      "style": "Tudor half-timbered townhouse, sign 'WILLOW BAKERY'",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_bldg_m_00",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1008,
+      "z": -164,
+      "facing": "-Z",
+      "footprint": {
+        "d": 12,
+        "w": 15
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 6, yaw 0 rad. Local w=15 (along front) d=12 (depth), wall height h=12.5, roof rise 4, base y=8; ridge route y=24.72. Plaster #c0b9a0, roof #71695b, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #b26d52 (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 15.9 x 12.7 from y 8 to 20.45. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'BRIDGE HOUSE'",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "quay_bldg_m_01",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1032,
+      "z": -118,
+      "facing": "+Z",
+      "footprint": {
+        "d": 14,
+        "w": 16.8
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 7, yaw 3.14 rad. Local w=16.8 (along front) d=14 (depth), wall height h=13.75, roof rise 4.6, base y=8; ridge route y=26.57. Plaster #d7b399, roof #72615b, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 17.7 x 14.7 from y 8 to 21.7. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'TIDE & TIMBER'",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "quay_bldg_m_02",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1008,
+      "z": -72,
+      "facing": "-Z",
+      "footprint": {
+        "d": 12,
+        "w": 18.6
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 8, yaw 0 rad. Local w=18.6 (along front) d=12 (depth), wall height h=10, roof rise 5.2, base y=8; ridge route y=23.42. Plaster #b9c2b0, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 19.5 x 12.7 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'THE COBBLER'",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "quay_bldg_m_03",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1032,
+      "z": 91,
+      "facing": "+Z",
+      "footprint": {
+        "d": 14,
+        "w": 15
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 9, yaw 3.14 rad. Local w=15 (along front) d=14 (depth), wall height h=11.25, roof rise 4, base y=8; ridge route y=23.47. Plaster #c9bda7, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #80987a (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 15.9 x 14.7 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'WREN COTTAGE'",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "quay_bldg_m_04",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1008,
+      "z": 137,
+      "facing": "-Z",
+      "footprint": {
+        "d": 12,
+        "w": 16.8
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 10, yaw 0 rad. Local w=16.8 (along front) d=12 (depth), wall height h=12.5, roof rise 4.6, base y=8; ridge route y=25.32. Plaster #d8c6a1, roof #71695b, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 17.7 x 12.7 from y 8 to 20.45. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'THE TEA ROOM'",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "quay_bldg_m_05",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1032,
+      "z": 183,
+      "facing": "+Z",
+      "footprint": {
+        "d": 14,
+        "w": 18.6
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 11, yaw 3.14 rad. Local w=18.6 (along front) d=14 (depth), wall height h=13.75, roof rise 5.2, base y=8; ridge route y=27.17. Plaster #c0b9a0, roof #72615b, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 19.5 x 14.7 from y 8 to 21.7. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'THE OLD ANCHOR'",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "quay_bldg_m_06",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1008,
+      "z": 229,
+      "facing": "-Z",
+      "footprint": {
+        "d": 12,
+        "w": 15
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 12, yaw 0 rad. Local w=15 (along front) d=12 (depth), wall height h=10, roof rise 4, base y=8; ridge route y=22.22. Plaster #d7b399, roof #6e635a, fascia sign bg #745547 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door, awning #b26d52 (w*0.83 x 2.5, pitched 0.14 rad) at y 4.3. Solid shell collider 15.9 x 12.7 from y 8 to 17.95. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'QUAYSIDE BOOKS'",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "quay_bldg_m_07",
+      "district": "bellwether_quay",
+      "type": "quay_building",
+      "x": 1032,
+      "z": 275,
+      "facing": "+Z",
+      "footprint": {
+        "d": 14,
+        "w": 16.8
+      },
+      "hasInterior": false,
+      "notes": "makeQuayBuilding index 13, yaw 3.14 rad. Local w=16.8 (along front) d=14 (depth), wall height h=11.25, roof rise 4.6, base y=8; ridge route y=24.07. Plaster #b9c2b0, roof #505e63, fascia sign bg #405b51 text #f4e5bd (w*0.8 x 0.95 at y 4.82), dark-oak timbers #4e4136, jettied upper storey (+0.7 x +0.6 from y ~0.53h), 3 upper windows + 2 large ground windows + oak door 1.55x3.4 on the front, chimney at local x=0.27w, flower boxes either side of door. Solid shell collider 17.7 x 14.7 from y 8 to 19.2. Roof is a landing surface (riverRoofAt 13473: y = base+h+rise*max(0,1-|lz|/(d/2+0.65))+0.29). Routes: ridge (kind 'roof'), copper downspout at front-right corner (kind 'trunk', r 0.14) and gutter-to-ridge (kind 'roof'). Facade only, no interior.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14041",
+      "style": "Tudor half-timbered townhouse, sign 'WILLOW BAKERY'",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "quay_clock_tower",
+      "district": "bellwether_quay",
+      "type": "landmark_tower",
+      "x": 1051,
+      "z": 35,
+      "footprint": {
+        "d": 13,
+        "w": 13
+      },
+      "hasInterior": false,
+      "notes": "makeClockTower 13911. Base y 8. Plinth 13x1.1x13 (#aaa697); shaft 9x29x9 (#d1c7ae) to y 37; bands 10x0.6x10 at local y 2,14,24,28; canvas clock faces 3.6x3.6 at local y 24 (world 32) on all four sides (cream #e3d7af, hands #3f493e, STATIC hands, not tied to time); pyramid roof cone r 8 h 8 (world y 37..45); iron spire 3.4 tall to about y 48. Collider 9x9 y 8..37. Climbable roof platform 11.3x11.3: surface y = 37 + 8*max(0, 1 - chebyshev distance/5.66). No climb route registered up the shaft (reachable only by leaping from higher routes, inferred).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13911",
+      "style": "market clock tower, pale stone, four clock faces, pyramid roof",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_market_square",
+      "district": "bellwether_quay",
+      "type": "plaza",
+      "x": 1035,
+      "z": 14,
+      "footprint": {
+        "d": 120,
+        "w": 120
+      },
+      "hasInterior": false,
+      "notes": "(bounds inferred from placed objects) Contains 5 market stalls, the clock tower, 6 iron lamps at x 978,1010,1092 x z -40,68 each with an oak bench 3.6x0.45x1.3 at x+5 (iron legs at x+3.5/x+6.5) (14054), and the sign 'OLD TOWN MARKET ->'. Ambient: produce on stalls. No NPC vendors.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14054",
+      "style": "open cobbled market square",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_market_stall_0",
+      "district": "bellwether_quay",
+      "type": "market_stall",
+      "x": 996,
+      "z": -23,
+      "footprint": {
+        "d": 2.8,
+        "w": 5
+      },
+      "hasInterior": false,
+      "notes": "marketStall 13965 index 0. y 8. Oak counter 5x1.2x2.8; 4 posts 3.8 tall at x +/-2.6, z +/-1.5; canopy of 7 strips 0.78x0.16x3.6 at y 3.85 alternating #b7785d / #dfd1a8; 12 produce balls r 0.23 (#b8773c, #a8b066, #ba6050). Collider 5x2.8 y 8..9.3. Foraging candidate (brief s7).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13965",
+      "style": "timber stall, striped cloth canopy",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_market_stall_1",
+      "district": "bellwether_quay",
+      "type": "market_stall",
+      "x": 1010,
+      "z": -23,
+      "footprint": {
+        "d": 2.8,
+        "w": 5
+      },
+      "hasInterior": false,
+      "notes": "marketStall 13965 index 1. y 8. Oak counter 5x1.2x2.8; 4 posts 3.8 tall at x +/-2.6, z +/-1.5; canopy of 7 strips 0.78x0.16x3.6 at y 3.85 alternating #879e76 / #dfd1a8; 12 produce balls r 0.23 (#b8773c, #a8b066, #ba6050). Collider 5x2.8 y 8..9.3. Foraging candidate (brief s7).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13965",
+      "style": "timber stall, striped cloth canopy",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_market_stall_2",
+      "district": "bellwether_quay",
+      "type": "market_stall",
+      "x": 1024,
+      "z": -23,
+      "footprint": {
+        "d": 2.8,
+        "w": 5
+      },
+      "hasInterior": false,
+      "notes": "marketStall 13965 index 2. y 8. Oak counter 5x1.2x2.8; 4 posts 3.8 tall at x +/-2.6, z +/-1.5; canopy of 7 strips 0.78x0.16x3.6 at y 3.85 alternating #b7785d / #dfd1a8; 12 produce balls r 0.23 (#b8773c, #a8b066, #ba6050). Collider 5x2.8 y 8..9.3. Foraging candidate (brief s7).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13965",
+      "style": "timber stall, striped cloth canopy",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_market_stall_3",
+      "district": "bellwether_quay",
+      "type": "market_stall",
+      "x": 994,
+      "z": 42,
+      "footprint": {
+        "d": 2.8,
+        "w": 5
+      },
+      "hasInterior": false,
+      "notes": "marketStall 13965 index 3. y 8. Oak counter 5x1.2x2.8; 4 posts 3.8 tall at x +/-2.6, z +/-1.5; canopy of 7 strips 0.78x0.16x3.6 at y 3.85 alternating #879e76 / #dfd1a8; 12 produce balls r 0.23 (#b8773c, #a8b066, #ba6050). Collider 5x2.8 y 8..9.3. Foraging candidate (brief s7).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13965",
+      "style": "timber stall, striped cloth canopy",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_market_stall_4",
+      "district": "bellwether_quay",
+      "type": "market_stall",
+      "x": 1007,
+      "z": 42,
+      "footprint": {
+        "d": 2.8,
+        "w": 5
+      },
+      "hasInterior": false,
+      "notes": "marketStall 13965 index 4. y 8. Oak counter 5x1.2x2.8; 4 posts 3.8 tall at x +/-2.6, z +/-1.5; canopy of 7 strips 0.78x0.16x3.6 at y 3.85 alternating #b7785d / #dfd1a8; 12 produce balls r 0.23 (#b8773c, #a8b066, #ba6050). Collider 5x2.8 y 8..9.3. Foraging candidate (brief s7).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13965",
+      "style": "timber stall, striped cloth canopy",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_dock_0",
+      "district": "bellwether_quay",
+      "type": "dock",
+      "x": 812.59,
+      "z": 208,
+      "facing": "+X",
+      "footprint": {
+        "d": 7,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "quayDock(-1, 208) 13999. Deck top y 8 (14x0.5x7, #75604b) registered as a walk platform; 4 pilings r .23-.3, 7 tall; plank seams. Moored boat at x=820.59, z 208, y 2.54 (water+0.14): ellipsoid hull scaled 2.6x0.9x7 (#856854 by boat index), deck 4.1x9, 3 thwarts, mast 5, sail 2.9x2.1 #d3c6a3, yaw -0.2 rad; bobs y +/- 0.12 at 0.7 rad/s and rolls 0.026 rad (updateRiverDistrict). Brief s3 marina belongs on the ocean side, not here.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13999",
+      "style": "oak landing stage with moored sailing boat",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "quay_dock_1",
+      "district": "bellwether_quay",
+      "type": "dock",
+      "x": 887.91,
+      "z": -124,
+      "facing": "-X",
+      "footprint": {
+        "d": 7,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "quayDock(1, -124) 13999. Deck top y 8 (14x0.5x7, #75604b) registered as a walk platform; 4 pilings r .23-.3, 7 tall; plank seams. Moored boat at x=879.91, z -124, y 2.54 (water+0.14): ellipsoid hull scaled 2.6x0.9x7 (#526e68 by boat index), deck 4.1x9, 3 thwarts, mast 5, sail 2.9x2.1 #d3c6a3, yaw +0.22 rad; bobs y +/- 0.12 at 0.7 rad/s and rolls 0.026 rad (updateRiverDistrict). Brief s3 marina belongs on the ocean side, not here.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13999",
+      "style": "oak landing stage with moored sailing boat",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_dock_2",
+      "district": "bellwether_quay",
+      "type": "dock",
+      "x": 900.56,
+      "z": 290,
+      "facing": "-X",
+      "footprint": {
+        "d": 7,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "quayDock(1, 290) 13999. Deck top y 8 (14x0.5x7, #75604b) registered as a walk platform; 4 pilings r .23-.3, 7 tall; plank seams. Moored boat at x=892.56, z 290, y 2.54 (water+0.14): ellipsoid hull scaled 2.6x0.9x7 (#856854 by boat index), deck 4.1x9, 3 thwarts, mast 5, sail 2.9x2.1 #d3c6a3, yaw -0.2 rad; bobs y +/- 0.12 at 0.7 rad/s and rolls 0.026 rad (updateRiverDistrict). Brief s3 marina belongs on the ocean side, not here.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13999",
+      "style": "oak landing stage with moored sailing boat",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "quay_sign_entry",
+      "district": "bellwether_quay",
+      "type": "sign",
+      "x": 650,
+      "z": 25,
+      "yaw": -0.15,
+      "footprint": {
+        "d": 0.2,
+        "w": 8
+      },
+      "hasInterior": false,
+      "notes": "riverSign 14010: wooden post 3.2 tall, board 8x1.3x0.2 at y+3.1, bg #304c44 text #f6e9bd.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14097",
+      "style": "post sign 'BELLWETHER QUAY →'",
+      "v54": {
+        "facing": "yaw -0.15 rad"
+      }
+    },
+    {
+      "id": "quay_sign_river",
+      "district": "bellwether_quay",
+      "type": "sign",
+      "x": 780,
+      "z": 38,
+      "yaw": 1.57,
+      "footprint": {
+        "d": 0.2,
+        "w": 8
+      },
+      "hasInterior": false,
+      "notes": "riverSign 14010: wooden post 3.2 tall, board 8x1.3x0.2 at y+3.1, bg #304c44 text #f6e9bd.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14097",
+      "style": "post sign 'WILLOW RIVER'",
+      "v54": {
+        "facing": "yaw 1.57 rad"
+      }
+    },
+    {
+      "id": "quay_sign_market",
+      "district": "bellwether_quay",
+      "type": "sign",
+      "x": 974,
+      "z": 20,
+      "yaw": 1.57,
+      "footprint": {
+        "d": 0.2,
+        "w": 8
+      },
+      "hasInterior": false,
+      "notes": "riverSign 14010: wooden post 3.2 tall, board 8x1.3x0.2 at y+3.1, bg #304c44 text #f6e9bd.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14097",
+      "style": "post sign 'OLD TOWN MARKET →'",
+      "v54": {
+        "facing": "yaw 1.57 rad"
+      }
+    },
+    {
+      "id": "quay_grass_east",
+      "district": "bellwether_quay",
+      "type": "lawn",
+      "x": 1112,
+      "z": 253.5,
+      "footprint": {
+        "d": 343,
+        "w": 74
+      },
+      "hasInterior": false,
+      "notes": "groundPatch 1075..1149 x 82..425 (14042); the Galleria plaza (y 8.12) sits on top of its northern part.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14042",
+      "style": "grass patch at y 8.01",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_grass_west",
+      "district": "bellwether_quay",
+      "type": "lawn",
+      "x": 721,
+      "z": 316.5,
+      "footprint": {
+        "d": 217,
+        "w": 32
+      },
+      "hasInterior": false,
+      "notes": "groundPatch 705..737 x 208..425 (14043).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14043",
+      "style": "grass patch following terrain +0.015",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_willow_0",
+      "district": "bellwether_quay",
+      "type": "tree",
+      "x": 715,
+      "z": -28,
+      "footprint": {
+        "d": 18,
+        "w": 18
+      },
+      "hasInterior": false,
+      "notes": "makeTree spec {name:'QUAY WILLOW', seed:687, h:19, crown:9, branches:4, leafCount:850, colours #769377/#95a580/#586f5b} (14069). Footprint = crown diameter (inferred). Registers trunk/branch routes like other trees.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14064",
+      "style": "QUAY WILLOW (makeTree, climbable)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_willow_1",
+      "district": "bellwether_quay",
+      "type": "tree",
+      "x": 715,
+      "z": 43,
+      "footprint": {
+        "d": 18,
+        "w": 18
+      },
+      "hasInterior": false,
+      "notes": "makeTree spec {name:'QUAY WILLOW', seed:758, h:19, crown:9, branches:4, leafCount:850, colours #769377/#95a580/#586f5b} (14069). Footprint = crown diameter (inferred). Registers trunk/branch routes like other trees.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14064",
+      "style": "QUAY WILLOW (makeTree, climbable)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_willow_2",
+      "district": "bellwether_quay",
+      "type": "tree",
+      "x": 1004,
+      "z": 79,
+      "footprint": {
+        "d": 18,
+        "w": 18
+      },
+      "hasInterior": false,
+      "notes": "makeTree spec {name:'QUAY WILLOW', seed:1083, h:19, crown:9, branches:4, leafCount:850, colours #769377/#95a580/#586f5b} (14069). Footprint = crown diameter (inferred). Registers trunk/branch routes like other trees.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14064",
+      "style": "QUAY WILLOW (makeTree, climbable)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_willow_3",
+      "district": "bellwether_quay",
+      "type": "tree",
+      "x": 1108,
+      "z": 52,
+      "footprint": {
+        "d": 18,
+        "w": 18
+      },
+      "hasInterior": false,
+      "notes": "makeTree spec {name:'QUAY WILLOW', seed:1160, h:19, crown:9, branches:4, leafCount:850, colours #769377/#95a580/#586f5b} (14069). Footprint = crown diameter (inferred). Registers trunk/branch routes like other trees.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14064",
+      "style": "QUAY WILLOW (makeTree, climbable)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_willow_4",
+      "district": "bellwether_quay",
+      "type": "tree",
+      "x": 1094,
+      "z": 192,
+      "footprint": {
+        "d": 18,
+        "w": 18
+      },
+      "hasInterior": false,
+      "notes": "makeTree spec {name:'QUAY WILLOW', seed:1286, h:19, crown:9, branches:4, leafCount:850, colours #769377/#95a580/#586f5b} (14069). Footprint = crown diameter (inferred). Registers trunk/branch routes like other trees.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14064",
+      "style": "QUAY WILLOW (makeTree, climbable)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_willow_5",
+      "district": "bellwether_quay",
+      "type": "tree",
+      "x": 1015,
+      "z": 370,
+      "footprint": {
+        "d": 18,
+        "w": 18
+      },
+      "hasInterior": false,
+      "notes": "makeTree spec {name:'QUAY WILLOW', seed:1385, h:19, crown:9, branches:4, leafCount:850, colours #769377/#95a580/#586f5b} (14069). Footprint = crown diameter (inferred). Registers trunk/branch routes like other trees.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14064",
+      "style": "QUAY WILLOW (makeTree, climbable)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_embankment_lamps",
+      "district": "bellwether_quay",
+      "type": "street_furniture",
+      "x": 850,
+      "z": 91.5,
+      "footprint": {
+        "d": 619,
+        "w": 118
+      },
+      "hasInterior": false,
+      "notes": "For side in {-1,+1}, z = -218..394 step 34 skipping |z|<24 (17 per side): riverLamp at x = riverCenter(z) + side*55, y 8 (iron post r .13-.23 x 4.1, emissive lantern #f5d999 / emissive #ffc66d intensity 1.2, pyramid cap) plus iron bollard 0.55x0.6x0.55 at x - side*2.2, z+7 (13586). Lamps are emissive only (no real-time lights).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L13586",
+      "style": "34 iron quay lamps + bollards",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_bunting",
+      "district": "bellwether_quay",
+      "type": "overhead_lines",
+      "x": 850,
+      "z": 65,
+      "footprint": {
+        "d": 520,
+        "w": 164
+      },
+      "hasInterior": false,
+      "notes": "For side in {-1,+1}, z = -180..340 step 40 (14 per side): iron line r 0.045 from (riverCenter(z)+side*59, 14) via midpoint y 12.6 to (+23 further out, 15), registered as kind 'wire' routes 'Bellwether bunting line'; 7 flags 0.72x0.92 alternating #b16c58/#879a75 hanging below, waving rotation.x = 0.1*sin(1.8t+phase) (14081).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14081",
+      "style": "28 bunting lines over the quays",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "quay_ambient_walkers",
+      "district": "bellwether_quay",
+      "type": "ambient_npcs",
+      "x": 852,
+      "z": 7.5,
+      "footprint": {
+        "d": 345,
+        "w": 148
+      },
+      "hasInterior": false,
+      "notes": "(14102) i<4 at x=778 (west quay), else x=926 (east quay); z = -150 + (i%4)*105 (-150,-45,60,165), y 8. Block body 0.6x1.0x0.34 coat (#927a60/#647e78/#a57964/#747a5f), head ball r .25 skin #c1a285, two legs. Pace z = z0 + 15*sin(0.095t + 1.3i), turning 180 deg at the ends. Explicitly NOT part of combat/infection/emergency registries (cannot be bitten).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14102",
+      "style": "8 low-detail ambient townspeople",
+      "v54": {
+        "facing": "n/a"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

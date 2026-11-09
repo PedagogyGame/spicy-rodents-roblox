@@ -1,0 +1,293 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "hospital_spur",
+  "lots": [
+    {
+      "id": "hospital_main",
+      "district": "hospital_spur",
+      "type": "hospital",
+      "x": -356,
+      "z": 353,
+      "facing": "-Z",
+      "footprint": {
+        "d": 96,
+        "w": 94
+      },
+      "hasInterior": true,
+      "notes": "facing: sliding glass doors at local z=-48 (HOSP_D/2) facing the z=283 road via driveway x=-356. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Landmark entry only - full spec belongs to the hospital extractor. Floor y=HOSP_BASE+0.42, roof surface +13.34. Driveway x=-356 (z 284..305). Signs at z=303.5; \"HOSPITAL ←\" road guide at (-232,298). HUD tag \"HOSPITAL DISTRICT\" for x<-270 & z>245.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3802",
+      "style": "white #e6e5db, blue #628e9d",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_entry_canopy",
+      "district": "hospital_spur",
+      "type": "porte_cochere",
+      "x": -356,
+      "z": 302,
+      "facing": "-Z",
+      "footprint": {
+        "d": 7.3,
+        "w": 22
+      },
+      "hasInterior": false,
+      "notes": "Slab 22x0.75x7.3 at local y 8.1, local z -51 (world z 302), columns r .3 x 7.5 at local x +/-9, z -54. Signs: 'HOSPITAL  .  EMERGENCY' 35x2.65 at y base+14.35, z 303.5 (above the roofline, #335f67); 'SQUIRREL BITES ->' 13.5x1.3 (#9d4037) at (-345, 9.25, 303.2); roadside 'EMERGENCY ENTRANCE' at (-327, 299) and 'HOSPITAL <-' at (-232, 298) are shrunk to pedestrian wayfinding size by flatSign (w 5.2..8.1, h 0.89..1.32, two posts, y terrain+2.68). E within 8 of (-356, 298) starts the 1.45 s door transition to inside (-356, 0.72, 314) (hospitalTeleport 8475).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3845",
+      "style": "flat entrance canopy (#4a6b69) on two steel columns",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_ambulance_bay",
+      "district": "hospital_spur",
+      "type": "ambulance_bay",
+      "x": -356,
+      "z": 294.5,
+      "facing": "-Z",
+      "footprint": {
+        "d": 21,
+        "w": 8
+      },
+      "hasInterior": false,
+      "notes": "Drive ribbon x=-356, z 284..305, 8 wide, sidewalks at x -362.5/-349.5 (roads.json rd_068). The legacy ambulance parks at (-356, 295) for 16 s after driving west along z=283 at 12.5 u/s (updateAmbulance 8990).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3811",
+      "style": "hospital drive used as ambulance bay",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_lobby_waiting",
+      "district": "hospital_spur",
+      "type": "waiting_room",
+      "x": -356,
+      "z": 323,
+      "facing": "-Z",
+      "footprint": {
+        "d": 36,
+        "w": 44
+      },
+      "hasInterior": true,
+      "notes": "Front double glass doors: leaves hinge at x +/-8.2, panes 7.55x7.6, swing -side*open*1.36 rad, open when player within 15 of (-356,305) and held 1.5 s (updateHospitalDoors 8429); structural opening 22.5 wide x 7.5 tall (front wall segments 35.5 wide at x +/-29, lintel 19x5). Waiting seats 5x0.5x2.1 with blue backs at local x -14 and 16 (and -30/32 in the triage bays), z -35/-18. Floor: teal spine stripe 3.4 wide along x=0 (z -33.5..33.5), dashed markers every 7, guide stripes at x +/-8.3 (z -45.5..-2.5). Signs (2.2 tall at y 6.5): 'EMERGENCY ENTRY' (0,-39), 'EXIT' (0,-44), 'WAITING / TRIAGE' over the inner doorway (0,-17). Bounded by 6.7-tall partitions at x +/-22 (z -44.5..-23.5) and the z=-12 wall (24-wide central opening x -12..12). Inside spawn (-356, 0.72, 314); exit trigger within 6 of (-356, 312).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3872",
+      "style": "central waiting / entry hall",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_triage_west",
+      "district": "hospital_spur",
+      "type": "triage_bay",
+      "x": -390.5,
+      "z": 323,
+      "facing": "-Z",
+      "footprint": {
+        "d": 36,
+        "w": 25
+      },
+      "hasInterior": true,
+      "notes": "(room bounds inferred from partitions/signs) Triage benches (4.8 long, wood-tone #a4b8ae, steel legs) at local (-32,-26) and (-31,-22); wheeled cart at (-31,-17); waiting seat row x -30; potted plant at (-42,-43). Side-wall windows on x=-47 at z -34 and -14 (glass 9.1 long x 4.3 tall at y 5.4). Duct entrance grille (first vent) at local (-38,-12), height 2.8, rotated 90 deg.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3874",
+      "style": "west triage bay",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_triage_east",
+      "district": "hospital_spur",
+      "type": "triage_bay",
+      "x": -321.5,
+      "z": 323,
+      "facing": "-Z",
+      "footprint": {
+        "d": 36,
+        "w": 25
+      },
+      "hasInterior": true,
+      "notes": "(room bounds inferred from partitions/signs) Triage benches at local (32,-27) and (32,-23) rotated 180 deg; cart at (31,-18); seat row x 32; plant at (40,-42); windows on x=+47 at z -34,-14.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3875",
+      "style": "east triage bay",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_reception_checkin",
+      "district": "hospital_spur",
+      "type": "reception",
+      "x": -356,
+      "z": 348,
+      "facing": "-Z",
+      "footprint": {
+        "d": 14,
+        "w": 94
+      },
+      "hasInterior": true,
+      "notes": "Nurse desk 12x2.2x3.2 (#9faeae) at local (-18,-3) with monitor and white top (sign 'RECEPTION' at (-20,-8)); patient check-in desk 12x2.2x3.2 at (18,-3) (sign 'PATIENT CHECK-IN' at (19,-8)); 5 chart cubbies + monitors along z=-7 at x -18..-8.6; intake desks 5.8x1.5x2.3 at (+/-18, 2) with monitors; furniture colliders 12.5x3.8 at the two desks. Low partitions (5.0 tall) at z=2: x -46.5..-29.5 and x 27.5..46.5. Tall wall screens 0.22x3.8x4 on both side walls at z -8, 5, 18. Stretchers at (-33,-1) and (28,3).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3858",
+      "style": "reception (west) and patient check-in (east) counters",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_ward_bays_1_4",
+      "district": "hospital_spur",
+      "type": "treatment_ward",
+      "x": -356,
+      "z": 366.5,
+      "facing": "-Z",
+      "footprint": {
+        "d": 23,
+        "w": 94
+      },
+      "hasInterior": true,
+      "notes": "(room bounds inferred from partitions/signs) Beds 7x0.7x11 (#d9e7e6) at local x -33,-11,11,33, z 15, with pillow, 4 steel legs and translucent curtain (0.22x5x11, opacity .67) at x+4.1; bed colliders 7.3x11.3. Per bay: wall monitor 2.3x1.8 at (x-3.5, 4.8, z+3.4) with green trace, IV pole + bag at (x+3.2, z-3), surgical lamp disc r 1.65 at y 10.7 with glow. Sign 'TREATMENT WARD' (0,9), 'BAYS 1 - 4' (-24,11). Tan cross-aisle stripe 69x2.6 at z 5.9. Extra IV stands at (-30,14), (12,15). Duct grille at (-9,-12) and (-9,25) (height 2.8); duct runs overhead along x=-9.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3972",
+      "style": "treatment ward, bays 1-4",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_ward_bays_5_8",
+      "district": "hospital_spur",
+      "type": "treatment_ward",
+      "x": -356,
+      "z": 387,
+      "facing": "-Z",
+      "footprint": {
+        "d": 18,
+        "w": 94
+      },
+      "hasInterior": true,
+      "notes": "(room bounds inferred from partitions/signs) Beds at local x -33,-11,11,33, z 35 (same kit as bays 1-4). Sign 'BAYS 5 - 8' (23,31). IV stands at (-8,35), (33,35). Stretcher at (-18,33). Duct grille at (30,25); the duct climbs from y 2.8 to 7.6 between z 25 and 36 and ends at the overhead hatch (local 11, 36, height 7.6) directly above the bays (only usable from inside the duct).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3972",
+      "style": "treatment ward, bays 5-8",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_supplies",
+      "district": "hospital_spur",
+      "type": "supply_room",
+      "x": -384,
+      "z": 395.5,
+      "facing": "-Z",
+      "footprint": {
+        "d": 11,
+        "w": 38
+      },
+      "hasInterior": true,
+      "notes": "(room bounds inferred from partitions/signs) Wall 26x0.55x4.6 at z=43 spanning x -35..-9; sign 'SUPPLIES' (-31,42). Supply shelving: 2 racks at x -42 and -36 (z 40), 4 shelves each 5x0.16x2.5 at y 1.8..5.55 with 3 coloured boxes per shelf; potted plant at (-40,39). Back wall z=48 is 5 units behind the screen.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3878",
+      "style": "supplies corner",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_observation",
+      "district": "hospital_spur",
+      "type": "observation_room",
+      "x": -328,
+      "z": 395.5,
+      "facing": "-Z",
+      "footprint": {
+        "d": 11,
+        "w": 38
+      },
+      "hasInterior": true,
+      "notes": "(room bounds inferred from partitions/signs) Wall 26x0.55x4.6 at z=43 spanning x 14..40; sign 'OBSERVATION' (26,42); plant at (40,39); cart at (39,7) nearby.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3879",
+      "style": "observation corner",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_duct_network",
+      "district": "hospital_spur",
+      "type": "duct",
+      "x": -360,
+      "z": 365,
+      "facing": "-Z",
+      "footprint": {
+        "d": 50.7,
+        "w": 70.7
+      },
+      "hasInterior": true,
+      "notes": "ductNodes 4076 (local x,z; height above HOSPITAL_FLOOR=0.52): (-38,-12,2.8) -> (-9,-12,2.8) -> (-9,25,2.8) -> (30,25,2.8) -> (30,29,4.2) -> (30,36,7.6) -> (11,36,7.6). Square tube 2.7 wide x 1.76 tall: opaque floor #7e9291, translucent walls/ceiling (opacity .29), ribs every 5, warm strip lights every 8; the last segment has a real 3.1-long hole above the hatch. Vents (ductVents 4119): 4 low wall grilles 2.6x1.3 at the first four nodes (the first rotated 90 deg) and 1 upper hatch panel 2.7x2.9 at node 7. Accent glow balls at nodes 2,3,4,6,7. Footprint is the bounding box incl. tube width.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L4076",
+      "style": "see-through ventilation duct with climbing section",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "hosp_roof",
+      "district": "hospital_spur",
+      "type": "roof",
+      "x": -356,
+      "z": 353,
+      "facing": "-Z",
+      "footprint": {
+        "d": 99,
+        "w": 97
+      },
+      "hasInterior": false,
+      "notes": "Roof slab 97x0.75x99 at local y 12.8 (hidden while inside the hospital or the duct, updateHospital 9041). Landing surface at HOSP_BASE+13.34 (= y 13.44) for anything within the footprint +1.2 (roofSurfaceAt 6137). No climb route up the walls in v5.4: reachable only by leaping from trees/wires (inferred). 12 ceiling light panels 8x3.4 at y 11 (x -34,-12,14,33 x z -21,5,30).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3847",
+      "style": "flat hospital roof (#718c90)",
+      "v54": {
+        "facing": "-Z"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

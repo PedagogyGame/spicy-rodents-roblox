@@ -1,0 +1,569 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "east_commercial",
+  "lots": [
+    {
+      "id": "east_chilis_restaurant",
+      "district": "east_commercial",
+      "type": "restaurant",
+      "x": 474,
+      "z": -82,
+      "facing": "+Z",
+      "footprint": {
+        "d": 31,
+        "w": 52
+      },
+      "hasInterior": false,
+      "notes": "facing: glazed front at local z=+15.62, comment \"looks toward the main commercial road (+z)\". yaw=0 rad (front=(sin yaw,0,cos yaw)). base_y 9.35 (on a hill). Box 52x10.2x31 + brick band + cap to y=11.4; roof route at +11.62 (x 449..499). Signs \"CHILI'S\" and \"GRILL & BAR\" at z=-65.3. 6 glass panes front (local x -20..20 step 8), door 5x6.8. Patio: 5 tables at (432+14i, -48 or -43), 3 parasols. Parking bays: 8 lines x=438..508 step 10 at z=-24; parked cars (462,-29) & (493,-29). commercialBounds collider w52 d31.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L722",
+      "style": "Chili's-style grill: tan stucco #b9a48f, brick band #844c42, red awnings #b23b33",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "east_fuel_market",
+      "district": "east_commercial",
+      "type": "gas_station",
+      "x": 522,
+      "z": 110,
+      "facing": "-Z",
+      "footprint": {
+        "d": 23,
+        "w": 33
+      },
+      "hasInterior": false,
+      "notes": "facing: shop glass/door at local z=-11.65 facing the pump islands; code comment says \"north-facing\". yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Shop 33x8.2x23, parapet to ~9.95; roof route at +9.62 (x 506..538). Doors \"visible but not enterable\" (803). Signs FUEL MARKET / OPEN at z~97.7. Air/water station (505,91), waste container (535,93). Static tall delivery van at (604,110) 3x3.45x5.9 (tallVehicles). commercialBounds w33 d23.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L778",
+      "style": "cream #ded9c7, green #346d5b trim #294f48",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "east_fuel_canopy",
+      "district": "east_commercial",
+      "type": "gas_canopy",
+      "x": 476,
+      "z": 63,
+      "footprint": {
+        "d": 31,
+        "w": 68
+      },
+      "hasInterior": false,
+      "notes": "Canopy slab top ~ ground(1.19)+10.74; roof routes E-W (445..507 at z=63) and N-S (z 48.5..77.4 at x=476) at canopyBy+10.84; service ladder at (504,76.85) as trunk route. Six dispensers: x 452/474/496 x z 55/70 (474 red #ca5744, others teal #477e81). Apron panels 8.85x7.85 x=445..508, z=47..79. No ground collider for canopy columns.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L811",
+      "style": "white slab #eee9d8 on green band, 4 columns at (448|504, 50|76)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "east_fuel_price_tower",
+      "district": "east_commercial",
+      "type": "sign",
+      "x": 411,
+      "z": 91,
+      "footprint": {
+        "d": 0.13,
+        "w": 6.8
+      },
+      "hasInterior": false,
+      "notes": "flatSign panels unrotated (face +-Z).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L890",
+      "style": "pole 7.4 + FUEL/MARKET/OPEN panels",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "east_corner_shops",
+      "district": "east_commercial",
+      "type": "shop",
+      "x": 605,
+      "z": -94,
+      "facing": "+Z",
+      "footprint": {
+        "d": 28,
+        "w": 36
+      },
+      "hasInterior": false,
+      "notes": "facing: 3 storefront panes at z=-79.8 and sign at z=-79.4 face the z=0 road. yaw=0 rad (front=(sin yaw,0,cos yaw)). \"One more diner / storefront\". Box 36x9.1x28; roof route at y+10.9 (x 589..621). Sign \"CORNER SHOPS\". Note shopY samples terrain at x=609 not 605. Parked car (586,-33). commercialBounds w36 d28.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L903",
+      "style": "grey-green #a0b1ad, cap #504f4b",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "east_commercial_intersection",
+      "district": "east_commercial",
+      "type": "intersection",
+      "x": 347,
+      "z": 0,
+      "footprint": {
+        "d": 26,
+        "w": 29
+      },
+      "hasInterior": false,
+      "notes": "Traffic signals (static, never cycle) at (321,-29),(371,29),(372,-28),(320,29): 10-high pole, 2.2 arm toward x=347, 3-lamp head at +8.6 (red/amber/green). Zebra stripes 0.72x1.3 at x=325 & 369 (z -11..11.5 step 2.5) and 1.35x0.72 at z=+-22 (x 335..358.4 step 2.6). Stop signs (324,31),(371,-34); hydrants (312,23),(387,-22); streetlights (294,-22),(397,23),(583,-21).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L714",
+      "style": "signalised 4-way",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "east_parking_lots",
+      "district": "east_commercial",
+      "type": "parking",
+      "x": 522.5,
+      "z": 2,
+      "hasInterior": false,
+      "notes": "Two rows of bay lines (0.09x6) at z=139 and z=-135, x=410..635 step 15 (16 lines per row) - on grass, no paved surface. Parked car (558,142).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L911",
+      "style": "painted bays only",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "east_trolley_stop_0",
+      "district": "east_commercial",
+      "type": "transit_stop",
+      "x": 310,
+      "z": 20.2,
+      "facing": "-Z",
+      "footprint": {
+        "d": 1.95,
+        "w": 9.7
+      },
+      "hasInterior": false,
+      "notes": "facing: stop pad north of road centre at z=20.2, beside the rails at z~8.65. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Owned by street-vehicles extractor (makeHeritageTrolley 7637). Rails z=7.38/9.92, x 263..675.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L7697",
+      "style": "heritage trolley stop pad #bab8ad",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "east_trolley_stop_1",
+      "district": "east_commercial",
+      "type": "transit_stop",
+      "x": 465,
+      "z": 20.2,
+      "facing": "-Z",
+      "footprint": {
+        "d": 1.95,
+        "w": 9.7
+      },
+      "hasInterior": false,
+      "notes": "facing: stop pad north of road centre at z=20.2, beside the rails at z~8.65. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Owned by street-vehicles extractor (makeHeritageTrolley 7637). Rails z=7.38/9.92, x 263..675.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L7697",
+      "style": "heritage trolley stop pad #bab8ad",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "east_trolley_stop_2",
+      "district": "east_commercial",
+      "type": "transit_stop",
+      "x": 616,
+      "z": 20.2,
+      "facing": "-Z",
+      "footprint": {
+        "d": 1.95,
+        "w": 9.7
+      },
+      "hasInterior": false,
+      "notes": "facing: stop pad north of road centre at z=20.2, beside the rails at z~8.65. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Owned by street-vehicles extractor (makeHeritageTrolley 7637). Rails z=7.38/9.92, x 263..675.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L7697",
+      "style": "heritage trolley stop pad #bab8ad",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "skyline_radio_tower",
+      "district": "east_commercial",
+      "type": "landmark_tower",
+      "x": 646,
+      "z": -213,
+      "footprint": {
+        "d": 12.6,
+        "w": 12.6
+      },
+      "hasInterior": false,
+      "notes": "H=114 + 11 mast, beacon ball r=0.53 at +126, emissive #ff351e 0.55 (static, does NOT blink). Base foot radius 6.3 tapering to 1.3.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3004",
+      "style": "triangular lattice, alternating steel #aeb6b1 / red #b34c45 sections",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "skyline_cell_tower",
+      "district": "east_commercial",
+      "type": "landmark_tower",
+      "x": 629,
+      "z": 218,
+      "footprint": {
+        "d": 3.3,
+        "w": 3.3
+      },
+      "hasInterior": false,
+      "notes": "H=99, two antenna rings at 0.67H and 0.88H (6 panels each, radius 4), cone cap.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3027",
+      "style": "monopole #8f9d98, panels #d0d5cc",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "detail_38_fire_hydrant",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 312,
+      "z": 23,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.5,
+        "w": 2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 1.13; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "fire hydrant (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_39_fire_hydrant",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 387,
+      "z": -22,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.5,
+        "w": 2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 4.04; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "fire hydrant (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_40_park_bench",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 418,
+      "z": -39,
+      "yaw": 2.839999758845173,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.37; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "park bench (variation 4, even palette)",
+      "v54": {
+        "facing": "yaw 162.72 deg"
+      }
+    },
+    {
+      "id": "detail_41_park_bench",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 562,
+      "z": 46,
+      "yaw": 3.5499996985564666,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 1.46; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "park bench (variation 5, odd palette)",
+      "v54": {
+        "facing": "yaw 203.4 deg"
+      }
+    },
+    {
+      "id": "detail_42_trash_can",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 538,
+      "z": -38,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.56,
+        "w": 1.56
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 4.86; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "trash can (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_43_trash_can",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 419,
+      "z": 77,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.56,
+        "w": 1.56
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 4.35; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "trash can (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_44_streetlight",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 294,
+      "z": -22,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.2,
+        "w": 5.1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "streetlight (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_45_streetlight",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 397,
+      "z": 23,
+      "yaw": 2.839999758845173,
+      "footprint": {
+        "d": 1.2,
+        "w": 5.1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 4.98; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "streetlight (variation 4, even palette)",
+      "v54": {
+        "facing": "yaw 162.72 deg"
+      }
+    },
+    {
+      "id": "detail_46_streetlight",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 583,
+      "z": -21,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.2,
+        "w": 5.1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.54; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "streetlight (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_47_stop_sign",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 324,
+      "z": 31,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 0.3,
+        "w": 1.4
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 2.37; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "stop sign (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_48_stop_sign",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 371,
+      "z": -34,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 0.3,
+        "w": 1.4
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.01; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "stop sign (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_49_sprinkler_head",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 574,
+      "z": 145,
+      "yaw": 2.839999758845173,
+      "footprint": {
+        "d": 3,
+        "w": 3
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "sprinkler head (variation 4, even palette)",
+      "v54": {
+        "facing": "yaw 162.72 deg"
+      }
+    },
+    {
+      "id": "detail_50_lawn_flamingo",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 571,
+      "z": -149,
+      "yaw": 2.839999758845173,
+      "footprint": {
+        "d": 1.4,
+        "w": 1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 4.43; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "lawn flamingo (variation 4, even palette)",
+      "v54": {
+        "facing": "yaw 162.72 deg"
+      }
+    },
+    {
+      "id": "detail_51_kids_bike",
+      "district": "east_commercial",
+      "type": "detail",
+      "x": 251,
+      "z": 126,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 2.9,
+        "w": 1.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.69; group yaw = variation*0.71 rad. Public fixture / commercial landscaping list. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3266",
+      "style": "kids bike (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

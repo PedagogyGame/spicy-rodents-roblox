@@ -1,0 +1,352 @@
+{
+  "$schema": "../../schema/wildlife_fauna.schema.json",
+  "chainedDogs": {
+    "lines": "10013-10047, 10288+",
+    "list": [
+      [-403, -206],
+      [-404, -75],
+      [-418, 63],
+      [-403, 134]
+    ],
+    "radius": 3.4,
+    "stakeOffset": [4, 2]
+  },
+  "idlePredators": {
+    "byPlace": {
+      "hospital": "hospital security guard",
+      "other shelter": "snake",
+      "outdoors": "eagle",
+      "sewer": "small alligator",
+      "shed/house shelter": "cat"
+    },
+    "gameOverSeconds": 780,
+    "idleSeconds": 779,
+    "lines": "8185-8230"
+  },
+  "normalSquirrels": {
+    "count": 7,
+    "eyeColor": "#29302f (M.black)",
+    "furs": ["#b78453", "#9a6b47", "#b19b7b", "#675e4d", "#a48c68", "#8c7463", "#c19c66"],
+    "hideGroundY": [-0.07, -0.07, 0.03, 0.43, 7.369999999999999, 3.87, 0.03],
+    "hides": [
+      [-74, -71],
+      [84, 70],
+      [-196, 97],
+      [217, -111],
+      [-105, 321],
+      [103, 409],
+      [414, 332]
+    ],
+    "infectedHeadAndSharedFur": "#a67860",
+    "infectedTorso": "#83544d",
+    "infection": {
+      "advanceRequires": "infectionOwn >= 25 AND secondsSinceBite < 600",
+      "capWhenOwnBelow25": 0.92,
+      "dtClamp": 0.2,
+      "matureSeconds": 1500,
+      "perSquirrelMaxPercent": 3.5714285714285716,
+      "totalCapPercent": 25
+    },
+    "lines": "5060-5101 (create), 8898-8916 (updateWildlife), 8957-8977 (pounce), 8849-8865 (infection)",
+    "model": {
+      "ears": {
+        "pos": [0.13, 0.65, 0.3],
+        "r": 0.07
+      },
+      "eyes": {
+        "pos": [0.12, 0.49, 0.49],
+        "r": 0.039
+      },
+      "head": {
+        "pos": [0, 0.47, 0.31],
+        "r": 0.2
+      },
+      "paws": {
+        "pos": [0.18, 0.14, 0.28],
+        "r": 0.068
+      },
+      "tail": {
+        "pos": [0, 0.71, -0.48],
+        "r": 0.3,
+        "scale": [0.46, 1.7, 0.5]
+      },
+      "torso": {
+        "y": 0.27,
+        "r": 0.3,
+        "scale": [0.72, 0.68, 1.35]
+      },
+      "yOffset": -0.06
+    },
+    "pounce": {
+      "message": "ANOTHER SQUIRREL TURNS! +90 Power · +10 Coins",
+      "messageSeconds": 3,
+      "radius3D": 1.42,
+      "rewardCoins": 10,
+      "rewardPower": 90,
+      "sfx": [810, 0.12, "triangle", 0.04]
+    },
+    "wander": {
+      "amplitude": 8,
+      "amplitudeInfected": 6,
+      "footProbe": {
+        "front": 0.36,
+        "lift": -0.05,
+        "side": 0.24
+      },
+      "initialPhase": "i*1.7",
+      "lerpRate": 2,
+      "phaseRate": 1,
+      "phaseRateInfected": 1.3,
+      "tailWag": {
+        "amp": 0.17,
+        "freq": 7
+      },
+      "xFreq": 0.83,
+      "zFreq": 0.63,
+      "zPhaseMul": 1.3
+    }
+  },
+  "overflight": {
+    "speed": 26.25,
+    "alternatesHeading": true,
+    "altitude": [165, 205],
+    "centerJitter": {
+      "x": 95,
+      "z": 75
+    },
+    "contrailSegments": 18,
+    "duration": 48,
+    "halfPath": 630,
+    "headingJitter": 1.1,
+    "initialWait": 34,
+    "lines": "15508-15633",
+    "nextWait": [90, 150],
+    "relativeTo": "player position",
+    "silent": true
+  },
+  "rabbits": {
+    "behaviour": {
+      "dangerPhaseBoost": 9.5,
+      "dangerRadiusXZ": 12,
+      "escapeSeconds": 2.5,
+      "hop": {
+        "amp": 0.12,
+        "base": 0.13,
+        "freq": 4
+      },
+      "initialPhase": "i*1.4",
+      "lerpCalm": 2,
+      "lerpEscape": 10,
+      "orbitCalm": [7, 9],
+      "orbitEscape": [15, 14],
+      "phaseRate": 1.6,
+      "xFreq": 0.66,
+      "zFreq": 0.43
+    },
+    "bush": {
+      "centerYAboveGround": 1.8,
+      "collider": false,
+      "color": "#496c42",
+      "radius": 2,
+      "scale": [1.7, 1, 1.2]
+    },
+    "lines": "5102-5124 (create), 8918-8944 (update), 8946-8956 (pounce)",
+    "list": [
+      {
+        "x": -64,
+        "z": 93,
+        "color": "#ab9d87",
+        "i": 0
+      },
+      {
+        "x": 72,
+        "z": 96,
+        "color": "#c2b39c",
+        "i": 1
+      },
+      {
+        "x": -97,
+        "z": -70,
+        "color": "#786d62",
+        "i": 2
+      },
+      {
+        "x": 206,
+        "z": 325,
+        "color": "#a88e78",
+        "groundY": 4.09,
+        "i": 3
+      }
+    ],
+    "model": {
+      "body": {
+        "y": 0.3,
+        "r": 0.36,
+        "scale": [0.8, 0.7, 1.65]
+      },
+      "ears": {
+        "pos": [0.15, 0.75, 0.47],
+        "r": 0.13,
+        "scale": [0.5, 2.5, 0.64]
+      },
+      "eyes": {
+        "pos": [0.16, 0.5, 0.6],
+        "r": 0.045
+      },
+      "head": {
+        "pos": [0, 0.45, 0.43],
+        "r": 0.24
+      },
+      "tail": {
+        "color": "#efecdc (M.white)",
+        "pos": [0, 0.34, -0.6],
+        "r": 0.21
+      }
+    },
+    "pounce": {
+      "alwaysEscapes": true,
+      "escapeSeconds": 4,
+      "message": "Too quick! The rabbit slipped away. No reward.",
+      "messageSeconds": 2,
+      "phaseKick": 4,
+      "radius3D": 2.25
+    }
+  },
+  "shelterZones": {
+    "enclosedTest": "dist < 2 and y < ground+3 -> fog near 15 / far 53",
+    "lines": "3702-3725 (built), 8189 (predator), 9119 (fog enclosure)",
+    "list": [
+      {
+        "type": "log",
+        "x": -19,
+        "z": 376,
+        "model": "bark cylinder r2.3-2.4 len9.2 on its side, black cavity r1.3",
+        "r": 4
+      },
+      {
+        "type": "bridge",
+        "x": -116,
+        "z": 371,
+        "r": 4
+      },
+      {
+        "type": "hollow",
+        "x": 95,
+        "z": 359,
+        "model": "bark stump cyl r1.7 top / 2.3 base, h8; black opening r1.2 at y1.9 on -Z face",
+        "r": 4
+      },
+      {
+        "type": "shed",
+        "x": 203,
+        "z": 328,
+        "r": 6
+      },
+      {
+        "type": "house",
+        "x": 255,
+        "z": 328,
+        "r": 7
+      }
+    ]
+  },
+  "src": "wildlife.json v54.normalSquirrels, rabbits, yardCats, adjacentFauna, shelterZones, overflight (wildlife_foraging 2-5, 9); HTML units (x 2.5 for studs)",
+  "turtles": {
+    "lines": "10171-10199, 10279-10287",
+    "list": [
+      [-125, 328],
+      [-104, 349],
+      [-25, 84],
+      [164, -448],
+      [-406, 180]
+    ],
+    "shells": ["#596e3d", "#6e7750", "#5a6341", "#877958", "#73804e"],
+    "wander": {
+      "ampX": 2.3,
+      "ampZ": 2,
+      "lerp": 0.35,
+      "phaseRate": 0.15
+    }
+  },
+  "yardCats": {
+    "chaseRadius": 8,
+    "eyes": "#d7e36e",
+    "hit": {
+      "cooldownHit": 7,
+      "cooldownMiss": 4,
+      "knockback": 10.5,
+      "maxHeight": 2.4,
+      "minUpVel": 3.9,
+      "powerLoss": 12,
+      "radius": 2.75
+    },
+    "houseClearance": 1,
+    "lines": "11514-11641 (owned by humans/neighbourhood extractor; stats only here)",
+    "list": [
+      {
+        "anchor": "hNW (-56,-53) + (11,-23)",
+        "fur": "#80614b",
+        "home": [-45, -76],
+        "i": 0,
+        "legs": "#bd9f7e"
+      },
+      {
+        "anchor": "hSE (58,56) + (-10,23)",
+        "fur": "#454647",
+        "home": [48, 79],
+        "i": 1,
+        "legs": "#ddd3bd"
+      },
+      {
+        "anchor": "hNE (51,-59) + (-11,-20)",
+        "fur": "#a19e88",
+        "home": [40, -79],
+        "i": 2,
+        "legs": "#ddd3bd"
+      }
+    ],
+    "maxTargetHeightAboveGround": 2.8,
+    "messages": ["A yard cat crouches to pounce — JUMP!", "CAT SWAT! It knocked the squirrel backward. Leap or climb to escape!", "The cat lunged and missed!"],
+    "nose": "#bb8b89",
+    "sightRadius": 17.5,
+    "speeds": {
+      "chase": 8.5,
+      "stalk": 3.1,
+      "wander": 1.6
+    },
+    "territoryRadius": 26,
+    "turnRate": 5,
+    "voice": {
+      "ambientCooldown": 6,
+      "ambientRadius": 10,
+      "windupCooldown": 4.5
+    },
+    "wanderOrbit": {
+      "x": 7,
+      "z": 6,
+      "xFreq": 0.31,
+      "zFreq": 0.23
+    },
+    "windup": {
+      "crouchScaleY": 0.72,
+      "seconds": 0.68,
+      "triggerRadius": 3
+    }
+  },
+  "yardDogs": {
+    "alertsHumansRadius": 12,
+    "barkCooldown": 8,
+    "barkMaxPlayerY": 5,
+    "barkRadius": 10,
+    "barkYIsAbsoluteWorldY": true,
+    "lines": "7950-7974, 9091-9111",
+    "list": [
+      [203, 363],
+      [240, 402],
+      [98, 311],
+      [55, 345]
+    ],
+    "message": "WOOF! A yard dog spotted the squirrel.",
+    "note": "Verifier: the bark test is world y < 5 (9102). Dog 0 (203,363) sits on ground 4.9-6.4 and dog 1 (240,402) on 7.6-8.1, so they almost never or never bark at a squirrel on the ground. Dogs 2 and 3 work."
+  }
+}

@@ -1,0 +1,310 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "bellwether_galleria",
+  "lots": [
+    {
+      "id": "galleria_building",
+      "district": "bellwether_galleria",
+      "type": "mall",
+      "x": 1102,
+      "z": 338,
+      "facing": "-Z",
+      "footprint": {
+        "d": 108,
+        "w": 78
+      },
+      "hasInterior": true,
+      "notes": "MALL const 14191: floor y 8.14, gallery y 14.6, roof top 22.94, front z 284, back z 392. Perimeter walls 1 thick x 14.6 tall (solid, camera-blocking). Front facade z=284.5: wall segments 32.5 wide either side of a 13-wide x 6.8-tall entrance (lintel 13x7.8 above), 2 sliding glass doors 5.8x6.4 (slide to x = 1102 +/- (2.9 + open*6.1); open when player within 16 of (1102,284) and y < floor+5; lerp rate 5/s) (updateMall 15027), entrance canopy 16x0.3x7 at y+6.9 z 281.5 with glass top, sign 'BELLWETHER GALLERIA' 58x2.1 at y+12.3, 'COME ON IN' 8x0.7 at y+5.8, 3 window bays per side (blue panels 5.8x7 with brass frames) at x+/-15,27,35, pilasters at x+/-7,20,38. Long side walls: clerestory windows 10 long x 4.6 tall at y+9.2, z -40..40 step 20, brass mullions. Dark cornice band at y+14.35. Roof: 8 glass skylight panels 25.3x11.5 over the atrium at y+14.63 (z -42..42 step 12) with dark beams; stone roof slabs 25.5x108 over both shop ranges; roof is a landing surface at 23.12 (mallRoofAt). Interior lighting: 4 PointLights #ffdfa9 intensity 38, distance 46, decay 2 at (+/-25, +5.4, +/-30) (off in performance tier / when far), 3 glowing ceiling strips 11x2.2 at y+12.9 (z -35,-3,29), per-shop glow strips. Floor: canvas checker tile (#e3d8be/#c4ccbf) roughness .32 metal .12. Atrium columns 0.65x14.4 at x +/-12, z -44,-12,20,44. Routes: brass downspouts at x 1062.4 and 1141.6, z 288 (kind 'trunk', r .15) up to y 23.19, rooftop routes to z 388 (kind 'roof'). Visible only within 190 of the mall centre or atMall (pad 24 / fountain radius 18). Exposure 1.15 inside; sky stays visible through the glass roof. Start-at-mall spawn (1102, 8.32, 238) yaw PI.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14633",
+      "style": "Beaux-arts galleria: cream stone (#ded2ba), brass (#b69a53), blue glazing (#477b88), glass-roofed atrium",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "galleria_shop_0_willow_books",
+      "district": "bellwether_galleria",
+      "type": "mall_shop",
+      "x": 1076,
+      "z": 306,
+      "facing": "+X",
+      "footprint": {
+        "d": 32,
+        "w": 25.5
+      },
+      "hasInterior": true,
+      "notes": "makeMallShop(side -1, index 0, z -32) 14525; shop type 0. Bay between trim partitions (25 x 6.35 tall at local z -48 and -16); storefront at x = 1089: glass panels 10 long at z +/-9.5 leaving a 9-wide walk-in opening in the middle, accent fascia 0.65x1.25x28 at y+5.1, name sign 24x1.0 (bg #6d8265), tinted floor 24x27, glow strip 20 long at y+5.9. Contents: bookshop: 5 bookcases 2.2x3.5x3.5 against the back wall (x +/-35) each with 3x6 coloured books, reading table 6x0.3x3.8 at x+/-23, bench. 2 squirrel coins at x 1084.5, z 296 and 315, y floor+0.55. Shop fixtures are solid colliders that also block the camera.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14525",
+      "style": "WILLOW BOOKS (accent #6d8265)",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "galleria_shop_1_pixel_palace",
+      "district": "bellwether_galleria",
+      "type": "mall_shop",
+      "x": 1076,
+      "z": 338,
+      "facing": "+X",
+      "footprint": {
+        "d": 32,
+        "w": 25.5
+      },
+      "hasInterior": true,
+      "notes": "makeMallShop(side -1, index 1, z 0) 14525; shop type 1. Bay between trim partitions (25 x 6.35 tall at local z -16 and 16); storefront at x = 1089: glass panels 10 long at z +/-9.5 leaving a 9-wide walk-in opening in the middle, accent fascia 0.65x1.25x28 at y+5.1, name sign 24x1.0 (bg #68577c), tinted floor 24x27, glow strip 20 long at y+5.9. Contents: arcade: 7 cabinets 2.1x2.1x1.75 (4 at x+/-34, 3 at x+/-23) with emissive screens (#49c2c0/#dfad64/#bc8abd), control decks and gold buttons. 2 squirrel coins at x 1084.5, z 328 and 347, y floor+0.55. Shop fixtures are solid colliders that also block the camera.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14525",
+      "style": "PIXEL PALACE (accent #68577c)",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "galleria_shop_2_acorn_outfitters",
+      "district": "bellwether_galleria",
+      "type": "mall_shop",
+      "x": 1076,
+      "z": 370,
+      "facing": "+X",
+      "footprint": {
+        "d": 32,
+        "w": 25.5
+      },
+      "hasInterior": true,
+      "notes": "makeMallShop(side -1, index 2, z 32) 14525; shop type 2. Bay between trim partitions (25 x 6.35 tall at local z 16 and 48); storefront at x = 1089: glass panels 10 long at z +/-9.5 leaving a 9-wide walk-in opening in the middle, accent fascia 0.65x1.25x28 at y+5.1, name sign 24x1.0 (bg #986f53), tinted floor 24x27, glow strip 20 long at y+5.9. Contents: clothing: 2 brass hanging rails 12 long at z +/-8 with 9 garments each (blue/cream/pink), central plinth 4x0.9x4 with 2 mannequins. 2 squirrel coins at x 1084.5, z 360 and 379, y floor+0.55. Shop fixtures are solid colliders that also block the camera.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14525",
+      "style": "ACORN OUTFITTERS (accent #986f53)",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "galleria_shop_3_little_jungle",
+      "district": "bellwether_galleria",
+      "type": "mall_shop",
+      "x": 1128,
+      "z": 306,
+      "facing": "-X",
+      "footprint": {
+        "d": 32,
+        "w": 25.5
+      },
+      "hasInterior": true,
+      "notes": "makeMallShop(side 1, index 0, z -32) 14525; shop type 3. Bay between trim partitions (25 x 6.35 tall at local z -48 and -16); storefront at x = 1115: glass panels 10 long at z +/-9.5 leaving a 9-wide walk-in opening in the middle, accent fascia 0.65x1.25x28 at y+5.1, name sign 24x1.0 (bg #597e70), tinted floor 24x27, glow strip 20 long at y+5.9. Contents: plant conservatory: 6 planters (x offsets -7/+2, z -9/0/+9) and wall sign 'PLANTS / POTS / LITTLE JUNGLES'. 2 squirrel coins at x 1119.5, z 296 and 315, y floor+0.55. Shop fixtures are solid colliders that also block the camera.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14525",
+      "style": "LITTLE JUNGLE (accent #597e70)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "galleria_shop_4_groove_records",
+      "district": "bellwether_galleria",
+      "type": "mall_shop",
+      "x": 1128,
+      "z": 338,
+      "facing": "-X",
+      "footprint": {
+        "d": 32,
+        "w": 25.5
+      },
+      "hasInterior": true,
+      "notes": "makeMallShop(side 1, index 1, z 0) 14525; shop type 4. Bay between trim partitions (25 x 6.35 tall at local z -16 and 16); storefront at x = 1115: glass panels 10 long at z +/-9.5 leaving a 9-wide walk-in opening in the middle, accent fascia 0.65x1.25x28 at y+5.1, name sign 24x1.0 (bg #527a85), tinted floor 24x27, glow strip 20 long at y+5.9. Contents: record shop: 3 crates 14x1x2.6 with 12 sleeves each, 5 wall-mounted discs at x+/-37. 2 squirrel coins at x 1119.5, z 328 and 347, y floor+0.55. Shop fixtures are solid colliders that also block the camera.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14525",
+      "style": "GROOVE RECORDS (accent #527a85)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "galleria_shop_5_copper_cup_cafe",
+      "district": "bellwether_galleria",
+      "type": "mall_shop",
+      "x": 1128,
+      "z": 370,
+      "facing": "-X",
+      "footprint": {
+        "d": 32,
+        "w": 25.5
+      },
+      "hasInterior": true,
+      "notes": "makeMallShop(side 1, index 2, z 32) 14525; shop type 5. Bay between trim partitions (25 x 6.35 tall at local z 16 and 48); storefront at x = 1115: glass panels 10 long at z +/-9.5 leaving a 9-wide walk-in opening in the middle, accent fascia 0.65x1.25x28 at y+5.1, name sign 24x1.0 (bg #a37254), tinted floor 24x27, glow strip 20 long at y+5.9. Contents: cafe: counter 3x1.5x22 at x+/-35 with trim top, wall sign 'COFFEE / PASTRIES', 3 round tables r 1.4 with 2 stools each and cups. 2 squirrel coins at x 1119.5, z 360 and 379, y floor+0.55. Shop fixtures are solid colliders that also block the camera.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14525",
+      "style": "COPPER CUP CAFE (accent #a37254)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "galleria_atrium",
+      "district": "bellwether_galleria",
+      "type": "atrium",
+      "x": 1102,
+      "z": 338,
+      "footprint": {
+        "d": 106,
+        "w": 26
+      },
+      "hasInterior": true,
+      "notes": "Open centre x 1089..1115. Atrium planters at (1094/1110, 297), benches (rot 90 deg) at x 1095/1109, z 316 and 348. Back-wall sign 'BELLWETHER / SIX SHOPS / UPPER GALLERY' at z 389.8 y+6.4.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14787",
+      "style": "double-height glass-roofed atrium",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "galleria_upper_gallery",
+      "district": "bellwether_galleria",
+      "type": "mezzanine",
+      "x": 1102,
+      "z": 338,
+      "footprint": {
+        "d": 106,
+        "w": 77
+      },
+      "hasInterior": true,
+      "notes": "mallUpperAt 14335: walkable at y 14.6 where |dx|<=38.5 and -53<=dz<=53 and (|dx|>=13 OR dz<=-47 OR dz>=48): two side walkways 25.5 wide over the shops plus front bridge (z 285..291) and back bridge (z 386..391). Glass balustrades 1.15 tall at x +/-13.05 (95 long) and z=-47 (26 long); z=48 balustrade is split (9.3 centre + 2.6 at x +/-11.7) to leave openings at the stair heads. Furniture: benches at x +/-29, z -35/-5/27 and planters at x +/-19 (dz +6). 8 squirrel coins at x +/-18, dz -38,-10,18,44 (y 15.15) and 1 GOLD coin at (1102, 15.2, 288) on the front bridge. Ceiling under gallery (gallery-0.65) and under roof (roof-0.55) clamp upward jumps (constrainMallCeiling 14417).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14335",
+      "style": "upper gallery ring (y 14.6) with glass balustrades and brass rails",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "galleria_stair_west",
+      "district": "bellwether_galleria",
+      "type": "stair",
+      "x": 1094.5,
+      "z": 374.5,
+      "facing": "+Z",
+      "footprint": {
+        "d": 23,
+        "w": 5
+      },
+      "hasInterior": true,
+      "notes": "mallStairAt 14341: |dx| 5..10, dz 25..48; step height = (14.6-8.14)/24 = 0.269, tread 0.958; surface quantised to steps. Handrails (brass tubes) at x offsets 5 and 10. Sign 'GALLERY UPSTAIRS' at dz 24.7. Walking into a riser more than 0.5 above the current height is blocked.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14726",
+      "style": "24-step dark stone stair with brass nosings and handrails",
+      "v54": {
+        "facing": "+Z (ascending toward the back)"
+      }
+    },
+    {
+      "id": "galleria_stair_east",
+      "district": "bellwether_galleria",
+      "type": "stair",
+      "x": 1109.5,
+      "z": 374.5,
+      "facing": "+Z",
+      "footprint": {
+        "d": 23,
+        "w": 5
+      },
+      "hasInterior": true,
+      "notes": "mallStairAt 14341: |dx| 5..10, dz 25..48; step height = (14.6-8.14)/24 = 0.269, tread 0.958; surface quantised to steps. Handrails (brass tubes) at x offsets 5 and 10. Sign 'GALLERY UPSTAIRS' at dz 24.7. Walking into a riser more than 0.5 above the current height is blocked.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14726",
+      "style": "24-step dark stone stair with brass nosings and handrails",
+      "v54": {
+        "facing": "+Z (ascending toward the back)"
+      }
+    },
+    {
+      "id": "galleria_coin_fountain",
+      "district": "bellwether_galleria",
+      "type": "fountain",
+      "x": 1102,
+      "z": 252,
+      "footprint": {
+        "d": 15.9,
+        "w": 15.9
+      },
+      "hasInterior": false,
+      "notes": "makeCoinFountain 14812. Outside the mall, 32 south of the entrance. Lathe basin r 7.95 (rim top floor+1.12 for 7.05<r<7.95, basin floor+0.34 inside), brass column to +4.44, bowl r 2.9 at +2.55, top bowl r 1.7 at +4.4; water disks r 7.05 (+0.64), r 2.48 (+3.03), r 1.28 (+4.78). 12 arcing jets (quadratic curves from r .7,y 4.87 via r 3.7,y 6.4 to r 5.5,y .65) with 96 instanced droplets cycling at 0.68/s; 5 ripple rings expanding r 1.7->6.7 every 4.5 s; 52 gold + 52 silver instanced coins in the basin; 48 rim tiles alternating brass/blue at r 7.48. Blocking: central column r<1.5 below +4.7, rim ring 6.8<r<8.22 below +0.7. Sign wall 13.4x1.8x0.28 at (1102, 241.2): 'THE WISHING FOUNTAIN' / 'E / TOSS 1 SQUIRREL COIN'. Benches at (1089/1115, 252), planters at (1083/1121, 242) and (1083/1121, 268). 4 squirrel coins at (1092/1112, 244/258). Interaction (handleMallInteraction 15002): E within 11.5 of the centre and |y-8.14|<=2.8 spends 1 Squirrel Coin, 0.7 s cooldown, coin arcs 0.9 s (peak +3) into the water; COSMETIC ONLY, no reward.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14812",
+      "style": "three-tier wishing fountain (stone basin, brass column, trim bowls)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "galleria_plaza",
+      "district": "bellwether_galleria",
+      "type": "plaza",
+      "x": 1103,
+      "z": 324.5,
+      "footprint": {
+        "d": 181,
+        "w": 84
+      },
+      "hasInterior": false,
+      "notes": "makeMallPlaza 14984; mallBaseAt 14348 (x 1061..1145, z 234..415). Six dark lamp posts with glowing heads at x 1069/1135, z 238/273/402. Sign 'SHOPS / FOUNTAIN / GALLERY' 24x1.2 at (1076, 11.14, 234). Brief s7 lists the mall plaza as a foraging source.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14984",
+      "style": "flat cream stone plaza (y 8.12)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "galleria_promenade_path",
+      "district": "bellwether_galleria",
+      "type": "path",
+      "x": 1069,
+      "z": 153,
+      "footprint": {
+        "d": 170,
+        "w": 8
+      },
+      "hasInterior": false,
+      "notes": "groundPatch 1065..1073 x 68..238 linking the market square to the plaza; 6 quay lamps at x 1071, z 82..222 step 28; signs 'GALLERIA + FOUNTAIN ->' (1069,70) and 'GALLERIA (up arrow)' (1069,206).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L14987",
+      "style": "cobbled promenade (riverCobble, y 8.12)",
+      "v54": {
+        "facing": "n/a"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

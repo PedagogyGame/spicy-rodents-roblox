@@ -1,0 +1,105 @@
+{
+  "$schema": "../../schema/wildlife_hollows.schema.json",
+  "alternates": ["RED MAPLE (34,34)", "park outer 90 (-221,355)", "estate gate oak 0 (-230,-329)", "Shop Oak B (362,24)"],
+  "knothole": [
+    {
+      "id": "H3",
+      "district": "core (player spawn oak, acorns)",
+      "x": -34,
+      "z": -33,
+      "H": 29,
+      "tree": "BUR OAK"
+    },
+    {
+      "id": "H4",
+      "district": "north residential (giant)",
+      "x": 88,
+      "z": 139,
+      "H": 70,
+      "tree": "HIGHLAND ELM"
+    },
+    {
+      "id": "H5",
+      "district": "east residential (giant; v5.4 squirrel hide 3 at its foot)",
+      "x": 216,
+      "z": -109,
+      "H": 65,
+      "tree": "OLD WATCH SYCAMORE"
+    },
+    {
+      "id": "H6",
+      "district": "southwest residential (giant)",
+      "x": -101,
+      "z": -146,
+      "H": 61,
+      "tree": "SENTINEL OAK"
+    },
+    {
+      "id": "H7",
+      "district": "west stream / treehouse (acorns)",
+      "x": -142,
+      "z": 154,
+      "H": 31,
+      "tree": "Treehouse Oak"
+    },
+    {
+      "id": "H8",
+      "district": "east commercial (restaurant dumpsters)",
+      "x": 412,
+      "z": -62,
+      "H": 27,
+      "tree": "Chilis Sycamore"
+    },
+    {
+      "id": "H9",
+      "district": "south estates (acorns)",
+      "x": 118,
+      "z": -356,
+      "H": 29,
+      "tree": "Estate Oak South 1"
+    },
+    {
+      "id": "H10",
+      "district": "westside old houses (acorns)",
+      "x": -401,
+      "z": 6,
+      "H": 46,
+      "tree": "Westside 4 shade oak"
+    },
+    {
+      "id": "H11",
+      "district": "riverside, next to Galleria plaza",
+      "x": 1094,
+      "z": 192,
+      "H": 19,
+      "tree": "QUAY WILLOW"
+    }
+  ],
+  "premium": [
+    {
+      "id": "H1",
+      "x": 90,
+      "z": 358,
+      "H": 33.32,
+      "groundY": 5.01,
+      "premiumFeeder": [105, 330],
+      "premiumGarden": [115, 341],
+      "replaceModel": true,
+      "tree": "park outer 95",
+      "why": "Beside Tabasco community garden (115,341); merges the existing shelter 'hollow' stump at (95,359); has the park high-watch perch; restored v4.1 feeder (132,333) and cache (119,326) nearby"
+    },
+    {
+      "id": "H2",
+      "x": -37,
+      "z": 29,
+      "H": 32,
+      "groundY": 0,
+      "premiumFeeder": [-45, 68],
+      "premiumGarden": [-36, 52],
+      "replaceModel": true,
+      "tree": "SYCAMORE",
+      "why": "Core district; sycamores are the classic hollow tree; garden plot (-36,52) 23 units away; densest backyards; apple 3 (-24,80)"
+    }
+  ],
+  "src": "wildlife.json proposals.hollowTrees (designer proposal, wildlife_foraging 6.5); HTML units (x 2.5 for studs)"
+}

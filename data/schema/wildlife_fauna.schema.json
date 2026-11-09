@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/wildlife_fauna",
+  "title": "v5.4 fauna: AI squirrels, rabbits, yard cats, turtles, dogs, shelters, overflights (data/authored/wildlife/fauna.json), wildlife_foraging 2-5, 9",
+  "type": "object",
+  "required": ["normalSquirrels", "rabbits", "yardCats", "yardDogs", "chainedDogs", "shelterZones"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "src": { "type": "string" },
+    "normalSquirrels": {
+      "type": "object", "required": ["count", "hides", "hideGroundY", "furs"],
+      "properties": {
+        "count": { "type": "integer" },
+        "hides": { "type": "array", "items": { "$ref": "#/$defs/xz" } },
+        "hideGroundY": { "type": "array", "items": { "type": "number" }, "x-unit": "u" },
+        "furs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "rabbits": {
+      "type": "object", "required": ["list"],
+      "properties": { "list": { "type": "array", "items": { "type": "object", "required": ["i", "x", "z"], "properties": { "i": { "type": "integer" }, "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "color": { "type": "string" } } } } }
+    },
+    "yardCats": {
+      "type": "object", "required": ["list"],
+      "properties": { "list": { "type": "array", "items": { "type": "object", "required": ["i", "home"], "properties": { "i": { "type": "integer" }, "home": { "$ref": "#/$defs/xz" }, "anchor": { "type": "string" }, "fur": { "type": "string" }, "legs": { "type": "string" } } } } }
+    },
+    "turtles": { "type": "object", "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/xz" } } } },
+    "yardDogs": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/xz" } }, "barkRadius": { "type": "number", "x-unit": "u" }, "barkMaxPlayerY": { "type": "number", "x-unit": "u" }, "alertsHumansRadius": { "type": "number", "x-unit": "u" } } },
+    "chainedDogs": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/xz" } }, "radius": { "type": "number", "x-unit": "u" }, "stakeOffset": { "$ref": "#/$defs/xz" } } },
+    "idlePredators": { "type": "object" },
+    "shelterZones": {
+      "type": "object", "required": ["list"],
+      "properties": { "list": { "type": "array", "items": { "type": "object", "required": ["type", "x", "z", "r"], "properties": { "type": { "type": "string" }, "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "r": { "type": "number", "x-unit": "u" }, "model": { "type": "string" } } } } }
+    },
+    "overflight": { "type": "object", "description": "HTML units (not converted)" }
+  },
+  "$defs": { "xz": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "x-unit": "u" } }
+}

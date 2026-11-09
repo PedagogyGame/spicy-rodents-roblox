@@ -1,0 +1,265 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "south_estates",
+  "lots": [
+    {
+      "id": "estate_0_parcel",
+      "district": "south_estates",
+      "type": "estate_parcel",
+      "x": -130,
+      "z": -440,
+      "facing": "+Z",
+      "footprint": {
+        "d": 216,
+        "w": 210
+      },
+      "hasInterior": false,
+      "notes": "facing: gate and frontage on the estate avenue (z=-305) to the +Z side. yaw=0 rad (front=(sin yaw,0,cos yaw)). createEstate(0, -130) (function 2754). Hedge lines (ball shrubs, h 1.7) at x=-235 and x=-25 from z=-332 to -548 and along z=-548. Gate pillars 1.5x6.2x1.5 at x=-139 & -121, z=-330. Front shrub row z=-335 (12 slots step 5.1, 4 skipped at the gate, so 8 balls). Paver drive x=-130, tile centres z -331..-374 (edges -328.05..-376.95). Paver walks from (-130,-402) to guesthouse and court. Parked car (-112,-350).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2819",
+      "style": "Grand brick revival (wall #ad7964, roof #514846)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "estate_0_mansion",
+      "district": "south_estates",
+      "type": "estate_mansion",
+      "x": -130,
+      "z": -370,
+      "facing": "+Z",
+      "footprint": {
+        "d": 35,
+        "w": 81
+      },
+      "hasInterior": false,
+      "notes": "facing: entrance door/portico/steps at local +z (z 16..28); comment \"north frontage faces the road\". yaw=0 rad (front=(sin yaw,0,cos yaw)). base_y 7.37. Main block 46x14x29 + two wings 19x10.2x24 at local x=+-30 (z+2). Projecting portico 19x15.8x4 at z=15 with pyramid pediment (cone r11), 4 columns at z=20.3, rooftop dormers x=+-19. Rear garden glass doors at local -z. Collider commercialBounds w81 d35 (solid, not enterable). Roof route at y+14.7 (x+-22).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2697",
+      "style": "Grand brick revival (wall #ad7964, roof #514846)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "estate_0_guesthouse",
+      "district": "south_estates",
+      "type": "guesthouse",
+      "x": -63,
+      "z": -463,
+      "facing": "+Z",
+      "footprint": {
+        "d": 15,
+        "w": 20
+      },
+      "hasInterior": false,
+      "notes": "facing: glass and door at local z=+7.6, porch columns at +11.6. yaw=0 rad (front=(sin yaw,0,cos yaw)). Box 20x6.7x15, roof slab 22x0.73x17; commercialBounds w20 d15; roof route y+7.48.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2678",
+      "style": "wall #d2b69c roof #765848",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "estate_0_pool",
+      "district": "south_estates",
+      "type": "estate_pool",
+      "x": -142,
+      "z": -425,
+      "footprint": {
+        "d": 31,
+        "w": 41
+      },
+      "hasInterior": false,
+      "notes": "Water 34x24; 4 loungers + umbrellas at z=pool+19; ladder rails at x=pool-18.5. No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2582",
+      "style": "deck #d9c6b0 tile #4e9eac",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "estate_0_tennis_court",
+      "district": "south_estates",
+      "type": "tennis_court",
+      "x": -177,
+      "z": -504,
+      "footprint": {
+        "d": 26,
+        "w": 42
+      },
+      "hasInterior": false,
+      "notes": "Net along local z (x=court centre) with fence-kind route on net top (y+1.55); 4 light poles at (+-20,+-12); see-through fence panels 3.8 high with 15-wide gap on +z side (no collision).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2627",
+      "style": "green court #476c59",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "estate_0_pergola",
+      "district": "south_estates",
+      "type": "pergola_summer_kitchen",
+      "x": -84,
+      "z": -424,
+      "footprint": {
+        "d": 8,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "4 posts 5.8 high, 7 roof slats; counter 5x1.5x2.1 and 2 stools.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2806",
+      "style": "timber pergola #a89272 + counter #746c62",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "estate_1_parcel",
+      "district": "south_estates",
+      "type": "estate_parcel",
+      "x": 130,
+      "z": -440,
+      "facing": "+Z",
+      "footprint": {
+        "d": 216,
+        "w": 210
+      },
+      "hasInterior": false,
+      "notes": "facing: gate and frontage on the estate avenue (z=-305) to the +Z side. yaw=0 rad (front=(sin yaw,0,cos yaw)). createEstate(1, 130) (function 2754). Hedge lines (ball shrubs, h 1.7) at x=25 and x=235 from z=-332 to -548 and along z=-548. Gate pillars 1.5x6.2x1.5 at x=121 & 139, z=-330. Front shrub row z=-335 (12 slots step 5.1, 4 skipped at the gate, so 8 balls). Paver drive x=130, tile centres z -331..-374 (edges -328.05..-376.95). Paver walks from (130,-402) to guesthouse and court. Parked car (112,-350).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2820",
+      "style": "Formal modern limestone villa (wall #d6cab2, roof #6b6b60)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "estate_1_mansion",
+      "district": "south_estates",
+      "type": "estate_mansion",
+      "x": 130,
+      "z": -370,
+      "facing": "+Z",
+      "footprint": {
+        "d": 35,
+        "w": 81
+      },
+      "hasInterior": false,
+      "notes": "facing: entrance door/portico/steps at local +z (z 16..28); comment \"north frontage faces the road\". yaw=0 rad (front=(sin yaw,0,cos yaw)). base_y 2.27. Main block 46x14x29 + two wings 19x10.2x24 at local x=+-30 (z+2). Roof terrace 17x1.1x11, parapets, 2 columns at x=+-6.3 z=18, canopy 17x7 at y 11.95. Rear garden glass doors at local -z. Collider commercialBounds w81 d35 (solid, not enterable). Roof route at y+14.7 (x+-22).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2697",
+      "style": "Formal modern limestone villa (wall #d6cab2, roof #6b6b60)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "estate_1_guesthouse",
+      "district": "south_estates",
+      "type": "guesthouse",
+      "x": 63,
+      "z": -463,
+      "facing": "+Z",
+      "footprint": {
+        "d": 15,
+        "w": 20
+      },
+      "hasInterior": false,
+      "notes": "facing: glass and door at local z=+7.6, porch columns at +11.6. yaw=0 rad (front=(sin yaw,0,cos yaw)). Box 20x6.7x15, roof slab 22x0.73x17; commercialBounds w20 d15; roof route y+7.48.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2678",
+      "style": "wall #dacdb0 roof #686764",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "estate_1_pool",
+      "district": "south_estates",
+      "type": "estate_pool",
+      "x": 142,
+      "z": -425,
+      "footprint": {
+        "d": 31,
+        "w": 41
+      },
+      "hasInterior": false,
+      "notes": "Water 34x24; 4 loungers + umbrellas at z=pool+19; ladder rails at x=pool-18.5. No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2582",
+      "style": "deck #e1d9c6 tile #2d7c90",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "estate_1_tennis_court",
+      "district": "south_estates",
+      "type": "tennis_court",
+      "x": 177,
+      "z": -504,
+      "footprint": {
+        "d": 26,
+        "w": 42
+      },
+      "hasInterior": false,
+      "notes": "Net along local z (x=court centre) with fence-kind route on net top (y+1.55); 4 light poles at (+-20,+-12); see-through fence panels 3.8 high with 15-wide gap on +z side (no collision).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2627",
+      "style": "blue court #356785",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "estate_1_pergola",
+      "district": "south_estates",
+      "type": "pergola_summer_kitchen",
+      "x": 84,
+      "z": -424,
+      "footprint": {
+        "d": 8,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "4 posts 5.8 high, 7 roof slats; counter 5x1.5x2.1 and 2 stools.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2806",
+      "style": "timber pergola #a89272 + counter #746c62",
+      "v54": {
+        "facing": "n/a"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

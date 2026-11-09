@@ -1,0 +1,134 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "north_gardens",
+  "lots": [
+    {
+      "id": "north_park_shed",
+      "district": "north_gardens",
+      "type": "shed",
+      "x": 203,
+      "z": 328,
+      "facing": "-Z",
+      "footprint": {
+        "d": 10,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: door at local z=-5.1, porch and ristra beam at z=318. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). One hanging ristra (9 peppers) on the porch beam at (205,318). shelterZones type shed r=6. No collision (inferred: not registered).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3671",
+      "style": "shed #a89c7d, roof #5f5d56 tilted .09",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_pocket_house",
+      "district": "north_gardens",
+      "type": "shelter_house",
+      "x": 255,
+      "z": 328,
+      "facing": "-Z",
+      "footprint": {
+        "d": 11,
+        "w": 13
+      },
+      "hasInterior": false,
+      "notes": "facing: black doorway 3.4x3.2 at z=322.3. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Comment: \"Tiny enterable indoor pocket behind doorway\". Implemented only as shelterZones type house r=7; the box has no collision so the squirrel simply walks into it.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3697",
+      "style": "cream #d4c8b4, roof #756955",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_doghouse_0",
+      "district": "north_gardens",
+      "type": "doghouse",
+      "x": 203,
+      "z": 365,
+      "facing": "-Z",
+      "footprint": {
+        "d": 3.8,
+        "w": 3.9
+      },
+      "hasInterior": false,
+      "notes": "facing: black entrance at local z=-1.94. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Yard dogs are handled in the update loop (7950). No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3789",
+      "style": "brown #8d694b roof #635044",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_doghouse_1",
+      "district": "north_gardens",
+      "type": "doghouse",
+      "x": 236,
+      "z": 397,
+      "facing": "-Z",
+      "footprint": {
+        "d": 3.8,
+        "w": 3.9
+      },
+      "hasInterior": false,
+      "notes": "facing: black entrance at local z=-1.94. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Yard dogs are handled in the update loop (7950). No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3789",
+      "style": "brown #8d694b roof #635044",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_sewer",
+      "district": "north_gardens",
+      "type": "sewer",
+      "x": 123,
+      "z": 264,
+      "hasInterior": true,
+      "notes": "Segments (123,334)->(123,264)->(200,264). Grates (E to enter/exit) at A (123,334) and B (200,264). Outfitter stand at (130,264). Owned by sewer/fashion extractor.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3727",
+      "style": "L-shaped tunnel 5.8 wide, floor y=-3.4, walls 4.6",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "north_sign_park_cemetery",
+      "district": "north_gardens",
+      "type": "sign",
+      "x": 192,
+      "z": 250,
+      "facing": "+Z",
+      "footprint": {
+        "d": 0.13,
+        "w": 8.1
+      },
+      "hasInterior": false,
+      "notes": "facing: flatSign unrotated. yaw=0 rad (front=(sin yaw,0,cos yaw)). Road-guide regex shrinks it to <=8.1x1.32 at eye level y+2.68 on two posts.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3478",
+      "style": "\"PARK / CEMETERY ↑\" road-guide sign",
+      "v54": {
+        "facing": "+Z"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

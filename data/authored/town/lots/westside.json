@@ -1,0 +1,227 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "westside",
+  "lots": [
+    {
+      "id": "west_old_house_0",
+      "district": "westside",
+      "type": "house",
+      "x": -370,
+      "z": -224,
+      "facing": "+X",
+      "footprint": {
+        "d": 21,
+        "w": 20
+      },
+      "hasInterior": true,
+      "notes": "facing: group rotY=PI/2 maps local +z (open garage bay, windows, side door) to world +X, toward the x=-289 road. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). oldHouse(0) (loop 9998). base_y 4.29; local width 21 x depth 20 x height 6.1; roof landing y=10.95. ENTERABLE: 6-wide open bay in the +X wall; press E within 7 of door (-357.2,-224) and |dy|<4 -> 0.85 s smoothstep transit to (-364,-224); inside clamp to footprint-0.7; roof hidden; E within 8 of inside point to exit to x+depth/2+5. Furniture: 4 plain boxes (comment: garage tools, sitting-room furniture, small kitchen - names inferred). Old concrete drive (12 tiles 4.9x4.2) at z=-219.38 running +X. Bins at world x = x+-(width/2+3), z-8. Garden shed 3.3x2.5x2.9 at (-401,-218). Utility box 3.4x2.25x2.3 at local x=width/2+4.4 (world -Z side). Shade tree at (-403,-238). Walls block the squirrel (outdoorBlocked 6330) but NOT pedestrians (humanHouseCollision ignores oldDistrictHomes).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9913",
+      "style": "older house #0: wall #a69a7c, roof #6f6257, flat roof slab",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "west_old_house_1",
+      "district": "westside",
+      "type": "house",
+      "x": -365,
+      "z": -163,
+      "facing": "+X",
+      "footprint": {
+        "d": 23,
+        "w": 23
+      },
+      "hasInterior": true,
+      "notes": "facing: group rotY=PI/2 maps local +z (open garage bay, windows, side door) to world +X, toward the x=-289 road. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). oldHouse(1) (loop 9998). base_y 7.24; local width 23 x depth 23 x height 6.55; roof landing y=14.35. ENTERABLE: 6-wide open bay in the +X wall; press E within 7 of door (-350.7,-163) and |dy|<4 -> 0.85 s smoothstep transit to (-357.5,-163); inside clamp to footprint-0.7; roof hidden; E within 8 of inside point to exit to x+depth/2+5. Furniture: 4 plain boxes (comment: garage tools, sitting-room furniture, small kitchen - names inferred). Old concrete drive (12 tiles 4.9x4.2) at z=-157.94 running +X. Bins at world x = x+-(width/2+3), z-8. Shade tree at (-401,-144). Walls block the squirrel (outdoorBlocked 6330) but NOT pedestrians (humanHouseCollision ignores oldDistrictHomes).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9913",
+      "style": "older house #1: wall #bdab92, roof #605a57, flat roof slab",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "west_old_house_2",
+      "district": "westside",
+      "type": "house",
+      "x": -360,
+      "z": -102,
+      "facing": "+X",
+      "footprint": {
+        "d": 25,
+        "w": 20
+      },
+      "hasInterior": true,
+      "notes": "facing: group rotY=PI/2 maps local +z (open garage bay, windows, side door) to world +X, toward the x=-289 road. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). oldHouse(2) (loop 9998). base_y 4.89; local width 25 x depth 20 x height 7; roof landing y=12.45. ENTERABLE: 6-wide open bay in the +X wall; press E within 7 of door (-347.2,-102) and |dy|<4 -> 0.85 s smoothstep transit to (-354,-102); inside clamp to footprint-0.7; roof hidden; E within 8 of inside point to exit to x+depth/2+5. Furniture: 4 plain boxes (comment: garage tools, sitting-room furniture, small kitchen - names inferred). Old concrete drive (12 tiles 4.9x4.2) at z=-96.5 running +X. Bins at world x = x+-(width/2+3), z-8. Garden shed 3.3x2.5x2.9 at (-391,-96). Utility box 3.4x2.25x2.3 at local x=width/2+4.4 (world -Z side). Shade tree at (-399,-116). Walls block the squirrel (outdoorBlocked 6330) but NOT pedestrians (humanHouseCollision ignores oldDistrictHomes).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9913",
+      "style": "older house #2: wall #919b8a, roof #746359, flat roof slab",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "west_old_house_3",
+      "district": "westside",
+      "type": "house",
+      "x": -370,
+      "z": -41,
+      "facing": "+X",
+      "footprint": {
+        "d": 21,
+        "w": 23
+      },
+      "hasInterior": true,
+      "notes": "facing: group rotY=PI/2 maps local +z (open garage bay, windows, side door) to world +X, toward the x=-289 road. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). oldHouse(3) (loop 9998). base_y 3.51; local width 21 x depth 23 x height 7.45; roof landing y=11.52. ENTERABLE: 6-wide open bay in the +X wall; press E within 7 of door (-355.7,-41) and |dy|<4 -> 0.85 s smoothstep transit to (-362.5,-41); inside clamp to footprint-0.7; roof hidden; E within 8 of inside point to exit to x+depth/2+5. Furniture: 4 plain boxes (comment: garage tools, sitting-room furniture, small kitchen - names inferred). Old concrete drive (12 tiles 4.9x4.2) at z=-36.38 running +X. Bins at world x = x+-(width/2+3), z-8. Shade tree at (-403,-22). Walls block the squirrel (outdoorBlocked 6330) but NOT pedestrians (humanHouseCollision ignores oldDistrictHomes).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9913",
+      "style": "older house #3: wall #bcafa1, roof #6f6257, flat roof slab",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "west_old_house_4",
+      "district": "westside",
+      "type": "house",
+      "x": -365,
+      "z": 20,
+      "facing": "+X",
+      "footprint": {
+        "d": 23,
+        "w": 20
+      },
+      "hasInterior": false,
+      "notes": "facing: group rotY=PI/2 maps local +z (open garage bay, windows, side door) to world +X, toward the x=-289 road. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). oldHouse(4) (loop 9998). base_y 5.59; local width 23 x depth 20 x height 6.1; roof landing y=12.25. Sealed: solid +X wall (not enterable). Old concrete drive (12 tiles 4.9x4.2) at z=25.06 running +X. Bins at world x = x+-(width/2+3), z-8. Garden shed 3.3x2.5x2.9 at (-396,26). Utility box 3.4x2.25x2.3 at local x=width/2+4.4 (world -Z side). Shade tree at (-401,6). Walls block the squirrel (outdoorBlocked 6330) but NOT pedestrians (humanHouseCollision ignores oldDistrictHomes).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9913",
+      "style": "older house #4: wall #99917f, roof #605a57, flat roof slab",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "west_old_house_5",
+      "district": "westside",
+      "type": "house",
+      "x": -360,
+      "z": 81,
+      "facing": "+X",
+      "footprint": {
+        "d": 25,
+        "w": 23
+      },
+      "hasInterior": false,
+      "notes": "facing: group rotY=PI/2 maps local +z (open garage bay, windows, side door) to world +X, toward the x=-289 road. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). oldHouse(5) (loop 9998). base_y 5.75; local width 25 x depth 23 x height 6.55; roof landing y=12.86. Sealed: solid +X wall (not enterable). Old concrete drive (12 tiles 4.9x4.2) at z=86.5 running +X. Bins at world x = x+-(width/2+3), z-8. Shade tree at (-399,100). Walls block the squirrel (outdoorBlocked 6330) but NOT pedestrians (humanHouseCollision ignores oldDistrictHomes).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9913",
+      "style": "older house #5: wall #bcb28a, roof #746359, flat roof slab",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "west_old_house_6",
+      "district": "westside",
+      "type": "house",
+      "x": -370,
+      "z": 142,
+      "facing": "+X",
+      "footprint": {
+        "d": 21,
+        "w": 20
+      },
+      "hasInterior": false,
+      "notes": "facing: group rotY=PI/2 maps local +z (open garage bay, windows, side door) to world +X, toward the x=-289 road. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). oldHouse(6) (loop 9998). base_y 5.51; local width 21 x depth 20 x height 7; roof landing y=13.07. Sealed: solid +X wall (not enterable). Old concrete drive (12 tiles 4.9x4.2) at z=146.62 running +X. Bins at world x = x+-(width/2+3), z-8. Garden shed 3.3x2.5x2.9 at (-401,148). Utility box 3.4x2.25x2.3 at local x=width/2+4.4 (world -Z side). Shade tree at (-403,128). Walls block the squirrel (outdoorBlocked 6330) but NOT pedestrians (humanHouseCollision ignores oldDistrictHomes).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9913",
+      "style": "older house #6: wall #9b988d, roof #6f6257, flat roof slab",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "west_police_station",
+      "district": "westside",
+      "type": "police_station",
+      "x": -510,
+      "z": -107,
+      "facing": "+Z",
+      "footprint": {
+        "d": 31,
+        "w": 46
+      },
+      "hasInterior": false,
+      "notes": "facing: glass entrance, \"WEST TOPEKA POLICE\" sign at local z=+15.4..15.7, patrol pads at z+26. yaw=0 rad (front=(sin yaw,0,cos yaw)). Landmark entry - full spec belongs to the police extractor. Slab 46x31, walls 8.8, roof 9.25; reception desk inside but station is NEVER enterable (guarded; commercialBounds w45.8 d30.8 at 11224). Patrol pads 9x15 at (-525,-81) and (-495,-81) with parked cruisers. Roof route y+9.7.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L10050",
+      "style": "blue-grey #89979d, roof #344852",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "west_westside_fuel",
+      "district": "westside",
+      "type": "gas_station",
+      "x": -397,
+      "z": 229,
+      "facing": "-Z",
+      "footprint": {
+        "d": 25,
+        "w": 34
+      },
+      "hasInterior": false,
+      "notes": "facing: shop windows at local z=-4.6, sign at -5.1, pump canopy at z=-20. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). base_y 4.04. Shop 27x5x17 at local z=+4; canopy 34x0.35x18 at y 6.6 on 4 posts; 2 pumps at local x=+-7, z=-18; air/water at (15,-6.35). Closure rule: while player within 66 and last bite there <50 s ago, attackSeconds += dt; when attackSeconds>=600 AND bites (within 74) >=3 -> permanent \"WE ARE CLOSED DUE TO VIOLENT DANGEROUS SQUIRRELS\" sign (updateWestside). No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9889",
+      "style": "weathered: shop #b7a991, canopy #746b5c, \"WESTSIDE FUEL\"",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "west_storage_units",
+      "district": "westside",
+      "type": "storage_units",
+      "x": -513,
+      "z": 213,
+      "facing": "-Z",
+      "footprint": {
+        "d": 79,
+        "w": 94
+      },
+      "hasInterior": false,
+      "notes": "facing: \"WESTSIDE STORAGE\" sign at local z=-37. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Door rows are free-standing facades with roof strips at z=+-30; no collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L10156",
+      "style": "slab #8b8980, 2 rows x 6 roll-up doors 11x5.8 at local z=+-26, x=-38+15u",
+      "v54": {
+        "facing": "-Z"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

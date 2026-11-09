@@ -1,0 +1,392 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "old_town_core",
+  "lots": [
+    {
+      "id": "core_house_0_victorian",
+      "district": "old_town_core",
+      "type": "house",
+      "x": -56,
+      "z": -53,
+      "facing": "+Z",
+      "footprint": {
+        "d": 15.58,
+        "w": 18.04
+      },
+      "hasInterior": true,
+      "notes": "facing: buildHouse faceSign=-1; front wall local z = -faceSign*d/2 = +d/2, i.e. toward the z=0 street. yaw=0 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 7.3, gable peak 11.07 (ridge along X, roof route y=11.33); walls #ded7b7, trim #f5ecd5, roof #63524c. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=-44.18, threshold z=-45.21, inside z=-46.97 (x=-56). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=-56 to z=+-16; driveway 5.3x26 at x=-73; mailbox at (-52, toward street); parked car at x=-73. Parcel roughly x -83..-13.75, z -91..-13.75. Backyard (house 0 is the \"covered porch / barbecue\" lot): 20x9 deck + 20x9 porch roof at y=4.9 with 3 posts and rail; barbecues at (-62,-81) and (-57,-81, scale .67); steel drum (-38,-83); picnic tables x4 at random (x -76..-24, z -87..-71). Perimeter fences: wood x=-83 (z -91..-40), wood z=-91 (x -83..-20). Yard cat 0 at (-45,-76). Living-event barbecue gathering centre (-66,-84).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1248",
+      "style": "VICTORIAN (buildHouse style 0)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "core_house_1_bungalow",
+      "district": "old_town_core",
+      "type": "house",
+      "x": 51,
+      "z": -59,
+      "facing": "+Z",
+      "footprint": {
+        "d": 16.4,
+        "w": 19.68
+      },
+      "hasInterior": true,
+      "notes": "facing: buildHouse faceSign=-1; front wall local z = -faceSign*d/2 = +d/2, i.e. toward the z=0 street. yaw=0 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 6.07, gable peak 8.53 (ridge along X, roof route y=8.79); walls #b6c1b1, trim #f2ecdf, roof #686a60. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=-49.77, threshold z=-50.8, inside z=-52.56 (x=51). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=51 to z=+-16; driveway 5.3x26 at x=68; mailbox at (55, toward street); parked car at x=68. Parcel roughly x 13.75..84, z -91..-13.75. Backyard pool lot: coping 14x20 at (55,-84), water 11.2x17.1; 4 loungers at x=41..51.5, z=-75 (rot PI/2); pool ladder rails x=49, z=-82/-76. Fences: chain z=-91 (x 20..84), chain x=84 (z -91..-42). Yard cat 2 at (40,-79).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1249",
+      "style": "BUNGALOW (buildHouse style 1)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "core_house_2_brick",
+      "district": "old_town_core",
+      "type": "house",
+      "x": -53,
+      "z": 51,
+      "facing": "-Z",
+      "footprint": {
+        "d": 16.4,
+        "w": 18.04
+      },
+      "hasInterior": true,
+      "notes": "facing: buildHouse faceSign=1; front wall local z = -faceSign*d/2 = -d/2, i.e. toward the z=0 street. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 7.46, gable peak 10.74 (ridge along X, roof route y=11); walls #bb8e71, trim #e4d6c5, roof #615653. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=41.78, threshold z=42.8, inside z=44.56 (x=-53). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=-53 to z=+-16; driveway 5.3x26 at x=-70; mailbox at (-49, toward street); parked car at x=-70. Parcel roughly x -83..-13.75, z 13.75..94. Guesthouse / trampoline lot: guest cottage (-58,83) and trampoline (-33,80) are separate lots. Fences: wood x=-83 (z 42..94), chain z=94 (x -82..-22). Visual-only v3.5 wood rail fence z=38 x -58..-22 crosses this front walk (no collision).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1250",
+      "style": "BRICK HOUSE (buildHouse style 2)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "core_house_3_blue_cottage",
+      "district": "old_town_core",
+      "type": "house",
+      "x": 58,
+      "z": 56,
+      "facing": "-Z",
+      "footprint": {
+        "d": 14.76,
+        "w": 17.22
+      },
+      "hasInterior": true,
+      "notes": "facing: buildHouse faceSign=1; front wall local z = -faceSign*d/2 = -d/2, i.e. toward the z=0 street. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Group scale 0.82; eave 6.56, gable peak 9.51 (ridge along X, roof route y=9.77); walls #aebbc4, trim #f4e8cf, roof #6f6f75. Hollow shell: 4 walls (0.24 thick), 2.6x3.5 front portal with hinged door (pivot local x=-1.12, opens sign*open*1.35 rad). Door waypoints: outside z=47.6, threshold z=48.62, inside z=50.38 (x=58). Full furnishing (furnishOriginalHouse 11682 + makeHomeDetails 11795) exists but is DEAD CODE in v5.4: enterableHouses filter (11788) tests h.indoorGroup before it is assigned, so the player can never enter; NPC residents (3 per house, cast 4494-4505) do retreat inside via the door (beginHomeRetreat 6886). Front walk 2.7 wide x=58 to z=+-16; driveway 5.3x26 at x=75; mailbox at (62, toward street); parked car at x=75. Parcel roughly x 13.75..84, z 13.75..94. Doghouse / mower lot: doghouse (39,80), bowl (44,78), ride-on mower (76,80). Fences: wood z=92 (x 20..84), chain x=84 (z 39..92). Yard cat 1 at (48,79).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1251",
+      "style": "BLUE COTTAGE (buildHouse style 3)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "core_guest_cottage",
+      "district": "old_town_core",
+      "type": "guesthouse",
+      "x": -58,
+      "z": 83,
+      "facing": "-Z",
+      "footprint": {
+        "d": 11,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: window and door at z=77.35 (south face of an 11-deep box centred z=83), facing house 2. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Solid box 12x5.2x11, roof slab 13x0.55x12.3 at y=5.6; patio 7x4.5 at (-58,76). getGroundAt gives a walkable roof at y=6 when squirrel y>5.2 (6235). NO wall collision registered (not in houses/obstacles/commercialBounds) - squirrel can pass through at ground level (inferred).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1417",
+      "style": "cream box #e7d8bf, flat roof slab #8c746c",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "core_backyard_pool",
+      "district": "old_town_core",
+      "type": "backyard_pool",
+      "x": 55,
+      "z": -84,
+      "footprint": {
+        "d": 20,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "Behind house 1. Inset-water illusion (water box at y=0.25); 11 random foam streaks; 4 loungers (chair() 1385) at (41+3.5i, -75).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1396",
+      "style": "coping #d6d0c0, floor #9aceca, water M.water",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "core_trampoline",
+      "district": "old_town_core",
+      "type": "backyard_trampoline",
+      "x": -33,
+      "z": 80,
+      "footprint": {
+        "d": 10.2,
+        "w": 10.2
+      },
+      "hasInterior": false,
+      "notes": "Behind house 2. Guardrail is a 17-point climb route (kind trampoline) at y=5.97. Bounce surface y=1.65 within r=5 (getGroundAt 6236); trampoline bounce mechanic attemptTrampolineBounce 10373.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1463",
+      "style": "round, hoop r=5.1 at y=1.45, net to 5.8, guard ring 5.9",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "core_doghouse",
+      "district": "old_town_core",
+      "type": "backyard_doghouse",
+      "x": 39,
+      "z": 80,
+      "facing": "-Z",
+      "footprint": {
+        "d": 4.2,
+        "w": 4
+      },
+      "hasInterior": false,
+      "notes": "facing: black entrance panel at z=77.83. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Behind house 3; food bowl at (44,78); no collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1465",
+      "style": "brown #976b4b, roof #584c45 tilted 0.1",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "core_mower",
+      "district": "old_town_core",
+      "type": "backyard_prop",
+      "x": 76,
+      "z": 80,
+      "facing": "+X",
+      "footprint": {
+        "d": 2.2,
+        "w": 3.2
+      },
+      "hasInterior": false,
+      "notes": "facing: unrotated group; seat/handle toward local +x. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). Behind house 3. Comment: \"waiting to become a rideable prop later\". No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L1486",
+      "style": "ride-on mower #d1ae44",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "core_garden_plot_a",
+      "district": "old_town_core",
+      "type": "garden",
+      "x": -36,
+      "z": 52,
+      "footprint": {
+        "d": 4,
+        "w": 7
+      },
+      "hasInterior": false,
+      "notes": "Placed at y=0 (core is flat here). Rows of cylinder plants + mini wheelbarrow. Visual only, no collision/foraging.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12782",
+      "style": "v3.5 garden plot variant 0 (green crop)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "core_garden_plot_c",
+      "district": "old_town_core",
+      "type": "garden",
+      "x": -104,
+      "z": -18,
+      "footprint": {
+        "d": 3.8,
+        "w": 7.5
+      },
+      "hasInterior": false,
+      "notes": "Visual only.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12784",
+      "style": "v3.5 garden plot variant 2",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "core_intersection",
+      "district": "old_town_core",
+      "type": "intersection",
+      "x": 0,
+      "z": 0,
+      "footprint": {
+        "d": 18,
+        "w": 18
+      },
+      "hasInterior": false,
+      "notes": "Raised curbs 258x0.23x0.32 along z=+-10.1 and x=+-10.1 (span -129..129, run uninterrupted THROUGH the intersection); outdoorSurfaceAt raises to y=0.245 on them (519). Sidewalk joints every 5.8 from -117..117. Crossing dashes 0.76x0.17 at x=+-(11..15.8), z=+-8.6 and mirrored. Four storm grates 1.25x0.67 at (+-16, +-9.7).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L580",
+      "style": "graded flat 4-way",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_shrub_cluster_A",
+      "district": "old_town_core",
+      "type": "shrub_cluster",
+      "x": -28,
+      "z": 19.33,
+      "footprint": {
+        "d": 7.6,
+        "w": 5.6
+      },
+      "hasInterior": false,
+      "notes": "addShrub 12568: three stacked 7-sided cylinders r 0.4..0.7*s. Placed at y=0 (NOT terrain-following; buried where terrain > 0). Points: (-30,18) scale 0.9 #648843 terrain 0; (-28,23) scale 1.05 #557a37 terrain 0; (-26,17) scale 1.2 #557a37 terrain 0. Visual only, no collider.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12756",
+      "style": "low 3-cylinder shrubs (Lambert)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_shrub_cluster_B",
+      "district": "old_town_core",
+      "type": "shrub_cluster",
+      "x": 48.33,
+      "z": -13,
+      "footprint": {
+        "d": 6.6,
+        "w": 10.6
+      },
+      "hasInterior": false,
+      "notes": "addShrub 12568: three stacked 7-sided cylinders r 0.4..0.7*s. Placed at y=0 (NOT terrain-following; buried where terrain > 0). Points: (44,-12) scale 0.9 #557a37 terrain 0; (48,-16) scale 1.05 #648843 terrain 0; (53,-11) scale 1.2 #557a37 terrain 0. Visual only, no collider.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12756",
+      "style": "low 3-cylinder shrubs (Lambert)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_shrub_cluster_C",
+      "district": "old_town_core",
+      "type": "shrub_cluster",
+      "x": 88.5,
+      "z": 35,
+      "footprint": {
+        "d": 3.6,
+        "w": 6.6
+      },
+      "hasInterior": false,
+      "notes": "addShrub 12568: three stacked 7-sided cylinders r 0.4..0.7*s. Placed at y=0 (NOT terrain-following; buried where terrain > 0). Points: (86,34) scale 0.9 #557a37 terrain 0; (91,36) scale 1.05 #557a37 terrain 0. Visual only, no collider.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12756",
+      "style": "low 3-cylinder shrubs (Lambert)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_shrub_cluster_E",
+      "district": "old_town_core",
+      "type": "shrub_cluster",
+      "x": -92,
+      "z": -52.33,
+      "footprint": {
+        "d": 6.6,
+        "w": 9.6
+      },
+      "hasInterior": false,
+      "notes": "addShrub 12568: three stacked 7-sided cylinders r 0.4..0.7*s. Placed at y=0 (NOT terrain-following; buried where terrain > 0). Points: (-88,-52) scale 1.05 #557a37 terrain 0; (-92,-55) scale 1.2 #557a37 terrain 0; (-96,-50) scale 0.9 #648843 terrain 0. Visual only, no collider.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12756",
+      "style": "low 3-cylinder shrubs (Lambert)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_fence_run_0",
+      "district": "old_town_core",
+      "type": "fence_run",
+      "x": -40,
+      "z": 38,
+      "footprint": {
+        "d": 0.16,
+        "w": 36
+      },
+      "hasInterior": false,
+      "notes": "addFenceRun(-58,38 -> -22,38, 'wood') 12583: 16 posts (0.16x1.1x0.16) every 2.4; rails at y 0.72 and 0.36. Built at y=0 (terrain at ends 0 / 0). VISUAL ONLY: not in fenceCollisions, no route. Run 0 crosses the core_house_2 front walk.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12764",
+      "style": "wood rail (posts #8b6a44, 2 rails #9a7750)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_fence_run_1",
+      "district": "old_town_core",
+      "type": "fence_run",
+      "x": 34,
+      "z": 44,
+      "footprint": {
+        "d": 0.16,
+        "w": 32
+      },
+      "hasInterior": false,
+      "notes": "addFenceRun(18,44 -> 50,44, 'chain') 12583: 14 posts (0.12x1.0x0.12) every 2.46; one 0.55-tall mesh panel per bay at y 0.62. Built at y=0 (terrain at ends 0 / 0). VISUAL ONLY: not in fenceCollisions, no route. Run 0 crosses the core_house_2 front walk.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12764",
+      "style": "chain-link (posts #8e8e8e, mesh #b7c0c0)",
+      "v54": {
+        "facing": "n/a"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

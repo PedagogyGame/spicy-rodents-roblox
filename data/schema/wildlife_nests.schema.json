@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/wildlife_nests",
+  "title": "The 24 v5.4 bird nests and the town birds (data/authored/wildlife/nests.json), wildlife_foraging 8",
+  "type": "object",
+  "required": ["nests", "count", "routeT", "yOffset", "yOffsetApple"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "src": { "type": "string" },
+    "count": { "type": "integer", "minimum": 1 },
+    "routeT": { "type": "number", "minimum": 0, "maximum": 1 },
+    "yOffset": { "type": "number", "x-unit": "u" },
+    "yOffsetApple": { "type": "number", "x-unit": "u" },
+    "eggs": { "type": "integer" },
+    "eggColors": { "type": "array", "items": { "type": "string" } },
+    "bowl": { "type": "string" },
+    "rim": { "type": "string" },
+    "nests": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["route", "x", "y", "z"], "additionalProperties": false,
+        "properties": {
+          "route": { "type": "string", "minLength": 1, "description": "name of the bough route the nest sits on (t = routeT)" },
+          "x": { "type": "number", "x-unit": "u" }, "y": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }
+        }
+      }
+    },
+    "birds": { "type": "object", "description": "nest birds, flocks (anchors in HTML units: converted below), model and visibility constants",
+      "properties": {
+        "flocks": { "type": "object", "properties": { "anchors": { "type": "array", "items": { "type": "object", "properties": { "x": { "type": "number", "x-unit": "u" }, "y": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" } } } } } }
+      }
+    }
+  }
+}

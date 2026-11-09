@@ -1,0 +1,12 @@
+{
+  "className": "Folder",
+  "children": [
+    {
+      "name": "Note",
+      "className": "StringValue",
+      "properties": {
+        "Value": "W0 skeleton: real placeholder rigs arrive with tools/placeholders in W1."
+      }
+    }
+  ]
+}

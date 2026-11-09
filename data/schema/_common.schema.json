@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/common",
+  "title": "Shared definitions for the authored data (HTML units, see BUILD_PLAN 3.1)",
+  "description": "Units: positions and lengths are HTML world units (1 u = 2.5 studs) and carry x-unit \"u\"; speeds carry \"u/s\"; angles are radians (\"rad\"); times in seconds (\"s\"). The compiler converts u and u/s to studs once. JSON null is read as absent by Lune, so nullable fields are never required. Patterns use a regex subset (anchors, classes, \\d \\w \\s, * + ?).",
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.\\-]*$",
+      "minLength": 2,
+      "maxLength": 80
+    },
+    "src": {
+      "type": "string",
+      "pattern": "^v5\\.4 L\\d+",
+      "description": "provenance: the v5.4 line (or spec citation) the record was read from"
+    },
+    "srcList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/src"
+      },
+      "minItems": 1
+    },
+    "u": {
+      "type": "number",
+      "x-unit": "u"
+    },
+    "uPositive": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "x-unit": "u"
+    },
+    "xz": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "x-unit": "u"
+    },
+    "xyz": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "x-unit": "u"
+    },
+    "colour": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]$"
+    },
+    "facing": {
+      "enum": [
+        "+X",
+        "-X",
+        "+Z",
+        "-Z"
+      ]
+    },
+    "axisRange": {
+      "type": "object",
+      "required": [
+        "axis",
+        "coord",
+        "start",
+        "end"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "axis": {
+          "enum": [
+            "x",
+            "z"
+          ]
+        },
+        "coord": {
+          "$ref": "#/$defs/u"
+        },
+        "start": {
+          "$ref": "#/$defs/u"
+        },
+        "end": {
+          "$ref": "#/$defs/u"
+        }
+      }
+    }
+  }
+}

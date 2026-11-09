@@ -1,0 +1,376 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "north_park",
+  "lots": [
+    {
+      "id": "north_sycamore_park",
+      "district": "north_park",
+      "type": "park",
+      "x": -50,
+      "z": 362.5,
+      "facing": "-Z",
+      "footprint": {
+        "d": 133,
+        "w": 390
+      },
+      "hasInterior": false,
+      "notes": "facing: name board \"SYCAMORE PARK\" at (-61,296) on the south edge facing the z=283 road. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). parkBoundary {xmin -245, xmax 145, zmin 296, zmax 429} (constant is defined but unused). Corner posts at (-214,305),(-210,417),(108,307),(111,417),(-72,418). 4 path polylines (3.2 wide) meet at hub (-56,355). Benches (-59,355),(7,333),(-185,326),(112,396); trash cans (-201,331),(-30,405),(82,311); lamps (-118,326),(10,398). Park trees x8 (parkTreePositions 3395). Hedge patches (125,303),(118,372),(-104,305). HUD tag \"SYCAMORE PARK\" when z>303 & x<150. NPC \"park\" lane z=326 (x -205..112).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3320",
+      "style": "undulating lawn with paths, pond, gazebo",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_pond",
+      "district": "north_park",
+      "type": "pond",
+      "x": -147,
+      "z": 371,
+      "footprint": {
+        "d": 38,
+        "w": 55.1
+      },
+      "hasInterior": false,
+      "notes": "Shallow; surface above ground (no terrain hole). Not a swim/drown volume.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3358",
+      "style": "ellipse bed r19 x1.45, water r17.8 x1.48 at ground+0.15",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "north_footbridge",
+      "district": "north_park",
+      "type": "footbridge",
+      "x": -115.5,
+      "z": 371,
+      "footprint": {
+        "d": 4.3,
+        "w": 14.3
+      },
+      "hasInterior": false,
+      "notes": "Bridge route (kind bridge) at deck height y+0.78 from x=-122 to -109. Shelter zone \"bridge\" r=4 at (-116,371).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3367",
+      "style": "11 planks 1.25x4.3 at x=-122+1.3i, rails",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "north_gazebo",
+      "district": "north_park",
+      "type": "gazebo",
+      "x": 52,
+      "z": 411,
+      "footprint": {
+        "d": 12.8,
+        "w": 12.8
+      },
+      "hasInterior": false,
+      "notes": "No collision, no roof route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3465",
+      "style": "octagonal deck r6.4, 8 posts r5.65, cone roof r7.1 h3 #6c7a65",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "north_playground",
+      "district": "north_park",
+      "type": "playground",
+      "x": 18,
+      "z": 320,
+      "footprint": {
+        "d": 14,
+        "w": 71
+      },
+      "hasInterior": false,
+      "notes": "Swing frames at (-17.2,318) & (-8.8,318) (playX -13 +- 4.2); slide platform (27,317) y+3 with chute to z 322; sandbox 9x8 at (49,326).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L4253",
+      "style": "muted: 2 swings, slide, sandbox",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "north_softball_diamond",
+      "district": "north_park",
+      "type": "sports_field",
+      "x": 66,
+      "z": 356,
+      "footprint": {
+        "d": 43.8,
+        "w": 43.8
+      },
+      "hasInterior": false,
+      "notes": "Created by living-event system (newLivingEvent 11310); event every 40 min offset 1200 s; event cars park 26-40 units +Z. Owned by living-events extractor.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L11404",
+      "style": "31x31 dirt diamond rotated 45 deg #b18b68, 4 bases",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "north_tabasco_garden",
+      "district": "north_park",
+      "type": "community_garden",
+      "x": 115,
+      "z": 341,
+      "facing": "-Z",
+      "footprint": {
+        "d": 24,
+        "w": 50
+      },
+      "hasInterior": false,
+      "notes": "facing: sign \"TABASCO GARDEN\" at z=325 on the south side. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Concealment spot (squirrel hidden when y<2.4 within |dx|<27,|dz|<15 - 7035) and part of the 8-chili hunt. Wheelbarrow lookout perch at (139,342). HUD tag here is SYCAMORE PARK.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3590",
+      "style": "4 soil beds 4.5x24 (x 102,108.2,114.4,120.6), corn x16 (x 93..99), bushes x14, 9 tabasco plants (x 125..130.2)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_hollow_log",
+      "district": "north_park",
+      "type": "shelter",
+      "x": -19,
+      "z": 376,
+      "facing": "+X",
+      "footprint": {
+        "d": 4.8,
+        "w": 9.2
+      },
+      "hasInterior": false,
+      "notes": "facing: cavity disc at local x=+4.65 (log lies along X). yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). shelterZones type log r=4 (predator watchdog shelter).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3703",
+      "style": "bark log r2.4 len 9.2",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "north_hollow_stump",
+      "district": "north_park",
+      "type": "shelter",
+      "x": 95,
+      "z": 359,
+      "facing": "-Z",
+      "footprint": {
+        "d": 4.6,
+        "w": 4.6
+      },
+      "hasInterior": false,
+      "notes": "facing: black hollow at local z=-1.53. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). shelterZones type hollow r=4.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3703",
+      "style": "stump r1.7-2.3 h8",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_doghouse_2",
+      "district": "north_park",
+      "type": "doghouse",
+      "x": 90,
+      "z": 308,
+      "facing": "-Z",
+      "footprint": {
+        "d": 3.8,
+        "w": 3.9
+      },
+      "hasInterior": false,
+      "notes": "facing: black entrance at local z=-1.94. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Yard dogs are handled in the update loop (7950). No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3789",
+      "style": "brown #8d694b roof #635044",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "detail_52_park_bench",
+      "district": "north_park",
+      "type": "detail",
+      "x": -59,
+      "z": 355,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.27; group yaw = variation*0.71 rad. Sycamore Park bench. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3449",
+      "style": "park bench (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_53_park_bench",
+      "district": "north_park",
+      "type": "detail",
+      "x": 7,
+      "z": 333,
+      "yaw": 2.839999758845173,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 2.6; group yaw = variation*0.71 rad. Sycamore Park bench. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3449",
+      "style": "park bench (variation 4, even palette)",
+      "v54": {
+        "facing": "yaw 162.72 deg"
+      }
+    },
+    {
+      "id": "detail_54_park_bench",
+      "district": "north_park",
+      "type": "detail",
+      "x": -185,
+      "z": 326,
+      "yaw": 4.259999638267759,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.52; group yaw = variation*0.71 rad. Sycamore Park bench. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3449",
+      "style": "park bench (variation 6, even palette)",
+      "v54": {
+        "facing": "yaw 244.08 deg"
+      }
+    },
+    {
+      "id": "detail_55_park_bench",
+      "district": "north_park",
+      "type": "detail",
+      "x": 112,
+      "z": 396,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.06; group yaw = variation*0.71 rad. Sycamore Park bench. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3449",
+      "style": "park bench (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_56_trash_can",
+      "district": "north_park",
+      "type": "detail",
+      "x": -201,
+      "z": 331,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.56,
+        "w": 1.56
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 2.83; group yaw = variation*0.71 rad. Sycamore Park trash can. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3455",
+      "style": "trash can (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_57_trash_can",
+      "district": "north_park",
+      "type": "detail",
+      "x": -30,
+      "z": 405,
+      "yaw": 0,
+      "footprint": {
+        "d": 1.56,
+        "w": 1.56
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.8; group yaw = variation*0.71 rad. Sycamore Park trash can. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3455",
+      "style": "trash can (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_58_trash_can",
+      "district": "north_park",
+      "type": "detail",
+      "x": 82,
+      "z": 311,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.56,
+        "w": 1.56
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 2.93; group yaw = variation*0.71 rad. Sycamore Park trash can. Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3455",
+      "style": "trash can (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

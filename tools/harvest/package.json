@@ -1,0 +1,16 @@
+{
+  "name": "spicy-rodents-harvest",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Headless capture of the pinned Spicy Rodents v5.4 HTML: climbing routes, forks, trees, poles, nests, apple trees and other world registries, written to data/harvest/.",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "harvest": "node src/harvest.js",
+    "analyze": "node src/analyze.js"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

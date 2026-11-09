@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/wildlife_restore_v41",
+  "title": "Features lost after v4.1 to restore: nut caches, deer, fox, gardens, insects, feeders, trash cans, bushes (data/authored/wildlife/restore_v41.json), wildlife_foraging 11",
+  "type": "object",
+  "required": ["nutCaches", "deer", "fox", "gardens", "insects", "birdFeeders", "scavengeTrashCans", "floweringBushes"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "src": { "type": "string" },
+    "note": { "type": "string" },
+    "lifeSafeSpot": { "type": "object", "properties": { "bounds": { "type": "object", "properties": { "x": { "type": "array", "x-unit": "u" }, "z": { "type": "array", "x-unit": "u" } } }, "defaultMinRoad": { "type": "number", "x-unit": "u" }, "buildingMargin": { "type": "number", "x-unit": "u" } } },
+    "nutCaches": {
+      "type": "object", "required": ["list"],
+      "properties": {
+        "list": { "type": "array", "minItems": 10, "maxItems": 10, "items": { "type": "object", "required": ["index", "x", "z", "y", "coins"], "properties": { "index": { "type": "integer" }, "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "y": { "type": "number", "x-unit": "u" }, "coins": { "type": "integer" }, "check54": { "type": "object" }, "moved": { "type": "object", "properties": { "from": { "$ref": "#/$defs/xz" }, "to": { "$ref": "#/$defs/xz" }, "reason": { "type": "string" } } } } } },
+        "nominal": { "type": "array", "items": { "$ref": "#/$defs/xz" } },
+        "minRoad": { "type": "number", "x-unit": "u" }
+      }
+    },
+    "deer": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "type": "object", "required": ["name", "x", "z"], "properties": { "name": { "type": "string" }, "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "y": { "type": "number", "x-unit": "u" }, "size": { "type": "number" }, "child": { "type": "boolean" }, "sex": { "type": "string" }, "nominal": { "$ref": "#/$defs/xz" } } } }, "minRoad": { "type": "number", "x-unit": "u" }, "leash": { "type": "number", "x-unit": "u" } } },
+    "fox": { "type": "object", "required": ["spawn"], "properties": { "spawn": { "type": "object", "properties": { "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "y": { "type": "number", "x-unit": "u" } } }, "nominal": { "$ref": "#/$defs/xz" }, "minRoad": { "type": "number", "x-unit": "u" }, "huntRadius": { "type": "number", "x-unit": "u" }, "huntSpeed": { "type": "number", "x-unit": "u/s" } } },
+    "gardens": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "type": "object", "properties": { "nominal": { "$ref": "#/$defs/xz" }, "placed": { "$ref": "#/$defs/xz" }, "kind": { "type": "integer" }, "y": { "type": "number", "x-unit": "u" } } } }, "size": { "type": "array", "x-unit": "u" }, "minRoad": { "type": "number", "x-unit": "u" } } },
+    "insects": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "type": "object", "required": ["kind", "x", "z"], "properties": { "kind": { "enum": ["butterfly", "dragonfly"] }, "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "y": { "type": "number", "x-unit": "u" } } } } } },
+    "birdFeeders": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "type": "object", "properties": { "nominal": { "$ref": "#/$defs/xz" }, "placed": { "$ref": "#/$defs/xz" } } } } } },
+    "scavengeTrashCans": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "type": "object", "required": ["index", "x", "z"], "properties": { "index": { "type": "integer" }, "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "coins": { "type": "integer" } } } }, "minRoad": { "type": "number", "x-unit": "u" } } },
+    "floweringBushes": { "type": "object", "required": ["list"], "properties": { "list": { "type": "array", "items": { "type": "array", "minItems": 4, "maxItems": 4, "items": [{ "type": "number", "x-unit": "u" }, { "type": "number", "x-unit": "u" }, { "type": "number" }, { "type": "integer" }] } }, "area": { "type": "object", "properties": { "x": { "type": "array", "x-unit": "u" }, "z": { "type": "array", "x-unit": "u" } } } } },
+    "handlerOrder": { "type": "object" }
+  },
+  "$defs": { "xz": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "x-unit": "u" } }
+}

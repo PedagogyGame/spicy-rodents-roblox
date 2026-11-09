@@ -1,0 +1,409 @@
+{
+  "$schema": "harvest/peppers v1",
+  "units": "HTML world units (1 u = 2.5 studs), +Y up, exactly as the page computed them",
+  "WARNING": "Chili pepper hiding places use pepperSeed = crypto.getRandomValues (L5314-5320): they change on every page load and are NOT part of the deterministic world. Recorded for information only; never consume these positions.",
+  "runs": [
+    {
+      "label": "html#1",
+      "seed": 3299238839,
+      "list": [
+        {
+          "pos": [-33.810776118495006,8.830678587389787,-33.27615077062325],
+          "kind": "trunk",
+          "area": "BUR OAK trunk",
+          "model": {
+            "$object3d": "Group",
+            "position": [-33.20864904787341,8.830678587389787,-34.154886864834964],
+            "rotationY": 0.41735527563102615,
+            "scale": [1.1446858057752252,1.1446858057752252,1.1446858057752252],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 0.3856666794223705,
+          "baseY": 8.830678587389787
+        },
+        {
+          "pos": [26.04554696663287,19.936842555753028,-26.15280333950894],
+          "kind": "branch",
+          "area": "AMERICAN ELM bough 3",
+          "model": {
+            "$object3d": "Group",
+            "position": [26.04554696663287,19.936842555753028,-26.15280333950894],
+            "rotationY": -1.0337871045367137,
+            "scale": [1.106265550130047,1.106265550130047,1.106265550130047],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 2.9168612512076906,
+          "baseY": 19.936842555753028
+        },
+        {
+          "pos": [-36.89007417475915,13.968000126989288,28.38705522531095],
+          "kind": "trunk",
+          "area": "SYCAMORE trunk",
+          "model": {
+            "$object3d": "Group",
+            "position": [-36.75286612642287,13.968000126989288,27.621985178406717],
+            "rotationY": 1.3566691596760423,
+            "scale": [1.0079366490012034,1.0079366490012034,1.0079366490012034],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 5.132371574962667,
+          "baseY": 13.968000126989288
+        },
+        {
+          "pos": [33.8545102703328,13.330739409274159,38.54617596445824],
+          "kind": "branch",
+          "area": "RED MAPLE bough 4",
+          "model": {
+            "$object3d": "Group",
+            "position": [33.8545102703328,13.330739409274159,38.54617596445824],
+            "rotationY": -1.2538644305435687,
+            "scale": [0.9762325658695772,0.9762325658695772,0.9762325658695772],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 1.4598986543874222,
+          "baseY": 13.330739409274159
+        },
+        {
+          "pos": [-43.53380445764637,2.38,94],
+          "kind": "fence",
+          "area": "chain-link fence top",
+          "model": {
+            "$object3d": "Group",
+            "position": [-43.53380445764637,2.38,94],
+            "rotationY": 2.4944506705114877,
+            "scale": [1.0478910497622564,1.0478910497622564,1.0478910497622564],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 1.8889802878168906,
+          "baseY": 2.38
+        },
+        {
+          "pos": [-33.59486695575087,6.25,85.08333688586013],
+          "kind": "trampoline",
+          "area": "trampoline guardrail",
+          "model": {
+            "$object3d": "Group",
+            "position": [-33.59486695575087,6.25,85.08333688586013],
+            "rotationY": -1.8442724419213703,
+            "scale": [1.0159072651760652,1.0159072651760652,1.0159072651760652],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 0.3955885014375113,
+          "baseY": 6.25
+        },
+        {
+          "pos": [129.89391667558812,5.38980821049698,335.1285147431772],
+          "kind": "ground",
+          "area": "among the garden Tabasco peppers",
+          "model": {
+            "$object3d": "Group",
+            "position": [129.89391667558812,5.38980821049698,335.1285147431772],
+            "rotationY": -0.4865718021143257,
+            "scale": [0.9245305821998044,0.9245305821998044,0.9245305821998044],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 2.7149017472179886,
+          "baseY": 5.38980821049698
+        },
+        {
+          "pos": [75,0.69,83.5],
+          "kind": "ground",
+          "area": "behind the lawnmower",
+          "model": {
+            "$object3d": "Group",
+            "position": [75,0.69,83.5],
+            "rotationY": 2.3944418440795845,
+            "scale": [1.1465773199684917,1.1465773199684917,1.1465773199684917],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 5.138515018976055,
+          "baseY": 0.69
+        }
+      ]
+    },
+    {
+      "label": "html#2",
+      "seed": 133440412,
+      "list": [
+        {
+          "pos": [-34.036432566324926,7.748559535513838,-33.435132454002726],
+          "kind": "trunk",
+          "area": "BUR OAK trunk",
+          "model": {
+            "$object3d": "Group",
+            "position": [-34.116809823479514,7.748559535513838,-34.39511844125819],
+            "rotationY": -0.7441711803909818,
+            "scale": [1.1155403980519623,1.1155403980519623,1.1155403980519623],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 0.4109248217196667,
+          "baseY": 7.748559535513838
+        },
+        {
+          "pos": [25.72189145057293,20.633125559588592,-31.359689912166658],
+          "kind": "branch",
+          "area": "AMERICAN ELM bough 4",
+          "model": {
+            "$object3d": "Group",
+            "position": [25.72189145057293,20.633125559588592,-31.359689912166658],
+            "rotationY": -0.21772052401944952,
+            "scale": [0.9605419418076053,0.9605419418076053,0.9605419418076053],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 5.821063074985129,
+          "baseY": 20.633125559588592
+        },
+        {
+          "pos": [-36.68984874337672,14.198847390021177,28.37331609877377],
+          "kind": "trunk",
+          "area": "SYCAMORE trunk",
+          "model": {
+            "$object3d": "Group",
+            "position": [-36.37901689272209,14.198847390021177,27.745257006205865],
+            "rotationY": -0.30208479479281447,
+            "scale": [0.9948731832206249,0.9948731832206249,0.9948731832206249],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 3.9439130560378506,
+          "baseY": 14.198847390021177
+        },
+        {
+          "pos": [33.61594423582949,13.940408562032932,31.68673118196252],
+          "kind": "branch",
+          "area": "RED MAPLE bough 8",
+          "model": {
+            "$object3d": "Group",
+            "position": [33.61594423582949,13.940408562032932,31.68673118196252],
+            "rotationY": 0.7688772729960496,
+            "scale": [0.9509414658183232,0.9509414658183232,0.9509414658183232],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 6.01777890711485,
+          "baseY": 13.940408562032932
+        },
+        {
+          "pos": [-31.79099829049695,6.25,75.02743287439411],
+          "kind": "trampoline",
+          "area": "trampoline guardrail",
+          "model": {
+            "$object3d": "Group",
+            "position": [-31.79099829049695,6.25,75.02743287439411],
+            "rotationY": -0.43626591732372955,
+            "scale": [1.0603948610369116,1.0603948610369116,1.0603948610369116],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 3.4762156562095687,
+          "baseY": 6.25
+        },
+        {
+          "pos": [103.84975235121885,21.651918499018944,350.3520315651211],
+          "kind": "wire",
+          "area": "high park tree to phone line",
+          "model": {
+            "$object3d": "Group",
+            "position": [103.84975235121885,21.651918499018944,350.3520315651211],
+            "rotationY": 1.4296580837519866,
+            "scale": [0.9292204751633107,0.9292204751633107,0.9292204751633107],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 3.712160277392958,
+          "baseY": 21.651918499018944
+        },
+        {
+          "pos": [128.01010855683126,5.301869820509048,333.25545630580746],
+          "kind": "ground",
+          "area": "among the garden Tabasco peppers",
+          "model": {
+            "$object3d": "Group",
+            "position": [128.01010855683126,5.301869820509048,333.25545630580746],
+            "rotationY": 0.27209618400108937,
+            "scale": [1.0509678669739513,1.0509678669739513,1.0509678669739513],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 5.49030365949355,
+          "baseY": 5.301869820509048
+        },
+        {
+          "pos": [75,0.69,83.5],
+          "kind": "ground",
+          "area": "behind the lawnmower",
+          "model": {
+            "$object3d": "Group",
+            "position": [75,0.69,83.5],
+            "rotationY": -1.1771522746257879,
+            "scale": [0.9088752463692799,0.9088752463692799,0.9088752463692799],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 0.5164653363971613,
+          "baseY": 0.69
+        }
+      ]
+    },
+    {
+      "label": "pretty#1",
+      "seed": 1487361164,
+      "list": [
+        {
+          "pos": [-33.71572800879424,9.56723136369939,-32.72899277580189],
+          "kind": "trunk",
+          "area": "BUR OAK trunk",
+          "model": {
+            "$object3d": "Group",
+            "position": [-32.98669121994132,9.56723136369939,-32.03397447432483],
+            "rotationY": -0.6648141036959201,
+            "scale": [0.8695816907100379,0.8695816907100379,0.8695816907100379],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 5.900397240920151,
+          "baseY": 9.56723136369939
+        },
+        {
+          "pos": [40.99080002336019,22.161698608152975,-44.191013400890554],
+          "kind": "branch",
+          "area": "AMERICAN ELM bough 7",
+          "model": {
+            "$object3d": "Group",
+            "position": [40.99080002336019,22.161698608152975,-44.191013400890554],
+            "rotationY": -1.176424516768895,
+            "scale": [1.0773371189367025,1.0773371189367025,1.0773371189367025],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 6.230275235102708,
+          "baseY": 22.161698608152975
+        },
+        {
+          "pos": [-37.35636544059042,7.720710970752106,29.193589142143797],
+          "kind": "trunk",
+          "area": "SYCAMORE trunk",
+          "model": {
+            "$object3d": "Group",
+            "position": [-38.230201350460504,7.720710970752106,29.668284847445417],
+            "rotationY": -0.5414825770485083,
+            "scale": [0.8685580945108086,0.8685580945108086,0.8685580945108086],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 3.6756949274247632,
+          "baseY": 7.720710970752106
+        },
+        {
+          "pos": [41.82957478214071,22.79969367478943,40.08680570962238],
+          "kind": "branch",
+          "area": "RED MAPLE bough 2",
+          "model": {
+            "$object3d": "Group",
+            "position": [41.82957478214071,22.79969367478943,40.08680570962238],
+            "rotationY": -1.2984597195220702,
+            "scale": [0.8919324411312117,0.8919324411312117,0.8919324411312117],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 4.410873932204108,
+          "baseY": 22.79969367478943
+        },
+        {
+          "pos": [476,12.348409373217516,57.4334176639681],
+          "kind": "roof",
+          "area": "fuel canopy crosswalk",
+          "model": {
+            "$object3d": "Group",
+            "position": [476,12.348409373217516,57.4334176639681],
+            "rotationY": 1.7599405118779838,
+            "scale": [1.0112098947167396,1.0112098947167396,1.0112098947167396],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 4.525765315377095,
+          "baseY": 12.348409373217516
+        },
+        {
+          "pos": [84,2.38,-61.02102157327844],
+          "kind": "fence",
+          "area": "chain-link fence top",
+          "model": {
+            "$object3d": "Group",
+            "position": [84,2.38,-61.02102157327844],
+            "rotationY": -0.589534020229705,
+            "scale": [0.9097230101469904,0.9097230101469904,0.9097230101469904],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 2.944411155617506,
+          "baseY": 2.38
+        },
+        {
+          "pos": [126.3130746174138,5.774067182590465,341.4494013977237],
+          "kind": "ground",
+          "area": "among the garden Tabasco peppers",
+          "model": {
+            "$object3d": "Group",
+            "position": [126.3130746174138,5.774067182590465,341.4494013977237],
+            "rotationY": 0.6543503041795269,
+            "scale": [1.0540719997603445,1.0540719997603445,1.0540719997603445],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 5.531022712954141,
+          "baseY": 5.774067182590465
+        },
+        {
+          "pos": [39,0.69,-83],
+          "kind": "ground",
+          "area": "behind the smoker",
+          "model": {
+            "$object3d": "Group",
+            "position": [39,0.69,-83],
+            "rotationY": -1.4941545767355167,
+            "scale": [1.0243329926393925,1.0243329926393925,1.0243329926393925],
+            "visible": true,
+            "children": 8
+          },
+          "found": false,
+          "phase": 5.676648458668121,
+          "baseY": 0.69
+        }
+      ]
+    }
+  ]
+}

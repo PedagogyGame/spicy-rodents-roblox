@@ -1,0 +1,292 @@
+{
+  "$schema": "golden/junction v1",
+  "source": "RouteJunction L5782-5793",
+  "count": 49,
+  "cases": [
+    {
+      "fn": "inward",
+      "t": 0,
+      "desired": -1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.01,
+      "desired": -1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.01,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.034,
+      "desired": -1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.034,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.035,
+      "desired": -1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 0.035,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.036,
+      "desired": -1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 0.036,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.5,
+      "desired": -1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 0.5,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.964,
+      "desired": -1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 0.964,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.965,
+      "desired": -1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 0.965,
+      "desired": 1,
+      "result": 1
+    },
+    {
+      "fn": "inward",
+      "t": 0.966,
+      "desired": -1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 0.966,
+      "desired": 1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 1,
+      "desired": -1,
+      "result": -1
+    },
+    {
+      "fn": "inward",
+      "t": 1,
+      "desired": 1,
+      "result": -1
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0,
+      "explicit": false,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0,
+      "explicit": true,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0.3,
+      "explicit": false,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0.3,
+      "explicit": true,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0.48,
+      "explicit": false,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0.48,
+      "explicit": true,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0.4800001,
+      "explicit": false,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 0.4800001,
+      "explicit": true,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 1,
+      "explicit": false,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 1,
+      "explicit": true,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 1.7,
+      "explicit": false,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 1.7,
+      "explicit": true,
+      "result": true
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 1.7000001,
+      "explicit": false,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 1.7000001,
+      "explicit": true,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 5,
+      "explicit": false,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": 5,
+      "explicit": true,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": "NaN",
+      "explicit": false,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": "NaN",
+      "explicit": true,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": "Infinity",
+      "explicit": false,
+      "result": false
+    },
+    {
+      "fn": "canTransfer",
+      "gap": "Infinity",
+      "explicit": true,
+      "result": false
+    },
+    {
+      "fn": "ease",
+      "p": -1,
+      "result": 0
+    },
+    {
+      "fn": "ease",
+      "p": 0,
+      "result": 0
+    },
+    {
+      "fn": "ease",
+      "p": 0.1,
+      "result": 0.028000000000000004
+    },
+    {
+      "fn": "ease",
+      "p": 0.25,
+      "result": 0.15625
+    },
+    {
+      "fn": "ease",
+      "p": 0.5,
+      "result": 0.5
+    },
+    {
+      "fn": "ease",
+      "p": 0.75,
+      "result": 0.84375
+    },
+    {
+      "fn": "ease",
+      "p": 0.9,
+      "result": 0.972
+    },
+    {
+      "fn": "ease",
+      "p": 1,
+      "result": 1
+    },
+    {
+      "fn": "ease",
+      "p": 2,
+      "result": 1
+    }
+  ]
+}

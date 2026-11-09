@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/lanes",
+  "title": "Traffic and sidewalk lanes (data/authored/town/lanes.json), BUILD_PLAN 3.6, traffic 3",
+  "type": "object",
+  "required": ["lanes"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "src": { "type": "string" },
+    "lanes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/lane" } }
+  },
+  "$defs": {
+    "u": { "type": "number", "x-unit": "u" },
+    "xz": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "x-unit": "u" },
+    "speed": { "x-unit": "u/s", "oneOf": [{ "type": "number", "minimum": 0 }, { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 2, "maxItems": 2 }] },
+    "axisRange": {
+      "type": "object", "required": ["axis", "coord", "start", "end"], "additionalProperties": false,
+      "properties": { "axis": { "enum": ["x", "z"] }, "coord": { "$ref": "#/$defs/u" }, "start": { "$ref": "#/$defs/u" }, "end": { "$ref": "#/$defs/u" } }
+    },
+    "pointPath": {
+      "type": "object", "required": ["points"], "additionalProperties": false,
+      "properties": {
+        "points": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/xz" } },
+        "closed": { "type": "boolean" },
+        "interpolation": { "type": "string" },
+        "length": { "$ref": "#/$defs/u" },
+        "continues": { "type": "string" }
+      }
+    },
+    "templatePath": {
+      "type": "object", "required": ["points_template"], "additionalProperties": false,
+      "description": "points given as formulas in the source (resolved at run time); kept verbatim, no unit conversion",
+      "properties": {
+        "points_template": { "type": "array", "items": { "type": "array", "items": { "type": ["string", "number"] } } },
+        "closed": { "type": "boolean" },
+        "resolved_start": { "type": "array" }
+      }
+    },
+    "segmentPath": {
+      "type": "object", "required": ["segments"], "additionalProperties": false,
+      "properties": { "segments": { "type": "array", "minItems": 1, "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/xz" } } } }
+    },
+    "laneSet": {
+      "type": "object", "required": ["lanes", "start", "end"], "additionalProperties": false,
+      "properties": {
+        "lanes": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["axis", "coord"], "additionalProperties": false, "properties": { "axis": { "enum": ["x", "z"] }, "coord": { "$ref": "#/$defs/u" } } } },
+        "start": { "$ref": "#/$defs/u" },
+        "end": { "$ref": "#/$defs/u" }
+      }
+    },
+    "lane": {
+      "type": "object",
+      "required": ["id", "path", "dir", "users", "speed", "src"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.\\-]*$" },
+        "roads": { "type": "array", "items": { "type": "string", "pattern": "^rd_\\d\\d\\d_" }, "description": "road ids this lane runs on (cross-checked against roads.json); empty for yard/verge glides" },
+        "roadNote": { "type": "string", "description": "the road description exactly as the spec extractor wrote it" },
+        "path": { "oneOf": [{ "$ref": "#/$defs/axisRange" }, { "$ref": "#/$defs/pointPath" }, { "$ref": "#/$defs/templatePath" }, { "$ref": "#/$defs/segmentPath" }, { "$ref": "#/$defs/laneSet" }] },
+        "dir": { "type": "string", "minLength": 1, "description": "direction rule as written in the spec (+z, -z, +x, -x, both, loop..., ping-pong...)" },
+        "users": { "type": "array", "items": { "type": "string" } },
+        "speed": { "type": "object", "additionalProperties": { "$ref": "#/$defs/speed" }, "description": "cruise speed per vehicle class, u/s (number) or [min, max]" },
+        "wrap": { "type": "string" },
+        "yieldsTo": { "type": "array", "items": { "type": "string" } },
+        "stops": { "type": ["array", "object"] },
+        "schedule": { "type": ["array", "object", "string"] },
+        "stations": { "type": ["array", "object"] },
+        "dwellSeconds": { "type": ["number", "array", "object", "string"], "x-unit": "s" },
+        "notes": { "type": "string" },
+        "src": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^v5\\.4 L\\d+" } }
+      }
+    }
+  }
+}

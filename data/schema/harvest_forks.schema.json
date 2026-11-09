@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/harvest_forks",
+  "title": "Harvested canopyForks (data/harvest/forks.json)",
+  "type": "object",
+  "required": ["trunkCount", "forkCount", "trunks"],
+  "additionalProperties": true,
+  "properties": {
+    "trunkCount": { "type": "integer" },
+    "forkCount": { "type": "integer" },
+    "trunks": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["trunk", "forks"], "additionalProperties": true,
+        "properties": {
+          "trunk": { "type": "integer", "minimum": 0 },
+          "trunkName": { "type": "string" },
+          "forks": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["branch", "t", "height", "origin", "outward"], "additionalProperties": true,
+              "properties": {
+                "branch": { "type": "integer", "minimum": 0 },
+                "branchName": { "type": "string" },
+                "branchKind": { "enum": ["branch", "bridge", "lookout"] },
+                "t": { "type": "number", "minimum": 0, "maximum": 1 },
+                "height": { "type": "number", "x-unit": "u" },
+                "origin": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "x-unit": "u" },
+                "outward": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3, "x-unit": "none", "description": "unit vector" },
+                "trunkClearance": { "type": ["number", "null"], "x-unit": "u" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

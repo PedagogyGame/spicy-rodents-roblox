@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/wildlife_forage_v54",
+  "title": "v5.4 foraging-relevant set dressing (data/authored/wildlife/forage_v54.json), wildlife_foraging 10",
+  "type": "object",
+  "required": ["gardenPlots", "tabascoGarden", "hedgePatches", "birdFeeders", "trashCans"],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "src": { "type": "string" },
+    "note": { "type": "string" },
+    "gardenPlots": { "type": "object", "properties": { "list": { "type": "array", "items": { "type": "object", "properties": { "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "w": { "type": "number", "x-unit": "u" }, "d": { "type": "number", "x-unit": "u" }, "variant": { "type": "integer" }, "plantColor": { "type": "string" } } } } } },
+    "tabascoGarden": { "type": "object", "properties": { "center": { "$ref": "#/$defs/xz" }, "groundY": { "type": "number", "x-unit": "u" }, "wheelbarrowPerch": { "$ref": "#/$defs/xz" } } },
+    "hedgePatches": { "type": "object", "properties": { "list": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4, "x-unit": "u" } }, "maxPlayerY": { "type": "number", "x-unit": "u" } } },
+    "birdFeeders": { "type": "object", "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/typedPoint" } } } },
+    "trashCans": { "type": "object", "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/typedPoint" } } } },
+    "compostBins": { "type": "object", "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/typedPoint" } } } },
+    "coreYardBins": { "type": "object", "properties": { "list": { "type": "array", "items": { "$ref": "#/$defs/xz" } }, "y": { "type": "number", "x-unit": "u" } } },
+    "oldHouseBins": { "type": "object", "properties": { "list": { "type": "array", "items": { "type": "object", "properties": { "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "house": { "type": "integer" }, "size": { "type": "array", "items": { "type": "number" }, "x-unit": "u" }, "color": { "type": "string" } } } } } },
+    "gasStationWasteContainer": { "type": "object", "properties": { "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "size": { "type": "array", "items": { "type": "number" }, "x-unit": "u" } } },
+    "restaurants": { "type": "object", "properties": { "list": { "type": "array", "items": { "type": "object", "properties": { "center": { "$ref": "#/$defs/xz" }, "footprint": { "$ref": "#/$defs/xz" }, "proposedDumpster": { "type": "array", "x-unit": "u" } } } } } },
+    "mallPlaza": { "type": "object", "properties": { "bounds": { "type": "object", "properties": { "x": { "type": "array", "x-unit": "u" }, "z": { "type": "array", "x-unit": "u" } } }, "y": { "type": "number", "x-unit": "u" }, "fountain": { "$ref": "#/$defs/xz" }, "mall": { "type": "object", "properties": { "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "w": { "type": "number", "x-unit": "u" }, "d": { "type": "number", "x-unit": "u" }, "floor": { "type": "number", "x-unit": "u" } } } } }
+  },
+  "$defs": {
+    "xz": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "x-unit": "u" },
+    "typedPoint": { "type": "object", "required": ["type", "x", "z"], "properties": { "type": { "type": "string" }, "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "y": { "type": "number", "x-unit": "u" }, "v": { "type": "integer" } } }
+  }
+}

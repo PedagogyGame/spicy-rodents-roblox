@@ -1,0 +1,21 @@
+{
+  "name": "spicy-rodents-cloud",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open Cloud tooling for the Spicy Rodents Roblox rebuild (save place versions, Luau Execution tests, asset uploads). Dependency-free: Node 22's built-in fetch goes through HTTPS_PROXY with NODE_USE_ENV_PROXY=1 and trusts NODE_EXTRA_CA_CERTS.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.21"
+  },
+  "bin": {
+    "spicy-cloud": "./cloud.mjs"
+  },
+  "scripts": {
+    "universe": "node cloud.mjs universe",
+    "save_place": "node cloud.mjs save_place",
+    "run_engine_tests": "node cloud.mjs run_engine_tests",
+    "upload_asset": "node cloud.mjs upload_asset",
+    "harvest_ids": "node cloud.mjs harvest_ids",
+    "publish": "node cloud.mjs publish"
+  }
+}

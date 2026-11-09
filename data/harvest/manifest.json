@@ -1,0 +1,523 @@
+{
+  "$schema": "harvest/manifest v1",
+  "generatedAt": "2026-11-09T06:01:58.005Z",
+  "tool": "tools/harvest v0.1.0",
+  "pin": {
+    "html": {
+      "path": "/home/user/spicy-rodents/reference/Spicy_Rodents_v5_4_Living_Town.html",
+      "sha256": "fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227",
+      "bytes": 1418205
+    },
+    "prettyJs": {
+      "path": "/home/user/spicy-rodents/reference/v5_4_game.js",
+      "sha256": "721ca9c3d43f18e788d7c6a31865df2c28b67390aaa154d263801e6401fe9ff5",
+      "bytes": 601291
+    },
+    "moduleStartsAtHtmlLine": 228
+  },
+  "environment": {
+    "node": "v22.23.4",
+    "playwright": "1.63.0",
+    "chromium": "153.0.8010.12",
+    "gl": "ANGLE SwiftShader (headless, --use-angle=swiftshader)",
+    "platform": "linux"
+  },
+  "seeds": {
+    "world": "rng(20261008) at L90 (global `random`, `R`, `pick`)",
+    "perTree": "rng(spec.seed) at L1763 (makeTree) and rng(seed) at L2825 (estateGateOak)",
+    "neighborhoodDetail": "rng(51903) at L12980",
+    "river": "rng(5110726) at L13450",
+    "coins": "rng(5300811) at L14892",
+    "livingTown": "rng(540811) at L15133 (apple trees, nests, birds)",
+    "peppers": "rng(pepperSeed), pepperSeed from crypto.getRandomValues at L5314: NOT deterministic; excluded",
+    "runtimeOnly": "Math.random() is used only by runtime behaviour (spawns, bites, waits), never by world construction"
+  },
+  "runs": [
+    {
+      "label": "html#1",
+      "variant": "html",
+      "dumpMs": 8286,
+      "totalMs": 9194,
+      "bootOk": true,
+      "bootError": null,
+      "dumpOk": true,
+      "dumpErrors": [],
+      "inPageDumpMs": 21,
+      "consoleLines": ["[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[info] [Spicy Rodents] 110 utility supports verified off pavement","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"],
+      "pageErrors": [],
+      "blockedRequests": ["https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/RGBELoader.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/EffectComposer.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/OutputPass.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/RenderPass.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/UnrealBloomPass.js","https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_puresky_1k.hdr","https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow/bark_willow_diff_1k.jpg","https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow/bark_willow_nor_gl_1k.jpg","https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=DM+Sans:wght@400;500;600;700&displ..."]
+    },
+    {
+      "label": "html#2",
+      "variant": "html",
+      "dumpMs": 7283,
+      "totalMs": 8051,
+      "bootOk": true,
+      "bootError": null,
+      "dumpOk": true,
+      "dumpErrors": [],
+      "inPageDumpMs": 15,
+      "consoleLines": ["[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[info] [Spicy Rodents] 110 utility supports verified off pavement","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"],
+      "pageErrors": [],
+      "blockedRequests": ["https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/RGBELoader.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/EffectComposer.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/OutputPass.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/RenderPass.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/UnrealBloomPass.js","https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_puresky_1k.hdr","https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow/bark_willow_diff_1k.jpg","https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow/bark_willow_nor_gl_1k.jpg","https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=DM+Sans:wght@400;500;600;700&displ..."]
+    },
+    {
+      "label": "pretty#1",
+      "variant": "pretty",
+      "dumpMs": 6472,
+      "totalMs": 7391,
+      "bootOk": true,
+      "bootError": null,
+      "dumpOk": true,
+      "dumpErrors": [],
+      "inPageDumpMs": 11,
+      "consoleLines": ["[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[info] [Spicy Rodents] 110 utility supports verified off pavement","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector","[error] Failed to load resource: net::ERR_BLOCKED_BY_CLIENT.Inspector"],
+      "pageErrors": [],
+      "blockedRequests": ["https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/loaders/RGBELoader.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/EffectComposer.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/OutputPass.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/RenderPass.js","https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/postprocessing/UnrealBloomPass.js","https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_puresky_1k.hdr","https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow/bark_willow_diff_1k.jpg","https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/bark_willow/bark_willow_nor_gl_1k.jpg","https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=DM+Sans:wght@400;500;600;700&displ..."]
+    }
+  ],
+  "determinism": {
+    "runs": [
+      {
+        "label": "html#1",
+        "hash": "b0db2d6f2efb037b11b9fd7a1da90eac47ce99c080108e1e6ba83f103dc0988a"
+      },
+      {
+        "label": "html#2",
+        "hash": "b0db2d6f2efb037b11b9fd7a1da90eac47ce99c080108e1e6ba83f103dc0988a"
+      },
+      {
+        "label": "pretty#1",
+        "hash": "b0db2d6f2efb037b11b9fd7a1da90eac47ce99c080108e1e6ba83f103dc0988a"
+      }
+    ],
+    "allHtmlRunsIdentical": true,
+    "prettyMatchesHtml": true,
+    "pepperSeeds": [
+      {
+        "label": "html#1",
+        "seed": 3299238839
+      },
+      {
+        "label": "html#2",
+        "seed": 133440412
+      },
+      {
+        "label": "pretty#1",
+        "seed": 1487361164
+      }
+    ]
+  },
+  "counts": {
+    "comparisons": [
+      {
+        "what": "routes",
+        "expected": 1332,
+        "actual": 1332,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "spatial index entries",
+        "expected": 81613,
+        "actual": 81613,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "spatial index entries == sum of samples",
+        "expected": 81613,
+        "actual": 81613,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "routes indexed",
+        "expected": 1332,
+        "actual": 1332,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "canopy fork trunks",
+        "expected": 95,
+        "actual": 95,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "trees (trees[] incl. 12 apple trees)",
+        "expected": 95,
+        "actual": 95,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "nests",
+        "expected": 24,
+        "actual": 24,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "apple trees",
+        "expected": 12,
+        "actual": 12,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "utility supports",
+        "expected": 110,
+        "actual": 110,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "utility supports verified by the game",
+        "expected": 110,
+        "actual": 110,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "residential poles (poles[])",
+        "expected": 97,
+        "actual": 97,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "houses (4 core + 20 outer)",
+        "expected": 24,
+        "actual": 24,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "registered pavement zones",
+        "expected": 48,
+        "actual": 48,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "peppers (nondeterministic, flagged)",
+        "expected": 8,
+        "actual": 8,
+        "status": "match",
+        "note": "positions excluded from the deterministic data"
+      },
+      {
+        "what": "kind trunk count",
+        "expected": 265,
+        "actual": 265,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind trunk total length (rounded u)",
+        "expected": 4086,
+        "actual": 4086,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind branch count",
+        "expected": 715,
+        "actual": 715,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind branch total length (rounded u)",
+        "expected": 11238,
+        "actual": 11238,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind bridge count",
+        "expected": 78,
+        "actual": 78,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind bridge total length (rounded u)",
+        "expected": 1417,
+        "actual": 1417,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind lookout count",
+        "expected": 12,
+        "actual": 12,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind lookout total length (rounded u)",
+        "expected": 55,
+        "actual": 55,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind roof count",
+        "expected": 99,
+        "actual": 99,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind roof total length (rounded u)",
+        "expected": 1700,
+        "actual": 1700,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind wire count",
+        "expected": 150,
+        "actual": 150,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind wire total length (rounded u)",
+        "expected": 6979,
+        "actual": 6979,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind fence count",
+        "expected": 12,
+        "actual": 12,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind fence total length (rounded u)",
+        "expected": 920,
+        "actual": 920,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind trampoline count",
+        "expected": 1,
+        "actual": 1,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "kind trampoline total length (rounded u)",
+        "expected": 32,
+        "actual": 32,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "route kinds present",
+        "expected": 8,
+        "actual": 8,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "routes failing registry validation",
+        "expected": 0,
+        "actual": 0,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "sample counts == max(20, ceil(3L)) + 1",
+        "expected": 1332,
+        "actual": 1332,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "route ids == creation order 0..n-1",
+        "expected": 1332,
+        "actual": 1332,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "trees matching wildlife.json by (x,z) to 0.005",
+        "expected": 95,
+        "actual": 95,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "nests matching wildlife.json by (x,z) to 0.01",
+        "expected": 24,
+        "actual": 24,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "apple trees matching wildlife.json by (x,z) to 0.005",
+        "expected": 12,
+        "actual": 12,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "apple tree heights matching wildlife.json to 0.005",
+        "expected": 12,
+        "actual": 12,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "addRoute call sites used (of 60)",
+        "expected": 60,
+        "actual": 60,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "routes attributed to a call site",
+        "expected": 1332,
+        "actual": 1332,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "catalog rows matching per-call-site counts",
+        "expected": 60,
+        "actual": 60,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "islands (1.7 u sample rule)",
+        "expected": 149,
+        "actual": 149,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "largest island routes",
+        "expected": 563,
+        "actual": 563,
+        "status": "match",
+        "note": ""
+      },
+      {
+        "what": "branch tips with an auto-link",
+        "expected": 0,
+        "actual": 0,
+        "status": "match",
+        "note": ""
+      }
+    ],
+    "kinds": {
+      "roof": {
+        "count": 99,
+        "length": 1699.888
+      },
+      "trunk": {
+        "count": 265,
+        "length": 4085.755
+      },
+      "bridge": {
+        "count": 78,
+        "length": 1417.165
+      },
+      "fence": {
+        "count": 12,
+        "length": 919.829
+      },
+      "trampoline": {
+        "count": 1,
+        "length": 32.145
+      },
+      "wire": {
+        "count": 150,
+        "length": 6979.254
+      },
+      "branch": {
+        "count": 715,
+        "length": 11237.552
+      },
+      "lookout": {
+        "count": 12,
+        "length": 55.163
+      }
+    },
+    "treeMatch": {
+      "specCount": 95,
+      "matchedByXZ": 95
+    }
+  },
+  "files": {
+    "routes.json": {
+      "bytes": 824309,
+      "sha256": "d34675124e7f03e6004e2c678ac581b2afec6ce1efbb3931a4f2a9b062dab757"
+    },
+    "route_samples.json": {
+      "bytes": 4152141,
+      "sha256": "1f089164e07181c7dfa26241431f1ff5db4ecf0e449903858de5503c13b094df"
+    },
+    "route_index.json": {
+      "bytes": 855698,
+      "sha256": "6b528e975101a7fb06900489c8597718614d2091f7e9f25c1c7c5547fb7cc81a"
+    },
+    "forks.json": {
+      "bytes": 296628,
+      "sha256": "1f1a3c2866cb379dc2d3c88935b29007771c4cbcee2b9f843c72e485bb2effd7"
+    },
+    "trees.json": {
+      "bytes": 30861,
+      "sha256": "7a53d807fb5a7ecee26d55c42a42875edfa191bc98668dbe15ab0de21f6e1cf5"
+    },
+    "utility.json": {
+      "bytes": 34452,
+      "sha256": "807c990659b2b55d187fd1ed513ccbe62f1ad07b78d093e13cf735087455ab40"
+    },
+    "nests.json": {
+      "bytes": 5835,
+      "sha256": "fb4728a3868e6a9674fdfdbfab816eabc33c3397bfc20972979fc19fce172963"
+    },
+    "apple_trees.json": {
+      "bytes": 4994,
+      "sha256": "6e85f4974865ff24922be634c713e295d7528779df68a335498c7db51ee867f8"
+    },
+    "houses.json": {
+      "bytes": 27862,
+      "sha256": "44259f383c8cf811410fc101dd3da9c0d5f4a0356329d18788fa07486d89f912"
+    },
+    "colliders.json": {
+      "bytes": 14183,
+      "sha256": "cc6fce0b5277a93e719790966d3a1d38f88d643eebc8e040db28197c1e73217b"
+    },
+    "world.json": {
+      "bytes": 9943,
+      "sha256": "3d39bf35b83f17820421cdac55a24b746909423b6b19451c19bd97a6a7ae245b"
+    },
+    "vehicles_initial.json": {
+      "bytes": 37877,
+      "sha256": "c11e5f624516de73f9e7a04670402312ba8f30d3ba2519781e3462fb1e5c055a"
+    },
+    "fauna.json": {
+      "bytes": 12011,
+      "sha256": "082e6ef1b6a35393768e7262bd1ada3fe23969bec17c45b6eb57ffb36e389286"
+    },
+    "peppers_nondeterministic.json": {
+      "bytes": 14500,
+      "sha256": "46f957376b084e63d95421b5e45d3a2bc7ff1b54348a40642c611448626299df"
+    },
+    "graph.json": {
+      "bytes": 444486,
+      "sha256": "0462b82931e082ca1767dd39d38f26f804a8509fd6b2f78c68e405977e384b01"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/wildlife_apple_trees",
+  "title": "The 12 v5.4 orchard trees (data/authored/wildlife/apple_trees.json), wildlife_foraging 7",
+  "type": "object",
+  "required": ["appleTrees", "count"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "src": { "type": "string" },
+    "count": { "type": "integer", "minimum": 1 },
+    "appleTrees": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["name", "x", "z", "H", "base"], "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^APPLE \\d+$" },
+          "x": { "type": "number", "x-unit": "u" },
+          "z": { "type": "number", "x-unit": "u" },
+          "H": { "type": "number", "exclusiveMinimum": 0, "x-unit": "u" },
+          "base": { "type": "number", "x-unit": "u" }
+        }
+      }
+    },
+    "candidateSectors": { "type": "array", "items": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "x-unit": "u" } } },
+    "perSectorMax": { "type": "integer" },
+    "fallbackRow": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "xFrom": { "type": "number", "x-unit": "u" }, "xStep": { "type": "number", "x-unit": "u" }, "xTo": { "type": "number", "x-unit": "u" },
+        "z": { "type": "array", "items": { "type": "number" }, "x-unit": "u" }
+      }
+    },
+    "siteClear": { "type": "object", "description": "clearance rules in HTML units (not converted)" },
+    "model": { "type": "object", "description": "v5.4 model constants, HTML units (not converted)" },
+    "collectible": { "type": "boolean" },
+    "selectionNote": { "type": "string" },
+    "rejectedCandidates": { "type": "array", "items": { "type": "object", "properties": { "x": { "type": "number", "x-unit": "u" }, "z": { "type": "number", "x-unit": "u" }, "reason": { "type": "string" } } } }
+  }
+}

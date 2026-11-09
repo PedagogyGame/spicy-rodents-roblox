@@ -1,0 +1,775 @@
+{
+  "$schema": "../../schema/wildlife_restore_v41.schema.json",
+  "birdFeeders": {
+    "interactions": "none (decorative)",
+    "lines": "12394-12409, 12758-12765",
+    "list": [
+      {
+        "nominal": [-89, 70],
+        "placed": [-89, 70]
+      },
+      {
+        "nominal": [88, 75],
+        "placed": [88, 75]
+      },
+      {
+        "nominal": [-219, 215],
+        "placed": [-219, 215]
+      },
+      {
+        "nominal": [132, 333],
+        "placed": [132, 333]
+      },
+      {
+        "nominal": [237, 308],
+        "placed": [237, 308]
+      }
+    ],
+    "model": "post r0.085-0.11 h3.7 #8b6445, tray 1.15 at y3.22, roof cone #6f8c55 at 3.8, seed cylinder #bd8f5d at 3.4"
+  },
+  "deer": {
+    "blockedTurn": "heading += 0.67*pi, speed = 0",
+    "colors": {
+      "antler": "#c2ac82",
+      "buck": "#946f4e",
+      "doe": "#ad845e",
+      "eye": "#25221e",
+      "fawn": "#b99a70",
+      "hoof": "#48443b",
+      "white": "#dfd1b3"
+    },
+    "flee": {
+      "headingAwayFromPlayer": true,
+      "minRoad": 2.6,
+      "speedAdult": 11.8,
+      "speedDamp": 6,
+      "speedFawn": 9,
+      "turnRate": 5.6
+    },
+    "gait": {
+      "calmAmp": 0.015,
+      "calmFreq": 3,
+      "fleeAmp": 0.065,
+      "fleeFreq": 13
+    },
+    "leash": 95,
+    "lines": "12472-12519 (create), 12576-12601 (update), 12676-12701 (pounce), 12782-12788 (spawn)",
+    "list": [
+      {
+        "name": "Willow",
+        "x": 117,
+        "z": 365,
+        "y": 5.79,
+        "child": false,
+        "nominal": [117, 365],
+        "sex": "doe",
+        "size": 1
+      },
+      {
+        "name": "Hazel",
+        "x": 145,
+        "z": 385,
+        "y": 6.17,
+        "child": false,
+        "nominal": [145, 385],
+        "sex": "doe",
+        "size": 0.95
+      },
+      {
+        "name": "Bracken",
+        "x": 195.18,
+        "z": 314.98,
+        "y": 3.59,
+        "child": false,
+        "nominal": [187, 320],
+        "sex": "buck",
+        "size": 1.18
+      },
+      {
+        "name": "Ash",
+        "x": -204,
+        "z": 353,
+        "y": 2.35,
+        "child": false,
+        "nominal": [-204, 353],
+        "sex": "buck",
+        "size": 1.13
+      },
+      {
+        "name": "Fawn",
+        "x": 137,
+        "z": 366,
+        "y": 5.83,
+        "child": true,
+        "nominal": [137, 366],
+        "sex": "doe",
+        "size": 0.55
+      }
+    ],
+    "messages": {
+      "fail": "{name} dodged the pounce! Deer bites succeed only 15% of the time.",
+      "success": "LUCKY DEER BITE ({name}) · +32 Power · Deer bolts away!"
+    },
+    "minRoad": 7,
+    "pounce": {
+      "cooldownOnAttempt": 7,
+      "failScare": 10,
+      "maxDy": 2.8,
+      "radiusXZ": "1.6 + size*0.35",
+      "requiresFox": "tryNewWildlifePounce returns false at once when foxCreature is null (v4.1:12652), so deer can be bitten only while the fox exists",
+      "success": {
+        "cooldown": 75,
+        "hits": 1,
+        "power": 32,
+        "resetsSecondsSinceBite": true,
+        "scare": 12
+      },
+      "successChance": 0.15
+    },
+    "roam": {
+      "speed": 1.25,
+      "desiredHeading": "sin(phase*0.37 + origin.x) * 1.3 (absolute yaw)",
+      "minRoad": 5.1,
+      "speedDamp": 1.3,
+      "turnRate": 1.2
+    },
+    "runtime": true,
+    "threat": {
+      "maxPlayerHeightAboveDeerGround": 5,
+      "radiusXZ": 21,
+      "scareSeconds": 3.4
+    }
+  },
+  "floweringBushes": {
+    "area": {
+      "x": [-245, 243],
+      "z": [-215, 407]
+    },
+    "attempts": 76,
+    "flowerColor": "#e3c6dc",
+    "flowersEvery": 5,
+    "foliage": ["#587844", "#6a8850", "#4e714c", "#789557"],
+    "lines": "12445-12471, 12776-12780",
+    "list": [
+      [-120, 256, 0.95, 1],
+      [230, 116, 1.22, 5],
+      [-96, -21, 0.85, 6],
+      [240, 26, 0.77, 10],
+      [-104, -204, 0.91, 14],
+      [-240, 204, 0.87, 15],
+      [-214, 108, 1.1, 19],
+      [231, -209, 0.99, 20],
+      [101, -72, 0.8, 21],
+      [-160, -29, 1.08, 22],
+      [121, 347, 0.82, 24],
+      [36, -22, 1.24, 26],
+      [-74, -133, 1.1, 28],
+      [57, 204, 0.77, 29],
+      [50, -26, 0.88, 30],
+      [-33, -117, 0.75, 32],
+      [151, 364, 1.21, 33],
+      [214, 234, 1.11, 34],
+      [-102, 357, 0.78, 36],
+      [126, 127, 0.81, 37],
+      [-56, -19, 0.65, 38],
+      [-44, 38, 0.71, 39],
+      [-139, 345, 1.19, 42],
+      [-64, -143, 0.82, 43],
+      [48, -99, 1.3, 45],
+      [-37, 225, 0.89, 46],
+      [193, 361, 0.72, 47],
+      [120, 321, 0.91, 48],
+      [84, 123, 1.31, 49],
+      [53, 361, 1.11, 51],
+      [-7, 382, 0.66, 52],
+      [-26, -99, 0.78, 54],
+      [-147, 65, 1.21, 58],
+      [98, 317, 0.83, 59],
+      [233, -127, 1.19, 61],
+      [34, 351, 1.29, 62],
+      [-236, 391, 1.1, 63],
+      [72, 307, 1.19, 64],
+      [-134, 265, 1.09, 65],
+      [37, 238, 1.17, 69],
+      [-32, 236, 1.1, 72],
+      [73, 198, 0.99, 73],
+      [-109, 264, 0.72, 75]
+    ],
+    "listFields": "x,z,scale,variant",
+    "placed": 43,
+    "scale": [0.62, 1.32],
+    "variantRule": "variant = attempt index i (0..75): foliage colour = foliage[i % 4]; pink flowers when i % 5 == 0 (v4.1:12460)"
+  },
+  "fox": {
+    "colors": {
+      "bright": "#e4d6bc",
+      "dark": "#302c29",
+      "fur": "#b8663c"
+    },
+    "huntRadius": 24,
+    "huntSpeed": 8.8,
+    "huntTurnRate": 7,
+    "lines": "12520-12556 (create), 12603-12649 (update), 12652-12674 (pounce), 12789 (spawn)",
+    "lunge": {
+      "cooldown": 4.8,
+      "detachesFromRoute": true,
+      "knockback": 9,
+      "message": "FOX LUNGE! −17 Power · Climb, dodge or surprise it!",
+      "minUpVel": 3.5,
+      "powerLoss": 17,
+      "radius": 2.15,
+      "seconds": 2.9,
+      "sfx": [180, 0.2, "square", 0.04]
+    },
+    "minRoad": 7,
+    "moveConstraint": {
+      "leash": 115,
+      "minRoad": 2.3,
+      "onBlocked": "stays in place (no heading change)"
+    },
+    "nominal": [65, 313],
+    "pouncedByPlayer": {
+      "advantagedIf": "stalk/focus mode OR player >1.5 above fox OR behind",
+      "behindTest": "cos(player.yaw - fox.facing) > 0.35",
+      "chanceAdvantaged": 0.7,
+      "chanceOtherwise": 0.18,
+      "fail": {
+        "attackCooldown": 0,
+        "message": "The fox dodged your attack!"
+      },
+      "maxDy": 2.2,
+      "radiusXZ": 1.75,
+      "success": {
+        "attackCooldown": 9,
+        "message": "FOX SURPRISED! +55 Power · 9 seconds to escape.",
+        "power": 55,
+        "stun": 9
+      }
+    },
+    "roam": {
+      "speed": 2,
+      "desiredHeading": "sin(phase*0.58) * 0.85 (absolute yaw)",
+      "turnRate": 1.5
+    },
+    "runtime": true,
+    "spawn": {
+      "x": 65,
+      "z": 313,
+      "y": 2.94
+    },
+    "tailWag": {
+      "amp": 0.17,
+      "freq": 7
+    },
+    "validTarget": "player not in sewer/hospital/duct/house interior AND player height above ground < 2.5",
+    "warning": {
+      "cooldown": 6,
+      "message": "FOX NEARBY · Keep your distance or escape into the trees!",
+      "radius": 6,
+      "seconds": 2.1
+    }
+  },
+  "gardens": {
+    "border": "#7f6141",
+    "fruitByKind": {
+      "0": "#7e314c",
+      "1": "#d94b36",
+      "2": ["#dd9a67", "#a7abc9", "#b47eb3"]
+    },
+    "lines": "12317-12346, 12750-12757",
+    "list": [
+      {
+        "kind": 0,
+        "y": 0,
+        "nominal": [67, 58],
+        "placed": [71.98, 62.02]
+      },
+      {
+        "kind": 1,
+        "y": 0.04,
+        "nominal": [-113, 72],
+        "placed": [-113, 72]
+      },
+      {
+        "kind": 2,
+        "y": 0.1,
+        "nominal": [107, 264],
+        "placed": [107, 264]
+      },
+      {
+        "kind": 1,
+        "y": 0.1,
+        "nominal": [-234, 96],
+        "placed": [-234, 96]
+      },
+      {
+        "kind": 0,
+        "y": 2.95,
+        "nominal": [221, 132],
+        "placed": [221, 132]
+      }
+    ],
+    "minRoad": 4.5,
+    "plants": "4 rows x 5",
+    "runtime": true,
+    "size": [5.8, 3.9],
+    "soil": "#55412e"
+  },
+  "handlerOrder": {
+    "interactE": ["hospital", "nut cache", "trash can", "...rest"],
+    "pounce": ["humans", "police", "fox", "deer", "rabbits", "normal squirrels"]
+  },
+  "insects": {
+    "butterfly": {
+      "body": "#4a4545",
+      "colorIndex": "(kind*4+i) % 5",
+      "colors": ["#e8bd51", "#a8c5f0", "#dd9dbb", "#ecd68c", "#bdc3d2"],
+      "heightAboveGround": 1.8,
+      "index": "kind*4 + i (per garden kind, i = 0..3; v4.1:12344)",
+      "initialPhase": "index*2.12",
+      "wingFlapMul": 4
+    },
+    "dragonfly": {
+      "body": "#315253",
+      "heightAboveGround": 2.1,
+      "index": "kind*3 + i (per garden kind, i = 0..1; v4.1:12345)",
+      "initialPhase": "index*1.31 + 0.9",
+      "wingColorRule": "index odd -> #c0dce4, even -> #adcbb8",
+      "wingColors": ["#adcbb8", "#c0dce4"],
+      "wingFlapMul": 10
+    },
+    "interactions": "none",
+    "lines": "12343-12392 (create), 12566-12575 (update)",
+    "list": [
+      {
+        "kind": "butterfly",
+        "x": 70.59,
+        "z": 61.02,
+        "y": 1.8
+      },
+      {
+        "kind": "butterfly",
+        "x": 72.71,
+        "z": 62.11,
+        "y": 1.8
+      },
+      {
+        "kind": "butterfly",
+        "x": 71.13,
+        "z": 60.85,
+        "y": 1.8
+      },
+      {
+        "kind": "butterfly",
+        "x": 73.32,
+        "z": 60.4,
+        "y": 1.8
+      },
+      {
+        "kind": "dragonfly",
+        "x": 72.91,
+        "z": 61.61,
+        "y": 2.1
+      },
+      {
+        "kind": "dragonfly",
+        "x": 71.92,
+        "z": 61.7,
+        "y": 2.1
+      },
+      {
+        "kind": "butterfly",
+        "x": -112.86,
+        "z": 71.56,
+        "y": 1.84
+      },
+      {
+        "kind": "butterfly",
+        "x": -113.87,
+        "z": 70.76,
+        "y": 1.85
+      },
+      {
+        "kind": "butterfly",
+        "x": -111.3,
+        "z": 73.65,
+        "y": 1.83
+      },
+      {
+        "kind": "butterfly",
+        "x": -112.81,
+        "z": 72.63,
+        "y": 1.84
+      },
+      {
+        "kind": "dragonfly",
+        "x": -113.67,
+        "z": 70.96,
+        "y": 2.14
+      },
+      {
+        "kind": "dragonfly",
+        "x": -113.3,
+        "z": 71.03,
+        "y": 2.14
+      },
+      {
+        "kind": "butterfly",
+        "x": 106.08,
+        "z": 264.52,
+        "y": 1.9
+      },
+      {
+        "kind": "butterfly",
+        "x": 106.93,
+        "z": 263.11,
+        "y": 1.9
+      },
+      {
+        "kind": "butterfly",
+        "x": 108.5,
+        "z": 265.61,
+        "y": 1.9
+      },
+      {
+        "kind": "butterfly",
+        "x": 107.95,
+        "z": 265.42,
+        "y": 1.9
+      },
+      {
+        "kind": "dragonfly",
+        "x": 106.94,
+        "z": 265.08,
+        "y": 2.2
+      },
+      {
+        "kind": "dragonfly",
+        "x": 105.56,
+        "z": 263.1,
+        "y": 2.2
+      },
+      {
+        "kind": "butterfly",
+        "x": -233.99,
+        "z": 94.86,
+        "y": 1.9
+      },
+      {
+        "kind": "butterfly",
+        "x": -234.25,
+        "z": 95.07,
+        "y": 1.9
+      },
+      {
+        "kind": "butterfly",
+        "x": -234.07,
+        "z": 95.43,
+        "y": 1.9
+      },
+      {
+        "kind": "butterfly",
+        "x": -234.16,
+        "z": 94.62,
+        "y": 1.9
+      },
+      {
+        "kind": "dragonfly",
+        "x": -234.72,
+        "z": 95.33,
+        "y": 2.2
+      },
+      {
+        "kind": "dragonfly",
+        "x": -232.21,
+        "z": 96.68,
+        "y": 2.2
+      },
+      {
+        "kind": "butterfly",
+        "x": 222.41,
+        "z": 133.04,
+        "y": 4.86
+      },
+      {
+        "kind": "butterfly",
+        "x": 221.19,
+        "z": 131.99,
+        "y": 4.77
+      },
+      {
+        "kind": "butterfly",
+        "x": 219.49,
+        "z": 131.65,
+        "y": 4.63
+      },
+      {
+        "kind": "butterfly",
+        "x": 223.01,
+        "z": 130.77,
+        "y": 4.94
+      },
+      {
+        "kind": "dragonfly",
+        "x": 221.92,
+        "z": 133.05,
+        "y": 5.12
+      },
+      {
+        "kind": "dragonfly",
+        "x": 219.34,
+        "z": 131.78,
+        "y": 4.91
+      }
+    ],
+    "motion": {
+      "x": "x0 + sin(phase*0.35)*0.65",
+      "z": "z0 + cos(phase*0.25)*0.53",
+      "y": "y0 + sin(phase*0.57)*0.48",
+      "phaseRate": 4,
+      "spin": "rotation.y = phase*0.17",
+      "wingAngle": "sin(phase*flapMul)*0.78"
+    },
+    "perGarden": {
+      "butterflies": 4,
+      "dragonflies": 2
+    },
+    "total": 30
+  },
+  "lifeSafeSpot": {
+    "bounds": {
+      "x": [-255, 252],
+      "z": [-240, 422]
+    },
+    "buildingMargin": 4,
+    "defaultMinRoad": 4,
+    "relocationSearch": {
+      "perRing": 20,
+      "ringAngleOffset": 0.34,
+      "ringStep": 3.2,
+      "rings": 12
+    }
+  },
+  "note": "Lost after v4.1. Code lines refer to reference/v4_1_game.js. Positions are after v4.1's lifeFindGrass relocation (runtime:true). check54 = validity of the same spot in the v5.4 world (headless).",
+  "nutCaches": {
+    "interact": {
+      "coins": "3 + (index % 3) * 2",
+      "key": "E",
+      "maxDy": 2.8,
+      "notIndoors": true,
+      "notOnRoute": true,
+      "oneTimePerRun": true,
+      "power": 5,
+      "radiusXZ": 2.85
+    },
+    "lines": "12266-12316, 12737-12749, hook 7613",
+    "list": [
+      {
+        "x": -78,
+        "z": -88,
+        "y": 0,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @39.18",
+          "safe": "ok"
+        },
+        "coins": 3,
+        "index": 0
+      },
+      {
+        "x": -111,
+        "z": 44,
+        "y": 0.02,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @31.22",
+          "safe": "ok"
+        },
+        "coins": 5,
+        "index": 1
+      },
+      {
+        "x": 61.67,
+        "z": 67.39,
+        "y": 0,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "RED MAPLE @43.36",
+          "safe": "ok"
+        },
+        "coins": 7,
+        "index": 2
+      },
+      {
+        "x": 97,
+        "z": 118,
+        "y": 0.27,
+        "check54": {
+          "blockedInV54": true,
+          "nearestTree": "neighborhood canopy @1.22",
+          "safe": "ok"
+        },
+        "coins": 3,
+        "index": 3,
+        "moved": {
+          "from": [93, 118],
+          "reason": "In the v5.4 world (93,118) is 1.2 units from the trunk of 'outer 24' and reports outdoorBlocked",
+          "to": [97, 118]
+        }
+      },
+      {
+        "x": -158,
+        "z": 116,
+        "y": 0.07,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @13.42",
+          "safe": "ok"
+        },
+        "coins": 5,
+        "index": 4
+      },
+      {
+        "x": -225,
+        "z": -103,
+        "y": 6.13,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @72.25",
+          "safe": "ok"
+        },
+        "coins": 7,
+        "index": 5
+      },
+      {
+        "x": -215,
+        "z": 265,
+        "y": 4.5,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @44.45",
+          "safe": "ok"
+        },
+        "coins": 3,
+        "index": 6
+      },
+      {
+        "x": -112,
+        "z": 386,
+        "y": 4.07,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @26.17",
+          "safe": "ok"
+        },
+        "coins": 5,
+        "index": 7
+      },
+      {
+        "x": 119,
+        "z": 326,
+        "y": 4.19,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @43.19",
+          "safe": "ok"
+        },
+        "coins": 7,
+        "index": 8
+      },
+      {
+        "x": 233,
+        "z": 205,
+        "y": 3.2,
+        "check54": {
+          "blockedInV54": false,
+          "nearestTree": "neighborhood canopy @20.71",
+          "safe": "ok"
+        },
+        "coins": 3,
+        "index": 9
+      }
+    ],
+    "message": "NUT CACHE {n}/10 FOUND · +{coins} Squirrel Coins · +5 Power",
+    "messageSeconds": 3.5,
+    "minRoad": 3.6,
+    "model": {
+      "acorns": "4 x r0.15 #a77b41 scale (0.85,1.45,0.85) at radius 0.38, y 0.34; hidden when found",
+      "lid": "r0.69 #6c8751 scale (1.05,0.25,1.0)",
+      "pebbles": "6 x r0.22 alternating #777b6e / #6c8751",
+      "rim": "cyl r0.89/1.1 h0.28 #5c4b35"
+    },
+    "nominal": [
+      [-78, -88],
+      [-111, 44],
+      [62, 61],
+      [93, 118],
+      [-158, 116],
+      [-225, -103],
+      [-215, 265],
+      [-112, 386],
+      [119, 326],
+      [233, 205]
+    ],
+    "runtime": true,
+    "sfx": [690, 0.14, "triangle", 0.023]
+  },
+  "scavengeTrashCans": {
+    "interact": {
+      "chance": 0.35,
+      "coins": "2 + (index % 4)",
+      "key": "E",
+      "maxDy": 2.6,
+      "notIndoors": true,
+      "notOnRoute": true,
+      "oneTimePerCan": true,
+      "radiusXZ": 2.5
+    },
+    "lines": "12410-12444, 12766-12775, hook 7614",
+    "list": [
+      {
+        "x": -71,
+        "z": 68,
+        "coins": 2,
+        "index": 0
+      },
+      {
+        "x": 53,
+        "z": -76,
+        "coins": 3,
+        "index": 1
+      },
+      {
+        "x": 221,
+        "z": 61,
+        "coins": 4,
+        "index": 2
+      },
+      {
+        "x": -238,
+        "z": 140,
+        "coins": 5,
+        "index": 3
+      },
+      {
+        "x": 107,
+        "z": 204,
+        "coins": 2,
+        "index": 4
+      },
+      {
+        "x": 134,
+        "z": 392,
+        "coins": 3,
+        "index": 5
+      }
+    ],
+    "messages": {
+      "hit": "TRASH CAN TREASURE! +{coins} Squirrel Coins",
+      "miss": "Nothing edible in this trash can. Keep searching."
+    },
+    "minRoad": 3.6,
+    "model": "cyl r0.59/0.48 h1.16 #64756b, lid #364a41, 6 ribs #899d90"
+  },
+  "src": "wildlife.json v41_restore (v4.1 L12233-12793; wildlife_foraging 11), nut cache 3 moved per proposals.nutCacheFix; HTML units (x 2.5 for studs)"
+}

@@ -1,0 +1,546 @@
+{
+  "$schema": "harvest/fauna v1",
+  "units": "HTML world units (1 u = 2.5 studs), +Y up, exactly as the page computed them",
+  "dogs": [
+    {
+      "body": {
+        "$object3d": "Group",
+        "position": [203,5.644914809234605,363],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 10
+      },
+      "x": 203,
+      "z": 363,
+      "yy": 5.644914809234605,
+      "i": 0,
+      "phase": 0,
+      "barkCooldown": 0
+    },
+    {
+      "body": {
+        "$object3d": "Group",
+        "position": [240,7.825461189871482,402],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 10
+      },
+      "x": 240,
+      "z": 402,
+      "yy": 7.825461189871482,
+      "i": 1,
+      "phase": 2.1,
+      "barkCooldown": 0
+    },
+    {
+      "body": {
+        "$object3d": "Group",
+        "position": [98,2.9876551771224444,311],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 10
+      },
+      "x": 98,
+      "z": 311,
+      "yy": 2.9876551771224444,
+      "i": 2,
+      "phase": 4.2,
+      "barkCooldown": 0
+    },
+    {
+      "body": {
+        "$object3d": "Group",
+        "position": [55,3.125585837680627,345],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 10
+      },
+      "x": 55,
+      "z": 345,
+      "yy": 3.125585837680627,
+      "i": 3,
+      "phase": 6.300000000000001,
+      "barkCooldown": 0
+    }
+  ],
+  "yardCats": [
+    {
+      "root": {
+        "$object3d": "Group",
+        "position": [-45,0.11,-76],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 14
+      },
+      "tail": {
+        "$object3d": "Group",
+        "position": [0,0.64,-0.8],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "x": -45,
+      "z": -76,
+      "phase": 0,
+      "home": [-45,0,-76],
+      "state": "wander",
+      "windup": 0,
+      "hitCooldown": 0,
+      "voiceCooldown": 0,
+      "target": null
+    },
+    {
+      "root": {
+        "$object3d": "Group",
+        "position": [48,0.11,79],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 14
+      },
+      "tail": {
+        "$object3d": "Group",
+        "position": [0,0.64,-0.8],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "x": 48,
+      "z": 79,
+      "phase": 2.83,
+      "home": [48,0,79],
+      "state": "wander",
+      "windup": 0,
+      "hitCooldown": 0,
+      "voiceCooldown": 0,
+      "target": null
+    },
+    {
+      "root": {
+        "$object3d": "Group",
+        "position": [40,0.11,-79],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 14
+      },
+      "tail": {
+        "$object3d": "Group",
+        "position": [0,0.64,-0.8],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "x": 40,
+      "z": -79,
+      "phase": 5.66,
+      "home": [40,0,-79],
+      "state": "wander",
+      "windup": 0,
+      "hitCooldown": 0,
+      "voiceCooldown": 0,
+      "target": null
+    }
+  ],
+  "chainedDogs": [
+    {
+      "g": {
+        "$object3d": "Group",
+        "position": [-403,3.924267582276558,-206],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 8
+      },
+      "x": -403,
+      "z": -206,
+      "phase": 0,
+      "radius": 3.4,
+      "leash": {
+        "$object3d": "Mesh",
+        "position": [-401,4.607494480926471,-205],
+        "rotationY": -0.45403646908699685,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "stake": [-399,4.390721379576383,-204],
+      "chainOriginal": 4.47213595499958
+    },
+    {
+      "g": {
+        "$object3d": "Group",
+        "position": [-404,2.9738557393960594,-75],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 8
+      },
+      "x": -404,
+      "z": -75,
+      "phase": 0.7,
+      "radius": 3.4,
+      "leash": {
+        "$object3d": "Mesh",
+        "position": [-402,3.540984367352287,-74],
+        "rotationY": -0.4767531653442307,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "stake": [-400,3.208112995308515,-73],
+      "chainOriginal": 4.47213595499958
+    },
+    {
+      "g": {
+        "$object3d": "Group",
+        "position": [-418,6.215040166365617,63],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 8
+      },
+      "x": -418,
+      "z": 63,
+      "phase": 1.4,
+      "radius": 3.4,
+      "leash": {
+        "$object3d": "Mesh",
+        "position": [-416,6.809506287270555,64],
+        "rotationY": -0.47142059111854473,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "stake": [-414,6.503972408175492,65],
+      "chainOriginal": 4.47213595499958
+    },
+    {
+      "g": {
+        "$object3d": "Group",
+        "position": [-403,7.62821505086204,134],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 8
+      },
+      "x": -403,
+      "z": 134,
+      "phase": 2.0999999999999996,
+      "radius": 3.4,
+      "leash": {
+        "$object3d": "Mesh",
+        "position": [-401,8.051597143358554,135],
+        "rotationY": -0.5045194168493605,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 0
+      },
+      "stake": [-399,7.574979235855069,136],
+      "chainOriginal": 4.47213595499958
+    }
+  ],
+  "normalSquirrels": [
+    {
+      "i": 0,
+      "root": {
+        "$object3d": "Group",
+        "position": [-74,-0.135,-71],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 11
+      },
+      "torso": {
+        "$object3d": "Mesh",
+        "position": [0,0.27,0],
+        "rotationY": 0,
+        "scale": [0.72,0.68,1.35],
+        "visible": true,
+        "children": 0
+      },
+      "tail": {
+        "$object3d": "Mesh",
+        "position": [0,0.71,-0.48],
+        "rotationY": 0,
+        "scale": [0.46,1.7,0.5],
+        "visible": true,
+        "children": 0
+      },
+      "x": -74,
+      "z": -71,
+      "phase": 0,
+      "infected": false,
+      "progress": 0,
+      "component": 0
+    },
+    {
+      "i": 1,
+      "root": {
+        "$object3d": "Group",
+        "position": [84,-0.135,70],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 11
+      },
+      "torso": {
+        "$object3d": "Mesh",
+        "position": [0,0.27,0],
+        "rotationY": 0,
+        "scale": [0.72,0.68,1.35],
+        "visible": true,
+        "children": 0
+      },
+      "tail": {
+        "$object3d": "Mesh",
+        "position": [0,0.71,-0.48],
+        "rotationY": 0,
+        "scale": [0.46,1.7,0.5],
+        "visible": true,
+        "children": 0
+      },
+      "x": 84,
+      "z": 70,
+      "phase": 1.7,
+      "infected": false,
+      "progress": 0,
+      "component": 0
+    },
+    {
+      "i": 2,
+      "root": {
+        "$object3d": "Group",
+        "position": [-196,-0.03499999999999999,97],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 11
+      },
+      "torso": {
+        "$object3d": "Mesh",
+        "position": [0,0.27,0],
+        "rotationY": 0,
+        "scale": [0.72,0.68,1.35],
+        "visible": true,
+        "children": 0
+      },
+      "tail": {
+        "$object3d": "Mesh",
+        "position": [0,0.71,-0.48],
+        "rotationY": 0,
+        "scale": [0.46,1.7,0.5],
+        "visible": true,
+        "children": 0
+      },
+      "x": -196,
+      "z": 97,
+      "phase": 3.4,
+      "infected": false,
+      "progress": 0,
+      "component": 0
+    },
+    {
+      "i": 3,
+      "root": {
+        "$object3d": "Group",
+        "position": [217,0.3663871333944708,-111],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 11
+      },
+      "torso": {
+        "$object3d": "Mesh",
+        "position": [0,0.27,0],
+        "rotationY": 0,
+        "scale": [0.72,0.68,1.35],
+        "visible": true,
+        "children": 0
+      },
+      "tail": {
+        "$object3d": "Mesh",
+        "position": [0,0.71,-0.48],
+        "rotationY": 0,
+        "scale": [0.46,1.7,0.5],
+        "visible": true,
+        "children": 0
+      },
+      "x": 217,
+      "z": -111,
+      "phase": 5.1,
+      "infected": false,
+      "progress": 0,
+      "component": 0
+    },
+    {
+      "i": 4,
+      "root": {
+        "$object3d": "Group",
+        "position": [-105,7.313030501797097,321],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 11
+      },
+      "torso": {
+        "$object3d": "Mesh",
+        "position": [0,0.27,0],
+        "rotationY": 0,
+        "scale": [0.72,0.68,1.35],
+        "visible": true,
+        "children": 0
+      },
+      "tail": {
+        "$object3d": "Mesh",
+        "position": [0,0.71,-0.48],
+        "rotationY": 0,
+        "scale": [0.46,1.7,0.5],
+        "visible": true,
+        "children": 0
+      },
+      "x": -105,
+      "z": 321,
+      "phase": 6.8,
+      "infected": false,
+      "progress": 0,
+      "component": 0
+    },
+    {
+      "i": 5,
+      "root": {
+        "$object3d": "Group",
+        "position": [103,3.8076370216687567,409],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 11
+      },
+      "torso": {
+        "$object3d": "Mesh",
+        "position": [0,0.27,0],
+        "rotationY": 0,
+        "scale": [0.72,0.68,1.35],
+        "visible": true,
+        "children": 0
+      },
+      "tail": {
+        "$object3d": "Mesh",
+        "position": [0,0.71,-0.48],
+        "rotationY": 0,
+        "scale": [0.46,1.7,0.5],
+        "visible": true,
+        "children": 0
+      },
+      "x": 103,
+      "z": 409,
+      "phase": 8.5,
+      "infected": false,
+      "progress": 0,
+      "component": 0
+    },
+    {
+      "i": 6,
+      "root": {
+        "$object3d": "Group",
+        "position": [414,-0.03499999999999999,332],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 11
+      },
+      "torso": {
+        "$object3d": "Mesh",
+        "position": [0,0.27,0],
+        "rotationY": 0,
+        "scale": [0.72,0.68,1.35],
+        "visible": true,
+        "children": 0
+      },
+      "tail": {
+        "$object3d": "Mesh",
+        "position": [0,0.71,-0.48],
+        "rotationY": 0,
+        "scale": [0.46,1.7,0.5],
+        "visible": true,
+        "children": 0
+      },
+      "x": 414,
+      "z": 332,
+      "phase": 10.2,
+      "infected": false,
+      "progress": 0,
+      "component": 0
+    }
+  ],
+  "rabbits": [
+    {
+      "root": {
+        "$object3d": "Group",
+        "position": [-64,0.1,93],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      },
+      "x": -64,
+      "z": 93,
+      "i": 0,
+      "phase": 0,
+      "escapeUntil": 0
+    },
+    {
+      "root": {
+        "$object3d": "Group",
+        "position": [72,0.1,96],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      },
+      "x": 72,
+      "z": 96,
+      "i": 1,
+      "phase": 1.4,
+      "escapeUntil": 0
+    },
+    {
+      "root": {
+        "$object3d": "Group",
+        "position": [-97,0.1,-70],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      },
+      "x": -97,
+      "z": -70,
+      "i": 2,
+      "phase": 2.8,
+      "escapeUntil": 0
+    },
+    {
+      "root": {
+        "$object3d": "Group",
+        "position": [206,4.185746086414277,325],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      },
+      "x": 206,
+      "z": 325,
+      "i": 3,
+      "phase": 4.199999999999999,
+      "escapeUntil": 0
+    }
+  ]
+}

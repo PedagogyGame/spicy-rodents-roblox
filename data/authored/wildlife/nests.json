@@ -1,0 +1,236 @@
+{
+  "$schema": "../../schema/wildlife_nests.schema.json",
+  "count": 24,
+  "birds": {
+    "flocks": {
+      "count": 5,
+      "anchors": [
+        {
+          "x": -42,
+          "z": 42,
+          "y": 44
+        },
+        {
+          "x": 50,
+          "z": 345,
+          "y": 48
+        },
+        {
+          "x": 460,
+          "z": 95,
+          "y": 46
+        },
+        {
+          "x": 782,
+          "z": 125,
+          "y": 49
+        },
+        {
+          "x": 998,
+          "z": 110,
+          "y": 53
+        }
+      ],
+      "angularSpeed": 0.095,
+      "bank": -0.17,
+      "birdsPerFlock": 4,
+      "bob": 2.5,
+      "colors": ["#536b7a", "#785d43", "#4d5350"],
+      "offsetPerBird": 0.38,
+      "radius": "24 + 2*flock",
+      "scale": "1 + U(-0.1,0.15)",
+      "zSquash": 0.7
+    },
+    "interactions": "none (no collision, no reaction to squirrels)",
+    "lines": "15330-15384 (model), 15435-15506 (populate/update)",
+    "model": {
+      "beak": "#c3a564",
+      "belly": "#d4c9a7",
+      "body": "sphere r0.19 scale (0.85,1,1.8)",
+      "dark": "#34413d",
+      "head": "r0.15",
+      "wingSpanEach": 0.96
+    },
+    "nestBirds": {
+      "count": 12,
+      "colors": ["#8f4d35", "#536b7a", "#64594c"],
+      "cycleOffset": "U(0,36)",
+      "cycleSeconds": 48,
+      "everyOtherNest": true,
+      "flySeconds": 36,
+      "loopHeight": "20*sin(u*pi)^0.7",
+      "loopRadius": "15 + 12*sin(u*pi)",
+      "perchOffset": [0.28, 0.35, 0.08],
+      "perchSeconds": 12,
+      "scale": 0.75,
+      "zSquash": 0.55
+    },
+    "total": 32,
+    "visibility": {
+      "hiddenIndoors": true,
+      "nestRadius": 165,
+      "performanceTierEveryOther": true,
+      "radius": 210
+    },
+    "wingFlap": {
+      "amp": 0.55,
+      "bias": 0.1,
+      "folded": 1.1,
+      "freq": 10
+    }
+  },
+  "bowl": "#5c4934",
+  "eggColors": ["#c7d8cc", "#e4d7b9"],
+  "eggs": 3,
+  "nests": [
+    {
+      "x": -26.39,
+      "z": -34.37,
+      "y": 17.57,
+      "route": "BUR OAK bough 1"
+    },
+    {
+      "x": 34.51,
+      "z": 28.37,
+      "y": 19.06,
+      "route": "RED MAPLE bough 8"
+    },
+    {
+      "x": -29.26,
+      "z": -200.6,
+      "y": 22.95,
+      "route": "outer 4 bough 2"
+    },
+    {
+      "x": 228.84,
+      "z": -211.4,
+      "y": 30.36,
+      "route": "outer 8 bough 5"
+    },
+    {
+      "x": 243.65,
+      "z": 224.96,
+      "y": 23.46,
+      "route": "outer 13 bough 0"
+    },
+    {
+      "x": -230.53,
+      "z": 226.53,
+      "y": 25.16,
+      "route": "outer 17 bough 1"
+    },
+    {
+      "x": -98.11,
+      "z": 125.09,
+      "y": 25.85,
+      "route": "outer 21 bough 2"
+    },
+    {
+      "x": -244.88,
+      "z": -234.82,
+      "y": 23.78,
+      "route": "outer 25 bough 2"
+    },
+    {
+      "x": 95.55,
+      "z": -242.7,
+      "y": 26.31,
+      "route": "outer 29 bough 6"
+    },
+    {
+      "x": -225.9,
+      "z": 129.26,
+      "y": 26.8,
+      "route": "outer 34 bough 1"
+    },
+    {
+      "x": 207.49,
+      "z": -95.89,
+      "y": 49.96,
+      "route": "OLD WATCH SYCAMORE high lookout bough 3"
+    },
+    {
+      "x": -219.66,
+      "z": 361.37,
+      "y": 22.86,
+      "route": "outer 90 bough 1"
+    },
+    {
+      "x": 9.63,
+      "z": 394.84,
+      "y": 20.93,
+      "route": "outer 94 bough 5"
+    },
+    {
+      "x": 329.94,
+      "z": -25.83,
+      "y": 18.49,
+      "route": "Shop Oak A bough 9"
+    },
+    {
+      "x": 465.52,
+      "z": 36.43,
+      "y": 16.58,
+      "route": "Pump Elm bough 4"
+    },
+    {
+      "x": 229.95,
+      "z": -347.59,
+      "y": 24.36,
+      "route": "Estate Sycamore South bough 1"
+    },
+    {
+      "x": 374.54,
+      "z": -351.47,
+      "y": 19.05,
+      "route": "Villa Oak South bough 6"
+    },
+    {
+      "x": -142.53,
+      "z": 150.24,
+      "y": 26.3,
+      "route": "Treehouse Oak bough 10"
+    },
+    {
+      "x": -393.16,
+      "z": -121.96,
+      "y": 33.78,
+      "route": "Westside 2 shade oak bough 9"
+    },
+    {
+      "x": -390.5,
+      "z": 95.52,
+      "y": 30.61,
+      "route": "Westside 5 shade oak bough 11"
+    },
+    {
+      "x": -326.59,
+      "z": 4.62,
+      "y": 23.83,
+      "route": "Westside street elm 2 bough 5"
+    },
+    {
+      "x": 1005.41,
+      "z": 74.21,
+      "y": 23.44,
+      "route": "QUAY WILLOW bough 6"
+    },
+    {
+      "x": -21.72,
+      "z": 80.43,
+      "y": 6.36,
+      "route": "APPLE 3 bough 1"
+    },
+    {
+      "x": 39.93,
+      "z": 409.95,
+      "y": 6.97,
+      "route": "APPLE 8 bough 1"
+    }
+  ],
+  "rim": "#8b7048",
+  "routeT": 0.66,
+  "src": "wildlife.json v54.nests + v54.birds (v5.4 L15330-15506; wildlife_foraging 8); HTML units (x 2.5 for studs)",
+  "yOffset": 0.48,
+  "yOffsetApple": 0.3
+}

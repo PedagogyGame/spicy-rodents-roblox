@@ -1,0 +1,339 @@
+{
+  "$schema": "../../schema/wildlife_forage_v54.schema.json",
+  "birdFeeders": {
+    "lines": "3121-3129, 3243-3249",
+    "list": [
+      {
+        "type": "bird feeder",
+        "x": -198,
+        "z": 49,
+        "y": 0.1,
+        "v": 0
+      },
+      {
+        "type": "bird feeder",
+        "x": 50,
+        "z": -221,
+        "y": 4.28,
+        "v": 1
+      }
+    ],
+    "model": "post 4.8 high, 1.9 tray at 3.7, red cone roof",
+    "runtime": true
+  },
+  "compostBins": {
+    "list": [
+      {
+        "type": "compost bin",
+        "x": 227,
+        "z": -70,
+        "y": 0.1,
+        "v": 1
+      },
+      {
+        "type": "compost bin",
+        "x": -74,
+        "z": 200,
+        "y": 5.51,
+        "v": 2
+      }
+    ],
+    "runtime": true
+  },
+  "coreYardBins": {
+    "y": 0.62,
+    "colors": ["#285b4a", "#3a5366", "#555850"],
+    "lines": "1487-1492",
+    "list": [
+      [-74, -76],
+      [71, -76],
+      [-74, 77],
+      [71, 77]
+    ],
+    "size": "cyl r0.6 h1.1"
+  },
+  "gardenPlots": {
+    "border": "#6f5339",
+    "lines": "12619-12650, 12781-12784",
+    "list": [
+      {
+        "x": -36,
+        "z": 52,
+        "d": 4,
+        "plantColor": "#5d9c41",
+        "variant": 0,
+        "w": 7
+      },
+      {
+        "x": 116,
+        "z": -24,
+        "d": 4.5,
+        "plantColor": "#c94f2d",
+        "variant": 1,
+        "w": 6.5
+      },
+      {
+        "x": -104,
+        "z": -18,
+        "d": 3.8,
+        "plantColor": "#7bbf53",
+        "variant": 2,
+        "w": 7.5
+      }
+    ],
+    "note": "root placed at y=0 (not terrain-following)",
+    "soil": "#7a5132"
+  },
+  "gasStationWasteContainer": {
+    "x": 535,
+    "z": 93,
+    "color": "#61756a",
+    "lines": "897-901",
+    "size": [2.3, 2.8, 2]
+  },
+  "hedgePatches": {
+    "blindBox": "|dx| < length/2 + 1.8 and |dz| < height + 1.1, moveSpeed < 3.4 (7036-7042)",
+    "effectiveInV54": [true, false, false, false, false],
+    "fields": "x,z,length,height",
+    "lines": "3573-3586",
+    "list": [
+      [125, 303, 14, 2.3],
+      [118, 372, 11, 3],
+      [-104, 305, 18, 2.4],
+      [290, 306, 22, 2.6],
+      [613, 421, 15, 2.2]
+    ],
+    "maxPlayerY": 2.8,
+    "note": "Verifier: only hedge (125,303) has ground (2.0-2.7) below the absolute 2.8 limit; the other four sit on ground 3.5-7.7 and never conceal.",
+    "yIsAbsoluteWorldY": true
+  },
+  "mallPlaza": {
+    "y": 8.12,
+    "bounds": {
+      "x": [1061, 1145],
+      "z": [234, 415]
+    },
+    "fountain": [1102, 252],
+    "lines": "14984-15001, 14191-14203",
+    "mall": {
+      "x": 1102,
+      "z": 338,
+      "d": 108,
+      "floor": 8.14,
+      "w": 78
+    }
+  },
+  "note": "In v5.4 none of these objects can be eaten or interacted with; they are set dressing. The Tabasco garden hides one chili spot and is meant to conceal the squirrel, but its concealment test never fires (see tabascoGarden.concealment).",
+  "oldHouseBins": {
+    "lines": "9948-9956",
+    "list": [
+      {
+        "x": -383.5,
+        "z": -232,
+        "color": "#686a61",
+        "house": 0,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -356.5,
+        "z": -232,
+        "color": "#686a61",
+        "house": 0,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -379.5,
+        "z": -171,
+        "color": "#686a61",
+        "house": 1,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -350.5,
+        "z": -171,
+        "color": "#686a61",
+        "house": 1,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -375.5,
+        "z": -110,
+        "color": "#686a61",
+        "house": 2,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -344.5,
+        "z": -110,
+        "color": "#686a61",
+        "house": 2,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -383.5,
+        "z": -49,
+        "color": "#686a61",
+        "house": 3,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -356.5,
+        "z": -49,
+        "color": "#686a61",
+        "house": 3,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -379.5,
+        "z": 12,
+        "color": "#686a61",
+        "house": 4,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -350.5,
+        "z": 12,
+        "color": "#686a61",
+        "house": 4,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -375.5,
+        "z": 73,
+        "color": "#686a61",
+        "house": 5,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -344.5,
+        "z": 73,
+        "color": "#686a61",
+        "house": 5,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -383.5,
+        "z": 134,
+        "color": "#686a61",
+        "house": 6,
+        "size": [0.75, 1.35, 0.85]
+      },
+      {
+        "x": -356.5,
+        "z": 134,
+        "color": "#686a61",
+        "house": 6,
+        "size": [0.75, 1.35, 0.85]
+      }
+    ]
+  },
+  "restaurants": {
+    "list": [
+      {
+        "name": "Chili's-style restaurant",
+        "footprint": [52, 31],
+        "center": [474, -82],
+        "frontFaces": "+Z",
+        "proposedDumpster": [474, -101]
+      },
+      {
+        "name": "Ice cream (standalone)",
+        "center": [152, 56],
+        "proposedDumpster": [152, 66]
+      },
+      {
+        "name": "Ice cream (strip)",
+        "center": [-154, -66],
+        "proposedDumpster": [-154, -76]
+      },
+      {
+        "name": "Corner shops / diner",
+        "footprint": [36, 28],
+        "center": [605, -94]
+      },
+      {
+        "name": "Copper Cup Cafe (Galleria)",
+        "note": "mall shop, east side slot 2"
+      }
+    ],
+    "note": "No dumpsters exist in v5.4. Proposed dumpster spots were checked clear of pavement/solids in a headless run."
+  },
+  "src": "wildlife.json v54.forage (wildlife_foraging 10); HTML units (x 2.5 for studs)",
+  "tabascoGarden": {
+    "beds": "4 earth tiles 4.5x24 at x=102+6.2*col",
+    "cabbages": 14,
+    "center": [115, 341],
+    "concealment": {
+      "effectiveInV54": false,
+      "halfX": 27,
+      "halfZ": 15,
+      "maxMoveSpeed": 3.4,
+      "maxY": 2.4,
+      "note": "Verifier: the test is player.pos.y < 2.4 (world y, 7035), but the ground inside |dx|<27,|dz|<15 is 3.9-5.7, so it can never trigger for a squirrel on the ground. Rebuild as height above ground.",
+      "terrainRangeInBox": [3.94, 5.66],
+      "yIsAbsoluteWorldY": true
+    },
+    "corn": 16,
+    "groundY": 5.1,
+    "lines": "3589-3655, 7034-7042",
+    "sign": "TABASCO GARDEN",
+    "tabascoPlants": 9,
+    "wheelbarrowPerch": [139, 342]
+  },
+  "trashCans": {
+    "lines": "3085-3091, 3256-3257, 3450-3455",
+    "list": [
+      {
+        "type": "trash can",
+        "x": 150,
+        "z": -220,
+        "y": 7.88,
+        "v": 2
+      },
+      {
+        "type": "trash can",
+        "x": 120,
+        "z": 194,
+        "y": 0.1,
+        "v": 3
+      },
+      {
+        "type": "trash can",
+        "x": 538,
+        "z": -38,
+        "y": 4.86,
+        "v": 2
+      },
+      {
+        "type": "trash can",
+        "x": 419,
+        "z": 77,
+        "y": 4.35,
+        "v": 3
+      },
+      {
+        "type": "trash can",
+        "x": -201,
+        "z": 331,
+        "y": 2.83,
+        "v": 2
+      },
+      {
+        "type": "trash can",
+        "x": -30,
+        "z": 405,
+        "y": 0.8,
+        "v": 0
+      },
+      {
+        "type": "trash can",
+        "x": 82,
+        "z": 311,
+        "y": 2.93,
+        "v": 3
+      }
+    ],
+    "model": "cyl r0.72/0.62 h1.58, lid r0.78",
+    "runtime": true
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "$schema": "../../schema/wildlife_apple_trees.schema.json",
+  "count": 12,
+  "appleTrees": [
+    {
+      "name": "APPLE 1",
+      "x": -84,
+      "z": -24,
+      "H": 9.68,
+      "base": 0
+    },
+    {
+      "name": "APPLE 2",
+      "x": -24,
+      "z": -84,
+      "H": 8.53,
+      "base": 0
+    },
+    {
+      "name": "APPLE 3",
+      "x": -24,
+      "z": 80,
+      "H": 9.6,
+      "base": 0
+    },
+    {
+      "name": "APPLE 4",
+      "x": 80,
+      "z": 24,
+      "H": 9.35,
+      "base": 0
+    },
+    {
+      "name": "APPLE 5",
+      "x": -85,
+      "z": 352,
+      "H": 9.45,
+      "base": 6.43
+    },
+    {
+      "name": "APPLE 6",
+      "x": -58,
+      "z": 382,
+      "H": 8.96,
+      "base": 3.24
+    },
+    {
+      "name": "APPLE 7",
+      "x": -28,
+      "z": 399,
+      "H": 9.37,
+      "base": 1
+    },
+    {
+      "name": "APPLE 8",
+      "x": 38,
+      "z": 410,
+      "H": 8.85,
+      "base": 1.16
+    },
+    {
+      "name": "APPLE 9",
+      "x": 988,
+      "z": -214,
+      "H": 9.01,
+      "base": 8
+    },
+    {
+      "name": "APPLE 10",
+      "x": 1018,
+      "z": -214,
+      "H": 9.21,
+      "base": 8
+    },
+    {
+      "name": "APPLE 11",
+      "x": 1048,
+      "z": -214,
+      "H": 9.66,
+      "base": 8
+    },
+    {
+      "name": "APPLE 12",
+      "x": 1078,
+      "z": -214,
+      "H": 8.68,
+      "base": 8
+    }
+  ],
+  "candidateSectors": [
+    [
+      [-84, -24],
+      [-24, -84],
+      [-24, 80],
+      [80, 24],
+      [-94, 24],
+      [24, -94],
+      [94, -24],
+      [24, 94],
+      [-102, 42],
+      [42, 103],
+      [-110, -45],
+      [110, 43]
+    ],
+    [
+      [-85, 352],
+      [-58, 382],
+      [-28, 399],
+      [12, 381],
+      [38, 410],
+      [-97, 414],
+      [-117, 345],
+      [86, 402],
+      [123, 414],
+      [142, 348],
+      [-82, 296],
+      [-108, 282]
+    ],
+    [
+      [988, -214],
+      [1018, -214],
+      [1048, -214],
+      [1078, -214],
+      [1108, -214],
+      [1078, -187],
+      [1108, -182],
+      [1039, 405],
+      [1051, 362],
+      [733, 373]
+    ]
+  ],
+  "collectible": false,
+  "fallbackRow": {
+    "z": [-226, -192],
+    "xFrom": 982,
+    "xStep": 24,
+    "xTo": 1120
+  },
+  "model": {
+    "H": "8.8 + U(-0.5,1.0)",
+    "appleRadius": 0.205,
+    "boughReach": [3.7, 5],
+    "boughs": 6,
+    "fallenApples": 5,
+    "fallenRing": [2.2, 4.2],
+    "fruitColors": ["#bf3e30", "#d5b54b"],
+    "fruitHanging": 40,
+    "leaves": "3 x 230 instanced, colours #617f3c #829e4d #4e7138",
+    "routes": "trunk (surfaceRadius 0.5) + 6 'bough' branch routes (visualOffset 0.3)",
+    "trunkRadius": [0.58, 0.45],
+    "twigsPerBough": 3,
+    "wood": "#766047"
+  },
+  "perSectorMax": 4,
+  "rejectedCandidates": [
+    {
+      "x": 12,
+      "z": 381,
+      "reason": "within 15 of park tree (14,395)"
+    }
+  ],
+  "selectionNote": "Verifier: sectors 1 and 3 use their first four candidates. In sector 2 candidate (12,381) is rejected (14.1 from park tree (14,395), inside the 15-unit tree clearance), so the fifth candidate (38,410) becomes APPLE 8. The fallback row is not used.",
+  "siteClear": {
+    "commercialMargin": 10,
+    "hospitalMargin": 15,
+    "houseMargin": 9,
+    "mallMargin": 14,
+    "oldHomeMargin": 9,
+    "otherTree": 15,
+    "pavement": 8,
+    "riverBuilding": 24,
+    "solidProbeGrid": "3x3 at 3-unit spacing",
+    "utilitySupport": 8
+  },
+  "src": "wildlife.json v54.appleTrees (v5.4 L15131-15329; wildlife_foraging 7); HTML units (x 2.5 for studs)"
+}

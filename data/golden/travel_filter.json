@@ -1,0 +1,367 @@
+{
+  "$schema": "golden/travel_filter v1",
+  "source": "finishTrafficFrame L15870-15897: skip when travel < 1e-5 or travel > max(12, dt*80 + 2) (dt is already capped at 0.08 by tick L16007)",
+  "count": 72,
+  "cases": [
+    {
+      "travel": 0,
+      "dt": 0.016666666666666666,
+      "skip": true
+    },
+    {
+      "travel": 0.000005,
+      "dt": 0.016666666666666666,
+      "skip": true
+    },
+    {
+      "travel": 0.00001,
+      "dt": 0.016666666666666666,
+      "skip": false
+    },
+    {
+      "travel": 0.000011,
+      "dt": 0.016666666666666666,
+      "skip": false
+    },
+    {
+      "travel": 0.29,
+      "dt": 0.016666666666666666,
+      "skip": false
+    },
+    {
+      "travel": 1,
+      "dt": 0.016666666666666666,
+      "skip": false
+    },
+    {
+      "travel": 11.99,
+      "dt": 0.016666666666666666,
+      "skip": false
+    },
+    {
+      "travel": 12,
+      "dt": 0.016666666666666666,
+      "skip": false
+    },
+    {
+      "travel": 12.01,
+      "dt": 0.016666666666666666,
+      "skip": true
+    },
+    {
+      "travel": 18,
+      "dt": 0.016666666666666666,
+      "skip": true
+    },
+    {
+      "travel": 19.5,
+      "dt": 0.016666666666666666,
+      "skip": true
+    },
+    {
+      "travel": 30,
+      "dt": 0.016666666666666666,
+      "skip": true
+    },
+    {
+      "travel": 0,
+      "dt": 0.03333333333333333,
+      "skip": true
+    },
+    {
+      "travel": 0.000005,
+      "dt": 0.03333333333333333,
+      "skip": true
+    },
+    {
+      "travel": 0.00001,
+      "dt": 0.03333333333333333,
+      "skip": false
+    },
+    {
+      "travel": 0.000011,
+      "dt": 0.03333333333333333,
+      "skip": false
+    },
+    {
+      "travel": 0.29,
+      "dt": 0.03333333333333333,
+      "skip": false
+    },
+    {
+      "travel": 1,
+      "dt": 0.03333333333333333,
+      "skip": false
+    },
+    {
+      "travel": 11.99,
+      "dt": 0.03333333333333333,
+      "skip": false
+    },
+    {
+      "travel": 12,
+      "dt": 0.03333333333333333,
+      "skip": false
+    },
+    {
+      "travel": 12.01,
+      "dt": 0.03333333333333333,
+      "skip": true
+    },
+    {
+      "travel": 18,
+      "dt": 0.03333333333333333,
+      "skip": true
+    },
+    {
+      "travel": 19.5,
+      "dt": 0.03333333333333333,
+      "skip": true
+    },
+    {
+      "travel": 30,
+      "dt": 0.03333333333333333,
+      "skip": true
+    },
+    {
+      "travel": 0,
+      "dt": 0.05,
+      "skip": true
+    },
+    {
+      "travel": 0.000005,
+      "dt": 0.05,
+      "skip": true
+    },
+    {
+      "travel": 0.00001,
+      "dt": 0.05,
+      "skip": false
+    },
+    {
+      "travel": 0.000011,
+      "dt": 0.05,
+      "skip": false
+    },
+    {
+      "travel": 0.29,
+      "dt": 0.05,
+      "skip": false
+    },
+    {
+      "travel": 1,
+      "dt": 0.05,
+      "skip": false
+    },
+    {
+      "travel": 11.99,
+      "dt": 0.05,
+      "skip": false
+    },
+    {
+      "travel": 12,
+      "dt": 0.05,
+      "skip": false
+    },
+    {
+      "travel": 12.01,
+      "dt": 0.05,
+      "skip": true
+    },
+    {
+      "travel": 18,
+      "dt": 0.05,
+      "skip": true
+    },
+    {
+      "travel": 19.5,
+      "dt": 0.05,
+      "skip": true
+    },
+    {
+      "travel": 30,
+      "dt": 0.05,
+      "skip": true
+    },
+    {
+      "travel": 0,
+      "dt": 0.08,
+      "skip": true
+    },
+    {
+      "travel": 0.000005,
+      "dt": 0.08,
+      "skip": true
+    },
+    {
+      "travel": 0.00001,
+      "dt": 0.08,
+      "skip": false
+    },
+    {
+      "travel": 0.000011,
+      "dt": 0.08,
+      "skip": false
+    },
+    {
+      "travel": 0.29,
+      "dt": 0.08,
+      "skip": false
+    },
+    {
+      "travel": 1,
+      "dt": 0.08,
+      "skip": false
+    },
+    {
+      "travel": 11.99,
+      "dt": 0.08,
+      "skip": false
+    },
+    {
+      "travel": 12,
+      "dt": 0.08,
+      "skip": false
+    },
+    {
+      "travel": 12.01,
+      "dt": 0.08,
+      "skip": true
+    },
+    {
+      "travel": 18,
+      "dt": 0.08,
+      "skip": true
+    },
+    {
+      "travel": 19.5,
+      "dt": 0.08,
+      "skip": true
+    },
+    {
+      "travel": 30,
+      "dt": 0.08,
+      "skip": true
+    },
+    {
+      "travel": 0,
+      "dt": 0.1,
+      "skip": true
+    },
+    {
+      "travel": 0.000005,
+      "dt": 0.1,
+      "skip": true
+    },
+    {
+      "travel": 0.00001,
+      "dt": 0.1,
+      "skip": false
+    },
+    {
+      "travel": 0.000011,
+      "dt": 0.1,
+      "skip": false
+    },
+    {
+      "travel": 0.29,
+      "dt": 0.1,
+      "skip": false
+    },
+    {
+      "travel": 1,
+      "dt": 0.1,
+      "skip": false
+    },
+    {
+      "travel": 11.99,
+      "dt": 0.1,
+      "skip": false
+    },
+    {
+      "travel": 12,
+      "dt": 0.1,
+      "skip": false
+    },
+    {
+      "travel": 12.01,
+      "dt": 0.1,
+      "skip": true
+    },
+    {
+      "travel": 18,
+      "dt": 0.1,
+      "skip": true
+    },
+    {
+      "travel": 19.5,
+      "dt": 0.1,
+      "skip": true
+    },
+    {
+      "travel": 30,
+      "dt": 0.1,
+      "skip": true
+    },
+    {
+      "travel": 0,
+      "dt": 0.2,
+      "skip": true
+    },
+    {
+      "travel": 0.000005,
+      "dt": 0.2,
+      "skip": true
+    },
+    {
+      "travel": 0.00001,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 0.000011,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 0.29,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 1,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 11.99,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 12,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 12.01,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 18,
+      "dt": 0.2,
+      "skip": false
+    },
+    {
+      "travel": 19.5,
+      "dt": 0.2,
+      "skip": true
+    },
+    {
+      "travel": 30,
+      "dt": 0.2,
+      "skip": true
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+# CI for the Spicy Rodents Roblox rebuild (BUILD_PLAN §1.2, §6.1, D16, spike S10).
+# Mirrors tools/ci.sh (stylua --check, selene, Lune unit tests, rojo build, Lune place tests,
+# sourcemap) and adds strict `luau-lsp analyze` with the Roblox definitions, which the cloud
+# container cannot run (GitHub release downloads are blocked there; runners can reach them).
+# Open Cloud steps (save, engine tests) are NOT run here: the API key lives behind the
+# container's proxy and is never a repository secret (decision: BUILD_PLAN §4.3 S1 fallback is
+# opt-in, not default).
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ROJO_VERSION: "7.7.1"
+  LUNE_VERSION: "0.11.1"
+  STYLUA_VERSION: "2.6.0"
+  SELENE_VERSION: "0.31.0"
+  LUAU_LSP_VERSION: "1.70.1"
+
+jobs:
+  ci:
+    name: lint, test, build, analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false # no LFS objects are needed for code CI
+
+      - name: Install pinned toolchain (rojo, lune, stylua, selene, luau-lsp)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin" tools-dl
+          cd tools-dl
+          dl() { # name url
+            echo "downloading $1 from $2"
+            curl -sSfL --retry 3 -o "$1.zip" "$2"
+            unzip -o -q "$1.zip" -d "$1"
+          }
+          dl rojo "https://github.com/rojo-rbx/rojo/releases/download/v${ROJO_VERSION}/rojo-${ROJO_VERSION}-linux-x86_64.zip"
+          dl lune "https://github.com/lune-org/lune/releases/download/v${LUNE_VERSION}/lune-${LUNE_VERSION}-linux-x86_64.zip"
+          # StyLua release binaries are built with every syntax feature (Luau included).
+          dl stylua "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/stylua-linux-x86_64.zip"
+          dl luau-lsp "https://github.com/JohnnyMorganz/luau-lsp/releases/download/${LUAU_LSP_VERSION}/luau-lsp-linux-x86_64.zip"
+          # Selene publishes "selene-<version>-linux.zip"; fall back to cargo if the name changes.
+          if ! dl selene "https://github.com/Kampfkarren/selene/releases/download/${SELENE_VERSION}/selene-${SELENE_VERSION}-linux.zip"; then
+            echo "selene release asset not found; installing with cargo (slower)"
+            cargo install selene --locked --version "${SELENE_VERSION}"
+            mkdir -p selene && cp "$HOME/.cargo/bin/selene" selene/selene
+          fi
+          for t in rojo lune stylua selene luau-lsp; do
+            bin="$(find "$t" -maxdepth 2 -type f -name "$t" | head -n1)"
+            test -n "$bin" || { echo "binary $t not found in archive"; ls -R "$t"; exit 1; }
+            install -m 0755 "$bin" "$HOME/.local/bin/$t"
+          done
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/rojo" --version
+          "$HOME/.local/bin/lune" --version
+          "$HOME/.local/bin/stylua" --version
+          "$HOME/.local/bin/selene" --version
+          "$HOME/.local/bin/luau-lsp" --version
+
+      - name: Local CI gate (stylua, selene, lune tests, rojo build, place tests, sourcemap)
+        shell: bash
+        run: tools/ci.sh
+
+      - name: Roblox type definitions (pinned to the luau-lsp release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSfL --retry 3 -o globalTypes.d.luau \
+            "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_VERSION}/scripts/globalTypes.d.luau"
+          test -s globalTypes.d.luau
+
+      - name: luau-lsp analyze (strict, Roblox platform, sourcemap)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The sourcemap was written by tools/ci.sh (rojo sourcemap default.project.json).
+          test -s sourcemap.json
+          cat > .luau-analyze.json <<'JSON'
+          {
+            "luau-lsp.platform.type": "roblox",
+            "luau-lsp.sourcemap.enabled": true,
+            "luau-lsp.require.mode": "relativeToFile",
+            "luau-lsp.diagnostics.strictDatamodelTypes": false
+          }
+          JSON
+          luau-lsp analyze \
+            --definitions=globalTypes.d.luau \
+            --sourcemap=sourcemap.json \
+            --platform=roblox \
+            --base-luaurc=.luaurc \
+            --settings=.luau-analyze.json \
+            --ignore="**/*.spec.luau" \
+            src/ tests/engine/ tools/cloud/tasks/
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: place-files
+          path: |
+            build/SpicyRodents.rbxl
+            build/test.rbxl
+            sourcemap.json
+          retention-days: 7
+          if-no-files-found: ignore

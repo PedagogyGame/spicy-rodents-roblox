@@ -1,0 +1,51 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "north_cemetery",
+  "lots": [
+    {
+      "id": "north_cedar_rest_cemetery",
+      "district": "north_cemetery",
+      "type": "cemetery",
+      "x": 462,
+      "z": 366,
+      "facing": "-Z",
+      "footprint": {
+        "d": 124,
+        "w": 370
+      },
+      "hasInterior": false,
+      "notes": "facing: gate gap x 442..466 in the z=304 wall, sign at (453,303). yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). Walls: z=304 (x 277..442 and 466..647), x=277 & x=647 (z 304..428), z=428 (x 277..647). Gate pillars r0.61 h4.3 at x=442,466. 50 headstones in 5 types (10 each) on a 27x20 grid x 300..603, z 322..407 (skip |x-450|<24). Curving path 5.5 wide (451,307)->(447,333)->(464,356)->(484,394)->(513,411). Lamps (308,414),(385,335),(624,341). Hedges (290,306),(613,421). Walls have no collision. graveRegion constant unused. NPC \"mourner\" lane z=405 (x 306..628).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3480",
+      "style": "aged stone wall #7e8781 (blocks 4.95x1.35x0.82 every 5)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "north_cemetery_crypt",
+      "district": "north_cemetery",
+      "type": "chapel_crypt",
+      "x": 594,
+      "z": 378,
+      "facing": "+Z",
+      "footprint": {
+        "d": 17,
+        "w": 23
+      },
+      "hasInterior": false,
+      "notes": "facing: door 5.7x6.8 at local z=+8.85, columns at z=+9. yaw=0 rad (front=(sin yaw,0,cos yaw)). Roof route at y+10.45 (x 583..605). No wall collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3548",
+      "style": "stone #969991, cap #7e8781, 2 columns with cone caps",
+      "v54": {
+        "facing": "+Z"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

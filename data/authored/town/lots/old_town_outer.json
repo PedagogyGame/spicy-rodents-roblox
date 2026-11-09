@@ -1,0 +1,1454 @@
+{
+  "$schema": "../../../schema/lots.schema.json",
+  "district": "old_town_outer",
+  "lots": [
+    {
+      "id": "outer_home_00",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -135,
+      "z": -74,
+      "facing": "+X",
+      "footprint": {
+        "d": 12,
+        "w": 10
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 4. Solid box 12x5.2x10 (local), gable to +8 (abs peak y=8.84); base_y=0.84; wall #c1b5a2, roof #5e5d5d, door #4b6d61; porch depth 2.5; side wing (0.3w x 3 x 0.47d), chimney, dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 45. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2050",
+      "style": "outer-generic #0 (style arg 0 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "outer_home_01",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -217,
+      "z": -72,
+      "facing": "-X",
+      "footprint": {
+        "d": 14,
+        "w": 11
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 5. Solid box 14x6x11 (local), gable to +9.35 (abs peak y=13.91); base_y=4.56; wall #b7c5c1, roof #71625c, door #6e5144; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 37. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2051",
+      "style": "outer-generic #1 (style arg 2 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "outer_home_02",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -217,
+      "z": -130,
+      "facing": "-X",
+      "footprint": {
+        "d": 16,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 6. Solid box 16x6.8x12 (local), gable to +10.7 (abs peak y=16.5); base_y=5.8; wall #d4b998, roof #5d6b65, door #3d5e78; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 37. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2052",
+      "style": "outer-generic #2 (style arg 1 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "outer_home_03",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -127,
+      "z": -209,
+      "facing": "-Z",
+      "footprint": {
+        "d": 13,
+        "w": 13
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 7. Solid box 13x5.2x13 (local), gable to +8 (abs peak y=8.1); base_y=0.1; wall #a69f8b, roof #755a50, door #a3835b; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 35. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2053",
+      "style": "outer-generic #3 (style arg 3 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "outer_home_04",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -63,
+      "z": -215,
+      "facing": "-Z",
+      "footprint": {
+        "d": 10,
+        "w": 15
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 8. Solid box 15x6x10 (local), gable to +9.35 (abs peak y=9.45); base_y=0.1; wall #dfd6ba, roof #5e5d5d, door #4b6d61; porch depth 3.5; side wing (0.3w x 3 x 0.47d). Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 41. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2054",
+      "style": "outer-generic #4 (style arg 2 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "outer_home_05",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 62,
+      "z": -208,
+      "facing": "-Z",
+      "footprint": {
+        "d": 11,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 9. Solid box 12x6.8x11 (local), gable to +10.7 (abs peak y=14.92); base_y=4.22; wall #a6b5ac, roof #71625c, door #6e5144; porch depth 4.5; dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 34. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2055",
+      "style": "outer-generic #5 (style arg 1 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "outer_home_06",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 139,
+      "z": -207,
+      "facing": "-Z",
+      "footprint": {
+        "d": 12,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 10. Solid box 14x5.2x12 (local), gable to +8 (abs peak y=14.99); base_y=6.99; wall #c1b5a2, roof #5d6b65, door #3d5e78; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 33. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2056",
+      "style": "outer-generic #6 (style arg 0 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "outer_home_07",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 216,
+      "z": -136,
+      "facing": "+Z",
+      "footprint": {
+        "d": 13,
+        "w": 16
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=-174) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 11. Solid box 16x6x13 (local), gable to +9.35 (abs peak y=11.98); base_y=2.63; wall #b7c5c1, roof #755a50, door #a3835b; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 38. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2057",
+      "style": "outer-generic #7 (style arg 2 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "outer_home_08",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 216,
+      "z": -57,
+      "facing": "+X",
+      "footprint": {
+        "d": 13,
+        "w": 10
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 12. Solid box 13x6.8x10 (local), gable to +10.7 (abs peak y=10.8); base_y=0.1; wall #d4b998, roof #5e5d5d, door #4b6d61; porch depth 4.5; side wing (0.3w x 3 x 0.47d). Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 38. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2058",
+      "style": "outer-generic #8 (style arg 3 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "outer_home_09",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 124,
+      "z": -72,
+      "facing": "-X",
+      "footprint": {
+        "d": 15,
+        "w": 11
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 13. Solid box 15x5.2x11 (local), gable to +8 (abs peak y=8.58); base_y=0.58; wall #a69f8b, roof #71625c, door #6e5144; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 54. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2059",
+      "style": "outer-generic #9 (style arg 1 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "outer_home_10",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 127,
+      "z": 69,
+      "facing": "-X",
+      "footprint": {
+        "d": 12,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 14. Solid box 12x6x12 (local), gable to +9.35 (abs peak y=10.04); base_y=0.69; wall #dfd6ba, roof #5d6b65, door #3d5e78; porch depth 3.5; dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 51. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2060",
+      "style": "outer-generic #10 (style arg 3 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "outer_home_11",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 211,
+      "z": 76,
+      "facing": "+X",
+      "footprint": {
+        "d": 14,
+        "w": 13
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=178) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 15. Solid box 14x6.8x13 (local), gable to +10.7 (abs peak y=14.02); base_y=3.32; wall #a6b5ac, roof #755a50, door #a3835b; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 33. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2061",
+      "style": "outer-generic #11 (style arg 0 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "outer_home_12",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 216,
+      "z": 142,
+      "facing": "-Z",
+      "footprint": {
+        "d": 10,
+        "w": 16
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 16. Solid box 16x5.2x10 (local), gable to +8 (abs peak y=10.41); base_y=2.41; wall #c1b5a2, roof #5e5d5d, door #4b6d61; porch depth 2.5; side wing (0.3w x 3 x 0.47d), chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 29. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2062",
+      "style": "outer-generic #12 (style arg 1 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "outer_home_13",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 132,
+      "z": 207,
+      "facing": "+Z",
+      "footprint": {
+        "d": 11,
+        "w": 13
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 17. Solid box 13x6x11 (local), gable to +9.35 (abs peak y=9.45); base_y=0.1; wall #b7c5c1, roof #71625c, door #6e5144; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 36. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2063",
+      "style": "outer-generic #13 (style arg 2 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "outer_home_14",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": 48,
+      "z": 216,
+      "facing": "+Z",
+      "footprint": {
+        "d": 12,
+        "w": 15
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 18. Solid box 15x6.8x12 (local), gable to +10.7 (abs peak y=11.77); base_y=1.07; wall #d4b998, roof #5d6b65, door #3d5e78; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 45. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2064",
+      "style": "outer-generic #14 (style arg 3 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "outer_home_15",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -62,
+      "z": 213,
+      "facing": "+Z",
+      "footprint": {
+        "d": 13,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 19. Solid box 12x5.2x13 (local), gable to +8 (abs peak y=13.5); base_y=5.5; wall #a69f8b, roof #755a50, door #a3835b; porch depth 2.5; chimney, dark-tinted windows. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 42. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2065",
+      "style": "outer-generic #15 (style arg 0 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "outer_home_16",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -139,
+      "z": 204,
+      "facing": "+Z",
+      "footprint": {
+        "d": 10,
+        "w": 14
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=0 rad (front=(sin yaw,0,cos yaw)). houses[] id 20. Solid box 14x6x10 (local), gable to +9.35 (abs peak y=15.44); base_y=6.09; wall #dfd6ba, roof #5e5d5d, door #4b6d61; porch depth 3.5; side wing (0.3w x 3 x 0.47d). Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 33. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2066",
+      "style": "outer-generic #16 (style arg 1 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "outer_home_17",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -216,
+      "z": 140,
+      "facing": "-Z",
+      "footprint": {
+        "d": 11,
+        "w": 16
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road z=171) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=0. yaw=3.1416 rad (front=(sin yaw,0,cos yaw)). houses[] id 21. Solid box 16x6.8x11 (local), gable to +10.7 (abs peak y=11.56); base_y=0.86; wall #a6b5ac, roof #71625c, door #6e5144; porch depth 4.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 31. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2067",
+      "style": "outer-generic #17 (style arg 3 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-Z"
+      }
+    },
+    {
+      "id": "outer_home_18",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -209,
+      "z": 62,
+      "facing": "-X",
+      "footprint": {
+        "d": 13,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=-1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 22. Solid box 13x5.2x12 (local), gable to +8 (abs peak y=8.1); base_y=0.1; wall #c1b5a2, roof #5d6b65, door #3d5e78; porch depth 2.5; chimney. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 29. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2068",
+      "style": "outer-generic #18 (style arg 2 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "-X"
+      }
+    },
+    {
+      "id": "outer_home_19",
+      "district": "old_town_outer",
+      "type": "house",
+      "x": -128,
+      "z": 72,
+      "facing": "+X",
+      "footprint": {
+        "d": 15,
+        "w": 13
+      },
+      "hasInterior": false,
+      "notes": "facing: door/porch side = sign(position - nearest grid road x=-180) => points AWAY from that road (quirk); walkway runs from the house toward the road on the opposite side. Group rotY=PI/2. yaw=1.5708 rad (front=(sin yaw,0,cos yaw)). houses[] id 23. Solid box 15x6x13 (local), gable to +9.35 (abs peak y=9.5); base_y=0.15; wall #b7c5c1, roof #755a50, door #a3835b; porch depth 3.5. Roof treated as FLAT at peak for landing (roofY returns peak). Distance to road centreline 52. Built by buildOuterHome 2071.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L2069",
+      "style": "outer-generic #19 (style arg 0 is ignored by buildOuterHome)",
+      "v54": {
+        "facing": "+X"
+      }
+    },
+    {
+      "id": "outer_icecream_standalone",
+      "district": "old_town_outer",
+      "type": "restaurant_icecream",
+      "x": 152,
+      "z": 56,
+      "facing": "+Z",
+      "footprint": {
+        "d": 6.8,
+        "w": 8.5
+      },
+      "hasInterior": false,
+      "notes": "facing: awning/window/sign at local +z. yaw=0 rad (front=(sin yaw,0,cos yaw)). v3.5 env pass. Placed at y=0 although terrain here is ~2.26, so it is half-buried (inferred bug). No collision, no routes. Bench + giant cone prop. \"Competitor\" of the strip shop.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12786",
+      "style": "pink shop #ffd6df, blue roof #6fb6d8",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "outer_icecream_strip",
+      "district": "old_town_outer",
+      "type": "restaurant_icecream",
+      "x": -154,
+      "z": -66,
+      "facing": "+Z",
+      "footprint": {
+        "d": 7.5,
+        "w": 12
+      },
+      "hasInterior": false,
+      "notes": "facing: glass, door and fascia at local +z. yaw=0 rad (front=(sin yaw,0,cos yaw)). v3.5 env pass. y=0 vs terrain ~1.42 (partly buried, inferred). 3 umbrellas behind (local z=-2.1). No collision.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12787",
+      "style": "white shell #e9eef0, cyan fascia #5ec0dd",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "outer_garden_plot_b",
+      "district": "old_town_outer",
+      "type": "garden",
+      "x": 116,
+      "z": -24,
+      "footprint": {
+        "d": 4.5,
+        "w": 6.5
+      },
+      "hasInterior": false,
+      "notes": "y=0 vs terrain 0.23. Visual only.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12783",
+      "style": "v3.5 garden plot variant 1 (red crop)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "outer_stream",
+      "district": "old_town_outer",
+      "type": "stream",
+      "x": -143.5,
+      "z": 83,
+      "footprint": {
+        "d": 18,
+        "w": 63
+      },
+      "hasInterior": false,
+      "notes": "Polyline (-175,92)->(-160,88)->(-142,82)->(-126,76)->(-112,74), placed at y=0.02 (terrain 0.03-0.09). Plank crossing 3.2x1.2 at middle point (-142,82). Visual only (not water for movement).",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12753",
+      "style": "water #6dbfd6, 2.1 wide, bank strips",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "outer_treehouse",
+      "district": "old_town_outer",
+      "type": "treehouse",
+      "x": -142,
+      "z": 154,
+      "facing": "+Z",
+      "footprint": {
+        "d": 7.8,
+        "w": 8
+      },
+      "hasInterior": true,
+      "notes": "facing: open front wall + ladder at local z=+3.76/+4.15 (code comment calls this \"south\"). yaw=0 rad (front=(sin yaw,0,cos yaw)). Floor at base+13.2 (base 1.52); 4.2x3.2 deck at local x=+5.9; ladder trunk route; floor/deck lookout routes; roof hidden while squirrel inside (updateWestside). Furniture: table, bunk, chest, lantern. buildTreehouse 9502.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L9501",
+      "style": "timber #916c47/#b9986c in \"Treehouse Oak\" (H 31)",
+      "v54": {
+        "facing": "+Z"
+      }
+    },
+    {
+      "id": "env_shrub_cluster_D",
+      "district": "old_town_outer",
+      "type": "shrub_cluster",
+      "x": 122,
+      "z": -46.5,
+      "footprint": {
+        "d": 4.6,
+        "w": 5.6
+      },
+      "hasInterior": false,
+      "notes": "addShrub 12568: three stacked 7-sided cylinders r 0.4..0.7*s. Placed at y=0 (NOT terrain-following; buried where terrain > 0). Points: (120,-48) scale 1.2 #648843 terrain 0.4; (124,-45) scale 0.9 #557a37 terrain 0.57. Visual only, no collider.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12756",
+      "style": "low 3-cylinder shrubs (Lambert)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_fence_run_2",
+      "district": "old_town_outer",
+      "type": "fence_run",
+      "x": 112,
+      "z": -36,
+      "footprint": {
+        "d": 0.16,
+        "w": 32
+      },
+      "hasInterior": false,
+      "notes": "addFenceRun(96,-36 -> 128,-36, 'wood') 12583: 14 posts (0.16x1.1x0.16) every 2.46; rails at y 0.72 and 0.36. Built at y=0 (terrain at ends 0 / 0.72). VISUAL ONLY: not in fenceCollisions, no route. Run 0 crosses the core_house_2 front walk.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12764",
+      "style": "wood rail (posts #8b6a44, 2 rails #9a7750)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "env_fence_run_3",
+      "district": "old_town_outer",
+      "type": "fence_run",
+      "x": -118,
+      "z": -28,
+      "footprint": {
+        "d": 36,
+        "w": 0.16
+      },
+      "hasInterior": false,
+      "notes": "addFenceRun(-118,-46 -> -118,-10, 'chain') 12583: 16 posts (0.12x1.0x0.12) every 2.4; one 0.55-tall mesh panel per bay at y 0.62. Built at y=0 (terrain at ends 0.26 / 0.19). VISUAL ONLY: not in fenceCollisions, no route. Run 0 crosses the core_house_2 front walk.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L12764",
+      "style": "chain-link (posts #8e8e8e, mesh #b7c0c0)",
+      "v54": {
+        "facing": "n/a"
+      }
+    },
+    {
+      "id": "detail_00_fire_hydrant",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -124,
+      "z": -87,
+      "yaw": 0,
+      "footprint": {
+        "d": 1.5,
+        "w": 2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.41; group yaw = variation*0.71 rad. Yard placement: houses[4+0] = outer_home_00 at (-135,-74) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "fire hydrant (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_01_fire_hydrant",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 204,
+      "z": -149,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 1.5,
+        "w": 2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 4.18; group yaw = variation*0.71 rad. Yard placement: houses[4+7] = outer_home_07 at (216,-136) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "fire hydrant (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_02_park_bench",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -116,
+      "z": -197,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+3] = outer_home_03 at (-127,-209) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "park bench (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_03_park_bench",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 115,
+      "z": 81,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 2.2,
+        "w": 4.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.19; group yaw = variation*0.71 rad. Yard placement: houses[4+10] = outer_home_10 at (127,69) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "park bench (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_04_trash_can",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 150,
+      "z": -220,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.56,
+        "w": 1.56
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 7.88; group yaw = variation*0.71 rad. Yard placement: houses[4+6] = outer_home_06 at (139,-207) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "trash can (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_05_trash_can",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 120,
+      "z": 194,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.56,
+        "w": 1.56
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+13] = outer_home_13 at (132,207) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "trash can (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_06_streetlight",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 135,
+      "z": -60,
+      "yaw": 0,
+      "footprint": {
+        "d": 1.2,
+        "w": 5.1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.97; group yaw = variation*0.71 rad. Yard placement: houses[4+9] = outer_home_09 at (124,-72) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "streetlight (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_07_streetlight",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -151,
+      "z": 216,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 1.2,
+        "w": 5.1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 6.86; group yaw = variation*0.71 rad. Yard placement: houses[4+16] = outer_home_16 at (-139,204) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "streetlight (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_08_stop_sign",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 227,
+      "z": 129,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 0.3,
+        "w": 1.4
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.5; group yaw = variation*0.71 rad. Yard placement: houses[4+12] = outer_home_12 at (216,142) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "stop sign (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_09_stop_sign",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -140,
+      "z": 59,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 0.3,
+        "w": 1.4
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.24; group yaw = variation*0.71 rad. Yard placement: houses[4+19] = outer_home_19 at (-128,72) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "stop sign (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_10_garden_gnome",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -51,
+      "z": 225,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1,
+        "w": 1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.67; group yaw = variation*0.71 rad. Yard placement: houses[4+15] = outer_home_15 at (-62,213) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "garden gnome (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_11_garden_gnome",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -229,
+      "z": -118,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1,
+        "w": 1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 6.54; group yaw = variation*0.71 rad. Yard placement: houses[4+2] = outer_home_02 at (-217,-130) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "garden gnome (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_12_bird_feeder",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -198,
+      "z": 49,
+      "yaw": 0,
+      "footprint": {
+        "d": 2.8,
+        "w": 2.8
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+18] = outer_home_18 at (-209,62) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "bird feeder (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_13_bird_feeder",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 50,
+      "z": -221,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 2.8,
+        "w": 2.8
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 4.28; group yaw = variation*0.71 rad. Yard placement: houses[4+5] = outer_home_05 at (62,-208) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "bird feeder (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_14_sprinkler_head",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -206,
+      "z": -60,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 3,
+        "w": 3
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.39; group yaw = variation*0.71 rad. Yard placement: houses[4+1] = outer_home_01 at (-217,-72) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "sprinkler head (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_15_sprinkler_head",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 204,
+      "z": -45,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 3,
+        "w": 3
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+8] = outer_home_08 at (216,-57) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "sprinkler head (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_16_porch_swing",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -52,
+      "z": -228,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.5,
+        "w": 5.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+4] = outer_home_04 at (-63,-215) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "porch swing (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_17_porch_swing",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 199,
+      "z": 63,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.5,
+        "w": 5.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.55; group yaw = variation*0.71 rad. Yard placement: houses[4+11] = outer_home_11 at (211,76) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "porch swing (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_18_window_box",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 227,
+      "z": -124,
+      "yaw": 0,
+      "footprint": {
+        "d": 0.9,
+        "w": 3.1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 1.52; group yaw = variation*0.71 rad. Yard placement: houses[4+7] = outer_home_07 at (216,-136) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "window box (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_19_window_box",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 36,
+      "z": 228,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 0.9,
+        "w": 3.1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 2.41; group yaw = variation*0.71 rad. Yard placement: houses[4+14] = outer_home_14 at (48,216) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "window box (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_20_driveway_basketball_hoop",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 138,
+      "z": 56,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 2.6,
+        "w": 3.6
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 1.33; group yaw = variation*0.71 rad. Yard placement: houses[4+10] = outer_home_10 at (127,69) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "driveway basketball hoop (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_21_driveway_basketball_hoop",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -228,
+      "z": 127,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 2.6,
+        "w": 3.6
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.99; group yaw = variation*0.71 rad. Yard placement: houses[4+17] = outer_home_17 at (-216,140) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "driveway basketball hoop (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_22_kids_bike",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 143,
+      "z": 219,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 2.9,
+        "w": 1.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+13] = outer_home_13 at (132,207) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "kids bike (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_23_kids_bike",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -147,
+      "z": -62,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 2.9,
+        "w": 1.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 1.24; group yaw = variation*0.71 rad. Yard placement: houses[4+0] = outer_home_00 at (-135,-74) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "kids bike (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_24_lawn_flamingo",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -128,
+      "z": 191,
+      "yaw": 0,
+      "footprint": {
+        "d": 1.4,
+        "w": 1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.41; group yaw = variation*0.71 rad. Yard placement: houses[4+16] = outer_home_16 at (-139,204) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "lawn flamingo (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_25_lawn_flamingo",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -139,
+      "z": -222,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 1.4,
+        "w": 1
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 1.04; group yaw = variation*0.71 rad. Yard placement: houses[4+3] = outer_home_03 at (-127,-209) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "lawn flamingo (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_26_wind_chime",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -117,
+      "z": 84,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 1.2,
+        "w": 1.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.08; group yaw = variation*0.71 rad. Yard placement: houses[4+19] = outer_home_19 at (-128,72) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "wind chime (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_27_wind_chime",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 127,
+      "z": -195,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.2,
+        "w": 1.2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.8; group yaw = variation*0.71 rad. Yard placement: houses[4+6] = outer_home_06 at (139,-207) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "wind chime (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_28_garden_hose_reel",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -206,
+      "z": -143,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.9,
+        "w": 1.9
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.3; group yaw = variation*0.71 rad. Yard placement: houses[4+2] = outer_home_02 at (-217,-130) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "garden hose reel (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_29_garden_hose_reel",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 112,
+      "z": -85,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.9,
+        "w": 1.9
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.12; group yaw = variation*0.71 rad. Yard placement: houses[4+9] = outer_home_09 at (124,-72) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "garden hose reel (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_30_wheelbarrow",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 73,
+      "z": -196,
+      "yaw": 0,
+      "footprint": {
+        "d": 1.5,
+        "w": 3.4
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.98; group yaw = variation*0.71 rad. Yard placement: houses[4+5] = outer_home_05 at (62,-208) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "wheelbarrow (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_31_wheelbarrow",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 204,
+      "z": 154,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 1.5,
+        "w": 3.4
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 1.42; group yaw = variation*0.71 rad. Yard placement: houses[4+12] = outer_home_12 at (216,142) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "wheelbarrow (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_32_compost_bin",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 227,
+      "z": -70,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 2.5,
+        "w": 2.6
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+8] = outer_home_08 at (216,-57) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "compost bin (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    },
+    {
+      "id": "detail_33_compost_bin",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -74,
+      "z": 200,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 2.5,
+        "w": 2.6
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 5.51; group yaw = variation*0.71 rad. Yard placement: houses[4+15] = outer_home_15 at (-62,213) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "compost bin (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_34_rain_barrel",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 222,
+      "z": 88,
+      "yaw": 1.4199998794225865,
+      "footprint": {
+        "d": 1.8,
+        "w": 2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 3.4; group yaw = variation*0.71 rad. Yard placement: houses[4+11] = outer_home_11 at (211,76) offset (11,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "rain barrel (variation 2, even palette)",
+      "v54": {
+        "facing": "yaw 81.36 deg"
+      }
+    },
+    {
+      "id": "detail_35_rain_barrel",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -221,
+      "z": 74,
+      "yaw": 2.1299998191338796,
+      "footprint": {
+        "d": 1.8,
+        "w": 2
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.1; group yaw = variation*0.71 rad. Yard placement: houses[4+18] = outer_home_18 at (-209,62) offset (-12,12). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "rain barrel (variation 3, odd palette)",
+      "v54": {
+        "facing": "yaw 122.04 deg"
+      }
+    },
+    {
+      "id": "detail_36_porch_light",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": 59,
+      "z": 203,
+      "yaw": 0,
+      "footprint": {
+        "d": 0.8,
+        "w": 1.6
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 0.21; group yaw = variation*0.71 rad. Yard placement: houses[4+14] = outer_home_14 at (48,216) offset (11,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "porch light (variation 0, even palette)",
+      "v54": {
+        "facing": "yaw 0 deg"
+      }
+    },
+    {
+      "id": "detail_37_porch_light",
+      "district": "old_town_outer",
+      "type": "detail",
+      "x": -229,
+      "z": -85,
+      "yaw": 0.7099999397112933,
+      "footprint": {
+        "d": 0.8,
+        "w": 1.6
+      },
+      "hasInterior": false,
+      "notes": "addDetail 3054; terrain y 6.01; group yaw = variation*0.71 rad. Yard placement: houses[4+1] = outer_home_01 at (-217,-72) offset (-12,-13). Footprint is approximate (inferred from part sizes, unrotated). Visual only: no collider, no route.",
+      "routes": {
+        "source": "harvest"
+      },
+      "src": "v5.4 L3248",
+      "style": "porch light (variation 1, odd palette)",
+      "v54": {
+        "facing": "yaw 40.68 deg"
+      }
+    }
+  ],
+  "src": "spec/data/lots_core.json + lots_districts.json (verified v5.4 extraction); HTML units"
+}

@@ -1,0 +1,235 @@
+{
+  "$schema": "harvest/apple_trees v1",
+  "units": "HTML world units (1 u = 2.5 studs), +Y up, exactly as the page computed them",
+  "count": 12,
+  "appleTrees": [
+    {
+      "x": -84,
+      "z": -24,
+      "H": 9.677252183272504,
+      "spec": {
+        "name": "APPLE 1",
+        "crown": 6
+      },
+      "root": [-84,0,-24],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 1",
+        "position": [-84,0,-24],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": -24,
+      "z": -84,
+      "H": 8.531653012218886,
+      "spec": {
+        "name": "APPLE 2",
+        "crown": 6
+      },
+      "root": [-24,0,-84],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 2",
+        "position": [-24,0,-84],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": -24,
+      "z": 80,
+      "H": 9.598418015707285,
+      "spec": {
+        "name": "APPLE 3",
+        "crown": 6
+      },
+      "root": [-24,0,80],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 3",
+        "position": [-24,0,80],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": 80,
+      "z": 24,
+      "H": 9.345390117331409,
+      "spec": {
+        "name": "APPLE 4",
+        "crown": 6
+      },
+      "root": [80,0,24],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 4",
+        "position": [80,0,24],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": -85,
+      "z": 352,
+      "H": 9.449831514921971,
+      "spec": {
+        "name": "APPLE 5",
+        "crown": 6
+      },
+      "root": [-85,6.434082371762704,352],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 5",
+        "position": [-85,6.434082371762704,352],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": -58,
+      "z": 382,
+      "H": 8.961657251301222,
+      "spec": {
+        "name": "APPLE 6",
+        "crown": 6
+      },
+      "root": [-58,3.24117073444931,382],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 6",
+        "position": [-58,3.24117073444931,382],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": -28,
+      "z": 399,
+      "H": 9.372723699850031,
+      "spec": {
+        "name": "APPLE 7",
+        "crown": 6
+      },
+      "root": [-28,0.9996747910699104,399],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 7",
+        "position": [-28,0.9996747910699104,399],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": 38,
+      "z": 410,
+      "H": 8.846337233041414,
+      "spec": {
+        "name": "APPLE 8",
+        "crown": 6
+      },
+      "root": [38,1.1573248420492124,410],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 8",
+        "position": [38,1.1573248420492124,410],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": 988,
+      "z": -214,
+      "H": 9.01269716101233,
+      "spec": {
+        "name": "APPLE 9",
+        "crown": 6
+      },
+      "root": [988,8,-214],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 9",
+        "position": [988,8,-214],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": 1018,
+      "z": -214,
+      "H": 9.213937916629948,
+      "spec": {
+        "name": "APPLE 10",
+        "crown": 6
+      },
+      "root": [1018,8,-214],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 10",
+        "position": [1018,8,-214],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": 1048,
+      "z": -214,
+      "H": 9.655760763515719,
+      "spec": {
+        "name": "APPLE 11",
+        "crown": 6
+      },
+      "root": [1048,8,-214],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 11",
+        "position": [1048,8,-214],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    },
+    {
+      "x": 1078,
+      "z": -214,
+      "H": 8.676126063987613,
+      "spec": {
+        "name": "APPLE 12",
+        "crown": 6
+      },
+      "root": [1078,8,-214],
+      "group": {
+        "$object3d": "Group",
+        "name": "Apple tree 12",
+        "position": [1078,8,-214],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      }
+    }
+  ]
+}

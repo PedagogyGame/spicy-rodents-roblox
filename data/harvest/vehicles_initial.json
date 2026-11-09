@@ -1,0 +1,1638 @@
+{
+  "$schema": "harvest/vehicles v1",
+  "units": "HTML world units (1 u = 2.5 studs), +Y up, exactly as the page computed them",
+  "note": "state at the dump point (after world build, before the first tick)",
+  "cars": [
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-73,0,-45],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 8.041174594080076,
+      "speed": 0,
+      "dir": -1,
+      "lane": -73,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [68,0,-51],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 9.100461694877595,
+      "speed": 0,
+      "dir": 1,
+      "lane": 68,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-70,0,43],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 8.919856605120003,
+      "speed": 0,
+      "dir": -1,
+      "lane": -70,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [75,0,48],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 6.7874435796402395,
+      "speed": 0,
+      "dir": 1,
+      "lane": 75,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-5.4,0,115],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": true,
+      "velocity": 8.086290817940608,
+      "speed": 0,
+      "dir": 1,
+      "lane": -5.4,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [5.4,0,-86],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": true,
+      "velocity": 8.943118187831715,
+      "speed": 0,
+      "dir": -1,
+      "lane": 5.4,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [462,5.9885350938714375,-29],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 8.020640462404117,
+      "speed": 0,
+      "dir": 1,
+      "lane": 462,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [493,5.791981693174173,-29],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 7.981346423737705,
+      "speed": 0,
+      "dir": -1,
+      "lane": 493,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [586,3.5559617329276696,-33],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 8.335023031104356,
+      "speed": 0,
+      "dir": 1,
+      "lane": 586,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [558,0.14,142],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 6.949141173157841,
+      "speed": 0,
+      "dir": -1,
+      "lane": 558,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [287,0.14,-5.6],
+        "rotationY": 1.5707963267948966,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": true,
+      "velocity": 6.975738571025431,
+      "speed": 0,
+      "dir": 1,
+      "lane": 287,
+      "routeAxis": "x"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [620,2.0443035469692554,5.6],
+        "rotationY": -1.5707963267948966,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": true,
+      "velocity": 7.762897175899706,
+      "speed": 0,
+      "dir": -1,
+      "lane": 620,
+      "routeAxis": "x"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-112,6.448910349543769,-350],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 6.961141782114282,
+      "speed": 0,
+      "dir": 1,
+      "lane": -112,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [112,3.508471814151026,-350],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 6.9465867867693305,
+      "speed": 0,
+      "dir": 1,
+      "lane": 112,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [95,0.05,-5.6],
+        "rotationY": 1.5707963267948966,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 23
+      },
+      "moving": false,
+      "velocity": 7.632402213755995,
+      "speed": 0,
+      "dir": 1,
+      "lane": 95,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [629,0,283],
+        "rotationY": 1.5707963267948966,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 28
+      },
+      "moving": false,
+      "velocity": 8.740345160244033,
+      "speed": 0,
+      "dir": 1,
+      "lane": 629,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-356,0,283],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 28
+      },
+      "moving": false,
+      "velocity": 7.8077299552969635,
+      "speed": 0,
+      "dir": 1,
+      "lane": -356,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-356,0,283],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 28
+      },
+      "moving": false,
+      "velocity": 6.51540247281082,
+      "speed": 0,
+      "dir": 1,
+      "lane": -356,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-356,0,283],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 28
+      },
+      "moving": false,
+      "velocity": 7.903546693036333,
+      "speed": 0,
+      "dir": 1,
+      "lane": -356,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-525,0.18,-81],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 23
+      },
+      "moving": false,
+      "velocity": 9.337435342604294,
+      "speed": 0,
+      "dir": 1,
+      "lane": -525,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-495,0.18,-81],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": true,
+        "children": 23
+      },
+      "moving": false,
+      "velocity": 8.486466312548146,
+      "speed": 0,
+      "dir": 1,
+      "lane": -495,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-519,0,-81],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 23
+      },
+      "moving": false,
+      "velocity": 8.515774999046698,
+      "speed": 0,
+      "dir": 1,
+      "lane": -519,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-501,0,-81],
+        "rotationY": 0,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 23
+      },
+      "moving": false,
+      "velocity": 8.686644094763324,
+      "speed": 0,
+      "dir": 1,
+      "lane": -501,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-74,0,-120],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 8.789645619690418,
+      "speed": 0,
+      "dir": -1,
+      "lane": -74,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-66,0,-120],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 9.363363204523921,
+      "speed": 0,
+      "dir": -1,
+      "lane": -66,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-58,0,-120],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 6.952070042025298,
+      "speed": 0,
+      "dir": -1,
+      "lane": -58,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [58,0,396],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 7.343659740174189,
+      "speed": 0,
+      "dir": -1,
+      "lane": 58,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [66,0,396],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 7.6158047469798476,
+      "speed": 0,
+      "dir": -1,
+      "lane": 66,
+      "routeAxis": "z"
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [74,0,396],
+        "rotationY": 3.141592653589793,
+        "scale": [0.79,0.79,0.79],
+        "visible": false,
+        "children": 21
+      },
+      "moving": false,
+      "velocity": 8.793365329504013,
+      "speed": 0,
+      "dir": -1,
+      "lane": 74,
+      "routeAxis": "z"
+    }
+  ],
+  "tallVehicles": [
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [604,0.1,110],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 7
+      },
+      "width": 3,
+      "length": 5.9,
+      "height": 3.65
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-5.7,0.22599105264990005,-120],
+        "rotationY": -0.12659230409844693,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 27
+      },
+      "width": 3.35,
+      "length": 6.55,
+      "height": 3.58
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [283,0.15000000000000002,8.65],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 67
+      },
+      "width": 3.5,
+      "length": 11,
+      "height": 4.12
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "Dump truck",
+        "position": [383,4.393274340903221,-5.6],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 19
+      },
+      "width": 3.35,
+      "length": 8.9,
+      "height": 4.12,
+      "label": "Dump truck",
+      "type": "dump",
+      "axis": "x",
+      "direction": 1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 6.7,
+      "min": 280,
+      "max": 660
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "Dump truck",
+        "position": [-185.4,3.94455439608445,-210],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 19
+      },
+      "width": 3.35,
+      "length": 8.9,
+      "height": 4.12,
+      "label": "Dump truck",
+      "type": "dump",
+      "axis": "z",
+      "direction": 1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 6.7,
+      "min": -250,
+      "max": 250
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "RV",
+        "position": [579,3.233618612148368,5.6],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 15
+      },
+      "width": 3.2,
+      "length": 8.7,
+      "height": 4.3,
+      "label": "RV",
+      "type": "rv",
+      "axis": "x",
+      "direction": -1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 7.5,
+      "min": 280,
+      "max": 660
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "RV",
+        "position": [5.4,2.339877953116958,180],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 15
+      },
+      "width": 3.2,
+      "length": 8.7,
+      "height": 4.3,
+      "label": "RV",
+      "type": "rv",
+      "axis": "z",
+      "direction": -1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 7.5,
+      "min": -250,
+      "max": 250
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "Dump truck",
+        "position": [1084,8.159999999999998,409],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 19
+      },
+      "width": 3.35,
+      "length": 8.9,
+      "height": 4.12,
+      "label": "Dump truck",
+      "type": "dump",
+      "axis": "z",
+      "direction": -1,
+      "moving": false,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 0,
+      "cruise": 6.7,
+      "min": -250,
+      "max": 250
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "RV",
+        "position": [1123,8.159999999999998,409],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 15
+      },
+      "width": 3.2,
+      "length": 8.7,
+      "height": 4.3,
+      "label": "RV",
+      "type": "rv",
+      "axis": "z",
+      "direction": -1,
+      "moving": false,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 0,
+      "cruise": 7.5,
+      "min": -250,
+      "max": 250
+    }
+  ],
+  "heavyTraffic": [
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "Dump truck",
+        "position": [383,4.393274340903221,-5.6],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 19
+      },
+      "width": 3.35,
+      "length": 8.9,
+      "height": 4.12,
+      "label": "Dump truck",
+      "type": "dump",
+      "axis": "x",
+      "direction": 1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 6.7,
+      "min": 280,
+      "max": 660
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "Dump truck",
+        "position": [-185.4,3.94455439608445,-210],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 19
+      },
+      "width": 3.35,
+      "length": 8.9,
+      "height": 4.12,
+      "label": "Dump truck",
+      "type": "dump",
+      "axis": "z",
+      "direction": 1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 6.7,
+      "min": -250,
+      "max": 250
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "RV",
+        "position": [579,3.233618612148368,5.6],
+        "rotationY": -1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 15
+      },
+      "width": 3.2,
+      "length": 8.7,
+      "height": 4.3,
+      "label": "RV",
+      "type": "rv",
+      "axis": "x",
+      "direction": -1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 7.5,
+      "min": 280,
+      "max": 660
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "RV",
+        "position": [5.4,2.339877953116958,180],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 15
+      },
+      "width": 3.2,
+      "length": 8.7,
+      "height": 4.3,
+      "label": "RV",
+      "type": "rv",
+      "axis": "z",
+      "direction": -1,
+      "moving": true,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 5,
+      "cruise": 7.5,
+      "min": -250,
+      "max": 250
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "Dump truck",
+        "position": [1084,8.159999999999998,409],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 19
+      },
+      "width": 3.35,
+      "length": 8.9,
+      "height": 4.12,
+      "label": "Dump truck",
+      "type": "dump",
+      "axis": "z",
+      "direction": -1,
+      "moving": false,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-1.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,3],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 0,
+      "cruise": 6.7,
+      "min": -250,
+      "max": 250
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "name": "RV",
+        "position": [1123,8.159999999999998,409],
+        "rotationY": 3.141592653589793,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 15
+      },
+      "width": 3.2,
+      "length": 8.7,
+      "height": 4.3,
+      "label": "RV",
+      "type": "rv",
+      "axis": "z",
+      "direction": -1,
+      "moving": false,
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,-2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.55,0.62,2.8],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "speed": 0,
+      "cruise": 7.5,
+      "min": -250,
+      "max": 250
+    }
+  ],
+  "streetVehicles": [
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [-5.7,0.22599105264990005,-120],
+        "rotationY": -0.12659230409844693,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 27
+      },
+      "width": 3.35,
+      "length": 6.55,
+      "height": 3.58,
+      "type": "ice-cream",
+      "curve": {
+        "type": "CatmullRomCurve3",
+        "arcLengthDivisions": 200,
+        "isCatmullRomCurve3": true,
+        "points": {
+          "$truncated": true
+        },
+        "closed": true,
+        "curveType": "centripetal",
+        "tension": 0.5,
+        "needsUpdate": false,
+        "cacheArcLengths": {
+          "$truncated": true
+        }
+      },
+      "routeLength": 519.9198583220434,
+      "distance": 0,
+      "speed": 0,
+      "cruise": 7.6,
+      "stops": [83.18717733152695,306.7527164100056],
+      "nextStop": 0,
+      "dwell": 0,
+      "deliveries": 0,
+      "hatchPivot": {
+        "$object3d": "Group",
+        "position": [-1.68,2.88,-1.04],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 2
+      },
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.68,0.54,-2.35],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.68,0.54,-2.35],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.68,0.54,2.25],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.68,0.54,2.25],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "phase": 0
+    },
+    {
+      "group": {
+        "$object3d": "Group",
+        "position": [283,0.15000000000000002,8.65],
+        "rotationY": 1.5707963267948966,
+        "scale": [1,1,1],
+        "visible": true,
+        "children": 67
+      },
+      "width": 3.5,
+      "length": 11,
+      "height": 4.12,
+      "type": "trolley",
+      "trackZ": 8.65,
+      "schedule": [310,465,616,657,616,465,310,283],
+      "nextStop": 0,
+      "speed": 0,
+      "cruise": 10.7,
+      "dwell": 0,
+      "doors": [
+        {
+          "$truncated": true
+        },
+        {
+          "$truncated": true
+        },
+        {
+          "$truncated": true
+        },
+        {
+          "$truncated": true
+        }
+      ],
+      "wheels": [
+        {
+          "$object3d": "Group",
+          "position": [-1.75,0.4,-3.48],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.75,0.4,-2.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.75,0.4,2.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [-1.75,0.4,3.48],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.75,0.4,-3.48],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.75,0.4,-2.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.75,0.4,2.4],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        },
+        {
+          "$object3d": "Group",
+          "position": [1.75,0.4,3.48],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 2
+        }
+      ],
+      "phase": 0,
+      "lastBell": 0
+    }
+  ],
+  "motorcycles": [
+    {
+      "i": 0,
+      "group": {
+        "$object3d": "Group",
+        "position": [0,0,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": false,
+        "children": 10
+      },
+      "rider": {
+        "idx": 45,
+        "name": "Morgan Rider",
+        "role": "motorcyclist",
+        "home": -1,
+        "personality": "wary",
+        "root": {
+          "$object3d": "Group",
+          "position": [0,0,0],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": false,
+          "children": 1
+        },
+        "body": {
+          "$object3d": "Group",
+          "position": [0,0,0],
+          "rotationY": 0,
+          "scale": [0.5836391813498456,0.5836391813498456,0.5836391813498456],
+          "visible": true,
+          "children": 8
+        },
+        "head": {
+          "$object3d": "Group",
+          "position": [0,2.9,0],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 9
+        },
+        "arms": {
+          "$truncated": true
+        },
+        "legs": {
+          "$truncated": true
+        },
+        "state": "walk",
+        "alert": 0,
+        "attention": 0,
+        "sayCooldown": 0,
+        "visible": false,
+        "goal": null,
+        "speed": 1.55800990187563,
+        "phase": 2.4852284086072625,
+        "facing": 1.7885298766369238,
+        "timeAway": 0,
+        "reacting": 0,
+        "bike": null,
+        "skill": 0.17783822445198894,
+        "bubbles": {
+          "$truncated": true
+        },
+        "maxLife": 34.861115891486406,
+        "redEyes": {
+          "$truncated": true
+        },
+        "hospital": true,
+        "motorcycle": {
+          "$truncated": true
+        }
+      },
+      "active": false,
+      "crashed": false,
+      "wait": 19,
+      "direction": 1,
+      "velocity": 10.4,
+      "skid": 0,
+      "crashPoint": null
+    },
+    {
+      "i": 1,
+      "group": {
+        "$object3d": "Group",
+        "position": [0,0,0],
+        "rotationY": 0,
+        "scale": [1,1,1],
+        "visible": false,
+        "children": 10
+      },
+      "rider": {
+        "idx": 46,
+        "name": "Alex Rider",
+        "role": "motorcyclist",
+        "home": -1,
+        "personality": "wary",
+        "root": {
+          "$object3d": "Group",
+          "position": [0,0,0],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": false,
+          "children": 1
+        },
+        "body": {
+          "$object3d": "Group",
+          "position": [0,0,0],
+          "rotationY": 0,
+          "scale": [0.6054322774065192,0.6054322774065192,0.6054322774065192],
+          "visible": true,
+          "children": 8
+        },
+        "head": {
+          "$object3d": "Group",
+          "position": [0,2.9,0],
+          "rotationY": 0,
+          "scale": [1,1,1],
+          "visible": true,
+          "children": 9
+        },
+        "arms": {
+          "$truncated": true
+        },
+        "legs": {
+          "$truncated": true
+        },
+        "state": "walk",
+        "alert": 0,
+        "attention": 0,
+        "sayCooldown": 0,
+        "visible": false,
+        "goal": null,
+        "speed": 1.1456974277505652,
+        "phase": 5.470616176116558,
+        "facing": 4.865029024763793,
+        "timeAway": 0,
+        "reacting": 0,
+        "bike": null,
+        "skill": 0.49911934323608875,
+        "bubbles": {
+          "$truncated": true
+        },
+        "maxLife": 43.22954384749755,
+        "redEyes": {
+          "$truncated": true
+        },
+        "hospital": true,
+        "motorcycle": {
+          "$truncated": true
+        }
+      },
+      "active": false,
+      "crashed": false,
+      "wait": 83,
+      "direction": -1,
+      "velocity": 11.9,
+      "skid": 0,
+      "crashPoint": null
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "spicy-rodents/wildlife_trees",
+  "title": "The 95 v5.4 trees (data/authored/wildlife/trees.json), wildlife_foraging 6.1",
+  "type": "object",
+  "required": ["trees", "count"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "src": { "type": "string" },
+    "count": { "type": "integer", "minimum": 1 },
+    "trees": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["idx", "name", "builder", "x", "z", "baseY", "H", "trunkBaseRadius"], "additionalProperties": false,
+        "properties": {
+          "idx": { "type": "integer", "minimum": 0 },
+          "name": { "type": "string", "minLength": 1 },
+          "builder": { "type": "string" },
+          "x": { "type": "number", "x-unit": "u" },
+          "z": { "type": "number", "x-unit": "u" },
+          "baseY": { "type": "number", "x-unit": "u" },
+          "H": { "type": "number", "exclusiveMinimum": 0, "x-unit": "u" },
+          "trunkBaseRadius": { "type": "number", "exclusiveMinimum": 0, "x-unit": "u" },
+          "acorns": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "acornTrees": { "type": "object", "description": "v5.4 constants, HTML units where lengths (acornRadius)" },
+    "knotholesDecorative": { "type": "object", "description": "v5.4 constants, HTML units" }
+  }
+}
