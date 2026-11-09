@@ -15,6 +15,7 @@ local LampPlan = {}
 
 local KINDS = { asphalt = true, concrete = true, cobble = true }
 local POST_R = 0.375 -- studs (0.15 u)
+local ARM = 3 -- studs: the arm reaches over the kerb (v5.4 streetlight arm 3.3 u at a 9 u pole, scaled)
 local ORIGIN = Geometry.frame(0, 0, 0, 0)
 
 export type Lamp = {
@@ -25,6 +26,8 @@ export type Lamp = {
 	z: number,
 	y: number,
 	top: number,
+	hx: number, -- the lamp head at the arm's tip, over the road side of the post
+	hz: number,
 	flicker: boolean,
 }
 
@@ -108,6 +111,7 @@ function LampPlan.plan(
 					if ok then
 						placed += 1
 						local y = heightAt(px, pz)
+						local ax, az = -nx * side * ARM, -nz * side * ARM
 						table.insert(lamps, {
 							id = `{road.id}_{if side < 0 then "L" else "R"}{i}`,
 							road = road.id,
@@ -116,6 +120,8 @@ function LampPlan.plan(
 							z = pz,
 							y = y,
 							top = y + height,
+							hx = px + ax,
+							hz = pz + az,
 							flicker = false,
 						})
 					else

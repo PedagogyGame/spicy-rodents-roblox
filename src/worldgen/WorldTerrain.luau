@@ -15,9 +15,31 @@ local WorldTerrain = {}
 
 local ROAD_MATERIAL = { asphalt = "Asphalt", concrete = "Concrete", cobble = "Cobblestone", path = "Slate" }
 
+-- v5.4 ground colours (worldgen_districts_art §11: grass #819762 under the #a2b78b tint, road #929493
+-- tint over #555b5b grain, sidewalk #c3beb1, quay cobble tint #c4bdab, sand, mud bank).
+local MATERIAL_COLORS = {
+	Grass = "8a9f63",
+	Asphalt = "4b5153",
+	Concrete = "c3beb1",
+	Cobblestone = "c4bdab",
+	Slate = "b5a888",
+	Mud = "6f6450",
+	Sand = "d8c9a3",
+	Ground = "8c7a5d",
+}
+
+function WorldTerrain.colour(terrain: Terrain)
+	for name, h in MATERIAL_COLORS do
+		pcall(function()
+			terrain:SetMaterialColor((Enum.Material :: any)[name], Color3.fromHex(h))
+		end)
+	end
+end
+
 function WorldTerrain.write(terrain: Terrain, opts: { chunk: number? }?): { [string]: any }
 	local o = opts or {}
 	local t0 = os.clock()
+	WorldTerrain.colour(terrain)
 	Height.configure(Import.generated("TerrainExtensions"))
 	local spu = Height.STUDS_PER_UNIT
 	local P = Height.PLAYABLE_U
