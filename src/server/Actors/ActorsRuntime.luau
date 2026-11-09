@@ -275,6 +275,12 @@ function ActorsRuntime.start(opts: Opts): Runtime
 			else
 				local r = roots[a.id]
 				local p = r.Position
+				-- the held body's pose feeds the AI world (perception: people spot and flee a held
+				-- rodent; traffic yields to and sweeps held squirrels); the brain stays suspended
+				local v = r.AssemblyLinearVelocity
+				a.x, a.z = p.X, p.Z
+				a.y = p.Y - offsets[a.id] + a.hip
+				a.speed = math.sqrt(v.X * v.X + v.Z * v.Z)
 				local h = history[actor.id]
 				if h == nil then
 					h = Recovery.newHistory()
