@@ -47,9 +47,10 @@ InputMap.BINDINGS = table.freeze({
 	chooseLeft = { "A", "Left", "DPadLeft" },
 	chooseRight = { "D", "Right", "DPadRight" },
 	pounce = { "MouseButton1", "ButtonR2" },
-	interact = { "F", "ButtonY" },
+	interact = { "E", "ButtonY" },
+	kick = { "F", "ButtonX" },
 	toggleView = { "V", "ButtonR3" },
-	up = { "Space", "E", "ButtonA" },
+	up = { "Space", "ButtonA" },
 	down = { "LeftControl", "Q", "ButtonB" },
 	handbrake = { "Space", "ButtonA" },
 })
@@ -63,15 +64,15 @@ InputMap.LABYRINTH = table.freeze({ forward = "W", back = "S", right = "Up", lef
 -- On-screen hints per controller (the owner-facing rule: always say what to press).
 function InputMap.HINTS(role: string): string
 	if role == "human" then
-		return "WASD move · Shift run · Space jump · V first person · F enter a vehicle"
+		return "WASD move · Shift run · Space jump · F kick · E get in a vehicle · V first person"
 	elseif role == "squirrel" then
 		return "WASD run · Shift sprint · Space leap · E grab a branch · Q drop · A/D pick a route · Ctrl stalk"
 	elseif role == "quadruped" then
 		return "WASD move · Shift run · Space jump"
 	elseif role == "vehicle" then
-		return "W/S drive and brake · A/D steer · Space handbrake · V view · F get out"
+		return "W/S drive and brake · A/D steer · Space handbrake · V view · E get out"
 	elseif role == "drone" then
-		return "WASD fly · Space/E up · Ctrl/Q down · Shift boost"
+		return "WASD fly · Space up · Ctrl/Q down · Shift boost · E land"
 	end
 	return "Waiting for a body…"
 end

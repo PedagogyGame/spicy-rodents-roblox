@@ -341,7 +341,9 @@ function Game.start(opts: Opts?): any
 				ok, why = rt.become(player, "human", nil)
 			end
 		else -- police, drone
-			local officer = if current and current.species == "human" and (s.role == "police" or s.role == "drone")
+			local officer = if current
+					and current.species == "human"
+					and (s.role == "police" or s.role == "drone")
 				then current
 				else freeOfficer()
 			local target = deviceModel(if choice == "drone" then "drone_" else "car_")
@@ -453,7 +455,11 @@ function Game.start(opts: Opts?): any
 				end
 			end
 		end
-		local hitId = PlayRules.kickTarget({ id = actor.id, x = p.X, y = p.Y, z = p.Z }, { x = look.X, z = look.Z }, targets)
+		local hitId = PlayRules.kickTarget(
+			{ id = actor.id, x = p.X, y = p.Y, z = p.Z },
+			{ x = look.X, z = look.Z },
+			targets
+		)
 		if hitId == nil then
 			fire(player, { kind = "kick", hit = false })
 			return false
@@ -461,7 +467,15 @@ function Game.start(opts: Opts?): any
 		local target = byId[hitId]
 		local h, dead = PlayRules.damage(healthOf(hitId), PlayRules.KICK_DAMAGE)
 		health[hitId] = h
-		fire(player, { kind = "kick", hit = true, target = if target.variant == "spicy" then "rodent" else "squirrel", health = h })
+		fire(
+			player,
+			{
+				kind = "kick",
+				hit = true,
+				target = if target.variant == "spicy" then "rodent" else "squirrel",
+				health = h,
+			}
+		)
 		local driver = possession:controllerOf(target)
 		if driver ~= "ai" and driver ~= nil then
 			local ds = stateOf(driver)
@@ -603,6 +617,15 @@ function Game.start(opts: Opts?): any
 		end
 		fadeAcc += dt
 		if fadeAcc >= 1 then
+			-- a joining player is handed a townsperson by RoleService (Ladder: lowest rank)
+			for _, player in Players:GetPlayers() do
+				local actor = possession:actorOf(player)
+				local s = stateOf(player)
+				if s.role == nil and actor and actor.species == "human" then
+					s.role = "townsperson"
+					publish(player)
+				end
+			end
 			for player, s in states do
 				if s.role == "rodent" then
 					if PowerRules.fade(s.power, fadeAcc) > 0 then

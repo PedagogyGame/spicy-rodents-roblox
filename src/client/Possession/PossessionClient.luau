@@ -7,7 +7,7 @@
 -- QuadrupedMotor), applies the camera from CameraPolicy and shows the HUD line for that body. On
 -- `Released` it stops the controller and parks the camera. Devices (§1.5): `DeviceGranted` switches
 -- to the Vehicle or Drone controller and the vehicle / drone camera while the body stays possessed;
--- `DeviceReleased` returns to the body. F asks the server to enter the nearest vehicle or get out;
+-- `DeviceReleased` returns to the body. E asks the server to enter the nearest vehicle or get out (people only);
 -- V toggles first person where CameraPolicy allows it. The Roblox menu's Reset is routed to the
 -- server's recovery through StarterGui:SetCore("ResetButtonCallback", BindableEvent): it never kills
 -- or respawns a body.
@@ -283,14 +283,17 @@ function PossessionClient.start(opts: Opts): Client
 		end)
 	end
 
-	-- verbs that are not motor input: F (enter / exit), V (first-person toggle)
+	-- verbs that are not motor input: E (enter / exit), V (first-person toggle)
 	local UIS = game:GetService("UserInputService")
 	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 		if processed then
 			return
 		end
 		local name = io.KeyCode.Name
-		if name == "F" or name == "ButtonY" then
+		-- E (pad Y) enters or leaves a vehicle or the drone; only people drive, and a squirrel's E is
+		-- its grab (InputMap). F is the townsperson's kick (Client/Main, PlayNet.Kick).
+		local onFoot = payloadNow ~= nil and payloadNow.species == "human"
+		if (name == "E" or name == "ButtonY") and (device ~= nil or onFoot) then
 			if deviceRequest and body then
 				deviceRequest:FireServer("interact")
 			elseif hud then

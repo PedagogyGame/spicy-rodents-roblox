@@ -5,13 +5,17 @@
 -- the body keeps the AI's last move direction for up to `holdSeconds` (0.75 s) or until the first
 -- input (BUILD_PLAN §1.5 step 5), so the stride carries on, and disables the Dead state on the
 -- owning client (Humanoid states are evaluated by the network owner) so nothing local can kill it.
--- Measures input-to-response latency for the S2 checklist.
+-- Measures input-to-response latency for the S2 checklist. Shift sprints (WalkSpeed 16 -> SPRINT;
+-- the owning client's WalkSpeed is what the Humanoid simulates; first playable build).
 -- No side effects on require.
 -- Interface: start(body, payload, metrics) -> stop()
 
 export type Metrics = { [string]: any }
 
 local Human = {}
+
+Human.WALK = 16
+Human.SPRINT = 26
 
 -- KeyCode names (Enum is not available under Lune, where the skeleton test requires this module)
 local MOVE_KEYS: { [string]: boolean } = {
@@ -48,6 +52,7 @@ function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics):
 	local rootPart = root :: BasePart
 	hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
 	hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+	hum.WalkSpeed = Human.WALK
 
 	local snap = payload.snapshot
 	local dir = Vector3.new(snap.vx, 0, snap.vz)
@@ -86,6 +91,9 @@ function Human.start(body: Model, payload: { [string]: any }, metrics: Metrics):
 	table.insert(
 		conns,
 		RunService.RenderStepped:Connect(function()
+			local sprint = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+				or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+			hum.WalkSpeed = if sprint then Human.SPRINT else Human.WALK
 			if hold then
 				if os.clock() >= holdUntil then
 					endHold()
