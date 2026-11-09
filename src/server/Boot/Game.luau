@@ -18,7 +18,8 @@
 -- (Combat/PlayRules; Power per Rodent/PowerRules, brief v2 §15), Power fades while playing.
 -- Engine only inside the functions; no side effects on require.
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, pick(player, choice) -> (ok, why?),
---   kick(player) -> (hit?), kill(actor, cause), step(dt), stateOf(player), health(actorId), stop() }
+--   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
+--   kill(actor, cause), step(dt), stateOf(player), health(actorId), stop() }
 
 local Import = require("../Import")
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
@@ -216,8 +217,12 @@ function Game.start(opts: Opts?): any
 	local now = 0
 
 	local function fire(player: any, payload: { [string]: any })
-		if typeof(player) == "Instance" and (player :: Instance).Parent == Players then
-			eventRemote:FireClient(player :: Player, payload)
+		if typeof(player) == "Instance" then
+			if (player :: Instance).Parent == Players then
+				eventRemote:FireClient(player :: Player, payload)
+			end
+		elseif type(player) == "table" and type(player.events) == "table" then
+			table.insert(player.events, payload) -- PlayerLike stub (engine smoke): what the client would get
 		end
 	end
 
@@ -634,30 +639,27 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
+	-- the remote handlers (the engine smoke calls these with PlayerLike stubs: same path as the menu)
+	local function onPick(player: any, choice: any)
+		local ok, err = pcall(function()
+			pick(player, choice)
+		end)
+		if not ok then
+			warn(`[SpicyRodents] pick {choice} failed: {err}`)
+			fire(player, { kind = "refused", text = "Something went wrong; try again" })
+		end
+	end
+	local function onKick(player: any)
+		local ok, err = pcall(function()
+			kick(player)
+		end)
+		if not ok then
+			warn(`[SpicyRodents] kick failed: {err}`)
+		end
+	end
 	local conns: { RBXScriptConnection } = {}
-	table.insert(
-		conns,
-		pickRemote.OnServerEvent:Connect(function(player: Player, choice: any)
-			local ok, err = pcall(function()
-				pick(player, choice)
-			end)
-			if not ok then
-				warn(`[SpicyRodents] pick {choice} failed: {err}`)
-				fire(player, { kind = "refused", text = "Something went wrong; try again" })
-			end
-		end)
-	)
-	table.insert(
-		conns,
-		kickRemote.OnServerEvent:Connect(function(player: Player)
-			local ok, err = pcall(function()
-				kick(player)
-			end)
-			if not ok then
-				warn(`[SpicyRodents] kick failed: {err}`)
-			end
-		end)
-	)
+	table.insert(conns, pickRemote.OnServerEvent:Connect(onPick))
+	table.insert(conns, kickRemote.OnServerEvent:Connect(onKick))
 	table.insert(
 		conns,
 		Players.PlayerRemoving:Connect(function(player: Player)
@@ -690,6 +692,7 @@ function Game.start(opts: Opts?): any
 		timings = timings,
 		pick = pick,
 		kick = kick,
+		remotes = { Pick = onPick, Kick = onKick },
 		kill = kill,
 		step = function(dt: number)
 			rt.step(dt)
