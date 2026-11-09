@@ -311,6 +311,15 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 	local cand: { Cluster } = {}
 	local tips: { { number } } = {}
 	local yMin, yMax = math.huge, -math.huge
+	-- the crown's horizontal reach: the branch tips round the trunk top (bridges reach beyond it)
+	local crownR = 8 * scale
+	for _, b in boughs do
+		if b.route.kind ~= "bridge" then
+			local e = b.line[#b.line]
+			crownR = math.max(crownR, math.sqrt((e[1] - top[1]) ^ 2 + (e[3] - top[3]) ^ 2))
+		end
+	end
+	crownR += 6 * scale
 	for _, b in boughs do
 		local e = b.line[#b.line]
 		if b.route.kind == "branch" or b.route.kind == "lookout" then
@@ -337,19 +346,33 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			local function cl(r: number, ox: number, oy: number, oz: number, pri: number)
 				table.insert(cand, { p = { p[1] + ox, p[2] + oy, p[3] + oz }, r = r, pri = pri })
 			end
-			for _, sg in { -1, 1 } do
-				local r = scale * (3.0 + 2.6 * u) * (0.75 + 0.5 * rand())
-				local off = r + 1.4 + 0.9 * rand()
-				cl(r, side[1] * sg * off, r * 0.25 + rand() * 1.2, side[3] * sg * off, 2)
-			end
-			if u > 0.4 or b.route.kind == "bridge" then
-				local r = scale * (3.6 + 3.0 * u) * (0.75 + 0.5 * rand())
-				local off = r + 3.8 + 1.2 * rand()
-				cl(r, up[1] * off, up[2] * off, up[3] * off, 1)
-			end
-			if i % 2 == 0 then
-				local r = scale * (2.8 + 2.0 * u) * (0.8 + 0.4 * rand())
-				cl(r, 0, -(r + 0.15), 0, 3)
+			local inCrown = math.sqrt((p[1] - top[1]) ^ 2 + (p[3] - top[3]) ^ 2) <= crownR
+			if inCrown then
+				for _, sg in { -1, 1 } do
+					local r = scale * (3.0 + 2.6 * u) * (0.75 + 0.5 * rand())
+					local off = r + 1.4 + 0.9 * rand()
+					cl(r, side[1] * sg * off, r * 0.25 + rand() * 1.2, side[3] * sg * off, 2)
+				end
+				if u > 0.4 or b.route.kind == "bridge" then
+					local r = scale * (3.6 + 3.0 * u) * (0.75 + 0.5 * rand())
+					local off = r + 3.8 + 1.2 * rand()
+					cl(r, up[1] * off, up[2] * off, up[3] * off, 1)
+				end
+				if i % 2 == 0 then
+					local r = scale * (2.8 + 2.0 * u) * (0.8 + 0.4 * rand())
+					cl(r, 0, -(r + 0.15), 0, 3)
+				end
+			elseif not willow then
+				-- a living bridge out past the crown: leafy tufts alternating along it, like a vine-hung
+				-- limb (the bark stays mostly hidden without a solid tube of leaves)
+				local sg = if i % 2 == 0 then 1 else -1
+				local r = scale * (2.3 + 1.2 * rand())
+				local off = r + 1.3 + 0.6 * rand()
+				cl(r, side[1] * sg * off, r * 0.2, side[3] * sg * off, 4)
+				if i % 3 == 0 then
+					local rb = scale * (2.2 + rand())
+					cl(rb, 0, -(rb + 0.15), 0, 4)
+				end
 			end
 			s += step
 		end
@@ -474,25 +497,28 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 
 	-- 3. willow curtains and apples ----------------------------------------------------------------
 	if willow then
+		-- weeping curtains: strands hanging from the lower half of the crown all round, almost to the
+		-- ground at the rim (QUAY WILLOW, worldgen_districts_art §3.7)
 		local strands = 0
 		for _, c in accepted do
 			local dx, dz = c.p[1] - cx, c.p[3] - cz
 			local dist = math.sqrt(dx * dx + dz * dz)
-			if dist > rh * 0.45 and strands < 44 then
+			if dist > rh * 0.25 and strands < 110 then
 				local ux, uz = dx / math.max(dist, 1e-6), dz / math.max(dist, 1e-6)
-				for k = 1, 2 do
-					local a = (rand() - 0.5) * 1.2
+				for k = 1, 3 do
+					local a = (rand() - 0.5) * 1.6
 					local ox = ux * math.cos(a) - uz * math.sin(a)
 					local oz = ux * math.sin(a) + uz * math.cos(a)
-					local x, z = c.p[1] + ox * c.r * 0.7, c.p[3] + oz * c.r * 0.7
-					local y1 = c.p[2] - c.r * 0.2
+					local x, z = c.p[1] + ox * c.r * 0.75, c.p[3] + oz * c.r * 0.75
+					local y1 = c.p[2] - c.r * 0.1
 					local ground = (opts.groundAt(x, z, y1))
-					local y0 = math.max(ground + 3.5, y1 - (9 + 9 * rand()) * scale)
+					local rim = math.clamp(dist / rh, 0, 1)
+					local y0 = math.max(ground + 2.5, y1 - (8 + 14 * rim + 4 * rand()))
 					if y1 - y0 > 2 then
 						strands += 1
-						local rr = (0.9 + 0.5 * rand()) * scale
+						local rr = 1.0 + 0.6 * rand()
 						cylinder(list, `Strand{strands}`, { x, y0, z }, { x, y1, z }, rr, 0, {
-							color = shade(greens[(k % #greens) + 1], 0.95 + 0.1 * rand()),
+							color = shade(greens[(k % #greens) + 1], 0.98 + 0.1 * rand()),
 							material = "LeafyGrass",
 							canCollide = false,
 							canQuery = false,
