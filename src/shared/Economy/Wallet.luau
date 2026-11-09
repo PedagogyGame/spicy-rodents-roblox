@@ -5,7 +5,9 @@
 -- finite, non-negative number of cents, and a balance never exceeds MAX_CENTS (well inside the
 -- 2^53 exact-integer range of a Luau number and of the DataStore's JSON).
 -- Interface: isCents(v), credit(balance, cents) -> (ok, newBalance | reason),
---            debit(balance, cents) -> (ok, newBalance | reason), format(cents) -> "S$12.34"
+--            debit(balance, cents) -> (ok, newBalance | reason), format(cents) -> "S$12.34",
+--            purse(cents?) -> Purse (W1: the server-life wallet until W4 binds it to the profile);
+--            Purse:credit(cents, why) / Purse:debit(cents, why) -> (ok, reason?), Purse.cents, Purse.history
 
 local Wallet = {}
 
@@ -56,6 +58,48 @@ function Wallet.format(cents: number): string
 		grouped = string.sub(grouped, 2)
 	end
 	return `{sign}S${grouped}.{string.format("%02d", rest)}`
+end
+
+export type Entry = { delta: number, why: string, balance: number }
+export type Purse = {
+	cents: number,
+	history: { Entry }, -- the last HISTORY entries, oldest first
+	credit: (self: Purse, cents: number, why: string) -> (boolean, string?),
+	debit: (self: Purse, cents: number, why: string) -> (boolean, string?),
+}
+
+Wallet.HISTORY = 20
+
+local function record(p: Purse, delta: number, why: string)
+	table.insert(p.history, { delta = delta, why = why, balance = p.cents })
+	if #p.history > Wallet.HISTORY then
+		table.remove(p.history, 1)
+	end
+end
+
+-- A server-life wallet (BUILD_PLAN §4.4 #6b: "Wallet (server-life until W4)").
+function Wallet.purse(cents: number?): Purse
+	local p = { cents = cents or 0, history = {} } :: Purse
+	assert(Wallet.isCents(p.cents), "Wallet.purse: bad opening balance")
+	function p.credit(self: Purse, amount: number, why: string): (boolean, string?)
+		local ok, r = Wallet.credit(self.cents, amount)
+		if not ok then
+			return false, r :: string
+		end
+		self.cents = r :: number
+		record(self, amount, why)
+		return true
+	end
+	function p.debit(self: Purse, amount: number, why: string): (boolean, string?)
+		local ok, r = Wallet.debit(self.cents, amount)
+		if not ok then
+			return false, r :: string
+		end
+		self.cents = r :: number
+		record(self, -amount, why)
+		return true
+	end
+	return p
 end
 
 return Wallet

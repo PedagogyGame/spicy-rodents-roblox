@@ -1,0 +1,30 @@
+{
+  "$schema": "../../tools/compile/schema/building.schema.json",
+  "id": "police_station", "version": 0, "lot": "west_police_station", "builder": "PoliceStation",
+  "src": "BUILD_PLAN §3.12, §4.4 #7 (v0: enterable lobby, briefing room, drone console, 2 player-car pads, the AI cruiser pad); hospital_police_infection §5; v5.4 patrol pads 9x15 at (-525,-81) and (-495,-81) (lot notes). Local lot frame in HTML units: lx across the front, lz toward the front (front wall at lz = +d/2).",
+  "partitionHeightU": 6, "doorHeightU": 3.5,
+  "rooms": [
+    { "id": "lobby", "name": "Lobby", "rect": [-12, 12, 2, 15.5] },
+    { "id": "briefing", "name": "Briefing Room", "rect": [-23, -12, -15.5, 15.5] },
+    { "id": "dispatch", "name": "Dispatch", "rect": [12, 23, -15.5, 15.5] },
+    { "id": "back_office", "name": "Lockers", "rect": [-12, 12, -15.5, 2] }
+  ],
+  "briefRooms": ["lobby", "briefing", "dispatch"],
+  "doors": [
+    { "id": "entrance", "a": "lobby", "b": "outside", "at": [0, 15.5], "width": 6, "lockable": false },
+    { "id": "lobby_briefing", "a": "lobby", "b": "briefing", "at": [-12, 9], "width": 3.5, "lockable": false },
+    { "id": "lobby_dispatch", "a": "lobby", "b": "dispatch", "at": [12, 9], "width": 3.5, "lockable": true },
+    { "id": "lobby_back", "a": "lobby", "b": "back_office", "at": [0, 2], "width": 3.5, "lockable": true }
+  ],
+  "stations": [
+    { "id": "front_desk", "kind": "desk", "room": "lobby", "at": [0, 8] },
+    { "id": "quest_board", "kind": "quest_board", "room": "briefing", "at": [-21, 0] },
+    { "id": "drone_console", "kind": "drone_console", "room": "dispatch", "at": [17.5, 0] }
+  ],
+  "shelves": [],
+  "pads": [
+    { "id": "player_car_1", "kind": "player_car", "at": [-17, 26], "w": 9, "d": 15 },
+    { "id": "player_car_2", "kind": "player_car", "at": [-7, 26], "w": 9, "d": 15 },
+    { "id": "ai_cruiser", "kind": "ai_cruiser", "at": [13, 26], "w": 9, "d": 15 }
+  ]
+}

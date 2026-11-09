@@ -1,0 +1,233 @@
+{
+  "$schema": "../../tools/compile/schema/interior.schema.json",
+  "id": "frb_bungalow",
+  "lot": "core_house_1_bungalow",
+  "version": 0,
+  "src": "BUILD_PLAN \u00a73.4 interior template (W1 v0, one of the 4 FRB houses); worldgen_core \u00a716 (interiors sit inside the real shell); humans_actors Q4 escape rule. Rooms are fractional rects [fx0, fx1, fz0, fz1]: fx across the front (0 = left seen from the street), fz from the back wall (0) to the front wall (1). Door `at` is fractional on a room boundary; width in HTML units.",
+  "floorU": 0.13,
+  "wallU": 0.24,
+  "doorHeightU": 3.5,
+  "rooms": [
+    {
+      "id": "living",
+      "name": "Living Room",
+      "rect": [
+        0,
+        0.6,
+        0.5,
+        1
+      ]
+    },
+    {
+      "id": "kitchen",
+      "name": "Kitchen",
+      "rect": [
+        0.6,
+        1,
+        0.5,
+        1
+      ]
+    },
+    {
+      "id": "bedroom",
+      "name": "Bedroom",
+      "rect": [
+        0,
+        0.45,
+        0,
+        0.5
+      ]
+    },
+    {
+      "id": "bath",
+      "name": "Bathroom",
+      "rect": [
+        0.45,
+        0.65,
+        0,
+        0.5
+      ]
+    },
+    {
+      "id": "den",
+      "name": "Den",
+      "rect": [
+        0.65,
+        1,
+        0,
+        0.5
+      ]
+    }
+  ],
+  "doors": [
+    {
+      "id": "front",
+      "a": "living",
+      "b": "outside",
+      "at": [
+        0.3,
+        1
+      ],
+      "width": 2.6,
+      "lockable": true
+    },
+    {
+      "id": "living_kitchen",
+      "a": "living",
+      "b": "kitchen",
+      "at": [
+        0.6,
+        0.75
+      ],
+      "width": 2,
+      "lockable": false
+    },
+    {
+      "id": "living_bedroom",
+      "a": "living",
+      "b": "bedroom",
+      "at": [
+        0.22,
+        0.5
+      ],
+      "width": 2,
+      "lockable": true
+    },
+    {
+      "id": "living_bath",
+      "a": "living",
+      "b": "bath",
+      "at": [
+        0.55,
+        0.5
+      ],
+      "width": 1.8,
+      "lockable": true
+    },
+    {
+      "id": "kitchen_den",
+      "a": "kitchen",
+      "b": "den",
+      "at": [
+        0.82,
+        0.5
+      ],
+      "width": 2,
+      "lockable": false
+    },
+    {
+      "id": "back",
+      "a": "den",
+      "b": "outside",
+      "at": [
+        0.82,
+        0
+      ],
+      "width": 2.2,
+      "lockable": true
+    }
+  ],
+  "furniture": [
+    {
+      "id": "sofa",
+      "room": "living",
+      "kit": "sofa",
+      "at": [
+        0.3,
+        0.62
+      ],
+      "size": [
+        5,
+        1.6,
+        2
+      ],
+      "hide": "behind"
+    },
+    {
+      "id": "bed",
+      "room": "bedroom",
+      "kit": "bed",
+      "at": [
+        0.22,
+        0.2
+      ],
+      "size": [
+        4,
+        1.2,
+        6
+      ],
+      "hide": "under"
+    },
+    {
+      "id": "wardrobe",
+      "room": "bedroom",
+      "kit": "wardrobe",
+      "at": [
+        0.04,
+        0.3
+      ],
+      "size": [
+        1.2,
+        4.2,
+        3
+      ],
+      "hide": "inside"
+    },
+    {
+      "id": "counter",
+      "room": "kitchen",
+      "kit": "counter",
+      "at": [
+        0.8,
+        0.95
+      ],
+      "size": [
+        5,
+        2.2,
+        1.4
+      ]
+    },
+    {
+      "id": "shelf",
+      "room": "den",
+      "kit": "bookshelf",
+      "at": [
+        0.97,
+        0.25
+      ],
+      "size": [
+        0.8,
+        4,
+        3
+      ]
+    }
+  ],
+  "defenderSpawn": {
+    "room": "kitchen",
+    "at": [
+      0.8,
+      0.75
+    ]
+  },
+  "burglarEntry": {
+    "door": "back"
+  },
+  "remodelSlots": [
+    "living.wall",
+    "den.wall"
+  ],
+  "squirrelRoutes": [
+    {
+      "kind": "counter_top",
+      "slot": "counter"
+    },
+    {
+      "kind": "shelf_top",
+      "slot": "shelf"
+    },
+    {
+      "kind": "curtain_rail",
+      "room": "living"
+    }
+  ]
+}

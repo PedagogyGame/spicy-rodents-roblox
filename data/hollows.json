@@ -1,0 +1,50 @@
+{
+  "$schema": "../tools/compile/schema/hollows.schema.json",
+  "src": "BUILD_PLAN §3.5, §5.5; brief v2 §3 (12 claimable: 2 premium, 1 escape, 9 single-chamber, plus the fallen log); wildlife_foraging §6.4-§6.5 sites. HTML units.",
+  "meterDefaults": { "capacity": 120, "ownAt": 0.7 },
+  "hollows": [
+    {
+      "id": "H1", "tier": "premium", "variant": "spiral", "tree": "park outer 95", "x": 90, "z": 358, "girth": 2.0,
+      "asset": "hero.hollow.spiral",
+      "chambers": [ { "id": "low", "h": 0.25, "cap": 40 }, { "id": "mid", "h": 0.55, "cap": 60 }, { "id": "crown", "h": 0.85, "cap": 20, "lookout": true } ],
+      "knotholes": [ { "h": 0.05, "bearing": 200, "chamber": "low", "exitTo": "ground" }, { "h": 0.88, "bearing": 30, "chamber": "crown", "exitTo": "bough" } ],
+      "interiorRoute": { "kind": "ramp", "from": "low", "to": "crown" },
+      "meter": { "capacity": 240, "ownAt": 0.7 }, "claimable": true,
+      "premiumForage": [ { "id": "tabasco_garden_bed_1", "kind": "garden", "x": 115, "z": 341 }, { "id": "feeder_premium_H1", "kind": "feeder", "x": 105, "z": 330 } ],
+      "src": "wildlife_foraging §6.5 H1; BUILD_PLAN §5.5"
+    },
+    {
+      "id": "H2", "tier": "premium", "variant": "shaft", "tree": "SYCAMORE", "x": -37, "z": 29, "girth": 2.0,
+      "asset": "hero.hollow.shaft",
+      "chambers": [ { "id": "low", "h": 0.2, "cap": 40 }, { "id": "mid", "h": 0.5, "cap": 60 }, { "id": "nook", "h": 0.9, "cap": 20, "hideout": true } ],
+      "knotholes": [ { "h": 0.04, "bearing": 90, "chamber": "low", "exitTo": "ground" }, { "h": 0.5, "bearing": 300, "chamber": "mid", "exitTo": "route:243" }, { "h": 0.92, "bearing": 150, "chamber": "nook", "exitTo": "route:248" } ],
+      "interiorRoute": { "kind": "shaft", "from": "low", "to": "nook" },
+      "meter": { "capacity": 240, "ownAt": 0.7 }, "claimable": true,
+      "premiumForage": [ { "id": "garden_plot_core", "kind": "garden", "x": -36, "z": 52 }, { "id": "feeder_premium_H2", "kind": "feeder", "x": -45, "z": 68 } ],
+      "src": "wildlife_foraging §6.5 H2; BUILD_PLAN §5.5"
+    },
+    { "id": "H3", "tier": "single", "variant": "knothole", "tree": "BUR OAK", "x": -34, "z": -33, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "route:220" } ], "claimable": true, "src": "wildlife_foraging §6.5 H3" },
+    { "id": "H4", "tier": "single", "variant": "knothole", "tree": "HIGHLAND ELM", "x": 88, "z": 139, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H4" },
+    { "id": "H5", "tier": "single", "variant": "knothole", "tree": "OLD WATCH SYCAMORE", "x": 216, "z": -109, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H5" },
+    { "id": "H6", "tier": "single", "variant": "knothole", "tree": "SENTINEL OAK", "x": -101, "z": -146, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H6" },
+    { "id": "H7", "tier": "single", "variant": "knothole", "tree": "Treehouse Oak", "x": -142, "z": 154, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H7" },
+    { "id": "H8", "tier": "single", "variant": "knothole", "tree": "Chilis Sycamore", "x": 412, "z": -62, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H8" },
+    { "id": "H9", "tier": "single", "variant": "knothole", "tree": "Estate Oak South 1", "x": 118, "z": -356, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H9" },
+    { "id": "H10", "tier": "single", "variant": "knothole", "tree": "Westside 4 shade oak", "x": -401, "z": 6, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H10" },
+    { "id": "H11", "tier": "single", "variant": "knothole", "tree": "QUAY WILLOW", "x": 1094, "z": 192, "chambers": [ { "id": "c", "h": 0.4, "cap": 30 } ], "knotholes": [ { "h": 0.4, "bearing": 0, "chamber": "c", "exitTo": "trunk" } ], "claimable": true, "src": "wildlife_foraging §6.5 H11" },
+    {
+      "id": "H12", "tier": "escape", "variant": "escape", "tree": "AMERICAN ELM", "x": 32, "z": -37,
+      "asset": "hero.hollow.escape",
+      "chambers": [ { "id": "c", "h": 0.45, "cap": 30 } ],
+      "knotholes": [ { "h": 0.03, "bearing": 180, "chamber": "c", "exitTo": "ground" }, { "h": 0.58, "bearing": 80, "chamber": "c", "exitTo": "route:232" }, { "h": 0.58, "bearing": 300, "chamber": "c", "exitTo": "route:236" } ],
+      "claimable": true,
+      "note": "BUILD_PLAN §5.5 asks for a core-grid oak with at least three boughs; the only core oak (BUR OAK) is H3, so the core AMERICAN ELM (7 boughs, route island 231-240) is used; RED MAPLE (34,34) stays the alternate. Town-plan page may move it.",
+      "src": "brief v2 §3 escape tree; BUILD_PLAN §3.5, §5.5 H12"
+    }
+  ],
+  "log": {
+    "id": "LOG", "variant": "log", "claimable": false, "x": -19, "z": 376, "lengthU": 9, "yaw": 0.35,
+    "exits": 2, "nook": { "t": 0.5 }, "routeKind": "tunnel",
+    "src": "wildlife_foraging §6.4 (v5.4 hollow log); BUILD_PLAN §5.5"
+  }
+}

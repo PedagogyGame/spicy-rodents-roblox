@@ -1,0 +1,42 @@
+{
+  "$schema": "../../tools/compile/schema/building.schema.json",
+  "id": "hospital", "version": 0, "lot": "hospital_main", "builder": "Hospital",
+  "src": "BUILD_PLAN §3.12, §4.4 #7 (v0: the 8 brief rooms, 4 stations, pharmacy shelves with item slots, room-name volumes); hospital_police_infection §2-§3; brief v2 §5. Local lot frame in HTML units: lx across the front, lz toward the front (front wall at lz = +d/2).",
+  "wallHeightU": 13.34, "partitionHeightU": 6.7, "doorHeightU": 3.5,
+  "rooms": [
+    { "id": "reception", "name": "Reception", "rect": [-16, 16, 26, 48] },
+    { "id": "triage", "name": "Triage", "rect": [-47, -16, 26, 48] },
+    { "id": "pharmacy", "name": "Pharmacy", "rect": [16, 47, 26, 48] },
+    { "id": "ward_a", "name": "Ward A", "rect": [-47, 0, -12, 26] },
+    { "id": "ward_b", "name": "Ward B", "rect": [0, 47, -12, 26] },
+    { "id": "isolation", "name": "Isolation", "rect": [-47, -16, -48, -12] },
+    { "id": "staff_room", "name": "Staff Room", "rect": [-16, 16, -48, -12] },
+    { "id": "supply", "name": "Supply", "rect": [16, 47, -48, -12] },
+    { "id": "ambulance_bay", "name": "Ambulance Bay", "rect": [-4, 4, 48, 69], "exterior": true }
+  ],
+  "briefRooms": ["reception", "triage", "ward_a", "ward_b", "isolation", "pharmacy", "staff_room", "ambulance_bay"],
+  "doors": [
+    { "id": "entrance", "a": "reception", "b": "outside", "at": [0, 48], "width": 9, "lockable": false },
+    { "id": "rec_triage", "a": "reception", "b": "triage", "at": [-16, 37], "width": 4, "lockable": false },
+    { "id": "rec_pharmacy", "a": "reception", "b": "pharmacy", "at": [16, 37], "width": 4, "lockable": true },
+    { "id": "rec_ward_a", "a": "reception", "b": "ward_a", "at": [-8, 26], "width": 5, "lockable": false },
+    { "id": "rec_ward_b", "a": "reception", "b": "ward_b", "at": [8, 26], "width": 5, "lockable": false },
+    { "id": "ward_a_isolation", "a": "ward_a", "b": "isolation", "at": [-31, -12], "width": 4, "lockable": true },
+    { "id": "ward_a_staff", "a": "ward_a", "b": "staff_room", "at": [-8, -12], "width": 4, "lockable": false },
+    { "id": "ward_b_supply", "a": "ward_b", "b": "supply", "at": [31, -12], "width": 4, "lockable": true },
+    { "id": "staff_supply", "a": "staff_room", "b": "supply", "at": [16, -30], "width": 4, "lockable": false },
+    { "id": "staff_exit", "a": "staff_room", "b": "outside", "at": [0, -48], "width": 4, "lockable": true }
+  ],
+  "stations": [
+    { "id": "reception_desk", "kind": "admit", "room": "reception", "at": [0, 40] },
+    { "id": "triage_station", "kind": "triage", "room": "triage", "at": [-31, 37] },
+    { "id": "pharmacy_counter", "kind": "dispense", "room": "pharmacy", "at": [31, 32] },
+    { "id": "ward_station", "kind": "treat", "room": "ward_a", "at": [-24, 8] }
+  ],
+  "shelves": [
+    { "id": "rx_1", "room": "pharmacy", "at": [22, 45], "lengthU": 7, "levels": 3, "slotsPerLevel": 4 },
+    { "id": "rx_2", "room": "pharmacy", "at": [31, 45], "lengthU": 7, "levels": 3, "slotsPerLevel": 4 },
+    { "id": "rx_3", "room": "pharmacy", "at": [40, 45], "lengthU": 7, "levels": 3, "slotsPerLevel": 4 }
+  ],
+  "pads": []
+}

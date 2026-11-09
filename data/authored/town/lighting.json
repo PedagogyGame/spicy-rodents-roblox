@@ -1,0 +1,9 @@
+{
+  "src": "BUILD_PLAN §3.19 (brief v2 §15 street lighting). W1 places greybox posts and Skyline heads only (no lights).",
+  "lamps": { "perBlockSide": 1, "spacingMaxU": 60, "height": 5.5, "setbackU": 1.2, "warmth": [0.95, 0.75, 0.45], "range": 18, "brightness": 1.2, "minRoadLengthU": 12 },
+  "porch": { "everyHouse": true, "range": 8 },
+  "shopFront": { "emissive": true, "openOnly": true },
+  "flicker": { "fraction": 0.07, "seed": 7 },
+  "client": { "enableRadius": 180, "shadows": false, "nightOnly": true },
+  "skyline": { "emissiveHeads": true }
+}

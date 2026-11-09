@@ -1,0 +1,16 @@
+{
+  "$schema": "../tools/compile/schema/terrain_extensions.schema.json",
+  "src": "BUILD_PLAN D32, §3.12, §4.4 #7; brief v2 §13a (hill with sky lift and hilltop restaurant), §15 (off-road zone beyond a ridge with real trees, a beach running past the public area into a back field with hills). worldgen_districts_art §14.4: ocean north (beyond z 443), hills south and west. Positions are a W1 proposal for the town-plan page. HTML units.",
+  "verbatimRect": { "minX": -590, "maxX": 1150, "minZ": -565, "maxZ": 443 },
+  "blendU": 60,
+  "worldClampU": { "minX": -900, "maxX": 1720, "minZ": -900, "maxZ": 600 },
+  "patches": [
+    { "id": "hill", "shape": "dome", "mode": "add", "cx": -420, "cz": -680, "radius": 150, "height": 42, "material": "Grass", "note": "sky lift hill; hilltop restaurant at the crown (W3b #13)" },
+    { "id": "ridge", "shape": "ridge", "mode": "add", "from": [1195, -320], "to": [1195, 580], "halfWidth": 32, "height": 22, "material": "Grass", "note": "ridge with real trees (W3b #14) between the Quay and the off-road field" },
+    { "id": "back_field", "shape": "field", "mode": "add", "minX": 1235, "maxX": 1700, "minZ": -320, "maxZ": 580, "base": 4, "amplitude": 9, "wavelength": 170, "edge": 50, "material": "Grass", "note": "back field with hills (off-road)" },
+    { "id": "long_beach", "shape": "beach", "mode": "set", "minX": -320, "maxX": 1700, "minZ": 448, "maxZ": 590, "fromY": 2.2, "toY": 0.4, "edge": 30, "material": "Sand", "note": "beach north of the town, running east past the public area into the off-road district" }
+  ],
+  "districts": [
+    { "id": "offroad", "label": "OFF-ROAD", "jurisdiction": false, "terrain": "extension", "minX": 1215, "maxX": 1700, "minZ": -320, "maxZ": 590, "slopes": [ { "from": [1150, 300], "to": [1260, 300] }, { "from": [1150, -200], "to": [1260, -200] } ], "note": "no roads, lanes, lots or stop lines; the drone sees it (brief v2 §15)" }
+  ]
+}
