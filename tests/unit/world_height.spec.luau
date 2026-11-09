@@ -2,6 +2,7 @@
 -- World/Height + World/Ground golden tests (spike S6; BUILD_PLAN §6.2 "World/Height, World/Ground"
 -- row): every row of tests/golden/terrain.json (11,060 vectors from the verbatim v5.4 functions,
 -- HTML units) through the verbatim port at 1e-9, and the stud wrappers at 1e-6 after x2.5 scaling.
+-- W1: the D32 extensions (configure) leave every row inside the v5.4 rectangle bit-exact.
 local fs = require("@lune/fs")
 local Height = require("@shared/World/Height")
 local Ground = require("@shared/World/Ground")
@@ -73,5 +74,40 @@ return function(t)
 		t.eq(Ground.surfaceKind(0, 0), "terrain")
 		t.eq(Ground.groundAt(300, 300, 0), Ground.groundAt(300, 300, 0))
 		t.eq(Ground.roofAt(0, 0, 0), nil)
+	end)
+
+	t.test("D32 extensions: verbatim inside the rectangle (bit-exact on every golden row), patches outside", function()
+		local ext = require("../../generated/TerrainExtensions") :: any
+		Height.configure(ext)
+		local inside, rows, patched = 0, 0, 0
+		local R = ext.verbatimRect
+		for _, row in golden.rows do
+			local x, z = num(row[2]), num(row[3])
+			rows += 1
+			if x >= R.minX and x <= R.maxX and z >= R.minZ and z <= R.maxZ then
+				inside += 1
+				t.eq(Height.terrainU(x, z), Height.atU(x, z))
+			elseif Height.terrainU(x, z) ~= Height.atU(x, z) then
+				patched += 1 -- outside the rectangle the authored patches apply (atU stays verbatim)
+			end
+		end
+		print(`      {inside} of {rows} golden rows inside the verbatim rectangle; {patched} outside rows under a patch`)
+		t.truthy(inside > 0)
+		-- the hill rises, the beach flattens toward its target, the field rolls
+		t.truthy(Height.terrainU(-420, -680) > Height.atU(-420, -680) + 30, "hill")
+		t.truthy(math.abs(Height.terrainU(400, 560) - (2.2 + (0.4 - 2.2) * (560 - 448) / (590 - 448))) < 1.5, "beach")
+		t.eq(Height.extensionMaterial(400 * 2.5, 560 * 2.5), "Sand")
+		-- continuity across the rectangle edge (blend over blendU)
+		for _, p in { { R.minX, -600 }, { 1000, R.maxZ }, { R.maxX, 0 }, { -400, R.minZ } } do
+			local x, z = p[1], p[2]
+			local dx = if x == R.minX then -0.01 elseif x == R.maxX then 0.01 else 0
+			local dz = if z == R.minZ then -0.01 elseif z == R.maxZ then 0.01 else 0
+			-- just outside the edge the patches have (almost) no weight yet: the ground is v5.4's own
+			t.near(Height.terrainU(x + dx, z + dz), Height.atU(x + dx, z + dz), 1e-3, `edge {x},{z}`)
+		end
+		local clamp = Height.worldClamp()
+		t.near(clamp.maxX, ext.worldClampU.maxX * 2.5, 1e-9)
+		Height.configure(nil)
+		t.eq(Height.at(-420 * 2.5, -680 * 2.5), Height.atU(-420, -680) * 2.5)
 	end)
 end

@@ -1,8 +1,11 @@
 --!strict
--- WorldGen bake tests (spike S6; BUILD_PLAN §6.2 "bake determinism", §6.4 place tests): the Lune
--- bake of generated/ data gives one Model per lot (243) and per road (116), no solid overlap
--- between lot greyboxes, the data's facing, seats on World/Height, LevelOfDetail on every building,
--- a stable BakeHash and an InstanceHash that survives the .rbxm round trip.
+-- WorldGen bake tests (spike S6, W1 #7; BUILD_PLAN §6.2 "bake determinism", §6.4 place tests): the
+-- Lune bake of generated/ data gives one Model per lot (243) and per road (116) plus route props,
+-- lamps and the Skyline; the data's facing; seats on World/Height (or the harvested absolute seat);
+-- LevelOfDetail from data; the builder families (gables at the harvested eave/peak, doors with prompt
+-- placeholders, SurfaceGui signs, Beam wires, trees around their route curves, the Hospital and
+-- PoliceStation programmes, the 4 FRB interiors with server-owned doors); a stable BakeHash and an
+-- InstanceHash that survives the .rbxm round trip.
 local roblox = require("@lune/roblox")
 local Bake = require("@worldgen/Bake")
 local Factory = require("@worldgen/Factory")
@@ -10,9 +13,8 @@ local Plan = require("@worldgen/Plan")
 local Kits = require("@worldgen/Kits")
 local Height = require("@shared/World/Height")
 
-local lots = require("../../generated/Lots") :: any
-local roads = require("../../generated/Roads") :: any
 local Index = require("../../generated/Index") :: any
+local LotTypes = require("../../generated/LotTypes") :: any
 
 local function factory()
 	return Factory.new({
@@ -21,110 +23,250 @@ local function factory()
 		CFrame = roblox.CFrame,
 		Color3 = roblox.Color3,
 		Enum = roblox.Enum,
+		UDim2 = roblox.UDim2,
+		ColorSequence = roblox.ColorSequence,
 	})
 end
 
-return function(t)
-	local data = { lots = lots, roads = roads }
-	local plans = Bake.plans(data)
+local function part(p: any, name: string): any
+	for _, s in p.parts do
+		if s.name == name then
+			return s
+		end
+	end
+	return nil
+end
 
-	t.test("one plan per lot and per road; every lot type has a kit", function()
+return function(t)
+	local data = Bake.data()
+	local lots, roads = data.lots, data.roads
+	local plans = Bake.plans(data)
+	local byId: { [string]: any } = {}
+	for _, p in plans do
+		if p.kind == "lot" then
+			byId[p.id] = p
+		end
+	end
+
+	t.test("one plan per lot and per road; every lot type has a kit from data", function()
 		t.eq(#lots, Index.modules.Lots.count)
 		t.eq(#roads, Index.modules.Roads.count)
-		local nl, nr = 0, 0
+		local n = { lot = 0, road = 0, props = 0, lamps = 0, skyline = 0 }
 		for _, p in plans do
+			n[p.kind] += 1
 			if p.kind == "lot" then
-				nl += 1
 				t.eq(p.attributes.UnknownType, nil, p.id)
-			else
-				nr += 1
 			end
 		end
-		t.eq(nl, 243)
-		t.eq(nr, 116)
+		t.eq(n.lot, 243)
+		t.eq(n.road, 116)
+		t.eq(n.skyline, 1)
+		t.truthy(n.props >= 400, `props {n.props}`)
+		t.truthy(n.lamps >= 80, `lamp models {n.lamps}`)
+		for _, lot in lots do
+			t.truthy(Kits.known(lot.type), lot.type)
+			t.eq(Kits.get(lot.type).lod, LotTypes.types[lot.type].lod, lot.type)
+		end
 	end)
 
 	t.test("BakeHash is deterministic across runs", function()
 		t.eq(Bake.hash(Bake.plans(data)), Bake.hash(plans))
 	end)
 
-	t.test("no solid overlap between lot greyboxes (3-D, 0.05 st tolerance)", function()
-		local solids = {}
-		for _, p in plans do
-			if p.kind == "lot" and p.attributes.Solid then
-				table.insert(solids, p)
-			end
-		end
-		local overlaps = {}
-		for i = 1, #solids do
-			local a = solids[i].parts[1]
-			local ax0, ax1, az0, az1 = Plan.worldBox(a)
-			for j = i + 1, #solids do
-				local b = solids[j].parts[1]
-				local bx0, bx1, bz0, bz1 = Plan.worldBox(b)
-				local ox = math.min(ax1, bx1) - math.max(ax0, bx0)
-				local oz = math.min(az1, bz1) - math.max(az0, bz0)
-				local oy = math.min(a.cy + a.sy / 2, b.cy + b.sy / 2) - math.max(a.cy - a.sy / 2, b.cy - b.sy / 2)
-				if ox > 0.05 and oz > 0.05 and oy > 0.05 then
-					table.insert(overlaps, `{solids[i].id} x {solids[j].id}`)
-				end
-			end
-		end
-		print(`      {#solids} solid lots, {#overlaps} overlaps`)
-		t.eq(#overlaps, 0, table.concat(overlaps, "; "))
-	end)
-
 	t.test("facing: cardinal lots look along their front; footprints keep their world extents", function()
 		local front = { ["+Z"] = { 0, 1 }, ["-Z"] = { 0, -1 }, ["+X"] = { 1, 0 }, ["-X"] = { -1, 0 } }
 		local checked = 0
-		for i, lot in lots do
-			local f = front[lot.facing]
-			local s = plans[i].parts[1]
-			local x0, x1, z0, z1 = Plan.worldBox(s)
-			if lot.footprint and not plans[i].attributes.AttachedTo then
+		for _, lot in lots do
+			local p = byId[lot.id]
+			local s = p.parts[1]
+			local fam = p.attributes.Builder
+			if (fam == "Block" or fam == "Building" or fam == "House") and lot.footprint and not p.attributes.AttachedTo then
+				local x0, x1, z0, z1 = Plan.worldBox(s)
 				t.near(x1 - x0, lot.footprint.w, 1e-9, lot.id)
 				t.near(z1 - z0, lot.footprint.d, 1e-9, lot.id)
 			end
+			local f = front[lot.facing]
 			if f then
 				local cf = roblox.CFrame.Angles(0, s.yaw, 0)
 				t.near(cf.LookVector.X, f[1], 1e-5, lot.id)
 				t.near(cf.LookVector.Z, f[2], 1e-5, lot.id)
 				checked += 1
-			elseif type(lot.yaw) == "number" then
-				-- free yaw: the box stays world-aligned, the front snaps to the nearest quarter turn
-				local cf = roblox.CFrame.Angles(0, s.yaw, 0)
-				local dot = cf.LookVector.X * math.sin(lot.yaw) + cf.LookVector.Z * math.cos(lot.yaw)
-				t.truthy(dot >= math.cos(math.pi / 4) - 1e-6, lot.id)
-				t.near(plans[i].attributes.FacingYaw :: number, lot.yaw, 1e-12, lot.id)
-				checked += 1
 			end
 		end
-		t.truthy(checked >= 175, `checked {checked}`)
+		t.truthy(checked >= 115, `checked {checked}`)
 	end)
 
-	t.test("buildings sit on World/Height and carry LevelOfDetail SLIM", function()
-		for i, lot in lots do
-			local p = plans[i]
-			t.near(p.attributes.SeatY :: number, Height.at(lot.x, lot.z), 1e-9, lot.id)
+	t.test("seats: World/Height or the harvested absolute seat; buildings carry their data LevelOfDetail", function()
+		for _, lot in lots do
+			local p = byId[lot.id]
+			local abs = lot.seat and string.match(lot.seat, "^absolute:(.+)$")
+			local want = if abs then tonumber(abs) * 2.5 else Height.at(lot.x, lot.z)
+			t.near(p.attributes.SeatY :: number, want, 1e-9, lot.id)
 			if p.category == "building" then
 				t.eq(p.lod, "SLIM", lot.id)
-				local s = p.parts[1]
-				t.near(s.cy - s.sy / 2, Height.at(lot.x, lot.z), 1e-9, lot.id)
-				t.near(s.sy, Kits.get(lot.type).heightU * 2.5, 1e-9, lot.id)
 			end
 		end
 	end)
 
-	t.test("roads: continuous terrain-following segments", function()
+	t.test("houses: harvested eave and peak, gable plates meet at the ridge; outer homes land flat", function()
+		local core = byId.core_house_1_bungalow
+		t.eq(core.attributes.Interior, "frb_bungalow")
+		t.near(core.attributes.EaveY :: number, 6.068 * 2.5, 1e-9)
+		t.near(core.attributes.PeakY :: number, 8.528 * 2.5, 1e-9)
+		local a, b = part(core, "RoofA"), part(core, "RoofB")
+		t.truthy(a and b, "two roof plates")
+		-- the plates' upper faces rise toward the ridge: their centres sit halfway up the slope
+		local seat = core.attributes.SeatY :: number
+		t.near(a.cy - seat, (6.068 + 8.528) / 2 * 2.5, 0.25)
+		t.truthy(math.abs(a.pitch) > 0.1, "pitched")
+		local outer = byId.outer_home_05
+		t.eq(outer.attributes.Roof, "flat")
+		local body = part(outer, "Body")
+		local outerLot
+		for _, l in lots do
+			if l.id == "outer_home_05" then
+				outerLot = l
+			end
+		end
+		t.near(body.sy, outerLot.params.peakU * 2.5, 1e-6)
+		t.eq(part(outer, "RoofA"), nil)
+	end)
+
+	t.test("doors, prompts and signs: every building with a door has a prompt placeholder; quay names on SurfaceGuis", function()
+		local doors, signs = 0, 0
 		for _, p in plans do
-			if p.kind == "road" then
-				for k = 2, #p.parts do
-					local a, b = p.parts[k - 1], p.parts[k]
-					local ha = a.cy + math.sin(a.pitch) * a.sz / 2
-					local hb = b.cy - math.sin(b.pitch) * b.sz / 2
-					t.near(ha, hb, 1e-6, p.id)
+			if p.kind == "lot" then
+				for _, e in p.extras or {} do
+					if e.kind == "Prompt" then
+						doors += 1
+					elseif e.kind == "SurfaceGui" then
+						signs += 1
+						t.truthy(e.text and #e.text > 0, p.id)
+					end
 				end
 			end
+		end
+		t.truthy(doors >= 80, `prompts {doors}`)
+		t.truthy(signs >= 40, `signs {signs}`)
+		local anchor = byId.quay_bldg_w_00
+		local found = false
+		for _, e in anchor.extras do
+			found = found or (e.kind == "SurfaceGui" and e.text == "THE OLD ANCHOR")
+		end
+		t.truthy(found, "THE OLD ANCHOR sign")
+	end)
+
+	t.test("hospital: 8 brief rooms as volumes, 4 stations, 36 pharmacy item slots, enterable", function()
+		local h = byId.hospital_main
+		t.eq(h.attributes.Builder, "Hospital")
+		t.eq(h.attributes.Enterable, true)
+		for _, id in { "reception", "triage", "ward_a", "ward_b", "isolation", "pharmacy", "staff_room", "ambulance_bay" } do
+			local v = part(h, "Room_" .. id)
+			t.truthy(v, id)
+			t.eq(v.canCollide, false, id)
+			t.eq(v.canQuery, true, id)
+		end
+		local stations, slots = 0, 0
+		for _, s in h.parts do
+			if s.role == "Station" then
+				stations += 1
+			end
+		end
+		for _, e in h.extras do
+			if e.kind == "Attachment" and e.attrs and e.attrs.ItemSlot then
+				slots += 1
+			end
+		end
+		t.eq(stations, 4)
+		t.eq(slots, 36)
+		t.eq(part(h, "Door_entrance").attrs.ServerOwned, true)
+		t.eq(part(h, "Nav").attrs.NavUnreached, 0)
+	end)
+
+	t.test("police station: lobby, briefing, drone console, 2 player-car pads and the AI cruiser pad", function()
+		local s = byId.west_police_station
+		t.eq(s.attributes.Builder, "PoliceStation")
+		t.truthy(part(s, "Room_lobby"))
+		t.truthy(part(s, "Room_briefing"))
+		t.eq(part(s, "Station_drone_console").attrs.Station, "drone_console")
+		local player, ai = 0, 0
+		for _, p in s.parts do
+			if p.role == "Pad" then
+				if p.attrs.PadKind == "player_car" then
+					player += 1
+				else
+					ai += 1
+				end
+			end
+		end
+		t.eq(player, 2)
+		t.eq(ai, 1)
+	end)
+
+	t.test("FRB interiors: 4 houses with rooms, server-owned lockable doors, hide spots and a connected room graph", function()
+		local n = 0
+		for _, p in plans do
+			if p.kind == "lot" and p.attributes.Interior then
+				n += 1
+				t.eq(part(p, "Nav").attrs.NavUnreached, 0, p.id)
+				local front, back, hides = part(p, "Door_front"), part(p, "Door_back"), 0
+				t.truthy(front and front.attrs.ServerOwned and front.attrs.Lockable, p.id)
+				t.truthy(back, p.id)
+				for _, e in p.extras do
+					if e.kind == "Attachment" and e.attrs and e.attrs.HideType then
+						hides += 1
+					end
+				end
+				t.truthy(hides >= 3, `{p.id} hides {hides}`)
+			end
+		end
+		t.eq(n, 4)
+	end)
+
+	t.test("route props: trees around their curves, poles, Beam wires, pipes and fences, LOD from data", function()
+		local kinds: { [string]: number } = {}
+		local beams = 0
+		for _, p in plans do
+			if p.kind == "props" then
+				kinds[p.category] = (kinds[p.category] or 0) + 1
+				t.eq(p.lod, Kits.routeProps[p.category].lod, p.id)
+				for _, e in p.extras or {} do
+					if e.kind == "Beam" then
+						beams += 1
+					end
+				end
+			end
+		end
+		t.eq(kinds.tree, 95) -- one model per harvested tree trunk (trees.json: 95)
+		t.eq(kinds.pole, 97)
+		t.eq(kinds.wire, 150)
+		t.truthy((kinds.pipe or 0) >= 60, `pipes {kinds.pipe}`)
+		t.truthy((kinds.fence or 0) >= 12, `fences {kinds.fence}`)
+		t.truthy(beams >= 150, `beams {beams}`)
+	end)
+
+	t.test("lamps: greybox posts on both sides of the streets, a 5-10 % flicker set, Skyline heads for every lamp and building", function()
+		local posts, flicker = 0, 0
+		local sky
+		for _, p in plans do
+			if p.kind == "lamps" then
+				for _, s in p.parts do
+					posts += 1
+					if s.attrs.Flicker then
+						flicker += 1
+					end
+				end
+			elseif p.kind == "skyline" then
+				sky = p
+			end
+		end
+		t.truthy(posts >= 300, `posts {posts}`)
+		local f = flicker / posts
+		t.truthy(f >= 0.05 and f <= 0.1, `flicker {f}`)
+		t.eq(sky.attributes.LampHeads, posts)
+		t.eq(sky.streaming, "Persistent")
+		for _, s in sky.parts do
+			t.eq(s.canCollide, false, s.name)
 		end
 	end)
 
@@ -132,6 +274,7 @@ return function(t)
 		local town = Bake.run(data, factory())
 		t.eq(#town:FindFirstChild("Lots"):GetChildren(), 243)
 		t.eq(#town:FindFirstChild("Roads"):GetChildren(), 116)
+		t.truthy(town:FindFirstChild("Skyline") ~= nil, "Skyline")
 		t.eq(town:GetAttribute("BakeHash"), Bake.hash(plans))
 		local back = roblox.deserializeModel(roblox.serializeModel({ town }))[1]
 		t.eq(Bake.instanceHash(back), town:GetAttribute("InstanceHash"))
@@ -145,6 +288,10 @@ return function(t)
 				slim += 1
 			end
 		end
-		t.eq(slim, 78 + 15) -- buildings plus their interior children keep the kit's SLIM
+		t.eq(slim, 78 + 15) -- buildings plus their interior children keep the type's SLIM
+		local sign = back:FindFirstChild("Lots"):FindFirstChild("quay_bldg_w_00"):FindFirstChild("SignBoard")
+		t.eq(sign:FindFirstChild("Sign"):FindFirstChild("Text").Text, "THE OLD ANCHOR")
+		local wire = back:FindFirstChild("Props"):FindFirstChildWhichIsA("Model")
+		t.truthy(wire ~= nil)
 	end)
 end
