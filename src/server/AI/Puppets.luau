@@ -142,6 +142,9 @@ local function buildHuman(index: number, parent: Instance): Rig
 	}
 	local rig = assemble("human", `Human_{index}`, Vector3.new(2, 2, 1), specs, parent, color)
 	local humanoid = Instance.new("Humanoid")
+	-- R15 names, so the R15 rule: HipHeight is the gap from the root's bottom (-1) to the soles (-3.2)
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.HipHeight = 2.2
 	humanoid.EvaluateStateMachine = false
 	humanoid.BreakJointsOnDeath = false
 	humanoid.RequiresNeck = false

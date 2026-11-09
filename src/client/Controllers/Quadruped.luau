@@ -31,7 +31,10 @@ function Quadruped.start(
 	local input = ctx.input
 	local pos = root.Position
 	local ground = world.groundAt(pos.X, pos.Z, pos.Y)
-	params.hip = math.clamp(pos.Y - ground, 0.2, 6)
+	-- the body's own HipHeight (PuppetSpec), so the feet land on the voxel surface the raycast finds
+	-- rather than wherever the AI's analytic ground left the root
+	local hip = body:GetAttribute("HipHeight")
+	params.hip = if type(hip) == "number" and hip > 0 then hip else math.clamp(pos.Y - ground, 0.2, 6)
 	local snap = payload.snapshot
 	local yaw = (snap.yaw or 0) + math.pi -- Roblox yaw to HTML yaw
 	local state = QuadrupedMotor.new(pos.X, pos.Y, pos.Z, yaw)

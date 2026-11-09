@@ -537,6 +537,9 @@ def build_scene(scene_data, debug):
         ]
         for d in dbg:
             d.update({"rot": [1, 0, 0, 0, 1, 0, 0, 0, 1], "t": 0.0, "m": "SmoothPlastic"})
+        # a Beam (wire) from the wedge top to the ball top, through the same path as the town's wires
+        dbg += beam_parts([{"a": [-4, 2.2, 2], "b": [-4, 2.2, -5], "w": 0.15, "c": [20, 20, 20]}])
+        dbg += beam_parts([{"a": [0, 6.5, 0], "b": [-4, 2.2, -5], "w": 0.15, "c": [20, 20, 20]}])
         link_object("debug_axes", parts_mesh("debug_axes", dbg, templates), "debug_axes", mats["opaque"])
         floor = build_mesh(
             "debug_floor",

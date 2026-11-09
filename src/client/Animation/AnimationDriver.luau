@@ -75,8 +75,9 @@ type Entry = {
 	joints: { Joint },
 	tailN: number,
 	phase: number,
-	-- visual root (Root joint C0 offset)
+	-- visual root: the Root Motor6D's C0, or the root-side Attachment of a Root AnimationConstraint
 	rootJoint: Motor6D?,
+	rootAttach: Attachment?,
 	baseC0: CFrame,
 	footDrop: number, -- studs from the root down to the soles at rest
 	settle: Settle,
@@ -164,15 +165,25 @@ local function gaitJoints(model: Model): ({ Joint }, number)
 	return joints, tailN
 end
 
--- The Motor6D named Root that hangs the visible body off the root part (animals: RootPart -> Pelvis;
--- R15: HumanoidRootPart -> LowerTorso).
-local function rootJointOf(model: Model, root: BasePart): Motor6D?
+-- The joint named Root that hangs the visible body off the root part (animals: RootPart -> Pelvis;
+-- R15: HumanoidRootPart -> LowerTorso): a Motor6D, or on stock R15s built with the avatar joint
+-- upgrade an AnimationConstraint, whose root-side Attachment is moved instead of C0.
+local function rootJointOf(model: Model, root: BasePart): (Motor6D?, Attachment?)
 	for _, d in model:GetDescendants() do
-		if d:IsA("Motor6D") and d.Name == "Root" and d.Part0 == root then
-			return d
+		if d.Name ~= "Root" then
+			continue
+		end
+		if d:IsA("Motor6D") and d.Part0 == root then
+			return d, nil
+		elseif d:IsA("AnimationConstraint") then
+			for _, a in { d.Attachment0, d.Attachment1 } do
+				if a and a.Parent == root then
+					return nil, a
+				end
+			end
 		end
 	end
-	return nil
+	return nil, nil
 end
 
 -- Studs from the root's centre down to the soles: the puppet's HipHeight attribute (the root's
@@ -269,7 +280,7 @@ function AnimationDriver.start(opts: Opts): Driver
 				return
 			end
 		end
-		local rootJoint = rootJointOf(model, root)
+		local rootJoint, rootAttach = rootJointOf(model, root)
 		entries[model] = {
 			body = model,
 			root = root,
@@ -286,7 +297,8 @@ function AnimationDriver.start(opts: Opts): Driver
 			tailN = tailN,
 			phase = (#model.Name * 0.37) % (2 * math.pi),
 			rootJoint = rootJoint,
-			baseC0 = if rootJoint then rootJoint.C0 else CFrame.identity,
+			rootAttach = rootAttach,
+			baseC0 = if rootJoint then rootJoint.C0 elseif rootAttach then rootAttach.CFrame else CFrame.identity,
 			footDrop = footDropOf(model, root),
 			settle = { y = 0, v = 0, rootV = 0, lastY = 0, live = false },
 			fix = 0,
@@ -307,9 +319,13 @@ function AnimationDriver.start(opts: Opts): Driver
 			for _, j in e.joints do
 				j.motor.Transform = CFrame.identity
 			end
-			local rj = e.rootJoint
-			if rj and e.applied ~= 0 then
-				rj.C0 = e.baseC0
+			if e.applied ~= 0 then
+				local rj, ra = e.rootJoint, e.rootAttach
+				if rj then
+					rj.C0 = e.baseC0
+				elseif ra then
+					ra.CFrame = e.baseC0
+				end
 			end
 			entries[child :: any] = nil
 			count -= 1
@@ -346,8 +362,8 @@ function AnimationDriver.start(opts: Opts): Driver
 
 	-- the visual root of one body this frame (after physics: root.Position is what renders)
 	local function visualRoot(e: Entry, pos: Vector3, dt: number, now: number, camPos: Vector3)
-		local rj = e.rootJoint
-		if rj == nil or rj.Parent == nil then
+		local rj, ra = e.rootJoint, e.rootAttach
+		if (rj == nil or rj.Parent == nil) and (ra == nil or ra.Parent == nil) then
 			return
 		end
 		local anchored = e.root.Anchored
@@ -359,7 +375,9 @@ function AnimationDriver.start(opts: Opts): Driver
 			e.fix, e.fixTarget = 0, 0
 		end
 		local off = 0
-		if not (e.humanoid and not anchored) then -- a possessed person stands on its Humanoid
+		if e.humanoid and not anchored then
+			e.settle.live = false -- a possessed person stands on its Humanoid
+		else
 			off = AnimationDriver.settle(e.settle, pos.Y, dt)
 		end
 		if anchored then
@@ -386,8 +404,12 @@ function AnimationDriver.start(opts: Opts): Driver
 		off += e.fix
 		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) then
 			e.applied = off
-			local up = e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))
-			rj.C0 = CFrame.new(up) * e.baseC0
+			local shifted = CFrame.new(e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))) * e.baseC0
+			if rj then
+				rj.C0 = shifted
+			elseif ra then
+				ra.CFrame = shifted
+			end
 		end
 	end
 

@@ -12,8 +12,10 @@
 --   humans  (brief v2 §13a): skin tone on the RigSpec.human skin regions (Head, hands, lower arms), the face
 --           decal (FaceDecal on Head) when the avatar has a classic face, the hair accessory; the uniform,
 --           build and hitbox never change.
---   animals (A3, B1): the capped 30 % fur tint on Body and FurCards, pattern colour on Pattern, the tail tip
---           (the part holding the TailTip socket), derived eyes on Eyes (the rodent's never change: stock
+--   animals (A3, B1): the capped 30 % fur tint on Body and FurCards (the puppet's other Region = "Body" fur
+--           parts move by the same step, keeping their shade; likewise Region = "Pattern"), pattern colour
+--           on Pattern, the tail tip (the part holding the TailTip socket), derived eyes on Eyes (the
+--           rodent's never change: stock
 --           eyesLocked), the one softened neon accent on the ears, and ONE rigid accessory on HeadSocket at
 --           x0.45. A part with a SurfaceAppearance gets SurfaceAppearance.Color (S8: writable at runtime),
 --           otherwise Part.Color, so puppets and skinned rigs blend the same way.
@@ -24,6 +26,7 @@ local Import = require("../Import")
 local BlendRules = Import.shared("Avatar/BlendRules") :: typeof(require("../../shared/Avatar/BlendRules"))
 local DevSamples = Import.shared("Avatar/DevSamples") :: typeof(require("../../shared/Avatar/DevSamples"))
 local PartBuilder = Import.shared("Avatar/PartBuilder") :: typeof(require("../../shared/Avatar/PartBuilder"))
+local PuppetSpec = Import.shared("Avatar/PuppetSpec") :: typeof(require("../../shared/Avatar/PuppetSpec"))
 
 -- Exported types do not cross Import (W1 Track A note): BlendRules' types are restated loosely here.
 type Rgb = { r: number, g: number, b: number }
@@ -54,14 +57,14 @@ AvatarBlendService.__index = AvatarBlendService
 
 AvatarBlendService.ACCESSORY_SCALE = 0.45 -- HeadSocket shrink (S9 carry-forward)
 
--- Stock looks per animal species (the placeholder palette, Avatar/PuppetSpec; art replaces them in W5).
+-- Stock looks per animal species (the placeholder palette, Avatar/PuppetSpec.STOCK_LOOKS; art replaces
+-- them in W5).
 local hex = PartBuilder.hex
-AvatarBlendService.STOCK = {
-	squirrel = { body = hex("#b78453"), pattern = hex("#e6d3b3"), eyes = hex("#1d1a17"), eyesLocked = false },
-	rodent = { body = hex("#83544d"), pattern = hex("#c9a38c"), eyes = hex("#b0242a"), eyesLocked = true },
-	fox = { body = hex("#b8663c"), pattern = hex("#efe6da"), eyes = hex("#2a1d12"), eyesLocked = false },
-	deer = { body = hex("#ad845e"), pattern = hex("#eadfcc"), eyes = hex("#1a1512"), eyesLocked = false },
-} :: { [string]: StockLook }
+AvatarBlendService.STOCK = {} :: { [string]: StockLook }
+for species, l in PuppetSpec.STOCK_LOOKS do
+	AvatarBlendService.STOCK[species] =
+		{ body = hex(l.body), pattern = hex(l.pattern), eyes = hex(l.eyes), eyesLocked = l.eyesLocked }
+end
 
 local HUMAN_SKIN = { "Head", "LeftHand", "RightHand", "LeftLowerArm", "RightLowerArm" } -- RigSpec.human.regions
 
@@ -163,6 +166,28 @@ function AvatarBlendService.ops(model: Instance, species: string, look: Look): {
 		return out
 	end
 	local a = look :: AnimalLook
+	-- a part-built puppet's other fur parts (PuppetSpec's Region attribute) keep their own shade and
+	-- move by the same step as their region's main part; emitted first, so the named ops below win
+	-- where both apply and revert (newest first) restores the stock colour last
+	local function shade(region: string, target: Rgb)
+		local main = model:FindFirstChild(region, true)
+		if not (main and main:IsA("BasePart")) then
+			return
+		end
+		local base = (main :: BasePart).Color
+		local dr, dg, db = target.r - base.R, target.g - base.G, target.b - base.B
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d ~= main and d:GetAttribute("Region") == region then
+				local c = d.Color
+				local value =
+					{ r = math.clamp(c.R + dr, 0, 1), g = math.clamp(c.G + dg, 0, 1), b = math.clamp(c.B + db, 0, 1) }
+				local inst, prop = colourTarget(d)
+				table.insert(out, { inst = inst, prop = prop, value = value })
+			end
+		end
+	end
+	shade("Body", a.bodyTint)
+	shade("Pattern", a.patternColour)
 	add("Body", a.bodyTint)
 	add("FurCards", a.bodyTint)
 	add("Pattern", a.patternColour)

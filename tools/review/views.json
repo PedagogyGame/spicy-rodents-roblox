@@ -101,7 +101,7 @@
     {
       "name": "axes_check",
       "debug": true,
-      "desc": "Orientation test: red +X, green +Y, blue +Z bars from the origin, a WedgePart at (-4,1,0) (tall face at its +Z), a cylinder at (0,1,-5) (axis X) and a ball at (-4,1,-5). From (+X,+Y,+Z) a correct render shows red going down-RIGHT and blue going down-LEFT.",
+      "desc": "Orientation test: red +X, green +Y, blue +Z bars from the origin, a WedgePart at (-4,1,0) (tall face at its +Z), a cylinder at (0,1,-5) (axis X) a ball at (-4,1,-5) and two black Beam wires (wedge top -> ball top, green bar top -> ball top). From (+X,+Y,+Z) a correct render shows red going down-RIGHT and blue going down-LEFT.",
       "pos": [12, 9, 14], "look": [-1, 1, -1], "fov": 50, "groups": ["debug_axes"], "samples": 16
     }
   ]

@@ -13,7 +13,7 @@
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
 -- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast? };
---   feedback(frame, events, onRoute) -> string? (pure)
+--   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -54,6 +54,15 @@ function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any }
 	return nil
 end
 
+-- The root's height above the soles: the body's HipHeight attribute, else the measured gap (clamped).
+function Squirrel.hipOf(body: Model, measured: number): number
+	local hip = body:GetAttribute("HipHeight")
+	if type(hip) == "number" and hip > 0 then
+		return hip
+	end
+	return math.clamp(measured, 0.1, 3)
+end
+
 function Squirrel.start(
 	body: Model,
 	payload: { [string]: any },
@@ -74,7 +83,11 @@ function Squirrel.start(
 	local input = ctx.input
 	local pos = root.Position
 	local ground = world.groundAt(pos.X, pos.Z, pos.Y)
-	local hip = math.clamp(pos.Y - ground, 0.1, 3)
+	-- the root's height above the soles is the body's own HipHeight (PuppetSpec), not the gap to the
+	-- ground at the handoff: the AI stood on World/Height's analytic ground, which can sit up to a stud
+	-- under the voxel surface the motor's raycast finds (the old measure buried the squirrel), and a
+	-- squirrel taken on a trunk is nowhere near the ground
+	local hip = Squirrel.hipOf(body, pos.Y - ground)
 	local snap = payload.snapshot
 	local state = SquirrelMotor.new(pos.X, ground, pos.Z)
 	state.yaw = (snap.yaw or 0) + math.pi

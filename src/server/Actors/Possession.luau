@@ -106,7 +106,12 @@ function Possession.engine(): Engine
 			return (body :: Model).PrimaryPart
 		end,
 		markDriver = function(body: any, userId: number)
-			(body :: Model):SetAttribute(PossessionState.ATTR.Driver, userId)
+			local model = body :: Model
+			model:SetAttribute(PossessionState.ATTR.Driver, userId)
+			-- a person a player drives carries the player's name; back to the AI, no label (stubs
+			-- in engine tests have no Player, so their bodies stay unlabelled)
+			local player = if userId ~= 0 then game:GetService("Players"):GetPlayerByUserId(userId) else nil
+			ActorServiceT.nameLabel(model, if player then player.DisplayName else nil)
 		end,
 		teleport = function(body: any, x: number, y: number, z: number, yaw: number)
 			local model = body :: Model

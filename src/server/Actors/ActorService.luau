@@ -182,8 +182,8 @@ end
 -- Readies a body Model for the actor model (engine only): strips scripts and any server-side
 -- Animator (D3: each client makes its own, so no track replicates), anchors the root only (limbs
 -- hang off Motor6Ds and follow BulkMoveTo, rule 4), turns the Humanoid's state machine off with
--- Dead disabled, makes the model Atomic for streaming and stamps the replicated attributes.
--- Non-Humanoid bodies (the squirrel puppet) lose collision: their client motor ground-snaps.
+-- Dead disabled and no name label, makes the model Atomic for streaming and stamps the replicated
+-- attributes. Non-Humanoid bodies (the squirrel puppet) lose collision: their client motor ground-snaps.
 function ActorService.prepareBody(model: Model, actorId: string, species: string): Model
 	for _, d in model:GetDescendants() do
 		if d:IsA("BaseScript") or d:IsA("ModuleScript") or d:IsA("Animator") then
@@ -216,12 +216,31 @@ function ActorService.prepareBody(model: Model, actorId: string, species: string
 		humanoid.EvaluateStateMachine = false
 		humanoid.AutoRotate = false
 	end
+	ActorService.nameLabel(model, nil)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model.Name = actorId
 	model:SetAttribute("ActorId", actorId)
 	model:SetAttribute("Species", species)
 	model:SetAttribute("DriverUserId", 0)
 	return model
+end
+
+-- nameLabel(model, displayName?): the floating name over a person. AI bodies show none (owner playtest
+-- 2026-11-09: "human_25" labels floated over people); a body a player drives shows the player's name.
+function ActorService.nameLabel(model: Model, displayName: string?)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid == nil then
+		return
+	end
+	if displayName then
+		humanoid.DisplayName = displayName
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
+		humanoid.NameDisplayDistance = 100
+	else
+		humanoid.DisplayName = ""
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		humanoid.NameDisplayDistance = 0
+	end
 end
 
 -- A stock R15 body from a blank HumanoidDescription with tinted clothes-free colours (S9: 1-17 ms
