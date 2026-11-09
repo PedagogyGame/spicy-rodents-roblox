@@ -66,11 +66,12 @@ function Gait.pose(phase: number, speed: number, t: number, p: Params, tailN: nu
 	local legs = {}
 	for name, off in offsets do
 		local a = phase + off
-		-- positive pitch about the bone's X swings the foot backward (-Z is forward in RigSpec)
+		-- positive pitch about the bone's X swings the foot forward (-Z is forward in RigSpec)
 		local upper = amp * math.sin(a)
-		-- the knee folds while the foot swings forward (the recovery half of the cycle)
-		local lower = amp * 0.9 * math.max(0, -math.cos(a))
-		if string.sub(name, 1, 4) == "Back" then
+		-- the lower leg folds while the foot swings forward (the recovery half, d(upper)/da > 0):
+		-- a front leg's foot tucks back (+Z), a hind leg's hock folds the other way
+		local lower = amp * 0.9 * math.max(0, math.cos(a))
+		if string.sub(name, 1, 5) == "Front" then
 			lower = -lower
 		end
 		legs[name] = { upper = upper, lower = lower }
