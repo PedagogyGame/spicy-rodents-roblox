@@ -243,26 +243,30 @@ class Body:
             g[:, i] = (self.eval_points(pts + o) - self.eval_points(pts - o)) / (2 * e)
         return g
 
-    def project(self, pts, steps=3, eps=1e-3, chunk=200000):
-        """Newton steps onto the zero level (in chunks, with culling per chunk)."""
+    def project(self, pts, steps=2, eps=1e-3, block=0.12):
+        """Newton steps onto the zero level, one spatial block at a time (so culling works)."""
         pts = pts.astype(F32).copy()
-        for s0 in range(0, len(pts), chunk):
-            p = pts[s0 : s0 + chunk]
+        key = np.floor(pts / block).astype(np.int64)
+        key = (key[:, 0] + 4096) * 1_000_000_000 + (key[:, 1] + 4096) * 30_000 + (key[:, 2] + 4096)
+        order = np.argsort(key, kind="stable")
+        ks = key[order]
+        cuts = np.flatnonzero(np.diff(ks)) + 1
+        groups = np.split(order, cuts)
+        # tetrahedral gradient: 4 evaluations give d and grad
+        tet = np.array([[1, -1, -1], [-1, -1, 1], [-1, 1, -1], [1, 1, 1]], dtype=F32)
+        for g in groups:
+            p = pts[g]
             for _ in range(steps):
-                lo, hi = p.min(axis=0) - 0.01, p.max(axis=0) + 0.01
-                d = self.eval_points(p, lo, hi)
-                g = np.empty_like(p)
-                for i in range(3):
-                    o = np.zeros(3, dtype=F32)
-                    o[i] = eps
-                    g[:, i] = (self.eval_points(p + o, lo, hi) - self.eval_points(p - o, lo, hi)) / (2 * eps)
-                gn = np.maximum(np.einsum("ij,ij->i", g, g), 1e-6)
-                step = (d / gn)[:, None] * g
-                # never move further than half a cell's worth in one step (thin features)
-                lim = 0.5 * np.linalg.norm(step, axis=1, keepdims=True)
-                step = np.where(lim > 0.01, step * (0.01 / np.maximum(lim, 1e-9)), step)
-                p -= step
-            pts[s0 : s0 + chunk] = p
+                lo, hi = p.min(axis=0) - 0.02, p.max(axis=0) + 0.02
+                vals = [self.eval_points(p + tet[i] * eps, lo, hi) for i in range(4)]
+                d = sum(vals) / 4
+                grad = sum(vals[i][:, None] * tet[i] for i in range(4)) / (4 * eps)
+                gn = np.maximum(np.einsum("ij,ij->i", grad, grad), 1e-6)
+                step = (d / gn)[:, None] * grad
+                ln = np.linalg.norm(step, axis=1, keepdims=True)
+                step = np.where(ln > 0.01, step * (0.01 / np.maximum(ln, 1e-9)), step)
+                p = p - step
+            pts[g] = p
         return pts
 
 

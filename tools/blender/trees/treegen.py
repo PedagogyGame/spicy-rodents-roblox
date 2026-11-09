@@ -485,7 +485,7 @@ class TreeBuilder:
         on_trunk = dtrunk < 3.5
         rt = self.trunk_r_at_y(start[1]) if on_trunk else 1.2
         cat = self.cat
-        r_base = {"named": 1.45, "outer": 1.05, "giant": 2.1, "apple": 0.78, "estate": 1.55}[cat]
+        r_base = {"named": 1.75, "outer": 1.15, "giant": 2.3, "apple": 0.8, "estate": 1.8}[cat]
         if kind == "bridge":
             r_base *= 0.85
         if kind == "lookout":

@@ -1,5 +1,5 @@
 {
-  "about": "Named viewpoints for tools/review/render.py. Roblox coordinates in studs (Y up; the game's North is +Z, so +X is West). pos = camera, look = point looked at, fov = VERTICAL field of view in degrees (Roblox Camera.FieldOfView convention; Roblox default 70). aboveGround: pos.y and look.y are heights above the terrain (World/Height) under each point. groups: what is drawn (town = Workspace.Town parts, terrain = boot terrain heightfield + river water, editor_ground = build/EditorGround.rbxm, lineup / lineup_ground = placeholder puppets on a 1-stud checker). up: optional camera up vector (used for straight-down views). debug views render only with --debug.",
+  "about": "Named viewpoints for tools/review/render.py. Roblox coordinates in studs (Y up; the game's North is +Z, so +X is West). pos = camera, look = point looked at, fov = VERTICAL field of view in degrees (Roblox Camera.FieldOfView convention; Roblox default 70). aboveGround: pos.y and look.y are heights above the terrain (World/Height) under each point. groups: what is drawn (town = Workspace.Town parts, terrain = boot terrain heightfield + river water, editor_ground = build/EditorGround.rbxm, lineup / lineup_ground = placeholder puppets on a 1-stud checker). up: optional camera up vector (used for straight-down views). debug views render only with --debug. optIn views (\"optIn\": \"backdrop\", the bd_ views) render only with --set backdrop or when named in --only; their \"light\" block sets the sun, sky, haze and Neon strength for that view (tools/review/backdrop_render.py).",
   "defaults": { "res": "960x540", "samples": 20, "groups": ["town", "terrain"] },
   "sun": { "dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0 },
   "views": [
@@ -117,6 +117,72 @@
       "name": "q_willow",
       "desc": "A Quay willow (QUAY WILLOW trunk at x 1787.5 z -70): trunk and drooping crown.",
       "pos": [1850, 6, -15], "look": [1787.5, 22, -70], "fov": 70, "aboveGround": true
+    },
+    {
+      "name": "bd_n_ocean_beach", "optIn": "backdrop",
+      "desc": "Backdrop: street level on the long beach (eye 5.5 st) looking north over the sea: the pier north of Sycamore Park, the horizon.",
+      "pos": [-60, 7.7, 1380], "look": [-150, 8, 2400], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_s_plains_mountains", "optIn": "backdrop",
+      "desc": "Backdrop: street level south of the estates (eye 5.5 st) looking south: plains, hedgerows, the distant road, foothills (R1), mountains (R2), snowy peaks (R3), fog cards between them.",
+      "pos": [900, 16.5, -2150], "look": [900, 220, -7000], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_e_tower", "optIn": "backdrop",
+      "desc": "Backdrop: street level at the east edge of town (eye 5.5 st) looking -X along the sunset azimuth at the radio tower on its knoll.",
+      "pos": [-1400, 14.8, 600], "look": [-2914, 200, 851], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_w_offroad", "optIn": "backdrop",
+      "desc": "Backdrop: street level in the off-road back field (eye 5.5 st) looking +X past the world edge: band terrain, plains, the foothills' arm and the coast.",
+      "pos": [3900, 48, 0], "look": [9000, 120, 300], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_marina", "optIn": "backdrop",
+      "desc": "Backdrop: the marina at the Willow River mouth from the beach (eye 12 st): breakwaters, pontoons, moored boats, harbour lights, the lighthouse beyond.",
+      "pos": [1980, 14.5, 1415], "look": [2350, 2, 1720], "fov": 65, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_mountains_tele", "optIn": "backdrop",
+      "desc": "Backdrop: the ranges from the sky-lift hilltop (eye 8 st, 40 degree lens): layered foothills, mountains and snowy peaks with fog cards.",
+      "pos": [-1050, 123, -1700], "look": [-300, 650, -9000], "fov": 40, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_aerial300_s", "optIn": "backdrop",
+      "desc": "Backdrop: drone at 300 st over the town centre looking south (mountains side).",
+      "pos": [700, 300, 0], "look": [700, 120, -6000], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_aerial300_n", "optIn": "backdrop",
+      "desc": "Backdrop: drone at 300 st over the old town looking north: beach, pier, marina, ocean horizon (the horizon must read with no seam).",
+      "pos": [700, 305, -400], "look": [700, 60, 6000], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+    },
+    {
+      "name": "bd_sunset", "optIn": "backdrop",
+      "desc": "Backdrop: sunset approximation (sun about 2 degrees up on the measured azimuth) from the north-east of town at eye 6 st: the tower silhouetted against the low sun.",
+      "pos": [0, 19.4, 600], "look": [-2914, 230, 851], "fov": 60, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.963, 0.038, 0.267], "sunStrength": 2.4, "sunColor": [1.0, 0.52, 0.26], "sky": {"zenith": [0.1, 0.15, 0.36], "mid": [0.5, 0.36, 0.42], "horizon": [1.0, 0.5, 0.22], "ground": [0.3, 0.2, 0.16]}, "haze": {"color": [0.78, 0.5, 0.38], "start": 300, "half": 4200, "max": 0.92}, "cardTint": [1.0, 0.72, 0.6], "cardStrength": 0.95}
+    },
+    {
+      "name": "bd_night", "optIn": "backdrop",
+      "desc": "Backdrop: night approximation (moonlight, dark sky, Neon lamp heads, tower beacon, lighthouse and harbour lights) from the drone at 300 st looking -X toward the tower.",
+      "pos": [600, 300, 300], "look": [-2914, 150, 851], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [0.482, 0.835, 0.267], "sunStrength": 0.16, "sunColor": [0.62, 0.72, 1.0], "sky": {"zenith": [0.004, 0.006, 0.022], "mid": [0.008, 0.012, 0.035], "horizon": [0.03, 0.04, 0.075], "ground": [0.01, 0.012, 0.02], "strength": 1.0}, "haze": {"color": [0.025, 0.032, 0.055], "start": 300, "half": 3800, "max": 0.9}, "neon": 14, "cardTint": [0.35, 0.4, 0.55], "cardStrength": 0.12}
+    },
+    {
+      "name": "bd_overview", "optIn": "backdrop",
+      "desc": "Backdrop: the whole bay from 9 km up and 12 km south: town, band terrain, land mesh, ranges, fog cards, coast and ocean.",
+      "pos": [700, 9000, -15000], "look": [700, 0, -500], "fov": 50, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
     },
     {
       "name": "axes_check",

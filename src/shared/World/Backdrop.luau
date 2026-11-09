@@ -257,6 +257,10 @@ end
 -- cut, t (distance past the waterline) and d (distance outside the clamp).
 function Backdrop.sample(x: number, z: number): (number, number, number, number)
 	local d, px, pz = Backdrop.outside(x, z)
+	local m, prof, t = coast(x, z)
+	if m >= 1 then
+		return prof, prof, t, d -- open water: the profile alone (most of the north strip)
+	end
 	local land: number
 	if d <= 0 then
 		land = Height.at(x, z)
@@ -270,7 +274,6 @@ function Backdrop.sample(x: number, z: number): (number, number, number, number)
 			land = math.max(e + (mh + 2 - e) * s, mh + 1)
 		end
 	end
-	local m, prof, t = coast(x, z)
 	return land + (prof - land) * m, land, t, d
 end
 

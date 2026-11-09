@@ -12,7 +12,7 @@
                           "sky": {"zenith", "mid", "horizon", "ground": [r, g, b], "strength": s},
                           "haze": {"color": [r, g, b], "start": studs, "half": studs (distance to half haze),
                                    "max": 0..1, "strength": emission strength},
-                          "neon": emission strength of Neon parts (night), "cards": [r, g, b] fog card colour }
+                          "neon": emission strength of Neon parts (night), "cardStrength": s, "cardTint": [r, g, b] }
                         Views without "light" get render.py's defaults back (the golden-hour sun and sky).
 """
 import math
@@ -68,13 +68,19 @@ def _card_material(name, keys):
     for pos, a in pts[1:-1]:
         e = els.new(pos)
         e.color = (a, a, a, 1.0)
-    links.new(col.outputs["Color"], em.inputs["Color"])
+    tint = nodes.new("ShaderNodeMix")
+    tint.data_type = "RGBA"
+    tint.blend_type = "MULTIPLY"
+    tint.inputs["Factor"].default_value = 1.0
+    links.new(col.outputs["Color"], tint.inputs["A"])
+    tint.inputs["B"].default_value = (1.0, 1.0, 1.0, 1.0)
+    links.new(tint.outputs["Result"], em.inputs["Color"])
     em.inputs["Strength"].default_value = 1.0
     links.new(ramp.outputs["Color"], mix.inputs["Fac"])
     links.new(tr.outputs["BSDF"], mix.inputs[1])
     links.new(em.outputs["Emission"], mix.inputs[2])
     links.new(mix.outputs["Shader"], out.inputs["Surface"])
-    _state["cards"].append(em)
+    _state["cards"].append((em, tint.inputs["B"]))
     return mat
 
 
@@ -215,7 +221,6 @@ def _snapshot():
         "sun_energy": sun.data.energy,
         "sun_color": tuple(sun.data.color),
         "neon": [s.default_value for s in _state["neon"]],
-        "cards": [tuple(e.inputs["Strength"].default_value for _ in [0]) for e in _state["cards"]],
     }
 
 
@@ -229,8 +234,9 @@ def _restore(d):
     sun.data.color = d["sun_color"]
     for s, v in zip(_state["neon"], d["neon"]):
         s.default_value = v
-    for e in _state["cards"]:
-        e.inputs["Strength"].default_value = 1.0
+    for em, tint in _state["cards"]:
+        em.inputs["Strength"].default_value = 1.0
+        tint.default_value = (1.0, 1.0, 1.0, 1.0)
     _set_haze(None)
 
 
@@ -260,7 +266,9 @@ def before_view(view, vcfg):
     if "neon" in light:
         for s in _state["neon"]:
             s.default_value = light["neon"]
-    if "cardStrength" in light:
-        for e in _state["cards"]:
-            e.inputs["Strength"].default_value = light["cardStrength"]
+    for em, tint in _state["cards"]:
+        if "cardStrength" in light:
+            em.inputs["Strength"].default_value = light["cardStrength"]
+        if "cardTint" in light:
+            tint.default_value = tuple(light["cardTint"]) + (1.0,)
     _set_haze(light.get("haze"))

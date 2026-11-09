@@ -680,6 +680,17 @@ def place_camera(cam, view, ground):
     return pos, look
 
 
+def _backdrop_module():
+    """tools/review/backdrop_render.py (fog cards, the band terrain, per-view "light" and haze), when present."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import backdrop_render
+    except ImportError:
+        return None
+    backdrop_render.install(globals())
+    return backdrop_render
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--scene", default="build/review/scene.json")
@@ -687,6 +698,7 @@ def main(argv):
     ap.add_argument("--out", default="build/review")
     ap.add_argument("--only", default="")
     ap.add_argument("--debug", action="store_true", help="also render views marked debug (axes_check)")
+    ap.add_argument("--set", default="", help='also render views with "optIn": <set> (e.g. backdrop: the bd_ views)')
     ap.add_argument("--samples", type=int, default=0, help="override every view's samples")
     ap.add_argument("--res", default="")
     ap.add_argument("--threads", type=int, default=2)
@@ -700,12 +712,21 @@ def main(argv):
         scene_data = json.load(fh)
     t_load = time.time() - t0
     only = [s for s in args.only.split(",") if s]
-    views = [v for v in vcfg["views"] if (args.debug or not v.get("debug")) and (not only or v["name"] in only)]
+    views = [
+        v
+        for v in vcfg["views"]
+        if (args.debug or not v.get("debug"))
+        and (not only or v["name"] in only)
+        and (v["name"] in only or not v.get("optIn") or v.get("optIn") == args.set)
+    ]
     need_debug = any(v.get("debug") for v in views)
 
     t1 = time.time()
+    backdrop = _backdrop_module()
     build_scene(scene_data, need_debug)
     setup_world(vcfg.get("sun", {}))
+    if backdrop:
+        backdrop.build(scene_data, globals())
     defaults = vcfg.get("defaults", {})
     res = tuple(int(x) for x in (args.res or defaults.get("res", "960x540")).split("x"))
     cam = setup_render(res, defaults.get("samples", 24), args.threads)
@@ -722,6 +743,8 @@ def main(argv):
             ob.hide_render = ob.get("review_group", "always") not in groups
         bpy.context.scene.cycles.samples = args.samples or v.get("samples", defaults.get("samples", 24))
         pos, look = place_camera(cam, v, ground)
+        if backdrop:
+            backdrop.before_view(v, vcfg)
         out = os.path.abspath(os.path.join(args.out, f"{v['name']}.png"))
         bpy.context.scene.render.filepath = out
         t = time.time()
