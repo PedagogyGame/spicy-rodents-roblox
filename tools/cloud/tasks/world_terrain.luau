@@ -10,6 +10,9 @@ local wall0 = DateTime.now().UnixTimestampMillis
 local town = WorldBuild.terrain("town")
 local wall1 = DateTime.now().UnixTimestampMillis
 print(`terrain town: {town.seconds} s, {town.voxels} voxels, {town.chunks} chunks`)
+-- read-back: road centre (asphalt at y 0), river channel (mud bed, water to 6 st), east hills
+-- (grass up to Height.at), the bridge-strip bank
+local probeTown = WorldBuild.probe({ { 2, 2 }, { 2125, 250 }, { 1177.5, -225 }, { 1880, 500 } }, -16, 32)
 local bands = WorldBuild.terrain("bands")
 local wall2 = DateTime.now().UnixTimestampMillis
 print(`terrain bands: {bands.seconds} s, {bands.voxels} voxels`)
@@ -20,5 +23,7 @@ return {
 	townWallMs = wall1 - wall0,
 	bands = bands,
 	bandsWallMs = wall2 - wall1,
+	probeTown = probeTown,
+	probeBand = WorldBuild.probe({ { -3000, -3000 } }, -16, 256),
 	placeVersion = game.PlaceVersion,
 }

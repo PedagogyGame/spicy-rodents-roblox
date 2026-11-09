@@ -7,8 +7,11 @@
 --   run(data, factory) -> Town Model     data = { lots = generated Lots, roads = generated Roads }
 --   plans(data) -> { BuildPlan }; hash(plans) -> hex; instanceHash(town) -> hex
 -- BakeHash hashes the plan with every number rounded to 1e-3 studs, so libm ulp differences
--- between Lune and the engine cannot flip it; InstanceHash hashes the built Instances (what the
--- .rbxm round trip must preserve) at 1e-2 studs.
+-- between Lune and the engine cannot flip it. InstanceHash hashes the built Instances' structure
+-- (paths, classes, colours, materials, flags, LOD, streaming, attributes): exact in both runtimes.
+-- Geometry (Size, CFrame) is float32 and rounds differently in each runtime (measured in S6: 131 of
+-- 2,128 lines flip at a 1e-2 grid), so it is compared with a tolerance instead: geometry(town)
+-- returns path -> 10 numbers and maxGeometryDelta(a, b) the worst difference.
 
 local Factory = require("./Factory")
 local Greybox = require("./Builders/Greybox")
@@ -132,7 +135,7 @@ function Bake.run(data: Data, factory: Factory.Factory): any
 	return town
 end
 
--- Hash of the built Instances (engine or Lune): one line per BasePart / Model, sorted by path.
+-- Structural hash of the built Instances (engine or Lune): one line per BasePart / Model, sorted.
 -- Town's own attributes are excluded (InstanceHash is stored there).
 function Bake.instanceHash(town: any): string
 	return fnv(table.concat(Bake.instanceLines(town), "\n"))
@@ -144,23 +147,12 @@ function Bake.instanceLines(town: any): { string }
 		for _, child in inst:GetChildren() do
 			local p = path .. "/" .. child.Name
 			if child:IsA("BasePart") then
-				local cf = child.CFrame
-				local look, up = cf.LookVector, cf.UpVector
 				local c = child.Color
 				table.insert(
 					lines,
 					table.concat({
 						p,
-						q(child.Size.X, "%.2f"),
-						q(child.Size.Y, "%.2f"),
-						q(child.Size.Z, "%.2f"),
-						q(cf.Position.X, "%.2f"),
-						q(cf.Position.Y, "%.2f"),
-						q(cf.Position.Z, "%.2f"),
-						q(look.X, "%.3f"),
-						q(look.Y, "%.3f"),
-						q(look.Z, "%.3f"),
-						q(up.Y, "%.3f"),
+						child.ClassName,
 						`{math.floor(c.R * 255 + 0.5)},{math.floor(c.G * 255 + 0.5)},{math.floor(c.B * 255 + 0.5)}`,
 						child.Material.Name,
 						tostring(child.CanCollide),
@@ -190,6 +182,58 @@ function Bake.instanceLines(town: any): { string }
 	walk(town, "Town")
 	table.sort(lines)
 	return lines
+end
+
+-- Geometry of every BasePart under `town`: path -> { size xyz, position xyz, look xyz, up.Y }.
+function Bake.geometry(town: any): { [string]: { number } }
+	local out: { [string]: { number } } = {}
+	local function walk(inst: any, path: string)
+		for _, child in inst:GetChildren() do
+			local p = path .. "/" .. child.Name
+			if child:IsA("BasePart") then
+				local cf, sz = child.CFrame, child.Size
+				local look = cf.LookVector
+				out[p] = {
+					sz.X,
+					sz.Y,
+					sz.Z,
+					cf.Position.X,
+					cf.Position.Y,
+					cf.Position.Z,
+					look.X,
+					look.Y,
+					look.Z,
+					cf.UpVector.Y,
+				}
+			end
+			walk(child, p)
+		end
+	end
+	walk(town, "Town")
+	return out
+end
+
+-- Worst absolute difference between two geometry maps (math.huge if a path is missing on either side).
+function Bake.maxGeometryDelta(a: { [string]: { number } }, b: { [string]: { number } }): (number, string?)
+	local worst, at = 0, nil
+	for path, va in a do
+		local vb = b[path]
+		if not vb then
+			return math.huge, path
+		end
+		for i = 1, #va do
+			local d = math.abs(va[i] - vb[i])
+			if d > worst then
+				worst, at = d, path
+			end
+		end
+	end
+	for path in b do
+		if not a[path] then
+			return math.huge, path
+		end
+	end
+	return worst, at
 end
 
 return Bake

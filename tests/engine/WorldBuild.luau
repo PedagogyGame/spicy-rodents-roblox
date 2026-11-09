@@ -4,8 +4,9 @@
 --   counts:    lot Models == #Generated.Lots, road Models == #Generated.Roads
 --   overlaps:  no 3-D overlap between solid lot greyboxes (engine CFrame/Size, 0.05 st tolerance)
 --   parity:    Bake.plans(Generated) hashed in the engine == Town.BakeHash (Lune);
---              Bake.instanceHash(Workspace.Town) == Town.InstanceHash (the .rbxm round trip);
---              a full engine-side Bake.run gives the same InstanceHash (and is timed)
+--              Bake.instanceHash(Workspace.Town) == Town.InstanceHash (structure after the .rbxm
+--              round trip); a full engine-side Bake.run gives the same InstanceHash (and is timed),
+--              and its geometry matches the placed Town within 1e-3 st
 --   requires:  first-require time of every Generated chunk (largest < 100 ms)
 -- terrain(which): TerrainBake timing for "town" (the v5.4 playable rectangle from World/Height)
 -- or "bands" (near-hill backdrop band, 0-2 km beyond the south and west play edges, stand-in hills).
@@ -147,11 +148,7 @@ function WorldBuild.run(): { [string]: any }
 	local fresh = Bake.run(data, Factory.new(Factory.engineEnv()))
 	local tRun = os.clock() - t2
 	local freshHash = fresh:GetAttribute("InstanceHash")
-	if freshHash ~= town:GetAttribute("InstanceHash") or placedHash ~= town:GetAttribute("InstanceHash") then
-		-- evidence for the diff: the first lines of each side (compare with the Lune bake locally)
-		local a, b = Bake.instanceLines(town), Bake.instanceLines(fresh)
-		result.sampleLines = { placed = { a[1], a[2], a[3], a[#a] }, engine = { b[1], b[2], b[3], b[#b] } }
-	end
+	local geomDelta, geomAt = Bake.maxGeometryDelta(Bake.geometry(town), Bake.geometry(fresh))
 	fresh:Destroy()
 	result.parity = {
 		lunePlanHash = town:GetAttribute("BakeHash"),
@@ -159,10 +156,15 @@ function WorldBuild.run(): { [string]: any }
 		luneInstanceHash = town:GetAttribute("InstanceHash"),
 		placedInstanceHash = placedHash,
 		engineBakeInstanceHash = freshHash,
+		geometryMaxDelta = geomDelta,
+		geometryMaxDeltaAt = geomAt,
 		planMs = tPlan * 1000,
 		instanceHashMs = tInst * 1000,
 		engineBakeMs = tRun * 1000,
 	}
+	if geomDelta > 1e-3 then
+		fail(`BakeParity: placed geometry differs from an engine-side bake by {geomDelta} at {geomAt}`)
+	end
 	if planHash ~= town:GetAttribute("BakeHash") then
 		fail("BakeParity: engine plan hash differs from the Lune BakeHash")
 	end
@@ -264,6 +266,24 @@ function WorldBuild.terrain(which: string, opts: { chunk: number?, clear: boolea
 		error("WorldBuild.terrain: unknown region " .. which)
 	end
 	return stats
+end
+
+-- Read back what TerrainBake wrote: the voxel column at (x, z) in studs, bottom-up, as
+-- "Material:occupancy" strings from y0 to y1, plus Terrain:CountCells().
+function WorldBuild.probe(points: { { number } }, y0: number, y1: number): { [string]: any }
+	local terrain = workspace.Terrain
+	local out: { [string]: any } = { cells = terrain:CountCells() }
+	for _, pt in points do
+		local x, z = math.floor(pt[1] / 4) * 4, math.floor(pt[2] / 4) * 4
+		local region = Region3.new(Vector3.new(x, y0, z), Vector3.new(x + 4, y1, z + 4))
+		local mats, occs = terrain:ReadVoxels(region, 4)
+		local col: { string } = {}
+		for j = 1, #mats[1] do
+			table.insert(col, `{mats[1][j][1].Name}:{string.format("%.2f", occs[1][j][1])}`)
+		end
+		out[`{pt[1]},{pt[2]}`] = table.concat(col, " ")
+	end
+	return out
 end
 
 return WorldBuild

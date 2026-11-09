@@ -136,6 +136,7 @@ return function(t)
 		local back = roblox.deserializeModel(roblox.serializeModel({ town }))[1]
 		t.eq(Bake.instanceHash(back), town:GetAttribute("InstanceHash"))
 		t.eq(back:GetAttribute("BakeHash"), town:GetAttribute("BakeHash"))
+		t.truthy(Bake.maxGeometryDelta(Bake.geometry(town), Bake.geometry(back)) <= 1e-4, "geometry round trip")
 		local slim = 0
 		for _, m in back:FindFirstChild("Lots"):GetChildren() do
 			t.truthy(m.PrimaryPart ~= nil, m.Name)
