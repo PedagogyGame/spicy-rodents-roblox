@@ -16,42 +16,45 @@ return function(t)
 	local records = require("../../generated/Lanes") :: any
 	local lanes, skipped = LaneMath.load(records)
 
-	t.test("lanes: 20 straight + 1 loop from the 25 compiled records; poses and yaws (traffic.md §3)", function()
-		local n = 0
-		for _ in lanes do
-			n += 1
+	t.test(
+		"lanes: 18 straight + 1 loop from the 25 compiled records (6 polyline/segment/template lanes are W1); poses and yaws (traffic.md §3)",
+		function()
+			local n = 0
+			for _ in lanes do
+				n += 1
+			end
+			t.eq(n, 19)
+			local skippedN = 0
+			for _ in skipped do
+				skippedN += 1
+			end
+			t.eq(skippedN, 6, "polyline/segment/template lanes are W1")
+			local nb = lanes["res_main_ns_northbound"]
+			t.near(nb.length, Units.st(520), 1e-9)
+			local p = LaneMath.pointAt(nb, Units.st(10))
+			t.near(p.x, Units.st(-5.4), 1e-9)
+			t.near(p.z, Units.st(-250), 1e-9)
+			t.near(p.yaw, 0, 1e-12, "+z heading is yaw 0")
+			local sb = lanes["res_main_ns_southbound"]
+			local q = LaneMath.pointAt(sb, 0)
+			t.near(q.z, Units.st(260), 1e-9)
+			t.near(q.yaw, math.pi, 1e-12, "-z heading is yaw pi")
+			local eb = lanes["blvd_eastbound"]
+			t.near(LaneMath.pointAt(eb, 0).yaw, math.pi / 2, 1e-12, "+x heading is yaw pi/2")
+			t.near(LaneMath.pointAt(lanes["blvd_westbound"], 0).yaw, -math.pi / 2, 1e-12)
+			t.near(eb.speeds.sedan, Units.st(8.6), 1e-9, "sedan cruise max on the boulevard")
+			-- one-way wrap and ping-pong
+			local s, wrapped = LaneMath.advance(nb, nb.length - 0.5, 60, 1 / 60) -- 1 st past the end
+			t.truthy(wrapped)
+			t.truthy(s >= 0 and s < 1, `wrapped s = {s}, length {nb.length}`)
+			local beat = lanes["patrol_beat"]
+			t.eq(beat.dir, 0, "patrol beat runs both ways")
+			local s2, dir2, turned = LaneMath.pingPong(beat, beat.length - 0.1, 1, 26.25, 1 / 60)
+			t.truthy(turned)
+			t.eq(dir2, -1)
+			t.truthy(s2 < beat.length)
 		end
-		t.eq(n, 21)
-		local skippedN = 0
-		for _ in skipped do
-			skippedN += 1
-		end
-		t.eq(skippedN, 4, "polyline/segment/template lanes are W1")
-		local nb = lanes["res_main_ns_northbound"]
-		t.near(nb.length, Units.st(520), 1e-9)
-		local p = LaneMath.pointAt(nb, Units.st(10))
-		t.near(p.x, Units.st(-5.4), 1e-9)
-		t.near(p.z, Units.st(-250), 1e-9)
-		t.near(p.yaw, 0, 1e-12, "+z heading is yaw 0")
-		local sb = lanes["res_main_ns_southbound"]
-		local q = LaneMath.pointAt(sb, 0)
-		t.near(q.z, Units.st(260), 1e-9)
-		t.near(q.yaw, math.pi, 1e-12, "-z heading is yaw pi")
-		local eb = lanes["blvd_eastbound"]
-		t.near(LaneMath.pointAt(eb, 0).yaw, math.pi / 2, 1e-12, "+x heading is yaw pi/2")
-		t.near(LaneMath.pointAt(lanes["blvd_westbound"], 0).yaw, -math.pi / 2, 1e-12)
-		t.near(eb.speeds.sedan, Units.st(8.6), 1e-9, "sedan cruise max on the boulevard")
-		-- one-way wrap and ping-pong
-		local s, wrapped = LaneMath.advance(nb, nb.length - 1, 60, 1 / 60)
-		t.truthy(wrapped)
-		t.truthy(s >= 0 and s < 1)
-		local beat = lanes["patrol_beat"]
-		t.eq(beat.dir, 0, "patrol beat runs both ways")
-		local s2, dir2, turned = LaneMath.pingPong(beat, beat.length - 0.1, 1, 26.25, 1 / 60)
-		t.truthy(turned)
-		t.eq(dir2, -1)
-		t.truthy(s2 < beat.length)
-	end)
+	)
 
 	t.test("ice-cream loop: closed centripetal Catmull-Rom, length 519.92 u (traffic.md verifier 13)", function()
 		local loop = lanes["icecream_loop"]
@@ -139,11 +142,11 @@ return function(t)
 			local v1 = { x = v0.x + math.sin(yaw) * speed * dt, y = v0.y, z = v0.z + math.cos(yaw) * speed * dt }
 			-- squirrel somewhere around the vehicle, moving at up to sprint speed in any direction, at a
 			-- height from the sewer to above the roof
-			local spread = box.length
+			local spread = 0.75 * box.length -- around the padded box so hits and misses are both common
 			local p0 = {
-				x = v0.x + Units.st(rng.range(-1, 1)) * spread,
-				y = Units.st(rng.range(-0.5, 5)),
-				z = v0.z + Units.st(rng.range(-1, 1)) * spread,
+				x = v0.x + rng.range(-1, 1) * spread, -- BOXES are already in studs
+				y = rng.range(Units.st(-0.5), box.height + Units.st(0.5)),
+				z = v0.z + rng.range(-1, 1) * spread,
 			}
 			local ang = rng.range(-math.pi, math.pi)
 			local move = Units.st(rng.range(0, 16.8)) * dt
@@ -171,47 +174,45 @@ return function(t)
 		t.truthy(hits > 100 and hits < 900, "the mix is informative")
 	end)
 
-	t.test("the sedan jump window: 0.51 s of clearance per leap, parked and moving (traffic.md §8.4)", function()
-		local k = Units.STUDS_PER_UNIT
-		local box = BOX.sedan
-		for _, carSpeed in { 0, 6 } do
-			local clearFrames = 0
-			local firstClear, lastClear = nil, nil
-			for f = 0, 50 do
-				local t0, t1 = f / 60, (f + 1) / 60
-				local function sq(tt: number): Swept.Vec3
-					return { x = Units.st(-4 + 8 * tt), y = Units.st(0.18 + 12.8 * tt - 15 * tt * tt), z = 0 }
+	t.test(
+		"the sedan jump window: about 0.51 s above the sedan's ceiling per leap, never hit there, parked and moving (traffic.md §8.4)",
+		function()
+			local k = Units.STUDS_PER_UNIT
+			local box = BOX.sedan
+			local ceiling = box.height - Swept.CEILING_UNITS * k -- relative to the vehicle base
+			for _, carSpeed in { 0, 6 } do
+				local aboveFrames, hitsAbove, hitsBelowOver = 0, 0, 0
+				for f = 0, 50 do
+					local t0, t1 = f / 60, (f + 1) / 60
+					local function sq(tt: number): Swept.Vec3
+						return { x = Units.st(-4 + 8 * tt), y = Units.st(0.18 + 12.8 * tt - 15 * tt * tt), z = 0 }
+					end
+					local function car(tt: number): Swept.Vec3
+						return { x = Units.st(-carSpeed * tt), y = Units.st(0.04), z = 0 }
+					end
+					local a, b, ca, cb = sq(t0), sq(t1), car(t0), car(t1)
+					local hit = Swept.hit(a, b, ca, cb, math.pi / 2, math.pi / 2, box.width, box.length, box.height, k)
+					local above = math.min(a.y - ca.y, b.y - cb.y) > ceiling
+					local over = math.abs(a.x - ca.x) < box.length / 2 + Swept.PAD_UNITS * k
+					if above then
+						aboveFrames += 1
+						if hit then
+							hitsAbove += 1
+						end
+					elseif over and hit then
+						hitsBelowOver += 1
+					end
 				end
-				local function car(tt: number): Swept.Vec3
-					return { x = Units.st(-carSpeed * tt), y = Units.st(0.04), z = 0 }
-				end
-				local hit = Swept.hit(
-					sq(t0),
-					sq(t1),
-					car(t0),
-					car(t1),
-					math.pi / 2,
-					math.pi / 2,
-					box.width,
-					box.length,
-					box.height,
-					k
+				local window = aboveFrames / 60
+				print(
+					`      car {carSpeed} u/s: {aboveFrames} frames above the ceiling = {string.format("%.3f", window)} s`
 				)
-				-- the squirrel is over the padded box while |x_rel| < L/2 + pad
-				local over = math.abs(sq(t0).x - car(t0).x) < box.length / 2 + 0.18 * k
-				if over and not hit then
-					clearFrames += 1
-					firstClear = firstClear or t0
-					lastClear = t1
-				end
+				t.truthy(window >= 0.48 and window <= 0.53, `window {window}`)
+				t.eq(hitsAbove, 0, "never hit while above the ceiling")
+				t.truthy(hitsBelowOver > 0, "hit when over the footprint below the ceiling")
 			end
-			local window = clearFrames / 60
-			print(
-				`      car {carSpeed} u/s: {clearFrames} clear frames = {string.format("%.3f", window)} s, from {firstClear} to {lastClear}`
-			)
-			t.truthy(window >= 0.45 and window <= 0.55, `window {window}`)
 		end
-	end)
+	)
 
 	t.test("SweptCollision.step: filters (invisible, stationary, wrap, teleport), first hit wins", function()
 		local svc = SweptCollision.new()
