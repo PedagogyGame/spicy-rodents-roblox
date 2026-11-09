@@ -1,0 +1,83 @@
+{
+  "about": "Named viewpoints for tools/review/render.py. Roblox coordinates in studs (Y up; the game's North is +Z, so +X is West). pos = camera, look = point looked at, fov = VERTICAL field of view in degrees (Roblox Camera.FieldOfView convention; Roblox default 70). aboveGround: pos.y and look.y are heights above the terrain (World/Height) under each point. groups: what is drawn (town = Workspace.Town parts, terrain = boot terrain heightfield + river water, editor_ground = build/EditorGround.rbxm, lineup / lineup_ground = placeholder puppets on a 1-stud checker). up: optional camera up vector (used for straight-down views). debug views render only with --debug.",
+  "defaults": { "res": "960x540", "samples": 20, "groups": ["town", "terrain"] },
+  "sun": { "dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0 },
+  "views": [
+    {
+      "name": "a_street_level",
+      "desc": "Eye height 5 st (human head) on the east sidewalk of rd_004 (x = -450), looking north past outer homes 01/02 (left) and 00 (right).",
+      "pos": [-421, 5, -480], "look": [-452, 6, -60], "fov": 70, "aboveGround": true
+    },
+    {
+      "name": "b_squirrel_eye",
+      "desc": "Squirrel eye 0.8 st above the road surface on rd_001 (x = 0), looking north toward the old-town core trees (Tree_550 at x 25 z -267, Tree_220 / Tree_231 at the core).",
+      "pos": [8, 0.8, -340], "look": [0, 7, -60], "fov": 70, "aboveGround": true
+    },
+    {
+      "name": "c_tree_25",
+      "desc": "Tree_283 (trunk foot about x -364 z -299, 56 x 76 x 65 st) from 25 st away, eye 5 st, sun behind the camera.",
+      "pos": [-349, 5, -319], "look": [-364, 16, -298.6], "fov": 80, "aboveGround": true
+    },
+    {
+      "name": "d_poles_lamps",
+      "desc": "Along the north sidewalk of rd_010 (z = 0) looking west->east... i.e. toward -X: telephone poles at z -41.2 on the right, street lamps along the kerbs and sidewalks.",
+      "pos": [300, 5.5, -33], "look": [-200, 9, -24], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "e1_aerial_300",
+      "desc": "Oblique aerial 300 st above the ground over the old-town core (looking from the sun side).",
+      "pos": [260, 300, -430], "look": [0, 0, 0], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "e2_top_300",
+      "desc": "Straight down from 300 st above the central intersection, North (+Z) up, so +X (West) is on the LEFT like town_map.svg.",
+      "pos": [0, 300, 0], "look": [0, 0, 0.001], "up": [0, 0, 1], "fov": 70, "aboveGround": true
+    },
+    {
+      "name": "e3_overview_top",
+      "desc": "Whole town straight down from 3600 st, North up (compare with assets/placeholders/town_map.svg).",
+      "pos": [700, 3600, -150], "look": [700, 0, -149.999], "up": [0, 0, 1], "fov": 40, "samples": 12
+    },
+    {
+      "name": "f1_lineup_all",
+      "desc": "Placeholder puppets side by side on a 1-stud checker, front three-quarter (authored facing -Z toward the camera).",
+      "pos": [8, 11, -46], "look": [27, 3, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
+    },
+    {
+      "name": "f2_lineup_small",
+      "desc": "Close-up of squirrel, rodent and fox (1-stud checker).",
+      "pos": [1.0, 2.9, -9.5], "look": [5.0, 1.0, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
+    },
+    {
+      "name": "f3_lineup_rear",
+      "desc": "The lineup from behind (+Z) three-quarter: tails, backs, rear lights.",
+      "pos": [50, 10, 42], "look": [27, 3, 0], "fov": 40, "groups": ["lineup", "lineup_ground"]
+    },
+    {
+      "name": "g_editor_view",
+      "desc": "What Studio's EDITOR shows: the town without terrain plus build/EditorGround.rbxm (the server swaps it for terrain at boot).",
+      "pos": [170, 70, -230], "look": [0, 0, 0], "fov": 60, "groups": ["town", "editor_ground"]
+    },
+    {
+      "name": "h_quay_bridge",
+      "desc": "The quay: stone bridge over the river at x 2125 z 0, bridge towers, embankment (looking west->east toward -X from the east bank).",
+      "pos": [2470, 30, -170], "look": [2125, 30, 0], "fov": 60
+    },
+    {
+      "name": "i_hospital",
+      "desc": "Hospital front (hospital_main x -890 z 882.5, porte cochere, ambulance bay) from the south-west.",
+      "pos": [-700, 25, 620], "look": [-890, 15, 800], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "k_gas_canopy",
+      "desc": "East fuel canopy (east_fuel_canopy x 1190 z 157.5) and fuel market at eye height.",
+      "pos": [1320, 6, 40], "look": [1190, 10, 160], "fov": 65, "aboveGround": true
+    },
+    {
+      "name": "axes_check",
+      "debug": true,
+      "desc": "Orientation test: red +X, green +Y, blue +Z bars from the origin, a WedgePart at (-4,1,0) (tall face at its +Z), a cylinder at (0,1,-5) (axis X) and a ball at (-4,1,-5). From (+X,+Y,+Z) a correct render shows red going down-RIGHT and blue going down-LEFT.",
+      "pos": [12, 9, 14], "look": [-1, 1, -1], "fov": 50, "groups": ["debug_axes"], "samples": 16
+    }
+  ]
+}
