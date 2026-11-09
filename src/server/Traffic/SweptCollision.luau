@@ -19,6 +19,7 @@
 local Import = require("../Import")
 local Swept = Import.shared("Traffic/Swept") :: typeof(require("../../shared/Traffic/Swept"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local Boxes = Import.shared("Traffic/Boxes") :: typeof(require("../../shared/Traffic/Boxes"))
 
 local SweptCollision = {}
 SweptCollision.__index = SweptCollision
@@ -69,20 +70,16 @@ export type SweptCollision = typeof(setmetatable(
 	SweptCollision
 ))
 
-local st = Units.st
--- Logical boxes in studs (traffic.md §2 and §9 in HTML units x 2.5). The cart is brief v2's golf cart
--- (carts are in the fatal fleet at low speed, Q8); no v5.4 source: a placeholder for W1's VehicleKinds.
-SweptCollision.BOXES = {
-	sedan = { width = st(2.35), length = st(4.45), height = st(2.04) },
-	patrol_car = { width = st(2.35), length = st(4.45), height = st(2.04) }, -- makeCar body: the sedan box
-	ambulance = { width = st(2.35), length = st(4.45), height = st(2.04) }, -- makeCar body: the sedan box
-	delivery_van = { width = st(3.0), length = st(5.9), height = st(3.65) },
-	ice_cream_van = { width = st(3.35), length = st(6.55), height = st(3.58) },
-	trolley = { width = st(3.5), length = st(11.0), height = st(4.12) },
-	dump_truck = { width = st(3.35), length = st(8.9), height = st(4.12) },
-	rv = { width = st(3.2), length = st(8.7), height = st(4.3) },
-	cart = { width = st(1.6), length = st(3.0), height = st(1.9) },
-}
+-- Logical boxes in studs: the shared table (Traffic/Boxes; traffic.md §2 and §9 in HTML units x 2.5), so
+-- the AI fleet, the placeholder vehicles and this test agree. Motorcycles are listed there but are not in
+-- the fatal fleet (traffic.md §5.12): their pose carries no box here unless the caller passes one.
+local BOXES: { [string]: Box } = {}
+for kind, b in Boxes.BOXES do
+	if Boxes.FATAL[kind] then
+		BOXES[kind] = b
+	end
+end
+SweptCollision.BOXES = BOXES
 
 function SweptCollision.new(opts: { boxes: { [string]: Box }?, scale: number? }?): SweptCollision
 	local o = opts or {}
