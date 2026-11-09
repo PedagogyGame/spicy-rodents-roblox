@@ -5,7 +5,8 @@
 -- ReplicatedStorage.Assets (Rigs/<species>, Placeholders/<species>, or any Model whose `RigSpec`
 -- attribute names the species; tools/placeholders writes these with RigSpec's final bone, socket
 -- and region names), (2) for humans a stock R15 from a blank HumanoidDescription in the post's
--- palette (townspeople wear their cast member's v5.4 shirt and skin, data/authored/cast; posts wear the
+-- palette (townspeople wear their cast member's v5.4 shirt and skin, data/authored/cast, with a shirt that
+-- reads as skin swapped for a clothes colour by RolePalettes.clothed; posts wear the
 -- RolePalettes uniform; pants from the v5.4 pants list), (3) for animals the RigSpec placeholder puppet
 -- built from Shared/Avatar/PuppetSpec (rounded ball-and-cylinder bodies: a fox squirrel, the mangy
 -- red-eyed spicy rodent, a red fox, white-tailed deer; every bone a Motor6D the client gait drives),
@@ -107,6 +108,13 @@ local function stockHuman(index: number, post: string?): Model
 			shirt = c.shirt or shirt
 			skin = c.skin or skin
 		end
+		-- many v5.4 cast shirts are tans and browns: on a clothes-free stock body they read as bare skin
+		local worn = RolePalettes.clothed(
+			{ r = shirt.R, g = shirt.G, b = shirt.B },
+			{ r = skin.R, g = skin.G, b = skin.B },
+			index + 1
+		)
+		shirt = Color3.new(worn.r, worn.g, worn.b)
 	end
 	desc.HeadColor = skin
 	desc.LeftArmColor = skin

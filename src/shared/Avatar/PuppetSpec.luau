@@ -68,6 +68,8 @@ PuppetSpec.STOCK_LOOKS = {
 	deer = { body = "#a8784c", pattern = "#efe7d8", eyes = "#15110e", eyesLocked = false },
 } :: { [string]: { body: string, pattern: string, eyes: string, eyesLocked: boolean } }
 
+PuppetSpec.FOX_SCALE = 0.77
+
 -- Builder ------------------------------------------------------------------------------------------
 
 type Extra = {
@@ -376,7 +378,10 @@ end
 
 local function fox(opts: Opts): ModelSpec
 	local c = PuppetSpec.PALETTES.fox
-	local b = newBuilder(1)
+	-- authored at a 2.6 st shoulder and built at FOX_SCALE: about 2 st at the shoulder, 2.8 st to the ear
+	-- tips, a third of a person's height (review 2026-11-09: 3.6 st tall read as 60 % of a human)
+	local k = PuppetSpec.FOX_SCALE
+	local b = newBuilder(k)
 	local HIP = 2.05
 	local G = -HIP
 	b.block("RootPart", { 1.0, 1.1, 3.0 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
@@ -448,7 +453,7 @@ local function fox(opts: Opts): ModelSpec
 	b.socket("MouthSocket", "Jaw", { 0, hy - 0.26, hz - 0.64 })
 	b.socket("TailTip", "Tail6", tip)
 	b.socket("ChestCenter", "Chest", { 0, 0.02, -0.85 })
-	return finish(b, "fox", opts.name or "fox", opts.variant, HIP, HIP + 0.55)
+	return finish(b, "fox", opts.name or "fox", opts.variant, HIP * k, (HIP + 0.55) * k)
 end
 
 -- White-tailed deer (doe, buck, fawn by RigSpec.deer.scaleVariants) ------------------------------------
@@ -467,7 +472,9 @@ local function deer(opts: Opts): ModelSpec
 		c[key] = v
 	end
 	local b = newBuilder(k)
-	local HIP = 3.8
+	-- a doe stands about 4 st at the shoulder with the head top at about 5.5 st, under a person's 6 st
+	-- (review 2026-11-09: 6.5 st does read as human-sized); the buck and fawn scale from her
+	local HIP = 3.1
 	local G = -HIP
 	b.block("RootPart", { 1.5, 1.8, 4.2 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
 	-- a smooth barrel (Body between the Hips and Chest balls) with a slight rump and withers
@@ -483,16 +490,14 @@ local function deer(opts: Opts): ModelSpec
 	b.weld("Body", "Spine2")
 	b.cyl("Pattern", { 0, -0.42, 0.85 }, { 0, -0.44, -1.0 }, 0.95, c.belly) -- white belly
 	b.weld("Pattern", "Spine2")
-	-- a thick neck angled up and forward, three balls tapering to the head
-	local necks = {
-		{ name = "Neck1", d = 1.1, pos = { 0, 0.55, -1.7 }, at = { 0, 0.3, -1.45 }, parent = "Chest" },
-		{ name = "Neck2", d = 0.92, pos = { 0, 1.05, -2.1 }, at = { 0, 0.85, -1.92 }, parent = "Neck1" },
-		{ name = "Neck3", d = 0.8, pos = { 0, 1.5, -2.45 }, at = { 0, 1.3, -2.3 }, parent = "Neck2" },
-	}
-	for _, n in necks do
-		b.ball(n.name, n.d, n.pos, c.fur, FUR)
-		b.motor(n.name, n.parent, n.at)
-	end
+	-- a solid neck angled up and forward: two overlapping cylinders tapering into a throat ball under
+	-- the head (review 2026-11-09: the ball chain read as a caterpillar or a giraffe)
+	b.cyl("Neck1", { 0, 0.3, -1.4 }, { 0, 1.12, -2.04 }, 1.0, c.fur, FUR)
+	b.motor("Neck1", "Chest", { 0, 0.3, -1.4 })
+	b.cyl("Neck2", { 0, 0.95, -1.9 }, { 0, 1.62, -2.42 }, 0.86, c.fur, FUR)
+	b.motor("Neck2", "Neck1", { 0, 0.95, -1.9 })
+	b.ball("Neck3", 0.84, { 0, 1.66, -2.5 }, c.fur, FUR)
+	b.motor("Neck3", "Neck2", { 0, 1.55, -2.38 })
 	local hy, hz = 1.95, -2.75
 	b.ball("Head", 0.98, { 0, hy, hz }, c.fur, FUR)
 	b.motor("Head", "Neck3", { 0, hy - 0.2, hz + 0.15 })
@@ -548,13 +553,13 @@ local function deer(opts: Opts): ModelSpec
 	-- the short tail hangs over the white rump; Tail2 is the white flag (raised when running, Gait)
 	local tip = tail(b, { 0, 0.6, 2.15 }, { -50, -78 }, 0.38, { 0.46, 0.4 }, { c.tail, c.flag })
 	mirrored(b, "Front", 0.42, "Chest", {
-		pts = { { -0.3, -1.2 }, { -1.65, -1.15 }, { -3.0, -1.25 }, { -3.58, -1.28 }, { G, -1.46 } },
+		pts = { { -0.3, -1.2 }, { -1.4, -1.15 }, { -2.45, -1.24 }, { -2.88, -1.27 }, { G, -1.46 } },
 		d = { 0.52, 0.26, 0.2 },
 		toe = { 0.3, 0.22, 0.34 },
 		colors = { c.fur, c.legs, c.legs, c.hoof },
 	})
 	mirrored(b, "Back", 0.44, "Hips", {
-		pts = { { -0.05, 1.15 }, { -1.05, 1.0 }, { -2.35, 1.45 }, { -3.58, 1.32 }, { G, 1.16 } },
+		pts = { { -0.05, 1.15 }, { -0.9, 1.0 }, { -1.95, 1.42 }, { -2.88, 1.32 }, { G, 1.16 } },
 		d = { 0.5, 0.34, 0.22 },
 		thigh = { 1.05, -0.45, 1.15 },
 		toe = { 0.3, 0.22, 0.34 },

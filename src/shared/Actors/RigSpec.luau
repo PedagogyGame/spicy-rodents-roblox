@@ -176,7 +176,7 @@ RigSpec.deer = {
 	clips = QUADRUPED_CLIPS,
 	budget = { tris = 9500, bones = 40 },
 	hitbox = { kind = "capsule", radius = 1.75, height = 7.75 },
-	scaleVariants = { doe = 1.0, buck = 1.18, fawn = 0.55 },
+	scaleVariants = { doe = 1.0, buck = 1.1, fawn = 0.55 }, -- buck 1.18 stood taller than a person (review)
 } :: Contract
 
 -- Standard R15 (Roblox names) on one shared UV layout; skin shows through transparent texels on the
