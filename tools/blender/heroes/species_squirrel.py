@@ -275,11 +275,12 @@ def pattern_field(c, n, dom, variant="squirrel"):
     x, y, z = c[:, 0], c[:, 1], c[:, 2]
     wob = 0.03 * np.sin(y * 23.0 + x * 9.0) + 0.02 * np.sin(y * 51.0 - z * 17.0)
     out = np.zeros(len(c))
-    torso = np.isin(dom, list(TORSO))
-    # belly and chest: low, facing down; the line rises toward the chest and the throat
-    line = 0.70 + 0.06 * _sstep(0.2, -0.5, y) + wob
-    belly = _sstep(-0.05, 0.35, -n[:, 2] + (line - z) * 2.5)
-    out[torso] = belly[torso]
+    # belly and chest by position (the belly's dominant bones are often the legs'): low, facing
+    # down, near the midline; the line rises toward the chest and the throat
+    trunk = ~np.char.startswith(dom.astype(str), "Tail") & ~np.isin(dom, ["Head", "Jaw", "EarL", "EarR"]) & (y > -0.75) & (y < 0.5)
+    line = 0.68 + 0.08 * _sstep(0.2, -0.5, y) + wob
+    belly = _sstep(0.1, 0.45, -n[:, 2] * 0.8 + (line - z) * 2.5 - np.abs(x) * 1.5 + 0.15)
+    out[trunk] = belly[trunk]
     neck = dom == "Neck"
     out[neck] = _sstep(0.0, 0.4, -n[neck, 2] + (0.9 - z[neck]) * 1.5 + wob[neck])
     head = dom == "Head"
@@ -418,8 +419,12 @@ def paint(tx, variant, tools):
     lid = 1 - sst(r_eye + 0.002, r_eye + 0.009, d_eye)
     override(head, _hex("#7a2a2a") if rodent else _hex("#2a1e1a"), r=0.4, k=lid)
     # inner ears: thin pinkish skin with fine hairs
-    inner = ear & (N[:, 1] < -0.15)
-    override(ear, _hex("#9c6a60") if rodent else _hex("#b88a7c"), r=0.5, k=sst(-0.15, -0.45, N[:, 1]) * inner)
+    # inner ears: thin warm skin with fine hairs, the fur coming over the rim
+    ec = np.where(P[:, :1] > 0, lm["earL"], lm["earR"])
+    rim = 1 - sst(0.025, 0.055, np.linalg.norm(P - ec, axis=1))
+    inner = ear & (N[:, 1] < -0.2)
+    skin_e = (_hex("#7a4a40") if rodent else _hex("#9a6a5a")) * (0.85 + 0.3 * fine)[:, None]
+    override(ear, skin_e, r=0.5, k=sst(-0.2, -0.5, N[:, 1]) * inner * rim * 0.9)
     # foot pads
     override(feet, _hex("#5c4440"), r=0.5, k=sst(-0.4, -0.75, N[:, 2]) * feet)
     # claws and teeth

@@ -369,7 +369,7 @@ def paint_body(sp, variant, lo, hi, W, bone_names, opts, log):
     aoval = ao[..., 0][filled]
     aoval[hard] = np.maximum(aoval[hard], 0.8)
     ao_k = paint.get("ao_strength", 0.6)
-    occl = 1 - ao_k * (1 - np.clip(aoval, 0, 1))
+    occl = 1 - ao_k * (1 - np.clip(aoval, 0, 1)) ** 1.6  # soft: crevices darken, never to black
     rgb = np.clip(paint["rgb"] * occl[:, None], 0, 1)
     color = np.zeros((res, res, 4), dtype=F32)
     color[filled, :3] = rgb
