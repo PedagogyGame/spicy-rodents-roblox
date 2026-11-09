@@ -176,3 +176,121 @@ def join_into(target, others):
     bl.select_only([target] + list(others), active=target)
     bpy.ops.object.join()
     return target
+
+
+# ---- part-based UV layout ------------------------------------------------------------------------------
+
+def _dijkstra(adj, sources, targets, wv):
+    """Shortest path (edge cost = length x mean vertex weight) from any source to any target; returns
+    the vertex path (list) or []."""
+    import heapq
+
+    dist = {s: 0.0 for s in sources}
+    prev = {}
+    heap = [(0.0, s) for s in sources]
+    heapq.heapify(heap)
+    targets = set(targets)
+    done = set()
+    while heap:
+        d, u = heapq.heappop(heap)
+        if u in done:
+            continue
+        done.add(u)
+        if u in targets:
+            path = [u]
+            while path[-1] in prev:
+                path.append(prev[path[-1]])
+            return path[::-1]
+        for v, length in adj[u]:
+            nd = d + length * 0.5 * (wv[u] + wv[v])
+            if nd < dist.get(v, 1e30):
+                dist[v] = nd
+                prev[v] = u
+                heapq.heappush(heap, (nd, v))
+    return []
+
+
+def unwrap_parts(obj, face_part, cuts, margin=0.004):
+    """Seams on part boundaries plus cuts, then an angle-based unwrap (holes filled virtually),
+    islands scaled to equal texel density and packed.
+    face_part: int per face (-1 = leave alone, e.g. claws: they are separate islands anyway).
+    cuts: [(part, source_fn, target_fn, weight_fn)]: source/target_fn(vertex ids, co, normals) ->
+    boolean mask over those ids; weight_fn(co, normals) -> per-vertex cost multiplier (>= 1)."""
+    import bmesh
+
+    me = obj.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    bm.edges.ensure_lookup_table()
+    bm.faces.ensure_lookup_table()
+    co = np.array([v.co[:] for v in bm.verts])
+    nv = np.array([v.normal[:] for v in bm.verts])
+    for e in bm.edges:
+        fs = e.link_faces
+        e.seam = bool(len(fs) == 2 and face_part[fs[0].index] != face_part[fs[1].index])
+    nseam = sum(e.seam for e in bm.edges)
+    for part, src_fn, tgt_fn, w_fn in cuts:
+        # vertices whose every face is in this part (interior) plus its boundary ring
+        vin = {}
+        for v in bm.verts:
+            ps = {face_part[f.index] for f in v.link_faces}
+            if part in ps:
+                vin[v.index] = len(ps) > 1  # True = on the part's boundary
+        if not vin:
+            continue
+        ids = np.array(sorted(vin))
+        wv = np.ones(len(bm.verts))
+        wv[ids] = w_fn(co[ids], nv[ids])
+        adj = {i: [] for i in ids}
+        for e in bm.edges:
+            a, b = e.verts[0].index, e.verts[1].index
+            if a in adj and b in adj and any(face_part[f.index] == part for f in e.link_faces):
+                if e.seam and vin[a] and vin[b]:
+                    continue  # do not walk along the part boundary itself
+                L = (bm.verts[a].co - bm.verts[b].co).length
+                adj[a].append((b, L))
+                adj[b].append((a, L))
+        src = ids[src_fn(ids, co[ids], nv[ids], np.array([vin[i] for i in ids]))]
+        tgt = ids[tgt_fn(ids, co[ids], nv[ids], np.array([vin[i] for i in ids]))]
+        path = _dijkstra(adj, list(src), list(tgt), wv)
+        for a, b in zip(path[:-1], path[1:]):
+            e = bm.edges.get((bm.verts[a], bm.verts[b]))
+            if e is not None:
+                e.seam = True
+    bm.to_mesh(me)
+    bm.free()
+    bl.select_only([obj])
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.unwrap(method="ANGLE_BASED", fill_holes=True, correct_aspect=True, margin=margin)
+    bpy.ops.uv.average_islands_scale()
+    bpy.ops.uv.pack_islands(rotate=True, margin=margin)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    return nseam
+
+
+def smooth_labels(obj, labels, iters=3):
+    """Mode filter over face adjacency: a face with fewer than two same-label neighbours takes the
+    most common neighbour label (no one-face specks of another part)."""
+    import bmesh
+    from collections import Counter
+
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.faces.ensure_lookup_table()
+    nbrs = [[g.index for e in f.edges for g in e.link_faces if g.index != f.index] for f in bm.faces]
+    bm.free()
+    lab = np.array(labels)
+    for _ in range(iters):
+        new = lab.copy()
+        for i, nb in enumerate(nbrs):
+            if lab[i] < 0 or not nb:
+                continue
+            same = sum(1 for j in nb if lab[j] == lab[i])
+            if same < 2:
+                c = Counter(lab[j] for j in nb if lab[j] >= 0).most_common(1)
+                if c:
+                    new[i] = c[0][0]
+        lab = new
+    return lab

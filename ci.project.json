@@ -62,6 +62,9 @@
       },
       "EditorGround": {
         "$path": { "optional": "build/EditorGround.rbxm" }
+      },
+      "Attractions": {
+        "$path": { "optional": "build/Attractions.rbxm" }
       }
     },
 

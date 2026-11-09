@@ -6,8 +6,10 @@
 --     heads with Flicker = true flicker gently. Heads are Workspace.Town.Skyline "Head_*" parts.
 --   * Skyline massing: each building's far-view box (baked transparent) is shown only while that
 --     lot's own model is streamed out, so near the player the real roofs, windows and colours show.
+--   * Night-aware: the pool follows Lighting's StreetLamps attribute (0..1, written by Client/World/Sky from the
+--     day cycle): off by day, fading in at dusk, full at night; without the attribute the lamps stay on.
 -- Started by Render/VehicleView.start (Main's single client script stays the only script).
--- Interface: start() -> stop(); nearest(points, x, z, max, radius) -> { index } (pure)
+-- Interface: start() -> stop(); nearest(points, x, z, max, radius) -> { index } (pure); level() -> 0..1
 
 local TownView = {}
 
@@ -40,6 +42,12 @@ function TownView.nearest(points: { { number } }, x: number, z: number, max: num
 		table.insert(out, cand[k][2])
 	end
 	return out
+end
+
+-- Street-lamp level from the day cycle (Lighting attribute StreetLamps; 1 when no sky runs).
+function TownView.level(): number
+	local v = game:GetService("Lighting"):GetAttribute("StreetLamps")
+	return if type(v) == "number" then math.clamp(v, 0, 1) else 1
 end
 
 function TownView.start(): () -> ()
@@ -116,10 +124,16 @@ function TownView.start(): () -> ()
 			RunService.Heartbeat:Connect(function(dt: number)
 				t += dt
 				acc += dt
+				local level = TownView.level()
 				if acc >= TownView.PERIOD then
 					acc = 0
 					local cam = workspace.CurrentCamera
-					if cam then
+					if level < 0.03 then
+						table.clear(flickering)
+						for _, l in lights do
+							l.Enabled = false
+						end
+					elseif cam then
 						local p = cam.CFrame.Position
 						local pick = TownView.nearest(points, p.X, p.Z, TownView.MAX_LIGHTS, TownView.RADIUS)
 						table.clear(flickering)
@@ -131,7 +145,7 @@ function TownView.start(): () -> ()
 									l.Parent = head
 								end
 								l.Enabled = true
-								l.Brightness = TownView.BRIGHTNESS
+								l.Brightness = TownView.BRIGHTNESS * level
 								if head:GetAttribute("Flicker") == true then
 									flickering[l] = idx
 								end
@@ -143,7 +157,7 @@ function TownView.start(): () -> ()
 				end
 				for l, seed in flickering do
 					local n = math.sin(t * 13.1 + seed) * math.sin(t * 7.3 + seed * 0.5)
-					l.Brightness = TownView.BRIGHTNESS * (if n > 0.82 then 0.25 else 1)
+					l.Brightness = TownView.BRIGHTNESS * level * (if n > 0.82 then 0.25 else 1)
 				end
 			end)
 		)

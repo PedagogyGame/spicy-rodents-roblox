@@ -1,8 +1,8 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Main
 -- Client entry of the first playable build (owner directive 2026-11-09; BUILD_PLAN §1.3, §4.4 #5):
--- the loading screen first (UI/PlayMenu: server boot progress, then the climbing routes prepared on
--- this computer), then the AnimationDriver over every body (D3), the traffic ghosts
+-- the day cycle (World/Sky) and the loading screen first (UI/PlayMenu: server boot progress, then the climbing
+-- routes prepared on this computer), then the AnimationDriver over every body (D3), the traffic ghosts
 -- (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
@@ -28,6 +28,7 @@ local AnimationDriver = require("./Animation/AnimationDriver")
 local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local ClientWorld = require("./World/ClientWorld")
+local Sky = require("./World/Sky")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -47,6 +48,12 @@ task.spawn(function()
 		task.wait(0.2)
 	end
 end)
+
+-- the day cycle, the moon and the backdrop's lights from the server's clock (World/Sky), from the first frame
+local skyOk, skyErr = pcall(Sky.start)
+if not skyOk then
+	warn(`Client: the sky did not start: {skyErr}`)
+end
 
 local pickRemote: RemoteEvent? = nil
 local menu = PlayMenu.start(function(choice: string)

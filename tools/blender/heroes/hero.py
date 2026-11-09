@@ -88,6 +88,78 @@ def assign_regions(lo, field_fn, W, bone_names):
     return int(mi.sum())
 
 
+PARTS = ["torso", "head", "earL", "earR", "tail", "FrontL", "FrontR", "BackL", "BackR"]
+
+
+def bone_part(name):
+    if name.startswith("Tail"):
+        return "tail"
+    if name in ("Head", "Jaw"):
+        return "head"
+    if name == "EarL":
+        return "earL"
+    if name == "EarR":
+        return "earR"
+    for leg in ("FrontL", "FrontR", "BackL", "BackR"):
+        if name.startswith(leg + "_"):
+            return leg
+    return "torso"
+
+
+def quadruped_uv(lo, W, bone_names):
+    """Part-based seams for any of the RigSpec quadrupeds: a cut along the belly from the throat to
+    the tail root, down the inside of each leg, under the tail; head and ears unwrap as domes."""
+    me = lo.data
+    part_of_bone = np.array([PARTS.index(bone_part(b)) for b in bone_names])
+    vpart = part_of_bone[np.argmax(W, axis=1)]
+    kind = np.empty(len(me.polygons), dtype=np.int32)
+    me.attributes["hard_kind"].data.foreach_get("value", kind)
+    fl = []
+    for p in me.polygons:
+        vs = [vpart[i] for i in p.vertices]
+        fl.append(max(set(vs), key=vs.count))
+    fl = np.array(fl)
+    fl[kind > 0] = -1
+    fl = geometry.smooth_labels(lo, fl)
+    vsets = [set() for _ in me.vertices]
+    for p in me.polygons:
+        for i in p.vertices:
+            vsets[i].add(int(fl[p.index]))
+    P = {n: i for i, n in enumerate(PARTS)}
+
+    def ring(of, touching, low_frac=None):
+        def fn(ids, co, nv, bnd):
+            m = np.array([of in vsets[i] and touching in vsets[i] for i in ids])
+            if low_frac is not None and m.any():
+                z = co[m, 2]
+                m &= co[:, 2] <= np.quantile(z, low_frac)
+            return m
+        return fn
+
+    def lowest(frac):
+        def fn(ids, co, nv, bnd):
+            return co[:, 2] <= np.quantile(co[:, 2], frac)
+        return fn
+
+    def farthest_back(ids, co, nv, bnd):
+        return co[:, 1] >= np.quantile(co[:, 1], 0.995)
+
+    def ventral(co, nv):
+        width = max(np.ptp(co[:, 0]), 1e-3)
+        return 1 + 6 * np.maximum(0, nv[:, 2] + 0.3) + 10 * np.abs(co[:, 0]) / width
+
+    def inner(co, nv):
+        side = np.sign(np.mean(co[:, 0])) or 1.0
+        inward = -side * nv[:, 0]
+        return 1 + 6 * np.maximum(0, 0.6 - inward)
+
+    cuts = [(P["torso"], ring(P["torso"], P["head"], 0.3), ring(P["torso"], P["tail"], 0.5), ventral)]
+    for leg in ("FrontL", "FrontR", "BackL", "BackR"):
+        cuts.append((P[leg], ring(P[leg], P["torso"]), lowest(0.02), inner))
+    cuts.append((P["tail"], ring(P["tail"], P["torso"], 0.5), farthest_back, ventral))
+    return geometry.unwrap_parts(lo, fl, cuts)
+
+
 def separate_pattern(lo):
     """Split material 1 into its own object named Pattern; lo becomes Body."""
     me = lo.data
@@ -139,8 +211,8 @@ def finish(sp, variant, skel, bone_names, body, hi, lo, opts, log):
     log(f"{nh} hard parts joined; body now {bl.tri_count(lo.data)} tris")
     npat = assign_regions(lo, lambda c, n, dom: sp.pattern_field(c, n, dom, variant), W, bone_names)
     log(f"pattern faces {npat}")
-    geometry.uv_unwrap(lo)
-    log("uv unwrapped")
+    nseam = quadruped_uv(lo, W, bone_names)
+    log(f"uv unwrapped ({nseam} part-boundary seam edges)")
     arm = rig.build_armature(skel, "Rig")
     rig.bind(lo, arm)
     import textures  # noqa: E402
