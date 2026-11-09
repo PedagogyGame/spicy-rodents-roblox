@@ -156,7 +156,21 @@ RigSpec.deer = {
 	primaryPart = "RootPart",
 	bubbleHead = "Head",
 	bones = concat(
-		{ "Root", "Hips", "Spine1", "Spine2", "Spine3", "Chest", "Neck1", "Neck2", "Neck3", "Head", "Jaw", "EarL", "EarR" },
+		{
+			"Root",
+			"Hips",
+			"Spine1",
+			"Spine2",
+			"Spine3",
+			"Chest",
+			"Neck1",
+			"Neck2",
+			"Neck3",
+			"Head",
+			"Jaw",
+			"EarL",
+			"EarR",
+		},
 		chain("Tail", 2),
 		legs()
 	),

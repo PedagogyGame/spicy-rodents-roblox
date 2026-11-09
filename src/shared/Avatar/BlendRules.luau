@@ -125,44 +125,44 @@ BlendRules.SKIN_TONES = {
 } :: { Rgb }
 
 -- Colour words in item names, longest match first (D13 "colour words from item names").
-local COLOUR_WORDS: { { string, Rgb } } = {
-	{ "neon green", { r = 0.22, g = 1.0, b = 0.08 } },
-	{ "neon pink", { r = 1.0, g = 0.1, b = 0.7 } },
-	{ "neon blue", { r = 0.1, g = 0.6, b = 1.0 } },
-	{ "hot pink", { r = 1.0, g = 0.2, b = 0.6 } },
-	{ "sky blue", { r = 0.53, g = 0.81, b = 0.92 } },
-	{ "navy", { r = 0.1, g = 0.12, b = 0.35 } },
-	{ "teal", { r = 0.0, g = 0.5, b = 0.5 } },
-	{ "turquoise", { r = 0.25, g = 0.88, b = 0.82 } },
-	{ "cyan", { r = 0.0, g = 0.9, b = 0.9 } },
-	{ "aqua", { r = 0.0, g = 0.9, b = 0.9 } },
-	{ "blue", { r = 0.2, g = 0.35, b = 0.85 } },
-	{ "lime", { r = 0.5, g = 1.0, b = 0.0 } },
-	{ "green", { r = 0.2, g = 0.6, b = 0.25 } },
-	{ "olive", { r = 0.5, g = 0.5, b = 0.1 } },
-	{ "yellow", { r = 1.0, g = 0.9, b = 0.2 } },
-	{ "gold", { r = 0.85, g = 0.65, b = 0.13 } },
-	{ "orange", { r = 1.0, g = 0.55, b = 0.1 } },
-	{ "red", { r = 0.85, g = 0.15, b = 0.15 } },
-	{ "crimson", { r = 0.7, g = 0.05, b = 0.15 } },
-	{ "maroon", { r = 0.5, g = 0.0, b = 0.1 } },
-	{ "pink", { r = 1.0, g = 0.6, b = 0.75 } },
-	{ "magenta", { r = 1.0, g = 0.0, b = 1.0 } },
-	{ "purple", { r = 0.5, g = 0.2, b = 0.7 } },
-	{ "violet", { r = 0.55, g = 0.3, b = 0.85 } },
-	{ "lavender", { r = 0.7, g = 0.6, b = 0.9 } },
-	{ "brown", { r = 0.45, g = 0.3, b = 0.18 } },
-	{ "tan", { r = 0.82, g = 0.7, b = 0.55 } },
-	{ "beige", { r = 0.9, g = 0.85, b = 0.7 } },
-	{ "cream", { r = 0.98, g = 0.95, b = 0.85 } },
-	{ "white", { r = 0.95, g = 0.95, b = 0.95 } },
-	{ "black", { r = 0.08, g = 0.08, b = 0.1 } },
-	{ "gray", { r = 0.5, g = 0.5, b = 0.52 } },
-	{ "grey", { r = 0.5, g = 0.5, b = 0.52 } },
-	{ "silver", { r = 0.75, g = 0.75, b = 0.78 } },
-	{ "charcoal", { r = 0.2, g = 0.2, b = 0.22 } },
-	{ "denim", { r = 0.25, g = 0.35, b = 0.55 } },
-	{ "khaki", { r = 0.76, g = 0.69, b = 0.57 } },
+local COLOUR_WORDS: { { word: string, c: Rgb } } = {
+	{ word = "neon green", c = { r = 0.22, g = 1.0, b = 0.08 } },
+	{ word = "neon pink", c = { r = 1.0, g = 0.1, b = 0.7 } },
+	{ word = "neon blue", c = { r = 0.1, g = 0.6, b = 1.0 } },
+	{ word = "hot pink", c = { r = 1.0, g = 0.2, b = 0.6 } },
+	{ word = "sky blue", c = { r = 0.53, g = 0.81, b = 0.92 } },
+	{ word = "navy", c = { r = 0.1, g = 0.12, b = 0.35 } },
+	{ word = "teal", c = { r = 0.0, g = 0.5, b = 0.5 } },
+	{ word = "turquoise", c = { r = 0.25, g = 0.88, b = 0.82 } },
+	{ word = "cyan", c = { r = 0.0, g = 0.9, b = 0.9 } },
+	{ word = "aqua", c = { r = 0.0, g = 0.9, b = 0.9 } },
+	{ word = "blue", c = { r = 0.2, g = 0.35, b = 0.85 } },
+	{ word = "lime", c = { r = 0.5, g = 1.0, b = 0.0 } },
+	{ word = "green", c = { r = 0.2, g = 0.6, b = 0.25 } },
+	{ word = "olive", c = { r = 0.5, g = 0.5, b = 0.1 } },
+	{ word = "yellow", c = { r = 1.0, g = 0.9, b = 0.2 } },
+	{ word = "gold", c = { r = 0.85, g = 0.65, b = 0.13 } },
+	{ word = "orange", c = { r = 1.0, g = 0.55, b = 0.1 } },
+	{ word = "red", c = { r = 0.85, g = 0.15, b = 0.15 } },
+	{ word = "crimson", c = { r = 0.7, g = 0.05, b = 0.15 } },
+	{ word = "maroon", c = { r = 0.5, g = 0.0, b = 0.1 } },
+	{ word = "pink", c = { r = 1.0, g = 0.6, b = 0.75 } },
+	{ word = "magenta", c = { r = 1.0, g = 0.0, b = 1.0 } },
+	{ word = "purple", c = { r = 0.5, g = 0.2, b = 0.7 } },
+	{ word = "violet", c = { r = 0.55, g = 0.3, b = 0.85 } },
+	{ word = "lavender", c = { r = 0.7, g = 0.6, b = 0.9 } },
+	{ word = "brown", c = { r = 0.45, g = 0.3, b = 0.18 } },
+	{ word = "tan", c = { r = 0.82, g = 0.7, b = 0.55 } },
+	{ word = "beige", c = { r = 0.9, g = 0.85, b = 0.7 } },
+	{ word = "cream", c = { r = 0.98, g = 0.95, b = 0.85 } },
+	{ word = "white", c = { r = 0.95, g = 0.95, b = 0.95 } },
+	{ word = "black", c = { r = 0.08, g = 0.08, b = 0.1 } },
+	{ word = "gray", c = { r = 0.5, g = 0.5, b = 0.52 } },
+	{ word = "grey", c = { r = 0.5, g = 0.5, b = 0.52 } },
+	{ word = "silver", c = { r = 0.75, g = 0.75, b = 0.78 } },
+	{ word = "charcoal", c = { r = 0.2, g = 0.2, b = 0.22 } },
+	{ word = "denim", c = { r = 0.25, g = 0.35, b = 0.55 } },
+	{ word = "khaki", c = { r = 0.76, g = 0.69, b = 0.57 } },
 }
 
 local BIZARRE_WORDS = {
@@ -288,8 +288,8 @@ function BlendRules.colourWord(name: string?): (Rgb?, string?)
 	end
 	local lower = string.lower(name)
 	for _, entry in COLOUR_WORDS do
-		if string.find(lower, entry[1], 1, true) then
-			return entry[2], entry[1]
+		if string.find(lower, entry.word, 1, true) then
+			return entry.c, entry.word
 		end
 	end
 	return nil, nil
@@ -378,7 +378,9 @@ function BlendRules.traits(desc: DescriptionLike, productInfo: ProductInfo?, tab
 		end
 		if acc.isLayered then
 			-- jackets, sweaters, shirts count as shirts for the pattern colour (D13)
-			if c and (acc.accessoryType == "Jacket" or acc.accessoryType == "Sweater" or acc.accessoryType == "Shirt") then
+			if
+				c and (acc.accessoryType == "Jacket" or acc.accessoryType == "Sweater" or acc.accessoryType == "Shirt")
+			then
 				layeredShirt = layeredShirt or c
 			end
 		else
@@ -519,7 +521,7 @@ local function composeHuman(traits: Traits): HumanLook
 end
 
 -- Animals: capped fur tint, pattern colours from shirt/pants, derived eyes, one rigid accessory.
-local function composeAnimal(species: string, stock: StockLook, traits: Traits): AnimalLook
+local function composeAnimal(_species: string, stock: StockLook, traits: Traits): AnimalLook
 	local avatarWeight = BlendRules.AVATAR_WEIGHT
 	local bodyTint = BlendRules.clampPalette(BlendRules.mix(stock.body, traits.dominant, avatarWeight))
 	local patternSource = traits.shirt or traits.dominant

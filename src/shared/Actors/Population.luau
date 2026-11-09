@@ -218,7 +218,11 @@ function Population.validate(config: Config): (boolean, { string })
 			`hard cap {config.hardCap} - hard-cap floors {capFloors} < {config.playerSlots} player slots`
 		)
 	end
-	if config.squirrelFloat.min < 10 or config.squirrelFloat.max > 14 or config.squirrelFloat.min > config.squirrelFloat.max then
+	if
+		config.squirrelFloat.min < 10
+		or config.squirrelFloat.max > 14
+		or config.squirrelFloat.min > config.squirrelFloat.max
+	then
 		table.insert(errors, "squirrel float must sit inside 10-14 (brief v2 §5)")
 	end
 	if config.deerBodies < 5 then

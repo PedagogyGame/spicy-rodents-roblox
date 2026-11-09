@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Squirrel turntable (S12)</title>
+<style>
+  :root { --bg: #1e1e22; --fg: #e8e8ea; --muted: #9a9aa2; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { color: var(--muted); margin: 0 0 12px; }
+  #stage { width: 100%; max-width: 256px; aspect-ratio: 1; margin: 0 auto; display: block;
+            border-radius: 8px; cursor: ew-resize; user-select: none; touch-action: none; image-rendering: auto; }
+  .row { display: flex; gap: 12px; align-items: center; justify-content: center; margin: 12px 0; }
+  button { background: #33333a; color: var(--fg); border: 1px solid #55555e; border-radius: 6px; padding: 6px 12px; }
+  img.sheet { width: 100%; height: auto; border-radius: 8px; }
+</style></head>
+<body><main>
+<h1>Test squirrel turntable</h1>
+<p>CYCLES CPU, 64 samples, 512 px, 2 threads: 13.521 s per frame (0.2254 min), 36 frames Drag the image or let it spin.</p>
+<img id="stage" src="squirrel_turntable/f_00.png" alt="turntable frame" draggable="false">
+<div class="row"><button id="toggle">Pause</button><span id="deg">0°</span></div>
+<p>Contact sheet (all 36 frames):</p>
+<img class="sheet" src="squirrel_turntable_sheet.png" alt="contact sheet">
+</main>
+<script>
+  const n = 36, img = document.getElementById('stage'), deg = document.getElementById('deg');
+  const frames = Array.from({length: n}, (_, i) => `squirrel_turntable/f_${String(i).padStart(2, '0')}.png`);
+  frames.forEach(src => { const p = new Image(); p.src = src; });
+  let i = 0, playing = true, dragX = null, dragStart = 0;
+  function show(k) { i = ((k % n) + n) % n; img.src = frames[i]; deg.textContent = Math.round(i * 360 / n) + '°'; }
+  setInterval(() => { if (playing && dragX === null) show(i + 1); }, 120);
+  document.getElementById('toggle').onclick = e => { playing = !playing; e.target.textContent = playing ? 'Pause' : 'Play'; };
+  img.addEventListener('pointerdown', e => { dragX = e.clientX; dragStart = i; img.setPointerCapture(e.pointerId); });
+  img.addEventListener('pointermove', e => { if (dragX !== null) show(dragStart + Math.round((e.clientX - dragX) / 8)); });
+  img.addEventListener('pointerup', () => { dragX = null; });
+  img.addEventListener('pointercancel', () => { dragX = null; });
+</script></body></html>

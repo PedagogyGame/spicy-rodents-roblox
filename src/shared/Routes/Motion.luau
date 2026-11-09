@@ -2,11 +2,743 @@
 -- ReplicatedStorage.Shared.Routes.Motion
 -- advance, junction and fork choice, visual pose.
 -- Interface (BUILD_PLAN §1.4): advance(state, input, dt), visualPose(state)
--- W0 skeleton stub: no behaviour yet. Requiring this module must have no side effects
--- (rule 4: requiring never starts a thread; services expose init(ctx) and step(dt, now)).
+--
+-- The pure rail rules of v5.4 (reference/v5_4_game.js), shared by the player's SquirrelMotor, the AI
+-- squirrel brain and the server MoveValidator:
+--   RouteMotion.advance (L267-272)            routes_movement §1.2
+--   RouteJunction inward/canTransfer/ease     §9.3, L5782-5793
+--   nearestRoute / groundTrunkCandidate /     §9.1-§9.2, L5718-5778
+--     forwardIntoTrunk
+--   directionFromView / routeTangentXZ        §10, L5806-5819
+--   switchRoute (end-of-route auto switch)    §11.1, L5941-5986
+--   junctionCandidates / chooseRouteJunction  §11.2, L6004-6061
+--   canopy forks: nearby, choose, take,       §12, L4386-4456
+--     side-step, W auto-take
+--   visual placement                          §14, L6769-6820
+-- Everything takes a `World` ({ registry, index, graph }) and plain numbers; no engine types. All
+-- distances are studs (the v5.4 constants are declared in HTML units and converted once, here).
+
+local Curve = require("./Curve")
+local Graph = require("./Graph")
+local Registry = require("./Registry")
+local SpatialIndex = require("./SpatialIndex")
+local Units = require("../Config/Units")
 
 local Motion = {}
 
-Motion.__skeleton = true
+export type Vec3 = Curve.Vec3
+export type Route = Registry.Route
+
+export type World = {
+	registry: Registry.Registry,
+	index: SpatialIndex.SpatialIndex,
+	graph: Graph.Graph,
+	_trunkFeet: { TrunkFoot }?,
+}
+
+export type TrunkFoot = { id: number, x: number, y: number, z: number, isPole: boolean }
+
+-- Where a route is entered: route id, parameter and (optional) travel direction.
+export type EnterSpec = { routeId: number, t: number, dir: number?, d: number? }
+
+export type Candidate = { routeId: number, t: number, d: number }
+
+-- v5.4 constants in HTML units (routes_movement §20 scale table), converted to studs once.
+local st = Units.st
+Motion.C = {
+	autoSwitchGap = st(0.48), -- RouteJunction.canTransfer(gap) (L5785)
+	explicitGap = st(1.7), -- canTransfer(gap, true)
+	enterMaxGap = st(3.15), -- enterRoute: gap limit while already on a route (L5834)
+	bridgeMinGap = st(0.11), -- enterRoute: transfer easing only above this gap (L5838)
+	eSearch = st(1.95), -- attachRoute on a rail: nearestRoute(1.95) (L5879)
+	groundReachE = st(3.1), -- attachRoute off rail: groundTrunkCandidate(3.1) (L5884)
+	airGrab = st(3.4), -- attachRoute off rail: nearestRoute(3.4) (L5884)
+	walkInReach = st(2.0), -- walk-in auto-grab reach (L6640)
+	poleGate = st(1.85), -- groundTrunkCandidate pole horizontal gate (L5747)
+	maxRise = st(3.1), -- groundTrunkCandidate |dy| (L5756)
+	riseWeight = 0.24, -- rank = horizontal + rise * 0.24 (+0.2 u for poles)
+	polePenalty = st(0.2),
+	footSnap = st(0.12), -- forwardIntoTrunk: within 0.12 counts as into (L5771)
+	intoDot = 0.43, -- forwardIntoTrunk dot threshold (L5776)
+	junctionRadius = st(2.15), -- junctionCandidates search radius (L6007)
+	junctionOutwardLenSq = st(1) * st(1) * 0.24, -- junctionOutward delta.lengthSq() > 0.24 (L6030)
+	junctionTangentDt = 0.09, -- junctionOutward tangent from t +- 0.09
+	junctionSideMin = -0.08, -- chooseRouteJunction filter (L6041)
+	forkTake = st(2.15), -- takeSelectedFork |dy| limit (L4448)
+	forkTakeForced = st(2.75), -- ... when forced by holding W (L4449)
+	forkEnterT = 0.018, -- enterRoute({branch, t: 0.018}) (L4452)
+	forkBelow = st(1.9), -- nearbyCanopyForks window [h - 1.9, h + 10.5] (L4390)
+	forkAbove = st(10.5),
+	forkFallback = st(5.5), -- ... else |dh| < 5.5
+	forkSideMin = -0.1, -- chooseCanopyFork filter (L4397)
+	forkUpWeight = 0.48, -- per stud of climb (weights are per unit; applied to studs after dividing)
+	forkAbsWeight = 0.10,
+	forkSideWeight = 3.2,
+	siblingMaxT = 0.21, -- sideStepToSibling railT <= 0.21 (L4424)
+	siblingHeight = st(2.9), -- |dh| < 2.9 (L4430)
+	siblingSideMin = -0.12,
+	siblingEnterT = 0.03,
+	forkAutoBehind = st(0.42), -- W auto-take: railT*L >= fork.t*L - 0.42 (L6680)
+	forkAutoAheadT = 0.022, -- before <= fork.t + 0.022 (L6681)
+	inwardLow = 0.035, -- RouteJunction.inward (L5783)
+	inwardHigh = 0.965,
+	endWindowLow = Graph.END_T_LOW, -- switchRoute end window (L5951)
+	endWindowHigh = Graph.END_T_HIGH,
+	switchContinuity = 2, -- score = 2*continuity + 2.9*view - 1.6*gap(u) (L5973)
+	switchView = 2.9,
+	switchGap = 1.6, -- per HTML unit of gap
+	switchTie = 0.65, -- stall when best - second < 0.65 (L5980)
+	switchFloor = -0.75, -- never auto-turn away: score < -0.75 (L5985)
+	tangentClampLow = 0.006, -- routeTangentXZ clamp (L5806)
+	tangentClampHigh = 0.994,
+	tangentMinLenSq = 0.0001,
+	viewDot = 0.18, -- directionFromView camera test (L5813)
+	facingDot = 0.28, -- ... body-facing fallback (L5817)
+	railWalk = st(7.2), -- rail speeds (L6668-6671), studs/s
+	railSprint = st(12.2),
+	railStalk = st(1.2),
+	boostMult = 1.6,
+	treeTravelMult = 0.6,
+	advanceMaxDt = 0.05, -- RouteMotion.advance clamp (L268)
+	advanceMinLength = st(1), -- max(1, length) (L269)
+	bridgeBase = 0.13, -- routeBridge duration clamp(0.13 + 0.065*gap(u), 0.15, 0.31) (L5842)
+	bridgePerUnit = 0.065,
+	bridgeMin = 0.15,
+	bridgeMax = 0.31,
+	bridgeMaxStep = 0.05, -- elapsed += min(dt, 0.05) (L6657)
+	yawRate = 14, -- body yaw rate on a rail (L6700)
+	tangentYawMin = 0.25, -- |tx| + |tz| > 0.25 before steering yaw (L6697)
+	visualBranchLift = st(0.5), -- §14 visual offsets
+	visualLookoutLift = st(0.61),
+	visualWireLift = st(0.22),
+	visualClearancePad = st(0.31),
+	visualClearanceT = 0.2,
+	visualClearanceSampleT = 0.16,
+	visualTrunkPad = st(0.28),
+	visualTrunkFixedPad = st(0.2),
+	visualTrunkMinR = st(0.32),
+	visualTrunkTaper = 0.48,
+	visualGiantMinR = st(0.45),
+	visualGiantTaper = st(1.05),
+	visualDefaultR = st(1.3),
+}
+local C = Motion.C
+
+-- RouteMotion.advance(t, dir, forward, seconds, speed, length) (L267-272). `minLength` defaults to
+-- 1 u in studs; pass 1 when speed and length are HTML units (golden tests).
+function Motion.advance(
+	t: number,
+	dir: number,
+	forward: number,
+	seconds: number,
+	speed: number,
+	length: number,
+	minLength: number?
+): number
+	local dt = math.max(0, math.min(seconds, C.advanceMaxDt))
+	return t + (forward * dir * dt * speed) / math.max(minLength or C.advanceMinLength, length)
+end
+
+-- RouteJunction (L5782-5793)
+function Motion.inward(t: number, desired: number): number
+	if t < C.inwardLow then
+		return 1
+	elseif t > C.inwardHigh then
+		return -1
+	end
+	return desired
+end
+
+function Motion.canTransfer(gap: number, explicit: boolean?): boolean
+	if gap ~= gap or gap == math.huge or gap == -math.huge then
+		return false
+	end
+	return gap <= (if explicit then C.explicitGap else C.autoSwitchGap)
+end
+
+function Motion.ease(p: number): number
+	p = math.max(0, math.min(1, p))
+	return p * p * (3 - 2 * p)
+end
+
+-- Rail speed (L6668-6671), studs/s. treeTravel = kind in {trunk, branch, bridge, lookout}.
+function Motion.railSpeed(treeTravel: boolean, sprint: boolean, focus: boolean, boosted: boolean): number
+	local base = if focus then C.railStalk elseif sprint then C.railSprint else C.railWalk
+	if boosted and not focus then
+		base *= C.boostMult
+	end
+	if treeTravel then
+		base *= C.treeTravelMult
+	end
+	return base
+end
+
+-- Camera basis in XZ (L5796-5801): forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw).
+function Motion.cameraForwardXZ(cameraYaw: number): (number, number)
+	return -math.sin(cameraYaw), -math.cos(cameraYaw)
+end
+
+function Motion.cameraRightXZ(cameraYaw: number): (number, number)
+	return math.cos(cameraYaw), -math.sin(cameraYaw)
+end
+
+-- routeTangentXZ(route, t) (L5805-5809): XZ unit tangent at clamp(t, 0.006, 0.994), or nil.
+function Motion.routeTangentXZ(world: World, route: Route, t: number): (number?, number?)
+	local tan = world.registry:tangentAt(route, math.clamp(t, C.tangentClampLow, C.tangentClampHigh))
+	local lenSq = tan.x * tan.x + tan.z * tan.z
+	if lenSq > C.tangentMinLenSq then
+		local len = math.sqrt(lenSq)
+		return tan.x / len, tan.z / len
+	end
+	return nil, nil
+end
+
+-- directionFromView(route, t, fallback) (L5810-5819). Trunks always travel +1 (W climbs).
+function Motion.directionFromView(
+	world: World,
+	route: Route,
+	t: number,
+	cameraYaw: number,
+	bodyYaw: number,
+	fallback: number
+): number
+	if route.kind == "trunk" then
+		return 1
+	end
+	local tx, tz = Motion.routeTangentXZ(world, route, t)
+	if tx == nil or tz == nil then
+		return fallback
+	end
+	local fx, fz = Motion.cameraForwardXZ(cameraYaw)
+	local d = tx * fx + tz * fz
+	if math.abs(d) > C.viewDot then
+		return if d >= 0 then 1 else -1
+	end
+	local facing = tx * math.sin(bodyYaw) + tz * math.cos(bodyYaw)
+	if math.abs(facing) > C.facingDot then
+		return if facing >= 0 then 1 else -1
+	end
+	return fallback
+end
+
+-- headingAlong(route, t, dir): body yaw along the travel direction (resyncRouteHeading, L5820-5825).
+function Motion.headingAlong(world: World, route: Route, t: number, dir: number): number?
+	local tx, tz = Motion.routeTangentXZ(world, route, t)
+	if tx == nil or tz == nil then
+		return nil
+	end
+	return math.atan2(tx * dir, tz * dir)
+end
+
+-- nearestRoute (L5718): closest sample within maxDist, excluding one route.
+function Motion.nearestRoute(
+	world: World,
+	x: number,
+	y: number,
+	z: number,
+	maxDist: number,
+	excludeRouteId: number?
+): Candidate?
+	local hit = world.index:nearest(x, y, z, maxDist, excludeRouteId)
+	if not hit then
+		return nil
+	end
+	return { routeId = hit.routeId, t = hit.t, d = hit.d }
+end
+
+local function trunkFeet(world: World): { TrunkFoot }
+	local feet = world._trunkFeet
+	if feet then
+		return feet
+	end
+	feet = {}
+	for _, route in world.registry:all() do
+		if route.kind == "trunk" and not route.flags.autoGrabExcluded then
+			local foot = world.registry:foot(route)
+			table.insert(feet, { id = route.id, x = foot.x, y = foot.y, z = foot.z, isPole = route.flags.isPole })
+		end
+	end
+	world._trunkFeet = feet
+	return feet
+end
+
+-- groundTrunkCandidate(point, reach) (L5742-5766): the best trunk foot by rank; t = 0.
+function Motion.groundTrunkCandidate(world: World, x: number, y: number, z: number, reach: number): Candidate?
+	local best: Candidate? = nil
+	local score = math.huge
+	for _, foot in trunkFeet(world) do
+		local horizontal = math.sqrt((x - foot.x) ^ 2 + (z - foot.z) ^ 2)
+		if foot.isPole and reach > C.poleGate and horizontal > C.poleGate then
+			continue
+		end
+		local rise = math.abs(y - foot.y)
+		if horizontal > reach or rise > C.maxRise then
+			continue
+		end
+		local rank = horizontal + rise * C.riseWeight + (if foot.isPole then C.polePenalty else 0)
+		if rank < score then
+			score = rank
+			best = { routeId = foot.id, t = 0, d = horizontal }
+		end
+	end
+	return best
+end
+
+-- forwardIntoTrunk (L5767-5778): the camera-relative move direction points at the foot.
+function Motion.forwardIntoTrunk(
+	world: World,
+	candidate: Candidate?,
+	px: number,
+	pz: number,
+	fw: number,
+	side: number,
+	cameraYaw: number
+): boolean
+	if not candidate or fw <= 0 then
+		return false
+	end
+	local route = world.registry:get(candidate.routeId)
+	if not route then
+		return false
+	end
+	local foot = world.registry:foot(route)
+	local dx, dz = foot.x - px, foot.z - pz
+	local distance = math.sqrt(dx * dx + dz * dz)
+	if distance < C.footSnap then
+		return true
+	end
+	local mvx = -math.sin(cameraYaw) * fw + math.cos(cameraYaw) * side
+	local mvz = -math.cos(cameraYaw) * fw - math.sin(cameraYaw) * side
+	local length = math.sqrt(mvx * mvx + mvz * mvz)
+	return length > 0.1 and (mvx * dx + mvz * dz) / (length * distance) > C.intoDot
+end
+
+-- bridgeDuration(gap): transfer easing time (L5842), gap in studs.
+function Motion.bridgeDuration(gap: number): number
+	return math.clamp(C.bridgeBase + Units.u(gap) * C.bridgePerUnit, C.bridgeMin, C.bridgeMax)
+end
+
+export type SwitchResult = {
+	chosen: EnterSpec?,
+	reason: string, -- "ok" | "none" | "stall" | "away"
+	candidates: number,
+}
+
+-- switchRoute(old, atStart) (L5941-5986): the automatic end-of-route switch.
+-- selectedRouteId is the A/D selection (selectedJunction.route) if any.
+function Motion.switchRoute(
+	world: World,
+	old: Route,
+	atStart: boolean,
+	cameraYaw: number,
+	selectedRouteId: number?
+): SwitchResult
+	local reg = world.registry
+	local cur = reg:pointAt(old, if atStart then 0 else 1)
+	local outward = reg:tangentAt(old, if atStart then 0 else 1)
+	local sgn = if atStart then -1 else 1
+	local ox, oy, oz = outward.x * sgn, outward.y * sgn, outward.z * sgn
+
+	local seen: { [number]: { routeId: number, t: number, gap: number } } = {}
+	world.index:forEachNear(cur.x, cur.y, cur.z, 1, function(id, t, sx, sy, sz)
+		if id == old.id or (t > C.endWindowLow and t < C.endWindowHigh) then
+			return nil
+		end
+		local dx, dy, dz = sx - cur.x, sy - cur.y, sz - cur.z
+		local gap = math.sqrt(dx * dx + dy * dy + dz * dz)
+		if not Motion.canTransfer(gap) then
+			return nil
+		end
+		local prev = seen[id]
+		if not prev or gap < prev.gap then
+			seen[id] = { routeId = id, t = t, gap = gap }
+		end
+		return nil
+	end)
+
+	local fx, fz = Motion.cameraForwardXZ(cameraYaw)
+	local candidates: { { routeId: number, t: number, gap: number, dir: number, score: number } } = {}
+	for _, c in seen do
+		local route = reg:get(c.routeId)
+		if not route then
+			continue
+		end
+		if route.kind == "trunk" and old.kind ~= "bridge" then
+			continue
+		end
+		local tangent = reg:tangentAt(route, math.clamp(c.t, 0.002, 0.998))
+		local toward = if (tangent.x * ox + tangent.y * oy + tangent.z * oz) >= 0 then 1 else -1
+		local dir = Motion.inward(c.t, toward)
+		local tx, ty, tz = tangent.x * dir, tangent.y * dir, tangent.z * dir
+		local xzLen = math.sqrt(tx * tx + tz * tz)
+		local view = 0
+		if xzLen > 0 then
+			view = fx * (tx / xzLen) + fz * (tz / xzLen)
+		end
+		local continuity = tx * ox + ty * oy + tz * oz
+		local score = continuity * C.switchContinuity + view * C.switchView - Units.u(c.gap) * C.switchGap
+		table.insert(candidates, { routeId = c.routeId, t = c.t, gap = c.gap, dir = dir, score = score })
+	end
+	if #candidates == 0 then
+		return { chosen = nil, reason = "none", candidates = 0 }
+	end
+	table.sort(candidates, function(a, b)
+		return a.score > b.score
+	end)
+	local chosen = nil
+	if selectedRouteId then
+		for _, c in candidates do
+			if c.routeId == selectedRouteId then
+				chosen = c
+				break
+			end
+		end
+	end
+	local best = chosen or candidates[1]
+	if not chosen and #candidates > 1 and best.score - candidates[2].score < C.switchTie then
+		return { chosen = nil, reason = "stall", candidates = #candidates }
+	end
+	if not chosen and best.score < C.switchFloor then
+		return { chosen = nil, reason = "away", candidates = #candidates }
+	end
+	return {
+		chosen = { routeId = best.routeId, t = best.t, dir = best.dir, d = best.gap },
+		reason = "ok",
+		candidates = #candidates,
+	}
+end
+
+-- junctionCandidates() (L6004-6023): non-trunk routes within 2.15 u of the rail point, closest sample
+-- per route, kept when <= 1.7 u, sorted by distance. Empty on a trunk.
+function Motion.junctionCandidates(world: World, route: Route, t: number): { Candidate }
+	if route.kind == "trunk" then
+		return {}
+	end
+	local p = world.registry:pointAt(route, t)
+	local seen: { [number]: Candidate } = {}
+	world.index:forEachNear(p.x, p.y, p.z, 1, function(id, st_, sx, sy, sz)
+		if id == route.id then
+			return nil
+		end
+		local other = world.registry:get(id)
+		if not other or other.kind == "trunk" then
+			return nil
+		end
+		local dx, dy, dz = sx - p.x, sy - p.y, sz - p.z
+		local distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+		if distance > C.junctionRadius then
+			return nil
+		end
+		local prev = seen[id]
+		if not prev or distance < prev.d then
+			seen[id] = { routeId = id, t = st_, d = distance }
+		end
+		return nil
+	end)
+	local out: { Candidate } = {}
+	for _, c in seen do
+		if Motion.canTransfer(c.d, true) then
+			table.insert(out, c)
+		end
+	end
+	table.sort(out, function(a, b)
+		if a.d ~= b.d then
+			return a.d < b.d
+		end
+		return a.routeId < b.routeId
+	end)
+	return out
+end
+
+-- junctionOutward(c) (L6024-6032): XZ direction from the rail point to the candidate, or the
+-- candidate's tangent times its intended direction when they nearly coincide.
+function Motion.junctionOutward(
+	world: World,
+	route: Route,
+	t: number,
+	railDir: number,
+	cameraYaw: number,
+	bodyYaw: number,
+	c: Candidate
+): (number, number)
+	local reg = world.registry
+	local other = reg:get(c.routeId) :: Route
+	local p = reg:pointAt(route, t)
+	local startP = reg:pointAt(other, math.max(0, c.t - C.junctionTangentDt))
+	local endP = reg:pointAt(other, math.min(1, c.t + C.junctionTangentDt))
+	local tx, tz = endP.x - startP.x, endP.z - startP.z
+	local tl = math.sqrt(tx * tx + tz * tz)
+	if tl > 0 then
+		tx, tz = tx / tl, tz / tl
+	end
+	local target = reg:pointAt(other, c.t)
+	local dx, dz = target.x - p.x, target.z - p.z
+	local lenSq = dx * dx + dz * dz
+	if lenSq > C.junctionOutwardLenSq then
+		local l = math.sqrt(lenSq)
+		return dx / l, dz / l
+	end
+	local intended = Motion.inward(c.t, Motion.directionFromView(world, other, c.t, cameraYaw, bodyYaw, railDir))
+	return tx * intended, tz * intended
+end
+
+-- chooseRouteJunction(side) (L6033-6049): the A/D selection on non-trunk routes; cycles on repeat.
+-- Returns the newly selected route id (or nil when nothing qualifies).
+function Motion.chooseRouteJunction(
+	world: World,
+	route: Route,
+	t: number,
+	railDir: number,
+	cameraYaw: number,
+	bodyYaw: number,
+	side: number,
+	currentSelection: number?
+): number?
+	local candidates = Motion.junctionCandidates(world, route, t)
+	if #candidates == 0 then
+		return nil
+	end
+	local rx, rz = Motion.cameraRightXZ(cameraYaw)
+	local choices: { { routeId: number, side: number, d: number } } = {}
+	for _, c in candidates do
+		local ox, oz = Motion.junctionOutward(world, route, t, railDir, cameraYaw, bodyYaw, c)
+		local s = side * (rx * ox + rz * oz)
+		if s > C.junctionSideMin then
+			table.insert(choices, { routeId = c.routeId, side = s, d = c.d })
+		end
+	end
+	if #choices == 0 then
+		return nil
+	end
+	table.sort(choices, function(a, b)
+		if a.side ~= b.side then
+			return a.side > b.side
+		end
+		return a.d < b.d
+	end)
+	local oldIndex = 0
+	for i, c in choices do
+		if c.routeId == currentSelection then
+			oldIndex = i
+			break
+		end
+	end
+	local pick = if oldIndex == 0 then choices[1] else choices[(oldIndex % #choices) + 1]
+	return pick.routeId
+end
+
+-- takeSelectedJunction() (L6050-6061): re-validate the selection and build the enter spec.
+function Motion.takeSelectedJunction(
+	world: World,
+	route: Route,
+	t: number,
+	railDir: number,
+	cameraYaw: number,
+	bodyYaw: number,
+	selected: number?
+): EnterSpec?
+	if not selected then
+		return nil
+	end
+	for _, c in Motion.junctionCandidates(world, route, t) do
+		if c.routeId == selected then
+			local other = world.registry:get(c.routeId) :: Route
+			local dir = Motion.directionFromView(world, other, c.t, cameraYaw, bodyYaw, railDir)
+			return { routeId = c.routeId, t = c.t, dir = dir, d = c.d }
+		end
+	end
+	return nil
+end
+
+-- nearbyCanopyForks() (L4386-4393) for a trunk at parameter t.
+function Motion.nearbyForks(world: World, trunk: Route, t: number): { Graph.Fork }
+	local all = world.graph:forks(trunk.id)
+	if #all == 0 then
+		return all
+	end
+	local height = world.registry:pointAt(trunk, t).y
+	local ahead: { Graph.Fork } = {}
+	for _, f in all do
+		if f.height >= height - C.forkBelow and f.height <= height + C.forkAbove then
+			table.insert(ahead, f)
+		end
+	end
+	if #ahead > 0 then
+		return ahead
+	end
+	local near: { Graph.Fork } = {}
+	for _, f in all do
+		if math.abs(f.height - height) < C.forkFallback then
+			table.insert(near, f)
+		end
+	end
+	return near
+end
+
+-- chooseCanopyFork(side) (L4394-4422): pick (or cycle) a bough on the current trunk. Returns the
+-- selected fork or nil. `posY` is the squirrel's y, right = cameraRightXZ.
+function Motion.chooseCanopyFork(
+	world: World,
+	trunk: Route,
+	t: number,
+	posY: number,
+	cameraYaw: number,
+	side: number,
+	pendingBranch: number?
+): Graph.Fork?
+	local branches = Motion.nearbyForks(world, trunk, t)
+	if #branches == 0 then
+		return nil
+	end
+	local rx, rz = Motion.cameraRightXZ(cameraYaw)
+	local best: Graph.Fork? = nil
+	local bestCost = math.huge
+	for _, f in branches do
+		local s = f.outward.x * rx + f.outward.z * rz
+		if side * s > C.forkSideMin then
+			-- weights are per HTML unit of height difference
+			local delta = Units.u(f.height - posY)
+			local cost = math.max(0, delta) * C.forkUpWeight
+				+ math.abs(delta) * C.forkAbsWeight
+				- math.max(0, side * s) * C.forkSideWeight
+			if cost < bestCost then
+				bestCost = cost
+				best = f
+			end
+		end
+	end
+	if not best then
+		return nil
+	end
+	local bySide: { Graph.Fork } = {}
+	for _, f in branches do
+		if side * (f.outward.x * rx + f.outward.z * rz) > C.forkSideMin then
+			table.insert(bySide, f)
+		end
+	end
+	table.sort(bySide, function(a, b)
+		return math.abs(a.height - posY) < math.abs(b.height - posY)
+	end)
+	local currentIdx = 0
+	for i, f in bySide do
+		if f.branch == pendingBranch then
+			currentIdx = i
+			break
+		end
+	end
+	if currentIdx == 0 then
+		return best
+	end
+	return bySide[(currentIdx % #bySide) + 1]
+end
+
+-- takeSelectedFork(force) (L4444-4456): the enter spec onto the pending bough, or nil.
+function Motion.takeFork(fork: Graph.Fork, currentRouteId: number, posY: number, force: boolean): EnterSpec?
+	if fork.trunk ~= currentRouteId then
+		return nil
+	end
+	local dist = math.abs(posY - fork.height)
+	if dist > C.forkTake and not force then
+		return nil
+	end
+	if dist > C.forkTakeForced then
+		return nil
+	end
+	return { routeId = fork.branch, t = C.forkEnterT, dir = 1 }
+end
+
+-- forkAutoTake (L6676-6686): holding W past the pending fork takes it.
+function Motion.forkAutoTake(fork: Graph.Fork, trunk: Route, before: number, after: number, fw: number): boolean
+	return fw > 0
+		and after * trunk.length >= fork.t * trunk.length - C.forkAutoBehind
+		and before <= fork.t + C.forkAutoAheadT
+end
+
+-- sideStepToSibling(side) (L4423-4443): hop to a sibling bough near the shared trunk node.
+function Motion.sideStepToSibling(world: World, branch: Route, t: number, cameraYaw: number, side: number): EnterSpec?
+	if branch.kind ~= "branch" or t > C.siblingMaxT then
+		return nil
+	end
+	local parent = world.graph:forkOf(branch.id)
+	if not parent then
+		return nil
+	end
+	local rx, rz = Motion.cameraRightXZ(cameraYaw)
+	local selected: Graph.Fork? = nil
+	local bestS = -math.huge
+	for _, f in world.graph:forks(parent.trunk) do
+		if f.branch ~= branch.id and math.abs(f.height - parent.height) < C.siblingHeight then
+			local s = f.outward.x * rx + f.outward.z * rz
+			if s * side > C.siblingSideMin and s * side > bestS then
+				bestS = s * side
+				selected = f
+			end
+		end
+	end
+	if not selected then
+		return nil
+	end
+	return { routeId = selected.branch, t = C.siblingEnterT, dir = 1 }
+end
+
+-- visualPose (§14, L6769-6790): where the mesh sits for a squirrel on `route` at `t`. The route
+-- centreline is the physics position; trunks push the body out along the surface normal, boughs and
+-- wires lift it. trunkNormal (XZ unit) is the bark normal chosen when the trunk was entered.
+function Motion.visualPose(
+	world: World,
+	route: Route,
+	t: number,
+	pos: Vec3,
+	trunkNormalX: number?,
+	trunkNormalZ: number?
+): Vec3
+	local kind = route.kind
+	if kind == "trunk" then
+		local sx, sz
+		if route.flags.fixedSurfaceZ then
+			sx, sz = 0, 1
+		else
+			sx, sz = trunkNormalX or 0, trunkNormalZ or 1
+		end
+		local r = if route.surfaceRadius > 0 then route.surfaceRadius else C.visualDefaultR
+		local tapered
+		if route.flags.isGiant then
+			tapered = math.max(C.visualGiantMinR, r / 0.95 - C.visualGiantTaper * t)
+		else
+			tapered = math.max(C.visualTrunkMinR, r * (1 - C.visualTrunkTaper * t))
+		end
+		local offset
+		if route.flags.fixedSurfaceZ or route.flags.isPole then
+			offset = r + C.visualTrunkFixedPad
+		else
+			offset = tapered + C.visualTrunkPad
+		end
+		return Curve.vec3(pos.x + sx * offset, pos.y, pos.z + sz * offset)
+	elseif kind == "branch" or kind == "bridge" or kind == "lookout" then
+		local lift = route.visualOffset or (if kind == "lookout" then C.visualLookoutLift else C.visualBranchLift)
+		local x, z = pos.x, pos.z
+		local clearance = route.trunkClearance
+		if kind == "branch" and clearance and t < C.visualClearanceT then
+			local start = world.registry:pointAt(route, 0)
+			local ahead = world.registry:pointAt(route, C.visualClearanceSampleT)
+			local dx, dz = ahead.x - start.x, ahead.z - start.z
+			local l = math.sqrt(dx * dx + dz * dz)
+			if l > 0 then
+				local k = (clearance + C.visualClearancePad) * (1 - t / C.visualClearanceT) ^ 2
+				x += dx / l * k
+				z += dz / l * k
+			end
+		end
+		return Curve.vec3(x, pos.y + lift, z)
+	elseif kind == "wire" then
+		return Curve.vec3(pos.x, pos.y + C.visualWireLift, pos.z)
+	end
+	return Curve.vec3(pos.x, pos.y, pos.z)
+end
+
+-- turnToward(old, desired, rate, dt) (L6570-6572): exponential approach along the short way round.
+function Motion.turnToward(old: number, desired: number, rate: number, dt: number): number
+	return old + math.atan2(math.sin(desired - old), math.cos(desired - old)) * (1 - math.exp(-rate * dt))
+end
 
 return Motion
