@@ -362,7 +362,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 					local r = scale * (2.8 + 2.0 * u) * (0.8 + 0.4 * rand())
 					cl(r, 0, -(r + 0.15), 0, 3)
 				end
-			elseif not willow then
+			else
 				-- a living bridge out past the crown: leafy tufts alternating along it, like a vine-hung
 				-- limb (the bark stays mostly hidden without a solid tube of leaves)
 				local sg = if i % 2 == 0 then 1 else -1
@@ -503,21 +503,21 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		for _, c in accepted do
 			local dx, dz = c.p[1] - cx, c.p[3] - cz
 			local dist = math.sqrt(dx * dx + dz * dz)
-			if dist > rh * 0.25 and strands < 110 then
+			if dist > rh * 0.2 and strands < 150 then
 				local ux, uz = dx / math.max(dist, 1e-6), dz / math.max(dist, 1e-6)
 				for k = 1, 3 do
 					local a = (rand() - 0.5) * 1.6
 					local ox = ux * math.cos(a) - uz * math.sin(a)
 					local oz = ux * math.sin(a) + uz * math.cos(a)
 					local x, z = c.p[1] + ox * c.r * 0.75, c.p[3] + oz * c.r * 0.75
-					local y1 = c.p[2] - c.r * 0.1
+					local y1 = c.p[2] - c.r * 0.35
 					local ground = (opts.groundAt(x, z, y1))
 					local rim = math.clamp(dist / rh, 0, 1)
-					local y0 = math.max(ground + 2.5, y1 - (8 + 14 * rim + 4 * rand()))
+					local y0 = math.max(ground + 2.5, y1 - (5 + 15 * rim * rim + 6 * rand()))
 					local mid = { x, (y0 + y1) / 2, z }
 					if y1 - y0 > 2 and clear({ x, y0, z }, 1.2) and clear(mid, 1.2) then
 						strands += 1
-						local rr = 1.0 + 0.6 * rand()
+						local rr = 0.55 + 0.35 * rand()
 						cylinder(list, `Strand{strands}`, { x, y0, z }, { x, y1, z }, rr, 0, {
 							color = shade(greens[(k % #greens) + 1], 0.98 + 0.1 * rand()),
 							material = "LeafyGrass",

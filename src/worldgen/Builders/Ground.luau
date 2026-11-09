@@ -380,7 +380,8 @@ function Ground.bridge(ctx: Ctx)
 	local rampLen = (R.bridgeStart - R.rampStart) * SPU
 	for _, s in { -1, 1 } do
 		local mid = if s < 0 then (R.rampStart * SPU + x0) / 2 else (x1 + R.rampEnd * SPU) / 2
-		world(ctx, `Ramp{if s < 0 then "W" else "E"}`, mid, (BANK_Y - 0.1 + deck) / 2, zc, 2 * halfD, deck - (BANK_Y - 0.1), rampLen, {
+		-- 0.3 st narrower than the piers each side: no coplanar side faces (they z-fight in Roblox)
+		world(ctx, `Ramp{if s < 0 then "W" else "E"}`, mid, (BANK_Y - 0.1 + deck) / 2, zc, 2 * halfD - 0.6, deck - (BANK_Y - 0.1), rampLen, {
 			yaw = if s < 0 then math.pi / 2 else -math.pi / 2,
 			shape = "Wedge",
 			color = STONE_MID,

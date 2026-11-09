@@ -569,8 +569,9 @@ function RouteProps.plans(
 			local n = 0
 			for k = 2, #line - 1 do
 				local p = line[k]
-				local deck = groundAt(p[1], p[3], p[2] - 1)
-				if p[2] - deck > 2.5 and p[2] - deck < 60 then
+				local deck, onDeck = groundAt(p[1], p[3], p[2] - 1)
+				-- only over the flat deck (v5.4 hangers run between x 790 and 910 u), not the ramps
+				if onDeck and deck > 38.5 and p[2] - deck > 2.5 and p[2] - deck < 60 then
 					n += 1
 					cyl(list, `Hanger{n}`, { p[1], deck, p[3] }, p, 0.14, 0, {
 						color = Palette.hex("#4e7c87"),
