@@ -258,6 +258,8 @@ def bake(lo, hi, kind, res, path, extrusion, ray, samples=4):
     img = bpy.data.images.new(f"bake_{kind}", res, res, alpha=False, float_buffer=True)
     img.colorspace_settings.name = "Non-Color"
     saved = list(lo.data.materials)
+    mats_idx = np.empty(len(lo.data.polygons), dtype=np.int32)
+    lo.data.polygons.foreach_get("material_index", mats_idx)
     mat = bpy.data.materials.new(f"Bake_{kind}")
     mat.use_nodes = True
     node = mat.node_tree.nodes.new("ShaderNodeTexImage")
@@ -265,8 +267,6 @@ def bake(lo, hi, kind, res, path, extrusion, ray, samples=4):
     mat.node_tree.nodes.active = node
     lo.data.materials.clear()
     lo.data.materials.append(mat)
-    mats_idx = np.empty(len(lo.data.polygons), dtype=np.int32)
-    lo.data.polygons.foreach_get("material_index", mats_idx)
     lo.data.polygons.foreach_set("material_index", np.zeros_like(mats_idx))
     bl.select_only([hi, lo], active=lo)
     b = scene.render.bake
