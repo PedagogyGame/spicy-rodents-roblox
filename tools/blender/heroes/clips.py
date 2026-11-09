@@ -329,3 +329,139 @@ def author_all(sp, variant, arm, skel, opts, log):
     for pb in arm.pose.bones:
         pb.matrix_basis.identity()
     return report
+
+
+# ---- cyclic gaits -----------------------------------------------------------------------------------
+
+def foot_cycle(p, offset, duty, stride, lift, lift_bias=0.75):
+    """Phase p in [0, 1). Returns (dy, dz, in_stance, f) with f the fraction through stance or swing.
+    Stance: the foot moves back (+Y) from -stride/2 to +stride/2 on the ground; swing: it lifts and
+    returns forward, eased."""
+    u = (p - offset) % 1.0
+    if u < duty:
+        f = u / duty
+        return -stride / 2 + stride * f, 0.0, True, f
+    f = (u - duty) / (1 - duty)
+    dy = stride / 2 - stride * ease_io(f)
+    dz = lift * math.sin(math.pi * min(f ** lift_bias, 1.0))
+    return dy, dz, False, f
+
+
+def lerp(a, b, t):
+    return a + (b - a) * t
+
+
+def wave(n, phase, amp, lag, amp_growth=0.0):
+    """A travelling wave down an n-segment chain: segment i lags by `lag` radians."""
+    return [amp * (1 + amp_growth * i / max(n - 1, 1)) * math.sin(phase - lag * i) for i in range(n)]
+
+
+def pose_gait(rig, p, cfg, t=0.0):
+    """One frame of a cyclic gait. cfg: dict with legs, body, spine, head, tail, jaw, ears callables."""
+    D = rig.identity()
+    b = cfg["body"](p, t)
+    body(D, cfg["pivot"], **b)
+    sp = cfg.get("spine")
+    if sp:
+        arch, bend, twist = sp(p, t)
+        spine(D, cfg["spine_bones"], arch, bend, twist)
+    W = rig.fk(D)
+    for leg, L in cfg["legs"].items():
+        dy, dz, st, f = foot_cycle(p, L["offset"], L["duty"], L["stride"], L["lift"], L.get("lift_bias", 0.75))
+        base = np.array(L["base"], float)
+        tgt = base + np.array([L.get("dx", lambda p, st, f: 0.0)(p, st, f), dy, dz])
+        if "extra" in L:
+            tgt = tgt + np.asarray(L["extra"](p, st, f, t), float)
+        fp, tp = L["pitch"](st, f)
+        rig.leg(D, W, leg, tgt, fp, tp, np.asarray(L["pole"], float))
+    W = rig.fk(D)
+    hd = cfg.get("head")
+    if hd:
+        yaw, pitch, roll = hd(p, t)
+        look(D, rig, W, cfg["neck_chain"], Rz(yaw) @ Rx(pitch) @ Ry(roll), cfg.get("neck_weights"))
+    tl = cfg.get("tail")
+    if tl:
+        pitches, yaws = tl(p, t)
+        tail(D, "Tail", len(pitches), pitches, yaws)
+    jw = cfg.get("jaw")
+    if jw:
+        D["Jaw"][0] = D["Jaw"][0] @ Rx(jw(p, t))
+    er = cfg.get("ears")
+    if er:
+        (lp, ly), (rp, ry) = er(p, t)
+        D["EarL"][0] = D["EarL"][0] @ Rz(ly) @ Rx(lp)
+        D["EarR"][0] = D["EarR"][0] @ Rz(ry) @ Rx(rp)
+    return D
+
+
+def build_pose(rig, P, cfg):
+    """A pose from explicit parameters. P keys (all optional):
+      body: dict(bob, pitch, roll, yaw, surge, sway)   spine: (arch, bend, twist)
+      legs: {leg: (target xyz, foot_pitch, toe_pitch, pole)}   neck_pre: radians (Neck dips first)
+      head: (yaw, pitch, roll) world target            tail: (pitches, yaws)
+      jaw: radians open                                 ears: ((pitchL, yawL), (pitchR, yawR))"""
+    D = rig.identity()
+    body(D, cfg["pivot"], **P.get("body", {}))
+    if "spine" in P:
+        spine(D, cfg["spine_bones"], *P["spine"])
+    W = rig.fk(D)
+    for leg, (tgt, fp, tp, pole) in P.get("legs", {}).items():
+        rig.leg(D, W, leg, np.asarray(tgt, float), fp, tp, np.asarray(pole, float))
+    if "neck_pre" in P:
+        chain = cfg["neck_chain"]
+        k = 1.0 / (len(chain) - 1)
+        for n in chain[:-1]:
+            D[n][0] = D[n][0] @ Rx(P["neck_pre"] * k)
+    W = rig.fk(D)
+    if "head" in P:
+        yaw, pitch, roll = P["head"]
+        look(D, rig, W, cfg["neck_chain"], Rz(yaw) @ Rx(pitch) @ Ry(roll), cfg.get("neck_weights"))
+    if "tail" in P:
+        pitches, yaws = P["tail"]
+        tail(D, "Tail", len(pitches), pitches, yaws)
+    if "jaw" in P:
+        D["Jaw"][0] = D["Jaw"][0] @ Rx(P["jaw"])
+    if "ears" in P:
+        (lp, ly), (rp, ry) = P["ears"]
+        D["EarL"][0] = D["EarL"][0] @ Rz(ly) @ Rx(lp)
+        D["EarR"][0] = D["EarR"][0] @ Rz(ry) @ Rx(rp)
+    return D
+
+
+class Keys:
+    """Catmull-Rom interpolation of named scalar parameters through keyed frames (smooth, no stops)."""
+
+    def __init__(self, keys):
+        self.frames = sorted(keys)
+        self.keys = keys
+
+    def __call__(self, f, name, default=0.0):
+        fr = [k for k in self.frames if name in self.keys[k]]
+        if not fr:
+            return default
+        vals = [self.keys[k][name] for k in fr]
+        if f <= fr[0]:
+            return vals[0]
+        if f >= fr[-1]:
+            return vals[-1]
+        i = max(j for j in range(len(fr)) if fr[j] <= f)
+        f0, f1 = fr[i], fr[i + 1]
+        t = (f - f0) / (f1 - f0)
+        p0 = vals[i - 1] if i > 0 else vals[i]
+        p1, p2 = vals[i], vals[i + 1]
+        p3 = vals[i + 2] if i + 2 < len(vals) else vals[i + 1]
+        # uniform Catmull-Rom with tangents scaled to the actual key spacing
+        m1 = (p2 - p0) / 2 if i > 0 else (p2 - p1)
+        m2 = (p3 - p1) / 2 if i + 2 < len(vals) else (p2 - p1)
+        t2, t3 = t * t, t * t * t
+        return (2 * t3 - 3 * t2 + 1) * p1 + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * p2 + (t3 - t2) * m2
+
+
+def piecewise(t, keys):
+    """keys: [(t, value)] sorted; smooth (eased) transitions, holds between."""
+    if t <= keys[0][0]:
+        return keys[0][1]
+    for (t0, v0), (t1, v1) in zip(keys[:-1], keys[1:]):
+        if t <= t1:
+            return v0 + (v1 - v0) * ease_io((t - t0) / max(t1 - t0, 1e-9))
+    return keys[-1][1]

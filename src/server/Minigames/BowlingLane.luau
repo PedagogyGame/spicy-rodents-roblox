@@ -49,6 +49,7 @@ type Pin = {
 	transparency: { [BasePart]: number },
 	collide: { [BasePart]: boolean },
 	home: CFrame,
+	upLocal: Vector3,
 	up: boolean, -- standing in the current rack (before this ball)
 	hidden: boolean,
 	force: VectorForce?,
@@ -115,6 +116,9 @@ function BowlingLane.new(opts: { [string]: any }): any
 			table.insert(self.pins, {
 				model = pm,
 				body = body,
+				-- the body-local direction that points up while the pin stands (the belly is a cylinder whose
+				-- axis is its own X)
+				upLocal = body.CFrame:VectorToObjectSpace(Vector3.yAxis),
 				parts = parts,
 				transparency = tr,
 				collide = cc,
@@ -205,7 +209,7 @@ function BowlingLane._release(_self: any, pin: Pin)
 end
 
 local function upright(pin: Pin): boolean
-	return pin.body.CFrame.UpVector.Y >= BowlingLane.STAND_COS
+	return pin.body.CFrame:VectorToWorldSpace(pin.upLocal).Y >= BowlingLane.STAND_COS
 end
 
 -- Standing after the roll: upright, still on the deck (not in the pit, gutter or the next lane).

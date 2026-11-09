@@ -183,7 +183,17 @@ function Session.leave(s: Session, key: any, _now: number): number?
 	if s.phase == "lobby" or s.phase == "done" then
 		table.remove(s.seats, seat)
 		table.remove(s.names, seat)
-		if #s.seats == 0 then
+		-- seats after it move up one (the gone flags follow them)
+		local gone = {}
+		for i, g in s.gone do
+			if i < seat then
+				gone[i] = g
+			elseif i > seat then
+				gone[i - 1] = g
+			end
+		end
+		s.gone = gone
+		if not anyoneLeft(s) then
 			Session.reset(s)
 		end
 	else

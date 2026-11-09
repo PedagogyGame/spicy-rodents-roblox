@@ -189,6 +189,7 @@ def alignment_checks(tb, bark_obj):
     s = tg.arclen(P)
     tt = s / s[-1]
     errs, errs_low = [], []
+    flare_top = max(2.5, 1.2 * float(tb.Rt(0.0)))  # root buttresses live below this height
     for p, t in zip(P, tt):
         want = float(tb.Rt(t))
         for k in range(8):
@@ -200,12 +201,13 @@ def alignment_checks(tb, bark_obj):
                 continue
             hp = np.array([-hit[0][0], hit[0][2], hit[0][1]])
             got = np.linalg.norm((hp - p) * np.array([1, 0, 1]))
-            (errs if p[1] > 2.5 else errs_low).append(got - want)
+            (errs if p[1] > flare_top else errs_low).append(got - want)
     errs = np.array(errs) if errs else np.zeros(1)
     out["trunk"] = {"samples": int(len(P)), "rays": int(len(errs)), "surfaceRadius_st": round(trunk["surfaceRadius"] * tg.SPU, 3),
                     "bark_minus_gameplay_radius_st": {"mean": round(float(errs.mean()), 3), "max_abs": round(float(np.abs(errs).max()), 3),
                                                       "p95_abs": round(float(np.percentile(np.abs(errs), 95)), 3)},
-                    "root_flare_rays_below_2_5st": len(errs_low)}
+                    "climb_zone_from_st": round(flare_top, 2), "root_flare_rays": len(errs_low),
+                    "root_flare_max_outset_st": round(float(max(errs_low)) if errs_low else 0.0, 3)}
     berrs, misses, n = [], 0, 0
     bough_bvh = {b["route"]["id"]: bvh_arrays(*b["mesh"]) for b in tb.boughs}
     full = bvh_of(bark_obj)

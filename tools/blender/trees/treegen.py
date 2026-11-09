@@ -93,6 +93,17 @@ def classify(tree, trunk_route):
     return sp, pal, name.upper(), "named"
 
 
+# crown character per species: lobe squash (y), canopy floor (fraction of H), clump spacing
+# (>1 opens gaps so limbs show), clump size factor
+CROWN = {
+    "oak": {"sy": 0.74, "floor": 0.38, "spacing": 1.08, "size": 1.05},
+    "elm": {"sy": 0.80, "floor": 0.50, "spacing": 1.02, "size": 1.0},
+    "sycamore": {"sy": 0.86, "floor": 0.42, "spacing": 1.28, "size": 1.0},
+    "maple": {"sy": 1.0, "floor": 0.34, "spacing": 0.98, "size": 0.95},
+    "willow": {"sy": 0.85, "floor": 0.40, "spacing": 1.0, "size": 0.9},
+    "apple": {"sy": 0.82, "floor": 0.36, "spacing": 1.0, "size": 1.0},
+}
+
 LEAF_SHAPE = {"oak": "oak", "elm": "elm", "sycamore": "palmate", "maple": "palmate", "willow": "willow", "apple": "apple"}
 BARK_FAMILY = {"oak": "oak", "elm": "elm", "sycamore": "sycamore", "maple": "maple", "willow": "willow", "apple": "apple"}
 
@@ -729,7 +740,8 @@ class TreeBuilder:
         cap_r = max(R_tip * 1.05, rh * 0.62)
         cap_y = max(yhi, top[1]) + cap_r * (0.05 if sp in ("oak", "sycamore") else 0.2)
         if self.cat == "giant":
-            cap_y = yhi + cap_r * 0.1
+            cap_r = max(R_tip * 1.1, rh * 0.7)
+            cap_y = yhi + cap_r * 0.05
         lobes.append((np.array([top[0] * 0.5 + c[0] * 0.5, cap_y - cap_r * 0.35, top[2] * 0.5 + c[2] * 0.5]), cap_r, "cap"))
         if sp == "elm":  # vase: a wider upper ring
             for k in range(5):
@@ -751,7 +763,12 @@ class TreeBuilder:
         if sp == "apple":
             rho = float(np.clip(self.R_tip * 0.55, 2.2, 3.4))
         self.rho = rho
-        self.min_leaf_y = {"apple": 3.0, "willow": 8.0}.get(sp, max(7.0, self.H * 0.2))
+        cp = CROWN[sp]
+        self.lobe_sy = np.array([1.0, cp["sy"], 1.0])
+        self.min_leaf_y = max(5.0 if sp == "apple" else 8.0, self.H * (0.6 if self.cat == "giant" else cp["floor"]))
+        rho *= cp["size"]
+        sy = cp["sy"] * (0.85 if self.cat == "giant" else 1.0)
+        SY = np.array([1.0, sy, 1.0])
         # samples on the union boundary
         golden = math.pi * (3 - math.sqrt(5))
         cands = []
@@ -761,9 +778,10 @@ class TreeBuilder:
                 y = 1 - (k + 0.5) / n * 2
                 rr = math.sqrt(max(0.0, 1 - y * y))
                 a = golden * k + li * 1.3
-                d = np.array([math.cos(a) * rr, y, math.sin(a) * rr])
-                p = lc + d * lr
-                inside = np.linalg.norm(LC - p[None], axis=1) < LR * 0.96
+                d0 = np.array([math.cos(a) * rr, y, math.sin(a) * rr])
+                p = lc + d0 * lr * SY
+                d = norm(d0 / SY)
+                inside = np.linalg.norm((LC - p[None]) / SY[None], axis=1) < LR * 0.96
                 inside[li] = False
                 if inside.any():
                     continue
@@ -781,7 +799,7 @@ class TreeBuilder:
             r = rho * (0.62 if is_bridge else (1.2 if d[1] < -0.45 else 1.0)) * rng.uniform(0.85, 1.15)
             ctr = p - d * r * 0.42
             if len(acc_pts):
-                if np.min(np.linalg.norm(acc_pts - ctr[None], axis=1)) < 1.05 * r:
+                if np.min(np.linalg.norm(acc_pts - ctr[None], axis=1)) < cp["spacing"] * r:
                     continue
             ok = False
             for _ in range(3):
@@ -941,7 +959,7 @@ class TreeBuilder:
             V = V + ctr[None]
             ng, _ = vertex_normals(V, Ft)
             lc, lr, lk = self.lobes[li]
-            nl = norm(V - lc[None])
+            nl = norm((V - lc[None]) / (self.lobe_sy ** 2))
             ncl = norm(V - ctr[None])
             N = norm(ng * 0.30 + ncl * 0.20 + nl * 0.50)
             h = (ctr[1] - yl) / max(yh - yl, 1e-6)
@@ -962,40 +980,44 @@ class TreeBuilder:
         rng = self.rng
         c, rh, ylo, yhi = self.crown
         n = 0
-        cand = sorted(self.clump_info, key=lambda a: a[2][1])
+        cand = sorted(self.clump_info, key=lambda a: a[2][1] + rng.random() * 0.3)
+
+        def bridge_lobe(li):
+            return self.lobes[li][2] == "bridge"
         for (ctr, r, d, li) in cand:
-            if d[1] > 0.55 or n >= 80:
+            if (d[1] > 0.55 and not bridge_lobe(li)) or n >= 110:
                 continue
             bridge = self.lobes[li][2] == "bridge"
             out = np.array([d[0], 0, d[2]])
             out = norm(out) if np.linalg.norm(out) > 0.2 else norm(np.array([ctr[0] - c[0], 0, ctr[2] - c[2]]) + 1e-6)
             radial = min(1.0, np.hypot(ctr[0] - c[0], ctr[2] - c[2]) / max(rh, 1.0))
-            m = 1 if bridge else (3 if r > 3.5 else 2)
+            m = 2 if bridge else (4 if r > 3.5 else 3)
             for k in range(m):
                 a = (k - (m - 1) / 2) * 0.9 + rng.normal(0, 0.25)
                 side = np.array([-out[2], 0, out[0]])
                 spread = norm(out * 0.85 + side * math.sin(a) * 0.9)
                 top = ctr + spread * r * 0.62 + np.array([0, -r * 0.4, 0])
                 if bridge:
-                    bottom_y = max(9.0, top[1] - rng.uniform(5, 9))
+                    bottom_y = max(9.0, top[1] - rng.uniform(5, 12))
                 else:
-                    bottom_y = max(5.0, 6.0 + (1 - radial) * 12 + rng.uniform(0, 4))
+                    bottom_y = max(4.5, 5.0 + (1 - radial) * 10 + rng.uniform(0, 9))
                 if top[1] - bottom_y < 4:
                     continue
                 drift = out * rng.uniform(0.6, 2.2) + side * rng.normal(0, 0.6)
                 h = top[1] - bottom_y
-                pts = np.array([top, top + np.array([0, -h * 0.35, 0]) + drift * 0.35,
-                                top + np.array([0, -h * 0.7, 0]) + drift * 0.75, np.array([top[0], bottom_y, top[2]]) + drift])
+                pts = np.array([top, top + np.array([0, -h * 0.3, 0]) + drift * 0.45,
+                                top + np.array([0, -h * 0.65, 0]) + drift * 0.8, top + np.array([0, -h * 0.9, 0]) + drift * 0.95,
+                                np.array([top[0], bottom_y, top[2]]) + drift])
                 if self.clearance(pts[1:]).min() < 0.4:
                     continue
-                w = rng.uniform(1.2, 1.9) * (0.75 if bridge else 1.0)
+                w = rng.uniform(0.8, 1.3) * (0.8 if bridge else 1.0)
 
                 def radius(i, ang, w=w):
-                    f = i / 3
-                    rr = w * (1.0 - 0.62 * f)
-                    return rr * (1 - 0.45 * np.cos(2 * ang))  # wide across the curtain, thin radially
+                    f = i / 4
+                    rr = w * (1.0 - 0.55 * f) * (0.25 if i == 4 else 1.0)
+                    return rr * (1 - 0.5 * np.cos(2 * ang))  # wide across the curtain, thin radially
 
-                V, F, UV, N = tube(pts, radius, 5, 1, self.leaf_tile * 1.4, start_normal=out, cap_end=True, cap_start=True)
+                V, F, UV, N = tube(pts, radius, 4, 1, self.leaf_tile * 1.2, start_normal=out, cap_end=True, cap_start=True)
                 # soften: bend normals toward the outside of the crown
                 N = norm(N * 0.5 + out[None] * 0.5)
                 self.leaf["mid" if (n % 3 == 0) else "sun"].add(V, F, UV, N)
@@ -1009,11 +1031,13 @@ class TreeBuilder:
             for k in range(2):
                 if n >= 28:
                     break
-                dd = norm(d * 0.7 + rng.normal(size=3) * np.array([0.6, 0.3, 0.6]) + np.array([0, -0.35, 0]))
-                cpos = ctr + dd * r * np.array([0.95, 0.82, 0.95])
+                if d[1] > 0.6:
+                    break
+                dd = norm(d * 0.8 + rng.normal(size=3) * np.array([0.5, 0.25, 0.5]) + np.array([0, -0.3, 0]))
+                cpos = ctr + dd * r * np.array([1.0, 0.86, 1.0]) * 1.02
                 if self.clearance(cpos[None])[0] < 0.6 or cpos[1] < 2.5:
                     continue
-                ra = 0.62
+                ra = 0.72
                 lat, lon = 4, 6
                 V, UV, N = [], [], []
                 red = n % 3 != 2

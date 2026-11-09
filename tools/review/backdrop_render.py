@@ -124,8 +124,11 @@ def _terrain(scene, g):
     minx, maxx, minz, maxz = bd["clamp"]
     north = bd["northFrom"]
 
+    st = bd["step"]
+
     def keep(x, z):
-        return (x < minx) | (x > maxx) | (z < minz) | (z > north)
+        # one cell of overlap with the town's coarse grid (drawn 0.3 st lower) so no seam opens at the clamp edge
+        return (x < minx + st) | (x > maxx - st) | (z < minz + st) | (z > north - st)
 
     tmat = bpy.data.materials.get("terrain") or g["material_terrain"]("terrain")
     g["link_object"]("terrain_backdrop", g["grid_mesh"]("terrain_backdrop", bd, t["colors"], keep=keep), "backdrop_terrain", tmat)
