@@ -269,7 +269,8 @@ function Kit.label(self: Kit, gui: any, props: { [string]: any }): any
 	t.BackgroundTransparency = 1
 	t.Size = r.UDim2.fromScale(1, 1)
 	t.TextScaled = true
-	t.Font = r.Enum.Font.GothamBold
+	-- FontFace, not Font: the enum alias does not serialise from Lune
+	t.FontFace = r.Font.fromEnum(r.Enum.Font.GothamBold)
 	t.TextColor3 = self:color({ 255, 255, 255 })
 	for k, v in props do
 		if k == "TextColor" then
@@ -278,7 +279,7 @@ function Kit.label(self: Kit, gui: any, props: { [string]: any }): any
 			t.BackgroundTransparency = 0
 			t.BackgroundColor3 = self:color(v)
 		elseif k == "Font" then
-			t.Font = (r.Enum.Font :: any)[v]
+			t.FontFace = r.Font.fromEnum((r.Enum.Font :: any)[v])
 		elseif k == "Pos" then
 			t.Position = r.UDim2.fromScale(v[1], v[2])
 		elseif k == "Size" then

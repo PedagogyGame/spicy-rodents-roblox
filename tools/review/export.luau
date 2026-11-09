@@ -533,6 +533,8 @@ local scene = {
 }
 -- the far scenery, fog cards and the boot terrain beyond the clamp (build/Backdrop.rbxm; tools/bake/backdrop.luau)
 require("./backdrop_export")(scene)
+-- the attraction buildings, their lights, sign text and terrain carves (build/Attractions.rbxm; tools/bake/attractions.luau)
+require("./attractions_export")(scene)
 local dir = string.match(out, "^(.*)/[^/]+$")
 if dir and not fs.isDir(dir) then
 	fs.writeDir(dir)

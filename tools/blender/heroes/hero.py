@@ -57,6 +57,13 @@ def add_hard_parts(sp, variant, lo, bone_names):
     a = lo.data.attributes.new("hard_kind", "INT", "FACE")
     a.data.foreach_set("value", np.zeros(len(lo.data.polygons), dtype=np.int32))
     geometry.join_into(lo, objs)
+    import bmesh
+
+    bm = bmesh.new()
+    bm.from_mesh(lo.data)
+    bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+    bm.to_mesh(lo.data)
+    bm.free()
     return len(parts)
 
 
@@ -83,11 +90,16 @@ def assign_regions(lo, field_fn, W, bone_names):
 
 def separate_pattern(lo):
     """Split material 1 into its own object named Pattern; lo becomes Body."""
+    me = lo.data
+    mi = np.empty(len(me.polygons), dtype=np.int32)
+    me.polygons.foreach_get("material_index", mi)
+    assert (mi == 1).any(), "no Pattern faces"
     bl.select_only([lo])
+    me.vertices.foreach_set("select", np.zeros(len(me.vertices), dtype=bool))
+    me.edges.foreach_set("select", np.zeros(len(me.edges), dtype=bool))
+    me.polygons.foreach_set("select", mi == 1)
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="DESELECT")
-    lo.active_material_index = 1
-    bpy.ops.object.material_slot_select()
+    bpy.ops.mesh.select_mode(type="FACE")
     bpy.ops.mesh.separate(type="SELECTED")
     bpy.ops.object.mode_set(mode="OBJECT")
     pat = [o for o in bpy.context.selected_objects if o is not lo][0]

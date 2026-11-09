@@ -431,6 +431,9 @@ def make_material(lo, paths, variant):
     """Body and Pattern share one texture set (one UV atlas); each region gets its own material (one
     SurfaceAppearance each in Roblox, D22)."""
     mats = [principled_material(f"{n}", paths) for n in ("Body", "Pattern")]
+    idx = np.empty(len(lo.data.polygons), dtype=np.int32)
+    lo.data.polygons.foreach_get("material_index", idx)
     lo.data.materials.clear()
     for m in mats:
         lo.data.materials.append(m)
+    lo.data.polygons.foreach_set("material_index", idx)

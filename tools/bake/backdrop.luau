@@ -91,7 +91,7 @@ end
 local HAZE = hex("b6c3cd") -- baked aerial perspective target (pale blue-grey, the golden-hour fog seen far off)
 local function aerial(c: RGB, x: number, z: number, strength: number?): RGB
 	local d = math.sqrt((x - CX) ^ 2 + (z - CZ) ^ 2)
-	local t = math.clamp((d - 2500) / 13000, 0, 1) ^ 0.85 * 0.8 * (strength or 1)
+	local t = math.clamp((d - 3000) / 14000, 0, 1) ^ 0.9 * 0.55 * (strength or 1)
 	return mix(c, HAZE, t)
 end
 
@@ -378,21 +378,21 @@ local function onLand(x: number, z: number): number
 	return if z > 480 then COAST_FAR_Y else FAR_Y
 end
 
-local ROCK1, ROCK2, ROCK3, SNOW = hex("6f7468"), hex("7b848b"), hex("8f9aa6"), hex("eef2f6")
+local ROCK2, ROCK3, SNOW = hex("6f7a84"), hex("8592a0"), hex("eef2f6")
 local FOREST1, FOREST2 = hex("4a5c3b"), hex("4e6049")
 
 local RANGES: { Range } = {
 	{
 		id = "R1",
-		ax = 8200,
-		az = 5200,
-		from = 160,
-		to = 380,
-		step = 520,
+		ax = 7600,
+		az = 4300,
+		from = 155,
+		to = 385,
+		step = 480,
 		rows = { -950, -430, 0, 750 },
-		taper = 26,
+		taper = 24,
 		crest = function(u: number, j: number): number
-			return 250 + 70 * math.sin(u / 1900 + 0.4) + 55 * math.abs(math.sin(u / 830 + 1.1)) + 30 * (hash(j, 1) - 0.5)
+			return 330 + 90 * math.sin(u / 1900 + 0.4) + 80 * math.abs(math.sin(u / 830 + 1.1)) + 45 * (hash(j, 1) - 0.5)
 		end,
 		rowHeight = function(r: number, crest: number, base: number, j: number): number
 			if r == 2 then
@@ -418,15 +418,15 @@ local RANGES: { Range } = {
 	},
 	{
 		id = "R2",
-		ax = 11500,
-		az = 7800,
-		from = 175,
-		to = 365,
-		step = 700,
+		ax = 10200,
+		az = 6300,
+		from = 172,
+		to = 368,
+		step = 640,
 		rows = { -1500, -650, 0, 1100 },
 		taper = 22,
 		crest = function(u: number, j: number): number
-			return 820 + 220 * math.sin(u / 2600 + 2.0) + 160 * math.abs(math.sin(u / 1150 + 0.3)) + 70 * (hash(j, 11) - 0.5)
+			return 980 + 240 * math.sin(u / 2600 + 2.0) + 220 * math.abs(math.sin(u / 1150 + 0.3)) + 90 * (hash(j, 11) - 0.5)
 		end,
 		rowHeight = function(r: number, crest: number, base: number, j: number): number
 			if r == 2 then
@@ -442,7 +442,7 @@ local RANGES: { Range } = {
 			if row == 1 or (row >= 3 and top < crest * 0.5) then
 				return FOREST2, "Grass"
 			end
-			if top > 1080 and row == 2 and hash(j, 13) < 0.5 then
+			if top > 1250 and row == 2 and hash(j, 13) < 0.5 then
 				return mix(ROCK2, SNOW, 0.55), "Slate"
 			end
 			return mix(ROCK2, FOREST2, 0.25 * hash(j, row)), "Slate"
@@ -452,15 +452,15 @@ local RANGES: { Range } = {
 	},
 	{
 		id = "R3",
-		ax = 15500,
-		az = 11000,
-		from = 192,
-		to = 348,
-		step = 1100,
+		ax = 13200,
+		az = 8800,
+		from = 190,
+		to = 350,
+		step = 1000,
 		rows = { -2100, -900, -260, 0, 1500 },
 		taper = 14,
 		crest = function(u: number, j: number): number
-			return 1550 + 350 * math.sin(u / 3100 + 1.0) + 260 * math.abs(math.sin(u / 1400)) + 120 * (hash(j, 21) - 0.5)
+			return 1850 + 380 * math.sin(u / 3100 + 1.0) + 320 * math.abs(math.sin(u / 1400)) + 140 * (hash(j, 21) - 0.5)
 		end,
 		rowHeight = function(r: number, crest: number, base: number, j: number): number
 			if r == 2 then
@@ -475,10 +475,10 @@ local RANGES: { Range } = {
 		end,
 		endHeight = 0,
 		colour = function(top: number, _crest: number, row: number, j: number): (RGB, string)
-			if row == 3 and top > 1250 then
+			if row == 3 and top > 1450 then
 				return SNOW, "Snow"
 			end
-			if row == 2 and top > 1650 and hash(j, 24) < 0.6 then
+			if row == 2 and top > 1900 and hash(j, 24) < 0.6 then
 				return mix(ROCK3, SNOW, 0.6), "Snow"
 			end
 			return ROCK3, "Slate"
@@ -570,9 +570,9 @@ local FOG: { FogLayer } = {
 	-- at the foot of the foothills, in front of them
 	{ range = "R1", offset = -1180, height = 240, sink = 40, colour = "cfd6c4", bottom = 0.42, mid = 0.8, layer = 1, onLand = true },
 	-- behind the foothill crest, over the foot of the mountains
-	{ range = "R1", offset = 1000, height = 760, sink = 60, colour = "c6d1d3", bottom = 0.3, mid = 0.72, layer = 2, onLand = false },
+	{ range = "R1", offset = 850, height = 720, sink = 60, colour = "c6d1d3", bottom = 0.3, mid = 0.72, layer = 2, onLand = false },
 	-- behind the mountains, over the foot of the snowy peaks
-	{ range = "R2", offset = 1250, height = 1350, sink = 60, colour = "c2cfda", bottom = 0.22, mid = 0.66, layer = 3, onLand = false },
+	{ range = "R2", offset = 750, height = 1300, sink = 60, colour = "c2cfda", bottom = 0.22, mid = 0.66, layer = 3, onLand = false },
 }
 do
 	local cards = model(root, "FogCards")
@@ -667,7 +667,7 @@ do
 			if mesh.drawn(i, k) then
 				local cx, cz = (xs[i] + xs[i + 1]) / 2, (zs[k] + zs[k + 1]) / 2
 				local d = outsideOf(cx, cz)
-				if d > 700 and d < 2700 and cz < 1300 then
+				if d > 650 and d < 1500 and cz < 1300 then
 					-- along the cell's lower z edge or its lower x edge, by hash
 					local hsel = hash(i, k, 9)
 					if hsel < 0.38 then
@@ -681,8 +681,8 @@ do
 	end
 	-- copses: a few round woods on the plains
 	for c = 1, 14 do
-		local x = -6000 + 14600 * hash(c, 41)
-		local z = -5000 + 2600 * hash(c, 42)
+		local x = -5200 + 12400 * hash(c, 41)
+		local z = -3400 + 1000 * hash(c, 42)
 		if (x > clamp.minX - 500 and x < clamp.maxX + 500) or (z < clamp.minZ - 700) then
 			for t = 1, 5 do
 				local a = hash(c, t, 43) * math.pi * 2
@@ -697,15 +697,17 @@ do
 	for j = 1, #crest - 1 do
 		local a, b = crest[j], crest[j + 1]
 		local seg = (b - a).Magnitude
-		local per = math.floor(seg / 150)
+		local per = math.floor(seg / 120)
 		for s = 0, per - 1 do
-			local f = (s + 0.5) / per
+			local f = (s + 0.3 + 0.4 * hash(j, s, 50)) / per
 			local p = a:Lerp(b, f)
-			if p.Z < CZ - 2200 and hash(j, s, 51) > 0.2 then
-				local hgt = 60 + 30 * hash(j, s, 52)
-				local along = math.atan2(b.X - a.X, b.Z - a.Z)
-				local col = aerial(shade(TREE[1 + math.floor(hash(j, s, 53) * #TREE)], 0.95), p.X, p.Z, 0.9)
-				ellipsoid(trees, "Crest", Vector3.new(80, hgt, 150), CFrame.new(p.X, p.Y + hgt * 0.25, p.Z) * CFrame.Angles(0, along, 0), col, "trees")
+			if p.Z < CZ - 1800 and hash(j, s, 51) > 0.3 then
+				local big = hash(j, s, 52)
+				local hgt = 38 + 52 * big * big
+				local wide = 60 + 90 * hash(j, s, 54)
+				local along = math.atan2(b.X - a.X, b.Z - a.Z) + 0.6 * (hash(j, s, 55) - 0.5)
+				local col = aerial(shade(TREE[1 + math.floor(hash(j, s, 53) * #TREE)], 0.9 + 0.15 * hash(j, s, 56)), p.X, p.Z, 0.9)
+				ellipsoid(trees, "Crest", Vector3.new(wide * 0.7, hgt, wide), CFrame.new(p.X, p.Y + hgt * 0.2, p.Z) * CFrame.Angles(0, along, 0), col, "trees")
 			end
 		end
 	end
@@ -717,10 +719,10 @@ do
 	local road = model(root, "Road")
 	road:SetAttribute("Width", 22)
 	local function rz(x: number): number
-		return clamp.minZ - 1080 + 170 * math.sin(x / 1900 + 0.5) + 60 * math.sin(x / 640 + 1.7)
+		return clamp.minZ - 760 + 130 * math.sin(x / 1900 + 0.5) + 50 * math.sin(x / 640 + 1.7)
 	end
-	local x = -6900
-	while x <= 9000 do
+	local x = -5900
+	while x <= 7300 do
 		local z = rz(x)
 		table.insert(roadPts, Vector3.new(x, Backdrop.meshHeight(x, z) + 1.4, z))
 		x += 150
@@ -736,7 +738,7 @@ end
 ---------------------------------------------------------------------------------------------- farms
 do
 	local farms = model(root, "Farms")
-	local spots = { { -1200, -3150 }, { 1500, -2950 }, { 3900, -3500 }, { -3600, -2900 }, { 5800, -1400 }, { -4300, 300 }, { 6300, 500 }, { -400, -3900 } }
+	local spots = { { -1200, -2900 }, { 1500, -2750 }, { 3900, -3150 }, { -3600, -2800 }, { 5600, -1400 }, { -4300, 300 }, { 5900, 500 }, { -400, -3250 } }
 	for f, s in spots do
 		local x, z = s[1], s[2]
 		local y = Backdrop.meshHeight(x, z)

@@ -122,49 +122,49 @@
       "name": "bd_n_ocean_beach", "optIn": "backdrop",
       "desc": "Backdrop: street level on the long beach (eye 5.5 st) looking north over the sea: the pier north of Sycamore Park, the horizon.",
       "pos": [-60, 7.7, 1380], "look": [-150, 8, 2400], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_s_plains_mountains", "optIn": "backdrop",
       "desc": "Backdrop: street level south of the estates (eye 5.5 st) looking south: plains, hedgerows, the distant road, foothills (R1), mountains (R2), snowy peaks (R3), fog cards between them.",
       "pos": [900, 16.5, -2150], "look": [900, 220, -7000], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_e_tower", "optIn": "backdrop",
       "desc": "Backdrop: street level at the east edge of town (eye 5.5 st) looking -X along the sunset azimuth at the radio tower on its knoll.",
       "pos": [-1400, 14.8, 600], "look": [-2914, 200, 851], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_w_offroad", "optIn": "backdrop",
       "desc": "Backdrop: street level in the off-road back field (eye 5.5 st) looking +X past the world edge: band terrain, plains, the foothills' arm and the coast.",
       "pos": [3900, 48, 0], "look": [9000, 120, 300], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_marina", "optIn": "backdrop",
       "desc": "Backdrop: the marina at the Willow River mouth from the beach (eye 12 st): breakwaters, pontoons, moored boats, harbour lights, the lighthouse beyond.",
       "pos": [1980, 14.5, 1415], "look": [2350, 2, 1720], "fov": 65, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_mountains_tele", "optIn": "backdrop",
       "desc": "Backdrop: the ranges from the sky-lift hilltop (eye 8 st, 40 degree lens): layered foothills, mountains and snowy peaks with fog cards.",
       "pos": [-1050, 123, -1700], "look": [-300, 650, -9000], "fov": 40, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_aerial300_s", "optIn": "backdrop",
       "desc": "Backdrop: drone at 300 st over the town centre looking south (mountains side).",
       "pos": [700, 300, 0], "look": [700, 120, -6000], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_aerial300_n", "optIn": "backdrop",
       "desc": "Backdrop: drone at 300 st over the old town looking north: beach, pier, marina, ocean horizon (the horizon must read with no seam).",
       "pos": [700, 305, -400], "look": [700, 60, 6000], "fov": 70, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
       "name": "bd_sunset", "optIn": "backdrop",
@@ -182,7 +182,82 @@
       "name": "bd_overview", "optIn": "backdrop",
       "desc": "Backdrop: the whole bay from 9 km up and 12 km south: town, band terrain, land mesh, ranges, fog cards, coast and ocean.",
       "pos": [700, 9000, -15000], "look": [700, 0, -500], "fov": 50, "groups": ["town", "terrain", "backdrop", "backdrop_terrain"],
-      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 5200, "max": 0.9}}
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}}
+    },
+    {
+      "name": "bw_lanes_eye", "optIn": "bowling",
+      "desc": "Bowling alley: eye height (5.2 st) behind the settees of lanes 3-4 looking down all six lanes to the pins, masking units and the overhead scoreboards.",
+      "pos": [1300, 21.7, -404], "look": [1300, 18.2, -476], "fov": 62, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_approach", "optIn": "bowling",
+      "desc": "Bowling alley: a bowler's eye on the lane 3 approach: boards, arrows, gutters, the pin deck lit by the masking-unit lights.",
+      "pos": [1296.9, 21.6, -414], "look": [1296.9, 17.2, -472], "fov": 55, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_pins", "optIn": "bowling",
+      "desc": "Bowling alley: the lane 3 pin deck close up from the lane (pins, spots, kickbacks, pit cushion, sweep bar parked).",
+      "pos": [1296.9, 19.0, -466], "look": [1296.9, 17.3, -477.5], "fov": 50, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_rack", "optIn": "bowling",
+      "desc": "Bowling alley: the ball-return hood and rack between lanes 3 and 4 with the balls, at standing height (the tunnel's mouth).",
+      "pos": [1303.5, 21.0, -411.5], "look": [1300, 18.0, -417], "fov": 60, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_concourse", "optIn": "bowling",
+      "desc": "Bowling alley: from the entrance at eye height: front desk and shoe cubbies (left), snack bar (right), tables, settees and lanes beyond.",
+      "pos": [1302, 21.7, -374], "look": [1294, 19.5, -410], "fov": 70, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_games_room", "optIn": "bowling",
+      "desc": "Bowling alley games room at eye height: pool tables under their lamps, pinball machines, bumper pool, the dartboard wall and the fortune-teller corner.",
+      "pos": [1330, 21.7, -377], "look": [1347, 19.0, -430], "fov": 70, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_darts", "optIn": "bowling",
+      "desc": "Darts: the thrower's view from the oche to the board (bull at 5.45 st).",
+      "pos": [1346.4, 21.5, -434], "look": [1355.4, 21.95, -434], "fov": 28, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_fortune", "optIn": "bowling",
+      "desc": "Madame Acorna's fortune-teller cabinet in the corner by the ferns.",
+      "pos": [1345.5, 21.6, -438.5], "look": [1352.3, 20.8, -446.3], "fov": 55, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_back_of_house", "optIn": "bowling",
+      "desc": "Back of house behind the pinsetters: machine backs, workbench, spare pins, the steel push-bar exit doors.",
+      "pos": [1300, 21.7, -488], "look": [1277.5, 19.8, -500.8], "fov": 70, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_alley", "optIn": "bowling",
+      "desc": "The alley behind: steel doors on a concrete stoop, three big round dark-blue trash cans by the tunnel vents, the push broom by the door, fence.",
+      "pos": [1310, 18.4, -518], "look": [1285, 15.0, -501.5], "fov": 65, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_vent", "optIn": "bowling",
+      "desc": "Squirrel's eye at the tunnel vent (lanes 1-2) between the trash cans.",
+      "pos": [1287.6, 13.9, -510.5], "look": [1287.6, 13.6, -501], "fov": 70, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_tunnel", "optIn": "bowling",
+      "desc": "Inside the ball-return tunnel under lanes 1-2 at squirrel eye, looking toward the bowlers' end (track, ribs, joists, amber lamps).",
+      "pos": [1287.6, 14.3, -452], "look": [1287.6, 14.1, -424], "fov": 70, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_tunnel_exit", "optIn": "bowling",
+      "desc": "The tunnel's exit: the hood mouth of the lanes 1-2 ball return where the squirrel pops out onto the rack, from the approach.",
+      "pos": [1290.2, 19.2, -410.5], "look": [1287.6, 18.0, -415.8], "fov": 60, "groups": ["attractions", "terrain"]
+    },
+    {
+      "name": "bw_exterior", "optIn": "bowling",
+      "desc": "Bellwether Bowl from the parking: facade, sign band, canopy, entrance steps, pylon sign with the giant pin.",
+      "pos": [1278, 21.4, -318], "look": [1312, 22.5, -372], "fov": 62, "groups": ["attractions", "terrain", "town"]
+    },
+    {
+      "name": "bw_aerial", "optIn": "bowling",
+      "desc": "Bellwether Bowl from the air (roof, alley and fence, the parking bays in front).",
+      "pos": [1205, 130, -322], "look": [1316, 16, -440], "fov": 55, "groups": ["attractions", "terrain", "town"]
     },
     {
       "name": "axes_check",

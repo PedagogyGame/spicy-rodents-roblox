@@ -691,6 +691,16 @@ def _backdrop_module():
     return backdrop_render
 
 
+def _attractions_module():
+    """tools/review/attractions_render.py (attraction lights and sign text), when present."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import attractions_render
+    except ImportError:
+        return None
+    return attractions_render
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--scene", default="build/review/scene.json")
@@ -727,6 +737,9 @@ def main(argv):
     setup_world(vcfg.get("sun", {}))
     if backdrop:
         backdrop.build(scene_data, globals())
+    attractions = _attractions_module()
+    if attractions:
+        attractions.build(scene_data, globals())
     defaults = vcfg.get("defaults", {})
     res = tuple(int(x) for x in (args.res or defaults.get("res", "960x540")).split("x"))
     cam = setup_render(res, defaults.get("samples", 24), args.threads)

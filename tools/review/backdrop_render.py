@@ -131,7 +131,7 @@ def _terrain(scene, g):
     g["link_object"]("terrain_backdrop", g["grid_mesh"]("terrain_backdrop", bd, t["colors"], keep=keep), "backdrop_terrain", tmat)
     me = g["water_mesh"]("sea_water", bd, bd["seaY"])
     if me:
-        wmat = g["material_simple"]("sea_water", (0.06, 0.2, 0.22), rough=0.05, alpha=0.82)
+        wmat = g["material_simple"]("sea_water", (0.05, 0.17, 0.19), rough=0.16, alpha=0.86)
         g["link_object"]("sea_water", me, "backdrop_terrain", wmat)
 
 
