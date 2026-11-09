@@ -115,6 +115,27 @@ def make_material(name, maps, normal_strength=1.0, debug_alpha=None):
     return mat
 
 
+def decimate(V, F, target):
+    """Collapse-decimate a small mesh to about `target` triangles (Blender modifier, evaluated)."""
+    me = bpy.data.meshes.new("_dec")
+    me.from_pydata(np.asarray(V).tolist(), [], np.asarray(F).tolist())
+    ob = bpy.data.objects.new("_dec", me)
+    bpy.context.scene.collection.objects.link(ob)
+    mod = ob.modifiers.new("d", "DECIMATE")
+    mod.ratio = min(1.0, target / max(1, len(F)))
+    mod.use_collapse_triangulate = True
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = ob.evaluated_get(dg)
+    m2 = ev.to_mesh()
+    m2.calc_loop_triangles()
+    V2 = np.array([v.co[:] for v in m2.vertices])
+    F2 = np.array([t.vertices[:] for t in m2.loop_triangles], np.int64)
+    ev.to_mesh_clear()
+    bpy.data.objects.remove(ob, do_unlink=True)
+    bpy.data.meshes.remove(me)
+    return V2, F2
+
+
 # ---- scene --------------------------------------------------------------------------------------
 
 def reset_scene():
@@ -124,20 +145,18 @@ def reset_scene():
 
 def build_tree_objects(rec, data, cache, opts=None):
     t0 = time.time()
+    opts = dict(opts or {})
+    opts.setdefault("decimate", decimate)
     tb = tg.TreeBuilder(rec, data, opts).build()
     sp = rec["species"]
     bark_maps = cache.bark(tg.BARK_FAMILY[sp])
     shape = tg.LEAF_SHAPE[sp]
-    mats = {
-        "Bark": make_material(f"Bark_{rec['index']:03d}", bark_maps, 1.0),
-        "LeavesShade": make_material(f"LeavesShade_{rec['index']:03d}", cache.leaf(shape, rec["palette"], "shade"), 1.0),
-        "LeavesSun": make_material(f"LeavesSun_{rec['index']:03d}", cache.leaf(shape, rec["palette"], "sun"), 1.0),
-    }
+    mats = {"Bark": make_material(f"Bark_{rec['index']:03d}", bark_maps, 1.0)}
     objs = {"Bark": tg.make_object("Bark", tb.bark, mats["Bark"])}
-    if tb.leaf["shade"].tris:
-        objs["LeavesShade"] = tg.make_object("LeavesShade", tb.leaf["shade"], mats["LeavesShade"])
-    if tb.leaf["sun"].tris:
-        objs["LeavesSun"] = tg.make_object("LeavesSun", tb.leaf["sun"], mats["LeavesSun"])
+    for layer, part in (("shade", "LeavesShade"), ("mid", "LeavesMid"), ("sun", "LeavesSun")):
+        if tb.leaf[layer].tris:
+            mats[part] = make_material(f"{part}_{rec['index']:03d}", cache.leaf(shape, rec["palette"], layer), 1.0)
+            objs[part] = tg.make_object(part, tb.leaf[layer], mats[part])
     if tb.fruit.tris:
         mats["Apples"] = make_material(f"Apples_{rec['index']:03d}", cache.apple(), 0.5)
         objs["Apples"] = tg.make_object("Apples", tb.fruit, mats["Apples"])
@@ -159,7 +178,11 @@ def to_b(p):
 def alignment_checks(tb, bark_obj):
     """Trunk: bark radius vs the squirrel's tapered radius at every route sample (8 directions).
     Boughs: bark top vs the squirrel's feet (rail + lift), by a downward ray at every sample."""
-    bvh = bvh_of(bark_obj)
+    def bvh_arrays(V, F):
+        Vb = tg.to_blender_coords(V)
+        return BVHTree.FromPolygons([Vector(v) for v in Vb], [tuple(int(i) for i in f) for f in F])
+
+    bvh = bvh_arrays(*tb.trunk_mesh)
     out = {}
     trunk = tb.rec["trunk"]
     P = tb.trunkP
@@ -184,9 +207,12 @@ def alignment_checks(tb, bark_obj):
                                                       "p95_abs": round(float(np.percentile(np.abs(errs), 95)), 3)},
                     "root_flare_rays_below_2_5st": len(errs_low)}
     berrs, misses, n = [], 0, 0
+    bough_bvh = {b["route"]["id"]: bvh_arrays(*b["mesh"]) for b in tb.boughs}
+    full = bvh_of(bark_obj)
     for (P, lift, kind, name, rid) in tb.rails:
         if kind == "trunk":
             continue
+        bvh = bough_bvh.get(rid, full)
         L = tg.arclen(P)
         for p, sv in zip(P, L):
             if name.endswith("OPEN SKY LOOKOUT"):
@@ -330,10 +356,12 @@ def render_views(tb, objs, views, out, args, tag):
     paths = {}
     for view in views:
         if view == "street":
-            dist = max(top * 1.55, width * 1.1)
+            # fit the whole tree: vertical fov of a 28 mm lens at 16:9 is ~39.7 deg
+            half_v = math.atan(0.5 * 36 * 540 / 960 / 28)
+            dist = max((top * 0.62) / math.tan(half_v), width * 0.95)
             ang = math.radians(200)
             loc = (cx + math.sin(ang) * dist, cy - math.cos(ang) * dist, 5.0)
-            cam = add_camera("CamStreet", loc, (cx, cy, top * 0.47), 28)
+            cam = add_camera("CamStreet", loc, (cx, cy, top * 0.5), 28)
         elif view == "below":
             c, rh, ylo, yhi = tb.crown
             off = max(4.0, rh * 0.32)
@@ -352,7 +380,7 @@ def render_views(tb, objs, views, out, args, tag):
         hidden = []
         added = []
         if view == "debug":
-            for k in ("LeavesShade", "LeavesSun", "Apples"):
+            for k in ("LeavesShade", "LeavesMid", "LeavesSun", "Apples"):
                 if k in objs:
                     objs[k].hide_render = True
                     hidden.append(objs[k])

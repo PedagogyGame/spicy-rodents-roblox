@@ -5,140 +5,140 @@
     {
       "lot": "outer_home_00",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_01",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_02",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_03",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_04",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_05",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_06",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_07",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_08",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_09",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_10",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_11",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_12",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_13",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_14",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_15",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_16",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_17",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_18",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     },
     {
       "lot": "outer_home_19",
       "action": "harvest_lock",
-      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; its flat roof landing at the ridge height is kept flat (v5.4 roofY = peak) until the W3 house templates replace it.",
+      "reason": "Outer home keeps its v5.4 orientation and roof so its harvested ridge, downspout and gutter routes still sit on its greybox; it carries the v5.4 gable from its eave to the harvested peak (the ridge route runs along the ridge; review 2026-11-09) until the W3 house templates replace it.",
       "cite": "BUILD_PLAN §3.13 invariant 2; routes_movement verifier 4; worldgen_core §18.2",
       "until": "W3b #10"
     }

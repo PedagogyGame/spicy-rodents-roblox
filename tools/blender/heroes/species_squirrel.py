@@ -214,3 +214,77 @@ RODENT_PATCHES = [  # centre on the skin surface, radius, stitch line (two point
     {"c": (-0.25, -0.46, 0.92), "r": 0.065, "stitch": ((-0.22, -0.52, 0.99), (-0.27, -0.40, 0.85))},
     {"c": (0.06, 0.12, 1.21), "r": 0.055, "stitch": ((0.10, 0.05, 1.20), (0.01, 0.19, 1.22))},
 ]
+
+
+def hard_parts(variant="squirrel"):
+    """Claws and incisors: [(name, verts, faces, bone, kind)] (kind: claw | tooth)."""
+    from geometry import curved_spike
+
+    rodent = variant == "rodent"
+    dz = -0.03 if rodent else 0.0
+    hz = HZ + dz
+    out = []
+    kn = np.array(FRONT["Toe"])
+    for side, sx in (("L", 1), ("R", -1)):
+        for i, (dx, dy) in enumerate(((-0.034, 0.0), (-0.012, 0.013), (0.012, 0.013), (0.034, 0.0))):
+            tip = (kn + [dx, -0.08 + dy, -0.021]) * [sx, 1, 1]
+            v, f = curved_spike(tip + [0, 0.004, 0.006], (0, -1, -0.35), 0.038 if rodent else 0.032, 0.0085, curl=(0, 0.2, -1), curl_amt=0.9)
+            out.append((f"claw_F{side}{i}", v, f, f"Front{side}_Toe", "claw"))
+        ba = np.array(BACK["Toe"])
+        for i, (dx, dy) in enumerate(((-0.038, 0.006), (-0.018, 0.016), (0.0, 0.02), (0.018, 0.016), (0.038, 0.006))):
+            tip = (ba + [dx, -0.115 + dy, -0.02]) * [sx, 1, 1]
+            v, f = curved_spike(tip + [0, 0.004, 0.006], (0, -1, -0.3), 0.04 if rodent else 0.034, 0.009, curl=(0, 0.2, -1), curl_amt=0.9)
+            out.append((f"claw_B{side}{i}", v, f, f"Back{side}_Toe", "claw"))
+    up_len = 0.062 if rodent else 0.034
+    lo_len = 0.04 if rodent else 0.022
+    for sx in (1, -1):
+        crooked = 0.12 * sx if rodent else 0.0
+        v, f = curved_spike((0.0095 * sx, -1.118, hz - 0.118), (crooked, -0.25, -1), up_len, 0.0105, curl=(0, 0.6, 0), curl_amt=0.35, sides=4, flat=1.5)
+        out.append((f"tooth_U{sx}", v, f, "Head", "tooth"))
+        v, f = curved_spike((0.008 * sx, -1.072, hz - 0.17), (0, -0.55, 1), lo_len, 0.009, curl=(0, 1, 0), curl_amt=0.3, sides=4, flat=1.4)
+        out.append((f"tooth_L{sx}", v, f, "Jaw", "tooth"))
+    return out
+
+
+BUDGET = {"body_tris": 7300, "cards_tris": 6000, "rodent_cards_tris": 3000}
+# RootPart: the puppet's hidden root block (PuppetSpec: 0.66 x 0.66 x 1.4 st at hip height 0.9)
+ROOT_PART = ((0.0, 0.0, 0.9), (0.33, 0.7, 0.33))
+HIP_HEIGHT = 0.9
+TORSO = {"Hips", "Spine1", "Spine2", "Spine3", "Chest"}
+
+
+def _sstep(a, b, x):
+    t = np.clip((x - a) / (b - a), 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def pattern_field(c, n, dom, variant="squirrel"):
+    """0..1 'how much Pattern (cream belly, throat, chin, tail tip)' at points c with normals n and
+    dominant bones dom. Faces above 0.5 become the Pattern region."""
+    c = np.asarray(c)
+    n = np.asarray(n)
+    x, y, z = c[:, 0], c[:, 1], c[:, 2]
+    wob = 0.03 * np.sin(y * 23.0 + x * 9.0) + 0.02 * np.sin(y * 51.0 - z * 17.0)
+    out = np.zeros(len(c))
+    torso = np.isin(dom, list(TORSO))
+    # belly and chest: low, facing down; the line rises toward the chest and the throat
+    line = 0.70 + 0.06 * _sstep(0.2, -0.5, y) + wob
+    belly = _sstep(-0.05, 0.35, -n[:, 2] + (line - z) * 2.5)
+    out[torso] = belly[torso]
+    neck = dom == "Neck"
+    out[neck] = _sstep(0.0, 0.4, -n[neck, 2] + (0.9 - z[neck]) * 1.5 + wob[neck])
+    head = dom == "Head"
+    hz = HZ + (-0.03 if variant == "rodent" else 0.0)
+    out[head] = _sstep(0.15, 0.45, -n[head, 2] + (hz - 0.09 - z[head]) * 4 + wob[head]) * (y[head] < -0.86)
+    jaw = dom == "Jaw"
+    out[jaw] = _sstep(-0.3, 0.1, -n[jaw, 2] + wob[jaw])
+    # the inside of the upper forelegs continues the chest
+    fl = np.isin(dom, ["FrontL_Upper", "FrontR_Upper"])
+    inward = -np.sign(x) * n[:, 0]
+    out[fl] = _sstep(0.2, 0.6, inward[fl] - n[fl, 2] * 0.5 + wob[fl])
+    tail = np.char.startswith(dom.astype(str), "Tail")
+    tip = _sstep(1.86, 1.98, y + wob * 2)
+    out[tail] = np.maximum(out[tail], tip[tail])
+    if variant == "rodent":
+        out *= 0.92  # a dingier, narrower belly
+    return out

@@ -376,6 +376,8 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
     elif layer == "shade":
         cool = np.array([0.86, 0.95, 1.02])
         col = col * cool * 0.80
+    else:  # mid
+        col = col * np.array([1.0, 1.0, 0.92]) * 0.95
     col = col * lum[..., None]
     # within a leaf: lighter midrib and veins, darker toward the stalk and the edges
     shape = layout["shape"]

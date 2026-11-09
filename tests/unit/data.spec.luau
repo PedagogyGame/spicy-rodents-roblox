@@ -13,7 +13,8 @@ return function(t)
 		t.eq(#d:roads(), idx.modules.Roads.count)
 		t.eq(#d:cast(), idx.modules.Cast.count)
 		-- the harvested chunks plus the attraction routes (data/attractions.json: the bowling alley tunnels)
-		local extra = if idx.modules.Attractions then idx.modules.Attractions.count else 0
+		local attractions = (d:module("Attractions") :: any).routes
+		local extra = if attractions then #attractions else 0
 		t.eq(d:routes():count(), idx.modules.Routes.count + extra)
 		t.eq(d:bakeHash(), idx.harvestPin.sha256)
 		t.truthy(Data.default() == d)

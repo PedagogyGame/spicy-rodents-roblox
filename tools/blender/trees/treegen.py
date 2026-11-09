@@ -340,7 +340,7 @@ class TreeBuilder:
         self.cat = rec["category"]
         self.sp = rec["species"]
         self.bark = Mesh()
-        self.leaf = {"shade": Mesh(), "sun": Mesh()}
+        self.leaf = {"shade": Mesh(), "mid": Mesh(), "sun": Mesh()}
         self.fruit = Mesh()
         self.rails = []  # (polyline studs local, lift, kind, name, route id)
         self.boughs = []
@@ -399,7 +399,7 @@ class TreeBuilder:
         L = arclen(P)[-1]
         self.trunkL = L
         self.rails.append((P, 0.0, "trunk", trunk["name"], trunk["id"]))
-        Q, s, t = resample(P, 1.8)
+        Q, s, t = resample(P, 2.4)
         # carry the trunk down into the ground (pivot y = 0 is the ground at the root)
         foot = Q[0]
         below = [np.array([foot[0], y, foot[2]]) for y in (-3.0, -1.6, -0.6) if y < foot[1] - 0.2]
@@ -457,6 +457,7 @@ class TreeBuilder:
         sides = 16 if R0 > 2.4 else (14 if R0 > 1.6 else 12)
         V, F, UV, N = tube(C, radius, sides, u_rep, v_tile, start_normal=[1.0, 0.0, 0.0], cap_end=True, v0=0.0)
         self.bark.add(V, F, UV, N)
+        self.trunk_mesh = (V, F)
         self.trunk_rings = (C, tt)
         # trunk tunnel: the squirrel orbits the bark (tapered + 0.7 st) -> keep leaves 2.6 st beyond
         for a, b, ta, tb in zip(Q[:-1], Q[1:], t[:-1], t[1:]):
@@ -493,8 +494,8 @@ class TreeBuilder:
             r_base = min(r_base, 0.78 * rt)
         r_tip = max(0.5 * lift + 0.08, 0.32)
         r_base = max(r_base, r_tip * 1.15)
-        step = 1.6 if L < 30 else 2.2
-        Q, s, u = resample(P, step)
+        step = 2.6 if L < 30 else 3.4
+        Q, s, u = resample(P, step, min_n=4)
         # rounded tip: extend a little past the rail end along the last tangent
         tan_end = norm(Q[-1] - Q[-2])
         coll = 0.9 * rt if on_trunk else 0.6
@@ -509,7 +510,7 @@ class TreeBuilder:
             r = radii[i]
             return r * (1 + 0.05 * np.sin(ang * 3 + wob_ph + i * 0.4))
 
-        sides = 10 if r_base > 1.3 else 8
+        sides = 8 if r_base > 1.2 else 6
         circ = 2 * math.pi * r_base
         u_rep = max(1, int(round(circ / 4.0)))
         v_tile = circ / u_rep * 1.3
@@ -517,9 +518,8 @@ class TreeBuilder:
         self.bark.add(V, F, UV, N)
         # tunnel above the rail where the squirrel's body is (feet = rail + lift)
         self.add_tunnel_polyline(P, 2.5, lift_up=lift + 0.9)
-        self.boughs = getattr(self, "boughs", [])
         self.boughs.append({"route": route, "P": P, "Q": centers, "radii": radii, "L": L, "lift": lift, "kind": kind,
-                            "on_trunk": on_trunk})
+                            "on_trunk": on_trunk, "mesh": (V, F)})
 
     def build_lookout_pad(self, P, lift):
         mid = P.mean(axis=0)
@@ -629,238 +629,324 @@ class TreeBuilder:
             V, F, UV, N = tube(pts, radius, 6, 1, 3.0, cap_end=True)
             self.bark.add(V, F, UV, N)
 
-    # .. twigs and leaves ..
+    # .. canopy: a shell of leaf clumps on a lobed envelope around the bough tips ..
     def crown_frame(self):
-        """Crown centre and radii from the bough ends."""
         ends = [b["P"][-1] for b in self.boughs if b["kind"] in ("branch", "lookout")]
         if not ends:
             ends = [self.trunkP[-1]]
         E = np.array(ends)
         top = self.trunkP[-1]
         c = np.array([E[:, 0].mean() * 0.6 + top[0] * 0.4, 0, E[:, 2].mean() * 0.6 + top[2] * 0.4])
-        rh = max(np.max(np.hypot(E[:, 0] - c[0], E[:, 2] - c[2])), self.H * 0.18)
+        rh = max(float(np.max(np.hypot(E[:, 0] - c[0], E[:, 2] - c[2]))), self.H * 0.15)
         ylo = min(E[:, 1].min(), top[1])
         yhi = max(E[:, 1].max(), top[1])
         c[1] = (ylo + yhi) / 2
         return c, rh, ylo, yhi
 
+    def envelope_lobes(self):
+        """Spheres (centre, radius, kind) whose union is the crown envelope. The walkable rails stay
+        inside it (hollow crown) except where bridges leave the crown."""
+        rng = self.rng
+        c, rh, ylo, yhi = self.crown
+        sp = self.sp
+        R_tip = float(np.clip(0.42 * rh, 5.0, 24.0))
+        if self.cat == "giant":
+            R_tip = float(np.clip(0.48 * rh, 12.0, 30.0))
+        if sp == "willow":
+            R_tip = float(np.clip(0.55 * rh, 6.0, 14.0))
+        if sp == "apple":
+            R_tip = float(np.clip(0.75 * rh, 4.0, 7.0))
+        lobes = []
+        top = self.trunkP[-1]
+        for b in self.boughs:
+            P, L, kind = b["P"], b["L"], b["kind"]
+            name = b["route"]["name"]
+            if kind == "bridge":
+                # a leafy sleeve over the inner part of a living bridge (the limb stays readable)
+                sP = arclen(P)
+                n = max(1, int(L * 0.65 / (R_tip * 0.9)))
+                for k in range(n):
+                    sv = L * (0.12 + 0.6 * (k + 0.5) / n)
+                    j = int(np.searchsorted(sP, sv).clip(0, len(P) - 1))
+                    if np.hypot(P[j][0] - c[0], P[j][2] - c[2]) > rh * 1.25 and sp != "willow":
+                        continue
+                    lobes.append((P[j] + np.array([0, R_tip * 0.25, 0]), R_tip * 0.62, "bridge"))
+                continue
+            tip = P[-1]
+            out = tip - np.array([c[0], tip[1], c[2]])
+            out = norm(out) if np.linalg.norm(out) > 1e-3 else np.array([1.0, 0, 0])
+            k = 0.18 if kind != "lookout" else 0.0
+            lobes.append((tip + out * R_tip * k + np.array([0, R_tip * 0.22, 0]), R_tip * rng.uniform(0.95, 1.1), "tip"))
+            if L > R_tip * 1.6 and kind == "branch":
+                sP = arclen(P)
+                j = int(np.searchsorted(sP, L * 0.55).clip(0, len(P) - 1))
+                lobes.append((P[j] + np.array([0, R_tip * 0.42, 0]), R_tip * 0.85, "mid"))
+        # crown cap over the trunk top
+        cap_r = max(R_tip * 1.05, rh * 0.62)
+        cap_y = max(yhi, top[1]) + cap_r * (0.05 if sp in ("oak", "sycamore") else 0.2)
+        if self.cat == "giant":
+            cap_y = yhi + cap_r * 0.1
+        lobes.append((np.array([top[0] * 0.5 + c[0] * 0.5, cap_y - cap_r * 0.35, top[2] * 0.5 + c[2] * 0.5]), cap_r, "cap"))
+        if sp == "elm":  # vase: a wider upper ring
+            for k in range(5):
+                a = k * 2 * math.pi / 5 + rng.random()
+                lobes.append((np.array([c[0] + math.cos(a) * rh * 0.75, yhi + R_tip * 0.1, c[2] + math.sin(a) * rh * 0.75]), R_tip * 0.9, "ring"))
+        self.R_tip = R_tip
+        return lobes
+
     def build_twigs_and_leaves(self):
         rng = self.rng
         sp = self.sp
-        c, rh, ylo, yhi = self.crown_frame()
-        self.crown = (c, rh, ylo, yhi)
-        scale = {"named": 1.0, "outer": 0.8, "giant": 1.35, "apple": 0.45, "estate": 1.0}[self.cat]
-        if sp == "willow":
-            scale = 0.75
-        rho0 = 6.0 * scale  # nominal clump radius (studs)
-        clumps = []  # (centre, radius, squash, priority)
-        twig_tris = 0
-
-        def try_clump(p, rho, pri, squash=0.82):
-            # shrink / push until clear of every tunnel and building; returns accepted (p, rho) or None
-            p = np.array(p, float)
-            for _ in range(6):
-                cl = self.clearance(p[None])[0]
-                need = rho * 1.12
-                if cl >= need and self.box_clear(p[None])[0] >= rho * 0.55 and p[1] - rho * squash > self.min_leaf_y:
-                    clumps.append((p, rho, squash, pri))
-                    return True
-                if cl > need * 0.62:
-                    rho = cl / 1.12
-                    if rho >= rho0 * 0.38:
-                        continue
-                # push away from the nearest tunnel
-                A, B, r = self._tun
-                d = seg_dist(p[None], A, B)[0] - r
-                j = int(np.argmin(d))
-                ab = B[j] - A[j]
-                tt = np.clip(np.dot(p - A[j], ab) / max(np.dot(ab, ab), 1e-9), 0, 1)
-                q = A[j] + ab * tt
-                away = norm(p - q + np.array([0, 0.3, 0]))
-                p = p + away * (need - cl + 0.5)
-            return False
-
-        self.min_leaf_y = {"apple": 3.2, "willow": 9.0}.get(sp, max(6.0, self.H * 0.22))
-        # 1. twigs from the boughs, with a clump on each twig end
-        twigs = []
-        for b in self.boughs:
-            if b["kind"] == "lookout" and b["L"] < 4:
-                continue
-            P, L = b["P"], b["L"]
-            nt = max(2, int(L / (rho0 * 1.15)))
-            if b["kind"] == "bridge":
-                nt = max(2, int(L / (rho0 * 1.6)))
-            ss = np.linspace(0.32 if b["kind"] != "bridge" else 0.12, 0.97, nt) * L
-            sP = arclen(P)
-            for si, sv in enumerate(ss):
-                k = int(np.searchsorted(sP, sv).clip(1, len(P) - 1))
-                p = P[k]
-                tan = norm(P[k] - P[k - 1])
-                side = norm(np.cross(tan, [0, 1, 0]) + 1e-9)
-                best = None
-                for attempt in range(8):
-                    sg = 1 if (si + attempt) % 2 == 0 else -1
-                    ang = rng.uniform(0.5, 1.25)
-                    up = rng.uniform(0.25, 0.85)
-                    d = norm(tan * math.cos(ang) + side * sg * math.sin(ang) + np.array([0, up, 0]))
-                    tl = rho0 * rng.uniform(0.9, 1.5)
-                    e = p + d * tl + np.array([0, b["lift"] - 0.6, 0])
-                    cl = self.clearance(e[None])[0]
-                    if best is None or cl > best[0]:
-                        best = (cl, e, d, tl)
-                    if cl > rho0 * 1.2:
-                        break
-                cl, e, d, tl = best
-                base = p + np.array([0, b["lift"] - 0.5, 0])
-                twigs.append((base, e, 0.42 if self.cat != "giant" else 0.6))
-                try_clump(e + d * rho0 * 0.35 + np.array([0, rho0 * 0.25, 0]), rho0 * rng.uniform(0.85, 1.15), 1)
-            # tip burst: around and beyond the end of the rail (the tip itself stays visible)
-            if b["kind"] in ("branch",):
-                e = P[-1]
-                tan = norm(P[-1] - P[-4] if len(P) > 4 else P[-1] - P[0])
-                for k in range(3):
-                    a = k * 2.1 + rng.random()
-                    off = norm(tan * 0.8 + np.array([math.cos(a), 0.6 + 0.3 * rng.random(), math.sin(a)]))
-                    try_clump(e + off * rho0 * 1.6, rho0 * rng.uniform(0.9, 1.2), 0)
-        # 2. crown dome (silhouette) and a lower skirt
-        nd = int(np.clip((rh / rho0) ** 2 * 2.4, 8, 60))
-        golden = math.pi * (3 - math.sqrt(5))
-        rv = max((yhi - ylo) / 2 + rho0 * 0.8, rh * 0.45)
-        cy = (ylo + yhi) / 2 + rho0 * 0.6
-        shape_y = {"elm": 0.9, "oak": 0.72, "maple": 1.0, "sycamore": 0.85, "willow": 0.75, "apple": 0.85}[sp]
-        for k in range(nd):
-            yy = 1 - (k + 0.5) / nd * 1.45
-            rr = math.sqrt(max(0.0, 1 - yy * yy))
-            a = golden * k + rng.random() * 0.2
-            f = 0.92 + 0.12 * rng.random()
-            wide = 1.0 + (0.18 * yy if sp == "elm" else 0.0)
-            p = np.array([c[0] + math.cos(a) * rr * rh * f * wide, cy + yy * rv * shape_y * f, c[2] + math.sin(a) * rr * rh * f * wide])
-            try_clump(p, rho0 * rng.uniform(0.95, 1.3), 2)
-        # 3. inner fill (shade layer)
-        for k in range(int(nd * 0.5)):
-            a = rng.random() * 6.28
-            rr = math.sqrt(rng.random()) * rh * 0.7
-            p = np.array([c[0] + math.cos(a) * rr, cy + rng.uniform(-0.6, 0.5) * rv * shape_y, c[2] + math.sin(a) * rr])
-            try_clump(p, rho0 * rng.uniform(1.0, 1.3), 3)
-
-        # accept: drop clumps mostly inside others (biggest first keeps volume)
-        order = sorted(range(len(clumps)), key=lambda i: (clumps[i][3], -clumps[i][1]))
-        kept = []
-        for i in order:
-            p, r, sq, pri = clumps[i]
-            ok = True
-            for q, rq, _, _ in kept:
-                if np.linalg.norm(p - q) + r * 0.55 < rq:
-                    ok = False
-                    break
-            if ok:
-                kept.append(clumps[i])
-        budget = self.opts.get("max_clumps", {"giant": 70, "apple": 26}.get(self.cat, 48))
-        kept = kept[:budget]
-        self.clumps = kept
-        # twig meshes (only twigs whose clump survived is not tracked; all twigs are drawn)
-        for base, e, r0 in twigs:
-            pts = np.array([base, base * 0.55 + e * 0.45 + np.array([0, 0.4, 0]), e])
-            V, F, UV, N = tube(pts, lambda i, ang, r0=r0: np.full_like(ang, max(0.14, r0 * (1 - i / 2.6))), 5, 1, 3.0, cap_end=True)
-            self.bark.add(V, F, UV, N)
-            twig_tris += len(F)
-        self.log["twig_tris"] = twig_tris
-        self.build_clump_meshes(kept)
-        if sp == "willow":
-            self.build_willow_fronds(kept)
+        self.crown = self.crown_frame()
+        c, rh, ylo, yhi = self.crown
+        lobes = self.envelope_lobes()
+        self.lobes = lobes
+        LC = np.array([l[0] for l in lobes])
+        LR = np.array([l[1] for l in lobes])
+        rho = float(np.clip(self.R_tip * 0.5, 2.4, 11.0))
         if sp == "apple":
-            self.build_apples(kept)
+            rho = float(np.clip(self.R_tip * 0.55, 2.2, 3.4))
+        self.rho = rho
+        self.min_leaf_y = {"apple": 3.0, "willow": 8.0}.get(sp, max(7.0, self.H * 0.2))
+        # samples on the union boundary
+        golden = math.pi * (3 - math.sqrt(5))
+        cands = []
+        for li, (lc, lr, lk) in enumerate(lobes):
+            n = int(np.clip(4 * lr * lr / (rho * rho) * 1.25, 6, 400))
+            for k in range(n):
+                y = 1 - (k + 0.5) / n * 2
+                rr = math.sqrt(max(0.0, 1 - y * y))
+                a = golden * k + li * 1.3
+                d = np.array([math.cos(a) * rr, y, math.sin(a) * rr])
+                p = lc + d * lr
+                inside = np.linalg.norm(LC - p[None], axis=1) < LR * 0.96
+                inside[li] = False
+                if inside.any():
+                    continue
+                cands.append((p, d, li))
+        # priority: top and sides before the underside; bridge sleeves last
+        def prio(cd):
+            p, d, li = cd
+            return (lobes[li][2] == "bridge", -d[1] - 0.3 * rng.random())
+        cands.sort(key=prio)
+        A, B, Rt = self._tun
+        accepted = []
+        acc_pts = np.zeros((0, 3))
+        for p, d, li in cands:
+            r = rho * (1.25 if d[1] < -0.45 else 1.0) * rng.uniform(0.85, 1.15)
+            ctr = p - d * r * 0.42
+            if len(acc_pts):
+                if np.min(np.linalg.norm(acc_pts - ctr[None], axis=1)) < 1.05 * r:
+                    continue
+            ok = False
+            for _ in range(3):
+                cl = self.clearance(ctr[None])[0]
+                if cl >= r * 1.18:
+                    ok = True
+                    break
+                if cl > rho * 0.55 * 1.18:
+                    r = cl / 1.18
+                    ok = True
+                    break
+                ctr = ctr + d * (r * 1.18 - cl + 0.3)  # push outward along the envelope normal
+            if not ok:
+                continue
+            if ctr[1] - r * 0.8 < self.min_leaf_y or self.box_clear(ctr[None])[0] < r * 0.55:
+                continue
+            accepted.append((ctr, r, d, li))
+            acc_pts = np.vstack([acc_pts, ctr[None]])
+        budget = self.opts.get("max_clumps") or int(np.clip(self.leaf_budget() / 110, 20, 140))
+        if len(accepted) > budget:
+            # keep the silhouette: drop the most interior / underside first
+            score = [a[2][1] + 0.5 * (lobes[a[3]][2] != "bridge") for a in accepted]
+            keep = np.argsort(score)[::-1][:budget]
+            accepted = [accepted[i] for i in sorted(keep)]
+        self.clumps = [(a[0], a[1], 0.86, 0) for a in accepted]
+        self.clump_info = accepted
+        self.log["lobes"] = len(lobes)
+        self.log["clump_candidates"] = len(cands)
+        self.log["clumps"] = len(accepted)
+        self.log["rho"] = round(rho, 2)
+        self.build_twigs()
+        self.build_clump_meshes()
+        if sp == "willow":
+            self.build_willow_fronds()
+        if sp == "apple":
+            self.build_apples()
 
-    def build_clump_meshes(self, kept):
+    def leaf_budget(self):
+        return {"giant": 11000, "named": 9000, "estate": 8000, "outer": 6000, "apple": 2600}.get(self.cat, 8000) * (0.6 if self.sp == "willow" else 1.0)
+
+    def build_twigs(self):
+        """Branchlets from the boughs (or the leader) into the lower and outer clumps."""
         rng = self.rng
-        if not kept:
+        pts, owner = [], []
+        for b in self.boughs:
+            P = b["Q"]
+            for k in range(1, len(P)):
+                pts.append(P[k])
+                owner.append(b["radii"][k])
+        C, tt = self.trunk_rings
+        for k in range(len(C)):
+            if C[k][1] > self.trunkP[-1][1] - 1:
+                pts.append(C[k])
+                owner.append(0.8)
+        if not pts:
             return
-        Cs = np.array([k[0] for k in kept])
-        Rs = np.array([k[1] for k in kept])
-        cc = (Cs * Rs[:, None] ** 2).sum(0) / (Rs ** 2).sum()
-        ext = np.maximum(np.abs(Cs - cc[None]).max(0) + Rs.max(), 1.0)
-        ext[1] = max(ext[1], ext[0] * 0.5)
-        self.canopy_centre, self.canopy_ext = cc, ext
-        tile = float(np.clip(self.H * 0.1, 4.0, 9.0))
-        self.leaf_tile = tile
-        yl, yh = Cs[:, 1].min(), Cs[:, 1].max()
-        for (p, rho, sq, pri) in kept:
-            big = rho > 4.5
-            V0, F0 = icosphere(2 if big else 1)
-            nl = 7 if big else 5
+        pts = np.array(pts)
+        owner = np.array(owner)
+        tris = 0
+        made = 0
+        for (ctr, r, d, li) in self.clump_info:
+            if d[1] > 0.55 and rng.random() < 0.7:
+                continue  # top clumps are seen from above: no branchlet needed
+            dist = np.linalg.norm(pts - ctr[None], axis=1)
+            order = np.argsort(dist)[:6]
+            done = False
+            for j in order:
+                base = pts[j]
+                end = ctr - norm(ctr - base) * r * 0.35
+                seg = end - base
+                L = np.linalg.norm(seg)
+                if L < r * 0.4 or L > self.R_tip * 2.4:
+                    continue
+                mid = base + seg * 0.5 + np.array([0, L * 0.08, 0])
+                probe = np.array([base + seg * f for f in (0.35, 0.6, 0.85)])
+                if self.clearance(probe).min() < 0.25:
+                    continue
+                r0 = float(np.clip(owner[j] * 0.45, 0.22, 0.9))
+                path = np.array([base, mid, end])
+
+                def radius(i, ang, r0=r0):
+                    return np.full_like(ang, max(0.14, r0 * (1 - 0.42 * i)))
+
+                V, F, UV, N = tube(path, radius, 5, 1, 3.0, cap_end=True)
+                self.bark.add(V, F, UV, N)
+                tris += len(F)
+                made += 1
+                done = True
+                break
+        self.log["twigs"] = made
+        self.log["twig_tris"] = tris
+
+    def clump_templates(self):
+        """A few lumpy unit clumps (icosphere 3, decimated in Blender when available)."""
+        key = ("tpl", self.opts.get("tpl_tris", 0))
+        if hasattr(self, "_tpl"):
+            return self._tpl
+        rng = np.random.default_rng(77)
+        V0, F0 = icosphere(3)
+        tpls = []
+        for t in range(6):
+            nl = 9
             dirs = norm(rng.normal(size=(nl, 3)))
-            amps = rng.uniform(0.12, 0.26, nl)
+            amps = rng.uniform(0.10, 0.22, nl)
             disp = np.ones(len(V0))
             for dv, am in zip(dirs, amps):
-                disp += am * np.maximum(0, V0 @ dv) ** 5
-            disp += 0.05 * np.sin(V0[:, 0] * 7 + rng.random() * 6) * np.sin(V0[:, 2] * 6 + rng.random() * 6)
-            flat = np.where(V0[:, 1] < -0.2, 1 - 0.22 * (-V0[:, 1] - 0.2), 1.0)
-            V = V0 * disp[:, None] * flat[:, None] * rho
-            V[:, 1] *= sq
-            V = V + p[None]
-            ng, _ = vertex_normals(V, F0)
-            # soft volume normals: blend toward the canopy ellipsoid normal
-            nc = norm((V - cc[None]) / (ext[None] ** 2))
-            nclump = norm(V - p[None])
-            N = norm(ng * 0.35 + nclump * 0.25 + nc * 0.40)
-            h = (p[1] - yl) / max(yh - yl, 1e-6)
-            radial = np.hypot(p[0] - cc[0], p[2] - cc[2]) / max(ext[0], ext[2])
-            sunny = (pri in (0, 2) and h > 0.25) or h > 0.72 or radial > 0.8
-            if pri == 3:
-                sunny = False
-            V2, F2, UV2, N2 = triplanar_split(V, F0, N, tile, rot=rng.random() * 6.28, offset=tuple(rng.random(2)))
-            self.leaf["sun" if sunny else "shade"].add(V2, F2, UV2, N2)
+                disp += am * np.maximum(0, V0 @ dv) ** 6
+            disp += 0.035 * np.sin(V0[:, 0] * 9 + t) * np.sin(V0[:, 2] * 8 - t) * np.sin(V0[:, 1] * 7 + 2 * t)
+            flat = np.where(V0[:, 1] < -0.25, 1 - 0.3 * (-V0[:, 1] - 0.25), 1.0)
+            V = V0 * (disp * flat)[:, None]
+            dec = self.opts.get("decimate")
+            target = self.opts.get("tpl_tris", 0)
+            if dec is not None and target:
+                V, F = dec(V, F0, target)
+            else:
+                V, F = V, F0
+            tpls.append((V, F))
+        self._tpl = tpls
+        return tpls
 
-    def build_willow_fronds(self, kept):
+    def build_clump_meshes(self):
         rng = self.rng
-        cc = self.canopy_centre
+        if not self.clump_info:
+            return
+        n = len(self.clump_info)
+        per = self.leaf_budget() / n
+        lvl = 1 if per < 150 else 2
+        if self.opts.get("decimate") is not None:
+            self.opts["tpl_tris"] = int(np.clip(per, 60, 420))
+            tpls = self.clump_templates()
+        else:
+            V0, F0 = icosphere(lvl)
+            tpls = [(V0, F0)]
+        tile = float(np.clip(self.H * 0.075, 3.2, 7.0))
+        self.leaf_tile = tile
+        Cs = np.array([a[0] for a in self.clump_info])
+        yl, yh = Cs[:, 1].min(), Cs[:, 1].max()
+        for (ctr, r, d, li) in self.clump_info:
+            Vt, Ft = tpls[int(rng.integers(0, len(tpls)))]
+            # random rotation about Y and a small tilt
+            a = rng.random() * 6.28
+            ca, sa = math.cos(a), math.sin(a)
+            Rm = np.array([[ca, 0, -sa], [0, 1, 0], [sa, 0, ca]])
+            V = (Vt @ Rm.T) * r
+            V[:, 1] *= 0.86
+            V = V + ctr[None]
+            ng, _ = vertex_normals(V, Ft)
+            lc, lr, lk = self.lobes[li]
+            nl = norm(V - lc[None])
+            ncl = norm(V - ctr[None])
+            N = norm(ng * 0.30 + ncl * 0.20 + nl * 0.50)
+            h = (ctr[1] - yl) / max(yh - yl, 1e-6)
+            if d[1] > 0.3 and h > 0.35:
+                layer = "sun"
+            elif d[1] < -0.3 or h < 0.2:
+                layer = "shade"
+            else:
+                layer = "mid"
+            roll = rng.random()
+            if roll < 0.12:
+                layer = {"sun": "mid", "mid": "sun", "shade": "mid"}[layer]
+            V2, F2, UV2, N2 = triplanar_split(V, Ft, N, tile, rot=rng.random() * 6.28, offset=tuple(rng.random(2)))
+            self.leaf[layer].add(V2, F2, UV2, N2)
+
+    def build_willow_fronds(self):
+        rng = self.rng
+        c, rh, ylo, yhi = self.crown
         n = 0
-        for (p, rho, sq, pri) in kept:
-            dxz = np.array([p[0] - cc[0], 0, p[2] - cc[2]])
-            dist = np.linalg.norm(dxz)
-            if dist < self.canopy_ext[0] * 0.35 and p[1] > cc[1]:
+        for (ctr, r, d, li) in self.clump_info:
+            if d[1] > 0.2:
                 continue
-            m = 3 if rho > 3 else 2
+            m = 2 if r > 3 else 1
             for k in range(m):
                 a = rng.random() * 6.28
-                out = norm(dxz + 1e-6) if dist > 0.5 else np.array([math.cos(a), 0, math.sin(a)])
-                spread = np.array([math.cos(a), 0, math.sin(a)]) * 0.5 + out * 0.8
-                top = p + norm(spread) * rho * 0.75 + np.array([0, -rho * 0.25, 0])
-                length = rng.uniform(10, 18) * (0.7 + 0.6 * min(1, dist / max(self.canopy_ext[0], 1)))
-                bottom_y = max(3.5, top[1] - length)
-                if top[1] - bottom_y < 4:
+                out = norm(np.array([d[0], 0, d[2]]) + 1e-6)
+                spread = norm(out * 0.8 + np.array([math.cos(a), 0, math.sin(a)]) * 0.6)
+                top = ctr + spread * r * 0.7 + np.array([0, -r * 0.2, 0])
+                length = rng.uniform(12, 22)
+                bottom_y = max(4.0, top[1] - length)
+                if top[1] - bottom_y < 5:
                     continue
-                drift = out * rng.uniform(0.5, 2.0)
-                pts = np.array([top, top + np.array([0, -(top[1] - bottom_y) * 0.5, 0]) + drift * 0.6, np.array([top[0], bottom_y, top[2]]) + drift])
-                if self.clearance(pts).min() < 0.8:
+                drift = out * rng.uniform(0.8, 2.5)
+                pts = np.array([top, top + np.array([0, -(top[1] - bottom_y) * 0.45, 0]) + drift * 0.5,
+                                np.array([top[0], bottom_y, top[2]]) + drift])
+                if self.clearance(pts[1:]).min() < 0.6:
                     continue
-                w = rng.uniform(1.0, 1.6)
+                w = rng.uniform(1.1, 1.8)
 
                 def radius(i, ang, w=w):
                     f = i / 2
-                    r = w * (1.0 - 0.55 * f)
-                    return r * (1 + 0.35 * np.cos(2 * ang))  # flattened ribbon-ish curtain
+                    rr = w * (1.0 - 0.6 * f)
+                    return rr * (1 + 0.35 * np.cos(2 * ang))
 
-                V, F, UV, N = tube(pts, radius, 6, 1, self.leaf_tile * 0.8, cap_end=True, cap_start=True)
-                self.leaf["sun"].add(V, F, UV, N)
+                V, F, UV, N = tube(pts, radius, 6, 1, self.leaf_tile * 1.4, cap_end=True, cap_start=True)
+                self.leaf["mid" if k % 2 else "sun"].add(V, F, UV, N)
                 n += 1
         self.log["willow_fronds"] = n
 
-    def build_apples(self, kept):
+    def build_apples(self):
         rng = self.rng
         n = 0
-        cc = self.canopy_centre
-        for (p, rho, sq, pri) in kept:
+        for (ctr, r, d, li) in self.clump_info:
             for k in range(2):
-                if n >= 36:
+                if n >= 34:
                     break
-                d = norm(rng.normal(size=3) * np.array([1, 0.4, 1]) + np.array([0, -0.35, 0]))
-                if np.dot(d, norm(p - cc + 1e-6)) < -0.2:
+                dd = norm(d * 0.7 + rng.normal(size=3) * np.array([0.6, 0.3, 0.6]) + np.array([0, -0.35, 0]))
+                cpos = ctr + dd * r * np.array([0.95, 0.82, 0.95])
+                if self.clearance(cpos[None])[0] < 0.6 or cpos[1] < 2.5:
                     continue
-                c = p + d * rho * np.array([0.97, sq * 0.97, 0.97])
-                if self.clearance(c[None])[0] < 0.6:
-                    continue
-                r = 0.62
+                ra = 0.62
                 lat, lon = 5, 7
                 V, UV, N = [], [], []
                 red = n % 3 != 2
@@ -869,8 +955,7 @@ class TreeBuilder:
                     for j in range(lon + 1):
                         ph = 2 * math.pi * j / lon
                         nrm = np.array([math.sin(th) * math.cos(ph), math.cos(th), math.sin(th) * math.sin(ph)])
-                        squash = 1 - 0.12 * (1 - abs(math.cos(th)))
-                        V.append(c + nrm * r * np.array([1, 0.92, 1]) * (1 - 0.15 * math.exp(-(th / 0.35) ** 2)))
+                        V.append(cpos + nrm * ra * np.array([1, 0.92, 1]) * (1 - 0.15 * math.exp(-(th / 0.35) ** 2)))
                         N.append(nrm)
                         UV.append(((j / lon) * 0.5 + (0.0 if red else 0.5), 1 - i / lat))
                 F = []
@@ -884,8 +969,8 @@ class TreeBuilder:
 
     # -- reports --
     def tri_counts(self):
-        return {"bark": self.bark.tris, "leaves_shade": self.leaf["shade"].tris, "leaves_sun": self.leaf["sun"].tris,
-                "fruit": self.fruit.tris}
+        return {"bark": self.bark.tris, "leaves_shade": self.leaf["shade"].tris, "leaves_mid": self.leaf["mid"].tris,
+                "leaves_sun": self.leaf["sun"].tris, "fruit": self.fruit.tris}
 
 
 # ---- Blender ------------------------------------------------------------------------------------

@@ -4,6 +4,8 @@
 -- lie within surfaceRadius + 0.3 u of baked geometry (parts and wire Beams) or of the terrain, except
 -- the routes listed in data/harvest_patches.json, each of which carries a reason. Runs on BuildPlans
 -- (Lune bake and engine bake give the same plans), so the same verdict holds in both runtimes.
+-- Leaf clusters do not count as geometry (they neither collide nor take queries): a route must sit on
+-- bark, poles, pipes, rails, roofs or wires.
 -- Interface: index(plans) -> Geometry.Index; run(plans, routes, opts) -> Result
 --   opts = { registry = Routes/Registry instance over the same routes, heightAt = World/Height.at,
 --            slackU = 0.3, patched = { [routeId]: true } }
