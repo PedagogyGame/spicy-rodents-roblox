@@ -16,12 +16,27 @@
     {
       "name": "c_tree_25",
       "desc": "Tree_283 (trunk foot about x -364 z -299, 56 x 76 x 65 st) from 25 st away, eye 5 st, sun behind the camera.",
-      "pos": [-349, 5, -319], "look": [-364, 16, -298.6], "fov": 80, "aboveGround": true
+      "pos": [-349, 5, -319], "look": [-364, 19, -298.6], "fov": 84, "aboveGround": true
+    },
+    {
+      "name": "c2_tree_whole",
+      "desc": "The same tree (Tree_283) whole, from 70 st away, eye 6 st.",
+      "pos": [-322, 6, -355], "look": [-364, 30, -298.6], "fov": 70, "aboveGround": true
     },
     {
       "name": "d_poles_lamps",
       "desc": "On the south sidewalk of rd_010 (z = 0) looking east (-X): telephone poles at z -41.2 on the right, street lamps along the kerbs and sidewalks.",
       "pos": [300, 5.5, -33], "look": [-200, 9, -24], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "d2_pole_base",
+      "desc": "Close-up of a telephone pole foot and a lamp post foot (Pole_50 at x 125 z -41.2; the export measures every pole 0.95 st above the terrain).",
+      "pos": [133, 2.2, -50], "look": [125, 1.2, -41.2], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "d3_pole_top",
+      "desc": "A telephone pole top with its crossarm from below (wires would hang here).",
+      "pos": [150, 6, -60], "look": [125, 38, -41.2], "fov": 55, "aboveGround": true
     },
     {
       "name": "e1_aerial_300",
@@ -61,7 +76,7 @@
     {
       "name": "h_quay_bridge",
       "desc": "The quay: stone bridge over the river at x 2125 z 0, bridge towers, embankment (from the west bank, looking east toward -X).",
-      "pos": [2470, 30, -170], "look": [2125, 30, 0], "fov": 60
+      "pos": [2420, 75, -230], "look": [2125, 30, 0], "fov": 60
     },
     {
       "name": "i_hospital",
@@ -72,6 +87,16 @@
       "name": "k_gas_canopy",
       "desc": "East fuel canopy (east_fuel_canopy x 1190 z 157.5) and fuel market at eye height.",
       "pos": [1320, 6, 40], "look": [1190, 10, 160], "fov": 65, "aboveGround": true
+    },
+    {
+      "name": "l_treehouse",
+      "desc": "The outer treehouse (floor y 36.6 at x -355 z 385) and the tree it should sit in (Tree_928).",
+      "pos": [-300, 10, 330], "look": [-355, 35, 385], "fov": 70, "aboveGround": true
+    },
+    {
+      "name": "m_backyard",
+      "desc": "Old-town core back yards at eye height: trampoline with its rail (Fence_19 at y 14.9), garden plots, guest cottage.",
+      "pos": [-40, 6, 150], "look": [-85, 6, 205], "fov": 70, "aboveGround": true
     },
     {
       "name": "axes_check",

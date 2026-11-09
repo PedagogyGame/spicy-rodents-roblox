@@ -21,6 +21,8 @@
 --   terrain  : World/Height.at sampled at the TerrainBake column centres (4 st) over the playable rectangle,
 --              with the WorldTerrain surface material per column and the river water mask, plus a coarse
 --              grid over the D32 world clamp (the boot terrain the player stands on; Lune cannot read voxels).
+--   zfight   : { differentLook = { { a, b, y, area, at, looks } }, sameLookPairs }: level Block parts whose top
+--              faces coincide (within 0.005 st) and overlap: z-fighting in Roblox when colour or material differ.
 --   lineup   : placement of each placeholder puppet in a row toward -X on a ground plane at y = 0 (root at
 --              HipHeight or BaseOffset above it, authored facing -Z kept, so a camera at -Z reads the row left to
 --              right), with labels and the measured foot gap.
@@ -246,6 +248,56 @@ for _, folder in town:GetChildren() do
 	end
 end
 
+-- Coplanar top faces (z-fighting): level Block parts of the town whose top faces lie within 0.005 st of each
+-- other and whose footprints (world AABB) overlap. A different colour or material flickers in Roblox; the same
+-- look is harmless (counted only).
+local tops: { any } = {}
+for _, d in town:GetDescendants() do
+	if d:IsA("BasePart") and d.Transparency < 0.95 and (shapeOf(d) == "Block" or shapeOf(d) == "Box") then
+		if math.abs(d.CFrame.YVector.Y) > 0.9999 then
+			local lo, hi = aabb(d)
+			local c = rgb(d.Color)
+			table.insert(tops, { part = d, top = hi.Y, lo = lo, hi = hi, look = `{c[1]},{c[2]},{c[3]}/{d.Material.Name}` })
+		end
+	end
+end
+table.sort(tops, function(a, b)
+	return a.top < b.top
+end)
+local zfight: { any } = {}
+local zfightSameLook = 0
+for a = 1, #tops do
+	local A = tops[a]
+	local b = a + 1
+	while b <= #tops and tops[b].top - A.top < 0.005 do
+		local B = tops[b]
+		local ox = math.min(A.hi.X, B.hi.X) - math.max(A.lo.X, B.lo.X)
+		local oz = math.min(A.hi.Z, B.hi.Z) - math.max(A.lo.Z, B.lo.Z)
+		if ox > 0.05 and oz > 0.05 and ox * oz > 0.5 then
+			if A.look == B.look then
+				zfightSameLook += 1
+			else
+				table.insert(zfight, {
+					a = A.part:GetFullName(),
+					b = B.part:GetFullName(),
+					y = r2(A.top),
+					area = r2(ox * oz),
+					at = {
+						r2((math.max(A.lo.X, B.lo.X) + math.min(A.hi.X, B.hi.X)) / 2),
+						r2(A.top),
+						r2((math.max(A.lo.Z, B.lo.Z) + math.min(A.hi.Z, B.hi.Z)) / 2),
+					},
+					looks = { A.look, B.look },
+				})
+			end
+		end
+		b += 1
+	end
+end
+table.sort(zfight, function(a, b)
+	return a.area > b.area
+end)
+
 -- Editor ground (Studio's EDITOR view only: the server destroys it at boot and writes Terrain instead)
 local editorGround = load("build/EditorGround.rbxm")
 local egOrigin = 0
@@ -449,6 +501,7 @@ local scene = {
 	beams = beams,
 	models = models,
 	contact = contact,
+	zfight = { differentLook = zfight, sameLookPairs = zfightSameLook },
 	lineup = lineup,
 	terrain = terrain,
 }
@@ -484,6 +537,11 @@ for _, c in contact do
 			`contact: {c.kind}: {c.floating}/{c.models} float > 0.25 st (worst {c.maxGap} st {c.worst[1].p}), {c.sunk} sunk > 1 st (min {c.minGap})`
 		)
 	end
+end
+print(`z-fight: {#zfight} coplanar overlapping top faces with a different colour/material ({zfightSameLook} same-look)`)
+for j = 1, math.min(6, #zfight) do
+	local z = zfight[j]
+	print(`  {z.area} st2 at y {z.y}: {z.a} <> {z.b}`)
 end
 for _, it in lineup.items do
 	print(`lineup: {it.name} hip {it.hipHeight} -> lowest visible part {it.footGap} st from the ground`)

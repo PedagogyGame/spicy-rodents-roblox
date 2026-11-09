@@ -48,9 +48,9 @@ PuppetSpec.SPECIES = { "squirrel", "rodent", "fox", "deer", "drone", "human" }
 PuppetSpec.PALETTES = {
 	squirrel = { fur = "#9a5a32", back = "#82492a", head = "#93552f", tail = "#a3643a", fringe = "#c99560",
 	             belly = "#e4c9a0", muzzle = "#d8b98f", ear = "#8a4e2c", foot = "#6b3d23", eyes = "#121010" },
-	rodent = { fur = "#4b372b", back = "#3b2a20", head = "#45322a", tail = "#503b2e", fringe = "#5f4838",
-	           belly = "#77655a", muzzle = "#6b5446", ear = "#4f3a2e", foot = "#33261e", eyes = "#ff2a1a",
-	           mange = "#8f726a", blood = "#7a1414", teeth = "#e9dfbd" },
+	rodent = { fur = "#5a4231", back = "#4b3627", head = "#533c2e", tail = "#5e4535", fringe = "#6e5543",
+	           belly = "#857160", muzzle = "#77604f", ear = "#5a4231", foot = "#3a2b21", eyes = "#ff2a1a",
+	           mange = "#9a7d73", blood = "#7a1414", teeth = "#e9dfbd" },
 	fox = { fur = "#c4622d", back = "#b2552a", tail = "#c0602f", fringe = "#d27a45", white = "#f2ede4",
 	        shin = "#5a3020", legs = "#2c2320", ear = "#7d3b1e", nose = "#141110", eyes = "#2a1a0e" },
 	deer = { fur = "#a8784c", back = "#93673f", belly = "#efe7d8", legs = "#9a6e46", hoof = "#2a221d",
@@ -63,7 +63,7 @@ PuppetSpec.PALETTES = {
 -- The species stock looks the avatar blend starts from (Server/Avatar/AvatarBlendService.STOCK).
 PuppetSpec.STOCK_LOOKS = {
 	squirrel = { body = "#9a5a32", pattern = "#e4c9a0", eyes = "#121010", eyesLocked = false },
-	rodent = { body = "#4b372b", pattern = "#77655a", eyes = "#ff2a1a", eyesLocked = true },
+	rodent = { body = "#5a4231", pattern = "#857160", eyes = "#ff2a1a", eyesLocked = true },
 	fox = { body = "#c4622d", pattern = "#f2ede4", eyes = "#2a1a0e", eyesLocked = false },
 	deer = { body = "#a8784c", pattern = "#efe7d8", eyes = "#15110e", eyesLocked = false },
 } :: { [string]: { body: string, pattern: string, eyes: string, eyesLocked: boolean } }
@@ -268,89 +268,90 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 	local b = newBuilder(1)
 	local HIP = 0.9
 	local G = -HIP
-	local arch = if rodent then 0.05 else 0 -- the rodent hunches
 	local mange: Extra = { region = "Body", material = "Sand" }
 	b.block("RootPart", { 0.66, 0.66, 1.4 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
+	-- a smooth capsule torso (Body between the Hips and Chest balls); the spine balls sit just inside
+	-- it, except the rodent's Spine1, which shows a bald patch on its flank
 	torso(b, {
-		Pelvis = { d = 0.48, pos = { 0, 0.1 + arch, 0.5 }, color = c.back },
-		Hips = { d = 0.66, pos = { 0, 0, 0.3 }, color = c.fur },
+		Pelvis = { d = 0.54, pos = { 0, 0.08, 0.46 }, color = c.back },
+		Hips = { d = 0.7, pos = { 0, 0, 0.26 }, color = c.fur },
 		Spine1 = {
 			d = 0.6,
-			pos = { if rodent then 0.05 else 0, 0.06 + arch * 1.5, 0.1 },
+			pos = { if rodent then 0.1 else 0, if rodent then 0.06 else 0.02, 0.06 },
 			color = if rodent then c.mange else c.back,
 			extra = if rodent then mange else nil,
 		},
-		Spine2 = { d = 0.56, pos = { 0, 0.06 + arch, -0.08 }, color = c.back },
-		Spine3 = { d = 0.54, pos = { 0, 0.05 + arch * 0.5, -0.26 }, color = c.back },
-		Chest = { d = 0.54, pos = { 0, 0.01, -0.42 }, color = c.fur },
+		Spine2 = { d = 0.6, pos = { 0, 0.02, -0.12 }, color = c.back },
+		Spine3 = { d = 0.6, pos = { 0, 0.03, -0.28 }, color = c.back },
+		Chest = { d = 0.64, pos = { 0, -0.03, -0.42 }, color = c.fur },
 	})
-	b.cyl("Body", { 0, 0.02, 0.3 }, { 0, 0.02, -0.42 }, 0.58, c.fur)
+	b.cyl("Body", { 0, -0.02, 0.26 }, { 0, -0.02, -0.42 }, 0.66, c.fur, { overlap = 0 })
 	b.weld("Body", "Spine2")
-	b.cyl("Pattern", { 0, -0.11, 0.22 }, { 0, -0.12, -0.5 }, 0.42, c.belly)
+	b.cyl("Pattern", { 0, -0.17, 0.2 }, { 0, -0.18, -0.5 }, 0.44, c.belly) -- the cream belly
 	b.weld("Pattern", "Spine2")
-	-- neck, head, muzzle, the eyes through the head, diamond ears
-	b.ball("Neck", 0.36, { 0, 0.2, -0.58 }, c.fur, FUR)
-	b.motor("Neck", "Chest", { 0, 0.12, -0.5 })
-	local hy, hz = 0.42 - arch, -0.78
-	b.ball("Head", 0.5, { 0, hy, hz }, c.head, FUR)
-	b.motor("Head", "Neck", { 0, hy - 0.12, -0.66 })
-	b.ball("Jaw", 0.27, { 0, hy - 0.08, hz - 0.22 }, c.muzzle, CREAM)
-	b.motor("Jaw", "Head", { 0, hy - 0.1, hz - 0.12 })
-	-- one dark bead through the head: its ends are the two eyes (the rodent's bigger and glowing red)
-	local eyeD = if rodent then 0.15 else 0.11
-	local eyeHalf = if rodent then 0.255 else 0.245
+	-- neck, a big round head, the muzzle, one bead through the head for both eyes, diamond ears
+	b.ball("Neck", 0.42, { 0, 0.14, -0.62 }, c.fur, FUR)
+	b.motor("Neck", "Chest", { 0, 0.06, -0.52 })
+	local hy, hz = if rodent then 0.32 else 0.36, -0.82 -- the rodent carries its head low
+	b.ball("Head", 0.56, { 0, hy, hz }, c.head, FUR)
+	b.motor("Head", "Neck", { 0, hy - 0.12, -0.7 })
+	b.ball("Jaw", 0.3, { 0, hy - 0.08, hz - 0.24 }, c.muzzle, CREAM)
+	b.motor("Jaw", "Head", { 0, hy - 0.08, hz - 0.14 })
+	local eyeD = if rodent then 0.17 else 0.13 -- the rodent's slightly oversized and glowing red
+	local eyeHalf = if rodent then 0.28 else 0.272
 	b.cyl(
 		"Eyes",
-		{ -eyeHalf, hy + 0.05, hz - 0.1 },
-		{ eyeHalf, hy + 0.05, hz - 0.1 },
+		{ -eyeHalf, hy + 0.06, hz - 0.1 },
+		{ eyeHalf, hy + 0.06, hz - 0.1 },
 		eyeD,
 		c.eyes,
 		if rodent then { material = "Neon", overlap = 0 } else { reflectance = 0.15, overlap = 0 }
 	)
 	b.weld("Eyes", "Head")
 	for _, side in { { name = "EarL", sx = -1 }, { name = "EarR", sx = 1 } } do
-		local torn = rodent and side.sx > 0
-		local s = if torn then 0.13 else 0.17
-		local tilt = if torn then 0.5 else 0.2
-		b.block(side.name, { s, s, 0.045 }, { side.sx * 0.13, hy + 0.22, hz + 0.06 }, c.ear, {
+		local torn = rodent and side.sx > 0 -- one ragged, drooping ear
+		local s = if torn then 0.14 else 0.19
+		local tilt = if torn then 0.55 else 0.2
+		b.block(side.name, { s, s, 0.045 }, { side.sx * 0.14, hy + 0.25, hz + 0.06 }, c.ear, {
 			region = "Body",
 			roll = math.pi / 4 - side.sx * tilt,
 			yaw = side.sx * 0.3,
 		})
-		b.motor(side.name, "Head", { side.sx * 0.12, hy + 0.17, hz + 0.06 })
+		b.motor(side.name, "Head", { side.sx * 0.13, hy + 0.2, hz + 0.06 })
 	end
 	if rodent then
 		-- a little red at the corner of the mouth and crooked buck teeth (mild: no gore)
-		b.ball("Blood", 0.1, { 0.08, hy - 0.15, hz - 0.27 }, c.blood)
+		b.ball("Blood", 0.1, { 0.09, hy - 0.14, hz - 0.28 }, c.blood)
 		b.weld("Blood", "Jaw")
-		b.block("Teeth", { 0.1, 0.1, 0.03 }, { 0, hy - 0.17, hz - 0.33 }, c.teeth, { roll = 0.08 })
+		b.block("Teeth", { 0.1, 0.1, 0.03 }, { 0, hy - 0.18, hz - 0.36 }, c.teeth, { roll = 0.08 })
 		b.weld("Teeth", "Jaw")
 	end
-	-- the S-curved bushy tail: up and back from the rump, over toward the head, the tip flicked back
+	-- the big S-curved bushy tail: back and up from the rump, curling forward over it, the tip flicked
+	-- back; the rodent's is ragged and thin where the fur fell out
 	local tip = tail(
 		b,
-		{ 0, 0.16 + arch, 0.66 },
-		if rodent then { 35, 58, 80, 100, 122, 140, 118, 85 } else { 40, 62, 85, 108, 128, 135, 112, 78 },
-		0.2,
+		{ 0, 0.1, 0.62 },
+		if rodent then { 22, 48, 76, 98, 120, 138, 128, 90 } else { 25, 50, 78, 102, 125, 140, 125, 80 },
+		0.19,
 		if rodent
-			then { 0.2, 0.26, 0.2, 0.34, 0.36, 0.24, 0.32, 0.26 } -- ragged and thin where the fur fell out
-			else { 0.24, 0.32, 0.4, 0.46, 0.5, 0.5, 0.46, 0.38 },
+			then { 0.24, 0.32, 0.26, 0.42, 0.46, 0.3, 0.38, 0.3 }
+			else { 0.3, 0.42, 0.54, 0.62, 0.66, 0.64, 0.58, 0.48 },
 		{ c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.fringe }
 	)
-	-- FurCards: the frosted outer fringe on the tail's back curve
-	b.ball("FurCards", if rodent then 0.32 else 0.48, if rodent then { 0, 0.82, 0.98 } else { 0, 0.8, 1.0 }, c.fringe)
+	-- FurCards: the frosted fringe filling out the tail's back curve
+	b.ball("FurCards", if rodent then 0.34 else 0.5, if rodent then { 0, 0.5, 1.02 } else { 0, 0.52, 1.12 }, c.fringe)
 	b.weld("FurCards", "Tail4")
-	-- slim legs: short front legs under the chest, hind legs with a round thigh and a long foot
-	mirrored(b, "Front", 0.15, "Chest", {
-		pts = { { -0.05, -0.4 }, { -0.4, -0.38 }, { -0.74, -0.44 }, { -0.85, -0.46 }, { G, -0.58 } },
+	-- slim legs: front legs under the chest, hind legs with a round thigh, the long foot angled down
+	mirrored(b, "Front", 0.17, "Chest", {
+		pts = { { -0.12, -0.42 }, { -0.46, -0.38 }, { -0.76, -0.46 }, { -0.85, -0.48 }, { G, -0.6 } },
 		d = { 0.17, 0.12, 0.11 },
-		toe = { 0.13, 0.06, 0.15 },
+		toe = { 0.13, 0.06, 0.16 },
 		colors = { c.fur, c.fur, c.foot, c.foot },
 	})
-	mirrored(b, "Back", 0.19, "Hips", {
-		pts = { { 0, 0.32 }, { -0.3, 0.26 }, { -0.62, 0.42 }, { -0.84, 0.24 }, { G, 0.08 } },
+	mirrored(b, "Back", 0.21, "Hips", {
+		pts = { { -0.02, 0.28 }, { -0.36, 0.2 }, { -0.64, 0.44 }, { -0.83, 0.24 }, { G, 0.06 } },
 		d = { 0.2, 0.13, 0.11 },
-		thigh = { 0.46, -0.12, 0.32 },
+		thigh = { 0.5, -0.14, 0.28 },
 		toe = { 0.14, 0.06, 0.22 },
 		colors = { c.fur, c.fur, c.foot, c.foot },
 	})
@@ -363,11 +364,11 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 			end
 		end
 	end
-	b.socket("HeadSocket", "Head", { 0, hy + 0.25, hz })
-	b.socket("MouthSocket", "Jaw", { 0, hy - 0.12, hz - 0.34 })
+	b.socket("HeadSocket", "Head", { 0, hy + 0.28, hz })
+	b.socket("MouthSocket", "Jaw", { 0, hy - 0.12, hz - 0.38 })
 	b.socket("TailTip", "Tail8", tip)
-	b.socket("ChestCenter", "Chest", { 0, 0.01, -0.42 })
-	return finish(b, species, opts.name or species, opts.variant, HIP, HIP + 0.35)
+	b.socket("ChestCenter", "Chest", { 0, -0.03, -0.42 })
+	return finish(b, species, opts.name or species, opts.variant, HIP, HIP + 0.33)
 end
 
 -- Red fox --------------------------------------------------------------------------------------------
@@ -379,14 +380,14 @@ local function fox(opts: Opts): ModelSpec
 	local G = -HIP
 	b.block("RootPart", { 1.0, 1.1, 3.0 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
 	torso(b, {
-		Pelvis = { d = 0.8, pos = { 0, 0.12, 1.2 }, color = c.back },
-		Hips = { d = 1.0, pos = { 0, 0.05, 0.85 }, color = c.fur },
-		Spine1 = { d = 0.92, pos = { 0, 0.12, 0.42 }, color = c.back },
-		Spine2 = { d = 0.88, pos = { 0, 0.1, 0 }, color = c.back },
-		Spine3 = { d = 0.92, pos = { 0, 0.1, -0.42 }, color = c.back },
-		Chest = { d = 1.0, pos = { 0, 0.02, -0.85 }, color = c.fur },
+		Pelvis = { d = 0.78, pos = { 0, 0.18, 1.15 }, color = c.back },
+		Hips = { d = 0.98, pos = { 0, 0.08, 0.82 }, color = c.fur },
+		Spine1 = { d = 0.86, pos = { 0, 0.08, 0.4 }, color = c.back },
+		Spine2 = { d = 0.86, pos = { 0, 0.06, 0 }, color = c.back },
+		Spine3 = { d = 0.88, pos = { 0, 0.1, -0.42 }, color = c.back },
+		Chest = { d = 0.98, pos = { 0, 0.03, -0.85 }, color = c.fur },
 	})
-	b.cyl("Body", { 0, 0.06, 0.85 }, { 0, 0.06, -0.85 }, 0.9, c.fur)
+	b.cyl("Body", { 0, 0.06, 0.82 }, { 0, 0.06, -0.85 }, 0.92, c.fur, { overlap = 0 })
 	b.weld("Body", "Spine2")
 	b.ball("Pattern", 0.76, { 0, -0.1, -1.15 }, c.white) -- white chest and throat
 	b.weld("Pattern", "Chest")
@@ -468,66 +469,65 @@ local function deer(opts: Opts): ModelSpec
 	local HIP = 3.8
 	local G = -HIP
 	b.block("RootPart", { 1.5, 1.8, 4.2 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
+	-- a smooth barrel (Body between the Hips and Chest balls) with a slight rump and withers
 	torso(b, {
-		Pelvis = { d = 1.35, pos = { 0, 0.32, 1.6 }, color = c.fur },
-		Hips = { d = 1.7, pos = { 0, 0.1, 1.15 }, color = c.fur },
-		Spine1 = { d = 1.62, pos = { 0, 0.18, 0.55 }, color = c.back },
-		Spine2 = { d = 1.55, pos = { 0, 0.12, -0.05 }, color = c.back },
-		Spine3 = { d = 1.62, pos = { 0, 0.12, -0.65 }, color = c.back },
-		Chest = { d = 1.72, pos = { 0, 0.02, -1.2 }, color = c.fur },
+		Pelvis = { d = 1.3, pos = { 0, 0.35, 1.55 }, color = c.fur },
+		Hips = { d = 1.7, pos = { 0, 0.12, 1.1 }, color = c.fur },
+		Spine1 = { d = 1.5, pos = { 0, 0.1, 0.5 }, color = c.back },
+		Spine2 = { d = 1.5, pos = { 0, 0.08, -0.05 }, color = c.back },
+		Spine3 = { d = 1.55, pos = { 0, 0.14, -0.6 }, color = c.back },
+		Chest = { d = 1.72, pos = { 0, 0.02, -1.15 }, color = c.fur },
 	})
-	b.cyl("Body", { 0, 0.06, 1.15 }, { 0, 0.06, -1.2 }, 1.58, c.fur)
+	b.cyl("Body", { 0, 0.06, 1.1 }, { 0, 0.06, -1.15 }, 1.6, c.fur, { overlap = 0 })
 	b.weld("Body", "Spine2")
-	b.cyl("Pattern", { 0, -0.4, 0.9 }, { 0, -0.42, -1.1 }, 1.0, c.belly) -- white belly
+	b.cyl("Pattern", { 0, -0.42, 0.85 }, { 0, -0.44, -1.0 }, 0.95, c.belly) -- white belly
 	b.weld("Pattern", "Spine2")
-	-- a long neck of three balls rising forward
+	-- a thick neck angled up and forward, three balls tapering to the head
 	local necks = {
-		{ name = "Neck1", d = 1.02, pos = { 0, 0.62, -1.72 }, at = { 0, 0.3, -1.5 }, parent = "Chest" },
-		{ name = "Neck2", d = 0.88, pos = { 0, 1.25, -2.0 }, at = { 0, 0.95, -1.85 }, parent = "Neck1" },
-		{ name = "Neck3", d = 0.76, pos = { 0, 1.85, -2.22 }, at = { 0, 1.55, -2.1 }, parent = "Neck2" },
+		{ name = "Neck1", d = 1.1, pos = { 0, 0.55, -1.7 }, at = { 0, 0.3, -1.45 }, parent = "Chest" },
+		{ name = "Neck2", d = 0.92, pos = { 0, 1.05, -2.1 }, at = { 0, 0.85, -1.92 }, parent = "Neck1" },
+		{ name = "Neck3", d = 0.8, pos = { 0, 1.5, -2.45 }, at = { 0, 1.3, -2.3 }, parent = "Neck2" },
 	}
 	for _, n in necks do
 		b.ball(n.name, n.d, n.pos, c.fur, FUR)
 		b.motor(n.name, n.parent, n.at)
 	end
-	local hy, hz = 2.3, -2.45
-	b.ball("Head", 0.88, { 0, hy, hz }, c.fur, FUR)
-	b.motor("Head", "Neck3", { 0, 2.1, -2.32 })
-	b.cyl("Snout", { 0, hy - 0.08, hz - 0.25 }, { 0, hy - 0.32, hz - 0.85 }, 0.44, c.fur, FUR)
+	local hy, hz = 1.95, -2.75
+	b.ball("Head", 0.98, { 0, hy, hz }, c.fur, FUR)
+	b.motor("Head", "Neck3", { 0, hy - 0.2, hz + 0.15 })
+	b.cyl("Snout", { 0, hy - 0.1, hz - 0.3 }, { 0, hy - 0.4, hz - 0.95 }, 0.5, c.fur, FUR)
 	b.weld("Snout", "Head")
-	b.cyl("Jaw", { 0, hy - 0.28, hz - 0.27 }, { 0, hy - 0.44, hz - 0.73 }, 0.3, c.belly, CREAM)
-	b.motor("Jaw", "Head", { 0, hy - 0.25, hz - 0.25 })
-	b.ball("Nose", 0.24, { 0, hy - 0.32, hz - 0.91 }, c.nose)
+	b.cyl("Jaw", { 0, hy - 0.32, hz - 0.3 }, { 0, hy - 0.52, hz - 0.85 }, 0.32, c.belly, CREAM)
+	b.motor("Jaw", "Head", { 0, hy - 0.3, hz - 0.28 })
+	b.ball("Nose", 0.27, { 0, hy - 0.42, hz - 1.0 }, c.nose)
 	b.weld("Nose", "Head")
 	b.cyl(
 		"Eyes",
-		{ -0.375, hy + 0.12, hz - 0.23 },
-		{ 0.375, hy + 0.12, hz - 0.23 },
-		0.17,
+		{ -0.42, hy + 0.12, hz - 0.25 },
+		{ 0.42, hy + 0.12, hz - 0.25 },
+		0.18,
 		c.eyes,
 		{ reflectance = 0.15, overlap = 0 }
 	)
 	b.weld("Eyes", "Head")
 	for _, side in { { name = "EarL", sx = -1 }, { name = "EarR", sx = 1 } } do
-		b.block(side.name, { 0.52, 0.52, 0.08 }, { side.sx * 0.42, hy + 0.4, hz + 0.1 }, c.fur, {
+		b.block(side.name, { 0.6, 0.6, 0.08 }, { side.sx * 0.45, hy + 0.42, hz + 0.12 }, c.fur, {
 			region = "Body",
 			roll = math.pi / 4 - side.sx * 0.55,
 			yaw = side.sx * 0.25,
 		})
-		b.motor(side.name, "Head", { side.sx * 0.3, hy + 0.3, hz + 0.1 })
+		b.motor(side.name, "Head", { side.sx * 0.32, hy + 0.32, hz + 0.12 })
 	end
 	if variant == "buck" then
 		for _, sx in { -1, 1 } do
 			local s = if sx < 0 then "L" else "R"
-			local base0 = { sx * 0.16, hy + 0.38, hz + 0.03 }
-			local beam = { sx * 0.6, hy + 1.2, hz - 0.2 }
-			b.cyl(`Antler{s}`, base0, beam, 0.11, c.antler)
+			b.cyl(`Antler{s}`, { sx * 0.18, hy + 0.42, hz + 0.05 }, { sx * 0.65, hy + 1.25, hz - 0.2 }, 0.12, c.antler)
 			b.weld(`Antler{s}`, "Head")
 			b.cyl(
 				`Antler{s}Tine`,
-				{ sx * 0.4, hy + 0.82, hz - 0.1 },
-				{ sx * 0.32, hy + 1.25, hz - 0.45 },
-				0.08,
+				{ sx * 0.42, hy + 0.85, hz - 0.08 },
+				{ sx * 0.36, hy + 1.3, hz - 0.45 },
+				0.09,
 				c.antler
 			)
 			b.weld(`Antler{s}Tine`, "Head")
@@ -535,34 +535,34 @@ local function deer(opts: Opts): ModelSpec
 	elseif variant == "fawn" then
 		-- a few white spots along the back
 		local spots = {
-			{ pos = { -0.42, 0.62, 0.7 }, on = "Spine1" },
-			{ pos = { 0.45, 0.6, 0.0 }, on = "Spine2" },
-			{ pos = { -0.4, 0.6, -0.7 }, on = "Spine3" },
+			{ pos = { -0.42, 0.72, 0.7 }, on = "Spine1" },
+			{ pos = { 0.42, 0.72, 0.0 }, on = "Spine2" },
+			{ pos = { -0.42, 0.74, -0.6 }, on = "Spine3" },
 		}
-		for i, s in spots do
-			b.ball(`Spot{i}`, 0.34, s.pos, c.spots)
-			b.weld(`Spot{i}`, s.on)
+		for i, sp in spots do
+			b.ball(`Spot{i}`, 0.34, sp.pos, c.spots)
+			b.weld(`Spot{i}`, sp.on)
 		end
 	end
 	-- the short tail hangs over the white rump; Tail2 is the white flag (raised when running, Gait)
-	local tip = tail(b, { 0, 0.62, 2.2 }, { -55, -80 }, 0.36, { 0.42, 0.36 }, { c.tail, c.flag })
+	local tip = tail(b, { 0, 0.6, 2.15 }, { -50, -78 }, 0.38, { 0.46, 0.4 }, { c.tail, c.flag })
 	mirrored(b, "Front", 0.42, "Chest", {
-		pts = { { -0.3, -1.25 }, { -1.65, -1.2 }, { -3.0, -1.28 }, { -3.58, -1.3 }, { G, -1.48 } },
-		d = { 0.5, 0.26, 0.2 },
+		pts = { { -0.3, -1.2 }, { -1.65, -1.15 }, { -3.0, -1.25 }, { -3.58, -1.28 }, { G, -1.46 } },
+		d = { 0.52, 0.26, 0.2 },
 		toe = { 0.3, 0.22, 0.34 },
 		colors = { c.fur, c.legs, c.legs, c.hoof },
 	})
 	mirrored(b, "Back", 0.44, "Hips", {
-		pts = { { -0.05, 1.2 }, { -1.05, 1.05 }, { -2.35, 1.5 }, { -3.58, 1.36 }, { G, 1.2 } },
+		pts = { { -0.05, 1.15 }, { -1.05, 1.0 }, { -2.35, 1.45 }, { -3.58, 1.32 }, { G, 1.16 } },
 		d = { 0.5, 0.34, 0.22 },
-		thigh = { 1.05, -0.45, 1.2 },
+		thigh = { 1.05, -0.45, 1.15 },
 		toe = { 0.3, 0.22, 0.34 },
 		colors = { c.fur, c.legs, c.legs, c.hoof },
 	})
-	b.socket("HeadSocket", "Head", { 0, hy + 0.44, hz })
-	b.socket("MouthSocket", "Jaw", { 0, hy - 0.46, hz - 0.78 })
+	b.socket("HeadSocket", "Head", { 0, hy + 0.49, hz })
+	b.socket("MouthSocket", "Jaw", { 0, hy - 0.55, hz - 0.9 })
 	b.socket("TailTip", "Tail2", tip)
-	b.socket("ChestCenter", "Chest", { 0, 0.02, -1.2 })
+	b.socket("ChestCenter", "Chest", { 0, 0.02, -1.15 })
 	local name = opts.name or (if variant then `deer_{variant}` else "deer")
 	return finish(b, "deer", name, variant, HIP * k, (HIP + 0.9) * k)
 end

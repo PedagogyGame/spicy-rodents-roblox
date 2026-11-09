@@ -50,6 +50,8 @@ def rb_to_bl(v):
     return Vector((v[0], -v[2], v[1]))
 
 
+JITTER = 0.0015  # studs per step (13 steps): see parts_mesh
+
 # Roblox Material name -> (roughness, metallic)
 SURFACE = {
     "SmoothPlastic": (0.42, 0.0),
@@ -199,7 +201,12 @@ def srgb_to_linear(c):
 
 
 def parts_mesh(name, parts, templates):
-    """One mesh for a list of part dicts (Roblox frame): per-face col, rough, metal, alpha attributes."""
+    """One mesh for a list of part dicts (Roblox frame): per-face col, rough, metal, alpha attributes.
+
+    Every part is lifted by a tiny deterministic amount (0 to 0.018 st, JITTER) so exactly coplanar faces do not
+    shadow each other into black patches in Cycles. Roblox would z-fight (flicker) there instead: export.luau
+    lists those overlaps under `zfight`.
+    """
     by_shape = {}
     for p in parts:
         by_shape.setdefault(p["s"], []).append(p)
@@ -218,6 +225,7 @@ def parts_mesh(name, parts, templates):
             size = np.repeat(size[:, :1], 3, axis=1)
         local = t["v"][None, :, :] * size[:, None, :]  # (n, k, 3)
         world = np.einsum("nij,nkj->nki", rot, local) + pos[:, None, :]
+        world[:, :, 1] += (((np.arange(n) + base // 7) * 7) % 13)[:, None] * JITTER
         bl = world @ AXES.T
         k = len(t["v"])
         vs.append(bl.reshape(-1, 3))
