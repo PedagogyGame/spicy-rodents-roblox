@@ -76,22 +76,23 @@ function LampPlan.plan(
 	local minGap = (L.minGapU or 10) * spu
 	local crossClear = (L.crossClearU or 4.8) * spu
 	local height = lampKit.heightU * spu
-	local roadBoxes: { Geometry.Box } = {}
+	local roadBoxes: { { box: Geometry.Box, road: string } } = {}
 	for _, p in roadPlans do
 		for _, part in p.parts do
 			if part.role ~= "Paint" then -- lane paint and curbs ride on the segments
-				table.insert(roadBoxes, part :: any)
+				table.insert(roadBoxes, { box = part :: any, road = p.id })
 			end
 		end
 	end
-	local function blocked(x: number, z: number): boolean
+	-- `own`: the street a bridge lamp stands on (its deck is the lamp's footing, not an obstacle)
+	local function blocked(x: number, z: number, own: string?): boolean
 		for _, b in solids do
 			if Geometry.containsXZ(b, x, z, 1.5) then
 				return true
 			end
 		end
 		for _, b in roadBoxes do
-			if Geometry.containsXZ(b, x, z, 0.6) then
+			if b.road ~= own and Geometry.containsXZ(b.box, x, z, 0.6) then
 				return true
 			end
 		end
@@ -181,7 +182,9 @@ function LampPlan.plan(
 			if len >= 12 then
 				local side = side0 * (if bi % 2 == 0 then -1 else 1)
 				local n = math.max(1, math.floor(len / spacing + 0.5))
-				local off = verge(road, side)
+				-- a bridge has no verge: its lamps stand on the deck inside the parapet
+				local onBridge = string.find(road.id, "bridge", 1, true) ~= nil
+				local off = if onBridge then road.width / 2 - 2 else verge(road, side)
 				for i = 1, n do
 					local t = blk[1] + (i - 0.5) / n * len
 					local placed = false
@@ -195,7 +198,7 @@ function LampPlan.plan(
 							else
 								px, pz = c + side * off, tt
 							end
-							if not blocked(px, pz) and not crowded(px, pz) then
+							if not blocked(px, pz, if onBridge then road.id else nil) and not crowded(px, pz) then
 								local y = baseAt(px, pz)
 								-- toward the street: -side across the street's axis
 								local ox, oz = 0, 0

@@ -52,11 +52,12 @@ function Bake.data(): Data
 	}
 end
 
--- The solid lot boxes lamps must avoid (every collidable lot part).
+-- The solid lot boxes lamps must avoid (every collidable part of a solid lot: buildings, structures,
+-- slabs; not the ground plates, whose collidable parts are the bridge deck and the river walls).
 local function solidBoxes(plans: { Plan.BuildPlan }): { any }
 	local out = {}
 	for _, p in plans do
-		if p.kind == "lot" then
+		if p.kind == "lot" and p.category ~= "plate" then
 			for _, s in p.parts do
 				if s.canCollide then
 					table.insert(out, s)
