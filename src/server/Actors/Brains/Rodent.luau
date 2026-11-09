@@ -6,7 +6,7 @@
 -- target; phase runs x1.3 when infected. Stalk/pounce/bite are W1 (CombatRules).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
-local Import = require("../../AI/Import")
+local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 

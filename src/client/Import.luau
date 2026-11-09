@@ -1,5 +1,5 @@
 --!strict
--- ServerScriptService.Server.AI.Import
+-- StarterPlayer.StarterPlayerScripts.Client.Import
 -- Cross-root require shim (spike S5 finding, 2026-11-09): a server module cannot reach
 -- ReplicatedStorage.Shared with one relative string that works everywhere. On disk the shared root
 -- is `src/shared` (two levels up from `src/server/AI`); in the engine it is
@@ -7,15 +7,19 @@
 -- (`../../../ReplicatedStorage/Shared/...` resolves there, measured; `@shared`-style aliases do
 -- not). Lune and the engine therefore need different strings, and luau-lsp needs a path it can
 -- resolve on disk for types. Callers write:
---   local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+--   local Units = Import.shared("Config/Units") :: typeof(require("../shared/Config/Units"))  -- from a file at the root
+--   (one ../ more per folder level below the root)
 -- so the value comes from here (engine or Lune) and the type from the on-disk path.
 -- Interface: shared(path) -> module. Engine-only branches run only when `script` exists.
--- The lead may move this to src/server/Import.luau (or change the Rojo tree) for every root.
+-- STANDARD (W0, lead decision): every cross-root require goes through the Import module of its
+-- own root (src/server/Import.luau, src/client/Import.luau, src/worldgen/Import.luau). Within a root,
+-- plain relative string requires ("./Sibling", "../Up") are used; they resolve identically on disk and
+-- in the engine.
 
 local Import = {}
 
--- From src/server/AI/ the shared root is two levels up.
-local LUNE_SHARED_PREFIX = "../../shared/"
+-- From src/client/ the shared root is one level up.
+local LUNE_SHARED_PREFIX = "../shared/"
 
 local function engineShared(path: string): any
 	local node: Instance = game:GetService("ReplicatedStorage"):FindFirstChild("Shared")

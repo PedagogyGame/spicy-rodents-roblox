@@ -14,8 +14,9 @@
 -- on possession, teleports and respawns (§1.5 step 6). Budget (spike S3): <= 0.05 ms per squirrel per
 -- tick.
 
-local Motion = require("../../shared/Routes/Motion")
-local SquirrelMotor = require("../../shared/Movement/SquirrelMotor")
+local Import = require("../Import")
+local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Routes/Motion"))
+local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
 
 local MoveValidator = {}
 MoveValidator.__index = MoveValidator

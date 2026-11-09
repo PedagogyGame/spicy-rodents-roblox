@@ -7,7 +7,7 @@
 -- turn 5.6, lambda 6; steps are kept within 95 u of the origin (else heading += 0.67 pi, speed 0).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
-local Import = require("../../AI/Import")
+local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 

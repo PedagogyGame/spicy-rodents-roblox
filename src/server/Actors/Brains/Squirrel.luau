@@ -8,7 +8,7 @@
 -- W1 replaces the polyline data with Shared/Routes (Curve, Registry, Graph, Motion).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
-local Import = require("../../AI/Import")
+local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 

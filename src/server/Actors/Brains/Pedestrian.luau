@@ -9,7 +9,7 @@
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
 
-local Import = require("../../AI/Import")
+local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 local Perception = require("../Perception")

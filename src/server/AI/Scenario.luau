@@ -8,7 +8,7 @@
 -- Interface: build(opts) -> World, stepFrame(world, dt) -> FrameMetrics, liveness(world) -> Report
 -- Pure; studs via Config/Units. The frame order mirrors §1.3: brains -> AI motors -> traffic.
 
-local Import = require("./Import")
+local Import = require("../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local Species = Import.shared("Actors/Species") :: typeof(require("../../shared/Actors/Species"))
 local Population = Import.shared("Actors/Population") :: typeof(require("../../shared/Actors/Population"))

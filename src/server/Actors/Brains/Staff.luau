@@ -7,7 +7,7 @@
 -- i % 4, initial pause 0.4 + (i % 3) 0.3). Pace 1.4 u/s is a W0 tunable (the spec names none).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
-local Import = require("../../AI/Import")
+local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 

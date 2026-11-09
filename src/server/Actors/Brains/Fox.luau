@@ -6,7 +6,7 @@
 -- within 24 u: heading at the target, turn 7, speed 8.8 u/s. Warning, lunge and stun are W1.
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
-local Import = require("../../AI/Import")
+local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
 

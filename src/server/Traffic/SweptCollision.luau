@@ -16,8 +16,9 @@
 -- hits; the owning service emits `RunOver(actor, vehicle, driver?)`. Budget (spike S4): 15 squirrels x
 -- 50 vehicles <= 0.5 ms per tick.
 
-local Swept = require("../../shared/Traffic/Swept")
-local Units = require("../../shared/Config/Units")
+local Import = require("../Import")
+local Swept = Import.shared("Traffic/Swept") :: typeof(require("../../shared/Traffic/Swept"))
+local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 
 local SweptCollision = {}
 SweptCollision.__index = SweptCollision
