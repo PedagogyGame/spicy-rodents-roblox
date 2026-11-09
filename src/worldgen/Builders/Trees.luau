@@ -19,7 +19,8 @@
 -- Leaves and twigs neither collide nor take queries (rails, the camera and raycasts see only bark);
 -- leaves cast shadows. Deterministic (integer xorshift seeded by the trunk route id).
 -- Interface: build(list, trunk, members, opts) where members are polylines { route, line } (the trunk
---   among them) and opts = { groundAt = (x, z, maxY?) -> y, scale? }. Returns the leaf count. Pure.
+--   among them) and opts = { groundAt = (x, z, maxY?) -> (y, onPart), maxLeaves? }. Returns the leaf
+--   count. Pure.
 
 local Palette = require("../Palette")
 local Spec = require("../Spec")
@@ -143,14 +144,13 @@ local function trunkRadius(route: any, t: number): number
 	return math.max(0.32 * SPU, r * (1 - 0.48 * t))
 end
 
-export type Opts = { groundAt: (number, number, number?) -> number, maxLeaves: number? }
+export type Opts = { groundAt: (number, number, number?) -> (number, boolean), maxLeaves: number? }
 
 function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts: Opts): number
 	local rand = rng(trunk.id + 7)
 	local name = string.upper(trunk.name or "")
 	local willow = string.find(name, "WILLOW", 1, true) ~= nil
 	local apple = string.find(name, "APPLE", 1, true) ~= nil
-	local giant = string.find(name, "GIANT", 1, true) ~= nil
 	local foot = trunk.points[1]
 	local top = trunk.points[#trunk.points]
 	local H = math.max(top[2] - foot[2], 6)
@@ -185,9 +185,8 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		cylinder(list, `Trunk_{k}`, a, b, r, if k == 1 then 0 else r * 0.25, barkOpts)
 	end
 	-- root flare (skipped where the trunk stands at a kerb, road or sidewalk: no bark on the paving)
-	local g = opts.groundAt(foot[1], foot[3], foot[2] + 2)
+	local g, paved = opts.groundAt(foot[1], foot[3], foot[2] + 2)
 	local r0 = trunkRadius(trunk, 0)
-	local paved = g > foot[2] + 0.05 or g - foot[2] > 0.6
 	if not paved then
 		cylinder(list, "Flare", { foot[1], g - 1.2, foot[3] }, { foot[1], g + 1.6 * scale, foot[3] }, r0 * 1.32, 0, {
 			color = shade(barkColor, 0.92),
@@ -470,7 +469,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 					local oz = ux * math.sin(a) + uz * math.cos(a)
 					local x, z = c.p[1] + ox * c.r * 0.7, c.p[3] + oz * c.r * 0.7
 					local y1 = c.p[2] - c.r * 0.2
-					local ground = opts.groundAt(x, z, y1)
+					local ground = (opts.groundAt(x, z, y1))
 					local y0 = math.max(ground + 3.5, y1 - (9 + 9 * rand()) * scale)
 					if y1 - y0 > 2 then
 						strands += 1
@@ -507,7 +506,6 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			end
 		end
 	end
-	local _ = giant
 	return leaves
 end
 

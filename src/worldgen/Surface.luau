@@ -4,8 +4,9 @@
 -- ground they stand on, which is not always the terrain: the bridge deck, plazas, sidewalks, decks,
 -- lower roofs). An XZ grid over the near-level top faces of the baked lot and road parts (collidable
 -- parts and ground plates; leaves, rooms, windows, signs and doors excluded) plus World/Height.
--- Interface: new(plans, heightAt) -> Surface; Surface.at(s, x, z, maxY?) -> studs: the highest top face
---   (or terrain) under (x, z) that is not above maxY + 0.5 (nil maxY: no limit).
+-- Interface: new(plans, heightAt) -> Surface; Surface.at(s, x, z, maxY?) -> (studs, onPart): the highest
+--   top face (or terrain) under (x, z) that is not above maxY + 0.5 (nil maxY: no limit), and whether
+--   it is a part (paving, deck, plate, roof) rather than the terrain.
 -- Pure.
 
 local Geometry = require("./Geometry")
@@ -87,18 +88,20 @@ function Surface.new(plans: { Spec.BuildPlan }, heightAt: (number, number) -> nu
 	return self
 end
 
-function Surface.at(self: Surface, x: number, z: number, maxY: number?): number
+function Surface.at(self: Surface, x: number, z: number, maxY: number?): (number, boolean)
 	local best = self.heightAt(x, z)
+	local onPart = false
 	local limit = if maxY then maxY + 0.5 else math.huge
 	for _, t in self.cells[key(math.floor(x / CELL), math.floor(z / CELL))] or {} do
 		if t.ny > 0.5 and Geometry.containsXZ(t.box :: any, x, z, 0) then
 			local y = t.qy - (t.nx * (x - t.qx) + t.nz * (z - t.qz)) / t.ny
-			if y <= limit and y > best then
-				best = y
+			if y <= limit and y > best - 0.05 then
+				best = math.max(best, y)
+				onPart = true
 			end
 		end
 	end
-	return best
+	return best, onPart
 end
 
 return Surface

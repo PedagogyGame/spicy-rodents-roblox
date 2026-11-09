@@ -12,7 +12,6 @@
 
 local Geometry = require("../Geometry")
 local Import = require("../Import")
-local Palette = require("../Palette")
 local Spec = require("../Spec")
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 
@@ -240,7 +239,7 @@ local function detail(lot: any, body: Spec.PartSpec, list: Spec.PartList, seat: 
 	end
 end
 
-function Props.dress(lot: any, kit: any, body: Spec.PartSpec, list: Spec.PartList, seat: number)
+function Props.dress(lot: any, _kit: any, body: Spec.PartSpec, list: Spec.PartList, seat: number)
 	local t = lot.type
 	if t == "gas_canopy" or t == "porte_cochere" then
 		canopyColumns(lot, body, list)
@@ -251,8 +250,6 @@ function Props.dress(lot: any, kit: any, body: Spec.PartSpec, list: Spec.PartLis
 	elseif t == "detail" then
 		detail(lot, body, list, seat)
 	end
-	local _ = kit
-	local _p = Palette
 end
 
 return Props
