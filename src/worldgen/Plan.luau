@@ -388,7 +388,7 @@ local function curbSide(road: Road, others: { Road }?): number?
 			local o0, o1 =
 				math.min(o.start :: number, o["end"] :: number), math.max(o.start :: number, o["end"] :: number)
 			local gap = math.abs(oc - c) - o.width / 2 - road.width / 2
-			if gap > -0.5 and gap < 3 and o0 < a1 and o1 > a0 then
+			if gap > -0.5 and gap < 8 and o0 < a1 and o1 > a0 then
 				return if oc > c then 1 else -1
 			end
 		end
