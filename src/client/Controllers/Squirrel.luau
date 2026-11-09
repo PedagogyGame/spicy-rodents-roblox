@@ -15,10 +15,16 @@
 -- heading and momentum; an AI squirrel suspended on a rail (snapshot.brain.routeId, s, dir) resumes on
 -- that rail at the same arc position; the AI's direction is held for up to holdSeconds or until the
 -- first input.
+-- Recovery: the motor is the only authority on where the body is, so the two things that move it from
+-- outside are taken in here. A fall into the river puts it on the nearer quay (v5.4 recoverRiverFall,
+-- called after the motor step as in L6767). A teleport by the server (the Reset button, the server's own
+-- rescue) shows up as a root that is not where the last frame left it; the motor restarts from there
+-- instead of writing the old position back over it.
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
 -- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast? };
---   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs
+--   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
+--   movedFromOutside(gap, speed, frameDt) -> boolean (pure)
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -26,6 +32,7 @@ local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require(
 local SquirrelVisual =
 	Import.shared("Movement/SquirrelVisual") :: typeof(require("../../shared/Movement/SquirrelVisual"))
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
+local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
@@ -70,6 +77,14 @@ function Squirrel.hipOf(body: Model, measured: number): number
 		return hip
 	end
 	return math.clamp(measured, 0.1, 3)
+end
+
+-- Whether a root found `gap` studs from where the last frame wrote it was moved by someone else. Physics
+-- carries the body at the written velocity between frames (twice that is allowed for an uneven frame);
+-- beyond that and a little slack it is a teleport.
+Squirrel.OUTSIDE_SLACK = 2
+function Squirrel.movedFromOutside(gap: number, speed: number, frameDt: number): boolean
+	return gap > Squirrel.OUTSIDE_SLACK + speed * math.max(frameDt, 0) * 2
 end
 
 function Squirrel.start(
@@ -131,7 +146,7 @@ function Squirrel.start(
 
 	local holdUntil = os.clock() + (payload.holdSeconds or 0.75)
 	local holding = state.routeId ~= nil or math.abs(state.vx) + math.abs(state.vz) > 0.1
-	local last = pos
+	local last, lastSpeed = pos, 0
 	local lastSaid, lastText = -math.huge, ""
 	local stopDrive = BodyDriver.driveRender(root, function(frameDt: number)
 		local dt = math.min(frameDt, 0.08)
@@ -140,8 +155,21 @@ function Squirrel.start(
 			if built then
 				motorWorld.registry, motorWorld.index = built.registry, built.index
 				motorWorld.graph, motorWorld.trampolines = built.graph, built.trampolines
+				-- Motion caches the trunk feet of the registry it first saw on the world table
+				local cache: any = motorWorld
+				cache._trunkFeet = nil
 				railLive = true
 			end
+		end
+		local at = root.Position
+		if Squirrel.movedFromOutside((at - last).Magnitude, lastSpeed, frameDt) then
+			-- moved by the server: restart the motor where the body now is, and cut the drawn point to it
+			local g = world.groundAt(at.X, at.Z, at.Y)
+			local soles = at.Y - hip
+			local air = soles - g > SquirrelMotor.params.glueMin
+			SquirrelMotor.place(state, at.X, if air then soles else g, at.Z, not air)
+			visual.live = false
+			holding = false
 		end
 		local f = input:sample(BodyDriver.cameraYawHtml())
 		local mi = {
@@ -170,6 +198,13 @@ function Squirrel.start(
 		for _, e in events do
 			metrics.lastEvent = e.kind
 		end
+		if state.routeId == nil then
+			local rx, ry, rz = Recovery.riverFall(state.x, state.y, state.z)
+			if rx and ry and rz then
+				SquirrelMotor.place(state, rx, ry, rz, true)
+				metrics.lastEvent = "riverRecover"
+			end
+		end
 		local say = if ctx.toast then Squirrel.feedback(f :: any, events :: any, wasOnRoute) else nil
 		local t = os.clock()
 		if say and t - lastSaid > 1.5 and (say ~= lastText or t - lastSaid > 8) then
@@ -195,7 +230,7 @@ function Squirrel.start(
 			* CFrame.new(0, hip, 0)
 		local p = cf.Position
 		local vel = if snapped or dt <= 0 then Vector3.zero else (p - last) / dt
-		last = p
+		last, lastSpeed = p, vel.Magnitude
 		return cf, vel
 	end)
 	return function()

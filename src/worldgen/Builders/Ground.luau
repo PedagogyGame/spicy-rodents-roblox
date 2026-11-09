@@ -131,11 +131,10 @@ end
 -- Terrain-following tiles (tilted to the local slope, 1 stud thick so their edges overlap).
 local function drape(ctx: Ctx, color: { number }, material: string, lift: number)
 	local x0, x1, z0, z1 = extents(ctx)
-	local marker = ctx.lot.facing ~= nil or ctx.lot.yaw ~= nil
-	if marker then
-		-- the PrimaryPart keeps the lot's facing; the tilted tiles follow it
-		hidden(ctx, "draped")
-	end
+	-- the PrimaryPart ("Greybox", invisible) keeps the lot's facing; the tilted tiles follow it. Every
+	-- tile is a "Tile": the client stands on tiles of any thickness, but only on a thin Greybox
+	-- (ClientWorld.groundLike), and a 1 st tile named Greybox left the feet inside the surface.
+	hidden(ctx, "draped")
 	local nx = math.max(1, math.ceil((x1 - x0) / TILE))
 	local nz = math.max(1, math.ceil((z1 - z0) / TILE))
 	local dx, dz = (x1 - x0) / nx, (z1 - z0) / nz
@@ -154,7 +153,7 @@ local function drape(ctx: Ctx, color: { number }, material: string, lift: number
 			local pitch = math.asin(math.clamp(-gz / (L * math.cos(roll)), -1, 1))
 			world(
 				ctx,
-				if i == 0 and j == 0 and not marker then "Greybox" else `Tile_{i}_{j}`,
+				`Tile_{i}_{j}`,
 				(ax + bx) / 2,
 				hc + lift - thick / 2,
 				(az + bz) / 2,

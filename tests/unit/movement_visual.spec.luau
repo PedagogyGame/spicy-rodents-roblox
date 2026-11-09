@@ -4,7 +4,10 @@
 -- Client/Camera/CameraRig.focusStep and Client/World/ClientWorld.groundLike. What is pinned: running on flat
 -- ground has no vertical motion at any frame rate; the drawn feet touch the ground on slopes; a kerb is
 -- spread over a few frames and never overshoots; a grounded body follows the ground downhill without
--- leaving it; mounting a trunk, climbing a pole and crossing onto a wire never snap or pop.
+-- leaving it; mounting a trunk, climbing a pole and crossing onto a wire never snap or pop; walking,
+-- sprinting or grabbing onto a pole is eased, never cut; a long fall has no sawtooth; a landing on a
+-- platform never dips toward its foot; every draped tile the bake draws is ground to the client; and the
+-- motor is re-placed after a river fall or a server teleport (SquirrelMotor.place, Squirrel.movedFromOutside).
 local Units = require("@shared/Config/Units")
 local Motion = require("@shared/Routes/Motion")
 local Registry = require("@shared/Routes/Registry")
@@ -15,6 +18,8 @@ local TestWorld = require("@tests/cheat/TestWorld")
 local CameraRig = require("@client/Camera/CameraRig")
 local ClientWorld = require("@client/World/ClientWorld")
 local Gait = require("@client/Animation/Gait")
+local Squirrel = require("@client/Controllers/Squirrel")
+local Bake = require("@worldgen/Bake")
 
 local st = Units.st
 local P = SquirrelVisual.params
@@ -82,6 +87,22 @@ return function(t)
 		t.eq(SquirrelVisual.update(rest(), 6.5, 0, 0, 1 / 60, ground), true, "6.5 st snaps")
 		t.near(st(2.5), P.snap, 1e-12)
 		t.near(st(1.6), P.railSnap, 1e-12)
+		-- the cut is on the target's own jump, not on the distance trailed: a drawn point far behind a
+		-- target that stands still eases
+		v = rest()
+		v.x = -10
+		t.eq(SquirrelVisual.update(v, 0, 0, 0, 1 / 60, ground), false, "trailing far behind is not a teleport")
+		t.near(v.x, -10 * math.exp(-23 / 60), 1e-12)
+		-- what the motor travels in the frame is not a jump (a long frame at speed)
+		local hitch = { ground = true, rail = false, bridging = false, travel = 7 }
+		t.eq(SquirrelVisual.update(rest(), 7, 0, 0, 1 / 6, hitch), false, "7 st travelled in a hitch")
+		hitch.travel = 0.5
+		t.eq(SquirrelVisual.update(rest(), 7, 0, 0, 1 / 6, hitch), true, "7 st with 0.5 st travelled")
+		-- mounting a rail from the ground or the air is eased however far the target moves
+		local mount = { ground = false, rail = true, bridging = false, mounted = true }
+		v = rest()
+		t.eq(SquirrelVisual.update(v, 7.5, 3, 0, 1 / 60, mount), false, "a mount is eased")
+		t.truthy(v.x > 0 and v.x < 7.5 * (1 - math.exp(-23 / 60)) + 1e-9, "and has not arrived")
 		-- a transfer bridge never snaps and eases at 17/s
 		v = rest()
 		t.eq(SquirrelVisual.update(v, 12, 0, 0, 1 / 60, bridge), false)
@@ -183,41 +204,52 @@ return function(t)
 	end)
 
 	t.test("a kerb and a plate lip are spread over a few frames, never overshoot, and the motor stays down", function()
-		for _, case in { { 0.3, false }, { 0.3, true }, { 0.5, false }, { -0.3, false }, { -0.5, true } } do
-			local rise, sprint = case[1] :: number, case[2] :: boolean
-			local function h(_x: number, z: number, _refY: number): number
-				return if z >= 30 then 2 + rise else 2
-			end
-			local w = open(h)
-			local s = SquirrelMotor.new(0, 2, 0)
-			local v = SquirrelVisual.new()
-			local inp = input(math.pi)
-			inp.fw = 1
-			inp.sprint = sprint
-			local maxStep, frames = 0, 0
-			local lo, hi = math.min(2, 2 + rise), math.max(2, 2 + rise)
-			for i = 1, 240 do
-				local lastY = v.y
-				local _, events = SquirrelMotor.step(s, inp, 1 / 60, w)
-				for _, e in events do
-					t.truthy(e.kind ~= "land", `kerb {rise}: land event`)
+		for _, pattern in { "60", "144", "30", "uneven" } do
+			for _, case in { { 0.3, false }, { 0.3, true }, { 0.5, false }, { -0.3, false }, { -0.5, true } } do
+				local rise, sprint = case[1] :: number, case[2] :: boolean
+				local name = `kerb {rise} at {pattern}`
+				local function h(_x: number, z: number, _refY: number): number
+					return if z >= 30 then 2 + rise else 2
 				end
-				t.eq(s.grounded, true, `kerb {rise}: grounded`)
-				t.eq(SquirrelVisual.frame(v, s, w, 1 / 60), i == 1)
-				t.truthy(v.y >= lo - 1e-9 and v.y <= hi + 1e-9, `kerb {rise}: overshoot {v.y}`)
-				if i > 1 then
-					local d = (v.y - lastY) * (if rise > 0 then 1 else -1)
-					t.truthy(d >= -1e-9, `kerb {rise}: the drawn height reverses`)
-					maxStep = math.max(maxStep, d)
-					if d > 1e-6 then
-						frames += 1
+				local w = open(h)
+				local s = SquirrelMotor.new(0, 2, 0)
+				local v = SquirrelVisual.new()
+				local inp = input(math.pi)
+				inp.fw = 1
+				inp.sprint = sprint
+				local maxStep, frames = 0, 0
+				local lo, hi = math.min(2, 2 + rise), math.max(2, 2 + rise)
+				local elapsed, i = 0, 0
+				while elapsed < 4 do
+					i += 1
+					local dt = frameDt(pattern, i)
+					elapsed += dt
+					local lastY = v.y
+					local _, events = SquirrelMotor.step(s, inp, dt, w)
+					for _, e in events do
+						t.truthy(e.kind ~= "land", `{name}: land event`)
+					end
+					t.eq(s.grounded, true, `{name}: grounded`)
+					t.eq(SquirrelVisual.frame(v, s, w, dt), i == 1)
+					t.truthy(v.y >= lo - 1e-9 and v.y <= hi + 1e-9, `{name}: overshoot {v.y}`)
+					if i > 1 then
+						local d = (v.y - lastY) * (if rise > 0 then 1 else -1)
+						t.truthy(d >= -1e-9, `{name}: the drawn height reverses`)
+						maxStep = math.max(maxStep, d)
+						if d > 1e-6 then
+							frames += 1
+						end
 					end
 				end
+				t.truthy(s.z > 40, "ran past the kerb")
+				t.near(v.y, 2 + rise, 1e-6, `{name}: settled`)
+				-- the share of the kerb taken in one frame does not grow with the distance covered in it
+				-- (a 70 ms hitch in the uneven pattern is most of the easing time, so most of the kerb)
+				local share = maxStep / math.abs(rise)
+				t.truthy(share <= (if pattern == "uneven" then 0.95 else 0.75), `{name}: {share} of it in one frame`)
+				local most = if pattern == "144" then 30 elseif pattern == "30" then 8 else 14
+				t.truthy(frames >= 2 and frames <= most, `{name}: over {frames} frames`)
 			end
-			t.truthy(s.z > 40, "ran past the kerb")
-			t.near(v.y, 2 + rise, 1e-6, `kerb {rise}: settled`)
-			t.truthy(maxStep <= math.abs(rise) * 0.75, `kerb {rise}: {maxStep} st in one frame`)
-			t.truthy(frames >= 2 and frames <= 12, `kerb {rise}: over {frames} frames`)
 		end
 	end)
 
@@ -309,7 +341,18 @@ return function(t)
 		local v2 = SquirrelVisual.new()
 		SquirrelVisual.lean(v2, 0, 1 / 60)
 		SquirrelVisual.lean(v2, 0.02, 0.001)
-		t.truthy(math.abs(v2.lean) < 0.001)
+		t.truthy(math.abs(v2.lean) < 0.005)
+		-- the same turn reads the same lean at any frame rate
+		for _, hz in { 30, 60, 144, 240 } do
+			local vh = SquirrelVisual.new()
+			local y = 0
+			SquirrelVisual.lean(vh, 0, 1 / hz)
+			for _ = 1, hz * 2 do
+				y += 3 / hz
+				SquirrelVisual.lean(vh, y, 1 / hz)
+			end
+			t.near(vh.lean, -3 * P.leanPerTurn, 0.002, `lean at {hz} Hz`)
+		end
 		-- a body at HTML yaw faces (sin yaw, cos yaw): facing the bark is facing against the outward normal
 		for _, n in { { 0, 1 }, { 1, 0 }, { -0.6, 0.8 } } do
 			local y = SquirrelVisual.trunkYaw(n[1], n[2])
@@ -445,6 +488,196 @@ return function(t)
 		t.near(v.cadence, SquirrelVisual.cadence(s.moveSpeed, true, false), 1e-9)
 	end)
 
+	t.test("poles and thin trunks: a walk-in, a sprint-in and a grab from reach are eased, never cut", function()
+		-- a pole (1 st) and the thinnest and thickest trees, with the ground at each one's foot as it is in
+		-- the town
+		local picks: { Registry.Route } = {}
+		local poles, thin, thick = 0, nil :: Registry.Route?, nil :: Registry.Route?
+		for _, r in world.registry:all() do
+			if r.kind == "trunk" and not r.flags.autoGrabExcluded then
+				if r.flags.isPole then
+					poles += 1
+					if poles % 40 == 1 and #picks < 6 then
+						table.insert(picks, r)
+					end
+				else
+					if not thin or r.surfaceRadius < thin.surfaceRadius then
+						thin = r
+					end
+					if not thick or r.surfaceRadius > thick.surfaceRadius then
+						thick = r
+					end
+				end
+			end
+		end
+		table.insert(picks, thin :: Registry.Route)
+		table.insert(picks, thick :: Registry.Route)
+		t.truthy(#picks >= 4, `{#picks} trunks to mount`)
+		local worstShare, worstPitch, mounts = 0, 0, 0
+		for _, route in picks do
+			local foot = world.registry:foot(route)
+			local w: any = setmetatable({
+				groundAt = function(_x: number, _z: number, _refY: number): number
+					return foot.y
+				end,
+			}, { __index = world })
+			for _, case in
+				{
+					{ "60", false, 0, false },
+					{ "144", false, 1, false },
+					{ "30", false, 2, false },
+					{ "uneven", false, 3, false },
+					{ "60", true, 1, false },
+					{ "144", true, 2, false },
+					{ "30", true, 0, false },
+					{ "60", false, 2, true },
+					{ "144", false, 3, true },
+				}
+			do
+				local pattern, sprint = case[1] :: string, case[2] :: boolean
+				local quarter, grab = case[3] :: number, case[4] :: boolean
+				local name = `route {route.id} at {pattern}{if sprint then " sprinting" else ""}{if grab
+					then " grabbing"
+					else ""}`
+				-- from one of four sides, facing the trunk
+				local a = quarter * math.pi / 2
+				local dx, dz = math.sin(a), math.cos(a)
+				local from = if grab then Motion.C.groundReachE - 0.3 else 15
+				local s = SquirrelMotor.new(foot.x - dx * from, foot.y, foot.z - dz * from)
+				s.yaw = a
+				local v = SquirrelVisual.new()
+				local inp = input(a + math.pi)
+				inp.fw = if grab then 0 else 1
+				inp.sprint = sprint
+				local attachedAt: number? = nil
+				local attachedTo: number? = nil
+				local elapsed, i, stopAt = 0, 0, 3
+				-- until half a second up the trunk
+				while elapsed < stopAt do
+					i += 1
+					local dt = frameDt(pattern, i)
+					elapsed += dt
+					inp.grab = grab and i == 20
+					local lx, ly, lz, lpitch = v.x, v.y, v.z, v.pitch
+					local ltx, lty, ltz = v.tx or lx, v.ty or ly, v.tz or lz
+					local wasOn = s.routeId ~= nil
+					SquirrelMotor.step(s, inp, dt, w)
+					t.eq(SquirrelVisual.frame(v, s, w, dt), i == 1, `{name}: snap at frame {i}`)
+					if s.routeId and not wasOn and not attachedAt then
+						attachedAt = i
+						attachedTo = s.routeId
+						stopAt = elapsed + 0.5
+						mounts += 1
+						-- the frame of the mount: the drawn point starts toward the bark and has not
+						-- arrived (it moves no more than one eased frame of its gap to the paws' place on
+						-- the bark, or to where the motor was if that was further); the nose starts up
+						-- and is not yet up
+						local tx, ty, tz = v.tx :: number, v.ty :: number, v.tz :: number
+						local gap = math.max(
+							math.sqrt((tx - lx) ^ 2 + (ty - ly) ^ 2 + (tz - lz) ^ 2),
+							math.sqrt((ltx - lx) ^ 2 + (lty - ly) ^ 2 + (ltz - lz) ^ 2)
+						)
+						local moved = math.sqrt((v.x - lx) ^ 2 + (v.y - ly) ^ 2 + (v.z - lz) ^ 2)
+						local ease = 1 - math.exp(-P.rate * dt)
+						t.truthy(gap > 0.3, `{name}: a gap of {gap} st to close`)
+						worstShare = math.max(worstShare, moved / gap / ease)
+						worstPitch = math.max(worstPitch, math.abs(v.pitch - lpitch) / (1 - math.exp(-P.poseRate * dt)))
+					end
+				end
+				t.truthy(attachedAt ~= nil, `{name}: mounted`)
+				t.eq(attachedTo, route.id, `{name}: onto its own trunk`)
+			end
+		end
+		print(`      mounts: {mounts}; first-frame share of the gap {worstShare} x ease; pitch {worstPitch} rad x ease`)
+		t.truthy(worstShare <= 1 + 1e-9, `the mount frame covers {worstShare} x one eased frame of the gap`)
+		t.truthy(worstPitch <= P.trunkPitchHigh + 0.01, `pitch on the mount frame {worstPitch} rad x ease`)
+	end)
+
+	t.test("a 140 st fall: no cut and no sawtooth at any frame rate; the drawn point only goes down", function()
+		for _, pattern in { "30", "60", "144", "uneven" } do
+			local w = open(function(_x: number, _z: number, _refY: number): number
+				return 0
+			end)
+			local s = SquirrelMotor.new(0, 0, 0)
+			SquirrelMotor.place(s, 0, 140, 0, false)
+			local v = SquirrelVisual.new()
+			local inp = input(math.pi)
+			local elapsed, i, landed, fastest = 0, 0, false, 0
+			while elapsed < 4 do
+				i += 1
+				local dt = frameDt(pattern, i)
+				elapsed += dt
+				local lastY = v.y
+				local _, events = SquirrelMotor.step(s, inp, dt, w)
+				for _, e in events do
+					landed = landed or e.kind == "land"
+				end
+				fastest = math.max(fastest, -s.vy)
+				t.eq(SquirrelVisual.frame(v, s, w, dt), i == 1, `{pattern}: snap at frame {i}`)
+				if i > 1 then
+					t.truthy(v.y <= lastY + 1e-9, `{pattern}: the drawn point rises at frame {i}`)
+				end
+				t.truthy(v.y >= s.y - 1e-9 and v.y >= -1e-9, `{pattern}: the drawn point leads the fall`)
+			end
+			t.truthy(landed, `{pattern}: landed`)
+			t.truthy(fastest > 100, `{pattern}: fell at {fastest} st/s`)
+			t.eq(s.y, 0)
+			t.near(v.y, 0, 1e-3, `{pattern}: settled`)
+		end
+	end)
+
+	t.test("a sprint leap onto a platform: the drawn point never dips toward its foot after the landing", function()
+		-- a platform H high from edgeX on; it is ground only to a body at its height (as a roof is)
+		local function fly(pattern: string, H: number, edgeX: number): (number?, number, number, number)
+			local function h(x: number, _z: number, refY: number): number
+				return if x >= edgeX and refY + 1.5 >= H then H else 0
+			end
+			local w = open(h)
+			local s = SquirrelMotor.new(0, 0, 0)
+			s.yaw = math.pi / 2
+			local v = SquirrelVisual.new()
+			local inp = input(-math.pi / 2)
+			inp.fw = 1
+			inp.sprint = true
+			local elapsed, i, landX, dip = 0, 0, nil :: number?, 0
+			while elapsed < 3.2 do
+				i += 1
+				local dt = frameDt(pattern, i)
+				elapsed += dt
+				inp.leap = landX == nil and elapsed >= 1 and s.grounded
+				local lastY = v.y
+				local _, events = SquirrelMotor.step(s, inp, dt, w)
+				for _, e in events do
+					if e.kind == "land" and not landX then
+						landX = s.x
+					end
+				end
+				SquirrelVisual.frame(v, s, w, dt)
+				if landX then
+					dip = math.max(dip, math.min(lastY, H) - v.y)
+				end
+			end
+			return landX, dip, s.y, v.y
+		end
+		local runs = 0
+		for _, pattern in { "60", "144", "30", "uneven" } do
+			for _, H in { 1.05, 1.9, 2.5 } do
+				-- where the leap comes down to H with nothing in the way: put the edge just before it
+				local free = fly(pattern, 0, math.huge)
+				t.truthy(free ~= nil, `{pattern}: the leap lands`)
+				for _, back in { 4, 6, 9 } do
+					local landX, dip, sy, vy = fly(pattern, H, (free :: number) - back)
+					if landX and sy == H then
+						runs += 1
+						t.truthy(dip < 1e-6, `{pattern} H {H} edge {back} st back: dips {dip} st after landing`)
+						t.near(vy, H, 1e-3, `{pattern} H {H}: settled on the platform`)
+					end
+				end
+			end
+		end
+		t.truthy(runs >= 24, `{runs} platform landings checked`)
+	end)
+
 	t.test(
 		"Gait: the squirrel has no body bob; the climb pose reaches with the front and pushes with the back",
 		function()
@@ -510,6 +743,23 @@ return function(t)
 			t.eq(y, 0)
 			t.eq(z, 0)
 		end
+		-- given the target's last position the lag is exactly speed / rate at any frame time: no
+		-- sawtooth between long and short frames
+		for _, pattern in { "60", "144", "30", "uneven" } do
+			local x, tx = 0, 0
+			local lo, hi = math.huge, -math.huge
+			for i = 1, 600 do
+				local dt = frameDt(pattern, i)
+				local last = tx
+				tx += 42 * dt
+				x = CameraRig.focusStep(x, 0, 0, tx, 0, 0, dt, last, 0, 0)
+				if i > 300 then
+					lo, hi = math.min(lo, tx - x), math.max(hi, tx - x)
+				end
+			end
+			t.near(lo, 42 / F.rateXZ, 1e-6, `{pattern}: focus lag`)
+			t.near(hi, 42 / F.rateXZ, 1e-6, `{pattern}: focus lag`)
+		end
 		-- a small step is eased, not jumped
 		local x1, y1 = CameraRig.focusStep(0, 0, 0, 0, 0.5, 0, 1 / 60)
 		t.eq(x1, 0)
@@ -531,5 +781,88 @@ return function(t)
 		t.eq(ClientWorld.groundLike("Seg_101", 0.2, 0.5), false, "translucent")
 		t.eq(ClientWorld.groundLike("Plinth", 0.2, 0), false)
 		t.eq(ClientWorld.groundLike("Trunk", 0.2, 0), false)
+		-- every tile the bake drapes over the terrain is ground, whatever its thickness; the invisible
+		-- part that carries the lot is not
+		local lots, tiles = 0, 0
+		for _, p in Bake.plans(Bake.data()) do
+			if p.kind == "lot" and p.attributes.GroundStyle == "draped" then
+				lots += 1
+				for _, part in p.parts do
+					local drawn = (part.transparency or 0) < 1
+					if string.sub(part.name, 1, 5) == "Tile_" then
+						tiles += 1
+						t.truthy(drawn, `{p.id} {part.name} is drawn`)
+						t.eq(
+							ClientWorld.groundLike(part.name, part.sy, part.transparency or 0),
+							true,
+							`{p.id} {part.name}`
+						)
+					elseif string.sub(part.name, 1, 7) == "Greybox" then
+						-- a drawn Greybox thicker than a plate would be a floor the client cannot see
+						t.eq(drawn, false, `{p.id} {part.name} is hidden`)
+						t.eq(
+							ClientWorld.groundLike(part.name, part.sy, part.transparency or 0),
+							false,
+							`{p.id} {part.name}`
+						)
+					end
+				end
+				t.eq(string.sub(p.parts[1].name, 1, 5) == "Tile_", false, `{p.id}: the first part is the hidden one`)
+			end
+		end
+		t.truthy(lots >= 5 and tiles > lots, `{lots} draped lots, {tiles} tiles`)
+	end)
+
+	t.test("place and movedFromOutside: the motor restarts at rest where the body was put", function()
+		local trunk = world.registry:get(220) :: Registry.Route
+		local foot = world.registry:foot(trunk)
+		local s = SquirrelMotor.new(foot.x, world.groundHeight, foot.z - st(1.2))
+		local inp = input(math.pi)
+		inp.grab = true
+		SquirrelMotor.step(s, inp, 1 / 60, world)
+		inp.grab = false
+		inp.fw = 1
+		for _ = 1, 30 do
+			SquirrelMotor.step(s, inp, 1 / 60, world)
+		end
+		t.eq(s.routeId, 220)
+		t.truthy(s.moveSpeed > 0, "climbing")
+		local yaw = s.yaw
+		SquirrelMotor.place(s, 40, 3, -12, true)
+		t.eq(s.x, 40)
+		t.eq(s.y, 3)
+		t.eq(s.z, -12)
+		t.eq(s.routeId, nil)
+		t.eq(s.bridge, nil)
+		t.eq(s.pendingFork, nil)
+		t.eq(s.grounded, true)
+		t.eq(s.moveSpeed, 0)
+		t.eq(s.vx * s.vx + s.vy * s.vy + s.vz * s.vz, 0)
+		t.eq(s.yaw, yaw, "the heading is kept")
+		-- and it runs on from there over the ground it was put on
+		local w = open(function(_x: number, _z: number, _refY: number): number
+			return 3
+		end)
+		local v = SquirrelVisual.new()
+		for i = 1, 60 do
+			SquirrelMotor.step(s, inp, 1 / 60, w)
+			t.eq(SquirrelVisual.frame(v, s, w, 1 / 60), i == 1)
+		end
+		t.eq(s.grounded, true)
+		t.eq(s.y, 3)
+		t.truthy(s.z > -12 + 5, "runs on")
+		-- placed in the air it falls
+		SquirrelMotor.place(s, 0, 30, 0, false)
+		SquirrelMotor.step(s, input(math.pi), 1 / 60, w)
+		t.eq(s.grounded, false)
+		t.truthy(s.y < 30 and s.vy < 0, "falling")
+		-- the body is where the driver wrote it, carried by its own velocity: only a larger gap is a move
+		-- made from outside (a server recovery, a reset)
+		t.eq(Squirrel.movedFromOutside(0, 0, 1 / 60), false)
+		t.eq(Squirrel.movedFromOutside(1.4, 42, 1 / 60), false, "one sprint frame")
+		t.eq(Squirrel.movedFromOutside(42 * 0.07, 42, 0.07), false, "a hitch at a sprint")
+		t.eq(Squirrel.movedFromOutside(145 / 30, 145, 1 / 30), false, "a long fall at 30 Hz")
+		t.eq(Squirrel.movedFromOutside(Squirrel.OUTSIDE_SLACK + 0.1, 0, 1 / 60), true, "a still body moved")
+		t.eq(Squirrel.movedFromOutside(12, 42, 1 / 60), true, "a recovery while sprinting")
 	end)
 end

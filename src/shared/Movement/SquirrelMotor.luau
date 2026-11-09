@@ -2,6 +2,7 @@
 -- ReplicatedStorage.Shared.Movement.SquirrelMotor
 -- Squirrel rail/ground motor shared by AI (server) and players (client).
 -- Interface (BUILD_PLAN §1.4, D2): new(params), step(state, input, dt, world) -> state, events, serialize, deserialize, envelope
+--   place(state, x, y, z, grounded): the body somewhere else at rest (river recovery, a server teleport)
 --
 -- A port of v5.4's `updatePlayer` (reference/v5_4_game.js L6573-6770) and the launch helpers
 -- (leap L5922, Q drop L5672, attemptPounce L6482, jumpVelocity L5915, pounceVelocity L6473,
@@ -201,6 +202,25 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		clock = 0,
 		alive = true,
 	}
+end
+
+-- Puts the body somewhere else at rest (v5.4 recoverRiverFall L14116-14132, a server teleport): off any
+-- rail, no bridge, no pending choice, no velocity; the heading is kept. With `grounded` false it falls
+-- from there.
+function SquirrelMotor.place(state: State, x: number, y: number, z: number, grounded: boolean)
+	state.x, state.y, state.z = x, y, z
+	state.vx, state.vy, state.vz = 0, 0, 0
+	state.moveSpeed = 0
+	state.grounded = grounded
+	state.routeId = nil
+	state.bridge = nil
+	state.pendingFork = nil
+	state.selectedJunction = nil
+	state.routeWasMoving = false
+	state.routeFreeLook = 0
+	state.committedAirborne = false
+	state.cameraCommit = 0
+	state.attackWindow = 0
 end
 
 function SquirrelMotor.idleInput(cameraYaw: number?): Input

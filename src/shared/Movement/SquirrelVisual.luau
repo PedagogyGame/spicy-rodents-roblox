@@ -4,12 +4,14 @@
 -- (Movement/SquirrelMotor) owns the authoritative position; what is drawn is a second point that follows it:
 --   * position: every axis eases toward the motor's visual pose at 23/s (17/s while a transfer bridge
 --     runs), integrated exactly for a moving target so the distance trailed does not depend on the frame
---     time, and snaps only on a teleport-sized gap (2.5 u; 1.6 u on a rail outside a bridge);
+--     time. It cuts only when the motor's own pose jumps further than the motor travels in the frame
+--     (2.5 u; 1.6 u on a rail): a teleport or a recovery. Mounting a rail from the ground or the air is
+--     eased like a bridge; v5.4 tests the distance trailed instead and so teleports onto every pole;
 --   * ground contact: while the motor stands on the ground the drawn height is the ground under the DRAWN
 --     point (so the feet touch on a slope although the drawn point trails the motor), followed exactly at
 --     the slope the ground has between the drawn point and the motor and eased beyond it, which spreads a
---     kerb or a plate lip over a few frames. Where a ledge separates the drawn point from the motor, the
---     height eases toward the motor instead (v5.4's rule);
+--     kerb or a plate lip over a few frames. Where a ledge separates the drawn point from the motor, and
+--     while a landing is still arriving, the height eases toward the motor instead (v5.4's rule);
 --   * heading: the motor's yaw on the ground and on branches and wires; on a trunk or a pole the body faces
 --     the bark with its nose up (0.83 rad near the ground, 1.43 rad once the paws grip, L6797-6846);
 --   * lean: a roll into turns from the yaw rate (L6817-6822), never on a trunk.
@@ -44,6 +46,9 @@ export type Visual = {
 	ty: number?,
 	tz: number?,
 	slope: number,
+	-- the drawn feet are on the ground under them (false while arriving from the air, a rail or a ledge)
+	contact: boolean,
+	rail: boolean,
 	lean: number,
 	lastYaw: number?,
 	-- the drawn orientation (frame): html yaw, nose-up pitch, and how much of a trunk grip is showing
@@ -61,6 +66,8 @@ export type Mode = {
 	ground: boolean, -- the motor stands on the ground (no rail)
 	rail: boolean,
 	bridging: boolean, -- a transfer bridge is easing between two rails
+	mounted: boolean?, -- this frame took a rail from the ground or the air (eased, never cut)
+	travel: number?, -- studs the motor moves in this frame by its own speed (not a teleport)
 }
 
 SquirrelVisual.params = {
@@ -70,10 +77,12 @@ SquirrelVisual.params = {
 	railSnap = st(1.6),
 	-- ground contact: the height change followed exactly per stud of drawn travel is the slope known here
 	-- (the one followed last frame, or the one measured between the drawn point and the motor over at least
-	-- lagFloor studs) plus contactBase for curvature, at most contactSlope; the rest is a step and eases at
-	-- `rate`
+	-- lagFloor studs), at most contactSlope, plus contactBase per stud for curvature but never more than
+	-- stepH in one frame (so the share of a kerb taken at once does not grow with speed or frame time);
+	-- the rest is a step and eases at `rate`
 	contactSlope = 1.5,
 	contactBase = 0.25,
+	stepH = 0.04,
 	contactEps = 0.002,
 	lagFloor = 0.25,
 	slopeMinMove = 0.02,
@@ -84,7 +93,7 @@ SquirrelVisual.params = {
 	leanPerTurn = 0.035,
 	leanMax = 0.31,
 	leanRate = 12,
-	turnDtFloor = 0.012,
+	turnDtFloor = 1e-4, -- a divide guard only: a floor near a frame time under-reads fast displays
 	-- trunk pose (L6846): nose-up pitch by how far the paws are off the ground
 	trunkPitchLow = 0.83,
 	trunkPitchHigh = 1.43,
@@ -113,6 +122,8 @@ function SquirrelVisual.new(): Visual
 		ty = nil,
 		tz = nil,
 		slope = 0,
+		contact = false,
+		rail = false,
 		lean = 0,
 		lastYaw = nil,
 		yaw = nil,
@@ -148,18 +159,19 @@ function SquirrelVisual.update(
 	mode: Mode,
 	groundAt: ((x: number, z: number, refY: number) -> number)?
 ): boolean
-	local dx, dy, dz = tx - v.x, ty - v.y, tz - v.z
-	local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
 	local lx, ly, lz = v.tx or tx, v.ty or ty, v.tz or tz
 	v.tx, v.ty, v.tz = tx, ty, tz
-	if
-		not v.live
-		or (not mode.bridging and dist > P.snap)
-		or (mode.rail and not mode.bridging and dist > P.railSnap)
-	then
+	-- A teleport is a jump of the target itself, beyond what the motor travels in the frame. v5.4 tests
+	-- the distance trailed instead, which cuts a long fall into a sawtooth (the lag grows with speed) and
+	-- teleports the body onto a pole it walks into; a mount from the ground or the air is eased, as a
+	-- bridge is.
+	local jump = math.sqrt((tx - lx) ^ 2 + (ty - ly) ^ 2 + (tz - lz) ^ 2) - (mode.travel or 0)
+	local cut = not mode.bridging and not mode.mounted and (jump > P.snap or (mode.rail and jump > P.railSnap))
+	if not v.live or cut then
 		v.x, v.y, v.z = tx, ty, tz
 		v.live = true
 		v.slope = 0
+		v.contact = false
 		return true
 	end
 	local rate = if mode.bridging then P.bridgeRate else P.rate
@@ -174,25 +186,39 @@ function SquirrelVisual.update(
 			-- the motor ahead of it. A height change beyond that (a kerb or a plate lip just crossed) is a
 			-- step, and the excess is eased
 			local known = math.max(v.slope, math.abs(ty - gy) / math.max(lag, P.lagFloor))
-			local allow = math.min(P.contactSlope, P.contactBase + known) * moved + P.contactEps
+			-- beyond the known slope only a small height is taken at once (stepH, so the share of a kerb
+			-- taken in one frame does not grow with the distance covered in it)
+			local allow = math.min(P.contactSlope, known) * moved
+				+ math.min(P.contactBase * moved, P.stepH)
+				+ P.contactEps
 			local d = gy - v.y
-			if math.abs(d) <= allow then
+			if not v.contact and math.abs(eased - gy) > allow then
+				-- still arriving (a landing, a dismount): ease to the motor, as v5.4 does, until the eased
+				-- height meets the ground under the drawn point. Following that ground at once would dive
+				-- to the foot of a platform the motor has just landed on.
+				v.y = eased
+				v.slope = 0
+			elseif math.abs(d) <= allow then
 				if moved > P.slopeMinMove then
 					v.slope = math.abs(d) / moved
 				end
 				v.y = gy
+				v.contact = true
 			else
 				local base = v.y + (if d > 0 then allow else -allow)
 				v.y = base + (gy - base) * (1 - math.exp(-dt * rate))
 				v.slope = 0
+				v.contact = true
 			end
 		else
 			v.y = eased
 			v.slope = 0
+			v.contact = false
 		end
 	else
 		v.y = eased
 		v.slope = 0
+		v.contact = false
 	end
 	v.x, v.z = nx, nz
 	return false
@@ -258,15 +284,15 @@ function SquirrelVisual.frame(
 		tz -= nz * pull
 	end
 	local rail = route ~= nil
-	local snapped = SquirrelVisual.update(
-		v,
-		tx,
-		ty,
-		tz,
-		dt,
-		{ ground = not rail and state.grounded, rail = rail, bridging = state.bridge ~= nil },
-		groundAt or world.groundAt
-	)
+	local snapped = SquirrelVisual.update(v, tx, ty, tz, dt, {
+		ground = not rail and state.grounded,
+		rail = rail,
+		bridging = state.bridge ~= nil,
+		-- onto a rail from the ground or the air (a bridge covers rail to rail)
+		mounted = rail and not v.rail and state.bridge == nil,
+		travel = math.max(state.moveSpeed, math.sqrt(state.vx * state.vx + state.vy * state.vy + state.vz * state.vz))
+			* dt,
+	}, groundAt or world.groundAt)
 	local targetYaw = if onTrunk then SquirrelVisual.trunkYaw(nx, nz) else state.yaw
 	local targetPitch = if onTrunk then SquirrelVisual.trunkPitch(v.y - Height.at(v.x, v.z)) else 0
 	local last = v.yaw
@@ -283,6 +309,7 @@ function SquirrelVisual.frame(
 		v.pitch = targetPitch + (v.pitch - targetPitch) * k
 	end
 	v.trunk = onTrunk
+	v.rail = rail
 	v.yaw = targetYaw + v.yawOff
 	v.climb = math.clamp(v.pitch / P.trunkPitchHigh, 0, 1)
 	SquirrelVisual.lean(v, state.yaw, dt, onTrunk)
