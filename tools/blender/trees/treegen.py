@@ -717,6 +717,8 @@ class TreeBuilder:
         for b in self.boughs:
             P, L, kind = b["P"], b["L"], b["kind"]
             name = b["route"]["name"]
+            if kind == "bridge" and sp == "willow":
+                continue  # willow bridges carry hanging strands instead (build_willow_fronds)
             if kind == "bridge":
                 # a leafy sleeve over the inner part of a living bridge (the limb stays readable)
                 sP = arclen(P)
@@ -1020,6 +1022,36 @@ class TreeBuilder:
                 V, F, UV, N = tube(pts, radius, 4, 1, self.leaf_tile * 1.1, start_normal=o, cap_end=True, cap_start=True)
                 N = norm(N * 0.6 + o[None] * 0.4)
                 self.leaf["mid" if (n % 3 == 0) else "sun"].add(V, F, UV, N)
+                n += 1
+        # strands straight off the living bridges, below the walkway
+        for b in self.boughs:
+            if b["kind"] != "bridge":
+                continue
+            P, Q, radii = b["P"], b["Q"], b["radii"]
+            sP = arclen(P)
+            L = sP[-1]
+            for j, sv in enumerate(np.arange(L * 0.06, L * 0.9, 2.6)):
+                k = int(np.searchsorted(sP, sv).clip(1, len(P) - 1))
+                tan = norm(P[k] - P[k - 1])
+                side = norm(np.cross(tan, [0, 1, 0]) + 1e-9) * (1 if j % 2 else -1)
+                start = P[k] + side * 0.9 + np.array([0, -0.2, 0])
+                hgt = rng.uniform(4.0, 10.0)
+                bottom_y = max(8.0, start[1] - hgt)
+                h = start[1] - bottom_y
+                if h < 2.5:
+                    continue
+                drift = side * rng.uniform(0.3, 1.0)
+                pts = np.array([start, start + np.array([0, -h * 0.4, 0]) + drift * 0.5, start + np.array([0, -h * 0.75, 0]) + drift * 0.85,
+                                np.array([start[0], bottom_y, start[2]]) + drift])
+                if self.clearance(pts[1:]).min() < 0.3:
+                    continue
+                w = rng.uniform(0.5, 0.75)
+
+                def radius(i, ang, w=w):
+                    return w * (1.0 - 0.25 * i) * (1 - 0.45 * np.cos(2 * ang)) * (0.4 if i == 3 else 1.0)
+
+                V, F, UV, N = tube(pts, radius, 4, 1, self.leaf_tile * 1.1, start_normal=side, cap_end=True, cap_start=True)
+                self.leaf["sun" if j % 3 else "mid"].add(V, F, UV, N)
                 n += 1
         self.log["willow_fronds"] = n
 

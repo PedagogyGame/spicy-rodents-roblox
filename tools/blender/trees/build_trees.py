@@ -353,6 +353,13 @@ def render_views(tb, objs, views, out, args, tag):
     scene = bpy.context.scene
     lo, hi = tree_extent(objs)
     top = hi[2]
+    # frame on the crown (long living bridges may leave the frame)
+    if tb.clump_info:
+        C = np.array([tg.to_blender_coords(np.array([k[0]]))[0] for k in tb.clump_info])
+        R = np.array([k[1] for k in tb.clump_info])
+        clo, chi = (C - R[:, None]).min(0), (C + R[:, None]).max(0)
+        lo = np.array([clo[0], clo[1], lo[2]])
+        hi = np.array([chi[0], chi[1], hi[2]])
     cx, cy = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
     width = max(hi[0] - lo[0], hi[1] - lo[1])
     paths = {}
