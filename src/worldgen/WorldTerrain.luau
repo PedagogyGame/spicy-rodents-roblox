@@ -17,7 +17,7 @@ local ROAD_MATERIAL = { asphalt = "Asphalt", concrete = "Concrete", cobble = "Co
 
 -- v5.4 ground colours (worldgen_districts_art §11: grass #819762 under the #a2b78b tint, road #929493
 -- tint over #555b5b grain, sidewalk #c3beb1, quay cobble tint #c4bdab, sand, mud bank).
-local MATERIAL_COLORS = {
+local MATERIAL_COLORS: { [string]: string } = {
 	Grass = "8a9f63",
 	Asphalt = "4b5153",
 	Concrete = "c3beb1",

@@ -5,7 +5,10 @@
 -- ReplicatedStorage.Assets (Rigs/<species>, Placeholders/<species>, or any Model whose `RigSpec`
 -- attribute names the species; tools/placeholders writes these with RigSpec's final bone, socket
 -- and region names), (2) for humans a stock R15 from a blank HumanoidDescription in the post's
--- palette, (3) the S5 part-built puppet (Server/AI/Puppets). Every body is readied by
+-- palette (townspeople wear their cast member's v5.4 shirt and skin, data/authored/cast; posts wear the
+-- RolePalettes uniform; pants from the v5.4 pants list), (3) for animals the RigSpec placeholder puppet
+-- built from Shared/Avatar/PuppetSpec (head, ears, eyes, four-segment legs, tail arc: the Motor6Ds the
+-- client gait drives), (4) the S5 part-built puppet (Server/AI/Puppets) if that fails. Every body is readied by
 -- ActorService.prepareBody (anchored root, Atomic streaming, no server Animator, Dead disabled,
 -- replicated ActorId/Species attributes) and stamped with Variant and Post.
 -- Interface: build(species, variant, index, post?) -> Model; template(species) -> Model?;
@@ -13,6 +16,7 @@
 -- Engine only inside the functions. No side effects on require.
 
 local ActorService = require("./ActorService")
+local Import = require("../Import")
 local Puppets = require("../AI/Puppets")
 
 local BodyFactory = {}
@@ -45,13 +49,64 @@ function BodyFactory.template(species: string): Model?
 	return nil
 end
 
+-- The cast's v5.4 looks ({ shirt, skin } as Color3), read once from Shared.Generated.Cast.
+local castCache: { { shirt: Color3?, skin: Color3? } }? = nil
+local function castLooks(): { { shirt: Color3?, skin: Color3? } }
+	if castCache then
+		return castCache
+	end
+	local out: { { shirt: Color3?, skin: Color3? } } = {}
+	pcall(function()
+		for _, c in Import.shared("Generated/Cast") :: { any } do
+			local look = c.look or {}
+			local shirt = string.match(tostring(look.outfit or ""), "shirt%s*#(%x%x%x%x%x%x)")
+			local skin = string.match(tostring(look.skinTone or ""), "#?(%x%x%x%x%x%x)")
+			if shirt or skin then
+				table.insert(out, {
+					shirt = if shirt then Color3.fromHex(shirt) else nil,
+					skin = if skin then Color3.fromHex(skin) else nil,
+				})
+			end
+		end
+	end)
+	castCache = out
+	return out
+end
+
+-- Post -> RolePalettes uniform role (the street posts dress as townspeople from the cast).
+local function roleFor(post: string?, index: number): string?
+	if post == "police" then
+		return "officer"
+	elseif post == "hospital_staff" then
+		return ({ "nurse", "doctor", "orderly", "nurse", "guard" })[index % 5 + 1]
+	end
+	return nil
+end
+
 local function stockHuman(index: number, post: string?): Model
 	local Players = game:GetService("Players")
 	local desc = Instance.new("HumanoidDescription")
-	local skin = Color3.fromHSV(0.07, 0.3 + (index % 4) * 0.1, 0.45 + (index % 5) * 0.1)
+	local RolePalettes = Import.shared("Avatar/RolePalettes")
+	local fallback = RolePalettes.look("townsperson", index + 1)
+	local skin = Color3.new(fallback.skin.r, fallback.skin.g, fallback.skin.b)
+	local shirt = Color3.new(fallback.shirt.r, fallback.shirt.g, fallback.shirt.b)
+	local pants = Color3.new(fallback.pants.r, fallback.pants.g, fallback.pants.b)
+	local role = roleFor(post, index)
 	local rgb = POST_SHIRTS[post or ""]
-	local shirt = if rgb then Color3.fromRGB(rgb[1], rgb[2], rgb[3]) else Color3.fromHSV((index * 0.137) % 1, 0.55, 0.8)
-	local pants = Color3.fromHSV((index * 0.291 + 0.5) % 1, 0.4, 0.4)
+	if role then
+		local look = RolePalettes.look(role, index + 1)
+		shirt = Color3.new(look.shirt.r, look.shirt.g, look.shirt.b)
+		pants = Color3.new(look.pants.r, look.pants.g, look.pants.b)
+	elseif rgb then
+		shirt = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+	else
+		local cast = castLooks()
+		local c = cast[(index % math.max(#cast, 1)) + 1]
+		if c then
+			shirt = c.shirt or shirt
+			skin = c.skin or skin
+		end
+	end
 	desc.HeadColor = skin
 	desc.LeftArmColor = skin
 	desc.RightArmColor = skin
@@ -74,6 +129,18 @@ function BodyFactory.build(species: string, variant: string, index: number, post
 		else
 			model = Puppets.build(species, variant, index, workspace).model
 		end
+	elseif species == "squirrel" or species == "fox" or species == "deer" then
+		local ok, result = pcall(function(): Model
+			local PuppetSpec = Import.shared("Avatar/PuppetSpec")
+			local PartBuilder = Import.shared("Avatar/PartBuilder")
+			local v: string = variant
+			local spec = if species == "squirrel" and v == "spicy"
+				then PuppetSpec.spec("rodent")
+				elseif species == "deer" then PuppetSpec.spec("deer", { variant = v })
+				else PuppetSpec.spec(species)
+			return PartBuilder.instantiate(spec, PartBuilder.engineLib())
+		end)
+		model = if ok then result else Puppets.build(species, variant, index, workspace).model
 	else
 		model = Puppets.build(species, variant, index, workspace).model
 	end

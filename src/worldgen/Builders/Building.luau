@@ -164,7 +164,10 @@ function Building.windows(
 		local side = not f.alongX
 		if f.len >= 9 and not (side and (pal.timber or f.len < 14)) then
 			local bays = math.clamp(math.floor(f.len / 12), 1, 5)
-			local gaps = avoid and avoid[f.id] or {}
+			local gaps: { { c: number, w: number } } = {}
+			if avoid and avoid[f.id] then
+				gaps = avoid[f.id]
+			end
 			for fl = 1, floors do
 				local y = base + (fl - 0.5) * floorH + 0.3
 				for i = 1, bays do

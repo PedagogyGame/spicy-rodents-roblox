@@ -7,7 +7,8 @@
 -- behind the newest snapshot with one BulkMoveTo. The kinds come once from the PlayNet folder's
 -- TrafficKinds attribute (JSON, id -> { kind, color }). The ghosts live in workspace.TrafficGhosts,
 -- are local to this client and never collide (the server's swept test is the authority).
--- Interface: start() -> stop(); the folder is returned by folder()
+-- Interface: start() -> stop(); the folder is returned by folder(). start() also starts Render/TownView
+-- (street-lamp lights and the Skyline far view).
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -15,6 +16,7 @@ local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Tra
 local Net = Import.shared("Net/Net") :: typeof(require("../../shared/Net/Net"))
 local Schemas = Import.shared("Net/Schemas") :: typeof(require("../../shared/Net/Schemas"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
+local TownView = require("./TownView")
 
 local VehicleView = {}
 
@@ -25,6 +27,8 @@ function VehicleView.folder(): Folder?
 end
 
 function VehicleView.start(): () -> ()
+	-- the street lamps and Skyline far view (no remotes needed) start first, whatever happens below
+	TownView.start()
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local RunService = game:GetService("RunService")
 	local HttpService = game:GetService("HttpService")
