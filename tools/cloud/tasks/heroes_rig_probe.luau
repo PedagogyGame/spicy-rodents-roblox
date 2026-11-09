@@ -6,7 +6,7 @@
 --   node tools/cloud/cloud.mjs run_engine_tests tools/cloud/tasks/heroes_rig_probe.luau --version <v> --place ci
 -- The asset id comes from the first line below (edited per probe).
 
-local MODEL_ID = 99429788385147
+local MODEL_ID = 113341664367996
 
 local InsertService = game:GetService("InsertService")
 
@@ -61,6 +61,25 @@ for _, d in (model :: Instance):GetDescendants() do
 			alphaMode = sa and tostring(sa.AlphaMode) or nil,
 			anchored = m.Anchored,
 			children = #m:GetChildren(),
+		})
+	elseif d:IsA("BasePart") then
+		local bp = d :: BasePart
+		table.insert(parts, {
+			name = bp.Name,
+			class = bp.ClassName,
+			size = { r3(bp.Size.X), r3(bp.Size.Y), r3(bp.Size.Z) },
+			cframe = cf(bp.CFrame),
+			transparency = bp.Transparency,
+			anchored = bp.Anchored,
+		})
+	elseif d:IsA("Motor6D") then
+		local m = d :: Motor6D
+		table.insert(parts, {
+			motor = m.Name,
+			part0 = m.Part0 and m.Part0.Name,
+			part1 = m.Part1 and m.Part1.Name,
+			c0 = cf(m.C0),
+			c1 = cf(m.C1),
 		})
 	elseif d:IsA("Attachment") then
 		table.insert(parts, { attachment = d.Name, parent = d.Parent and d.Parent.Name })

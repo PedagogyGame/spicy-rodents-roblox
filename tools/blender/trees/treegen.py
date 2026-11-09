@@ -441,7 +441,7 @@ class TreeBuilder:
                 f = tt[i] - 1.0
                 base = Rtop + (Rleader_end - Rtop) * f ** 0.8
             # buttress lobes near the ground (decay over ~1.1 R0 of height)
-            fall = math.exp(-max(0.0, y) / (0.55 * R0)) if y > 0 else 1.0
+            fall = math.exp(-max(0.0, y) / (0.33 * R0)) if y > 0 else 1.0
             lob = np.zeros_like(ang)
             for a0, amp in zip(lobe_ang, lobe_amp):
                 da = np.angle(np.exp(1j * (ang - a0)))
@@ -494,7 +494,7 @@ class TreeBuilder:
             r_base = min(r_base, 0.78 * rt)
         r_tip = max(0.5 * lift + 0.08, 0.32)
         r_base = max(r_base, r_tip * 1.15)
-        step = 2.6 if L < 30 else 3.4
+        step = 3.0 if L < 30 else 4.0
         Q, s, u = resample(P, step, min_n=4)
         # rounded tip: extend a little past the rail end along the last tangent
         tan_end = norm(Q[-1] - Q[-2])
@@ -502,13 +502,16 @@ class TreeBuilder:
         prof = r_tip + (r_base - r_tip) * (1 - u) ** 1.25
         collar = 1 + (0.55 * np.exp(-s / max(coll, 0.3)) if on_trunk else 0.0)
         radii = prof * collar
-        centers = Q + np.array([0.0, 1.0, 0.0])[None] * (lift - radii)[:, None]
+        tq = np.gradient(Q, axis=0)
+        cos_t = np.sqrt(tq[:, 0] ** 2 + tq[:, 2] ** 2) / np.maximum(np.linalg.norm(tq, axis=1), 1e-9)
+        r_vert = radii / np.maximum(cos_t, 0.45)
+        centers = Q + np.array([0.0, 1.0, 0.0])[None] * (lift - r_vert)[:, None]
         rng = self.rng
         wob_ph = rng.random() * 6.28
 
         def radius(i, ang):
             r = radii[i]
-            return r * (1 + 0.05 * np.sin(ang * 3 + wob_ph + i * 0.4))
+            return r * (1 + 0.03 * np.sin(ang * 3 + wob_ph + i * 0.4))
 
         sides = 8 if r_base > 1.2 else 6
         circ = 2 * math.pi * r_base
@@ -664,13 +667,12 @@ class TreeBuilder:
             if kind == "bridge":
                 # a leafy sleeve over the inner part of a living bridge (the limb stays readable)
                 sP = arclen(P)
-                n = max(1, int(L * 0.65 / (R_tip * 0.9)))
+                rb = max(4.0, R_tip * 0.5)
+                n = max(1, int(L * 0.78 / (rb * 1.1)))
                 for k in range(n):
-                    sv = L * (0.12 + 0.6 * (k + 0.5) / n)
+                    sv = L * (0.06 + 0.78 * (k + 0.5) / n)
                     j = int(np.searchsorted(sP, sv).clip(0, len(P) - 1))
-                    if np.hypot(P[j][0] - c[0], P[j][2] - c[2]) > rh * 1.25 and sp != "willow":
-                        continue
-                    lobes.append((P[j] + np.array([0, R_tip * 0.25, 0]), R_tip * 0.62, "bridge"))
+                    lobes.append((P[j] + np.array([0, rb * 0.45, 0]), rb * (1.0 - 0.25 * k / max(1, n)), "bridge"))
                 continue
             tip = P[-1]
             out = tip - np.array([c[0], tip[1], c[2]])
@@ -775,7 +777,7 @@ class TreeBuilder:
             self.build_apples()
 
     def leaf_budget(self):
-        return {"giant": 11000, "named": 9000, "estate": 8000, "outer": 6000, "apple": 2600}.get(self.cat, 8000) * (0.6 if self.sp == "willow" else 1.0)
+        return {"giant": 11500, "named": 10000, "estate": 9000, "outer": 6500, "apple": 2800}.get(self.cat, 8000) * (0.6 if self.sp == "willow" else 1.0)
 
     def build_twigs(self):
         """Branchlets from the boughs (or the leader) into the lower and outer clumps."""
@@ -798,7 +800,7 @@ class TreeBuilder:
         tris = 0
         made = 0
         for (ctr, r, d, li) in self.clump_info:
-            if d[1] > 0.55 and rng.random() < 0.7:
+            if d[1] > 0.25 or (d[1] > -0.2 and rng.random() < 0.4):
                 continue  # top clumps are seen from above: no branchlet needed
             dist = np.linalg.norm(pts - ctr[None], axis=1)
             order = np.argsort(dist)[:6]
@@ -838,12 +840,12 @@ class TreeBuilder:
         V0, F0 = icosphere(3)
         tpls = []
         for t in range(6):
-            nl = 9
-            dirs = norm(rng.normal(size=(nl, 3)))
-            amps = rng.uniform(0.10, 0.22, nl)
-            disp = np.ones(len(V0))
+            nl = 8
+            dirs = norm(rng.normal(size=(nl, 3)) + np.array([0, 0.4, 0]))
+            amps = rng.uniform(0.16, 0.30, nl)
+            disp = np.full(len(V0), 0.88)
             for dv, am in zip(dirs, amps):
-                disp += am * np.maximum(0, V0 @ dv) ** 6
+                disp += am * np.maximum(0, V0 @ dv) ** 4
             disp += 0.035 * np.sin(V0[:, 0] * 9 + t) * np.sin(V0[:, 2] * 8 - t) * np.sin(V0[:, 1] * 7 + 2 * t)
             flat = np.where(V0[:, 1] < -0.25, 1 - 0.3 * (-V0[:, 1] - 0.25), 1.0)
             V = V0 * (disp * flat)[:, None]
@@ -870,7 +872,7 @@ class TreeBuilder:
         else:
             V0, F0 = icosphere(lvl)
             tpls = [(V0, F0)]
-        tile = float(np.clip(self.H * 0.075, 3.2, 7.0))
+        tile = float(np.clip(self.H * 0.06, 2.8, 5.0))
         self.leaf_tile = tile
         Cs = np.array([a[0] for a in self.clump_info])
         yl, yh = Cs[:, 1].min(), Cs[:, 1].max()

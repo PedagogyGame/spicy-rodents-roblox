@@ -169,12 +169,12 @@ BARK_FAMILIES = ("oak", "elm", "sycamore", "maple", "willow", "apple")
 # base (furrow, ridge, highlight) colours, sRGB hex: v5.4 M.bark #736354 x tint #b6a99b, sycamore
 # #a3a089 / #a5a394 / #a3a48f, apple wood #766047, estate oak #716050.
 BARK_COLOURS = {
-    "oak": ("#2a231d", "#5f5245", "#8c806f"),
-    "elm": ("#2b231d", "#625244", "#8a7a68"),
+    "oak": ("#231c16", "#56483b", "#7e705f"),
+    "elm": ("#241d18", "#574739", "#7c6c5a"),
     "sycamore": ("#6f6a55", "#a3a089", "#e4dfcc"),
-    "maple": ("#3a332c", "#7b6f62", "#a89d8d"),
-    "willow": ("#2a241f", "#625649", "#8c8172"),
-    "apple": ("#33281f", "#766047", "#9d8668"),
+    "maple": ("#2f2924", "#6a5f54", "#968b7c"),
+    "willow": ("#241f1b", "#5a4e42", "#837868"),
+    "apple": ("#2b231c", "#64533f", "#8a775f"),
 }
 
 
@@ -203,10 +203,10 @@ def bark_maps(family, seed=1, tint=None):
         t = smoothstep(0.15, 0.85, h)
         col = mix(mix(dark, mid, smoothstep(0.0, 0.55, h)), light, smoothstep(0.55, 1.0, h) * 0.8)
         col = col * (0.88 + 0.24 * fbm(u, v, 4, 4, 4, rng))[..., None]
-        lich = smoothstep(0.62, 0.78, fbm(u, v, 5, 5, 5, rng)) * smoothstep(0.45, 0.8, h)
-        col = mix(col, lichen, lich * (0.55 if family != "maple" else 0.3))
-        mossm = smoothstep(0.7, 0.85, fbm(u, v, 3, 4, 4, rng)) * (1 - smoothstep(0.1, 0.5, h))
-        col = mix(col, moss, mossm * 0.5)
+        lich = smoothstep(0.68, 0.82, fbm(u, v, 5, 5, 5, rng)) * smoothstep(0.45, 0.8, h)
+        col = mix(col, lichen, lich * (0.22 if family != "maple" else 0.12))
+        mossm = smoothstep(0.72, 0.86, fbm(u, v, 3, 4, 4, rng)) * (1 - smoothstep(0.1, 0.5, h))
+        col = mix(col, moss, mossm * 0.3)
         rough = 0.97 - 0.18 * t
         nstr = {"oak": 7.0, "elm": 6.0, "willow": 7.5, "maple": 4.0}[family]
     elif family == "sycamore":
@@ -343,7 +343,7 @@ def leaf_layout(shape, seed=1, n=N):
             "tone": rng.random(count), "bright": rng.random(count)}
 
 
-def leaf_normal_rough(layout, strength=70.0):
+def leaf_normal_rough(layout, strength=42.0):
     H, ID, S, T = layout["H"], layout["ID"], layout["S"], layout["T"]
     gap = ID < 0
     # Detail height: each leaf's own relief plus a small step per stacking order, so edges read.
@@ -353,7 +353,7 @@ def leaf_normal_rough(layout, strength=70.0):
     hd = blur(hd, 0.7)
     normal = height_to_normal(hd, strength)
     occl = H - blur(H, 9.0)
-    rough = np.where(gap, 0.95, 0.62 - 0.12 * np.clip(occl * 3 + 0.5, 0, 1) + 0.06 * (layout["bright"][np.maximum(ID, 0)] - 0.5))
+    rough = np.where(gap, 0.95, 0.78 - 0.10 * np.clip(occl * 3 + 0.5, 0, 1) + 0.06 * (layout["bright"][np.maximum(ID, 0)] - 0.5))
     return normal, np.clip(rough, 0, 1)
 
 
@@ -369,10 +369,10 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
     tone = np.minimum((layout["tone"] * k).astype(int), k - 1)[idx]
     bright = layout["bright"][idx]
     col = pal[tone]
-    lum = 0.80 + 0.36 * bright
+    lum = 0.88 + 0.22 * bright
     if layer == "sun":
-        warm = np.array([1.10, 1.06, 0.80])
-        col = col * warm * 1.10
+        warm = np.array([1.16, 1.08, 0.70])
+        col = col * warm * 1.12
     elif layer == "shade":
         cool = np.array([0.86, 0.95, 1.02])
         col = col * cool * 0.80
@@ -386,7 +386,7 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
     col = col * (1.0 + 0.16 * rib[..., None]) * (1.0 - 0.18 * edge[..., None]) * (0.86 + 0.18 * np.clip(S, 0, 1))[..., None]
     # occlusion: leaves deeper in the pile are darker
     occl = H - blur(H, 10.0)
-    ao = np.clip(0.62 + occl * 1.6, 0.35, 1.08)
+    ao = np.clip(0.80 + occl * 1.1, 0.58, 1.06)
     col = col * ao[..., None]
     u, v = _grid_uv(H.shape[0])
     big = fbm(u, v, 3, 3, 3, rng)
@@ -394,7 +394,7 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
     if layer == "sun":
         yellow = srgb_to_lin(hex_rgb("#c9cf6a"))
         col = mix(col, yellow * lum[..., None], smoothstep(0.62, 0.9, big) * 0.22 * (1 - gap))
-    deep = pal.min(axis=0) * (0.20 if layer == "shade" else 0.28)
+    deep = pal.min(axis=0) * (0.38 if layer == "shade" else 0.5)
     col = np.where(gap[..., None], deep, col)
     return lin_to_srgb(col)
 

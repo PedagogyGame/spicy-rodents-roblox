@@ -109,7 +109,7 @@ def make_material(name, maps, normal_strength=1.0, debug_alpha=None):
     nt.links.new(tn.outputs["Color"], nm.inputs["Color"])
     nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
     if "Specular IOR Level" in bsdf.inputs:
-        bsdf.inputs["Specular IOR Level"].default_value = 0.4
+        bsdf.inputs["Specular IOR Level"].default_value = 0.5
     if debug_alpha is not None:
         bsdf.inputs["Alpha"].default_value = debug_alpha
     return mat
@@ -358,7 +358,7 @@ def render_views(tb, objs, views, out, args, tag):
         if view == "street":
             # fit the whole tree: vertical fov of a 28 mm lens at 16:9 is ~39.7 deg
             half_v = math.atan(0.5 * 36 * 540 / 960 / 28)
-            dist = max((top * 0.62) / math.tan(half_v), width * 0.95)
+            dist = (top * 0.58) / math.tan(half_v) + width * 0.5
             ang = math.radians(200)
             loc = (cx + math.sin(ang) * dist, cy - math.cos(ang) * dist, 5.0)
             cam = add_camera("CamStreet", loc, (cx, cy, top * 0.5), 28)
