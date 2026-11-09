@@ -21,4 +21,5 @@ File: `docs/owner/files/SpicyRodents_play.rbxl` (about 1.3 MB). Nothing gets pub
 - **Nobody has tested the feel yet.** Movement, the camera, climbing, driving and the drone are new on screen and have only been tested headless. If something feels wrong, say what you pressed and what happened.
 - **The day stays fixed** at a sunny afternoon. The day/night clock comes in the next wave.
 - **The town is grey boxes.** Real art comes later.
+- **One Spicy Rodent per town.** With two players in a test, the second player who picks the rodent is told someone else already is.
 - If the loading screen turns **red**, the server failed to start. Copy the text from View > Output and send it to me.
