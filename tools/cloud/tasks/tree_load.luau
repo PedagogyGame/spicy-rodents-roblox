@@ -97,6 +97,13 @@ for _, spec in TREES do
 	local maxSizeErr, maxRelErr = 0, 0
 	local ref: BasePart? = nil
 	local refCenter: Vector3? = nil
+	local loadedPos: { [string]: Vector3 } = {}
+	for name in spec.parts do
+		local mp = tree:FindFirstChild(name, true)
+		if mp and mp:IsA("BasePart") then
+			loadedPos[name] = mp.Position -- as loaded, before the recipe moves anything
+		end
+	end
 	for name, p in spec.parts do
 		local mp = tree:FindFirstChild(name, true)
 		if mp and mp:IsA("BasePart") then
@@ -107,7 +114,7 @@ for _, spec in TREES do
 				ref, refCenter = mp, c
 			else
 				-- as loaded: the offset between two parts should equal the offset of their centres
-				local loadedRel = mp.Position - (ref :: BasePart).Position
+				local loadedRel = loadedPos[name] - loadedPos[(ref :: BasePart).Name]
 				local wantRel = c - (refCenter :: Vector3)
 				maxRelErr = math.max(maxRelErr, (loadedRel - wantRel).Magnitude)
 			end
@@ -118,6 +125,19 @@ for _, spec in TREES do
 			ok = false
 		end
 	end
+	-- as loaded, the Model pivot sits at the FBX origin = the tree root: check PivotTo(pivot) lands each part
+	local maxPivotErr = 0
+	if tree:IsA("Model") then
+		local pv = (tree :: Model):GetPivot().Position
+		for name, p in spec.parts do
+			local lp = loadedPos[name]
+			if lp then
+				local want = Vector3.new(p.center[1], p.center[2], p.center[3])
+				maxPivotErr = math.max(maxPivotErr, ((lp - pv) - want).Magnitude)
+			end
+		end
+	end
+	entry.pivotRecipeMaxErrStuds = r3(maxPivotErr)
 	entry.maxSizeErrStuds = r3(maxSizeErr)
 	entry.maxRelativeOffsetErrStuds = r3(maxRelErr)
 	if maxSizeErr > 0.05 then

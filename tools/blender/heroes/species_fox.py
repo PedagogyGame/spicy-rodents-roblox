@@ -247,7 +247,8 @@ def paint(tx, variant, tools):
     def override(mask, col, r=None, k=None):
         w = (np.ones(n) if k is None else np.asarray(k, float)) * mask
         m = w > 0
-        natv[m] = natv[m] * (1 - w[m, None]) + np.asarray(col, np.float32) * w[m, None]
+        col = np.asarray(col, np.float32)
+        natv[m] = natv[m] * (1 - w[m, None]) + (col[m] if col.ndim == 2 else col) * w[m, None]
         alpha[m] = alpha[m] * (1 - w[m])
         if r is not None:
             rough[m] = rough[m] * (1 - w[m]) + r * w[m]

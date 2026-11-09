@@ -277,7 +277,9 @@ def pattern_field(c, n, dom, variant="squirrel"):
     out = np.zeros(len(c))
     # belly and chest by position (the belly's dominant bones are often the legs'): low, facing
     # down, near the midline; the line rises toward the chest and the throat
-    trunk = ~np.char.startswith(dom.astype(str), "Tail") & ~np.isin(dom, ["Head", "Jaw", "EarL", "EarR"]) & (y > -0.75) & (y < 0.5)
+    ds = dom.astype(str)
+    trunk = (~np.char.startswith(ds, "Tail") & ~np.isin(ds, ["Head", "Jaw", "EarL", "EarR"]) & ~np.char.endswith(ds, "_Lower")
+             & ~np.char.endswith(ds, "_Foot") & ~np.char.endswith(ds, "_Toe") & (y > -0.75) & (y < 0.5) & (z > 0.42))
     line = 0.68 + 0.08 * _sstep(0.2, -0.5, y) + wob
     belly = _sstep(0.1, 0.45, -n[:, 2] * 0.8 + (line - z) * 2.5 - np.abs(x) * 1.5 + 0.15)
     out[trunk] = belly[trunk]
@@ -406,7 +408,8 @@ def paint(tx, variant, tools):
     def override(mask, col, a=0.0, r=None, k=None):
         m = mask if k is None else mask & (k > 0)
         w = (np.ones(n) if k is None else k)[m]
-        natv[m] = natv[m] * (1 - w[:, None]) + np.asarray(col, np.float32) * w[:, None]
+        col = np.asarray(col, np.float32)
+        natv[m] = natv[m] * (1 - w[:, None]) + (col[m] if col.ndim == 2 else col) * w[:, None]
         alpha[m] = alpha[m] * (1 - w) + a * w
         if r is not None:
             rough[m] = rough[m] * (1 - w) + r * w

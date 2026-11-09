@@ -153,6 +153,27 @@ def resample(P, step, min_n=2):
     return out, ss, ss / max(L, 1e-9)
 
 
+def adaptive(P, tol=0.1, max_step=4.0):
+    """Keep the fewest points of a dense polyline so the chords stay within `tol` of it and no chord
+    is longer than `max_step`. Returns (points, s, s/L) with s the dense arc length at kept points."""
+    D, sd, _ = resample(P, 0.5)
+    keep = [0]
+    i = 0
+    n = len(D)
+    while i < n - 1:
+        j = i + 1
+        while j + 1 < n and sd[j + 1] - sd[i] <= max_step:
+            a, b = D[i], D[j + 1]
+            mids = D[i + 1 : j + 1]
+            if seg_dist(mids, a[None], b[None]).max() > tol:
+                break
+            j += 1
+        keep.append(j)
+        i = j
+    L = sd[-1]
+    return D[keep], sd[keep], sd[keep] / max(L, 1e-9)
+
+
 def seg_dist(p, A, B):
     """Distance from points p (n,3) to segments A,B (m,3) -> (n, m)."""
     p = np.atleast_2d(p)
@@ -508,8 +529,7 @@ class TreeBuilder:
             r_base = min(r_base, 0.78 * rt)
         r_tip = max(0.5 * lift + 0.08, 0.32)
         r_base = max(r_base, r_tip * 1.15)
-        step = 3.0 if L < 30 else 4.0
-        Q, s, u = resample(P, step, min_n=4)
+        Q, s, u = adaptive(P, tol=0.08, max_step=3.0 if L < 30 else 4.0)
         # rounded tip: extend a little past the rail end along the last tangent
         tan_end = norm(Q[-1] - Q[-2])
         coll = 0.9 * rt if on_trunk else 0.6

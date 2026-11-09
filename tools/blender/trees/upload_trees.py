@@ -137,11 +137,13 @@ def main():
         "$schema": "art/trees v1",
         "src": "tools/blender/trees (build_trees.py geometry + textures, upload_trees.py upload). Procedural Blender only.",
         "units": "studs, Roblox axes (+Y up). pivot = the tree's root on the ground (data/harvest/trees.json root x 2.5).",
-        "placement": ("InsertService:LoadAsset(assetId) returns a Model with MeshParts named as in `parts` (each with a "
-                      "SurfaceAppearance). parts[name].center is that MeshPart's bounding-box centre relative to the pivot "
-                      "(identity rotation), so place a tree with: for each MeshPart p, p.Anchored = true, "
-                      "p.CFrame = CFrame.new(pivot + center). Bark carries the climbing surfaces (trunk radius = the "
-                      "squirrel's tapered radius, bough tops = rail + lift); leaves and apples should be CanCollide/CanQuery false."),
+        "placement": ("model = InsertService:LoadAsset(assetId):GetChildren()[1] (a Model named displayName). Its pivot is "
+                      "the FBX origin = the tree root, so model:PivotTo(CFrame.new(pivot[1], pivot[2], pivot[3])) puts every "
+                      "MeshPart at pivot + parts[name].center (verified by tools/cloud/tasks/tree_load.luau: sizes and centres "
+                      "exact). Anchor all parts. Bark carries the climbing surfaces (trunk radius = the squirrel's tapered "
+                      "radius r(1 - 0.48 t), giants r/0.95 - 2.625 t; bough tops = rail + lift) and keeps collision; set "
+                      "CanCollide/CanQuery false and CastShadow true on Leaves*/Apples. Pivot y is the harvested ground "
+                      "height at the root; the trunk carries 3 studs of bark below it for terrain mismatch."),
         "partRoles": {"Bark": "trunk, roots, boughs, bridges, twigs, lookout pads (collide)",
                       "LeavesShade": "under-canopy clumps (no collide)", "LeavesMid": "mid clumps (no collide)",
                       "LeavesSun": "sunlit top clumps, willow curtains (no collide)", "Apples": "fruit (no collide)"},
@@ -155,7 +157,7 @@ def main():
             "index": i, "label": info["label"], "species": info["species"], "category": info["category"],
             "assetId": st.get("assetId"), "displayName": st.get("name"), "moderation": st.get("moderation"),
             "trunkRoute": info["trunkRoute"], "routes": info["routes"], "pivot": info["pivot"],
-            "parts": info["parts"], "tris": info["tris"],
+            "heightStuds": info.get("heightStuds"), "parts": info["parts"], "tris": info["tris"],
             "checks": {
                 "trunkRadiusMaxAbsErr": info.get("checks", {}).get("trunk", {}).get("bark_minus_gameplay_radius_st", {}).get("max_abs"),
                 "boughFeetToBarkP95": info.get("checks", {}).get("boughs", {}).get("feet_to_bark_surface_st", {}).get("p95_abs"),
