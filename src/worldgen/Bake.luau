@@ -24,6 +24,7 @@ local Plan = require("./Plan")
 local RoadBuilder = require("./Builders/Road")
 local RouteProps = require("./Builders/RouteProps")
 local Skyline = require("./Skyline")
+local Yield = require("./Yield")
 local Curve = Import.shared("Routes/Curve") :: typeof(require("../shared/Routes/Curve"))
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
 
@@ -70,6 +71,7 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 	local out: { Plan.BuildPlan } = {}
 	for _, lot in data.lots do
 		table.insert(out, Plan.plan(lot, lot.type, { parentId = parents[lot.id] }))
+		Yield.breathe()
 	end
 	Plan.attachSlabs(out)
 	local lotPlans = table.clone(out)
@@ -78,6 +80,7 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 		local rp = Plan.road(road, data.roads)
 		table.insert(out, rp)
 		table.insert(roadPlans, rp)
+		Yield.breathe()
 	end
 	if data.routes then
 		local props = RouteProps.plans(data.routes, Kits.routeProps, Curve, Height.at)
@@ -85,6 +88,7 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 			table.insert(out, p)
 		end
 	end
+	Yield.breathe()
 	local lamps = {}
 	if data.lighting then
 		local lampPlans
@@ -203,6 +207,7 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 end
 
 function Bake.hash(plans: { Plan.BuildPlan }): string
+	Yield.breathe()
 	return fnv(Bake.serialize(plans))
 end
 
@@ -222,6 +227,7 @@ function Bake.run(data: Data, factory: Factory.Factory): any
 		model.Parent = if p.kind == "skyline" then town else folders[FOLDER[p.kind]]
 		counts[p.kind] += 1
 		partCount += #p.parts
+		Yield.breathe()
 	end
 	for _, name in { "Lots", "Roads", "Props", "Lamps" } do
 		folders[name].Parent = town
@@ -281,6 +287,7 @@ function Bake.instanceLines(town: any): { string }
 				end
 				table.insert(lines, `{p}|{child.ClassName}|{extra}`)
 			elseif child:IsA("Model") then
+				Yield.breathe()
 				local keys: { string } = {}
 				local attrs = child:GetAttributes()
 				for k in attrs do
@@ -308,6 +315,7 @@ end
 function Bake.geometry(town: any): { [string]: { number } }
 	local out: { [string]: { number } } = {}
 	local function walk(inst: any, path: string)
+		Yield.breathe()
 		for _, child in inst:GetChildren() do
 			local p = path .. "/" .. child.Name
 			if child:IsA("BasePart") then

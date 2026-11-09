@@ -11,6 +11,7 @@
 
 local Geometry = require("./Geometry")
 local Spec = require("./Spec")
+local Yield = require("./Yield")
 
 local RouteCheck = {}
 
@@ -53,6 +54,7 @@ function RouteCheck.run(plans: { Spec.BuildPlan }, routes: { any }, opts: any): 
 	local patchedFailing = 0
 	local patchedPassing: { number } = {}
 	for _, r in routes do
+		Yield.breathe()
 		local route = opts.registry:get(r.id)
 		local pts = opts.registry:samples(route)
 		local R = r.surfaceRadius + slack

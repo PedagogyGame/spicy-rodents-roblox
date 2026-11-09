@@ -16,6 +16,7 @@ local Import = require("./Import")
 local Kits = require("./Kits")
 local RouteCheck = require("./RouteCheck")
 local Spec = require("./Spec")
+local Yield = require("./Yield")
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
 local Registry = Import.shared("Routes/Registry") :: typeof(require("../shared/Routes/Registry"))
 
@@ -123,6 +124,7 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 		table.insert(failures, `lot count {lots} ~= data {#data.lots}`)
 	end
 
+	Yield.breathe()
 	-- overlaps
 	local overlaps, nSolid = WorldChecks.overlaps(plans)
 	r.solids, r.overlaps = nSolid, overlaps
@@ -206,6 +208,7 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 	table.sort(lampShort)
 	r.lamps = { roads = lampRoads, oneSided = lampShort }
 
+	Yield.breathe()
 	-- doors
 	local reach = DoorReach.run(plans, Height.at, Height.insideRiverWater)
 	r.doors = reach
@@ -216,6 +219,7 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 		)
 	end
 
+	Yield.breathe()
 	-- routes on geometry
 	if data.routes then
 		local patches = Import.generated("HarvestPatches")

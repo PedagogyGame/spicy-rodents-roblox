@@ -64,7 +64,9 @@ function LampPlan.plan(
 	local roadBoxes: { Geometry.Box } = {}
 	for _, p in roadPlans do
 		for _, part in p.parts do
-			table.insert(roadBoxes, part :: any)
+			if part.role ~= "Paint" then -- lane paint and curbs ride on the segments
+				table.insert(roadBoxes, part :: any)
+			end
 		end
 	end
 	local function blocked(x: number, z: number): boolean
