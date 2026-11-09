@@ -13,18 +13,7 @@ end
 
 -- Dynamic instance require: luau-lsp cannot resolve it statically, so the type is declared here.
 local BootSmokeModule = engineTests:FindFirstChild("BootSmoke") :: ModuleScript
-local BootSmoke = (require :: any)(BootSmokeModule) :: {
-	run: (
-	) -> {
-		ok: boolean,
-		injected: boolean,
-		required: number,
-		failed: { { path: string, err: string } },
-		warnings: { string },
-		unreadableProperties: { string },
-		properties: any,
-	},
-}
+local BootSmoke = (require :: any)(BootSmokeModule) :: { run: () -> any }
 local started = os.clock()
 local result = BootSmoke.run()
 
