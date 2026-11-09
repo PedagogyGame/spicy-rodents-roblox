@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "spicy-rodents/interior",
-  "title": "Interior template (data/interiors/<id>.json), BUILD_PLAN 3.4. Fractional rects [fx0, fx1, fz0, fz1] (fx across the front, fz from back 0 to front 1); widths and sizes in HTML units.",
+  "title": "Interior template (data/interiors/<id>.json), BUILD_PLAN 3.4. Fractional rects [fx0, fx1, fz0, fz1] (fx along the model RightVector: 0 = the right-hand side seen from the street; fz from back 0 to front 1); widths and sizes in HTML units.",
   "type": "object",
   "required": ["id", "lot", "version", "rooms", "doors", "furniture", "defenderSpawn", "burglarEntry", "remodelSlots", "squirrelRoutes", "src"],
   "additionalProperties": false,

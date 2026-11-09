@@ -338,12 +338,12 @@ function WorldBuild.terrain(which: string, opts: { chunk: number?, clear: boolea
 			local hills = 130
 				+ 70 * math.sin(x * 0.0021 + 0.7) * math.cos(z * 0.0017 - 0.4)
 				+ 25 * math.sin(x * 0.011 + z * 0.007)
-			local band = edge + smooth((d - 150) / 900) * hills
+			local h = edge + smooth((d - 150) / 900) * hills
 			-- the D32 patches (once configured) win where they apply, so the band never cuts the hill
 			if Height.extensionMaterial(x, z) ~= nil then
-				return math.max(band, Height.at(x, z))
+				return math.max(h, Height.at(x, z))
 			end
-			return band
+			return h
 		end
 		local s1 = TerrainBake.write(terrain, {
 			rect = { minX = minX - band, maxX = minX, minZ = minZ - band, maxZ = maxZ },

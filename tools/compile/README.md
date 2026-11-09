@@ -79,5 +79,10 @@ generated/Lots.luau Roads.luau Lanes.luau Cast.luau RoutesCatalog.luau Wildlife.
   fields are never `required`, and arrays never contain null.
 - Schema `pattern` is a regex subset translated to Luau patterns (anchors, classes, `\d \w \s`,
   `* + ?`); no alternation or `{n}`.
-- Lot types (`data/lot_types/`) and `harvest_patches.json` are W1; invariant 1 (paramSchema) and
-  the route-to-lot assignment are not implemented yet.
+- W1 (`lib/W1.luau`, schemas in `tools/compile/schema/`): `data/authored/lot_types.json`,
+  `data/buildings/*.json`, `data/interiors/*.json`, `data/harvest_patches.json`, `data/population.json`,
+  `data/hollows.json`, `data/terrain_extensions.json`, `data/authored/town/lighting.json` ->
+  `LotTypes`, `Buildings`, `Interiors`, `HarvestPatches`, `Population`, `Hollows`, `TerrainExtensions`,
+  `Lighting` (HTML units, not converted; builders scale by 2.5). Invariants 1 (params vs paramSchema),
+  5, 9 (room graphs), 11, 20 and 19 (offroad) run; the route-to-lot assignment is not implemented yet.
+- `w1_seed.luau` seeded lot `params`/`seat`/`home` from the harvest once; lots are hand-edited since.
