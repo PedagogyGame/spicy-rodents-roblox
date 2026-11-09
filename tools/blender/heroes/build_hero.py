@@ -72,9 +72,11 @@ def main(argv):
     opts.h_hi = (0.009 if opts.quick else 0.0055) * scale
     opts.h_lo = (0.014 if opts.quick else 0.011) * scale
     opts.tex = 512 if opts.quick else 1024
-    bl.reset_scene()
     skel = sp.skeleton()
     bone_names = [b[0] for b in skel]
+    if opts.stages == "clips":
+        return clips_only(sp, variant, skel, opts, log)
+    bl.reset_scene()
 
     body, hi, lo = build_geometry(sp, variant, opts, log)
     import hero  # noqa: E402  (the rest of the pipeline)
@@ -84,6 +86,29 @@ def main(argv):
     with open(os.path.join(opts.out, "report.json"), "w") as fh:
         json.dump(report, fh, indent=2)
     log("done")
+    return 0
+
+
+def clips_only(sp, variant, skel, opts, log):
+    """Re-author the clips on an existing build (geometry, maps and FBX untouched)."""
+    import clips
+
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(opts.out, f"{variant}.blend"))
+    for act in list(bpy.data.actions):
+        bpy.data.actions.remove(act)
+    arm = bpy.data.objects["Rig"]
+    rep = clips.author_all(sp, variant, arm, skel, opts, log)
+    meta = json.loads(bpy.context.scene.get("hero_meta", "{}"))
+    meta["clips"] = {k: v for k, v in rep.items() if isinstance(v, dict) and "key_frames" in v}
+    meta["turntable_pose"] = ["Idle", 1] if "Idle" in rep else None
+    bpy.context.scene["hero_meta"] = json.dumps(meta)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(opts.out, f"{variant}.blend"))
+    path = os.path.join(opts.out, "report.json")
+    report = json.load(open(path)) if os.path.exists(path) else {}
+    report["clips"] = rep
+    with open(path, "w") as fh:
+        json.dump(report, fh, indent=2)
+    log("clips re-authored")
     return 0
 
 

@@ -149,8 +149,11 @@ def sculpt(variant="squirrel"):
     P.append(Ellipsoid((0, -1.14, hz - 0.088), (0.038, 0.032, 0.032), k=0.025, tag="nose"))
     P += mirror_pair([Ellipsoid((0.042, -1.085, hz - 0.11), (0.042, 0.05, 0.036), k=0.03, tag="whiskerpad")])
     P.append(RoundCone((0, -0.86, hz - 0.14), (0, -1.05, hz - 0.185), 0.075, 0.036, k=0.045, tag="jaw"))
-    corner = (0.075, -0.985, hz - 0.15) if rodent else (0.056, -1.005, hz - 0.142)
-    P += mirror_pair([RoundCone(corner, (0.0, -1.105, hz - 0.142), 0.011 if rodent else 0.007, 0.006, k=0.012, op="sub", tag="mouth")])
+    corner = (0.078, -0.985, hz - 0.128) if rodent else (0.056, -1.005, hz - 0.142)
+    P += mirror_pair([RoundCone(corner, (0.0, -1.105, hz - 0.142), 0.013 if rodent else 0.007, 0.006, k=0.012, op="sub", tag="mouth")])
+    if rodent:
+        # the crazed grin: lips drawn back from the buck teeth
+        P.append(Ellipsoid((0.0, -1.10, hz - 0.15), (0.05, 0.03, 0.016), k=0.01, op="sub", tag="grin"))
     er = eye_radius(variant) + 0.003
     ec = eye_centre(variant, 1)
     P += mirror_pair([Ellipsoid(ec, (er, er, er), k=0.02, op="sub", tag="eyesocket")])
@@ -219,9 +222,9 @@ def sculpt(variant="squirrel"):
 
 # The rodent's bald patches and the stitch lines over them (texture painter + sculpt agree).
 RODENT_PATCHES = [  # centre on the skin surface, radius, stitch line (two points)
-    {"c": (0.36, 0.26, 0.66), "r": 0.075, "stitch": ((0.34, 0.18, 0.74), (0.37, 0.34, 0.58))},
-    {"c": (-0.25, -0.46, 0.92), "r": 0.065, "stitch": ((-0.22, -0.52, 0.99), (-0.27, -0.40, 0.85))},
-    {"c": (0.06, 0.12, 1.21), "r": 0.055, "stitch": ((0.10, 0.05, 1.20), (0.01, 0.19, 1.22))},
+    {"c": (0.36, 0.26, 0.66), "r": 0.09, "stitch": ((0.34, 0.16, 0.75), (0.37, 0.36, 0.57))},
+    {"c": (-0.25, -0.46, 0.92), "r": 0.08, "stitch": ((-0.22, -0.53, 1.00), (-0.27, -0.39, 0.84))},
+    {"c": (0.06, 0.12, 1.21), "r": 0.065, "stitch": ((0.11, 0.04, 1.20), (0.0, 0.21, 1.22))},
 ]
 
 
@@ -248,7 +251,7 @@ def hard_parts(variant="squirrel"):
     lo_len = 0.04 if rodent else 0.014
     for sx in (1, -1):
         crooked = 0.12 * sx if rodent else 0.0
-        v, f = curved_spike((0.0095 * sx, -1.118, hz - 0.118), (crooked, -0.25, -1), up_len, 0.0105, curl=(0, 0.6, 0), curl_amt=0.35, sides=4, flat=1.5)
+        v, f = curved_spike((0.0105 * sx, -1.115, hz - 0.118), (crooked, -0.25, -1), up_len, 0.0115 if rodent else 0.0105, curl=(0, 0.6, 0), curl_amt=0.35, sides=4, flat=1.6)
         out.append((f"tooth_U{sx}", v, f, "Head", "tooth"))
         v, f = curved_spike((0.008 * sx, -1.072, hz - 0.17), (0, -0.55, 1), lo_len, 0.009, curl=(0, 1, 0), curl_amt=0.3, sides=4, flat=1.4)
         out.append((f"tooth_L{sx}", v, f, "Jaw", "tooth"))
@@ -435,13 +438,13 @@ def paint(tx, variant, tools):
     override(hard == 2, _hex("#e0b05a") if not rodent else _hex("#d8b25e"), r=0.22)
     if rodent:
         # mange: patchy thin fur showing grey-pink skin, bigger toward the haunches and the tail
-        skin = _hex("#9e827c")
-        bruise = _hex("#6e5560")
-        mn = fbm(P * 14.0, 3, seed=31)
-        thin = sst(0.56, 0.68, mn + 0.08 * tail + 0.05 * sst(0.0, 0.4, P[:, 1]))
+        skin = _hex("#86706a")
+        bruise = _hex("#5d4a55")
+        mn = fbm(P * 11.0, 3, seed=31)
+        thin = sst(0.64, 0.72, mn + 0.06 * tail + 0.04 * sst(0.0, 0.4, P[:, 1]))
         sk = skin * (0.8 + 0.4 * vn(P * 90.0, 32))[:, None] * (1 - 0.0)
         sk = sk * (1 - 0.35 * sst(0.5, 0.8, fbm(P * 30.0, 2, seed=33)))[:, None] + bruise * 0.0
-        override(hard == 0, sk, r=0.55, k=thin * 0.85)
+        override(hard == 0, sk, r=0.55, k=thin * 0.8)
         # ribs: the fur is thin over them
         ribs = np.isin(dom, list(TORSO)) & (np.abs(P[:, 0]) > 0.17) & (P[:, 1] > -0.42) & (P[:, 1] < -0.02) & (P[:, 2] < 1.02) & (P[:, 2] > 0.6)
         override(ribs, skin * 0.92, r=0.55, k=ribs * 0.55 * sst(0.4, 0.7, np.abs(N[:, 0])))
@@ -456,11 +459,11 @@ def paint(tx, variant, tools):
             override(hard == 0, col, r=0.5, k=k)
             a, b = pt["stitch"]
             ds, ts = _seg_dist(P, a, b)
-            cut = 1 - sst(0.002, 0.005, ds)
-            override(hard == 0, _hex("#4a1f1c"), r=0.4, k=cut * (k > 0.3))
+            cut = 1 - sst(0.003, 0.007, ds)
+            override(hard == 0, _hex("#3e1714"), r=0.4, k=cut * (k > 0.3))
             L = float(np.linalg.norm(np.array(b) - np.array(a)))
-            ph = (ts * L / 0.022) % 1.0
-            cross = (np.abs(ph - 0.5) < 0.12) & (ds < 0.016)
+            ph = (ts * L / 0.024) % 1.0
+            cross = (np.abs(ph - 0.5) < 0.16) & (ds < 0.02) & (ts > 0.02) & (ts < 0.98)
             override(hard == 0, _hex("#1c1714"), r=0.6, k=cross.astype(np.float32))
             gT = np.where(cross, gT + 0.4 * np.sign(vn(P * 500.0, 7) - 0.5), gT)
         # scabs here and there
@@ -574,3 +577,13 @@ def blood_mask(P, tools):
     speck = sst(0.72, 0.8, vn(P * 140.0, 13))
     m = np.maximum(m, speck * 0.85 * (m > 0.05))
     return np.clip(m * (0.7 + 0.3 * vn(P * 200.0, 17)), 0, 1).astype(np.float32)
+
+
+# Sockets (RigSpec ANIMAL_SOCKETS): bone and a point in Blender coordinates; publish.py converts them to
+# offsets in the bone's (axis-aligned) frame, Roblox axes, for Attachments parented to the Bones.
+SOCKETS = {
+    "HeadSocket": ("Head", (0.0, -0.86, 1.36)),
+    "MouthSocket": ("Jaw", (0.0, -1.10, 1.06)),
+    "TailTip": ("Tail8", TAIL[-1]),
+    "ChestCenter": ("Chest", (0.0, -0.40, 0.86)),
+}

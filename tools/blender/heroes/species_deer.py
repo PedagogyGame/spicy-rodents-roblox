@@ -310,3 +310,11 @@ def antlers():
         v, f = curved_spike(base - [0, 0, 0.03], (0.55 * sx, 0.35, 1.0), 0.05, 0.085, curl=(0, 0, 0), curl_amt=0, sides=8, segs=1)
         parts.append((v, f))
     return parts
+
+
+SOCKETS = {
+    "HeadSocket": ("Head", (0.0, -2.36, 5.36)),
+    "MouthSocket": ("Jaw", (0.0, -2.95, 4.55)),
+    "TailTip": ("Tail2", TAIL[-1]),
+    "ChestCenter": ("Chest", (0.0, -0.80, 3.20)),
+}

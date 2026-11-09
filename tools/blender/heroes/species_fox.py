@@ -300,3 +300,11 @@ def card_shape(P, N, F, dom, variant, rng):
     lift = np.where(tail, rng.uniform(0.3, 0.7, k), rng.uniform(0.2, 0.4, k))
     roll = np.where(tail, rng.uniform(-1.3, 1.3, k), rng.uniform(-0.6, 0.6, k))
     return {"length": L, "width": W, "lift": lift, "roll": roll, "droop": np.full(k, 0.25)}
+
+
+SOCKETS = {
+    "HeadSocket": ("Head", (0.0, -1.50, 2.42)),
+    "MouthSocket": ("Jaw", (0.0, -1.95, 2.00)),
+    "TailTip": ("Tail6", TAIL[-1]),
+    "ChestCenter": ("Chest", (0.0, -0.70, 1.50)),
+}

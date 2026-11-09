@@ -54,12 +54,12 @@ def eye_textures(variant, out_dir, res=256, name=None):
         c = np.where(((th > pupil) & (th < iris))[..., None], irisc, c)
         c = np.where((th >= iris)[..., None], np.array([0.04, 0.03, 0.025]), c)
     elif variant == "rodent":
-        pupil, iris = 11.0, 40.0
+        pupil, iris = 9.0, 50.0
         # sclera: yellowed with red veins running in toward the iris
-        sclera = np.array([0.86, 0.80, 0.66])
+        sclera = np.array([0.80, 0.66, 0.46])
         veins = tx.strands(np.stack([u.ravel() * 9, th.ravel() * 0.02, np.zeros(res * res)], -1).astype(F32),
                            np.tile(np.array([[0, 1, 0]], F32), (res * res, 1)), 0.35, 4.0, seed=9).reshape(res, res)
-        vmask = np.clip((veins - 0.62) * 6, 0, 1) * np.clip((th - iris) / 30, 0, 1)
+        vmask = np.clip((veins - 0.55) * 5, 0, 1) * np.clip((th - iris + 5) / 20, 0, 1)
         red = np.array([0.62, 0.06, 0.05])
         c = sclera[None, None] * (1 - vmask[..., None]) + red * vmask[..., None]
         c = c * (1 - 0.35 * np.clip((th - 75) / 40, 0, 1))[..., None] + np.array([0.5, 0.1, 0.08]) * 0.35 * np.clip((th - 75) / 40, 0, 1)[..., None]
