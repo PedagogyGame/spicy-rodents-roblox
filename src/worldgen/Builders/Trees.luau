@@ -176,8 +176,8 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 	local tc, tl = arcs(trunkLine)
 
 	-- 1. bark --------------------------------------------------------------------------------------
-	-- trunk: pieces of at most 6 studs, each at the squirrel's tapered trunk radius
-	local nT = math.max(2, math.ceil(tl / 6))
+	-- trunk: pieces of at most 8 studs, each at the squirrel's tapered trunk radius
+	local nT = math.max(2, math.ceil(tl / 8))
 	for k = 1, nT do
 		local a = at(trunkLine, tc, tl * (k - 1) / nT)
 		local b = at(trunkLine, tc, tl * k / nT)
@@ -188,8 +188,8 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 	local g, paved = opts.groundAt(foot[1], foot[3], foot[2] + 2)
 	local r0 = trunkRadius(trunk, 0)
 	if not paved then
-		cylinder(list, "Flare", { foot[1], g - 1.2, foot[3] }, { foot[1], g + 1.6 * scale, foot[3] }, r0 * 1.32, 0, {
-			color = shade(barkColor, 0.92),
+		cylinder(list, "Flare", { foot[1], g - 1.2, foot[3] }, { foot[1], g + 0.9 * scale, foot[3] }, r0 * 1.16, 0, {
+			color = barkColor,
 			material = "Wood",
 			canCollide = false,
 			canQuery = false,
@@ -227,7 +227,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		for k = 1, n do
 			local a, e = b.line[k], b.line[k + 1]
 			local sl = len3(sub(e, a))
-			local parts = math.max(1, math.ceil(sl / 8))
+			local parts = math.max(1, math.ceil(sl / 11))
 			for j = 1, parts do
 				piece += 1
 				local f0, f1 = (j - 1) / parts, j / parts
@@ -304,7 +304,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		end
 		local t0 = if b.route.kind == "bridge" then 0.08 elseif b.route.kind == "lookout" then 0.25 else 0.3
 		local t1 = if b.route.kind == "bridge" then 0.94 else 1
-		local step = math.clamp(4.6 * scale, 2.6, 6.5)
+		local step = math.clamp(5.4 * scale, 3, 7.5)
 		local s = b.L * t0
 		local i = 0
 		while s <= b.L * t1 + 1e-6 do
@@ -324,17 +324,17 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				table.insert(cand, { p = { p[1] + ox, p[2] + oy, p[3] + oz }, r = r, pri = pri })
 			end
 			for _, sg in { -1, 1 } do
-				local r = scale * (2.7 + 2.0 * u) * (0.85 + 0.3 * rand())
+				local r = scale * (3.0 + 2.6 * u) * (0.75 + 0.5 * rand())
 				local off = r + 1.4 + 0.9 * rand()
-				cl(r, side[1] * sg * off, r * 0.2 + rand() * 1.2, side[3] * sg * off, 2)
+				cl(r, side[1] * sg * off, r * 0.25 + rand() * 1.2, side[3] * sg * off, 2)
 			end
 			if u > 0.4 or b.route.kind == "bridge" then
-				local r = scale * (3.2 + 2.2 * u) * (0.85 + 0.3 * rand())
+				local r = scale * (3.6 + 3.0 * u) * (0.75 + 0.5 * rand())
 				local off = r + 3.8 + 1.2 * rand()
 				cl(r, up[1] * off, up[2] * off, up[3] * off, 1)
 			end
 			if i % 2 == 0 then
-				local r = scale * (2.6 + 1.6 * u) * (0.85 + 0.3 * rand())
+				local r = scale * (2.8 + 2.0 * u) * (0.8 + 0.4 * rand())
 				cl(r, 0, -(r + 0.15), 0, 3)
 			end
 			s += step
@@ -344,7 +344,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 	for _, e in tips do
 		for k = 1, 5 do
 			local a = (k / 5 + rand() * 0.15) * 2 * math.pi
-			local r = scale * (3.8 + 1.8 * rand())
+			local r = scale * (4.2 + 2.6 * rand())
 			local off = r + 1.8 + rand() * 1.5
 			table.insert(cand, {
 				p = { e[1] + math.cos(a) * off, e[2] + r * 0.35 + rand() * 2, e[3] + math.sin(a) * off },
@@ -352,7 +352,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				pri = 1,
 			})
 		end
-		local r = scale * (4.2 + 1.5 * rand())
+		local r = scale * (5 + 2 * rand())
 		table.insert(cand, { p = { e[1], e[2] + r + 3.9, e[3] }, r = r, pri = 0 })
 	end
 	-- the crown dome over the tips
@@ -379,14 +379,14 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 	local rv = math.max(rh * 0.5, (yMax - yMin) / 2 + 5 * scale)
 	local ccy = math.max(cy, top[2]) + rv * 0.25
 	local area = 2 * math.pi * rh * rv * 1.3
-	local nd = math.clamp(math.floor(area / (math.pi * (4.8 * scale) ^ 2) * 1.1), 10, 90)
+	local nd = math.clamp(math.floor(area / (math.pi * (5.6 * scale) ^ 2) * 1.15), 10, 80)
 	local golden = math.pi * (3 - math.sqrt(5))
 	for k = 0, nd - 1 do
 		local y = 1 - (k + 0.5) / nd * 1.35 -- 1 .. -0.35: the top and the sides, an open underside
 		local rr = math.sqrt(math.max(0, 1 - y * y))
 		local a = golden * k
-		local r = scale * (4.0 + 2.6 * rand())
-		local f = 0.86 + 0.08 * rand()
+		local r = scale * (4.6 + 3.0 * rand())
+		local f = 0.84 + 0.1 * rand()
 		table.insert(cand, {
 			p = { cx + math.cos(a) * rr * rh * f, ccy + y * rv * f, cz + math.sin(a) * rr * rh * f },
 			r = r,
@@ -424,7 +424,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		if ok then
 			for _, q in accepted do
 				local d = len3(sub(c.p, q.p))
-				if d < 0.55 * (c.r + q.r) then
+				if d < 0.5 * (c.r + q.r) then
 					ok = false
 					break
 				end
@@ -438,10 +438,13 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 	for _, c in accepted do
 		lo, hi = math.min(lo, c.p[2]), math.max(hi, c.p[2])
 	end
+	local g1 = (trunk.id % #greens) + 1
+	local pick = { greens[g1], greens[(g1 % #greens) + 1], greens[((g1 + 1) % #greens) + 1] }
 	for i, c in accepted do
-		local base = greens[math.floor(rand() * #greens) + 1]
+		local roll = rand()
+		local base = if roll < 0.5 then pick[1] elseif roll < 0.85 then pick[2] else pick[3]
 		local h = if hi > lo then (c.p[2] - lo) / (hi - lo) else 0.5
-		local col = shade(base, 0.84 + 0.2 * h + (rand() - 0.5) * 0.1)
+		local col = shade(base, 0.9 + 0.14 * h + (rand() - 0.5) * 0.06)
 		local d = 2 * c.r
 		list:add(ORIGIN :: any, `Leaves{i}`, c.p[1], c.p[2], c.p[3], d, d, d, {
 			shape = "Ball",
