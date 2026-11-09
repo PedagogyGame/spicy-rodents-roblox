@@ -313,7 +313,7 @@ def author_all(sp, variant, arm, skel, opts, log):
         info.update({
             "path": path,
             "key_frames": [k + 1 for k in spec.get("keys", [0, spec["frames"] // 4, spec["frames"] // 2, 3 * spec["frames"] // 4])],
-            "view": spec.get("view", [-62, 8]),
+            "view": spec.get("view", [-14, 6]),
             "brief": spec.get("brief", name),
             "nominalSpeed": spec.get("nominal_speed"),
             "markers": [list(m) for m in spec.get("markers", ())],

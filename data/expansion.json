@@ -27,7 +27,8 @@
       "end": 1620,
       "width": 24,
       "sidewalk": { "width": 6, "offset": 15 },
-      "notes": "New lane south of Main Street: from the cross street east past the steakhouse, the bowling alley's front steps, the racquet club and both lounges to a turning circle (xp_bowl_lane_turn). Two lanes, no traffic AI."
+      "joins": ["rd_022_commercial_cross_x347", "rd_024_commercial_sidewalk_x364.5"],
+      "notes": "New lane south of Main Street (centre z -312, clear of the cross-street lamp R13 at z -288): from the cross street east past the steakhouse, the bowling alley's front steps, the antique store, both lounges and the racquet club to a turning circle (xp_bowl_lane_turn). Two lanes, no traffic AI."
     },
     {
       "id": "xs_liberty_ave",
@@ -40,6 +41,7 @@
       "end": -537.5,
       "width": 45,
       "sidewalk": { "width": 8.25, "offset": 30.25 },
+      "joins": ["rd_022_commercial_cross_x347"],
       "notes": "The cross street continued south into the civic quarter; xp_liberty_taper joins the 72.5-wide cross street to this 45-wide avenue at z -537.5."
     },
     {
@@ -53,6 +55,7 @@
       "end": 2300,
       "width": 50,
       "sidewalk": { "width": 8.75, "offset": 30.25 },
+      "joins": ["rd_037_estate_avenue", "rd_038_estate_sidewalk_z-317.1", "rd_039_estate_sidewalk_z-292.9"],
       "notes": "The estate avenue continued east (same width and sidewalks) past the museum, the green, the school, the church and on to the old TV station."
     },
     {
@@ -66,6 +69,7 @@
       "end": -610,
       "width": 37.5,
       "sidewalk": { "width": 6.25, "offset": 25 },
+      "joins": ["rd_071_westside_street", "rd_072_westside_sidewalk_x-299", "rd_073_westside_sidewalk_x-279"],
       "notes": "The westside street continued south to the sky-lift base station and its car park."
     },
     {
@@ -79,6 +83,7 @@
       "end": 693.75,
       "width": 22,
       "sidewalk": { "width": 5, "offset": 13.5 },
+      "joins": ["rd_019_commercial_blvd", "rd_021_commercial_sidewalk_z17.4", "rd_049_north_cross_z283", "rd_050_north_cross_sidewalk_z273.7"],
       "notes": "From Main Street north between the fuel market and the shop row to the north cross road; serves the mall car park and the north-east service alley. Threaded between the boulevard lamp R25 (1397.7, 36) and the north-cross lamp L29 (1358.7, 690.5): keep the 22 + 2 x 5 width."
     },
     {
@@ -92,6 +97,7 @@
       "end": 1665,
       "width": 27.5,
       "sidewalk": { "width": 5.5, "offset": 23.25 },
+      "joins": ["rd_049_north_cross_z283", "rd_050_north_cross_sidewalk_z273.7", "rd_051_north_cross_sidewalk_z292.3"],
       "notes": "Stub that carries the north cross road on to Marina Road."
     },
     {
@@ -105,6 +111,7 @@
       "end": 1345,
       "width": 30,
       "sidewalk": { "width": 6, "offset": 18 },
+      "joins": [],
       "notes": "North from the north cross road between the cemetery and the quay lawn down to the marina car park."
     }
   ],
