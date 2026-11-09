@@ -468,13 +468,26 @@ function RouteProps.plans(
 				local dx, dz = b[1] - a[1], b[3] - a[3]
 				local len = math.sqrt(dx * dx + dz * dz)
 				if len > 1e-3 then
-					list:add(ORIGIN, `Panel_{k}`, mx, top - h / 2, mz, if parapet then 1.2 else 0.3, h, len + 0.05, {
-						yaw = math.atan2(-dx, -dz),
-						color = if parapet then STONE else LOOK.fence.color,
-						material = if parapet then "Limestone" else LOOK.fence.material,
-						role = "Fence",
-						attrs = { Embedded = true },
-					})
+					-- the panel follows the rail's slope (ramps, hillside fences)
+					local dy = b[2] - a[2]
+					list:add(
+						ORIGIN,
+						`Panel_{k}`,
+						mx,
+						top - h / 2,
+						mz,
+						if parapet then 1.2 else 0.3,
+						h,
+						math.sqrt(len * len + dy * dy) + 0.05,
+						{
+							yaw = math.atan2(-dx, -dz),
+							pitch = math.atan2(dy, len),
+							color = if parapet then STONE else LOOK.fence.color,
+							material = if parapet then "Limestone" else LOOK.fence.material,
+							role = "Fence",
+							attrs = { Embedded = true },
+						}
+					)
 				end
 			end
 		else

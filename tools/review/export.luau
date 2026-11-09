@@ -24,7 +24,8 @@
 --              with the WorldTerrain surface material per column and the river water mask, plus a coarse
 --              grid over the D32 world clamp (the boot terrain the player stands on; Lune cannot read voxels).
 --   zfight   : { differentLook = { { a, b, y, area, at, looks } }, sameLookPairs }: level Block parts whose top
---              faces coincide (within 0.005 st) and overlap: z-fighting in Roblox when colour or material differ.
+--              faces coincide (within 0.005 st at the centre of their overlap, measured on the face planes) and
+--              overlap: z-fighting in Roblox when colour or material differ.
 --   lineup   : placement of each placeholder puppet in a row toward -X on a ground plane at y = 0 (root at
 --              HipHeight or BaseOffset above it, authored facing -Z kept, so a camera at -Z reads the row left to
 --              right), with labels and the measured foot gap.
@@ -288,7 +289,17 @@ for a = 1, #tops do
 		local B = tops[b]
 		local ox = math.min(A.hi.X, B.hi.X) - math.max(A.lo.X, B.lo.X)
 		local oz = math.min(A.hi.Z, B.hi.Z) - math.max(A.lo.Z, B.lo.Z)
-		if ox > 0.05 and oz > 0.05 and ox * oz > 0.5 then
+		-- the real top faces at the overlap centre (a part tilted under 0.8 degrees still counts as level,
+		-- and its AABB top can sit a few hundredths above its face: compare the face planes, not the AABBs)
+		local mx = (math.max(A.lo.X, B.lo.X) + math.min(A.hi.X, B.hi.X)) / 2
+		local mz = (math.max(A.lo.Z, B.lo.Z) + math.min(A.hi.Z, B.hi.Z)) / 2
+		local function faceY(part: any): number
+			local cf, sz = part.CFrame, part.Size
+			local up = cf.YVector
+			local q = cf.Position + up * (sz.Y / 2)
+			return q.Y - (up.X * (mx - q.X) + up.Z * (mz - q.Z)) / up.Y
+		end
+		if ox > 0.05 and oz > 0.05 and ox * oz > 0.5 and math.abs(faceY(A.part) - faceY(B.part)) < 0.005 then
 			if A.look == B.look then
 				zfightSameLook += 1
 			else

@@ -334,22 +334,33 @@ local function detail(lot: any, body: Spec.PartSpec, list: Spec.PartList, seat: 
 			then { 60, 120, 170 }
 			elseif kind == "wheelbarrow" then { 150, 60, 50 }
 			else { 70, 130, 70 }
-	elseif kind == "porch_swing" or kind == "window_box" then
-		body.sy, body.cy = 1.2, seat + 1.4
+	elseif kind == "porch_swing" then
+		-- a garden swing: the seat hangs from a top bar on two posts
+		body.sy, body.cy = 0.5, seat + 1.6
 		body.color, body.material = WOOD, "WoodPlanks"
-		if kind == "window_box" then
-			add(
-				list,
-				"Flowers",
-				x,
-				seat + 2.3,
-				z,
-				body.sx * 0.9,
-				0.8,
-				body.sz * 0.9,
-				{ color = { 196, 84, 104 }, material = "LeafyGrass", canCollide = false, role = "Trim" }
-			)
+		local along = body.sx >= body.sz
+		local L = math.max(body.sx, body.sz)
+		for k, s in { -1, 1 } do
+			local px = if along then x + s * (L / 2 + 0.3) else x
+			local pz = if along then z else z + s * (L / 2 + 0.3)
+			post(list, `SwingPost{k}`, px, pz, seat - 0.3, seat + 6, 0.25, WOOD, "Wood", false)
 		end
+		add(list, "SwingBar", x, seat + 6, z, if along then L + 1 else 0.4, 0.4, if along then 0.4 else L + 1, {
+			color = WOOD,
+			material = "Wood",
+			canCollide = false,
+			role = "Trim",
+		})
+	elseif kind == "window_box" then
+		-- a planter box on the ground with flowers
+		body.sy, body.cy = 1.2, seat + 0.6
+		body.color, body.material = WOOD, "WoodPlanks"
+		add(list, "Flowers", x, seat + 1.5, z, body.sx * 0.9, 0.8, body.sz * 0.9, {
+			color = { 196, 84, 104 },
+			material = "LeafyGrass",
+			canCollide = false,
+			role = "Trim",
+		})
 	end
 end
 
