@@ -168,10 +168,13 @@ local function blockPart(
 	q: number,
 	sx: number,
 	sz: number,
-	isChild: boolean
+	isChild: boolean,
+	hidden: boolean
 ): PartSpec
 	local solid = Kits.isSolid(kit.category) and not isChild
-	local transparency = if isChild then 0.7 elseif kit.category == "marker" then 1 else 0
+	-- a child zone inside an enterable programme building (the v5.4 hospital zones) is only a named
+	-- marker: as a see-through box it stood through the rooms and their furniture
+	local transparency = if hidden then 1 elseif isChild then 0.7 elseif kit.category == "marker" then 1 else 0
 	local h = kit.heightU * SPU
 	local cy, sy
 	if kit.category == "plate" then
@@ -299,7 +302,8 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 			family(lctx)
 		end
 	else
-		local body = list:world(blockPart(lot, kit, seat, q, sx, sz, isChild))
+		local hidden = isChild and BUILDING_BY_LOT[ctx.parentId :: string] ~= nil
+		local body = list:world(blockPart(lot, kit, seat, q, sx, sz, isChild, hidden))
 		if not isChild then
 			Props.dress(lot, kit, body, list, seat)
 		end

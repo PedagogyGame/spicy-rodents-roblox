@@ -2,8 +2,8 @@
 -- ServerScriptService.Server.WorldGen.Spec
 -- BuildPlan data types and the part/extra helpers every builder family uses (BUILD_PLAN §1.4
 -- WorldGen; W1 #7). A BuildPlan is pure data: parts (world-space boxes, cylinders and wedges) plus
--- extras (SurfaceGui signs, ProximityPrompt placeholders, Attachments, Beams). Factory turns it into
--- Instances in Lune or the engine; Bake hashes it (BakeParity).
+-- extras (SurfaceGui signs, ProximityPrompt placeholders, Attachments, Beams, PointLights). Factory
+-- turns it into Instances in Lune or the engine; Bake hashes it (BakeParity).
 -- Interface: list() -> PartList; PartList:add(frame, name, mx, my, mz, sx, sy, sz, opts) -> PartSpec;
 --   PartList:world(name, spec) ; PartList:extra(ExtraSpec)
 -- Pure: no Instances, no side effects on require.
@@ -40,7 +40,7 @@ export type PartSpec = {
 	transparency: number,
 	shape: string?, -- "Block" (default) | "Cylinder" | "Ball" | "Wedge" (a WedgePart: slope rises toward local +Z)
 	castShadow: boolean?, -- default: canCollide
-	role: string?, -- Body, Roof, Wall, Floor, Door, Sign, Room, Station, Shelf, Pad, Furniture, Limb, Pipe, Rail, Post, Anchor, Skyline
+	role: string?, -- Body, Roof, Wall, Floor, Door, Sign, Room, Station, Shelf, Pad, Furniture, Limb, Pipe, Rail, Post, Anchor, Skyline, Trim, Window, Step, Ceiling, Finish, Light
 	canQuery: boolean?, -- default: transparency < 1
 	attrs: { [string]: string | number | boolean }?,
 	mesh: MeshSpec?, -- a MeshPart instead of a Part (shape is ignored)
@@ -51,6 +51,7 @@ export type PartSpec = {
 --   Prompt:     an Attachment `name` at local `offset` holding a disabled ProximityPrompt placeholder
 --   Attachment: `name` at local `offset` with attributes
 --   Beam:       between Attachments `a` and `b` of `part`; p0/p1 are their world points (RouteCheck)
+--   PointLight: `name` under `part` with `color`, `range` (studs, at most 60), `brightness`, `shadows`
 export type ExtraSpec = {
 	kind: string,
 	part: string,
@@ -65,6 +66,9 @@ export type ExtraSpec = {
 	p1: { number }?,
 	width: number?,
 	color: { number }?,
+	range: number?,
+	brightness: number?,
+	shadows: boolean?,
 	attrs: { [string]: string | number | boolean }?,
 }
 

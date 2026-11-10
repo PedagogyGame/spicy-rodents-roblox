@@ -10,7 +10,8 @@
 --   plans(data) -> { BuildPlan }; hash(plans) -> hex; instanceHash(town) -> hex
 -- BakeHash hashes the plan with every number rounded to 1e-3 studs, so libm ulp differences
 -- between Lune and the engine cannot flip it. InstanceHash hashes the built Instances' structure
--- (paths, classes, colours, materials, flags, LOD, streaming, attributes): exact in both runtimes.
+-- (paths, classes, colours, materials, flags incl. CanQuery, LOD, streaming, attributes, PointLight
+-- range and brightness): exact in both runtimes. Town carries LightCount (PointLights baked).
 -- Geometry (Size, CFrame) is float32 and rounds differently in each runtime (measured in S6: 131 of
 -- 2,128 lines flip at a 1e-2 grid), so it is compared with a tolerance instead: geometry(town)
 -- returns path -> 10 numbers and maxGeometryDelta(a, b) the worst difference.
@@ -31,7 +32,7 @@ local Height = Import.shared("World/Height") :: typeof(require("../shared/World/
 
 local Bake = {}
 
-Bake.VERSION = 2
+Bake.VERSION = 3 -- 3: canQuery and light parameters are hashed; PointLights in the instance lines
 
 export type Data = { lots: { Plan.Lot }, roads: { Plan.Road }, routes: { any }?, lighting: any?, treeArt: { any }? }
 
@@ -210,6 +211,7 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 					if s.castShadow == nil then "" else tostring(s.castShadow),
 					s.role or "",
 					attrList(s.attrs) .. (if s.mesh then "|mesh:" .. s.mesh.id else ""),
+					if s.canQuery == nil then "" else tostring(s.canQuery),
 				}, "|")
 			)
 		end
@@ -223,6 +225,13 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 				`  +{e.kind}|{e.part}|{e.name}|{e.text or ""}|{e.a or ""}|{e.b or ""}|{table.concat(nums, ",")}|{attrList(
 					e.attrs
 				)}`
+					.. (
+						if e.kind == "PointLight"
+							then `|{q(e.range or 12, "%.1f")}|{q(e.brightness or 1, "%.2f")}|{tostring(
+								e.shadows == true
+							)}|{table.concat(e.color or { 255, 255, 255 }, ",")}`
+							else ""
+					)
 			)
 		end
 	end
@@ -244,8 +253,13 @@ function Bake.run(data: Data, factory: Factory.Factory): any
 		folders[name] = factory.instance("Folder", name)
 	end
 	local counts = { lot = 0, road = 0, props = 0, lamps = 0, skyline = 0 }
-	local partCount = 0
+	local partCount, lightCount = 0, 0
 	for _, p in plans do
+		for _, e in p.extras or {} do
+			if e.kind == "PointLight" then
+				lightCount += 1
+			end
+		end
 		local model = if p.kind == "road" then RoadBuilder.build(p, factory) else Greybox.build(p, factory)
 		model.Parent = if p.kind == "skyline" then town else folders[FOLDER[p.kind]]
 		counts[p.kind] += 1
@@ -262,6 +276,7 @@ function Bake.run(data: Data, factory: Factory.Factory): any
 	town:SetAttribute("PropCount", counts.props)
 	town:SetAttribute("LampModels", counts.lamps)
 	town:SetAttribute("PartCount", partCount)
+	town:SetAttribute("LightCount", lightCount)
 	town:SetAttribute("InstanceHash", Bake.instanceHash(town))
 	return town
 end
@@ -289,6 +304,7 @@ function Bake.instanceLines(town: any): { string }
 						tostring(child.CanCollide),
 						tostring(child.Anchored),
 						q(child.Transparency, "%.2f"),
+						tostring(child.CanQuery),
 					}, "|")
 				)
 			elseif
@@ -297,12 +313,19 @@ function Bake.instanceLines(town: any): { string }
 				or child:IsA("Attachment")
 				or child:IsA("Beam")
 				or child:IsA("TextLabel")
+				or child:IsA("PointLight")
 			then
 				local extra = ""
 				if child:IsA("TextLabel") then
 					extra = child.Text
 				elseif child:IsA("ProximityPrompt") then
 					extra = child.ActionText .. "/" .. tostring(child.Enabled)
+				elseif child:IsA("PointLight") then
+					extra = q(child.Range, "%.1f")
+						.. "/"
+						.. q(child.Brightness, "%.2f")
+						.. "/"
+						.. tostring(child.Enabled)
 				elseif child:IsA("Beam") then
 					extra = (if child.Attachment0 then child.Attachment0.Name else "")
 						.. ">"
