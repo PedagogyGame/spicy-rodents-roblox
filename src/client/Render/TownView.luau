@@ -8,8 +8,12 @@
 --     lot's own model is streamed out, so near the player the real roofs, windows and colours show.
 --   * Night-aware: the pool follows Lighting's StreetLamps attribute (0..1, written by Client/World/Sky from the
 --     day cycle): off by day, fading in at dusk, full at night; without the attribute the lamps stay on.
+--   * Building lights: Render/TownLights (started and stopped here) makes the room fixtures and the tagged
+--     home windows of the streamed-in lots glow at night.
 -- Started by Render/VehicleView.start (Main's single client script stays the only script).
 -- Interface: start() -> stop(); nearest(points, x, z, max, radius) -> { index } (pure); level() -> 0..1
+
+local TownLights = require("./TownLights")
 
 local TownView = {}
 
@@ -55,6 +59,12 @@ function TownView.start(): () -> ()
 	local alive = true
 	local conns: { RBXScriptConnection } = {}
 	local lights: { PointLight } = {}
+	-- room fixtures and home windows of the lots themselves (its own wait for the town; a failure
+	-- there leaves the baked look and never stops the street lamps)
+	local okLights, stopLights = pcall(TownLights.start)
+	if not okLights then
+		warn("TownView: building lights did not start: " .. tostring(stopLights))
+	end
 	task.spawn(function()
 		local town = workspace:WaitForChild("Town", 120)
 		local skyline = town and town:WaitForChild("Skyline", 60)
@@ -164,6 +174,9 @@ function TownView.start(): () -> ()
 	end)
 	return function()
 		alive = false
+		if okLights and type(stopLights) == "function" then
+			stopLights()
+		end
 		for _, c in conns do
 			c:Disconnect()
 		end

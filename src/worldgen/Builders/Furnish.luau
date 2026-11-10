@@ -32,6 +32,7 @@
 local Facade = require("./Facade")
 local Furniture = require("./Furniture")
 local Spec = require("../Spec")
+local Yield = require("../Yield")
 
 local Furnish = {}
 
@@ -1467,6 +1468,7 @@ function Furnish.plan(ctx: Spec.LotCtx, info: Info): Plan
 				end
 			end
 			table.insert(rooms, room)
+			Yield.breathe() -- (engine bakes: a big room is many flood fills)
 			local res = Furnish.layout(room, Furnish.RECIPES[r.kind] or Furnish.RECIPES.generic, tones)
 			layouts[r.id] = res
 			for _, k in res.skipped do

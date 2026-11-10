@@ -20,6 +20,7 @@
 
 local Geometry = require("./Geometry")
 local Spec = require("./Spec")
+local Yield = require("./Yield")
 
 local InteriorCheck = {}
 
@@ -472,6 +473,7 @@ function InteriorCheck.run(plans: { Spec.BuildPlan }): { [string]: any }
 	local out = { lots = 0, rooms = 0, lights = 0, pieces = 0, failures = {} :: { string } }
 	for _, p in plans do
 		if p.kind == "lot" and p.attributes.Enterable == true then
+			Yield.breathe()
 			local r = InteriorCheck.lot(p)
 			out.lots += 1
 			out.rooms += r.rooms
