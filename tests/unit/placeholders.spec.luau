@@ -61,8 +61,8 @@ return function(t)
 			PuppetSpec.spec("deer", { variant = "fawn" }),
 		}
 		for _, spec in cases do
-			-- the one Spicy Rodent carries its extra detail (hackles, claws, fangs, scars); every other animal is lean
-			local budget = if spec.species == "rodent" then 64 else 42
+			-- the Spicy Rodent carries a little extra (a ruffle of fur, embers, teeth, a scar)
+			local budget = if spec.species == "rodent" then 50 else 42
 			t.truthy(#spec.parts <= budget, `{spec.name}: {#spec.parts} parts (budget {budget})`)
 			local hip = (spec.attributes :: any).HipHeight
 			local model = PartBuilder.instantiate(spec, lib)
@@ -200,8 +200,8 @@ return function(t)
 		local belly = byName.Body.pos[2] - byName.Body.size[2] / 2 + 0.9 -- above the ground
 		t.truthy(belly > 0.2 and belly < 0.36, `the belly rides {belly} st off the ground (it was 0.57)`)
 		t.truthy(byName.FrontL_Lower.size[2] <= 0.1 and byName.BackL_Lower.size[2] <= 0.11, "slimmer legs")
-		-- Owner 2026-11-10: "make squirrel as dark and edgy as possible, which will still work on kid
-		-- access Roblox games ... quite distinct, and different enough from the other infected squirrels".
+		-- Owner 2026-11-10, on a soot-black rodent with a dead eye, fangs, claws and a bone tail: "too
+		-- edgy ... combine those two back together and aim really for a more textured thing".
 		local rd = PuppetSpec.spec("rodent")
 		local rp: { [string]: any } = {}
 		for _, p in rd.parts do
@@ -210,41 +210,51 @@ return function(t)
 		local function lum(c: any): number
 			return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
 		end
-		-- soot-black where a squirrel is rust: no fur part is even a third as bright as the squirrel's
-		for _, name in { "Body", "Head", "Hips", "Chest", "Spine2", "Tail2", "FrontL_Upper", "BackR_Upper" } do
-			t.truthy(lum(rp[name].color) < 0.09, `{name} is dark ({lum(rp[name].color)})`)
-			t.truthy(lum(rp[name].color) < lum(byName[name].color) / 3, `{name} is far darker than a squirrel's`)
+		-- a blend: clearly darker than a squirrel, nowhere near black, and still warm (red over blue)
+		for _, name in { "Body", "Head", "Hips", "Chest", "Tail2", "FrontL_Upper", "BackR_Upper" } do
+			local mine, theirs = lum(rp[name].color), lum(byName[name].color)
+			t.truthy(mine < theirs * 0.7, `{name} is darker than a squirrel's ({mine} vs {theirs})`)
+			t.truthy(mine > theirs * 0.3 and mine > 0.12, `{name} is not black ({mine})`)
+			t.truthy(rp[name].color.r > rp[name].color.b * 1.5, `{name} keeps a warm brown`)
 		end
-		-- what no squirrel has: a dead eye beside the glowing one, fangs, claws, hackles, embers, a scar
-		for _, name in { "DeadEye", "Teeth", "Fang2", "BloodBib", "BloodDrip", "Scar", "Stitch1", "Hackle1", "Hackle5" } do
+		-- a squirrel's outline: the same bushy tail within a quarter, the same bones
+		for i = 1, 8 do
+			local ratio = rp[`Tail{i}`].size[1] / byName[`Tail{i}`].size[1]
+			t.truthy(ratio > 0.55 and ratio <= 1, `Tail{i} is a squirrel's tail, a little ragged ({ratio})`)
+		end
+		-- what marks it out: glowing red eyes, a ruffle of raised fur, two embers, buck teeth, a scar
+		for _, name in { "Teeth", "Blood", "Scar", "Hackle1", "Hackle3", "Ember1", "Ember2" } do
 			t.truthy(rp[name] ~= nil, `the rodent has {name}`)
 			t.eq(byName[name], nil, `a squirrel has no {name}`)
 		end
-		for _, side in { "FrontL", "FrontR", "BackL", "BackR" } do
-			t.truthy(rp[`{side}_Claw`] ~= nil, `{side} claw`)
-			t.truthy(lum(rp[`{side}_Claw`].color) > 0.5, "claws are bone")
-		end
-		t.truthy(lum(rp.DeadEye.color) > 0.7, "one eye is dead white")
 		t.eq(rp.Eyes.material, "Neon")
-		for i = 1, 3 do
-			t.eq(rp[`Ember{i}`].material, "Neon", "embers glow")
-			t.truthy(rp[`Ember{i}`].color.r > 0.9 and rp[`Ember{i}`].color.g < 0.5)
+		t.eq(rp.Ember1.material, "Neon")
+		-- and what was too much is gone
+		for _, name in { "DeadEye", "Fang2", "BloodBib", "BloodDrip", "Stitch1", "FrontL_Claw", "Hackle4", "Ember3" } do
+			t.eq(rp[name], nil, `no {name}`)
 		end
-		-- stylised blood: red, on the muzzle, the chest and the front paws; nothing green anywhere
-		for _, name in { "Blood", "BloodBib", "BloodDrip", "FrontL_Toe", "FrontR_Toe" } do
-			t.truthy(rp[name].color.r > rp[name].color.g * 3, `{name} is blood red`)
-		end
+		t.truthy(rp.FrontL_Toe.color.r < 0.3, "paws are not red")
 		for _, p in rd.parts do
 			t.truthy(p.color.g <= p.color.r + 0.03, `{p.name} is not green`)
 		end
-		-- the tail is worn to bone between its tufts, and thinner than a squirrel's everywhere
-		t.truthy(lum(rp.Tail8.color) > 0.5 and lum(rp.Tail5.color) > 0.5, "bare bone in the tail")
-		for i = 1, 8 do
-			t.truthy(rp[`Tail{i}`].size[1] < byName[`Tail{i}`].size[1], `Tail{i} is thinner`)
+		-- textured, never flat plastic: fur is fibrous, bellies are cloth, paws are leather
+		for _, spec in { sq, rd, PuppetSpec.spec("fox"), PuppetSpec.spec("deer", { variant = "doe" }) } do
+			local flat = 0
+			for _, p in spec.parts do
+				if
+					p.name ~= "RootPart"
+					and (p.material == nil or p.material == "SmoothPlastic" or p.material == "Plastic")
+				then
+					flat += 1
+				end
+			end
+			t.truthy(flat <= 6, `{spec.name}: {flat} flat plastic parts (eyes, teeth and the like only)`)
 		end
-		-- hunched: its back stands higher over the shoulders than a squirrel's
-		t.truthy(rp.Spine3.pos[2] > byName.Spine3.pos[2] + 0.05, "a hunched back")
-		t.truthy(#rd.parts <= 64, `{#rd.parts} parts (one rodent per server)`)
+		t.eq(byName.Body.material, "Carpet")
+		t.eq(rp.Head.material, "Carpet")
+		t.eq(byName.Pattern.material, "Fabric")
+		t.eq(byName.FrontL_Toe.material, "Leather")
+		t.truthy(#rd.parts <= 50, `{#rd.parts} parts`)
 		local doe = (PuppetSpec.spec("deer", { variant = "doe" }).attributes :: any).HipHeight
 		local fawn = (PuppetSpec.spec("deer", { variant = "fawn" }).attributes :: any).HipHeight
 		t.near(fawn / doe, 0.55, 1e-9)

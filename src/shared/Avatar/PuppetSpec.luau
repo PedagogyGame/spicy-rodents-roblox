@@ -41,23 +41,22 @@ local PuppetSpec = {}
 PuppetSpec.SPECIES = { "squirrel", "rodent", "fox", "deer", "drone", "human" }
 
 -- Palettes (hex). Regular squirrels wear a fox squirrel's rust back and cream belly; the spicy rodent is
--- the thing the town is afraid of (owner 2026-11-10: "make squirrel as dark and edgy as possible, which
--- will still work on kid access Roblox games ... the darkest goriest, scariest squirrel, and it does need
--- to be quite distinct, and different enough from the other infected squirrels"). Nothing about it is a
--- squirrel's colour: soot-black matted fur on a hunched back with a ridge of raised hackles and embers
--- smouldering between them, one glowing red eye and one dead white one, two long fangs, bone claws,
--- stylised blood on the muzzle, chest and front paws, a stitched scar on a bald flank, and a tail worn
--- down to bare bone between its tufts. Kept inside Roblox's Mild label: the blood is flat and
--- unrealistic, and there are no open wounds or organs (no green, BUILD_PLAN §5.6). The red fox
+-- the same animal gone wrong, a blend of a squirrel and something darker (owner 2026-11-10, on the
+-- soot-black version with a dead eye, fangs, claws and bone: "too edgy ... combine those two back together
+-- and aim really for a more textured thing"): a squirrel's shape and bushy tail in dark smoky brown with
+-- a rust undertone, a scorched back, an ember-rust fringe to a ragged tail, glowing red eyes, a slight
+-- hunch with a ruffle of raised fur and two small embers along the spine, crooked buck teeth, a little
+-- red at the corner of the mouth and a scar on a bald flank (no green, mild rating: BUILD_PLAN §5.6).
+-- Fur is drawn in a fibrous material (Carpet), bellies in Fabric and paws in Leather, never flat plastic:
+-- the owner wants the animals textured like the ground they stand on. The red fox
 -- has black socks and a white tail tip; the white-tailed deer a white belly, throat and tail flag.
 -- stylua: ignore
 PuppetSpec.PALETTES = {
 	squirrel = { fur = "#9a5a32", back = "#82492a", head = "#93552f", tail = "#a3643a", fringe = "#c99560",
 	             belly = "#e4c9a0", muzzle = "#d8b98f", ear = "#8a4e2c", foot = "#6b3d23", eyes = "#121010" },
-	rodent = { fur = "#16110f", back = "#0b0908", head = "#1a1412", tail = "#120e0c", fringe = "#2a1210",
-	           belly = "#2b211e", muzzle = "#4a1210", ear = "#120d0b", foot = "#080606", eyes = "#ff1a0a",
-	           mange = "#8f7069", blood = "#8a0f0f", teeth = "#e6dcc0", bone = "#d9cfb4",
-	           ember = "#ff5a14", deadEye = "#d8dde0", stitch = "#050404" },
+	rodent = { fur = "#4d2f22", back = "#2f1d16", head = "#472a1f", tail = "#3d251b", fringe = "#a8502a",
+	           belly = "#8b6b54", muzzle = "#6e4636", ear = "#33201a", foot = "#241612", eyes = "#ff2a1a",
+	           mange = "#9a7d73", blood = "#7a1414", teeth = "#e9dfbd", ember = "#ff6a1e" },
 	fox = { fur = "#c4622d", back = "#b2552a", tail = "#c0602f", fringe = "#d27a45", white = "#f2ede4",
 	        shin = "#5a3020", legs = "#2c2320", ear = "#7d3b1e", nose = "#141110", eyes = "#2a1a0e" },
 	deer = { fur = "#a8784c", back = "#93673f", belly = "#efe7d8", legs = "#9a6e46", hoof = "#2a221d",
@@ -70,7 +69,7 @@ PuppetSpec.PALETTES = {
 -- The species stock looks the avatar blend starts from (Server/Avatar/AvatarBlendService.STOCK).
 PuppetSpec.STOCK_LOOKS = {
 	squirrel = { body = "#9a5a32", pattern = "#e4c9a0", eyes = "#121010", eyesLocked = false },
-	rodent = { body = "#16110f", pattern = "#2b211e", eyes = "#ff1a0a", eyesLocked = true },
+	rodent = { body = "#4d2f22", pattern = "#8b6b54", eyes = "#ff2a1a", eyesLocked = true },
 	fox = { body = "#c4622d", pattern = "#f2ede4", eyes = "#2a1a0e", eyesLocked = false },
 	deer = { body = "#a8784c", pattern = "#efe7d8", eyes = "#15110e", eyesLocked = false },
 } :: { [string]: { body: string, pattern: string, eyes: string, eyesLocked: boolean } }
@@ -103,10 +102,12 @@ type Builder = {
 }
 
 local FUR: Extra = { region = "Body" }
-local CREAM: Extra = { region = "Pattern" }
+local CREAM: Extra = { region = "Pattern", material = "Fabric" }
+local FUR_MATERIAL = "Carpet" -- fibrous, never flat plastic (the owner: "a more textured thing")
 
--- newBuilder(k): every position and size is multiplied by k (the deer's doe/buck/fawn scale).
-local function newBuilder(k: number): Builder
+-- newBuilder(k, material?): every position and size is multiplied by k (the deer's doe/buck/fawn scale);
+-- `material` is what a part is made of unless it says otherwise (the animals' fur).
+local function newBuilder(k: number, material: string?): Builder
 	local parts: { PartSpec } = {}
 	local joints: { JointSpec } = {}
 	local attachments: { AttachmentSpec } = {}
@@ -128,7 +129,7 @@ local function newBuilder(k: number): Builder
 			yaw = e.yaw,
 			pitch = e.pitch,
 			roll = e.roll,
-			material = e.material,
+			material = e.material or material,
 			transparency = e.transparency,
 			reflectance = e.reflectance,
 			attributes = attributes,
@@ -245,7 +246,13 @@ local function leg(b: Builder, name: string, x: number, parent: string, def: Leg
 	b.cyl(`{name}_Foot`, at(3), at(4), def.d[3], def.colors[3], FUR)
 	b.motor(`{name}_Foot`, `{name}_Lower`, at(3))
 	local toe = def.toe
-	b.block(`{name}_Toe`, toe, { x, p[5][1] + toe[2] / 2, (p[4][2] + p[5][2]) / 2 }, def.colors[4], FUR)
+	b.block(
+		`{name}_Toe`,
+		toe,
+		{ x, p[5][1] + toe[2] / 2, (p[4][2] + p[5][2]) / 2 },
+		def.colors[4],
+		{ region = "Body", material = "Leather" }
+	)
 	b.motor(`{name}_Toe`, `{name}_Foot`, at(4))
 end
 
@@ -278,7 +285,7 @@ end
 local function squirrel(species: string, opts: Opts): ModelSpec
 	local rodent = species == "rodent"
 	local c = PuppetSpec.PALETTES[species]
-	local b = newBuilder(1)
+	local b = newBuilder(1, FUR_MATERIAL)
 	local HIP = 0.9
 	-- Owner 2026-11-10: "squirrels legs definitely a bit too tall and big". The body rode 0.57 st off the
 	-- ground on legs as long as it was deep, like a small deer. It is modelled here with the ground LEGS
@@ -289,37 +296,31 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 	local G = -LEGS
 	local mange: Extra = { region = "Body", material = "Sand" }
 	b.block("RootPart", { 0.66, 0.66, 1.4 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
-	-- a smooth capsule torso (Body between the Hips and Chest balls); the spine balls sit just inside
-	-- it, except the rodent's Spine1, which shows a bald patch on its flank
+	-- a smooth capsule torso (Body between the Hips and Chest balls); the spine balls sit just inside it
 	torso(b, {
 		Pelvis = { d = 0.54, pos = { 0, 0.08, 0.46 }, color = c.back },
 		Hips = { d = 0.7, pos = { 0, 0, 0.26 }, color = c.fur },
-		Spine1 = {
-			d = 0.6,
-			pos = { if rodent then 0.1 else 0, if rodent then 0.06 else 0.02, 0.06 },
-			color = if rodent then c.mange else c.back,
-			extra = if rodent then mange else nil,
-		},
-		-- the rodent's back is hunched
-		Spine2 = { d = if rodent then 0.64 else 0.6, pos = { 0, if rodent then 0.1 else 0.02, -0.12 }, color = c.back },
-		Spine3 = { d = if rodent then 0.64 else 0.6, pos = { 0, if rodent then 0.12 else 0.03, -0.28 }, color = c.back },
+		Spine1 = { d = 0.6, pos = { 0, 0.02, 0.06 }, color = c.back },
+		-- the rodent's back is a little hunched
+		Spine2 = { d = if rodent then 0.62 else 0.6, pos = { 0, if rodent then 0.06 else 0.02, -0.12 }, color = c.back },
+		Spine3 = { d = if rodent then 0.62 else 0.6, pos = { 0, if rodent then 0.07 else 0.03, -0.28 }, color = c.back },
 		Chest = { d = 0.64, pos = { 0, -0.03, -0.42 }, color = c.fur },
 	})
 	b.cyl("Body", { 0, -0.02, 0.26 }, { 0, -0.02, -0.42 }, 0.66, c.fur, { overlap = 0 })
 	b.weld("Body", "Spine2")
-	b.cyl("Pattern", { 0, -0.17, 0.2 }, { 0, -0.18, -0.5 }, 0.44, c.belly) -- the cream belly
+	b.cyl("Pattern", { 0, -0.17, 0.2 }, { 0, -0.18, -0.5 }, 0.44, c.belly, { material = "Fabric" }) -- the cream belly
 	b.weld("Pattern", "Spine2")
 	-- neck, a big round head, the muzzle, one bead through the head for both eyes, diamond ears
 	b.ball("Neck", 0.42, { 0, 0.14, -0.62 }, c.fur, FUR)
 	b.motor("Neck", "Chest", { 0, 0.06, -0.52 })
 	local hy, hz = if rodent then 0.32 else 0.36, -0.82 -- the rodent carries its head low
-	b.ball("Head", if rodent then 0.6 else 0.56, { 0, hy, hz }, c.head, FUR)
+	b.ball("Head", if rodent then 0.58 else 0.56, { 0, hy, hz }, c.head, FUR)
 	b.motor("Head", "Neck", { 0, hy - 0.12, -0.7 })
 	b.ball("Jaw", 0.3, { 0, hy - 0.08, hz - 0.24 }, c.muzzle, CREAM)
 	b.motor("Jaw", "Head", { 0, hy - 0.08, hz - 0.14 })
 	local eyeD = if rodent then 0.17 else 0.13 -- the rodent's slightly oversized and glowing red
 	local eyeHalf = if rodent then 0.28 else 0.272
-	local eyeLook: Extra = { reflectance = 0.15, overlap = 0 }
+	local eyeLook: Extra = { reflectance = 0.15, overlap = 0, material = "SmoothPlastic" }
 	if rodent then
 		eyeLook = { material = "Neon", overlap = 0 }
 	end
@@ -337,43 +338,37 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 		b.motor(side.name, "Head", { side.sx * 0.13, hy + 0.2, hz + 0.06 })
 	end
 	if rodent then
-		-- one eye is dead: a milky ball over the left end of the red bead
-		b.ball("DeadEye", 0.2, { -(eyeHalf - 0.03), hy + 0.06, hz - 0.1 }, c.deadEye, { reflectance = 0.2 })
-		b.weld("DeadEye", "Head")
-		-- two long crooked fangs, blood at the mouth, down the chest, and a drop about to fall
-		b.block("Teeth", { 0.045, 0.17, 0.04 }, { 0.06, hy - 0.21, hz - 0.34 }, c.teeth, { roll = 0.12 })
+		-- crooked buck teeth and a little red at the corner of the mouth (mild: no gore)
+		b.block(
+			"Teeth",
+			{ 0.1, 0.11, 0.03 },
+			{ 0, hy - 0.18, hz - 0.36 },
+			c.teeth,
+			{ roll = 0.08, material = "SmoothPlastic" }
+		)
 		b.weld("Teeth", "Jaw")
-		b.block("Fang2", { 0.045, 0.14, 0.04 }, { -0.06, hy - 0.2, hz - 0.34 }, c.teeth, { roll = -0.1 })
-		b.weld("Fang2", "Jaw")
-		b.ball("Blood", 0.13, { 0.09, hy - 0.14, hz - 0.28 }, c.blood)
+		b.ball("Blood", 0.1, { 0.09, hy - 0.14, hz - 0.28 }, c.blood, { material = "SmoothPlastic" })
 		b.weld("Blood", "Jaw")
-		b.ball("BloodDrip", 0.06, { 0.03, hy - 0.31, hz - 0.3 }, c.blood)
-		b.weld("BloodDrip", "Jaw")
-		b.ball("BloodBib", 0.27, { 0, -0.09, -0.61 }, c.blood)
-		b.weld("BloodBib", "Chest")
-		-- a ridge of raised hackles down the hunched back, with embers smouldering between them
-		local ridge = {
-			{ "Hips", 0.36, 0.24 },
-			{ "Spine1", 0.4, 0.06 },
-			{ "Spine2", 0.46, -0.11 },
-			{ "Spine3", 0.47, -0.27 },
-			{ "Chest", 0.36, -0.42 },
-		}
-		for i, h in ridge do
-			b.block(`Hackle{i}`, { 0.045, 0.24, 0.13 }, { 0, h[2] + 0.06, h[3] :: number }, c.back, { pitch = 0.5 })
+		-- a ruffle of raised fur along the hunched back, and two small embers smouldering in it
+		for i, h in { { "Spine1", 0.37, 0.07 }, { "Spine2", 0.4, -0.1 }, { "Spine3", 0.41, -0.26 } } do
+			b.block(
+				`Hackle{i}`,
+				{ 0.05, 0.13, 0.11 },
+				{ 0, (h[2] :: number) + 0.03, h[3] :: number },
+				c.back,
+				{ pitch = 0.6, region = "Body" }
+			)
 			b.weld(`Hackle{i}`, h[1] :: string)
 		end
-		for i, e in { { "Spine1", 0.37, 0.15 }, { "Spine2", 0.45, -0.02 }, { "Spine3", 0.46, -0.19 } } do
-			b.ball(`Ember{i}`, 0.075, { 0, e[2] :: number, e[3] :: number }, c.ember, { material = "Neon" })
+		for i, e in { { "Spine2", 0.39, -0.02 }, { "Spine3", 0.41, -0.18 } } do
+			b.ball(`Ember{i}`, 0.055, { 0, e[2] :: number, e[3] :: number }, c.ember, { material = "Neon" })
 			b.weld(`Ember{i}`, e[1] :: string)
 		end
-		-- a stitched scar across the bald patch on its flank (closed: no open wound)
-		b.block("Scar", { 0.02, 0.035, 0.26 }, { 0.395, 0.12, 0.07 }, c.blood)
+		-- a small bald patch on its flank with an old scar across it
+		b.ball("BaldPatch", 0.34, { 0.2, 0.07, 0.07 }, c.mange, mange)
+		b.weld("BaldPatch", "Spine1")
+		b.block("Scar", { 0.02, 0.03, 0.18 }, { 0.365, 0.09, 0.07 }, c.blood, { material = "SmoothPlastic" })
 		b.weld("Scar", "Spine1")
-		for i, z in { -0.02, 0.07, 0.16 } do
-			b.block(`Stitch{i}`, { 0.025, 0.11, 0.03 }, { 0.39, 0.12, z }, c.stitch)
-			b.weld(`Stitch{i}`, "Spine1")
-		end
 	end
 	-- the big S-curved bushy tail: back and up from the rump, curling forward over it, the tip flicked
 	-- back; the rodent's is ragged and thin where the fur fell out
@@ -382,23 +377,23 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 		{ 0, 0.1, 0.62 },
 		if rodent then { 22, 48, 76, 98, 120, 138, 128, 90 } else { 25, 50, 78, 102, 125, 140, 125, 80 },
 		0.19,
-		-- the rodent's tail is worn to bare bone between a few tufts
+		-- the rodent's tail is ragged and thinner where the fur fell out, with an ember-rust fringe
 		if rodent
-			then { 0.26, 0.3, 0.17, 0.32, 0.14, 0.24, 0.12, 0.1 }
+			then { 0.26, 0.34, 0.3, 0.44, 0.48, 0.36, 0.42, 0.32 }
 			else { 0.3, 0.42, 0.54, 0.62, 0.66, 0.64, 0.58, 0.48 },
 		if rodent
-			then { c.back, c.tail, c.bone, c.tail, c.bone, c.fringe, c.bone, c.bone }
+			then { c.back, c.tail, c.tail, c.tail, c.tail, c.tail, c.fringe, c.fringe }
 			else { c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.fringe }
 	)
 	-- FurCards: the frosted fringe filling out the tail's back curve
-	b.ball("FurCards", if rodent then 0.26 else 0.5, if rodent then { 0, 0.5, 1.02 } else { 0, 0.52, 1.12 }, c.fringe)
+	b.ball("FurCards", if rodent then 0.36 else 0.5, if rodent then { 0, 0.5, 1.02 } else { 0, 0.52, 1.12 }, c.fringe)
 	b.weld("FurCards", "Tail4")
 	-- slim legs: front legs under the chest, hind legs with a round thigh, the long foot angled down
 	mirrored(b, "Front", 0.17, "Chest", {
 		pts = { { -0.12, -0.42 }, { -0.34, -0.37 }, { -0.52, -0.45 }, { -0.565, -0.47 }, { G, -0.58 } },
 		d = { 0.14, 0.1, 0.09 },
 		toe = { 0.11, 0.05, 0.14 },
-		colors = { c.fur, c.fur, c.foot, if rodent then c.blood else c.foot }, -- the rodent's front paws are red
+		colors = { c.fur, c.fur, c.foot, c.foot },
 	})
 	mirrored(b, "Back", 0.21, "Hips", {
 		pts = { { -0.02, 0.28 }, { -0.27, 0.2 }, { -0.46, 0.4 }, { -0.545, 0.24 }, { G, 0.08 } },
@@ -408,14 +403,6 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 		colors = { c.fur, c.fur, c.foot, c.foot },
 	})
 	if rodent then
-		-- long bone claws on all four feet
-		for _, claw in
-			{ { "FrontL", -0.17, -0.63 }, { "FrontR", 0.17, -0.63 }, { "BackL", -0.21, 0.03 }, { "BackR", 0.21, 0.03 } }
-		do
-			local side = claw[1] :: string
-			b.block(`{side}_Claw`, { 0.035, 0.03, 0.11 }, { claw[2] :: number, G + 0.03, claw[3] :: number }, c.bone)
-			b.weld(`{side}_Claw`, `{side}_Toe`)
-		end
 		-- a bald patch on the left haunch
 		for _, p in b.parts do
 			if p.name == "BackL_Upper" then
@@ -454,7 +441,7 @@ local function fox(opts: Opts): ModelSpec
 	-- authored at a 2.6 st shoulder and built at FOX_SCALE: about 2 st at the shoulder, 2.8 st to the ear
 	-- tips, a third of a person's height (review 2026-11-09: 3.6 st tall read as 60 % of a human)
 	local k = PuppetSpec.FOX_SCALE
-	local b = newBuilder(k)
+	local b = newBuilder(k, FUR_MATERIAL)
 	local HIP = 2.05
 	local G = -HIP
 	b.block("RootPart", { 1.0, 1.1, 3.0 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
@@ -544,7 +531,7 @@ local function deer(opts: Opts): ModelSpec
 	for key, v in tint do
 		c[key] = v
 	end
-	local b = newBuilder(k)
+	local b = newBuilder(k, FUR_MATERIAL)
 	-- a doe stands about 4 st at the shoulder with the head top at about 5.5 st, under a person's 6 st
 	-- (review 2026-11-09: 6.5 st does read as human-sized); the buck and fawn scale from her
 	local HIP = 3.1
