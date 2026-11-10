@@ -214,9 +214,15 @@ return function(t)
 				local events = count(p, "event")
 				-- while it rolls: the ball leaves the rack and runs the lane, pins tip
 				local tt = 0
+				local headWrites = rawget(head, "_pivots") or 0
 				while not hw:ready() and tt < 20 do
 					w.svc:step(0.05)
 					tt += 0.05
+					if hw.state == "rolling" then
+						-- in flight the server moves only the ball: a pin (several parts) is written once, at
+						-- the count, so it can never arrive torn on a client that is drawing the same throw
+						t.eq(rawget(head, "_pivots") or 0, headWrites, "no pin is written while the throw is in flight")
+					end
 					local _, _, d = AlleyLayout.toLocal(PLACE, ball.CFrame.X, ball.CFrame.Y, ball.CFrame.Z)
 					if d > 20 and d < 50 then
 						sawBallOnLane = true

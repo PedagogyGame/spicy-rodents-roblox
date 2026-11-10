@@ -5,10 +5,11 @@
 -- real lane parts every rendered frame: the ball down the lane and into the pit, each pin tipping the way it
 -- was pushed and sliding. It simulates nothing (so no two screens can disagree, and what you see is what is
 -- scored); it exists because anchored parts moved by the server alone arrive at the network rate and would
--- stutter. While a throw plays, every pin of the rack and the ball are written each frame, so the server's own
--- coarser copies of the same motion never show through; the last write is the script's final pose, which is
--- exactly where the server has them (both use Shared/Minigames/Bowling/PartPose), and then the server's
--- pinsetter takes over. If a lane has not streamed in, or the script is damaged, nothing is played and the
+-- stutter. While a throw plays, every pin of the rack and the ball are written each frame (the server moves
+-- only the ball in flight, coarsely, and that never shows through); the last write is the script's final
+-- pose, which is exactly where the server puts everything when it counts the throw (both use
+-- Shared/Minigames/Bowling/PartPose); the final pose is held for TAIL seconds so the server's own copy has
+-- arrived before this lets go, and then the server's pinsetter takes over. If a lane has not streamed in, or the script is damaged, nothing is played and the
 -- server's copy is what shows: a throw can never break on a client.
 -- Pins that fall into the pit are hidden with LocalTransparencyModifier (never replicated, reset when the
 -- throw ends: by then the server has hidden them itself).
@@ -25,7 +26,7 @@ local RollScript =
 
 local BowlingPlayback = {}
 
-BowlingPlayback.TAIL = 0.15 -- seconds held on the final pose before the server's copy is trusted again
+BowlingPlayback.TAIL = 0.6 -- seconds held on the final pose (the server counts 0.25 s after the end and sweeps 0.9 s later)
 BowlingPlayback.BIND = "SpicyBowlingPlayback"
 BowlingPlayback.clock = os.clock
 

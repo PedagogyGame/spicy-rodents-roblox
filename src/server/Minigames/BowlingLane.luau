@@ -10,8 +10,10 @@
 -- the ball down the lane and into the pit, pins tipping and sliding, the sweep bar, kept pins lifted and set
 -- back or a fresh rack lowered, and the ball's run home through the return duct (the squirrel tunnel's curve)
 -- up onto the rack. Clients play the same RollScript at their own frame rate (Client/Minigames/
--- BowlingPlayback), so the server only writes the roll at ROLL_WRITE_HZ: enough for a late joiner or a client
--- whose playback failed, without flooding replication.
+-- BowlingPlayback). While a throw is in flight the server itself moves only the BALL, a few times a second
+-- (so a client whose playback could not run still sees it go), and writes the PINS once, when the throw is
+-- counted: a pin is several parts, and parts of one pin arriving in different network frames while a client
+-- draws the same pin every frame could tear it apart for a moment.
 -- Why the server decides: a lane is watched by up to four bowlers and the settees, a roll has no steering
 -- after release so input latency is invisible, and the score must be what everyone saw.
 -- Interface: new(opts) -> Lane; Lane:ready() -> bool; Lane:release(params, seat?, seed) -> (ok, why?, script?);
@@ -37,7 +39,7 @@ local BowlingLane = {}
 BowlingLane.__index = BowlingLane
 
 BowlingLane.RANGES = BallPath.RANGES
-BowlingLane.ROLL_WRITE_HZ = 20 -- server writes of a throw in flight (clients draw every frame themselves)
+BowlingLane.ROLL_WRITE_HZ = 20 -- server writes of the ball in flight (clients draw every frame themselves)
 BowlingLane.SET_TIME = LaneCycle.SET_TIME
 BowlingLane.RETURN_TIME = LaneCycle.RETURN_TIME
 
@@ -374,10 +376,14 @@ function BowlingLane.step(self: any, dt: number): { string }
 		return {}
 	end
 	local events = LaneCycle.step(c, dt)
-	self.writeAcc += dt
-	local rolling = c.phase == "rolling"
-	if #events > 0 or not rolling or self.writeAcc >= 1 / BowlingLane.ROLL_WRITE_HZ then
-		self.writeAcc = 0
+	if c.phase == "rolling" then
+		-- in flight: the ball only, throttled; the pins are written when the throw is counted
+		self.writeAcc += dt
+		if self.writeAcc >= 1 / BowlingLane.ROLL_WRITE_HZ then
+			self.writeAcc = 0
+			self:_writeBall(LaneCycle.pose(c).ball)
+		end
+	else
 		self:_apply()
 	end
 	self.state = c.phase

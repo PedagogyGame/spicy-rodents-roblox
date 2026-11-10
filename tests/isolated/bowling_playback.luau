@@ -11,6 +11,7 @@ local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local PartPose = require("@shared/Minigames/Bowling/PartPose")
 local PinModel = require("@shared/Minigames/Bowling/PinModel")
 local RollScript = require("@shared/Minigames/Bowling/RollScript")
+local LaneCycle = require("@shared/Minigames/Bowling/LaneCycle")
 local BowlingLane = require("@server/Minigames/BowlingLane")
 local BowlingPlayback = require("@client/Minigames/BowlingPlayback")
 local FakeEngine = require("@tests/lib/FakeEngine")
@@ -231,6 +232,10 @@ return function(t)
 			t.near(ax, fz, 1e-9)
 			t.near(az, -fx, 1e-9)
 		end
+		-- the client lets go of the final pose after the server has counted (and written it) and before the
+		-- sweep bar starts moving anything
+		t.truthy(BowlingPlayback.TAIL > LaneCycle.SETTLE + 0.2, "held until the server's own copy has arrived")
+		t.truthy(BowlingPlayback.TAIL < LaneCycle.SETTLE + LaneCycle.PAUSE - 0.3, "released before the pinsetter moves")
 		t.eq(PartPose.HOME, "BowlHome")
 		t.eq(PartPose.RACK, "BowlRack")
 	end)
