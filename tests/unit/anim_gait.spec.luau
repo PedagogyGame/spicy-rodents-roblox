@@ -181,4 +181,24 @@ return function(t)
 		t.eq(pick[2], 2)
 		t.eq(#TownView.nearest(pts, 0, 0, 10, 100), 3)
 	end)
+
+	-- Owner 2026-11-10: "people wandering around who seem to sort of always be running in place".
+	t.test("a person's legs keep pace with the ground: the stock clips are timed for 16 st/s", function()
+		local human = AnimationDriver.DEFAULT_CLIPS.human
+		t.eq(human.nominalWalk, 16)
+		t.eq(human.nominalRun, 16)
+		-- a stroll at 2 to 4 st/s is a slow cycle (it played at 0.33 to 0.67: up to 2.7 times too fast)
+		t.near(AnimationDriver.clipSpeed(2, human.nominalWalk), 0.125, 1e-9)
+		t.near(AnimationDriver.clipSpeed(4, human.nominalWalk), 0.25, 1e-9)
+		-- a fleeing townsperson (19) and a running player (28) on the run clip
+		t.near(AnimationDriver.clipSpeed(19, human.nominalRun), 19 / 16, 1e-9)
+		t.near(AnimationDriver.clipSpeed(28, human.nominalRun), 1.75, 1e-9)
+		-- the feet never outrun the body: playback is never above speed / nominal, except at the floor
+		for speed = 1.6, 30, 0.7 do
+			t.truthy(AnimationDriver.clipSpeed(speed, 16) <= speed / 16 + 1e-9, `at {speed} st/s`)
+		end
+		t.eq(AnimationDriver.clipSpeed(0.5, 16), 0.1, "the floor")
+		t.eq(AnimationDriver.clipSpeed(100, 16), 2.5, "the ceiling")
+		t.eq(AnimationDriver.clipSpeed(7, nil), 1, "other clips play at their own speed")
+	end)
 end

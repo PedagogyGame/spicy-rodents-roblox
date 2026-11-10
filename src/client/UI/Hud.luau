@@ -3,7 +3,7 @@
 -- The minimal W1 HUD: one line saying what the player is looking at and one saying what to press
 -- (the owner-facing build rule in docs/HANDOFF.md §4: say on screen what this is and what to press,
 -- show progress while loading, never ignore input silently), plus a transient toast for refusals and
--- the squirrel's sprint meter (a bar that empties while sprinting; red while out of breath).
+-- the squirrel's sprint meter (a bar that empties while sprinting; red while out of fumes).
 -- Interface: start() -> Hud { set(title, hint), toast(text, seconds?), meter(fraction?, winded?) };
 --   meterLook(fraction, winded) -> { scale, color = { r, g, b }, label } (pure)
 -- No side effects on require.
@@ -16,13 +16,14 @@ export type Hud = {
 
 local Hud = {}
 
--- How the sprint meter is drawn for a meter at `fraction` (0..1): amber, red while out of breath.
+-- How the sprint meter is drawn for a meter at `fraction` (0..1): amber, red while out of fumes (the
+-- owner's wording, 2026-11-10).
 function Hud.meterLook(fraction: number, winded: boolean): { scale: number, color: { number }, label: string }
 	local f = math.clamp(fraction, 0, 1)
 	return {
 		scale = f,
 		color = if winded then { 214, 68, 54 } else { 255, 170, 60 },
-		label = if winded then "OUT OF BREATH" else "SPRINT",
+		label = if winded then "OUT OF FUMES" else "SPRINT",
 	}
 end
 

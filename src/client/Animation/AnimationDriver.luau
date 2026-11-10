@@ -33,7 +33,8 @@
 --     offset the body carried as an AI decays at v5.4's 23/s, the same rate the controller's drawn point
 --     eases onto its own ground, so a possession hands over without a step.
 -- No side effects on require.
--- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure)
+-- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
+--   clipSpeed(speed, nominal?) -> playback speed (pure)
 
 local Gait = require("./Gait")
 local KinematicPose = require("../Controllers/KinematicPose")
@@ -204,10 +205,24 @@ AnimationDriver.DEFAULT_CLIPS = {
 		jump = "rbxassetid://507765000",
 		fall = "rbxassetid://507767968",
 		sit = "rbxassetid://2506281703", -- the stock R15 Animate sit
-		nominalWalk = 6, -- the stock walk reads right at about 6 st/s
+		-- The stock R15 walk and run are authored for Roblox's default 16 st/s: Roblox's own Animate
+		-- script plays them at speed / 16. This said 6 for the walk, so a townsperson strolling at 2 to
+		-- 4 st/s cycled their legs nearly three times too fast (owner 2026-11-10: "people wandering
+		-- around who seem to sort of always be running in place").
+		nominalWalk = 16,
 		nominalRun = 16,
 	},
 } :: { [string]: ClipSet }
+
+-- Playback speed of a walk or run clip authored for `nominal` st/s on a body moving at `speed`: the
+-- feet keep pace with the ground. The floor is low (a slow stroll is a slow cycle, never legs that
+-- run under a body that barely moves); other clips play at their own speed.
+function AnimationDriver.clipSpeed(speed: number, nominal: number?): number
+	if nominal == nil or nominal <= 0 then
+		return 1
+	end
+	return math.clamp(speed / nominal, 0.1, 2.5)
+end
 
 -- The Motor6Ds the gait drives, by RigSpec bone name.
 local function gaitJoints(model: Model): ({ Joint }, number)
@@ -573,7 +588,7 @@ function AnimationDriver.start(opts: Opts): Driver
 					then set.nominalRun
 					elseif e.current == "walk" then set.nominalWalk
 					else nil
-				cur:AdjustSpeed(if nominal then math.clamp(e.speed / nominal, 0.3, 2.5) else 1)
+				cur:AdjustSpeed(AnimationDriver.clipSpeed(e.speed, nominal))
 			end
 		end
 	end

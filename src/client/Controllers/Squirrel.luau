@@ -59,7 +59,7 @@ function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any }
 			return HINTS[e.reason]
 		end
 		if e.kind == "winded" then
-			return "Out of breath: sprint comes back in a few seconds"
+			return "Out of fumes: sprint comes back in a few seconds"
 		end
 	end
 	local attached = false

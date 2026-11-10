@@ -51,6 +51,10 @@ Motion.C = {
 	enterMaxGap = st(3.15), -- enterRoute: gap limit while already on a route (L5834)
 	bridgeMinGap = st(0.11), -- enterRoute: transfer easing only above this gap (L5838)
 	eSearch = st(1.95), -- attachRoute on a rail: nearestRoute(1.95) (L5879)
+	airCatch = st(0.6), -- a leap off a rail lands on a branch or wire that passes this near the feet
+	airCatchPad = st(0.5), -- index samples this far out are refined along their curve (they are 1/3 u apart)
+	airCatchClear = st(1.0), -- travel from the launch point before another rail can be caught
+	airCatchOwn = st(2.4), -- travel before the rail that was left can be caught again (falling only)
 	groundReachE = st(3.1), -- attachRoute off rail: groundTrunkCandidate(3.1) (L5884)
 	airGrab = st(3.4), -- attachRoute off rail: nearestRoute(3.4) (L5884)
 	walkInReach = st(2.0), -- walk-in auto-grab reach (L6640)
@@ -244,6 +248,62 @@ function Motion.nearestRoute(
 		return nil
 	end
 	return { routeId = hit.routeId, t = hit.t, d = hit.d }
+end
+
+-- airCatch: the branch, wire or other non-trunk rail whose curve passes within `radius` of the point, the
+-- nearest if there are several (owner 2026-11-10: "when jumping from branch or line, if the squirrel's
+-- jump and fall lines up with other branch or line, make it land on that"). The index holds arc-length
+-- samples a few studs apart, so each rail with a sample inside radius + airCatchPad is refined along its
+-- curve between the neighbouring samples before the distance is judged. Trunks and poles are never
+-- caught in the air (running into one climbs it; E still grabs one).
+function Motion.airCatch(
+	world: World,
+	x: number,
+	y: number,
+	z: number,
+	radius: number,
+	excludeRouteId: number?
+): Candidate?
+	local reach = radius + C.airCatchPad
+	local near: { [number]: { t: number, d: number } } = {}
+	world.index:forEachNear(x, y, z, math.max(1, math.ceil(reach / world.index.cellSize)), function(id, t, sx, sy, sz)
+		if id ~= excludeRouteId then
+			local dx, dy, dz = sx - x, sy - y, sz - z
+			local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+			local had = near[id]
+			if d <= reach and (had == nil or d < had.d) then
+				near[id] = { t = t, d = d }
+			end
+		end
+		return nil
+	end)
+	local best: Candidate? = nil
+	for id, hit in near do
+		local route = world.registry:get(id)
+		if route and route.kind ~= "trunk" and not route.flags.isPole then
+			-- the closest point of the curve between the samples either side of the nearest one
+			local span = 1 / math.max(route.sampleCount - 1, 1)
+			local lo, hi = math.max(0, hit.t - span), math.min(1, hit.t + span)
+			local function dist(t: number): number
+				local p = world.registry:pointAt(route, t)
+				return math.sqrt((p.x - x) ^ 2 + (p.y - y) ^ 2 + (p.z - z) ^ 2)
+			end
+			for _ = 1, 12 do
+				local a, b = lo + (hi - lo) / 3, hi - (hi - lo) / 3
+				if dist(a) < dist(b) then
+					hi = b
+				else
+					lo = a
+				end
+			end
+			local t = (lo + hi) / 2
+			local d = dist(t)
+			if d <= radius and (best == nil or d < best.d) then
+				best = { routeId = id, t = t, d = d }
+			end
+		end
+	end
+	return best
 end
 
 local function trunkFeet(world: World): { TrunkFoot }

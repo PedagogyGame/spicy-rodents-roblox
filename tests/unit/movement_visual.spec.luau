@@ -822,7 +822,7 @@ return function(t)
 		local idle = input(math.pi)
 		t.eq(
 			Squirrel.feedback(idle, { { kind = "winded" } }, false),
-			"Out of breath: sprint comes back in a few seconds"
+			"Out of fumes: sprint comes back in a few seconds"
 		)
 		t.eq(Squirrel.feedback(idle, {}, false), nil)
 		local full = Hud.meterLook(1, false)
@@ -830,7 +830,7 @@ return function(t)
 		t.eq(full.label, "SPRINT")
 		local out = Hud.meterLook(0.2, true)
 		t.eq(out.scale, 0.2)
-		t.eq(out.label, "OUT OF BREATH")
+		t.eq(out.label, "OUT OF FUMES")
 		t.truthy(out.color[1] ~= full.color[1] or out.color[2] ~= full.color[2], "a different colour when winded")
 		t.eq(Hud.meterLook(-3, false).scale, 0)
 		t.eq(Hud.meterLook(7, false).scale, 1)

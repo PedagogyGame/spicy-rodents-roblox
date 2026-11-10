@@ -112,6 +112,12 @@ export type State = {
 	winded: boolean, -- the meter ran out: no sprint until sprintRecover of it is back
 	tireless: boolean?, -- the meter never drains (AI bodies, a later item, tests that replay v5.4 runs)
 	railLeap: boolean?, -- in the air from a leap off a rail: it carries as far as v5.4's did
+	-- the rail a leap left and where (while that leap is in the air): it lands on a branch or wire its
+	-- flight lines up with (Motion.airCatch)
+	airFromRoute: number?,
+	airX: number?,
+	airY: number?,
+	airZ: number?,
 }
 
 export type Event = { kind: string, routeId: number?, fromRouteId: number?, reason: string? }
@@ -259,6 +265,7 @@ function SquirrelMotor.place(state: State, x: number, y: number, z: number, grou
 	state.cameraCommit = 0
 	state.attackWindow = 0
 	state.railLeap = false
+	state.airFromRoute = nil
 end
 
 function SquirrelMotor.idleInput(cameraYaw: number?): Input
@@ -486,6 +493,7 @@ local function enterRoute(state: State, world: World, spec: Motion.EnterSpec, in
 	state.grounded = false
 	state.committedAirborne = false
 	state.railLeap = false
+	state.airFromRoute = nil
 	push(events, if wasOnRoute then "transfer" else "attach", target.id, fromRouteId)
 	return true
 end
@@ -552,6 +560,8 @@ local function doLeap(state: State, world: World, events: { Event })
 		state.grounded = false
 		commitToAir(state, heading)
 		state.railLeap = from ~= nil
+		state.airFromRoute = from
+		state.airX, state.airY, state.airZ = state.x, state.y, state.z
 		push(events, "leap", nil, from)
 	end
 end
@@ -562,6 +572,7 @@ local function doDrop(state: State, world: World, events: { Event })
 		launchFromVisibleRoute(state, world)
 		clearPendingFork(state)
 		state.routeId = nil
+		state.airFromRoute = nil
 		state.vy = P.dropUp
 		state.committedAirborne = true
 		state.cameraCommit = P.cameraCommitDrop
@@ -579,6 +590,7 @@ local function doPounce(state: State, world: World, input: Input, events: { Even
 		SquirrelMotor.pounceVelocity(input.cameraPitch, state.focus, state.moveSpeed, state.boostRemaining > 0, heading)
 	local from = state.routeId
 	state.railLeap = false
+	state.airFromRoute = nil -- a pounce is aimed at prey: it never catches a branch on the way
 	if from == nil and not state.tireless then
 		-- a pounce off the ground spends the sprint meter; a winded one lunges no faster than a walk
 		local tired = state.winded
@@ -772,9 +784,32 @@ local function resolveWalls(state: State, world: World, oldX: number, oldZ: numb
 	end
 end
 
+-- A leap off a rail lands on the branch or wire its flight lines up with: another rail once the body is
+-- clear of the launch point, the rail it left only further along and on the way down. A drop (Q) and a
+-- pounce are meant to reach the ground or the prey and catch nothing.
+local function catchRail(state: State, world: World, input: Input, events: { Event })
+	local from = state.airFromRoute
+	local ax, ay, az = state.airX, state.airY, state.airZ
+	if from == nil or ax == nil or ay == nil or az == nil then
+		return
+	end
+	local travelled = math.sqrt((state.x - ax) ^ 2 + (state.y - ay) ^ 2 + (state.z - az) ^ 2)
+	if travelled < C.airCatchClear then
+		return
+	end
+	local own = travelled >= C.airCatchOwn and state.vy < 0
+	local found = Motion.airCatch(world, state.x, state.y, state.z, C.airCatch, if own then nil else from)
+	if found and enterRoute(state, world, { routeId = found.routeId, t = found.t, d = found.d }, input, events) then
+		push(events, "catch", found.routeId, from)
+	end
+end
+
 local function substep(state: State, input: Input, dt: number, world: World, events: { Event })
 	local reg = world.registry
 	state.cameraCommit = math.max(0, state.cameraCommit - dt)
+	if state.routeId == nil and not state.grounded and state.airFromRoute ~= nil then
+		catchRail(state, world, input, events)
+	end
 	local rail = route(world, state.routeId)
 	state.focus = input.focus
 		and not state.committedAirborne
@@ -958,6 +993,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 			end
 			state.grounded = true
 			state.railLeap = false
+			state.airFromRoute = nil
 			if state.committedAirborne then
 				state.committedAirborne = false
 				state.cameraCommit = math.max(state.cameraCommit, P.cameraCommitLand)

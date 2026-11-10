@@ -345,6 +345,111 @@ return function(t)
 		t.eq(s.railLeap, false, "a ground leap is not a rail leap")
 	end)
 
+	-- Owner 2026-11-10: "when jumping from branch or line, if the squirrel's jump and fall lines up with
+	-- other branch or line, make it land on that".
+	t.test("a leap off a rail lands on a branch or wire its flight lines up with", function()
+		local C = Motion.C
+		-- a long, fairly level rail that is not a trunk: a wire or a bough
+		local wire: Registry.Route? = nil
+		for _, r in world.registry:all() do
+			if r.kind ~= "trunk" and not r.flags.isPole and r.length > Units.st(30) then
+				local a, b = world.registry:pointAt(r, 0.3), world.registry:pointAt(r, 0.7)
+				if math.abs(a.y - b.y) < 2 and a.y > world.groundHeight + 12 then
+					wire = r
+					break
+				end
+			end
+		end
+		assert(wire, "a long level rail above the ground")
+		local mid = world.registry:pointAt(wire, 0.5)
+		-- the pure search: on the curve, beside it inside the radius, and outside it
+		local on = Motion.airCatch(world, mid.x, mid.y, mid.z, C.airCatch)
+		assert(on, "the wire is caught at its own point")
+		t.eq(on.routeId, wire.id)
+		t.near(on.t, 0.5, 0.02)
+		t.truthy(on.d < 0.05, `on the curve: {on.d}`)
+		local above = Motion.airCatch(world, mid.x, mid.y + C.airCatch - 0.1, mid.z, C.airCatch)
+		assert(above, "the wire is caught from just inside the radius")
+		t.eq(above.routeId, wire.id)
+		t.near(above.d, C.airCatch - 0.1, 0.05)
+		t.eq(Motion.airCatch(world, mid.x, mid.y + C.airCatch + 0.6, mid.z, C.airCatch, nil), nil, "too far above")
+		t.eq(Motion.airCatch(world, mid.x, mid.y, mid.z, C.airCatch, wire.id), nil, "the excluded rail is not caught")
+		-- no trunk or pole is ever caught in the air
+		local trunk = world.registry:get(220) :: Registry.Route
+		local tp = world.registry:pointAt(trunk, 0.5)
+		local hit = Motion.airCatch(world, tp.x, tp.y, tp.z, C.airCatch)
+		t.truthy(hit == nil or hit.routeId ~= 220, "a trunk is not caught")
+		-- in flight from a leap off another rail, falling past the wire: it lands on it
+		local function falling(from: number?): SquirrelMotor.State
+			local s = SquirrelMotor.new(mid.x, world.groundHeight, mid.z)
+			s.x, s.y, s.z = mid.x, mid.y + 3, mid.z
+			s.grounded = false
+			s.vy = -8
+			s.airFromRoute = from
+			s.airX, s.airY, s.airZ = mid.x + 30, mid.y + 10, mid.z
+			return s
+		end
+		local s = falling(220)
+		local caught = false
+		for _ = 1, 40 do
+			local _, events = SquirrelMotor.step(s, input(math.pi), 1 / 60, world)
+			for _, e in events do
+				if e.kind == "catch" then
+					caught = true
+					t.eq(e.routeId, wire.id)
+				end
+			end
+			if s.routeId then
+				break
+			end
+		end
+		t.eq(s.routeId, wire.id, "landed on the wire")
+		t.eq(caught, true)
+		t.eq(s.airFromRoute, nil)
+		t.near(s.y, world.registry:pointAt(wire, s.railT).y, 0.05)
+		-- a plain fall (no leap off a rail: a drop with Q, a pounce, a fall off a roof) passes it
+		local f = falling(nil)
+		for _ = 1, 40 do
+			SquirrelMotor.step(f, input(math.pi), 1 / 60, world)
+		end
+		t.eq(f.routeId, nil, "a fall that is not a leap off a rail catches nothing")
+		t.truthy(f.y < mid.y - 3)
+		-- a leap along the wire comes down on the same wire further on, not at the launch point
+		local w = SquirrelMotor.new(mid.x, world.groundHeight, mid.z)
+		local start = world.registry:pointAt(wire, 0.25)
+		w.routeId, w.railT, w.railDir, w.grounded = wire.id, 0.25, 1, false
+		w.x, w.y, w.z = start.x, start.y, start.z
+		local inp = input(math.pi)
+		SquirrelMotor.step(w, inp, 1 / 60, world) -- settles the heading along the rail
+		inp.leap = true
+		SquirrelMotor.step(w, inp, 1 / 60, world)
+		inp.leap = false
+		t.eq(w.routeId, nil)
+		t.eq(w.airFromRoute, wire.id)
+		local air = 0
+		for _ = 1, 120 do
+			SquirrelMotor.step(w, inp, 1 / 60, world)
+			if w.routeId or w.grounded then
+				break
+			end
+			air += 1
+		end
+		t.truthy(air > 20, `it flew for {air} frames before anything caught it`)
+		if w.routeId == wire.id then
+			local landed = world.registry:pointAt(wire, w.railT)
+			local far = math.sqrt((landed.x - start.x) ^ 2 + (landed.z - start.z) ^ 2)
+			t.truthy(far >= C.airCatchOwn, `back on the wire {far} st further on`)
+		end
+		-- Q lets go for the ground: nothing is caught on the way down
+		local d = SquirrelMotor.new(mid.x, world.groundHeight, mid.z)
+		d.routeId, d.railT, d.railDir, d.grounded = wire.id, 0.5, 1, false
+		d.x, d.y, d.z = mid.x, mid.y, mid.z
+		local q = input(math.pi)
+		q.drop = true
+		SquirrelMotor.step(d, q, 1 / 60, world)
+		t.eq(d.airFromRoute, nil)
+	end)
+
 	t.test("a leap off a rail is always a full one, and costs nothing", function()
 		local P = SquirrelMotor.params
 		local trunk = world.registry:get(220) :: Registry.Route
