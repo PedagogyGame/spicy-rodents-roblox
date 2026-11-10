@@ -16,6 +16,7 @@
 -- 2,128 lines flip at a 1e-2 grid), so it is compared with a tolerance instead: geometry(town)
 -- returns path -> 10 numbers and maxGeometryDelta(a, b) the worst difference.
 
+local Facade = require("./Builders/Facade")
 local Factory = require("./Factory")
 local Greybox = require("./Builders/Greybox")
 local Import = require("./Import")
@@ -61,7 +62,8 @@ local function solidBoxes(plans: { Plan.BuildPlan }): { any }
 	for _, p in plans do
 		if p.kind == "lot" and p.category ~= "plate" then
 			for _, s in p.parts do
-				if s.canCollide then
+				-- door steps and indoor ceilings do not push lamps about (they keep their pinned places)
+				if s.canCollide and s.role ~= "Step" and s.role ~= "Ceiling" then
 					table.insert(out, s)
 				end
 			end
@@ -95,6 +97,8 @@ function Bake.plans(data: Data): { Plan.BuildPlan }
 	local obstacles: { { number } } = {}
 	if data.routes then
 		local props = RouteProps.plans(data.routes, Kits.routeProps, Curve, Height.at, groundAt, data.treeArt)
+		-- every drawn downspout meets the gutter above it (visual parts on the lot's own plan)
+		Facade.downspouts(lotPlans, props)
 		for _, p in props do
 			table.insert(out, p)
 			-- lamps keep clear of utility poles and tree trunks

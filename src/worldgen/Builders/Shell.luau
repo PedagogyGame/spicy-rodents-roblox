@@ -4,12 +4,14 @@
 -- partition walls between adjacent rooms (openings where a door sits), server-owned door leaves with a
 -- prompt placeholder, room-name volumes and the nav anchor with one Attachment per room-graph node.
 -- Shared by Builders/Interior (FRB houses) and Builders/Programme (Hospital, PoliceStation).
--- Interface: build(ctx, layout) where layout = { rooms, doors, wallH, partH, doorH, thick, floorTop,
+-- Exterior doors get their surround, steps and canopy from Builders/Facade; interior leaves a knob.
+-- Interface: build(ctx, layout) -> Built { grid (the window grid), partition (thickness) } where layout = { rooms, doors, wallH, partH, doorH, thick, floorTop,
 --   roof = "flat" | "none", extras = { { id, kind, room, x, z } } } in model-local studs
 --   (rooms: { id, name, x0, x1, z0, z1, exterior? }; doors: { id, a, b, x, z, w, lockable }).
 -- Pure (adds PartSpecs/ExtraSpecs to ctx.list).
 
 local Building = require("./Building")
+local Facade = require("./Facade")
 local RoomGraph = require("../RoomGraph")
 local Spec = require("../Spec")
 
@@ -33,7 +35,11 @@ export type Layout = {
 	roof: string,
 	extras: { { id: string, kind: string, room: string, x: number, z: number } },
 	windows: string?, -- "bands" (ribbon windows, hospital) or nil (window grid)
+	plainFront: boolean?, -- the building draws its own front entrance surrounds (hospital)
 }
+
+-- What Shell.build hands back to the interior dressing (Builders/Furnish).
+export type Built = { grid: { Facade.Win }, partition: number }
 
 -- One straight wall along local X (axis "x", at mz = fixed) or local Z (axis "z", at mx = fixed), from
 -- `a` to `b`, with openings { c, w } (door centre and width along the wall) and a lintel over each.
@@ -81,7 +87,15 @@ local function wall(
 	end
 end
 
-local function doorLeaf(ctx: Spec.LotCtx, d: Door, axis: string, y0: number, doorH: number, t: number)
+local function doorLeaf(
+	ctx: Spec.LotCtx,
+	d: Door,
+	axis: string,
+	y0: number,
+	doorH: number,
+	t: number,
+	interior: boolean
+)
 	local attrs = {
 		DoorId = d.id,
 		ServerOwned = true,
@@ -109,9 +123,27 @@ local function doorLeaf(ctx: Spec.LotCtx, d: Door, axis: string, y0: number, doo
 		offset = { 0, 0, 0 },
 		attrs = { Placeholder = true },
 	})
+	if interior then
+		-- one round knob through the leaf serves both rooms; it turns with the door (Doors.followers)
+		local off = d.w / 2 - 0.6 -- toward the leaf's free edge (its local +X; the hinge is on -X)
+		local kx, kz = d.x + off, d.z
+		if axis == "z" then
+			kx, kz = d.x, d.z - off
+		end
+		ctx.list:add(ctx.frame, name .. "_Knob", kx, y0 + 3.5, kz, 0.56, 0.56, 0.56, {
+			shape = "Ball",
+			color = { 182, 154, 83 },
+			material = "Metal",
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+			role = "Trim",
+			attrs = { DoorOf = d.id },
+		})
+	end
 end
 
-function Shell.build(ctx: Spec.LotCtx, L: Layout)
+function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 	local W, D, t = ctx.W, ctx.D, L.thick
 	local pal = Building.look(ctx)
 	local WALL = pal.wall
@@ -129,13 +161,13 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 	)
 
 	-- doors onto each wall line
-	local function gapsOn(axis: string, fixed: number, tol: number, a: number, b: number): { { c: number, w: number } }
+	local function gapsOn(axis: string, fixed: number, tol: number, a: number, b: number): { Facade.Gap }
 		local out = {}
 		for _, d in L.doors do
 			local onLine = if axis == "x" then math.abs(d.z - fixed) <= tol else math.abs(d.x - fixed) <= tol
 			local along = if axis == "x" then d.x else d.z
 			if onLine and along >= a - EPS and along <= b + EPS then
-				table.insert(out, { c = along, w = d.w })
+				table.insert(out, { c = along, w = d.w, top = y0 + L.doorH })
 			end
 		end
 		return out
@@ -213,13 +245,18 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 		)
 	end
 	-- windows on the exterior walls, clear of the door openings; plinth, cornice, chimney
-	local glaze = if L.windows == "bands" then Building.bands else Building.windows
-	glaze(ctx, y0, h, {
+	local avoid = {
 		F = gapsOn("x", -D / 2, t + EPS, -W / 2, W / 2),
 		B = gapsOn("x", D / 2, t + EPS, -W / 2, W / 2),
 		L = gapsOn("z", -W / 2, t + EPS, -D / 2, D / 2),
 		R = gapsOn("z", W / 2, t + EPS, -D / 2, D / 2),
-	})
+	}
+	local grid: { Facade.Win } = {}
+	if L.windows == "bands" then
+		Building.bands(ctx, y0, h, avoid)
+	else
+		grid = Building.windows(ctx, y0, h, avoid)
+	end
 
 	-- partitions between adjacent interior rooms
 	local inner: { Room } = {}
@@ -306,7 +343,27 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 				end
 			end
 		end
-		doorLeaf(ctx, dd, axis, y0, L.doorH, if onX or onZ then t else pt)
+		local exterior = onX or onZ
+		doorLeaf(ctx, dd, axis, y0, L.doorH, if exterior then t else pt, not exterior)
+		if exterior then
+			-- the way in from outside: surround, knob and panels, steps down to the ground, and over the
+			-- main entrance the style's canopy
+			local face = if onX then (if d.z < 0 then "F" else "B") else (if d.x < 0 then "L" else "R")
+			local leafT = math.max(t * 0.5, 0.2)
+			Facade.entrance(ctx, {
+				name = "Door_" .. d.id,
+				doorId = d.id,
+				face = face,
+				c = if onX then d.x else d.z,
+				w = d.w,
+				h = L.doorH,
+				y0 = y0,
+				proud = -(t - leafT) / 2,
+				wallTop = h,
+				surround = not (L.plainFront and face == "F"),
+				canopy = face == "F" and not L.plainFront,
+			}, Facade.style(ctx))
+		end
 	end
 
 	-- room-name volumes (non-solid, queryable)
@@ -363,6 +420,7 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout)
 			})
 		end
 	end
+	return { grid = grid, partition = pt }
 end
 
 -- Lot-local programme rect [x0, x1, z0, z1] in HTML units (lz toward the front) -> model-local studs.

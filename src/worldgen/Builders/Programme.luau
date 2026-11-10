@@ -8,6 +8,7 @@
 -- Interface: build(ctx) (ctx.building is the generated/Buildings record). Pure.
 
 local Building = require("./Building")
+local Facade = require("./Facade")
 local Shell = require("./Shell")
 local Spec = require("../Spec")
 
@@ -64,6 +65,7 @@ function Programme.build(ctx: Spec.LotCtx)
 		roof = "flat",
 		extras = extras,
 		windows = if b.id == "hospital" then "bands" else nil,
+		plainFront = b.id == "hospital", -- Builders/Hospital draws the entrance piers and lintel
 	})
 	for _, s in b.stations do
 		ctx.list:add(ctx.frame, "Station_" .. s.id, s.at[1] * spu, floorTop + 1.5, -s.at[2] * spu, 6, 3, 2.5, {
@@ -111,6 +113,16 @@ function Programme.build(ctx: Spec.LotCtx)
 		})
 	end
 	Building.dress(ctx, wallH + 0.6, wallH + 0.6, true, false)
+	if b.id ~= "hospital" then
+		-- the hospital has its own parapet and roof sign (Builders/Hospital); the station gets a
+		-- parapet and its name over the door
+		local style = Facade.style(ctx)
+		Facade.flatRoof(ctx, wallH + 0.6, style, false)
+		local text = ctx.params.sign or ctx.kit.signText
+		if text then
+			Building.sign(ctx, text, math.min(wallH - 1.6, floorTop + b.doorHeightU * spu + 4.6), 30)
+		end
+	end
 	ctx.attributes.Building = b.id
 	ctx.attributes.Enterable = true
 end

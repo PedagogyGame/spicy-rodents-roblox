@@ -32,6 +32,8 @@ local function solidParts(p: Spec.BuildPlan): { Spec.PartSpec }
 			and s.role ~= "Furniture"
 			and s.role ~= "Station"
 			and s.role ~= "Shelf"
+			and s.role ~= "Step"
+			and s.role ~= "Ceiling"
 		then
 			table.insert(out, s)
 		end
