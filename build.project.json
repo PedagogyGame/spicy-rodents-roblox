@@ -51,6 +51,12 @@
         "SignalBehavior": "Deferred",
         "FallenPartsDestroyHeight": -200
       },
+      "Terrain": {
+        "$className": "Terrain",
+        "$properties": {
+          "Decoration": false
+        }
+      },
       "Town": {
         "$path": { "optional": "build/Town.rbxm" }
       },

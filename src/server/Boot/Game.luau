@@ -171,8 +171,9 @@ function Game.start(opts: Opts?): any
 	if o.terrain ~= false then
 		stage(0.12, "Shaping the ground, the river, the hills and the beach (a few seconds)")
 		-- Roblox's animated grass blades stand as tall as a squirrel's legs and made the animals look
-		-- half buried (owner feedback 2026-11-09); v5.4's grass was a flat texture.
-		workspace.Terrain.Decoration = false
+		-- half buried (owner feedback 2026-11-09); v5.4's grass was a flat texture. Terrain.Decoration is
+		-- off in the place file (the project files' Workspace.Terrain): a game script may not write it
+		-- (it needs the Plugin or Open Cloud capability, which is why the cloud checks never saw this).
 		local server = script.Parent and script.Parent.Parent
 		local worldGen = server and server:FindFirstChild("WorldGen")
 		local mod = worldGen and worldGen:FindFirstChild("WorldTerrain")
