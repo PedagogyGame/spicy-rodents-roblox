@@ -170,6 +170,9 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 		menu.toast(if msg.note then tostring(msg.note) else (names[msg.role] or "Here you go"), 4)
 	elseif kind == "refused" then
 		menu.toast(tostring(msg.text), 3)
+	elseif kind == "notice" then
+		-- something the game did to you that you should read (a bowling ball knocked you off a lane)
+		menu.toast(tostring(msg.text), 4)
 	elseif kind == "bite" then
 		menu.toast(`CHOMP! "{msg.line}"   +{msg.delta} Power   ({msg.bites} bites)`, 2.5)
 	elseif kind == "bitten" then

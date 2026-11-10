@@ -787,7 +787,6 @@ function Game.start(opts: Opts?): any
 		attractions = AttractionService.start({
 			net = net,
 			heartbeat = o.heartbeat ~= false,
-			physics = o.heartbeat ~= false,
 			terrain = o.terrain ~= false,
 			canPlay = function(player: any): (boolean, string?)
 				local actor = possession:actorOf(player)
@@ -809,6 +808,46 @@ function Game.start(opts: Opts?): any
 			bodyOf = function(player: any): Model?
 				local actor = possession:actorOf(player)
 				return if actor then actor.body :: Model else nil
+			end,
+			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
+			animals = function(): { { [string]: any } }
+				local out = {}
+				for _, a in world.actors do
+					local other = rt.byTownId[a.id]
+					if other and isSquirrelFamily(other) then
+						local r = (other.body :: Model).PrimaryPart
+						if r then
+							local q = r.Position
+							table.insert(out, {
+								id = other.id,
+								kind = if other.variant == "spicy" then "rodent" else "squirrel",
+								x = q.X,
+								y = q.Y,
+								z = q.Z,
+							})
+						end
+					end
+				end
+				return out
+			end,
+			knock = function(id: any, x: number, y: number, z: number, text: string)
+				local townId = townIdOf[id]
+				local target = townId and rt.byTownId[townId]
+				if target == nil then
+					return
+				end
+				local driver = possession:controllerOf(target)
+				if driver ~= "ai" and driver ~= nil then
+					-- a player's body: put it there (its controller restarts where it finds itself) and say why
+					local body = target.body :: Model
+					body:PivotTo(CFrame.new(x, y + 0.6, z) * body:GetPivot().Rotation)
+					fire(driver, { kind = "notice", text = text })
+				else
+					local a = world.actorsById[townId]
+					if a then
+						a.x, a.z = x, z
+					end
+				end
 			end,
 		})
 	end)

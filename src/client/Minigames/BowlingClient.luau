@@ -1,83 +1,64 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Minigames.BowlingClient
--- The bowler's side of a lane (brief v2 §13a "choose your angle and power, bowl"): on your turn your person steps
--- onto the approach holding the ball (the server welds it to your hand), the camera stands behind you looking
--- down the lane, a dotted aim line shows where the ball starts and where the hook takes it; A/D walk along the
--- foul line, the mouse (or Left/Right) turns the angle, Z/X put hook on, and holding Space or the mouse button
--- runs the power meter: let go to bowl (a short slide to the line). The camera rides behind the ball to the
--- pins, holds on the pin action, then comes back for your next ball. Waiting players keep their own camera
--- and controls and follow the score on screen. The SERVER rolls the ball and owns the pins (D28): this only
--- sends { offset, angle, power, spin } once.
--- Interface: new(ctx) -> Bowler; Bowler:onState(msg); Bowler:onEvent(msg); Bowler:onRolled(); Bowler:stop();
---   HELP; aimDots(offset, angle, spin, power, lane, place) -> { {X, D} } (pure)
+-- The bowler's side of a lane (brief v2 §13a "choose your angle and power, bowl"). It is thin wiring: the aiming
+-- state and every word on screen come from Shared/Minigames/Bowling/AimModel, the camera shots from
+-- Bowling/Shots, and the throw itself is drawn by BowlingPlayback from the server's script.
+-- On your turn your person steps onto the approach holding the ball (the server welds it to your hand), the
+-- camera stands behind you, a dotted line shows your throw two thirds of the way down the lane (orange where a
+-- hook has begun to bend it). A / D step along the foul line; the mouse (or Left / Right, or the gamepad
+-- stick) turns the angle; Z / X or the mouse wheel put hook on; hold Space or the mouse button to run the
+-- power meter and let go to bowl (in the green band the ball goes exactly where you aimed). Touch players get
+-- buttons for all of it. The camera rides behind the ball, cuts to the pins a moment before it arrives, holds
+-- on the pinfall, then comes back for your next ball or hands your own camera back. A turn clock counts down
+-- on screen before an idle turn is skipped. A throw the server refuses, or that never reaches it, puts you
+-- straight back to aiming with a line on screen: input is never swallowed. Typing in chat moves nothing.
+-- The SERVER decides the throw (D28): this sends { offset, angle, power, spin } once per ball.
+-- Interface: new(ctx) -> Bowler; Bowler:onState(msg); Bowler:onRoll(msg, script); Bowler:onRefused(msg);
+--   Bowler:stop(); HELP; SEND_TIMEOUT
 
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local AimModel =
+	Import.shared("Minigames/Bowling/AimModel") :: typeof(require("../../shared/Minigames/Bowling/AimModel"))
+local PartPose =
+	Import.shared("Minigames/Bowling/PartPose") :: typeof(require("../../shared/Minigames/Bowling/PartPose"))
+local Shots = Import.shared("Minigames/Bowling/Shots") :: typeof(require("../../shared/Minigames/Bowling/Shots"))
+local InputMap = require("../Input/InputMap")
 
 local BowlingClient = {}
 BowlingClient.__index = BowlingClient
 
-BowlingClient.HELP = {
-	how = {
-		"Ten frames each, up to four bowlers. Knock all ten down with the first ball for a STRIKE, with two for a SPARE.",
-		"The scoreboard over the lane keeps score for everyone.",
-	},
-	keys = {
-		"A / D  step left / right along the line",
-		"Mouse (or Left / Right)  aim the angle",
-		"Z / X  hook the ball left / right",
-		"Hold Space or the mouse button: power meter",
-		"Let go to bowl",
-		"Q  leave the lane",
-	},
-}
-
-BowlingClient.MAX_ANGLE = 0.1
-BowlingClient.POWER_PERIOD = 1.5
-
--- Aim preview dots (local X across, D down-lane): straight along the angle, curving with the hook on the
--- back end (a picture of intent, not a simulation).
-function BowlingClient.aimDots(offset: number, angle: number, spin: number, power: number, lane: number): { { number } }
-	local rx, _, rd = AlleyLayout.release(lane, offset)
-	local out = {}
-	local d = 1.5
-	while d <= 46 do
-		local x = rx + math.tan(angle) * (d - rd)
-		if d > 18 then
-			local k = (d - 18) / 38
-			x += spin * k * k * (2.2 - 1.2 * power)
-		end
-		table.insert(out, { x, d })
-		d += if d < 20 then 1.6 else 3.2
-	end
-	return out
-end
+BowlingClient.HELP = AimModel.HELP
+BowlingClient.SEND_TIMEOUT = 2.5 -- seconds to wait for the server to answer a throw before aiming again
+BowlingClient.WATCH_LIMIT = 14 -- the roll camera can never be kept longer than this
 
 function BowlingClient.new(ctx: { [string]: any }): any
 	local self = setmetatable({}, BowlingClient) :: any
 	self.ctx = ctx
 	self.lane = ctx.lane :: number
 	self.place = ctx.place
-	self.offset = 0
-	self.angle = 0
-	self.spin = 0
-	self.charging = false
-	self.chargeT = 0
-	self.myTurn = false
-	self.turnMine = false
+	self.aim = AimModel.new()
+	self.turnMine = false -- it is my frame
+	self.canBowl = false -- and the lane is set
 	self.controlsOff = false
-	self.sent = false
-	self.watchUntil = 0
+	self.sentAt = 0
+	self.watch = nil :: { script: any, t0: number }?
 	self.slideT = -1
+	self.turnLeft = nil :: number?
+	self.turnLeftAt = 0
+	self.mouseDx = 0
 	self.held = {} :: { [string]: boolean }
 	self.dots = {} :: { BasePart }
+	self.dotSig = ""
 	self.conns = {} :: { RBXScriptConnection }
 	local UIS = game:GetService("UserInputService")
 	local RunService = game:GetService("RunService")
 	table.insert(
 		self.conns,
 		UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
-			if processed and io.UserInputType ~= Enum.UserInputType.Keyboard then
+			-- chat, text boxes and the Roblox menu own the keys while they are up; a click on a button is the
+			-- button's, not a throw
+			if InputMap.ignore(io, processed) then
 				return
 			end
 			self:_key(io, true)
@@ -91,79 +72,89 @@ function BowlingClient.new(ctx: { [string]: any }): any
 	)
 	table.insert(
 		self.conns,
+		UIS.InputChanged:Connect(function(io: InputObject, processed: boolean)
+			if io.UserInputType == Enum.UserInputType.MouseMovement then
+				self.mouseDx += io.Delta.X
+			elseif io.UserInputType == Enum.UserInputType.MouseWheel and not InputMap.ignore(io, processed) then
+				if self.canBowl then
+					AimModel.hook(self.aim, if io.Position.Z > 0 then 1 else -1)
+				end
+			end
+		end)
+	)
+	table.insert(
+		self.conns,
 		RunService.RenderStepped:Connect(function(dt: number)
 			self:_frame(dt)
 		end)
 	)
-	ctx.ui:touch(
-		{ { "left", "<" }, { "right", ">" }, { "aimL", "<<" }, { "aimR", ">>" }, { "bowl", "HOLD TO BOWL" } },
-		function(id)
+	ctx.ui:touch({
+		{ "left", "<" },
+		{ "right", ">" },
+		{ "aimL", "<<" },
+		{ "aimR", ">>" },
+		{ "hookL", "Hook L" },
+		{ "hookR", "Hook R" },
+		{ "bowl", "HOLD TO BOWL" },
+	}, function(id)
+		if id == "bowl" then
+			self:_charge(true)
+		elseif id == "hookL" or id == "hookR" then
+			if self.canBowl then
+				AimModel.hook(self.aim, if id == "hookL" then -1 else 1)
+			end
+		else
 			self.held[id] = true
-			if id == "bowl" then
-				self:_charge(true)
-			end
-		end,
-		function(id)
-			self.held[id] = nil
-			if id == "bowl" then
-				self:_charge(false)
-			end
 		end
-	)
+	end, function(id)
+		if id == "bowl" then
+			self:_charge(false)
+		else
+			self.held[id] = nil
+		end
+	end)
 	return self
 end
 
 function BowlingClient._key(self: any, io: InputObject, down: boolean)
-	local k = io.KeyCode
-	local name = k.Name
+	local name = io.KeyCode.Name
 	if io.UserInputType == Enum.UserInputType.MouseButton1 then
 		name = "MouseButton1"
 	end
 	if name == "Space" or name == "MouseButton1" or name == "ButtonR2" or name == "ButtonA" then
 		self:_charge(down)
-	elseif name == "A" then
+	elseif name == "A" or name == "DPadLeft" then
 		self.held.left = down or nil
-	elseif name == "D" then
+	elseif name == "D" or name == "DPadRight" then
 		self.held.right = down or nil
 	elseif name == "Left" then
 		self.held.aimL = down or nil
 	elseif name == "Right" then
 		self.held.aimR = down or nil
-	elseif down and name == "Z" then
-		self.spin = math.max(-1, self.spin - 0.5)
-	elseif down and name == "X" then
-		self.spin = math.min(1, self.spin + 0.5)
+	elseif down and self.canBowl and (name == "Z" or name == "ButtonL1") then
+		AimModel.hook(self.aim, -1)
+	elseif down and self.canBowl and (name == "X" or name == "ButtonR1") then
+		AimModel.hook(self.aim, 1)
 	end
 end
 
+-- The bowl button. Down starts the meter (only when it is your ball); letting go throws.
 function BowlingClient._charge(self: any, down: boolean)
-	if down then
-		if self.myTurn and not self.sent and not self.charging then
-			self.charging = true
-			self.chargeT = 0
-		end
-	elseif self.charging then
-		self.charging = false
-		if self.myTurn and not self.sent then
-			self:_bowl()
-		end
+	if down and not self.canBowl then
+		return
 	end
-end
-
-local function powerAt(t: number): number
-	local p = (t / BowlingClient.POWER_PERIOD) % 2
-	return if p <= 1 then p else 2 - p
-end
-
-function BowlingClient._bowl(self: any)
-	local power = powerAt(self.chargeT)
-	self.sent = true
-	self.sawBusy = false
-	self.slideT = 0
-	self.lastPower = power
-	self.ctx.send("release", { self.offset, self.angle, power, self.spin })
-	self.ctx.ui:meter(nil)
-	self.watchUntil = os.clock() + 7
+	local params = AimModel.charge(self.aim, down)
+	if params then
+		if not self.canBowl then
+			-- the turn moved on while the button was held: nothing is thrown
+			AimModel.refused(self.aim)
+			return
+		end
+		self.sentAt = os.clock()
+		self.slideT = 0
+		self.ctx.send("release", { params.offset, params.angle, params.power, params.spin })
+		self.ctx.ui:meter(nil)
+	end
 end
 
 function BowlingClient._clearDots(self: any)
@@ -171,16 +162,24 @@ function BowlingClient._clearDots(self: any)
 		d:Destroy()
 	end
 	table.clear(self.dots)
+	self.dotSig = ""
 end
 
 function BowlingClient._drawDots(self: any)
-	local pts = BowlingClient.aimDots(
-		self.offset,
-		self.angle,
-		self.spin,
-		if self.charging then powerAt(self.chargeT) else 0.6,
-		self.lane
+	local aim = self.aim
+	-- the line only changes when the aim does
+	local sig = string.format(
+		"%.4f %.5f %d %.2f",
+		aim.offset,
+		aim.angle,
+		aim.notch,
+		if aim.charging then AimModel.power(aim) else -1
 	)
+	if sig == self.dotSig then
+		return
+	end
+	self.dotSig = sig
+	local pts = AimModel.preview(aim)
 	local cam = workspace.CurrentCamera
 	for i, p in pts do
 		local dot = self.dots[i]
@@ -197,12 +196,12 @@ function BowlingClient._drawDots(self: any)
 			dot.Parent = cam
 			self.dots[i] = dot
 		end
-		local x, y, z = AlleyLayout.toWorld(self.place, p[1], 0.012, p[2])
-		local s = if i <= 12 then 0.18 else 0.13
+		local s = if i <= 12 then 0.18 else 0.14
 		dot.Size = Vector3.new(0.01, s, s)
-		dot.Color = if p[2] > 18 and self.spin ~= 0 then Color3.fromRGB(255, 170, 60) else Color3.fromRGB(120, 230, 255)
-		dot.Transparency = 0.15 + i * 0.03
-		dot.CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, 0, math.pi / 2)
+		dot.Color = if p.hooked then Color3.fromRGB(255, 170, 60) else Color3.fromRGB(120, 230, 255)
+		dot.Transparency = math.min(0.75, 0.15 + i * 0.025)
+		dot.CFrame = CFrame.new(PartPose.world(self.place, self.lane, p.x, 0.012, p.d))
+			* CFrame.Angles(0, 0, math.pi / 2)
 	end
 	for i = #pts + 1, #self.dots do
 		self.dots[i]:Destroy()
@@ -210,164 +209,180 @@ function BowlingClient._drawDots(self: any)
 	end
 end
 
-function BowlingClient._ball(self: any): BasePart?
-	local att = workspace:FindFirstChild("Attractions")
-	local alley = att and att:FindFirstChild("BowlingAlley")
-	local lanes = alley and alley:FindFirstChild("Lanes")
-	local lane = lanes and lanes:FindFirstChild(`Lane{self.lane}`)
-	local ball = lane and lane:FindFirstChild("Ball")
-	return if ball and ball:IsA("BasePart") then ball else nil
+function BowlingClient._shot(self: any, shot: any)
+	local eye = PartPose.world(self.place, self.lane, shot.ex, shot.ey, shot.ed)
+	local look = PartPose.world(self.place, self.lane, shot.lx, shot.ly, shot.ld)
+	-- a change of shot is a cut, not a swoop through the lane
+	local cut = self.lastShot ~= nil and self.lastShot ~= shot.phase
+	self.lastShot = shot.phase
+	self.ctx.camera(CFrame.lookAt(eye, look), shot.fov, cut)
+end
+
+-- The bowler's body on the approach, facing down the line of the throw.
+function BowlingClient._stand(self: any, forward: number)
+	local body = self.ctx.body()
+	local root = body and body.PrimaryPart
+	if root then
+		local aim = self.aim
+		local at =
+			PartPose.world(self.place, self.lane, aim.offset * (AlleyLayout.LANE_W / 2 - 0.5) - 0.35, 0, -4.4 + forward)
+		local yaw = AlleyLayout.yawOf(self.place) - aim.angle
+		root.CFrame = CFrame.new(at.X, root.Position.Y, at.Z) * CFrame.Angles(0, yaw, 0)
+		root.AssemblyLinearVelocity = Vector3.zero
+	end
 end
 
 function BowlingClient._frame(self: any, dt: number)
 	local ctx = self.ctx
+	local aim = self.aim
 	local now = os.clock()
 	local UIS = game:GetService("UserInputService")
-	if self.myTurn and not self.sent then
-		local half = 1
-		if self.held.left then
-			self.offset = math.max(-half, self.offset - dt * 0.9)
+	local mouseDx = self.mouseDx
+	self.mouseDx = 0
+	-- a throw the server never answered: back to aiming, and say so
+	if aim.phase == "sent" and now - self.sentAt > BowlingClient.SEND_TIMEOUT then
+		AimModel.refused(aim)
+		self.slideT = -1
+		if ctx.toast then
+			ctx.toast("Your throw did not reach the lane: aim and bowl again", 4)
 		end
-		if self.held.right then
-			self.offset = math.min(half, self.offset + dt * 0.9)
+	end
+	local aiming = self.canBowl and aim.phase ~= "watch"
+	if aiming then
+		local input: { [string]: any } = {
+			left = self.held.left,
+			right = self.held.right,
+			aimL = self.held.aimL,
+			aimR = self.held.aimR,
+		}
+		if UIS.MouseBehavior ~= Enum.MouseBehavior.Default then
+			-- the cursor is locked (first person): its travel turns the angle
+			input.mouseDx = mouseDx
+		elseif UIS.MouseEnabled then
+			local mp = UIS:GetMouseLocation()
+			if self.lastMouse and (mp - self.lastMouse).Magnitude > 0.5 then
+				input.mouseX01 = mp.X / math.max(1, workspace.CurrentCamera.ViewportSize.X)
+			end
+			self.lastMouse = mp
 		end
-		local mouseMoved = false
-		local mp = UIS:GetMouseLocation()
-		if self.lastMouse and (mp - self.lastMouse).Magnitude > 0.5 then
-			mouseMoved = true
+		for _, state in UIS:GetGamepadState(Enum.UserInputType.Gamepad1) do
+			if state.KeyCode == Enum.KeyCode.Thumbstick1 and math.abs(state.Position.X) > 0.2 then
+				input.stickAim = state.Position.X
+			end
 		end
-		self.lastMouse = mp
-		if mouseMoved and not UIS.TouchEnabled then
-			local vp = workspace.CurrentCamera.ViewportSize
-			self.angle = math.clamp((mp.X / vp.X - 0.5) * 2, -1, 1) * BowlingClient.MAX_ANGLE
-		end
-		if self.held.aimL then
-			self.angle = math.max(-BowlingClient.MAX_ANGLE, self.angle - dt * 0.06)
-		end
-		if self.held.aimR then
-			self.angle = math.min(BowlingClient.MAX_ANGLE, self.angle + dt * 0.06)
-		end
-		if self.charging then
-			self.chargeT += dt
-			ctx.ui:meter(powerAt(self.chargeT), nil, "POWER - let go to bowl")
+		AimModel.step(aim, input, dt)
+		if aim.charging then
+			ctx.ui:meter(AimModel.power(aim), AimModel.SWEET, AimModel.SWEET_TEXT)
 		else
 			ctx.ui:meter(nil)
 		end
-		self:_drawDots()
-		-- the person stands on the approach, facing the pins
-		local body = ctx.body()
-		local root = body and body.PrimaryPart
-		if root then
-			local X = AlleyLayout.laneX(self.lane) + self.offset * (AlleyLayout.LANE_W / 2 - 0.5)
-			local x, _, z = AlleyLayout.toWorld(self.place, X - 0.35, 0, -4.4)
-			local yaw = AlleyLayout.yawOf(self.place) - self.angle
-			root.CFrame = CFrame.new(x, root.Position.Y, z) * CFrame.Angles(0, yaw, 0)
-			root.AssemblyLinearVelocity = Vector3.zero
+		ctx.ui:hook(aim.notch, AimModel.NOTCHES)
+		if aim.phase == "aim" then
+			self:_drawDots()
+			self:_stand(0)
 		end
-		local spinText = if self.spin == 0 then "straight" elseif self.spin < 0 then "hook left" else "hook right"
-		ctx.ui:status(`Your turn - aim with the mouse, hold Space to bowl ({spinText})`)
-		-- camera: behind and above the bowler, down the lane
-		local cx, cy, cz = AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane) + self.offset * 0.8, 5.6, -12.5)
-		local lx, ly, lz =
-			AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane) + math.tan(self.angle) * 30, 0.4, 38)
-		ctx.camera(CFrame.lookAt(Vector3.new(cx, cy, cz), Vector3.new(lx, ly, lz)), 50)
+		-- the turn clock, counted down between the server's once-a-second reports
+		local left = if self.turnLeft then math.max(0, self.turnLeft - (now - self.turnLeftAt)) else nil
+		ctx.ui:clock(left, AimModel.warning(left))
+		ctx.ui:status(AimModel.statusText(aim, UIS.TouchEnabled and not UIS.KeyboardEnabled))
+		self:_shot(Shots.aim(aim.offset, aim.angle))
 	else
 		if #self.dots > 0 then
 			self:_clearDots()
 		end
+		ctx.ui:hook(nil)
+		ctx.ui:clock(nil)
+		self.lastMouse = nil
 	end
 	-- the slide to the line after letting go
 	if self.slideT >= 0 then
 		self.slideT += dt
-		local body = ctx.body()
-		local root = body and body.PrimaryPart
-		if root and self.slideT < 0.45 then
-			local X = AlleyLayout.laneX(self.lane) + self.offset * (AlleyLayout.LANE_W / 2 - 0.5)
-			local x, _, z = AlleyLayout.toWorld(self.place, X - 0.35, 0, -4.4 + 3.2 * math.min(1, self.slideT / 0.45))
-			root.CFrame = CFrame.new(x, root.Position.Y, z) * root.CFrame.Rotation
-			root.AssemblyLinearVelocity = Vector3.zero
-		elseif self.slideT >= 0.45 then
+		if self.slideT < 0.45 then
+			self:_stand(3.2 * self.slideT / 0.45)
+		else
 			self.slideT = -1
 		end
 	end
-	-- after the release: ride behind the ball, then hold on the pins
-	if self.sent and now < self.watchUntil then
-		local ball = self:_ball()
-		if ball then
-			local p = ball.Position
-			local _, _, D = AlleyLayout.toLocal(self.place, p.X, p.Y, p.Z)
-			local fx, fz = AlleyLayout.dirToWorld(self.place, 0, 1)
-			local fwd = Vector3.new(fx, 0, fz)
-			local laneMid = Vector3.new(
-				AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane), 0.8, AlleyLayout.HEAD_D + 1.5)
-			)
-			if D < 40 and D > -2 then
-				ctx.camera(CFrame.lookAt(p - fwd * 7 + Vector3.new(0, 2.6, 0), p + fwd * 12), 55)
-			else
-				local hx, hy, hz = AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane), 3.2, 44)
-				ctx.camera(CFrame.lookAt(Vector3.new(hx, hy, hz), laneMid), 45)
-			end
+	local watch = self.watch
+	if watch then
+		-- the throw: behind the ball, the cut to the pins, then back
+		local t = now - watch.t0
+		local shot = Shots.roll(watch.script, t)
+		if shot.phase == "done" or t > BowlingClient.WATCH_LIMIT then
+			self.watch = nil
+		else
+			self:_shot(shot)
 		end
+	elseif self.turnMine and not aiming then
+		-- between your two balls (the pinsetter is working): look at the deck from behind the approach
+		self:_shot(Shots.between())
 	elseif not self.turnMine and self.controlsOff and self.slideT < 0 then
 		-- your frame is over: your own camera and legs back
 		self.controlsOff = false
 		ctx.controls(true)
 		ctx.releaseCamera()
-	elseif self.turnMine and not self.myTurn and not (self.sent and now < self.watchUntil) then
-		-- between balls (the pinsetter is working): look at the pins from behind the approach
-		local cx, cy, cz = AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane), 5.6, -12.5)
-		local lx, ly, lz = AlleyLayout.toWorld(self.place, AlleyLayout.laneX(self.lane), 0.4, 50)
-		ctx.camera(CFrame.lookAt(Vector3.new(cx, cy, cz), Vector3.new(lx, ly, lz)), 50)
 	end
 end
 
--- msg = the "state" payload: { view, you, ready }. turnMine: it is your frame; canBowl: and the lane is set.
+-- msg = the "state" payload: { view, you, ready }.
 function BowlingClient.onState(self: any, msg: { [string]: any })
 	local view = msg.view
+	local aim = self.aim
 	local turnMine = view.phase == "playing" and view.turn == msg.you
 	local canBowl = turnMine and msg.ready == true
 	if turnMine and not self.controlsOff then
 		self.controlsOff = true
 		self.ctx.controls(false)
 	end
-	if msg.ready ~= true then
-		self.sawBusy = true
+	if canBowl and (aim.phase == "watch" or not self.canBowl) and aim.phase ~= "sent" then
+		-- the lane is set and it is your ball: aim (the line of your last ball is kept)
+		AimModel.nextBall(aim)
 	end
-	if canBowl and self.sent and self.sawBusy then
-		-- the lane is set again: the next ball of your frame
-		self.sent = false
-		self.charging = false
+	if not turnMine and aim.phase == "sent" then
+		AimModel.refused(aim) -- the turn moved on with a throw unanswered
 	end
 	self.turnMine = turnMine
-	self.myTurn = canBowl
+	self.canBowl = canBowl
+	self.turnLeft = view.turnLeft
+	self.turnLeftAt = os.clock()
 	if not canBowl then
+		local ui = self.ctx.ui
 		if view.phase == "lobby" then
-			self.ctx.ui:status(
-				`Starting in {view.lobbyLeft or 0}... friends can walk up and press E (Space: start now)`
+			ui:status(
+				`Starting in {view.lobbyLeft or 0}... friends can walk up and press E. Space starts now; "Add a computer" for an opponent`
 			)
 		elseif view.phase == "playing" and view.turn then
 			local s = view.seats[view.turn]
 			if turnMine then
-				self.ctx.ui:status("Your turn: the pinsetter is setting up...")
+				ui:status(if self.watch then "There it goes..." else "Your turn: the pinsetter is setting up...")
 			else
-				self.ctx.ui:status(`{s and s.name or "?"} is bowling`)
+				ui:status(`{s and s.name or "?"} is bowling. You are next when the board shows your name. Q leaves.`)
 			end
 		elseif view.phase == "done" then
-			self.ctx.ui:status(`Game over. Play again or leave (Q). The lane resets in {view.doneLeft or 0}`)
+			ui:status(`Game over. Play again or Leave (Q). The lane resets in {view.doneLeft or 0}`)
 		end
 	end
 end
 
--- a roll's result: hold the pin view a moment longer, then come back
-function BowlingClient.onEvent(self: any, msg: { [string]: any })
-	if msg.pins ~= nil and self.sent then
-		self.watchUntil = math.min(self.watchUntil, os.clock() + 1.6)
+-- A throw on this lane is being played. If it is the one you just sent, the camera goes with it.
+function BowlingClient.onRoll(self: any, msg: { [string]: any }, script: any)
+	local aim = self.aim
+	if aim.phase == "sent" then
+		AimModel.sent(aim)
+		self.watch = { script = script, t0 = os.clock() }
+		self.ctx.ui:meter(nil)
+		self:_clearDots()
+	elseif self.turnMine and msg.seat == nil then
+		-- a scripted pinfall on your turn (a developer's test roll): watch it too
+		self.watch = { script = script, t0 = os.clock() }
 	end
 end
 
-function BowlingClient.onRolled(self: any)
-	if self.sent then
-		self.watchUntil = os.clock() + 9
+-- The server refused something. If it was the throw, you are aiming again at once.
+function BowlingClient.onRefused(self: any, msg: { [string]: any })
+	if msg.verb == nil or msg.verb == "release" then
+		AimModel.refused(self.aim)
+		self.slideT = -1
 	end
 end
 
@@ -377,7 +392,11 @@ function BowlingClient.stop(self: any)
 	end
 	table.clear(self.conns)
 	self:_clearDots()
-	self.ctx.ui:meter(nil)
+	self.watch = nil
+	local ui = self.ctx.ui
+	ui:meter(nil)
+	ui:hook(nil)
+	ui:clock(nil)
 end
 
 return BowlingClient
