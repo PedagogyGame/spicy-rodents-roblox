@@ -14,8 +14,10 @@ export type Metrics = { [string]: any }
 
 local Human = {}
 
-Human.WALK = 16
-Human.SPRINT = 26
+-- Owner 2026-11-10: people a slight bit faster, and they never run out of the ability to run (no
+-- stamina here); the squirrel walks at 18 and sprints at 33 in bursts (SquirrelMotor.params).
+Human.WALK = 17
+Human.SPRINT = 28
 
 -- KeyCode names (Enum is not available under Lune, where the skeleton test requires this module)
 local MOVE_KEYS: { [string]: boolean } = {

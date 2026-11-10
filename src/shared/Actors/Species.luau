@@ -82,7 +82,7 @@ local DEFS: { [string]: SpeciesDef } = {
 			"PadAttachmentL",
 			"PadAttachmentR",
 		},
-		speeds = { walk = Units.st(1.2), sprint = Units.st(3.2), flee = Units.st(7.1) },
+		speeds = { walk = Units.st(1.2), sprint = Units.st(3.2), flee = Units.st(7.6) },
 		stockLooks = {
 			look("townsperson", "#c69c6d", "#5a6b7d", "#2b2b2b"),
 			look("police", "#c69c6d", "#1f2d4d", "#2b2b2b"),
@@ -101,8 +101,8 @@ local DEFS: { [string]: SpeciesDef } = {
 		hipHeight = 0.9,
 		sockets = { "HeadSocket", "MouthSocket", "TailTip", "ChestCenter" },
 		speeds = {
-			walk = Units.st(8.0),
-			sprint = Units.st(16.8),
+			walk = Units.st(7.2), -- SquirrelMotor.params (owner 2026-11-10; v5.4: 8.0 and 16.8)
+			sprint = Units.st(13.2),
 			stalk = Units.st(1.65),
 			rail = { walk = Units.st(7.2), sprint = Units.st(12.2), stalk = Units.st(1.2), woodMultiplier = 0.6 },
 		},

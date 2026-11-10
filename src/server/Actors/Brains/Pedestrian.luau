@@ -50,7 +50,9 @@ type Brain = Common.Brain & {
 local Pedestrian = {}
 
 local GOAL_REACH = Units.st(1.7)
-local FLEE_SPEED = Units.st(7.1)
+-- v5.4: 7.1 u/s. Owner 2026-11-10: people "a slight bit faster as we make the squirrel slower", and they
+-- never tire: 19 st/s outruns a walking squirrel (18) and loses to a sprint burst (33).
+local FLEE_SPEED = Units.st(7.6)
 local FLEE_CYCLIST = Units.st(8.25)
 local FLEE_STEP = Units.st(22)
 local SPOT_RADIUS = Units.st(20)

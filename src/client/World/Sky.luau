@@ -344,7 +344,7 @@ function Sky.start(): () -> ()
 	local clock: any
 	local function rebuild()
 		local rspd = ReplicatedStorage:GetAttribute("ClockRealSecondsPerDay")
-		local perDay = if type(rspd) == "number" then rspd else 72
+		local perDay = if type(rspd) == "number" then rspd else 720
 		if type(ReplicatedStorage:GetAttribute("ClockEpoch")) == "number" then
 			clock = Clock.fromEngine(perDay)
 		else

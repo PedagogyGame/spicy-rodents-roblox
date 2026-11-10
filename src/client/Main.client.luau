@@ -101,7 +101,7 @@ end)
 local started, clientOrErr = pcall(PossessionClient.start, {
 	bodies = bodies :: Instance,
 	overview = { position = Vector3.new(0, 120, 260), lookAt = Vector3.zero },
-	hud = { set = hud.set, toast = menu.toast },
+	hud = { set = hud.set, toast = menu.toast, meter = hud.meter },
 })
 if not started then
 	warn(`Client: PossessionClient failed: {clientOrErr}`)

@@ -8,7 +8,8 @@
 -- (leap L5922, Q drop L5672, attemptPounce L6482, jumpVelocity L5915, pounceVelocity L6473,
 -- attackHeading L5900, enterRoute L5826, attachRoute L5870) for a squirrel actor, in studs:
 --   GROUND  camera-relative WASD, accel 23 / drag 13 (air 4.2 / 1.15), turn 25 (19 in focus),
---           walk 8, sprint 16.8, stalk 1.65 u/s, x1.6 boost; gravity 30 u/s^2; ground snap;
+--           walk 7.2, sprint 13.2 (v5.4: 8 and 16.8; owner 2026-11-10 "runs a bit too fast"), stalk
+--           1.65 u/s, x1.6 boost; sprint is a burst (stamina, below); gravity 30 u/s^2; ground snap;
 --           swept per-axis wall sliding (0.24 u steps, x0.28 on a blocked axis) through world.blocked
 --   ROUTE   RouteMotion.advance at the rail speed, direction held while the key is held, fork
 --           auto-take, end-of-route auto switch, transfer easing (routeBridge), body yaw along the
@@ -101,6 +102,9 @@ export type State = {
 	bridge: Bridge?,
 	clock: number, -- accumulated simulated seconds (packet timestamps)
 	alive: boolean,
+	stamina: number, -- sprint meter, 0..1 (the client's own feel; the server only caps speed)
+	winded: boolean, -- the meter ran out: no sprint until sprintRecover of it is back
+	tireless: boolean?, -- the meter never drains (AI bodies, a later item, tests that replay v5.4 runs)
 }
 
 export type Event = { kind: string, routeId: number?, fromRouteId: number?, reason: string? }
@@ -109,10 +113,24 @@ export type Event = { kind: string, routeId: number?, fromRouteId: number?, reas
 export type Snapshot = { [string]: number | boolean }
 
 local st = Units.st
+-- v5.4's own ground speeds, kept for the record and for tests that replay v5.4 numbers
+SquirrelMotor.V54 = { walk = st(8.0), sprint = st(16.8) }
 SquirrelMotor.params = {
 	-- ground (routes_movement §8.1-§8.2)
-	walk = st(8.0),
-	sprint = st(16.8),
+	-- v5.4 ran at 8.0 and 16.8 u/s (SquirrelMotor.V54). Owner 2026-11-10: "the squirrel runs a bit too
+	-- fast ... I don't want it to just be fast and getting everybody, as much as I want to encourage the
+	-- dynamic of stalking around in trees": a walk no faster than a fleeing person (18 st/s), a sprint
+	-- that still catches one (33 st/s) but only in bursts. Rail speeds (Motion.C) are unchanged.
+	walk = st(7.2),
+	sprint = st(13.2),
+	-- sprint bursts: a full meter is sprintSeconds of sprinting; it refills in sprintRefill seconds of
+	-- not sprinting; once empty ("winded") sprint is off until sprintRecover of the meter is back. A
+	-- leap from the ground costs leapCost, and a winded one goes forward at leapForwardWinded.
+	sprintSeconds = 4,
+	sprintRefill = 9,
+	sprintRecover = 0.35,
+	leapCost = 0.12,
+	leapForwardWinded = st(9.5),
 	stalk = st(1.65),
 	boostMult = 1.6,
 	treeTravelMult = 0.6,
@@ -201,6 +219,8 @@ function SquirrelMotor.new(x: number, y: number, z: number): State
 		bridge = nil,
 		clock = 0,
 		alive = true,
+		stamina = 1,
+		winded = false,
 	}
 end
 
@@ -252,9 +272,9 @@ function SquirrelMotor.attackHeading(
 	return yaw
 end
 
--- jumpVelocity() (L5915-5921), studs/s.
-function SquirrelMotor.jumpVelocity(heading: number, boosted: boolean): (number, number, number)
-	local forward = if boosted then P.leapForwardBoost else P.leapForward
+-- jumpVelocity() (L5915-5921), studs/s. A winded leap rises as high but carries less far.
+function SquirrelMotor.jumpVelocity(heading: number, boosted: boolean, winded: boolean?): (number, number, number)
+	local forward = if winded then P.leapForwardWinded elseif boosted then P.leapForwardBoost else P.leapForward
 	return math.sin(heading) * forward, P.leapUp, math.cos(heading) * forward
 end
 
@@ -299,8 +319,9 @@ local SCALARS = {
 	"trunkNormalZ",
 	"routeFreeLook",
 	"clock",
+	"stamina",
 }
-local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive" }
+local FLAGS = { "grounded", "committedAirborne", "focus", "routeWasMoving", "alive", "winded" }
 local OPTIONAL_IDS = { "routeId", "pendingFork", "selectedJunction" }
 
 function SquirrelMotor.serialize(state: State): Snapshot
@@ -493,7 +514,18 @@ local function doLeap(state: State, world: World, events: { Event })
 	if state.routeId or state.grounded then
 		local heading =
 			SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
-		local vx, vy, vz = SquirrelMotor.jumpVelocity(heading, state.boostRemaining > 0)
+		-- a leap off the ground spends some of the sprint meter, so hopping is not a free sprint; a leap
+		-- off a rail is always a full one (the gaps between branches and wires are built for it)
+		local tired = false
+		if state.routeId == nil and not state.tireless then
+			tired = state.winded
+			state.stamina = math.max(0, state.stamina - P.leapCost)
+			if state.stamina == 0 and not state.winded then
+				state.winded = true
+				push(events, "winded")
+			end
+		end
+		local vx, vy, vz = SquirrelMotor.jumpVelocity(heading, state.boostRemaining > 0, tired)
 		local from = state.routeId
 		launchFromVisibleRoute(state, world)
 		state.vx, state.vy, state.vz = vx, vy, vz
@@ -702,7 +734,24 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 
 	local fw, side = input.fw, input.side
 	local moving = if rail then fw ~= 0 else (fw ~= 0 or side ~= 0)
-	local sprint = input.sprint
+	-- sprint is a burst: the meter drains while sprinting and moving, refills otherwise
+	local sprint = input.sprint and not state.winded and not state.focus
+	if state.tireless then
+		state.stamina, state.winded = 1, false
+		sprint = input.sprint and not state.focus
+	elseif sprint and moving then
+		state.stamina = math.max(0, state.stamina - dt / P.sprintSeconds)
+		if state.stamina == 0 then
+			state.winded = true
+			sprint = false
+			push(events, "winded")
+		end
+	else
+		state.stamina = math.min(1, state.stamina + dt / P.sprintRefill)
+		if state.winded and state.stamina >= P.sprintRecover then
+			state.winded = false
+		end
+	end
 	local treeTravel = rail ~= nil and rail.flags.treeTravel
 	local base = (if state.focus then P.stalk elseif sprint then P.sprint else P.walk)
 		* (if state.boostRemaining > 0 and not state.focus then P.boostMult else 1)
@@ -964,8 +1013,13 @@ local function add(list: { Violation }, code: string, severity: number, detail: 
 end
 
 -- Caps in studs/s.
+-- A leap now launches faster than the sprint (41 against 33 st/s; in v5.4 it was just under it), and
+-- a landing carries that speed on for a moment, so the cap is the faster of the two.
 function SquirrelMotor.groundCap(boosted: boolean): number
-	return P.sprint * (if boosted then P.boostMult else 1)
+	return math.max(
+		P.sprint * (if boosted then P.boostMult else 1),
+		if boosted then P.leapForwardBoost else P.leapForward
+	)
 end
 
 function SquirrelMotor.railCap(treeTravel: boolean, boosted: boolean): number

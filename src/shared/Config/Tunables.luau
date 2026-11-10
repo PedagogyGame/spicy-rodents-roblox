@@ -19,10 +19,11 @@ local Tunables = {}
 
 -- stylua: ignore start
 Tunables.tree = {
-	clock = { realSecondsPerDay = { v = 72, unit = "s", src = "brief v2 §15 dec 10 (decided)" },
+	clock = { realSecondsPerDay = { v = 720, unit = "s", src = "owner 2026-11-10: a 12-minute day (was 72 s, brief v2 §15 dec 10)" },
 	          weeksPerCycle = { v = 6 }, winterWeek = { v = 6 }, lunarMonthDays = { v = 29.53 },
 	          dayCurve = { v = { night = 0.20, sunrise = 0.10, goldenAm = 0.12, day = 0.30, goldenPm = 0.12, sunset = 0.10, blue = 0.06 } } },
-	squirrel = { walk = { v = 8.0, unit = "u/s", src = "routes §8.1" }, sprint = { v = 16.8, unit = "u/s" },
+	squirrel = { walk = { v = 7.2, unit = "u/s", src = "owner 2026-11-10 (v5.4: 8.0)" }, sprint = { v = 13.2, unit = "u/s", src = "owner 2026-11-10 (v5.4: 16.8)" },
+	             sprintSeconds = { v = 4, unit = "s", src = "owner 2026-11-10: sprint bursts" }, sprintRefillS = { v = 9, unit = "s" },
 	             stalk = { v = 1.65, unit = "u/s" }, gravity = { v = 30, unit = "u/s2" },
 	             leapFwd = { v = 16.5, unit = "u/s" }, leapUp = { v = 12.8, unit = "u/s" },
 	             grabRadius = { v = 3.4, unit = "u" }, maxTransferGap = { v = 3.15, unit = "u" },

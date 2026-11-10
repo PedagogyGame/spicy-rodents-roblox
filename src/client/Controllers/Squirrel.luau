@@ -22,7 +22,8 @@
 -- instead of writing the old position back over it.
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
 -- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
--- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast? };
+-- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
+-- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter? };
 --   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure)
 -- No side effects on require.
@@ -52,6 +53,9 @@ function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any }
 	for _, e in events do
 		if e.kind == "hint" and e.reason and HINTS[e.reason] then
 			return HINTS[e.reason]
+		end
+		if e.kind == "winded" then
+			return "Out of breath: sprint comes back in a few seconds"
 		end
 	end
 	local attached = false
@@ -148,6 +152,7 @@ function Squirrel.start(
 	local holding = state.routeId ~= nil or math.abs(state.vx) + math.abs(state.vz) > 0.1
 	local last, lastSpeed = pos, 0
 	local lastSaid, lastText = -math.huge, ""
+	local shownStamina, shownWinded = -1, false
 	local stopDrive = BodyDriver.driveRender(root, function(frameDt: number)
 		local dt = math.min(frameDt, 0.08)
 		if not railLive and state.routeId == nil then
@@ -211,6 +216,10 @@ function Squirrel.start(
 			lastSaid, lastText = t, say
 			ctx.toast(say, 2.5)
 		end
+		if ctx.meter and (math.abs(state.stamina - shownStamina) > 0.004 or state.winded ~= shownWinded) then
+			shownStamina, shownWinded = state.stamina, state.winded
+			ctx.meter(state.stamina, state.winded)
+		end
 		-- the bowling alley's ball-return tunnel (and its vent): the camera rides low behind (CameraPolicy zone)
 		local zone = nil
 		if state.routeId then
@@ -236,6 +245,9 @@ function Squirrel.start(
 	return function()
 		stopDrive()
 		KinematicPose.clear(body)
+		if ctx.meter then
+			ctx.meter(nil)
+		end
 	end
 end
 

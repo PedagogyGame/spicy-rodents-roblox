@@ -183,4 +183,55 @@ return function(t)
 		t.eq(total, town:GetAttribute("PartCount"))
 		t.truthy(total <= 30000, `part budget: {total}`) -- review 2026-11-09: full tree crowns, under ~30k
 	end)
+
+	-- Two drawn faces on one plane flicker against each other as the camera moves (the owner's "doors
+	-- glitch and shimmer in a strobe light way": the leaf's face lay on the wall's own plane).
+	t.test("no facade door or sign board has a face on the plane of another drawn face", function()
+		local doors, clashes = 0, {}
+		for _, p in plans do
+			if p.kind == "lot" then
+				for _, d in p.parts do
+					if (d.role == "Door" or d.role == "Sign") and (d.transparency or 0) < 1 and (d.pitch or 0) == 0 then
+						doors += 1
+						local c, sn = math.cos(d.yaw), math.sin(d.yaw)
+						for _, o in p.parts do
+							local quarter = (o.yaw - d.yaw) / (math.pi / 2)
+							local turned = math.abs(quarter - math.round(quarter)) < 1e-6
+							local block = o.shape == nil or o.shape == "Block"
+							local sameLook = o.material == d.material
+								and o.color[1] == d.color[1]
+								and o.color[2] == d.color[2]
+								and o.color[3] == d.color[3]
+							if
+								o ~= d
+								and block
+								and o.mesh == nil
+								and turned
+								and (o.pitch or 0) == 0
+								and (o.transparency or 0) < 1
+								and not sameLook
+							then
+								-- the other part in the door's frame (local +X = (cos, 0, -sin), +Z = (sin, 0, cos))
+								local dx, dz = o.cx - d.cx, o.cz - d.cz
+								local lx, lz = dx * c - dz * sn, dx * sn + dz * c
+								local swap = math.round(quarter) % 2 ~= 0
+								local ox, oz = if swap then o.sz else o.sx, if swap then o.sx else o.sz
+								local overX = math.min(d.sx, ox, (d.sx + ox) / 2 - math.abs(lx))
+								local overY = math.min(d.sy, o.sy, (d.sy + o.sy) / 2 - math.abs(o.cy - d.cy))
+								if overX > 0.3 and overY > 0.3 then
+									-- the outward (local -Z) faces: the only pair of them a player sees
+									local gap = math.abs((lz - oz / 2) - (-d.sz / 2))
+									if gap < 0.02 then
+										table.insert(clashes, `{p.id}: {d.name} and {o.name}`)
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		t.truthy(doors >= 72, `{doors} doors and sign boards checked`)
+		t.eq(table.concat(clashes, "; ", 1, math.min(#clashes, 6)), "", `{#clashes} flickering faces`)
+	end)
 end

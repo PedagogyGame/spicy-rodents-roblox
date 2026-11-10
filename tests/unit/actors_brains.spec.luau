@@ -94,7 +94,7 @@ return function(t)
 		brain:think(0.1, c)
 		t.eq(brain.state, "flee")
 		t.near(human.alert, 8, 1e-9)
-		t.near(human.intent.speed, Units.st(7.1))
+		t.near(human.intent.speed, Units.st(7.6))
 		t.truthy(human.intent.tx < human.x, "flees away from the squirrel along -x")
 		-- without the squirrel the alert decays and the walk resumes under 2 s of alert
 		grid:remove(2)

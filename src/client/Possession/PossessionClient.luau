@@ -37,7 +37,7 @@ local Drone = require("../Controllers/Drone")
 export type Opts = {
 	bodies: Instance, -- the folder holding every body
 	overview: { position: Vector3, lookAt: Vector3 }?, -- camera when driving nothing
-	hud: { set: (string, string) -> (), toast: (string, number?) -> () }?,
+	hud: { set: (string, string) -> (), toast: (string, number?) -> (), meter: ((number?, boolean?) -> ())? }?,
 }
 
 export type Client = {
@@ -239,7 +239,13 @@ function PossessionClient.start(opts: Opts): Client
 
 	local function startBodyController(model: Model, payload: { [string]: any })
 		local kind = PossessionClient.controllerFor(payload.species, payload.variant)
-		local ctx = { world = world, input = input, species = payload.species, toast = toast }
+		local ctx = {
+			world = world,
+			input = input,
+			species = payload.species,
+			toast = toast,
+			meter = if hud then hud.meter else nil,
+		}
 		-- the default controls walk and jump a Humanoid; motor-driven bodies have none, so this is
 		-- harmless for them and needed for a person (a vehicle or the drone turned them off)
 		InputMap.setCharacterControls(true)

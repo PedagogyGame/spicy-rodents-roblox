@@ -103,8 +103,9 @@ return function(t)
 		local function fakeTime(): number
 			return now
 		end
-		local a = Clock.new({ serverTime = fakeTime, epoch = 500, base = base, realSecondsPerDay = 72 })
-		local b = Clock.new({ serverTime = fakeTime, epoch = 500, base = base, realSecondsPerDay = 72 })
+		local perDay = DayClock.REAL_SECONDS_PER_DAY
+		local a = Clock.new({ serverTime = fakeTime, epoch = 500, base = base, realSecondsPerDay = perDay })
+		local b = Clock.new({ serverTime = fakeTime, epoch = 500, base = base, realSecondsPerDay = perDay })
 		now = 500
 		local g = a:game()
 		t.eq(g.day, DayClock.START_DAY)
@@ -113,8 +114,19 @@ return function(t)
 		t.eq(g.phase, "waxing gibbous")
 		now = 500 + 123.4
 		t.deepEq(a:game(), b:game())
-		-- one in-game day is 72 real seconds
-		now = 500 + 72
+		-- one in-game day is 12 real minutes (owner 2026-11-10), and dawn and dusk are slow: the sun
+		-- takes over a minute to rise and to set, with over a minute of golden light either side
+		t.eq(perDay, 720)
+		for _, seg in { "sunrise", "sunset", "goldenAm", "goldenPm" } do
+			t.truthy(
+				DayCurve.DEFAULT_SHARES[seg] * perDay >= 70,
+				`{seg} lasts {DayCurve.DEFAULT_SHARES[seg] * perDay} s`
+			)
+		end
+		now = 500 + 140
+		t.eq(a:game().segment, "sunset", "over two minutes in, the sun is still setting")
+		t.eq(a:game().day, DayClock.START_DAY)
+		now = 500 + perDay
 		t.near(a:game().hour, DayClock.START_HOUR, 1e-6)
 		t.eq(a:game().day, DayClock.START_DAY + 1)
 		-- before the server publishes, the client shows the same opening moment

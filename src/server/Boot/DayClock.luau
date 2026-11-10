@@ -1,8 +1,9 @@
 --!strict
 -- ServerScriptService.Server.Boot.DayClock
 -- Publishes the game clock (BUILD_PLAN §1.7 "Game time: server epoch attribute; clients derive everything from
--- it"; brief v2 §15 decision 10: 72 real seconds per in-game day, sunrise and sunset held longer by
--- Time/DayCurve). The server writes ReplicatedStorage attributes ClockEpoch (server time), ClockBase (game
+-- it"). One in-game day is 12 real minutes (owner, 2026-11-10: the 72 s day of brief v2 §15 decision 10
+-- "felt really weird when it happened really fast"; dawn and dusk are to be slow). Time/DayCurve holds
+-- sunrise and sunset longer than a linear clock: 72 s each, with 86 s of golden light either side. The server writes ReplicatedStorage attributes ClockEpoch (server time), ClockBase (game
 -- seconds at the epoch), ClockRate and ClockRealSecondsPerDay once at boot; Shared/Time/Clock.fromEngine reads
 -- them and every client derives the same time of day from workspace:GetServerTimeNow(), so all clients stay
 -- in sync without a per-frame remote (Client/World/Sky turns it into lighting). The server never drives
@@ -20,7 +21,7 @@ local DayClock = {}
 
 DayClock.START_DAY = 9
 DayClock.START_HOUR = 16.75 -- golden afternoon (DayCurve goldenPm 16:30-18:30)
-DayClock.REAL_SECONDS_PER_DAY = 72 -- Tunables clock.realSecondsPerDay (brief v2 §15 decision 10)
+DayClock.REAL_SECONDS_PER_DAY = 720 -- Tunables clock.realSecondsPerDay (owner 2026-11-10: 12 minutes)
 
 -- Game seconds at which the clock reads `startHour` on `startDay`.
 function DayClock.base(startDay: number?, startHour: number?, realSecondsPerDay: number?): number

@@ -19,6 +19,8 @@ local CameraRig = require("@client/Camera/CameraRig")
 local ClientWorld = require("@client/World/ClientWorld")
 local Gait = require("@client/Animation/Gait")
 local Squirrel = require("@client/Controllers/Squirrel")
+local Hud = require("@client/UI/Hud")
+local Human = require("@client/Controllers/Human")
 local Bake = require("@worldgen/Bake")
 
 local st = Units.st
@@ -133,6 +135,7 @@ return function(t)
 				return 4.2
 			end)
 			local s = SquirrelMotor.new(0, 4.2, 0)
+			s.tireless = true -- a long sprint: the sprint meter has its own test (movement_motor)
 			local v = SquirrelVisual.new()
 			local inp = input(math.pi)
 			inp.fw = 1
@@ -157,14 +160,14 @@ return function(t)
 					maxStep = math.max(maxStep, math.sqrt((v.x - lastX) ^ 2 + (v.z - lastZ) ^ 2) / dt)
 				end
 			end
-			-- the drawn point never moves faster than the motor can (sprint 16.8 u/s = 42 st/s)
+			-- the drawn point never moves faster than the motor can (the sprint speed)
 			t.truthy(maxStep <= SquirrelMotor.params.sprint * 1.02, `{pattern}: drawn speed {maxStep}`)
 			-- straight again for the last 5 s: level, and trailing the motor by speed / 23
 			t.truthy(math.abs(v.lean) < 0.01, `{pattern}: lean {v.lean}`)
 			local lag = math.sqrt((s.x - v.x) ^ 2 + (s.z - v.z) ^ 2)
 			t.truthy(lag < SquirrelMotor.params.sprint / P.rate * 1.6, `{pattern}: lag {lag}`)
 			t.near(v.moveSpeed, s.moveSpeed, 1e-12)
-			t.near(v.cadence, 16.8 * 2.85, 0.2, `{pattern}: sprint cadence`)
+			t.near(v.cadence, Units.u(SquirrelMotor.params.sprint) * 2.85, 0.2, `{pattern}: sprint cadence`)
 		end
 	end)
 
@@ -811,6 +814,36 @@ return function(t)
 			end
 		end
 		t.truthy(lots >= 5 and tiles > lots, `{lots} draped lots, {tiles} tiles`)
+	end)
+
+	-- Owner 2026-11-10: the squirrel slower with sprint bursts that run out; people a slight bit faster,
+	-- never out of the ability to run.
+	t.test("sprint bursts are said and shown; a running person outpaces a walking squirrel", function()
+		local idle = input(math.pi)
+		t.eq(
+			Squirrel.feedback(idle, { { kind = "winded" } }, false),
+			"Out of breath: sprint comes back in a few seconds"
+		)
+		t.eq(Squirrel.feedback(idle, {}, false), nil)
+		local full = Hud.meterLook(1, false)
+		t.eq(full.scale, 1)
+		t.eq(full.label, "SPRINT")
+		local out = Hud.meterLook(0.2, true)
+		t.eq(out.scale, 0.2)
+		t.eq(out.label, "OUT OF BREATH")
+		t.truthy(out.color[1] ~= full.color[1] or out.color[2] ~= full.color[2], "a different colour when winded")
+		t.eq(Hud.meterLook(-3, false).scale, 0)
+		t.eq(Hud.meterLook(7, false).scale, 1)
+		-- the chase: a walking squirrel does not catch a running person, a sprinting one does
+		local M = SquirrelMotor.params
+		t.truthy(
+			Human.SPRINT > M.walk and Human.SPRINT < M.sprint,
+			`person {Human.SPRINT}, squirrel {M.walk}..{M.sprint}`
+		)
+		t.truthy(Human.WALK > 16 and Human.WALK <= 18, "a slight bit faster than 16")
+		t.truthy(M.sprint < SquirrelMotor.V54.sprint and M.walk < SquirrelMotor.V54.walk, "slower than v5.4")
+		-- one full burst gains less than 25 studs on a running person: not enough to run down a town
+		t.truthy((M.sprint - Human.SPRINT) * M.sprintSeconds < 25)
 	end)
 
 	t.test("place and movedFromOutside: the motor restarts at rest where the body was put", function()

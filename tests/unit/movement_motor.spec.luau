@@ -148,27 +148,131 @@ return function(t)
 		end
 	)
 
-	t.test("ground run: speed caps at walk 8 / sprint 16.8 / boost x1.6 u/s and velocity follows the camera", function()
+	t.test(
+		"ground run: speed caps at walk 7.2 / sprint 13.2 / boost x1.6 u/s and velocity follows the camera",
+		function()
+			local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+			local inp = input(math.pi) -- camera at yaw pi: forward = (0, +1) in XZ
+			inp.fw = 1
+			for _ = 1, 180 do
+				SquirrelMotor.step(s, inp, 1 / 60, world)
+			end
+			local speed = Units.u(math.sqrt(s.vx * s.vx + s.vz * s.vz))
+			t.near(speed, 7.2, 0.02, "walk")
+			t.eq(SquirrelMotor.V54.walk, Units.st(8.0))
+			t.eq(SquirrelMotor.V54.sprint, Units.st(16.8))
+			t.truthy(s.vz > 0 and math.abs(s.vx) < 1e-6, "runs along +z for camera yaw pi")
+			t.truthy(s.grounded)
+			inp.sprint = true
+			for _ = 1, 180 do
+				SquirrelMotor.step(s, inp, 1 / 60, world)
+			end
+			t.near(Units.u(math.sqrt(s.vx * s.vx + s.vz * s.vz)), 13.2, 0.02, "sprint")
+			s.boostRemaining = 30
+			s.tireless = true
+			for _ = 1, 180 do
+				SquirrelMotor.step(s, inp, 1 / 60, world)
+			end
+			t.near(Units.u(math.sqrt(s.vx * s.vx + s.vz * s.vz)), 13.2 * 1.6, 0.05, "sprint + boost")
+		end
+	)
+
+	-- Owner 2026-11-10: "the squirrel runs a bit too fast ... and run out of sprint bursts".
+	t.test("sprint is a burst: 4 s of it, then a walk until the meter is back; a ground leap costs some", function()
+		local P = SquirrelMotor.params
+		local function speedOf(s: SquirrelMotor.State): number
+			return math.sqrt(s.vx * s.vx + s.vz * s.vz)
+		end
 		local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
-		local inp = input(math.pi) -- camera at yaw pi: forward = (0, +1) in XZ
+		local inp = input(math.pi)
 		inp.fw = 1
-		for _ = 1, 180 do
-			SquirrelMotor.step(s, inp, 1 / 60, world)
-		end
-		local speed = Units.u(math.sqrt(s.vx * s.vx + s.vz * s.vz))
-		t.near(speed, 8.0, 0.02, "walk")
-		t.truthy(s.vz > 0 and math.abs(s.vx) < 1e-6, "runs along +z for camera yaw pi")
-		t.truthy(s.grounded)
 		inp.sprint = true
-		for _ = 1, 180 do
-			SquirrelMotor.step(s, inp, 1 / 60, world)
+		t.eq(s.stamina, 1)
+		local winded, windedAt, frames = 0, 0, 0
+		local function run(seconds: number)
+			for _ = 1, math.round(seconds * 60) do
+				frames += 1
+				local _, events = SquirrelMotor.step(s, inp, 1 / 60, world)
+				for _, e in events do
+					if e.kind == "winded" then
+						winded += 1
+						windedAt = frames / 60
+					end
+				end
+			end
 		end
-		t.near(Units.u(math.sqrt(s.vx * s.vx + s.vz * s.vz)), 16.8, 0.02, "sprint")
-		s.boostRemaining = 30
-		for _ = 1, 180 do
-			SquirrelMotor.step(s, inp, 1 / 60, world)
+		run(3.5)
+		t.near(speedOf(s), P.sprint, 0.05, "sprinting")
+		t.near(s.stamina, 1 - 3.5 / P.sprintSeconds, 1e-6)
+		t.eq(winded, 0)
+		run(1)
+		t.eq(winded, 1, "one winded event")
+		t.near(windedAt, P.sprintSeconds, 1 / 60 + 1e-9)
+		t.near(speedOf(s), P.walk, 0.1, "Shift held, out of breath: a walk")
+		t.eq(s.winded, true)
+		-- still holding Shift: the meter comes back, and at sprintRecover of it the sprint returns
+		run(P.sprintRecover * P.sprintRefill - 0.5 - 0.1)
+		t.eq(s.winded, true)
+		t.near(speedOf(s), P.walk, 0.05)
+		run(0.5)
+		t.eq(s.winded, false)
+		t.near(speedOf(s), P.sprint, 0.6, "sprinting again")
+		t.eq(winded, 1)
+		-- resting refills it in sprintRefill seconds from empty
+		inp.sprint = false
+		inp.fw = 0
+		s.stamina = 0
+		run(P.sprintRefill / 2)
+		t.near(s.stamina, 0.5, 1e-6)
+		run(P.sprintRefill)
+		t.eq(s.stamina, 1)
+		-- the meter survives a handoff
+		s.stamina, s.winded = 0.2, true
+		local back = SquirrelMotor.deserialize(SquirrelMotor.serialize(s))
+		t.eq(back.stamina, 0.2)
+		t.eq(back.winded, true)
+		-- a leap off the ground costs leapCost and goes the full distance; a winded one goes less far
+		s.stamina, s.winded = 1, false
+		inp.leap = true
+		SquirrelMotor.step(s, inp, 1 / 60, world)
+		inp.leap = false
+		t.near(s.stamina, 1 - P.leapCost, 1 / 60 / P.sprintRefill + 1e-6) -- less one frame of refill
+		t.near(speedOf(s), P.leapForward, 1, "a full leap (less one frame of air drag)")
+		run(2)
+		t.eq(s.grounded, true)
+		s.stamina, s.winded = 0.05, true
+		inp.leap = true
+		SquirrelMotor.step(s, inp, 1 / 60, world)
+		inp.leap = false
+		t.near(speedOf(s), P.leapForwardWinded, 1, "a winded leap")
+		t.near(s.vy, P.leapUp, P.gravity / 60 + 1e-6, "as high as any leap")
+		-- a tireless body (AI, tests) never drains
+		local a = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+		a.tireless = true
+		inp.fw, inp.sprint = 1, true
+		for _ = 1, 600 do
+			SquirrelMotor.step(a, inp, 1 / 60, world)
 		end
-		t.near(Units.u(math.sqrt(s.vx * s.vx + s.vz * s.vz)), 16.8 * 1.6, 0.05, "sprint + boost")
+		t.eq(a.stamina, 1)
+		t.near(speedOf(a), P.sprint, 0.05)
+	end)
+
+	t.test("a leap off a rail is always a full one, and costs nothing", function()
+		local P = SquirrelMotor.params
+		local trunk = world.registry:get(220) :: Registry.Route
+		local foot = world.registry:foot(trunk)
+		local s = SquirrelMotor.new(foot.x, world.groundHeight, foot.z - Units.st(1.2))
+		local inp = input(math.pi)
+		inp.grab = true
+		SquirrelMotor.step(s, inp, 1 / 60, world)
+		inp.grab = false
+		t.eq(s.routeId, 220)
+		s.stamina, s.winded = 0, true
+		inp.leap = true
+		SquirrelMotor.step(s, inp, 1 / 60, world)
+		t.eq(s.routeId, nil)
+		t.near(math.sqrt(s.vx * s.vx + s.vz * s.vz), P.leapForward, 1, "less one frame of air drag")
+		t.truthy(s.stamina < 0.01, "nothing spent")
 	end)
 
 	t.test("walk-in auto-grab onto the BUR OAK trunk, climb at 4.32 u/s, A/D picks a bough, E takes it", function()

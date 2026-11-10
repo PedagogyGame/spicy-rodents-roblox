@@ -371,7 +371,8 @@ end
 function Building.sign(ctx: Spec.LotCtx, text: string, y: number, width: number?)
 	local w = math.min(width or ctx.W * 0.6, 24)
 	local pal = Building.look(ctx)
-	ctx.list:add(ctx.frame, "SignBoard", 0, y, -ctx.D / 2 - 0.15, w, 2.2, 0.3, {
+	-- proud of the cornice (0.3 out): a face on the cornice's own plane flickers against it
+	ctx.list:add(ctx.frame, "SignBoard", 0, y, -ctx.D / 2 - 0.2, w, 2.2, 0.4, {
 		color = if pal.timber then pal.accent else SIGN,
 		canCollide = false,
 		role = "Sign",
@@ -380,9 +381,11 @@ function Building.sign(ctx: Spec.LotCtx, text: string, y: number, width: number?
 	ctx.list:extra({ kind = "SurfaceGui", part = "SignBoard", name = "Sign", text = text, face = "Front" })
 end
 
--- Front door leaf set into the front face (the body behind it is solid until W3 interiors).
+-- Front door leaf on the front face (the body behind it is solid until W3 interiors). It stands 0.37
+-- studs proud of the wall and 0.17 proud of the plinth: with its face on the wall's own plane the two
+-- surfaces flickered against each other (owner: "the doors glitch and shimmer in a strobe light way").
 function Building.door(ctx: Spec.LotCtx, width: number, height: number)
-	ctx.list:add(ctx.frame, "Door", 0, height / 2, -ctx.D / 2 + 0.15, width, height, 0.3, {
+	ctx.list:add(ctx.frame, "Door", 0, height / 2, -ctx.D / 2 - 0.12, width, height, 0.5, {
 		color = Building.look(ctx).door,
 		material = "Wood",
 		role = "Door",
