@@ -5,6 +5,13 @@
 -- bystanders). Numbers from humans_actors §4.2-§4.3 (lanes 12.1 u off the road centreline, goal step
 -- R(37, 95) u, new goal within 1.7 u, inward beyond +/-225 u, clamp [-260, 260] u; speeds walk
 -- R(0.8, 1.6), cyclist R(3.2, 5.2), flee 7.1 u/s) and §5.2 (alert 8, return to walk under 2).
+-- The bite-to-hospital sequence (owner 2026-11-10) adds: a Directive (Brains/Directive: down, hidden,
+-- route, hold) that overrides everything while it is set; the events "medical" (set or clear the
+-- directive), "bitten" and "witness" (run from `threat` along the lane); an optional
+-- ctx.emit("spotted", actor, threat) when a spot starts a flee, so the server can let some people
+-- say something; and the "rejoin" state: after a directive, a gathering or a player letting go far
+-- from the lane, the person adopts the nearest lane and WALKS back onto it (the lane lock damps the
+-- cross coordinate at lambda 8, which used to slide a person across the block in half a second).
 -- Interface (BUILD_PLAN §1.4): new(actor, params), think(dt, ctx), suspend() -> snapshot,
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
@@ -12,6 +19,7 @@
 local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
+local Directive = require("./Directive")
 local Perception = require("../Perception")
 
 export type Lane = {
@@ -37,7 +45,8 @@ type Brain = Common.Brain & {
 	lane: Lane,
 	goal: number, -- coordinate along the lane axis
 	walkSpeed: number,
-	state: string, -- walk | flee | gather
+	state: string, -- walk | flee | gather | rejoin
+	directive: Directive.State,
 	gatherX: number,
 	gatherZ: number,
 	gatherUntil: number,
@@ -60,6 +69,9 @@ local ALERT_ON_SPOT = 8
 local ALERT_WALK_AGAIN = 2
 local WALK_TURN = 4 -- rad/s (L7160)
 local DAMP_WALK, DAMP_FLEE = 6.8, 10 -- lambda (L7138)
+local REJOIN_FAR = 6 -- studs off the lane: further than this the person walks back instead of sliding
+local REJOIN_NEAR = 1.5 -- studs: on the lane again
+local REJOIN_SPEED = Units.st(1.6)
 
 -- The v5.4 sidewalk lanes (humans_actors §4.2 table), in studs. 4 core lanes first.
 function Pedestrian.defaultLanes(): { Lane }
@@ -137,6 +149,41 @@ local function setWalkIntent(self: Brain, goalU: number, speed: number, damp: nu
 	intent.damp = damp
 end
 
+-- How far the actor is from its lane (studs), and the nearest point on it.
+local function offLane(self: Brain): (number, number, number)
+	local lane, actor = self.lane, self.actor
+	local x, z
+	if lane.axis == "x" then
+		x, z = math.clamp(actor.x, lane.min, lane.max), lane.fixed
+	else
+		x, z = lane.fixed, math.clamp(actor.z, lane.min, lane.max)
+	end
+	return Common.dist2d(actor.x, actor.z, x, z), x, z
+end
+
+-- Adopt the lane nearest to where the person now stands and walk onto it (state "rejoin"); when
+-- they are on their lane already, just walk on.
+local function reseat(self: Brain)
+	local actor = self.actor
+	local best, bestD = self.lane, math.huge
+	for _, lane in self.params.lanes do
+		local x, z
+		if lane.axis == "x" then
+			x, z = math.clamp(actor.x, lane.min, lane.max), lane.fixed
+		else
+			x, z = lane.fixed, math.clamp(actor.z, lane.min, lane.max)
+		end
+		local d = Common.dist2d(actor.x, actor.z, x, z)
+		if d < bestD then
+			best, bestD = lane, d
+		end
+	end
+	self.lane = best
+	self.threat = nil
+	self.state = if bestD > REJOIN_NEAR then "rejoin" else "walk"
+	pickGoal(self)
+end
+
 -- Perception at the brain's own tick: the nearest squirrel-species actor that passes spotted().
 local function perceive(self: Brain, ctx: Common.Ctx): Common.Actor?
 	local actor = self.actor
@@ -176,10 +223,17 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	actor.alert = math.max(0, actor.alert - dt)
 	local cyclist = self.params.cyclist == true
 
+	-- an order from the medical sequence overrides everything (Brains/Directive)
+	if Directive.think(self.directive, actor, dt, ctx) then
+		return
+	end
+	if Directive.takeReleased(self.directive) then
+		reseat(self)
+	end
+
 	if self.state == "gather" then
 		if ctx.now >= self.gatherUntil then
-			self.state = "walk"
-			pickGoal(self)
+			reseat(self) -- back to the lane on foot (state "rejoin"), or straight on when already there
 		else
 			local intent = actor.intent
 			local d = Common.dist2d(actor.x, actor.z, self.gatherX, self.gatherZ)
@@ -198,12 +252,32 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 		end
 	end
 
+	if self.state == "rejoin" then
+		local d, x, z = offLane(self)
+		if d <= REJOIN_NEAR then
+			self.state = "walk"
+			pickGoal(self)
+		else
+			local intent = actor.intent
+			intent.mode = "walk"
+			intent.tx, intent.tz = x, z
+			intent.laneAxis, intent.laneCoord = nil, nil
+			intent.speed = math.max(self.walkSpeed, REJOIN_SPEED)
+			intent.turnRate = WALK_TURN
+			intent.damp = DAMP_WALK
+			return
+		end
+	end
+
 	-- spot reaction (L7068-7078): only when not already alert
 	local threat = perceive(self, ctx)
 	if threat and actor.alert <= 0 and self.state ~= "flee" then
 		self.state = "flee"
 		actor.alert = ALERT_ON_SPOT
 		self.threat = threat
+		if ctx.emit then
+			ctx.emit("spotted", actor, threat)
+		end
 	end
 
 	if self.state == "flee" then
@@ -243,6 +317,7 @@ function Methods.suspend(self: Brain): Common.Snapshot
 		gatherX = self.gatherX,
 		gatherZ = self.gatherZ,
 		gatherUntil = self.gatherUntil,
+		directive = Directive.snapshot(self.directive),
 	}
 end
 
@@ -255,6 +330,11 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.gatherX = snapshot.gatherX or 0
 	self.gatherZ = snapshot.gatherZ or 0
 	self.gatherUntil = snapshot.gatherUntil or 0
+	Directive.restore(self.directive, snapshot.directive)
+	-- handed back far from the lane (a player walked the body somewhere): walk to the nearest lane
+	if not Directive.active(self.directive) and self.state ~= "gather" and offLane(self) > REJOIN_FAR then
+		reseat(self)
+	end
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
@@ -265,6 +345,15 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 	elseif evt.type == "alarm" then
 		-- a new crime scene puts every visible human within 72 u on alert >= 7 (L9291-9302)
 		self.actor.alert = math.max(self.actor.alert, evt.alert or 7)
+	elseif evt.type == "medical" then
+		Directive.set(self.directive, evt)
+	elseif evt.type == "bitten" or evt.type == "witness" then
+		-- run from the biter along the lane (humans_actors §7.1, §7.3); an order in force wins
+		if evt.threat and not Directive.active(self.directive) then
+			self.state = "flee"
+			self.threat = evt.threat
+			self.actor.alert = math.max(self.actor.alert, evt.alert or ALERT_ON_SPOT)
+		end
 	end
 end
 
@@ -286,6 +375,7 @@ function Pedestrian.new(actor: Common.Actor, params: Params): Common.Brain
 		goal = 0,
 		walkSpeed = Common.range(rng, params.speedMin, params.speedMax),
 		state = "walk",
+		directive = Directive.new(),
 		gatherX = 0,
 		gatherZ = 0,
 		gatherUntil = 0,

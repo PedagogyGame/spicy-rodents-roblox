@@ -10,6 +10,8 @@
 --   last) -> { id }, damage(health, amount) -> (health, dead), shout(n) -> string,
 --   deathMessage(cause) -> (title, line)
 
+local Lines = require("../Speech/Lines")
+
 export type Point = { id: any, x: number, y: number, z: number }
 
 local PlayRules = {}
@@ -24,17 +26,10 @@ PlayRules.BITE_RANGE = 3.5 -- studs, horizontal, rodent root to person root
 PlayRules.BITE_HEIGHT = 5 -- studs, vertical
 PlayRules.BITE_COOLDOWN = 2.5 -- seconds before the same person can be bitten again
 
--- Mild lines only (brief v2 §15: v5.4's swearing is rewritten).
-PlayRules.SHOUTS = table.freeze({
-	"Ow! Get off me!",
-	"Yikes! A squirrel!",
-	"Shoo! Shoo!",
-	"My ankle!",
-	"Somebody call the police!",
-	"Not again!",
-	"Why is it RED?!",
-	"Help! Spicy rodent!",
-})
+-- Mild lines only (brief v2 §15: v5.4's swearing is rewritten). The lines live with every other
+-- spoken line in Speech/Lines (group "bitten"); the server picks the victim's bubble through
+-- Speech/SpeechRules, and `shout(n)` stays for callers that want the plain cycle.
+PlayRules.SHOUTS = Lines.GROUPS.bitten
 
 -- The nearest target in front of the kicker within reach, or nil.
 -- kicker: the kicker's root; look: the kicker's facing (x, z, need not be unit).

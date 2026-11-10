@@ -3,8 +3,8 @@
 -- The AI car motor: one fleet vehicle on its lane, per behaviour class, with yielding, stop control and
 -- teleport flags (BUILD_PLAN §4.4 W1 #9, D9; traffic.md §5, §6, §13). Movement/CarMotor is the player
 -- kinematic car (Track A #5); this is the lane layer the server fleet runs.
--- Interface: new(entry, lane, opts) -> Vehicle; step(v, ctx, dt) -> events; dispatch(v, route, opts);
---            body(v) -> LaneMath.Body; CLASSES; VIS_HEIGHT
+-- Interface: new(entry, lane, opts) -> Vehicle; step(v, ctx, dt) -> events; dispatch(v, route, ctx, held?);
+--            release(v); body(v) -> LaneMath.Body; CLASSES; VIS_HEIGHT
 --
 -- Behaviour classes port v5.4 movers (studs; the HTML constants x 2.5):
 --   sedan    updateCars (§5.1): exponential speed (accel 1.3, brake 9), the people corridor (lateral 3.3,
@@ -16,6 +16,8 @@
 --   motorcycle (§5.12): appears after a wait, rides to the lane end, hides; not fatal; hard stop only.
 --   legacy_ambulance (§5.8): wait 18, drive, stop dead within 5 of a person, park 16, wait 145.
 --   responder / incident (§5.9, §5.10): hidden until `dispatch`; out, on scene, back in reverse.
+--            A trip dispatched with `held` stays on scene until `release` (the medical sequence loads
+--            its patient first); without it the scene timer runs as in v5.4.
 --   event (§5.11): the 2400 s living-event glide (fatal even at a crawl).
 -- Rebuild fixes (traffic.md §11-§13): squirrels are in every yielding class's hazard set with RELATIVE
 -- visibility (squirrel y - vehicle base y < 4.76 u, not the absolute 4.8); opposing vehicles are excluded
@@ -64,6 +66,7 @@ export type Vehicle = {
 	teleported: boolean,
 	stop: Control.State,
 	moving: boolean, -- expected to be moving this tick (stuck detection)
+	held: boolean?, -- a dispatched trip waits on scene until released
 }
 
 export type Ctx = {
@@ -499,13 +502,23 @@ stepClass.legacy_ambulance = function(v, ctx, dt, events)
 	end
 end
 
--- dispatch(v, route, opts): start a responder or incident trip on `route` (a polyline Lane).
-function AICarMotor.dispatch(v: Vehicle, route: LaneMath.Lane, ctx: Ctx)
+-- dispatch(v, route, ctx, held?): start a responder or incident trip on `route` (a polyline Lane).
+-- With `held` the vehicle stays on scene until `release` instead of leaving on the scene timer.
+function AICarMotor.dispatch(v: Vehicle, route: LaneMath.Lane, ctx: Ctx, held: boolean?)
 	v.route = route
 	v.dir = 1
 	v.phase = "out"
 	v.timer = 0
+	v.held = if held then true else nil -- nil: the plain scene timer; false (after release): leave at once
 	appear(v, ctx, route, 0)
+end
+
+-- release(v): a held trip may leave: at once when it is on scene, on arrival when still on the way.
+function AICarMotor.release(v: Vehicle)
+	v.held = false
+	if v.phase == "hold" then
+		v.timer = 0
+	end
 end
 
 local function trip(
@@ -525,19 +538,22 @@ local function trip(
 	end
 	if v.phase == "hold" then
 		v.speed = 0
-		v.timer -= dt
-		if v.timer <= 0 then
-			v.phase, v.dir, v.s = "back", -1, 0
+		if not v.held then
+			v.timer -= dt
+			if v.timer <= 0 then
+				v.phase, v.dir, v.s = "back", -1, 0
+			end
 		end
 		place(v, ctx, route)
 		return
 	end
 	local done = drivePolyline(v, ctx, route, if v.phase == "out" then outSpeed else backSpeed, st(3.1), dt)
 	if done and v.phase == "out" then
-		v.phase, v.timer = "hold", holdSecs
+		-- a held trip waits for release (timer 0 then); one released on the way turns straight round
+		v.phase, v.timer = "hold", if v.held == nil then holdSecs else 0
 		table.insert(events, "arrived")
 	elseif done then
-		v.phase, v.route, v.visible = "idle", nil, false
+		v.phase, v.route, v.visible, v.held = "idle", nil, false, nil
 		table.insert(events, "home")
 	end
 end
