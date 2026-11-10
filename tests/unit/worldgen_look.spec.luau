@@ -7,6 +7,7 @@
 -- round-trips through .rbxm with WedgeParts and Ball shapes; the part budget holds.
 local roblox = require("@lune/roblox")
 local Bake = require("@worldgen/Bake")
+local Coplanar = require("@worldgen/Coplanar")
 local Factory = require("@worldgen/Factory")
 local Palette = require("@worldgen/Palette")
 local Kits = require("@worldgen/Kits")
@@ -181,59 +182,91 @@ return function(t)
 		print(`      balls {balls}, tree meshes {meshes}`)
 		t.eq(meshes, 392) -- 95 trees: bark + three leaf layers (+ apples on the 12 apple trees)
 		t.eq(total, town:GetAttribute("PartCount"))
-		t.truthy(total <= 30000, `part budget: {total}`) -- review 2026-11-09: full tree crowns, under ~30k
+		print(`      part count {total}`)
+		t.truthy(total <= 27000, `part budget: {total}`) -- art pass 2026-11-10: trim and interiors, under 27k
 	end)
 
 	-- Two drawn faces on one plane flicker against each other as the camera moves (the owner's "doors
-	-- glitch and shimmer in a strobe light way": the leaf's face lay on the wall's own plane).
-	t.test("no facade door or sign board has a face on the plane of another drawn face", function()
-		local doors, clashes = 0, {}
+	-- glitch and shimmer in a strobe light way": the leaf's face lay on the wall's own plane). The check
+	-- is WorldGen/Coplanar, over every part of every model in the town: doors, signs, window bars, trim,
+	-- eaves, roof plates, furniture, floors and wall linings alike.
+	t.test("no drawn face in the town lies on the plane of another drawn face (flicker)", function()
+		local doors = 0
 		for _, p in plans do
 			if p.kind == "lot" then
 				for _, d in p.parts do
-					if (d.role == "Door" or d.role == "Sign") and (d.transparency or 0) < 1 and (d.pitch or 0) == 0 then
+					if (d.role == "Door" or d.role == "Sign") and (d.transparency or 0) < 1 then
 						doors += 1
-						local c, sn = math.cos(d.yaw), math.sin(d.yaw)
-						for _, o in p.parts do
-							local quarter = (o.yaw - d.yaw) / (math.pi / 2)
-							local turned = math.abs(quarter - math.round(quarter)) < 1e-6
-							local block = o.shape == nil or o.shape == "Block"
-							local sameLook = o.material == d.material
-								and o.color[1] == d.color[1]
-								and o.color[2] == d.color[2]
-								and o.color[3] == d.color[3]
-							if
-								o ~= d
-								and block
-								and o.mesh == nil
-								and turned
-								and (o.pitch or 0) == 0
-								and (o.transparency or 0) < 1
-								and not sameLook
-							then
-								-- the other part in the door's frame (local +X = (cos, 0, -sin), +Z = (sin, 0, cos))
-								local dx, dz = o.cx - d.cx, o.cz - d.cz
-								local lx, lz = dx * c - dz * sn, dx * sn + dz * c
-								local swap = math.round(quarter) % 2 ~= 0
-								local ox, oz = if swap then o.sz else o.sx, if swap then o.sx else o.sz
-								local overX = math.min(d.sx, ox, (d.sx + ox) / 2 - math.abs(lx))
-								local overY = math.min(d.sy, o.sy, (d.sy + o.sy) / 2 - math.abs(o.cy - d.cy))
-								if overX > 0.3 and overY > 0.3 then
-									-- the outward (local -Z) faces: the only pair of them a player sees
-									local gap = math.abs((lz - oz / 2) - (-d.sz / 2))
-									if gap < 0.02 then
-										table.insert(clashes, `{p.id}: {d.name} and {o.name}`)
-									end
-								end
-							end
-						end
 					end
 				end
 			end
 		end
 		t.truthy(doors >= 72, `{doors} doors and sign boards checked`)
-		t.eq(table.concat(clashes, "; ", 1, math.min(#clashes, 6)), "", `{#clashes} flickering faces`)
+		local r = Coplanar.run(plans)
+		print(`      {r.checked} drawn blocks checked for shared planes`)
+		t.truthy(r.checked >= 8000, `{r.checked} blocks checked`)
+		t.eq(table.concat(r.clashes, "; ", 1, math.min(#r.clashes, 6)), "", `{#r.clashes} flickering faces`)
 	end)
+
+	t.test(
+		"Coplanar: finds a face on a wall's plane, ignores hidden backs, grounded bottoms and tiny overlaps",
+		function()
+			local function box(
+				name: string,
+				cx: number,
+				cy: number,
+				cz: number,
+				sx: number,
+				sy: number,
+				sz: number,
+				c: number
+			): any
+				return {
+					name = name,
+					cx = cx,
+					cy = cy,
+					cz = cz,
+					yaw = 0,
+					pitch = 0,
+					sx = sx,
+					sy = sy,
+					sz = sz,
+					color = { c, c, c },
+					material = "SmoothPlastic",
+					canCollide = false,
+					transparency = 0,
+				}
+			end
+			local wall = box("Wall", 0, 5, 0, 10, 10, 1, 200)
+			-- a door leaf whose outer (-z) face lies on the wall's outer face: the owner's strobe
+			local flush = Coplanar.clashes({ wall, box("Door", 0, 4.5, -0.25, 3, 8, 0.5, 90) })
+			t.eq(#flush, 1)
+			t.eq(flush[1].axis, 3)
+			t.eq(flush[1].side, -1)
+			-- 0.12 proud: no clash
+			t.eq(#Coplanar.clashes({ wall, box("Door", 0, 4.5, -0.37, 3, 8, 0.5, 90) }), 0)
+			-- the same colour and material cannot be told apart: no clash
+			t.eq(#Coplanar.clashes({ wall, box("Patch", 0, 4, -0.25, 3, 8, 0.5, 200) }), 0)
+			-- two boards with their backs on the wall's face are hidden by the wall itself
+			local a, b = box("BoardA", 0, 4, -0.6, 4, 4, 0.2, 90), box("BoardB", 1, 4, -0.65, 4, 4, 0.3, 120)
+			t.eq(#Coplanar.clashes({ wall, a, b }), 0)
+			-- without the wall their backs are in the open, and they clash
+			t.eq(#Coplanar.clashes({ a, b }), 1)
+			-- bottoms on the ground at the seat are never seen
+			local plinth, body = box("Plinth", 0, 0.6, 0, 12, 1.2, 3, 150), box("Body", 0, 5, 0, 10, 10, 1, 200)
+			t.eq(#Coplanar.clashes({ plinth, body }, 0), 0)
+			t.eq(#Coplanar.clashes({ plinth, body }, -5), 1)
+			-- a sliver of shared area (under 0.3 st on a side) is not a clash
+			t.eq(#Coplanar.clashes({ wall, box("Bar", 0, 9.9, -0.4, 0.2, 0.2, 0.2, 90) }), 0)
+			-- pitched parts are compared in their own frame: an eave strip continuing a roof plate in another
+			-- colour on the plate's own top plane clashes where the two overlap
+			local plate = box("Plate", 0, 10, 0, 20, 0.4, 12, 100)
+			plate.pitch = 0.5
+			local strip = box("Strip", 0, 10, 0, 20, 0.4, 2, 240)
+			strip.pitch = 0.5
+			t.truthy(#Coplanar.clashes({ plate, strip }) >= 1, "pitched overlap")
+		end
+	)
 
 	-- Owner 2026-11-10: "make sure squirrel cannot run through houses, double check that".
 	t.test("every house is solid: bodies, walls, roofs and the foundations under them all collide", function()

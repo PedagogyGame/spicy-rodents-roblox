@@ -357,8 +357,10 @@ function Building.dress(ctx: Spec.LotCtx, eave: number, peak: number, flat: bool
 			add(`TimberF{i}`, 0, y, -D / 2 - 0.1, W + 0.1, 0.4, 0.2, Palette.OAK, "Wood")
 			add(`TimberB{i}`, 0, y, D / 2 + 0.1, W + 0.1, 0.4, 0.2, Palette.OAK, "Wood")
 		end
+		-- the posts stand on the plinth (top 1.2) and 0.28 proud: with their faces on the plinth's own
+		-- front plane (both 0.2 proud) the two flickered against each other along the whole quay
 		for i, x in { -W / 2, -W / 6, W / 6, W / 2 } do
-			add(`PostF{i}`, x, eave / 2, -D / 2 - 0.1, 0.45, eave, 0.2, Palette.OAK, "Wood")
+			add(`PostF{i}`, x, (eave + 1.2) / 2, -D / 2 - 0.09, 0.45, eave - 1.2, 0.38, Palette.OAK, "Wood")
 		end
 	end
 	if pal.chimney and peak > eave + 0.5 then
