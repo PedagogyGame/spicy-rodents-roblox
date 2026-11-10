@@ -5,7 +5,7 @@
 -- phases"; §15 decision 10; worldgen_districts_art §14.3-14.4; BUILD_PLAN §1.4 Client/World/Sky, W6).
 -- Time: the server publishes the clock once (Server/Boot/DayClock: ClockEpoch, ClockBase, ClockRate attributes);
 -- here Shared/Time/Clock turns workspace:GetServerTimeNow() into game time, so every client shows the same moment
--- with no per-frame traffic. 72 real seconds per in-game day; Time/DayCurve holds sunrise and sunset longer.
+-- with no per-frame traffic. 12 real minutes per in-game day; Time/DayCurve holds sunrise and sunset longer.
 -- Every frame (lighting at 30 Hz):
 --   * Lighting: ClockTime through SkyKeys' warp (the sun is on the horizon inside the sunrise and sunset moments),
 --     Brightness, colour shifts, ambients, exposure, Atmosphere, ColorCorrection "Grade", Bloom, SunRays and the
@@ -28,6 +28,7 @@ local Moon = Import.shared("Time/Moon") :: typeof(require("../../shared/Time/Moo
 local DayCurve = Import.shared("Time/DayCurve") :: typeof(require("../../shared/Time/DayCurve"))
 local SkyKeys = Import.shared("World/SkyKeys") :: typeof(require("../../shared/World/SkyKeys"))
 local Backdrop = Import.shared("World/Backdrop") :: typeof(require("../../shared/World/Backdrop"))
+local NightVision = require("./NightVision")
 
 local Sky = {}
 
@@ -77,11 +78,13 @@ function Sky.step(gt: GameTime, customMoon: boolean?): any
 	Lighting.ClockTime = SkyKeys.clockTimeAt(gt.hour)
 	-- moonlight follows the phase at night (a new moon night is darker)
 	Lighting.Brightness = s.brightness * (1 + (0.45 + 0.75 * k - 1) * s.lamps)
-	Lighting.ExposureCompensation = s.exposure
+	-- the Spicy Rodent's night vision (World/NightVision): this client's own gain on top of the hour
+	local nv = NightVision.gain(NightVision.level(), s.lamps)
+	Lighting.ExposureCompensation = s.exposure + nv.exposure
 	Lighting.ColorShift_Top = c3(s.top)
 	Lighting.ColorShift_Bottom = c3(s.bottom)
-	Lighting.OutdoorAmbient = c3(s.outdoor)
-	Lighting.Ambient = c3(s.ambient)
+	Lighting.OutdoorAmbient = c3(NightVision.lit(s.outdoor, nv.lift))
+	Lighting.Ambient = c3(NightVision.lit(s.ambient, nv.lift))
 	Lighting.EnvironmentDiffuseScale = s.diffuse
 	Lighting.EnvironmentSpecularScale = s.specular
 	local atm = child(Lighting, "Atmosphere", "Atmosphere") :: Atmosphere

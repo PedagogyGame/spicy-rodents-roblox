@@ -32,6 +32,7 @@ export type Frame = {
 	jump: boolean,
 	interact: boolean, -- enter / exit a vehicle
 	toggleView: boolean, -- first-person toggle (V)
+	nightVision: boolean, -- the Spicy Rodent's night vision toggle (N)
 	handbrake: boolean, -- held
 }
 
@@ -57,6 +58,7 @@ InputMap.BINDINGS = table.freeze({
 	interact = { "E", "ButtonY" },
 	kick = { "F", "ButtonX" },
 	toggleView = { "V", "ButtonR3" },
+	nightVision = { "N", "DPadUp" }, -- the Spicy Rodent only (World/NightVision)
 	up = { "Space", "ButtonA" },
 	down = { "LeftControl", "Q", "ButtonB" },
 	handbrake = { "Space", "ButtonA" },
@@ -72,6 +74,8 @@ InputMap.LABYRINTH = table.freeze({ forward = "W", back = "S", right = "Up", lef
 function InputMap.HINTS(role: string): string
 	if role == "human" then
 		return "WASD move · Shift run · Space jump · F kick · E get in a vehicle · V first person"
+	elseif role == "rodent" then
+		return "WASD run · Shift sprint · Space leap · E grab · Q drop · A/D pick a route · Ctrl stalk · N night vision"
 	elseif role == "squirrel" then
 		return "WASD run · Shift sprint · Space leap · E grab a branch · Q drop · A/D pick a route · Ctrl stalk"
 	elseif role == "quadruped" then
@@ -298,6 +302,7 @@ function InputMap.start(): Sampler
 				jump = edges.jump == true,
 				interact = edges.interact == true,
 				toggleView = edges.toggleView == true,
+				nightVision = edges.nightVision == true,
 				handbrake = isHeld("handbrake"),
 			}
 			table.clear(edges)

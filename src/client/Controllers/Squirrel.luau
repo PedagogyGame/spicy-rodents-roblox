@@ -23,7 +23,10 @@
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
 -- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
 -- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
--- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter? };
+-- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
+-- pressing N is told so.
+-- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
+--   nightVisionSays(spicy, on) -> string (pure);
 --   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure)
 -- No side effects on require.
@@ -37,6 +40,7 @@ local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../sha
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
+local NightVision = require("../World/NightVision")
 
 local Squirrel = {}
 
@@ -72,6 +76,14 @@ function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any }
 		return "Q lets go of a branch: you are already on the ground"
 	end
 	return nil
+end
+
+-- What pressing N says: `spicy` whether this body is the Spicy Rodent, `on` the state after the press.
+function Squirrel.nightVisionSays(spicy: boolean, on: boolean): string
+	if not spicy then
+		return "Only the Spicy Rodent has night vision"
+	end
+	return if on then "Night vision on (N turns it off)" else "Night vision off"
 end
 
 -- The root's height above the soles: the body's HipHeight attribute, else the measured gap (clamped).
@@ -153,6 +165,8 @@ function Squirrel.start(
 	local last, lastSpeed = pos, 0
 	local lastSaid, lastText = -math.huge, ""
 	local shownStamina, shownWinded = -1, false
+	local spicy = (ctx.variant or payload.variant or body:GetAttribute("Variant")) == "spicy"
+	local vision: NightVision.Handle? = nil
 	local stopDrive = BodyDriver.driveRender(root, function(frameDt: number)
 		local dt = math.min(frameDt, 0.08)
 		if not railLive and state.routeId == nil then
@@ -177,6 +191,17 @@ function Squirrel.start(
 			holding = false
 		end
 		local f = input:sample(BodyDriver.cameraYawHtml())
+		if f.nightVision then
+			local nowOn = false
+			if spicy then
+				local h = vision or NightVision.start()
+				vision = h
+				nowOn = h.toggle()
+			end
+			if ctx.toast then
+				ctx.toast(Squirrel.nightVisionSays(spicy, nowOn), 2)
+			end
+		end
 		local mi = {
 			fw = f.fw,
 			side = f.side,
@@ -247,6 +272,9 @@ function Squirrel.start(
 		KinematicPose.clear(body)
 		if ctx.meter then
 			ctx.meter(nil)
+		end
+		if vision then
+			vision.stop() -- the next body, and the menu, see the town as everyone else does
 		end
 	end
 end

@@ -141,4 +141,46 @@ return function(t)
 			t.truthy(math.abs(SkyKeys.weather(d + 1 / 72) - w) < 0.01, "changes slowly")
 		end
 	end)
+
+	-- Owner 2026-11-10: "give spicy rodent night vision, the only one who has it, player has to hit
+	-- button for it".
+	t.test("night vision: the Spicy Rodent's alone, on N, bright at night and only a tint by day", function()
+		local NightVision = require("@client/World/NightVision")
+		local Squirrel = require("@client/Controllers/Squirrel")
+		local InputMap = require("@client/Input/InputMap")
+		-- off is nothing at all
+		local off = NightVision.gain(0, 1)
+		t.eq(off.exposure, 0)
+		t.eq(off.lift, 0)
+		t.deepEq(NightVision.lit({ 38, 43, 58 }, 0), { 38, 43, 58 })
+		local g0 = NightVision.grade(0)
+		t.eq(g0.brightness, 0)
+		t.eq(g0.saturation, 0)
+		t.deepEq(g0.tint, { 255, 255, 255 })
+		-- at night it lifts the picture by about two stops and the ambients well clear of black
+		local night = NightVision.gain(1, 1)
+		t.near(night.exposure, NightVision.EXPOSURE, 1e-9)
+		t.truthy(night.exposure >= 1.5 and night.exposure <= 3)
+		local lit = NightVision.lit({ 38, 43, 58 }, night.lift)
+		t.truthy(lit[2] > 150 and lit[2] > lit[1] and lit[2] > lit[3], "a bright, green-leaning ambient")
+		-- by day the gain is small: the picture is not blown out
+		local day = NightVision.gain(1, 0)
+		t.truthy(day.exposure < 0.3 and day.exposure > 0, `day exposure {day.exposure}`)
+		-- half way in, half the gain
+		t.near(NightVision.gain(0.5, 1).exposure, night.exposure / 2, 1e-9)
+		-- the picture is green and nearly colourless
+		local g1 = NightVision.grade(1)
+		t.truthy(g1.tint[2] > g1.tint[1] + 100 and g1.tint[2] > g1.tint[3] + 100)
+		t.truthy(g1.saturation < -0.5)
+		t.eq(NightVision.level(), 0, "off until the rodent turns it on")
+		-- the key, the hints, and what each body is told
+		t.eq(NightVision.KEY, "N")
+		t.eq(InputMap.BINDINGS.nightVision[1], "N")
+		t.truthy(string.find(InputMap.HINTS("rodent"), "N night vision", 1, true) ~= nil)
+		t.truthy(string.find(InputMap.HINTS("squirrel"), "night vision", 1, true) == nil)
+		t.truthy(string.find(InputMap.HINTS("human"), "night vision", 1, true) == nil)
+		t.eq(Squirrel.nightVisionSays(true, true), "Night vision on (N turns it off)")
+		t.eq(Squirrel.nightVisionSays(true, false), "Night vision off")
+		t.eq(Squirrel.nightVisionSays(false, false), "Only the Spicy Rodent has night vision")
+	end)
 end

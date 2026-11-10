@@ -233,7 +233,9 @@ function PossessionClient.start(opts: Opts): Client
 				elseif device then "Flying the police drone"
 				elseif p then (TITLES[ctx.species or ""] or `You are a {p.species}`)
 				else "Watching the town"
-			hud.set(title, InputMap.HINTS(role))
+			-- the rodent is driven by the squirrel controller but has its own key (N: night vision)
+			local hintRole = if role == "squirrel" and p and p.variant == "spicy" then "rodent" else role
+			hud.set(title, InputMap.HINTS(hintRole))
 		end
 	end
 
@@ -243,6 +245,7 @@ function PossessionClient.start(opts: Opts): Client
 			world = world,
 			input = input,
 			species = payload.species,
+			variant = payload.variant,
 			toast = toast,
 			meter = if hud then hud.meter else nil,
 		}

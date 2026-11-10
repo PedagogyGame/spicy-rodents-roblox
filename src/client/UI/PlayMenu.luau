@@ -91,6 +91,7 @@ function PlayMenu.helpLines(role: string?, device: string?): { string }
 		table.insert(lines, "Left click  pounce")
 		table.insert(lines, "Touch a person  bite (+100 Power)")
 		table.insert(lines, "Ctrl  stalk quietly")
+		table.insert(lines, "N  night vision (only the Spicy Rodent has it)")
 	elseif role == "squirrel" then
 		lines = table.clone(CLIMB)
 		table.insert(lines, "Left click  pounce")
