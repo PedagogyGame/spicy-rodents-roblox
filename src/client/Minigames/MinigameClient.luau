@@ -17,6 +17,7 @@ local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local InputMap = require("../Input/InputMap")
+local CameraRig = require("../Camera/CameraRig")
 local MinigameUI = require("../UI/MinigameUI")
 local BowlingClient = require("./BowlingClient")
 local DartsClient = require("./DartsClient")
@@ -80,6 +81,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 		camFov = fov or 70
 		if not camOn then
 			camOn = true
+			CameraRig.hold(true) -- the orbit camera stops writing while the game's own shot is up
 			RunService:BindToRenderStep(CAMERA_BIND, Enum.RenderPriority.Camera.Value + 2, function()
 				local c = workspace.CurrentCamera
 				if camCF then
@@ -95,6 +97,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 			camOn = false
 			camCF = nil
 			RunService:UnbindFromRenderStep(CAMERA_BIND)
+			CameraRig.hold(false)
 			workspace.CurrentCamera.FieldOfView = defaultFov
 			if opts.refreshCamera then
 				opts.refreshCamera()

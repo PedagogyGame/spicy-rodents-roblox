@@ -17,15 +17,18 @@
 -- the centre and moving the mouse turns the view, with no button held; the wheel zooms; the right stick
 -- of a gamepad does the same; I flips up/down (CameraRig.notify says which way it now is, and the choice
 -- lasts the session). The camera sits behind the smoothed focus point, comes in front of anything solid
--- between it and the body, and eases back out. The cursor is free while a menu is open (wantCursor), the
--- Roblox menu is open, a text box has focus, or Left Alt is held.
+-- between it and the body (never past it), eases back out, and fades the body when it is pulled in close.
+-- The cursor is free while a menu is open (wantCursor), the Roblox menu is open, a text box has focus, or
+-- Left Alt is held; while it is free, holding the right mouse button still turns the view. A script that
+-- takes camera.CFrame for a while (a minigame's shot) calls hold(true) and the orbit writes nothing.
 -- Interface: apply(decision, targets) where targets = { body?, vehicle?, drone? }; follow(body);
 --   orbit(body, human); overview(position, lookAt); subjectOf(body); stop();
 --   focusStep(px, py, pz, tx, ty, tz, dt, lx?, ly?, lz?) -> x, y, z (pure); FOCUS;
 --   LOOK; lookStep(yaw, elev, dx, dy, invert) -> yaw, elev (pure); orbitOffset(yaw, elev, dist) ->
 --   x, y, z (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
 --   transparency, canCollide) -> boolean (pure); inverted() -> boolean; setInverted(on);
---   wantCursor(key, on); notify: ((text) -> ())?
+--   wantCursor(key, on); hold(on); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
+--   (pure); notify: ((text) -> ())?
 -- No side effects on require (services are looked up inside the functions).
 
 local CameraRig = {}
@@ -193,7 +196,6 @@ CameraRig.LOOK = {
 	zoom = 0.88, -- distance multiplier per wheel notch toward the body
 	easeOut = 7, -- 1/s: how fast the camera backs out again after something pushed it in
 	pad = 0.35, -- studs kept between the camera and what it came in front of
-	nearest = 0.8, -- studs: never nearer the focus than this
 }
 
 local invertLook = false
@@ -211,6 +213,26 @@ end
 -- A menu or panel that needs the cursor says so here (and takes it back with on = false).
 function CameraRig.wantCursor(key: string, on: boolean)
 	cursorWanted[key] = if on then true else nil
+end
+
+-- Another script owns camera.CFrame for a while (a minigame's scripted shot): the orbit writes nothing
+-- and gives the cursor back.
+local held = false
+function CameraRig.hold(on: boolean)
+	held = on
+end
+
+-- How far out the camera may sit when something solid was hit `hitDistance` from the focus: short of it
+-- by the pad, and never past it however near it is (a wall at the body's back).
+function CameraRig.pullIn(hitDistance: number): number
+	return math.max(0.1, hitDistance - CameraRig.LOOK.pad, hitDistance * 0.5)
+end
+
+-- How far the body is faded out (0 drawn, 1 hidden) with the camera `shown` studs from the focus: it
+-- starts at `hideAt` and is gone at 65 % of it, so a pulled-in camera never fills the view with the
+-- back of a head (the default camera's own fade does not run under a scriptable camera).
+function CameraRig.fadeAt(shown: number, hideAt: number): number
+	return math.clamp((hideAt - shown) / (hideAt * 0.35), 0, 1)
 end
 
 -- One look input applied: dx, dy in radians (mouse right and mouse DOWN positive, as the screen has
@@ -251,8 +273,10 @@ end
 -- The orbit state survives a re-apply for the same body (a zone change, the V toggle and back).
 local orbitBody: Model? = nil
 local orbitYaw, orbitElev, orbitDist = 0, 0.3, 12
+local orbiting = false -- the orbit rig is the one bound right now
 
 function CameraRig.orbit(body: Model, human: boolean)
+	local resumed = orbiting and orbitBody == body -- the orbit itself re-applied (a zone change)
 	unbind()
 	local root = body.PrimaryPart
 	if root == nil then
@@ -275,11 +299,14 @@ function CameraRig.orbit(body: Model, human: boolean)
 		orbitYaw = math.atan2(-look.X, -look.Z) -- behind the body
 		orbitElev = 0.3
 		orbitDist = math.clamp(if human then 12.5 else biggest * 4, math.max(minDist, 8), 16)
+	elseif not resumed then
+		-- back from first person, a vehicle, the tunnel or the chase lock: keep looking the way the
+		-- camera looks now, not the way it looked before the other rig took over
+		local look = camera.CFrame.LookVector
+		if look.X * look.X + look.Z * look.Z > 1e-4 then
+			orbitYaw = math.atan2(-look.X, -look.Z)
+		end
 	end
-	local sensitivity = 1
-	pcall(function()
-		sensitivity = (UserSettings():GetService("UserGameSettings") :: any).MouseSensitivity
-	end)
 	local rays = RaycastParams.new()
 	rays.FilterType = Enum.RaycastFilterType.Exclude
 	rays.RespectCanCollide = true
@@ -311,20 +338,47 @@ function CameraRig.orbit(body: Model, human: boolean)
 			end
 		end
 	end)
+	-- The body fades when the camera is pulled in close. The first call always writes, which also shows
+	-- a body the default camera hid for first person (it stops updating that once the camera is
+	-- scriptable, so a person stayed invisible after V and back).
+	local hideAt = minDist * 0.5
+	local faded = -1
+	local function fadeBody(a: number)
+		if a == faded then
+			return
+		end
+		faded = a
+		for _, d in body:GetDescendants() do
+			if d:IsA("BasePart") or d:IsA("Decal") then
+				(d :: any).LocalTransparencyModifier = a
+			end
+		end
+	end
 	bind(function(dt: number)
 		if rootPart.Parent == nil then
 			return
 		end
-		local free = GuiService.MenuIsOpen
-			or UIS:GetFocusedTextBox() ~= nil
-			or UIS:IsKeyDown(Enum.KeyCode.LeftAlt)
-			or next(cursorWanted) ~= nil
-		if free then
+		if held then
 			UIS.MouseBehavior = Enum.MouseBehavior.Default
-		else
+			return
+		end
+		local typing = GuiService.MenuIsOpen or UIS:GetFocusedTextBox() ~= nil
+		local free = typing or UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or next(cursorWanted) ~= nil
+		local look = false
+		if not free then
 			UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+			look = true
+		elseif UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and not typing then
+			-- the cursor is out for buttons (a minigame bar, the menu, Left Alt): holding the right
+			-- button still turns the view, as the default camera did
+			UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+			look = true
+		else
+			UIS.MouseBehavior = Enum.MouseBehavior.Default
+		end
+		if look then
 			local d = UIS:GetMouseDelta()
-			local k = L.sens * sensitivity
+			local k = L.sens -- GetMouseDelta already carries the player's sensitivity setting
 			orbitYaw, orbitElev = CameraRig.lookStep(orbitYaw, orbitElev, d.X * k, d.Y * k, invertLook)
 		end
 		for _, input in UIS:GetGamepadState(Enum.UserInputType.Gamepad1) do
@@ -358,7 +412,7 @@ function CameraRig.orbit(body: Model, human: boolean)
 				part:IsA("Terrain")
 				or CameraRig.occludes(part.Name, if parent then parent.Name else "", part.Transparency, part.CanCollide)
 			then
-				clear = math.max(L.nearest, gone - L.pad)
+				clear = CameraRig.pullIn(gone)
 				break
 			end
 			travelled = gone + 0.05
@@ -370,12 +424,16 @@ function CameraRig.orbit(body: Model, human: boolean)
 		shown = if clear < shown
 			then clear
 			else math.min(clear, shown + (clear - shown) * (1 - math.exp(-dt * L.easeOut)))
+		fadeBody(CameraRig.fadeAt(shown, hideAt))
 		camera.CFrame = CFrame.lookAt(pos + dir * shown, pos)
 		camera.Focus = CFrame.new(pos)
 	end)
+	orbiting = true
 	onUnbind = function()
+		orbiting = false
 		wheel:Disconnect()
 		keys:Disconnect()
+		fadeBody(0)
 	end
 end
 

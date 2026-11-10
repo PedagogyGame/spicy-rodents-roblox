@@ -43,6 +43,8 @@ export type World = Motion.World & {
 	-- (it let go of a downspout on a wall, landed against one) moves by this one until it is clear, so
 	-- it can come away from the wall but never pass through it.
 	blockedCore: ((x: number, z: number, y: number) -> boolean)?,
+	-- optional: the body's box at a given half-width (studs), for the fallback's ratchet (resolveWalls)
+	blockedHalf: ((x: number, z: number, y: number, half: number) -> boolean)?,
 	-- optional world clamp (studs); defaults to the v5.4 rectangle
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number }?,
 	-- optional segment test for validators: does the straight move (x0,z0)->(x1,z1) at height y cross
@@ -184,6 +186,8 @@ SquirrelMotor.params = {
 	-- wall sweep (§8.3)
 	sweepStep = st(0.24),
 	sweepMaxSteps = 18,
+	-- half-widths tried, widest first, by a body that starts a step inside its own box (resolveWalls)
+	fitHalves = { 0.9, 0.8, 0.7, 0.6, 0.5, 0.4 },
 	blockedDamp = 0.28,
 	-- ground glue: the drop a grounded body follows without leaving the ground, per substep: the larger of
 	-- glueMin (a kerb, a plate lip) and glueSlope x the horizontal distance moved (a 50-degree slope)
@@ -721,6 +725,21 @@ local function resolveWalls(state: State, world: World, oldX: number, oldZ: numb
 	local core = world.blockedCore
 	if core and blocked(oldX, oldZ, y) then
 		blocked = core
+		-- A ratchet: the widest body that is clear where it stands. It slides along and comes away at
+		-- that width and never goes deeper, and the width grows back to the whole body as it comes
+		-- away. Without it a body that got within a body-width of a wall (it stepped off a roof edge,
+		-- was handed over beside one) could then press in to the core and run the wall half sunk.
+		local fit = world.blockedHalf
+		if fit then
+			for _, half in P.fitHalves do
+				if not fit(oldX, oldZ, y, half) then
+					blocked = function(bx0: number, bz0: number, at: number): boolean
+						return fit(bx0, bz0, at, half)
+					end
+					break
+				end
+			end
+		end
 	end
 	local bx, bz = false, false
 	for _ = 1, steps do

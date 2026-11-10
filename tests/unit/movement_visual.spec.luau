@@ -923,6 +923,19 @@ return function(t)
 		t.near(CameraRig.zoomStep(10, -1, 2, 24), 10 / L.zoom, 1e-9)
 		t.eq(CameraRig.zoomStep(2.1, 5, 2, 24), 2)
 		t.eq(CameraRig.zoomStep(23, -5, 2, 24), 24)
+		-- pulled in by a wall: short of it by the pad, and never past it however near
+		t.near(CameraRig.pullIn(6), 6 - L.pad, 1e-9)
+		t.near(CameraRig.pullIn(0.4), 0.2, 1e-9)
+		t.near(CameraRig.pullIn(0.05), 0.1, 1e-9)
+		for _, hit in { 0.15, 0.3, 0.6, 1, 3, 12 } do
+			t.truthy(CameraRig.pullIn(hit) < hit, `the camera is in front of a wall {hit} st away`)
+		end
+		-- the body fades as the camera closes in (a person: from 2 st, gone by 1.3)
+		t.eq(CameraRig.fadeAt(12, 2), 0)
+		t.eq(CameraRig.fadeAt(2, 2), 0)
+		t.eq(CameraRig.fadeAt(1.3, 2), 1)
+		t.eq(CameraRig.fadeAt(0.2, 2), 1)
+		t.near(CameraRig.fadeAt(1.65, 2), 0.5, 1e-9)
 		-- the toggle
 		t.eq(CameraRig.inverted(), false, "normal until the player presses I")
 		CameraRig.setInverted(true)
@@ -1014,6 +1027,45 @@ return function(t)
 			SquirrelMotor.step(s, inp, 1 / 60, w)
 			t.truthy(s.x + half <= WALL + 1e-6, "and once clear the whole body stops at it again")
 		end
+		-- with the client's ratchet (blockedHalf) a body that starts inside its box never presses deeper:
+		-- it stepped off a roof edge 0.65 st from the wall; the widest body that fits there is 0.6
+		local r = walled()
+		r.blockedHalf = function(x: number, _z: number, _y: number, h: number): boolean
+			return x + h > WALL
+		end
+		local q = SquirrelMotor.new(WALL - 0.65, 0, 0)
+		q.tireless = true
+		local push = input(-math.pi / 2)
+		push.fw, push.side, push.sprint = 1, 1, true
+		local z0 = q.z
+		for _ = 1, 180 do
+			SquirrelMotor.step(q, push, 1 / 60, r)
+			t.truthy(q.x <= WALL - 0.6 + 1e-6, `pressed deeper into the wall: x = {q.x}`)
+		end
+		t.truthy(math.abs(q.z - z0) > 20, "it still slides along the wall")
+		push.fw, push.side = -1, 0
+		for _ = 1, 60 do
+			SquirrelMotor.step(q, push, 1 / 60, r)
+		end
+		push.fw = 1
+		for _ = 1, 120 do
+			SquirrelMotor.step(q, push, 1 / 60, r)
+			t.truthy(q.x + half <= WALL + 1e-6, "once away, the whole body stops at the wall")
+		end
+		-- a trunk is round: the body comes as near the bark as the narrow probe, from any side, so the
+		-- walk-in grab (measured from the trunk's centre) is in reach of every tree it was before
+		t.eq(ClientWorld.isTrunk("Trunk_1", "Tree_630"), true)
+		t.eq(ClientWorld.isTrunk("TrunkFoot", "Tree_630"), true)
+		t.eq(ClientWorld.isTrunk("Trunk", "west_old_house_0"), false)
+		t.eq(ClientWorld.isTrunk("Body", "Tree_630"), false)
+		t.eq(ClientWorld.trunkClear(3.76 + core + 0.01, 3.76), true)
+		t.eq(ClientWorld.trunkClear(3.76 + core - 0.01, 3.76), false)
+		t.truthy(3.76 + core < Motion.C.walkInReach, "the estate oaks (r = 3.76) are inside the walk-in reach")
+		-- the lowest slice of the box counts only at the core (kerbs where the ground rises toward them)
+		t.truthy(
+			ClientWorld.BODY_RISE > 0 and ClientWorld.STEP + ClientWorld.BODY_RISE < 1.2,
+			"a 1.2 st plinth still stops the whole body"
+		)
 		-- bough cylinders are not walls; a house body, a trunk and a fence are
 		t.eq(ClientWorld.isBough("R221_4", "Tree_220"), true)
 		t.eq(ClientWorld.isBough("R7", "Tree_3"), true)
