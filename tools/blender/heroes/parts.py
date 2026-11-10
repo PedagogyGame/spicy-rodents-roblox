@@ -54,20 +54,17 @@ def eye_textures(variant, out_dir, res=256, name=None):
         c = np.where(((th > pupil) & (th < iris))[..., None], irisc, c)
         c = np.where((th >= iris)[..., None], np.array([0.04, 0.03, 0.025]), c)
     elif variant == "rodent":
-        pupil, iris = 9.0, 50.0
-        # sclera: yellowed with red veins running in toward the iris
-        sclera = np.array([0.80, 0.66, 0.46])
-        veins = tx.strands(np.stack([u.ravel() * 9, th.ravel() * 0.02, np.zeros(res * res)], -1).astype(F32),
-                           np.tile(np.array([[0, 1, 0]], F32), (res * res, 1)), 0.35, 4.0, seed=9).reshape(res, res)
-        vmask = np.clip((veins - 0.55) * 5, 0, 1) * np.clip((th - iris + 5) / 20, 0, 1)
-        red = np.array([0.62, 0.06, 0.05])
-        c = sclera[None, None] * (1 - vmask[..., None]) + red * vmask[..., None]
-        c = c * (1 - 0.35 * np.clip((th - 75) / 40, 0, 1))[..., None] + np.array([0.5, 0.1, 0.08]) * 0.35 * np.clip((th - 75) / 40, 0, 1)[..., None]
-        irisc = np.array([1.0, 0.22, 0.05]) * (0.75 + 0.5 * rad[..., None]) * (1 - 0.5 * np.clip((th - pupil) / (iris - pupil), 0, 1))[..., None] + np.array([0.45, 0.0, 0.0]) * np.clip((th - pupil) / (iris - pupil), 0, 1)[..., None]
+        # Glowing red eyes (owner 2026-11-10: the bloodshot, veined eyeball with a pin pupil was part
+        # of "too edgy"): a squirrel's dark round pupil in a deep red iris that fills the eye, brighter
+        # toward the pupil, nearly black at the lids. No sclera, no veins.
+        pupil, iris = 24.0, 74.0
+        k = np.clip((th - pupil) / (iris - pupil), 0, 1)
+        irisc = np.array([1.0, 0.16, 0.05]) * (0.95 + 0.1 * rad[..., None]) * (1 - 0.55 * k)[..., None]
+        c = np.broadcast_to(np.array([0.10, 0.01, 0.01]), irisc.shape).copy()
         c = np.where((th < iris)[..., None], irisc, c)
-        c = np.where((th < pupil)[..., None], np.array([0.02, 0.0, 0.0]), c)
-        ring = np.exp(-((th - iris) / 2.0) ** 2)
-        c = c * (1 - 0.7 * ring[..., None])
+        c = np.where((th < pupil)[..., None], np.array([0.03, 0.0, 0.0]), c)
+        ring = np.exp(-((th - iris) / 3.0) ** 2)
+        c = c * (1 - 0.6 * ring[..., None])
     else:
         pupil, iris = 26.0, 58.0
         c = np.zeros((res, res, 3)) + np.array([0.02, 0.016, 0.014])

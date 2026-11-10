@@ -167,6 +167,11 @@ def main(argv):
     ap.add_argument("--clips", default="")
     ap.add_argument("--hide-cards", action="store_true")
     ap.add_argument("--workbench", action="store_true", help="fast shape-only pose check")
+    ap.add_argument(
+        "--views",
+        default="",
+        help="comma list of review views: face_front, face_34, profile, side, gameplay_back, three_quarter, top",
+    )
     opts = ap.parse_args(argv)
     bpy.ops.wm.open_mainfile(filepath=opts.blend)
     scene = bpy.context.scene
@@ -200,6 +205,32 @@ def main(argv):
             scene.render.filepath = os.path.join(opts.out, f"{tag}_still_{i}.png")
             bpy.ops.render.render(write_still=True)
             written.append(scene.render.filepath)
+    if opts.views:
+        # Review views (owner 2026-11-10: "more attention paid to its face area"): close on the head with a
+        # long lens, the whole animal from the side, and the gameplay camera from behind and above.
+        head = center
+        if arm is not None and arm.pose.bones.get("Head"):
+            head = arm.matrix_world @ arm.pose.bones["Head"].head
+        face = Vector(head) + Vector((0, -0.16 * size, 0.02 * size))
+        body = center + Vector((0, 0, 0.1 * size))
+        VIEWS = {  # name: (target, distance in sizes, azimuth, elevation, lens)
+            "face_front": (face, 4.4, -90, 6, 110),
+            "face_34": (face, 4.4, -52, 10, 110),
+            "profile": (face, 4.4, 0, 4, 110),
+            "side": (body, 6.0, 0, 6, 50),
+            "three_quarter": (body, 6.0, -58, 14, 50),
+            "gameplay_back": (body, 7.5, 90, 28, 50),
+            "top": (body, 6.5, 90, 80, 50),
+        }
+        for name in [v for v in opts.views.split(",") if v]:
+            target, dist, az, el, lens = VIEWS[name]
+            cam.data.lens = lens
+            place(cam, target, size * dist, az, el)
+            scene.render.filepath = os.path.join(opts.out, f"{tag}_{name}.png")
+            bpy.ops.render.render(write_still=True)
+            written.append(scene.render.filepath)
+            print(f"view {name}", flush=True)
+        cam.data.lens = 50
     if opts.turntable:
         for i in range(opts.turntable):
             place(cam, center + Vector((0, 0, 0.22 * size)), size * 6.3, -90 + 360.0 * i / opts.turntable, 12)
