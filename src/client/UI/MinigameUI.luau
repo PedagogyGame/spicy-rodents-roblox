@@ -75,8 +75,8 @@ function MinigameUI.new(): any
 	help.Name = "Help"
 	help.BackgroundColor3 = C.NAVY
 	help.BackgroundTransparency = 0.12
-	help.Size = UDim2.fromOffset(300, 300)
-	help.Position = UDim2.new(0, 12, 0.5, -150)
+	help.Size = UDim2.fromOffset(340, 430)
+	help.Position = UDim2.new(0, 12, 0.5, -215)
 	help.Parent = gui
 	corner(help, 12)
 	self.helpFrame = help
@@ -107,11 +107,12 @@ function MinigameUI.new(): any
 	local status = Instance.new("TextLabel")
 	status.BackgroundColor3 = C.NAVY
 	status.BackgroundTransparency = 0.2
-	status.Size = UDim2.fromOffset(520, 34)
-	status.Position = UDim2.new(0.5, -260, 0, 138)
+	status.Size = UDim2.fromOffset(700, 44)
+	status.Position = UDim2.new(0.5, -350, 0, 134)
 	status.Font = Enum.Font.GothamBold
 	status.TextColor3 = C.CYAN
 	status.TextScaled = true
+	status.TextWrapped = true -- a long line (the bowler's keys) takes two rows rather than shrinking away
 	status.Text = ""
 	status.Parent = gui
 	corner(status, 10)
@@ -121,8 +122,8 @@ function MinigameUI.new(): any
 	clock.Name = "Clock"
 	clock.BackgroundColor3 = C.NAVY
 	clock.BackgroundTransparency = 0.2
-	clock.Size = UDim2.fromOffset(74, 34)
-	clock.Position = UDim2.new(0.5, 268, 0, 138)
+	clock.Size = UDim2.fromOffset(74, 44)
+	clock.Position = UDim2.new(0.5, 358, 0, 134)
 	clock.Font = Enum.Font.GothamBold
 	clock.TextColor3 = C.WHITE
 	clock.TextScaled = true
@@ -136,8 +137,8 @@ function MinigameUI.new(): any
 	warnLabel.Name = "ClockWarning"
 	warnLabel.BackgroundColor3 = Color3.fromRGB(120, 24, 24)
 	warnLabel.BackgroundTransparency = 0.15
-	warnLabel.Size = UDim2.fromOffset(520, 28)
-	warnLabel.Position = UDim2.new(0.5, -260, 0, 176)
+	warnLabel.Size = UDim2.fromOffset(700, 28)
+	warnLabel.Position = UDim2.new(0.5, -350, 0, 182)
 	warnLabel.Font = Enum.Font.GothamBold
 	warnLabel.TextColor3 = C.WHITE
 	warnLabel.TextScaled = true

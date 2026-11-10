@@ -31,10 +31,9 @@ AimModel.SWEET_TEXT = "POWER - let go in the green: the ball goes exactly where 
 
 AimModel.HELP = {
 	how = {
-		"Ten frames each, up to four bowlers (add a computer if you like). All ten pins with your first ball is a STRIKE, with two balls a SPARE.",
-		"Aim for the POCKET: just right (or just left) of the front pin. Dead centre leaves splits.",
-		"The dotted line shows your throw two thirds of the way. Hook bends the ball late (orange dots): judging the rest is the skill.",
-		"The scoreboard over the lane keeps score for everyone.",
+		"Ten frames each. All ten pins with your first ball is a STRIKE, with two balls a SPARE.",
+		"Aim for the POCKET: just right (or left) of the front pin. Dead centre leaves splits.",
+		"The dotted line shows two thirds of your throw. Hook bends the ball late: the dots turn orange where it starts.",
 	},
 	keys = {
 		"A / D  step left / right along the line",
@@ -207,9 +206,9 @@ function AimModel.statusText(aim: Aim, touch: boolean): string
 		return "Let go in the green to bowl!"
 	end
 	if touch then
-		return `Your turn ({AimModel.spinText(aim)}) - arrows step and aim, Hook buttons bend it, hold BOWL and let go`
+		return `Your turn ({AimModel.spinText(aim)}): arrows step and aim, Hook buttons bend it. Hold BOWL and let go`
 	end
-	return `Your turn ({AimModel.spinText(aim)}) - A/D step, mouse aims, Z/X hook, hold Space for power, let go to bowl`
+	return `Your turn ({AimModel.spinText(aim)}): A/D step, mouse aims, Z/X hook. Hold Space for power, let go to bowl`
 end
 
 -- The turn clock's warning, once it is running low.
