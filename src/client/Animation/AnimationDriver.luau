@@ -34,7 +34,7 @@
 --     eases onto its own ground, so a possession hands over without a step.
 -- No side effects on require.
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
---   clipSpeed(speed, nominal?) -> playback speed (pure)
+--   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount
 
 local Gait = require("./Gait")
 local KinematicPose = require("../Controllers/KinematicPose")
@@ -66,7 +66,8 @@ export type Driver = {
 	bodies: () -> number,
 }
 
-type Joint = { motor: Motor6D, kind: string, leg: string?, index: number? }
+-- `motor` is a Motor6D on a part-built puppet and a Bone on a skinned hero model: both carry Transform
+type Joint = { motor: any, kind: string, leg: string?, index: number? }
 
 type Entry = {
 	body: Model,
@@ -224,12 +225,14 @@ function AnimationDriver.clipSpeed(speed: number, nominal: number?): number
 	return math.clamp(speed / nominal, 0.1, 2.5)
 end
 
--- The Motor6Ds the gait drives, by RigSpec bone name.
-local function gaitJoints(model: Model): ({ Joint }, number)
+-- The joints the gait drives, by RigSpec bone name: Motor6Ds on a part-built puppet, Bones on a skinned
+-- hero model (Server/Assets/HeroArt). The names and the axes are the same on both (the hero's bones rest
+-- with no rotation), so one pose serves either. A hero's region Motor6Ds (BodyMotor6D, ...) match no name.
+function AnimationDriver.gaitJoints(model: Instance): ({ Joint }, number)
 	local joints: { Joint } = {}
 	local tailN = 0
 	for _, d in model:GetDescendants() do
-		if d:IsA("Motor6D") then
+		if d:IsA("Motor6D") or d:IsA("Bone") then
 			local name = d.Name
 			local leg, seg = string.match(name, "^(%a+[LR])_(%a+)$")
 			local tail = string.match(name, "^Tail(%d+)$")
@@ -249,7 +252,8 @@ end
 
 -- The joint named Root that hangs the visible body off the root part (animals: RootPart -> Pelvis;
 -- R15: HumanoidRootPart -> LowerTorso): a Motor6D, or on stock R15s built with the avatar joint
--- upgrade an AnimationConstraint, whose root-side Attachment is moved instead of C0.
+-- upgrade an AnimationConstraint, whose root-side Attachment is moved instead of C0. On a skinned hero
+-- model it is the Root Bone (a Bone is an Attachment: moving it moves the whole skin).
 local function rootJointOf(model: Model, root: BasePart): (Motor6D?, Attachment?)
 	for _, d in model:GetDescendants() do
 		if d.Name ~= "Root" then
@@ -257,6 +261,8 @@ local function rootJointOf(model: Model, root: BasePart): (Motor6D?, Attachment?
 		end
 		if d:IsA("Motor6D") and d.Part0 == root then
 			return d, nil
+		elseif d:IsA("Bone") then
+			return nil, d
 		elseif d:IsA("AnimationConstraint") then
 			for _, a in { d.Attachment0, d.Attachment1 } do
 				if a and a.Parent == root then
@@ -355,7 +361,7 @@ function AnimationDriver.start(opts: Opts): Driver
 		if Gait.PROCEDURAL[species] and clips[species] == nil then
 			local hip = model:GetAttribute("HipHeight")
 			gait = Gait.params(species, if type(hip) == "number" then hip else nil)
-			joints, tailN = gaitJoints(model)
+			joints, tailN = AnimationDriver.gaitJoints(model)
 		else
 			animator = ensureAnimator(model)
 			if animator == nil then

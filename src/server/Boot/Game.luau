@@ -46,12 +46,14 @@ local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local DayClock = require("./DayClock")
 local TreeArt = require("../Assets/TreeArt")
+local HeroArt = require("../Assets/HeroArt")
 
 export type Opts = {
 	players: boolean?, -- connect joins (default true; the engine smoke drives PlayerLike stubs)
 	engine: any?, -- Possession.Engine override (smoke)
 	heartbeat: boolean?, -- connect Heartbeat loops (default true; false = step(dt) by hand)
 	terrain: boolean?, -- write terrain (default true)
+	heroes: boolean?, -- load the sculpted squirrel and rodent models (default true; false keeps the puppets)
 	net: boolean?, -- create ReplicatedStorage.Net and stream poses (default true)
 }
 
@@ -228,6 +230,21 @@ function Game.start(opts: Opts?): any
 	playNet:SetAttribute("TrafficKinds", HttpService:JSONEncode(kindsJson))
 
 	-- 4. actors -----------------------------------------------------------------------------------
+	-- the sculpted squirrel and Spicy Rodent, loaded before any body is built (a failed load keeps the
+	-- part-built puppet for that animal: Assets/HeroArt)
+	if o.heroes ~= false then
+		local th = os.clock()
+		local okH, report = pcall(HeroArt.install)
+		if not okH then
+			warn(`[SpicyRodents] hero art failed: {report}`)
+		else
+			for name, why in (report :: any).failed do
+				warn(`[SpicyRodents] hero art: {name} keeps its stand-in body ({why})`)
+			end
+			playNet:SetAttribute("HeroArt", table.concat((report :: any).installed, ","))
+		end
+		mark("heroes", th)
+	end
 	stage(0.6, "Waking up the town: 102 people and animals")
 	local ta = os.clock()
 	local rt = ActorsRuntime.start({
