@@ -161,9 +161,8 @@ local function offLane(self: Brain): (number, number, number)
 	return Common.dist2d(actor.x, actor.z, x, z), x, z
 end
 
--- Adopt the lane nearest to where the person now stands and walk onto it (state "rejoin"); when
--- they are on their lane already, just walk on.
-local function reseat(self: Brain)
+-- Adopt the lane nearest to where the person now stands; returns how far away it is (studs).
+local function adopt(self: Brain): number
 	local actor = self.actor
 	local best, bestD = self.lane, math.huge
 	for _, lane in self.params.lanes do
@@ -179,8 +178,15 @@ local function reseat(self: Brain)
 		end
 	end
 	self.lane = best
+	return bestD
+end
+
+-- Adopt the nearest lane and walk onto it (state "rejoin"); when the person is on it already, just
+-- walk on.
+local function reseat(self: Brain)
+	local d = adopt(self)
 	self.threat = nil
-	self.state = if bestD > REJOIN_NEAR then "rejoin" else "walk"
+	self.state = if d > REJOIN_NEAR then "rejoin" else "walk"
 	pickGoal(self)
 end
 
@@ -348,11 +354,22 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 	elseif evt.type == "medical" then
 		Directive.set(self.directive, evt)
 	elseif evt.type == "bitten" or evt.type == "witness" then
-		-- run from the biter along the lane (humans_actors §7.1, §7.3); an order in force wins
-		if evt.threat and not Directive.active(self.directive) then
-			self.state = "flee"
-			self.threat = evt.threat
-			self.actor.alert = math.max(self.actor.alert, evt.alert or ALERT_ON_SPOT)
+		-- run from the biter along the lane (humans_actors §7.1, §7.3). An order in force wins unless
+		-- the event says `override` (a cured person bitten again on the walk home drops the walk).
+		if evt.threat and (evt.override == true or not Directive.active(self.directive)) then
+			if Directive.active(self.directive) then
+				Directive.set(self.directive, {})
+			end
+			Directive.takeReleased(self.directive)
+			-- the flee is lane-locked: only someone on (or beside) a lane runs; anyone further off
+			-- first walks to the nearest lane
+			if adopt(self) <= REJOIN_FAR then
+				self.state = "flee"
+				self.threat = evt.threat
+				self.actor.alert = math.max(self.actor.alert, evt.alert or ALERT_ON_SPOT)
+			else
+				self.state = "rejoin"
+			end
 		end
 	end
 end

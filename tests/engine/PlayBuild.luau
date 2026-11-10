@@ -162,7 +162,19 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		local brain = if vt then world.brains[vt] else nil
 		numbers.victimState = if brain then brain.state else "?"
 		check(brain ~= nil and brain.state == "flee", `victim state {numbers.victimState}`)
-		check((victim.body :: Model):FindFirstChild("Shout", true) ~= nil, "no shout over the victim")
+		-- the shout is two replicated attributes now (the client draws the bubble: UI/SpeechBubbles), and
+		-- the bite starts the bite-to-hospital sequence (Infection/InfectionService). NOT RUN since this
+		-- edit (2026-11-10): the cloud checks were off limits for the session that made it.
+		local say = (victim.body :: Model):GetAttribute("Say")
+		numbers.victimSays = say
+		check(type(say) == "string" and #say > 0, "no line over the victim (Say attribute)")
+		check(type((victim.body :: Model):GetAttribute("SayAt")) == "number", "no SayAt stamp on the victim")
+		check((victim.body :: Model):FindFirstChild("Shout", true) == nil, "the server still builds a Shout gui")
+		check(G.infection ~= nil, "the infection service did not start")
+		if G.infection and vt then
+			check(G.infection:isInfected(vt), "the bitten person is not infected")
+			numbers.victimCase = G.infection:stateOf(vt)
+		end
 	else
 		table.insert(failures, "no rodent or victim for the bite")
 	end
