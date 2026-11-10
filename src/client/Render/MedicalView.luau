@@ -159,12 +159,14 @@ function MedicalView.start(opts: { bodies: Instance }): () -> ()
 				local eyes = entry.eyes
 				if eyes then
 					local head = entry.body:FindFirstChild("Head")
-					if head and head:IsA("BasePart") then
+					-- no eyes on a head that is not drawn: your own body in first person (the camera
+					-- fades it with LocalTransparencyModifier; two red balls would hang in the view)
+					-- or a hidden one; nor on a body with no head part (the cyclists' puppets)
+					if head and head:IsA("BasePart") and head.LocalTransparencyModifier < 0.5 then
 						eyes[1].CFrame = head.CFrame * CFrame.new(-e.x, e.y, e.z)
 						eyes[2].CFrame = head.CFrame * CFrame.new(e.x, e.y, e.z)
 						eyes[1].Transparency, eyes[2].Transparency = 0, 0
 					else
-						-- a body with no head part (the cyclists' puppets): no eyes to draw
 						eyes[1].Transparency, eyes[2].Transparency = 1, 1
 					end
 				end
