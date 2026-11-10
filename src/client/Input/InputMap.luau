@@ -38,6 +38,7 @@ export type Frame = {
 
 export type Sampler = {
 	sample: (self: Sampler, cameraYaw: number) -> Frame,
+	flush: (self: Sampler) -> (), -- forget presses nobody sampled (a new body must not act on an old key)
 	stop: (self: Sampler) -> (),
 	lastInputAt: number,
 }
@@ -307,6 +308,9 @@ function InputMap.start(): Sampler
 			}
 			table.clear(edges)
 			return f
+		end,
+		flush = function(_s: Sampler)
+			table.clear(edges)
 		end,
 		stop = function(_s: Sampler)
 			began:Disconnect()

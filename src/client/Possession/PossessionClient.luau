@@ -249,6 +249,9 @@ function PossessionClient.start(opts: Opts): Client
 			toast = toast,
 			meter = if hud then hud.meter else nil,
 		}
+		-- a key pressed in the menu or in another body is not this body's: without this an N pressed
+		-- minutes ago switched the rodent's night vision on at the handoff (and a Space made it leap)
+		input:flush()
 		-- the default controls walk and jump a Humanoid; motor-driven bodies have none, so this is
 		-- harmless for them and needed for a person (a vehicle or the drone turned them off)
 		InputMap.setCharacterControls(true)
