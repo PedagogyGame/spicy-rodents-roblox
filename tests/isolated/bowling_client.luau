@@ -158,10 +158,23 @@ return function(t)
 				FakeEngine.input("changed", { UserInputType = Kind.MouseWheel, Position = roblox.Vector3.new(0, 0, 1) })
 				frames(r, 0.05)
 				t.eq(r.ui.hookNotch, 0, "the wheel turns the hook back")
-				-- the mouse moves across the screen: the angle follows it
-				FakeEngine.uis().mouse = roblox.Vector2.new(1920 * 0.75, 500)
+				-- the mouse moves 200 pixels right: the angle turns by that much, on top of the keys' aim
+				local before = r.bowler.aim.angle
+				FakeEngine.uis().mouse = roblox.Vector2.new(960 + 200, 500)
 				frames(r, 0.05)
-				t.near(r.bowler.aim.angle, AimModel.MAX_ANGLE * 0.5, 1e-6)
+				t.near(r.bowler.aim.angle, before + 200 * AimModel.MOUSE_SENS, 1e-6)
+				local aimed = r.bowler.aim.angle
+				-- a locked cursor (first person) reports travel instead of position
+				FakeEngine.uis().MouseBehavior = roblox.Enum.MouseBehavior.LockCenter
+				FakeEngine.input(
+					"changed",
+					{ UserInputType = Kind.MouseMovement, Delta = roblox.Vector3.new(-50, 0, 0) }
+				)
+				frames(r, 1 / 60)
+				t.near(r.bowler.aim.angle, aimed - 50 * AimModel.MOUSE_SENS, 1e-6)
+				FakeEngine.uis().MouseBehavior = roblox.Enum.MouseBehavior.Default
+				frames(r, 0.05)
+				aimed = r.bowler.aim.angle
 				-- hold Space: the meter runs with its green band and its words; let go at 0.7
 				key(Key.Space, true, true)
 				frames(r, AimModel.POWER_PERIOD * 0.7)
@@ -172,7 +185,7 @@ return function(t)
 				t.eq(#r.sent, 1)
 				t.eq(r.sent[1].verb, "release")
 				t.near(r.sent[1].args[1], r.bowler.aim.offset, 1e-9)
-				t.near(r.sent[1].args[2], AimModel.MAX_ANGLE * 0.5, 1e-6)
+				t.near(r.sent[1].args[2], aimed, 1e-6)
 				t.near(r.sent[1].args[3], 0.7, 0.02)
 				t.eq(r.sent[1].args[4], 0)
 				-- nothing more goes out while that one is unanswered

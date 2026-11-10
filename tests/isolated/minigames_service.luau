@@ -33,7 +33,13 @@ local function buildAlley(): any
 	local root = FakeEngine.new("Model", "BowlingAlley")
 	local lanes = FakeEngine.new("Folder", "Lanes")
 	lanes.Parent = root
+	local boards = FakeEngine.new("Folder", "Scoreboards")
+	boards.Parent = root
 	for lane = 1, AlleyLayout.LANES do
+		-- the overhead monitor: Scoreboards.Lane<i>.Screen.Score (a SurfaceGui the server rewrites)
+		local board = FakeEngine.model(`Lane{lane}`, v3(0, 0, 0), boards)
+		local screen = FakeEngine.part("Screen", v3(0, 0, 0), board)
+		FakeEngine.new("SurfaceGui", "Score").Parent = screen
 		local lm = FakeEngine.model(`Lane{lane}`, v3(0, 0, 0), lanes)
 		local rx, ry, rd = AlleyLayout.rackSlot(lane)
 		FakeEngine.part("Ball", v3(AlleyLayout.toWorld(PLACE, rx, ry, rd)), lm)
@@ -261,6 +267,15 @@ return function(t)
 				t.truthy((pin.model:GetPivot().Position - pin.home.Position).Magnitude < 1e-3, `pin {n} is on its spot`)
 				t.eq(pin.model:FindFirstChild("Body").Transparency, 0)
 			end
+			-- the overhead monitor shows the sheet: the bowler's name and the final total
+			local monitor = w.root:FindFirstChild("Scoreboards"):FindFirstChild("Lane3"):FindFirstChild("Screen")
+			local shown: { [string]: boolean } = {}
+			for _, d in monitor:GetDescendants() do
+				if d.ClassName == "TextLabel" then
+					shown[tostring(d.Text)] = true
+				end
+			end
+			t.truthy(shown[tostring(s.result.scores[1])], "the monitor over the lane shows the final score")
 			-- play again from the end card
 			t.truthy(input(w, p, "again"))
 			t.eq(s.phase, "playing")

@@ -21,7 +21,7 @@ return function(t)
 		AimModel.step(aim, { stickStep = 1 }, 1)
 		t.near(aim.offset, -0.1, 1e-9)
 		AimModel.step(aim, { aimR = true }, 0.5)
-		t.near(aim.angle, 0.03, 1e-9)
+		t.near(aim.angle, 0.5 * AimModel.AIM_RATE, 1e-9)
 		AimModel.step(aim, { aimL = true }, 100)
 		t.eq(aim.angle, -AimModel.MAX_ANGLE)
 		-- a free cursor: its place across the screen is the angle

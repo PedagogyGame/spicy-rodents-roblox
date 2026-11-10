@@ -20,9 +20,9 @@ local AimModel = {}
 AimModel.MAX_ANGLE = BallPath.RANGES.angle
 AimModel.POWER_PERIOD = 1.5 -- seconds for the needle to run from empty to full
 AimModel.STEP_RATE = 0.9 -- offset units a second along the foul line
-AimModel.AIM_RATE = 0.06 -- radians a second on the keys
-AimModel.MOUSE_SENS = 0.0003 -- radians per pixel of mouse travel when the cursor is locked
-AimModel.STICK_RATE = 0.09 -- radians a second at full stick
+AimModel.AIM_RATE = 0.025 -- radians a second on the keys (fine: the pocket is about 0.003 radians wide)
+AimModel.MOUSE_SENS = 0.00012 -- radians per pixel of mouse travel (the whole range is about 830 pixels)
+AimModel.STICK_RATE = 0.05 -- radians a second at full stick
 AimModel.NOTCHES = 2 -- hook notches either side of straight
 AimModel.PREVIEW_D = 40 -- the aim line stops here: reading the rest of a hook is the bowler's skill
 AimModel.WARN_AT = 15 -- seconds left on the turn clock when the warning starts
@@ -60,8 +60,8 @@ export type Input = {
 	right: boolean?,
 	aimL: boolean?, -- turn the angle on the keys
 	aimR: boolean?,
-	mouseDx: number?, -- pixels of locked-cursor travel this frame
-	mouseX01: number?, -- the free cursor's place across the screen (0..1), only when it moved
+	mouseDx: number?, -- pixels of mouse travel this frame (the client's normal way: relative, so the keys' fine aim is kept)
+	mouseX01: number?, -- or the cursor's place across the screen (0..1) as an absolute aim
 	stickAim: number?, -- gamepad -1..1
 	stickStep: number?, -- gamepad -1..1
 }

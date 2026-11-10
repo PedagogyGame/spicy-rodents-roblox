@@ -213,8 +213,9 @@ end
 function BowlingClient._shot(self: any, shot: any)
 	local eye = PartPose.world(self.place, self.lane, shot.ex, shot.ey, shot.ed)
 	local look = PartPose.world(self.place, self.lane, shot.lx, shot.ly, shot.ld)
-	-- a change of shot is a cut, not a swoop through the lane
-	local cut = self.lastShot ~= nil and self.lastShot ~= shot.phase
+	-- to and from the pin shot is a cut (never a swoop the length of the lane); the other changes glide
+	local last = self.lastShot
+	local cut = last ~= nil and last ~= shot.phase and (last == "pins" or shot.phase == "pins")
 	self.lastShot = shot.phase
 	self.ctx.camera(CFrame.lookAt(eye, look), shot.fov, cut)
 end
@@ -256,13 +257,15 @@ function BowlingClient._frame(self: any, dt: number)
 			aimL = self.held.aimL,
 			aimR = self.held.aimR,
 		}
+		-- the mouse turns the aim by how far it moved (never by where it is, so a fine aim set with the arrow
+		-- keys is not thrown away by a nudge): a locked cursor (first person) reports its travel, a free one
+		-- is read from its position
 		if UIS.MouseBehavior ~= Enum.MouseBehavior.Default then
-			-- the cursor is locked (first person): its travel turns the angle
 			input.mouseDx = mouseDx
 		elseif UIS.MouseEnabled then
 			local mp = UIS:GetMouseLocation()
-			if self.lastMouse and (mp - self.lastMouse).Magnitude > 0.5 then
-				input.mouseX01 = mp.X / math.max(1, workspace.CurrentCamera.ViewportSize.X)
+			if self.lastMouse then
+				input.mouseDx = mp.X - self.lastMouse.X
 			end
 			self.lastMouse = mp
 		end
