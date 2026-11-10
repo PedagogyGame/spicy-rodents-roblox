@@ -158,7 +158,8 @@ return function(t)
 				end
 			end
 			lit += litHere
-			t.eq(p.attributes.NightLights or 0, litHere, `{p.id} NightLights`)
+			-- (room light fixtures are counted in NightLights too: Builders/Furnish)
+			t.eq((p.attributes.NightLights or 0) - (p.attributes.RoomLights or 0), litHere, `{p.id} NightLights`)
 		end
 		print(`      {windows} windows, {displays} display panes, {lit} glow at night`)
 		t.truthy(windows >= 1400, `{windows} windows`)

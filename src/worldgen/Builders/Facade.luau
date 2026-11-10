@@ -357,6 +357,10 @@ function Facade.windowGrid(
 				else
 					winH = math.min(style.winH, floorH * 0.5)
 					y = base + (fl - 0.5) * floorH + 0.3
+					if fl == 1 and (style.kind == "cottage" or style.kind == "brick" or style.kind == "utility") then
+						-- a home's ground-floor windows sit at eye height however tall the storey is
+						y = math.min(y, base + 5.6)
+					end
 				end
 				if fl == 1 and style.display and f.id == "F" then
 					local spans: { { number } } = { { -f.len / 2 + 1.6, f.len / 2 - 1.6 } }

@@ -5,6 +5,7 @@
 -- prompt placeholder, room-name volumes and the nav anchor with one Attachment per room-graph node.
 -- Shared by Builders/Interior (FRB houses) and Builders/Programme (Hospital, PoliceStation).
 -- Exterior doors get their surround, steps and canopy from Builders/Facade; interior leaves a knob.
+--   avoid(ctx, layout) -> door openings per exterior face; grid(ctx, layout) -> the window grid (pure)
 -- Interface: build(ctx, layout) -> Built { grid (the window grid), partition (thickness) } where layout = { rooms, doors, wallH, partH, doorH, thick, floorTop,
 --   roof = "flat" | "none", extras = { { id, kind, room, x, z } } } in model-local studs
 --   (rooms: { id, name, x0, x1, z0, z1, exterior? }; doors: { id, a, b, x, z, w, lockable }).
@@ -22,7 +23,16 @@ local PARTITION = { 236, 233, 224 }
 local FLOOR = { 160, 152, 140 }
 local DOOR = { 120, 86, 60 }
 
-export type Room = { id: string, name: string, x0: number, x1: number, z0: number, z1: number, exterior: boolean? }
+export type Room = {
+	id: string,
+	name: string,
+	x0: number,
+	x1: number,
+	z0: number,
+	z1: number,
+	exterior: boolean?,
+	kind: string?, -- what the room is for (Builders/Furnish.roomKind); baked as RoomKind
+}
 export type Door = { id: string, a: string, b: string, x: number, z: number, w: number, lockable: boolean }
 export type Layout = {
 	rooms: { Room },
@@ -143,6 +153,36 @@ local function doorLeaf(
 	end
 end
 
+-- Door openings on each exterior face ("F", "B", "L", "R"): what the windows keep clear of.
+function Shell.avoid(ctx: Spec.LotCtx, L: Layout): { [string]: { Facade.Gap } }
+	local W, D, t = ctx.W, ctx.D, L.thick
+	local out: { [string]: { Facade.Gap } } = { F = {}, B = {}, L = {}, R = {} }
+	for _, d in L.doors do
+		local gap = { c = d.x, w = d.w, top = L.floorTop + L.doorH }
+		if math.abs(d.z + D / 2) <= t + EPS then
+			table.insert(out.F, gap)
+		elseif math.abs(d.z - D / 2) <= t + EPS then
+			table.insert(out.B, gap)
+		elseif math.abs(d.x + W / 2) <= t + EPS then
+			gap.c = d.z
+			table.insert(out.L, gap)
+		elseif math.abs(d.x - W / 2) <= t + EPS then
+			gap.c = d.z
+			table.insert(out.R, gap)
+		end
+	end
+	return out
+end
+
+-- The window grid Shell.build will draw on the exterior walls (none for ribbon windows). Pure: the
+-- interior dressing reads it before the shell is built.
+function Shell.grid(ctx: Spec.LotCtx, L: Layout): { Facade.Win }
+	if L.windows == "bands" then
+		return {}
+	end
+	return Facade.windowGrid(ctx, L.floorTop, L.wallH, Shell.avoid(ctx, L), Facade.style(ctx), nil)
+end
+
 function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 	local W, D, t = ctx.W, ctx.D, L.thick
 	local pal = Building.look(ctx)
@@ -245,12 +285,7 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 		)
 	end
 	-- windows on the exterior walls, clear of the door openings; plinth, cornice, chimney
-	local avoid = {
-		F = gapsOn("x", -D / 2, t + EPS, -W / 2, W / 2),
-		B = gapsOn("x", D / 2, t + EPS, -W / 2, W / 2),
-		L = gapsOn("z", -W / 2, t + EPS, -D / 2, D / 2),
-		R = gapsOn("z", W / 2, t + EPS, -D / 2, D / 2),
-	}
+	local avoid = Shell.avoid(ctx, L)
 	local grid: { Facade.Win } = {}
 	if L.windows == "bands" then
 		Building.bands(ctx, y0, h, avoid)
@@ -384,7 +419,7 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 				canQuery = true,
 				role = "Room",
 				color = { 255, 255, 255 },
-				attrs = { RoomId = r.id, RoomName = r.name, Exterior = r.exterior == true },
+				attrs = { RoomId = r.id, RoomName = r.name, Exterior = r.exterior == true, RoomKind = r.kind or "" },
 			}
 		)
 	end
