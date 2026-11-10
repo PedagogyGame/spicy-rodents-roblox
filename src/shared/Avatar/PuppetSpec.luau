@@ -41,16 +41,19 @@ local PuppetSpec = {}
 PuppetSpec.SPECIES = { "squirrel", "rodent", "fox", "deer", "drone", "human" }
 
 -- Palettes (hex). Regular squirrels wear a fox squirrel's rust back and cream belly; the spicy rodent is
--- the same animal gone feral: mangy dark umber fur, bald patches, oversized glowing red eyes, buck teeth
--- and a little red at the muzzle (natural colours, no green, mild rating: BUILD_PLAN §5.6). The red fox
+-- the same animal gone feral and HOT (owner 2026-11-10: "improve squirrel too, making it more spicy"; the
+-- dull umber read as a dirty squirrel, not a spicy one): chili-red fur over a scorched back, a tail that
+-- burns from dark red through orange to a glowing yellow tip, glowing red eyes, a bald patch,
+-- buck teeth and a little red at the muzzle (no green, mild rating: BUILD_PLAN §5.6). The red fox
 -- has black socks and a white tail tip; the white-tailed deer a white belly, throat and tail flag.
 -- stylua: ignore
 PuppetSpec.PALETTES = {
 	squirrel = { fur = "#9a5a32", back = "#82492a", head = "#93552f", tail = "#a3643a", fringe = "#c99560",
 	             belly = "#e4c9a0", muzzle = "#d8b98f", ear = "#8a4e2c", foot = "#6b3d23", eyes = "#121010" },
-	rodent = { fur = "#5a4231", back = "#4b3627", head = "#533c2e", tail = "#5e4535", fringe = "#6e5543",
-	           belly = "#857160", muzzle = "#77604f", ear = "#5a4231", foot = "#3a2b21", eyes = "#ff2a1a",
-	           mange = "#9a7d73", blood = "#7a1414", teeth = "#e9dfbd" },
+	rodent = { fur = "#b3311c", back = "#6e1c12", head = "#a82c1a", tail = "#c23a1a", fringe = "#ffb52e",
+	           belly = "#e08a3c", muzzle = "#d9783a", ear = "#7a1f14", foot = "#3a1410", eyes = "#ff2a1a",
+	           mange = "#b98274", blood = "#7a1414", teeth = "#e9dfbd",
+	           tailMid = "#e2561c", tailHot = "#f58a1f" },
 	fox = { fur = "#c4622d", back = "#b2552a", tail = "#c0602f", fringe = "#d27a45", white = "#f2ede4",
 	        shin = "#5a3020", legs = "#2c2320", ear = "#7d3b1e", nose = "#141110", eyes = "#2a1a0e" },
 	deer = { fur = "#a8784c", back = "#93673f", belly = "#efe7d8", legs = "#9a6e46", hoof = "#2a221d",
@@ -63,7 +66,7 @@ PuppetSpec.PALETTES = {
 -- The species stock looks the avatar blend starts from (Server/Avatar/AvatarBlendService.STOCK).
 PuppetSpec.STOCK_LOOKS = {
 	squirrel = { body = "#9a5a32", pattern = "#e4c9a0", eyes = "#121010", eyesLocked = false },
-	rodent = { body = "#5a4231", pattern = "#857160", eyes = "#ff2a1a", eyesLocked = true },
+	rodent = { body = "#b3311c", pattern = "#e08a3c", eyes = "#ff2a1a", eyesLocked = true },
 	fox = { body = "#c4622d", pattern = "#f2ede4", eyes = "#2a1a0e", eyesLocked = false },
 	deer = { body = "#a8784c", pattern = "#efe7d8", eyes = "#15110e", eyesLocked = false },
 } :: { [string]: { body: string, pattern: string, eyes: string, eyesLocked: boolean } }
@@ -273,7 +276,13 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 	local c = PuppetSpec.PALETTES[species]
 	local b = newBuilder(1)
 	local HIP = 0.9
-	local G = -HIP
+	-- Owner 2026-11-10: "squirrels legs definitely a bit too tall and big". The body rode 0.57 st off the
+	-- ground on legs as long as it was deep, like a small deer. It is modelled here with the ground LEGS
+	-- below the body centre, and then the whole drawn body is lowered so its toes stand at the root's
+	-- HipHeight (which the motors, the hitbox and the camera keep): the belly is now 0.29 st off the
+	-- ground and the legs are a little thinner.
+	local LEGS = 0.62
+	local G = -LEGS
 	local mange: Extra = { region = "Body", material = "Sand" }
 	b.block("RootPart", { 0.66, 0.66, 1.4 }, { 0, 0, 0 }, c.fur, { transparency = 1 })
 	-- a smooth capsule torso (Body between the Hips and Chest balls); the spine balls sit just inside
@@ -339,23 +348,25 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 		if rodent
 			then { 0.24, 0.32, 0.26, 0.42, 0.46, 0.3, 0.38, 0.3 }
 			else { 0.3, 0.42, 0.54, 0.62, 0.66, 0.64, 0.58, 0.48 },
-		{ c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.fringe }
+		if rodent
+			then { c.back, c.tail, c.tail, c.tailMid, c.tailMid, c.tailHot, c.tailHot, c.fringe }
+			else { c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.tail, c.fringe }
 	)
 	-- FurCards: the frosted fringe filling out the tail's back curve
 	b.ball("FurCards", if rodent then 0.34 else 0.5, if rodent then { 0, 0.5, 1.02 } else { 0, 0.52, 1.12 }, c.fringe)
 	b.weld("FurCards", "Tail4")
 	-- slim legs: front legs under the chest, hind legs with a round thigh, the long foot angled down
 	mirrored(b, "Front", 0.17, "Chest", {
-		pts = { { -0.12, -0.42 }, { -0.46, -0.38 }, { -0.76, -0.46 }, { -0.85, -0.48 }, { G, -0.6 } },
-		d = { 0.17, 0.12, 0.11 },
-		toe = { 0.13, 0.06, 0.16 },
+		pts = { { -0.12, -0.42 }, { -0.34, -0.37 }, { -0.52, -0.45 }, { -0.565, -0.47 }, { G, -0.58 } },
+		d = { 0.14, 0.1, 0.09 },
+		toe = { 0.11, 0.05, 0.14 },
 		colors = { c.fur, c.fur, c.foot, c.foot },
 	})
 	mirrored(b, "Back", 0.21, "Hips", {
-		pts = { { -0.02, 0.28 }, { -0.36, 0.2 }, { -0.64, 0.44 }, { -0.83, 0.24 }, { G, 0.06 } },
-		d = { 0.2, 0.13, 0.11 },
-		thigh = { 0.5, -0.14, 0.28 },
-		toe = { 0.14, 0.06, 0.22 },
+		pts = { { -0.02, 0.28 }, { -0.27, 0.2 }, { -0.46, 0.4 }, { -0.545, 0.24 }, { G, 0.08 } },
+		d = { 0.16, 0.11, 0.09 },
+		thigh = { 0.44, -0.1, 0.28 },
+		toe = { 0.12, 0.05, 0.19 },
 		colors = { c.fur, c.fur, c.foot, c.foot },
 	})
 	if rodent then
@@ -371,7 +382,23 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 	b.socket("MouthSocket", "Jaw", { 0, hy - 0.12, hz - 0.38 })
 	b.socket("TailTip", "Tail8", tip)
 	b.socket("ChestCenter", "Chest", { 0, -0.03, -0.42 })
-	return finish(b, species, opts.name or species, opts.variant, HIP, HIP + 0.33)
+	-- lower the drawn body onto its shorter legs: everything but the root itself, with its joints and sockets
+	local drop = HIP - LEGS
+	for _, p in b.parts do
+		if p.name ~= "RootPart" then
+			p.pos = { p.pos[1], p.pos[2] - drop, p.pos[3] }
+		end
+	end
+	for _, j in b.joints do
+		local at = j.at
+		if at then
+			j.at = { at[1], at[2] - drop, at[3] }
+		end
+	end
+	for _, a in b.attachments do
+		a.pos = { a.pos[1], a.pos[2] - drop, a.pos[3] }
+	end
+	return finish(b, species, opts.name or species, opts.variant, HIP, LEGS + 0.33)
 end
 
 -- Red fox --------------------------------------------------------------------------------------------

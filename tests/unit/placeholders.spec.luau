@@ -185,9 +185,35 @@ return function(t)
 		t.eq(sedan:FindFirstChild("LightBarB"), nil)
 	end)
 
-	t.test("squirrel stands 1.2 st at the shoulder; deer variants scale; the rodent alone has Blood", function()
+	t.test("squirrel stands low on short legs; deer variants scale; the rodent alone has Blood", function()
 		local sq = PuppetSpec.spec("squirrel")
-		t.near((sq.attributes :: any).ShoulderHeight, 1.25, 0.06)
+		-- Owner 2026-11-10: "squirrels legs definitely a bit too tall and big" (it stood 1.25 st at the
+		-- shoulder on 0.57 st of leg). The root keeps its 0.9 st HipHeight; the drawn body sits lower.
+		t.near((sq.attributes :: any).ShoulderHeight, 0.95, 0.03)
+		t.eq((sq.attributes :: any).HipHeight, 0.9)
+		local byName: { [string]: any } = {}
+		for _, p in sq.parts do
+			byName[p.name] = p
+		end
+		local belly = byName.Body.pos[2] - byName.Body.size[2] / 2 + 0.9 -- above the ground
+		t.truthy(belly > 0.2 and belly < 0.36, `the belly rides {belly} st off the ground (it was 0.57)`)
+		t.truthy(byName.FrontL_Lower.size[2] <= 0.1 and byName.BackL_Lower.size[2] <= 0.11, "slimmer legs")
+		-- the spicy rodent is hot: red fur, a tail that burns to a yellow tip, ember eyes; no green
+		local hot = PuppetSpec.PALETTES.rodent
+		for _, key in { "fur", "tail", "tailMid", "tailHot", "fringe", "eyes" } do
+			local r = tonumber(string.sub(hot[key], 2, 3), 16) :: number
+			local g = tonumber(string.sub(hot[key], 4, 5), 16) :: number
+			local bl = tonumber(string.sub(hot[key], 6, 7), 16) :: number
+			t.truthy(r > g and r > bl and r >= 0xa0, `{key} {hot[key]} is a hot colour`)
+		end
+		local rd = PuppetSpec.spec("rodent")
+		local tip: any = nil
+		for _, p in rd.parts do
+			if p.name == "Tail8" then
+				tip = p
+			end
+		end
+		t.truthy(tip.color.r > 0.9 and tip.color.g > 0.6 and tip.color.b < 0.3, "the rodent's tail tip glows yellow")
 		local doe = (PuppetSpec.spec("deer", { variant = "doe" }).attributes :: any).HipHeight
 		local fawn = (PuppetSpec.spec("deer", { variant = "fawn" }).attributes :: any).HipHeight
 		t.near(fawn / doe, 0.55, 1e-9)
