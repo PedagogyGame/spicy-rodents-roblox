@@ -379,7 +379,7 @@ def cream_face(P, N, dom, variant):
     line = 0.71 + 0.08 * _sstep(0.2, -0.5, y) + np.clip(-y - 0.45, 0, 1) * 0.62
     line = np.minimum(line, hz - 0.1)
     field = -N[:, 2] * 0.8 + (line - z) * 2.5 - np.abs(x) * 1.2 + 0.15
-    return _sstep(0.1, 0.5, field) * _sstep(-0.28, -0.4, y)
+    return _sstep(0.0, 0.6, field) * _sstep(-0.28, -0.4, y)
 
 
 # ---- fur flow and painting (textures.py calls these) ------------------------------------------------
@@ -509,8 +509,9 @@ def paint(tx, variant, tools):
 
     # cream chin, throat and cheek undersides, with a furry broken edge (painted, never a mesh edge)
     cream = _hex("#8f7359") if rodent else _hex("#e4c9a0")
-    ck = np.clip(cream_face(P, N, tx["dom"], variant) + (fine - 0.5) * 0.15, 0, 1)
-    ck = sst(0.15, 0.85, ck)
+    # feathered: the edge breaks up along the hairs (owner agreed, 2026-11-10)
+    ck = np.clip(cream_face(P, N, tx["dom"], variant) + (fine - 0.5) * 0.34 + (guard - 0.5) * 0.22, 0, 1)
+    ck = sst(0.12, 0.88, ck)
     override(hard == 0, cream[None, :] * (0.9 + 0.2 * fine)[:, None], k=ck * (hard == 0))
     # the pale ring round each eye, and paler whisker pads
     buff = _hex("#7d6048") if rodent else _hex("#dcb98a")
@@ -549,8 +550,11 @@ def paint(tx, variant, tools):
         scorch = sst(0.55, 0.95, N[:, 2]) * np.isin(dom, list(TORSO) + ["Neck", "Head"]) * (hard == 0)
         override(hard == 0, _hex("#1e1512") * (0.8 + 0.4 * fine)[:, None], a=0.0, k=scorch * 0.7)
         # the tail's fringe smoulders: ember rust at the plume's edges instead of a frosted tip
+        # (furry and broken, not a painted stripe: it follows the hairs and thins out in places)
         lat_t = np.abs(N[:, 0])
-        override(tail, _hex("#b5562a") * (0.8 + 0.4 * fine)[:, None], k=sst(0.7, 0.92, lat_t) * 0.9)
+        ek = sst(0.78, 0.99, lat_t + (fine - 0.5) * 0.4 + (big - 0.5) * 0.4) * (0.45 + 0.55 * sst(0.3, 0.7, guard))
+        ecol = _hex("#7a3a22")[None, :] * (1 - fine)[:, None] + _hex("#c9642c")[None, :] * fine[:, None]
+        override(tail, ecol, k=ek * 0.9)
         # one small bald patch with an old pale scar across it
         for i, pt in enumerate(RODENT_PATCHES):
             c = np.array(pt["c"], np.float32)
