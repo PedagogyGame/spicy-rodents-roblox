@@ -540,6 +540,110 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"two collapses a minute apart: the first patient's cure never takes the second patient's ambulance away",
+		function()
+			local h = harness(13, nil, function(params: any)
+				params.immediateChance = 1
+			end)
+			h.step(20)
+			local people = townspeople(h)
+			local first = nearest(people, 0, 0)
+			local a = first.id
+			t.truthy(h.svc:bite(a, h.rodent))
+			t.truthy(
+				h.runUntil(400, function(): boolean
+					return h.svc:stateOf(a) == "treated"
+				end),
+				`the first patient never got a bed (state {h.svc:stateOf(a)})`
+			)
+			t.eq(h.svc:stats().dispatched, 1)
+			local recA = h.svc.records[a]
+			t.eq(recA.vehicle, nil, "a record lets go of its ambulance once the trip is over")
+			t.eq(recA.amb, "none")
+			-- the second collapse, while the first patient is in bed: the same ambulance goes out again
+			local second = nil
+			for _, p in people do
+				if p.id ~= a and h.svc.busy[p.id] == nil and h.svc.leaving[p.id] == nil then
+					local d = (p.x - first.x) ^ 2 + (p.z - first.z) ^ 2
+					if second == nil or d < (second.x - first.x) ^ 2 + (second.z - first.z) ^ 2 then
+						second = p
+					end
+				end
+			end
+			local b = second.id
+			t.truthy(h.svc:bite(b, h.rodent))
+			local closedA, vehicle, sawHold = nil :: number?, nil :: any, false
+			t.truthy(
+				h.runUntil(300, function(): boolean
+					return h.svc:stateOf(b) == "transit"
+				end, function()
+					if closedA == nil and h.svc:stateOf(a) == nil then
+						closedA = h.time
+					end
+					local rec = h.svc.records[b]
+					if rec and rec.vehicle and h.svc:stateOf(b) ~= "transit" then
+						vehicle = vehicle or rec.vehicle
+						t.eq(rec.vehicle, vehicle, "one ambulance for the whole call")
+						t.eq(vehicle.held, true, `the ambulance was let go at {h.time} s, before the patient was aboard`)
+						local s = h.svc:stateOf(b)
+						if s == "approach" or s == "assess" or s == "loading" or s == "retrieve" then
+							sawHold = true
+							t.eq(vehicle.phase, "hold", `the ambulance left the scene during {s}`)
+						end
+					end
+				end),
+				`the second patient was never loaded (state {h.svc:stateOf(b)})`
+			)
+			t.truthy(vehicle ~= nil and sawHold, "the second patient's ambulance came and waited")
+			t.truthy(closedA ~= nil, "the first patient was cured while the second call was running (or the test has no teeth)")
+			t.eq(h.svc:stats().dispatched, 2)
+			t.eq(h.svc:stats().abandoned, 0, "nobody was left on the pavement")
+			t.truthy(
+				h.runUntil(300, function(): boolean
+					return h.svc:stateOf(b) == nil
+				end),
+				`the second patient was never cured (state {h.svc:stateOf(b)})`
+			)
+			t.eq(h.svc:stats().cured, 2)
+		end
+	)
+
+	t.test("an ambulance that is called off on the way: the patient is not left waiting for it", function()
+		local h = harness(14, { 0, 0 })
+		h.step(20)
+		local victim = nearest(townspeople(h), 0, 0)
+		local id = victim.id
+		t.truthy(h.svc:bite(id, h.rodent))
+		t.truthy(h.runUntil(60, function(): boolean
+			return h.svc:stateOf(id) == "enroute"
+		end))
+		local rec = h.svc.records[id]
+		local lost = rec.vehicle
+		h.step(3)
+		h.traffic:releaseResponder(lost) -- something else lets it go: it will turn round at the scene
+		local other = nil :: any
+		t.truthy(
+			h.runUntil(300, function(): boolean
+				return h.svc:stateOf(id) == "transit"
+			end, function()
+				local s = h.svc:stateOf(id)
+				if rec.vehicle and rec.vehicle ~= lost then
+					other = rec.vehicle
+				end
+				if s == "approach" or s == "assess" or s == "loading" or s == "retrieve" then
+					t.truthy(rec.vehicle ~= lost, "nobody is loaded into an ambulance that is not waiting for them")
+					t.eq(rec.vehicle.phase, "hold")
+					t.eq(rec.vehicle.held, true)
+				end
+			end),
+			`never loaded (state {h.svc:stateOf(id)})`
+		)
+		t.truthy(other ~= nil, "a second ambulance was sent")
+		t.eq(h.svc:stats().abandoned, 0)
+		t.eq(h.svc:stats().dispatched, 2)
+	end)
+
 	t.test("five scenes, three ambulances: everyone is collected, treated and released", function()
 		local h = harness(21, nil, function(params: any)
 			params.immediateChance = 1

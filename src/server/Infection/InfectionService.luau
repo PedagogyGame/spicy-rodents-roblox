@@ -327,6 +327,7 @@ function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { n
 		end
 	end
 	if bestI == nil or not clearLine(self, x, z, px, pz) then
+		print("WHY snap", x, z, px, pz, math.sqrt(bestD))
 		return nil, 0
 	end
 	-- the best of that strip's junctions to start the graph search from
@@ -343,11 +344,13 @@ function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { n
 		end
 	end
 	if bestPath == nil then
+		print("WHY nopath", x, z)
 		return nil, 0
 	end
 	-- Nav.path ends at the node nearest the goal: the route only works if that IS the goal
 	local last = bestPath[#bestPath - 1] or bestPath[#bestPath]
 	if math.abs(last[1] - goal[1]) + math.abs(last[2] - goal[2]) > 1 then
+		print("WHY notgoal", x, z, last[1], last[2])
 		return nil, 0
 	end
 	pushPoint(points, px, pz)
@@ -360,6 +363,7 @@ function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { n
 	local fx, fz = x, z
 	for i, p in points do
 		if i < #points and not clearLine(self, fx, fz, p[1], p[2]) then
+			print("WHY leg", x, z, i, fx, fz, p[1], p[2])
 			return nil, 0
 		end
 		fx, fz = p[1], p[2]
