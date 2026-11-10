@@ -14,7 +14,8 @@
 -- throw ends: by then the server has hidden them itself).
 -- Interface: play(place, lane, script, onCue?) -> bool (script already checked by RollScript.check);
 --   stop(lane, place?, mask?) (cut a throw short; with a mask, show that rack standing and the ball on its
---   rack); now(lane) -> seconds into the throw being played, or nil; playing(lane) -> bool; TAIL
+--   rack); now(lane) -> seconds into the throw being played, or nil; playing(lane) -> bool; TAIL; clock
+--   (os.clock; a test swaps it)
 
 local Import = require("../Import")
 local PartPose =
@@ -26,6 +27,7 @@ local BowlingPlayback = {}
 
 BowlingPlayback.TAIL = 0.15 -- seconds held on the final pose before the server's copy is trusted again
 BowlingPlayback.BIND = "SpicyBowlingPlayback"
+BowlingPlayback.clock = os.clock
 
 type PinParts = { model: Model, home: CFrame, parts: { BasePart }, hidden: boolean }
 type Entry = {
@@ -112,7 +114,7 @@ local function finish(e: Entry)
 end
 
 local function step()
-	local now = os.clock()
+	local now = BowlingPlayback.clock()
 	for lane, e in active do
 		local t = now - e.t0
 		local tEnd = e.script.tEnd
@@ -164,7 +166,7 @@ function BowlingPlayback.play(
 		place = place,
 		lane = lane,
 		script = script,
-		t0 = os.clock(),
+		t0 = BowlingPlayback.clock(),
 		ball = ball,
 		pins = pins,
 		cues = RollScript.cues(script),
@@ -204,7 +206,7 @@ end
 
 function BowlingPlayback.now(lane: number): number?
 	local e = active[lane]
-	return if e then os.clock() - e.t0 else nil
+	return if e then BowlingPlayback.clock() - e.t0 else nil
 end
 
 function BowlingPlayback.playing(lane: number): boolean

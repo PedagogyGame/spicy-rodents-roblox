@@ -396,11 +396,11 @@ local function promptTexts(st: Station): (string, string)
 		end
 	end
 	if s.phase == "idle" or s.phase == "done" then
-		return verb, `{st.label} - open`
+		return verb, `{st.label} - open (alone, with friends, or against a computer)`
 	elseif s.phase == "lobby" then
-		return "Join", `{st.label} - {n}/{s.rules.def.seats} joining`
+		return "Join", `{st.label} - {n}/{s.rules.def.seats} joining, starting soon`
 	end
-	return "In use", `{st.label} - game on ({n} playing)`
+	return "In use", `{st.label} - game on ({n} playing): try another`
 end
 
 function MinigameService._refresh(self: any, st: Station)

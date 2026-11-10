@@ -32,7 +32,7 @@ LaneCycle.TURNAROUND =
 LaneCycle.LIFT = 2.4 -- how high the machine lifts a pin
 LaneCycle.SWEEP_REST = AlleyLayout.MASK_BOTTOM + 0.4
 LaneCycle.SWEEP_LOW = 0.7
-LaneCycle.SWEEP_D0 = AlleyLayout.DECK_START - 0.6
+LaneCycle.SWEEP_D0 = AlleyLayout.DECK_START - 0.05 -- where the bake parks it: just behind the masking unit's face
 LaneCycle.SWEEP_D1 = AlleyLayout.CUSHION_D - 0.5
 
 export type Result = { pins: number, seat: number?, standing: { boolean }, flags: RollScript.Flags }

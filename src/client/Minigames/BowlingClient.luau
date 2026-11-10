@@ -14,7 +14,7 @@
 -- straight back to aiming with a line on screen: input is never swallowed. Typing in chat moves nothing.
 -- The SERVER decides the throw (D28): this sends { offset, angle, power, spin } once per ball.
 -- Interface: new(ctx) -> Bowler; Bowler:onState(msg); Bowler:onRoll(msg, script); Bowler:onRefused(msg);
---   Bowler:stop(); HELP; SEND_TIMEOUT
+--   Bowler:stop(); HELP; SEND_TIMEOUT; WATCH_LIMIT; clock (os.clock; a test swaps it)
 
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
@@ -31,6 +31,7 @@ BowlingClient.__index = BowlingClient
 BowlingClient.HELP = AimModel.HELP
 BowlingClient.SEND_TIMEOUT = 2.5 -- seconds to wait for the server to answer a throw before aiming again
 BowlingClient.WATCH_LIMIT = 14 -- the roll camera can never be kept longer than this
+BowlingClient.clock = os.clock
 
 function BowlingClient.new(ctx: { [string]: any }): any
 	local self = setmetatable({}, BowlingClient) :: any
@@ -150,7 +151,7 @@ function BowlingClient._charge(self: any, down: boolean)
 			AimModel.refused(self.aim)
 			return
 		end
-		self.sentAt = os.clock()
+		self.sentAt = BowlingClient.clock()
 		self.slideT = 0
 		self.ctx.send("release", { params.offset, params.angle, params.power, params.spin })
 		self.ctx.ui:meter(nil)
@@ -235,7 +236,7 @@ end
 function BowlingClient._frame(self: any, dt: number)
 	local ctx = self.ctx
 	local aim = self.aim
-	local now = os.clock()
+	local now = BowlingClient.clock()
 	local UIS = game:GetService("UserInputService")
 	local mouseDx = self.mouseDx
 	self.mouseDx = 0
@@ -344,7 +345,7 @@ function BowlingClient.onState(self: any, msg: { [string]: any })
 	self.turnMine = turnMine
 	self.canBowl = canBowl
 	self.turnLeft = view.turnLeft
-	self.turnLeftAt = os.clock()
+	self.turnLeftAt = BowlingClient.clock()
 	if not canBowl then
 		local ui = self.ctx.ui
 		if view.phase == "lobby" then
@@ -369,12 +370,12 @@ function BowlingClient.onRoll(self: any, msg: { [string]: any }, script: any)
 	local aim = self.aim
 	if aim.phase == "sent" then
 		AimModel.sent(aim)
-		self.watch = { script = script, t0 = os.clock() }
+		self.watch = { script = script, t0 = BowlingClient.clock() }
 		self.ctx.ui:meter(nil)
 		self:_clearDots()
 	elseif self.turnMine and msg.seat == nil then
 		-- a scripted pinfall on your turn (a developer's test roll): watch it too
-		self.watch = { script = script, t0 = os.clock() }
+		self.watch = { script = script, t0 = BowlingClient.clock() }
 	end
 end
 

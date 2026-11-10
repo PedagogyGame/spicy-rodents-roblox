@@ -222,8 +222,9 @@ function RollScript.ball(script: Script, t: number): (number?, number, number, n
 		end
 		vx, vd = keys[#keys - 1], keys[#keys]
 	end
-	-- over the back edge into the pit
-	local tau = t - script.tBallEnd
+	-- over the back edge into the pit: it drops, carries on a moment and lies still (after the script's end
+	-- nothing about the throw changes any more, so the last pose drawn anywhere is the same pose)
+	local tau = math.min(t - script.tBallEnd, RollScript.REST)
 	local R = AlleyLayout.BALL_D / 2
 	local wall = PinModel.WALL_X - R
 	local px = math.clamp(x + vx * tau, -wall, wall)
@@ -249,7 +250,10 @@ function RollScript.pin(script: Script, n: number, t: number): (number, number, 
 		return sx, 0, sd, 0, 0, false
 	end
 	local keys = deck.pins[n]
-	local x, d = PinModel.segAt(keys, tau, PinModel.FRICTION)
+	local pit = deck.pitT[n]
+	-- a pin that went over the back edge stops where it is once it is out of sight
+	local slideT = if pit >= 0 then math.min(tau, pit + RollScript.PIT_HIDE) else tau
+	local x, d = PinModel.segAt(keys, slideT, PinModel.FRICTION)
 	local fall = smooth((tau - hit) / RollScript.FALL_TIME)
 	local tilt = fall * math.pi / 2
 	local vx, vd = keys[4], keys[5]
@@ -261,7 +265,6 @@ function RollScript.pin(script: Script, n: number, t: number): (number, number, 
 		y -= AlleyLayout.GUTTER_DEPTH * smooth(over / 0.3)
 	end
 	local hidden = false
-	local pit = deck.pitT[n]
 	if pit >= 0 and tau > pit then
 		local f = tau - pit
 		y = math.max(AlleyLayout.PIT_Y, y - 0.5 * RollScript.GRAVITY * f * f)

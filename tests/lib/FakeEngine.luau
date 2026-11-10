@@ -8,10 +8,18 @@
 -- The engine globals exist only between install() and uninstall(): use `FakeEngine.with(function() ... end)`.
 -- ONLY IN AN ISOLATED RUN (tests/lib/Isolated, cases under tests/isolated/): install() reaches the globals
 -- through getfenv, which switches off Luau's fast paths for everything that runs afterwards in the process.
+-- `game:GetService` gives a RunService whose BindToRenderStep callbacks and RenderStepped signal the test
+-- fires itself (renderStep), a UserInputService with InputBegan / InputEnded / InputChanged signals the test
+-- fires (input) and a few settable facts (the mouse, a focused text box), an HttpService that can JSONEncode,
+-- and empty stand-ins for anything else. workspace.CurrentCamera is a fake camera with a viewport.
 -- Interface: new(className, name?, props?) -> Instance; install(); uninstall(); with(fn); part(name, cframe,
---   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v)
+--   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v); workspace() -> the fake Workspace;
+--   renderStep(dt) (call every bound render step and RenderStepped); bound() -> how many render steps are
+--   bound; signal() -> { Connect, fire }; uis() -> the fake UserInputService; input(kind "began" | "ended" |
+--   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position? })
 
 local roblox = require("@lune/roblox")
+local serde = require("@lune/serde")
 
 local FakeEngine = {}
 
@@ -188,9 +196,131 @@ function FakeEngine.model(name: string, pivot: any, parent: any?): any
 	return m
 end
 
-local GLOBALS = { "Vector3", "CFrame", "Color3", "Enum", "Instance", "workspace", "typeof" }
+local GLOBALS = { "Vector3", "Vector2", "CFrame", "Color3", "UDim2", "Enum", "Instance", "workspace", "typeof", "game" }
 local saved: { [string]: any } = {}
 local installed = false
+local renderSteps: { [string]: (dt: number) -> () } = {}
+local fakeWorkspace: any = nil
+local fakeUis: any = nil
+local renderStepped: any = nil
+
+function FakeEngine.workspace(): any
+	return fakeWorkspace
+end
+
+-- Fire every render step a module bound (in no particular order).
+function FakeEngine.renderStep(dt: number)
+	for _, fn in table.clone(renderSteps) do
+		fn(dt)
+	end
+	if renderStepped then
+		renderStepped.fire(dt)
+	end
+end
+
+function FakeEngine.bound(): number
+	local n = 0
+	for _ in renderSteps do
+		n += 1
+	end
+	return n
+end
+
+-- A signal: Connect(fn) -> { Disconnect }, and fire(...) for the test.
+function FakeEngine.signal(): any
+	local handlers: { any } = {}
+	local sig = {}
+	function sig.Connect(_self: any, fn: (...any) -> ()): any
+		table.insert(handlers, fn)
+		return {
+			Disconnect = function()
+				local i = table.find(handlers, fn)
+				if i then
+					table.remove(handlers, i)
+				end
+			end,
+		}
+	end
+	function sig.fire(...: any)
+		for _, fn in table.clone(handlers) do
+			fn(...)
+		end
+	end
+	function sig.count(): number
+		return #handlers
+	end
+	return sig
+end
+
+function FakeEngine.uis(): any
+	return fakeUis
+end
+
+-- Fire an input event as the engine would: kind "began" | "ended" | "changed".
+function FakeEngine.input(kind: string, io: { [string]: any }, processed: boolean?)
+	local event = {
+		KeyCode = io.KeyCode or { Name = "Unknown" },
+		UserInputType = io.UserInputType or roblox.Enum.UserInputType.Keyboard,
+		Delta = io.Delta or roblox.Vector3.new(0, 0, 0),
+		Position = io.Position or roblox.Vector3.new(0, 0, 0),
+	}
+	local sig = if kind == "began"
+		then fakeUis.InputBegan
+		elseif kind == "ended" then fakeUis.InputEnded
+		else fakeUis.InputChanged
+	sig.fire(event, processed == true)
+end
+
+local function fakeGame(): any
+	renderStepped = FakeEngine.signal()
+	fakeUis = {
+		InputBegan = FakeEngine.signal(),
+		InputEnded = FakeEngine.signal(),
+		InputChanged = FakeEngine.signal(),
+		MouseBehavior = roblox.Enum.MouseBehavior.Default,
+		MouseEnabled = true,
+		TouchEnabled = false,
+		KeyboardEnabled = true,
+		mouse = roblox.Vector2.new(960, 540), -- the test moves this
+		focused = nil, -- a focused text box (anything non-nil) means the player is typing
+		GetMouseLocation = function(self: any): any
+			return self.mouse
+		end,
+		GetFocusedTextBox = function(self: any): any
+			return self.focused
+		end,
+		GetGamepadState = function(_self: any, _pad: any): { any }
+			return {}
+		end,
+	}
+	local services: { [string]: any } = {
+		UserInputService = fakeUis,
+		RunService = {
+			RenderStepped = renderStepped,
+			BindToRenderStep = function(_self: any, name: string, _priority: number, fn: (dt: number) -> ())
+				renderSteps[name] = fn
+			end,
+			UnbindFromRenderStep = function(_self: any, name: string)
+				renderSteps[name] = nil
+			end,
+		},
+		HttpService = {
+			JSONEncode = function(_self: any, value: any): string
+				return serde.encode("json", value)
+			end,
+		},
+	}
+	return {
+		GetService = function(_self: any, name: string): any
+			local svc = services[name]
+			if svc == nil then
+				svc = FakeEngine.new(name, name)
+				services[name] = svc
+			end
+			return svc
+		end,
+	}
+end
 
 -- install: the engine globals appear (for modules that look them up when their functions run).
 function FakeEngine.install()
@@ -206,10 +336,21 @@ function FakeEngine.install()
 	end
 	env.Vector3 = roblox.Vector3
 	env.CFrame = roblox.CFrame
+	env.Vector2 = roblox.Vector2
+	env.UDim2 = roblox.UDim2
 	env.Color3 = roblox.Color3
 	env.Enum = roblox.Enum
 	env.Instance = { new = FakeEngine.new }
-	env.workspace = FakeEngine.new("Workspace", "Workspace")
+	fakeWorkspace = FakeEngine.new("Workspace", "Workspace")
+	local camera = FakeEngine.new("Camera", "Camera")
+	rawset(camera, "ViewportSize", roblox.Vector2.new(1920, 1080))
+	rawset(camera, "CFrame", roblox.CFrame.new(0, 0, 0))
+	rawset(camera, "FieldOfView", 70)
+	camera.Parent = fakeWorkspace
+	rawset(fakeWorkspace, "CurrentCamera", camera)
+	env.workspace = fakeWorkspace
+	env.game = fakeGame()
+	table.clear(renderSteps)
 	env.typeof = function(v: any): string
 		return if isInstance(v) then "Instance" else realTypeof(v)
 	end
@@ -226,6 +367,10 @@ function FakeEngine.uninstall()
 		env[g] = saved[g]
 	end
 	table.clear(saved)
+	table.clear(renderSteps)
+	fakeWorkspace = nil
+	fakeUis = nil
+	renderStepped = nil
 end
 
 -- with: run fn with the engine globals in place; they are always taken away again, even if fn throws.
