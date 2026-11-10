@@ -26,3 +26,6 @@ __pycache__/
 # Cloud tooling never writes secrets, but keep its local state out of git anyway
 /tools/cloud/state/
 /tools/cloud/.state/
+
+# Background build worktrees (agents work here on their own branches)
+/.claude/worktrees/
