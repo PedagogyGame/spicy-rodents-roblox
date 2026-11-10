@@ -4,7 +4,8 @@
 -- (Vector3, CFrame, Color3, Enum) are Lune's real ones; instances are small Luau tables with the handful of
 -- members the glue uses: a tree (Parent, FindFirstChild, GetChildren, GetDescendants, IsA, Destroy, Clone),
 -- attributes, properties as plain fields, Position from CFrame, and Model:GetPivot / PivotTo that carry the
--- model's parts along. No events, no physics, no replication.
+-- model's parts along; the usual events (Activated, Triggered, OnClientEvent ...) appear as signals the test
+-- fires; RemoteEvent:FireServer records what was sent. No physics, no replication.
 -- The engine globals exist only between install() and uninstall(): use `FakeEngine.with(function() ... end)`.
 -- ONLY IN AN ISOLATED RUN (tests/lib/Isolated, cases under tests/isolated/): install() reaches the globals
 -- through getfenv, which switches off Luau's fast paths for everything that runs afterwards in the process.
@@ -16,7 +17,9 @@
 --   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v); workspace() -> the fake Workspace;
 --   renderStep(dt) (call every bound render step and RenderStepped); bound() -> how many render steps are
 --   bound; signal() -> { Connect, fire }; uis() -> the fake UserInputService; input(kind "began" | "ended" |
---   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position? })
+--   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position? });
+--   game:GetService("Players").LocalPlayer (with a PlayerGui); any other service is an empty fake instance;
+--   task.spawn / defer run at once and task.delay waits for runDelayed()
 
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
@@ -24,6 +27,26 @@ local serde = require("@lune/serde")
 local FakeEngine = {}
 
 local BASE_PARTS: { [string]: boolean } = { Part = true, MeshPart = true, WedgePart = true }
+local GUI_OBJECTS: { [string]: boolean } =
+	{ Frame = true, TextLabel = true, TextButton = true, ImageLabel = true, ScrollingFrame = true, TextBox = true }
+-- members that are events: a signal appears the first time one is asked for (fire it with inst.<Event>.fire(...))
+local EVENTS: { [string]: boolean } = {
+	Activated = true,
+	MouseButton1Down = true,
+	MouseButton1Up = true,
+	MouseButton1Click = true,
+	MouseLeave = true,
+	MouseEnter = true,
+	Triggered = true,
+	OnClientEvent = true,
+	OnServerEvent = true,
+	PromptShown = true,
+	PromptHidden = true,
+	Ended = true,
+	Heartbeat = true,
+	ChildAdded = true,
+	AncestryChanged = true,
+}
 
 local Inst = {}
 
@@ -46,6 +69,10 @@ Inst.__index = function(self: any, key: any): any
 		return if cf then cf.Position else nil
 	elseif key == "PrimaryPart" then
 		return rawget(self, "_primary")
+	elseif EVENTS[key] then
+		local sig = FakeEngine.signal()
+		rawset(self, key, sig)
+		return sig
 	end
 	return nil
 end
@@ -80,6 +107,21 @@ function methods.FindFirstChild(self: any, name: string): any
 	return nil
 end
 
+-- (a fake tree is always complete: waiting is finding)
+function methods.WaitForChild(self: any, name: string, _timeout: number?): any
+	return methods.FindFirstChild(self, name)
+end
+
+-- RemoteEvent:FireServer: what the client sent is kept in order on the instance (`fired`).
+function methods.FireServer(self: any, ...: any)
+	local list = rawget(self, "fired")
+	if list == nil then
+		list = {}
+		rawset(self, "fired", list)
+	end
+	table.insert(list, { ... })
+end
+
 function methods.FindFirstChildOfClass(self: any, class: string): any
 	for _, c in rawget(self, "_children") do
 		if c.ClassName == class then
@@ -107,7 +149,10 @@ end
 
 function methods.IsA(self: any, class: string): boolean
 	local own = self.ClassName
-	return class == own or class == "Instance" or (class == "BasePart" and BASE_PARTS[own] == true)
+	return class == own
+		or class == "Instance"
+		or (class == "BasePart" and BASE_PARTS[own] == true)
+		or (class == "GuiObject" and GUI_OBJECTS[own] == true)
 end
 
 function methods.SetAttribute(self: any, name: string, value: any)
@@ -196,13 +241,36 @@ function FakeEngine.model(name: string, pivot: any, parent: any?): any
 	return m
 end
 
-local GLOBALS = { "Vector3", "Vector2", "CFrame", "Color3", "UDim2", "Enum", "Instance", "workspace", "typeof", "game" }
+local GLOBALS = {
+	"Vector3",
+	"Vector2",
+	"CFrame",
+	"Color3",
+	"UDim",
+	"UDim2",
+	"Enum",
+	"Instance",
+	"workspace",
+	"typeof",
+	"game",
+	"task",
+}
 local saved: { [string]: any } = {}
 local installed = false
 local renderSteps: { [string]: (dt: number) -> () } = {}
 local fakeWorkspace: any = nil
 local fakeUis: any = nil
 local renderStepped: any = nil
+local delayed: { () -> () } = {}
+
+-- Run everything handed to task.delay so far (in order), as if its time had come.
+function FakeEngine.runDelayed()
+	local list = delayed
+	delayed = {}
+	for _, fn in list do
+		fn()
+	end
+end
 
 function FakeEngine.workspace(): any
 	return fakeWorkspace
@@ -293,10 +361,18 @@ local function fakeGame(): any
 			return {}
 		end,
 	}
+	-- the local player, with a PlayerGui for interfaces to go into
+	local players = FakeEngine.new("Players", "Players")
+	local localPlayer = FakeEngine.new("Player", "LocalPlayer")
+	FakeEngine.new("PlayerGui", "PlayerGui").Parent = localPlayer
+	localPlayer.Parent = players
+	rawset(players, "LocalPlayer", localPlayer)
 	local services: { [string]: any } = {
 		UserInputService = fakeUis,
+		Players = players,
 		RunService = {
 			RenderStepped = renderStepped,
+			Heartbeat = FakeEngine.signal(),
 			BindToRenderStep = function(_self: any, name: string, _priority: number, fn: (dt: number) -> ())
 				renderSteps[name] = fn
 			end,
@@ -338,6 +414,22 @@ function FakeEngine.install()
 	env.CFrame = roblox.CFrame
 	env.Vector2 = roblox.Vector2
 	env.UDim2 = roblox.UDim2
+	env.UDim = roblox.UDim
+	-- task: spawn and defer run at once; delay is kept for the test to run (runDelayed), never timed
+	env.task = {
+		spawn = function(fn: (...any) -> (), ...: any)
+			fn(...)
+		end,
+		defer = function(fn: (...any) -> (), ...: any)
+			fn(...)
+		end,
+		delay = function(_seconds: number, fn: () -> ())
+			table.insert(delayed, fn)
+		end,
+		wait = function(): number
+			return 0
+		end,
+	}
 	env.Color3 = roblox.Color3
 	env.Enum = roblox.Enum
 	env.Instance = { new = FakeEngine.new }
@@ -371,6 +463,7 @@ function FakeEngine.uninstall()
 	fakeWorkspace = nil
 	fakeUis = nil
 	renderStepped = nil
+	delayed = {}
 end
 
 -- with: run fn with the engine globals in place; they are always taken away again, even if fn throws.
