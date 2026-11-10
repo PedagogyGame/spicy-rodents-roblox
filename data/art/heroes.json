@@ -4,10 +4,10 @@
     "squirrel": {
       "rig": "squirrel",
       "model": {
-        "assetId": "125654770584412",
+        "assetId": "116513654149636",
         "moderation": "Approved",
-        "fbxBytes": 3864940,
-        "sha": "72cc1b10e456fed0"
+        "fbxBytes": 3804428,
+        "sha": "3ca6854a99c2668a"
       },
       "bones": 35,
       "bonesMatchRigSpec": true,
@@ -34,20 +34,20 @@
         }
       },
       "tris": {
-        "total": 12732,
-        "Body": 7267,
-        "Pattern": 425,
+        "total": 12796,
+        "Body": 7827,
+        "Pattern": 25,
         "Eyes": 448,
-        "FurCards": 4592
+        "FurCards": 4496
       },
       "regions": {
         "Body": {
-          "tris": 7267,
+          "tris": 7827,
           "alphaMode": "TintMask",
           "tint": "#c27442"
         },
         "Pattern": {
-          "tris": 425,
+          "tris": 25,
           "alphaMode": "TintMask",
           "tint": "#f5d8ac"
         },
@@ -56,7 +56,7 @@
           "alphaMode": "Overlay"
         },
         "FurCards": {
-          "tris": 4592,
+          "tris": 4496,
           "alphaMode": "Transparency",
           "tint": "#c27442"
         }
@@ -98,7 +98,7 @@
       "hipHeight": 0.9,
       "clips": {
         "Idle": {
-          "assetId": "105503374404579",
+          "assetId": "114052541887620",
           "moderation": "Approved",
           "brief": "idle",
           "duration": 3.0,
@@ -107,29 +107,29 @@
           "poseCount": 36,
           "nominalSpeed": null,
           "markers": [],
-          "rbxmBytes": 74606
+          "rbxmBytes": 77413
         },
         "Walk": {
-          "assetId": "116913388697883",
+          "assetId": "100972548402656",
           "moderation": "Approved",
           "brief": "walk",
           "duration": 0.8,
           "loop": true,
           "keyframes": 25,
           "poseCount": 36,
-          "nominalSpeed": 0.4125,
+          "nominalSpeed": 0.69,
           "markers": [],
-          "rbxmBytes": 20566
+          "rbxmBytes": 21168
         },
         "Run": {
-          "assetId": "139575297291535",
+          "assetId": "75567975955833",
           "moderation": "Approved",
           "brief": "run",
           "duration": 0.466667,
           "loop": true,
           "keyframes": 15,
           "poseCount": 36,
-          "nominalSpeed": 3.43,
+          "nominalSpeed": 4.57,
           "markers": [
             {
               "time": 0.0,
@@ -137,34 +137,34 @@
               "value": "stride"
             }
           ],
-          "rbxmBytes": 14035
+          "rbxmBytes": 14181
         },
         "Climb": {
-          "assetId": "71499561784767",
+          "assetId": "106748373386847",
           "moderation": "Approved",
           "brief": "climb",
           "duration": 0.6,
           "loop": true,
           "keyframes": 19,
           "poseCount": 36,
-          "nominalSpeed": 1.5,
+          "nominalSpeed": 1.33,
           "markers": [],
-          "rbxmBytes": 17946
+          "rbxmBytes": 17973
         },
         "Wire": {
-          "assetId": "73868896883976",
+          "assetId": "112948511637029",
           "moderation": "Approved",
           "brief": "wire traversal",
           "duration": 1.0,
           "loop": true,
           "keyframes": 31,
           "poseCount": 36,
-          "nominalSpeed": 0.55,
+          "nominalSpeed": 1.02,
           "markers": [],
-          "rbxmBytes": 25671
+          "rbxmBytes": 26151
         },
         "Leap": {
-          "assetId": "133390368063518",
+          "assetId": "86002579743514",
           "moderation": "Approved",
           "brief": "leap",
           "duration": 0.766667,
@@ -184,10 +184,10 @@
               "value": "land"
             }
           ],
-          "rbxmBytes": 23962
+          "rbxmBytes": 24191
         },
         "Pounce": {
-          "assetId": "99761231177400",
+          "assetId": "106395010025022",
           "moderation": "Approved",
           "brief": "pounce",
           "duration": 0.966667,
@@ -207,10 +207,10 @@
               "value": "land"
             }
           ],
-          "rbxmBytes": 30085
+          "rbxmBytes": 30439
         },
         "Bite": {
-          "assetId": "75926607099862",
+          "assetId": "107543483770582",
           "moderation": "Approved",
           "brief": "bite dance",
           "duration": 2.066667,
@@ -219,19 +219,19 @@
           "poseCount": 36,
           "nominalSpeed": null,
           "markers": [],
-          "rbxmBytes": 64405
+          "rbxmBytes": 65560
         },
         "Stalk": {
-          "assetId": "95165052119916",
+          "assetId": "107478850422829",
           "moderation": "Approved",
           "brief": "sneak (stalk)",
           "duration": 1.2,
           "loop": true,
           "keyframes": 37,
           "poseCount": 36,
-          "nominalSpeed": 0.19,
+          "nominalSpeed": 0.26,
           "markers": [],
-          "rbxmBytes": 28475
+          "rbxmBytes": 28454
         }
       },
       "clipsShared": false
@@ -239,10 +239,10 @@
     "rodent": {
       "rig": "squirrel",
       "model": {
-        "assetId": "86042493224567",
+        "assetId": "138576770823082",
         "moderation": "Approved",
-        "fbxBytes": 3904844,
-        "sha": "50fe9e3e1b3c1f1e"
+        "fbxBytes": 3912428,
+        "sha": "9d417882b825dc56"
       },
       "bones": 35,
       "bonesMatchRigSpec": true,
@@ -268,29 +268,29 @@
           "rootWeighted": false
         },
         "Blood": {
-          "maxInfluences": 3,
+          "maxInfluences": 2,
           "unweighted": 0,
           "rootWeighted": false
         }
       },
       "tris": {
-        "total": 10498,
-        "Body": 7222,
-        "Pattern": 470,
+        "total": 10052,
+        "Body": 7805,
+        "Pattern": 47,
         "Eyes": 448,
-        "FurCards": 1844,
-        "Blood": 514
+        "FurCards": 1716,
+        "Blood": 36
       },
       "regions": {
         "Body": {
-          "tris": 7222,
+          "tris": 7805,
           "alphaMode": "TintMask",
-          "tint": "#7d5d46"
+          "tint": "#663d2c"
         },
         "Pattern": {
-          "tris": 470,
+          "tris": 47,
           "alphaMode": "TintMask",
-          "tint": "#a08a74"
+          "tint": "#987559"
         },
         "Eyes": {
           "tris": 448,
@@ -302,12 +302,12 @@
           }
         },
         "FurCards": {
-          "tris": 1844,
+          "tris": 1716,
           "alphaMode": "Transparency",
-          "tint": "#7d5d46"
+          "tint": "#663d2c"
         },
         "Blood": {
-          "tris": 514,
+          "tris": 36,
           "alphaMode": "Transparency"
         }
       },
@@ -348,7 +348,7 @@
       "hipHeight": 0.9,
       "clips": {
         "Idle": {
-          "assetId": "105503374404579",
+          "assetId": "114052541887620",
           "moderation": "Approved",
           "brief": "idle",
           "duration": 3.0,
@@ -357,29 +357,29 @@
           "poseCount": 36,
           "nominalSpeed": null,
           "markers": [],
-          "rbxmBytes": 74606
+          "rbxmBytes": 77413
         },
         "Walk": {
-          "assetId": "116913388697883",
+          "assetId": "100972548402656",
           "moderation": "Approved",
           "brief": "walk",
           "duration": 0.8,
           "loop": true,
           "keyframes": 25,
           "poseCount": 36,
-          "nominalSpeed": 0.4125,
+          "nominalSpeed": 0.69,
           "markers": [],
-          "rbxmBytes": 20566
+          "rbxmBytes": 21168
         },
         "Run": {
-          "assetId": "139575297291535",
+          "assetId": "75567975955833",
           "moderation": "Approved",
           "brief": "run",
           "duration": 0.466667,
           "loop": true,
           "keyframes": 15,
           "poseCount": 36,
-          "nominalSpeed": 3.43,
+          "nominalSpeed": 4.57,
           "markers": [
             {
               "time": 0.0,
@@ -387,34 +387,34 @@
               "value": "stride"
             }
           ],
-          "rbxmBytes": 14035
+          "rbxmBytes": 14181
         },
         "Climb": {
-          "assetId": "71499561784767",
+          "assetId": "106748373386847",
           "moderation": "Approved",
           "brief": "climb",
           "duration": 0.6,
           "loop": true,
           "keyframes": 19,
           "poseCount": 36,
-          "nominalSpeed": 1.5,
+          "nominalSpeed": 1.33,
           "markers": [],
-          "rbxmBytes": 17946
+          "rbxmBytes": 17973
         },
         "Wire": {
-          "assetId": "73868896883976",
+          "assetId": "112948511637029",
           "moderation": "Approved",
           "brief": "wire traversal",
           "duration": 1.0,
           "loop": true,
           "keyframes": 31,
           "poseCount": 36,
-          "nominalSpeed": 0.55,
+          "nominalSpeed": 1.02,
           "markers": [],
-          "rbxmBytes": 25671
+          "rbxmBytes": 26151
         },
         "Leap": {
-          "assetId": "133390368063518",
+          "assetId": "86002579743514",
           "moderation": "Approved",
           "brief": "leap",
           "duration": 0.766667,
@@ -434,10 +434,10 @@
               "value": "land"
             }
           ],
-          "rbxmBytes": 23962
+          "rbxmBytes": 24191
         },
         "Pounce": {
-          "assetId": "99761231177400",
+          "assetId": "106395010025022",
           "moderation": "Approved",
           "brief": "pounce",
           "duration": 0.966667,
@@ -457,10 +457,10 @@
               "value": "land"
             }
           ],
-          "rbxmBytes": 30085
+          "rbxmBytes": 30439
         },
         "Bite": {
-          "assetId": "75926607099862",
+          "assetId": "107543483770582",
           "moderation": "Approved",
           "brief": "bite dance",
           "duration": 2.066667,
@@ -469,19 +469,19 @@
           "poseCount": 36,
           "nominalSpeed": null,
           "markers": [],
-          "rbxmBytes": 64405
+          "rbxmBytes": 65560
         },
         "Stalk": {
-          "assetId": "95165052119916",
+          "assetId": "107478850422829",
           "moderation": "Approved",
           "brief": "sneak (stalk)",
           "duration": 1.2,
           "loop": true,
           "keyframes": 37,
           "poseCount": 36,
-          "nominalSpeed": 0.19,
+          "nominalSpeed": 0.26,
           "markers": [],
-          "rbxmBytes": 28475
+          "rbxmBytes": 28454
         }
       },
       "clipsShared": true
@@ -963,7 +963,7 @@
       "scale": 1.1
     }
   },
-  "generated": "2026-11-09T20:44:28Z",
+  "generated": "2026-11-10T23:24:59Z",
   "notes": [
     "Models: Open Cloud Model uploads of the FBX (tools/blender/heroes). InsertService:LoadAsset gives a Model with a Part named RootPart (transparent, at the origin = the ground under the body centre) carrying the Bone tree (Root > Hips > ...), one skinned MeshPart per region joined to RootPart by a Motor6D, and an AnimationController.",
     "Every Bone arrives with an identity rest rotation, so the clips (spicy-clip/1: Pose.CFrame = local delta in an axis-aligned joint frame) play unchanged on these rigs and on the part-built puppets.",
