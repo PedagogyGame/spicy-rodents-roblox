@@ -39,6 +39,10 @@ export type World = Motion.World & {
 	groundAt: (x: number, z: number, refY: number) -> number,
 	-- optional wall test: true when a body of the squirrel radius at (x, z, y) overlaps a collider
 	blocked: ((x: number, z: number, y: number) -> boolean)?,
+	-- optional narrower wall test (the body's core). A body that starts a step already inside `blocked`
+	-- (it let go of a downspout on a wall, landed against one) moves by this one until it is clear, so
+	-- it can come away from the wall but never pass through it.
+	blockedCore: ((x: number, z: number, y: number) -> boolean)?,
 	-- optional world clamp (studs); defaults to the v5.4 rectangle
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number }?,
 	-- optional segment test for validators: does the straight move (x0,z0)->(x1,z1) at height y cross
@@ -105,6 +109,7 @@ export type State = {
 	stamina: number, -- sprint meter, 0..1 (the client's own feel; the server only caps speed)
 	winded: boolean, -- the meter ran out: no sprint until sprintRecover of it is back
 	tireless: boolean?, -- the meter never drains (AI bodies, a later item, tests that replay v5.4 runs)
+	railLeap: boolean?, -- in the air from a leap off a rail: it carries as far as v5.4's did
 }
 
 export type Event = { kind: string, routeId: number?, fromRouteId: number?, reason: string? }
@@ -124,13 +129,17 @@ SquirrelMotor.params = {
 	walk = st(7.2),
 	sprint = st(13.2),
 	-- sprint bursts: a full meter is sprintSeconds of sprinting; it refills in sprintRefill seconds of
-	-- not sprinting; once empty ("winded") sprint is off until sprintRecover of the meter is back. A
-	-- leap from the ground costs leapCost, and a winded one goes forward at leapForwardWinded.
+	-- not sprinting, on the ground or on a rail (never in the air, or a hop would pay for itself); once
+	-- empty ("winded") sprint is off until sprintRecover of the meter is back. A leap from the ground
+	-- costs leapCost and a pounce from the ground pounceCost; winded, neither carries faster than a
+	-- walk, so hopping or pounce-chaining is never a way round the meter (review 2026-11-10: chained
+	-- pounces held 28 st/s for ever, hops 24 st/s for half a minute). Off a rail both are free and full.
 	sprintSeconds = 4,
 	sprintRefill = 9,
 	sprintRecover = 0.35,
 	leapCost = 0.12,
-	leapForwardWinded = st(9.5),
+	pounceCost = 0.25,
+	leapForwardWinded = st(7.2),
 	stalk = st(1.65),
 	boostMult = 1.6,
 	treeTravelMult = 0.6,
@@ -245,6 +254,7 @@ function SquirrelMotor.place(state: State, x: number, y: number, z: number, grou
 	state.committedAirborne = false
 	state.cameraCommit = 0
 	state.attackWindow = 0
+	state.railLeap = false
 end
 
 function SquirrelMotor.idleInput(cameraYaw: number?): Input
@@ -471,6 +481,7 @@ local function enterRoute(state: State, world: World, spec: Motion.EnterSpec, in
 	state.vx, state.vy, state.vz = 0, 0, 0
 	state.grounded = false
 	state.committedAirborne = false
+	state.railLeap = false
 	push(events, if wasOnRoute then "transfer" else "attach", target.id, fromRouteId)
 	return true
 end
@@ -536,6 +547,7 @@ local function doLeap(state: State, world: World, events: { Event })
 		state.routeId = nil
 		state.grounded = false
 		commitToAir(state, heading)
+		state.railLeap = from ~= nil
 		push(events, "leap", nil, from)
 	end
 end
@@ -562,6 +574,20 @@ local function doPounce(state: State, world: World, input: Input, events: { Even
 	local vx, vy, vz =
 		SquirrelMotor.pounceVelocity(input.cameraPitch, state.focus, state.moveSpeed, state.boostRemaining > 0, heading)
 	local from = state.routeId
+	state.railLeap = false
+	if from == nil and not state.tireless then
+		-- a pounce off the ground spends the sprint meter; a winded one lunges no faster than a walk
+		local tired = state.winded
+		state.stamina = math.max(0, state.stamina - P.pounceCost)
+		if state.stamina == 0 and not state.winded then
+			state.winded = true
+			push(events, "winded")
+		end
+		local h = math.sqrt(vx * vx + vz * vz)
+		if tired and h > P.walk then
+			vx, vz = vx * P.walk / h, vz * P.walk / h
+		end
+	end
 	state.cooldown = P.pounceCooldown
 	state.attack = P.pounceAttack
 	state.attackWindow = P.pounceWindow
@@ -692,6 +718,10 @@ local function resolveWalls(state: State, world: World, oldX: number, oldZ: numb
 	local sx, sz = dx / steps, dz / steps
 	local x, z = oldX, oldZ
 	local y = state.y
+	local core = world.blockedCore
+	if core and blocked(oldX, oldZ, y) then
+		blocked = core
+	end
 	local bx, bz = false, false
 	for _ = 1, steps do
 		local px, pz = x, z
@@ -750,7 +780,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 			sprint = false
 			push(events, "winded")
 		end
-	else
+	elseif rail ~= nil or state.grounded then
 		state.stamina = math.min(1, state.stamina + dt / P.sprintRefill)
 		if state.winded and state.stamina >= P.sprintRecover then
 			state.winded = false
@@ -867,8 +897,16 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 				dx, dz = dx / l, dz / l
 			end
 			local a = 1 - math.exp(-dt * (if state.grounded then P.accelGround else P.accelAir))
-			state.vx += (dx * state.moveSpeed - state.vx) * a
-			state.vz += (dz * state.moveSpeed - state.vz) * a
+			-- a leap off a rail steers toward v5.4's own speeds whatever the meter says: the gaps between
+			-- branches, wires and roofs were built for that carry, and the slower ground speeds would
+			-- have cut it by a sixth (by two fifths when winded)
+			local steer = state.moveSpeed
+			if state.railLeap and not state.grounded then
+				local v54 = if input.sprint then SquirrelMotor.V54.sprint else SquirrelMotor.V54.walk
+				steer = math.max(steer, v54 * (if state.boostRemaining > 0 then P.boostMult else 1))
+			end
+			state.vx += (dx * steer - state.vx) * a
+			state.vz += (dz * steer - state.vz) * a
 			state.yaw = Motion.turnToward(
 				state.yaw,
 				math.atan2(dx, dz),
@@ -900,6 +938,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 				push(events, "land")
 			end
 			state.grounded = true
+			state.railLeap = false
 			if state.committedAirborne then
 				state.committedAirborne = false
 				state.cameraCommit = math.max(state.cameraCommit, P.cameraCommitLand)

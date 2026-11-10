@@ -41,7 +41,9 @@ function Quadruped.start(
 	state.vx, state.vz = snap.vx or 0, snap.vz or 0
 	local holdUntil = os.clock() + (payload.holdSeconds or 0.75)
 	local holding = math.abs(state.vx) + math.abs(state.vz) > 0.1
-	local motorWorld = { groundAt = world.groundAt, blocked = world.blocked, clamp = world.clamp }
+	-- the narrow wall probe: QuadrupedMotor reverts a blocked move outright, so a body handed over
+	-- beside a wall must not start inside its own probe (the squirrel's wider box has a way out)
+	local motorWorld = { groundAt = world.groundAt, blocked = world.blockedCore, clamp = world.clamp }
 	local inputAt: number? = nil
 	return BodyDriver.drive(root, function(dt: number)
 		local f = input:sample(BodyDriver.cameraYawHtml())

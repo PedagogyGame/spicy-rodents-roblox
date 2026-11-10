@@ -883,6 +883,147 @@ return function(t)
 		t.eq(s.grounded, true)
 	end)
 
+	-- Owner 2026-11-10: "be sure that the mouse is controlling the camera view and that there is an
+	-- inversion toggle for that look".
+	t.test("mouse look: the mouse turns the view, up/down can be inverted, the camera stays behind the look", function()
+		local L = CameraRig.LOOK
+		-- mouse right turns the view right: the Roblox heading falls
+		local yaw, elev = CameraRig.lookStep(1, 0.3, 0.2, 0, false)
+		t.near(yaw, 0.8, 1e-9)
+		t.eq(elev, 0.3)
+		-- mouse up (screen dy < 0) looks up: the camera drops behind the body
+		local _, up = CameraRig.lookStep(1, 0.3, 0, -0.1, false)
+		t.near(up, 0.2, 1e-9)
+		-- inverted: the same push looks down, and left/right is unchanged
+		local yawI, upI = CameraRig.lookStep(1, 0.3, 0.2, -0.1, true)
+		t.near(upI, 0.4, 1e-9)
+		t.near(yawI, 0.8, 1e-9)
+		-- the look never flips over the top or under the bottom, and the heading wraps
+		local _, top = CameraRig.lookStep(0, 1.3, 0, 5, false)
+		t.eq(top, L.elevMax)
+		local _, bottom = CameraRig.lookStep(0, -1, 0, -5, false)
+		t.eq(bottom, L.elevMin)
+		local wrapped = CameraRig.lookStep(0.1, 0, 0.3, 0, false)
+		t.near(wrapped, 2 * math.pi - 0.2, 1e-9)
+		-- the camera sits opposite the look direction: heading 0 looks along -z, so the camera is at +z
+		local x, y, z = CameraRig.orbitOffset(0, 0, 10)
+		t.near(x, 0, 1e-9)
+		t.near(y, 0, 1e-9)
+		t.near(z, 10, 1e-9)
+		local x2, y2, z2 = CameraRig.orbitOffset(math.pi / 2, 0.5, 10)
+		t.near(math.sqrt(x2 * x2 + y2 * y2 + z2 * z2), 10, 1e-9)
+		t.near(y2, 10 * math.sin(0.5), 1e-9)
+		t.truthy(x2 > 8 and math.abs(z2) < 1e-6)
+		-- the motor's camera yaw reads the same heading back from that view (forward is away from the camera)
+		local fx, fz = Motion.cameraForwardXZ(math.atan2(x2, z2))
+		t.near(fx, -1, 1e-6)
+		t.near(fz, 0, 1e-6)
+		-- the wheel zooms in toward the body and stops at the limits
+		t.near(CameraRig.zoomStep(10, 1, 2, 24), 10 * L.zoom, 1e-9)
+		t.near(CameraRig.zoomStep(10, -1, 2, 24), 10 / L.zoom, 1e-9)
+		t.eq(CameraRig.zoomStep(2.1, 5, 2, 24), 2)
+		t.eq(CameraRig.zoomStep(23, -5, 2, 24), 24)
+		-- the toggle
+		t.eq(CameraRig.inverted(), false, "normal until the player presses I")
+		CameraRig.setInverted(true)
+		t.eq(CameraRig.inverted(), true)
+		CameraRig.setInverted(false)
+		-- what the camera comes in front of: walls and trunks, not bough cylinders, glass-less trim or leaves
+		t.eq(CameraRig.occludes("Body", "west_old_house_0", 0, true), true)
+		t.eq(CameraRig.occludes("Trunk", "Tree_220", 1, true), true)
+		t.eq(CameraRig.occludes("R221_4", "Tree_220", 1, true), false)
+		t.eq(CameraRig.occludes("LeavesSun", "Tree_220", 0, false), false)
+		t.eq(CameraRig.occludes("Plinth", "west_old_house_0", 0, false), false)
+		t.eq(CameraRig.occludes("Hidden", "x", 1, true), false)
+		-- the help panel says so for every body on foot, not in a vehicle
+		local PlayMenu = require("@client/UI/PlayMenu")
+		for _, role in { "rodent", "squirrel", "townsperson", "police" } do
+			local text = table.concat(PlayMenu.helpLines(role), "\n")
+			t.truthy(string.find(text, "Mouse  look around", 1, true) ~= nil, role)
+			t.truthy(string.find(text, "I  invert look", 1, true) ~= nil, role)
+		end
+		t.truthy(string.find(table.concat(PlayMenu.helpLines("police", "vehicle"), "\n"), "invert", 1, true) == nil)
+	end)
+
+	-- Owner 2026-11-10: "make sure squirrel cannot run through houses, double check that".
+	t.test("a house wall stops the whole body, at a run, a sprint, a leap and a pounce; never a way through", function()
+		-- a wall face at x = 5, as the client world reports it: the body's box, and its narrow core
+		local WALL = 5
+		local half, core = ClientWorld.BODY_HALF, ClientWorld.PROBE_RADIUS
+		t.truthy(half >= 0.8, "at least v5.4's 0.32 u collision radius")
+		local _, sx, sy, sz = ClientWorld.bodyProbe(0)
+		t.eq(sx, half * 2)
+		t.eq(sz, half * 2)
+		t.near(sy, ClientWorld.BODY_TOP - ClientWorld.STEP, 1e-9)
+		local function walled(): any
+			local w: any = open(function(_x: number, _z: number, _refY: number): number
+				return 0
+			end)
+			w.blocked = function(x: number, _z: number, _y: number): boolean
+				return x + half > WALL
+			end
+			w.blockedCore = function(x: number, _z: number, _y: number): boolean
+				return x + core > WALL
+			end
+			return w
+		end
+		for _, how in { "walk", "sprint", "leap", "pounce", "diagonal" } do
+			for _, pattern in { "60", "30", "uneven" } do
+				local w = walled()
+				local s = SquirrelMotor.new(-20, 0, 0)
+				s.tireless = true
+				local inp = input(-math.pi / 2) -- forward = +x, into the wall
+				inp.fw = 1
+				inp.sprint = how ~= "walk"
+				inp.side = if how == "diagonal" then 1 else 0
+				local z0 = s.z
+				for i = 1, 240 do
+					inp.leap = how == "leap" and i % 40 == 0
+					inp.pounce = how == "pounce" and i % 45 == 0
+					SquirrelMotor.step(s, inp, frameDt(pattern, i), w)
+					t.truthy(
+						s.x + half <= WALL + 1e-6,
+						`{how} at {pattern}: the body is in the wall at frame {i} (x = {s.x})`
+					)
+				end
+				t.truthy(s.x > WALL - half - 0.7, `{how} at {pattern}: it reaches the wall (x = {s.x})`)
+				if how == "diagonal" then
+					t.truthy(math.abs(s.z - z0) > 20, "and slides along it")
+				end
+			end
+		end
+		-- let go of a downspout on the wall: the body starts inside its own box. It can come away and
+		-- move along the wall, and pushing on never takes it through
+		local w = walled()
+		local s = SquirrelMotor.new(WALL - 0.5, 0, 0)
+		local inp = input(-math.pi / 2)
+		inp.fw = 1
+		inp.sprint = true
+		s.tireless = true
+		for _ = 1, 120 do
+			SquirrelMotor.step(s, inp, 1 / 60, w)
+			t.truthy(s.x + core <= WALL + 1e-6, `pushed on from the downspout: x = {s.x}`)
+		end
+		inp.fw = -1
+		for _ = 1, 60 do
+			SquirrelMotor.step(s, inp, 1 / 60, w)
+		end
+		t.truthy(s.x < WALL - half - 5, `it comes away from the wall (x = {s.x})`)
+		inp.fw = 1
+		for _ = 1, 120 do
+			SquirrelMotor.step(s, inp, 1 / 60, w)
+			t.truthy(s.x + half <= WALL + 1e-6, "and once clear the whole body stops at it again")
+		end
+		-- bough cylinders are not walls; a house body, a trunk and a fence are
+		t.eq(ClientWorld.isBough("R221_4", "Tree_220"), true)
+		t.eq(ClientWorld.isBough("R7", "Tree_3"), true)
+		t.eq(ClientWorld.isBough("Trunk", "Tree_220"), false)
+		t.eq(ClientWorld.isBough("Body", "west_old_house_0"), false)
+		t.eq(ClientWorld.isBough("Rail_2", "north_footbridge"), false)
+		t.eq(ClientWorld.isBough("RoofA", "west_old_house_0"), false)
+		t.eq(ClientWorld.isBough("R221_4", "west_old_house_0"), false)
+	end)
+
 	-- Owner 2026-11-10: "the squirrel turns too abruptly, make turning more smooth and agile".
 	t.test("a quarter turn swings through in about a fifth of a second; the keys answer as fast as before", function()
 		local w = open(function(_x: number, _z: number, _refY: number): number

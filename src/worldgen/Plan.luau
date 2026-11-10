@@ -320,8 +320,9 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 end
 
 -- A stone foundation under buildings and structures on a slope (review 2026-11-09: nothing floats):
--- from the lowest terrain under the footprint up to the seat, visual only (no collision, so the
--- overlap, door and route checks see the same massing). Lots on harvested absolute seats in the air
+-- from the lowest terrain under the footprint up to the seat. It is solid (owner 2026-11-10: "make sure
+-- squirrel cannot run through houses"): on the downhill side the foundation stands taller than a body,
+-- and without collision an animal walked in under the house through it. Lots on harvested absolute seats in the air
 -- (bridge towers) and the treehouse are skipped.
 local FOUNDATION = { 150, 144, 132 }
 function Plan.foundation(lot: Lot, kit: Kits.Kit, seat: number, list: Spec.PartList)
@@ -349,7 +350,7 @@ function Plan.foundation(lot: Lot, kit: Kits.Kit, seat: number, list: Spec.PartL
 			sz = z1 - z0 + 0.3,
 			color = FOUNDATION,
 			material = "Concrete",
-			canCollide = false,
+			canCollide = true,
 			transparency = 0,
 			castShadow = false,
 			role = "Trim",

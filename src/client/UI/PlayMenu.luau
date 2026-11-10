@@ -106,6 +106,10 @@ function PlayMenu.helpLines(role: string?, device: string?): { string }
 	else
 		lines = { "Pick who to play from the menu" }
 	end
+	if role ~= nil and device == nil then
+		table.insert(lines, "Mouse  look around   ·   wheel  zoom")
+		table.insert(lines, "I  invert look up/down   ·   Alt  free the cursor")
+	end
 	table.insert(lines, "M  menu   ·   Esc > Reset  if you get stuck")
 	return lines
 end

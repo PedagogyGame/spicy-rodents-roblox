@@ -2,21 +2,30 @@
 -- StarterPlayer.StarterPlayerScripts.Client.Camera.CameraRig
 -- Per-mode camera rigs from Camera/CameraPolicy (BUILD_PLAN §1.4 Camera/CameraRig, §4.4 #5; brief v2
 -- §14). Modes:
---   humanThird / humanFirst  the default Roblox camera on the Humanoid; first person through
+--   humanThird / animalThird the orbit camera below (on a touch-only device: the default follow camera)
+--   humanFirst               the default Roblox camera on the Humanoid in first person through
 --                            Player.CameraMode = LockFirstPerson (the V toggle flips it)
 --   lockFirst                LockFirstPerson with the toggle refused (arena, lounges)
---   animalThird              the default follow camera on the body's Head (else PrimaryPart), zoom
---                            limits sized to the body (the subject is set from a LocalScript because
---                            the engine only auto-assigns Humanoid subjects)
 --   chaseLock                scriptable: behind the body along its facing, looking forward
 --   tunnelChase              scriptable: low behind a squirrel in the bowling alley's ball-return tunnel
 --   vehicleFirst             scriptable at the vehicle's EyeSocket; mouse/right-stick look within
 --                            +/-110 degrees of the nose; vehicleThird follows the vehicle root
 --   drone                    the follow camera on the drone root
 --   overview / outbreak      a parked scriptable shot
+-- The orbit camera (owner 2026-11-10: "be sure that the mouse is controlling the camera view and that
+-- there is an inversion toggle for that look"): on foot the mouse IS the look. The cursor is locked to
+-- the centre and moving the mouse turns the view, with no button held; the wheel zooms; the right stick
+-- of a gamepad does the same; I flips up/down (CameraRig.notify says which way it now is, and the choice
+-- lasts the session). The camera sits behind the smoothed focus point, comes in front of anything solid
+-- between it and the body, and eases back out. The cursor is free while a menu is open (wantCursor), the
+-- Roblox menu is open, a text box has focus, or Left Alt is held.
 -- Interface: apply(decision, targets) where targets = { body?, vehicle?, drone? }; follow(body);
---   overview(position, lookAt); subjectOf(body); stop();
---   focusStep(px, py, pz, tx, ty, tz, dt, lx?, ly?, lz?) -> x, y, z (pure); FOCUS
+--   orbit(body, human); overview(position, lookAt); subjectOf(body); stop();
+--   focusStep(px, py, pz, tx, ty, tz, dt, lx?, ly?, lz?) -> x, y, z (pure); FOCUS;
+--   LOOK; lookStep(yaw, elev, dx, dy, invert) -> yaw, elev (pure); orbitOffset(yaw, elev, dist) ->
+--   x, y, z (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
+--   transparency, canCollide) -> boolean (pure); inverted() -> boolean; setInverted(on);
+--   wantCursor(key, on); notify: ((text) -> ())?
 -- No side effects on require (services are looked up inside the functions).
 
 local CameraRig = {}
@@ -176,6 +185,200 @@ function CameraRig.follow(body: Model)
 	end)
 end
 
+CameraRig.LOOK = {
+	sens = 0.0045, -- radians per pixel of mouse travel at Roblox's default mouse sensitivity
+	stick = 2.8, -- radians per second at full right-stick deflection
+	elevMin = -1.2, -- the camera below the body, looking up (under a branch)
+	elevMax = 1.35, -- nearly overhead
+	zoom = 0.88, -- distance multiplier per wheel notch toward the body
+	easeOut = 7, -- 1/s: how fast the camera backs out again after something pushed it in
+	pad = 0.35, -- studs kept between the camera and what it came in front of
+	nearest = 0.8, -- studs: never nearer the focus than this
+}
+
+local invertLook = false
+CameraRig.notify = nil :: ((text: string) -> ())?
+local cursorWanted: { [string]: boolean } = {}
+
+function CameraRig.inverted(): boolean
+	return invertLook
+end
+
+function CameraRig.setInverted(on: boolean)
+	invertLook = on
+end
+
+-- A menu or panel that needs the cursor says so here (and takes it back with on = false).
+function CameraRig.wantCursor(key: string, on: boolean)
+	cursorWanted[key] = if on then true else nil
+end
+
+-- One look input applied: dx, dy in radians (mouse right and mouse DOWN positive, as the screen has
+-- them). The view turns right for dx > 0. Up/down: by default pushing the mouse up looks up (the camera
+-- drops behind the body); inverted, pushing up looks down. `elev` is the camera's elevation over the
+-- focus (positive: above it, looking down).
+function CameraRig.lookStep(yaw: number, elev: number, dx: number, dy: number, invert: boolean): (number, number)
+	local L = CameraRig.LOOK
+	local nextYaw = (yaw - dx) % (2 * math.pi)
+	local nextElev = math.clamp(elev + (if invert then -dy else dy), L.elevMin, L.elevMax)
+	return nextYaw, nextElev
+end
+
+-- Where the camera sits relative to the focus for a view heading `yaw` (Roblox: look = (-sin, 0, -cos))
+-- at elevation `elev` and distance `dist`.
+function CameraRig.orbitOffset(yaw: number, elev: number, dist: number): (number, number, number)
+	local c = math.cos(elev)
+	return math.sin(yaw) * c * dist, math.sin(elev) * dist, math.cos(yaw) * c * dist
+end
+
+function CameraRig.zoomStep(dist: number, wheel: number, min: number, max: number): number
+	return math.clamp(dist * CameraRig.LOOK.zoom ^ wheel, min, max)
+end
+
+-- Does this part hide the body from the camera? Solid things do. The invisible cylinders that give tree
+-- boughs their collision do not (a camera that jumped in at every twig would be unusable in a canopy),
+-- nor does anything else invisible except a tree's trunk collider, which stands where the drawn trunk is.
+function CameraRig.occludes(name: string, parentName: string, transparency: number, canCollide: boolean): boolean
+	if not canCollide then
+		return false
+	end
+	if string.match(name, "^R%d") ~= nil and string.sub(parentName, 1, 5) == "Tree_" then
+		return false
+	end
+	return transparency < 0.9 or name == "Trunk"
+end
+
+-- The orbit state survives a re-apply for the same body (a zone change, the V toggle and back).
+local orbitBody: Model? = nil
+local orbitYaw, orbitElev, orbitDist = 0, 0.3, 12
+
+function CameraRig.orbit(body: Model, human: boolean)
+	unbind()
+	local root = body.PrimaryPart
+	if root == nil then
+		CameraRig.follow(body)
+		return
+	end
+	local rootPart = root :: BasePart
+	local UIS = game:GetService("UserInputService")
+	local GuiService = game:GetService("GuiService")
+	local camera = workspace.CurrentCamera
+	local L = CameraRig.LOOK
+	local _, size = body:GetBoundingBox()
+	local biggest = math.max(size.X, size.Y, size.Z)
+	local lift = if human then math.max(1.5, size.Y * 0.3) else math.max(0.6, size.Y * 0.6)
+	local minDist = if human then 4 else math.max(2, biggest * 1.5)
+	local maxDist = if human then 40 else math.max(24, biggest * 10)
+	if orbitBody ~= body then
+		orbitBody = body
+		local look = rootPart.CFrame.LookVector
+		orbitYaw = math.atan2(-look.X, -look.Z) -- behind the body
+		orbitElev = 0.3
+		orbitDist = math.clamp(if human then 12.5 else biggest * 4, math.max(minDist, 8), 16)
+	end
+	local sensitivity = 1
+	pcall(function()
+		sensitivity = (UserSettings():GetService("UserGameSettings") :: any).MouseSensitivity
+	end)
+	local rays = RaycastParams.new()
+	rays.FilterType = Enum.RaycastFilterType.Exclude
+	rays.RespectCanCollide = true
+	local ignore: { Instance } = { body, camera }
+	local bodies = body.Parent
+	if bodies and bodies ~= workspace then
+		table.insert(ignore, bodies) -- other animals and people never push the camera in
+	end
+	rays.FilterDescendantsInstances = ignore
+	local pos = rootPart.Position + Vector3.new(0, lift, 0)
+	local last = pos
+	local shown = orbitDist
+	camera.CameraType = Enum.CameraType.Scriptable
+	local wheel = UIS.InputChanged:Connect(function(input: InputObject, processed: boolean)
+		if input.UserInputType == Enum.UserInputType.MouseWheel and not processed then
+			orbitDist = CameraRig.zoomStep(orbitDist, input.Position.Z, minDist, maxDist)
+		end
+	end)
+	local keys = UIS.InputBegan:Connect(function(input: InputObject, processed: boolean)
+		if input.KeyCode == Enum.KeyCode.I and not processed and UIS:GetFocusedTextBox() == nil then
+			invertLook = not invertLook
+			local say = CameraRig.notify
+			if say then
+				say(
+					if invertLook
+						then "Camera look: inverted (I switches back)"
+						else "Camera look: normal (I inverts up/down)"
+				)
+			end
+		end
+	end)
+	bind(function(dt: number)
+		if rootPart.Parent == nil then
+			return
+		end
+		local free = GuiService.MenuIsOpen
+			or UIS:GetFocusedTextBox() ~= nil
+			or UIS:IsKeyDown(Enum.KeyCode.LeftAlt)
+			or next(cursorWanted) ~= nil
+		if free then
+			UIS.MouseBehavior = Enum.MouseBehavior.Default
+		else
+			UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+			local d = UIS:GetMouseDelta()
+			local k = L.sens * sensitivity
+			orbitYaw, orbitElev = CameraRig.lookStep(orbitYaw, orbitElev, d.X * k, d.Y * k, invertLook)
+		end
+		for _, input in UIS:GetGamepadState(Enum.UserInputType.Gamepad1) do
+			if input.KeyCode == Enum.KeyCode.Thumbstick2 and input.Position.Magnitude > 0.15 then
+				local k = L.stick * dt
+				-- stick up is +Y; the mouse's up is -Y
+				orbitYaw, orbitElev =
+					CameraRig.lookStep(orbitYaw, orbitElev, input.Position.X * k, -input.Position.Y * k, invertLook)
+			end
+		end
+		local target = rootPart.Position + Vector3.new(0, lift, 0)
+		pos = Vector3.new(
+			CameraRig.focusStep(pos.X, pos.Y, pos.Z, target.X, target.Y, target.Z, dt, last.X, last.Y, last.Z)
+		)
+		last = target
+		-- come in front of whatever solid thing stands between the body and the camera
+		local ox, oy, oz = CameraRig.orbitOffset(orbitYaw, orbitElev, 1)
+		local dir = Vector3.new(ox, oy, oz)
+		local clear = orbitDist
+		local from = pos
+		local travelled = 0
+		for _ = 1, 6 do
+			local hit = workspace:Raycast(from, dir * (orbitDist - travelled + L.pad), rays)
+			if hit == nil then
+				break
+			end
+			local part = hit.Instance
+			local parent = part.Parent
+			local gone = travelled + (hit.Position - from).Magnitude
+			if
+				part:IsA("Terrain")
+				or CameraRig.occludes(part.Name, if parent then parent.Name else "", part.Transparency, part.CanCollide)
+			then
+				clear = math.max(L.nearest, gone - L.pad)
+				break
+			end
+			travelled = gone + 0.05
+			from = pos + dir * travelled
+			if travelled >= orbitDist then
+				break
+			end
+		end
+		shown = if clear < shown
+			then clear
+			else math.min(clear, shown + (clear - shown) * (1 - math.exp(-dt * L.easeOut)))
+		camera.CFrame = CFrame.lookAt(pos + dir * shown, pos)
+		camera.Focus = CFrame.new(pos)
+	end)
+	onUnbind = function()
+		wheel:Disconnect()
+		keys:Disconnect()
+	end
+end
+
 function CameraRig.overview(position: Vector3, lookAt: Vector3)
 	unbind()
 	setFirstPerson(false)
@@ -204,18 +407,29 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 	if mode == "humanThird" or mode == "humanFirst" or mode == "lockFirst" then
 		local body = targets.body
 		if body then
-			CameraRig.follow(body)
-			player.CameraMaxZoomDistance = 40
-			setFirstPerson(mode ~= "humanThird")
+			-- a touch-only device keeps the default camera (its drag and pinch); so does first person
+			local orbit = mode == "humanThird" and (UIS.MouseEnabled or UIS.GamepadEnabled)
+			if orbit then
+				setFirstPerson(false)
+				CameraRig.orbit(body, true)
+			else
+				CameraRig.follow(body)
+				player.CameraMaxZoomDistance = 40
+				setFirstPerson(mode ~= "humanThird")
+			end
 		end
 	elseif mode == "animalThird" then
 		local body = targets.body
 		if body then
 			setFirstPerson(false)
-			CameraRig.follow(body)
-			local s = sizeOf(body)
-			player.CameraMinZoomDistance = math.max(2, s * 1.5)
-			player.CameraMaxZoomDistance = math.max(24, s * 10)
+			if UIS.MouseEnabled or UIS.GamepadEnabled then
+				CameraRig.orbit(body, false)
+			else
+				CameraRig.follow(body)
+				local s = sizeOf(body)
+				player.CameraMinZoomDistance = math.max(2, s * 1.5)
+				player.CameraMaxZoomDistance = math.max(24, s * 10)
+			end
 		end
 	elseif mode == "chaseLock" then
 		local body = targets.body

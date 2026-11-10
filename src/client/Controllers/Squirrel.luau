@@ -125,6 +125,7 @@ function Squirrel.start(
 		trampolines = first.trampolines,
 		groundAt = world.groundAt,
 		blocked = world.blocked,
+		blockedCore = world.blockedCore,
 		clamp = world.clamp,
 	}
 	local pos = root.Position

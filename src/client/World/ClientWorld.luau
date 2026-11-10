@@ -15,9 +15,18 @@
 -- edge or a plate lip is ground to climb (the ground ray finds its top and the motor rises onto it), and
 -- only something taller than a step stops the body. The probe used to reach down to 0.25 st, where every
 -- kerb met from the low side counted as a wall.
--- Interface: get() -> ClientWorld { groundAt, blocked, blockedRadius, waterAt, clamp, rail() -> RailWorld?,
---   ignore(instances) }; groundLike(name, sizeY, transparency) -> boolean (pure);
---   STEP; wallProbe(feetY) -> centreY, radius (pure)
+-- The body is as wide as it is drawn (owner 2026-11-10: "make sure squirrel cannot run through houses";
+-- the screenshot showed it half inside a house's plinth): `blocked` is a box BODY_HALF to each side, from
+-- one step above the feet to the top of the body. It used to be a sphere 0.35 st across, a seventh of the
+-- body, so the drawn squirrel sank into every wall it met. `blockedCore` is the old narrow probe at the
+-- new height: the motor uses it only while the body already overlaps something (it let go of a downspout
+-- on a wall), so it can come away but never pass through. The invisible cylinders that give tree boughs
+-- their collision (Town.Props.Tree_*.R*) are not walls: v5.4 had none, and they would stop a leap between
+-- branches.
+-- Interface: get() -> ClientWorld { groundAt, blocked, blockedCore, blockedRadius, waterAt, clamp,
+--   rail() -> RailWorld?, ignore(instances) }; groundLike(name, sizeY, transparency) -> boolean (pure);
+--   STEP; BODY_HALF; BODY_TOP; wallProbe(feetY) -> centreY, radius (pure);
+--   bodyProbe(feetY) -> centreY, sizeX, sizeY, sizeZ (pure); isBough(name, parentName) -> boolean (pure)
 -- No side effects on require (services are looked up on first get()).
 
 local Import = require("../Import")
@@ -29,6 +38,7 @@ local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 export type ClientWorld = {
 	groundAt: (x: number, z: number, refY: number) -> number,
 	blocked: (x: number, z: number, y: number) -> boolean,
+	blockedCore: (x: number, z: number, y: number) -> boolean,
 	blockedRadius: (x: number, z: number, y: number, r: number) -> boolean,
 	waterAt: (x: number, z: number) -> number?,
 	clamp: { minX: number, maxX: number, minZ: number, maxZ: number },
@@ -66,6 +76,20 @@ function ClientWorld.wallProbe(feetY: number): (number, number)
 	return feetY + ClientWorld.STEP + ClientWorld.PROBE_RADIUS, ClientWorld.PROBE_RADIUS
 end
 
+-- The body's own box: BODY_HALF to each side of the centre (v5.4's collision radius was 0.32 u = 0.8 st;
+-- the drawn squirrel's nose reaches further), from STEP to BODY_TOP above the feet.
+ClientWorld.BODY_HALF = 1.0
+ClientWorld.BODY_TOP = 1.7
+function ClientWorld.bodyProbe(feetY: number): (number, number, number, number)
+	local sy = ClientWorld.BODY_TOP - ClientWorld.STEP
+	return feetY + ClientWorld.STEP + sy / 2, ClientWorld.BODY_HALF * 2, sy, ClientWorld.BODY_HALF * 2
+end
+
+-- Is this colliding part one of the invisible bough cylinders of a tree (Tree_<id>.R<route>_<i>)?
+function ClientWorld.isBough(name: string, parentName: string): boolean
+	return string.match(name, "^R%d") ~= nil and string.sub(parentName, 1, 5) == "Tree_"
+end
+
 local PLATE_REFRESH = 1 -- seconds between looks for Town.Lots / Town.Roads (they stream in)
 local PLATE_HOPS = 4
 
@@ -81,6 +105,20 @@ function ClientWorld.get(): ClientWorld
 	overlap.FilterType = Enum.RaycastFilterType.Exclude
 	overlap.RespectCanCollide = true
 	overlap.MaxParts = 1
+	-- the wall probes look past bough cylinders, so they need more than the first part found
+	local walls = OverlapParams.new()
+	walls.FilterType = Enum.RaycastFilterType.Exclude
+	walls.RespectCanCollide = true
+	walls.MaxParts = 24
+	local function solid(found: { BasePart }): boolean
+		for _, part in found do
+			local parent = part.Parent
+			if not ClientWorld.isBough(part.Name, if parent then parent.Name else "") then
+				return true
+			end
+		end
+		return false
+	end
 
 	-- the plate ray: only the folders that hold ground plates, colliding or not
 	local plate = RaycastParams.new()
@@ -151,8 +189,12 @@ function ClientWorld.get(): ClientWorld
 			return solidY
 		end,
 		blocked = function(x: number, z: number, y: number): boolean
+			local cy, sx, sy, sz = ClientWorld.bodyProbe(y)
+			return solid(workspace:GetPartBoundsInBox(CFrame.new(x, cy, z), Vector3.new(sx, sy, sz), walls))
+		end,
+		blockedCore = function(x: number, z: number, y: number): boolean
 			local cy, r = ClientWorld.wallProbe(y)
-			return #workspace:GetPartBoundsInRadius(Vector3.new(x, cy, z), r, overlap) > 0
+			return solid(workspace:GetPartBoundsInRadius(Vector3.new(x, cy, z), r, walls))
 		end,
 		blockedRadius = function(x: number, z: number, y: number, r: number): boolean
 			return #workspace:GetPartBoundsInRadius(Vector3.new(x, y + 0.3, z), r, overlap) > 0
@@ -172,6 +214,7 @@ function ClientWorld.get(): ClientWorld
 			end
 			ray.FilterDescendantsInstances = ignoreList
 			overlap.FilterDescendantsInstances = ignoreList
+			walls.FilterDescendantsInstances = ignoreList
 		end,
 	}
 	task.spawn(function()

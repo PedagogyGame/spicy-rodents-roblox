@@ -30,6 +30,7 @@ local VehicleView = require("./Render/VehicleView")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
+local CameraRig = require("./Camera/CameraRig")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -126,6 +127,8 @@ end)
 -- keep the help panel in step with vehicles and the drone
 local lastDevice: string? = nil
 game:GetService("RunService").Heartbeat:Connect(function()
+	-- the orbit camera owns the mouse on foot; the menu needs the cursor back while it is up
+	CameraRig.wantCursor("menu", menu.isOpen())
 	local d = client.state().device
 	if d ~= lastDevice then
 		lastDevice = d

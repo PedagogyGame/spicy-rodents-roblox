@@ -11,6 +11,8 @@
 --   UI:meter(value?, sweet?: {lo, hi}, label?); UI:buttons(list: { {id, text} }, onClick); UI:touch(list, onDown,
 --   onUp); UI:card(title, text, seconds); UI:isOpen()
 
+local CameraRig = require("../Camera/CameraRig")
+
 local MinigameUI = {}
 MinigameUI.__index = MinigameUI
 
@@ -319,6 +321,8 @@ end
 
 -- buttons({ {id, text} }, onClick(id))
 function MinigameUI.buttons(self: any, list: { { string } }, onClick: (id: string) -> ())
+	-- buttons need a cursor: the orbit camera gives the mouse back while any are up
+	CameraRig.wantCursor("minigame", #list > 0)
 	for _, c in self.buttonBar:GetChildren() do
 		if c:IsA("TextButton") then
 			c:Destroy()

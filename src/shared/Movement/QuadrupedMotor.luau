@@ -126,11 +126,14 @@ function QuadrupedMotor.step(state: State, input: Input, dt: number, world: Worl
 		state.y += state.vy * h
 		state.z += state.vz * h
 		local blocked = world.blocked
-		if blocked and blocked(state.x, state.z, state.y) then
+		-- world.blocked takes the height of the feet (its probe starts one step above them); state.y
+		-- is the root, a hip above: with the root a deer's probe passed over fences it should stop at
+		local feetY = state.y - params.hip
+		if blocked and blocked(state.x, state.z, feetY) then
 			-- per-axis slide: keep the axis that is free
-			if not blocked(state.x, oz, state.y) then
+			if not blocked(state.x, oz, feetY) then
 				state.z, state.vz = oz, 0
-			elseif not blocked(ox, state.z, state.y) then
+			elseif not blocked(ox, state.z, feetY) then
 				state.x, state.vx = ox, 0
 			else
 				state.x, state.z, state.vx, state.vz = ox, oz, 0, 0

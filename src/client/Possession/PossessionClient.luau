@@ -176,6 +176,9 @@ function PossessionClient.start(opts: Opts): Client
 			hud.toast(text, seconds)
 		end
 	end
+	CameraRig.notify = function(text: string) -- "Camera look: inverted" on I
+		toast(text, 2.5)
+	end
 	-- no body yet (the join hands a townsperson; until then): a parked view of the town, never the void
 	if player.Character == nil and opts.overview then
 		CameraRig.overview(opts.overview.position, opts.overview.lookAt)

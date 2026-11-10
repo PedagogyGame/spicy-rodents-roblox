@@ -234,4 +234,37 @@ return function(t)
 		t.truthy(doors >= 72, `{doors} doors and sign boards checked`)
 		t.eq(table.concat(clashes, "; ", 1, math.min(#clashes, 6)), "", `{#clashes} flickering faces`)
 	end)
+
+	-- Owner 2026-11-10: "make sure squirrel cannot run through houses, double check that".
+	t.test("every house is solid: bodies, walls, roofs and the foundations under them all collide", function()
+		local bodies, walls, foundations, open = 0, 0, 0, {}
+		for _, p in plans do
+			if p.kind == "lot" then
+				for _, part in p.parts do
+					local name = part.name
+					local massing = name == "Body"
+						or name == "Foundation"
+						or string.sub(name, 1, 4) == "Wall"
+						or string.sub(name, 1, 4) == "Roof"
+					if massing and (part.transparency or 0) < 1 then
+						if name == "Body" then
+							bodies += 1
+						elseif name == "Foundation" then
+							foundations += 1
+						else
+							walls += 1
+						end
+						if part.canCollide ~= true then
+							table.insert(open, `{p.id}.{name}`)
+						end
+					end
+				end
+			end
+		end
+		t.truthy(
+			bodies >= 70 and walls >= 100 and foundations >= 30,
+			`{bodies} bodies, {walls} walls and roofs, {foundations} foundations`
+		)
+		t.eq(table.concat(open, ", ", 1, math.min(#open, 8)), "", `{#open} parts a body could pass through`)
+	end)
 end

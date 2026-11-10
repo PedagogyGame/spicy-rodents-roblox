@@ -257,6 +257,94 @@ return function(t)
 		t.near(speedOf(a), P.sprint, 0.05)
 	end)
 
+	-- Review 2026-11-10: chained pounces held 28 st/s for ever and hops 24 st/s for half a minute.
+	t.test("hopping and pounce-chaining are no way round the sprint meter", function()
+		local P = SquirrelMotor.params
+		local function average(press: string, every: number): (number, number)
+			local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+			local inp = input(math.pi)
+			inp.fw = 1
+			local nextAt, late0, firstWinded = 0, 0, math.huge
+			for i = 1, 60 * 60 do
+				local now = i / 60
+				local anyInp = inp :: any
+				anyInp[press] = false
+				if (every == 0 and s.grounded) or (every > 0 and now >= nextAt) then
+					anyInp[press] = true
+					nextAt = now + every
+				end
+				local _, events = SquirrelMotor.step(s, inp, 1 / 60, world)
+				for _, e in events do
+					if e.kind == "winded" then
+						firstWinded = math.min(firstWinded, now)
+					end
+				end
+				if i == 30 * 60 then
+					late0 = s.z
+				end
+			end
+			return (s.z - late0) / 30, firstWinded
+		end
+		local hop, hopWinded = average("leap", 0)
+		t.truthy(hopWinded < 10, `hopping empties the meter in {hopWinded} s`)
+		t.truthy(hop <= P.walk * 1.03, `winded hopping averages {hop} st/s (walk {P.walk})`)
+		for _, every in { 0.7, 0.72, 1.0 } do
+			local pounce, pounceWinded = average("pounce", every)
+			t.truthy(pounceWinded < 10, `pouncing every {every} s empties the meter in {pounceWinded} s`)
+			t.truthy(pounce <= P.walk * 1.06, `pouncing every {every} s averages {pounce} st/s (walk {P.walk})`)
+		end
+		-- the first pounce of a fresh squirrel is a full lunge
+		local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+		local inp = input(math.pi)
+		inp.pounce = true
+		SquirrelMotor.step(s, inp, 1 / 60, world)
+		t.truthy(math.sqrt(s.vx * s.vx + s.vz * s.vz) > P.walk * 1.4, "a full pounce")
+		t.near(s.stamina, 1 - P.pounceCost, 1e-6, "no refill in the air")
+	end)
+
+	t.test("a leap off a rail carries as far as v5.4's did, winded or not", function()
+		local P = SquirrelMotor.params
+		local trunk = world.registry:get(220) :: Registry.Route
+		local foot = world.registry:foot(trunk)
+		local function carry(winded: boolean): number
+			local s = SquirrelMotor.new(foot.x, world.groundHeight, foot.z - Units.st(1.2))
+			local inp = input(math.pi)
+			inp.grab = true
+			SquirrelMotor.step(s, inp, 1 / 60, world)
+			inp.grab = false
+			t.eq(s.routeId, 220)
+			-- climb a little so the flight is long enough to measure
+			inp.fw = 1
+			for _ = 1, 90 do
+				SquirrelMotor.step(s, inp, 1 / 60, world)
+			end
+			if winded then
+				s.stamina, s.winded = 0, true
+			end
+			inp.leap = true
+			SquirrelMotor.step(s, inp, 1 / 60, world)
+			inp.leap = false
+			t.eq(s.railLeap, true)
+			-- steer along the leap with Shift held
+			inp.cameraYaw = math.atan2(s.vx, s.vz) + math.pi
+			inp.sprint = true
+			for _ = 1, 30 do
+				SquirrelMotor.step(s, inp, 1 / 60, world)
+			end
+			t.eq(s.grounded, false, "still in the air")
+			return math.sqrt(s.vx * s.vx + s.vz * s.vz)
+		end
+		local fresh, tired = carry(false), carry(true)
+		t.truthy(fresh >= P.leapForward * 0.97, `half a second into a rail leap: {fresh} st/s`)
+		t.near(tired, fresh, 1e-6, "the meter does not shorten a leap between branches")
+		-- and on the ground the flag is gone
+		local s = SquirrelMotor.new(Units.st(300), world.groundHeight, Units.st(300))
+		local inp = input(math.pi)
+		inp.leap = true
+		SquirrelMotor.step(s, inp, 1 / 60, world)
+		t.eq(s.railLeap, false, "a ground leap is not a rail leap")
+	end)
+
 	t.test("a leap off a rail is always a full one, and costs nothing", function()
 		local P = SquirrelMotor.params
 		local trunk = world.registry:get(220) :: Registry.Route
