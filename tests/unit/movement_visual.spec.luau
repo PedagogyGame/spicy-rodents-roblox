@@ -846,6 +846,81 @@ return function(t)
 		t.truthy((M.sprint - Human.SPRINT) * M.sprintSeconds < 25)
 	end)
 
+	-- Owner 2026-11-10: "the squirrel catches and gets stuck on the crack between the sidewalk and grass".
+	t.test("a kerb is a step, not a wall: the wall probe starts where the ground glue ends", function()
+		local feet = 12.5
+		local cy, r = ClientWorld.wallProbe(feet)
+		t.near(cy - r - feet, SquirrelMotor.params.glueMin, 1e-9, "the probe's underside is one step up")
+		t.eq(ClientWorld.STEP, SquirrelMotor.params.glueMin)
+		t.truthy(cy + r - feet >= 1.4 and cy + r - feet <= 1.7, "and it reaches the top of the body")
+		-- every sidewalk and paving lip in the town is under that step (0.4 st slabs, 0.3 st plates)
+		local tallest = 0
+		for _, p in Bake.plans(Bake.data()) do
+			if p.kind == "road" then
+				for _, part in p.parts do
+					if string.sub(part.name, 1, 3) == "Seg" then
+						tallest = math.max(tallest, part.sy)
+					end
+				end
+			end
+		end
+		t.truthy(tallest > 0 and tallest < ClientWorld.STEP, `tallest road or sidewalk slab {tallest}`)
+		-- the motor climbs a kerb it is not blocked by, and the drawn point follows without a cut
+		local w = open(function(x: number, _z: number, _refY: number): number
+			return if x >= 5 then 0.45 else 0
+		end)
+		local s = SquirrelMotor.new(0, 0, 0)
+		local v = SquirrelVisual.new()
+		local inp = input(-math.pi / 2) -- camera yaw -pi/2: forward = +x
+		inp.fw = 1
+		for i = 1, 90 do
+			SquirrelMotor.step(s, inp, 1 / 60, w)
+			local snapped = SquirrelVisual.frame(v, s, w, 1 / 60, w.groundAt)
+			t.eq(snapped, i == 1)
+		end
+		t.truthy(s.x > 15, `ran on past the kerb to x = {s.x}`)
+		t.eq(s.y, 0.45)
+		t.eq(s.grounded, true)
+	end)
+
+	-- Owner 2026-11-10: "the squirrel turns too abruptly, make turning more smooth and agile".
+	t.test("a quarter turn swings through in about a fifth of a second; the keys answer as fast as before", function()
+		local w = open(function(_x: number, _z: number, _refY: number): number
+			return 0
+		end)
+		local s = SquirrelMotor.new(0, 0, 0)
+		local inp = input(math.pi) -- forward = +z
+		inp.fw = 1
+		for _ = 1, 60 do
+			SquirrelMotor.step(s, inp, 1 / 60, w)
+		end
+		local yaw0 = s.yaw
+		inp.fw, inp.side = 0, 1 -- now to the right of the camera
+		local at50, at90, vel90 = nil, nil, nil
+		local biggest = 0
+		for i = 1, 60 do
+			local before = s.yaw
+			SquirrelMotor.step(s, inp, 1 / 60, w)
+			biggest = math.max(biggest, math.abs(shortest(s.yaw - before)))
+			local turned = math.abs(shortest(s.yaw - yaw0)) / (math.pi / 2)
+			if at50 == nil and turned >= 0.5 then
+				at50 = i / 60
+			end
+			if at90 == nil and turned >= 0.9 then
+				at90 = i / 60
+			end
+			local speed = math.sqrt(s.vx * s.vx + s.vz * s.vz)
+			if vel90 == nil and speed > 0 and math.abs(s.vx) / speed >= 0.9 then
+				vel90 = i / 60
+			end
+		end
+		t.truthy(at50 ~= nil and at50 >= 0.04 and at50 <= 0.09, `half the turn at {at50} s`)
+		t.truthy(at90 ~= nil and at90 >= 0.14 and at90 <= 0.25, `90 % of the turn at {at90} s`)
+		t.truthy(biggest < math.rad(20), `no frame turns more than 20 degrees (was 31): {math.deg(biggest)}`)
+		t.truthy(vel90 ~= nil and vel90 <= 0.12, `the velocity follows the key in {vel90} s`)
+		t.near(math.abs(shortest(s.yaw - yaw0)), math.pi / 2, 1e-3, "and the turn completes")
+	end)
+
 	t.test("place and movedFromOutside: the motor restarts at rest where the body was put", function()
 		local trunk = world.registry:get(220) :: Registry.Route
 		local foot = world.registry:foot(trunk)

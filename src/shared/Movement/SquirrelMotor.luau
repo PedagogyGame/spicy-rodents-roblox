@@ -140,8 +140,12 @@ SquirrelMotor.params = {
 	accelAir = 4.2,
 	dragGround = 13,
 	dragAir = 1.15,
-	turnRate = 25,
-	turnRateFocus = 19,
+	-- v5.4 turned the body at 25/s (19 stalking): 90 % of a turn inside 0.1 s, which read as a snap
+	-- (owner 2026-11-10: "the squirrel turns too abruptly, make turning more smooth and agile"). At 13/s
+	-- the body swings through the turn in about a fifth of a second; the velocity still answers the keys
+	-- at accelGround, so the controls are as quick as before.
+	turnRate = 13,
+	turnRateFocus = 11,
 	faceCameraRate = 11,
 	gravity = st(30), -- SQUIRREL_GRAVITY (L6472)
 	-- walk-in auto-grab (§9.1)

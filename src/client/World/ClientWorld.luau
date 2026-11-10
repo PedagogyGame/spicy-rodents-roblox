@@ -10,8 +10,14 @@
 -- non-colliding plates over the terrain (lot ground, banks, court tiles, pads, a few road segments), up to
 -- 0.3 st above the colliding surface. A second ray, limited to Town.Lots and Town.Roads, finds the topmost
 -- such plate above the solid hit (groundLike), so feet stand on the drawn surface instead of inside it.
+-- A wall is what the body cannot step onto (owner 2026-11-10: "the squirrel catches and gets stuck on the
+-- crack between the sidewalk and grass"): the wall probe starts STEP above the feet, so a kerb, a paving
+-- edge or a plate lip is ground to climb (the ground ray finds its top and the motor rises onto it), and
+-- only something taller than a step stops the body. The probe used to reach down to 0.25 st, where every
+-- kerb met from the low side counted as a wall.
 -- Interface: get() -> ClientWorld { groundAt, blocked, blockedRadius, waterAt, clamp, rail() -> RailWorld?,
---   ignore(instances) }; groundLike(name, sizeY, transparency) -> boolean (pure)
+--   ignore(instances) }; groundLike(name, sizeY, transparency) -> boolean (pure);
+--   STEP; wallProbe(feetY) -> centreY, radius (pure)
 -- No side effects on require (services are looked up on first get()).
 
 local Import = require("../Import")
@@ -49,6 +55,15 @@ function ClientWorld.groundLike(name: string, sizeY: number, transparency: numbe
 		or string.sub(name, 1, 4) == "Tile"
 		or string.sub(name, 1, 3) == "Pad"
 		or string.sub(name, 1, 3) == "Seg"
+end
+
+-- The tallest thing a walking body steps onto (SquirrelMotor.params.glueMin: the same height it follows
+-- down without leaving the ground), and the wall probe above it: a sphere from STEP to STEP + 0.7 over
+-- the feet, the height of a squirrel's body.
+ClientWorld.STEP = 0.75
+ClientWorld.PROBE_RADIUS = 0.35
+function ClientWorld.wallProbe(feetY: number): (number, number)
+	return feetY + ClientWorld.STEP + ClientWorld.PROBE_RADIUS, ClientWorld.PROBE_RADIUS
 end
 
 local PLATE_REFRESH = 1 -- seconds between looks for Town.Lots / Town.Roads (they stream in)
@@ -136,7 +151,8 @@ function ClientWorld.get(): ClientWorld
 			return solidY
 		end,
 		blocked = function(x: number, z: number, y: number): boolean
-			return #workspace:GetPartBoundsInRadius(Vector3.new(x, y + 0.6, z), 0.35, overlap) > 0
+			local cy, r = ClientWorld.wallProbe(y)
+			return #workspace:GetPartBoundsInRadius(Vector3.new(x, cy, z), r, overlap) > 0
 		end,
 		blockedRadius = function(x: number, z: number, y: number, r: number): boolean
 			return #workspace:GetPartBoundsInRadius(Vector3.new(x, y + 0.3, z), r, overlap) > 0
