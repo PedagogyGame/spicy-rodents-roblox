@@ -11,10 +11,25 @@ local scenario: Replay.Scenario = {
 	seconds = 260,
 	ci = 130,
 	entries = { Fleet.byClass("patrol")[1] },
+	-- it turned round by jumping the whole beat and drove the next leg backwards (LaneMath.pingPong measured
+	-- s from the wrong end); now it drives a 14 st U-turn onto the other side of the road
 	expect = {
-		none = { "speed_stutter", "sink", "float", "teleport_bit_dropped", "off_road", "through_building" },
+		none = {
+			"speed_stutter",
+			"sink",
+			"float",
+			"teleport_bit_dropped",
+			"off_road",
+			"through_building",
+			"sim_jump_unflagged",
+			"sim_yaw_snap",
+			"teleport_unflagged",
+			"reverse_travel",
+			"yaw_jump",
+			"sideways_slide",
+			"accel_spike",
+		},
 	},
-	known = { "sim_jump_unflagged", "sim_yaw_snap", "teleport_unflagged", "reverse_travel", "yaw_jump" },
 }
 
 return scenario

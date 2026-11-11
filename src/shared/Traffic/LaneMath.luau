@@ -535,15 +535,48 @@ function LaneMath.seesHazard(
 	return nil
 end
 
--- pingPong(lane, s, dir, speed, dt) -> s', dir', turned: shuttle motion between the lane ends.
+-- pingPong(lane, s, dir, speed, dt) -> s', dir', turned: shuttle motion between the lane ends. `s` is
+-- measured in the travel direction's own frame, as `pointAt`, `arcOf` and the stop lines measure it (from
+-- `startAt` for +1, from `endAt` for -1), so it always grows; past the end the vehicle comes back the other
+-- way from that same end: s' is the overshoot in the new direction's frame. (It used to reflect s in the
+-- old frame, which `pointAt` then read from the far end: the patrol car jumped the whole beat at every
+-- turn and drove the next leg backwards.)
 function LaneMath.pingPong(lane: Lane, s: number, dir: number, speed: number, dt: number): (number, number, boolean)
-	local n = s + speed * dt * dir
+	local n = s + math.abs(speed) * dt
 	if n > lane.length then
-		return lane.length - (n - lane.length), -1, true
-	elseif n < 0 then
-		return -n, 1, true
+		return math.min(n - lane.length, lane.length), -dir, true
 	end
 	return n, dir, false
+end
+
+-- uturnLength(lane): the arc length of the U-turn that joins the end of one direction of a ping-pong lane
+-- to the start of the other (a half circle between `coordFor[1]` and `coordFor[-1]`); 0 when both
+-- directions share one line.
+function LaneMath.uturnLength(lane: Lane): number
+	local cf = lane.coordFor
+	if not cf then
+		return 0
+	end
+	return math.pi * math.abs(cf[1] - cf[-1]) / 2
+end
+
+-- uturnPoint(lane, dir, d) -> pose: d studs into the U-turn at the far end of direction `dir` (a left turn
+-- under drive-on-the-right): a half circle, beyond the lane's end, from the dir side to the -dir side.
+function LaneMath.uturnPoint(lane: Lane, dir: number, d: number): Pose
+	local cf = lane.coordFor :: { [number]: number }
+	local r = math.abs(cf[1] - cf[-1]) / 2
+	local mid = (cf[1] + cf[-1]) / 2
+	local endAlong = if dir > 0 then lane.endAt else lane.startAt
+	local phi = math.clamp(d / math.max(r, 1e-9), 0, math.pi)
+	-- in (along, coord) coordinates: forward is (dir, 0); out from the centre to the start is (0, u)
+	local u = if cf[dir] > mid then 1 else -1
+	local along = endAlong + dir * r * math.sin(phi)
+	local coord = mid + u * r * math.cos(phi)
+	local tAlong, tCoord = dir * math.cos(phi), -u * math.sin(phi)
+	if lane.axis == "x" then
+		return { x = along, y = 0, z = coord, yaw = math.atan2(tAlong, tCoord) }
+	end
+	return { x = coord, y = 0, z = along, yaw = math.atan2(tCoord, tAlong) }
 end
 
 -- vehicleAhead(me, fx, fz, range, halfWidth, others) (trafficVehicleAhead, L15721-15736): is another

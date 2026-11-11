@@ -267,11 +267,39 @@ end
 local function advanceLane(v: Vehicle, ctx: Ctx, dt: number, events: { string })
 	local lane = v.lane
 	if v.class == "patrol" then
-		local s, d, turned = LaneMath.pingPong(lane, v.s, v.dir, v.speed, dt)
-		v.s, v.dir = s, d
-		if turned then
+		-- past an end the car drives a U-turn (phase "uturn", `timer` = studs into it) onto the other side
+		-- of the road, then on along the other direction (LaneMath.pingPong measures s in each direction's
+		-- own frame)
+		local arc = LaneMath.uturnLength(lane)
+		if v.phase == "uturn" then
+			local d = v.timer + v.speed * dt
+			if d < arc then
+				v.timer = d
+				local p = LaneMath.uturnPoint(lane, v.dir, d)
+				v.x, v.z, v.yaw = p.x, p.z, p.yaw
+				v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
+				return
+			end
+			v.phase, v.timer = "drive", 0
+			v.dir = -v.dir
+			v.s = math.min(d - arc, lane.length)
 			table.insert(events, "turn")
 			v.stop = Control.newState()
+		else
+			local s, d, turned = LaneMath.pingPong(lane, v.s, v.dir, v.speed, dt)
+			if turned and arc > 0 then
+				v.s = lane.length
+				v.phase, v.timer = "uturn", s
+				local p = LaneMath.uturnPoint(lane, v.dir, s)
+				v.x, v.z, v.yaw = p.x, p.z, p.yaw
+				v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
+				return
+			end
+			v.s, v.dir = s, d
+			if turned then
+				table.insert(events, "turn")
+				v.stop = Control.newState()
+			end
 		end
 	else
 		local s, wrapped = LaneMath.advance(lane, v.s, v.speed, dt)
@@ -327,13 +355,14 @@ local function yielding(
 	range: number,
 	tva: number,
 	up: number,
-	down: number
+	down: number,
+	limit: number?
 )
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
 	local hw = v.box.width / 2
 	local danger = LaneMath.seesHazard(v.x, v.z, fx, fz, range, hw, hazards(v, ctx, fx, fz, true)) ~= nil
 		or LaneMath.vehicleAhead(AICarMotor.body(v), fx, fz, tva, hw, sameWay(v, ctx, fx, fz))
-	local cap = stopCap(v, ctx, down, dt, events)
+	local cap = math.min(stopCap(v, ctx, down, dt, events), limit or math.huge)
 	local desired = if danger then 0 else math.min(v.cruise, cap)
 	v.speed = approach(v.speed, desired, (if desired < v.speed then down else up) * dt)
 	advanceLane(v, ctx, dt, events)
@@ -343,8 +372,16 @@ stepClass.heavy = function(v, ctx, dt, events)
 	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10))
 end
 
+local UTURN_SPEED = st(5) -- 12.5 st/s round the patrol beat's 14 st U-turn: 0.9 rad/s of steering
+local UTURN_BRAKE = st(4) -- braking into it, gentler than the 10 u/s2 hazard stop
+
 stepClass.patrol = function(v, ctx, dt, events)
-	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10))
+	local limit = math.huge
+	if LaneMath.uturnLength(v.lane) > 0 then
+		local toEnd = if v.phase == "uturn" then 0 else math.max(0, v.lane.length - v.s)
+		limit = math.sqrt(UTURN_SPEED * UTURN_SPEED + 2 * UTURN_BRAKE * toEnd)
+	end
+	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10), limit)
 end
 
 stepClass.van = function(v, ctx, dt, events)
