@@ -176,12 +176,12 @@
       "species": "car"
     },
     {
-      "bytes": 2404,
+      "bytes": 4582,
       "file": "vehicle_delivery_van.rbxm",
-      "joints": 9,
-      "parts": 10,
+      "joints": 38,
+      "parts": 39,
       "rigspec": true,
-      "sha": "f963f77b4f2bda4686cce415c1337a65c5f1b7a2a728a0555bb4c5afd401a5b3",
+      "sha": "94a8638a41e2b486e72a5eccf37f4431787fb9a8d23ad283e2216c8d4d5d6a8f",
       "sockets": 3,
       "species": "car"
     },

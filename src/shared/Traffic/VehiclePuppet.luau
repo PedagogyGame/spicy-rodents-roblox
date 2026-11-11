@@ -7,7 +7,7 @@
 -- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
 -- These kinds are SHAPED (owner 2026-11-11: "the vehicles are extremely rough"), a vehicle from about forty
 -- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building):
--- sedan, patrol car, ambulance. The rest are still the ten-block placeholder and
+-- sedan, patrol car, ambulance, delivery van. The rest are still the ten-block placeholder and
 -- follow the same recipe.
 -- Names follow Actors/RigSpec.car (RootPart, Body, WheelFL/FR/BL/BR, LightBar (+ LightBarB, the second
 -- beacon colour), Headlights, TailLights;
@@ -300,6 +300,7 @@ type Van = {
 	axleB: number,
 	lampY: number, -- headlamp strip height
 	tailY: number,
+	doors: boolean, -- rear doors with a window, split down the middle; else a plain panel between the lamps
 }
 
 -- Returns the half-width of the flanks, the station (Z) of the body's tail face and of the hull's front.
@@ -342,9 +343,14 @@ local function vanBody(k: Kit, color: Rgb, v: Van): (number, number, number)
 	lamps(k, lamp, ends, v.lampY, v.tailY, tall)
 	add(k, "Grille", lamp * 0.58, v.lampY - 0.04, v.lampY + tall + 0.04, -ends - 0.09, -ends + 0.05, seam)
 	local door = lamp - math.max(0.55, bw * 0.16)
-	add(k, "RearDoors", door, v.sill + 0.62, top - 0.15, ends - 0.05, ends + 0.09, color)
-	add(k, "RearGlass", door - 0.3, v.belt + 0.3, v.screenTop - 0.2, ends - 0.05, ends + 0.12, glass).material = "Glass"
-	add(k, "DoorSplit", 0.04, v.sill + 0.62, top - 0.15, ends - 0.05, ends + 0.15, seam)
+	if v.doors then
+		add(k, "RearDoors", door, v.sill + 0.62, top - 0.15, ends - 0.05, ends + 0.09, color)
+		add(k, "RearGlass", door - 0.3, v.belt + 0.3, v.screenTop - 0.2, ends - 0.05, ends + 0.12, glass).material =
+			"Glass"
+		add(k, "DoorSplit", 0.04, v.sill + 0.62, top - 0.15, ends - 0.05, ends + 0.15, seam)
+	else
+		add(k, "RearPanel", door, v.tailY - 0.08, v.tailY + tall + 0.08, ends - 0.05, ends + 0.09, color)
+	end
 	return bw, ends, s1
 end
 
@@ -373,6 +379,7 @@ local function ambulanceParts(k: Kit, color: Rgb): number
 		axleB = 8.9,
 		lampY = 1.2,
 		tailY = 1.75,
+		doors = true,
 	})
 	add(k, "Stripe", bw + 0.03, 2.45, 2.8, front + 2.5, ends - 0.02, red)
 	local crossZ = (front + 2.4 + ends) / 2
@@ -381,11 +388,45 @@ local function ambulanceParts(k: Kit, color: Rgb): number
 	return front + 1.1
 end
 
+local PARCEL_BROWN = "#9a5a2a"
+
+-- Delivery van: a tall panel van, the cab under a high roof, a brown band and a parcel panel on the
+-- load space, a sliding-door seam, double doors at the back.
+local function deliveryVanParts(k: Kit, color: Rgb): number
+	local brown = hex(PARCEL_BROWN)
+	local bw, ends, front = vanBody(k, color, {
+		inset = 0.3,
+		sill = 0.75,
+		waist = 3.3,
+		belt = 4.3,
+		roof = k.H,
+		roofR = 0.7,
+		R = 0.65,
+		screen0 = 2.3,
+		screen1 = 3.9,
+		screenTop = 7.0,
+		cab = 2.6,
+		wheelR = 1.3,
+		wheelW = 1.0,
+		axleF = 2.6,
+		axleB = 11.0,
+		lampY = 1.7,
+		tailY = 2.3,
+		doors = true,
+	})
+	local load = front + 2.6 + 0.6 -- behind the cab door
+	add(k, "Band", bw + 0.02, 3.5, 4.15, load, ends - 0.02, brown)
+	add(k, "Parcel", bw + 0.03, 5.3, 7.5, load + 2.3, load + 5.1, brown)
+	add(k, "Seam3", bw + 0.03, 0.95, 8.2, load + 1.5, load + 1.57, hex(FIXED.seam))
+	return front + 1.2
+end
+
 -- Kinds drawn from shaped parts instead of the ten-block placeholder.
 local BUILDERS: { [string]: Builder } = {
 	sedan = sedanParts,
 	patrol_car = sedanParts,
 	ambulance = ambulanceParts,
+	delivery_van = deliveryVanParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against

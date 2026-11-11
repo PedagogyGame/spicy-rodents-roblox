@@ -13,9 +13,8 @@ local Boxes = require("@shared/Traffic/Boxes")
 
 -- Kinds drawn from shaped parts, and the rest with the part count of their ten-block placeholder. A kind
 -- moves from BLOCKS to SHAPED when it gets its builder.
-local SHAPED = { "sedan", "patrol_car", "ambulance" }
+local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van" }
 local BLOCKS: { [string]: number } = {
-	delivery_van = 10,
 	ice_cream_van = 10,
 	trolley = 10,
 	dump_truck = 10,
@@ -297,6 +296,28 @@ return function(t)
 			t.eq(tinted.Stripe.color.r, p.Stripe.color.r)
 		end
 	)
+
+	t.test("the delivery van: a tall panel van, a brown band and parcel panel on the load space, rear doors", function()
+		local p = byName(VehiclePuppet.spec("delivery_van"))
+		local box = Boxes.get("delivery_van")
+		t.near(p.Roof.pos[2] + p.Roof.size[2] / 2, box.height / 2, 1e-6, "the roof is the top of the box")
+		t.truthy(p.Hull.size[2] > p.Hull.size[1], "taller than wide")
+		t.eq(p.Windscreen.shape, "Wedge")
+		t.truthy(p.Windscreen.pos[2] + p.Windscreen.size[2] / 2 < p.Hull.pos[2] + p.Hull.size[2] / 2 - 1, "a high roof")
+		for _, name in { "RoofEdgeL", "RoofEdgeR" } do
+			t.eq(p[name].shape, "Cylinder", `{name} rounds the roof`)
+			t.near(p[name].yaw :: number, math.pi / 2, 1e-9, `{name} lies along the van`)
+		end
+		for _, name in { "Band", "Parcel" } do
+			local c = p[name].color
+			t.truthy(c.r > c.g * 1.4 and c.g > c.b * 1.5, `{name} is brown`)
+			t.truthy(p[name].size[1] > p.Hull.size[1], `{name} shows on both flanks`)
+			t.truthy(p[name].pos[3] > p.SideGlass.pos[3], `{name} is behind the cab`)
+		end
+		t.truthy(p.RearDoors.pos[3] > 0 and p.DoorSplit.size[1] < 0.2 and p.RearGlass.material == "Glass")
+		t.near(p.Mirrors.size[1], box.width, 1e-6, "the mirrors reach the box")
+		t.eq(p.LightBar.transparency, 1)
+	end)
 
 	t.test("a kind not yet shaped is the ten-block placeholder, unchanged in part count", function()
 		local seen = 0

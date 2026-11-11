@@ -146,7 +146,7 @@ for row = 1, nRows do
 			})
 		end
 		-- far enough for the row's width and for its tallest vehicle under its label
-		local dist = math.max((total + 3) / 2 / (tanV * aspect), (tallest * 1.9 + 3) / 2 / tanV)
+		local dist = math.max((total + 3) / 2 / (tanV * aspect), (tallest * 1.5 + 2.5) / 2 / tanV)
 		table.insert(views, {
 			name = `{if turned then "rear" else "front"}_{row}`,
 			desc = if turned then "rear three-quarter" else "front three-quarter",
