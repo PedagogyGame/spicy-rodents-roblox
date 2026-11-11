@@ -71,8 +71,10 @@ return function(t)
 		end
 		t.eq(lamps, 390)
 		-- re-pinned 2026-11-11: roads now roll with the ground across their width (World/RoadSurface, so
-		-- cars stand on the drawn asphalt), and the street lamps beside them stand on that surface
-		t.eq(Bake.fnv(table.concat(sky, "\n")), "9e9ae946b2fa5590", "Skyline or lamps moved: re-pin only on purpose")
+		-- cars stand on the drawn asphalt), and the street lamps beside them stand on that surface; and again
+		-- the same day: the radio mast and the cell tower are a mast and a pole (Builders/Fixtures), so
+		-- the far skyline's two towers are slim
+		t.eq(Bake.fnv(table.concat(sky, "\n")), "a04813272e833ca5", "Skyline or lamps moved: re-pin only on purpose")
 		-- re-pinned 2026-11-11: the police station stands on a level site (World/Height.SITES), which
 		-- flattened the one segment of its slab road that tilted (rd_114_police_slab Seg003)
 		t.eq(Bake.fnv(table.concat(props, "\n")), "5222db9c85fcb7d2", "props or roads moved: re-pin only on purpose")
@@ -93,11 +95,13 @@ return function(t)
 		end
 		-- 817 since 2026-11-11 (was 854): the 37 door leaves of the six enterable buildings no longer
 		-- collide (Builders/Shell: a doorway is an opening; the leaf is an auto door)
-		t.eq(#lines, 817, "collidable massing parts")
+		-- re-pinned 2026-11-11: the pergolas, doghouses, market stalls, gazebo and towers have shapes of
+		-- their own (Builders/Fixtures) in place of one block each
+		t.eq(#lines, 882, "collidable massing parts")
 		-- re-pinned 2026-11-11: 16 front door leaves moved up to the ground on their lot's uphill side
 		-- (Building.door; they stood 0.3 to 3.6 st under the grass), and the 37 leaves above left the
 		-- list. Nothing else moved.
-		t.eq(Bake.fnv(table.concat(lines, "\n")), "87e71ff8c5473b26", "massing moved: re-pin only on purpose")
+		t.eq(Bake.fnv(table.concat(lines, "\n")), "113865ddcaec078f", "massing moved: re-pin only on purpose")
 		t.eq(Bake.fnv(table.concat(firsts, "\n")), "89066c7454a584aa", "a lot's first part changed")
 	end)
 

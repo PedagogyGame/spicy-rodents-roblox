@@ -25,6 +25,7 @@ local PoliceStation = require("./Builders/PoliceStation")
 local Sign = require("./Builders/Sign")
 local Props = require("./Builders/Props")
 local Treehouse = require("./Builders/Treehouse")
+local Fixtures = require("./Builders/Fixtures")
 local Spec = require("./Spec")
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
 local RoadSurface = Import.shared("World/RoadSurface") :: typeof(require("../shared/World/RoadSurface"))
@@ -174,7 +175,9 @@ local function blockPart(
 	local solid = Kits.isSolid(kit.category) and not isChild
 	-- a child zone inside an enterable programme building (the v5.4 hospital zones) is only a named
 	-- marker: as a see-through box it stood through the rooms and their furniture
-	local transparency = if hidden then 1 elseif isChild then 0.7 elseif kit.category == "marker" then 1 else 0
+	-- (owner 2026-11-11, "clean up a few things on the map": every child zone is hidden now; the
+	-- galleria's shops and atrium still stood as tinted see-through boxes)
+	local transparency = if hidden or isChild then 1 elseif kit.category == "marker" then 1 else 0
 	local h = kit.heightU * SPU
 	local cy, sy
 	if kit.category == "plate" then
@@ -305,6 +308,8 @@ function Plan.plan(lot: Lot, lotType: string, ctx: Ctx): BuildPlan
 		local hidden = isChild and BUILDING_BY_LOT[ctx.parentId :: string] ~= nil
 		local body = list:world(blockPart(lot, kit, seat, q, sx, sz, isChild, hidden))
 		if not isChild then
+			-- the small structures that have a shape of their own (pergolas, doghouses, stalls, towers)
+			Fixtures.dress(lot, body, list, Geometry.frame(lot.x, seat, lot.z, q * HALF_PI + math.pi))
 			Props.dress(lot, kit, body, list, seat)
 		end
 	end

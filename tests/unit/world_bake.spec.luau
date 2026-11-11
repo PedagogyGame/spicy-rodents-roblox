@@ -347,7 +347,9 @@ return function(t)
 
 	-- The v5.4 hospital zones (lobby, triage, ward bays...) are child lots inside the enterable shell.
 	-- As see-through boxes up to 235 st long they stood through every room and its furniture.
-	t.test("hospital zones inside the enterable shell are invisible markers; mall shops are unchanged", function()
+	-- (owner 2026-11-11, "clean up a few things on the map": the galleria's shops and atrium, the last
+	-- zones still drawn as tinted see-through boxes, are invisible markers too)
+	t.test("zones inside a building are invisible markers: the hospital's and the galleria's alike", function()
 		local hidden, ghosts = 0, 0
 		for _, p in plans do
 			if p.kind == "lot" and p.attributes.ParentLot ~= nil then
@@ -359,7 +361,8 @@ return function(t)
 					t.eq(s.canCollide, false, p.id)
 				else
 					ghosts += 1
-					t.eq(s.transparency, 0.7, p.id)
+					t.eq(s.transparency, 1, p.id)
+					t.eq(s.canCollide, false, p.id)
 				end
 			end
 		end
