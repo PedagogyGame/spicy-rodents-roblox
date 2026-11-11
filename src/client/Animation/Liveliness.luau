@@ -201,8 +201,10 @@ Liveliness.P = {
 	-- next segment (the bend runs down the tail).
 	tail = {
 		pass = 0.02,
-		omegaRoot = 16,
+		omegaRoot = 16, -- side to side
 		omegaTip = 9,
+		liftOmegaRoot = 11, -- up and down: slower, so a throw hangs and comes back past rest
+		liftOmegaTip = 7,
 		zeta = 0.3,
 		-- left behind in a turn: seconds of lag per segment at the root and at the tip (the angle is the
 		-- lag times the yaw rate), and where a segment stops
@@ -215,8 +217,8 @@ Liveliness.P = {
 		start = 0.0008,
 		startMax = 0.16,
 		-- in the air it trails: low behind a rise, high behind a fall (rad over the whole tail per studs/s)
-		air = 0.02,
-		airMax = 0.55,
+		air = 0.014,
+		airMax = 0.4,
 		liftShare = { 0.3, 0.22, 0.15, 0.11, 0.08, 0.06, 0.05, 0.03 },
 		-- the ripple of a tail streaming at speed: rad per segment at the tip at a sprint, its frequency
 		-- (Hz) at rest and at a sprint, the phase from one segment to the next, and its share in pitch
@@ -260,7 +262,7 @@ Liveliness.P = {
 	fold = {
 		fore = { -3.1, 5.0, 2.5, -4.4 },
 		hind = { -0.04, -0.89, 2.77, -1.84 },
-		max = 0.12,
+		max = 0.14,
 		min = -0.03,
 		dead = 0.003, -- studs under which the legs are left alone
 		rate = 14, -- 1/s the legs take the ground again after a landing
@@ -310,6 +312,7 @@ end
 
 -- scratch: the tail segments' spring coefficients and lags for the frame being solved
 local SA, SB, SC, SD, LAG = zeros(TAIL), zeros(TAIL), zeros(TAIL), zeros(TAIL), zeros(TAIL)
+local PA, PB, PC, PD = zeros(TAIL), zeros(TAIL), zeros(TAIL), zeros(TAIL)
 
 function Liveliness.new(seed: number, rig: string?): State
 	return {
@@ -564,6 +567,7 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 	for i = 1, TAIL do
 		local f = (i - 1) / (TAIL - 1)
 		SA[i], SB[i], SC[i], SD[i] = spring(K.omegaRoot + (K.omegaTip - K.omegaRoot) * f, K.zeta, h)
+		PA[i], PB[i], PC[i], PD[i] = spring(K.liftOmegaRoot + (K.liftOmegaTip - K.liftOmegaRoot) * f, K.zeta, h)
 		LAG[i] = K.lagRoot + (K.lagTip - K.lagRoot) * f
 	end
 	local yaw0, pace0, vy0 = st.inYaw, st.inPace, st.inVy
@@ -638,7 +642,8 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 			x = tailYaw[i] + soft(LAG[i] * turnIn, K.yawMax)
 			tailYaw[i], tailYawV[i] = tailYaw[i] - x + sa * x + sb * tailYawV[i], sc * x + sd * tailYawV[i]
 			x = tailPitch[i] + liftIn * K.liftShare[i] -- (a raised segment has a negative rx)
-			tailPitch[i], tailPitchV[i] = tailPitch[i] - x + sa * x + sb * tailPitchV[i], sc * x + sd * tailPitchV[i]
+			tailPitch[i], tailPitchV[i] =
+				tailPitch[i] - x + PA[i] * x + PB[i] * tailPitchV[i], PC[i] * x + PD[i] * tailPitchV[i]
 		end
 	end
 	st.inYaw, st.inPace, st.inVy = input.yawRate, rawPace, input.vy

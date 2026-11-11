@@ -862,8 +862,9 @@ return function(t: any)
 				t.near(chest, 0, 1e-12, "the chest does not roll")
 				t.near(layers.Neck[3], 3 * creep.spine, 1e-12, "the head still shakes")
 			else
-				t.eq(layers.Chest, nil)
+				t.eq(layers.Chest[3], 0)
 			end
+			t.near(layers.Spine2[1] + layers.Chest[1], 0, 1e-12, "nor does the breath pitch it")
 		end
 		t.truthy(shudders > 20)
 		-- onto: offsets on the same axes add; the root's offset carries over

@@ -370,13 +370,13 @@ function AnimationDriver.heroLayers(
 			out[`Tail{i}`] = { 0, yaw, 0 }
 		end
 	end
+	-- the breath and the shudder are the back's (and the shudder the head's too): the chest takes both
+	-- back, so the fore paws it carries stay where they stand, and the neck takes the shudder up again
 	out.Spine2 = { pose.chest, 0, pose.spine }
+	out.Chest = { -pose.chest, 0, -3 * pose.spine }
 	if pose.spine ~= 0 then
 		out.Spine1 = { 0, 0, pose.spine }
 		out.Spine3 = { 0, 0, pose.spine }
-		-- the shudder is the back's and the head's: the chest takes it back, so the fore paws it carries
-		-- stay where they stand, and the neck takes it up again
-		out.Chest = { 0, 0, -3 * pose.spine }
 		out.Neck = { 0, 0, 3 * pose.spine }
 	end
 	return if live then Liveliness.onto(out, live.pose) else out
