@@ -23,6 +23,9 @@
 --   ctx.truth                                       the true history (lib/Replay: at, window)
 --   ctx.vehicles[id]                                { id, name, kind, class, box, entry }
 --   ctx.surfaceAt(x, z, refY), ctx.heightAt(x, z)   the game's ground (World/Ground with the town's paving)
+--   ctx.town, ctx.colliders, ctx.Colliders          World/Town (road strips, lots), the buildings in a
+--                                                   World/Colliders hash, and that module (nil on a bench
+--                                                   unless given)
 --   ctx.settings                                    the run's settings
 --   ctx.stats                                       a table of the detector's own numbers for the report
 -- Severity is magnitude / limit: how many times over its limit an incident is. It ranks "the worst".
@@ -33,6 +36,7 @@
 
 local fs = require("@lune/fs")
 local Boxes = require("@shared/Traffic/Boxes")
+local Colliders = require("@shared/World/Colliders")
 local Height = require("@shared/World/Height")
 local Truth = require("./Truth")
 
@@ -143,6 +147,9 @@ export type Ctx = {
 	vehicles: { [number]: any },
 	heightAt: (x: number, z: number) -> number,
 	surfaceAt: (x: number, z: number, refY: number) -> number,
+	town: any?,
+	colliders: any?,
+	Colliders: any,
 	flag: (
 		kind: string,
 		frame: Frame,
@@ -295,6 +302,9 @@ function Detect.newBook(settings: any): Book
 				vehicles = env.vehicles,
 				heightAt = env.heightAt,
 				surfaceAt = env.surfaceAt,
+				town = env.town,
+				colliders = env.colliders,
+				Colliders = Colliders,
 				flag = function(
 					kind: string,
 					frame: Frame,
@@ -431,7 +441,7 @@ export type Bench = {
 --       ground; the frame's dt is the time since the previous frame.
 --   bench:finish() -> incidents, counts
 -- opts: vehicles { [id] = { name, kind, class } } (default: #1, a sedan), thresholds ("key" = value),
--- heightAt / surfaceAt (default: flat ground at y = 0), tickDt (1 / 30).
+-- heightAt / surfaceAt (default: flat ground at y = 0), town / colliders (default: none), tickDt (1 / 30).
 function Detect.bench(def: Def, opts: { [string]: any }?): Bench
 	local o: { [string]: any } = opts or {}
 	local thresholds = {}
@@ -452,8 +462,14 @@ function Detect.bench(def: Def, opts: { [string]: any }?): Bench
 	end
 	local truth = Truth.new()
 	local book = Detect.newBook({ warmup = 0, thresholds = thresholds })
-	local hooks =
-		def.new(book:ctx(def, { truth = truth, vehicles = vehicles, heightAt = heightAt, surfaceAt = surfaceAt }))
+	local hooks = def.new(book:ctx(def, {
+		truth = truth,
+		vehicles = vehicles,
+		heightAt = heightAt,
+		surfaceAt = surfaceAt,
+		town = o.town,
+		colliders = o.colliders,
+	}))
 	local tickDt = o.tickDt or 1 / 30
 	local live: { [number]: any } = {}
 	local frames, lastT = 0, nil :: number?

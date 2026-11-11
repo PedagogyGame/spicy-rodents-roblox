@@ -45,6 +45,7 @@ local PoseStream = require("@shared/Traffic/PoseStream")
 local Net = require("@shared/Net/Net")
 local Schemas = require("@shared/Net/Schemas")
 local Height = require("@shared/World/Height")
+local Colliders = require("@shared/World/Colliders")
 local Ground = require("@shared/World/Ground")
 local Town = require("@shared/World/Town")
 local Rng = require("@shared/Util/Rng")
@@ -221,14 +222,19 @@ function Replay.settings(opts: { [string]: any }?): Settings
 	return s
 end
 
--- The game's ground: World/Ground over the town's paving (roads sit 0.14 st above the terrain) and the
--- bridge deck. Built once per process.
-local groundWorld: any = nil
-local function surface(): (x: number, z: number, refY: number) -> number
-	if groundWorld == nil then
-		groundWorld = Ground.world({ town = Town.fromData(Data.default()) })
+-- The game's town for the detectors: World/Ground over the town's paving (roads sit 0.14 st above the
+-- terrain) and the bridge deck, the road strips and lots (World/Town) and the buildings
+-- (World/Colliders). Built once per process.
+local townWorld: { town: any, colliders: any, groundAt: (x: number, z: number, refY: number) -> number }? = nil
+local function town(): { town: any, colliders: any, groundAt: (x: number, z: number, refY: number) -> number }
+	local w = townWorld
+	if w == nil then
+		local data = Data.default()
+		local t = Town.fromData(data)
+		w = { town = t, colliders = Colliders.fromData(data), groundAt = Ground.world({ town = t }).groundAt }
+		townWorld = w
 	end
-	return groundWorld.groundAt
+	return w
 end
 
 local function histogram(step: number, size: number)
@@ -323,7 +329,15 @@ function Replay.run(opts: { [string]: any }?): Result
 		-- the detectors
 		local truth = Truth.new()
 		local book = Detect.newBook(settings)
-		local env = { truth = truth, vehicles = vehicles, heightAt = Height.at, surfaceAt = surface() }
+		local townData = town()
+		local env = {
+			truth = truth,
+			vehicles = vehicles,
+			heightAt = Height.at,
+			surfaceAt = townData.groundAt,
+			town = townData.town,
+			colliders = townData.colliders,
+		}
 		local defs: { Detect.Def } = {}
 		local hooks: { Detect.Hooks } = {}
 		for _, def in Detect.load() do

@@ -7,6 +7,8 @@
 local serde = require("@lune/serde")
 local Ghost = require("@shared/Traffic/Ghost")
 local Boxes = require("@shared/Traffic/Boxes")
+local Colliders = require("@shared/World/Colliders")
+local Town = require("@shared/World/Town")
 local Detect = require("../../tools/sim/lib/Detect")
 local NetModel = require("../../tools/sim/lib/NetModel")
 local Replay = require("../../tools/sim/lib/Replay")
@@ -677,4 +679,59 @@ return function(t)
 			t.eq(incidents[1].origin, "sim")
 		end
 	)
+
+	t.test("obstacles: through a building, off the carriageway (the trolley may use its rails)", function()
+		local def = detectors.obstacles
+		local strips: { any } = {
+			{ id = "street", kind = "asphalt", axis = "z", coord = 0, min = -10, max = 100, half = 10, offset = 0.1 },
+			{ id = "walk", kind = "concrete", axis = "z", coord = 14, min = -10, max = 100, half = 4, offset = 0.2 },
+			{ id = "rails", kind = "rail", axis = "z", coord = 40, min = -10, max = 100, half = 3, offset = 0 },
+		}
+		local town = Town.new(strips, {})
+		local colliders = Colliders.new()
+		Colliders.add(
+			colliders,
+			{ id = "shed", cx = 0, cz = 30, hw = 3, hd = 3, y0 = 0, eave = 9, peak = 9, ridge = nil }
+		)
+		local world = { town = town, colliders = colliders }
+		-- down the middle of the street: on the road, and straight through the shed that stands on it
+		local incidents, counts = drive(def, { bench = world })
+		t.eq(counts.through_building, 1)
+		t.eq(counts.off_road, nil)
+		t.eq((incidents[1].detail :: any).building, "shed")
+		t.eq(incidents[1].origin, "sim", "the server drove it there")
+		t.truthy(incidents[1].magnitude > 2.5, "right through")
+		-- along the sidewalk: 4 st beyond the kerb
+		local function sidewalk(clock: number): { [string]: any }
+			return { x = 14, z = 20 * clock, yaw = 0, speed = 20 }
+		end
+		local walked, onWalk = drive(def, { bench = world, truth = sidewalk })
+		t.eq(onWalk.off_road, 1)
+		t.eq(onWalk.through_building, nil)
+		t.near(walked[1].magnitude, 4, 1e-6, "studs from the carriageway's edge")
+		t.eq((walked[1].detail :: any).nearestRoad, "street")
+		-- on the rails: fine for the trolley, off the road for a sedan
+		local function rails(clock: number): { [string]: any }
+			return { x = 40, z = 20 * clock, yaw = 0, speed = 20 }
+		end
+		local _, sedan = drive(def, { bench = world, truth = rails })
+		t.eq(sedan.off_road, 1)
+		local _, trolley = drive(def, {
+			truth = rails,
+			bench = {
+				town = town,
+				colliders = colliders,
+				vehicles = { [1] = { name = "Trolley", kind = "trolley", class = "trolley" } },
+			},
+		})
+		t.eq(total(trolley), 0)
+		-- a car standing off the road is parked, not driving there
+		local _, parked = drive(def, {
+			bench = world,
+			truth = function(_clock: number): { [string]: any }
+				return { x = 60, z = 5, yaw = 0, speed = 0 }
+			end,
+		})
+		t.eq(total(parked), 0)
+	end)
 end
