@@ -1,7 +1,8 @@
 --!strict
 -- tools/bake/alley/Lanes: six lanes in three pairs (brief v2 §13a): maple and pine boards, the foul line, approach
--- dots, target arrows, gutters, capping, pin decks with spots, ten pins per lane (welded composite parts the
--- server unanchors for play), pits with cushions, kickbacks, the masking units with lane numbers, the pinsetter
+-- dots, target arrows, gutters, capping, pin decks with spots, ten pins per lane (anchored composite parts the
+-- server moves by script: pinfall is decided by Shared/Minigames/Bowling/PinModel, never by physics, so the
+-- pins collide with nothing), pits with cushions, kickbacks, the masking units with lane numbers, the pinsetter
 -- machines and sweep bars, a ball per lane, the ball-return hoods and racks between each pair's approaches,
 -- settees and scorer consoles, overhead score monitors (SurfaceGui the server rewrites) and the lights.
 -- Names the server relies on (Server/Minigames/BowlingLane): Lanes.Lane<i>.{Ball, Pins.Pin<n> (PrimaryPart
@@ -254,7 +255,7 @@ local function pins(kit: any, parent: any, lane: number)
 		local px, pd = L.pinLocal(lane, n)
 		local m = kit:model(folder, `Pin{n}`)
 		m:SetAttribute("Spot", n)
-		local opts = { group = "BowlingPhysics", shadow = true }
+		local opts = { group = "BowlingPhysics", shadow = true, collide = false, query = true }
 		local body
 		for i, pr in Lanes.PIN_PROFILE do
 			local p = kit:cyl(
