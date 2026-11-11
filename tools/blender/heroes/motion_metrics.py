@@ -45,8 +45,15 @@ LEGS = ("FrontL", "FrontR", "BackL", "BackR")
 def planted_mask(height, dt):
     """True where the paw is down. Its resting height is the level it spends a fifth of the stretch at or
     under (the stance is the flat bottom of the height curve; a leg at full stretch dips a little under it
-    or twitches a little over it, which is not a step)."""
-    on = height <= np.quantile(height, 0.2) + PLANT
+    or twitches a little over it, which is not a step). A bounding gallop has its paws down for less than
+    a fifth of the stride: where the curve is still falling at that level (the paw is in its swing there),
+    the bottom is looked for at a tenth and then a twentieth of the stretch instead."""
+    level = np.quantile(height, 0.2)
+    for share in (0.2, 0.1, 0.05):
+        level = np.quantile(height, share)
+        if level - np.quantile(height, share / 2) < PLANT / 3:
+            break
+    on = height <= level + PLANT
     n = len(on)
     i = 0
     while i < n:
