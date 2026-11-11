@@ -33,7 +33,7 @@ if not ok then
 end
 local tree = {}
 local bones = {}
-local parts = {}
+local parts: { { [string]: any } } = {} -- rows of different shapes: parts, motors, attachments
 for _, d in (model :: Instance):GetDescendants() do
 	table.insert(tree, `{d:GetFullName()} [{d.ClassName}]`)
 	if d:IsA("Bone") then

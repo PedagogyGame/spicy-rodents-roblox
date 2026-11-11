@@ -4,10 +4,10 @@
     "squirrel": {
       "rig": "squirrel",
       "model": {
-        "assetId": "128344898172346",
+        "assetId": "76531525066511",
         "moderation": "Approved",
         "fbxBytes": 4481692,
-        "sha": "8eaacc1e9d9fcf3f"
+        "sha": "6793d3c87f897013"
       },
       "bones": 35,
       "bonesMatchRigSpec": true,
@@ -119,7 +119,7 @@
           "rbxmBytes": 16888
         },
         "Run": {
-          "assetId": "116948739011953",
+          "assetId": "90468448447985",
           "moderation": "Approved",
           "brief": "run (bounding gallop)",
           "duration": 0.466667,
@@ -134,7 +134,7 @@
               "value": "stride"
             }
           ],
-          "rbxmBytes": 16120
+          "rbxmBytes": 16157
         },
         "Climb": {
           "assetId": "124697817757826",
@@ -236,10 +236,10 @@
     "rodent": {
       "rig": "squirrel",
       "model": {
-        "assetId": "133769194457190",
+        "assetId": "140106981482488",
         "moderation": "Approved",
         "fbxBytes": 4040684,
-        "sha": "e933fcb2425fc6b7"
+        "sha": "98c9e6d2769ddfb5"
       },
       "bones": 35,
       "bonesMatchRigSpec": true,
@@ -366,7 +366,7 @@
           "rbxmBytes": 16888
         },
         "Run": {
-          "assetId": "116948739011953",
+          "assetId": "90468448447985",
           "moderation": "Approved",
           "brief": "run (bounding gallop)",
           "duration": 0.466667,
@@ -381,7 +381,7 @@
               "value": "stride"
             }
           ],
-          "rbxmBytes": 16120
+          "rbxmBytes": 16157
         },
         "Climb": {
           "assetId": "124697817757826",
@@ -957,7 +957,7 @@
       "scale": 1.1
     }
   },
-  "generated": "2026-11-11T11:06:02Z",
+  "generated": "2026-11-11T14:44:39Z",
   "notes": [
     "Models: Open Cloud Model uploads of the FBX (tools/blender/heroes). InsertService:LoadAsset gives a Model with a Part named RootPart (transparent, at the origin = the ground under the body centre) carrying the Bone tree (Root > Hips > ...), one skinned MeshPart per region joined to RootPart by a Motor6D, and an AnimationController.",
     "Every Bone arrives with an identity rest rotation, so the clips (spicy-clip/1: Pose.CFrame = local delta in an axis-aligned joint frame) play unchanged on these rigs and on the part-built puppets.",

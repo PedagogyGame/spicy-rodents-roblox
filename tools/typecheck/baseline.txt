@@ -1,7 +1,7 @@
 # Known type errors: the debt tools/typecheck/main.luau tolerates. One line per file and message
 # (quoted types blanked): file <tab> how many <tab> message. The check fails on anything not listed
 # here. Fix errors, then run `lune run tools/typecheck/main.luau --update`; never add lines by hand.
-# 83 errors in total (luau-lsp 1.70.1).
+# 66 errors in total (luau-lsp 1.70.1).
 src/worldgen/BackdropTerrain.luau	1	TypeError: Key '…' is missing from '…' in the type '…'
 src/worldgen/Builders/Building.luau	1	TypeError: Expected this to be exactly '…', but got '…'
 src/worldgen/Builders/Building.luau	2	TypeError: Expected this to be '…', but got '…'
@@ -34,9 +34,3 @@ tests/engine/Paintball.luau	5	TypeError: Key '…' not found in table '…'
 tests/engine/Possession.luau	4	TypeError: Key '…' is missing from '…' in the type '…'
 tests/engine/PossessionSoak.luau	1	TypeError: Function only returns 1 value, but 2 are required here
 tests/engine/WorldBuild.luau	5	TypeError: Key '…' is missing from '…' in the type '…'
-tools/cloud/tasks/art_probe.luau	2	TypeError: Expected type table, got '…' instead
-tools/cloud/tasks/art_probe.luau	4	TypeError: Expected this to be '…', but got '…'
-tools/cloud/tasks/ground_probe.luau	6	TypeError: Expected this to be '…', but got '…'
-tools/cloud/tasks/heroes_rig_probe.luau	1	TypeError: Table type '…' not compatible with type '…' because the former is missing fields '…', '…', '…', and '…'
-tools/cloud/tasks/heroes_rig_probe.luau	2	TypeError: Table type '…' not compatible with type '…' because the former is missing fields '…', '…', '…', '…', '…', '…', '…', and '…'
-tools/cloud/tasks/possession_s2_smoke.luau	2	TypeError: Value of type '…' could be nil

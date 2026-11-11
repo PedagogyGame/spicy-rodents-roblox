@@ -22,7 +22,7 @@ local HeroAssets = {}
 
 HeroAssets.SPECIES = {
 	squirrel = {
-		assetId = 128344898172346,
+		assetId = 76531525066511,
 		hipHeight = 0.9,
 		regions = {
 			Body = { alphaMode = "Overlay" },
@@ -38,7 +38,7 @@ HeroAssets.SPECIES = {
 		},
 	},
 	rodent = {
-		assetId = 133769194457190,
+		assetId = 140106981482488,
 		hipHeight = 0.9,
 		regions = {
 			Blood = { alphaMode = "Transparency" },
@@ -64,7 +64,7 @@ HeroAssets.CLIPS = {
 		Idle = { id = "rbxassetid://131290508281628", length = 3.0, loop = true },
 		Leap = { id = "rbxassetid://102733473426026", length = 0.7667, loop = false },
 		Pounce = { id = "rbxassetid://125262543371003", length = 0.9667, loop = false },
-		Run = { id = "rbxassetid://116948739011953", length = 0.4667, loop = true },
+		Run = { id = "rbxassetid://90468448447985", length = 0.4667, loop = true },
 		Stalk = { id = "rbxassetid://87730756983478", length = 1.2, loop = true },
 		Walk = { id = "rbxassetid://80734625038082", length = 0.8, loop = true },
 		Wire = { id = "rbxassetid://75735754293305", length = 1.0, loop = true },
