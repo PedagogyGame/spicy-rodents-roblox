@@ -882,6 +882,11 @@ return function(t)
 			t.eq(h.svc:statusOf(id), "symptoms", "and the status line says so all the time")
 			-- the rodent's player (not held here) would have been told too
 			t.truthy(h.toasts[#h.toasts].key == "symptoms" or h.toasts[#h.toasts].key == "victimSick")
+			-- a second bite: not a second infection, and the player is told about it too
+			t.truthy(not h.svc:bite(id, h.rodent))
+			t.deepEq(h.toasts[#h.toasts], { id = id, key = "bittenAgain" })
+			t.eq(victim.x, x0, "still not moved")
+			t.eq(h.world.brains[id].directive.mode, nil)
 			-- the player walks into the hospital
 			victim.x, victim.z = layout.reception[1], layout.reception[2]
 			h.step(1)
@@ -900,7 +905,7 @@ return function(t)
 			t.truthy(not victim.infected)
 			t.eq(h.svc:statusOf(id), nil, "nothing on the status line once cured")
 			keys = told()
-			t.deepEq(keys, { "bitten", "symptoms", "treating", "leftEarly", "treating", "cured" })
+			t.deepEq(keys, { "bitten", "symptoms", "bittenAgain", "treating", "leftEarly", "treating", "cured" })
 			t.deepEq(h.medLog[id], { "symptomatic", "-" })
 			t.eq(h.svc.hospital:stats().admitted, 0, "no bed is used")
 			t.eq(h.world.brains[id].directive.mode, nil)

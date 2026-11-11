@@ -122,6 +122,7 @@ InfectionService.TICK = 0.2 -- s: the cases are advanced five times a second
 InfectionService.SINK = -40 -- studs: a hidden patient's body is drawn this far under the ground
 InfectionService.GROUNDS = 60 -- studs round the hospital's footprint that count as "at the hospital"
 InfectionService.SPOT_SPEAK = 0.65 -- share of spotters whose line is a "spotting" one (else "fleeing")
+InfectionService.FLEE_SPEED = 19 -- studs/s: a bitten staff member's run, the pedestrians' flee pace (7.6 u/s)
 InfectionService.CROWD_CANDIDATES = 8 -- the nearest people asked to a scene, at most
 InfectionService.CROWD_DETOUR = 60 -- studs a bystander will walk round a building, beyond the straight line
 InfectionService.HOME_SNAP = 45 -- studs: a townsperson's walk home ends on the pavement this near the bite
@@ -899,7 +900,7 @@ local function flee(self: Service, rec: Record)
 		local c, s = math.cos(turn), math.sin(turn)
 		local tx, tz = a.x + (dx * c - dz * s) * 30, a.z + (dx * s + dz * c) * 30
 		if clearLine(self, a.x, a.z, tx, tz) then
-			order(self, rec.id, { mode = "route", points = { { tx, tz } }, speed = 19 })
+			order(self, rec.id, { mode = "route", points = { { tx, tz } }, speed = InfectionService.FLEE_SPEED })
 			return
 		end
 	end
