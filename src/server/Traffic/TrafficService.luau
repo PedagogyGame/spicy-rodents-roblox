@@ -3,9 +3,11 @@
 -- The AI fleet on its lanes: fixed-tick simulation, the fatal test, the pose stream (BUILD_PLAN §4.4
 -- W1 #9, D9, §1.6 VehiclePoses; traffic.md §5, §8, §13).
 -- Interface: new(opts) -> TrafficService; :step(dt, world) -> { Hit }; :poses() -> { VehiclePose };
---            :poseRecords() -> stream records; :dispatchResponder(dest) ; :dispatchIncident(scene);
---            :markTeleported(actorId) (HANDOFF rule 12); :stats(); RunOver (Util/Signal);
---            :start(ctx) (engine only: Heartbeat loop + Net stream at posesHz; never called on require).
+--            :poseRecords() -> stream records; :frame(dt, now, world, net?) -> { Hit } (one server frame:
+--            step, then the pose stream's send through Traffic/PoseStream); :dispatchResponder(dest);
+--            :dispatchIncident(scene); :markTeleported(actorId) (HANDOFF rule 12); :stats(); :kinds();
+--            RunOver (Util/Signal); :start(ctx) (engine only: a Heartbeat loop over `frame`; never called
+--            on require).
 --
 -- Pure and steppable: `step(dt, world)` runs whole 1/tickHz ticks (Tunables traffic.tickHz, default 30)
 -- and carries the remainder. Each tick: (1) every vehicle's AICarMotor steps against the people and the
@@ -21,6 +23,7 @@ local Control = Import.shared("Traffic/Control") :: typeof(require("../../shared
 local Fleet = Import.shared("Traffic/Fleet") :: typeof(require("../../shared/Traffic/Fleet"))
 local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Traffic/Ghost"))
 local LaneMath = Import.shared("Traffic/LaneMath") :: typeof(require("../../shared/Traffic/LaneMath"))
+local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 local Signal = Import.shared("Util/Signal") :: typeof(require("../../shared/Util/Signal"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local SweptCollision = require("./SweptCollision")
@@ -63,6 +66,7 @@ export type Opts = {
 	entries: { Entry }?,
 	control: ControlData?,
 	sceneSecs: number?,
+	posesHz: number?, -- pose sends a second (Traffic/PoseStream.HZ)
 }
 
 export type TrafficService = typeof(setmetatable(
@@ -71,6 +75,8 @@ export type TrafficService = typeof(setmetatable(
 		records: { [string]: any },
 		vehicles: { Vehicle },
 		byId: { [number]: Vehicle },
+		entries: { Entry },
+		sender: any, -- Traffic/PoseStream.Sender (exported types do not cross Import)
 		prev: { [number]: { x: number, y: number, z: number, yaw: number, visible: boolean } },
 		prevActors: { [any]: { x: number, y: number, z: number } },
 		swept: SweptCollision.SweptCollision,
@@ -113,6 +119,8 @@ function TrafficService.new(opts: Opts): TrafficService
 		records = records,
 		vehicles = {},
 		byId = {},
+		entries = opts.entries or Fleet.ENTRIES,
+		sender = PoseStream.newSender(opts.posesHz),
 		prev = {},
 		prevActors = {},
 		swept = SweptCollision.new(),
@@ -131,7 +139,7 @@ function TrafficService.new(opts: Opts): TrafficService
 		RunOver = Signal.new(),
 		unified = unified,
 	}, TrafficService)
-	for _, e in opts.entries or Fleet.ENTRIES do
+	for _, e in self.entries do
 		local lane = lanes[e.lane] or error(`TrafficService: fleet entry {e.id} names missing lane {e.lane}`)
 		local cruise = 0
 		if e.speedKey then
@@ -310,10 +318,31 @@ function TrafficService.poseRecords(self: TrafficService): { { [string]: number 
 	return out
 end
 
--- kinds(): id -> {kind, color} for the client ghost renderer.
+-- frame(dt, now, world, net?) -> hits: one server frame of traffic, exactly what Server/Boot/Game runs on
+-- every Heartbeat and what the headless replay (tools/sim) runs: the simulation steps its whole ticks,
+-- then, when `net` is given and Traffic/PoseStream's sender says a send is due, the pose records go out
+-- with the server clock `now` (the caller's clock AFTER this frame) as their stamp.
+function TrafficService.frame(
+	self: TrafficService,
+	dt: number,
+	now: number,
+	world: World?,
+	net: any?
+): { SweptCollision.Hit }
+	local hits = self:step(dt, world)
+	if net then
+		local records = self.sender:frame(dt, now, self)
+		if records then
+			net:stream(nil, PoseStream.REMOTE, records)
+		end
+	end
+	return hits
+end
+
+-- kinds(): id -> {kind, color} for the client ghost renderer (this service's own fleet entries).
 function TrafficService.kinds(self: TrafficService): { [number]: { kind: string, color: string? } }
 	local out = {}
-	for _, e in Fleet.ENTRIES do
+	for _, e in self.entries do
 		if self.byId[e.id] then
 			out[e.id] = { kind = e.kind, color = e.color }
 		end
@@ -360,26 +389,23 @@ function TrafficService.stats(self: TrafficService): Stats
 	return self._stats
 end
 
--- Engine binder: Heartbeat drives `step` with the world from `ctx.world()`; poses stream at posesHz
--- through `ctx.net:stream(nil, "VehiclePoses", records)`. Returns a disconnect function.
+-- Engine binder: Heartbeat drives `frame` with the world from `ctx.world()` and its own clock (each dt
+-- clamped to PoseStream.MAX_FRAME_DT, as Server/Boot/Game does); the poses stream through `ctx.net`.
+-- Returns a disconnect function. Server/Boot/Game does not use it: it calls `frame` from its own step.
 function TrafficService.start(
 	self: TrafficService,
-	ctx: { world: () -> World, net: any?, posesHz: number?, onHit: ((hit: any) -> ())? }
+	ctx: { world: () -> World, net: any?, onHit: ((hit: any) -> ())? }
 ): () -> ()
 	local RunService = game:GetService("RunService")
-	local period = 1 / (ctx.posesHz or 15)
-	local since = 0
-	local conn = RunService.Heartbeat:Connect(function(dt: number)
-		local hits = self:step(dt, ctx.world())
+	local now = 0
+	local conn = RunService.Heartbeat:Connect(function(frameDt: number)
+		local dt = math.min(frameDt, PoseStream.MAX_FRAME_DT)
+		now += dt
+		local hits = self:frame(dt, now, ctx.world(), ctx.net)
 		if ctx.onHit then
 			for _, h in hits do
 				ctx.onHit(h)
 			end
-		end
-		since += dt
-		if ctx.net and since >= period then
-			since = 0
-			ctx.net:stream(nil, "VehiclePoses", self:poseRecords())
 		end
 	end)
 	return function()
