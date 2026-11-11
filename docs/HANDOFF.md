@@ -1,6 +1,22 @@
 # HANDOFF — read this first in any new session
 
-Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2026-11-09.
+Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2026-11-11.
+
+## 0. State on 2026-11-11 (read this before anything below; older sections are history where they differ)
+- **The experience is "Spicy Rodent" (singular)**: universe 10775476638, main place 106044514609985. Never touch the duplicate "Spicy Rodents" (10775476357 / 71294450489810).
+- **Live in the game: version 35**, built from `330c11f`. Everything after that is on `w0-foundation` only, and is published only when the owner says "Publish" (close Studio first).
+- **On `w0-foundation` since v35, all with the full check script and the server checks passing:**
+  - the bite-to-hospital sequence and the townspeople's lines;
+  - nicer buildings and furnished interiors that can be walked into (town 26,613 parts, budget 27,000);
+  - bowling, complete;
+  - the squirrel reworked for the view from behind: re-authored clips, softer back view, `Client/Animation/Liveliness` (the body answers turns, stops and landings), a run with 40 % of its old bounce, five manners of running (`Liveliness.manner`), and the Bite clip played on a bite (the body's `BiteAt` attribute); models and clips re-uploaded (`data/art/heroes.json`);
+  - the car glitch fixes found with the headless replay in `tools/sim` (patrol car, lane ends, pop-ins, streaks, roads that roll with the ground);
+  - a strict type check at the end of `tools/ci.sh` (`tools/typecheck`, luau-lsp 1.70.1 built from source by `docs/ENVIRONMENT_SETUP.sh`): it fails on any type error not in `tools/typecheck/baseline.txt`. 83 old errors remain, none in `src/client`, `src/server` or `src/shared`: 37 in `src/worldgen`, 29 in `tests/engine`, 17 in `tools/cloud/tasks`.
+- **Nobody has seen any of it on a screen.** The checks are headless. The owner's look after a publish decides: the squirrel's run and back view, the run manners (how often, how strong), the bite lunge while running, the cars, the interiors under the camera, bowling.
+- **Known and unverified:** the car fixes had no independent verification pass, and with them the game's step costs more (a fast-forwarded hospital run takes 18 s where it took 12; a traffic tick is about 1.3 ms at worst).
+- **Parked, unfinished:** `art/trees` and `art/people` (Blender work in progress, nothing uploaded, no game code); vehicle models not started; nine more minigames; the 83 type errors.
+- **Tools that give eyes:** `tools/review` (the still town, rendered offline), `tools/review/motion_path.luau` + `tools/blender/heroes/render_motion.py` (the squirrel in motion from the play camera; strips in `docs/renders/heroes/motion/`, last rendered BEFORE the bounce cut and the manners), `tools/sim` (traffic replay with glitch detectors).
+- **Usage:** background helpers burn a five-hour allowance in about two hours when several run at once, and are cut off mid-work; have each commit and move its branch after every step, and land finished pieces one at a time.
 
 ## 1. Where things are
 - **Branches.**
