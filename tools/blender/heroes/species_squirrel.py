@@ -25,6 +25,22 @@ the ground and the shoulder is about 0.93. The authored numbers (TAIL0, FRONT0, 
 in sculpt) stay in the authored space; everything this module hands out (skeleton, sculpt, FRONT, BACK,
 TAIL, landmarks, eye centres, hard parts, sockets) is in the lowered space, and the painters convert the
 surface points they are given back to the authored space before using authored heights.
+
+From behind (owner 2026-11-11: "I don't like its big legs. I don't like the way it looks from the back ...
+rigid, unalive"): the play camera is behind and above, so what is on the screen is the tail, the rump and
+the haunches. No bone moved for this; the sculpt, the skin weights, the paint and the fur cards did:
+  * the body is a pear: one soft haunch lobe each side, wider than anything ahead of it and hanging to
+    0.14 above the ground over the knee and shin, a filled groin and a deeper belly, a narrower waist;
+    shin, calf and foot are slim, so what shows under the body is a foot, not a leg;
+  * the tail is a flat feather (PLUME), narrow where it leaves the rump, with a rust middle, a dark band
+    and a pale fringe of long hair-tip cards; the rodent's is a rat's bare ringed tail with three ragged
+    clumps of bristle (RODENT_TUFTS) whose edges smoulder, and the knobs of its spine are bare knuckles
+    with raised hackles between them and mange over its hindquarters;
+  * the trunk's skin follows the spine and the haunch lobe is skin from the pelvis to the knee
+    (refine_weights): bone heat alone hung the belly and flanks on the knees and elbows;
+  * a darker stripe down the spine, warmer flanks, paws the colour of the coat;
+  * fur cards in kinds, each drawn on both sides (card_groups, card_cells, card_tufts).
+The faces are as they were.
 """
 import math
 
@@ -604,7 +620,7 @@ def hard_parts(variant="squirrel"):
 
 
 # RigSpec budgets: squirrel 13,000 tris (body + claws/teeth ~7.7k, cards 4.6k, eyes 0.45k), rodent 11,000
-BUDGET = {"body_tris": 7100, "cards_tris": 4600, "rodent_cards_tris": 2200}
+BUDGET = {"body_tris": 7100, "cards_tris": 4600, "rodent_cards_tris": 2120}
 # RootPart: the puppet's hidden root block (PuppetSpec: 0.66 x 0.66 x 1.4 st at hip height 0.9)
 ROOT_PART = ((0.0, 0.0, 0.9), (0.33, 0.7, 0.33))
 HIP_HEIGHT = 0.9
@@ -932,12 +948,12 @@ def paint(tx, variant, tools):
         dk = np.full(n, 9.0, np.float32)
         for kc, kr in rodent_knobs():
             dk = np.minimum(dk, np.linalg.norm((P - kc.astype(np.float32)) / (kr.astype(np.float32) * 1.15), axis=1))
-        knob = (1 - sst(0.84, 1.08, dk + (vn(P * 60.0, 77) - 0.5) * 0.25)) * sst(0.3, 0.75, N[:, 2]) * (hard == 0)
-        override(hard == 0, _hex("#8f7a70")[None, :] * (0.8 + 0.4 * vn(P * 140.0, 78))[:, None], r=0.5, k=knob * 0.85, skin=True)
-        mange = (sst(0.58, 0.65, fbm(P * 4.2, 3, seed=37)) * sst(-0.25, 0.05, y) * (1 - tk) * (1 - sst(0.1, 0.4, headw))
+        knob = (1 - sst(0.78, 1.02, dk + (vn(P * 60.0, 77) - 0.5) * 0.25)) * sst(0.3, 0.75, N[:, 2]) * (hard == 0)
+        override(hard == 0, _hex("#7c675e")[None, :] * (0.78 + 0.44 * vn(P * 140.0, 78))[:, None], r=0.5, k=knob * 0.85, skin=True)
+        mange = (sst(0.56, 0.68, fbm(P * 4.2, 3, seed=37) + (fine - 0.5) * 0.06) * sst(-0.25, 0.05, y) * (1 - tk) * (1 - sst(0.1, 0.4, headw))
                  * (1 - sst(0.3, 0.7, footw)) * (1 - m) * (hard == 0))
-        mcol = _hex("#96796f")[None, :] * ((0.8 + 0.4 * vn(P * 90.0, 38)) * (1 - 0.5 * sst(0.72, 0.86, fine)))[:, None]
-        override(hard == 0, mcol, r=0.55, k=mange * 0.8, skin=True)
+        mcol = _hex("#866c63")[None, :] * ((0.78 + 0.44 * vn(P * 90.0, 38)) * (1 - 0.6 * sst(0.6, 0.8, fine)))[:, None]
+        override(hard == 0, mcol, r=0.55, k=mange * 0.7, skin=True)
         # one small bald patch with an old pale scar across it
         for i, pt in enumerate(RODENT_PATCHES):
             c = np.array(pt["c"], np.float32)
@@ -1096,6 +1112,9 @@ def card_density(c, n, dom, variant, group="coat"):
             d[np.linalg.norm(c - np.array(pt["c"]), axis=1) < pt["r"] * 1.3] = 0
     else:
         d[tail] = (0.8 * (1 - _sstep(0.02, 0.1, s)))[tail]  # the rump's fur runs on over the tail's root
+        # the head keeps the few tufts it had (15 on the ear tips, 4 on the cheeks): the body's share of
+        # the cards has doubled, and at the same density so would the head's
+        d[head | ears | (dom == "Jaw")] *= 0.5
     return d
 
 
@@ -1133,6 +1152,8 @@ def card_tufts(info, variant, group, rng):
         flat = _unit(np.cross(up, d))
         side = _unit(flat * np.cos(tilt)[:, None] + np.cross(d, flat) * np.sin(tilt)[:, None])
         near = 0.72 + 0.28 * _sstep(0.08, 0.4, s)  # shorter by the root, so the tail leaves the rump narrow
+        # and toward and round the tip: the animal is no longer than it was (the camera stands off by its length)
+        near = near * (1 - 0.55 * tipward) * (1 - 0.45 * _sstep(0.8, 0.96, s) * (1 - tipward))
         return {"length": rng.uniform(0.18, 0.28, k) * near, "width": rng.uniform(0.065, 0.105, k) * near,
                 "dir": d, "dir2": d2, "side": side, "cell": 8 + pair}
     if group == "plume":
@@ -1142,13 +1163,13 @@ def card_tufts(info, variant, group, rng):
         stand = rng.random(k) < 0.34
         lift = np.where(stand, rng.uniform(0.55, 1.0, k), rng.uniform(0.15, 0.4, k))
         cell = np.where(stand & (edge < 0.12), 8 + pair, cell)
-        return {"length": rng.uniform(0.17, 0.26, k), "width": rng.uniform(0.05, 0.078, k), "lift": lift,
+        return {"length": rng.uniform(0.17, 0.26, k) * (1 - 0.45 * _sstep(0.82, 0.96, s)), "width": rng.uniform(0.05, 0.078, k), "lift": lift,
                 "roll": np.where(stand, rng.uniform(-1.2, 1.2, k), rng.normal(0, 0.3, k)), "droop": np.full(k, 0.3), "cell": cell}
     if group == "bristle":
         # bottle-brush: straight out of the clump every way, leaning toward the tip
         d = _unit(N * rng.uniform(0.7, 1.0, k)[:, None] + axis * rng.uniform(0.1, 0.7, k)[:, None] + rng.normal(0, 0.25, (k, 3)))
         ref = _unit(np.cross(d, rng.normal(0, 1, (k, 3))))
-        return {"length": rng.uniform(0.12, 0.23, k), "width": rng.uniform(0.05, 0.085, k), "dir": d, "side": ref,
+        return {"length": rng.uniform(0.12, 0.23, k) * (1 - 0.45 * _sstep(0.9, 0.97, s)), "width": rng.uniform(0.05, 0.085, k), "dir": d, "side": ref,
                 "cell": np.where(rng.random(k) < 0.78, 8 + pair, 10 + pair)}
     if group == "hackle":
         d = _unit(np.array([0.0, 0.5, 0.85])[None, :] + rng.normal(0, 0.22, (k, 3)))

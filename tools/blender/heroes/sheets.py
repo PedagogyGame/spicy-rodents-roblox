@@ -3,6 +3,8 @@
   python3 -I tools/blender/heroes/sheets.py poses --dir <render dir> --tag squirrel --out <png>
   python3 -I tools/blender/heroes/sheets.py turntable --dir <render dir> --tag squirrel --out <png>
   python3 -I tools/blender/heroes/sheets.py motion --manifest <frames dir>/manifest.json --out <base>
+  python3 -I tools/blender/heroes/sheets.py pairs --out <jpg> --title <text> [--note <text>] \
+      --pair "<label>|<before png>|<after png>" [--pair ...]      # before and after, one row per pair
 
 poses: one row per clip (<tag>_pose_<Clip>_<k>.png, k = key pose index), labelled with the clip name
 and the key's time; turntable: the <tag>_turntable_NN.png frames in a grid (4 per row); motion: the
@@ -189,9 +191,51 @@ def motion(manifest, base):
     return "\n".join(done)
 
 
+def pairs(out, title, note, rows, left="BEFORE", right="AFTER"):
+    """Before and after, side by side, one row per view: rows = [(label, before png, after png)]. At most
+    1600 px wide and 400 KB, as the motion strips."""
+    gap = 8
+    cell_w = (MOTION_W - gap * 3) // 2
+    f_head, f_note, f_lab, f_tag = font(19), font(13), font(14), font(15)
+    probe = ImageDraw.Draw(Image.new("RGB", (8, 8)))
+    notes = wrap(probe, note, f_note, MOTION_W - 20) if note else []
+    head_h = 10 + 24 + 17 * len(notes) + 8
+    imgs = []
+    for label, a, b in rows:
+        pair = []
+        for p in (a, b):
+            im = Image.open(p).convert("RGB")
+            if im.width != cell_w:
+                im = im.resize((cell_w, round(im.height * cell_w / im.width)), Image.LANCZOS)
+            pair.append(im)
+        imgs.append((label, pair))
+    lab_h = 24
+    total = head_h + sum(max(p[0].height, p[1].height) + lab_h + gap for _l, p in imgs)
+    sheet = Image.new("RGB", (MOTION_W, total), MOTION_BG)
+    dr = ImageDraw.Draw(sheet)
+    dr.text((10, 8), title, fill=(245, 245, 245), font=f_head)
+    for k, line in enumerate(notes):
+        dr.text((10, 34 + 17 * k), line, fill=(185, 188, 196), font=f_note)
+    y = head_h
+    for label, pair in imgs:
+        dr.text((gap + 2, y + 3), label, fill=(225, 225, 230), font=f_lab)
+        y += lab_h
+        for k, (im, tag) in enumerate(zip(pair, (left, right))):
+            x = gap + k * (cell_w + gap)
+            sheet.paste(im, (x, y))
+            dr.rectangle((x + 6, y + 6, x + 12 + dr.textlength(tag, font=f_tag), y + 28), fill=(22, 24, 28))
+            dr.text((x + 9, y + 8), tag, fill=(245, 245, 245), font=f_tag)
+        y += max(pair[0].height, pair[1].height) + gap
+    q = save_under(sheet, out)
+    return f"{out} {sheet.size[0]}x{sheet.size[1]} q{q} {os.path.getsize(out) // 1000} KB"
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("kind", choices=["poses", "turntable", "motion"])
+    ap.add_argument("kind", choices=["poses", "turntable", "motion", "pairs"])
+    ap.add_argument("--title", default="")
+    ap.add_argument("--note", default="")
+    ap.add_argument("--pair", action="append", default=[], help="pairs: 'label|before.png|after.png', once per row")
     ap.add_argument("--dir")
     ap.add_argument("--tag")
     ap.add_argument("--out", required=True)
@@ -201,6 +245,9 @@ if __name__ == "__main__":
     a = ap.parse_args()
     if a.kind == "motion":
         print(motion(a.manifest, a.out))
+        raise SystemExit(0)
+    if a.kind == "pairs":
+        print(pairs(a.out, a.title, a.note, [tuple(p.split("|")) for p in a.pair]))
         raise SystemExit(0)
     meta = None
     if a.meta and os.path.exists(a.meta):
