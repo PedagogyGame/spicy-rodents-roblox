@@ -196,12 +196,12 @@
       "species": "car"
     },
     {
-      "bytes": 2404,
+      "bytes": 4702,
       "file": "vehicle_ice_cream_van.rbxm",
-      "joints": 9,
-      "parts": 10,
+      "joints": 39,
+      "parts": 40,
       "rigspec": true,
-      "sha": "5aefcedf3d02558b1cc4df8fa6980f07f3b54af7442d3f312c51562d7d5963a5",
+      "sha": "33609483abae8e3bddb42f3c88d8f565bc552288e5a38013e638279cc74d14ef",
       "sockets": 3,
       "species": "car"
     },

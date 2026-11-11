@@ -7,7 +7,7 @@
 -- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
 -- These kinds are SHAPED (owner 2026-11-11: "the vehicles are extremely rough"), a vehicle from about forty
 -- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building):
--- sedan, patrol car, ambulance, delivery van. The rest are still the ten-block placeholder and
+-- sedan, patrol car, ambulance, delivery van, ice cream van. The rest are still the ten-block placeholder and
 -- follow the same recipe.
 -- Names follow Actors/RigSpec.car (RootPart, Body, WheelFL/FR/BL/BR, LightBar (+ LightBarB, the second
 -- beacon colour), Headlights, TailLights;
@@ -278,6 +278,26 @@ local function sedanParts(k: Kit, color: Rgb): number
 	return (screen1 + rear1) / 2
 end
 
+-- a box anywhere: x0..x1, y0..y1 above the ground, z0..z1
+local function box(
+	k: Kit,
+	name: string,
+	x0: number,
+	x1: number,
+	y0: number,
+	y1: number,
+	z0: number,
+	z1: number,
+	c: Rgb
+): Part
+	return put(k, {
+		name = name,
+		size = { x1 - x0, y1 - y0, z1 - z0 },
+		pos = { (x0 + x1) / 2, k.bottom + (y0 + y1) / 2, (z0 + z1) / 2 },
+		color = c,
+	})
+end
+
 -- The one-box body the vans share (ambulance, delivery van, ice cream van, RV): a short sloped bonnet
 -- behind the rounded nose, a raked windscreen, then one tall hull to a square tail under a roof with
 -- rounded edges; cab glass, mirrors out to the box, door seams, bumpers, lamps and the rear doors.
@@ -421,12 +441,61 @@ local function deliveryVanParts(k: Kit, color: Rgb): number
 	return front + 1.2
 end
 
+local SCOOP_PINK, WAFER = "#e58aa6", "#d2a25c"
+
+-- Ice cream van (SCOOP MOBILE): cream with a pink skirt between the wheels; on the kerb side (local +X,
+-- we drive on the right) a serving hatch with a counter and a pink awning; a wafer and a pink scoop on
+-- the roof over the cab, up to the top of the box.
+local function iceCreamVanParts(k: Kit, color: Rgb): number
+	local pink = hex(SCOOP_PINK)
+	local roof = k.H - 2.1
+	local bw, ends, front = vanBody(k, color, {
+		inset = 0.4,
+		sill = 0.75,
+		waist = 3.2,
+		belt = 4.2,
+		roof = roof,
+		roofR = 0.6,
+		R = 0.65,
+		screen0 = 2.4,
+		screen1 = 4.0,
+		screenTop = roof - 0.6,
+		cab = 2.6,
+		wheelR = 1.3,
+		wheelW = 1.0,
+		axleF = 2.7,
+		axleB = 12.4,
+		lampY = 1.7,
+		tailY = 2.3,
+		doors = false,
+	})
+	local archR = 1.3 + 0.17
+	add(k, "Skirt", bw + 0.02, 0.95, 2.7, -ends + 2.7 + archR + 0.06, -ends + 12.4 - archR - 0.06, pink)
+	local hatch0, hatch1 = front + 4.0, front + 7.6
+	box(k, "Hatch", bw - 0.3, bw + 0.03, 4.55, roof - 0.8, hatch0, hatch1, hex("#3b2c2a"))
+	box(k, "Counter", bw - 0.1, k.hw, 4.3, 4.55, hatch0 - 0.25, hatch1 + 0.25, hex(FIXED.chrome)).material = "Metal"
+	-- the awning: a wedge turned so its high side is against the van and it falls away toward the kerb
+	put(k, {
+		name = "Awning",
+		size = { hatch1 - hatch0 + 0.5, 0.6, k.hw - bw },
+		pos = { (bw + k.hw) / 2, k.bottom + roof - 0.9, (hatch0 + hatch1) / 2 },
+		yaw = -math.pi / 2,
+		color = pink,
+		shape = "Wedge",
+	})
+	local coneZ = front + 1.4
+	upright(k, "Cone", 0, coneZ, 0.55, roof, roof + 0.95, hex(WAFER))
+	ball(k, "Scoop", 0, k.H - 0.82, coneZ, 0.8, pink)
+	return coneZ + 2
+end
+
 -- Kinds drawn from shaped parts instead of the ten-block placeholder.
 local BUILDERS: { [string]: Builder } = {
 	sedan = sedanParts,
 	patrol_car = sedanParts,
 	ambulance = ambulanceParts,
 	delivery_van = deliveryVanParts,
+	ice_cream_van = iceCreamVanParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against

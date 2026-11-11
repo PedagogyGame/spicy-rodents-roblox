@@ -13,9 +13,8 @@ local Boxes = require("@shared/Traffic/Boxes")
 
 -- Kinds drawn from shaped parts, and the rest with the part count of their ten-block placeholder. A kind
 -- moves from BLOCKS to SHAPED when it gets its builder.
-local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van" }
+local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van" }
 local BLOCKS: { [string]: number } = {
-	ice_cream_van = 10,
 	trolley = 10,
 	dump_truck = 10,
 	rv = 10,
@@ -318,6 +317,54 @@ return function(t)
 		t.near(p.Mirrors.size[1], box.width, 1e-6, "the mirrors reach the box")
 		t.eq(p.LightBar.transparency, 1)
 	end)
+
+	t.test(
+		"the ice cream van: a serving hatch, counter and awning on the kerb side, a wafer and a scoop on the roof",
+		function()
+			local p = byName(VehiclePuppet.spec("ice_cream_van"))
+			local box = Boxes.get("ice_cream_van")
+			local function pink(c: PartBuilder.Rgb): boolean
+				return c.r > 0.8 and c.r > c.g * 1.3 and c.b > c.g
+			end
+			-- the hatch is on local +X only (the kerb side: we drive on the right), behind the cab
+			for _, name in { "Hatch", "Counter", "Awning" } do
+				t.truthy(p[name].pos[1] > 0 and p[name].pos[1] - p[name].size[1] / 2 > 0, `{name} is on the kerb side`)
+				t.truthy(p[name].pos[3] > p.SideGlass.pos[3], `{name} is behind the cab`)
+			end
+			t.truthy(lum(p.Hatch.color) < 0.25, "the hatch is a dark opening")
+			t.truthy(
+				p.Counter.pos[2] < p.Hatch.pos[2] and p.Awning.pos[2] > p.Hatch.pos[2],
+				"counter below, awning above"
+			)
+			t.near(p.Counter.pos[1] + p.Counter.size[1] / 2, box.width / 2, 1e-6, "the counter reaches the box")
+			-- the awning is a wedge turned to fall away from the van
+			t.eq(p.Awning.shape, "Wedge")
+			t.near(p.Awning.yaw :: number, -math.pi / 2, 1e-9)
+			t.truthy(pink(p.Awning.color) and pink(p.Skirt.color) and pink(p.Scoop.color), "pink trim")
+			-- the cone: a wafer cylinder standing on the roof with a ball on it, up to the top of the box
+			t.eq(p.Cone.shape, "Cylinder")
+			t.near(p.Cone.roll :: number, math.pi / 2, 1e-9, "the wafer stands upright")
+			t.eq(p.Scoop.shape, "Ball")
+			t.near(
+				p.Cone.pos[2] - p.Cone.size[1] / 2,
+				p.Roof.pos[2] + p.Roof.size[2] / 2,
+				1e-6,
+				"the wafer stands on the roof"
+			)
+			t.truthy(
+				p.Scoop.pos[2] > p.Cone.pos[2] and p.Scoop.size[1] > p.Cone.size[2],
+				"the scoop sits on and overhangs it"
+			)
+			t.truthy(
+				p.Scoop.pos[2] + p.Scoop.size[2] / 2 > box.height / 2 - 0.1,
+				"the scoop reaches the top of the box"
+			)
+			t.truthy(p.Scoop.pos[3] < p.Hatch.pos[3], "over the cab")
+			-- the skirt lies between the wheel arches, not across them
+			t.truthy(p.Skirt.pos[3] - p.Skirt.size[3] / 2 > p.ArchF.pos[3] + p.ArchF.size[2] / 2)
+			t.truthy(p.Skirt.pos[3] + p.Skirt.size[3] / 2 < p.ArchB.pos[3] - p.ArchB.size[2] / 2)
+		end
+	)
 
 	t.test("a kind not yet shaped is the ten-block placeholder, unchanged in part count", function()
 		local seen = 0
