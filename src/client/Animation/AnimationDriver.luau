@@ -77,6 +77,9 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local HeroAssets = Import.shared("Actors/HeroAssets") :: typeof(require("../../shared/Actors/HeroAssets"))
+-- (a module reached through Import carries its values' types but not its exported type names:
+-- this is the same type, taken from a value)
+type HeroClip = typeof(HeroAssets.CLIPS.squirrel.Idle)
 local HospitalLayout =
 	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
 
@@ -134,7 +137,7 @@ type Entry = {
 	anchored: boolean,
 	applied: number,
 	kin: boolean, -- a kinematic controller drew this body last frame
-	hero: { [string]: HeroAssets.Clip }?, -- a sculpted hero rig playing its authored clips
+	hero: { [string]: HeroClip }?, -- a sculpted hero rig playing its authored clips
 	biteSeen: number?, -- the body's BiteAt attribute as last seen (biteDue)
 	biteTrack: AnimationTrack?, -- the Bite clip, played over whatever the body is doing
 	mode: string, -- what a hero body is doing (heroClip's mode), for Animation/Liveliness
@@ -762,7 +765,7 @@ function AnimationDriver.start(opts: Opts): Driver
 		local joints: { Joint } = {}
 		local tailN = 0
 		local animator: Animator? = nil
-		local hero: { [string]: HeroAssets.Clip }? = nil
+		local hero: { [string]: HeroClip }? = nil
 		if Gait.PROCEDURAL[species] and clips[species] == nil then
 			local hip = model:GetAttribute("HipHeight")
 			gait = Gait.params(species, if type(hip) == "number" then hip else nil)

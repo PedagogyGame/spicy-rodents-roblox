@@ -213,7 +213,7 @@ end
 
 -- A menu or panel that needs the cursor says so here (and takes it back with on = false).
 function CameraRig.wantCursor(key: string, on: boolean)
-	cursorWanted[key] = if on then true else nil
+	(cursorWanted :: { [string]: boolean? })[key] = if on then true else nil
 end
 
 -- Another script owns camera.CFrame for a while (a minigame's scripted shot): the orbit writes nothing

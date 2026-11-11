@@ -66,7 +66,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 		}
 	end
 	local ui = MinigameUI.new()
-	local place: AlleyLayout.Place? = nil
+	local place: { x: number, z: number, floorY: number, yaw: number }? = nil -- AlleyLayout.Place
 	pcall(function()
 		local mod = Data.default():module("Attractions") :: any
 		local a = mod and mod.attractions and mod.attractions[1]
@@ -235,7 +235,9 @@ function MinigameClient.start(opts: { [string]: any }): any
 	end
 
 	stateR.OnClientEvent:Connect(function(msg: { [string]: any })
-		local ok, err = pcall(function()
+		-- (pcall of a function that returns nothing still returns the error on failure; the checker
+		-- counts one value)
+		local ok, err = (pcall :: any)(function()
 			local kind = msg.kind
 			local a = active
 			if kind == "joined" then
@@ -297,9 +299,10 @@ function MinigameClient.start(opts: { [string]: any }): any
 				if a.controller then
 					a.controller:onState(msg)
 				end
-				if view.phase == "done" and a.game ~= "fortune_machine" then
+				local playing: string = a.game -- (tested on a.game itself, the checker narrows it for the branches below)
+				if view.phase == "done" and playing ~= "fortune_machine" then
 					setButtons({ { "again", "Play again" }, { "leave", "Leave (Q)" } })
-				elseif view.phase == "playing" and a.game == "bowling" then
+				elseif view.phase == "playing" and playing == "bowling" then
 					setButtons({ { "leave", "Leave (Q)" } })
 				end
 				-- bowling's end card: ranked scores and what to press, with the reset counting down
