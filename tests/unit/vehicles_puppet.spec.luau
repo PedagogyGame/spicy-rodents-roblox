@@ -271,14 +271,19 @@ return function(t)
 	end)
 
 	t.test(
-		"the ambulance: a low white van with a red stripe, a red cross on each flank and a red and white bar",
+		"the ambulance: a low white van with a red stripe, a green cross on each flank and a red and white bar",
 		function()
 			local spec = VehiclePuppet.spec("ambulance")
 			local p = byName(spec)
 			t.truthy(lum(p.Hull.color) > 0.8, "white")
 			for _, name in { "Stripe", "CrossV", "CrossH" } do
 				local c = p[name].color
-				t.truthy(c.r > 0.7 and c.g < 0.35 and c.b < 0.35, `{name} is red`)
+				if name == "Stripe" then
+					t.truthy(c.r > 0.7 and c.g < 0.35 and c.b < 0.35, "the stripe is red")
+				else
+					-- never a red cross on white: that emblem is protected
+					t.truthy(c.g > c.r + 0.2 and c.g > c.b, `{name} is green`)
+				end
 				t.truthy(p[name].size[1] > p.Hull.size[1], `{name} shows on both flanks`)
 			end
 			t.truthy(

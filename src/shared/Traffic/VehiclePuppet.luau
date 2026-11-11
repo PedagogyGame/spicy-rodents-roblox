@@ -376,8 +376,8 @@ end
 
 local STRIPE_RED = "#c9372c"
 
--- Ambulance: the sedan's box, so a low car-derived van: white, a red stripe along the flanks, a red
--- cross on each side, the red and white bar over the cab.
+-- Ambulance: the sedan's box, so a low car-derived van: white, a red stripe along the flanks, a green
+-- medical cross on each side, the red and white bar over the cab.
 local function ambulanceParts(k: Kit, color: Rgb): number
 	local H = k.H
 	local red = hex(STRIPE_RED)
@@ -403,8 +403,11 @@ local function ambulanceParts(k: Kit, color: Rgb): number
 	})
 	add(k, "Stripe", bw + 0.03, 2.45, 2.8, front + 2.5, ends - 0.02, red)
 	local crossZ = (front + 2.4 + ends) / 2
-	add(k, "CrossV", bw + 0.035, 3.1, 4.3, crossZ - 0.2, crossZ + 0.2, red)
-	add(k, "CrossH", bw + 0.045, 3.5, 3.9, crossZ - 0.6, crossZ + 0.6, red)
+	-- the medical cross is green: a red cross on white is the protected emblem of the Red Cross and
+	-- must not be used on a game's ambulance
+	local green = hex("#2f9e5b")
+	add(k, "CrossV", bw + 0.035, 3.1, 4.3, crossZ - 0.2, crossZ + 0.2, green)
+	add(k, "CrossH", bw + 0.045, 3.5, 3.9, crossZ - 0.6, crossZ + 0.6, green)
 	return front + 1.1
 end
 
