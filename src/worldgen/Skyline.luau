@@ -45,7 +45,7 @@ function Skyline.plan(
 					castShadow = false,
 					color = p.parts[1].color,
 					role = "Skyline",
-					attrs = { Lot = p.id },
+					attrs = { Lot = p.id } :: Spec.Attrs,
 				})
 			end
 		end
@@ -92,7 +92,7 @@ function Skyline.plan(
 			color = { 255, 228, 170 },
 			material = "Neon",
 			role = "Skyline",
-			attrs = { Lamp = l.id, Flicker = l.flicker },
+			attrs = { Lamp = l.id, Flicker = l.flicker } :: Spec.Attrs,
 		})
 	end
 	return {

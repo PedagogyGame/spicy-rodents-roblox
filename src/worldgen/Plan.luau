@@ -363,7 +363,7 @@ function Plan.foundation(lot: Lot, kit: Kits.Kit, seat: number, list: Spec.PartL
 			transparency = 0,
 			castShadow = false,
 			role = "Trim",
-			attrs = { Embedded = true },
+			attrs = { Embedded = true } :: Spec.Attrs,
 		})
 	end
 end

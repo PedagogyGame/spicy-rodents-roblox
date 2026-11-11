@@ -120,7 +120,7 @@ local function doorLeaf(
 	interior: boolean,
 	motion: Motion
 )
-	local attrs = {
+	local attrs: Spec.Attrs = {
 		DoorId = d.id,
 		ServerOwned = true,
 		Lockable = d.lockable,
@@ -496,7 +496,7 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 				canQuery = true,
 				role = "Room",
 				color = { 255, 255, 255 },
-				attrs = { RoomId = r.id, RoomName = r.name, Exterior = r.exterior == true, RoomKind = r.kind or "" },
+				attrs = { RoomId = r.id, RoomName = r.name, Exterior = r.exterior == true, RoomKind = r.kind or "" } :: Spec.Attrs,
 			}
 		)
 	end
@@ -519,7 +519,7 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 		canCollide = false,
 		transparency = 1,
 		role = "Anchor",
-		attrs = { NavNodes = #graph.nodes, NavUnreached = #RoomGraph.unreached(graph, "outside") },
+		attrs = { NavNodes = #graph.nodes, NavUnreached = #RoomGraph.unreached(graph, "outside") } :: Spec.Attrs,
 	})
 	for _, node in graph.nodes do
 		if node.id ~= "outside" then

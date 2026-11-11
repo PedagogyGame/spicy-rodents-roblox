@@ -307,7 +307,7 @@ function Building.sign(ctx: Spec.LotCtx, text: string, y: number, width: number?
 		color = if pal.timber then pal.accent else SIGN,
 		canCollide = false,
 		role = "Sign",
-		attrs = { SignText = text },
+		attrs = { SignText = text } :: Spec.Attrs,
 	})
 	ctx.list:extra({ kind = "SurfaceGui", part = "SignBoard", name = "Sign", text = text, face = "Front" })
 end
@@ -332,7 +332,7 @@ function Building.door(ctx: Spec.LotCtx, width: number, height: number): (number
 		color = Building.look(ctx).door,
 		material = "Wood",
 		role = "Door",
-		attrs = { DoorId = ctx.lot.id .. ":front", ServerOwned = true, Lockable = true, Open = false, Locked = false },
+		attrs = { DoorId = ctx.lot.id .. ":front", ServerOwned = true, Lockable = true, Open = false, Locked = false } :: Spec.Attrs,
 	})
 	ctx.list:extra({
 		kind = "Prompt",
@@ -340,7 +340,7 @@ function Building.door(ctx: Spec.LotCtx, width: number, height: number): (number
 		name = "Prompt",
 		action = "Open",
 		offset = { 0, 0, -0.3 },
-		attrs = { Placeholder = true },
+		attrs = { Placeholder = true } :: Spec.Attrs,
 	})
 	ctx.attributes.DoorOutside = true
 	Facade.entrance(ctx, {
