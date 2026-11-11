@@ -24,8 +24,20 @@ local scenario: Replay.Scenario = {
 			v.s = v.lane.length - math.max(v.cruise, 10) * (2 + 0.4 * i)
 		end
 	end,
-	expect = { none = { "speed_stutter", "sink", "float", "sim_jump_unflagged" }, some = { "teleport_flagged" } },
-	known = { "teleport_bit_dropped", "teleport_unflagged" },
+	-- every wrap snaps on every client (the flag is carried to the next send); each is still a car vanishing
+	-- at one end of a street and appearing at the other, in the middle of the town
+	expect = {
+		none = {
+			"speed_stutter",
+			"sink",
+			"float",
+			"sim_jump_unflagged",
+			"teleport_bit_dropped",
+			"teleport_unflagged",
+			"accel_spike",
+		},
+		some = { "teleport_flagged" },
+	},
 }
 
 return scenario

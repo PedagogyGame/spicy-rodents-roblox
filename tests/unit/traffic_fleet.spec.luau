@@ -354,7 +354,12 @@ return function(t)
 				stopped = false,
 			}),
 		})
-		t.near(g:sample(0.5)[1].x, 100, 1e-6, "teleport snaps")
+		-- until the snapshot that carries it, the car carries on along its heading at its speed (yaw 0 is +z);
+		-- from that snapshot on it is where the teleport put it, never in between
+		local before = g:sample(0.5)[1]
+		t.near(before.x, 0, 1e-6, "no streak towards the teleport's end")
+		t.near(before.z, 0.5, 1e-6, "carries on at its speed until the snap")
+		t.near(g:sample(1)[1].x, 100, 1e-6, "teleport snaps")
 		local h = Ghost.new({ delay = 0 })
 		h:push(0, {
 			Ghost.encode({

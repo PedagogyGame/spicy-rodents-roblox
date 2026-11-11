@@ -89,6 +89,9 @@ export type TrafficService = typeof(setmetatable(
 		rngState: number,
 		sceneSecs: number,
 		_stuckRun: { [number]: number },
+		-- vehicles that teleported since the last pose send: the flag must reach the wire even when the
+		-- tick that set it is not the one a send goes out after (30 Hz ticks, 15 Hz sends)
+		_snapPending: { [number]: boolean },
 		_stats: Stats,
 		RunOver: Signal,
 		unified: { string },
@@ -138,6 +141,7 @@ function TrafficService.new(opts: Opts): TrafficService
 		rngState = (opts.seed or 5401) % 4294967296,
 		sceneSecs = opts.sceneSecs or 30,
 		_stuckRun = {},
+		_snapPending = {},
 		_stats = { ticks = 0, ms = 0, maxTickMs = 0, hits = 0, stuck = {}, events = {}, violations = {} },
 		RunOver = Signal.new(),
 		unified = unified,
@@ -211,6 +215,9 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 	for _, v in self.vehicles do
 		local wasStopped = v.phase
 		local events = AICarMotor.step(v, ctx, dt)
+		if v.teleported then
+			self._snapPending[v.id] = true
+		end
 		for _, ev in events do
 			stats.events[ev] = (stats.events[ev] or 0) + 1
 			if ev == "rollingStop" then
@@ -303,9 +310,13 @@ function TrafficService.poses(self: TrafficService): { SweptCollision.VehiclePos
 	return out
 end
 
--- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them).
+-- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them). A
+-- vehicle that teleported on any tick since the previous call carries the flag (the call is the send),
+-- so a wrap on a tick between two sends still snaps on every client instead of streaking across town.
 function TrafficService.poseRecords(self: TrafficService): { { [string]: number } }
 	local out = table.create(#self.vehicles)
+	local pending = self._snapPending
+	self._snapPending = {}
 	for _, v in self.vehicles do
 		table.insert(
 			out,
@@ -317,7 +328,7 @@ function TrafficService.poseRecords(self: TrafficService): { { [string]: number 
 				speed = v.speed,
 				visible = v.visible,
 				beacons = v.class == "responder" or v.class == "incident" or v.class == "legacy_ambulance",
-				teleported = v.teleported,
+				teleported = v.teleported or pending[v.id] == true,
 				stopped = v.speed < 0.05,
 			})
 		)

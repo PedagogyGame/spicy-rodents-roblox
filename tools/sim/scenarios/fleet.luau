@@ -23,10 +23,13 @@ local scenario: Replay.Scenario = {
 			"roll_missing",
 			"ghost_visibility",
 			"teleport_bit_lost",
+			"teleport_bit_dropped",
+			"teleport_unflagged",
 		},
 	},
-	-- shows today (wraps whose flag misses the send; vehicles that share a lane)
-	known = { "teleport_bit_dropped", "teleport_unflagged", "box_overlap" },
+	-- shows today (vehicles that share a lane). A wrap's flag now reaches the wire however the tick falls
+	-- between two sends (TrafficService.poseRecords carries it until the next send)
+	known = { "box_overlap" },
 }
 
 return scenario
