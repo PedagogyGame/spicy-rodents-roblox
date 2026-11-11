@@ -7,7 +7,7 @@
 -- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
 -- These kinds are SHAPED (owner 2026-11-11: "the vehicles are extremely rough"), a vehicle from about forty
 -- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building):
--- sedan, patrol car, ambulance, delivery van, ice cream van, trolley, dump truck, rv. The rest are still the ten-block placeholder and
+-- sedan, patrol car, ambulance, delivery van, ice cream van, trolley, dump truck, rv, cart. The rest are still the ten-block placeholder and
 -- follow the same recipe.
 -- Names follow Actors/RigSpec.car (RootPart, Body, WheelFL/FR/BL/BR, LightBar (+ LightBarB, the second
 -- beacon colour), Headlights, TailLights;
@@ -665,6 +665,56 @@ local function rvParts(k: Kit, color: Rgb): number
 	return front + 1.2
 end
 
+local CART_SEAT = "#c9b68f"
+
+-- Golf cart: an open tub with a rounded nose and a sloped cowl, a bench seat, two golf bags standing on
+-- the rear deck, and a canopy (the top of the box) on four posts behind a clear windshield.
+local function cartParts(k: Kit, color: Rgb): number
+	local hw, hl, H = k.hw, k.hl, k.H
+	local trim, seat = hex(FIXED.trim), hex(CART_SEAT)
+	local bw, ends, R = hw - 0.12, hl - 0.12, 0.45
+	local sill, floor, cowl = 0.45, 1.3, 1.85
+	local dash, bench, deck = -hl + 2.3, 0.4, 1.9 -- stations (Z) of the dash, the seat front and the deck
+
+	add(k, "Body", bw, sill, floor, dash + 0.3, ends, color)
+	add(k, "Front", bw, sill, cowl, -ends + R, dash + 0.3, color)
+	roundNose(k, bw, ends, R, sill, cowl, color)
+	add(k, "Cowl", bw, cowl, 2.25, -ends + R, dash + 0.3, color).shape = "Wedge"
+	add(k, "SeatBase", bw - 0.1, floor, 1.85, bench, deck, color)
+	add(k, "Seat", bw - 0.2, 1.85, 2.12, bench - 0.05, deck - 0.15, seat)
+	add(k, "SeatBack", bw - 0.2, 2.12, 3.1, deck - 0.4, deck - 0.1, seat)
+	add(k, "Deck", bw, floor, 1.75, deck, ends, color)
+	upright(k, "Bag1", -0.75, deck + 0.75, 0.38, 1.75, 3.4, hex("#3f6b4a"))
+	upright(k, "Bag2", 0.75, deck + 0.75, 0.38, 1.75, 3.25, hex("#8c3b32"))
+
+	-- canopy, posts, windshield, steering wheel (on the driver's side, local -X)
+	add(k, "Canopy", bw, H - 0.25, H, dash - 0.5, deck + 0.9, color)
+	for _, c in
+		{
+			{ tag = "FL", sx = -1, z = dash + 0.15, foot = 2.1 },
+			{ tag = "FR", sx = 1, z = dash + 0.15, foot = 2.1 },
+			{ tag = "BL", sx = -1, z = deck + 0.1, foot = 1.75 },
+			{ tag = "BR", sx = 1, z = deck + 0.1, foot = 1.75 },
+		}
+	do
+		local x = c.sx * (bw - 0.1)
+		box(k, `Post{c.tag}`, x - 0.07, x + 0.07, c.foot, H - 0.25, c.z - 0.07, c.z + 0.07, trim)
+	end
+	local shield = add(k, "Windshield", bw - 0.2, 2.2, H - 0.5, dash + 0.12, dash + 0.18, hex("#a9c0cb"))
+	shield.material, shield.transparency = "Glass", 0.55
+	along(k, "Steering", -0.85, 2.45, 0.32, dash + 0.45, dash + 0.53, trim)
+
+	running(k, bw, hw - 0.05, 0.6, 0.5, 0.75, 0.3, -hl + 1.35, hl - 1.3)
+	add(k, "BumperF", bw - 0.2, sill - 0.05, sill + 0.3, -hl, -ends + 0.3, trim)
+	add(k, "BumperB", bw - 0.1, sill - 0.05, sill + 0.3, ends - 0.3, hl, trim)
+	local lamp = bw - R - 0.04
+	add(k, "Headlights", lamp, 0.95, 1.27, -ends - 0.05, -ends + 0.05, hex(FIXED.head)).material = "Neon"
+	add(k, "Badge", lamp - 0.5, 0.91, 1.31, -ends - 0.08, -ends + 0.05, color)
+	add(k, "TailLights", bw - 0.2, 0.85, 1.1, ends - 0.05, ends + 0.05, hex(FIXED.tail)).material = "Neon"
+	add(k, "TailPanel", bw - 0.75, 0.81, 1.14, ends - 0.05, ends + 0.08, color)
+	return 0.6
+end
+
 -- Kinds drawn from shaped parts instead of the ten-block placeholder.
 local BUILDERS: { [string]: Builder } = {
 	sedan = sedanParts,
@@ -675,6 +725,7 @@ local BUILDERS: { [string]: Builder } = {
 	trolley = trolleyParts,
 	dump_truck = dumpTruckParts,
 	rv = rvParts,
+	cart = cartParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against

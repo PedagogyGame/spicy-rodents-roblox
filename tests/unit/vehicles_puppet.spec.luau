@@ -13,9 +13,9 @@ local Boxes = require("@shared/Traffic/Boxes")
 
 -- Kinds drawn from shaped parts, and the rest with the part count of their ten-block placeholder. A kind
 -- moves from BLOCKS to SHAPED when it gets its builder.
-local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley", "dump_truck", "rv" }
+local SHAPED =
+	{ "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley", "dump_truck", "rv", "cart" }
 local BLOCKS: { [string]: number } = {
-	cart = 10,
 	motorcycle = 10,
 }
 
@@ -463,6 +463,36 @@ return function(t)
 			t.eq(p.RearPanel.color.r, p.Hull.color.r, "a plain back")
 		end
 	)
+
+	t.test("the golf cart: an open tub, a bench, two bags on the deck, a canopy on four posts", function()
+		local p = byName(VehiclePuppet.spec("cart"))
+		local box = Boxes.get("cart")
+		t.near(p.Canopy.pos[2] + p.Canopy.size[2] / 2, box.height / 2, 1e-6, "the canopy is the top of the box")
+		for _, name in { "PostFL", "PostFR", "PostBL", "PostBR" } do
+			local post = p[name]
+			t.truthy(post.size[1] < 0.2 and post.size[3] < 0.2 and post.size[2] > 2, `{name} is a thin post`)
+			t.near(
+				post.pos[2] + post.size[2] / 2,
+				p.Canopy.pos[2] - p.Canopy.size[2] / 2,
+				1e-6,
+				`{name} carries the canopy`
+			)
+		end
+		t.truthy(p.PostFL.pos[1] < 0 and p.PostFR.pos[1] > 0 and p.PostFL.pos[3] < p.PostBL.pos[3])
+		-- open: nothing but posts and a clear windshield between the tub and the canopy
+		t.truthy((p.Windshield.transparency :: number) >= 0.4, "the windshield is clear")
+		t.eq(p.Cowl.shape, "Wedge")
+		t.truthy(p.Seat.pos[2] < p.SeatBack.pos[2] and p.SeatBack.pos[3] > p.Seat.pos[3], "a bench with a back")
+		t.truthy(p.Seat.pos[2] + p.Seat.size[2] / 2 < p.Canopy.pos[2] - 2, "headroom over the bench")
+		for _, name in { "Bag1", "Bag2" } do
+			t.eq(p[name].shape, "Cylinder")
+			t.near(p[name].roll :: number, math.pi / 2, 1e-9, `{name} stands upright`)
+			t.truthy(p[name].pos[3] > p.SeatBack.pos[3], `{name} is behind the seat`)
+		end
+		t.truthy(p.Bag1.color.g > p.Bag1.color.r and p.Bag2.color.r > p.Bag2.color.g, "a green bag and a red one")
+		t.truthy(p.Steering.pos[1] < 0, "the wheel is on the driver's side")
+		t.truthy(p.WheelFL.size[2] < 1.5, "small wheels")
+	end)
 
 	t.test("a kind not yet shaped is the ten-block placeholder, unchanged in part count", function()
 		local seen = 0

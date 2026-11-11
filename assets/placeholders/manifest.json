@@ -166,12 +166,12 @@
       "species": "car"
     },
     {
-      "bytes": 2386,
+      "bytes": 4467,
       "file": "vehicle_cart.rbxm",
-      "joints": 9,
-      "parts": 10,
+      "joints": 37,
+      "parts": 38,
       "rigspec": true,
-      "sha": "d5d9efb9dab2ae1223c7eec8207d0c5c33a96e3d2c0224ee1082a46574b686aa",
+      "sha": "42b086fd430cd861cd6a86e02490a13b7b4e524240aea66a820c435bb20518fe",
       "sockets": 3,
       "species": "car"
     },
