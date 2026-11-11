@@ -106,6 +106,7 @@ type Record = {
 	possessable: boolean,
 	gone: boolean, -- the body is out of the world: the case waits
 	faults: number, -- times this case's step failed
+	strayed: boolean, -- staff bitten far from their round: walked back to it when their run is over
 }
 
 type Scene = {
@@ -130,6 +131,10 @@ InfectionService.HOME_SNAP = 45 -- studs: a townsperson's walk home ends on the 
 InfectionService.RETRY_SECS = 20 -- a case whose step failed tries again after this, times its failures
 InfectionService.CREW_WALK_SECS = 12 -- the crew walks this long to a patient; anything further it runs
 InfectionService.AWAY_SECS = 2 -- a cured person with no way home on foot is out of sight this long, then home
+InfectionService.RUN = 30 -- studs: the run of a bitten person who has no lane to run along
+InfectionService.RUN_MIN = 8 -- studs: with less room than this there is no run
+InfectionService.STRAY = 60 -- studs from their own round: staff further off than this are walked back by a real way
+InfectionService.CROWD_SCARE = 30 -- studs: a bystander this near the rodent leaves the crowd and runs
 
 -- What a player holding a body is told (on screen, plain words, what to do).
 InfectionService.TOASTS = table.freeze({
@@ -495,7 +500,151 @@ function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { n
 	return way, wayLen + math.sqrt((door[1] - out[1]) ^ 2 + (door[2] - out[2]) ^ 2)
 end
 
+-- a run with no lane -----------------------------------------------------------------------------
+
+local RUN_TURNS = { 0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, 2.6, -2.6 } -- rad off the straight line away
+local WALL = 2.5 -- studs a run indoors keeps from the walls
+
+-- Where someone with no lane to run along runs from a threat at (fx, fz): the waypoints of a short
+-- run, or nil when there is no room for one.
+--   Indoors (the wards, the police station, a shop floor: the point is inside a building's box) the
+--   run stays inside that building, as far as its walls allow, in the best direction. Nothing stops
+--   a kinematic walker at a wall, so a run "out" would be a run through it. (The old test wanted a
+--   clear line from the start point, which no line that starts inside a box is: of the 38 staff, the
+--   29 who work indoors never ran.)
+--   Outdoors: RUN studs along the first clear line, turning further from straight away at each try;
+--   with every line blocked, round the building in the way (World/FootPath, a short search).
+local function runWay(self: Service, x: number, z: number, fx: number, fz: number): { { number } }?
+	local dx, dz = x - fx, z - fz
+	local m = math.sqrt(dx * dx + dz * dz)
+	if m < 0.01 then
+		dx, dz, m = 1, 0, 1
+	end
+	dx, dz = dx / m, dz / m
+	local foot = self.foot
+	local run = InfectionService.RUN
+	local own = FootPath.boxesAt(foot, x, z)
+	local inside = false
+	if own then
+		for b in own do
+			if math.abs(x - b.cx) < b.hw and math.abs(z - b.cz) < b.hd then
+				inside = true
+			end
+		end
+	end
+	if own and inside then
+		local bestLen, bx, bz = 0, x, z
+		for _, turn in RUN_TURNS do
+			local c, s = math.cos(turn), math.sin(turn)
+			local ux, uz = dx * c - dz * s, dx * s + dz * c
+			local len = run
+			for b in own do
+				if math.abs(x - b.cx) < b.hw and math.abs(z - b.cz) < b.hd then
+					-- how far along (ux, uz) this building's walls are, less the margin
+					if math.abs(ux) > 1e-6 then
+						local wall = if ux > 0 then b.cx + b.hw - WALL else b.cx - b.hw + WALL
+						len = math.min(len, (wall - x) / ux)
+					end
+					if math.abs(uz) > 1e-6 then
+						local wall = if uz > 0 then b.cz + b.hd - WALL else b.cz - b.hd + WALL
+						len = math.min(len, (wall - z) / uz)
+					end
+				end
+			end
+			if len > bestLen + 0.5 and FootPath.clear(foot, x, z, x + ux * len, z + uz * len, own) then
+				bestLen, bx, bz = len, x + ux * len, z + uz * len
+				if len >= run then
+					break
+				end
+			end
+		end
+		return if bestLen >= InfectionService.RUN_MIN then { { bx, bz } } else nil
+	end
+	local bounds = foot.bounds
+	local function target(turn: number): (number, number, boolean)
+		local c, s = math.cos(turn), math.sin(turn)
+		local ux, uz = dx * c - dz * s, dx * s + dz * c
+		local tx, tz = x + ux * run, z + uz * run
+		local ok = tx > bounds.minX and tx < bounds.maxX and tz > bounds.minZ and tz < bounds.maxZ
+		if ok and own then
+			-- right beside a wall (inside the box grown by a walker's width): only away from it
+			for b in own do
+				local nx = if math.abs(x - b.cx) >= b.hw then math.sign(x - b.cx) else 0
+				local nz = if math.abs(z - b.cz) >= b.hd then math.sign(z - b.cz) else 0
+				if ux * nx + uz * nz <= 0.1 then
+					ok = false
+				end
+			end
+		end
+		return tx, tz, ok
+	end
+	for _, turn in RUN_TURNS do
+		local tx, tz, ok = target(turn)
+		if ok and FootPath.clear(foot, x, z, tx, tz, own) then
+			return { { tx, tz } }
+		end
+	end
+	for i = 1, 3 do
+		local tx, tz, ok = target(RUN_TURNS[i])
+		if ok and FootPath.boxesAt(foot, tx, tz) == nil then
+			local way = FootPath.find(foot, x, z, tx, tz, { maxLength = run * 1.5, maxNodes = 300 })
+			if way then
+				return way
+			end
+		end
+	end
+	return nil
+end
+
+-- how far (x, z) is from the round a Staff or Officer brain walks (the closed loop of its points)
+local function offRound(points: { { number } }, x: number, z: number): number
+	local best = math.huge
+	local n = #points
+	for i = 1, n do
+		local p, q = points[i], points[i % n + 1]
+		local ex, ez = q[1] - p[1], q[2] - p[2]
+		local l2 = ex * ex + ez * ez
+		local t = if l2 > 0 then math.clamp(((x - p[1]) * ex + (z - p[2]) * ez) / l2, 0, 1) else 0
+		best = math.min(best, math.sqrt((x - p[1] - ex * t) ^ 2 + (z - p[2] - ez * t) ^ 2))
+	end
+	return best
+end
+
+-- A person with no lane under their feet runs from `threat` (runWay). False when there was no room.
+local function runFrom(self: Service, id: number, threat: any, after: string?): boolean
+	local a = actorOf(self, id)
+	local way = if a then runWay(self, a.x, a.z, threat.x, threat.z) else nil
+	if way == nil then
+		return false
+	end
+	order(self, id, { mode = "route", points = way, speed = InfectionService.FLEE_SPEED, after = after })
+	return true
+end
+
 -- scenes -----------------------------------------------------------------------------------------
+
+-- the squirrels people are afraid of, in sight: the Spicy Rodent and any infected squirrel
+local function threats(self: Service): { any }
+	local out = {}
+	for _, o in self.world.actors do
+		if o.species == "squirrel" and (o.variant == "spicy" or o.infected == true) and (o.lift or 0) == 0 then
+			table.insert(out, o)
+		end
+	end
+	return out
+end
+
+-- the threat within `r` studs of (x, z) that is nearest, if any
+local function threatNear(list: { any }, x: number, z: number, r: number): any?
+	local best, bestD = nil, r * r
+	for _, o in list do
+		local d = (o.x - x) ^ 2 + (o.z - z) ^ 2
+		if d <= bestD then
+			best, bestD = o, d
+		end
+	end
+	return best
+end
 
 local function releaseBystander(self: Service, id: number)
 	if self.busy[id] ~= nil then
@@ -516,12 +665,16 @@ local function closeScene(self: Service, victim: number)
 end
 
 -- the crew member's job is over: back at the ambulance bay (they rode home), or, with `stay`, let go
--- where they stand (a paramedic bitten at the scene becomes a patient there)
+-- where they stand (a paramedic bitten at the scene becomes a patient there). With `stay` the way
+-- between the ambulance and the patient is kept: the patient still has to get to the ambulance, and
+-- without it they stood up, waited out the walk on the spot and vanished there.
 local function freeCrew(self: Service, rec: Record, stay: boolean?)
 	local id = rec.crew
 	rec.crewPlanned = false
-	rec.crewPath = nil
-	rec.crewFrom = nil
+	if not stay then
+		rec.crewPath = nil
+		rec.crewFrom = nil
+	end
 	if id == nil then
 		return
 	end
@@ -583,6 +736,8 @@ local function openScene(self: Service, rec: Record)
 	local scene: Scene = { victim = rec.id, x = a.x, z = a.z, bystanders = {} }
 	self.scenes[rec.id] = scene
 	local radius = self.tun.bystanderRadius
+	-- nobody walks over to stand beside the rodent: with it at the patient the scene has no crowd
+	local feared = threatNear(threats(self), a.x, a.z, InfectionService.CROWD_SCARE) ~= nil
 	local candidates = {}
 	for _, o in self.world.actors do
 		if o.species == "human" and o.id ~= rec.id then
@@ -614,7 +769,7 @@ local function openScene(self: Service, rec: Record)
 		max = self.tun.bystanders[2],
 		radius = radius,
 	})
-	if want == 0 or #chosen == 0 then
+	if want == 0 or #chosen == 0 or feared then
 		return
 	end
 	local colliders, roads = self.colliders, self.roads
@@ -680,7 +835,30 @@ local function openScene(self: Service, rec: Record)
 	end
 end
 
+-- A bystander with the rodent this close leaves the crowd and runs: an order switches the brain's own
+-- eyes off (Brains/Directive), so people stood in a ring 20 studs from the rodent on its victim, one of
+-- them saying it might still be here. A townsperson runs along their lane when they are on one; off
+-- it, and a shop worker, by the short clear run (runWay). Some say what they saw (onSpotted).
+local function scareBystander(self: Service, id: number, threat: any)
+	self.busy[id] = nil
+	order(self, id, {})
+	local brain = self.world.brains[id] :: any
+	if brain == nil then
+		return
+	end
+	if brain.kind == "Pedestrian" then
+		brain:onEvent({ type = "witness", threat = threat, alert = 10 })
+		if brain.state == "rejoin" then
+			runFrom(self, id, threat)
+		end
+	else
+		runFrom(self, id, threat)
+	end
+	self:onSpotted(id, threat.id)
+end
+
 local function stepScenes(self: Service)
+	local feared: { any }? = nil
 	for _, scene in self.scenes do
 		for i = #scene.bystanders, 1, -1 do
 			local b = scene.bystanders[i]
@@ -691,12 +869,20 @@ local function stepScenes(self: Service)
 					order(self, b.id, {})
 				end
 				table.remove(scene.bystanders, i)
-			elseif not b.said and self.now >= b.sayAt then
+			else
 				local o = actorOf(self, b.id)
-				local near = o ~= nil and (o.x - scene.x) ^ 2 + (o.z - scene.z) ^ 2 < 60 * 60
-				-- the town-wide limit may make them wait their turn; after half a minute they let it go
-				if (near and say(self, b.id, "bystander", false)) or self.now >= b.sayAt + 30 then
-					b.said = true
+				local list = feared or threats(self)
+				feared = list
+				local threat = if o then threatNear(list, o.x, o.z, InfectionService.CROWD_SCARE) else nil
+				if threat then
+					scareBystander(self, b.id, threat)
+					table.remove(scene.bystanders, i)
+				elseif not b.said and self.now >= b.sayAt then
+					local near = o ~= nil and (o.x - scene.x) ^ 2 + (o.z - scene.z) ^ 2 < 60 * 60
+					-- the town-wide limit may make them wait their turn; after half a minute they let it go
+					if (near and say(self, b.id, "bystander", false)) or self.now >= b.sayAt + 30 then
+						b.said = true
+					end
 				end
 			end
 		end
@@ -895,23 +1081,24 @@ local function flee(self: Service, rec: Record)
 	end
 	if brain.kind == "Pedestrian" then
 		brain:onEvent({ type = "bitten", threat = biter, override = true })
+		if brain.state == "rejoin" then
+			-- bitten off their lane (in a crowd, on a walk across open ground): the brain would only
+			-- walk them back to the pavement at a stroll, so they get the run of a person with no lane
+			-- first, and find the pavement after it
+			runFrom(self, rec.id, biter)
+		end
 		return
 	end
-	-- staff and officers have no lane to run along: a short clear run away from the biter
-	local dx, dz = a.x - biter.x, a.z - biter.z
-	local m = math.sqrt(dx * dx + dz * dz)
-	if m < 0.01 then
-		dx, dz, m = 1, 0, 1
+	-- Staff and officers have no lane: a short run (runWay), then back to their round. Someone bitten
+	-- far from that round (a paramedic at a scene, anyone on the walk home from the hospital) is not
+	-- handed back to the brain there: it knows only the straight line home, through whatever stands
+	-- in between. They stop where the run ends and stepCase walks them back by a real way.
+	local points = brain.points
+	local far = type(points) == "table" and #points > 0 and offRound(points, a.x, a.z) > InfectionService.STRAY
+	if not runFrom(self, rec.id, biter, if far then "stand" else nil) and far then
+		order(self, rec.id, { mode = "hold", x = a.x, z = a.z, speed = 1 }) -- no room to run: wait here
 	end
-	dx, dz = dx / m, dz / m
-	for _, turn in { 0, 0.6, -0.6, 1.2, -1.2 } do
-		local c, s = math.cos(turn), math.sin(turn)
-		local tx, tz = a.x + (dx * c - dz * s) * 30, a.z + (dx * s + dz * c) * 30
-		if clearLine(self, a.x, a.z, tx, tz) then
-			order(self, rec.id, { mode = "route", points = { { tx, tz } }, speed = InfectionService.FLEE_SPEED })
-			return
-		end
-	end
+	rec.strayed = far
 end
 
 -- Where a cured person goes: the hospital's own people, the crews, officers and shop staff back to
@@ -973,6 +1160,38 @@ local function wayHome(self: Service, layout: any, bed: any, hx: number, hz: num
 		end
 	end
 	return points, MedicalRoute.length(points)
+end
+
+-- The walk from (x, z) back to a post at (hx, hz) for someone the brain must not walk home itself
+-- (it goes in a straight line): to the hospital and its ambulance bay the way a walk-in comes (the
+-- pavements, or round the buildings), anywhere else across the open ground round the buildings. nil
+-- when there is no way on foot.
+local function wayBack(self: Service, x: number, z: number, hx: number, hz: number): { { number } }?
+	local layout = self.layout
+	if layout and HospitalLayout.contains(layout, hx, hz, InfectionService.GROUNDS) then
+		local way = self:walkRoute(x, z)
+		if way == nil then
+			return nil
+		end
+		if HospitalLayout.contains(layout, hx, hz) then
+			-- the hospital's own people: in through the door and reception
+			pushPoint(way, layout.reception[1], layout.reception[2])
+			pushPoint(way, hx, hz)
+			return way
+		end
+		-- the ambulance bay is outside: to the spot in front of the door, not through it
+		local door = way[#way]
+		if door and math.abs(door[1] - layout.entrance[1]) + math.abs(door[2] - layout.entrance[2]) < 0.75 then
+			way[#way] = nil
+		end
+		local last = way[#way] or { x, z }
+		if not FootPath.clear(self.foot, last[1], last[2], hx, hz) then
+			return nil
+		end
+		pushPoint(way, hx, hz)
+		return way
+	end
+	return (FootPath.find(self.foot, x, z, hx, hz, { maxLength = self.params.walkInMaxDist }))
 end
 
 local function apply(self: Service, rec: Record, effect: any)
@@ -1228,6 +1447,31 @@ local function stepCase(self: Service, rec: Record)
 	for _, e in effects do
 		apply(self, rec, e)
 	end
+	if inputs.controller == "player" then
+		-- A body a player holds is under no order. One given just before the hand-over (the run of a
+		-- bitten officer, a walk back) would wait in the brain and carry on when the player lets go:
+		-- a sprint in a straight line from wherever that is to where the order pointed.
+		local brain = self.world.brains[rec.id] :: any
+		if brain.directive and brain.directive.mode ~= nil then
+			order(self, rec.id, {})
+		end
+		rec.strayed = false
+	elseif rec.strayed then
+		-- staff bitten far from their round (see flee): when the run is over they walk back to their
+		-- post by a real way, at a walk; with no way they wait where they are for what their own case
+		-- does next (the walk in, or the collapse)
+		local state = rec.case.state
+		if state ~= "bitten" and state ~= "incubating" then
+			rec.strayed = false
+		elseif state == "incubating" and directiveDone(self, rec.id) then
+			rec.strayed = false
+			local hx, hz = homeOf(self, rec)
+			local way = wayBack(self, a.x, a.z, hx, hz)
+			if way then
+				order(self, rec.id, { mode = "route", points = way, speed = self.tun.dischargeSpeed })
+			end
+		end
+	end
 	-- a walk-in who has reached the bed sits down as a patient
 	if rec.toBed and directiveDone(self, rec.id) then
 		rec.toBed = false
@@ -1371,6 +1615,7 @@ function InfectionService.bite(self: Service, victimId: number, biterId: number?
 		possessable = true,
 		gone = false,
 		faults = 0,
+		strayed = false,
 	}
 	self.records[victimId] = rec
 	table.insert(self.order, victimId)

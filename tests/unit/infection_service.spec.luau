@@ -1076,7 +1076,8 @@ return function(t)
 			t.truthy(next(own) ~= nil, "the clerk stands inside the station")
 			t.truthy(h.svc:bite(clerk.id, h.rodent))
 			t.truthy(h.svc:bite(far.id, h.rodent))
-			local cx, cz, fx, fz = clerk.x, clerk.z, far.x, far.z
+			-- (the clerk runs first, inside the station, and falls where the run ends)
+			local cx, cz, fx, fz = nil :: number?, clerk.z, far.x, far.z
 			-- the clerk: an ambulance to the nearest road, the crew out of sight until it is there
 			local recC = h.svc.records[clerk.id]
 			local crew, crewActor = nil :: number?, nil :: any
@@ -1114,7 +1115,11 @@ return function(t)
 						outdoors(clerk, "the carried patient", own)
 						t.eq(clerk.lift, nil, "carried in sight")
 					elseif s ~= "transit" and s ~= "bitten" then
+						cx = cx or clerk.x
 						t.eq(clerk.x, cx, "the patient stays where they fell until they are carried")
+						t.truthy(
+							own[(Colliders.pointIn(colliders, clerk.x, clerk.z, Height.at(clerk.x, clerk.z) + 3) :: any).id]
+						)
 					end
 				end),
 				`the clerk was never loaded (state {h.svc:stateOf(clerk.id)})`
@@ -1821,6 +1826,291 @@ return function(t)
 				end
 			end
 			t.truthy(spoke, "a townsperson who saw the rodent said something")
+		end
+	)
+	-- review round 2 (2026-11-11) ---------------------------------------------------------------------
+
+	-- the rodent, parked beside (x, z) as if a player held it there
+	local function parkRodent(h: Harness, x: number, z: number)
+		local rodent = h.world.actorsById[h.rodent]
+		h.world.possessed[h.rodent] = true
+		rodent.x, rodent.z = x, z
+		rodent.y = h.world.ctx.groundAt(x, z) + 0.5
+		rodent.speed = 0
+		h.world.grid:set(h.rodent, x, z)
+	end
+
+	t.test(
+		"everyone runs when bitten: all 38 people with no lane, indoors without leaving the building, outdoors on clear ground",
+		function()
+			local h = harness(71, nil, function(params: any)
+				params.immediateChance = 0
+			end)
+			h.step(20)
+			local ran: { { a: any, x: number, z: number, len: number } } = {}
+			local indoorsN, n = 0, 0
+			for _, a in h.world.actors do
+				local brain = h.world.brains[a.id] :: any
+				if a.species == "human" and brain.kind ~= "Pedestrian" then
+					n += 1
+					-- the rodent 2 studs away, from a different side each time
+					local x0, z0 = a.x, a.z
+					parkRodent(h, x0 + math.cos(n * 2.4) * 2, z0 + math.sin(n * 2.4) * 2)
+					local own = boxesAt(x0, z0)
+					local indoors = Colliders.pointIn(colliders, x0, z0, Height.at(x0, z0) + 3) ~= nil
+					t.truthy(h.svc:bite(a.id, h.rodent))
+					local d = brain.directive
+					t.eq(d.mode, "route", `{a.post} {a.id} at ({x0}, {z0}) was given no run`)
+					t.eq(d.speed, InfectionService.FLEE_SPEED, "at a run")
+					local len = FootPath.length(x0, z0, d.points)
+					t.truthy(
+						len >= InfectionService.RUN_MIN - 0.01 and len <= InfectionService.RUN * 1.5 + 0.01,
+						`{a.post} {a.id}: a run of {len} studs`
+					)
+					-- no step of it goes through a wall: indoors it stays in the building, outdoors it
+					-- enters none
+					local px, pz = x0, z0
+					for _, p in d.points do
+						for i = 1, 12 do
+							local sx, sz = px + (p[1] - px) * i / 12, pz + (p[2] - pz) * i / 12
+							local hit = Colliders.pointIn(colliders, sx, sz, Height.at(sx, sz) + 3)
+							if indoors then
+								t.truthy(hit ~= nil and own[hit.id], `{a.post} {a.id} runs out through the wall`)
+							else
+								t.truthy(hit == nil, `{a.post} {a.id} runs into {if hit then hit.id else ""}`)
+							end
+						end
+						px, pz = p[1], p[2]
+					end
+					if indoors then
+						indoorsN += 1
+					end
+					table.insert(ran, { a = a, x = x0, z = z0, len = len })
+				end
+			end
+			t.eq(n, 38, "shop workers, hospital staff, crews, police")
+			t.truthy(indoorsN >= 25, `{indoorsN} of them work inside a building (they never ran before)`)
+			h.world.possessed[h.rodent] = nil
+			h.step(1.5)
+			for _, r in ran do
+				local moved = math.sqrt((r.a.x - r.x) ^ 2 + (r.a.z - r.z) ^ 2)
+				t.truthy(moved >= math.min(r.len, 19) * 0.6, `{r.a.post} {r.a.id} moved {moved} studs in 1.5 s`)
+			end
+			-- and when the run is over they are back on their rounds, under no order
+			h.step(6)
+			for _, r in ran do
+				t.eq(h.world.brains[r.a.id].directive.mode, nil, `{r.a.post} {r.a.id} still under an order`)
+			end
+		end
+	)
+
+	t.test(
+		"a paramedic bitten at the scene: the patient still gets to the ambulance on foot and is loaded beside it; the paramedic runs, then walks back to the bay round the buildings",
+		function()
+			local h = harness(72, nil, function(params: any)
+				params.immediateChance = 1
+				params.incubateSecs = { 420, 420 } -- (the paramedic's own symptoms wait until they are home)
+			end)
+			h.svc.tun.crowdChance = 0
+			h.step(20)
+			local victim = nearest(townspeople(h), -700, 300)
+			local id = victim.id
+			t.truthy(h.svc:bite(id, h.rodent))
+			local rec = h.svc.records[id]
+			t.truthy(
+				h.runUntil(240, function(): boolean
+					return h.svc:stateOf(id) == "assess"
+				end),
+				`the crew never reached the patient (state {h.svc:stateOf(id)})`
+			)
+			local crew = rec.crew
+			t.truthy(crew ~= nil and rec.crewSecs > 0, "a crew member walked over (or the test has no teeth)")
+			local medic = h.world.actorsById[crew]
+			local station = h.world.brains[crew].points[1]
+			local stage = rec.stage
+			-- the rodent is still there, and bites the paramedic
+			h.svc.params.immediateChance = 0
+			parkRodent(h, medic.x + 2, medic.z)
+			t.truthy(h.svc:bite(crew, h.rodent), "the paramedic is a new case")
+			h.world.possessed[h.rodent] = nil
+			t.eq(rec.crew, nil, "no longer this patient's crew")
+			t.eq(h.svc.busy[crew], nil)
+			local medicBrain = h.world.brains[crew] :: any
+			t.eq(medicBrain.directive.mode, "route", "the paramedic runs")
+			t.eq(medicBrain.directive.speed, InfectionService.FLEE_SPEED)
+			t.eq(medicBrain.directive.after, "stand", "and is not handed back to a brain that walks straight home")
+			-- the patient: up and walking to the ambulance by the way the crew came, loaded beside it
+			local lastX, lastZ = victim.x, victim.z
+			local stood, walkedAlone = 0, false
+			t.truthy(
+				h.runUntil(120, function(): boolean
+					return h.svc:stateOf(id) == "transit"
+				end, function()
+					local s = h.svc:stateOf(id)
+					if s == "retrieve" then
+						walkedAlone = true
+						t.eq(h.world.brains[id].directive.mode, "route", "the patient has a way to walk")
+						if math.abs(victim.x - lastX) + math.abs(victim.z - lastZ) < 0.05 then
+							stood += DT
+						end
+					end
+					if s ~= "transit" then
+						lastX, lastZ = victim.x, victim.z
+					end
+					outdoors(medic, "the bitten paramedic")
+				end),
+				`the patient was never loaded (state {h.svc:stateOf(id)})`
+			)
+			t.truthy(walkedAlone, "the patient walked to the ambulance")
+			t.truthy(table.find(h.medLog[id], "carried") ~= nil)
+			local gap = math.sqrt((lastX - stage.x) ^ 2 + (lastZ - stage.z) ^ 2)
+			t.truthy(gap < 12, `the patient went out of sight {gap} studs from the ambulance`)
+			t.truthy(stood < rec.crewSecs * 0.5 + 1.5, `the patient stood on the spot for {stood} s of the walk`)
+			-- the paramedic: back to the bay on foot by a real way, never through a house
+			local walking = false
+			local bittenAt = h.time
+			local sceneGap = math.sqrt((medic.x - station[1]) ^ 2 + (medic.z - station[2]) ^ 2)
+			t.truthy(
+				h.runUntil(400, function(): boolean
+					return walking and medicBrain.directive.mode == nil
+				end, function()
+					outdoors(medic, "the bitten paramedic")
+					if
+						medicBrain.directive.mode == "route"
+						and medicBrain.directive.speed == h.svc.tun.dischargeSpeed
+					then
+						walking = true
+					end
+				end),
+				`the paramedic never got back (order {medicBrain.directive.mode}, at {medic.x}, {medic.z})`
+			)
+			t.truthy(
+				math.sqrt((medic.x - station[1]) ^ 2 + (medic.z - station[2]) ^ 2) < 8,
+				`the paramedic is at ({medic.x}, {medic.z}), the bay at ({station[1]}, {station[2]})`
+			)
+			t.eq(h.svc:stateOf(crew), "incubating", "home before the symptoms")
+			print(
+				`      the bitten paramedic was back at the bay after {math.floor(h.time - bittenAt)} s, from {math.floor(
+					sceneGap
+				)} studs away, through no building`
+			)
+			-- everything runs out: both are cured in the hospital, nothing is left behind
+			t.truthy(h.runUntil(1500, function(): boolean
+				return next(h.svc:cases()) == nil and next(h.svc.leaving) == nil
+			end))
+			t.eq(h.svc:stats().cured, 2)
+			h.step(30)
+			clean(h, "after the bitten paramedic")
+		end
+	)
+
+	t.test(
+		"a bitten officer taken by a player a moment later: the run does not wait in the brain for the player to let go",
+		function()
+			local h = harness(73, nil, function(params: any)
+				params.immediateChance = 0
+			end)
+			h.step(20)
+			local officer = nil
+			for _, a in h.world.actors do
+				if a.post == "police" and (h.world.brains[a.id] :: any).kind == "Officer" and officer == nil then
+					officer = a
+				end
+			end
+			local id = officer.id
+			local brain = h.world.brains[id] :: any
+			parkRodent(h, officer.x + 2, officer.z)
+			t.truthy(h.svc:bite(id, h.rodent))
+			h.world.possessed[h.rodent] = nil
+			t.eq(brain.directive.mode, "route", "the bitten officer runs")
+			h.step(0.4)
+			-- a Police pick takes this body (it is possessable while it incubates)
+			t.truthy(h.possessable[id] ~= false)
+			h.players[id] = true
+			TownAI.suspend(h.world, id)
+			h.step(0.6)
+			t.eq(brain.directive.mode, nil, "a held body is under no order")
+			h.step(30)
+			-- the player drives across town and lets go there
+			local gx, gz = 600, 0
+			TownAI.resume(h.world, id, gx, h.world.ctx.groundAt(gx, gz) + officer.hip, gz)
+			h.players[id] = nil
+			local worst = 0
+			h.step(10, function()
+				worst = math.max(worst, officer.speed)
+			end)
+			t.truthy(worst < 8, `the body ran off at {worst} studs/s when the player let go`)
+			t.eq(brain.directive.mode, nil)
+		end
+	)
+
+	t.test(
+		"the crowd sees the rodent: a bystander it bites runs, the others run when it comes near, and nobody gathers round it",
+		function()
+			local h = harness(11, { 0, 0 })
+			h.svc.tun.crowdChance = 1
+			h.step(20)
+			local victim = nearest(townspeople(h), 0, 0)
+			t.truthy(h.svc:bite(victim.id, h.rodent))
+			t.truthy(h.runUntil(5, function(): boolean
+				return h.svc:stateOf(victim.id) == "down"
+			end))
+			local scene = h.svc.scenes[victim.id]
+			local crowd = table.clone(scene.bystanders)
+			t.truthy(#crowd >= 2, `a crowd of {#crowd} (the test needs one)`)
+			-- they walk over and stand looking at the patient
+			h.runUntil(40, function(): boolean
+				for _, b in crowd do
+					if not (h.world.brains[b.id] :: any).directive.done then
+						return false
+					end
+				end
+				return true
+			end)
+			-- the rodent bites one of them where they stand, off their lane
+			h.svc.params.immediateChance = 0
+			local first = h.world.actorsById[crowd[1].id]
+			local fx, fz = first.x, first.z
+			parkRodent(h, fx + 2, fz)
+			t.truthy(h.svc:bite(first.id, h.rodent))
+			t.eq(h.svc.busy[first.id], nil, "bitten: out of the crowd")
+			-- the others are within sight of it: they leave too, at a run
+			local others: { { a: any, x: number, z: number } } = {}
+			for i = 2, #crowd do
+				local o = h.world.actorsById[crowd[i].id]
+				table.insert(others, { a = o, x = o.x, z = o.z })
+			end
+			h.step(0.4)
+			t.eq(#scene.bystanders, 0, "nobody stands in a ring round the rodent")
+			for _, o in others do
+				t.eq(h.svc.busy[o.a.id], nil)
+			end
+			h.step(2.6)
+			local ran = math.sqrt((first.x - fx) ^ 2 + (first.z - fz) ^ 2)
+			t.truthy(ran > 25, `the bitten bystander moved {ran} studs in 3 s (a stroll back to the pavement is 9)`)
+			for _, o in others do
+				local moved = math.sqrt((o.a.x - o.x) ^ 2 + (o.a.z - o.z) ^ 2)
+				t.truthy(moved > 20, `a bystander beside the rodent moved {moved} studs in 3 s`)
+				outdoors(o.a, "a fleeing bystander")
+			end
+			-- a collapse with the rodent sitting on it draws no crowd at all
+			h.world.possessed[h.rodent] = nil
+			h.svc.params.immediateChance = 1
+			local second = nearest(townspeople(h), 300, 300)
+			t.truthy(h.svc:biteable(second.id) and h.svc:bite(second.id, h.rodent))
+			t.truthy(h.runUntil(6, function(): boolean
+				return h.svc:stateOf(second.id) == "down"
+			end, function()
+				parkRodent(h, second.x + 3, second.z)
+			end))
+			t.eq(#h.svc.scenes[second.id].bystanders, 0, "nobody walks over to stand beside the rodent")
+			-- everything runs out and nobody is left under an order
+			h.world.possessed[h.rodent] = nil
+			t.truthy(h.runUntil(1800, function(): boolean
+				return next(h.svc:cases()) == nil and next(h.svc.leaving) == nil
+			end))
+			h.step(30)
+			clean(h, "after the scared crowd")
 		end
 	)
 end

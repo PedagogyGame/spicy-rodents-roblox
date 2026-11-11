@@ -21,6 +21,7 @@
 --     (MAX_NODES cells is about 15 ms under Lune; most searches open a few hundred).
 -- Interface: new(opts) -> Finder; find(finder, x0, z0, x1, z1, opts?) -> ({ {x, z} }?, length)
 --   (the waypoints after the start, the goal last); clear(finder, x0, z0, x1, z1, skip?) -> boolean;
+--   boxesAt(finder, x, z) -> { [Box]: true }? (the buildings a point is inside);
 --   length(x0, z0, points) -> studs; CELL, RADIUS, MAX_NODES
 -- Pure; studs. No side effects on require.
 
@@ -137,9 +138,9 @@ local function open(f: Finder, ix: number, iz: number): boolean
 	return true
 end
 
--- the boxes (grown by the radius) that hold a point: a walker who starts or ends inside one may
--- cross that one's wall
-local function boxesAt(f: Finder, x: number, z: number): { [Colliders.Box]: boolean }?
+-- boxesAt(finder, x, z): the boxes (grown by the radius) that hold a point, or nil in the open: a
+-- walker who starts or ends inside one may cross that one's wall (pass the set to `clear` as `skip`)
+function FootPath.boxesAt(f: Finder, x: number, z: number): { [Colliders.Box]: boolean }?
 	local out: { [Colliders.Box]: boolean }? = nil
 	for _, b in f.boxes do
 		if math.abs(x - b.cx) < b.hw + f.radius and math.abs(z - b.cz) < b.hd + f.radius then
@@ -351,8 +352,8 @@ function FootPath.find(
 	f.searches += 1
 	f.opened = 0
 	local maxLength = if opts and opts.maxLength then opts.maxLength else math.huge
-	local skip: { [Colliders.Box]: boolean }? = boxesAt(f, x0, z0)
-	local atGoal = boxesAt(f, x1, z1)
+	local skip: { [Colliders.Box]: boolean }? = FootPath.boxesAt(f, x0, z0)
+	local atGoal = FootPath.boxesAt(f, x1, z1)
 	if atGoal then
 		local set = skip or {}
 		for b in atGoal do
