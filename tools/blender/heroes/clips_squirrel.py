@@ -393,17 +393,18 @@ def climb(rig, n=18):
     the back humps off the bark as the hind feet are brought up outside them; 8 both hind feet take hold,
     knees out, and shove for four keys; the body stretches flat up the bark, forelegs reaching. The head
     is lifted to look up the trunk; the tail lies along the bark with its tip clear of it and a wave
-    swinging down it from side to side, each segment later than the last."""
+    swinging down it from side to side, each segment later than the last. The paws skim the bark between
+    holds (never more than a tenth of a stud off it), so the clip held still at any frame still clings."""
     S = CLIMB_TRAVEL
     fore = Limb(n, 2, S, -0.60, 0.25,
                 y={3: -0.16, 5: -0.22, 9: -0.38, 13: -0.56, 15: -0.66, 17: -0.65},
-                z={3: 0.06, 5: 0.10, 9: 0.10, 13: 0.10, 15: 0.08, 17: 0.04},
+                z={3: 0.05, 5: 0.07, 9: 0.07, 13: 0.07, 15: 0.06, 17: 0.03},
                 fp={0: 0.55, 2: 1.2, 4: 2.1, 8: 1.6, 13: 0.7, 16: 0.5}, tp={0: 0.5, 2: 0.6, 4: 1.8, 9: 0.9, 15: 0.3, 17: 0.45},
                 xs={4: 0.23, 9: 0.20, 15: 0.23}, ground=-0.012, pole=(1.0, 0.45, 0.2))
     hind = Limb(n, 4, S, 0.02, 0.40,
                 y={5: 0.92, 7: 0.82, 10: 0.46, 13: 0.10, 15: -0.08, 17: -0.04},
-                z={5: 0.07, 7: 0.13, 10: 0.14, 13: 0.12, 15: 0.08, 17: 0.04},
-                fp={0: 0.12, 2: 0.3, 4: 0.95, 5: 1.6, 7: 1.5, 10: 0.7, 14: 0.25, 17: 0.12}, tp={0: 0.3, 4: 0.35, 5: 1.4, 8: 0.9, 12: 0.4, 17: 0.3},
+                z={5: 0.06, 7: 0.09, 10: 0.09, 13: 0.08, 15: 0.06, 17: 0.03},
+                fp={0: 0.12, 2: 0.3, 4: 0.95, 5: 1.6, 7: 1.3, 10: 0.45, 14: 0.2, 17: 0.12}, tp={0: 0.3, 4: 0.35, 5: 1.4, 8: 0.9, 12: 0.4, 17: 0.3},
                 xs={6: 0.36, 11: 0.33, 16: 0.39}, ground=-0.012, pole=(1.0, -0.55, 0.12))
     offsets = {"FrontL": 0.0, "FrontR": 1 / n, "BackL": 8 / n, "BackR": 8 / n}
     arch = curve(n, {0: -0.12, 3: 0.14, 6: 0.40, 8: 0.44, 10: 0.20, 12: -0.14, 14: -0.26, 16: -0.24})
