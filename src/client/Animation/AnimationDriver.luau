@@ -42,9 +42,10 @@
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
 --   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount;
 --   heroClip(mode, speed, stalk) -> clip name (pure); heroRate(name, speed, cadence?, length) -> playback
---   speed (pure); HERO
+--   speed (pure); HERO. The Spicy Rodent's hero body also gets Animation/Creep's twitches on top.
 
 local Gait = require("./Gait")
+local Creep = require("./Creep")
 local KinematicPose = require("../Controllers/KinematicPose")
 local Import = require("../Import")
 local PossessionState =
@@ -107,6 +108,9 @@ type Entry = {
 	applied: number,
 	kin: boolean, -- a kinematic controller drew this body last frame
 	hero: { [string]: HeroAssets.Clip }?, -- a sculpted hero rig playing its authored clips
+	-- the Spicy Rodent's twitches (Animation/Creep), layered on its clips: the bones by name, what the
+	-- clip last gave each and what was last written to it (so an offset is never applied twice)
+	creep: { seed: number, bones: { [string]: any }, base: { [any]: CFrame }, wrote: { [any]: CFrame } }?,
 }
 
 -- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
@@ -462,7 +466,17 @@ function AnimationDriver.start(opts: Opts): Driver
 			applied = 0,
 			kin = false,
 			hero = hero,
+			creep = nil,
 		}
+		if hero and model:GetAttribute("RigSpec") == "rodent" then
+			local bones: { [string]: any } = {}
+			for _, d in model:GetDescendants() do
+				if d:IsA("Bone") then
+					bones[d.Name] = d
+				end
+			end
+			entries[model].creep = { seed = (#model.Name * 7.31) % 97, bones = bones, base = {}, wrote = {} }
+		end
 		count += 1
 	end
 
@@ -711,6 +725,39 @@ function AnimationDriver.start(opts: Opts): Driver
 		clock += dt
 		for _, e in entries do
 			local p = e.gait
+			local creep = e.creep
+			if creep and e.hero then
+				-- the Spicy Rodent's twitches, multiplied onto what its clip gave each bone this frame
+				local pose = Creep.pose(workspace:GetServerTimeNow(), creep.seed)
+				local function layer(name: string, offset: CFrame)
+					local bone = creep.bones[name]
+					if bone == nil then
+						return
+					end
+					local now = bone.Transform
+					-- if the Animator did not write this bone since the last frame, `now` is our own
+					-- value: start again from what the clip last gave
+					local base = if creep.wrote[bone] == now then creep.base[bone] else now
+					local out = base * offset
+					creep.base[bone] = base
+					creep.wrote[bone] = out
+					bone.Transform = out
+				end
+				layer("Head", CFrame.Angles(pose.head.pitch, pose.head.yaw, pose.head.roll))
+				layer("Jaw", CFrame.Angles(-pose.jaw, 0, 0)) -- the jaw opens about -X (the authored bite)
+				layer("EarL", CFrame.Angles(0, 0, pose.earL))
+				layer("EarR", CFrame.Angles(0, 0, -pose.earR))
+				for i, yaw in pose.tail do
+					if yaw ~= 0 then
+						layer(`Tail{i}`, CFrame.Angles(0, yaw, 0))
+					end
+				end
+				layer("Spine2", CFrame.Angles(pose.chest, 0, pose.spine))
+				if pose.spine ~= 0 then
+					layer("Spine1", CFrame.Angles(0, 0, pose.spine))
+					layer("Spine3", CFrame.Angles(0, 0, pose.spine))
+				end
+			end
 			if p == nil or #e.joints == 0 or e.hero ~= nil then
 				continue -- (a hero rig is posed by its clips)
 			end

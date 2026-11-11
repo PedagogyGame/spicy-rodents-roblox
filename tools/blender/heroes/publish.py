@@ -171,7 +171,10 @@ def main():
             clips[clip] = clip_ids[key]
         regions = {}
         for name, tris in rep["regions"].items():
-            regions[name] = {"tris": tris, "alphaMode": REGION_MODE.get(name, "Overlay")}
+            mode = REGION_MODE.get(name, "Overlay")
+            if mode == "TintMask" and rep.get("textures", {}).get("baked"):
+                mode = "Overlay"  # the tint is baked into the colour map: the region shows as imported
+            regions[name] = {"tris": tris, "alphaMode": mode}
             tint = rep.get("textures", {}).get("tint", {}).get(name)
             if tint:
                 regions[name]["tint"] = tint

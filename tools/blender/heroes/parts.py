@@ -54,15 +54,21 @@ def eye_textures(variant, out_dir, res=256, name=None):
         c = np.where(((th > pupil) & (th < iris))[..., None], irisc, c)
         c = np.where((th >= iris)[..., None], np.array([0.04, 0.03, 0.025]), c)
     elif variant == "rodent":
-        # Glowing red eyes (owner 2026-11-10: the bloodshot, veined eyeball with a pin pupil was part
-        # of "too edgy"): a squirrel's dark round pupil in a deep red iris that fills the eye, brighter
-        # toward the pupil, nearly black at the lids. No sclera, no veins.
-        pupil, iris = 24.0, 74.0
+        # Glowing red eyes with a pin pupil (owner 2026-11-11: "crank up that squirrels creepy
+        # weirdness"): a hot orange-red iris that fills the eye, brighter round the tiny black pupil,
+        # darkening to the lids, with fine dark-red threads running in from the rim.
+        pupil, iris = 11.0, 76.0
         k = np.clip((th - pupil) / (iris - pupil), 0, 1)
-        irisc = np.array([1.0, 0.16, 0.05]) * (0.95 + 0.1 * rad[..., None]) * (1 - 0.55 * k)[..., None]
+        irisc = np.array([1.0, 0.2, 0.05]) * (0.95 + 0.1 * rad[..., None]) * (1 - 0.6 * k)[..., None]
+        veins = tx.strands(np.stack([u.ravel() * 9, th.ravel() * 0.02, np.zeros(res * res)], -1).astype(F32),
+                           np.tile(np.array([[0, 1, 0]], F32), (res * res, 1)), 0.35, 4.0, seed=9).reshape(res, res)
+        vmask = np.clip((veins - 0.6) * 5, 0, 1) * np.clip((th - 34) / 30, 0, 1) * 0.55
+        irisc = irisc * (1 - vmask[..., None]) + np.array([0.3, 0.0, 0.0]) * vmask[..., None]
         c = np.broadcast_to(np.array([0.10, 0.01, 0.01]), irisc.shape).copy()
         c = np.where((th < iris)[..., None], irisc, c)
-        c = np.where((th < pupil)[..., None], np.array([0.03, 0.0, 0.0]), c)
+        c = np.where((th < pupil)[..., None], np.array([0.02, 0.0, 0.0]), c)
+        halo = np.exp(-((th - pupil - 5) / 5.0) ** 2)
+        c = c + np.array([0.35, 0.25, 0.05]) * halo[..., None] * (th >= pupil)[..., None]
         ring = np.exp(-((th - iris) / 3.0) ** 2)
         c = c * (1 - 0.6 * ring[..., None])
     else:
@@ -88,8 +94,12 @@ def build_eyes(sp, variant, arm, bone_names, out_dir):
     off = 0
     for side in (1, -1):
         c = sp.eye_centre(variant, side)
-        gaze = sp.eye_gaze(side)
-        v, f, uv = geometry.uv_sphere(c, sp.eye_radius(variant), gaze, segs=14, rings=8)
+        # (a species may give each eye its own size and gaze: the rodent's do not match)
+        try:
+            gaze, radius = sp.eye_gaze(side, variant), sp.eye_radius(variant, side)
+        except TypeError:
+            gaze, radius = sp.eye_gaze(side), sp.eye_radius(variant)
+        v, f, uv = geometry.uv_sphere(c, radius, gaze, segs=14, rings=8)
         allv.extend(v.tolist())
         allf.extend([tuple(i + off for i in face) for face in f])
         alluv.extend(uv)
@@ -115,7 +125,7 @@ CELLS_X, CELLS_Y = 4, 2  # 8 atlas cells: 4 brightness levels x 2 tuft shapes
 LEVELS = [0.52, 0.70, 0.85, 0.98]
 
 
-def card_atlas(variant, out_dir, res=512):
+def card_atlas(variant, out_dir, res=512, tint=None):
     """Strand tufts with alpha: greyscale (tinted with the Body colour in the engine), a strand normal
     map and roughness. Cell (i, j): brightness LEVELS[i], shape j (0 = narrow lock, 1 = wide tuft)."""
     rng = np.random.default_rng(7 if variant != "rodent" else 8)
@@ -165,6 +175,10 @@ def card_atlas(variant, out_dir, res=512):
     paths = {"color": os.path.join(out_dir, f"{variant}_cards_color.png"),
              "normal": os.path.join(out_dir, f"{variant}_cards_normal.png"),
              "roughness": os.path.join(out_dir, f"{variant}_cards_roughness.png")}
+    if tint is not None:
+        # the Body colour is baked in: nothing has to tint the cards at runtime
+        col = col.copy()
+        col[..., :3] = col[..., :3] * np.asarray(tint, F32)
     bl.save_png(paths["color"], col)
     bl.save_png(paths["normal"], np.concatenate([nrm, np.ones((res, res, 1), F32)], -1), colorspace="Non-Color")
     bl.save_png(paths["roughness"], rough, colorspace="Non-Color")
@@ -262,7 +276,12 @@ def build_cards(sp, variant, lo, arm, W, bone_names, opts, out_dir, body_color_p
     _uv_from_corners(obj, uvs)
     _assign(obj, bone_names, np.array(wts))
     rig.bind(obj, arm)
-    paths = card_atlas(variant, out_dir)
+    card_tint = None
+    tints = getattr(sp, "TINTS", {}).get(variant, {})
+    if getattr(sp, "BAKE_TINTS", False) and tints.get("FurCards"):
+        h = tints["FurCards"].lstrip("#")
+        card_tint = [int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4)]
+    paths = card_atlas(variant, out_dir, tint=card_tint)
     obj.data.materials.append(tx.principled_material("FurCards", paths, alpha_from_color=True))
     return obj
 

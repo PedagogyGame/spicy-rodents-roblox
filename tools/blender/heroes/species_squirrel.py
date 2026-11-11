@@ -8,7 +8,15 @@ The rodent (variant="rodent") is the same skeleton (so every clip is shared): th
 wrong, a blend the owner asked for after a harsher version ("too edgy ... combine those two back
 together"): a little leaner, a ragged right ear, a lower head with crooked buck teeth, slightly
 oversized glowing eyes, one small bald scar on a flank, a ruffle of raised fur along the spine and a
-slightly ragged tail with an ember-rust fringe. No ribs, stitches, mange or blood beyond the mouth corner.
+slightly ragged tail with an ember-rust fringe. No ribs, stitches or blood beyond the mouth corner.
+
+Then the owner asked for more (2026-11-11: "just crank up that squirrels creepy weirdness, even further"):
+weird, not gory. The eyes no longer match (one bulging and staring up, one smaller and wandering down
+and out, pin pupils, sleepless dark hollows round them); a grin cut far too wide up the cheeks with a
+row of small crooked teeth under long buck teeth; spindly over-long fingers and toes with long claws; a
+sharper hunch with the knobs of the spine showing through the fur; one ear too big beside the torn one;
+a tail that is bottle-brush in places and nearly bare in others; thin patchy fur. The twitching, the
+cocked head and the chattering jaw are added by the client (Client/Animation/Creep).
 
 Proportions (owner 2026-11-10: "squirrels legs definitely a bit too tall and big"): the anatomy below is
 authored standing 1.2 studs at the shoulder, and everything is then LOWERED: what is above LEG_TOP comes
@@ -128,17 +136,24 @@ def skeleton():
 
 
 HZ = 1.19  # skull centre height
+RODENT_DZ = -0.06  # the rodent carries its head low and forward
 EYE_L = np.array([0.110, -0.93, 1.245])
 EYE_R_RODENT = 0.066
 EYE_R = 0.058  # a touch larger than life: the face is what players look at
 NOSE = np.array([0.0, -1.165, 1.10])
 
 
-def eye_radius(variant):
-    return EYE_R_RODENT if variant == "rodent" else EYE_R
+def eye_radius(variant, side=1):
+    """The rodent's eyes do not match: its left bulges, its right is smaller."""
+    if variant == "rodent":
+        return 0.082 if side > 0 else 0.057
+    return EYE_R
 
 
-def eye_gaze(side):
+def eye_gaze(side, variant="squirrel"):
+    if variant == "rodent":
+        # wall-eyed: the big eye stares up and ahead, the small one wanders down and out
+        return np.array([0.74, -0.6, 0.3]) if side > 0 else np.array([-0.93, -0.16, -0.34])
     return np.array([side * 0.86, -0.48, 0.16])
 
 
@@ -148,7 +163,8 @@ EYE_STYLE = "squirrel"
 def _eye0(variant, side=1):
     c = EYE_L.copy()
     if variant == "rodent":
-        c = c + [0.012, 0.004, -0.026]  # the rodent carries its head lower; its eyes bulge a little
+        # the head is carried lower; the big eye bulges out of its socket, the small one sits deeper
+        c = c + ([0.02, -0.012, RODENT_DZ + 0.012] if side > 0 else [0.0, 0.006, RODENT_DZ - 0.004])
     c[0] *= side
     return c
 
@@ -160,7 +176,7 @@ def eye_centre(variant, side=1):
 
 def landmarks(variant):
     """Named points the texture painter and the card scatterer use (authored space)."""
-    dz = -0.03 if variant == "rodent" else 0.0
+    dz = RODENT_DZ if variant == "rodent" else 0.0
     return {
         "nose": NOSE + [0, 0, dz],
         "eyeL": _eye0(variant, 1),
@@ -173,6 +189,25 @@ def landmarks(variant):
     }
 
 
+FINGERS = ((-0.034, 0.0), (-0.012, 0.013), (0.012, 0.013), (0.034, 0.0))
+TOES = ((-0.038, 0.006), (-0.018, 0.016), (0.0, 0.02), (0.018, 0.016), (0.038, 0.006))
+# The rodent's grin (authored space, before the head's drop): from the front of the mouth round the side
+# of the muzzle (GRIN_MID) and far back up the cheek (GRIN_CORNER). The points lie ON the face, so the cut
+# shows as a mouth line; a first version ran straight to a corner inside the cheek and showed nothing.
+GRIN_FRONT = np.array([0.0, -1.105, HZ - 0.142])
+GRIN_MID = np.array([0.086, -1.045, HZ - 0.137])
+GRIN_CORNER = np.array([0.172, -0.94, HZ - 0.098])
+
+
+def finger_reach(rodent):
+    """(length, splay): the rodent's fingers are spindly, over-long and spread."""
+    return (0.128, 1.45) if rodent else (0.08, 1.0)
+
+
+def toe_reach(rodent):
+    return (0.158, 1.3) if rodent else (0.115, 1.0)
+
+
 def _limb(a, b, ra, rb, k, tag=""):
     return RoundCone(a, b, ra, rb, k=k, tag=tag)
 
@@ -181,15 +216,23 @@ def sculpt(variant="squirrel"):
     """The SDF primitive list (left/right pairs mirrored)."""
     rodent = variant == "rodent"
     lean = 0.93 if rodent else 1.0  # the rodent is a little leaner through the waist and belly
-    dz = -0.03 if rodent else 0.0  # and carries its head low
+    dz = RODENT_DZ if rodent else 0.0  # and carries its head low
     P = []
     # --- torso: rib cage, belly, pelvis, the dorsal line and the chest -----------------------------
     P.append(Ellipsoid((0, -0.25, 0.83), (0.25, 0.35, 0.31), tag="ribs"))
     P.append(Ellipsoid((0, 0.08, 0.82), (0.24 * lean, 0.30, 0.29 * lean), k=0.12, tag="belly"))
     P.append(Ellipsoid((0, 0.36, 0.88), (0.255, 0.28, 0.31), k=0.10, tag="pelvis"))
     # the dorsal line arches: highest over the loins, lower at the withers and the croup
-    P.append(RoundCone((0, 0.46, 1.03), (0, 0.10, 1.07), 0.16, 0.165, k=0.12, tag="back"))
-    P.append(RoundCone((0, 0.10, 1.07), (0, -0.44, 0.98), 0.165, 0.16, k=0.12, tag="back"))
+    peak = 1.13 if rodent else 1.07  # the rodent is hunched
+    P.append(RoundCone((0, 0.46, 1.03), (0, 0.10, peak), 0.16, 0.165, k=0.12, tag="back"))
+    P.append(RoundCone((0, 0.10, peak), (0, -0.44, 0.98), 0.165, 0.16, k=0.12, tag="back"))
+    if rodent:
+        # the knobs of its spine show through the fur along the hunch
+        for i in range(9):
+            y = -0.42 + i * 0.105
+            axis = 0.98 + (peak - 0.98) * (y + 0.44) / 0.54 if y < 0.10 else peak + (1.03 - peak) * (y - 0.10) / 0.36
+            top = axis + 0.165
+            P.append(Ellipsoid((0, y, top + 0.012), (0.026, 0.034, 0.024), k=0.018, tag="knob"))
     P.append(Ellipsoid((0, -0.50, 0.78), (0.17, 0.15, 0.22), k=0.08, tag="brisket"))
     P.append(Ellipsoid((0, 0.54, 0.92), (0.19, 0.13, 0.19), k=0.08, tag="rump"))
     # --- neck and head ------------------------------------------------------------------------------
@@ -203,19 +246,37 @@ def sculpt(variant="squirrel"):
     P.append(Ellipsoid((0, -1.14, hz - 0.088), (0.038, 0.032, 0.032), k=0.025, tag="nose"))
     P += mirror_pair([Ellipsoid((0.042, -1.085, hz - 0.11), (0.042, 0.05, 0.036), k=0.03, tag="whiskerpad")])
     P.append(RoundCone((0, -0.86, hz - 0.14), (0, -1.05, hz - 0.185), 0.075, 0.036, k=0.045, tag="jaw"))
-    corner = (0.064, -0.998, hz - 0.136) if rodent else (0.056, -1.005, hz - 0.142)
-    P += mirror_pair([RoundCone(corner, (0.0, -1.105, hz - 0.142), 0.009 if rodent else 0.007, 0.006, k=0.012, op="sub", tag="mouth")])
-    er = eye_radius(variant) + 0.003
-    ec = _eye0(variant, 1)
-    P += mirror_pair([Ellipsoid(ec, (er, er, er), k=0.02, op="sub", tag="eyesocket")])
-    P += mirror_pair([Ellipsoid(ec + [-0.012, 0.01, 0.05], (0.05, 0.065, 0.022), k=0.022, tag="brow")])
+    if rodent:
+        drop = np.array([0, 0, dz])
+        P += mirror_pair([
+            RoundCone(GRIN_FRONT + drop, GRIN_MID + drop, 0.011, 0.014, k=0.012, op="sub", tag="mouth"),
+            RoundCone(GRIN_MID + drop, GRIN_CORNER + drop, 0.014, 0.012, k=0.012, op="sub", tag="mouth"),
+        ])
+    else:
+        corner = np.array([0.056, -1.005, hz - 0.142])
+        P += mirror_pair([RoundCone(corner, (0.0, -1.105, hz - 0.142), 0.007, 0.006, k=0.012, op="sub", tag="mouth")])
+    if rodent:
+        # the grin: cut far too wide up the cheeks, the lips drawn back off the teeth at the front
+        P.append(Ellipsoid((0.0, -1.095, hz - 0.15), (0.058, 0.034, 0.015), k=0.01, op="sub", tag="grin"))
+    for side in (1, -1):
+        er = eye_radius(variant, side) + 0.003
+        ec = _eye0(variant, side)
+        P.append(Ellipsoid(ec, (er, er, er), k=0.02, op="sub", tag="eyesocket"))
+        P.append(Ellipsoid(ec + np.array([-0.012 * side, 0.01, 0.05]), (0.05, 0.065, 0.022), k=0.022, tag="brow"))
     # ears: short, broad, rounded leaves tilted out and back, cupped on the front
     tilt = rot_y(0.32) @ rot_x(-0.12)
     base = np.array([0.11, -0.80, 1.33 + dz])
     c = base + tilt @ np.array([0, 0, 0.07])
-    P += mirror_pair([Ellipsoid(c, (0.062, 0.022, 0.088), axes=tilt, k=0.03, tag="ear")])
     cup = c + tilt @ np.array([0, -0.019, 0.012])
-    P += mirror_pair([Ellipsoid(cup, (0.044, 0.011, 0.064), axes=tilt, k=0.006, op="sub", tag="earcup")])
+    if rodent:
+        # one ear too big and too upright; the other (torn, below) the ordinary size
+        big = Ellipsoid(c + tilt @ np.array([0, 0, 0.03]), (0.08, 0.022, 0.125), axes=rot_y(0.12) @ rot_x(-0.05), k=0.03, tag="ear")
+        bigcup = Ellipsoid(cup + tilt @ np.array([0, 0, 0.03]), (0.058, 0.011, 0.095), axes=rot_y(0.12) @ rot_x(-0.05), k=0.006, op="sub", tag="earcup")
+        P += [big, Ellipsoid(c, (0.062, 0.022, 0.088), axes=tilt, k=0.03, tag="ear").mirrored()]
+        P += [bigcup, Ellipsoid(cup, (0.044, 0.011, 0.064), axes=tilt, k=0.006, op="sub", tag="earcup").mirrored()]
+    else:
+        P += mirror_pair([Ellipsoid(c, (0.062, 0.022, 0.088), axes=tilt, k=0.03, tag="ear")])
+        P += mirror_pair([Ellipsoid(cup, (0.044, 0.011, 0.064), axes=tilt, k=0.006, op="sub", tag="earcup")])
     # --- forelegs ---------------------------------------------------------------------------------------
     sh, el, wr, kn = (np.array(FRONT0[k]) for k in ("Upper", "Lower", "Foot", "Toe"))
     P += mirror_pair([
@@ -226,8 +287,9 @@ def sculpt(variant="squirrel"):
         Ellipsoid(el + (wr - el) * 0.3, (0.052, 0.05, 0.11), axes=frame_from(wr - el), k=0.06, tag="forearmmuscle"),
         _limb(wr, kn, 0.037, 0.030, 0.02, "hand"),
     ])
-    for dx, dy in ((-0.034, 0.0), (-0.012, 0.013), (0.012, 0.013), (0.034, 0.0)):
-        P += mirror_pair([_limb(kn + [dx * 0.5, 0, 0], kn + [dx, -0.08 + dy, -0.021], 0.017, 0.011, 0.012, "finger")])
+    for dx, dy in FINGERS:
+        fl, fs = finger_reach(rodent)
+        P += mirror_pair([_limb(kn + [dx * 0.5, 0, 0], kn + [dx * fs, -fl + dy, -0.021], 0.014 if rodent else 0.017, 0.008 if rodent else 0.011, 0.012, "finger")])
     # --- hind legs: a big round haunch over the folded leg, the long foot flat on the ground --------
     hp, kn2, hk, ba = (np.array(BACK0[k]) for k in ("Upper", "Lower", "Foot", "Toe"))
     P += mirror_pair([
@@ -237,12 +299,14 @@ def sculpt(variant="squirrel"):
         Ellipsoid(kn2 + (hk - kn2) * 0.3 + [0.0, 0.035, 0.03], (0.08, 0.10, 0.14), axes=frame_from(hk - kn2), k=0.07, tag="calf"),
         _limb(hk, ba, 0.048, 0.031, 0.03, "foot"),
     ])
-    for dx, dy in ((-0.038, 0.006), (-0.018, 0.016), (0.0, 0.02), (0.018, 0.016), (0.038, 0.006)):
-        P += mirror_pair([_limb(ba + [dx * 0.5, 0, 0], ba + [dx, -0.115 + dy, -0.02], 0.018, 0.010, 0.012, "toe")])
+    for dx, dy in TOES:
+        tl, ts = toe_reach(rodent)
+        P += mirror_pair([_limb(ba + [dx * 0.5, 0, 0], ba + [dx * ts, -tl + dy, -0.02], 0.015 if rodent else 0.018, 0.008 if rodent else 0.010, 0.012, "toe")])
     # --- tail: a slim core and a broad, slightly flattened plume (two lobes per segment) ------------
     plume = [0.46, 0.76, 0.96, 1.06, 1.08, 1.04, 0.94, 0.76, 0.46]  # a full, soft brush (seen from behind in play)
     if rodent:
-        plume = [0.4, 0.62, 0.8, 0.66, 0.88, 0.74, 0.7, 0.54, 0.34]  # a little ragged, still a squirrel's tail
+        # bottle-brush in places and nearly bare in others
+        plume = [0.46, 0.22, 0.78, 0.18, 0.92, 0.3, 0.74, 0.2, 0.42]
     for i in range(8):
         a, b = np.array(TAIL0[i]), np.array(TAIL0[i + 1])
         P.append(RoundCone(a, b, 0.07 if i == 0 else 0.05, 0.045, k=0.05, tag="tailcore"))
@@ -289,28 +353,47 @@ def hard_parts(variant="squirrel"):
     from geometry import curved_spike
 
     rodent = variant == "rodent"
-    dz = -0.03 if rodent else 0.0
+    dz = RODENT_DZ if rodent else 0.0
     hz = HZ + dz
     out = []
     kn = np.array(FRONT0["Toe"])
     for side, sx in (("L", 1), ("R", -1)):
-        for i, (dx, dy) in enumerate(((-0.034, 0.0), (-0.012, 0.013), (0.012, 0.013), (0.034, 0.0))):
-            tip = (kn + [dx, -0.08 + dy, -0.021]) * [sx, 1, 1]
-            v, f = curved_spike(tip + [0, 0.004, 0.006], (0, -1, -0.35), 0.038 if rodent else 0.032, 0.0085, curl=(0, 0.2, -1), curl_amt=0.9)
+        fl, fs = finger_reach(rodent)
+        for i, (dx, dy) in enumerate(FINGERS):
+            tip = (kn + [dx * fs, -fl + dy, -0.021]) * [sx, 1, 1]
+            v, f = curved_spike(tip + [0, 0.004, 0.006], (0, -1, -0.35), 0.056 if rodent else 0.032, 0.0085, curl=(0, 0.2, -1), curl_amt=0.9)
             out.append((f"claw_F{side}{i}", v, f, f"Front{side}_Toe", "claw"))
         ba = np.array(BACK0["Toe"])
-        for i, (dx, dy) in enumerate(((-0.038, 0.006), (-0.018, 0.016), (0.0, 0.02), (0.018, 0.016), (0.038, 0.006))):
-            tip = (ba + [dx, -0.115 + dy, -0.02]) * [sx, 1, 1]
-            v, f = curved_spike(tip + [0, 0.004, 0.006], (0, -1, -0.3), 0.04 if rodent else 0.034, 0.009, curl=(0, 0.2, -1), curl_amt=0.9)
+        tl, ts = toe_reach(rodent)
+        for i, (dx, dy) in enumerate(TOES):
+            tip = (ba + [dx * ts, -tl + dy, -0.02]) * [sx, 1, 1]
+            v, f = curved_spike(tip + [0, 0.004, 0.006], (0, -1, -0.3), 0.054 if rodent else 0.034, 0.009, curl=(0, 0.2, -1), curl_amt=0.9)
             out.append((f"claw_B{side}{i}", v, f, f"Back{side}_Toe", "claw"))
-    up_len = 0.042 if rodent else 0.026  # buck teeth, not fangs
-    lo_len = 0.02 if rodent else 0.014
+    up_len = 0.056 if rodent else 0.026  # long buck teeth
+    lo_len = 0.024 if rodent else 0.014
     for sx in (1, -1):
-        crooked = 0.16 * sx if rodent and sx > 0 else 0.0  # one tooth askew
+        crooked = (0.2 if sx > 0 else -0.07) if rodent else 0.0  # both askew, one badly
         v, f = curved_spike((0.0105 * sx, -1.115, hz - 0.118), (crooked, -0.25, -1), up_len, 0.0115 if rodent else 0.0105, curl=(0, 0.6, 0), curl_amt=0.35, sides=4, flat=1.6)
         out.append((f"tooth_U{sx}", v, f, "Head", "tooth"))
         v, f = curved_spike((0.008 * sx, -1.072, hz - 0.17), (0, -0.55, 1), lo_len, 0.009, curl=(0, 1, 0), curl_amt=0.3, sides=4, flat=1.4)
         out.append((f"tooth_L{sx}", v, f, "Jaw", "tooth"))
+    if rodent:
+        # a row of small crooked teeth along the grin, upper and lower, back to the corners
+        drop = np.array([0, 0, dz])
+        g0, g1, g2 = GRIN_FRONT + drop, GRIN_MID + drop, GRIN_CORNER + drop
+        for sx in (1, -1):
+            for i in range(7):
+                u = (i + 0.9) / 7.4
+                # along the grin, set a little inside the lip
+                p = (g0 + (g1 - g0) * (u / 0.45)) if u < 0.45 else (g1 + (g2 - g1) * ((u - 0.45) / 0.55))
+                p = p * [0.94, 1.0, 1.0] + [0.0, 0.006, 0.004]
+                lean = ((i * 37 + (7 if sx > 0 else 3)) % 11 - 5) / 5 * 0.35  # each one leans its own way
+                v, f = curved_spike(p * [sx, 1, 1], (lean, -0.12, -1), 0.026 - 0.008 * u, 0.0066, curl=(0, 0.5, 0), curl_amt=0.2, sides=4)
+                out.append((f"grin_U{'L' if sx > 0 else 'R'}{i}", v, f, "Head", "tooth"))
+                if i % 2 == 0:
+                    q = p + np.array([0.0, 0.004, -0.03])
+                    v, f = curved_spike(q * [sx, 1, 1], (-lean, -0.2, 1), 0.019 - 0.005 * u, 0.0056, curl=(0, 0.5, 0), curl_amt=0.2, sides=4)
+                    out.append((f"grin_L{'L' if sx > 0 else 'R'}{i}", v, f, "Jaw", "tooth"))
     # whiskers: five long dark hairs fanning from each whisker pad (drawn with the claws' dark colour)
     for sx in (1, -1):
         for i, (dz_w, back, ln) in enumerate(((0.012, 0.25, 0.17), (0.0, 0.1, 0.2), (-0.012, 0.0, 0.19), (-0.022, 0.2, 0.15), (0.02, 0.45, 0.13))):
@@ -374,7 +457,7 @@ def cream_face(P, N, dom, variant):
     dominant bone, and the cream's edge then ran along the bone boundaries as a ragged, hard-edged bib."""
     _ = dom
     x, y, z = P[:, 0], P[:, 1], P[:, 2]
-    hz = HZ + (-0.03 if variant == "rodent" else 0.0)
+    hz = HZ + (RODENT_DZ if variant == "rodent" else 0.0)
     # the cream line: belly height at the chest, rising up the throat to just under the cheeks
     line = 0.71 + 0.08 * _sstep(0.2, -0.5, y) + np.clip(-y - 0.45, 0, 1) * 0.62
     line = np.minimum(line, hz - 0.1)
@@ -392,6 +475,9 @@ TINTS = {
     "rodent": {"Body": "#663d2c", "Pattern": "#987559", "FurCards": "#663d2c"},
 }
 BAKE_EXTRUSION = 0.03
+# The tints above are baked into the uploaded colour maps (textures.py, parts.py): the game sets nothing
+# on the SurfaceAppearances at runtime.
+BAKE_TINTS = True
 
 
 def flow_dir(name, head, tail, co, n, variant):
@@ -470,8 +556,13 @@ def paint(tx, variant, tools):
     g = g + (big - 0.5) * 0.12
     g = np.where(feet, g * 0.86, g)
     # face: pale eye ring, lighter cheeks and muzzle
-    r_eye = eye_radius(variant)
-    d_eye = np.minimum(np.linalg.norm(P - lm["eyeL"], axis=1), np.linalg.norm(P - lm["eyeR"], axis=1))
+    # the distance to the nearer eye's rim, measured as if both had the reference radius (the rodent's
+    # eyes are two sizes)
+    r_eye = eye_radius(variant, -1)
+    d_eye = r_eye + np.minimum(
+        np.linalg.norm(P - lm["eyeL"], axis=1) - eye_radius(variant, 1),
+        np.linalg.norm(P - lm["eyeR"], axis=1) - eye_radius(variant, -1),
+    )
     ring = sst(r_eye + 0.003, r_eye + 0.010, d_eye) * (1 - sst(r_eye + 0.016, r_eye + 0.032, d_eye))
     g = np.where(head, g + 0.10 * (1 - dorsal) * (1 - ring), g)
     g = g * (1 - 0.0 * ring) + ring * (0.98 - g) * 0.85
@@ -566,6 +657,22 @@ def paint(tx, variant, tools):
             a, b = pt["stitch"]
             ds, _ts = _seg_dist(P, a, b)
             override(hard == 0, _hex("#c9b0a6"), r=0.45, k=(1 - sst(0.004, 0.009, ds)) * (k > 0.3))
+        # sleepless dark hollows round the eyes, in place of a squirrel's pale ring
+        hollow = sst(r_eye + 0.004, r_eye + 0.014, d_eye) * (1 - sst(r_eye + 0.03, r_eye + 0.075, d_eye))
+        override(head, _hex("#170d0c") * (0.8 + 0.4 * fine)[:, None], k=hollow * 0.72 * (hard == 0))
+        # the inside of the grin: dark, wet gum along the cut from each corner to the front
+        gdrop = np.array([0, 0, RODENT_DZ])
+        g0, g1, g2 = GRIN_FRONT + gdrop, GRIN_MID + gdrop, GRIN_CORNER + gdrop
+        flip = np.array([-1, 1, 1])
+        dm = np.minimum.reduce([
+            _seg_dist(P, g0, g1)[0], _seg_dist(P, g1, g2)[0],
+            _seg_dist(P, g0 * flip, g1 * flip)[0], _seg_dist(P, g1 * flip, g2 * flip)[0],
+        ])
+        override(head | (dom == "Jaw"), _hex("#2e0c0e"), r=0.3, k=(1 - sst(0.014, 0.03, dm)) * (hard == 0))
+        # thin, patchy fur: grey-pink skin shows through here and there
+        mn = fbm(P * 12.0, 3, seed=31)
+        thin = sst(0.66, 0.76, mn) * (hard == 0) * (1 - np.clip(ck, 0, 1))
+        override(hard == 0, skin * (0.8 + 0.4 * vn(P * 90.0, 32))[:, None], r=0.55, k=thin * 0.5)
         # sore, reddened eyelids
         override(head, _hex("#7a2c2a"), r=0.4, k=(1 - sst(r_eye + 0.004, r_eye + 0.014, d_eye)) * 0.45)
     rgb = tools["finish_rgb"](grey, alpha, natv, region, tb, tp)
@@ -642,7 +749,7 @@ def blood_faces(lo, co, W, bone_names):
     """Faces under the rodent's blood shell: mouth corners and chin, the front claws and fingers."""
     me = lo.data
     lm = landmarks("rodent")
-    hz = HZ - 0.03
+    hz = HZ + RODENT_DZ
     # a little red at one corner of the mouth, nothing else (authored space, lowered for the mesh)
     spot = np.array([0.064, -0.998, hz - 0.15])
     spot[2] = float(zw(spot[2]))  # (the parameter W here is the weight matrix, not the lowering helper)
@@ -667,7 +774,7 @@ def blood_mask(P, tools):
     P = U(P)
     sst = tools["sstep"]
     vn = tools["vnoise"]
-    hz = HZ - 0.03
+    hz = HZ + RODENT_DZ
     c = np.array([0.064, -0.998, hz - 0.15])
     d = np.linalg.norm(P - c, axis=1)
     m = (1 - sst(0.01, 0.026, d)).astype(np.float32)

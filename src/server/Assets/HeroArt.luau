@@ -14,8 +14,9 @@
 -- What the game expects of a body: PrimaryPart "RootPart" at HipHeight over the feet (the kinematic
 -- motors, the hitbox and the camera all work from it), the RigSpec bones, regions and sockets.
 -- So prepare(): the imported root is renamed SkinRoot and welded HipHeight below a new small RootPart;
--- each region's SurfaceAppearance gets its mode and stock tint (the colour maps are greyscale under a
--- tint mask); the sockets become Attachments under their Bones; the rodent's eyes get a faint red light.
+-- the sockets become Attachments under their Bones; the rodent's eyes get a faint red light. The colour
+-- maps carry their final colours (the tints are baked in on export), so no SurfaceAppearance has to be
+-- changed at runtime.
 -- Bones are posed on the client only (Client/Animation/AnimationDriver writes Bone.Transform).
 -- Interface: prepare(model, name, entry, lib?) -> Model (errors on a malformed model);
 --   install(opts?) -> { installed: { string }, failed: { [string]: string } };
@@ -81,13 +82,21 @@ function HeroArt.prepare(model: any, name: string, entry: HeroAssets.Entry, lib:
 		end
 		for _, child in part:GetChildren() do
 			if child:IsA("SurfaceAppearance") then
+				-- The colour maps are uploaded with their final colours and the mode they need, so there is
+				-- normally nothing to do here. A mode or tint that does differ is set if the engine lets a
+				-- game script set it (a live server may not: the cloud checks run with more permission).
 				local sa: any = child
 				local mode = (Enum.AlphaMode :: any)[region.alphaMode]
-				if mode then
-					sa.AlphaMode = mode
+				if mode and sa.AlphaMode ~= mode then
+					pcall(function()
+						sa.AlphaMode = mode
+					end)
 				end
 				if region.tint then
-					sa.Color = hex(region.tint, Color3)
+					local tint = hex(region.tint, Color3)
+					pcall(function()
+						sa.Color = tint
+					end)
 				end
 			end
 		end

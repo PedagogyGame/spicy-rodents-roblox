@@ -1,10 +1,10 @@
 --!strict
 -- ReplicatedStorage.Shared.Actors.HeroAssets
 -- The uploaded skinned hero models the game may show in place of the part-built puppets: asset ids, the
--- height of the game's root over the model's feet, each region's SurfaceAppearance mode and stock tint,
--- and the sockets to add under the bones. WRITTEN FROM data/art/heroes.json (tools/blender/heroes/publish.py
--- fills that file on upload); tests/unit/hero_art.spec.luau fails when the two disagree. To swap in new
--- art: upload, then rewrite this table from the JSON (the spec prints what differs).
+-- height of the game's root over the model's feet, each region's SurfaceAppearance mode (and a stock tint,
+-- when one is not baked into the colour map), and the sockets to add under the bones. WRITTEN BY
+-- tools/blender/heroes/hero_assets_luau.py FROM data/art/heroes.json (publish.py fills that file on
+-- upload); tests/unit/hero_art.spec.luau fails when the two disagree.
 -- Interface: SPECIES: { [templateName]: Entry } (templateName: "squirrel" | "rodent");
 --   CLIPS: { [rig]: { [clipName]: Clip } } (rig "squirrel": Idle, Walk, Run, Climb, Wire, Leap, Pounce, Bite, Stalk).
 
@@ -22,13 +22,13 @@ local HeroAssets = {}
 
 HeroAssets.SPECIES = {
 	squirrel = {
-		assetId = 116513654149636,
+		assetId = 127244611331985,
 		hipHeight = 0.9,
 		regions = {
-			Body = { alphaMode = "TintMask", tint = "#c27442" },
+			Body = { alphaMode = "Overlay" },
 			Eyes = { alphaMode = "Overlay" },
-			FurCards = { alphaMode = "Transparency", tint = "#c27442" },
-			Pattern = { alphaMode = "TintMask", tint = "#f5d8ac" },
+			FurCards = { alphaMode = "Transparency" },
+			Pattern = { alphaMode = "Overlay" },
 		},
 		sockets = {
 			ChestCenter = { bone = "Chest", offset = { 0, -0.13, 0.04 } },
@@ -38,14 +38,14 @@ HeroAssets.SPECIES = {
 		},
 	},
 	rodent = {
-		assetId = 138576770823082,
+		assetId = 80428470170681,
 		hipHeight = 0.9,
 		regions = {
 			Blood = { alphaMode = "Transparency" },
-			Body = { alphaMode = "TintMask", tint = "#663d2c" },
+			Body = { alphaMode = "Overlay" },
 			Eyes = { alphaMode = "Overlay" },
-			FurCards = { alphaMode = "Transparency", tint = "#663d2c" },
-			Pattern = { alphaMode = "TintMask", tint = "#987559" },
+			FurCards = { alphaMode = "Transparency" },
+			Pattern = { alphaMode = "Overlay" },
 		},
 		sockets = {
 			ChestCenter = { bone = "Chest", offset = { 0, -0.13, 0.04 } },

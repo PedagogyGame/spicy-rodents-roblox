@@ -405,6 +405,18 @@ def paint_body(sp, variant, lo, hi, W, bone_names, opts, log):
     pp = os.path.join(out_dir, f"{variant}_body_preview.png")
     bl.save_png(pp, prev[::-1])
     log("maps written")
+    if getattr(sp, "BAKE_TINTS", False):
+        # The uploaded colour map carries the final colours, opaque. Setting a SurfaceAppearance's
+        # AlphaMode to TintMask at runtime is not something a live game script can be relied on to do
+        # (the cloud checks run with more permission than a game server), and without it the greyscale
+        # map would show. The masked map (paths["color"]) stays on disk for the fur-card scatter.
+        baked = os.path.join(out_dir, f"{variant}_body_baked.png")
+        bl.save_png(baked, prev[::-1])
+        mat_paths = dict(paths)
+        mat_paths["color"] = baked
+        make_material(lo, mat_paths, variant)
+        return {"res": res, "maps": paths, "baked": baked, "preview": pp, "coverage": round(float(filled.mean()), 3),
+                "tint": {}, "tint_baked": {k: v for k, v in paint["tints_hex"].items()}}
     make_material(lo, paths, variant)
     return {"res": res, "maps": paths, "preview": pp, "coverage": round(float(filled.mean()), 3),
             "tint": {k: v for k, v in paint["tints_hex"].items()}}
