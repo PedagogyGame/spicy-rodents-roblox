@@ -3,17 +3,31 @@ Pounce, Bite (the bite dance), Stalk (sneak)) plus Idle and Walk. 30 fps; loops 
 
 Conventions (clips.py): Blender axes, front -Y, left +X; Rx(+) tips a forward-pointing bone nose-down
 and lifts a backward-pointing one (the tail); Root carries the whole body about PIVOT.
-Timing references: v5.4's bite dance (2.1 s: spin 0.78 sin 12t, roll 0.17 sin 15t, hops |sin 10t|,
-head 0.24 sin 7t, eased in and out over 1/6 s); the game drives playback rate from speed
-(routes_movement §14), so `nominal_speed` is the no-slide ground speed (studs/s) at 1x: the hind
-stride over the stance time, stride / (duty x cycle).
+
+What the clips are built to (owner 2026-11-11, seen from the play camera behind and above: "rigid,
+unalive"):
+  * The surface the paws stand on is height 0 in every clip: the ground, and for Climb the bark and for
+    Wire the line or the bough's top. The game puts the model's feet point on the surface.
+  * A moving clip covers a fixed stretch of ground per cycle (the *_TRAVEL numbers below, which are what
+    the game's rate rule makes a cycle cover), and a planted paw goes straight back at exactly that, on
+    whole keys: it stays where it was put. `nominal_speed` is that stretch over the clip's length, the
+    ground speed at which the clip plays at 1x.
+  * The gaits are the animal's: a bounding gallop (Run), the same bound up a trunk (Climb) and small along
+    a wire (Wire), a trotting scuttle (Walk), a one-paw-at-a-time creep (Stalk).
+  * Nothing moves as one piece: the tail is said segment by segment in the model's frame, each later than
+    the one before (flow, tail_dirs); the head is held level against the body; the ears and the right
+    legs run a little behind.
+  * The frames of the one-shots are fixed points other code may count on (Leap: 5 take-off, 9 stretch,
+    14 top, 19 reach, 21 braced, 22 landing; Pounce: 12 lunge, 17 bite, 21 land), with Commit and Recover
+    markers on them. Timing reference for the bite dance: v5.4 (2.1 s: spin 0.78 sin 12t, roll
+    0.17 sin 15t, hops |sin 10t|, head 0.24 sin 7t, eased in and out over 1/6 s).
 """
 import math
 
 import numpy as np
 
 import clips as engine
-from clips import Keys, ease_io, foot_cycle, lerp, piecewise, smooth, wave
+from clips import piecewise, smooth
 from species_squirrel import BACK, FRONT, TAIL
 
 TAU = 2 * math.pi
@@ -30,13 +44,6 @@ SPINE = ["Hips", "Spine1", "Spine2", "Spine3", "Chest"]
 NECK = ["Neck", "Head"]
 LEGS = ("FrontL", "FrontR", "BackL", "BackR")
 CFG = {"pivot": PIVOT, "spine_bones": SPINE, "neck_chain": NECK, "neck_weights": [0.4, 0.6]}
-
-# rest pose: tail rises at ~25 degrees then levels; these bend it per clip
-TAIL_UP = [0.95, 0.45, 0.25, 0.05, -0.25, -0.45, -0.45, -0.25]  # the classic S over the back
-TAIL_SOFT = [0.7, 0.3, 0.18, 0.0, -0.18, -0.28, -0.28, -0.18]
-TAIL_BACK = [-0.25, 0.08, 0.12, 0.08, 0.0, -0.05, -0.08, -0.08]  # streaming behind at speed
-TAIL_LOW = [-0.6, 0.06, 0.05, 0.0, 0.0, 0.02, 0.06, 0.1]  # low and straight (stalk)
-TAIL_FLAT = [-0.42, -0.02, -0.04, -0.04, -0.04, 0.0, 0.0, 0.04]  # pressed to the trunk (climb)
 
 
 def side(leg):
@@ -128,41 +135,6 @@ def build_pose(rig, P, cfg):
         D["EarL"][0] = D["EarL"][0] @ engine.Rz(ly) @ engine.Rx(lp)
         D["EarR"][0] = D["EarR"][0] @ engine.Rz(ry) @ engine.Rx(rp)
     return D
-
-
-def hind_pitch(st, f, land=0.2, push=1.15, curl=0.9):
-    if st:
-        return lerp(land, push, smooth((f - 0.4) / 0.6)), 0.1 + 0.1 * f
-    return lerp(push * 1.1, land, smooth((f - 0.25) / 0.75)), curl * math.sin(math.pi * f)
-
-
-def front_pitch(st, f, land=0.8, push=1.6, fold=2.5):
-    if st:
-        return lerp(land, push, smooth((f - 0.5) / 0.5)), 0.2
-    k = math.sin(math.pi * min(f / 0.85, 1.0))
-    return lerp(push, land, smooth(f)) + (fold - push) * k * (1 - f), 0.5 * k
-
-
-def gait_legs(p, spec, t=0.0):
-    """spec[leg] = dict(offset, duty, stride, lift, base_dy, base_dx, base_dz, splay, pitch fn kwargs)."""
-    legs = {}
-    for leg in LEGS:
-        L = spec[leg]
-        dy, dz, st, f = foot_cycle(p, L["offset"], L["duty"], L["stride"], L["lift"], L.get("lift_bias", 0.75))
-        base = toe_rest(leg) + np.array([L.get("dx", 0.0) * side(leg), L.get("dy", 0.0), L.get("dz", 0.0)])
-        if "x_abs" in L:
-            base[0] = L["x_abs"] * side(leg)
-        tgt = base + np.array([0.0, dy, dz])
-        if leg.startswith("Back"):
-            fp, tp = hind_pitch(st, f, **L.get("pk", {}))
-        else:
-            fp, tp = front_pitch(st, f, **L.get("pk", {}))
-        legs[leg] = (tgt, fp, tp, pole(leg, L.get("splay", 0.0)))
-    return legs
-
-
-def tail_with(base, pitch_wave, yaw_wave):
-    return [b + w for b, w in zip(base, pitch_wave)], yaw_wave
 
 
 def cyc(p, keys, wrap=True):
@@ -552,24 +524,6 @@ def stalk(rig, n=36):
 
 # ---- one-shots --------------------------------------------------------------------------------------
 
-def keyed_legs(K, f, lead=("FrontL", "FrontR", "BackL", "BackR"), lag=0.0):
-    legs = {}
-    for leg in LEGS:
-        pre = "f" if leg.startswith("Front") else "h"
-        ff = f - (lag if leg.endswith("R") else 0.0)
-        tgt = toe_rest(leg) + np.array([0.0, K(ff, pre + "y", 0.0), K(ff, pre + "z", 0.0)])
-        tgt[0] = toe_rest(leg)[0] + side(leg) * K(ff, pre + "x", 0.0)
-        fp = K(ff, pre + "p", 0.2 if pre == "h" else 0.78)
-        tp = K(ff, pre + "t", 0.15)
-        legs[leg] = (tgt, fp, tp, pole(leg))
-    return legs
-
-
-def lagged_tail(K, f, base, name="tl", lag=1.2, gain=None):
-    gain = gain or [1.0, 0.7, 0.5, 0.4, 0.35, 0.3, 0.3, 0.3]
-    return [b + g * K(f - lag * i, name) for i, (b, g) in enumerate(zip(base, gain))]
-
-
 def track(table):
     """A curve through {frame: value} that holds its ends and never overshoots a key (one-shots)."""
     keys = sorted(table.items())
@@ -638,67 +592,101 @@ def leap(rig, n=24):
 
 
 def pounce(rig, n=30):
-    """Wind-up (crouch and the rear wiggle), Commit at 0.4 s: the lunge with paws and jaws open, the
-    bite snaps shut, Recover at 0.7 s: land, worry the bite with a head shake, settle."""
-    K = Keys({
-        0: dict(bob=-0.12, surge=0.0, pitch=0.06, arch=0.05, hy=0.0, hz=0.0, hp=0.2, ht=0.15, fy=-0.02, fz=0.0, fp=0.9, ft=0.15, tl=0.0, head=0.06, jaw=0.0, ear=0.15, neck=0.3),
-        11: dict(bob=-0.17, surge=0.05, pitch=0.08, arch=0.3, hy=-0.07, hp=0.15, fy=0.0, fp=1.0, tl=-0.15, head=0.04, jaw=0.05, ear=0.2, neck=0.3),
-        15: dict(bob=0.07, surge=-0.32, pitch=-0.12, arch=-0.34, hy=0.5, hz=0.03, hp=1.4, ht=0.1, fy=-0.5, fz=0.2, fp=1.05, ft=-0.2, tl=0.3, head=-0.06, jaw=0.62, ear=-0.5, neck=0.0),
-        17: dict(bob=0.03, surge=-0.36, pitch=0.04, arch=-0.15, hy=0.42, hz=0.06, hp=1.3, fy=-0.5, fz=0.1, fp=0.9, ft=0.1, tl=0.2, head=0.18, jaw=0.0, ear=-0.5, neck=0.1),
-        21: dict(bob=-0.07, surge=-0.28, pitch=0.12, arch=0.15, hy=0.1, hz=0.02, hp=0.5, fy=-0.38, fz=0.0, fp=0.95, tl=-0.05, head=0.12, jaw=0.06, ear=-0.2, neck=0.15),
-        29: dict(bob=-0.03, surge=0.0, pitch=0.03, arch=0.12, hy=0.0, hz=0.0, hp=0.22, fy=0.0, fz=0.0, fp=0.8, tl=0.0, head=-0.06, jaw=0.0, ear=0.0, neck=0.0),
-    })
+    """The pounce, on the same frames as before: 0 to 11 the wind-up, crouched with the weight going back,
+    the rear wiggling and the hind feet treading; 12 Commit (0.4 s): the hind legs fire and the body
+    lunges, forepaws out and jaws open; 15 at full stretch; 17 the bite snaps shut as the forepaws pin;
+    21 Recover (0.7 s): the hind feet land under it, the head worries the bite with a shake; 29 settled.
+    The tail is flung up by the lunge and comes down late, a segment at a time."""
+    T = {name: track(tab) for name, tab in dict(
+        bob={0: -0.12, 6: -0.16, 11: -0.18, 13: -0.02, 15: 0.07, 17: 0.02, 21: -0.09, 25: -0.05, 29: -0.03},
+        surge={0: 0.0, 6: 0.05, 11: 0.07, 13: -0.20, 15: -0.34, 17: -0.36, 21: -0.28, 29: 0.0},
+        pitch={0: 0.06, 11: 0.09, 13: -0.20, 15: -0.10, 17: 0.10, 21: 0.12, 29: 0.03},
+        arch={0: 0.08, 6: 0.28, 11: 0.38, 13: -0.08, 15: -0.34, 17: -0.10, 21: 0.22, 29: 0.14},
+        fy={0: -0.02, 11: 0.0, 13: -0.30, 15: -0.52, 17: -0.50, 21: -0.38, 29: 0.0},
+        fz={0: 0.0, 11: 0.0, 13: 0.24, 15: 0.20, 17: 0.05, 19: 0.0, 29: 0.0},
+        fx={0: 0.0, 13: 0.05, 15: 0.07, 17: -0.02, 21: 0.0},
+        fp={0: 0.9, 11: 1.0, 13: 1.3, 15: 0.9, 17: 0.9, 21: 0.95, 29: 0.8},
+        ft={0: 0.15, 13: 0.9, 15: -0.2, 17: 0.5, 21: 0.2},
+        hy={0: 0.0, 11: -0.08, 13: 0.55, 15: 0.86, 17: 0.60, 21: 0.10, 29: 0.0},
+        hz={0: 0.0, 11: 0.0, 13: 0.0, 15: 0.10, 17: 0.12, 21: 0.0, 29: 0.0},
+        hp={0: 0.15, 11: 0.12, 13: 1.35, 15: 2.1, 17: 1.5, 21: 0.4, 29: 0.2},
+        ht={0: 0.1, 13: 0.15, 15: 1.8, 17: 1.0, 21: 0.15},
+        tail={0: -0.05, 11: -0.14, 13: 0.10, 15: 0.42, 17: 0.60, 21: 0.15, 25: 0.36, 29: 0.30},
+        head={0: 0.06, 11: 0.04, 15: -0.06, 17: 0.20, 21: 0.12, 29: -0.06},
+        jaw={0: 0.0, 11: 0.05, 13: 0.35, 15: 0.62, 17: 0.0, 21: 0.06, 29: 0.0},
+        ear={0: 0.15, 11: 0.2, 15: -0.5, 17: -0.5, 21: -0.2, 29: 0.0},
+        neck={0: 0.3, 11: 0.3, 15: 0.0, 17: 0.1, 21: 0.15, 29: 0.0},
+    ).items()}
 
     def pose(i, n):
         f = float(i)
         t = i / 30.0
         wig = math.sin(TAU * t / 0.18) * smooth((f - 1) / 3) * smooth((11 - f) / 2)  # the rear wiggle
         shake = math.sin(TAU * t / 0.12) * smooth((f - 20) / 2) * smooth((27 - f) / 3)
-        legs = keyed_legs(K, f, lag=0.4)
-        for leg in ("BackL", "BackR"):  # treading in place during the wiggle
-            tg, fp, tp, pl = legs[leg]
-            tread = max(0.0, math.sin(TAU * t / 0.18 + (0 if leg == "BackL" else math.pi))) * 0.03 * smooth((f - 1) / 3) * smooth((10 - f) / 2)
-            legs[leg] = (tg + np.array([0, 0, tread]), fp, tp, pl)
+        legs = {}
+        for leg in LEGS:
+            pre = "f" if leg.startswith("Front") else "h"
+            ff = f - (0.4 if leg.endswith("R") else 0.0)
+            tg = toe_rest(leg) + np.array([T[pre + "x"](ff) * side(leg) if pre == "f" else 0.0, T[pre + "y"](ff), T[pre + "z"](ff)])
+            if pre == "h":  # treading in place during the wiggle
+                tg[2] += max(0.0, math.sin(TAU * t / 0.18 + (0 if leg == "BackL" else math.pi))) * 0.03 * smooth((f - 1) / 3) * smooth((10 - f) / 2)
+            legs[leg] = (tg, T[pre + "p"](ff), T[pre + "t"](ff), 0.25 if pre == "f" else 0.4)
+        elev = [T["tail"](f - 1.1 * k) + TAIL_STREAM[k] * 0.6 for k in range(8)]
+        lat = [0.30 * math.sin(TAU * (t - 0.012 * k) / 0.18) * smooth((f - 1) / 3) * smooth((12 - f) / 2) * (k / 7) + 0.03 * k * math.sin(0.45 * (f - 1.2 * k)) for k in range(8)]
         P = {
-            "body": dict(bob=K(f, "bob"), surge=K(f, "surge"), pitch=K(f, "pitch"), yaw=0.0),
-            "spine": (K(f, "arch"), 0.16 * wig, 0.0),
+            "body": dict(bob=T["bob"](f), surge=T["surge"](f), pitch=T["pitch"](f), roll=0.04 * shake),
+            "spine": (T["arch"](f), 0.16 * wig, 0.0),
             "legs": legs,
-            "neck_pre": K(f, "neck"),
-            "head": (0.22 * shake - 0.08 * wig, K(f, "head"), 0.1 * shake),
-            "tail": (lagged_tail(K, f, TAIL_LOW, lag=1.0), [y + 0.25 * wig * (k / 7) for k, y in enumerate(wave(8, 2.5 * t, 0.04, 0.5))]),
-            "jaw": K(f, "jaw"),
-            "ears": ((K(f, "ear"), 0.0), (K(f, "ear"), 0.0)),
+            "neck_pre": T["neck"](f),
+            "head": (0.22 * shake - 0.08 * wig, T["head"](f), 0.1 * shake),
+            "tail_dirs": tail_dirs(elev, lat),
+            "jaw": T["jaw"](f),
+            "ears": ((T["ear"](f), 0.0), (T["ear"](f - 0.8), 0.0)),
         }
-        return build_pose(rig, P, CFG)
+        return build_pose(rig, P, CFG_MID)
 
     return {"name": "Pounce", "frames": n, "pose": pose, "loop": False, "priority": "Action",
-            "keys": [0, 6, 11, 15, 17, 21, 25], "markers": ((0.4, "Commit", "lunge"), (0.7, "Recover", "land")),
+            "keys": [0, 6, 11, 13, 15, 17, 21, 25], "markers": ((0.4, "Commit", "lunge"), (0.7, "Recover", "land")),
             "brief": "pounce"}
 
 
 def bite_dance(rig, n=63):
     """The bite dance (v5.4 animateBiteDance, 2.1 s): spin wiggle 0.78 sin 12t, roll 0.17 sin 15t,
     hops |sin 10t|, head 0.24 sin 7t, eased in and out over 1/6 s; plus paws waving, jaw chattering
-    and the tail swishing."""
+    and the tail swishing. The paws hop round with the body (they are in the air as it turns), and the
+    tail follows the spin late, the tip last."""
+    pivot = np.array(PIVOT)
 
     def pose(i, n):
         t = i / 30.0
         k = max(0.0, min(1.0, 6 * t, 6 * (2.1 - t)))
         hop = abs(math.sin(10 * t)) * 0.16 * k
+        spin = math.sin(12 * t) * 0.78 * k
+        Rs = engine.Rz(spin)
         legs = {}
         for leg in LEGS:
             tg = toe_rest(leg).copy()
+            tg = pivot + Rs @ (tg - pivot)
             lift = hop * (0.85 if leg.startswith("Back") else 1.0)
             if leg.startswith("Front"):
                 lift += 0.07 * max(0.0, math.sin(10 * t + (0 if leg.endswith("L") else math.pi))) * k
             tg[2] += lift
-            legs[leg] = (tg, (0.3 + 0.8 * hop) if leg.startswith("Back") else (0.8 + 2.0 * lift), 0.15 + 2 * hop, pole(leg))
+            # the knee or elbow turns with the body too
+            pl = Rs @ pole(leg)
+            legs[leg] = (tg, (0.3 + 0.8 * hop) if leg.startswith("Back") else (0.8 + 2.0 * lift), 0.15 + 2 * hop, pl)
+        # the tail in the model's frame: carried round by the spin a little late, the tip latest
+        dirs = []
+        for j in range(8):
+            late = math.sin(12 * (t - 0.012 * j) - 0.25) * 0.78 * k
+            e = TAIL_CURL[j] + 0.12 * k * math.sin(10 * t - 0.5 * j) * (1 + 0.5 * j / 7)
+            swish = (0.10 + 0.05 * j) * k * math.sin(12 * t - 1.0 - 0.5 * j)
+            dirs.append(np.array([-math.sin(late) * math.cos(e) + swish, math.cos(late) * math.cos(e), math.sin(e)]))
         P = {
-            "body": dict(bob=hop, yaw=math.sin(12 * t) * 0.78 * k, roll=math.sin(15 * t) * 0.17 * k, pitch=-0.12 * k),
+            "body": dict(bob=hop, yaw=spin, roll=math.sin(15 * t) * 0.17 * k, pitch=-0.12 * k),
             "spine": (0.12 + 0.1 * k, 0.12 * math.sin(12 * t - 0.6) * k, 0.0),
             "legs": legs,
-            "head": (math.sin(7 * t) * 0.24 * k + math.sin(12 * t) * 0.78 * k * 0.5, -0.12 * k, 0.1 * math.sin(15 * t) * k),
-            "tail": tail_with(TAIL_UP, wave(8, 10 * t, 0.12 * k, 0.5, 0.5), wave(8, 12 * t - 1.0, 0.25 * k, 0.5, 0.8)),
+            "head": (math.sin(7 * t) * 0.24 * k + spin * 0.5, -0.12 * k, 0.1 * math.sin(15 * t) * k),
+            "tail_dirs": dirs,
             "jaw": 0.18 * abs(math.sin(25 * t)) * k,
             "ears": ((0.2 * math.sin(14 * t) * k, 0.0), (0.2 * math.sin(14 * t + 1.0) * k, 0.0)),
         }
