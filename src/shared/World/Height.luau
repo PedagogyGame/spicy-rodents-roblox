@@ -256,11 +256,8 @@ Height.SITES = SITES
 function Height.at(x: number, z: number): number
 	local h = Height.natural(x, z)
 	for _, s in SITES do
-		local level = s.level
-		if level == nil then
-			level = Height.natural(s.x, s.z)
-			s.level = level
-		end
+		local level: number = s.level or Height.natural(s.x, s.z)
+		s.level = level
 		if h > level then
 			local dx = math.max(math.abs(x - s.x) - s.w / 2 - Height.SITE_MARGIN, 0)
 			local dz = math.max(math.abs(z - s.z) - s.d / 2 - Height.SITE_MARGIN, 0)

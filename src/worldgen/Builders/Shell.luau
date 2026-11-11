@@ -64,7 +64,7 @@ local function wall(
 	fixed: number,
 	a: number,
 	b: number,
-	gaps: { { c: number, w: number } },
+	gaps: { Facade.Gap },
 	y0: number,
 	h: number,
 	doorH: number,
@@ -155,7 +155,7 @@ local function doorLeaf(
 		name = "Prompt",
 		action = "Open",
 		offset = { 0, 0, 0 },
-		attrs = { Placeholder = true },
+		attrs = { Placeholder = true } :: Spec.Attrs,
 	})
 	if interior then
 		-- one round knob through the leaf serves both rooms; it turns with the door (Doors.followers)
@@ -172,7 +172,7 @@ local function doorLeaf(
 			canQuery = false,
 			castShadow = false,
 			role = "Trim",
-			attrs = { DoorOf = d.id },
+			attrs = { DoorOf = d.id } :: Spec.Attrs,
 		}
 		if motion.kind == "slide" then
 			-- a sliding leaf has a flat pull, thinner than the wall it runs into: a round knob would
@@ -528,7 +528,7 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 				part = "Nav",
 				name = node.id,
 				offset = { node.x, 0, node.z },
-				attrs = { Kind = node.kind, Links = table.concat(graph.links[node.id], ",") },
+				attrs = { Kind = node.kind, Links = table.concat(graph.links[node.id], ",") } :: Spec.Attrs,
 			})
 		end
 	end

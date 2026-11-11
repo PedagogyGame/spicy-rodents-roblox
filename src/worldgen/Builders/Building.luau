@@ -139,7 +139,7 @@ end
 -- Continuous ribbon windows (hospital, review 2026-11-09 "a plain box"): one glass band per floor on
 -- every face, broken around the ground-floor door openings in `avoid`, with an accent floor line under
 -- each band. Visual only.
-function Building.bands(ctx: Spec.LotCtx, base: number, top: number, avoid: { [string]: { { c: number, w: number } } }?)
+function Building.bands(ctx: Spec.LotCtx, base: number, top: number, avoid: { [string]: { Facade.Gap } }?)
 	local pal = Building.look(ctx)
 	local W, D = ctx.W, ctx.D
 	local height = top - base

@@ -204,7 +204,7 @@ function Programme.build(ctx: Spec.LotCtx)
 			name = "Prompt",
 			action = "Use",
 			offset = { 0, 1.5, 0 },
-			attrs = { Placeholder = true },
+			attrs = { Placeholder = true } :: Spec.Attrs,
 		})
 	end
 	for _, s in b.shelves do
@@ -224,7 +224,7 @@ function Programme.build(ctx: Spec.LotCtx)
 					part = name,
 					name = `Slot_{lv}_{k}`,
 					offset = { -len / 2 + (k - 0.5) * len / s.slotsPerLevel, -h / 2 + (lv - 0.5) * 2.2 + 0.6, -0.9 },
-					attrs = { ItemSlot = true, Level = lv, Index = k },
+					attrs = { ItemSlot = true, Level = lv, Index = k } :: Spec.Attrs,
 				})
 			end
 		end

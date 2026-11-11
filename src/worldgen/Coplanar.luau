@@ -146,7 +146,8 @@ function Coplanar.run(plans: { Spec.BuildPlan }): { checked: number, clashes: { 
 	local checked = 0
 	local out: { string } = {}
 	for _, p in plans do
-		local seat = if p.kind == "lot" then p.attributes.SeatY :: number? else nil
+		local seatY = p.attributes.SeatY
+		local seat = if p.kind == "lot" and type(seatY) == "number" then seatY else nil
 		for _, s in p.parts do
 			if drawnBlock(s) then
 				checked += 1

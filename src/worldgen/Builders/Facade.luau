@@ -402,7 +402,7 @@ function Facade.windowGrid(
 							local w = math.min(cell - 1.4, style.displayW)
 							for j = 1, n do
 								k += 1
-								table.insert(out, {
+								local pane: Win = {
 									face = f.id,
 									floor = 1,
 									i = k,
@@ -411,7 +411,8 @@ function Facade.windowGrid(
 									w = w,
 									h = h,
 									kind = "display",
-								})
+								}
+								table.insert(out, pane)
 							end
 						end
 					end
@@ -463,7 +464,7 @@ function Facade.windows(ctx: Spec.LotCtx, grid: { Win }, style: Style)
 		local win: Spec.Opts = { role = "Window" }
 		local glass: Spec.Opts = { role = "Window" }
 		if style.glow and w.kind == "sash" and glows(ctx, w) then
-			glass.attrs = { NightLight = true }
+			glass.attrs = { NightLight = true } :: Spec.Attrs
 			lit += 1
 		end
 		if w.kind == "display" then
@@ -533,7 +534,7 @@ function Facade.windows(ctx: Spec.LotCtx, grid: { Win }, style: Style)
 		board(ctx, f, "Course" .. key, 0, c.y, if f.alongX then f.len + 0.5 else f.len, 0.36, 0.34, pal.trim)
 	end
 	if lit > 0 then
-		ctx.attributes.NightLights = ((ctx.attributes.NightLights :: number?) or 0) + lit
+		Spec.bump(ctx.attributes, "NightLights", lit)
 	end
 end
 
@@ -573,7 +574,7 @@ function Facade.entrance(ctx: Spec.LotCtx, d: Door, style: Style)
 
 	-- followers: they turn with the leaf when the server opens it
 	if d.leaf ~= false then
-		local follow = { DoorOf = d.doorId }
+		local follow: Spec.Attrs = { DoorOf = d.doorId }
 		local hand = if f.alongX then 1 else -1 -- the leaf's free edge is its local +X
 		if not d.slide then
 			local kx, kz = outPoint(f, d.c + hand * (d.w / 2 - 0.7), d.proud + 0.1)
@@ -647,7 +648,7 @@ function Facade.entrance(ctx: Spec.LotCtx, d: Door, style: Style)
 				ctx.list:add(ctx.frame, `{d.name}_Step{k}`, cx, low + h / 2, cz, d1 - d0, h, sw, opts)
 			end
 		end
-		ctx.attributes.Steps = ((ctx.attributes.Steps :: number?) or 0) + n
+		Spec.bump(ctx.attributes, "Steps", n)
 	elseif drop >= -0.3 and drop <= 0.3 then
 		local cx, cz = outPoint(f, d.c, 0.55)
 		local y = math.max(d.y0, g) + 0.02
@@ -1150,7 +1151,7 @@ function Facade.downspouts(lotPlans: { Spec.BuildPlan }, propPlans: { Spec.Build
 						transparency = 0,
 						shape = "Cylinder",
 						role = "Gutter",
-						attrs = { Route = pp.attributes.Route :: number },
+						attrs = { Route = pp.attributes.Route :: number } :: Spec.Attrs,
 					})
 				end
 			end

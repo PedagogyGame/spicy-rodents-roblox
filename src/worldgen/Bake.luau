@@ -26,6 +26,7 @@ local Plan = require("./Plan")
 local RoadBuilder = require("./Builders/Road")
 local RouteProps = require("./Builders/RouteProps")
 local Skyline = require("./Skyline")
+local Spec = require("./Spec")
 local Surface = require("./Surface")
 local Yield = require("./Yield")
 local Curve = Import.shared("Routes/Curve") :: typeof(require("../shared/Routes/Curve"))
@@ -219,10 +220,12 @@ function Bake.serialize(plans: { Plan.BuildPlan }): string
 				}, "|")
 			)
 		end
-		for _, e in p.extras or {} do
+		for _, e in p.extras or Spec.NO_EXTRAS do
 			local nums: { string } = {}
-			for _, v in e.offset or {} do
-				table.insert(nums, q(v, "%.3f"))
+			if e.offset then
+				for _, v in e.offset do
+					table.insert(nums, q(v, "%.3f"))
+				end
 			end
 			table.insert(
 				lines,
@@ -259,7 +262,7 @@ function Bake.run(data: Data, factory: Factory.Factory): any
 	local counts = { lot = 0, road = 0, props = 0, lamps = 0, skyline = 0 }
 	local partCount, lightCount = 0, 0
 	for _, p in plans do
-		for _, e in p.extras or {} do
+		for _, e in p.extras or Spec.NO_EXTRAS do
 			if e.kind == "PointLight" then
 				lightCount += 1
 			end

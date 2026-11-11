@@ -12,6 +12,11 @@ local Geometry = require("./Geometry")
 
 local Spec = {}
 
+-- A part's or an extra's attributes. A table constructor is only checked against this where it is
+-- the whole expected type, so a constructor handed to an optional field is written `{ ... } :: Spec.Attrs`
+-- (an annotation the checker still verifies, not a way round it).
+export type Attrs = { [string]: string | number | boolean }
+
 -- A file-authored mesh (the Blender tree models): Factory makes a MeshPart of the part's size with a
 -- SurfaceAppearance. Content ids are rbxassetid:// strings. The part's size is the mesh's own size.
 export type MeshSpec = {
@@ -42,7 +47,7 @@ export type PartSpec = {
 	castShadow: boolean?, -- default: canCollide
 	role: string?, -- Body, Roof, Wall, Floor, Door, Sign, Room, Station, Shelf, Pad, Furniture, Limb, Pipe, Rail, Post, Anchor, Skyline, Trim, Window, Step, Ceiling, Finish, Light
 	canQuery: boolean?, -- default: transparency < 1
-	attrs: { [string]: string | number | boolean }?,
+	attrs: Attrs?,
 	mesh: MeshSpec?, -- a MeshPart instead of a Part (shape is ignored)
 }
 
@@ -69,7 +74,7 @@ export type ExtraSpec = {
 	range: number?,
 	brightness: number?,
 	shadows: boolean?,
-	attrs: { [string]: string | number | boolean }?,
+	attrs: Attrs?,
 }
 
 export type BuildPlan = {
@@ -78,7 +83,7 @@ export type BuildPlan = {
 	category: string,
 	lod: string,
 	streaming: string,
-	attributes: { [string]: string | number | boolean },
+	attributes: Attrs,
 	parts: { PartSpec },
 	extras: { ExtraSpec }?,
 }
@@ -95,7 +100,7 @@ export type Opts = {
 	castShadow: boolean?,
 	role: string?,
 	canQuery: boolean?,
-	attrs: { [string]: string | number | boolean }?,
+	attrs: Attrs?,
 	mesh: MeshSpec?,
 }
 
@@ -185,11 +190,20 @@ export type LotCtx = {
 	list: PartList,
 	building: any?, -- generated/Buildings record (Hospital, PoliceStation)
 	interior: any?, -- generated/Interiors template (FRB houses)
-	attributes: { [string]: string | number | boolean },
+	attributes: Attrs,
 	palette: any?, -- Palette.Look (the v5.4 colours and materials for this lot)
 }
 
 Spec.SPU = 2.5 -- studs per HTML unit (Config/Units; W1 data stays in HTML units, builders scale here)
+
+-- A plan without extras has these (so a loop over `plan.extras or Spec.NO_EXTRAS` is typed).
+Spec.NO_EXTRAS = table.freeze({}) :: { ExtraSpec }
+
+-- Adds `n` to a counting attribute (one that is not there yet counts from 0).
+function Spec.bump(attributes: Attrs, key: string, n: number)
+	local have = attributes[key]
+	attributes[key] = (if type(have) == "number" then have else 0) + n
+end
 
 function Spec.list(): PartList
 	return { parts = {}, extras = {}, names = {}, add = add, world = world, extra = extra } :: PartList

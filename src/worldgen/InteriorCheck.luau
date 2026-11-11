@@ -73,6 +73,9 @@ InteriorCheck.REQUIRED = {
 	lockers = { { kit = "cell", has = { "Cell" } }, { kit = "locker_bank", attr = "Lockers", min = 6 } },
 } :: { [string]: { Rule } }
 
+local NO_RULES: { Rule } = table.freeze({})
+local NO_ATTRIBUTES: { string } = table.freeze({})
+
 type Box = { x0: number, x1: number, y0: number, y1: number, z0: number, z1: number }
 
 local function boxOf(s: Spec.PartSpec): Box
@@ -172,7 +175,7 @@ function InteriorCheck.lot(p: Spec.BuildPlan): { [string]: any }
 
 	-- PointLights by host part
 	local lit: { [string]: boolean } = {}
-	for _, e in p.extras or {} do
+	for _, e in p.extras or Spec.NO_EXTRAS do
 		if e.kind == "PointLight" then
 			lit[e.part] = true
 		end
@@ -180,7 +183,7 @@ function InteriorCheck.lot(p: Spec.BuildPlan): { [string]: any }
 	-- nav extras (hide spots, stations, shelves) in world coordinates
 	local frame = Geometry.frame(nav.cx, 0, nav.cz, nav.yaw)
 	local spots: { { name: string, x: number, z: number } } = {}
-	for _, e in p.extras or {} do
+	for _, e in p.extras or Spec.NO_EXTRAS do
 		local a: any = e.attrs or {}
 		if e.kind == "Attachment" and e.part == "Nav" and e.offset then
 			if a.Kind == "hide" or a.Kind == "station" or a.Kind == "shelf" then
@@ -206,11 +209,11 @@ function InteriorCheck.lot(p: Spec.BuildPlan): { [string]: any }
 				pieces += 1
 			end
 		end
-		local rules = InteriorCheck.REQUIRED[room.kind]
+		local rules: { Rule }? = InteriorCheck.REQUIRED[room.kind]
 		if not rules then
 			fail(`{tag}: unknown room kind "{room.kind}"`)
 		end
-		for _, rule in rules or {} do
+		for _, rule in rules or NO_RULES do
 			if rule.station then
 				local ok = false
 				for _, r in mine do
@@ -229,7 +232,7 @@ function InteriorCheck.lot(p: Spec.BuildPlan): { [string]: any }
 						if rule.attr then
 							sum += (a[rule.attr] or 0) :: number
 						end
-						for _, h in rule.has or {} do
+						for _, h in rule.has or NO_ATTRIBUTES do
 							if a[h] ~= true then
 								fail(`{tag}: {r.name} lacks {h}`)
 							end

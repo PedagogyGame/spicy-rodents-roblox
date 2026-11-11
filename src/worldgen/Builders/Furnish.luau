@@ -445,6 +445,7 @@ local KIT_KIND: { [string]: string } = {
 }
 Furnish.KIT_KIND = KIT_KIND
 
+local NO_LANES: { { number } } = table.freeze({})
 local WALL_Q = { 0, 1, 2, 3 } -- wall 1 back (+z), 2 right (+x), 3 front (-z), 4 left (-x)
 
 -- Lays one room out. Pure and deterministic.
@@ -546,7 +547,7 @@ function Furnish.layout(room: Room, recipe: { Item }, tones: Furniture.Tones): L
 	end
 	-- the ways people walk (kinematic staff and patients stop for nothing): every cell the lane's
 	-- band touches
-	for _, l in room.lanes or {} do
+	for _, l in room.lanes or NO_LANES do
 		local hw = (room.laneHalf or Furnish.BODY) + CELL * 0.71
 		local i0, i1 = cells(math.min(l[1], l[3]) - hw, math.max(l[1], l[3]) + hw, x0, nx)
 		local j0, j1 = cells(math.min(l[2], l[4]) - hw, math.max(l[2], l[4]) + hw, z0, nz)
@@ -1366,7 +1367,8 @@ export type Info = {
 	building: string, -- "house" | "hospital" | "police_station"
 	tones: string, -- Furniture.TONES key
 	rooms: { { id: string, kind: string, x0: number, x1: number, z0: number, z1: number, exterior: boolean? } },
-	doors: { { id: string, a: string, b: string, x: number, z: number, w: number } },
+	-- (Shell.Door, field for field: the builders hand their shell's doors over as they are)
+	doors: { { id: string, a: string, b: string, x: number, z: number, w: number, lockable: boolean } },
 	thick: number, -- exterior wall
 	partition: number, -- partition wall
 	floorTop: number,
@@ -1468,7 +1470,7 @@ function Furnish.plan(ctx: Spec.LotCtx, info: Info): Plan
 				end
 			end
 			local half = info.laneHalf or Furnish.BODY
-			for _, l in info.lanes or {} do
+			for _, l in info.lanes or NO_LANES do
 				if
 					math.max(l[1], l[3]) + half > room.x0
 					and math.min(l[1], l[3]) - half < room.x1
@@ -1829,7 +1831,7 @@ function Furnish.emit(ctx: Spec.LotCtx, plan: Plan)
 				shape = "Cylinder",
 				roll = math.pi / 2,
 				role = "Light",
-				attrs = { NightLight = true, Room = room.id },
+				attrs = { NightLight = true, Room = room.id } :: Spec.Attrs,
 			})
 			deco(name .. "_Cord", cx, ceilY - 0.6, cz, 1.2, 0.1, 0.1, { 60, 60, 60 }, "Metal", {
 				shape = "Cylinder",
@@ -1856,7 +1858,7 @@ function Furnish.emit(ctx: Spec.LotCtx, plan: Plan)
 					local lx, lz = room.x0 + rw * (i - 0.5) / gx, room.z0 + rd * (j - 0.5) / gz
 					deco(name, lx, ceilY - 0.09, lz, 5.0, 0.18, 2.4, COOL, "Neon", {
 						role = "Light",
-						attrs = { NightLight = true, Room = room.id },
+						attrs = { NightLight = true, Room = room.id } :: Spec.Attrs,
 					})
 					list:extra({
 						kind = "PointLight",
@@ -1919,7 +1921,7 @@ function Furnish.emit(ctx: Spec.LotCtx, plan: Plan)
 
 	ctx.attributes.Furnished = pieces
 	ctx.attributes.RoomLights = lights
-	ctx.attributes.NightLights = ((ctx.attributes.NightLights :: number?) or 0) + lights
+	Spec.bump(ctx.attributes, "NightLights", lights)
 end
 
 return Furnish

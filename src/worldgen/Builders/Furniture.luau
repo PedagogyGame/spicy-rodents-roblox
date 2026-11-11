@@ -69,7 +69,7 @@ export type Piece = {
 	solid: boolean, -- the root collides
 	mounted: number?, -- hangs on the wall: the height of its lowest edge
 	parts: { PartDef },
-	attrs: { [string]: string | number | boolean }?,
+	attrs: Spec.Attrs?,
 }
 
 local HALF_PI = math.pi / 2
@@ -390,7 +390,7 @@ MAKERS.counter_run = function(T, o)
 		h = 8.2
 	end
 	local p = piece("counter_run", w, 2.2, h, 2.4, true, b)
-	p.attrs = { Sink = true, Hob = true }
+	p.attrs = { Sink = true, Hob = true } :: Spec.Attrs
 	return p
 end
 
@@ -425,7 +425,7 @@ MAKERS.dining_set = function(T, o)
 		w = 10.2
 	end
 	local p = piece("dining_set", w, 7.3, 3.4, 0.6, true, b)
-	p.attrs = { Seats = n }
+	p.attrs = { Seats = n } :: Spec.Attrs
 	return p
 end
 
@@ -554,7 +554,7 @@ MAKERS.waiting_row = function(T, o)
 		b.box(`Back{k}`, x, 1.45, 0.85, 1.9, 1.5, 0.25, T.fabric)
 	end
 	local p = piece("waiting_row", w, 2.2, 3.0, 2.0, false, b)
-	p.attrs = { Seats = seats }
+	p.attrs = { Seats = seats } :: Spec.Attrs
 	return p
 end
 
@@ -572,7 +572,7 @@ MAKERS.ward_bed = function(T, _o)
 	b.rodZ("Rail", 2.95, 8.0, 0, 8.0, 0.16, T.metal)
 	b.box("Curtain", 2.95, 2.0, 2.0, 0.12, 5.95, 3.9, T.curtain, "Fabric")
 	local p = piece("ward_bed", 6.0, 8.2, 8.1, 2.4, true, b)
-	p.attrs = { Curtain = true }
+	p.attrs = { Curtain = true } :: Spec.Attrs
 	return p
 end
 
@@ -623,7 +623,7 @@ MAKERS.locker_bank = function(T, o)
 		b.box(`Door{k}`, (k - (n + 1) / 2) * 1.6, 0.4, -0.86, 1.4, 6.5, 0.06, T.fabric, "Metal")
 	end
 	local p = piece("locker_bank", w, 1.7, 7.2, 2.4, true, b)
-	p.attrs = { Lockers = n }
+	p.attrs = { Lockers = n } :: Spec.Attrs
 	return p
 end
 
@@ -638,7 +638,7 @@ MAKERS.briefing_row = function(T, o)
 		b.box(`Back{k}`, x, 1.45, 0.6, 1.5, 1.8, 0.22, T.fabricDark, "Fabric")
 	end
 	local p = piece("briefing_row", w, 1.8, 3.25, 1.8, false, b)
-	p.attrs = { Seats = seats }
+	p.attrs = { Seats = seats } :: Spec.Attrs
 	return p
 end
 
@@ -667,7 +667,7 @@ MAKERS.cell = function(T, _o)
 	b.box("BunkLeg", -2.3, 0, 2.2, 4.4, 1.4, 0.3, T.metal, "Metal")
 	b.box("BunkPad", -2.3, 1.7, 2.2, 4.8, 0.35, 2.2, T.cushion, "Fabric")
 	local p = piece("cell", w, d, h, 2.5, true, b)
-	p.attrs = { Cell = true }
+	p.attrs = { Cell = true } :: Spec.Attrs
 	return p
 end
 
@@ -796,6 +796,8 @@ local function place(
 	return list:add(frame, name, x + rx, floorY + def.y, z + rz, def.sx, def.sy, def.sz, opts)
 end
 
+local NO_ATTRS: Spec.Attrs = table.freeze({})
+
 -- Adds a piece to `list` at model-local (x, z) on the floor at floorY (above the seat). The root part
 -- is named `name` and carries Kit plus `attrs`; details are <name>_<suffix>.
 function Furniture.emit(
@@ -807,17 +809,16 @@ function Furniture.emit(
 	z: number,
 	turns: number,
 	floorY: number,
-	attrs: { [string]: string | number | boolean }?
+	attrs: Spec.Attrs?
 ): Spec.PartSpec
 	local root: Spec.PartSpec? = nil
 	for i, def in p.parts do
 		if i == 1 then
-			local a: { [string]: string | number | boolean } = { Kit = p.kind }
-			for k, v in p.attrs or {} do
-				a[k] = v
-			end
-			for k, v in attrs or {} do
-				a[k] = v
+			local a: Spec.Attrs = { Kit = p.kind }
+			for _, more in { p.attrs or NO_ATTRS, attrs or NO_ATTRS } do
+				for k, v in more do
+					a[k] = v
+				end
 			end
 			if p.mounted then
 				a.WallMounted = true
@@ -835,7 +836,7 @@ function Furniture.emit(
 				canQuery = false,
 				castShadow = false,
 				role = if def.solid then "Furniture" else "Decor",
-				attrs = if def.solid then { Part = name } else nil,
+				attrs = if def.solid then { Part = name } :: Spec.Attrs else nil,
 			})
 		end
 	end

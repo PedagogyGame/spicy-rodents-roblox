@@ -121,7 +121,7 @@ function Interior.build(ctx: Spec.LotCtx)
 			part = "Nav",
 			name = "Hide_" .. string.sub(h.id, 11),
 			offset = { h.x, 0, h.z },
-			attrs = { HideType = h.hide, Room = h.room },
+			attrs = { HideType = h.hide, Room = h.room } :: Spec.Attrs,
 		})
 	end
 	local ds = tpl.defenderSpawn
@@ -138,7 +138,7 @@ function Interior.build(ctx: Spec.LotCtx)
 			part = "Nav",
 			name = `SquirrelRoute{i}`,
 			offset = { 0, 0, 0 },
-			attrs = { RouteKind = r.kind, Slot = r.slot or "", Room = r.room or "", Template = "W3" },
+			attrs = { RouteKind = r.kind, Slot = r.slot or "", Room = r.room or "", Template = "W3" } :: Spec.Attrs,
 		})
 	end
 	ctx.attributes.Interior = tpl.id
