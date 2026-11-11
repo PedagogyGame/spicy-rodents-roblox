@@ -71,7 +71,9 @@ return function(t)
 		end
 		t.eq(lamps, 390)
 		t.eq(Bake.fnv(table.concat(sky, "\n")), "44a6ca98126b416a", "Skyline or lamps moved: re-pin only on purpose")
-		t.eq(Bake.fnv(table.concat(props, "\n")), "6f18bcf82f1f304e", "props or roads moved: re-pin only on purpose")
+		-- re-pinned 2026-11-11: the police station stands on a level site (World/Height.SITES), which
+		-- flattened the one segment of its slab road that tilted (rd_114_police_slab Seg003)
+		t.eq(Bake.fnv(table.concat(props, "\n")), "331f94fdbae316d3", "props or roads moved: re-pin only on purpose")
 	end)
 
 	t.test("pin: the collidable massing of every lot and its first part are exactly as before", function()

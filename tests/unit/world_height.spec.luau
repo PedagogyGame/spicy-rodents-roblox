@@ -50,11 +50,70 @@ return function(t)
 		for i, row in golden.rows do
 			if i % 7 == 0 then
 				local x, z = num(row[2]), num(row[3])
-				worst = math.max(worst, math.abs(Height.at(x * 2.5, z * 2.5) - num(row[5]) * 2.5))
+				worst = math.max(worst, math.abs(Height.natural(x * 2.5, z * 2.5) - num(row[5]) * 2.5))
 				worst = math.max(worst, math.abs(Height.base(x * 2.5, z * 2.5) - num(row[4]) * 2.5))
 			end
 		end
 		t.truthy(worst <= 1e-6, `worst {worst}`)
+	end)
+
+	t.test("building sites: level under the building and round it, a bank back up, the port everywhere else", function()
+		t.truthy(#Height.SITES >= 2, "the hospital and the police station")
+		local M, K = Height.SITE_MARGIN, Height.SITE_BANK
+		-- how far from a site the port's own ground can still be above the bank (a generous bound)
+		local function reach(x: number, z: number): number
+			local best = math.huge
+			for _, s in Height.SITES do
+				local dx = math.max(math.abs(x - s.x) - s.w / 2 - M, 0)
+				local dz = math.max(math.abs(z - s.z) - s.d / 2 - M, 0)
+				best = math.min(best, math.sqrt(dx * dx + dz * dz))
+			end
+			return best
+		end
+		local cut, same = 0, 0
+		for i, row in golden.rows do
+			local x, z = num(row[2]) * 2.5, num(row[3]) * 2.5
+			local at, natural = Height.at(x, z), Height.natural(x, z)
+			t.truthy(at <= natural, `row {i}: a site raised the ground`)
+			if at < natural then
+				cut += 1
+				t.truthy(reach(x, z) * K < natural, `row {i}: cut away from any site`)
+			else
+				same += 1
+			end
+		end
+		print(`      {cut} golden rows lowered by a site, {same} untouched`)
+		t.truthy(same > 10000, "the sites are local")
+		for _, s in Height.SITES do
+			local level = Height.natural(s.x, s.z)
+			t.eq(Height.at(s.x, s.z), level, `{s.id}: the seat is the ground at the centre`)
+			local lowered = 0
+			for ix = -10, 10 do
+				for iz = -10, 10 do
+					local x = s.x + (s.w / 2 + M) * ix / 10
+					local z = s.z + (s.d / 2 + M) * iz / 10
+					t.truthy(Height.at(x, z) <= level + 1e-9, `{s.id}: ground above the seat at ({x}, {z})`)
+					if Height.natural(x, z) > level + 0.05 then
+						lowered += 1
+					end
+				end
+			end
+			t.truthy(lowered > 0, `{s.id} needs no site: take it off the list`)
+			-- the bank: SITE_BANK up per stud out, never above the port's ground, continuous at the edge
+			local ex, ez = s.x - s.w / 2 - M, s.z + s.d / 2 + M
+			for _, d in { 0.01, 1, 3, 6, 12, 40 } do
+				local h = Height.at(ex - d, s.z)
+				t.truthy(h <= level + K * d + 1e-9 and h <= Height.natural(ex - d, s.z) + 1e-9, `{s.id}: bank at {d}`)
+				local hb = Height.at(s.x, ez + d)
+				t.truthy(hb <= level + K * d + 1e-9 and hb <= Height.natural(s.x, ez + d) + 1e-9, `{s.id}: bank {d}`)
+			end
+		end
+		-- the hospital's back corner stood 6 st above its floor; the staff exit was 2 st under the grass
+		t.truthy(Height.natural(-1007, 1002) > 6 and Height.at(-1007, 1002) < 0.3, "the back corner is cut level")
+		t.truthy(Height.natural(-890, 1004) > 3 and Height.at(-890, 1004) < 0.3, "the ground at the staff exit")
+		-- far from any site nothing changes
+		t.eq(Height.at(0, 0), Height.natural(0, 0))
+		t.eq(Height.at(1500, -900), Height.natural(1500, -900))
 	end)
 
 	t.test("flat core: height is exactly 0 for Chebyshev distance <= 104 u", function()
