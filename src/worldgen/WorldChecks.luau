@@ -5,7 +5,8 @@
 -- lot count equals data; no solid overlap between lots; every exterior door reachable from a
 -- sidewalk; every route sample within surfaceRadius + 0.3 u of geometry or terrain except the
 -- routes in harvest_patches.json (each with a reason); Skyline for every building; the hospital's 8
--- brief rooms and the station's drone console exist; at least one lamp per road side.
+-- brief rooms and the station's drone console exist; at least one lamp per road side; every enterable
+-- room passes InteriorCheck (furnished, walkable, lit).
 -- Interface: run(data?, plans?) -> Result { ok, failures, ... }
 -- Pure (reads generated data through Import).
 
@@ -13,6 +14,7 @@ local Bake = require("./Bake")
 local DoorReach = require("./DoorReach")
 local Geometry = require("./Geometry")
 local Import = require("./Import")
+local InteriorCheck = require("./InteriorCheck")
 local Kits = require("./Kits")
 local RouteCheck = require("./RouteCheck")
 local Spec = require("./Spec")
@@ -32,6 +34,8 @@ local function solidParts(p: Spec.BuildPlan): { Spec.PartSpec }
 			and s.role ~= "Furniture"
 			and s.role ~= "Station"
 			and s.role ~= "Shelf"
+			and s.role ~= "Step"
+			and s.role ~= "Ceiling"
 		then
 			table.insert(out, s)
 		end
@@ -207,6 +211,24 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 	end
 	table.sort(lampShort)
 	r.lamps = { roads = lampRoads, oneSided = lampShort }
+
+	Yield.breathe()
+	-- interiors: every enterable room furnished for its purpose, doorways and walkways clear, nothing
+	-- floating or buried, a light in every room
+	local interiors = InteriorCheck.run(plans)
+	r.interiors =
+		{ lots = interiors.lots, rooms = interiors.rooms, pieces = interiors.pieces, lights = interiors.lights }
+	if #interiors.failures > 0 then
+		table.insert(
+			failures,
+			`{#interiors.failures} interior failures: {table.concat(
+				interiors.failures,
+				"; ",
+				1,
+				math.min(#interiors.failures, 5)
+			)}`
+		)
+	end
 
 	Yield.breathe()
 	-- doors

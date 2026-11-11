@@ -773,6 +773,58 @@ The brief (section 3 Backdrop, section 10 drone) asks for the following.
 
 **Recommended layout (inferred; designer to confirm, see Open questions).** Ocean to the **north** (beyond z 443): the Willow River already ends at z 443 and can become an estuary, with the marina at the river mouth near (850, 480). Beach and pier sit north of Sycamore Park and the cemetery. Mountains, hills and plains lie to the **south and west**, behind the estates (z < -560) and the police station (x < -586), with the river flowing from the southern hills (it starts at z -244). The sunset-silhouette tower then sits west or south-west, depending on the measured sun azimuth.
 
+### 14.5 Buildings and interiors art pass (2026-11-10)
+
+Owner: "make these buildings and interiors of houses much nicer". The pass is pure plan data on the existing pipeline (parts and built-in materials only, no assets). Code: `src/worldgen/Builders/Facade.luau` (exteriors), `Furniture.luau` and `Furnish.luau` (interiors), `src/worldgen/Coplanar.luau` and `InteriorCheck.luau` (checks), `src/client/Render/TownLights.luau` (night glow).
+
+**Rules every added part obeys**
+
+- **Massing is not touched.** Bodies, walls, floors, roof plates, foundations, route props, lamps and the Skyline are exactly what they were; `tests/unit/worldgen_pins.spec.luau` freezes them by hash. Silhouettes, footprints and every climbing route are unchanged (0 routes off geometry).
+- **Decoration never collides and takes no queries** (`CanCollide = false`, `CanQuery = false`), so a ground ray from the sky lands on the pavement and not on an awning. Three exceptions, each a real obstacle: door steps (role `Step`), the ceiling of an enterable building (role `Ceiling`), and the solid root of a piece of furniture (role `Furniture`).
+- **No two drawn faces share a plane.** `Coplanar.run` checks every model in the town; stacked trim differs by at least 0.04 st.
+- **Names.** New parts never start with `Win`, `Timber`, `Cornice`, `Gable`, `Chimney`, `Roof`, `Wall`, `Body`, `Tile`, `Pad`, `Seg`, `Bank` or `Greybox` unless they are one (tests and `Client/World` key on those prefixes).
+- **Engine parity.** Balls are uniform and cylinders round; lights are `PointLight` extras with plain scriptable properties; `BakeHash` covers `canQuery` and the light parameters (`Bake.VERSION = 3`).
+- **Budget.** The town is 25,341 parts (16,521 before; cap 27,000 in `worldgen_look.spec`). Knobs to turn if it runs over: `Facade.KNOBS` (rails, shutters, flower boxes, quoins, barge boards, bays) and `Furnish.KNOBS` (pictures, skirting, curtains).
+
+**Exterior styles** (`Facade.style`, a pure function of lot type and id; colours and materials always from `Palette.Look`)
+
+| Style | Lots | Windows | Entrance | Roof and corners |
+|---|---|---|---|---|
+| cottage | timber-clad houses and guesthouses | 3.6 x 4.8 sash: casing, glass, mullion, meeting rail on the front, sill; shutters on every third house | jambs, head, glazed transom, brass knob, two panels; porch on two posts (house 0, outer homes, every other Westside house) or a hood on brackets | eaves 1.625 st, rakes 1.2 st, fascia, barge boards, ridge cap, gutters; corner boards |
+| brick | brick houses | 3.0 x 4.8 with stone heads | as cottage | as cottage; quoins |
+| tudor | the 30 quay houses | 3.6 x 5.0 upper windows above the storey line with flower boxes; display panes on a stall riser at street level | oak door, jambs and head; awning when index % 3 == 0 (#80987a odd, #b26d52 even) | rakes 1.625 st (the "gutter to ridge" routes run on them); copper gutters; four posts front and back, braces, a jetty beam on the mid band; fascia sign under the storey line |
+| shopfront | mall, restaurant, shop, gas station, ice cream | display panes on the 13.2 st shop storey, sash above | awning (restaurant red, shop accent) or a flat canopy on posts | sign band with a cap behind the sign board; deck, parapet and coping; pilasters on the mall |
+| estate | the two mansions | 4.4 x 6.4 with stone heads; sill courses on the upper floors | portico: four columns, a slab and a low pediment | deck, parapet, coping; quoins |
+| civic | hospital, police station | hospital ribbon bands (unchanged); station 3.4 x 5.0 with heads and courses | hospital keeps its piers and lintel and gains steps and glazed double doors; station: flat canopy, two blue lamps, "WEST TOPEKA POLICE" | parapet and coping on the station; pilasters |
+| utility | storage, crypt, shelter | plain sash | crypt: two columns and a slab; shelter: hood | - |
+
+- **Steps.** Where a door's sill stands 0.3 to 4.5 st above the terrain 3 st outside it, collidable steps of at most 0.7 st rise run down to the ground (22 doors, 35 steps: the hospital and station floors are 1.05 st up). On level ground the door gets a flat threshold.
+- **Downspouts.** All 54 building downspouts now meet a gutter: the 30 quay pipes run through theirs, 24 house pipes are joined by a short neck (`Facade.downspouts`, added to the lot plans after the route props are drawn).
+- **Night.** A stable 60 % of the window panes of homes and quay houses carry `NightLight = true`; `TownLights` turns them warm Neon when `Lighting.StreetLamps` passes 0.35 and back to glass below 0.25.
+
+**Interiors** (the four FRB houses, the hospital, the police station: 31 rooms, 333 pieces, 55 lights)
+
+- **Shell finish.** Every room has a floor finish of its own (wood, ceramic tile or carpet; drawn 0.05 st over the structural floor a body stands on), wall linings split round the doors, skirting, thresholds in the doorways, and one collidable ceiling per building (10.5 st in the houses, at partition height in the big blocks). House windows have a pane, casing, and curtains on a rail on the inside; the station has blinds; the hospital its ribbon band.
+- **Light.** One pendant per house room and a grid of glow panels in the big blocks, each with a `PointLight` (no shadows, range inside the room). They are lit as baked, so a room is never black; at night `TownLights` makes the shade glow and the light a quarter brighter.
+- **Furniture** is human scale against a 5.5 st person (seat 1.5, table 2.5, counter 3, bed 6.6 x 7.8, door 8.75). A piece has one root (named, attributes `Kit`, `Room`; solid when a body should be stopped) and quiet details named `<root>_<Part>`.
+- **Recipes by room kind** (`Furnish.RECIPES`; `InteriorCheck.REQUIRED` holds the must-haves independently):
+  - living: sofa, TV stand facing it, coffee table on a rug, armchair, bookshelf, floor lamp; sideboard, plant, pictures
+  - kitchen: counter run with sink and hob (wall cupboards where no window is in the way), fridge, table and four chairs on a rug
+  - bedroom: bed with pillows and blanket, nightstand with lamp, wardrobe, rug; armchair, lamp, plant, pictures
+  - bath: bathtub, toilet, basin with a mirror over it
+  - hall: shoe bench, coat hooks; dining: table for six, sideboard; study and den: desk, bookshelf, armchair; pantry: shelves
+  - hospital: reception desk and rows of waiting chairs; triage with four curtained treatment bays; two wards of twelve curtained beds each; isolation; pharmacy shelving and medicine cabinets; staff room; supply racks; a column grid in the big rooms
+  - police station: front desk and waiting rows; briefing chairs facing the quest board; dispatch desks and the drone console; lockers and two barred holding cells
+- **Template furniture and stations keep their contracts.** `Furniture_<id>` parts keep their names and `HideType`; hide spots (`Hide_<id>`, nav nodes `hide_<id>`) sit where the piece ended up, "behind" meaning behind it. `Station_<id>` and `Shelf_<id>` keep name, role, size, position, prompt and the 36 item slots; they are dressed as desks, consoles, a pin board and shelving.
+- **Layout** (`Furnish.layout`, deterministic, 0.5 st grid): door zones are keep-outs; template pieces go as near their template spot as doors, windows and walkways allow; then each recipe piece takes the best spot for its rule (a named wall, a corner, near, facing, in front of or under another piece, the centre, or hung on free wall), and only if a body 1 st in radius can still walk from the first door to every other door, the middle of the room and every hide spot, station and shelf. What does not fit is skipped, never squeezed into a doorway.
+- **Check** (`InteriorCheck`, part of `WorldChecks.run`, so the engine suite runs it): rooms furnished for their kind; solid pieces inside their room and clear of walls, doors and each other; nothing floating or buried; doorways clear; walkable; a light per room; a ceiling and a floor finish.
+
+**Not solved by this pass**
+
+- Doors stay shut: no runtime door service exists yet, so the rooms can only be seen once one is wired (`Doors.setOpen` already carries a leaf's knob and panels with it).
+- 14 exterior doors stand 0.3 to 3.6 st below the terrain in front of them (estate_1_mansion, the hospital staff exit, west_westside_fuel, several outer and Westside homes): trim cannot fix that; it needs terrain pads.
+- The upper windows of the four houses have no room behind them (one storey under the ceiling).
+
 ---
 
 ## 15. Brief deltas (scope: districts, scenery, backdrop, art, audio)
