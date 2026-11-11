@@ -362,7 +362,7 @@ return function(t)
 				x = 0,
 				z = 0,
 				yaw = 0,
-				speed = 1,
+				speed = 100,
 				visible = true,
 				beacons = false,
 				teleported = false,
@@ -375,7 +375,7 @@ return function(t)
 				x = 100,
 				z = 0,
 				yaw = 0,
-				speed = 1,
+				speed = 100,
 				visible = true,
 				beacons = false,
 				teleported = false,
@@ -409,18 +409,22 @@ return function(t)
 			t.near(Ghost.takeStamp(sentRecords) :: number, 1234.5, 1e-3)
 			t.eq(#sentRecords, 1)
 			t.eq(Ghost.takeStamp(sentRecords), nil, "a send without a stamp")
-			-- the clock: packets sent every 1/15 s arrive with up to 40 ms of jitter; the local times are
-			-- spaced as they were sent, to within a couple of milliseconds
+			-- the clock: packets sent every 1/15 s arrive with up to 40 ms of jitter; the snapshots keep the
+			-- server's own times, and the instant drawn moves on evenly, one frame's length a frame
 			local clock = Ghost.newClock()
 			local jitter = { 0.012, 0.04, 0.0, 0.031, 0.008, 0.039, 0.002, 0.02, 0.035, 0.0 }
-			local last: number? = nil
+			local drawn: number? = nil
 			for i = 1, 60 do
 				local sent = i / 15
-				local local0 = clock:localTime(sent, 500 + sent + 0.05 + jitter[(i - 1) % #jitter + 1])
-				if last and i > 3 then
-					t.near(local0 - last, 1 / 15, 0.005, `send {i} is spaced as the server spaced it`)
+				t.near(clock:stamp(sent, 500 + sent + 0.05 + jitter[(i - 1) % #jitter + 1]), sent, 1e-9)
+				for f = 1, 4 do
+					local at = clock:advance(500 + sent + f / 60, 1 / 60) - clock.delay
+					if drawn and i > 3 then
+						-- (the playout clock may steer by up to Ghost.SLEW: 5 % of a frame)
+						t.near(at - drawn, 1 / 60, Ghost.SLEW / 60 + 1e-9, `frame {f} of send {i} moves on evenly`)
+					end
+					drawn = at
 				end
-				last = local0
 			end
 			-- a car at 30 st/s, two snapshots 1/15 s apart; the next send is late
 			local g = Ghost.new({ delay = 0.13 })

@@ -97,14 +97,31 @@ export type Buffer = {
 	sample: (self: Buffer, now: number) -> { [number]: Pose },
 }
 
+-- jumped(a, b, span): b is further from a than the car could have driven in `span` seconds at the
+-- larger of their speeds (twice over, plus a car length): a teleport whose flagged send was lost on the
+-- way, or a jump the server made without flagging it. It is drawn as a snap, never as a streak across
+-- town and never carried on (extrapolated) along that impossible velocity.
+Ghost.JUMP_SLACK = 6 -- studs
+local function jumped(a: Pose, b: Pose, span: number): boolean
+	local dx, dz = b.x - a.x, b.z - a.z
+	local reach = 2 * math.max(a.speed, b.speed) * math.abs(span) + Ghost.JUMP_SLACK
+	return dx * dx + dz * dz > reach * reach
+end
+
 local function lerpAngle(a: number, b: number, t: number): number
 	local d = math.atan2(math.sin(b - a), math.cos(b - a))
 	return a + d * t
 end
 
--- stamp(serverSeconds): the record that carries the server's clock in a send.
+-- The stamp travels in a 32-bit float, which past a day of uptime resolves only 8 to 60 ms: the
+-- snapshots would be spaced unevenly by that much and every car would surge and drag (tools/sim:
+-- --uptime-hours 50). So the server sends its clock modulo STAMP_WRAP (resolved to 0.5 ms) and the
+-- client's clock (newClock) unwraps it against the stamps before it.
+Ghost.STAMP_WRAP = 4096
+
+-- stamp(serverSeconds): the record that carries the server's clock (modulo STAMP_WRAP) in a send.
 function Ghost.stamp(serverSeconds: number): { [string]: number }
-	return { id = Ghost.STAMP_ID, x = serverSeconds, z = 0, yaw = 0, speed = 0, bits = 0 }
+	return { id = Ghost.STAMP_ID, x = serverSeconds % Ghost.STAMP_WRAP, z = 0, yaw = 0, speed = 0, bits = 0 }
 end
 
 -- takeStamp(records): removes the stamp record from a decoded send and returns its seconds (nil when the
@@ -120,23 +137,110 @@ function Ghost.takeStamp(records: { { [string]: number } }): number?
 	return nil
 end
 
--- A clock that places server stamps on the local timeline: stamp + the smallest (arrival - stamp) seen
--- lately. The least-delayed packet defines the offset, so jitter never moves a snapshot; the offset is
--- allowed to drift up slowly, so a clock that falls behind recovers.
-export type StampClock = { offset: number?, localTime: (self: StampClock, stamp: number, arrival: number) -> number }
+-- The playout clock: which server instant the client draws at each frame. Every send's (arrival - stamp)
+-- is recorded, and the instant drawn is aimed at now - floor - delay:
+--   floor: the smallest (arrival - stamp) of the last CLOCK_WINDOW seconds (the least-delayed packet,
+--   the network's own floor; it follows the server falling behind after a stall, or the client's clock
+--   being resynced, within a second instead of the minutes a fixed creep took)
+--   delay: DELAY plus how much later than that floor most packets came (the 95th percentile over
+--   SPREAD_WINDOW), at most MAX_DELAY, so a jittery connection buffers enough to keep the cars fed
+-- The instant drawn advances by the frame's own length and is steered toward that aim at most SLEW
+-- seconds per second, so it never jumps (that would throw every car forward or back, or replay a moment
+-- backwards when the local clock steps): at worst the cars run 5 % slow or fast for a while. While the
+-- instant drawn is past the newest snapshot (the cars are being carried on or held) and the aim is
+-- behind it, as after a server stall (the stamps fall behind: Server/Boot/Game clamps its clock), it
+-- falls back at CATCH_UP instead, so the cars crawl on for a moment instead of freezing for seconds.
+-- Only an error beyond SNAP seconds (the first packet, a server restart) is taken at once.
+Ghost.MAX_DELAY = 0.45
+Ghost.CLOCK_WINDOW = 0.5
+Ghost.SPREAD_WINDOW = 4.0
+Ghost.SLEW = 0.05
+Ghost.CATCH_UP = 0.75 -- the slew while the instant drawn is past the newest snapshot and should fall back
+Ghost.DEADBAND = 0.004
+Ghost.SNAP = 1.0
+
+export type StampClock = {
+	offset: number?, -- now - offset - delay = the server instant drawn (nil until the first stamp)
+	delay: number, -- the render delay aimed at (Buffer.delay follows it)
+	drawn: number?, -- the server instant drawn this frame
+	last: number?, -- the newest unwrapped stamp
+	seen: { { d: number, at: number } }, -- recent (arrival - stamp), oldest first
+	prevNow: number?,
+	stamp: (self: StampClock, raw: number, arrival: number) -> number,
+	advance: (self: StampClock, now: number, dt: number?, newest: number?) -> number,
+}
+
+-- newClock(): `stamp(raw, arrival)` takes a send's stamp (as sent: modulo STAMP_WRAP) and the local time
+-- it arrived, records it, and returns the stamp unwrapped (server seconds: snapshots are kept on this
+-- timeline). `advance(now, dt?, newest?)` is called once per client frame with the local clock, the
+-- frame's length (default: the change in `now`) and the newest snapshot's time: it moves the instant drawn and returns the time to sample the
+-- snapshot buffer at (the instant drawn + `delay`, which the buffer subtracts itself).
 function Ghost.newClock(): StampClock
 	return {
 		offset = nil,
-		localTime = function(self: StampClock, stamp: number, arrival: number): number
-			local d = arrival - stamp
-			local o = self.offset
-			if o == nil or d < o or d > o + 2 then
-				o = d -- the first packet, a less delayed one, or a server restart
+		delay = Ghost.DELAY,
+		drawn = nil,
+		last = nil,
+		seen = {},
+		prevNow = nil,
+		stamp = function(self: StampClock, raw: number, arrival: number): number
+			local s = raw
+			local last = self.last
+			if last then
+				s = raw + Ghost.STAMP_WRAP * math.floor((last - raw) / Ghost.STAMP_WRAP + 0.5)
+				if s > last then
+					self.last = s
+				end
 			else
-				o += 0.0002 -- drift toward later arrivals by 0.2 ms per send
+				self.last = s
 			end
-			self.offset = o
-			return stamp + o
+			local seen = self.seen
+			table.insert(seen, { d = arrival - s, at = arrival })
+			while #seen > 1 and seen[1].at < arrival - Ghost.SPREAD_WINDOW do
+				table.remove(seen, 1)
+			end
+			return s
+		end,
+		advance = function(self: StampClock, now: number, dt: number?, newest: number?): number
+			local step = dt or (if self.prevNow then math.clamp(now - self.prevNow, 0, 0.5) else 0)
+			self.prevNow = now
+			local seen = self.seen
+			local n = #seen
+			if n == 0 then
+				return now - (self.offset or 0)
+			end
+			local floor = math.huge
+			local latest = seen[n].at
+			for i = n, 1, -1 do
+				local e = seen[i]
+				if e.at < latest - Ghost.CLOCK_WINDOW then
+					break
+				end
+				floor = math.min(floor, e.d)
+			end
+			local spreads = table.create(n)
+			for i, e in seen do
+				spreads[i] = math.max(e.d - floor, 0)
+			end
+			table.sort(spreads)
+			local spread = spreads[math.max(1, math.ceil(n * 0.95))]
+			local delay = math.min(Ghost.DELAY + spread, Ghost.MAX_DELAY)
+			local aim = now - floor - delay
+			local drawn = self.drawn
+			if drawn == nil or math.abs(aim - (drawn + step)) > Ghost.SNAP then
+				drawn = aim
+			else
+				drawn += step
+				local err = aim - drawn
+				if math.abs(err) > Ghost.DEADBAND then
+					local back = if newest and drawn > newest and err < 0 then Ghost.CATCH_UP else Ghost.SLEW
+					drawn += math.clamp(err, -back * step, Ghost.SLEW * step)
+				end
+			end
+			self.drawn = drawn
+			self.delay = delay
+			self.offset = now - drawn - delay
+			return drawn + delay
 		end,
 	}
 end
@@ -153,9 +257,22 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 				local p = Ghost.decode(r)
 				poses[p.id] = p
 			end
-			table.insert(self.snaps, { t = t, poses = poses })
-			while #self.snaps > keep do
-				table.remove(self.snaps, 1)
+			-- packets overtake each other: keep the snapshots in time order, and a copy of one already
+			-- held (a duplicated packet) is dropped
+			local snaps = self.snaps
+			local at = #snaps + 1
+			while at > 1 and snaps[at - 1].t >= t do
+				at -= 1
+			end
+			if snaps[at] and math.abs(snaps[at].t - t) < 1e-6 then
+				return
+			end
+			if at == 1 and #snaps >= keep then
+				return -- older than everything kept
+			end
+			table.insert(snaps, at, { t = t, poses = poses })
+			while #snaps > keep do
+				table.remove(snaps, 1)
 			end
 		end,
 		sample = function(self: Buffer, now: number): { [number]: Pose }
@@ -181,7 +298,14 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 				local out = {}
 				for id, pb in newest.poses do
 					local pa = before.poses[id]
-					if pa == nil or pb.teleported or pb.stopped or not pa.visible or not pb.visible then
+					if
+						pa == nil
+						or pb.teleported
+						or pb.stopped
+						or not pa.visible
+						or not pb.visible
+						or jumped(pa, pb, span)
+					then
 						out[id] = pb
 					else
 						local k = ahead / span
@@ -209,8 +333,8 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 			local out = {}
 			for id, pb in b.poses do
 				local pa = a.poses[id]
-				if pa == nil or pb.teleported or not pa.visible or not pb.visible then
-					out[id] = pb -- snap: new, teleported, or appearing/disappearing
+				if pa == nil or pb.teleported or not pa.visible or not pb.visible or jumped(pa, pb, b.t - a.t) then
+					out[id] = pb -- snap: new, teleported (flagged or not), or appearing/disappearing
 				else
 					out[id] = {
 						id = id,

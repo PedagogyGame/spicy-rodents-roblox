@@ -53,6 +53,8 @@ frame times
   --server-stall-every S a server stall every S seconds on average;  --server-stall-ms N  its length
   --net.KEY V  --server.KEY V  --client.KEY V     any single field of a profile (see --list)
   --clock-skew-ms N      the client clock's constant error;  --clock-drift-ppm N  its drift
+  --clock-step-at S      at S seconds the client clock steps by  --clock-step-ms N  (a resync)
+  --join-at S            the client joins S seconds after the server starts sending
   --phase F              where in a server frame the client's first frame falls, 0..1 (default 0.37)
 
 detectors and output
@@ -111,6 +113,9 @@ local SIMPLE: { [string]: { any } } = {
 	["--fps"] = { opts, "fps", 1 },
 	["--clock-skew-ms"] = { opts, "clockSkew", 0.001 },
 	["--clock-drift-ppm"] = { opts, "clockDrift", 1e-6 },
+	["--clock-step-at"] = { opts, "clockStepAt", 1 },
+	["--clock-step-ms"] = { opts, "clockStep", 0.001 },
+	["--join-at"] = { opts, "joinAt", 1 },
 	["--max-per-kind"] = { opts, "maxPerKind", 1 },
 	["--latency-ms"] = { opts.netSet, "latency", 0.001 },
 	["--jitter-ms"] = { opts.netSet, "jitter", 0.001 },

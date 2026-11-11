@@ -30,8 +30,9 @@ local scenario: Replay.Scenario = {
 		return dt
 	end,
 	expect = { none = { "teleport_unflagged", "yaw_jump", "sink", "float" } },
-	-- shows today: from the stall on the cars move in 15 steps a second (the client draws past its newest
-	-- snapshot: see "starved" in the summary) until the stamp clock has crept back, minutes later
+	-- shows today: the server itself stood still for 0.5 s; the cars hold for about 0.25 s, then step with
+	-- the next few sends for about 0.35 s while the playout clock falls back (Ghost.CATCH_UP), then run
+	-- smoothly again (it used to be 25 s of stepping, until the stamp clock had crept back)
 	known = { "speed_stutter" },
 }
 
