@@ -216,12 +216,12 @@
       "species": "car"
     },
     {
-      "bytes": 2458,
+      "bytes": 4652,
       "file": "vehicle_patrol_car.rbxm",
-      "joints": 10,
-      "parts": 11,
+      "joints": 39,
+      "parts": 40,
       "rigspec": true,
-      "sha": "3d603fe5dc0c8bd6fbc7df341295697fdd596f62b4a85d7e69e126f21550a8d0",
+      "sha": "ddf90fd6abc5e3992a48e6cc92e1ab7928251e2d6ef7550a1de845428b658bf2",
       "sockets": 3,
       "species": "car"
     },
@@ -236,12 +236,12 @@
       "species": "car"
     },
     {
-      "bytes": 2390,
+      "bytes": 4582,
       "file": "vehicle_sedan.rbxm",
-      "joints": 9,
-      "parts": 10,
+      "joints": 38,
+      "parts": 39,
       "rigspec": true,
-      "sha": "e7f86d52dc71e84ed3dc197498b6f95c9f91aafbad25c3b75d49c8d444d6ade2",
+      "sha": "f3f31470d65585e1da258f5a098bebb066efb0c9ca96a1513f6810d24c436553",
       "sockets": 3,
       "species": "car"
     },
