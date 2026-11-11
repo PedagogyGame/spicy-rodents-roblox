@@ -847,7 +847,8 @@ function Game.start(opts: Opts?): any
 							s.power,
 							{ kind = if officer then "biteOfficer" else "bitePerson", y = Units.u(p.Y) }
 						)
-						s.bites += 1
+						s.bites += 1 -- every client plays the bite on the rodent's body (Animation/AnimationDriver watches this)
+						(actor.body :: Model):SetAttribute("BiteAt", now)
 						shoutN += 1
 						local line = PlayRules.shout(shoutN)
 						local driver = if victim then possession:controllerOf(victim) else "ai"

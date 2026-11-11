@@ -135,6 +135,8 @@ type Entry = {
 	applied: number,
 	kin: boolean, -- a kinematic controller drew this body last frame
 	hero: { [string]: HeroAssets.Clip }?, -- a sculpted hero rig playing its authored clips
+	biteSeen: number?, -- the body's BiteAt attribute as last seen (biteDue)
+	biteTrack: AnimationTrack?, -- the Bite clip, played over whatever the body is doing
 	mode: string, -- what a hero body is doing (heroClip's mode), for Animation/Liveliness
 	-- what is layered on a hero's clips (heroLayers: Animation/Liveliness, and the Spicy Rodent's
 	-- Animation/Creep): the bones by name, what the clip last gave each and what was last written to it
@@ -529,6 +531,21 @@ function AnimationDriver.heroTracks(
 		t:AdjustSpeed(rate)
 	end
 	return want
+end
+
+-- The bite (owner's preview found the Bite clip uploaded and never played). The server stamps the
+-- biting body's BiteAt attribute with its clock at every bite; a client that sees the stamp change plays
+-- the Bite clip once, at Action priority over the gait, sped up so the lunge and snap take about a
+-- second. A body first seen with a stamp already on it has bitten in the past: nothing is played.
+AnimationDriver.BITE = { rate = 2.2, fade = 0.08 }
+function AnimationDriver.biteDue(seen: number?, at: any, first: boolean): (boolean, number?)
+	if type(at) ~= "number" then
+		return false, seen
+	end
+	if first or seen == at then
+		return false, at
+	end
+	return true, at
 end
 
 -- The seed of a rodent body's twitches (Animation/Creep), from its name: the same on every client.
@@ -1057,6 +1074,27 @@ function AnimationDriver.start(opts: Opts): Driver
 					e.current,
 					braking
 				)
+				-- a bite, over whatever the body is doing
+				local body = e.root.Parent
+				local biteNow, biteAt =
+					AnimationDriver.biteDue(e.biteSeen, body and body:GetAttribute("BiteAt"), e.current == nil)
+				e.biteSeen = biteAt
+				if biteNow and heroSet.Bite then
+					local bt = e.biteTrack
+					if bt == nil then
+						bt = track(e, "Bite")
+						if bt then
+							-- not one of the gait's tracks: a change of gait must not stop it
+							(e.tracks :: { [string]: AnimationTrack? }).Bite = nil
+							bt.Priority = Enum.AnimationPriority.Action
+							bt.Looped = false
+							e.biteTrack = bt
+						end
+					end
+					if bt then
+						bt:Play(AnimationDriver.BITE.fade, 1, AnimationDriver.BITE.rate)
+					end
+				end
 				local clip = heroSet[want]
 				local t = if clip then track(e, want) else nil
 				if t == nil or clip == nil then
