@@ -5,7 +5,7 @@
 --   [--rows N] [kind[:#rrggbb] ...]      default: every kind, in two rows
 -- Writes <out>/scene.json (the tools/review/export.luau part format, group "lineup") and <out>/views.json for
 -- tools/review/render.py. The kinds are dealt into N rows in the order given; each row gets two views,
--- `front_<n>` (front three-quarter) and `rear_<n>` (rear three-quarter, the same vehicles turned about, 300 st
+-- `front_<n>` (front three-quarter) and `rear_<n>` (rear three-quarter, the same vehicles turned about, 800 st
 -- away). A row stands nearly square to its camera and is framed to its own vehicles, so a row of
 -- motorcycles is drawn larger than a row of trolleys. Both cameras look from the vehicles' right with the
 -- review sun on the faces they see. tools/review/vehicles.sh renders the views and stacks them into one JPEG.
@@ -127,11 +127,12 @@ for row = 1, nRows do
 	end
 	for _, turned in { false, true } do
 		place += 1
-		local originZ = -300 * (place - 1)
-		local cursor = -total / 2
+		local originZ = -800 * (place - 1)
+		-- +s along the row is the camera's left: the first kind stands at the left of the picture
+		local cursor = total / 2
 		for k, e in group do
-			local s = (cursor + widths[k] / 2) / SKEW
-			cursor += widths[k] + 2.2
+			local s = (cursor - widths[k] / 2) / SKEW
+			cursor -= widths[k] + 2.2
 			local spec = VehiclePuppet.spec(e.kind, { color = e.color, name = `{e.kind}_{place}` })
 			local base = VehiclePuppet.baseOffset(e.kind)
 			local cf = lib.CFrame.new(s * ax, base, originZ + s * az)
@@ -139,19 +140,27 @@ for row = 1, nRows do
 				cf *= lib.CFrame.Angles(0, math.pi, 0)
 			end
 			emit(PartBuilder.instantiate(spec, lib, cf), spec.name)
+			-- two short lines, so the label of a narrow vehicle does not run into its neighbour's
+			local size = math.clamp(total * 0.019, 0.45, 1.5)
 			table.insert(labels, {
-				text = `{e.kind} ({PartBuilder.partCount(spec)} parts)`,
-				pos = { r4(s * ax), r4(base * 2 + 0.6 + tallest * 0.08), r4(originZ + s * az) },
-				size = r4(math.clamp(total * 0.022, 0.45, 0.9)),
+				text = `{e.kind}\n{PartBuilder.partCount(spec)} parts`,
+				pos = { r4(s * ax), r4(base * 2 + 0.6 + tallest * 0.08 + size * 1.1), r4(originZ + s * az) },
+				size = r4(size),
 			})
 		end
-		-- far enough for the row's width and for its tallest vehicle under its label
-		local dist = math.max((total + 3) / 2 / (tanV * aspect), (tallest * 1.5 + 2.5) / 2 / tanV)
+		-- far enough for the row's width and for its tallest vehicle under its label; the left end of
+		-- the row is the nearer one and spreads wider in the frame, so the camera aims a little left
+		local dist = math.max((total * 1.14 + 3) / 2 / (tanV * aspect), (tallest * 1.5 + 2.5) / 2 / tanV)
+		local aim = total * 0.045 / SKEW
 		table.insert(views, {
 			name = `{if turned then "rear" else "front"}_{row}`,
 			desc = if turned then "rear three-quarter" else "front three-quarter",
-			pos = { r4(math.sin(ANGLE) * dist), r4(dist * 0.3), r4(originZ - math.cos(ANGLE) * dist) },
-			look = { 0, r4(tallest * 0.55), originZ },
+			pos = {
+				r4(aim * ax + math.sin(ANGLE) * dist),
+				r4(dist * 0.3),
+				r4(originZ + aim * az - math.cos(ANGLE) * dist),
+			},
+			look = { r4(aim * ax), r4(tallest * 0.55), r4(originZ + aim * az) },
 			fov = FOV,
 			groups = { "lineup", "lineup_ground" },
 		})
@@ -169,7 +178,7 @@ fs.writeFile(
 		parts = parts,
 		beams = {},
 		lineup = {
-			ground = { y = 0, minX = -90, maxX = 90, minZ = -300 * place - 80, maxZ = 60 },
+			ground = { y = 0, minX = -120, maxX = 120, minZ = -800 * place, maxZ = 80 },
 			labels = labels,
 		},
 	}, false)
