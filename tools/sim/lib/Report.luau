@@ -48,6 +48,12 @@ function Report.describe(s: any): string
 	if s.clockSkew ~= 0 or s.clockDrift ~= 0 then
 		extra ..= `; client clock {ms(s.clockSkew)} off, drifting {num(s.clockDrift * 1e6, 0)} ppm`
 	end
+	if s.clockStep ~= 0 then
+		extra ..= `; client clock steps {ms(s.clockStep)} at {num(s.clockStepAt, 1)} s`
+	end
+	if s.joinAt > 0 then
+		extra ..= `; client joins at {num(s.joinAt, 1)} s`
+	end
 	return `{net}\n  {pace(`server {s.serverName}`, sv, "Hz")}; {pace(`client {s.clientName}`, c, "fps")}{extra}`
 end
 

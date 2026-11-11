@@ -118,7 +118,8 @@ return function(t)
 					continue
 				end
 				t.eq(#frame.ids, 25, "every vehicle has a pose in every frame")
-				t.near(frame.ref :: number, frame.now - Ghost.DELAY - (frame.offset :: number), 1e-9)
+				-- on an ideal network the playout clock settles on Ghost.DELAY (stamps travel as 32-bit floats)
+				t.near(frame.ref :: number, frame.now - Ghost.DELAY - (frame.offset :: number), 1e-6)
 				for _, id in { 3, 4, 5, 13 } do
 					local s = frame.v[id]
 					t.truthy(s.rok and s.vis and s.rvis)

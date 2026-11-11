@@ -73,10 +73,11 @@ function VehicleView.start(): () -> ()
 	local warned = false
 	table.insert(
 		conns,
-		RunService.RenderStepped:Connect(function()
+		RunService.RenderStepped:Connect(function(dt: number)
 			local good, err = pcall(function()
 				local before = #folder:GetChildren()
-				Ghost.render(receiver.buffer, workspace:GetServerTimeNow(), folder, kinds, Height.at, models)
+				local at = receiver:at(workspace:GetServerTimeNow(), dt)
+				Ghost.render(receiver.buffer, at, folder, kinds, Height.at, models)
 				if #folder:GetChildren() ~= before then
 					for _, d in folder:GetDescendants() do
 						if d:IsA("BasePart") then

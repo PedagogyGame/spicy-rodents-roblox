@@ -23,13 +23,11 @@ local scenario: Replay.Scenario = {
 			"roll_missing",
 			"ghost_visibility",
 			"teleport_bit_lost",
-			"teleport_bit_dropped",
+			"teleport_bit_dropped", -- a jump is held until a send carries it (TrafficService.jumped)
 			"teleport_unflagged",
-			"box_overlap",
+			"box_overlap", -- the eastbound lane keeps clear of the trolley track
 		},
 	},
-	-- A wrap's flag reaches the wire however the tick falls between two sends (TrafficService.poseRecords
-	-- carries it until the next send); the eastbound lane keeps clear of the trolley track
 }
 
 return scenario

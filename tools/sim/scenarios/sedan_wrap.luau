@@ -42,6 +42,7 @@ local scenario: Replay.Scenario = {
 			"sideways_slide",
 			"sink",
 			"float",
+			-- a jump is held until a send carries it (TrafficService.jumped)
 			"teleport_bit_dropped",
 			"teleport_unflagged",
 			"accel_spike",

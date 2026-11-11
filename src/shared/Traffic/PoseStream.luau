@@ -5,12 +5,13 @@
 --   * the server's send decision: an accumulator that lets a send go every 1 / HZ seconds and appends
 --     the server's clock as a stamp record (Traffic/Ghost.stamp). Server/Traffic/TrafficService.frame
 --     calls it once per server frame (Server/Boot/Game's step).
---   * the client's receive: the packet is decoded, the stamp taken out and placed on the local timeline
---     by the stamp clock, and the records pushed into the snapshot buffer that Ghost.render samples.
---     Client/Render/VehicleView calls it on every packet.
+--   * the client's receive: the packet is decoded, the stamp taken out and unwrapped by the playout clock,
+--     and the records pushed into the snapshot buffer (kept on the server's timeline) that Ghost.render
+--     samples. Client/Render/VehicleView calls it on every packet, and `at(now)` once per frame for the
+--     time to draw at.
 -- Interface: HZ; MAX_FRAME_DT; REMOTE; newSender(hz?) -> Sender; Sender:frame(dt, now, source) -> records?;
 --            newReceiver(opts?) -> Receiver; Receiver:receive(records, arrival);
---            Receiver:packet(payload, arrival) -> boolean
+--            Receiver:packet(payload, arrival) -> boolean; Receiver:at(now, dt?) -> number
 -- Pure: no engine calls, no state outside the objects it returns, no side effects on require.
 
 local Ghost = require("./Ghost")
@@ -64,20 +65,30 @@ export type Receiver = {
 	clock: Ghost.StampClock,
 	receive: (self: Receiver, records: Records, arrival: number) -> (),
 	packet: (self: Receiver, payload: any, arrival: number) -> boolean,
+	at: (self: Receiver, now: number, dt: number?) -> number,
 }
 
 -- newReceiver(opts?): the client side. `packet(payload, arrival)` takes what the remote delivered and the
 -- local time it arrived at; anything that is not a decodable buffer is dropped (false). `receive(records,
--- arrival)` takes one decoded send (the records of Net.decodeStream, stamp included): the server's own
--- clock spaces the snapshots, the arrival time only anchors them (a send without a stamp is timed by its
--- arrival). `buffer` is what Ghost.render samples every frame.
+-- arrival)` takes one decoded send (the records of Net.decodeStream, stamp included): the snapshot is kept
+-- at the server's own (unwrapped) stamp, so the snapshots are spaced as the server spaced them however the
+-- packets bunch, overtake or repeat (a send without a stamp is timed by its arrival). `at(now, dt?)` is called
+-- once per client frame with the local clock and the frame's length: it moves the playout clock (Ghost.newClock: how far behind
+-- the stream to draw, adapted to the network) and returns the time to hand Ghost.render / Ghost.view with
+-- `buffer`.
 function PoseStream.newReceiver(opts: { delay: number?, keep: number? }?): Receiver
 	return {
 		buffer = Ghost.new(opts),
 		clock = Ghost.newClock(),
 		receive = function(self: Receiver, records: Records, arrival: number)
 			local stamp = Ghost.takeStamp(records)
-			self.buffer:push(if stamp then self.clock:localTime(stamp, arrival) else arrival, records)
+			self.buffer:push(self.clock:stamp(stamp or arrival, arrival), records)
+		end,
+		at = function(self: Receiver, now: number, dt: number?): number
+			local snaps = self.buffer.snaps
+			local t = self.clock:advance(now, dt, if #snaps > 0 then snaps[#snaps].t else nil)
+			self.buffer.delay = self.clock.delay
+			return t
 		end,
 		packet = function(self: Receiver, payload: any, arrival: number): boolean
 			if typeof(payload) ~= "buffer" then

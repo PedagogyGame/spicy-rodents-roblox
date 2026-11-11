@@ -11,6 +11,7 @@ local MedicalRoute = require("@shared/Infection/MedicalRoute")
 local LaneMath = require("@shared/Traffic/LaneMath")
 local AICarMotor = require("@shared/Traffic/AICarMotor")
 local Ghost = require("@shared/Traffic/Ghost")
+local PoseStream = require("@shared/Traffic/PoseStream")
 local Schemas = require("@shared/Net/Schemas")
 local Net = require("@shared/Net/Net")
 local TrafficService = require("@server/Traffic/TrafficService")
@@ -113,39 +114,38 @@ return function(t)
 		"a dispatched ambulance is seen through the fleet's pose stream: stamped sends, a snap when it appears, an even drive",
 		function()
 			local svc = service()
+			local sent: { buffer } = {}
 			local net = Net.new({
-				send = function() end,
+				send = function(_player: any, _name: string, payload: any)
+					table.insert(sent, payload)
+				end,
 				players = function(): { any }
 					return {}
 				end,
 			})
-			-- the server's frame as Boot/Game runs it (traffic, then one stamped send every 1/15 s) and
-			-- the client's side of it as Render/VehicleView does (the stamp taken off, placed on the
-			-- local timeline, the records pushed); the packets arrive with up to 40 ms of jitter
-			local buf = Ghost.new()
-			local clock = Ghost.newClock()
-			local now, acc, sends = 0, 0, 0
+			-- the server's frame as Boot/Game runs it (TrafficService.frame: traffic, then one stamped send
+			-- every 1/15 s) and the client's side of it as Render/VehicleView does (PoseStream's receiver:
+			-- the packet in, then once a frame the instant to draw); the packets arrive with up to 40 ms
+			-- of jitter
+			local receiver = PoseStream.newReceiver()
+			local now, sends, drawAt = 0, 0, 0
 			local lag = 0.05
 			local function frame(dt: number)
 				now += dt
-				svc:step(dt, {})
-				acc += dt
-				if acc >= 1 / 15 then
-					acc = math.min(acc - 1 / 15, 1 / 15)
-					local poses = svc:poseRecords()
-					table.insert(poses, Ghost.stamp(now))
-					local wire = net:stream(nil, "VehiclePoses", poses)
-					local got = Net.decodeStream(Schemas.VehiclePose, wire)
-					local stamp = Ghost.takeStamp(got)
+				svc:frame(dt, now, {}, net)
+				while #sent > 0 do
+					local payload = table.remove(sent, 1) :: buffer
+					local stamp = Ghost.takeStamp(Net.decodeStream(Schemas.VehiclePose, payload))
 					t.truthy(
-						stamp ~= nil and math.abs((stamp :: number) - now) < 1e-3,
-						"every send carries the server's clock"
+						stamp ~= nil and math.abs((stamp :: number) - (now - svc.acc)) < 1e-3,
+						"every send carries the server's clock at the tick its state is from"
 					)
 					sends += 1
-					local arrival = now + lag + (sends * 7 % 5) * 0.01
-					buf:push(clock:localTime(stamp :: number, arrival), got)
+					t.truthy(receiver:packet(payload, now + lag + (sends * 7 % 5) * 0.01))
 				end
+				drawAt = receiver:at(now, dt)
 			end
+			local buf = receiver.buffer
 			for _ = 1, 120 do
 				frame(1 / 60)
 			end
@@ -159,7 +159,7 @@ return function(t)
 					id = v.id
 				end
 			end
-			local parked = buf:sample(now + lag)[id]
+			local parked = buf:sample(drawAt)[id]
 			t.truthy(parked ~= nil, "the parked responder is in the stream")
 			t.truthy(not parked.visible, "and hidden")
 			local v = svc:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
@@ -168,7 +168,7 @@ return function(t)
 			local seen, worstStep, snaps, first = 0, 0, 0, nil :: any
 			local last: any = nil
 			local function watch()
-				local p = buf:sample(now + lag)[id]
+				local p = buf:sample(drawAt)[id]
 				if p and p.visible then
 					seen += 1
 					first = first or p
@@ -209,7 +209,7 @@ return function(t)
 				frame(1 / 60)
 				watch()
 			end
-			local held = buf:sample(now + lag)[id]
+			local held = buf:sample(drawAt)[id]
 			t.truthy(held.visible and held.stopped, "standing on scene")
 			t.truthy(math.sqrt((held.x - v.x) ^ 2 + (held.z - v.z) ^ 2) < 0.5, "exactly where the server has it")
 			svc:releaseResponder(v)
@@ -223,7 +223,7 @@ return function(t)
 				frame(1 / 60)
 			end
 			t.eq(v.phase, "idle")
-			t.truthy(not buf:sample(now + lag)[id].visible, "hidden again at home")
+			t.truthy(not buf:sample(drawAt)[id].visible, "hidden again at home")
 			t.truthy(worstStep <= top / 60 * 1.6 + 0.3, `{worstStep} studs in one frame on the way home`)
 			-- turning round at the scene is a U-turn it drives, onto the other side of the road (it used
 			-- to flip round on the spot and jump 15 st sideways): nothing on the way out, at the scene or

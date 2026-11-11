@@ -343,7 +343,8 @@ end
 -- frame(dt, now, world, net?) -> hits: one server frame of traffic, exactly what Server/Boot/Game runs on
 -- every Heartbeat and what the headless replay (tools/sim) runs: the simulation steps its whole ticks,
 -- then, when `net` is given and Traffic/PoseStream's sender says a send is due, the pose records go out
--- with the server clock `now` (the caller's clock AFTER this frame) as their stamp.
+-- stamped with the instant their state belongs to: the server clock `now` (the caller's clock AFTER this
+-- frame) less the part of a tick not yet simulated.
 function TrafficService.frame(
 	self: TrafficService,
 	dt: number,
@@ -353,7 +354,10 @@ function TrafficService.frame(
 ): { SweptCollision.Hit }
 	local hits = self:step(dt, world)
 	if net then
-		local records = self.sender:frame(dt, now, self)
+		-- the records hold the state of the last whole tick, which is `acc` (the remainder not yet
+		-- simulated) older than the frame clock: stamp that instant, or a send that carries one tick
+		-- fewer than its neighbours is drawn as the car dragging, then surging (tools/sim live_server)
+		local records = self.sender:frame(dt, now - self.acc, self)
 		if records then
 			net:stream(nil, PoseStream.REMOTE, records)
 		end

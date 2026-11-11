@@ -89,6 +89,7 @@ return function(t)
 			a:frame(dt, now, {}, net)
 			-- the reference: the old Game step, written out
 			b:step(dt, {})
+			-- (a send carries every jump since the last one, then forgets them: TrafficService.jumped)
 			local expected = reference:frame(dt, now, b)
 			t.eq(#sent - before, if expected then 1 else 0, `frame {i}`)
 			if expected then
@@ -96,7 +97,12 @@ return function(t)
 				t.eq(#wire, Fleet.count() + 1, "25 vehicles and the stamp")
 				t.eq(buffer.len(sent[#sent]), 13 * (Fleet.count() + 1))
 				t.eq(wire[#wire].id, Ghost.STAMP_ID)
-				t.near(wire[#wire].x, now, 1e-5, "the stamp is the caller's clock (f32 on the wire)")
+				t.near(
+					wire[#wire].x,
+					now - a.acc,
+					1e-5,
+					"the stamp is the caller's clock less the tick not yet run (f32 on the wire)"
+				)
 				for j = 1, Fleet.count() do
 					t.eq(wire[j].id, expected[j].id)
 					t.near(wire[j].x, expected[j].x, 1e-3)
@@ -141,11 +147,11 @@ return function(t)
 		end
 	end)
 
-	t.test("the receiver is the old VehicleView handler: decode, stamp to local time, push", function()
+	t.test("the receiver: decode, unwrap the stamp, keep the snapshots on the server's timeline", function()
 		local svc = TrafficService.new({ lanes = records, roads = roads, seed = 3 })
 		local net, sent = loopback()
 		local receiver = PoseStream.newReceiver()
-		-- the reference: Client/Render/VehicleView's OnClientEvent as it was before the logic moved
+		-- the reference: the same steps by hand
 		local buf, clock = Ghost.new(), Ghost.newClock()
 		local now = 0
 		local jitter = { 0.031, 0.002, 0.044, 0.0, 0.019 }
@@ -158,20 +164,29 @@ return function(t)
 				t.truthy(receiver:packet(b, arrival))
 				local wire = Net.decodeStream(Schemas.VehiclePose, b)
 				local stamp = Ghost.takeStamp(wire)
-				buf:push(if stamp then clock:localTime(stamp, arrival) else arrival, wire)
+				buf:push(clock:stamp(stamp :: number, arrival), wire)
 			end
 		end
 		t.eq(#receiver.buffer.snaps, #buf.snaps)
 		t.truthy(#buf.snaps >= 12)
 		for i, snap in buf.snaps do
-			t.eq(receiver.buffer.snaps[i].t, snap.t, "the same local time")
+			t.eq(receiver.buffer.snaps[i].t, snap.t, "the same time")
 			t.eq(receiver.buffer.snaps[i].poses[Ghost.STAMP_ID], nil, "the stamp is not a vehicle")
 			t.deepEq(receiver.buffer.snaps[i].poses, snap.poses)
+			if i > 1 then
+				t.near(snap.t - buf.snaps[i - 1].t, 1 / 15, 1e-4, "spaced as the server sent them")
+			end
 		end
-		t.eq(receiver.clock.offset, clock.offset)
+		t.near(buf.snaps[#buf.snaps].t, now - svc.acc, 1e-3, "at the server's clock, the tick the state is from")
 		t.eq(receiver:packet("not a buffer", 5), false, "anything but a buffer is dropped")
 		t.eq(receiver:packet(nil, 5), false)
 		t.eq(#receiver.buffer.snaps, #buf.snaps)
+		-- the time to draw at: the newest snapshot's floor plus the delay, once a frame
+		local at = receiver:at(1000 + now + 0.06, 1 / 60)
+		local delay = receiver.buffer.delay
+		t.truthy(delay >= Ghost.DELAY and delay <= Ghost.DELAY + 0.045, `the delay {delay} covers the 44 ms of jitter`)
+		t.near(receiver.clock.delay, delay)
+		t.truthy(at - delay < buf.snaps[#buf.snaps].t, "drawn behind the newest snapshot")
 		-- a send without a stamp is timed by its arrival
 		local plain = PoseStream.newReceiver()
 		plain:receive({ { id = 4, x = 1, z = 2, yaw = 0, speed = 0, bits = 1 } }, 77.5)
@@ -264,14 +279,8 @@ return function(t)
 		local view = fs.readFile("src/client/Render/VehicleView.luau")
 		t.truthy(string.find(view, "PoseStream.newReceiver()", 1, true))
 		t.truthy(string.find(view, "receiver:packet(b, workspace:GetServerTimeNow())", 1, true))
-		t.truthy(
-			string.find(
-				view,
-				"Ghost.render(receiver.buffer, workspace:GetServerTimeNow(), folder, kinds, Height.at, models)",
-				1,
-				true
-			)
-		)
+		t.truthy(string.find(view, "local at = receiver:at(workspace:GetServerTimeNow(), dt)", 1, true))
+		t.truthy(string.find(view, "Ghost.render(receiver.buffer, at, folder, kinds, Height.at, models)", 1, true))
 		for _, inline in { "takeStamp", "newClock", "decodeStream", "Ghost.new(", "CFrame.", "Vector3." } do
 			t.falsy(string.find(view, inline, 1, true), `VehicleView no longer inlines {inline}`)
 		end

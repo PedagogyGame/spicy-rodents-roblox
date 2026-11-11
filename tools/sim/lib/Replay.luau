@@ -78,6 +78,13 @@ export type Scenario = {
 	expect: { none: { string }?, some: { string }? }?,
 	known: { string }?,
 	ci: number?,
+	-- any of these settings, unless the command line gives it (seconds)
+	uptime: number?,
+	clockSkew: number?,
+	clockDrift: number?,
+	clockStepAt: number?,
+	clockStep: number?,
+	joinAt: number?,
 }
 
 export type Sim = {
@@ -106,6 +113,9 @@ export type Settings = {
 	uptime: number, -- seconds the server clock has already run when the replay starts
 	clockSkew: number, -- the client clock's constant error (seconds)
 	clockDrift: number, -- and its drift (seconds per second)
+	clockStepAt: number, -- at this wall time the client clock steps (a resync of GetServerTimeNow) ...
+	clockStep: number, -- ... by this many seconds (0 = never)
+	joinAt: number, -- the client joins this late: it drops every packet and draws nothing before it
 	phase: number, -- where in a server frame the client's first frame falls (0..1)
 	warmup: number, -- seconds at the start the detectors ignore
 	detectors: { string }?, -- names to run (default: all)
@@ -145,6 +155,9 @@ function Replay.defaults(): Settings
 		uptime = 0,
 		clockSkew = 0,
 		clockDrift = 0,
+		clockStepAt = 0,
+		clockStep = 0,
+		joinAt = 0,
 		phase = 0.37,
 		warmup = 1,
 		detectors = nil,
@@ -204,10 +217,32 @@ function Replay.settings(opts: { [string]: any }?): Settings
 	s.net, s.server, s.client = table.clone(s.net), table.clone(s.server), table.clone(s.client)
 	s.seconds = o.seconds or sc.seconds or s.seconds
 	s.trafficSeed = o.trafficSeed or sc.trafficSeed or s.trafficSeed
-	for _, key in { "seed", "uptime", "clockSkew", "clockDrift", "phase", "warmup", "maxPerKind", "keepFrames" } do
+	for _, key in { "uptime", "clockSkew", "clockDrift", "clockStepAt", "clockStep", "joinAt" } do
+		if (sc :: any)[key] ~= nil then
+			(s :: any)[key] = (sc :: any)[key]
+		end
+	end
+	for _, key in
+		{
+			"seed",
+			"uptime",
+			"clockSkew",
+			"clockDrift",
+			"clockStepAt",
+			"clockStep",
+			"joinAt",
+			"phase",
+			"warmup",
+			"maxPerKind",
+			"keepFrames",
+		}
+	do
 		if o[key] ~= nil then
 			(s :: any)[key] = o[key]
 		end
+	end
+	if s.joinAt > 0 then
+		s.warmup = math.max(s.warmup, s.joinAt + 1) -- the cars appearing when a client joins are no glitch
 	end
 	if o.fps then
 		s.client.hz = o.fps
@@ -462,7 +497,7 @@ function Replay.run(opts: { [string]: any }?): Result
 		end
 		local pendingServer = nextServerFrame()
 		local clientWall = settings.phase / settings.server.hz
-		local prevNow: number? = nil
+		local prevWall: number? = nil
 		local prevV: { [number]: Detect.Sample } = {}
 		local lastStamp = -math.huge
 		local frameNo = 0
@@ -479,7 +514,18 @@ function Replay.run(opts: { [string]: any }?): Result
 				pendingServer = nextServerFrame()
 			end
 			-- the client clock: workspace:GetServerTimeNow() (wall time plus its error)
-			local now = clientWall + settings.clockSkew + settings.clockDrift * clientWall
+			local now = clientWall
+				+ settings.clockSkew
+				+ settings.clockDrift * clientWall
+				+ (if settings.clockStep ~= 0 and clientWall >= settings.clockStepAt then settings.clockStep else 0)
+			if clientWall < settings.joinAt then
+				-- not joined yet: whatever arrives is lost on the way to nobody
+				while flights[1] and flights[1].at <= clientWall do
+					table.remove(flights, 1)
+				end
+				clientWall += clientPace:next()
+				continue
+			end
 			-- packets that have arrived are handled before the frame is drawn, all at this frame's clock
 			local packets = 0
 			while flights[1] and flights[1].at <= clientWall do
@@ -502,14 +548,21 @@ function Replay.run(opts: { [string]: any }?): Result
 			frameNo += 1
 			local buf = receiver.buffer
 			local nSnaps = #buf.snaps
+			-- Client/Render/VehicleView: once a frame, the time to draw at (RenderStepped's dt is real time)
+			local at = receiver:at(now, if prevWall then clientWall - prevWall else nil)
 			local offset = receiver.clock.offset
-			local ref: number? = if offset then now - buf.delay - offset else nil
-			local starved = if nSnaps > 0 then (now - buf.delay) - buf.snaps[nSnaps].t else 0
+			local ref: number? = nil -- the server instant being drawn, on the server's clock
+			if offset then
+				local wrapped = at - buf.delay -- the client keeps stamps sent modulo Ghost.STAMP_WRAP
+				ref = wrapped + Ghost.STAMP_WRAP * math.floor((sim.clock - wrapped) / Ghost.STAMP_WRAP + 0.5)
+			end
+			local starved = if nSnaps > 0 then (at - buf.delay) - buf.snaps[nSnaps].t else 0
 			local v: { [number]: Detect.Sample } = {}
 			local frame: Detect.Frame = {
 				i = frameNo,
 				t = clientWall,
-				dt = if prevNow then now - prevNow else 1 / settings.client.hz,
+				-- the frame's real length (the local clock `now` may step when it resyncs)
+				dt = if prevWall then clientWall - prevWall else 1 / settings.client.hz,
 				now = now,
 				clock = sim.clock,
 				ref = ref,
@@ -522,7 +575,7 @@ function Replay.run(opts: { [string]: any }?): Result
 				ids = {},
 			}
 			-- Ghost.render's pure half: what every root part is given this frame
-			Ghost.view(buf, now, kinds, heightAt, function(id, p, _k, x, y, z, yaw, pitch)
+			Ghost.view(buf, at, kinds, heightAt, function(id, p, _k, x, y, z, yaw, pitch)
 				local live = traffic.byId[id]
 				local s: Detect.Sample = {
 					id = id,
@@ -629,7 +682,7 @@ function Replay.run(opts: { [string]: any }?): Result
 			end
 
 			prevV = v
-			prevNow = now
+			prevWall = clientWall
 			clientWall += clientPace:next()
 		end
 
