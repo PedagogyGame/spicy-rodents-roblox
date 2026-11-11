@@ -852,7 +852,12 @@ class TreeBuilder:
     def bough_limb(self, b):
         """(Re)build a bough's tube from its rail, radii and lift."""
         Q, radii, lift = b["rail"], b["radii"], b["lift"]
-        centers = Q + b["w0"] * (Y[None] * lift - b["ups"] * radii[:, None])
+        # the game draws the squirrel's feet pushed out of the trunk over a bough's first fifth
+        # (feet_path): the bark's top goes under those feet, so the limb leaves the trunk's axis level
+        # and then follows the pushed line
+        push = self.feet_path(Q, 0.0, b["kind"], b["route"], s=b["s"], L=b["L"], sP=(b["P"], b["sP"])) - Q
+        push[0] = 0.0
+        centers = Q + push + b["w0"] * (Y[None] * lift - b["ups"] * radii[:, None])
         wob = b["wob"]
 
         def radius(i, ang, radii=radii):
@@ -862,7 +867,7 @@ class TreeBuilder:
         # the blend belongs to the junction: past it, boughs that run side by side stay two round limbs
         zone, clear = b["zone"], b["clear"]
         limb.fade = (max(0.55 * zone, clear + 0.5), max(1.2 * zone, clear + 4.5))
-        limb.feet = Q + Y[None] * lift
+        limb.feet = Q + push + Y[None] * lift
         b["limb"], b["Q"] = limb, centers
 
     def relieve_crossings(self):
@@ -1416,6 +1421,7 @@ class TreeBuilder:
             r0 = float(radii[i]) * rng.uniform(0.55, 0.7)
             kid = self.add_branch(pts[i], d, ln, r0, br["level"] + 1, chain, float(radii[i]), br["order"] + 0.01 * i)
             if kid is not None:
+                kid["bough"] = br.get("bough", -1)
                 br["kids"].append(kid)
                 new.append(kid)
             side = -side
@@ -1801,20 +1807,50 @@ class TreeBuilder:
         return {"bark": self.bark.tris, "leaves_shade": self.leaf["shade"].tris, "leaves_mid": self.leaf["mid"].tris,
                 "leaves_sun": self.leaf["sun"].tris, "fruit": self.fruit.tris}
 
-    def feet_path(self, P, lift, kind, route):
+    def feet_path(self, P, lift, kind, route, s=None, L=None, sP=None):
         """The squirrel's drawn feet along a rail (Motion.visualPose): rail + lift, pushed out of the
-        trunk over the first fifth of a bough."""
+        trunk over the first fifth of a bough. P is the route's dense samples; or, with s, L and
+        sP = (dense samples, their arc lengths), points of the rail at the arc lengths s."""
         F = P + Y[None] * lift
         clr = route.get("trunkClearance")
         if kind == "branch" and clr:
-            sP = arclen(P)
-            t = sP / max(sP[-1], 1e-9)
-            ahead = at_s(P, sP, 0.16 * sP[-1])[0] - P[0]
+            if s is None:
+                sP = arclen(P)
+                t = sP / max(sP[-1], 1e-9)
+                ahead = at_s(P, sP, 0.16 * sP[-1])[0] - P[0]
+            else:
+                dense, sd = sP
+                t = np.asarray(s) / max(L, 1e-9)
+                ahead = at_s(dense, sd, 0.16 * L)[0] - dense[0]
             h = np.array([ahead[0], 0.0, ahead[2]])
             if np.linalg.norm(h) > 1e-6:
                 k = (clr + 0.31) * SPU * np.clip(1 - t / 0.2, 0, 1) ** 2
                 F = F + norm(h)[None] * k[:, None]
         return F
+
+
+def twig_tips(tb):
+    """The twig tips of a built tree (TreeBuilder after .build()), for whoever hangs leaves on them:
+    one dict per branch that carries no further branch, with
+      pos     (3,) the tip, studs, Roblox axes (+Y up), local to the tree's pivot (rec["root"])
+      dir     (3,) unit direction the twig points at its tip
+      radius  wood radius at the tip, studs
+      length  length of the twig, studs
+      level   1 = side branch off a bough or the leader, 2 = branchlet, 3+ = twig
+      bough   index into tb.boughs of the bough it grows from (tb.boughs[i]["route"]["id"] is the
+              route id; negative ids are the giants' decor limbs), -1 for the leader's crown limbs
+      route   that bough's route id, None for the leader
+      meshed  False when the twig itself was left out of the bark for the triangle budget"""
+    out = []
+    for br in tb.branches:
+        if br["kids"]:
+            continue
+        pts = br["pts"]
+        bi = int(br.get("bough", -1))
+        out.append({"pos": pts[-1].copy(), "dir": norm(pts[-1] - pts[-2]), "radius": float(br["radii"][-1]),
+                    "length": float(arclen(pts)[-1]), "level": int(br["level"]), "bough": bi,
+                    "route": tb.boughs[bi]["route"]["id"] if bi >= 0 else None, "meshed": bool(br["mesh"])})
+    return out
 
 
 # ---- Blender ------------------------------------------------------------------------------------
