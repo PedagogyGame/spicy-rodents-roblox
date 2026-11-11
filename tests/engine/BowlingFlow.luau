@@ -169,13 +169,24 @@ function BowlingFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 		check(hw:standingCount() == 10, `{label}: {hw:standingCount()} pins stand`)
 		local off = (hw.ball.CFrame.Position - hw.rackCF.Position).Magnitude
 		check(off < 0.05, `{label}: the ball is {off} studs from its rack`)
+		-- (only this lane's messages are counted: in the booted game a stub also hears from other systems)
+		local function heard(p: any): number
+			local n = 0
+			for _, e in p.events do
+				if e.station == id then
+					n += 1
+				end
+			end
+			return n
+		end
 		local before: { number } = {}
 		for i, p in who do
-			before[i] = #p.events
+			before[i] = heard(p)
 		end
 		opts.step(3)
 		for i, p in who do
-			check(#p.events == before[i], `{label}: {#p.events - before[i]} more messages reached {p.Name} afterwards`)
+			local more = heard(p) - before[i]
+			check(more == 0, `{label}: {more} more messages about the lane reached {p.Name} afterwards`)
 		end
 	end
 
