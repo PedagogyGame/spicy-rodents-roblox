@@ -40,7 +40,7 @@ done_step() {
 	printf -- "-- ok (%.1fs)\n" "$(echo "$end - $STEP_START" | bc)"
 }
 
-LUAU_DIRS=(src tests tools/cloud/tasks tools/compile tools/anim tools/bake tools/typecheck)
+LUAU_DIRS=(src tests tools/cloud/tasks tools/compile tools/anim tools/bake tools/sim tools/typecheck)
 
 step "stylua --check (StyLua $(stylua --version | awk '{print $2}'), Luau syntax)"
 stylua --check "${LUAU_DIRS[@]}"

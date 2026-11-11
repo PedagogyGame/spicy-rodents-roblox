@@ -4,7 +4,11 @@
 -- VehiclePoses, W1 #9; traffic.md §13 "render on clients with interpolation, about 100 ms behind").
 -- Interface: encode(pose) -> record (Net/Schemas.VehiclePose fields); decode(record) -> Pose;
 --            new(opts) -> Buffer; Buffer:push(t, records); Buffer:sample(now) -> { [id] = Pose };
---            render(buffer, now, folder, lib, kinds) (engine: placeholder models, one BulkMoveTo).
+--            seat(x, z, yaw, length, heightAt) -> y, pitch; seen(pose, kind, heightAt) -> x, y, z, yaw, pitch
+--            (pure: the root pose a player sees); view(buffer, now, kinds, heightAt, visit) (pure: one
+--            client frame, `visit` called per vehicle with its sampled and seen pose);
+--            rootCFrame(lib, x, y, z, yaw, pitch, visible) (the CFrame of that pose, lib = PartBuilder.Lib);
+--            render(buffer, now, folder, kinds, heightAt, models) (engine: placeholder models, one BulkMoveTo).
 --
 -- Records are 13 bytes (u16 id, f32 x, f32 z, u8 yaw, u8 speed, u8 bits). The server never sends y:
 -- clients take it from World/Height like the server does (traffic.md §13 "Terrain"). A teleported pose
@@ -246,6 +250,75 @@ function Ghost.seat(
 	return (front + rear) / 2, math.clamp(pitch, -0.5, 0.5)
 end
 
+Ghost.HIDDEN_Y = -500 -- a hidden ghost parks this far below the map
+
+-- seen(p, kind, heightAt) -> x, y, z, yaw, pitch: the pose `render` gives the root part of a vehicle of
+-- that kind for the sampled pose `p`: a visible one sits on the ground under its axles (`seat`), its
+-- centre half its box height above it, pitched with the slope; a hidden one parks at HIDDEN_Y, level.
+-- Yaw is the HTML yaw (Units.yawCFrame turns it into the engine's). Pure: the headless replay
+-- (tools/sim/traffic_replay.luau) records exactly these numbers as "what the player sees".
+function Ghost.seen(
+	p: Pose,
+	kind: string,
+	heightAt: (x: number, z: number) -> number
+): (number, number, number, number, number)
+	if p.visible then
+		local y, pitch = Ghost.seat(p.x, p.z, p.yaw, VehiclePuppet.length(kind), heightAt)
+		return p.x, y + VehiclePuppet.baseOffset(kind), p.z, p.yaw, pitch
+	end
+	return p.x, Ghost.HIDDEN_Y, p.z, p.yaw, 0
+end
+
+-- view(buffer, now, kinds, heightAt, visit) -> n: one client frame, pure. Samples the buffer at `now` and
+-- calls `visit(id, pose, kind, x, y, z, yaw, pitch)` for every sampled vehicle whose kind is known:
+-- `pose` is the sampled (interpolated) pose, the five numbers are `seen` (what the root part is given).
+-- `render` places the models from exactly these calls and the headless replay (tools/sim) records them,
+-- so what the replay measures is what the game draws. Returns the number of vehicles visited.
+export type Kinds = { [number]: { kind: string, color: string? } }
+function Ghost.view(
+	buffer: Buffer,
+	now: number,
+	kinds: Kinds,
+	heightAt: (x: number, z: number) -> number,
+	visit: (
+		id: number,
+		pose: Pose,
+		kind: { kind: string, color: string? },
+		x: number,
+		y: number,
+		z: number,
+		yaw: number,
+		pitch: number
+	) -> ()
+): number
+	local n = 0
+	for id, p in buffer:sample(now) do
+		local k = kinds[id]
+		if k then
+			n += 1
+			visit(id, p, k, Ghost.seen(p, k.kind, heightAt))
+		end
+	end
+	return n
+end
+
+-- rootCFrame(lib, x, y, z, yaw, pitch, visible): the root part's CFrame for a `seen` pose: at (x, y, z),
+-- facing the HTML yaw (Config/Units adds the engine's pi), a visible vehicle pitched nose-up by `pitch`
+-- about its own X axis. `lib` supplies CFrame and Vector3 (PartBuilder.engineLib() in the game,
+-- @lune/roblox in the specs), so the same expression is checked headless.
+function Ghost.rootCFrame(
+	lib: { CFrame: any, Vector3: any },
+	x: number,
+	y: number,
+	z: number,
+	yaw: number,
+	pitch: number,
+	visible: boolean
+): any
+	local level = lib.CFrame.new(lib.Vector3.new(x, y, z)) * lib.CFrame.Angles(0, Units.robloxYaw(yaw), 0)
+	return if visible then level * lib.CFrame.Angles(pitch, 0, 0) else level
+end
+
 -- render(buffer, now, folder, kinds, heightAt, models): engine only. `kinds` maps id -> {kind, color};
 -- `models` caches the placeholder Model per id (built from Traffic/VehiclePuppet at the true box).
 -- Moves every visible root with one BulkMoveTo (HANDOFF rule 4); hidden ghosts park far below.
@@ -253,33 +326,26 @@ function Ghost.render(
 	buffer: Buffer,
 	now: number,
 	folder: Instance,
-	kinds: { [number]: { kind: string, color: string? } },
+	kinds: Kinds,
 	heightAt: (x: number, z: number) -> number,
 	models: { [number]: Model }
 ): number
 	local lib = PartBuilder.engineLib()
 	local parts, cframes = {}, {}
-	for id, p in buffer:sample(now) do
+	Ghost.view(buffer, now, kinds, heightAt, function(id, p, k, x, y, z, yaw, pitch)
 		local model = models[id]
-		local k = kinds[id]
-		if not model and k then
+		if not model then
 			local spec = VehiclePuppet.spec(k.kind, { color = k.color, name = `Ghost_{id}` })
 			local built = PartBuilder.instantiate(spec, lib) :: Model
 			built.Parent = folder
 			models[id] = built
 			model = built
 		end
-		if model and model.PrimaryPart and k then
+		if model.PrimaryPart then
 			table.insert(parts, model.PrimaryPart)
-			if p.visible then
-				local y, pitch = Ghost.seat(p.x, p.z, p.yaw, VehiclePuppet.length(k.kind), heightAt)
-				local at = Vector3.new(p.x, y + VehiclePuppet.baseOffset(k.kind), p.z)
-				table.insert(cframes, Units.yawCFrame(p.yaw, at) * CFrame.Angles(pitch, 0, 0))
-			else
-				table.insert(cframes, Units.yawCFrame(p.yaw, Vector3.new(p.x, -500, p.z)))
-			end
+			table.insert(cframes, Ghost.rootCFrame(lib, x, y, z, yaw, pitch, p.visible))
 		end
-	end
+	end)
 	if #parts > 0 then
 		workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
 	end

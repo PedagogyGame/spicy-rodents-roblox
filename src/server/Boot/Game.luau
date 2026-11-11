@@ -66,7 +66,7 @@ local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
 local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
-local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Traffic/Ghost"))
+local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
 export type Opts = {
 	players: boolean?, -- connect joins (default true; the engine smoke drives PlayerLike stubs)
@@ -863,23 +863,20 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
-	local poseAcc, biteAcc, fadeAcc = 0, 0, 0
+	local biteAcc, fadeAcc = 0, 0
 	local function step(dt: number)
 		now += dt
-		local hits = traffic:step(dt, trafficWorld() :: any)
+		-- the fleet steps, then an even 15 pose sends a second go out stamped with `now`: one call that
+		-- the headless replay (tools/sim) makes too, so what it measures is what this server does
+		local hits = traffic:frame(dt, now, trafficWorld() :: any, net)
 		local _ = hits
+		-- the bite-to-hospital sequence steps after the fleet: an ambulance it dispatches or turns round
+		-- now is flagged as a jump in the very next pose send (TrafficService remembers jumps between sends)
 		if infection then
 			local okS, errS = pcall(infection.step, infection, dt)
 			if not okS then
 				infectionFault("step", errS)
 			end
-		end
-		poseAcc += dt
-		if net and poseAcc >= 1 / 15 then
-			poseAcc = math.min(poseAcc - 1 / 15, 1 / 15) -- an even 15 sends a second
-			local records = traffic:poseRecords()
-			table.insert(records, Ghost.stamp(now)) -- the server's clock (Traffic/Ghost)
-			net:stream(nil, "VehiclePoses", records)
 		end
 		biteAcc += dt
 		if biteAcc >= 0.1 then
@@ -954,7 +951,7 @@ function Game.start(opts: Opts?): any
 			conns,
 			RunService.Heartbeat:Connect(function(dt: number)
 				local ok, err = pcall(function()
-					step(math.min(dt, 0.1))
+					step(math.min(dt, PoseStream.MAX_FRAME_DT))
 				end)
 				if not ok then
 					warn(`[SpicyRodents] step failed: {err}`)
