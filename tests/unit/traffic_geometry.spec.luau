@@ -122,4 +122,51 @@ return function(t)
 			t.truthy(stops >= 5, `{v.name}: {stops} stops`)
 		end
 	end)
+
+	t.test("polylines: every corner is an arc, the path is continuous, the heading turns smoothly", function()
+		local lanes = LaneMath.load(records)
+		LaneMath.unify(lanes, roads, records)
+		local routes = {
+			{ lanes.north_arterial_legacy_ambulance, 1 },
+			{ lanes.responder_ambulance_trunk, 1 },
+			{ lanes.responder_ambulance_trunk, -1 },
+			{ LaneMath.makeRoute("incident", LaneMath.incidentRoute(0, { -525, -81 }, { 250, -200 }), {}), 1 },
+			{ LaneMath.makeRoute("incident", LaneMath.incidentRoute(0, { -525, -81 }, { 250, -200 }), {}), -1 },
+		}
+		for _, r in routes do
+			local lane, dir = r[1], r[2]
+			local len = LaneMath.length(lane, dir)
+			local step = 0.5
+			local p = LaneMath.pointAt(lane, 0, dir)
+			local s = 0
+			while s + step <= len do
+				s += step
+				local q = LaneMath.pointAt(lane, s, dir)
+				local d = math.sqrt((q.x - p.x) ^ 2 + (q.z - p.z) ^ 2)
+				t.truthy(
+					math.abs(d - step) < 0.01,
+					`{lane.id} ({dir}): {d} st between points {step} st apart at s = {s}`
+				)
+				local turn = math.abs(wrapAngle(q.yaw - p.yaw))
+				t.truthy(turn <= step / 4, `{lane.id} ({dir}): heading turns {turn} rad in {step} st at s = {s}`)
+				local along = ((q.x - p.x) * math.sin(q.yaw) + (q.z - p.z) * math.cos(q.yaw)) / math.max(d, 1e-9)
+				t.truthy(
+					along > 0.99,
+					`{lane.id} ({dir}): travel {math.deg(math.acos(math.clamp(along, -1, 1)))} deg off the heading`
+				)
+				p = q
+			end
+			-- it still ends where the polyline ends
+			local poly = if dir < 0 then lane.polyRev else lane.poly
+			local last = poly.pts[#poly.pts]
+			local e = LaneMath.pointAt(lane, len, dir)
+			t.near(e.x, last[1], 1e-6)
+			t.near(e.z, last[2], 1e-6)
+		end
+		-- the legacy ambulance's whole run, tick by tick
+		local svc = service({ entry(14) })
+		svc.byId[14].timer = 0.1
+		local events = drive(svc, 14, 140, 0.15)
+		t.truthy((events.park or 0) >= 1, "it reached the hospital and parked")
+	end)
 end

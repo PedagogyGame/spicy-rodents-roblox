@@ -16,8 +16,20 @@ local scenario: Replay.Scenario = {
 		v.phase, v.visible, v.dir, v.timer = "drive", true, 1, 0
 		v.s = v.lane.length - 400
 	end,
-	expect = { none = { "sim_jump_unflagged", "teleport_unflagged", "speed_stutter", "sink", "float" } },
-	known = { "sim_yaw_snap", "yaw_jump" },
+	-- it turned the square corner on the spot (90 degrees in one tick) and slid sideways through it on
+	-- screen; polylines now round every corner (LaneMath.CORNER_RADIUS)
+	expect = {
+		none = {
+			"sim_jump_unflagged",
+			"teleport_unflagged",
+			"speed_stutter",
+			"sink",
+			"float",
+			"sim_yaw_snap",
+			"yaw_jump",
+			"sideways_slide",
+		},
+	},
 }
 
 return scenario

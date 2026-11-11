@@ -37,7 +37,21 @@ export type LaneRecord = {
 	wrap: string?,
 }
 
-export type Poly = { pts: { { number } }, cum: { number }, length: number }
+-- A polyline as driven: its corner points (`pts`, `cum` along them, kept for the offsets), and the path a
+-- vehicle follows, `pieces`: straight runs joined by circular arcs at the corners (LaneMath.CORNER_RADIUS),
+-- so the heading turns continuously; `length` is the driven length.
+export type Piece = {
+	s: number, -- arc distance where the piece starts
+	len: number,
+	ax: number, -- line: start point and unit direction; arc: centre, radius, start angle and signed sweep
+	az: number,
+	dx: number,
+	dz: number,
+	r: number, -- 0 for a line
+	a0: number,
+	sweep: number,
+}
+export type Poly = { pts: { { number } }, cum: { number }, length: number, pieces: { Piece } }
 
 export type Lane = {
 	id: string,
@@ -117,13 +131,99 @@ end
 LaneMath.LOOP_ARC_DIVISIONS = 4000 -- arc-length table of loop lanes (the ice cream loop: 0.3 st apart)
 LaneMath.POLY_OFFSET = Units.st(3) -- keep-right offset for centreline polylines (inside an 18 u road's right half)
 
+LaneMath.CORNER_RADIUS = Units.st(8) -- 20 st: a street corner taken inside an 18 u road
+
+-- The driven path through `pts`: every corner is cut by an arc of CORNER_RADIUS tangent to both legs, or a
+-- smaller one where a leg is too short (a leg between two corners gives each half of itself; the first
+-- and last legs give all of theirs). A path that turned on the spot at each corner (v5.4's polylines) spun
+-- the vehicle 90 degrees in one tick and slid it sideways through the turn on screen.
+local function pieces(pts: { { number } }): { Piece }
+	local n = #pts
+	-- drop zero-length legs
+	local p: { { number } } = { pts[1] }
+	for i = 2, n do
+		local a, b = p[#p], pts[i]
+		if (b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2 > 1e-18 then
+			table.insert(p, b)
+		end
+	end
+	n = #p
+	local out: { Piece } = {}
+	if n < 2 then
+		local q = pts[1]
+		return { { s = 0, len = 0, ax = q[1], az = q[2], dx = 0, dz = 1, r = 0, a0 = 0, sweep = 0 } }
+	end
+	local lens, dirs = {}, {}
+	for i = 1, n - 1 do
+		local dx, dz = p[i + 1][1] - p[i][1], p[i + 1][2] - p[i][2]
+		local len = math.sqrt(dx * dx + dz * dz)
+		lens[i], dirs[i] = len, { dx / len, dz / len }
+	end
+	-- the tangent length cut from each side of every interior corner
+	local cut, radius, turn = { [1] = 0, [n] = 0 }, {}, {}
+	for i = 2, n - 1 do
+		local d0, d1 = dirs[i - 1], dirs[i]
+		local cross = d0[1] * d1[2] - d0[2] * d1[1]
+		local dot = math.clamp(d0[1] * d1[1] + d0[2] * d1[2], -1, 1)
+		local theta = math.atan2(cross, dot) -- signed turn
+		turn[i] = theta
+		local half = math.tan(math.abs(theta) / 2)
+		if math.abs(theta) < 1e-6 or half > 1e6 then
+			cut[i], radius[i] = 0, 0
+		else
+			local room = math.min(
+				if i - 1 == 1 then lens[i - 1] else lens[i - 1] / 2,
+				if i == n - 1 then lens[i] else lens[i] / 2
+			)
+			local r = math.min(LaneMath.CORNER_RADIUS, room / half)
+			cut[i], radius[i] = r * half, r
+		end
+	end
+	local s = 0
+	local function line(x: number, z: number, d: { number }, len: number)
+		if len > 1e-9 then
+			table.insert(out, { s = s, len = len, ax = x, az = z, dx = d[1], dz = d[2], r = 0, a0 = 0, sweep = 0 })
+			s += len
+		end
+	end
+	for i = 1, n - 1 do
+		local d = dirs[i]
+		local x0, z0 = p[i][1] + d[1] * cut[i], p[i][2] + d[2] * cut[i]
+		line(x0, z0, d, lens[i] - cut[i] - cut[i + 1])
+		local j = i + 1
+		if j < n and radius[j] > 0 then
+			-- the arc from the end of leg i to the start of leg j, turning by turn[j]
+			local r, theta = radius[j], turn[j]
+			local sx, sz = p[j][1] - d[1] * cut[j], p[j][2] - d[2] * cut[j]
+			-- the centre is r to the side the path turns towards: left of (dx, dz) is (-dz, dx) here
+			local side = if theta > 0 then 1 else -1
+			local cx, cz = sx - d[2] * r * side, sz + d[1] * r * side
+			local a0 = math.atan2(sz - cz, sx - cx)
+			table.insert(
+				out,
+				{ s = s, len = r * math.abs(theta), ax = cx, az = cz, dx = 0, dz = 0, r = r, a0 = a0, sweep = theta }
+			)
+			s += r * math.abs(theta)
+		end
+	end
+	if #out == 0 then
+		table.insert(
+			out,
+			{ s = 0, len = 0, ax = p[1][1], az = p[1][2], dx = dirs[1][1], dz = dirs[1][2], r = 0, a0 = 0, sweep = 0 }
+		)
+	end
+	return out
+end
+
 function LaneMath.poly(pts: { { number } }): Poly
 	local cum = { 0 }
 	for i = 2, #pts do
 		local a, b = pts[i - 1], pts[i]
 		cum[i] = cum[i - 1] + math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
 	end
-	return { pts = pts, cum = cum, length = cum[#cum] }
+	local ps = pieces(pts)
+	local last = ps[#ps]
+	return { pts = pts, cum = cum, length = last.s + last.len, pieces = ps }
 end
 
 -- offsetRight(pts, d): the polyline moved d to the RIGHT of travel (right of heading f = (fx, fz) is
@@ -416,6 +516,30 @@ end
 
 -- polyPoint(poly, s): position and heading at arc distance s (clamped to the ends).
 function LaneMath.polyPoint(poly: Poly, s: number): (number, number, number)
+	local ps = poly.pieces
+	if ps then
+		local d = math.clamp(s, 0, poly.length)
+		local lo, hi = 1, #ps
+		while lo < hi do -- the last piece starting at or before d
+			local mid = (lo + hi + 1) // 2
+			if ps[mid].s <= d then
+				lo = mid
+			else
+				hi = mid - 1
+			end
+		end
+		local pc = ps[lo]
+		local k = math.clamp(d - pc.s, 0, pc.len)
+		if pc.r == 0 then
+			return pc.ax + pc.dx * k, pc.az + pc.dz * k, math.atan2(pc.dx, pc.dz)
+		end
+		-- on the arc: the angle round the centre advances by sweep * k / len; the heading is the tangent
+		local sign = if pc.sweep > 0 then 1 else -1
+		local a = pc.a0 + sign * k / pc.r
+		local x, z = pc.ax + pc.r * math.cos(a), pc.az + pc.r * math.sin(a)
+		local tx, tz = -math.sin(a) * sign, math.cos(a) * sign
+		return x, z, math.atan2(tx, tz)
+	end
 	local pts, cum = poly.pts, poly.cum
 	local n = #pts
 	if n == 1 then
