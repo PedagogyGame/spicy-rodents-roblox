@@ -29,23 +29,30 @@
 --   doneText      the end banner ("" = say nothing; nil = the service's own "X wins!")
 --   inPlay        is this seated player still at the game? (replaces the walk-away radius: an arena)
 --   debug         a scripted outcome for the engine checks (MinigameService:debug(stationId, ...))
--- Interface: types Place, StationDef, Spec, Ctx, Table, ServerGame; num(v, default) -> number (a finite number
+-- Interface: types Place, StationDef, Event, Ctx, Table, ServerGame; num(v, default) -> number (a finite number
 --   from a client's argument, or the default)
 
-local Import = require("../Import")
-local GameSpec = Import.shared("Minigames/GameSpec") :: typeof(require("../../shared/Minigames/GameSpec"))
-local Session = Import.shared("Minigames/Session") :: typeof(require("../../shared/Minigames/Session"))
--- (GameSpec is types only; the value is not used)
-local _ = GameSpec
-
-export type Place = GameSpec.Place
-export type StationDef = GameSpec.StationDef
-export type Spec = GameSpec.Spec
+-- (A type cannot be named across roots (Import gives values), so the shared shapes are written out again here:
+-- Shared/Minigames/GameSpec.Place and .StationDef, Shared/Minigames/Session.Event. Spec and Session are `any`.)
+export type Place = { x: number, z: number, floorY: number, yaw: number }
+export type StationDef = {
+	id: string,
+	game: string,
+	label: string,
+	site: string,
+	x: number,
+	y: number,
+	d: number,
+	index: number?,
+	variant: string?,
+	reach: number?,
+}
+export type Event = { kind: string, seat: number?, key: any?, why: string? }
 
 export type Ctx = {
 	station: StationDef,
-	spec: Spec,
-	session: Session.Session,
+	spec: any, -- Shared/Minigames/GameSpec.Spec
+	session: any, -- Shared/Minigames/Session.Session
 	place: Place, -- the site's frame (AlleyLayout.toWorld(place, X, Y, D))
 	root: Instance?, -- the site's baked model under Workspace.Attractions (nil in a bare test)
 	anchor: Vector3, -- the station's prompt, world
@@ -77,7 +84,7 @@ export type Table = {
 	input: ((self: any, player: any, seat: number, verb: string, args: { any }) -> (boolean?, string?))?,
 	step: ((self: any, dt: number) -> ())?,
 	busy: ((self: any) -> boolean)?,
-	event: ((self: any, e: Session.Event) -> ())?,
+	event: ((self: any, e: Event) -> ())?,
 	computer: ((self: any, key: any, seat: number) -> number?)?,
 	screen: ((self: any, view: { [string]: any }) -> ())?,
 	sig: ((self: any, view: { [string]: any }) -> any)?,

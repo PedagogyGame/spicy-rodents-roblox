@@ -173,19 +173,17 @@ function Session.join(s: Session, key: any, name: string, now: number): (boolean
 			return false, "a game is in progress: wait for it to finish or try another table"
 		end
 		-- a game that takes players while it is on: a vacated seat first, then a new one
-		local late: number? = nil
+		local vacated: number? = nil
 		for i = 1, #s.seats do
 			if s.gone[i] then
-				late = i
+				vacated = i
 				break
 			end
 		end
-		if late == nil then
-			if #s.seats >= s.rules.def.seats then
-				return false, "the table is full"
-			end
-			late = #s.seats + 1
+		if vacated == nil and #s.seats >= s.rules.def.seats then
+			return false, "the table is full"
 		end
+		local late: number = vacated or (#s.seats + 1)
 		s.seats[late] = key
 		s.names[late] = name
 		s.gone[late] = nil

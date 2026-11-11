@@ -34,7 +34,8 @@ local function adopt(entry: ClientGame.ClientGame)
 	if entry.sounds then
 		MinigameSounds.add(entry.sounds)
 	end
-	for _, kind in entry.kinds or {} do
+	local kinds: { string } = entry.kinds or {}
+	for _, kind in kinds do
 		assert(not RESERVED[kind], `ClientGames: {entry.game} cannot take the framework's message kind "{kind}"`)
 		local owner = ClientGames.ownerOf(kind)
 		assert(

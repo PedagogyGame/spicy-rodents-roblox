@@ -5,9 +5,13 @@
 -- alley's ball-return ducts (and from under its alley and entrance) so the squirrel tunnels are open air, registers
 -- the collision groups (LaneGuard keeps people off the lanes; BowlingPhysics is the baked group of the ball and
 -- pins, which are scripted and collide with nothing), swings the steel push-bar exit doors on E (from inside only, like the real thing:
--- the prompt needs line of sight), and starts the MinigameService (lanes, darts, the fortune teller) with its
--- Heartbeat step. Missing Workspace.Attractions is reported, never fatal.
--- Interface: start(opts) -> Attractions { minigames, step(dt), stop(), doors } | nil
+-- the prompt needs line of sight), and starts the MinigameService with its Heartbeat step. Every model under
+-- Workspace.Attractions that carries the bake's Origin attributes is a SITE for minigames (the bowling alley, and
+-- each expansion venue a game has baked: Shared/Minigames/Games explains sites); the service is handed them all
+-- and puts each registered game's stations where they stand. Missing Workspace.Attractions is reported, never
+-- fatal.
+-- Interface: start(opts) -> Attractions { minigames, place (the alley's), sites, step(dt), stop() } | nil;
+--   sites(folder) -> { [siteId]: { root, place } }
 
 local Import = require("../Import")
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
@@ -119,6 +123,27 @@ local function doors(root: Instance, conns: { RBXScriptConnection }): { step: (d
 	}
 end
 
+-- The baked places with games in them: a child of Workspace.Attractions with OriginX / OriginZ / FloorY / Yaw.
+-- Its site id is its Site attribute (the bake writes it), else its AttractionId.
+function AttractionService.sites(folder: Instance): { [string]: MinigameService.Site }
+	local out: { [string]: MinigameService.Site } = {}
+	for _, m in folder:GetChildren() do
+		local x, z = m:GetAttribute("OriginX"), m:GetAttribute("OriginZ")
+		local floorY, yaw = m:GetAttribute("FloorY"), m:GetAttribute("Yaw")
+		local id = m:GetAttribute("Site") or m:GetAttribute("AttractionId")
+		if
+			type(id) == "string"
+			and type(x) == "number"
+			and type(z) == "number"
+			and type(floorY) == "number"
+			and type(yaw) == "number"
+		then
+			out[id] = { root = m, place = { x = x, z = z, floorY = floorY, yaw = yaw } }
+		end
+	end
+	return out
+end
+
 function AttractionService.start(opts: Opts?): any?
 	local o: Opts = opts or {}
 	local folder = workspace:FindFirstChild("Attractions")
@@ -160,9 +185,10 @@ function AttractionService.start(opts: Opts?): any?
 	end
 	local conns: { RBXScriptConnection } = {}
 	local seed = o.seed or (os.time() % 1000000)
+	local sites = AttractionService.sites(folder :: Instance)
+	sites.bowling_alley = { root = alley, place = place }
 	local minigames = MinigameService.new({
-		root = alley,
-		place = place,
+		sites = sites,
 		tunnels = tunnels,
 		net = o.net,
 		canPlay = o.canPlay,
@@ -188,10 +214,17 @@ function AttractionService.start(opts: Opts?): any?
 			end)
 		)
 	end
-	print(`[Attractions] bowling alley ready: {#minigames.order} stations, {carved} terrain carves, seed {seed}`)
+	local siteCount = 0
+	for _ in sites do
+		siteCount += 1
+	end
+	print(
+		`[Attractions] bowling alley ready: {#minigames.order} stations on {siteCount} site(s), {carved} terrain carves, seed {seed}`
+	)
 	return {
 		minigames = minigames,
 		place = place,
+		sites = sites,
 		carved = carved,
 		step = step,
 		stop = function()

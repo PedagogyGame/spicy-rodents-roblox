@@ -226,7 +226,7 @@ function Game.screen(self: any, view: { [string]: any })
 	end
 end
 
-function Game.event(self: any, e: Session.Event)
+function Game.event(self: any, e: ServerGame.Event)
 	local board = self.hw
 	if e.kind == "start" then
 		self.clearAt = nil

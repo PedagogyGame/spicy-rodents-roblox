@@ -43,7 +43,7 @@ MinigameService.WANDER = 70 -- studs from the station before a seated player is 
 MinigameService.PROMPT_DISTANCE = 9
 MinigameService.AI_DELAY = 2.2 -- a computer player thinks this long before its go
 
-export type Place = Games.Place
+export type Place = ServerGame.Place
 export type Site = { root: Instance?, place: Place }
 
 export type Opts = {
@@ -66,8 +66,8 @@ type Station = {
 	game: string,
 	label: string,
 	lane: number?, -- the station's index (lane 3, table 2), under the name the first clients read
-	def: Games.StationDef,
-	spec: Games.Spec,
+	def: ServerGame.StationDef,
+	spec: any, -- Shared/Minigames/GameSpec.Spec
 	site: string,
 	place: Place,
 	root: Instance?,
@@ -131,7 +131,7 @@ function MinigameService.new(opts: Opts): any
 	end
 	for i, def in Games.stations(places) do
 		local site = sites[def.site]
-		local spec = Games.get(def.game) :: Games.Spec
+		local spec = Games.get(def.game) :: any
 		if site == nil then
 			-- (a Spec that lists a station on a site that was not baked: there is nowhere to put it)
 			continue
@@ -158,7 +158,7 @@ function MinigameService.new(opts: Opts): any
 			rng = Rng.new((opts.seed or 1) * 9973 + i * 7919),
 		}
 		if spec.soon == nil then
-			local so: Session.Opts = spec.session or {}
+			local so = spec.session or {}
 			station.session = Session.new(spec.rules, {
 				lobbySeconds = so.lobbySeconds,
 				turnSeconds = so.turnSeconds,
@@ -356,10 +356,11 @@ function MinigameService._everyone(self: any, st: Station, payload: { [string]: 
 	end
 end
 
-function MinigameService._event(_self: any, st: Station, e: Session.Event)
+function MinigameService._event(_self: any, st: Station, e: ServerGame.Event)
 	local tbl = st.tbl
-	if tbl and tbl.event then
-		tbl:event(e)
+	local heard = tbl and tbl.event
+	if heard then
+		heard(tbl, e)
 	end
 end
 
@@ -397,8 +398,9 @@ function MinigameService._aiTurn(self: any, st: Station, key: any)
 	end
 	local tbl = st.tbl
 	local seat = Session.seatOf(st.session, key)
-	if tbl and tbl.computer and seat then
-		local wait = tbl:computer(key, seat)
+	local play = tbl and tbl.computer
+	if play and seat then
+		local wait = play(tbl, key, seat)
 		if wait ~= nil then
 			st.aiAt = if wait > 0 then self.clock + wait else nil
 		end
@@ -409,8 +411,9 @@ local function promptTexts(st: Station): (string, string)
 	local s = st.session
 	local words = st.spec.prompt
 	local tbl = st.tbl
-	if tbl and tbl.prompt then
-		local action, object = tbl:prompt()
+	local own = tbl and tbl.prompt
+	if own then
+		local action, object = own(tbl)
 		if action then
 			return action, object or st.label
 		end
@@ -455,13 +458,15 @@ function MinigameService._refresh(self: any, st: Station)
 	local tbl = st.tbl
 	local view = Session.view(s, self.clock)
 	-- the world screen is rebuilt only when what it shows changed (it replicates to every player)
-	if tbl and tbl.screen then
+	local draw = tbl and tbl.screen
+	if draw then
 		local sig = nil
+		local also = tbl and tbl.sig
 		pcall(function()
 			local g = view.game
 			-- (no holes: a nil in the middle of a list is where an encoder may stop reading it)
 			sig = game:GetService("HttpService"):JSONEncode({
-				if tbl.sig then tbl:sig(view) else false,
+				if also then also(tbl, view) else false,
 				view.phase,
 				view.lobbyLeft or false,
 				view.turn or false,
@@ -474,13 +479,14 @@ function MinigameService._refresh(self: any, st: Station)
 		if sig == nil or sig ~= st.screenSig then
 			st.screenSig = sig
 			local ok, err = pcall(function()
-				(tbl.screen :: any)(tbl, view)
+				draw(tbl, view)
 			end)
 			if not ok then
 				warn(`[Minigames] scoreboard {st.id}: {err}`)
 			end
 		end
 	end
+	local more = tbl and tbl.state
 	for _, p in self:_seated(st) do
 		local seat = Session.seatOf(s, p)
 		local payload: { [string]: any } = {
@@ -493,7 +499,7 @@ function MinigameService._refresh(self: any, st: Station)
 			ready = true,
 			view = view,
 		}
-		local extra = if tbl and tbl.state then tbl:state(p, seat) else nil
+		local extra = if more then more(tbl, p, seat) else nil
 		if extra then
 			for k, v in extra do
 				payload[k] = v
@@ -544,8 +550,9 @@ function MinigameService.join(self: any, player: any, id: string): (boolean, str
 	local s = st.session
 	local tbl = st.tbl
 	-- the game's own say first (a one-press machine clears the last player's card, or asks for a moment)
-	if tbl and tbl.join then
-		local ok, why = tbl:join(player)
+	local ask = tbl and tbl.join
+	if ask then
+		local ok, why = ask(tbl, player)
 		if not ok then
 			local text = why or "Not just now"
 			self:fire(player, { kind = "refused", text = text })
@@ -592,8 +599,9 @@ function MinigameService.join(self: any, player: any, id: string): (boolean, str
 		-- again mid-game must not get a fresh one (a bowler's open frame would become a certain spare)
 		self:_onStart(st)
 	end
-	if tbl and tbl.joined then
-		tbl:joined(player, seat)
+	local after = tbl and tbl.joined
+	if after then
+		after(tbl, player, seat)
 	end
 	st.dirty = true
 	self:_refresh(st)
@@ -656,8 +664,9 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 	local s = st.session
 	local tbl = st.tbl
 	-- the game's own verbs that work whatever the table is doing
-	if tbl and tbl.command then
-		local handled, ok, why = tbl:command(player, verb, args)
+	local command = tbl and tbl.command
+	if command then
+		local handled, ok, why = command(tbl, player, verb, args)
 		if handled then
 			return ok == true, if ok then nil else why
 		end
@@ -700,8 +709,9 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 	if seat == nil then
 		return false, "You are not at that game: walk up and press E"
 	end
-	if tbl and tbl.input then
-		local ok, why = tbl:input(player, seat, verb, args)
+	local take = tbl and tbl.input
+	if take then
+		local ok, why = take(tbl, player, seat, verb, args)
 		if ok ~= nil then
 			return ok, why
 		end
@@ -725,10 +735,11 @@ end
 function MinigameService.debug(self: any, id: string, ...: any): (boolean, string?)
 	local st = self.stations[id] :: Station?
 	local tbl = st and st.tbl
-	if tbl == nil or tbl.debug == nil then
+	local scripted = tbl and tbl.debug
+	if scripted == nil then
 		return false, "nothing can be scripted there"
 	end
-	return tbl:debug(...)
+	return scripted(tbl, ...)
 end
 MinigameService.debugRoll = MinigameService.debug
 MinigameService.debugDart = MinigameService.debug
@@ -745,10 +756,12 @@ function MinigameService.step(self: any, dt: number)
 		local tbl = st.tbl
 		local spec = st.spec
 		local words = spec.words
-		if tbl and tbl.step then
-			tbl:step(dt)
+		local advance = tbl and tbl.step
+		if advance then
+			advance(tbl, dt)
 		end
-		local busy = if tbl and tbl.busy then tbl:busy() else false
+		local isBusy = tbl and tbl.busy
+		local busy = if isBusy then isBusy(tbl) else false
 		local before = {}
 		for _, p in self:_seated(st) do
 			before[p] = true
@@ -795,8 +808,9 @@ function MinigameService.step(self: any, dt: number)
 				elseif r and r.winner and s.names[r.winner] and #s.seats > 1 then
 					text = `{s.names[r.winner]} wins!`
 				end
-				if tbl and tbl.doneText then
-					local own = tbl:doneText(Session.view(s, self.clock))
+				local say = tbl and tbl.doneText
+				if say then
+					local own = say(tbl, Session.view(s, self.clock))
 					if own ~= nil then
 						text = own
 					end
@@ -842,6 +856,7 @@ function MinigameService.step(self: any, dt: number)
 			st.aiAt = nil
 		end
 		-- seated players who stopped being a person, or wandered off
+		local inPlay = tbl and tbl.inPlay
 		for _, p in self:_seated(st) do
 			if isComputer(p) then
 				continue
@@ -853,8 +868,8 @@ function MinigameService.step(self: any, dt: number)
 			end
 			local body = self.opts.bodyOf and self.opts.bodyOf(p)
 			local far = false
-			if tbl and tbl.inPlay then
-				far = not tbl:inPlay(p, body)
+			if inPlay then
+				far = not inPlay(tbl, p, body)
 			elseif body and body.PrimaryPart then
 				far = (body.PrimaryPart.Position - st.anchor).Magnitude > (st.def.reach or MinigameService.WANDER)
 			end

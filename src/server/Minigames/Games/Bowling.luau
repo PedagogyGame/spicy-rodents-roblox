@@ -154,7 +154,7 @@ function Bowling.doneText(_self: any, view: { [string]: any }): string?
 	return Referee.summary(view).line
 end
 
-function Bowling.event(self: any, e: Session.Event)
+function Bowling.event(self: any, e: ServerGame.Event)
 	local lane = self.hw
 	if lane == nil then
 		return
