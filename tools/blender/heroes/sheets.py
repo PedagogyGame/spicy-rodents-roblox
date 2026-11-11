@@ -5,11 +5,15 @@
   python3 -I tools/blender/heroes/sheets.py motion --manifest <frames dir>/manifest.json --out <base>
   python3 -I tools/blender/heroes/sheets.py pairs --out <jpg> --title <text> [--note <text>] \
       --pair "<label>|<before png>|<after png>" [--pair ...]      # before and after, one row per pair
+  python3 -I tools/blender/heroes/sheets.py stack --out <jpg> --title <text> [--note <text>] \
+      --strip "<tag>|<label>|<image>" [--strip ...]               # whole strips, one above the other
 
 poses: one row per clip (<tag>_pose_<Clip>_<k>.png, k = key pose index), labelled with the clip name
 and the key's time; turntable: the <tag>_turntable_NN.png frames in a grid (4 per row); motion: the
 strips of one take from render_motion.py, <base>_back.jpg (the play camera) and <base>_side.jpg, each
-1600 px wide and at most 400 KB: the take's frames in order, eight to a row, then three frames larger.
+1600 px wide and at most 400 KB: the take's frames in order, eight to a row, then three frames larger;
+stack: finished strips (a take before and after a change) one directly above the other, each under a band
+with its tag (BEFORE, AFTER) and what it is, 1600 px wide and at most 400 KB.
 """
 import argparse
 import glob
@@ -230,9 +234,40 @@ def pairs(out, title, note, rows, left="BEFORE", right="AFTER"):
     return f"{out} {sheet.size[0]}x{sheet.size[1]} q{q} {os.path.getsize(out) // 1000} KB"
 
 
+def stack(out, title, note, rows):
+    """Whole strips one above the other: rows = [(tag, label, image)]. Each strip's own heading (the first
+    lines of a motion strip say the same for both) stays, under a band that says which it is."""
+    f_head, f_note, f_lab, f_tag = font(19), font(13), font(14), font(16)
+    probe = ImageDraw.Draw(Image.new("RGB", (8, 8)))
+    notes = wrap(probe, note, f_note, MOTION_W - 20) if note else []
+    head_h = 10 + 24 + 17 * len(notes) + 8
+    band_h = 30
+    imgs = []
+    for tag, label, path in rows:
+        im = Image.open(path).convert("RGB")
+        if im.width != MOTION_W:
+            im = im.resize((MOTION_W, round(im.height * MOTION_W / im.width)), Image.LANCZOS)
+        imgs.append((tag, label, im))
+    sheet = Image.new("RGB", (MOTION_W, head_h + sum(band_h + im.height for _t, _l, im in imgs)), MOTION_BG)
+    dr = ImageDraw.Draw(sheet)
+    dr.text((10, 8), title, fill=(245, 245, 245), font=f_head)
+    for k, line in enumerate(notes):
+        dr.text((10, 34 + 17 * k), line, fill=(185, 188, 196), font=f_note)
+    y = head_h
+    for tag, label, im in imgs:
+        dr.rectangle((0, y, MOTION_W, y + band_h), fill=(52, 56, 66))
+        dr.text((10, y + 5), tag, fill=(255, 214, 120), font=f_tag)
+        dr.text((22 + dr.textlength(tag, font=f_tag), y + 7), label, fill=(232, 232, 236), font=f_lab)
+        sheet.paste(im, (0, y + band_h))
+        y += band_h + im.height
+    q = save_under(sheet, out)
+    return f"{out} {sheet.size[0]}x{sheet.size[1]} q{q} {os.path.getsize(out) // 1000} KB"
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("kind", choices=["poses", "turntable", "motion", "pairs"])
+    ap.add_argument("kind", choices=["poses", "turntable", "motion", "pairs", "stack"])
+    ap.add_argument("--strip", action="append", default=[], help="stack: 'tag|label|image', once per strip, top first")
     ap.add_argument("--title", default="")
     ap.add_argument("--note", default="")
     ap.add_argument("--pair", action="append", default=[], help="pairs: 'label|before.png|after.png', once per row")
@@ -248,6 +283,9 @@ if __name__ == "__main__":
         raise SystemExit(0)
     if a.kind == "pairs":
         print(pairs(a.out, a.title, a.note, [tuple(p.split("|")) for p in a.pair]))
+        raise SystemExit(0)
+    if a.kind == "stack":
+        print(stack(a.out, a.title, a.note, [tuple(p.split("|")) for p in a.strip]))
         raise SystemExit(0)
     meta = None
     if a.meta and os.path.exists(a.meta):
