@@ -7,11 +7,13 @@
 -- the same bytes.
 -- A step is DT (1/240 s). Inside it nothing is ever allowed to overlap: the model finds the EARLIEST moment in
 -- the step at which a ball would touch another ball, a cushion, a pocket's jaw or point, a post, or a hole's
--- rim (solved exactly from where the balls are and how they move), moves every ball on to that moment with
--- Cloth.advance, settles that one contact, and looks again until the step is used up. So nothing tunnels at
--- any speed, a cut is as thin as it was aimed, a tight rack breaks ball by ball in the order the contacts
--- really happen (ties go to the lower ball, then the table's own order), and the same break is the same
--- break every time.
+-- rim (solved from where the balls are and how they are moving), moves every ball on to that moment with
+-- Cloth.advance, looks again from there until the contact is at hand (T_NOW), settles that one contact, and
+-- carries on until the step is used up. So nothing tunnels at any speed, a cut is as thin as it was aimed,
+-- a tight rack breaks ball by ball in the order the contacts really happen (ties go to the lower ball, then
+-- the table's own order), and the same break is the same break every time. Things closing more slowly than
+-- CLOSE are not contacts (two balls rolling on side by side); a step that cannot untie its contacts in
+-- MAX_EVENTS is given up and costs the balls speed (world.knots counts them; none in any spec).
 --   Ball to ball: equal masses, restitution E_BALL along the line of centres, and a little friction between
 --   the balls that falls as they rub faster: that is cut and spin THROW and the spin one ball hands another.
 --   A stunned cue ball leaves along the tangent line; the cloth then bends a rolling one forward and brings a
@@ -27,11 +29,14 @@
 --   depth it is pocketed. If it reaches the rim again first: behind a pocket is the liner, which kills it and
 --   drops it; anywhere else it must climb back out, which costs RIM_K times the height it fell taken from its
 --   outward speed: a slow ball cannot (it tips back in), a fast one skips over, and one in between is turned
---   off its line and lips out. That is a cup's whole character and a hanging ball's too.
+--   off its line and lips out. That is a cup's whole character: Tables.CUP_DEPTH and RIM_K set the speed it
+--   still takes (tools/pool/calibrate.luau prints it). A ball over a hole still meets cushions and jaws, so a
+--   firm ball into bumper pool's cup hits the end cushion behind it and drops, and a ball rattles in a
+--   pocket's jaws while it falls.
 -- Everything in a step is + - * / and sqrt. Pure; Lune-tested (tests/unit/pool_physics.spec.luau).
 -- Interface: constants and the Response sets; world(table, spots) -> World; strike(world, id, vx, vz, qx,
 --   qz, s); step(world) -> moving; ball(world, id) -> Ball?; energy(world) -> number; moving(world) ->
---   boolean; EV (event kinds). world.events is flat { t, kind, a, b, speed, ... } (EVENT_STRIDE numbers each);
+--   boolean; EV (event kinds); world.contacts, world.knots (cost measures). world.events is flat { t, kind, a, b, speed, ... } (EVENT_STRIDE numbers each);
 --   world.keys[i] is ball i's flat key points { t, x, z, vx, vz, qx, qz, s, y, mode, ... } (KEY_STRIDE each),
 --   written whenever something changes its motion.
 
