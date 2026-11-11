@@ -11,8 +11,8 @@
 -- Skill levels differ the way people do: how fast they dare go, how late they brake, how long their eye and
 -- hand take (they act on what they saw a moment ago and re-decide only so often), how exactly they judge where
 -- the marble is, and how often a thumb slips. The labyrinth is played alone (the checklist's "one player at a
--- time, no computer opponent"): the pilots are the marble that plays itself on an empty table, the ghost a
--- record run is shown as, a stand-in for a player in tests, and the way a designer learns how hard a board is.
+-- time, no computer opponent"): the pilots are the marble that plays itself on an empty table, a stand-in for
+-- a player in tests and flow checks, and the way a designer learns how hard a board is before a person tries.
 -- LEVELS[4], the steady hand, has no error at all: it is the scripted run that proves each board can be done.
 -- Deterministic: a pilot's whole state is in its table (its dice are a number in it), so the same board, level
 -- and seed play the same run on any machine.

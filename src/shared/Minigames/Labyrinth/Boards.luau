@@ -177,7 +177,7 @@ Boards.SOURCES = {
 		id = "the_specialist",
 		name = "The Specialist",
 		level = 4,
-		blurb = "Holes on both sides, all the way.",
+		blurb = "A slalom to start, then a hole at every bend.",
 		map = {
 			"+--+--+--+--+--+--+--+--+--+--+",
 			"|7        9 |         9 |    F|",

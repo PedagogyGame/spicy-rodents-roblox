@@ -283,6 +283,57 @@ return function(t)
 		t.truthy(m.x > cx + 0.05 and m.y > cy + 0.05, "a corner never traps it")
 	end)
 
+	t.test("a seam is not a snag: sliding past the root of a wall on the far side loses nothing", function()
+		-- an empty board with one wall across the middle (above row 4, columns 3 to 8) and a second wall hanging
+		-- from its middle post down into row 4 (after column 5): a T
+		local map: { string } = {}
+		for r = Boards.ROWS, 1, -1 do
+			local posts = { "+" }
+			for c = 1, Boards.COLS do
+				table.insert(posts, if r == Boards.ROWS or (r == 4 and c >= 3 and c <= 8) then "--+" else "  +")
+			end
+			table.insert(map, table.concat(posts))
+			local cells = {}
+			for c = 1, Boards.COLS do
+				local wall = c == 1 or (r == 4 and c == 6)
+				local mark = if c == 1 and r == Boards.ROWS then "F" elseif c == 1 and r == 1 then "S" else " "
+				table.insert(cells, (if wall then "|" else " ") .. " " .. mark)
+			end
+			table.insert(map, table.concat(cells) .. "|")
+		end
+		table.insert(map, "+" .. string.rep("--+", Boards.COLS))
+		local board = Boards.compile({ id = "tee", name = "Tee", level = 0, blurb = "", map = map })
+		t.eq(#board.walls, 6, "the frame, the bar and the stem")
+		local R = board.marbleR
+		local barY = board.y0 + 4 * board.pitch
+		local stemX = board.x0 + 5 * board.pitch
+		-- along the top of the bar, pressed down onto it, left to right across the stem's root
+		local m = Physics.new(board.x0 + 2.6 * board.pitch, barY + Boards.WALL / 2 + R + 0.005)
+		m.tx, m.ty = 3, -4
+		steps(board, m, 10, 0, 0, STAY)
+		local crossed = false
+		for _ = 1, 120 do
+			local vx = m.vx
+			Physics.step(board, m, 0, 0, STAY)
+			if m.x > board.x0 + 7.5 * board.pitch then
+				break
+			end
+			t.eq(m.hit, 0, "no click at the seam")
+			t.truthy(m.vx > vx, "it keeps gathering speed all the way along")
+			t.near(m.y, barY + Boards.WALL / 2 + R, 1e-9, "flat against the bar")
+			crossed = crossed or m.x > stemX + 0.05
+		end
+		t.truthy(crossed, "it slid across the root of the stem")
+		-- along the underside the stem is a real corner: the marble stops in it, dead still
+		local u = Physics.new(board.x0 + 2.6 * board.pitch, barY - Boards.WALL / 2 - R - 0.005)
+		u.tx, u.ty = 3, 4
+		steps(board, u, 240, 0, 0, STAY)
+		t.near(u.x, stemX - Boards.WALL / 2 - R, 1e-9, "stopped by the stem")
+		t.near(u.y, barY - Boards.WALL / 2 - R, 1e-9, "under the bar")
+		t.eq(u.vx, 0)
+		t.eq(u.vy, 0)
+	end)
+
 	t.test("the end of a wall is a round corner: the marble catches on it and rolls around", function()
 		-- the first board's lane wall above row 2 runs from the left frame to the post after column 8
 		local R = FIRST.marbleR

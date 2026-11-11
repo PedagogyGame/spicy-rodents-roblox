@@ -20,8 +20,8 @@
 -- What this game needs from the framework that a turn game does not is listed in NEEDS.
 -- Pure; Lune-tested (tests/unit/labyrinth_rules.spec.luau).
 -- Interface: the Minigame.Rules shape (def, verbs, serverVerbs, init, input, result, turn, skipTurn, view) plus
---   NEEDS, SLACK, HOLDS; snapshot(state) -> { number } (for a watcher who arrives mid-run); boardOf(state);
---   line(state) -> the status line; clockText(tenths) -> "m:ss.t"
+--   NEEDS, SLACK, HOLDS, TEXT; snapshot(state) -> { number } (for a watcher who arrives mid-run);
+--   boardOf(state); line(state) -> the status line; clockText(tenths) -> "m:ss.t"
 
 local Boards = require("./Boards")
 local InputLog = require("./InputLog")
@@ -43,12 +43,28 @@ Rules.serverVerbs = { clock = true }
 Rules.HOLDS = table.freeze({ stay = Physics.HOLD_STAY, level = Physics.HOLD_LEVEL }) :: { [string]: number }
 Rules.SLACK = 5 -- seconds a log may trail or lead the server's clock and still be a fair time
 
+-- The game's own words, for the prompt, the banners and the animal rule (LAB-S1, C4, C12): one place, so
+-- the server and the client say the same thing.
+Rules.TEXT = table.freeze({
+	prompt = "Play the labyrinth",
+	inUse = "In use by %s",
+	refused = "The labyrinth is for people.",
+	dropped = "Plonk. Down hole %d.",
+	back = "Back on the board.",
+	finished = "Home in %s.",
+	shooed = "Shoo! Paws off the labyrinth.", -- to the player when an animal climbs on the table
+	shooedAnimal = "You are shooed off the table. The marble does not care.", -- to the animal
+	bitten = "You were bitten: the run is over.",
+	receptionist = "Dr. Maple will see you eventually.",
+})
+
 -- What the shared framework must offer for this game (it is not a turn game):
 Rules.NEEDS = table.freeze({
 	"a run phase with no turn clock: turn(state) is seat 1 from the first key to the finish; the only clocks are "
 		.. "the run's own four minutes (Run.MAX_TICKS) and the lobby's idle clock before the first key",
 	"the player's client steps Run itself every 1/60 s and sends verb 'tilt' { 'seg', start, text, digest } about "
-		.. "five times a second (InputLog.writer); the service must pass those args through untouched",
+		.. "five times a second (InputLog.writer); the service must pass those args through untouched, and return "
+		.. "a refusal's reason to the client (on 'gap: the server is at tick N' it rewinds its writer to N)",
 	"before each forwarded 'tilt', and about once a second, the service sends the server verb 'clock' { seconds }",
 	"each accepted piece is relayed to everyone watching the table as it arrives (start, text), and a watcher "
 		.. "who arrives mid-run is first sent Rules.snapshot(state); they draw with Stream",
@@ -60,7 +76,7 @@ export type State = {
 	board: number,
 	run: Run.State,
 	serverNow: number?, -- the server's clock, seconds (nil until it has spoken)
-	serverStart: number?, -- what that clock said when the first piece arrived
+	serverStart: number?, -- what that clock said when the run's own clock started
 	fair: boolean,
 	diverged: boolean,
 }
@@ -152,14 +168,15 @@ function Rules.input(state: State, seat: number, verb: string, args: { any }?): 
 			return false, "bad segment"
 		end
 		local board = Boards.ALL[state.board]
-		if state.serverStart == nil and state.serverNow ~= nil then
-			state.serverStart = state.serverNow
-		end
 		for _, code in codes do
 			if Run.over(run) then
 				break
 			end
 			Run.step(board, run, code)
+		end
+		if state.serverStart == nil and state.serverNow ~= nil and run.tick > 0 then
+			-- the server's clock when the player's first key went down (time before it is not the run's)
+			state.serverStart = state.serverNow - Run.seconds(run)
 		end
 		if type(digest) == "number" and not Run.over(run) and digest ~= Run.digest(run) then
 			state.diverged = true

@@ -226,6 +226,25 @@ return function(t)
 			end
 		end
 		t.deepEq(sent, long)
+		-- a writer that fell behind sends in pieces and says there is more; told of a gap, it sends again
+		local late = InputLog.writer()
+		for _ = 1, 300 do
+			InputLog.push(late, Controls.code(1, 0))
+		end
+		local start, data, more = InputLog.take(late)
+		t.eq(start, 0)
+		t.eq(data, "h120")
+		t.eq(more, true, "more is waiting: no digest goes with this piece")
+		InputLog.take(late)
+		start, data, more = InputLog.take(late)
+		t.eq(start, 240)
+		t.eq(data, "h60")
+		t.eq(more, false)
+		t.eq((InputLog.take(late)), nil)
+		InputLog.rewind(late, 200)
+		start, data = InputLog.take(late)
+		t.eq(start, 200, "after a gap it sends again from the server's tick")
+		t.eq(data, "h100")
 	end)
 
 	t.test("C14: the rules module satisfies the Minigame contract: one seat, no stakes, no money", function()
@@ -512,10 +531,37 @@ return function(t)
 		t.eq(slow.finished, true, "it is still the player's run")
 		t.eq(play(0.2).fair, false, "nor was one that arrives five times faster than time")
 		t.falsy((Rules.input(Rules.init(1, 1), 1, "clock", { "noon" })))
+		-- sitting at the board before the first key is not part of the run, however long it lasts
+		local waited = Rules.init(1, 1)
+		t.truthy(Rules.input(waited, 1, "clock", { 0 }))
+		t.truthy(Rules.input(waited, 1, "tilt", { "seg", 0, "e60" }))
+		local at = 45
+		for _, piece in InputLog.segments(codes, 60) do
+			t.truthy(Rules.input(waited, 1, "clock", { at }))
+			t.truthy(Rules.input(waited, 1, "tilt", { "seg", piece.start, piece.data }))
+			at += 1
+		end
+		t.eq(
+			(Rules.result(waited) :: { [string]: any }).fair,
+			true,
+			"the wait before the first key is not held against it"
+		)
 		-- without a clock (tests, a framework that has none yet) nothing is called unfair
 		local state = Rules.init(1, 1)
 		t.truthy(send(state, codes))
 		t.eq((Rules.result(state) :: { [string]: any }).fair, true)
+	end)
+
+	t.test("LAB-S1 / C12: the game's own words: the prompt, in use, and the animal that is shooed off", function()
+		t.eq(Rules.TEXT.prompt, "Play the labyrinth")
+		t.eq(string.format(Rules.TEXT.inUse, "Ada"), "In use by Ada")
+		t.eq(string.format(Rules.TEXT.dropped, 7), "Plonk. Down hole 7.")
+		t.eq(string.format(Rules.TEXT.finished, Rules.clockText(345)), "Home in 0:34.5.")
+		t.eq(Rules.TEXT.receptionist, "Dr. Maple will see you eventually.")
+		for key, line in Rules.TEXT :: { [string]: string } do
+			t.truthy(#line > 0 and #line < 80, `{key} is one short line`)
+		end
+		t.truthy(Rules.TEXT.shooed ~= Rules.TEXT.shooedAnimal, "both sides are told, each in their own words")
 	end)
 
 	t.test("the clock reads minutes, seconds and tenths", function()

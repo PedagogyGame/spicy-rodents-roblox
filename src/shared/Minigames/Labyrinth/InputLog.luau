@@ -12,8 +12,9 @@
 -- Pure; Lune-tested (tests/unit/labyrinth_rules.spec.luau).
 -- Interface: SEGMENT_TICKS, SEGMENT_CHARS, SEND_EVERY; encode(codes, first?, last?) -> string;
 --   decode(text, maxTicks?) -> codes? (nil for anything that is not a log); ticks(text) -> count?;
---   segments(codes, every?) -> { { start = tick, data = string } }; writer() -> Writer with
---   push(writer, code) and take(writer) -> (start tick, data)? (the client's side: what to send next)
+--   segments(codes, every?) -> { { start = tick, data = string } }; the client's side: writer() -> Writer,
+--   push(writer, code) every tick, take(writer) -> (start tick, data, more)? (what to send next),
+--   rewind(writer, tick) (after the server reports a gap)
 
 local Controls = require("./Controls")
 
@@ -92,41 +93,44 @@ function InputLog.segments(codes: { number }, every: number?): { { start: number
 end
 
 export type Writer = {
-	start: number, -- ticks already taken
-	pending: { number },
+	codes: { number }, -- the whole log so far (a four-minute run is 14,400 small numbers)
+	sent: number, -- how many of them have been taken
 }
 
 function InputLog.writer(): Writer
-	return { start = 0, pending = {} }
+	return { codes = {}, sent = 0 }
 end
 
 -- Call once for every tick played. Ticks before the first key are not part of a run (the clock has not
 -- started, LAB-R4) and are not written.
 function InputLog.push(w: Writer, code: number)
-	if code == Controls.NEUTRAL and w.start == 0 and #w.pending == 0 then
+	if code == Controls.NEUTRAL and #w.codes == 0 then
 		return
 	end
-	table.insert(w.pending, code)
+	table.insert(w.codes, code)
 end
 
--- The next piece to send (nil when nothing is waiting): the tick it starts at and its text.
-function InputLog.take(w: Writer): (number?, string?)
-	local n = #w.pending
-	if n == 0 then
-		return nil, nil
+-- The next piece to send: the tick it starts at, its text, and whether more is still waiting (a client sends
+-- its digest only with a piece that brings the server right up to date). nil when nothing is waiting.
+function InputLog.take(w: Writer): (number?, string?, boolean?)
+	local n = #w.codes
+	if w.sent >= n then
+		return nil, nil, nil
 	end
-	local last = math.min(n, InputLog.SEGMENT_TICKS)
-	local data = InputLog.encode(w.pending, 1, last)
+	local start = w.sent
+	local last = math.min(n, start + InputLog.SEGMENT_TICKS)
+	local data = InputLog.encode(w.codes, start + 1, last)
 	while #data > InputLog.SEGMENT_CHARS do
-		last = math.max(1, last // 2)
-		data = InputLog.encode(w.pending, 1, last)
+		last = start + math.max(1, (last - start) // 2)
+		data = InputLog.encode(w.codes, start + 1, last)
 	end
-	local start = w.start
-	w.start += last
-	local rest: { number } = table.create(n - last)
-	table.move(w.pending, last + 1, n, 1, rest)
-	w.pending = rest
-	return start, data
+	w.sent = last
+	return start, data, last < n
+end
+
+-- The server refused a piece and said which tick it is at ("gap"): send again from there.
+function InputLog.rewind(w: Writer, tick: number)
+	w.sent = math.clamp(math.floor(tick), 0, #w.codes)
 end
 
 return InputLog
