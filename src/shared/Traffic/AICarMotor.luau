@@ -148,7 +148,71 @@ function AICarMotor.new(
 end
 
 function AICarMotor.body(v: Vehicle): LaneMath.Body
-	return { x = v.x, z = v.z, yaw = v.yaw, width = v.box.width, length = v.box.length, visible = v.visible, id = v.id }
+	return {
+		x = v.x,
+		z = v.z,
+		yaw = v.yaw,
+		width = v.box.width,
+		length = v.box.length,
+		visible = v.visible,
+		id = v.id,
+		speed = v.speed,
+	}
+end
+
+-- gapAhead(v, fx, fz, range, halfWidth, others) -> studs: the free road between v's nose and the tail of
+-- the nearest body in the corridor ahead (LaneMath.vehicleAhead's corridor), math.huge when none.
+local function gapAhead(
+	v: Vehicle,
+	fx: number,
+	fz: number,
+	range: number,
+	halfWidth: number,
+	others: { LaneMath.Body }
+): number
+	local best = math.huge
+	local margin = 0.2 * Units.STUDS_PER_UNIT
+	for _, b in others do
+		if b.visible ~= false and b.id ~= v.id then
+			local dx, dz = b.x - v.x, b.z - v.z
+			local along = dx * fx + dz * fz
+			local across = math.abs(dx * fz - dz * fx)
+			local psi = b.yaw
+			local otherAlong = math.abs(math.sin(psi) * fx + math.cos(psi) * fz) * b.length / 2
+				+ math.abs(math.cos(psi) * fx - math.sin(psi) * fz) * b.width / 2
+			if along > 0 and along < range + otherAlong and across < halfWidth + b.width / 2 + margin then
+				best = math.min(best, along - otherAlong - v.box.length / 2)
+			end
+		end
+	end
+	return best
+end
+
+-- mergeConflict(v, ctx, horizon) -> boolean: will a moving vehicle that is crossing v's path (not
+-- following it, not oncoming) come within a car length of v in the next `horizon` seconds, both keeping
+-- their headings and speeds? The ice cream van's U-turns cross the residential street and merge into its
+-- far lane: without this it cut in front of southbound cars too close for them to stop.
+local function mergeConflict(v: Vehicle, ctx: Ctx, horizon: number): boolean
+	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	local vx, vz = fx * v.speed, fz * v.speed
+	for _, b in ctx.bodies do
+		local bs = b.speed or 0
+		if b.visible ~= false and b.id ~= v.id and bs > 0.5 then
+			local bx, bz = math.sin(b.yaw), math.cos(b.yaw)
+			if math.abs(bx * fx + bz * fz) < 0.95 then
+				local px, pz = b.x - v.x, b.z - v.z
+				local wx, wz = bx * bs - vx, bz * bs - vz
+				local w2 = wx * wx + wz * wz
+				local t = if w2 > 1e-9 then math.clamp(-(px * wx + pz * wz) / w2, 0, horizon) else 0
+				local cx, cz = px + wx * t, pz + wz * t
+				local r = (v.box.length + b.length) / 2
+				if cx * cx + cz * cz < r * r then
+					return true
+				end
+			end
+		end
+	end
+	return false
 end
 
 local function approach(v: number, goal: number, amount: number): number
@@ -162,8 +226,19 @@ local function shortest(a: number): number
 	return math.atan2(math.sin(a), math.cos(a))
 end
 
+-- Which other vehicles a vehicle brakes for. v5.4 counted only those heading its way (dot > 0.3; opposing
+-- traffic excluded, §6.1, the trolley deadlock), so a lane vehicle drove straight into one crossing its
+-- lane: the ice cream van merging across the residential street at the end of each loop, the patrol car
+-- in its U-turn. The lane classes now also brake for crossing traffic (dot > -0.3, still not opposing);
+-- the crossing classes (van, patrol, trolley) keep v5.4's rule, so two vehicles never wait for each other.
+local CROSSING_YIELD: { [string]: boolean } = { sedan = true, heavy = true, motorcycle = true }
+
+local function minDot(v: Vehicle): number
+	return if CROSSING_YIELD[v.class] then -0.3 else 0.3
+end
+
 -- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels visible
--- relative to the vehicle base) and vehicles heading the same way (opposing traffic excluded, §6.1).
+-- relative to the vehicle base) and vehicles it brakes for (minDot).
 local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicles: boolean): { LaneMath.Hazard }
 	local out: { LaneMath.Hazard } = {}
 	for _, p in ctx.people do
@@ -178,9 +253,10 @@ local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicle
 		end
 	end
 	if withVehicles then
+		local lo = minDot(v)
 		for _, b in ctx.bodies do
 			if b.visible ~= false and b.id ~= v.id then
-				if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3 then
+				if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > lo then
 					table.insert(out, { x = b.x, z = b.z, r = b.width / 2 })
 				end
 			end
@@ -191,9 +267,10 @@ end
 
 local function sameWay(v: Vehicle, ctx: Ctx, fx: number, fz: number): { LaneMath.Body }
 	local out = {}
+	local lo = minDot(v)
 	for _, b in ctx.bodies do
 		if b.id ~= v.id then
-			if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3 then
+			if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > lo then
 				table.insert(out, b)
 			end
 		end
@@ -241,11 +318,38 @@ local function place(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, keepYaw: number?
 	v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
 end
 
+-- Is the spot (x, z) free of every other visible vehicle, with SPOT_REACH between the boxes along their
+-- lengths? A wrap or an appearance onto an occupied spot put one car inside another.
+local SPOT_REACH = st(2)
+local function spotClear(v: Vehicle, ctx: Ctx, x: number, z: number): boolean
+	for _, b in ctx.bodies do
+		if b.visible ~= false and b.id ~= v.id then
+			local r = (v.box.length + b.length) / 2 + SPOT_REACH
+			if (b.x - x) ^ 2 + (b.z - z) ^ 2 < r * r then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+-- The fleet's bodies are last tick's; a vehicle that appears or wraps updates its own at once, so a
+-- vehicle stepped later in the same tick does not wrap or appear on top of it.
+local function syncBody(v: Vehicle, ctx: Ctx)
+	for _, b in ctx.bodies do
+		if b.id == v.id then
+			b.x, b.z, b.yaw, b.visible = v.x, v.z, v.yaw, v.visible
+			return
+		end
+	end
+end
+
 local function appear(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, s: number)
 	v.s = s
 	v.visible = true
 	v.teleported = true
 	place(v, ctx, lane)
+	syncBody(v, ctx)
 end
 
 local function stopCap(v: Vehicle, ctx: Ctx, decel: number, dt: number, events: { string })
@@ -305,9 +409,20 @@ local function advanceLane(v: Vehicle, ctx: Ctx, dt: number, events: { string })
 		local s, wrapped = LaneMath.advance(lane, v.s, v.speed, dt)
 		v.s = s
 		if wrapped then
-			v.teleported = true
 			v.stop = Control.newState()
 			table.insert(events, "wrap")
+			local p = LaneMath.pointAt(lane, s, v.dir)
+			if not spotClear(v, ctx, p.x, p.z) then
+				-- the lane's start is taken: off the map until it is free (AICarMotor.step)
+				v.phase, v.visible = "queued", false
+				place(v, ctx, lane)
+				syncBody(v, ctx)
+				return
+			end
+			v.teleported = true
+			place(v, ctx, lane)
+			syncBody(v, ctx)
+			return
 		end
 	end
 	place(v, ctx, lane)
@@ -380,6 +495,11 @@ stepClass.patrol = function(v, ctx, dt, events)
 	if LaneMath.uturnLength(v.lane) > 0 then
 		local toEnd = if v.phase == "uturn" then 0 else math.max(0, v.lane.length - v.s)
 		limit = math.sqrt(UTURN_SPEED * UTURN_SPEED + 2 * UTURN_BRAKE * toEnd)
+		-- the U-turn crosses the oncoming lane: wait for a gap in it (the east end is 15 u from where the
+		-- westbound boulevard traffic wraps in)
+		if (v.phase == "uturn" or toEnd < st(6)) and mergeConflict(v, ctx, 2) then
+			limit = 0
+		end
 	end
 	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10), limit)
 end
@@ -398,6 +518,7 @@ stepClass.van = function(v, ctx, dt, events)
 		local dist = (target - v.s) % L
 		local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
 		local danger = LaneMath.seesHazard(v.x, v.z, fx, fz, st(7.7), st(1.85), hazards(v, ctx, fx, fz, true)) ~= nil
+			or mergeConflict(v, ctx, 2)
 		local desired = if danger then 0 else math.min(v.cruise, math.sqrt(2 * st(5.0) * dist))
 		v.speed = approach(v.speed, desired, (if desired < v.speed then st(11) else st(4.5)) * dt)
 		-- arrive when this tick's step reaches the stop: the braking profile brings the van in at a crawl
@@ -460,7 +581,8 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 	if v.phase == "idle" then
 		v.visible = false
 		v.timer -= dt
-		if v.timer <= 0 then
+		local spawn = LaneMath.pointAt(v.lane, v.spawnS, v.dir)
+		if v.timer <= 0 and spotClear(v, ctx, spawn.x, spawn.z) then
 			v.phase = "ride"
 			v.speed = v.cruise
 			appear(v, ctx, v.lane, v.spawnS)
@@ -472,7 +594,12 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 	if personNear(ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) then
 		v.speed = 0
 	else
-		v.speed = v.cruise
+		-- follows the vehicle ahead (v5.4's riders stopped only for people, so they rode straight through
+		-- every slower car on the boulevard): its speed eases down with the gap, so it settles behind a
+		-- slower car at that car's speed instead of braking hard and pulling away again
+		local gap = gapAhead(v, fx, fz, st(24), st(1.2), sameWay(v, ctx, fx, fz))
+		local desired = math.min(v.cruise, math.max(0, (gap - st(2)) * 1.2))
+		v.speed = approach(v.speed, desired, (if desired < v.speed then st(8) else st(4)) * dt)
 	end
 	local s = v.s + v.speed * dt
 	if s >= v.lane.length - st(3) then
@@ -487,6 +614,10 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 	place(v, ctx, v.lane)
 end
 
+local POLY_ACCEL = st(5) -- 12.5 st/s2 pulling away
+local POLY_BRAKE = st(6) -- 15 st/s2 into a corner or the end of the route
+local CORNER_LATERAL = st(10) -- 25 st/s2 round a corner: 22 st/s through a 20 st one
+
 -- polyline drive shared by the emergency classes: hard stop for people within r; returns true at the end
 local function drivePolyline(
 	v: Vehicle,
@@ -497,12 +628,19 @@ local function drivePolyline(
 	dt: number
 ): boolean
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
-	if personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true) then
-		v.speed = 0
-	else
-		v.speed = speed
-	end
 	local len = LaneMath.length(lane, v.dir)
+	if personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true) then
+		v.speed = 0 -- the hard stop for people stays instant (traffic.md §5.8)
+	else
+		-- pulls away, slows for each corner and brakes to a stop at the end (it used to run at full speed
+		-- from the first tick to the last: 0 to 31 st/s and back in one tick)
+		local cap = math.min(
+			speed,
+			LaneMath.cornerCap(lane, v.dir, v.s, CORNER_LATERAL, POLY_BRAKE),
+			math.max(math.sqrt(2 * POLY_BRAKE * math.max(0, len - v.s)), st(0.4))
+		)
+		v.speed = approach(v.speed, cap, (if cap < v.speed then POLY_BRAKE else POLY_ACCEL) * dt)
+	end
 	v.s = math.min(len, v.s + v.speed * dt)
 	place(v, ctx, lane)
 	return v.s >= len - 1e-6
@@ -623,6 +761,16 @@ end
 function AICarMotor.step(v: Vehicle, ctx: Ctx, dt: number): { string }
 	v.teleported = false
 	local events = {}
+	if v.phase == "queued" then
+		-- a wrap waiting for its lane's start to clear
+		if spotClear(v, ctx, v.x, v.z) then
+			v.phase = "drive"
+			appear(v, ctx, v.lane, v.s)
+			table.insert(events, "appear")
+		end
+		v.moving = false
+		return events
+	end
 	local fn = stepClass[v.class] or error(`AICarMotor: unknown class {v.class}`)
 	local px, pz = v.x, v.z
 	fn(v, ctx, dt, events)

@@ -75,7 +75,16 @@ export type Lane = {
 
 export type Pose = { x: number, y: number, z: number, yaw: number }
 
-export type Body = { x: number, z: number, yaw: number, width: number, length: number, visible: boolean?, id: any? }
+export type Body = {
+	x: number,
+	z: number,
+	yaw: number,
+	width: number,
+	length: number,
+	visible: boolean?,
+	id: any?,
+	speed: number?,
+}
 
 -- headingYaw(axis, dir): HTML yaw for travel along an axis (traffic.md §2.6: axis x -> dir*pi/2;
 -- axis z -> 0 if dir > 0 else pi).
@@ -589,6 +598,25 @@ function LaneMath.polyPoint(poly: Poly, s: number): (number, number, number)
 	local t = if seg > 1e-12 then (d - cum[i]) / seg else 0
 	local x, z = a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t
 	return x, z, math.atan2(b[1] - a[1], b[2] - a[2])
+end
+
+-- cornerCap(lane, dir, s, lateral, decel) -> speed: the fastest a vehicle at s may go so that it can
+-- slow, at `decel`, to take every rounded corner ahead at `lateral` sideways acceleration (math.huge on
+-- lanes without corners).
+function LaneMath.cornerCap(lane: Lane, dir: number, s: number, lateral: number, decel: number): number
+	if lane.shape ~= "polyline" then
+		return math.huge
+	end
+	local poly = if dir < 0 then lane.polyRev :: Poly else lane.poly :: Poly
+	local cap = math.huge
+	for _, pc in poly.pieces do
+		if pc.r > 0 and pc.s + pc.len > s then
+			local dist = math.max(0, pc.s - s)
+			local v = math.sqrt(lateral * pc.r)
+			cap = math.min(cap, math.sqrt(v * v + 2 * decel * dist))
+		end
+	end
+	return cap
 end
 
 -- pointAt(lane, s, dir?, y?) -> pose: s studs along the lane from its start end in the travel

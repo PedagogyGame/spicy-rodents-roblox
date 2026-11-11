@@ -31,8 +31,8 @@ local scenario: Replay.Scenario = {
 		t.byId[9].s = t.byId[11].spawnS + 40
 		t.byId[10].s = t.byId[11].spawnS + 160
 	end,
-	expect = { none = { "speed_stutter", "sink", "float", "sideways_slide" } },
-	known = { "box_overlap" },
+	-- they rode straight through both (3.8 st deep); now they settle in behind at the leader's speed
+	expect = { none = { "speed_stutter", "sink", "float", "sideways_slide", "box_overlap", "accel_spike" } },
 }
 
 return scenario

@@ -169,4 +169,57 @@ return function(t)
 		local events = drive(svc, 14, 140, 0.15)
 		t.truthy((events.park or 0) >= 1, "it reached the hospital and parked")
 	end)
+
+	-- the overlap of two boxes on the ground (centre, HTML yaw, half width, half length): the smallest
+	-- overlap along the four separating axes, <= 0 when apart
+	local function overlap(a: { number }, b: { number }): number
+		local depth = math.huge
+		for _, yaw in { a[3], b[3] } do
+			for pass = 1, 2 do
+				local ax, az = math.sin(yaw), math.cos(yaw)
+				if pass == 2 then
+					ax, az = az, -ax
+				end
+				local function reach(o: { number }): number
+					local fx, fz = math.sin(o[3]), math.cos(o[3])
+					return math.abs(fx * ax + fz * az) * o[5] + math.abs(fz * ax - fx * az) * o[4]
+				end
+				depth = math.min(depth, reach(a) + reach(b) - math.abs((b[1] - a[1]) * ax + (b[2] - a[2]) * az))
+			end
+		end
+		return depth
+	end
+
+	t.test("the lane fleet never drives one vehicle into another (10 simulated minutes)", function()
+		local entries = {}
+		for _, e in Fleet.ENTRIES do
+			if e.class ~= "responder" and e.class ~= "incident" then
+				table.insert(entries, e)
+			end
+		end
+		local svc = service(entries)
+		local worst, where = 0, ""
+		for _ = 1, 30 * 600 do
+			svc:step(1 / 30)
+			local vs = svc.vehicles
+			for i = 1, #vs do
+				local a = vs[i]
+				if a.visible then
+					for j = i + 1, #vs do
+						local b = vs[j]
+						if b.visible and math.abs(a.x - b.x) < 30 and math.abs(a.z - b.z) < 30 then
+							local d = overlap(
+								{ a.x, a.z, a.yaw, a.box.width / 2, a.box.length / 2 },
+								{ b.x, b.z, b.yaw, b.box.width / 2, b.box.length / 2 }
+							)
+							if d > worst then
+								worst, where = d, `{a.name} and {b.name} at ({a.x}, {a.z}), t = {svc.now}`
+							end
+						end
+					end
+				end
+			end
+		end
+		t.truthy(worst < 0.3, `{worst} st deep: {where}`)
+	end)
 end

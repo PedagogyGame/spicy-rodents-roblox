@@ -32,6 +32,16 @@ local scenario: Replay.Scenario = {
 			"roll_missing",
 			"off_road",
 			"through_building",
+			-- fixed in this round: the patrol car's turn, the polyline corners, the van and trolley stops,
+			-- the van's U-turn speed, wraps that streaked, motorcycles and the trolley inside other cars
+			"box_overlap",
+			"teleport_unflagged",
+			"teleport_bit_dropped",
+			"sim_jump_unflagged",
+			"sim_yaw_snap",
+			"yaw_jump",
+			"reverse_travel",
+			"sideways_slide",
 		},
 	},
 }
