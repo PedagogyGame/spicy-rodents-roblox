@@ -18,7 +18,7 @@
 -- drone (the standing officer no longer walks off while the drone flies); E, V and Reset always answer
 -- on screen; device refusals are said in plain words (reasonText).
 -- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(), Client.refreshCamera(),
---   Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure);
+--   Client.flushInput(), Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure);
 --   reasonText(why) -> string? (pure; nil = say nothing)
 
 local Import = require("../Import")
@@ -45,6 +45,7 @@ export type Client = {
 	markRequest: () -> (),
 	current: () -> Model?,
 	refreshCamera: () -> (),
+	flushInput: () -> (),
 	state: () -> { [string]: any },
 }
 
@@ -460,6 +461,11 @@ function PossessionClient.start(opts: Opts): Client
 		end,
 		refreshCamera = function()
 			applyCamera()
+		end,
+		-- a minigame took the keys, or gave them back: presses made on the other side are forgotten (the same
+		-- hand-over rule as a new body above)
+		flushInput = function()
+			input:flush()
 		end,
 		state = function(): { [string]: any }
 			return {

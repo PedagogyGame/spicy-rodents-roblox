@@ -5,11 +5,14 @@
 -- it), a big banner for STRIKE / BUST / your turn, a status line (whose turn, lobby countdown, end card), the
 -- scorecard (bowling's ten-frame sheet, darts' 501 or cricket marks), the power / timing meter with its sweet
 -- spot, and buttons that work by mouse and touch (Leave, Start now, Play again, 501 / Cricket, and the bowling
--- touch controls). Pure layout: the game controllers (Client/Minigames/*) feed it.
+-- touch controls). For bowling also: the turn clock (it turns red with a plain warning before an idle turn is
+-- skipped), the hook indicator (five pips), and the end card (ranked scores, strikes, spares, misses, Play
+-- again / Leave, the reset countdown). Pure layout: the game controllers (Client/Minigames/*) feed it.
 -- Interface: new() -> UI; UI:open(game, title, help: { how: {string}, keys: {string} }); UI:close();
 --   UI:banner(text, big?); UI:status(text); UI:scoreBowling(view, you); UI:scoreDarts(view, you);
 --   UI:meter(value?, sweet?: {lo, hi}, label?); UI:buttons(list: { {id, text} }, onClick); UI:touch(list, onDown,
---   onUp); UI:card(title, text, seconds); UI:isOpen()
+--   onUp); UI:card(title, text, seconds); UI:isOpen(); UI:clock(seconds?, warning?); UI:hook(notch?, notches?);
+--   UI:summary(summary?, you?, secondsLeft?, onAgain?, onLeave?) (Shared/Minigames/Bowling/Referee.summary)
 
 local CameraRig = require("../Camera/CameraRig")
 
@@ -72,8 +75,8 @@ function MinigameUI.new(): any
 	help.Name = "Help"
 	help.BackgroundColor3 = C.NAVY
 	help.BackgroundTransparency = 0.12
-	help.Size = UDim2.fromOffset(300, 300)
-	help.Position = UDim2.new(0, 12, 0.5, -150)
+	help.Size = UDim2.fromOffset(340, 430)
+	help.Position = UDim2.new(0, 12, 0.5, -215)
 	help.Parent = gui
 	corner(help, 12)
 	self.helpFrame = help
@@ -104,15 +107,46 @@ function MinigameUI.new(): any
 	local status = Instance.new("TextLabel")
 	status.BackgroundColor3 = C.NAVY
 	status.BackgroundTransparency = 0.2
-	status.Size = UDim2.fromOffset(520, 34)
-	status.Position = UDim2.new(0.5, -260, 0, 138)
+	status.Size = UDim2.fromOffset(700, 44)
+	status.Position = UDim2.new(0.5, -350, 0, 134)
 	status.Font = Enum.Font.GothamBold
 	status.TextColor3 = C.CYAN
 	status.TextScaled = true
+	status.TextWrapped = true -- a long line (the bowler's keys) takes two rows rather than shrinking away
 	status.Text = ""
 	status.Parent = gui
 	corner(status, 10)
 	self.statusLabel = status
+	-- the turn clock (right of the status line) and its warning (under it)
+	local clock = Instance.new("TextLabel")
+	clock.Name = "Clock"
+	clock.BackgroundColor3 = C.NAVY
+	clock.BackgroundTransparency = 0.2
+	clock.Size = UDim2.fromOffset(74, 44)
+	clock.Position = UDim2.new(0.5, 358, 0, 134)
+	clock.Font = Enum.Font.GothamBold
+	clock.TextColor3 = C.WHITE
+	clock.TextScaled = true
+	clock.Text = ""
+	clock.Visible = false
+	clock.Parent = gui
+	corner(clock, 10)
+	self.clockLabel = clock
+	self.clockShown = ""
+	local warnLabel = Instance.new("TextLabel")
+	warnLabel.Name = "ClockWarning"
+	warnLabel.BackgroundColor3 = Color3.fromRGB(120, 24, 24)
+	warnLabel.BackgroundTransparency = 0.15
+	warnLabel.Size = UDim2.fromOffset(700, 28)
+	warnLabel.Position = UDim2.new(0.5, -350, 0, 182)
+	warnLabel.Font = Enum.Font.GothamBold
+	warnLabel.TextColor3 = C.WHITE
+	warnLabel.TextScaled = true
+	warnLabel.Text = ""
+	warnLabel.Visible = false
+	warnLabel.Parent = gui
+	corner(warnLabel, 8)
+	self.clockWarning = warnLabel
 
 	-- scorecard (bottom right)
 	local card = Instance.new("Frame")
@@ -156,6 +190,40 @@ function MinigameUI.new(): any
 	self.meterFrame, self.meterFill, self.meterSweet, self.meterNeedle, self.meterLabel =
 		meter, fill, sweet, needle, meterLabel
 
+	-- hook indicator (under the meter): pips from full hook left to full hook right
+	local hook = Instance.new("Frame")
+	hook.Name = "Hook"
+	hook.BackgroundColor3 = C.NAVY
+	hook.BackgroundTransparency = 0.2
+	hook.Size = UDim2.fromOffset(300, 26)
+	hook.Position = UDim2.new(0.5, -150, 1, -226)
+	hook.Visible = false
+	hook.Parent = gui
+	corner(hook, 8)
+	self.hookFrame = hook
+	self.hookLabel = label(hook, "HOOK", UDim2.new(0, 150, 1, -6), UDim2.fromOffset(6, 3), C.CYAN, Enum.Font.GothamBold)
+	self.hookLabel.TextXAlignment = Enum.TextXAlignment.Left
+	self.hookPips = {} :: { Frame }
+	self.hookShown = nil :: number?
+
+	-- the end card (centre): built by summary()
+	local over = Instance.new("Frame")
+	over.Name = "Summary"
+	over.BackgroundColor3 = C.NAVY
+	over.BackgroundTransparency = 0.05
+	over.Size = UDim2.fromOffset(520, 240)
+	over.Position = UDim2.new(0.5, -260, 0.5, -150)
+	over.Visible = false
+	over.Parent = gui
+	corner(over, 14)
+	local overStroke = Instance.new("UIStroke")
+	overStroke.Color = C.GOLD
+	overStroke.Thickness = 2
+	overStroke.Parent = over
+	self.summaryFrame = over
+	self.summarySig = ""
+	self.summaryFoot = nil :: TextLabel?
+
 	-- buttons (bottom left)
 	local buttons = Instance.new("Frame")
 	buttons.BackgroundTransparency = 1
@@ -170,7 +238,7 @@ function MinigameUI.new(): any
 	-- touch controls (above the buttons)
 	local touch = Instance.new("Frame")
 	touch.BackgroundTransparency = 1
-	touch.Size = UDim2.fromOffset(420, 64)
+	touch.Size = UDim2.fromOffset(720, 64)
 	touch.Position = UDim2.new(0, 12, 1, -132)
 	touch.Parent = gui
 	local tl = Instance.new("UIListLayout")
@@ -261,6 +329,9 @@ end
 function MinigameUI.close(self: any)
 	self.gui.Enabled = false
 	self:meter(nil)
+	self:clock(nil)
+	self:hook(nil)
+	self:summary(nil)
 	self:buttons({}, function() end)
 	self:touch({}, function() end, function() end)
 end
@@ -349,7 +420,7 @@ function MinigameUI.touch(self: any, list: { { string } }, onDown: (id: string) 
 	local UIS = game:GetService("UserInputService")
 	self.touchBar.Visible = UIS.TouchEnabled
 	for _, item in list do
-		local b = makeButton(self.touchBar, item[2], if item[1] == "bowl" then 150 else 64)
+		local b = makeButton(self.touchBar, item[2], if item[1] == "bowl" then 150 elseif #item[2] > 3 then 86 else 60)
 		b.BackgroundColor3 = Color3.fromRGB(40, 50, 100)
 		b.MouseButton1Down:Connect(function()
 			onDown(item[1])
@@ -360,6 +431,178 @@ function MinigameUI.touch(self: any, list: { { string } }, onDown: (id: string) 
 		b.MouseLeave:Connect(function()
 			onUp(item[1])
 		end)
+	end
+end
+
+-- The turn clock. seconds nil hides it; under ten seconds it turns red. warning (a sentence) shows under the
+-- status line while there is one.
+function MinigameUI.clock(self: any, seconds: number?, warning: string?)
+	local c = self.clockLabel
+	local shown = ""
+	if seconds ~= nil then
+		local n = math.max(0, math.ceil(seconds))
+		shown = `{n // 60}:{string.format("%02d", n % 60)}`
+	end
+	local key = shown .. "|" .. (warning or "")
+	if key == self.clockShown then
+		return
+	end
+	self.clockShown = key
+	c.Visible = shown ~= ""
+	c.Text = shown
+	c.TextColor3 = if seconds ~= nil and seconds <= 10 then Color3.fromRGB(255, 90, 80) else C.WHITE
+	self.clockWarning.Visible = warning ~= nil and warning ~= ""
+	self.clockWarning.Text = warning or ""
+end
+
+-- The hook indicator: notch -notches .. notches (negative = hook left); nil hides it.
+function MinigameUI.hook(self: any, notch: number?, notches: number?)
+	local frame = self.hookFrame
+	if notch == nil then
+		if frame.Visible then
+			frame.Visible = false
+			self.hookShown = nil
+		end
+		return
+	end
+	if self.hookShown == notch and frame.Visible then
+		return
+	end
+	self.hookShown = notch
+	frame.Visible = true
+	local n = notches or 2
+	local pips = self.hookPips
+	if #pips ~= 2 * n + 1 then
+		for _, p in pips do
+			p:Destroy()
+		end
+		table.clear(pips)
+		for i = 1, 2 * n + 1 do
+			local p = Instance.new("Frame")
+			p.BorderSizePixel = 0
+			p.Size = UDim2.fromOffset(22, 14)
+			p.Position = UDim2.new(1, -(2 * n + 2 - i) * 26 - 4, 0.5, -7)
+			p.Parent = frame
+			corner(p, 4)
+			pips[i] = p
+		end
+	end
+	for i, p in pips do
+		local at = i - n - 1
+		local lit = at == notch
+		p.BackgroundColor3 = if lit
+			then (if at == 0 then C.CYAN else Color3.fromRGB(255, 170, 60))
+			else Color3.fromRGB(50, 56, 90)
+	end
+	self.hookLabel.Text = if notch == 0
+		then "HOOK: straight"
+		else `HOOK: {if math.abs(notch) >= n then "full" else "half"} {if notch < 0 then "left" else "right"}`
+end
+
+-- The bowling end card: ranked rows from Referee.summary, who won, and what to press. nil hides it.
+function MinigameUI.summary(
+	self: any,
+	sum: { [string]: any }?,
+	you: number?,
+	secondsLeft: number?,
+	onAgain: (() -> ())?,
+	onLeave: (() -> ())?
+)
+	local frame = self.summaryFrame
+	if sum == nil then
+		if frame.Visible then
+			frame.Visible = false
+			self.summarySig = ""
+		end
+		return
+	end
+	self.summaryAgain, self.summaryLeave = onAgain, onLeave
+	local parts = { tostring(you), tostring(sum.line) }
+	for _, r in sum.rows do
+		table.insert(parts, `{r.seat}:{r.name}:{r.total}:{r.strikes}:{r.spares}:{r.misses}:{r.gone}`)
+	end
+	local sig = table.concat(parts, "|")
+	if sig ~= self.summarySig then
+		self.summarySig = sig
+		for _, c in frame:GetChildren() do
+			if c:IsA("GuiObject") then
+				c:Destroy()
+			end
+		end
+		local rows = sum.rows
+		local h = 150 + #rows * 32
+		frame.Size = UDim2.fromOffset(520, h)
+		frame.Position = UDim2.new(0.5, -260, 0.5, -h / 2 - 20)
+		label(frame, "GAME OVER", UDim2.new(1, -20, 0, 30), UDim2.fromOffset(10, 8), C.GOLD, Enum.Font.FredokaOne)
+		label(
+			frame,
+			tostring(sum.line),
+			UDim2.new(1, -20, 0, 26),
+			UDim2.fromOffset(10, 40),
+			C.WHITE,
+			Enum.Font.GothamBold
+		)
+		-- the card's columns: heading, where it starts and how wide it is (fractions of the card)
+		local cols: { { title: string, x: number, w: number } } = {
+			{ title = "", x = 0.02, w = 0.07 },
+			{ title = "BOWLER", x = 0.1, w = 0.36 },
+			{ title = "SCORE", x = 0.47, w = 0.13 },
+			{ title = "STRIKES", x = 0.61, w = 0.13 },
+			{ title = "SPARES", x = 0.74, w = 0.12 },
+			{ title = "MISSES", x = 0.87, w = 0.12 },
+		}
+		for _, c in cols do
+			label(frame, c.title, UDim2.new(c.w, 0, 0, 16), UDim2.new(c.x, 0, 0, 72), C.CYAN, Enum.Font.GothamBold)
+		end
+		for i, r in rows do
+			local y = 92 + (i - 1) * 32
+			local mine = r.seat == you
+			local row = Instance.new("Frame")
+			row.BackgroundColor3 = if mine then Color3.fromRGB(28, 96, 104) else Color3.fromRGB(26, 32, 66)
+			row.Size = UDim2.new(1, -16, 0, 28)
+			row.Position = UDim2.fromOffset(8, y)
+			row.Parent = frame
+			corner(row, 6)
+			local name = r.name .. (if mine then " (you)" else "") .. (if r.gone then " (left)" else "")
+			local cells =
+				{ `{r.place}.`, name, tostring(r.total), tostring(r.strikes), tostring(r.spares), tostring(r.misses) }
+			for k, c in cols do
+				label(
+					row,
+					cells[k],
+					UDim2.fromScale(c.w, 0.8),
+					UDim2.fromScale(c.x, 0.1),
+					if k == 3 then C.GOLD else C.WHITE,
+					if k == 3 then Enum.Font.FredokaOne else Enum.Font.GothamBold
+				)
+			end
+		end
+		local by = 98 + #rows * 32
+		local again = makeButton(frame, "Play again", 150)
+		again.Size = UDim2.fromOffset(150, 34)
+		again.Position = UDim2.new(0.5, -160, 0, by)
+		again.Activated:Connect(function()
+			if self.summaryAgain then
+				self.summaryAgain()
+			end
+		end)
+		local leave = makeButton(frame, "Leave (Q)", 150)
+		leave.Size = UDim2.fromOffset(150, 34)
+		leave.Position = UDim2.new(0.5, 10, 0, by)
+		leave.BackgroundColor3 = Color3.fromRGB(170, 60, 50)
+		leave.Activated:Connect(function()
+			if self.summaryLeave then
+				self.summaryLeave()
+			end
+		end)
+		self.summaryFoot =
+			label(frame, "", UDim2.new(1, -20, 0, 16), UDim2.fromOffset(10, by + 38), C.CYAN, Enum.Font.Gotham)
+	end
+	frame.Visible = true
+	local foot = self.summaryFoot :: TextLabel?
+	if foot then
+		foot.Text =
+			`The lane resets in {math.max(0, math.ceil(secondsLeft or 0))} s. Anyone can walk up and start a new game.`
 	end
 end
 

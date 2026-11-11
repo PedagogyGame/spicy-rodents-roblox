@@ -12,6 +12,7 @@
 
 local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
+local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../../../shared/Actors/StaffRounds"))
 local Common = require("./Common")
 local Directive = require("./Directive")
 
@@ -89,18 +90,15 @@ end
 
 function Staff.new(actor: Common.Actor, params: Params): Common.Brain
 	local i = params.index
-	local dir = if i % 2 == 1 then 1 else -1
-	local st = Units.st
-	local localCircuit: { { number } } = params.circuit
-		or {
-			{ 0, 0 },
-			{ dir * st(2.6), -st(0.65) },
-			{ dir * st(2.1), -st(2.8) },
-			{ 0, -st(2.0) },
-		}
 	local points = {}
-	for _, lp in localCircuit do
-		table.insert(points, { params.stationX + lp[1], params.stationZ + lp[2] })
+	local localCircuit = params.circuit
+	if localCircuit then
+		for _, lp in localCircuit do
+			table.insert(points, { params.stationX + lp[1], params.stationZ + lp[2] })
+		end
+	else
+		-- the v5.4 circuit (Shared/Actors/StaffRounds: the bake keeps an indoor one clear of furniture)
+		points = StaffRounds.points(params.stationX, params.stationZ, i)
 	end
 	local start = (i % #points) + 1
 	local self = setmetatable({

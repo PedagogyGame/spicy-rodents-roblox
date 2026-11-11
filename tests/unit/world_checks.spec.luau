@@ -16,5 +16,7 @@ return function(t)
 		t.eq(r.hospitalRooms, 8)
 		t.truthy(r.droneConsole)
 		t.truthy(r.doors.doors >= 80)
+		t.eq(r.interiors.lots, 6)
+		t.eq(r.interiors.rooms, 31)
 	end)
 end

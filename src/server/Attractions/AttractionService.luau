@@ -3,8 +3,8 @@
 -- Boots the attraction buildings baked on their own (Workspace.Attractions from tools/bake/attractions.luau;
 -- data/attractions.json; brief v2 §13a; BUILD_PLAN §1.1 rule 13): carves the boot terrain out of the bowling
 -- alley's ball-return ducts (and from under its alley and entrance) so the squirrel tunnels are open air, registers
--- the collision groups (BowlingPhysics for the ball and pins; LaneGuard keeps people off the lanes but lets the
--- ball and pins through), swings the steel push-bar exit doors on E (from inside only, like the real thing:
+-- the collision groups (LaneGuard keeps people off the lanes; BowlingPhysics is the baked group of the ball and
+-- pins, which are scripted and collide with nothing), swings the steel push-bar exit doors on E (from inside only, like the real thing:
 -- the prompt needs line of sight), and starts the MinigameService (lanes, darts, the fortune teller) with its
 -- Heartbeat step. Missing Workspace.Attractions is reported, never fatal.
 -- Interface: start(opts) -> Attractions { minigames, step(dt), stop(), doors } | nil
@@ -19,10 +19,12 @@ export type Opts = {
 	net: any?,
 	canPlay: ((player: any) -> (boolean, string?))?,
 	bodyOf: ((player: any) -> Model?)?,
+	animals: (() -> { { [string]: any } })?, -- squirrel-family bodies (a lane in play knocks them off it)
+	knock: ((id: any, x: number, y: number, z: number, text: string) -> ())?,
 	heartbeat: boolean?, -- default true
-	physics: boolean?, -- default true
 	terrain: boolean?, -- carve terrain (default true)
 	prompts: boolean?,
+	seed: number?, -- the lanes' seeded streams (default: from the clock, printed so a game can be replayed)
 }
 
 local function carve(root: Instance): number
@@ -157,6 +159,7 @@ function AttractionService.start(opts: Opts?): any?
 		end
 	end
 	local conns: { RBXScriptConnection } = {}
+	local seed = o.seed or (os.time() % 1000000)
 	local minigames = MinigameService.new({
 		root = alley,
 		place = place,
@@ -164,8 +167,10 @@ function AttractionService.start(opts: Opts?): any?
 		net = o.net,
 		canPlay = o.canPlay,
 		bodyOf = o.bodyOf,
-		physics = o.physics ~= false,
+		animals = o.animals,
+		knock = o.knock,
 		prompts = o.prompts,
+		seed = seed,
 	})
 	local doorRig = doors(alley, conns)
 	local function step(dt: number)
@@ -183,7 +188,7 @@ function AttractionService.start(opts: Opts?): any?
 			end)
 		)
 	end
-	print(`[Attractions] bowling alley ready: {#minigames.order} stations, {carved} terrain carves`)
+	print(`[Attractions] bowling alley ready: {#minigames.order} stations, {carved} terrain carves, seed {seed}`)
 	return {
 		minigames = minigames,
 		place = place,

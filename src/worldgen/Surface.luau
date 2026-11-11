@@ -26,6 +26,10 @@ local SKIP_ROLES = {
 	Sign = true,
 	Door = true,
 	Paint = true,
+	-- door steps and indoor ceilings are not ground for poles, pipes, fences or lamps: those stand
+	-- where they stood before the art pass (tests/unit/worldgen_pins.spec)
+	Step = true,
+	Ceiling = true,
 }
 
 type Top = { box: Spec.PartSpec, nx: number, ny: number, nz: number, qx: number, qy: number, qz: number }

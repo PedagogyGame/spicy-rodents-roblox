@@ -1,7 +1,7 @@
 # Known type errors: the debt tools/typecheck/main.luau tolerates. One line per file and message
 # (quoted types blanked): file <tab> how many <tab> message. The check fails on anything not listed
 # here. Fix errors, then run `lune run tools/typecheck/main.luau --update`; never add lines by hand.
-# 129 errors in total (luau-lsp 1.70.1).
+# 118 errors in total (luau-lsp 1.70.1).
 src/client/Animation/AnimationDriver.luau	2	TypeError: Unknown type '…'
 src/client/Camera/CameraRig.luau	1	TypeError: Expected this to be '…', but got '…'
 src/client/Minigames/MinigameClient.luau	1	TypeError: Function only returns 1 value, but 2 are required here
@@ -13,7 +13,6 @@ src/server/Assets/TreeArt.luau	1	TypeError: Cannot call a value of the union typ
 src/server/Attractions/AttractionService.luau	1	TypeError: Function only returns 1 value, but 2 are required here
 src/server/Economy/Receipts.luau	1	TypeError: Unknown type '…'
 src/server/Minigames/MinigameService.luau	1	TypeError: Unknown type '…'
-src/server/Minigames/MinigameService.luau	3	TypeError: Value of type '…' could be nil
 src/server/Paintball/Harness.luau	1	TypeError: Unknown type '…'
 src/shared/Avatar/PuppetSpec.luau	1	TypeError: Cannot call a value of type { [string]: string } in union:
 src/shared/Avatar/PuppetSpec.luau	10	TypeError: Expected this to be '…', but got '…'
@@ -23,22 +22,16 @@ src/shared/Minigames/Session.luau	1	TypeError: Expected this to be '…', but go
 src/shared/Minigames/Session.luau	3	TypeError: Value of type '…' could be nil
 src/shared/Traffic/Ghost.luau	1	TypeError: Expected this to be '…', but got '…'
 src/worldgen/BackdropTerrain.luau	1	TypeError: Key '…' is missing from '…' in the type '…'
-src/worldgen/Bake.luau	1	TypeError: Cannot call a value of type {ExtraSpec} in union:
 src/worldgen/Builders/Building.luau	1	TypeError: Expected this to be exactly '…', but got '…'
 src/worldgen/Builders/Building.luau	2	TypeError: Expected this to be '…', but got '…'
 src/worldgen/Builders/Greybox.luau	1	TypeError: Cannot call a value of type {ExtraSpec} in union:
 src/worldgen/Builders/Ground.luau	1	TypeError: Expected this to be '…', but got '…'
 src/worldgen/Builders/Ground.luau	1	TypeError: Expected this to be exactly '…', but got '…'
-src/worldgen/Builders/Interior.luau	1	TypeError: Expected this to be exactly '…', but got '…'
-src/worldgen/Builders/Programme.luau	2	TypeError: Expected this to be exactly '…', but got '…'
 src/worldgen/Builders/Props.luau	2	TypeError: Expected this to be exactly '…', but got '…'
 src/worldgen/Builders/RouteProps.luau	1	TypeError: Cannot call a value of type {Art} in union:
 src/worldgen/Builders/RouteProps.luau	1	TypeError: Expected this to be '…', but got '…'
 src/worldgen/Builders/RouteProps.luau	5	TypeError: Expected this to be exactly '…', but got '…'
-src/worldgen/Builders/Shell.luau	1	TypeError: Cannot call a value of the union type:
-src/worldgen/Builders/Shell.luau	2	TypeError: Expected this to be exactly '…', but got '…'
 src/worldgen/Builders/Shell.luau	3	TypeError: Expected this to be '…', but got '…'
-src/worldgen/Builders/Trees.luau	1	TypeError: Expected this to be
 src/worldgen/Builders/Trees.luau	4	TypeError: Expected this to be exactly '…', but got '…'
 src/worldgen/Geometry.luau	1	TypeError: Cannot call a value of type {Prim} in union:
 src/worldgen/LampPlan.luau	1	TypeError: Cannot call a value of type {{number}} in union:
