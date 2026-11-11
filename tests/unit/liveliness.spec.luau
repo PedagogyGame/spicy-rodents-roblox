@@ -824,6 +824,62 @@ return function(t: any)
 		t.eq(st.tailYaw[8], 0, "(the tail's springs: its ripple is not one)")
 	end)
 
+	t.test("a body the server moves in steps does not shiver", function()
+		-- a squirrel the server moves ten times a second: it stands for five frames and jumps on the sixth.
+		-- It runs straight at 18 studs/s for 3 s, then turns at 2 rad/s. What the driver tells the layer:
+		-- the root as it is each frame, and its own smoothed speed (AnimationDriver's e.speed).
+		local st = Liveliness.new(10)
+		local dt = 1 / 60
+		local x, z, yaw = 0, 0, 0
+		local shownX, shownZ, shownYaw = 0, 0, 0
+		local lastX, lastZ, told = 0, 0, 18
+		local dipSpan, liftSpan, bendStraight = 0, 0, 0
+		local bendLow, bendHigh = math.huge, -math.huge
+		for i = 1, 360 do
+			local now = i * dt
+			if now > 3 then
+				yaw += 2 * dt
+			end
+			x -= math.sin(yaw) * 18 * dt
+			z -= math.cos(yaw) * 18 * dt
+			if i % 6 == 0 then
+				shownX, shownZ, shownYaw = x, z, yaw
+			end
+			local seen = math.sqrt((shownX - lastX) ^ 2 + (shownZ - lastZ) ^ 2) / dt
+			lastX, lastZ = shownX, shownZ
+			told += (seen - told) * math.min(1, dt / 0.15)
+			local pose = Liveliness.frame(st, {
+				x = shownX,
+				y = 0.9,
+				z = shownZ,
+				pitch = 0,
+				yaw = shownYaw,
+				roll = 0,
+				speed = told,
+				mode = "ground",
+				coarse = true,
+				time = now,
+			}, dt) :: Liveliness.Pose
+			checkBounds(t, pose, "stepped")
+			local lift = 0
+			for k = 1, 8 do
+				lift += st.tailPitch[k]
+			end
+			if now > 1.5 and now <= 3 then
+				dipSpan = math.max(dipSpan, math.abs(st.dip))
+				liftSpan = math.max(liftSpan, math.abs(lift))
+				bendStraight = math.max(bendStraight, math.abs(st.bend))
+			elseif now > 4.5 then
+				bendLow, bendHigh = math.min(bendLow, st.bend), math.max(bendHigh, st.bend)
+			end
+		end
+		t.truthy(dipSpan < 0.006, `running straight its nose nods {dipSpan} rad at most`)
+		t.truthy(liftSpan < 0.03, `its tail bobs {liftSpan} rad over its whole length`)
+		t.truthy(bendStraight < 0.004, `its back stays straight ({bendStraight})`)
+		t.truthy(bendLow > 0.1, `in the turn the spine bends into it ({bendLow} to {bendHigh} rad)`)
+		t.truthy(bendHigh - bendLow < 0.012, `steadily ({bendHigh - bendLow} rad of shiver)`)
+	end)
+
 	t.test("the layers add: the squirrel gets this one, the Spicy Rodent this one on its twitches", function()
 		local seed = AnimationDriver.creepSeed("squirrel_1")
 		local live = Liveliness.new(seed, "rodent")

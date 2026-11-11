@@ -86,6 +86,10 @@ export type State = {
 	inPace: number,
 	inVy: number,
 	mode: string,
+	-- what comes in for a body that moves in steps, smoothed once before the rest (see P.smooth.steps)
+	preYaw: number,
+	prePace: number,
+	preVy: number,
 	-- smoothed input
 	w: number, -- yaw rate
 	wHead: number, -- yaw rate, smoothed less (the head goes first)
@@ -139,13 +143,16 @@ Liveliness.P = {
 	maxDt = 0.1, -- a longer frame is taken as this (a hitch never throws the springs)
 	teleport = 200, -- studs/s: a root that moves faster than this was put there, it did not travel
 	sprint = 33, -- studs/s: "a sprint" below (SquirrelMotor.params.sprint)
-	-- seconds of smoothing of what comes in: { a body drawn every frame, a body the server moves in steps }
+	-- seconds of smoothing of what comes in: { a body drawn every frame, a body the server moves in steps }.
+	-- A body moved ten times a second stands still for five frames and jumps on the sixth: its rates are
+	-- smoothed once more before these (`steps`), so that the jumps do not come through as a shiver.
 	smooth = {
 		yaw = { 0.04, 0.22 },
 		head = { 0.018, 0.22 },
 		pace = { 0.03, 0.2 },
 		accel = { 0.05, 0.25 },
 		vy = { 0.04, 0.2 },
+		steps = 0.15,
 	},
 	-- a turn (yaw rate, rad/s). A quarter turn of the mouse in 0.3 s is 5.1 rad/s at its peak.
 	turn = {
@@ -339,6 +346,9 @@ function Liveliness.new(seed: number, rig: string?): State
 		inPace = 0,
 		inVy = 0,
 		mode = "ground",
+		preYaw = 0,
+		prePace = 0,
+		preVy = 0,
 		w = 0,
 		wHead = 0,
 		pace = 0,
@@ -484,6 +494,7 @@ local function rest(st: State, input: Input)
 	st.live = true
 	st.inYaw, st.inPace, st.inVy = input.yawRate, input.pace or input.speed, input.vy
 	st.mode = input.mode
+	st.preYaw, st.prePace, st.preVy = input.yawRate, st.inPace, input.vy
 	st.w, st.wHead, st.pace, st.accel, st.vy = input.yawRate, input.yawRate, st.inPace, 0, input.vy
 	st.speed = input.speed
 	st.bend, st.bendV, st.head, st.headV, st.lean, st.leanV = 0, 0, 0, 0, 0, 0
@@ -566,6 +577,7 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 	local kPace = 1 - math.exp(-h / S.pace[coarse])
 	local kAccel = 1 - math.exp(-h / S.accel[coarse])
 	local kVy = 1 - math.exp(-h / S.vy[coarse])
+	local kSteps = if input.coarse then 1 - math.exp(-h / S.steps) else 1
 	local kPass = 1 - math.exp(-h / P.tail.pass)
 	local T, B, K = P.turn, P.brake, P.tail
 	local ba, bb, bc, bd = spring(T.bend.omega, T.bend.zeta, h)
@@ -591,6 +603,10 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 		local yawRate = yaw0 + (input.yawRate - yaw0) * u
 		local paceIn = pace0 + (rawPace - pace0) * u
 		local vyIn = vy0 + (input.vy - vy0) * u
+		st.preYaw += (yawRate - st.preYaw) * kSteps
+		st.prePace += (paceIn - st.prePace) * kSteps
+		st.preVy += (vyIn - st.preVy) * kSteps
+		yawRate, paceIn, vyIn = st.preYaw, st.prePace, st.preVy
 		-- what comes in, smoothed
 		st.w += (yawRate - st.w) * kYaw
 		st.wHead += (yawRate - st.wHead) * kHead
