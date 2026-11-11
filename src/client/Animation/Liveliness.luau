@@ -216,9 +216,12 @@ Liveliness.P = {
 		brakeMax = 1.0,
 		start = 0.0008,
 		startMax = 0.16,
-		-- in the air it trails: low behind a rise, high behind a fall (rad over the whole tail per studs/s)
-		air = 0.014,
-		airMax = 0.4,
+		-- in the air it trails: a little low behind a rise, high behind a fall (rad over the whole tail
+		-- per studs/s, and at most)
+		rise = 0.006,
+		riseMax = 0.16,
+		fall = 0.014,
+		fallMax = 0.4,
 		liftShare = { 0.3, 0.22, 0.15, 0.11, 0.08, 0.06, 0.05, 0.03 },
 		-- the ripple of a tail streaming at speed: rad per segment at the tip at a sprint, its frequency
 		-- (Hz) at rest and at a sprint, the phase from one segment to the next, and its share in pitch
@@ -631,7 +634,7 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 		-- the tail: what the root does reaches segment after segment, and each answers on its own spring
 		local lift = if accel < 0 then soft(K.brake * slowing, K.brakeMax) else -math.min(K.start * accel, K.startMax)
 		if inAir then
-			lift -= math.clamp(K.air * st.vy, -K.airMax, K.airMax)
+			lift += if st.vy > 0 then -math.min(K.rise * st.vy, K.riseMax) else math.min(-K.fall * st.vy, K.fallMax)
 		end
 		local turnIn, liftIn = w, lift
 		for i = 1, TAIL do

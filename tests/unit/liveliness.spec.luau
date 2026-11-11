@@ -393,7 +393,10 @@ return function(t: any)
 		t.truthy(noseUp > 0.15 and noseUp <= P.flight.max, `nose up {noseUp} rad on the way up`)
 		t.truthy(noseDown < -0.15 and noseDown >= -P.flight.max, `nose down {noseDown} rad on the way down`)
 		t.truthy(stretch < -0.05, `the back hollows {stretch} rad as it rises`)
-		t.truthy(tailLow > 0.2 and tailHigh < -0.2, `the tail trails the flight: low {tailLow}, then high {tailHigh}`)
+		t.truthy(
+			tailLow > 0.08 and tailHigh < -0.2,
+			`the tail trails the flight: a little low {tailLow}, then high {tailHigh}`
+		)
 		t.truthy(sinkMost < -0.06 and sinkMost >= P.land.min, `the landing sinks it {sinkMost} studs`)
 		t.truthy(sinkAt - 1.853 > 0.04 and sinkAt - 1.853 < 0.2, `{sinkAt - 1.853} s after the motor lands`)
 		t.truthy(bounce > 0.003 and bounce <= P.land.max, `and it comes back up past level ({bounce})`)
