@@ -14,7 +14,7 @@
 -- loudness and pitch taken from the model (LAB-S3): the click of a wall by how hard it was hit, the wooden
 -- rumble by how fast the marble rolls.
 -- Pure; Lune-tested (tests/unit/labyrinth_pilot.spec.luau).
--- Interface: BUFFER, HURRY, CUES; pose(board, run, before?, alpha?) -> Pose; cues(board, run) -> { Cue };
+-- Interface: BUFFER, HURRY, STALL, CUES; pose(board, run, before?, alpha?) -> Pose; cues(board, run) -> { Cue };
 --   rumble(run) -> (volume 0..1, pitch); watch(snapshot or nil, board?, hold?) -> Watch?; push(watch, start,
 --   text) -> (ok, why?); advance(watch, dt) -> ticks played (cues gather in watch.cues); ghost(board, hold,
 --   log) -> Watch?; boardOf(watch) -> Board
@@ -29,6 +29,7 @@ local Stream = {}
 
 Stream.BUFFER = 12 -- ticks a watcher stays behind the newest piece (0.2 s)
 Stream.HURRY = 45 -- with more than this many ticks waiting, a watcher plays two for one until it has caught up
+Stream.STALL = 0.4 -- seconds a watcher waits for a full buffer before playing what it has (the end of a run)
 Stream.MAX_WAITING = 1200 -- a watcher never holds more than this (a sender flooding it is cut off)
 
 -- every sound the game makes (MinigameSounds cue names; docs/AUDIO_BUDGET lists them when they are wired)
@@ -165,6 +166,8 @@ export type Watch = {
 	next: number, -- the tick the next piece must start at
 	debt: number, -- seconds of time not yet turned into ticks
 	buffer: number,
+	hurry: boolean, -- false for a ghost: a recording is played at its own pace
+	stalled: number, -- seconds it has waited with less than a buffer in hand
 	started: boolean, -- it has begun playing (it waits for BUFFER ticks first)
 	cues: { Cue }, -- one-shot sounds since the caller last emptied it
 }
@@ -190,6 +193,8 @@ function Stream.watch(snapshot: any, board: Boards.Board?, hold: number?): Watch
 		next = run.tick,
 		debt = 0,
 		buffer = Stream.BUFFER,
+		hurry = true,
+		stalled = 0,
 		started = false,
 		cues = {},
 	}
@@ -229,16 +234,25 @@ function Stream.advance(w: Watch, dt: number): number
 	local board = Boards.ALL[w.level]
 	local left = #w.waiting - w.head + 1
 	if not w.started then
-		if left < math.max(w.buffer, 1) then
+		if left <= 0 then
 			return 0
 		end
+		if left < w.buffer then
+			-- less than a buffer in hand: wait a little for more, then play what there is (the last ticks of
+			-- a run come with nothing after them)
+			w.stalled += dt
+			if w.stalled < Stream.STALL then
+				return 0
+			end
+		end
 		w.started = true
+		w.stalled = 0
 	end
 	w.debt = math.min(w.debt + dt, 0.25)
 	local played = 0
 	while w.debt >= Physics.TICK do
 		w.debt -= Physics.TICK
-		local burst = if left > Stream.HURRY then 2 else 1
+		local burst = if w.hurry and left > Stream.HURRY then 2 else 1
 		for _ = 1, burst do
 			if left <= 0 or Run.over(w.run) then
 				break
@@ -275,6 +289,7 @@ function Stream.ghost(board: Boards.Board, hold: number, log: any): Watch?
 	w.waiting = codes
 	w.next = #codes
 	w.buffer = 0
+	w.hurry = false
 	return w
 end
 

@@ -4,8 +4,8 @@
 -- The player's machine plays the model live from the keys, sends the log in pieces as it goes, and the server
 -- (and every watcher) replays the same pieces through the same model (C1, LAB-P6, LAB-S4). Keys are held for
 -- many ticks at a time, so the log is written as runs: a letter a..i for the code and how many ticks it was
--- held. "e30h4e12" is 30 ticks of nothing, 4 ticks of right-and-forward, 12 of nothing. A four-minute run of
--- steady play is a few hundred characters.
+-- held. "e30h4e12" is 30 ticks of nothing, 4 ticks of right-and-forward, 12 of nothing. A person's taps and
+-- holds come to about a character for every three or four ticks: a minute of play is a kilobyte.
 -- A piece (segment) names the tick it starts at, so a lost or doubled piece is noticed and never shifts the
 -- replay; it is at most SEGMENT_TICKS long, so nobody can make the server replay minutes in one call, and at
 -- most SEGMENT_CHARS characters (Net scalar strings are capped at 200).

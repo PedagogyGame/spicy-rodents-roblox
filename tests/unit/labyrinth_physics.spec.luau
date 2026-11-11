@@ -396,9 +396,9 @@ return function(t)
 						local dc = (now - 1) % board.cols - (was - 1) % board.cols
 						local dr = (now - 1) // board.cols - (was - 1) // board.cols
 						t.truthy(math.abs(dc) <= 1 and math.abs(dr) <= 1, "one cell at a time")
-						local function open(cell: number, c: number, r: number): boolean
+						local function open(from: number, c: number, r: number): boolean
 							local bit = if c == 1 then 1 elseif c == -1 then 4 elseif r == 1 then 2 else 8
-							return bit32.band(board.open[cell], bit) ~= 0
+							return bit32.band(board.open[from], bit) ~= 0
 						end
 						if dc ~= 0 and dr ~= 0 then
 							-- round a post: one of the two ways round must be open
