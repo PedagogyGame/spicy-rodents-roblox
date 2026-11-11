@@ -354,7 +354,7 @@ def main(argv):
     faces = [(f, e) for f in spec.FACES for e in spec.EXPRESSIONS]
     for i, (face, expr) in enumerate(faces):
         at = Atlas(res)
-        rgba, nrm, rough = bake(ht, lambda ch, P, N: paint.head(ch, P, N, expr, face), details["Head"])
+        rgba, nrm, rough = bake(ht, lambda ch, P, N: paint.head(ch, P, N, expr, face), details["Head"], ao_scale=0.45)
         at.put(ht, rgba, nrm, rough)
         at.finish()
         key = f"head_{face}_{expr}"
@@ -490,7 +490,7 @@ def main(argv):
         "units": "studs; positions in Roblox axes (+Y up, the person faces -Z); 'rootRelative' and 'center' are relative to the HumanoidRootPart's centre in the rest pose",
         "notes": [
             "Every mesh is rigid and exported in the rest pose, so a MeshPart's position in the loaded Model is its 'center'. Build the rig by creating one Motor6D per joint (Part0, Part1, C0 = CFrame.new(c0), C1 = CFrame.new(c1)), or by adding <Joint>RigAttachment pairs at those offsets and calling Humanoid:BuildRigFromAttachments.",
-            "Joint names, hierarchy and positions are the stock R15 block rig's, except that the elbows and wrists hang under the shoulder (x = 1.08 and 1.10) instead of on the block arm's centre line (x = 1.5, kept in 'stockBlockRig'): a round arm must pivot inside its own shoulder ball. The stock animations only rotate these joints.",
+            f"Joint names, hierarchy and positions are the stock R15 block rig's, except that the elbows and wrists hang under the shoulder (x = {spec.ARM_X_ELBOW} and {spec.ARM_X_WRIST}) instead of on the block arm's centre line (x = 1.5, kept in 'stockBlockRig'): a round arm must pivot inside its own shoulder ball. The stock animations only rotate these joints.",
             "HumanoidRootPart is not a mesh: a 2 x 2 x 1 transparent part at the origin; HipHeight 2 (the soles are 3 studs under its centre).",
             "Regions: every MeshPart's SurfaceAppearance uses AlphaMode Overlay (the importer's default). Set MeshPart.Color to the palette colour named by 'tints' (a RolePalettes look key: skin, shirt, pants, hair, cap; or a fixed '#rrggbb'); the colour map only darkens, lightens and inks detail on top.",
             "Left and right limbs share texture space (mirrored UVs); both builds share every UV layout, so any body_<build>_<outfit> SurfaceAppearance fits either build, and any Head_<face>_<expression> SurfaceAppearance fits the head (swap the SurfaceAppearance to change expression).",

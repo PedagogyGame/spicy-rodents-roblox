@@ -98,10 +98,10 @@ ATTACHMENTS = [
     ("WaistCenterAttachment", "LowerTorso", (0.0, -0.75, 0.0)),
     ("WaistFrontAttachment", "LowerTorso", (0.0, -0.75, -0.46)),
     ("WaistBackAttachment", "LowerTorso", (0.0, -0.75, 0.46)),
-    ("LeftShoulderAttachment", "LeftUpperArm", (-1.06, 1.03, 0.0)),
-    ("RightShoulderAttachment", "RightUpperArm", (1.06, 1.03, 0.0)),
-    ("PadAttachmentL", "LeftUpperArm", (-1.06, 1.03, 0.0)),
-    ("PadAttachmentR", "RightUpperArm", (1.06, 1.03, 0.0)),
+    ("LeftShoulderAttachment", "LeftUpperArm", (-1.0, 0.98, 0.0)),
+    ("RightShoulderAttachment", "RightUpperArm", (1.0, 0.98, 0.0)),
+    ("PadAttachmentL", "LeftUpperArm", (-1.0, 0.98, 0.0)),
+    ("PadAttachmentR", "RightUpperArm", (1.0, 0.98, 0.0)),
     ("LeftGripAttachment", "LeftHand", (-1.0, -1.0, -0.03)),
     ("RightGripAttachment", "RightHand", (1.0, -1.0, -0.03)),
     ("LeftFootAttachment", "LeftFoot", (-0.5, -3.0, 0.0)),
@@ -112,14 +112,14 @@ ATTACHMENTS = [
 # Both builds share the skeleton, the mesh topology and the UV layout (so one texture set dresses both).
 BUILDS = {
     "slim": dict(
-        chest_w=0.74, chest_d=0.42, chest_z=3.46, waist_w=0.62, waist_d=0.39, belly=0.0, yoke=0.80, yoke_r=0.235,
-        hip_r=0.312, pelvis_w=0.665, pelvis_d=0.415, thigh=0.29, knee=0.24, shin=0.222, calf=0.25, ankle=0.205,
-        shoulder=0.245, uarm=0.19, elbow=0.17, farm=0.158, wrist=0.142, hand=0.92, shoe=1.0,
+        chest_w=0.74, chest_d=0.42, chest_z=3.46, waist_w=0.63, waist_d=0.39, belly=0.0,
+        hip_r=0.302, pelvis_w=0.665, pelvis_d=0.415, thigh=0.29, knee=0.24, shin=0.222, calf=0.25, ankle=0.205,
+        shoulder=0.207, uarm=0.19, elbow=0.17, farm=0.158, wrist=0.142, hand=1.0, shoe=1.0,
     ),
     "broad": dict(
-        chest_w=0.82, chest_d=0.50, chest_z=3.42, waist_w=0.77, waist_d=0.52, belly=0.1, yoke=0.80, yoke_r=0.26,
+        chest_w=0.82, chest_d=0.50, chest_z=3.42, waist_w=0.77, waist_d=0.52, belly=0.1,
         hip_r=0.345, pelvis_w=0.81, pelvis_d=0.51, thigh=0.325, knee=0.27, shin=0.25, calf=0.28, ankle=0.218,
-        shoulder=0.27, uarm=0.215, elbow=0.192, farm=0.178, wrist=0.156, hand=0.98, shoe=1.05,
+        shoulder=0.232, uarm=0.215, elbow=0.192, farm=0.178, wrist=0.156, hand=1.06, shoe=1.05,
     ),
 }
 BUILD_ORDER = ["slim", "broad"]

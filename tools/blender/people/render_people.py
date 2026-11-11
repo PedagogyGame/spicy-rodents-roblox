@@ -319,7 +319,7 @@ def main(argv):
     for name, cam_az, sun_az, yaw in (("lineup_front", -90, -128, 22), ("lineup_back", 90, 52, 22)):
         if want and name not in want:
             continue
-        gap = 2.75
+        gap = 2.5
         labels = []
         for i, (role, idx, build, outfit, hair, pz) in enumerate(LINEUP):
             x = (i - (len(LINEUP) - 1) / 2) * gap * (1 if cam_az < 0 else -1)
@@ -332,7 +332,7 @@ def main(argv):
     # three faces
     for expr, role, idx, build, outfit, hair, pz, az in (
         ("calm", "townsperson", 4, "slim", "jacket", "long", "stand", -72),
-        ("worried", "officer", 3, "broad", "police", "short", "stand", -104),
+        ("worried", "doctor", 3, "broad", "coat", "parted", "stand", -104),
         ("frightened", "nurse", 6, "slim", "scrubs", "curly", "startled", -80),
     ):
         name = "face_" + expr

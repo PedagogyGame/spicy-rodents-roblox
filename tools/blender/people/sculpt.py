@@ -105,26 +105,32 @@ def above(z, k=0.012):
 
 # ---- torso ---------------------------------------------------------------------------------------
 
-SHOULDER_BALL = v(1.04, 0.0, 3.763)  # the arm's ball: 0.04 outboard of the stock shoulder pivot
+SHOULDER_BALL = v(*J["LeftShoulder"])  # the arm's ball is centred on the shoulder pivot itself
+YOKE_INSET = 0.012  # the torso's shoulder end is the same ball, this much smaller (always under the arm's)
+# torso columns (deg from the back): close together round each shoulder so the yoke's end is a true ball
+TORSO_PHIS = [0, 20, 40, 58, 72, 82, 90, 98, 108, 122, 140, 160, 180, 200, 220, 238, 252, 262, 270, 278, 288, 302, 320, 340]
 
 
 def upper_torso(b):
     cw, cd, ww, wd, bel = b["chest_w"], b["chest_d"], b["waist_w"], b["waist_d"], b["belly"]
-    yk, yr = b["yoke"], b["yoke_r"]
+    sh = b["shoulder"] - YOKE_INSET
+    # the shoulder line: from the base of the neck down to the arm's ball, ending in that same ball so
+    # the cloth runs from the collar over the shoulder into the sleeve without a step
+    yoke = RoundCone((0.2, 0.03, 3.985), tuple(SHOULDER_BALL), 0.165, sh, k=0.2)
     p = [
         Ellipsoid((0, 0.0, b["chest_z"]), (cw, cd, 0.60)),
         Ellipsoid((0, -bel * 0.55, 2.82), (ww, wd, 0.52), k=0.30),  # waist, belly
         Ellipsoid((0, -bel * 0.3, 2.44), (ww * 0.97, wd * 0.95, 0.30), k=0.18),  # the ball inside the trousers
-        RoundCone((-yk, 0.02, 3.82), (yk, 0.02, 3.82), yr, yr, k=0.22),  # shoulder yoke: its ends cap the arm balls
-        RoundCone((-0.36, 0.05, 3.92), (0.36, 0.05, 3.92), 0.19, 0.19, k=0.22),  # the slope up to the neck
+        yoke, yoke.mirrored(),
+        RoundCone((-0.3, 0.05, 3.93), (0.3, 0.05, 3.93), 0.19, 0.19, k=0.22),  # the slope up to the neck
         Ellipsoid((0, 0.02, 4.0), (0.31, 0.295, 0.12), k=0.08),  # collar stand round the neck
         Ellipsoid((0, -cd * 0.62, b["chest_z"] + 0.02), (cw * 0.72, cd * 0.5, 0.3), k=0.25),  # chest fullness
     ]
     top = v(0, 0.02, 3.84)
     rings = [(top, 0.0), (top, 32.0), (top, 56.0), (top, 76.0)]
-    rings += [(v(0, 0, z), 90.0) for z in (3.82, 3.62, 3.40, 3.15, 2.90, 2.68, 2.50)]
+    rings += [(v(0, 0, z), 90.0) for z in (3.86, 3.763, 3.66, 3.54, 3.36, 3.15, 2.90, 2.68, 2.50)]
     rings += [(v(0, 0, 2.44), 112.0), (v(0, 0, 2.44), 135.0), (v(0, 0, 2.44), 180.0)]
-    ch = mesher.ring_stack("UpperTorso", rings, seam=(0, 1, 0), phis=np.arange(20) * 18.0)
+    ch = mesher.ring_stack("UpperTorso", rings, seam=(0, 1, 0), phis=TORSO_PHIS)
     return [Comp("main", p, ch, drop_b=1)]
 
 
@@ -143,6 +149,12 @@ def lower_torso(b):
 
 # ---- legs ----------------------------------------------------------------------------------------
 
+def inner_thigh(b, grow=0.0):
+    """The inside of the thigh: the stock hips are a whole stud apart, so without it the legs are two
+    posts with daylight up to the belt. It stays on its own side of the midline (legs swing about X)."""
+    return RoundCone((0.335, 0.0, 1.85), (0.455, 0.0, 1.24), 0.25 + grow, b["knee"] * 0.9 + grow, k=0.12)
+
+
 def upper_leg(b):
     hip, knee = v(*J["LeftHip"]), v(*J["LeftKnee"])
     hr = b["hip_r"]
@@ -150,6 +162,7 @@ def upper_leg(b):
         Ellipsoid(hip, (hr, hr, hr)),  # the hip: a ball over the pelvis, so the seat moves with the leg
         RoundCone(hip - v(0, 0, 0.12), knee, b["thigh"], b["knee"], k=0.14),
         Ellipsoid((0.5, 0.07, 1.98), (hr * 0.9, hr * 0.98, hr * 0.92), k=0.1),  # the seat
+        inner_thigh(b),
     ]
     ch = mesher.capsule("UpperLeg", hip, knee, seam=(-1, 0, 0), ncols=12, caps_a=[30, 60, 90], mids=[0.22, 0.46, 0.72],
                         caps_b=[30, 60, 90])
@@ -196,7 +209,7 @@ def upper_arm(b):
         Ellipsoid(c, (b["shoulder"],) * 3),
         RoundCone(c - v(0, 0, 0.06), el, b["uarm"], b["elbow"], k=0.1),
     ]
-    ch = mesher.capsule("UpperArm", c, el, seam=(-1, 0, 0), ncols=10, caps_a=[30, 60, 90], mids=[0.34, 0.68],
+    ch = mesher.capsule("UpperArm", c, el, seam=(-1, 0, 0), ncols=10, caps_a=[22, 45, 68, 90], mids=[0.34, 0.68],
                         caps_b=[30, 60, 90])
     return [Comp("main", p, ch)]
 
@@ -240,7 +253,7 @@ def hand(b, detail=False):
     ch = mesher.capsule("Hand", a, bb, seam=R @ v(0, 1, 0), ncols=12, caps_a=[58, 90], mids=[0.3, 0.55, 0.8],
                         caps_b=[30, 60, 90], phis=phis)
     cht = mesher.capsule("Thumb", tb, tt, seam=(1, 0, 0), ncols=6, caps_a=[90], mids=[0.5], caps_b=[45, 90])
-    return [Comp("main", lo, ch, hi=hi, drop_a=1), Comp("thumb", thumb, cht, drop_a=1)]
+    return [Comp("main", lo, ch, hi=hi, drop_a=1), Comp("thumb", thumb, cht)]  # closed at its base: the rim can show past the palm
 
 
 # ---- head ----------------------------------------------------------------------------------------
@@ -252,7 +265,7 @@ FACE = dict(eye_x=0.225, eye_z=4.85, brow_z=5.01, nose_z=4.70, mouth_z=4.49, chi
 # column azimuths from the front (deg): close together over the nose, wide round the back
 _FRONT = [0, 7, 14, 22, 31, 42, 55, 70, 87, 105, 124, 144, 163]
 HEAD_PHIS = sorted({(180 + a) % 360 for a in _FRONT} | {(180 - a) % 360 for a in _FRONT} | {0.0})
-HEAD_THETAS = [14, 28, 42, 54, 64, 72, 80, 87, 93, 98, 104, 110, 117, 125, 134, 144, 156, 168]
+HEAD_THETAS = [14, 28, 42, 54, 64, 72, 80, 87, 93, 98, 104, 110, 117, 124, 130, 136, 142, 149, 157, 168]
 
 
 def head(detail=False):
@@ -275,11 +288,8 @@ def head(detail=False):
     ]
     hi = None
     if detail:
-        hole = Ellipsoid((0.045, -0.68, 4.642), (0.02, 0.03, 0.014), k=0.02, op="sub")
         hi = p + [
-            hole, hole.mirrored(),
-            RoundCone((0, -0.655, 4.60), (0, -0.65, 4.56), 0.018, 0.024, k=0.03, op="sub"),  # philtrum
-            Ellipsoid((0, -0.575, 4.405), (0.08, 0.04, 0.025), k=0.05, op="sub"),  # under the lip
+            RoundCone((0, -0.655, 4.60), (0, -0.65, 4.565), 0.014, 0.018, k=0.03, op="sub"),  # philtrum
         ]
     ch = mesher.globe("Head", HEAD_C, pole=(0, 0, 1), seam=(0, 1, 0), thetas=HEAD_THETAS, phis=HEAD_PHIS,
                       emphasis=lambda ph: 1.55 if abs(ph - 180) < 62 else 1.0)
@@ -309,7 +319,8 @@ def coat_tail(b):
     hip, knee = v(*J["LeftHip"]), v(*J["LeftKnee"])
     r = b["hip_r"] + 0.04
     p = [Ellipsoid(hip, (r, r, r)), RoundCone(hip, hip + (knee - hip) * 0.7, r - 0.01, b["thigh"] + 0.075, k=0.05),
-         Ellipsoid((0.5, 0.075, 1.98), (r * 0.9, r * 0.98, r * 0.92), k=0.1), below(hip[2] - 0.5, k=0.016)]
+         Ellipsoid((0.5, 0.075, 1.98), (r * 0.9, r * 0.98, r * 0.92), k=0.1), inner_thigh(b, 0.04),
+         below(hip[2] - 0.5, k=0.016)]
     ch = mesher.capsule("CoatTail", hip, hip + (knee - hip) * 0.56, seam=(-1, 0, 0), ncols=12, caps_a=[35, 65, 90],
                         mids=[0.4, 0.8], caps_b=[30, 52, 90])
     return [Comp("main", p, ch, drop_a=1)]
