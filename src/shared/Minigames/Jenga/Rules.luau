@@ -312,11 +312,9 @@ local function step(state: State)
 		state.sample -= 1
 		if state.sample <= 0 then
 			state.sample = View.STEPS
-			local brain = state.brain
-			if not brain then
-				brain = Bots.new(state.computer[seat] or "idle", state.seed * 13 + state.turnIndex * 101 + seat)
-				state.brain = brain
-			end
+			local brain: Bots.Brain = state.brain
+				or Bots.new(state.computer[seat] or "idle", state.seed * 13 + state.turnIndex * 101 + seat)
+			state.brain = brain
 			local verb, args = Bots.act(brain, tw, state.phase, View.STEPS * DT)
 			if verb then
 				apply(state, verb, args or {})

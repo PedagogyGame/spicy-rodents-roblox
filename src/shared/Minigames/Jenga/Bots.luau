@@ -403,7 +403,8 @@ function Bots.act(brain: Brain, tw: Tower.Tower, phase: string, dt: number): (st
 			brain.goal = math.clamp(brain.goal, b.along - Bots.LEAD, b.along + Bots.LEAD)
 			brain.phase += dt * 7
 			local lateral = S.wobble * (math.sin(brain.phase) + (draw(brain) - 0.5))
-			return "pull", { level, slot, brain.goal, lateral, brain.push }
+			local args: { any } = { level, slot, brain.goal, lateral, brain.push }
+			return "pull", args
 		end
 		return nil
 	elseif phase == "place" then

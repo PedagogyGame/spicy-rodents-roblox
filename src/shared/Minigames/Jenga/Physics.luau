@@ -37,6 +37,7 @@ Physics.DT = 1 / Physics.RATE
 Physics.MU_K = 0.30 -- sliding friction of timber on timber at a crawl
 Physics.MU_S = 0.42 -- static friction: what must be overcome to start a block
 Physics.V_REF = 3 -- studs/s: sliding friction doubles at this speed (rough faces catch)
+Physics.V_STICK = 0.25 -- studs/s: a sliding block slower than this catches again
 Physics.KH = 1800 -- the arm's spring, force per stud of stretch
 Physics.MAX_FORCE = 15 * Layout.GRAVITY -- the hardest a hand pulls: fifteen block-weights
 Physics.MAX_HAND_SPEED = 8 -- studs/s
@@ -287,12 +288,11 @@ function Physics.step(tw: Tower.Tower)
 				moved = 0
 				tw.sliding = false
 			else
-				if not tw.sliding then
-					tw.sliding = true
-					if an.load[b.id] > Physics.CREAK_LOAD * G then
-						Tower.emit(tw, "creak", b.id, an.load[b.id] / G)
-					end
+				if not tw.sliding and an.load[b.id] > Physics.CREAK_LOAD * G then
+					Tower.emit(tw, "creak", b.id, an.load[b.id] / G)
 				end
+				-- slower than this and it catches again: a block drawn slowly comes in jerks
+				tw.sliding = moved > Physics.V_STICK * DT
 				if moved > a then
 					moved = a
 				end
