@@ -126,7 +126,7 @@ def main():
         text(dr, (16, 12), "Two builds on one rig, beside a 5.5-stud staff", font(20), anchor="la")
         save(im, os.path.join(a.out, "scale.jpg"))
     if have("hair_0", "hair_1"):
-        save(vstack([labelled(d, "hair_0", size=20, where="at"), labelled(d, "hair_1", size=20, where="at")]), os.path.join(a.out, "hair_hats.jpg"))
+        save(vstack([labelled(d, "hair_0", size=16, where="at"), labelled(d, "hair_1", size=16, where="at")]), os.path.join(a.out, "hair_hats.jpg"))
 
 
 if __name__ == "__main__":

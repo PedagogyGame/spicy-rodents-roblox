@@ -330,18 +330,18 @@ def main(argv):
         shoot(name, (1600, 560), labels)
 
     # three faces
-    for expr, role, idx, build, outfit, hair, pz, az in (
-        ("calm", "townsperson", 4, "slim", "jacket", "long", "stand", -72),
-        ("worried", "doctor", 3, "broad", "coat", "parted", "stand", -104),
-        ("frightened", "nurse", 6, "slim", "scrubs", "curly", "startled", -80),
+    for expr, role, idx, build, outfit, hair, pz, az, dist, aim in (
+        ("calm", "townsperson", 4, "slim", "jacket", "long", "stand", -72, 7.4, 4.72),
+        ("worried", "doctor", 3, "broad", "coat", "short", "stand", -104, 7.4, 4.72),
+        ("frightened", "nurse", 6, "slim", "scrubs", "curly", "startled", -80, 9.4, 4.5),  # wider: the raised hands
     ):
         name = "face_" + expr
         if want and name not in want:
             continue
         st.person(role, idx, build, outfit, hair, expression=expr, pose=pz)
         aim_sun(sun, fill, -128 if az > -90 else -52, 40)
-        place(cam, (0, -0.08, 4.72), 7.4, az, 3, 100)
-        shoot(name, (533, 640), [(expr.capitalize(), (0, 0, 3.9))])
+        place(cam, (0, -0.08, aim), dist, az, 3, 100)
+        shoot(name, (533, 640), [(expr.capitalize(), (0, 0, aim - 0.82 * dist / 7.4))])
 
     if not want or "run" in want:
         st.person("townsperson", 6, "slim", "jacket", "ponytail", pose="run", yaw=0, look={"shirt": "#9b4a4a"})
@@ -362,7 +362,7 @@ def main(argv):
         st.person("doctor", 3, "broad", "coat", "parted", pose="sit", at=(0, 0), yaw=0)
         aim_sun(sun, fill, -125)
         place(cam, (0.0, -0.3, 2.05), 12.5, -52, 9, 75)
-        shoot("sit", (800, 760), [("Sitting", (0, 0, 0))])
+        shoot("sit", (800, 760), [("Sitting", (0.9, -1.9, 0))])
 
     if not want or "scale" in want:
         sx = -4.2
@@ -382,7 +382,7 @@ def main(argv):
         aim_sun(sun, fill, -122)
         place(cam, (2.2, 0, 2.85), 56, -90, 3, 100)
         bx = sx - 2.9 + 1.2
-        labels = [(f"{k} studs" if k else "0", (bx - 0.25, 0, float(k) - 0.02)) for k in range(0, 6)] + [("5.5 studs", (bx - 0.25, 0, 5.48))]
+        labels = [("0" if k == 0 else ("1 stud" if k == 1 else f"{k} studs"), (bx - 0.25, 0, float(k) - 0.02)) for k in range(0, 6)] + [("5.5 studs", (bx - 0.25, 0, 5.48))]
         labels += [("Slim build", (sx + 2.9 * 2, 0, 0)), ("Broad build", (sx + 2.9 * 4.5, 0, 0))]
         shoot("scale", (1600, 620), labels)
 

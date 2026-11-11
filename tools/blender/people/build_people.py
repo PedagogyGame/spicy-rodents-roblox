@@ -281,7 +281,7 @@ def main(argv):
     ap.add_argument("--res", type=int, default=1024)
     ap.add_argument("--outfits", default="all")
     ap.add_argument("--no-fbx", action="store_true")
-    ap.add_argument("--quick", action="store_true", help="512 px maps, calm faces only")
+    ap.add_argument("--quick", action="store_true", help="512 px maps (a 90-second build for looking at shapes)")
     opts = ap.parse_args(argv)
     out = os.path.abspath(opts.out)
     res = 512 if opts.quick else opts.res

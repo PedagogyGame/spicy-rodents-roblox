@@ -213,6 +213,9 @@ def main(argv):
         top = b["parts"]["Head"]["center"][1] + b["parts"]["Head"]["size"][1] / 2 + spec.ROOT_HEIGHT
         hair_top = max(i["center"][1] + i["size"][1] / 2 for i in man["headwear"]["items"].values() if i["kind"] == "hair") + spec.ROOT_HEIGHT
         report[build] = {"triangles": t, "scalp": round(top, 3), "tallest_hair": round(hair_top, 3)}
+        # where the rig is NOT the stock block rig's (the manifest keeps the stock position beside its own)
+        report[build]["off_stock_rig"] = {jn: {"here": j["position"], "stock": j["stockBlockRig"]}
+                                          for jn, j in b["joints"].items() if "stockBlockRig" in j}
         if len(rest_meshes[build]) == len(spec.PARTS):
             gaps, gap_fails = joint_gaps(rest_meshes[build], b)
             report[build]["joints"] = gaps

@@ -744,7 +744,7 @@ def head(chart, P, N, expression, face="plain"):
 # ---- hair and hats -----------------------------------------------------------------------------------
 
 def hair(chart, P, N, style):
-    c = Canvas(len(P), rough=0.5)
+    c = Canvas(len(P), rough=0.6)
     crown = np.array([0.0, 0.05, 5.5], dtype=F32)
     if style == "parted":
         crown = np.array([-0.26, 0.0, 5.48], dtype=F32)
@@ -761,11 +761,11 @@ def hair(chart, P, N, style):
         c.tone(cells - 0.5, 0.32)
         c.h += 0.012 * tx.strands(P, flow, 0.012, 0.05, seed=4)
         return c
-    fine = tx.strands(P, flow, 0.009, 0.16, seed=1)
-    clump = tx.strands(P, flow, 0.035, 0.34, seed=2)
+    fine = tx.strands(P, flow, 0.014, 0.15, samples=17, seed=1)
+    clump = tx.strands(P, flow, 0.04, 0.34, samples=15, seed=2)
     c.tone(fine - 0.5, 0.13)
     c.tone(clump - 0.5, 0.2)
-    c.h += 0.006 * fine + 0.016 * clump
+    c.h += 0.004 * fine + 0.012 * clump
     c.tone(band(P[:, 2], 5.2, 5.36, 0.07) * sstep(0.1, 0.6, N[:, 2]), 0.12)  # the sheen across the top
     if style == "balding":
         c.ink(tx.strands(P, flow, 0.014, 0.2, seed=8) > 0.42, (0.86, 0.86, 0.84), 0.5)  # grey
