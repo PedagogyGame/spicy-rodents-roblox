@@ -134,6 +134,51 @@ return function(t)
 		end
 		t.truthy(kinds.fortune and kinds.taunt and kinds.omen)
 	end)
+	t.test("leaving at the end card keeps every sheet under its own name", function()
+		local s = Session.new(Bowling, { lobbySeconds = 5, turnSeconds = 0, doneSeconds = 30 })
+		Session.join(s, "a", "Ann", 0)
+		Session.join(s, "b", "Bob", 0)
+		Session.start(s, 1)
+		-- Ann bowls a perfect game, Bob never hits a pin
+		local guard = 0
+		while s.phase == "playing" and guard < 100 do
+			guard += 1
+			local pins = if Session.turnKey(s) == "a" then 10 else 0
+			t.truthy(Session.apply(s, "server", "roll", { pins }, 2))
+			Session.step(s, 2)
+		end
+		t.eq(s.phase, "done")
+		t.eq((s.result :: any).scores[1], 300)
+		t.eq((s.result :: any).scores[2], 0)
+		-- Ann presses Leave on the end card first
+		t.eq(Session.leave(s, "a", 3), 1)
+		t.eq(s.phase, "done", "Bob still has the card")
+		t.eq(Session.seatOf(s, "a"), nil)
+		t.eq(Session.seatOf(s, "b"), 2, "Bob keeps the seat his sheet is numbered by")
+		local v = Session.view(s, 3)
+		t.eq(v.seats[2].name, "Bob")
+		t.eq(v.game.seats[2].total, 0, "Bob's sheet is still Bob's")
+		t.eq(v.seats[1].name, "Ann")
+		t.eq(v.seats[1].gone, true)
+		t.eq(v.game.seats[1].total, 300)
+		t.eq(v.result.scores[2], 0)
+		-- play again seats only who stayed
+		t.truthy(Session.again(s, 4))
+		t.eq(#s.seats, 1)
+		t.eq(s.names[1], "Bob")
+		t.eq(Session.seatOf(s, "b"), 1)
+		-- the last one off the end card empties the table
+		local s2 = Session.new(Bowling, { lobbySeconds = 0, turnSeconds = 0 })
+		Session.join(s2, "a", "Ann", 0)
+		for _ = 1, 12 do
+			Session.apply(s2, "server", "roll", { 10 }, 1)
+		end
+		t.eq(s2.phase, "done")
+		Session.leave(s2, "a", 2)
+		t.eq(s2.phase, "idle")
+		t.eq(#s2.seats, 0)
+	end)
+
 	t.test("the end of a game is announced exactly once, however it ended", function()
 		-- ended by the last input (the usual way): step says "done" once, later "reset"
 		local s = Session.new(Bowling, { lobbySeconds = 0, turnSeconds = 60, doneSeconds = 30 })

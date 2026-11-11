@@ -180,13 +180,15 @@ local function anyoneLeft(s: Session): boolean
 end
 
 -- leave: off the table. In the lobby the seat is removed; mid-game it is marked gone and its turns are
--- played out as misses. Returns the seat that was left (nil if not seated).
+-- played out as misses. At the end card it is marked gone too, never removed: the finished game's sheets and
+-- result are numbered by the seats that played it, so moving the others up would put the leaver's score
+-- under the next player's name. Returns the seat that was left (nil if not seated).
 function Session.leave(s: Session, key: any, _now: number): number?
 	local seat = Session.seatOf(s, key)
 	if seat == nil then
 		return nil
 	end
-	if s.phase == "lobby" or s.phase == "done" then
+	if s.phase == "lobby" then
 		table.remove(s.seats, seat)
 		table.remove(s.names, seat)
 		-- seats after it move up one (the gone flags follow them)

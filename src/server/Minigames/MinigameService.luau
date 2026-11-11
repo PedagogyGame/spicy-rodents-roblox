@@ -525,7 +525,22 @@ function MinigameService.join(self: any, player: any, id: string): (boolean, str
 			end
 			Session.reset(s)
 		end
+	elseif s.phase == "done" and Session.seatOf(s, player) == nil then
+		-- a newcomer at a lane or board still showing its end card starts a fresh table (Session.join). Whoever
+		-- is still reading that card is told and let go; otherwise their card would stay up for good with
+		-- nothing behind it, and they could not walk up to any other game
+		for _, p in self:_seated(st) do
+			self.playerStation[p] = nil
+			st.seen[p] = nil
+			self:fire(p, {
+				kind = "left",
+				station = id,
+				why = "finished",
+				text = `A new game is starting on {st.label}: that one is over`,
+			})
+		end
 	end
+	local was = s.phase
 	local ok, why, seat = Session.join(s, player, nameOf(player), self.clock)
 	if not ok then
 		self:fire(player, { kind = "refused", text = why or "cannot join" })
@@ -543,7 +558,9 @@ function MinigameService.join(self: any, player: any, id: string): (boolean, str
 	})
 	if st.kind == "fortune" then
 		self:_pull(st, player)
-	elseif s.phase == "playing" then
+	elseif s.phase == "playing" and was ~= "playing" then
+		-- only the join that STARTED the game sets the lane up. A bowler already seated who triggers the prompt
+		-- again mid-frame must not get ten fresh pins (their open frame would become a certain spare)
 		self:_onStart(st)
 	end
 	st.dirty = true

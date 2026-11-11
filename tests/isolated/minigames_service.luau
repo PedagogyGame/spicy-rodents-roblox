@@ -13,7 +13,9 @@ local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local Bowling = require("@shared/Minigames/MinigameRules/Bowling")
 local Intruders = require("@shared/Minigames/Bowling/Intruders")
 local PartPose = require("@shared/Minigames/Bowling/PartPose")
+local Referee = require("@shared/Minigames/Bowling/Referee")
 local RollScript = require("@shared/Minigames/Bowling/RollScript")
+local Session = require("@shared/Minigames/Session")
 local MinigameService = require("@server/Minigames/MinigameService")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local roblox = require("@lune/roblox")
@@ -528,6 +530,171 @@ return function(t)
 			end
 			t.eq(s.phase, "done")
 			t.truthy(string.find(refused(ann, "release", POCKET), "game is over", 1, true) ~= nil)
+		end)
+	end)
+
+	-- scripted pinfalls for whoever is up until the game ends: pinsFor(seat) says how many each ball takes
+	local function playOut(w: World, s: any, pinsFor: (seat: number) -> number)
+		local guard = 0
+		while s.phase == "playing" and guard < 100 do
+			guard += 1
+			untilReady(w)
+			local seat = s.game.rules.turn(s.game.state)
+			assert(w.svc:debugRoll(LANE, math.min(pinsFor(seat), s.game.state.pinsUp)))
+			untilReady(w)
+		end
+		step(w, 0.3)
+	end
+
+	t.test(
+		"the first to leave the end card takes no one's score with them: every sheet stays under its name",
+		function()
+			FakeEngine.with(function()
+				local w = world()
+				local ann, bob = stub("Ann"), stub("Bob")
+				local s = seated(w, { ann, bob })
+				playOut(w, s, function(seat: number): number
+					return if seat == 1 then 10 else 0
+				end)
+				t.eq(s.phase, "done")
+				t.deepEq(s.result.scores, { 300, 0 })
+				t.eq(
+					last(bob, "event", function(e)
+						return e.over == true
+					end).text,
+					"Ann wins with 300!"
+				)
+				-- Ann presses Leave on the end card
+				t.truthy(input(w, ann, "leave"))
+				step(w, 1.2)
+				t.eq(s.phase, "done", "Bob still has the end card")
+				local st = last(bob, "state")
+				t.eq(st.you, 2, "Bob is still seat 2, the seat his sheet is numbered by")
+				local sum = Referee.summary(st.view)
+				t.eq(#sum.rows, 2)
+				t.eq(sum.rows[1].name, "Ann")
+				t.eq(sum.rows[1].total, 300)
+				t.eq(sum.rows[1].gone, true)
+				t.eq(sum.rows[2].name, "Bob")
+				t.eq(sum.rows[2].total, 0)
+				t.eq(sum.line, "Ann wins with 300!")
+				-- the monitor over the lane still pairs each name with its own total
+				local monitor = w.root:FindFirstChild("Scoreboards"):FindFirstChild("Lane3"):FindFirstChild("Screen")
+				local texts: { string } = {}
+				for _, d in monitor:GetDescendants() do
+					if d.ClassName == "TextLabel" then
+						table.insert(texts, tostring(d.Text))
+					end
+				end
+				local all = table.concat(texts, "|")
+				t.truthy(string.find(all, "Bob", 1, true) ~= nil and string.find(all, "300", 1, true) ~= nil)
+				-- Bob plays again alone: a fresh sheet in seat 1
+				t.truthy(input(w, bob, "again"))
+				t.eq(#s.seats, 1)
+				t.eq(s.names[1], "Bob")
+				t.deepEq(rolls(s, 1), {})
+			end)
+		end
+	)
+
+	t.test("a newcomer at a lane showing its end card: whoever is still on the card is told and let go", function()
+		FakeEngine.with(function()
+			local w = world()
+			local ann, bob = stub("Ann"), stub("Bob")
+			local s = seated(w, { ann })
+			playOut(w, s, function(_seat: number): number
+				return 10
+			end)
+			t.eq(s.phase, "done")
+			t.eq(s.result.scores[1], 300)
+			t.eq(w.svc:stationOf(ann), LANE)
+			-- Bob walks up and presses E while Ann's card is still up
+			t.truthy(w.svc:join(bob, LANE))
+			t.eq(s.phase, "lobby")
+			t.eq(Session.seatOf(s, bob), 1)
+			t.eq(w.svc:stationOf(ann), nil, "Ann is no longer held at the lane")
+			local left = last(ann, "left")
+			t.truthy(left ~= nil, "Ann is told")
+			t.eq(left.why, "finished")
+			t.eq(left.station, LANE)
+			t.truthy(string.find(left.text, "new game is starting", 1, true) ~= nil)
+			-- her old Play again is refused in words, not swallowed
+			local okAgain, whyAgain = input(w, ann, "again")
+			t.falsy(okAgain)
+			t.truthy(string.find(whyAgain :: string, "walk up and press E", 1, true) ~= nil)
+			-- and she is free to walk up and join Bob's lobby (or any other game)
+			t.truthy(w.svc:join(ann, LANE))
+			t.eq(#s.seats, 2)
+			t.eq(w.svc:stationOf(ann), LANE)
+			-- someone already on the card who presses E again is not thrown off it
+			local w2 = world()
+			local cat = stub("Cat")
+			local s2 = seated(w2, { cat })
+			playOut(w2, s2, function(_seat: number): number
+				return 0
+			end)
+			t.eq(s2.phase, "done")
+			t.truthy(w2.svc:join(cat, LANE))
+			t.eq(s2.phase, "done")
+			t.eq(w2.svc:stationOf(cat), LANE)
+			t.eq(last(cat, "left"), nil)
+		end)
+	end)
+
+	t.test("a seated bowler who triggers the lane's prompt again mid-frame keeps the pins they left", function()
+		FakeEngine.with(function()
+			local w = world()
+			local ann, bob = stub("Ann"), stub("Bob")
+			local s = seated(w, { ann, bob })
+			t.truthy(input(w, ann, "release", THIN))
+			local first = w.all[#w.all].script
+			t.truthy(first.down > 0 and first.down < 10, `the thin ball took {first.down}`)
+			untilReady(w)
+			local up = 10 - first.down
+			t.eq(lane(w):standingCount(), up)
+			local mask = lane(w):standingMask()
+			local gameOns = 0
+			for _, e in ann.events do
+				if e.kind == "event" and e.text == "Game on!" then
+					gameOns += 1
+				end
+			end
+			t.eq(gameOns, 1)
+			local racks = 0
+			for _, m in w.all do
+				if m.kind == "rack" then
+					racks += 1
+				end
+			end
+			-- a client that fires the prompt although it is switched off while playing: the bowler, then the
+			-- one who is waiting
+			t.truthy(w.svc:join(ann, LANE))
+			t.truthy(w.svc:join(bob, LANE))
+			step(w, 0.5)
+			t.eq(s.phase, "playing")
+			t.eq(lane(w):standingCount(), up, "no fresh rack")
+			t.deepEq(lane(w):standingMask(), mask)
+			t.eq(s.game.state.pinsUp, up)
+			t.deepEq(rolls(s, 1), { first.down })
+			local after = 0
+			for _, e in ann.events do
+				if e.kind == "event" and e.text == "Game on!" then
+					after += 1
+				end
+			end
+			t.eq(after, 1, "the game is not announced a second time")
+			for _, m in w.all do
+				if m.kind == "rack" then
+					racks -= 1
+				end
+			end
+			t.eq(racks, 0, "and no client is told the lane was re-racked")
+			-- the second ball is thrown at what was left, and scored as that
+			t.truthy(input(w, ann, "release", THIN))
+			local second = w.all[#w.all].script
+			untilReady(w)
+			t.deepEq(rolls(s, 1), { first.down, second.down })
+			t.truthy(first.down + second.down <= 10)
 		end)
 	end)
 
