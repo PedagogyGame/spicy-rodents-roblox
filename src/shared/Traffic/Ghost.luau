@@ -36,7 +36,18 @@ Ghost.BIT_BEACONS = 2
 Ghost.BIT_TELEPORTED = 4
 Ghost.BIT_STOPPED = 8
 Ghost.SPEED_STEP = 0.5 -- studs/s per speed byte (max 127.5 st/s; the fastest vehicle is 67.5)
-Ghost.DELAY = 0.1 -- render 100 ms behind the newest snapshot
+Ghost.DELAY = 0.13 -- render this far behind the newest snapshot (about two sends)
+-- Owner 2026-11-10: "some of the cars are glitching out". Snapshots were timed by when each packet
+-- ARRIVED, with barely one send interval of buffer: a late or lost packet froze every car and the next
+-- one threw it forward. Three things now keep cars moving evenly:
+--   * each send carries the server's own clock in a stamp record (id STAMP_ID, the seconds in x);
+--     Ghost.newClock turns stamps into local times with the smallest delay seen, so snapshots are spaced
+--     as the server spaced them however the packets bunch up
+--   * when the newest snapshot is older than the render time, a moving car carries on along its last
+--     seen velocity for up to EXTRAPOLATE seconds (a stopped car has no velocity, so it does not creep)
+--   * on a slope the car pitches with the road (the height under its front and rear), not flat
+Ghost.STAMP_ID = 65535
+Ghost.EXTRAPOLATE = 0.12
 
 local TAU = 2 * math.pi
 
@@ -87,6 +98,45 @@ local function lerpAngle(a: number, b: number, t: number): number
 	return a + d * t
 end
 
+-- stamp(serverSeconds): the record that carries the server's clock in a send.
+function Ghost.stamp(serverSeconds: number): { [string]: number }
+	return { id = Ghost.STAMP_ID, x = serverSeconds, z = 0, yaw = 0, speed = 0, bits = 0 }
+end
+
+-- takeStamp(records): removes the stamp record from a decoded send and returns its seconds (nil when the
+-- server sent none).
+function Ghost.takeStamp(records: { { [string]: number } }): number?
+	for i = #records, 1, -1 do
+		if records[i].id == Ghost.STAMP_ID then
+			local s = records[i].x
+			table.remove(records, i)
+			return s
+		end
+	end
+	return nil
+end
+
+-- A clock that places server stamps on the local timeline: stamp + the smallest (arrival - stamp) seen
+-- lately. The least-delayed packet defines the offset, so jitter never moves a snapshot; the offset is
+-- allowed to drift up slowly, so a clock that falls behind recovers.
+export type StampClock = { offset: number?, localTime: (self: StampClock, stamp: number, arrival: number) -> number }
+function Ghost.newClock(): StampClock
+	return {
+		offset = nil,
+		localTime = function(self: StampClock, stamp: number, arrival: number): number
+			local d = arrival - stamp
+			local o = self.offset
+			if o == nil or d < o or d > o + 2 then
+				o = d -- the first packet, a less delayed one, or a server restart
+			else
+				o += 0.0002 -- drift toward later arrivals by 0.2 ms per send
+			end
+			self.offset = o
+			return stamp + o
+		end,
+	}
+end
+
 function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 	local o: { delay: number?, keep: number? } = opts or {}
 	local keep = o.keep or 12
@@ -115,7 +165,36 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 				return snaps[1].poses
 			end
 			if rt >= snaps[n].t then
-				return snaps[n].poses -- hold the newest (no extrapolation: a stopped car must not creep)
+				-- starved (a late or lost send): carry each moving car on along the velocity of its last
+				-- two snapshots for a moment; a car that was not moving stays exactly where it is
+				local newest = snaps[n]
+				local before = snaps[n - 1]
+				local ahead = math.min(rt - newest.t, Ghost.EXTRAPOLATE)
+				if before == nil or ahead <= 0 or newest.t - before.t <= 1e-3 then
+					return newest.poses
+				end
+				local span = newest.t - before.t
+				local out = {}
+				for id, pb in newest.poses do
+					local pa = before.poses[id]
+					if pa == nil or pb.teleported or pb.stopped or not pa.visible or not pb.visible then
+						out[id] = pb
+					else
+						local k = ahead / span
+						out[id] = {
+							id = id,
+							x = pb.x + (pb.x - pa.x) * k,
+							z = pb.z + (pb.z - pa.z) * k,
+							yaw = pb.yaw,
+							speed = pb.speed,
+							visible = pb.visible,
+							beacons = pb.beacons,
+							teleported = false,
+							stopped = pb.stopped,
+						}
+					end
+				end
+				return out
 			end
 			local i = 1
 			while snaps[i + 1].t < rt do
@@ -148,6 +227,25 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 	return buf
 end
 
+-- seat(x, z, yaw, length, heightAt) -> y, pitch: where a vehicle of that length sits on the ground at
+-- (x, z) heading `yaw` (HTML yaw: it faces (sin yaw, cos yaw)): the mean of the heights under its front
+-- and rear axles, and the nose-up pitch (radians, for CFrame.Angles(pitch, 0, 0) after Units.yawCFrame)
+-- that lays it along the slope between them. Pure.
+function Ghost.seat(
+	x: number,
+	z: number,
+	yaw: number,
+	length: number,
+	heightAt: (x: number, z: number) -> number
+): (number, number)
+	local half = math.max(length, 1) * 0.36 -- the axles sit about 36 % of the length from the middle
+	local fx, fz = math.sin(yaw), math.cos(yaw)
+	local front = heightAt(x + fx * half, z + fz * half)
+	local rear = heightAt(x - fx * half, z - fz * half)
+	local pitch = math.atan2(front - rear, 2 * half)
+	return (front + rear) / 2, math.clamp(pitch, -0.5, 0.5)
+end
+
 -- render(buffer, now, folder, kinds, heightAt, models): engine only. `kinds` maps id -> {kind, color};
 -- `models` caches the placeholder Model per id (built from Traffic/VehiclePuppet at the true box).
 -- Moves every visible root with one BulkMoveTo (HANDOFF rule 4); hidden ghosts park far below.
@@ -172,9 +270,14 @@ function Ghost.render(
 			model = built
 		end
 		if model and model.PrimaryPart and k then
-			local y = if p.visible then heightAt(p.x, p.z) + VehiclePuppet.baseOffset(k.kind) else -500
 			table.insert(parts, model.PrimaryPart)
-			table.insert(cframes, Units.yawCFrame(p.yaw, Vector3.new(p.x, y, p.z)))
+			if p.visible then
+				local y, pitch = Ghost.seat(p.x, p.z, p.yaw, VehiclePuppet.length(k.kind), heightAt)
+				local at = Vector3.new(p.x, y + VehiclePuppet.baseOffset(k.kind), p.z)
+				table.insert(cframes, Units.yawCFrame(p.yaw, at) * CFrame.Angles(pitch, 0, 0))
+			else
+				table.insert(cframes, Units.yawCFrame(p.yaw, Vector3.new(p.x, -500, p.z)))
+			end
 		end
 	end
 	if #parts > 0 then

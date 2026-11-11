@@ -384,4 +384,77 @@ return function(t)
 		})
 		t.near(h:sample(0.5)[1].x, 50, 1e-4, "interpolates")
 	end)
+
+	-- Owner 2026-11-10: "some of the cars are glitching out".
+	t.test(
+		"ghost cars move evenly: the server's clock spaces the snapshots, a late send is carried over, cars pitch on slopes",
+		function()
+			local function rec(x: number, stopped: boolean?): { [string]: number }
+				return Ghost.encode({
+					id = 7,
+					x = x,
+					z = 0,
+					yaw = math.pi / 2,
+					speed = if stopped then 0 else 30,
+					visible = true,
+					beacons = false,
+					teleported = false,
+					stopped = stopped == true,
+				})
+			end
+			-- the stamp survives the wire and is taken out of the records
+			local wire =
+				BufferCodec.decode(Schemas.VehiclePose, BufferCodec.encode(Schemas.VehiclePose, Ghost.stamp(1234.5)))
+			local sentRecords = { rec(10), wire }
+			t.near(Ghost.takeStamp(sentRecords) :: number, 1234.5, 1e-3)
+			t.eq(#sentRecords, 1)
+			t.eq(Ghost.takeStamp(sentRecords), nil, "a send without a stamp")
+			-- the clock: packets sent every 1/15 s arrive with up to 40 ms of jitter; the local times are
+			-- spaced as they were sent, to within a couple of milliseconds
+			local clock = Ghost.newClock()
+			local jitter = { 0.012, 0.04, 0.0, 0.031, 0.008, 0.039, 0.002, 0.02, 0.035, 0.0 }
+			local last: number? = nil
+			for i = 1, 60 do
+				local sent = i / 15
+				local local0 = clock:localTime(sent, 500 + sent + 0.05 + jitter[(i - 1) % #jitter + 1])
+				if last and i > 3 then
+					t.near(local0 - last, 1 / 15, 0.005, `send {i} is spaced as the server spaced it`)
+				end
+				last = local0
+			end
+			-- a car at 30 st/s, two snapshots 1/15 s apart; the next send is late
+			local g = Ghost.new({ delay = 0.13 })
+			g:push(100, { rec(0) })
+			g:push(100 + 1 / 15, { rec(2) })
+			local newest = 100 + 1 / 15
+			t.near(g:sample(newest + 0.13)[7].x, 2, 1e-4, "exactly at the newest snapshot")
+			local carried = g:sample(newest + 0.13 + 0.05)[7].x
+			t.near(carried, 2 + 30 * 0.05, 0.05, "50 ms late: it carries on at its speed instead of freezing")
+			local capped = g:sample(newest + 0.13 + 5)[7].x
+			t.near(capped, 2 + 30 * Ghost.EXTRAPOLATE, 0.05, "and stops carrying on after EXTRAPOLATE")
+			-- when the late send arrives the car is close to where it was drawn (no throw forward)
+			g:push(100 + 3 / 15, { rec(6) })
+			local after = g:sample(newest + 0.13 + 0.05 + 1 / 60)[7].x
+			t.truthy(math.abs(after - carried) < 1.2, `a step of {after - carried} st on recovery`)
+			-- a stopped car never creeps
+			local h = Ghost.new({ delay = 0.13 })
+			h:push(10, { rec(5, true) })
+			h:push(10 + 1 / 15, { rec(5, true) })
+			t.eq(h:sample(11)[7].x, 5)
+			-- on a slope the car sits on the mean of its axle heights and pitches with the road
+			local function hill(x: number, _z: number): number
+				return x * 0.2
+			end
+			local y, pitch = Ghost.seat(10, 0, math.pi / 2, 11, hill) -- heading +x, uphill
+			t.near(y, 2, 1e-6)
+			t.near(pitch, math.atan(0.2), 1e-6, "nose up the hill")
+			local _, down = Ghost.seat(10, 0, -math.pi / 2, 11, hill)
+			t.near(down, -math.atan(0.2), 1e-6, "nose down going the other way")
+			local flatY, flatPitch = Ghost.seat(3, 4, 1.1, 11, function(): number
+				return 7
+			end)
+			t.eq(flatY, 7)
+			t.eq(flatPitch, 0)
+		end
+	)
 end

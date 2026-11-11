@@ -167,6 +167,7 @@ def main(argv):
     ap.add_argument("--clips", default="")
     ap.add_argument("--hide-cards", action="store_true")
     ap.add_argument("--workbench", action="store_true", help="fast shape-only pose check")
+    ap.add_argument("--pose-view", default="", help="az,el[,dist] for every clip pose instead of the clip's own view")
     ap.add_argument(
         "--views",
         default="",
@@ -247,10 +248,15 @@ def main(argv):
             if only and clip not in only:
                 continue
             view = info.get("view", [-14, 6])
+            pdist = info.get("dist", 5.2)
+            if opts.pose_view:
+                pv = [float(x) for x in opts.pose_view.split(",")]
+                view = pv[:2]
+                pdist = pv[2] if len(pv) > 2 else pdist
             for k, f in enumerate(info["key_frames"]):
                 set_action(arm, f"{clip}", f)
                 c = Vector(info.get("center", list(center + Vector((0, 0, 0.12)))))
-                place(cam, c, size * info.get("dist", 5.2), view[0], view[1])
+                place(cam, c, size * pdist, view[0], view[1])
                 scene.render.filepath = os.path.join(opts.out, f"{tag}_pose_{clip}_{k}.png")
                 bpy.ops.render.render(write_still=True)
                 written.append(scene.render.filepath)

@@ -75,4 +75,11 @@ print(`hero_bodies: installed={table.concat(report.installed, ",")} failures={#f
 for _, f in failures do
 	print("  FAIL " .. f)
 end
-return { suite = "hero_bodies", ok = #failures == 0, failures = failures, install = report, bodies = bodies, placeVersion = game.PlaceVersion }
+return {
+	suite = "hero_bodies",
+	ok = #failures == 0,
+	failures = failures,
+	install = report,
+	bodies = bodies,
+	placeVersion = game.PlaceVersion,
+}

@@ -47,6 +47,10 @@ function VehiclePuppet.baseOffset(kind: string): number
 	return Boxes.get(kind).height / 2
 end
 
+function VehiclePuppet.length(kind: string): number
+	return Boxes.get(kind).length
+end
+
 function VehiclePuppet.spec(kind: string, opts: Opts?): PartBuilder.ModelSpec
 	local o: Opts = opts or {}
 	local d = DEFAULTS[kind] or error(`VehiclePuppet: unknown kind {kind}`)

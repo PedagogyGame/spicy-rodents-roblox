@@ -33,8 +33,16 @@
 --     offset the body carried as an AI decays at v5.4's 23/s, the same rate the controller's drawn point
 --     eases onto its own ground, so a possession hands over without a step.
 -- No side effects on require.
+-- A sculpted hero squirrel (Server/Assets/HeroArt, attribute Hero) plays its own authored clips (owner
+-- 2026-11-10: the run looked "rigid, unalive": the procedural gait only swings the legs under a stiff body,
+-- while the authored run is a bounding gallop with the spine stretching and gathering and the tail
+-- streaming and waving). heroClip picks the clip from what the body is doing (the kinematic controller's
+-- mode for a held body; the root's attitude and speed for the others) and heroRate keeps the cycle in
+-- step with the motor's stride. If a clip cannot be loaded the body falls back to the procedural gait.
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
---   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount
+--   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount;
+--   heroClip(mode, speed, stalk) -> clip name (pure); heroRate(name, speed, cadence?, length) -> playback
+--   speed (pure); HERO
 
 local Gait = require("./Gait")
 local KinematicPose = require("../Controllers/KinematicPose")
@@ -42,6 +50,7 @@ local Import = require("../Import")
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
+local HeroAssets = Import.shared("Actors/HeroAssets") :: typeof(require("../../shared/Actors/HeroAssets"))
 
 export type ClipSet = {
 	idle: string?,
@@ -97,6 +106,7 @@ type Entry = {
 	anchored: boolean,
 	applied: number,
 	kin: boolean, -- a kinematic controller drew this body last frame
+	hero: { [string]: HeroAssets.Clip }?, -- a sculpted hero rig playing its authored clips
 }
 
 -- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
@@ -225,6 +235,53 @@ function AnimationDriver.clipSpeed(speed: number, nominal: number?): number
 	return math.clamp(speed / nominal, 0.1, 2.5)
 end
 
+-- Which authored clip a hero squirrel shows: `mode` is "ground" | "trunk" | "rail" | "air", `speed` in
+-- studs/s, `stalk` whether it is creeping.
+AnimationDriver.HERO = {
+	still = 0.5, -- studs/s under which it stands (or hangs on a trunk)
+	runAbove = 9, -- studs/s: a walk below, the bounding run above
+	-- studs travelled per clip cycle when no motor cadence is known (v5.4: one bound per 5.5 studs)
+	stride = { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 4.5, Stalk = 2.2 } :: { [string]: number },
+	minRate = 0.3,
+	maxRate = 2.6, -- faster than this the legs blur into noise
+}
+
+function AnimationDriver.heroClip(mode: string, speed: number, stalk: boolean): string
+	local H = AnimationDriver.HERO
+	if mode == "air" then
+		return "Leap"
+	elseif mode == "trunk" then
+		return "Climb"
+	elseif speed < H.still then
+		return "Idle"
+	elseif mode == "rail" then
+		return "Wire"
+	elseif stalk then
+		return "Stalk"
+	end
+	return if speed < H.runAbove then "Walk" else "Run"
+end
+
+-- Playback speed for clip `name` of `length` seconds on a body moving at `speed`: one clip cycle per
+-- stride. `cadence` (rad/s of stride phase, from the kinematic motor) wins when it is known. A body
+-- hanging still on a trunk holds its climb pose (0); Idle and Leap play at their own speed.
+function AnimationDriver.heroRate(name: string, speed: number, cadence: number?, length: number): number
+	local H = AnimationDriver.HERO
+	if name == "Idle" or name == "Leap" then
+		return 1
+	end
+	if name == "Climb" and speed < H.still then
+		return 0
+	end
+	local stride = H.stride[name] or 5.5
+	local cyclesPerSecond = if cadence
+			and cadence > 0
+			and name == "Run"
+		then cadence / (2 * math.pi)
+		else math.max(speed, 0) / stride
+	return math.clamp(cyclesPerSecond * length, H.minRate, H.maxRate)
+end
+
 -- The joints the gait drives, by RigSpec bone name: Motor6Ds on a part-built puppet, Bones on a skinned
 -- hero model (Server/Assets/HeroArt). The names and the axes are the same on both (the hero's bones rest
 -- with no rotation), so one pose serves either. A hero's region Motor6Ds (BodyMotor6D, ...) match no name.
@@ -319,7 +376,8 @@ function AnimationDriver.start(opts: Opts): Driver
 			return t
 		end
 		local set = clips[e.species]
-		local id = set and (set :: any)[name]
+		local heroClip = if e.hero then e.hero[name] else nil
+		local id = if heroClip then heroClip.id else set and (set :: any)[name]
 		if type(id) ~= "string" then
 			return nil
 		end
@@ -337,7 +395,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			return nil
 		end
 		local lt = loaded :: AnimationTrack
-		lt.Looped = name ~= "jump"
+		lt.Looped = if heroClip then heroClip.loop else name ~= "jump"
 		lt.Priority = if name == "idle" then Enum.AnimationPriority.Idle else Enum.AnimationPriority.Movement
 		e.tracks[name] = lt
 		return lt
@@ -358,10 +416,18 @@ function AnimationDriver.start(opts: Opts): Driver
 		local joints: { Joint } = {}
 		local tailN = 0
 		local animator: Animator? = nil
+		local hero: { [string]: HeroAssets.Clip }? = nil
 		if Gait.PROCEDURAL[species] and clips[species] == nil then
 			local hip = model:GetAttribute("HipHeight")
 			gait = Gait.params(species, if type(hip) == "number" then hip else nil)
 			joints, tailN = AnimationDriver.gaitJoints(model)
+			if model:GetAttribute("Hero") == true and HeroAssets.CLIPS[species] then
+				-- the sculpted rig plays its authored clips; the gait above stays as the fallback
+				animator = ensureAnimator(model)
+				if animator then
+					hero = HeroAssets.CLIPS[species]
+				end
+			end
 		else
 			animator = ensureAnimator(model)
 			if animator == nil then
@@ -395,6 +461,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			anchored = root.Anchored,
 			applied = 0,
 			kin = false,
+			hero = hero,
 		}
 		count += 1
 	end
@@ -558,6 +625,45 @@ function AnimationDriver.start(opts: Opts): Driver
 				e.vy += (vy - e.vy) * alpha
 			end
 			visualRoot(e, pos, dt, now, camPos)
+			local heroSet = e.hero
+			if heroSet then
+				-- what the body is doing: the controller says so for a held body; for the rest, a root
+				-- standing on end is on a trunk, and anything else is on the ground at its seen speed
+				local mode = if kin and kin.mode
+					then kin.mode
+					elseif math.abs(e.root.CFrame.LookVector.Y) > 0.6 then "trunk"
+					else "ground"
+				local want = AnimationDriver.heroClip(mode, e.speed, kin ~= nil and kin.stalk == true)
+				local clip = heroSet[want]
+				local t = if clip then track(e, want) else nil
+				if t == nil or clip == nil then
+					-- the clip did not load: this body goes back to the procedural gait for good
+					for _, old in e.tracks do
+						old:Stop(0)
+					end
+					e.hero = nil
+					continue
+				end
+				if want ~= e.current then
+					for name, old in e.tracks do
+						if name ~= want and old.IsPlaying then
+							old:Stop(0.15)
+						end
+					end
+					t:Play(0.15)
+					e.current = want
+				elseif not t.IsPlaying and clip.loop then
+					t:Play(0.1)
+				end
+				if not clip.loop and t.Length > 0 and t.TimePosition >= t.Length - 0.06 then
+					t:AdjustSpeed(0) -- hold the last pose of a one-shot (a long fall after a leap)
+				else
+					t:AdjustSpeed(
+						AnimationDriver.heroRate(want, e.speed, if kin then kin.cadence else nil, clip.length)
+					)
+				end
+				continue
+			end
 			if e.gait then
 				continue -- posed in Stepped (gaitStep)
 			end
@@ -605,8 +711,8 @@ function AnimationDriver.start(opts: Opts): Driver
 		clock += dt
 		for _, e in entries do
 			local p = e.gait
-			if p == nil or #e.joints == 0 then
-				continue
+			if p == nil or #e.joints == 0 or e.hero ~= nil then
+				continue -- (a hero rig is posed by its clips)
 			end
 			local kin = KinematicPose.get(e.body)
 			if kin then

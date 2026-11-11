@@ -261,6 +261,11 @@ function Squirrel.start(
 		-- what is drawn: the eased pose, about the feet point (yaw, then nose-up pitch and lean, then the hip)
 		local snapped = SquirrelVisual.frame(visual, state, motorWorld :: any, dt, world.groundAt)
 		kin.moveSpeed, kin.cadence, kin.climb = visual.moveSpeed, visual.cadence, visual.climb
+		kin.mode = if state.routeId ~= nil
+			then (if visual.climb > 0.5 then "trunk" else "rail")
+			elseif state.grounded then "ground"
+			else "air"
+		kin.stalk = state.focus
 		local cf = Units.yawCFrame(visual.yaw or state.yaw, Vector3.new(visual.x, visual.y, visual.z))
 			* CFrame.Angles(visual.pitch, 0, -visual.lean)
 			* CFrame.new(0, hip, 0)

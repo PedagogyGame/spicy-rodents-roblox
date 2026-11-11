@@ -47,6 +47,7 @@ local AttractionService = require("../Attractions/AttractionService")
 local DayClock = require("./DayClock")
 local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
+local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Traffic/Ghost"))
 
 export type Opts = {
 	players: boolean?, -- connect joins (default true; the engine smoke drives PlayerLike stubs)
@@ -723,8 +724,10 @@ function Game.start(opts: Opts?): any
 		local _ = hits
 		poseAcc += dt
 		if net and poseAcc >= 1 / 15 then
-			poseAcc = 0
-			net:stream(nil, "VehiclePoses", traffic:poseRecords())
+			poseAcc = math.min(poseAcc - 1 / 15, 1 / 15) -- an even 15 sends a second
+			local records = traffic:poseRecords()
+			table.insert(records, Ghost.stamp(now)) -- the server's clock (Traffic/Ghost)
+			net:stream(nil, "VehiclePoses", records)
 		end
 		biteAcc += dt
 		if biteAcc >= 0.1 then

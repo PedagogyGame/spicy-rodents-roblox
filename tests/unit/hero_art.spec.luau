@@ -217,4 +217,52 @@ return function(t: any)
 		t.truthy(n >= 18, `{n} gait joints`)
 		t.eq(hj.BodyMotor6D, nil, "a region's own joint is not a gait joint")
 	end)
+
+	-- Owner 2026-11-10: "I don't like the way the squirrel runs ... from the back, it looks rigid, unalive".
+	t.test(
+		"a hero squirrel plays its authored clips: the right one for what it is doing, in step with its stride",
+		function()
+			local doc = serde.decode("json", fs.readFile("data/art/heroes.json"))
+			local clips = HeroAssets.CLIPS.squirrel
+			for name, src in doc.species.squirrel.clips do
+				t.eq(clips[name].id, "rbxassetid://" .. src.assetId, name)
+				t.near(clips[name].length, src.duration, 1e-3, name)
+				t.eq(clips[name].loop, src.loop, name)
+			end
+			for _, name in { "Idle", "Walk", "Run", "Climb", "Wire", "Leap", "Stalk" } do
+				t.truthy(clips[name] ~= nil, `the rig has {name}`)
+			end
+			local pick, rate, H = AnimationDriver.heroClip, AnimationDriver.heroRate, AnimationDriver.HERO
+			-- on the ground: standing, ambling, the bounding run, creeping
+			t.eq(pick("ground", 0, false), "Idle")
+			t.eq(pick("ground", 4, false), "Walk")
+			t.eq(pick("ground", 18, false), "Run")
+			t.eq(pick("ground", 33, false), "Run")
+			t.eq(pick("ground", 4, true), "Stalk")
+			t.eq(pick("ground", 0.1, true), "Idle")
+			-- on a trunk it climbs (and hangs there when still); on a wire or bough it runs the wire clip
+			t.eq(pick("trunk", 10, false), "Climb")
+			t.eq(pick("trunk", 0, false), "Climb")
+			t.eq(pick("rail", 20, false), "Wire")
+			t.eq(pick("rail", 0, false), "Idle")
+			t.eq(pick("air", 30, false), "Leap")
+			-- the run keeps step with the motor's stride: one bound per cadence cycle, never a blur
+			local run = clips.Run.length
+			t.near(rate("Run", 18, 2 * math.pi * 3, run), 3 * run, 1e-9, "three bounds a second")
+			t.eq(rate("Run", 33, 2 * math.pi * 12, run), H.maxRate, "capped")
+			t.near(rate("Run", 11, nil, run), 11 / H.stride.Run * run, 1e-9, "from speed when no motor says")
+			t.truthy(
+				rate("Walk", 4, nil, clips.Walk.length) > rate("Walk", 2, nil, clips.Walk.length),
+				"faster legs at a faster walk"
+			)
+			t.eq(rate("Walk", 0.01, nil, clips.Walk.length), H.minRate)
+			-- hanging still on a trunk holds the pose; idle and the leap play at their own speed
+			t.eq(rate("Climb", 0, nil, clips.Climb.length), 0)
+			t.truthy(rate("Climb", 10, nil, clips.Climb.length) > 0.5)
+			t.eq(rate("Idle", 0, nil, clips.Idle.length), 1)
+			t.eq(rate("Leap", 40, nil, clips.Leap.length), 1)
+			t.eq(clips.Leap.loop, false)
+			t.eq(clips.Run.loop, true)
+		end
+	)
 end

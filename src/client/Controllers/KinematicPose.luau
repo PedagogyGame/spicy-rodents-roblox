@@ -13,6 +13,9 @@ export type Pose = {
 	moveSpeed: number, -- studs/s, the motor's own speed
 	cadence: number, -- rad/s of stride phase
 	climb: number, -- 0 level .. 1 gripping a trunk or pole
+	-- what the body is doing, for a rig that plays clips: "ground" | "trunk" | "rail" | "air"
+	mode: string?,
+	stalk: boolean?, -- creeping (Ctrl)
 }
 
 local KinematicPose = {}

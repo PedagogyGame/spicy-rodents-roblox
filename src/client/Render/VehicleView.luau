@@ -60,6 +60,7 @@ function VehicleView.start(): () -> ()
 	folder.Parent = workspace
 	folderRef = folder
 	local buffer = Ghost.new()
+	local clock = Ghost.newClock()
 	local models: { [number]: Model } = {}
 	local conns: { RBXScriptConnection } = {}
 	table.insert(
@@ -70,7 +71,10 @@ function VehicleView.start(): () -> ()
 			end
 			local good, records = pcall(Net.decodeStream, Schemas.VehiclePose, b)
 			if good then
-				buffer:push(workspace:GetServerTimeNow(), records)
+				-- the server's own clock spaces the snapshots; the arrival time only anchors them
+				local arrival = workspace:GetServerTimeNow()
+				local stamp = Ghost.takeStamp(records)
+				buffer:push(if stamp then clock:localTime(stamp, arrival) else arrival, records)
 			end
 		end)
 	)
