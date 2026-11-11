@@ -541,7 +541,10 @@ local function trip(
 		if not v.held then
 			v.timer -= dt
 			if v.timer <= 0 then
+				-- the trip home starts on the other side of the road, facing the other way: a jump, not
+				-- a move (clients snap the ghost; the fatal sweep skips the tick)
 				v.phase, v.dir, v.s = "back", -1, 0
+				v.teleported = true
 			end
 		end
 		place(v, ctx, route)

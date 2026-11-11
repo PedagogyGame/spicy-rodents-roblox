@@ -15,6 +15,9 @@
 -- fire RunOver(actorId, vehicle). Lanes are the compiled records with handedness unified (drive on the
 -- right), stop lines from Traffic/Control at the existing sign sites, the fleet from Traffic/Fleet.
 -- Vehicles are server state only; clients render ghosts from `poseRecords()` (Traffic/Ghost).
+-- A vehicle's `teleported` flag lasts one tick (1/30 s) and the stream sends every other tick, so the
+-- service remembers every jump until the next `poseRecords()` carries it: a wrap, an appearance or a
+-- responder turning round at a scene is never drawn as a slide across the road.
 
 local Import = require("../Import")
 local AICarMotor = Import.shared("Traffic/AICarMotor") :: typeof(require("../../shared/Traffic/AICarMotor"))
@@ -75,6 +78,7 @@ export type TrafficService = typeof(setmetatable(
 		prev: { [number]: { x: number, y: number, z: number, yaw: number, visible: boolean } },
 		prevActors: { [any]: { x: number, y: number, z: number } },
 		swept: SweptCollision.SweptCollision,
+		jumped: { [number]: boolean }, -- vehicles that teleported since the last poseRecords()
 		stops: { [string]: { StopLine } },
 		control: ControlData,
 		heightAt: (x: number, z: number) -> number,
@@ -117,6 +121,7 @@ function TrafficService.new(opts: Opts): TrafficService
 		prev = {},
 		prevActors = {},
 		swept = SweptCollision.new(),
+		jumped = {},
 		stops = Control.resolve(control, lanes),
 		control = control,
 		heightAt = opts.heightAt or function(_x: number, _z: number): number
@@ -206,6 +211,9 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 				stats.violations.rollingStop = (stats.violations.rollingStop or 0) + 1
 			end
 		end
+		if v.teleported then
+			self.jumped[v.id] = true
+		end
 		-- stuck: visible, in a driving phase, not dwelling or waiting at a stop line, and not moving
 		local driving = v.visible
 			and (v.phase == "drive" or v.phase == "ride" or v.phase == "out" or v.phase == "back")
@@ -290,8 +298,11 @@ function TrafficService.poses(self: TrafficService): { SweptCollision.VehiclePos
 end
 
 -- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them).
+-- Each call is one send: a jump made since the last call is flagged in this one and then forgotten.
 function TrafficService.poseRecords(self: TrafficService): { { [string]: number } }
 	local out = table.create(#self.vehicles)
+	local jumped = self.jumped
+	self.jumped = {}
 	for _, v in self.vehicles do
 		table.insert(
 			out,
@@ -303,7 +314,7 @@ function TrafficService.poseRecords(self: TrafficService): { { [string]: number 
 				speed = v.speed,
 				visible = v.visible,
 				beacons = v.class == "responder" or v.class == "incident" or v.class == "legacy_ambulance",
-				teleported = v.teleported,
+				teleported = v.teleported or jumped[v.id] == true,
 				stopped = v.speed < 0.05,
 			})
 		)
@@ -347,6 +358,7 @@ function TrafficService.dispatchResponder(self: TrafficService, dest: { number }
 			end
 			local route = LaneMath.makeRoute(`responder_{v.id}`, pts, v.lane.speeds)
 			AICarMotor.dispatch(v, route, ctxFor(self, {}), if opts and opts.hold then true else nil)
+			self.jumped[v.id] = true -- it appears on the drive (dispatched between two ticks)
 			return v
 		end
 	end
