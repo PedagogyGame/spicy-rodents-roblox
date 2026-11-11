@@ -737,4 +737,44 @@ return function(t)
 		})
 		t.eq(total(parked), 0)
 	end)
+
+	t.test("surface: a car seated on the terrain under a raised slab is buried, and drives through its edge", function()
+		local def = detectors.surface
+		-- the drawn ground: terrain at 0, and a slab 1.2 st high from z = 20 on (a road part over it)
+		local function baked(_x: number, z: number, maxY: number?): number
+			if z >= 20 and (maxY == nil or 1.2 <= maxY + 0.5) then
+				return 1.2
+			end
+			return 0
+		end
+		local incidents, counts = drive(def, { bench = { bakedAt = baked }, seconds = 2 })
+		t.eq(counts.buried, 1, serde.encode("json", counts))
+		t.eq(counts.ledge, 1)
+		t.eq(counts.hover, nil)
+		for _, inc in incidents do
+			if inc.kind == "buried" then
+				t.near(inc.magnitude, 1.2, 1e-6)
+			end
+		end
+		-- the same car seated on the slab: nothing
+		local half = Boxes.get("sedan").height / 2
+		local _, onTop = drive(def, {
+			bench = { bakedAt = baked },
+			seconds = 2,
+			truth = function(clock: number): { [string]: any }
+				return { x = 0, z = 25 + 5 * clock, yaw = 0, speed = 5 }
+			end,
+			seen = function(_time, s)
+				s.y = 1.2 + half
+			end,
+		})
+		t.eq(total(onTop), 0)
+		-- and a car drawn a stud above flat ground hovers
+		local _, high = drive(def, {
+			seen = function(_time, s)
+				s.y = half + 1
+			end,
+		})
+		t.eq(high.hover, 1)
+	end)
 end

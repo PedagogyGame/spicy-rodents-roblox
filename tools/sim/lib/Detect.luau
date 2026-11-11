@@ -23,6 +23,8 @@
 --   ctx.truth                                       the true history (lib/Replay: at, window)
 --   ctx.vehicles[id]                                { id, name, kind, class, box, entry }
 --   ctx.surfaceAt(x, z, refY), ctx.heightAt(x, z)   the game's ground (World/Ground with the town's paving)
+--   ctx.bakedAt(x, z, maxY?)                        the ground as baked and drawn (lib/Baked: road parts,
+--                                                   lot plates, terrain); the bench's default is surfaceAt
 --   ctx.town, ctx.colliders, ctx.Colliders          World/Town (road strips, lots), the buildings in a
 --                                                   World/Colliders hash, and that module (nil on a bench
 --                                                   unless given)
@@ -149,6 +151,7 @@ export type Ctx = {
 	vehicles: { [number]: any },
 	heightAt: (x: number, z: number) -> number,
 	surfaceAt: (x: number, z: number, refY: number) -> number,
+	bakedAt: (x: number, z: number, maxY: number?) -> number,
 	town: any?,
 	colliders: any?,
 	Colliders: any,
@@ -304,6 +307,9 @@ function Detect.newBook(settings: any): Book
 				vehicles = env.vehicles,
 				heightAt = env.heightAt,
 				surfaceAt = env.surfaceAt,
+				bakedAt = env.bakedAt or function(x: number, z: number, maxY: number?): number
+					return env.surfaceAt(x, z, maxY or 0)
+				end,
 				town = env.town,
 				colliders = env.colliders,
 				Colliders = Colliders,
@@ -443,7 +449,7 @@ export type Bench = {
 --       ground; the frame's dt is the time since the previous frame.
 --   bench:finish() -> incidents, counts
 -- opts: vehicles { [id] = { name, kind, class } } (default: #1, a sedan), thresholds ("key" = value),
--- heightAt / surfaceAt (default: flat ground at y = 0), town / colliders (default: none), tickDt (1 / 30).
+-- heightAt / surfaceAt / bakedAt (default: flat ground at y = 0), town / colliders (default: none), tickDt (1 / 30).
 function Detect.bench(def: Def, opts: { [string]: any }?): Bench
 	local o: { [string]: any } = opts or {}
 	local thresholds = {}
@@ -469,6 +475,7 @@ function Detect.bench(def: Def, opts: { [string]: any }?): Bench
 		vehicles = vehicles,
 		heightAt = heightAt,
 		surfaceAt = surfaceAt,
+		bakedAt = o.bakedAt,
 		town = o.town,
 		colliders = o.colliders,
 	}))

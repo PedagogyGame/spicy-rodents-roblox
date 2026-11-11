@@ -54,6 +54,7 @@ local Rng = require("@shared/Util/Rng")
 local Units = require("@shared/Config/Units")
 local TrafficService = require("@server/Traffic/TrafficService")
 
+local Baked = require("./Baked")
 local Detect = require("./Detect")
 local NetModel = require("./NetModel")
 local Truth = require("./Truth")
@@ -338,6 +339,9 @@ function Replay.run(opts: { [string]: any }?): Result
 			vehicles = vehicles,
 			heightAt = Height.at,
 			surfaceAt = townData.groundAt,
+			bakedAt = function(x: number, z: number, maxY: number?): number
+				return (Baked.get().at(x, z, maxY))
+			end,
 			town = townData.town,
 			colliders = townData.colliders,
 		}
