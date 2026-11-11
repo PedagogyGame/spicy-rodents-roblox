@@ -256,6 +256,19 @@ def skeleton():
 SPINE_CHAIN = ["Hips", "Spine1", "Spine2", "Spine3", "Chest"]
 
 
+def haunch_lobe(variant="squirrel"):
+    """The left haunch's soft lobe in the LOWERED space: (centre, radii, axes). It lies along the thigh from
+    just behind the hip joint to just past the knee; the sculpt and the skin weights agree on it."""
+    radii = (0.165, 0.275, 0.19) if variant == "rodent" else (0.185, 0.30, 0.21)  # the rodent's are leaner and sharper
+    return np.array([0.20, 0.25, 0.40]), np.array(radii), rot_x(0.82)
+
+
+LOBE_RIM = (0.9, 1.6)  # the lobe's skin, in its own radii: all the leg's inside, the body's outside
+LOBE_HIP = (0.05, 0.24)  # and round the hip joint (studs from it, in the plane the leg swings in) it stays put
+LOBE_FOLLOW = 0.3  # how much of the thigh's swing the lobe's bulk takes
+LOBE_KNEE = (0.08, 0.28)  # the skin this near the knee joint goes all the way with it; none of it this far off
+
+
 def refine_weights(co, W, bone_names, variant):
     """Skin weights for the trunk by anatomy (hero.finish calls this on the bone-heat weights).
 
@@ -266,10 +279,10 @@ def refine_weights(co, W, bone_names, variant):
     back and haunches moving wrongly, or not at all.
 
     Here the trunk behind the shoulders follows the spine by its place along the body (each vertex shared
-    between the two nearest of Hips..Chest); the haunch (the thigh and the soft lobe over it) and the legs
-    keep their bone-heat weights, so the haunch swings with the thigh under a back that holds its shape; the
-    rump belongs to the hips and only the tail itself to the tail. Ahead of the shoulders (chest front,
-    neck, head) nothing changes. co: vertex positions (lowered space)."""
+    between the two nearest of Hips..Chest); the haunch's soft lobe stays on the back and takes a share of
+    the thigh's swing, while the skin by the knee and the shin goes with the leg (below); the rump belongs
+    to the hips and only the tail itself to the tail. Ahead of the shoulders (chest front, neck, head)
+    nothing changes. co: vertex positions (lowered space)."""
     co = np.asarray(co, dtype=np.float64)
     W = np.asarray(W, dtype=np.float64)
     x, y, z = np.abs(co[:, 0]), co[:, 1], co[:, 2]
@@ -295,18 +308,48 @@ def refine_weights(co, W, bone_names, variant):
     only_tail[none, col["Tail1"]] = 1.0
     only_tail /= only_tail.sum(axis=1, keepdims=True)
     base = W * (1 - tail)[:, None] + only_tail * tail[:, None]
-    # what moves with a leg: the haunch (thigh and lobe), the upper arm, and everything below the belly
-    # (the haunch's inner side shades into the groin over a wide band; the shin below it is all leg)
-    q = _sstep(0.25, 0.38, z)
-    t = np.clip((x - (0.04 + 0.04 * q)) / (0.06 + 0.06 * q), 0, 1)
-    # (and its top and back stay with the hips: the lobe is skin stretched from the pelvis to the knee, so
-    # the knee end goes with the knee and no gap opens under the rump when the leg swings forward)
-    hind = t * t * (3 - 2 * t) * (1 - _sstep(0.36, 0.68, z)) * (1 - _sstep(0.34, 0.54, y)) * _sstep(-0.12, 0.0, y)
+    behind = _sstep(-0.56, -0.4, y) * (1 - tail)
+    trunk = spine * behind[:, None] + base * (1 - behind)[:, None]
+    # The haunch. The clips swing the thigh a long way about the hip: 65 degrees up when the hind legs gather
+    # under the body, 110 back when they trail in flight, and out to the side on a trunk. A lobe given whole
+    # to the thigh went round with it as a stiff paddle (a fin standing off the flank, wings beside the rump
+    # on a trunk), and one given to it by halves folded flat. So the lobe is the body's: it stays on the
+    # pelvis as the round haunch the camera sees from behind in every pose and takes LOBE_FOLLOW of the
+    # thigh's swing, enough for the mass to shift with each stride; only the skin by the knee joint and
+    # along the shin goes all the way with the leg, and the leg slides out from under the lobe and back.
+    hip, knee, hock = (np.array(BACK[k]) for k in ("Upper", "Lower", "Foot"))
+    pa = np.stack([x, y, z], axis=1)
+    lc, lr, lax = haunch_lobe(variant)
+    on_lobe = 1 - _sstep(LOBE_RIM[0], LOBE_RIM[1], np.linalg.norm(((pa - lc) @ lax) / lr, axis=1))
+    shin = pa - knee
+    ts = np.clip(shin @ (hock - knee) / float((hock - knee) @ (hock - knee)), 0, 1)
+    d_shin = np.linalg.norm(shin - ts[:, None] * (hock - knee), axis=1)
+    near_shin = 1 - _sstep(0.06, 0.15, d_shin)
+    from_hip = np.linalg.norm((pa - hip)[:, 1:], axis=1)  # in the plane the leg swings in
+    near_knee = (1 - _sstep(LOBE_KNEE[0], LOBE_KNEE[1], np.linalg.norm(pa - knee, axis=1))) * on_lobe
+    bulk = LOBE_FOLLOW * on_lobe * _sstep(LOBE_HIP[0], LOBE_HIP[1], from_hip)
+    zone = np.maximum(np.maximum(bulk, near_knee), near_shin) * _sstep(0.03, 0.09, x)
+    leg = np.zeros_like(W)
+    for sgn, side in ((1, "L"), (-1, "R")):
+        lcols = [i for i, b in enumerate(bone_names) if b.startswith(f"Back{side}_")]
+        rows_s = co[:, 0] * sgn >= 0
+        part = np.zeros_like(W)
+        part[:, lcols] = W[:, lcols]
+        part[part.sum(axis=1) < 1e-4, col[f"Back{side}_Upper"]] = 1.0
+        # (the heel is close under the lobe, and bone heat gave the lobe's under side to the foot: above the
+        # heel nothing follows the foot, it follows the shin)
+        up = _sstep(0.09, 0.15, z)
+        for b in (f"Back{side}_Foot", f"Back{side}_Toe"):
+            part[:, col[f"Back{side}_Lower"]] += part[:, col[b]] * up
+            part[:, col[b]] *= 1 - up
+        leg[rows_s] = part[rows_s]
+    leg /= leg.sum(axis=1, keepdims=True)
+    body = leg * zone[:, None] + trunk * (1 - zone)[:, None]
+    # the upper arm and everything below the belly keep the bone heat's weights
     fore = _sstep(0.05, 0.11, x) * (1 - _sstep(0.42, 0.6, z)) * _sstep(-0.2, -0.3, y)
     low = 1 - _sstep(0.13, 0.17, z)
-    limb = np.maximum(np.maximum(hind, fore), low)
-    trunk = _sstep(-0.56, -0.4, y) * (1 - tail) * (1 - limb)
-    return spine * trunk[:, None] + base * (1 - trunk)[:, None]
+    limb = np.maximum(fore, low)
+    return base * limb[:, None] + body * (1 - limb)[:, None]
 
 
 HZ = 1.19  # skull centre height
@@ -498,11 +541,11 @@ def sculpt(variant="squirrel"):
     # the body (it hangs to within 0.14 of the ground and covers the knee and most of the shin), the
     # space between the thighs is filled, and what is left of the leg below it (shin, heel, foot) is slim.
     hp, kn2, hk, ba = (np.array(BACK0[k]) for k in ("Upper", "Lower", "Foot", "Toe"))
-    lobe = (0.165, 0.275, 0.19) if rodent else (0.185, 0.30, 0.21)  # the rodent's are leaner and sharper
+    lobe_c, lobe_r, lobe_axes = haunch_lobe(variant)
     P.append(Ellipsoid(A(0.0, 0.22, 0.37), (0.16 * lean, 0.26, 0.17), k=0.10, tag="groin"))
     P += mirror_pair([
         _limb(hp + [0.0, 0.02, 0.02], kn2, 0.20 * lean, 0.10, 0.10, "thigh"),
-        Ellipsoid(A(0.20, 0.25, 0.40), lobe, axes=rot_x(0.82), k=0.11, tag="haunchlobe"),
+        Ellipsoid(A(*lobe_c), lobe_r, axes=lobe_axes, k=0.11, tag="haunchlobe"),
         _limb(kn2, hk, 0.08, 0.042, 0.06, "shank"),
         Ellipsoid(kn2 + (hk - kn2) * 0.3 + [0.0, 0.03, 0.03], (0.06, 0.075, 0.115), axes=frame_from(hk - kn2), k=0.06, tag="calf"),
         _limb(hk, ba, 0.042, 0.029, 0.03, "foot"),
