@@ -48,18 +48,6 @@ local parts = 0
 
 type Place = { x: number, z: number, floorY: number, yaw: number }
 
-local function siteModel(name: string, id: string, place: Place): any
-	local root = roblox.Instance.new("Model")
-	root.Name = name
-	root:SetAttribute("AttractionId", id)
-	root:SetAttribute("Site", id)
-	root:SetAttribute("OriginX", place.x)
-	root:SetAttribute("OriginZ", place.z)
-	root:SetAttribute("FloorY", place.floorY)
-	root:SetAttribute("Yaw", place.yaw)
-	return root
-end
-
 -- the buildings of data/attractions.json
 local places: { [string]: Place } = {}
 for _, a in doc.attractions do
@@ -69,7 +57,7 @@ for _, a in doc.attractions do
 	local place: Place = { x = a.place.x, z = a.place.z, floorY = a.place.floorY, yaw = a.place.yaw }
 	places[a.id] = place
 	local kit = Kit.new(roblox, place)
-	local root = siteModel("BowlingAlley", a.id, place)
+	local root = GameBakes.siteModel(roblox, "BowlingAlley", a.id, place)
 	Shell.build(kit, root, a)
 	Lanes.build(kit, root)
 	Rooms.build(kit, root)
@@ -86,26 +74,8 @@ for _, v in (Expansion :: any).venues do
 		venues[v.id] = v
 	end
 end
-local sites: { [string]: { kit: any, root: any } } = {}
-local siteCount, built = 0, {} :: { string }
-for _, st in Games.stations(places) do
-	local venue = venues[st.site]
-	if venue == nil or not GameBakes.has(st.game) then
-		continue
-	end
-	local site = sites[st.site]
-	if site == nil then
-		site = { kit = Kit.new(roblox, places[st.site]), root = siteModel(st.site, st.site, places[st.site]) }
-		site.root.Parent = folder
-		sites[st.site] = site
-		siteCount += 1
-	end
-	GameBakes.build(st.game, site.kit, site.root, st, venue)
-	table.insert(built, st.id)
-end
-for _, site in sites do
-	parts += site.kit.count
-end
+local onVenues = GameBakes.venueSites(roblox, folder, Games.stations(places), places, venues)
+parts += onVenues.parts
 
 local bytes = roblox.serializeModel({ folder })
 if not fs.isDir("build") then
@@ -113,7 +83,10 @@ if not fs.isDir("build") then
 end
 fs.writeFile(out, bytes)
 print(
-	`attractions: {#doc.attractions} building(s), {siteCount} venue site(s) [{table.concat(built, ", ")}], {parts} parts -> {out} ({#bytes} bytes) in {string.format(
+	`attractions: {#doc.attractions} building(s), {onVenues.sites} venue site(s) [{table.concat(
+		onVenues.built,
+		", "
+	)}], {parts} parts -> {out} ({#bytes} bytes) in {string.format(
 		"%.2f",
 		os.clock() - t0
 	)} s`
