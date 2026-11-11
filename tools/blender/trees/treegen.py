@@ -743,6 +743,11 @@ class TreeBuilder:
                 keep.append(s)
         if L - keep[-1] > 1e-6:
             keep[-1] = L
+        # one ring where the root flare ends (just under the height the climb is measured from): a
+        # ring with lobes below it and the next one three studs up would carry the flare up between them
+        self.flare_end = max(2.5, 1.2 * float(self.Rt(0.0))) - 0.15
+        if self.flare_end < L - 1.0:
+            keep = sorted([s for s in keep if abs(s - self.flare_end) > 0.45] + [self.flare_end])
         s = np.array(keep)
         Q = at_s(P, sP, s)
         t = s / L
@@ -796,7 +801,7 @@ class TreeBuilder:
             # no wood of it outside the climbing radius below the route's top, none over the axis,
             # where the walks that start at the top take their first step; rf = its radius as a
             # fraction of the trunk's: a thinner leader stands further from the axis)
-            p0 = top + lean * (0.96 - rf) * Rtop - Y * 0.5 * Rtop
+            p0 = top + lean * (0.92 - rf) * Rtop - Y * 0.5 * Rtop
             return p0, p0 + Y * length * 0.4, top + norm(Y + 0.45 * lean) * length, rf * Rtop
 
         def leader_room(lean, length, rf=0.46):
@@ -871,6 +876,7 @@ class TreeBuilder:
         def radius(i, ang):
             y = C[i][1]
             fall = math.exp(-(max(0.0, y) / (0.5 * R0)) ** 2)  # gone by the height the climb starts at
+            fall *= float(np.clip((P[0][1] + self.flare_end - 0.02 - y) / 0.4, 0.0, 1.0))
             lob = np.zeros_like(ang)
             # the ring's angle 0 is +X (start_normal) and grows toward T x N = Y x X = -Z
             for a0, amp in zip(self.root_ang, lobe_amp):
