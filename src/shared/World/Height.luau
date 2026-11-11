@@ -11,6 +11,8 @@
 -- ground stays continuous; inside the rectangle `at` is the verbatim port, bit for bit. Until
 -- configure is called (Data/WorldBoot does it once at boot), `at` is the v5.4 function everywhere.
 -- Interface additions: configure(ext?), terrainU(x, z), extensionMaterial(x, z), worldClamp()
+-- Building sites: `at` is `natural` (the port and the patches) with a level site cut for each building
+-- in SITES; natural(x, z), SITES, SITE_MARGIN, SITE_BANK.
 -- State: the configured extension table only; no side effects on require.
 
 local Height = {}
@@ -118,6 +120,10 @@ local ext: any = nil
 
 function Height.configure(e: any?)
 	ext = e
+	-- (the building sites below take their level from the configured ground)
+	for _, s in Height.SITES do
+		s.level = nil
+	end
 end
 
 local function smooth01(t: number): number
@@ -225,8 +231,43 @@ function Height.base(x: number, z: number): number
 	return Height.baseU(x / STUDS_PER_UNIT, z / STUDS_PER_UNIT) * STUDS_PER_UNIT
 end
 
-function Height.at(x: number, z: number): number
+-- The ground before any building site is cut into it (studs): the port and the D32 patches.
+function Height.natural(x: number, z: number): number
 	return Height.terrainU(x / STUDS_PER_UNIT, z / STUDS_PER_UNIT) * STUDS_PER_UNIT
+end
+
+-- Building sites (the interiors work, 2026-11-11). A building people walk into stands on a level site
+-- cut into the slope: v5.4's hospital sat in rising ground, which in voxels came up through the floor of
+-- its back rooms (as much as 5 st of grass indoors) and buried the staff exit 2 st deep. Inside a site
+-- (the lot's footprint and SITE_MARGIN round it) the ground is never above the height at the lot's
+-- centre, which is the building's seat; outside it the cut bank climbs back to the natural ground at
+-- SITE_BANK studs per stud. A site only ever lowers the ground. The list is static because this module
+-- has no requires; tests/unit/worldgen_enter.spec checks it against the lot data (every enterable lot
+-- that needs one has one, with the lot's own centre and footprint).
+Height.SITE_MARGIN = 6
+Height.SITE_BANK = 0.8
+type Site = { id: string, x: number, z: number, w: number, d: number, level: number? }
+local SITES: { Site } = {
+	{ id = "hospital_main", x = -890, z = 882.5, w = 235, d = 240 },
+	{ id = "west_police_station", x = -1275, z = -267.5, w = 115, d = 77.5 },
+}
+Height.SITES = SITES
+
+function Height.at(x: number, z: number): number
+	local h = Height.natural(x, z)
+	for _, s in SITES do
+		local level: number = s.level or Height.natural(s.x, s.z)
+		s.level = level
+		if h > level then
+			local dx = math.max(math.abs(x - s.x) - s.w / 2 - Height.SITE_MARGIN, 0)
+			local dz = math.max(math.abs(z - s.z) - s.d / 2 - Height.SITE_MARGIN, 0)
+			local cap = level + Height.SITE_BANK * math.sqrt(dx * dx + dz * dz)
+			if cap < h then
+				h = cap
+			end
+		end
+	end
+	return h
 end
 
 function Height.insideRiverWater(x: number, z: number): boolean

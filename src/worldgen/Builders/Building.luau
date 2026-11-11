@@ -5,10 +5,13 @@
 -- SurfaceGui sign on the front. Heights come from the lot's params (seeded from the v5.4 harvest:
 -- eaveU, peakU, roof, ridge) or the lot type (heightU). Also exports the roof and sign helpers the
 -- House and Interior families reuse.
--- Interface (BUILD_PLAN §1.4): plan(ctx); roof(ctx, eave, peak, kind, ridgeLocalX); sign(ctx, text, y)
+-- The art that makes the massing read as a building (window anatomy, door surrounds, steps and
+-- canopies, roof trim, corners, shop fronts) lives in Builders/Facade; this places it.
+-- Interface (BUILD_PLAN §1.4): plan(ctx); roof(ctx, eave, peak, kind, ridgeLocalX); sign(ctx, text, y);
+--   windows(ctx, base, top, avoid) -> grid; dress(ctx, eave, peak, flat, plinth); door(ctx, w, h)
 -- Pure (adds PartSpecs/ExtraSpecs to ctx.list).
 
-local Geometry = require("../Geometry")
+local Facade = require("./Facade")
 local Palette = require("../Palette")
 local Spec = require("../Spec")
 
@@ -58,41 +61,22 @@ function Building.heights(ctx: Spec.LotCtx): (number, number, string, boolean)
 	return eave, peak, kind, alongLocalX
 end
 
--- Two pitched plates from the eave line to the ridge (top faces meet at the peak).
+-- Two pitched plates from the eave line to the ridge (top faces meet at the peak; Facade.roofSides
+-- holds their geometry), the gable infill, and the trim that continues them: eaves, rakes, fascia and
+-- barge boards, a ridge cap and gutters (visual only: the plates are the roof a body stands on).
 function Building.roof(ctx: Spec.LotCtx, eave: number, peak: number, alongLocalX: boolean)
-	local W, D = ctx.W, ctx.D
-	local span = if alongLocalX then D else W -- horizontal run from eave to eave
-	local length = if alongLocalX then W else D -- along the ridge
-	local rise = peak - eave
-	local half = span / 2
-	local slope = math.sqrt(half * half + rise * rise)
-	local phi = math.atan2(rise, half)
-	for side = -1, 1, 2 do
-		-- plate centre on the slope line (offset half a plate thickness up the normal)
-		local u = side * half / 2 -- across-ridge coordinate of the plate centre
-		local nx, ny = side * math.sin(phi), math.cos(phi) -- outward (upper) normal in (across, up)
-		local cu, cy = u + nx * PLATE / 2, eave + rise / 2 + ny * PLATE / 2
-		local mx, mz, yaw = 0, cu, 0
-		if not alongLocalX then
-			mx, mz, yaw = cu, 0, math.pi / 2
-		end
-		-- choose the pitch sign so that the plate's inner (+Z local) end is the high end: evaluate it
-		local pitch = phi
-		local tip = Geometry.rotate({ 0, 0, slope / 2 }, yaw, pitch, 0)
-		local tipAcross = if alongLocalX then tip[3] else tip[1]
-		local tipHigher = tip[2] > 0
-		if (tipAcross * u < 0) ~= tipHigher then
-			pitch = -phi
-		end
-		ctx.list:add(ctx.frame, if side < 0 then "RoofA" else "RoofB", mx, cy, mz, length, PLATE, slope, {
-			yaw = yaw,
-			pitch = pitch,
+	local sides = Facade.roofSides(ctx, eave, peak, alongLocalX)
+	for _, s in sides do
+		ctx.list:add(ctx.frame, s.name, s.mx, s.cy, s.mz, s.length, PLATE, s.slope, {
+			yaw = s.yaw,
+			pitch = s.pitch,
 			color = Building.look(ctx).roof,
 			material = Building.look(ctx).roofMaterial,
 			role = "Roof",
 		})
 	end
 	Building.gableEnds(ctx, eave, peak, alongLocalX)
+	Facade.roofTrim(ctx, sides, eave, peak, alongLocalX, Facade.style(ctx))
 end
 
 -- Gable-end infill: two WedgeParts per end in the wall colour, just inside the end walls, so the
@@ -134,94 +118,28 @@ function Building.gableEnds(ctx: Spec.LotCtx, eave: number, peak: number, alongL
 	end
 end
 
--- Window panes on the four faces between `base` and `top` (studs above the seat): a trim panel and a
--- glass pane standing slightly proud of the wall, a grid of floors and bays sized from the face.
--- `avoid` lists door openings per face ("F", "B", "L", "R": { c = centre along the face, w = width }),
--- kept clear on the ground floor. Visual only (no collision).
+-- Windows on the four faces between `base` and `top` (studs above the seat): Facade.windowGrid places
+-- them (floors of bays, clear of the door openings in `avoid` on the ground floor: "F", "B", "L", "R" ->
+-- { c = centre along the face, w = width }) and Facade.windows draws each with its casing, glass,
+-- glazing bars and sill. Visual only (no collision). Returns the grid (interiors hang curtains on it).
 function Building.windows(
 	ctx: Spec.LotCtx,
 	base: number,
 	top: number,
-	avoid: { [string]: { { c: number, w: number } } }?
-)
-	local pal = Building.look(ctx)
-	local W, D = ctx.W, ctx.D
-	local height = top - base
-	if height < 5 then
-		return
-	end
-	local floors = math.clamp(math.floor(height / 9 + 0.3), 1, 3)
-	local floorH = height / floors
-	local winH = math.min(4.4, floorH * 0.5)
-	local winW = 3.2
-	local faces = {
-		{ id = "F", len = W, fixed = -D / 2, out = -1, alongX = true },
-		{ id = "B", len = W, fixed = D / 2, out = 1, alongX = true },
-		{ id = "L", len = D, fixed = -W / 2, out = -1, alongX = false },
-		{ id = "R", len = D, fixed = W / 2, out = 1, alongX = false },
-	}
-	for _, f in faces do
-		-- terraced quay rows hide their side walls: front and back only there
-		local side = not f.alongX
-		if f.len >= 9 and not (side and (pal.timber or f.len < 14)) then
-			local bays = math.clamp(math.floor(f.len / 12), 1, 5)
-			local gaps: { { c: number, w: number } } = {}
-			if avoid and avoid[f.id] then
-				gaps = avoid[f.id]
-			end
-			for fl = 1, floors do
-				local y = base + (fl - 0.5) * floorH + 0.3
-				for i = 1, bays do
-					local c = -f.len / 2 + f.len * (i - 0.5) / bays
-					local clear = true
-					if fl == 1 then
-						for _, g in gaps do
-							if math.abs(c - g.c) < g.w / 2 + winW / 2 + 0.6 then
-								clear = false
-							end
-						end
-					end
-					if clear then
-						for k, layer in
-							{ { d = 0.08, w = winW + 0.7, h = winH + 0.7 }, { d = 0.16, w = winW, h = winH } }
-						do
-							local depth = layer.d * 2
-							local off = f.fixed + f.out * (layer.d - depth / 2)
-							local mx, mz, sx, sz
-							if f.alongX then
-								mx, mz, sx, sz = c, off, layer.w, depth
-							else
-								mx, mz, sx, sz = off, c, depth, layer.w
-							end
-							ctx.list:add(
-								ctx.frame,
-								`{if k == 1 then "Frame" else "Win"}{f.id}{fl}_{i}`,
-								mx,
-								y,
-								mz,
-								sx,
-								layer.h,
-								sz,
-								{
-									color = if k == 1 then pal.trim else pal.window,
-									material = if k == 1 then "SmoothPlastic" else "Glass",
-									canCollide = false,
-									castShadow = false,
-									role = "Window",
-								}
-							)
-						end
-					end
-				end
-			end
-		end
-	end
+	avoid: { [string]: { Facade.Gap } }?
+): { Facade.Win }
+	local style = Facade.style(ctx)
+	-- quay houses: the mid timber band (Building.dress, eave * 0.51) is the storey line
+	local storey = if Building.look(ctx).timber then (top + 0.6) * 0.51 else nil
+	local grid = Facade.windowGrid(ctx, base, top, avoid, style, storey)
+	Facade.windows(ctx, grid, style)
+	return grid
 end
 
 -- Continuous ribbon windows (hospital, review 2026-11-09 "a plain box"): one glass band per floor on
 -- every face, broken around the ground-floor door openings in `avoid`, with an accent floor line under
 -- each band. Visual only.
-function Building.bands(ctx: Spec.LotCtx, base: number, top: number, avoid: { [string]: { { c: number, w: number } } }?)
+function Building.bands(ctx: Spec.LotCtx, base: number, top: number, avoid: { [string]: { Facade.Gap } }?)
 	local pal = Building.look(ctx)
 	local W, D = ctx.W, ctx.D
 	local height = top - base
@@ -317,9 +235,9 @@ function Building.bands(ctx: Spec.LotCtx, base: number, top: number, avoid: { [s
 	end
 end
 
--- Facade dressing: a stone plinth, a cornice strip under a flat roof, Tudor timber bands (quay) and
--- a chimney (houses with one in v5.4). Visual only (no collision), so physics and the checks are
--- unchanged.
+-- Facade dressing: a stone plinth, a cornice strip under a flat roof, Tudor timber bands, posts, braces
+-- and a jetty beam (quay), corner boards, quoins or pilasters by style, and a chimney with its cap and
+-- pots (houses with one in v5.4). Visual only (no collision), so physics and the checks are unchanged.
 function Building.dress(ctx: Spec.LotCtx, eave: number, peak: number, flat: boolean, plinth: boolean?)
 	local pal = Building.look(ctx)
 	local W, D = ctx.W, ctx.D
@@ -357,13 +275,26 @@ function Building.dress(ctx: Spec.LotCtx, eave: number, peak: number, flat: bool
 			add(`TimberF{i}`, 0, y, -D / 2 - 0.1, W + 0.1, 0.4, 0.2, Palette.OAK, "Wood")
 			add(`TimberB{i}`, 0, y, D / 2 + 0.1, W + 0.1, 0.4, 0.2, Palette.OAK, "Wood")
 		end
+		-- the posts stand on the plinth (top 1.2) and 0.28 proud: with their faces on the plinth's own
+		-- front plane (both 0.2 proud) the two flickered against each other along the whole quay
 		for i, x in { -W / 2, -W / 6, W / 6, W / 2 } do
-			add(`PostF{i}`, x, eave / 2, -D / 2 - 0.1, 0.45, eave, 0.2, Palette.OAK, "Wood")
+			add(`PostF{i}`, x, (eave + 1.2) / 2, -D / 2 - 0.09, 0.45, eave - 1.2, 0.38, Palette.OAK, "Wood")
 		end
 	end
+	if pal.timber then
+		Facade.timber(ctx, eave)
+	end
+	-- corners: from the plinth top (or the ground) to just under the cornice or the eave
+	Facade.corners(
+		ctx,
+		if flat then eave - 0.85 else eave - 0.06,
+		Facade.style(ctx),
+		if plinth ~= false then 1.2 else 0
+	)
 	if pal.chimney and peak > eave + 0.5 then
 		local h = peak - eave * 0.8 + 2.5
 		add("Chimney", -0.28 * W, eave * 0.8 + h / 2, 0.2 * D, 2.2, h, 2.2, CHIMNEY, "Brick")
+		Facade.chimneyCap(ctx, -0.28 * W, 0.2 * D, eave * 0.8 + h, 2.2, if pal.timber then 2 else 1)
 	end
 end
 
@@ -384,8 +315,20 @@ end
 -- Front door leaf on the front face (the body behind it is solid until W3 interiors). It stands 0.37
 -- studs proud of the wall and 0.17 proud of the plinth: with its face on the wall's own plane the two
 -- surfaces flickered against each other (owner: "the doors glitch and shimmer in a strobe light way").
-function Building.door(ctx: Spec.LotCtx, width: number, height: number)
-	ctx.list:add(ctx.frame, "Door", 0, height / 2, -ctx.D / 2 - 0.12, width, height, 0.5, {
+-- The sill is at the seat, or at the ground where the ground in front stands higher: a building is
+-- seated at the height of its centre, so on a slope its uphill wall is part buried, and 13 front doors
+-- stood 0.3 to 3.6 st under the grass. Such a door keeps its height where the wall allows and is never
+-- shorter than DOOR_MIN. Returns the sill and the leaf height (above the seat).
+Building.DOOR_MIN = 6.5
+function Building.door(ctx: Spec.LotCtx, width: number, height: number): (number, number)
+	local eave = Building.heights(ctx)
+	local sill = 0
+	local rise = Facade.doorGround(ctx, "F", 0, width)
+	if rise > 0.3 then
+		sill = rise
+		height = math.max(math.min(height, eave - 0.9 - sill), math.min(height, Building.DOOR_MIN))
+	end
+	ctx.list:add(ctx.frame, "Door", 0, sill + height / 2, -ctx.D / 2 - 0.12, width, height, 0.5, {
 		color = Building.look(ctx).door,
 		material = "Wood",
 		role = "Door",
@@ -400,6 +343,19 @@ function Building.door(ctx: Spec.LotCtx, width: number, height: number)
 		attrs = { Placeholder = true },
 	})
 	ctx.attributes.DoorOutside = true
+	Facade.entrance(ctx, {
+		name = "Door",
+		doorId = ctx.lot.id .. ":front",
+		face = "F",
+		c = 0,
+		w = width,
+		h = height,
+		y0 = sill,
+		proud = 0.37,
+		wallTop = eave,
+		canopy = true,
+	}, Facade.style(ctx))
+	return sill, height
 end
 
 function Building.plan(ctx: Spec.LotCtx)
@@ -415,14 +371,30 @@ function Building.plan(ctx: Spec.LotCtx)
 		Building.roof(ctx, eave, peak, alongX)
 	end
 	local doorW = math.min(3 * Spec.SPU, ctx.W * 0.5)
+	local doorH = math.min(3.5 * Spec.SPU, eave * 0.8)
+	local doorTop = doorH
 	if ctx.kit.door then
-		Building.door(ctx, doorW, math.min(3.5 * Spec.SPU, eave * 0.8))
+		local sill, leaf = Building.door(ctx, doorW, doorH)
+		doorTop = sill + leaf
 	end
-	Building.windows(ctx, 0.6, eave - 0.6, { F = if ctx.kit.door then { { c = 0, w = doorW } } else {} })
+	Building.windows(ctx, 0.6, eave - 0.6, { F = if ctx.kit.door then { { c = 0, w = doorW, top = doorTop } } else {} })
 	Building.dress(ctx, eave, peak, not gable)
+	local style = Facade.style(ctx)
+	if not gable then
+		Facade.flatRoof(ctx, eave, style, true)
+	end
 	local text = ctx.params.sign or ctx.kit.signText
 	if text then
-		Building.sign(ctx, text, math.min(eave - 1.4, 4.4 * Spec.SPU))
+		local y = math.min(eave - 1.4, 4.4 * Spec.SPU)
+		if pal.timber then
+			-- the fascia sign hangs under the storey line (worldgen_districts_art §3.4), clear of the door
+			y = math.min(eave * 0.51 - 1.55, 12)
+		elseif style.display and eave >= 16 then
+			-- on the fascia band over the shop front, under the cornice
+			y = math.min(eave - 2.6, 12.2)
+			Facade.band(ctx, y, style)
+		end
+		Building.sign(ctx, text, y)
 	end
 	ctx.attributes.EaveY = eave
 	ctx.attributes.PeakY = peak

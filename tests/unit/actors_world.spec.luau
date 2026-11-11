@@ -46,6 +46,13 @@ return function(t)
 			if x >= R.minX and x <= R.maxX and z >= R.minZ and z <= R.maxZ then
 				n += 1
 				local h = num(row[5]) * S
+				-- (a building site cuts the ground level under the hospital and the police station:
+				-- world_height.spec holds the cut to the sites; there the golden row is the ground
+				-- before the cut)
+				if Height.at(x * S, z * S) < Height.natural(x * S, z * S) then
+					t.near(Height.natural(x * S, z * S), h, 1e-6)
+					h = Height.at(x * S, z * S)
+				end
 				if math.abs(g.groundAt(x * S, z * S, -1e9) - h) > 1e-6 then
 					bad += 1
 				end

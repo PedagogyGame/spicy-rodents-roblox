@@ -522,7 +522,13 @@ function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { n
 		return nil, 0
 	end
 	if HospitalLayout.contains(layout, x, z) then
-		return { { layout.reception[1], layout.reception[2] } }, 1
+		-- already indoors: along the hospital's lanes to the check-in spot (never across a ward's beds
+		-- or through the desk)
+		local inside = HospitalLayout.walk(layout, x, z, layout.reception[1], layout.reception[2])
+		if #inside == 0 then
+			inside = { { layout.reception[1], layout.reception[2] } }
+		end
+		return inside, 1 -- (as good as there: the length only decides whether a walk in is worth it)
 	end
 	local points, len = self:sidewalkRoute(x, z)
 	if points then
@@ -1211,8 +1217,8 @@ end
 -- there is no way on foot (beyond the river; a search over its budget).
 local function wayHome(self: Service, layout: any, bed: any, hx: number, hz: number): ({ { number } }?, number)
 	if HospitalLayout.contains(layout, hx, hz) then
-		-- the hospital's own people: back to work through the ward door and reception
-		local points = { { bed.door[1], bed.door[2] }, { layout.reception[1], layout.reception[2] }, { hx, hz } }
+		-- the hospital's own people: back to their post along the lanes (the aisles, the ward doors)
+		local points = HospitalLayout.walk(layout, bed.x, bed.z, hx, hz)
 		return points, MedicalRoute.length(points)
 	end
 	local points = HospitalLayout.pathOut(layout, bed)
@@ -1247,9 +1253,11 @@ local function wayBack(self: Service, x: number, z: number, hx: number, hz: numb
 			return nil
 		end
 		if HospitalLayout.contains(layout, hx, hz) then
-			-- the hospital's own people: in through the door and reception
-			pushPoint(way, layout.reception[1], layout.reception[2])
-			pushPoint(way, hx, hz)
+			-- the hospital's own people: in through the door, then along the lanes to their post
+			local last = way[#way] or { x, z }
+			for _, p in HospitalLayout.walk(layout, last[1], last[2], hx, hz) do
+				pushPoint(way, p[1], p[2])
+			end
 			return way
 		end
 		-- the ambulance bay is outside: to the spot in front of the door, not through it
@@ -1371,12 +1379,15 @@ local function apply(self: Service, rec: Record, effect: any)
 	elseif kind == "arrive" then
 		self.hospital:admit(id, self.now)
 		if effect.by == "walk" and self.layout then
+			-- to the check-in spot along the hospital's lanes (in at the door, never through the wall
+			-- beside it or across the waiting room's seats)
 			local r = self.layout.reception
-			order(
-				self,
-				id,
-				{ mode = "route", points = { { r[1], r[2] } }, speed = self.tun.walkInSpeed, after = "stand" }
-			)
+			local a = actorOf(self, id)
+			local points = if a then HospitalLayout.walk(self.layout, a.x, a.z, r[1], r[2]) else {}
+			if #points == 0 then
+				points = { { r[1], r[2] } }
+			end
+			order(self, id, { mode = "route", points = points, speed = self.tun.walkInSpeed, after = "stand" })
 		end
 	elseif kind == "bed" then
 		local layout = self.layout

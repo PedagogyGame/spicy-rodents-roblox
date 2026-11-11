@@ -3,16 +3,22 @@
 -- The WorldBuild exit checks on the bake plans (BUILD_PLAN §4.4 #7, §6.5), shared by Lune
 -- (tools/bake/check.luau, tests/unit/world_checks.spec.luau) and the engine (tests/engine/WorldBuild):
 -- lot count equals data; no solid overlap between lots; every exterior door reachable from a
--- sidewalk; every route sample within surfaceRadius + 0.3 u of geometry or terrain except the
+-- sidewalk and standing on its threshold at ground level or on steps down to it (DoorSill);
+-- every route sample within surfaceRadius + 0.3 u of geometry or terrain except the
 -- routes in harvest_patches.json (each with a reason); Skyline for every building; the hospital's 8
--- brief rooms and the station's drone console exist; at least one lamp per road side.
+-- brief rooms and the station's drone console exist; at least one lamp per road side; every enterable
+-- room passes InteriorCheck (furnished, walkable, lit) and a body can walk from each building's door
+-- into every one of its rooms (EnterCheck).
 -- Interface: run(data?, plans?) -> Result { ok, failures, ... }
 -- Pure (reads generated data through Import).
 
 local Bake = require("./Bake")
 local DoorReach = require("./DoorReach")
+local DoorSill = require("./DoorSill")
+local EnterCheck = require("./EnterCheck")
 local Geometry = require("./Geometry")
 local Import = require("./Import")
+local InteriorCheck = require("./InteriorCheck")
 local Kits = require("./Kits")
 local RouteCheck = require("./RouteCheck")
 local Spec = require("./Spec")
@@ -32,6 +38,8 @@ local function solidParts(p: Spec.BuildPlan): { Spec.PartSpec }
 			and s.role ~= "Furniture"
 			and s.role ~= "Station"
 			and s.role ~= "Shelf"
+			and s.role ~= "Step"
+			and s.role ~= "Ceiling"
 		then
 			table.insert(out, s)
 		end
@@ -209,6 +217,35 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 	r.lamps = { roads = lampRoads, oneSided = lampShort }
 
 	Yield.breathe()
+	-- interiors: every enterable room furnished for its purpose, doorways and walkways clear, nothing
+	-- floating or buried, a light in every room
+	local interiors = InteriorCheck.run(plans)
+	r.interiors =
+		{ lots = interiors.lots, rooms = interiors.rooms, pieces = interiors.pieces, lights = interiors.lights }
+	if #interiors.failures > 0 then
+		table.insert(
+			failures,
+			`{#interiors.failures} interior failures: {table.concat(
+				interiors.failures,
+				"; ",
+				1,
+				math.min(#interiors.failures, 5)
+			)}`
+		)
+	end
+
+	Yield.breathe()
+	-- getting in: a body walks from the ground in front of the door into every room and out at the back
+	local enter = EnterCheck.run(plans, Height.at)
+	r.enter = { lots = enter.lots, rooms = enter.rooms, doors = enter.doors }
+	if #enter.failures > 0 then
+		table.insert(
+			failures,
+			`{#enter.failures} ways in blocked: {table.concat(enter.failures, "; ", 1, math.min(#enter.failures, 5))}`
+		)
+	end
+
+	Yield.breathe()
 	-- doors
 	local reach = DoorReach.run(plans, Height.at, Height.insideRiverWater)
 	r.doors = reach
@@ -216,6 +253,21 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 		table.insert(
 			failures,
 			`{#reach.unreachable} doors not reachable from a sidewalk: {table.concat(reach.unreachable, ", ")}`
+		)
+	end
+
+	-- every exterior door stands on its threshold at ground level, or on steps down to it
+	local sills = DoorSill.run(plans, Height.at)
+	r.sills = sills
+	if #sills.failures > 0 then
+		table.insert(
+			failures,
+			`{#sills.failures} doors off the ground: {table.concat(
+				sills.failures,
+				"; ",
+				1,
+				math.min(#sills.failures, 6)
+			)}`
 		)
 	end
 

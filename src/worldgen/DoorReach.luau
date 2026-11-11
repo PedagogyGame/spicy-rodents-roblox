@@ -14,7 +14,17 @@ local Spec = require("./Spec")
 local DoorReach = {}
 
 local CELL = 2.5
-local PASS_ROLES = { Door = true, Floor = true, Room = true, Anchor = true, Skyline = true, Sign = true, Pad = true }
+-- Step: the door steps are the way to the door, not a wall in front of it
+local PASS_ROLES = {
+	Door = true,
+	Floor = true,
+	Room = true,
+	Anchor = true,
+	Skyline = true,
+	Sign = true,
+	Pad = true,
+	Step = true,
+}
 
 function DoorReach.run(
 	plans: { Spec.BuildPlan },
