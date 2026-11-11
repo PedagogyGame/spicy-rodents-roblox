@@ -3,8 +3,11 @@
 --   position_jump       a hop
 --   teleport_unflagged  a hop of a car length or more, with no teleport flag on the pose being drawn:
 --                       the car streaks across the street (a wrap interpolated as if it were driving)
---   teleport_flagged    the same distance but the pose is a snap the server asked for (a wrap, an
---                       appearance): correct replication, still a car vanishing and reappearing in view
+--   teleport_flagged    the same distance but the pose is a snap the server asked for (a wrap, a
+--                       dispatch): correct replication, still a car vanishing here and reappearing
+--                       there. Counted as one pop (magnitude 1, like appear / disappear: every one is
+--                       reported, none outranks a real fault); detail.distance has the length and
+--                       detail.insideFrom / insideTo say how central both ends are
 -- `origin` says where it comes from: "sim" when the server's own state jumped around the instant being
 -- drawn (detail.truth: "flagged teleport" or "unflagged jump"), "stream" when the truth drove smoothly
 -- and only the reconstruction hopped.
@@ -65,11 +68,7 @@ local def: Detect.Def = {
 									truth, origin = "continuous", "stream"
 								end
 							end
-							local kind = if s.snap
-								then "teleport_flagged"
-								elseif d >= th.teleport then "teleport_unflagged"
-								else "position_jump"
-							ctx.flag(kind, frame, s, d, limit, "studs", {
+							local detail = {
 								origin = origin,
 								truth = truth,
 								from = { p.x, p.z },
@@ -77,7 +76,15 @@ local def: Detect.Def = {
 								insideFrom = Detect.inside(p.x, p.z),
 								insideTo = Detect.inside(s.x, s.z),
 								wireSpeed = speed,
-							})
+								distance = d,
+							}
+							if s.snap and d >= th.teleport then
+								ctx.flag("teleport_flagged", frame, s, 1, 1, "pop", detail)
+							elseif d >= th.teleport then
+								ctx.flag("teleport_unflagged", frame, s, d, limit, "studs", detail)
+							else
+								ctx.flag("position_jump", frame, s, d, limit, "studs", detail)
+							end
 						end
 					end
 				end

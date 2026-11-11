@@ -5,7 +5,8 @@
 -- network); that lag is not an error and is taken out here: the reference is the true pose at the
 -- server-clock instant `frame.ref` (the client clock minus the delay minus the stamp clock's offset).
 -- What is left is what the reconstruction got wrong: a car carried past its stop by extrapolation, held
--- back and then released, dragged along a teleport, or out of step with its stamps.
+-- back and then released, or out of step with its stamps. Where the truth itself teleports or jumps
+-- around that instant there is no one true pose to compare with: those frames are left to jumps.luau.
 -- detail.along / detail.across split the error along the true heading (positive: drawn ahead) and
 -- sideways; the summary's "drawn pose behind the server's pose" line has the plain lag.
 local Detect = require("../lib/Detect")
@@ -28,6 +29,12 @@ local def: Detect.Def = {
 			unit = "s",
 			why = "plus the distance driven in one simulation tick: a send can carry a state up to one tick older than its stamp",
 		},
+		{
+			key = "window",
+			value = 0.12,
+			unit = "s",
+			why = "frames within this of a true teleport or jump are jumps.luau's: one send interval plus a tick and margin",
+		},
 	},
 	new = function(ctx: Detect.Ctx): Detect.Hooks
 		local th = ctx.th
@@ -41,16 +48,18 @@ local def: Detect.Def = {
 						local limit = th.base + s.rspeed * th.tick
 						if err > limit then
 							local fx, fz = math.sin(s.ryaw), math.cos(s.ryaw)
-							local w = ctx.truth:window(id, (frame.ref :: number) - 0.12, (frame.ref :: number) + 0.12)
-							ctx.flag("rubber_band", frame, s, err, limit, "studs", {
-								along = dx * fx + dz * fz,
-								across = dx * fz - dz * fx,
-								origin = if w.flagged > 0 or w.jump > 0 then "sim" else "stream",
-								truth = if w.flagged > 0
-									then "flagged teleport"
-									elseif w.jump > 0 then "unflagged jump"
-									else "continuous",
-							})
+							local w = ctx.truth:window(
+								id,
+								(frame.ref :: number) - th.window,
+								(frame.ref :: number) + th.window
+							)
+							if w.flagged == 0 and w.jump == 0 then
+								ctx.flag("rubber_band", frame, s, err, limit, "studs", {
+									along = dx * fx + dz * fz,
+									across = dx * fz - dz * fx,
+									origin = "stream",
+								})
+							end
 						end
 					end
 				end

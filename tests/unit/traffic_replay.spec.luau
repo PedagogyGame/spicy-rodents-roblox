@@ -344,6 +344,8 @@ return function(t)
 		})
 		t.eq(#snap, 1)
 		t.eq(snap[1].kind, "teleport_flagged")
+		t.eq(snap[1].magnitude, 1, "a flagged teleport is one pop")
+		t.near((snap[1].detail :: any).distance, 300 + 20 / 60, 0.01)
 		-- the truth itself wraps (flagged) and the client draws it faithfully: origin sim
 		local wrapped = drive(def, {
 			truth = function(clock)
