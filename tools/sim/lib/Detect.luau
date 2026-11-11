@@ -33,6 +33,7 @@
 -- Severity is magnitude / limit: how many times over its limit an incident is. It ranks "the worst".
 -- Interface: load(dir?) -> { Def }; newBook(settings) -> Book; Book:ctx(def, env) -> Ctx; Book:sweep(t);
 --            Book:finish(); Book.incidents; Book.counts; Book.stats; wrapAngle(a); obbOverlap(a, b);
+--            bodyPoint(sample, along, across, up) (a point fixed to the car as drawn);
 --            inside(x, z) (studs inside the town's modelled rectangle; negative outside)
 --            bench(def, opts?) -> Bench (a detector on its own, fed by hand: for its spec)
 
@@ -53,6 +54,7 @@ export type Sample = {
 	z: number,
 	yaw: number,
 	pitch: number,
+	roll: number?, -- right side up (Ghost.seen); nil: level
 	speed: number, -- the speed on the wire (interpolated like the pose)
 	snap: boolean, -- this frame's pose is a snap to a snapshot flagged TELEPORTED
 	stopped: boolean,
@@ -196,6 +198,26 @@ function Detect.load(dir: string?): { Def }
 	return out
 end
 
+-- bodyPoint(s, along, across, up) -> x, y, z: a point fixed to the car as drawn (root pose, pitch, roll):
+-- `along` towards its nose, `across` to its right, `up` above its centre (studs). The car's right for
+-- HTML yaw is (-cos yaw, sin yaw), as Ghost.rootCFrame's RightVector.
+function Detect.bodyPoint(s: Sample, along: number, across: number, up: number): (number, number, number)
+	local fx, fz = math.sin(s.yaw), math.cos(s.yaw)
+	local cp, sp = math.cos(s.pitch), math.sin(s.pitch)
+	local r = s.roll or 0
+	local cr, sr = math.cos(r), math.sin(r)
+	-- pitched: forward F' = F cp + U sp, up U' = U cp - F sp; then rolled about F': right R'' = R cr + U' sr,
+	-- up U'' = U' cr - R sr
+	local Fx, Fy, Fz = fx * cp, sp, fz * cp
+	local Ux, Uy, Uz = -fx * sp, cp, -fz * sp
+	local Rx, Ry, Rz = -fz, 0, fx
+	local R2x, R2y, R2z = Rx * cr + Ux * sr, Ry * cr + Uy * sr, Rz * cr + Uz * sr
+	local U2x, U2y, U2z = Ux * cr - Rx * sr, Uy * cr - Ry * sr, Uz * cr - Rz * sr
+	return s.x + Fx * along + R2x * across + U2x * up,
+		s.y + Fy * along + R2y * across + U2y * up,
+		s.z + Fz * along + R2z * across + U2z * up
+end
+
 function Detect.wrapAngle(a: number): number
 	return math.atan2(math.sin(a), math.cos(a))
 end
@@ -243,6 +265,7 @@ local function copySeen(s: Sample): { [string]: any }
 		z = s.z,
 		yaw = s.yaw,
 		pitch = s.pitch,
+		roll = s.roll,
 		speed = s.speed,
 		snap = s.snap,
 		stopped = s.stopped,
@@ -443,7 +466,7 @@ export type Bench = {
 -- bench(def, opts?): one detector on its own, fed by hand, for the detector's spec
 -- (tests/unit/traffic_replay.spec.luau shows every detector on a bench).
 --   bench:tick(clock, { { id, x, z, yaw, visible, speed, teleported? } })   one true tick
---   bench:frame(t, { [id] = { x, z, yaw, vis?, y?, pitch?, speed?, snap? } }, ref?)
+--   bench:frame(t, { [id] = { x, z, yaw, vis?, y?, pitch?, roll?, speed?, snap? } }, ref?)
 --       one client frame at time t: what is drawn, and the server-clock instant it draws (`ref`: the
 --       reference pose is then read from the truth, as the replay does). y defaults to standing on the
 --       ground; the frame's dt is the time since the previous frame.
@@ -518,6 +541,7 @@ function Detect.bench(def: Def, opts: { [string]: any }?): Bench
 					z = p.z,
 					yaw = p.yaw or 0,
 					pitch = p.pitch or 0,
+					roll = p.roll,
 					speed = p.speed or 0,
 					snap = p.snap == true,
 					stopped = (p.speed or 0) < 0.05,

@@ -7,6 +7,7 @@ local LaneMath = require("@shared/Traffic/LaneMath")
 local Control = require("@shared/Traffic/Control")
 local Fleet = require("@shared/Traffic/Fleet")
 local Ghost = require("@shared/Traffic/Ghost")
+local VehiclePuppet = require("@shared/Traffic/VehiclePuppet")
 local Boxes = require("@shared/Traffic/Boxes")
 local Schemas = require("@shared/Net/Schemas")
 local Net = require("@shared/Net/Net")
@@ -455,6 +456,29 @@ return function(t)
 			end)
 			t.eq(flatY, 7)
 			t.eq(flatPitch, 0)
+			-- across a slope, given its track, the car leans with the road: right side up when the ground
+			-- rises to its right; level along the slope; a two-wheeler stays upright
+			local _, sidePitch, roll = Ghost.seat(10, 0, 0, 11, hill, 4) -- heading +z: its right is -x
+			t.near(sidePitch, 0, 1e-9)
+			t.near(roll, -math.atan(0.2), 1e-6, "the ground falls to its right")
+			local _, _, rollBack = Ghost.seat(10, 0, math.pi, 11, hill, 4)
+			t.near(rollBack, math.atan(0.2), 1e-6, "heading -z, its right is +x: uphill")
+			local _, _, untracked = Ghost.seat(10, 0, 0, 11, hill)
+			t.eq(untracked, 0)
+			t.eq(VehiclePuppet.track("motorcycle"), nil)
+			t.truthy((VehiclePuppet.track("sedan") :: number) > 0)
+			-- and the CFrame really lifts its right side: the seen pose's right wheel is on the ground
+			local roblox = require("@lune/roblox")
+			local lib = { CFrame = roblox.CFrame, Vector3 = roblox.Vector3 }
+			local pose: any = { x = 10, z = 0, yaw = 0, visible = true }
+			local x, sy, z, yaw, p, r = Ghost.seen(pose, "sedan", hill)
+			local cf = Ghost.rootCFrame(lib, x, sy, z, yaw, p, true, r)
+			local track = VehiclePuppet.track("sedan") :: number
+			local wheel = cf * roblox.Vector3.new(track / 2, -VehiclePuppet.baseOffset("sedan"), 0)
+			-- (the root turns about its centre, so its base slides a little sideways on a 11 degree crossfall)
+			t.near(wheel.Y, hill(wheel.X, wheel.Z), 0.1, "the right wheel stands on the slope")
+			local leftWheel = cf * roblox.Vector3.new(-track / 2, -VehiclePuppet.baseOffset("sedan"), 0)
+			t.near(leftWheel.Y, hill(leftWheel.X, leftWheel.Z), 0.1, "and so does the left")
 		end
 	)
 end

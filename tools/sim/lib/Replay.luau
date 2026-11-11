@@ -527,7 +527,7 @@ function Replay.run(opts: { [string]: any }?): Result
 				ids = {},
 			}
 			-- Ghost.render's pure half: what every root part is given this frame
-			Ghost.view(buf, now, kinds, heightAt, function(id, p, _k, x, y, z, yaw, pitch)
+			Ghost.view(buf, now, kinds, heightAt, function(id, p, _k, x, y, z, yaw, pitch, roll)
 				local live = traffic.byId[id]
 				local s: Detect.Sample = {
 					id = id,
@@ -537,6 +537,7 @@ function Replay.run(opts: { [string]: any }?): Result
 					z = z,
 					yaw = yaw,
 					pitch = pitch,
+					roll = roll,
 					speed = p.speed,
 					snap = p.teleported,
 					stopped = p.stopped,

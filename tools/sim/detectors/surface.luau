@@ -10,7 +10,7 @@
 -- on a wide road over sloping ground, and where two roads cross, the asphalt a player sees is not where
 -- World/Height says. ctx.bakedAt (lib/Baked: worldgen/Surface over the lot and road plans the bake
 -- builds, with the terrain under them) is that drawn ground. Checked under the four wheels of the car as
--- drawn (root pose, box size, pitch), every `every` frames, staggered by vehicle.
+-- drawn (root pose, box size, pitch, roll), every `every` frames, staggered by vehicle.
 local Detect = require("../lib/Detect")
 
 local def: Detect.Def = {
@@ -80,17 +80,12 @@ local def: Detect.Def = {
 					end
 					local box = ctx.vehicles[id].box
 					local hw, hh = box.width / 2, box.height / 2
-					local fx, fz = math.sin(s.yaw), math.cos(s.yaw)
-					local rx, rz = fz, -fx
-					local sinP, cosP = math.sin(s.pitch), math.cos(s.pitch)
 					local gaps: { number } = {}
 					local deepest, deepWhere, highest, highWhere = -math.huge, "", -math.huge, ""
 					local tops: { number } = {}
 					for k, w in WHEELS do
-						local along, across = w[1] * box.length, w[2] * hw
-						local forward = along * cosP + hh * sinP
-						local px, pz = s.x + fx * forward + rx * across, s.z + fz * forward + rz * across
-						local py = s.y + along * sinP - hh * cosP
+						-- the bottom of the box under each wheel, as drawn (pitch and roll included)
+						local px, py, pz = Detect.bodyPoint(s, w[1] * box.length, w[2] * hw, -hh)
 						local top = ctx.bakedAt(px, pz, py + th.maxAbove)
 						tops[k] = top
 						local gap = top - py -- > 0: the ground is above the tyre's bottom (buried)
@@ -111,19 +106,11 @@ local def: Detect.Def = {
 					end
 					if deepest > th.buried then
 						stats.buriedChecks += 1
-						ctx.flag(
-							"buried",
-							frame,
-							s,
-							deepest,
-							th.buried,
-							"studs",
-							{
-								where = deepWhere,
-								ground = math.max(table.unpack(tops)),
-								heightAt = ctx.heightAt(s.x, s.z),
-							}
-						)
+						ctx.flag("buried", frame, s, deepest, th.buried, "studs", {
+							where = deepWhere,
+							ground = math.max(table.unpack(tops)),
+							heightAt = ctx.heightAt(s.x, s.z),
+						})
 					end
 					if highest > th.hover then
 						stats.hoverChecks += 1

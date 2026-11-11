@@ -286,7 +286,7 @@ return function(t)
 		local ghost = fs.readFile("src/shared/Traffic/Ghost.luau")
 		local render = string.sub(ghost, (string.find(ghost, "function Ghost.render(", 1, true)) :: number)
 		t.truthy(string.find(render, "Ghost.view(buffer, now, kinds, heightAt,", 1, true), "render draws from view")
-		t.truthy(string.find(render, "Ghost.rootCFrame(lib, x, y, z, yaw, pitch, p.visible)", 1, true))
+		t.truthy(string.find(render, "Ghost.rootCFrame(lib, x, y, z, yaw, pitch, p.visible, roll)", 1, true))
 		t.falsy(string.find(render, "buffer:sample", 1, true), "render does not sample on its own")
 	end)
 end

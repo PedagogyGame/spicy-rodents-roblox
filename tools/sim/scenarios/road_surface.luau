@@ -1,15 +1,15 @@
 --!strict
--- Scenario: cars where the drawn road is not where World/Height puts them. Clients seat every ghost on
--- World/Height (Client/Render/VehicleView passes Height.at to Ghost.render), but the asphalt a player
--- sees is the bake's (worldgen/Plan.road): flat parts, level across the road's whole width at the height
--- of its centre line. Three places, each reached within a few seconds:
+-- Scenario: cars where the drawn road and World/Height disagree most. The bake lays roads as flat parts;
+-- level across their width (until 2026-11-11) they stood well off the terrain the ghosts were seated
+-- on. Three places, each reached within a few seconds:
 --   * the eastbound sedan climbing the commercial boulevard into the cross street at x = 867.5: the
---     cross street's slab is level across its 72.5 st at its own centre line's height, so on the
---     boulevard's slope its west edge stands up to 2.7 st above the boulevard (a ledge the car drives
---     straight into), and the boulevard's own slab is off the terrain by its crossfall
+--     cross street's slab stood up to 2.7 st proud of the boulevard (a ledge the car drove straight
+--     into), and the boulevard's own slab was off the terrain by its crossfall
 --   * the northbound sedan and the dump truck crossing the east-west streets at z = 405 (the same
 --     thing on a narrower street: 1.5 and 2.1 st)
 --   * the trolley on its track along the boulevard's edge (z = 22), where the crossfall is largest
+-- Fixed by rolling the road parts to the crossfall (Shared/World/RoadSurface, worldgen/Plan.road) and
+-- seating the ghosts on those parts, pitched and rolled with them (Traffic/Ghost.seat).
 local Fleet = require("@shared/Traffic/Fleet")
 local Replay = require("../lib/Replay")
 
@@ -35,9 +35,8 @@ local scenario: Replay.Scenario = {
 		sedanEB.s = 80 -- the cross street's west edge (x = 831) is at s = 128
 	end,
 	expect = {
-		none = { "sink", "float", "height_jump", "pitch_jump", "hover", "ledge" },
+		none = { "sink", "float", "height_jump", "pitch_jump", "roll_missing", "hover", "ledge", "buried" },
 	},
-	known = { "buried" },
 }
 
 return scenario
