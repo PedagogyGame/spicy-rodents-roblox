@@ -1,19 +1,20 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Minigames.MinigameClient
--- The minigame framework's client half (BUILD_PLAN §1.3 client frame, D28; brief v2 §13a, §15): walk up to a
--- lane, the dartboard or Madame Acorna and press E (the ProximityPrompts are the server's); the server seats you
--- and this opens the game: MinigameUI (how to play, controls, scorecard, banners, meter, Leave / Start now /
--- Play again), the game's controller (Minigames/BowlingClient, DartsClient; the fortune teller is a short
--- show), the game's camera (a scripted camera while it is your go; your own camera and legs back between
--- turns) and Q to leave. People only: the prompts are switched off on this screen while you are an animal or
--- in a vehicle, and while you are already playing; E then never also asks for a vehicle (PossessionClient
--- checks the "PromptVisible" / "InMinigame" attributes this sets on the local player).
--- Net: Minigame.Input { gameId, seat, verb, args } out; Minigame.State in (joined, state, event, dart, fortune,
--- left, refused; and for bowling "roll": one throw's script, sent to everyone and played back on the lane's
--- parts by BowlingPlayback whether or not you are in that game, and "rack": a throw was cut short).
--- Bowling extras here: the scorecard is rebuilt only when it changes, the end card (ranked scores, strikes,
--- spares, misses, Play again / Leave, the reset countdown), and a refusal is handed to the controller so a
--- refused throw puts the bowler straight back to aiming.
+-- The minigame framework's client half (BUILD_PLAN §1.3 client frame, D28; brief v2 §13, §15), and it names no
+-- game: walk up to a station (a lane, the dartboard, a table, a court) and press E (the ProximityPrompts are the
+-- server's); the server seats you and this opens the game from the registry (Client/Minigames/ClientGames; what
+-- a game may supply is in Client/Minigames/ClientGame): MinigameUI with the game's help card, buttons, scorecard
+-- and end card, the game's controller, the game's camera (a scripted camera while it is your go; your own
+-- camera and legs back between turns) and Q to leave. People only: the prompts are switched off on this screen
+-- while you are an animal or in a vehicle, and while you are already playing; E then never also asks for a
+-- vehicle (PossessionClient checks the "PromptVisible" / "InMinigame" attributes this sets on the local player).
+-- Net: Minigame.Input { gameId, seat, verb, args } out; Minigame.State in. The framework's own kinds: joined
+-- (opens the game; carries the station's site and place), state (scorecard, buttons, end card, the controller's
+-- onState), event (a banner), left (closes it, always with words), refused (words on screen; the controller's
+-- onRefused, so a refused input puts the player straight back in control). Every other kind is the game's own:
+-- one a game lists in `kinds` was sent to EVERYONE and goes to that game's `watch` whether or not you are in
+-- it (a bowling throw is played back on the lane you are only watching), and then, like any other kind of the
+-- station you are at, to the controller's onMessage.
 -- Interface: start(opts) -> Client { active() -> stationId? }; opts = { state: () -> { species, device },
 --   current: () -> Model?, toast: (text, seconds?) -> (), refreshCamera: () -> (), flushInput: (() -> ())? }
 -- Every game here follows three rules of the main client: its own camera shots sit between CameraRig.hold(true)
@@ -22,30 +23,26 @@
 -- (a game opens, a game closes, a controller's turn begins) pending input is flushed.
 
 local Import = require("../Import")
-local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
+local Games = Import.shared("Minigames/Games") :: typeof(require("../../shared/Minigames/Games"))
+local Sites = Import.shared("Minigames/Sites") :: typeof(require("../../shared/Minigames/Sites"))
 local InputMap = require("../Input/InputMap")
 local CameraRig = require("../Camera/CameraRig")
 local MinigameUI = require("../UI/MinigameUI")
-local BowlingClient = require("./BowlingClient")
-local BowlingPlayback = require("./BowlingPlayback")
-local DartsClient = require("./DartsClient")
+local ClientGame = require("./ClientGame")
+local ClientGames = require("./ClientGames")
 local MinigameSounds = require("./MinigameSounds")
-local Referee = Import.shared("Minigames/Bowling/Referee") :: typeof(require("../../shared/Minigames/Bowling/Referee"))
-local RollScript =
-	Import.shared("Minigames/Bowling/RollScript") :: typeof(require("../../shared/Minigames/Bowling/RollScript"))
 
 local MinigameClient = {}
 
-local FORTUNE_HELP = {
-	how = {
-		"Madame Acorna reads your fortune for free: no coins, no prizes, never any money.",
-		"Three of a kind on the reels is a Grand Omen.",
-	},
-	keys = { "E  pull the lever again", "Q  walk away" },
-}
+type Place = ClientGame.Place
 
 local CAMERA_BIND = "SpicyMinigameCamera"
+local PLAIN_HELP = { how = { "" }, keys = { "Q  leave" } }
+local LEAVE = { "leave", "Leave (Q)" }
+-- what a player taken off a table reads when neither the server nor the game has its own words
+local IDLE_WORDS = "You were taken out of the game: two turns in a row went unplayed"
+local FINISHED_WORDS = "That game is over and the table has reset. Press E there to play again."
 
 function MinigameClient.start(opts: { [string]: any }): any
 	local Players = game:GetService("Players")
@@ -58,7 +55,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 	local inputR = net and net:WaitForChild("Minigame.Input", 10) :: RemoteEvent?
 	local stateR = net and net:WaitForChild("Minigame.State", 10) :: RemoteEvent?
 	if inputR == nil or stateR == nil then
-		warn("MinigameClient: Net Minigame remotes missing; the alley's games are off on this screen")
+		warn("MinigameClient: Net Minigame remotes missing; the minigames are off on this screen")
 		return {
 			active = function()
 				return nil
@@ -66,16 +63,67 @@ function MinigameClient.start(opts: { [string]: any }): any
 		}
 	end
 	local ui = MinigameUI.new()
-	local place: { x: number, z: number, floorY: number, yaw: number }? = nil -- AlleyLayout.Place
-	pcall(function()
-		local mod = Data.default():module("Attractions") :: any
-		local a = mod and mod.attractions and mod.attractions[1]
-		if a then
-			place = { x = a.place.x, z = a.place.z, floorY = a.place.floorY, yaw = a.place.yaw }
-		end
-	end)
 
-	local active: { [string]: any }? = nil -- { station, game, seat, controller }
+	-- Where each site stands: told by the server when you join; before that (a throw on a lane you are only
+	-- watching) read from the compiled data, the bowling alley first and the expansion venues only if asked for.
+	local learned: { [string]: Place } = {}
+	local alleySites: { [string]: Place }? = nil
+	local allSites: { [string]: Place }? = nil
+	local stationSite: { [string]: string } = {}
+	local function dataSites(expansion: boolean): { [string]: Place }
+		local out: { [string]: Place } = {}
+		pcall(function()
+			out = Sites.fromData(Data.default(), expansion)
+		end)
+		return out
+	end
+	local function sitePlace(site: string): Place?
+		if learned[site] then
+			return learned[site]
+		end
+		local near = alleySites or dataSites(false)
+		alleySites = near
+		if near[site] then
+			return near[site]
+		end
+		local all = allSites or dataSites(true)
+		allSites = all
+		return all[site]
+	end
+	local function siteOf(station: string): string?
+		if stationSite[station] == nil then
+			local near = alleySites or dataSites(false)
+			alleySites = near
+			for _, def in Games.stations(near) do
+				stationSite[def.id] = def.site
+			end
+			if stationSite[station] == nil then
+				local all = allSites or dataSites(true)
+				allSites = all
+				for _, def in Games.stations(all) do
+					stationSite[def.id] = def.site
+				end
+			end
+		end
+		return stationSite[station]
+	end
+	local function placeOf(msg: { [string]: any }): Place?
+		local site = msg.site
+		local told = Sites.place(msg)
+		if told then
+			if type(site) == "string" then
+				learned[site] = told
+			end
+			return told
+		end
+		if type(site) ~= "string" and type(msg.station) == "string" then
+			site = siteOf(msg.station)
+		end
+		return if type(site) == "string" then sitePlace(site) else nil
+	end
+
+	local active: { [string]: any }? = nil -- { station, game, seat, controller, cg, modes, phase }
+	local lingering: any = nil -- the controller of a game whose card is still up after the server let go
 	local camOn = false
 	local camCF: CFrame? = nil
 	local camFov = 70
@@ -147,16 +195,13 @@ function MinigameClient.start(opts: { [string]: any }): any
 		end
 		lastButtons = sig
 		ui:buttons(list, function(id: string)
-			if id == "leave" then
-				send("leave")
-			elseif id == "start" then
-				send("start")
-			elseif id == "addai" then
-				send("addai")
-			elseif id == "again" then
-				send("again")
-			elseif id == "501" or id == "cricket" then
+			-- a button's id is the verb it sends; one of the lobby's choices is sent as the mode
+			local a = active
+			local modes = a and a.modes
+			if type(modes) == "table" and table.find(modes, id) then
 				send("mode", { id })
+			else
+				send(id)
 			end
 		end)
 	end
@@ -166,6 +211,14 @@ function MinigameClient.start(opts: { [string]: any }): any
 	local function flushInput()
 		if opts.flushInput then
 			opts.flushInput()
+		end
+	end
+
+	local function endLinger()
+		local c = lingering
+		lingering = nil
+		if c then
+			c:stop()
 		end
 	end
 
@@ -192,13 +245,30 @@ function MinigameClient.start(opts: { [string]: any }): any
 		if active then
 			close()
 		end
+		endLinger()
 		flushInput()
-		local p = place
-		active = { station = msg.station, game = msg.game, seat = msg.seat, lane = msg.lane }
+		local p = placeOf(msg)
+		local cg = ClientGames.get(msg.game)
+		local spec = Games.get(msg.game)
+		local a: { [string]: any } = {
+			station = msg.station,
+			game = msg.game,
+			seat = msg.seat,
+			lane = msg.lane,
+			cg = cg,
+			modes = spec and spec.rules and spec.rules.MODES,
+		}
+		active = a
 		player:SetAttribute("InMinigame", msg.station)
-		local ctx = {
+		local label = tostring(msg.label)
+		local ctx: ClientGame.Ctx = {
+			station = msg.station,
+			game = msg.game,
+			label = label,
 			place = p,
 			lane = msg.lane,
+			index = msg.index or msg.lane,
+			variant = msg.variant,
 			ui = ui,
 			send = send,
 			camera = camera,
@@ -209,27 +279,19 @@ function MinigameClient.start(opts: { [string]: any }): any
 			body = function(): Model?
 				return opts.current()
 			end,
+			sound = MinigameSounds.play,
 		}
-		if msg.game == "bowling" and p then
-			ui:open("bowling", `Bowling - {msg.label}`, BowlingClient.HELP);
-			(active :: any).controller = BowlingClient.new(ctx)
-			setButtons({ { "start", "Start now" }, { "addai", "Add a computer" }, { "leave", "Leave (Q)" } })
-		elseif msg.game == "darts" and p then
-			ui:open("darts", "Darts", DartsClient.HELP);
-			(active :: any).controller = DartsClient.new(ctx)
-			setButtons({
-				{ "501", "501" },
-				{ "cricket", "Cricket" },
-				{ "addai", "+ Computer" },
-				{ "start", "Start" },
-				{ "leave", "Leave (Q)" },
-			})
-		elseif msg.game == "fortune_machine" then
-			ui:open("fortune", "Madame Acorna", FORTUNE_HELP)
-			setButtons({ { "again", "Pull again" }, { "leave", "Walk away (Q)" } })
+		-- (a game whose controller needs to know where its station stands is not opened without that)
+		if cg and (p ~= nil or cg.placeless == true or cg.new == nil) then
+			local title = if cg.title then cg.title(msg) else (spec and spec.title) or label
+			ui:open(msg.game, title, cg.help or PLAIN_HELP)
+			if cg.new then
+				a.controller = cg.new(ctx)
+			end
+			setButtons((cg.buttons and cg.buttons("joined", nil)) or { LEAVE })
 		else
-			ui:open(msg.game, tostring(msg.label), { how = { "" }, keys = { "Q  leave" } })
-			setButtons({ { "leave", "Leave (Q)" } })
+			ui:open(msg.game, label, PLAIN_HELP)
+			setButtons({ LEAVE })
 		end
 		opts.toast(`You joined {msg.label}. Q leaves.`, 3)
 	end
@@ -240,6 +302,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 		local ok, err = (pcall :: any)(function()
 			local kind = msg.kind
 			local a = active
+			local owner = if type(kind) == "string" then ClientGames.ownerOf(kind) else nil
 			if kind == "joined" then
 				open(msg)
 			elseif kind == "refused" then
@@ -248,68 +311,58 @@ function MinigameClient.start(opts: { [string]: any }): any
 				if a and a.controller and a.controller.onRefused then
 					a.controller:onRefused(msg)
 				end
-			elseif kind == "roll" then
-				-- a bowling throw on ANY lane (you may only be watching): play the server's script on the
-				-- lane's parts. A damaged script is not played; the server's own copy of the motion shows.
-				local script, why = RollScript.check(msg.script)
-				local lane = tonumber(msg.lane)
-				if script == nil or lane == nil then
-					warn(`MinigameClient: a bowling throw could not be played ({why})`)
-				else
-					BowlingPlayback.play(place, lane, script, MinigameSounds.play)
-				end
-				-- the bowler is told either way: the server HAS counted this throw, so their controller must
-				-- stop waiting for an answer (with no script it simply does not ride the camera behind the ball)
-				if a and msg.station == a.station and a.controller and a.controller.onRoll then
-					a.controller:onRoll(msg, if lane then script else nil)
-				end
-			elseif kind == "rack" then
-				local lane = tonumber(msg.lane)
-				if lane and type(msg.mask) == "table" then
-					BowlingPlayback.stop(lane, place, msg.mask)
+			elseif owner then
+				-- a game's message to everyone (you may only be watching): the game shows it; the player
+				-- seated at that station hears of it too (their controller must stop waiting for an answer)
+				local watched = if owner.watch then owner.watch(msg, placeOf(msg)) else nil
+				if a and msg.station == a.station and a.controller and a.controller.onMessage then
+					a.controller:onMessage(msg, watched)
 				end
 			elseif a == nil or msg.station ~= a.station then
 				return
 			elseif kind == "state" then
 				a.seat = msg.you or a.seat
 				local view = msg.view
+				local cg = a.cg :: ClientGame.ClientGame?
 				a.phase = view.phase
 				-- the scorecard is only rebuilt when what it shows has changed (state arrives every second)
 				local sig = ""
 				pcall(function()
 					local g = view.game
+					-- (no holes: a nil in the middle of a list is where an encoder may stop reading it)
 					sig = game:GetService("HttpService"):JSONEncode({
 						view.phase,
-						view.turn,
+						view.turn or false,
 						view.seats,
-						g and g.seats,
-						g and g.mode,
-						view.mode,
-						msg.you,
+						(g and g.seats) or false,
+						view.mode or false,
+						msg.you or false,
+						(cg and cg.cardSig and cg.cardSig(view)) or false,
 					})
 				end)
 				if sig == "" or sig ~= lastCard then
 					lastCard = sig
-					if a.game == "bowling" then
-						ui:scoreBowling(view, msg.you)
-					elseif a.game == "darts" then
-						ui:scoreDarts(view, msg.you)
+					if cg and cg.card then
+						ui:clearCard()
+						cg.card(ui.card, view, msg.you, MinigameUI.kit)
 					end
 				end
-				if a.controller then
+				if a.controller and a.controller.onState then
 					a.controller:onState(msg)
 				end
-				-- (as two flags: tested in the branches themselves, the checker takes the first test's
-				-- failing for "it is the fortune machine" and objects to the second)
-				local fortune, bowling = a.game == "fortune_machine", a.game == "bowling"
-				if view.phase == "done" and not fortune then
-					setButtons({ { "again", "Play again" }, { "leave", "Leave (Q)" } })
-				elseif view.phase == "playing" and bowling then
-					setButtons({ { "leave", "Leave (Q)" } })
+				local list: { { string } }? = nil
+				if cg and cg.buttons then
+					list = cg.buttons(view.phase, view)
+				elseif view.phase == "done" then
+					list = { { "again", "Play again" }, LEAVE }
 				end
-				-- bowling's end card: ranked scores and what to press, with the reset counting down
-				if a.game == "bowling" and view.phase == "done" then
-					ui:summary(Referee.summary(view), msg.you, view.doneLeft, function()
+				if list then
+					setButtons(list)
+				end
+				-- the end card: ranked scores and what to press, with the reset counting down
+				local sum = if cg and cg.endCard and view.phase == "done" then cg.endCard(view, msg.you) else nil
+				if sum then
+					ui:summary(sum, msg.you, view.doneLeft, function()
 						send("again")
 					end, function()
 						send("leave")
@@ -319,59 +372,42 @@ function MinigameClient.start(opts: { [string]: any }): any
 				end
 			elseif kind == "event" then
 				ui:banner(tostring(msg.text), msg.big == true)
-				if msg.mark == "X" then
-					MinigameSounds.play("strike", 1)
-				elseif msg.mark == "/" then
-					MinigameSounds.play("spare", 1)
+				if a.controller and a.controller.onMessage then
+					a.controller:onMessage(msg, nil)
 				end
-			elseif kind == "dart" then
-				ui:banner(tostring(msg.text), msg.event == "checkout" or msg.event == "win" or msg.event == "bust")
-			elseif kind == "fortune" then
-				-- the show: the camera on the cabinet while the reels spin, then the printed card
-				local p = place
-				if p then
-					local f = AlleyLayout.FORTUNE
-					local eye = Vector3.new(AlleyLayout.toWorld(p, f.x - 3.6, 5.2, f.d - 3.6))
-					local look = Vector3.new(AlleyLayout.toWorld(p, f.x, 3.4, f.d))
-					camera(CFrame.lookAt(eye, look), 45)
-				end
-				ui:status("The reels are spinning...")
-				local reveal = tonumber(msg.reveal) or 2.5
-				task.delay(reveal, function()
-					local title = if msg.card == "omen"
-						then "A GRAND OMEN"
-						elseif msg.card == "taunt" then "THE MACHINE SAYS"
-						else "YOUR FORTUNE"
-					ui:card(title, tostring(msg.line or ""), 8)
-					ui:status("Pull again (E) or walk away (Q)")
-					releaseCamera()
-				end)
 			elseif kind == "left" then
-				if a.game == "fortune_machine" and msg.why == "finished" then
-					-- keep the card up a moment; the cabinet frees itself for the next pull
+				local cg = a.cg :: ClientGame.ClientGame?
+				if cg and cg.linger and msg.why == "finished" then
+					-- keep the card up a moment; the station frees itself for the next player
 					player:SetAttribute("InMinigame", nil)
+					lingering = a.controller
 					active = nil
-					task.delay(5, function()
+					task.delay(cg.linger, function()
 						if active == nil then
+							endLinger()
 							ui:close()
 						end
 					end)
 				else
 					close()
+					local words = cg and cg.words
 					if type(msg.text) == "string" and msg.text ~= "" then
 						opts.toast(msg.text, 4)
 					elseif msg.why == "idle" then
-						opts.toast("You were taken off the lane: two turns in a row went unplayed", 4)
+						opts.toast((words and words.idle) or IDLE_WORDS, 4)
 					elseif msg.why == "too far" then
 						opts.toast("You walked away from the game", 3)
 					elseif msg.why == "not a person" then
 						opts.toast("You were taken out of the game", 3)
 					elseif msg.why == "finished" then
-						opts.toast("That game is over and the lane has reset. Press E at a lane to play again.", 4)
+						opts.toast((words and words.finished) or FINISHED_WORDS, 4)
 					elseif msg.why == "left" then
 						opts.toast("You left the game", 2)
 					end
 				end
+			elseif a.controller and a.controller.onMessage then
+				-- a kind of the game's own
+				a.controller:onMessage(msg, nil)
 			end
 		end)
 		if not ok then
@@ -379,7 +415,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 		end
 	end)
 
-	-- Q leaves, H toggles the help card, Space starts a lobby early
+	-- Q leaves, H toggles the help card, Space starts a lobby early; a game may add keys of its own
 	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 		if InputMap.ignore(io, processed) then
 			return
@@ -389,12 +425,14 @@ function MinigameClient.start(opts: { [string]: any }): any
 			return
 		end
 		local k = io.KeyCode
+		local cg = a.cg :: ClientGame.ClientGame?
+		local own = cg and cg.keys and cg.keys[k.Name]
 		if k == Enum.KeyCode.Q or k == Enum.KeyCode.ButtonB then
 			send("leave")
 		elseif k == Enum.KeyCode.H then
 			ui:toggleHelp()
-		elseif k == Enum.KeyCode.E and a.game == "fortune_machine" then
-			send("again")
+		elseif own then
+			send(own)
 		elseif k == Enum.KeyCode.Space and a.phase == "lobby" then
 			send("start")
 		end
@@ -423,26 +461,28 @@ function MinigameClient.start(opts: { [string]: any }): any
 		acc = 0
 		local st = opts.state()
 		local person = st.species == "human" and st.device == nil
+		-- every baked place with games in it (the bowling alley, the venues) keeps its prompts in its own folder
 		local att = workspace:FindFirstChild("Attractions")
-		local alley = att and att:FindFirstChild("BowlingAlley")
-		local folder = alley and alley:FindFirstChild("MinigamePrompts")
-		if folder then
-			for _, part in folder:GetChildren() do
-				local prompt = part:FindFirstChildOfClass("ProximityPrompt")
-				if prompt then
-					local want = person and active == nil
-					if prompt.Enabled ~= want then
-						prompt.Enabled = want
+		for _, site in if att then att:GetChildren() else {} do
+			local folder = site:FindFirstChild("MinigamePrompts")
+			if folder then
+				for _, part in folder:GetChildren() do
+					local prompt = part:FindFirstChildOfClass("ProximityPrompt")
+					if prompt then
+						local want = person and active == nil
+						if prompt.Enabled ~= want then
+							prompt.Enabled = want
+						end
 					end
 				end
 			end
-		end
-		-- the push-bar doors are for people too (a squirrel's E is its grab)
-		local doors = alley and alley:FindFirstChild("Doors")
-		if doors then
-			for _, d in doors:GetDescendants() do
-				if d:IsA("ProximityPrompt") and d.Enabled ~= person then
-					d.Enabled = person
+			-- the push-bar doors are for people too (a squirrel's E is its grab)
+			local doors = site:FindFirstChild("Doors")
+			if doors then
+				for _, d in doors:GetDescendants() do
+					if d:IsA("ProximityPrompt") and d.Enabled ~= person then
+						d.Enabled = person
+					end
 				end
 			end
 		end

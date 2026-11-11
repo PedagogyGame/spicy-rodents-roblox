@@ -280,6 +280,10 @@ function MinigameService._ctx(self: any, st: Station): ServerGame.Ctx
 			self:_broadcast(st, stamped(payload))
 		end,
 		everyone = function(payload: { [string]: any })
+			-- (a watcher never joined: the site tells its client where the station stands)
+			if payload.site == nil then
+				payload.site = st.site
+			end
 			self:_everyone(st, stamped(payload))
 		end,
 		apply = function(key: any, verb: string, args: { any }?): (boolean, string?)
