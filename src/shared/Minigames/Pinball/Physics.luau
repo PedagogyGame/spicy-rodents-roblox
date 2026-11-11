@@ -46,16 +46,18 @@ Physics.MAX_SUBSTEPS = 12
 Physics.ROLL_DECEL = 0.2 -- studs/s^2 of rolling resistance
 Physics.REST_V0 = 0.15 -- below this speed into a surface nothing bounces back
 Physics.REST_V1 = 0.6 -- from here up the surface's full liveliness
-Physics.FLIP_ACC_UP = 1000 -- rad/s^2 under the power winding of the coil
+Physics.FLIP_ACC_UP = 1100 -- rad/s^2 under the power winding of the coil
 Physics.FLIP_ACC_HOLD = 250 -- rad/s^2 under the hold winding (once the flipper has reached its top stop)
 Physics.FLIP_W_MAX = 40 -- rad/s
+Physics.FLIP_W_SETTLE = 1.5 -- rad/s: how fast a flipper that has bounced off its top stop comes back to it
 Physics.FLIP_ACC_DOWN = 240 -- rad/s^2 under the return spring
+Physics.FLIP_ACC_BRAKE = 1000 -- rad/s^2 that stops a flipper let go on its way up
 Physics.FLIP_W_DOWN = 22
 Physics.FLIP_STOP_E = 0.12 -- how much of its speed the flipper keeps bouncing off the top stop
 Physics.FLIP_REST_E = 0.2 -- and off the bottom one
 Physics.FLIP_BOUNCE_MIN = 2 -- rad/s: slower than this it simply stops
 Physics.FLIP_E = 0.55 -- flipper rubber
-Physics.FLIP_MU = 0.4 -- flipper rubber grips: without it the ball is slung off the tip from anywhere
+Physics.FLIP_MU = 0.2 -- flipper rubber grips: with none the ball is slung off the tip from anywhere, with too much every shot leaves square to the flipper; this spreads the shots along its length (tools/pinball/calibrate.luau)
 Physics.BUMPER_KICK = 6.5 -- studs/s outward, whatever the ball came in at
 Physics.BUMPER_MIN = 0.3 -- the skirt needs this much of a touch to fire
 Physics.BUMPER_E = 0.5 -- a dead bumper (tilt, or too soft a touch) is a rubber post
@@ -580,21 +582,35 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 		if pressed then
 			local up = c.fup[i]
 			if a0 < up or w ~= 0 then
-				w += (if s.fh[i] then Physics.FLIP_ACC_HOLD else Physics.FLIP_ACC_UP) * DT
-				if w > Physics.FLIP_W_MAX then
-					w = Physics.FLIP_W_MAX
+				if s.fh[i] then
+					-- on the hold winding it comes back to its stop gently
+					w += Physics.FLIP_ACC_HOLD * DT
+					if w > Physics.FLIP_W_SETTLE then
+						w = Physics.FLIP_W_SETTLE
+					end
+				else
+					w += Physics.FLIP_ACC_UP * DT
+					if w > Physics.FLIP_W_MAX then
+						w = Physics.FLIP_W_MAX
+					end
 				end
 				a1 = a0 + w * DT
 				if a1 >= up then
 					a1 = up
 					s.fh[i] = true
 					w = if w > Physics.FLIP_BOUNCE_MIN then -w * Physics.FLIP_STOP_E else 0
+				elseif a1 <= c.frest[i] then
+					-- pressed again while still falling: it lands on its rest stop and starts from there
+					a1 = c.frest[i]
+					w = 0
 				end
 			end
 		else
 			local rest = c.frest[i]
 			if a0 > rest or w ~= 0 then
-				w -= Physics.FLIP_ACC_DOWN * DT
+				-- let go on the way up, the flipper coasts on a little against the spring and its own drag (a
+				-- short tap is a short flick); then it falls
+				w -= (if w > 0 then Physics.FLIP_ACC_BRAKE else Physics.FLIP_ACC_DOWN) * DT
 				if w < -Physics.FLIP_W_DOWN then
 					w = -Physics.FLIP_W_DOWN
 				end
@@ -602,6 +618,9 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 				if a1 <= rest then
 					a1 = rest
 					w = if -w > Physics.FLIP_BOUNCE_MIN then -w * Physics.FLIP_REST_E else 0
+				elseif a1 >= c.fup[i] then
+					a1 = c.fup[i]
+					w = if w > Physics.FLIP_BOUNCE_MIN then -w * Physics.FLIP_STOP_E else 0
 				end
 			end
 		end

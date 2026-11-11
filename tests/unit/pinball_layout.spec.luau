@@ -95,10 +95,10 @@ return function(t: Test.T)
 			-- mirror images about the playfield's centre line
 			t.near(l.x + r.x, 2 * Layout.XC, 1e-9)
 			t.eq(l.y, r.y)
-			-- the flipper is a real flipper's size (3 inches on a 20.25 inch table) and swings 50 to 65 degrees
+			-- the flipper is a real flipper's size (3 inches on a 20.25 inch table) and swings 50 to 70 degrees
 			t.near(l.len / Layout.WIDTH, 3 / 20.25, 0.02)
 			local swing = math.deg(l.up - l.rest)
-			t.truthy(swing >= 50 and swing <= 65, `swing {swing}`)
+			t.truthy(swing >= 50 and swing <= 70, `swing {swing}`)
 			-- the gap between the tips at rest lets a ball through, and is no wider than three balls
 			local tipL = l.x + Det.cos(l.rest) * l.len + l.rTip
 			local tipR = r.x - Det.cos(r.rest) * r.len - r.rTip

@@ -115,7 +115,7 @@ do
 	Layout.lamp(def, "ramp_r", mx(0.82), 2.4, "white")
 
 	-- The lock pods. Each is the blind end of the alley between the orbit's inner guide and a ramp: a kick-out
-	-- hole under a horseshoe, shot from the far flipper. A roof from the guide down to the back of the ramp
+	-- hole under a horseshoe, shot from the far flipper, that drops the ball back onto the flipper below it. A roof from the guide down to the back of the ramp
 	-- keeps a ball from the asteroid field out of the alley and sheds it into the middle of the table; every
 	-- wall of the alley slopes, so a ball that is not swallowed rolls back out.
 	local PX, PY, PR = 0.44, 2.86, 0.125
@@ -137,11 +137,11 @@ do
 	Layout.post(def, mx(body[5]), body[6])
 	table.insert(
 		def.saucers,
-		{ id = "pod_1", x = PX, y = PY, r = 0.085, maxSpeed = 7, vx = 1.1, vy = -3.0, holdTicks = 240 }
+		{ id = "pod_1", x = PX, y = PY, r = 0.085, maxSpeed = 7, vx = 0.5, vy = -1.5, holdTicks = 240 }
 	)
 	table.insert(
 		def.saucers,
-		{ id = "pod_2", x = mx(PX), y = PY, r = 0.085, maxSpeed = 7, vx = -1.1, vy = -3.0, holdTicks = 240 }
+		{ id = "pod_2", x = mx(PX), y = PY, r = 0.085, maxSpeed = 7, vx = -0.5, vy = -1.5, holdTicks = 240 }
 	)
 end
 Layout.lamp(def, "pod_1", 0.52, 2.62, "green")

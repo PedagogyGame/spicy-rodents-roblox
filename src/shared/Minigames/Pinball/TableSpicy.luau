@@ -101,7 +101,8 @@ do
 	standup("spicy_c", X1 - 0.16, 2.24, X1 - 0.1, 2.13, X1 - 0.26, 2.11)
 	standup("spicy_y", X1 - 0.1, 2.11, X1 - 0.04, 2.0, X1 - 0.2, 1.98)
 	Layout.wall(def, "wood", { X1, 1.98, X1 - 0.04, 2.0 })
-	Layout.wall(def, "wood", { X1 - 0.16, 2.24, X1, 2.5 })
+	-- the bump's upper side is steep: a ball dribbling down the hot lane slides off it onto the right flipper
+	Layout.wall(def, "wood", { X1 - 0.16, 2.24, X1, 2.9 })
 end
 
 -- the hot lane up the right side; a ball that comes down it rolls off the bump above C and Y into the table
@@ -111,15 +112,15 @@ Layout.post(def, X1 - 0.22, 2.8)
 table.insert(def.sensors, { id = "hot_lane", kind = "rollover", x1 = X1 - 0.22, y1 = 3.0, x2 = X1, y2 = 3.0 })
 Layout.lamp(def, "hot_lane", X1 - 0.11, 2.8, "red")
 
--- the bite: a kick-out hole in a horseshoe, open toward the left flipper
+-- the bite: a kick-out hole in a horseshoe; it drops the ball back onto the right flipper, to be caught
 table.insert(def.saucers, {
 	id = "bite",
 	x = 1.58,
 	y = 3.52,
 	r = 0.075,
 	maxSpeed = 7,
-	vx = -1.25,
-	vy = -3.4,
+	vx = -0.19,
+	vy = -1.5,
 	holdTicks = 300,
 })
 Layout.cup(def, 1.58, 3.52, 0.125, 250, 130)

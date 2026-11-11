@@ -125,6 +125,33 @@ return function(t: Test.T)
 		t.eq(s.fa[RIGHT], c.frest[RIGHT], "dead: the right falls")
 	end)
 
+	t.test("PIN-P1: the flipper never leaves its stops, however the button is worked; a short tap is a short flick", function()
+		local s = Physics.new(c, 1)
+		local ev: { number } = {}
+		local seed = 9
+		local pressed = false
+		for _ = 1, 20000 do
+			seed = (seed * 69069 + 1) % 4294967296
+			if seed % 9 < 2 then
+				pressed = not pressed
+			end
+			Physics.step(c, s, pressed, not pressed, ev)
+			for i = 1, 2 do
+				t.truthy(s.fa[i] >= c.frest[i] and s.fa[i] <= c.fup[i], `flipper {i} at {s.fa[i]}`)
+			end
+		end
+		-- a tap of 20 ms: the flipper flicks part of the way and falls back
+		local tap = Physics.new(c, 1)
+		local top = c.frest[LEFT]
+		for tick = 1, 80 do
+			Physics.step(c, tap, tick <= 5, false, ev)
+			top = math.max(top, tap.fa[LEFT])
+		end
+		local share = (top - c.frest[LEFT]) / (c.fup[LEFT] - c.frest[LEFT])
+		t.truthy(share > 0.25 and share < 0.75, `a tap lifts it {share} of the way`)
+		t.eq(tap.fa[LEFT], c.frest[LEFT], "and it is back down")
+	end)
+
 	t.test("PIN-P2: a held flipper is a solid slope: a ball rolls into the cradle, comes to rest and stays", function()
 		for _, i in { LEFT, RIGHT } do
 			local s, tick = cradle(i)
@@ -234,13 +261,16 @@ return function(t: Test.T)
 	end)
 
 	t.test("PIN-P2: a live catch: a flip timed so the flipper reaches its stop as the ball lands deadens the ball", function()
-		-- a ball falls from up the table onto the middle of the left flipper
-		local function rebound(flipAt: number): (number, number)
+		-- a ball falls from up the table onto the middle of the left flipper; how far does it hop off the
+		-- raised flipper's face afterwards?
+		local up = c.fup[LEFT]
+		local nx, ny = -math.sin(up), math.cos(up)
+		local function hop(flipAt: number): (number, number)
 			local s = Physics.new(c, 1)
 			local ev: { number } = {}
 			local i = Physics.addBall(s, c.fpx[LEFT] + 0.2, 2.2, 0, 0)
 			local b = s.balls[i]
-			local landed, top = 0, 0
+			local landed, high = 0, 0
 			for tick = 1, 420 do
 				local vy = b.vy
 				Physics.step(c, s, tick >= flipAt, false, ev)
@@ -248,30 +278,30 @@ return function(t: Test.T)
 					if b.vy > vy + 0.5 then
 						landed = tick
 					end
-				elseif tick <= landed + 150 then
-					top = math.max(top, b.y)
+				elseif tick <= landed + 60 and b.mode == Physics.FREE then
+					local off = (b.x - c.fpx[LEFT]) * nx + (b.y - c.fpy[LEFT]) * ny - Layout.BALL_R - c.frb[LEFT]
+					high = math.max(high, off)
 				end
 			end
-			return top, landed
+			return high, landed
 		end
 		-- on a flipper held up all along it bounces
-		local heldTop, landsAt = rebound(1)
-		local restY = c.fpy[LEFT] + 0.2 * math.tan(c.fup[LEFT]) + 0.09
-		t.truthy(heldTop > restY + 0.2, `it bounces off a held flipper ({heldTop - restY})`)
+		local held, landsAt = hop(1)
+		t.truthy(held > 0.1, `it hops off a held flipper ({held})`)
 		-- flipped so the stroke ends as it lands, the flipper is on the recoil and takes the bounce out
 		local best, window = math.huge, 0
-		for flipAt = landsAt - 22, landsAt - 6 do
-			local top = rebound(flipAt)
-			best = math.min(best, top)
-			if top < restY + (heldTop - restY) * 0.5 then
+		for flipAt = landsAt - 24, landsAt - 6 do
+			local high = hop(flipAt)
+			best = math.min(best, high)
+			if high < held * 0.5 then
 				window += 1
 			end
 		end
-		t.truthy(best < restY + (heldTop - restY) * 0.35, `the best catch leaves a third of the bounce ({best - restY})`)
+		t.truthy(best < held * 0.35, `the best catch leaves under a third of the hop ({best} of {held})`)
 		t.truthy(window >= 2, `the window is at least two ticks wide ({window})`)
 		t.truthy(window <= 8, `and it takes timing ({window})`)
 		-- flipped late, into the falling ball, it is a hit, not a catch
-		local lateTop = rebound(landsAt - 3)
-		t.truthy(lateTop > heldTop + 0.3, "a late flip bats it away")
+		local late = hop(landsAt - 3)
+		t.truthy(late > held * 2, "a late flip bats it away")
 	end)
 end

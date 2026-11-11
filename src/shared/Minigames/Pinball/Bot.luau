@@ -3,18 +3,21 @@
 -- A computer player for the pinball machines. It plays the way a person does: it looks at the ball (where it
 -- is and how fast) and presses the same buttons (Machine.BTN: the two flippers, the plunger, a nudge). It
 -- never reaches into the model. Three skill levels:
---   1 NOVICE  flips late and loosely at anything near a flipper, plunges at any strength;
---   2 REGULAR flips in good time and lets a rolling ball come down the flipper before it shoots;
---   3 WIZARD  times the flip to the spot on the flipper that pays best on this table (it has learnt the shots
---             by practice: Bot.learn plays each flipper's shots on a scratch machine once and remembers what
---             they scored), plunges for the skill shot and nudges a ball away from an outlane.
+--   1 NOVICE  bats late and loosely at anything near a flipper, sometimes with both at once, and plunges at
+--             any strength;
+--   2 REGULAR bats in good time, traps the ball on a raised flipper about half the time and then shoots it
+--             from somewhere in the outer half of the flipper;
+--   3 WIZARD  traps whenever it can, lets the ball go and flips when it has rolled to the spot on the flipper
+--             that pays best on this table (it has learnt the shots by practice: learn() plays each flipper's
+--             shots on a scratch machine once and remembers what they scored), plunges for the skill shot and
+--             nudges a ball away from an outlane.
 -- Pinball has no computer opponent (checklist PIN-R5); the bot is the idle machine's attract mode, the way the
 -- specs play whole games, and what tools/pinball/calibrate.luau measures the tables with.
 -- A bot's state is plain data with its own seeded stream; the same seed and the same machine give the same
 -- game. (learn() keeps what it has learnt per table: a memo of a pure function of the table.)
 -- Pure; Lune-tested (tests/unit/pinball_games.spec.luau).
 -- Interface: LEVELS, NAMES; new(level, seed) -> State; step(bot, table, machine) -> buttons;
---   learn(table) -> Lesson (per flipper: the spot that pays best, and the plunger pull for the skill shot)
+--   learn(table) -> Lesson (per flipper: the spots that pay best, and the plunger pull for the skill shot)
 
 local Det = require("./Det")
 local Layout = require("./Layout")
@@ -34,8 +37,9 @@ export type Level = {
 	learnt: boolean, -- uses the learnt spots and the skill-shot pull
 	pullSd: number,
 	nudges: boolean,
-	holdTicks: number, -- how long it keeps the button down
+	holdTicks: number, -- how long it keeps the button down after a flip
 	panic: number, -- chance that it presses both flippers at once
+	trap: number, -- chance that it tries to catch an incoming ball on a raised flipper
 }
 Bot.LEVELS = {
 	{
@@ -49,23 +53,25 @@ Bot.LEVELS = {
 		nudges = false,
 		holdTicks = 70,
 		panic = 0.35,
+		trap = 0,
 	},
 	{
 		lateMean = 3,
 		lateSd = 3,
 		aimSd = 0.1,
-		aimLo = 0.5,
+		aimLo = 0.45,
 		aimHi = 0.95,
 		learnt = false,
 		pullSd = 0.12,
 		nudges = false,
 		holdTicks = 45,
 		panic = 0.05,
+		trap = 0.5,
 	},
 	{
 		lateMean = 1,
 		lateSd = 1,
-		aimSd = 0.03,
+		aimSd = 0.025,
 		aimLo = 0.6,
 		aimHi = 0.9,
 		learnt = true,
@@ -73,23 +79,33 @@ Bot.LEVELS = {
 		nudges = true,
 		holdTicks = 36,
 		panic = 0,
+		trap = 1,
 	},
 } :: { Level }
+
+Bot.TRAP_SPEED = 9 -- a ball faster than this is batted, not caught
+Bot.SKID = 4.5 -- flipper lengths a second: a ball crossing the flipper faster than this is hit at once
+Bot.TRAP_TICKS = 1200 -- it gives a catch this long to settle
+Bot.STILL_TICKS = 30 -- a caught ball must lie this long before it is let go
+
+-- what a flipper hand is doing
+local IDLE, WAIT, HOLD, REST, TRAP = 0, 1, 2, 3, 4
 
 export type State = {
 	level: number,
 	rng: number,
 	pullFor: number, -- ticks it means to hold the plunger this time (0: not decided)
 	pulled: number,
+	mode: { number }, -- per flipper
+	timer: { number }, -- per flipper: ticks left in WAIT, HOLD, REST or TRAP
 	aim: { number }, -- per flipper: the spot it is waiting for on this approach (0: not decided)
-	pressIn: { number }, -- per flipper: ticks until it presses (0: no press coming)
-	hold: { number }, -- per flipper: ticks of hold left
-	rest: { number }, -- per flipper: ticks it will not press again
+	still: { number }, -- per flipper: ticks the trapped ball has lain still
+	noTrap: { number }, -- per flipper: ticks in which it will not trap again (it has just let a ball go to shoot it)
 	nudgeRest: number,
 }
 
 export type Lesson = {
-	aim: { number }, -- per flipper: the spot (fraction along the flipper) that pays best
+	aim: { { number } }, -- per flipper: the spots (fraction along the flipper) that pay best, best first
 	pull: number, -- plunger pull 0..1 for the skill shot
 	shots: { { number } }, -- per flipper: (spot, what it paid) pairs as flat numbers, for the calibrate tool
 }
@@ -116,19 +132,21 @@ function Bot.new(level: number, seed: number): State
 		rng = math.floor(seed) % 4294967296,
 		pullFor = 0,
 		pulled = 0,
-		aim = {},
-		pressIn = {},
-		hold = {},
-		rest = {},
+		mode = { IDLE, IDLE },
+		timer = { 0, 0 },
+		aim = { 0, 0 },
+		still = { 0, 0 },
+		noTrap = { 0, 0 },
 		nudgeRest = 0,
 	}
 end
 
--- Where a ball is over flipper i as it lies at rest: along (0 at the pivot, 1 at the tip), the gap between the
--- two surfaces, and how fast the gap is closing.
-local function over(c: Layout.Compiled, i: number, b: Physics.Ball): (number, number, number)
-	local rest = c.frest[i]
-	local dx, dy = c.fmir[i] * Det.cos(rest), Det.sin(rest)
+-- Where a ball is over flipper i as it lies at rest (or, with up, as it stands when raised): along (0 at the
+-- pivot, 1 at the tip), the gap between the two surfaces, how fast the gap is closing, and how fast the ball
+-- is moving toward the tip.
+local function over(c: Layout.Compiled, i: number, b: Physics.Ball, up: boolean?): (number, number, number, number)
+	local angle = if up then c.fup[i] else c.frest[i]
+	local dx, dy = c.fmir[i] * Det.cos(angle), Det.sin(angle)
 	-- the flipper's upper side: its direction turned a quarter turn, whichever way faces up the table
 	local nx, ny = -dy, dx
 	if ny < 0 then
@@ -140,7 +158,7 @@ local function over(c: Layout.Compiled, i: number, b: Physics.Ball): (number, nu
 	local surface = c.frb[i] + (c.frt[i] - c.frb[i]) * t
 	local gap = qx * nx + qy * ny - R - surface
 	local closing = -(b.vx * nx + b.vy * ny)
-	return along, gap, closing
+	return along, gap, closing, (b.vx * dx + b.vy * dy) / c.flen[i]
 end
 
 local function plungerBall(tbl: Machine.Table, m: Machine.State): boolean
@@ -156,7 +174,7 @@ end
 local LESSONS: { [string]: Lesson } = {}
 
 -- learn(table): practise. For each flipper: cradle a ball, let it go, flip when it has rolled to a spot, and
--- see what the next three seconds score; the spot whose neighbourhood pays best is the one to aim for. For
+-- see what the next three seconds score; the spots whose neighbourhood pays best are the ones to aim for. For
 -- the plunger: try every strength and keep the one that pays best in its first four seconds.
 function Bot.learn(tbl: Machine.Table): Lesson
 	local known = LESSONS[tbl.id]
@@ -184,7 +202,7 @@ function Bot.learn(tbl: Machine.Table): Lesson
 		end
 		local spots: { number } = {}
 		local paid: { number } = {}
-		for d = 20, 260, 4 do
+		for d = 20, 280, 3 do
 			local m = Machine.clone(base)
 			for _ = 1, d do
 				Machine.step(tbl, m, 0, out)
@@ -194,7 +212,7 @@ function Bot.learn(tbl: Machine.Table): Lesson
 				break
 			end
 			local along = over(c, i, b)
-			if along > 1.08 then
+			if along > 1.05 then
 				break
 			end
 			local before = m.scores[1]
@@ -212,15 +230,45 @@ function Bot.learn(tbl: Machine.Table): Lesson
 			table.insert(paid, gain)
 			table.clear(out)
 		end
-		-- the best spot is the middle of the best run of three
-		local best, bestAt = -1, 0.75
-		for k = 2, #spots - 1 do
-			local v = paid[k - 1] + 2 * paid[k] + paid[k + 1]
-			if v > best and spots[k] > 0.1 then
-				best, bestAt = v, spots[k]
+		-- a spot is as good as it and its two neighbours on each side together (a hand is not exact)
+		local order: { number } = {}
+		local worth: { number } = {}
+		for k = 1, #spots do
+			local v = 0
+			for j = k - 2, k + 2 do
+				v += (paid[j] or 0) * (if j == k then 2 else 1)
+			end
+			worth[k] = v
+			if spots[k] > 0.12 and k > 2 and k <= #spots - 2 then
+				table.insert(order, k)
 			end
 		end
-		lesson.aim[i] = bestAt
+		table.sort(order, function(a, b)
+			if worth[a] ~= worth[b] then
+				return worth[a] > worth[b]
+			end
+			return a < b
+		end)
+		-- the best three that are not next to each other
+		local best: { number } = {}
+		for _, k in order do
+			local apart = true
+			for _, s in best do
+				if math.abs(spots[k] - s) < 0.08 then
+					apart = false
+				end
+			end
+			if apart then
+				table.insert(best, spots[k])
+				if #best == 3 then
+					break
+				end
+			end
+		end
+		if #best == 0 then
+			best[1] = 0.75
+		end
+		lesson.aim[i] = best
 		local flat: { number } = {}
 		for k = 1, #spots do
 			table.insert(flat, spots[k])
@@ -230,8 +278,9 @@ function Bot.learn(tbl: Machine.Table): Lesson
 	end
 	local bestPull, bestGain = 0.8, -1
 	local gains: { number } = {}
-	for step = 1, 20 do
-		local pull = step / 20
+	local STEPS = 50
+	for step = 1, STEPS do
+		local pull = step / STEPS
 		local m = Machine.new(tbl, 11, 1)
 		local hold = math.floor(pull * tbl.def.plunger.pullTicks + 0.5)
 		for k = 1, hold + 1 do
@@ -246,15 +295,28 @@ function Bot.learn(tbl: Machine.Table): Lesson
 		gains[step] = m.scores[1]
 		table.clear(out)
 	end
-	for step = 2, 19 do
+	for step = 2, STEPS - 1 do
 		local v = gains[step - 1] + 2 * gains[step] + gains[step + 1]
 		if v > bestGain then
-			bestGain, bestPull = v, step / 20
+			bestGain, bestPull = v, step / STEPS
 		end
 	end
 	lesson.pull = bestPull
 	LESSONS[tbl.id] = lesson
 	return lesson
+end
+
+local function chooseAim(bot: State, tbl: Machine.Table, level: Level, i: number): number
+	local spot
+	if level.learnt then
+		local best = Bot.learn(tbl).aim[i]
+		-- mostly the best shot; now and then the next ones, so the whole table gets played
+		local r = rand(bot)
+		spot = best[if r < 0.65 or #best < 2 then 1 elseif r < 0.9 or #best < 3 then 2 else 3]
+	else
+		spot = level.aimLo + rand(bot) * (level.aimHi - level.aimLo)
+	end
+	return math.clamp(spot + bell(bot) * level.aimSd, 0.15, 1.0)
 end
 
 -- step(bot, table, machine): the buttons the bot holds this tick.
@@ -285,67 +347,111 @@ function Bot.step(bot: State, tbl: Machine.Table, m: Machine.State): number
 		bot.pulled = 0
 	end
 
-	-- the flippers
+	-- the flippers: one hand each
 	local balls = m.phys.balls
 	local panic = false
 	for i = 1, c.nFlip do
-		local hold = bot.hold[i] or 0
-		local rest = bot.rest[i] or 0
-		local pressIn = bot.pressIn[i] or 0
-		if hold > 0 then
-			hold -= 1
-			if hold == 0 then
-				rest = 16
+		local mode, timer = bot.mode[i], bot.timer[i]
+		if bot.noTrap[i] > 0 then
+			bot.noTrap[i] -= 1
+		end
+		if mode == HOLD or mode == REST then
+			timer -= 1
+			if timer <= 0 then
+				mode, timer = if mode == HOLD then REST else IDLE, 16
 			end
-		elseif rest > 0 then
-			rest -= 1
-		elseif pressIn > 0 then
-			pressIn -= 1
-			if pressIn == 0 then
-				hold = level.holdTicks
+		elseif mode == WAIT then
+			timer -= 1
+			if timer <= 0 then
+				mode, timer = HOLD, level.holdTicks
 				bot.aim[i] = 0
 				if rand(bot) < level.panic then
 					panic = true
 				end
+			end
+		elseif mode == TRAP then
+			-- the flipper is up; wait for the ball to settle in the cradle, then let it go and shoot it
+			timer -= 1
+			local near, lying = false, false
+			for _, b in balls do
+				if b.mode == FREE and b.x < Layout.FIELD_X1 then
+					local along, gap = over(c, i, b)
+					if along > -0.9 and along < 1.4 and gap > -0.3 and gap < 0.9 then
+						near = true
+						if b.vx * b.vx + b.vy * b.vy < 0.02 then
+							lying = true
+						end
+					end
+				end
+			end
+			bot.still[i] = if lying then bot.still[i] + 1 else 0
+			if bot.still[i] >= Bot.STILL_TICKS then
+				mode, timer = IDLE, 0
+				bot.aim[i] = chooseAim(bot, tbl, level, i)
+				bot.noTrap[i] = 480
+			elseif not near or timer <= 0 then
+				mode, timer = REST, 8
 			end
 		else
 			for _, b in balls do
 				if b.mode ~= FREE or b.x > Layout.FIELD_X1 then
 					continue
 				end
-				local along, gap, closing = over(c, i, b)
+				-- a catch: the flipper has to be up and still before the ball lands on it, so the moment is
+				-- judged against the flipper as it will stand
+				if level.trap > 0 and bot.noTrap[i] == 0 then
+					local upAlong, upGap, upClosing, upOutward = over(c, i, b, true)
+					if upClosing > 0.3 and upGap > 0.02 and upGap < upClosing * 34 / Physics.HZ then
+						local lands = upAlong + upOutward * upGap / upClosing
+						if
+							lands > 0.05
+							and lands < 0.8
+							and b.vx * b.vx + b.vy * b.vy < Bot.TRAP_SPEED * Bot.TRAP_SPEED
+						then
+							if rand(bot) < level.trap then
+								mode, timer = TRAP, Bot.TRAP_TICKS
+								bot.still[i] = 0
+								break
+							end
+							-- not this time: this ball is batted
+							bot.noTrap[i] = 120
+						end
+					end
+				end
+				local along, gap, closing, outward = over(c, i, b)
 				if along < -0.1 or along > 1.12 or gap > 0.5 or gap < -0.08 then
 					continue
 				end
 				local now = false
 				if gap < 0.03 and closing < 1.5 then
-					-- the ball is rolling on the flipper: wait for the spot
-					local aim = bot.aim[i] or 0
-					if aim == 0 then
-						local spot = if level.learnt
-							then Bot.learn(tbl).aim[i]
-							else level.aimLo + rand(bot) * (level.aimHi - level.aimLo)
-						aim = math.clamp(spot + bell(bot) * level.aimSd, 0.15, 1.02)
-						bot.aim[i] = aim
+					if outward > Bot.SKID then
+						-- the ball is skidding out along the flipper: no time to pick a spot
+						now = along > 0.25
+					else
+						-- the ball is rolling on the flipper: wait for the spot
+						if bot.aim[i] == 0 then
+							bot.aim[i] = chooseAim(bot, tbl, level, i)
+						end
+						now = along >= bot.aim[i]
 					end
-					now = along >= aim
 				elseif closing > 0 and along > 0.12 then
 					-- the ball is coming down onto the flipper: meet it as it lands
 					now = gap < closing * 7 / Physics.HZ
 				end
 				if now then
-					pressIn = math.max(1, math.floor(level.lateMean + bell(bot) * level.lateSd + 0.5))
+					mode = WAIT
+					timer = math.max(1, math.floor(level.lateMean + bell(bot) * level.lateSd + 0.5))
 					break
 				end
 			end
 		end
-		bot.hold[i], bot.rest[i], bot.pressIn[i] = hold, rest, pressIn
+		bot.mode[i], bot.timer[i] = mode, timer
 	end
 	for i = 1, c.nFlip do
-		if (bot.hold[i] or 0) > 0 or panic then
-			if panic and (bot.hold[i] or 0) == 0 then
-				bot.hold[i] = level.holdTicks
-			end
+		if panic and bot.mode[i] ~= HOLD and bot.mode[i] ~= TRAP then
+			bot.mode[i], bot.timer[i] = HOLD, level.holdTicks
+		end
+		if bot.mode[i] == HOLD or bot.mode[i] == TRAP then
 			buttons = bit32.bor(buttons, if c.fbtn[i] == 1 then BTN.LEFT else BTN.RIGHT)
 		end
 	end

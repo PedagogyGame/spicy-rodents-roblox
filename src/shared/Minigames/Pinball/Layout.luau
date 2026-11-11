@@ -373,7 +373,7 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	local len = spec.len or 0.33
 	local rBase, rTip = 0.045, 0.028
 	local rest = spec.rest or Det.rad(-30)
-	local up = spec.up or Det.rad(28)
+	local up = spec.up or Det.rad(38)
 	local px = XC - spec.gap / 2 - rTip - len * Det.cos(rest)
 	local py = spec.pivotY
 	table.insert(def.flippers, {
