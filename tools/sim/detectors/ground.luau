@@ -7,7 +7,7 @@
 --   tilt_mismatch  the car's pitch is not the slope of the ground from bumper to bumper
 --   roll_missing   the ground slopes sideways under the car, which never rolls
 -- The ground is the game's own (World/Ground over World/Height, the bridge deck and the town's paving:
--- ctx.surfaceAt), sampled under the four wheels of the car as drawn (root pose, box size, pitch). The
+-- ctx.surfaceAt), sampled under the four wheels of the car as drawn (root pose, box size, pitch, roll). The
 -- contact kinds are checked every `every` frames, staggered by vehicle. All of these come from where the
 -- vehicle is drawn, so their origin is the seating maths (Ghost.seat) or the lane, not the network.
 local Detect = require("../lib/Detect")
@@ -21,7 +21,7 @@ local def: Detect.Def = {
 		sink = "a wheel or the belly of the car is buried in the ground",
 		float = "a wheel hangs in the air: daylight under the car",
 		tilt_mismatch = "the car is tilted nose-up or nose-down against the ground it stands on",
-		roll_missing = "the road slopes sideways under the car but the car stays level: one side digs in, the other lifts",
+		roll_missing = "the road slopes sideways under the car but the car does not lean with it: one side digs in, the other lifts",
 	},
 	thresholds = {
 		{
@@ -55,7 +55,7 @@ local def: Detect.Def = {
 			key = "roll",
 			value = 0.12,
 			unit = "rad",
-			why = "7 degrees of crossfall under a car that cannot roll: its sides are half a stud off on a sedan",
+			why = "7 degrees between the crossfall and the car's roll: its sides are half a stud off on a sedan",
 		},
 		{
 			key = "every",
@@ -113,14 +113,10 @@ local def: Detect.Def = {
 					local box = info.box
 					local half, hw, hh = box.length / 2, box.width / 2, box.height / 2
 					local fx, fz = math.sin(s.yaw), math.cos(s.yaw)
-					local rx, rz = fz, -fx
-					local sinP, cosP = math.sin(s.pitch), math.cos(s.pitch)
-					-- a point of the box's underside, `along` towards the nose and `across` to the side
+					local rx, rz = -fz, fx -- the car's right (Ghost.rootCFrame's RightVector)
+					-- a point of the box's underside, `along` towards the nose and `across` to the right
 					local function under(along: number, across: number): (number, number, number)
-						local forward = along * cosP + hh * sinP
-						return s.x + fx * forward + rx * across,
-							s.y + along * sinP - hh * cosP,
-							s.z + fz * forward + rz * across
+						return Detect.bodyPoint(s, along, across, -hh)
 					end
 					local deepest, highest = -math.huge, -math.huge
 					local where = ""
@@ -165,15 +161,16 @@ local def: Detect.Def = {
 					local right = ctx.surfaceAt(s.x + rx * hw, s.z + rz * hw, s.y)
 					local left = ctx.surfaceAt(s.x - rx * hw, s.z - rz * hw, s.y)
 					local crossfall = math.atan2(right - left, box.width)
-					if math.abs(crossfall) > th.roll then
+					local unrolled = math.abs(crossfall - (s.roll or 0))
+					if unrolled > th.roll then
 						ctx.flag(
 							"roll_missing",
 							frame,
 							s,
-							math.abs(crossfall),
+							unrolled,
 							th.roll,
 							"rad",
-							{ crossfall = crossfall }
+							{ crossfall = crossfall, roll = s.roll or 0 }
 						)
 					end
 				end

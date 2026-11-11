@@ -280,14 +280,22 @@ return function(t)
 		t.truthy(string.find(view, "PoseStream.newReceiver()", 1, true))
 		t.truthy(string.find(view, "receiver:packet(b, workspace:GetServerTimeNow())", 1, true))
 		t.truthy(string.find(view, "local at = receiver:at(workspace:GetServerTimeNow(), dt)", 1, true))
-		t.truthy(string.find(view, "Ghost.render(receiver.buffer, at, folder, kinds, Height.at, models)", 1, true))
+		t.truthy(string.find(view, "Ghost.render(receiver.buffer, at, folder, kinds, ground, models)", 1, true))
+		-- the ghosts stand on the drawn roads, and the headless replay seats them on the same ground
+		local ground = "RoadSurface.ground(RoadSurface.new(Data.default():roads()), Height.at)"
+		t.truthy(string.find(view, ground, 1, true), "VehicleView seats the ghosts on World/RoadSurface")
+		local replay = fs.readFile("tools/sim/lib/Replay.luau")
+		t.truthy(
+			string.find(replay, "RoadSurface.ground(RoadSurface.new(data:roads()), Height.at)", 1, true),
+			"the replay seats them the same way"
+		)
 		for _, inline in { "takeStamp", "newClock", "decodeStream", "Ghost.new(", "CFrame.", "Vector3." } do
 			t.falsy(string.find(view, inline, 1, true), `VehicleView no longer inlines {inline}`)
 		end
 		local ghost = fs.readFile("src/shared/Traffic/Ghost.luau")
 		local render = string.sub(ghost, (string.find(ghost, "function Ghost.render(", 1, true)) :: number)
 		t.truthy(string.find(render, "Ghost.view(buffer, now, kinds, heightAt,", 1, true), "render draws from view")
-		t.truthy(string.find(render, "Ghost.rootCFrame(lib, x, y, z, yaw, pitch, p.visible)", 1, true))
+		t.truthy(string.find(render, "Ghost.rootCFrame(lib, x, y, z, yaw, pitch, p.visible, roll)", 1, true))
 		t.falsy(string.find(render, "buffer:sample", 1, true), "render does not sample on its own")
 	end)
 end

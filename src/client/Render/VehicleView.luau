@@ -4,7 +4,7 @@
 -- ReplicatedStorage.Net.VehiclePoses (an UnreliableRemoteEvent carrying 13-byte records) goes through
 -- Traffic/PoseStream's receiver (decode, the server's stamp placed on the local clock, the Traffic/Ghost
 -- snapshot buffer), and every RenderStepped Ghost.render places the placeholder cars
--- (Traffic/VehiclePuppet at the true logical box) Ghost.DELAY behind the newest snapshot with one
+-- (Traffic/VehiclePuppet at the true logical box, seated on World/RoadSurface) Ghost.DELAY behind the newest snapshot with one
 -- BulkMoveTo. All the arithmetic between a packet and a CFrame lives in those two shared modules, which
 -- the headless replay (tools/sim) runs as well; this file only wires them to the engine. The kinds come once from the PlayNet folder's
 -- TrafficKinds attribute (JSON, id -> { kind, color }). The ghosts live in workspace.TrafficGhosts,
@@ -17,6 +17,8 @@ local Import = require("../Import")
 local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Traffic/Ghost"))
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
+local RoadSurface = Import.shared("World/RoadSurface") :: typeof(require("../../shared/World/RoadSurface"))
+local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local TownView = require("./TownView")
 
 local VehicleView = {}
@@ -61,6 +63,9 @@ function VehicleView.start(): () -> ()
 	folder.Parent = workspace
 	folderRef = folder
 	local receiver = PoseStream.newReceiver()
+	-- the ghosts stand on the roads as baked (World/RoadSurface: the same parts worldgen lays), not on
+	-- the terrain under them
+	local ground = RoadSurface.ground(RoadSurface.new(Data.default():roads()), Height.at)
 	local models: { [number]: Model } = {}
 	local conns: { RBXScriptConnection } = {}
 	table.insert(
@@ -77,7 +82,7 @@ function VehicleView.start(): () -> ()
 			local good, err = pcall(function()
 				local before = #folder:GetChildren()
 				local at = receiver:at(workspace:GetServerTimeNow(), dt)
-				Ghost.render(receiver.buffer, at, folder, kinds, Height.at, models)
+				Ghost.render(receiver.buffer, at, folder, kinds, ground, models)
 				if #folder:GetChildren() ~= before then
 					for _, d in folder:GetDescendants() do
 						if d:IsA("BasePart") then

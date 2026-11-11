@@ -47,6 +47,7 @@ local PoseStream = require("@shared/Traffic/PoseStream")
 local Net = require("@shared/Net/Net")
 local Schemas = require("@shared/Net/Schemas")
 local Height = require("@shared/World/Height")
+local RoadSurface = require("@shared/World/RoadSurface")
 local Colliders = require("@shared/World/Colliders")
 local Ground = require("@shared/World/Ground")
 local Town = require("@shared/World/Town")
@@ -54,6 +55,7 @@ local Rng = require("@shared/Util/Rng")
 local Units = require("@shared/Config/Units")
 local TrafficService = require("@server/Traffic/TrafficService")
 
+local Baked = require("./Baked")
 local Detect = require("./Detect")
 local NetModel = require("./NetModel")
 local Truth = require("./Truth")
@@ -373,6 +375,9 @@ function Replay.run(opts: { [string]: any }?): Result
 			vehicles = vehicles,
 			heightAt = Height.at,
 			surfaceAt = townData.groundAt,
+			bakedAt = function(x: number, z: number, maxY: number?): number
+				return (Baked.get().at(x, z, maxY))
+			end,
 			town = townData.town,
 			colliders = townData.colliders,
 		}
@@ -468,7 +473,7 @@ function Replay.run(opts: { [string]: any }?): Result
 
 		-- the client, as Client/Render/VehicleView builds it
 		local receiver = PoseStream.newReceiver()
-		local heightAt = Height.at
+		local heightAt = RoadSurface.ground(RoadSurface.new(data:roads()), Height.at)
 
 		local addLag, lagSummary = histogram(0.05, 4000) -- studs behind the server's pose right now
 		local addLagMs, lagMsSummary = histogram(1, 3000) -- the same as time: studs / true speed
@@ -575,7 +580,7 @@ function Replay.run(opts: { [string]: any }?): Result
 				ids = {},
 			}
 			-- Ghost.render's pure half: what every root part is given this frame
-			Ghost.view(buf, at, kinds, heightAt, function(id, p, _k, x, y, z, yaw, pitch)
+			Ghost.view(buf, at, kinds, heightAt, function(id, p, _k, x, y, z, yaw, pitch, roll)
 				local live = traffic.byId[id]
 				local s: Detect.Sample = {
 					id = id,
@@ -585,6 +590,7 @@ function Replay.run(opts: { [string]: any }?): Result
 					z = z,
 					yaw = yaw,
 					pitch = pitch,
+					roll = roll,
 					speed = p.speed,
 					snap = p.teleported,
 					stopped = p.stopped,

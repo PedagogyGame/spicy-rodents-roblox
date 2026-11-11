@@ -10,7 +10,8 @@ local scenario: Replay.Scenario = {
 	about = "the game's 25 vehicles, seed 7, nobody on the roads",
 	seconds = 600,
 	ci = 60,
-	-- on an ideal network with steady frames nothing stutters, hops, twitches, sinks or floats
+	-- on an ideal network with steady frames nothing stutters, hops, twitches, sinks or floats, on the
+	-- analytic ground or the drawn roads
 	expect = {
 		none = {
 			"speed_stutter",
@@ -21,6 +22,9 @@ local scenario: Replay.Scenario = {
 			"float",
 			"tilt_mismatch",
 			"roll_missing",
+			"ledge",
+			"hover",
+			"buried",
 			"ghost_visibility",
 			"teleport_bit_lost",
 			"teleport_bit_dropped", -- a jump is held until a send carries it (TrafficService.jumped)
