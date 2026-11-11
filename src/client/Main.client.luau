@@ -6,8 +6,10 @@
 -- (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
--- bites, kicks, RUN OVER, KICKED OUT. The S2 test place runs its own S2Client and this script steps
--- aside there.
+-- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
+-- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
+-- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
+-- The S2 test place runs its own S2Client and this script steps aside there.
 -- Live-server robustness (W1 client review): Shift Lock is switched off (Shift is sprint); the Roblox
 -- Reset button does nothing until a body is handed over (then PossessionClient routes it to the safe-
 -- spot recovery); every wait on the server has a timeout and an on-screen message that works outside
@@ -27,6 +29,8 @@ local PlayMenu = require("./UI/PlayMenu")
 local AnimationDriver = require("./Animation/AnimationDriver")
 local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
+local MedicalView = require("./Render/MedicalView")
+local SpeechBubbles = require("./UI/SpeechBubbles")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
@@ -92,6 +96,19 @@ local kickRemote = kickR :: RemoteEvent
 local eventRemote = eventR :: RemoteEvent
 
 AnimationDriver.start({ container = bodies })
+-- what townspeople say, and what a bitten person looks like (owner 2026-11-10)
+task.spawn(function()
+	local okS, errS = pcall(SpeechBubbles.start, { bodies = bodies :: Instance })
+	if not okS then
+		warn(`Client: SpeechBubbles failed: {errS}`)
+		menu.toast("Speech bubbles did not start: press F9 and send the red lines", 10)
+	end
+	local okV, errV = pcall(MedicalView.start, { bodies = bodies :: Instance })
+	if not okV then
+		warn(`Client: MedicalView failed: {errV}`)
+		menu.toast("The infection visuals did not start: press F9 and send the red lines", 10)
+	end
+end)
 task.spawn(function()
 	VehicleView.start()
 	local ghosts = VehicleView.folder()
@@ -174,6 +191,9 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 		menu.toast(`CHOMP! "{msg.line}"   +{msg.delta} Power   ({msg.bites} bites)`, 2.5)
 	elseif kind == "bitten" then
 		menu.toast(`The rodent bit you! You shout: "{msg.line}"`, 2.5)
+	elseif kind == "med" then
+		-- the bite-to-hospital sequence: what is happening to you and what to do about it
+		menu.toast(tostring(msg.text), if type(msg.secs) == "number" then msg.secs else 6)
 	elseif kind == "kick" then
 		if msg.hit then
 			menu.toast(

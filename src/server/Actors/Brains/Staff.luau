@@ -5,11 +5,15 @@
 -- each (hospital_police_infection §5.3: advance within 0.75 u, pause 0.24 s staff / 0.48 patients;
 -- the patient circuit shape station -> +(dir 2.6, -0.65) -> +(dir 2.1, -2.8) -> +(0, -2.0), start index
 -- i % 4, initial pause 0.4 + (i % 3) 0.3). Pace 1.4 u/s is a W0 tunable (the spec names none).
+-- A Directive (Brains/Directive; the bite-to-hospital sequence) overrides the circuit while it is set:
+-- onEvent({ type = "medical", mode = ... }) sets or clears it; "bitten" needs no handling here (the
+-- service sends a bitten staff member running with a short route).
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
 local Units = Import.shared("Config/Units") :: typeof(require("../../../shared/Config/Units"))
 local Common = require("./Common")
+local Directive = require("./Directive")
 
 export type Params = {
 	stationX: number, -- studs
@@ -25,6 +29,7 @@ type Brain = Common.Brain & {
 	points: { { number } }, -- absolute (x, z)
 	target: number,
 	pause: number,
+	directive: Directive.State,
 }
 
 local Staff = {}
@@ -36,9 +41,12 @@ local PACE = Units.st(1.4)
 local Methods = {}
 Methods.__index = Methods
 
-function Methods.think(self: Brain, dt: number, _ctx: Common.Ctx)
+function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	local actor = self.actor
 	local intent = actor.intent
+	if Directive.think(self.directive, actor, dt, ctx) then
+		return
+	end
 	local p = self.points[self.target]
 	local d = Common.dist2d(actor.x, actor.z, p[1], p[2])
 	if self.pause > 0 then
@@ -61,17 +69,20 @@ function Methods.think(self: Brain, dt: number, _ctx: Common.Ctx)
 end
 
 function Methods.suspend(self: Brain): Common.Snapshot
-	return { target = self.target, pause = self.pause }
+	return { target = self.target, pause = self.pause, directive = Directive.snapshot(self.directive) }
 end
 
 function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.target = snapshot.target or 1
 	self.pause = snapshot.pause or 0
+	Directive.restore(self.directive, snapshot.directive)
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })
 	if evt.type == "pause" then
 		self.pause = math.max(self.pause, evt.seconds or 1)
+	elseif evt.type == "medical" then
+		Directive.set(self.directive, evt)
 	end
 end
 
@@ -98,6 +109,7 @@ function Staff.new(actor: Common.Actor, params: Params): Common.Brain
 		points = points,
 		target = start,
 		pause = 0.4 + (i % 3) * 0.3,
+		directive = Directive.new(),
 	}, Methods)
 	actor.x, actor.z = points[start][1], points[start][2]
 	return (self :: any) :: Common.Brain

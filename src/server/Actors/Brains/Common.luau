@@ -2,7 +2,8 @@
 -- ServerScriptService.Server.Actors.Brains.Common
 -- Shared contract for the minimal W0 brains: the Actor state they read, the Intent they write and
 -- the per-tick Ctx the scheduler hands them (BUILD_PLAN §1.4 Brains/*, §1.5 Actor; spike S5).
--- Interface: types Actor, Intent, Ctx, Brain, Snapshot; newIntent(), newActor(), steer helpers.
+-- Interface: types Actor, Intent, Ctx (with the optional `emit` event sink), Brain, Snapshot;
+--   newIntent(), newActor(), steer helpers.
 -- Pure. Positions are studs, yaw is the HTML yaw (0 faces +Z; Config/Units adds the +pi at the
 -- CFrame boundary, D21). Brains never allocate per tick: they write into actor.intent in place.
 
@@ -39,6 +40,8 @@ export type Actor = {
 	alert: number, -- humans: seconds of alert left
 	moved: number, -- distance moved so far (liveness check)
 	rig: any?, -- engine body handle (Puppets)
+	infected: boolean?, -- carries the infection (Infection/InfectionService; squirrels: the "one of those" tell)
+	lift: number?, -- studs added to the drawn body's height (a hidden patient is sunk out of sight)
 }
 
 export type Grid = {
@@ -54,6 +57,9 @@ export type Ctx = {
 	bounds: { minX: number, maxX: number, minZ: number, maxZ: number },
 	routes: any?, -- SpikeRoutes-like: byId(id) -> { length, points, links, kind }
 	queryBuffer: { number }, -- shared scratch list for grid queries
+	-- optional event sink: a brain reports something the services care about ("spotted": a person
+	-- just saw a squirrel and started to run). AI/TownAI collects them (drainEvents).
+	emit: ((kind: string, actor: Actor, other: Actor?) -> ())?,
 }
 
 export type Snapshot = { [string]: any }

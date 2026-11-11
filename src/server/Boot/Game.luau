@@ -14,11 +14,18 @@
 --      RoleService (the 49 cap and the Ladder stay in force: a joining player is a townsperson, the
 --      50th is turned away), the device fleet (patrol cars, carts, bikes, the drone).
 --   5. ReplicatedStorage.PlayNet remotes: Pick(choice) from the menu, Kick() (townsperson F), Event
---      (server -> client: picked, refused, bite, bitten, hurt, died, kick).
+--      (server -> client: picked, refused, bite, bitten, med, hurt, died, kick).
 -- Every frame: ActorsRuntime steps the AI (its own Heartbeat); here traffic steps at 30 Hz against the
 -- people and the player-held squirrels (RunOver kills: "RUN OVER"), poses stream to clients at 15 Hz
 -- (Net VehiclePoses, rendered by Client/Render/VehicleView), the rodent bites people it touches
 -- (Combat/PlayRules; Power per Rodent/PowerRules, brief v2 §15), Power fades while playing.
+-- A bite starts the bite-to-hospital sequence (owner 2026-11-10; Infection/InfectionService, stepped
+-- here after traffic): the person is infected and runs, collapses at once or shows symptoms later,
+-- an ambulance and a crowd come or they walk in, and the hospital is the only cure. The service
+-- writes the Med, Say and SayAt attributes on the bodies (clients draw the red eyes, the poses and
+-- the speech bubbles) and sends the player holding a bitten body a "med" event that says what to do.
+-- Knocking the rodent out cures nobody (the old brief v2 §8 instant cure is off: Tunables
+-- infection.recentBiteSecs = 0).
 -- Streaming and input (W1 client review): the device fleet (patrol cars, carts, bikes, the drone) is
 -- ModelStreamingMode Persistent, so a DeviceGranted model is never nil on the driver's client; the body a
 -- player holds is PersistentPerPlayer for that player (persist), so the client always finds its body;
@@ -28,7 +35,8 @@
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, pick(player, choice) -> (ok, why?),
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
---   the bowling alley's MinigameService; nil without Workspace.Attractions), stop() }
+--   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
+--   InfectionService; nil when it could not start), townIdOf(actorId), stop() }
 
 local Import = require("../Import")
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
@@ -44,6 +52,8 @@ local ActorsRuntime = require("../Actors/ActorsRuntime")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
+local InfectionService = require("../Infection/InfectionService")
+local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
 local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
@@ -89,39 +99,6 @@ local function remote(parent: Instance, name: string): RemoteEvent
 	e.Name = name
 	e.Parent = parent
 	return e
-end
-
-local function shoutAt(body: Model, text: string)
-	local anchor = body:FindFirstChild("Head") or body.PrimaryPart
-	if anchor == nil then
-		return
-	end
-	local old = anchor:FindFirstChild("Shout")
-	if old then
-		old:Destroy()
-	end
-	local gui = Instance.new("BillboardGui")
-	gui.Name = "Shout"
-	gui.Size = UDim2.fromOffset(240, 44)
-	gui.StudsOffset = Vector3.new(0, 3, 0)
-	gui.AlwaysOnTop = true
-	gui.MaxDistance = 150
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundColor3 = Color3.new(1, 1, 1)
-	label.BackgroundTransparency = 0.1
-	label.TextColor3 = Color3.fromRGB(30, 30, 30)
-	label.Font = Enum.Font.GothamBold
-	label.TextScaled = true
-	label.Text = text
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = label
-	label.Parent = gui
-	gui.Parent = anchor
-	task.delay(2.5, function()
-		gui:Destroy()
-	end)
 end
 
 function Game.start(opts: Opts?): any
@@ -310,6 +287,7 @@ function Game.start(opts: Opts?): any
 	local lastBitten: { [any]: number } = {}
 	local shoutN = 0
 	local now = 0
+	local lastSay: { [number]: string } = {} -- town id -> the line last shown over that body
 
 	local function fire(player: any, payload: { [string]: any })
 		if typeof(player) == "Instance" then
@@ -318,6 +296,68 @@ function Game.start(opts: Opts?): any
 			end
 		elseif type(player) == "table" and type(player.events) == "table" then
 			table.insert(player.events, payload) -- PlayerLike stub (engine smoke): what the client would get
+		end
+	end
+
+	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
+	local infection: any = nil
+	local okI, errI = pcall(function()
+		infection = InfectionService.new({
+			world = world,
+			traffic = traffic,
+			data = data,
+			controllerOf = function(id: number): string
+				local actor = rt.byTownId[id]
+				return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
+			end,
+			setAttr = function(id: number, name: string, value: any)
+				local actor = rt.byTownId[id]
+				if actor then
+					(actor.body :: Model):SetAttribute(name, value)
+				end
+				if name == "Say" then
+					lastSay[id] = value
+				end
+			end,
+			setPossessable = function(id: number, value: boolean)
+				local actor = rt.byTownId[id]
+				if actor then
+					actor.possessable = value
+				end
+			end,
+			notify = function(id: number, payload: { [string]: any })
+				local actor = rt.byTownId[id]
+				local driver = if actor then possession:controllerOf(actor) else nil
+				if driver ~= nil and driver ~= "ai" then
+					fire(driver, payload)
+				end
+			end,
+			serverTime = function(): number
+				return workspace:GetServerTimeNow()
+			end,
+		})
+	end)
+	if not okI then
+		infection = nil
+		warn(`[SpicyRodents] the infection service did not start (bites still score, nobody falls ill): {errI}`)
+	elseif infection.layout then
+		-- the cots the patients sit up on (eight, in the two wards); decoration, never fatal
+		local okP, errP = pcall(HospitalProps.build, infection.layout)
+		if not okP then
+			warn(`[SpicyRodents] the hospital cots were not built: {errP}`)
+		end
+	end
+	-- a fault in the sequence must never stop traffic, bites or the pose stream: it is caught where
+	-- it is called, reported (the first few times) and, if it keeps failing, switched off
+	local infectionFaults = 0
+	local function infectionFault(where: string, err: any)
+		infectionFaults += 1
+		if infectionFaults <= 3 then
+			warn(`[SpicyRodents] infection {where} failed: {err}`)
+		end
+		if infectionFaults == 60 then
+			infection = nil
+			warn("[SpicyRodents] the infection service keeps failing: switched off (bites still score)")
 		end
 	end
 
@@ -521,7 +561,9 @@ function Game.start(opts: Opts?): any
 	end
 
 	-- a squirrel-family actor is knocked out: its player (if any) is told and released to the menu;
-	-- the body goes back to the AI at its spawn with full health (bodies are never destroyed, D1)
+	-- the body goes back to the AI at its spawn with full health (bodies are never destroyed, D1).
+	-- Knocking out the Spicy Rodent cures NOBODY (owner 2026-11-10: the hospital is the only cure;
+	-- Tunables infection.recentBiteSecs = 0): the people it bit stay infected until they are treated.
 	local function kill(actor: any, cause: string)
 		local driver = possession:controllerOf(actor)
 		health[actor.id] = PlayRules.HEALTH
@@ -638,6 +680,10 @@ function Game.start(opts: Opts?): any
 					people[n] = rec
 				end
 				rec.x, rec.y, rec.z = a.x, a.y - a.hip, a.z
+				-- AICarMotor's `hospital` flag: the emergency vehicles do not stop for the hospital's
+				-- own people or for anyone at a scene; a patient out of sight is nobody's hazard
+				rec.hospital = infection ~= nil and infection:trafficFlags(a.id)
+				rec.visible = (a.lift or 0) == 0
 			elseif isSquirrelFamily(actor) and actor.mode ~= "ai" then
 				table.insert(squirrels, { id = actor.id, x = a.x, y = a.y - a.hip, z = a.z })
 			end
@@ -679,6 +725,9 @@ function Game.start(opts: Opts?): any
 						local victim = rt.actors:get(vid)
 						local vt = townIdOf[vid]
 						local va = world.actorsById[vt]
+						if infection and not infection:biteable(vt) then
+							continue -- a patient on the ground, in the ambulance or in a bed is left alone
+						end
 						local officer = va ~= nil and va.post == "police"
 						local delta = PowerRules.apply(
 							s.power,
@@ -687,11 +736,17 @@ function Game.start(opts: Opts?): any
 						s.bites += 1
 						shoutN += 1
 						local line = PlayRules.shout(shoutN)
-						if victim then
-							shoutAt(victim.body, line)
-						end
 						local driver = if victim then possession:controllerOf(victim) else "ai"
-						if driver == "ai" then
+						if infection then
+							-- infected: they run and shout (the Say attribute; clients draw the bubble),
+							-- and the sequence to the hospital begins. A player holding the victim gets a
+							-- "med" event from the service that says what happened and what to do.
+							local okB, errB = pcall(infection.bite, infection, vt, townIdOf[actor.id])
+							if not okB then
+								infectionFault("bite", errB)
+							end
+							line = lastSay[vt] or line
+						elseif driver == "ai" then
 							local brain = world.brains[vt] :: any
 							local me = world.actorsById[townIdOf[actor.id]]
 							if brain and brain.lane and va and me then
@@ -722,6 +777,12 @@ function Game.start(opts: Opts?): any
 		now += dt
 		local hits = traffic:step(dt, trafficWorld() :: any)
 		local _ = hits
+		if infection then
+			local okS, errS = pcall(infection.step, infection, dt)
+			if not okS then
+				infectionFault("step", errS)
+			end
+		end
 		poseAcc += dt
 		if net and poseAcc >= 1 / 15 then
 			poseAcc = math.min(poseAcc - 1 / 15, 1 / 15) -- an even 15 sends a second
@@ -878,6 +939,10 @@ function Game.start(opts: Opts?): any
 		health = healthOf,
 		placeAI = placeAI,
 		attractions = attractions,
+		infection = infection,
+		townIdOf = function(actorId: string): number?
+			return townIdOf[actorId]
+		end,
 		stop = function()
 			rt.stop()
 			if attractions then
