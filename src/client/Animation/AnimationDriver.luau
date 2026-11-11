@@ -426,14 +426,16 @@ function AnimationDriver.heroLayers(
 		end
 	end
 	-- the breath and the shudder are the back's (and the shudder the head's too): the bones before and
-	-- after take the breath back and the chest takes the shudder back (by the rig's own lengths the chest
-	-- ends level and at its height), so the fore paws it carries stay where they stand; the neck takes the
-	-- shudder up again
-	out.Spine1 = { -0.645 * pose.chest, 0, pose.spine }
-	out.Spine2 = { pose.chest, 0, pose.spine }
+	-- after take the breath back (by the rig's own lengths the chest ends level and at its height) and
+	-- the chest takes the shudder back, so the fore paws it carries stay where they stand (within 0.02
+	-- studs; they were shoved a third of a stud); the neck takes the shudder up again. The shudder rolls
+	-- the bone behind the chest: the nearer the roll is to where it is taken back, the less it carries
+	-- the chest sideways.
+	out.Spine1 = { -0.645 * pose.chest, 0, 0 }
+	out.Spine2 = { pose.chest, 0, 0 }
 	out.Chest = { -0.355 * pose.chest, 0, -3 * pose.spine }
 	if pose.spine ~= 0 then
-		out.Spine3 = { 0, 0, pose.spine }
+		out.Spine3 = { 0, 0, 3 * pose.spine }
 		out.Neck = { 0, 0, 3 * pose.spine }
 	end
 	return if live then Liveliness.onto(out, live.pose) else out

@@ -921,6 +921,7 @@ return function(t: any)
 				shudders += 1
 				local chest = layers.Spine1[3] + layers.Spine2[3] + layers.Spine3[3] + layers.Chest[3]
 				t.near(chest, 0, 1e-12, "the chest does not roll")
+				t.near(layers.Spine3[3], 3 * creep.spine, 1e-12, "the back behind it does, as far as it ever did")
 				t.near(layers.Neck[3], 3 * creep.spine, 1e-12, "the head still shakes")
 			else
 				t.eq(layers.Chest[3], 0)
