@@ -48,8 +48,13 @@ return function(t)
 		local g = Ghost.new({ delay = 0 })
 		g:push(0, { rec(1, 0, 30) })
 		g:push(1 / 15, { rec(1, 1300, 30) }) -- a wrap whose flagged send was lost
-		t.near(g:sample(1 / 30)[1].x, 1300, 1e-3, "snapped, not half way across town")
-		t.near(g:sample(1 / 15 + 0.1)[1].x, 1300, 1e-3, "not extrapolated along the jump")
+		t.near(g:sample(1 / 30)[1].x, 1, 1e-3, "driving on until the jump's instant, not half way across town")
+		t.near(g:sample(1 / 15 + 0.1)[1].x, 1300, 1e-3, "then snapped, and not extrapolated along the jump")
+		-- after the snap the car leaves the new place at once (it used to stand still a send long)
+		g:push(2 / 15, { rec(1, 1302, 30) })
+		local leaving = g:sample(1 / 15 + 1 / 60)[1]
+		t.near(leaving.x, 1300.5, 1e-3)
+		t.truthy(leaving.teleported, "marked as the snap it is while it leaves")
 		local h = Ghost.new({ delay = 0 })
 		h:push(0, { rec(1, 0, 30) })
 		h:push(1 / 15, { rec(1, 2, 30) }) -- an ordinary step

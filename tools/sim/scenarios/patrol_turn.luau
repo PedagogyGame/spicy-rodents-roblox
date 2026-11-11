@@ -15,8 +15,9 @@ local scenario: Replay.Scenario = {
 		v.s = v.lane.length - 80
 		v.speed = v.cruise
 	end,
-	expect = { none = { "speed_stutter", "sink", "float", "teleport_bit_dropped" } },
-	known = { "sim_jump_unflagged", "sim_yaw_snap", "teleport_unflagged", "reverse_travel" },
+	-- teleport_unflagged is fixed on the client: a jump no car could drive is drawn as a snap (Ghost)
+	expect = { none = { "speed_stutter", "sink", "float", "teleport_bit_dropped", "teleport_unflagged" } },
+	known = { "sim_jump_unflagged", "sim_yaw_snap", "reverse_travel" },
 }
 
 return scenario

@@ -111,6 +111,11 @@ local function jumped(a: Pose, b: Pose, span: number): boolean
 	return dx * dx + dz * dz > reach * reach
 end
 
+-- snapped(a, b, span): b does not follow a by driving (teleported, appeared, vanished, or jumped)
+local function snapped(a: Pose, b: Pose, span: number): boolean
+	return b.teleported or a.visible ~= b.visible or (a.visible and jumped(a, b, span))
+end
+
 local function lerpAngle(a: number, b: number, t: number): number
 	local d = math.atan2(math.sin(b - a), math.cos(b - a))
 	return a + d * t
@@ -332,13 +337,40 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 				i += 1
 			end
 			local a, b = snaps[i], snaps[i + 1]
-			local u = (rt - a.t) / (b.t - a.t)
+			local span = b.t - a.t
+			local u = (rt - a.t) / span
+			local pre = snaps[i - 1]
 			local out = {}
 			for id, pb in b.poses do
 				local pa = a.poses[id]
-				if pa == nil or pb.teleported or not pa.visible or not pb.visible or jumped(pa, pb, b.t - a.t) then
-					out[id] = pb -- snap: new, teleported (flagged or not), or appearing/disappearing
+				if pa == nil then
+					out[id] = pb -- seen for the first time
+				elseif snapped(pa, pb, span) then
+					-- a teleport, an appearance or a disappearance happened by b's instant: snap exactly then.
+					-- Until then the car carries on as it was (it used to snap a send early and stand still)
+					if pa.visible and not pa.stopped then
+						local k = rt - a.t
+						out[id] = {
+							id = id,
+							x = pa.x + math.sin(pa.yaw) * pa.speed * k,
+							z = pa.z + math.cos(pa.yaw) * pa.speed * k,
+							yaw = pa.yaw,
+							speed = pa.speed,
+							visible = true,
+							beacons = pa.beacons,
+							teleported = false,
+							stopped = false,
+						}
+					else
+						out[id] = pa
+					end
 				else
+					-- flagged as teleported while it leaves the snapshot it snapped to
+					local fresh = false
+					if pre then
+						local pp = pre.poses[id]
+						fresh = pp == nil or snapped(pp, pa, a.t - pre.t)
+					end
 					out[id] = {
 						id = id,
 						x = pa.x + (pb.x - pa.x) * u,
@@ -347,7 +379,7 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 						speed = pa.speed + (pb.speed - pa.speed) * u,
 						visible = pb.visible,
 						beacons = pb.beacons,
-						teleported = false,
+						teleported = fresh,
 						stopped = pb.stopped,
 					}
 				end

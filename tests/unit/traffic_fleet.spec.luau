@@ -354,7 +354,10 @@ return function(t)
 				stopped = false,
 			}),
 		})
-		t.near(g:sample(0.5)[1].x, 100, 1e-6, "teleport snaps")
+		-- (yaw 0 faces +z: until the teleport's own instant the car drives on at 1 st/s, then it snaps)
+		t.near(g:sample(0.5)[1].x, 0, 1e-6, "not before its instant")
+		t.near(g:sample(0.5)[1].z, 0.5, 1e-6, "driving on as it was")
+		t.near(g:sample(1.01)[1].x, 100, 1e-6, "teleport snaps")
 		local h = Ghost.new({ delay = 0 })
 		h:push(0, {
 			Ghost.encode({
