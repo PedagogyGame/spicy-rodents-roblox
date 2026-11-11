@@ -62,10 +62,16 @@ end
 local layout = infection.layout
 
 local clock = 0
+-- (yield now and then: the engine stops a script that runs too long without one)
+local lastYield = os.clock()
 local function step(secs: number, each: (() -> ())?)
 	for _ = 1, math.max(1, math.floor(secs / STEP + 0.5)) do
 		G.step(STEP)
 		clock += STEP
+		if os.clock() - lastYield > 1 then
+			task.wait()
+			lastYield = os.clock()
+		end
 		if each then
 			each()
 		end

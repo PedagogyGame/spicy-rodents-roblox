@@ -55,10 +55,17 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 	end
 	local layout = infection.layout
 	local clock = 0
+	-- (the whole game is stepped many simulated minutes in a row: yield now and then, or the engine
+	-- stops a script that has run too long without one)
+	local lastYield = os.clock()
 	local function step(secs: number)
 		for _ = 1, math.max(1, math.floor(secs / STEP + 0.5)) do
 			G.step(STEP)
 			clock += STEP
+			if os.clock() - lastYield > 1 then
+				task.wait()
+				lastYield = os.clock()
+			end
 		end
 	end
 	-- step until done() or the limit; returns whether it happened and the seconds it took
