@@ -852,12 +852,7 @@ class TreeBuilder:
     def bough_limb(self, b):
         """(Re)build a bough's tube from its rail, radii and lift."""
         Q, radii, lift = b["rail"], b["radii"], b["lift"]
-        # the game draws the squirrel's feet pushed out of the trunk over a bough's first fifth
-        # (feet_path): the bark's top goes under those feet, so the limb leaves the trunk's axis level
-        # and then follows the pushed line
-        push = self.feet_path(Q, 0.0, b["kind"], b["route"], s=b["s"], L=b["L"], sP=(b["P"], b["sP"])) - Q
-        push[0] = 0.0
-        centers = Q + push + b["w0"] * (Y[None] * lift - b["ups"] * radii[:, None])
+        centers = Q + b["w0"] * (Y[None] * lift - b["ups"] * radii[:, None])
         wob = b["wob"]
 
         def radius(i, ang, radii=radii):
@@ -867,7 +862,7 @@ class TreeBuilder:
         # the blend belongs to the junction: past it, boughs that run side by side stay two round limbs
         zone, clear = b["zone"], b["clear"]
         limb.fade = (max(0.55 * zone, clear + 0.5), max(1.2 * zone, clear + 4.5))
-        limb.feet = Q + push + Y[None] * lift
+        limb.feet = Q + Y[None] * lift
         b["limb"], b["Q"] = limb, centers
 
     def relieve_crossings(self):
@@ -1807,21 +1802,15 @@ class TreeBuilder:
         return {"bark": self.bark.tris, "leaves_shade": self.leaf["shade"].tris, "leaves_mid": self.leaf["mid"].tris,
                 "leaves_sun": self.leaf["sun"].tris, "fruit": self.fruit.tris}
 
-    def feet_path(self, P, lift, kind, route, s=None, L=None, sP=None):
+    def feet_path(self, P, lift, kind, route):
         """The squirrel's drawn feet along a rail (Motion.visualPose): rail + lift, pushed out of the
-        trunk over the first fifth of a bough. P is the route's dense samples; or, with s, L and
-        sP = (dense samples, their arc lengths), points of the rail at the arc lengths s."""
+        trunk over the first fifth of a bough."""
         F = P + Y[None] * lift
         clr = route.get("trunkClearance")
         if kind == "branch" and clr:
-            if s is None:
-                sP = arclen(P)
-                t = sP / max(sP[-1], 1e-9)
-                ahead = at_s(P, sP, 0.16 * sP[-1])[0] - P[0]
-            else:
-                dense, sd = sP
-                t = np.asarray(s) / max(L, 1e-9)
-                ahead = at_s(dense, sd, 0.16 * L)[0] - dense[0]
+            sP = arclen(P)
+            t = sP / max(sP[-1], 1e-9)
+            ahead = at_s(P, sP, 0.16 * sP[-1])[0] - P[0]
             h = np.array([ahead[0], 0.0, ahead[2]])
             if np.linalg.norm(h) > 1e-6:
                 k = (clr + 0.31) * SPU * np.clip(1 - t / 0.2, 0, 1) ** 2
