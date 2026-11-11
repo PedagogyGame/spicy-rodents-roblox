@@ -9,12 +9,15 @@
 --     rubber that is lively and metal and wood that are dead (a bounce keeps a share of the speed INTO the
 --     surface; slow touches keep none, so a ball can roll along a guide and come to rest in a corner).
 --   * A flipper is a rotating body, not a paddle that teleports. It is driven up at FLIP_ACC_UP (a full stroke
---     in about 45 ms), falls back slower under its spring, and bounces a little off its stops. The ball takes
---     its speed from the flipper's SURFACE at the point of contact (pivot distance times angular speed), so the
---     tip hits harder than the base, and the direction comes from where the flipper is in its stroke when they
---     meet: timing aims. A held flipper is a solid slope (a ball can be cradled on it and stops dead); a
---     flipper that has just hit its stop is on the recoil, moving away, and a ball landing right then is
---     deadened (a live catch). None of that is scripted; it falls out of the collision.
+--     in about 45 ms), falls back slower under its spring, and bounces a little off its stops. Its motion is
+--     worked out exactly inside every sub-step, so its surface gains speed smoothly: a ball lying on it is
+--     PUSHED (it rides the surface, sliding out toward the tip as the flipper whirls, gripped a little by the
+--     rubber), a ball that meets it is HIT (it takes the surface's speed at the point of contact, pivot distance
+--     times angular speed, plus its bounce). So the tip hits harder than the base, and where the ball is on the
+--     flipper when the button goes down sets the angle it leaves at, smoothly: timing aims. A held flipper is a
+--     solid slope (a ball can be cradled on it and stops dead); a flipper that has just hit its stop is on the
+--     recoil, moving away, and a ball landing right then is deadened (a live catch). None of that is scripted;
+--     it falls out of the collision.
 --   * Nothing tunnels. Each tick is cut into as many sub-steps as it takes for the ball and the flipper
 --     surfaces to move no more than SUB_TRAVEL (under a third of the ball's radius) relative to each other, and
 --     a wall is a line the ball's centre may not come within one radius of, from either side.
@@ -46,7 +49,7 @@ Physics.MAX_SUBSTEPS = 12
 Physics.ROLL_DECEL = 0.2 -- studs/s^2 of rolling resistance
 Physics.REST_V0 = 0.15 -- below this speed into a surface nothing bounces back
 Physics.REST_V1 = 0.6 -- from here up the surface's full liveliness
-Physics.FLIP_ACC_UP = 1100 -- rad/s^2 under the power winding of the coil
+Physics.FLIP_ACC_UP = 1300 -- rad/s^2 under the power winding of the coil
 Physics.FLIP_ACC_HOLD = 250 -- rad/s^2 under the hold winding (once the flipper has reached its top stop)
 Physics.FLIP_W_MAX = 40 -- rad/s
 Physics.FLIP_W_SETTLE = 1.5 -- rad/s: how fast a flipper that has bounced off its top stop comes back to it
@@ -147,11 +150,12 @@ local SEN_ROLLOVER, SEN_SPINNER = Layout.SEN_ROLLOVER, Layout.SEN_SPINNER
 local sqrt, floor = math.sqrt, math.floor
 
 -- per-step scratch, rebuilt from the state at the top of every step (nothing is carried in it)
-local fA0: { number } = {}
-local fDA: { number } = {}
-local fOm: { number } = {}
-local fDx: { number } = {}
+local fMove: { boolean } = {} -- the flipper is not lying still on a stop this tick
+local fOm: { number } = {} -- angular speed of the surface over the sub-step in hand (mirrored: about +z of the table)
+local fRise: { number } = {} -- how much that speed changed from the sub-step before (rad/s, never negative)
+local fDx: { number } = {} -- the flipper's direction in the sub-step in hand
 local fDy: { number } = {}
+local subG = 0 -- the speed gravity alone adds in one sub-step
 
 function Physics.new(c: Layout.Compiled, seed: number): State
 	local s: State = {
@@ -431,23 +435,32 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 			local vn = rvx * nx + rvy * ny
 			if vn < 0 then
 				local sp = -vn
-				local e = Physics.FLIP_E * fade(sp)
+				-- A flipper that is speeding up under a ball lying on it PUSHES the ball; it does not hit it. The
+				-- part of the closing speed that is only the surface gaining speed in this sub-step (and gravity
+				-- pressing the ball down) is taken up dead; what is left over is a hit and bounces.
+				local push = fRise[i] * sqrt(px * px + py * py) + subG
+				local hit = sp - push
+				if hit < 0 then
+					hit = 0
+				end
+				local out = Physics.FLIP_E * fade(hit) * hit
+				-- the rubber grips in proportion to how hard the two are pressed together (a ball merely lying on
+				-- the flipper rolls freely)
+				local grip = Physics.FLIP_MU * (sp + out - 2 * subG)
 				local vt = rvy * nx - rvx * ny
-				if sp > V0 then
-					local rub = Physics.FLIP_MU * (1 + e) * sp
-					if vt > rub then
-						vt -= rub
-					elseif vt < -rub then
-						vt += rub
+				if grip > 0 then
+					if vt > grip then
+						vt -= grip
+					elseif vt < -grip then
+						vt += grip
 					else
 						vt = 0
 					end
 				end
-				local out = e * sp
 				b.vx = svx + out * nx - vt * ny
 				b.vy = svy + out * ny + vt * nx
-				if sp > Physics.SOUND_MIN then
-					emit(ev, EV.FLIPPER, i, sp, bi)
+				if hit > Physics.SOUND_MIN then
+					emit(ev, EV.FLIPPER, i, hit, bi)
 				end
 			end
 		else
@@ -470,6 +483,8 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 						if sp > Physics.DROP_MIN then
 							drop[c.sRef[id]] = true
 							emit(ev, EV.DROP, c.sRef[id], sp, bi)
+							-- another ball may have been lying against it
+							Physics.wake(s)
 						end
 					elseif kind == SEG_STANDUP then
 						if sp > Physics.STANDUP_MIN then
@@ -559,6 +574,99 @@ local function ride(c: Layout.Compiled, b: Ball, bi: number, ev: { number })
 	b.z = r.h[k] + r.slope[k] * u
 end
 
+-- turn(compiled, state, i, dt): flipper i moves for dt under its coil or its spring, between its stops; returns
+-- the angle it turned through. The motion is worked out exactly for a steady pull (angle = w t + a t^2 / 2, up
+-- to the top speed), so it is the same stroke however finely a tick is cut.
+local function turn(c: Layout.Compiled, s: State, i: number, dt: number): number
+	local a0, w = s.fa[i], s.fw[i]
+	local start = a0
+	local rest, up = c.frest[i], c.fup[i]
+	local a1, w1
+	if s.fp[i] then
+		if a0 >= up and w == 0 then
+			return 0
+		end
+		-- the power winding drives it up; once it has reached its stop the hold winding brings it back there
+		-- gently if it bounced
+		local acc, top = Physics.FLIP_ACC_UP, Physics.FLIP_W_MAX
+		if s.fh[i] then
+			acc, top = Physics.FLIP_ACC_HOLD, Physics.FLIP_W_SETTLE
+		end
+		w1 = w + acc * dt
+		if w >= top then
+			w1 = top
+			a1 = a0 + top * dt
+		elseif w1 > top then
+			local t1 = (top - w) / acc
+			w1 = top
+			a1 = a0 + w * t1 + 0.5 * acc * t1 * t1 + top * (dt - t1)
+		else
+			a1 = a0 + w * dt + 0.5 * acc * dt * dt
+		end
+		if a1 >= up then
+			a1 = up
+			s.fh[i] = true
+			w1 = if w1 > Physics.FLIP_BOUNCE_MIN then -w1 * Physics.FLIP_STOP_E else 0
+		elseif a1 <= rest then
+			-- pressed again while still falling: it lands on its rest stop and starts from there
+			a1 = rest
+			w1 = 0
+		end
+	else
+		if a0 <= rest and w == 0 then
+			return 0
+		end
+		-- let go on the way up, the flipper coasts on a little against the spring and its own drag (a short tap
+		-- is a short flick); then it falls
+		local acc = Physics.FLIP_ACC_DOWN
+		local low = -Physics.FLIP_W_DOWN
+		if w > 0 then
+			local brake = Physics.FLIP_ACC_BRAKE
+			local t0 = w / brake
+			if t0 >= dt then
+				-- still coasting up at the end of this step
+				a1 = a0 + w * dt - 0.5 * brake * dt * dt
+				w1 = w - brake * dt
+				if a1 >= up then
+					a1 = up
+					w1 = if w1 > Physics.FLIP_BOUNCE_MIN then -w1 * Physics.FLIP_STOP_E else 0
+				end
+				s.fa[i] = a1
+				s.fw[i] = w1
+				return a1 - a0
+			end
+			-- it tops out inside this step and falls for the rest of it
+			a0 += 0.5 * w * t0
+			if a0 > up then
+				a0 = up
+			end
+			w = 0
+			dt -= t0
+		end
+		w1 = w - acc * dt
+		if w <= low then
+			w1 = low
+			a1 = a0 + low * dt
+		elseif w1 < low then
+			local t1 = (w - low) / acc
+			w1 = low
+			a1 = a0 + w * t1 - 0.5 * acc * t1 * t1 + low * (dt - t1)
+		else
+			a1 = a0 + w * dt - 0.5 * acc * dt * dt
+		end
+		if a1 <= rest then
+			a1 = rest
+			w1 = if -w1 > Physics.FLIP_BOUNCE_MIN then -w1 * Physics.FLIP_REST_E else 0
+		elseif a1 >= up then
+			a1 = up
+			w1 = if w1 > Physics.FLIP_BOUNCE_MIN then -w1 * Physics.FLIP_STOP_E else 0
+		end
+	end
+	s.fa[i] = a1
+	s.fw[i] = w1
+	return a1 - start
+end
+
 -- step(compiled, state, left, right, events): one tick of 1/240 s.
 function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolean, ev: { number })
 	s.tick += 1
@@ -567,78 +675,29 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 	local nF = c.nFlip
 	local g = c.gravity
 
-	-- the flippers move first: where each will be at the end of the tick, and how fast its surface turns
+	-- the flippers: read the buttons, and see how far each could turn in this tick
 	local reachMoved = 0
 	local anyMoved = false
 	for i = 1, nF do
-		local a0, w = s.fa[i], s.fw[i]
-		local a1 = a0
 		local pressed = not s.dead and ((c.fbtn[i] == 1 and left) or (c.fbtn[i] == 2 and right))
 		if pressed ~= s.fp[i] then
 			s.fp[i] = pressed
 			s.fh[i] = false
 			emit(ev, if pressed then EV.FLIP_UP else EV.FLIP_DOWN, i, 0, 0)
 		end
-		if pressed then
-			local up = c.fup[i]
-			if a0 < up or w ~= 0 then
-				if s.fh[i] then
-					-- on the hold winding it comes back to its stop gently
-					w += Physics.FLIP_ACC_HOLD * DT
-					if w > Physics.FLIP_W_SETTLE then
-						w = Physics.FLIP_W_SETTLE
-					end
-				else
-					w += Physics.FLIP_ACC_UP * DT
-					if w > Physics.FLIP_W_MAX then
-						w = Physics.FLIP_W_MAX
-					end
-				end
-				a1 = a0 + w * DT
-				if a1 >= up then
-					a1 = up
-					s.fh[i] = true
-					w = if w > Physics.FLIP_BOUNCE_MIN then -w * Physics.FLIP_STOP_E else 0
-				elseif a1 <= c.frest[i] then
-					-- pressed again while still falling: it lands on its rest stop and starts from there
-					a1 = c.frest[i]
-					w = 0
-				end
-			end
-		else
-			local rest = c.frest[i]
-			if a0 > rest or w ~= 0 then
-				-- let go on the way up, the flipper coasts on a little against the spring and its own drag (a
-				-- short tap is a short flick); then it falls
-				w -= (if w > 0 then Physics.FLIP_ACC_BRAKE else Physics.FLIP_ACC_DOWN) * DT
-				if w < -Physics.FLIP_W_DOWN then
-					w = -Physics.FLIP_W_DOWN
-				end
-				a1 = a0 + w * DT
-				if a1 <= rest then
-					a1 = rest
-					w = if -w > Physics.FLIP_BOUNCE_MIN then -w * Physics.FLIP_REST_E else 0
-				elseif a1 >= c.fup[i] then
-					a1 = c.fup[i]
-					w = if w > Physics.FLIP_BOUNCE_MIN then -w * Physics.FLIP_STOP_E else 0
-				end
-			end
-		end
-		s.fw[i] = w
-		s.fa[i] = a1
-		fA0[i] = a0
-		local da = a1 - a0
-		fDA[i] = da
-		fOm[i] = c.fmir[i] * da / DT
-		if da ~= 0 then
+		local a0, w = s.fa[i], s.fw[i]
+		local moving = w ~= 0 or (if pressed then a0 < c.fup[i] else a0 > c.frest[i])
+		fMove[i] = moving
+		fOm[i] = 0
+		fRise[i] = 0
+		fDx[i] = c.fmir[i] * Det.cos(a0)
+		fDy[i] = Det.sin(a0)
+		if moving then
 			anyMoved = true
-			local moved = (if da < 0 then -da else da) * (c.freach[i] + R)
+			local moved = ((if w < 0 then -w else w) + Physics.FLIP_ACC_UP * DT) * DT * (c.freach[i] + R)
 			if moved > reachMoved then
 				reachMoved = moved
 			end
-		else
-			fDx[i] = c.fmir[i] * Det.cos(a1)
-			fDy[i] = Det.sin(a1)
 		end
 	end
 
@@ -675,14 +734,29 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 	local sgrid = c.sgrid
 	local gridW, gridH = c.gridW, c.gridH
 
-	if anyFree then
-		for k = 1, n do
+	subG = g * h
+	if not anyFree then
+		-- nothing for a flipper to meet: it still moves
+		if anyMoved then
+			for i = 1, nF do
+				if fMove[i] then
+					turn(c, s, i, DT)
+				end
+			end
+		end
+	else
+		for _ = 1, n do
 			if anyMoved then
-				local frac = k / n
 				for i = 1, nF do
-					local da = fDA[i]
-					if da ~= 0 then
-						local a = if k == n then s.fa[i] else fA0[i] + da * frac
+					if fMove[i] then
+						-- the surface's speed over this sub-step, and how much it rose since the one before
+						local before = fOm[i]
+						local da = turn(c, s, i, h)
+						local om = c.fmir[i] * da / h
+						local rise = om - before
+						fOm[i] = om
+						fRise[i] = if rise < 0 then -rise else rise
+						local a = s.fa[i]
 						fDx[i] = c.fmir[i] * Det.cos(a)
 						fDy[i] = Det.sin(a)
 					end

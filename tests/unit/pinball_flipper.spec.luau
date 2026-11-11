@@ -237,6 +237,56 @@ return function(t: Test.T)
 	)
 
 	t.test(
+		"PIN-P1: timing aims finely: tick by tick the angle moves on smoothly, never in jumps and never back",
+		function()
+			-- every tick of delay from the pivot to the tip: one tick later is at most a couple of degrees on,
+			-- so any spot on the table that a flipper can reach at all can be reached by timing alone
+			local base = cradle(LEFT)
+			local shots: { Shot } = {}
+			for delay = 40, 260 do
+				local sh = shot(base, LEFT, delay)
+				if sh and sh.along > 0.02 and sh.along < 0.97 then
+					table.insert(shots, sh)
+				end
+			end
+			t.truthy(#shots > 80, `a shot for every tick ({#shots})`)
+			local worst = 0
+			for k = 2, #shots do
+				local step = shots[k].angle - shots[k - 1].angle
+				t.truthy(step > -0.3, `at {shots[k].along} the angle fell back by {-step} degrees`)
+				worst = math.max(worst, step)
+			end
+			t.truthy(worst < 3, `the largest step from one tick to the next is {worst} degrees`)
+			t.truthy(shots[#shots].angle - shots[1].angle > 35, "over a spread of more than 35 degrees")
+		end
+	)
+
+	t.test(
+		"PIN-P1: a ball lying on the flipper is pushed, not hit: it leaves with the surface, without a rattle",
+		function()
+			local base = cradle(LEFT)
+			local s = clone(base)
+			local ev: { number } = {}
+			for _ = 1, 150 do
+				Physics.step(c, s, false, false, ev)
+			end
+			table.clear(ev)
+			local b = s.balls[1]
+			for _ = 1, 14 do
+				Physics.step(c, s, true, false, ev)
+			end
+			local hits = 0
+			for k = 1, #ev, 4 do
+				if ev[k] == Physics.EV.FLIPPER then
+					hits += 1
+				end
+			end
+			t.eq(hits, 0, "no impact is heard: the flipper carried the ball")
+			t.truthy(b.vy > 8, `and threw it up the table ({b.vy})`)
+		end
+	)
+
+	t.test(
 		"PIN-P1: the ball's speed comes from the flipper's surface: further out is harder, and never more than the tip can give",
 		function()
 			local base = cradle(LEFT)
@@ -244,10 +294,10 @@ return function(t: Test.T)
 			for delay = 40, 240, 4 do
 				local sh = shot(base, LEFT, delay)
 				if sh then
-					if near == nil and sh.along > 0.15 then
+					if near == nil and sh.along > 0.05 then
 						near = sh
 					end
-					if sh.along < 0.72 then
+					if sh.along < 0.55 then
 						far = sh
 					end
 				end
