@@ -10,7 +10,8 @@
 -- on the tower than a slow draw. Whatever the hand pulls with goes into the tower at that block's height, as
 -- does any sideways wandering of the hand (less when the block is pushed through from the far end with a
 -- fingertip, and less for a middle block guided by both neighbours). A block that carries most of its level
--- takes the levels above along with it, and those small shifts stay.
+-- takes the levels above along with it (less when it is poked through than when it is dragged), and those
+-- small shifts stay.
 -- THE ROCKING. The part of the tower above each joint is a tall heavy body standing on the patch Stability
 -- found. It sits on a full, stiff contact until the turning force on it moves the centre of pressure to the
 -- patch's edge; then it lifts and rocks about that edge, slowly, the way a tall thing does, hanging near the
@@ -22,7 +23,7 @@
 -- Interface: DT; feel(tower, level, slot) -> Feel?; tap(tower, level, slot) -> Feel?; grab(tower, level,
 --   slot, push) -> (ok, why?); drag(tower, along, lateral); letGo(tower) -> (ok, why?); step(tower);
 --   run(tower, seconds); settle(tower, maxSeconds) -> seconds; place(tower, slot, along, across, speed) ->
---   (ok, why?); danger(tower) -> 0..1; atRest(tower) -> boolean; energy(tower) -> number; the constants below
+--   (ok, why?); strain(tower, level, slot, push) -> ratio; danger(tower) -> 0..1; atRest(tower) -> boolean; energy(tower) -> number; the constants below
 
 local Layout = require("./Layout")
 local Stability = require("./Stability")
@@ -35,7 +36,7 @@ Physics.DT = 1 / Physics.RATE
 
 Physics.MU_K = 0.30 -- sliding friction of timber on timber at a crawl
 Physics.MU_S = 0.42 -- static friction: what must be overcome to start a block
-Physics.V_REF = 1.5 -- studs/s: sliding friction doubles at this speed (rough faces catch)
+Physics.V_REF = 3 -- studs/s: sliding friction doubles at this speed (rough faces catch)
 Physics.KH = 1800 -- the arm's spring, force per stud of stretch
 Physics.MAX_FORCE = 15 * Layout.GRAVITY -- the hardest a hand pulls: fifteen block-weights
 Physics.MAX_HAND_SPEED = 8 -- studs/s
@@ -46,6 +47,7 @@ Physics.SLOP = 0.03 -- studs a held block can be pulled sideways in its slot
 Physics.LAT_MAX = 0.3 -- studs of wander that count
 Physics.SHEAR_LO = 0.5 -- a block carrying more than this share of its level starts to take the levels above
 Physics.SHEAR_HI = 0.85 -- with it; at this share they go all the way with it
+Physics.PUSH_CARRY = 0.4 -- a poke moves a block in short sharp steps: the weight above mostly stays put
 Physics.MICRO = 0.04 -- and any carrying block creeps the levels above by this much of its travel x share
 Physics.STUCK_CREEP = 0.05 -- studs/s: a block too tight to slide still creeps under a hand's full pull
 Physics.CREAK_LOAD = 1.5 -- block-weights of load before a starting block creaks
@@ -309,6 +311,9 @@ function Physics.step(tw: Tower.Tower)
 			local share = an.share[b.id]
 			local carry = math.clamp((share - Physics.SHEAR_LO) / (Physics.SHEAR_HI - Physics.SHEAR_LO), 0, 1)
 				+ Physics.MICRO * share
+			if tw.push then
+				carry *= Physics.PUSH_CARRY
+			end
 			if carry > 0 and k < n then
 				local d = s * moved * math.min(carry, 1)
 				if Layout.alongX(k) then
@@ -502,6 +507,32 @@ function Physics.place(tw: Tower.Tower, slot: number, along: number, across: num
 	tw.stale = true
 	Tower.emit(tw, "place", b.id, v)
 	return true
+end
+
+-- strain(level, slot, push): how hard starting that block would lean on the tower: the turning force of the
+-- pull it takes to start it, over what the weakest joint below can stand (1 or more: the tower will rock up
+-- on an edge for as long as the pull lasts). What an old hand reads from a crooked tower before touching it.
+function Physics.strain(tw: Tower.Tower, level: number, slot: number, push: boolean): number
+	local b = Tower.blockAt(tw, level, slot)
+	if not b then
+		return 0
+	end
+	local an = Stability.ensure(tw)
+	local force = math.min(Physics.MU_S * friction(an, b.id, push), Physics.MAX_FORCE)
+	local d = if Layout.alongX(level) then 1 else 2
+	local y = (level - 0.5) * T
+	local worst = 0
+	for i = 0, math.min(level, an.n) - 1 do
+		local j = 2 * i + d
+		local hold = G * an.mass[i + 1] * math.min(an.bL[j], an.bR[j])
+		if hold > 0 then
+			local r = force * (y - i * T) / hold
+			worst = if r > worst then r else worst
+		else
+			worst = math.huge
+		end
+	end
+	return worst
 end
 
 -- danger(): 0 when nothing rocks, 1 when some part of the tower has its weight right over the edge.

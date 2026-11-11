@@ -194,6 +194,7 @@ end
 function Stability.analyse(tw: Tower.Tower, into: Analysis?): Analysis
 	local an = into or newAnalysis()
 	local levels, blocks = tw.levels, tw.blocks
+	local held = tw.held
 	local n = #levels
 	an.n = n
 	an.ok = true
@@ -237,11 +238,22 @@ function Stability.analyse(tw: Tower.Tower, into: Analysis?): Analysis
 				else
 					bx, bz = SX[k] + off, SZ[k] + b.along
 				end
-				M += 1
-				MX += bx
-				MZ += bz
-				MY += yk
-				MYY += yk * yk
+				-- a block being slid out rests on the tower only by the part still in it (the hand has the
+				-- rest): that part of its weight, at the middle of that part
+				local m, cx, cz = 1, bx, bz
+				if id == held then
+					m = math.max(0, 1 - math.abs(b.along) / L)
+					if upX then
+						cx -= b.along * 0.5
+					else
+						cz -= b.along * 0.5
+					end
+				end
+				M += m
+				MX += m * cx
+				MZ += m * cz
+				MY += m * yk
+				MYY += m * yk * yk
 				nUp += 1
 				-- in the joint's frame: A is the direction ACROSS the upper blocks, B along them
 				if upX then
