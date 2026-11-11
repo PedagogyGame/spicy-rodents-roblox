@@ -1177,7 +1177,11 @@ return function(t)
 			local farAway = 0
 			t.truthy(
 				h.runUntil(500, function(): boolean
-					return h.svc:stateOf(clerk.id) == nil and h.svc:stateOf(far.id) == nil
+					-- (and on until the worker's trip home has been watched for a few steps: which of
+					-- the two is cured last depends on which ambulance was quicker)
+					return h.svc:stateOf(clerk.id) == nil
+						and h.svc:stateOf(far.id) == nil
+						and (farAway >= 5 or h.svc.leaving[far.id] == nil)
 				end, function()
 					-- the worker has no way home on foot: out of sight from the bed for the trip, and
 					-- not on offer to players while under the ward
@@ -1756,7 +1760,17 @@ return function(t)
 				t.truthy(done, `seed {seed}: still open after {math.floor(h.time)} s: {table.concat(left, "; ")}`)
 				t.eq(#faults, 0, `seed {seed}: {faults[1]}`)
 				t.eq(h.svc:stats().faults, 0)
+				-- the last ambulances drive home (they wait for a gap to turn round in, slow for their
+				-- corners and pull in to their bays: a minute is no longer always enough)
 				h.step(60)
+				h.runUntil(240, function(): boolean
+					for _, v in responders(h) do
+						if v.phase ~= "idle" then
+							return false
+						end
+					end
+					return true
+				end)
 				clean(h, `chaos seed {seed}`)
 				local s = h.svc:stats()
 				print(
@@ -2203,7 +2217,7 @@ return function(t)
 			t.eq(v.phase, "hold")
 			t.truthy(v.x == x and v.z == z and v.yaw == yaw, "it has not moved")
 			h.step(0.8)
-			t.eq(v.phase, "back", "then it turns for home")
+			t.eq(v.phase, "turn", "then it turns for home (a U-turn it drives, AICarMotor)")
 			-- a case that ends in that moment still lets the ambulance go (it was held for ever otherwise)
 			local h2 = harness(11, { 0, 0 })
 			h2.svc.tun.crowdChance = 0

@@ -1,10 +1,12 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Render.VehicleView
 -- Ghost AI vehicles from the pose stream (BUILD_PLAN §1.4, §1.6 VehiclePoses, D9; W1 #9 hand-off):
--- ReplicatedStorage.Net.VehiclePoses (an UnreliableRemoteEvent carrying 13-byte records) is decoded
--- with Net.decodeStream(Schemas.VehiclePose) into a Traffic/Ghost buffer, and every RenderStepped
--- Ghost.render places the placeholder cars (Traffic/VehiclePuppet at the true logical box) 100 ms
--- behind the newest snapshot with one BulkMoveTo. The kinds come once from the PlayNet folder's
+-- ReplicatedStorage.Net.VehiclePoses (an UnreliableRemoteEvent carrying 13-byte records) goes through
+-- Traffic/PoseStream's receiver (decode, the server's stamp placed on the local clock, the Traffic/Ghost
+-- snapshot buffer), and every RenderStepped Ghost.render places the placeholder cars
+-- (Traffic/VehiclePuppet at the true logical box, seated on World/RoadSurface) Ghost.DELAY behind the newest snapshot with one
+-- BulkMoveTo. All the arithmetic between a packet and a CFrame lives in those two shared modules, which
+-- the headless replay (tools/sim) runs as well; this file only wires them to the engine. The kinds come once from the PlayNet folder's
 -- TrafficKinds attribute (JSON, id -> { kind, color }). The ghosts live in workspace.TrafficGhosts,
 -- are local to this client and never collide (the server's swept test is the authority).
 -- Interface: start() -> stop(); the folder is returned by folder(). start() also starts Render/TownView
@@ -13,9 +15,10 @@
 
 local Import = require("../Import")
 local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Traffic/Ghost"))
-local Net = Import.shared("Net/Net") :: typeof(require("../../shared/Net/Net"))
-local Schemas = Import.shared("Net/Schemas") :: typeof(require("../../shared/Net/Schemas"))
+local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
+local RoadSurface = Import.shared("World/RoadSurface") :: typeof(require("../../shared/World/RoadSurface"))
+local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local TownView = require("./TownView")
 
 local VehicleView = {}
@@ -59,32 +62,27 @@ function VehicleView.start(): () -> ()
 	folder.Name = "TrafficGhosts"
 	folder.Parent = workspace
 	folderRef = folder
-	local buffer = Ghost.new()
-	local clock = Ghost.newClock()
+	local receiver = PoseStream.newReceiver()
+	-- the ghosts stand on the roads as baked (World/RoadSurface: the same parts worldgen lays), not on
+	-- the terrain under them
+	local ground = RoadSurface.ground(RoadSurface.new(Data.default():roads()), Height.at)
 	local models: { [number]: Model } = {}
 	local conns: { RBXScriptConnection } = {}
 	table.insert(
 		conns,
 		poses.OnClientEvent:Connect(function(b: buffer)
-			if typeof(b) ~= "buffer" then
-				return
-			end
-			local good, records = pcall(Net.decodeStream, Schemas.VehiclePose, b)
-			if good then
-				-- the server's own clock spaces the snapshots; the arrival time only anchors them
-				local arrival = workspace:GetServerTimeNow()
-				local stamp = Ghost.takeStamp(records)
-				buffer:push(if stamp then clock:localTime(stamp, arrival) else arrival, records)
-			end
+			-- the server's own clock spaces the snapshots; the arrival time only anchors them
+			receiver:packet(b, workspace:GetServerTimeNow())
 		end)
 	)
 	local warned = false
 	table.insert(
 		conns,
-		RunService.RenderStepped:Connect(function()
+		RunService.RenderStepped:Connect(function(dt: number)
 			local good, err = pcall(function()
 				local before = #folder:GetChildren()
-				Ghost.render(buffer, workspace:GetServerTimeNow(), folder, kinds, Height.at, models)
+				local at = receiver:at(workspace:GetServerTimeNow(), dt)
+				Ghost.render(receiver.buffer, at, folder, kinds, ground, models)
 				if #folder:GetChildren() ~= before then
 					for _, d in folder:GetDescendants() do
 						if d:IsA("BasePart") then
