@@ -24,7 +24,10 @@
 -- heading, nose-up pitch and lean.
 -- v5.4 switches heading and pitch in one frame when a trunk is mounted or left; here the pitch eases and
 -- the heading change is absorbed by an offset that decays, so nothing pops and steady turning has no lag.
+-- On a bough's first fifth, where the motor's line is still inside the trunk, the body is drawn on the
+-- bough's top line further out instead of at v5.4's level push, which is under a rising bough (junctionT).
 -- Interface: new() -> Visual; frame(v, state, world, dt, groundAt?) -> snapped;
+--   junctionT(world, route, t) -> the t a bough is drawn at, or nil for the motor's own pose;
 --   update(v, tx, ty, tz, dt, mode, groundAt?) -> snapped;
 --   lean(v, yaw, dt, hold?) -> radians; trunkYaw(nx, nz) -> html yaw; trunkPitch(heightAboveGround) -> radians;
 --   cadence(moveSpeed, rail, boosted) -> rad/s; params
@@ -125,9 +128,76 @@ SquirrelVisual.params = {
 	-- the wire starts; drawn there, the sculpted body ran half a stud above the line. A wire is drawn 0.15
 	-- studs thick (worldgen RouteProps), so this is its top
 	wireLift = 0.08,
+	-- a bough's first fifth (junctionT): how far outside the parent trunk's base radius, measured level
+	-- from the bough's start, the drawn feet point first stands on the bough (the base radius is all a
+	-- bough knows of its trunk; a bur oak's bark at its forks is 0.6 to 0.9 studs inside it, so 0 already
+	-- stands 0.8 to 1.3 studs off the bark), and the most of the stretch that may be skipped. A bough whose
+	-- line is not that far out by then is drawn as v5.4 has it: the drawn body would stand still at the
+	-- collar for most of a second. That is every bough of the villa, shop, pump and treehouse trees and
+	-- most of the quay willows, which rise steeply out of a trunk whose base radius says little about the
+	-- bark at the fork: they need the trunk's radius at that height, which a bough does not carry
+	collarGap = 0,
+	collarMax = 0.7,
 	poseRate = 16,
 }
 local P = SquirrelVisual.params
+
+-- per route: the t at which a bough's centre line is trunkClearance + collarGap from its start, level
+local collarCache: { [any]: number } = setmetatable({}, { __mode = "k" }) :: any
+
+local function collarT(world: SquirrelMotor.World, route: any): number
+	local known = collarCache[route]
+	if known then
+		return known
+	end
+	local reg = world.registry
+	local start = reg:pointAt(route, 0)
+	local need = (route.trunkClearance or 0) + P.collarGap
+	local function out(t: number): boolean
+		local p = reg:pointAt(route, t)
+		return math.sqrt((p.x - start.x) ^ 2 + (p.z - start.z) ^ 2) >= need
+	end
+	local T = C.visualClearanceT
+	local lo, hi = 0, T
+	for i = 1, 20 do
+		if out(T * i / 20) then
+			lo, hi = T * (i - 1) / 20, T * i / 20
+			for _ = 1, 12 do
+				local mid = (lo + hi) / 2
+				if out(mid) then
+					hi = mid
+				else
+					lo = mid
+				end
+			end
+			break
+		end
+	end
+	collarCache[route] = hi
+	return hi
+end
+
+-- Where on a bough the squirrel is DRAWN while the motor is at t in its first fifth. The motor's line
+-- starts on the trunk's axis, so until about t = 0.1 the point above it is inside the trunk. v5.4 (and
+-- Motion.visualPose, which stays the motor's own: a leap starts there and the server checks it) moves the
+-- body level along the bough's heading by (trunkClearance + 0.31 u)(1 - t/0.2)^2. Under a rising bough
+-- that point is in the air beside the trunk, below the bough, and the body then comes up through the wood
+-- (6.4 studs under the top of a 60 degree bur oak bough at t = 0, on its centre line at t = 0.1). Drawn
+-- instead on the bough's own top line, further out: at the collar (where the line is clear of the trunk)
+-- when the motor is at t = 0, back with the motor at t = 0.2, never moving backwards, and at the motor's
+-- own speed where the two meet. Returns nil where the body is drawn at the motor's own pose: beyond the
+-- stretch, on anything but a bough out of a trunk, and on a bough that gets clear too late (collarMax).
+function SquirrelVisual.junctionT(world: SquirrelMotor.World, route: any, t: number): number?
+	local T = C.visualClearanceT
+	if route.kind ~= "branch" or not route.trunkClearance or t >= T then
+		return nil
+	end
+	local e = collarT(world, route) / T
+	if e > P.collarMax then
+		return nil
+	end
+	return T * (e + (1 - e) * math.max(t / T, 0) ^ (1 / (1 - e)))
+end
 
 function SquirrelVisual.new(): Visual
 	return {
@@ -302,6 +372,17 @@ function SquirrelVisual.frame(
 		tz -= nz * pull
 	elseif route and route.kind == "wire" then
 		ty -= C.visualWireLift - P.wireLift
+	elseif route then
+		local drawnT = SquirrelVisual.junctionT(world, route, state.railT)
+		if drawnT then
+			-- leaving a trunk: on the bough's top line ahead of the motor, not level out from it
+			-- (junctionT). Relative to the motor's own point, so a transfer bridge still eases in
+			local at = world.registry:pointAt(route, state.railT)
+			local ahead = world.registry:pointAt(route, drawnT)
+			tx = state.x + (ahead.x - at.x)
+			ty += ahead.y - at.y
+			tz = state.z + (ahead.z - at.z)
+		end
 	end
 	local rail = route ~= nil
 	local snapped = SquirrelVisual.update(v, tx, ty, tz, dt, {
