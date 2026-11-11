@@ -7,7 +7,7 @@
 -- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
 -- These kinds are SHAPED (owner 2026-11-11: "the vehicles are extremely rough"), a vehicle from about forty
 -- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building):
--- sedan, patrol car, ambulance, delivery van, ice cream van, trolley, dump truck. The rest are still the ten-block placeholder and
+-- sedan, patrol car, ambulance, delivery van, ice cream van, trolley, dump truck, rv. The rest are still the ten-block placeholder and
 -- follow the same recipe.
 -- Names follow Actors/RigSpec.car (RootPart, Body, WheelFL/FR/BL/BR, LightBar (+ LightBarB, the second
 -- beacon colour), Headlights, TailLights;
@@ -630,6 +630,41 @@ local function dumpTruckParts(k: Kit, color: Rgb): number
 	return (s1 + cabEnd) / 2
 end
 
+-- RV: a long motorhome on the van body: two saloon windows through the hull, a tan stripe, an entry door
+-- and a rolled awning on the kerb side (local +X), an air conditioner on the roof up to the top of the box.
+local function rvParts(k: Kit, color: Rgb): number
+	local roof = k.H - 0.85
+	local glass = hex(FIXED.glass)
+	local bw, ends, front = vanBody(k, color, {
+		inset = 0.35,
+		sill = 0.8,
+		waist = 3.4,
+		belt = 4.5,
+		roof = roof,
+		roofR = 0.7,
+		R = 0.65,
+		screen0 = 2.4,
+		screen1 = 4.1,
+		screenTop = 7.3,
+		cab = 2.7,
+		wheelR = 1.35,
+		wheelW = 1.0,
+		axleF = 2.7,
+		axleB = 15.7,
+		lampY = 1.75,
+		tailY = 2.4,
+		doors = false,
+	})
+	local saloon = front + 2.7 + 1.1 -- behind the cab door
+	add(k, "Stripe", bw + 0.02, 3.7, 4.3, front + 0.02, ends - 0.02, hex("#9b7b4f"))
+	add(k, "WindowA", bw + 0.04, 5.6, 7.6, saloon, saloon + 3.2, glass).material = "Glass"
+	add(k, "WindowB", bw + 0.04, 5.6, 7.6, saloon + 5.4, saloon + 9.2, glass).material = "Glass"
+	box(k, "Door", bw - 0.1, bw + 0.03, 1.1, 7.9, saloon + 3.6, saloon + 5.0, hex("#cfc8b6"))
+	add(k, "AirCon", 1.2, roof, k.H, saloon + 2.6, saloon + 5.2, hex("#d7d4ca"))
+	along(k, "Awning", bw + 0.1, roof - 0.95, 0.25, saloon - 0.3, saloon + 9.6, hex("#6f4f3a"))
+	return front + 1.2
+end
+
 -- Kinds drawn from shaped parts instead of the ten-block placeholder.
 local BUILDERS: { [string]: Builder } = {
 	sedan = sedanParts,
@@ -639,6 +674,7 @@ local BUILDERS: { [string]: Builder } = {
 	ice_cream_van = iceCreamVanParts,
 	trolley = trolleyParts,
 	dump_truck = dumpTruckParts,
+	rv = rvParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against

@@ -13,9 +13,8 @@ local Boxes = require("@shared/Traffic/Boxes")
 
 -- Kinds drawn from shaped parts, and the rest with the part count of their ten-block placeholder. A kind
 -- moves from BLOCKS to SHAPED when it gets its builder.
-local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley", "dump_truck" }
+local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley", "dump_truck", "rv" }
 local BLOCKS: { [string]: number } = {
-	rv = 10,
 	cart = 10,
 	motorcycle = 10,
 }
@@ -432,6 +431,36 @@ return function(t)
 				p.TailLights.pos[3] + p.TailLights.size[3] / 2 > box.length / 2 - 1e-6,
 				"the lamp strip is the tail"
 			)
+		end
+	)
+
+	t.test(
+		"the RV: a long motorhome with saloon windows, a stripe, a kerb-side door and awning, an air conditioner",
+		function()
+			local p = byName(VehiclePuppet.spec("rv"))
+			local box = Boxes.get("rv")
+			t.truthy(p.Hull.size[3] > box.length * 0.75, "one long hull behind the cab")
+			for _, name in { "WindowA", "WindowB" } do
+				t.eq(p[name].material, "Glass")
+				t.truthy(p[name].size[1] > p.Hull.size[1], `{name} shows on both flanks`)
+				t.truthy(p[name].pos[3] > p.SideGlass.pos[3], `{name} is behind the cab`)
+			end
+			t.truthy(p.WindowB.pos[3] - p.WindowB.size[3] / 2 > p.WindowA.pos[3] + p.WindowA.size[3] / 2, "two windows")
+			-- the door stands between the windows on the kerb side only
+			t.truthy(p.Door.pos[1] - p.Door.size[1] / 2 > 0, "the door is on local +X")
+			t.truthy(p.Door.pos[3] > p.WindowA.pos[3] and p.Door.pos[3] < p.WindowB.pos[3])
+			t.truthy(p.Door.size[2] > 6, "a door a person walks through")
+			t.truthy(
+				p.Stripe.size[3] > box.length * 0.7 and p.Stripe.size[1] > p.Hull.size[1],
+				"a stripe down both flanks"
+			)
+			-- the air conditioner is the top of the box; the awning is a roll along the kerb-side roof edge
+			t.near(p.AirCon.pos[2] + p.AirCon.size[2] / 2, box.height / 2, 1e-6)
+			t.near(p.AirCon.pos[2] - p.AirCon.size[2] / 2, p.Roof.pos[2] + p.Roof.size[2] / 2, 1e-6, "on the roof")
+			t.eq(p.Awning.shape, "Cylinder")
+			t.near(p.Awning.yaw :: number, math.pi / 2, 1e-9)
+			t.truthy(p.Awning.pos[1] > 0 and p.Awning.pos[1] + p.Awning.size[2] / 2 <= box.width / 2 + 1e-6)
+			t.eq(p.RearPanel.color.r, p.Hull.color.r, "a plain back")
 		end
 	)
 
