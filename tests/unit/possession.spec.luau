@@ -188,6 +188,42 @@ return function(t)
 		t.eq(p2.Character, nil)
 	end)
 
+	t.test("a body that stops being possessable while the client streams is refused, not handed over", function()
+		-- `possessable` changes at run time now (a bitten person collapses and becomes a patient), and
+		-- streaming around the body is a yield of up to two seconds
+		local wd = world(2, 0)
+		local p = { UserId = 7, Name = "g", Character = nil }
+		local a = wd.actors:get("human_1") :: any
+		local engine = wd.possession.engine :: any
+		engine.streamAround = function()
+			a.possessable = false -- the collapse lands during the yield
+		end
+		local refused = wd.possession.stats.refused
+		local ok, why = wd.possession:possess(p, a)
+		t.falsy(ok)
+		t.eq(why, "not possessable")
+		t.eq(wd.possession.stats.refused, refused + 1)
+		t.eq(p.Character, nil, "the player holds nothing")
+		t.eq(a.mode, "ai", "the patient stays with the AI")
+		t.truthy(a.body.anchored)
+		t.eq(wd.possession:controllerOf(a), "ai")
+		t.truthy((wd.possession:check()))
+		-- a swap is refused the same way and the player keeps the body they had
+		local b = wd.actors:get("human_2") :: any
+		engine.streamAround = function() end
+		t.truthy((wd.possession:possess(p, b)))
+		a.possessable = true
+		engine.streamAround = function()
+			a.possessable = false
+		end
+		ok, why = wd.possession:swap(p, a)
+		t.falsy(ok)
+		t.eq(why, "not possessable")
+		t.eq(p.Character, b.body, "still in the old body")
+		t.eq(b.mode, "player")
+		t.truthy((wd.possession:check()))
+	end)
+
 	t.test("swap releases the old body and possesses the new one in one step", function()
 		local wd = world(1, 1)
 		local p = { UserId = 3, Name = "c", Character = nil }
