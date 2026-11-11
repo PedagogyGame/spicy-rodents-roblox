@@ -13,7 +13,7 @@
 -- `joins` is a second way in to another station's game (the far side of a net): it has a prompt of its own and
 -- no Session; pressing it seats the player at the station it names, and that game's Table is told which one was
 -- pressed.
--- One game cannot take another down: a Table that fails to build, or whose step throws, is logged once and its
+-- One game cannot take another down: a Table that fails to build, or whose step throws, is logged and its
 -- station alone is put out of order (whoever is seated is let go with words; a step that throws is forgiven
 -- twice, the table reset each time); every other station carries on in the same frame.
 -- Inputs arrive on Net "Minigame.Input" { gameId = station id, seat, verb, args } (schema-checked and rate
@@ -1003,8 +1003,9 @@ function MinigameService.step(self: any, dt: number)
 		if st.session == nil or st.broken then
 			continue
 		end
-		-- (each station on its own: one game's error stops neither the stations after it nor the frame)
-		local ok, err = pcall(MinigameService._stepStation, self, st, dt)
+		-- (each station on its own: one game's error stops neither the stations after it nor the frame. pcall of a
+		-- function that returns nothing still returns the error on failure; the checker counts one value)
+		local ok, err = (pcall :: any)(MinigameService._stepStation, self, st, dt)
 		if not ok then
 			self:_fault(st, err)
 		end
