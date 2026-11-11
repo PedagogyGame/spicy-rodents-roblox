@@ -17,9 +17,11 @@
 --         drops two of theirs; your LAST ball in the opponent's cup loses the game.
 --   BP-R6 nothing jumps (the model never lifts a ball); the first to have all five down wins.
 --   BP-R7 an idle turn passes the shot (in the opening: that player's ball is simply not struck).
+--   Decision D2's fallback: init(seats, seed, false) leaves the opening out and plays in turn from seat 1
+--   (the marked ball must still go down first).
 --   Practice (seats = 1): only your five are on the table; sink them in the fewest shots.
 -- Pure and seeded. Lune-tested (tests/unit/pool_bumper.spec.luau).
--- Interface: def, verbs; init(seats, seed) -> State; input(state, seat, "shoot", { ball, angle, power, tipX?,
+-- Interface: def, verbs; init(seats, seed, together?) -> State; input(state, seat, "shoot", { ball, angle, power, tipX?,
 --   tipY? }); turn(state) (in the opening: the first seat that has not struck yet); waiting(state) -> { seats
 --   that may strike now }; skipTurn(state); result(state); view(state); script(state) -> Shot.Script?;
 --   settle(state, pots, shooterOf, rest?) (the referee alone); sideOf(ball); cupOf(seat) -> hole index;
@@ -87,14 +89,14 @@ function BumperPool.markedOf(seat: number): number
 	return (seat - 1) * 5 + 1
 end
 
-function BumperPool.init(seats: number, seed: number): State
+function BumperPool.init(seats: number, seed: number, together: boolean?): State
 	local two = seats >= 2
 	return {
 		seats = seats,
 		seed = seed,
 		seat = 1,
 		spots = Tables.bumperStart({ true, two }),
-		phase = if two then "opening" else "play",
+		phase = if two and together ~= false then "opening" else "play",
 		pending = {},
 		openers = if two then { 1, 6 } else { 1 },
 		sunk = table.create(seats, 0),

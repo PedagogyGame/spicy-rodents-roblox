@@ -271,6 +271,12 @@ return function(t)
 				t.near(sp.z, Tables.CUP_Z - Tables.MARKED_OFF, 1e-9, "seat 2's marked ball never moved")
 			end
 		end
+		-- the fallback for decision D2: no opening at all, in turn from seat 1
+		local alt = BumperPool.init(2, 2, false)
+		t.eq(alt.phase, "play")
+		t.deepEq(BumperPool.waiting(alt), { 1 })
+		t.falsy(BumperPool.input(alt, 2, "shoot", { 6, 0, 0.2 }), "not seat 2's turn")
+		t.truthy(BumperPool.input(alt, 1, "shoot", { 1, math.rad(38), 0.2 }))
 		-- both idle: ordinary play from seat 1, nothing moved
 		local n = BumperPool.init(2, 2)
 		BumperPool.skipTurn(n)

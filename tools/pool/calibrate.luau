@@ -200,8 +200,15 @@ for _, row in { { "corner", 6 }, { "side", 4 } } do
 	end
 end
 
-print(`== the break ({BREAKS} racks, full power, square from the head spot)`)
-do
+-- {label, power, tip height, how far along the head string the cue ball is set}
+local BREAK_KINDS: { { any } } = {
+	{ "full power, centre ball, from the head spot", 1, 0, 0 },
+	{ "full power with follow, from the head spot", 1, 0.3, 0 },
+	{ "full power, centre ball, from 1.2 studs along the head string", 1, 0, 1.2 },
+	{ "nine tenths power (inside the sure band), centre ball, from the head spot", 0.9, 0, 0 },
+}
+for _, kind in BREAK_KINDS do
+	print(`== the break ({BREAKS} racks: {kind[1]})`)
 	local pots, scratches, dry, head, tSum, tMax, contacts, steps, knots, sizeSum, sizeMax =
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 	local far = 0
@@ -209,7 +216,10 @@ do
 	local firstLayout = ""
 	local started = os.clock()
 	for seed = 1, BREAKS do
-		local s = Shot.run(pool, Tables.rack(seed), { Cue.strike(0, 0, 1, 0, 0.3, seed) })
+		local spots = Tables.rack(seed)
+		spots[1].x = kind[4]
+		local angle = Cue.angleOf(spots[2].x - spots[1].x, spots[2].z - spots[1].z)
+		local s = Shot.run(pool, spots, { Cue.strike(0, angle, kind[2], 0, kind[3], seed) })
 		local np = 0
 		for _, p in Shot.pots(s) do
 			if p.ball == 0 then
@@ -455,6 +465,18 @@ for _, pair in { { 1, 1 }, { 2, 2 }, { 3, 3 }, { 1, 2 }, { 2, 3 } } do
 			tMax
 		)} s; thinking {f(planMs / plans)} ms (most {f(planMax)})`
 	)
+end
+
+print("== cost of the aim preview (the same model, run to the first contact and a moment past it)")
+do
+	local spots = Tables.rack(1)
+	local started = os.clock()
+	local n = 0
+	for k = 1, 400 do
+		Cue.preview(pool, spots, 0, (k - 200) * 0.004, 0.2 + (k % 5) * 0.15, 0, 0.5)
+		n += 1
+	end
+	print(`  {f((os.clock() - started) / n * 1000, 3)} ms a preview at the break position`)
 end
 
 print("== cost of ordinary shots (eight-ball, a game between the middle players)")

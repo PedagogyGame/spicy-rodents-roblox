@@ -46,7 +46,7 @@ export type Level = {
 
 Computer.LEVELS = {
 	{
-		aim = math.rad(1.1),
+		aim = math.rad(1.7),
 		power = 0.16,
 		sims = 0,
 		breakPower = 0.8,
@@ -57,7 +57,7 @@ Computer.LEVELS = {
 		touch = 0.26,
 	},
 	{
-		aim = math.rad(0.42),
+		aim = math.rad(0.38),
 		power = 0.08,
 		sims = 6,
 		breakPower = 0.92,
@@ -362,21 +362,29 @@ function Computer.eightBall(state: EightBall.State, level: number, seed: number)
 	local cue = spotOf(state.spots, 0)
 	local cx, cz = if cue then cue.x else 0, if cue then cue.z else tb.headZ
 	if not state.broken then
-		-- the break: from the head spot (a hair to one side, so no two are alike) square into the front ball
+		-- the break, square into the front ball: the beginner from about the head spot with follow (the cue
+		-- ball goes looking for a pocket), the better players centre ball, the best from out by the side
+		-- cushion, where the rack opens best
 		local apex: Tables.Spot? = nil
 		for _, s in state.spots do
 			if s.id ~= 0 and (apex == nil or s.z < apex.z) then
 				apex = s
 			end
 		end
+		local lvl = math.clamp(math.floor(level), 1, 3)
 		local px = rng.range(-0.25, 0.25)
+		if lvl == 2 then
+			px = rng.range(-0.7, 0.7)
+		elseif lvl == 3 then
+			px = (if rng.next() < 0.5 then -1.2 else 1.2) + rng.range(-0.1, 0.1)
+		end
 		if EightBall.canPlace(state, px, tb.headZ) then
 			table.insert(out, { verb = "place", args = { px, tb.headZ } })
 			cx, cz = px, tb.headZ
 		end
 		local ax, az = if apex then apex.x else 0, if apex then apex.z else tb.footZ
 		local angle = Cue.angleOf(ax - cx, az - cz) + wobble(rng, L.aim * 0.5)
-		table.insert(out, { verb = "shoot", args = { angle, L.breakPower, 0, 0.3 } })
+		table.insert(out, { verb = "shoot", args = { angle, L.breakPower, 0, if lvl == 1 then 0.3 else 0 } })
 		return out
 	end
 	if state.inHand ~= "none" then

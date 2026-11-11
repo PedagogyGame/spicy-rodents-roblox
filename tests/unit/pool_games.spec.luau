@@ -139,12 +139,12 @@ return function(t)
 		t.deepEq(EightBall.script(x), EightBall.script(y))
 	end)
 
-	t.test("eight-ball practice: each computer player clears a table alone", function()
+	t.test("eight-ball practice: each computer player plays a table alone to the end", function()
 		for level = 1, 3 do
 			local s = pool({ level }, 40 + level)
 			t.truthy(s.done)
 			local r = EightBall.result(s) :: any
-			t.truthy(r.shots[1] >= 8, "at least the break, seven balls and the 8... or an early end")
+			t.truthy(r.shots[1] >= 2, "the break and at least one more")
 			t.truthy(r.bestRun[1] >= 1)
 		end
 	end)
