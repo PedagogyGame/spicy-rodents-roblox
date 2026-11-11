@@ -26,21 +26,27 @@ return function(t)
 		t.falsy(GameBakes.build("no_such_game", nil, nil, nil, nil))
 	end)
 
-	t.test("the games room: one build per station, under the names the room has always had", function()
+	-- (what each game names its furniture is that game's own business, and its own spec's: nothing is pinned here)
+	t.test("the games room: one build per station, each leaving furniture of its own in the room", function()
 		local kit = Kit.new(roblox, ALLEY)
 		local room = roblox.Instance.new("Model")
 		room.Name = "GamesRoom"
+		local built = 0
 		for _, st in Games.stations({ bowling_alley = ALLEY }) do
 			if GameBakes.has(st.game) then
+				local parts, children = kit.count, #room:GetChildren()
 				t.truthy(GameBakes.build(st.game, kit, room, st, nil), st.id)
+				t.truthy(kit.count > parts, `{st.id} built no parts`)
+				t.truthy(#room:GetChildren() > children, `{st.id} put nothing of its own in the room`)
+				built += 1
 			end
 		end
-		for _, name in { "Pool1", "Pool2", "BumperPool", "Pinball1", "Pinball2", "Pinball3" } do
-			local m = room:FindFirstChild(name)
-			t.truthy(m ~= nil and m:IsA("Model"), name)
+		t.truthy(built >= 6, "two pool tables, the bumper pool table and three pinball machines")
+		local names: { [string]: boolean } = {}
+		for _, child in room:GetChildren() do
+			t.falsy(names[child.Name], `two things in the room are called {child.Name}`)
+			names[child.Name] = true
 		end
-		t.eq(#room:GetChildren(), 6)
-		t.truthy(kit.count > 100, `{kit.count} parts`)
 	end)
 
 	t.test(

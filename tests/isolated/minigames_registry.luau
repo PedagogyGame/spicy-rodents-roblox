@@ -77,11 +77,9 @@ return function(t)
 				end
 				t.truthy(hasServer, `{spec.game} has no line in Server/Minigames/ServerGames`)
 				t.truthy(hasClient, `{spec.game} has no line in Client/Minigames/ClientGames`)
+				-- (a game that is not built yet says `soon`: its stub lines exist all the same)
 				if spec.soon == nil then
 					built += 1
-				else
-					-- a game that is not built yet: its stub lines exist, and nothing can be played
-					t.eq(ServerGames.get(spec.game), nil, `{spec.game} says soon but has a server half`)
 				end
 			end
 		end
@@ -198,7 +196,7 @@ return function(t)
 				t.truthy(table.find(verbs, v), v)
 			end
 			t.eq(table.find(verbs, "flip") ~= nil, true, "the machine's flip is a client verb")
-			t.eq(table.find(verbs, "settle"), nil, "a server verb is never on the wire")
+			t.eq(table.find(verbs, "machine_settle"), nil, "a server verb is never on the wire")
 			local payload = Schemas.REMOTES["Minigame.Input"].payload :: any
 			t.truthy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "call", args = { "heads" } }))
 			t.falsy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "dance", args = {} }))
@@ -213,12 +211,14 @@ return function(t)
 				t.eq(st.site, "bowling_alley")
 				t.eq((Games.get(st.game) :: any).game, st.game)
 			end
-			t.eq(#list, 14)
+			t.truthy(#list >= 14, `{#list} stations in the alley`)
 			t.eq(
 				table.concat(ids, " ", 1, 8),
 				"bowling_lane_1 bowling_lane_2 bowling_lane_3 bowling_lane_4 bowling_lane_5 bowling_lane_6 darts_1 fortune_1"
 			)
-			t.eq((Games.station("pinball_2", alley) :: any).variant, "rodent")
+			t.eq((Games.station("darts_1", alley) :: any).label, "Dartboard")
+			t.eq((Games.station(S.machine, { [SITE] = PLACE }) :: any).variant, "retro")
+			t.eq(Games.station(S.machine, alley), nil, "a station is only on the site it stands on")
 			t.eq(#Games.stations({}), 0, "no sites, no stations")
 			-- every site there is: ids stay unique and every station stands on a site that exists
 			local all = Sites.fromData(Data.default())

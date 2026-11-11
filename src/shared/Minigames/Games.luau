@@ -11,6 +11,9 @@
 --   its furniture (tools/bake/GameBakes, one line; tools/bake/games/<Game>.luau).
 -- MinigameService, MinigameClient, MinigameUI and Session name no game: adding one touches only new files and
 -- those lines. A Spec with `soon` is a game that is not built yet: its stations get a prompt that says so.
+-- The smallest worked example of each flow is tests/lib/FakeGames (six games registered only in a spec); the rig
+-- that plays any registered game on the fake engine, real service against real client, is tests/lib/MinigameRig
+-- (tests/isolated/minigames_registry.luau uses both).
 -- flow:
 --   "turns"  one seat acts at a time (rules.turn); the turn clock plays out an idle turn (bowling, darts, pool)
 --   "solo"   one seat, a machine (the fortune teller, pinball, the labyrinth); rules.turn may return 1 so that

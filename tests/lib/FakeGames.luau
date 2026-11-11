@@ -613,8 +613,8 @@ Machine.def = {
 	authority = "server",
 	money = "none",
 }
-Machine.verbs = { plunge = true, flip = true, settle = true }
-Machine.serverVerbs = { settle = true }
+Machine.verbs = { plunge = true, flip = true, machine_settle = true }
+Machine.serverVerbs = { machine_settle = true }
 
 function Machine.init(_seats: number, _seed: number): any
 	return { launched = false, flips = {}, lastTick = 0, final = false }
@@ -719,7 +719,7 @@ local function machineServer(ctx: any): any
 		end
 		if sim.over then
 			self.sim = nil
-			ctx.server("settle", { sim.score, sim.tick }, 1)
+			ctx.server("machine_settle", { sim.score, sim.tick }, 1)
 		end
 	end
 
