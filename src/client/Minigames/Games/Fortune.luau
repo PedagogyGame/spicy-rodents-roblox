@@ -3,7 +3,8 @@
 -- Madame Acorna's client half on the minigame framework (Client/Minigames/ClientGame; brief v2 §13a): a short
 -- show. On "fortune" the camera goes to the cabinet while the reels spin, then the printed card comes up (a
 -- fortune, a taunt or a Grand Omen) and the camera is handed back. E pulls the lever again; the card stays up a
--- moment after the cabinet has freed itself for the next player (linger).
+-- moment after the cabinet has freed itself for the next player (linger). A card never follows the player to
+-- another game, and a reveal whose pull was walked away from never shows.
 -- Interface: a ClientGame.ClientGame
 
 local Import = require("../../Import")
@@ -12,11 +13,19 @@ local AlleyLayout =
 local ClientGame = require("../ClientGame")
 
 local function new(ctx: ClientGame.Ctx): ClientGame.Controller
+	-- A reveal belongs to the pull that started it: it is dropped if another pull has begun since, or if the
+	-- game was closed (the player walked away, or is at another game by now).
+	local pulls = 0
+	local stopped = false
 	return {
 		onMessage = function(_self: any, msg: { [string]: any }, _watched: any?)
 			if msg.kind ~= "fortune" then
 				return
 			end
+			pulls += 1
+			local pull = pulls
+			-- the cabinet has taken the last card back
+			ctx.ui:paper("", "", 0)
 			-- the show: the camera on the cabinet while the reels spin, then the printed card
 			local p = ctx.place
 			if p then
@@ -28,6 +37,9 @@ local function new(ctx: ClientGame.Ctx): ClientGame.Controller
 			ctx.ui:status("The reels are spinning...")
 			local reveal = tonumber(msg.reveal) or 2.5
 			task.delay(reveal, function()
+				if stopped or pull ~= pulls then
+					return
+				end
 				local title = if msg.card == "omen"
 					then "A GRAND OMEN"
 					elseif msg.card == "taunt" then "THE MACHINE SAYS"
@@ -37,7 +49,9 @@ local function new(ctx: ClientGame.Ctx): ClientGame.Controller
 				ctx.releaseCamera()
 			end)
 		end,
-		stop = function(_self: any) end,
+		stop = function(_self: any)
+			stopped = true
+		end,
 	}
 end
 

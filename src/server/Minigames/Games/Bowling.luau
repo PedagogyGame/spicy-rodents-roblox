@@ -172,6 +172,8 @@ function Bowling.event(self: any, e: ServerGame.Event)
 end
 
 -- debug: a scripted pinfall on the lane (Luau Execution; tests) through the same path as a real roll.
+-- (MinigameService:debugRoll reaches it by this name, and refuses at any station that does not say it.)
+Bowling.debugName = "roll"
 function Bowling.debug(self: any, pins: number): (boolean, string?)
 	local lane = self.hw
 	local s = self.ctx.session

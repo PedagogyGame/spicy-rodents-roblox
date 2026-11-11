@@ -25,7 +25,9 @@
 -- A site is a baked place with its own local frame (Attractions/AlleyLayout's: X across, Y up from the floor, D
 -- away from the entrance; toWorld / toLocal): "bowling_alley" (data/attractions.json) or a venue id of
 -- generated/Expansion ("f3_racquet_club", "f3_steakhouse", "f2_doctor", "f3_tv_station"). A station is where a
--- player walks up and presses E; stations(sites) returns a game's stations for the sites that exist.
+-- player walks up and presses E; stations(sites) returns a game's stations for the sites that exist. A station
+-- with `joins = "<another station's id>"` is a second way in to that station's game (same game, and the station
+-- it names has a game of its own): a prompt and nothing else.
 -- Pure. Interface: ALL; SERVICE_VERBS; get(game) -> Spec?; stations(sites) -> { StationDef } (registry order,
 --   ids unique); station(id, sites) -> StationDef?; verbs() -> { string } (everything a client may send, for
 --   Net/Schemas); check(spec) -> (ok, err?); register(spec) (tests: a game added at run time)
@@ -143,6 +145,19 @@ function Games.stations(sites: { [string]: Place }): { StationDef }
 			assert(seen[st.id] == nil, `Games.stations: {st.id} is listed by {seen[st.id]} and {spec.game}`)
 			seen[st.id] = spec.game
 			table.insert(out, st)
+		end
+	end
+	-- a second way in leads to a station of the same game that has a game of its own
+	local byId: { [string]: StationDef } = {}
+	for _, st in out do
+		byId[st.id] = st
+	end
+	for _, st in out do
+		if st.joins ~= nil then
+			local target = byId[st.joins]
+			assert(target ~= nil, `Games.stations: {st.id} joins {st.joins}, which is not a station`)
+			assert(target.game == st.game, `Games.stations: {st.id} joins {st.joins}, a station of {target.game}`)
+			assert(target.joins == nil, `Games.stations: {st.id} joins {st.joins}, which itself joins another`)
 		end
 	end
 	return out

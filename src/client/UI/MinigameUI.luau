@@ -14,7 +14,8 @@
 --   UI:banner(text, big?); UI:status(text); UI.card (the scorecard Frame); UI:clearCard();
 --   UI:meter(value?, sweet?: {lo, hi}, label?); UI:buttons(list: { {id, text} }, onClick); UI:touch(list, onDown,
 --   onUp) (an item whose id is "bowl" or whose third entry is "wide" is the wide main button); UI:paper(title,
---   text, seconds); UI:isOpen(); UI:clock(seconds?, warning?); UI:hook(notch?, notches?);
+--   text, seconds) (seconds <= 0 takes the card away; so do open and close); UI:isOpen(); UI:clock(seconds?,
+--   warning?); UI:hook(notch?, notches?);
 --   UI:summary(summary?, you?, secondsLeft?, onAgain?, onLeave?): summary = { line, rows = { { seat, name, place,
 --   gone, ... } }, title?, cols? = { { title, key, x, w, strong? } } (fractions of the card; key "place" and
 --   "name" are drawn as rank and name), foot? (a format with one %d: the seconds left) };
@@ -256,6 +257,7 @@ function MinigameUI.new(): any
 
 	-- the fortune card
 	local fcard = Instance.new("Frame")
+	fcard.Name = "Paper"
 	fcard.BackgroundColor3 = Color3.fromRGB(246, 236, 210)
 	fcard.Size = UDim2.fromOffset(460, 200)
 	fcard.Position = UDim2.new(0.5, -230, 0.5, -60)
@@ -335,6 +337,8 @@ function MinigameUI.open(self: any, _game: string, title: string, help: { how: {
 	self.helpText.Text = table.concat(lines, "\n")
 	self:status("")
 	self:meter(nil)
+	-- (the last game's paper card does not follow the player to the next one)
+	self:paper("", "", 0)
 	for _, c in self.card:GetChildren() do
 		c:Destroy()
 	end
@@ -344,6 +348,7 @@ end
 
 function MinigameUI.close(self: any)
 	self.gui.Enabled = false
+	self:paper("", "", 0)
 	self:meter(nil)
 	self:clock(nil)
 	self:hook(nil)
@@ -641,7 +646,14 @@ end
 
 -- A printed paper card in the middle of the screen for a while (the fortune teller's). (It was a method named
 -- `card`, which the scorecard frame of the same name hid: calling it failed. `paper` is its working name.)
+-- seconds <= 0 takes the card away now. Opening or closing the UI takes it away too: a card never outlives the
+-- game it was dealt in.
 function MinigameUI.paper(self: any, title: string, text: string, seconds: number)
+	if seconds <= 0 then
+		self.fortuneCard.Visible = false
+		self.fortuneUntil = 0
+		return
+	end
 	self.fortuneTitle.Text = title
 	self.fortuneText.Text = text
 	self.fortuneCard.Visible = true

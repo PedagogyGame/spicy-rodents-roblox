@@ -7,7 +7,13 @@
 -- and end card, the game's controller, the game's camera (a scripted camera while it is your go; your own
 -- camera and legs back between turns) and Q to leave. People only: the prompts are switched off on this screen
 -- while you are an animal or in a vehicle, and while you are already playing; E then never also asks for a
--- vehicle (PossessionClient checks the "PromptVisible" / "InMinigame" attributes this sets on the local player).
+-- vehicle (PossessionClient checks the "PromptVisible" / "InMinigame" attributes this sets on the local player),
+-- and F never also kicks (Main checks "InMinigame" through InputMap.kicks).
+-- Keys while a game is open: the game's own `keys` are looked at FIRST (a key mapped to "" is swallowed: it does
+-- nothing, not even the framework's own meaning), then Q / gamepad B leave, H hides the help card and Space
+-- starts a lobby. A game that maps Q or ButtonB keeps a Leave button on its bar.
+-- A game may change how fast the player walks while it is open (ctx.pace: the "MoveScale" and "NoSprint"
+-- attributes on the body, which Controllers/Human reads every frame); the pace is put back when the game closes.
 -- Net: Minigame.Input { gameId, seat, verb, args } out; Minigame.State in. The framework's own kinds: joined
 -- (opens the game; carries the station's site and place), state (scorecard, buttons, end card, the controller's
 -- onState), event (a banner), left (closes it, always with words), refused (words on screen; the controller's
@@ -200,6 +206,31 @@ function MinigameClient.start(opts: { [string]: any }): any
 		controlsOff = not on
 		InputMap.setCharacterControls(on)
 	end
+	-- the player's walking pace while a game is open: attributes on the body, read by Controllers/Human
+	local paced: Instance? = nil
+	local function unpace()
+		local body = paced
+		paced = nil
+		if body then
+			body:SetAttribute("MoveScale", nil)
+			body:SetAttribute("NoSprint", nil)
+		end
+	end
+	local function pace(scale: number?, sprint: boolean?)
+		local body = opts.current() :: Instance?
+		if paced ~= body then
+			unpace()
+		end
+		if body then
+			paced = body
+			body:SetAttribute("MoveScale", if scale == nil or scale == 1 then nil else scale)
+			body:SetAttribute("NoSprint", if sprint == false then true else nil)
+		end
+	end
+	-- the clock both sides share (a stamp on an input is read against the same clock on the server)
+	local function stamp(): number
+		return workspace:GetServerTimeNow()
+	end
 
 	local lastButtons = ""
 	local function setButtons(list: { { string } })
@@ -214,11 +245,15 @@ function MinigameClient.start(opts: { [string]: any }): any
 		end
 		lastButtons = sig
 		ui:buttons(list, function(id: string)
-			-- a button's id is the verb it sends; one of the lobby's choices is sent as the mode
+			-- a button's id is the verb it sends; one of the lobby's choices is sent as the mode; "verb:word"
+			-- sends the verb with that one word ("addai:Minnie" asks for the computer player of that name)
 			local a = active
 			local modes = a and a.modes
+			local verb, word = string.match(id, "^([^:]+):(.+)$")
 			if type(modes) == "table" and table.find(modes, id) then
 				send("mode", { id })
+			elseif verb then
+				send(verb, { word })
 			else
 				send(id)
 			end
@@ -233,11 +268,24 @@ function MinigameClient.start(opts: { [string]: any }): any
 		end
 	end
 
+	-- What a game held is handed back when it goes, however it goes: the camera, the legs, the walking pace.
+	local function handBack()
+		releaseCamera()
+		if controlsOff then
+			controls(true)
+		end
+		unpace()
+	end
+
+	-- A linger belongs to the game that started it: the count moves when one starts and when a game opens, so
+	-- a timer left over from an earlier game never closes the one on screen now.
+	local lingers = 0
 	local function endLinger()
 		local c = lingering
 		lingering = nil
 		if c then
 			c:stop()
+			handBack()
 		end
 	end
 
@@ -252,10 +300,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 		if a and a.controller then
 			a.controller:stop()
 		end
-		releaseCamera()
-		if controlsOff then
-			controls(true)
-		end
+		handBack()
 		ui:close()
 		flushInput()
 	end
@@ -264,6 +309,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 		if active then
 			close()
 		end
+		lingers += 1
 		endLinger()
 		flushInput()
 		local p = placeOf(msg)
@@ -294,6 +340,8 @@ function MinigameClient.start(opts: { [string]: any }): any
 			camera = camera,
 			releaseCamera = releaseCamera,
 			controls = controls,
+			pace = pace,
+			stamp = stamp,
 			setButtons = setButtons,
 			toast = opts.toast,
 			body = function(): Model?
@@ -313,7 +361,9 @@ function MinigameClient.start(opts: { [string]: any }): any
 			ui:open(msg.game, label, PLAIN_HELP)
 			setButtons({ LEAVE })
 		end
-		opts.toast(`You joined {msg.label}. Q leaves.`, 3)
+		-- (a game that keeps Q for itself has a Leave button on its bar instead)
+		local qLeaves = not (cg and cg.keys and cg.keys.Q ~= nil)
+		opts.toast(if qLeaves then `You joined {msg.label}. Q leaves.` else `You joined {msg.label}.`, 3)
 	end
 
 	stateR.OnClientEvent:Connect(function(msg: { [string]: any })
@@ -412,8 +462,11 @@ function MinigameClient.start(opts: { [string]: any }): any
 					player:SetAttribute("InMinigame", nil)
 					lingering = a.controller
 					active = nil
+					lingers += 1
+					local mine = lingers
 					task.delay(cg.linger, function()
-						if active == nil then
+						-- (only if nothing has opened or lingered since: a second pull's card keeps its own time)
+						if lingers == mine and active == nil then
 							endLinger()
 							ui:close()
 						end
@@ -445,7 +498,8 @@ function MinigameClient.start(opts: { [string]: any }): any
 		end
 	end)
 
-	-- Q leaves, H toggles the help card, Space starts a lobby early; a game may add keys of its own
+	-- The game's own keys first ("" swallows the key); then Q leaves, H toggles the help card, Space starts a
+	-- lobby early
 	UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 		if InputMap.ignore(io, processed) then
 			return
@@ -457,12 +511,14 @@ function MinigameClient.start(opts: { [string]: any }): any
 		local k = io.KeyCode
 		local cg = a.cg :: ClientGame.ClientGame?
 		local own = cg and cg.keys and cg.keys[k.Name]
-		if k == Enum.KeyCode.Q or k == Enum.KeyCode.ButtonB then
+		if own ~= nil then
+			if own ~= "" then
+				send(own)
+			end
+		elseif k == Enum.KeyCode.Q or k == Enum.KeyCode.ButtonB then
 			send("leave")
 		elseif k == Enum.KeyCode.H then
 			ui:toggleHelp()
-		elseif own then
-			send(own)
 		elseif k == Enum.KeyCode.Space and a.phase == "lobby" then
 			send("start")
 		end

@@ -253,6 +253,8 @@ function Game.event(self: any, e: ServerGame.Event)
 end
 
 -- debug: a dart landed exactly at (xmm, ymm) for whoever is throwing (the rules' server verb "land"; tests).
+-- (MinigameService:debugDart reaches it by this name, and refuses at any station that does not say it.)
+Game.debugName = "dart"
 function Game.debug(self: any, xmm: number, ymm: number): (boolean, string?)
 	local seat = Session.turn(self.ctx.session)
 	local was = self:_cricketPoints(seat)

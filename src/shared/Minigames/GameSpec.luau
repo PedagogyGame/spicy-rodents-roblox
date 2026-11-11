@@ -19,6 +19,10 @@ export type StationDef = {
 	index: number?, -- lane 3, table 2 (sent to the client as `index`, and as `lane`)
 	variant: string?, -- one rules module, several looks: "acorn" | "rodent" | "space"
 	reach: number?, -- studs from the anchor before a seated player is taken off (default MinigameService.WANDER)
+	-- a second way in to another station of the same game (the far side of a net, a desk by the door): this
+	-- station is only a prompt, and pressing it seats the player at the station named here, whose Table is told
+	-- which prompt was pressed (Table.join's `via`)
+	joins: string?,
 }
 
 export type Flow = "turns" | "solo" | "live" | "match"

@@ -18,9 +18,12 @@
 --   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v); workspace() -> the fake Workspace;
 --   renderStep(dt) (call every bound render step and RenderStepped); bound() -> how many render steps are
 --   bound; signal() -> { Connect, fire }; uis() -> the fake UserInputService; input(kind "began" | "ended" |
---   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position? });
+--   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position?, id? };
+--   with an id every event from that id's "began" to its "ended" is handed over as ONE InputObject, as the
+--   engine does for a finger: a controller can follow a touch by the object, which is the only sound way);
 --   game:GetService("Players").LocalPlayer (with a PlayerGui); any other service is an empty fake instance;
---   task.spawn / defer run at once and task.delay waits for runDelayed(); events(names) and classes({ parts?,
+--   task.spawn / defer run at once and task.delay waits for runDelayed(count?) (everything queued, or only the
+--   first `count`, oldest first); events(names) and classes({ parts?,
 --   gui? }) teach it more event members and more BasePart / GuiObject classes (a game's own test asks for what
 --   its glue uses rather than editing the lists here); the fake UserInputService remembers what input() pressed
 --   (IsKeyDown, IsMouseButtonPressed)
@@ -308,14 +311,25 @@ local fakeWorkspace: any = nil
 local fakeUis: any = nil
 local renderStepped: any = nil
 local delayed: { () -> () } = {}
+local inputs: { [any]: { [string]: any } } = {} -- io.id -> the one InputObject of that touch, began to ended
 
--- Run everything handed to task.delay so far (in order), as if its time had come.
-function FakeEngine.runDelayed()
+-- Run what was handed to task.delay so far (in order), as if its time had come: all of it, or only the first
+-- `count` (a timer that fires while later ones are still running).
+function FakeEngine.runDelayed(count: number?)
 	local list = delayed
 	delayed = {}
-	for _, fn in list do
-		fn()
+	local n = math.min(count or #list, #list)
+	for i = n + 1, #list do
+		table.insert(delayed, list[i])
 	end
+	for i = 1, n do
+		list[i]()
+	end
+end
+
+-- How many task.delay callbacks are waiting.
+function FakeEngine.delayedCount(): number
+	return #delayed
 end
 
 function FakeEngine.workspace(): any
@@ -372,12 +386,23 @@ end
 
 -- Fire an input event as the engine would: kind "began" | "ended" | "changed".
 function FakeEngine.input(kind: string, io: { [string]: any }, processed: boolean?)
-	local event = {
-		KeyCode = io.KeyCode or { Name = "Unknown" },
-		UserInputType = io.UserInputType or roblox.Enum.UserInputType.Keyboard,
-		Delta = io.Delta or roblox.Vector3.new(0, 0, 0),
-		Position = io.Position or roblox.Vector3.new(0, 0, 0),
-	}
+	-- (with an id: the same object for every event of that touch, a new one at its next "began")
+	local event: { [string]: any } = {}
+	if io.id ~= nil then
+		local kept = inputs[io.id]
+		if kept == nil or kind == "began" then
+			kept = {}
+			inputs[io.id] = kept
+		end
+		event = kept :: { [string]: any }
+		if kind == "ended" then
+			inputs[io.id] = nil
+		end
+	end
+	event.KeyCode = io.KeyCode or { Name = "Unknown" }
+	event.UserInputType = io.UserInputType or roblox.Enum.UserInputType.Keyboard
+	event.Delta = io.Delta or roblox.Vector3.new(0, 0, 0)
+	event.Position = io.Position or roblox.Vector3.new(0, 0, 0)
 	local sig = if kind == "began"
 		then fakeUis.InputBegan
 		elseif kind == "ended" then fakeUis.InputEnded
@@ -526,6 +551,7 @@ function FakeEngine.uninstall()
 	fakeUis = nil
 	renderStepped = nil
 	delayed = {}
+	inputs = {}
 end
 
 -- with: run fn with the engine globals in place; they are always taken away again, even if fn throws.

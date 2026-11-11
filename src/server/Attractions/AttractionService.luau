@@ -29,6 +29,9 @@ export type Opts = {
 	terrain: boolean?, -- carve terrain (default true)
 	prompts: boolean?,
 	seed: number?, -- the lanes' seeded streams (default: from the clock, printed so a game can be replayed)
+	-- what the games may ask of the rest of the town (Server/Minigames/ServerGame.Town: people, body, release,
+	-- charge, best); handed to MinigameService as it is, every member optional
+	games: { [string]: any }?,
 }
 
 local function carve(root: Instance): number
@@ -197,6 +200,7 @@ function AttractionService.start(opts: Opts?): any?
 		knock = o.knock,
 		prompts = o.prompts,
 		seed = seed,
+		games = o.games,
 	})
 	local doorRig = doors(alley, conns)
 	local function step(dt: number)

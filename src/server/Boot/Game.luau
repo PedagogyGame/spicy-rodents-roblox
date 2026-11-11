@@ -1013,6 +1013,31 @@ function Game.start(opts: Opts?): any
 				local actor = possession:actorOf(player)
 				return if actor then actor.body :: Model else nil
 			end,
+			-- what the games may ask of the rest of the town (Server/Minigames/ServerGame.Town). Only `people`
+			-- is behind it so far: there is nobody to lend as a computer player's body, no wallet to charge
+			-- and no profile for a personal best, so the service's own stand-ins answer for those.
+			games = {
+				people = function(): { { [string]: any } }
+					local out = {}
+					for _, player in Players:GetPlayers() do
+						local actor = possession:actorOf(player)
+						local body = actor and actor.body :: Model?
+						local r = body and body.PrimaryPart
+						if actor and r then
+							local q = r.Position
+							table.insert(out, {
+								key = player,
+								name = if player.DisplayName ~= "" then player.DisplayName else player.Name,
+								species = actor.species,
+								x = q.X,
+								y = q.Y,
+								z = q.Z,
+							})
+						end
+					end
+					return out
+				end,
+			},
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
 			animals = function(): { { [string]: any } }
 				local out = {}

@@ -7,11 +7,16 @@
 --   title      the card's heading for a "joined" message (default: the Spec's title)
 --   buttons    the button bar for a phase: "joined" (as the game opens), then the Session's "lobby", "playing",
 --              "done" on every state message. nil = leave the bar as it is. A button's id is sent as a verb with
---              no arguments; an id that is one of the rules' MODES is sent as verb "mode" { id }. A game with
---              no `buttons` at all gets the framework's: Start now (and Add a computer, if its Spec names
---              computers) in a lobby, Play again at the end, Leave (Q) always.
---   keys       extra keys while the game is open: KeyCode name -> verb sent with no arguments (the fortune
---              teller's E = "again"). Q leaves, H hides the help card and Space starts a lobby in every game.
+--              no arguments; an id that is one of the rules' MODES is sent as verb "mode" { id }; an id of the
+--              form "verb:word" is sent as that verb with the one word ("addai:Minnie": the computer player of
+--              that name). A game with no `buttons` at all gets the framework's: Start now (and Add a computer,
+--              if its Spec names computers) in a lobby, Play again at the end, Leave (Q) always.
+--   keys       the game's keys while it is open: KeyCode name -> verb sent with no arguments (the fortune
+--              teller's E = "again"). They are looked at BEFORE the framework's own (Q and gamepad B leave, H
+--              hides the help card, Space starts a lobby), and a key mapped to "" is swallowed: it sends
+--              nothing and keeps its framework meaning from firing (a game that crouches on gamepad B says
+--              ButtonB = "" and reads the key in its controller). A game that takes Q or ButtonB away keeps a
+--              Leave button on its bar.
 --   new        the controller for a seat at the game (it gets a Ctx). It is made only when the station's place
 --              is known, unless `placeless`. A controller connects its own input and render steps and MUST
 --              follow the three rules in MinigameClient's header (camera through ctx.camera / ctx.releaseCamera,
@@ -30,6 +35,11 @@
 -- your seat, plus the Table's extras); onMessage(msg, watched) for every other message of its station that the
 -- framework does not own (the game's own kinds, and "event" after its banner is up); onRefused(msg) when the
 -- server refused an input (never silent: the words are already on screen); stop() when the game closes.
+-- The Ctx: besides the station's facts and the UI, `pace(scale, sprint)` changes how fast the player walks while
+-- the game is open (scale multiplies the walking and sprinting speed, 0 to 2, nil = 1; sprint = false switches
+-- Shift off; Controllers/Human reads it every frame, so never write Humanoid.WalkSpeed yourself) and the
+-- framework puts the pace back when the game closes; `stamp()` is the clock both sides share
+-- (workspace:GetServerTimeNow), the only clock a client may put on an input the server will judge by time.
 -- Interface: types Place, Ctx, Controller, ClientGame. Types only.
 
 export type Place = { x: number, z: number, floorY: number, yaw: number }
@@ -47,6 +57,8 @@ export type Ctx = {
 	camera: (cf: CFrame, fov: number?, snap: boolean?) -> (),
 	releaseCamera: () -> (),
 	controls: (on: boolean) -> (), -- false takes the player's legs (the game reads the keys itself)
+	pace: (scale: number?, sprint: boolean?) -> (), -- the player's walking pace while the game is open
+	stamp: () -> number, -- the shared clock (the server's ctx.stamp reads the same one)
 	setButtons: (list: { { string } }) -> (),
 	toast: (text: string, seconds: number?) -> (),
 	body: () -> Model?,

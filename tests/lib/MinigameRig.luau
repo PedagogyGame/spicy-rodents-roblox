@@ -2,23 +2,33 @@
 -- tests/lib/MinigameRig.luau: a whole minigame on the fake engine, for any game in the registry. The real
 -- Server/Minigames/MinigameService and the real Client/Minigames/MinigameClient (with MinigameUI and the game's
 -- own halves from the registries) are joined by a fake network that carries each side's messages to the other
--- a few frames late, as plain copies, with everything the client sends checked against the Net schema. The
+-- a few frames late, as plain copies, with everything the client sends put through the real Shared/Net first:
+-- its schema and its rate limit (Minigame.Input: 20 a second, 40 at once), on the rig's own clock. The
 -- player is the fake engine's LocalPlayer with a body; other people are PlayerLike stubs (stub()).
 -- A case: MinigameRig.play(function(w) ... end, opts). The world is built fresh; however the case ends the main
 -- client's hooks are put back, and a case never passes with a warning logged (the client swallows its own
--- errors into warnings) or a rule of the main client broken on the way: the camera moved while CameraRig was
--- not held, hold called twice in a row, a payload the Net schema refuses.
+-- errors into warnings) or a rule broken on the way: the camera moved while CameraRig was not held, hold called
+-- twice in a row, a payload the Net schema refuses, a message the Net's rate limit would have dropped (on a real
+-- server it vanishes without a word, so a controller that sends one a frame fails here), a game using a remote
+-- other than Minigame.Input / Minigame.State.
+-- Two clocks, as in the game: the service's own (ctx.now(): seconds of stepping, from 0) and the shared one
+-- (workspace:GetServerTimeNow, which ctx.stamp() reads on both sides: 1000 + frames / 60 here). A game that
+-- mixes them is wrong by a thousand seconds on the rig, as it would be wrong by the server's uptime in the game.
 -- ONLY IN AN ISOLATED RUN (tests/lib/Isolated; cases under tests/isolated/): it installs FakeEngine.
 -- opts: sites = { [siteId]: Place } (default: the bowling alley where the compiled data puts it); furnish(roots)
 --   builds what the game's hardware looks for under each site's Model (roots[siteId], already under
 --   Workspace.Attractions with the bake's Site / Origin attributes); stand = { site, x, y, d } where the
 --   player's body starts (default: the first site's origin, 3 up); service = extra MinigameService opts; lag
---   (frames each way, default 3); seed; touch (a touch device).
+--   (frames each way, default 3); seed; touch (a touch device). The service's opts.games.people lists the
+--   player and whoever a case adds to w.people ({ key, name, x, y, z }); body / charge / best are the
+--   service's own stand-ins unless opts.service.games says otherwise.
 -- Interface: play(fn, opts?); frame(w); run(w, seconds); untilTrue(w, limit, cond) -> bool; press(w, stationId)
 --   (the station's prompt is triggered by the player); prompt(w, stationId) -> ProximityPrompt; walkTo(w, site,
 --   x, y, d); texts(root) -> { string } (every word drawn, nothing hidden); has(list, needle); screen(w) ->
 --   string; button(root, text); click(w, text); key(code, down, processed?); mouse(down, processed?);
---   last(list, kind, pred?) -> message?; count(list, kind) -> number; stub(name) -> PlayerLike;
+--   touch(id, kind "began" | "changed" | "ended", x, y, processed?) (a finger: one InputObject from began to
+--   ended, as the engine gives); last(list, kind, pred?) -> message?; count(list, kind) -> number; stub(name) ->
+--   PlayerLike; SERVER_TIME (what the shared clock reads at frame 0);
 --   input(w, player, stationId, verb, args?) -> (ok, why?) (a stub's input, straight into the service);
 --   wire(value, path) -> a copy as a RemoteEvent would carry it (errors on what one cannot); DT
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
@@ -35,6 +45,7 @@ local roblox = require("@lune/roblox")
 local MinigameRig = {}
 
 MinigameRig.DT = 1 / 60
+MinigameRig.SERVER_TIME = 1000
 local Kind = roblox.Enum.UserInputType
 
 export type Place = AlleyLayout.Place
@@ -59,6 +70,8 @@ export type World = {
 	state: any, -- the Minigame.State remote
 	handler: ((player: any, payload: any) -> ())?,
 	heartbeat: any,
+	handlers: { [string]: (player: any, payload: any) -> () }, -- what the service asked the net for, by remote
+	people: { any }, -- others in the town with a body, for opts.games.people (the player is always listed)
 	lag: number,
 	up: { any },
 	down: { any },
@@ -167,6 +180,8 @@ local function build(opts: Opts?): World
 		state = state,
 		handler = nil,
 		heartbeat = (game :: any):GetService("RunService").Heartbeat,
+		handlers = {},
+		people = {},
 		lag = o.lag or 3,
 		up = {},
 		down = {},
@@ -185,14 +200,41 @@ local function build(opts: Opts?): World
 		cursors = {},
 		controls = {},
 	}
-	-- what the client fires arrives at the server a few frames later, if the Net schema lets it through. (The
-	-- schema is read here, not as this file loads: a spec that registers a game of its own first finds that
-	-- game's verbs on the wire.)
+	-- the clock both sides share (ctx.stamp on the server, Ctx.stamp on the client): never the service's own
+	rawset(workspace, "GetServerTimeNow", function(_self: any): number
+		return MinigameRig.SERVER_TIME + w.frames / 60
+	end)
+	-- what the client fires arrives at the server a few frames later, if the real Net lets it through: its schema
+	-- and its rate limit. (Both are read here, not as this file loads: a spec that registers a game of its own
+	-- first finds that game's verbs on the wire.)
 	local Schemas = (require :: any)("@shared/Net/Schemas")
+	local Net = (require :: any)("@shared/Net/Net")
+	local gate = Net.new({
+		send = function() end,
+		players = function(): { any }
+			return {}
+		end,
+	}, {
+		clock = function(): number
+			return w.frames / 60
+		end,
+	})
 	rawset(input, "FireServer", function(_self: any, payload: any)
 		local ok, why = Schema.check(Schemas.REMOTES["Minigame.Input"].payload :: any, payload)
 		if not ok then
 			table.insert(w.broken, `the client sent a payload the Net schema refuses: {tostring(why)}`)
+			return
+		end
+		local passed, reason = gate:receive(player, "Minigame.Input", payload)
+		if not passed then
+			if #w.broken < 5 then
+				table.insert(
+					w.broken,
+					`frame {w.frames}: the Net dropped the client's "{tostring(payload.verb)}" ({tostring(reason)}): `
+						.. "Minigame.Input carries 20 messages a second (40 at once) and a dropped one is never "
+						.. "answered. Send a stream as segments, about ten a second"
+				)
+			end
 			return
 		end
 		local copy = MinigameRig.wire(payload, "Minigame.Input")
@@ -206,16 +248,39 @@ local function build(opts: Opts?): World
 		sites = sites,
 		seed = o.seed or 7,
 		net = {
-			on = function(_self: any, _name: string, fn: (player: any, payload: any) -> ())
-				w.handler = fn
+			-- (by remote: only Minigame.Input and Minigame.State are carried. A game speaks through its verbs and
+			-- through ctx.send / broadcast / everyone; a remote of its own could not be played here)
+			on = function(_self: any, name: string, fn: (player: any, payload: any) -> ())
+				w.handlers[name] = fn
+				if name == "Minigame.Input" then
+					w.handler = fn
+				else
+					table.insert(w.broken, `the server listened on {name}: the rig carries Minigame.Input only`)
+				end
 			end,
-			fire = function(_self: any, to: any, _name: string, payload: any)
-				if to == player then
+			fire = function(_self: any, to: any, name: string, payload: any)
+				if name ~= "Minigame.State" then
+					table.insert(w.broken, `the server fired {name}: the rig carries Minigame.State only`)
+				elseif to == player then
 					toClient(payload)
 				end
 			end,
-			fireAll = function(_self: any, _name: string, payload: any)
-				toClient(payload)
+			fireAll = function(_self: any, name: string, payload: any)
+				if name ~= "Minigame.State" then
+					table.insert(w.broken, `the server fired {name}: the rig carries Minigame.State only`)
+				else
+					toClient(payload)
+				end
+			end,
+		},
+		games = {
+			people = function(): { any }
+				local q = w.body.PrimaryPart.Position
+				local out: { any } = { { key = player, name = "Ann", species = w.species, x = q.X, y = q.Y, z = q.Z } }
+				for _, other in w.people do
+					table.insert(out, other)
+				end
+				return out
 			end,
 		},
 		canPlay = function(p: any): (boolean, string?)
@@ -232,7 +297,14 @@ local function build(opts: Opts?): World
 		end,
 	}
 	for k, v in o.service or {} do
-		serviceOpts[k] = v
+		if k == "games" then
+			-- (a case's own town: its members replace the rig's, the rest stay)
+			for name, fn in v do
+				serviceOpts.games[name] = fn
+			end
+		else
+			serviceOpts[k] = v
+		end
 	end
 	w.svc = MinigameService.new(serviceOpts)
 	w.client = MinigameClient.start({
@@ -300,11 +372,11 @@ function MinigameRig.play(fn: (w: World) -> (), opts: Opts?)
 			error(tostring(err) .. logged, 0)
 		end
 		local world = w :: World
-		if #world.warnings > 0 then
-			error(`warnings were logged:\n{table.concat(world.warnings, "\n")}`, 0)
-		end
 		if #world.broken > 0 then
 			error(`rules were broken:\n{table.concat(world.broken, "\n")}`, 0)
+		end
+		if #world.warnings > 0 then
+			error(`warnings were logged:\n{table.concat(world.warnings, "\n")}`, 0)
 		end
 		for i = 2, #world.holds do
 			if world.holds[i] == world.holds[i - 1] then
@@ -425,6 +497,13 @@ end
 
 function MinigameRig.mouse(down: boolean, processed: boolean?)
 	FakeEngine.input(if down then "began" else "ended", { UserInputType = Kind.MouseButton1 }, processed)
+end
+
+-- A finger on the screen. `id` names the finger: every event of one touch, from "began" to "ended", is handed to
+-- the listeners as the SAME InputObject, as the engine does. A controller that follows two fingers at once (a
+-- flipper under each thumb, a slider and a stick) must tell them apart by that object, never by where they are.
+function MinigameRig.touch(id: any, kind: string, x: number, y: number, processed: boolean?)
+	FakeEngine.input(kind, { id = id, UserInputType = Kind.Touch, Position = roblox.Vector3.new(x, y, 0) }, processed)
 end
 
 -- the last message of a kind in a list of payloads (w.got, w.sent by verb, a stub's events)
