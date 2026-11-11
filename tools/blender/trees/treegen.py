@@ -1,35 +1,39 @@
 """Route-true trees that branch like wood and carry leaf sprays (numpy geometry; bpy only through the
 `union` callback and to_blender).
 
-Every tree is rebuilt from its harvested climbing routes (data/harvest: routes, route_samples, forks,
-trees). Units: studs (HTML units x 2.5), Roblox axes (+Y up), local to the tree's root (pivot) =
-trees.json `root` x 2.5. Conversion to Blender happens only when objects are made:
-Blender (x, y, z) = (-X, Z, Y), so the FBX export (axis_forward Z, axis_up Y, FBX_SCALE_ALL)
-lands back on Roblox (X, Y, Z) with 1 Blender unit = 1 stud.
+Every tree is rebuilt from its harvested climbing routes (data/harvest: routes, forks, trees; a
+route's centre line is the game's own curve, class Curve). Units: studs (HTML units x 2.5), Roblox axes
+(+Y up), local to the tree's root (pivot) = trees.json `root` x 2.5. Conversion to Blender happens only
+when objects are made: Blender (x, y, z) = (-X, Z, Y), so the FBX export (axis_forward Z, axis_up Y,
+FBX_SCALE_ALL) lands back on Roblox (X, Y, Z) with 1 Blender unit = 1 stud.
 
 How a tree is made
-  1. The wood the squirrel runs on (trunk, leader, walkable boughs, living bridges, root flare, the
-     giants' decor limbs and lookout pads) is one skin: every limb is swept as a closed tube, the tubes
-     are joined by a boolean union (opts["union"], Blender) and the vertices near a junction are then
-     pulled out onto a smooth union of the limbs (a signed-distance blend), so a bough leaves the trunk
-     through a flared collar with a shoulder under it and a web in the crotch, and the bark of the two
-     meets along one ridge. A bough starts thin inside the trunk and thins again after every side
-     branch (the cross-section areas it gives away add up to what it loses).
+  1. The wood the squirrel runs on (trunk, walkable boughs, living bridges, root flare, the leader, the
+     giants' decor limbs and lookout perches) is one skin: every limb is swept as a closed tube, the
+     tubes are joined by a boolean union (opts["union"], Blender) and the vertices near a junction are
+     then pulled out onto a smooth union of the limbs (a signed-distance blend), so the bark of two
+     limbs meets in one rounded crease. A bough swells into a collar where it leaves the trunk and
+     thins after every side branch (the cross-section areas it gives away add up to what it loses).
+     The leader leaves the trunk's top to the side, as one more limb, and turns up into the crown.
   2. Side branches grow from the boughs, the leader and each other: they leave at the species' angle,
      sag, turn up toward the light, kink at every node and taper to twigs. Each one meets its parent
-     in a skirt that lies on the parent's surface (no cylinder ends, no gaps).
+     in a skirt that lies on the parent's surface (no cylinder ends, no gaps). twig_tips(tb) lists
+     where they end.
   3. Leaves are sprays: alpha-textured cards (4 triangles, bent and twisted) set on the twigs, in three
      parts by light (LeavesSun, LeavesMid, LeavesShade) so colour changes with height and depth.
 
-Gameplay contract (src/shared/Routes/Motion.luau visualPose), unchanged from the first trees:
+Gameplay contract (src/shared/Routes/Motion.luau visualPose; tools/blender/trees/check_promises.py
+measures it on the exported meshes, to 0.1 stud):
   * trunk bark radius at route parameter t equals the squirrel's tapered radius
-      r(1 - 0.48 t) (min 0.8 st), giants r/0.95 - 2.625 t (min 1.125 st); r = surfaceRadius x 2.5.
-    Where boughs leave, the collars add wood on top of that radius (never less).
-  * branch / bridge / lookout bark: the TOP of the bough is the squirrel's feet, rail + lift
-    (0.5 u = 1.25 st, apples 0.75 st, lookouts 1.525 st); the bough's centre sits lift - r(s) above
-    the rail and its radius never drops below lift / 2, so the rail stays inside the bark.
-  * no leaf card and no twig comes within a tunnel of every walkable rail (and of any foreign route
-    passing through the crown), so a squirrel on a bough stays visible.
+      r(1 - 0.48 t) (min 0.8 st), giants r/0.95 - 2.625 t (min 1.125 st); r = surfaceRadius x 2.5,
+    all the way round, from the top of the root flare to the top of the route. The only wood outside
+    it is the boughs themselves: a bough with its collar stays within 2 studs of its route, so
+    collars add no wood to the trunk and a steep bough (which hangs to one side of its route) is thin.
+  * branch / bridge / lookout bark: the bough's top edge is the squirrel's feet line, rail + lift
+    (0.5 u = 1.25 st, apples 0.75 st, lookouts 1.525 st), from the route's first point to its last:
+    every ring of the tube has a corner on that line, and nothing else stands over it.
+  * no leaf card comes within a tunnel of every walkable rail (and of any foreign route passing
+    through the crown), so a squirrel on a bough stays visible.
 """
 import json
 import math
@@ -251,9 +255,10 @@ def resample(P, step, min_n=2):
     return at_s(P, s, ss), ss, ss / max(L, 1e-9)
 
 
-def adaptive_s(P, tol=0.1, max_step=4.0):
+def adaptive_s(P, tol=0.1, max_step=4.0, upright=False):
     """Arc lengths of the fewest points of a dense polyline whose chords stay within `tol` of it, no
-    chord longer than `max_step`."""
+    chord longer than `max_step`. upright: `tol` is the error allowed straight up and down (what the
+    game sees of a feet line), so a steep chord has to lie closer."""
     D, sd, _ = resample(P, 0.25)
     keep = [0]
     i = 0
@@ -263,7 +268,8 @@ def adaptive_s(P, tol=0.1, max_step=4.0):
         while j + 1 < n and sd[j + 1] - sd[i] <= max_step:
             a, b = D[i], D[j + 1]
             mids = D[i + 1 : j + 1]
-            if seg_dist(mids, a[None], b[None]).max() > tol:
+            lv = math.hypot(b[0] - a[0], b[2] - a[2]) / max(float(np.linalg.norm(b - a)), 1e-9) if upright else 1.0
+            if seg_dist(mids, a[None], b[None]).max() > tol * max(lv, 0.15):
                 break
             j += 1
         keep.append(j)
@@ -292,7 +298,7 @@ def rotate(v, axis, ang):
 def perp_up(t, prev=None):
     """World up made perpendicular to the tangent t (continued through vertical stretches)."""
     u = Y - t * np.dot(Y, t)
-    if np.linalg.norm(u) < 0.15:
+    if np.linalg.norm(u) < 0.03:
         if prev is not None:
             u = prev - t * np.dot(prev, t)
         else:
@@ -392,8 +398,9 @@ def tube(centers, radius_fn, sides, u_rep, v_tile, start_normal=None, cap_end=Fa
     return V, F, UV, NN
 
 
-def closed_tube(centers, radius_fn, sides, u_rep, v_tile, start_normal=None, fr=None):
-    """A watertight tube for the boolean union: welded rings, a fan cap at both ends.
+def closed_tube(centers, radius_fn, sides, u_rep, v_tile, start_normal=None, fr=None, cap=(0.4, 0.6)):
+    """A watertight tube for the boolean union: welded rings, a fan cap at both ends (cap: how far
+    the two cap points stand off, in ring radii).
     Returns V (n*sides + 2, 3), faces (list of index tuples, outward) and one uv per face corner."""
     C = np.asarray(centers, float)
     n = len(C)
@@ -408,8 +415,8 @@ def closed_tube(centers, radius_fn, sides, u_rep, v_tile, start_normal=None, fr=
         V[i * sides : (i + 1) * sides] = C[i][None] + d * r[:, None]
     r0 = float(np.mean(radius_fn(0, ang)))
     r1 = float(np.mean(radius_fn(n - 1, ang)))
-    V[-2] = C[0] - T[0] * r0 * 0.4
-    V[-1] = C[-1] + T[-1] * r1 * 0.6
+    V[-2] = C[0] - T[0] * r0 * cap[0]
+    V[-1] = C[-1] + T[-1] * r1 * cap[1]
     faces, uvs = [], []
     for i in range(n - 1):
         v0, v1 = s[i] / v_tile, s[i + 1] / v_tile
@@ -742,58 +749,85 @@ class TreeBuilder:
         foot = Q[0]
         below = [np.array([foot[0], y, foot[2]]) for y in (-3.0, -1.6, -0.6) if y < foot[1] - 0.2]
         # leader: the trunk's wood goes on above its route into the crown as one more limb. It leaves the
-        # top to the side, away from the limbs that start there (a bridge's walk starts on the trunk's
-        # axis: nothing may stand over it), and turns up
+        # top to the side and turns up, on whichever side keeps it clear of the walks: of those that start
+        # at the top (a bridge's first step is on the trunk's axis: nothing may stand over it) and of the
+        # boughs that climb past it
         top, ttan = Q[-1], norm(Q[-1] - Q[-2])
-        starts = []
-        for m in self.rec["members"]:
-            mp = self.samples(m["id"])
-            if np.linalg.norm(mp[0] - top) < 3.0:
-                h = (mp[min(len(mp) - 1, 6)] - mp[0]) * np.array([1.0, 0.0, 1.0])
-                if np.linalg.norm(h) > 1e-6:
-                    pushed = m["kind"] == "branch" and m.get("trunkClearance")
-                    starts.append((norm(h), 1.0 if pushed else 3.0))
-        lean = None
-        if starts:
-            away = -sum(h * w for h, w in starts)
-            if np.linalg.norm(away) > 0.35 * sum(w for _, w in starts):
-                lean = norm(away)
-            else:
-                # limbs all round: the middle of the widest gap between them
-                az = sorted(math.atan2(h[2], h[0]) for h, _ in starts)
-                gaps = [(az[(i + 1) % len(az)] - az[i]) % (2 * math.pi) or 2 * math.pi for i in range(len(az))]
-                i = int(np.argmax(gaps))
-                a0 = az[i] + gaps[i] / 2
-                lean = np.array([math.cos(a0), 0.0, math.sin(a0)])
         Rtop = float(self.Rt(1.0))
         crown_top = self.H * (self.par["top"] - 0.10)
         lead_len = max(0.0, crown_top - top[1]) * (0.5 if giant else 0.78)
         rng = self.rng
+        away = np.zeros(3)
+        axis_walk = False  # an unpushed walk starts on the trunk's axis
+        body = []  # the squirrel's body line on every walk near the top
+        for m in self.rec["members"]:
+            if m["name"].endswith("OPEN SKY LOOKOUT"):
+                continue
+            mp = self.samples(m["id"])
+            sm = arclen(mp)
+            pushed = m["kind"] == "branch" and m.get("trunkClearance")
+            if np.linalg.norm(mp[0] - top) < 3.0:
+                h = (mp[min(len(mp) - 1, 24)] - mp[0]) * np.array([1.0, 0.0, 1.0])
+                if np.linalg.norm(h) > 1e-6:
+                    away -= norm(h) * (1.0 if pushed else 3.0)
+                axis_walk = axis_walk or not pushed
+            pts = mp[sm >= (0.2 * sm[-1] if pushed else 0.0)] + Y[None] * (lift_of(m) + 1.0)
+            pts = pts[np.linalg.norm(pts - top[None], axis=1) < lead_len + 8.0]
+            if len(pts):
+                body.append(pts[::2])
+        body = np.concatenate(body) if body else np.zeros((0, 3))
+
+        def leader_path(lean, length):
+            if lean is None:  # straight on from the trunk
+                return top - ttan * 0.5 * Rtop, top + ttan * length * 0.45, top + norm(ttan * 0.4 + Y) * length, 0.9 * Rtop
+            p0 = top + lean * 0.5 * Rtop
+            return p0, p0 + norm(Y * 0.67 + lean * 0.74) * length * 0.4, top + norm(Y + 0.45 * lean) * length, 0.66 * Rtop
+
+        def leader_room(lean, length):
+            p0, p1, p2, r0 = leader_path(lean, length)
+            f = np.linspace(0, 1, 25)[:, None]
+            path = (1 - f) ** 2 * p0 + 2 * (1 - f) * f * p1 + f * f * p2
+            if not len(body):
+                return 9.0
+            rr = r0 + (max(0.3, Rtop * 0.2) - r0) * f[:-1, 0] ** 0.85
+            return float((seg_dist(body, path[:-1], path[1:]) - rr[None]).min())
+
         self.leader = None
         if lead_len > Rtop * 1.5:
-            k = max(4, int(lead_len / 2.4))
-            if lean is not None:
-                p0 = top + lean * 0.5 * Rtop
-                p1 = p0 + norm(Y * 0.67 + lean * 0.74) * lead_len * 0.4
-                p2 = top + norm(Y + 0.45 * lean) * lead_len
-                r0 = 0.66 * Rtop
-            else:
-                p0 = top - ttan * 0.5 * Rtop
-                p1 = top + ttan * lead_len * 0.45
-                p2 = top + norm(ttan * 0.4 + Y) * lead_len
-                r0 = 0.9 * Rtop
-            side = norm(np.cross(p2 - p0, [0.3, 0.1, 0.9]))
-            LP = []
-            for j in range(k + 1):
-                f = j / k
-                wob = side * math.sin(f * 7.0 + rng.random() * 0.5) * 0.35 * f * (1 - f) * 4
-                LP.append((1 - f) ** 2 * p0 + 2 * (1 - f) * f * p1 + f * f * p2 + wob)
-            LP = np.array(LP)
-            LR = r0 + (max(0.3, Rtop * 0.2) - r0) * np.linspace(0, 1, k + 1) ** 0.85
-            self.leader = (LP, LR)
-        C = np.concatenate([np.array(below).reshape(-1, 3), Q])
+            leans = [np.array([math.cos(a0), 0.0, math.sin(a0)]) for a0 in np.arange(16) * (math.pi / 8)]
+            pick = None
+            for length in (lead_len, 0.6 * lead_len, 0.35 * lead_len):
+                cands = []
+                for ln in leans + ([] if axis_walk else [None]):
+                    room = leader_room(ln, length)
+                    if ln is None:
+                        bonus = 0.6 if np.linalg.norm(away) < 0.1 else 0.0
+                    else:
+                        bonus = 0.4 * float(np.dot(ln, norm(away + 1e-9))) * (np.linalg.norm(away) > 0.1)
+                    cands.append((room + bonus, room, ln))
+                best = max(cands, key=lambda c: c[0])
+                if best[1] >= 1.0 or pick is None or best[1] > pick[0] + 0.5:
+                    pick = (best[1], best[2], length)
+                if best[1] >= 1.0:
+                    break
+            room, lean, lead_len = pick
+            self.log["leader_room"] = round(room, 2)
+            if room > 0.2 and lead_len > Rtop * 1.5:
+                k = max(4, int(lead_len / 2.4))
+                p0, p1, p2, r0 = leader_path(lean, lead_len)
+                side = norm(np.cross(p2 - p0, [0.3, 0.1, 0.9]))
+                LP = []
+                for j in range(k + 1):
+                    f = j / k
+                    wob = side * math.sin(f * 7.0 + rng.random() * 0.5) * 0.35 * f * (1 - f) * 4
+                    LP.append((1 - f) ** 2 * p0 + 2 * (1 - f) * f * p1 + f * f * p2 + wob)
+                LP = np.array(LP)
+                LR = r0 + (max(0.3, Rtop * 0.2) - r0) * np.linspace(0, 1, k + 1) ** 0.85
+                self.leader = (LP, LR)
+        # (one ring just above the route's top, under a flat cap: the top of the climb is still trunk)
+        C = np.concatenate([np.array(below).reshape(-1, 3), Q, (top + ttan * 0.3)[None]])
         nb = len(below)
-        tt = np.concatenate([np.zeros(nb), t])
+        tt = np.concatenate([np.zeros(nb), t, [1.0]])
         R0 = float(self.Rt(0.0))
         base = self.Rt(tt)
         # root flare: buttress lobes that the roots continue (decaying over about one foot radius)
@@ -814,7 +848,7 @@ class TreeBuilder:
                 lob += amp * np.exp(-(da / 0.42) ** 2)
             # (the game stands the squirrel at the tapered radius all the way round: the flutes are
             # shallow, and the ring's corners stand as far outside that radius as its flats lie inside)
-            flute = 0.025 * np.sin(ang * 7 + flute_ph + y * 0.15) + 0.015 * np.sin(ang * 3 - y * 0.31)
+            flute = 0.02 * np.sin(ang * 7 + flute_ph + y * 0.15) + 0.012 * np.sin(ang * 3 - y * 0.31)
             r = base[i] * (1 + 0.5 * facet) * (1 + 0.55 * fall * lob) + flute * min(1.0, base[i] / 2.0)
             return np.maximum(r, 0.2)
 
@@ -823,7 +857,10 @@ class TreeBuilder:
         v_tile = circ / u_rep * 1.3
         sides = 18 if R0 > 3.6 else (14 if R0 > 2.4 else (12 if R0 > 1.6 else 10))
         facet = 1 - math.cos(math.pi / sides)
-        limb = Limb("trunk", "trunk", C, base, sides, 0.0, radius, start_normal, u_rep, v_tile)
+        # (rings lie level, whatever the trunk's lean: the game measures its radius horizontally)
+        level = (frames(C, start_normal)[0], np.tile(start_normal, (len(C), 1)), np.tile([0.0, 0.0, -1.0], (len(C), 1)))
+        limb = Limb("trunk", "trunk", C, base, sides, 0.0, radius, start_normal, u_rep, v_tile, fr=level)
+        limb.cap = (0.4, 0.3)
         self.limbs.append(limb)
         self.trunk_limb = limb
         if self.leader is not None:
@@ -859,10 +896,10 @@ class TreeBuilder:
         on_trunk = dtrunk < 3.5
         rt = self.trunk_r_at_y(start[1]) if on_trunk else 1.2
         cat = self.cat
-        # (with its collar a bough stays within 2.1 studs of its route all round: what leaves the trunk
+        # (with its collar a bough stays within 2 studs of its route all round: what leaves the trunk
         # there is the bough the squirrel steps onto, not wood in the way of the trunk climb)
         cap = {"named": 1.4, "outer": 1.2, "giant": 1.4, "apple": 0.62, "estate": 1.4}[cat]
-        cap = min(cap, (2.1 + lift) / 2 / (1 + COLLAR))
+        cap = min(cap, (2.0 + lift) / 2 / (1 + COLLAR))
         r_tip = max(0.5 * lift + 0.08, 0.32)
         r_base = cap
         if kind == "bridge":
@@ -899,7 +936,7 @@ class TreeBuilder:
         area = r_base ** 2 - r_tip ** 2
         give = 0.62 * area * w / max(w.sum(), 1e-9) if len(kids) else np.zeros(0)
         # samples: few on the straight runs, close together through the junction
-        ss = list(adaptive_s(P, tol=0.025, max_step=3.4 if L < 30 else 4.4))
+        ss = list(adaptive_s(P, tol=0.035, max_step=3.4 if L < 30 else 4.4, upright=True))
         if on_trunk:
             ss += list(np.arange(0.0, zone, 0.48 * rt + 0.1))
         ss = sorted(ss)
@@ -919,10 +956,10 @@ class TreeBuilder:
             # the collar: the bough swells where it leaves the trunk
             radii = radii * (1 + COLLAR * (1 - smoothstep((s - s_exit) / (1.8 * r_base))))
             # the feet line is the tube's top edge, so a steep bough hangs to one side of its route: it
-            # is kept thin enough to stay within 2.05 studs of the route all round (see cap) and does not
+            # is kept thin enough to stay within 2 studs of the route all round (see cap) and does not
             # fatten again further out
             level = np.sqrt(np.clip(1 - norm(np.gradient(Q, axis=0))[:, 1] ** 2, 0, 1))
-            rmax = (2.05 ** 2 - lift ** 2) / (2 * (2.05 - lift * level))
+            rmax = (2.0 ** 2 - lift ** 2) / (2 * (2.0 - lift * level))
             radii = np.minimum.accumulate(np.minimum(radii, np.maximum(rmax, r_tip)))
         # the feet line (rail + lift) is the tube's top generator at any slope: centre = feet - r * up_perp
         T = norm(np.gradient(Q, axis=0))
@@ -938,7 +975,7 @@ class TreeBuilder:
         b = {"route": route, "P": P, "sP": sP, "s": s, "radii": radii, "L": L, "lift": lift, "kind": kind,
              "on_trunk": on_trunk, "rt": rt, "zone": zone, "clear": clear, "kids": kids, "give": give, "r_tip": r_tip,
              "rail": Q, "ups": ups, "sides": sides, "u_rep": u_rep, "v_tile": circ / u_rep * 1.3,
-             "k": 0.6, "wob": rng.random() * 6.28}
+             "k": 0.5, "wob": rng.random() * 6.28}
         self.bough_limb(b)
         self.limbs.append(b["limb"])
         self.boughs.append(b)
@@ -949,22 +986,38 @@ class TreeBuilder:
         """(Re)build a bough's tube from its rail, radii and lift. The squirrel's feet line (rail + lift)
         is the tube's top edge: every ring has a corner on it, at any slope."""
         Q, radii, lift = b["rail"], b["radii"], b["lift"]
-        # one more ring just past the rail's end, so the walk's last step still has bark under it
-        tend = norm(Q[-1] - Q[-2])
-        feet = np.concatenate([Q, Q[-1:] + tend * 0.45]) + Y[None] * lift
-        R = np.concatenate([radii, radii[-1:]])
-        U = np.concatenate([b["ups"], b["ups"][-1:]])
-        for _ in range(2):
-            C = feet - U * R[:, None]
-            T = frames(C)[0]
-            prev, ups = None, []
-            for t in T:
-                prev = perp_up(t, prev)
-                ups.append(prev)
-            U = np.array(ups)
+        # one more ring before the rail's start and one past its end, so the walk's first and last
+        # steps still have bark under them
+        t0, tend = norm(Q[1] - Q[0]), norm(Q[-1] - Q[-2])
+        feet = np.concatenate([Q[:1] - t0 * 0.45, Q, Q[-1:] + tend * 0.45]) + Y[None] * lift
+        R = np.concatenate([radii[:1], radii, radii[-1:]])
+        # ring planes square to the feet line, except through a tight bend (a willow bough arching
+        # over): there they turn no faster than the tube's far side can follow without folding
+        T = frames(feet)[0]
+        ds = np.linalg.norm(np.diff(feet, axis=0), axis=1)
+        lim = ds / (2.3 * np.maximum(R[:-1], R[1:]))
+        for _ in range(60):
+            ang = np.arccos(np.clip((T[:-1] * T[1:]).sum(1), -1, 1))
+            bad = ang > lim
+            if not bad.any():
+                break
+            m = np.zeros(len(T), bool)
+            m[:-1] |= bad
+            m[1:] |= bad
+            m[0] = m[-1] = False
+            Tn = T.copy()
+            Tn[1:-1] = norm(T[:-2] + 2 * T[1:-1] + T[2:])
+            T = np.where(m[:, None], Tn, T)
+        # (where the route stands plumb, as some do inside the trunk, "up" is taken from where it leans
+        # next: back toward where it came from)
+        back = (Q[0] - Q[-1]) * np.array([1.0, 0.0, 1.0])
+        prev, ups = (norm(back) if np.linalg.norm(back) > 1e-6 else None), []
+        for t in T:
+            prev = perp_up(t, prev)
+            ups.append(prev)
+        U = np.array(ups)
         C = feet - U * R[:, None]
-        T = frames(C)[0]
-        N = -norm(U - T * (U * T).sum(1)[:, None])
+        N = -U
         wob = b["wob"]
 
         def radius(i, ang, R=R):
@@ -976,34 +1029,49 @@ class TreeBuilder:
         # the blend belongs to the junction: past it, boughs that run side by side stay two round limbs
         zone, clear = b["zone"], b["clear"]
         limb.fade = (max(0.55 * zone, clear + 0.5), max(1.2 * zone, clear + 4.5))
-        limb.feet = feet
-        b["limb"], b["Q"] = limb, C[:-1]
+        limb.feet, limb.U = feet, U
+        b["limb"], b["Q"] = limb, C[1:-1]
 
     def relieve_crossings(self):
-        """Boughs of different forks cross near the trunk. Where one would swallow another route's feet
-        line it is thinned there (down to half), so the walkway passes over or under clear wood."""
+        """Routes of one tree cross each other. A bough's tube hangs under its own feet line, so where
+        another walk passes close under that line the tube would swallow it: there the bough is waisted
+        (down to a radius of 0.42 studs), and the other walk passes under clear wood."""
         walk = [b for b in self.boughs if b["kind"] in ("branch", "bridge")]
+        marg, floor = 0.12, 0.42
         n = 0
         for b in walk:
-            C, R0 = b["Q"], b["radii"]
-            R = R0.copy()
+            limb, s, R0 = b["limb"], b["s"], b["radii"]
+            sd = np.minimum(np.arange(0.0, s[-1] + 0.5, 0.5), s[-1])
+            Fd = at_s(limb.feet[1:-1], s, sd)
+            Ud = norm(at_s(limb.U[1:-1], s, sd))
+            rmax = np.full(len(sd), 1e3)
             for o in walk:
                 if o is b:
                     continue
-                m = o["sP"] > o["clear"] + 1.0
+                pushed = o["kind"] == "branch" and o["route"].get("trunkClearance")
+                m = o["sP"] >= (0.2 * o["L"] if pushed else 0.75)
                 if m.sum() < 2:
                     continue
                 Fo = o["P"][m] + Y[None] * o["lift"]
-                if np.all(Fo.min(0) > C.max(0) + 4) or np.all(Fo.max(0) < C.min(0) - 4):
+                if np.all(Fo.min(0) > Fd.max(0) + 4) or np.all(Fo.max(0) < Fd.min(0) - 4):
                     continue
-                d = seg_dist(C, Fo[:-1], Fo[1:]).min(1)
-                R = np.minimum(R, np.maximum(d - 0.15, 0.5 * R0))
-            R = np.maximum(R, b["r_tip"])
+                # a ring of radius r under the feet point f swallows q when |f - U r - q| < r + marg
+                w = Fd[:, None, :] - Fo[None]
+                ww = (w * w).sum(2)
+                wu = (w * Ud[:, None, :]).sum(2) + marg
+                cand = np.where(wu > 1e-6, (ww - marg ** 2) / (2 * np.maximum(wu, 1e-6)), 1e3)
+                rmax = np.minimum(rmax, np.maximum(cand, 0.0).min(1))
+            R = R0.copy()
+            for i in range(len(s)):  # each ring answers for the stretch to its neighbours
+                mm = (sd >= s[max(i - 1, 0)]) & (sd <= s[min(i + 1, len(s) - 1)])
+                if mm.any():
+                    R[i] = min(R[i], float(rmax[mm].min()))
+            R = np.maximum(R, np.minimum(floor, R0))
             if (R < R0 - 0.02).any():
                 # ease into the waist
                 for _ in range(2):
                     R = np.minimum(R, np.concatenate([[R[0]], (R[:-2] + R[2:]) / 2 + 0.08, [R[-1]]]))
-                R = np.maximum(np.minimum(R, R0), b["r_tip"])
+                R = np.maximum(np.minimum(R, R0), np.minimum(floor, R0))
                 b["radii"] = R
                 i = self.limbs.index(b["limb"])
                 self.bough_limb(b)
@@ -1168,7 +1236,7 @@ class TreeBuilder:
                     for other in self.limbs:
                         if other is not limb and other.kind != "root":
                             g = np.minimum(g, other.chain.dist(feet, pad=6.0))
-                    out = g > 0.15
+                    out = g > 0.02
                     if out.any():
                         j = int(np.argmax(out))
                         kk[j:] = np.minimum(kk[j:], np.clip(0.9 * g[j:], 0.03, k0))
@@ -1177,7 +1245,8 @@ class TreeBuilder:
         self.blend = blend
         parts = []
         for li, limb in enumerate(self.limbs):
-            V, faces, uvs = closed_tube(limb.C, limb.radius_fn, limb.sides, limb.u_rep, limb.v_tile, limb.start_normal, limb.fr)
+            V, faces, uvs = closed_tube(limb.C, limb.radius_fn, limb.sides, limb.u_rep, limb.v_tile, limb.start_normal, limb.fr,
+                                        getattr(limb, "cap", (0.4, 0.6)))
             parts.append({"V": V, "faces": faces, "uvs": uvs, "id": li})
         for pi, (mid, feet) in enumerate(getattr(self, "pads", [])):
             parts.append(self.pad_part(mid, feet, len(self.limbs) + pi))
