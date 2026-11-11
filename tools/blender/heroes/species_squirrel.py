@@ -36,8 +36,9 @@ the haunches. No bone moved for this; the sculpt, the skin weights, the paint an
     and a pale fringe of long hair-tip cards; the rodent's is a rat's bare ringed tail with three ragged
     clumps of bristle (RODENT_TUFTS) whose edges smoulder, and the knobs of its spine are bare knuckles
     with raised hackles between them and mange over its hindquarters;
-  * the trunk's skin follows the spine and the haunch lobe is skin from the pelvis to the knee
-    (refine_weights): bone heat alone hung the belly and flanks on the knees and elbows;
+  * the trunk's skin follows the spine; the haunch lobe stays on the pelvis and takes a third of the thigh's
+    swing, and only the skin by the knee and shin goes all the way with the leg (refine_weights): bone heat
+    alone hung the belly and flanks on the knees and elbows, and a lobe given to the thigh swung as a flap;
   * a darker stripe down the spine, warmer flanks, paws the colour of the coat;
   * fur cards in kinds, each drawn on both sides (card_groups, card_cells, card_tufts).
 The faces are as they were.
@@ -1202,7 +1203,8 @@ def card_tufts(info, variant, group, rng):
         near = 0.72 + 0.28 * _sstep(0.08, 0.4, s)  # shorter by the root, so the tail leaves the rump narrow
         # and toward and round the tip: the animal is no longer than it was (the camera stands off by its length)
         near = near * (1 - 0.55 * tipward) * (1 - 0.45 * _sstep(0.8, 0.96, s) * (1 - tipward))
-        return {"length": rng.uniform(0.18, 0.28, k) * near, "width": rng.uniform(0.065, 0.105, k) * near,
+        # (broad cards: a card's hairs spread over its width, and narrow ones stood up round the tip as spikes)
+        return {"length": rng.uniform(0.18, 0.28, k) * near, "width": rng.uniform(0.095, 0.15, k) * near,
                 "dir": d, "dir2": d2, "side": side, "cell": 8 + pair}
     if group == "plume":
         edge = plume_half_width(s, variant) - np.abs(xs)  # studs in from the feather's edge
@@ -1210,7 +1212,9 @@ def card_tufts(info, variant, group, rng):
         # one in three stands up off the face: seen from the side the feather is a brush, not a blade
         stand = rng.random(k) < 0.34
         lift = np.where(stand, rng.uniform(0.55, 1.0, k), rng.uniform(0.15, 0.4, k))
-        cell = np.where(stand & (edge < 0.12), 8 + pair, cell)
+        # (the standing hairs by the edge are the faces' own kind, not the fringe's pale one: seen from the
+        # side the pale ones lay over the dark band as blotches)
+        cell = np.where(stand & (edge < 0.12), 10 + pair, cell)
         return {"length": rng.uniform(0.17, 0.26, k) * (1 - 0.45 * _sstep(0.82, 0.96, s)), "width": rng.uniform(0.05, 0.078, k), "lift": lift,
                 "roll": np.where(stand, rng.uniform(-1.2, 1.2, k), rng.normal(0, 0.3, k)), "droop": np.full(k, 0.3), "cell": cell}
     if group == "bristle":
