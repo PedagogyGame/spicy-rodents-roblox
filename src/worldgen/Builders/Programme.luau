@@ -13,8 +13,12 @@ local Building = require("./Building")
 local Facade = require("./Facade")
 local Furnish = require("./Furnish")
 local Furniture = require("./Furniture")
+local Import = require("../Import")
 local Shell = require("./Shell")
 local Spec = require("../Spec")
+local HospitalLayout =
+	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
+local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../../shared/Actors/StaffRounds"))
 
 local Programme = {}
 
@@ -131,6 +135,42 @@ function Programme.build(ctx: Spec.LotCtx)
 		band = { y = floorTop + 0.5 * floorH + 0.4, h = math.min(4.2, floorH * 0.42) }
 	end
 	local tones = if b.id == "hospital" then "hospital" else "police"
+	-- Where people stand and walk indoors, kept clear before any furniture is placed: staff, patients
+	-- and stretchers are kinematic (nothing stops them at a bed or a desk), so a way that crosses
+	-- furniture is a person walking through it.
+	local lanes: { { number } } = {}
+	local discs: { { x: number, z: number, r: number } } = {}
+	if b.id == "hospital" then
+		-- the hospital sequence's own layout (Shared/Infection/HospitalLayout): the cots the server
+		-- stands in the wards, the lanes every walk follows and the staff's rounds, the check-in spot
+		-- in front of the reception desk and the intake in front of the triage desk
+		local ways = HospitalLayout.plan(b, HospitalLayout.BEDS)
+		if ways then
+			for _, l in ways.lanes do
+				table.insert(lanes, { l[1] * spu, -l[2] * spu, l[3] * spu, -l[4] * spu })
+			end
+			for _, bed in ways.beds do
+				pins[bed.ward] = pins[bed.ward] or {}
+				table.insert(pins[bed.ward], {
+					id = "Cot" .. bed.index,
+					kind = "cot",
+					x = bed.x * spu,
+					z = -bed.z * spu,
+					fixed = true,
+					sx = HospitalLayout.BED.width,
+					sz = HospitalLayout.BED.length,
+				})
+			end
+			table.insert(discs, { x = ways.reception[1] * spu, z = -ways.reception[2] * spu, r = 2.5 })
+			table.insert(discs, { x = ways.intake[1] * spu, z = -ways.intake[2] * spu, r = 2.5 })
+		end
+	else
+		-- the station's indoor staff walk the v5.4 round about their post (Shared/Actors/StaffRounds;
+		-- world offsets from the lot's centre, turned into the model's frame)
+		local cx, cz, r = StaffRounds.bounds(StaffRounds.POLICE.x, StaffRounds.POLICE.z)
+		local c, s = ctx.frame.c, ctx.frame.s
+		table.insert(discs, { x = cx * c - cz * s, z = cx * s + cz * c, r = r + 1.5 })
+	end
 	local plan = Furnish.plan(ctx, {
 		building = b.id,
 		tones = tones,
@@ -144,8 +184,9 @@ function Programme.build(ctx: Spec.LotCtx)
 		grid = Shell.grid(ctx, layout),
 		band = band,
 		pins = pins,
-		-- staff stand round the lot's centre (Server/AI/TownAI): nothing is put there
-		discs = { { x = 0, z = 0, r = if b.id == "hospital" then 9 else 6 } },
+		discs = discs,
+		lanes = lanes,
+		laneHalf = HospitalLayout.LANE,
 		columns = if b.id == "hospital" then 28 else nil,
 	})
 	Shell.build(ctx, layout)

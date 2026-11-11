@@ -96,6 +96,8 @@ export type Room = {
 	windows: { WindowIn },
 	pins: { Pin },
 	discs: { { x: number, z: number, r: number } },
+	lanes: { { number } }?, -- ways people walk: { x1, z1, x2, z2 }, kept clear `laneHalf` to each side
+	laneHalf: number?,
 }
 export type Placed = {
 	name: string,
@@ -536,6 +538,25 @@ function Furnish.layout(room: Room, recipe: { Item }, tones: Furniture.Tones): L
 			for i = 0, nx - 1 do
 				local px, pz = x0 + (i + 0.5) * CELL, z0 + (j + 0.5) * CELL
 				if (px - c.x) ^ 2 + (pz - c.z) ^ 2 <= c.r * c.r then
+					keep[j * nx + i + 1] = true
+					gate[j * nx + i + 1] = true
+				end
+			end
+		end
+	end
+	-- the ways people walk (kinematic staff and patients stop for nothing): every cell the lane's
+	-- band touches
+	for _, l in room.lanes or {} do
+		local hw = (room.laneHalf or Furnish.BODY) + CELL * 0.71
+		local i0, i1 = cells(math.min(l[1], l[3]) - hw, math.max(l[1], l[3]) + hw, x0, nx)
+		local j0, j1 = cells(math.min(l[2], l[4]) - hw, math.max(l[2], l[4]) + hw, z0, nz)
+		local abx, abz = l[3] - l[1], l[4] - l[2]
+		local len2 = math.max(abx * abx + abz * abz, 1e-9)
+		for j = j0, j1 do
+			for i = i0, i1 do
+				local px, pz = x0 + (i + 0.5) * CELL, z0 + (j + 0.5) * CELL
+				local f = math.clamp(((px - l[1]) * abx + (pz - l[2]) * abz) / len2, 0, 1)
+				if (px - l[1] - abx * f) ^ 2 + (pz - l[2] - abz * f) ^ 2 <= hw * hw then
 					keep[j * nx + i + 1] = true
 					gate[j * nx + i + 1] = true
 				end
@@ -1355,6 +1376,8 @@ export type Info = {
 	band: { y: number, h: number }?, -- ribbon windows instead (hospital)
 	pins: { [string]: { Pin } }, -- by room
 	discs: { { x: number, z: number, r: number } },
+	lanes: { { number } }?, -- the ways people walk through the building (model-local studs)
+	laneHalf: number?,
 	columns: number?, -- grid spacing of structural columns in rooms over 60 st both ways
 }
 export type Plan = {
@@ -1444,6 +1467,19 @@ function Furnish.plan(ctx: Spec.LotCtx, info: Info): Plan
 					table.insert(room.discs, c)
 				end
 			end
+			local half = info.laneHalf or Furnish.BODY
+			for _, l in info.lanes or {} do
+				if
+					math.max(l[1], l[3]) + half > room.x0
+					and math.min(l[1], l[3]) - half < room.x1
+					and math.max(l[2], l[4]) + half > room.z0
+					and math.min(l[2], l[4]) - half < room.z1
+				then
+					room.lanes = room.lanes or {}
+					table.insert(room.lanes :: { { number } }, l)
+				end
+			end
+			room.laneHalf = half
 			if info.columns then
 				-- a grid of columns carries the ceiling of the big rooms (and gives them scale)
 				local rw, rd = room.x1 - room.x0, room.z1 - room.z0
