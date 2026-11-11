@@ -423,10 +423,8 @@ function Boards.compile(source: Source): Board
 		bad("the start and the finish cells cannot hold a hole")
 	end
 
-	local pathCells = route(cols, rows, open, blocked, startCell, finishCell)
-	if pathCells == nil then
-		bad("there is no way from the start to the finish")
-	end
+	local pathCells: { number } = route(cols, rows, open, blocked, startCell, finishCell)
+		or bad("there is no way from the start to the finish")
 	local cellAt: { number } = table.create(n, 0)
 	for i, cell in pathCells do
 		cellAt[cell] = i
