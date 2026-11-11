@@ -16,7 +16,8 @@
 -- is knocked into the gutter and told so while the throw counts, and a computer opponent finishes a game with a
 -- real score; darts: three darts a turn, the turn passes,
 -- a checkout on a double wins 501, cricket mode from the lobby; the fortune machine pulls a card with no money;
--- pool and pinball say "soon".
+-- every station of a game that is not built yet says so. The station and prompt counts and the "not built yet"
+-- stations are read from the registry (Shared/Minigames/Games), so this check does not change as games land.
 -- Interface: run(opts?) -> Result (JSON-friendly)
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -27,6 +28,7 @@ local Possession = (require :: any)(server:WaitForChild("Actors"):WaitForChild("
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AlleyLayout = (require :: any)(Shared:WaitForChild("Attractions"):WaitForChild("AlleyLayout"))
 local Bowling = (require :: any)(Shared:WaitForChild("Minigames"):WaitForChild("MinigameRules"):WaitForChild("Bowling"))
+local Games = (require :: any)(Shared:WaitForChild("Minigames"):WaitForChild("Games"))
 
 local Minigames = {}
 
@@ -76,17 +78,32 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 		stationCount += 1
 	end
 	numbers.stations = stationCount
-	check(stationCount == 14, `stations {stationCount} (6 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball)`)
-	local prompts = alley and alley:FindFirstChild("MinigamePrompts")
+	-- every station the registry lists for the sites that were baked (Shared/Minigames/Games): the alley's
+	-- fourteen (6 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball) and whatever the venues' games add
+	local sites: { [string]: any } = A.sites or {}
+	local places: { [string]: any } = {}
+	numbers.sites = 0
+	for id, site in sites do
+		places[id] = site.place
+		numbers.sites += 1
+	end
+	local registered = #Games.stations(places)
+	numbers.registeredStations = registered
+	check(stationCount == registered, `stations {stationCount}, the registry lists {registered}`)
+	check(stationCount >= 14, `stations {stationCount} (the alley alone has 14)`)
+	-- each has its prompt, in its own site's folder
 	local promptCount = 0
-	if prompts then
-		for _, p in prompts:GetChildren() do
-			if p:FindFirstChildOfClass("ProximityPrompt") then
-				promptCount += 1
+	for _, site in sites do
+		local prompts = site.root and site.root:FindFirstChild("MinigamePrompts")
+		if prompts then
+			for _, p in prompts:GetChildren() do
+				if p:FindFirstChildOfClass("ProximityPrompt") then
+					promptCount += 1
+				end
 			end
 		end
 	end
-	check(promptCount == 14, `{promptCount} minigame prompts`)
+	check(promptCount == stationCount, `{promptCount} minigame prompts for {stationCount} stations`)
 	for lane = 1, 6 do
 		local lm = alley and alley.Lanes:FindFirstChild(`Lane{lane}`)
 		local pins = lm and lm:FindFirstChild("Pins")
@@ -173,13 +190,20 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 		return svc:input(p, { gameId = id, seat = 1, verb = verb, args = args or {} })
 	end
 
-	-- animals and soon-games are turned away
+	-- animals are turned away; so is anyone at a station whose game is not built yet (its Spec says `soon`),
+	-- with that Spec's words
 	local ok, why = svc:join(sq, "bowling_lane_3")
 	check(not ok and why and string.find(why, "people", 1, true), `squirrel joined a lane: {why}`)
-	ok, why = svc:join(p1, "pool_1")
-	check(not ok and why and string.find(why, "next build", 1, true), `pool said: {why}`)
-	ok, why = svc:join(p1, "pinball_2")
-	check(not ok and why and string.find(why, "out of order", 1, true), `pinball said: {why}`)
+	numbers.soonStations = 0
+	for id, st in svc.stations do
+		local spec = Games.get(st.game)
+		if spec and spec.soon then
+			numbers.soonStations += 1
+			ok, why = svc:join(p1, id)
+			check(not ok and why == spec.soon, `{id} is not built yet, but pressing E there said: {why}`)
+			check(svc:stationOf(p1) == nil, `{id} is not built yet, but it seated a player`)
+		end
+	end
 
 	-- bowling: two players, a full game ---------------------------------------------------------------------------
 	local LANE = "bowling_lane_3"
