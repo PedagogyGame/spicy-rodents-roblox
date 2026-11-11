@@ -59,7 +59,7 @@ return function(t)
 	end)
 
 	t.test("Med on screen: red eyes when symptomatic, hidden in transit, a pose when down or in bed", function()
-		t.deepEq(MedicalView.look("symptomatic"), { hidden = false, eyes = true, pose = "stagger" })
+		t.deepEq(MedicalView.look("symptomatic"), { hidden = false, eyes = true, pose = "stagger", glow = true })
 		t.deepEq(MedicalView.look("down"), { hidden = false, eyes = false, pose = "down" })
 		t.deepEq(MedicalView.look("carried"), { hidden = false, eyes = false, pose = "walk" })
 		t.deepEq(MedicalView.look("transit"), { hidden = true, eyes = false, pose = nil })
@@ -135,6 +135,128 @@ return function(t)
 			t.near((mattress :: any).x, bed.x, 1e-6, "the patient sits on the middle of the mattress")
 			t.near((mattress :: any).z, bed.z, 1e-6)
 			t.eq(#cot.parts, 5)
+		end
+	end)
+	t.test("a sitting patient's legs lie flat: the knees and ankles of the chair sit are straightened", function()
+		t.truthy(AnimationDriver.medPose("down", 3).flat, "on the ground")
+		t.truthy(AnimationDriver.medPose("treated", 3).flat, "on the cot")
+		for _, med in { "symptomatic", "carried", "transit", nil :: any, "nonsense" } do
+			t.eq(AnimationDriver.medPose(med, 3).flat, false)
+		end
+		t.deepEq(AnimationDriver.FLAT_JOINTS, { "LeftKnee", "RightKnee", "LeftAnkle", "RightAnkle" })
+	end)
+
+	t.test("walk or run: a body at the paces the sequence uses keeps one clip, however its position arrives", function()
+		-- the driver's own measurement: the root's position arrives `hz` times a second and is
+		-- drawn at 60, so the observed speed is zero on most frames and several times too high on
+		-- the others; `pace` smooths it and `gaitClip` picks the clip
+		local function switches(speedAt: (t: number) -> number, hz: number, start: string): (number, { string })
+			local dt = 1 / 60
+			local every = math.floor(60 / hz + 0.5)
+			local pace, clip = speedAt(0), start
+			local pending, count = 0, 0
+			local seen: { string } = {}
+			for frame = 1, 60 * 30 do
+				local tt = frame * dt
+				pending += speedAt(tt) * dt
+				local inst = 0
+				if frame % every == 0 then
+					inst = pending / dt
+					pending = 0
+				end
+				pace = AnimationDriver.pace(pace, inst, dt)
+				local want = AnimationDriver.gaitClip(clip, pace, 9)
+				if want ~= clip then
+					clip = want
+					if tt > 2 then
+						count += 1
+					end
+				end
+				if tt > 2 and table.find(seen, clip) == nil then
+					table.insert(seen, clip)
+				end
+			end
+			return count, seen
+		end
+		-- hospital.dischargeSpeed, infection.crewSpeed and bystanderSpeed in studs/s, and every
+		-- pace near the threshold: the old single threshold at 9 flipped 14 to 40 times a second
+		for _, hz in { 60, 30, 20, 15, 10 } do
+			for _, v in { 9.0, 8.625, 8.0, 7.5, 9.5, 10.5, 11, 7 } do
+				for _, start in { "walk", "run" } do
+					local n = switches(function(): number
+						return v
+					end, hz, start)
+					t.truthy(n <= 1, `{v} studs/s seen at {hz} Hz, starting on {start}: {n} clip changes in 28 s`)
+				end
+			end
+		end
+		-- someone walking home at 9 studs/s walks; the crew at 8.6 walks; a flee at 19 runs
+		for _, hz in { 60, 20, 10 } do
+			for _, case in { { 9.0, "walk" }, { 8.625, "walk" }, { 19, "run" }, { 3, "walk" } } do
+				local _, seen = switches(function(): number
+					return case[1] :: number
+				end, hz, "walk")
+				t.deepEq(seen, { case[2] }, `{case[1]} studs/s at {hz} Hz`)
+			end
+		end
+		-- a sick person walking in (the uneven pace of Brains/Directive on infection.walkInSpeed)
+		-- staggers at a walk: the run clip at the top of every swing made them jog to the hospital
+		local Tunables = require("@shared/Config/Tunables")
+		local top = Tunables.get("infection.walkInSpeed")
+		t.truthy(top <= 9.01, `the walk in peaks at {top} studs/s`)
+		for _, hz in { 60, 20, 10 } do
+			local _, seen = switches(function(tt: number): number
+				return top * (0.55 + 0.45 * math.abs(math.sin(tt * 0.9)))
+			end, hz, "walk")
+			t.deepEq(seen, { "walk" }, `the walk in at {hz} Hz`)
+		end
+		-- and the switch is still quick when someone really starts to run (3 -> 19 studs/s)
+		local pace, clip, took = 3, "walk", nil :: number?
+		for frame = 1, 120 do
+			pace = AnimationDriver.pace(pace, 19, 1 / 60)
+			clip = AnimationDriver.gaitClip(clip, pace, 9)
+			if clip == "run" and took == nil then
+				took = frame / 60
+			end
+		end
+		t.truthy(took ~= nil and (took :: number) < 0.3, `running {took} s after the start of a flee`)
+		-- the band is part of the interface
+		t.eq(AnimationDriver.gaitClip("walk", 10.49, 9), "walk")
+		t.eq(AnimationDriver.gaitClip("walk", 10.5, 9), "run")
+		t.eq(AnimationDriver.gaitClip("run", 7.5, 9), "run")
+		t.eq(AnimationDriver.gaitClip("run", 7.49, 9), "walk")
+		t.eq(AnimationDriver.gaitClip(nil, 9, 9), "walk")
+		t.eq(AnimationDriver.gaitClip("idle", 9), "walk")
+	end)
+
+	t.test("the stagger: someone with the symptoms sways a few degrees; nobody else does", function()
+		local worstRoll, worstPitch, crossings, last = 0, 0, 0, 0
+		for i = 0, 600 do
+			local roll, pitch = AnimationDriver.sway("symptomatic", i / 60, 1.3)
+			worstRoll = math.max(worstRoll, math.abs(roll))
+			worstPitch = math.max(worstPitch, math.abs(pitch))
+			if roll * last < 0 then
+				crossings += 1
+			end
+			last = if roll ~= 0 then roll else last
+		end
+		t.truthy(worstRoll > math.rad(2.5) and worstRoll < math.rad(5), `sways {math.deg(worstRoll)} degrees`)
+		t.truthy(worstPitch > math.rad(1) and worstPitch < math.rad(3))
+		t.truthy(crossings >= 12 and crossings <= 40, `{crossings} sways in 10 s (a stagger, not a shiver)`)
+		local a = AnimationDriver.sway("symptomatic", 4, 0.2)
+		local b = AnimationDriver.sway("symptomatic", 4, 2.9)
+		t.truthy(a ~= b, "two people are out of step")
+		for _, med in { "down", "carried", "transit", "treated", nil :: any, 7 } do
+			local roll, pitch = AnimationDriver.sway(med, 3.3, 1)
+			t.eq(roll, 0)
+			t.eq(pitch, 0)
+		end
+		-- and it can be seen from any side: larger eyes, and a faint red glow on the whole body
+		t.truthy(MedicalView.EYE.size >= 0.26, "the eyes can be made out across a street")
+		t.eq(MedicalView.look("symptomatic").glow, true)
+		t.truthy(MedicalView.GLOW.fill > 0.6 and MedicalView.GLOW.fill < 0.95, "faint")
+		for _, med in { "down", "carried", "transit", "treated", nil :: any } do
+			t.truthy(not MedicalView.look(med).glow)
 		end
 	end)
 end

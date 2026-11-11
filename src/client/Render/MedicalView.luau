@@ -4,7 +4,9 @@
 -- show up a bit later"; hospital_police_infection §6.7 red eyes). The server writes one attribute on
 -- the body, Med (Server/Infection/InfectionService), and nothing at all while the infection
 -- incubates; this module draws it:
---   symptomatic  two small red glowing eyes on the head (the visible tell)
+--   symptomatic  two red glowing eyes on the head and a faint red glow on the whole body (the
+--                visible tell: the eyes alone were two 0.2-stud balls, about 5 px across at 30 studs
+--                and not there at all from behind); Animation/AnimationDriver adds the stagger
 --   down         the red eyes stay off (v5.4 turns them off at the scene); the pose is drawn by
 --                Animation/AnimationDriver, which reads the same attribute (sitting on the ground)
 --   carried      nothing here: the patient is on their feet, walked to the ambulance by the crew
@@ -13,23 +15,26 @@
 --                server also sinks it under the ground, so a missed hide shows nothing either)
 --   treated      nothing here (AnimationDriver sits the patient up on the cot)
 -- The eyes are client-made parts kept on the head every frame (no welds into a body another machine
--- may own); hiding is LocalTransparencyModifier on the body's parts and decals, put back when the
--- attribute changes, and re-applied to parts that stream in while it is hidden.
+-- may own); the glow is a client-made Highlight on the body (fill only, hidden behind walls); hiding
+-- is LocalTransparencyModifier on the body's parts and decals, put back when the attribute changes,
+-- and re-applied to parts that stream in while it is hidden.
 -- No service access at require time (Lune requires this module).
--- Interface: start(opts { bodies }) -> stop(); look(med) -> { hidden, eyes, pose } (pure);
---   EYE { size, x, y, z, color }
+-- Interface: start(opts { bodies }) -> stop(); look(med) -> { hidden, eyes, pose, glow? } (pure);
+--   EYE { size, x, y, z, color }; GLOW { color, fill }
 
-export type Look = { hidden: boolean, eyes: boolean, pose: string? }
+export type Look = { hidden: boolean, eyes: boolean, pose: string?, glow: boolean? }
 
 local MedicalView = {}
 
 -- on an R15 head (1.2 studs): either side of the nose, on the face (-Z is forward)
-MedicalView.EYE = table.freeze({ size = 0.2, x = 0.2, y = 0.12, z = -0.57, color = { 255, 36, 28 } })
+MedicalView.EYE = table.freeze({ size = 0.28, x = 0.2, y = 0.12, z = -0.55, color = { 255, 36, 28 } })
+-- the fever glow: a red fill over the whole body, this transparent (faint, but there from any side)
+MedicalView.GLOW = table.freeze({ color = { 255, 40, 30 }, fill = 0.8 })
 
 -- look(med): what the attribute means on screen. Unknown values draw nothing.
 function MedicalView.look(med: any): Look
 	if med == "symptomatic" then
-		return { hidden = false, eyes = true, pose = "stagger" }
+		return { hidden = false, eyes = true, pose = "stagger", glow = true }
 	elseif med == "down" then
 		return { hidden = false, eyes = false, pose = "down" }
 	elseif med == "carried" then
@@ -48,6 +53,7 @@ type Entry = {
 	added: RBXScriptConnection?,
 	hidden: boolean,
 	eyes: { BasePart }?,
+	glow: Highlight?,
 }
 
 function MedicalView.start(opts: { bodies: Instance }): () -> ()
@@ -115,6 +121,22 @@ function MedicalView.start(opts: { bodies: Instance }): () -> ()
 			end
 			entry.eyes = nil
 		end
+		if look.glow and entry.glow == nil then
+			local g = MedicalView.GLOW
+			local glow = Instance.new("Highlight")
+			glow.Name = "Fever"
+			glow.FillColor = Color3.fromRGB(g.color[1], g.color[2], g.color[3])
+			glow.FillTransparency = g.fill
+			glow.OutlineTransparency = 1
+			glow.DepthMode = Enum.HighlightDepthMode.Occluded
+			glow.Enabled = false -- switched on with the eyes, once the head is known to be drawn
+			glow.Adornee = entry.body
+			glow.Parent = holder
+			entry.glow = glow
+		elseif not look.glow and entry.glow then
+			entry.glow:Destroy()
+			entry.glow = nil
+		end
 	end
 
 	local function add(child: Instance)
@@ -122,7 +144,7 @@ function MedicalView.start(opts: { bodies: Instance }): () -> ()
 			return
 		end
 		local body = child :: Model
-		local entry: Entry = { body = body, conn = nil :: any, added = nil, hidden = false, eyes = nil }
+		local entry: Entry = { body = body, conn = nil :: any, added = nil, hidden = false, eyes = nil, glow = nil }
 		entry.conn = body:GetAttributeChangedSignal("Med"):Connect(function()
 			apply(entry)
 		end)
@@ -146,6 +168,10 @@ function MedicalView.start(opts: { bodies: Instance }): () -> ()
 				table.insert(spare, p)
 			end
 		end
+		if entry.glow then
+			entry.glow:Destroy()
+			entry.glow = nil
+		end
 	end
 
 	local conns: { RBXScriptConnection } = {}
@@ -166,12 +192,18 @@ function MedicalView.start(opts: { bodies: Instance }): () -> ()
 					-- no eyes on a head that is not drawn: your own body in first person (the camera
 					-- fades it with LocalTransparencyModifier; two red balls would hang in the view)
 					-- or a hidden one; nor on a body with no head part (the cyclists' puppets)
-					if head and head:IsA("BasePart") and head.LocalTransparencyModifier < 0.5 then
-						eyes[1].CFrame = head.CFrame * CFrame.new(-e.x, e.y, e.z)
-						eyes[2].CFrame = head.CFrame * CFrame.new(e.x, e.y, e.z)
+					local drawn = head ~= nil and head:IsA("BasePart") and head.LocalTransparencyModifier < 0.5
+					if drawn then
+						local cf = (head :: BasePart).CFrame
+						eyes[1].CFrame = cf * CFrame.new(-e.x, e.y, e.z)
+						eyes[2].CFrame = cf * CFrame.new(e.x, e.y, e.z)
 						eyes[1].Transparency, eyes[2].Transparency = 0, 0
 					else
 						eyes[1].Transparency, eyes[2].Transparency = 1, 1
+					end
+					-- (no glow either on a body that is not drawn: your own in first person)
+					if entry.glow and entry.glow.Enabled ~= drawn then
+						entry.glow.Enabled = drawn
 					end
 				end
 			end
