@@ -10,7 +10,8 @@
 
 A pose is {bone: (R 3x3, t 3)}: the joint's local delta in its axis-aligned frame at the bone head, exactly
 Bone.Transform in the engine (every bone's rest rotation is the identity, rig.py). The game multiplies a
-layer onto it as Bone.Transform = pose * CFrame.Angles(rx, ry, rz).
+layer onto it as Bone.Transform = pose * CFrame.Angles(rx, ry, rz); a layer of six numbers (the Root's)
+also carries an offset in studs: pose * CFrame.new(tx, ty, tz) * CFrame.Angles(rx, ry, rz).
 
 Blending follows the Animator for tracks of one priority: weights that sum to 1 mix the poses; a sum
 short of 1 leaves that share of the rest pose showing; a sum over 1 is scaled down.
@@ -214,13 +215,16 @@ def blend(poses, weights, names):
 
 
 def apply_layers(pose, layers):
-    """Bone.Transform = pose * CFrame.Angles(rx, ry, rz) for every layered bone."""
+    """Bone.Transform = pose * CFrame.new(tx, ty, tz) * CFrame.Angles(rx, ry, rz) for every layered bone
+    (a layer of three numbers has no offset)."""
     if not layers:
         return pose
     out = dict(pose)
     for bone, r in layers.items():
         if bone in out:
             R, t = out[bone]
+            if len(r) >= 6:
+                t = t + R @ np.array(r[3:6], dtype=np.float64)
             out[bone] = (R @ angles(r[0], r[1], r[2]), t)
     return out
 
@@ -291,8 +295,10 @@ def lerp_frames(a, b, u):
     la, lb = a.get("layers") or {}, b.get("layers") or {}
     layers = {}
     for bone in set(la) | set(lb):
-        ra, rb = la.get(bone, [0, 0, 0]), lb.get(bone, [0, 0, 0])
-        layers[bone] = [ra[k] + (rb[k] - ra[k]) * u for k in range(3)]
+        ra, rb = la.get(bone, []), lb.get(bone, [])
+        n = max(len(ra), len(rb), 3)
+        ra, rb = list(ra) + [0] * (n - len(ra)), list(rb) + [0] * (n - len(rb))
+        layers[bone] = [ra[k] + (rb[k] - ra[k]) * u for k in range(n)]
     out["layers"] = layers
     return out
 
