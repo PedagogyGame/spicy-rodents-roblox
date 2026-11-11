@@ -63,7 +63,8 @@ type Record = {
 	biter: number?,
 	home: { number }, -- where the person was bitten (they walk back there when cured)
 	amb: string, -- none | queued | assigned | returning
-	vehicle: any?,
+	vehicle: any?, -- the responder on this patient's call (only while the trip is this record's)
+	trip: any?, -- that trip's route: a vehicle on any other route is no longer this record's
 	virtual: boolean, -- the stop is the ambulance's own parking spot: nothing drives
 	stage: any?, -- MedicalRoute.Stage
 	crew: number?, -- the crew member out for this patient
@@ -516,15 +517,27 @@ end
 
 -- the ambulance ----------------------------------------------------------------------------------
 
+-- Is the record's responder still on the trip this record sent it on? A responder that has parked,
+-- or been sent out again for someone else, drives a different route (or none).
+local function onTrip(rec: Record): boolean
+	local v = rec.vehicle
+	return v ~= nil and rec.trip ~= nil and v.route == rec.trip and v.phase ~= "idle"
+end
+
+-- The record lets go of its ambulance. The vehicle is only released while it is still out on this
+-- record's call: after the patient is loaded it has been released already, and by the time the case
+-- closes it may be parked or on its way to the next patient (releasing it then sent it home empty
+-- and left that patient on the pavement).
 local function dropAmbulance(self: Service, rec: Record)
 	local i = table.find(self.queue, rec.id)
 	if i then
 		table.remove(self.queue, i)
 	end
-	if rec.vehicle then
+	if rec.amb == "assigned" and onTrip(rec) then
 		self.traffic:releaseResponder(rec.vehicle)
 	end
 	rec.vehicle = nil
+	rec.trip = nil
 	rec.virtual = false
 	rec.amb = "none"
 end
@@ -535,18 +548,41 @@ local function ambulanceFact(rec: Record): string
 			return "arrived"
 		end
 		local v = rec.vehicle
-		if v == nil then
+		if v == nil or not onTrip(rec) then
 			return "none"
 		end
 		return if v.phase == "hold" then "arrived" else "assigned"
 	elseif rec.amb == "returning" then
-		local v = rec.vehicle
-		if rec.virtual or v == nil or v.phase == "idle" or v.route == nil then
+		if rec.virtual or not onTrip(rec) then
 			return "home"
 		end
 		return "returning"
 	end
 	return rec.amb
+end
+
+-- The ambulance that was coming is no longer coming for this patient (something else let it go, so
+-- it turns round at the scene, or it is on another route): a patient still waiting goes back to the
+-- head of the queue; one the crew is already working on is carried to the roadside and taken in.
+local function checkAmbulance(self: Service, rec: Record)
+	if rec.amb ~= "assigned" or rec.virtual then
+		return
+	end
+	local v = rec.vehicle
+	if v ~= nil and onTrip(rec) and v.held == true then
+		return
+	end
+	rec.vehicle = nil
+	rec.trip = nil
+	local state = rec.case.state
+	if state == "scene" or state == "enroute" then
+		rec.amb = "queued"
+		if table.find(self.queue, rec.id) == nil then
+			table.insert(self.queue, 1, rec.id)
+		end
+	else
+		rec.amb = "none"
+	end
 end
 
 local function stepQueue(self: Service)
@@ -571,6 +607,7 @@ local function stepQueue(self: Service)
 			break -- all three are out: the patient keeps their place in the queue
 		end
 		rec.vehicle = v
+		rec.trip = v.route
 		rec.amb = "assigned"
 		self._stats.dispatched += 1
 		table.remove(self.queue, 1)
@@ -720,7 +757,7 @@ local function apply(self: Service, rec: Record, effect: any)
 		end
 	elseif kind == "load" then
 		hidePatient(self, rec)
-		if rec.vehicle then
+		if rec.amb == "assigned" and onTrip(rec) then
 			self.traffic:releaseResponder(rec.vehicle)
 		end
 		rec.amb = "returning"
@@ -882,6 +919,7 @@ local function factsFor(self: Service, rec: Record): any
 end
 
 local function stepCase(self: Service, rec: Record)
+	checkAmbulance(self, rec)
 	local inputs = factsFor(self, rec)
 	local effects = InfectionRules.advance(rec.case, self.now, inputs, self.rand, self.params)
 	for _, e in effects do
@@ -896,9 +934,14 @@ local function stepCase(self: Service, rec: Record)
 			order(self, rec.id, { mode = "down", faceX = bed.door[1], faceZ = bed.door[2] })
 		end
 	end
-	-- the crew member is back at the parked ambulance
-	if rec.crew and rec.amb == "returning" and ambulanceFact(rec) == "home" then
+	-- the ambulance is parked again: the crew member is back at the bay, and the record forgets the
+	-- vehicle (it may go out for someone else from now on)
+	if rec.amb == "returning" and ambulanceFact(rec) == "home" then
 		freeCrew(self, rec)
+		rec.vehicle = nil
+		rec.trip = nil
+		rec.virtual = false
+		rec.amb = "none"
 	end
 	publish(self, rec)
 	if InfectionRules.closed(rec.case) then
@@ -970,6 +1013,7 @@ function InfectionService.bite(self: Service, victimId: number, biterId: number?
 		home = { a.x, a.z },
 		amb = "none",
 		vehicle = nil,
+		trip = nil,
 		virtual = false,
 		stage = nil,
 		crew = nil,
