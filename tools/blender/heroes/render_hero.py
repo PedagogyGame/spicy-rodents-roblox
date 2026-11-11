@@ -176,6 +176,7 @@ def main(argv):
     )
     ap.add_argument("--at", default="", help="the pose the stills and views are taken in: Clip:frame, or rest (default: Idle, frame 1)")
     ap.add_argument("--zoom", type=float, default=1.0, help="views: the lens is this many times longer (the animal that much larger)")
+    ap.add_argument("--lift", type=float, default=0.0, help="views: the point looked at is this many studs higher (a tail held upright)")
     opts = ap.parse_args(argv)
     bpy.ops.wm.open_mainfile(filepath=opts.blend)
     scene = bpy.context.scene
@@ -240,7 +241,7 @@ def main(argv):
         for name in [v for v in opts.views.split(",") if v]:
             target, dist, az, el, lens = VIEWS[name]
             cam.data.lens = lens * opts.zoom
-            place(cam, target, size * dist, az, el)
+            place(cam, target + Vector((0, 0, opts.lift)), size * dist, az, el)
             scene.render.filepath = os.path.join(opts.out, f"{tag}_{name}.png")
             bpy.ops.render.render(write_still=True)
             written.append(scene.render.filepath)
