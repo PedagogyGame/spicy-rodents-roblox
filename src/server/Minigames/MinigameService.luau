@@ -17,7 +17,7 @@
 --            and both sides are told (Bowling/Intruders; opts.animals / opts.knock from Boot/Game)
 --   darts    Dartboard ("throw" { aimX, aimY, timing } resolved by the rules' seeded scatter; "mode" 501/cricket).
 --            A turn's darts are pulled out a beat after the turn passes, and at the latest when the next turn's
---            first dart lands (never together with it), or at once when the turn is skipped. A computer player
+--            first dart is thrown (never together with it), or at once when the turn is skipped. A computer player
 --            there is a pub darts player of its own name (DART_AI): treble 20s, then a set-up and a double in
 --            501; down the numbers in cricket (dartsAim)
 --   fortune  FortuneCabinet (the prompt pulls the lever; reels; a printed fortune or taunt; never money)
@@ -462,6 +462,10 @@ local function promptTexts(st: Station): (string, string)
 		return verb, `{st.label} - open (alone, with friends, or against a computer)`
 	elseif s.phase == "lobby" then
 		return "Join", `{st.label} - {n}/{s.rules.def.seats} joining, starting soon`
+	end
+	if st.kind == "dartboard" then
+		-- (there is one board: nothing else to try)
+		return "In use", `{st.label} - game on ({n} playing): wait for the next game`
 	end
 	return "In use", `{st.label} - game on ({n} playing): try another`
 end
@@ -1112,9 +1116,10 @@ function MinigameService.step(self: any, dt: number)
 					st.hw:clear()
 				end
 			elseif e.kind == "skipped" then
-				-- (a thrower who left: the rest of their turn was played out as misses)
-				if st.kind == "dartboard" and st.hw then
-					st.clearAt = nil
+				-- (a thrower who left: the rest of their turn was played out as misses.) Darts they left in the
+				-- board come out now; but when the turn before theirs has only just ended, its last dart may
+				-- still be in the air, and those come out on their own beat
+				if st.kind == "dartboard" and st.hw and st.clearAt == nil then
 					st.hw:clear()
 				end
 			elseif e.kind == "removed" and e.key ~= nil then
