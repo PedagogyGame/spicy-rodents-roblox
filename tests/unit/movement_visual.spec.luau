@@ -320,7 +320,7 @@ return function(t)
 		t.truthy(s.z > 5 + st(6), "and carries forward")
 	end)
 
-	t.test("lean: into the turn, clamped, level on a trunk; trunk yaw faces the bark; pitch 0.83 -> 1.43", function()
+	t.test("lean: into the turn, clamped, level on a trunk; trunk yaw faces the bark; pitch 0.83 -> upright", function()
 		local v = SquirrelVisual.new()
 		SquirrelVisual.lean(v, 0, 1 / 60)
 		t.eq(v.lean, 0)
@@ -364,8 +364,11 @@ return function(t)
 		end
 		t.near(SquirrelVisual.trunkPitch(0), 0.83, 1e-12)
 		t.near(SquirrelVisual.trunkPitch(st(0.25)), 0.83, 1e-12)
-		t.near(SquirrelVisual.trunkPitch(st(2.4)), 1.43, 1e-12)
-		t.near(SquirrelVisual.trunkPitch(100), 1.43, 1e-12)
+		-- once the paws grip the body lies along the bark (v5.4's 1.43 rad left a sculpted body's fore paws
+		-- in the trunk and its hind feet off it)
+		t.near(P.trunkPitchHigh, math.pi / 2, 1e-12)
+		t.near(SquirrelVisual.trunkPitch(st(2.4)), math.pi / 2, 1e-12)
+		t.near(SquirrelVisual.trunkPitch(100), math.pi / 2, 1e-12)
 		t.truthy(SquirrelVisual.trunkPitch(st(1.3)) > 0.83 and SquirrelVisual.trunkPitch(st(1.3)) < 1.43)
 		-- cadence: 2.85 rad per u on the ground, 0.7 on a rail, x1.14 boosted
 		t.near(SquirrelVisual.cadence(st(8), false, false), 22.8, 1e-9)
@@ -416,7 +419,7 @@ return function(t)
 		t.truthy(drawn < out, "pulled in from v5.4's pad")
 		t.near(v.y, vis.y, 0.01)
 		-- nose up at the full grip pitch, facing the trunk axis, level
-		t.near(v.pitch, 1.43, 0.01)
+		t.near(v.pitch, P.trunkPitchHigh, 0.01)
 		t.near(v.climb, 1, 0.01)
 		local fx, fz = math.sin(v.yaw :: number), math.cos(v.yaw :: number)
 		local ax, az = (s.x - v.x) / drawn, (s.z - v.z) / drawn
@@ -468,7 +471,7 @@ return function(t)
 				-- on the pole: the feet point is poleGap outside its surface, nose up
 				local d = math.sqrt((v.x - s.x) ^ 2 + (v.z - s.z) ^ 2)
 				t.near(d, pole.surfaceRadius + P.poleGap, 0.02, "pole gap")
-				t.near(v.pitch, 1.43, 0.02)
+				t.near(v.pitch, P.trunkPitchHigh, 0.02)
 				gapChecked = true
 			end
 			if switchedAt and i > switchedAt + 150 then
@@ -482,12 +485,17 @@ return function(t)
 		t.truthy(maxMove < 0.9, `drawn move {maxMove} st in one frame`)
 		t.truthy(maxYaw < 0.8, `heading change {maxYaw} rad in one frame`)
 		t.truthy(maxPitch < 0.4, `pitch change {maxPitch} rad in one frame`)
-		-- 2.5 s along the wire: level, heading along the motor's, riding the wire lift
+		-- 2.5 s along the wire: level, heading along the motor's, the paws on the line: the drawn feet point
+		-- rides the wire's top (it is drawn 0.15 studs thick), not v5.4's lift half a stud above it, which
+		-- stays the motor's own (a leap off the wire starts there)
 		t.truthy(math.abs(v.pitch) < 0.01, `pitch {v.pitch}`)
 		t.truthy(v.climb < 0.01)
 		t.truthy(math.abs(shortest((v.yaw :: number) - s.yaw)) < 0.01, "heading follows the wire")
 		local vis = SquirrelMotor.visualPose(s, world)
-		t.truthy(math.abs(v.y - vis.y) < 0.15, `wire height {v.y - vis.y}`)
+		t.near(vis.y - s.y, Motion.C.visualWireLift, 1e-9, "the motor's lift is untouched")
+		t.near(P.wireLift, 0.08, 1e-12)
+		t.truthy(math.abs(v.y - (s.y + P.wireLift)) < 0.15, `wire height {v.y - s.y}`)
+		t.truthy(v.y < vis.y - 0.3, "let down from the motor's lift")
 		t.near(v.cadence, SquirrelVisual.cadence(s.moveSpeed, true, false), 1e-9)
 	end)
 

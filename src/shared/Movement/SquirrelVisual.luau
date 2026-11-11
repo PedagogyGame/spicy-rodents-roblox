@@ -13,12 +13,14 @@
 --     kerb or a plate lip over a few frames. Where a ledge separates the drawn point from the motor, and
 --     while a landing is still arriving, the height eases toward the motor instead (v5.4's rule);
 --   * heading: the motor's yaw on the ground and on branches and wires; on a trunk or a pole the body faces
---     the bark with its nose up (0.83 rad near the ground, 1.43 rad once the paws grip, L6797-6846);
+--     the bark with its nose up (0.83 rad near the ground, straight up once the paws grip: v5.4's 1.43
+--     rad, L6797-6846, leaves a sculpted body's fore paws in the bark and its hind feet off it);
 --   * lean: a roll into turns from the yaw rate (L6817-6822), never on a trunk.
 -- Nothing here feeds back into the motor: animation and drawing never move the authoritative position
 -- (owner rule 2026-11-09). Pure numbers (Lune-tested); the client controller builds the CFrame.
 -- `frame` is the whole drawn pose for one motor state (what Controllers/Squirrel draws): the eased point
--- (on a trunk pulled in from v5.4's pad until the paws meet the bark), heading, nose-up pitch and lean.
+-- (on a trunk pulled in from v5.4's pad until the paws meet the bark, on a wire let down from v5.4's lift
+-- until they stand on the line), heading, nose-up pitch and lean.
 -- v5.4 switches heading and pitch in one frame when a trunk is mounted or left; here the pitch eases and
 -- the heading change is absorbed by an offset that decays, so nothing pops and steady turning has no lag.
 -- Interface: new() -> Visual; frame(v, state, world, dt, groundAt?) -> snapped;
@@ -94,9 +96,11 @@ SquirrelVisual.params = {
 	leanMax = 0.31,
 	leanRate = 12,
 	turnDtFloor = 1e-4, -- a divide guard only: a floor near a frame time under-reads fast displays
-	-- trunk pose (L6846): nose-up pitch by how far the paws are off the ground
+	-- trunk pose (L6846): nose-up pitch by how far the paws are off the ground. Once the paws grip the
+	-- body lies along the bark (v5.4 has 1.43 rad: on the sculpted body, whose feet point is on the bark,
+	-- those 8 degrees put the fore paws 0.03 studs into the trunk and the hind feet 0.08 off it)
 	trunkPitchLow = 0.83,
-	trunkPitchHigh = 1.43,
+	trunkPitchHigh = math.pi / 2,
 	gripLow = st(0.25),
 	gripHigh = st(2.4),
 	-- stride cadence, radians per HTML unit travelled (L6824)
@@ -110,6 +114,11 @@ SquirrelVisual.params = {
 	-- (0.3 until the sculpted body: its paws stood 0.4 studs off the bark, "floating"; the feet point is
 	-- the soles of a skinned hero, so it belongs on the bark the motor takes the trunk to have)
 	barkGap = 0,
+	-- how far above a wire's own line the drawn feet point rides. The motor's visual pose is
+	-- Motion.C.visualWireLift (0.55 studs) above it, which is where v5.4's body rode and where a leap off
+	-- the wire starts; drawn there, the sculpted body ran half a stud above the line. A wire is drawn 0.15
+	-- studs thick (worldgen RouteProps), so this is its top
+	wireLift = 0.08,
 	poseRate = 16,
 }
 local P = SquirrelVisual.params
@@ -284,6 +293,8 @@ function SquirrelVisual.frame(
 			else C.visualTrunkPad - P.barkGap
 		tx -= nx * pull
 		tz -= nz * pull
+	elseif route and route.kind == "wire" then
+		ty -= C.visualWireLift - P.wireLift
 	end
 	local rail = route ~= nil
 	local snapped = SquirrelVisual.update(v, tx, ty, tz, dt, {
