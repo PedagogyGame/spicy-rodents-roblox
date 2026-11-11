@@ -385,4 +385,38 @@ return function(t)
 		victimBrain:think(0.1, c3)
 		t.eq(victim.intent.mode, "stand", "a patient on the ground does not get up to run")
 	end)
+
+	t.test("an alarm (someone collapsed nearby) keeps a runner running and blinds nobody", function()
+		-- a walker who hears the alarm still sees the rodent in front of them at once (the alarm used
+		-- to raise `alert`, which also switches the spot reaction off: 7 s of strolling past it)
+		local grid = Perception.newGrid(40)
+		local byId: { [number]: Common.Actor } = {}
+		local human, brain = pedestrian(0, -30.25)
+		local c = ctx(grid, byId)
+		local spotted = 0
+		c.emit = function(kind: string)
+			if kind == "spotted" then
+				spotted += 1
+			end
+		end
+		brain:think(0.1, c)
+		brain:onEvent({ type = "alarm", alert = 7 })
+		t.eq(human.alert, 0, "a walker's alert is left alone")
+		loudSquirrel(human, grid, byId, "spicy")
+		local secs = 0
+		while secs < 3 and brain.state ~= "flee" do
+			c.now += 0.1
+			secs += 0.1
+			brain:think(0.1, c)
+		end
+		t.eq(brain.state, "flee")
+		t.truthy(secs <= 1, `fled {secs} s after the rodent came into view`)
+		t.eq(spotted, 1, "and the spot was reported (somebody may say a line)")
+		-- someone already running keeps running for the 7 s
+		human.alert = 2.5
+		brain:onEvent({ type = "alarm", alert = 7 })
+		t.eq(human.alert, 7)
+		brain:onEvent({ type = "alarm", alert = 3 })
+		t.eq(human.alert, 7, "never lowered")
+	end)
 end

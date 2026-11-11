@@ -588,7 +588,9 @@ local function openScene(self: Service, rec: Record)
 		if o.species == "human" and o.id ~= rec.id then
 			local d2 = (o.x - a.x) ^ 2 + (o.z - a.z) ^ 2
 			if d2 <= radius * radius and isAI(self, o.id) then
-				-- humans_actors §7.2: a new scene puts everyone within 72 u on alert
+				-- humans_actors §7.2: a new scene keeps the people within 72 u who are already running
+				-- on alert (the brain leaves a walker alone: the alarm must not stop anyone noticing
+				-- the rodent)
 				local brain = self.world.brains[o.id]
 				if brain then
 					brain:onEvent({ type = "alarm", alert = 7 })

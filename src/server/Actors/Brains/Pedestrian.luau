@@ -7,7 +7,8 @@
 -- R(0.8, 1.6), cyclist R(3.2, 5.2), flee 7.1 u/s) and §5.2 (alert 8, return to walk under 2).
 -- The bite-to-hospital sequence (owner 2026-11-10) adds: a Directive (Brains/Directive: down, hidden,
 -- route, hold) that overrides everything while it is set; the events "medical" (set or clear the
--- directive), "bitten" and "witness" (run from `threat` along the lane); an optional
+-- directive), "bitten" and "witness" (run from `threat` along the lane), "alarm" (someone collapsed
+-- nearby: a person already running keeps running, nobody else is touched); an optional
 -- ctx.emit("spotted", actor, threat) when a spot starts a flee, so the server can let some people
 -- say something; and the "rejoin" state: after a directive, a gathering or a player letting go far
 -- from the lane, the person adopts the nearest lane and WALKS back onto it (the lane lock damps the
@@ -354,8 +355,12 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 		self.gatherX, self.gatherZ = evt.x, evt.z
 		self.gatherUntil = evt.untilTime
 	elseif evt.type == "alarm" then
-		-- a new crime scene puts every visible human within 72 u on alert >= 7 (L9291-9302)
-		self.actor.alert = math.max(self.actor.alert, evt.alert or 7)
+		-- a new scene keeps the people already running from it on alert >= 7 (L9291-9302). Only them:
+		-- here `alert` also blocks the spot reaction (think: `threat and actor.alert <= 0`), so raising
+		-- it on someone who is just walking made them ignore the rodent in front of them for 7 s
+		if self.state == "flee" then
+			self.actor.alert = math.max(self.actor.alert, evt.alert or 7)
+		end
 	elseif evt.type == "medical" then
 		Directive.set(self.directive, evt)
 	elseif evt.type == "bitten" or evt.type == "witness" then
