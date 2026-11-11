@@ -215,6 +215,20 @@ local function ground(ctx: Spec.LotCtx, mx: number, mz: number): number
 	return Height.at(wx, wz) - ctx.seat
 end
 
+-- The highest the ground stands (above the seat) in front of a door: across the door's width, from the
+-- wall to 3 st out. A sill lower than this is partly under the grass (WorldGen/DoorSill checks it).
+function Facade.doorGround(ctx: Spec.LotCtx, face: string, c: number, w: number): number
+	local f = Facade.faces(ctx)[face]
+	local top = -math.huge
+	for _, a in { -0.5, 0, 0.5 } do
+		for _, dist in { 0, 1.5, 3 } do
+			local mx, mz = outPoint(f, c + a * w, dist)
+			top = math.max(top, ground(ctx, mx, mz))
+		end
+	end
+	return top
+end
+
 function Facade.style(ctx: Spec.LotCtx): Style
 	local t: string = ctx.lot.type or ""
 	local id: string = ctx.lot.id or ""

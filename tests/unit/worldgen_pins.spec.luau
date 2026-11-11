@@ -90,7 +90,9 @@ return function(t)
 			end
 		end
 		t.eq(#lines, 854, "collidable massing parts")
-		t.eq(Bake.fnv(table.concat(lines, "\n")), "3e2b604320333bd5", "massing moved: re-pin only on purpose")
+		-- re-pinned 2026-11-11: 16 front door leaves moved up to the ground on their lot's uphill side
+		-- (Building.door; they stood 0.3 to 3.6 st under the grass). Nothing else moved.
+		t.eq(Bake.fnv(table.concat(lines, "\n")), "f8a1d06e1097db80", "massing moved: re-pin only on purpose")
 		t.eq(Bake.fnv(table.concat(firsts, "\n")), "89066c7454a584aa", "a lot's first part changed")
 	end)
 

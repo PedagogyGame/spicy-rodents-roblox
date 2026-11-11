@@ -315,8 +315,20 @@ end
 -- Front door leaf on the front face (the body behind it is solid until W3 interiors). It stands 0.37
 -- studs proud of the wall and 0.17 proud of the plinth: with its face on the wall's own plane the two
 -- surfaces flickered against each other (owner: "the doors glitch and shimmer in a strobe light way").
-function Building.door(ctx: Spec.LotCtx, width: number, height: number)
-	ctx.list:add(ctx.frame, "Door", 0, height / 2, -ctx.D / 2 - 0.12, width, height, 0.5, {
+-- The sill is at the seat, or at the ground where the ground in front stands higher: a building is
+-- seated at the height of its centre, so on a slope its uphill wall is part buried, and 13 front doors
+-- stood 0.3 to 3.6 st under the grass. Such a door keeps its height where the wall allows and is never
+-- shorter than DOOR_MIN. Returns the sill and the leaf height (above the seat).
+Building.DOOR_MIN = 6.5
+function Building.door(ctx: Spec.LotCtx, width: number, height: number): (number, number)
+	local eave = Building.heights(ctx)
+	local sill = 0
+	local rise = Facade.doorGround(ctx, "F", 0, width)
+	if rise > 0.3 then
+		sill = rise
+		height = math.max(math.min(height, eave - 0.9 - sill), math.min(height, Building.DOOR_MIN))
+	end
+	ctx.list:add(ctx.frame, "Door", 0, sill + height / 2, -ctx.D / 2 - 0.12, width, height, 0.5, {
 		color = Building.look(ctx).door,
 		material = "Wood",
 		role = "Door",
@@ -331,7 +343,6 @@ function Building.door(ctx: Spec.LotCtx, width: number, height: number)
 		attrs = { Placeholder = true },
 	})
 	ctx.attributes.DoorOutside = true
-	local eave = Building.heights(ctx)
 	Facade.entrance(ctx, {
 		name = "Door",
 		doorId = ctx.lot.id .. ":front",
@@ -339,11 +350,12 @@ function Building.door(ctx: Spec.LotCtx, width: number, height: number)
 		c = 0,
 		w = width,
 		h = height,
-		y0 = 0,
+		y0 = sill,
 		proud = 0.37,
 		wallTop = eave,
 		canopy = true,
 	}, Facade.style(ctx))
+	return sill, height
 end
 
 function Building.plan(ctx: Spec.LotCtx)
@@ -359,11 +371,13 @@ function Building.plan(ctx: Spec.LotCtx)
 		Building.roof(ctx, eave, peak, alongX)
 	end
 	local doorW = math.min(3 * Spec.SPU, ctx.W * 0.5)
-	if ctx.kit.door then
-		Building.door(ctx, doorW, math.min(3.5 * Spec.SPU, eave * 0.8))
-	end
 	local doorH = math.min(3.5 * Spec.SPU, eave * 0.8)
-	Building.windows(ctx, 0.6, eave - 0.6, { F = if ctx.kit.door then { { c = 0, w = doorW, top = doorH } } else {} })
+	local doorTop = doorH
+	if ctx.kit.door then
+		local sill, leaf = Building.door(ctx, doorW, doorH)
+		doorTop = sill + leaf
+	end
+	Building.windows(ctx, 0.6, eave - 0.6, { F = if ctx.kit.door then { { c = 0, w = doorW, top = doorTop } } else {} })
 	Building.dress(ctx, eave, peak, not gable)
 	local style = Facade.style(ctx)
 	if not gable then

@@ -265,15 +265,12 @@ return function(t)
 				end
 			end
 		end
-		print(
-			`      {doors} exterior doors: {stepped} with steps ({steps} steps), {level} level; left as they are (sill under the ground or over 4.5 st up): {table.concat(
-				untouched,
-				", "
-			)}`
-		)
+		print(`      {doors} exterior doors: {stepped} with steps ({steps} steps), {level} level`)
 		t.truthy(doors >= 80, `{doors} doors`)
 		t.truthy(stepped >= 15, `{stepped} doors with steps`)
-		t.truthy(#untouched <= 22, `{#untouched} doors neither stepped nor level`)
+		-- (14 doors once stood under the ground on their lot's uphill side: Building.door now sets the
+		-- sill at the ground there, and the hospital stands on a level site)
+		t.eq(table.concat(untouched, ", "), "", "doors neither stepped nor level")
 	end)
 
 	t.test("entrances: the hood, porch, awning, canopy or portico the style calls for, never in a ray's way", function()

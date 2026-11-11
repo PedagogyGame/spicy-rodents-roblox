@@ -3,7 +3,8 @@
 -- The WorldBuild exit checks on the bake plans (BUILD_PLAN §4.4 #7, §6.5), shared by Lune
 -- (tools/bake/check.luau, tests/unit/world_checks.spec.luau) and the engine (tests/engine/WorldBuild):
 -- lot count equals data; no solid overlap between lots; every exterior door reachable from a
--- sidewalk; every route sample within surfaceRadius + 0.3 u of geometry or terrain except the
+-- sidewalk and standing on its threshold at ground level or on steps down to it (DoorSill);
+-- every route sample within surfaceRadius + 0.3 u of geometry or terrain except the
 -- routes in harvest_patches.json (each with a reason); Skyline for every building; the hospital's 8
 -- brief rooms and the station's drone console exist; at least one lamp per road side; every enterable
 -- room passes InteriorCheck (furnished, walkable, lit).
@@ -12,6 +13,7 @@
 
 local Bake = require("./Bake")
 local DoorReach = require("./DoorReach")
+local DoorSill = require("./DoorSill")
 local Geometry = require("./Geometry")
 local Import = require("./Import")
 local InteriorCheck = require("./InteriorCheck")
@@ -238,6 +240,21 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 		table.insert(
 			failures,
 			`{#reach.unreachable} doors not reachable from a sidewalk: {table.concat(reach.unreachable, ", ")}`
+		)
+	end
+
+	-- every exterior door stands on its threshold at ground level, or on steps down to it
+	local sills = DoorSill.run(plans, Height.at)
+	r.sills = sills
+	if #sills.failures > 0 then
+		table.insert(
+			failures,
+			`{#sills.failures} doors off the ground: {table.concat(
+				sills.failures,
+				"; ",
+				1,
+				math.min(#sills.failures, 6)
+			)}`
 		)
 	end
 
