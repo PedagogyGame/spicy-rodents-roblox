@@ -1379,12 +1379,15 @@ local function apply(self: Service, rec: Record, effect: any)
 	elseif kind == "arrive" then
 		self.hospital:admit(id, self.now)
 		if effect.by == "walk" and self.layout then
+			-- to the check-in spot along the hospital's lanes (in at the door, never through the wall
+			-- beside it or across the waiting room's seats)
 			local r = self.layout.reception
-			order(
-				self,
-				id,
-				{ mode = "route", points = { { r[1], r[2] } }, speed = self.tun.walkInSpeed, after = "stand" }
-			)
+			local a = actorOf(self, id)
+			local points = if a then HospitalLayout.walk(self.layout, a.x, a.z, r[1], r[2]) else {}
+			if #points == 0 then
+				points = { { r[1], r[2] } }
+			end
+			order(self, id, { mode = "route", points = points, speed = self.tun.walkInSpeed, after = "stand" })
 		end
 	elseif kind == "bed" then
 		local layout = self.layout
