@@ -1,16 +1,19 @@
 """Build, check, render and export the 95 route-true trees (headless bpy 5.2.x).
 
   PY=/root/.cache/spicy-rodents/venv/bin/python
-  taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids review --render street,below --out build/art/trees
-  taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids all --fbx --out build/art/trees
-  taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids 0 --render debug --out build/art/trees
+  nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids all --fbx --out build/art/trees
+  nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids review --render street,fork,collar,junction,bough
+  nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids 0 --render debug
 
---ids: comma-separated trees.json indices, "review" (BUR OAK, AMERICAN ELM, SYCAMORE, SENTINEL OAK,
-APPLE 3, a QUAY WILLOW) or "all". Writes per tree into --out:
-  tree_NNN.fbx                 MeshParts Bark, LeavesShade, LeavesSun (+ Apples), PBR textures embedded
+--ids: comma-separated trees.json indices, "review" (BUR OAK, AMERICAN ELM, SYCAMORE, a street elm, SENTINEL
+OAK, a park maple, a QUAY WILLOW, APPLE 3) or "all". Writes per tree into --out:
+  tree_NNN.fbx                 MeshParts Bark, LeavesShade, LeavesMid, LeavesSun (+ Apples), PBR textures embedded
   tree_NNN.json                pivot, part bounds (Roblox axes, relative to the pivot), tris, checks
-  renders/tree_NNN_<view>.png  Cycles 960x540 (street, below, debug = bark see-through + red rails)
-  tex/*.png                    shared procedural maps (512 px, tileable)
+  renders/tree_NNN_<view>.png  Cycles (views.py cameras: street, crown, fork, collar, junction, junction2,
+                               bough; debug = bark see-through + red rails + yellow feet lines)
+  tex/*.png                    procedural maps: tileable bark (512), leaf-spray atlases with alpha (1024)
+Leaves are alpha cards: in the engine the Leaves* parts need DoubleSided = true and their
+SurfaceAppearance AlphaMode = Transparency (tree_NNN.json says so per part).
 Threads: Cycles uses --threads (default 2); run under taskset to pin the process.
 """
 import argparse
@@ -21,7 +24,8 @@ import os
 import sys
 import time
 
-import bpy  # noqa: E402
+import bpy  # noqa: E402  (first: bmesh and mathutils come with it)
+import bmesh  # noqa: E402
 import numpy as np  # noqa: E402
 from mathutils import Vector  # noqa: E402
 from mathutils.bvhtree import BVHTree  # noqa: E402
@@ -30,8 +34,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import textures as tx  # noqa: E402
 import treegen as tg  # noqa: E402
+import views as vw  # noqa: E402
 
-REVIEW = [0, 1, 2, 40, 85, 77]
+REVIEW = [0, 1, 2, 10, 40, 50, 77, 85]
+LEAF_PARTS = (("shade", "LeavesShade"), ("mid", "LeavesMid"), ("sun", "LeavesSun"))
+# The game lights everything with a flat ambient that shadows do not reach (LightingPreset.GOLDEN:
+# OutdoorAmbient #a2a180 against a sun of Brightness 2.6). Cycles has no such term, so the review
+# materials emit their own colour times this, or the underside of every leaf would render black.
+AMBIENT = 0.28
 
 
 # ---- textures and materials ---------------------------------------------------------------------
@@ -56,20 +66,20 @@ class TexCache:
 
     def layout(self, shape):
         if shape not in self.layouts:
-            self.layouts[shape] = tx.leaf_layout(shape, seed=21 + tx.LEAF_SHAPES.index(shape))
+            self.layouts[shape] = tx.spray_layout(shape, seed=31 + tx.SPRAY_SHAPES.index(shape))
         return self.layouts[shape]
 
-    def leaf(self, shape, palette, layer):
+    def spray(self, shape, palette, layer):
         key = hashlib.sha1(("|".join(palette)).encode()).hexdigest()[:8]
-        cpath = self.path(f"leaf_{shape}_{key}_{layer}.png")
-        npath = self.path(f"leaf_{shape}_normal.png")
-        rpath = self.path(f"leaf_{shape}_roughness.png")
+        cpath = self.path(f"spray_{shape}_{key}_{layer}.png")
+        npath = self.path(f"spray_{shape}_normal.png")
+        rpath = self.path(f"spray_{shape}_roughness.png")
         if not (os.path.exists(npath) and os.path.exists(rpath)):
-            n, r = tx.leaf_normal_rough(self.layout(shape))
+            n, r = tx.spray_normal_rough(self.layout(shape))
             tx.write_png(npath, n)
             tx.write_png(rpath, r)
         if not os.path.exists(cpath):
-            tx.write_png(cpath, tx.leaf_colour(self.layout(shape), palette, layer))
+            tx.write_png(cpath, tx.spray_colour(self.layout(shape), palette, layer))
         return [cpath, npath, rpath]
 
     def apple(self):
@@ -91,7 +101,7 @@ def load_image(path, non_color):
     return img
 
 
-def make_material(name, maps, normal_strength=1.0, debug_alpha=None):
+def make_material(name, maps, normal_strength=1.0, alpha=False):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -99,6 +109,13 @@ def make_material(name, maps, normal_strength=1.0, debug_alpha=None):
     tc = nt.nodes.new("ShaderNodeTexImage")
     tc.image = load_image(maps[0], False)
     nt.links.new(tc.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(tc.outputs["Color"], bsdf.inputs["Emission Color"])
+    bsdf.inputs["Emission Strength"].default_value = AMBIENT
+    if alpha:
+        # the engine's SurfaceAppearance AlphaMode Transparency: the colour map's alpha cuts the card
+        tc.image.alpha_mode = "CHANNEL_PACKED"
+        nt.links.new(tc.outputs["Alpha"], bsdf.inputs["Alpha"])
+        mat.use_backface_culling = False
     tr = nt.nodes.new("ShaderNodeTexImage")
     tr.image = load_image(maps[2], True)
     nt.links.new(tr.outputs["Color"], bsdf.inputs["Roughness"])
@@ -109,31 +126,73 @@ def make_material(name, maps, normal_strength=1.0, debug_alpha=None):
     nt.links.new(tn.outputs["Color"], nm.inputs["Color"])
     nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
     if "Specular IOR Level" in bsdf.inputs:
-        bsdf.inputs["Specular IOR Level"].default_value = 0.5
-    if debug_alpha is not None:
-        bsdf.inputs["Alpha"].default_value = debug_alpha
+        bsdf.inputs["Specular IOR Level"].default_value = 0.5 if not alpha else 0.3
     return mat
 
 
-def decimate(V, F, target):
-    """Collapse-decimate a small mesh to about `target` triangles (Blender modifier, evaluated)."""
-    me = bpy.data.meshes.new("_dec")
-    me.from_pydata(np.asarray(V).tolist(), [], np.asarray(F).tolist())
-    ob = bpy.data.objects.new("_dec", me)
-    bpy.context.scene.collection.objects.link(ob)
-    mod = ob.modifiers.new("d", "DECIMATE")
-    mod.ratio = min(1.0, target / max(1, len(F)))
-    mod.use_collapse_triangulate = True
-    dg = bpy.context.evaluated_depsgraph_get()
-    ev = ob.evaluated_get(dg)
-    m2 = ev.to_mesh()
-    m2.calc_loop_triangles()
-    V2 = np.array([v.co[:] for v in m2.vertices])
-    F2 = np.array([t.vertices[:] for t in m2.loop_triangles], np.int64)
-    ev.to_mesh_clear()
-    bpy.data.objects.remove(ob, do_unlink=True)
-    bpy.data.meshes.remove(me)
-    return V2, F2
+# ---- the bark's one skin: a boolean union of the closed limb tubes --------------------------------
+
+def union_parts(parts, solver="MANIFOLD"):
+    """parts: [{V (n,3), faces [tuples], uvs [per face, per corner], id}] -> V, F (tris), per-corner
+    uvs (m,3,2) and the owning part of every triangle. None if the union fails."""
+    scene = bpy.context.scene
+    objs = []
+    col = bpy.data.collections.new("_union")
+    for p in parts:
+        me = bpy.data.meshes.new(f"_u{p['id']}")
+        me.from_pydata(np.asarray(p["V"]).tolist(), [], [tuple(int(i) for i in f) for f in p["faces"]])
+        uv = me.uv_layers.new(name="UVMap")
+        flat = np.array([c for face in p["uvs"] for corner in face for c in corner], dtype=np.float32)
+        uv.data.foreach_set("uv", flat)
+        own = me.uv_layers.new(name="Owner")
+        tag = np.tile(np.array([(p["id"] + 0.5) / 256.0, 0.5], dtype=np.float32), len(me.loops))
+        own.data.foreach_set("uv", tag)
+        me.update()
+        ob = bpy.data.objects.new(me.name, me)
+        scene.collection.objects.link(ob)
+        objs.append(ob)
+    base = objs[0]
+    for ob in objs[1:]:
+        col.objects.link(ob)
+    out = None
+    for sv in (solver, "EXACT"):
+        try:
+            mod = base.modifiers.new("u", "BOOLEAN")
+            mod.operation = "UNION"
+            mod.operand_type = "COLLECTION"
+            mod.collection = col
+            mod.solver = sv
+            dg = bpy.context.evaluated_depsgraph_get()
+            ev = base.evaluated_get(dg)
+            m2 = ev.to_mesh()
+            bm = bmesh.new()
+            bm.from_mesh(m2)
+            ev.to_mesh_clear()
+            base.modifiers.remove(mod)
+            if len(bm.faces) < 0.3 * sum(len(p["faces"]) for p in parts) or len(bm.faces) == len(parts[0]["faces"]):
+                bm.free()
+                continue
+            bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.012)
+            bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=0.004)
+            bmesh.ops.triangulate(bm, faces=bm.faces)
+            bm.verts.index_update()
+            luv = bm.loops.layers.uv["UVMap"]
+            lown = bm.loops.layers.uv["Owner"]
+            V = np.array([v.co[:] for v in bm.verts])
+            F = np.array([[l.vert.index for l in f.loops] for f in bm.faces], np.int64)
+            UVc = np.array([[l[luv].uv[:] for l in f.loops] for f in bm.faces], float)
+            owner = np.array([int(f.loops[0][lown].uv[0] * 256.0) for f in bm.faces], np.int64)
+            bm.free()
+            out = (V, F, UVc, owner)
+            break
+        except Exception as exc:  # a solver that is not in this build, or a failed union
+            print(f"union {sv}: {exc}", flush=True)
+    for ob in objs:
+        me = ob.data
+        bpy.data.objects.remove(ob, do_unlink=True)
+        bpy.data.meshes.remove(me)
+    bpy.data.collections.remove(col)
+    return out
 
 
 # ---- scene --------------------------------------------------------------------------------------
@@ -146,16 +205,16 @@ def reset_scene():
 def build_tree_objects(rec, data, cache, opts=None):
     t0 = time.time()
     opts = dict(opts or {})
-    opts.setdefault("decimate", decimate)
+    opts.setdefault("union", union_parts)
     tb = tg.TreeBuilder(rec, data, opts).build()
     sp = rec["species"]
     bark_maps = cache.bark(tg.BARK_FAMILY[sp])
     shape = tg.LEAF_SHAPE[sp]
     mats = {"Bark": make_material(f"Bark_{rec['index']:03d}", bark_maps, 1.0)}
     objs = {"Bark": tg.make_object("Bark", tb.bark, mats["Bark"])}
-    for layer, part in (("shade", "LeavesShade"), ("mid", "LeavesMid"), ("sun", "LeavesSun")):
+    for layer, part in LEAF_PARTS:
         if tb.leaf[layer].tris:
-            mats[part] = make_material(f"{part}_{rec['index']:03d}", cache.leaf(shape, rec["palette"], layer), 1.0)
+            mats[part] = make_material(f"{part}_{rec['index']:03d}", cache.spray(shape, rec["palette"], layer), 0.8, alpha=True)
             objs[part] = tg.make_object(part, tb.leaf[layer], mats[part])
     if tb.fruit.tris:
         mats["Apples"] = make_material(f"Apples_{rec['index']:03d}", cache.apple(), 0.5)
@@ -166,80 +225,92 @@ def build_tree_objects(rec, data, cache, opts=None):
 
 # ---- checks -------------------------------------------------------------------------------------
 
-def bvh_of(obj):
-    dg = bpy.context.evaluated_depsgraph_get()
-    return BVHTree.FromObject(obj, dg)
-
-
 def to_b(p):
     return Vector((-p[0], p[2], p[1]))
 
 
-def alignment_checks(tb, bark_obj):
-    """Trunk: bark radius vs the squirrel's tapered radius at every route sample (8 directions).
-    Boughs: bark top vs the squirrel's feet (rail + lift), by a downward ray at every sample."""
-    def bvh_arrays(V, F):
-        Vb = tg.to_blender_coords(V)
-        return BVHTree.FromPolygons([Vector(v) for v in Vb], [tuple(int(i) for i in f) for f in F])
+def stats(a):
+    a = np.asarray(a, float)
+    if not len(a):
+        return {"n": 0}
+    return {"n": int(len(a)), "mean": round(float(a.mean()), 3), "p95_abs": round(float(np.percentile(np.abs(a), 95)), 3),
+            "max_abs": round(float(np.abs(a).max()), 3), "min": round(float(a.min()), 3), "max": round(float(a.max()), 3)}
 
-    bvh = bvh_arrays(*tb.trunk_mesh)
+
+def alignment_checks(tb):
+    """Against the finished bark (the one skin plus the side branches):
+    trunk   bark radius minus the squirrel's tapered radius, by rays from the route outward in 8
+            directions at every sample; the stretches where collars add wood are reported apart.
+    boughs  the squirrel's feet (rail + lift) to the bark surface past the junction, signed
+            (+ floats, - sinks); the junction stretch (the first fifth, where the game pushes the
+            squirrel out of the trunk) is reported apart.
+    leaves  the smallest distance of any leaf vertex to a walking tunnel, and the budgets."""
+    V, F, _, _ = tb.bark.arrays()
+    Vb = tg.to_blender_coords(V)
+    bvh = BVHTree.FromPolygons([Vector(v) for v in Vb], [tuple(int(i) for i in f) for f in F])
+    Vs, Fs = tb.skin
+    skin = BVHTree.FromPolygons([Vector(v) for v in tg.to_blender_coords(Vs)], [tuple(int(i) for i in f) for f in Fs])
     out = {}
     trunk = tb.rec["trunk"]
     P = tb.trunkP
-    s = tg.arclen(P)
-    tt = s / s[-1]
-    errs, errs_low = [], []
-    flare_top = max(2.5, 1.2 * float(tb.Rt(0.0)))  # root buttresses live below this height
+    tt = tb.trunk_s / tb.trunkL
+    flare_top = max(2.5, 1.2 * float(tb.Rt(0.0)))
+    climb, zone, low = [], [], []
     for p, t in zip(P, tt):
         want = float(tb.Rt(t))
+        in_zone = any(y0 <= p[1] <= y1 for y0, y1 in tb.zones) or t > 0.985
         for k in range(8):
             a = k * math.pi / 4
             d = np.array([math.cos(a), 0, math.sin(a)])
-            origin = p + d * (want + 6.0)
-            hit = bvh.ray_cast(to_b(origin), to_b(-d), 12.0)
+            hit = skin.ray_cast(to_b(p), Vector((-d[0], d[2], d[1])), want + 14.0)
             if hit[0] is None:
                 continue
-            hp = np.array([-hit[0][0], hit[0][2], hit[0][1]])
-            got = np.linalg.norm((hp - p) * np.array([1, 0, 1]))
-            (errs if p[1] > flare_top else errs_low).append(got - want)
-    errs = np.array(errs) if errs else np.zeros(1)
-    out["trunk"] = {"samples": int(len(P)), "rays": int(len(errs)), "surfaceRadius_st": round(trunk["surfaceRadius"] * tg.SPU, 3),
-                    "bark_minus_gameplay_radius_st": {"mean": round(float(errs.mean()), 3), "max_abs": round(float(np.abs(errs).max()), 3),
-                                                      "p95_abs": round(float(np.percentile(np.abs(errs), 95)), 3)},
-                    "climb_zone_from_st": round(flare_top, 2), "root_flare_rays": len(errs_low),
-                    "root_flare_max_outset_st": round(float(max(errs_low)) if errs_low else 0.0, 3)}
-    berrs, misses, n = [], 0, 0
-    bough_bvh = {b["route"]["id"]: bvh_arrays(*b["mesh"]) for b in tb.boughs}
-    full = bvh_of(bark_obj)
-    for (P, lift, kind, name, rid) in tb.rails:
+            err = hit[3] - want
+            (low if p[1] <= flare_top else (zone if in_zone else climb)).append(err)
+    out["trunk"] = {"samples": int(len(P)), "surfaceRadius_st": round(trunk["surfaceRadius"] * tg.SPU, 3),
+                    "climb_zone_from_st": round(flare_top, 2),
+                    "bark_minus_gameplay_radius_st": stats(climb), "at_collars": stats(zone), "root_flare": stats(low)}
+    routes = tb.data["routes"]
+    past, junction, pads, miss = [], [], [], 0
+    worst = (0.0, "", 0.0)
+    for (Pr, lift, kind, name, rid) in tb.rails:
         if kind == "trunk":
             continue
-        bvh = bough_bvh.get(rid, full)
-        L = tg.arclen(P)
-        for p, sv in zip(P, L):
+        route = routes[rid]
+        s = tg.arclen(Pr)
+        t = s / max(s[-1], 1e-9)
+        b = next((b for b in tb.boughs if b["route"]["id"] == rid), None)
+        feet_line = Pr + tg.Y[None] * lift
+        feet_drawn = tb.feet_path(Pr, lift, kind, route)
+        pushed = kind == "branch" and route.get("trunkClearance")
+        for i in range(len(Pr)):
             if name.endswith("OPEN SKY LOOKOUT"):
-                pass
-            elif sv < 4.0:  # inside the trunk / collar
-                continue
-            feet = p + np.array([0, lift, 0])
-            n += 1
-            near = bvh.find_nearest(to_b(feet), 6.0)
+                bucket, q = pads, feet_line[i]
+            elif b is not None and b["on_trunk"] and (t[i] < 0.2 if pushed else s[i] < b["zone"]):
+                bucket, q = junction, feet_drawn[i]
+            else:
+                bucket, q = past, feet_line[i]
+            near = bvh.find_nearest(to_b(q), 8.0)
             if near[0] is None:
-                misses += 1
+                miss += 1
                 continue
-            # signed: + when the feet float above the bark, - when they sink into it
-            dvec = to_b(feet) - near[0]
-            sign = 1.0 if dvec.dot(near[1]) >= 0 else -1.0
-            berrs.append(sign * near[3])
-    berrs = np.array(berrs) if berrs else np.zeros(1)
-    out["boughs"] = {"samples": n, "misses": misses, "feet_to_bark_surface_st": {"mean": round(float(berrs.mean()), 3),
-                     "max_abs": round(float(np.abs(berrs).max()), 3), "p95_abs": round(float(np.percentile(np.abs(berrs), 95)), 3)}}
-    # leaves vs tunnels (clump centres): minimum clearance margin
-    if tb.clumps:
-        C = np.array([k[0] for k in tb.clumps])
-        Rr = np.array([k[1] for k in tb.clumps])
-        cl = tb.clearance(C) - Rr * 1.12
-        out["leaves"] = {"clumps": len(tb.clumps), "min_tunnel_margin_st": round(float(cl.min()), 3)}
+            dvec = to_b(q) - near[0]
+            e = (1.0 if dvec.dot(near[1]) >= 0 else -1.0) * near[3]
+            bucket.append(e)
+            if bucket is past and abs(e) > abs(worst[0]):
+                worst = (round(float(e), 3), name, round(float(s[i]), 1), round(float(s[-1]), 1))
+    out["boughs"] = {"misses": miss, "feet_to_bark_surface_st": stats(past), "worst": worst,
+                     "junction_feet_to_bark_st": stats(junction), "lookout_pads": stats(pads)}
+    lv = []
+    for layer, part in LEAF_PARTS:
+        Vl = tb.leaf[layer].arrays()[0]
+        if len(Vl):
+            lv.append(Vl)
+    tr = tb.tri_counts()
+    leaves = tr["leaves_shade"] + tr["leaves_mid"] + tr["leaves_sun"]
+    out["leaves"] = {"cards": len(tb.cards), "min_tunnel_margin_st": round(float(tb.clearance(np.concatenate(lv)).min()), 3) if lv else None}
+    out["budget"] = {"bark": tr["bark"], "bark_max": tg.BARK_BUDGET, "leaves": leaves, "leaves_max": tg.LEAF_BUDGET,
+                     "ok": bool(tr["bark"] <= tg.BARK_BUDGET and leaves <= tg.LEAF_BUDGET)}
     return out
 
 
@@ -263,11 +334,10 @@ def setup_render(args):
     scene.cycles.max_bounces = 6
     scene.cycles.diffuse_bounces = 3
     scene.cycles.glossy_bounces = 2
-    scene.cycles.transparent_max_bounces = 16
+    scene.cycles.transparent_max_bounces = 48
     scene.render.threads_mode = "FIXED"
     scene.render.threads = args.threads
-    scene.render.resolution_x = 960
-    scene.render.resolution_y = 540
+    scene.render.resolution_x, scene.render.resolution_y = (int(v) for v in args.res.split("x"))
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGB"
@@ -324,6 +394,8 @@ def setup_render(args):
     ramp.color_ramp.elements[1].color = (0.30, 0.38, 0.13, 1)
     gnt.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
     gnt.links.new(ramp.outputs["Color"], gb.inputs["Base Color"])
+    gnt.links.new(ramp.outputs["Color"], gb.inputs["Emission Color"])
+    gb.inputs["Emission Strength"].default_value = AMBIENT
     gb.inputs["Roughness"].default_value = 0.95
     g.data.materials.append(gm)
     return scene
@@ -332,6 +404,7 @@ def setup_render(args):
 def add_camera(name, loc, target, lens):
     cd = bpy.data.cameras.new(name)
     cd.lens = lens
+    cd.clip_start = 0.05
     cd.clip_end = 3000
     co = bpy.data.objects.new(name, cd)
     bpy.context.scene.collection.objects.link(co)
@@ -340,78 +413,47 @@ def add_camera(name, loc, target, lens):
     return co
 
 
-def tree_extent(objs):
-    lo = np.full(3, 1e9)
-    hi = np.full(3, -1e9)
-    for o in objs.values():
-        V = np.array([v.co[:] for v in o.data.vertices])
-        lo = np.minimum(lo, V.min(0))
-        hi = np.maximum(hi, V.max(0))
-    return lo, hi
-
-
-def render_views(tb, objs, views, out, args, tag):
+def render_views(tb, objs, views, out, args):
     scene = bpy.context.scene
-    lo, hi = tree_extent(objs)
-    top = hi[2]
-    # frame on the crown (long living bridges may leave the frame)
-    if tb.clump_info:
-        C = np.array([tg.to_blender_coords(np.array([k[0]]))[0] for k in tb.clump_info])
-        R = np.array([k[1] for k in tb.clump_info])
-        clo, chi = (C - R[:, None]).min(0), (C + R[:, None]).max(0)
-        lo = np.array([clo[0], clo[1], lo[2]])
-        hi = np.array([chi[0], chi[1], hi[2]])
-    cx, cy = (lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2
-    width = max(hi[0] - lo[0], hi[1] - lo[1])
     paths = {}
+    rx, ry = (int(v) for v in args.res.split("x"))
+    route_cams = vw.cameras(tb.rails, tb.H, rx / ry)
     for view in views:
-        if view == "street":
-            # fit the whole tree: vertical fov of a 28 mm lens at 16:9 is ~39.7 deg
-            half_v = math.atan(0.5 * 36 * 540 / 960 / 28)
-            dist = (top * 0.56) / math.tan(half_v) + width * 0.3
-            ang = math.radians(200)
-            loc = (cx + math.sin(ang) * dist, cy - math.cos(ang) * dist, 5.0)
-            cam = add_camera("CamStreet", loc, (cx, cy, top * 0.5), 28)
-        elif view == "below":
-            c, rh, ylo, yhi = tb.crown
-            off = max(4.0, rh * 0.32)
-            ang = math.radians(30)
-            loc = (-(0 + math.sin(ang) * off), math.cos(ang) * off * -1, 4.0)
-            tgt = (-(c[0] * 0.5) + math.sin(ang) * off * 0.6, c[2] * 0.5 + math.cos(ang) * off * 0.6, (ylo + yhi) / 2 + 4)
-            cam = add_camera("CamBelow", loc, tgt, 14)
-        elif view == "debug":
-            dist = max(top * 1.15, width * 0.9)
-            ang = math.radians(160)
-            loc = (cx + math.sin(ang) * dist, cy - math.cos(ang) * dist, top * 0.55)
-            cam = add_camera("CamDebug", loc, (cx, cy, top * 0.5), 32)
-        else:
-            continue
-        scene.camera = cam
-        hidden = []
-        added = []
-        if view == "debug":
+        key = view[2:] if view.startswith("r_") else view
+        hidden, added = [], []
+        if key in route_cams:
+            # route-defined cameras (views.py): the same picture before and after an art change
+            loc, tgt, lens = route_cams[key]
+            cam = add_camera("Cam" + key, to_b(loc), to_b(tgt), lens)
+        elif key == "debug":
+            loc, tgt, lens = route_cams["street"]
+            loc = np.array([loc[0], tb.H * 0.55, loc[2]])
+            cam = add_camera("CamDebug", to_b(loc), to_b(tgt), 32)
             for k in ("LeavesShade", "LeavesMid", "LeavesSun", "Apples"):
                 if k in objs:
                     objs[k].hide_render = True
                     hidden.append(objs[k])
             added = add_debug_rails(tb, objs)
-        path = os.path.join(out, "renders", f"tree_{tb.rec['index']:03d}_{view}.png")
+        else:
+            continue
+        scene.camera = cam
+        path = os.path.join(out, "renders", f"tree_{tb.rec['index']:03d}_{key}{('_' + args.tag) if args.tag else ''}.png")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         scene.render.filepath = path
         t0 = time.time()
         bpy.ops.render.render(write_still=True)
-        paths[view] = {"path": path, "seconds": round(time.time() - t0, 1)}
+        paths[key] = {"path": path, "seconds": round(time.time() - t0, 1)}
         for o in hidden:
             o.hide_render = False
         for o in added:
             bpy.data.objects.remove(o, do_unlink=True)
-        if view == "debug":
+        if key == "debug":
             objs["Bark"].data.materials[0] = tb._bark_mat_orig
     return paths
 
 
 def add_debug_rails(tb, objs):
-    """Red emissive rails (route centrelines) and yellow feet lines (rail + lift); bark see-through."""
+    """Red emissive rails (route centrelines) and yellow feet lines (the drawn feet); bark see-through."""
     red = bpy.data.materials.new("Rail")
     red.use_nodes = True
     n = red.node_tree.nodes
@@ -427,20 +469,22 @@ def add_debug_rails(tb, objs):
     em.inputs["Strength"].default_value = 4.0
     yel.node_tree.links.new(em.outputs[0], n.get("Material Output").inputs["Surface"])
     added = []
+    routes = tb.data["routes"]
     for (P, lift, kind, name, rid) in tb.rails:
-        for mat, off, depth in ((red, 0.0, 0.13), (yel, lift, 0.07)):
+        for mat, depth in ((red, 0.13), (yel, 0.07)):
             if kind == "trunk" and mat is yel:
                 continue
+            line = P if mat is red else tb.feet_path(P, lift, kind, routes[rid])
             cu = bpy.data.curves.new(f"rail{rid}", "CURVE")
             cu.dimensions = "3D"
             cu.bevel_depth = depth
             cu.bevel_resolution = 2
             sp = cu.splines.new("POLY")
-            sp.points.add(len(P) - 1)
-            for i, p in enumerate(P):
-                b = to_b(p + np.array([0, off, 0]))
+            sp.points.add(len(line) - 1)
+            for i, p in enumerate(line):
+                b = to_b(p)
                 sp.points[i].co = (b[0], b[1], b[2], 1)
-            ob = bpy.data.objects.new(f"rail{rid}_{'f' if off else 'c'}", cu)
+            ob = bpy.data.objects.new(f"rail{rid}_{'c' if mat is red else 'f'}", cu)
             ob.data.materials.append(mat)
             bpy.context.scene.collection.objects.link(ob)
             added.append(ob)
@@ -494,7 +538,11 @@ def main(argv):
     ap.add_argument("--fbx", action="store_true")
     ap.add_argument("--samples", type=int, default=48)
     ap.add_argument("--threads", type=int, default=2)
+    ap.add_argument("--res", default="960x540")
+    ap.add_argument("--tag", default="", help="suffix for the render file names (e.g. before)")
     ap.add_argument("--no-checks", action="store_true")
+    ap.add_argument("--no-leaves", action="store_true", help="render the bark alone (junction close-ups)")
+    ap.add_argument("--clay", action="store_true", help="render the bark untextured (to judge the forms)")
     args = ap.parse_args(argv)
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
@@ -513,18 +561,38 @@ def main(argv):
         rec = recs[i]
         reset_scene()
         tb, objs, mats = build_tree_objects(rec, data, cache)
+        parts = {k: bounds_roblox(o) for k, o in objs.items()}
+        for k in parts:
+            leaf = k.startswith("Leaves")
+            parts[k]["doubleSided"] = leaf
+            parts[k]["alphaMode"] = "Transparency" if leaf else "Overlay"
+            if leaf:
+                # the part's own colour: the palette's mean green (seen only if the textures never load)
+                rgb = np.mean([[int(h[j : j + 2], 16) for j in (1, 3, 5)] for h in rec["palette"]], axis=0)
+                parts[k]["color"] = [int(round(float(x))) for x in rgb]
         info = {
             "index": i, "label": rec["label"], "species": rec["species"], "category": rec["category"],
             "trunkRoute": rec["trunk"]["id"], "routes": [rec["trunk"]["id"]] + [m["id"] for m in rec["members"]],
             "pivot": [round(float(x), 3) for x in rec["root"]], "heightStuds": round(rec["H"], 2),
-            "tris": tb.tri_counts(), "parts": {k: bounds_roblox(o) for k, o in objs.items()}, "log": tb.log,
+            "tris": tb.tri_counts(), "parts": parts, "log": tb.log,
         }
         info["tris"]["total"] = sum(info["tris"].values())
         if not args.no_checks:
-            info["checks"] = alignment_checks(tb, objs["Bark"])
+            info["checks"] = alignment_checks(tb)
         if views:
             setup_render(args)
-            info["renders"] = render_views(tb, objs, views, out, args, f"{i:03d}")
+            if args.no_leaves:
+                for k in ("LeavesShade", "LeavesMid", "LeavesSun", "Apples"):
+                    if k in objs:
+                        objs[k].hide_render = True
+            if args.clay:
+                clay = bpy.data.materials.new("Clay")
+                clay.use_nodes = True
+                b = clay.node_tree.nodes.get("Principled BSDF")
+                b.inputs["Base Color"].default_value = (0.62, 0.58, 0.52, 1)
+                b.inputs["Roughness"].default_value = 0.75
+                objs["Bark"].data.materials[0] = clay
+            info["renders"] = render_views(tb, objs, views, out, args)
         if args.fbx:
             p = os.path.join(out, f"tree_{i:03d}.fbx")
             export_fbx(p, objs)
@@ -534,9 +602,12 @@ def main(argv):
             json.dump(info, fh, indent=1)
         line = {k: info[k] for k in ("index", "label", "tris")}
         if "checks" in info:
-            line["trunkErr"] = info["checks"]["trunk"]["bark_minus_gameplay_radius_st"]["max_abs"]
-            line["boughErr"] = info["checks"]["boughs"]["feet_to_bark_surface_st"]["p95_abs"]
-            line["boughMiss"] = info["checks"]["boughs"]["misses"]
+            c = info["checks"]
+            line["trunkErr"] = c["trunk"]["bark_minus_gameplay_radius_st"].get("max_abs")
+            line["boughErr"] = c["boughs"]["feet_to_bark_surface_st"].get("p95_abs")
+            line["leafMargin"] = c["leaves"]["min_tunnel_margin_st"]
+            line["budgetOk"] = c["budget"]["ok"]
+        line["s"] = tb.log.get("build_s")
         print(json.dumps(line), flush=True)
         summary.append(info)
     with open(os.path.join(out, f"summary_{args.ids.replace(',', '_')[:40]}.json"), "w") as fh:

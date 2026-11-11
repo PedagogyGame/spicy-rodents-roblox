@@ -54,6 +54,17 @@ def main():
     trees = []
     for i in sorted(got):
         t, src_t = got[i], by[i]
+        # What the importer cannot know and the build does (tree_NNN.json -> data/art/trees.json parts):
+        # leaf sprays are alpha cards, drawn from both sides, cut by the colour map's alpha; their part
+        # colour is a leaf green, which is what shows if the SurfaceAppearance never arrives.
+        for p in t["parts"]:
+            want = (src_t.get("parts") or {}).get(p["name"]) or {}
+            if want.get("doubleSided") is not None:
+                p["doubleSided"] = bool(want["doubleSided"])
+            if want.get("alphaMode") and p.get("surface"):
+                p["surface"]["alphaMode"] = want["alphaMode"]
+            if want.get("color"):
+                p["color"] = want["color"]
         trees.append({
             "index": i,
             "trunkRoute": src_t["trunkRoute"],

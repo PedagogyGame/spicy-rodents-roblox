@@ -399,6 +399,319 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
     return lin_to_srgb(col)
 
 
+# ---- leaf sprays (alpha cards) --------------------------------------------------------------------
+
+SPRAY_SHAPES = ("oak", "elm", "palmate", "maple", "willow", "apple")
+SPRAY_N = 1024
+
+# leaf length px, width / length, leaves on the main twig, side twigs, leaves per side twig, angle off the twig
+SPRAY_PLAN = {
+    "oak": dict(L=140, wr=0.50, main=9, twigs=4, per=4, ang=(48, 72), petiole=10, step=46),
+    "elm": dict(L=112, wr=0.48, main=11, twigs=4, per=5, ang=(52, 70), petiole=6, step=38),
+    "palmate": dict(L=112, wr=1.0, main=7, twigs=4, per=3, ang=(40, 75), petiole=30, step=54),
+    "maple": dict(L=100, wr=1.0, main=8, twigs=4, per=4, ang=(40, 70), petiole=26, step=46),
+    "apple": dict(L=112, wr=0.56, main=9, twigs=4, per=4, ang=(40, 70), petiole=12, step=44),
+    "willow": dict(L=116, wr=0.16, main=30, twigs=1, per=14, ang=(16, 30), petiole=4, step=24),
+}
+
+
+def _leaf_half_width(shape, s, k):
+    """Half width (fraction of the leaf's width) along the midrib s in [0, 1]; k varies the lobes."""
+    s = np.clip(s, 0.0, 1.0)
+    if shape == "oak":
+        env = np.sin(math.pi * s ** 0.85) ** 0.7 * (0.72 + 0.34 * s)
+        lobes = np.abs(np.sin(math.pi * (3.4 + 0.5 * k) * s + 0.4 + k)) ** 0.75
+        return env * (0.50 + 0.50 * lobes)
+    if shape == "elm":
+        saw = 1.0 - 0.10 * ((s * 13.0 + k) % 1.0)
+        return np.sin(math.pi * s ** 0.72) ** 0.72 * saw * (1 - s ** 7)
+    if shape == "apple":
+        return np.sin(math.pi * s ** 0.8) ** 0.62 * (1 - s ** 9) * (0.96 + 0.04 * np.sin(s * 60 + k))
+    if shape == "willow":
+        return np.sin(math.pi * s ** 0.8) ** 1.05
+    return np.sin(math.pi * s)
+
+
+# palmate leaves: lobes as (angle from the midrib, reach, angular half width), and the body's reach
+PALM_LOBES = {
+    "maple": (((0.0, 1.00, 0.30), (0.98, 0.86, 0.28), (-0.98, 0.86, 0.28), (1.95, 0.52, 0.27), (-1.95, 0.52, 0.27)), 0.40),
+    "palmate": (((0.0, 0.96, 0.40), (0.95, 0.88, 0.38), (-0.95, 0.88, 0.38), (1.85, 0.62, 0.34), (-1.85, 0.62, 0.34)), 0.56),
+}
+
+
+def _palmate_radius(shape, th, k):
+    """Outline radius (fraction of the leaf's reach) at angle th from the midrib: a body with five
+    lobes, the maple's pointed, the sycamore's broad."""
+    lobes, body = PALM_LOBES[shape]
+    th = np.angle(np.exp(1j * th))
+    r = np.full_like(th, body)
+    for t0, a, sg in lobes:
+        r = r + (a - body) * np.exp(-((th - t0) / sg) ** 2)
+    teeth = 1.0 - (0.06 if shape == "maple" else 0.045) * np.abs(np.sin(15.0 * th + k))
+    return r * teeth
+
+
+class _Canvas:
+    """The layers a spray is painted into (math frame: x right, y up; row = n - 1 - y)."""
+
+    def __init__(self, n):
+        self.n = n
+        self.A = np.zeros((n, n))  # coverage
+        self.ID = np.full((n, n), -1, dtype=np.int32)  # leaf index, -2 = twig
+        self.S = np.zeros((n, n))
+        self.T = np.zeros((n, n))
+        self.Hh = np.zeros((n, n))  # relief for the normal map
+        self.AO = np.ones((n, n))
+        self.leaves = []
+
+    def window(self, cx, cy, hb, box):
+        x0, x1 = int(max(box[0], math.floor(cx - hb))), int(min(box[2], math.ceil(cx + hb)))
+        y0, y1 = int(max(box[1], math.floor(cy - hb))), int(min(box[3], math.ceil(cy + hb)))
+        if x1 <= x0 or y1 <= y0:
+            return None
+        ys, xs = np.mgrid[y0:y1, x0:x1].astype(np.float64)
+        rows = slice(self.n - y1, self.n - y0)
+        return xs + 0.5, ys[::-1] + 0.5, rows, slice(x0, x1)
+
+    def stroke(self, pts, w0, w1, box):
+        """A twig: a polyline with a width tapering from w0 to w1 px."""
+        pts = np.asarray(pts, float)
+        seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+        tot = max(seg.sum(), 1e-6)
+        acc = 0.0
+        for a, b, l in zip(pts[:-1], pts[1:], seg):
+            wa, wb = w0 + (w1 - w0) * acc / tot, w0 + (w1 - w0) * (acc + l) / tot
+            acc += l
+            c = (a + b) / 2
+            win = self.window(c[0], c[1], l / 2 + max(wa, wb) + 2, box)
+            if win is None:
+                continue
+            X, Yv, rows, cols = win
+            ab = b - a
+            t = np.clip(((X - a[0]) * ab[0] + (Yv - a[1]) * ab[1]) / max(l * l, 1e-9), 0, 1)
+            d = np.hypot(X - (a[0] + t * ab[0]), Yv - (a[1] + t * ab[1]))
+            w = (wa + (wb - wa) * t) / 2
+            cov = np.clip(w - d + 0.5, 0, 1)
+            m = cov > 0.5
+            self.A[rows, cols] = np.maximum(cov, self.A[rows, cols])
+            self.ID[rows, cols] = np.where(m, -2, self.ID[rows, cols])
+            self.T[rows, cols] = np.where(m, d / np.maximum(w, 1e-6), self.T[rows, cols])
+            self.Hh[rows, cols] = np.where(m, 0.10 * np.sqrt(np.clip(1 - (d / np.maximum(w, 1e-6)) ** 2, 0, 1)), self.Hh[rows, cols])
+
+    def leaf(self, shape, bx, by, ang, L, W, box, rng, zbias=0.0):
+        """One leaf with its stalk end at (bx, by), pointing along ang. Returns False if it leaves the box."""
+        ca, sa = math.cos(ang), math.sin(ang)
+        palm = shape in ("palmate", "maple")
+        if palm:
+            cx, cy, hb = bx + ca * L * 0.40, by + sa * L * 0.40, L * 0.66 + 2
+        else:
+            cx, cy, hb = bx + ca * L * 0.5, by + sa * L * 0.5, L * 0.5 + W * 0.5 + 2
+        ext = L * 0.64 if palm else max(abs(ca) * L * 0.5 + abs(sa) * W * 0.6, abs(sa) * L * 0.5 + abs(ca) * W * 0.6) + 1
+        if cx - ext < box[0] + 3 or cx + ext > box[2] - 3 or cy - ext < box[1] + 3 or cy + ext > box[3] - 3:
+            return False
+        X, Yv, rows, cols = self.window(cx, cy, hb, box)
+        dx, dy = X - bx, Yv - by
+        al = dx * ca + dy * sa
+        ac = -dx * sa + dy * ca
+        k = rng.random() * 6.28
+        curl = rng.normal(0, 0.10)
+        if palm:
+            # the lobes fan out from where the stalk meets the blade, a third of the way up the leaf
+            px, py = al - L * 0.30, ac
+            rad = np.hypot(px, py)
+            th = np.arctan2(py, px)
+            R = L * 0.70 * _palmate_radius(shape, th, k)
+            notch = (np.cos(th - math.pi) > 0.93) & (rad > R * 0.3)
+            margin = np.where(notch, -3.0, R - rad)
+            s = np.clip(rad / np.maximum(R, 1e-6), 0, 1)
+            tn = np.sin(2.5 * th)
+            dome = np.sqrt(np.clip(1 - s * s, 0, 1))
+            vein = np.zeros_like(rad)
+            for t0, a_, sg in PALM_LOBES[shape][0]:
+                dth = np.angle(np.exp(1j * (th - t0)))
+                vein = np.maximum(vein, np.exp(-((np.sin(dth) * rad / 2.4) ** 2)) * (np.cos(dth) > 0) * (rad < L * 0.70 * a_ * 0.92))
+            relief = 0.30 * dome - 0.10 * vein + curl * (px / L)
+            rib = vein
+        else:
+            s = al / L
+            ac2 = ac - curl * L * (s - 0.5) ** 2 * 1.5
+            w = _leaf_half_width(shape, s, k) * W * 0.5
+            margin = np.minimum(w - np.abs(ac2), np.minimum(al, L - al) + 0.5)
+            tn = ac2 / np.maximum(w, 1e-6)
+            dome = np.sqrt(np.clip(1 - tn * tn, 0, 1))
+            rib = np.exp(-(ac2 / max(1.6, W * 0.035)) ** 2)
+            veins = 0.5 + 0.5 * np.cos((s * (7 if shape != "willow" else 0) - np.abs(tn) * 1.9) * 2 * math.pi)
+            relief = 0.30 * dome - 0.10 * rib + 0.035 * veins * dome + curl * (s - 0.5)
+        cov = np.clip(margin + 0.5, 0, 1)
+        lid = len(self.leaves)
+        # the leaf shades what lies under its edge
+        sh = np.clip((margin + 7.0) / 7.0, 0, 1) * 0.34
+        self.AO[rows, cols] = np.minimum(self.AO[rows, cols], 1 - sh * (cov < 0.5))
+        m = cov > 0
+        self.A[rows, cols] = np.where(m, np.maximum(cov, self.A[rows, cols]), self.A[rows, cols])
+        full = cov > 0.5
+        self.ID[rows, cols] = np.where(full, lid, self.ID[rows, cols])
+        self.S[rows, cols] = np.where(full, np.clip(s, 0, 1), self.S[rows, cols])
+        self.T[rows, cols] = np.where(full, tn, self.T[rows, cols])
+        self.Hh[rows, cols] = np.where(full, relief + zbias, self.Hh[rows, cols])
+        self.AO[rows, cols] = np.where(full, np.maximum(self.AO[rows, cols], 1.0 - 0.10 * (1 - np.clip(margin / 6.0, 0, 1))), self.AO[rows, cols])
+        if palm:
+            self.S[rows, cols] = np.where(full, 1 - rib * 0.999, self.S[rows, cols])  # veins ride in S for palmate leaves
+        self.leaves.append((rng.random(), rng.random(), rng.random()))
+        return True
+
+
+def _twig_leaves(cv, shape, plan, rng, box, start, heading, length, n, w0, scale=1.0, terminal=True):
+    """A twig from `start` along `heading` (radians) with n alternate leaves; returns its points."""
+    pts = [np.array(start, float)]
+    h = heading
+    seg = length / max(n, 1)
+    bend = rng.normal(0, 0.05)
+    side = 1 if rng.random() < 0.5 else -1
+    spots = []
+    h0 = heading
+    for i in range(n):
+        h += bend + rng.normal(0, 0.05) - 0.10 * side * (shape in ("elm",))
+        if shape == "willow":
+            h = h0 + (h - h0) * 0.55  # a hanging strand sways but keeps falling
+        p = pts[-1] + np.array([math.cos(h), math.sin(h)]) * seg
+        pts.append(p)
+        spots.append((p, h, side))
+        side = -side
+    cv.stroke(pts, w0, max(1.6, w0 * 0.4), box)
+    L0 = plan["L"] * scale
+    order = list(range(n))
+    for i in order:
+        p, h, sd = spots[i]
+        a = h + sd * math.radians(rng.uniform(*plan["ang"]))
+        L = L0 * rng.uniform(0.78, 1.12) * (0.82 + 0.18 * i / max(n - 1, 1))
+        W = L * plan["wr"] * rng.uniform(0.9, 1.1)
+        pe = plan["petiole"] * scale * rng.uniform(0.8, 1.3)
+        b = p + np.array([math.cos(a), math.sin(a)]) * pe
+        for shrink in (1.0, 0.8, 0.62):
+            if cv.leaf(shape, b[0], b[1], a + rng.normal(0, 0.08), L * shrink, W * shrink, box, rng, zbias=0.02 * i):
+                cv.stroke([p, b], 2.6, 2.0, box)
+                break
+    if terminal:
+        p, h, _ = spots[-1]
+        for da in ((0.0,) if shape == "willow" else (0.0, 0.55, -0.55)):
+            L = L0 * rng.uniform(0.85, 1.1)
+            b = p + np.array([math.cos(h + da), math.sin(h + da)]) * plan["petiole"] * 0.6 * scale
+            for shrink in (1.0, 0.8, 0.62):
+                if cv.leaf(shape, b[0], b[1], h + da, L * shrink, L * plan["wr"] * shrink, box, rng, zbias=0.3):
+                    break
+    return pts
+
+
+def spray_layout(shape, seed=1, n=SPRAY_N):
+    """Paint the four sprays of a species into an atlas. Broad leaves: 2 x 2 cells, each a twig rising
+    from the middle of the cell's lower edge. Willow: 4 columns, each a strand hanging from the top."""
+    rng = np.random.default_rng(seed)
+    cv = _Canvas(n)
+    plan = SPRAY_PLAN[shape]
+    if shape == "willow":
+        cw = n // 4
+        for c in range(4):
+            box = (c * cw, 0, (c + 1) * cw, n)
+            x0 = c * cw + cw * rng.uniform(0.45, 0.55)
+            # the strands hang: build them top-down, a long one between two shorter ones
+            for k, off in enumerate((0.0, -0.2, 0.2)):
+                xs = x0 + off * cw * rng.uniform(0.8, 1.1)
+                length = n * (0.95 if k == 0 else rng.uniform(0.55, 0.85)) - 24
+                _twig_leaves(cv, shape, plan, rng, box, (xs, n - 4), -math.pi / 2 + rng.normal(0, 0.02), length,
+                             int(length / plan["step"]), 4.5 if k == 0 else 3.2)
+        return _finish_layout(cv, shape, seed)
+    ch = n // 2
+    for c in range(4):
+        box = ((c % 2) * ch, (c // 2) * ch, (c % 2) * ch + ch, (c // 2) * ch + ch)
+        bx, by = box[0] + ch * 0.5, box[1] + 5
+        lean = rng.normal(0, 0.10)
+        nmain = plan["main"]
+        length = min(ch * 0.68, nmain * plan["step"])
+        heading = math.pi / 2 + lean
+        # side twigs first (they lie under the main twig's leaves): alternate sides, shorter up the twig
+        for t in range(plan["twigs"]):
+            f = (0.10 + 0.17 * t) + rng.uniform(-0.03, 0.03)
+            sd = 1 if (t + c) % 2 == 0 else -1
+            st = np.array([bx, by]) + np.array([math.cos(heading), math.sin(heading)]) * length * f
+            hd = heading - sd * math.radians(rng.uniform(50, 68) - 6 * t)
+            _twig_leaves(cv, shape, plan, rng, box, st, hd, ch * rng.uniform(0.30, 0.37) * (1 - 0.1 * t), plan["per"], 4.0, scale=0.92)
+        _twig_leaves(cv, shape, plan, rng, box, (bx, by), heading, length, nmain, 6.5)
+    return _finish_layout(cv, shape, seed)
+
+
+def _finish_layout(cv, shape, seed):
+    lv = np.array(cv.leaves) if cv.leaves else np.zeros((1, 3))
+    return {"shape": shape, "A": cv.A, "ID": cv.ID, "S": cv.S, "T": cv.T, "H": cv.Hh, "AO": cv.AO, "leaves": lv, "seed": seed}
+
+
+def spray_normal_rough(layout, strength=30.0):
+    ID, H = layout["ID"], layout["H"]
+    hd = blur(np.where(ID == -1, 0.0, H + 0.05), 0.8)
+    normal = height_to_normal(hd, strength)
+    bright = layout["leaves"][np.maximum(ID, 0), 1]
+    rough = np.where(ID >= 0, 0.66 - 0.10 * bright + 0.10 * np.clip(np.abs(layout["T"]), 0, 1) ** 2, 0.86)
+    rough = np.where(ID == -1, 0.75, rough)
+    return normal, np.clip(rough, 0, 1)
+
+
+def spray_colour(layout, palette, layer="sun", seed=3):
+    """RGBA (sRGB, straight alpha) for one light layer of a tree's palette. The colour is carried past
+    the leaf edges so that mip levels do not pick up a dark fringe."""
+    rng = np.random.default_rng(seed)
+    A, ID, S, T, AO = layout["A"], layout["ID"], layout["S"], layout["T"], layout["AO"]
+    shape = layout["shape"]
+    n = A.shape[0]
+    pal = np.stack([srgb_to_lin(hex_rgb(c)) for c in palette])
+    k = len(pal)
+    lv = layout["leaves"]
+    idx = np.maximum(ID, 0)
+    tone = np.minimum((lv[:, 0] * k).astype(int), k - 1)[idx]
+    bright = lv[:, 1][idx]
+    hue = lv[:, 2][idx]
+    col = pal[tone]
+    if layer == "sun":
+        col = col * np.array([1.13, 1.10, 0.80]) * 1.07
+    elif layer == "shade":
+        col = col * np.array([0.88, 0.98, 0.98]) * 0.86
+    else:
+        col = col * np.array([1.03, 1.04, 0.90]) * 1.0
+    col = col * (0.84 + 0.30 * bright)[..., None]
+    # a few leaves turn toward yellow, a few toward blue-green
+    yellow = srgb_to_lin(hex_rgb("#c3c860"))
+    col = mix(col, yellow * (0.8 + 0.3 * bright)[..., None], np.clip((hue - 0.80) * 2.2, 0, 0.42) * (0.6 if layer == "shade" else 1.0))
+    col = col * np.where((hue < 0.14)[..., None], np.array([0.90, 0.99, 1.04]), np.ones(3))
+    if shape in ("palmate", "maple"):
+        rib = 1 - S  # palmate leaves carry their veins in S
+        col = col * (1.0 + 0.22 * rib[..., None]) * 0.97
+    else:
+        rib = np.exp(-(T / 0.085) ** 2)
+        vein = 0.5 + 0.5 * np.cos((S * 7 - np.abs(T) * 1.9) * 2 * math.pi) if shape != "willow" else np.zeros_like(S)
+        edge = smoothstep(0.6, 1.0, np.abs(T))
+        col = col * (1.0 + 0.20 * rib[..., None] + 0.05 * (vein * (1 - rib))[..., None])
+        col = col * (1.0 - 0.14 * edge[..., None]) * (0.84 + 0.22 * np.clip(S, 0, 1))[..., None]
+    u, v = _grid_uv(n)
+    col = col * (0.93 + 0.14 * fbm(u, v, 4, 4, 3, rng))[..., None]
+    col = col * AO[..., None]
+    twig = srgb_to_lin(hex_rgb("#5d4a34")) * (0.8 + 0.5 * np.clip(1 - np.abs(T), 0, 1))[..., None] * (0.8 if layer == "shade" else 1.0)
+    col = np.where((ID == -2)[..., None], twig, col)
+    # carry colour outward from the leaves (two blur scales), so transparent texels are leaf-coloured
+    inside = (ID != -1) & (A > 0.5)
+    w = inside.astype(float)
+    out = col.copy()
+    for sigma in (3.0, 12.0, 40.0):
+        bw = np.maximum(blur(w, sigma), 1e-5)
+        bc = np.stack([blur(col[..., c] * w, sigma) for c in range(3)], axis=-1) / bw[..., None]
+        fill = np.clip(bc, 0, 1)
+        need = ~inside if sigma == 3.0 else (blur(w, sigma / 3.5) < 0.02) & ~inside
+        out = np.where(need[..., None], fill, out)
+    mean = (col * w[..., None]).sum((0, 1)) / max(w.sum(), 1.0)
+    far = blur(w, 40.0) < 1e-3
+    out = np.where((far & ~inside)[..., None], mean, out)
+    rgba = np.concatenate([lin_to_srgb(out), np.clip(A, 0, 1)[..., None]], axis=-1)
+    return rgba
+
+
 def apple_maps():
     """256x128 fruit map: left half red apple, right half yellow-green apple."""
     h, w = 128, 256
