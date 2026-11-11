@@ -51,6 +51,7 @@ export type Script = {
 	capped: boolean, -- the shot ran into MAX_T and was stopped where it was (never seen in the specs)
 	contacts: number,
 	steps: number,
+	knots: number, -- steps the model gave up with contacts unsettled (0 in every spec)
 }
 
 local KS = Physics.KEY_STRIDE
@@ -149,6 +150,7 @@ function Shot.run(tb: Tables.Table, spots: { Tables.Spot }, strikes: { Strike },
 		capped = capped,
 		contacts = w.contacts,
 		steps = w.steps,
+		knots = w.knots,
 	}
 end
 

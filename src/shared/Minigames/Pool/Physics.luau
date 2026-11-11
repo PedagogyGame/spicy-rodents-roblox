@@ -56,7 +56,7 @@ Physics.V_DEAD = 0.06 -- studs/s: below this a touch does not bounce at all
 -- touch again and again for ever on the last bit of a rounding error.
 Physics.CLOSE = 1e-5
 Physics.KNOT_DAMP = 0.9 -- a step that could not untie its contacts costs every moving ball this share of its speed
-Physics.RIM_K = 1 -- the price of climbing out of a hole, in fallen heights
+Physics.RIM_K = 0.6 -- the price of climbing out of a hole, in fallen heights
 Physics.E_LINER = 0.25 -- the back of a pocket
 Physics.LINER_DOT = -0.05 -- behind this (dot with the mouth direction) the rim is liner, not cloth
 
