@@ -54,11 +54,11 @@ end
 -- admit: the patient's bed, or nil when they have to wait (they keep their place in the queue).
 -- Admitting someone twice changes nothing.
 function HospitalService.admit(self: Hospital, id: any, now: number): number?
-	local p = self.byId[id]
-	if p then
-		return p.bed
+	local already = self.byId[id]
+	if already then
+		return already.bed
 	end
-	p = { id = id, bed = nil, since = now, done = false }
+	local p: Patient = { id = id, bed = nil, since = now, done = false }
 	self.byId[id] = p
 	self._stats.admitted += 1
 	local bed = if #self.queue == 0 then freeBed(self) else nil

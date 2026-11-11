@@ -390,7 +390,7 @@ local function tellBiter(self: Service, rec: Record, key: string)
 end
 
 -- a part of a step that fails is reported and contained: the rest of the step still runs
-local function guard(self: Service, where: string, fn: (...any) -> (), ...: any): boolean
+local function guard(self: Service, where: string, fn: (...any) -> ...any, ...: any): boolean
 	local ok, err = pcall(fn, ...)
 	if not ok then
 		self._stats.faults += 1

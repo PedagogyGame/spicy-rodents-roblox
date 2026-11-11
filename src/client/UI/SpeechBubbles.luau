@@ -125,7 +125,8 @@ function SpeechBubbles.start(opts: Opts): () -> ()
 		local s = slots[i]
 		s.expires, s.body = 0, nil
 		guis[i].Enabled = false
-		guis[i].Adornee = nil
+		-- clearing an Adornee is allowed by the engine; the type definitions say it is never nil
+		guis[i].Adornee = nil :: any
 	end
 
 	local function show(body: Model)

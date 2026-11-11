@@ -1,7 +1,7 @@
 # CI for the Spicy Rodents Roblox rebuild (BUILD_PLAN §1.2, §6.1, D16, spike S10).
-# Mirrors tools/ci.sh (stylua --check, selene, Lune unit tests, rojo build, Lune place tests,
-# sourcemap) and adds strict `luau-lsp analyze` with the Roblox definitions, which the cloud
-# container cannot run (GitHub release downloads are blocked there; runners can reach them).
+# Runs tools/ci.sh (stylua --check, selene, Lune unit tests, rojo build, Lune place tests,
+# sourcemap, and the strict `luau-lsp analyze` type check through tools/typecheck), exactly as it
+# runs in the cloud container, where luau-lsp is built from source (docs/ENVIRONMENT_SETUP.sh).
 # Open Cloud steps (save, engine tests) are NOT run here: the API key lives behind the
 # container's proxy and is never a repository secret (decision: BUILD_PLAN §4.3 S1 fallback is
 # opt-in, not default).
@@ -72,11 +72,7 @@ jobs:
           "$HOME/.local/bin/selene" --version
           "$HOME/.local/bin/luau-lsp" --version
 
-      - name: Local CI gate (stylua, selene, lune tests, rojo build, place tests, sourcemap)
-        shell: bash
-        run: tools/ci.sh
-
-      - name: Roblox type definitions (pinned to the luau-lsp release)
+      - name: Roblox type definitions (pinned to the luau-lsp release; tools/typecheck reads ./globalTypes.d.luau)
         shell: bash
         run: |
           set -euo pipefail
@@ -84,28 +80,9 @@ jobs:
             "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/${LUAU_LSP_VERSION}/scripts/globalTypes.d.luau"
           test -s globalTypes.d.luau
 
-      - name: luau-lsp analyze (strict, Roblox platform, sourcemap)
+      - name: Local CI gate (stylua, selene, lune tests, rojo build, place tests, sourcemap, type check)
         shell: bash
-        run: |
-          set -euo pipefail
-          # The sourcemap was written by tools/ci.sh (rojo sourcemap default.project.json).
-          test -s sourcemap.json
-          cat > .luau-analyze.json <<'JSON'
-          {
-            "luau-lsp.platform.type": "roblox",
-            "luau-lsp.sourcemap.enabled": true,
-            "luau-lsp.require.mode": "relativeToFile",
-            "luau-lsp.diagnostics.strictDatamodelTypes": false
-          }
-          JSON
-          luau-lsp analyze \
-            --definitions=globalTypes.d.luau \
-            --sourcemap=sourcemap.json \
-            --platform=roblox \
-            --base-luaurc=.luaurc \
-            --settings=.luau-analyze.json \
-            --ignore="**/*.spec.luau" \
-            src/ tests/engine/ tools/cloud/tasks/
+        run: tools/ci.sh
 
       - name: Upload build artifacts
         if: always()

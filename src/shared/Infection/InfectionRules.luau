@@ -317,9 +317,12 @@ local function stepOnce(
 	params: Params,
 	effects: { Effect }
 ): boolean
+	-- (the self-treat test reads case.state, not the local: tested on the local, the type checker
+	-- takes `state` for "treated" in everything below)
+	local selfTreating = case.state == "treated" and case.selfTreat == true
 	local state = case.state
 	local player = inputs.controller == "player"
-	if player and PATIENT[state] and not (state == "treated" and case.selfTreat) then
+	if player and PATIENT[state] and not selfTreating then
 		-- a player is holding a patient (see the header): back on their feet, and told what to do
 		InfectionRules.standUp(case, now)
 		table.insert(effects, { kind = "standDown" })
