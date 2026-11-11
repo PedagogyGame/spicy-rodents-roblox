@@ -265,8 +265,9 @@ export type TakeDef = {
 	-- stretches (seconds) the measurements use, by name
 	windows: { [string]: { number } },
 	-- the frames the review strips show: `count` frames from `at` seconds, every `step` frames; `tall` for
-	-- a body that stands on end (the side view is then upright)
-	strip: { at: number, count: number, step: number, tall: boolean? },
+	-- a body that stands on end (the side view is then upright); `large`, the seconds of the three frames
+	-- shown larger (a third of the stretch apart when not given)
+	strip: { at: number, count: number, step: number, tall: boolean?, large: { number }? },
 }
 
 local function keys(over: { [string]: any }?): Keys
@@ -324,7 +325,7 @@ Path.TAKES = {
 			return keys({ fw = 1, sprint = true, look = look })
 		end,
 		windows = { straight = { 0.4, 0.8 }, turning = { 0.8, 2.2 }, left = { 0.8, 1.3 }, right = { 1.55, 2.05 } },
-		strip = { at = 0.75, count = 16, step = 4 },
+		strip = { at = 0.75, count = 16, step = 5, large = { 0.95, 1.3, 1.7 } },
 	},
 	{
 		name = "stop",
@@ -337,7 +338,7 @@ Path.TAKES = {
 			return keys()
 		end,
 		windows = { stopping = { 1.5, 2 }, idle = { 2, 3.75 } },
-		strip = { at = 1.45, count = 16, step = 3 },
+		strip = { at = 1.45, count = 16, step = 2, large = { 1.45, 1.6, 2.5 } },
 	},
 	{
 		name = "leap",
@@ -347,7 +348,8 @@ Path.TAKES = {
 			return keys({ fw = 1, pounce = pressed(i, 0.7), leap = pressed(i, 1.7) })
 		end,
 		windows = { hop = { 0.7, 1.1 }, leap = { 1.7, 2.7 } },
-		strip = { at = 1.65, count = 16, step = 4 },
+		-- larger: the hop in the air, the top of the leap, its landing
+		strip = { at = 1.65, count = 16, step = 4, large = { 0.85, 2.15, 2.5833 } },
 	},
 	{
 		name = "climb",
@@ -386,7 +388,8 @@ Path.TAKES = {
 			},
 		},
 		windows = { steady = { 1.3, 2.9 } },
-		strip = { at = 1.5, count = 16, step = 1, tall = true },
+		-- larger: the moment it takes the trunk, then two of the climb
+		strip = { at = 1.5, count = 16, step = 1, tall = true, large = { 0.4, 1.5, 1.6667 } },
 	},
 	{
 		name = "wire",
@@ -654,6 +657,16 @@ function Path.simulate(variantName: string, takeName: string): Take
 	local stride = def.strip
 	local start = math.floor(stride.at * Path.FPS + 0.5)
 	local last = start + (stride.count - 1) * stride.step
+	local large = {
+		start,
+		start + math.floor((last - start) / 3 + 0.5),
+		start + math.floor((last - start) * 2 / 3 + 0.5),
+	}
+	if stride.large then
+		for j, at in stride.large do
+			large[j] = math.floor(at * Path.FPS + 0.5)
+		end
+	end
 	return {
 		format = Path.FORMAT,
 		variant = variantName,
@@ -680,12 +693,7 @@ function Path.simulate(variantName: string, takeName: string): Take
 			count = stride.count,
 			step = stride.step,
 			tall = stride.tall == true,
-			-- three frames a third of the stretch apart, shown larger
-			large = {
-				start,
-				start + math.floor((last - start) / 3 + 0.5),
-				start + math.floor((last - start) * 2 / 3 + 0.5),
-			},
+			large = large,
 		},
 		serverTime = Path.SERVER_TIME,
 		bodyName = Path.BODY_NAME,
