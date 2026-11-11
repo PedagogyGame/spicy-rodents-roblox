@@ -174,7 +174,7 @@ return function(t)
 					first = first or p
 					t.truthy(p.beacons, "the beacons are on")
 					if p.teleported then
-						-- a jump the server flagged (turning round at the scene): drawn as a snap
+						-- a jump the server flagged would be drawn as a snap: there is none on a trip
 						if last and not last.teleported then
 							snaps += 1
 						end
@@ -225,10 +225,10 @@ return function(t)
 			t.eq(v.phase, "idle")
 			t.truthy(not buf:sample(now + lag)[id].visible, "hidden again at home")
 			t.truthy(worstStep <= top / 60 * 1.6 + 0.3, `{worstStep} studs in one frame on the way home`)
-			-- turning round at the scene puts it on the other side of the road, facing the other way: the
-			-- server flags that jump and the flag reaches the client whichever tick it fell on, so the
-			-- ghost snaps there (it used to slide sideways across the road in one send)
-			t.eq(snaps, 1, "one snap: the turn at the scene")
+			-- turning round at the scene is a U-turn it drives, onto the other side of the road (it used
+			-- to flip round on the spot and jump 15 st sideways): nothing on the way out, at the scene or
+			-- on the way home is a snap
+			t.eq(snaps, 0, "no snap: it drives the turn at the scene")
 			-- the flag lasts one tick on the vehicle; the stream sends every other tick; the service
 			-- keeps the jump for the next send, once
 			local svc2 = service()
@@ -252,12 +252,23 @@ return function(t)
 			svc2:poseRecords()
 			svc2:releaseResponder(v2)
 			svc2:step(1 / 30, {})
+			t.eq(v2.phase, "turn")
+			-- the turn: a half circle of POLY_OFFSET, driven, ending on the return side facing home
+			local sx, sz, syaw = v2.x, v2.z, v2.yaw
+			local turnSecs, worstTurn = 0, 0
+			while v2.phase == "turn" and turnSecs < 20 do
+				local px, pz = v2.x, v2.z
+				svc2:step(1 / 30, {})
+				turnSecs += 1 / 30
+				worstTurn = math.max(worstTurn, math.sqrt((v2.x - px) ^ 2 + (v2.z - pz) ^ 2))
+				t.truthy(not v2.teleported, "no tick of the turn is a jump")
+			end
 			t.eq(v2.phase, "back")
-			t.truthy(v2.teleported, "the turn is a jump")
-			svc2:step(1 / 30, {})
-			t.truthy(not v2.teleported)
-			t.truthy(flagged(), "the turn is in the next send")
-			t.truthy(not flagged())
+			t.truthy(worstTurn < 1, `{worstTurn} studs in one tick of the turn`)
+			t.truthy(turnSecs > 2 and turnSecs < 8, `{turnSecs} s to turn round`)
+			t.near(math.sqrt((v2.x - sx) ^ 2 + (v2.z - sz) ^ 2), 2 * LaneMath.POLY_OFFSET, 1.5)
+			t.near(math.abs(math.atan2(math.sin(v2.yaw - syaw), math.cos(v2.yaw - syaw))), math.pi, 0.05)
+			t.truthy(not flagged(), "nothing to flag")
 			t.truthy(math.abs(sends - now * 15) <= 2, `{sends} sends in {now} s: an even 15 a second`)
 		end
 	)

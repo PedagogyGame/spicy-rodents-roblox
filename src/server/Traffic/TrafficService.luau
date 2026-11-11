@@ -313,7 +313,10 @@ function TrafficService.poses(self: TrafficService): { SweptCollision.VehiclePos
 end
 
 -- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them).
--- Each call is one send: a jump made since the last call is flagged in this one and then forgotten.
+-- Each call is one send: a jump made since the last call is flagged in this one and then forgotten, so
+-- a wrap on a tick between two sends (30 Hz ticks, 15 Hz sends) still snaps on every client instead of
+-- streaking across town. A client that loses that one send sees a jump no car could drive and snaps
+-- all the same (Traffic/Ghost).
 function TrafficService.poseRecords(self: TrafficService): { { [string]: number } }
 	local out = table.create(#self.vehicles)
 	local jumped = self.jumped

@@ -2203,7 +2203,7 @@ return function(t)
 			t.eq(v.phase, "hold")
 			t.truthy(v.x == x and v.z == z and v.yaw == yaw, "it has not moved")
 			h.step(0.8)
-			t.eq(v.phase, "back", "then it turns for home")
+			t.eq(v.phase, "turn", "then it turns for home (a U-turn it drives, AICarMotor)")
 			-- a case that ends in that moment still lets the ambulance go (it was held for ever otherwise)
 			local h2 = harness(11, { 0, 0 })
 			h2.svc.tun.crowdChance = 0

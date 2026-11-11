@@ -60,7 +60,9 @@ return function(t)
 				end
 			end
 			t.truthy(checked >= 6, `checked {checked} straight vehicle lanes`)
-			t.near(lanes.blvd_eastbound.coord :: number, st(5.6), 1e-9, "eastbound now runs at z > 0")
+			-- eastbound now runs at z > 0, clear of the trolley track on that side (z = 8.65 u)
+			t.near(lanes.blvd_eastbound.coord :: number, st(8.65) - LaneMath.RAIL_CLEARANCE, 1e-9)
+			t.near((lanes.patrol_beat.coordFor :: any)[1], st(8.65) - LaneMath.RAIL_CLEARANCE, 1e-9)
 			t.near(lanes.blvd_westbound.coord :: number, -st(5.6), 1e-9)
 			t.near(lanes.res_main_ns_northbound.coord :: number, -st(5.4), 1e-9, "residential lanes were already right")
 			t.truthy(table.find(changed, "patrol_beat") ~= nil)
@@ -354,7 +356,12 @@ return function(t)
 				stopped = false,
 			}),
 		})
-		t.near(g:sample(0.5)[1].x, 100, 1e-6, "teleport snaps")
+		-- until the snapshot that carries it, the car carries on along its heading at its speed (yaw 0 is +z);
+		-- from that snapshot on it is where the teleport put it, never in between
+		local before = g:sample(0.5)[1]
+		t.near(before.x, 0, 1e-6, "no streak towards the teleport's end")
+		t.near(before.z, 0.5, 1e-6, "carries on at its speed until the snap")
+		t.near(g:sample(1)[1].x, 100, 1e-6, "teleport snaps")
 		local h = Ghost.new({ delay = 0 })
 		h:push(0, {
 			Ghost.encode({

@@ -211,14 +211,14 @@ return function(t)
 	)
 
 	t.test("the report: summary, JSON and the worst list", function()
-		local result = Replay.run({ scenario = "patrol_turn" })
-		local text = Report.summary(result, 5, "lune run tools/sim/traffic_replay.luau --scenario patrol_turn")
-		t.truthy(string.find(text, "sim_jump_unflagged", 1, true))
-		t.truthy(string.find(text, "#12 Patrol car", 1, true))
+		local result = Replay.run({ scenario = "motorcycles" })
+		local text = Report.summary(result, 5, "lune run tools/sim/traffic_replay.luau --scenario motorcycles")
+		t.truthy(string.find(text, "appear", 1, true))
+		t.truthy(string.find(text, "#8 Morgan Rider", 1, true))
 		t.truthy(
 			string.find(
 				text,
-				"trace it: lune run tools/sim/traffic_replay.luau --scenario patrol_turn --trace",
+				"trace it: lune run tools/sim/traffic_replay.luau --scenario motorcycles --trace",
 				1,
 				true
 			)
@@ -229,8 +229,8 @@ return function(t)
 			t.truthy(worst[i - 1].severity >= worst[i].severity, "most severe first")
 		end
 		local back = serde.decode("json", serde.encode("json", Report.json(result, "cmd")))
-		t.eq(back.scenario.name, "patrol_turn")
-		t.eq(back.counts.sim_jump_unflagged, 1)
+		t.eq(back.scenario.name, "motorcycles")
+		t.eq(back.counts.appear, 2)
 		t.eq(#back.incidents, #result.incidents)
 		local first = back.incidents[1]
 		for _, field in { "kind", "t", "vehicle", "magnitude", "limit", "unit", "severity", "name" } do
@@ -660,6 +660,13 @@ return function(t)
 			-- the send carried it and the network lost it
 			local lost = wrapAt(6, { send(6, 6 / 30, true, true) })
 			t.eq(lost[1].kind, "teleport_bit_lost")
+			local lostTwice = wrapAt(6, { send(6, 6 / 30, true, true), send(8, 8 / 30, true, true) })
+			t.eq(#lostTwice, 1)
+			t.eq(lostTwice[1].kind, "teleport_bit_lost")
+			-- lost, but the next send carries the flag again and arrives: the flag was not lost
+			local repeated, rstats = wrapAt(6, { send(6, 6 / 30, true, true), send(8, 8 / 30, true, false) })
+			t.eq(#repeated, 0)
+			t.eq(rstats.teleportsCarried, 1)
 			-- a jump and a heading snap the server never flagged
 			local bench = Detect.bench(def)
 			for i = 1, 12 do

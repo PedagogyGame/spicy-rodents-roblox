@@ -153,7 +153,13 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 				local p = Ghost.decode(r)
 				poses[p.id] = p
 			end
-			table.insert(self.snaps, { t = t, poses = poses })
+			-- in time order: a packet that arrives after a newer one (reordered on the way) goes before it,
+			-- or sampling would run the car back to where it was (a wrap drew it back across the street)
+			local at = #self.snaps + 1
+			while at > 1 and self.snaps[at - 1].t > t do
+				at -= 1
+			end
+			table.insert(self.snaps, at, { t = t, poses = poses })
 			while #self.snaps > keep do
 				table.remove(self.snaps, 1)
 			end
@@ -209,7 +215,30 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 			local out = {}
 			for id, pb in b.poses do
 				local pa = a.poses[id]
-				if pa == nil or pb.teleported or not pa.visible or not pb.visible then
+				if pa and pb.teleported and pb.visible then
+					-- the snap happens at b, not at a: until then the car carries on along its heading at its
+					-- speed (a wrap) or stays hidden (an appearance). Snapping at a showed b's pose a whole send
+					-- early and then held it still until b: a car that had just reappeared stood frozen for
+					-- 4 frames and then jumped to speed.
+					if pa.visible then
+						local ahead = rt - a.t
+						out[id] = {
+							id = id,
+							x = pa.x + math.sin(pa.yaw) * pa.speed * ahead,
+							z = pa.z + math.cos(pa.yaw) * pa.speed * ahead,
+							yaw = pa.yaw,
+							speed = pa.speed,
+							visible = true,
+							beacons = pa.beacons,
+							-- the server repeats the flag on the next send (a lost packet must not streak):
+							-- leaving a snapshot that was itself the snap, this span's first frame is the snap
+							teleported = pa.teleported,
+							stopped = pa.stopped,
+						}
+					else
+						out[id] = pa
+					end
+				elseif pa == nil or pb.teleported or not pa.visible or not pb.visible then
 					out[id] = pb -- snap: new, teleported, or appearing/disappearing
 				else
 					out[id] = {
@@ -220,7 +249,8 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 						speed = pa.speed + (pb.speed - pa.speed) * u,
 						visible = pb.visible,
 						beacons = pb.beacons,
-						teleported = false,
+						-- leaving a snapshot the car snapped to: the first frame of this span is the snap
+						teleported = pa.teleported,
 						stopped = pb.stopped,
 					}
 				end

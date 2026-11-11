@@ -15,8 +15,19 @@ local scenario: Replay.Scenario = {
 		v.s = v.lane.length - 80
 		v.speed = v.cruise
 	end,
-	expect = { none = { "speed_stutter", "sink", "float", "teleport_bit_dropped" } },
-	known = { "sim_jump_unflagged", "sim_yaw_snap", "teleport_unflagged", "reverse_travel" },
+	expect = {
+		none = {
+			"speed_stutter",
+			"sink",
+			"float",
+			"teleport_bit_dropped",
+			"sim_jump_unflagged",
+			"sim_yaw_snap",
+			"teleport_unflagged",
+			"reverse_travel",
+			"yaw_jump",
+		},
+	},
 }
 
 return scenario

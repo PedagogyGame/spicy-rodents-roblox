@@ -6,7 +6,8 @@
 --   teleport_bit_dropped  the server flagged a teleport, but the flag was gone again before the next
 --                         send (the flag lives for one 30 Hz tick, sends go at 15 Hz): the wire never
 --                         carried it, so clients interpolate across the teleport
---   teleport_bit_lost     the one send that carried the flag was lost on the network
+--   teleport_bit_lost     every send that carried the flag was lost on the network (the service flags
+--                         a jump on one send; a server that repeated it would need them all lost)
 -- These are counted per event on the server's timeline (t is the wall-clock time of the tick or send),
 -- not per client frame; the jumps and turns detectors show what each one looks like on screen.
 -- ctx.stats: teleports flagged / carried / dropped / lost, and how much older the state in a send is than
@@ -51,7 +52,20 @@ local def: Detect.Def = {
 		local ageSum, sends = 0, 0
 		local prev: { [number]: { x: number, z: number, yaw: number, vis: boolean, speed: number } } = {}
 		-- flagged teleports of visible vehicles waiting for the next send
-		local pending: { [number]: { t: number, step: number, from: { number }, to: { number } } } = {}
+		local pending: { [number]: { t: number, step: number, from: { number }, to: { number }, lost: number? } } = {}
+		local function reportLost(id: number, tp: any, wall: number, n: number?)
+			stats.teleportsLost += 1
+			ctx.report({
+				kind = "teleport_bit_lost",
+				t = wall,
+				vehicle = id,
+				magnitude = tp.step,
+				limit = th.visibleStep,
+				unit = "studs",
+				origin = "stream",
+				detail = { from = tp.from, to = tp.to, teleportAt = tp.t, send = n, lostSends = tp.lost },
+			})
+		end
 		return {
 			tick = function(tick: Detect.Tick)
 				for _, v in tick.vehicles do
@@ -119,20 +133,13 @@ local def: Detect.Def = {
 					local detail = { from = tp.from, to = tp.to, teleportAt = tp.t, send = send.n }
 					if pose and pose.teleported then
 						if send.lost then
-							stats.teleportsLost += 1
-							ctx.report({
-								kind = "teleport_bit_lost",
-								t = send.wall,
-								vehicle = id,
-								magnitude = tp.step,
-								limit = th.visibleStep,
-								unit = "studs",
-								origin = "stream",
-								detail = detail,
-							})
-						else
-							stats.teleportsCarried += 1
+							-- the next send may carry it again: wait for it
+							tp.lost = (tp.lost or 0) + 1
+							continue
 						end
+						stats.teleportsCarried += 1
+					elseif tp.lost then
+						reportLost(id, tp, send.wall, send.n)
 					else
 						stats.teleportsDropped += 1
 						ctx.report({
@@ -147,6 +154,13 @@ local def: Detect.Def = {
 						})
 					end
 					pending[id] = nil
+				end
+			end,
+			finish = function()
+				for id, tp in pending do
+					if tp.lost then
+						reportLost(id, tp, tp.t, nil)
+					end
 				end
 			end,
 		}

@@ -32,8 +32,7 @@ local scenario: Replay.Scenario = {
 		south.s = south.lane.length - 62
 		south.speed = south.cruise
 	end,
-	-- holds today and must keep holding (a kind listed under `known` instead would be a glitch that still
-	-- shows: see lib/Replay)
+	-- holds today and must keep holding (the northbound sedan's flag used to miss the send: it streaked)
 	expect = {
 		none = {
 			"sim_jump_unflagged",
@@ -45,6 +44,7 @@ local scenario: Replay.Scenario = {
 			"float",
 			"teleport_bit_dropped",
 			"teleport_unflagged",
+			"accel_spike",
 		},
 		some = { "teleport_flagged" },
 	},

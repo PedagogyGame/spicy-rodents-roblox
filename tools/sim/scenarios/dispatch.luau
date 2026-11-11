@@ -1,8 +1,8 @@
 --!strict
 -- Scenario: the vehicles that are hidden until dispatched (traffic.md §5.9, §5.10): the three responder
 -- ambulances and the two incident police cars, alone. One responder is sent to a house two seconds in,
--- the incident pair to a scene at four seconds; each drives out along its route (polylines with square
--- corners), holds at the scene, and drives back the way it came. The game does not dispatch them yet
+-- the incident pair to a scene at four seconds; each drives out along its route (polylines, corners
+-- rounded), holds at the scene, U-turns and drives back the way it came. The game does not dispatch them yet
 -- (nothing calls TrafficService.dispatchResponder / dispatchIncident), so this is what players will see
 -- once the bite-to-ambulance work lands.
 local Fleet = require("@shared/Traffic/Fleet")
@@ -23,10 +23,26 @@ local scenario: Replay.Scenario = {
 	ci = 40,
 	entries = entries,
 	sceneSecs = 6, -- the responder's hold at the scene (30 s in the game)
-	expect = { none = { "teleport_unflagged", "sink", "float", "reverse_travel" } },
-	-- shows today: square corners turned on the spot, routes straight across lots and through houses,
-	-- one incident car driving through the other
-	known = { "sim_yaw_snap", "yaw_jump", "sideways_slide", "through_building", "off_road", "box_overlap" },
+	-- the square corners are rounded (LaneMath.CORNER_RADIUS), the turn back at the scene is a U-turn (it
+	-- flipped round on the spot and jumped 15 st sideways), and they pull away and brake
+	expect = {
+		none = {
+			"teleport_unflagged",
+			"sink",
+			"float",
+			"reverse_travel",
+			"sim_yaw_snap",
+			"yaw_jump",
+			"sideways_slide",
+			"sim_jump_unflagged",
+			"position_jump",
+			"accel_spike",
+		},
+	},
+	-- shows today: routes straight across lots and through houses (LaneMath.incidentRoute and the
+	-- responder's tail are straight lines, not roads); both incident cars' last legs are one line, so the
+	-- second car runs up behind the first one parked on it (it now stops behind it, 5.9 st too late)
+	known = { "through_building", "off_road", "box_overlap" },
 	frame = function(sim: Replay.Sim)
 		if sim.wall >= 2 and not sim.state.responder then
 			sim.state.responder = true
