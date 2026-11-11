@@ -239,13 +239,48 @@ return function(t: any)
 			t.eq(pick("ground", 18, false), "Run")
 			t.eq(pick("ground", 33, false), "Run")
 			t.eq(pick("ground", 4, true), "Stalk")
-			t.eq(pick("ground", 0.1, true), "Idle")
+			t.eq(pick("ground", 0.1, true), "Stalk", "a stalk that stops holds its creep")
+			t.eq(rate("Stalk", 0.1, nil, clips.Stalk.length), 0, "frozen")
+			t.truthy(rate("Stalk", 4, nil, clips.Stalk.length) > 0)
+			-- a run that is braking keeps to its run until it stands; one that only slows goes to a walk
+			t.eq(pick("ground", 4, false, nil, "Run", true), "Run")
+			t.eq(pick("ground", 4, false, nil, "Run", false), "Walk")
+			t.eq(pick("ground", 4, false, nil, "Idle", true), "Walk")
+			t.eq(pick("ground", 0.1, false, nil, "Run", true), "Idle")
+			-- stopping, or easing off: a body let go loses a share of its speed each moment, so the bar
+			-- falls with the speed under the run's slowest (the motor's stop is 17 studs/s^2 per stud/s)
+			local braking, settle = AnimationDriver.heroBraking, AnimationDriver.heroSettle
+			t.truthy(braking(18, 300), "let go at a run")
+			t.falsy(braking(18, 30))
+			t.truthy(braking(2, 34), "still a stop near its end")
+			t.falsy(braking(2, 5), "easing off")
+			t.falsy(braking(5, 0))
+			t.falsy(braking(5, -60), "speeding up")
+			-- a run that is stopping finishes its bound: paced to reach the gathered pose (hind feet under
+			-- it) as it comes to stand, held there, and never whirled round to it
+			local S = H.settle
+			local runLength = clips.Run.length
+			t.truthy(S.at > 0 and S.at + S.slack < runLength and S.rate <= H.maxRate)
+			t.eq(settle("Run", 0.3, runLength, 18, 300, 1.5), 1.5, "at a run's speed it keeps its cadence")
+			t.eq(settle("Walk", 0.3, clips.Walk.length, 5, 85, 0.7), 0.7, "only the run")
+			t.eq(settle("Run", 0.3, runLength, 5, 2, 0.7), 0.7, "easing off")
+			t.eq(settle("Run", S.at, runLength, 5, 85, 0.7), 0, "there: held")
+			t.eq(settle("Run", S.at + S.slack / 2, runLength, 5, 85, 0.7), 0, "just past it: held")
+			local seconds = 5 / 85 * math.log(5 / H.still) -- until it stands
+			t.near(settle("Run", S.at - 0.1, runLength, 5, 85, 0.7), 0.1 / seconds, 1e-9, "arrives as it stands")
+			t.eq(settle("Run", S.at + 0.1, runLength, 5, 85, 0.7), S.rate, "most of a bound to go: as far as it gets")
+			t.eq(settle("Run", S.at - 0.1, runLength, H.still, 9, 0.3), S.rate, "standing now")
 			-- on a trunk it climbs (and hangs there when still); on a wire or bough it runs the wire clip
 			t.eq(pick("trunk", 10, false), "Climb")
 			t.eq(pick("trunk", 0, false), "Climb")
 			t.eq(pick("rail", 20, false), "Wire")
 			t.eq(pick("rail", 0, false), "Idle")
+			t.eq(pick("rail", 0, true), "Idle")
+			-- in the air: the leap, however it got there, but for a pounce
 			t.eq(pick("air", 30, false), "Leap")
+			t.eq(pick("air", 30, false, "leap"), "Leap")
+			t.eq(pick("air", 30, false, "pounce"), "Pounce")
+			t.truthy(clips.Pounce ~= nil)
 			-- the run keeps step with the motor's stride: one bound per cadence cycle, never a blur
 			local run = clips.Run.length
 			t.near(rate("Run", 18, 2 * math.pi * 3, run), 3 * run, 1e-9, "three bounds a second")
@@ -256,11 +291,29 @@ return function(t: any)
 				"faster legs at a faster walk"
 			)
 			t.eq(rate("Walk", 0.01, nil, clips.Walk.length), H.minRate)
+			-- the clips are authored to these strides (tools/blender/heroes/clips_squirrel.py: a planted paw
+			-- goes back under the body at exactly this much a cycle), so they change together or paws slide
+			for name, studs in { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 6.9, Stalk = 2.2 } do
+				t.eq(H.stride[name], studs, `{name} stride`)
+			end
+			-- along a wire: two small bounds over 6.9 studs, in step at any speed up to the rail's 18 studs/s
+			-- (with 4.5 the paws slid a third of every stride below that)
+			t.near(rate("Wire", 9, nil, clips.Wire.length), 9 / 6.9 * clips.Wire.length, 1e-9, "a slow wire")
+			t.near(rate("Wire", 17.9, nil, clips.Wire.length), 17.9 / 6.9 * clips.Wire.length, 1e-9)
+			t.eq(rate("Wire", 18, nil, clips.Wire.length), H.maxRate, "the rail's walk is the clip's fastest")
 			-- hanging still on a trunk holds the pose; idle and the leap play at their own speed
 			t.eq(rate("Climb", 0, nil, clips.Climb.length), 0)
 			t.truthy(rate("Climb", 10, nil, clips.Climb.length) > 0.5)
 			t.eq(rate("Idle", 0, nil, clips.Idle.length), 1)
 			t.eq(rate("Leap", 40, nil, clips.Leap.length), 1)
+			-- a launched leap goes from its take-off to its landing in the time the body is in the air
+			for name, air in H.air do
+				t.truthy(air.launch < air.fall and air.fall < air.land and air.land < clips[name].length, name)
+				t.near(rate(name, 18, nil, clips[name].length, 0.5), (air.land - air.launch) / 0.5, 1e-9, name)
+				t.eq(rate(name, 18, nil, clips[name].length, 0.01), H.maxRate, "never a blur")
+				t.eq(rate(name, 18, nil, clips[name].length, 60), H.minRate)
+				t.eq(rate(name, 18, nil, clips[name].length, 0), 1)
+			end
 			t.eq(clips.Leap.loop, false)
 			t.eq(clips.Run.loop, true)
 		end

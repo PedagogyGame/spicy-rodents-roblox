@@ -22,7 +22,7 @@ local HeroAssets = {}
 
 HeroAssets.SPECIES = {
 	squirrel = {
-		assetId = 127244611331985,
+		assetId = 128344898172346,
 		hipHeight = 0.9,
 		regions = {
 			Body = { alphaMode = "Overlay" },
@@ -38,7 +38,7 @@ HeroAssets.SPECIES = {
 		},
 	},
 	rodent = {
-		assetId = 80428470170681,
+		assetId = 133769194457190,
 		hipHeight = 0.9,
 		regions = {
 			Blood = { alphaMode = "Transparency" },
@@ -59,15 +59,15 @@ HeroAssets.SPECIES = {
 -- The squirrel rig's animation clips (the rodent shares them): asset id, seconds, whether it loops.
 HeroAssets.CLIPS = {
 	squirrel = {
-		Bite = { id = "rbxassetid://107543483770582", length = 2.0667, loop = false },
-		Climb = { id = "rbxassetid://106748373386847", length = 0.6, loop = true },
-		Idle = { id = "rbxassetid://114052541887620", length = 3.0, loop = true },
-		Leap = { id = "rbxassetid://86002579743514", length = 0.7667, loop = false },
-		Pounce = { id = "rbxassetid://106395010025022", length = 0.9667, loop = false },
-		Run = { id = "rbxassetid://75567975955833", length = 0.4667, loop = true },
-		Stalk = { id = "rbxassetid://107478850422829", length = 1.2, loop = true },
-		Walk = { id = "rbxassetid://100972548402656", length = 0.8, loop = true },
-		Wire = { id = "rbxassetid://112948511637029", length = 1.0, loop = true },
+		Bite = { id = "rbxassetid://80748279389978", length = 2.0667, loop = false },
+		Climb = { id = "rbxassetid://124697817757826", length = 0.6, loop = true },
+		Idle = { id = "rbxassetid://131290508281628", length = 3.0, loop = true },
+		Leap = { id = "rbxassetid://102733473426026", length = 0.7667, loop = false },
+		Pounce = { id = "rbxassetid://125262543371003", length = 0.9667, loop = false },
+		Run = { id = "rbxassetid://116948739011953", length = 0.4667, loop = true },
+		Stalk = { id = "rbxassetid://87730756983478", length = 1.2, loop = true },
+		Walk = { id = "rbxassetid://80734625038082", length = 0.8, loop = true },
+		Wire = { id = "rbxassetid://75735754293305", length = 1.0, loop = true },
 	},
 } :: { [string]: { [string]: Clip } }
 
