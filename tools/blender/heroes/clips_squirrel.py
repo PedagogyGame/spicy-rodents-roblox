@@ -18,7 +18,12 @@ from species_squirrel import BACK, FRONT, TAIL
 
 TAU = 2 * math.pi
 PIVOT = (0.0, 0.0, 0.9)
-RUN_TRAVEL = 5.6  # studs of ground per Run cycle (the motor strides 5.5 at a walk, 5.9 flat out)
+# Studs of ground under one cycle of each moving clip: what the game's rate rule makes a cycle cover
+# (AnimationDriver.heroRate: Run by the motor's cadence, 5.5 studs a bound at a walk and 5.9 flat out;
+# the others by HERO.stride). Planted paws go back at exactly this, so they stay where they are put.
+RUN_TRAVEL = 5.6
+WALK_TRAVEL = 2.4
+STALK_TRAVEL = 2.2
 SPINE = ["Hips", "Spine1", "Spine2", "Spine3", "Chest"]
 NECK = ["Neck", "Head"]
 LEGS = ("FrontL", "FrontR", "BackL", "BackR")
@@ -67,20 +72,60 @@ def bend_side(rig, W, leg, tgt, foot_pitch, splay=0.0):
     return q + np.array([splay * side(leg), 0.0, 0.0])
 
 
+def turn_onto(a, b):
+    """The smallest rotation that takes direction a onto direction b."""
+    a, b = engine.unit(a), engine.unit(b)
+    ax = np.cross(a, b)
+    s = np.linalg.norm(ax)
+    if s < 1e-9:
+        return np.eye(3)
+    return engine.rot_axis(ax, math.atan2(s, float(a @ b)))
+
+
 def build_pose(rig, P, cfg):
-    """clips.build_pose, with one more way to say where a leg bends: a number in place of the pole
-    direction is a splay, and the joint then keeps to its own side of the leg (bend_side)."""
-    legs = P.get("legs", {})
-    if any(np.isscalar(v[3]) for v in legs.values()):
-        D = rig.identity()
-        engine.body(D, cfg["pivot"], **P.get("body", {}))
-        if "spine" in P:
-            engine.spine(D, cfg["spine_bones"], *P["spine"])
-        W = rig.fk(D)
-        P = dict(P)
-        P["legs"] = {leg: (tgt, fp, tp, bend_side(rig, W, leg, tgt, fp, pl) if np.isscalar(pl) else pl)
-                     for leg, (tgt, fp, tp, pl) in legs.items()}
-    return engine.build_pose(rig, P, cfg)
+    """A pose from explicit parameters, as clips.build_pose, with more ways to say it:
+      legs: {leg: (toe xyz, foot_pitch, toe_pitch, pole)}; a NUMBER for the pole is a splay, and the knee
+            or elbow then keeps to its own side of the leg (bend_side)
+      tail_dirs: where each tail segment points in the MODEL's frame, a vector each (tail_dirs()); the
+            pelvis may pitch and roll under the tail without dragging it about
+      tail: (pitches, yaws), local, as before
+      turn: {bone: 3x3} more local rotation for a body bone, before the legs are placed"""
+    D = rig.identity()
+    engine.body(D, cfg["pivot"], **P.get("body", {}))
+    if "spine" in P:
+        engine.spine(D, cfg["spine_bones"], *P["spine"])
+    for name, R in P.get("turn", {}).items():
+        D[name][0] = D[name][0] @ R
+    W = rig.fk(D)
+    for leg, (tgt, fp, tp, pl) in P.get("legs", {}).items():
+        tgt = np.asarray(tgt, float)
+        pl = bend_side(rig, W, leg, tgt, fp, pl) if np.isscalar(pl) else np.asarray(pl, float)
+        rig.leg(D, W, leg, tgt, fp, tp, pl)
+    if "neck_pre" in P:
+        chain = cfg["neck_chain"]
+        k = 1.0 / (len(chain) - 1)
+        for n in chain[:-1]:
+            D[n][0] = D[n][0] @ engine.Rx(P["neck_pre"] * k)
+    W = rig.fk(D)
+    if "head" in P:
+        yaw, pitch, roll = P["head"]
+        engine.look(D, rig, W, cfg["neck_chain"], engine.Rz(yaw) @ engine.Rx(pitch) @ engine.Ry(roll), cfg.get("neck_weights"))
+    if "tail_dirs" in P:
+        Rp = W["Hips"][0]
+        for k, d in enumerate(P["tail_dirs"]):
+            R = turn_onto(Rp @ TAIL_DIR[k], d) @ Rp
+            D[f"Tail{k + 1}"][0] = Rp.T @ R
+            Rp = R
+    elif "tail" in P:
+        pitches, yaws = P["tail"]
+        engine.tail(D, "Tail", len(pitches), pitches, yaws)
+    if "jaw" in P:
+        D["Jaw"][0] = D["Jaw"][0] @ engine.Rx(P["jaw"])
+    if "ears" in P:
+        (lp, ly), (rp, ry) = P["ears"]
+        D["EarL"][0] = D["EarL"][0] @ engine.Rz(ly) @ engine.Rx(lp)
+        D["EarR"][0] = D["EarR"][0] @ engine.Rz(ry) @ engine.Rx(rp)
+    return D
 
 
 def hind_pitch(st, f, land=0.2, push=1.15, curl=0.9):
@@ -157,82 +202,126 @@ def curve(n, table, wrap=True):
     return lambda p: cyc(p, keys, wrap)
 
 
-# how far each tail segment rises at rest (radians above the horizontal, pointing back)
-TAIL_REST = [math.atan2(b[2] - a[2], b[1] - a[1]) for a, b in zip(TAIL, TAIL[1:])]
+# each tail segment's direction at rest (it rises at about 25 degrees, then levels)
+TAIL_DIR = [engine.unit(np.array(b) - np.array(a)) for a, b in zip(TAIL, TAIL[1:])]
 
 
-def tail_local(elev, head, pelvis_pitch=0.0, pelvis_yaw=0.0):
-    """The tail's local rotations from where each segment should point in the MODEL's frame, whatever
-    the pelvis is doing under it: elev[k] radians above the horizontal, head[k] radians round to the
-    body's right of straight back. pelvis_pitch and pelvis_yaw: how far the body and spine have already
-    turned the tail's root (body pitch - arch / 2, body yaw - bend / 2)."""
-    pitches, yaws = [], []
-    pe, ph = pelvis_pitch, pelvis_yaw
-    for k in range(len(elev)):
-        e = elev[k] - TAIL_REST[k]
-        pitches.append(e - pe)
-        yaws.append(head[k] - ph)
-        pe, ph = e, head[k]
-    return pitches, yaws
+def tail_dirs(elev, lat=None):
+    """Directions for build_pose's tail_dirs: segment k points elev[k] radians above the horizontal
+    (straight back at 0, straight up at pi / 2) and leans lat[k] to the body's left (a slope: 0.3 is
+    about 17 degrees), in the model's own frame."""
+    lat = lat or [0.0] * len(elev)
+    return [np.array([lat[k], math.cos(elev[k]), math.sin(elev[k])]) for k in range(len(elev))]
+
+
+def flow(n, p, mean, swing, peak, lag, grow=0.0):
+    """Where each of n tail segments points at phase p: mean[k] + a swing that is at its most at phase
+    `peak` at the root and `lag` cycles later with every segment, `grow` larger with each: a wave running
+    down the tail, never the tail moving as one piece."""
+    return [mean[k] + (swing + grow * k) * math.cos(TAU * (p - peak - lag * k)) for k in range(n)]
+
+
+def pulse(p, at, width):
+    """A bump of height 1 at phase `at`, about `width` cycles wide, repeating every cycle."""
+    d = (p - at + 0.5) % 1.0 - 0.5
+    return math.exp(-((d / width) ** 2))
 
 
 # ---- loops ------------------------------------------------------------------------------------------
 
+def planted(dx=0.0, dy_front=0.0, dy_back=0.0, splay_front=0.3, splay_back=0.45):
+    """All four paws flat on the ground at rest, moved by dx outward and dy back."""
+    legs = {}
+    for leg in LEGS:
+        front = leg.startswith("Front")
+        t = toe_rest(leg) + np.array([dx * side(leg), dy_front if front else dy_back, 0.0])
+        legs[leg] = (t, 0.78 if front else 0.12, 0.15 if front else 0.1, splay_front if front else splay_back)
+    return legs
+
+
+# the tail at rest over the back: a reclined question mark (never past upright), the tip curling back
+TAIL_CURL = [0.80, 1.00, 1.08, 0.98, 0.72, 0.38, 0.05, -0.25]
+TAIL_LEAN = [0.22, 0.32, 0.40, 0.42, 0.38, 0.32, 0.26, 0.20]  # how far it leans to one side, per segment
+
+
 def idle(rig, n=90):
-    head_keys = [(0.0, (0.0, -0.12)), (0.17, (0.0, -0.12)), (0.21, (0.55, -0.04)), (0.43, (0.55, -0.04)),
-                 (0.47, (-0.38, 0.04)), (0.66, (-0.38, 0.04)), (0.71, (0.08, 0.28)), (0.86, (0.08, 0.28)),
-                 (0.92, (0.0, -0.12)), (1.0, (0.0, -0.12))]
+    """Standing, never quite still: crouched low on folded hind legs with the back rounded, breathing
+    quick and shallow; the head snaps from one look to the next and holds, dips to sniff, comes up
+    alert; the weight shifts after the head; the tail stands in a soft curl leaning to one side, swishes
+    over to the other and back, and flags twice in short bursts that run from root to tip; each ear
+    twitches on its own. Every paw stays where it is."""
+    look = [(0.0, (0.0, -0.10)), (0.10, (0.0, -0.10)), (0.13, (0.50, -0.05)), (0.24, (0.50, -0.05)), (0.26, (0.60, -0.01)),
+            (0.36, (0.60, -0.01)), (0.40, (-0.45, -0.12)), (0.49, (-0.45, -0.12)), (0.51, (-0.36, -0.17)), (0.58, (-0.36, -0.17)),
+            (0.63, (0.06, 0.24)), (0.78, (0.06, 0.24)), (0.82, (0.0, -0.30)), (0.93, (0.0, -0.30)), (0.98, (0.0, -0.10)), (1.0, (0.0, -0.10))]
+    # which side the tail leans to (+1 left, -1 right): over and back once a loop, not in even halves
+    lean = [(0.0, 1.0), (0.42, 1.0), (0.50, -1.0), (0.86, -1.0), (0.95, 1.0), (1.0, 1.0)]
 
     def pose(i, n):
         p = i / n
-        t = i / 30.0
-        breath = math.sin(TAU * 2 * p)
-        yaw = piecewise(p, [(k, v[0]) for k, v in head_keys])
-        hp = piecewise(p, [(k, v[1]) for k, v in head_keys])
-        # sniffing: quick small nods while the nose is down
-        sniff = 0.03 * math.sin(TAU * 12 * p) * smooth((p - 0.72) / 0.03) * smooth((0.85 - p) / 0.03)
-        flick = math.exp(-((p - 0.58) / 0.05) ** 2)
-        pw = wave(8, TAU * 2 * p, 0.05, 0.55, 1.0)
-        pw = [w + 0.35 * flick * math.sin(TAU * 4 * (p - 0.58) - 0.7 * k) * (k + 1) / 8 for k, w in enumerate(pw)]
-        yw = wave(8, TAU * p + 1.0, 0.06, 0.4, 1.5)
-        ear_l = (0.0, -0.35 * math.exp(-((p - 0.4) / 0.015) ** 2))
-        ear_r = (0.0, 0.35 * math.exp(-((p - 0.83) / 0.015) ** 2))
-        legs = {leg: (toe_rest(leg), 0.2 if leg.startswith("Back") else 0.78, 0.15, pole(leg)) for leg in LEGS}
+        breath = math.sin(TAU * 4 * p)
+        yaw = piecewise(p, [(k, v[0]) for k, v in look])
+        hp = piecewise(p, [(k, v[1]) for k, v in look])
+        late = piecewise((p - 0.035) % 1.0, [(k, v[0]) for k, v in look])  # the body follows the head, a beat behind
+        sniff = 0.035 * math.sin(TAU * 13 * p) * smooth((p - 0.64) / 0.03) * smooth((0.78 - p) / 0.03)
+        alert = smooth((p - 0.80) / 0.03) * smooth((0.95 - p) / 0.04)
+        down = smooth((p - 0.61) / 0.04) * smooth((0.80 - p) / 0.03)
+        elev, lat = [], []
+        for k in range(8):
+            ph = p - 0.012 * k  # each segment a little later than the one before
+            side_k = piecewise(ph % 1.0, lean)
+            flag = pulse(ph, 0.30, 0.035) * math.sin(TAU * 13 * (ph - 0.30)) + pulse(ph, 0.73, 0.05) * math.sin(TAU * 12 * (ph - 0.73))
+            elev.append(TAIL_CURL[k] + (0.03 + 0.012 * k) * math.sin(TAU * (ph - 0.1)) + (0.05 + 0.045 * k) * flag - 0.10 * (1 - side_k * side_k) * (k / 7))
+            lat.append(TAIL_LEAN[k] * side_k + 0.02 * k * math.sin(TAU * 2 * (ph + 0.2)))
+        ear_l = (0.16 * alert, -0.35 * (pulse(p, 0.20, 0.012) + pulse(p, 0.55, 0.012)))
+        ear_r = (0.16 * alert, 0.35 * (pulse(p, 0.44, 0.012) + pulse(p, 0.88, 0.012)))
         P = {
-            "body": dict(bob=0.006 * breath, pitch=-0.06 + 0.008 * breath, roll=0.01 * math.sin(TAU * p)),
-            "spine": (0.14 + 0.02 * breath, 0.02 * math.sin(TAU * p), 0.0),
-            "legs": legs,
-            "head": (yaw, hp + sniff, 0.06 * math.sin(TAU * p)),
-            "tail": tail_with(TAIL_UP, pw, yw),
+            "body": dict(bob=-0.095 + 0.005 * breath + 0.02 * alert - 0.01 * down, pitch=-0.03 + 0.004 * breath - 0.07 * alert + 0.06 * down,
+                         roll=0.04 * late, sway=-0.03 * late + 0.008 * math.sin(TAU * p), yaw=0.05 * late),
+            "spine": (0.26 + 0.02 * breath - 0.06 * alert, 0.16 * late, 0.08 * late),
+            "legs": planted(dx=0.02, dy_back=-0.05),
+            "head": (yaw, hp + sniff, 0.10 * late + 0.03 * math.sin(TAU * 3 * p)),
+            "tail_dirs": tail_dirs(elev, lat),
             "ears": (ear_l, ear_r),
         }
         return build_pose(rig, P, CFG)
 
     return {"name": "Idle", "frames": n, "pose": pose, "loop": True, "priority": "Idle",
-            "keys": [0, 20, 40, 64], "brief": "idle"}
+            "keys": [0, 21, 40, 66, 78], "brief": "idle"}
 
 
 def walk(rig, n=24):
-    spec = {
-        "BackL": dict(offset=0.0, duty=0.62, stride=0.34, lift=0.08),
-        "FrontL": dict(offset=0.25, duty=0.62, stride=0.32, lift=0.07),
-        "BackR": dict(offset=0.5, duty=0.62, stride=0.34, lift=0.08),
-        "FrontR": dict(offset=0.75, duty=0.62, stride=0.32, lift=0.07),
-    }
+    """The quick low scuttle of the slow speeds (the game shows it between standing and the run): two
+    trotting steps a cycle, WALK_TRAVEL studs of ground under them, the belly low, the diagonal pairs
+    flicking through short strides while the back snakes from side to side and the tail trails in a soft
+    curve with the same wave running down it."""
+    g = n // 2  # keys in one step cycle
+    S = WALK_TRAVEL / 2
+    fore = Limb(g, 6, S, -0.84, 0.13, y={8: -0.42, 10: -0.80, 11: -0.88}, z={7: 0.05, 9: 0.085, 11: 0.03},
+                fp={0: 0.7, 3: 0.9, 6: 1.7, 8: 2.3, 10: 0.9, 11: 0.7}, tp={0: 0.2, 6: 0.25, 8: 1.4, 10: 0.3}, splay=0.3)
+    hind = Limb(g, 6, S, -0.14, 0.20, y={8: 0.30, 10: -0.10, 11: -0.18}, z={7: 0.05, 9: 0.08, 11: 0.03},
+                fp={0: 0.15, 3: 0.3, 6: 1.1, 7: 1.2, 8: 0.9, 10: 0.4, 11: 0.2}, tp={0: 0.1, 6: 0.15, 8: 0.9, 10: 0.2}, splay=0.5)
+    offsets = {"FrontL": 0.0, "BackR": 0.0, "FrontR": 0.5, "BackL": 0.5}
+    tail_mean = [0.16, 0.24, 0.28, 0.26, 0.20, 0.12, 0.04, -0.04]
 
     def pose(i, n):
         p = i / n
+        q = (2 * p) % 1.0  # the step's own phase
+        legs = {leg: (fore if leg.startswith("Front") else hind).at(leg, q - offsets[leg]) for leg in LEGS}
+        wig = math.sin(TAU * (q + 0.02))  # + as the left forepaw and right hind foot take the weight
+        elev = flow(8, p, tail_mean, 0.05, 0.3, 0.05, 0.012)
+        lat = flow(8, q, [0.0] * 8, 0.08, 0.40, 0.07, 0.035)
         P = {
-            "body": dict(bob=0.012 * math.cos(TAU * 2 * p), pitch=-0.03, roll=0.03 * math.sin(TAU * p), yaw=0.02 * math.sin(TAU * p + 0.6)),
-            "spine": (0.08, 0.05 * math.sin(TAU * p), 0.02 * math.sin(TAU * p)),
-            "legs": gait_legs(p, spec),
-            "head": (0.04 * math.sin(TAU * p), -0.06 + 0.03 * math.sin(TAU * 2 * p - 0.8), 0.0),
-            "tail": tail_with(TAIL_SOFT, wave(8, TAU * 2 * p - 1.2, 0.05, 0.5, 0.8), wave(8, TAU * p, 0.07, 0.45, 1.2)),
+            "body": dict(bob=-0.085 + 0.012 * math.cos(TAU * 2 * (q - 0.06)), pitch=0.03, roll=0.035 * wig, yaw=-0.04 * math.cos(TAU * q), sway=0.012 * wig),
+            "spine": (0.10 + 0.03 * math.cos(TAU * 2 * q), 0.13 * math.cos(TAU * q), 0.05 * wig),
+            "legs": legs,
+            "head": (0.05 * math.sin(TAU * (p - 0.1)), -0.07 + 0.015 * math.sin(TAU * 2 * (q - 0.2)), 0.0),
+            "tail_dirs": tail_dirs(elev, lat),
+            "ears": ((-0.2 + 0.05 * math.sin(TAU * (q - 0.2)), 0.05), (-0.2 + 0.05 * math.sin(TAU * (q - 0.45)), -0.05)),
         }
         return build_pose(rig, P, CFG)
 
     return {"name": "Walk", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(0.34 / (0.62 * n / 30), 2), "keys": [0, 6, 12, 18], "brief": "walk"}
+            "nominal_speed": round(WALK_TRAVEL / (n / 30), 2), "travel": WALK_TRAVEL, "keys": [0, 3, 6, 9], "brief": "walk (scuttle)"}
 
 
 class Limb:
@@ -263,13 +352,6 @@ class Limb:
             y, z = self.y(u), self.z(u)
         tgt = np.array([self.xs(u) * side(leg), y + dy, toe_rest(leg)[2] + self.ground + z])
         return (tgt, self.fp(u), self.tp(u), self.splay(u))
-
-
-def flow(n, p, mean, swing, peak, lag, grow=0.0):
-    """Where each of n tail segments points at phase p: mean[k] + a swing that peaks at phase `peak` at
-    the root and `lag` cycles later with every segment, `grow` larger with each: a wave running down the
-    tail, never the tail moving as one piece."""
-    return [mean[k] + (swing + grow * k) * math.cos(TAU * (p - peak - lag * k)) for k in range(n)]
 
 
 def run(rig, n=14):
@@ -309,7 +391,7 @@ def run(rig, n=14):
         b_yaw = 0.03 * math.sin(TAU * p)
         bend = 0.05 * math.sin(TAU * (p - 0.3))
         elev = flow(8, p, tail_mean, 0.22, 0.10, 0.045, 0.02)
-        head = flow(8, p, [0.0] * 8, 0.05, 0.55, 0.05, 0.03)
+        lat = flow(8, p, [0.0] * 8, 0.05, 0.55, 0.05, 0.035)
         P = {
             "body": dict(bob=bob(p), pitch=b_pitch, surge=surge(p), roll=b_roll, yaw=b_yaw),
             "spine": (b_arch, bend, 0.05 * math.sin(TAU * (p + 0.05))),
@@ -317,7 +399,7 @@ def run(rig, n=14):
             # the neck gives against the chest (down as the chest comes up), so the head rides steadier
             "neck_pre": -0.7 * (b_pitch + 0.5 * b_arch),
             "head": (0.02 * math.sin(TAU * (p - 0.2)), -0.05 + 0.03 * math.sin(TAU * (p - 0.45)), 0.0),
-            "tail": tail_local(elev, head, b_pitch - 0.5 * b_arch, b_yaw - 0.5 * bend),
+            "tail_dirs": tail_dirs(elev, lat),
             "ears": ((-0.45 + 0.08 * math.sin(TAU * (p - 0.1)), 0.1), (-0.45 + 0.08 * math.sin(TAU * (p - 0.3)), -0.1)),
         }
         return build_pose(rig, P, CFG)
@@ -386,32 +468,45 @@ def wire(rig, n=30):
 
 
 def stalk(rig, n=36):
-    """Sneak: belly low, a slow lateral-sequence creep with careful high steps, head low and level
-    on the target, tail low and straight with the tip twitching."""
-    spec = {
-        "BackL": dict(offset=0.0, duty=0.76, stride=0.24, lift=0.075, lift_bias=0.6, dy=0.02),
-        "FrontL": dict(offset=0.25, duty=0.76, stride=0.22, lift=0.08, lift_bias=0.6, pk=dict(land=0.9, push=1.4, fold=2.2)),
-        "BackR": dict(offset=0.5, duty=0.76, stride=0.24, lift=0.075, lift_bias=0.6, dy=0.02),
-        "FrontR": dict(offset=0.75, duty=0.76, stride=0.22, lift=0.08, lift_bias=0.6, pk=dict(land=0.9, push=1.4, fold=2.2)),
-    }
+    """The stalk: belly almost on the ground, two long creeping strides a cycle (STALK_TRAVEL studs under
+    them), one paw at a time in the order left hind, left fore, right hind, right fore, each reaching far
+    ahead and set down with care. The body moves in pulses, easing forward and all but stopping between
+    steps; the shoulders rock as each foreleg takes the weight and the hips sway the other way. The head
+    is carried low, level and dead steady; the tail lies low and straight behind, clear of the back, and
+    only its tip twitches."""
+    g = n // 2
+    S = STALK_TRAVEL / 2
+    fore = Limb(g, 12, S, -0.87, 0.14, y={13: -0.22, 15: -0.58, 17: -0.90}, z={13: 0.05, 15: 0.11, 17: 0.05},
+                fp={0: 0.75, 6: 0.85, 12: 1.6, 14: 2.3, 16: 0.9, 17: 0.7}, tp={0: 0.2, 12: 0.3, 14: 1.6, 16: 0.2}, splay=0.55)
+    hind = Limb(g, 12, S, -0.20, 0.21, y={13: 0.46, 15: 0.14, 17: -0.22}, z={13: 0.05, 15: 0.10, 17: 0.04},
+                fp={0: 0.14, 6: 0.25, 12: 1.0, 14: 0.9, 16: 0.4, 17: 0.2}, tp={0: 0.1, 12: 0.15, 14: 0.8, 16: 0.15}, splay=0.75)
+    offsets = {"BackL": 0.0, "FrontL": 5 / g, "BackR": 9 / g, "FrontR": 14 / g}
+    tail_mean = [-0.10, -0.08, -0.05, -0.02, 0.0, 0.03, 0.08, 0.14]
 
     def pose(i, n):
         p = i / n
-        twitch = [0, 0, 0, 0, 0, 0.12, 0.2, 0.28]
-        yw = [w + tw * math.sin(TAU * 3 * p) for w, tw in zip(wave(8, TAU * p, 0.03, 0.4), twitch)]
+        q = (2 * p) % 1.0
+        legs = {leg: (fore if leg.startswith("Front") else hind).at(leg, q - offsets[leg]) for leg in LEGS}
+        # + while the left foreleg carries the chest (its stance runs from 5/18 to 17/18 of the step cycle)
+        rock = math.sin(TAU * (q - 5 / g - 0.08))
+        hip = math.sin(TAU * (q - 0.08))  # + while the left hind foot carries the rump
+        creep = math.sin(TAU * 2 * (q - 0.02))  # two pulses to a stride
+        twitch = [0.0, 0.0, 0.0, 0.0, 0.03, 0.10, 0.20, 0.32]
+        lat = [0.03 * k * math.sin(TAU * (p - 0.2 - 0.04 * k)) + twitch[k] * math.sin(TAU * 5 * p) * (0.5 + 0.5 * math.sin(TAU * (p - 0.1))) for k in range(8)]
+        elev = [tail_mean[k] + 0.012 * k * math.sin(TAU * (q - 0.05 * k)) for k in range(8)]
         P = {
-            "body": dict(bob=-0.15 + 0.008 * math.cos(TAU * 2 * p), pitch=0.05, roll=0.015 * math.sin(TAU * p)),
-            "spine": (-0.04, 0.03 * math.sin(TAU * p), 0.0),
-            "legs": gait_legs(p, spec),
-            "neck_pre": 0.38,
-            "head": (0.0, 0.02, 0.0),
-            "tail": (TAIL_LOW, yw),
-            "ears": ((0.18, 0.0), (0.18, 0.0)),
+            "body": dict(bob=-0.155 + 0.008 * math.cos(TAU * 2 * q), pitch=0.04, surge=0.045 * creep, roll=0.02 * hip, sway=0.02 * hip, yaw=0.025 * math.cos(TAU * q)),
+            "spine": (-0.03 + 0.07 * math.cos(TAU * 2 * (q - 0.1)), 0.10 * math.cos(TAU * (q - 0.05)), 0.16 * rock),
+            "legs": legs,
+            "neck_pre": 0.36,
+            "head": (0.0, 0.03, 0.0),
+            "tail_dirs": tail_dirs(elev, lat),
+            "ears": ((0.18, 0.04 * math.sin(TAU * 3 * p)), (0.18, -0.04 * math.sin(TAU * 3 * p + 1.3))),
         }
         return build_pose(rig, P, CFG)
 
     return {"name": "Stalk", "frames": n, "pose": pose, "loop": True, "priority": "Movement",
-            "nominal_speed": round(0.24 / (0.76 * n / 30), 2), "keys": [0, 9, 18, 27], "brief": "sneak (stalk)"}
+            "nominal_speed": round(STALK_TRAVEL / (n / 30), 2), "travel": STALK_TRAVEL, "keys": [0, 5, 9, 14], "brief": "sneak (stalk)"}
 
 
 # ---- one-shots --------------------------------------------------------------------------------------
