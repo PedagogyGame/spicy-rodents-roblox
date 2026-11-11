@@ -222,6 +222,37 @@ return function(t)
 		t.deepEq(BumperPool.view(x), BumperPool.view(y))
 	end)
 
+	t.test("thinking can be spread over frames: breathe is called after every model run and changes nothing", function()
+		-- bumper pool: the best player's whole search
+		local b = BumperPool.init(2, 9)
+		local runs = 0
+		local with = Computer.bumper(b, 1, 3, 9, function()
+			runs += 1
+		end)
+		t.deepEq(with, Computer.bumper(b, 1, 3, 9), "the same strike with or without it")
+		t.truthy(runs >= 36 and runs <= 144, `the best player tried {runs} shots`)
+		local beginner = 0
+		Computer.bumper(b, 1, 1, 9, function()
+			beginner += 1
+		end)
+		t.truthy(beginner >= 1 and beginner < runs, `the beginner tried {beginner}`)
+		-- eight-ball: a table past its break, the best player looking ahead
+		local s = EightBall.init(2, 3)
+		EightBall.input(s, 1, "shoot", { 0, 1, 0, 0 })
+		local looks = 0
+		local a = Computer.eightBall(s, 3, 3, function()
+			looks += 1
+		end)
+		t.deepEq(a, Computer.eightBall(s, 3, 3))
+		t.truthy(looks <= 36, `at most a few dozen looks ({looks})`)
+		-- the beginner plays what it sees: no model runs at all when a shot is on
+		local none = 0
+		Computer.eightBall(s, 1, 3, function()
+			none += 1
+		end)
+		t.truthy(none <= 24)
+	end)
+
 	t.test("bumper pool practice: each computer player sinks its five alone", function()
 		local shots: { number } = {}
 		for level = 1, 3 do

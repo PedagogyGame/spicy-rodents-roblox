@@ -191,6 +191,53 @@ return function(t)
 		end
 	)
 
+	t.test("POOL-P3 the angle shortens a little at speed: a hard bank comes off steeper than a soft one", function()
+		-- a ball into the foot cushion at 45 degrees. Returns the angle off the cushion as it leaves, and the
+		-- angle it settles to once the cloth has it rolling again (v = (5 v + 2 q) / 7)
+		local function bank(v: number, roll: number): (number, number)
+			local c = v * 0.7071067811865476
+			local w = world(pool, { { id = 0, x = -2.2, z = pool.halfL - R - 0.01 } }, {
+				id = 0,
+				vx = c,
+				vz = c,
+				qx = roll * c,
+				qz = roll * c,
+				s = 0,
+			})
+			untilEvents(w, 1)
+			t.eq(w.events[2], EV.cushion)
+			local k = w.keys[1]
+			local o = #k - Physics.KEY_STRIDE
+			local vx, vz, qx, qz = k[o + 4], k[o + 5], k[o + 6], k[o + 7]
+			local off = math.deg(math.atan2(-vz, vx))
+			return off, math.deg(math.atan2(-(5 * vz + 2 * qz), 5 * vx + 2 * qx))
+		end
+		-- a ball that arrives rolling: each harder bank leaves a little steeper and settles a little steeper
+		local lastOff, lastSettled = 0, 0
+		for _, v in { 2, 5, 9, 14, 22, 34 } do
+			local off, settled = bank(v, 1)
+			t.truthy(off > lastOff, `{v} studs/s leaves at {off} (softer: {lastOff})`)
+			t.truthy(settled > lastSettled, `{v} studs/s settles at {settled} (softer: {lastSettled})`)
+			lastOff, lastSettled = off, settled
+		end
+		local softOff, softSettled = bank(2, 1)
+		local hardOff, hardSettled = bank(22, 1)
+		t.truthy(
+			hardOff - softOff > 2 and hardOff - softOff < 7,
+			`a little: {hardOff - softOff} degrees off the cushion`
+		)
+		t.truthy(
+			hardSettled - softSettled > 0.8 and hardSettled - softSettled < 5,
+			`{hardSettled - softSettled} settled`
+		)
+		-- a rolling ball banks long of a mirror (its roll carries it on); a firm shot arrives still sliding and
+		-- banks short of one: the same cushion, the two banks a player learns
+		local _, rolling = bank(9, 1)
+		local _, sliding = bank(9, 0)
+		t.truthy(rolling < 45 and rolling > 36, `rolling in: {rolling}`)
+		t.truthy(sliding > 45 and sliding < 62, `sliding in: {sliding}`)
+	end)
+
 	t.test("POOL-P4 a clean pot drops: straight into a corner and straight into a side pocket", function()
 		for _, h in { 6, 4, 1, 3 } do
 			local hole = pool.holes[h]

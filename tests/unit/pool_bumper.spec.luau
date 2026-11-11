@@ -33,13 +33,14 @@ return function(t)
 		end
 		return false
 	end
-	-- the first opening bank (angle, at power 0.2) that sinks seat 1's marked ball on an otherwise still table
+	-- the first opening bank (angle, at power 0.2) that sinks seat 1's marked ball off the side cushion and
+	-- touches no other ball on the way (so it is the same bank whatever the other marked ball is doing)
 	local function sinkingAngle(): number
 		for i = 0, 120 do
 			local angle = math.rad(30 + i * 0.125)
 			local s = Shot.run(bumper, Tables.bumperStart(), { Cue.strike(1, angle, 0.2, 0, 0.8, nil) })
 			local pots = Shot.pots(s)
-			if #pots == 1 and pots[1].ball == 1 and pots[1].hole == 2 then
+			if #pots == 1 and pots[1].ball == 1 and pots[1].hole == 2 and s.first[1] == 0 then
 				return angle
 			end
 		end
@@ -163,11 +164,27 @@ return function(t)
 		t.eq(s.sunk[2], 2, "the opponent drops two of their own")
 		local last = s.last :: BumperPool.Last
 		t.eq(last.awarded, 2)
-		t.deepEq(last.dropped, { 10, 9 }, "unmarked ones first")
-		t.falsy(onTable(s, 10))
+		-- the table picks as a player would: the marked ball while it is still up, then the farthest from the cup
+		t.deepEq(last.dropped, { 6, 9 }, "their marked ball, then the farthest (the lower of two equally far)")
+		t.falsy(onTable(s, 6))
 		t.falsy(onTable(s, 9))
-		t.truthy(onTable(s, 6), "their marked ball stays up")
-		t.falsy(s.markedDown[2])
+		t.truthy(onTable(s, 10))
+		t.truthy(s.markedDown[2], "with the marked ball down, their other balls are free")
+		-- with the marked ball already down, the two lying farthest from the cup go
+		local far = inPlay()
+		far.markedDown[2] = true
+		for i = #far.spots, 1, -1 do
+			local sp = far.spots[i]
+			if sp.id == 6 then
+				table.remove(far.spots, i)
+			elseif sp.id == 10 then
+				sp.x, sp.z = 0.3, -1.6 -- well up the table, near its cup
+			end
+		end
+		far.sunk[2] = 1
+		BumperPool.settle(far, { pot(3, 2) }, by(1))
+		t.deepEq((far.last :: BumperPool.Last).dropped, { 9, 7 }, "the ball near the cup is left to be played")
+		t.truthy(onTable(far, 10))
 		-- once the marked ball is down there is no penalty
 		local ok = inPlay()
 		BumperPool.settle(ok, { pot(1, 2) }, by(1))

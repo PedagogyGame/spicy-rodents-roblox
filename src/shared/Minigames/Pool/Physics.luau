@@ -21,8 +21,10 @@
 --   Cushions: the speed into the cushion comes back times a restitution that falls from E_SOFT to E_HARD as
 --   the shot gets harder; the cushion's grip on the ball's side (speed along the cushion plus side spin)
 --   takes or gives up to MU of the hit, which is how running side widens the angle and check side narrows
---   it; a hard hit sinks in and comes off a little short (SHORTEN); and the ball leaves with ROLL of a
---   natural roll already on it, so a bank learned once works again.
+--   it; a hard hit sinks in and comes off a little short (shorten: about a degree and a half between a soft
+--   bank and a hard one for a ball that arrives rolling, and several more for one that arrives still
+--   sliding, which a firm shot does); and the ball leaves with ROLL of a natural roll already on it, so a
+--   bank learned once works again.
 --   Jaws are cushions that give less back, with the point between cushion and jaw as a round corner: a ball
 --   that catches a point rattles. Posts (bumper pool) are small, lively rubber circles.
 --   Holes: a ball whose centre crosses a hole's rim is in the air and falls (Cloth). Down by the hole's
@@ -82,7 +84,9 @@ export type Response = {
 	keep: number, -- share of the roll into the surface the ball keeps
 	roll: number, -- share of a natural roll it leaves with
 }
-Physics.CUSHION = { eSoft = 0.86, eHard = 0.7, hard = 24, mu = 0.25, shorten = 0.2, keep = 0.1, roll = 0.4 } :: Response
+-- shorten is set against the falling restitution: a harder hit comes back slower, which alone would LENGTHEN
+-- the angle, so the share taken along the cushion must outrun it for a hard bank to come off short
+Physics.CUSHION = { eSoft = 0.86, eHard = 0.7, hard = 24, mu = 0.25, shorten = 0.5, keep = 0.1, roll = 0.4 } :: Response
 Physics.JAW = { eSoft = 0.62, eHard = 0.45, hard = 20, mu = 0.2, shorten = 0.1, keep = 0.1, roll = 0.2 } :: Response
 Physics.POST = { eSoft = 0.92, eHard = 0.84, hard = 30, mu = 0.1, shorten = 0, keep = 0.1, roll = 0.4 } :: Response
 

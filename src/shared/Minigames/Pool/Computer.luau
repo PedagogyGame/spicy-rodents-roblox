@@ -18,8 +18,12 @@
 --   first, always.
 -- Pure and seeded: the same state, level and seed give the same inputs. Lune-tested
 -- (tests/unit/pool_games.spec.luau: whole games to the end on several seeds).
--- Interface: POOL_PLAYERS, BUMPER_PLAYERS ({ name, level }); LEVELS; eightBall(state, level, seed) ->
---   { Input }; bumper(state, seat, level, seed) -> { Input }; Input = { verb, args }
+-- Thinking costs model runs (the best bumper pool player tries up to 144 shots, some tens of milliseconds in
+-- all), so both entry points take an optional `breathe` function that is called after every model run: the
+-- server passes one that yields when its frame budget is spent (the computer player has two seconds before
+-- it must strike), and the answer is the same with or without it.
+-- Interface: POOL_PLAYERS, BUMPER_PLAYERS ({ name, level }); LEVELS; eightBall(state, level, seed,
+--   breathe?) -> { Input }; bumper(state, seat, level, seed, breathe?) -> { Input }; Input = { verb, args }
 
 local BumperPool = require("./BumperPool")
 local Cloth = require("./Cloth")
@@ -302,7 +306,8 @@ local function legalHit(
 	cx: number,
 	cz: number,
 	rng: Rng.Rng,
-	tries: number
+	tries: number,
+	breathe: (() -> ())?
 ): (number, number)
 	local tb = Tables.eightBall()
 	local spots = state.spots
@@ -333,6 +338,9 @@ local function legalHit(
 	for k = 0, tries - 1 do
 		local angle = turn + 2 * math.pi * k / tries
 		local script = Shot.run(tb, spots, { Cue.strike(0, angle, 0.34, 0, 0.8, nil) })
+		if breathe then
+			breathe()
+		end
 		if isLegal[script.first[1]] and script.railAfter then
 			local bad = false
 			for _, p in Shot.pots(script) do
@@ -349,7 +357,7 @@ local function legalHit(
 end
 
 -- The inputs for the computer player's turn at eight-ball (the seat to play is state.seat).
-function Computer.eightBall(state: EightBall.State, level: number, seed: number): { Input }
+function Computer.eightBall(state: EightBall.State, level: number, seed: number, breathe: (() -> ())?): { Input }
 	local L = levelOf(level)
 	local rng = Rng.new(seed * 31 + state.shotNo * 977 + 5)
 	local tb = Tables.eightBall()
@@ -430,6 +438,9 @@ function Computer.eightBall(state: EightBall.State, level: number, seed: number)
 							found = true
 							pick, angle, power, tipY = o, a, p, ty
 						end
+						if breathe then
+							breathe()
+						end
 					end
 				end
 				if found or left <= 0 then
@@ -440,7 +451,7 @@ function Computer.eightBall(state: EightBall.State, level: number, seed: number)
 		angle += wobble(rng, L.aim)
 		power = math.clamp(power * (1 + wobble(rng, L.power)), 0.03, 0.88)
 	else
-		angle, power = legalHit(state, legal, cx, cz, rng, 12 + 12 * math.clamp(math.floor(level), 1, 3))
+		angle, power = legalHit(state, legal, cx, cz, rng, 12 + 12 * math.clamp(math.floor(level), 1, 3), breathe)
 		angle += wobble(rng, L.aim)
 	end
 	if EightBall.onEight(state, seat) then
@@ -502,7 +513,13 @@ local function bumperScore(state: BumperPool.State, seat: number, ball: number, 
 end
 
 -- The inputs for `seat`'s turn at bumper pool (in the opening, its strike of the marked ball).
-function Computer.bumper(state: BumperPool.State, seat: number, level: number, seed: number): { Input }
+function Computer.bumper(
+	state: BumperPool.State,
+	seat: number,
+	level: number,
+	seed: number,
+	breathe: (() -> ())?
+): { Input }
 	local L = levelOf(level)
 	local rng = Rng.new(seed * 31 + state.shotNo * 977 + seat * 13)
 	local tb = Tables.bumper()
@@ -567,6 +584,9 @@ function Computer.bumper(state: BumperPool.State, seat: number, level: number, s
 					local power = math.clamp(p0 * (if pk == 1 then 1 else 1.3), 0.03, 0.9)
 					local script = Shot.run(tb, state.spots, { Cue.strike(id, angle, power, 0, 0.8, nil) })
 					local score = bumperScore(state, seat, id, script)
+					if breathe then
+						breathe()
+					end
 					if score > bestScore then
 						bestScore, bestBall, bestAngle, bestPower = score, id, angle, power
 					end

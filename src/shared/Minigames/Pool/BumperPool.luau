@@ -11,7 +11,8 @@
 --         table plays when both are in). Whoever sinks theirs shoots next; if neither does, the ball lying
 --         nearer its cup; if both do, each side's next ball goes on the marked ball's spot and they open again.
 --   BP-R4 the marked ball must be sunk first: sink another of your own before it and the opponent drops two
---         of their own balls straight into their cup.
+--         of their own balls straight into their cup (the table picks them as a player would: their marked
+--         ball if it is still up, then the balls lying farthest from their cup).
 --   BP-R5 sinking one of your own gives another shot; an opponent's ball that goes down counts for the
 --         opponent, with no penalty; your own ball in the opponent's cup counts as down but the opponent
 --         drops two of theirs; your LAST ball in the opponent's cup loses the game.
@@ -161,15 +162,25 @@ local function win(state: State, seat: number?, how: string)
 	end
 end
 
--- The penalty award: `seat` drops two of its own balls straight into its cup (unmarked ones first).
+-- The penalty award: `seat` drops two of its own balls straight into its cup. The rule lets the player choose;
+-- the table chooses as a player would: the marked ball if it is still up (with it down, every other ball is
+-- free to be sunk), then the balls lying farthest from the cup (the lower ball of two equally far).
 local function award(state: State, seat: number, dropped: { number })
 	local own = BumperPool.mine(state, seat)
 	local marked = BumperPool.markedOf(seat)
+	local cup = Tables.bumper().holes[BumperPool.cupOf(seat)]
+	local far: { [number]: number } = {}
+	for _, s in state.spots do
+		far[s.id] = (s.x - cup.x) * (s.x - cup.x) + (s.z - cup.z) * (s.z - cup.z)
+	end
 	table.sort(own, function(a, b)
 		if (a == marked) ~= (b == marked) then
-			return b == marked
+			return a == marked
 		end
-		return a > b
+		if far[a] ~= far[b] then
+			return far[a] > far[b]
+		end
+		return a < b
 	end)
 	for k = 1, math.min(2, #own) do
 		local ball = own[k]
