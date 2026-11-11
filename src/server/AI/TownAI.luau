@@ -10,8 +10,11 @@
 -- from a v5.4 hide, the fox roaming and 6 deer grazing at their v5.4 origins. Ground is
 -- World/Ground over Town pavement (walkers never take roofs). Steppable and pure: Lune runs the
 -- SimFull-style liveness test; Server/Actors/ActorsRuntime adds bodies and possession in the engine.
+-- Brains report what the services care about through ctx.emit (a person spotting a squirrel):
+-- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them.
 -- Interface: build(opts) -> World; stepFrame(world, dt) -> FrameMetrics; liveness(world) -> Liveness;
---   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn)
+--   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn);
+--   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?)
 -- Pure; studs. Nothing runs until stepFrame is called (rule 4).
 
 local Import = require("../Import")
@@ -51,6 +54,8 @@ export type Opts = {
 
 export type FrameMetrics = { brainMs: number, motorMs: number, gridMs: number, totalMs: number, ticked: number }
 
+export type Event = { kind: string, id: number, other: number?, t: number }
+
 export type World = {
 	opts: Opts,
 	config: any, -- Actors/Population.Config
@@ -69,9 +74,12 @@ export type World = {
 	counts: { [string]: number },
 	possessed: { [number]: boolean }, -- actor ids driven by players (their brains are suspended)
 	nextId: number,
+	events: { Event }, -- what the brains reported since the last drainEvents
 }
 
 local TownAI = {}
+
+TownAI.MAX_EVENTS = 256 -- nobody draining (a test, a place without the services) never grows the list
 
 local st = Units.st
 -- v5.4 landmarks (HTML units), as in the S5 scenario: AI squirrel hides, deer and fox origins
@@ -169,7 +177,15 @@ function TownAI.build(opts: Opts): World
 		counts = {},
 		possessed = {},
 		nextId = 0,
+		events = {},
 	}
+	ctx.emit = function(kind: string, actor: Common.Actor, other: Common.Actor?)
+		local events = world.events
+		if #events >= TownAI.MAX_EVENTS then
+			table.remove(events, 1)
+		end
+		table.insert(events, { kind = kind, id = actor.id, other = if other then other.id else nil, t = world.now })
+	end
 	local counts = world.counts
 
 	local function add(
@@ -382,6 +398,13 @@ function TownAI.resume(world: World, id: number, x: number, y: number, z: number
 	snap.x, snap.z = x, z
 	brain:resume(snap)
 	world.scheduler:register(id, brain, actor, world.now)
+end
+
+-- drainEvents: what the brains reported since the last call (oldest first); the queue is emptied.
+function TownAI.drainEvents(world: World): { Event }
+	local events = world.events
+	world.events = {}
+	return events
 end
 
 function TownAI.counts(world: World): { [string]: number }
