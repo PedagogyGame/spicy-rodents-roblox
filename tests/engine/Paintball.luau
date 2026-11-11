@@ -37,7 +37,7 @@ local function summarise(list: { number }): { [string]: number }
 end
 
 function Paintball.run(options: Options?): { [string]: any }
-	local opts = options or {}
+	local opts: Options = options or {}
 	local started = os.clock()
 	local deadline = started + (opts.wallLimitSeconds or 200)
 	local dt = 1 / 60
@@ -63,8 +63,9 @@ function Paintball.run(options: Options?): { [string]: any }
 	local buffers = Puppets.newBuffers()
 	local memBefore = Stats:GetTotalMemoryUsageMb()
 
-	local conditions = {}
-	for _, rtt in opts.latenciesMs or { 0, 100, 150 } do
+	local conditions: { { [string]: any } } = {} -- a Harness report, or { rttMs, skipped }
+	local latencies: { number } = opts.latenciesMs or { 0, 100, 150 }
+	for _, rtt in latencies do
 		if os.clock() > deadline - 10 then
 			table.insert(conditions, { rttMs = rtt, skipped = "wall limit" })
 			continue

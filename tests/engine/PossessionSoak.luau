@@ -117,7 +117,7 @@ function Soak.run(o: Opts): Result
 		ops += 1
 		local p = o.players[math.floor(rand() * #o.players) + 1]
 		local r = rand()
-		local ok, err = pcall(function()
+		local ok, err = pcall(function(): ...any
 			if not joined[p.UserId] then
 				joined[p.UserId] = true
 				roles:onJoin(p)

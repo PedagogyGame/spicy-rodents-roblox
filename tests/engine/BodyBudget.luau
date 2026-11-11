@@ -199,12 +199,13 @@ local function runVariant(v: Variant, deadline: number): { [string]: any }
 end
 
 function BodyBudget.run(options: Options?): { [string]: any }
-	local opts = options or {}
+	local opts: Options = options or {}
 	local started = os.clock()
 	local deadline = started + (opts.wallLimitSeconds or 200)
-	local results = {}
+	local results: { { [string]: any } } = {} -- a variant's report, or { name, skipped } or { name, error }
 	local ok = true
-	for _, v in opts.variants or BodyBudget.VARIANTS do
+	local variants: { Variant } = opts.variants or BodyBudget.VARIANTS
+	for _, v in variants do
 		if os.clock() > deadline - 15 then
 			table.insert(results, { name = v.name, skipped = "wall limit" })
 			continue
