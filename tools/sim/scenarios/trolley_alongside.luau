@@ -28,8 +28,8 @@ local scenario: Replay.Scenario = {
 		truck.speed = truck.cruise
 		trolley.phase, trolley.timer = "dwell", 2
 	end,
-	expect = { none = { "speed_stutter", "sink", "float" } },
-	known = { "box_overlap" },
+	-- the truck used to pass 0.94 st inside the trolley; the lane now keeps LaneMath.RAIL_CLEARANCE from the rails
+	expect = { none = { "speed_stutter", "sink", "float", "box_overlap" } },
 }
 
 return scenario

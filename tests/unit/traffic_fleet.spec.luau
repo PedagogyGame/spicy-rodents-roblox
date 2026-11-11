@@ -60,7 +60,9 @@ return function(t)
 				end
 			end
 			t.truthy(checked >= 6, `checked {checked} straight vehicle lanes`)
-			t.near(lanes.blvd_eastbound.coord :: number, st(5.6), 1e-9, "eastbound now runs at z > 0")
+			-- eastbound now runs at z > 0, clear of the trolley track on that side (z = 8.65 u)
+			t.near(lanes.blvd_eastbound.coord :: number, st(8.65) - LaneMath.RAIL_CLEARANCE, 1e-9)
+			t.near((lanes.patrol_beat.coordFor :: any)[1], st(8.65) - LaneMath.RAIL_CLEARANCE, 1e-9)
 			t.near(lanes.blvd_westbound.coord :: number, -st(5.6), 1e-9)
 			t.near(lanes.res_main_ns_northbound.coord :: number, -st(5.4), 1e-9, "residential lanes were already right")
 			t.truthy(table.find(changed, "patrol_beat") ~= nil)

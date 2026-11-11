@@ -1,6 +1,6 @@
 --!strict
 -- Scenario: every vehicle that wraps (the one-way lanes' v5.4 teleport, traffic.md §5.1, §5.5) placed
--- 2 to 5 s short of its lane's end, so all eight wraps happen in the first seconds: where does the car
+-- 2 to 14 s short of its lane's end, so all eight wraps happen in the first 15 s: where does the car
 -- vanish, where does it reappear, and does the client snap it or streak it across?
 local Fleet = require("@shared/Traffic/Fleet")
 local Replay = require("../lib/Replay")
@@ -14,14 +14,14 @@ end
 
 local scenario: Replay.Scenario = {
 	name = "lane_ends",
-	about = "the eight wrapping vehicles 2 to 5 s short of their lanes' ends: eight wraps in a few seconds",
-	seconds = 12,
-	ci = 12,
+	about = "the eight wrapping vehicles 2 to 14 s short of their lanes' ends: eight wraps in 15 s",
+	seconds = 20,
+	ci = 20,
 	entries = entries,
 	setup = function(sim: Replay.Sim)
 		for i, v in sim.traffic.vehicles do
 			v.speed = v.cruise
-			v.s = v.lane.length - math.max(v.cruise, 10) * (2 + 0.4 * i)
+			v.s = v.lane.length - math.max(v.cruise, 10) * (2 + 1.5 * i)
 		end
 	end,
 	-- every wrap snaps on every client (the flag is carried to the next send); each is still a car vanishing

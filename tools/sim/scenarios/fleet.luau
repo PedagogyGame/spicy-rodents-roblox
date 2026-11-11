@@ -25,11 +25,11 @@ local scenario: Replay.Scenario = {
 			"teleport_bit_lost",
 			"teleport_bit_dropped",
 			"teleport_unflagged",
+			"box_overlap",
 		},
 	},
-	-- shows today (vehicles that share a lane). A wrap's flag now reaches the wire however the tick falls
-	-- between two sends (TrafficService.poseRecords carries it until the next send)
-	known = { "box_overlap" },
+	-- A wrap's flag now reaches the wire however the tick falls between two sends (TrafficService.poseRecords
+	-- carries it until the next send); the eastbound lane keeps clear of the trolley track
 }
 
 return scenario

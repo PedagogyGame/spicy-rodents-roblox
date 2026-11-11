@@ -444,7 +444,21 @@ function LaneMath.load(records: { LaneRecord }): ({ [string]: Lane }, { [string]
 	return lanes, skipped
 end
 
-export type RoadRecord = { id: string, axis: string, coord: any, width: number? }
+export type RoadRecord = {
+	id: string,
+	axis: string,
+	coord: any,
+	width: number?,
+	kind: string?,
+	start: number?,
+	["end"]: number?,
+}
+
+-- A lane that runs beside a rail road keeps its vehicles' centreline this far from the rail's: the
+-- trolley's half width (1.75 u) plus the widest lane vehicle's (the dump truck, 1.675 u) plus 0.125 u.
+-- Under drive-on-the-right the boulevard's eastbound lane (z = +5.6 u) sits on the trolley's side (track
+-- z = 8.65 u): a dump truck passing the trolley was 0.94 st inside it.
+LaneMath.RAIL_CLEARANCE = Units.st(3.55)
 
 -- unify(lanes, roads, records?): drive on the right everywhere (owner decision 9). Returns the ids changed.
 -- Straight one-way lanes compare their coord with their road's centreline (the record's first road);
@@ -463,6 +477,25 @@ function LaneMath.unify(lanes: { [string]: Lane }, roads: { RoadRecord }, record
 			recRoad[rec.id] = roadCoord[first]
 		end
 	end
+	local rails: { RoadRecord } = {}
+	for _, r in roads do
+		if r.kind == "rail" and type(r.coord) == "number" and r.start and r["end"] then
+			table.insert(rails, r)
+		end
+	end
+	-- coord, pulled away from any parallel rail alongside the lane's extent
+	local function clearOfRails(lane: Lane, coord: number): number
+		local lo, hi = math.min(lane.startAt, lane.endAt), math.max(lane.startAt, lane.endAt)
+		for _, r in rails do
+			local rlo, rhi =
+				math.min(r.start :: number, r["end"] :: number), math.max(r.start :: number, r["end"] :: number)
+			local rc = r.coord :: number
+			if r.axis == lane.axis and rlo < hi and rhi > lo and math.abs(coord - rc) < LaneMath.RAIL_CLEARANCE then
+				coord = rc + (if coord < rc then -1 else 1) * LaneMath.RAIL_CLEARANCE
+			end
+		end
+		return coord
+	end
 	local changed = {}
 	for id, lane in lanes do
 		if not lane.vehicle then
@@ -478,9 +511,9 @@ function LaneMath.unify(lanes: { [string]: Lane }, roads: { RoadRecord }, record
 			-- right of +z is -x; right of +x is +z
 			local function rightCoord(d: number): number
 				if lane.axis == "z" then
-					return road - d * off
+					return clearOfRails(lane, road - d * off)
 				end
-				return road + d * off
+				return clearOfRails(lane, road + d * off)
 			end
 			if lane.dir == 0 then
 				lane.coordFor = { [1] = rightCoord(1), [-1] = rightCoord(-1) }
