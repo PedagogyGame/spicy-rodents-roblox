@@ -105,7 +105,7 @@ def above(z, k=0.012):
 
 # ---- torso ---------------------------------------------------------------------------------------
 
-SHOULDER_BALL = v(1.08, 0.0, 3.763)  # the arm's ball: 0.08 outboard of the stock shoulder pivot
+SHOULDER_BALL = v(1.04, 0.0, 3.763)  # the arm's ball: 0.04 outboard of the stock shoulder pivot
 
 
 def upper_torso(b):
@@ -224,7 +224,7 @@ def hand(b, detail=False):
     def at(dx, dy, dz):
         return wr + R @ (v(dx, dy, dz) * s)
 
-    ball = Ellipsoid(wr, (0.14,) * 3)
+    ball = Ellipsoid(wr, (b["wrist"] - 0.016,) * 3)  # inside the cuff
     palm = Ellipsoid(at(-0.005, -0.015, -0.22), v(0.092, 0.165, 0.175) * s, axes=R, k=0.06)
     mitt = Ellipsoid(at(-0.024, -0.02, -0.385), v(0.082, 0.155, 0.158) * s, axes=R, k=0.07)
     lo = [ball, palm, mitt]
@@ -247,7 +247,7 @@ def hand(b, detail=False):
 
 HEAD_C = v(0.0, 0.0, 4.80)  # the globe's centre
 SKULL = ((0.0, 0.03, 4.90), (0.588, 0.612, 0.532))  # hair is sculpted round this
-FACE = dict(eye_x=0.215, eye_z=4.85, brow_z=5.01, nose_z=4.70, mouth_z=4.49, chin_z=4.33)
+FACE = dict(eye_x=0.225, eye_z=4.85, brow_z=5.01, nose_z=4.70, mouth_z=4.49, chin_z=4.33)
 
 # column azimuths from the front (deg): close together over the nose, wide round the back
 _FRONT = [0, 7, 14, 22, 31, 42, 55, 70, 87, 105, 124, 144, 163]
@@ -279,7 +279,7 @@ def head(detail=False):
         hi = p + [
             hole, hole.mirrored(),
             RoundCone((0, -0.655, 4.60), (0, -0.65, 4.56), 0.018, 0.024, k=0.03, op="sub"),  # philtrum
-            Ellipsoid((0, -0.565, 4.405), (0.1, 0.05, 0.035), k=0.05, op="sub"),  # under the lip
+            Ellipsoid((0, -0.575, 4.405), (0.08, 0.04, 0.025), k=0.05, op="sub"),  # under the lip
         ]
     ch = mesher.globe("Head", HEAD_C, pole=(0, 0, 1), seam=(0, 1, 0), thetas=HEAD_THETAS, phis=HEAD_PHIS,
                       emphasis=lambda ph: 1.55 if abs(ph - 180) < 62 else 1.0)
