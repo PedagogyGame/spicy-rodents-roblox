@@ -7,13 +7,15 @@
 -- every route sample within surfaceRadius + 0.3 u of geometry or terrain except the
 -- routes in harvest_patches.json (each with a reason); Skyline for every building; the hospital's 8
 -- brief rooms and the station's drone console exist; at least one lamp per road side; every enterable
--- room passes InteriorCheck (furnished, walkable, lit).
+-- room passes InteriorCheck (furnished, walkable, lit) and a body can walk from each building's door
+-- into every one of its rooms (EnterCheck).
 -- Interface: run(data?, plans?) -> Result { ok, failures, ... }
 -- Pure (reads generated data through Import).
 
 local Bake = require("./Bake")
 local DoorReach = require("./DoorReach")
 local DoorSill = require("./DoorSill")
+local EnterCheck = require("./EnterCheck")
 local Geometry = require("./Geometry")
 local Import = require("./Import")
 local InteriorCheck = require("./InteriorCheck")
@@ -229,6 +231,17 @@ function WorldChecks.run(dataIn: any?, plansIn: { Spec.BuildPlan }?): { [string]
 				1,
 				math.min(#interiors.failures, 5)
 			)}`
+		)
+	end
+
+	Yield.breathe()
+	-- getting in: a body walks from the ground in front of the door into every room and out at the back
+	local enter = EnterCheck.run(plans, Height.at)
+	r.enter = { lots = enter.lots, rooms = enter.rooms, doors = enter.doors }
+	if #enter.failures > 0 then
+		table.insert(
+			failures,
+			`{#enter.failures} ways in blocked: {table.concat(enter.failures, "; ", 1, math.min(#enter.failures, 5))}`
 		)
 	end
 

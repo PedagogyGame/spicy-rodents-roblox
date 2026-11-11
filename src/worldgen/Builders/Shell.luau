@@ -1,8 +1,12 @@
 --!strict
 -- ServerScriptService.Server.WorldGen.Builders.Shell
 -- Enterable shells for W1 (BUILD_PLAN §3.4, §4.4 #7): floor, exterior walls with door openings,
--- partition walls between adjacent rooms (openings where a door sits), server-owned door leaves with a
--- prompt placeholder, room-name volumes and the nav anchor with one Attachment per room-graph node.
+-- partition walls between adjacent rooms (openings where a door sits), door leaves with a prompt
+-- placeholder, room-name volumes and the nav anchor with one Attachment per room-graph node.
+-- A doorway is a real opening and its leaf never collides (attributes Auto, Motion "swing" | "slide",
+-- SlideSign, SlideRun; the lot carries AutoDoors = how many): each client opens the leaves near it as a
+-- body comes up (Shared/World/DoorMotion, Client/Render/DoorView). WorldGen/EnterCheck walks a body
+-- from every exterior door to every room on the plan.
 -- Shared by Builders/Interior (FRB houses) and Builders/Programme (Hospital, PoliceStation).
 -- Exterior doors get their surround, steps and canopy from Builders/Facade; interior leaves a knob.
 --   avoid(ctx, layout) -> door openings per exterior face; grid(ctx, layout) -> the window grid (pure)
@@ -97,6 +101,15 @@ local function wall(
 	end
 end
 
+-- How a leaf opens (Shared/World/DoorMotion; each client moves the doors near its camera): it swings
+-- about its hinge edge, or, when it is wide and the wall beside it is long enough to take it, slides
+-- along the wall into it (`sign` along the leaf's local X, `run` studs).
+export type Motion = { kind: string, sign: number, run: number }
+
+-- A leaf wider than this slides: a 10 to 22 st leaf swinging through a room reads as a barn gate, and
+-- the hospital's and the station's doors are that wide. House doors (4.5 to 6.5 st) swing.
+Shell.SLIDE_MIN = 7
+
 local function doorLeaf(
 	ctx: Spec.LotCtx,
 	d: Door,
@@ -104,7 +117,8 @@ local function doorLeaf(
 	y0: number,
 	doorH: number,
 	t: number,
-	interior: boolean
+	interior: boolean,
+	motion: Motion
 )
 	local attrs = {
 		DoorId = d.id,
@@ -114,14 +128,24 @@ local function doorLeaf(
 		Locked = false,
 		RoomA = d.a,
 		RoomB = d.b,
+		-- an auto door: it opens for whoever comes near and never stops a body
+		Auto = true,
+		Motion = motion.kind,
+		SlideSign = motion.sign,
+		SlideRun = motion.run,
 	}
 	local name = "Door_" .. d.id
 	local leafT = math.max(t * 0.5, 0.2)
-	-- size along the wall in local X so the part's local Z is the door normal (DoorReach, Doors)
+	-- size along the wall in local X so the part's local Z is the door normal (DoorReach, Doors).
+	-- The doorway is a real opening in the wall and the leaf does not collide (owner 2026-11-11:
+	-- "rooms cannot be entered yet"): a kinematic body tests walls with an overlap query, so a solid
+	-- leaf was a wall until a server door service that does not exist opened it.
 	ctx.list:add(ctx.frame, name, d.x, y0 + doorH / 2, d.z, d.w, doorH, leafT, {
 		yaw = if axis == "z" then math.pi / 2 else 0,
 		color = if ctx.palette then ctx.palette.door else DOOR,
 		material = "Wood",
+		canCollide = false,
+		castShadow = true,
 		role = "Door",
 		attrs = attrs,
 	})
@@ -140,7 +164,7 @@ local function doorLeaf(
 		if axis == "z" then
 			kx, kz = d.x, d.z - off
 		end
-		ctx.list:add(ctx.frame, name .. "_Knob", kx, y0 + 3.5, kz, 0.56, 0.56, 0.56, {
+		local opts: Spec.Opts = {
 			shape = "Ball",
 			color = { 182, 154, 83 },
 			material = "Metal",
@@ -149,7 +173,16 @@ local function doorLeaf(
 			castShadow = false,
 			role = "Trim",
 			attrs = { DoorOf = d.id },
-		})
+		}
+		if motion.kind == "slide" then
+			-- a sliding leaf has a flat pull, thinner than the wall it runs into: a round knob would
+			-- travel along the wall as a brass bump on both of its faces
+			opts.shape = nil
+			opts.yaw = if axis == "z" then math.pi / 2 else 0
+			ctx.list:add(ctx.frame, name .. "_Knob", kx, y0 + 3.9, kz, 0.24, 1.5, leafT + 0.1, opts)
+		else
+			ctx.list:add(ctx.frame, name .. "_Knob", kx, y0 + 3.5, kz, 0.56, 0.56, 0.56, opts)
+		end
 	end
 end
 
@@ -357,29 +390,71 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 		end
 	end
 
-	-- door leaves (server-owned; Doors.luau swings them) on their wall line
+	-- door leaves on their wall line. They never collide and each client opens the ones near it
+	-- (Shared/World/DoorMotion, Client/Render/DoorView); Doors.luau can still pose one from the server.
+	local placed: { { d: Door, dd: Door, axis: string, exterior: boolean, lo: number, hi: number } } = {}
+	local roomById: { [string]: Room } = {}
+	for _, r in L.rooms do
+		roomById[r.id] = r
+	end
 	for _, d in L.doors do
 		local onX = math.abs(math.abs(d.z) - D / 2) <= t + EPS
 		local onZ = math.abs(math.abs(d.x) - W / 2) <= t + EPS
 		local axis = "x"
 		local dd = table.clone(d)
+		-- the stretch of wall the doorway is cut in (along the wall)
+		local lo, hi = -W / 2, W / 2
 		if onX then
 			dd.z = if d.z < 0 then -D / 2 + t / 2 else D / 2 - t / 2
 		elseif onZ then
 			axis = "z"
 			dd.x = if d.x < 0 then -W / 2 + t / 2 else W / 2 - t / 2
+			lo, hi = -D / 2 + t, D / 2 - t
 		else
 			-- interior door: on the shared edge of its two rooms
-			for _, r in L.rooms do
-				if r.id == d.a then
-					if math.abs(d.x - r.x0) <= EPS or math.abs(d.x - r.x1) <= EPS then
-						axis = "z"
+			local A, B = roomById[d.a], roomById[d.b]
+			if A and (math.abs(d.x - A.x0) <= EPS or math.abs(d.x - A.x1) <= EPS) then
+				axis = "z"
+			end
+			if A and B then
+				if axis == "z" then
+					lo, hi = math.max(A.z0, B.z0, -D / 2 + t), math.min(A.z1, B.z1, D / 2 - t)
+				else
+					lo, hi = math.max(A.x0, B.x0, -W / 2 + t), math.min(A.x1, B.x1, W / 2 - t)
+				end
+			end
+		end
+		table.insert(placed, { d = d, dd = dd, axis = axis, exterior = onX or onZ, lo = lo, hi = hi })
+	end
+	for _, pl in placed do
+		local d, dd, axis, exterior = pl.d, pl.dd, pl.axis, pl.exterior
+		local onX = exterior and axis == "x"
+		-- room for the leaf to slide: the wall beside the doorway, as far as its end or the next doorway
+		local along = if axis == "x" then dd.x else dd.z
+		local fixed = if axis == "x" then dd.z else dd.x
+		local lo, hi = pl.lo, pl.hi
+		for _, o in placed do
+			if o ~= pl and o.axis == axis then
+				local oFixed = if axis == "x" then o.dd.z else o.dd.x
+				local oAlong = if axis == "x" then o.dd.x else o.dd.z
+				if math.abs(oFixed - fixed) <= t + EPS then
+					if oAlong > along then
+						hi = math.min(hi, oAlong - o.d.w / 2)
+					else
+						lo = math.max(lo, oAlong + o.d.w / 2)
 					end
 				end
 			end
 		end
-		local exterior = onX or onZ
-		doorLeaf(ctx, dd, axis, y0, L.doorH, if exterior then t else pt, not exterior)
+		local runHi, runLo = hi - (along + d.w / 2), (along - d.w / 2) - lo
+		local motion: Motion = { kind = "swing", sign = 1, run = 0 }
+		if d.w > Shell.SLIDE_MIN and math.max(runHi, runLo) >= d.w + 0.2 then
+			-- toward the longer stretch of wall; the leaf's local +X is model +X on an x wall and model
+			-- -Z on a z wall (it is turned a quarter there)
+			local dir = if runHi >= runLo then 1 else -1
+			motion = { kind = "slide", sign = dir * (if axis == "x" then 1 else -1), run = d.w }
+		end
+		doorLeaf(ctx, dd, axis, y0, L.doorH, if exterior then t else pt, not exterior, motion)
 		if exterior then
 			-- the way in from outside: surround, knob and panels, steps down to the ground, and over the
 			-- main entrance the style's canopy
@@ -397,9 +472,11 @@ function Shell.build(ctx: Spec.LotCtx, L: Layout): Built
 				wallTop = h,
 				surround = not (L.plainFront and face == "F"),
 				canopy = face == "F" and not L.plainFront,
+				slide = motion.kind == "slide",
 			}, Facade.style(ctx))
 		end
 	end
+	ctx.attributes.AutoDoors = #placed
 
 	-- room-name volumes (non-solid, queryable)
 	for _, r in L.rooms do

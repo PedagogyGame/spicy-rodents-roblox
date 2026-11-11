@@ -1,9 +1,18 @@
 --!strict
 -- Getting in (the interiors work, 2026-11-11): every exterior door stands on its threshold at ground
--- level or on steps a walking body can take (WorldGen/DoorSill), and the buildings people walk into
--- stand on level sites (World/Height.SITES) that match the lot data.
+-- level or on steps a walking body can take (WorldGen/DoorSill); the buildings people walk into stand
+-- on level sites (World/Height.SITES) that match the lot data; a body walks from the ground in front
+-- of each building's door into every one of its rooms and out at the back (WorldGen/EnterCheck), and
+-- the check catches a solid leaf, a wall with no opening, a tall threshold, a low lintel, furniture in
+-- a doorway and ground coming up through the floor; every doorway's leaf is an auto door that never
+-- collides, swings clear of the furniture or slides into the wall beside it.
+local roblox = require("@lune/roblox")
 local Bake = require("@worldgen/Bake")
 local DoorSill = require("@worldgen/DoorSill")
+local EnterCheck = require("@worldgen/EnterCheck")
+local Geometry = require("@worldgen/Geometry")
+local Shell = require("@worldgen/Builders/Shell")
+local DoorMotion = require("@shared/World/DoorMotion")
 local Height = require("@shared/World/Height")
 
 return function(t)
@@ -12,6 +21,44 @@ return function(t)
 	local lots: { [string]: any } = {}
 	for _, l in data.lots do
 		lots[l.id] = l
+	end
+	local byId: { [string]: any } = {}
+	local shells: { any } = {}
+	for _, p in plans do
+		byId[p.id] = p
+		if p.kind == "lot" and p.attributes.Enterable == true then
+			table.insert(shells, p)
+		end
+	end
+	local function find(parts: { any }, name: string): any
+		for _, s in parts do
+			if s.name == name then
+				return s
+			end
+		end
+		error("no part " .. name)
+	end
+	-- a copy of a baked plan with its parts changed
+	local function altered(id: string, mutate: (parts: { any }) -> ()): any
+		local base = byId[id]
+		local parts = {}
+		for _, s in base.parts do
+			table.insert(parts, table.clone(s))
+		end
+		mutate(parts)
+		local p = table.clone(base)
+		p.parts = parts
+		return p
+	end
+	-- a solid block where a part is: across the doorway of a leaf, `y0` to `y1` above its sill
+	local function across(parts: { any }, leafName: string, name: string, y0: number, y1: number, thick: number)
+		local leaf = find(parts, leafName)
+		local block = table.clone(leaf)
+		local sill = leaf.cy - leaf.sy / 2
+		block.name, block.role, block.attrs = name, "Wall", nil
+		block.canCollide = true
+		block.cy, block.sy, block.sz = sill + (y0 + y1) / 2, y1 - y0, thick
+		table.insert(parts, block)
 	end
 
 	-- a one-building plan with a front door at z = -10 whose sill is `sill` above y = 0
@@ -167,4 +214,189 @@ return function(t)
 		end
 		t.eq(enterable, 6)
 	end)
+
+	t.test("EnterCheck: a body walks from every building's door into each of its rooms and out at the back", function()
+		local r = EnterCheck.run(plans, Height.at)
+		print(`      {r.lots} buildings, {r.doors} exterior doors, {r.rooms} rooms, {r.cells} cells walked`)
+		t.eq(table.concat(r.failures, "; "), "")
+		t.eq(r.lots, 6)
+		t.eq(r.rooms, 31)
+		t.eq(r.doors, 11, "two for each house and the hospital, one for the station")
+		-- the body is the game's own: the step a walking body takes and its width (Client/World/ClientWorld)
+		local ClientWorld = require("@client/World/ClientWorld")
+		t.eq(EnterCheck.STEP, ClientWorld.STEP)
+		t.eq(EnterCheck.HALF, ClientWorld.BODY_HALF)
+		t.truthy(
+			EnterCheck.TOP >= 5.5 and EnterCheck.TOP > ClientWorld.BODY_TOP,
+			"a person's height: a squirrel fits too"
+		)
+	end)
+
+	t.test(
+		"EnterCheck has teeth: a solid leaf, a wall with no opening, a tall threshold, a low lintel, furniture in a doorway, ground through the floor",
+		function()
+			local id = "core_house_1_bungalow"
+			local function fails(mutate: (parts: { any }) -> (), heightAt: ((number, number) -> number)?): string
+				return table.concat(EnterCheck.lot(altered(id, mutate), heightAt or Height.at).failures, " | ")
+			end
+			local function has(text: string, what: string): boolean
+				return string.find(text, what, 1, true) ~= nil
+			end
+			t.eq(fails(function() end), "", "the baked house is clean")
+			-- the leaves solid, as they were baked before: nobody gets in
+			local text = fails(function(parts)
+				for _, s in parts do
+					if s.role == "Door" then
+						s.canCollide = true
+					end
+				end
+			end)
+			for _, room in { "living", "kitchen", "bedroom", "bath", "den" } do
+				t.truthy(has(text, "no way from Door_front into the room " .. room), text)
+			end
+			t.truthy(has(text, "out at Door_back"), text)
+			-- only the back door solid: every room is reached, but nobody comes out at the back
+			text = fails(function(parts)
+				find(parts, "Door_back").canCollide = true
+			end)
+			t.eq(text, "no way through the building from Door_front out at Door_back")
+			-- a wall with no opening where the front door is
+			text = fails(function(parts)
+				across(parts, "Door_front", "Wall_rogue", 0, 8.75, 0.6)
+			end)
+			t.truthy(has(text, "into the room living") and has(text, "into the room den"), text)
+			-- a threshold taller than a step shuts the bathroom; one a body steps over does not
+			text = fails(function(parts)
+				across(parts, "Door_living_bath", "Kerb_rogue", 0, 1.0, 0.4)
+			end)
+			t.eq(text, "no way from Door_front into the room bath")
+			t.eq(
+				fails(function(parts)
+					across(parts, "Door_living_bath", "Kerb_low", 0, 0.7, 0.4)
+				end),
+				""
+			)
+			-- a lintel lower than a person
+			text = fails(function(parts)
+				across(parts, "Door_living_bath", "Beam_rogue", 4.5, 5.2, 0.4)
+			end)
+			t.eq(text, "no way from Door_front into the room bath")
+			-- a cabinet pushed into the doorway
+			text = fails(function(parts)
+				local door = find(parts, "Door_living_bath")
+				local block = table.clone(door)
+				block.name, block.role, block.attrs, block.canCollide = "Furniture_rogue", "Furniture", nil, true
+				block.sx, block.sy, block.sz = 3.4, 3, 3.4
+				block.cy = door.cy - door.sy / 2 + 1.5
+				table.insert(parts, block)
+			end)
+			t.eq(text, "no way from Door_front into the room bath")
+			-- the ground coming up through the floor of half the house
+			local lot = lots[id]
+			local floor = find(byId[id].parts, "Floor")
+			text = fails(function() end, function(x: number, z: number): number
+				return if x > lot.x then floor.cy + floor.sy / 2 + 0.2 else Height.at(x, z)
+			end)
+			t.truthy(has(text, "the ground comes up through the floor"), text)
+			-- the hospital on the natural ground: the grass indoors that the level site took away
+			local natural = table.concat(EnterCheck.lot(byId.hospital_main, Height.natural).failures, " | ")
+			t.truthy(has(natural, "the ground comes up through the floor"), natural)
+		end
+	)
+
+	t.test(
+		"doors: every doorway's leaf is an auto door that never collides; wide ones slide into the wall, the rest swing clear of the furniture",
+		function()
+			local C = roblox.CFrame
+			local doors, slides, swings = 0, 0, 0
+			for _, p in shells do
+				local walls: { { number } } = {}
+				local cores: { { name: string, box: { number } } } = {}
+				for _, s in p.parts do
+					local x0, x1, y0, y1, z0, z1 = Geometry.aabb(s)
+					if s.role == "Wall" and s.canCollide then
+						table.insert(walls, { x0, x1, y0, y1, z0, z1 })
+					elseif (s.role == "Furniture" or s.role == "Station" or s.role == "Shelf") and s.canCollide then
+						table.insert(cores, { name = s.name, box = { x0, x1, y0, y1, z0, z1 } })
+					end
+				end
+				local function inWall(x: number, y: number, z: number): boolean
+					for _, w in walls do
+						if
+							x > w[1] + 0.01
+							and x < w[2] - 0.01
+							and y > w[3]
+							and y < w[4]
+							and z > w[5] + 0.01
+							and z < w[6] - 0.01
+						then
+							return true
+						end
+					end
+					return false
+				end
+				local n = 0
+				for _, s in p.parts do
+					local a = s.attrs
+					if s.role == "Door" and a then
+						n += 1
+						doors += 1
+						local tag = `{p.id}.{s.name}`
+						t.eq(s.canCollide, false, `{tag} collides: nobody could walk in`)
+						t.eq(a.Auto, true, tag)
+						t.eq(a.Locked, false, tag)
+						local closed = C.new(s.cx, s.cy, s.cz) * C.Angles(0, s.yaw, 0)
+						local size = { X = s.sx, Y = s.sy, Z = s.sz }
+						local sill = s.cy - s.sy / 2
+						if a.Motion == "slide" then
+							slides += 1
+							t.truthy(s.sx > Shell.SLIDE_MIN, tag)
+							t.near(a.SlideRun, s.sx, 1e-9, `{tag}: it clears the whole doorway`)
+							t.truthy(a.SlideSign == 1 or a.SlideSign == -1, tag)
+							local open = DoorMotion.pose(closed, size, "slide", a.SlideSign, a.SlideRun, 1, C)
+							-- open, the whole leaf stands inside the wall beside the doorway: both faces,
+							-- at both ends and the middle (so it shows nowhere and shares no face)
+							for _, f in { -0.5, 0, 0.5 } do
+								for _, side in { -1, 1 } do
+									local pt = (open * C.new(f * (s.sx - 0.1), 0, side * s.sz / 2)).Position
+									t.truthy(inWall(pt.X, pt.Y, pt.Z), `{tag}: the open leaf shows outside the wall`)
+								end
+							end
+						else
+							swings += 1
+							t.eq(a.Motion, "swing", tag)
+							t.truthy(s.sx <= Shell.SLIDE_MIN, `{tag}: a {s.sx} st leaf swings`)
+							-- either way it swings, the leaf sweeps over no furniture
+							for _, sign in { 1, -1 } do
+								for _, alpha in { 0.2, 0.4, 0.6, 0.8, 1 } do
+									local cf = DoorMotion.pose(closed, size, "swing", sign, 0, alpha, C)
+									for _, f in { -0.45, -0.25, 0, 0.25, 0.48 } do
+										local pt = (cf * C.new(f * s.sx, 0, 0)).Position
+										for _, c in cores do
+											local b = c.box
+											local hit = pt.X > b[1] - 0.1
+												and pt.X < b[2] + 0.1
+												and pt.Z > b[5] - 0.1
+												and pt.Z < b[6] + 0.1
+												and b[4] > sill + 0.2
+											t.truthy(not hit, `{tag} swings through {c.name}`)
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+				t.eq(p.attributes.AutoDoors, n, p.id)
+			end
+			print(`      {doors} doorways: {slides} leaves slide into the wall, {swings} swing`)
+			t.eq(doors, 37)
+			t.eq(slides, 14, "the hospital's ten and the station's four")
+			t.eq(swings, 23, "the house doors")
+			-- a plain building's front door is on a solid body: it stays a wall, shut
+			local shop = find(byId.east_corner_shops.parts, "Door")
+			t.eq(shop.canCollide, true)
+			t.eq(shop.attrs.Auto, nil)
+		end
+	)
 end

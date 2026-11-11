@@ -211,10 +211,17 @@ return function(t)
 						t.truthy(head, `{p.id}.{s.name}: head`)
 						t.truthy(head.cy - head.sy / 2 >= s.cy + s.sy / 2 - 1e-6, `{p.id}.{s.name}: head over the leaf`)
 					end
-					-- followers swing with the leaf
+					-- followers swing with the leaf (a leaf that slides into the wall has no knob to drag
+					-- along its face: its panels or panes follow it)
 					local knob = parts[s.name .. "_Knob"]
-					t.truthy(knob and knob.attrs.DoorOf == a.DoorId, `{p.id}.{s.name}: knob follows the leaf`)
-					t.eq(knob.shape, "Ball")
+					if a.Motion == "slide" then
+						t.eq(knob, nil, `{p.id}.{s.name}: a sliding leaf with a knob`)
+						local rider = parts[s.name .. "_PanelA"] or parts[s.name .. "_Stile"]
+						t.truthy(rider and rider.attrs.DoorOf == a.DoorId, `{p.id}.{s.name}: panels follow the leaf`)
+					else
+						t.truthy(knob and knob.attrs.DoorOf == a.DoorId, `{p.id}.{s.name}: knob follows the leaf`)
+						t.eq(knob.shape, "Ball")
+					end
 					-- the ground 3 st outside the door
 					local n = Geometry.rotate({ 0, 0, 1 }, s.yaw, 0, 0)
 					local c = p.parts[1]

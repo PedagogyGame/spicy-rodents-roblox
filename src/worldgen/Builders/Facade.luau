@@ -94,6 +94,7 @@ export type Door = {
 	surround: boolean?, -- false: the building draws its own (hospital)
 	canopy: boolean?, -- true: this is the main entrance
 	leaf: boolean?, -- false: no knob and panels
+	slide: boolean?, -- the leaf slides into the wall (Builders/Shell): no knob to drag along its face
 }
 export type RoofSide = {
 	name: string,
@@ -574,11 +575,13 @@ function Facade.entrance(ctx: Spec.LotCtx, d: Door, style: Style)
 	if d.leaf ~= false then
 		local follow = { DoorOf = d.doorId }
 		local hand = if f.alongX then 1 else -1 -- the leaf's free edge is its local +X
-		local kx, kz = outPoint(f, d.c + hand * (d.w / 2 - 0.7), d.proud + 0.1)
-		deco(ctx, d.name .. "_Knob", kx, d.y0 + math.min(3.5, d.h * 0.42), kz, 0.44, 0.44, 0.44, BRASS, "Metal", {
-			shape = "Ball",
-			attrs = follow,
-		})
+		if not d.slide then
+			local kx, kz = outPoint(f, d.c + hand * (d.w / 2 - 0.7), d.proud + 0.1)
+			deco(ctx, d.name .. "_Knob", kx, d.y0 + math.min(3.5, d.h * 0.42), kz, 0.44, 0.44, 0.44, BRASS, "Metal", {
+				shape = "Ball",
+				attrs = follow,
+			})
+		end
 		local t = 0.1
 		local px, pz = outPoint(f, d.c, d.proud + 0.06 - t / 2)
 		local function panel(

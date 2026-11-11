@@ -10,9 +10,12 @@
 --     day cycle): off by day, fading in at dusk, full at night; without the attribute the lamps stay on.
 --   * Building lights: Render/TownLights (started and stopped here) makes the room fixtures and the tagged
 --     home windows of the streamed-in lots glow at night.
+--   * Doors: Render/DoorView (started and stopped here) opens the leaves of the enterable buildings as a
+--     body comes up to them.
 -- Started by Render/VehicleView.start (Main's single client script stays the only script).
 -- Interface: start() -> stop(); nearest(points, x, z, max, radius) -> { index } (pure); level() -> 0..1
 
+local DoorView = require("./DoorView")
 local TownLights = require("./TownLights")
 
 local TownView = {}
@@ -64,6 +67,12 @@ function TownView.start(): () -> ()
 	local okLights, stopLights = pcall(TownLights.start)
 	if not okLights then
 		warn("TownView: building lights did not start: " .. tostring(stopLights))
+	end
+	-- the doors of the buildings a body can walk into open as one comes near (a failure there leaves
+	-- them drawn shut: they never collide, so the way in stays open all the same)
+	local okDoors, stopDoors = pcall(DoorView.start)
+	if not okDoors then
+		warn("TownView: the doors did not start: " .. tostring(stopDoors))
 	end
 	task.spawn(function()
 		local town = workspace:WaitForChild("Town", 120)
@@ -176,6 +185,9 @@ function TownView.start(): () -> ()
 		alive = false
 		if okLights and type(stopLights) == "function" then
 			stopLights()
+		end
+		if okDoors and type(stopDoors) == "function" then
+			stopDoors()
 		end
 		for _, c in conns do
 			c:Disconnect()

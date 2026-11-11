@@ -89,10 +89,13 @@ return function(t)
 				end
 			end
 		end
-		t.eq(#lines, 854, "collidable massing parts")
+		-- 817 since 2026-11-11 (was 854): the 37 door leaves of the six enterable buildings no longer
+		-- collide (Builders/Shell: a doorway is an opening; the leaf is an auto door)
+		t.eq(#lines, 817, "collidable massing parts")
 		-- re-pinned 2026-11-11: 16 front door leaves moved up to the ground on their lot's uphill side
-		-- (Building.door; they stood 0.3 to 3.6 st under the grass). Nothing else moved.
-		t.eq(Bake.fnv(table.concat(lines, "\n")), "f8a1d06e1097db80", "massing moved: re-pin only on purpose")
+		-- (Building.door; they stood 0.3 to 3.6 st under the grass), and the 37 leaves above left the
+		-- list. Nothing else moved.
+		t.eq(Bake.fnv(table.concat(lines, "\n")), "87e71ff8c5473b26", "massing moved: re-pin only on purpose")
 		t.eq(Bake.fnv(table.concat(firsts, "\n")), "89066c7454a584aa", "a lot's first part changed")
 	end)
 

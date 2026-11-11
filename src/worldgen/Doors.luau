@@ -6,13 +6,20 @@
 -- recoverable from the open one and no extra state is stored. A leaf's knob and panels are separate
 -- visual parts carrying DoorOf = the leaf's DoorId (Builders/Facade, Builders/Shell): they are its
 -- followers and turn with it, by the same rigid motion.
+-- The doors of the buildings people walk into (attribute Auto = true, Builders/Shell) never collide and
+-- are opened on each client as a body comes near (Shared/World/DoorMotion, Client/Render/DoorView), so
+-- the server does not have to move them for anyone to get in. setOpen still poses one (a lock or a
+-- story beat may want a door held shut or open), and leaves its collision alone: off, as baked.
 -- Interface: pose(closed, size, open, sign, CFrameT) -> CFrame; setOpen(leaf, open, CFrameT?) -> boolean;
 --   setLocked(leaf, locked) ; collect(root) -> { [doorId]: BasePart }; followers(leaf) -> { BasePart }
 -- The prompts are placeholders until the W2 door service wires them (Enabled = false).
 
+local Import = require("./Import")
+local DoorMotion = Import.shared("World/DoorMotion") :: typeof(require("../shared/World/DoorMotion"))
+
 local Doors = {}
 
-Doors.SWING = 1.35
+Doors.SWING = DoorMotion.SWING
 
 -- Pose of a leaf whose closed CFrame is `closed`: hinge on its local -X edge, swing about +Y.
 function Doors.pose(closed: any, size: any, open: boolean, sign: number, C: any): any
@@ -67,7 +74,9 @@ function Doors.setOpen(leaf: any, open: boolean, C: any?): boolean
 		f.CFrame = motion * f.CFrame
 	end
 	leaf.CFrame = to
-	leaf.CanCollide = not open
+	if leaf:GetAttribute("Auto") ~= true then
+		leaf.CanCollide = not open
+	end
 	leaf:SetAttribute("Open", open)
 	return true
 end
