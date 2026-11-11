@@ -24,7 +24,8 @@ local scenario: Replay.Scenario = {
 	entries = entries,
 	sceneSecs = 6, -- the responder's hold at the scene (30 s in the game)
 	-- the square corners are rounded (LaneMath.CORNER_RADIUS), the turn back at the scene is a U-turn (it
-	-- flipped round on the spot and jumped 15 st sideways), and they pull away and brake
+	-- flipped round on the spot and jumped 15 st sideways), they pull away and brake, and the second
+	-- incident car parks behind the first instead of driving through it to its spot beyond
 	expect = {
 		none = {
 			"teleport_unflagged",
@@ -37,12 +38,12 @@ local scenario: Replay.Scenario = {
 			"sim_jump_unflagged",
 			"position_jump",
 			"accel_spike",
+			"box_overlap",
 		},
 	},
 	-- shows today: routes straight across lots and through houses (LaneMath.incidentRoute and the
-	-- responder's tail are straight lines, not roads); both incident cars' last legs are one line, so the
-	-- second car runs up behind the first one parked on it (it now stops behind it, 5.9 st too late)
-	known = { "through_building", "off_road", "box_overlap" },
+	-- responder's tail are straight lines, not roads)
+	known = { "through_building", "off_road" },
 	frame = function(sim: Replay.Sim)
 		if sim.wall >= 2 and not sim.state.responder then
 			sim.state.responder = true

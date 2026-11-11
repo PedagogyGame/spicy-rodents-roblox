@@ -442,10 +442,17 @@ function Replay.run(opts: { [string]: any }?): Result
 		})
 
 		local tickDt = traffic.tick
+		local frameWorld: any = {} -- the world handed to traffic:frame this server frame
 		traffic.onTick = function(_svc: any)
 			truth:record(sim.clock, sim.wall, tickDt, traffic.vehicles)
-			local tick: Detect.Tick =
-				{ n = truth.ticks, clock = sim.clock, wall = sim.wall, dt = tickDt, vehicles = traffic.vehicles }
+			local tick: Detect.Tick = {
+				n = truth.ticks,
+				clock = sim.clock,
+				wall = sim.wall,
+				dt = tickDt,
+				vehicles = traffic.vehicles,
+				world = frameWorld,
+			}
 			for _, h in hooks do
 				if h.tick then
 					h.tick(tick)
@@ -468,7 +475,8 @@ function Replay.run(opts: { [string]: any }?): Result
 				scenario.frame(sim)
 			end
 			local world = if scenario.world then scenario.world(sim) else emptyWorld
-			traffic:frame(dt, sim.clock, world or emptyWorld, net)
+			frameWorld = world or emptyWorld
+			traffic:frame(dt, sim.clock, frameWorld, net)
 		end
 
 		-- the client, as Client/Render/VehicleView builds it

@@ -158,6 +158,9 @@ function AICarMotor.new(
 	return v
 end
 
+-- The classes that answer calls: they have right of way over the lane classes (below).
+local EMERGENCY: { [string]: boolean } = { responder = true, incident = true, legacy_ambulance = true }
+
 function AICarMotor.body(v: Vehicle): LaneMath.Body
 	return {
 		x = v.x,
@@ -167,6 +170,7 @@ function AICarMotor.body(v: Vehicle): LaneMath.Body
 		length = v.box.length,
 		visible = v.visible,
 		id = v.id,
+		emergency = EMERGENCY[v.class],
 		speed = v.speed,
 	}
 end
@@ -226,6 +230,24 @@ local function mergeConflict(v: Vehicle, ctx: Ctx, horizon: number): boolean
 	return false
 end
 
+-- inPath(a, b, gap): is b's box in a's way: in front of a's nose by at most `gap` (or already level with
+-- it) and across a's width, with b's extents projected on a's heading whatever b's own heading (a car
+-- crossing a's path is as much in the way as one ahead of it in a's lane).
+local PATH_MARGIN = st(0.2)
+local function inPath(a: LaneMath.Body, b: LaneMath.Body, gap: number): boolean
+	local fx, fz = math.sin(a.yaw), math.cos(a.yaw)
+	local dx, dz = b.x - a.x, b.z - a.z
+	local along = dx * fx + dz * fz
+	if along <= 0 then
+		return false
+	end
+	local across = math.abs(dx * fz - dz * fx)
+	local ux, uz = math.sin(b.yaw), math.cos(b.yaw)
+	local bAlong = math.abs(ux * fx + uz * fz) * b.length / 2 + math.abs(uz * fx - ux * fz) * b.width / 2
+	local bAcross = math.abs(ux * fz - uz * fx) * b.length / 2 + math.abs(uz * fz + ux * fx) * b.width / 2
+	return along - bAlong < a.length / 2 + gap and across < a.width / 2 + bAcross + PATH_MARGIN
+end
+
 local function approach(v: number, goal: number, amount: number): number
 	if v < goal then
 		return math.min(goal, v + amount)
@@ -237,19 +259,65 @@ local function shortest(a: number): number
 	return math.atan2(math.sin(a), math.cos(a))
 end
 
--- Which other vehicles a vehicle brakes for. v5.4 counted only those heading its way (dot > 0.3; opposing
--- traffic excluded, §6.1, the trolley deadlock), so a lane vehicle drove straight into one crossing its
--- lane: the ice cream van merging across the residential street at the end of each loop, the patrol car
--- in its U-turn. The lane classes now also brake for crossing traffic (dot > -0.3, still not opposing);
--- the crossing classes (van, patrol, trolley) keep v5.4's rule, so two vehicles never wait for each other.
+-- How close in front of an emergency vehicle's nose another vehicle counts as in its way (PRIORITY_GAP);
+-- how near the end of its route a held-up emergency vehicle counts as there (ARRIVE_QUEUED).
+local PRIORITY_GAP = st(4)
+local ARRIVE_QUEUED = st(30)
+
+-- The lane classes also brake for traffic crossing their lane (below); the crossing classes do not.
 local CROSSING_YIELD: { [string]: boolean } = { sedan = true, heavy = true, motorcycle = true }
 
-local function minDot(v: Vehicle): number
-	return if CROSSING_YIELD[v.class] then -0.3 else 0.3
+-- Which bodies a vehicle brakes for when they are in its corridor:
+--   * every player's vehicle, whatever its heading (a car parked across the lane is still in the way; a
+--     player's car never waits for the fleet, so no deadlock);
+--   * fleet vehicles heading its way (dot > 0.3; v5.4 counted only these: opposing traffic excluded, §6.1,
+--     the trolley deadlock);
+--   * an emergency vehicle crossing or entering its path (right of way), unless this vehicle is already
+--     in the emergency vehicle's own way: then it keeps going to clear it, and the emergency vehicle waits
+--     (drivePolyline). Without this the ambulances and incident cars, which yield to no vehicle in v5.4,
+--     and the lane traffic drove through each other wherever a call route crosses a street;
+--   * for the lane classes (sedan, heavy, motorcycle), other traffic crossing the lane (dot > -0.3, still
+--     not opposing): the ice cream van merging across the residential street at the end of each loop,
+--     the patrol car in its U-turn. The crossing classes themselves (van, patrol, trolley) keep v5.4's
+--     rule and wait for a gap instead (mergeConflict), so two vehicles never wait for each other.
+local function bracesFor(v: Vehicle, b: LaneMath.Body, fx: number, fz: number): boolean
+	if b.player == true then
+		return true
+	end
+	local dot = math.sin(b.yaw) * fx + math.cos(b.yaw) * fz
+	if dot > 0.3 then
+		return true
+	end
+	if b.emergency == true then
+		return not inPath(b, AICarMotor.body(v), PRIORITY_GAP)
+	end
+	return CROSSING_YIELD[v.class] == true and dot > -0.3
+end
+
+-- The players' vehicles among the bodies.
+local function playerCars(ctx: Ctx): { LaneMath.Body }
+	local out = {}
+	for _, b in ctx.bodies do
+		if b.player then
+			table.insert(out, b)
+		end
+	end
+	return out
+end
+
+-- Is a player's vehicle in the corridor ahead within `gap` studs of v's nose? (the classes that yield to
+-- no vehicle in v5.4, motorcycles and the emergency routes, still must not drive through one)
+local function playerCarAhead(v: Vehicle, ctx: Ctx, gap: number): boolean
+	local cars = playerCars(ctx)
+	if #cars == 0 then
+		return false
+	end
+	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	return LaneMath.vehicleAhead(AICarMotor.body(v), fx, fz, v.box.length / 2 + gap, v.box.width / 2, cars)
 end
 
 -- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels visible
--- relative to the vehicle base) and vehicles it brakes for (minDot).
+-- relative to the vehicle base) and the vehicles it braces for (bracesFor).
 local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicles: boolean): { LaneMath.Hazard }
 	local out: { LaneMath.Hazard } = {}
 	for _, p in ctx.people do
@@ -264,10 +332,9 @@ local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicle
 		end
 	end
 	if withVehicles then
-		local lo = minDot(v)
 		for _, b in ctx.bodies do
 			if b.visible ~= false and b.id ~= v.id then
-				if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > lo then
+				if bracesFor(v, b, fx, fz) then
 					table.insert(out, { x = b.x, z = b.z, r = b.width / 2 })
 				end
 			end
@@ -278,10 +345,9 @@ end
 
 local function sameWay(v: Vehicle, ctx: Ctx, fx: number, fz: number): { LaneMath.Body }
 	local out = {}
-	local lo = minDot(v)
 	for _, b in ctx.bodies do
 		if b.id ~= v.id then
-			if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > lo then
+			if bracesFor(v, b, fx, fz) then
 				table.insert(out, b)
 			end
 		end
@@ -313,7 +379,7 @@ local function junctionClear(v: Vehicle, ctx: Ctx, line: Control.StopLine?): boo
 		end
 	end
 	for _, b in ctx.bodies do
-		if b.visible ~= false and b.id ~= v.id then
+		if b.visible ~= false and b.id ~= v.id and not (b.player and (b.speed or 0) < 0.5) then
 			if (b.x - cx) ^ 2 + (b.z - cz) ^ 2 < r * r then
 				return false
 			end
@@ -602,7 +668,7 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 		return
 	end
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
-	if personNear(ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) then
+	if personNear(ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) or playerCarAhead(v, ctx, st(2)) then
 		v.speed = 0
 	else
 		-- follows the vehicle ahead (v5.4's riders stopped only for people, so they rode straight through
@@ -626,9 +692,47 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 end
 
 local POLY_ACCEL = st(5) -- 12.5 st/s2 pulling away
-local TURN_SPEED = st(3) -- 7.5 st/s round the 7.5 st U-turn at the scene: 1 rad/s
+local TURN_SPEED = st(2.4) -- 6 st/s round the 5 st U-turn at the scene (POLY_OFFSET): 1.2 rad/s
 local POLY_BRAKE = st(6) -- 15 st/s2 into a corner or the end of the route
 local CORNER_LATERAL = st(10) -- 25 st/s2 round a corner: 22 st/s through a 20 st one
+local FOLLOW_BRAKE = st(3) -- 7.5 st/s2 coming up behind a vehicle: half of POLY_BRAKE, so it can be held
+
+-- fleetInWay(v, ctx, gap): an emergency vehicle's right of way ends at a vehicle already in its way
+-- (inPath): one ahead in its lane, or a lane vehicle still crossing in front of it (those that have not
+-- reached its path wait for it: bracesFor). Oncoming traffic is never in the way (its own lane). Two
+-- emergency vehicles crossing: the higher id waits, so they never wait for each other. Returns the body.
+local function fleetInWay(v: Vehicle, ctx: Ctx, gap: number): LaneMath.Body?
+	local me = AICarMotor.body(v)
+	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	for _, b in ctx.bodies do
+		if b.visible == false or b.id == v.id or b.player then
+			continue
+		end
+		local dot = math.sin(b.yaw) * fx + math.cos(b.yaw) * fz
+		if dot < -0.3 then
+			continue
+		end
+		if b.emergency and dot <= 0.3 and (b.id :: number) > v.id then
+			continue -- a crossing emergency vehicle with a higher id waits for this one
+		end
+		if inPath(me, b, gap) then
+			return b
+		end
+	end
+	return nil
+end
+
+-- What an emergency vehicle slows down behind: fleet vehicles heading its way and players' vehicles
+-- (never a crossing emergency vehicle: fleetInWay decides which of the two waits).
+local function leaders(v: Vehicle, ctx: Ctx, fx: number, fz: number): { LaneMath.Body }
+	local out = {}
+	for _, b in ctx.bodies do
+		if b.id ~= v.id and (b.player == true or math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3) then
+			table.insert(out, b)
+		end
+	end
+	return out
+end
 
 -- polyline drive shared by the emergency classes: hard stop for people within r; returns true at the end.
 -- The stop is not for ever: someone who stays in the way is waited for BLOCK_PATIENCE seconds, then
@@ -652,24 +756,36 @@ local function drivePolyline(
 		blocked = math.max(0, blocked - dt)
 	end
 	v.blocked = blocked
-	if inWay and blocked <= AICarMotor.BLOCK_PATIENCE then
-		v.speed = 0 -- the hard stop for people stays instant (traffic.md §5.8)
+	-- a vehicle already in its way (fleetInWay): one crossing in front of its nose is stopped for at once,
+	-- as is a player's car right in front of it; one ahead in its own lane is slowed down behind (below)
+	local queued = fleetInWay(v, ctx, PRIORITY_GAP)
+	local crossing = queued ~= nil and math.sin(queued.yaw) * fx + math.cos(queued.yaw) * fz <= 0.3
+	if (inWay and blocked <= AICarMotor.BLOCK_PATIENCE) or crossing or playerCarAhead(v, ctx, st(1.2)) then
+		v.speed = 0 -- the hard stop stays instant (traffic.md §5.8)
 	else
 		-- pulls away, slows for each corner and brakes to a stop at the end (it used to run at full speed
-		-- from the first tick to the last: 0 to 31 st/s and back in one tick)
-		-- and keeps behind a vehicle ahead on the same route (both incident cars drive one polyline)
-		local gap = gapAhead(v, fx, fz, st(24), v.box.width / 2, sameWay(v, ctx, fx, fz))
+		-- from the first tick to the last: 0 to 31 st/s and back in one tick), and keeps behind a
+		-- vehicle ahead: it looks as far as it needs to stop (a player's car standing in the lane, the
+		-- other incident car parked on the same line) and follows a moving one at its speed
+		local reach = st(6) + v.speed * v.speed / (2 * FOLLOW_BRAKE)
+		local room = math.max(0, gapAhead(v, fx, fz, reach, v.box.width / 2, leaders(v, ctx, fx, fz)) - st(2))
 		local cap = math.min(
 			if inWay then math.min(speed, AICarMotor.BLOCK_CRAWL) else speed, -- edging past someone
 			LaneMath.cornerCap(lane, v.dir, v.s, CORNER_LATERAL, POLY_BRAKE),
 			math.max(math.sqrt(2 * POLY_BRAKE * math.max(0, len - v.s)), st(0.4)),
-			math.max(0, (gap - st(2)) * 1.2)
+			room * 1.2,
+			math.sqrt(2 * FOLLOW_BRAKE * room)
 		)
 		v.speed = approach(v.speed, cap, (if cap < v.speed then POLY_BRAKE else POLY_ACCEL) * dt)
 	end
 	v.s = math.min(len, v.s + v.speed * dt)
 	place(v, ctx, lane)
-	return v.s >= len - 1e-6
+	-- brought to a stand near the end of its route by another emergency vehicle standing there (the
+	-- incident cars' routes end one behind the other in the same lane, the second car's spot beyond the
+	-- first's): it has arrived where it stands, instead of waiting out the other's hold or driving
+	-- through it
+	local parkedAhead = queued ~= nil and queued.emergency == true and (queued.speed or 0) < 0.5
+	return v.s >= len - 1e-6 or (parkedAhead and v.speed < 0.5 and len - v.s < ARRIVE_QUEUED)
 end
 
 stepClass.legacy_ambulance = function(v, ctx, dt, events)

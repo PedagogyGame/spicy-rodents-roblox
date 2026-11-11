@@ -46,7 +46,12 @@ type Signal = any
 local st = Units.st
 
 export type Squirrel = { id: any, x: number, y: number, z: number, teleported: boolean? }
-export type World = { people: { Person }?, squirrels: { Squirrel }? }
+-- A player's vehicle (Server/Actors/DeviceService: parked or driven), studs and HTML yaw. The fleet brakes
+-- and queues for it like for a fleet vehicle (traffic.md §12, addendum A1: "AI cars must treat player cars
+-- as fleet members in trafficVehicleAhead"); clients draw fleet ghosts without collision, so without this
+-- the AI drove straight through a player's car.
+export type PlayerCar = { id: any, x: number, z: number, yaw: number, width: number, length: number, speed: number? }
+export type World = { people: { Person }?, squirrels: { Squirrel }?, cars: { PlayerCar }? }
 
 export type Stats = {
 	ticks: number,
@@ -184,6 +189,19 @@ local function ctxFor(self: TrafficService, world: World): Ctx
 	local bodies = table.create(#self.vehicles)
 	for _, v in self.vehicles do
 		table.insert(bodies, AICarMotor.body(v))
+	end
+	for _, c in (world.cars or {}) :: { PlayerCar } do
+		table.insert(bodies, {
+			x = c.x,
+			z = c.z,
+			yaw = c.yaw,
+			width = c.width,
+			length = c.length,
+			visible = true,
+			id = `player:{c.id}`,
+			player = true,
+			speed = c.speed or 0,
+		})
 	end
 	return {
 		now = self.now,

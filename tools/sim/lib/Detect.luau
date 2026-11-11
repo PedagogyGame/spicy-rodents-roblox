@@ -97,6 +97,9 @@ export type Tick = {
 	wall: number,
 	dt: number, -- the tick length
 	vehicles: { any }, -- the live AICarMotor vehicles (x, z, yaw, visible, teleported, phase, s, ...): read, never write
+	-- the world the scenario handed the service this frame ({ people, squirrels, cars? }; empty without
+	-- a `world` hook): read, never write
+	world: any?,
 }
 
 export type Send = {

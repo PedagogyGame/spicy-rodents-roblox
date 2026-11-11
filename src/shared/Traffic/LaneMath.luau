@@ -75,6 +75,8 @@ export type Lane = {
 
 export type Pose = { x: number, y: number, z: number, yaw: number }
 
+-- `player`: a player's vehicle (parked or driven), not a fleet member; `emergency`: a fleet vehicle
+-- answering a call (right of way); `speed` in studs/s when known
 export type Body = {
 	x: number,
 	z: number,
@@ -83,6 +85,8 @@ export type Body = {
 	length: number,
 	visible: boolean?,
 	id: any?,
+	player: boolean?,
+	emergency: boolean?,
 	speed: number?,
 }
 
@@ -138,7 +142,12 @@ function LaneMath.isVehicleLane(id: string): boolean
 end
 
 LaneMath.LOOP_ARC_DIVISIONS = 4000 -- arc-length table of loop lanes (the ice cream loop: 0.3 st apart)
-LaneMath.POLY_OFFSET = Units.st(3) -- keep-right offset for centreline polylines (inside an 18 u road's right half)
+-- The keep-right offset of centreline polylines (the emergency routes): 5 st, so an ambulance (5.9 st
+-- wide) runs between the crown of the road and the lane traffic, whose lanes are 12.75 to 14 st out
+-- and whose widest body (the dump truck) reaches in to 8.6 st. At 3 u (7.5 st) its side was inside the
+-- cars of the lane it passed, so once emergency vehicles stopped driving through traffic it queued
+-- behind a sedan that had stopped for the very patient it was sent to, and never arrived.
+LaneMath.POLY_OFFSET = Units.st(2)
 
 LaneMath.CORNER_RADIUS = Units.st(8) -- 20 st: a street corner taken inside an 18 u road
 
