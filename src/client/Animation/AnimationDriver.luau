@@ -44,10 +44,13 @@
 --   heroClip(mode, speed, stalk) -> clip name (pure); heroRate(name, speed, cadence?, length) -> playback
 --   speed (pure); heroTracks(tracks, current, want, track, loop, rate) -> clip now playing; HERO. The
 --   Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
---   heroLayers(rig, t, seed) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
+--   heroLayers(rig, t, seed, live?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
+--   Every hero body near the camera also gets Animation/Liveliness (how it answers its own movement):
+--   liveSample(cf, speed, mode, kin?, time, far) -> Liveliness.Sample (pure).
 
 local Gait = require("./Gait")
 local Creep = require("./Creep")
+local Liveliness = require("./Liveliness")
 local KinematicPose = require("../Controllers/KinematicPose")
 local Import = require("../Import")
 local PossessionState =
@@ -110,9 +113,18 @@ type Entry = {
 	applied: number,
 	kin: boolean, -- a kinematic controller drew this body last frame
 	hero: { [string]: HeroAssets.Clip }?, -- a sculpted hero rig playing its authored clips
-	-- the Spicy Rodent's twitches (Animation/Creep), layered on its clips: the bones by name, what the
-	-- clip last gave each and what was last written to it (so an offset is never applied twice)
-	creep: { seed: number, bones: { [string]: any }, base: { [any]: CFrame }, wrote: { [any]: CFrame } }?,
+	mode: string, -- what a hero body is doing (heroClip's mode), for Animation/Liveliness
+	-- what is layered on a hero's clips (heroLayers: Animation/Liveliness, and the Spicy Rodent's
+	-- Animation/Creep): the bones by name, what the clip last gave each and what was last written to it
+	-- (so an offset is never applied twice)
+	creep: {
+		seed: number,
+		rig: string,
+		live: Liveliness.State,
+		bones: { [string]: any },
+		base: { [any]: CFrame },
+		wrote: { [any]: CFrame },
+	}?,
 }
 
 -- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
@@ -331,16 +343,24 @@ end
 
 -- The joint rotations a hero body gets on top of its clip at server time `t`, as
 -- { [boneName] = { rx, ry, rz } }: radians on the rig's own axes, each multiplied onto what the clip gave
--- that bone as CFrame.Angles(rx, ry, rz). `rig` is the body's RigSpec attribute. So far only the Spicy
--- Rodent ("rodent") has any: Animation/Creep's twitches. Pure: the driver below applies exactly this, and
--- the offline motion preview (tools/review/motion_path.luau) reads it, so both show the same thing; a
--- new layer belongs here.
-function AnimationDriver.heroLayers(rig: string, t: number, seed: number): { [string]: { number } }
+-- that bone as CFrame.Angles(rx, ry, rz) (the Root may carry three more numbers, an offset in studs:
+-- CFrame.new(tx, ty, tz) * CFrame.Angles(rx, ry, rz)). `rig` is the body's RigSpec attribute. The Spicy
+-- Rodent ("rodent") has Animation/Creep's twitches; `live`, when given, is the body's Animation/Liveliness
+-- state after this frame's step, and its pose is added on top (the two are offsets on the same axes).
+-- Pure: the driver below applies exactly this, and the offline motion preview
+-- (tools/review/motion_path.luau) reads it, so both show the same thing; a new layer belongs here.
+function AnimationDriver.heroLayers(
+	rig: string,
+	t: number,
+	seed: number,
+	live: Liveliness.State?
+): { [string]: { number } }
 	local out: { [string]: { number } } = {}
 	if rig ~= "rodent" then
-		return out
+		return if live then Liveliness.onto(out, live.pose) else out
 	end
-	local pose = Creep.pose(t, seed)
+	-- (at a sprint a head jerk shows less: the run already throws the head about)
+	local pose = Creep.pose(t, seed, if live then Liveliness.twitch(live) else 1)
 	out.Head = { pose.head.pitch, pose.head.yaw, pose.head.roll }
 	out.Jaw = { -pose.jaw, 0, 0 } -- the jaw opens about -X (the authored bite)
 	out.EarL = { 0, 0, pose.earL }
@@ -354,8 +374,42 @@ function AnimationDriver.heroLayers(rig: string, t: number, seed: number): { [st
 	if pose.spine ~= 0 then
 		out.Spine1 = { 0, 0, pose.spine }
 		out.Spine3 = { 0, 0, pose.spine }
+		-- the shudder is the back's and the head's: the chest takes it back, so the fore paws it carries
+		-- stay where they stand, and the neck takes it up again
+		out.Chest = { 0, 0, -3 * pose.spine }
+		out.Neck = { 0, 0, 3 * pose.spine }
 	end
-	return out
+	return if live then Liveliness.onto(out, live.pose) else out
+end
+
+-- What Animation/Liveliness is told about a hero body this frame: its root's pose (`cf`, a CFrame), the
+-- speed the animation is told, heroClip's mode, the kinematic controller's pose when the body is held
+-- (else the pose arrives in the server's steps), the server's clock, and whether it is too far from the
+-- camera to matter. Pure: the offline motion preview builds the same sample.
+function AnimationDriver.liveSample(
+	cf: any,
+	speed: number,
+	mode: string,
+	kin: KinematicPose.Pose?,
+	time: number,
+	far: boolean
+): Liveliness.Sample
+	local pitch, yaw, roll = cf:ToOrientation()
+	return {
+		x = cf.X,
+		y = cf.Y,
+		z = cf.Z,
+		pitch = pitch,
+		yaw = yaw,
+		roll = roll,
+		speed = speed,
+		mode = mode,
+		stalk = kin ~= nil and kin.stalk == true,
+		winded = kin ~= nil and kin.winded == true,
+		coarse = kin == nil,
+		time = time,
+		far = far,
+	}
 end
 
 -- The joints the gait drives, by RigSpec bone name: Motor6Ds on a part-built puppet, Bones on a skinned
@@ -538,17 +592,20 @@ function AnimationDriver.start(opts: Opts): Driver
 			applied = 0,
 			kin = false,
 			hero = hero,
+			mode = "ground",
 			creep = nil,
 		}
-		if hero and model:GetAttribute("RigSpec") == "rodent" then
+		if hero then
 			local bones: { [string]: any } = {}
 			for _, d in model:GetDescendants() do
 				if d:IsA("Bone") then
 					bones[d.Name] = d
 				end
 			end
+			local seed = AnimationDriver.creepSeed(model.Name)
+			local rig = if model:GetAttribute("RigSpec") == "rodent" then "rodent" else "squirrel"
 			entries[model].creep =
-				{ seed = AnimationDriver.creepSeed(model.Name), bones = bones, base = {}, wrote = {} }
+				{ seed = seed, rig = rig, live = Liveliness.new(seed, rig), bones = bones, base = {}, wrote = {} }
 		end
 		count += 1
 	end
@@ -720,6 +777,7 @@ function AnimationDriver.start(opts: Opts): Driver
 					then kin.mode
 					elseif math.abs(e.root.CFrame.LookVector.Y) > 0.6 then "trunk"
 					else "ground"
+				e.mode = mode
 				local want = AnimationDriver.heroClip(mode, e.speed, kin ~= nil and kin.stalk == true)
 				local clip = heroSet[want]
 				local t = if clip then track(e, want) else nil
@@ -790,7 +848,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			local p = e.gait
 			local creep = e.creep
 			if creep and e.hero then
-				-- the Spicy Rodent's twitches, multiplied onto what its clip gave each bone this frame
+				-- the layers (heroLayers), multiplied onto what the clip gave each bone this frame
 				local function layer(name: string, offset: CFrame)
 					local bone = creep.bones[name]
 					if bone == nil then
@@ -805,8 +863,13 @@ function AnimationDriver.start(opts: Opts): Driver
 					creep.wrote[bone] = out
 					bone.Transform = out
 				end
-				for name, r in AnimationDriver.heroLayers("rodent", workspace:GetServerTimeNow(), creep.seed) do
-					layer(name, CFrame.Angles(r[1], r[2], r[3]))
+				local now = workspace:GetServerTimeNow()
+				local cf, camera = e.root.CFrame, workspace.CurrentCamera
+				local far = camera ~= nil and (cf.Position - camera.CFrame.Position).Magnitude > Liveliness.RANGE
+				local sample = AnimationDriver.liveSample(cf, e.speed, e.mode, KinematicPose.get(e.body), now, far)
+				local live = if Liveliness.frame(creep.live, sample, dt) then creep.live else nil
+				for name, r in AnimationDriver.heroLayers(creep.rig, now, creep.seed, live) do
+					layer(name, CFrame.new(r[4] or 0, r[5] or 0, r[6] or 0) * CFrame.Angles(r[1], r[2], r[3]))
 				end
 			end
 			if p == nil or #e.joints == 0 or e.hero ~= nil then

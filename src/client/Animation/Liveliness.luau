@@ -201,9 +201,9 @@ Liveliness.P = {
 	-- next segment (the bend runs down the tail).
 	tail = {
 		pass = 0.02,
-		omegaRoot = 19,
-		omegaTip = 10,
-		zeta = 0.32,
+		omegaRoot = 16,
+		omegaTip = 9,
+		zeta = 0.3,
 		-- left behind in a turn: seconds of lag per segment at the root and at the tip (the angle is the
 		-- lag times the yaw rate), and where a segment stops
 		lagRoot = 0.011,
@@ -252,8 +252,8 @@ Liveliness.P = {
 		flag = { every = 6.1, chance = 0.4 }, -- a burst of tail flagging
 		glance = { every = 3.7, chance = 0.5 }, -- a quick look to one side, held
 	},
-	-- the Spicy Rodent's head jerks while it runs: all of one below `from` studs/s, `least` of one at `to`
-	twitch = { from = 12, to = 30, least = 0.5 },
+	-- the Spicy Rodent's head jerks while it runs: all of one up to `from` studs/s (a run), `least` of one at `to`
+	twitch = { from = 18, to = 33, least = 0.5 },
 	-- legs: radians about X of Upper, Lower, Foot and Toe per stud a paw must come up toward the body to
 	-- stay on the ground (measured on the built rig at its standing pose; the sum is 0, so the sole stays
 	-- flat), and how far a paw is folded or let down at most
@@ -528,6 +528,10 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 			st.tailPitchV[i] += hit * P.land.tail * P.tail.liftShare[i] * TAIL
 		end
 	end
+	-- a change of mode is sharp (a leap leaves the ground at once): what comes in is not eased across it
+	if st.mode ~= mode then
+		st.inYaw, st.inPace, st.inVy = input.yawRate, rawPace, input.vy
+	end
 	st.mode = mode
 
 	-- how much of each answer this body gives: a body standing on end does not answer turns; braking
@@ -539,6 +543,7 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 	local leanSpeed = P.turn.lean.slow + (1 - P.turn.lean.slow) * math.clamp(rawPace / P.sprint, 0, 1.2)
 	local settled = (1 - st.air) * (1 - st.air)
 
+	local streamingWas = smooth(P.tail.rippleFrom, P.sprint, st.pace)
 	local n = math.clamp(math.ceil(dt * P.rate - 1e-9), 1, math.ceil(P.maxDt * P.rate))
 	local h = dt / n
 	local kYaw = 1 - math.exp(-h / S.yaw[coarse])
@@ -647,6 +652,7 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 		then st.still + (1 - st.still) * (1 - math.exp(-dt * P.idle.settle))
 		else st.still * math.exp(-dt * P.idle.leave)
 	local Br = P.breath
+	local effortWas = st.effort
 	if input.winded then
 		st.effort += (1 - st.effort) * (1 - math.exp(-dt * Br.windedRate))
 	elseif input.speed > Br.sprintAbove then
@@ -654,9 +660,12 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 	else
 		st.effort = math.max(0, st.effort - dt / Br.recover)
 	end
-	st.breath = (st.breath + dt * 2 * math.pi * (Br.calmHz + (Br.pantHz - Br.calmHz) * st.effort)) % (2 * math.pi)
+	-- (the phases move at the mean of the frame's two rates, so they do not depend on its length)
+	local effort = 0.5 * (effortWas + st.effort)
+	st.breath = (st.breath + dt * 2 * math.pi * (Br.calmHz + (Br.pantHz - Br.calmHz) * effort)) % (2 * math.pi)
 	local streaming = smooth(K.rippleFrom, P.sprint, st.pace)
-	st.ripple = (st.ripple + dt * 2 * math.pi * (K.rippleHz[1] + (K.rippleHz[2] - K.rippleHz[1]) * streaming))
+	local stream = 0.5 * (streamingWas + streaming)
+	st.ripple = (st.ripple + dt * 2 * math.pi * (K.rippleHz[1] + (K.rippleHz[2] - K.rippleHz[1]) * stream))
 		% (200 * math.pi)
 
 	-- the pose --------------------------------------------------------------------------------------------

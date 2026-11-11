@@ -274,6 +274,7 @@ function Squirrel.start(
 		kin.moveSpeed, kin.cadence, kin.climb = visual.moveSpeed, visual.cadence, visual.climb
 		kin.mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded)
 		kin.stalk = state.focus
+		kin.winded = state.winded
 		local cf = Units.yawCFrame(visual.yaw or state.yaw, Vector3.new(visual.x, visual.y, visual.z))
 			* CFrame.Angles(visual.pitch, 0, -visual.lean)
 			* CFrame.new(0, hip, 0)

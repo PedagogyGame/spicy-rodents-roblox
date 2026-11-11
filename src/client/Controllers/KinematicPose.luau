@@ -16,6 +16,7 @@ export type Pose = {
 	-- what the body is doing, for a rig that plays clips: "ground" | "trunk" | "rail" | "air"
 	mode: string?,
 	stalk: boolean?, -- creeping (Ctrl)
+	winded: boolean?, -- out of fumes (the sprint meter ran out)
 }
 
 local KinematicPose = {}
