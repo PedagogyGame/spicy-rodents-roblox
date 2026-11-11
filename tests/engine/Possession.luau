@@ -55,7 +55,7 @@ end
 export type Opts = { cycles: number?, seed: number?, humans: number?, squirrels: number? }
 
 function PossessionSuite.run(opts: Opts?): { [string]: any }
-	local o = opts or {}
+	local o: Opts = opts or {}
 	local started = os.clock()
 	local folder = Instance.new("Folder")
 	folder.Name = "PossessionSoakBodies"
