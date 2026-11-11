@@ -31,6 +31,7 @@ type Harness = {
 	possessable: { [number]: boolean },
 	toasts: { { id: number, key: string } },
 	players: { [number]: boolean },
+	drivers: { [number]: any }, -- who plays a body (the service's driverOf)
 	time: number,
 	worstMs: number, -- the longest single step of the service (it runs inside a server frame)
 	step: (secs: number, each: (() -> ())?) -> (),
@@ -64,6 +65,7 @@ return function(t)
 			possessable = {},
 			toasts = {},
 			players = {},
+			drivers = {},
 			time = 0,
 			worstMs = 0,
 			rodent = 0,
@@ -86,6 +88,9 @@ return function(t)
 			end,
 			controllerOf = function(id: number): string
 				return if h.players[id] then "player" else "ai"
+			end,
+			driverOf = function(id: number): any?
+				return h.drivers[id]
 			end,
 			setAttr = function(id: number, name: string, value: any)
 				h.attrs[id] = h.attrs[id] or {}
@@ -216,6 +221,13 @@ return function(t)
 		local prev: { [number]: { number } } = {}
 		local jumps: { string } = {}
 		local function look()
+			-- a cured person out of sight for the trip home is nobody's to play (a player handed that
+			-- body would start under the ward)
+			for id, l in h.svc.leaving do
+				if l.away then
+					t.eq(h.possessable[id], false, `{id} is on offer to players while out of sight on the way home`)
+				end
+			end
 			for _, a in h.world.actors do
 				if a.species == "human" then
 					local shown = if (a.lift or 0) == 0 then 1 else 0
@@ -771,10 +783,13 @@ return function(t)
 				local bitten = {}
 				for i = 1, 16 do
 					local a = humans[i]
-					posts[a.post] = (posts[a.post] or 0) + 1
 					h.step(rng.int(0, 4))
 					if h.svc:biteable(a.id) and h.svc:bite(a.id, h.rodent) then
 						bitten[a.id] = true
+						posts[a.post] = (posts[a.post] or 0) + 1
+					else
+						-- (a rider shouts and rides off: never a case)
+						t.truthy(a.post == "rider" or not h.svc:biteable(a.id), `{a.post} {a.id} was not infected`)
 					end
 				end
 				local open: { [number]: boolean } = table.clone(bitten)
@@ -1152,10 +1167,23 @@ return function(t)
 			t.eq(recF.crewSecs, 0, "no crew can walk there: taken in where they sit")
 			-- both are cured in the hospital and nowhere else
 			local curedAt: { [number]: boolean } = {}
+			local farAway = 0
 			t.truthy(
 				h.runUntil(500, function(): boolean
 					return h.svc:stateOf(clerk.id) == nil and h.svc:stateOf(far.id) == nil
 				end, function()
+					-- the worker has no way home on foot: out of sight from the bed for the trip, and
+					-- not on offer to players while under the ward
+					local l = h.svc.leaving[far.id]
+					if l then
+						farAway += 1
+						t.truthy(l.away)
+						t.eq(far.lift, InfectionService.SINK, "out of sight until home")
+						t.truthy(HospitalLayout.contains(layout, far.x, far.z), "and still at the bed, not at the door")
+						t.eq(h.possessable[far.id], false, "nobody is handed a body under the ward")
+					elseif farAway > 0 then
+						t.eq(h.possessable[far.id], true, "home: anyone's to play again")
+					end
 					for _, a in { clerk, far } do
 						if h.svc:stateOf(a.id) == nil and not curedAt[a.id] then
 							curedAt[a.id] = true
@@ -1168,6 +1196,7 @@ return function(t)
 				`not cured: {h.svc:stateOf(clerk.id)}, {h.svc:stateOf(far.id)}`
 			)
 			t.eq(h.svc:stats().cured, 2)
+			t.truthy(farAway >= 5, `the worker was out of sight for {farAway} steps of the trip home`)
 			t.eq(h.svc:stats().abandoned, 0, "an ambulance came for both")
 			-- home: the clerk on foot, back into the station; the worker (no way on foot) out of sight
 			-- from the bed and then at the shop, never walked out to the front door to vanish there
@@ -2111,6 +2140,246 @@ return function(t)
 			end))
 			h.step(30)
 			clean(h, "after the scared crowd")
+		end
+	)
+	t.test("a cyclist or motorcyclist is never a patient: bitten, they shout and ride off", function()
+		local h = harness(75, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 })
+		h.step(20)
+		local riders = 0
+		for _, a in h.world.actors do
+			if a.species == "human" and a.post == "rider" then
+				riders += 1
+				local brain = h.world.brains[a.id] :: any
+				parkRodent(h, a.x + 2, a.z)
+				t.truthy(h.svc:biteable(a.id))
+				t.eq(h.svc:bite(a.id, h.rodent), false, "no new infection")
+				t.eq(h.svc:stateOf(a.id), nil, "no case")
+				t.truthy(not a.infected and not h.svc:isInfected(a.id))
+				t.eq(brain.state, "flee", "they ride off")
+				t.truthy(table.find(Lines.GROUPS.bitten, (h.attrs[a.id] or {}).Say) ~= nil, "shouting")
+				t.truthy(h.svc:biteable(a.id), "and can be bitten again")
+				h.step(1.2)
+			end
+		end
+		t.eq(riders, 8)
+		t.eq(h.svc:stats().bites, 8, "every bite is counted")
+		-- (the people who saw it run; none of that opens a case)
+		t.eq(h.svc:stats().cases, 0)
+		h.world.possessed[h.rodent] = nil
+		h.step(30)
+		for _, a in h.world.actors do
+			if a.species == "human" then
+				t.eq((h.attrs[a.id] or {}).Med, nil, `{a.post} {a.id} shows Med`)
+			end
+		end
+		t.eq(h.svc:townPercent(), 0)
+	end)
+
+	t.test(
+		"the patient goes out of sight beside the ambulance first; it pulls away a moment later, and never stays held",
+		function()
+			local h = harness(11, { 0, 0 })
+			h.svc.tun.crowdChance = 0
+			h.step(20)
+			local victim = nearest(townspeople(h), 0, 0)
+			local id = victim.id
+			t.truthy(h.svc:bite(id, h.rodent))
+			t.truthy(h.runUntil(300, function(): boolean
+				return h.svc:stateOf(id) == "transit"
+			end))
+			local rec = h.svc.records[id]
+			local v = rec.vehicle
+			t.eq(victim.lift, InfectionService.SINK, "the patient is out of sight")
+			t.eq(v.phase, "hold", "and the ambulance is still standing there")
+			local x, z, yaw = v.x, v.z, v.yaw
+			h.step(InfectionService.LOAD_LINGER - 0.4)
+			t.eq(v.phase, "hold")
+			t.truthy(v.x == x and v.z == z and v.yaw == yaw, "it has not moved")
+			h.step(0.8)
+			t.eq(v.phase, "back", "then it turns for home")
+			-- a case that ends in that moment still lets the ambulance go (it was held for ever otherwise)
+			local h2 = harness(11, { 0, 0 })
+			h2.svc.tun.crowdChance = 0
+			h2.step(20)
+			local victim2 = nearest(townspeople(h2), 0, 0)
+			t.truthy(h2.svc:bite(victim2.id, h2.rodent))
+			t.truthy(h2.runUntil(300, function(): boolean
+				return h2.svc:stateOf(victim2.id) == "transit"
+			end))
+			local v2 = h2.svc.records[victim2.id].vehicle
+			t.eq(v2.phase, "hold")
+			h2.svc:shutdown()
+			t.truthy(
+				h2.runUntil(200, function(): boolean
+					return v2.phase == "idle"
+				end),
+				`the ambulance is still {v2.phase} after the switch-off`
+			)
+			t.truthy(not v2.held)
+		end
+	)
+
+	t.test("news about a victim goes to the player who bit them, not to whoever plays the rodent later", function()
+		local h = harness(11, { 0, 0 })
+		h.svc.tun.crowdChance = 0
+		h.step(20)
+		local victim = nearest(townspeople(h), 0, 0)
+		local function news(): number
+			local n = 0
+			for _, toast in h.toasts do
+				if toast.id == h.rodent then
+					n += 1
+				end
+			end
+			return n
+		end
+		-- player A plays the rodent and bites; the collapse is A's news
+		h.drivers[h.rodent] = "player A"
+		t.truthy(h.svc:bite(victim.id, h.rodent, "player A"))
+		t.truthy(h.runUntil(5, function(): boolean
+			return h.svc:stateOf(victim.id) == "down"
+		end))
+		t.eq(news(), 1)
+		t.eq(h.toasts[#h.toasts].key, "victimDown")
+		-- A is knocked out; B picks the Spicy Rodent (the same body) and bites someone else
+		h.drivers[h.rodent] = "player B"
+		h.svc.params.immediateChance = 1
+		local other = nearest(townspeople(h), 300, 300)
+		t.truthy(h.svc:bite(other.id, h.rodent, "player B"))
+		t.truthy(h.runUntil(1500, function(): boolean
+			return next(h.svc:cases()) == nil
+		end))
+		t.eq(h.svc:stats().cured, 2)
+		local keys = {}
+		for _, toast in h.toasts do
+			if toast.id == h.rodent then
+				table.insert(keys, toast.key)
+			end
+		end
+		-- A's: the collapse. B's: their own victim's collapse and cure. Not A's victim's cure.
+		t.deepEq(keys, { "victimDown", "victimDown", "victimCured" })
+		-- a second bite by the new player makes the victim theirs
+		local h2 = harness(12, { 0.99, 0.99 })
+		h2.step(10)
+		local v2 = nearest(townspeople(h2), 0, 0)
+		h2.drivers[h2.rodent] = "player B"
+		t.truthy(h2.svc:bite(v2.id, h2.rodent, "player A"))
+		h2.step(3)
+		t.eq(h2.svc:bite(v2.id, h2.rodent, "player B"), false)
+		t.eq(h2.svc.records[v2.id].by, "player B")
+		-- with nobody named (a caller that does not say who bit) the news goes to the body, as before
+		local h3 = harness(11, { 0, 0 })
+		h3.step(20)
+		local v3 = nearest(townspeople(h3), 0, 0)
+		h3.drivers[h3.rodent] = "player C"
+		t.truthy(h3.svc:bite(v3.id, h3.rodent))
+		t.truthy(h3.runUntil(5, function(): boolean
+			return h3.svc:stateOf(v3.id) == "down"
+		end))
+		t.eq(h3.toasts[#h3.toasts].key, "victimDown")
+	end)
+
+	t.test(
+		"a collapse in the road: a runner reaches the kerb first; one who cannot is not parked on by the ambulance",
+		function()
+			-- (a) bitten on a crossing with the collapse due at once: they are off the asphalt when they fall
+			local h = harness(76, nil, function(params: any)
+				params.immediateChance = 1
+				params.collapseAfterSecs = { 0.2, 0.2 }
+			end)
+			h.svc.tun.crowdChance = 0
+			h.step(20)
+			local roads = h.svc.roads
+			-- the main street's own pavements are not road (the merged centreline is as wide as the
+			-- commercial boulevard further east: by it, they were)
+			t.truthy(not MedicalRoute.onRoad(roads, 110, -30.25, 2), "the pavement along the main street")
+			t.truthy(MedicalRoute.onRoad(roads, 110, -20), "its asphalt")
+			t.truthy(MedicalRoute.onRoad(roads, 1000, -30.25), "the boulevard is wider")
+			-- someone walking a lane that crosses the north-south street at x = 0 (22.5 studs each side)
+			local walker = nil
+			for _, a in townspeople(h) do
+				local lane = (h.world.brains[a.id] :: any).lane
+				if lane.axis == "x" and math.abs(lane.fixed) > 100 and math.abs(lane.fixed) < 600 and walker == nil then
+					walker = a
+				end
+			end
+			t.truthy(walker ~= nil)
+			local lane = (h.world.brains[walker.id] :: any).lane
+			walker.x, walker.z = 3, lane.fixed
+			t.truthy(MedicalRoute.onRoad(roads, walker.x, walker.z), "standing in the road")
+			parkRodent(h, walker.x - 2, walker.z)
+			t.truthy(h.svc:bite(walker.id, h.rodent))
+			h.world.possessed[h.rodent] = nil
+			local held = 0
+			t.truthy(h.runUntil(10, function(): boolean
+				return h.svc:stateOf(walker.id) == "down"
+			end, function()
+				if h.svc:stateOf(walker.id) == "bitten" then
+					held += DT
+				end
+			end))
+			t.truthy(
+				not MedicalRoute.onRoad(roads, walker.x, walker.z, InfectionService.ROAD_PAD),
+				`they sat down in the road at ({walker.x}, {walker.z})`
+			)
+			t.truthy(held > 0.3 and held < 4, `the fall waited {held} s for the kerb`)
+			-- (b) someone who cannot get off it (no hold: they fall where they stand, in the ambulance's lane)
+			local h2 = harness(77, nil, function(params: any)
+				params.immediateChance = 1
+				params.collapseAfterSecs = { 0.2, 0.2 }
+				params.roadHoldSecs = 0
+			end)
+			h2.svc.tun.crowdChance = 0
+			h2.step(20)
+			local victim = nil
+			for _, a in townspeople(h2) do
+				local l = (h2.world.brains[a.id] :: any).lane
+				if l.axis == "x" and math.abs(l.fixed) > 100 and math.abs(l.fixed) < 600 and victim == nil then
+					victim = a
+				end
+			end
+			local brain = h2.world.brains[victim.id] :: any
+			victim.x, victim.z = 7.5, brain.lane.fixed
+			t.truthy(h2.svc:bite(victim.id, h2.rodent))
+			t.truthy(h2.runUntil(5, function(): boolean
+				return h2.svc:stateOf(victim.id) == "down"
+			end))
+			local px, pz = victim.x, victim.z
+			t.truthy(MedicalRoute.onRoad(h2.svc.roads, px, pz), "the patient is on the asphalt")
+			local rec = h2.svc.records[victim.id]
+			t.truthy(rec.stage.dist < 12, "in the ambulance's lane")
+			local closest = math.huge
+			t.truthy(
+				h2.runUntil(300, function(): boolean
+					return h2.svc:stateOf(victim.id) == "transit"
+				end, function()
+					local v = rec.vehicle
+					if v and v.visible then
+						-- the vehicle's box against the patient: along and across its heading
+						local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+						local dx, dz = px - v.x, pz - v.z
+						local along, across = math.abs(dx * fx + dz * fz), math.abs(dx * fz - dz * fx)
+						local gap = math.max(along - v.box.length / 2, across - v.box.width / 2)
+						closest = math.min(closest, gap)
+					end
+				end),
+				`never loaded (state {h2.svc:stateOf(victim.id)})`
+			)
+			t.truthy(closest > 2, `the ambulance came within {closest} studs of the patient (under 0: on them)`)
+			t.truthy(rec.stop ~= nil, "the stop is on record")
+			local short = math.sqrt((rec.stop[1] - px) ^ 2 + (rec.stop[2] - pz) ^ 2)
+			t.truthy(short >= InfectionService.STOP_CLEAR - 0.01 and short < 40, `it stopped {short} studs from them`)
+			t.truthy(rec.crewSecs > 0, "the crew walked the last steps")
+			print(
+				`      a patient in the road: the ambulance stopped {math.floor(short)} studs short, never nearer than {math.floor(
+					closest
+				)} studs`
+			)
+			t.truthy(h2.runUntil(1200, function(): boolean
+				return next(h2.svc:cases()) == nil and next(h2.svc.leaving) == nil
+			end))
+			h2.step(30)
+			clean(h2, "after the patient in the road")
 		end
 	)
 end

@@ -78,6 +78,7 @@ export type Opts = {
 	setAttr: ((id: number, name: string, value: any) -> ())?, -- replicate an attribute on the body
 	setPossessable: ((id: number, possessable: boolean) -> ())?,
 	notify: ((id: number, payload: { [string]: any }) -> ())?, -- a message for the player holding `id`
+	driverOf: ((id: number) -> any?)?, -- who plays body `id` now (any value naming the player; nil: the AI)
 	serverTime: (() -> number)?, -- the clock clients share (workspace:GetServerTimeNow)
 	onFault: ((where: string, err: any) -> ())?, -- a part of a step failed (it was contained)
 }
@@ -87,12 +88,15 @@ type Record = {
 	case: any, -- InfectionRules.Case
 	inputs: any, -- InfectionRules.Inputs (reused)
 	biter: number?,
+	by: any?, -- who was playing the biter at the bite (driverOf's value); nil: nobody in particular
 	home: { number }, -- where the person was bitten (a townsperson walks back there when cured)
 	amb: string, -- none | queued | assigned | returning
 	vehicle: any?, -- the responder on this patient's call (only while the trip is this record's)
+	lingerUntil: number?, -- the patient is aboard: the ambulance pulls away at this time
 	trip: any?, -- that trip's route: a vehicle on any other route is no longer this record's
 	virtual: boolean, -- the stop is the ambulance's own parking spot: nothing drives
 	stage: any?, -- MedicalRoute.Stage
+	stop: { number }?, -- where the ambulance stops on the road (the stage, or short of it)
 	crew: number?, -- the crew member out for this patient (aboard from the dispatch on)
 	crewPlanned: boolean, -- the crew's walk has been worked out for this arrival
 	crewSecs: number, -- seconds of that walk (0: the crew stays aboard)
@@ -135,6 +139,11 @@ InfectionService.RUN = 30 -- studs: the run of a bitten person who has no lane t
 InfectionService.RUN_MIN = 8 -- studs: with less room than this there is no run
 InfectionService.STRAY = 60 -- studs from their own round: staff further off than this are walked back by a real way
 InfectionService.CROWD_SCARE = 30 -- studs: a bystander this near the rodent leaves the crowd and runs
+InfectionService.LOAD_LINGER = 1.5 -- s the ambulance stays after its patient is aboard, before it pulls away
+InfectionService.ROAD_PAD = 2 -- studs beyond the asphalt that still count as "in the road" for a collapse
+-- studs between a patient and the point of the road centreline where their ambulance stops: its lane
+-- is 7.5 studs off the centreline and the vehicle 11 studs long, so at this distance it is never on them
+InfectionService.STOP_CLEAR = 21
 
 -- What a player holding a body is told (on screen, plain words, what to do).
 InfectionService.TOASTS = table.freeze({
@@ -169,6 +178,7 @@ export type Service = typeof(setmetatable(
 		setAttr: (id: number, name: string, value: any) -> (),
 		setPossessable: (id: number, possessable: boolean) -> (),
 		notify: (id: number, payload: { [string]: any }) -> (),
+		driverOf: (id: number) -> any?,
 		serverTime: () -> number,
 		onFault: (where: string, err: any) -> (),
 		now: number,
@@ -235,6 +245,9 @@ function InfectionService.new(opts: Opts): Service
 		setAttr = opts.setAttr or function() end,
 		setPossessable = opts.setPossessable or function() end,
 		notify = opts.notify or function() end,
+		driverOf = opts.driverOf or function(): any?
+			return nil
+		end,
 		serverTime = opts.serverTime or function(): number
 			return world.now
 		end,
@@ -350,6 +363,17 @@ local function toast(self: Service, id: number?, key: string)
 		return
 	end
 	self.notify(id, { kind = "med", key = key, text = InfectionService.TOASTS[key], secs = 7 })
+end
+
+-- News about a victim, for the player who bit them. The rodent is one body that players take in
+-- turn: when the record says who bit (`by`) and somebody else plays the rodent by now, the news is
+-- not theirs and is not sent (they got "the person you bit has collapsed" about bites they never made).
+local function tellBiter(self: Service, rec: Record, key: string)
+	local biter = rec.biter
+	if biter == nil or (rec.by ~= nil and self.driverOf(biter) ~= rec.by) then
+		return
+	end
+	toast(self, biter, key)
 end
 
 -- a part of a step that fails is reported and contained: the rest of the step still runs
@@ -907,9 +931,10 @@ local function dropAmbulance(self: Service, rec: Record)
 	if i then
 		table.remove(self.queue, i)
 	end
-	if rec.amb == "assigned" and onTrip(rec) then
+	if (rec.amb == "assigned" or rec.lingerUntil ~= nil) and onTrip(rec) then
 		self.traffic:releaseResponder(rec.vehicle)
 	end
+	rec.lingerUntil = nil
 	rec.vehicle = nil
 	rec.trip = nil
 	rec.virtual = false
@@ -961,6 +986,37 @@ local function checkAmbulance(self: Service, rec: Record)
 	end
 end
 
+-- The road trip to a patient, ending where the ambulance stops: at the stage (the nearest point of
+-- the road), or, for a patient in the road or right beside it there, back along the trip until the
+-- stop is STOP_CLEAR from them. The ambulance stops level with the end of its trip, in its lane: a
+-- patient who collapsed on a crossing was driven over and parked on. nil: nothing to drive (the stop
+-- is the ambulance's own parking spot, or no point of the way there is clear of the patient).
+local function tripTo(self: Service, rec: Record): { { number } }?
+	local home, stage = self.home, rec.stage
+	local trip = if home and stage then MedicalRoute.trip(self.roads, home, stage) else nil
+	local a = actorOf(self, rec.id)
+	local clear = InfectionService.STOP_CLEAR
+	if trip == nil or a == nil or stage.dist >= clear then
+		return trip
+	end
+	for n = #trip, 2, -1 do
+		local p, q = trip[n - 1], trip[n]
+		local ex, ez = q[1] - p[1], q[2] - p[2]
+		local len = math.sqrt(ex * ex + ez * ez)
+		for back = 0, len, 2 do
+			local x, z = q[1] - ex / len * back, q[2] - ez / len * back
+			if (x - a.x) ^ 2 + (z - a.z) ^ 2 >= clear * clear then
+				local cut = table.move(trip, 1, n - 1, 1, {})
+				if math.abs(x - p[1]) + math.abs(z - p[2]) > 2 then
+					table.insert(cut, { x, z })
+				end
+				return if #cut >= 2 then cut else nil
+			end
+		end
+	end
+	return nil
+end
+
 local function stepQueue(self: Service)
 	while #self.queue > 0 do
 		local id = self.queue[1]
@@ -969,20 +1025,22 @@ local function stepQueue(self: Service)
 			table.remove(self.queue, 1)
 			continue
 		end
-		local home = self.home
-		local trip = if home then MedicalRoute.trip(self.roads, home, rec.stage) else nil
+		local trip = tripTo(self, rec)
 		if trip == nil then
 			-- the patient is beside the ambulance's own parking spot: nothing to drive
 			rec.virtual = true
+			rec.stop = nil
 			rec.amb = "assigned"
 			callCrew(self, rec, false)
 			table.remove(self.queue, 1)
 			continue
 		end
-		local v = self.traffic:dispatchResponder({ rec.stage.x, rec.stage.z }, { route = trip, hold = true })
+		local stop = trip[#trip]
+		local v = self.traffic:dispatchResponder({ stop[1], stop[2] }, { route = trip, hold = true })
 		if v == nil then
 			break -- all three are out: the patient keeps their place in the queue
 		end
+		rec.stop = { stop[1], stop[2] }
 		rec.vehicle = v
 		rec.trip = v.route
 		rec.amb = "assigned"
@@ -1010,7 +1068,8 @@ local function crewTime(self: Service, rec: Record): number
 	if a == nil or stage == nil or c == nil then
 		return 0
 	end
-	local fx, fz = stage.x, stage.z
+	local stop = rec.stop
+	local fx, fz = if stop then stop[1] else stage.x, if stop then stop[2] else stage.z
 	if rec.virtual then
 		fx, fz = c.x, c.z -- nothing drove: the crew member walks over from where they stand
 	end
@@ -1059,6 +1118,7 @@ local function standDown(self: Service, rec: Record)
 	sink(self, rec.id, false)
 	rec.toBed = false
 	rec.stage = nil
+	rec.stop = nil
 	rec.route, rec.routeLen = nil, nil
 	order(self, rec.id, {})
 	self._stats.stoodDown += 1
@@ -1207,14 +1267,14 @@ local function apply(self: Service, rec: Record, effect: any)
 		else
 			say(self, id, effect.situation, effect.force)
 			if effect.situation == "symptoms" and effect.force then
-				toast(self, rec.biter, "victimSick")
+				tellBiter(self, rec, "victimSick")
 			end
 		end
 	elseif kind == "toast" then
 		toast(self, id, effect.key)
 	elseif kind == "collapse" then
 		openScene(self, rec)
-		toast(self, rec.biter, "victimDown")
+		tellBiter(self, rec, "victimDown")
 	elseif kind == "call" then
 		rec.amb = "queued"
 		if table.find(self.queue, id) == nil then
@@ -1269,9 +1329,12 @@ local function apply(self: Service, rec: Record, effect: any)
 			end
 		end
 	elseif kind == "load" then
+		-- the patient and the crew go out of sight beside the ambulance now; it pulls away a moment
+		-- later (stepCase). Let go in the same tick, it was turned round on the far side of the road
+		-- in the very frame the two people vanished.
 		hidePatient(self, rec)
 		if rec.amb == "assigned" and onTrip(rec) then
-			self.traffic:releaseResponder(rec.vehicle)
+			rec.lingerUntil = self.now + InfectionService.LOAD_LINGER
 		end
 		rec.amb = "returning"
 	elseif kind == "abandon" then
@@ -1328,7 +1391,7 @@ local function apply(self: Service, rec: Record, effect: any)
 			a.infected = nil
 		end
 		self._stats.cured += 1
-		toast(self, rec.biter, "victimCured")
+		tellBiter(self, rec, "victimCured")
 	elseif kind == "discharge" then
 		local layout = self.layout
 		local bed = layout and layout.beds[self.hospital:bedOf(id) or 0]
@@ -1369,7 +1432,10 @@ local function publish(self: Service, rec: Record)
 		rec.med = med
 		self.setAttr(rec.id, "Med", med)
 	end
-	local possessable = InfectionRules.possessable(rec.case)
+	-- (a cured person out of sight for the trip home is nobody's to play until they are there: the
+	-- body is under the ward, and a player handed it would start there. `arrived` gives the flag back)
+	local l = self.leaving[rec.id]
+	local possessable = InfectionRules.possessable(rec.case) and not (l ~= nil and l.away)
 	if possessable ~= rec.possessable then
 		rec.possessable = possessable
 		self.setPossessable(rec.id, possessable)
@@ -1388,7 +1454,8 @@ local function remove(self: Service, rec: Record)
 	if rec.med ~= nil then
 		self.setAttr(rec.id, "Med", nil)
 	end
-	if not rec.possessable then
+	local l = self.leaving[rec.id]
+	if not rec.possessable and not (l ~= nil and l.away) then
 		self.setPossessable(rec.id, true)
 	end
 end
@@ -1406,9 +1473,13 @@ local function factsFor(self: Service, rec: Record): any
 	else
 		inputs.nearHospital, inputs.atEntrance = false, false
 	end
+	-- nobody sits down in the road: a collapse that is due waits for the kerb (InfectionRules)
+	inputs.onRoad = a ~= nil
+		and (case.state == "bitten" or case.state == "symptomatic" or case.state == "walkin")
+		and MedicalRoute.onRoad(self.roads, a.x, a.z, InfectionService.ROAD_PAD)
 	-- the walk-in route is worked out once, at the moment the symptomatic person decides
 	inputs.routeLen = nil
-	local deciding = (case.state == "symptomatic" and self.now >= case.untilT)
+	local deciding = (case.state == "symptomatic" and self.now >= case.untilT and not case.falling)
 		or (case.state == "treated" and case.selfTreat) -- let go by a player inside the hospital
 	if deciding and inputs.controller == "ai" and a then
 		local route, len = self:walkRoute(a.x, a.z)
@@ -1442,6 +1513,12 @@ local function stepCase(self: Service, rec: Record)
 		a.infected = true
 	end
 	checkAmbulance(self, rec)
+	if rec.lingerUntil and self.now >= rec.lingerUntil then
+		rec.lingerUntil = nil
+		if onTrip(rec) then
+			self.traffic:releaseResponder(rec.vehicle)
+		end
+	end
 	local inputs = factsFor(self, rec)
 	local effects = InfectionRules.advance(rec.case, self.now, inputs, self.rand, self.params)
 	for _, e in effects do
@@ -1553,17 +1630,66 @@ end
 
 -- public -----------------------------------------------------------------------------------------
 
--- bite(victimId, biterId?): the rodent bit this person. True when a new infection began (false for
--- a second bite on someone already infected, who just runs and shouts again, and for a patient).
-function InfectionService.bite(self: Service, victimId: number, biterId: number?): boolean
+-- the people close to a bite (humans_actors §7.3): they run; the nearest few say what they saw
+local function alarmWitnesses(self: Service, victimId: number, a: any, biter: any)
+	local r = self.tun.witnessRadius
+	local near = {}
+	for _, o in self.world.actors do
+		if o.species == "human" and o.id ~= victimId and self.records[o.id] == nil and self.busy[o.id] == nil then
+			local d2 = (o.x - a.x) ^ 2 + (o.z - a.z) ^ 2
+			if d2 <= r * r and isAI(self, o.id) then
+				table.insert(near, { id = o.id, d = d2 })
+			end
+		end
+	end
+	table.sort(near, function(p, q)
+		if p.d ~= q.d then
+			return p.d < q.d
+		end
+		return p.id < q.id
+	end)
+	for i, w in near do
+		local brain = self.world.brains[w.id] :: any
+		if brain and brain.kind == "Pedestrian" and self.leaving[w.id] == nil then
+			brain:onEvent({ type = "witness", threat = biter, alert = 10 })
+		end
+		if i <= 3 then
+			say(self, w.id, "witness", false)
+		end
+	end
+end
+
+-- bite(victimId, biterId?, by?): the rodent bit this person. True when a new infection began (false
+-- for a second bite on someone already infected, who just runs and shouts again, for a patient, and
+-- for a rider). `by` names who was playing the biter (what `driverOf` returns for them): the news
+-- about this victim is theirs alone.
+function InfectionService.bite(self: Service, victimId: number, biterId: number?, by: any?): boolean
 	local a = actorOf(self, victimId)
 	if a == nil or a.species ~= "human" then
 		return false
 	end
 	self._stats.bites += 1
+	local biter = if biterId then actorOf(self, biterId) else nil
+	if a.post == "rider" then
+		-- A cyclist or motorcyclist is never a patient. Their body is a rider built onto a bike: it
+		-- has no joints to sit it down and the bike cannot be left behind, so a collapsed one stayed
+		-- bolt upright in the saddle, was walked to the ambulance bike and all, and stood through a
+		-- cot. They shout and ride off; the bite still scores for the rodent (Boot/Game).
+		local brain = self.world.brains[victimId] :: any
+		if biter and brain and isAI(self, victimId) then
+			brain:onEvent({ type = "bitten", threat = biter, override = true })
+		end
+		say(self, victimId, "bitten", true)
+		if biter then
+			alarmWitnesses(self, victimId, a, biter)
+		end
+		return false
+	end
 	local existing = self.records[victimId]
 	if existing then
-		existing.biter = biterId or existing.biter
+		if biterId then
+			existing.biter, existing.by = biterId, by
+		end
 		for _, e in InfectionRules.rebite(existing.case, self.now, self.controllerOf(victimId)) do
 			apply(self, existing, e)
 		end
@@ -1596,12 +1722,15 @@ function InfectionService.bite(self: Service, victimId: number, biterId: number?
 		case = case,
 		inputs = inputs,
 		biter = biterId,
+		by = by,
 		home = { a.x, a.z },
 		amb = "none",
 		vehicle = nil,
+		lingerUntil = nil,
 		trip = nil,
 		virtual = false,
 		stage = nil,
+		stop = nil,
 		crew = nil,
 		crewPlanned = false,
 		crewSecs = 0,
@@ -1624,34 +1753,8 @@ function InfectionService.bite(self: Service, victimId: number, biterId: number?
 	for _, e in effects do
 		apply(self, rec, e)
 	end
-	-- witnesses (humans_actors §7.3): people close by run; the nearest few say what they saw
-	local biter = if biterId then actorOf(self, biterId) else nil
 	if biter then
-		local r = self.tun.witnessRadius
-		local near = {}
-		for _, o in self.world.actors do
-			if o.species == "human" and o.id ~= victimId and self.records[o.id] == nil and self.busy[o.id] == nil then
-				local d2 = (o.x - a.x) ^ 2 + (o.z - a.z) ^ 2
-				if d2 <= r * r and isAI(self, o.id) then
-					table.insert(near, { id = o.id, d = d2 })
-				end
-			end
-		end
-		table.sort(near, function(p, q)
-			if p.d ~= q.d then
-				return p.d < q.d
-			end
-			return p.id < q.id
-		end)
-		for i, w in near do
-			local brain = self.world.brains[w.id] :: any
-			if brain and brain.kind == "Pedestrian" and self.leaving[w.id] == nil then
-				brain:onEvent({ type = "witness", threat = biter, alert = 10 })
-			end
-			if i <= 3 then
-				say(self, w.id, "witness", false)
-			end
-		end
+		alarmWitnesses(self, victimId, a, biter)
 	end
 	publish(self, rec)
 	return true
