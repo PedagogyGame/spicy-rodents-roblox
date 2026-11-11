@@ -19,8 +19,9 @@
 -- Nothing here feeds back into the motor: animation and drawing never move the authoritative position
 -- (owner rule 2026-11-09). Pure numbers (Lune-tested); the client controller builds the CFrame.
 -- `frame` is the whole drawn pose for one motor state (what Controllers/Squirrel draws): the eased point
--- (on a trunk pulled in from v5.4's pad until the paws meet the bark, on a wire let down from v5.4's lift
--- until they stand on the line), heading, nose-up pitch and lean.
+-- (on a trunk pulled in from v5.4's pad until the paws meet the bark, standing off it by the fore paws'
+-- reach while the body still leans; on a wire let down from v5.4's lift until they stand on the line),
+-- heading, nose-up pitch and lean.
 -- v5.4 switches heading and pitch in one frame when a trunk is mounted or left; here the pitch eases and
 -- the heading change is absorbed by an offset that decays, so nothing pops and steady turning has no lag.
 -- Interface: new() -> Visual; frame(v, state, world, dt, groundAt?) -> snapped;
@@ -114,6 +115,11 @@ SquirrelVisual.params = {
 	-- (0.3 until the sculpted body: its paws stood 0.4 studs off the bark, "floating"; the feet point is
 	-- the soles of a skinned hero, so it belongs on the bark the motor takes the trunk to have)
 	barkGap = 0,
+	-- studs from the feet point forward to the fore paws at full reach. Until the nose is up the body
+	-- leans on the trunk, and its feet point stands off the bark by this much of its lean (x cos pitch),
+	-- so the fore paws meet the bark instead of going into it (with the feet point on the bark they went
+	-- 0.32 studs in, and the nose after them, for the fifth of a second a trunk takes to mount)
+	foreReach = 0.66,
 	-- how far above a wire's own line the drawn feet point rides. The motor's visual pose is
 	-- Motion.C.visualWireLift (0.55 studs) above it, which is where v5.4's body rode and where a leap off
 	-- the wire starts; drawn there, the sculpted body ran half a stud above the line. A wire is drawn 0.15
@@ -291,6 +297,7 @@ function SquirrelVisual.frame(
 		local pull = if route.flags.fixedSurfaceZ or route.flags.isPole
 			then C.visualTrunkFixedPad - P.poleGap
 			else C.visualTrunkPad - P.barkGap
+		pull -= P.foreReach * math.max(math.cos(v.pitch), 0)
 		tx -= nx * pull
 		tz -= nz * pull
 	elseif route and route.kind == "wire" then

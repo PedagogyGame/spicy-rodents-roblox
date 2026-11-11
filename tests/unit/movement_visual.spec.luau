@@ -386,6 +386,7 @@ return function(t)
 		inp.fw = 1
 		local attachedAt: number? = nil
 		local maxMove, maxYaw, maxPitch = 0, 0, 0
+		local leastReach = math.huge
 		for i = 1, 360 do
 			local lx, ly, lz, lyaw, lpitch = v.x, v.y, v.z, v.yaw, v.pitch
 			local _, events = SquirrelMotor.step(s, inp, 1 / 60, world)
@@ -399,6 +400,14 @@ return function(t)
 				inp.fw = 0
 			end
 			t.eq(SquirrelVisual.frame(v, s, world, 1 / 60), i == 1, `snap at frame {i}`)
+			if attachedAt then
+				-- while the body still leans its fore paws reach toward the trunk: the feet point stands
+				-- off the bark by that reach, so they never go into it
+				local pose = SquirrelMotor.visualPose(s, world)
+				local bark = math.sqrt((pose.x - s.x) ^ 2 + (pose.z - s.z) ^ 2) - Motion.C.visualTrunkPad
+				local off = math.sqrt((v.x - s.x) ^ 2 + (v.z - s.z) ^ 2) - bark
+				leastReach = math.min(leastReach, off - P.foreReach * math.max(math.cos(v.pitch), 0))
+			end
 			if i > 1 then
 				maxMove = math.max(maxMove, math.sqrt((v.x - lx) ^ 2 + (v.y - ly) ^ 2 + (v.z - lz) ^ 2))
 				maxYaw = math.max(maxYaw, math.abs(shortest((v.yaw :: number) - (lyaw :: number))))
@@ -411,6 +420,7 @@ return function(t)
 		t.truthy(maxMove < 0.9, `drawn move {maxMove} st in one frame`)
 		t.truthy(maxYaw < 0.8, `heading change {maxYaw} rad in one frame`)
 		t.truthy(maxPitch < 0.4, `pitch change {maxPitch} rad in one frame`)
+		t.truthy(leastReach > -0.02, `the fore paws went {-leastReach} st into the bark while it mounted`)
 		-- settled: the feet point sits barkGap outside the bark that v5.4's pad was measured from
 		local vis = SquirrelMotor.visualPose(s, world)
 		local out = math.sqrt((vis.x - s.x) ^ 2 + (vis.z - s.z) ^ 2)
