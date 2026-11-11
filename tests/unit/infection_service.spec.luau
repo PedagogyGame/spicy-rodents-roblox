@@ -1548,6 +1548,178 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"ten minutes of everything at once (bites, players taking and dropping bodies, patients included, bodies leaving the world, ambulances called off): nothing fails, nobody is stuck, nothing is left behind",
+		function()
+			for seed = 1, 2 do
+				local h = harness(700 + seed)
+				local rng = Rng.new(900 + seed)
+				local faults: { string } = {}
+				h.svc.onFault = function(where: string, err: any)
+					table.insert(faults, `{where}: {err}`)
+				end
+				h.step(10)
+				local humans = {}
+				for _, a in h.world.actors do
+					if a.species == "human" then
+						table.insert(humans, a)
+					end
+				end
+				local heldAt: { [number]: { number } } = {} -- bodies players hold, and where they stand
+				local gone: { [number]: any } = {}
+				local counts = { bites = 0, taken = 0, patientsTaken = 0, dropped = 0, left = 0, calledOff = 0 }
+				local function take(a: any)
+					TownAI.suspend(h.world, a.id)
+					h.players[a.id] = true
+					heldAt[a.id] = { a.x, a.z, h.time }
+					counts.taken += 1
+				end
+				local function drop(id: number)
+					local a = h.world.actorsById[id] or gone[id]
+					h.players[id] = nil
+					heldAt[id] = nil
+					TownAI.resume(h.world, id, a.x, a.y, a.z)
+					counts.dropped += 1
+				end
+				local function meddle()
+					local a = humans[rng.int(1, #humans)]
+					local roll = rng.next()
+					local here = h.world.actorsById[a.id] ~= nil
+					if roll < 0.4 then
+						if here and h.svc:biteable(a.id) then
+							h.svc:bite(a.id, h.rodent)
+							counts.bites += 1
+						end
+					elseif roll < 0.52 then
+						-- a player takes a body that is on offer
+						if here and not h.players[a.id] and h.possessable[a.id] ~= false then
+							take(a)
+						end
+					elseif roll < 0.57 then
+						-- the hand-over that should never happen: a player ends up holding a patient
+						for _, p in humans do
+							local s = h.svc:stateOf(p.id)
+							if
+								s ~= nil
+								and h.possessable[p.id] == false
+								and not h.players[p.id]
+								and h.world.actorsById[p.id]
+								and (p.lift or 0) == 0
+							then
+								take(p)
+								counts.patientsTaken += 1
+								break
+							end
+						end
+					elseif roll < 0.7 then
+						local id = next(heldAt)
+						if id then
+							drop(id)
+						end
+					elseif roll < 0.76 then
+						-- a held player walks into the hospital
+						local id = next(heldAt)
+						if id and h.world.actorsById[id] then
+							local b = h.world.actorsById[id]
+							b.x, b.z = layout.reception[1], layout.reception[2]
+							heldAt[id] = { b.x, b.z, heldAt[id][3] }
+						end
+					elseif roll < 0.84 then
+						-- a body leaves the world (only one the AI has: a held one is the player's)
+						if here and not h.players[a.id] then
+							gone[a.id] = a
+							h.world.actorsById[a.id] = nil
+							counts.left += 1
+						end
+					elseif roll < 0.92 then
+						for id, b in gone do
+							h.world.actorsById[id] = b
+							gone[id] = nil
+							break
+						end
+					else
+						for _, v in responders(h) do
+							if v.phase == "out" then
+								h.traffic:releaseResponder(v)
+								counts.calledOff += 1
+								break
+							end
+						end
+					end
+				end
+				local nextMeddle = h.time
+				h.step(600, function()
+					if h.time >= nextMeddle then
+						nextMeddle = h.time + 3
+						meddle()
+					end
+					-- a body a player holds is never moved, hidden or ordered about
+					for id, at in heldAt do
+						local a = h.world.actorsById[id]
+						if a then
+							t.eq(a.x, at[1], `seed {seed}: held body {id} was moved ({h.svc:stateOf(id)})`)
+							t.eq(a.z, at[2])
+							-- (the service acts on its next tick: a patient taken this very step is put
+							-- right within half a second)
+							if h.time - at[3] > 0.5 then
+								t.eq(a.lift, nil, `seed {seed}: held body {id} is hidden`)
+								t.eq(h.world.brains[id].directive.mode, nil, `seed {seed}: held body {id} has an order`)
+								local case = h.svc:cases()[id]
+								t.truthy(
+									case == nil or not InfectionRules.isPatient(case),
+									`seed {seed}: a player holds a patient in {h.svc:stateOf(id)}`
+								)
+								t.truthy(
+									h.possessable[id] ~= false,
+									`seed {seed}: held body {id} is marked not possessable`
+								)
+							end
+						end
+					end
+				end)
+				t.eq(#faults, 0, `seed {seed}: {faults[1]}`)
+				-- the meddling stops: every player lets go, every body is back
+				for id in table.clone(heldAt) do
+					drop(id)
+				end
+				for id, b in gone do
+					h.world.actorsById[id] = b
+				end
+				table.clear(gone)
+				local done = h.runUntil(2500, function(): boolean
+					return next(h.svc:cases()) == nil and next(h.svc.leaving) == nil
+				end, function()
+					for id in h.svc:cases() do
+						t.truthy(
+							h.world.actorsById[id].infected,
+							`seed {seed}: {id} lost the infection outside the hospital`
+						)
+					end
+				end)
+				local left = {}
+				for id, case in h.svc:cases() do
+					table.insert(left, `{h.world.actorsById[id].post} {id}: {case.state}`)
+				end
+				t.truthy(done, `seed {seed}: still open after {math.floor(h.time)} s: {table.concat(left, "; ")}`)
+				t.eq(#faults, 0, `seed {seed}: {faults[1]}`)
+				t.eq(h.svc:stats().faults, 0)
+				h.step(60)
+				clean(h, `chaos seed {seed}`)
+				local s = h.svc:stats()
+				print(
+					`      seed {seed}: {counts.bites} bites ({s.cases} cases, {s.cured} cured), {counts.taken} bodies taken ({counts.patientsTaken} of them patients), {counts.left} bodies gone for a while, {counts.calledOff} ambulances called off, {s.stoodDown} stood down, {s.abandoned} taken in without an ambulance; clean at {math.floor(
+						h.time
+					)} s`
+				)
+				t.eq(s.cured, s.cases, `seed {seed}: every case ended in a cure`)
+				t.truthy(
+					s.cases >= 20 and counts.patientsTaken >= 2 and counts.left >= 5,
+					"the chaos was chaotic enough"
+				)
+			end
+		end
+	)
+
 	t.test("the rodent's death cures nobody: only the hospital does", function()
 		local h = harness(41, { 0.99, 0.99 }) -- incubates for close to two minutes
 		h.step(10)
