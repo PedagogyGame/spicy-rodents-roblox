@@ -23,10 +23,11 @@ local scenario: Replay.Scenario = {
 	ci = 40,
 	entries = entries,
 	sceneSecs = 6, -- the responder's hold at the scene (30 s in the game)
-	expect = { none = { "teleport_unflagged", "sink", "float", "reverse_travel" } },
-	-- shows today: square corners turned on the spot, routes straight across lots and through houses,
-	-- one incident car driving through the other
-	known = { "sim_yaw_snap", "yaw_jump", "sideways_slide", "through_building", "off_road", "box_overlap" },
+	expect = { none = { "teleport_unflagged", "sink", "float", "reverse_travel", "box_overlap" } },
+	-- shows today: square corners turned on the spot, routes straight across lots and through houses
+	-- (the second incident car no longer drives through the first to reach its spot beyond it: it parks
+	-- behind it)
+	known = { "sim_yaw_snap", "yaw_jump", "sideways_slide", "through_building", "off_road" },
 	frame = function(sim: Replay.Sim)
 		if sim.wall >= 2 and not sim.state.responder then
 			sim.state.responder = true

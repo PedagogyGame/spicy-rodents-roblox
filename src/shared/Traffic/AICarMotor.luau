@@ -147,8 +147,39 @@ function AICarMotor.new(
 	return v
 end
 
+-- The classes that answer calls: they have right of way over the lane classes (below).
+local EMERGENCY: { [string]: boolean } = { responder = true, incident = true, legacy_ambulance = true }
+
 function AICarMotor.body(v: Vehicle): LaneMath.Body
-	return { x = v.x, z = v.z, yaw = v.yaw, width = v.box.width, length = v.box.length, visible = v.visible, id = v.id }
+	return {
+		x = v.x,
+		z = v.z,
+		yaw = v.yaw,
+		width = v.box.width,
+		length = v.box.length,
+		visible = v.visible,
+		id = v.id,
+		emergency = EMERGENCY[v.class],
+		speed = v.speed,
+	}
+end
+
+-- inPath(a, b, gap): is b's box in a's way: in front of a's nose by at most `gap` (or already level with
+-- it) and across a's width, with b's extents projected on a's heading whatever b's own heading (a car
+-- crossing a's path is as much in the way as one ahead of it in a's lane).
+local PATH_MARGIN = st(0.2)
+local function inPath(a: LaneMath.Body, b: LaneMath.Body, gap: number): boolean
+	local fx, fz = math.sin(a.yaw), math.cos(a.yaw)
+	local dx, dz = b.x - a.x, b.z - a.z
+	local along = dx * fx + dz * fz
+	if along <= 0 then
+		return false
+	end
+	local across = math.abs(dx * fz - dz * fx)
+	local ux, uz = math.sin(b.yaw), math.cos(b.yaw)
+	local bAlong = math.abs(ux * fx + uz * fz) * b.length / 2 + math.abs(uz * fx - ux * fz) * b.width / 2
+	local bAcross = math.abs(ux * fz - uz * fx) * b.length / 2 + math.abs(uz * fz + ux * fx) * b.width / 2
+	return along - bAlong < a.length / 2 + gap and across < a.width / 2 + bAcross + PATH_MARGIN
 end
 
 local function approach(v: number, goal: number, amount: number): number
@@ -162,11 +193,23 @@ local function shortest(a: number): number
 	return math.atan2(math.sin(a), math.cos(a))
 end
 
--- Which bodies a vehicle brakes for: fleet vehicles heading its way (opposing traffic excluded, §6.1, the
--- trolley deadlock) and every player's vehicle in its path whatever its heading (a car parked across the
--- lane is still in the way; a player's car never waits for the fleet, so no deadlock).
-local function bracesFor(b: LaneMath.Body, fx: number, fz: number): boolean
-	return b.player == true or math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3
+-- How close in front of an emergency vehicle's nose another vehicle counts as in its way (PRIORITY_GAP);
+-- how near the end of its route a held-up emergency vehicle counts as there (ARRIVE_QUEUED).
+local PRIORITY_GAP = st(4)
+local ARRIVE_QUEUED = st(30)
+
+-- Which bodies a lane vehicle brakes for: fleet vehicles heading its way (opposing traffic excluded, §6.1,
+-- the trolley deadlock); every player's vehicle in its path whatever its heading (a car parked across the
+-- lane is still in the way; a player's car never waits for the fleet, so no deadlock); and an emergency
+-- vehicle crossing or entering its path (right of way), unless this vehicle is already in the emergency
+-- vehicle's own way: then it keeps going to clear it, and the emergency vehicle waits (drivePolyline).
+-- Without this the ambulances and incident cars, which yield to no vehicle in v5.4, and the lane traffic
+-- drove through each other wherever a call route crosses a street.
+local function bracesFor(v: Vehicle, b: LaneMath.Body, fx: number, fz: number): boolean
+	if b.player == true or math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3 then
+		return true
+	end
+	return b.emergency == true and not inPath(b, AICarMotor.body(v), PRIORITY_GAP)
 end
 
 -- The players' vehicles among the bodies.
@@ -209,7 +252,7 @@ local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicle
 	if withVehicles then
 		for _, b in ctx.bodies do
 			if b.visible ~= false and b.id ~= v.id then
-				if bracesFor(b, fx, fz) then
+				if bracesFor(v, b, fx, fz) then
 					table.insert(out, { x = b.x, z = b.z, r = b.width / 2 })
 				end
 			end
@@ -222,7 +265,7 @@ local function sameWay(v: Vehicle, ctx: Ctx, fx: number, fz: number): { LaneMath
 	local out = {}
 	for _, b in ctx.bodies do
 		if b.id ~= v.id then
-			if bracesFor(b, fx, fz) then
+			if bracesFor(v, b, fx, fz) then
 				table.insert(out, b)
 			end
 		end
@@ -475,6 +518,31 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 	place(v, ctx, v.lane)
 end
 
+-- fleetInWay(v, ctx, gap): an emergency vehicle's right of way ends at a vehicle already in its way
+-- (inPath): one ahead in its lane, or a lane vehicle still crossing in front of it (those that have not
+-- reached its path wait for it: bracesFor). Oncoming traffic is never in the way (its own lane). Two
+-- emergency vehicles crossing: the higher id waits, so they never wait for each other. Returns the body.
+local function fleetInWay(v: Vehicle, ctx: Ctx, gap: number): LaneMath.Body?
+	local me = AICarMotor.body(v)
+	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	for _, b in ctx.bodies do
+		if b.visible == false or b.id == v.id or b.player then
+			continue
+		end
+		local dot = math.sin(b.yaw) * fx + math.cos(b.yaw) * fz
+		if dot < -0.3 then
+			continue
+		end
+		if b.emergency and dot <= 0.3 and (b.id :: number) > v.id then
+			continue -- a crossing emergency vehicle with a higher id waits for this one
+		end
+		if inPath(me, b, gap) then
+			return b
+		end
+	end
+	return nil
+end
+
 -- polyline drive shared by the emergency classes: hard stop for people within r; returns true at the end
 local function drivePolyline(
 	v: Vehicle,
@@ -485,17 +553,24 @@ local function drivePolyline(
 	dt: number
 ): boolean
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	local len = LaneMath.length(lane, v.dir)
+	local queued = fleetInWay(v, ctx, PRIORITY_GAP)
 	if
-		personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true) or playerCarAhead(v, ctx, stopR)
+		personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true)
+		or playerCarAhead(v, ctx, stopR)
+		or queued ~= nil
 	then
 		v.speed = 0
 	else
 		v.speed = speed
 	end
-	local len = LaneMath.length(lane, v.dir)
 	v.s = math.min(len, v.s + v.speed * dt)
 	place(v, ctx, lane)
-	return v.s >= len - 1e-6
+	-- held up near the end of its route by another emergency vehicle standing there (the incident cars'
+	-- routes end one behind the other in the same lane, the second car's spot beyond the first's): it has
+	-- arrived where it stands, instead of waiting out the other's hold or driving through it
+	local parkedAhead = queued ~= nil and queued.emergency == true and (queued.speed or 0) < 0.5
+	return v.s >= len - 1e-6 or (parkedAhead and len - v.s < ARRIVE_QUEUED)
 end
 
 stepClass.legacy_ambulance = function(v, ctx, dt, events)

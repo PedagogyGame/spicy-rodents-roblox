@@ -266,6 +266,52 @@ return function(t)
 		end
 	end)
 
+	t.test(
+		"right of way: a responder and a dump truck at the west street crossing never meet, and it arrives",
+		function()
+			-- separating-axis depth of two boxes (x, z, yaw, half width, half length); > 0 when they overlap
+			local function depth(a: any, b: any): number
+				local d = math.huge
+				for _, yaw in { a.yaw, b.yaw } do
+					for pass = 1, 2 do
+						local ax, az = math.sin(yaw), math.cos(yaw)
+						if pass == 2 then
+							ax, az = az, -ax
+						end
+						local function reach(o: any): number
+							local fx, fz = math.sin(o.yaw), math.cos(o.yaw)
+							return math.abs(fx * ax + fz * az) * o.hl + math.abs(fz * ax - fx * az) * o.hw
+						end
+						d = math.min(d, reach(a) + reach(b) - math.abs((b.x - a.x) * ax + (b.z - a.z) * az))
+					end
+				end
+				return d
+			end
+			local function box(v: any): any
+				return { x = v.x, z = v.z, yaw = v.yaw, hw = v.box.width / 2, hl = v.box.length / 2 }
+			end
+			-- the responder's trunk turns east along z = -440 across the west street; a dump truck crawls north
+			-- up that street at 3 st/s from sixteen starting points, so it is on the crossing for some of them
+			for k = 0, 15 do
+				local svc = service({ Fleet.ENTRIES[4], Fleet.ENTRIES[15] }, 3)
+				local truck, amb = svc.vehicles[1], svc.vehicles[2]
+				truck.cruise, truck.speed = 3, 3
+				truck.s = LaneMath.arcOf(truck.lane, truck.x, -620 + 10 * k, truck.dir)
+				svc:dispatchResponder({ st(60), st(-120) })
+				local worst, arrived = 0, false
+				for _ = 1, 30 * 60 do
+					svc:step(1 / 30, {})
+					if amb.visible then
+						worst = math.max(worst, depth(box(truck), box(amb)))
+					end
+					arrived = arrived or amb.phase == "hold"
+				end
+				t.truthy(worst <= 0, `start {k}: the truck and the ambulance were {worst} st into each other`)
+				t.truthy(arrived, `start {k}: the responder reached the house`)
+			end
+		end
+	)
+
 	t.test("run-over: a squirrel darting into the lane just ahead of a moving sedan fires RunOver once", function()
 		local svc, v = sedanNB()
 		for _ = 1, 30 * 3 do
