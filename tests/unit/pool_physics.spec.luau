@@ -574,10 +574,16 @@ return function(t)
 			end
 			return "none", s
 		end
-		for _, speed in { 1.8, 2.5, 3.5, 4.2 } do
+		for _, speed in { 1.8, 2.5, 3.5 } do
 			t.eq((at(lone, 0, speed, 0)), "drop", `{speed} studs/s drops`)
 			t.eq((at(lone, 0, speed, 0.15)), "drop", `{speed} studs/s drops off centre too`)
 		end
+		-- the middle of the cup takes a faster ball than its edge: at 4.2 the centre line drops, a line two
+		-- thirds of the way out rides the lip and comes out, and right at the edge even a slow ball does
+		t.eq((at(lone, 0, 4.2, 0)), "drop")
+		t.eq((at(lone, 0, 4.2, 0.15)), "out", "off centre at the same speed it lips out")
+		t.eq((at(lone, 0, 3.6, 0.205)), "out", "a graze at the very edge")
+		t.eq((at(lone, 0, 1.8, 0.205)), "drop", "unless it is rolling dead slow")
 		for _, speed in { 5.5, 9, 14, 30 } do
 			local what, s = at(lone, 0, speed, 0)
 			t.eq(what, "out", `{speed} studs/s skips over`)

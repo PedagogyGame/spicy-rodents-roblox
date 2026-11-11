@@ -29,8 +29,9 @@
 --   depth it is pocketed. If it reaches the rim again first: behind a pocket is the liner, which kills it and
 --   drops it; anywhere else it must climb back out, which costs RIM_K times the height it fell taken from its
 --   outward speed: a slow ball cannot (it tips back in), a fast one skips over, and one in between is turned
---   off its line and lips out. That is a cup's whole character: Tables.CUP_DEPTH and RIM_K set the speed it
---   still takes (tools/pool/calibrate.luau prints it). A ball over a hole still meets cushions and jaws, so a
+--   off its line and lips out (at a cup a ball that grazes the rim may pay for the climb out of its speed
+--   round the lip, so the middle of a cup takes a faster ball than its edge does). That is a cup's whole
+--   character: Tables.CUP_DEPTH and RIM_K set the speed it still takes (tools/pool/calibrate.luau prints it). A ball over a hole still meets cushions and jaws, so a
 --   firm ball into bumper pool's cup hits the end cushion behind it and drops, and a ball rattles in a
 --   pocket's jaws while it falls.
 -- Everything in a step is + - * / and sqrt. Pure; Lune-tested (tests/unit/pool_physics.spec.luau).
@@ -68,6 +69,7 @@ Physics.T_NOW = 1e-9
 Physics.MAX_REFINE = 6
 Physics.KNOT_DAMP = 0.9 -- a step that could not untie its contacts costs every moving ball this share of its speed
 Physics.RIM_K = 0.6 -- the price of climbing out of a hole, in fallen heights
+Physics.LIP_OUT = 0.3 -- a ball that rides a cup's lip leaves it with this share of its speed pointing outward
 Physics.E_LINER = 0.25 -- the back of a pocket
 Physics.LINER_DOT = -0.05 -- behind this (dot with the mouth direction) the rim is liner, not cloth
 
@@ -346,11 +348,13 @@ local function wave(w: World, t: number, R: number)
 			end
 		end
 	end
+	-- the rub of every contact is measured before any of it is applied, so a ball driven into two others at
+	-- once treats them alike (left and right of a split are mirror images)
+	local cph: { number }, cpv: { number } = table.create(nc, 0), table.create(nc, 0)
 	for c = 1, nc do
 		local jn = cl[c]
 		if jn > 0 then
-			local i, j = ci[c], cj[c]
-			local a, b = balls[i], balls[j]
+			local a, b = balls[ci[c]], balls[cj[c]]
 			local nx, nz = cnx[c], cnz[c]
 			local tx, tz = -nz, nx
 			-- rubbing at the contact point: along the level (motion plus both side spins) and up and down (both rolls)
@@ -369,6 +373,19 @@ local function wave(w: World, t: number, R: number)
 				if math.abs(pv) > math.abs(uv) / 5 then
 					pv = uv / 5
 				end
+				cph[c], cpv[c] = ph, pv
+			end
+		end
+	end
+	for c = 1, nc do
+		local jn = cl[c]
+		if jn > 0 then
+			local i, j = ci[c], cj[c]
+			local a, b = balls[i], balls[j]
+			local nx, nz = cnx[c], cnz[c]
+			local tx, tz = -nz, nx
+			local ph, pv = cph[c], cpv[c]
+			if ph ~= 0 or pv ~= 0 then
 				a.vx -= ph * tx
 				a.vz -= ph * tz
 				b.vx += ph * tx
@@ -733,6 +750,16 @@ function Physics.step(w: World): boolean
 						a.y = 0
 						a.hole = 0
 						event(w, t, 7, a.id, bj, vr)
+					elseif hole.cup and vr * vr + vt * vt > need then
+						-- a cup's lip: not enough to climb straight out, but the ball is riding round the rim, and
+						-- what the climb costs comes off that: it rolls out along the lip, turned well off its line
+						local left = math.sqrt(vr * vr + vt * vt - need)
+						vr = Physics.LIP_OUT * left
+						vt = (if vt < 0 then -left else left) * math.sqrt(1 - Physics.LIP_OUT * Physics.LIP_OUT)
+						a.mode = 1
+						a.y = 0
+						a.hole = 0
+						event(w, t, 7, a.id, bj, left)
 					else
 						vr = -0.3 * vr
 					end
