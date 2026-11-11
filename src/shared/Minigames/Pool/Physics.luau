@@ -51,6 +51,11 @@ Physics.MU_BALL_VAR = 0.108
 Physics.MU_BALL_C1 = 0.2016
 Physics.MU_BALL_C2 = 0.01694
 Physics.V_DEAD = 0.06 -- studs/s: below this a touch does not bounce at all
+-- Two things closing more slowly than this are not in contact at all (the measure is closing speed times
+-- their distance, so about 3e-5 studs/s for two balls): without it two balls rolling on side by side would
+-- touch again and again for ever on the last bit of a rounding error.
+Physics.CLOSE = 1e-5
+Physics.KNOT_DAMP = 0.9 -- a step that could not untie its contacts costs every moving ball this share of its speed
 Physics.RIM_K = 1 -- the price of climbing out of a hole, in fallen heights
 Physics.E_LINER = 0.25 -- the back of a pocket
 Physics.LINER_DOT = -0.05 -- behind this (dot with the mouth direction) the rim is liner, not cloth
@@ -89,6 +94,7 @@ export type World = {
 	events: { number },
 	keys: { { number } },
 	contacts: number, -- contacts settled so far (a cost measure)
+	knots: number, -- steps given up with contacts still unsettled (0 in every spec)
 }
 
 function Physics.world(tb: Tables.Table, spots: { Tables.Spot }): World
@@ -98,7 +104,7 @@ function Physics.world(tb: Tables.Table, spots: { Tables.Spot }): World
 		balls[i] = Cloth.new(s.id, s.x, s.z)
 		keys[i] = {}
 	end
-	return { table = tb, balls = balls, t = 0, steps = 0, events = {}, keys = keys, contacts = 0 }
+	return { table = tb, balls = balls, t = 0, steps = 0, events = {}, keys = keys, contacts = 0, knots = 0 }
 end
 
 function Physics.ball(w: World, id: number): Cloth.Ball?
@@ -175,6 +181,7 @@ end
 
 local E_BALL = Physics.E_BALL
 local V_DEAD = Physics.V_DEAD
+local CLOSE = Physics.CLOSE
 
 -- A ball meets a fixed surface whose inward normal (from the ball to the surface) is nx, nz.
 local function bounce(b: Cloth.Ball, nx: number, nz: number, P: Response): number
@@ -232,7 +239,7 @@ local function wave(w: World, t: number, R: number)
 					local d2 = dx * dx + dz * dz
 					if d2 <= lim2 and d2 > 0 then
 						local closing = (a.vx - b.vx) * dx + (a.vz - b.vz) * dz
-						if closing > 0 then
+						if closing > CLOSE then
 							local d = math.sqrt(d2)
 							nc += 1
 							ci[nc], cj[nc] = i, j
@@ -427,7 +434,7 @@ function Physics.step(w: World): boolean
 								local sd = pz * tx - px * tz
 								local vn = avz * tx - avx * tz
 								local faced = false
-								if (sd >= 0 and vn < 0) or (sd < 0 and vn > 0) then
+								if (sd >= 0 and vn < -CLOSE) or (sd < 0 and vn > CLOSE) then
 									local gap = (if sd < 0 then -sd else sd) - R
 									local tt = if gap <= 0 then 0 else gap / (if vn < 0 then -vn else vn)
 									if tt <= best then
@@ -444,7 +451,7 @@ function Physics.step(w: World): boolean
 									-- the two ends as round corners
 									local ex, ez = sg.x1 - ax, sg.z1 - az
 									local bd = ex * avx + ez * avz
-									if bd > 0 then
+									if bd > CLOSE then
 										local c = ex * ex + ez * ez - R2
 										if c <= 0 then
 											if 0 < best then
@@ -460,7 +467,7 @@ function Physics.step(w: World): boolean
 									end
 									ex, ez = sg.x2 - ax, sg.z2 - az
 									bd = ex * avx + ez * avz
-									if bd > 0 then
+									if bd > CLOSE then
 										local c = ex * ex + ez * ez - R2
 										if c <= 0 then
 											if 0 < best then
@@ -483,7 +490,7 @@ function Physics.step(w: World): boolean
 							local p = posts[k]
 							local ex, ez = p.x - ax, p.z - az
 							local bd = ex * avx + ez * avz
-							if bd > 0 then
+							if bd > CLOSE then
 								local lim = p.r + R
 								local c = ex * ex + ez * ez - lim * lim
 								if c <= 0 then
@@ -555,7 +562,7 @@ function Physics.step(w: World): boolean
 						local dx, dz = b.x - ax, b.z - az
 						local rvx, rvz = avx - b.vx, avz - b.vz
 						local bd = dx * rvx + dz * rvz
-						if bd > 0 then
+						if bd > CLOSE then
 							local c = dx * dx + dz * dz - D2
 							if c <= 0 then
 								if 0 < best then
@@ -579,7 +586,21 @@ function Physics.step(w: World): boolean
 		end
 		if guard >= Physics.MAX_EVENTS then
 			-- a knot of contacts this step cannot untie: the rest of the step is given up (the balls wait where
-			-- they are for a few thousandths of a second) rather than let anything move unchecked
+			-- they are for a few thousandths of a second) rather than let anything move unchecked, and the knot
+			-- costs them speed, so it cannot last
+			w.knots += 1
+			for i = 1, n do
+				local a = balls[i]
+				if a.mode == 1 or a.mode == 2 then
+					local k = Physics.KNOT_DAMP
+					a.vx *= k
+					a.vz *= k
+					a.qx *= k
+					a.qz *= k
+					a.s *= k
+					key(w, i, w.t + Physics.DT)
+				end
+			end
 			break
 		end
 		if kind == 0 then

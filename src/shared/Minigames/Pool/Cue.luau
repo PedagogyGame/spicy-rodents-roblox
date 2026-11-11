@@ -26,7 +26,7 @@ local Tables = require("./Tables")
 local Cue = {}
 
 Cue.MIN_SPEED = 0.8 -- studs/s: the softest touch
-Cue.MAX_SPEED = 46 -- studs/s: a full break (17 mph at this table's scale)
+Cue.MAX_SPEED = 60 -- studs/s: a full break (22 mph at this table's scale)
 Cue.CURVE = 1.5 -- speed rises as power ^ CURVE: half the hold is a third of the speed
 Cue.TIP_MAX = 0.5 -- of a radius
 Cue.SURE = 0.9 -- up to this power the delivery is exact
