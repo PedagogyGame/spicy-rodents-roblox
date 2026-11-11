@@ -79,7 +79,13 @@ local def: Detect.Def = {
 								limit = th.reversals,
 								unit = "reversals/s",
 								origin = "sim",
-								detail = { first = tick.wall, last = tick.wall, lo = v.speed, hi = v.speed, phase = v.phase },
+								detail = {
+									first = tick.wall,
+									last = tick.wall,
+									lo = v.speed,
+									hi = v.speed,
+									phase = v.phase,
+								},
 							}
 							p.open = open
 							ctx.report(open)
