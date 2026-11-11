@@ -9,6 +9,24 @@ local scenario: Replay.Scenario = {
 	name = "fleet",
 	about = "the game's 25 vehicles, seed 7, nobody on the roads",
 	seconds = 600,
+	ci = 60,
+	-- on an ideal network with steady frames nothing stutters, hops, twitches, sinks or floats
+	expect = {
+		none = {
+			"speed_stutter",
+			"position_jump",
+			"height_jump",
+			"pitch_jump",
+			"sink",
+			"float",
+			"tilt_mismatch",
+			"roll_missing",
+			"ghost_visibility",
+			"teleport_bit_lost",
+		},
+	},
+	-- shows today (wraps whose flag misses the send; vehicles that share a lane)
+	known = { "teleport_bit_dropped", "teleport_unflagged", "box_overlap" },
 }
 
 return scenario

@@ -29,9 +29,12 @@
 -- Interface: load(dir?) -> { Def }; newBook(settings) -> Book; Book:ctx(def, env) -> Ctx; Book:sweep(t);
 --            Book:finish(); Book.incidents; Book.counts; Book.stats; wrapAngle(a); obbOverlap(a, b);
 --            inside(x, z) (studs inside the town's modelled rectangle; negative outside)
+--            bench(def, opts?) -> Bench (a detector on its own, fed by hand: for its spec)
 
 local fs = require("@lune/fs")
+local Boxes = require("@shared/Traffic/Boxes")
 local Height = require("@shared/World/Height")
+local Truth = require("./Truth")
 
 local Detect = {}
 
@@ -408,6 +411,146 @@ function Detect.newBook(settings: any): Book
 		end,
 	}
 	return book
+end
+
+export type Bench = {
+	truth: Truth.Truth,
+	book: Book,
+	hooks: Hooks,
+	tick: (self: Bench, clock: number, vehicles: { any }) -> (),
+	frame: (self: Bench, t: number, seen: { [number]: { [string]: any } }, ref: number?) -> Frame,
+	finish: (self: Bench) -> ({ Incident }, { [string]: number }),
+}
+
+-- bench(def, opts?): one detector on its own, fed by hand, for the detector's spec
+-- (tests/unit/traffic_replay.spec.luau shows every detector on a bench).
+--   bench:tick(clock, { { id, x, z, yaw, visible, speed, teleported? } })   one true tick
+--   bench:frame(t, { [id] = { x, z, yaw, vis?, y?, pitch?, speed?, snap? } }, ref?)
+--       one client frame at time t: what is drawn, and the server-clock instant it draws (`ref`: the
+--       reference pose is then read from the truth, as the replay does). y defaults to standing on the
+--       ground; the frame's dt is the time since the previous frame.
+--   bench:finish() -> incidents, counts
+-- opts: vehicles { [id] = { name, kind, class } } (default: #1, a sedan), thresholds ("key" = value),
+-- heightAt / surfaceAt (default: flat ground at y = 0), tickDt (1 / 30).
+function Detect.bench(def: Def, opts: { [string]: any }?): Bench
+	local o: { [string]: any } = opts or {}
+	local thresholds = {}
+	for key, value in (o.thresholds or {}) :: { [string]: number } do
+		thresholds[`{def.name}.{key}`] = value
+	end
+	local heightAt = o.heightAt or function(_x: number, _z: number): number
+		return 0
+	end
+	local surfaceAt = o.surfaceAt or function(x: number, z: number, _refY: number): number
+		return heightAt(x, z)
+	end
+	local vehicles: { [number]: any } = {}
+	for id, info in
+		(o.vehicles or { [1] = { name = "Bench sedan", kind = "sedan", class = "sedan" } }) :: { [number]: any }
+	do
+		vehicles[id] = { id = id, name = info.name, kind = info.kind, class = info.class, box = Boxes.get(info.kind) }
+	end
+	local truth = Truth.new()
+	local book = Detect.newBook({ warmup = 0, thresholds = thresholds })
+	local hooks =
+		def.new(book:ctx(def, { truth = truth, vehicles = vehicles, heightAt = heightAt, surfaceAt = surfaceAt }))
+	local tickDt = o.tickDt or 1 / 30
+	local live: { [number]: any } = {}
+	local frames, lastT = 0, nil :: number?
+	local prev: { [number]: Sample } = {}
+	local bench: Bench
+	bench = {
+		truth = truth,
+		book = book,
+		hooks = hooks,
+		tick = function(_self: Bench, clock: number, list: { any })
+			for _, v in list do
+				v.teleported = v.teleported == true
+				v.visible = v.visible ~= false
+				v.speed = v.speed or 0
+				v.phase = v.phase or "drive"
+				v.lane = v.lane or { id = "bench" }
+				live[v.id] = v
+			end
+			truth:record(clock, clock, tickDt, list)
+			if hooks.tick then
+				hooks.tick({ n = truth.ticks, clock = clock, wall = clock, dt = tickDt, vehicles = list })
+			end
+		end,
+		frame = function(_self: Bench, t: number, seen: { [number]: { [string]: any } }, ref: number?): Frame
+			frames += 1
+			local v: { [number]: Sample } = {}
+			local ids = {}
+			for id, p in seen do
+				local info = vehicles[id] or error(`bench: no vehicle {id}`)
+				local now = live[id]
+				local vis = p.vis ~= false
+				local s: Sample = {
+					id = id,
+					vis = vis,
+					x = p.x,
+					y = p.y or (if vis then surfaceAt(p.x, p.z, 0) + info.box.height / 2 else -500),
+					z = p.z,
+					yaw = p.yaw or 0,
+					pitch = p.pitch or 0,
+					speed = p.speed or 0,
+					snap = p.snap == true,
+					stopped = (p.speed or 0) < 0.05,
+					tvis = if now then now.visible else vis,
+					tx = if now then now.x else p.x,
+					ty = 0,
+					tz = if now then now.z else p.z,
+					tyaw = if now then now.yaw else p.yaw or 0,
+					tspeed = if now then now.speed else p.speed or 0,
+					rok = false,
+					rvis = false,
+					rx = 0,
+					rz = 0,
+					ryaw = 0,
+					rspeed = 0,
+				}
+				if ref then
+					local r = truth:at(id, ref)
+					if r and not r.stale then
+						s.rok, s.rvis, s.rx, s.rz, s.ryaw, s.rspeed = true, r.visible, r.x, r.z, r.yaw, r.speed
+					end
+				end
+				v[id] = s
+				table.insert(ids, id)
+			end
+			table.sort(ids)
+			local frame: Frame = {
+				i = frames,
+				t = t,
+				dt = if lastT then t - lastT else 1 / 60,
+				now = t,
+				clock = truth.newest,
+				ref = ref,
+				starved = 0,
+				snaps = 2,
+				offset = 0,
+				packets = 0,
+				v = v,
+				pv = prev,
+				ids = ids,
+			}
+			if hooks.frame then
+				hooks.frame(frame)
+			end
+			book:sweep(t)
+			prev = v
+			lastT = t
+			return frame
+		end,
+		finish = function(_self: Bench): ({ Incident }, { [string]: number })
+			if hooks.finish then
+				hooks.finish()
+			end
+			book:finish()
+			return book.incidents, book.counts
+		end,
+	}
+	return bench
 end
 
 return Detect

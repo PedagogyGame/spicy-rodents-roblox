@@ -2,7 +2,8 @@
 -- Detector: heading.
 --   yaw_jump        the car's heading turns further in one frame than a vehicle can steer
 --   sideways_slide  the car travels in a direction its nose does not point (it crabs or slides)
---   reverse_travel  the car travels backwards (the trolley is double-ended and exempt)
+--   reverse_travel  the car travels backwards faster than a parking manoeuvre (the trolley is
+--                   double-ended and exempt; the event sedans back into their spaces at 0.7 st/s)
 -- The direction of travel is measured over at least `minMove` studs of seen motion, so a creeping car's
 -- rounding does not swing it. `origin` is "sim" when the server's own heading did it (the true heading
 -- stepped that fast, or the seen pose matches the true pose being drawn), else "stream".
@@ -44,6 +45,12 @@ local def: Detect.Def = {
 			why = "the direction of travel is taken over at least this much seen motion",
 		},
 		{
+			key = "reverseSpeed",
+			value = 3,
+			unit = "st/s",
+			why = "backing up slower than a walk is parking (the event sedans reverse into their spaces at 0.7 st/s, traffic.md §5.11); faster is a car driving backwards",
+		},
+		{
 			key = "window",
 			value = 0.12,
 			unit = "s",
@@ -52,7 +59,7 @@ local def: Detect.Def = {
 	},
 	new = function(ctx: Detect.Ctx): Detect.Hooks
 		local th = ctx.th
-		local anchor: { [number]: { x: number, z: number } } = {}
+		local anchor: { [number]: { x: number, z: number, t: number } } = {}
 		return {
 			frame = function(frame: Detect.Frame)
 				for _, id in frame.ids do
@@ -89,7 +96,7 @@ local def: Detect.Def = {
 					local a = anchor[id]
 					local step = math.sqrt((s.x - p.x) ^ 2 + (s.z - p.z) ^ 2)
 					if a == nil or step > 2.5 * math.max(s.speed, p.speed) * frame.dt + 3 then
-						anchor[id] = { x = s.x, z = s.z } -- a jump: start measuring again from here
+						anchor[id] = { x = s.x, z = s.z, t = frame.t } -- a jump: start measuring again from here
 						continue
 					end
 					local dx, dz = s.x - a.x, s.z - a.z
@@ -102,15 +109,18 @@ local def: Detect.Def = {
 								and (s.x - s.rx) ^ 2 + (s.z - s.rz) ^ 2 < 2.25
 							origin = if same then "sim" else "stream"
 						end
+						local moved = math.sqrt(dx * dx + dz * dz)
+						local speed = moved / math.max(frame.t - a.t, 1e-6)
 						local detail = {
 							origin = origin,
 							travel = math.atan2(dx, dz),
 							yaw = s.yaw,
-							moved = math.sqrt(dx * dx + dz * dz),
+							moved = moved,
+							speed = speed,
 						}
 						local info = ctx.vehicles[id]
 						if off > math.pi - th.slide then
-							if not (info and REVERSIBLE[info.class]) then
+							if speed > th.reverseSpeed and not (info and REVERSIBLE[info.class]) then
 								ctx.flag("reverse_travel", frame, s, math.deg(off), 90, "deg", detail)
 							end
 						elseif off > th.slide then
@@ -124,7 +134,7 @@ local def: Detect.Def = {
 								detail
 							)
 						end
-						anchor[id] = { x = s.x, z = s.z }
+						anchor[id] = { x = s.x, z = s.z, t = frame.t }
 					end
 				end
 			end,

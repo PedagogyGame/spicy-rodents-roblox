@@ -26,7 +26,10 @@
 --     frame = function(sim) end?,     -- every server frame before the step: timed actions (dispatches)
 --     world = function(sim) return { people = {...}, squirrels = {...} } end?,
 --     expect = { none = { kinds }, some = { kinds } }?,   -- what must hold (the regression spec and --check)
---     ci = true?,                     -- run by tests/unit/traffic_replay.spec with its own settings
+--     known = { kinds }?,             -- glitches this scenario shows TODAY: reported, and checked to still
+--                                     -- show (the instrument must keep seeing them); whoever fixes one
+--                                     -- moves its kind to expect.none
+--     ci = 20?,                       -- seconds: tests/unit/traffic_replay.spec runs the scenario this long
 --   }
 --
 -- Interface: defaults(); settings(opts) -> Settings; scenario(name) -> Scenario; scenarios() -> { name };
@@ -69,7 +72,8 @@ export type Scenario = {
 	frame: ((sim: Sim) -> ())?,
 	world: ((sim: Sim) -> any)?,
 	expect: { none: { string }?, some: { string }? }?,
-	ci: boolean?,
+	known: { string }?,
+	ci: number?,
 }
 
 export type Sim = {
@@ -663,7 +667,8 @@ function Replay.run(opts: { [string]: any }?): Result
 	return result
 end
 
--- check(result): the scenario's `expect` against the counts. Returns the failures (empty: all hold).
+-- check(result): the scenario's `expect` and `known` against the counts. Returns the failures (empty:
+-- all hold).
 function Replay.check(result: Result): { string }
 	local failures = {}
 	local expect = result.scenario.expect
@@ -678,6 +683,14 @@ function Replay.check(result: Result): { string }
 			if (result.counts[kind] or 0) == 0 then
 				table.insert(failures, `{result.scenario.name}: expected {kind}, found none`)
 			end
+		end
+	end
+	for _, kind in result.scenario.known or {} do
+		if (result.counts[kind] or 0) == 0 then
+			table.insert(
+				failures,
+				`{result.scenario.name}: the known glitch {kind} no longer shows; if it is fixed, move it from known to expect.none in tools/sim/scenarios/{result.scenario.name}.luau`
+			)
 		end
 	end
 	return failures

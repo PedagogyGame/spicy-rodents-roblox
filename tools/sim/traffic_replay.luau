@@ -27,6 +27,8 @@ lune run tools/sim/traffic_replay.luau [options]
 
 what to run
   --scenario NAME        a file in tools/sim/scenarios (default: fleet, the game's 25 vehicles)
+  --all                  every scenario in turn, one line of counts each (each for its `ci` seconds
+                         unless --seconds or --minutes is given); with --check, every `expect`
   --minutes N            simulated minutes (or --seconds N); default: the scenario's own
   --seed N               seed of the network and frame-time models (default 1)
   --traffic-seed N       seed of the fleet (default 7, the game's)
@@ -71,7 +73,7 @@ local opts: { [string]: any } = { netSet = {}, serverSet = {}, clientSet = {}, t
 local reportPath: string? = nil
 local traceOut = "build/sim/trace.csv"
 local top = 10
-local check, quiet, list = false, false, false
+local check, quiet, list, all = false, false, false, false
 local traceRange: string? = nil
 local traceVehicles: { number }? = nil
 
@@ -137,6 +139,9 @@ while i <= #args do
 		i -= 1
 	elseif a == "--check" then
 		check = true
+		i -= 1
+	elseif a == "--all" then
+		all = true
 		i -= 1
 	elseif a == "--quiet" then
 		quiet = true
@@ -264,6 +269,40 @@ do
 	end
 end
 local command = "lune run tools/sim/traffic_replay.luau " .. table.concat(repeatable, " ")
+
+if all then
+	local failed = 0
+	for _, name in Replay.scenarios() do
+		local sc = Replay.scenario(name)
+		local one = table.clone(opts)
+		one.scenario = name
+		one.seconds = opts.seconds or sc.ci or sc.seconds
+		local t0 = os.clock()
+		local good, r = pcall(Replay.run, one)
+		if not good then
+			fail(`{name}: {r}`)
+		end
+		local counts = {}
+		for kind, n in r.counts :: { [string]: number } do
+			table.insert(counts, `{kind} {n}`)
+		end
+		table.sort(counts)
+		print(
+			string.format(
+				"%-18s %4.0f s (%.1f s to compute)  %s",
+				name,
+				r.settings.seconds,
+				os.clock() - t0,
+				if #counts > 0 then table.concat(counts, ", ") else "no incidents"
+			)
+		)
+		for _, f in Replay.check(r) do
+			failed += 1
+			print(`  CHECK FAILED  {f}`)
+		end
+	end
+	process.exit(if check and failed > 0 then 1 else 0)
+end
 
 local started = os.clock()
 local ok, result = pcall(Replay.run, opts)
