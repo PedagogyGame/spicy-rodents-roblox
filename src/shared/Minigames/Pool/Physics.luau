@@ -55,6 +55,12 @@ Physics.V_DEAD = 0.06 -- studs/s: below this a touch does not bounce at all
 -- their distance, so about 3e-5 studs/s for two balls): without it two balls rolling on side by side would
 -- touch again and again for ever on the last bit of a rounding error.
 Physics.CLOSE = 1e-5
+-- The moment of a contact is first found as if the balls moved in straight lines for the rest of the step.
+-- They do not quite (the cloth is slowing and turning them), so having moved up to that moment the model
+-- looks again, and settles the contact only once it is less than T_NOW away: a ball is on the cushion when
+-- it bounces, to a millionth of a millionth of a stud, whichever ball the search happened to see first.
+Physics.T_NOW = 1e-9
+Physics.MAX_REFINE = 6
 Physics.KNOT_DAMP = 0.9 -- a step that could not untie its contacts costs every moving ball this share of its speed
 Physics.RIM_K = 0.6 -- the price of climbing out of a hole, in fallen heights
 Physics.E_LINER = 0.25 -- the back of a pocket
@@ -402,6 +408,7 @@ function Physics.step(w: World): boolean
 	local remaining = Physics.DT
 	local t = w.t
 	local guard = 0
+	local refine = 0
 	local anyMoving = false
 	while true do
 		local best = remaining
@@ -621,12 +628,17 @@ function Physics.step(w: World): boolean
 			end
 			t += best
 			remaining -= best
+			if best > Physics.T_NOW and refine < Physics.MAX_REFINE then
+				refine += 1
+				continue
+			end
 		end
+		refine = 0
 		guard += 1
 		local a = balls[bi]
 		if a.mode == 0 then
-			-- it came to rest at the very moment of the contact
-			a.mode = 1
+			-- it came to rest at the very moment of the contact: there is nothing left to settle
+			continue
 		end
 		if kind == C_BALL then
 			wave(w, t, R)

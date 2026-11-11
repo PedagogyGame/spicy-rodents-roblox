@@ -270,35 +270,64 @@ do
 	)
 end
 
-print("== bumper pool: a cup against speed (share of lines across the cup that drop; r = cup radius)")
+-- what a ball does at a cup on its first visit: "drop", "out" (over the rim and out again) or "miss"
+local function atCup(tb: Tables.Table, cz: number, off: number, speed: number): string
+	-- struck a stud short of the rim so that it arrives rolling at `speed`
+	local v0 = math.sqrt(speed * speed + 2 * Cloth.A_ROLL * 1)
+	local from = { { id = 1, x = off, z = cz - 1 - math.sqrt(math.max(Tables.CUP_R ^ 2 - off * off, 0)) } }
+	local s = Shot.run(tb, from, { strike(1, 0, v0, 1, 0) }, 1.5 / speed + 0.4)
+	local entered = false
+	for e = 1, #s.events, Physics.EVENT_STRIDE do
+		local kind = s.events[e + 1]
+		if kind == EV.drop then
+			return "drop"
+		elseif kind == EV.rim then
+			return "out"
+		elseif kind == EV.enter then
+			entered = true
+		elseif kind == EV.post and not entered then
+			return "miss"
+		end
+	end
+	return "miss"
+end
+
+print("== bumper pool: a cup alone in the cloth, by the speed a ball reaches its rim (lines across the whole cup)")
 do
-	for _, speed in { 1, 2, 3, 4, 5, 6, 8, 12 } do
-		local drop, lip, n = 0, 0, 0
-		for i = -20, 20 do
-			local off = i / 20 * (Tables.CUP_R * 1.2)
-			local s = Shot.run(bumper, { { id = 1, x = off, z = 0.9 } }, { strike(1, 0, speed, 1, 0) }, 8)
-			-- only the first pass counts (a ball that comes back off the end cushion is another shot)
-			local res = "miss"
-			for e = 1, #s.events, Physics.EVENT_STRIDE do
-				local kind = s.events[e + 1]
-				if kind == EV.drop then
-					res = "drop"
-					break
-				elseif kind == EV.rim then
-					res = "lip"
-					break
-				elseif kind == EV.cushion or kind == EV.post then
-					break
-				end
-			end
+	local lone = table.clone(bumper)
+	lone.posts = {}
+	lone.holes = { { x = 0, z = 0, r = Tables.CUP_R, mx = 0, mz = 0, cup = true, depth = Tables.CUP_DEPTH } }
+	for _, speed in { 1, 2, 3, 4, 4.5, 5, 6, 8, 12 } do
+		local drop, out, n = 0, 0, 0
+		for i = -19, 19 do
+			local r = atCup(lone, 0, i / 20 * Tables.CUP_R, speed)
 			n += 1
-			if res == "drop" then
+			if r == "drop" then
 				drop += 1
-			elseif res == "lip" then
-				lip += 1
+			elseif r == "out" then
+				out += 1
 			end
 		end
-		print(`  {speed} studs/s: drops {f(100 * drop / n, 0)} %, lips out or skips over {f(100 * lip / n, 0)} %`)
+		print(`  {speed} studs/s: drops {f(100 * drop / n, 0)} %, lips out or skips over {f(100 * out / n, 0)} %`)
+	end
+end
+
+print("== bumper pool: the real cup from the front (the end cushion just behind it is a backboard)")
+do
+	local cz = bumper.holes[2].z
+	for _, speed in { 2, 4, 6, 8, 10, 14, 20 } do
+		local drop, out, n = 0, 0, 0
+		for i = -12, 12 do
+			-- the lines that clear the two bumpers beside the cup
+			local r = atCup(bumper, cz, i * 0.0125, speed)
+			n += 1
+			if r == "drop" then
+				drop += 1
+			elseif r == "out" then
+				out += 1
+			end
+		end
+		print(`  {speed} studs/s: drops {f(100 * drop / n, 0)} %, comes back out {f(100 * out / n, 0)} %`)
 	end
 	local line = "  a post, square on: back"
 	for _, v in { 3, 10, 25 } do
