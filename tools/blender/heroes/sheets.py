@@ -124,7 +124,8 @@ def motion_sheet(man, view, out):
         note = (
             f"PLAY CAMERA, from behind: {cam['distance']:.1f} studs from the point it looks at, {cam['elevation']:.2f} rad above it, "
             f"field of view {cam['fov']:g}. Each small picture is the part of a 1920 x 1080 game frame around the body, pixel for pixel; "
-            f"the three below are the same view {man['largeZoom']:g} times the size. {span} Ground grid: 1 stud, a heavy line every 5."
+            f"the three below are the same view enlarged ({man['largeZoom']:g} times, or as much as the body fits: the factor is under each). "
+            f"{span} Ground grid: 1 stud, a heavy line every 5."
         )
     else:
         below = f", {big_imgs[0].width / man['sideView']['w']:.0f} px in the three below" if big_imgs else ""
@@ -169,6 +170,8 @@ def motion_sheet(man, view, out):
         for im, e in zip(big_imgs, large):
             sheet.paste(im, (x, y))
             label = f"{e['t']:.3f} s   {e['clip']} {e['clipTime']:.2f}   {e['speed']:.0f} st/s"
+            if view == "back":
+                label += f"   x{e.get('backLargeZoom', man['largeZoom']):g}"
             dr.text((x + 4, y + im.height + 3), label, fill=(225, 225, 230), font=f_note)
             x += im.width + gap
     q = save_under(sheet, out)

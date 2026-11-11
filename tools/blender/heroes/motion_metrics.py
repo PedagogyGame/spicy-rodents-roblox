@@ -10,17 +10,18 @@ through the exported clips (motion_pose.py). Frames are 1/60 s apart; between tw
 taken in a straight line (`--upsample` points per frame) so a stance of three frames is still measured.
 
 Per gait (a take's steady stretch): what the animation is told and what the body does; the clip, its rate,
-the cycle's period and the ground covered in one cycle; per paw the stance (planted: the paw's joint within
-PLANT studs of where it rests) with how long it lasts, how far the body travels meanwhile, how far the clip
-moves the paw back under the body meanwhile, and the SLIDE: how far the planted paw drifts over the ground
-(studs per stance; 0 is a paw that stays where it was put); the bob of hips and shoulders; the spine's flex
-(the chest against the pelvis, nose-down/up and side to side, degrees, range over the stretch); the tail
-tip's swing in the body's own frame; the head's bob, pitch, yaw and roll ranges. Paw joints are the ball of
-the hind foot and the knuckles of the fore paw; `gap` is how far the lowest of them stays from the surface
-(ground, bark or wire).
-Per event: the turn (yaw rate, lean, and whether tail, spine or head answer it: each is compared with the
-straight run before it), the stop, the hop and the leap (what the Leap clip shows against what the body
-does), taking the trunk.
+the cycle's period and the ground covered in one cycle; per paw the stance (planted: the clip alone has the
+paw's joint within PLANT studs of where it rests, so a layer that shakes the body is not counted as steps)
+with how long it lasts, how far the body travels meanwhile, how far the clip moves the paw back under the
+body meanwhile (and `strideClip`, its whole reach fore and aft), and the SLIDE: how far the planted paw
+drifts over the ground (studs per stance; 0 is a paw that stays where it was put); the bob of hips and
+shoulders; the spine's flex (the chest against the pelvis, nose-down/up and side to side, degrees, range
+over the stretch); the tail tip's swing in the body's own frame; the head's bob, pitch, yaw and roll
+ranges. Paw joints are the ball of the hind foot and the knuckles of the fore paw (a couple of hundredths
+of a stud above the sole); `gap` is how far a planted one stays from the surface (ground, bark or wire).
+Per event: the turn (yaw rate, lean, and whether tail, spine or head answer it: the S against the same
+sprint run straight, moment for moment), the stop, the hop and the leap (what the Leap clip shows against
+what the body does), taking the trunk; and which clips are never shown.
 """
 import argparse
 import json

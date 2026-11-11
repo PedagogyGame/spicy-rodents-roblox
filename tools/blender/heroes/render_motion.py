@@ -4,22 +4,25 @@
   nice -n 5 /root/.cache/spicy-rodents/venv/bin/python -I tools/blender/heroes/render_motion.py \
       --variant squirrel [--takes walk,sprint,...] [--prefix before] [--strips docs/renders/heroes/motion] \
       [--blend build/heroes/squirrel/squirrel.blend] [--motion build/motion] [--samples 20] [--threads 2] \
-      [--frames start:count:step] [--large i,j,k] [--only back,side] [--keep]
+      [--frames start:count:step] [--large i,j,k] [--only back,side] [--no-strips] [--reuse]
+  (the takes of a variant that are in --motion, when --takes is not given; each take names its own frames)
 
 For every chosen frame of a take the built hero is put at the frame's drawn feet point with its yaw, pitch
 and roll; the clip tracks the game would be playing are read from the .blend's actions at the frame's clip
-times (a loop wraps, a one-shot holds, two clips crossing over are mixed by their weights); the frame's
-`layers` are multiplied on (Bone.Transform = clip pose * CFrame.Angles(rx, ry, rz)); and it is rendered
-under daylight on ground with a one-stud grid (a heavier line every five studs), with the take's trunk or
-wire where the motor has it.
+times (a loop wraps, a one-shot holds, the pose between two keys is taken in a straight line as the engine
+plays the uploaded clip, two clips crossing over are mixed by their weights); the frame's `layers` are
+multiplied on (Bone.Transform = clip pose * CFrame.Angles(rx, ry, rz)); and it is rendered under daylight
+on ground with a one-stud grid (a heavier line every five studs), with the take's trunk or wire where the
+motor has it (the bark and the wire are the route's own: the game's meshes are drawn around the same lines).
 
 Views:
   back   the PLAY CAMERA: at the frame's camera position, looking at its focus, field of view as the game's.
          The picture is the part of a 1920 x 1080 game frame around the body, pixel for pixel (the body is
          about one stud tall and fourteen studs away, so it is small on the screen); the three larger frames
-         are the same view three times the size.
-  side   a tracking camera level with the body on its right-hand side (orthographic, so one stud is the same
-         length everywhere and paws can be read against the grid).
+         are the same view three times the size, each centred on the body's joints.
+  side   a tracking camera on the body's right-hand side, looking a little down (orthographic, so one stud
+         is the same length everywhere and paws can be read against the grid). A take that leaves the
+         ground is shown in a window tall enough for its highest point; a climb in an upright one.
 
 Output: PNG frames under build/motion/frames/<variant>_<take>/ and, through sheets.py (system python3 with
 Pillow), <strips>/<prefix>_<variant>_<take>_back.jpg and _side.jpg, each at most 1600 px wide and 400 KB.
@@ -352,8 +355,7 @@ def back_view(scene, cam, take, frame, res, zoom, points=None):
     cd.type = "PERSP"
     cd.sensor_fit = "HORIZONTAL"
     cd.sensor_width = 36.0
-    f_px = (GAME_SCREEN[1] / 2) / math.tan(math.radians(take["camera"]["fov"]) / 2) * zoom
-    cd.lens = 36.0 * f_px / res[0]
+    screen_px = (GAME_SCREEN[1] / 2) / math.tan(math.radians(take["camera"]["fov"]) / 2)  # pixels per unit of slope
     fwd = focus - eye
     fwd /= np.linalg.norm(fwd)
     right = np.cross(fwd, [0.0, 1.0, 0.0])
@@ -361,22 +363,30 @@ def back_view(scene, cam, take, frame, res, zoom, points=None):
     up = np.cross(right, fwd)
 
     def on_screen(q):
+        """Where a world point falls on the game screen, in pixels from its middle, and how deep it is."""
         d = q - eye
         depth = float(d @ fwd)
-        return float(d @ right) / depth * f_px, float(d @ up) / depth * f_px, depth
+        return float(d @ right) / depth * screen_px, float(d @ up) / depth * screen_px, depth
 
     # the middle of the picture. In a run of frames it is tied to the drawn feet point (a little up and
     # toward the tail), so what the clip does to the body shows as movement in the picture; a single
-    # larger frame is centred on the joints themselves (a tail held over the back stays in it).
+    # larger frame is centred on the joints themselves (a tail held over the back stays in it) and is
+    # enlarged a little less when the body would not fit (a body on end, or seen side-on in a turn).
     R, p = mp.body_frame(frame)
     u, v, depth = on_screen(p + R @ np.array([0.0, 0.62, 0.45]))
     if points is not None:
         uv = np.array([on_screen(q)[:2] for q in points])
         u, v = (uv[:, 0].min() + uv[:, 0].max()) / 2, (uv[:, 1].min() + uv[:, 1].max()) / 2
-    cd.shift_x = u / res[0]
-    cd.shift_y = v / res[0]
+        fur = 44.0  # screen pixels of fur and margin around the joints
+        fit = min(res[0] / (np.ptp(uv[:, 0]) + fur), res[1] / (np.ptp(uv[:, 1]) + fur))
+        zoom = min(zoom, math.floor(fit * 4) / 4)
+    f_px = screen_px * zoom
+    cd.lens = 36.0 * f_px / res[0]
+    cd.shift_x = u * zoom / res[0]
+    cd.shift_y = v * zoom / res[0]
     scene.camera = cam
     scene.render.resolution_x, scene.render.resolution_y = res
+    back_view.zoom = zoom
     return depth
 
 
@@ -408,7 +418,12 @@ def side_view(scene, cam, take, frame, res, view):
     scene.render.resolution_x, scene.render.resolution_y = res
 
 
+REUSE = False  # --reuse: a frame whose PNG is already there is not rendered again
+
+
 def render(scene, path):
+    if REUSE and os.path.exists(path):
+        return
     scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
 
@@ -491,6 +506,7 @@ def render_take(opts, scene, arm, actions, clips, rig, take):
             if "back" in opts.only:
                 entry["backLarge"] = os.path.join(out, f"back_large_{i:04d}.png")
                 back_view(scene, back_cam, take, f, LARGE, LARGE_ZOOM, joints)
+                entry["backLargeZoom"] = back_view.zoom
                 render(scene, entry["backLarge"])
             if "side" in opts.only:
                 entry["sideLarge"] = os.path.join(out, f"side_large_{i:04d}.png")
@@ -537,7 +553,10 @@ def main(argv):
     ap.add_argument("--prefix", default="before")
     ap.add_argument("--strips", default="docs/renders/heroes/motion")
     ap.add_argument("--no-strips", action="store_true")
+    ap.add_argument("--reuse", action="store_true", help="keep the frames already rendered (delete the PNGs to be redone)")
     opts = ap.parse_args(argv)
+    global REUSE
+    REUSE = opts.reuse
     opts.only = [x for x in opts.only.split(",") if x]
     opts.frames = os.path.join(opts.motion, "frames")
     blend = opts.blend or os.path.join("build", "heroes", opts.variant, f"{opts.variant}.blend")
