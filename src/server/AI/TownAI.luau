@@ -3,15 +3,19 @@
 -- The town's AI population on the real data (BUILD_PLAN §1.5, §4.4 #3; the S5 Scenario's structure
 -- on generated/ instead of synthetic lanes and routes): humans per data/population.json posts
 -- (townspeople walk the sidewalk lanes from World/Town via Actors/Nav; shop workers keep shop
--- circuits; hospital staff and the ambulance crew walk circuits at hospital_main and the ambulance
--- bay; 6 officers patrol from west_police_station, the guard and car crew hold the station),
+-- circuits; hospital staff walk the ward rounds and the desk post of Infection/HospitalLayout, indoors
+-- on lanes the bake keeps clear; the ambulance crew walks a circuit at the ambulance bay; 6 officers
+-- patrol from west_police_station, the guard and car crew hold the station's locker room),
 -- novelty riders and motorcyclists as cyclists on the lanes, squirrels running the 1,332 harvested
 -- routes (Routes/Registry + Graph through AI/RouteAdapter), the AI rodent wandering and stalking
 -- from a v5.4 hide, the fox roaming and 6 deer grazing at their v5.4 origins. Ground is
 -- World/Ground over Town pavement (walkers never take roofs). Steppable and pure: Lune runs the
 -- SimFull-style liveness test; Server/Actors/ActorsRuntime adds bodies and possession in the engine.
+-- Brains report what the services care about through ctx.emit (a person spotting a squirrel):
+-- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them.
 -- Interface: build(opts) -> World; stepFrame(world, dt) -> FrameMetrics; liveness(world) -> Liveness;
---   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn)
+--   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn);
+--   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?)
 -- Pure; studs. Nothing runs until stepFrame is called (rule 4).
 
 local Import = require("../Import")
@@ -23,6 +27,10 @@ local Ground = Import.shared("World/Ground") :: typeof(require("../../shared/Wor
 local Town = Import.shared("World/Town") :: typeof(require("../../shared/World/Town"))
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local HumanAIMotor = Import.shared("Movement/HumanAIMotor") :: typeof(require("../../shared/Movement/HumanAIMotor"))
+local HospitalLayout =
+	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
+local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../../shared/Actors/StaffRounds"))
+local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
 local Perception = require("../Actors/Perception")
@@ -51,6 +59,8 @@ export type Opts = {
 
 export type FrameMetrics = { brainMs: number, motorMs: number, gridMs: number, totalMs: number, ticked: number }
 
+export type Event = { kind: string, id: number, other: number?, t: number }
+
 export type World = {
 	opts: Opts,
 	config: any, -- Actors/Population.Config
@@ -69,9 +79,12 @@ export type World = {
 	counts: { [string]: number },
 	possessed: { [number]: boolean }, -- actor ids driven by players (their brains are suspended)
 	nextId: number,
+	events: { Event }, -- what the brains reported since the last drainEvents
 }
 
 local TownAI = {}
+
+TownAI.MAX_EVENTS = 256 -- nobody draining (a test, a place without the services) never grows the list
 
 local st = Units.st
 -- v5.4 landmarks (HTML units), as in the S5 scenario: AI squirrel hides, deer and fox origins
@@ -169,7 +182,15 @@ function TownAI.build(opts: Opts): World
 		counts = {},
 		possessed = {},
 		nextId = 0,
+		events = {},
 	}
+	ctx.emit = function(kind: string, actor: Common.Actor, other: Common.Actor?)
+		local events = world.events
+		if #events >= TownAI.MAX_EVENTS then
+			table.remove(events, 1)
+		end
+		table.insert(events, { kind = kind, id = actor.id, other = if other then other.id else nil, t = world.now })
+	end
 	local counts = world.counts
 
 	local function add(
@@ -223,6 +244,19 @@ function TownAI.build(opts: Opts): World
 	local hx, hz = lotPos(data, "hospital_main", { -356, 353 })
 	local bx, bz = lotPos(data, "hosp_ambulance_bay", { -340, 330 })
 	local px, pz = lotPos(data, "west_police_station", { -510, -107 })
+	-- the hospital's posts: the round behind the reception desk and the rounds of the wards
+	local deskRound: any = nil
+	local wardRounds: { any } = {}
+	local okLayout, layout = pcall(HospitalLayout.fromData, data, Tunables.get("hospital.beds"))
+	if okLayout and layout then
+		for _, round in layout.posts do
+			if round.room == "reception" then
+				deskRound = round
+			else
+				table.insert(wardRounds, round)
+			end
+		end
+	end
 	local shops = shopSites(data)
 	local scale = 1
 	if opts.humans then
@@ -239,7 +273,21 @@ function TownAI.build(opts: Opts): World
 			idx += 1
 			local id = post.id
 			local actor: Common.Actor
-			if id == "hospital_staff" or id == "ambulance_crew" then
+			if id == "hospital_staff" and #wardRounds > 0 then
+				-- indoors, on the lanes the bake keeps clear (Infection/HospitalLayout): the first works
+				-- behind the reception desk, the rest walk the rounds at the foot of the ward beds
+				local round = if k == 1 and deskRound then deskRound else wardRounds[(k - 2) % #wardRounds + 1]
+				local first = round.points[1]
+				local circuit = {}
+				for _, p in round.points do
+					table.insert(circuit, { p[1] - first[1], p[2] - first[2] })
+				end
+				actor = add("human", id, "Staff", hipH, first[1], first[2])
+				register(
+					actor,
+					Staff.new(actor, { stationX = first[1], stationZ = first[2], index = k, circuit = circuit })
+				)
+			elseif id == "hospital_staff" or id == "ambulance_crew" then
 				local cx, cz = if id == "ambulance_crew" then bx else hx, if id == "ambulance_crew" then bz else hz
 				actor = add("human", id, "Staff", hipH, cx + ((k % 4) - 1.5) * 6, cz + ((k % 3) - 1) * 6)
 				register(actor, Staff.new(actor, { stationX = cx, stationZ = cz, index = k }))
@@ -249,8 +297,11 @@ function TownAI.build(opts: Opts): World
 					actor = add("human", id, "Officer", hipH, px + k * 3, pz + 8)
 					register(actor, Officer.new(actor, { stationX = px, stationZ = pz, index = k }))
 				else
-					actor = add("human", id, "Staff", hipH, px - 6 + k, pz - 10)
-					register(actor, Staff.new(actor, { stationX = px + 6, stationZ = pz - 12, index = k }))
+					-- the guard and the car crew: in the locker room (Actors/StaffRounds.POLICE: the bake
+					-- keeps their round clear)
+					local sx, sz = px + StaffRounds.POLICE.x, pz + StaffRounds.POLICE.z
+					actor = add("human", id, "Staff", hipH, sx, sz)
+					register(actor, Staff.new(actor, { stationX = sx, stationZ = sz, index = k }))
 				end
 			elseif id == "shop_worker" or id == "attraction_staff" then
 				local shop = if #shops > 0 then shops[(k - 1) % #shops + 1] else { 0, 0 }
@@ -382,6 +433,13 @@ function TownAI.resume(world: World, id: number, x: number, y: number, z: number
 	snap.x, snap.z = x, z
 	brain:resume(snap)
 	world.scheduler:register(id, brain, actor, world.now)
+end
+
+-- drainEvents: what the brains reported since the last call (oldest first); the queue is emptied.
+function TownAI.drainEvents(world: World): { Event }
+	local events = world.events
+	world.events = {}
+	return events
 end
 
 function TownAI.counts(world: World): { [string]: number }

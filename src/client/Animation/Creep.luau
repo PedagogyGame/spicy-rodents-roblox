@@ -13,8 +13,9 @@
 -- Angles in radians on the rig's own axes (bones rest unrotated: +X right, +Y up, -Z ahead):
 --   head { pitch, yaw, roll }, jaw (0 shut .. opens positive), earL, earR (flick), tail[1..8] yaw,
 --   spine roll (the shudder), chest pitch (the breath).
--- Interface: pose(t, seed) -> Pose; SLOTS; apply is the caller's (AnimationDriver multiplies these onto
--- the clip's joint transforms).
+-- Interface: pose(t, seed, jerk?) -> Pose (`jerk` 0..1 is how much of a head snap shows: all of it when
+-- not given); SLOTS; apply is the caller's (AnimationDriver multiplies these onto the clip's joint
+-- transforms).
 
 local Creep = {}
 
@@ -83,7 +84,7 @@ local function event(
 	return pulse(t, start, length), rnd(slot, salt + 3, seed), rnd(slot, salt + 4, seed), math.max(t - start, 0)
 end
 
-function Creep.pose(t: number, seed: number): Pose
+function Creep.pose(t: number, seed: number, jerk: number?): Pose
 	local S = Creep.SLOTS
 	-- the head: cocked, drifting a little, and now and then snapping to a new angle
 	local function sideOf(slot: number): number
@@ -98,6 +99,7 @@ function Creep.pose(t: number, seed: number): Pose
 	local yaw = 0.04 * math.sin(t * 0.43 + seed * 2)
 	local pitch = 0.03 * math.sin(t * 0.57 + seed * 3)
 	local k, a, b = event(t, seed, S.snap, 10, 0.16, 0.3)
+	k *= jerk or 1
 	if k > 0 then
 		yaw += (a * 2 - 1) * Creep.SNAP * k
 		roll += (b * 2 - 1) * Creep.SNAP * 0.7 * k

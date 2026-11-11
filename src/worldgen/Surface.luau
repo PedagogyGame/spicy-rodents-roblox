@@ -26,6 +26,10 @@ local SKIP_ROLES = {
 	Sign = true,
 	Door = true,
 	Paint = true,
+	-- door steps and indoor ceilings are not ground for poles, pipes, fences or lamps: those stand
+	-- where they stood before the art pass (tests/unit/worldgen_pins.spec)
+	Step = true,
+	Ceiling = true,
 }
 
 type Top = { box: Spec.PartSpec, nx: number, ny: number, nz: number, qx: number, qy: number, qz: number }
@@ -92,7 +96,8 @@ function Surface.at(self: Surface, x: number, z: number, maxY: number?): (number
 	local best = self.heightAt(x, z)
 	local onPart = false
 	local limit = if maxY then maxY + 0.5 else math.huge
-	for _, t in self.cells[key(math.floor(x / CELL), math.floor(z / CELL))] or {} do
+	local tops: { Top } = self.cells[key(math.floor(x / CELL), math.floor(z / CELL))] or {}
+	for _, t in tops do
 		if t.ny > 0.5 and Geometry.containsXZ(t.box :: any, x, z, 0) then
 			local y = t.qy - (t.nx * (x - t.qx) + t.nz * (z - t.qz)) / t.ny
 			if y <= limit and y > best - 0.05 then

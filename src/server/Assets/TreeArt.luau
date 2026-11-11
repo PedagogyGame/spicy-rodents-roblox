@@ -52,7 +52,7 @@ end
 
 function TreeArt.run(town: Instance, opts: Opts?): { trees: number, upgraded: number, failed: number, seconds: number }
 	local o: Opts = opts or {}
-	local load = o.load
+	local load: (assetId: number) -> Instance = o.load
 		or function(assetId: number): Instance
 			return game:GetService("InsertService"):LoadAsset(assetId)
 		end

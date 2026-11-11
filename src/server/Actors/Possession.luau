@@ -287,9 +287,14 @@ function Possession.new(deps: Deps): Service
 		end
 		local x, y, z = deps.actors:poseOf(actor)
 		engine.streamAround(player, x, y, z, timeout) -- the only yield
-		-- re-validate after the yield: the world may have moved on
+		-- re-validate after the yield: the world may have moved on. `possessable` changes at run time
+		-- (a bitten person who collapses during the yield is a patient now: Infection/InfectionService),
+		-- and a player must never be handed a body that is on the ground, hidden or in a bed.
 		if not free(self, actor) then
 			return refuse(self, "body was taken while streaming")
+		end
+		if not actor.possessable then
+			return refuse(self, "not possessable")
 		end
 		if PossessionState.actorOf(self.ledger, key) ~= nil then
 			releaseNow(self, player, "swap")

@@ -2,13 +2,19 @@
 -- ServerStorage.EngineTests.Minigames (CI place only; injected with --inject ci.project.json or a saved version)
 -- The bowling alley and the minigame framework in the real engine (brief v2 §13a; BUILD_PLAN D28): Server/Boot/Game
 -- boots the whole game with Workspace.Attractions (build/Attractions.rbxm) and PlayerLike stubs. Luau Execution has
--- no physics, no Heartbeat and no players, so frames are stepped by hand and a lane's pinfall is scripted with
--- MinigameService:debugRoll (the same scoring, pinsetter and ball-return path a physical roll takes) and darts with
--- debugDart (the rules' server verb "land"). Checks: the alley is there with its stations, prompts, pins, balls,
--- doors and the carved tunnels; the six tunnel routes are in the Routes registry and the vent's foot stands on the
--- alley paving; two players bowl a full game in turn (a perfect 300 against 9-0 frames = 90; turn order by frame;
--- the overhead monitor shows 300); a third player is turned away mid-game, an animal is turned away, a player
--- who walks off mid-game has the rest of their frames played out; darts: three darts a turn, the turn passes,
+-- no Heartbeat and no players, so frames are stepped by hand. Bowling needs no physics (the server decides every
+-- throw with the pure models in Shared/Minigames/Bowling), so REAL throws run here through the input path; a
+-- lane's pinfall is also scripted with MinigameService:debugRoll where a known score is wanted (the same scoring,
+-- pinsetter and ball-return path), and darts with debugDart (the rules' server verb "land"). Checks: the alley is
+-- there with its stations, prompts, pins, balls, doors and the carved tunnels; the six tunnel routes are in the
+-- Routes registry and the vent's foot stands on the alley paving; two players bowl a full game in turn (a perfect
+-- 300 against 9-0 frames = 90; turn order by frame; the overhead monitor shows 300); a third player is turned
+-- away mid-game, an animal is turned away, a player who walks off mid-game has the rest of their frames played
+-- out; real throws: a pocket ball knocks down seven or more and the pins left on the deck are the count, a
+-- gutter ball scores nothing and is called one, the throw's script reaches the bowler, the ball runs home through
+-- the return duct, a thrower who leaves mid-roll is never scored against the next bowler, a squirrel on the lane
+-- is knocked into the gutter and told so while the throw counts, and a computer opponent finishes a game with a
+-- real score; darts: three darts a turn, the turn passes,
 -- a checkout on a double wins 501, cricket mode from the lobby; the fortune machine pulls a card with no money;
 -- pool and pinball say "soon".
 -- Interface: run(opts?) -> Result (JSON-friendly)
@@ -269,7 +275,148 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	step(1)
 	check(s.phase == "idle", `lane idle after everyone left ({s.phase})`)
 
-	-- a computer fills the second seat: it takes its own turns (no physics here: its balls count zero)
+	-- real throws through the input path (the server decides each one; nothing here is physics) --------------------
+	standAt(p1, AlleyLayout.laneX(3), -9)
+	standAt(p2, AlleyLayout.laneX(3) + 2, -12)
+	local POCKET = { 0.165, 0, 0.7, 0 } -- offset, angle, power, spin: a quarter stud right of the head pin
+	local function untilReady(limit: number)
+		local waited = 0
+		while not laneHw:ready() and waited < limit do
+			step(0.1)
+			waited += 0.1
+		end
+	end
+	local function visiblePins(): number
+		local n = 0
+		for _, pm in alley.Lanes.Lane3.Pins:GetChildren() do
+			local body = pm:FindFirstChild("Body")
+			if body and body.Transparency < 1 then
+				n += 1
+			end
+		end
+		return n
+	end
+	check(svc:join(p1, LANE), "p1 joins for real throws")
+	check(svc:join(p2, LANE), "p2 joins for real throws")
+	check(input(p1, LANE, "start"), "start (real throws)")
+	step(0.3)
+	-- a squirrel (a player's) sits right in the ball's way on lane 3
+	do
+		local actor = G.runtime.possession:actorOf(sq)
+		local body = actor and actor.body
+		if body then
+			local x, y, z = AlleyLayout.toWorld(place, AlleyLayout.laneX(3) + 0.3, 0.6, 30)
+			body:PivotTo(CFrame.new(x, y, z))
+		end
+	end
+	ok, why = input(p1, LANE, "release", POCKET)
+	check(ok, `pocket release: {why}`)
+	local sent = lastEvent(p1, "roll")
+	check(sent ~= nil and type(sent.script) == "table" and sent.seat == 1, "the thrower was sent the throw's script")
+	check(lastEvent(p2, "roll") ~= nil, "the other bowler was sent it too")
+	ok, why = input(p1, LANE, "release", POCKET)
+	check(not ok and why and string.find(why, "pinsetter", 1, true), `a second release mid-roll said: {why}`)
+	-- mid-roll the ball is out on the lane
+	step(1.0)
+	do
+		local bp = laneHw.ball.Position
+		local _, _, D = AlleyLayout.toLocal(place, bp.X, bp.Y, bp.Z)
+		numbers.ballMidRollD = D
+		check(D > 8 and D < 56, `one second into a throw the ball is {D} studs down the lane`)
+	end
+	untilReady(15)
+	local realState = (s.game :: any).state
+	local first = realState.rolls[1][1]
+	numbers.pocketBall = first
+	check(first ~= nil and first >= 7, `a pocket ball knocked down {first}`)
+	if first ~= nil and first < 10 then
+		check(laneHw:standingCount() == 10 - first, `{laneHw:standingCount()} pins stand after {first} fell`)
+		check(visiblePins() == 10 - first, `{visiblePins()} pins are on the deck after {first} fell`)
+	end
+	local banner = nil
+	for i = #p1.events, 1, -1 do
+		local e = p1.events[i]
+		if e.kind == "event" and e.pins ~= nil then
+			banner = e
+			break
+		end
+	end
+	check(banner and banner.pins == first and type(banner.text) == "string", "the throw's banner carries its count")
+	-- the ball ran home through the duct to the rack
+	numbers.ballHomeAfterThrow = (laneHw.ball.Position - Vector3.new(wx, wy, wz)).Magnitude
+	check(
+		numbers.ballHomeAfterThrow < 0.5,
+		`after a real throw the ball is {numbers.ballHomeAfterThrow} from its rack slot`
+	)
+	-- the squirrel was bowled into the gutter and told; the bowlers were told; the throw counted
+	do
+		local actor = G.runtime.possession:actorOf(sq)
+		local root = actor and actor.body and actor.body.PrimaryPart
+		if root then
+			local X, _, D = AlleyLayout.toLocal(place, root.Position.X, root.Position.Y, root.Position.Z)
+			numbers.squirrelAfter = `{X - AlleyLayout.laneX(3)}, {D}`
+			check(
+				math.abs(math.abs(X - AlleyLayout.laneX(3)) - 2.45) < 0.2,
+				`the squirrel is {X - AlleyLayout.laneX(3)} across the lane`
+			)
+			check(D < 30, `the squirrel was knocked back to {D}`)
+		end
+		local told = false
+		for _, e in sq.events do
+			if e.kind == "notice" and string.find(tostring(e.text), "bowling ball", 1, true) then
+				told = true
+			end
+		end
+		check(told, "the squirrel's player was told what hit it")
+		local bowlersTold = false
+		for _, e in p1.events do
+			if e.kind == "event" and e.intruder and string.find(tostring(e.text), "The throw counts", 1, true) then
+				bowlersTold = true
+			end
+		end
+		check(bowlersTold, "the bowlers were told the squirrel was knocked clear and the throw counts")
+	end
+	-- a gutter ball (or, after a strike, Bob's): nothing falls, and it is called a gutter ball
+	local thrower = if (s.game :: any).rules.turn(realState) == 1 then p1 else p2
+	local throwerSeat = if thrower == p1 then 1 else 2
+	local before = #realState.rolls[throwerSeat]
+	ok, why = input(thrower, LANE, "release", { 1, 0.1, 0.7, 0 })
+	check(ok, `gutter release: {why}`)
+	untilReady(15)
+	check(
+		realState.rolls[throwerSeat][before + 1] == 0,
+		`a gutter ball scored {realState.rolls[throwerSeat][before + 1]}`
+	)
+	local sawGutter = false
+	for _, e in thrower.events do
+		if e.kind == "event" and e.text == "Gutter ball" then
+			sawGutter = true
+		end
+	end
+	check(sawGutter, "the gutter ball was called a gutter ball")
+	-- whoever is up lets go and walks off while the ball rolls: nothing lands on the other bowler's sheet
+	local up = (s.game :: any).rules.turn(realState)
+	local leaver, stayer = if up == 1 then p1 else p2, if up == 1 then p2 else p1
+	local stayerSeat = if up == 1 then 2 else 1
+	local stayerBalls = #realState.rolls[stayerSeat]
+	if not laneHw:ready() then
+		untilReady(15)
+	end
+	ok, why = input(leaver, LANE, "release", POCKET)
+	check(ok, `release before walking off: {why}`)
+	step(0.5)
+	svc:leave(leaver, "walked off")
+	untilReady(15)
+	check(
+		#realState.rolls[stayerSeat] == stayerBalls,
+		"the ball of a bowler who left was not scored against the next one"
+	)
+	check(laneHw:standingCount() == 10, `the next bowler has {laneHw:standingCount()} pins`)
+	svc:leave(stayer, "done")
+	step(1)
+	check(s.phase == "idle", `lane idle after the real throws ({s.phase})`)
+
+	-- a computer fills the second seat: it takes its own turns with real throws of its own skill
 	standAt(p1, AlleyLayout.laneX(3), -9)
 	check(svc:join(p1, LANE), "p1 joins for the computer game")
 	ok, why = input(p1, LANE, "addai")
@@ -288,8 +435,13 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	end
 	check(s.phase == "done", `vs computer phase {s.phase}`)
 	check(s.result and s.result.scores[1] == 300, `vs computer: human {s.result and s.result.scores[1]}`)
-	check(#(s.game :: any).state.rolls[2] >= 20, "the computer bowled its frames")
+	check(#(s.game :: any).state.rolls[2] >= 11, "the computer bowled its frames")
 	numbers.computerRolls = #(s.game :: any).state.rolls[2]
+	numbers.computerScore = s.result and s.result.scores[2]
+	check(
+		s.result and s.result.scores[2] > 20 and s.result.scores[2] < 300,
+		`the computer scored {numbers.computerScore}`
+	)
 	svc:leave(p1, "done")
 	step(1)
 	check(s.phase == "idle", `lane idle after the human left the computer ({s.phase})`)

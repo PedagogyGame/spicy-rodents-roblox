@@ -23,7 +23,8 @@ function Greybox.build(plan: Spec.BuildPlan, factory: Factory.Factory): any
 	end
 	-- Attachments first so Beams can find them
 	for pass = 1, 2 do
-		for _, e in plan.extras or {} do
+		local extras: { Spec.ExtraSpec } = plan.extras or {}
+		for _, e in extras do
 			if (e.kind == "Beam") == (pass == 2) then
 				factory.extra(e, byName)
 			end

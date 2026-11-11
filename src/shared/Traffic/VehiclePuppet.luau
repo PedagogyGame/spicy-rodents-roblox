@@ -1,7 +1,7 @@
 --!strict
 -- ReplicatedStorage.Shared.Traffic.VehiclePuppet
 -- Placeholder vehicles at the TRUE logical boxes (BUILD_PLAN §4.4 W1 #9 and #10, D9, §5.2).
--- Interface: spec(kind, opts?) -> PartBuilder.ModelSpec; KINDS; baseOffset(kind) (root centre above the base)
+-- Interface: spec(kind, opts?) -> PartBuilder.ModelSpec; KINDS; baseOffset(kind) (root centre above the base); length(kind), width(kind), track(kind)
 --
 -- The invisible RootPart is exactly the logical box from Traffic/Boxes (the box the fatal test sweeps), and
 -- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
@@ -49,6 +49,19 @@ end
 
 function VehiclePuppet.length(kind: string): number
 	return Boxes.get(kind).length
+end
+
+function VehiclePuppet.width(kind: string): number
+	return Boxes.get(kind).width
+end
+
+-- track(kind): how far apart its left and right wheels stand (studs), or nil for a two-wheeler, which
+-- stands upright whatever the road's crossfall (Traffic/Ghost.seat rolls the rest with the ground)
+function VehiclePuppet.track(kind: string): number?
+	if kind == "motorcycle" then
+		return nil
+	end
+	return Boxes.get(kind).width * 0.8
 end
 
 function VehiclePuppet.spec(kind: string, opts: Opts?): PartBuilder.ModelSpec

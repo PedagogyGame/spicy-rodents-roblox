@@ -32,6 +32,20 @@
 --     cadence and the swing follows the motor's speed, never the observed displacement. Whatever
 --     offset the body carried as an AI decays at v5.4's 23/s, the same rate the controller's drawn point
 --     eases onto its own ground, so a possession hands over without a step.
+-- Patients (owner 2026-11-10, the bite-to-hospital sequence): the server writes a Med attribute on a
+-- bitten body (Server/Infection/InfectionService). An AI body with Med "down" (collapsed at a scene)
+-- or "treated" (in a hospital bed) plays the stock sit clip and is lowered through the same
+-- visual-root offset: sitting on the ground, or on the cot (Infection/HospitalLayout.BED.top above
+-- the floor). The stock sit is a chair sit (knees bent, shins straight down), which on the ground put
+-- everything below the knee under the pavement and on a cot through the mattress: the knees and
+-- ankles are straightened after the Animator has written them (Stepped), so the legs lie flat in
+-- front of the patient. A patient walked to the ambulance ("carried") keeps the usual walk. Someone
+-- with the symptoms ("symptomatic") staggers: the visible body sways about the soles. A body a player
+-- holds is never posed. Render/MedicalView draws the rest of the attribute (red eyes, hiding).
+-- Walk or run: with one threshold a body moving at about that speed (a cured person walking home at
+-- 9 studs/s, the ambulance crew at 8.6) flipped between the two clips many times a second, each flip
+-- restarting a 0.2 s cross-fade: the observed speed ripples with the replication steps. The choice
+-- now has a band (gaitClip) and its own slower speed (pace).
 -- No side effects on require.
 -- A sculpted hero squirrel (Server/Assets/HeroArt, attribute Hero) plays its own authored clips (owner
 -- 2026-11-10: the run looked "rigid, unalive": the procedural gait only swings the legs under a stiff body,
@@ -41,17 +55,33 @@
 -- step with the motor's stride. If a clip cannot be loaded the body falls back to the procedural gait.
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
 --   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount;
---   heroClip(mode, speed, stalk) -> clip name (pure); heroRate(name, speed, cadence?, length) -> playback
---   speed (pure); HERO. The Spicy Rodent's hero body also gets Animation/Creep's twitches on top.
+--   heroClip(mode, speed, stalk, action?, was?, braking?) -> clip name (pure); heroRate(name, speed,
+--   cadence?, length, airSeconds?) -> playback speed (pure); heroStart(name, action?) -> seconds (pure);
+--   heroBraking(speed, slowing) -> boolean (pure); heroSettle(name, time, length, speed, slowing, rate) ->
+--   playback speed (pure);
+--   heroTracks(tracks, current, want, track, loop, rate, startAt?) -> clip now playing; HERO. The
+--   Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
+--   heroLayers(rig, t, seed, live?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
+--   Every hero body near the camera also gets Animation/Liveliness (how it answers its own movement):
+--   liveSample(cf, speed, mode, kin?, time, far) -> Liveliness.Sample (pure).
+--   medPose(med, footDrop) -> { clip, drop, flat } (pure); gaitClip(current, pace, runAbove?) -> "walk" |
+--   "run" (pure); pace(prev, inst, dt) -> studs/s (pure); sway(med, t, seed) -> roll, pitch (pure);
+--   FLAT_JOINTS
 
 local Gait = require("./Gait")
 local Creep = require("./Creep")
+local Liveliness = require("./Liveliness")
 local KinematicPose = require("../Controllers/KinematicPose")
 local Import = require("../Import")
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local HeroAssets = Import.shared("Actors/HeroAssets") :: typeof(require("../../shared/Actors/HeroAssets"))
+-- (a module reached through Import carries its values' types but not its exported type names:
+-- this is the same type, taken from a value)
+type HeroClip = typeof(HeroAssets.CLIPS.squirrel.Idle)
+local HospitalLayout =
+	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
 
 export type ClipSet = {
 	idle: string?,
@@ -107,10 +137,29 @@ type Entry = {
 	anchored: boolean,
 	applied: number,
 	kin: boolean, -- a kinematic controller drew this body last frame
-	hero: { [string]: HeroAssets.Clip }?, -- a sculpted hero rig playing its authored clips
-	-- the Spicy Rodent's twitches (Animation/Creep), layered on its clips: the bones by name, what the
-	-- clip last gave each and what was last written to it (so an offset is never applied twice)
-	creep: { seed: number, bones: { [string]: any }, base: { [any]: CFrame }, wrote: { [any]: CFrame } }?,
+	hero: { [string]: HeroClip }?, -- a sculpted hero rig playing its authored clips
+	biteSeen: number?, -- the body's BiteAt attribute as last seen (biteDue)
+	biteTrack: AnimationTrack?, -- the Bite clip, played over whatever the body is doing
+	mode: string, -- what a hero body is doing (heroClip's mode), for Animation/Liveliness
+	-- what is layered on a hero's clips (heroLayers: Animation/Liveliness, and the Spicy Rodent's
+	-- Animation/Creep): the bones by name, what the clip last gave each and what was last written to it
+	-- (so an offset is never applied twice)
+	creep: {
+		seed: number,
+		rig: string,
+		live: Liveliness.State,
+		bones: { [string]: any },
+		base: { [any]: CFrame },
+		wrote: { [any]: CFrame },
+	}?,
+	med: any, -- the body's Med attribute (a patient's pose)
+	medConn: RBXScriptConnection?,
+	drop: number, -- studs the pose lowers the body by, now (eased)
+	pace: number, -- studs/s, smoothed more slowly than `speed`: only picks walk or run
+	legs: { any }, -- the knee and ankle joints a sitting patient's legs are straightened at
+	lean: number, -- 0..1: how much of the stagger sway is on (eased)
+	roll: number, -- rad the visible body leans by now (about the soles)
+	pitch: number,
 }
 
 -- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
@@ -142,6 +191,13 @@ AnimationDriver.FIX_MAX = 1.4
 AnimationDriver.CLEARANCE = 0.04 -- soles rest this much above the surface found
 AnimationDriver.NEAR_GROUND = 2 -- only soles this close to the terrain are probed (not squirrels up trees)
 AnimationDriver.KIN_RATE = 23 -- 1/s: a kinematic body sheds its carried offset at v5.4's visual easing rate
+AnimationDriver.SIT_SEAT = 1.35 -- studs from an R15 root down to what the sit clip sits on
+AnimationDriver.POSE_RATE = 6 -- 1/s: how fast a patient sinks into (or rises out of) the pose
+AnimationDriver.RUN_BAND = 1.5 -- studs/s either side of runAbove in which the walk or run clip is kept
+AnimationDriver.PACE_TAU = 0.3 -- s: the smoothing of the speed that picks walk or run
+AnimationDriver.SWAY_RATE = 3 -- 1/s: how fast the stagger comes on and goes
+-- the R15 joints straightened on a sitting patient (Motor6Ds, or AnimationConstraints on newer rigs)
+AnimationDriver.FLAT_JOINTS = table.freeze({ "LeftKnee", "RightKnee", "LeftAnkle", "RightAnkle" })
 
 local SHORT, BASE, MEDIAN_N = 3, 12, 7 -- frames: short and long velocity baselines; median window
 local scratch: { number } = table.create(MEDIAN_N, 0)
@@ -229,6 +285,57 @@ AnimationDriver.DEFAULT_CLIPS = {
 	},
 } :: { [string]: ClipSet }
 
+-- medPose(med, footDrop): how an AI body with this Med attribute is posed: the clip to play (nil =
+-- the usual choice by speed), how far the visible body is lowered (studs), and whether the legs are
+-- laid flat (FLAT_JOINTS straightened). `footDrop` is the body's root height above its soles. A
+-- collapsed person sits on the ground; a patient in a bed sits up on the cot; both with their legs
+-- out in front of them. Anything else (symptomatic, walked to the ambulance, in transit, healthy)
+-- keeps its usual animation.
+function AnimationDriver.medPose(med: any, footDrop: number): { clip: string?, drop: number, flat: boolean }
+	if med == "down" then
+		return { clip = "sit", drop = math.max(0, footDrop - AnimationDriver.SIT_SEAT), flat = true }
+	elseif med == "treated" then
+		return {
+			clip = "sit",
+			drop = math.max(0, footDrop - AnimationDriver.SIT_SEAT - HospitalLayout.BED.top),
+			flat = true,
+		}
+	end
+	return { clip = nil, drop = 0, flat = false }
+end
+
+-- gaitClip(current, pace, runAbove?): walk or run for a body moving at `pace` studs/s, given the clip
+-- it plays now: run from RUN_BAND above the threshold, walk from RUN_BAND below it, and in between
+-- whatever is playing already (anything but "run" counts as walking).
+function AnimationDriver.gaitClip(current: string?, pace: number, runAbove: number?): string
+	local mid = runAbove or 9
+	if pace >= mid + AnimationDriver.RUN_BAND then
+		return "run"
+	elseif pace < mid - AnimationDriver.RUN_BAND then
+		return "walk"
+	end
+	return if current == "run" then "run" else "walk"
+end
+
+-- pace(prev, inst, dt): the speed that picks walk or run, one frame on: `inst` (this frame's observed
+-- speed) smoothed over PACE_TAU. A body whose position arrives 10 to 20 times a second is seen to
+-- move in steps; over 0.3 s the ripple that leaves is narrower than the band.
+function AnimationDriver.pace(prev: number, inst: number, dt: number): number
+	return prev + (inst - prev) * math.min(1, dt / AnimationDriver.PACE_TAU)
+end
+
+-- sway(med, t, seed): the stagger of someone with the symptoms: how far the visible body leans to
+-- the side (roll) and forward (pitch), in radians, at time t. A slow side-to-side sway with a quicker
+-- wobble on it, about four degrees at most; `seed` keeps two people out of step. 0, 0 for anyone else.
+function AnimationDriver.sway(med: any, t: number, seed: number): (number, number)
+	if med ~= "symptomatic" then
+		return 0, 0
+	end
+	local roll = 0.05 * math.sin(t * 4.7 + seed) + 0.02 * math.sin(t * 9.4 + seed * 2.3)
+	local pitch = 0.03 * math.sin(t * 3.1 + seed * 1.7)
+	return roll, pitch
+end
+
 -- Playback speed of a walk or run clip authored for `nominal` st/s on a body moving at `speed`: the
 -- feet keep pace with the ground. The floor is low (a slow stroll is a slow cycle, never legs that
 -- run under a body that barely moves); other clips play at their own speed.
@@ -244,37 +351,98 @@ end
 AnimationDriver.HERO = {
 	still = 0.5, -- studs/s under which it stands (or hangs on a trunk)
 	runAbove = 9, -- studs/s: a walk below, the bounding run above
-	-- studs travelled per clip cycle when no motor cadence is known (v5.4: one bound per 5.5 studs)
-	stride = { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 4.5, Stalk = 2.2 } :: { [string]: number },
+	-- studs travelled per clip cycle when no motor cadence is known (v5.4: one bound per 5.5 studs). The
+	-- clips are authored to these (tools/blender/heroes/clips_squirrel.py, its *_TRAVEL numbers): a planted
+	-- paw goes back under the body at exactly this much a cycle, so it stays where it was put. Wire is two
+	-- small bounds a cycle (6.9 studs: at the rail's 18 studs/s that is the fastest the clip may play)
+	stride = { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 6.9, Stalk = 2.2 } :: { [string]: number },
 	minRate = 0.3,
 	maxRate = 2.6, -- faster than this the legs blur into noise
+	fade = 0.15, -- seconds: one clip's track fades out and the next fades in over this
+	refade = 0.1, -- a looping clip found stopped is started again over this
+	holdEnd = 0.06, -- a one-shot is frozen this close to its end
+	-- the one-shots that carry a body through the air, by the seconds into each at which the body leaves
+	-- the surface and at which it comes down (the clips' Commit and Recover markers), and where a fall
+	-- that was not a jump comes into it. The body is launched at once, so the clip starts at `launch`
+	-- (its crouch belongs on the ground) and is paced to reach `land` as the body does; a longer fall is
+	-- held there, reaching for the ground.
+	air = {
+		Leap = { launch = 5 / 30, land = 19 / 30, fall = 14 / 30 },
+		Pounce = { launch = 0.4, land = 0.7, fall = 0.55 },
+	} :: { [string]: { launch: number, land: number, fall: number } },
+	landRate = 1.6, -- a one-shot left for another clip (a landing) runs through its last keys at this rate as it fades
+	-- studs/s^2 of slowing from which a run is stopping (heroBraking): it keeps to Run, not Walk, until it
+	-- stands. A stop dies away, so under runAbove the bar falls with the speed
+	brake = 40,
+	-- where a run that is stopping ends its last bound (heroSettle): `at` seconds into Run, the hind feet
+	-- planted under the body and the fore paws just lifted, from where the cross to Idle only sets the
+	-- fore paws down. A run found up to `slack` seconds past that is held; any other is taken there at
+	-- up to `rate` (from mid-flight that reaches the fore paws' landing, which also stands down cleanly)
+	settle = { at = 0.17, slack = 0.04, rate = 1.8 },
 }
 
-function AnimationDriver.heroClip(mode: string, speed: number, stalk: boolean): string
+-- Whether a body moving at `speed` and losing `slowing` studs/s of it each second is stopping (and not
+-- easing off to a slower pace): HERO.brake at the run's slowest or faster, and in proportion below it (a
+-- body let go loses a fixed share of its speed each moment, so its slowing falls away with its speed).
+-- `slowing` is the motor's own for a held body (the fall of the speed the animation is told, frame to
+-- frame) and Animation/Liveliness's reading of the root for the others: that one is smoothed against the
+-- server's steps and trails the drawn body, which let a stop from an ordinary run reach the walk's speed
+-- before it read as a stop, and the Walk clip flashed on the way down.
+function AnimationDriver.heroBraking(speed: number, slowing: number): boolean
+	local H = AnimationDriver.HERO
+	return slowing > H.brake * math.clamp(speed / H.runAbove, 0, 1)
+end
+
+-- `action` is how a body in the air left its surface ("leap" | "pounce"; nil: it fell); `was` the clip it
+-- played last frame and `braking` whether it is stopping (heroBraking): a run that is stopping keeps to
+-- its run until it stands, the walk is for a body that ambles.
+function AnimationDriver.heroClip(
+	mode: string,
+	speed: number,
+	stalk: boolean,
+	action: string?,
+	was: string?,
+	braking: boolean?
+): string
 	local H = AnimationDriver.HERO
 	if mode == "air" then
-		return "Leap"
+		return if action == "pounce" then "Pounce" else "Leap"
 	elseif mode == "trunk" then
 		return "Climb"
 	elseif speed < H.still then
-		return "Idle"
+		-- a stalk that stops holds its creep where it is (heroRate), it does not stand up
+		return if stalk and mode == "ground" then "Stalk" else "Idle"
 	elseif mode == "rail" then
 		return "Wire"
 	elseif stalk then
 		return "Stalk"
 	end
-	return if speed < H.runAbove then "Walk" else "Run"
+	return if speed < H.runAbove and not (was == "Run" and braking) then "Walk" else "Run"
 end
 
 -- Playback speed for clip `name` of `length` seconds on a body moving at `speed`: one clip cycle per
 -- stride. `cadence` (rad/s of stride phase, from the kinematic motor) wins when it is known. A body
--- hanging still on a trunk holds its climb pose (0); Idle and Leap play at their own speed.
-function AnimationDriver.heroRate(name: string, speed: number, cadence: number?, length: number): number
+-- hanging still on a trunk holds its climb pose, and a stalk that has stopped its creep (0); Idle plays at
+-- its own speed; a leap or a pounce goes from its take-off to its landing in the `airSeconds` the motor
+-- expects the body to stay up (at its own speed when that is not known: a fall).
+function AnimationDriver.heroRate(
+	name: string,
+	speed: number,
+	cadence: number?,
+	length: number,
+	airSeconds: number?
+): number
 	local H = AnimationDriver.HERO
-	if name == "Idle" or name == "Leap" then
+	local air = H.air[name]
+	if air then
+		return if airSeconds and airSeconds > 0
+			then math.clamp((air.land - air.launch) / airSeconds, H.minRate, H.maxRate)
+			else 1
+	end
+	if name == "Idle" then
 		return 1
 	end
-	if name == "Climb" and speed < H.still then
+	if (name == "Climb" or name == "Stalk") and speed < H.still then
 		return 0
 	end
 	local stride = H.stride[name] or 5.5
@@ -284,6 +452,183 @@ function AnimationDriver.heroRate(name: string, speed: number, cadence: number?,
 		then cadence / (2 * math.pi)
 		else math.max(speed, 0) / stride
 	return math.clamp(cyclesPerSecond * length, H.minRate, H.maxRate)
+end
+
+-- Where a clip starts, seconds into it: a leap or a pounce at its take-off (the body is already in the
+-- air), a fall that nothing launched (`action` nil) further in; any other clip at its beginning.
+function AnimationDriver.heroStart(name: string, action: string?): number
+	local air = AnimationDriver.HERO.air[name]
+	return if air == nil then 0 elseif action then air.launch else air.fall
+end
+
+-- The playback speed of a run that is stopping (heroBraking of its `speed` and `slowing`, and under
+-- HERO.runAbove): `rate` (heroRate) for anything else. `time` is the seconds into the clip.
+-- A stopping body is caught anywhere in its bound; left to its cadence the clip all but freezes there,
+-- half the time in flight, and the cross to Idle then hangs it in the air and pushes its stretched legs
+-- a quarter of a stud through the ground on the way down. Instead the bound is finished: the clip is
+-- paced to reach HERO.settle.at as the body comes to stand (its speed dies away as an exponential, so
+-- that is speed / slowing * ln(speed / still) seconds from now), and held there.
+function AnimationDriver.heroSettle(
+	name: string,
+	time: number,
+	length: number,
+	speed: number,
+	slowing: number,
+	rate: number
+): number
+	local H = AnimationDriver.HERO
+	if name ~= "Run" or speed >= H.runAbove or length <= 0 or not AnimationDriver.heroBraking(speed, slowing) then
+		return rate
+	end
+	local S = H.settle
+	local left = (S.at - time) % length -- seconds of clip to go
+	if left > length - S.slack or left < 1e-3 then
+		return 0
+	end
+	local seconds = math.max(speed, H.still) / slowing * math.log(math.max(speed / H.still, 1))
+	return if seconds * S.rate <= left then S.rate else left / seconds
+end
+
+-- One frame of a hero body's clip tracks: `want` (heroClip) becomes the clip that plays, at `rate`
+-- (heroRate), from `startAt` seconds into it (heroStart; its beginning when not given). `tracks` holds
+-- the body's loaded tracks by clip name, `current` is the clip it played last frame, `t` is the track of
+-- `want`, `loop` whether that clip loops. A change of clip crosses over in HERO.fade seconds, and a
+-- one-shot that is left (a leap, on landing) runs through its last keys as it fades, while a gait left
+-- for Idle is held where it is (the body stands: its legs do not run on under it); a one-shot that has
+-- reached its end is frozen there, and one that carries a body through the air where it comes down (a long
+-- fall holds the reach). Returns the clip now playing. It only calls Play, Stop and AdjustSpeed, reads
+-- IsPlaying, Looped, TimePosition and Length and sets TimePosition, so the offline motion preview
+-- (tools/review/motion) runs this same function on stand-in tracks.
+function AnimationDriver.heroTracks(
+	tracks: { [string]: any },
+	current: string?,
+	want: string,
+	t: any,
+	loop: boolean,
+	rate: number,
+	startAt: number?
+): string
+	local H = AnimationDriver.HERO
+	if want ~= current then
+		for name, old in tracks do
+			if name ~= want and old.IsPlaying then
+				if not old.Looped then
+					old:AdjustSpeed(H.landRate)
+				elseif want == "Idle" then
+					old:AdjustSpeed(0)
+				end
+				old:Stop(H.fade)
+			end
+		end
+		t:Play(H.fade)
+		if startAt and startAt > 0 then
+			t.TimePosition = startAt
+		end
+	elseif not t.IsPlaying and loop then
+		t:Play(H.refade)
+	end
+	local air = H.air[want]
+	if not loop and t.Length > 0 and t.TimePosition >= (if air then air.land else t.Length - H.holdEnd) then
+		t:AdjustSpeed(0) -- hold the pose (a long fall after a leap)
+	else
+		t:AdjustSpeed(rate)
+	end
+	return want
+end
+
+-- The bite (owner's preview found the Bite clip uploaded and never played). The server stamps the
+-- biting body's BiteAt attribute with its clock at every bite; a client that sees the stamp change plays
+-- the Bite clip once, at Action priority over the gait, sped up so the lunge and snap take about a
+-- second. A body first seen with a stamp already on it has bitten in the past: nothing is played.
+AnimationDriver.BITE = { rate = 2.2, fade = 0.08 }
+function AnimationDriver.biteDue(seen: number?, at: any, first: boolean): (boolean, number?)
+	if type(at) ~= "number" then
+		return false, seen
+	end
+	if first or seen == at then
+		return false, at
+	end
+	return true, at
+end
+
+-- The seed of a rodent body's twitches (Animation/Creep), from its name: the same on every client.
+function AnimationDriver.creepSeed(name: string): number
+	return (#name * 7.31) % 97
+end
+
+-- The joint rotations a hero body gets on top of its clip at server time `t`, as
+-- { [boneName] = { rx, ry, rz } }: radians on the rig's own axes, each multiplied onto what the clip gave
+-- that bone as CFrame.Angles(rx, ry, rz) (the Root may carry three more numbers, an offset in studs:
+-- CFrame.new(tx, ty, tz) * CFrame.Angles(rx, ry, rz)). `rig` is the body's RigSpec attribute. The Spicy
+-- Rodent ("rodent") has Animation/Creep's twitches; `live`, when given, is the body's Animation/Liveliness
+-- state after this frame's step, and its pose is added on top (the two are offsets on the same axes).
+-- Pure: the driver below applies exactly this, and the offline motion preview
+-- (tools/review/motion_path.luau) reads it, so both show the same thing; a new layer belongs here.
+function AnimationDriver.heroLayers(
+	rig: string,
+	t: number,
+	seed: number,
+	live: Liveliness.State?
+): { [string]: { number } }
+	local out: { [string]: { number } } = {}
+	if rig ~= "rodent" then
+		return if live then Liveliness.onto(out, live.pose) else out
+	end
+	-- (at a sprint a head jerk shows less: the run already throws the head about)
+	local pose = Creep.pose(t, seed, if live then Liveliness.twitch(live) else 1)
+	out.Head = { pose.head.pitch, pose.head.yaw, pose.head.roll }
+	out.Jaw = { -pose.jaw, 0, 0 } -- the jaw opens about -X (the authored bite)
+	out.EarL = { 0, 0, pose.earL }
+	out.EarR = { 0, 0, -pose.earR }
+	for i, yaw in pose.tail do
+		if yaw ~= 0 then
+			out[`Tail{i}`] = { 0, yaw, 0 }
+		end
+	end
+	-- the breath and the shudder are the back's (and the shudder the head's too): the bones before and
+	-- after take the breath back (by the rig's own lengths the chest ends level and at its height) and
+	-- the chest takes the shudder back, so the fore paws it carries stay where they stand (within 0.02
+	-- studs; they were shoved a third of a stud); the neck takes the shudder up again. The shudder rolls
+	-- the bone behind the chest: the nearer the roll is to where it is taken back, the less it carries
+	-- the chest sideways.
+	out.Spine1 = { -0.645 * pose.chest, 0, 0 }
+	out.Spine2 = { pose.chest, 0, 0 }
+	out.Chest = { -0.355 * pose.chest, 0, -3 * pose.spine }
+	if pose.spine ~= 0 then
+		out.Spine3 = { 0, 0, 3 * pose.spine }
+		out.Neck = { 0, 0, 3 * pose.spine }
+	end
+	return if live then Liveliness.onto(out, live.pose) else out
+end
+
+-- What Animation/Liveliness is told about a hero body this frame: its root's pose (`cf`, a CFrame), the
+-- speed the animation is told, heroClip's mode, the kinematic controller's pose when the body is held
+-- (else the pose arrives in the server's steps), the server's clock, and whether it is too far from the
+-- camera to matter. Pure: the offline motion preview builds the same sample.
+function AnimationDriver.liveSample(
+	cf: any,
+	speed: number,
+	mode: string,
+	kin: KinematicPose.Pose?,
+	time: number,
+	far: boolean
+): Liveliness.Sample
+	local pitch, yaw, roll = cf:ToOrientation()
+	return {
+		x = cf.X,
+		y = cf.Y,
+		z = cf.Z,
+		pitch = pitch,
+		yaw = yaw,
+		roll = roll,
+		speed = speed,
+		mode = mode,
+		stalk = kin ~= nil and kin.stalk == true,
+		winded = kin ~= nil and kin.winded == true,
+		coarse = kin == nil,
+		time = time,
+		far = far,
+	}
 end
 
 -- The joints the gait drives, by RigSpec bone name: Motor6Ds on a part-built puppet, Bones on a skinned
@@ -420,7 +765,7 @@ function AnimationDriver.start(opts: Opts): Driver
 		local joints: { Joint } = {}
 		local tailN = 0
 		local animator: Animator? = nil
-		local hero: { [string]: HeroAssets.Clip }? = nil
+		local hero: { [string]: HeroClip }? = nil
 		if Gait.PROCEDURAL[species] and clips[species] == nil then
 			local hip = model:GetAttribute("HipHeight")
 			gait = Gait.params(species, if type(hip) == "number" then hip else nil)
@@ -439,6 +784,12 @@ function AnimationDriver.start(opts: Opts): Driver
 			end
 		end
 		local rootJoint, rootAttach = rootJointOf(model, root)
+		local medConn = model:GetAttributeChangedSignal("Med"):Connect(function()
+			local e = entries[model]
+			if e then
+				e.med = model:GetAttribute("Med")
+			end
+		end)
 		entries[model] = {
 			body = model,
 			root = root,
@@ -466,16 +817,39 @@ function AnimationDriver.start(opts: Opts): Driver
 			applied = 0,
 			kin = false,
 			hero = hero,
+			mode = "ground",
 			creep = nil,
+			med = model:GetAttribute("Med"),
+			medConn = medConn,
+			drop = 0,
+			pace = 0,
+			legs = {},
+			lean = 0,
+			roll = 0,
+			pitch = 0,
 		}
-		if hero and model:GetAttribute("RigSpec") == "rodent" then
+		if animator and gait == nil then
+			local legs = entries[model].legs
+			for _, d in model:GetDescendants() do
+				if
+					(d:IsA("Motor6D") or d:IsA("AnimationConstraint"))
+					and table.find(AnimationDriver.FLAT_JOINTS, d.Name) ~= nil
+				then
+					table.insert(legs, d)
+				end
+			end
+		end
+		if hero then
 			local bones: { [string]: any } = {}
 			for _, d in model:GetDescendants() do
 				if d:IsA("Bone") then
 					bones[d.Name] = d
 				end
 			end
-			entries[model].creep = { seed = (#model.Name * 7.31) % 97, bones = bones, base = {}, wrote = {} }
+			local seed = AnimationDriver.creepSeed(model.Name)
+			local rig = if model:GetAttribute("RigSpec") == "rodent" then "rodent" else "squirrel"
+			entries[model].creep =
+				{ seed = seed, rig = rig, live = Liveliness.new(seed, rig), bones = bones, base = {}, wrote = {} }
 		end
 		count += 1
 	end
@@ -483,13 +857,16 @@ function AnimationDriver.start(opts: Opts): Driver
 	local function remove(child: Instance)
 		local e = entries[child :: any]
 		if e then
+			if e.medConn then
+				e.medConn:Disconnect()
+			end
 			for _, t in e.tracks do
 				t:Stop(0)
 			end
 			for _, j in e.joints do
 				j.motor.Transform = CFrame.identity
 			end
-			if e.applied ~= 0 then
+			if e.applied ~= 0 or e.roll ~= 0 or e.pitch ~= 0 then
 				local rj, ra = e.rootJoint, e.rootAttach
 				if rj then
 					rj.C0 = e.baseC0
@@ -508,6 +885,13 @@ function AnimationDriver.start(opts: Opts): Driver
 		if set.sit and hum and hum.SeatPart ~= nil then
 			return "sit"
 		end
+		-- a patient (AI bodies only: a held body keeps its own animation)
+		if e.med ~= nil and e.root.Anchored then
+			local clip = AnimationDriver.medPose(e.med, e.footDrop).clip
+			if clip and (set :: any)[clip] then
+				return clip
+			end
+		end
 		if set.jump and e.vy > 6 then
 			return "jump"
 		elseif set.fall and e.vy < -10 then
@@ -516,8 +900,8 @@ function AnimationDriver.start(opts: Opts): Driver
 		if e.speed < walkAbove then
 			return if set.idle then "idle" elseif set.run then "hold" else "none"
 		end
-		if set.walk and e.speed < runAbove then
-			return "walk"
+		if set.walk and set.run then
+			return AnimationDriver.gaitClip(e.current, e.pace, runAbove)
 		end
 		return if set.run then "run" else "walk"
 	end
@@ -530,11 +914,17 @@ function AnimationDriver.start(opts: Opts): Driver
 	probe.FilterDescendantsInstances = { opts.container, workspace.CurrentCamera }
 	local DOWN = Vector3.new(0, -(AnimationDriver.PROBE_UP - AnimationDriver.FIX_MIN + 0.5), 0)
 
-	-- the visible body's vertical offset from its root (world up, whatever the root's attitude)
-	local function applyOffset(e: Entry, off: number)
-		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) then
-			e.applied = off
+	-- the visible body's vertical offset from its root (world up, whatever the root's attitude), and
+	-- its lean (a stagger: about the soles, so the feet stay where they are)
+	local function applyOffset(e: Entry, off: number, roll: number?, pitch: number?)
+		local r, p = roll or 0, pitch or 0
+		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) or r ~= e.roll or p ~= e.pitch then
+			e.applied, e.roll, e.pitch = off, r, p
 			local shifted = CFrame.new(e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))) * e.baseC0
+			if r ~= 0 or p ~= 0 then
+				local soles = Vector3.new(0, -e.footDrop, 0)
+				shifted = CFrame.new(soles) * CFrame.Angles(p, 0, r) * CFrame.new(-soles) * shifted
+			end
 			local rj, ra = e.rootJoint, e.rootAttach
 			if rj then
 				rj.C0 = shifted
@@ -608,7 +998,29 @@ function AnimationDriver.start(opts: Opts): Driver
 		end
 		e.fix += (e.fixTarget - e.fix) * (1 - math.exp(-dt * 8))
 		off += e.fix
-		applyOffset(e, off)
+		-- a patient's pose lowers the visible body (sitting on the ground, or up on the cot)
+		local wantDrop = if anchored and e.med ~= nil then AnimationDriver.medPose(e.med, e.footDrop).drop else 0
+		if wantDrop ~= e.drop then
+			e.drop += (wantDrop - e.drop) * (1 - math.exp(-dt * AnimationDriver.POSE_RATE))
+			if math.abs(wantDrop - e.drop) < 0.005 then
+				e.drop = wantDrop
+			end
+		end
+		off -= e.drop
+		-- the stagger of someone with the symptoms (AI bodies: a held body is never posed)
+		local wantLean = if anchored and e.med == "symptomatic" then 1 else 0
+		if wantLean ~= e.lean then
+			e.lean += (wantLean - e.lean) * (1 - math.exp(-dt * AnimationDriver.SWAY_RATE))
+			if math.abs(wantLean - e.lean) < 0.01 then
+				e.lean = wantLean
+			end
+		end
+		if e.lean > 0 then
+			local roll, pitch = AnimationDriver.sway("symptomatic", now, e.phase)
+			applyOffset(e, off, roll * e.lean, pitch * e.lean)
+		else
+			applyOffset(e, off)
+		end
 	end
 
 	local function step(dt: number)
@@ -631,12 +1043,15 @@ function AnimationDriver.start(opts: Opts): Driver
 				vy = 0
 			end
 			local kin = KinematicPose.get(e.body)
+			local toldBefore = e.speed
 			if kin then
 				-- the motor's own speed: what the body is seen to do never feeds the animation
 				e.speed, e.vy = kin.moveSpeed, 0
+				e.pace = kin.moveSpeed
 			else
 				e.speed += (inst - e.speed) * alpha
 				e.vy += (vy - e.vy) * alpha
+				e.pace = AnimationDriver.pace(e.pace, inst, dt)
 			end
 			visualRoot(e, pos, dt, now, camPos)
 			local heroSet = e.hero
@@ -647,7 +1062,42 @@ function AnimationDriver.start(opts: Opts): Driver
 					then kin.mode
 					elseif math.abs(e.root.CFrame.LookVector.Y) > 0.6 then "trunk"
 					else "ground"
-				local want = AnimationDriver.heroClip(mode, e.speed, kin ~= nil and kin.stalk == true)
+				e.mode = mode
+				local action = if kin then kin.action else nil
+				local slowing = if kin
+					then (toldBefore - e.speed) / math.max(dt, 1e-3)
+					elseif e.creep then -e.creep.live.accel
+					else 0
+				local braking = AnimationDriver.heroBraking(e.speed, slowing)
+				local want = AnimationDriver.heroClip(
+					mode,
+					e.speed,
+					kin ~= nil and kin.stalk == true,
+					action,
+					e.current,
+					braking
+				)
+				-- a bite, over whatever the body is doing
+				local body = e.root.Parent
+				local biteNow, biteAt =
+					AnimationDriver.biteDue(e.biteSeen, body and body:GetAttribute("BiteAt"), e.current == nil)
+				e.biteSeen = biteAt
+				if biteNow and heroSet.Bite then
+					local bt = e.biteTrack
+					if bt == nil then
+						bt = track(e, "Bite")
+						if bt then
+							-- not one of the gait's tracks: a change of gait must not stop it
+							(e.tracks :: { [string]: AnimationTrack? }).Bite = nil
+							bt.Priority = Enum.AnimationPriority.Action
+							bt.Looped = false
+							e.biteTrack = bt
+						end
+					end
+					if bt then
+						bt:Play(AnimationDriver.BITE.fade, 1, AnimationDriver.BITE.rate)
+					end
+				end
 				local clip = heroSet[want]
 				local t = if clip then track(e, want) else nil
 				if t == nil or clip == nil then
@@ -658,24 +1108,20 @@ function AnimationDriver.start(opts: Opts): Driver
 					e.hero = nil
 					continue
 				end
-				if want ~= e.current then
-					for name, old in e.tracks do
-						if name ~= want and old.IsPlaying then
-							old:Stop(0.15)
-						end
-					end
-					t:Play(0.15)
-					e.current = want
-				elseif not t.IsPlaying and clip.loop then
-					t:Play(0.1)
+				local cadence, airSeconds = if kin then kin.cadence else nil, if kin then kin.airSeconds else nil
+				local rate = AnimationDriver.heroRate(want, e.speed, cadence, clip.length, airSeconds)
+				if want == e.current then
+					rate = AnimationDriver.heroSettle(want, t.TimePosition, clip.length, e.speed, slowing, rate)
 				end
-				if not clip.loop and t.Length > 0 and t.TimePosition >= t.Length - 0.06 then
-					t:AdjustSpeed(0) -- hold the last pose of a one-shot (a long fall after a leap)
-				else
-					t:AdjustSpeed(
-						AnimationDriver.heroRate(want, e.speed, if kin then kin.cadence else nil, clip.length)
-					)
-				end
+				e.current = AnimationDriver.heroTracks(
+					e.tracks,
+					e.current,
+					want,
+					t,
+					clip.loop,
+					rate,
+					AnimationDriver.heroStart(want, action)
+				)
 				continue
 			end
 			if e.gait then
@@ -727,8 +1173,7 @@ function AnimationDriver.start(opts: Opts): Driver
 			local p = e.gait
 			local creep = e.creep
 			if creep and e.hero then
-				-- the Spicy Rodent's twitches, multiplied onto what its clip gave each bone this frame
-				local pose = Creep.pose(workspace:GetServerTimeNow(), creep.seed)
+				-- the layers (heroLayers), multiplied onto what the clip gave each bone this frame
 				local function layer(name: string, offset: CFrame)
 					local bone = creep.bones[name]
 					if bone == nil then
@@ -743,19 +1188,21 @@ function AnimationDriver.start(opts: Opts): Driver
 					creep.wrote[bone] = out
 					bone.Transform = out
 				end
-				layer("Head", CFrame.Angles(pose.head.pitch, pose.head.yaw, pose.head.roll))
-				layer("Jaw", CFrame.Angles(-pose.jaw, 0, 0)) -- the jaw opens about -X (the authored bite)
-				layer("EarL", CFrame.Angles(0, 0, pose.earL))
-				layer("EarR", CFrame.Angles(0, 0, -pose.earR))
-				for i, yaw in pose.tail do
-					if yaw ~= 0 then
-						layer(`Tail{i}`, CFrame.Angles(0, yaw, 0))
-					end
+				local now = workspace:GetServerTimeNow()
+				local cf, camera = e.root.CFrame, workspace.CurrentCamera
+				local far = camera ~= nil and (cf.Position - camera.CFrame.Position).Magnitude > Liveliness.RANGE
+				local sample = AnimationDriver.liveSample(cf, e.speed, e.mode, KinematicPose.get(e.body), now, far)
+				local live = if Liveliness.frame(creep.live, sample, dt) then creep.live else nil
+				for name, r in AnimationDriver.heroLayers(creep.rig, now, creep.seed, live) do
+					layer(name, CFrame.new(r[4] or 0, r[5] or 0, r[6] or 0) * CFrame.Angles(r[1], r[2], r[3]))
 				end
-				layer("Spine2", CFrame.Angles(pose.chest, 0, pose.spine))
-				if pose.spine ~= 0 then
-					layer("Spine1", CFrame.Angles(0, 0, pose.spine))
-					layer("Spine3", CFrame.Angles(0, 0, pose.spine))
+			end
+			if #e.legs > 0 and e.med ~= nil and e.root.Anchored and AnimationDriver.medPose(e.med, e.footDrop).flat then
+				-- a sitting patient's legs lie flat: the knees and ankles are straightened after the
+				-- Animator has written the chair sit (it writes them again every frame, so nothing is
+				-- left to put back when the pose ends)
+				for _, joint in e.legs do
+					joint.Transform = CFrame.identity
 				end
 			end
 			if p == nil or #e.joints == 0 or e.hero ~= nil then

@@ -8,6 +8,8 @@
 -- lobby is open; one player is enough. The rules module owns the game itself (Minigame.Rules plus turn(),
 -- view(), skipTurn()); the server's MinigameService owns the engine side. Pure; Lune-tested
 -- (tests/unit/minigames_session.spec.luau). Keys are opaque player handles (Player or a test stub).
+-- The end of a game is announced exactly once, as a "done" event from step(), however it ended (the last
+-- input through apply(), a skipped turn, a timeout).
 -- Interface: new(rules, opts) -> Session; join(s, key, name, now) -> (ok, why?, seat?); leave(s, key, now)
 --   -> seat?; start(s, now) -> (ok, why?); apply(s, key, verb, args, now) -> (ok, why?); step(s, now) ->
 --   { Event }; seatOf(s, key) -> seat?; turnKey(s) -> key?; again(s, now) -> (ok, why?); view(s, now) ->
@@ -41,6 +43,7 @@ export type Session = {
 	lastTurn: number?,
 	result: { [string]: any }?,
 	pendingMode: string?,
+	doneTold: boolean, -- the "done" event has gone out for this game
 }
 
 local Session = {}
@@ -73,6 +76,7 @@ function Session.new(rules: any, opts: Opts?): Session
 		lastTurn = nil,
 		result = nil,
 		pendingMode = nil,
+		doneTold = false,
 	}
 end
 
@@ -86,6 +90,7 @@ function Session.reset(s: Session)
 	s.lastTurn = nil
 	s.result = nil
 	s.pendingMode = nil
+	s.doneTold = false
 end
 
 function Session.seatOf(s: Session, key: any): number?
@@ -102,7 +107,9 @@ function Session.turn(s: Session): number?
 	if s.phase ~= "playing" or g == nil then
 		return nil
 	end
-	return g.rules.turn(g.state)
+	-- (every game so far takes turns; one that does not has nobody's turn)
+	local turn = g.rules.turn
+	return if turn then turn(g.state) else nil
 end
 
 function Session.turnKey(s: Session): any?
@@ -131,6 +138,7 @@ function Session.start(s: Session, now: number): (boolean, string?)
 	s.turnStarted = now
 	s.lastTurn = nil
 	s.result = nil
+	s.doneTold = false
 	table.clear(s.timeouts)
 	return true
 end
@@ -174,13 +182,15 @@ local function anyoneLeft(s: Session): boolean
 end
 
 -- leave: off the table. In the lobby the seat is removed; mid-game it is marked gone and its turns are
--- played out as misses. Returns the seat that was left (nil if not seated).
+-- played out as misses. At the end card it is marked gone too, never removed: the finished game's sheets and
+-- result are numbered by the seats that played it, so moving the others up would put the leaver's score
+-- under the next player's name. Returns the seat that was left (nil if not seated).
 function Session.leave(s: Session, key: any, _now: number): number?
 	local seat = Session.seatOf(s, key)
 	if seat == nil then
 		return nil
 	end
-	if s.phase == "lobby" or s.phase == "done" then
+	if s.phase == "lobby" then
 		table.remove(s.seats, seat)
 		table.remove(s.names, seat)
 		-- seats after it move up one (the gone flags follow them)
@@ -230,11 +240,13 @@ local function skipGone(s: Session, now: number, events: { Event })
 			break
 		end
 		local g = s.game :: Minigame.Game
-		g.rules.skipTurn(g.state)
-		table.insert(events, { kind = "skipped", seat = seat, why = "left" })
-		if finishIfDone(s, now) then
-			table.insert(events, { kind = "done" })
+		local skip = g.rules.skipTurn
+		if skip == nil then
+			break -- a game with turns and no way to skip one: nothing more can be done here
 		end
+		skip(g.state)
+		table.insert(events, { kind = "skipped", seat = seat, why = "left" })
+		finishIfDone(s, now)
 	end
 end
 
@@ -283,16 +295,16 @@ function Session.step(s: Session, now: number, busy: boolean?): { Event }
 	end
 	if s.phase == "playing" then
 		skipGone(s, now, events)
-		local tsec = s.opts.turnSeconds
-		if tsec == nil then
-			tsec = Session.DEFAULTS.turnSeconds
-		end
+		local tsec: number = s.opts.turnSeconds or Session.DEFAULTS.turnSeconds
 		local seat = Session.turn(s)
 		if busy then
 			s.turnStarted = now
 		elseif seat and tsec > 0 and now - s.turnStarted > tsec then
 			local g = s.game :: Minigame.Game
-			g.rules.skipTurn(g.state)
+			local skip = g.rules.skipTurn
+			if skip then
+				skip(g.state)
+			end
 			s.timeouts[seat] = (s.timeouts[seat] or 0) + 1
 			s.turnStarted = now
 			table.insert(events, { kind = "timeout", seat = seat, key = s.seats[seat] })
@@ -306,9 +318,7 @@ function Session.step(s: Session, now: number, busy: boolean?): { Event }
 					return events
 				end
 			end
-			if finishIfDone(s, now) then
-				table.insert(events, { kind = "done" })
-			end
+			finishIfDone(s, now)
 			skipGone(s, now, events)
 		end
 		local t = Session.turn(s)
@@ -319,12 +329,20 @@ function Session.step(s: Session, now: number, busy: boolean?): { Event }
 				table.insert(events, { kind = "turn", seat = t, key = s.seats[t] })
 			end
 		end
-		if s.phase == "playing" and finishIfDone(s, now) then
+		if s.phase == "playing" then
+			finishIfDone(s, now)
+		end
+	end
+	if s.phase == "done" then
+		-- however the game ended (an input through apply, a skip, a timeout): said once
+		if not s.doneTold then
+			s.doneTold = true
 			table.insert(events, { kind = "done" })
 		end
-	elseif s.phase == "done" and now >= s.doneEnds then
-		Session.reset(s)
-		table.insert(events, { kind = "reset" })
+		if now >= s.doneEnds then
+			Session.reset(s)
+			table.insert(events, { kind = "reset" })
+		end
 	end
 	return events
 end

@@ -101,7 +101,7 @@ local function world(
 		castShadow = opts.castShadow,
 		role = opts.role or "Body",
 		canQuery = opts.canQuery,
-		attrs = opts.attrs or (if opts.role == "Wall" then { Embedded = true } else nil),
+		attrs = opts.attrs or (if opts.role == "Wall" then { Embedded = true } :: Spec.Attrs else nil),
 	})
 end
 
@@ -166,7 +166,7 @@ local function drape(ctx: Ctx, color: { number }, material: string, lift: number
 					pitch = pitch,
 					roll = roll,
 					castShadow = false,
-					attrs = { Embedded = true },
+					attrs = { Embedded = true } :: Spec.Attrs,
 				}
 			)
 		end

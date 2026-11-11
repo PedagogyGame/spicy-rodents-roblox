@@ -8,19 +8,26 @@
 -- animals are refused, and so is anyone driving. One player is enough everywhere.
 -- Inputs arrive on Net "Minigame.Input" { gameId = station id, seat, verb, args } (schema-checked and rate
 -- limited by Shared/Net), are checked against the seat and the turn here, and drive the station's hardware:
---   bowling  BowlingLane (server-owned physics; "release" { offset, angle, power, spin }); the pinfall it counts
---            is scored as the rules' server verb "roll"; the overhead monitor is rewritten (Scoreboard)
+--   bowling  BowlingLane ("release" { offset, angle, power, spin }: the throw is decided at once by the pure
+--            models in Shared/Minigames/Bowling and sent to EVERY client as one "roll" script to play back);
+--            when the lane has played it the count is scored through Bowling/Referee (only onto the sheet of
+--            the bowler who threw it); the lane is re-racked whenever it disagrees with the rules (a skipped
+--            frame); the overhead monitor is rewritten (Scoreboard). A squirrel or the Spicy Rodent on a lane
+--            cannot break a game: the ball (or the sweep bar) knocks it into the gutter, the throw counts,
+--            and both sides are told (Bowling/Intruders; opts.animals / opts.knock from Boot/Game)
 --   darts    Dartboard ("throw" { aimX, aimY, timing } resolved by the rules' seeded scatter; "mode" 501/cricket)
 --   fortune  FortuneCabinet (the prompt pulls the lever; reels; a printed fortune or taunt; never money)
 --   pool, bumper pool, pinball: the prompt says plainly they are not in this build yet
 -- Out: Net "Minigame.State" to the seated players: joined / state (Session.view + your seat) / event (banners)
--- / dart / fortune / left / refused. PlayerLike stubs (engine smoke) get the same payloads in player.events.
--- Steppable: step(dt) (Heartbeat in the game; by hand in Luau Execution, where debugRoll stands in for physics).
+-- / dart / fortune / left / refused; and "roll" (a bowling throw's script) to everyone, so watchers see the
+-- same throw. PlayerLike stubs (engine smoke) get the same payloads in player.events.
+-- Steppable: step(dt) (Heartbeat in the game; by hand in Luau Execution).
 -- Interface: new(opts) -> Service; Service:join(player, stationId) -> (ok, why?); Service:leave(player, why?);
 --   Service:input(player, payload) -> (ok, why?); Service:step(dt); Service:sessionOf(stationId);
 --   Service:stationOf(player) -> id?; Service:debugRoll(stationId, pins) -> (ok, why?); Service:debugDart(stationId,
 --   xmm, ymm) -> (ok, why?) (scripted throws for the engine smoke); Service:stations();
---   Service:stop(); GAMES
+--   Service:stop(); GAMES; opts.animals() -> { { id, kind, x, y, z } } (squirrel-family bodies, world);
+--   opts.knock(id, x, y, z, text) (move one clear and tell its player)
 
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
@@ -31,6 +38,10 @@ local Darts =
 	Import.shared("Minigames/MinigameRules/Darts") :: typeof(require("../../shared/Minigames/MinigameRules/Darts"))
 local FortuneMachine =
 	Import.shared("Minigames/MinigameRules/FortuneMachine") :: typeof(require("../../shared/Minigames/MinigameRules/FortuneMachine"))
+local Intruders =
+	Import.shared("Minigames/Bowling/Intruders") :: typeof(require("../../shared/Minigames/Bowling/Intruders"))
+local Referee = Import.shared("Minigames/Bowling/Referee") :: typeof(require("../../shared/Minigames/Bowling/Referee"))
+local Rng = Import.shared("Util/Rng") :: typeof(require("../../shared/Util/Rng"))
 local BowlingLane = require("./BowlingLane")
 local Dartboard = require("./Dartboard")
 local FortuneCabinet = require("./FortuneCabinet")
@@ -58,12 +69,14 @@ MinigameService.PROMPT_DISTANCE = 9
 
 export type Opts = {
 	root: Instance?, -- Workspace.Attractions.BowlingAlley
-	place: AlleyLayout.Place,
+	place: { x: number, z: number, floorY: number, yaw: number }, -- AlleyLayout.Place
 	tunnels: { [number]: { { number } } }?, -- pair -> tunnel route world points (the ball's way back)
 	net: any?, -- Shared/Net instance (engine); nil = the events go to PlayerLike stubs only
 	canPlay: ((player: any) -> (boolean, string?))?,
 	bodyOf: ((player: any) -> Model?)?,
-	physics: boolean?, -- false in Luau Execution
+	animals: (() -> { { [string]: any } })?, -- squirrel-family bodies: { id, kind, x, y, z } in world studs
+	knock: ((id: any, x: number, y: number, z: number, text: string) -> ())?, -- move one clear, tell its player
+	instantRack: boolean?, -- skip the pinsetter's animation (tests)
 	prompts: boolean?, -- create ProximityPrompts (default true)
 	seed: number?,
 }
@@ -74,8 +87,8 @@ type Station = {
 	kind: string,
 	label: string,
 	lane: number?,
-	session: any?,
-	hw: any?, -- BowlingLane | Dartboard | FortuneCabinet
+	session: any, -- Minigames/Session (nil for the stations that are not in this build)
+	hw: any, -- BowlingLane | Dartboard | FortuneCabinet (nil when the station's model is missing)
 	screen: Instance?, -- the scoreboard SurfaceGui
 	prompt: ProximityPrompt?,
 	anchor: Vector3,
@@ -85,6 +98,10 @@ type Station = {
 	screenSig: string?, -- what the world scoreboard shows now
 	aiAt: number?, -- when the computer player acts
 	clearAt: number?, -- when the thrown darts come out of the board
+	rng: any, -- this station's seeded stream (throw seeds, computer players)
+	knocked: { [any]: boolean }, -- animals already bowled over by the throw in flight
+	lastT: number?, -- how far into the throw the lane was last step
+	lastSweep: number?, -- where the sweep bar was last step
 }
 
 local function nameOf(player: any): string
@@ -109,9 +126,10 @@ function MinigameService.new(opts: Opts): any
 	local root = opts.root
 	local promptFolder: Instance? = nil
 	if root and opts.prompts ~= false then
-		promptFolder = Instance.new("Folder")
-		promptFolder.Name = "MinigamePrompts"
-		promptFolder.Parent = root
+		local folder = Instance.new("Folder")
+		folder.Name = "MinigamePrompts"
+		folder.Parent = root
+		promptFolder = folder
 	end
 	local lanes = root and root:FindFirstChild("Lanes")
 	local boards = root and root:FindFirstChild("Scoreboards")
@@ -132,6 +150,8 @@ function MinigameService.new(opts: Opts): any
 			dirty = true,
 			lastBroadcast = -math.huge,
 			seen = {},
+			rng = Rng.new((opts.seed or 1) * 9973 + i * 7919),
+			knocked = {},
 		}
 		local def = MinigameService.GAMES[st.game]
 		if def then
@@ -151,7 +171,18 @@ function MinigameService.new(opts: Opts): any
 					model = laneModel,
 					place = self.place,
 					tunnel = opts.tunnels and opts.tunnels[pair],
-					physics = opts.physics,
+					-- a throw was cut short (the table emptied, the game ended): every client stops playing it
+					onRack = function(mask: { boolean })
+						local payload = { kind = "rack", station = st.id, lane = st.lane, mask = mask }
+						if self.net then
+							self.net:fireAll("Minigame.State", payload)
+						end
+						for _, p in self:_seated(station) do
+							if typeof(p) ~= "Instance" then
+								self:fire(p, payload)
+							end
+						end
+					end,
 				})
 			end
 			local sb = boards and boards:FindFirstChild(`Lane{st.lane}`)
@@ -207,8 +238,14 @@ function MinigameService.new(opts: Opts): any
 		self.net:on("Minigame.Input", function(player: any, payload: any)
 			local ok, err = pcall(function()
 				local good, why = self:input(player, payload)
-				if not good and why then
-					self:fire(player, { kind = "refused", text = why })
+				if not good then
+					-- never silently: the player reads why, and their controller learns its input did not go in
+					self:fire(player, {
+						kind = "refused",
+						text = why or "That did not work",
+						verb = if type(payload) == "table" then payload.verb else nil,
+						station = if type(payload) == "table" then payload.gameId else nil,
+					})
 				end
 			end)
 			if not ok then
@@ -235,7 +272,6 @@ function MinigameService.fire(self: any, player: any, payload: { [string]: any }
 end
 
 -- Computer players (AI fill: "Add a computer" in a bowling or darts lobby) ----------------------------------------
-MinigameService.AI_NAMES = { "Bowlbot", "Gutter Gus", "Strike Sally" }
 MinigameService.AI_DELAY = 2.2
 
 function MinigameService._addAi(self: any, st: Station): (boolean, string?)
@@ -247,15 +283,53 @@ function MinigameService._addAi(self: any, st: Station): (boolean, string?)
 		return false, "No computer players for this game"
 	end
 	self.aiCount = (self.aiCount or 0) + 1
-	local name = MinigameService.AI_NAMES[(self.aiCount - 1) % #MinigameService.AI_NAMES + 1] .. " (computer)"
-	local key = { ai = true, Name = name, UserId = -self.aiCount }
+	local who = Referee.AI[(self.aiCount - 1) % #Referee.AI + 1]
+	local name = who.name .. " (computer)"
+	local key = { ai = true, Name = name, skill = who.skill, UserId = -self.aiCount }
 	local ok, why = Session.join(s, key, name, self.clock)
 	st.dirty = true
 	return ok, why
 end
 
--- the computer's go: a decent bowler (aims at the pocket with a little error) or a pub darts player (T20 or the
--- bull, timing near the sweet spot)
+-- A bowling throw, a person's or a computer's: the lane decides it at once; everyone is sent the script.
+function MinigameService._release(self: any, st: Station, thrower: any, params: any): (boolean, string?)
+	local lane = st.hw
+	local s = st.session
+	local seat = Session.seatOf(s, thrower)
+	local ok, why, script = lane:release(params, seat, st.rng.int(1, 2147483646))
+	if not ok then
+		return false, why
+	end
+	Session.touch(s, self.clock)
+	self:_announceRoll(st, seat, script)
+	return true
+end
+
+function MinigameService._announceRoll(self: any, st: Station, seat: number?, script: any)
+	local s = st.session
+	st.knocked = {}
+	st.lastT = 0
+	st.dirty = true
+	local payload = {
+		kind = "roll",
+		station = st.id,
+		lane = st.lane,
+		seat = seat,
+		name = seat and s.names[seat],
+		script = script,
+	}
+	if self.net then
+		self.net:fireAll("Minigame.State", payload)
+	end
+	for _, p in self:_seated(st) do
+		if typeof(p) ~= "Instance" then
+			self:fire(p, payload)
+		end
+	end
+end
+
+-- the computer's go: a bowler of its own skill (Bowling/Referee: the pocket on a full rack, the nearest pin on a
+-- spare, with its own aim and power error) or a pub darts player (T20 or the bull, timing near the sweet spot)
 function MinigameService._aiTurn(self: any, st: Station, key: any)
 	if st.aiAt == nil then
 		st.aiAt = self.clock + MinigameService.AI_DELAY
@@ -264,16 +338,10 @@ function MinigameService._aiTurn(self: any, st: Station, key: any)
 	if self.clock < st.aiAt then
 		return
 	end
-	local rng = Random.new(math.floor(self.clock * 1000) + (st.lane or 7))
 	if st.kind == "lane" and st.hw and st.hw:ready() then
 		st.aiAt = nil
-		local offset = rng:NextNumber(-0.25, 0.35)
-		local rx = AlleyLayout.release(st.lane :: number, offset)
-		local pocketX = AlleyLayout.laneX(st.lane :: number) + 0.3
-		local angle = math.atan((pocketX - rx) / AlleyLayout.HEAD_D) + rng:NextNumber(-0.014, 0.014)
-		st.hw:release({ offset = offset, angle = angle, power = rng:NextNumber(0.5, 0.85), spin = 0 })
-		Session.touch(st.session, self.clock)
-		st.dirty = true
+		local params = Referee.aiThrow(st.rng, key.skill or Referee.skillOf(tostring(key.Name)), st.hw:standingMask())
+		self:_release(st, key, params)
 	elseif st.kind == "dartboard" and st.hw and not st.hw:busy() then
 		st.aiAt = self.clock + 1.1
 		local s = st.session
@@ -283,7 +351,7 @@ function MinigameService._aiTurn(self: any, st: Station, key: any)
 		if g and g.mode == "501" and g.players[seat or 1].score <= 50 then
 			aimX, aimY = 0, 0
 		end
-		local ok = Session.apply(s, key, "throw", { aimX, aimY, 0.5 + rng:NextNumber(-0.09, 0.09) }, self.clock)
+		local ok = Session.apply(s, key, "throw", { aimX, aimY, 0.5 + st.rng.range(-0.09, 0.09) }, self.clock)
 		if ok then
 			self:_afterDart(st, seat)
 		end
@@ -329,11 +397,11 @@ local function promptTexts(st: Station): (string, string)
 		end
 	end
 	if s.phase == "idle" or s.phase == "done" then
-		return verb, `{st.label} - open`
+		return verb, `{st.label} - open (alone, with friends, or against a computer)`
 	elseif s.phase == "lobby" then
-		return "Join", `{st.label} - {n}/{s.rules.def.seats} joining`
+		return "Join", `{st.label} - {n}/{s.rules.def.seats} joining, starting soon`
 	end
-	return "In use", `{st.label} - game on ({n} playing)`
+	return "In use", `{st.label} - game on ({n} playing): try another`
 end
 
 function MinigameService._refresh(self: any, st: Station)
@@ -458,7 +526,22 @@ function MinigameService.join(self: any, player: any, id: string): (boolean, str
 			end
 			Session.reset(s)
 		end
+	elseif s.phase == "done" and Session.seatOf(s, player) == nil then
+		-- a newcomer at a lane or board still showing its end card starts a fresh table (Session.join). Whoever
+		-- is still reading that card is told and let go; otherwise their card would stay up for good with
+		-- nothing behind it, and they could not walk up to any other game
+		for _, p in self:_seated(st) do
+			self.playerStation[p] = nil
+			st.seen[p] = nil
+			self:fire(p, {
+				kind = "left",
+				station = id,
+				why = "finished",
+				text = `A new game is starting on {st.label}: that one is over`,
+			})
+		end
 	end
+	local was = s.phase
 	local ok, why, seat = Session.join(s, player, nameOf(player), self.clock)
 	if not ok then
 		self:fire(player, { kind = "refused", text = why or "cannot join" })
@@ -476,7 +559,9 @@ function MinigameService.join(self: any, player: any, id: string): (boolean, str
 	})
 	if st.kind == "fortune" then
 		self:_pull(st, player)
-	elseif s.phase == "playing" then
+	elseif s.phase == "playing" and was ~= "playing" then
+		-- only the join that STARTED the game sets the lane up. A bowler already seated who triggers the prompt
+		-- again mid-frame must not get ten fresh pins (their open frame would become a certain spare)
 		self:_onStart(st)
 	end
 	st.dirty = true
@@ -484,7 +569,7 @@ function MinigameService.join(self: any, player: any, id: string): (boolean, str
 	return true
 end
 
-function MinigameService.leave(self: any, player: any, why: string?)
+function MinigameService.leave(self: any, player: any, why: string?, text: string?)
 	local id = self.playerStation[player]
 	if id == nil then
 		return
@@ -506,7 +591,7 @@ function MinigameService.leave(self: any, player: any, why: string?)
 			st.hw:idle(true)
 		end
 	end
-	self:fire(player, { kind = "left", station = id, why = why or "left" })
+	self:fire(player, { kind = "left", station = id, why = why or "left", text = text })
 	st.dirty = true
 end
 
@@ -550,14 +635,14 @@ end
 
 function MinigameService.input(self: any, player: any, payload: any): (boolean, string?)
 	if type(payload) ~= "table" then
-		return false, nil
+		return false, "That did not reach the game: try again"
 	end
 	local id = payload.gameId
 	local verb = payload.verb
 	local args = if type(payload.args) == "table" then payload.args else {}
 	local st = self.stations[id] :: Station?
 	if st == nil or st.session == nil then
-		return false, nil
+		return false, "There is no game there"
 	end
 	if self.playerStation[player] ~= id then
 		return false, "You are not at that game: walk up and press E"
@@ -593,7 +678,11 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 		return self:join(player, id)
 	end
 	if s.phase ~= "playing" then
-		return false, if s.phase == "lobby" then "Waiting for the game to start (Space starts it now)" else nil
+		return false,
+			if s.phase == "lobby"
+				then "Waiting for the game to start (Space starts it now)"
+				elseif s.phase == "done" then "The game is over: Play again or Leave (Q)"
+				else "No game is on here: walk up and press E"
 	end
 	if Session.turnKey(s) ~= player then
 		return false, "Not your turn yet"
@@ -606,22 +695,16 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 		if not lane:ready() then
 			return false, "Wait for the pinsetter and the ball"
 		end
-		local ok, why = lane:release({
+		return self:_release(st, player, {
 			offset = num(args[1], 0),
 			angle = num(args[2], 0),
 			power = num(args[3], 0.6),
 			spin = num(args[4], 0),
 		})
-		if ok then
-			Session.touch(s, self.clock)
-			self:_broadcast(st, { kind = "rolled", station = st.id })
-			st.dirty = true
-		end
-		return ok, why
 	elseif verb == "throw" and st.kind == "dartboard" then
 		local board = st.hw
 		if board and board:busy() then
-			return false, nil
+			return false, "Wait for the dart to land"
 		end
 		local seat = Session.seatOf(s, player)
 		local ok, why =
@@ -631,7 +714,7 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 		end
 		return ok, why
 	end
-	return false, nil
+	return false, "That does not work at this game"
 end
 
 function MinigameService._afterDart(self: any, st: Station, seat: number?)
@@ -691,7 +774,12 @@ function MinigameService.debugRoll(self: any, id: string, pins: number): (boolea
 	if not st.hw:ready() then
 		return false, "lane busy"
 	end
-	return st.hw:debugRoll(pins)
+	local seat = Session.turn(st.session)
+	local ok, why, script = st.hw:debugRoll(pins, seat)
+	if ok then
+		self:_announceRoll(st, seat, script)
+	end
+	return ok, why
 end
 
 -- debugDart: a dart landed exactly at (xmm, ymm) for whoever is throwing (the rules' server verb "land"; tests).
@@ -710,7 +798,94 @@ function MinigameService.debugDart(self: any, id: string, xmm: number, ymm: numb
 end
 
 -- Per frame -------------------------------------------------------------------------------------------------------
-local ROLL_TEXT: { [string]: string } = { strike = "STRIKE!", spare = "SPARE!" }
+-- Animals near a lane in its own frame (x across from the lane centre, y up, d down-lane). Asked for once a
+-- step at most, and only while some lane is rolling or sweeping.
+function MinigameService._animals(self: any, st: Station): { any }
+	local source = self.opts.animals
+	if source == nil then
+		return {}
+	end
+	if self.animalsAt ~= self.clock then
+		self.animalsAt = self.clock
+		local ok, list = pcall(source)
+		self.animalList = if ok and type(list) == "table" then list else {}
+	end
+	local out = {}
+	local lx = AlleyLayout.laneX(st.lane :: number)
+	for _, a in self.animalList do
+		local X, Y, D = AlleyLayout.toLocal(self.place, a.x, a.y, a.z)
+		if math.abs(X - lx) < AlleyLayout.PITCH and D > -2 and D < AlleyLayout.PIT_END + 1 then
+			table.insert(out, { id = a.id, kind = a.kind, x = X - lx, y = Y, d = D })
+		end
+	end
+	return out
+end
+
+-- The rule for a squirrel or the Spicy Rodent on a lane (Bowling/Intruders): the ball, or the sweep bar, knocks
+-- it into the gutter; the throw counts; the bowlers and the animal's player are told.
+function MinigameService._intruders(self: any, st: Station)
+	local lane = st.hw
+	local knocks: { any } = {}
+	local swept = false
+	local animals: { any } = {}
+	local tNow = lane:scriptTime()
+	if tNow ~= nil then
+		local script = lane:script()
+		if script and script.path and tNow > (st.lastT or 0) then
+			animals = self:_animals(st)
+			if #animals > 0 then
+				knocks = Intruders.struck(script, st.lastT or 0, tNow, animals)
+			end
+		end
+		st.lastT = tNow
+		st.lastSweep = nil
+	else
+		local d, low = lane:sweep()
+		if d ~= nil and low then
+			animals = self:_animals(st)
+			if #animals > 0 then
+				knocks = Intruders.swept(st.lastSweep or d, d, animals)
+				swept = true
+			end
+			st.lastSweep = d
+		else
+			st.lastSweep = nil
+		end
+	end
+	for _, k in knocks do
+		if st.knocked[k.id] then
+			continue
+		end
+		st.knocked[k.id] = true
+		local kind = "squirrel"
+		for _, a in animals do
+			if a.id == k.id and a.kind == "rodent" then
+				kind = "Spicy Rodent"
+			end
+		end
+		local wx, wy, wz = AlleyLayout.toWorld(self.place, AlleyLayout.laneX(st.lane :: number) + k.x, 0.4, k.d)
+		if self.opts.knock then
+			local ok, err = pcall(
+				self.opts.knock,
+				k.id,
+				wx,
+				wy,
+				wz,
+				if swept then Intruders.TEXT.animalSwept else Intruders.TEXT.animal
+			)
+			if not ok then
+				warn(`[Minigames] knock failed: {err}`)
+			end
+		end
+		local article = if kind == "squirrel" then "A squirrel" else "The Spicy Rodent"
+		self:_broadcast(st, {
+			kind = "event",
+			station = st.id,
+			text = `{article} {if swept then Intruders.TEXT.swept else Intruders.TEXT.bowlers}`,
+			intruder = true,
+		})
+	end
+end
 
 function MinigameService._laneStep(self: any, st: Station, dt: number)
 	local lane = st.hw
@@ -719,36 +894,53 @@ function MinigameService._laneStep(self: any, st: Station, dt: number)
 	end
 	lane:step(dt)
 	local s = st.session
-	local pins = lane:takeResult()
-	if pins ~= nil and s.phase == "playing" then
-		local g = s.game
-		local before = Bowling.standing(g.state)
-		local ballNo = g.state.ballOf[g.state.seat]
-		local ok = Session.apply(s, "server", "roll", { math.min(pins, before) }, self.clock)
-		local event = g.state.lastEvent or "next"
-		local rack = if g.state.done then "full" else Bowling.rackFor(g.state)
-		lane:setRack(rack, not self.opts.physics and self.opts.instantRack == true)
-		local text = ROLL_TEXT[event]
-		if text == nil then
-			if pins == 0 then
-				text = if ballNo == 1 then "Gutter ball..." else "Missed it"
-			elseif event == "gameover" then
-				text = `{pins} - that's the game!`
-			else
-				text = `{pins} pin{if pins == 1 then "" else "s"}`
-			end
+	if not lane:ready() then
+		self:_intruders(st)
+	end
+	local result = lane:takeResult()
+	if result ~= nil then
+		-- only ever onto the sheet of the bowler who threw it (Referee: they may have left while it rolled)
+		local wasPlaying = s.phase == "playing"
+		local verdict = Referee.score(s, result, self.clock)
+		if wasPlaying then
+			lane:setRack(verdict.rack, self.opts.instantRack == true)
+		else
+			lane:setRack("full", true)
 		end
-		self:_broadcast(st, {
-			kind = "event",
-			station = st.id,
-			text = text,
-			big = event == "strike" or event == "spare",
-			pins = pins,
-			ok = ok,
-		})
+		if verdict.applied then
+			self:_broadcast(st, {
+				kind = "event",
+				station = st.id,
+				text = verdict.text,
+				big = verdict.big,
+				pins = verdict.pins,
+				mark = verdict.mark,
+				ok = true,
+			})
+		elseif wasPlaying then
+			self:_broadcast(st, {
+				kind = "event",
+				station = st.id,
+				text = "That ball's bowler has left: it does not count. Fresh pins.",
+				pins = 0,
+				ok = false,
+			})
+		end
 		st.dirty = true
-	elseif pins ~= nil then
-		lane:setRack("full", true)
+	end
+	-- the pins on the deck must be what the rules expect (a skipped or timed-out frame leaves a stale rack)
+	if lane:ready() then
+		local order = Referee.sync(s, lane:standingCount())
+		if order then
+			if s.phase == "playing" then
+				lane:hold(nil)
+				lane.heldBy = nil
+				lane:setRack(order, self.opts.instantRack == true)
+			else
+				lane:reset(true)
+			end
+			st.dirty = true
+		end
 	end
 	-- the ball in the bowler's hand once the lane is ready
 	if lane:ready() and s.phase == "playing" then
@@ -809,10 +1001,11 @@ function MinigameService.step(self: any, dt: number)
 					})
 				end
 			elseif e.kind == "timeout" then
-				self:_broadcast(
-					st,
-					{ kind = "event", station = st.id, text = `{s.names[e.seat] or "?"} took too long: turn skipped` }
-				)
+				self:_broadcast(st, {
+					kind = "event",
+					station = st.id,
+					text = `{s.names[e.seat] or "?"} took too long: that frame is skipped`,
+				})
 				if st.kind == "lane" and st.hw then
 					st.hw:hold(nil)
 					st.hw.heldBy = nil
@@ -824,12 +1017,14 @@ function MinigameService.step(self: any, dt: number)
 			elseif e.kind == "done" then
 				local r = s.result
 				local w = r and r.winner and s.names[r.winner]
-				self:_broadcast(st, {
-					kind = "event",
-					station = st.id,
-					text = if w and #s.seats > 1 then `{w} wins!` else "Game over!",
-					big = true,
-				})
+				local text = if w and #s.seats > 1 then `{w} wins!` else "Game over!"
+				if st.kind == "lane" then
+					text = Referee.summary(Session.view(s, self.clock)).line
+				end
+				if st.kind ~= "fortune" then
+					-- (the fortune teller's card is its own ending)
+					self:_broadcast(st, { kind = "event", station = st.id, text = text, big = true, over = true })
+				end
 				if st.kind == "dartboard" and st.hw then
 					st.clearAt = self.clock + 3
 				end
@@ -884,17 +1079,19 @@ function MinigameService.step(self: any, dt: number)
 				continue
 			end
 			local canPlay = self.opts.canPlay
-			local ok = true
+			local ok, whyNot = true, nil :: string?
 			if canPlay then
-				ok = (canPlay(p))
+				ok, whyNot = canPlay(p)
 			end
 			local body = self.opts.bodyOf and self.opts.bodyOf(p)
 			local far = false
 			if body and body.PrimaryPart then
 				far = (body.PrimaryPart.Position - st.anchor).Magnitude > MinigameService.WANDER
 			end
-			if not ok or far then
-				self:leave(p, if far then "too far" else "not a person")
+			if far then
+				self:leave(p, "too far", "You walked away from the game")
+			elseif not ok then
+				self:leave(p, "not a person", `You were taken out of the game. {whyNot or ""}`)
 			end
 		end
 		if st.dirty or (s.phase ~= "idle" and self.clock - st.lastBroadcast >= 1) then

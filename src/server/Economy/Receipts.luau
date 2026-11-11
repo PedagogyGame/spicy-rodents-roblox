@@ -12,13 +12,16 @@
 
 local Import = require("../Import")
 local Products = Import.shared("Economy/Products") :: typeof(require("../../shared/Economy/Products"))
+-- (a module reached through Import carries its values' types but not its exported type names:
+-- this is the same type, taken from a value)
+type Catalog = typeof(Products.catalog({}))
 local ReceiptLedger = require("./ReceiptLedger")
 local ProfileStore = require("../Persistence/ProfileStore")
 
 export type Decision = "PurchaseGranted" | "NotProcessedYet"
 export type Deps = {
 	profileOf: (playerId: number) -> ProfileStore.Profile?, -- nil while the player is absent or loading
-	catalog: Products.Catalog,
+	catalog: Catalog,
 	now: () -> number,
 }
 export type Stats = {

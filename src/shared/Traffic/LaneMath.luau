@@ -37,7 +37,21 @@ export type LaneRecord = {
 	wrap: string?,
 }
 
-export type Poly = { pts: { { number } }, cum: { number }, length: number }
+-- A polyline as driven: its corner points (`pts`, `cum` along them, kept for the offsets), and the path a
+-- vehicle follows, `pieces`: straight runs joined by circular arcs at the corners (LaneMath.CORNER_RADIUS),
+-- so the heading turns continuously; `length` is the driven length.
+export type Piece = {
+	s: number, -- arc distance where the piece starts
+	len: number,
+	ax: number, -- line: start point and unit direction; arc: centre, radius, start angle and signed sweep
+	az: number,
+	dx: number,
+	dz: number,
+	r: number, -- 0 for a line
+	a0: number,
+	sweep: number,
+}
+export type Poly = { pts: { { number } }, cum: { number }, length: number, pieces: { Piece } }
 
 export type Lane = {
 	id: string,
@@ -55,13 +69,29 @@ export type Lane = {
 	poly: Poly?, -- polyline geometry in the +1 direction
 	polyRev: Poly?, -- polyline geometry walked in reverse (-1), kept right after `unify`
 	coordFor: { [number]: number }?, -- ping-pong vehicle lanes after `unify`: the coord per direction
+	returnLane: Lane?, -- one-way lanes after `link`: the lane a vehicle turns onto at this lane's end
+	kerb: number?, -- one-way lanes after `link`: the line along the kerb on their right (a parked rider's)
 	vehicle: boolean, -- a vehicle lane (handedness applies) rather than a sidewalk or rider lane
 	mirrored: boolean?, -- `unify` moved it to the right-hand side
 }
 
 export type Pose = { x: number, y: number, z: number, yaw: number }
 
-export type Body = { x: number, z: number, yaw: number, width: number, length: number, visible: boolean?, id: any? }
+-- `player`: a player's vehicle (parked or driven), not a fleet member; `emergency`: a fleet vehicle
+-- answering a call (right of way); `speed` in studs/s when known (never negative: see `back`)
+export type Body = {
+	x: number,
+	z: number,
+	yaw: number,
+	width: number,
+	length: number,
+	visible: boolean?,
+	id: any?,
+	player: boolean?,
+	emergency: boolean?,
+	back: boolean?, -- it is moving against its own heading (the trolley, whose body never turns)
+	speed: number?,
+}
 
 -- headingYaw(axis, dir): HTML yaw for travel along an axis (traffic.md §2.6: axis x -> dir*pi/2;
 -- axis z -> 0 if dir > 0 else pi).
@@ -114,7 +144,97 @@ function LaneMath.isVehicleLane(id: string): boolean
 	return not (string.sub(id, 1, 8) == "sidewalk" or string.sub(id, 1, 7) == "novelty")
 end
 
-LaneMath.POLY_OFFSET = Units.st(3) -- keep-right offset for centreline polylines (inside an 18 u road's right half)
+LaneMath.LOOP_ARC_DIVISIONS = 4000 -- arc-length table of loop lanes (the ice cream loop: 0.3 st apart)
+-- The keep-right offset of centreline polylines (the emergency routes): 5 st, so an ambulance (5.9 st
+-- wide) runs between the crown of the road and the lane traffic, whose lanes are 12.75 to 14 st out
+-- and whose widest body (the dump truck) reaches in to 8.6 st. At 3 u (7.5 st) its side was inside the
+-- cars of the lane it passed, so once emergency vehicles stopped driving through traffic it queued
+-- behind a sedan that had stopped for the very patient it was sent to, and never arrived.
+LaneMath.POLY_OFFSET = Units.st(2)
+
+LaneMath.CORNER_RADIUS = Units.st(8) -- 20 st: a street corner taken inside an 18 u road
+
+-- The driven path through `pts`: every corner is cut by an arc of CORNER_RADIUS tangent to both legs, or a
+-- smaller one where a leg is too short (a leg between two corners gives each half of itself; the first
+-- and last legs give all of theirs). A path that turned on the spot at each corner (v5.4's polylines) spun
+-- the vehicle 90 degrees in one tick and slid it sideways through the turn on screen.
+local function pieces(pts: { { number } }): { Piece }
+	local n = #pts
+	-- drop zero-length legs
+	local p: { { number } } = { pts[1] }
+	for i = 2, n do
+		local a, b = p[#p], pts[i]
+		if (b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2 > 1e-18 then
+			table.insert(p, b)
+		end
+	end
+	n = #p
+	local out: { Piece } = {}
+	if n < 2 then
+		local q = pts[1]
+		return { { s = 0, len = 0, ax = q[1], az = q[2], dx = 0, dz = 1, r = 0, a0 = 0, sweep = 0 } }
+	end
+	local lens, dirs = {}, {}
+	for i = 1, n - 1 do
+		local dx, dz = p[i + 1][1] - p[i][1], p[i + 1][2] - p[i][2]
+		local len = math.sqrt(dx * dx + dz * dz)
+		lens[i], dirs[i] = len, { dx / len, dz / len }
+	end
+	-- the tangent length cut from each side of every interior corner
+	local cut, radius, turn = { [1] = 0, [n] = 0 }, {}, {}
+	for i = 2, n - 1 do
+		local d0, d1 = dirs[i - 1], dirs[i]
+		local cross = d0[1] * d1[2] - d0[2] * d1[1]
+		local dot = math.clamp(d0[1] * d1[1] + d0[2] * d1[2], -1, 1)
+		local theta = math.atan2(cross, dot) -- signed turn
+		turn[i] = theta
+		local half = math.tan(math.abs(theta) / 2)
+		if math.abs(theta) < 1e-6 or half > 1e6 then
+			cut[i], radius[i] = 0, 0
+		else
+			local room = math.min(
+				if i - 1 == 1 then lens[i - 1] else lens[i - 1] / 2,
+				if i == n - 1 then lens[i] else lens[i] / 2
+			)
+			local r = math.min(LaneMath.CORNER_RADIUS, room / half)
+			cut[i], radius[i] = r * half, r
+		end
+	end
+	local s = 0
+	local function line(x: number, z: number, d: { number }, len: number)
+		if len > 1e-9 then
+			table.insert(out, { s = s, len = len, ax = x, az = z, dx = d[1], dz = d[2], r = 0, a0 = 0, sweep = 0 })
+			s += len
+		end
+	end
+	for i = 1, n - 1 do
+		local d = dirs[i]
+		local x0, z0 = p[i][1] + d[1] * cut[i], p[i][2] + d[2] * cut[i]
+		line(x0, z0, d, lens[i] - cut[i] - cut[i + 1])
+		local j = i + 1
+		if j < n and radius[j] > 0 then
+			-- the arc from the end of leg i to the start of leg j, turning by turn[j]
+			local r, theta = radius[j], turn[j]
+			local sx, sz = p[j][1] - d[1] * cut[j], p[j][2] - d[2] * cut[j]
+			-- the centre is r to the side the path turns towards: left of (dx, dz) is (-dz, dx) here
+			local side = if theta > 0 then 1 else -1
+			local cx, cz = sx - d[2] * r * side, sz + d[1] * r * side
+			local a0 = math.atan2(sz - cz, sx - cx)
+			table.insert(
+				out,
+				{ s = s, len = r * math.abs(theta), ax = cx, az = cz, dx = 0, dz = 0, r = r, a0 = a0, sweep = theta }
+			)
+			s += r * math.abs(theta)
+		end
+	end
+	if #out == 0 then
+		table.insert(
+			out,
+			{ s = 0, len = 0, ax = p[1][1], az = p[1][2], dx = dirs[1][1], dz = dirs[1][2], r = 0, a0 = 0, sweep = 0 }
+		)
+	end
+	return out
+end
 
 function LaneMath.poly(pts: { { number } }): Poly
 	local cum = { 0 }
@@ -122,7 +242,9 @@ function LaneMath.poly(pts: { { number } }): Poly
 		local a, b = pts[i - 1], pts[i]
 		cum[i] = cum[i - 1] + math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
 	end
-	return { pts = pts, cum = cum, length = cum[#cum] }
+	local ps = pieces(pts)
+	local last = ps[#ps]
+	return { pts = pts, cum = cum, length = last.s + last.len, pieces = ps }
 end
 
 -- offsetRight(pts, d): the polyline moved d to the RIGHT of travel (right of heading f = (fx, fz) is
@@ -217,6 +339,69 @@ function LaneMath.makeRoute(id: string, pts: { { number } }, speeds: { [string]:
 	}
 end
 
+-- A trip that starts and ends in a kerbside bay. `centre` is the trip along road centrelines, its first
+-- point abeam the bay; the bay is `kerb` studs to the right of that point, facing along the first leg.
+-- Out: from the bay (BAY_LEAD straight on, then across to the keep-right line over BAY_RUN) and on along
+-- the centrelines kept right by `offset` (default POLY_OFFSET). Back: the same roads kept right the other
+-- way, past the bay on the far side to BAY_BACK behind it, round (a U-turn of radius `offset`) and into
+-- the bay from behind, ending exactly as it started. The first leg must be at least BAY_NEED long.
+-- An emergency vehicle parked in view at its bay pulls out and comes home like a car; it used to pop into
+-- existence where its route began and vanish there on its return.
+LaneMath.BAY_LEAD = Units.st(1.2)
+LaneMath.BAY_RUN = Units.st(7.2)
+LaneMath.BAY_BACK = Units.st(12)
+LaneMath.BAY_NEED = Units.st(13)
+function LaneMath.bayRoute(
+	id: string,
+	centre: { { number } },
+	kerb: number,
+	speeds: { [string]: number },
+	offset: number?
+): Lane
+	local off = offset or LaneMath.POLY_OFFSET
+	local c1, c2 = centre[1], centre[2]
+	local dx, dz = c2[1] - c1[1], c2[2] - c1[2]
+	local len = math.sqrt(dx * dx + dz * dz)
+	local fx, fz = dx / len, dz / len
+	local rx, rz = -fz, fx -- the right of travel
+	local function pt(along: number, across: number): { number }
+		return { c1[1] + fx * along + rx * across, c1[2] + fz * along + rz * across }
+	end
+	local lead, run = LaneMath.BAY_LEAD, LaneMath.BAY_RUN
+	local out = LaneMath.offsetRight(centre, off)
+	local outPath = { pt(0, kerb), pt(lead, kerb), pt(lead + run, off) }
+	for i = 2, #out do
+		table.insert(outPath, out[i])
+	end
+	local back = LaneMath.offsetRight(reversed(centre), off)
+	local backPath = table.create(#back + 4)
+	for i = 1, #back - 1 do
+		table.insert(backPath, back[i])
+	end
+	local behind = LaneMath.BAY_BACK
+	for _, p in { pt(-behind, -off), pt(-behind, off), pt(-(lead + run), off), pt(-lead, kerb), pt(0, kerb) } do
+		table.insert(backPath, p)
+	end
+	local poly = LaneMath.poly(outPath)
+	return {
+		id = id,
+		source = nil,
+		shape = "polyline",
+		axis = nil,
+		coord = nil,
+		startAt = 0,
+		endAt = poly.length,
+		dir = 1,
+		length = poly.length,
+		curve = nil,
+		speeds = speeds,
+		poly = poly,
+		polyRev = LaneMath.poly(backPath),
+		vehicle = true,
+		mirrored = true,
+	}
+end
+
 -- incidentRoute(rec, car, start, scene) -> points (traffic.md §5.10): start -> (-300 u, start.z) ->
 -- (-300 u, p.z + 10 u) -> (p.x -/+ 9 u, p.z + 10 u). `car` is 0 or 1; positions in studs.
 function LaneMath.incidentRoute(car: number, start: { number }, scene: { number }): { { number } }
@@ -260,6 +445,13 @@ function LaneMath.fromRecord(rec: LaneRecord): (Lane?, string?)
 			pts[i] = Curve.vec3(p[1], 0, p[2])
 		end
 		local curve = Curve.new(pts, true)
+		local length = curve:getLength() -- v5.4's 200-division length (traffic.md verifier 13)
+		-- ...but a vehicle drives it by arc length, and 200 divisions are 6.5 st each on this loop: inside
+		-- one, the raw parameter's speed changes sharply where the long straights meet the tight U-turn
+		-- knots, so the van surged and dragged by up to 30 % going into each U-turn. A dense table maps arc
+		-- length to the parameter evenly (the length moves by under 0.1 %; `length` stays v5.4's).
+		curve.arcLengthDivisions = LaneMath.LOOP_ARC_DIVISIONS
+		curve._lengths = nil
 		return {
 			id = rec.id,
 			shape = "loop",
@@ -268,7 +460,7 @@ function LaneMath.fromRecord(rec: LaneRecord): (Lane?, string?)
 			startAt = 0,
 			endAt = 0,
 			dir = 1,
-			length = curve:getLength(),
+			length = length,
 			curve = curve,
 			speeds = speedsOf(rec),
 			speedRanges = rangesOf(rec),
@@ -336,7 +528,21 @@ function LaneMath.load(records: { LaneRecord }): ({ [string]: Lane }, { [string]
 	return lanes, skipped
 end
 
-export type RoadRecord = { id: string, axis: string, coord: any, width: number? }
+export type RoadRecord = {
+	id: string,
+	axis: string,
+	coord: any,
+	width: number?,
+	kind: string?,
+	start: number?,
+	["end"]: number?,
+}
+
+-- A lane that runs beside a rail road keeps its vehicles' centreline this far from the rail's: the
+-- trolley's half width (1.75 u) plus the widest lane vehicle's (the dump truck, 1.675 u) plus 0.125 u.
+-- Under drive-on-the-right the boulevard's eastbound lane (z = +5.6 u) sits on the trolley's side (track
+-- z = 8.65 u): a dump truck passing the trolley was 0.94 st inside it.
+LaneMath.RAIL_CLEARANCE = Units.st(3.55)
 
 -- unify(lanes, roads, records?): drive on the right everywhere (owner decision 9). Returns the ids changed.
 -- Straight one-way lanes compare their coord with their road's centreline (the record's first road);
@@ -355,6 +561,25 @@ function LaneMath.unify(lanes: { [string]: Lane }, roads: { RoadRecord }, record
 			recRoad[rec.id] = roadCoord[first]
 		end
 	end
+	local rails: { RoadRecord } = {}
+	for _, r in roads do
+		if r.kind == "rail" and type(r.coord) == "number" and r.start and r["end"] then
+			table.insert(rails, r)
+		end
+	end
+	-- coord, pulled away from any parallel rail alongside the lane's extent
+	local function clearOfRails(lane: Lane, coord: number): number
+		local lo, hi = math.min(lane.startAt, lane.endAt), math.max(lane.startAt, lane.endAt)
+		for _, r in rails do
+			local rlo, rhi =
+				math.min(r.start :: number, r["end"] :: number), math.max(r.start :: number, r["end"] :: number)
+			local rc = r.coord :: number
+			if r.axis == lane.axis and rlo < hi and rhi > lo and math.abs(coord - rc) < LaneMath.RAIL_CLEARANCE then
+				coord = rc + (if coord < rc then -1 else 1) * LaneMath.RAIL_CLEARANCE
+			end
+		end
+		return coord
+	end
 	local changed = {}
 	for id, lane in lanes do
 		if not lane.vehicle then
@@ -370,9 +595,9 @@ function LaneMath.unify(lanes: { [string]: Lane }, roads: { RoadRecord }, record
 			-- right of +z is -x; right of +x is +z
 			local function rightCoord(d: number): number
 				if lane.axis == "z" then
-					return road - d * off
+					return clearOfRails(lane, road - d * off)
 				end
-				return road + d * off
+				return clearOfRails(lane, road + d * off)
 			end
 			if lane.dir == 0 then
 				lane.coordFor = { [1] = rightCoord(1), [-1] = rightCoord(-1) }
@@ -399,6 +624,121 @@ function LaneMath.unify(lanes: { [string]: Lane }, roads: { RoadRecord }, record
 	return changed
 end
 
+-- link(lanes, roads, records) -> ids: every straight one-way vehicle lane gets a way back, so a vehicle
+-- that reaches the end of its street turns round there and drives back along the other side instead of
+-- vanishing and reappearing at the far end (v5.4's wrap, a pop in plain view some seven times a minute).
+-- Two one-way lanes over the same stretch of the same road, in opposite directions, are each other's
+-- `returnLane`; a lane whose road has no lane the other way (the west street's northbound one) gets one,
+-- mirrored across the centreline (`<id>~back`, returned). Where a rail lane runs alongside (the trolley
+-- beside the boulevard) both lanes are lengthened to end TURN_CLEAR beyond the rail lane's ends, so the
+-- turn is made clear of a trolley standing at its terminus (a long vehicle's tail swings out as it
+-- turns: the RV's was 0.9 st inside the trolley). Each lane also learns the line along the kerb on its
+-- right (`kerb`: KERB_INSET inside the edge of its road, nil where rails run between), where a rider
+-- parks between rides.
+-- Call after `unify`.
+LaneMath.TURN_CLEAR = Units.st(12)
+LaneMath.KERB_INSET = Units.st(1.8)
+function LaneMath.link(lanes: { [string]: Lane }, roads: { RoadRecord }, records: { LaneRecord }): { string }
+	local roadCoord: { [string]: number } = {}
+	local roadHalf: { [string]: number } = {}
+	local railRoad: { [string]: boolean } = {}
+	for _, r in roads do
+		if type(r.coord) == "number" then
+			roadCoord[r.id] = r.coord
+			roadHalf[r.id] = (r.width or 0) / 2
+			railRoad[r.id] = r.kind == "rail"
+		end
+	end
+	local roadOf: { [string]: number } = {}
+	local halfOf: { [string]: number } = {}
+	local rails: { Lane } = {}
+	for _, rec in records do
+		local first = if type(rec.roads) == "table" then rec.roads[1] else nil
+		if first and roadCoord[first] then
+			roadOf[rec.id] = roadCoord[first]
+			halfOf[rec.id] = roadHalf[first]
+			local lane = lanes[rec.id]
+			if railRoad[first] and lane and lane.shape == "straight" then
+				table.insert(rails, lane)
+			end
+		end
+	end
+	local ids = {}
+	for id, lane in lanes do
+		if lane.vehicle and lane.shape == "straight" and lane.dir ~= 0 then
+			table.insert(ids, id)
+		end
+	end
+	table.sort(ids)
+	local made = {}
+	for _, id in ids do
+		local lane = lanes[id]
+		if lane.returnLane then
+			continue
+		end
+		local road = roadOf[lane.source or id]
+		for _, other in ids do
+			local o = lanes[other]
+			if
+				o ~= lane
+				and not o.returnLane
+				and o.axis == lane.axis
+				and o.dir == -lane.dir
+				and roadOf[o.source or other] == road
+				and math.abs(o.startAt - lane.startAt) < 1e-6
+				and math.abs(o.endAt - lane.endAt) < 1e-6
+			then
+				lane.returnLane, o.returnLane = o, lane
+				break
+			end
+		end
+		if not lane.returnLane and road and math.abs((lane.coord :: number) - road) > 1e-9 then
+			local back = table.clone(lane)
+			back.id = `{id}~back`
+			back.source = lane.source or id
+			back.coord = 2 * road - (lane.coord :: number)
+			back.dir = -lane.dir
+			back.returnLane, lane.returnLane = lane, back
+			lanes[back.id] = back
+			table.insert(made, back.id)
+		end
+		-- the kerb on the right of travel (right of +z is -x; right of +x is +z)
+		local half = halfOf[lane.source or id]
+		if road and half and half > LaneMath.KERB_INSET then
+			local reach = half - LaneMath.KERB_INSET
+			lane.kerb = road + (if lane.axis == "z" then -lane.dir else lane.dir) * reach
+			local other = lane.returnLane
+			if other then
+				other.kerb = road + (if other.axis == "z" then -other.dir else other.dir) * reach
+			end
+		end
+		-- (no kerb line across the rails: the trolley runs between the eastbound boulevard lane and its kerb)
+		for _, l in { lane, lane.returnLane or lane } do
+			for _, rail in rails do
+				local rc, k, c = rail.coord :: number, l.kerb, l.coord :: number
+				if k and rail.axis == l.axis and (rc - c) * (rc - k) < 0 then
+					l.kerb = nil
+				end
+			end
+		end
+		local back = lane.returnLane
+		if back then
+			for _, rail in rails do
+				local rc = rail.coord :: number
+				local beside = math.min(math.abs(rc - (lane.coord :: number)), math.abs(rc - (back.coord :: number)))
+				if rail.axis == lane.axis and beside < LaneMath.TURN_CLEAR then
+					local lo = math.min(lane.startAt, math.min(rail.startAt, rail.endAt) - LaneMath.TURN_CLEAR)
+					local hi = math.max(lane.endAt, math.max(rail.startAt, rail.endAt) + LaneMath.TURN_CLEAR)
+					for _, l in { lane, back } do
+						l.startAt, l.endAt, l.length = lo, hi, hi - lo
+					end
+				end
+			end
+		end
+	end
+	return made
+end
+
 function LaneMath.length(lane: Lane, dir: number?): number
 	if lane.shape == "polyline" and dir == -1 then
 		return (lane.polyRev :: Poly).length
@@ -408,6 +748,30 @@ end
 
 -- polyPoint(poly, s): position and heading at arc distance s (clamped to the ends).
 function LaneMath.polyPoint(poly: Poly, s: number): (number, number, number)
+	local ps = poly.pieces
+	if ps then
+		local d = math.clamp(s, 0, poly.length)
+		local lo, hi = 1, #ps
+		while lo < hi do -- the last piece starting at or before d
+			local mid = (lo + hi + 1) // 2
+			if ps[mid].s <= d then
+				lo = mid
+			else
+				hi = mid - 1
+			end
+		end
+		local pc = ps[lo]
+		local k = math.clamp(d - pc.s, 0, pc.len)
+		if pc.r == 0 then
+			return pc.ax + pc.dx * k, pc.az + pc.dz * k, math.atan2(pc.dx, pc.dz)
+		end
+		-- on the arc: the angle round the centre advances by sweep * k / len; the heading is the tangent
+		local sign = if pc.sweep > 0 then 1 else -1
+		local a = pc.a0 + sign * k / pc.r
+		local x, z = pc.ax + pc.r * math.cos(a), pc.az + pc.r * math.sin(a)
+		local tx, tz = -math.sin(a) * sign, math.cos(a) * sign
+		return x, z, math.atan2(tx, tz)
+	end
 	local pts, cum = poly.pts, poly.cum
 	local n = #pts
 	if n == 1 then
@@ -424,6 +788,39 @@ function LaneMath.polyPoint(poly: Poly, s: number): (number, number, number)
 	local t = if seg > 1e-12 then (d - cum[i]) / seg else 0
 	local x, z = a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t
 	return x, z, math.atan2(b[1] - a[1], b[2] - a[2])
+end
+
+-- halfTurn(x, z, yaw, r, d) -> pose: d studs into a left U-turn of radius r that starts at (x, z) heading
+-- `yaw` and ends 2r to its left heading the other way (the right of heading f is (-fz, fx), its left
+-- (fz, -fx)).
+function LaneMath.halfTurn(x: number, z: number, yaw: number, r: number, d: number): Pose
+	local fx, fz = math.sin(yaw), math.cos(yaw)
+	local lx, lz = fz, -fx
+	local phi = math.clamp(d / math.max(r, 1e-9), 0, math.pi)
+	local c, sn = math.cos(phi), math.sin(phi)
+	local px = x + r * lx * (1 - c) + r * fx * sn
+	local pz = z + r * lz * (1 - c) + r * fz * sn
+	local tx, tz = lx * sn + fx * c, lz * sn + fz * c
+	return { x = px, y = 0, z = pz, yaw = math.atan2(tx, tz) }
+end
+
+-- cornerCap(lane, dir, s, lateral, decel) -> speed: the fastest a vehicle at s may go so that it can
+-- slow, at `decel`, to take every rounded corner ahead at `lateral` sideways acceleration (math.huge on
+-- lanes without corners).
+function LaneMath.cornerCap(lane: Lane, dir: number, s: number, lateral: number, decel: number): number
+	if lane.shape ~= "polyline" then
+		return math.huge
+	end
+	local poly = if dir < 0 then lane.polyRev :: Poly else lane.poly :: Poly
+	local cap = math.huge
+	for _, pc in poly.pieces do
+		if pc.r > 0 and pc.s + pc.len > s then
+			local dist = math.max(0, pc.s - s)
+			local v = math.sqrt(lateral * pc.r)
+			cap = math.min(cap, math.sqrt(v * v + 2 * decel * dist))
+		end
+	end
+	return cap
 end
 
 -- pointAt(lane, s, dir?, y?) -> pose: s studs along the lane from its start end in the travel
@@ -535,15 +932,63 @@ function LaneMath.seesHazard(
 	return nil
 end
 
--- pingPong(lane, s, dir, speed, dt) -> s', dir', turned: shuttle motion between the lane ends.
+-- pingPong(lane, s, dir, speed, dt) -> s', dir', turned: shuttle motion between the lane ends. `s` is
+-- measured in the travel direction's own frame, as `pointAt`, `arcOf` and the stop lines measure it (from
+-- `startAt` for +1, from `endAt` for -1), so it always grows; past the end the vehicle comes back the other
+-- way from that same end: s' is the overshoot in the new direction's frame. (It used to reflect s in the
+-- old frame, which `pointAt` then read from the far end: the patrol car jumped the whole beat at every
+-- turn and drove the next leg backwards.)
 function LaneMath.pingPong(lane: Lane, s: number, dir: number, speed: number, dt: number): (number, number, boolean)
-	local n = s + speed * dt * dir
+	local n = s + math.abs(speed) * dt
 	if n > lane.length then
-		return lane.length - (n - lane.length), -1, true
-	elseif n < 0 then
-		return -n, 1, true
+		return math.min(n - lane.length, lane.length), -dir, true
 	end
 	return n, dir, false
+end
+
+-- The line a vehicle leaves and the line it joins when it turns round at the far end of travel direction
+-- `dir`: the two sides of a ping-pong lane (`coordFor`), or a one-way lane and its `returnLane`.
+local function turnCoords(lane: Lane, dir: number): (number?, number?)
+	local cf = lane.coordFor
+	if cf then
+		return cf[dir], cf[-dir]
+	end
+	local back = lane.returnLane
+	if back and dir == lane.dir then
+		return lane.coord, back.coord
+	end
+	return nil, nil
+end
+
+-- uturnLength(lane, dir?): the arc length of the U-turn at the far end of direction `dir` (default: the
+-- lane's own): a half circle between the two sides of a ping-pong lane (`coordFor`), or from a one-way
+-- lane onto its `returnLane`; 0 when there is none (or both directions share one line).
+function LaneMath.uturnLength(lane: Lane, dir: number?): number
+	local a, b = turnCoords(lane, dir or (if lane.dir == 0 then 1 else lane.dir))
+	if a == nil or b == nil then
+		return 0
+	end
+	return math.pi * math.abs(a - b) / 2
+end
+
+-- uturnPoint(lane, dir, d) -> pose: d studs into the U-turn at the far end of direction `dir` (a left turn
+-- under drive-on-the-right): a half circle, beyond the lane's end, from the dir side to the -dir side.
+function LaneMath.uturnPoint(lane: Lane, dir: number, d: number): Pose
+	local from, to = turnCoords(lane, dir)
+	local a, b = from :: number, to :: number
+	local r = math.abs(a - b) / 2
+	local mid = (a + b) / 2
+	local endAlong = if dir > 0 then lane.endAt else lane.startAt
+	local phi = math.clamp(d / math.max(r, 1e-9), 0, math.pi)
+	-- in (along, coord) coordinates: forward is (dir, 0); out from the centre to the start is (0, u)
+	local u = if a > mid then 1 else -1
+	local along = endAlong + dir * r * math.sin(phi)
+	local coord = mid + u * r * math.cos(phi)
+	local tAlong, tCoord = dir * math.cos(phi), -u * math.sin(phi)
+	if lane.axis == "x" then
+		return { x = along, y = 0, z = coord, yaw = math.atan2(tAlong, tCoord) }
+	end
+	return { x = coord, y = 0, z = along, yaw = math.atan2(tCoord, tAlong) }
 end
 
 -- vehicleAhead(me, fx, fz, range, halfWidth, others) (trafficVehicleAhead, L15721-15736): is another
@@ -567,7 +1012,12 @@ function LaneMath.vehicleAhead(
 			local psi = item.yaw
 			local otherAlong = math.abs(math.sin(psi) * fx + math.cos(psi) * fz) * item.length / 2
 				+ math.abs(math.cos(psi) * fx - math.sin(psi) * fz) * item.width / 2
-			if along > 0 and along < range + otherAlong and across < halfWidth + item.width / 2 + margin then
+			-- (and across the corridor it reaches as far as it is turned: a vehicle crossing the lane, or
+			-- swinging round a corner beside it, is as wide as it is long; v5.4 took its width whatever
+			-- its heading)
+			local otherAcross = math.abs(math.sin(psi) * fz - math.cos(psi) * fx) * item.length / 2
+				+ math.abs(math.cos(psi) * fz + math.sin(psi) * fx) * item.width / 2
+			if along > 0 and along < range + otherAlong and across < halfWidth + otherAcross + margin then
 				return true
 			end
 		end

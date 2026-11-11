@@ -271,7 +271,8 @@ function RouteProps.plans(
 	treeArt: { Trees.Art }?
 ): ({ Spec.BuildPlan }, { [number]: string })
 	local artByTrunk: { [number]: Trees.Art } = {}
-	for _, a in treeArt or {} do
+	local arts: { Trees.Art } = treeArt or {}
+	for _, a in arts do
 		artByTrunk[a.trunkRoute] = a
 	end
 	local groundAt: (number, number, number?) -> (number, boolean) = groundAtIn
@@ -369,7 +370,7 @@ function RouteProps.plans(
 			color = LOOK.pole.color,
 			material = "Wood",
 			role = "Post",
-			attrs = { Embedded = true },
+			attrs = { Embedded = true } :: Spec.Attrs,
 		})
 		RouteProps.crossarm(list, r, byLook.wire)
 		table.insert(out, newPlan(`Pole_{r.id}`, "pole", props, { Route = r.id }, list))
@@ -386,7 +387,8 @@ function RouteProps.plans(
 			local yaw = if dxz[1] * dxz[1] + dxz[2] * dxz[2] > 1 then math.atan2(dxz[1], dxz[2]) else 0
 			local sx, sz = math.cos(yaw), -math.sin(yaw)
 			local w = 1.1
-			local wood = { color = { 120, 92, 66 }, material = "Wood", role = "Pipe", attrs = { Embedded = true } }
+			local wood =
+				{ color = { 120, 92, 66 }, material = "Wood", role = "Pipe", attrs = { Embedded = true } :: Spec.Attrs }
 			local rails = table.clone(line)
 			if foot == line[1] then
 				table.insert(rails, 1, { foot[1], g - 0.3, foot[3] })
@@ -429,7 +431,7 @@ function RouteProps.plans(
 					material = "Metal",
 					canCollide = false,
 					role = "Pipe",
-					attrs = { Embedded = true },
+					attrs = { Embedded = true } :: Spec.Attrs,
 				})
 			end
 			cyl(
@@ -493,7 +495,7 @@ function RouteProps.plans(
 							color = if parapet then STONE else LOOK.fence.color,
 							material = if parapet then "Limestone" else LOOK.fence.material,
 							role = "Fence",
-							attrs = { Embedded = true },
+							attrs = { Embedded = true } :: Spec.Attrs,
 						}
 					)
 				end
@@ -512,7 +514,7 @@ function RouteProps.plans(
 					material = "Metal",
 					canCollide = false,
 					role = "Post",
-					attrs = { Embedded = true },
+					attrs = { Embedded = true } :: Spec.Attrs,
 				})
 			end
 			for k = 1, n do
@@ -585,7 +587,7 @@ function RouteProps.plans(
 					color = { 52, 58, 60 },
 					material = "Metal",
 					role = "Post",
-					attrs = { Embedded = true },
+					attrs = { Embedded = true } :: Spec.Attrs,
 				})
 			end
 			for k = 2, #line - 1, 2 do

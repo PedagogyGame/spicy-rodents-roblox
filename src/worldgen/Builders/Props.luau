@@ -57,7 +57,7 @@ local function post(
 		canCollide = collide,
 		castShadow = true,
 		role = "Post",
-		attrs = { Embedded = true },
+		attrs = { Embedded = true } :: Spec.Attrs,
 	})
 end
 
@@ -106,7 +106,7 @@ local function canopyColumns(lot: any, body: Spec.PartSpec, list: Spec.PartList)
 			canCollide = false,
 			castShadow = false,
 			role = "Trim",
-			attrs = { Embedded = true },
+			attrs = { Embedded = true } :: Spec.Attrs,
 		})
 	end
 end

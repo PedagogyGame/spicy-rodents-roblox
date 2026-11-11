@@ -59,7 +59,7 @@ function TerrainBake.write(terrain: Terrain, opts: Opts): Stats
 	local chunk = opts.chunk or 64
 	local yieldEvery = opts.yieldEvery or 1
 	local heightAt, waterTopAt, materialAt = opts.heightAt, opts.waterTopAt, opts.materialAt
-	local paint = opts.paint or {}
+	local paint: { PaintRect } = opts.paint or {}
 	local grass, water, air = Enum.Material.Grass, Enum.Material.Water, Enum.Material.Air
 	local stats: Stats = {
 		chunks = 0,

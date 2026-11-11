@@ -2,13 +2,15 @@
 -- ReplicatedStorage.Shared.Minigames.MinigameRules.Bowling
 -- Ten-pin bowling on the Minigame contract (BUILD_PLAN §3.16; brief v2 §13a "fully playable lanes ... working
 -- scoreboards"): up to 4 bowlers take whole frames in turn; ten frames each; the tenth frame gives a third
--- ball after a strike or a spare. The pinfall itself comes from the lane's physics (Server/Minigames/
--- BowlingLane: the server owns the ball and every pin, D28); this module only counts it, so the verb
--- "roll" is a SERVER verb (clients send "release" to the lane, never a pin count).
+-- ball after a strike or a spare. The pinfall itself is decided on the server by the scripted pin model
+-- (Shared/Minigames/Bowling/PinModel through RollScript; Server/Minigames/BowlingLane plays it); this module
+-- only counts it, so the verb "roll" is a SERVER verb (clients send "release" to the lane, never a pin count).
 -- Pure; Lune-tested (tests/unit/minigames_bowling.spec.luau).
 -- Interface: the Minigame.Rules shape plus turn(state) -> seat?, view(state) -> table (scoreboard),
 --   score(rolls) -> { frame totals or false }, marks(rolls) -> { box strings }, total(rolls) -> number,
---   rackFor(state) -> "full" | "keep" (what the pinsetter sets before the next ball), standing(state) -> pins
+--   rackFor(state) -> "full" | "keep" (what the pinsetter sets before the next ball), standing(state) -> pins,
+--   stats(rolls) -> { strikes, spares, opens, misses, balls } (the end card), streak(rolls) -> strikes in a
+--   row up to the last ball
 
 local Bowling = {}
 
@@ -150,14 +152,15 @@ end
 function Bowling.total(rolls: { number }): number
 	local best = 0
 	for _, v in Bowling.score(rolls) do
-		if v then
+		if type(v) == "number" then
 			best = v
 		end
 	end
 	return best
 end
 
--- The final score, counting every ball even if bonuses are pending (used for a player who left).
+-- The scoreboard boxes per frame: "X" strike, "/" spare, "-" a ball that hit nothing, else the count. Frames
+-- one to nine have two boxes (a strike sits in the second); the tenth has up to three.
 function Bowling.marks(rolls: { number }): { { string } }
 	local out: { { string } } = {}
 	for f, fr in Bowling.frames(rolls) do
@@ -203,6 +206,53 @@ function Bowling.marks(rolls: { number }): { { string } }
 		out[f] = boxes
 	end
 	return out
+end
+
+-- What a bowler did, for the end card: strikes and spares (every one, the tenth frame's bonus balls too), open
+-- frames, balls that hit nothing, and how many balls were bowled.
+function Bowling.stats(
+	rolls: { number }
+): { strikes: number, spares: number, opens: number, misses: number, balls: number }
+	local strikes, spares, opens, misses = 0, 0, 0, 0
+	for f, boxes in Bowling.marks(rolls) do
+		local marked = false
+		for _, m in boxes do
+			if m == "X" then
+				strikes += 1
+				marked = true
+			elseif m == "/" then
+				spares += 1
+				marked = true
+			elseif m == "-" then
+				misses += 1
+			end
+		end
+		local complete = if f < Bowling.FRAMES then #boxes == 2 else #boxes >= 2
+		if complete and not marked then
+			opens += 1
+		end
+	end
+	return { strikes = strikes, spares = spares, opens = opens, misses = misses, balls = #rolls }
+end
+
+-- Strikes in a row ending with the last ball bowled (3 is a turkey).
+function Bowling.streak(rolls: { number }): number
+	local seq: { string } = {}
+	for _, boxes in Bowling.marks(rolls) do
+		for _, m in boxes do
+			if m ~= "" then
+				table.insert(seq, m)
+			end
+		end
+	end
+	local n = 0
+	for i = #seq, 1, -1 do
+		if seq[i] ~= "X" then
+			break
+		end
+		n += 1
+	end
+	return n
 end
 
 local function seatFinished(state: State, seat: number): boolean
@@ -370,6 +420,7 @@ function Bowling.view(state: State): { [string]: any }
 			frame = math.min(state.frameOf[s], Bowling.FRAMES),
 			ball = state.ballOf[s],
 			finished = state.frameOf[s] > Bowling.FRAMES,
+			stats = Bowling.stats(rolls),
 		}
 	end
 	return {

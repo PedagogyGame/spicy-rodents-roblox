@@ -1,0 +1,5 @@
+# Known type errors: the debt tools/typecheck/main.luau tolerates. One line per file and message
+# (quoted types blanked): file <tab> how many <tab> message. The check fails on anything not listed
+# here. Fix errors, then run `lune run tools/typecheck/main.luau --update`; never add lines by hand.
+# 4 errors in total (luau-lsp 1.70.1).
+src/worldgen/Builders/Trees.luau	4	TypeError: Expected this to be exactly '…', but got '…'

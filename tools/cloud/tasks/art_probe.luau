@@ -216,13 +216,13 @@ local function rays(part: BasePart): { [string]: any }
 	params.FilterDescendantsInstances = { part }
 	local c = part.Position
 	local out: { [string]: any } = {}
-	local cases = {
+	local cases: { [string]: { Vector3 } } = {
 		boreAlongZ = { c + Vector3.new(0, 0, -10), Vector3.new(0, 0, 20) },
 		downOnTop = { c + Vector3.new(0, 10, 0), Vector3.new(0, -20, 0) },
 		sideAlongX = { c + Vector3.new(-10, 0, 0), Vector3.new(20, 0, 0) },
 	}
 	for name, case in cases do
-		local ok, hit = try(name, function()
+		local ok, hit: any = try(name, function()
 			return workspace:Raycast(case[1], case[2], params)
 		end)
 		if not ok then

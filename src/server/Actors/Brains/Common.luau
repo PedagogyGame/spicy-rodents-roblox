@@ -2,7 +2,8 @@
 -- ServerScriptService.Server.Actors.Brains.Common
 -- Shared contract for the minimal W0 brains: the Actor state they read, the Intent they write and
 -- the per-tick Ctx the scheduler hands them (BUILD_PLAN §1.4 Brains/*, §1.5 Actor; spike S5).
--- Interface: types Actor, Intent, Ctx, Brain, Snapshot; newIntent(), newActor(), steer helpers.
+-- Interface: types Actor, Intent, Ctx (with the optional `emit` event sink), Brain, Snapshot;
+--   newIntent(), newActor(), halt(actor), steer helpers.
 -- Pure. Positions are studs, yaw is the HTML yaw (0 faces +Z; Config/Units adds the +pi at the
 -- CFrame boundary, D21). Brains never allocate per tick: they write into actor.intent in place.
 
@@ -39,6 +40,8 @@ export type Actor = {
 	alert: number, -- humans: seconds of alert left
 	moved: number, -- distance moved so far (liveness check)
 	rig: any?, -- engine body handle (Puppets)
+	infected: boolean?, -- carries the infection (Infection/InfectionService; squirrels: the "one of those" tell)
+	lift: number?, -- studs added to the drawn body's height (a hidden patient is sunk out of sight)
 }
 
 export type Grid = {
@@ -54,6 +57,9 @@ export type Ctx = {
 	bounds: { minX: number, maxX: number, minZ: number, maxZ: number },
 	routes: any?, -- SpikeRoutes-like: byId(id) -> { length, points, links, kind }
 	queryBuffer: { number }, -- shared scratch list for grid queries
+	-- optional event sink: a brain reports something the services care about ("spotted": a person
+	-- just saw a squirrel and started to run). AI/TownAI collects them (drainEvents).
+	emit: ((kind: string, actor: Actor, other: Actor?) -> ())?,
 }
 
 export type Snapshot = { [string]: any }
@@ -115,6 +121,19 @@ function Common.newActor(
 		moved = 0,
 		rig = nil,
 	}
+end
+
+-- halt(actor): the body stands where it is until its brain thinks again. A brain that is handed a
+-- body back (a player let go of it) calls this: the intent still holds what the brain wanted before
+-- the hand-over (a walk target, a lane lock on a lane that may now be a block away), and the motor
+-- would act on it every frame until the next think, which for a far body is a whole second.
+function Common.halt(actor: Actor)
+	local intent = actor.intent
+	intent.mode = "stand"
+	intent.speed = 0
+	intent.tx, intent.tz = actor.x, actor.z
+	intent.laneAxis, intent.laneCoord = nil, nil
+	intent.heading = 0 -- the motor leaves the yaw alone
 end
 
 -- Shortest signed angle from a to b.
