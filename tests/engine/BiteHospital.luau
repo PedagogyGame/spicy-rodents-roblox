@@ -152,7 +152,8 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 	end
 	check(bit, "the rodent's player got no bite event")
 
-	local down, downSecs = waitFor(8, function(): boolean
+	-- (up to 4 s of running, and up to 6 more when the fall would be in the road)
+	local down, downSecs = waitFor(12, function(): boolean
 		return med(id) == "down"
 	end)
 	numbers.downAfter = downSecs

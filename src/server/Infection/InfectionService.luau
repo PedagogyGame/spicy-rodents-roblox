@@ -22,9 +22,20 @@
 --          MedicalView draws it; nothing is written while a case incubates, so a client cannot read
 --          who is infected)
 --   Say, SayAt   the line and its server time (Client/UI/SpeechBubbles draws the bubble)
--- A body a player holds is never ordered about, moved or hidden; its player is told what is happening
--- and what to do through `notify`, and `statusOf` is the same for a line that stays on screen.
+-- A body a player holds is never ordered about, moved or hidden (an order given a moment before the
+-- hand-over is taken back); its player is told what is happening and what to do through `notify`,
+-- and `statusOf` is the same for a line that stays on screen. News about a victim goes to the player
+-- who bit them (`by`, `driverOf`), not to whoever plays the rodent later.
 -- Killing the rodent cures nobody (no call exists for it).
+-- EVERYBODY RUNS, AND NOBODY THROUGH A WALL. A bitten townsperson on a lane runs along it (the brain).
+-- Anyone with no lane under their feet (staff, officers, a bystander in a crowd) gets a short run
+-- from `runWay`: indoors it stays inside the building, outdoors it is a clear line or goes round.
+-- Staff bitten far from their round (a paramedic at a scene) are not handed back to a brain that
+-- walks home in a straight line: they are walked back by a real way (`wayBack`). People standing
+-- round a patient run when the rodent comes near, and nobody gathers round it. A cyclist or
+-- motorcyclist is never a patient (the body cannot be posed): they shout and ride off.
+-- The ambulance stops short of a patient who is in the road (`tripTo`) and stays a moment after its
+-- patient is aboard (LOAD_LINGER) before it turns for home.
 --
 -- NOBODY GETS STUCK. Every wait in a case ends on a clock (InfectionRules), and here:
 --   * Walking is never the only way. A walk in follows the pavements (the sidewalk graph) and, where
@@ -43,7 +54,7 @@
 --     every body go (the boot loop calls it if it has to switch the service off).
 -- In every one of these the person stays infected: the hospital is the only cure.
 -- Step-driven: requiring this module starts nothing; Boot/Game calls step(dt) from its own loop.
--- Interface: new(opts) -> Service; :bite(victimId, biterId?) -> boolean (a new infection began);
+-- Interface: new(opts) -> Service; :bite(victimId, biterId?, by?) -> boolean (a new infection began);
 --   :onSpotted(observerId, threatId); :step(dt); :isInfected(id); :biteable(id); :stateOf(id) ->
 --   string?; :statusOf(id) -> string? (for the player holding `id`); :townPercent(); :trafficFlags(id)
 --   -> boolean; :cases() -> { [id]: Case }; :walkRoute(x, z) -> ({ {x, z} }?, length);
