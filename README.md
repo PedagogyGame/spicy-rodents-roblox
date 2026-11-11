@@ -33,8 +33,12 @@ the Roblox engine (verified in spike S1). Tests may use the `.luaurc` aliases (`
 
 Pinned in `rokit.toml` (rojo 7.7.1, lune 0.11.1, stylua 2.6.0 with the Luau feature, selene 0.31.0,
 luau-lsp 1.70.1). In the cloud container, `docs/ENVIRONMENT_SETUP.sh` installs the same versions
-with cargo, plus the bpy 5.2.3 venv. Lint: `selene.toml` with the committed `roblox.yml`; format:
-`stylua.toml`; types: `.luaurc` (strict) and `luau-lsp analyze` in GitHub Actions.
+with cargo (luau-lsp is built from its source with cmake), plus the bpy 5.2.3 venv. Lint:
+`selene.toml` with the committed `roblox.yml`; format: `stylua.toml`; types: `.luaurc` (strict) and
+`luau-lsp analyze`, run by `tools/ci.sh` through `tools/typecheck/main.luau`, here and in GitHub
+Actions alike. The type check fails on any error that is not in `tools/typecheck/baseline.txt`,
+the list of errors that were already there when the check was added; fix errors, then run
+`lune run tools/typecheck/main.luau --update` so the list only ever shrinks.
 
 ## Everyday commands
 
