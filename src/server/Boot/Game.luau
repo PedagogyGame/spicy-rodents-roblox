@@ -40,6 +40,7 @@ local Net = Import.shared("Net/Net") :: typeof(require("../../shared/Net/Net"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local PlayerVehicles =
 	Import.shared("Vehicles/PlayerVehicles") :: typeof(require("../../shared/Vehicles/PlayerVehicles"))
+local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require("../../shared/Vehicles/VehicleKinds"))
 local ActorsRuntime = require("../Actors/ActorsRuntime")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
@@ -625,6 +626,7 @@ function Game.start(opts: Opts?): any
 	-- the traffic world: people (AI and held humans) and the player-held squirrels (fatal sweep)
 	local people: { { [string]: any } } = {}
 	local squirrels: { { [string]: any } } = {}
+	local cars: { { [string]: any } } = {}
 	local function trafficWorld(): { [string]: any }
 		table.clear(squirrels)
 		local n = 0
@@ -645,7 +647,28 @@ function Game.start(opts: Opts?): any
 		for i = #people, n + 1, -1 do
 			people[i] = nil
 		end
-		return { people = people, squirrels = squirrels }
+		-- the players' vehicles, parked or driven: the fleet queues behind them (TrafficService.PlayerCar)
+		table.clear(cars)
+		if devices then
+			for id, model in devices.models do
+				local v = PlayerVehicles.get(devices.fleet, id)
+				local root = (model :: Model).PrimaryPart
+				if v and root then
+					local size = VehicleKinds.kind(v.kind).size
+					local p, look = root.Position, root.CFrame.LookVector
+					table.insert(cars, {
+						id = id,
+						x = p.X,
+						z = p.Z,
+						yaw = math.atan2(look.X, look.Z),
+						width = size[1],
+						length = size[3],
+						speed = root.AssemblyLinearVelocity.Magnitude,
+					})
+				end
+			end
+		end
+		return { people = people, squirrels = squirrels, cars = cars }
 	end
 
 	local function bites()

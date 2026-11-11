@@ -61,7 +61,18 @@ export type Lane = {
 
 export type Pose = { x: number, y: number, z: number, yaw: number }
 
-export type Body = { x: number, z: number, yaw: number, width: number, length: number, visible: boolean?, id: any? }
+-- `player`: a player's vehicle (parked or driven), not a fleet member; `speed` in studs/s when known
+export type Body = {
+	x: number,
+	z: number,
+	yaw: number,
+	width: number,
+	length: number,
+	visible: boolean?,
+	id: any?,
+	player: boolean?,
+	speed: number?,
+}
 
 -- headingYaw(axis, dir): HTML yaw for travel along an axis (traffic.md §2.6: axis x -> dir*pi/2;
 -- axis z -> 0 if dir > 0 else pi).

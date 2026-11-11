@@ -162,8 +162,37 @@ local function shortest(a: number): number
 	return math.atan2(math.sin(a), math.cos(a))
 end
 
+-- Which bodies a vehicle brakes for: fleet vehicles heading its way (opposing traffic excluded, §6.1, the
+-- trolley deadlock) and every player's vehicle in its path whatever its heading (a car parked across the
+-- lane is still in the way; a player's car never waits for the fleet, so no deadlock).
+local function bracesFor(b: LaneMath.Body, fx: number, fz: number): boolean
+	return b.player == true or math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3
+end
+
+-- The players' vehicles among the bodies.
+local function playerCars(ctx: Ctx): { LaneMath.Body }
+	local out = {}
+	for _, b in ctx.bodies do
+		if b.player then
+			table.insert(out, b)
+		end
+	end
+	return out
+end
+
+-- Is a player's vehicle in the corridor ahead within `gap` studs of v's nose? (the classes that yield to
+-- no vehicle in v5.4, motorcycles and the emergency routes, still must not drive through one)
+local function playerCarAhead(v: Vehicle, ctx: Ctx, gap: number): boolean
+	local cars = playerCars(ctx)
+	if #cars == 0 then
+		return false
+	end
+	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	return LaneMath.vehicleAhead(AICarMotor.body(v), fx, fz, v.box.length / 2 + gap, v.box.width / 2, cars)
+end
+
 -- Hazards for a yielding class: people (humans visible, not hospital, not injured; squirrels visible
--- relative to the vehicle base) and vehicles heading the same way (opposing traffic excluded, §6.1).
+-- relative to the vehicle base) and the vehicles it braces for (bracesFor).
 local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicles: boolean): { LaneMath.Hazard }
 	local out: { LaneMath.Hazard } = {}
 	for _, p in ctx.people do
@@ -180,7 +209,7 @@ local function hazards(v: Vehicle, ctx: Ctx, fx: number, fz: number, withVehicle
 	if withVehicles then
 		for _, b in ctx.bodies do
 			if b.visible ~= false and b.id ~= v.id then
-				if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3 then
+				if bracesFor(b, fx, fz) then
 					table.insert(out, { x = b.x, z = b.z, r = b.width / 2 })
 				end
 			end
@@ -193,7 +222,7 @@ local function sameWay(v: Vehicle, ctx: Ctx, fx: number, fz: number): { LaneMath
 	local out = {}
 	for _, b in ctx.bodies do
 		if b.id ~= v.id then
-			if math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3 then
+			if bracesFor(b, fx, fz) then
 				table.insert(out, b)
 			end
 		end
@@ -225,7 +254,7 @@ local function junctionClear(v: Vehicle, ctx: Ctx, line: Control.StopLine?): boo
 		end
 	end
 	for _, b in ctx.bodies do
-		if b.visible ~= false and b.id ~= v.id then
+		if b.visible ~= false and b.id ~= v.id and not (b.player and (b.speed or 0) < 0.5) then
 			if (b.x - cx) ^ 2 + (b.z - cz) ^ 2 < r * r then
 				return false
 			end
@@ -428,7 +457,7 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 		return
 	end
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
-	if personNear(ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) then
+	if personNear(ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) or playerCarAhead(v, ctx, st(2)) then
 		v.speed = 0
 	else
 		v.speed = v.cruise
@@ -456,7 +485,9 @@ local function drivePolyline(
 	dt: number
 ): boolean
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
-	if personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true) then
+	if
+		personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true) or playerCarAhead(v, ctx, stopR)
+	then
 		v.speed = 0
 	else
 		v.speed = speed

@@ -244,6 +244,28 @@ return function(t)
 		end
 	)
 
+	t.test("player cars: a sedan stops behind a player's car standing in its lane, at any angle", function()
+		for _, yaw in { 0, math.pi / 2, math.pi } do
+			local svc, v = sedanNB()
+			local ahead = v.z + st(30)
+			local car = { id = "pickup", x = v.x, z = ahead, yaw = yaw, width = st(2.5), length = st(5.4), speed = 0 }
+			for _ = 1, 30 * 10 do
+				svc:step(1 / 30, { cars = { car } })
+			end
+			local reach = if yaw == math.pi / 2 then car.width / 2 else car.length / 2
+			t.truthy(
+				v.z + v.box.length / 2 < ahead - reach,
+				`yaw {yaw}: stopped short of the car ({ahead - reach - v.z - v.box.length / 2} st clear)`
+			)
+			t.near(v.speed, 0, 1e-3)
+			-- the car drives off: the sedan pulls away
+			for _ = 1, 30 * 5 do
+				svc:step(1 / 30, {})
+			end
+			t.truthy(v.speed > st(3), "pulled away once the car was gone")
+		end
+	end)
+
 	t.test("run-over: a squirrel darting into the lane just ahead of a moving sedan fires RunOver once", function()
 		local svc, v = sedanNB()
 		for _ = 1, 30 * 3 do
