@@ -299,10 +299,12 @@ function MinigameClient.start(opts: { [string]: any }): any
 				if a.controller then
 					a.controller:onState(msg)
 				end
-				local playing: string = a.game -- (tested on a.game itself, the checker narrows it for the branches below)
-				if view.phase == "done" and playing ~= "fortune_machine" then
+				-- (as two flags: tested in the branches themselves, the checker takes the first test's
+				-- failing for "it is the fortune machine" and objects to the second)
+				local fortune, bowling = a.game == "fortune_machine", a.game == "bowling"
+				if view.phase == "done" and not fortune then
 					setButtons({ { "again", "Play again" }, { "leave", "Leave (Q)" } })
-				elseif view.phase == "playing" and playing == "bowling" then
+				elseif view.phase == "playing" and bowling then
 					setButtons({ { "leave", "Leave (Q)" } })
 				end
 				-- bowling's end card: ranked scores and what to press, with the reset counting down
