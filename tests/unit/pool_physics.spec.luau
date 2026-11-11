@@ -392,6 +392,21 @@ return function(t)
 		t.truthy(#a > 5000)
 	end)
 
+	t.test("POOL-P5 a ball driven into two at once treats them alike: the split is a mirror image", function()
+		local h = math.sqrt(3) * R
+		local spots = { { id = 0, x = 0, z = -0.5 }, { id = 1, x = -R, z = h }, { id = 2, x = R, z = h } }
+		local w = world(pool, spots, strike(0, 0, 10, 0))
+		untilEvents(w, 2)
+		local c, a, b = w.balls[1], w.balls[2], w.balls[3]
+		t.eq(w.events[1], w.events[ES + 1], "both contacts at the same moment")
+		t.near(a.vx, -b.vx, 1e-6)
+		t.near(a.vz, b.vz, 1e-6)
+		t.near(c.vx, 0, 1e-6)
+		t.near(math.deg(math.atan2(b.vx, b.vz)), 30, 2.5, "each leaves along its line of centres")
+		t.truthy(c.vz < 0, "and the cue ball comes back off the pair")
+		t.truthy(Physics.energy(w) < 0.5 * 10 * 10)
+	end)
+
 	t.test("energy never grows: breaks, hard shots with every spin, and bumper pool among the posts", function()
 		local function watch(w: Physics.World, label: string)
 			local e = Physics.energy(w)
