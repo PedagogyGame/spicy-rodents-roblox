@@ -69,6 +69,7 @@ export type Lane = {
 	poly: Poly?, -- polyline geometry in the +1 direction
 	polyRev: Poly?, -- polyline geometry walked in reverse (-1), kept right after `unify`
 	coordFor: { [number]: number }?, -- ping-pong vehicle lanes after `unify`: the coord per direction
+	returnLane: Lane?, -- one-way lanes after `link`: the lane a vehicle turns onto at this lane's end
 	vehicle: boolean, -- a vehicle lane (handedness applies) rather than a sidewalk or rider lane
 	mirrored: boolean?, -- `unify` moved it to the right-hand side
 }
@@ -558,6 +559,94 @@ function LaneMath.unify(lanes: { [string]: Lane }, roads: { RoadRecord }, record
 	return changed
 end
 
+-- link(lanes, roads, records) -> ids: every straight one-way vehicle lane gets a way back, so a vehicle
+-- that reaches the end of its street turns round there and drives back along the other side instead of
+-- vanishing and reappearing at the far end (v5.4's wrap, a pop in plain view some seven times a minute).
+-- Two one-way lanes over the same stretch of the same road, in opposite directions, are each other's
+-- `returnLane`; a lane whose road has no lane the other way (the west street's northbound one) gets one,
+-- mirrored across the centreline (`<id>~back`, returned). Where a rail lane runs alongside (the trolley
+-- beside the boulevard) both lanes are lengthened to end TURN_CLEAR beyond the rail lane's ends, so the
+-- turn is made clear of a trolley standing at its terminus (a long vehicle's tail swings out as it
+-- turns: the RV's was 0.9 st inside the trolley). Call after `unify`.
+LaneMath.TURN_CLEAR = Units.st(12)
+function LaneMath.link(lanes: { [string]: Lane }, roads: { RoadRecord }, records: { LaneRecord }): { string }
+	local roadCoord: { [string]: number } = {}
+	local railRoad: { [string]: boolean } = {}
+	for _, r in roads do
+		if type(r.coord) == "number" then
+			roadCoord[r.id] = r.coord
+			railRoad[r.id] = r.kind == "rail"
+		end
+	end
+	local roadOf: { [string]: number } = {}
+	local rails: { Lane } = {}
+	for _, rec in records do
+		local first = if type(rec.roads) == "table" then rec.roads[1] else nil
+		if first and roadCoord[first] then
+			roadOf[rec.id] = roadCoord[first]
+			local lane = lanes[rec.id]
+			if railRoad[first] and lane and lane.shape == "straight" then
+				table.insert(rails, lane)
+			end
+		end
+	end
+	local ids = {}
+	for id, lane in lanes do
+		if lane.vehicle and lane.shape == "straight" and lane.dir ~= 0 then
+			table.insert(ids, id)
+		end
+	end
+	table.sort(ids)
+	local made = {}
+	for _, id in ids do
+		local lane = lanes[id]
+		if lane.returnLane then
+			continue
+		end
+		local road = roadOf[lane.source or id]
+		for _, other in ids do
+			local o = lanes[other]
+			if
+				o ~= lane
+				and not o.returnLane
+				and o.axis == lane.axis
+				and o.dir == -lane.dir
+				and roadOf[o.source or other] == road
+				and math.abs(o.startAt - lane.startAt) < 1e-6
+				and math.abs(o.endAt - lane.endAt) < 1e-6
+			then
+				lane.returnLane, o.returnLane = o, lane
+				break
+			end
+		end
+		if not lane.returnLane and road and math.abs((lane.coord :: number) - road) > 1e-9 then
+			local back = table.clone(lane)
+			back.id = `{id}~back`
+			back.source = lane.source or id
+			back.coord = 2 * road - (lane.coord :: number)
+			back.dir = -lane.dir
+			back.returnLane, lane.returnLane = lane, back
+			lanes[back.id] = back
+			table.insert(made, back.id)
+		end
+		local back = lane.returnLane
+		if back then
+			for _, rail in rails do
+				local rc = rail.coord :: number
+				local beside = math.min(math.abs(rc - (lane.coord :: number)), math.abs(rc - (back.coord :: number)))
+				if rail.axis == lane.axis and beside < LaneMath.TURN_CLEAR then
+					local lo = math.min(lane.startAt, math.min(rail.startAt, rail.endAt) - LaneMath.TURN_CLEAR)
+					local hi = math.max(lane.endAt, math.max(rail.startAt, rail.endAt) + LaneMath.TURN_CLEAR)
+					for _, l in { lane, back } do
+						l.startAt, l.endAt, l.length = lo, hi, hi - lo
+					end
+				end
+			end
+		end
+	end
+	return made
+end
+
 function LaneMath.length(lane: Lane, dir: number?): number
 	if lane.shape == "polyline" and dir == -1 then
 		return (lane.polyRev :: Poly).length
@@ -765,27 +854,42 @@ function LaneMath.pingPong(lane: Lane, s: number, dir: number, speed: number, dt
 	return n, dir, false
 end
 
--- uturnLength(lane): the arc length of the U-turn that joins the end of one direction of a ping-pong lane
--- to the start of the other (a half circle between `coordFor[1]` and `coordFor[-1]`); 0 when both
--- directions share one line.
-function LaneMath.uturnLength(lane: Lane): number
+-- The line a vehicle leaves and the line it joins when it turns round at the far end of travel direction
+-- `dir`: the two sides of a ping-pong lane (`coordFor`), or a one-way lane and its `returnLane`.
+local function turnCoords(lane: Lane, dir: number): (number?, number?)
 	local cf = lane.coordFor
-	if not cf then
+	if cf then
+		return cf[dir], cf[-dir]
+	end
+	local back = lane.returnLane
+	if back and dir == lane.dir then
+		return lane.coord, back.coord
+	end
+	return nil, nil
+end
+
+-- uturnLength(lane, dir?): the arc length of the U-turn at the far end of direction `dir` (default: the
+-- lane's own): a half circle between the two sides of a ping-pong lane (`coordFor`), or from a one-way
+-- lane onto its `returnLane`; 0 when there is none (or both directions share one line).
+function LaneMath.uturnLength(lane: Lane, dir: number?): number
+	local a, b = turnCoords(lane, dir or (if lane.dir == 0 then 1 else lane.dir))
+	if a == nil or b == nil then
 		return 0
 	end
-	return math.pi * math.abs(cf[1] - cf[-1]) / 2
+	return math.pi * math.abs(a - b) / 2
 end
 
 -- uturnPoint(lane, dir, d) -> pose: d studs into the U-turn at the far end of direction `dir` (a left turn
 -- under drive-on-the-right): a half circle, beyond the lane's end, from the dir side to the -dir side.
 function LaneMath.uturnPoint(lane: Lane, dir: number, d: number): Pose
-	local cf = lane.coordFor :: { [number]: number }
-	local r = math.abs(cf[1] - cf[-1]) / 2
-	local mid = (cf[1] + cf[-1]) / 2
+	local from, to = turnCoords(lane, dir)
+	local a, b = from :: number, to :: number
+	local r = math.abs(a - b) / 2
+	local mid = (a + b) / 2
 	local endAlong = if dir > 0 then lane.endAt else lane.startAt
 	local phi = math.clamp(d / math.max(r, 1e-9), 0, math.pi)
 	-- in (along, coord) coordinates: forward is (dir, 0); out from the centre to the start is (0, u)
-	local u = if cf[dir] > mid then 1 else -1
+	local u = if a > mid then 1 else -1
 	local along = endAlong + dir * r * math.sin(phi)
 	local coord = mid + u * r * math.cos(phi)
 	local tAlong, tCoord = dir * math.cos(phi), -u * math.sin(phi)

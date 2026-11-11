@@ -87,6 +87,76 @@ return function(t)
 		t.truthy((events.stopped or 0) + (svc:stats().violations.rollingStop or 0) >= 4, "stop lines both ways")
 	end)
 
+	t.test(
+		"street ends: every one-way lane has a way back, and its vehicles turn round there instead of wrapping",
+		function()
+			local lanes = LaneMath.load(records)
+			LaneMath.unify(lanes, roads, records)
+			local made = LaneMath.link(lanes, roads, records)
+			t.deepEq(made, { "res_west_ns_x-180_northbound~back" }, "the west street had no lane the other way")
+			local pairs = {
+				{ "res_main_ns_northbound", "res_main_ns_southbound" },
+				{ "blvd_eastbound", "blvd_westbound" },
+				{ "res_west_ns_x-180_northbound", "res_west_ns_x-180_northbound~back" },
+			}
+			for _, pair in pairs do
+				local a, b = lanes[pair[1]], lanes[pair[2]]
+				t.eq(a.returnLane, b, `{pair[1]} turns onto {pair[2]}`)
+				t.eq(b.returnLane, a)
+				t.eq(a.dir, -b.dir)
+				t.eq(a.length, b.length)
+				-- the turn joins the end of one to the start of the other, heading and all
+				for _, lane in { a, b } do
+					local back = lane.returnLane :: any
+					local e, u0 = LaneMath.pointAt(lane, lane.length), LaneMath.uturnPoint(lane, lane.dir, 0)
+					t.near(e.x, u0.x, 1e-9)
+					t.near(e.z, u0.z, 1e-9)
+					t.near(wrapAngle(e.yaw - u0.yaw), 0, 1e-9)
+					local u1 = LaneMath.uturnPoint(lane, lane.dir, LaneMath.uturnLength(lane))
+					local s0 = LaneMath.pointAt(back, 0)
+					t.near(u1.x, s0.x, 1e-9)
+					t.near(u1.z, s0.z, 1e-9)
+					t.near(wrapAngle(u1.yaw - s0.yaw), 0, 1e-9)
+				end
+			end
+			-- the mirrored lane is on the other side of the west street's centreline (x = -450)
+			t.near(lanes["res_west_ns_x-180_northbound~back"].coord :: number, -436.5, 1e-9)
+			-- beside the trolley the boulevard's lanes end clear of its termini (707.5 and 1642.5)
+			t.near(lanes.blvd_eastbound.startAt, 707.5 - LaneMath.TURN_CLEAR, 1e-9)
+			t.near(lanes.blvd_eastbound.endAt, 1642.5 + LaneMath.TURN_CLEAR, 1e-9)
+			t.eq(lanes.patrol_beat.returnLane, nil, "a ping-pong lane turns onto its own other side")
+			t.eq(lanes.trolley_track.returnLane, nil)
+			-- driven: a sedan, an RV and a dump truck each to the end of their street and back, tick by tick
+			for _, id in { 1, 3, 4, 6 } do
+				local svc = service({ entry(id) })
+				local v = svc.byId[id]
+				local first = v.lane
+				v.s = v.lane.length - 200
+				svc:step(1 / 30) -- (placed there)
+				local events = drive(svc, id, 200, 0.1)
+				t.truthy((events.turn or 0) >= 1, `{v.name} turned round`)
+				t.eq(events.wrap, nil, `{v.name} did not wrap`)
+				t.truthy(v.visible, "never hidden")
+				t.truthy(v.lane == first or v.lane == first.returnLane)
+			end
+			-- three at once on the main street for ten minutes: nobody meets in a turn
+			local svc = service({ entry(1), entry(2), entry(3) })
+			local worst = math.huge
+			for _ = 1, 30 * 600 do
+				svc:step(1 / 30)
+				for i, a in svc.vehicles do
+					for j = i + 1, #svc.vehicles do
+						local b = svc.vehicles[j]
+						-- centres never closer than the two half widths (boxes cannot overlap beyond that)
+						local d = math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2)
+						worst = math.min(worst, d - (a.box.width + b.box.width) / 2)
+					end
+				end
+			end
+			t.truthy(worst > 0.5, `two vehicles came within {worst} st of each other's sides`)
+		end
+	)
+
 	t.test("ice cream loop: even speed by arc length, through both U-turns", function()
 		local lanes = LaneMath.load(records)
 		local loop = lanes.icecream_loop

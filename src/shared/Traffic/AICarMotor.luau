@@ -214,8 +214,9 @@ local function mergeConflict(v: Vehicle, ctx: Ctx, horizon: number): boolean
 		local bs = b.speed or 0
 		if b.visible ~= false and b.id ~= v.id and bs > 0.5 then
 			local bx, bz = math.sin(b.yaw), math.cos(b.yaw)
-			if math.abs(bx * fx + bz * fz) < 0.95 then
-				local px, pz = b.x - v.x, b.z - v.z
+			local px, pz = b.x - v.x, b.z - v.z
+			-- (one behind v is following it round the same turn: that one brakes for v, not v for it)
+			if math.abs(bx * fx + bz * fz) < 0.95 and px * fx + pz * fz > -v.box.length / 2 then
 				local wx, wz = bx * bs - vx, bz * bs - vz
 				local w2 = wx * wx + wz * wz
 				local t = if w2 > 1e-9 then math.clamp(-(px * wx + pz * wz) / w2, 0, horizon) else 0
@@ -444,43 +445,51 @@ local function stopCap(v: Vehicle, ctx: Ctx, decel: number, dt: number, events: 
 	return cap
 end
 
--- one-way lane motion with the wrap teleport
+-- Lane motion. At the end of its lane a vehicle turns round: a U-turn (phase "uturn", `timer` = studs into
+-- it) onto the other side of the road, then on along the other direction: the other side of a ping-pong
+-- lane (the patrol beat; LaneMath.pingPong measures s in each direction's own frame) or a one-way lane's
+-- `returnLane` (LaneMath.link). v5.4 wrapped one-way traffic to the lane's start instead, a car vanishing
+-- at one end of the street and another appearing at the other, in plain view; only a lane with no way
+-- back (none in the game's data) still does.
 local function advanceLane(v: Vehicle, ctx: Ctx, dt: number, events: { string })
 	local lane = v.lane
-	if v.class == "patrol" then
-		-- past an end the car drives a U-turn (phase "uturn", `timer` = studs into it) onto the other side
-		-- of the road, then on along the other direction (LaneMath.pingPong measures s in each direction's
-		-- own frame)
-		local arc = LaneMath.uturnLength(lane)
-		if v.phase == "uturn" then
-			local d = v.timer + v.speed * dt
-			if d < arc then
-				v.timer = d
-				local p = LaneMath.uturnPoint(lane, v.dir, d)
-				v.x, v.z, v.yaw = p.x, p.z, p.yaw
-				v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
-				return
-			end
-			v.phase, v.timer = "drive", 0
+	local arc = LaneMath.uturnLength(lane, v.dir)
+	if v.phase == "uturn" then
+		local d = v.timer + v.speed * dt
+		if d < arc then
+			v.timer = d
+			local p = LaneMath.uturnPoint(lane, v.dir, d)
+			v.x, v.z, v.yaw = p.x, p.z, p.yaw
+			v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
+			return
+		end
+		v.phase, v.timer = "drive", 0
+		local back = lane.returnLane
+		if back then
+			v.lane, v.dir = back, back.dir
+		else
 			v.dir = -v.dir
-			v.s = math.min(d - arc, lane.length)
+		end
+		v.s = math.min(d - arc, v.lane.length)
+		table.insert(events, "turn")
+		v.stop = Control.newState()
+	elseif arc > 0 then
+		local n = v.s + math.abs(v.speed) * dt
+		if n > lane.length then
+			v.s = lane.length
+			v.phase, v.timer = "uturn", n - lane.length
+			local p = LaneMath.uturnPoint(lane, v.dir, v.timer)
+			v.x, v.z, v.yaw = p.x, p.z, p.yaw
+			v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
+			return
+		end
+		v.s = n
+	elseif lane.dir == 0 then
+		local s, d, turned = LaneMath.pingPong(lane, v.s, v.dir, v.speed, dt)
+		v.s, v.dir = s, d
+		if turned then
 			table.insert(events, "turn")
 			v.stop = Control.newState()
-		else
-			local s, d, turned = LaneMath.pingPong(lane, v.s, v.dir, v.speed, dt)
-			if turned and arc > 0 then
-				v.s = lane.length
-				v.phase, v.timer = "uturn", s
-				local p = LaneMath.uturnPoint(lane, v.dir, s)
-				v.x, v.z, v.yaw = p.x, p.z, p.yaw
-				v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
-				return
-			end
-			v.s, v.dir = s, d
-			if turned then
-				table.insert(events, "turn")
-				v.stop = Control.newState()
-			end
 		end
 	else
 		local s, wrapped = LaneMath.advance(lane, v.s, v.speed, dt)
@@ -502,10 +511,90 @@ local function advanceLane(v: Vehicle, ctx: Ctx, dt: number, events: { string })
 			return
 		end
 	end
-	place(v, ctx, lane)
+	place(v, ctx, v.lane)
+end
+
+local UTURN_SPEED = st(5) -- 12.5 st/s round a 13.5 st U-turn: 0.9 rad/s of steering
+local UTURN_SPEED_HEAVY = st(4) -- the RVs and dump trucks take it at 10 st/s
+local UTURN_BRAKE = st(4) -- braking into it, gentler than the 10 u/s2 hazard stop
+local TURN_LOOK = st(14) -- how far along the turn a vehicle looks for one ahead of it
+local TURN_GAP = st(2) -- and the free road it keeps to it
+
+-- poseAhead(v, d): where v's centre is d studs further on: along its lane, round the U-turn at its end
+-- and on along the lane it comes back by.
+local function poseAhead(v: Vehicle, d: number): (number, number, number)
+	local lane = v.lane
+	local arc = LaneMath.uturnLength(lane, v.dir)
+	local into = if v.phase == "uturn" then v.timer + d else v.s + d - lane.length
+	local p: LaneMath.Pose
+	if into <= 0 then
+		p = LaneMath.pointAt(lane, v.s + d, v.dir)
+	elseif into < arc then
+		p = LaneMath.uturnPoint(lane, v.dir, into)
+	else
+		local back = lane.returnLane
+		p = if back then LaneMath.pointAt(back, into - arc, back.dir) else LaneMath.pointAt(lane, into - arc, -v.dir)
+	end
+	return p.x, p.z, p.yaw
+end
+
+-- pathGap(v, ctx, reach) -> studs: the free road in front of v's nose along the path it is about to
+-- drive (poseAhead), up to `reach`; math.huge when nothing stands on it. The corridor tests look straight
+-- ahead, which in a turn is not where the vehicle goes: a sedan following a dump truck round the end of
+-- the boulevard drove into its tail. Oncoming vehicles are not counted (they pass on their own side).
+local PATH_STEP = st(1)
+local function pathGap(v: Vehicle, ctx: Ctx, reach: number): number
+	local half = v.box.width / 2
+	local nose = (v.box.length - v.box.width) / 2
+	local d = PATH_STEP
+	while d <= reach + nose do
+		local x, z, yaw = poseAhead(v, d)
+		local fx, fz = math.sin(yaw), math.cos(yaw)
+		for _, b in ctx.bodies do
+			if b.visible ~= false and b.id ~= v.id then
+				-- b as a capsule along its heading
+				local ux, uz = math.sin(b.yaw), math.cos(b.yaw)
+				local hl = math.max(0, (b.length - b.width) / 2)
+				local dx, dz = x - b.x, z - b.z
+				local t = math.clamp(dx * ux + dz * uz, -hl, hl)
+				local cx, cz = dx - ux * t, dz - uz * t
+				local r = half + b.width / 2 + PATH_MARGIN
+				if cx * cx + cz * cz < r * r and ux * fx + uz * fz > -0.3 then
+					return math.max(0, d - nose - PATH_MARGIN)
+				end
+			end
+		end
+		d += PATH_STEP
+	end
+	return math.huge
+end
+
+-- turnLimit(v, ctx): the speed a vehicle may have this tick because of the U-turn at the end of its lane
+-- (math.huge on a lane without one): it brakes into the turn and takes it slowly; it waits at its
+-- mouth, or in it, while a vehicle is crossing its way (the patrol car turns across the oncoming lane
+-- in the middle of the boulevard); and at the end of a street it keeps behind the vehicle ahead of it
+-- on the turn (pathGap).
+local function turnLimit(v: Vehicle, ctx: Ctx): number
+	if LaneMath.uturnLength(v.lane, v.dir) <= 0 then
+		return math.huge
+	end
+	local toEnd = if v.phase == "uturn" then 0 else math.max(0, v.lane.length - v.s)
+	local top = if v.class == "heavy" then UTURN_SPEED_HEAVY else UTURN_SPEED
+	if (v.phase == "uturn" or toEnd < st(6)) and mergeConflict(v, ctx, 2) then
+		return 0
+	end
+	local limit = math.sqrt(top * top + 2 * UTURN_BRAKE * toEnd)
+	if v.lane.returnLane and toEnd < TURN_LOOK then
+		limit = math.min(limit, math.max(0, (pathGap(v, ctx, TURN_LOOK) - TURN_GAP) * 1.2))
+	end
+	return limit
 end
 
 local stepClass: { [string]: (Vehicle, Ctx, number, { string }) -> () } = {}
+
+local SEDAN_GAP = st(2) -- 5 st between a standing sedan and the tail of what it stopped behind
+local SEDAN_FOLLOW = 1.2 -- desired speed per stud of free road beyond SEDAN_GAP (1/s): 19 st back at 17 st/s
+local SEDAN_BRAKE = st(16) -- 40 st/s2: the hardest it brakes for a vehicle (for a person it stops as before)
 
 stepClass.sedan = function(v, ctx, dt, events)
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
@@ -518,14 +607,24 @@ stepClass.sedan = function(v, ctx, dt, events)
 			break
 		end
 	end
+	-- A vehicle ahead (v5.4: any within 9 u + 0.65 v set the desired speed to 0, and braking shortened that
+	-- look-ahead until the leader dropped out of it: the sedan lurched up to anything slower, braking and
+	-- pulling away on alternate ticks). The desired speed now eases down with the free road to the leader,
+	-- so the sedan settles behind it at its speed, SEDAN_GAP back when both stand.
+	local follow = math.huge
 	if not danger then
-		danger =
-			LaneMath.vehicleAhead(AICarMotor.body(v), fx, fz, st(9) + 0.65 * v.speed, st(1.2), sameWay(v, ctx, fx, fz))
+		local reach = st(9) + 0.65 * v.speed
+		local gap = gapAhead(v, fx, fz, reach, st(1.2), sameWay(v, ctx, fx, fz))
+		follow = math.max(0, (gap - SEDAN_GAP) * SEDAN_FOLLOW)
 	end
-	local cap = stopCap(v, ctx, st(9), dt, events)
+	local cap = math.min(stopCap(v, ctx, st(9), dt, events), turnLimit(v, ctx), follow)
 	local desired = if danger then 0 else math.min(v.cruise, cap)
 	local rate = if desired < v.speed then 9 else 1.3
-	v.speed += (desired - v.speed) * (1 - math.exp(-dt * rate))
+	local step = (desired - v.speed) * (1 - math.exp(-dt * rate))
+	if not danger then
+		step = math.max(step, -SEDAN_BRAKE * dt) -- behind a vehicle it brakes like a car, not like a wall
+	end
+	v.speed += step
 	if v.speed < 1e-3 and desired == 0 then
 		v.speed = 0
 	end
@@ -533,7 +632,9 @@ stepClass.sedan = function(v, ctx, dt, events)
 	local nx, nz = v.x + fx * v.speed * dt, v.z + fz * v.speed * dt
 	if personNear(ctx, nx, nz, st(3.1), false) then
 		v.speed = 0
-		place(v, ctx, v.lane)
+		if v.phase ~= "uturn" then
+			place(v, ctx, v.lane)
+		end
 		return
 	end
 	advanceLane(v, ctx, dt, events)
@@ -561,24 +662,11 @@ local function yielding(
 end
 
 stepClass.heavy = function(v, ctx, dt, events)
-	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10))
+	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10), turnLimit(v, ctx))
 end
 
-local UTURN_SPEED = st(5) -- 12.5 st/s round the patrol beat's 14 st U-turn: 0.9 rad/s of steering
-local UTURN_BRAKE = st(4) -- braking into it, gentler than the 10 u/s2 hazard stop
-
 stepClass.patrol = function(v, ctx, dt, events)
-	local limit = math.huge
-	if LaneMath.uturnLength(v.lane) > 0 then
-		local toEnd = if v.phase == "uturn" then 0 else math.max(0, v.lane.length - v.s)
-		limit = math.sqrt(UTURN_SPEED * UTURN_SPEED + 2 * UTURN_BRAKE * toEnd)
-		-- the U-turn crosses the oncoming lane: wait for a gap in it (the east end is 15 u from where the
-		-- westbound boulevard traffic wraps in)
-		if (v.phase == "uturn" or toEnd < st(6)) and mergeConflict(v, ctx, 2) then
-			limit = 0
-		end
-	end
-	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10), limit)
+	yielding(v, ctx, dt, events, st(10), st(11), st(3.2), st(10), turnLimit(v, ctx))
 end
 
 stepClass.van = function(v, ctx, dt, events)

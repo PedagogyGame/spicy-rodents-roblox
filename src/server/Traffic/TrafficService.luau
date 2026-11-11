@@ -122,6 +122,7 @@ end
 function TrafficService.new(opts: Opts): TrafficService
 	local lanes = LaneMath.load(opts.lanes)
 	local unified = LaneMath.unify(lanes, opts.roads, opts.lanes)
+	LaneMath.link(lanes, opts.roads, opts.lanes) -- a way back at the end of every one-way street
 	local records = {}
 	for _, r in opts.lanes do
 		records[r.id] = r

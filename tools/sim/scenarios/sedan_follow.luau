@@ -32,8 +32,10 @@ local scenario: Replay.Scenario = {
 		local v = sim.traffic.byId[2]
 		v.s = (v.s - 261) % v.lane.length
 	end,
-	expect = { none = { "speed_stutter", "reverse_travel", "box_overlap", "sink", "float" } },
-	known = { "speed_pumping" },
+	-- fixed: the sedan's desired speed eases down with the free road to the vehicle ahead (AICarMotor)
+	expect = {
+		none = { "speed_stutter", "reverse_travel", "box_overlap", "sink", "float", "speed_pumping", "accel_spike" },
+	},
 }
 
 return scenario

@@ -1,7 +1,10 @@
 --!strict
--- Scenario: every vehicle that wraps (the one-way lanes' v5.4 teleport, traffic.md §5.1, §5.5) placed
--- 2 to 14 s short of its lane's end, so all eight wraps happen in the first 15 s: where does the car
--- vanish, where does it reappear, and does the client snap it or streak it across?
+-- Scenario: every vehicle of a one-way lane placed 2 to 14 s short of its lane's end, so all eight reach
+-- the end of their street in the first 15 s. In v5.4 each wrapped there (traffic.md §5.1, §5.5): it
+-- vanished and reappeared at the other end of the street, in plain view, some seven times a minute across
+-- the fleet. Now each turns round at the end of its street and drives back along the other side
+-- (LaneMath.link, AICarMotor.advanceLane): nothing vanishes, nothing appears, and no two of them meet in
+-- the turn.
 local Fleet = require("@shared/Traffic/Fleet")
 local Replay = require("../lib/Replay")
 
@@ -14,9 +17,9 @@ end
 
 local scenario: Replay.Scenario = {
 	name = "lane_ends",
-	about = "the eight wrapping vehicles 2 to 14 s short of their lanes' ends: eight wraps in 15 s",
-	seconds = 20,
-	ci = 20,
+	about = "the eight one-way-lane vehicles 2 to 14 s short of their lanes' ends: eight U-turns in 30 s",
+	seconds = 45,
+	ci = 45,
 	entries = entries,
 	setup = function(sim: Replay.Sim)
 		for i, v in sim.traffic.vehicles do
@@ -24,8 +27,6 @@ local scenario: Replay.Scenario = {
 			v.s = v.lane.length - math.max(v.cruise, 10) * (2 + 1.5 * i)
 		end
 	end,
-	-- every wrap snaps on every client (the flag is carried to the next send); each is still a car vanishing
-	-- at one end of a street and appearing at the other, in the middle of the town
 	expect = {
 		none = {
 			"speed_stutter",
@@ -35,8 +36,18 @@ local scenario: Replay.Scenario = {
 			"teleport_bit_dropped",
 			"teleport_unflagged",
 			"accel_spike",
+			"teleport_flagged",
+			"appear",
+			"disappear",
+			"box_overlap",
+			"yaw_jump",
+			"sim_yaw_snap",
+			"sideways_slide",
+			"reverse_travel",
+			"off_road",
+			"through_building",
+			"speed_pumping",
 		},
-		some = { "teleport_flagged" },
 	},
 }
 

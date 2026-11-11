@@ -1,7 +1,10 @@
 --!strict
--- Scenario: two sedans, each a few seconds short of the end of its one-way lane. Each reaches the end and
--- wraps to the start (the v5.4 teleport, traffic.md §5.1): 1,300 studs in one tick, flagged for that
--- tick. The smallest case of "does a wrap reach the client as a snap or as a streak": the northbound
+-- Scenario: two sedans, each a few seconds short of the end of its one-way lane, on lanes with no way
+-- back, as v5.4 drove them (in the game every street has one, LaneMath.link, and the sedans turn round:
+-- see lane_ends; here the link is taken away). Each reaches the end and wraps to the start (the v5.4
+-- teleport, traffic.md §5.1): 1,300 studs in one tick, flagged for that tick. It keeps the flagged
+-- teleport measured from the service to the screen, which a dispatch still relies on.
+-- The smallest case of "does a wrap reach the client as a snap or as a streak": the northbound
 -- sedan wraps on a tick that is not followed by a send, the southbound one on a tick that is. The
 -- service remembers a jump until the next send carries it (TrafficService.jumped), so both snap.
 -- This file is also the pattern to copy for a focused case: pick the vehicles, force their state in
@@ -27,6 +30,7 @@ local scenario: Replay.Scenario = {
 	setup = function(sim: Replay.Sim)
 		-- sim.traffic is the real TrafficService; a vehicle's lane position is `s` (studs from the start)
 		local north, south = sim.traffic.byId[1], sim.traffic.byId[2]
+		north.lane.returnLane, south.lane.returnLane = nil, nil
 		north.s = north.lane.length - 62
 		north.speed = north.cruise
 		south.s = south.lane.length - 62

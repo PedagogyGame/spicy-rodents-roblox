@@ -1,7 +1,7 @@
 --!strict
 -- Scenario: every vehicle that drives a lane by itself (not the dispatched responders and incident cars),
 -- for a whole 2,400 s living-event cycle, on a town with nobody on the roads. At the fleet's speeds this
--- is 15 to 60 laps of every one-way lane and its wrap, 40 round trips of the patrol beat, 30 loops of the
+-- is 15 to 60 lengths of every one-way lane and the turn at its end, 40 round trips of the patrol beat, 30 loops of the
 -- ice cream van, 70 trolley stations, 25 motorcycle rides, 9 legacy ambulance runs and both event-car
 -- cycles (barbecue at 0 s, softball at 1,200 s): every straight, corner, U-turn, stop and lane end the
 -- fleet uses, several times over. The geometry hunt's coverage run (`--scenario lane_tour`).
@@ -42,6 +42,11 @@ local scenario: Replay.Scenario = {
 			"yaw_jump",
 			"reverse_travel",
 			"sideways_slide",
+			-- and since: no lane vehicle vanishes at the end of its street (it turns round), and a sedan
+			-- eases up to the vehicle ahead instead of lurching
+			"teleport_flagged",
+			"speed_pumping",
+			"accel_spike",
 		},
 	},
 }

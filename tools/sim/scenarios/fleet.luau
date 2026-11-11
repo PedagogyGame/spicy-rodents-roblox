@@ -30,6 +30,8 @@ local scenario: Replay.Scenario = {
 			"teleport_bit_dropped", -- a jump is held until a send carries it (TrafficService.jumped)
 			"teleport_unflagged",
 			"box_overlap", -- the eastbound lane keeps clear of the trolley track
+			"teleport_flagged", -- nobody wraps: every lane vehicle turns round at the end of its street
+			"speed_pumping",
 		},
 	},
 }

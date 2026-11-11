@@ -192,7 +192,8 @@ return function(t)
 		t.truthy((stats.events.stopped or 0) > 0, "stopped at a sign")
 		t.truthy((stats.events.arrived or 0) >= 3 and (stats.events.home or 0) >= 3, "dispatched trips completed")
 		t.truthy((stats.events.delivery or 0) > 0 and (stats.events.bell or 0) > 0, "van and trolley schedules ran")
-		t.truthy((stats.events.wrap or 0) > 0, "wraps happened (teleport flagged)")
+		t.truthy((stats.events.turn or 0) > 8, "every lane vehicle turned round at the end of its street")
+		t.eq(stats.events.wrap, nil, "and nobody wrapped: no car vanishes at one end and appears at the other")
 		print(
 			`      {stats.ticks} ticks, mean {string.format("%.3f", stats.ms / stats.ticks)} ms, max {string.format(
 				"%.3f",
