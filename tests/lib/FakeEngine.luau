@@ -20,7 +20,10 @@
 --   bound; signal() -> { Connect, fire }; uis() -> the fake UserInputService; input(kind "began" | "ended" |
 --   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position? });
 --   game:GetService("Players").LocalPlayer (with a PlayerGui); any other service is an empty fake instance;
---   task.spawn / defer run at once and task.delay waits for runDelayed()
+--   task.spawn / defer run at once and task.delay waits for runDelayed(); events(names) and classes({ parts?,
+--   gui? }) teach it more event members and more BasePart / GuiObject classes (a game's own test asks for what
+--   its glue uses rather than editing the lists here); the fake UserInputService remembers what input() pressed
+--   (IsKeyDown, IsMouseButtonPressed)
 
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
@@ -48,6 +51,22 @@ local EVENTS: { [string]: boolean } = {
 	ChildAdded = true,
 	AncestryChanged = true,
 }
+
+-- A test's own additions (a game whose glue listens to an event or makes a class that is not listed above).
+function FakeEngine.events(names: { string })
+	for _, name in names do
+		EVENTS[name] = true
+	end
+end
+
+function FakeEngine.classes(more: { parts: { string }?, gui: { string }? })
+	for _, name in more.parts or {} do
+		BASE_PARTS[name] = true
+	end
+	for _, name in more.gui or {} do
+		GUI_OBJECTS[name] = true
+	end
+end
 
 local Inst = {}
 
@@ -363,6 +382,15 @@ function FakeEngine.input(kind: string, io: { [string]: any }, processed: boolea
 		then fakeUis.InputBegan
 		elseif kind == "ended" then fakeUis.InputEnded
 		else fakeUis.InputChanged
+	-- what is held: the key or the mouse button, from its press to its release
+	if kind == "began" or kind == "ended" then
+		local held = if kind == "began" then true else nil
+		if io.KeyCode then
+			fakeUis.held[io.KeyCode] = held
+		elseif io.UserInputType then
+			fakeUis.held[io.UserInputType] = held
+		end
+	end
 	sig.fire(event, processed == true)
 end
 
@@ -378,6 +406,13 @@ local function fakeGame(): any
 		KeyboardEnabled = true,
 		mouse = roblox.Vector2.new(960, 540), -- the test moves this
 		focused = nil, -- a focused text box (anything non-nil) means the player is typing
+		held = {} :: { [any]: boolean }, -- keys and mouse buttons down now (input "began" until "ended")
+		IsKeyDown = function(self: any, code: any): boolean
+			return self.held[code] == true
+		end,
+		IsMouseButtonPressed = function(self: any, button: any): boolean
+			return self.held[button] == true
+		end,
 		GetMouseLocation = function(self: any): any
 			return self.mouse
 		end,

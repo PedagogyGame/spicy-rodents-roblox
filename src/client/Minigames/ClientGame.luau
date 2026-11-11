@@ -7,7 +7,9 @@
 --   title      the card's heading for a "joined" message (default: the Spec's title)
 --   buttons    the button bar for a phase: "joined" (as the game opens), then the Session's "lobby", "playing",
 --              "done" on every state message. nil = leave the bar as it is. A button's id is sent as a verb with
---              no arguments; an id that is one of the rules' MODES is sent as verb "mode" { id }.
+--              no arguments; an id that is one of the rules' MODES is sent as verb "mode" { id }. A game with
+--              no `buttons` at all gets the framework's: Start now (and Add a computer, if its Spec names
+--              computers) in a lobby, Play again at the end, Leave (Q) always.
 --   keys       extra keys while the game is open: KeyCode name -> verb sent with no arguments (the fortune
 --              teller's E = "again"). Q leaves, H hides the help card and Space starts a lobby in every game.
 --   new        the controller for a seat at the game (it gets a Ctx). It is made only when the station's place

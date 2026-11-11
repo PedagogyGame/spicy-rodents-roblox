@@ -65,7 +65,8 @@ function MinigameClient.start(opts: { [string]: any }): any
 	local ui = MinigameUI.new()
 
 	-- Where each site stands: told by the server when you join; before that (a throw on a lane you are only
-	-- watching) read from the compiled data, the bowling alley first and the expansion venues only if asked for.
+	-- watching) read from the site's baked model, or failing that from the compiled data, the bowling alley
+	-- first and the expansion venues only if asked for.
 	local learned: { [string]: Place } = {}
 	local alleySites: { [string]: Place }? = nil
 	local allSites: { [string]: Place }? = nil
@@ -80,6 +81,24 @@ function MinigameClient.start(opts: { [string]: any }): any
 	local function sitePlace(site: string): Place?
 		if learned[site] then
 			return learned[site]
+		end
+		-- the site's baked model says where it stands (the bake writes Site and the Origin attributes on it)
+		local att = workspace:FindFirstChild("Attractions")
+		for _, m in if att then att:GetChildren() else {} do
+			if m:GetAttribute("Site") == site then
+				local x, z = m:GetAttribute("OriginX"), m:GetAttribute("OriginZ")
+				local floorY, yaw = m:GetAttribute("FloorY"), m:GetAttribute("Yaw")
+				if
+					type(x) == "number"
+					and type(z) == "number"
+					and type(floorY) == "number"
+					and type(yaw) == "number"
+				then
+					local p: Place = { x = x, z = z, floorY = floorY, yaw = yaw }
+					learned[site] = p
+					return p
+				end
+			end
 		end
 		local near = alleySites or dataSites(false)
 		alleySites = near
@@ -257,6 +276,7 @@ function MinigameClient.start(opts: { [string]: any }): any
 			lane = msg.lane,
 			cg = cg,
 			modes = spec and spec.rules and spec.rules.MODES,
+			computers = spec ~= nil and spec.computers ~= nil and #spec.computers > 0,
 		}
 		active = a
 		player:SetAttribute("InMinigame", msg.station)
@@ -353,8 +373,17 @@ function MinigameClient.start(opts: { [string]: any }): any
 				local list: { { string } }? = nil
 				if cg and cg.buttons then
 					list = cg.buttons(view.phase, view)
+				elseif view.phase == "lobby" then
+					-- a game with no buttons of its own gets the framework's
+					list = { { "start", "Start now" } }
+					if a.computers then
+						table.insert(list, { "addai", "Add a computer" })
+					end
+					table.insert(list, LEAVE)
 				elseif view.phase == "done" then
 					list = { { "again", "Play again" }, LEAVE }
+				else
+					list = { LEAVE }
 				end
 				if list then
 					setButtons(list)
