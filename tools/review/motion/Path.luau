@@ -663,8 +663,8 @@ function Path.simulate(variantName: string, takeName: string): Take
 		start + math.floor((last - start) * 2 / 3 + 0.5),
 	}
 	if stride.large then
-		for j, at in stride.large do
-			large[j] = math.floor(at * Path.FPS + 0.5)
+		for j, seconds in stride.large do
+			large[j] = math.floor(seconds * Path.FPS + 0.5)
 		end
 	end
 	return {

@@ -10,6 +10,7 @@
 
 local AnimationDriver = require("@client/Animation/AnimationDriver")
 local CameraRig = require("@client/Camera/CameraRig")
+local Squirrel = require("@client/Controllers/Squirrel")
 local HeroAssets = require("@shared/Actors/HeroAssets")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local Path = require("@tests/../tools/review/motion/Path")
@@ -19,6 +20,19 @@ local CLIPS = HeroAssets.CLIPS.squirrel
 
 return function(t: any)
 	local dt = 1 / Path.FPS
+
+	t.test("the held body's mode and the clip crossover are the game's own (Squirrel.modeOf, HERO)", function()
+		t.eq(Squirrel.modeOf(false, 0, true), "ground")
+		t.eq(Squirrel.modeOf(false, 0, false), "air")
+		t.eq(Squirrel.modeOf(true, 0.2, false), "rail", "on a rail it is a trunk only once the climb pose shows")
+		t.eq(Squirrel.modeOf(true, 0.5, false), "rail")
+		t.eq(Squirrel.modeOf(true, 0.51, false), "trunk")
+		t.eq(Squirrel.modeOf(true, 1, true), "trunk")
+		-- the crossover the driver has always used (a change here changes what every body shows)
+		t.eq(H.fade, 0.15)
+		t.eq(H.refade, 0.1)
+		t.eq(H.holdEnd, 0.06)
+	end)
 
 	t.test("stand-in tracks: a change of clip crosses over in HERO.fade and both run on meanwhile", function()
 		local p = Path.newTracks(CLIPS)
