@@ -4,7 +4,9 @@
 -- VehiclePoses, W1 #9; traffic.md §13 "render on clients with interpolation, about 100 ms behind").
 -- Interface: encode(pose) -> record (Net/Schemas.VehiclePose fields); decode(record) -> Pose;
 --            new(opts) -> Buffer; Buffer:push(t, records); Buffer:sample(now) -> { [id] = Pose };
---            render(buffer, now, folder, lib, kinds) (engine: placeholder models, one BulkMoveTo).
+--            seat(x, z, yaw, length, heightAt) -> y, pitch; seen(pose, kind, heightAt) -> x, y, z, yaw, pitch
+--            (pure: the root pose a player sees); render(buffer, now, folder, kinds, heightAt, models)
+--            (engine: placeholder models, one BulkMoveTo).
 --
 -- Records are 13 bytes (u16 id, f32 x, f32 z, u8 yaw, u8 speed, u8 bits). The server never sends y:
 -- clients take it from World/Height like the server does (traffic.md §13 "Terrain"). A teleported pose
@@ -246,6 +248,25 @@ function Ghost.seat(
 	return (front + rear) / 2, math.clamp(pitch, -0.5, 0.5)
 end
 
+Ghost.HIDDEN_Y = -500 -- a hidden ghost parks this far below the map
+
+-- seen(p, kind, heightAt) -> x, y, z, yaw, pitch: the pose `render` gives the root part of a vehicle of
+-- that kind for the sampled pose `p`: a visible one sits on the ground under its axles (`seat`), its
+-- centre half its box height above it, pitched with the slope; a hidden one parks at HIDDEN_Y, level.
+-- Yaw is the HTML yaw (Units.yawCFrame turns it into the engine's). Pure: the headless replay
+-- (tools/sim/traffic_replay.luau) records exactly these numbers as "what the player sees".
+function Ghost.seen(
+	p: Pose,
+	kind: string,
+	heightAt: (x: number, z: number) -> number
+): (number, number, number, number, number)
+	if p.visible then
+		local y, pitch = Ghost.seat(p.x, p.z, p.yaw, VehiclePuppet.length(kind), heightAt)
+		return p.x, y + VehiclePuppet.baseOffset(kind), p.z, p.yaw, pitch
+	end
+	return p.x, Ghost.HIDDEN_Y, p.z, p.yaw, 0
+end
+
 -- render(buffer, now, folder, kinds, heightAt, models): engine only. `kinds` maps id -> {kind, color};
 -- `models` caches the placeholder Model per id (built from Traffic/VehiclePuppet at the true box).
 -- Moves every visible root with one BulkMoveTo (HANDOFF rule 4); hidden ghosts park far below.
@@ -271,13 +292,9 @@ function Ghost.render(
 		end
 		if model and model.PrimaryPart and k then
 			table.insert(parts, model.PrimaryPart)
-			if p.visible then
-				local y, pitch = Ghost.seat(p.x, p.z, p.yaw, VehiclePuppet.length(k.kind), heightAt)
-				local at = Vector3.new(p.x, y + VehiclePuppet.baseOffset(k.kind), p.z)
-				table.insert(cframes, Units.yawCFrame(p.yaw, at) * CFrame.Angles(pitch, 0, 0))
-			else
-				table.insert(cframes, Units.yawCFrame(p.yaw, Vector3.new(p.x, -500, p.z)))
-			end
+			local x, y, z, yaw, pitch = Ghost.seen(p, k.kind, heightAt)
+			local level = Units.yawCFrame(yaw, Vector3.new(x, y, z))
+			table.insert(cframes, if p.visible then level * CFrame.Angles(pitch, 0, 0) else level)
 		end
 	end
 	if #parts > 0 then
