@@ -96,4 +96,11 @@ Schemas.REMOTES = {
 	["Lab.State"] = { dir = "s2c", reliable = true, devOnly = true },
 } :: { [string]: Def }
 
+-- Paintball's wire is declared with the rest of its contract in Shared/Paintball/Wire (payloads, rates,
+-- byte layouts) and merged here: it replaces the four early Paintball entries above and adds
+-- Paintball.Cmd, Paintball.Snap and Paintball.Shot.
+for name, def in require("../Paintball/Wire").REMOTES do
+	Schemas.REMOTES[name] = def
+end
+
 return Schemas
