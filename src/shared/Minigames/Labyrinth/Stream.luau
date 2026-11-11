@@ -56,7 +56,7 @@ export type Pose = {
 	knobLeft: number, -- degrees each knob has turned
 	knobRight: number,
 	speed: number,
-	touching: boolean, -- against a wall
+	touching: boolean, -- it touched a wall this tick
 	home: number, -- 0..1 through the roll home while it is away (0 otherwise)
 	fromX: number, -- the hole it went down and the checkpoint it is coming back to
 	fromY: number,

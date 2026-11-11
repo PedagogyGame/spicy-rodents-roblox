@@ -72,7 +72,7 @@ export type Marble = {
 	-- what happened this tick, for sound and drawing (rewritten every step)
 	hit: number, -- hardest wall hit, studs/s (0: none)
 	rim: number, -- deepest it stood over a hole's edge, as a share of its radius (0: clear)
-	touch: number, -- 1 when it ended the tick against a wall
+	touch: number, -- 1 when it touched a wall this tick
 }
 
 local TICK = Physics.TICK
@@ -242,7 +242,6 @@ function Physics.step(board: Boards.Board, m: Marble, ux: number, uy: number, ho
 
 		-- walls: the deepest contact first, then look again
 		local walls = board.cellWalls[cell]
-		touch = 0
 		for _ = 1, 4 do
 			local best, bnx, bny = 0, 0, 0
 			for i = 1, #walls do
