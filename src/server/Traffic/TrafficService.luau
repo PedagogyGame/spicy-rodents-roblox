@@ -3,7 +3,8 @@
 -- The AI fleet on its lanes: fixed-tick simulation, the fatal test, the pose stream (BUILD_PLAN §4.4
 -- W1 #9, D9, §1.6 VehiclePoses; traffic.md §5, §8, §13).
 -- Interface: new(opts) -> TrafficService; :step(dt, world) -> { Hit }; :poses() -> { VehiclePose };
---            :poseRecords() -> stream records; :dispatchResponder(dest) ; :dispatchIncident(scene);
+--            :poseRecords() -> stream records; :dispatchResponder(dest, opts?) ; :releaseResponder(v);
+--            :responderIdle() -> n; :responderHome() -> {x, z}; :dispatchIncident(scene);
 --            :markTeleported(actorId) (HANDOFF rule 12); :stats(); RunOver (Util/Signal);
 --            :start(ctx) (engine only: Heartbeat loop + Net stream at posesHz; never called on require).
 --
@@ -14,6 +15,9 @@
 -- fire RunOver(actorId, vehicle). Lanes are the compiled records with handedness unified (drive on the
 -- right), stop lines from Traffic/Control at the existing sign sites, the fleet from Traffic/Fleet.
 -- Vehicles are server state only; clients render ghosts from `poseRecords()` (Traffic/Ghost).
+-- A vehicle's `teleported` flag lasts one tick (1/30 s) and the stream sends every other tick, so the
+-- service remembers every jump until the next `poseRecords()` carries it: a wrap, an appearance or a
+-- responder turning round at a scene is never drawn as a slide across the road.
 
 local Import = require("../Import")
 local AICarMotor = Import.shared("Traffic/AICarMotor") :: typeof(require("../../shared/Traffic/AICarMotor"))
@@ -74,6 +78,7 @@ export type TrafficService = typeof(setmetatable(
 		prev: { [number]: { x: number, y: number, z: number, yaw: number, visible: boolean } },
 		prevActors: { [any]: { x: number, y: number, z: number } },
 		swept: SweptCollision.SweptCollision,
+		jumped: { [number]: boolean }, -- vehicles that teleported since the last poseRecords()
 		stops: { [string]: { StopLine } },
 		control: ControlData,
 		heightAt: (x: number, z: number) -> number,
@@ -116,6 +121,7 @@ function TrafficService.new(opts: Opts): TrafficService
 		prev = {},
 		prevActors = {},
 		swept = SweptCollision.new(),
+		jumped = {},
 		stops = Control.resolve(control, lanes),
 		control = control,
 		heightAt = opts.heightAt or function(_x: number, _z: number): number
@@ -205,6 +211,9 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 				stats.violations.rollingStop = (stats.violations.rollingStop or 0) + 1
 			end
 		end
+		if v.teleported then
+			self.jumped[v.id] = true
+		end
 		-- stuck: visible, in a driving phase, not dwelling or waiting at a stop line, and not moving
 		local driving = v.visible
 			and (v.phase == "drive" or v.phase == "ride" or v.phase == "out" or v.phase == "back")
@@ -289,8 +298,11 @@ function TrafficService.poses(self: TrafficService): { SweptCollision.VehiclePos
 end
 
 -- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them).
+-- Each call is one send: a jump made since the last call is flagged in this one and then forgotten.
 function TrafficService.poseRecords(self: TrafficService): { { [string]: number } }
 	local out = table.create(#self.vehicles)
+	local jumped = self.jumped
+	self.jumped = {}
 	for _, v in self.vehicles do
 		table.insert(
 			out,
@@ -302,7 +314,7 @@ function TrafficService.poseRecords(self: TrafficService): { { [string]: number 
 				speed = v.speed,
 				visible = v.visible,
 				beacons = v.class == "responder" or v.class == "incident" or v.class == "legacy_ambulance",
-				teleported = v.teleported,
+				teleported = v.teleported or jumped[v.id] == true,
 				stopped = v.speed < 0.05,
 			})
 		)
@@ -321,22 +333,61 @@ function TrafficService.kinds(self: TrafficService): { [number]: { kind: string,
 	return out
 end
 
--- dispatchResponder(dest): the first idle responder drives the trunk plus a leg to dest {x, z} (studs;
--- traffic.md §5.9 makeRoadTrip, trunk prefix). Returns the vehicle or nil when all three are busy.
-function TrafficService.dispatchResponder(self: TrafficService, dest: { number }): Vehicle?
+export type DispatchOpts = {
+	route: { { number } }?, -- the whole trip as road points in studs (Infection/MedicalRoute.trip)
+	hold: boolean?, -- stay on scene until releaseResponder (the patient is loaded first)
+}
+
+-- dispatchResponder(dest, opts?): the first idle responder drives to dest {x, z} (studs). Returns the
+-- vehicle or nil when all three are busy.
+-- With opts.route the trip is exactly those road points (the medical sequence passes MedicalRoute's
+-- shortest road path, every leg on asphalt). Without it the trip is the trunk plus an L to dest, the
+-- W1 stand-in: that L leaves the roads for most destinations, so real dispatches pass a route.
+function TrafficService.dispatchResponder(self: TrafficService, dest: { number }, opts: DispatchOpts?): Vehicle?
 	local rec = self.records.responder_ambulance_trunk
 	for _, v in self.vehicles do
 		if v.class == "responder" and v.phase == "idle" then
-			local pts = table.clone(rec.path.points)
-			local last = pts[#pts]
-			table.insert(pts, { dest[1], last[2] })
-			table.insert(pts, { dest[1], dest[2] })
+			local pts: { { number } }
+			if opts and opts.route and #opts.route >= 2 then
+				pts = opts.route
+			else
+				pts = table.clone(rec.path.points)
+				local last = pts[#pts]
+				table.insert(pts, { dest[1], last[2] })
+				table.insert(pts, { dest[1], dest[2] })
+			end
 			local route = LaneMath.makeRoute(`responder_{v.id}`, pts, v.lane.speeds)
-			AICarMotor.dispatch(v, route, ctxFor(self, {}))
+			AICarMotor.dispatch(v, route, ctxFor(self, {}), if opts and opts.hold then true else nil)
+			self.jumped[v.id] = true -- it appears on the drive (dispatched between two ticks)
 			return v
 		end
 	end
 	return nil
+end
+
+-- releaseResponder(v): a held responder may drive home (at once on scene, on arrival otherwise).
+function TrafficService.releaseResponder(_self: TrafficService, v: Vehicle)
+	if v and (v.class == "responder" or v.class == "incident") then
+		AICarMotor.release(v)
+	end
+end
+
+-- responderIdle(): how many responders are parked and free.
+function TrafficService.responderIdle(self: TrafficService): number
+	local n = 0
+	for _, v in self.vehicles do
+		if v.class == "responder" and v.phase == "idle" then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- responderHome(): where the responders park (the trunk's first point, on the hospital drive).
+function TrafficService.responderHome(self: TrafficService): { number }?
+	local rec = self.records.responder_ambulance_trunk
+	local first = rec and rec.path and rec.path.points and rec.path.points[1]
+	return if first then { first[1], first[2] } else nil
 end
 
 -- dispatchIncident(scene): both incident cars from the station to the scene {x, z} (traffic.md §5.10).

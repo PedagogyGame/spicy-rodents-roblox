@@ -175,9 +175,12 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		local best, bestD = nil, math.huge
 		for _, a in world.actors do
 			local actor = byTownId[a.id]
+			-- a body that is not possessable right now (a patient on the ground, in an ambulance or in a
+			-- hospital bed: Infection/InfectionService) is never offered
 			if
 				a.species == species
 				and (variant == nil or a.variant == variant)
+				and actor.possessable ~= false
 				and possession:controllerOf(actor) == "ai"
 				and (species ~= "human" or a.post == "townsperson" or a.post == "rider")
 			then
@@ -191,7 +194,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 			-- above-floor bodies of any post (Population's re-post step, simplified for W1)
 			for _, a in world.actors do
 				local actor = byTownId[a.id]
-				if a.species == "human" and possession:controllerOf(actor) == "ai" then
+				if a.species == "human" and actor.possessable ~= false and possession:controllerOf(actor) == "ai" then
 					return actor
 				end
 			end
@@ -263,7 +266,11 @@ function ActorsRuntime.start(opts: Opts): Runtime
 			local actor = byTownId[a.id]
 			if actor.mode == "ai" then
 				table.insert(parts, roots[a.id])
-				table.insert(cfs, Units.yawCFrame(a.yaw, Vector3.new(a.x, a.y - a.hip + offsets[a.id], a.z)))
+				-- `lift` sinks a hidden patient out of sight (Infection/InfectionService.SINK)
+				table.insert(
+					cfs,
+					Units.yawCFrame(a.yaw, Vector3.new(a.x, a.y - a.hip + offsets[a.id] + (a.lift or 0), a.z))
+				)
 				if writeAttrs then
 					local body = actor.body :: Model
 					body:SetAttribute(PossessionState.ATTR.Speed, math.floor(a.speed * 10 + 0.5) / 10)

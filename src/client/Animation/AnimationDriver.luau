@@ -32,6 +32,20 @@
 --     cadence and the swing follows the motor's speed, never the observed displacement. Whatever
 --     offset the body carried as an AI decays at v5.4's 23/s, the same rate the controller's drawn point
 --     eases onto its own ground, so a possession hands over without a step.
+-- Patients (owner 2026-11-10, the bite-to-hospital sequence): the server writes a Med attribute on a
+-- bitten body (Server/Infection/InfectionService). An AI body with Med "down" (collapsed at a scene)
+-- or "treated" (in a hospital bed) plays the stock sit clip and is lowered through the same
+-- visual-root offset: sitting on the ground, or on the cot (Infection/HospitalLayout.BED.top above
+-- the floor). The stock sit is a chair sit (knees bent, shins straight down), which on the ground put
+-- everything below the knee under the pavement and on a cot through the mattress: the knees and
+-- ankles are straightened after the Animator has written them (Stepped), so the legs lie flat in
+-- front of the patient. A patient walked to the ambulance ("carried") keeps the usual walk. Someone
+-- with the symptoms ("symptomatic") staggers: the visible body sways about the soles. A body a player
+-- holds is never posed. Render/MedicalView draws the rest of the attribute (red eyes, hiding).
+-- Walk or run: with one threshold a body moving at about that speed (a cured person walking home at
+-- 9 studs/s, the ambulance crew at 8.6) flipped between the two clips many times a second, each flip
+-- restarting a 0.2 s cross-fade: the observed speed ripples with the replication steps. The choice
+-- now has a band (gaitClip) and its own slower speed (pace).
 -- No side effects on require.
 -- A sculpted hero squirrel (Server/Assets/HeroArt, attribute Hero) plays its own authored clips (owner
 -- 2026-11-10: the run looked "rigid, unalive": the procedural gait only swings the legs under a stiff body,
@@ -45,6 +59,9 @@
 --   speed (pure); heroTracks(tracks, current, want, track, loop, rate) -> clip now playing; HERO. The
 --   Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
 --   heroLayers(rig, t, seed) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
+--   medPose(med, footDrop) -> { clip, drop, flat } (pure); gaitClip(current, pace, runAbove?) -> "walk" |
+--   "run" (pure); pace(prev, inst, dt) -> studs/s (pure); sway(med, t, seed) -> roll, pitch (pure);
+--   FLAT_JOINTS
 
 local Gait = require("./Gait")
 local Creep = require("./Creep")
@@ -54,6 +71,8 @@ local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local HeroAssets = Import.shared("Actors/HeroAssets") :: typeof(require("../../shared/Actors/HeroAssets"))
+local HospitalLayout =
+	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
 
 export type ClipSet = {
 	idle: string?,
@@ -113,6 +132,14 @@ type Entry = {
 	-- the Spicy Rodent's twitches (Animation/Creep), layered on its clips: the bones by name, what the
 	-- clip last gave each and what was last written to it (so an offset is never applied twice)
 	creep: { seed: number, bones: { [string]: any }, base: { [any]: CFrame }, wrote: { [any]: CFrame } }?,
+	med: any, -- the body's Med attribute (a patient's pose)
+	medConn: RBXScriptConnection?,
+	drop: number, -- studs the pose lowers the body by, now (eased)
+	pace: number, -- studs/s, smoothed more slowly than `speed`: only picks walk or run
+	legs: { any }, -- the knee and ankle joints a sitting patient's legs are straightened at
+	lean: number, -- 0..1: how much of the stagger sway is on (eased)
+	roll: number, -- rad the visible body leans by now (about the soles)
+	pitch: number,
 }
 
 -- The visual-height follower's state (AnimationDriver.newSettle): the visual height and velocity, and
@@ -144,6 +171,13 @@ AnimationDriver.FIX_MAX = 1.4
 AnimationDriver.CLEARANCE = 0.04 -- soles rest this much above the surface found
 AnimationDriver.NEAR_GROUND = 2 -- only soles this close to the terrain are probed (not squirrels up trees)
 AnimationDriver.KIN_RATE = 23 -- 1/s: a kinematic body sheds its carried offset at v5.4's visual easing rate
+AnimationDriver.SIT_SEAT = 1.35 -- studs from an R15 root down to what the sit clip sits on
+AnimationDriver.POSE_RATE = 6 -- 1/s: how fast a patient sinks into (or rises out of) the pose
+AnimationDriver.RUN_BAND = 1.5 -- studs/s either side of runAbove in which the walk or run clip is kept
+AnimationDriver.PACE_TAU = 0.3 -- s: the smoothing of the speed that picks walk or run
+AnimationDriver.SWAY_RATE = 3 -- 1/s: how fast the stagger comes on and goes
+-- the R15 joints straightened on a sitting patient (Motor6Ds, or AnimationConstraints on newer rigs)
+AnimationDriver.FLAT_JOINTS = table.freeze({ "LeftKnee", "RightKnee", "LeftAnkle", "RightAnkle" })
 
 local SHORT, BASE, MEDIAN_N = 3, 12, 7 -- frames: short and long velocity baselines; median window
 local scratch: { number } = table.create(MEDIAN_N, 0)
@@ -230,6 +264,57 @@ AnimationDriver.DEFAULT_CLIPS = {
 		nominalRun = 16,
 	},
 } :: { [string]: ClipSet }
+
+-- medPose(med, footDrop): how an AI body with this Med attribute is posed: the clip to play (nil =
+-- the usual choice by speed), how far the visible body is lowered (studs), and whether the legs are
+-- laid flat (FLAT_JOINTS straightened). `footDrop` is the body's root height above its soles. A
+-- collapsed person sits on the ground; a patient in a bed sits up on the cot; both with their legs
+-- out in front of them. Anything else (symptomatic, walked to the ambulance, in transit, healthy)
+-- keeps its usual animation.
+function AnimationDriver.medPose(med: any, footDrop: number): { clip: string?, drop: number, flat: boolean }
+	if med == "down" then
+		return { clip = "sit", drop = math.max(0, footDrop - AnimationDriver.SIT_SEAT), flat = true }
+	elseif med == "treated" then
+		return {
+			clip = "sit",
+			drop = math.max(0, footDrop - AnimationDriver.SIT_SEAT - HospitalLayout.BED.top),
+			flat = true,
+		}
+	end
+	return { clip = nil, drop = 0, flat = false }
+end
+
+-- gaitClip(current, pace, runAbove?): walk or run for a body moving at `pace` studs/s, given the clip
+-- it plays now: run from RUN_BAND above the threshold, walk from RUN_BAND below it, and in between
+-- whatever is playing already (anything but "run" counts as walking).
+function AnimationDriver.gaitClip(current: string?, pace: number, runAbove: number?): string
+	local mid = runAbove or 9
+	if pace >= mid + AnimationDriver.RUN_BAND then
+		return "run"
+	elseif pace < mid - AnimationDriver.RUN_BAND then
+		return "walk"
+	end
+	return if current == "run" then "run" else "walk"
+end
+
+-- pace(prev, inst, dt): the speed that picks walk or run, one frame on: `inst` (this frame's observed
+-- speed) smoothed over PACE_TAU. A body whose position arrives 10 to 20 times a second is seen to
+-- move in steps; over 0.3 s the ripple that leaves is narrower than the band.
+function AnimationDriver.pace(prev: number, inst: number, dt: number): number
+	return prev + (inst - prev) * math.min(1, dt / AnimationDriver.PACE_TAU)
+end
+
+-- sway(med, t, seed): the stagger of someone with the symptoms: how far the visible body leans to
+-- the side (roll) and forward (pitch), in radians, at time t. A slow side-to-side sway with a quicker
+-- wobble on it, about four degrees at most; `seed` keeps two people out of step. 0, 0 for anyone else.
+function AnimationDriver.sway(med: any, t: number, seed: number): (number, number)
+	if med ~= "symptomatic" then
+		return 0, 0
+	end
+	local roll = 0.05 * math.sin(t * 4.7 + seed) + 0.02 * math.sin(t * 9.4 + seed * 2.3)
+	local pitch = 0.03 * math.sin(t * 3.1 + seed * 1.7)
+	return roll, pitch
+end
 
 -- Playback speed of a walk or run clip authored for `nominal` st/s on a body moving at `speed`: the
 -- feet keep pace with the ground. The floor is low (a slow stroll is a slow cycle, never legs that
@@ -511,6 +596,12 @@ function AnimationDriver.start(opts: Opts): Driver
 			end
 		end
 		local rootJoint, rootAttach = rootJointOf(model, root)
+		local medConn = model:GetAttributeChangedSignal("Med"):Connect(function()
+			local e = entries[model]
+			if e then
+				e.med = model:GetAttribute("Med")
+			end
+		end)
 		entries[model] = {
 			body = model,
 			root = root,
@@ -539,7 +630,26 @@ function AnimationDriver.start(opts: Opts): Driver
 			kin = false,
 			hero = hero,
 			creep = nil,
+			med = model:GetAttribute("Med"),
+			medConn = medConn,
+			drop = 0,
+			pace = 0,
+			legs = {},
+			lean = 0,
+			roll = 0,
+			pitch = 0,
 		}
+		if animator and gait == nil then
+			local legs = entries[model].legs
+			for _, d in model:GetDescendants() do
+				if
+					(d:IsA("Motor6D") or d:IsA("AnimationConstraint"))
+					and table.find(AnimationDriver.FLAT_JOINTS, d.Name) ~= nil
+				then
+					table.insert(legs, d)
+				end
+			end
+		end
 		if hero and model:GetAttribute("RigSpec") == "rodent" then
 			local bones: { [string]: any } = {}
 			for _, d in model:GetDescendants() do
@@ -556,13 +666,16 @@ function AnimationDriver.start(opts: Opts): Driver
 	local function remove(child: Instance)
 		local e = entries[child :: any]
 		if e then
+			if e.medConn then
+				e.medConn:Disconnect()
+			end
 			for _, t in e.tracks do
 				t:Stop(0)
 			end
 			for _, j in e.joints do
 				j.motor.Transform = CFrame.identity
 			end
-			if e.applied ~= 0 then
+			if e.applied ~= 0 or e.roll ~= 0 or e.pitch ~= 0 then
 				local rj, ra = e.rootJoint, e.rootAttach
 				if rj then
 					rj.C0 = e.baseC0
@@ -581,6 +694,13 @@ function AnimationDriver.start(opts: Opts): Driver
 		if set.sit and hum and hum.SeatPart ~= nil then
 			return "sit"
 		end
+		-- a patient (AI bodies only: a held body keeps its own animation)
+		if e.med ~= nil and e.root.Anchored then
+			local clip = AnimationDriver.medPose(e.med, e.footDrop).clip
+			if clip and (set :: any)[clip] then
+				return clip
+			end
+		end
 		if set.jump and e.vy > 6 then
 			return "jump"
 		elseif set.fall and e.vy < -10 then
@@ -589,8 +709,8 @@ function AnimationDriver.start(opts: Opts): Driver
 		if e.speed < walkAbove then
 			return if set.idle then "idle" elseif set.run then "hold" else "none"
 		end
-		if set.walk and e.speed < runAbove then
-			return "walk"
+		if set.walk and set.run then
+			return AnimationDriver.gaitClip(e.current, e.pace, runAbove)
 		end
 		return if set.run then "run" else "walk"
 	end
@@ -603,11 +723,17 @@ function AnimationDriver.start(opts: Opts): Driver
 	probe.FilterDescendantsInstances = { opts.container, workspace.CurrentCamera }
 	local DOWN = Vector3.new(0, -(AnimationDriver.PROBE_UP - AnimationDriver.FIX_MIN + 0.5), 0)
 
-	-- the visible body's vertical offset from its root (world up, whatever the root's attitude)
-	local function applyOffset(e: Entry, off: number)
-		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) then
-			e.applied = off
+	-- the visible body's vertical offset from its root (world up, whatever the root's attitude), and
+	-- its lean (a stagger: about the soles, so the feet stay where they are)
+	local function applyOffset(e: Entry, off: number, roll: number?, pitch: number?)
+		local r, p = roll or 0, pitch or 0
+		if math.abs(off - e.applied) > 0.002 or (off == 0 and e.applied ~= 0) or r ~= e.roll or p ~= e.pitch then
+			e.applied, e.roll, e.pitch = off, r, p
 			local shifted = CFrame.new(e.root.CFrame:VectorToObjectSpace(Vector3.new(0, off, 0))) * e.baseC0
+			if r ~= 0 or p ~= 0 then
+				local soles = Vector3.new(0, -e.footDrop, 0)
+				shifted = CFrame.new(soles) * CFrame.Angles(p, 0, r) * CFrame.new(-soles) * shifted
+			end
 			local rj, ra = e.rootJoint, e.rootAttach
 			if rj then
 				rj.C0 = shifted
@@ -681,7 +807,29 @@ function AnimationDriver.start(opts: Opts): Driver
 		end
 		e.fix += (e.fixTarget - e.fix) * (1 - math.exp(-dt * 8))
 		off += e.fix
-		applyOffset(e, off)
+		-- a patient's pose lowers the visible body (sitting on the ground, or up on the cot)
+		local wantDrop = if anchored and e.med ~= nil then AnimationDriver.medPose(e.med, e.footDrop).drop else 0
+		if wantDrop ~= e.drop then
+			e.drop += (wantDrop - e.drop) * (1 - math.exp(-dt * AnimationDriver.POSE_RATE))
+			if math.abs(wantDrop - e.drop) < 0.005 then
+				e.drop = wantDrop
+			end
+		end
+		off -= e.drop
+		-- the stagger of someone with the symptoms (AI bodies: a held body is never posed)
+		local wantLean = if anchored and e.med == "symptomatic" then 1 else 0
+		if wantLean ~= e.lean then
+			e.lean += (wantLean - e.lean) * (1 - math.exp(-dt * AnimationDriver.SWAY_RATE))
+			if math.abs(wantLean - e.lean) < 0.01 then
+				e.lean = wantLean
+			end
+		end
+		if e.lean > 0 then
+			local roll, pitch = AnimationDriver.sway("symptomatic", now, e.phase)
+			applyOffset(e, off, roll * e.lean, pitch * e.lean)
+		else
+			applyOffset(e, off)
+		end
 	end
 
 	local function step(dt: number)
@@ -707,9 +855,11 @@ function AnimationDriver.start(opts: Opts): Driver
 			if kin then
 				-- the motor's own speed: what the body is seen to do never feeds the animation
 				e.speed, e.vy = kin.moveSpeed, 0
+				e.pace = kin.moveSpeed
 			else
 				e.speed += (inst - e.speed) * alpha
 				e.vy += (vy - e.vy) * alpha
+				e.pace = AnimationDriver.pace(e.pace, inst, dt)
 			end
 			visualRoot(e, pos, dt, now, camPos)
 			local heroSet = e.hero
@@ -807,6 +957,14 @@ function AnimationDriver.start(opts: Opts): Driver
 				end
 				for name, r in AnimationDriver.heroLayers("rodent", workspace:GetServerTimeNow(), creep.seed) do
 					layer(name, CFrame.Angles(r[1], r[2], r[3]))
+				end
+			end
+			if #e.legs > 0 and e.med ~= nil and e.root.Anchored and AnimationDriver.medPose(e.med, e.footDrop).flat then
+				-- a sitting patient's legs lie flat: the knees and ankles are straightened after the
+				-- Animator has written the chair sit (it writes them again every frame, so nothing is
+				-- left to put back when the pose ends)
+				for _, joint in e.legs do
+					joint.Transform = CFrame.identity
 				end
 			end
 			if p == nil or #e.joints == 0 or e.hero ~= nil then

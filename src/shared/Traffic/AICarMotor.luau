@@ -3,8 +3,8 @@
 -- The AI car motor: one fleet vehicle on its lane, per behaviour class, with yielding, stop control and
 -- teleport flags (BUILD_PLAN §4.4 W1 #9, D9; traffic.md §5, §6, §13). Movement/CarMotor is the player
 -- kinematic car (Track A #5); this is the lane layer the server fleet runs.
--- Interface: new(entry, lane, opts) -> Vehicle; step(v, ctx, dt) -> events; dispatch(v, route, opts);
---            body(v) -> LaneMath.Body; CLASSES; VIS_HEIGHT
+-- Interface: new(entry, lane, opts) -> Vehicle; step(v, ctx, dt) -> events; dispatch(v, route, ctx, held?);
+--            release(v); body(v) -> LaneMath.Body; CLASSES; VIS_HEIGHT
 --
 -- Behaviour classes port v5.4 movers (studs; the HTML constants x 2.5):
 --   sedan    updateCars (§5.1): exponential speed (accel 1.3, brake 9), the people corridor (lateral 3.3,
@@ -16,11 +16,17 @@
 --   motorcycle (§5.12): appears after a wait, rides to the lane end, hides; not fatal; hard stop only.
 --   legacy_ambulance (§5.8): wait 18, drive, stop dead within 5 of a person, park 16, wait 145.
 --   responder / incident (§5.9, §5.10): hidden until `dispatch`; out, on scene, back in reverse.
+--            A trip dispatched with `held` stays on scene until `release` (the medical sequence loads
+--            its patient first); without it the scene timer runs as in v5.4.
 --   event (§5.11): the 2400 s living-event glide (fatal even at a crawl).
 -- Rebuild fixes (traffic.md §11-§13): squirrels are in every yielding class's hazard set with RELATIVE
 -- visibility (squirrel y - vehicle base y < 4.76 u, not the absolute 4.8); opposing vehicles are excluded
 -- from the same-lane tests (the trolley deadlock, §6.1); emergency classes keep at least the hard stop
 -- for people. A wrap, an appearance and a dispatch set `teleported` for that tick (SweptCollision skips it).
+-- The emergency classes' hard stop has a limit (owner playtest review 2026-11-11: one player standing on
+-- the hospital drive held all three ambulances for as long as they stood there, and every patient in
+-- town waited out the timeout): after BLOCK_PATIENCE seconds stopped for a person the vehicle edges
+-- on at BLOCK_CRAWL. Vehicles never hurt people (only held squirrels are in the fatal sweep).
 
 local Control = require("./Control")
 local Boxes = require("./Boxes")
@@ -64,6 +70,8 @@ export type Vehicle = {
 	teleported: boolean,
 	stop: Control.State,
 	moving: boolean, -- expected to be moving this tick (stuck detection)
+	held: boolean?, -- a dispatched trip waits on scene until released
+	blocked: number?, -- seconds an emergency vehicle has been stopped for a person in its way
 }
 
 export type Ctx = {
@@ -87,6 +95,9 @@ local BASE_LIFT = st(0.04) -- y = terrain + 0.04 (§5.1)
 local R_HUMAN, R_SQUIRREL = st(0.4), st(0.56)
 local TROLLEY_SCHEDULE = { 310, 465, 616, 657, 616, 465, 310, 283 } -- §5.4, HTML x
 local VAN_STOPS = { 0.16, 0.59 } -- §5.3, fraction of the loop
+
+AICarMotor.BLOCK_PATIENCE = 4 -- s an emergency vehicle waits for a person in its way before edging on
+AICarMotor.BLOCK_CRAWL = st(2) -- studs/s while it edges past them
 
 export type Opts = { at: number?, cruise: number?, wait: number?, offset: number? }
 
@@ -446,7 +457,10 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 	place(v, ctx, v.lane)
 end
 
--- polyline drive shared by the emergency classes: hard stop for people within r; returns true at the end
+-- polyline drive shared by the emergency classes: hard stop for people within r; returns true at the end.
+-- The stop is not for ever: someone who stays in the way is waited for BLOCK_PATIENCE seconds, then
+-- the vehicle edges on at a crawl until they are behind it. The count runs down again at the same
+-- rate once the way is clear, so stepping in and out of the way does not start the wait afresh.
 local function drivePolyline(
 	v: Vehicle,
 	ctx: Ctx,
@@ -456,11 +470,15 @@ local function drivePolyline(
 	dt: number
 ): boolean
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	local blocked = v.blocked or 0
 	if personNear(ctx, v.x + fx * stopR * 0.5, v.z + fz * stopR * 0.5, stopR, true) then
-		v.speed = 0
+		blocked = math.min(blocked + dt, AICarMotor.BLOCK_PATIENCE + 2)
+		v.speed = if blocked > AICarMotor.BLOCK_PATIENCE then math.min(speed, AICarMotor.BLOCK_CRAWL) else 0
 	else
+		blocked = math.max(0, blocked - dt)
 		v.speed = speed
 	end
+	v.blocked = blocked
 	local len = LaneMath.length(lane, v.dir)
 	v.s = math.min(len, v.s + v.speed * dt)
 	place(v, ctx, lane)
@@ -499,13 +517,24 @@ stepClass.legacy_ambulance = function(v, ctx, dt, events)
 	end
 end
 
--- dispatch(v, route, opts): start a responder or incident trip on `route` (a polyline Lane).
-function AICarMotor.dispatch(v: Vehicle, route: LaneMath.Lane, ctx: Ctx)
+-- dispatch(v, route, ctx, held?): start a responder or incident trip on `route` (a polyline Lane).
+-- With `held` the vehicle stays on scene until `release` instead of leaving on the scene timer.
+function AICarMotor.dispatch(v: Vehicle, route: LaneMath.Lane, ctx: Ctx, held: boolean?)
 	v.route = route
 	v.dir = 1
 	v.phase = "out"
 	v.timer = 0
+	v.blocked = 0
+	v.held = if held then true else nil -- nil: the plain scene timer; false (after release): leave at once
 	appear(v, ctx, route, 0)
+end
+
+-- release(v): a held trip may leave: at once when it is on scene, on arrival when still on the way.
+function AICarMotor.release(v: Vehicle)
+	v.held = false
+	if v.phase == "hold" then
+		v.timer = 0
+	end
 end
 
 local function trip(
@@ -525,19 +554,25 @@ local function trip(
 	end
 	if v.phase == "hold" then
 		v.speed = 0
-		v.timer -= dt
-		if v.timer <= 0 then
-			v.phase, v.dir, v.s = "back", -1, 0
+		if not v.held then
+			v.timer -= dt
+			if v.timer <= 0 then
+				-- the trip home starts on the other side of the road, facing the other way: a jump, not
+				-- a move (clients snap the ghost; the fatal sweep skips the tick)
+				v.phase, v.dir, v.s = "back", -1, 0
+				v.teleported = true
+			end
 		end
 		place(v, ctx, route)
 		return
 	end
 	local done = drivePolyline(v, ctx, route, if v.phase == "out" then outSpeed else backSpeed, st(3.1), dt)
 	if done and v.phase == "out" then
-		v.phase, v.timer = "hold", holdSecs
+		-- a held trip waits for release (timer 0 then); one released on the way turns straight round
+		v.phase, v.timer = "hold", if v.held == nil then holdSecs else 0
 		table.insert(events, "arrived")
 	elseif done then
-		v.phase, v.route, v.visible = "idle", nil, false
+		v.phase, v.route, v.visible, v.held = "idle", nil, false, nil
 		table.insert(events, "home")
 	end
 end
