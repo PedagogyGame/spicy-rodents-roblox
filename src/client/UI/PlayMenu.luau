@@ -10,13 +10,18 @@
 --   * Help panel (top left, always visible): the keys for the current role and device.
 --   * Status (top centre): role, health bar for the rodent and squirrels, bites and Power for the rodent.
 --   * Banners: big centred messages (RUN OVER!, KICKED OUT!) and short toasts for bites, kicks, refusals.
+--   * A bitten player's way to the hospital: a HOSPITAL marker over its door, drawn through everything
+--     for as long as they are infected, and the distance and direction on the line under the status
+--     (the server publishes the door as the Workspace attribute HospitalDoor). The messages used to
+--     say "far west" and "follow the signs": the game has no compass and the town has no signs.
 -- Layout (W1 client review): the help panel sits bottom-left and the Menu button bottom-right, clear of
 -- the Roblox chat window (top-left) and player list (top-right); the menu, banner and help panel scale
 -- down on small laptop screens (UIScale from the viewport, scaleFor); toasts wrap. Error lines name F9
 -- (the Developer Console), which works in a live game as well as Studio.
 -- Pure part (Lune-tested): CHOICES, helpLines(role, device) -> { string }, statusLine(attrs) -> string,
---   sickLine(attrs) -> string? (a bitten player: what to do, under the status line),
---   scaleFor(width, height) -> number.
+--   sickLine(attrs, way?) -> string? (a bitten player: what to do, under the status line; `way`
+--   { dist, words } adds how far the door is and which way), wayWords(dx, dz, lookX, lookZ) -> string,
+--   markerText(dist) -> string, scaleFor(width, height) -> number.
 -- Engine part: start() -> Menu { loading(prepare) (yields until ready), open(), close(), isOpen(),
 --   setDevice(device?), banner(title, line, seconds?), toast(text, seconds?) }.
 -- No side effects on require.
@@ -119,14 +124,50 @@ end
 -- Infected, written by Server/Boot/Game from the infection service): what is wrong and what to do,
 -- on screen for as long as it is true. nil when there is nothing to say.
 PlayMenu.SICK = table.freeze({
-	infected = "INFECTED  ·  Walk into the hospital (far west of town) to be cured",
-	symptoms = "INFECTED, RED EYES  ·  Walk into the hospital (far west of town)",
+	infected = "INFECTED  ·  Walk into the hospital to be cured",
+	symptoms = "INFECTED, RED EYES  ·  Walk into the hospital to be cured",
 	treating = "BEING TREATED  ·  Stay inside the hospital",
 }) :: { [string]: string }
+-- the same with the way known: the distance and direction take the place of "to be cured"
+local SICK_WAY: { [string]: string } = {
+	infected = "INFECTED  ·  Walk into the hospital: ",
+	symptoms = "INFECTED, RED EYES  ·  Walk into the hospital: ",
+}
 
-function PlayMenu.sickLine(attrs: { [string]: any }): string?
+export type Way = { dist: number, words: string }
+
+-- a distance as a player reads it: whole studs close by, tens further off
+local function studs(dist: number): number
+	return if dist < 100 then math.floor(dist + 0.5) else math.floor(dist / 10 + 0.5) * 10
+end
+
+-- wayWords(dx, dz, lookX, lookZ): where a point (dx, dz) studs away lies for someone looking along
+-- (lookX, lookZ), the camera's direction on the ground: "ahead", "to your right", "behind you" or
+-- "to your left" (a quarter turn each). Roblox's axes: looking along -Z, +X is to the right.
+function PlayMenu.wayWords(dx: number, dz: number, lookX: number, lookZ: number): string
+	local turn = math.atan2(lookX * dz - lookZ * dx, lookX * dx + lookZ * dz)
+	if math.abs(turn) <= math.pi / 4 then
+		return "ahead"
+	elseif math.abs(turn) >= 3 * math.pi / 4 then
+		return "behind you"
+	end
+	return if turn > 0 then "to your right" else "to your left"
+end
+
+-- markerText(dist): what the marker over the hospital door says.
+function PlayMenu.markerText(dist: number): string
+	return `HOSPITAL\n{studs(dist)} studs`
+end
+
+function PlayMenu.sickLine(attrs: { [string]: any }, way: Way?): string?
 	local status = attrs.Infected
-	return if type(status) == "string" then PlayMenu.SICK[status] else nil
+	if type(status) ~= "string" then
+		return nil
+	end
+	if way and SICK_WAY[status] then
+		return `{SICK_WAY[status]}{studs(way.dist)} studs {way.words}`
+	end
+	return PlayMenu.SICK[status]
 end
 
 -- The status line from player attributes (PlayRole, Bites, Power, PowerStage, Health).
@@ -290,15 +331,41 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		TextSize = 17,
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 84),
-		Size = UDim2.new(0.8, 0, 0, 26),
+		Size = UDim2.new(0.9, 0, 0, 26),
 		BackgroundTransparency = 0.25,
 		BackgroundColor3 = Color3.fromRGB(120, 10, 10),
 		Visible = false,
 	})
 	corner(sick, 8)
 	local sickLimit = Instance.new("UISizeConstraint")
-	sickLimit.MaxSize = Vector2.new(660, 26)
+	sickLimit.MaxSize = Vector2.new(740, 26)
 	sickLimit.Parent = sick
+	-- the marker over the hospital door (shown while this player is infected; see the loop below)
+	local marker = Instance.new("BillboardGui")
+	marker.Name = "HospitalMarker"
+	marker.AlwaysOnTop = true
+	marker.LightInfluence = 0
+	marker.ResetOnSpawn = false
+	marker.Size = UDim2.fromOffset(150, 52)
+	marker.Enabled = false
+	local markerLabel = text(marker, {
+		Text = "HOSPITAL",
+		Font = Enum.Font.GothamBlack,
+		TextSize = 18,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 0.2,
+		BackgroundColor3 = Color3.fromRGB(170, 20, 20),
+	})
+	corner(markerLabel, 8)
+	local markerAnchor = Instance.new("Part")
+	markerAnchor.Name = "HospitalMarkerAnchor"
+	markerAnchor.Anchored = true
+	markerAnchor.CanCollide = false
+	markerAnchor.CanQuery = false
+	markerAnchor.CanTouch = false
+	markerAnchor.Transparency = 1
+	markerAnchor.Size = Vector3.new(1, 1, 1)
+	marker.Adornee = markerAnchor
 	local hpBack = Instance.new("Frame")
 	hpBack.AnchorPoint = Vector2.new(0.5, 0)
 	hpBack.Position = UDim2.new(0.5, 0, 0, 84)
@@ -484,10 +551,12 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 	end
 
 	gui.Parent = playerGui
+	marker.Parent = playerGui
 
 	local device: string? = nil
 	local isOpen = false
 	local toastToken, bannerToken = 0, 0
+	local way: Way? = nil -- to the hospital door, while this player is infected
 
 	local function attrs(): { [string]: any }
 		return player:GetAttributes()
@@ -503,7 +572,7 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 			else PlayMenu.statusLine(a)
 		helpText.Text = `<b>{title}</b>\n` .. table.concat(lines, "\n")
 		status.Text = PlayMenu.statusLine(a)
-		local sickText = PlayMenu.sickLine(a)
+		local sickText = PlayMenu.sickLine(a, way)
 		sick.Text = sickText or ""
 		sick.Visible = sickText ~= nil and not isOpen
 		local h = a.Health :: number?
@@ -519,6 +588,39 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		back.Visible = role ~= nil
 	end
 	player.AttributeChanged:Connect(refresh)
+
+	-- the way to the hospital, four times a second while this player is infected and not yet inside
+	task.spawn(function()
+		local shown: string? = nil
+		while gui.Parent do
+			local sickStatus = player:GetAttribute("Infected")
+			local door = workspace:GetAttribute("HospitalDoor")
+			local cam = workspace.CurrentCamera
+			local found: Way? = nil
+			if (sickStatus == "infected" or sickStatus == "symptoms") and typeof(door) == "Vector3" and cam then
+				local body = player.Character
+				local root = if body then body.PrimaryPart else nil
+				local from = if root then root.Position else cam.CFrame.Position
+				local look = cam.CFrame.LookVector
+				local dx, dz = door.X - from.X, door.Z - from.Z
+				local dist = math.sqrt(dx * dx + dz * dz)
+				found = { dist = dist, words = PlayMenu.wayWords(dx, dz, look.X, look.Z) }
+				if markerAnchor.Parent == nil then
+					markerAnchor.Parent = workspace
+				end
+				markerAnchor.Position = door + Vector3.new(0, 18, 0)
+				markerLabel.Text = PlayMenu.markerText(dist)
+			end
+			way = found
+			marker.Enabled = found ~= nil and not isOpen
+			local line = PlayMenu.sickLine({ Infected = sickStatus }, found)
+			if line ~= shown then
+				shown = line
+				refresh()
+			end
+			task.wait(0.25)
+		end
+	end)
 
 	local self: Menu
 	local function setOpen(open: boolean)

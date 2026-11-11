@@ -42,7 +42,10 @@
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
 --   InfectionService; nil when it could not start), townIdOf(actorId), stop() };
---   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure)
+--   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
+--   putBack(free, possessable) -> boolean (pure)
+-- For a bitten player the hospital's door is published as the Workspace attribute HospitalDoor (a
+-- Vector3): the client draws a marker over it and the distance to it (Client/UI/PlayMenu).
 
 local Import = require("../Import")
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
@@ -90,6 +93,15 @@ Game.REFUSALS = table.freeze({
 
 function Game.refusalText(why: string?): string
 	return if why then (Game.REFUSALS[why] or why) else "that body is busy"
+end
+
+-- putBack(free, possessable): an officer was moved to the patrol car for a pick that was then
+-- refused: do they go back where they were? Only while the AI still has the body AND they are still
+-- on their feet. One who collapsed during the hand-over (the usual reason for the refusal) fell at
+-- the car: the scene, the crowd's places and the ambulance's stop were all worked out there, and
+-- moved back the patient sat alone hundreds of studs from their own scene.
+function Game.putBack(free: boolean, possessable: boolean): boolean
+	return free and possessable
 end
 
 export type OfficerCandidate = { actor: any, police: boolean, free: boolean, possessable: boolean }
@@ -372,6 +384,13 @@ function Game.start(opts: Opts?): any
 					fire(driver, payload)
 				end
 			end,
+			-- who plays a body now: the service keeps it with each bite, so news about a victim
+			-- reaches the player who bit them and not whoever has taken the rodent since
+			driverOf = function(id: number): any?
+				local actor = rt.byTownId[id]
+				local driver = if actor then possession:controllerOf(actor) else nil
+				return if driver ~= "ai" then driver else nil
+			end,
 			serverTime = function(): number
 				return workspace:GetServerTimeNow()
 			end,
@@ -389,6 +408,11 @@ function Game.start(opts: Opts?): any
 		if not okP then
 			warn(`[SpicyRodents] the hospital cots were not built: {errP}`)
 		end
+		-- where a bitten player has to go: the client marks the door (UI/PlayMenu)
+		local door = infection.layout.entrance
+		pcall(function()
+			workspace:SetAttribute("HospitalDoor", Vector3.new(door[1], Height.at(door[1], door[2]), door[2]))
+		end)
 	end
 	-- a fault in the sequence must never stop traffic, bites or the pose stream: it is caught where
 	-- it is called (the service contains its own parts too and reports them here), warned about the
@@ -567,14 +591,21 @@ function Game.start(opts: Opts?): any
 			end
 			if officer ~= current then
 				-- the officer is moved to the car first so the client streams that place in before the
-				-- hand-over; if the hand-over is then refused they are put back where they were
+				-- hand-over; if the hand-over is then refused they are put back where they were, unless
+				-- they collapsed there in the meantime (Game.putBack)
 				local at = world.actorsById[townIdOf[officer.id]]
 				local bx, bz, byaw = if at then at.x else nil, if at then at.z else nil, if at then at.yaw else 0
 				if spot then
 					placeAI(officer, spot.X, spot.Z, yaw)
 				end
 				ok, why = takeBody(player, officer)
-				if not ok and spot and bx and bz and possession:controllerOf(officer) == "ai" then
+				if
+					not ok
+					and spot
+					and bx
+					and bz
+					and Game.putBack(possession:controllerOf(officer) == "ai", officer.possessable ~= false)
+				then
 					placeAI(officer, bx, bz, byaw)
 				end
 			else
@@ -801,7 +832,7 @@ function Game.start(opts: Opts?): any
 							-- infected: they run and shout (the Say attribute; clients draw the bubble),
 							-- and the sequence to the hospital begins. A player holding the victim gets a
 							-- "med" event from the service that says what happened and what to do.
-							local okB, errB = pcall(infection.bite, infection, vt, townIdOf[actor.id])
+							local okB, errB = pcall(infection.bite, infection, vt, townIdOf[actor.id], player)
 							if not okB then
 								infectionFault("bite", errB)
 							end
