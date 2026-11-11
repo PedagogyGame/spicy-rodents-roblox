@@ -6,12 +6,16 @@
 --   * a per-situation chance (some people stay quiet);
 --   * a per-actor cooldown (speech.actorCooldownS, 12 s: one person does not chatter);
 --   * a town-wide sliding window (at most speech.townBurst lines per speech.townWindowS);
---   * no repeat of the last three lines town-wide while the group has other lines.
+--   * no repeat of the last three lines town-wide while the group has other lines;
+--   * the line the owner asked for by name (Lines.THE_LINE) is favoured among the spotting lines: it
+--     is picked OWNER_SHARE of the times it was not the very last line said in town (so never twice
+--     running), which makes it about three spotting lines in ten. As one of seven equal lines it came
+--     up on one sighting in sixteen, and a short look at the game could pass without it.
 -- `force` (the bitten victim, the crew at the patient) skips the chance and the town window, never
 -- the one-line-per-actor-per-second floor, and still counts toward the window.
 -- The server replicates a line as two attributes on the body, Say then SayAt (server time); the
 -- client (Client/UI/SpeechBubbles) reads Say when SayAt changes and shows it for `remaining` seconds.
--- Interface: ATTR { Say, SayAt }; CHANCE; defaults() -> Params (from Config/Tunables);
+-- Interface: ATTR { Say, SayAt }; CHANCE; OWNER_SHARE; defaults() -> Params (from Config/Tunables);
 --   new(params?) -> State; request(state, now, actorId, situation, rand, opts?) -> string?;
 --   remaining(now, sayAt, showSecs) -> seconds (0 = do not show); stats(state)
 -- Pure: time and the random source are injected. No side effects on require.
@@ -55,6 +59,9 @@ SpeechRules.CHANCE = table.freeze({
 	crew = 1,
 	cured = 1,
 }) :: { [string]: number }
+
+-- How often a spotting line is the owner's own, when it was not the last line said in town.
+SpeechRules.OWNER_SHARE = 0.45
 
 -- A SayAt this far in the future is still shown (the client clock trails the server's a little).
 SpeechRules.FUTURE_TOLERANCE = 2
@@ -119,26 +126,36 @@ function SpeechRules.request(
 			return refuse(state)
 		end
 	end
-	-- pick a line that is not among the last few said in town
-	local pool = {}
-	for _, line in group do
-		if table.find(state.recent, line) == nil then
-			table.insert(pool, line)
+	local newest = state.recent[#state.recent]
+	local r = rand()
+	local line: string
+	local favoured = situation == "spotting" and newest ~= Lines.THE_LINE
+	if favoured and r < SpeechRules.OWNER_SHARE then
+		line = Lines.THE_LINE
+	else
+		if favoured then
+			r = (r - SpeechRules.OWNER_SHARE) / (1 - SpeechRules.OWNER_SHARE) -- the same draw, spread out again
 		end
-	end
-	if #pool == 0 then
-		-- every line of a small group was just used: anything but the very last line
-		local newest = state.recent[#state.recent]
-		for _, line in group do
-			if line ~= newest then
-				table.insert(pool, line)
+		-- a line that is not among the last few said in town (nor the favourite that was just passed over)
+		local pool = {}
+		for _, candidate in group do
+			if table.find(state.recent, candidate) == nil and not (favoured and candidate == Lines.THE_LINE) then
+				table.insert(pool, candidate)
 			end
 		end
 		if #pool == 0 then
-			pool = table.clone(group)
+			-- every line of a small group was just used: anything but the very last line
+			for _, candidate in group do
+				if candidate ~= newest then
+					table.insert(pool, candidate)
+				end
+			end
+			if #pool == 0 then
+				pool = table.clone(group)
+			end
 		end
+		line = pool[math.min(#pool, 1 + math.floor(r * #pool))]
 	end
-	local line = pool[math.min(#pool, 1 + math.floor(rand() * #pool))]
 	state.lastByActor[actorId] = now
 	table.insert(window, now)
 	table.insert(state.recent, line)

@@ -143,37 +143,62 @@ return function(t)
 		t.eq(SpeechRules.request(state, 12.1, 30, "spotting", always), nil)
 	end)
 
-	t.test("2,000 seeded draws: every spotting line appears, never the same line twice running", function()
-		local rng = Rng.new(20261110)
-		local state = SpeechRules.new(params({ actorCooldown = 0, townBurst = 1000, chance = { spotting = 1 } }))
-		local counts: { [string]: number } = {}
-		local last: string? = nil
-		local window: { string } = {}
-		for i = 1, 2000 do
-			local line = SpeechRules.request(state, i, i, "spotting", rng.next)
-			t.truthy(line ~= nil, `draw {i} gave nothing`)
-			local s = line :: string
-			t.truthy(s ~= last, `"{s}" twice running at draw {i}`)
-			t.truthy(table.find(window, s) == nil, `"{s}" within the last three at draw {i}`)
-			table.insert(window, s)
-			if #window > 3 then
-				table.remove(window, 1)
+	t.test(
+		"2,000 seeded draws: every spotting line appears, never the same line twice running, the owner's line about three times in ten",
+		function()
+			local rng = Rng.new(20261110)
+			local state = SpeechRules.new(params({ actorCooldown = 0, townBurst = 1000, chance = { spotting = 1 } }))
+			local counts: { [string]: number } = {}
+			local last: string? = nil
+			local window: { string } = {}
+			for i = 1, 2000 do
+				local line = SpeechRules.request(state, i, i, "spotting", rng.next)
+				t.truthy(line ~= nil, `draw {i} gave nothing`)
+				local s = line :: string
+				t.truthy(s ~= last, `"{s}" twice running at draw {i}`)
+				-- the other lines keep clear of the last three; the owner's line only of the very last
+				t.truthy(s == Lines.THE_LINE or table.find(window, s) == nil, `"{s}" within the last three at draw {i}`)
+				table.insert(window, s)
+				if #window > 3 then
+					table.remove(window, 1)
+				end
+				last = s
+				counts[s] = (counts[s] or 0) + 1
 			end
-			last = s
-			counts[s] = (counts[s] or 0) + 1
+			for _, line in Lines.GROUPS.spotting do
+				t.truthy((counts[line] or 0) > 100, `"{line}" came up {counts[line] or 0} times`)
+			end
+			-- the line the owner asked for by name: as one of seven equal lines it was 1 in 7 of these
+			local share = counts[Lines.THE_LINE] / 2000
+			t.truthy(share > 0.26 and share < 0.36, `the owner's line was {share * 100} % of the spotting lines`)
+			for _, line in Lines.GROUPS.spotting do
+				t.truthy(
+					line == Lines.THE_LINE or counts[line] < counts[Lines.THE_LINE] / 2,
+					`"{line}" came up {counts[line]} times, the owner's line {counts[Lines.THE_LINE]}`
+				)
+			end
+			-- through the server's own dice (0.65 of spotters get a spotting line, 0.7 of those speak):
+			-- about one sighting in seven produces it (it was one in sixteen)
+			local town = SpeechRules.new(params({ actorCooldown = 0, townBurst = 100000 }))
+			local owner = 0
+			for i = 1, 20000 do
+				if rng.next() < 0.65 and SpeechRules.request(town, i, i, "spotting", rng.next) == Lines.THE_LINE then
+					owner += 1
+				end
+			end
+			t.truthy(owner / 20000 > 0.11, `the owner's line on {owner / 200} % of sightings`)
+			-- only the spotting lines have a favourite
+			t.truthy(SpeechRules.OWNER_SHARE > 0.3 and SpeechRules.OWNER_SHARE < 0.6)
+			-- a three-line group still never repeats back to back
+			local small = SpeechRules.new(params({ actorCooldown = 0, townBurst = 1000 }))
+			local prev: string? = nil
+			for i = 1, 300 do
+				local line = SpeechRules.request(small, i, i, "cured", rng.next)
+				t.truthy(line ~= nil and line ~= prev, `cured repeat at {i}`)
+				prev = line
+			end
 		end
-		for _, line in Lines.GROUPS.spotting do
-			t.truthy((counts[line] or 0) > 100, `"{line}" came up {counts[line] or 0} times`)
-		end
-		-- a three-line group still never repeats back to back
-		local small = SpeechRules.new(params({ actorCooldown = 0, townBurst = 1000 }))
-		local prev: string? = nil
-		for i = 1, 300 do
-			local line = SpeechRules.request(small, i, i, "cured", rng.next)
-			t.truthy(line ~= nil and line ~= prev, `cured repeat at {i}`)
-			prev = line
-		end
-	end)
+	)
 
 	t.test("unknown situations say nothing; the defaults come from Tunables", function()
 		local state = SpeechRules.new()
