@@ -4,7 +4,8 @@
 -- by the rules (Minigames/MinigameRules/Darts: aim point + timing meter + seeded scatter), and this module shows it:
 -- a dart flies from the thrower's hand to the landing point on the baked board (GamesRoom.Dartboard.BoardFace) and
 -- sticks there, the turn's darts are pulled out when the turn passes, the idle darts hide while a game is on.
--- Board coordinates are millimetres from the bull (+x the thrower's right, +y up) as in the rules.
+-- Board coordinates are millimetres from the bull (+x the thrower's right, +y up) as in the rules. A dart thrown
+-- wild is drawn in the cabinet's edge (REACH), never in the air beyond it; its score is the rules' business.
 -- Interface: new(opts) -> Board; Board:land(xmm, ymm, from?: Vector3); Board:clear(); Board:busy(); Board:idle(on);
 --   Board:step(dt); Board:worldPoint(xmm, ymm) -> Vector3
 
@@ -15,6 +16,7 @@ local Dartboard = {}
 Dartboard.__index = Dartboard
 
 Dartboard.FLIGHT = 0.32 -- seconds in the air
+Dartboard.REACH = 320 -- mm from the bull, each way: as far out as a dart is drawn (the cabinet is 342 mm)
 
 function Dartboard.new(opts: { [string]: any }): any
 	local self = setmetatable({}, Dartboard) :: any
@@ -96,7 +98,8 @@ local SEAT_COLORS = { { 220, 40, 40 }, { 40, 90, 220 }, { 40, 170, 80 }, { 240, 
 -- land: a dart flies from `from` (the thrower's hand; default the oche at shoulder height) to (xmm, ymm).
 function Dartboard.land(self: any, xmm: number, ymm: number, seat: number?, from: Vector3?)
 	local b = self.board
-	local target = self:worldPoint(xmm, ymm)
+	local reach = Dartboard.REACH
+	local target = self:worldPoint(math.clamp(xmm, -reach, reach), math.clamp(ymm, -reach, reach))
 	local n = self:normal()
 	local startPos = from
 	if startPos == nil then
