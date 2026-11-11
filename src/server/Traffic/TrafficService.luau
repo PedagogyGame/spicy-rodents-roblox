@@ -89,9 +89,10 @@ export type TrafficService = typeof(setmetatable(
 		rngState: number,
 		sceneSecs: number,
 		_stuckRun: { [number]: number },
-		-- vehicles that teleported since the last pose send: the flag must reach the wire even when the
-		-- tick that set it is not the one a send goes out after (30 Hz ticks, 15 Hz sends)
-		_snapPending: { [number]: boolean },
+		-- vehicles that teleported lately, and on how many more pose sends they carry the flag: it must
+		-- reach the wire even when the tick that set it is not the one a send goes out after (30 Hz ticks,
+		-- 15 Hz sends), and survive one lost packet
+		_snapPending: { [number]: number },
 		_stats: Stats,
 		RunOver: Signal,
 		unified: { string },
@@ -216,7 +217,7 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 		local wasStopped = v.phase
 		local events = AICarMotor.step(v, ctx, dt)
 		if v.teleported then
-			self._snapPending[v.id] = true
+			self._snapPending[v.id] = TrafficService.SNAP_SENDS
 		end
 		for _, ev in events do
 			stats.events[ev] = (stats.events[ev] or 0) + 1
@@ -312,11 +313,19 @@ end
 
 -- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them). A
 -- vehicle that teleported on any tick since the previous call carries the flag (the call is the send),
--- so a wrap on a tick between two sends still snaps on every client instead of streaking across town.
+-- and on the SNAP_SENDS - 1 sends after it: a wrap on a tick between two sends, or one whose packet is
+-- lost, still snaps on every client instead of streaking across town. (A client that gets the flag on
+-- two snapshots in a row snaps once: the second one starts where the first one put the car.)
+TrafficService.SNAP_SENDS = 2
 function TrafficService.poseRecords(self: TrafficService): { { [string]: number } }
 	local out = table.create(#self.vehicles)
 	local pending = self._snapPending
 	self._snapPending = {}
+	for id, n in pending do
+		if n > 1 then
+			self._snapPending[id] = n - 1
+		end
+	end
 	for _, v in self.vehicles do
 		table.insert(
 			out,
@@ -328,7 +337,7 @@ function TrafficService.poseRecords(self: TrafficService): { { [string]: number 
 				speed = v.speed,
 				visible = v.visible,
 				beacons = v.class == "responder" or v.class == "incident" or v.class == "legacy_ambulance",
-				teleported = v.teleported or pending[v.id] == true,
+				teleported = v.teleported or pending[v.id] ~= nil,
 				stopped = v.speed < 0.05,
 			})
 		)

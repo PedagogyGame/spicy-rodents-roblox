@@ -153,7 +153,13 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 				local p = Ghost.decode(r)
 				poses[p.id] = p
 			end
-			table.insert(self.snaps, { t = t, poses = poses })
+			-- in time order: a packet that arrives after a newer one (reordered on the way) goes before it,
+			-- or sampling would run the car back to where it was (a wrap drew it back across the street)
+			local at = #self.snaps + 1
+			while at > 1 and self.snaps[at - 1].t > t do
+				at -= 1
+			end
+			table.insert(self.snaps, at, { t = t, poses = poses })
 			while #self.snaps > keep do
 				table.remove(self.snaps, 1)
 			end
@@ -224,7 +230,9 @@ function Ghost.new(opts: { delay: number?, keep: number? }?): Buffer
 							speed = pa.speed,
 							visible = true,
 							beacons = pa.beacons,
-							teleported = false,
+							-- the server repeats the flag on the next send (a lost packet must not streak):
+							-- leaving a snapshot that was itself the snap, this span's first frame is the snap
+							teleported = pa.teleported,
 							stopped = pa.stopped,
 						}
 					else

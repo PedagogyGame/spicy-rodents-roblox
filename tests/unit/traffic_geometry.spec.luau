@@ -5,6 +5,7 @@
 local LaneMath = require("@shared/Traffic/LaneMath")
 local Fleet = require("@shared/Traffic/Fleet")
 local TrafficService = require("@server/Traffic/TrafficService")
+local Ghost = require("@shared/Traffic/Ghost")
 
 local function entry(id: number): any
 	for _, e in Fleet.ENTRIES do
@@ -221,5 +222,45 @@ return function(t)
 			end
 		end
 		t.truthy(worst < 0.3, `{worst} st deep: {where}`)
+	end)
+
+	t.test("ghosts: a reordered packet is sampled in time order; a repeated wrap flag snaps once", function()
+		local function rec(x: number, teleported: boolean?): { [string]: number }
+			return Ghost.encode({
+				id = 1,
+				x = x,
+				z = 0,
+				yaw = math.pi / 2, -- heading +x
+				speed = 30,
+				visible = true,
+				beacons = false,
+				teleported = teleported == true,
+				stopped = false,
+			})
+		end
+		local g = Ghost.new({ delay = 0 })
+		g:push(0, { rec(0) })
+		g:push(2 / 15, { rec(4) })
+		g:push(1 / 15, { rec(2) }) -- overtaken on the way
+		t.near(g:sample(1.5 / 15)[1].x, 3, 1e-4, "between the 2nd and 3rd send, not run backwards")
+		-- a wrap at 1/15 s, its flag repeated on the next send: the car carries on to the snap, then never
+		-- goes back
+		local w = Ghost.new({ delay = 0 })
+		w:push(0, { rec(1000) })
+		w:push(1 / 15, { rec(10, true) })
+		w:push(2 / 15, { rec(12, true) })
+		w:push(3 / 15, { rec(14) })
+		local last = w:sample(0)[1].x
+		local snaps = 0
+		for i = 1, 11 do
+			local p = w:sample(i / 60)[1]
+			if p.x < last - 100 then
+				snaps += 1
+			else
+				t.truthy(p.x >= last - 1e-6, `drawn back from {last} to {p.x} at frame {i}`)
+			end
+			last = p.x
+		end
+		t.eq(snaps, 1)
 	end)
 end

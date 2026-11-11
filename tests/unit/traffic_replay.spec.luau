@@ -660,6 +660,13 @@ return function(t)
 			-- the send carried it and the network lost it
 			local lost = wrapAt(6, { send(6, 6 / 30, true, true) })
 			t.eq(lost[1].kind, "teleport_bit_lost")
+			local lostTwice = wrapAt(6, { send(6, 6 / 30, true, true), send(8, 8 / 30, true, true) })
+			t.eq(#lostTwice, 1)
+			t.eq(lostTwice[1].kind, "teleport_bit_lost")
+			-- lost, but the next send repeats the flag (TrafficService.SNAP_SENDS) and arrives: no streak
+			local repeated, rstats = wrapAt(6, { send(6, 6 / 30, true, true), send(8, 8 / 30, true, false) })
+			t.eq(#repeated, 0)
+			t.eq(rstats.teleportsCarried, 1)
 			-- a jump and a heading snap the server never flagged
 			local bench = Detect.bench(def)
 			for i = 1, 12 do
