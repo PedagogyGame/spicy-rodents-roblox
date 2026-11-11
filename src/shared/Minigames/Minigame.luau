@@ -10,6 +10,11 @@
 -- W4b (Minigames/Session, Server/Minigames/MinigameService): a turn-based rules module also exports turn(state)
 -- -> seat?, skipTurn(state) (an idle or vacated turn played out as a miss) and view(state) (the JSON-friendly
 -- scoreboard); serverVerbs lists the verbs only the server may send (bowling's "roll" is the lane's pinfall).
+-- The registry (Minigames/Games) adds what the other kinds of game need, all optional: MODES (the lobby's
+-- choices; Session checks a "mode" against it), step(state, dt) (a game that moves between inputs: a rally, a
+-- machine, a match clock), gone(state, seat) (a seat left or was taken off mid-game), join(state, seat) with
+-- def.lateJoin (a seat taken while the game is on: a team match), and Result.winners / Result.text (a winning
+-- side rather than one seat; the words of the end banner).
 
 export type Def = {
 	game: string,
@@ -18,7 +23,9 @@ export type Def = {
 	seats: number,
 	authority: string,
 	money: string?,
+	lateJoin: boolean?, -- a seat may be taken while the game is on (a team match)
 }
+-- (winners: the seats of a winning side; text: the end banner's words. Both optional, both carried by [string]: any.)
 export type Result = { done: boolean, scores: { [number]: number }, winner: number?, [string]: any }
 export type Rules = {
 	def: Def,
@@ -30,6 +37,10 @@ export type Rules = {
 	turn: ((state: any) -> number?)?,
 	skipTurn: ((state: any) -> ())?,
 	view: ((state: any) -> { [string]: any })?,
+	MODES: { string }?,
+	step: ((state: any, dt: number) -> ())?,
+	gone: ((state: any, seat: number) -> ())?,
+	join: ((state: any, seat: number) -> ())?,
 }
 export type Game = { rules: Rules, state: any, seats: number }
 

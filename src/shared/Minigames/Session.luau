@@ -10,10 +10,17 @@
 -- (tests/unit/minigames_session.spec.luau). Keys are opaque player handles (Player or a test stub).
 -- The end of a game is announced exactly once, as a "done" event from step(), however it ended (the last
 -- input through apply(), a skipped turn, a timeout).
+-- Games that are not turn-based (Minigames/Games: flow "live", "solo", "match") use the same session with the
+-- rules' optional hooks: step(state, dt) advances the game on every Session.step (a rally's ball, a machine, a
+-- match clock; the game may end there); with no turn() any seated player's input is taken, and opts.idleSeconds
+-- takes a seat off after that long without an accepted input (computer players, keys with ai = true, never
+-- idle out); gone(state, seat) tells the rules a seat left or was taken off; def.lateJoin lets a seat be taken
+-- (or a vacated one retaken) while the game is on, told to the rules by join(state, seat); applyAs sends a
+-- server verb for a named seat when there is no turn to resolve it from.
 -- Interface: new(rules, opts) -> Session; join(s, key, name, now) -> (ok, why?, seat?); leave(s, key, now)
---   -> seat?; start(s, now) -> (ok, why?); apply(s, key, verb, args, now) -> (ok, why?); step(s, now) ->
---   { Event }; seatOf(s, key) -> seat?; turnKey(s) -> key?; again(s, now) -> (ok, why?); view(s, now) ->
---   table; touch(s, now); reset(s)
+--   -> seat?; start(s, now) -> (ok, why?); apply(s, key, verb, args, now) -> (ok, why?); applyAs(s, seat, verb,
+--   args, now) -> (ok, why?); step(s, now, busy?) -> { Event }; seatOf(s, key) -> seat?; turnKey(s) -> key?;
+--   again(s, now) -> (ok, why?); view(s, now) -> table; touch(s, now); reset(s)
 
 local Minigame = require("./Minigame")
 
@@ -21,6 +28,7 @@ export type Opts = {
 	lobbySeconds: number?, -- 0 = start on the first join
 	turnSeconds: number?, -- idle turn clock (nil = none)
 	doneSeconds: number?, -- end card before the table resets
+	idleSeconds: number?, -- with nobody's turn: a seat with no accepted input for this long is taken off (nil = never)
 	maxTimeouts: number?,
 	seed: number?,
 }
@@ -44,6 +52,8 @@ export type Session = {
 	result: { [string]: any }?,
 	pendingMode: string?,
 	doneTold: boolean, -- the "done" event has gone out for this game
+	active: { [number]: number }, -- seat -> when its last input was accepted (the idle clock of a game without turns)
+	steppedAt: number, -- when the rules' step() last ran
 }
 
 local Session = {}
@@ -77,6 +87,8 @@ function Session.new(rules: any, opts: Opts?): Session
 		result = nil,
 		pendingMode = nil,
 		doneTold = false,
+		active = {},
+		steppedAt = 0,
 	}
 end
 
@@ -91,6 +103,7 @@ function Session.reset(s: Session)
 	s.result = nil
 	s.pendingMode = nil
 	s.doneTold = false
+	table.clear(s.active)
 end
 
 function Session.seatOf(s: Session, key: any): number?
@@ -140,6 +153,11 @@ function Session.start(s: Session, now: number): (boolean, string?)
 	s.result = nil
 	s.doneTold = false
 	table.clear(s.timeouts)
+	table.clear(s.active)
+	for i = 1, #s.seats do
+		s.active[i] = now
+	end
+	s.steppedAt = now
 	return true
 end
 
@@ -150,7 +168,35 @@ function Session.join(s: Session, key: any, name: string, now: number): (boolean
 		return true, "already seated", existing
 	end
 	if s.phase == "playing" then
-		return false, "a game is in progress: wait for it to finish or try another table"
+		local g = s.game
+		if g == nil or not s.rules.def.lateJoin then
+			return false, "a game is in progress: wait for it to finish or try another table"
+		end
+		-- a game that takes players while it is on: a vacated seat first, then a new one
+		local late: number? = nil
+		for i = 1, #s.seats do
+			if s.gone[i] then
+				late = i
+				break
+			end
+		end
+		if late == nil then
+			if #s.seats >= s.rules.def.seats then
+				return false, "the table is full"
+			end
+			late = #s.seats + 1
+		end
+		s.seats[late] = key
+		s.names[late] = name
+		s.gone[late] = nil
+		s.timeouts[late] = 0
+		s.active[late] = now
+		g.seats = #s.seats
+		local seatJoined = g.rules.join
+		if seatJoined then
+			seatJoined(g.state, late)
+		end
+		return true, nil, late
 	end
 	if s.phase == "done" then
 		-- the end card is up: a newcomer starts a fresh table
@@ -181,6 +227,14 @@ local function anyoneLeft(s: Session): boolean
 	return false
 end
 
+-- A seat has gone while the game is on: the rules hear of it (a rally is forfeited, a team is a player short).
+local function tellGone(s: Session, seat: number)
+	local g = s.game
+	if s.phase == "playing" and g and g.rules.gone then
+		g.rules.gone(g.state, seat)
+	end
+end
+
 -- leave: off the table. In the lobby the seat is removed; mid-game it is marked gone and its turns are
 -- played out as misses. At the end card it is marked gone too, never removed: the finished game's sheets and
 -- result are numbered by the seats that played it, so moving the others up would put the leaver's score
@@ -208,6 +262,7 @@ function Session.leave(s: Session, key: any, _now: number): number?
 		end
 	else
 		s.gone[seat] = true
+		tellGone(s, seat)
 		if not anyoneLeft(s) then
 			Session.reset(s)
 		end
@@ -258,7 +313,8 @@ function Session.apply(s: Session, key: any, verb: string, args: { any }?, now: 
 			return false, "not seated"
 		end
 		local m = if args then tostring(args[1]) else ""
-		if m ~= "501" and m ~= "cricket" then
+		local modes = s.rules.MODES
+		if type(modes) ~= "table" or table.find(modes, m) == nil then
 			return false, "mode"
 		end
 		s.pendingMode = m
@@ -280,6 +336,21 @@ function Session.apply(s: Session, key: any, verb: string, args: { any }?, now: 
 	if ok then
 		s.turnStarted = now
 		s.timeouts[seat] = 0
+		s.active[seat] = now
+		finishIfDone(s, now)
+	end
+	return ok, why
+end
+
+-- applyAs: a server verb for a named seat (a game without turns has no turn to resolve "server" from). It is
+-- the server's own doing, so nobody's idle clock is touched.
+function Session.applyAs(s: Session, seat: number, verb: string, args: { any }?, now: number): (boolean, string?)
+	local g = s.game
+	if s.phase ~= "playing" or g == nil then
+		return false, "no game in progress"
+	end
+	local ok, why = Minigame.input(g, seat, verb, args)
+	if ok then
 		finishIfDone(s, now)
 	end
 	return ok, why
@@ -292,6 +363,16 @@ function Session.step(s: Session, now: number, busy: boolean?): { Event }
 		if Session.start(s, now) then
 			table.insert(events, { kind = "start" })
 		end
+	end
+	if s.phase == "playing" then
+		-- a game that moves between inputs (a rally, a machine, a match clock) advances here, and may end here
+		local live = s.game :: Minigame.Game
+		local advance = live.rules.step
+		if advance then
+			advance(live.state, math.max(0, now - s.steppedAt))
+			finishIfDone(s, now)
+		end
+		s.steppedAt = now
 	end
 	if s.phase == "playing" then
 		skipGone(s, now, events)
@@ -311,6 +392,7 @@ function Session.step(s: Session, now: number, busy: boolean?): { Event }
 			if s.timeouts[seat] >= opt(s, "maxTimeouts") then
 				local key = s.seats[seat]
 				s.gone[seat] = true
+				tellGone(s, seat)
 				table.insert(events, { kind = "removed", seat = seat, key = key, why = "idle" })
 				if not anyoneLeft(s) then
 					Session.reset(s)
@@ -320,6 +402,28 @@ function Session.step(s: Session, now: number, busy: boolean?): { Event }
 			end
 			finishIfDone(s, now)
 			skipGone(s, now, events)
+		end
+		-- nobody's turn (a live game): each seat has its own idle clock, if the game asks for one
+		local idle = s.opts.idleSeconds
+		if seat == nil and idle ~= nil and idle > 0 and s.phase == "playing" then
+			for i, key in s.seats do
+				if s.gone[i] or (type(key) == "table" and key.ai == true) then
+					continue
+				end
+				if busy then
+					s.active[i] = now
+				elseif now - (s.active[i] or now) > idle then
+					s.gone[i] = true
+					tellGone(s, i)
+					table.insert(events, { kind = "removed", seat = i, key = key, why = "idle" })
+				end
+			end
+			if not anyoneLeft(s) then
+				Session.reset(s)
+				table.insert(events, { kind = "reset" })
+				return events
+			end
+			finishIfDone(s, now)
 		end
 		local t = Session.turn(s)
 		if t ~= s.lastTurn and s.phase == "playing" then
