@@ -80,13 +80,13 @@ Path.VARIANTS = {
 		rig = "squirrel",
 		hero = "squirrel",
 		species = "squirrel",
-		mesh = { min = { -0.42, -0.009, -1.172 }, max = { 0.42, 1.325, 2.337 } },
+		mesh = { min = { -0.462, -0.026, -1.172 }, max = { 0.441, 1.307, 2.32 } },
 	},
 	rodent = {
 		rig = "rodent",
 		hero = "rodent",
 		species = "squirrel",
-		mesh = { min = { -0.394, -0.013, -1.172 }, max = { 0.394, 1.269, 2.332 } },
+		mesh = { min = { -0.438, -0.013, -1.173 }, max = { 0.427, 1.295, 2.271 } },
 	},
 } :: { [string]: Variant }
 

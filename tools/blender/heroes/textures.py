@@ -393,6 +393,13 @@ def paint_body(sp, variant, lo, hi, W, bone_names, opts, log):
             arr[..., 3] = 1
         bl.save_png(p, arr[::-1], colorspace=cs)
         paths[name] = p
+    if "cards" in paint:
+        # where fur tufts may grow (1) and where the skin is bare (0), for the fur-card scatter (not uploaded)
+        fur = np.zeros((res, res, 4), dtype=F32)
+        fur[filled, :3] = np.asarray(paint["cards"], dtype=F32)[:, None]
+        fur = dilate(fur, filled)
+        fur[..., 3] = 1
+        bl.save_png(os.path.join(out_dir, f"{variant}_body_cardmask.png"), fur[::-1], colorspace="Non-Color")
     # a preview of what the engine shows with the stock tint (for review only, not uploaded)
     prev = color.copy()
     tint = paint["tint_by_region"]
