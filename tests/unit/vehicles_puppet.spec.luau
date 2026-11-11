@@ -2,8 +2,8 @@
 -- Traffic/VehiclePuppet shapes (owner 2026-11-11: "the vehicles are extremely rough"): a shaped kind is a
 -- vehicle from at most forty plain parts (wedges for the glass and the bonnet, cylinders and balls for
 -- the rounded nose, corners and roof edges), every visible part of every kind stays inside its logical
--- box (what you see is what kills, D9), the RigSpec.car names survive, and a kind not yet shaped is
--- still the ten-block placeholder. Also PartBuilder's "Wedge" shape.
+-- box (what you see is what kills, D9), the RigSpec.car names survive, and each of the ten kinds is
+-- recognisably itself. Also PartBuilder's "Wedge" shape.
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
 local PartBuilder = require("@shared/Avatar/PartBuilder")
@@ -11,12 +11,18 @@ local RigSpec = require("@shared/Actors/RigSpec")
 local VehiclePuppet = require("@shared/Traffic/VehiclePuppet")
 local Boxes = require("@shared/Traffic/Boxes")
 
--- Kinds drawn from shaped parts, and the rest with the part count of their ten-block placeholder. A kind
--- moves from BLOCKS to SHAPED when it gets its builder.
-local SHAPED =
-	{ "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley", "dump_truck", "rv", "cart" }
-local BLOCKS: { [string]: number } = {
-	motorcycle = 10,
+-- Every kind is drawn from shaped parts.
+local SHAPED = {
+	"sedan",
+	"patrol_car",
+	"ambulance",
+	"delivery_van",
+	"ice_cream_van",
+	"trolley",
+	"dump_truck",
+	"rv",
+	"cart",
+	"motorcycle",
 }
 
 local lib = {
@@ -494,18 +500,67 @@ return function(t)
 		t.truthy(p.WheelFL.size[2] < 1.5, "small wheels")
 	end)
 
-	t.test("a kind not yet shaped is the ten-block placeholder, unchanged in part count", function()
-		local seen = 0
-		for kind, parts in BLOCKS do
-			seen += 1
-			local spec = VehiclePuppet.spec(kind)
-			t.eq(#spec.parts, parts, `{kind} part count`)
-			t.truthy(PartBuilder.names(spec).parts.Cabin, `{kind} still has its block cabin`)
-			for _, part in spec.parts do
-				t.truthy(part.shape == nil or part.shape == "Cylinder", `{kind}.{part.name} is a block or a wheel`)
+	t.test(
+		"the motorcycle: two wheels in line under four wheel names, raked forks, a tank, bars and a screen",
+		function()
+			local paint = "#7a2f2a"
+			local p = byName(VehiclePuppet.spec("motorcycle", { color = paint }))
+			local box = Boxes.get("motorcycle")
+			-- each wheel is two half-width tyres side by side on the centre line
+			for _, pair in { { "WheelFL", "WheelFR" }, { "WheelBL", "WheelBR" } } do
+				local l, r = p[pair[1]], p[pair[2]]
+				t.near(l.pos[3], r.pos[3], 1e-9)
+				t.near(l.pos[1] + l.size[1] / 2, 0, 1e-9, `{pair[1]} ends on the centre line`)
+				t.near(r.pos[1] - r.size[1] / 2, 0, 1e-9, `{pair[2]} starts on it`)
+				t.truthy(l.size[1] + r.size[1] < 0.6, "one narrow tyre")
 			end
+			t.truthy(p.WheelFL.pos[3] < 0 and p.WheelBL.pos[3] > 0)
+			t.eq(VehiclePuppet.track("motorcycle"), nil, "a two-wheeler has no track")
+			-- the tank takes the paint; the engine and the trim do not
+			local want = PartBuilder.hex(paint)
+			t.near(p.Tank.color.r, want.r, 1e-9)
+			t.eq(p.Tank.shape, "Cylinder")
+			t.truthy(p.Body.color.r ~= want.r, "the engine keeps its metal")
+			t.truthy(
+				p.Tank.pos[2] > p.Body.pos[2] and p.Seat.pos[3] > p.Tank.pos[3],
+				"tank over the engine, seat behind"
+			)
+			-- forks raked back from the front axle to the bars; bars as wide as the box; a clear screen to its top
+			for _, name in { "ForkL", "ForkR" } do
+				t.truthy((p[name].pitch :: number) > 0.2, `{name} is raked`)
+				t.truthy(p[name].pos[3] < 0 and p[name].size[2] > 1.5)
+			end
+			t.near(p.Bars.size[1], box.width, 1e-6)
+			t.truthy(p.Bars.pos[2] > p.Tank.pos[2])
+			t.truthy((p.Screen.transparency :: number) >= 0.4)
+			t.near(p.Screen.pos[2] + p.Screen.size[2] / 2, box.height / 2, 1e-6)
+			t.eq(p.Headlights.material, "Neon")
+			t.truthy(p.Headlights.pos[3] < p.Tank.pos[3] and p.TailLights.pos[3] > p.Seat.pos[3])
+			local sockets = VehiclePuppet.spec("motorcycle").attachments
+			t.eq(sockets[1].pos[1], 0, "the rider sits on the centre line")
 		end
-		t.eq(seen + #SHAPED, #VehiclePuppet.KINDS, "every kind is either shaped or a placeholder")
+	)
+
+	t.test("all ten kinds are shaped: none is the ten-block placeholder", function()
 		t.eq(#VehiclePuppet.KINDS, 10)
+		t.eq(#SHAPED, 10)
+		local shaped = {}
+		for _, kind in SHAPED do
+			shaped[kind] = true
+		end
+		for _, kind in VehiclePuppet.KINDS do
+			t.truthy(shaped[kind], `{kind} is in the shaped list`)
+			local spec = VehiclePuppet.spec(kind)
+			local rounded = 0
+			for _, part in spec.parts do
+				if part.shape == "Ball" or (part.shape == "Cylinder" and string.sub(part.name, 1, 5) ~= "Wheel") then
+					rounded += 1
+				end
+			end
+			t.truthy(rounded >= 4, `{kind}: {rounded} rounded parts besides its wheels`)
+			-- the block placeholder's see-through cabin is gone: glass is dark and solid, or a clear screen
+			local cabin = byName(spec).Cabin
+			t.truthy(cabin == nil or (cabin.transparency or 0) == 0, `{kind}: no see-through block cabin`)
+		end
 	end)
 end

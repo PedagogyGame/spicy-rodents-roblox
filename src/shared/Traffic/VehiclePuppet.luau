@@ -1,14 +1,13 @@
 --!strict
 -- ReplicatedStorage.Shared.Traffic.VehiclePuppet
--- Placeholder vehicles at the TRUE logical boxes (BUILD_PLAN §4.4 W1 #9 and #10, D9, §5.2).
+-- Part-built vehicles at the TRUE logical boxes (BUILD_PLAN §4.4 W1 #9 and #10, D9, §5.2).
 -- Interface: spec(kind, opts?) -> PartBuilder.ModelSpec; KINDS; baseOffset(kind) (root centre above the base); length(kind), width(kind), track(kind)
 --
 -- The invisible RootPart is exactly the logical box from Traffic/Boxes (the box the fatal test sweeps), and
--- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
--- These kinds are SHAPED (owner 2026-11-11: "the vehicles are extremely rough"), a vehicle from about forty
--- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building):
--- sedan, patrol car, ambulance, delivery van, ice cream van, trolley, dump truck, rv, cart. The rest are still the ten-block placeholder and
--- follow the same recipe.
+-- the visible vehicle fills the same envelope and stays inside it, so a player never dies to a car that
+-- looks smaller.
+-- Every kind is SHAPED (owner 2026-11-11: "the vehicles are extremely rough"): a vehicle from about forty
+-- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building).
 -- Names follow Actors/RigSpec.car (RootPart, Body, WheelFL/FR/BL/BR, LightBar (+ LightBarB, the second
 -- beacon colour), Headlights, TailLights;
 -- sockets DriverSeat, DashSocket, EyeSocket). Authored rigs face -Z (RigSpec header; Config/Units adds
@@ -24,18 +23,19 @@ local VehiclePuppet = {}
 
 local hex = PartBuilder.hex
 
+-- cabin: the share of the box height above the driver's seat (where the sockets go)
 -- stylua: ignore
-local DEFAULTS: { [string]: { color: string, cabin: number, cabinLen: number, beacons: boolean } } = {
-	sedan = { color = "#7c8e8b", cabin = 0.42, cabinLen = 0.55, beacons = false },        -- §2.1 event sedan grey
-	patrol_car = { color = "#e0e6de", cabin = 0.42, cabinLen = 0.55, beacons = true },    -- §5.7 white, red/blue bar
-	ambulance = { color = "#f0eee6", cabin = 0.5, cabinLen = 0.7, beacons = true },       -- §5.8 box and stripes
-	delivery_van = { color = "#d9d4c4", cabin = 0.55, cabinLen = 0.8, beacons = false },   -- §2.3
-	ice_cream_van = { color = "#f3e7d7", cabin = 0.55, cabinLen = 0.8, beacons = false },  -- §2.4 SCOOP MOBILE
-	trolley = { color = "#7f2f2a", cabin = 0.6, cabinLen = 0.95, beacons = false },        -- §2.5 CITY TROLLEY
-	dump_truck = { color = "#c99a2e", cabin = 0.5, cabinLen = 0.3, beacons = false },      -- §2.6
-	rv = { color = "#e8e2d2", cabin = 0.6, cabinLen = 0.85, beacons = false },             -- §2.6
-	cart = { color = "#e9ece6", cabin = 0.45, cabinLen = 0.5, beacons = false },           -- brief v2 golf cart
-	motorcycle = { color = "#3a3f46", cabin = 0.3, cabinLen = 0.4, beacons = false },      -- §2.7
+local DEFAULTS: { [string]: { color: string, cabin: number, beacons: boolean } } = {
+	sedan = { color = "#7c8e8b", cabin = 0.42, beacons = false },        -- §2.1 event sedan grey
+	patrol_car = { color = "#e0e6de", cabin = 0.42, beacons = true },    -- §5.7 white, red/blue bar
+	ambulance = { color = "#f0eee6", cabin = 0.5, beacons = true },       -- §5.8 box and stripes
+	delivery_van = { color = "#d9d4c4", cabin = 0.55, beacons = false },   -- §2.3
+	ice_cream_van = { color = "#f3e7d7", cabin = 0.55, beacons = false },  -- §2.4 SCOOP MOBILE
+	trolley = { color = "#7f2f2a", cabin = 0.6, beacons = false },        -- §2.5 CITY TROLLEY
+	dump_truck = { color = "#c99a2e", cabin = 0.5, beacons = false },      -- §2.6
+	rv = { color = "#e8e2d2", cabin = 0.6, beacons = false },             -- §2.6
+	cart = { color = "#e9ece6", cabin = 0.45, beacons = false },           -- brief v2 golf cart
+	motorcycle = { color = "#3a3f46", cabin = 0.3, beacons = false },      -- §2.7
 }
 
 local BEACON_RED, BEACON_BLUE, BEACON_WHITE = "#ff2a2a", "#2f6bff", "#fff4e6"
@@ -715,6 +715,61 @@ local function cartParts(k: Kit, color: Rgb): number
 	return 0.6
 end
 
+-- Motorcycle: two wheels in line (each drawn as two half-width tyres, so RigSpec's four wheel names
+-- stand), raked forks, a round tank in the paint colour over a dark engine, a seat, mudguards, an
+-- exhaust, handlebars out to the sides of the box and a tall clear screen up to its top.
+local function motorcycleParts(k: Kit, color: Rgb): number
+	local hw, hl, H = k.hw, k.hl, k.H
+	local trim, tyre, chrome = hex(FIXED.trim), hex(FIXED.tyre), hex(FIXED.chrome)
+	local metal = hex("#585c61")
+	local wheelR, half = 0.82, 0.2
+	local axle = hl - wheelR - 0.01
+	for _, w in
+		{
+			{ name = "WheelFL", sx = -1, z = -axle },
+			{ name = "WheelFR", sx = 1, z = -axle },
+			{ name = "WheelBL", sx = -1, z = axle },
+			{ name = "WheelBR", sx = 1, z = axle },
+		}
+	do
+		put(k, {
+			name = w.name,
+			size = { half, wheelR * 2, wheelR * 2 },
+			pos = { w.sx * half / 2, k.bottom + wheelR, w.z },
+			color = tyre,
+			shape = "Cylinder",
+		})
+	end
+	across(k, "HubsF", half + 0.06, 0.36, wheelR, -axle, chrome).material = "Metal"
+	across(k, "HubsB", half + 0.06, 0.36, wheelR, axle, chrome).material = "Metal"
+
+	add(k, "Body", 0.28, 0.75, 1.6, -0.75, 0.75, metal).material = "Metal"
+	across(k, "Engine", 0.4, 0.3, 1.05, -0.15, chrome).material = "Metal"
+	along(k, "Tank", 0, 1.85, 0.38, -1.0, 0.15, color)
+	add(k, "Seat", 0.3, 1.75, 2.05, 0.1, 1.45, hex("#1c1d20"))
+	add(k, "FenderB", 0.24, 1.72, 1.86, 1.2, hl - 0.2, color)
+	add(k, "FenderF", 0.22, 1.7, 1.8, -hl + 0.25, -axle + 0.55, color)
+	along(k, "Exhaust", 0.38, 0.72, 0.11, 0.2, hl - 0.35, chrome).material = "Metal"
+	-- forks: two thin legs from the front axle, raked back to the bars
+	for _, sx in { -1, 1 } do
+		put(k, {
+			name = if sx < 0 then "ForkL" else "ForkR",
+			size = { 0.09, 2.0, 0.11 },
+			pos = { sx * 0.27, k.bottom + 1.72, -axle + 0.4 },
+			pitch = 0.42,
+			color = chrome,
+			material = "Metal",
+		})
+	end
+	across(k, "Bars", hw, 0.06, 2.68, -axle + 0.85, trim)
+	along(k, "Headlights", 0, 2.3, 0.24, -axle + 0.3, -axle + 0.6, hex(FIXED.head)).material = "Neon"
+	add(k, "Swingarm", 0.26, 0.72, 0.92, 0.6, axle, trim)
+	local screen = add(k, "Screen", 0.42, 2.5, H, -axle + 0.62, -axle + 0.7, hex("#a9c0cb"))
+	screen.material, screen.transparency = "Glass", 0.5
+	add(k, "TailLights", 0.16, 1.62, 1.8, hl - 0.22, hl - 0.14, hex(FIXED.tail)).material = "Neon"
+	return 0
+end
+
 -- Kinds drawn from shaped parts instead of the ten-block placeholder.
 local BUILDERS: { [string]: Builder } = {
 	sedan = sedanParts,
@@ -726,6 +781,7 @@ local BUILDERS: { [string]: Builder } = {
 	dump_truck = dumpTruckParts,
 	rv = rvParts,
 	cart = cartParts,
+	motorcycle = motorcycleParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against
@@ -792,118 +848,9 @@ end
 function VehiclePuppet.spec(kind: string, opts: Opts?): PartBuilder.ModelSpec
 	local o: Opts = opts or {}
 	local d = DEFAULTS[kind] or error(`VehiclePuppet: unknown kind {kind}`)
-	local b = Boxes.get(kind)
-	local W, L, H = b.width, b.length, b.height
 	local color = hex(o.color or d.color)
-	local build = BUILDERS[kind]
-	if build then
-		return shapedSpec(kind, build, o, color, d.cabin, if o.beacons == nil then d.beacons else o.beacons)
-	end
-	local dark = hex("#2b2f33")
-	local glass = hex("#5d7480")
-	local bodyH = H * (1 - d.cabin)
-	local cabinH = H * d.cabin
-	local wheelR = math.min(0.3 * H, 1.15)
-	local wheelW = math.min(0.6, W * 0.2)
-	local bottom = -H / 2
-	local beacons = if o.beacons == nil then d.beacons else o.beacons
-	local parts: { PartBuilder.PartSpec } = {
-		{ name = "RootPart", size = { W, H, L }, pos = { 0, 0, 0 }, color = color, transparency = 1 },
-		-- body: the full footprint, from just above the wheel centres to the cabin line
-		{
-			name = "Body",
-			size = { W, bodyH - wheelR * 0.6, L },
-			pos = { 0, bottom + wheelR * 0.6 + (bodyH - wheelR * 0.6) / 2, 0 },
-			color = color,
-		},
-		-- cabin: full height to the box top, set back from the nose (-Z is the front)
-		{
-			name = "Cabin",
-			size = { W * 0.92, cabinH, L * d.cabinLen },
-			pos = { 0, H / 2 - cabinH / 2, L * (0.5 - d.cabinLen / 2) * 0.35 },
-			color = glass,
-			transparency = 0.15,
-		},
-		{
-			name = "Headlights",
-			size = { W * 0.8, 0.35, 0.1 },
-			pos = { 0, bottom + bodyH * 0.65, -L / 2 + 0.04 },
-			color = hex("#fff3b5"),
-			material = "Neon",
-		},
-		{
-			name = "TailLights",
-			size = { W * 0.8, 0.3, 0.1 },
-			pos = { 0, bottom + bodyH * 0.65, L / 2 - 0.04 },
-			color = hex("#c53227"),
-			material = "Neon",
-		},
-		-- the beacon bar: two bright Neon halves, red on the driver's side and blue (the ambulance:
-		-- white) on the other (review 2026-11-09: the old navy bar barely showed); hidden on plain cars
-		{
-			name = "LightBar",
-			size = { W * 0.3, 0.3, 0.5 },
-			pos = { -W * 0.15, H / 2 - 0.15, 0 },
-			color = hex(BEACON_RED),
-			material = if beacons then "Neon" else "SmoothPlastic",
-			transparency = if beacons then 0 else 1,
-		},
-	}
-	if beacons then
-		table.insert(parts, {
-			name = "LightBarB",
-			size = { W * 0.3, 0.3, 0.5 },
-			pos = { W * 0.15, H / 2 - 0.15, 0 },
-			color = hex(if kind == "ambulance" then BEACON_WHITE else BEACON_BLUE),
-			material = "Neon",
-		})
-	end
-	local joints: { PartBuilder.JointSpec } = {
-		{ name = "BodyWeld", kind = "Weld", part0 = "RootPart", part1 = "Body" },
-		{ name = "CabinWeld", kind = "Weld", part0 = "RootPart", part1 = "Cabin" },
-		{ name = "HeadlightsWeld", kind = "Weld", part0 = "RootPart", part1 = "Headlights" },
-		{ name = "TailLightsWeld", kind = "Weld", part0 = "RootPart", part1 = "TailLights" },
-		{ name = "LightBarWeld", kind = "Weld", part0 = "RootPart", part1 = "LightBar" },
-	}
-	if beacons then
-		table.insert(joints, { name = "LightBarBWeld", kind = "Weld", part0 = "RootPart", part1 = "LightBarB" })
-	end
-	local wx = W / 2 - wheelW / 2
-	local wz = L / 2 - math.max(wheelR * 1.3, L * 0.16)
-	for _, w in
-		{
-			{ name = "WheelFL", sx = -1, sz = -1 },
-			{ name = "WheelFR", sx = 1, sz = -1 },
-			{ name = "WheelBL", sx = -1, sz = 1 },
-			{ name = "WheelBR", sx = 1, sz = 1 },
-		}
-	do
-		local name, sx, sz = w.name, w.sx, w.sz
-		table.insert(parts, {
-			name = name,
-			size = { wheelW, wheelR * 2, wheelR * 2 },
-			pos = { sx * wx, bottom + wheelR, sz * wz },
-			color = dark,
-			shape = "Cylinder",
-		})
-		-- the wheel joint is the spin axis (local X): the procedural backend turns C0 by speed*dt/r
-		table.insert(joints, { name = name, kind = "Motor6D", part0 = "RootPart", part1 = name })
-	end
-	local seatX = if kind == "motorcycle" then 0 else -W * 0.22
-	local attachments: { PartBuilder.AttachmentSpec } = {
-		{ name = "DriverSeat", part = "RootPart", pos = { seatX, bottom + bodyH, 0 } },
-		{ name = "DashSocket", part = "RootPart", pos = { seatX, bottom + bodyH + 0.4, -L * 0.18 } },
-		{ name = "EyeSocket", part = "RootPart", pos = { seatX, H / 2 - 0.5, 0.2 } },
-	}
-	return {
-		name = o.name or `Vehicle_{kind}`,
-		species = "car",
-		primary = "RootPart",
-		parts = parts,
-		joints = joints,
-		attachments = attachments,
-		attributes = { VehicleKind = kind, BaseOffset = H / 2, BoxW = W, BoxL = L, BoxH = H },
-	}
+	local build = BUILDERS[kind] or error(`VehiclePuppet: no builder for {kind}`)
+	return shapedSpec(kind, build, o, color, d.cabin, if o.beacons == nil then d.beacons else o.beacons)
 end
 
 return VehiclePuppet

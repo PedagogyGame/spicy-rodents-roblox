@@ -206,12 +206,12 @@
       "species": "car"
     },
     {
-      "bytes": 2373,
+      "bytes": 3122,
       "file": "vehicle_motorcycle.rbxm",
-      "joints": 9,
-      "parts": 10,
+      "joints": 21,
+      "parts": 22,
       "rigspec": true,
-      "sha": "efcc024e70e9428012a283cf48050df727b3247c76954f65ccfc14420863206d",
+      "sha": "2b5535a61f658f14f33193eacf4b0fca6d8a57c27c82a977cbac1f00a72d3a02",
       "sockets": 3,
       "species": "car"
     },
