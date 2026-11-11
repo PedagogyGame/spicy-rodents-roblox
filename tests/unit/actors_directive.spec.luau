@@ -246,6 +246,53 @@ return function(t)
 		t.truthy(worst * 60 <= 5, `{worst * 60} studs/s`)
 	end)
 
+	t.test(
+		"a body handed back off its lane stands still until its brain thinks (no slide on the old intent)",
+		function()
+			-- the brain of a far body thinks once a second: for that second only the motor runs, on
+			-- whatever intent is left. Before the hand-over the person was walking, locked to their lane.
+			for _, off in { 60, -200 } do
+				local human, brain = pedestrian(0, -30.25)
+				local c = ctx()
+				run(human, brain, c, 2, 10)
+				t.eq(human.intent.laneAxis, "x", "walking, locked to the lane")
+				local snap = brain:suspend()
+				human.x, human.z = human.x + 15, -30.25 + off -- the player walked the body away
+				human.speed = 0
+				brain:resume(snap)
+				local x0, z0 = human.x, human.z
+				local worst = 0
+				for _ = 1, 60 do
+					c.now += 1 / 60
+					local px, pz = human.x, human.z
+					Kinematics.step(human, 1 / 60, c) -- the motor alone: no think
+					worst = math.max(worst, Common.dist2d(human.x, human.z, px, pz) * 60)
+				end
+				local moved = Common.dist2d(human.x, human.z, x0, z0)
+				t.truthy(moved < 1, `handed back {off} studs off the lane: moved {moved} studs before the first think`)
+				t.truthy(worst < 5, `{worst} studs/s on the first frames`)
+				t.eq(human.intent.laneAxis, nil, "the old lane lock is gone")
+				-- and then walks to the nearest lane as before
+				run(human, brain, c, 3, 10)
+				t.truthy(brain.state == "rejoin" or brain.state == "walk")
+			end
+			-- staff and officers stand too: no step toward the waypoint they were heading for
+			local actor = Common.newActor(1, "human", "police", "Staff", 0, 0, 2.5)
+			local staff = Staff.new(actor, { stationX = 100, stationZ = 200, index = 3 }) :: any
+			local c = ctx()
+			run(actor, staff, c, 3, 10)
+			local snap = staff:suspend()
+			actor.x, actor.z = actor.x + 80, actor.z - 40
+			actor.speed = 0
+			staff:resume(snap)
+			local x0, z0 = actor.x, actor.z
+			for _ = 1, 60 do
+				Kinematics.step(actor, 1 / 60, c)
+			end
+			t.near(Common.dist2d(actor.x, actor.z, x0, z0), 0, 1e-6, "a handed-back staff member waits for its brain")
+		end
+	)
+
 	t.test("staff and officers obey the same orders and go back to their rounds", function()
 		for _, make in
 			{

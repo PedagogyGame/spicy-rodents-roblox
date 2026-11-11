@@ -76,6 +76,7 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.target = snapshot.target or 1
 	self.pause = snapshot.pause or 0
 	Directive.restore(self.directive, snapshot.directive)
+	Common.halt(self.actor) -- no walking on the old intent before the next think
 end
 
 function Methods.onEvent(self: Brain, evt: { [string]: any })

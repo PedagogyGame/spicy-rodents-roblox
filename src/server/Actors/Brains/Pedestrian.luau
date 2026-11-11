@@ -12,6 +12,8 @@
 -- say something; and the "rejoin" state: after a directive, a gathering or a player letting go far
 -- from the lane, the person adopts the nearest lane and WALKS back onto it (the lane lock damps the
 -- cross coordinate at lambda 8, which used to slide a person across the block in half a second).
+-- resume() also stops the motor (Common.halt) so the stale lane-locked intent cannot do that slide
+-- in the frames before the brain's next think.
 -- Interface (BUILD_PLAN §1.4): new(actor, params), think(dt, ctx), suspend() -> snapshot,
 -- resume(snapshot), onEvent(evt). Also Pedestrian.defaultLanes() (the v5.4 core lanes in studs).
 -- Pure; studs via Config/Units. Perception happens at the brain's own tick (5-10 Hz by LOD, D4).
@@ -337,6 +339,9 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.gatherZ = snapshot.gatherZ or 0
 	self.gatherUntil = snapshot.gatherUntil or 0
 	Directive.restore(self.directive, snapshot.directive)
+	-- nothing moves the body until the next think: the old intent is locked to the lane the person
+	-- was on before the hand-over, and the motor's lane lock would drag them back to it at once
+	Common.halt(self.actor)
 	-- handed back far from the lane (a player walked the body somewhere): walk to the nearest lane
 	if not Directive.active(self.directive) and self.state ~= "gather" and offLane(self) > REJOIN_FAR then
 		reseat(self)
