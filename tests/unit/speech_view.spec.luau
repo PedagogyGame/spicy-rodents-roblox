@@ -135,6 +135,24 @@ return function(t)
 			t.near((mattress :: any).x, bed.x, 1e-6, "the patient sits on the middle of the mattress")
 			t.near((mattress :: any).z, bed.z, 1e-6)
 			t.eq(#cot.parts, 5)
+			-- the patient looks down the length of the cot, away from the pillow: their legs (laid
+			-- flat by the client) stay on the mattress
+			local face = HospitalLayout.bedFace(layout, bed)
+			local fx, fz = face[1] - bed.x, face[2] - bed.z
+			local fl = math.sqrt(fx * fx + fz * fz)
+			t.near(
+				math.abs(fx * math.sin(cot.yaw) + fz * math.cos(cot.yaw)) / fl,
+				1,
+				1e-6,
+				`cot {i}: the patient faces along it`
+			)
+			for _, p in cot.parts do
+				if p.name == "Pillow" then
+					t.truthy((p.x - bed.x) * fx + (p.z - bed.z) * fz < 0, `cot {i}: the pillow is behind the patient`)
+				end
+			end
+			-- legs of about 2 studs from the middle of a mattress this long stay on it
+			t.truthy(HospitalLayout.BED.length / 2 >= 2.6)
 		end
 	end)
 	t.test("a sitting patient's legs lie flat: the knees and ankles of the chair sit are straightened", function()

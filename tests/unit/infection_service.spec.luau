@@ -403,6 +403,13 @@ return function(t)
 		local bed = layout.beds[h.svc.hospital:bedOf(id)]
 		t.near(victim.x, bed.x, 0.01)
 		t.near(victim.z, bed.z, 0.01)
+		-- sitting up along the cot, looking down its length (their legs lie out in front of them: turned
+		-- to the ward door they lay across the corner of the cot and through its frame)
+		local d = h.world.brains[id].directive
+		t.eq(d.mode, "down")
+		local fx, fz = d.faceX - bed.x, d.faceZ - bed.z
+		local fl = math.sqrt(fx * fx + fz * fz)
+		t.near((fx * math.sin(layout.yaw) + fz * math.cos(layout.yaw)) / fl, 1, 1e-6, "facing along the cot")
 		for _, v in responders(h) do
 			t.eq(v.phase, "idle", "the ambulance is parked again")
 		end

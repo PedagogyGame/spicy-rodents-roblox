@@ -8,7 +8,8 @@
 -- is the lot's facing through Units' single +pi), so a bed stands where the baked ward is.
 -- Interface: fromData(data, beds?) -> Layout?; contains(layout, x, z, pad?) -> boolean;
 --   nearEntrance(layout, x, z, r) -> boolean; pathIn(layout, bed) -> { {x, z} }; pathOut(layout, bed)
---   -> { {x, z} }; BED { length, width, top } (studs: the cot the server builds at each bed)
+--   -> { {x, z} }; bedFace(layout, bed) -> {x, z} (the point a patient in that bed looks at);
+--   BED { length, width, top } (studs: the cot the server builds at each bed)
 -- Pure; studs. No side effects on require.
 
 export type Bed = { index: number, x: number, z: number, ward: string, door: { number } }
@@ -122,6 +123,15 @@ end
 function HospitalLayout.nearEntrance(layout: Layout, x: number, z: number, r: number): boolean
 	local dx, dz = x - layout.entrance[1], z - layout.entrance[2]
 	return dx * dx + dz * dz <= r * r
+end
+
+-- bedFace: the point a patient sitting up in the bed looks at: along the cot, away from its pillow.
+-- The cots lie along the hospital's depth with the pillow toward the back wall (Server/Hospital/
+-- HospitalProps), so that is toward the front. A patient's legs lie out in front of them: facing the
+-- ward door instead, they lay across the cot's corner and through its frame.
+function HospitalLayout.bedFace(layout: Layout, bed: Bed): { number }
+	local reach = 4 * HospitalLayout.BED.length
+	return { bed.x + math.sin(layout.yaw) * reach, bed.z + math.cos(layout.yaw) * reach }
 end
 
 -- pathIn: door -> reception -> the ward's door -> the bed.

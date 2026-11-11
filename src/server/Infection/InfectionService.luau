@@ -147,10 +147,12 @@ InfectionService.STOP_CLEAR = 21
 
 -- What a player holding a body is told (on screen, plain words, what to do).
 InfectionService.TOASTS = table.freeze({
-	bitten = "The Spicy Rodent bit you! You are infected. Only the hospital can cure you: walk in through its front doors (far west of town, follow the HOSPITAL signs).",
-	bittenAgain = "The Spicy Rodent bit you again! You are still infected: only the hospital (far west of town) can cure you.",
-	infected = "You are infected: the Spicy Rodent bit this person. Only the hospital can cure you: walk in through its front doors (far west of town, follow the HOSPITAL signs).",
-	symptoms = "Your eyes have gone red and you feel dizzy. Walk to the hospital (far west of town) and stay inside for 30 seconds to be cured.",
+	-- (no compass words and no road signs: the town has neither. The client shows a HOSPITAL marker
+	-- over the door and the distance to it for as long as the player is infected: UI/PlayMenu)
+	bitten = "The Spicy Rodent bit you! You are infected. Only the hospital can cure you: follow the HOSPITAL marker on your screen and walk in through its front doors.",
+	bittenAgain = "The Spicy Rodent bit you again! You are still infected: only the hospital can cure you. Follow the HOSPITAL marker on your screen.",
+	infected = "You are infected: the Spicy Rodent bit this person. Only the hospital can cure you: follow the HOSPITAL marker on your screen and walk in through its front doors.",
+	symptoms = "Your eyes have gone red and you feel dizzy. Follow the HOSPITAL marker, walk into the hospital and stay inside for 30 seconds to be cured.",
 	treating = "The nurses are treating you. Stay inside the hospital for 30 seconds.",
 	leftEarly = "You left before the treatment was finished. Go back inside the hospital.",
 	cured = "CURED! You are healthy again.",
@@ -1372,7 +1374,8 @@ local function apply(self: Service, rec: Record, effect: any)
 			if rec.case.arrival == "ambulance" then
 				sink(self, id, false)
 				place(self, id, bed.x, bed.z)
-				order(self, id, { mode = "down", faceX = bed.door[1], faceZ = bed.door[2] })
+				local face = HospitalLayout.bedFace(layout, bed)
+				order(self, id, { mode = "down", faceX = face[1], faceZ = face[2] })
 			else
 				rec.toBed = true
 				local a = actorOf(self, id)
@@ -1552,10 +1555,12 @@ local function stepCase(self: Service, rec: Record)
 	-- a walk-in who has reached the bed sits down as a patient
 	if rec.toBed and directiveDone(self, rec.id) then
 		rec.toBed = false
-		local bed = self.layout and self.layout.beds[self.hospital:bedOf(rec.id) or 0]
-		if bed and rec.case.state == "treated" then
+		local layout = self.layout
+		local bed = layout and layout.beds[self.hospital:bedOf(rec.id) or 0]
+		if layout and bed and rec.case.state == "treated" then
 			place(self, rec.id, bed.x, bed.z)
-			order(self, rec.id, { mode = "down", faceX = bed.door[1], faceZ = bed.door[2] })
+			local face = HospitalLayout.bedFace(layout, bed)
+			order(self, rec.id, { mode = "down", faceX = face[1], faceZ = face[2] })
 		end
 	end
 	-- the ambulance is parked again: the crew member is back at the bay, and the record forgets the
