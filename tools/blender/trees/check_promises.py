@@ -32,7 +32,9 @@ BOUGH (visualPose, kinds branch / bridge / lookout):
   stands on is the upward-facing surface nearest the feet; error = feet height - that surface.
   + : floats above the bark, - : sinks into it. The stretch where a branch's feet are pushed off the centre
   line (t < 0.2, "clr" columns) is reported apart from the rest of the bough; both fail unless
-  --clearance-warn. Samples whose feet are still over the trunk (inside
+  --clearance-warn. With --clearance-warn the pushed feet only warn (off the bark, or no bark under them)
+  and that stretch is measured on the bough's own top line instead (centre line + lift, where the game
+  now draws the squirrel), which fails like the rest of the bough. Samples whose feet are still over the trunk (inside
   tapered(t) + 0.1 of the trunk centre line) stand on trunk bark and are counted apart.
 TUNNEL (src/worldgen/Builders/Trees.luau header and clear()): no leaf geometry within 1.6 studs of the
   squirrel's body line on a bough (centre line + 2 studs up), nor within 2.2 studs of the trunk's climbing
@@ -291,6 +293,11 @@ def check_tree(info, parts, routes, clearance_warn=False):
         j = 0
         for k, hp in hits:
             if hp is None:
+                a = 2 * math.pi * k / RAYS
+                q = p + np.array([math.cos(a), 0.0, math.sin(a)]) * want
+                if len(allB) > 1 and seg_dist(q[None], allB)[0] < JUNCTION:
+                    junction += 1  # the ray runs on inside a level bough that leaves the trunk here
+                    continue
                 miss += 1
                 rows.append({"y": float(p[1]), "t": float(t), "ray": k, "err": -float(want), "want": float(want)})
                 continue
@@ -316,10 +323,11 @@ def check_tree(info, parts, routes, clearance_warn=False):
 
     # boughs -----------------------------------------------------------------------------------------
     rep["boughs"] = []
-    all_e, all_c, tot_miss = [], [], 0
+    all_e, all_c, tot_miss, tot_cmiss = [], [], 0, 0
     for m, c, ts, P in bough:
         lift = bough_lift(m)
-        feet = P + np.array([0.0, lift, 0.0])
+        top_line = P + np.array([0.0, lift, 0.0])
+        feet = top_line.copy()
         cl = m.get("trunkClearance")
         if m["kind"] == "branch" and cl:
             d = c.at(CLEARANCE_SAMPLE_T) - c.at(0.0)
@@ -328,32 +336,51 @@ def check_tree(info, parts, routes, clearance_warn=False):
                 k = (cl * SPU + CLEARANCE_PAD) * np.clip(1 - ts / CLEARANCE_T, 0, None) ** 2
                 feet[:, 0] += d[0] / l * k
                 feet[:, 2] += d[2] / l * k
-        # feet still over the trunk?
-        e, ec, rows, miss, over = [], [], [], 0, 0
+        e, ec, rows, miss, cmiss, over = [], [], [], 0, 0, 0
         pushed = m["kind"] == "branch" and bool(cl)
-        for f, t in zip(feet, ts):
+
+        def under(f):
+            """Feet height minus the bark the squirrel stands on at f; "over" while the feet are still
+            over the trunk, None when there is no bark in the column."""
             i = int(np.argmin(np.abs(TP[:, 1] - f[1])))
             if TP[0][1] <= f[1] <= TP[-1][1] + 0.5 and math.hypot(f[0] - TP[i][0], f[2] - TP[i][2]) < TR[i] + 0.1:
-                over += 1
-                continue
+                return "over"
             tops = [f[1] + 6.0 - x[0] for x in crossings(bark, f + np.array([0, 6.0, 0]), (0, -1, 0), 12.0) if x[1] < 0]
             if not tops:
+                return None
+            return float(f[1] - min(tops, key=lambda y: abs(y - f[1])))
+
+        for f, f0, t in zip(feet, top_line, ts):
+            if pushed and t < CLEARANCE_T:
+                # the pushed feet (visualPose) are reported apart; with --clearance-warn the game draws
+                # the squirrel on the bough's own top line here, and that is what has to hold
+                err = under(f)
+                if err is None:
+                    cmiss += 1
+                elif err != "over":
+                    ec.append(err)
+                if not clearance_warn:
+                    if err == "over":
+                        over += 1
+                    continue
+                f = f0
+            err = under(f)
+            if err == "over":
+                over += 1
+            elif err is None:
                 miss += 1
                 rows.append({"s": float(t * c.length), "err": 9.0})
-                continue
-            err = float(f[1] - min(tops, key=lambda y: abs(y - f[1])))
-            if pushed and t < CLEARANCE_T:
-                ec.append(err)
             else:
                 e.append(err)
                 rows.append({"s": float(t * c.length), "err": err})
         s = stats(e)
         s.update(route=m["id"], name=m["name"], kind=m["kind"], length=round(c.length, 1), lift=round(lift, 3),
-                 samples=len(ts), over_trunk=over, miss=miss, worst=worst(rows, "err"), clearance=stats(ec))
+                 samples=len(ts), over_trunk=over, miss=miss, worst=worst(rows, "err"), clearance=dict(stats(ec), miss=cmiss))
         rep["boughs"].append(s)
         all_e += e
         all_c += ec
         tot_miss += miss
+        tot_cmiss += cmiss
     tot = stats(all_e)
     tot["miss"] = tot_miss
     rep["bough_total"] = tot
@@ -362,10 +389,11 @@ def check_tree(info, parts, routes, clearance_warn=False):
         fail.append(f"bough bark off the feet by > {TOL} st at {tot['bad']} of {tot['n']} samples (min {tot['min']}, max "
                     f"{tot['max']}), {tot_miss} samples with no bark under the feet")
     ct = rep["clearance_total"]
-    if ct["bad"]:
+    ct["miss"] = tot_cmiss
+    if ct["bad"] or tot_cmiss:
         (warn if clearance_warn else fail).append(
             f"trunk-clearance stretch (branch, t < {CLEARANCE_T}, feet pushed off the centre line): off the bark by > {TOL} st "
-            f"at {ct['bad']} of {ct['n']} samples (min {ct['min']}, max {ct['max']})")
+            f"at {ct['bad']} of {ct['n']} samples (min {ct['min']}, max {ct['max']}), {tot_cmiss} with no bark under them")
 
     # tunnel -----------------------------------------------------------------------------------------
     leaves = [(n, bvh(*parts[n])) for n in names if n.startswith("Leaves") or n == "Apples"]
@@ -448,7 +476,8 @@ def main(argv):
     ap.add_argument("--ids", default="")
     ap.add_argument("--json", default="")
     ap.add_argument("--clearance-warn", action="store_true",
-                    help="the trunk-clearance stretch of a branch (t < 0.2) only warns instead of failing")
+                    help="the pushed feet on the trunk-clearance stretch of a branch (t < 0.2) only warn; the stretch "
+                         "is checked on the bough's own top line instead")
     args = ap.parse_args(argv)
     routes = load_routes()
     if args.ids:

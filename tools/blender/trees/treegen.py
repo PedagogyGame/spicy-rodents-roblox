@@ -761,6 +761,8 @@ class TreeBuilder:
         away = np.zeros(3)
         axis_walk = False  # an unpushed walk starts on the trunk's axis
         body = []  # the squirrel's body line on every walk near the top
+        feet1 = []  # and the feet line over the first fifth of the boughs
+        top_az = []  # which way the walks that start at the top leave
         for m in self.rec["members"]:
             if m["name"].endswith("OPEN SKY LOOKOUT"):
                 continue
@@ -771,51 +773,78 @@ class TreeBuilder:
                 h = (mp[min(len(mp) - 1, 24)] - mp[0]) * np.array([1.0, 0.0, 1.0])
                 if np.linalg.norm(h) > 1e-6:
                     away -= norm(h) * (1.0 if pushed else 3.0)
+                    top_az.append(math.atan2(h[2], h[0]))
                 axis_walk = axis_walk or not pushed
             pts = mp[sm >= (0.2 * sm[-1] if pushed else 0.0)] + Y[None] * (lift_of(m) + 1.0)
             pts = pts[np.linalg.norm(pts - top[None], axis=1) < lead_len + 8.0]
             if len(pts):
                 body.append(pts[::2])
+            # the first fifth of a walk: the squirrel is drawn on the bough's own top line there too,
+            # from where that line leaves the trunk, so the leader's wood keeps off it
+            so = self.s_out(mp, sm, lift_of(m))
+            pts = mp[(sm >= so) & (sm < 0.2 * sm[-1])] + Y[None] * lift_of(m)
+            pts = pts[np.linalg.norm(pts - top[None], axis=1) < lead_len + 8.0]
+            if len(pts):
+                feet1.append(pts)
         body = np.concatenate(body) if body else np.zeros((0, 3))
+        feet1 = np.concatenate(feet1) if feet1 else np.zeros((0, 3))
 
-        def leader_path(lean, length):
+        def leader_path(lean, length, rf=0.46):
             if lean is None:  # straight on from the trunk
                 return top - ttan * 0.5 * Rtop, top + ttan * length * 0.45, top + norm(ttan * 0.4 + Y) * length, 0.9 * Rtop
-            p0 = top + lean * 0.5 * Rtop
-            return p0, p0 + norm(Y * 0.67 + lean * 0.74) * length * 0.4, top + norm(Y + 0.45 * lean) * length, 0.66 * Rtop
+            # (it starts inside the trunk, to one side of the axis, and stands plumb before it leans:
+            # no wood of it outside the climbing radius below the route's top, none over the axis,
+            # where the walks that start at the top take their first step; rf = its radius as a
+            # fraction of the trunk's: a thinner leader stands further from the axis)
+            p0 = top + lean * (0.96 - rf) * Rtop - Y * 0.5 * Rtop
+            return p0, p0 + Y * length * 0.4, top + norm(Y + 0.45 * lean) * length, rf * Rtop
 
-        def leader_room(lean, length):
-            p0, p1, p2, r0 = leader_path(lean, length)
+        def leader_room(lean, length, rf=0.46):
+            """-> (room for the squirrel's body, room over its feet on the first fifth of the walks)."""
+            p0, p1, p2, r0 = leader_path(lean, length, rf)
             f = np.linspace(0, 1, 25)[:, None]
             path = (1 - f) ** 2 * p0 + 2 * (1 - f) * f * p1 + f * f * p2
-            if not len(body):
-                return 9.0
             rr = r0 + (max(0.3, Rtop * 0.2) - r0) * f[:-1, 0] ** 0.85
-            return float((seg_dist(body, path[:-1], path[1:]) - rr[None]).min())
+            broom = float((seg_dist(body, path[:-1], path[1:]) - rr[None]).min()) if len(body) else 9.0
+            froom = float((seg_dist(feet1, path[:-1], path[1:]) - rr[None]).min()) if len(feet1) else 9.0
+            return broom, froom
 
         self.leader = None
         if lead_len > Rtop * 1.5:
-            leans = [np.array([math.cos(a0), 0.0, math.sin(a0)]) for a0 in np.arange(16) * (math.pi / 8)]
-            pick = None
+            az = [a0 for a0 in np.arange(16) * (math.pi / 8)]
+            ta = sorted(top_az)
+            az += [ta[i] + ((ta[(i + 1) % len(ta)] - ta[i]) % (2 * math.pi) or 2 * math.pi) / 2 for i in range(len(ta))]
+            leans = [np.array([math.cos(a0), 0.0, math.sin(a0)]) for a0 in az]
+            pick, done = None, False
             for length in (lead_len, 0.6 * lead_len, 0.35 * lead_len):
-                cands = []
-                for ln in leans + ([] if axis_walk else [None]):
-                    room = leader_room(ln, length)
-                    if ln is None:
-                        bonus = 0.6 if np.linalg.norm(away) < 0.1 else 0.0
-                    else:
-                        bonus = 0.4 * float(np.dot(ln, norm(away + 1e-9))) * (np.linalg.norm(away) > 0.1)
-                    cands.append((room + bonus, room, ln))
-                best = max(cands, key=lambda c: c[0])
-                if best[1] >= 1.0 or pick is None or best[1] > pick[0] + 0.5:
-                    pick = (best[1], best[2], length)
-                if best[1] >= 1.0:
+                for rf in (0.46, 0.36, 0.27):
+                    cands = []
+                    for ln in leans + ([] if axis_walk or rf != 0.46 else [None]):
+                        broom, froom = leader_room(ln, length, rf)
+                        if froom < 0.15:
+                            continue  # (it would stand on a walk's first steps)
+                        room = min(broom, froom + 0.75)
+                        if ln is None:
+                            bonus = 0.6 if np.linalg.norm(away) < 0.1 else 0.0
+                        else:
+                            bonus = 0.4 * float(np.dot(ln, norm(away + 1e-9))) * (np.linalg.norm(away) > 0.1)
+                        cands.append((room + bonus, room, ln))
+                    if not cands:
+                        continue
+                    best = max(cands, key=lambda c: c[0])
+                    if best[1] >= 1.0 or pick is None or best[1] > pick[0] + 0.5:
+                        pick = (best[1], best[2], length, rf)
+                    if best[1] >= 1.0:
+                        done = True
+                        break
+                if done:
                     break
-            room, lean, lead_len = pick
+            room, lean, lead_len, rf = pick if pick is not None else (0.0, None, 0.0, 0.46)
             self.log["leader_room"] = round(room, 2)
+            self.log["leader_rf"] = rf if lean is not None else 0.9
             if room > 0.2 and lead_len > Rtop * 1.5:
                 k = max(4, int(lead_len / 2.4))
-                p0, p1, p2, r0 = leader_path(lean, lead_len)
+                p0, p1, p2, r0 = leader_path(lean, lead_len, rf)
                 side = norm(np.cross(p2 - p0, [0.3, 0.1, 0.9]))
                 LP = []
                 for j in range(k + 1):
@@ -849,7 +878,7 @@ class TreeBuilder:
                 lob += amp * np.exp(-(da / 0.42) ** 2)
             # (the game stands the squirrel at the tapered radius all the way round: the flutes are
             # shallow, and the ring's corners stand as far outside that radius as its flats lie inside)
-            flute = 0.02 * np.sin(ang * 7 + flute_ph + y * 0.15) + 0.012 * np.sin(ang * 3 - y * 0.31)
+            flute = 0.014 * np.sin(ang * 7 + flute_ph + y * 0.15) + 0.008 * np.sin(ang * 3 - y * 0.31)
             r = base[i] * (1 + 0.5 * facet) * (1 + 0.55 * fall * lob) + flute * min(1.0, base[i] / 2.0)
             return np.maximum(r, 0.2)
 
@@ -868,6 +897,8 @@ class TreeBuilder:
             LP, LR = self.leader
             self.leader_limb = Limb("leader", "leader", LP, LR, 8 if LR[0] > 1.0 else 6, 0.45, None, None,
                                     max(1, int(round(2 * math.pi * LR[0] / 4.0))), 4.0)
+            # (its fillet starts above the trunk's top: below it the trunk keeps the climbing radius)
+            self.leader_limb.kramp = (max(top[1] - LP[0][1], 0.0) + 0.35, 0.8)
             self.limbs.append(self.leader_limb)
         # trunk tunnel: the squirrel orbits the bark (tapered + 0.7 st) -> keep leaves 2.6 st beyond
         Qt, st_, tq = resample(P, 2.4)
@@ -879,6 +910,27 @@ class TreeBuilder:
         P = self.trunkP
         tt = self.trunk_s / max(self.trunkL, 1e-9)
         return float(self.Rt(np.interp(y, P[:, 1], tt)))
+
+    def over_trunk(self, F):
+        """Per feet point: is it still over the trunk (inside the climbing radius, not above the top)?
+        There the squirrel stands on trunk bark; past it the bough's own top line has to be open."""
+        P = self.trunkP
+        F = np.atleast_2d(F)
+        y = F[:, 1]
+        cx, cz = np.interp(y, P[:, 1], P[:, 0]), np.interp(y, P[:, 1], P[:, 2])
+        r = self.Rt(np.interp(y, P[:, 1], self.trunk_s / max(self.trunkL, 1e-9)))
+        return (y >= P[0, 1]) & (y <= P[-1, 1] + 0.5) & (np.hypot(F[:, 0] - cx, F[:, 2] - cz) < r + 0.1)
+
+    def s_out(self, P, sP, lift):
+        """Arc length at which a walk's feet line (rail + lift) has left the trunk."""
+        over = self.over_trunk(P + Y[None] * lift)
+        if not over.any():
+            return 0.0
+        last = int(np.nonzero(over)[0][-1])
+        if sP[last] > 0.3 * sP[-1]:  # (a walk that comes back over the trunk further out: its start decides)
+            first_out = np.nonzero(~over)[0]
+            return float(sP[first_out[0]]) if len(first_out) else float(sP[-1])
+        return float(sP[min(last + 1, len(sP) - 1)])
 
     # .. boughs, bridges, lookouts ..
     def plan_bough(self, route):
@@ -976,7 +1028,7 @@ class TreeBuilder:
         b = {"route": route, "P": P, "sP": sP, "s": s, "radii": radii, "L": L, "lift": lift, "kind": kind,
              "on_trunk": on_trunk, "rt": rt, "zone": zone, "clear": clear, "kids": kids, "give": give, "r_tip": r_tip,
              "rail": Q, "ups": ups, "sides": sides, "u_rep": u_rep, "v_tile": circ / u_rep * 1.3,
-             "k": 0.5, "wob": rng.random() * 6.28}
+             "k": 0.5, "wob": rng.random() * 6.28, "s_out": self.s_out(P, sP, lift) if on_trunk else 0.0}
         self.bough_limb(b)
         self.limbs.append(b["limb"])
         self.boughs.append(b)
@@ -1049,8 +1101,9 @@ class TreeBuilder:
             for o in walk:
                 if o is b:
                     continue
-                pushed = o["kind"] == "branch" and o["route"].get("trunkClearance")
-                m = o["sP"] >= (0.2 * o["L"] if pushed else 0.75)
+                # (from where the other walk's feet line leaves the trunk: the game draws the squirrel
+                # on the bough's own top line over the first fifth too)
+                m = o["sP"] >= max(o["s_out"], 0.75)
                 if m.sum() < 2:
                     continue
                 Fo = o["P"][m] + Y[None] * o["lift"]
@@ -1091,9 +1144,12 @@ class TreeBuilder:
         reach = float(np.mean([np.hypot(b["P"][-1][0] - top[0], b["P"][-1][2] - top[2]) for b in walk]))
         gaps = [(az[(i + 1) % len(az)] - az[i]) % (2 * math.pi) for i in range(len(az))]
         mids = [az[i] + gaps[i] / 2 for i in range(len(az))]
+        # (their hub stands clear above the first steps of the walks that start at the top: the boughs'
+        # own top lines stay open there; the leader, beside the axis, carries it)
+        hub = max(b["lift"] for b in walk) + 2.0
         for n, a0 in enumerate(mids):
             out = np.array([math.cos(a0), 0, math.sin(a0)])
-            ctrl = np.array([top + np.array([0, 2.3, 0]), top + out * 9 + np.array([0, 3.2, 0]),
+            ctrl = np.array([top + np.array([0, hub, 0]), top + out * 9 + np.array([0, hub + 0.8, 0]),
                              top + out * reach * 0.45 + np.array([0, -self.H * 0.06, 0]),
                              top + out * reach * 0.68 + np.array([0, -self.H * 0.13, 0])])
             pts = []
@@ -1109,7 +1165,7 @@ class TreeBuilder:
                 continue
             s = arclen(P)
             L = s[-1]
-            radii = 0.55 + (1.5 - 0.55) * (1 - s / L) ** 1.2
+            radii = 0.55 + (1.2 - 0.55) * (1 - s / L) ** 1.2
             limb = Limb(f"decor{n}", "decor", P, radii, 8, 0.5, None, None, 2, 6.0)
             limb.fade = (6.0, 12.0)
             self.limbs.append(limb)
@@ -1211,14 +1267,14 @@ class TreeBuilder:
             for j in range(m):
                 f = j / (m - 1)
                 rad = R0 * 0.3 + Lr * f
-                y = 0.5 * R0 * (1 - f) ** 1.6 + 0.12 * R0 * math.sin(f * math.pi) - 1.3 * f ** 2
+                y = 0.34 * R0 * (1 - f) ** 1.6 + 0.12 * R0 * math.sin(f * math.pi) - 1.3 * f ** 2
                 side = np.array([-d[2], 0, d[0]]) * math.sin(f * 3 + k) * 0.25 * R0 * f
                 pts.append(d * rad + np.array([0, y, 0]) + side)
             pts = np.array(pts)
             r0 = R0 * (0.40 + 0.12 * rng.random())
             f = np.linspace(0, 1, m)
             radii = np.maximum(0.12, r0 * (1 - f) ** 1.1 + 0.1)
-            self.limbs.append(Limb(f"root{k}", "root", pts, radii, 5, float(np.clip(0.9 * r0, 0.4, 1.6)), None, None, 1, 3.0))
+            self.limbs.append(Limb(f"root{k}", "root", pts, radii, 5, float(np.clip(0.75 * r0, 0.4, 1.2)), None, None, 1, 3.0))
 
     # .. the skin: union the tubes, then pull the junctions onto the smooth blend ..
     def build_skin(self):
@@ -1227,6 +1283,9 @@ class TreeBuilder:
             k0 = max(limb.k, 0.05)
             ktab = None
             fade = getattr(limb, "fade", None)
+            kramp = getattr(limb, "kramp", None)
+            if kramp is not None:
+                ktab = (limb.s, np.maximum(k0 * smoothstep((limb.s - kramp[0]) / kramp[1]), 0.03))
             if fade is not None:
                 kk = k0 * (1 - smoothstep((limb.s - fade[0]) / max(fade[1] - fade[0], 1e-6)))
                 feet = getattr(limb, "feet", None)
@@ -1457,6 +1516,7 @@ class TreeBuilder:
         vi = uniq[:, 0].astype(np.int64)
         self.bark.add(V[vi], inv.reshape(-1, 3), uniq[:, 1:3], vn[vi])
         self.skin = (V, F)
+        self.skin_own = own  # per triangle: index into self.limbs (the lookout pads come after them)
         self.log["skin_tris"] = int(len(F))
 
     def pad_part(self, mid, feet, pid):
