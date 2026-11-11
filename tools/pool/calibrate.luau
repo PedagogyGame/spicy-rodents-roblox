@@ -2,7 +2,7 @@
 -- tools/pool/calibrate.luau: a developer's look at the cue-sport table model (Shared/Minigames/Pool) so its
 -- constants are tuned from numbers, not guesses. Prints: how the cloth slows a ball; what a cushion gives
 -- back and how side spin turns the angle; what follow, draw and stun do; how the pockets accept and refuse
--- by angle and speed; the break (spread, pots, scratches, time to rest); bumper pool's cups against speed and
+-- by angle and speed (and how much tighter they play when hammered); the break (spread, pots, scratches, time to rest); bumper pool's cups against speed and
 -- its posts; how each computer player does at both games; and what a step and a shot cost.
 -- Usage, from the repo root: lune run tools/pool/calibrate.luau [breaks, default 200] [games, default 12]
 -- Interface: a script (prints a report); nothing is written.
@@ -198,6 +198,40 @@ for _, row in { { "corner", 6 }, { "side", 4 } } do
 		end
 		print(line)
 	end
+end
+
+print("== pockets against speed: down the long cushion into a corner (P drops, r rattles and stays up, . misses)")
+print("   each column is the gap between ball and cushion, 0 to 1.6 ball radii in tenths")
+for _, speed in { 4, 8, 14, 22, 36, 55 } do
+	local line = `  {speed} studs/s: `
+	for g = 0, 16 do
+		local from = { { id = 1, x = pool.halfW - pool.ballR - g * 0.1 * pool.ballR, z = 0.8 } }
+		local s = Shot.run(pool, from, { strike(1, 0, speed, 1, 0) }, 6 / speed + 1.5)
+		local jaws = 0
+		for e = 1, #s.events, Physics.EVENT_STRIDE do
+			if s.events[e + 1] == EV.jaw then
+				jaws += 1
+			end
+		end
+		line ..= if #s.pots > 0 then "P" elseif jaws > 0 then "r" else "."
+	end
+	print(line)
+end
+do
+	-- balls left hanging: a sweep of soft shots dying at a corner's mouth
+	local hole = pool.holes[6]
+	local hung, n = 0, 0
+	for i = 0, 40 do
+		local v = Cloth.speedFor(2.2 - 0.3 + i * 0.015)
+		local from = { { id = 1, x = hole.x + hole.mx * 2.75, z = hole.z + hole.mz * 2.75 } }
+		local s = Shot.run(pool, from, { strike(1, -hole.mx * v, -hole.mz * v, 1, 0) })
+		n += 1
+		local x, z = restOf(s, 1)
+		if x and z and (math.abs(x) > pool.halfW - pool.ballR or math.abs(z) > pool.halfL - pool.ballR) then
+			hung += 1
+		end
+	end
+	print(`  soft shots dying at a corner's mouth: {hung} of {n} speeds leave the ball hanging in the jaws`)
 end
 
 -- {label, power, tip height, how far along the head string the cue ball is set}

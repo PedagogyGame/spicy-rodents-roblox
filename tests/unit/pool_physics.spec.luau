@@ -306,6 +306,60 @@ return function(t)
 		t.truthy(clean + rattledIn < 40, "the pocket is not a bucket: under half of a three-ball-wide sweep goes in")
 	end)
 
+	t.test("POOL-P4 a pocket plays tighter when it is hammered: pocket speed drops what a hard shot rattles", function()
+		-- down the long cushion into the foot right corner, a third of a ball off the cushion to a ball and a
+		-- quarter off it: at pocket speed every line drops; hammered, the wider lines rattle in the jaws and stay up
+		local function downTheRail(speed: number): (number, number, number)
+			local pots, rattles, lines = 0, 0, 0
+			for g = 3, 14 do
+				lines += 1
+				local from = { { id = 1, x = pool.halfW - R - g * 0.1 * R, z = 0.8 } }
+				local s = Shot.run(pool, from, { strike(1, 0, speed, 1) }, 6 / speed + 1.5)
+				local pot = Shot.pots(s)
+				if #pot > 0 then
+					t.eq(pot[1].hole, 6)
+					pots += 1
+				elseif kinds(s, EV.jaw) > 0 then
+					rattles += 1
+				end
+			end
+			return pots, rattles, lines
+		end
+		local softPots, _, lines = downTheRail(5)
+		t.eq(softPots, lines, "at pocket speed the corner takes every one of them")
+		local firmPots = downTheRail(16)
+		local hardPots, hardRattles = downTheRail(40)
+		t.truthy(firmPots <= softPots and hardPots <= firmPots, `never easier when harder ({firmPots}, {hardPots})`)
+		t.truthy(hardPots <= lines - 4, `hammered, the pocket turns the wider lines away ({hardPots} of {lines})`)
+		t.truthy(hardRattles >= 4, `and they rattle in the jaws ({hardRattles})`)
+		t.truthy(hardPots >= 1, "a hard shot tight on the cushion still goes")
+		-- straight down a pocket's centre line the speed does not matter (POOL-P4 "a clean pot drops")
+		local hole = pool.holes[6]
+		for _, speed in { 4, 16, 40 } do
+			local from = { { id = 1, x = hole.x + hole.mx * 2.4, z = hole.z + hole.mz * 2.4 } }
+			t.eq(#Shot.pots(Shot.run(pool, from, { strike(1, -hole.mx * speed, -hole.mz * speed, 1) })), 1)
+		end
+		-- a side pocket from 45 degrees: wide at pocket speed, narrow when hammered
+		local function sideWindow(speed: number): number
+			local side = pool.holes[4]
+			local c = 0.7071067811865476
+			local n = 0
+			for i = -20, 20 do
+				local off = i * 0.02
+				-- travelling toward +x and +z, aimed at the middle of the mouth, shifted sideways by `off`
+				local from = { { id = 1, x = side.x - 0.26 - c * 2 - c * off, z = -c * 2 + c * off } }
+				local s = Shot.run(pool, from, { strike(1, c * speed, c * speed, 1) }, 3 / speed + 0.6)
+				if #s.pots > 0 then
+					n += 1
+				end
+			end
+			return n
+		end
+		local slow, fast = sideWindow(4), sideWindow(36)
+		t.truthy(slow >= 10, `at pocket speed the side takes a ball-wide window ({slow} lines)`)
+		t.truthy(fast <= slow - 4, `hammered it takes far less ({fast} against {slow})`)
+	end)
+
 	t.test("POOL-P4 a ball can hang on the lip of a corner pocket, and a touch drops it", function()
 		local hole = pool.holes[6]
 		-- the middle of the mouth is CORNER_SHELF + CORNER_HOLE_R from the hole's centre, on its centre line

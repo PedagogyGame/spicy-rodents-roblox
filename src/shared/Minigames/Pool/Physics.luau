@@ -87,7 +87,7 @@ export type Response = {
 -- shorten is set against the falling restitution: a harder hit comes back slower, which alone would LENGTHEN
 -- the angle, so the share taken along the cushion must outrun it for a hard bank to come off short
 Physics.CUSHION = { eSoft = 0.86, eHard = 0.7, hard = 24, mu = 0.25, shorten = 0.5, keep = 0.1, roll = 0.4 } :: Response
-Physics.JAW = { eSoft = 0.62, eHard = 0.45, hard = 20, mu = 0.2, shorten = 0.1, keep = 0.1, roll = 0.2 } :: Response
+Physics.JAW = { eSoft = 0.75, eHard = 0.7, hard = 20, mu = 0.2, shorten = 0.1, keep = 0.1, roll = 0.2 } :: Response
 Physics.POST = { eSoft = 0.92, eHard = 0.84, hard = 30, mu = 0.1, shorten = 0, keep = 0.1, roll = 0.4 } :: Response
 
 Physics.EV = {

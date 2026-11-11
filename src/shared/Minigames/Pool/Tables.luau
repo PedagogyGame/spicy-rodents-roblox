@@ -106,10 +106,13 @@ Tables.POOL_HALF_W = 2.7
 Tables.POOL_HALF_L = 5.4
 Tables.CORNER_MOUTH = 0.72 -- between the two points of a corner pocket (2.1 balls)
 Tables.SIDE_MOUTH = 0.82 -- between the points of a side pocket (2.4 balls)
-Tables.JAW_LEN = 0.36
+Tables.JAW_LEN = 0.46 -- a facing must end inside its hole's rim, or the pocket would leak (the tables spec checks)
 Tables.CORNER_HOLE_R = 0.33
 Tables.SIDE_HOLE_R = 0.33
-Tables.CORNER_SHELF = 0.12 -- cloth between the mouth line and the drop, on the pocket's centre line
+-- cloth between the mouth line and the drop, on the pocket's centre line (1.3 inches at this scale). It is
+-- what makes a corner play tighter when it is hammered: a ball that catches a jaw has this far to go before
+-- it can fall, and a fast one is across to the other jaw and out again first.
+Tables.CORNER_SHELF = 0.2
 Tables.SIDE_SHELF = 0.03
 Tables.POCKET_DEPTH = 0.085 -- half a radius: past this a ball is down
 Tables.RACK_GAP = 0.004 -- between racked balls, before the seeded jitter

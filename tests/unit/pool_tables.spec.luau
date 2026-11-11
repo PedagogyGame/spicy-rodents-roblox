@@ -75,6 +75,40 @@ return function(t)
 		t.truthy(Tables.JAW_LEN > 0)
 	end)
 
+	t.test(
+		"eight-ball: no pocket leaks: every facing ends inside its hole's rim, and so does a ball riding it",
+		function()
+			for _, sg in pool.segs do
+				if sg.jaw then
+					-- the far end of a facing (end 2) and the nearest hole to it
+					local best, hole = math.huge, pool.holes[1]
+					for _, ho in pool.holes do
+						local d = math.sqrt((sg.x2 - ho.x) ^ 2 + (sg.z2 - ho.z) ^ 2)
+						if d < best then
+							best, hole = d, ho
+						end
+					end
+					t.truthy(best < hole.r - 0.01, `a facing ends {hole.r - best} inside the rim`)
+					-- a ball touching the facing at its end (on the pocket's side of it) has its centre over the hole
+					local nearest = math.huge
+					for _, side in { -1, 1 } do
+						local cx, cz = sg.x2 - side * sg.tz * R, sg.z2 + side * sg.tx * R
+						nearest = math.min(nearest, math.sqrt((cx - hole.x) ^ 2 + (cz - hole.z) ^ 2))
+					end
+					t.truthy(nearest < hole.r - 0.05, "the ball has dropped before it could pass the end of the facing")
+					-- and the facing starts on the cushion line, at a point of the mouth
+					t.truthy(
+						math.abs(math.abs(sg.x1) - pool.halfW) < 1e-9 or math.abs(math.abs(sg.z1) - pool.halfL) < 1e-9,
+						"a facing starts at a point"
+					)
+				end
+			end
+			-- the shelf: cloth between the mouth line and the drop, deeper at a corner than at a side pocket
+			t.truthy(Tables.CORNER_SHELF > Tables.SIDE_SHELF)
+			t.truthy(Tables.CORNER_SHELF > 0.5 * R and Tables.CORNER_SHELF < 2 * R, "a ball can hang there, not park")
+		end
+	)
+
 	t.test("BP-R1 bumper pool: twelve bumpers (eight in a cross, two by each cup), two cups, no pockets", function()
 		t.eq(#bumper.posts, 12)
 		t.eq(#bumper.holes, 2)
