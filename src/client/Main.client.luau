@@ -135,6 +135,7 @@ task.spawn(function()
 		current = client.current,
 		toast = menu.toast,
 		refreshCamera = client.refreshCamera,
+		flushInput = client.flushInput,
 	})
 	if not okM then
 		warn(`Client: MinigameClient failed: {errM}`)

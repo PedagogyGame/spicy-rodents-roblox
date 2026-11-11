@@ -328,6 +328,18 @@ function BowlingClient._frame(self: any, dt: number)
 	end
 end
 
+-- Forget input from before a hand-over of the keys (the main client's rule: PossessionClient does the same
+-- with input:flush() when a body changes hands). A key must be pressed again to count.
+function BowlingClient._flush(self: any)
+	table.clear(self.held)
+	self.mouseDx = 0
+	self.lastMouse = nil
+	local aim = self.aim
+	aim.charging = false
+	aim.chargeT = 0
+	self.ctx.ui:meter(nil)
+end
+
 -- msg = the "state" payload: { view, you, ready }.
 function BowlingClient.onState(self: any, msg: { [string]: any })
 	local view = msg.view
@@ -337,6 +349,11 @@ function BowlingClient.onState(self: any, msg: { [string]: any })
 	if turnMine and not self.controlsOff then
 		self.controlsOff = true
 		self.ctx.controls(false)
+	end
+	if turnMine and not self.turnMine then
+		-- the keys have just become the lane's: one still held from the walk up, the lobby or the last frame
+		-- is not a step along the foul line, and a meter left running is not this frame's throw
+		self:_flush()
 	end
 	if canBowl and (aim.phase == "watch" or not self.canBowl) and aim.phase ~= "sent" then
 		-- the lane is set and it is your ball: aim (the line of your last ball is kept)

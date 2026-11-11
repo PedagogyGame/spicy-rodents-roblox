@@ -363,6 +363,70 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"the hand-over of the keys: one held before your frame began does nothing until it is pressed again",
+		function()
+			FakeEngine.with(function()
+				local r = rig()
+				-- Bob is bowling; I am walking about with D held, and holding Space
+				state(r, 2, true)
+				key(Key.D, true)
+				key(Key.Left, true)
+				key(Key.Space, true)
+				frames(r, 0.3)
+				-- my frame begins with all three still down
+				state(r, 1, true)
+				frames(r, 1.0)
+				t.eq(r.bowler.aim.offset, 0, "the held D did not walk me along the foul line")
+				t.eq(r.bowler.aim.angle, 0, "the held arrow did not turn my aim")
+				t.eq(r.bowler.aim.charging, false, "the held Space did not start the meter")
+				key(Key.Space, false)
+				t.eq(#r.sent, 0, "and letting it go threw nothing")
+				-- pressed again, each does its job
+				key(Key.D, false)
+				key(Key.D, true)
+				frames(r, 0.5)
+				key(Key.D, false)
+				t.truthy(r.bowler.aim.offset > 0.4)
+				key(Key.Space, true)
+				frames(r, 0.9)
+				key(Key.Space, false)
+				t.eq(#r.sent, 1)
+				-- a meter left running when the turn clock took the frame away is not the next frame's throw
+				local r2 = rig()
+				state(r2, 1, true)
+				frames(r2, 0.2)
+				key(Key.Space, true)
+				frames(r2, 0.4)
+				t.eq(r2.bowler.aim.charging, true)
+				state(r2, 2, true) -- skipped: it is Bob's frame now, Space still down
+				frames(r2, 0.3)
+				state(r2, 1, true) -- and mine again
+				frames(r2, 0.3)
+				t.eq(r2.bowler.aim.charging, false)
+				t.eq(r2.ui.meterValue, nil, "the meter is off the screen")
+				key(Key.Space, false)
+				t.eq(#r2.sent, 0)
+				-- between my own two balls nothing is forgotten: a step held through the pinsetter still steps
+				local r3 = rig()
+				state(r3, 1, true)
+				frames(r3, 0.2)
+				key(Key.D, true)
+				state(r3, 1, false) -- the pinsetter is working
+				frames(r3, 0.3)
+				state(r3, 1, true)
+				local before = r3.bowler.aim.offset
+				frames(r3, 0.3)
+				t.truthy(r3.bowler.aim.offset > before)
+				key(Key.D, false)
+				r.bowler:stop()
+				r2.bowler:stop()
+				r3.bowler:stop()
+				BowlingClient.clock = os.clock
+			end)
+		end
+	)
+
 	t.test("the turn clock counts down on screen and warns before the skip; stop() cleans up", function()
 		FakeEngine.with(function()
 			local r = rig()

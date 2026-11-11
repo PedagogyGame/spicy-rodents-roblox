@@ -16,6 +16,7 @@ local RollScript = require("@shared/Minigames/Bowling/RollScript")
 local Rng = require("@shared/Util/Rng")
 local BowlingClient = require("@client/Minigames/BowlingClient")
 local BowlingPlayback = require("@client/Minigames/BowlingPlayback")
+local CameraRig = require("@client/Camera/CameraRig")
 local MinigameClient = require("@client/Minigames/MinigameClient")
 local MinigameSounds = require("@client/Minigames/MinigameSounds")
 local FakeEngine = require("@tests/lib/FakeEngine")
@@ -31,6 +32,7 @@ type Rig = {
 	state: any, -- the Minigame.State remote (fire state.OnClientEvent.fire(msg))
 	toasts: { string },
 	refreshed: number,
+	flushed: number, -- how often the body's pending input was thrown away
 	species: string,
 	gui: any,
 	player: any,
@@ -51,6 +53,7 @@ local function rig(): Rig
 		state = state,
 		toasts = {},
 		refreshed = 0,
+		flushed = 0,
 		species = "human",
 		gui = nil,
 		player = (game :: any):GetService("Players").LocalPlayer,
@@ -68,6 +71,9 @@ local function rig(): Rig
 		end,
 		refreshCamera = function()
 			r.refreshed += 1
+		end,
+		flushInput = function()
+			r.flushed += 1
 		end,
 	})
 	r.gui = r.player:FindFirstChild("PlayerGui"):FindFirstChild("MinigameUI")
@@ -425,6 +431,70 @@ return function(t)
 				send(r, { kind = "roll", station = "bowling_lane_1", lane = 1, seat = 1, script = script })
 				send(r, { kind = "rack", station = "bowling_lane_1", lane = 1, mask = PinModel.fullRack() })
 				t.eq(r.client.active(), nil)
+			end)
+		end
+	)
+
+	t.test(
+		"the main client's rules: the game's shots hold the orbit camera, its panels free the cursor, the keys are flushed at each hand-over",
+		function()
+			FakeEngine.with(function()
+				-- listen in on what the game asks of the orbit camera rig
+				local held, cursor = false, false
+				local holds: { boolean } = {}
+				local realHold, realCursor = CameraRig.hold, CameraRig.wantCursor
+				CameraRig.hold = function(on: boolean)
+					held = on
+					table.insert(holds, on)
+					realHold(on)
+				end
+				CameraRig.wantCursor = function(who: string, on: boolean)
+					if who == "minigame" then
+						cursor = on
+					end
+					realCursor(who, on)
+				end
+				local r = rig()
+				t.eq(r.flushed, 0)
+				send(r, { kind = "joined", station = STATION, game = "bowling", label = "Lane 3", lane = 3, seat = 1 })
+				t.eq(r.flushed, 1, "the keys change hands when the game opens")
+				t.eq(cursor, true, "the lobby's buttons need the cursor")
+				t.eq(held, false, "no shot is up in the lobby: the orbit camera is still the player's")
+				Session.join(r.session, "me", "Ann", 0)
+				Session.join(r.session, "bob", "Bob", 0)
+				Session.start(r.session, 1)
+				Session.step(r.session, 1)
+				-- my frame: the aiming shot owns the camera, so the orbit rig must be told to write nothing
+				send(r, stateMsg(r, 1, true, 2))
+				frames(0.3)
+				t.eq(held, true, "the aiming shot sits inside CameraRig.hold(true)")
+				t.eq(cursor, true, "Leave (Q) is on screen")
+				-- Bob's frame: my own camera and legs back
+				Referee.score(r.session, { pins = 3, seat = 1 }, 3)
+				Referee.score(r.session, { pins = 3, seat = 1 }, 3)
+				Session.step(r.session, 3)
+				t.eq(Session.turn(r.session), 2)
+				send(r, stateMsg(r, 1, true, 4))
+				frames(0.3)
+				t.eq(held, false, "between my frames the orbit camera is released")
+				t.eq(r.refreshed, 1)
+				-- my frame again, then I am taken off the lane mid-aim
+				Referee.score(r.session, { pins = 3, seat = 2 }, 5)
+				Referee.score(r.session, { pins = 3, seat = 2 }, 5)
+				Session.step(r.session, 5)
+				send(r, stateMsg(r, 1, true, 6))
+				frames(0.3)
+				t.eq(held, true)
+				send(r, { kind = "left", station = STATION, why = "left" })
+				t.eq(held, false, "leaving always gives the orbit camera back")
+				t.eq(cursor, false, "and the mouse to the camera")
+				t.eq(r.flushed, 2, "the keys change hands again when the game closes")
+				-- every hold was paired: never two in a row without a release
+				for i = 2, #holds do
+					t.truthy(holds[i] ~= holds[i - 1], "hold and release alternate")
+				end
+				t.eq(FakeEngine.bound(), 0)
+				CameraRig.hold, CameraRig.wantCursor = realHold, realCursor
 			end)
 		end
 	)

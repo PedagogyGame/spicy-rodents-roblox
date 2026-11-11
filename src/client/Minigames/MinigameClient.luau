@@ -15,7 +15,11 @@
 -- spares, misses, Play again / Leave, the reset countdown), and a refusal is handed to the controller so a
 -- refused throw puts the bowler straight back to aiming.
 -- Interface: start(opts) -> Client { active() -> stationId? }; opts = { state: () -> { species, device },
---   current: () -> Model?, toast: (text, seconds?) -> (), refreshCamera: () -> () }
+--   current: () -> Model?, toast: (text, seconds?) -> (), refreshCamera: () -> (), flushInput: (() -> ())? }
+-- Every game here follows three rules of the main client: its own camera shots sit between CameraRig.hold(true)
+-- and CameraRig.hold(false) (camera() / releaseCamera() below), or the orbit camera would overwrite them; its
+-- panels ask for the cursor through MinigameUI (CameraRig.wantCursor); and at each hand-over of the keys
+-- (a game opens, a game closes, a controller's turn begins) pending input is flushed.
 
 local Import = require("../Import")
 local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
@@ -157,6 +161,14 @@ function MinigameClient.start(opts: { [string]: any }): any
 		end)
 	end
 
+	-- The keys change hands when a game opens and when it closes. A press made on the other side must not fire
+	-- on this one (the Space that bowled is not a jump; an E from the walk up is not a pull of the lever).
+	local function flushInput()
+		if opts.flushInput then
+			opts.flushInput()
+		end
+	end
+
 	local lastCard = ""
 	local function close()
 		local a = active
@@ -173,12 +185,14 @@ function MinigameClient.start(opts: { [string]: any }): any
 			controls(true)
 		end
 		ui:close()
+		flushInput()
 	end
 
 	local function open(msg: { [string]: any })
 		if active then
 			close()
 		end
+		flushInput()
 		local p = place
 		active = { station = msg.station, game = msg.game, seat = msg.seat, lane = msg.lane }
 		player:SetAttribute("InMinigame", msg.station)
