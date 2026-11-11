@@ -12,15 +12,15 @@ type Walk = { from: { number }, to: { number }, speed: number, every: number, st
 -- stylua: ignore
 local WALKS: { Walk } = {
 	-- across the main street (x = 0, lanes at x = -13.5 and 13.5), north of the centre
-	{ from = { -32, 150 },   to = { 32, 150 },    speed = 4,  every = 38, start = 6 },
-	{ from = { 32, -260 },   to = { -32, -260 },  speed = 4,  every = 47, start = 21 },
+	{ from = { -32, 150 },   to = { 32, 150 },    speed = 4,  every = 17, start = 6 },
+	{ from = { 32, -260 },   to = { -32, -260 },  speed = 4,  every = 23, start = 11 },
 	-- across the west street (x = -450, lane at x = -463.5)
-	{ from = { -490, 40 },   to = { -430, 40 },   speed = 4,  every = 53, start = 12 },
+	{ from = { -490, 40 },   to = { -430, 40 },   speed = 4,  every = 19, start = 12 },
 	-- across the boulevard (z = 0, lanes at z = -14 and 14, the trolley at z = 21.6)
-	{ from = { 1000, -34 },  to = { 1000, 40 },   speed = 4,  every = 44, start = 9 },
-	{ from = { 1400, 40 },   to = { 1400, -34 },  speed = 4,  every = 61, start = 30 },
+	{ from = { 1000, -34 },  to = { 1000, 40 },   speed = 4,  every = 21, start = 9 },
+	{ from = { 1400, 40 },   to = { 1400, -34 },  speed = 4,  every = 27, start = 14 },
 	-- a runner darting out in front of the eastbound traffic
-	{ from = { 1200, 30 },   to = { 1200, 2 },    speed = 14, every = 35, start = 17 },
+	{ from = { 1200, 30 },   to = { 1200, 2 },    speed = 14, every = 15, start = 17 },
 }
 
 -- someone standing on the trolley track for 6 s every 80 s, and a squirrel in the southbound lane
