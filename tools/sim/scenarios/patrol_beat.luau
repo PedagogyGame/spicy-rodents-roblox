@@ -28,6 +28,8 @@ local scenario: Replay.Scenario = {
 			"yaw_jump",
 			"sideways_slide",
 			"accel_spike",
+			"appear",
+			"disappear",
 		},
 	},
 }
