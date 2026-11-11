@@ -2,13 +2,13 @@
 -- tools/review/vehicles: a vehicles-only review scene straight from Traffic/VehiclePuppet (no bake, no .rbxm),
 -- so a vehicle can be judged without the game. Nothing here ships.
 -- Usage (repo root): lune run tools/review/vehicles.luau [--out build/review/vehicles] [--res 1600x620]
---   [kind[:#rrggbb] ...]      default: sedan:#6d7f8f patrol_car ambulance
--- Writes <out>/scene.json (the tools/review/export.luau part format, group "lineup") and <out>/views.json with
--- two views for tools/review/render.py: `front` (front three-quarter) and `rear` (rear three-quarter). The
--- kinds stand twice, each row nearly square to its camera so the vehicles are about the same size in the
--- frame: the front row faces its camera, the rear row (300 st behind that camera) is turned about. Both
--- cameras look from the vehicles' right with the review sun on the faces they see.
--- tools/review/vehicles.sh renders the two views and stacks them into one JPEG.
+--   [--rows N] [kind[:#rrggbb] ...]      default: every kind, in two rows
+-- Writes <out>/scene.json (the tools/review/export.luau part format, group "lineup") and <out>/views.json for
+-- tools/review/render.py. The kinds are dealt into N rows in the order given; each row gets two views,
+-- `front_<n>` (front three-quarter) and `rear_<n>` (rear three-quarter, the same vehicles turned about, 300 st
+-- away). A row stands nearly square to its camera and is framed to its own vehicles, so a row of
+-- motorcycles is drawn larger than a row of trolleys. Both cameras look from the vehicles' right with the
+-- review sun on the faces they see. tools/review/vehicles.sh renders the views and stacks them into one JPEG.
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
@@ -16,9 +16,11 @@ local serde = require("@lune/serde")
 
 local PartBuilder = require("../../src/shared/Avatar/PartBuilder")
 local VehiclePuppet = require("../../src/shared/Traffic/VehiclePuppet")
+local Boxes = require("../../src/shared/Traffic/Boxes")
 
 local out = "build/review/vehicles"
 local res = "1600x620"
+local rows: number? = nil
 local entries: { { kind: string, color: string? } } = {}
 local i = 1
 while i <= #process.args do
@@ -29,6 +31,9 @@ while i <= #process.args do
 	elseif a == "--res" then
 		res = process.args[i + 1]
 		i += 1
+	elseif a == "--rows" then
+		rows = tonumber(process.args[i + 1]) or error("--rows needs a number")
+		i += 1
 	else
 		local kind, color = string.match(a, "^([%w_]+):(#%x+)$")
 		table.insert(entries, { kind = kind or a, color = color })
@@ -36,8 +41,22 @@ while i <= #process.args do
 	i += 1
 end
 if #entries == 0 then
-	entries = { { kind = "sedan", color = "#6d7f8f" }, { kind = "patrol_car" }, { kind = "ambulance" } }
+	-- the most seen first; the sedan in a fleet colour
+	entries = {
+		{ kind = "sedan", color = "#6d7f8f" },
+		{ kind = "patrol_car" },
+		{ kind = "ambulance" },
+		{ kind = "cart" },
+		{ kind = "motorcycle" },
+		{ kind = "delivery_van" },
+		{ kind = "ice_cream_van" },
+		{ kind = "rv" },
+		{ kind = "dump_truck" },
+		{ kind = "trolley" },
+	}
+	rows = rows or 2
 end
+local nRows = math.clamp(rows or 1, 1, #entries)
 
 local lib = {
 	Instance = roblox.Instance,
@@ -83,36 +102,60 @@ end
 -- mirrors its neighbour's lamps into the picture as a coloured blot.
 local ANGLE = math.rad(38)
 local ROW = math.rad(22)
-local GAP = 15
+local SKEW = math.cos(ANGLE - ROW)
 local ax, az = math.cos(ROW), math.sin(ROW)
-local n = #entries
+local resW, resH = string.match(res, "^(%d+)x(%d+)$")
+local aspect = (tonumber(resW) or 1600) / (tonumber(resH) or 620)
+local FOV = 17 -- vertical, degrees
+local tanV = math.tan(math.rad(FOV / 2))
+
 local views: { any } = {}
-for row, turned in { false, true } do
-	local originZ = if turned then -300 else 0
-	for k, e in entries do
-		local s = (k - (n + 1) / 2) * GAP
-		local spec = VehiclePuppet.spec(e.kind, { color = e.color, name = `{e.kind}_{row}` })
-		local cf = lib.CFrame.new(s * ax, VehiclePuppet.baseOffset(e.kind), originZ + s * az)
-		if turned then
-			cf *= lib.CFrame.Angles(0, math.pi, 0)
+local perRow = math.ceil(#entries / nRows)
+local place = 0
+for row = 1, nRows do
+	local group = {}
+	for k = (row - 1) * perRow + 1, math.min(row * perRow, #entries) do
+		table.insert(group, entries[k])
+	end
+	-- how wide each vehicle stands across the camera's view, and the row's width and height
+	local widths, total, tallest = {}, 0, 0
+	for k, e in group do
+		local b = Boxes.get(e.kind)
+		widths[k] = b.width * math.cos(ANGLE) + b.length * math.sin(ANGLE)
+		total += widths[k] + (if k > 1 then 2.2 else 0)
+		tallest = math.max(tallest, b.height)
+	end
+	for _, turned in { false, true } do
+		place += 1
+		local originZ = -300 * (place - 1)
+		local cursor = -total / 2
+		for k, e in group do
+			local s = (cursor + widths[k] / 2) / SKEW
+			cursor += widths[k] + 2.2
+			local spec = VehiclePuppet.spec(e.kind, { color = e.color, name = `{e.kind}_{place}` })
+			local base = VehiclePuppet.baseOffset(e.kind)
+			local cf = lib.CFrame.new(s * ax, base, originZ + s * az)
+			if turned then
+				cf *= lib.CFrame.Angles(0, math.pi, 0)
+			end
+			emit(PartBuilder.instantiate(spec, lib, cf), spec.name)
+			table.insert(labels, {
+				text = `{e.kind} ({PartBuilder.partCount(spec)} parts)`,
+				pos = { r4(s * ax), r4(base * 2 + 0.6 + tallest * 0.08), r4(originZ + s * az) },
+				size = r4(math.clamp(total * 0.022, 0.45, 0.9)),
+			})
 		end
-		emit(PartBuilder.instantiate(spec, lib, cf), spec.name)
-		table.insert(labels, {
-			text = `{e.kind} ({PartBuilder.partCount(spec)} parts)`,
-			pos = { r4(s * ax), r4(VehiclePuppet.baseOffset(e.kind) * 2 + 1.1), r4(originZ + s * az) },
-			size = 0.62,
+		-- far enough for the row's width and for its tallest vehicle under its label
+		local dist = math.max((total + 3) / 2 / (tanV * aspect), (tallest * 1.9 + 3) / 2 / tanV)
+		table.insert(views, {
+			name = `{if turned then "rear" else "front"}_{row}`,
+			desc = if turned then "rear three-quarter" else "front three-quarter",
+			pos = { r4(math.sin(ANGLE) * dist), r4(dist * 0.3), r4(originZ - math.cos(ANGLE) * dist) },
+			look = { 0, r4(tallest * 0.55), originZ },
+			fov = FOV,
+			groups = { "lineup", "lineup_ground" },
 		})
 	end
-	local span = (n - 1) * GAP * math.cos(ANGLE - ROW) + 13
-	local dist = span / 2 / math.tan(math.rad(21)) -- the row fills a 42 degree horizontal field
-	table.insert(views, {
-		name = if turned then "rear" else "front",
-		desc = if turned then "rear three-quarter" else "front three-quarter",
-		pos = { r4(math.sin(ANGLE) * dist), r4(dist * 0.3), r4(originZ - math.cos(ANGLE) * dist) },
-		look = { 0, 2.6, originZ },
-		fov = 17,
-		groups = { "lineup", "lineup_ground" },
-	})
 end
 
 if not fs.isDir(out) then
@@ -125,7 +168,10 @@ fs.writeFile(
 		units = "studs, Roblox axes (Y up, -Z forward)",
 		parts = parts,
 		beams = {},
-		lineup = { ground = { y = 0, minX = -70, maxX = 70, minZ = -380, maxZ = 40 }, labels = labels },
+		lineup = {
+			ground = { y = 0, minX = -90, maxX = 90, minZ = -300 * place - 80, maxZ = 60 },
+			labels = labels,
+		},
 	}, false)
 )
 fs.writeFile(
@@ -147,4 +193,4 @@ fs.writeFile(
 		views = views,
 	}, true)
 )
-print(`vehicles: {#parts} visible parts of {n} kinds x 2 rows -> {out}/scene.json, views.json`)
+print(`vehicles: {#parts} visible parts, {#entries} vehicles in {nRows} row(s) -> {out}/scene.json, views.json`)

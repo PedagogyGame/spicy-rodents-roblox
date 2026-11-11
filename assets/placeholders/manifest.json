@@ -156,12 +156,12 @@
       "sha": "038d514751b37dfdfb3bb6c71cefac18318fc93a46adf42ee829578d2fc0a958"
     },
     {
-      "bytes": 2460,
+      "bytes": 4615,
       "file": "vehicle_ambulance.rbxm",
-      "joints": 10,
-      "parts": 11,
+      "joints": 39,
+      "parts": 40,
       "rigspec": true,
-      "sha": "861146e2b48b865e49f5ff923c1b83cabb4fa4c2649106c454318a25492d2366",
+      "sha": "6afee54a5a5d08e532e9202b6679dac919fcff34668c79a74eda8f3ddead92a2",
       "sockets": 3,
       "species": "car"
     },
@@ -216,12 +216,12 @@
       "species": "car"
     },
     {
-      "bytes": 4652,
+      "bytes": 4675,
       "file": "vehicle_patrol_car.rbxm",
       "joints": 39,
       "parts": 40,
       "rigspec": true,
-      "sha": "ddf90fd6abc5e3992a48e6cc92e1ab7928251e2d6ef7550a1de845428b658bf2",
+      "sha": "16ad8d7f57df0c0f60a49017408fd26dfd9d297cbb12260d32b7dd7508c08d98",
       "sockets": 3,
       "species": "car"
     },
@@ -236,12 +236,12 @@
       "species": "car"
     },
     {
-      "bytes": 4582,
+      "bytes": 4609,
       "file": "vehicle_sedan.rbxm",
       "joints": 38,
       "parts": 39,
       "rigspec": true,
-      "sha": "f3f31470d65585e1da258f5a098bebb066efb0c9ca96a1513f6810d24c436553",
+      "sha": "3f4f510b272d270917fe3acea901d01dd8d5fecfd7b9d78c37a49c18a752ec66",
       "sockets": 3,
       "species": "car"
     },
