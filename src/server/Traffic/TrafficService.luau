@@ -92,6 +92,9 @@ export type TrafficService = typeof(setmetatable(
 		_stats: Stats,
 		RunOver: Signal,
 		unified: { string },
+		-- an observer called at the end of every simulation tick (the headless replay records the true
+		-- state from it); nil in the game
+		onTick: ((self: any) -> ())?,
 	},
 	TrafficService
 ))
@@ -138,6 +141,7 @@ function TrafficService.new(opts: Opts): TrafficService
 		_stats = { ticks = 0, ms = 0, maxTickMs = 0, hits = 0, stuck = {}, events = {}, violations = {} },
 		RunOver = Signal.new(),
 		unified = unified,
+		onTick = nil :: ((self: any) -> ())?,
 	}, TrafficService)
 	for _, e in self.entries do
 		local lane = lanes[e.lane] or error(`TrafficService: fleet entry {e.id} names missing lane {e.lane}`)
@@ -254,6 +258,9 @@ local function oneTick(self: TrafficService, world: World): { SweptCollision.Hit
 	stats.ticks += 1
 	stats.ms += ms
 	stats.maxTickMs = math.max(stats.maxTickMs, ms)
+	if self.onTick then
+		self.onTick(self)
+	end
 	return hits
 end
 
