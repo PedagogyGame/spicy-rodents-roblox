@@ -40,7 +40,12 @@ local def: Detect.Def = {
 			unit = "x",
 			why = "a step beyond jumpFactor x speed x dt + jumpSlack is a jump (jumps.luau), not a stutter",
 		},
-		{ key = "jumpSlack", value = 0.5, unit = "studs", why = "see jumpFactor" },
+		{
+			key = "jumpSlack",
+			value = 0.5,
+			unit = "studs",
+			why = "the half stud of jumps.luau's limit: the two detectors split the frames between them at the same line",
+		},
 		{
 			key = "accel",
 			value = 80,
