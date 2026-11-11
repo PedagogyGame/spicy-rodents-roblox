@@ -350,7 +350,7 @@ function Layout.addShell(def: TableDef)
 	local x1 = Layout.FIELD_X1
 	-- the lane's inner wall and the plunger tip the ball rests on
 	Layout.wall(def, "wood", { x1, 0, x1, 3.52 })
-	Layout.wall(def, "rubber", { x1, 0.3, W, 0.3 })
+	Layout.wall(def, "metal", { x1, 0.3, W, 0.3 })
 	-- the gate at the head of the lane slants down toward the playfield, so a ball that only just clears it
 	-- rolls off its end into the table
 	table.insert(def.gates, { id = "lane_gate", x1 = x1, y1 = 3.52, x2 = W, y2 = 3.62 })

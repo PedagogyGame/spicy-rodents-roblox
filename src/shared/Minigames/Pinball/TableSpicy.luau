@@ -10,7 +10,7 @@
 -- The rule sheet (one goal: feed the rodent to SUPER):
 --   * Everything feeds the HEAT meter: the wire most, then the bite, targets, bumpers. The meter cools all the
 --     time. At a third it is FERAL (all scores 2x), at two thirds RABID (3x), full is SUPER: 5x for twenty
---     seconds with every lamp flashing, then the meter falls back to RABID's line.
+--     seconds with every lamp flashing, then the meter falls back into RABID.
 --   * S-P-I-C-Y lights the bite; the bite then pays its jackpot and a big bite of heat.
 --   * Every third wire in one ball lights the extra ball at the bite (once a game).
 --   * A drain costs half the heat.
@@ -193,6 +193,7 @@ local HEAT = {
 	rabid = 200 / 3,
 	coolPerTick = 1.6 / 240, -- the meter cools by this all the time a ball is in play
 	superTicks = 4800, -- twenty seconds
+	afterSuper = 75, -- where the meter stands when SUPER ends: in RABID, five seconds from cooling out of it
 }
 local LEVEL_MULT = { 1, 2, 3, 5 } -- calm, FERAL, RABID, SUPER
 local WIRES_FOR_EXTRA = 3
@@ -363,7 +364,7 @@ local sheet: Machine.Sheet = {
 		if t.super > 0 then
 			t.super -= 1
 			if t.super == 0 then
-				t.heat = HEAT.rabid
+				t.heat = HEAT.afterSuper
 				Machine.callout(m, out, SAY.SUPER_OVER, 0)
 			end
 		elseif t.heat > 0 then

@@ -425,7 +425,7 @@ local function endBall(m: State, tbl: Table, out: { number })
 	m.bonusMult = mult
 	m.bonusLeft = total
 	m.bonusChunk = math.ceil(total / Machine.BONUS_STEPS)
-	m.bonusTimer = Machine.BONUS_STEP_TICKS
+	m.bonusTimer = if total > 0 then Machine.BONUS_STEP_TICKS else Machine.BONUS_HOLD // 2
 	m.queue = 0
 	m.feedIn = 0
 	m.autoIn = 0
