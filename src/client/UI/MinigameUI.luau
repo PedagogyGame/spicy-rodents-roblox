@@ -542,11 +542,17 @@ function MinigameUI.summary(
 			C.WHITE,
 			Enum.Font.GothamBold
 		)
-		local cols = { { "", 0.02, 0.07 }, { "BOWLER", 0.1, 0.36 }, { "SCORE", 0.47, 0.13 }, { "STRIKES", 0.61, 0.13 } }
-		table.insert(cols, { "SPARES", 0.74, 0.12 })
-		table.insert(cols, { "MISSES", 0.87, 0.12 })
+		-- the card's columns: heading, where it starts and how wide it is (fractions of the card)
+		local cols: { { title: string, x: number, w: number } } = {
+			{ title = "", x = 0.02, w = 0.07 },
+			{ title = "BOWLER", x = 0.1, w = 0.36 },
+			{ title = "SCORE", x = 0.47, w = 0.13 },
+			{ title = "STRIKES", x = 0.61, w = 0.13 },
+			{ title = "SPARES", x = 0.74, w = 0.12 },
+			{ title = "MISSES", x = 0.87, w = 0.12 },
+		}
 		for _, c in cols do
-			label(frame, c[1], UDim2.new(c[3], 0, 0, 16), UDim2.new(c[2], 0, 0, 72), C.CYAN, Enum.Font.GothamBold)
+			label(frame, c.title, UDim2.new(c.w, 0, 0, 16), UDim2.new(c.x, 0, 0, 72), C.CYAN, Enum.Font.GothamBold)
 		end
 		for i, r in rows do
 			local y = 92 + (i - 1) * 32
@@ -564,8 +570,8 @@ function MinigameUI.summary(
 				label(
 					row,
 					cells[k],
-					UDim2.fromScale(c[3], 0.8),
-					UDim2.fromScale(c[2], 0.1),
+					UDim2.fromScale(c.w, 0.8),
+					UDim2.fromScale(c.x, 0.1),
 					if k == 3 then C.GOLD else C.WHITE,
 					if k == 3 then Enum.Font.FredokaOne else Enum.Font.GothamBold
 				)

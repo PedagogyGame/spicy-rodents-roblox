@@ -13,6 +13,7 @@ local Session = require("@shared/Minigames/Session")
 local PinModel = require("@shared/Minigames/Bowling/PinModel")
 local Referee = require("@shared/Minigames/Bowling/Referee")
 local RollScript = require("@shared/Minigames/Bowling/RollScript")
+local Rng = require("@shared/Util/Rng")
 local BowlingClient = require("@client/Minigames/BowlingClient")
 local BowlingPlayback = require("@client/Minigames/BowlingPlayback")
 local MinigameClient = require("@client/Minigames/MinigameClient")
@@ -293,6 +294,85 @@ return function(t)
 				t.eq(over.Visible, false)
 				t.truthy(has(r.toasts, "You left the game"))
 				t.eq(FakeEngine.bound(), 0, "no camera or playback step is left bound")
+			end)
+		end
+	)
+
+	t.test(
+		"a counted throw is never reported lost: a long slow throw is played, a damaged script still ends the wait",
+		function()
+			FakeEngine.with(function()
+				local r = rig()
+				send(r, { kind = "joined", station = STATION, game = "bowling", label = "Lane 3", lane = 3, seat = 1 })
+				Session.join(r.session, "me", "Ann", 0)
+				Session.start(r.session, 1)
+				Session.step(r.session, 1)
+				send(r, stateMsg(r, 1, true, 2))
+				frames(0.3)
+				local function releases(): number
+					local n = 0
+					for _, f in r.input.fired do
+						if f[1].verb == "release" then
+							n += 1
+						end
+					end
+					return n
+				end
+				local function tap()
+					key(Key.Space, true)
+					frames(0.1)
+					key(Key.Space, false)
+				end
+				-- a quick tap: almost no power. The slow ball pushes a pin along and its script is long
+				tap()
+				t.eq(releases(), 1)
+				local rng = Rng.new(77)
+				local slow: any = nil
+				for _ = 1, 4000 do
+					local params = {
+						offset = rng.range(-1, 1),
+						angle = rng.range(-0.05, 0.05),
+						power = rng.range(0, 0.15),
+						spin = 0,
+					}
+					local s = RollScript.build(params, PinModel.fullRack(), rng.int(1, 2147483646))
+					local most = if s.deck then #s.deck.ball // 5 else 0
+					for n = 1, 10 do
+						most = math.max(most, if s.deck then #s.deck.pins[n] // 5 else 0)
+					end
+					if most > 80 then
+						slow = s
+						break
+					end
+				end
+				t.truthy(slow ~= nil, "a slow throw with a long script exists")
+				send(r, { kind = "roll", station = STATION, lane = 3, seat = 1, name = "Ann", script = slow })
+				send(r, stateMsg(r, 1, false, 3))
+				frames(0.2)
+				t.truthy(has(texts(r.gui), "There it goes"), "the bowler is watching their throw")
+				frames(BowlingClient.SEND_TIMEOUT + 1)
+				t.falsy(has(r.toasts, "did not reach the lane"), "a throw the server scored is not called lost")
+				-- the lane is set again: the second ball
+				Referee.score(r.session, { pins = slow.down, seat = 1, flags = slow.flags }, 4)
+				Session.step(r.session, 4)
+				frames(BowlingClient.WATCH_LIMIT)
+				if Session.turn(r.session) == 1 then
+					send(r, stateMsg(r, 1, true, 5))
+					frames(0.3)
+					tap()
+					t.eq(releases(), 2)
+					-- this time the script arrives damaged: nothing can be drawn here, but the server HAS counted
+					-- the throw, so the bowler must stop waiting for an answer and must not be told to bowl again
+					send(r, { kind = "roll", station = STATION, lane = 3, seat = 1, name = "Ann", script = { v = 1 } })
+					send(r, stateMsg(r, 1, false, 6))
+					frames(BowlingClient.SEND_TIMEOUT + 1)
+					t.falsy(has(r.toasts, "did not reach the lane"))
+					t.truthy(has(texts(r.gui), "pinsetter"), "the screen says the lane is being set")
+					tap()
+					t.eq(releases(), 2, "and no second ball can be thrown at a lane that is not ready")
+				end
+				send(r, { kind = "left", station = STATION, why = "left" })
+				t.eq(FakeEngine.bound(), 0, "the camera and the playback step were handed back")
 			end)
 		end
 	)

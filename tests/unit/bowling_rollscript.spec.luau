@@ -7,6 +7,7 @@ local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local BallPath = require("@shared/Minigames/Bowling/BallPath")
 local PinModel = require("@shared/Minigames/Bowling/PinModel")
 local RollScript = require("@shared/Minigames/Bowling/RollScript")
+local Rng = require("@shared/Util/Rng")
 
 local POCKET = { offset = 0.165, angle = 0, power = 0.7, spin = 0 } -- 0.25 right of the head pin
 local GUTTER = { offset = 1, angle = 0.1, power = 0.7, spin = 0 }
@@ -380,6 +381,65 @@ return function(t)
 			"path"
 		)
 	end)
+
+	t.test(
+		"every throw the server can build passes the clients' check: slow balls that push a pin along included",
+		function()
+			-- a quick tap of Space is a throw at almost no power. A slow ball stays against a pin for many steps
+			-- of the model and writes a key point on each; the check once allowed 80 a piece and refused those
+			-- throws on every client although the server had scored them
+			local rng = Rng.new(77)
+			local longest, biggest, long = 0, 0, 0
+			for i = 1, 3000 do
+				local band = if i % 3 == 0 then 0.4 else 0.15
+				local params = {
+					offset = rng.range(-1, 1),
+					angle = rng.range(-0.05, 0.05),
+					power = rng.range(0, band),
+					spin = rng.range(-1, 1),
+				}
+				local seed = rng.int(1, 2147483646)
+				local s = RollScript.build(params, PinModel.fullRack(), seed)
+				local got, why = RollScript.check(wire(s))
+				t.truthy(got ~= nil, `throw {i} (power {params.power}, seed {seed}) was refused: {why}`)
+				local deck = s.deck
+				if deck then
+					local most = #deck.ball // 5
+					for n = 1, 10 do
+						most = math.max(most, #deck.pins[n] // 5)
+					end
+					t.truthy(most <= PinModel.MAX_KEYS, `throw {i}: {most} key points on one piece`)
+					longest = math.max(longest, most)
+					if most > 80 then
+						long += 1
+					end
+				end
+				biggest = math.max(biggest, RollScript.size(s))
+			end
+			t.truthy(long >= 5, `only {long} of these throws carry more than 80 key points: the test lost its teeth`)
+			t.truthy(longest < PinModel.MAX_KEYS / 2, `the longest piece carries {longest} key points`)
+			-- what the worst of them costs to send (numbers): a tripwire, not a budget
+			t.truthy(biggest < 8000, `the largest slow throw carries {biggest} numbers`)
+			-- the throw the review named
+			local named = RollScript.build(
+				{ offset = 0.4559424542505294, angle = 0.03297907017432154, power = 0, spin = -0.5 },
+				PinModel.fullRack(),
+				1806522228
+			)
+			t.truthy(RollScript.check(wire(named)) ~= nil)
+			-- the limit is still a limit: more key points than the model can write is refused
+			local w = wire(RollScript.build(POCKET, PinModel.fullRack(), 3))
+			local flood = {}
+			for k = 1, PinModel.MAX_KEYS + 1 do
+				local o = 5 * (k - 1)
+				flood[o + 1], flood[o + 2], flood[o + 3], flood[o + 4], flood[o + 5] = k / 1000, 0, 60, 0, 1
+			end
+			w.deck.ball = flood
+			local got, why = RollScript.check(w)
+			t.eq(got, nil)
+			t.eq(why, "deck ball")
+		end
+	)
 
 	t.test("a scripted pinfall (the engine smoke's stand-in): n pins tip where they stand, no ball", function()
 		local s = RollScript.fake(maskOf({ 1, 2, 3, 7 }), 3)

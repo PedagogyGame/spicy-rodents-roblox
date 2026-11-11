@@ -239,11 +239,13 @@ function MinigameClient.start(opts: { [string]: any }): any
 				local lane = tonumber(msg.lane)
 				if script == nil or lane == nil then
 					warn(`MinigameClient: a bowling throw could not be played ({why})`)
-					return
+				else
+					BowlingPlayback.play(place, lane, script, MinigameSounds.play)
 				end
-				BowlingPlayback.play(place, lane, script, MinigameSounds.play)
+				-- the bowler is told either way: the server HAS counted this throw, so their controller must
+				-- stop waiting for an answer (with no script it simply does not ride the camera behind the ball)
 				if a and msg.station == a.station and a.controller and a.controller.onRoll then
-					a.controller:onRoll(msg, script)
+					a.controller:onRoll(msg, if lane then script else nil)
 				end
 			elseif kind == "rack" then
 				local lane = tonumber(msg.lane)

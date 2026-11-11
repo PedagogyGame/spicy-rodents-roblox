@@ -87,8 +87,8 @@ type Station = {
 	kind: string,
 	label: string,
 	lane: number?,
-	session: any?,
-	hw: any?, -- BowlingLane | Dartboard | FortuneCabinet
+	session: any, -- Minigames/Session (nil for the stations that are not in this build)
+	hw: any, -- BowlingLane | Dartboard | FortuneCabinet (nil when the station's model is missing)
 	screen: Instance?, -- the scoreboard SurfaceGui
 	prompt: ProximityPrompt?,
 	anchor: Vector3,
@@ -126,9 +126,10 @@ function MinigameService.new(opts: Opts): any
 	local root = opts.root
 	local promptFolder: Instance? = nil
 	if root and opts.prompts ~= false then
-		promptFolder = Instance.new("Folder")
-		promptFolder.Name = "MinigamePrompts"
-		promptFolder.Parent = root
+		local folder = Instance.new("Folder")
+		folder.Name = "MinigamePrompts"
+		folder.Parent = root
+		promptFolder = folder
 	end
 	local lanes = root and root:FindFirstChild("Lanes")
 	local boards = root and root:FindFirstChild("Scoreboards")
@@ -826,7 +827,7 @@ function MinigameService._intruders(self: any, st: Station)
 	local lane = st.hw
 	local knocks: { any } = {}
 	local swept = false
-	local animals: { any }? = nil
+	local animals: { any } = {}
 	local tNow = lane:scriptTime()
 	if tNow ~= nil then
 		local script = lane:script()
@@ -857,7 +858,7 @@ function MinigameService._intruders(self: any, st: Station)
 		end
 		st.knocked[k.id] = true
 		local kind = "squirrel"
-		for _, a in animals or {} do
+		for _, a in animals do
 			if a.id == k.id and a.kind == "rodent" then
 				kind = "Spicy Rodent"
 			end

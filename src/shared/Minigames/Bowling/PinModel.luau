@@ -17,7 +17,8 @@
 -- Interface: constants; fullRack() -> { boolean }; spot(n) -> (x, d); roll(entry { x, vx, vd }, mask, seed) ->
 --   Result { standing, down, ball = flat { t, x, d, vx, vd, ... }, pins[n] = flat key points ({} if it never
 --   moved), hitT[n] (-1 = never), pitT[n] (-1 = stayed on the deck), firstHit?, firstPin?, hitX?, ballEnd,
---   tEnd }; segAt(keys, t, friction) -> (x, d, moving); isSplit(mask) -> (boolean, name?); count(mask) -> n
+--   tEnd }; segAt(keys, t, friction) -> (x, d, moving); isSplit(mask) -> (boolean, name?); count(mask) -> n;
+--   MAX_KEYS (the most key points any one piece can carry)
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
 local Rng = require("../../Util/Rng")
@@ -41,6 +42,10 @@ PinModel.WALL_X = AlleyLayout.LANE_W / 2 + AlleyLayout.GUTTER_W -- kickback face
 PinModel.DECK_START = AlleyLayout.DECK_START
 PinModel.DECK_END = AlleyLayout.DECK_END
 PinModel.MAX_T = 4
+-- The most key points one piece can ever carry: one for each step of the model (a slow ball that pushes a pin
+-- along changes both velocities on every step they touch), and its first and its last. Whoever checks a
+-- script (RollScript.check) must allow this many, or a throw the server scored is refused by the clients.
+PinModel.MAX_KEYS = math.ceil(PinModel.MAX_T / PinModel.DT) + 4
 
 export type Entry = { x: number, vx: number, vd: number }
 export type Result = {

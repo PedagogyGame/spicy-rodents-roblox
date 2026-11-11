@@ -90,7 +90,8 @@ local function hide(pin: PinParts, on: boolean)
 	end
 end
 
-local function write(e: Entry, t: number)
+-- Returns true so that pcall(write, ...) has a second value to hand back whether it failed or not.
+local function write(e: Entry, t: number): boolean
 	local script = e.script
 	local ball = e.ball
 	if ball and ball.Parent then
@@ -106,6 +107,7 @@ local function write(e: Entry, t: number)
 			pin.model:PivotTo(PartPose.pin(e.place, pin.home, n, x, y, d, tilt, yaw))
 		end
 	end
+	return true
 end
 
 local function finish(e: Entry)

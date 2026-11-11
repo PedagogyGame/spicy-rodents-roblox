@@ -43,7 +43,8 @@ BowlingLane.ROLL_WRITE_HZ = 20 -- server writes of the ball in flight (clients d
 BowlingLane.SET_TIME = LaneCycle.SET_TIME
 BowlingLane.RETURN_TIME = LaneCycle.RETURN_TIME
 
-export type Params = BallPath.Params
+-- the same shape as Shared BallPath.Params (a type cannot be reached through Import.shared's typeof)
+export type Params = { offset: number, angle: number, power: number, spin: number }
 
 type Pin = {
 	model: Model,

@@ -276,15 +276,19 @@ end
 -- Placeholder sound cue points for a throw, in time order: { t, name, volume 0..1 }.
 function RollScript.cues(script: Script): { { any } }
 	local out: { { any } } = {}
+	local function cue(t: number, name: string, volume: number)
+		local c: { any } = { t, name, volume }
+		table.insert(out, c)
+	end
 	local path = script.path
 	if path == nil then
 		return out
 	end
 	local power = script.params.power
-	table.insert(out, { 0, "release", 0.6 })
-	table.insert(out, { 0.05, "roll", 0.4 + 0.5 * power })
+	cue(0, "release", 0.6)
+	cue(0.05, "roll", 0.4 + 0.5 * power)
 	if path.gutterT then
-		table.insert(out, { path.gutterT, "gutter", 0.8 })
+		cue(path.gutterT, "gutter", 0.8)
 	end
 	local deck = script.deck
 	if deck then
@@ -299,12 +303,12 @@ function RollScript.cues(script: Script): { { any } }
 		for _, h in hits do
 			-- pins that go within a few hundredths of each other are one clatter
 			if h - last >= 0.04 then
-				table.insert(out, { script.tEntry + h, "pin", math.clamp(0.5 + 0.05 * #hits, 0, 1) })
+				cue(script.tEntry + h, "pin", math.clamp(0.5 + 0.05 * #hits, 0, 1))
 				last = h
 			end
 		end
 	end
-	table.insert(out, { script.tBallEnd, "pit", 0.5 })
+	cue(script.tBallEnd, "pit", 0.5)
 	table.sort(out, function(a, b)
 		return a[1] < b[1]
 	end)
@@ -444,14 +448,16 @@ function RollScript.check(w: any): (Script?, string?)
 		if type(deck) ~= "table" or type(deck.pins) ~= "table" or #deck.pins ~= 10 then
 			return nil, "deck"
 		end
-		if not keysOk(deck.ball, 80, 10) or (path ~= nil and #deck.ball < 10) then
+		-- as many key points as the model can ever write (PinModel.MAX_KEYS): a smaller limit here once refused
+		-- slow balls that had pushed a pin along, although the server had scored them
+		if not keysOk(deck.ball, PinModel.MAX_KEYS, 10) or (path ~= nil and #deck.ball < 10) then
 			return nil, "deck ball"
 		end
 		if not nums10(deck.hitT, -1, 10) or not nums10(deck.pitT, -1, 10) then
 			return nil, "deck times"
 		end
 		for n = 1, 10 do
-			if not keysOk(deck.pins[n], 80, 10) then
+			if not keysOk(deck.pins[n], PinModel.MAX_KEYS, 10) then
 				return nil, "deck pin"
 			end
 			-- a pin that was hit must have somewhere to go; one that stands must not

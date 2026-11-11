@@ -368,17 +368,20 @@ function BowlingClient.onState(self: any, msg: { [string]: any })
 	end
 end
 
--- A throw on this lane is being played. If it is the one you just sent, the camera goes with it.
-function BowlingClient.onRoll(self: any, msg: { [string]: any }, script: any)
+-- A throw on this lane has been counted by the server and is being played. If it is the one you just sent,
+-- the camera goes with it. script is nil when this client could not play it (a damaged table): the throw still
+-- counted, so you stop waiting for an answer and watch the deck from the approach instead of riding the ball.
+function BowlingClient.onRoll(self: any, msg: { [string]: any }, script: any?)
 	local aim = self.aim
+	local watch = if script ~= nil then { script = script, t0 = BowlingClient.clock() } else nil
 	if aim.phase == "sent" then
 		AimModel.sent(aim)
-		self.watch = { script = script, t0 = BowlingClient.clock() }
+		self.watch = watch
 		self.ctx.ui:meter(nil)
 		self:_clearDots()
 	elseif self.turnMine and msg.seat == nil then
 		-- a scripted pinfall on your turn (a developer's test roll): watch it too
-		self.watch = { script = script, t0 = BowlingClient.clock() }
+		self.watch = watch
 	end
 end
 
