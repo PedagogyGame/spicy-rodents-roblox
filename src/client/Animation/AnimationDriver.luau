@@ -42,7 +42,8 @@
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
 --   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount;
 --   heroClip(mode, speed, stalk) -> clip name (pure); heroRate(name, speed, cadence?, length) -> playback
---   speed (pure); HERO. The Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
+--   speed (pure); heroTracks(tracks, current, want, track, loop, rate) -> clip now playing; HERO. The
+--   Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
 --   heroLayers(rig, t, seed) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
 
 local Gait = require("./Gait")
@@ -249,6 +250,9 @@ AnimationDriver.HERO = {
 	stride = { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 4.5, Stalk = 2.2 } :: { [string]: number },
 	minRate = 0.3,
 	maxRate = 2.6, -- faster than this the legs blur into noise
+	fade = 0.15, -- seconds: one clip's track fades out and the next fades in over this
+	refade = 0.1, -- a looping clip found stopped is started again over this
+	holdEnd = 0.06, -- a one-shot is frozen this close to its end (a long fall after a leap holds its last pose)
 }
 
 function AnimationDriver.heroClip(mode: string, speed: number, stalk: boolean): string
@@ -285,6 +289,39 @@ function AnimationDriver.heroRate(name: string, speed: number, cadence: number?,
 		then cadence / (2 * math.pi)
 		else math.max(speed, 0) / stride
 	return math.clamp(cyclesPerSecond * length, H.minRate, H.maxRate)
+end
+
+-- One frame of a hero body's clip tracks: `want` (heroClip) becomes the clip that plays, at `rate`
+-- (heroRate). `tracks` holds the body's loaded tracks by clip name, `current` is the clip it played last
+-- frame, `t` is the track of `want`, `loop` whether that clip loops. A change of clip crosses over in
+-- HERO.fade seconds; a one-shot that has reached its end is frozen there. Returns the clip now playing.
+-- It only calls Play, Stop and AdjustSpeed and reads IsPlaying, TimePosition and Length, so the offline
+-- motion preview (tools/review/motion) runs this same function on stand-in tracks.
+function AnimationDriver.heroTracks(
+	tracks: { [string]: any },
+	current: string?,
+	want: string,
+	t: any,
+	loop: boolean,
+	rate: number
+): string
+	local H = AnimationDriver.HERO
+	if want ~= current then
+		for name, old in tracks do
+			if name ~= want and old.IsPlaying then
+				old:Stop(H.fade)
+			end
+		end
+		t:Play(H.fade)
+	elseif not t.IsPlaying and loop then
+		t:Play(H.refade)
+	end
+	if not loop and t.Length > 0 and t.TimePosition >= t.Length - H.holdEnd then
+		t:AdjustSpeed(0) -- hold the last pose of a one-shot (a long fall after a leap)
+	else
+		t:AdjustSpeed(rate)
+	end
+	return want
 end
 
 -- The seed of a rodent body's twitches (Animation/Creep), from its name: the same on every client.
@@ -694,24 +731,14 @@ function AnimationDriver.start(opts: Opts): Driver
 					e.hero = nil
 					continue
 				end
-				if want ~= e.current then
-					for name, old in e.tracks do
-						if name ~= want and old.IsPlaying then
-							old:Stop(0.15)
-						end
-					end
-					t:Play(0.15)
-					e.current = want
-				elseif not t.IsPlaying and clip.loop then
-					t:Play(0.1)
-				end
-				if not clip.loop and t.Length > 0 and t.TimePosition >= t.Length - 0.06 then
-					t:AdjustSpeed(0) -- hold the last pose of a one-shot (a long fall after a leap)
-				else
-					t:AdjustSpeed(
-						AnimationDriver.heroRate(want, e.speed, if kin then kin.cadence else nil, clip.length)
-					)
-				end
+				e.current = AnimationDriver.heroTracks(
+					e.tracks,
+					e.current,
+					want,
+					t,
+					clip.loop,
+					AnimationDriver.heroRate(want, e.speed, if kin then kin.cadence else nil, clip.length)
+				)
 				continue
 			end
 			if e.gait then

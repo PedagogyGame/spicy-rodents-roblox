@@ -28,7 +28,7 @@
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
 --   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
---   movedFromOutside(gap, speed, frameDt) -> boolean (pure)
+--   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded) -> string (pure)
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -101,6 +101,17 @@ end
 Squirrel.OUTSIDE_SLACK = 2
 function Squirrel.movedFromOutside(gap: number, speed: number, frameDt: number): boolean
 	return gap > Squirrel.OUTSIDE_SLACK + speed * math.max(frameDt, 0) * 2
+end
+
+-- What the held body is doing, for a rig that plays clips (KinematicPose.mode): on a rail it is gripping
+-- a "trunk" once more than half of the climb pose shows (SquirrelVisual's `climb`), else running a "rail";
+-- off one it is on the "ground" or in the "air". Pure: the offline motion preview (tools/review/motion)
+-- asks the same question.
+function Squirrel.modeOf(onRoute: boolean, climb: number, grounded: boolean): string
+	if onRoute then
+		return if climb > 0.5 then "trunk" else "rail"
+	end
+	return if grounded then "ground" else "air"
 end
 
 function Squirrel.start(
@@ -261,10 +272,7 @@ function Squirrel.start(
 		-- what is drawn: the eased pose, about the feet point (yaw, then nose-up pitch and lean, then the hip)
 		local snapped = SquirrelVisual.frame(visual, state, motorWorld :: any, dt, world.groundAt)
 		kin.moveSpeed, kin.cadence, kin.climb = visual.moveSpeed, visual.cadence, visual.climb
-		kin.mode = if state.routeId ~= nil
-			then (if visual.climb > 0.5 then "trunk" else "rail")
-			elseif state.grounded then "ground"
-			else "air"
+		kin.mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded)
 		kin.stalk = state.focus
 		local cf = Units.yawCFrame(visual.yaw or state.yaw, Vector3.new(visual.x, visual.y, visual.z))
 			* CFrame.Angles(visual.pitch, 0, -visual.lean)
