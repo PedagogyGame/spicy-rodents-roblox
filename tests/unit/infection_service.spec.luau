@@ -12,6 +12,7 @@ local Colliders = require("@shared/World/Colliders")
 local HospitalLayout = require("@shared/Infection/HospitalLayout")
 local InfectionRules = require("@shared/Infection/InfectionRules")
 local MedicalRoute = require("@shared/Infection/MedicalRoute")
+local FootPath = require("@shared/World/FootPath")
 local Lines = require("@shared/Speech/Lines")
 local Rng = require("@shared/Util/Rng")
 local TownAI = require("@server/AI/TownAI")
@@ -950,6 +951,28 @@ return function(t)
 				walkable >= #cut - 3,
 				`only {walkable} of {#cut} have a way in (the three beyond the river may not)`
 			)
+			-- and when they collapse instead: the crew can walk from the nearest road to every person in
+			-- town, round the buildings, but for the few beyond the river (those are taken in out of
+			-- sight). Nobody is too far from a road to be collected.
+			local reach = h.svc.tun.crewRunSpeed * h.svc.params.crewMaxSecs
+			local humans, unreached, furthest = 0, 0, 0
+			for _, a in h.world.actors do
+				if a.species == "human" then
+					humans += 1
+					local stage = MedicalRoute.stage(h.svc.roads, a.x, a.z) :: MedicalRoute.Stage
+					local path, len = FootPath.find(h.svc.foot, stage.x, stage.z, a.x, a.z, { maxLength = reach })
+					if path == nil then
+						unreached += 1
+						t.truthy(a.x > 1900, `the crew cannot reach {a.post} {a.id} at ({a.x}, {a.z})`)
+					else
+						furthest = math.max(furthest, len)
+					end
+				end
+			end
+			print(
+				`      the crew can walk to {humans - unreached} of {humans} people (furthest {math.floor(furthest)} studs from the road)`
+			)
+			t.truthy(unreached <= 3, `{unreached} people the crew cannot reach`)
 			-- one of them, a police officer in the yard, far from any road, is bitten and walks in
 			local victim = nil
 			for _, a in cut do

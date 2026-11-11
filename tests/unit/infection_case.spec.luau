@@ -634,4 +634,144 @@ return function(t)
 			`      2,000 cases: {paths.immediate} collapsed at once, {paths.walk} walked in, {paths.collapse} collapses, {paths.abandoned} without an ambulance; longest {longest} s`
 		)
 	end)
+
+	t.test(
+		"1,500 seeded runs with a player taking and letting go of the body at any moment: never carried, never cured outside, never stuck",
+		function()
+			-- what is only ever done to a body the AI has: a step that does any of it while a player
+			-- holds the body is a broken rule
+			local AI_ONLY: { [string]: boolean } = {
+				collapse = true,
+				call = true,
+				crewOut = true,
+				carry = true,
+				load = true,
+				abandon = true,
+				walkIn = true,
+				arrive = true,
+				bed = true,
+				discharge = true,
+			}
+			local taken, stoodDown, selfCured, bedCured = 0, 0, 0, 0
+			for seed = 1, 1500 do
+				local rng = Rng.new(seed * 104729)
+				local routeLen: number? = if rng.next() < 0.7 then rng.range(20, 3000) else nil
+				local walkSecs, driveSecs, queueSecs = rng.range(10, 300), rng.range(15, 60), rng.range(0, 40)
+				local inputs: Inputs = { controller = "ai", nearHospital = false, routeLen = routeLen }
+				local case = InfectionRules.newCase(seed, 0, inputs, rng.next, P)
+				-- the world round the case, as the glue keeps it (all of it reset by "standDown")
+				local calledAt: number?, loadedAt: number?, walkAt: number?, admittedAt: number?, bedAt: number? =
+					nil, nil, nil, nil, nil
+				local held, heldUntil, inside, insideSince = false, 0, false, 0
+				local cures, now = 0, 0
+				while now < 2400 and not InfectionRules.closed(case) do
+					now += 0.5
+					-- hand-overs: until 700 s a player may take the body at any moment (whatever state
+					-- it is in: the race the server guards against) and keeps it for a while, sometimes
+					-- walking it into the hospital; after that the AI has it for good
+					if held and now >= heldUntil then
+						held, inside = false, false
+					elseif not held and now < 700 and rng.next() < 0.004 then
+						held, heldUntil = true, now + rng.range(1, 200)
+						inside = false
+						taken += 1
+					end
+					if held and not inside and rng.next() < 0.01 then
+						inside, insideSince = true, now
+					elseif held and inside and rng.next() < 0.01 then
+						inside = false
+					end
+					inputs.controller = if held then "player" else "ai"
+					if held then
+						inputs.atEntrance = inside
+					elseif case.state == "walkin" then
+						inputs.atEntrance = walkAt ~= nil and now - walkAt >= walkSecs
+					else
+						inputs.atEntrance = false
+					end
+					if calledAt == nil then
+						inputs.ambulance = "none"
+					elseif loadedAt then
+						inputs.ambulance = if now - loadedAt >= driveSecs then "home" else "returning"
+					elseif now - calledAt < driveSecs then
+						inputs.ambulance = "assigned"
+					else
+						inputs.ambulance = "arrived"
+						inputs.crewSecs = (seed % 4) * 8
+					end
+					if admittedAt == nil then
+						inputs.hospital = "none"
+					elseif now - admittedAt < queueSecs then
+						inputs.hospital = "queued"
+					elseif bedAt == nil or now - bedAt < P.treatSecs then
+						inputs.hospital = "bed"
+					else
+						inputs.hospital = "done"
+					end
+					local before, wasSelf = case.state, case.selfTreat
+					local fx = InfectionRules.advance(case, now, inputs, rng.next, P)
+					for _, e in fx do
+						if held then
+							t.truthy(
+								not AI_ONLY[e.kind],
+								`seed {seed}: "{e.kind}" done to a body a player holds ({before})`
+							)
+						end
+						if e.kind == "standDown" then
+							stoodDown += 1
+							t.truthy(held, `seed {seed}: stood down with no player`)
+							calledAt, loadedAt, walkAt, admittedAt, bedAt = nil, nil, nil, nil, nil
+						elseif e.kind == "call" then
+							calledAt, loadedAt = now, nil
+						elseif e.kind == "load" then
+							loadedAt = now
+						elseif e.kind == "abandon" then
+							calledAt = nil
+						elseif e.kind == "walkIn" then
+							walkAt = now
+						elseif e.kind == "resume" then
+							walkAt = nil
+						elseif e.kind == "arrive" then
+							admittedAt, bedAt = now, nil
+						elseif e.kind == "bed" then
+							bedAt = now
+						elseif e.kind == "cure" then
+							cures += 1
+							t.eq(before, "treated", `seed {seed}: cured from {before}`)
+							if wasSelf then
+								selfCured += 1
+								t.truthy(held and inside, `seed {seed}: a held person cured outside the hospital`)
+								t.truthy(
+									now - insideSince >= P.treatSecs - 0.5,
+									`seed {seed}: cured after {now - insideSince} s inside`
+								)
+							else
+								bedCured += 1
+								t.eq(inputs.hospital, "done", `seed {seed}: cured before the treatment ended`)
+							end
+						end
+					end
+					if not InfectionRules.closed(case) then
+						t.truthy(case.infected, `seed {seed}: not infected in {case.state}`)
+					end
+					if held then
+						t.truthy(
+							not InfectionRules.isPatient(case),
+							`seed {seed}: a player holds a patient ({case.state})`
+						)
+						local tell = InfectionRules.tell(case)
+						t.truthy(tell == nil or tell == "symptomatic", `seed {seed}: a held body shows "{tell}"`)
+					end
+				end
+				t.truthy(InfectionRules.closed(case), `seed {seed}: stuck in {case.state} after {now} s`)
+				t.eq(cures, 1, `seed {seed}: {cures} cures`)
+			end
+			print(
+				`      1,500 cases, {taken} hand-overs: {stoodDown} patients put back on their feet, {selfCured} cured standing in the hospital, {bedCured} in a bed`
+			)
+			t.truthy(taken > 2000 and stoodDown > 100, "the hand-overs hit patients often enough to mean something")
+			t.truthy(selfCured > 100 and bedCured > 100, "both cures happen")
+			t.eq(selfCured + bedCured, 1500)
+		end
+	)
 end
