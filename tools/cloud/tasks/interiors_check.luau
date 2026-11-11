@@ -62,6 +62,9 @@ do
 	local t0 = os.clock()
 	WorldTerrain.write(workspace.Terrain)
 	terrainSeconds = os.clock() - t0
+	-- freshly written voxels do not meet rays until the engine has taken a step or two
+	-- (tools/cloud/tasks/ground_probe.luau and terrain_calib.luau wait the same way)
+	task.wait(2)
 end
 
 -- what a body would stand on or walk into: collidable parts and the terrain (never a door leaf or
