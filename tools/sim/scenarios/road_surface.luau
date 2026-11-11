@@ -35,9 +35,9 @@ local scenario: Replay.Scenario = {
 		sedanEB.s = 80 -- the cross street's west edge (x = 831) is at s = 128
 	end,
 	expect = {
-		none = { "sink", "float", "height_jump", "pitch_jump", "hover" },
+		none = { "sink", "float", "height_jump", "pitch_jump", "hover", "ledge" },
 	},
-	known = { "buried", "ledge" },
+	known = { "buried" },
 }
 
 return scenario

@@ -267,10 +267,18 @@ return function(t)
 		t.truthy(
 			string.find(
 				view,
-				"Ghost.render(receiver.buffer, workspace:GetServerTimeNow(), folder, kinds, Height.at, models)",
+				"Ghost.render(receiver.buffer, workspace:GetServerTimeNow(), folder, kinds, ground, models)",
 				1,
 				true
 			)
+		)
+		-- the ghosts stand on the drawn roads, and the headless replay seats them on the same ground
+		local ground = "RoadSurface.ground(RoadSurface.new(Data.default():roads()), Height.at)"
+		t.truthy(string.find(view, ground, 1, true), "VehicleView seats the ghosts on World/RoadSurface")
+		local replay = fs.readFile("tools/sim/lib/Replay.luau")
+		t.truthy(
+			string.find(replay, "RoadSurface.ground(RoadSurface.new(data:roads()), Height.at)", 1, true),
+			"the replay seats them the same way"
 		)
 		for _, inline in { "takeStamp", "newClock", "decodeStream", "Ghost.new(", "CFrame.", "Vector3." } do
 			t.falsy(string.find(view, inline, 1, true), `VehicleView no longer inlines {inline}`)

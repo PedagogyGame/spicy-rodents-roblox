@@ -47,6 +47,7 @@ local PoseStream = require("@shared/Traffic/PoseStream")
 local Net = require("@shared/Net/Net")
 local Schemas = require("@shared/Net/Schemas")
 local Height = require("@shared/World/Height")
+local RoadSurface = require("@shared/World/RoadSurface")
 local Colliders = require("@shared/World/Colliders")
 local Ground = require("@shared/World/Ground")
 local Town = require("@shared/World/Town")
@@ -437,7 +438,7 @@ function Replay.run(opts: { [string]: any }?): Result
 
 		-- the client, as Client/Render/VehicleView builds it
 		local receiver = PoseStream.newReceiver()
-		local heightAt = Height.at
+		local heightAt = RoadSurface.ground(RoadSurface.new(data:roads()), Height.at)
 
 		local addLag, lagSummary = histogram(0.05, 4000) -- studs behind the server's pose right now
 		local addLagMs, lagMsSummary = histogram(1, 3000) -- the same as time: studs / true speed

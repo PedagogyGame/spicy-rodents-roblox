@@ -27,6 +27,7 @@ local Props = require("./Builders/Props")
 local Treehouse = require("./Builders/Treehouse")
 local Spec = require("./Spec")
 local Height = Import.shared("World/Height") :: typeof(require("../shared/World/Height"))
+local RoadSurface = Import.shared("World/RoadSurface") :: typeof(require("../shared/World/RoadSurface"))
 local Buildings = Import.generated("Buildings") :: { [string]: any }
 local Interiors = Import.generated("Interiors") :: { [string]: any }
 
@@ -36,8 +37,7 @@ local SPU = Kits.STUDS_PER_UNIT
 local HALF_PI = math.pi / 2
 local PLATE_THICKNESS = 0.2
 local CONTAIN_TOLERANCE = 0.5 -- studs: a child may poke this far out of its parent's footprint
-local ROAD_SEGMENT = 40 -- studs: roads follow the terrain in straight segments this long or less
-local ROAD_THICKNESS = 0.4
+local ROAD_THICKNESS = RoadSurface.THICKNESS
 
 export type PartSpec = Spec.PartSpec
 export type ExtraSpec = Spec.ExtraSpec
@@ -423,18 +423,6 @@ function Plan.attachSlabs(plans: { BuildPlan })
 	end
 end
 
-local function endpoints(road: Road): (number, number, number, number)
-	if road.axis == "x" then
-		local z = road.coord :: number
-		return road.start :: number, z, road["end"] :: number, z
-	elseif road.axis == "z" then
-		local x = road.coord :: number
-		return x, road.start :: number, x, road["end"] :: number
-	end
-	local s, e = road.start :: { number }, road["end"] :: { number }
-	return s[1], s[2], e[1], e[2]
-end
-
 -- A road is a chain of flat parts following the terrain (v5.4 draws 104 terrain-following
 -- segments per grid street at the kind's vertical offset).
 -- The world-axis sign (+1 / -1 along x for z roads, along z for x roads) from a sidewalk toward the
@@ -462,27 +450,20 @@ end
 
 function Plan.road(road: Road, others: { Road }?): BuildPlan
 	local look = Kits.ROAD[road.kind] or Kits.ROAD.concrete
-	local x0, z0, x1, z1 = endpoints(road)
-	local dx, dz = x1 - x0, z1 - z0
-	local len = math.sqrt(dx * dx + dz * dz)
-	local n = math.max(1, math.ceil(len / ROAD_SEGMENT))
-	local yaw = if len > 0 then math.atan2(-dx, -dz) else 0 -- LookVector along the road
+	-- the segments (along the terrain, rolled to its crossfall) come from Shared/World/RoadSurface, which
+	-- the clients also seat the traffic ghosts on, so the cars stand on exactly these parts' tops
 	local offset = look.offsetU * SPU
+	local layout = RoadSurface.layout(road :: any, offset)
+	local x0, z0, dx, dz, len, n = layout.x0, layout.z0, layout.dx, layout.dz, layout.len, layout.n
+	local yaw = layout.yaw -- LookVector along the road
 	local parts: { PartSpec } = {}
 	local function yAt(t: number): number
-		local x, z = x0 + dx * t, z0 + dz * t
-		-- the Quay bridge: on its deck and ramps, not on the river bed under it
-		local deck = Height.riverDeckAt(x, z)
-		local ground = Height.at(x, z)
-		if deck and deck > ground then
-			ground = deck
-		end
-		return ground + offset - ROAD_THICKNESS / 2
+		return (RoadSurface.groundAt(x0 + dx * t, z0 + dz * t)) + offset - ROAD_THICKNESS / 2
 	end
 	local surface = Palette.ROAD[road.kind] or look.color
 	local material = look.material
-	local yPrev = yAt(0)
-	local ux, uz = if len > 0 then dx / len else 0, if len > 0 then dz / len else 0
+	local yPrev = layout.y[1]
+	local ux, uz = layout.ux, layout.uz
 	local curb = curbSide(road, others)
 	local function strip(
 		name: string,
@@ -494,17 +475,21 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 		l: number,
 		color: { number },
 		pitch: number,
-		ySurface: number?
+		ySurface: number?,
+		roll: number?
 	)
 		-- a thin visual strip on the road surface at fraction t, offset `across` to the road's right
-		-- (ySurface: the segment's own centre height there, so the strip rides on its tilted top)
+		-- (ySurface: the segment's own centre height there, so the strip rides on its tilted top; roll:
+		-- the segment's, so a strip off the centre line rides on its rolled top too)
+		local r = roll or 0
 		table.insert(parts, {
 			name = name,
 			cx = x0 + dx * t - uz * across,
-			cy = (ySurface or yAt(t)) + ROAD_THICKNESS / 2 + lift,
+			cy = (ySurface or yAt(t)) + ROAD_THICKNESS / 2 + lift + across * math.tan(r),
 			cz = z0 + dz * t + ux * across,
 			yaw = yaw,
 			pitch = pitch,
+			roll = if r ~= 0 then r else nil,
 			sx = w,
 			sy = h,
 			sz = l,
@@ -518,12 +503,13 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 		})
 	end
 	for i = 1, n do
-		local yNext = yAt(i / n)
+		local yNext = layout.y[i + 1]
 		local seg = len / n
 		local rise = yNext - yPrev
 		local slopeLen = math.sqrt(seg * seg + rise * rise)
 		local tm = (i - 0.5) / n
-		local pitch = math.atan2(rise, seg)
+		local pitch = layout.pitch[i]
+		local roll = layout.roll[i]
 		table.insert(parts, {
 			name = string.format("Seg%03d", i),
 			cx = x0 + dx * tm,
@@ -531,6 +517,7 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 			cz = z0 + dz * tm,
 			yaw = yaw,
 			pitch = pitch,
+			roll = if roll ~= 0 then roll else nil,
 			sx = road.width,
 			sy = ROAD_THICKNESS,
 			sz = math.max(slopeLen, 0.2),
@@ -554,7 +541,8 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 					math.min(seg * 0.3, 8),
 					Palette.ROAD.paint,
 					pitch,
-					yPrev + (yNext - yPrev) * f
+					yPrev + (yNext - yPrev) * f,
+					roll
 				)
 			end
 		elseif road.kind == "concrete" and curb then
@@ -571,7 +559,8 @@ function Plan.road(road: Road, others: { Road }?): BuildPlan
 					math.max(slopeLen, 0.2),
 					Palette.ROAD.curb,
 					pitch,
-					(yPrev + yNext) / 2
+					(yPrev + yNext) / 2,
+					roll
 				)
 			end
 		end
