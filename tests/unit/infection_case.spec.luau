@@ -2,8 +2,10 @@
 -- Infection/InfectionRules: one bitten person's story on a scripted clock and scripted dice (owner
 -- 2026-11-10). Every path is driven to its end: collapse at once, symptoms later then a walk-in or a
 -- collapse, the walk-in that is too slow, no route, no ambulance, a full hospital, a bite on the
--- hospital's grounds, and a person a player holds. The rules that must never break are checked on
--- 2,000 seeded runs: everyone ends cured, nobody is cured anywhere but the hospital, and nothing shows
+-- hospital's grounds, and a person a player holds (told what to do, told again every 40 s, a status
+-- for the line that stays on screen; a player who ends up holding a patient gets the person back on
+-- their feet and the ambulance is sent away). The rules that must never break are checked on 2,000
+-- seeded runs: everyone ends cured, nobody is cured anywhere but the hospital, and nothing shows
 -- before the symptoms do.
 local InfectionRules = require("@shared/Infection/InfectionRules")
 local Rng = require("@shared/Util/Rng")
@@ -27,6 +29,7 @@ local P: InfectionRules.Params = {
 	groanSecs = { 12, 21 },
 	treatSecs = 30,
 	crewMaxSecs = 55,
+	remindSecs = 40,
 }
 
 -- dice that return the scripted values in order, then 0.5 for ever
@@ -67,6 +70,7 @@ return function(t)
 		t.deepEq(d.incubateSecs, { 40, 120 })
 		t.eq(d.walkInSpeed, 11, "4.4 u/s in studs")
 		t.eq(d.treatSecs, 30)
+		t.eq(d.remindSecs, 40)
 		t.eq(#InfectionRules.STATES, 15)
 		t.eq(InfectionRules.townPercent(17, 68), 25)
 		t.eq(InfectionRules.townPercent(0, 0), 0)
@@ -255,22 +259,27 @@ return function(t)
 			InfectionRules.advance(case, 156, { controller = "ai", ambulance = "none", hospital = "none" }, dice({}), P)
 		t.eq(kinds(fx), "arrive")
 		t.eq(case.state, "admitted")
-		-- the same holds when an ambulance was assigned but is stuck on the way
+		-- the same holds when an ambulance was assigned but is stuck on the way. Its clock starts when
+		-- it is assigned: a patient who waited two minutes for a free ambulance is not given up on
+		-- thirty seconds after one finally sets off
 		local stuck = InfectionRules.newCase(8, 0, AI, dice({ 0.1, 0 }), P)
 		InfectionRules.advance(stuck, 1.5, AI, dice({ 0, 0.99 }), P)
 		InfectionRules.advance(stuck, 5.5, AI, dice({}), P)
-		InfectionRules.advance(stuck, 6, { controller = "ai", ambulance = "assigned" }, dice({}), P)
+		local coming: Inputs = { controller = "ai", ambulance = "assigned" }
+		InfectionRules.advance(stuck, 125, { controller = "ai", ambulance = "queued" }, dice({ 0.99 }), P)
+		t.eq(stuck.state, "scene")
+		InfectionRules.advance(stuck, 126, coming, dice({ 0.99 }), P)
 		t.eq(stuck.state, "enroute")
-		t.eq(
-			kinds(
-				InfectionRules.advance(stuck, 155.5, { controller = "ai", ambulance = "assigned" }, dice({ 0.99 }), P)
-			),
-			"abandon"
-		)
+		for now = 127, 275 do
+			local tick = InfectionRules.advance(stuck, now, coming, dice({ 0.99 }), P)
+			t.truthy(not has(tick, "abandon"), `given up on at {now} with the ambulance on its way`)
+		end
+		t.eq(stuck.state, "enroute")
+		t.eq(kinds(InfectionRules.advance(stuck, 276, coming, dice({ 0.99 }), P)), "abandon")
 		-- and a return trip that never ends cannot hold a patient for ever
 		local held: Inputs = { controller = "ai", ambulance = "returning", hospital = "none" }
-		t.eq(kinds(InfectionRules.advance(stuck, 355.4, held, dice({}), P)), "")
-		t.eq(kinds(InfectionRules.advance(stuck, 355.5, held, dice({}), P)), "arrive")
+		t.eq(kinds(InfectionRules.advance(stuck, 475.9, held, dice({}), P)), "")
+		t.eq(kinds(InfectionRules.advance(stuck, 476, held, dice({}), P)), "arrive")
 	end)
 
 	t.test("a full hospital: the patient waits, infected, until a bed is free", function()
@@ -306,20 +315,34 @@ return function(t)
 		t.eq(kinds(fx), "flee,say:bitten,toast:bitten")
 		t.eq(case.state, "incubating")
 		t.truthy(not case.immediate)
+		t.eq(InfectionRules.status(case), "infected", "the status line says so from the bite on")
 		t.eq(kinds(InfectionRules.advance(case, 39, me, dice({}), P)), "")
 		t.eq(kinds(InfectionRules.advance(case, 40, me, dice({}), P)), "say:symptoms,toast:symptoms")
-		-- symptoms for as long as the player stays away: 20 minutes and no collapse, no hiding
-		for now = 41, 1240, 3 do
+		t.eq(InfectionRules.status(case), "symptoms")
+		-- symptoms for as long as the player stays away: 20 minutes and no collapse, no hiding; the
+		-- only thing that happens is the reminder, every 40 s (one toast is easily missed)
+		local reminders, lastAt = 0, 40
+		for now = 41, 1240 do
 			local e = InfectionRules.advance(case, now, me, dice({ 0 }), P)
-			t.eq(kinds(e), "", `at {now}`)
+			if kinds(e) == "toast:symptoms" then
+				reminders += 1
+				t.eq(now - lastAt, 40, `reminded at {now}`)
+				lastAt = now
+			else
+				t.eq(kinds(e), "", `at {now}`)
+			end
 			t.eq(case.state, "symptomatic")
 			t.truthy(case.infected and InfectionRules.possessable(case))
 		end
+		t.eq(reminders, 30, "told again every 40 s for 20 minutes")
 		local inside: Inputs = { controller = "player", atEntrance = true, nearHospital = true }
 		t.eq(kinds(InfectionRules.advance(case, 1300, inside, dice({}), P)), "toast:treating")
 		t.eq(case.state, "treated")
+		t.eq(InfectionRules.status(case), "treating")
 		t.eq(InfectionRules.tell(case), "symptomatic", "a held body is never posed or hidden")
 		t.truthy(InfectionRules.possessable(case) and not InfectionRules.biteable(case))
+		-- no reminder while the treatment runs
+		t.eq(kinds(InfectionRules.advance(case, 1309, inside, dice({}), P)), "")
 		-- walking out early starts it over
 		t.eq(kinds(InfectionRules.advance(case, 1310, me, dice({}), P)), "toast:leftEarly")
 		t.eq(case.state, "symptomatic")
@@ -329,6 +352,20 @@ return function(t)
 		t.truthy(case.infected)
 		t.eq(kinds(InfectionRules.advance(case, 1350, inside, dice({}), P)), "cure,toast:cured")
 		t.truthy(not case.infected and case.state == "released")
+		t.eq(InfectionRules.status(case), nil, "nothing more to say")
+		-- before the symptoms the reminder says "infected" (and where to go), every 40 s as well
+		local quiet = InfectionRules.newCase(14, 0, me, dice({ 0.99 }), P) -- incubates for 119.2 s
+		t.eq(kinds(InfectionRules.advance(quiet, 39.9, me, dice({}), P)), "")
+		t.eq(kinds(InfectionRules.advance(quiet, 40, me, dice({}), P)), "toast:infected")
+		t.eq(kinds(InfectionRules.advance(quiet, 79, me, dice({}), P)), "")
+		t.eq(kinds(InfectionRules.advance(quiet, 80, me, dice({}), P)), "toast:infected")
+		t.eq(InfectionRules.tell(quiet), nil, "and still nothing a client can read")
+		-- an AI case never reminds anybody
+		local ai = InfectionRules.newCase(15, 0, AI, dice({ 0.99, 0.99 }), P)
+		for now = 1, 119 do
+			t.eq(kinds(InfectionRules.advance(ai, now, AI, dice({}), P)), "")
+		end
+		t.eq(InfectionRules.status(ai), "infected", "(the server only shows a status to a player)")
 		-- going to the hospital before the symptoms show works too
 		local early = InfectionRules.newCase(12, 0, me, dice({ 0.5 }), P)
 		t.eq(kinds(InfectionRules.advance(early, 5, inside, dice({}), P)), "toast:treating")
@@ -345,11 +382,18 @@ return function(t)
 		t.eq(a.untilT, 40, "counted from the bite")
 		-- let go mid-incubation: the AI carries on to the symptoms and beyond
 		t.eq(kinds(InfectionRules.advance(a, 20, AI, dice({}), P)), "")
+		-- taken again while nothing shows: the player is told the body is infected (it is theirs now)
+		t.eq(kinds(InfectionRules.advance(a, 25, me, dice({}), P)), "toast:infected")
+		t.eq(InfectionRules.tell(a), nil)
+		t.eq(kinds(InfectionRules.advance(a, 30, AI, dice({}), P)), "")
 		t.eq(kinds(InfectionRules.advance(a, 40, AI, dice({ 0 }), P)), "say:symptoms")
 		t.eq(a.untilT, 48)
 		-- taken while symptomatic: told what to do; no timer runs while held
 		t.eq(kinds(InfectionRules.advance(a, 45, me, dice({}), P)), "toast:symptoms")
-		t.eq(kinds(InfectionRules.advance(a, 500, me, dice({}), P)), "")
+		t.eq(kinds(InfectionRules.advance(a, 84, me, dice({}), P)), "")
+		t.eq(kinds(InfectionRules.advance(a, 85, me, dice({}), P)), "toast:symptoms", "the reminder")
+		t.eq(kinds(InfectionRules.advance(a, 500, me, dice({}), P)), "toast:symptoms")
+		t.eq(kinds(InfectionRules.advance(a, 500.2, me, dice({}), P)), "")
 		t.eq(a.state, "symptomatic")
 		-- let go while symptomatic: a fresh symptom timer, then the usual end
 		t.eq(kinds(InfectionRules.advance(a, 501, AI, dice({ 0 }), P)), "")
@@ -373,6 +417,92 @@ return function(t)
 		t.truthy(a.infected and not a.selfTreat)
 	end)
 
+	t.test(
+		"a player holding a patient: back on their feet, the ambulance sent away, the hospital still the cure",
+		function()
+			local me: Inputs = { controller = "player" }
+			-- every state in which somebody else is doing something for the patient
+			local function patientIn(state: string): Case
+				local case = InfectionRules.newCase(21, 0, AI, dice({ 0.1, 0 }), P) -- the collapse path
+				local facts: Inputs = { controller = "ai", ambulance = "none", hospital = "none" }
+				local now = 0
+				for _ = 1, 4000 do
+					if case.state == state then
+						return case
+					end
+					now += 0.2
+					if case.state == "scene" then
+						facts.ambulance = "assigned"
+					elseif case.state == "enroute" and state ~= "enroute" then
+						facts.ambulance, facts.crewSecs = "arrived", 10
+					elseif case.state == "transit" and state ~= "transit" then
+						facts.ambulance = "home"
+					elseif case.state == "admitted" and state ~= "admitted" then
+						facts.hospital = "bed"
+					end
+					InfectionRules.advance(case, now, facts, dice({}), P)
+				end
+				error(`never reached {state} (stuck in {case.state})`)
+			end
+			for _, state in
+				{
+					"down",
+					"scene",
+					"enroute",
+					"approach",
+					"assess",
+					"loading",
+					"retrieve",
+					"transit",
+					"admitted",
+					"treated",
+				}
+			do
+				local case = patientIn(state)
+				t.truthy(InfectionRules.isPatient(case), state)
+				t.truthy(not InfectionRules.possessable(case), `{state}: never offered to a player`)
+				local now = case.since + 1
+				local fx = InfectionRules.advance(case, now, me, dice({}), P)
+				t.eq(kinds(fx), "standDown,toast:symptoms", `taken in {state}`)
+				t.eq(case.state, "symptomatic", `taken in {state}`)
+				t.truthy(case.infected, "standing up is not a cure")
+				t.eq(case.untilT, math.huge, "no clock runs while a player holds the body")
+				t.eq(InfectionRules.tell(case), "symptomatic", "red eyes, never hidden, never posed")
+				t.truthy(InfectionRules.possessable(case) and not InfectionRules.isPatient(case))
+				t.eq(InfectionRules.status(case), "symptoms")
+				-- nothing happens to them for as long as they stay away, but for the reminders
+				for k = 1, 300 do
+					local e = kinds(InfectionRules.advance(case, now + k, me, dice({ 0 }), P))
+					t.truthy(e == "" or e == "toast:symptoms", `{state}: {e}`)
+				end
+				t.eq(case.state, "symptomatic")
+				-- the cure is the hospital, as for any held person
+				local inside: Inputs = { controller = "player", atEntrance = true, nearHospital = true }
+				t.eq(kinds(InfectionRules.advance(case, now + 400, inside, dice({}), P)), "toast:treating")
+				t.eq(kinds(InfectionRules.advance(case, now + 430, inside, dice({}), P)), "cure,toast:cured")
+				t.truthy(not case.infected)
+			end
+			-- taken while already inside the hospital (a patient in a bed): treated where they stand
+			local bed = patientIn("treated")
+			local inside: Inputs = { controller = "player", atEntrance = true, nearHospital = true }
+			t.eq(
+				kinds(InfectionRules.advance(bed, bed.since + 1, inside, dice({}), P)),
+				"standDown,toast:symptoms,toast:treating"
+			)
+			t.truthy(bed.selfTreat and bed.infected)
+			-- standUp for a body that was out of the world: when the AI has it back, the usual end follows
+			local gone = patientIn("enroute")
+			InfectionRules.standUp(gone, 500)
+			t.eq(gone.state, "symptomatic")
+			t.eq(gone.untilT, math.huge, "the case waits")
+			t.truthy(gone.infected)
+			t.eq(kinds(InfectionRules.advance(gone, 900, AI, dice({ 0 }), P)), "", "back: the symptom clock starts")
+			t.eq(gone.untilT, 908)
+			local fx = InfectionRules.advance(gone, 908, { controller = "ai", routeLen = 300 }, dice({ 0.1 }), P)
+			t.eq(kinds(fx), "walkIn,say:symptoms")
+		end
+	)
+
 	t.test("a second bite on an infected person: they run and shout again, the case does not change", function()
 		local case = InfectionRules.newCase(14, 0, AI, dice({ 0.9, 0.5 }), P)
 		local before = case.untilT
@@ -383,6 +513,13 @@ return function(t)
 		t.truthy(not InfectionRules.biteable(down), "just bitten")
 		InfectionRules.advance(down, 2, AI, dice({ 0, 0 }), P)
 		t.eq(#InfectionRules.rebite(down, 3), 0, "nobody bites a patient on the ground")
+		-- a player holding the bitten body is told about the second bite too (and where the cure is)
+		local me: Inputs = { controller = "player" }
+		local held = InfectionRules.newCase(16, 0, me, dice({ 0.5 }), P)
+		t.eq(kinds(InfectionRules.rebite(held, 10)), "flee,say:bitten,toast:bittenAgain")
+		t.eq(kinds(InfectionRules.rebite(case, 10, "player")), "flee,say:bitten,toast:bittenAgain", "taken just now")
+		t.eq(kinds(InfectionRules.rebite(held, 10, "ai")), "flee,say:bitten", "let go just now")
+		t.eq(held.state, "incubating")
 	end)
 
 	t.test("2,000 seeded runs: everyone ends cured, only by the hospital; nothing shows before the symptoms", function()

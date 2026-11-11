@@ -9,23 +9,45 @@
 --   Infection/MedicalRoute    the ambulance's stop and road trip; the walk-in tail
 --   Infection/Bystanders      who gathers and where they stand
 --   Infection/HospitalLayout  the door, the intake, the beds
+--   World/FootPath            the way on foot round the buildings, off the pavements
 --   Hospital/HospitalService  beds, the queue, the treatment timer
 --   Speech/SpeechRules        which line, and whether the person speaks at all
 -- What it does to the town: orders to brains through `brain:onEvent({ type = "medical", ... })`
 -- (Brains/Directive: down, hidden, route, hold), positions of hidden or carried people written on the
 -- TownAI actors (kinematic: the runtime's BulkMoveTo shows them), a responder dispatched on a road
--- route and held on scene until the patient is aboard (Traffic/TrafficService), and three replicated
--- attributes per body, written only when they change:
+-- route and held on scene until the patient is aboard (Traffic/TrafficService; the responders are
+-- fleet vehicles, so they reach the clients in the same pose stream as every other car), and three
+-- replicated attributes per body, written only when they change:
 --   Med    nil | "symptomatic" | "down" | "transit" | "treated"  (Client/Render/MedicalView draws it;
 --          nothing is written while a case incubates, so a client cannot read who is infected)
 --   Say, SayAt   the line and its server time (Client/UI/SpeechBubbles draws the bubble)
 -- A body a player holds is never ordered about, moved or hidden; its player is told what is happening
--- and what to do through `notify`. Killing the rodent cures nobody (no call exists for it).
+-- and what to do through `notify`, and `statusOf` is the same for a line that stays on screen.
+-- Killing the rodent cures nobody (no call exists for it).
+--
+-- NOBODY GETS STUCK. Every wait in a case ends on a clock (InfectionRules), and here:
+--   * Walking is never the only way. A walk in follows the pavements (the sidewalk graph) and, where
+--     they do not reach, goes across the open ground round the buildings (World/FootPath); with no
+--     way at all the person collapses and an ambulance comes. The crew walks round buildings the same
+--     way; when it cannot reach the patient (too far from any road, across the river) the patient is
+--     taken in out of sight. The walk home is the same again, and a walk that overruns ends at home.
+--   * An ambulance belongs to a record only for its own trip. A patient whose ambulance is called
+--     off goes back to the head of the queue; one nobody comes for is taken in after the timeout.
+--   * A player who ends up holding a patient gets the person back on their feet (the rules' standUp);
+--     the ambulance, the crew, the crowd and the bed are let go (`standDown`).
+--   * A body that leaves the world (no actor, no brain) keeps its case: everything round it is let
+--     go, the case waits, and when the body is back the person is on their feet with the symptoms.
+--   * A fault while stepping one case is that case's alone: it is stood down, put back on its feet
+--     and tried again later; the other cases, the queue and the hospital carry on. `shutdown` lets
+--     every body go (the boot loop calls it if it has to switch the service off).
+-- In every one of these the person stays infected: the hospital is the only cure.
 -- Step-driven: requiring this module starts nothing; Boot/Game calls step(dt) from its own loop.
 -- Interface: new(opts) -> Service; :bite(victimId, biterId?) -> boolean (a new infection began);
 --   :onSpotted(observerId, threatId); :step(dt); :isInfected(id); :biteable(id); :stateOf(id) ->
---   string?; :townPercent(); :trafficFlags(id) -> boolean; :cases() -> { [id]: Case };
---   :walkRoute(x, z) -> ({ {x, z} }?, length); :stats(); TOASTS; TICK; SINK
+--   string?; :statusOf(id) -> string? (for the player holding `id`); :townPercent(); :trafficFlags(id)
+--   -> boolean; :cases() -> { [id]: Case }; :walkRoute(x, z) -> ({ {x, z} }?, length);
+--   :sidewalkRoute(x, z) -> ({ {x, z} }?, length) (the pavements only); :shutdown(); :stats();
+--   TOASTS; TICK; SINK
 -- Ids are TownAI actor ids. Positions in studs.
 
 local Import = require("../Import")
@@ -38,6 +60,8 @@ local HospitalLayout =
 local SpeechRules = Import.shared("Speech/SpeechRules") :: typeof(require("../../shared/Speech/SpeechRules"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local Colliders = Import.shared("World/Colliders") :: typeof(require("../../shared/World/Colliders"))
+local FootPath = Import.shared("World/FootPath") :: typeof(require("../../shared/World/FootPath"))
+local Ground = Import.shared("World/Ground") :: typeof(require("../../shared/World/Ground"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local HospitalService = require("../Hospital/HospitalService")
 local Nav = require("../Actors/Nav")
@@ -54,6 +78,7 @@ export type Opts = {
 	setPossessable: ((id: number, possessable: boolean) -> ())?,
 	notify: ((id: number, payload: { [string]: any }) -> ())?, -- a message for the player holding `id`
 	serverTime: (() -> number)?, -- the clock clients share (workspace:GetServerTimeNow)
+	onFault: ((where: string, err: any) -> ())?, -- a part of a step failed (it was contained)
 }
 
 type Record = {
@@ -61,19 +86,25 @@ type Record = {
 	case: any, -- InfectionRules.Case
 	inputs: any, -- InfectionRules.Inputs (reused)
 	biter: number?,
-	home: { number }, -- where the person was bitten (they walk back there when cured)
+	home: { number }, -- where the person was bitten (a townsperson walks back there when cured)
 	amb: string, -- none | queued | assigned | returning
 	vehicle: any?, -- the responder on this patient's call (only while the trip is this record's)
 	trip: any?, -- that trip's route: a vehicle on any other route is no longer this record's
 	virtual: boolean, -- the stop is the ambulance's own parking spot: nothing drives
 	stage: any?, -- MedicalRoute.Stage
-	crew: number?, -- the crew member out for this patient
-	crewSecs: number,
+	crew: number?, -- the crew member out for this patient (aboard from the dispatch on)
+	crewPlanned: boolean, -- the crew's walk has been worked out for this arrival
+	crewSecs: number, -- seconds of that walk (0: the crew stays aboard)
+	crewPath: { { number } }?, -- its waypoints, the patient last
+	crewFrom: { number }?, -- where it starts (the stop on the road)
+	crewLen: number, -- studs
 	route: { { number } }?, -- the walk-in route chosen at the symptomatic step
 	routeLen: number?,
 	toBed: boolean, -- a walk-in on the way to the bed (not yet posed as a patient)
 	med: string?, -- the Med attribute as last written
 	possessable: boolean,
+	gone: boolean, -- the body is out of the world: the case waits
+	faults: number, -- times this case's step failed
 }
 
 type Scene = {
@@ -90,10 +121,18 @@ InfectionService.TICK = 0.2 -- s: the cases are advanced five times a second
 InfectionService.SINK = -40 -- studs: a hidden patient's body is drawn this far under the ground
 InfectionService.GROUNDS = 60 -- studs round the hospital's footprint that count as "at the hospital"
 InfectionService.SPOT_SPEAK = 0.65 -- share of spotters whose line is a "spotting" one (else "fleeing")
+InfectionService.CROWD_CANDIDATES = 8 -- the nearest people asked to a scene, at most
+InfectionService.CROWD_DETOUR = 60 -- studs a bystander will walk round a building, beyond the straight line
+InfectionService.HOME_SNAP = 45 -- studs: a townsperson's walk home ends on the pavement this near the bite
+InfectionService.RETRY_SECS = 20 -- a case whose step failed tries again after this, times its failures
+InfectionService.CREW_WALK_SECS = 12 -- the crew walks this long to a patient; anything further it runs
+InfectionService.AWAY_SECS = 2 -- a cured person with no way home on foot is out of sight this long, then home
 
 -- What a player holding a body is told (on screen, plain words, what to do).
 InfectionService.TOASTS = table.freeze({
 	bitten = "The Spicy Rodent bit you! You are infected. Only the hospital can cure you: walk in through its front doors (far west of town, follow the HOSPITAL signs).",
+	bittenAgain = "The Spicy Rodent bit you again! You are still infected: only the hospital (far west of town) can cure you.",
+	infected = "You are infected: the Spicy Rodent bit this person. Only the hospital can cure you: walk in through its front doors (far west of town, follow the HOSPITAL signs).",
 	symptoms = "Your eyes have gone red and you feel dizzy. Walk to the hospital (far west of town) and stay inside for 30 seconds to be cured.",
 	treating = "The nurses are treating you. Stay inside the hospital for 30 seconds.",
 	leftEarly = "You left before the treatment was finished. Go back inside the hospital.",
@@ -111,6 +150,7 @@ export type Service = typeof(setmetatable(
 		layout: any?,
 		roads: any,
 		colliders: any,
+		foot: any, -- World/FootPath.Finder
 		tail: { { number } }?,
 		home: { number }?,
 		hospital: HospitalService.Hospital,
@@ -122,6 +162,7 @@ export type Service = typeof(setmetatable(
 		setPossessable: (id: number, possessable: boolean) -> (),
 		notify: (id: number, payload: { [string]: any }) -> (),
 		serverTime: () -> number,
+		onFault: (where: string, err: any) -> (),
 		now: number,
 		acc: number,
 		records: { [number]: Record },
@@ -129,7 +170,8 @@ export type Service = typeof(setmetatable(
 		queue: { number }, -- patients waiting for a responder
 		scenes: { [number]: Scene },
 		busy: { [number]: number }, -- bystander or crew id -> the victim they are with
-		leaving: { [number]: { home: { number }, teleport: boolean } },
+		-- cured people on their way home (`away`: no way on foot, out of sight until they are there)
+		leaving: { [number]: { home: { number }, deadline: number, away: boolean } },
 		crewIds: { number },
 		tun: { [string]: any },
 		_stats: { [string]: number },
@@ -141,18 +183,35 @@ function InfectionService.new(opts: Opts): Service
 	local world = opts.world
 	local layout = HospitalLayout.fromData(opts.data, Tunables.get("hospital.beds"))
 	local strips = world.town.strips
+	local colliders = Colliders.fromData(opts.data)
 	local crewIds = {}
 	for _, a in world.actors do
 		if a.species == "human" and a.post == "ambulance_crew" then
 			table.insert(crewIds, a.id)
 		end
 	end
+	local river = Height.RIVER
+	local S = Height.STUDS_PER_UNIT
 	local self = setmetatable({
 		world = world,
 		traffic = opts.traffic,
 		layout = layout,
 		roads = MedicalRoute.build(strips),
-		colliders = Colliders.fromData(opts.data),
+		colliders = colliders,
+		-- nobody walks through the river, or over its bridge (the AI motor does not know the deck)
+		foot = FootPath.new({
+			colliders = colliders,
+			bounds = Height.worldClamp(),
+			isBlocked = function(x: number, z: number): boolean
+				return Ground.surfaceKind(x, z) ~= "terrain"
+			end,
+			blockedBox = {
+				minX = river.startX * S,
+				maxX = river.endX * S,
+				minZ = river.zMin * S,
+				maxZ = river.zMax * S,
+			},
+		}),
 		tail = if layout then MedicalRoute.walkTail(strips, layout.entrance) else nil,
 		home = if opts.traffic then opts.traffic:responderHome() else nil,
 		hospital = HospitalService.new({
@@ -171,6 +230,7 @@ function InfectionService.new(opts: Opts): Service
 		serverTime = opts.serverTime or function(): number
 			return world.now
 		end,
+		onFault = opts.onFault or function() end,
 		now = 0,
 		acc = 0,
 		records = {},
@@ -183,6 +243,7 @@ function InfectionService.new(opts: Opts): Service
 		tun = {
 			walkInSpeed = Tunables.get("infection.walkInSpeed"),
 			crewSpeed = Tunables.get("infection.crewSpeed"),
+			crewRunSpeed = Tunables.get("infection.crewRunSpeed"),
 			crowdChance = Tunables.get("infection.crowdChance"),
 			bystanders = Tunables.get("infection.bystanders"),
 			bystanderRadius = Tunables.get("infection.bystanderRadius"),
@@ -192,7 +253,18 @@ function InfectionService.new(opts: Opts): Service
 			admitRadius = Tunables.get("hospital.admitRadius"),
 			dischargeSpeed = Tunables.get("hospital.dischargeSpeed"),
 		},
-		_stats = { bites = 0, cases = 0, cured = 0, dispatched = 0, abandoned = 0, crowds = 0, lines = 0, walkIns = 0 },
+		_stats = {
+			bites = 0,
+			cases = 0,
+			cured = 0,
+			dispatched = 0,
+			abandoned = 0,
+			crowds = 0,
+			lines = 0,
+			walkIns = 0,
+			stoodDown = 0,
+			faults = 0,
+		},
 	}, InfectionService)
 	return self
 end
@@ -227,7 +299,7 @@ end
 local function directiveDone(self: Service, id: number): boolean
 	local brain = self.world.brains[id] :: any
 	local d = brain and brain.directive
-	return d ~= nil and (d.mode == nil or d.done == true)
+	return d == nil or d.mode == nil or d.done == true
 end
 
 -- move an AI body (kinematic: the runtime draws it there next frame)
@@ -272,6 +344,35 @@ local function toast(self: Service, id: number?, key: string)
 	self.notify(id, { kind = "med", key = key, text = InfectionService.TOASTS[key], secs = 7 })
 end
 
+-- a part of a step that fails is reported and contained: the rest of the step still runs
+local function guard(self: Service, where: string, fn: (...any) -> (), ...: any): boolean
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		self._stats.faults += 1
+		self.onFault(where, err)
+	end
+	return ok
+end
+
+-- a copy of `points` whose walk stops `short` studs before its last point (`sx, sz` is where the
+-- walk starts): the crew stops beside the patient, the patient beside the ambulance
+local function stopShort(sx: number, sz: number, points: { { number } }, short: number): { { number } }
+	local out = table.clone(points)
+	local n = #out
+	local last = out[n]
+	local prev = out[n - 1] or { sx, sz }
+	local dx, dz = last[1] - prev[1], last[2] - prev[2]
+	local len = math.sqrt(dx * dx + dz * dz)
+	if len > short + 0.5 then
+		out[n] = { last[1] - dx / len * short, last[2] - dz / len * short }
+	elseif n > 1 then
+		out[n] = nil -- the last leg is shorter than the gap: stop at the corner before it
+	else
+		out[n] = { (last[1] + prev[1]) / 2, (last[2] + prev[2]) / 2 }
+	end
+	return out
+end
+
 -- the walk-in route ------------------------------------------------------------------------------
 
 local function pushPoint(points: { { number } }, x: number, z: number)
@@ -282,20 +383,18 @@ local function pushPoint(points: { { number } }, x: number, z: number)
 	table.insert(points, { x, z })
 end
 
--- walkRoute(x, z): the way on foot from (x, z) to the hospital door, or nil when there is none:
--- along the person's own sidewalk to its nearest junction, the sidewalk graph to the north end of the
--- westside sidewalk, then MedicalRoute's tail. Every leg but the step through the door is checked
--- against the building boxes (kinematic people do not collide: a blocked leg would be a walk through
--- a house). On the hospital's grounds the route is straight to the door.
-function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { number } }?, number)
+-- sidewalkRoute(x, z): the way to the hospital door along the pavements, or nil when they do not
+-- lead there from (x, z): along the person's own sidewalk to its nearest junction, the sidewalk graph
+-- to the north end of the westside sidewalk, then MedicalRoute's tail. Every leg but the step through
+-- the door is checked against the building boxes (kinematic people do not collide: a blocked leg
+-- would be a walk through a house). On the hospital's grounds the route is straight to the door.
+function InfectionService.sidewalkRoute(self: Service, x: number, z: number): ({ { number } }?, number)
 	local layout = self.layout
 	if layout == nil then
 		return nil, 0
 	end
 	local points: { { number } } = {}
-	if HospitalLayout.contains(layout, x, z) then
-		return { { layout.reception[1], layout.reception[2] } }, 1
-	elseif HospitalLayout.contains(layout, x, z, InfectionService.GROUNDS) then
+	if HospitalLayout.contains(layout, x, z, InfectionService.GROUNDS) then
 		local out = layout.outside
 		if clearLine(self, x, z, out[1], out[2]) then
 			pushPoint(points, out[1], out[2])
@@ -368,6 +467,31 @@ function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { n
 	return points, MedicalRoute.length(points) + math.sqrt(bestD)
 end
 
+-- walkRoute(x, z): the way on foot from (x, z) to the hospital door, or nil when there is none:
+-- along the pavements where they lead there (sidewalkRoute), else across the open ground round the
+-- buildings to the spot in front of the door (World/FootPath: the police yard, the shop floors, the
+-- drives and the pavements the sidewalk graph does not join up).
+function InfectionService.walkRoute(self: Service, x: number, z: number): ({ { number } }?, number)
+	local layout = self.layout
+	if layout == nil then
+		return nil, 0
+	end
+	if HospitalLayout.contains(layout, x, z) then
+		return { { layout.reception[1], layout.reception[2] } }, 1
+	end
+	local points, len = self:sidewalkRoute(x, z)
+	if points then
+		return points, len
+	end
+	local out, door = layout.outside, layout.entrance
+	local way, wayLen = FootPath.find(self.foot, x, z, out[1], out[2], { maxLength = self.params.walkInMaxDist })
+	if way == nil then
+		return nil, 0
+	end
+	table.insert(way, { door[1], door[2] })
+	return way, wayLen + math.sqrt((door[1] - out[1]) ^ 2 + (door[2] - out[2]) ^ 2)
+end
+
 -- scenes -----------------------------------------------------------------------------------------
 
 local function releaseBystander(self: Service, id: number)
@@ -392,6 +516,9 @@ end
 -- where they stand (a paramedic bitten at the scene becomes a patient there)
 local function freeCrew(self: Service, rec: Record, stay: boolean?)
 	local id = rec.crew
+	rec.crewPlanned = false
+	rec.crewPath = nil
+	rec.crewFrom = nil
 	if id == nil then
 		return
 	end
@@ -407,6 +534,34 @@ local function freeCrew(self: Service, rec: Record, stay: boolean?)
 	end
 	order(self, id, {})
 	self.setPossessable(id, true)
+end
+
+-- a crew member for this call: one who is free, on their feet and not a patient. With `aboard` they
+-- ride out in the ambulance (out of sight from the bay until they step out at the scene); for a
+-- patient beside the bay itself they just walk over.
+local function callCrew(self: Service, rec: Record, aboard: boolean)
+	if rec.crew ~= nil then
+		return
+	end
+	for _, id in self.crewIds do
+		if
+			self.busy[id] == nil
+			and self.records[id] == nil
+			and self.leaving[id] == nil
+			and isAI(self, id)
+			and actorOf(self, id) ~= nil
+			and self.world.brains[id] ~= nil
+		then
+			rec.crew = id
+			self.busy[id] = rec.id
+			self.setPossessable(id, false)
+			if aboard then
+				order(self, id, { mode = "hidden" })
+				sink(self, id, true)
+			end
+			return
+		end
+	end
 end
 
 -- the collapse: the patient sits where they are, the people round them are alarmed, some come over
@@ -440,6 +595,7 @@ local function openScene(self: Service, rec: Record)
 					x = o.x,
 					z = o.z,
 					eligible = (o.post == "townsperson" or o.post == "shop_worker")
+						and (o.lift or 0) == 0
 						and self.records[o.id] == nil
 						and self.busy[o.id] == nil
 						and self.leaving[o.id] == nil,
@@ -447,40 +603,62 @@ local function openScene(self: Service, rec: Record)
 			end
 		end
 	end
-	local chosen = Bystanders.select(scene, candidates, self.rand, {
+	local chosen, want = Bystanders.select(scene, candidates, self.rand, {
 		chance = self.tun.crowdChance,
 		min = self.tun.bystanders[1],
 		max = self.tun.bystanders[2],
 		radius = radius,
 	})
-	if #chosen == 0 then
+	if want == 0 or #chosen == 0 then
 		return
 	end
 	local colliders, roads = self.colliders, self.roads
-	local spots = Bystanders.spots(scene, #chosen, function(x: number, z: number): boolean
+	local spots = Bystanders.spots(scene, want, function(x: number, z: number): boolean
 		return Colliders.pointIn(colliders, x, z, Height.at(x, z) + 3, 3) == nil
 			and not MedicalRoute.onRoad(roads, x, z, 4)
 	end, self.tun.bystanderRing)
 	local people = {}
-	for _, id in chosen do
+	for i, id in chosen do
+		if i > InfectionService.CROWD_CANDIDATES then
+			break
+		end
 		local o = actorOf(self, id)
 		if o then
 			table.insert(people, { id = id, x = o.x, z = o.z })
 		end
 	end
-	local placed = Bystanders.assign(people, spots, function(p: any, x: number, z: number): boolean
-		return clearLine(self, p.x, p.z, x, z)
-	end)
+	-- each comes by the straight line when it is clear, else round the building in the way (a short
+	-- detour only); someone with no way over is replaced by the next nearest
+	local detour = InfectionService.CROWD_DETOUR
+	local placed = Bystanders.assign(people, spots, function(p: any, x: number, z: number): { { number } }?
+		if clearLine(self, p.x, p.z, x, z) then
+			return { { x, z } }
+		end
+		local direct = math.sqrt((x - p.x) ^ 2 + (z - p.z) ^ 2)
+		return (FootPath.find(self.foot, p.x, p.z, x, z, { maxLength = direct + detour, maxNodes = 400 }))
+	end, want, self.tun.bystanders[1])
 	for i, p in placed do
 		self.busy[p.id] = rec.id
-		order(self, p.id, {
-			mode = "hold",
-			x = p.x,
-			z = p.z,
-			faceX = a.x,
-			faceZ = a.z,
-			speed = self.tun.bystanderSpeed,
-		})
+		local path = p.path :: { { number } }
+		if #path <= 1 then
+			order(self, p.id, {
+				mode = "hold",
+				x = p.x,
+				z = p.z,
+				faceX = a.x,
+				faceZ = a.z,
+				speed = self.tun.bystanderSpeed,
+			})
+		else
+			order(self, p.id, {
+				mode = "route",
+				points = path,
+				speed = self.tun.bystanderSpeed,
+				after = "stand",
+				faceX = a.x,
+				faceZ = a.z,
+			})
+		end
 		table.insert(scene.bystanders, {
 			id = p.id,
 			sayAt = self.now + Bystanders.SAY_FIRST + Bystanders.SAY_EACH * (i - 1),
@@ -563,7 +741,8 @@ end
 
 -- The ambulance that was coming is no longer coming for this patient (something else let it go, so
 -- it turns round at the scene, or it is on another route): a patient still waiting goes back to the
--- head of the queue; one the crew is already working on is carried to the roadside and taken in.
+-- head of the queue (and the crew that rode out is back at the bay); one the crew is already working
+-- on is carried to the roadside and taken in.
 local function checkAmbulance(self: Service, rec: Record)
 	if rec.amb ~= "assigned" or rec.virtual then
 		return
@@ -576,6 +755,7 @@ local function checkAmbulance(self: Service, rec: Record)
 	rec.trip = nil
 	local state = rec.case.state
 	if state == "scene" or state == "enroute" then
+		freeCrew(self, rec)
 		rec.amb = "queued"
 		if table.find(self.queue, rec.id) == nil then
 			table.insert(self.queue, 1, rec.id)
@@ -589,7 +769,7 @@ local function stepQueue(self: Service)
 	while #self.queue > 0 do
 		local id = self.queue[1]
 		local rec = self.records[id]
-		if rec == nil or rec.stage == nil then
+		if rec == nil or rec.stage == nil or rec.amb ~= "queued" then
 			table.remove(self.queue, 1)
 			continue
 		end
@@ -599,6 +779,7 @@ local function stepQueue(self: Service)
 			-- the patient is beside the ambulance's own parking spot: nothing to drive
 			rec.virtual = true
 			rec.amb = "assigned"
+			callCrew(self, rec, false)
 			table.remove(self.queue, 1)
 			continue
 		end
@@ -610,34 +791,49 @@ local function stepQueue(self: Service)
 		rec.trip = v.route
 		rec.amb = "assigned"
 		self._stats.dispatched += 1
+		callCrew(self, rec, true)
 		table.remove(self.queue, 1)
 	end
 end
 
--- the crew member's walk from the ambulance to the patient: its seconds, or 0 when nobody is free
--- or the straight line is blocked (the patient is then loaded where they sit)
+-- The crew member's walk from the ambulance to the patient: its seconds, or 0 when the patient is
+-- loaded where they sit (they are right beside the ambulance, no crew rode out, or there is no way
+-- to them on foot within the crew's reach: across the river, or too far from any road). The walk
+-- goes round buildings (World/FootPath). The first CREW_WALK_SECS of it are at a walk and the rest
+-- at a run: the ambulance is held on scene for the walk there and back, and with three ambulances
+-- in town a slow walk to a far patient leaves the next patients waiting on the pavement.
 local function crewTime(self: Service, rec: Record): number
-	if rec.crew ~= nil then
+	if rec.crewPlanned then
 		return rec.crewSecs
 	end
-	local a, stage = actorOf(self, rec.id), rec.stage
-	if a == nil or stage == nil then
+	rec.crewPlanned = true
+	rec.crewSecs = 0
+	rec.crewPath = nil
+	local a, stage, crew = actorOf(self, rec.id), rec.stage, rec.crew
+	local c = if crew then actorOf(self, crew) else nil
+	if a == nil or stage == nil or c == nil then
 		return 0
 	end
-	local dist = math.sqrt((a.x - stage.x) ^ 2 + (a.z - stage.z) ^ 2)
-	if dist < 6 or not clearLine(self, stage.x, stage.z, a.x, a.z) then
+	local fx, fz = stage.x, stage.z
+	if rec.virtual then
+		fx, fz = c.x, c.z -- nothing drove: the crew member walks over from where they stand
+	end
+	if math.sqrt((a.x - fx) ^ 2 + (a.z - fz) ^ 2) < 6 then
 		return 0
 	end
-	for _, id in self.crewIds do
-		if self.busy[id] == nil and self.records[id] == nil and isAI(self, id) then
-			rec.crew = id
-			self.busy[id] = rec.id
-			self.setPossessable(id, false)
-			rec.crewSecs = math.clamp(dist / self.tun.crewSpeed, 3, self.params.crewMaxSecs)
-			return rec.crewSecs
-		end
+	local reach = self.tun.crewRunSpeed * self.params.crewMaxSecs
+	local path, len = FootPath.find(self.foot, fx, fz, a.x, a.z, { maxLength = reach })
+	if path == nil then
+		return 0
 	end
-	return 0
+	rec.crewPath, rec.crewFrom, rec.crewLen = path, { fx, fz }, len
+	local walk, run = self.tun.crewSpeed, self.tun.crewRunSpeed
+	local secs = len / walk
+	if secs > InfectionService.CREW_WALK_SECS then
+		secs = InfectionService.CREW_WALK_SECS + (len - InfectionService.CREW_WALK_SECS * walk) / run
+	end
+	rec.crewSecs = math.clamp(secs, 3, self.params.crewMaxSecs)
+	return rec.crewSecs
 end
 
 -- the patient leaves the scene out of sight: sunk, moved to the hospital's intake, the ambulance let go
@@ -654,6 +850,22 @@ local function hidePatient(self: Service, rec: Record)
 		order(self, rec.crew, { mode = "hidden" })
 		sink(self, rec.crew, true)
 	end
+end
+
+-- Everything that is being done for this patient stops: the crowd goes, the ambulance is let go (or
+-- the request dropped), the crew is free, the bed is free, the body is in sight and under no order.
+-- The case itself is untouched (the caller decides what the person does next).
+local function standDown(self: Service, rec: Record)
+	closeScene(self, rec.id)
+	dropAmbulance(self, rec)
+	freeCrew(self, rec)
+	self.hospital:discharge(rec.id)
+	sink(self, rec.id, false)
+	rec.toBed = false
+	rec.stage = nil
+	rec.route, rec.routeLen = nil, nil
+	order(self, rec.id, {})
+	self._stats.stoodDown += 1
 end
 
 -- effects ----------------------------------------------------------------------------------------
@@ -692,6 +904,67 @@ local function flee(self: Service, rec: Record)
 	end
 end
 
+-- Where a cured person goes: the hospital's own people, the crews, officers and shop staff back to
+-- their post (the first point of their round), a townsperson back to where they were bitten (to the
+-- pavement beside it when there is one, so the walk ends on their lane).
+local function homeOf(self: Service, rec: Record): (number, number)
+	local brain = self.world.brains[rec.id] :: any
+	if brain and brain.kind ~= "Pedestrian" then
+		local post = brain.points and brain.points[1]
+		if post then
+			return post[1], post[2]
+		end
+		return rec.home[1], rec.home[2]
+	end
+	local hx, hz = rec.home[1], rec.home[2]
+	local nav = self.world.nav
+	local bx, bz, bestD = hx, hz, InfectionService.HOME_SNAP ^ 2
+	if nav then
+		for _, s in nav.strips do
+			local sx, sz
+			if s.axis == "z" then
+				sx, sz = s.coord, math.clamp(hz, s.min, s.max)
+			else
+				sx, sz = math.clamp(hx, s.min, s.max), s.coord
+			end
+			local d = (sx - hx) ^ 2 + (sz - hz) ^ 2
+			if d < bestD then
+				bx, bz, bestD = sx, sz, d
+			end
+		end
+	end
+	return bx, bz
+end
+
+-- The walk from a bed to (hx, hz): out through the ward door and the front door, then the way a
+-- walk-in comes, backwards (the pavements), or across the open ground round the buildings. nil when
+-- there is no way on foot (beyond the river; a search over its budget).
+local function wayHome(self: Service, layout: any, bed: any, hx: number, hz: number): ({ { number } }?, number)
+	if HospitalLayout.contains(layout, hx, hz) then
+		-- the hospital's own people: back to work through the ward door and reception
+		local points = { { bed.door[1], bed.door[2] }, { layout.reception[1], layout.reception[2] }, { hx, hz } }
+		return points, MedicalRoute.length(points)
+	end
+	local points = HospitalLayout.pathOut(layout, bed)
+	local out = layout.outside
+	local back = self:sidewalkRoute(hx, hz)
+	if back then
+		for i = #back - 1, 1, -1 do
+			table.insert(points, back[i])
+		end
+		table.insert(points, { hx, hz })
+	else
+		local way = FootPath.find(self.foot, out[1], out[2], hx, hz, { maxLength = self.params.walkInMaxDist })
+		if way == nil then
+			return nil, 0
+		end
+		for _, p in way do
+			table.insert(points, p)
+		end
+	end
+	return points, MedicalRoute.length(points)
+end
+
 local function apply(self: Service, rec: Record, effect: any)
 	local kind = effect.kind
 	local id = rec.id
@@ -715,41 +988,52 @@ local function apply(self: Service, rec: Record, effect: any)
 		toast(self, rec.biter, "victimDown")
 	elseif kind == "call" then
 		rec.amb = "queued"
-		table.insert(self.queue, id)
+		if table.find(self.queue, id) == nil then
+			table.insert(self.queue, id)
+		end
 	elseif kind == "crewOut" then
-		local a, stage, crew = actorOf(self, id), rec.stage, rec.crew
-		if a and stage and crew then
-			local dx, dz = a.x - stage.x, a.z - stage.z
-			local m = math.max(0.01, math.sqrt(dx * dx + dz * dz))
+		-- the crew member steps out of the ambulance on the patient's side and walks over
+		local a, crew, path, from = actorOf(self, id), rec.crew, rec.crewPath, rec.crewFrom
+		if a and crew and path and from then
 			sink(self, crew, false)
-			place(self, crew, stage.x + dx / m * 5, stage.z + dz / m * 5)
+			if not rec.virtual then
+				local first = path[1]
+				local dx, dz = first[1] - from[1], first[2] - from[2]
+				local m = math.max(0.01, math.sqrt(dx * dx + dz * dz))
+				local out = math.min(5, m)
+				place(self, crew, from[1] + dx / m * out, from[2] + dz / m * out)
+			end
 			order(self, crew, {
 				mode = "route",
-				points = { { a.x - dx / m * 4, a.z - dz / m * 4 } },
-				speed = m / math.max(1, rec.crewSecs),
+				points = stopShort(from[1], from[2], path, 4),
+				speed = rec.crewLen / math.max(1, rec.crewSecs),
 				after = "stand",
 				faceX = a.x,
 				faceZ = a.z,
 			})
 		end
 	elseif kind == "carry" then
-		-- the patient is carried to the ambulance beside the crew member, both at the crew's pace
-		local a, stage, crew = actorOf(self, id), rec.stage, rec.crew
-		if a and stage then
-			local dx, dz = a.x - stage.x, a.z - stage.z
-			local m = math.max(0.01, math.sqrt(dx * dx + dz * dz))
-			local speed = m / math.max(1, rec.crewSecs)
-			closeScene(self, id)
+		-- the patient is carried to the ambulance beside the crew member, both at the crew's pace,
+		-- back the way the crew came
+		local a, crew, path, from = actorOf(self, id), rec.crew, rec.crewPath, rec.crewFrom
+		closeScene(self, id)
+		if a and path and from then
+			local back: { { number } } = {}
+			for i = #path - 1, 1, -1 do
+				table.insert(back, path[i])
+			end
+			table.insert(back, { from[1], from[2] })
+			local speed = rec.crewLen / math.max(1, rec.crewSecs)
 			order(self, id, {
 				mode = "route",
-				points = { { stage.x + dx / m * 5, stage.z + dz / m * 5 } },
+				points = stopShort(a.x, a.z, back, 5),
 				speed = speed,
 				after = "stand",
 			})
 			if crew then
 				order(self, crew, {
 					mode = "route",
-					points = { { stage.x + dx / m * 9, stage.z + dz / m * 9 } },
+					points = stopShort(a.x, a.z, back, 9),
 					speed = speed,
 					after = "stand",
 				})
@@ -766,6 +1050,8 @@ local function apply(self: Service, rec: Record, effect: any)
 		hidePatient(self, rec)
 		dropAmbulance(self, rec)
 		freeCrew(self, rec)
+	elseif kind == "standDown" then
+		standDown(self, rec)
 	elseif kind == "walkIn" then
 		if rec.route then
 			self._stats.walkIns += 1
@@ -820,34 +1106,24 @@ local function apply(self: Service, rec: Record, effect: any)
 		self.hospital:discharge(id)
 		sink(self, id, false)
 		if layout and bed and isAI(self, id) then
-			-- out through the ward door and the front door, then home on foot the way a walk-in comes.
-			-- Someone with no way to walk home (a pavement the sidewalk graph does not reach) walks out
-			-- of the doors and is then put back where they were bitten.
-			local hx, hz = rec.home[1], rec.home[2]
-			local points = HospitalLayout.pathOut(layout, bed)
-			local teleport = true
-			if HospitalLayout.contains(layout, hx, hz) then
-				-- the hospital's own people: back to work through the ward door and reception
-				points = { { bed.door[1], bed.door[2] }, { layout.reception[1], layout.reception[2] }, { hx, hz } }
-				teleport = false
-			elseif HospitalLayout.contains(layout, hx, hz, InfectionService.GROUNDS) then
-				local out = layout.outside
-				if clearLine(self, out[1], out[2], hx, hz) then
-					table.insert(points, { hx, hz })
-					teleport = false
-				end
+			local hx, hz = homeOf(self, rec)
+			local points, len = wayHome(self, layout, bed, hx, hz)
+			if points then
+				order(self, id, { mode = "route", points = points, speed = self.tun.dischargeSpeed, after = "stand" })
+				-- a walk that overruns (it never should) ends at home all the same
+				self.leaving[id] = {
+					home = { hx, hz },
+					deadline = self.now + len / self.tun.dischargeSpeed * 1.5 + 60,
+					away = false,
+				}
 			else
-				local back = self:walkRoute(hx, hz)
-				if back then
-					for i = #back - 1, 1, -1 do
-						table.insert(points, back[i])
-					end
-					table.insert(points, { hx, hz })
-					teleport = false
-				end
+				-- no way home on foot (beyond the river): out of sight from the bed, and home a moment
+				-- later; never walked out to the front door to vanish there in plain view
+				order(self, id, { mode = "hidden" })
+				sink(self, id, true)
+				self.setPossessable(id, false)
+				self.leaving[id] = { home = { hx, hz }, deadline = self.now + InfectionService.AWAY_SECS, away = true }
 			end
-			order(self, id, { mode = "route", points = points, speed = self.tun.dischargeSpeed, after = "stand" })
-			self.leaving[id] = { home = rec.home, teleport = teleport }
 		else
 			order(self, id, {})
 		end
@@ -919,6 +1195,23 @@ local function factsFor(self: Service, rec: Record): any
 end
 
 local function stepCase(self: Service, rec: Record)
+	local a = actorOf(self, rec.id)
+	if a == nil or self.world.brains[rec.id] == nil then
+		-- the body is out of the world: everything round the case is let go and the case waits. When
+		-- the body is back the person is on their feet, infected, with the symptoms showing.
+		if not rec.gone then
+			rec.gone = true
+			standDown(self, rec)
+			if InfectionRules.isPatient(rec.case) or rec.case.state == "walkin" then
+				InfectionRules.standUp(rec.case, self.now)
+			end
+		end
+		return
+	end
+	if rec.gone then
+		rec.gone = false
+		a.infected = true
+	end
 	checkAmbulance(self, rec)
 	local inputs = factsFor(self, rec)
 	local effects = InfectionRules.advance(rec.case, self.now, inputs, self.rand, self.params)
@@ -943,24 +1236,63 @@ local function stepCase(self: Service, rec: Record)
 		rec.virtual = false
 		rec.amb = "none"
 	end
+	-- a patient the case says is in the hospital's care is always on the hospital's list (it never
+	-- should be otherwise): a case must not wait for a bed nobody is keeping for it
+	local state = rec.case.state
+	if
+		(state == "admitted" or (state == "treated" and not rec.case.selfTreat))
+		and self.hospital:stateOf(rec.id) == "none"
+	then
+		self.hospital:admit(rec.id, self.now)
+	end
 	publish(self, rec)
 	if InfectionRules.closed(rec.case) then
 		remove(self, rec)
 	end
 end
 
--- cured people on their way home: when the walk is done (or there was no way to walk), they are home
+-- A case whose step failed: whatever was half done is undone and the person is put back on their
+-- feet, still infected, to go through it again a little later (longer after every failure). Each
+-- part is on its own so a second failure cannot stop the next part.
+local function recover(self: Service, rec: Record)
+	rec.faults += 1
+	if InfectionRules.closed(rec.case) or not InfectionRules.isInfected(rec.case) then
+		pcall(remove, self, rec) -- the cure had happened: only the tidying up failed
+		return
+	end
+	pcall(standDown, self, rec)
+	pcall(function()
+		InfectionRules.standUp(rec.case, self.now)
+		rec.case.untilT = self.now + InfectionService.RETRY_SECS * rec.faults
+	end)
+	pcall(publish, self, rec)
+end
+
+-- a cured person is back in their own life: in sight, under no order, anyone's to play
+local function arrived(self: Service, id: number, away: boolean)
+	self.leaving[id] = nil
+	if away then
+		sink(self, id, false)
+		self.setPossessable(id, true)
+	end
+	order(self, id, {})
+end
+
+-- cured people on their way home: when the walk is done (or its time is up) they are home
 local function stepLeaving(self: Service)
 	for id, l in self.leaving do
-		if not isAI(self, id) then
-			order(self, id, {})
-			self.leaving[id] = nil
-		elseif directiveDone(self, id) then
-			if l.teleport then
+		if not isAI(self, id) or actorOf(self, id) == nil then
+			arrived(self, id, l.away)
+		elseif l.away then
+			if self.now >= l.deadline then
+				place(self, id, l.home[1], l.home[2])
+				arrived(self, id, true)
+			end
+		elseif directiveDone(self, id) or self.now >= l.deadline then
+			if not directiveDone(self, id) then
 				place(self, id, l.home[1], l.home[2])
 			end
-			order(self, id, {})
-			self.leaving[id] = nil
+			arrived(self, id, false)
 		end
 	end
 end
@@ -978,7 +1310,7 @@ function InfectionService.bite(self: Service, victimId: number, biterId: number?
 	local existing = self.records[victimId]
 	if existing then
 		existing.biter = biterId or existing.biter
-		for _, e in InfectionRules.rebite(existing.case, self.now) do
+		for _, e in InfectionRules.rebite(existing.case, self.now, self.controllerOf(victimId)) do
 			apply(self, existing, e)
 		end
 		return false
@@ -1017,12 +1349,18 @@ function InfectionService.bite(self: Service, victimId: number, biterId: number?
 		virtual = false,
 		stage = nil,
 		crew = nil,
+		crewPlanned = false,
 		crewSecs = 0,
+		crewPath = nil,
+		crewFrom = nil,
+		crewLen = 0,
 		route = nil,
 		routeLen = nil,
 		toBed = false,
 		med = nil,
 		possessable = true,
+		gone = false,
+		faults = 0,
 	}
 	self.records[victimId] = rec
 	table.insert(self.order, victimId)
@@ -1081,7 +1419,8 @@ function InfectionService.onSpotted(self: Service, observerId: number, threatId:
 	say(self, observerId, if self.rand() < InfectionService.SPOT_SPEAK then "spotting" else "fleeing", false)
 end
 
--- step(dt): called every frame by the boot loop; the work happens every TICK seconds.
+-- step(dt): called every frame by the boot loop; the work happens every TICK seconds. Each part of
+-- the tick is contained: a fault in one case, or in the queue, does not stop the others.
 function InfectionService.step(self: Service, dt: number)
 	self.acc += dt
 	if self.acc < InfectionService.TICK then
@@ -1089,21 +1428,50 @@ function InfectionService.step(self: Service, dt: number)
 	end
 	self.now += self.acc
 	self.acc = 0
-	for _, ev in TownAI.drainEvents(self.world) do
-		if ev.kind == "spotted" then
-			self:onSpotted(ev.id, ev.other)
+	guard(self, "spotted", function()
+		for _, ev in TownAI.drainEvents(self.world) do
+			if ev.kind == "spotted" then
+				self:onSpotted(ev.id, ev.other)
+			end
+		end
+	end)
+	for _, id in table.clone(self.order) do
+		local rec = self.records[id]
+		if rec and not guard(self, "case", stepCase, self, rec) then
+			recover(self, rec)
 		end
 	end
+	guard(self, "queue", stepQueue, self)
+	guard(self, "hospital", function()
+		self.hospital:step(self.now)
+	end)
+	guard(self, "scenes", stepScenes, self)
+	guard(self, "leaving", stepLeaving, self)
+end
+
+-- shutdown(): the service is being switched off: every body is let go where it is (in sight, under
+-- no order, possessable), every ambulance released, every list emptied. Nobody is cured by it.
+function InfectionService.shutdown(self: Service)
 	for _, id in table.clone(self.order) do
 		local rec = self.records[id]
 		if rec then
-			stepCase(self, rec)
+			pcall(standDown, self, rec)
+			pcall(remove, self, rec)
 		end
 	end
-	stepQueue(self)
-	self.hospital:step(self.now)
-	stepScenes(self)
-	stepLeaving(self)
+	for id in table.clone(self.busy) do
+		self.busy[id] = nil
+		pcall(sink, self, id, false)
+		pcall(order, self, id, {})
+		pcall(self.setPossessable, id, true)
+	end
+	for id, l in table.clone(self.leaving) do
+		pcall(arrived, self, id, l.away)
+	end
+	table.clear(self.records)
+	table.clear(self.order)
+	table.clear(self.queue)
+	table.clear(self.scenes)
 end
 
 function InfectionService.isInfected(self: Service, id: number): boolean
@@ -1124,6 +1492,16 @@ end
 function InfectionService.stateOf(self: Service, id: number): string?
 	local rec = self.records[id]
 	return if rec then rec.case.state else nil
+end
+
+-- statusOf: what the status line of the player holding this body should say ("infected",
+-- "symptoms", "treating"); nil for a body no player holds, or one that is not infected.
+function InfectionService.statusOf(self: Service, id: number): string?
+	local rec = self.records[id]
+	if rec == nil or self.controllerOf(id) ~= "player" then
+		return nil
+	end
+	return InfectionRules.status(rec.case)
 end
 
 -- townPercent: infected humans over all humans, in percent.

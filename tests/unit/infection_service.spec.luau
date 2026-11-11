@@ -205,6 +205,36 @@ return function(t)
 		t.eq(h.svc:townPercent(), 0)
 	end
 
+	-- A body in plain sight that moves further in one step than anyone can run is a teleport somebody
+	-- may be watching. `look()` is called after every step; the jumps it saw are listed.
+	local function jumpWatch(h: Harness): (() -> (), { string })
+		local prev: { [number]: { number } } = {}
+		local jumps: { string } = {}
+		local function look()
+			for _, a in h.world.actors do
+				if a.species == "human" then
+					local shown = if (a.lift or 0) == 0 then 1 else 0
+					local p = prev[a.id]
+					if p == nil then
+						prev[a.id] = { a.x, a.z, shown }
+					else
+						local d = math.sqrt((a.x - p[1]) ^ 2 + (a.z - p[2]) ^ 2)
+						if d > 6 and p[3] == 1 and shown == 1 and not h.players[a.id] then
+							table.insert(
+								jumps,
+								`{a.post} {a.id} moved {math.floor(d)} studs in one step at {math.floor(h.time)} s ({h.svc:stateOf(
+									a.id
+								) or "no case"})`
+							)
+						end
+						p[1], p[2], p[3] = a.x, a.z, shown
+					end
+				end
+			end
+		end
+		return look, jumps
+	end
+
 	t.test("hospital: beds, a first-come queue, treatment for treatSecs, discharge frees the bed", function()
 		local hosp = HospitalService.new({ beds = 2, treatSecs = 30 })
 		t.eq(hosp:stateOf("a"), "none")
@@ -275,7 +305,7 @@ return function(t)
 		local scene = h.svc.scenes[id]
 		t.truthy(scene ~= nil)
 		local crowd = #scene.bystanders
-		t.truthy(crowd == 0 or (crowd >= 2 and crowd <= 4) or crowd == 1, `{crowd} bystanders`)
+		t.truthy(crowd == 0 or (crowd >= 2 and crowd <= 4), `{crowd} bystanders (one alone is not a crowd)`)
 		print(`      scene at ({math.floor(sx)}, {math.floor(sz)}): {crowd} bystanders called over`)
 		for _, b in scene.bystanders do
 			t.eq(h.world.brains[b.id].directive.mode, "hold")
@@ -735,6 +765,7 @@ return function(t)
 					end
 				end
 				local open: { [number]: boolean } = table.clone(bitten)
+				local look, jumps = jumpWatch(h)
 				local done = h.runUntil(1500, function(): boolean
 					return next(h.svc:cases()) == nil
 				end, function()
@@ -760,6 +791,7 @@ return function(t)
 						end
 					end
 					t.truthy(held <= 3)
+					look()
 				end)
 				local left = {}
 				for id, case in h.svc:cases() do
@@ -774,10 +806,14 @@ return function(t)
 				t.truthy(
 					h.runUntil(900, function(): boolean
 						return next(h.svc.leaving) == nil
-					end),
+					end, look),
 					`seed {seed}: someone never got home`
 				)
-				h.step(60)
+				h.step(60, look)
+				-- nobody was moved in plain sight: not the patients, not the crews, not the crowds, not
+				-- the cured on their way home (28 of 80 people used to vanish at the hospital door, and
+				-- the paramedics used to pop from the bay to the scene)
+				t.eq(#jumps, 0, `seed {seed}: {table.concat(jumps, "; ")}`)
 				clean(h, `seed {seed}`)
 				local kinds = {}
 				for post, c in posts do
@@ -817,19 +853,31 @@ return function(t)
 			end)
 			t.eq(h.svc:stateOf(id), "symptomatic")
 			t.deepEq(h.medLog[id], { "symptomatic" }, "the red eyes show on a held body too")
-			local keys = {}
-			for _, toast in h.toasts do
-				if toast.id == id then
-					table.insert(keys, toast.key)
+			-- what the player was told, in order (a repeat of the same message is a reminder)
+			local function told(): ({ string }, number)
+				local keys, repeats = {}, 0
+				for _, toast in h.toasts do
+					if toast.id == id then
+						if keys[#keys] == toast.key then
+							repeats += 1
+						else
+							table.insert(keys, toast.key)
+						end
+					end
 				end
+				return keys, repeats
 			end
+			local keys, reminders = told()
 			t.deepEq(keys, { "bitten", "symptoms" })
+			t.eq(reminders, 2, "symptoms at 40 s, told again at 80 s and 120 s")
+			t.eq(h.svc:statusOf(id), "symptoms", "and the status line says so all the time")
 			-- the rodent's player (not held here) would have been told too
 			t.truthy(h.toasts[#h.toasts].key == "symptoms" or h.toasts[#h.toasts].key == "victimSick")
 			-- the player walks into the hospital
 			victim.x, victim.z = layout.reception[1], layout.reception[2]
 			h.step(1)
 			t.eq(h.svc:stateOf(id), "treated")
+			t.eq(h.svc:statusOf(id), "treating")
 			h.step(20)
 			victim.x, victim.z = layout.outside[1], layout.outside[2] - 40 -- wanders out early
 			h.step(1)
@@ -841,16 +889,631 @@ return function(t)
 			h.step(3)
 			t.eq(h.svc:stateOf(id), nil)
 			t.truthy(not victim.infected)
-			keys = {}
-			for _, toast in h.toasts do
-				if toast.id == id then
-					table.insert(keys, toast.key)
-				end
-			end
+			t.eq(h.svc:statusOf(id), nil, "nothing on the status line once cured")
+			keys = told()
 			t.deepEq(keys, { "bitten", "symptoms", "treating", "leftEarly", "treating", "cured" })
 			t.deepEq(h.medLog[id], { "symptomatic", "-" })
 			t.eq(h.svc.hospital:stats().admitted, 0, "no bed is used")
 			t.eq(h.world.brains[id].directive.mode, nil)
+		end
+	)
+
+	-- nobody walks through a building: `own` are the boxes a walk may start or end inside
+	local function outdoors(a: any, what: string, own: { [string]: boolean }?)
+		if HospitalLayout.contains(layout, a.x, a.z, 4) then
+			return
+		end
+		local hit = Colliders.pointIn(colliders, a.x, a.z, Height.at(a.x, a.z) + 3)
+		t.truthy(hit == nil or (own ~= nil and own[hit.id]), `{what} walked through {if hit then hit.id else ""}`)
+	end
+
+	local function boxesAt(x: number, z: number): { [string]: boolean }
+		local own: { [string]: boolean } = {}
+		for _, b in colliders.boxes do
+			if math.abs(x - b.cx) < b.hw + 2 and math.abs(z - b.cz) < b.hd + 2 then
+				own[b.id] = true
+			end
+		end
+		return own
+	end
+
+	t.test(
+		"off the pavements: someone the sidewalk graph cannot reach still walks in, across the open ground, round the buildings",
+		function()
+			local h = harness(61, { 0.99, 0 }, function(params: any)
+				params.walkInChance = 1
+			end)
+			h.step(20)
+			-- everyone who stands where no pavement leads to the hospital: the police yard and station,
+			-- the shop floors, and the pavements the sidewalk graph does not join up
+			local cut, walkable = {}, 0
+			for _, a in h.world.actors do
+				if
+					a.species == "human"
+					and not HospitalLayout.contains(layout, a.x, a.z)
+					and h.svc:sidewalkRoute(a.x, a.z) == nil
+				then
+					table.insert(cut, a)
+					local route, len = h.svc:walkRoute(a.x, a.z)
+					if route then
+						walkable += 1
+						t.deepEq(route[#route], layout.entrance, "every walk in ends at the door")
+						t.truthy(len <= h.svc.params.walkInMaxDist + 10)
+					end
+				end
+			end
+			print(
+				`      {#cut} people stand where no pavement leads to the hospital; {walkable} of them can walk in all the same`
+			)
+			t.truthy(#cut >= 15, `only {#cut} people off the pavements (the test has no teeth)`)
+			t.truthy(
+				walkable >= #cut - 3,
+				`only {walkable} of {#cut} have a way in (the three beyond the river may not)`
+			)
+			-- one of them, a police officer in the yard, far from any road, is bitten and walks in
+			local victim = nil
+			for _, a in cut do
+				if a.post == "police" and h.world.brains[a.id].kind == "Officer" and h.svc:walkRoute(a.x, a.z) then
+					victim = a
+					break
+				end
+			end
+			t.truthy(victim ~= nil, "no officer in the yard")
+			local id = victim.id
+			t.truthy(MedicalRoute.stage(h.svc.roads, victim.x, victim.z).dist > 300, "far from any road")
+			t.truthy(h.svc:bite(id, h.rodent))
+			t.truthy(
+				h.runUntil(75, function(): boolean
+					return h.svc:stateOf(id) == "walkin"
+				end),
+				`did not set off (state {h.svc:stateOf(id)})`
+			)
+			local giveUp = h.svc.records[id].case.untilT - h.svc.now
+			t.truthy(
+				h.runUntil(giveUp + 5, function(): boolean
+					local s = h.svc:stateOf(id)
+					return s == "admitted" or s == "treated"
+				end, function()
+					outdoors(victim, "the walk-in")
+					t.eq(victim.lift, nil, "a walk-in is never hidden")
+				end),
+				`did not reach the door (state {h.svc:stateOf(id)})`
+			)
+			t.eq(h.svc:stats().dispatched, 0, "no ambulance for a walk-in")
+			t.truthy(h.runUntil(120, function(): boolean
+				return h.svc:stateOf(id) == nil
+			end))
+			t.truthy(HospitalLayout.contains(layout, victim.x, victim.z), "cured in the hospital")
+			t.truthy(not victim.infected)
+			-- and walks back to the beat, round the buildings again (no pop back to the station)
+			local post = h.world.brains[id].points[1]
+			t.deepEq(h.svc.leaving[id].home, post, "an officer goes back to the post, not to where the bite was")
+			local worstStep, px, pz = 0, victim.x, victim.z
+			t.truthy(
+				h.runUntil(400, function(): boolean
+					return h.svc.leaving[id] == nil
+				end, function()
+					outdoors(victim, "the walk home")
+					worstStep = math.max(worstStep, math.sqrt((victim.x - px) ^ 2 + (victim.z - pz) ^ 2))
+					px, pz = victim.x, victim.z
+				end),
+				"never got back"
+			)
+			t.truthy(worstStep < 6, `moved {worstStep} studs in one step on the way home (a teleport)`)
+			t.truthy(math.sqrt((victim.x - post[1]) ^ 2 + (victim.z - post[2]) ^ 2) < 6, "back on the beat")
+			h.step(20)
+			clean(h, "after the officer's walk")
+		end
+	)
+
+	t.test(
+		"far from any road: the crew walks round the buildings to the patient and carries them back; beyond the river the patient is taken in out of sight",
+		function()
+			local h = harness(62, nil, function(params: any)
+				params.immediateChance = 1
+			end)
+			h.svc.tun.crowdChance = 0
+			h.step(20)
+			-- a police clerk inside the station (540 studs from the nearest road, a building round them)
+			-- and a shop worker beyond the river (no road, no way on foot)
+			local clerk, far = nil, nil
+			for _, a in h.world.actors do
+				if a.species == "human" then
+					local dist = MedicalRoute.stage(h.svc.roads, a.x, a.z).dist
+					if a.post == "police" and h.world.brains[a.id].kind == "Staff" and clerk == nil then
+						clerk = a
+					elseif a.post == "shop_worker" and dist > 900 and far == nil then
+						far = a
+					end
+				end
+			end
+			t.truthy(clerk ~= nil and far ~= nil, "the town has no such people")
+			t.eq(h.svc:walkRoute(far.x, far.z), nil, "nobody walks in from beyond the river")
+			local own = boxesAt(clerk.x, clerk.z)
+			t.truthy(next(own) ~= nil, "the clerk stands inside the station")
+			t.truthy(h.svc:bite(clerk.id, h.rodent))
+			t.truthy(h.svc:bite(far.id, h.rodent))
+			local cx, cz, fx, fz = clerk.x, clerk.z, far.x, far.z
+			-- the clerk: an ambulance to the nearest road, the crew out of sight until it is there
+			local recC = h.svc.records[clerk.id]
+			local crew, crewActor = nil :: number?, nil :: any
+			local steppedOut = nil :: { number }?
+			local worstCrew = 0
+			t.truthy(
+				h.runUntil(400, function(): boolean
+					return h.svc:stateOf(clerk.id) == "transit"
+				end, function()
+					local s = h.svc:stateOf(clerk.id)
+					if recC.crew and crew == nil then
+						crew = recC.crew
+						crewActor = h.world.actorsById[crew]
+					end
+					if crewActor then
+						if s == "scene" or s == "enroute" then
+							t.eq(
+								crewActor.lift,
+								InfectionService.SINK,
+								"the crew rides out of sight (no pop from the bay)"
+							)
+							t.eq(h.possessable[crew], false)
+						elseif s == "approach" or s == "assess" or s == "loading" or s == "retrieve" then
+							t.eq(crewActor.lift, nil, "the crew is out and in sight")
+							if steppedOut == nil then
+								steppedOut = { crewActor.x, crewActor.z }
+							end
+							outdoors(crewActor, "the crew", own)
+							if s == "approach" or s == "retrieve" then
+								worstCrew = math.max(worstCrew, crewActor.speed)
+							end
+						end
+					end
+					if s == "retrieve" then
+						outdoors(clerk, "the carried patient", own)
+						t.eq(clerk.lift, nil, "carried in sight")
+					elseif s ~= "transit" and s ~= "bitten" then
+						t.eq(clerk.x, cx, "the patient stays where they fell until they are carried")
+					end
+				end),
+				`the clerk was never loaded (state {h.svc:stateOf(clerk.id)})`
+			)
+			t.truthy(crew ~= nil and steppedOut ~= nil, "a crew member walked to the patient")
+			t.truthy(recC.crewSecs > 0 and recC.crewLen > 300, `a walk of {recC.crewLen} studs`)
+			local stage = recC.stage
+			local out = steppedOut :: { number }
+			t.truthy(
+				math.sqrt((out[1] - stage.x) ^ 2 + (out[2] - stage.z) ^ 2) < 8,
+				"the crew steps out beside the ambulance"
+			)
+			t.truthy(worstCrew <= h.svc.tun.crewRunSpeed + 0.5, `the crew ran at {worstCrew} studs/s`)
+			t.truthy(worstCrew > h.svc.tun.crewSpeed, "a far patient is hurried to")
+			-- the worker beyond the river: collected all the same, never left on the ground for ever
+			local recF = h.svc.records[far.id]
+			t.truthy(
+				h.runUntil(500, function(): boolean
+					local s = h.svc:stateOf(far.id)
+					return s == "transit" or s == "admitted" or s == "treated" or s == nil
+				end, function()
+					local s = h.svc:stateOf(far.id)
+					if s == "down" or s == "scene" or s == "enroute" then
+						t.eq(far.x, fx)
+						t.eq(far.z, fz)
+					end
+				end),
+				`the far patient is stuck in {h.svc:stateOf(far.id)}`
+			)
+			t.eq(recF.crewSecs, 0, "no crew can walk there: taken in where they sit")
+			-- both are cured in the hospital and nowhere else
+			local curedAt: { [number]: boolean } = {}
+			t.truthy(
+				h.runUntil(500, function(): boolean
+					return h.svc:stateOf(clerk.id) == nil and h.svc:stateOf(far.id) == nil
+				end, function()
+					for _, a in { clerk, far } do
+						if h.svc:stateOf(a.id) == nil and not curedAt[a.id] then
+							curedAt[a.id] = true
+							t.truthy(HospitalLayout.contains(layout, a.x, a.z), `{a.post} cured outside the hospital`)
+						elseif h.svc:stateOf(a.id) ~= nil then
+							t.truthy(a.infected)
+						end
+					end
+				end),
+				`not cured: {h.svc:stateOf(clerk.id)}, {h.svc:stateOf(far.id)}`
+			)
+			t.eq(h.svc:stats().cured, 2)
+			t.eq(h.svc:stats().abandoned, 0, "an ambulance came for both")
+			-- home: the clerk on foot, back into the station; the worker (no way on foot) out of sight
+			-- from the bed and then at the shop, never walked out to the front door to vanish there
+			local farLeft = false
+			t.truthy(
+				h.runUntil(500, function(): boolean
+					return next(h.svc.leaving) == nil
+				end, function()
+					outdoors(clerk, "the clerk on the way home", own)
+					if not farLeft and h.svc.leaving[far.id] ~= nil then
+						t.eq(far.lift, InfectionService.SINK, "out of sight until home")
+						t.truthy(HospitalLayout.contains(layout, far.x, far.z), "and still at the bed, not at the door")
+						t.eq(h.possessable[far.id], false)
+					elseif h.svc.leaving[far.id] == nil then
+						farLeft = true
+					end
+				end),
+				"someone never got home"
+			)
+			local postC, postF = h.world.brains[clerk.id].points[1], h.world.brains[far.id].points[1]
+			t.truthy(
+				math.sqrt((clerk.x - postC[1]) ^ 2 + (clerk.z - postC[2]) ^ 2) < 12,
+				"the clerk is back at the desk"
+			)
+			t.truthy(math.sqrt((far.x - postF[1]) ^ 2 + (far.z - postF[2]) ^ 2) < 12, "the worker is back at the shop")
+			t.truthy(cz ~= nil)
+			h.step(30)
+			clean(h, "after the far patients")
+		end
+	)
+
+	t.test(
+		"a paramedic bitten in town goes back to the bay when cured; nobody on the way home is sent out as crew",
+		function()
+			local h = harness(63, nil, function(params: any)
+				params.immediateChance = 1
+			end)
+			h.svc.tun.crowdChance = 0
+			h.step(20)
+			local medic = nil
+			for _, a in h.world.actors do
+				if a.post == "ambulance_crew" then
+					medic = a
+					break
+				end
+			end
+			local station = h.world.brains[medic.id].points[1]
+			-- the paramedic is at a scene in the middle of town when the rodent gets them
+			local spot = nearest(townspeople(h), 0, 0)
+			medic.x, medic.z = spot.x + 6, spot.z
+			h.world.brains[medic.id]:onEvent({ type = "medical", mode = "down" })
+			t.truthy(h.svc:bite(medic.id, h.rodent))
+			t.truthy(
+				h.runUntil(420, function(): boolean
+					return h.svc:stateOf(medic.id) == nil
+				end),
+				`the paramedic was never cured (state {h.svc:stateOf(medic.id)})`
+			)
+			local l = h.svc.leaving[medic.id]
+			t.truthy(l ~= nil, "walking back")
+			t.deepEq(l.home, station, "to the bay, not to the street corner where the bite was")
+			-- while they walk back another patient needs a crew: not this one
+			local other = nearest(townspeople(h), 300, 300)
+			t.truthy(h.svc:bite(other.id, h.rodent))
+			local sawCrew = false
+			t.truthy(
+				h.runUntil(120, function(): boolean
+					return h.svc.leaving[medic.id] == nil
+				end, function()
+					local rec = h.svc.records[other.id]
+					if rec and rec.crew then
+						sawCrew = true
+						t.truthy(rec.crew ~= medic.id, "a paramedic on the way home was sent out again")
+					end
+					outdoors(medic, "the paramedic")
+				end),
+				"the paramedic never got back to the bay"
+			)
+			t.truthy(sawCrew, "the other call had a crew (or the test has no teeth)")
+			t.truthy(math.sqrt((medic.x - station[1]) ^ 2 + (medic.z - station[2]) ^ 2) < 6, "back at the bay")
+			t.truthy(h.runUntil(600, function(): boolean
+				return next(h.svc:cases()) == nil and next(h.svc.leaving) == nil
+			end))
+			h.step(30)
+			clean(h, "after the paramedic")
+		end
+	)
+
+	t.test(
+		"the crowd: a blocked onlooker is replaced by the next nearest; a scene has a crowd of two to four or none",
+		function()
+			local h = harness(64, nil, function(params: any)
+				params.immediateChance = 1
+				params.collapseAfterSecs = { 0.2, 0.4 }
+			end)
+			h.svc.tun.crowdChance = 1
+			h.step(20)
+			-- scenes all over town, one after another, each closed again before the next (so the same
+			-- people are free to come)
+			local sizes: { [number]: number } = {}
+			local scenes = 0
+			local people = townspeople(h)
+			for i = 1, #people, 2 do
+				local a = people[i]
+				if h.svc:biteable(a.id) and h.svc.busy[a.id] == nil and h.svc:bite(a.id, h.rodent) then
+					t.truthy(h.runUntil(3, function(): boolean
+						return h.svc:stateOf(a.id) == "down"
+					end))
+					local scene = h.svc.scenes[a.id]
+					local n = #scene.bystanders
+					sizes[n] = (sizes[n] or 0) + 1
+					scenes += 1
+					t.truthy(n == 0 or (n >= 2 and n <= 4), `a crowd of {n} at ({a.x}, {a.z})`)
+					for _, b in scene.bystanders do
+						local o = h.world.actorsById[b.id]
+						t.truthy(
+							(o.x - a.x) ^ 2 + (o.z - a.z) ^ 2 <= 180 ^ 2,
+							"called from further than the scene radius"
+						)
+					end
+					-- the scene ends (the test's own way of ending it: the service's shutdown path for one case)
+					h.svc:shutdown()
+					a.infected = nil
+				end
+			end
+			local parts = {}
+			for n = 0, 4 do
+				table.insert(parts, `{sizes[n] or 0} of {n}`)
+			end
+			print(`      {scenes} scenes with a crowd wanted every time: {table.concat(parts, ", ")}`)
+			t.eq(sizes[1] or 0, 0, "one onlooker alone is not a crowd")
+			t.truthy(scenes - (sizes[0] or 0) >= scenes * 0.6, "most scenes on the pavements get their crowd")
+		end
+	)
+
+	t.test(
+		"a player ends up holding a patient: the person is back on their feet, the ambulance and the crew are let go, the hospital is still the cure",
+		function()
+			local h = harness(65, { 0, 0 })
+			h.svc.tun.crowdChance = 1
+			h.step(20)
+			local victim = nearest(townspeople(h), 0, 0)
+			local id = victim.id
+			t.truthy(h.svc:bite(id, h.rodent))
+			t.truthy(h.runUntil(60, function(): boolean
+				return h.svc:stateOf(id) == "enroute"
+			end))
+			local rec = h.svc.records[id]
+			local vehicle, crew = rec.vehicle, rec.crew
+			t.truthy(vehicle ~= nil and crew ~= nil)
+			t.eq(h.possessable[id], false, "a patient is never offered")
+			-- the hand-over that should not have happened happens anyway
+			h.players[id] = true
+			h.world.possessed[id] = true
+			local x0, z0 = victim.x, victim.z
+			h.step(0.4)
+			t.eq(h.svc:stateOf(id), "symptomatic", "on their feet, the case is a held person's now")
+			t.truthy(victim.infected and h.svc:isInfected(id), "standing up is not a cure")
+			t.eq(h.attrs[id].Med, "symptomatic", "red eyes; not posed, not hidden")
+			t.eq(victim.lift, nil)
+			t.eq(h.possessable[id], true)
+			t.eq(h.world.brains[id].directive.mode, nil, "no order on a held body")
+			t.eq(next(h.svc.scenes), nil, "the scene is closed")
+			t.eq(next(h.svc.busy), nil, "the crowd and the crew are let go")
+			t.eq(h.world.actorsById[crew].lift, nil, "the crew member is back in sight at the bay")
+			t.eq(h.possessable[crew], true)
+			t.eq(rec.vehicle, nil)
+			t.eq(vehicle.held, false, "the ambulance is released")
+			t.eq(#h.svc.queue, 0)
+			t.eq(h.toasts[#h.toasts].key, "symptoms", "and the player is told what to do")
+			t.eq(h.svc:statusOf(id), "symptoms")
+			t.eq(h.svc:stats().stoodDown, 1)
+			-- nothing is done to them from now on, however long they stay away
+			h.step(200, function()
+				t.eq(victim.x, x0, "a held body is never moved")
+				t.eq(victim.z, z0)
+				t.eq(victim.lift, nil)
+				t.eq(h.world.brains[id].directive.mode, nil)
+			end)
+			t.eq(h.svc:stateOf(id), "symptomatic")
+			for _, v in responders(h) do
+				t.eq(v.phase, "idle", "the ambulance went home")
+			end
+			t.eq(h.svc:stats().cured, 0)
+			-- the player walks into the hospital and is cured there
+			victim.x, victim.z = layout.reception[1], layout.reception[2]
+			h.step(32)
+			t.eq(h.svc:stateOf(id), nil)
+			t.truthy(not victim.infected)
+			t.eq(h.svc:stats().cured, 1)
+			h.players[id] = nil
+			h.world.possessed[id] = nil
+			h.step(5)
+			clean(h, "after the held patient")
+		end
+	)
+
+	t.test(
+		"a patient let go by a player inside the hospital finishes as a patient there: no slide out through the wall",
+		function()
+			local h = harness(66, { 0 })
+			h.step(20)
+			local victim = nearest(townspeople(h), 0, 0)
+			local id = victim.id
+			-- the real hand-over: the brain is suspended while the player has the body
+			TownAI.suspend(h.world, id)
+			h.players[id] = true
+			t.truthy(h.svc:bite(id, h.rodent))
+			-- the player walks the body into the hospital and stands in reception
+			victim.x, victim.z = layout.reception[1], layout.reception[2]
+			h.step(10)
+			t.eq(h.svc:stateOf(id), "treated")
+			-- and lets go of it ten seconds into the treatment
+			h.players[id] = nil
+			TownAI.resume(h.world, id, victim.x, victim.y, victim.z)
+			local worst, px, pz = 0, victim.x, victim.z
+			t.truthy(
+				h.runUntil(120, function(): boolean
+					return h.svc:stateOf(id) == nil
+				end, function()
+					t.truthy(
+						HospitalLayout.contains(layout, victim.x, victim.z, 12),
+						`left the hospital: ({victim.x}, {victim.z}) in {h.svc:stateOf(id)}`
+					)
+					worst = math.max(worst, math.sqrt((victim.x - px) ^ 2 + (victim.z - pz) ^ 2))
+					px, pz = victim.x, victim.z
+				end),
+				`never cured (state {h.svc:stateOf(id)})`
+			)
+			t.truthy(worst < 6, `moved {worst} studs in one step`)
+			t.eq(h.svc:stats().dispatched, 0, "no ambulance: they were already there")
+			t.eq(h.svc.hospital:stats().admitted, 1, "treated in a bed like any walk-in")
+			t.deepEq(h.medLog[id], { "symptomatic", "treated", "-" })
+			t.truthy(not victim.infected)
+		end
+	)
+
+	t.test(
+		"a body that leaves the world mid-scene: everything round it is let go, the case waits, and the cure is still the hospital",
+		function()
+			local h = harness(67, { 0, 0 })
+			h.svc.tun.crowdChance = 1
+			h.step(20)
+			local victim = nearest(townspeople(h), 0, 0)
+			local id = victim.id
+			t.truthy(h.svc:bite(id, h.rodent))
+			t.truthy(h.runUntil(60, function(): boolean
+				return h.svc:stateOf(id) == "enroute"
+			end))
+			local vehicle = h.svc.records[id].vehicle
+			-- the body is gone (the actor is no longer in the world's index)
+			h.world.actorsById[id] = nil
+			h.step(1)
+			t.eq(next(h.svc.scenes), nil)
+			t.eq(next(h.svc.busy), nil)
+			t.eq(#h.svc.queue, 0)
+			t.eq(vehicle.held, false, "the ambulance is let go")
+			t.truthy(h.svc:isInfected(id), "the case is kept")
+			t.eq(h.svc:stateOf(id), "symptomatic")
+			-- five minutes later nothing has happened to the case, nothing has failed, nobody was cured
+			h.step(300)
+			t.eq(h.svc:stateOf(id), "symptomatic")
+			t.eq(h.svc:stats().cured, 0)
+			t.eq(h.svc:stats().faults, 0)
+			for _, v in responders(h) do
+				t.eq(v.phase, "idle")
+			end
+			t.eq(h.svc.hospital:stats().admitted, 0)
+			-- the body is back: the person is ill on their feet and ends up in the hospital like anyone
+			h.world.actorsById[id] = victim
+			victim.infected = nil -- (a body that came back knows nothing)
+			h.step(0.4)
+			t.truthy(victim.infected, "still infected")
+			t.eq(h.attrs[id].Med, "symptomatic")
+			t.truthy(
+				h.runUntil(700, function(): boolean
+					return h.svc:stateOf(id) == nil
+				end, function()
+					if h.svc:stateOf(id) == nil then
+						t.truthy(HospitalLayout.contains(layout, victim.x, victim.z), "cured outside the hospital")
+					end
+				end),
+				`stuck in {h.svc:stateOf(id)} after coming back`
+			)
+			t.eq(h.svc:stats().cured, 1)
+			t.truthy(h.runUntil(700, function(): boolean
+				return next(h.svc.leaving) == nil
+			end))
+			h.step(30)
+			clean(h, "after the body came back")
+		end
+	)
+
+	t.test(
+		"faults are contained: a broken dispatch, a broken brain and a switch-off leave nobody stuck and nobody cured for free",
+		function()
+			-- the ambulances cannot be sent at all: every patient is taken in after the timeout
+			local faults = {}
+			local h = harness(68, nil, function(params: any)
+				params.immediateChance = 1
+				params.ambulanceTimeoutSecs = 20
+			end)
+			h.svc.onFault = function(where: string, err: any)
+				table.insert(faults, `{where}: {err}`)
+			end
+			h.step(20)
+			local people = townspeople(h)
+			h.traffic.dispatchResponder = function()
+				error("no ambulances today")
+			end
+			local a, b = people[3], people[9]
+			t.truthy(h.svc:bite(a.id, h.rodent))
+			t.truthy(h.svc:bite(b.id, h.rodent))
+			t.truthy(
+				h.runUntil(120, function(): boolean
+					return h.svc:stateOf(a.id) == nil and h.svc:stateOf(b.id) == nil
+				end, function()
+					for _, p in { a, b } do
+						if h.svc:stateOf(p.id) ~= nil then
+							t.truthy(p.infected, "nobody is cured by a fault")
+						end
+					end
+				end),
+				`stuck: {h.svc:stateOf(a.id)}, {h.svc:stateOf(b.id)}`
+			)
+			t.truthy(#faults > 0 and string.find(faults[1], "queue", 1, true) ~= nil, "the fault was reported")
+			t.eq(h.svc:stats().abandoned, 2)
+			t.eq(h.svc:stats().cured, 2)
+			t.truthy(HospitalLayout.contains(layout, a.x, a.z, 40) or h.svc.leaving[a.id] ~= nil)
+			-- one person's brain fails on an order: that case is put back on its feet and tried again;
+			-- the other case in town is not held up by it
+			local h2 = harness(69, nil, function(params: any)
+				params.immediateChance = 1
+			end)
+			local reported = 0
+			h2.svc.onFault = function()
+				reported += 1
+			end
+			h2.step(20)
+			local p2 = townspeople(h2)
+			local bad, good = p2[4], p2[12]
+			local brain = h2.world.brains[bad.id]
+			local real = brain.onEvent
+			local broke = 0
+			brain.onEvent = function(self: any, evt: any)
+				if evt.type == "medical" and evt.mode == "hidden" and broke < 1 then
+					broke += 1
+					error("this brain cannot hide")
+				end
+				return real(self, evt)
+			end
+			t.truthy(h2.svc:bite(bad.id, h2.rodent))
+			t.truthy(h2.svc:bite(good.id, h2.rodent))
+			t.truthy(
+				h2.runUntil(900, function(): boolean
+					return h2.svc:stateOf(bad.id) == nil and h2.svc:stateOf(good.id) == nil
+				end, function()
+					if h2.svc:stateOf(bad.id) ~= nil then
+						t.truthy(bad.infected, "a fault is not a cure")
+					end
+				end),
+				`stuck: {h2.svc:stateOf(bad.id)}, {h2.svc:stateOf(good.id)}`
+			)
+			t.eq(broke, 1, "the brain failed once")
+			t.eq(reported, 1, "and it was reported")
+			t.eq(h2.svc:stats().faults, 1)
+			t.eq(h2.svc:stats().stoodDown, 1, "that case was put back on its feet")
+			t.eq(h2.svc:stats().cured, 2)
+			t.truthy(h2.runUntil(900, function(): boolean
+				return next(h2.svc.leaving) == nil
+			end))
+			h2.step(30)
+			clean(h2, "after the faults")
+			-- switched off in the middle of everything: every body is let go, nothing is left held
+			local h3 = harness(70, nil, function(params: any)
+				params.immediateChance = 1
+			end)
+			h3.svc.tun.crowdChance = 1
+			h3.step(20)
+			local p3 = townspeople(h3)
+			local bitten = {}
+			for i = 2, 14, 4 do
+				h3.svc:bite(p3[i].id, h3.rodent)
+				table.insert(bitten, p3[i])
+				h3.step(25)
+			end
+			h3.svc:shutdown()
+			h3.step(120)
+			t.eq(h3.svc:stats().cured, 0, "switching off cures nobody")
+			for _, p in bitten do
+				t.truthy(p.infected, "still infected (nobody is tracking it any more)")
+				p.infected = nil
+			end
+			clean(h3, "after the switch-off")
 		end
 	)
 

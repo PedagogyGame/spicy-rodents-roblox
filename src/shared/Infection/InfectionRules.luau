@@ -13,19 +13,31 @@
 --   down --(dispatchDelaySecs: the call)--> scene --(an ambulance is assigned)--> enroute
 --     --(it arrives)--> approach (the crew walks over) --> assess --> loading --> retrieve (the
 --     patient is carried to the ambulance) --> transit (out of sight, driven in) --> admitted
---   scene | enroute --(no ambulance within ambulanceTimeoutSecs)--> transit (taken in anyway)
+--   scene | enroute --(no ambulance within ambulanceTimeoutSecs)--> transit (taken in anyway; the
+--     clock starts again when an ambulance is assigned, so nobody is given up on while theirs is
+--     on its way)
 --   admitted --(a bed)--> treated --(hospital.treatSecs)--> released (cured)
 --
 -- THE ONLY CURE IS THE HOSPITAL: `infected` is cleared in one place, the step from treated to
 -- released. Nothing else clears it: not time, not the rodent's death (the old brief v2 §8 rule, cured
 -- instantly if bitten within infection.recentBiteSecs, is off: that tunable now defaults to 0).
 -- A person a player is holding is never frozen, hidden or moved: they incubate, get the tell, and are
--- treated by standing in the hospital for hospital.treatSecs (leaving early starts it over).
+-- treated by standing in the hospital for hospital.treatSecs (leaving early starts it over). They are
+-- told what is happening and what to do (the "toast" effects), and told again every remindSecs for
+-- as long as they are infected and not being treated (one toast is easily missed); `status` is the
+-- same thing for a line that stays on screen.
+-- A player can only ever be handed a body that is on its feet (`possessable`), but if one ends up
+-- holding a patient all the same (a hand-over that raced the collapse), the case does not carry on
+-- over their head: `standUp` puts the person back on their feet, still infected, the effect
+-- "standDown" tells the server to send the ambulance, the crew and the crowd away, and from then on
+-- it is a held person's case. The server uses the same `standUp` for a body that left the world for
+-- a while. Either way the hospital is still the only cure.
 -- Nothing a client can read shows an incubating case: `tell` is nil until the symptoms show.
 -- Interface: STATES; defaults() -> Params (Config/Tunables); newCase(id, now, inputs, rand, params)
 --   -> (Case, { Effect }); advance(case, now, inputs, rand, params) -> { Effect };
---   rebite(case, now) -> { Effect }; tell(case) -> string?; isInfected(case); biteable(case);
---   possessable(case); atScene(case); closed(case); townPercent(infected, humans) -> number
+--   rebite(case, now, controller?) -> { Effect }; standUp(case, now); tell(case) -> string?;
+--   status(case) -> string? ("infected" | "symptoms" | "treating"); isInfected(case); biteable(case);
+--   possessable(case); atScene(case); isPatient(case); closed(case); townPercent(infected, humans)
 -- Pure. No side effects on require.
 
 local Tunables = require("../Config/Tunables")
@@ -48,6 +60,7 @@ export type Params = {
 	groanSecs: Range,
 	treatSecs: number,
 	crewMaxSecs: number,
+	remindSecs: number, -- a held person is told again this often
 }
 
 export type Case = {
@@ -63,6 +76,7 @@ export type Case = {
 	deadline: number, -- the ambulance must have arrived by then
 	crewSecs: number, -- the crew's walk from the ambulance to the patient (0 = no crew)
 	nextGroan: number,
+	nextRemind: number, -- when the player holding the body is next told what to do
 	symptomsAt: number?, -- when the tell first showed
 	controller: string, -- who held the body at the last step ("ai" | "player")
 }
@@ -125,6 +139,19 @@ local AT_SCENE: { [string]: boolean } = {
 	loading = true,
 	retrieve = true,
 }
+-- on the ground, carried, out of sight or in a bed: somebody else is doing something for them
+local PATIENT: { [string]: boolean } = {
+	down = true,
+	scene = true,
+	enroute = true,
+	approach = true,
+	assess = true,
+	loading = true,
+	retrieve = true,
+	transit = true,
+	admitted = true,
+	treated = true,
+}
 
 function InfectionRules.defaults(): Params
 	local g = Tunables.get
@@ -144,6 +171,7 @@ function InfectionRules.defaults(): Params
 		groanSecs = g("infection.groanSecs"),
 		treatSecs = g("hospital.treatSecs"),
 		crewMaxSecs = 55, -- hospital_police_infection §7.5: walkTime = clamp(len / 3.45, 3, 55)
+		remindSecs = g("infection.remindSecs"),
 	}
 end
 
@@ -155,6 +183,12 @@ local function enter(case: Case, state: string, now: number, untilT: number?)
 	case.state = state
 	case.since = now
 	case.untilT = untilT or math.huge
+end
+
+-- a message for the player holding the body; the next reminder is counted from it
+local function inform(case: Case, now: number, params: Params, effects: { Effect }, key: string)
+	case.nextRemind = now + params.remindSecs
+	table.insert(effects, { kind = "toast", key = key })
 end
 
 local function collapse(case: Case, now: number, rand: () -> number, params: Params, effects: { Effect })
@@ -188,6 +222,7 @@ function InfectionRules.newCase(
 		deadline = math.huge,
 		crewSecs = 0,
 		nextGroan = math.huge,
+		nextRemind = math.huge,
 		symptomsAt = nil,
 		controller = inputs.controller,
 	}
@@ -201,18 +236,37 @@ function InfectionRules.newCase(
 		{ kind = "say", situation = "bitten", force = true },
 	}
 	if player then
-		table.insert(effects, { kind = "toast", key = "bitten" })
+		inform(case, now, params, effects, "bitten")
 	end
 	return case, effects
 end
 
 -- rebite: the rodent bites a person who is already infected and still on their feet: they run and
--- shout again; the case itself does not change (one infection, one cure).
-function InfectionRules.rebite(case: Case, _now: number): { Effect }
+-- shout again; the case itself does not change (one infection, one cure). A player holding the body
+-- is told it happened, and that the cure is still the hospital.
+function InfectionRules.rebite(case: Case, _now: number, controller: string?): { Effect }
 	if not InfectionRules.biteable(case) then
 		return {}
 	end
-	return { { kind = "flee" }, { kind = "say", situation = "bitten", force = true } }
+	local effects: { Effect } = { { kind = "flee" }, { kind = "say", situation = "bitten", force = true } }
+	if (controller or case.controller) == "player" then
+		table.insert(effects, { kind = "toast", key = "bittenAgain" })
+	end
+	return effects
+end
+
+-- standUp: whatever was being done for the patient is over (a player has the body, or the body was
+-- out of the world for a while): they are on their feet, still infected, the symptoms showing. The
+-- clock on what happens next starts when the AI has the person back (`advance` sets it); a player
+-- has no clock, only the walk to the hospital.
+function InfectionRules.standUp(case: Case, now: number)
+	enter(case, "symptomatic", now)
+	case.symptomsAt = case.symptomsAt or now
+	case.selfTreat = false
+	case.arrival = nil
+	case.crewSecs = 0
+	case.deadline = math.huge
+	case.nextGroan = math.huge
 end
 
 local function showSymptoms(
@@ -227,7 +281,7 @@ local function showSymptoms(
 	case.symptomsAt = case.symptomsAt or now
 	table.insert(effects, { kind = "say", situation = "symptoms", force = true })
 	if player then
-		table.insert(effects, { kind = "toast", key = "symptoms" })
+		inform(case, now, params, effects, "symptoms")
 	end
 end
 
@@ -249,12 +303,19 @@ local function stepOnce(
 ): boolean
 	local state = case.state
 	local player = inputs.controller == "player"
+	if player and PATIENT[state] and not (state == "treated" and case.selfTreat) then
+		-- a player is holding a patient (see the header): back on their feet, and told what to do
+		InfectionRules.standUp(case, now)
+		table.insert(effects, { kind = "standDown" })
+		inform(case, now, params, effects, "symptoms")
+		return true
+	end
 	if state == "bitten" then
 		if player then
 			-- taken over before the collapse: a held person never collapses, so they incubate instead
 			case.immediate = false
 			enter(case, "incubating", now, case.bittenAt + range(rand, params.incubateSecs))
-			table.insert(effects, { kind = "toast", key = "bitten" })
+			inform(case, now, params, effects, "bitten")
 			return true
 		elseif now >= case.untilT then
 			collapse(case, now, rand, params, effects)
@@ -298,7 +359,7 @@ local function stepOnce(
 		if player then
 			enter(case, "symptomatic", now)
 			table.insert(effects, { kind = "resume" })
-			table.insert(effects, { kind = "toast", key = "symptoms" })
+			inform(case, now, params, effects, "symptoms")
 			return true
 		elseif inputs.atEntrance then
 			enter(case, "admitted", now)
@@ -333,6 +394,8 @@ local function stepOnce(
 			return true
 		elseif state == "scene" and inputs.ambulance == "assigned" then
 			enter(case, "enroute", now)
+			-- an ambulance is on its way: it gets its own full time to arrive
+			case.deadline = now + params.ambulanceTimeoutSecs
 			return true
 		end
 	elseif state == "approach" then
@@ -387,7 +450,7 @@ local function stepOnce(
 			elseif not inputs.atEntrance then
 				case.selfTreat = false
 				enter(case, "symptomatic", now)
-				table.insert(effects, { kind = "toast", key = "leftEarly" })
+				inform(case, now, params, effects, "leftEarly")
 				return true
 			elseif now >= case.untilT then
 				case.infected = false -- the cure (1 of 2: a held person, treated in the hospital)
@@ -412,9 +475,13 @@ end
 function InfectionRules.advance(case: Case, now: number, inputs: Inputs, rand: () -> number, params: Params): { Effect }
 	local effects: { Effect } = {}
 	if inputs.controller ~= case.controller then
-		-- a player who takes a body that already shows the tell is told what to do about it
-		if inputs.controller == "player" and case.state == "symptomatic" then
-			table.insert(effects, { kind = "toast", key = "symptoms" })
+		-- a player who takes an infected body is told so, and what to do about it
+		if inputs.controller == "player" then
+			if case.state == "symptomatic" then
+				inform(case, now, params, effects, "symptoms")
+			elseif case.state == "incubating" then
+				inform(case, now, params, effects, "infected")
+			end
 		end
 		case.controller = inputs.controller
 	end
@@ -422,6 +489,16 @@ function InfectionRules.advance(case: Case, now: number, inputs: Inputs, rand: (
 		if not stepOnce(case, now, inputs, rand, params, effects) then
 			break
 		end
+	end
+	-- a held person who is infected and not being treated is told again every remindSecs: one toast
+	-- is easily missed, and nothing else on screen says where to go
+	if
+		inputs.controller == "player"
+		and case.infected
+		and (case.state == "incubating" or case.state == "symptomatic")
+		and now >= case.nextRemind
+	then
+		inform(case, now, params, effects, if case.state == "symptomatic" then "symptoms" else "infected")
 	end
 	-- the patient on the ground groans now and then (humans_actors §7.2)
 	if AT_SCENE[case.state] and now >= case.nextGroan then
@@ -442,6 +519,22 @@ function InfectionRules.tell(case: Case): string?
 	return TELL[case.state]
 end
 
+-- status: the line that stays on the screen of the player holding this body ("infected": bitten,
+-- nothing showing yet; "symptoms"; "treating": standing in the hospital); nil when there is nothing
+-- to say.
+function InfectionRules.status(case: Case): string?
+	if not case.infected then
+		return nil
+	elseif case.state == "treated" and case.selfTreat then
+		return "treating"
+	elseif case.state == "symptomatic" or case.state == "walkin" then
+		return "symptoms"
+	elseif case.state == "bitten" or case.state == "incubating" then
+		return "infected"
+	end
+	return nil
+end
+
 function InfectionRules.isInfected(case: Case): boolean
 	return case.infected
 end
@@ -459,6 +552,11 @@ end
 -- atScene: on the ground at a scene (traffic's emergency classes do not stop for them).
 function InfectionRules.atScene(case: Case): boolean
 	return AT_SCENE[case.state] == true
+end
+
+-- isPatient: on the ground, carried, out of sight or in a bed (not a held person treating themselves).
+function InfectionRules.isPatient(case: Case): boolean
+	return PATIENT[case.state] == true and not (case.state == "treated" and case.selfTreat)
 end
 
 function InfectionRules.closed(case: Case): boolean

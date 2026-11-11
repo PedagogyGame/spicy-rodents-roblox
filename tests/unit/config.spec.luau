@@ -90,6 +90,8 @@ return function(t)
 			["infection.walkInMaxDist"] = "u",
 			["infection.dispatchDelaySecs"] = "s",
 			["infection.crewSpeed"] = "u/s",
+			["infection.crewRunSpeed"] = "u/s",
+			["infection.remindSecs"] = "s",
 			["infection.assessSecs"] = "s",
 			["infection.loadSecs"] = "s",
 			["infection.ambulanceTimeoutSecs"] = "s",
