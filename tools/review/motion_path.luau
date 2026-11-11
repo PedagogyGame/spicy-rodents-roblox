@@ -6,14 +6,27 @@
 -- here ships or touches the game.
 -- Usage (repo root):
 --   lune run tools/review/motion_path.luau [--variants squirrel,rodent] [--takes walk,sprint,...]
---     [--out build/motion] [--list]
+--     [--out build/motion] [--list] [--set Module.table.name=number,...]
 -- Takes: walk, sprint, turn, stop, leap, climb, wire, stalk (all, when --takes is not given).
+-- --set tries a number of the game's WITHOUT changing the game: the named field of one of the tables in
+-- TUNABLE below is set for this run only, so the takes show what the game would do with it (give --out
+-- another folder, to keep them apart from the takes of the game as it is). For example:
+--   --set Motion.C.visualWireLift=0.08,SquirrelVisual.params.barkGap=0,AnimationDriver.HERO.stride.Wire=6.9
 
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
 
 local Path = require("./motion/Path")
+
+-- the tables of the game's numbers that --set may reach (the same tables Path's modules read)
+local TUNABLE: { [string]: any } = {
+	["AnimationDriver.HERO"] = require("../../src/client/Animation/AnimationDriver").HERO,
+	["AnimationDriver.HERO.stride"] = require("../../src/client/Animation/AnimationDriver").HERO.stride,
+	["CameraRig.ORBIT"] = require("../../src/client/Camera/CameraRig").ORBIT,
+	["Motion.C"] = require("../../src/shared/Routes/Motion").C,
+	["SquirrelVisual.params"] = require("../../src/shared/Movement/SquirrelVisual").params,
+}
 
 local out = "build/motion"
 local variants: { string } = { "squirrel", "rodent" }
@@ -44,6 +57,18 @@ do
 			i += 1
 		elseif a == "--list" then
 			listOnly = true
+		elseif a == "--set" then
+			for _, pair in split(args[i + 1]) do
+				local where, name, value = string.match(pair, "^(.+)%.([%w_]+)=(.+)$")
+				local tbl = if where then TUNABLE[where] else nil
+				local number = tonumber(value)
+				if tbl == nil or name == nil or number == nil or type(tbl[name]) ~= "number" then
+					error(`motion_path: --set {pair}: not a number of the game's that can be tried here`)
+				end
+				print(`trying {where}.{name} = {number} (the game has {tbl[name]})`)
+				tbl[name] = number
+			end
+			i += 1
 		else
 			error(`motion_path: unknown argument {a}`)
 		end
