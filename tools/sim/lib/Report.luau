@@ -225,6 +225,23 @@ function Report.summary(result: any, top: number?, command: string?): string
 			recon.max
 		)
 	)
+	-- the detectors' own numbers (ctx.stats), one line each
+	local names = {}
+	for name in st.detectors :: { [string]: any } do
+		table.insert(names, name)
+	end
+	table.sort(names)
+	for _, name in names do
+		local fields = {}
+		for key, value in st.detectors[name] :: { [string]: any } do
+			local shown = if type(value) == "number" and value % 1 ~= 0 then num(value) else tostring(value)
+			table.insert(fields, `{key} {shown}`)
+		end
+		if #fields > 0 then
+			table.sort(fields)
+			add(`  {name}: {table.concat(fields, ", ")}`)
+		end
+	end
 	local total = 0
 	for _, n in result.counts :: { [string]: number } do
 		total += n

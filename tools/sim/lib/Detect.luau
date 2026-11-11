@@ -100,6 +100,8 @@ export type Send = {
 	wall: number, -- when the server sent it
 	clock: number, -- the server's clock when it sent it
 	stamp: number, -- the stamp it carries (the clock as decoded from the wire: an f32)
+	age: number, -- seconds of server time the simulation had not yet run when it was sent: the state in
+	-- the packet is this much older than its stamp says (the tick accumulator's remainder)
 	poses: { [number]: any }, -- Ghost.Pose by id, decoded from the wire
 	lost: boolean,
 	arrival: number?, -- when it reaches the client's machine

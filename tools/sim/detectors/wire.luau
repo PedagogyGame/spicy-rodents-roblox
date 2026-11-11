@@ -9,8 +9,11 @@
 --   teleport_bit_lost     the one send that carried the flag was lost on the network
 -- These are counted per event on the server's timeline (t is the wall-clock time of the tick or send),
 -- not per client frame; the jumps and turns detectors show what each one looks like on screen.
--- ctx.stats: teleports flagged / carried / dropped / lost, and how old the state in a send is compared
--- with its stamp (poseAgeMs: 0 when the send follows a tick in the same frame).
+-- ctx.stats: teleports flagged / carried / dropped / lost, and how much older the state in a send is than
+-- its stamp (stateOlderThanStampMs: the stamp is the server's frame clock, the state is the last whole
+-- 30 Hz tick; the difference is the tick accumulator's remainder, 0 on an exact 60 Hz server and up to a
+-- frame's length, different for every send, on a real one: the client spaces the snapshots by stamps, so
+-- that difference is a timing error on every pose).
 local Detect = require("../lib/Detect")
 local Truth = require("../lib/Truth")
 
@@ -43,17 +46,14 @@ local def: Detect.Def = {
 		stats.teleportsCarried = 0
 		stats.teleportsDropped = 0
 		stats.teleportsLost = 0
-		stats.poseAgeMsMax = 0
-		stats.poseAgeMsMean = 0
-		stats.sendsOffTick = 0
+		stats.stateOlderThanStampMsMax = 0
+		stats.stateOlderThanStampMsMean = 0
 		local ageSum, sends = 0, 0
-		local lastTickClock: number? = nil
 		local prev: { [number]: { x: number, z: number, yaw: number, vis: boolean, speed: number } } = {}
 		-- flagged teleports of visible vehicles waiting for the next send
 		local pending: { [number]: { t: number, step: number, from: { number }, to: { number } } } = {}
 		return {
 			tick = function(tick: Detect.Tick)
-				lastTickClock = tick.clock
 				for _, v in tick.vehicles do
 					local p = prev[v.id]
 					if p and p.vis and v.visible then
@@ -110,15 +110,10 @@ local def: Detect.Def = {
 			end,
 			send = function(send: Detect.Send)
 				sends += 1
-				if lastTickClock then
-					local age = (send.clock - lastTickClock) * 1000
-					ageSum += age
-					stats.poseAgeMsMean = ageSum / sends
-					stats.poseAgeMsMax = math.max(stats.poseAgeMsMax, age)
-					if age > 1 then
-						stats.sendsOffTick += 1
-					end
-				end
+				local age = send.age * 1000
+				ageSum += age
+				stats.stateOlderThanStampMsMean = ageSum / sends
+				stats.stateOlderThanStampMsMax = math.max(stats.stateOlderThanStampMsMax, age)
 				for id, tp in pending do
 					local pose = send.poses[id]
 					local detail = { from = tp.from, to = tp.to, teleportAt = tp.t, send = send.n }

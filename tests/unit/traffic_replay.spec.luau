@@ -623,6 +623,7 @@ return function(t)
 					wall = clock,
 					clock = clock,
 					stamp = clock,
+					age = 0,
 					poses = { [1] = pose },
 					lost = lost,
 					arrival = nil,

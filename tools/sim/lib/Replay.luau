@@ -24,6 +24,8 @@
 --     trafficSeed = 7?, seconds = 60?, net = "ideal"?, server = "steady"?, client = "steady"?,
 --     setup = function(sim) end?,     -- once: sim.traffic is the real service; force vehicle states here
 --     frame = function(sim) end?,     -- every server frame before the step: timed actions (dispatches)
+--     hitch = function(sim, dt) return dt end?,   -- the length of the next server frame: return a longer
+--                                     -- one to stall the server at a chosen moment
 --     world = function(sim) return { people = {...}, squirrels = {...} } end?,
 --     expect = { none = { kinds }, some = { kinds } }?,   -- what must hold (the regression spec and --check)
 --     known = { kinds }?,             -- glitches this scenario shows TODAY: reported, and checked to still
@@ -71,6 +73,7 @@ export type Scenario = {
 	sceneSecs: number?,
 	setup: ((sim: Sim) -> ())?,
 	frame: ((sim: Sim) -> ())?,
+	hitch: ((sim: Sim, dt: number) -> number)?,
 	world: ((sim: Sim) -> any)?,
 	expect: { none: { string }?, some: { string }? }?,
 	known: { string }?,
@@ -373,6 +376,7 @@ function Replay.run(opts: { [string]: any }?): Result
 					wall = sim.wall,
 					clock = sim.clock,
 					stamp = stamp,
+					age = traffic.acc,
 					poses = poses,
 					lost = #arrivals == 0,
 					arrival = arrivals[1],
@@ -452,7 +456,11 @@ function Replay.run(opts: { [string]: any }?): Result
 			end
 		end
 
-		local pendingServer = serverPace:next()
+		local function nextServerFrame(): number
+			local dt = serverPace:next()
+			return if scenario.hitch then scenario.hitch(sim, dt) else dt
+		end
+		local pendingServer = nextServerFrame()
 		local clientWall = settings.phase / settings.server.hz
 		local prevNow: number? = nil
 		local prevV: { [number]: Detect.Sample } = {}
@@ -468,7 +476,7 @@ function Replay.run(opts: { [string]: any }?): Result
 			-- the server runs up to this instant
 			while sim.wall + pendingServer <= clientWall do
 				serverFrame(pendingServer)
-				pendingServer = serverPace:next()
+				pendingServer = nextServerFrame()
 			end
 			-- the client clock: workspace:GetServerTimeNow() (wall time plus its error)
 			local now = clientWall + settings.clockSkew + settings.clockDrift * clientWall
