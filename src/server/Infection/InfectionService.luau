@@ -18,8 +18,9 @@
 -- route and held on scene until the patient is aboard (Traffic/TrafficService; the responders are
 -- fleet vehicles, so they reach the clients in the same pose stream as every other car), and three
 -- replicated attributes per body, written only when they change:
---   Med    nil | "symptomatic" | "down" | "transit" | "treated"  (Client/Render/MedicalView draws it;
---          nothing is written while a case incubates, so a client cannot read who is infected)
+--   Med    nil | "symptomatic" | "down" | "carried" | "transit" | "treated"  (Client/Render/
+--          MedicalView draws it; nothing is written while a case incubates, so a client cannot read
+--          who is infected)
 --   Say, SayAt   the line and its server time (Client/UI/SpeechBubbles draws the bubble)
 -- A body a player holds is never ordered about, moved or hidden; its player is told what is happening
 -- and what to do through `notify`, and `statusOf` is the same for a line that stays on screen.
@@ -1013,8 +1014,8 @@ local function apply(self: Service, rec: Record, effect: any)
 			})
 		end
 	elseif kind == "carry" then
-		-- the patient is carried to the ambulance beside the crew member, both at the crew's pace,
-		-- back the way the crew came
+		-- the patient is helped to the ambulance beside the crew member, both at the crew's pace,
+		-- back the way the crew came (Med "carried": on their feet, not posed sitting while they move)
 		local a, crew, path, from = actorOf(self, id), rec.crew, rec.crewPath, rec.crewFrom
 		closeScene(self, id)
 		if a and path and from then

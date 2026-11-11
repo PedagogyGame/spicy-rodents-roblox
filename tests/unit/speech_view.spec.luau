@@ -61,6 +61,7 @@ return function(t)
 	t.test("Med on screen: red eyes when symptomatic, hidden in transit, a pose when down or in bed", function()
 		t.deepEq(MedicalView.look("symptomatic"), { hidden = false, eyes = true, pose = "stagger" })
 		t.deepEq(MedicalView.look("down"), { hidden = false, eyes = false, pose = "down" })
+		t.deepEq(MedicalView.look("carried"), { hidden = false, eyes = false, pose = "walk" })
 		t.deepEq(MedicalView.look("transit"), { hidden = true, eyes = false, pose = nil })
 		t.deepEq(MedicalView.look("treated"), { hidden = false, eyes = false, pose = "bed" })
 		t.deepEq(MedicalView.look(nil), { hidden = false, eyes = false, pose = nil })
@@ -81,7 +82,12 @@ return function(t)
 				end
 			end
 		end
-		t.truthy(seen.symptomatic and seen.down and seen.transit and seen.treated)
+		t.truthy(seen.symptomatic and seen.down and seen.carried and seen.transit and seen.treated)
+		t.eq(
+			InfectionRules.tell({ state = "retrieve", selfTreat = false } :: any),
+			"carried",
+			"a patient who is being moved is on their feet, not sliding along sitting"
+		)
 		t.eq(InfectionRules.tell({ state = "incubating", selfTreat = false } :: any), nil)
 		t.eq(InfectionRules.tell({ state = "bitten", selfTreat = false } :: any), nil)
 		t.truthy(MedicalView.EYE.z < 0, "the eyes are on the face (an R15 head looks along -Z)")
@@ -96,7 +102,7 @@ return function(t)
 		t.eq(bed.clip, "sit")
 		t.near(down.drop - bed.drop, HospitalLayout.BED.top, 1e-9, "the cot's mattress is that much higher")
 		t.truthy(bed.drop >= 0)
-		for _, med in { "symptomatic", "transit", nil :: any, "nonsense" } do
+		for _, med in { "symptomatic", "carried", "transit", nil :: any, "nonsense" } do
 			local p = AnimationDriver.medPose(med, footDrop)
 			t.eq(p.clip, nil)
 			t.eq(p.drop, 0)

@@ -362,7 +362,9 @@ return function(t)
 		if crew then
 			t.truthy(table.find(Lines.GROUPS.crew, (h.attrs[crew] or {}).Say) ~= nil, "the crew speaks at the patient")
 		end
-		t.deepEq(h.medLog[id], { "down", "transit" })
+		-- (with a crew the patient is walked to the ambulance on their feet: "carried")
+		local walked = rec.crewSecs > 0
+		t.deepEq(h.medLog[id], if walked then { "down", "carried", "transit" } else { "down", "transit" })
 		t.eq(victim.lift, InfectionService.SINK, "hidden: drawn under the ground")
 		t.near(victim.x, layout.intake[1], 0.01, "and already at the hospital's intake")
 		t.eq(next(h.svc.scenes), nil, "the scene is over")
@@ -377,7 +379,10 @@ return function(t)
 			end),
 			`never in a bed (state {h.svc:stateOf(id)})`
 		)
-		t.deepEq(h.medLog[id], { "down", "transit", "treated" })
+		t.deepEq(
+			h.medLog[id],
+			if walked then { "down", "carried", "transit", "treated" } else { "down", "transit", "treated" }
+		)
 		t.eq(victim.lift, nil)
 		local bed = layout.beds[h.svc.hospital:bedOf(id)]
 		t.near(victim.x, bed.x, 0.01)
@@ -401,7 +406,10 @@ return function(t)
 		t.truthy(h.time - treatedAt >= 29.5, `treated for {h.time - treatedAt} s`)
 		t.truthy(HospitalLayout.contains(layout, victim.x, victim.z), "cured inside the hospital")
 		t.truthy(not victim.infected and not h.svc:isInfected(id))
-		t.deepEq(h.medLog[id], { "down", "transit", "treated", "-" })
+		t.deepEq(
+			h.medLog[id],
+			if walked then { "down", "carried", "transit", "treated", "-" } else { "down", "transit", "treated", "-" }
+		)
 		t.eq(h.possessable[id], true)
 		t.eq(h.svc:stats().cured, 1)
 		-- home on foot the way a walk-in comes, never through a building

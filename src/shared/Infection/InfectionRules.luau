@@ -122,7 +122,9 @@ local TELL: { [string]: string } = {
 	approach = "down",
 	assess = "down",
 	loading = "down",
-	retrieve = "down",
+	-- helped to the ambulance: on their feet beside the crew member (a body that moves is not drawn
+	-- sitting on the ground)
+	retrieve = "carried",
 	transit = "transit",
 	treated = "treated",
 }

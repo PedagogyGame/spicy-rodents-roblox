@@ -7,6 +7,8 @@
 --   symptomatic  two small red glowing eyes on the head (the visible tell)
 --   down         the red eyes stay off (v5.4 turns them off at the scene); the pose is drawn by
 --                Animation/AnimationDriver, which reads the same attribute (sitting on the ground)
+--   carried      nothing here: the patient is on their feet, walked to the ambulance by the crew
+--                (the usual walk animation; a body that moves is not drawn sitting)
 --   transit      the body is not drawn at all on this client (carried off in the ambulance; the
 --                server also sinks it under the ground, so a missed hide shows nothing either)
 --   treated      nothing here (AnimationDriver sits the patient up on the cot)
@@ -30,6 +32,8 @@ function MedicalView.look(med: any): Look
 		return { hidden = false, eyes = true, pose = "stagger" }
 	elseif med == "down" then
 		return { hidden = false, eyes = false, pose = "down" }
+	elseif med == "carried" then
+		return { hidden = false, eyes = false, pose = "walk" }
 	elseif med == "transit" then
 		return { hidden = true, eyes = false, pose = nil }
 	elseif med == "treated" then

@@ -33,11 +33,11 @@
 --     offset the body carried as an AI decays at v5.4's 23/s, the same rate the controller's drawn point
 --     eases onto its own ground, so a possession hands over without a step.
 -- Patients (owner 2026-11-10, the bite-to-hospital sequence): the server writes a Med attribute on a
--- bitten body (Server/Infection/InfectionService). An AI body with Med "down" (collapsed at a scene,
--- or being carried to the ambulance) or "treated" (in a hospital bed) plays the stock sit clip and is
--- lowered through the same visual-root offset: sitting on the ground, or on the cot (Infection/
--- HospitalLayout.BED.top above the floor). A body a player holds is never posed. Render/MedicalView
--- draws the rest of the attribute (red eyes, hiding).
+-- bitten body (Server/Infection/InfectionService). An AI body with Med "down" (collapsed at a scene)
+-- or "treated" (in a hospital bed) plays the stock sit clip and is lowered through the same
+-- visual-root offset: sitting on the ground, or on the cot (Infection/HospitalLayout.BED.top above
+-- the floor). A patient walked to the ambulance ("carried") keeps the usual walk. A body a player
+-- holds is never posed. Render/MedicalView draws the rest of the attribute (red eyes, hiding).
 -- No side effects on require.
 -- A sculpted hero squirrel (Server/Assets/HeroArt, attribute Hero) plays its own authored clips (owner
 -- 2026-11-10: the run looked "rigid, unalive": the procedural gait only swings the legs under a stiff body,
@@ -246,7 +246,8 @@ AnimationDriver.DEFAULT_CLIPS = {
 -- medPose(med, footDrop): how an AI body with this Med attribute is posed: the clip to play (nil =
 -- the usual choice by speed) and how far the visible body is lowered (studs). `footDrop` is the
 -- body's root height above its soles. A collapsed person sits on the ground; a patient in a bed sits
--- up on the cot; anything else (symptomatic, in transit, healthy) keeps its usual animation.
+-- up on the cot; anything else (symptomatic, walked to the ambulance, in transit, healthy) keeps its
+-- usual animation.
 function AnimationDriver.medPose(med: any, footDrop: number): { clip: string?, drop: number }
 	if med == "down" then
 		return { clip = "sit", drop = math.max(0, footDrop - AnimationDriver.SIT_SEAT) }
