@@ -41,8 +41,10 @@ local Tables = require("./Tables")
 local Physics = {}
 
 Physics.DT = 1 / 240
-Physics.MAX_EVENTS = 48 -- contacts settled inside one step before the rest of the step is taken blind
+Physics.MAX_EVENTS = 64 -- contacts settled inside one step before the rest of the step is given up
 Physics.E_BALL = 0.94 -- ball to ball
+Physics.TOUCH = 0.004 -- studs: balls this close are touching (they are struck together, as one wave)
+Physics.WAVE_SWEEPS = 40 -- the most sweeps over a wave's contacts
 -- friction between two balls: MU_BALL_MIN + MU_BALL_VAR / (1 + C1 u + C2 u^2), u = rubbing speed in studs/s
 Physics.MU_BALL_MIN = 0.01
 Physics.MU_BALL_VAR = 0.108
@@ -62,7 +64,7 @@ export type Response = {
 	keep: number, -- share of the roll into the surface the ball keeps
 	roll: number, -- share of a natural roll it leaves with
 }
-Physics.CUSHION = { eSoft = 0.86, eHard = 0.7, hard = 24, mu = 0.14, shorten = 0.2, keep = 0.1, roll = 0.4 } :: Response
+Physics.CUSHION = { eSoft = 0.86, eHard = 0.7, hard = 24, mu = 0.25, shorten = 0.2, keep = 0.1, roll = 0.4 } :: Response
 Physics.JAW = { eSoft = 0.62, eHard = 0.45, hard = 20, mu = 0.2, shorten = 0.1, keep = 0.1, roll = 0.2 } :: Response
 Physics.POST = { eSoft = 0.92, eHard = 0.84, hard = 30, mu = 0.1, shorten = 0, keep = 0.1, roll = 0.4 } :: Response
 
@@ -205,65 +207,173 @@ local function bounce(b: Cloth.Ball, nx: number, nz: number, P: Response): numbe
 	return vn
 end
 
--- Two balls meet. Returns the closing speed.
-local function collide(a: Cloth.Ball, b: Cloth.Ball, R: number): number
-	local dx, dz = b.x - a.x, b.z - a.z
-	local d = math.sqrt(dx * dx + dz * dz)
-	if d <= 0 then
-		return 0
-	end
-	local nx, nz = dx / d, dz / d
-	-- balls that have sunk into each other (only ever by a hair) are set touching again
-	local over = 2 * R - d
-	if over > 0 then
-		local half = 0.5 * over
-		a.x -= nx * half
-		a.z -= nz * half
-		b.x += nx * half
-		b.z += nz * half
-	end
-	local rvx, rvz = a.vx - b.vx, a.vz - b.vz
-	local vn = rvx * nx + rvz * nz
-	if vn <= 0 then
-		return 0
-	end
-	local e = if vn < V_DEAD then 0 else E_BALL
-	local jn = 0.5 * (1 + e) * vn
-	local tx, tz = -nz, nx
-	-- rubbing at the contact point: along the level (motion plus both side spins) and up and down (both rolls)
-	local uh = rvx * tx + rvz * tz + a.s + b.s
-	local uv = -((a.qx + b.qx) * nx + (a.qz + b.qz) * nz)
-	local u = math.sqrt(uh * uh + uv * uv)
-	if u > 1e-9 then
-		local mu = Physics.MU_BALL_MIN + Physics.MU_BALL_VAR / (1 + Physics.MU_BALL_C1 * u + Physics.MU_BALL_C2 * u * u)
-		local pmax = mu * jn
-		local ph = pmax * uh / u
-		if math.abs(ph) > math.abs(uh) / 7 then
-			ph = uh / 7
+-- A WAVE: every pair of balls that is touching (within TOUCH) and closing at this instant, settled together.
+-- Each contact must turn its closing speed u into a parting speed E_BALL u; the impulses that do it are found
+-- by sweeping the contacts in a fixed order until they agree (an impulse can push, never pull). One pair
+-- alone gets exactly the two-ball answer. A ball that drives into two at once shares itself between them
+-- evenly, which is what makes a tight rack burst open instead of handing everything down one line of balls.
+-- A wave can never add energy: if the sweep overshoots, the whole wave is scaled back to break even.
+-- Then each contact rubs: the friction between the balls is throw and handed-on spin.
+local function wave(w: World, t: number, R: number)
+	local balls = w.balls
+	local n = #balls
+	local lim = 2 * R + Physics.TOUCH
+	local lim2 = lim * lim
+	local ci: { number }, cj: { number } = {}, {}
+	local cnx: { number }, cnz: { number }, cu: { number }, cl: { number } = {}, {}, {}, {}
+	local nc = 0
+	for i = 1, n - 1 do
+		local a = balls[i]
+		if a.mode <= 2 then
+			for j = i + 1, n do
+				local b = balls[j]
+				if b.mode <= 2 then
+					local dx, dz = b.x - a.x, b.z - a.z
+					local d2 = dx * dx + dz * dz
+					if d2 <= lim2 and d2 > 0 then
+						local closing = (a.vx - b.vx) * dx + (a.vz - b.vz) * dz
+						if closing > 0 then
+							local d = math.sqrt(d2)
+							nc += 1
+							ci[nc], cj[nc] = i, j
+							cnx[nc], cnz[nc] = dx / d, dz / d
+							cu[nc] = closing / d
+							cl[nc] = 0
+							-- balls that have sunk into each other (only ever by a hair) are set touching again
+							local over = 2 * R - d
+							if over > 0 then
+								local half = 0.5 * over
+								a.x -= dx / d * half
+								a.z -= dz / d * half
+								b.x += dx / d * half
+								b.z += dz / d * half
+							end
+						end
+					end
+				end
+			end
 		end
-		local pv = pmax * uv / u
-		if math.abs(pv) > math.abs(uv) / 5 then
-			pv = uv / 5
-		end
-		a.vx -= ph * tx
-		a.vz -= ph * tz
-		b.vx += ph * tx
-		b.vz += ph * tz
-		a.s -= 2.5 * ph
-		b.s -= 2.5 * ph
-		local dq = 2.5 * pv
-		a.qx += dq * nx
-		a.qz += dq * nz
-		b.qx += dq * nx
-		b.qz += dq * nz
 	end
-	a.vx -= jn * nx
-	a.vz -= jn * nz
-	b.vx += jn * nx
-	b.vz += jn * nz
-	a.mode = if a.mode == 0 then 1 else a.mode
-	b.mode = if b.mode == 0 then 1 else b.mode
-	return vn
+	if nc == 0 then
+		return
+	end
+	-- the velocity each ball had before the wave (for the energy check)
+	local pvx: { [number]: number }, pvz: { [number]: number } = {}, {}
+	if nc > 1 then
+		for c = 1, nc do
+			local i, j = ci[c], cj[c]
+			pvx[i], pvz[i] = balls[i].vx, balls[i].vz
+			pvx[j], pvz[j] = balls[j].vx, balls[j].vz
+		end
+	end
+	local sweeps = if nc == 1 then 1 else Physics.WAVE_SWEEPS
+	for _ = 1, sweeps do
+		local worst = 0
+		for c = 1, nc do
+			local a, b = balls[ci[c]], balls[cj[c]]
+			local nx, nz = cnx[c], cnz[c]
+			local u = cu[c]
+			local e = if u < V_DEAD then 0 else E_BALL
+			local rel = (a.vx - b.vx) * nx + (a.vz - b.vz) * nz
+			local l0 = cl[c]
+			local l1 = l0 + 0.5 * (rel + e * u)
+			if l1 < 0 then
+				l1 = 0
+			end
+			local dl = l1 - l0
+			if dl ~= 0 then
+				cl[c] = l1
+				a.vx -= dl * nx
+				a.vz -= dl * nz
+				b.vx += dl * nx
+				b.vz += dl * nz
+				if dl > worst then
+					worst = dl
+				elseif -dl > worst then
+					worst = -dl
+				end
+			end
+		end
+		if worst < 1e-7 then
+			break
+		end
+	end
+	if nc > 1 then
+		local before, after, cross, dd = 0, 0, 0, 0
+		for i, x in pvx do
+			local a = balls[i]
+			local z = pvz[i]
+			local ex, ez = a.vx - x, a.vz - z
+			before += x * x + z * z
+			after += a.vx * a.vx + a.vz * a.vz
+			cross += x * ex + z * ez
+			dd += ex * ex + ez * ez
+		end
+		if after > before and dd > 0 then
+			-- scale the whole wave back to break even (momentum is kept at any scale)
+			local s = -2 * cross / dd
+			if s < 0 then
+				s = 0
+			end
+			if s < 1 then
+				for i, x in pvx do
+					local a = balls[i]
+					local z = pvz[i]
+					a.vx = x + s * (a.vx - x)
+					a.vz = z + s * (a.vz - z)
+				end
+				for c = 1, nc do
+					cl[c] *= s
+				end
+			end
+		end
+	end
+	for c = 1, nc do
+		local jn = cl[c]
+		if jn > 0 then
+			local i, j = ci[c], cj[c]
+			local a, b = balls[i], balls[j]
+			local nx, nz = cnx[c], cnz[c]
+			local tx, tz = -nz, nx
+			-- rubbing at the contact point: along the level (motion plus both side spins) and up and down (both rolls)
+			local uh = (a.vx - b.vx) * tx + (a.vz - b.vz) * tz + a.s + b.s
+			local uv = -((a.qx + b.qx) * nx + (a.qz + b.qz) * nz)
+			local u = math.sqrt(uh * uh + uv * uv)
+			if u > 1e-9 then
+				local mu = Physics.MU_BALL_MIN
+					+ Physics.MU_BALL_VAR / (1 + Physics.MU_BALL_C1 * u + Physics.MU_BALL_C2 * u * u)
+				local pmax = mu * jn
+				local ph = pmax * uh / u
+				if math.abs(ph) > math.abs(uh) / 7 then
+					ph = uh / 7
+				end
+				local pv = pmax * uv / u
+				if math.abs(pv) > math.abs(uv) / 5 then
+					pv = uv / 5
+				end
+				a.vx -= ph * tx
+				a.vz -= ph * tz
+				b.vx += ph * tx
+				b.vz += ph * tz
+				a.s -= 2.5 * ph
+				b.s -= 2.5 * ph
+				local dq = 2.5 * pv
+				a.qx += dq * nx
+				a.qz += dq * nz
+				b.qx += dq * nx
+				b.qz += dq * nz
+			end
+			if a.mode == 0 then
+				a.mode = 1
+			end
+			if b.mode == 0 then
+				b.mode = 1
+			end
+			event(w, t, 1, a.id, b.id, cu[c])
+			key(w, i, t)
+			key(w, j, t)
+		end
+	end
 end
 
 -- candidate kinds inside step()
@@ -467,7 +577,12 @@ function Physics.step(w: World): boolean
 		if not anyMoving then
 			break
 		end
-		if kind == 0 or guard >= Physics.MAX_EVENTS then
+		if guard >= Physics.MAX_EVENTS then
+			-- a knot of contacts this step cannot untie: the rest of the step is given up (the balls wait where
+			-- they are for a few thousandths of a second) rather than let anything move unchecked
+			break
+		end
+		if kind == 0 then
 			for i = 1, n do
 				local a = balls[i]
 				if a.mode == 1 or a.mode == 2 then
@@ -493,13 +608,7 @@ function Physics.step(w: World): boolean
 			a.mode = 1
 		end
 		if kind == C_BALL then
-			local b = balls[bj]
-			local speed = collide(a, b, R)
-			if speed > 0 then
-				event(w, t, 1, a.id, b.id, speed)
-				key(w, bi, t)
-				key(w, bj, t)
-			end
+			wave(w, t, R)
 		elseif kind == C_FACE or kind == C_END1 or kind == C_END2 then
 			local sg = segs[bj]
 			local nx: number, nz: number
