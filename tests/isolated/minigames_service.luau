@@ -17,6 +17,7 @@ local Referee = require("@shared/Minigames/Bowling/Referee")
 local RollScript = require("@shared/Minigames/Bowling/RollScript")
 local Session = require("@shared/Minigames/Session")
 local MinigameService = require("@server/Minigames/MinigameService")
+local BowlingFlow = require("@tests/engine/BowlingFlow")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local roblox = require("@lune/roblox")
 
@@ -730,6 +731,62 @@ return function(t)
 				t.truthy(input(w, q, "start"))
 				step(w, 0.2)
 				t.truthy(input(w, q, "release", POCKET))
+			end)
+		end
+	)
+
+	t.test(
+		"the engine check's own flow (tests/engine/BowlingFlow) passes here: 300, 167, 150, real throws, clean ends",
+		function()
+			FakeEngine.with(function()
+				-- the cloud check cannot be run from this machine; its flow takes any MinigameService, so it is
+				-- run on this one first. What a server run adds is the real engine and the booted game.
+				local w = world(11)
+				local result = BowlingFlow.play(w.svc, { Bowling = Bowling, Session = Session, Referee = Referee }, {
+					players = { stub("Ann"), stub("Bob"), stub("Cat") },
+					laneA = "bowling_lane_2",
+					laneB = "bowling_lane_5",
+					step = function(seconds: number)
+						step(w, seconds)
+					end,
+				})
+				t.eq(table.concat(result.failures, "\n"), "")
+				t.truthy(result.ok)
+				local g = result.games
+				t.eq(g.perfect.total, 300)
+				t.deepEq(g.perfect.frames, { 30, 60, 90, 120, 150, 180, 210, 240, 270, 300 })
+				t.eq(g.perfect.marks[10], "X X X")
+				t.eq(g.mixed.total, 167)
+				t.deepEq(g.mixed.frames, { 20, 39, 48, 66, 74, 84, 90, 120, 148, 167 })
+				-- (a strike in frames one to nine is an empty first box and an X in the second)
+				t.deepEq(g.mixed.marks, { " X", "7 /", "9 -", " X", "- 8", "8 /", "- 6", " X", " X", "X 8 1" })
+				t.eq(g.spares.total, 150)
+				t.eq(g.spares.marks[10], "5 / 5")
+				t.eq(g.real.total, Bowling.total(g.real.rolls))
+				t.truthy(g.real.total >= 100, `ten frames of pocket balls scored {g.real.total}`)
+				-- a whole frame each in turn; the tenth frame's three balls together
+				t.eq(result.numbers.turnOrder, "12122122121221221221212111222")
+				t.eq(result.numbers.endLine, "Ann wins with 300!")
+				-- the check has teeth: on a service that drops a pin from every nine it reports failures (the nine
+				-- in the third frame is also the bonus of the spare before it: 165, not 167)
+				local w2 = world(11)
+				local honest = w2.svc.debugRoll
+				w2.svc.debugRoll = function(self: any, id: string, pins: number): (boolean, string?)
+					return honest(self, id, if pins == 9 then 8 else pins)
+				end
+				local bad = BowlingFlow.play(w2.svc, { Bowling = Bowling, Session = Session, Referee = Referee }, {
+					players = { stub("Ann"), stub("Bob"), stub("Cat") },
+					laneA = "bowling_lane_2",
+					laneB = "bowling_lane_5",
+					step = function(seconds: number)
+						step(w2, seconds)
+					end,
+				})
+				t.falsy(bad.ok)
+				t.truthy(#bad.failures >= 1)
+				t.truthy(
+					string.find(table.concat(bad.failures, "\n"), "mixed: total 165, expected 167", 1, true) ~= nil
+				)
 			end)
 		end
 	)
