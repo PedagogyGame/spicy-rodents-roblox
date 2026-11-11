@@ -16,8 +16,8 @@
 local InputLog = {}
 
 InputLog.MAX_TICKS = 720 -- three seconds a segment at most
-InputLog.MAX_CHANGES = 120 -- a person cannot change the buttons more often than this in one segment
-InputLog.BUTTONS_MAX = 127
+InputLog.MAX_CHANGES = 160 -- a person cannot change the buttons more often than this in one segment (a plunger pulled by a stick changes at every step of its travel)
+InputLog.BUTTONS_MAX = 4095 -- Machine.BUTTONS_MAX: seven button bits and an analogue plunger of 0..31 above them
 
 export type Segment = { number }
 export type Recorder = {

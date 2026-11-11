@@ -4,7 +4,9 @@
 -- board does round it. One machine, one to four players taking a ball each in turn, three balls a game, on
 -- free play (checklist PIN-R1..R5):
 --   * the plunger is analogue: hold to pull back (a full pull takes PULL time), let go to launch; the strength
---     is the launch speed, so a soft plunge can drop into a table's skill shot;
+--     is the launch speed, so a soft plunge can drop into a table's skill shot. A hand that can say HOW FAR
+--     (a stick pulled down, a finger dragged down a strip) sends the pull itself, 1..31, in the same number
+--     as the buttons, and the rod follows the hand;
 --   * a ball save runs for the table's own time from the moment the ball enters the playfield: a ball lost in
 --     it comes back to the plunger and is launched by the machine;
 --   * nudges shove the ball and swing the tilt bob: two warnings a ball, the third TILTS (flippers, bumpers
@@ -13,7 +15,9 @@
 --   * the end-of-ball bonus is counted out step by step with its multiplier;
 --   * one extra ball at most per player per game, earned by play; no credits, no replays, no match number;
 --   * a ball that sits still where no flipper holds it is found by a ball search (a seeded kick), so a game
---     can always be finished.
+--     can always be finished;
+--   * a player who has gone for good (walked away, bitten) is retired: the ball in play is played out dead,
+--     their later balls are passed over, their score stands.
 -- What each table scores, lights and says is its rule sheet (Sheet, in TableAcorn / TableSpicy / TableSpace):
 -- the machine hands every switch event from the physics to the sheet and offers it add(), callout(),
 -- extraBall(), feed() and the like.
@@ -24,7 +28,9 @@
 -- Pure; Lune-tested (tests/unit/pinball_machine.spec.luau, pinball_rules.spec.luau, pinball_games.spec.luau).
 -- Interface: BTN (button bits), PHASE, CUE, SAY (the callouts every table shares), TEXT; BALLS, MAX_PLAYERS and
 --   the tuning constants; new(table, seed, players) -> State; step(table, state, buttons, out);
---   forfeit(table, state, out) (an abandoned ball is played out dead); lamps(table, state, into) -> into;
+--   forfeit(table, state, out) (an abandoned ball is played out dead); retire(table, state, seat, out) (a
+--   player has gone for good); buttons(bits, pull) -> the number step() takes; pullOf(buttons) -> 0..31;
+--   lamps(table, state, into) -> into;
 --   for sheets: add, callout, cue, extraBall, feed, stat, raiseDrops, dropsClear, live(state) -> number;
 --   key(code, ref) -> shot key;
 --   clone(state) -> State; types Sheet, Table, State
@@ -55,6 +61,12 @@ Machine.FORFEIT_TICKS = 14400 -- an abandoned ball is given a minute to drain, t
 
 Machine.BTN = { LEFT = 1, RIGHT = 2, PLUNGE = 4, NUDGE_L = 8, NUDGE_R = 16, NUDGE_UP = 32, THUMP = 64 }
 Machine.BTN_ALL = 127
+-- above the button bits the same number carries an analogue plunger: how far the hand has pulled it, 0 (not
+-- held this way) to PULL_LEVELS (right back)
+Machine.PULL_UNIT = 128
+Machine.PULL_LEVELS = 31
+Machine.BUTTONS_MAX = 127 + 31 * 128
+Machine.ROD_TICKS = 40 -- the rod follows the hand this fast: its whole travel in this many ticks
 
 Machine.PHASE = { PLAY = 1, BONUS = 2, OVER = 3 }
 
@@ -150,6 +162,7 @@ export type State = {
 	tilted: boolean,
 	forfeit: boolean,
 	forfeitLeft: number,
+	gone: { boolean }, -- per player: retired from this game (their balls are passed over)
 	queue: number, -- balls the machine owes the plunger
 	feedIn: number, -- ticks until the next owed ball comes up (0: not counting)
 	autoIn: number, -- ticks until the machine launches the ball on the plunger (0: the player launches)
@@ -224,6 +237,21 @@ end
 -- how a shot is named (Shots) and how a sheet says what it wants hit.
 function Machine.key(code: number, ref: number): number
 	return code * 1000 + ref
+end
+
+-- buttons(bits, pull): the one number step() takes: BTN bits plus an analogue plunger pull of 0..1 (0: the
+-- plunger is not held this way).
+function Machine.buttons(bits: number, pull: number?): number
+	local level = 0
+	if pull and pull > 0 then
+		level = math.clamp(math.floor(pull * Machine.PULL_LEVELS + 0.5), 1, Machine.PULL_LEVELS)
+	end
+	return bit32.band(bits, Machine.BTN_ALL) + level * Machine.PULL_UNIT
+end
+
+-- pullOf(buttons): the analogue plunger level in a buttons number, 0..PULL_LEVELS.
+function Machine.pullOf(buttons: number): number
+	return bit32.band(bit32.rshift(buttons, 7), Machine.PULL_LEVELS)
 end
 
 -- cue(out, cue, a, b): for sheets.
@@ -382,6 +410,7 @@ function Machine.new(tbl: Table, seed: number, players: number): State
 		tilted = false,
 		forfeit = false,
 		forfeitLeft = 0,
+		gone = table.create(players, false),
 		queue = 0,
 		feedIn = 0,
 		autoIn = 0,
@@ -462,11 +491,14 @@ local function nextBall(m: State, tbl: Table, out: { number })
 		startBall(m, tbl, out)
 		return
 	end
-	m.up += 1
-	if m.up > m.players then
-		m.up = 1
-		m.ball += 1
-	end
+	-- the next player who is still here (a retired player's balls are passed over)
+	repeat
+		m.up += 1
+		if m.up > m.players then
+			m.up = 1
+			m.ball += 1
+		end
+	until m.ball > Machine.BALLS or not m.gone[m.up]
 	if m.ball > Machine.BALLS then
 		m.up = 1
 		m.ball = Machine.BALLS
@@ -671,9 +703,23 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 				Physics.launch(phys, resting, p.vMin + (p.vMax - p.vMin) * p.autoPull)
 				push(out, CUE.PLUNGE, 0, p.autoPull)
 			end
+		elseif buttons >= Machine.PULL_UNIT then
+			-- an analogue hand: the rod follows it, quickly but not at once
+			local want = Machine.pullOf(buttons) / Machine.PULL_LEVELS * p.pullTicks
+			local rate = p.pullTicks / Machine.ROD_TICKS
+			if want > m.pull + rate then
+				m.pull += rate
+			elseif want < m.pull - rate then
+				m.pull -= rate
+			else
+				m.pull = want
+			end
 		elseif band(buttons, BTN.PLUNGE) ~= 0 then
 			if m.pull < p.pullTicks then
 				m.pull += 1
+				if m.pull > p.pullTicks then
+					m.pull = p.pullTicks
+				end
 			end
 		elseif m.pull > 0 then
 			local strength = m.pull / p.pullTicks
@@ -847,6 +893,33 @@ function Machine.forfeit(_tbl: Table, m: State, _out: { number })
 		if b.mode == HELD then
 			b.timer = 1
 		end
+	end
+end
+
+-- retire(table, state, seat, out): this player has gone for good (walked away, bitten, removed). Their score
+-- stands; if their ball is in play it is played out dead (forfeit) and every later ball of theirs is passed
+-- over. When nobody is left the game is over at once.
+function Machine.retire(tbl: Table, m: State, seat: number, out: { number })
+	if m.phase == OVER or seat < 1 or seat > m.players or m.gone[seat] then
+		return
+	end
+	m.gone[seat] = true
+	local left = false
+	for i = 1, m.players do
+		if not m.gone[i] then
+			left = true
+		end
+	end
+	if not left then
+		for i = #m.phys.balls, 1, -1 do
+			m.phys.balls[i] = nil
+		end
+		m.phase = OVER
+		m.phys.dead = true
+		push(out, CUE.GAME_OVER, 0, 0)
+		Machine.callout(m, out, SAY.GAME_OVER, 0)
+	elseif m.up == seat and m.phase == PLAY then
+		Machine.forfeit(tbl, m, out)
 	end
 end
 

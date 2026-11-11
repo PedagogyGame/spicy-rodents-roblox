@@ -102,7 +102,7 @@ return function(t: Test.T)
 			["span"] = { 0, 0 },
 			["ticks"] = { 0, 48.5 },
 			["offsets"] = { 0, 48, 49, 1 },
-			["buttons"] = { 0, 48, 1, 128 },
+			["buttons"] = { 0, 48, 1, 4096 },
 			["numbers"] = { 0, 48, 1, 0.5 },
 		}
 		for why, seg in bad do

@@ -15,7 +15,9 @@
 -- Pure; Lune-tested (tests/unit/pinball_replay.spec.luau).
 -- Interface: new(tableId, seed, players) -> State; feed(r, seat, segment, out?) -> (ok, why?);
 --   recorder(r) -> InputLog.Recorder and live(r, rec, buttons, out?) -> Segment? (the player's side);
---   skip(r, out?) (the ball in play is abandoned and played out dead); grantThump(r); pace(r, seconds) -> ticks
+--   skip(r, out?) (the ball in play is abandoned and played out dead); retire(r, seat, out?) (a player has
+--   gone for good: their ball in play is played out dead, their later balls passed over, their score kept);
+--   grantThump(r); pace(r, seconds) -> ticks
 --   ahead; over(r) -> boolean; SEGMENT_TICKS, GUARD_MIN_SECONDS
 
 local InputLog = require("./InputLog")
@@ -195,6 +197,26 @@ function Replay.skip(r: State, out: { number }?)
 	r.held = 0
 	r.ballScore = m.scores[m.up]
 	r.ballTick = r.tick
+	if out == nil then
+		table.clear(scratch)
+	end
+end
+
+-- retire(r, seat, out): the player in `seat` has gone for good. If their ball is in play it is played out dead
+-- at once (as skip does); their later balls are passed over; their score stands. Every replay that is told
+-- to retire the same seat at the same tick does the same.
+function Replay.retire(r: State, seat: number, out: { number }?)
+	local m = r.m
+	if m.phase == OVER or seat < 1 or seat > m.players or m.gone[seat] then
+		return
+	end
+	local tbl = Tables.need(r.id)
+	local sink = out or scratch
+	local mine = m.up == seat
+	Machine.retire(tbl, m, seat, sink)
+	if mine and m.phase ~= OVER then
+		Replay.skip(r, sink)
+	end
 	if out == nil then
 		table.clear(scratch)
 	end

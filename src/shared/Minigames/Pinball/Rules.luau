@@ -8,7 +8,9 @@
 -- the game. turn() is the player whose ball is up; it moves on by itself when that ball has drained and its
 -- bonus is counted. skipTurn() abandons the ball in play (it is played out dead: the game's "miss").
 -- The server's own verb "thump" lets one thump on the glass into the log (an animal landed on the cabinet):
--- it is a nudge that can warn but never tilt.
+-- it is a nudge that can warn but never tilt. The server's verb "retire" takes a seat out for good (the
+-- player walked away or was bitten, C13): the ball in play is played out dead, their later balls are passed
+-- over and the score so far is kept.
 -- Free play: money is "none"; nothing here knows a credit, a replay award or a match number (PIN-R4).
 -- Pure; Lune-tested (tests/unit/pinball_rules.spec.luau).
 -- Interface: forTable(tableId) -> Minigame.Rules (cached); GAMES (the three ids); MAX_PLAYERS;
@@ -40,8 +42,8 @@ local function build(tableId: string): Minigame.Rules
 		authority = "client_replay",
 		money = "none",
 	} :: Minigame.Def
-	rules.verbs = { seg = true, thump = true }
-	rules.serverVerbs = { thump = true }
+	rules.verbs = { seg = true, thump = true, retire = true }
+	rules.serverVerbs = { thump = true, retire = true }
 
 	function rules.init(seats: number, seed: number): any
 		return Replay.new(tableId, seed, seats)
@@ -55,6 +57,13 @@ local function build(tableId: string): Minigame.Rules
 				return false, "no segment"
 			end
 			return Replay.feed(r, seat, seg)
+		elseif verb == "retire" then
+			-- the server's: this seat has gone for good (walked away, bitten); the score so far is kept
+			if Replay.over(r) then
+				return false, "the game is over"
+			end
+			Replay.retire(r, seat)
+			return true
 		elseif verb == "thump" then
 			if Replay.over(r) then
 				return false, "the game is over"
@@ -113,6 +122,7 @@ local function build(tableId: string): Minigame.Rules
 		for seat = 1, m.players do
 			players[seat] = {
 				score = m.scores[seat],
+				gone = m.gone[seat],
 				extraBall = m.extras[seat] > 0,
 				stats = table.clone(m.stats[seat]),
 			}
