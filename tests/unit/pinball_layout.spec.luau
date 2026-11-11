@@ -73,60 +73,71 @@ return function(t: Test.T)
 			t.eq(tbl.c.nFlip, 2)
 			-- every collider is in the grid cell it stands in
 			for i = 1, tbl.c.nCir do
-				local cell = math.floor(tbl.c.cy[i] / Layout.CELL) * tbl.c.gridW + math.floor(tbl.c.cx[i] / Layout.CELL) + 1
+				local cell = math.floor(tbl.c.cy[i] / Layout.CELL) * tbl.c.gridW
+					+ math.floor(tbl.c.cx[i] / Layout.CELL)
+					+ 1
 				t.truthy(table.find(tbl.c.grid[cell], -i), `circle {i} in its cell`)
 			end
 		end)
 
-		t.test(`{def.title}: PIN-P4 the slope is a real table's (6 to 7 degrees) and gravity follows from it`, function()
-			t.truthy(def.slopeDeg >= 6 and def.slopeDeg <= 7, "slope")
-			t.near(def.gravity, Layout.gravityFor(def.slopeDeg), 1e-9)
-			-- a ball rolling the length of the table from rest takes between one and a half and two seconds
-			local seconds = math.sqrt(2 * Layout.LENGTH / def.gravity)
-			t.truthy(seconds > 1.4 and seconds < 2.0, `fall time {seconds}`)
-		end)
-
-		t.test(`{def.title}: a pinball bottom: two flippers, slings, inlanes, outlanes, a gap to lose the ball in`, function()
-			local l, r = def.flippers[1], def.flippers[2]
-			t.eq(l.button, "left")
-			t.eq(r.button, "right")
-			t.eq(l.mirror, false)
-			t.eq(r.mirror, true)
-			-- mirror images about the playfield's centre line
-			t.near(l.x + r.x, 2 * Layout.XC, 1e-9)
-			t.eq(l.y, r.y)
-			-- the flipper is a real flipper's size (3 inches on a 20.25 inch table) and swings 50 to 70 degrees
-			t.near(l.len / Layout.WIDTH, 3 / 20.25, 0.02)
-			local swing = math.deg(l.up - l.rest)
-			t.truthy(swing >= 50 and swing <= 70, `swing {swing}`)
-			-- the gap between the tips at rest lets a ball through, and is no wider than three balls
-			local tipL = l.x + Det.cos(l.rest) * l.len + l.rTip
-			local tipR = r.x - Det.cos(r.rest) * r.len - r.rTip
-			local gap = tipR - tipL
-			t.truthy(gap > 2 * Layout.BALL_R + 0.02, `gap {gap}`)
-			t.truthy(gap < 6 * Layout.BALL_R, `gap {gap}`)
-			t.eq(#def.slings, 2)
-			for _, name in { "inlane_l", "inlane_r", "outlane_l", "outlane_r" } do
-				t.truthy(tbl.ix.sensor[name], name)
+		t.test(
+			`{def.title}: PIN-P4 the slope is a real table's (6 to 7 degrees) and gravity follows from it`,
+			function()
+				t.truthy(def.slopeDeg >= 6 and def.slopeDeg <= 7, "slope")
+				t.near(def.gravity, Layout.gravityFor(def.slopeDeg), 1e-9)
+				-- a ball rolling the length of the table from rest takes between one and a half and two seconds
+				local seconds = math.sqrt(2 * Layout.LENGTH / def.gravity)
+				t.truthy(seconds > 1.4 and seconds < 2.0, `fall time {seconds}`)
 			end
-			-- an outlane is wide enough to take a ball
-			local out = def.sensors[tbl.ix.sensor.outlane_l]
-			t.truthy(out.x2 - out.x1 > 2 * Layout.BALL_R, "outlane width")
-			t.truthy(tbl.ix.lamp.shoot_again, "a shoot-again lamp")
-			t.truthy(tbl.ix.lamp.extra_ball, "an extra-ball lamp")
-		end)
+		)
 
-		t.test(`{def.title}: the plunger sits at the foot of the shooter lane and its full pull takes about a second`, function()
-			local p = def.plunger
-			t.truthy(p.x > Layout.FIELD_X1 + Layout.BALL_R and p.x < Layout.WIDTH - Layout.BALL_R)
-			t.truthy(p.vMax > p.vMin and p.vMin > 0)
-			t.truthy(p.pullTicks >= 200 and p.pullTicks <= 360)
-			-- a full plunge has the speed to go right round the arch; the softest one has not
-			local top = Layout.ARCH_Y + Layout.WIDTH / 2 - p.y
-			t.truthy(p.vMax * p.vMax > 2 * def.gravity * top * 1.2, "a full plunge clears the arch")
-			t.truthy(p.vMin * p.vMin < 2 * def.gravity * top, "a soft plunge does not")
-			t.truthy(tbl.ix.gate.lane_gate, "the one-way gate at the head of the lane")
-		end)
+		t.test(
+			`{def.title}: a pinball bottom: two flippers, slings, inlanes, outlanes, a gap to lose the ball in`,
+			function()
+				local l, r = def.flippers[1], def.flippers[2]
+				t.eq(l.button, "left")
+				t.eq(r.button, "right")
+				t.eq(l.mirror, false)
+				t.eq(r.mirror, true)
+				-- mirror images about the playfield's centre line
+				t.near(l.x + r.x, 2 * Layout.XC, 1e-9)
+				t.eq(l.y, r.y)
+				-- the flipper is a real flipper's size (3 inches on a 20.25 inch table) and swings 50 to 70 degrees
+				t.near(l.len / Layout.WIDTH, 3 / 20.25, 0.02)
+				local swing = math.deg(l.up - l.rest)
+				t.truthy(swing >= 50 and swing <= 70, `swing {swing}`)
+				-- the gap between the tips at rest lets a ball through, and is no wider than three balls
+				local tipL = l.x + Det.cos(l.rest) * l.len + l.rTip
+				local tipR = r.x - Det.cos(r.rest) * r.len - r.rTip
+				local gap = tipR - tipL
+				t.truthy(gap > 2 * Layout.BALL_R + 0.02, `gap {gap}`)
+				t.truthy(gap < 6 * Layout.BALL_R, `gap {gap}`)
+				t.eq(#def.slings, 2)
+				for _, name in { "inlane_l", "inlane_r", "outlane_l", "outlane_r" } do
+					t.truthy(tbl.ix.sensor[name], name)
+				end
+				-- an outlane is wide enough to take a ball
+				local out = def.sensors[tbl.ix.sensor.outlane_l]
+				t.truthy(out.x2 - out.x1 > 2 * Layout.BALL_R, "outlane width")
+				t.truthy(tbl.ix.lamp.shoot_again, "a shoot-again lamp")
+				t.truthy(tbl.ix.lamp.extra_ball, "an extra-ball lamp")
+			end
+		)
+
+		t.test(
+			`{def.title}: the plunger sits at the foot of the shooter lane and its full pull takes about a second`,
+			function()
+				local p = def.plunger
+				t.truthy(p.x > Layout.FIELD_X1 + Layout.BALL_R and p.x < Layout.WIDTH - Layout.BALL_R)
+				t.truthy(p.vMax > p.vMin and p.vMin > 0)
+				t.truthy(p.pullTicks >= 200 and p.pullTicks <= 360)
+				-- a full plunge has the speed to go right round the arch; the softest one has not
+				local top = Layout.ARCH_Y + Layout.WIDTH / 2 - p.y
+				t.truthy(p.vMax * p.vMax > 2 * def.gravity * top * 1.2, "a full plunge clears the arch")
+				t.truthy(p.vMin * p.vMin < 2 * def.gravity * top, "a soft plunge does not")
+				t.truthy(tbl.ix.gate.lane_gate, "the one-way gate at the head of the lane")
+			end
+		)
 
 		t.test(`{def.title}: every lamp, switch and callout the rule sheet names exists`, function()
 			local m = Machine.new(tbl, 1, 1)
@@ -140,53 +151,62 @@ return function(t: Test.T)
 				t.truthy(#text > 0)
 			end
 			t.truthy(#tbl.sheet.status(m, m.sheets[1]) > 0, "a status line")
-			t.truthy(tbl.sheet.saveTicks >= 8 * 240 and tbl.sheet.saveTicks <= 10 * 240, "PIN-R2: ball save of 8 to 10 s")
+			t.truthy(
+				tbl.sheet.saveTicks >= 8 * 240 and tbl.sheet.saveTicks <= 10 * 240,
+				"PIN-R2: ball save of 8 to 10 s"
+			)
 		end)
 	end
 
-	t.test("PIN-R6: ACORN ATTACK is the electro-mechanical one: three bumpers, the five-target bank, a spinner", function()
-		local def = Tables.need("pinball_acorn").def
-		t.eq(#def.bumpers, 3)
-		t.eq(
-			count(def.targets, function(x)
-				return x.kind == "drop"
-			end),
-			5
-		)
-		t.eq(
-			count(def.sensors, function(x)
-				return x.kind == "spinner"
-			end),
-			1
-		)
-		t.eq(#def.rails, 0)
-		t.eq(#def.saucers, 0)
-	end)
+	t.test(
+		"PIN-R6: ACORN ATTACK is the electro-mechanical one: three bumpers, the five-target bank, a spinner",
+		function()
+			local def = Tables.need("pinball_acorn").def
+			t.eq(#def.bumpers, 3)
+			t.eq(
+				count(def.targets, function(x)
+					return x.kind == "drop"
+				end),
+				5
+			)
+			t.eq(
+				count(def.sensors, function(x)
+					return x.kind == "spinner"
+				end),
+				1
+			)
+			t.eq(#def.rails, 0)
+			t.eq(#def.saucers, 0)
+		end
+	)
 
-	t.test("PIN-R6: SPICY RODENT has the wire ramp, five S-P-I-C-Y targets and the bite, and is steeper and hungrier", function()
-		local def = Tables.need("pinball_rodent").def
-		local acorn = Tables.need("pinball_acorn").def
-		t.eq(#def.rails, 1)
-		t.eq(def.rails[1].id, "wire")
-		t.eq(
-			count(def.targets, function(x)
-				return x.kind == "standup"
-			end),
-			5
-		)
-		t.eq(#def.saucers, 1)
-		t.eq(def.saucers[1].id, "bite")
-		t.truthy(def.gravity > acorn.gravity, "steeper")
-		local function gapOf(d: Layout.TableDef): number
-			return d.flippers[2].x - d.flippers[1].x
+	t.test(
+		"PIN-R6: SPICY RODENT has the wire ramp, five S-P-I-C-Y targets and the bite, and is steeper and hungrier",
+		function()
+			local def = Tables.need("pinball_rodent").def
+			local acorn = Tables.need("pinball_acorn").def
+			t.eq(#def.rails, 1)
+			t.eq(def.rails[1].id, "wire")
+			t.eq(
+				count(def.targets, function(x)
+					return x.kind == "standup"
+				end),
+				5
+			)
+			t.eq(#def.saucers, 1)
+			t.eq(def.saucers[1].id, "bite")
+			t.truthy(def.gravity > acorn.gravity, "steeper")
+			local function gapOf(d: Layout.TableDef): number
+				return d.flippers[2].x - d.flippers[1].x
+			end
+			t.truthy(gapOf(def) > gapOf(acorn), "a wider gap between the flippers")
+			local function outlane(d: Layout.TableDef): number
+				local s = d.sensors[Layout.index(d).sensor.outlane_l]
+				return s.x2 - s.x1
+			end
+			t.truthy(outlane(def) > outlane(acorn), "wider outlanes")
 		end
-		t.truthy(gapOf(def) > gapOf(acorn), "a wider gap between the flippers")
-		local function outlane(d: Layout.TableDef): number
-			local s = d.sensors[Layout.index(d).sensor.outlane_l]
-			return s.x2 - s.x1
-		end
-		t.truthy(outlane(def) > outlane(acorn), "wider outlanes")
-	end)
+	)
 
 	t.test("PIN-R6: SPACE SQUIRREL has two ramps, an orbit and two lock pods", function()
 		local tbl = Tables.need("pinball_space")

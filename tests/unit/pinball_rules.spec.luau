@@ -31,7 +31,15 @@ local function inPlay(tbl: Machine.Table, players: number?): (Machine.State, { n
 	return m, out
 end
 
-local function fire(tbl: Machine.Table, m: Machine.State, out: { number }, code: number, ref: number, value: number?, ball: number?)
+local function fire(
+	tbl: Machine.Table,
+	m: Machine.State,
+	out: { number },
+	code: number,
+	ref: number,
+	value: number?,
+	ball: number?
+)
 	tbl.sheet.event(m, m.sheets[m.up], tbl, out, code, ref, value or 1, ball or 1)
 end
 
@@ -158,45 +166,49 @@ return function(t: Test.T)
 		t.eq(m3.skillLeft, 0)
 	end)
 
-	t.test("ACORN ATTACK: A-C-O-R-N down puts an acorn in the hoard, resets the bank, steps the multiplier, lights the spinner", function()
-		local m, out = inPlay(A)
-		local s = m.sheets[1]
-		local bank = { aix.target.acorn_a, aix.target.acorn_c, aix.target.acorn_o, aix.target.acorn_r, aix.target.acorn_n }
-		local function knock(n: number)
-			for i = 1, n do
-				m.phys.drop[bank[i]] = true
-				fire(A, m, out, EV.DROP, bank[i])
+	t.test(
+		"ACORN ATTACK: A-C-O-R-N down puts an acorn in the hoard, resets the bank, steps the multiplier, lights the spinner",
+		function()
+			local m, out = inPlay(A)
+			local s = m.sheets[1]
+			local bank =
+				{ aix.target.acorn_a, aix.target.acorn_c, aix.target.acorn_o, aix.target.acorn_r, aix.target.acorn_n }
+			local function knock(n: number)
+				for i = 1, n do
+					m.phys.drop[bank[i]] = true
+					fire(A, m, out, EV.DROP, bank[i])
+				end
+			end
+			knock(4)
+			t.eq(m.scores[1], 400)
+			t.eq(s.hoard, 0)
+			t.eq(Machine.lamps(A, m, {})[aix.lamp.acorn_n], 1, "the last one standing is lit")
+			t.eq(Machine.lamps(A, m, {})[aix.lamp.acorn_a], 0)
+			m.phys.drop[bank[5]] = true
+			fire(A, m, out, EV.DROP, bank[5])
+			t.eq(s.hoard, 1)
+			t.eq(m.scores[1], 500 + AP.bank)
+			t.eq(said(out, A.SAY.ACORN), 1)
+			t.eq(s.mult, 2)
+			t.eq(A.MULTS[s.mult], 2, "bonus 2x")
+			t.eq(s.spinnerLit, 1)
+			local before = m.scores[1]
+			fire(A, m, out, EV.SPIN, aix.sensor.spinner)
+			t.eq(m.scores[1] - before, AP.spinLit, "the lit spinner pays 100 a turn")
+			-- the bank stands up again a moment later
+			t.truthy(m.phys.drop[bank[1]])
+			tick(A, m, out, 200)
+			for i = 1, 5 do
+				t.falsy(m.phys.drop[bank[i]], `target {i} is up again`)
+			end
+			-- the multiplier goes 2x, 3x, 5x and no higher
+			for expect = 3, 6 do
+				knock(5)
+				tick(A, m, out, 200)
+				t.eq(A.MULTS[s.mult], ({ 1, 2, 3, 5, 5, 5 })[math.min(expect, 6)])
 			end
 		end
-		knock(4)
-		t.eq(m.scores[1], 400)
-		t.eq(s.hoard, 0)
-		t.eq(Machine.lamps(A, m, {})[aix.lamp.acorn_n], 1, "the last one standing is lit")
-		t.eq(Machine.lamps(A, m, {})[aix.lamp.acorn_a], 0)
-		m.phys.drop[bank[5]] = true
-		fire(A, m, out, EV.DROP, bank[5])
-		t.eq(s.hoard, 1)
-		t.eq(m.scores[1], 500 + AP.bank)
-		t.eq(said(out, A.SAY.ACORN), 1)
-		t.eq(s.mult, 2)
-		t.eq(A.MULTS[s.mult], 2, "bonus 2x")
-		t.eq(s.spinnerLit, 1)
-		local before = m.scores[1]
-		fire(A, m, out, EV.SPIN, aix.sensor.spinner)
-		t.eq(m.scores[1] - before, AP.spinLit, "the lit spinner pays 100 a turn")
-		-- the bank stands up again a moment later
-		t.truthy(m.phys.drop[bank[1]])
-		tick(A, m, out, 200)
-		for i = 1, 5 do
-			t.falsy(m.phys.drop[bank[i]], `target {i} is up again`)
-		end
-		-- the multiplier goes 2x, 3x, 5x and no higher
-		for expect = 3, 6 do
-			knock(5)
-			tick(A, m, out, 200)
-			t.eq(A.MULTS[s.mult], ({ 1, 2, 3, 5, 5, 5 })[math.min(expect, 6)])
-		end
-	end)
+	)
 
 	t.test("ACORN ATTACK: the bank does not stand up under a ball that is still on it", function()
 		local m, out = inPlay(A)
@@ -258,53 +270,59 @@ return function(t: Test.T)
 		t.eq(s.extraLit, 0, "one extra ball a game")
 	end)
 
-	t.test("ACORN ATTACK: the bonus is 100 a target or lane made on the ball plus 500 an acorn, times the multiplier", function()
-		local m, out = inPlay(A)
-		local s = m.sheets[1]
-		fire(A, m, out, EV.STANDUP, aix.target.oak_l)
-		fire(A, m, out, EV.ROLLOVER, aix.sensor.top_1)
-		m.phys.drop[aix.target.acorn_a] = true
-		fire(A, m, out, EV.DROP, aix.target.acorn_a)
-		s.hoard, s.mult = 2, 3
-		local base, mult = A.sheet.bonus(m, s)
-		t.eq(base, 3 * 100 + 2 * 500)
-		t.eq(mult, 3)
-		t.truthy(string.find(A.sheet.status(m, s), "A-C-O-R-N", 1, true), "the status line names the goal")
-		-- what was made is per ball; the hoard and the multiplier are the player's for the game
-		A.sheet.ballStart(m, s, A, out)
-		t.eq(s.made, 0)
-		t.eq(s.hoard, 2)
-		t.eq(s.mult, 3)
-	end)
+	t.test(
+		"ACORN ATTACK: the bonus is 100 a target or lane made on the ball plus 500 an acorn, times the multiplier",
+		function()
+			local m, out = inPlay(A)
+			local s = m.sheets[1]
+			fire(A, m, out, EV.STANDUP, aix.target.oak_l)
+			fire(A, m, out, EV.ROLLOVER, aix.sensor.top_1)
+			m.phys.drop[aix.target.acorn_a] = true
+			fire(A, m, out, EV.DROP, aix.target.acorn_a)
+			s.hoard, s.mult = 2, 3
+			local base, mult = A.sheet.bonus(m, s)
+			t.eq(base, 3 * 100 + 2 * 500)
+			t.eq(mult, 3)
+			t.truthy(string.find(A.sheet.status(m, s), "A-C-O-R-N", 1, true), "the status line names the goal")
+			-- what was made is per ball; the hoard and the multiplier are the player's for the game
+			A.sheet.ballStart(m, s, A, out)
+			t.eq(s.made, 0)
+			t.eq(s.hoard, 2)
+			t.eq(s.mult, 3)
+		end
+	)
 
 	-- ------------------------------------------------------------------------------------------------- SPICY
 	local S, SP, HEAT = TableSpicy, TableSpicy.POINTS, TableSpicy.HEAT
 	local six = S.ix
 
-	t.test("SPICY RODENT: everything feeds the heat, the wire most; the meter cools all the time a ball is in play", function()
-		local m, out = inPlay(S)
-		local s = m.sheets[1]
-		t.eq(s.heat, 0)
-		fire(S, m, out, EV.BUMPER, 1, 1)
-		t.eq(s.heat, HEAT.bumper)
-		t.eq(m.scores[1], SP.bumper)
-		fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
-		t.eq(s.heat, HEAT.bumper + HEAT.wire)
-		t.eq(m.scores[1], SP.bumper + SP.wire)
-		t.truthy(HEAT.wire > HEAT.bite and HEAT.bite > HEAT.letter and HEAT.letter > HEAT.bumper, "the wire most")
-		fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 0)
-		t.eq(s.heat, HEAT.bumper + HEAT.wire, "a ball that rolled back out of the wire fed nothing")
-		local hot = s.heat
-		tick(S, m, out, 240)
-		t.near(hot - s.heat, 1.6, 0.02, "it cools 1.6 a second")
-		-- not while the ball waits on the plunger
-		local idle = Machine.new(S, 1, 1)
-		idle.sheets[1].heat = 50
-		for _ = 1, 480 do
-			Machine.step(S, idle, 0, out)
+	t.test(
+		"SPICY RODENT: everything feeds the heat, the wire most; the meter cools all the time a ball is in play",
+		function()
+			local m, out = inPlay(S)
+			local s = m.sheets[1]
+			t.eq(s.heat, 0)
+			fire(S, m, out, EV.BUMPER, 1, 1)
+			t.eq(s.heat, HEAT.bumper)
+			t.eq(m.scores[1], SP.bumper)
+			fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
+			t.eq(s.heat, HEAT.bumper + HEAT.wire)
+			t.eq(m.scores[1], SP.bumper + SP.wire)
+			t.truthy(HEAT.wire > HEAT.bite and HEAT.bite > HEAT.letter and HEAT.letter > HEAT.bumper, "the wire most")
+			fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 0)
+			t.eq(s.heat, HEAT.bumper + HEAT.wire, "a ball that rolled back out of the wire fed nothing")
+			local hot = s.heat
+			tick(S, m, out, 240)
+			t.near(hot - s.heat, 1.6, 0.02, "it cools 1.6 a second")
+			-- not while the ball waits on the plunger
+			local idle = Machine.new(S, 1, 1)
+			idle.sheets[1].heat = 50
+			for _ = 1, 480 do
+				Machine.step(S, idle, 0, out)
+			end
+			t.eq(idle.sheets[1].heat, 50)
 		end
-		t.eq(idle.sheets[1].heat, 50)
-	end)
+	)
 
 	t.test("SPICY RODENT: the heat multiplies every score: FERAL 2x at a third, RABID 3x at two thirds", function()
 		local m, out = inPlay(S)
@@ -330,32 +348,35 @@ return function(t: Test.T)
 		t.truthy(string.find(S.sheet.status(m, s), "RABID", 1, true))
 	end)
 
-	t.test("SPICY RODENT: a full meter is SUPER: 5x for twenty seconds with the lamps flashing, then back to RABID's line", function()
-		local m, out = inPlay(S)
-		local s = m.sheets[1]
-		s.heat = 95
-		fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
-		t.eq(S.level(s), 4)
-		t.eq(s.super, HEAT.superTicks)
-		t.eq(HEAT.superTicks, 20 * 240)
-		t.eq(said(out, S.SAY.SUPER), 1)
-		local before = m.scores[1]
-		fire(S, m, out, EV.BUMPER, 1, 1)
-		t.eq(m.scores[1] - before, SP.bumper * 5)
-		local lamps = Machine.lamps(S, m, {})
-		t.eq(lamps[six.lamp.super], 2)
-		t.eq(lamps[six.lamp.heat_9], 2, "every heat lamp flashes")
-		t.eq(lamps[six.lamp.bumper_1], 2)
-		tick(S, m, out, HEAT.superTicks - 1)
-		t.eq(S.level(s), 4, "still SUPER at 19.99 s")
-		t.eq(s.heat, HEAT.full, "the meter holds full while it lasts")
-		tick(S, m, out, 2)
-		t.eq(S.level(s), 3, "then RABID")
-		t.near(s.heat, HEAT.afterSuper, 0.05)
-		t.truthy(HEAT.afterSuper > HEAT.rabid)
-		t.eq(said(out, S.SAY.SUPER_OVER), 1)
-		t.eq(s.peak, 4, "the ball's bonus remembers the level reached")
-	end)
+	t.test(
+		"SPICY RODENT: a full meter is SUPER: 5x for twenty seconds with the lamps flashing, then back to RABID's line",
+		function()
+			local m, out = inPlay(S)
+			local s = m.sheets[1]
+			s.heat = 95
+			fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
+			t.eq(S.level(s), 4)
+			t.eq(s.super, HEAT.superTicks)
+			t.eq(HEAT.superTicks, 20 * 240)
+			t.eq(said(out, S.SAY.SUPER), 1)
+			local before = m.scores[1]
+			fire(S, m, out, EV.BUMPER, 1, 1)
+			t.eq(m.scores[1] - before, SP.bumper * 5)
+			local lamps = Machine.lamps(S, m, {})
+			t.eq(lamps[six.lamp.super], 2)
+			t.eq(lamps[six.lamp.heat_9], 2, "every heat lamp flashes")
+			t.eq(lamps[six.lamp.bumper_1], 2)
+			tick(S, m, out, HEAT.superTicks - 1)
+			t.eq(S.level(s), 4, "still SUPER at 19.99 s")
+			t.eq(s.heat, HEAT.full, "the meter holds full while it lasts")
+			tick(S, m, out, 2)
+			t.eq(S.level(s), 3, "then RABID")
+			t.near(s.heat, HEAT.afterSuper, 0.05)
+			t.truthy(HEAT.afterSuper > HEAT.rabid)
+			t.eq(said(out, S.SAY.SUPER_OVER), 1)
+			t.eq(s.peak, 4, "the ball's bonus remembers the level reached")
+		end
+	)
 
 	t.test("SPICY RODENT: S-P-I-C-Y lights the bite; the bite then pays its jackpot and a big bite of heat", function()
 		local m, out = inPlay(S)
@@ -387,54 +408,60 @@ return function(t: Test.T)
 		t.eq(said(out, S.SAY.BITTEN), 1)
 	end)
 
-	t.test("PIN-R4 SPICY RODENT: every third wire in one ball lights the extra ball at the bite, once a game", function()
-		local m, out = inPlay(S)
-		local s = m.sheets[1]
-		fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
-		fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
-		t.eq(s.extraLit, 0)
-		t.eq(Machine.lamps(S, m, {})[six.lamp.wire], 2, "one more: the wire lamp flashes")
-		fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
-		t.eq(s.extraLit, 1)
-		fire(S, m, out, EV.SAUCER, six.saucer.bite)
-		t.truthy(m.shootAgain)
-		t.eq(s.extraLit, 0)
-		for _ = 1, 3 do
+	t.test(
+		"PIN-R4 SPICY RODENT: every third wire in one ball lights the extra ball at the bite, once a game",
+		function()
+			local m, out = inPlay(S)
+			local s = m.sheets[1]
 			fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
+			fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
+			t.eq(s.extraLit, 0)
+			t.eq(Machine.lamps(S, m, {})[six.lamp.wire], 2, "one more: the wire lamp flashes")
+			fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
+			t.eq(s.extraLit, 1)
+			fire(S, m, out, EV.SAUCER, six.saucer.bite)
+			t.truthy(m.shootAgain)
+			t.eq(s.extraLit, 0)
+			for _ = 1, 3 do
+				fire(S, m, out, EV.RAIL_OUT, six.rail.wire, 1)
+			end
+			t.eq(s.extraLit, 0, "never a second one")
+			-- the count is per ball
+			local m2, out2 = inPlay(S)
+			fire(S, m2, out2, EV.RAIL_OUT, six.rail.wire, 1)
+			fire(S, m2, out2, EV.RAIL_OUT, six.rail.wire, 1)
+			S.sheet.ballStart(m2, m2.sheets[1], S, out2)
+			fire(S, m2, out2, EV.RAIL_OUT, six.rail.wire, 1)
+			t.eq(m2.sheets[1].extraLit, 0)
 		end
-		t.eq(s.extraLit, 0, "never a second one")
-		-- the count is per ball
-		local m2, out2 = inPlay(S)
-		fire(S, m2, out2, EV.RAIL_OUT, six.rail.wire, 1)
-		fire(S, m2, out2, EV.RAIL_OUT, six.rail.wire, 1)
-		S.sheet.ballStart(m2, m2.sheets[1], S, out2)
-		fire(S, m2, out2, EV.RAIL_OUT, six.rail.wire, 1)
-		t.eq(m2.sheets[1].extraLit, 0)
-	end)
+	)
 
-	t.test("SPICY RODENT: a drain costs half the heat (a saved ball costs nothing); the hot lane is the skill shot", function()
-		local m, out = inPlay(S)
-		local s = m.sheets[1]
-		s.heat = 80
-		S.sheet.drained(m, s, S, out, true)
-		t.eq(s.heat, 80)
-		S.sheet.drained(m, s, S, out, false)
-		t.eq(s.heat, 40)
-		s.heat, s.super = 100, 1000
-		S.sheet.drained(m, s, S, out, false)
-		t.eq(s.super, 0, "and SUPER with it")
-		t.eq(s.heat, 50)
-		-- the hot lane
-		local m2, out2 = inPlay(S)
-		m2.skillLeft = 400
-		t.eq(Machine.lamps(S, m2, {})[six.lamp.hot_lane], 2)
-		fire(S, m2, out2, EV.ROLLOVER, six.sensor.hot_lane)
-		t.eq(m2.scores[1], SP.hotShot)
-		t.eq(said(out2, S.SAY.HOT_SHOT), 1)
-		t.eq(m2.sheets[1].heat, HEAT.hotShot)
-		fire(S, m2, out2, EV.ROLLOVER, six.sensor.hot_lane)
-		t.eq(m2.scores[1], SP.hotShot + SP.hotLane, "afterwards it is an ordinary lane")
-	end)
+	t.test(
+		"SPICY RODENT: a drain costs half the heat (a saved ball costs nothing); the hot lane is the skill shot",
+		function()
+			local m, out = inPlay(S)
+			local s = m.sheets[1]
+			s.heat = 80
+			S.sheet.drained(m, s, S, out, true)
+			t.eq(s.heat, 80)
+			S.sheet.drained(m, s, S, out, false)
+			t.eq(s.heat, 40)
+			s.heat, s.super = 100, 1000
+			S.sheet.drained(m, s, S, out, false)
+			t.eq(s.super, 0, "and SUPER with it")
+			t.eq(s.heat, 50)
+			-- the hot lane
+			local m2, out2 = inPlay(S)
+			m2.skillLeft = 400
+			t.eq(Machine.lamps(S, m2, {})[six.lamp.hot_lane], 2)
+			fire(S, m2, out2, EV.ROLLOVER, six.sensor.hot_lane)
+			t.eq(m2.scores[1], SP.hotShot)
+			t.eq(said(out2, S.SAY.HOT_SHOT), 1)
+			t.eq(m2.sheets[1].heat, HEAT.hotShot)
+			fire(S, m2, out2, EV.ROLLOVER, six.sensor.hot_lane)
+			t.eq(m2.scores[1], SP.hotShot + SP.hotLane, "afterwards it is an ordinary lane")
+		end
+	)
 
 	t.test("SPICY RODENT: the bonus is 1,000 a wire or target of the ball, times the heat level reached", function()
 		local m, out = inPlay(S)
@@ -462,27 +489,30 @@ return function(t: Test.T)
 	local P, PP = TableSpace, TableSpace.POINTS
 	local pix = P.ix
 
-	t.test("SPACE SQUIRREL: an orbit is a side lane and then the top of the arch; the plunge alone is not one", function()
-		local m, out = inPlay(P)
-		local s = m.sheets[1]
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
-		t.eq(m.scores[1], 0, "the plunge goes over the top without having come up a side lane")
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_l, -1)
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
-		t.eq(m.scores[1], 0, "coming DOWN a side lane does not arm it")
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_l, 1)
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, -1)
-		t.eq(m.scores[1], PP.orbit)
-		t.eq(s.orbits, 1)
-		t.eq(said(out, P.SAY.ORBIT), 1)
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
-		t.eq(m.scores[1], PP.orbit, "one orbit, not two")
-		-- too slow round is no orbit
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_r, 1)
-		tick(P, m, out, 721)
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
-		t.eq(s.orbits, 1)
-	end)
+	t.test(
+		"SPACE SQUIRREL: an orbit is a side lane and then the top of the arch; the plunge alone is not one",
+		function()
+			local m, out = inPlay(P)
+			local s = m.sheets[1]
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
+			t.eq(m.scores[1], 0, "the plunge goes over the top without having come up a side lane")
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_l, -1)
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
+			t.eq(m.scores[1], 0, "coming DOWN a side lane does not arm it")
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_l, 1)
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, -1)
+			t.eq(m.scores[1], PP.orbit)
+			t.eq(s.orbits, 1)
+			t.eq(said(out, P.SAY.ORBIT), 1)
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
+			t.eq(m.scores[1], PP.orbit, "one orbit, not two")
+			-- too slow round is no orbit
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_r, 1)
+			tick(P, m, out, 721)
+			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
+			t.eq(s.orbits, 1)
+		end
+	)
 
 	t.test("SPACE SQUIRREL: ramps and orbits within four seconds chain into a combo, up to 5x", function()
 		local m, out = inPlay(P)
@@ -512,171 +542,186 @@ return function(t: Test.T)
 		t.eq(s.flow, 9)
 	end)
 
-	t.test("SPACE SQUIRREL: F-U-E-L lights the locks; a lit pod keeps the ball and a new one comes to the plunger", function()
-		local m, out = inPlay(P)
-		local s = m.sheets[1]
-		local b = m.phys.balls[1]
-		for _, name in { "fuel_f", "fuel_u", "fuel_e" } do
-			fire(P, m, out, EV.STANDUP, pix.target[name])
-		end
-		t.eq(m.scores[1], 3 * PP.fuel)
-		t.eq(s.locksLit, 0)
-		t.truthy(string.find(P.sheet.status(m, s), "F-U-E-L", 1, true))
-		-- an unlit pod just kicks the ball back out
-		fire(P, m, out, EV.SAUCER, pix.saucer.pod_1)
-		t.eq(m.scores[1], 3 * PP.fuel + PP.pod)
-		t.eq(s.locked, 0)
-		fire(P, m, out, EV.STANDUP, pix.target.fuel_l)
-		t.eq(s.locksLit, 1)
-		t.eq(said(out, P.SAY.LOCKS_LIT), 1)
-		t.eq(Machine.lamps(P, m, {})[pix.lamp.pod_1], 2)
-		-- the ball falls into pod 2
-		local pod = P.def.saucers[pix.saucer.pod_2]
-		b.mode, b.ref, b.timer, b.x, b.y, b.asleep = Physics.HELD, pix.saucer.pod_2, pod.holdTicks, pod.x, pod.y, false
-		fire(P, m, out, EV.SAUCER, pix.saucer.pod_2, 0, 1)
-		t.eq(s.locked, 1)
-		t.eq(b.timer, -1, "the pod keeps it")
-		t.eq(m.queue, 1, "and the machine owes the plunger a ball")
-		t.eq(said(out, P.SAY.LOCKED), 1)
-		tick(P, m, out, Machine.FEED_TICKS + 5)
-		t.eq(#m.phys.balls, 2)
-		t.eq(m.phase, PHASE.PLAY)
-		t.eq(b.mode, Physics.HELD, "still locked")
-		t.eq(Machine.live(m), 1, "a locked ball is not a ball in play")
-	end)
-
-	t.test("SPACE SQUIRREL: both pods full, a ramp starts the countdown: 3, 2, 1, LIFTOFF, three balls in play", function()
-		local m, out = inPlay(P)
-		local s = m.sheets[1]
-		s.locksLit = 1
-		-- two balls into the two pods
-		for i, name in { "pod_1", "pod_2" } do
-			local pod = P.def.saucers[pix.saucer[name]]
-			local b = m.phys.balls[i]
-			b.mode, b.ref, b.timer, b.x, b.y, b.asleep = Physics.HELD, pix.saucer[name], pod.holdTicks, pod.x, pod.y, false
-			fire(P, m, out, EV.SAUCER, pix.saucer[name], 0, i)
+	t.test(
+		"SPACE SQUIRREL: F-U-E-L lights the locks; a lit pod keeps the ball and a new one comes to the plunger",
+		function()
+			local m, out = inPlay(P)
+			local s = m.sheets[1]
+			local b = m.phys.balls[1]
+			for _, name in { "fuel_f", "fuel_u", "fuel_e" } do
+				fire(P, m, out, EV.STANDUP, pix.target[name])
+			end
+			t.eq(m.scores[1], 3 * PP.fuel)
+			t.eq(s.locksLit, 0)
+			t.truthy(string.find(P.sheet.status(m, s), "F-U-E-L", 1, true))
+			-- an unlit pod just kicks the ball back out
+			fire(P, m, out, EV.SAUCER, pix.saucer.pod_1)
+			t.eq(m.scores[1], 3 * PP.fuel + PP.pod)
+			t.eq(s.locked, 0)
+			fire(P, m, out, EV.STANDUP, pix.target.fuel_l)
+			t.eq(s.locksLit, 1)
+			t.eq(said(out, P.SAY.LOCKS_LIT), 1)
+			t.eq(Machine.lamps(P, m, {})[pix.lamp.pod_1], 2)
+			-- the ball falls into pod 2
+			local pod = P.def.saucers[pix.saucer.pod_2]
+			b.mode, b.ref, b.timer, b.x, b.y, b.asleep =
+				Physics.HELD, pix.saucer.pod_2, pod.holdTicks, pod.x, pod.y, false
+			fire(P, m, out, EV.SAUCER, pix.saucer.pod_2, 0, 1)
+			t.eq(s.locked, 1)
+			t.eq(b.timer, -1, "the pod keeps it")
+			t.eq(m.queue, 1, "and the machine owes the plunger a ball")
+			t.eq(said(out, P.SAY.LOCKED), 1)
 			tick(P, m, out, Machine.FEED_TICKS + 5)
+			t.eq(#m.phys.balls, 2)
+			t.eq(m.phase, PHASE.PLAY)
+			t.eq(b.mode, Physics.HELD, "still locked")
+			t.eq(Machine.live(m), 1, "a locked ball is not a ball in play")
 		end
-		t.eq(s.locked, 2)
-		t.eq(s.locksLit, 0)
-		t.eq(said(out, P.SAY.READY), 1)
-		t.eq(#m.phys.balls, 3)
-		t.truthy(string.find(P.sheet.status(m, s), "RAMP", 1, true))
-		-- an orbit does not start it; a ramp does
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_l, 1)
-		fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
-		t.eq(s.count, 0)
-		fire(P, m, out, EV.RAIL_OUT, pix.rail.ramp_r, 1)
-		t.eq(s.count, P.COUNT_TICKS)
-		t.eq(P.COUNT_TICKS, 3 * 240)
-		local counts = said(out, P.SAY.COUNT)
-		t.eq(counts, 1)
-		tick(P, m, out, 240)
-		t.eq(said(out, P.SAY.COUNT), 2)
-		t.truthy(string.find(P.sheet.status(m, s), "LIFTOFF IN 2", 1, true))
-		tick(P, m, out, 240)
-		t.eq(said(out, P.SAY.COUNT), 3)
-		t.eq(s.multi, 0)
-		tick(P, m, out, 241)
-		t.eq(said(out, P.SAY.LIFTOFF), 1)
-		t.eq(s.multi, 1)
-		t.eq(s.locked, 0)
-		-- both pods fire: three balls loose
-		tick(P, m, out, 60)
-		local loose = 0
-		for _, b in m.phys.balls do
-			if b.mode == Physics.FREE then
-				loose += 1
-			end
-		end
-		t.eq(loose, 3)
-		t.eq(Machine.live(m), 3)
-		-- every ramp and orbit is a jackpot now
-		local before = m.scores[1]
-		tick(P, m, out, P.COMBO_TICKS)
-		fire(P, m, out, EV.RAIL_OUT, pix.rail.ramp_l, 1)
-		t.eq(m.scores[1] - before, PP.jackpot)
-		t.eq(said(out, P.SAY.JACKPOT), 1)
-		t.eq(Machine.lamps(P, m, {})[pix.lamp.jackpot], 2)
-		-- it ends when one ball is left
-		m.phys.balls[3] = nil
-		tick(P, m, out, 2)
-		t.eq(s.multi, 1, "two balls: still multiball")
-		m.phys.balls[2] = nil
-		tick(P, m, out, 2)
-		t.eq(s.multi, 0)
-		t.eq(said(out, P.SAY.MULTIBALL_OVER), 1)
-		t.eq(s.multiballs, 1)
-	end)
+	)
 
-	t.test("SPACE SQUIRREL: locks are the player's across balls; the pods are emptied between balls and the plunger makes the three up", function()
-		local m, out = inPlay(P, 2)
-		local s = m.sheets[1]
-		s.locksLit = 1
-		local pod = P.def.saucers[pix.saucer.pod_1]
-		local b = m.phys.balls[1]
-		b.mode, b.ref, b.timer, b.x, b.y, b.asleep = Physics.HELD, pix.saucer.pod_1, pod.holdTicks, pod.x, pod.y, false
-		fire(P, m, out, EV.SAUCER, pix.saucer.pod_1, 0, 1)
-		t.eq(s.locked, 1)
-		-- the served ball is lost: the ball is over, though one sits in a pod
-		tick(P, m, out, Machine.FEED_TICKS + Machine.AUTO_TICKS + 300)
-		for _, x in m.phys.balls do
-			if x.mode == Physics.FREE then
-				x.x, x.y, x.vx, x.vy, x.asleep = Layout.XC, 0.3, 0, -2, false
+	t.test(
+		"SPACE SQUIRREL: both pods full, a ramp starts the countdown: 3, 2, 1, LIFTOFF, three balls in play",
+		function()
+			local m, out = inPlay(P)
+			local s = m.sheets[1]
+			s.locksLit = 1
+			-- two balls into the two pods
+			for i, name in { "pod_1", "pod_2" } do
+				local pod = P.def.saucers[pix.saucer[name]]
+				local b = m.phys.balls[i]
+				b.mode, b.ref, b.timer, b.x, b.y, b.asleep =
+					Physics.HELD, pix.saucer[name], pod.holdTicks, pod.x, pod.y, false
+				fire(P, m, out, EV.SAUCER, pix.saucer[name], 0, i)
+				tick(P, m, out, Machine.FEED_TICKS + 5)
 			end
-		end
-		for _ = 1, 60 do
-			Machine.step(P, m, 0, out)
-		end
-		t.eq(m.phase, PHASE.BONUS)
-		local _, mult = P.sheet.bonus(m, s)
-		t.eq(mult, 2, "the bonus is times one more for every ball locked")
-		for _ = 1, 3000 do
-			Machine.step(P, m, 0, out)
-			if m.phase == PHASE.PLAY then
-				break
-			end
-		end
-		t.eq(m.up, 2)
-		t.eq(#m.phys.balls, 1, "the pod was emptied: player 2 starts with a clean table")
-		t.eq(m.sheets[2].locked, 0, "and no locks of their own")
-		t.eq(s.locked, 1, "player 1 keeps theirs")
-		-- with two locks and the pods empty, LIFTOFF serves both from the plunger
-		local m2, out2 = inPlay(P)
-		local s2 = m2.sheets[1]
-		s2.locked = 2
-		fire(P, m2, out2, EV.RAIL_OUT, pix.rail.ramp_l, 1)
-		tick(P, m2, out2, P.COUNT_TICKS + 1)
-		t.eq(s2.multi, 1)
-		t.eq(m2.queue, 2)
-		t.eq(Machine.live(m2), 3)
-	end)
-
-	t.test("PIN-R4 SPACE SQUIRREL: three orbits in one ball light the extra ball at the left pod; the dock is the skill shot", function()
-		local m, out = inPlay(P)
-		local s = m.sheets[1]
-		for _ = 1, 3 do
+			t.eq(s.locked, 2)
+			t.eq(s.locksLit, 0)
+			t.eq(said(out, P.SAY.READY), 1)
+			t.eq(#m.phys.balls, 3)
+			t.truthy(string.find(P.sheet.status(m, s), "RAMP", 1, true))
+			-- an orbit does not start it; a ramp does
 			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_l, 1)
 			fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
+			t.eq(s.count, 0)
+			fire(P, m, out, EV.RAIL_OUT, pix.rail.ramp_r, 1)
+			t.eq(s.count, P.COUNT_TICKS)
+			t.eq(P.COUNT_TICKS, 3 * 240)
+			local counts = said(out, P.SAY.COUNT)
+			t.eq(counts, 1)
+			tick(P, m, out, 240)
+			t.eq(said(out, P.SAY.COUNT), 2)
+			t.truthy(string.find(P.sheet.status(m, s), "LIFTOFF IN 2", 1, true))
+			tick(P, m, out, 240)
+			t.eq(said(out, P.SAY.COUNT), 3)
+			t.eq(s.multi, 0)
+			tick(P, m, out, 241)
+			t.eq(said(out, P.SAY.LIFTOFF), 1)
+			t.eq(s.multi, 1)
+			t.eq(s.locked, 0)
+			-- both pods fire: three balls loose
+			tick(P, m, out, 60)
+			local loose = 0
+			for _, b in m.phys.balls do
+				if b.mode == Physics.FREE then
+					loose += 1
+				end
+			end
+			t.eq(loose, 3)
+			t.eq(Machine.live(m), 3)
+			-- every ramp and orbit is a jackpot now
+			local before = m.scores[1]
+			tick(P, m, out, P.COMBO_TICKS)
+			fire(P, m, out, EV.RAIL_OUT, pix.rail.ramp_l, 1)
+			t.eq(m.scores[1] - before, PP.jackpot)
+			t.eq(said(out, P.SAY.JACKPOT), 1)
+			t.eq(Machine.lamps(P, m, {})[pix.lamp.jackpot], 2)
+			-- it ends when one ball is left
+			m.phys.balls[3] = nil
+			tick(P, m, out, 2)
+			t.eq(s.multi, 1, "two balls: still multiball")
+			m.phys.balls[2] = nil
+			tick(P, m, out, 2)
+			t.eq(s.multi, 0)
+			t.eq(said(out, P.SAY.MULTIBALL_OVER), 1)
+			t.eq(s.multiballs, 1)
 		end
-		t.eq(s.extraLit, 1)
-		fire(P, m, out, EV.SAUCER, pix.saucer.pod_2)
-		t.falsy(m.shootAgain, "the right pod is not it")
-		fire(P, m, out, EV.SAUCER, pix.saucer.pod_1)
-		t.truthy(m.shootAgain)
-		local base, mult = P.sheet.bonus(m, s)
-		t.eq(base, 3 * PP.bonusEach)
-		t.eq(mult, 1)
-		-- the dock
-		local m2, out2 = inPlay(P)
-		m2.skillLeft = 300
-		t.eq(Machine.lamps(P, m2, {})[pix.lamp.dock], 2)
-		fire(P, m2, out2, EV.ROLLOVER, pix.sensor.dock)
-		t.eq(m2.scores[1], PP.docked)
-		t.eq(said(out2, P.SAY.DOCKED), 1)
-		fire(P, m2, out2, EV.ROLLOVER, pix.sensor.dock)
-		t.eq(m2.scores[1], PP.docked + PP.dock)
-	end)
+	)
+
+	t.test(
+		"SPACE SQUIRREL: locks are the player's across balls; the pods are emptied between balls and the plunger makes the three up",
+		function()
+			local m, out = inPlay(P, 2)
+			local s = m.sheets[1]
+			s.locksLit = 1
+			local pod = P.def.saucers[pix.saucer.pod_1]
+			local b = m.phys.balls[1]
+			b.mode, b.ref, b.timer, b.x, b.y, b.asleep =
+				Physics.HELD, pix.saucer.pod_1, pod.holdTicks, pod.x, pod.y, false
+			fire(P, m, out, EV.SAUCER, pix.saucer.pod_1, 0, 1)
+			t.eq(s.locked, 1)
+			-- the served ball is lost: the ball is over, though one sits in a pod
+			tick(P, m, out, Machine.FEED_TICKS + Machine.AUTO_TICKS + 300)
+			for _, x in m.phys.balls do
+				if x.mode == Physics.FREE then
+					x.x, x.y, x.vx, x.vy, x.asleep = Layout.XC, 0.3, 0, -2, false
+				end
+			end
+			for _ = 1, 60 do
+				Machine.step(P, m, 0, out)
+			end
+			t.eq(m.phase, PHASE.BONUS)
+			local _, mult = P.sheet.bonus(m, s)
+			t.eq(mult, 2, "the bonus is times one more for every ball locked")
+			for _ = 1, 3000 do
+				Machine.step(P, m, 0, out)
+				if m.phase == PHASE.PLAY then
+					break
+				end
+			end
+			t.eq(m.up, 2)
+			t.eq(#m.phys.balls, 1, "the pod was emptied: player 2 starts with a clean table")
+			t.eq(m.sheets[2].locked, 0, "and no locks of their own")
+			t.eq(s.locked, 1, "player 1 keeps theirs")
+			-- with two locks and the pods empty, LIFTOFF serves both from the plunger
+			local m2, out2 = inPlay(P)
+			local s2 = m2.sheets[1]
+			s2.locked = 2
+			fire(P, m2, out2, EV.RAIL_OUT, pix.rail.ramp_l, 1)
+			tick(P, m2, out2, P.COUNT_TICKS + 1)
+			t.eq(s2.multi, 1)
+			t.eq(m2.queue, 2)
+			t.eq(Machine.live(m2), 3)
+		end
+	)
+
+	t.test(
+		"PIN-R4 SPACE SQUIRREL: three orbits in one ball light the extra ball at the left pod; the dock is the skill shot",
+		function()
+			local m, out = inPlay(P)
+			local s = m.sheets[1]
+			for _ = 1, 3 do
+				fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_l, 1)
+				fire(P, m, out, EV.ROLLOVER, pix.sensor.orbit_top, 1)
+			end
+			t.eq(s.extraLit, 1)
+			fire(P, m, out, EV.SAUCER, pix.saucer.pod_2)
+			t.falsy(m.shootAgain, "the right pod is not it")
+			fire(P, m, out, EV.SAUCER, pix.saucer.pod_1)
+			t.truthy(m.shootAgain)
+			local base, mult = P.sheet.bonus(m, s)
+			t.eq(base, 3 * PP.bonusEach)
+			t.eq(mult, 1)
+			-- the dock
+			local m2, out2 = inPlay(P)
+			m2.skillLeft = 300
+			t.eq(Machine.lamps(P, m2, {})[pix.lamp.dock], 2)
+			fire(P, m2, out2, EV.ROLLOVER, pix.sensor.dock)
+			t.eq(m2.scores[1], PP.docked)
+			t.eq(said(out2, P.SAY.DOCKED), 1)
+			fire(P, m2, out2, EV.ROLLOVER, pix.sensor.dock)
+			t.eq(m2.scores[1], PP.docked + PP.dock)
+		end
+	)
 
 	t.test("PIN-R6: the three score scales are far apart: tens, thousands, tens of thousands", function()
 		t.truthy(AP.bumper * 20 <= SP.bumper)
@@ -703,60 +748,63 @@ return function(t: Test.T)
 		t.eq(Rules.forTable("pinball_acorn").def.title, "ACORN ATTACK")
 	end)
 
-	t.test("PIN-R5: the turn is the player whose ball is up; only they may send a log; a skipped turn is a ball played out dead", function()
-		local rules = Rules.forTable("pinball_rodent")
-		local g = Minigame.start(rules, 2, 5)
-		local turn = rules.turn :: (any) -> number?
-		local skip = rules.skipTurn :: (any) -> ()
-		local view = rules.view :: (any) -> { [string]: any }
-		t.eq(turn(g.state), 1)
-		t.eq(Minigame.result(g), nil)
-		local ok, why = Minigame.input(g, 2, "seg", { { 0, 48 } })
-		t.falsy(ok)
-		t.eq(why, "not your ball")
-		t.truthy(Minigame.input(g, 1, "seg", { { 0, 48 } }))
-		ok, why = Minigame.input(g, 1, "seg", { { 0, 48 } })
-		t.falsy(ok, "the same segment twice is refused")
-		t.eq(why, "out of order")
-		t.falsy(Minigame.input(g, 1, "seg", {}))
-		t.falsy(Minigame.input(g, 1, "seg", { "nonsense" }))
-		t.falsy(Minigame.input(g, 1, "flip", {}), "not a verb")
-		local v = view(g.state)
-		t.eq(v.game, "pinball_rodent")
-		t.eq(v.title, "SPICY RODENT")
-		t.eq(v.freePlay, true)
-		t.eq(v.phase, "play")
-		t.eq(v.up, 1)
-		t.eq(v.ball, 1)
-		t.eq(v.balls, 3)
-		t.eq(#v.players, 2)
-		t.eq(v.players[1].score, 0)
-		t.truthy(#v.status > 0)
-		t.eq(v.tick, 48)
-		-- an idle turn is played out as the game's miss, six times over: the game ends, announced once
-		local order = {}
-		for _ = 1, 6 do
-			table.insert(order, turn(g.state))
+	t.test(
+		"PIN-R5: the turn is the player whose ball is up; only they may send a log; a skipped turn is a ball played out dead",
+		function()
+			local rules = Rules.forTable("pinball_rodent")
+			local g = Minigame.start(rules, 2, 5)
+			local turn = rules.turn :: (any) -> number?
+			local skip = rules.skipTurn :: (any) -> ()
+			local view = rules.view :: (any) -> { [string]: any }
+			t.eq(turn(g.state), 1)
+			t.eq(Minigame.result(g), nil)
+			local ok, why = Minigame.input(g, 2, "seg", { { 0, 48 } })
+			t.falsy(ok)
+			t.eq(why, "not your ball")
+			t.truthy(Minigame.input(g, 1, "seg", { { 0, 48 } }))
+			ok, why = Minigame.input(g, 1, "seg", { { 0, 48 } })
+			t.falsy(ok, "the same segment twice is refused")
+			t.eq(why, "out of order")
+			t.falsy(Minigame.input(g, 1, "seg", {}))
+			t.falsy(Minigame.input(g, 1, "seg", { "nonsense" }))
+			t.falsy(Minigame.input(g, 1, "flip", {}), "not a verb")
+			local v = view(g.state)
+			t.eq(v.game, "pinball_rodent")
+			t.eq(v.title, "SPICY RODENT")
+			t.eq(v.freePlay, true)
+			t.eq(v.phase, "play")
+			t.eq(v.up, 1)
+			t.eq(v.ball, 1)
+			t.eq(v.balls, 3)
+			t.eq(#v.players, 2)
+			t.eq(v.players[1].score, 0)
+			t.truthy(#v.status > 0)
+			t.eq(v.tick, 48)
+			-- an idle turn is played out as the game's miss, six times over: the game ends, announced once
+			local order = {}
+			for _ = 1, 6 do
+				table.insert(order, turn(g.state))
+				skip(g.state)
+			end
+			t.deepEq(order, { 1, 2, 1, 2, 1, 2 })
+			t.eq(turn(g.state), nil)
+			local r = Minigame.result(g)
+			assert(r, "a result")
+			t.truthy(r.done)
+			t.eq(#r.stats, 2)
+			t.eq(r.stats[1].balls, 3)
+			t.eq(r.suspect, false)
+			v = view(g.state)
+			t.eq(v.phase, "over")
+			t.eq(v.up, nil)
+			t.eq(v.status, "GAME OVER")
+			t.eq(v.say, "GAME OVER")
+			ok, why = Minigame.input(g, 1, "seg", { { v.tick, v.tick + 10 } })
+			t.falsy(ok)
 			skip(g.state)
+			t.eq(view(g.state).tick, v.tick, "skipping a finished game does nothing")
 		end
-		t.deepEq(order, { 1, 2, 1, 2, 1, 2 })
-		t.eq(turn(g.state), nil)
-		local r = Minigame.result(g)
-		assert(r)
-		t.truthy(r.done)
-		t.eq(#r.stats, 2)
-		t.eq(r.stats[1].balls, 3)
-		t.eq(r.suspect, false)
-		v = view(g.state)
-		t.eq(v.phase, "over")
-		t.eq(v.up, nil)
-		t.eq(v.status, "GAME OVER")
-		t.eq(v.say, "GAME OVER")
-		ok, why = Minigame.input(g, 1, "seg", { { v.tick, v.tick + 10 } })
-		t.falsy(ok)
-		skip(g.state)
-		t.eq(view(g.state).tick, v.tick, "skipping a finished game does nothing")
-	end)
+	)
 
 	t.test("PIN-R5: the result has every score and the winner; a tie has no winner", function()
 		local rules = Rules.forTable("pinball_acorn")
@@ -767,7 +815,7 @@ return function(t: Test.T)
 			skip(g.state)
 		end
 		local r = Minigame.result(g)
-		assert(r)
+		assert(r, "a result")
 		t.truthy(r.scores[2] >= 5000)
 		t.eq(r.winner, 2)
 		local g2 = Minigame.start(rules, 2, 1)
@@ -776,7 +824,7 @@ return function(t: Test.T)
 		end
 		g2.state.m.scores[1], g2.state.m.scores[2] = 700, 700
 		local r2 = Minigame.result(g2)
-		assert(r2)
+		assert(r2, "a result")
 		t.eq(r2.winner, nil)
 	end)
 end

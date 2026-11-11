@@ -34,7 +34,13 @@ local function digest(v: any): string
 end
 
 -- a whole game played live by computer players (one per seat), every segment handed to `send`
-local function playLive(id: string, seed: number, players: number, level: number, send: (seat: number, seg: InputLog.Segment) -> ()): Replay.State
+local function playLive(
+	id: string,
+	seed: number,
+	players: number,
+	level: number,
+	send: (seat: number, seg: InputLog.Segment) -> ()
+): Replay.State
 	local tbl = Tables.need(id)
 	local live = Replay.new(id, seed, players)
 	local bots = {}
@@ -56,32 +62,35 @@ local function playLive(id: string, seed: number, players: number, level: number
 end
 
 return function(t: Test.T)
-	t.test("InputLog: a recorder keeps only the changes; a second of holding one flipper is a handful of numbers", function()
-		local rec = InputLog.recorder(1000)
-		for i = 1, 240 do
-			InputLog.push(rec, if i > 10 and i <= 200 then BTN.LEFT else 0)
+	t.test(
+		"InputLog: a recorder keeps only the changes; a second of holding one flipper is a handful of numbers",
+		function()
+			local rec = InputLog.recorder(1000)
+			for i = 1, 240 do
+				InputLog.push(rec, if i > 10 and i <= 200 then BTN.LEFT else 0)
+			end
+			local seg = InputLog.cut(rec)
+			t.deepEq(seg, { 1000, 1240, 11, BTN.LEFT, 201, 0 })
+			t.eq(InputLog.changes(seg), 2)
+			-- the next segment starts where this one ended and carries the buttons over
+			InputLog.push(rec, 0)
+			InputLog.push(rec, BTN.RIGHT)
+			t.deepEq(InputLog.cut(rec), { 1240, 1242, 2, BTN.RIGHT })
+			-- played back, every tick has its buttons
+			local seen: { number } = {}
+			local held, ticks = InputLog.play(seg, 0, function(buttons: number): boolean?
+				table.insert(seen, buttons)
+				return nil
+			end)
+			t.eq(#seen, 240)
+			t.eq(ticks, 240)
+			t.eq(seen[10], 0)
+			t.eq(seen[11], BTN.LEFT)
+			t.eq(seen[200], BTN.LEFT)
+			t.eq(seen[201], 0)
+			t.eq(held, 0)
 		end
-		local seg = InputLog.cut(rec)
-		t.deepEq(seg, { 1000, 1240, 11, BTN.LEFT, 201, 0 })
-		t.eq(InputLog.changes(seg), 2)
-		-- the next segment starts where this one ended and carries the buttons over
-		InputLog.push(rec, 0)
-		InputLog.push(rec, BTN.RIGHT)
-		t.deepEq(InputLog.cut(rec), { 1240, 1242, 2, BTN.RIGHT })
-		-- played back, every tick has its buttons
-		local seen: { number } = {}
-		local held, ticks = InputLog.play(seg, 0, function(buttons: number): boolean?
-			table.insert(seen, buttons)
-			return nil
-		end)
-		t.eq(#seen, 240)
-		t.eq(ticks, 240)
-		t.eq(seen[10], 0)
-		t.eq(seen[11], BTN.LEFT)
-		t.eq(seen[200], BTN.LEFT)
-		t.eq(seen[201], 0)
-		t.eq(held, 0)
-	end)
+	)
 
 	t.test("InputLog.check: only a well-formed segment that starts where the last ended gets in", function()
 		t.truthy(InputLog.check({ 0, 48 }, 0))
@@ -116,49 +125,55 @@ return function(t: Test.T)
 		t.eq(why, "too many changes")
 	end)
 
-	t.test("PIN-P6: the server's replay of the input log is the same game as the one the player saw, bit for bit", function()
-		for _, id in Tables.IDS do
-			local server = Replay.new(id, 4242, 2)
-			local watcher = Replay.new(id, 4242, 2)
-			local segments, numbers = 0, 0
-			local live = playLive(id, 4242, 2, 2, function(seat, seg)
-				-- across the wire and back: the segment is plain numbers
-				local copy = table.clone(seg)
-				local ok, why = Replay.feed(server, seat, copy)
-				t.truthy(ok, why)
-				t.truthy(Replay.feed(watcher, seat, table.clone(seg), {}))
-				segments += 1
-				numbers += #seg
-			end)
-			t.truthy(Replay.over(server), `{id}: the replay reached the end of the game`)
-			t.eq(server.tick, live.tick)
-			t.eq(digest(server.m), digest(live.m), `{id}: the machines are identical`)
-			t.eq(digest(watcher.m), digest(live.m))
-			t.eq(server.m.scores[1], live.m.scores[1])
-			t.eq(server.m.scores[2], live.m.scores[2])
-			t.falsy(server.suspect, `{id}: play never trips the rate guard`)
-			-- the log is small: a few numbers a second
-			local seconds = live.tick / 240
-			t.truthy(numbers / seconds < 40, `{id}: {numbers / seconds} numbers a second`)
-			t.truthy(segments / seconds <= 5.1, "five segments a second")
-		end
-	end)
-
-	t.test("PIN-P6: no segment runs across two balls; the next player's log starts where the last ball ended", function()
-		local server = Replay.new("pinball_acorn", 7, 3)
-		local lastSeat, hands = 0, 0
-		local live = playLive("pinball_acorn", 7, 3, 1, function(seat, seg)
-			if seat ~= lastSeat then
-				hands += 1
-				lastSeat = seat
+	t.test(
+		"PIN-P6: the server's replay of the input log is the same game as the one the player saw, bit for bit",
+		function()
+			for _, id in Tables.IDS do
+				local server = Replay.new(id, 4242, 2)
+				local watcher = Replay.new(id, 4242, 2)
+				local segments, numbers = 0, 0
+				local live = playLive(id, 4242, 2, 2, function(seat, seg)
+					-- across the wire and back: the segment is plain numbers
+					local copy = table.clone(seg)
+					local ok, why = Replay.feed(server, seat, copy)
+					t.truthy(ok, why)
+					t.truthy(Replay.feed(watcher, seat, table.clone(seg), {}))
+					segments += 1
+					numbers += #seg
+				end)
+				t.truthy(Replay.over(server), `{id}: the replay reached the end of the game`)
+				t.eq(server.tick, live.tick)
+				t.eq(digest(server.m), digest(live.m), `{id}: the machines are identical`)
+				t.eq(digest(watcher.m), digest(live.m))
+				t.eq(server.m.scores[1], live.m.scores[1])
+				t.eq(server.m.scores[2], live.m.scores[2])
+				t.falsy(server.suspect, `{id}: play never trips the rate guard`)
+				-- the log is small: a few numbers a second
+				local seconds = live.tick / 240
+				t.truthy(numbers / seconds < 40, `{id}: {numbers / seconds} numbers a second`)
+				t.truthy(segments / seconds <= 5.1, "five segments a second")
 			end
-			t.eq(server.m.up, seat, "each segment belongs to the player whose ball is up")
-			t.eq(seg[1], server.tick)
-			t.truthy(Replay.feed(server, seat, seg))
-		end)
-		t.eq(hands, 9, "three players, three balls each, one after another")
-		t.eq(digest(server.m), digest(live.m))
-	end)
+		end
+	)
+
+	t.test(
+		"PIN-P6: no segment runs across two balls; the next player's log starts where the last ball ended",
+		function()
+			local server = Replay.new("pinball_acorn", 7, 3)
+			local lastSeat, hands = 0, 0
+			local live = playLive("pinball_acorn", 7, 3, 1, function(seat, seg)
+				if seat ~= lastSeat then
+					hands += 1
+					lastSeat = seat
+				end
+				t.eq(server.m.up, seat, "each segment belongs to the player whose ball is up")
+				t.eq(seg[1], server.tick)
+				t.truthy(Replay.feed(server, seat, seg))
+			end)
+			t.eq(hands, 9, "three players, three balls each, one after another")
+			t.eq(digest(server.m), digest(live.m))
+		end
+	)
 
 	t.test("PIN-P6: a different log is a different game: the score cannot be claimed, only played", function()
 		local a = Replay.new("pinball_rodent", 1, 1)
@@ -201,46 +216,55 @@ return function(t: Test.T)
 		t.eq(why, "the game is over")
 	end)
 
-	t.test("squirrel: a thump in the log is refused unless the server granted it, and each grant is good once", function()
-		local r = Replay.new("pinball_space", 3, 1)
-		local ok, why = Replay.feed(r, 1, { 0, 48, 5, BTN.THUMP, 6, 0 })
-		t.falsy(ok)
-		t.eq(why, "thump")
-		Replay.grantThump(r)
-		t.truthy(Replay.feed(r, 1, { 0, 48, 5, BTN.THUMP, 6, 0 }))
-		ok = Replay.feed(r, 1, { 48, 96, 5, BTN.THUMP, 6, 0 })
-		t.falsy(ok, "the grant is spent")
-		-- holding the bit is one thump, not many
-		Replay.grantThump(r)
-		t.truthy(Replay.feed(r, 1, { 48, 96, 5, BTN.THUMP, 20, BTN.THUMP + BTN.LEFT, 30, 0 }))
-	end)
+	t.test(
+		"squirrel: a thump in the log is refused unless the server granted it, and each grant is good once",
+		function()
+			local r = Replay.new("pinball_space", 3, 1)
+			local ok, why = Replay.feed(r, 1, { 0, 48, 5, BTN.THUMP, 6, 0 })
+			t.falsy(ok)
+			t.eq(why, "thump")
+			Replay.grantThump(r)
+			t.truthy(Replay.feed(r, 1, { 0, 48, 5, BTN.THUMP, 6, 0 }))
+			ok = Replay.feed(r, 1, { 48, 96, 5, BTN.THUMP, 6, 0 })
+			t.falsy(ok, "the grant is spent")
+			-- holding the bit is one thump, not many
+			Replay.grantThump(r)
+			t.truthy(Replay.feed(r, 1, { 48, 96, 5, BTN.THUMP, 20, BTN.THUMP + BTN.LEFT, 30, 0 }))
+		end
+	)
 
-	t.test("pace: the replay knows how far it is ahead of a clock, so a server can refuse a log that outruns time", function()
-		local r = Replay.new("pinball_acorn", 1, 1)
-		t.truthy(Replay.feed(r, 1, { 0, 480 }))
-		t.eq(Replay.pace(r, 2), 0)
-		t.eq(Replay.pace(r, 1), 240, "a second ahead")
-		t.eq(Replay.pace(r, 3), -240, "a second behind")
-		t.eq(Replay.SEGMENT_TICKS, 48)
-	end)
+	t.test(
+		"pace: the replay knows how far it is ahead of a clock, so a server can refuse a log that outruns time",
+		function()
+			local r = Replay.new("pinball_acorn", 1, 1)
+			t.truthy(Replay.feed(r, 1, { 0, 480 }))
+			t.eq(Replay.pace(r, 2), 0)
+			t.eq(Replay.pace(r, 1), 240, "a second ahead")
+			t.eq(Replay.pace(r, 3), -240, "a second behind")
+			t.eq(Replay.SEGMENT_TICKS, 48)
+		end
+	)
 
-	t.test("skip: an abandoned ball is played out dead and the next ball stands on the plunger, the same in every replay", function()
-		local a = Replay.new("pinball_rodent", 9, 2)
-		local b = Replay.new("pinball_rodent", 9, 2)
-		t.truthy(Replay.feed(a, 1, { 0, 300, 1, BTN.PLUNGE, 250, 0 }))
-		t.truthy(Replay.feed(b, 1, { 0, 300, 1, BTN.PLUNGE, 250, 0 }))
-		Replay.skip(a)
-		Replay.skip(b)
-		t.eq(a.m.up, 2)
-		t.eq(a.m.phase, PHASE.PLAY)
-		t.eq(a.m.ballTicks, 0)
-		t.eq(#a.m.phys.balls, 1)
-		t.eq(a.tick, b.tick)
-		t.eq(digest(a.m), digest(b.m))
-		t.truthy(a.tick - 300 <= Machine.FORFEIT_TICKS + 4000)
-		-- and the next player's log goes on from there
-		t.truthy(Replay.feed(a, 2, { a.tick, a.tick + 48 }))
-	end)
+	t.test(
+		"skip: an abandoned ball is played out dead and the next ball stands on the plunger, the same in every replay",
+		function()
+			local a = Replay.new("pinball_rodent", 9, 2)
+			local b = Replay.new("pinball_rodent", 9, 2)
+			t.truthy(Replay.feed(a, 1, { 0, 300, 1, BTN.PLUNGE, 250, 0 }))
+			t.truthy(Replay.feed(b, 1, { 0, 300, 1, BTN.PLUNGE, 250, 0 }))
+			Replay.skip(a)
+			Replay.skip(b)
+			t.eq(a.m.up, 2)
+			t.eq(a.m.phase, PHASE.PLAY)
+			t.eq(a.m.ballTicks, 0)
+			t.eq(#a.m.phys.balls, 1)
+			t.eq(a.tick, b.tick)
+			t.eq(digest(a.m), digest(b.m))
+			t.truthy(a.tick - 300 <= Machine.FORFEIT_TICKS + 4000)
+			-- and the next player's log goes on from there
+			t.truthy(Replay.feed(a, 2, { a.tick, a.tick + 48 }))
+		end
+	)
 
 	t.test("the rate guard: a score that climbs faster than the table allows marks the replay suspect", function()
 		local r = Replay.new("pinball_acorn", 1, 1)
@@ -275,7 +299,10 @@ return function(t: Test.T)
 						t.truthy(y > 0 and y < Layout.LENGTH, `{id}: ball y {y}`)
 						t.truthy(h >= 0 and h < 0.5, `{id}: ball height {h}`)
 						local across, _, along = Stream.ballAt(f, i)
-						t.truthy(math.abs(across) < Layout.WIDTH / 2 and math.abs(along) < Layout.LENGTH / 2 + 0.1, `{id}: {across} {along} from {x} {y} {h}`)
+						t.truthy(
+							math.abs(across) < Layout.WIDTH / 2 and math.abs(along) < Layout.LENGTH / 2 + 0.1,
+							`{id}: {across} {along} from {x} {y} {h}`
+						)
 					end
 					for i = 1, 2 do
 						t.truthy(f.flippers[i] >= tbl.c.frest[i] - 1e-9 and f.flippers[i] <= tbl.c.fup[i] + 1e-9)

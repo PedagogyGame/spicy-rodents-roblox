@@ -137,7 +137,8 @@ return function(t: Test.T)
 			Machine.step(acorn, m, 0, {})
 			return m.phys.balls[1].vy
 		end
-		local soft, half, full, over = speedAfter(20), speedAfter(p.pullTicks // 2), speedAfter(p.pullTicks), speedAfter(p.pullTicks + 200)
+		local soft, half, full, over =
+			speedAfter(20), speedAfter(p.pullTicks // 2), speedAfter(p.pullTicks), speedAfter(p.pullTicks + 200)
 		t.truthy(soft < half and half < full, `{soft} < {half} < {full}`)
 		t.near(full, p.vMax, 0.05)
 		t.near(over, p.vMax, 0.05, "holding longer than a full pull adds nothing")
@@ -175,48 +176,54 @@ return function(t: Test.T)
 		end
 	end)
 
-	t.test("PIN-R2: the ball save runs from the moment the ball enters the playfield, however long it waited", function()
-		for _, id in Tables.IDS do
-			local tbl = Tables.need(id)
-			local m = Machine.new(tbl, 1, 1)
-			run(tbl, m, 0, 240 * 20)
-			t.eq(m.saveLeft, 0)
-			launch(tbl, m, 0.9)
-			t.truthy(m.saveLeft > tbl.sheet.saveTicks - 5, "it starts as the ball leaves the lane")
-			local seconds = tbl.sheet.saveTicks / 240
-			t.truthy(seconds >= 8 and seconds <= 10, `{id}: {seconds} s`)
-			local lamps = Machine.lamps(tbl, m, {})
-			t.eq(lamps[tbl.ix.lamp.shoot_again], 2, "the shoot-again lamp flashes while it runs")
+	t.test(
+		"PIN-R2: the ball save runs from the moment the ball enters the playfield, however long it waited",
+		function()
+			for _, id in Tables.IDS do
+				local tbl = Tables.need(id)
+				local m = Machine.new(tbl, 1, 1)
+				run(tbl, m, 0, 240 * 20)
+				t.eq(m.saveLeft, 0)
+				launch(tbl, m, 0.9)
+				t.truthy(m.saveLeft > tbl.sheet.saveTicks - 5, "it starts as the ball leaves the lane")
+				local seconds = tbl.sheet.saveTicks / 240
+				t.truthy(seconds >= 8 and seconds <= 10, `{id}: {seconds} s`)
+				local lamps = Machine.lamps(tbl, m, {})
+				t.eq(lamps[tbl.ix.lamp.shoot_again], 2, "the shoot-again lamp flashes while it runs")
+			end
 		end
-	end)
+	)
 
-	t.test("PIN-R2: a ball lost inside the ball save comes back: said on the display, launched by the machine", function()
-		local m = Machine.new(acorn, 1, 1)
-		local out: { number } = {}
-		launch(acorn, m, 0.9, out)
-		run(acorn, m, 0, 240, out)
-		local score = m.scores[1]
-		lose(m)
-		run(acorn, m, 0, 60, out)
-		t.eq(count(out, CUE.DRAIN), 1)
-		t.eq(count(out, CUE.SAVE), 1)
-		t.eq(m.say, SAY.BALL_SAVED)
-		t.eq(Machine.TEXT[m.say], "BALL SAVED")
-		t.eq(m.phase, PHASE.PLAY, "the ball is not over")
-		t.eq(m.ball, 1)
-		t.eq(m.queue, 1, "the machine owes the plunger a ball")
-		t.eq(#m.phys.balls, 0)
-		-- it comes up, and the machine launches it without the player
-		run(acorn, m, 0, Machine.FEED_TICKS, out)
-		t.eq(#m.phys.balls, 1)
-		t.near(m.phys.balls[1].y, acorn.def.plunger.y, 0.01)
-		table.clear(out)
-		run(acorn, m, 0, Machine.AUTO_TICKS + 2, out)
-		t.eq(count(out, CUE.PLUNGE), 1, "auto-launched")
-		t.truthy(m.phys.balls[1].vy > acorn.def.plunger.vMin)
-		t.truthy(m.scores[1] >= score)
-		t.eq(count(out, CUE.BALL_END), 0)
-	end)
+	t.test(
+		"PIN-R2: a ball lost inside the ball save comes back: said on the display, launched by the machine",
+		function()
+			local m = Machine.new(acorn, 1, 1)
+			local out: { number } = {}
+			launch(acorn, m, 0.9, out)
+			run(acorn, m, 0, 240, out)
+			local score = m.scores[1]
+			lose(m)
+			run(acorn, m, 0, 60, out)
+			t.eq(count(out, CUE.DRAIN), 1)
+			t.eq(count(out, CUE.SAVE), 1)
+			t.eq(m.say, SAY.BALL_SAVED)
+			t.eq(Machine.TEXT[m.say], "BALL SAVED")
+			t.eq(m.phase, PHASE.PLAY, "the ball is not over")
+			t.eq(m.ball, 1)
+			t.eq(m.queue, 1, "the machine owes the plunger a ball")
+			t.eq(#m.phys.balls, 0)
+			-- it comes up, and the machine launches it without the player
+			run(acorn, m, 0, Machine.FEED_TICKS, out)
+			t.eq(#m.phys.balls, 1)
+			t.near(m.phys.balls[1].y, acorn.def.plunger.y, 0.01)
+			table.clear(out)
+			run(acorn, m, 0, Machine.AUTO_TICKS + 2, out)
+			t.eq(count(out, CUE.PLUNGE), 1, "auto-launched")
+			t.truthy(m.phys.balls[1].vy > acorn.def.plunger.vMin)
+			t.truthy(m.scores[1] >= score)
+			t.eq(count(out, CUE.BALL_END), 0)
+		end
+	)
 
 	t.test("PIN-R2: after the ball save (and its short grace) a drain ends the ball", function()
 		local m = Machine.new(acorn, 1, 1)
@@ -292,7 +299,12 @@ return function(t: Test.T)
 		for i = 1, 6 do
 			b.x, b.y, b.vx, b.vy = Layout.XC, 2.0, 0, 0
 			run(acorn, m, 0, 420, out)
-			Machine.step(acorn, m, if i % 3 == 0 then BTN.NUDGE_UP elseif i % 2 == 0 then BTN.NUDGE_R else BTN.NUDGE_L, out)
+			Machine.step(
+				acorn,
+				m,
+				if i % 3 == 0 then BTN.NUDGE_UP elseif i % 2 == 0 then BTN.NUDGE_R else BTN.NUDGE_L,
+				out
+			)
 		end
 		t.eq(m.warnings, 0)
 		t.falsy(m.tilted)
@@ -360,17 +372,20 @@ return function(t: Test.T)
 		t.eq(m.phys.fa[1], acorn.c.fup[1], "the flippers are alive again")
 	end)
 
-	t.test("PIN-R3: nudging with no ball out on the playfield does nothing (the ball on the plunger cannot be tilted away)", function()
-		local m = Machine.new(acorn, 1, 1)
-		local out: { number } = {}
-		for _ = 1, 8 do
-			Machine.step(acorn, m, BTN.NUDGE_L, out)
-			run(acorn, m, 0, Machine.NUDGE_COOL + 2, out)
+	t.test(
+		"PIN-R3: nudging with no ball out on the playfield does nothing (the ball on the plunger cannot be tilted away)",
+		function()
+			local m = Machine.new(acorn, 1, 1)
+			local out: { number } = {}
+			for _ = 1, 8 do
+				Machine.step(acorn, m, BTN.NUDGE_L, out)
+				run(acorn, m, 0, Machine.NUDGE_COOL + 2, out)
+			end
+			t.eq(m.warnings, 0)
+			t.falsy(m.tilted)
+			t.near(m.phys.balls[1].y, acorn.def.plunger.y, 0.01)
 		end
-		t.eq(m.warnings, 0)
-		t.falsy(m.tilted)
-		t.near(m.phys.balls[1].y, acorn.def.plunger.y, 0.01)
-	end)
+	)
 
 	t.test("squirrel: a thump on the glass is one nudge that can warn but never tilt", function()
 		local m = Machine.new(acorn, 1, 1)
@@ -466,122 +481,134 @@ return function(t: Test.T)
 		end
 	end)
 
-	t.test("PIN-R5: one to four players alternate ball by ball, each with a score and a rule sheet of their own", function()
-		t.eq(Machine.MAX_PLAYERS, 4)
-		t.fails(function()
-			Machine.new(acorn, 1, 5)
-		end)
-		t.fails(function()
-			Machine.new(acorn, 1, 0)
-		end)
-		local m = Machine.new(acorn, 1, 3)
-		local order: { string } = {}
-		for _ = 1, 9 do
-			table.insert(order, `{m.up}:{m.ball}`)
-			launch(acorn, m, 0.9)
-			-- each player scores something of their own
-			Machine.add(m, m.up * 1000)
-			m.sheets[m.up].hoard = m.up
-			m.saveLeft, m.graceLeft = 0, 0
-			lose(m)
-			for _ = 1, 4000 do
-				Machine.step(acorn, m, 0, {})
-				if m.phase == PHASE.OVER or (m.phase == PHASE.PLAY and m.ballTicks == 0) then
-					break
+	t.test(
+		"PIN-R5: one to four players alternate ball by ball, each with a score and a rule sheet of their own",
+		function()
+			t.eq(Machine.MAX_PLAYERS, 4)
+			t.fails(function()
+				Machine.new(acorn, 1, 5)
+			end)
+			t.fails(function()
+				Machine.new(acorn, 1, 0)
+			end)
+			local m = Machine.new(acorn, 1, 3)
+			local order: { string } = {}
+			for _ = 1, 9 do
+				table.insert(order, `{m.up}:{m.ball}`)
+				launch(acorn, m, 0.9)
+				-- each player scores something of their own
+				Machine.add(m, m.up * 1000)
+				m.sheets[m.up].hoard = m.up
+				m.saveLeft, m.graceLeft = 0, 0
+				lose(m)
+				for _ = 1, 4000 do
+					Machine.step(acorn, m, 0, {})
+					if m.phase == PHASE.OVER or (m.phase == PHASE.PLAY and m.ballTicks == 0) then
+						break
+					end
 				end
 			end
-		end
-		t.eq(table.concat(order, " "), "1:1 2:1 3:1 1:2 2:2 3:2 1:3 2:3 3:3")
-		t.eq(m.phase, PHASE.OVER)
-		for seat = 1, 3 do
-			t.truthy(m.scores[seat] >= seat * 3000, `player {seat} kept their own score`)
-			t.eq(m.sheets[seat].hoard, seat, "and their own hoard")
-		end
-		t.truthy(m.scores[3] > m.scores[1])
-	end)
-
-	t.test("multiball plumbing: a ball the machine owes comes up when the lane is clear, and the ball ends with the last", function()
-		local m = Machine.new(acorn, 1, 1)
-		local out: { number } = {}
-		launch(acorn, m, 0.9, out)
-		m.saveLeft, m.graceLeft = 0, 0
-		Machine.feed(m, 2)
-		t.eq(Machine.live(m), 3)
-		park(acorn, m, BTN.LEFT, Machine.FEED_TICKS + Machine.AUTO_TICKS + 40, out)
-		t.eq(#m.phys.balls, 2, "one at a time")
-		park(acorn, m, BTN.LEFT, 900, out)
-		t.eq(m.queue, 0)
-		t.eq(Machine.live(m), #m.phys.balls)
-		t.truthy(count(out, CUE.PLUNGE) >= 3)
-		-- lose them one by one: only the last ends the ball
-		for left = #m.phys.balls, 1, -1 do
-			t.eq(m.phase, PHASE.PLAY, `{left} still in play`)
-			local one = m.phys.balls[1]
-			one.x, one.y, one.vx, one.vy, one.asleep = Layout.XC, 0.3, 0, -2, false
-			for _ = 1, 60 do
-				Machine.step(acorn, m, 0, out)
-				if #m.phys.balls < left then
-					break
-				end
+			t.eq(table.concat(order, " "), "1:1 2:1 3:1 1:2 2:2 3:2 1:3 2:3 3:3")
+			t.eq(m.phase, PHASE.OVER)
+			for seat = 1, 3 do
+				t.truthy(m.scores[seat] >= seat * 3000, `player {seat} kept their own score`)
+				t.eq(m.sheets[seat].hoard, seat, "and their own hoard")
 			end
-			for _, rest in m.phys.balls do
-				rest.x, rest.y, rest.vx, rest.vy, rest.asleep = Layout.XC, 2.0, 0, 0, true
-			end
+			t.truthy(m.scores[3] > m.scores[1])
 		end
-		t.eq(m.phase, PHASE.BONUS)
-	end)
+	)
 
-	t.test("a ball that lies still where no flipper holds it is found by a ball search; a cradled one is left alone", function()
-		local m = Machine.new(acorn, 1, 1)
-		local out: { number } = {}
-		launch(acorn, m, 0.9, out)
-		local b = m.phys.balls[1]
-		park(acorn, m, BTN.LEFT, 60, out)
-		run(acorn, m, BTN.LEFT, Machine.SEARCH_TICKS * 3, out)
-		t.eq(count(out, CUE.SEARCH), 0, "a held flipper keeps the search away (a cradle is the player's)")
-		t.eq(b.y, 2.0)
-		park(acorn, m, 0, 60, out)
-		run(acorn, m, 0, Machine.SEARCH_TICKS - 70, out)
-		t.eq(count(out, CUE.SEARCH), 0)
-		run(acorn, m, 0, 20, out)
-		t.eq(count(out, CUE.SEARCH), 1)
-		t.falsy(b.asleep)
-		t.truthy(b.vy > 0.5, "kicked loose")
-		-- a moving ball is never searched for, however long it goes without a switch
-		local m2 = Machine.new(acorn, 1, 1)
-		launch(acorn, m2, 0.9, out)
-		table.clear(out)
-		local b2 = m2.phys.balls[1]
-		for _ = 1, Machine.SEARCH_TICKS * 2 do
-			b2.x, b2.y, b2.vx, b2.vy = Layout.XC, 2.0, 1, 0
-			Machine.step(acorn, m2, 0, out)
-		end
-		t.eq(count(out, CUE.SEARCH), 0)
-	end)
-
-	t.test("an abandoned ball is played out dead: launched by the machine, no flippers, no ball save, ended in time", function()
-		for _, id in Tables.IDS do
-			local tbl = Tables.need(id)
-			local m = Machine.new(tbl, 3, 2)
+	t.test(
+		"multiball plumbing: a ball the machine owes comes up when the lane is clear, and the ball ends with the last",
+		function()
+			local m = Machine.new(acorn, 1, 1)
 			local out: { number } = {}
-			Machine.forfeit(tbl, m, out)
-			t.truthy(m.forfeit)
-			local ticks = 0
-			while m.phase == PHASE.PLAY and m.forfeit and ticks < Machine.FORFEIT_TICKS + 10 do
-				Machine.step(tbl, m, BTN.LEFT + BTN.RIGHT + BTN.PLUNGE, out)
-				ticks += 1
-				t.eq(m.phys.fa[1], tbl.c.frest[1], "the buttons do nothing")
+			launch(acorn, m, 0.9, out)
+			m.saveLeft, m.graceLeft = 0, 0
+			Machine.feed(m, 2)
+			t.eq(Machine.live(m), 3)
+			park(acorn, m, BTN.LEFT, Machine.FEED_TICKS + Machine.AUTO_TICKS + 40, out)
+			t.eq(#m.phys.balls, 2, "one at a time")
+			park(acorn, m, BTN.LEFT, 900, out)
+			t.eq(m.queue, 0)
+			t.eq(Machine.live(m), #m.phys.balls)
+			t.truthy(count(out, CUE.PLUNGE) >= 3)
+			-- lose them one by one: only the last ends the ball
+			for left = #m.phys.balls, 1, -1 do
+				t.eq(m.phase, PHASE.PLAY, `{left} still in play`)
+				local one = m.phys.balls[1]
+				one.x, one.y, one.vx, one.vy, one.asleep = Layout.XC, 0.3, 0, -2, false
+				for _ = 1, 60 do
+					Machine.step(acorn, m, 0, out)
+					if #m.phys.balls < left then
+						break
+					end
+				end
+				for _, rest in m.phys.balls do
+					rest.x, rest.y, rest.vx, rest.vy, rest.asleep = Layout.XC, 2.0, 0, 0, true
+				end
 			end
-			t.truthy(ticks <= Machine.FORFEIT_TICKS, `{id}: ended within the minute ({ticks / 240} s)`)
-			t.eq(count(out, CUE.SAVE), 0)
-			t.eq(count(out, CUE.PLUNGE), 1, "the machine launched it")
 			t.eq(m.phase, PHASE.BONUS)
-			run(tbl, m, 0, 2000, out)
-			t.eq(m.up, 2, "and the next player is up")
-			t.falsy(m.forfeit)
-			t.falsy(m.phys.dead)
 		end
-	end)
+	)
+
+	t.test(
+		"a ball that lies still where no flipper holds it is found by a ball search; a cradled one is left alone",
+		function()
+			local m = Machine.new(acorn, 1, 1)
+			local out: { number } = {}
+			launch(acorn, m, 0.9, out)
+			local b = m.phys.balls[1]
+			park(acorn, m, BTN.LEFT, 60, out)
+			run(acorn, m, BTN.LEFT, Machine.SEARCH_TICKS * 3, out)
+			t.eq(count(out, CUE.SEARCH), 0, "a held flipper keeps the search away (a cradle is the player's)")
+			t.eq(b.y, 2.0)
+			park(acorn, m, 0, 60, out)
+			run(acorn, m, 0, Machine.SEARCH_TICKS - 70, out)
+			t.eq(count(out, CUE.SEARCH), 0)
+			run(acorn, m, 0, 20, out)
+			t.eq(count(out, CUE.SEARCH), 1)
+			t.falsy(b.asleep)
+			t.truthy(b.vy > 0.5, "kicked loose")
+			-- a moving ball is never searched for, however long it goes without a switch
+			local m2 = Machine.new(acorn, 1, 1)
+			launch(acorn, m2, 0.9, out)
+			table.clear(out)
+			local b2 = m2.phys.balls[1]
+			for _ = 1, Machine.SEARCH_TICKS * 2 do
+				b2.x, b2.y, b2.vx, b2.vy = Layout.XC, 2.0, 1, 0
+				Machine.step(acorn, m2, 0, out)
+			end
+			t.eq(count(out, CUE.SEARCH), 0)
+		end
+	)
+
+	t.test(
+		"an abandoned ball is played out dead: launched by the machine, no flippers, no ball save, ended in time",
+		function()
+			for _, id in Tables.IDS do
+				local tbl = Tables.need(id)
+				local m = Machine.new(tbl, 3, 2)
+				local out: { number } = {}
+				Machine.forfeit(tbl, m, out)
+				t.truthy(m.forfeit)
+				local ticks = 0
+				while m.phase == PHASE.PLAY and m.forfeit and ticks < Machine.FORFEIT_TICKS + 10 do
+					Machine.step(tbl, m, BTN.LEFT + BTN.RIGHT + BTN.PLUNGE, out)
+					ticks += 1
+					t.eq(m.phys.fa[1], tbl.c.frest[1], "the buttons do nothing")
+				end
+				t.truthy(ticks <= Machine.FORFEIT_TICKS, `{id}: ended within the minute ({ticks / 240} s)`)
+				t.eq(count(out, CUE.SAVE), 0)
+				t.eq(count(out, CUE.PLUNGE), 1, "the machine launched it")
+				t.eq(m.phase, PHASE.BONUS)
+				run(tbl, m, 0, 2000, out)
+				t.eq(m.up, 2, "and the next player is up")
+				t.falsy(m.forfeit)
+				t.falsy(m.phys.dead)
+			end
+		end
+	)
 
 	t.test("determinism: the same seed and the same buttons give the same machine, cue for cue", function()
 		for _, id in Tables.IDS do

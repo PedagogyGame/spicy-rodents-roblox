@@ -195,7 +195,11 @@ local function plungerReport(tbl: Machine.Table)
 						first = "flipper"
 					end
 				end
-				if cue == CUE.SAY and out[i + 1] >= 101 and string.find(tbl.sheet.text[out[i + 1]], "SHOT", 1, true) then
+				if
+					cue == CUE.SAY
+					and out[i + 1] >= 101
+					and string.find(tbl.sheet.text[out[i + 1]], "SHOT", 1, true)
+				then
 					skill = true
 				end
 			end
@@ -293,7 +297,25 @@ local function gamesReport(tbl: Machine.Table)
 			)} s in play with {fmt(flips / balls, 0)} flips`
 		)
 		local per = {}
-		for _, name in { "BUMPER", "SLING", "STANDUP", "DROP", "ROLLOVER", "SPIN", "SAUCER", "RAMP_IN", "RAMP_OUT", "SAVE", "EXTRA_BALL", "NUDGE", "TILT_WARN", "TILT", "SEARCH" } do
+		for _, name in
+			{
+				"BUMPER",
+				"SLING",
+				"STANDUP",
+				"DROP",
+				"ROLLOVER",
+				"SPIN",
+				"SAUCER",
+				"RAMP_IN",
+				"RAMP_OUT",
+				"SAVE",
+				"EXTRA_BALL",
+				"NUDGE",
+				"TILT_WARN",
+				"TILT",
+				"SEARCH",
+			}
+		do
 			if cues[name] then
 				table.insert(per, `{string.lower(name)} {fmt(cues[name] / GAMES)}`)
 			end

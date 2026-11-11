@@ -28,10 +28,7 @@ end
 local function digest(s: Physics.State): string
 	local parts = { tostring(s.tick), tostring(s.rng) }
 	for _, b in s.balls do
-		table.insert(
-			parts,
-			string.format("%.17g/%.17g/%.17g/%.17g/%d/%.17g", b.x, b.y, b.vx, b.vy, b.mode, b.s)
-		)
+		table.insert(parts, string.format("%.17g/%.17g/%.17g/%.17g/%d/%.17g", b.x, b.y, b.vx, b.vy, b.mode, b.s))
 	end
 	for i = 1, #s.fa do
 		table.insert(parts, string.format("%.17g/%.17g", s.fa[i], s.fw[i]))
@@ -50,14 +47,7 @@ local function shell(): Layout.Compiled
 end
 
 -- did the ball's centre cross a standing wall between two points?
-local function crossed(
-	c: Layout.Compiled,
-	s: Physics.State,
-	x0: number,
-	y0: number,
-	x1: number,
-	y1: number
-): number
+local function crossed(c: Layout.Compiled, s: Physics.State, x0: number, y0: number, x1: number, y1: number): number
 	for id = 1, c.nSeg do
 		local kind = c.sKind[id]
 		if kind == Layout.SEG_GATE or (kind == Layout.SEG_DROP and s.drop[c.sRef[id]]) then
@@ -88,14 +78,17 @@ local function overFlipper(c: Layout.Compiled, s: Physics.State, i: number, b: P
 end
 
 return function(t: Test.T)
-	t.test("the tick is 1/240 s (PIN: fixed tick of 240 Hz or finer) and a sub-step moves under a third of a radius", function()
-		t.eq(Physics.HZ, 240)
-		t.eq(Physics.DT, 1 / 240)
-		t.truthy(Physics.SUB_TRAVEL <= R / 3)
-		-- at top speed, with a flipper at full swing, the sub-steps in hand are enough
-		local worst = Physics.MAX_SPEED * Physics.DT + Physics.FLIP_W_MAX * Physics.DT * 0.45
-		t.truthy(worst / Physics.SUB_TRAVEL <= Physics.MAX_SUBSTEPS, "sub-steps cover the worst case")
-	end)
+	t.test(
+		"the tick is 1/240 s (PIN: fixed tick of 240 Hz or finer) and a sub-step moves under a third of a radius",
+		function()
+			t.eq(Physics.HZ, 240)
+			t.eq(Physics.DT, 1 / 240)
+			t.truthy(Physics.SUB_TRAVEL <= R / 3)
+			-- at top speed, with a flipper at full swing, the sub-steps in hand are enough
+			local worst = Physics.MAX_SPEED * Physics.DT + Physics.FLIP_W_MAX * Physics.DT * 0.45
+			t.truthy(worst / Physics.SUB_TRAVEL <= Physics.MAX_SUBSTEPS, "sub-steps cover the worst case")
+		end
+	)
 
 	t.test("determinism: the same seed and the same buttons give the same bits, on every table", function()
 		for _, id in Tables.IDS do
@@ -178,7 +171,13 @@ return function(t: Test.T)
 				s.dead = true
 				local ev: { number } = {}
 				-- thrown from the open middle of the table
-				local i = Physics.addBall(s, Layout.XC - 0.2 + rnd() * 0.4, 1.6 + rnd() * 0.4, rnd() * 20 - 10, rnd() * 20 - 4)
+				local i = Physics.addBall(
+					s,
+					Layout.XC - 0.2 + rnd() * 0.4,
+					1.6 + rnd() * 0.4,
+					rnd() * 20 - 10,
+					rnd() * 20 - 4
+				)
 				local b = s.balls[i]
 				local start = Physics.energy(tbl.c, b)
 				local high = start
@@ -252,40 +251,43 @@ return function(t: Test.T)
 		t.truthy(dead < 4.0 * 0.6, "a dead bumper only bounces")
 	end)
 
-	t.test("PIN-P4: a slingshot adds its kick to the bounce; a touch near its ends or too soft does not fire", function()
-		local tbl = Tables.need("pinball_acorn")
-		local sl = tbl.def.slings[1]
-		local dx, dy = sl.x2 - sl.x1, sl.y2 - sl.y1
-		local len = math.sqrt(dx * dx + dy * dy)
-		-- the face looks toward the middle of the table
-		local nx, ny = -dy / len, dx / len
-		if nx < 0 then
-			nx, ny = -nx, -ny
-		end
-		local function hit(at: number, speed: number): (number, number)
-			local s = Physics.new(tbl.c, 1)
-			local ev: { number } = {}
-			local px, py = sl.x1 + dx * at + nx * (R + 0.01), sl.y1 + dy * at + ny * (R + 0.01)
-			local i = Physics.addBall(s, px, py, -nx * speed, -ny * speed)
-			Physics.step(tbl.c, s, false, false, ev)
-			Physics.step(tbl.c, s, false, false, ev)
-			local fired = 0
-			for k = 1, #ev, 4 do
-				if ev[k] == EV.SLING then
-					fired += 1
-				end
+	t.test(
+		"PIN-P4: a slingshot adds its kick to the bounce; a touch near its ends or too soft does not fire",
+		function()
+			local tbl = Tables.need("pinball_acorn")
+			local sl = tbl.def.slings[1]
+			local dx, dy = sl.x2 - sl.x1, sl.y2 - sl.y1
+			local len = math.sqrt(dx * dx + dy * dy)
+			-- the face looks toward the middle of the table
+			local nx, ny = -dy / len, dx / len
+			if nx < 0 then
+				nx, ny = -nx, -ny
 			end
-			local b = s.balls[i]
-			return b.vx * nx + b.vy * ny, fired
+			local function hit(at: number, speed: number): (number, number)
+				local s = Physics.new(tbl.c, 1)
+				local ev: { number } = {}
+				local px, py = sl.x1 + dx * at + nx * (R + 0.01), sl.y1 + dy * at + ny * (R + 0.01)
+				local i = Physics.addBall(s, px, py, -nx * speed, -ny * speed)
+				Physics.step(tbl.c, s, false, false, ev)
+				Physics.step(tbl.c, s, false, false, ev)
+				local fired = 0
+				for k = 1, #ev, 4 do
+					if ev[k] == EV.SLING then
+						fired += 1
+					end
+				end
+				local b = s.balls[i]
+				return b.vx * nx + b.vy * ny, fired
+			end
+			local out, fired = hit(0.5, 2.0)
+			t.eq(fired, 1)
+			t.near(out, Physics.SLING_KICK + 2.0 * Layout.MATERIALS.rubber.e, 0.25)
+			local _, softFired = hit(0.5, 0.4)
+			t.eq(softFired, 0, "too soft a touch")
+			local _, endFired = hit(0.04, 2.0)
+			t.eq(endFired, 0, "at the very end of the rubber")
 		end
-		local out, fired = hit(0.5, 2.0)
-		t.eq(fired, 1)
-		t.near(out, Physics.SLING_KICK + 2.0 * Layout.MATERIALS.rubber.e, 0.25)
-		local _, softFired = hit(0.5, 0.4)
-		t.eq(softFired, 0, "too soft a touch")
-		local _, endFired = hit(0.04, 2.0)
-		t.eq(endFired, 0, "at the very end of the rubber")
-	end)
+	)
 
 	t.test("PIN-P4: the speed cap holds whatever kicks the ball", function()
 		local tbl = Tables.need("pinball_rodent")
@@ -310,127 +312,127 @@ return function(t: Test.T)
 		t.truthy(top > Physics.MAX_SPEED * 0.9, "the cap was reached")
 	end)
 
-	t.test("PIN-P3: at top speed nothing passes through a wall, a post or the cabinet, with one ball or three", function()
-		for _, id in Tables.IDS do
-			local tbl = Tables.need(id)
-			local c = tbl.c
-			local rnd = lcg(2024)
-			local s = Physics.new(c, 17)
-			local ev: { number } = {}
-			local px: { number }, py: { number } = {}, {}
-			local function throw()
-				-- from the open middle of the table, as hard as a ball can go, any way
-				local a = rnd() * 2 * math.pi
-				Physics.addBall(
-					s,
-					Layout.XC - 0.1 + rnd() * 0.2,
-					1.7 + rnd() * 0.3,
-					math.cos(a) * Physics.MAX_SPEED,
-					math.sin(a) * Physics.MAX_SPEED
-				)
-			end
-			for _ = 1, 3 do
-				throw()
-			end
-			local worst = 0
-			for i = 1, 9600 do
-				for k, b in s.balls do
-					px[k], py[k] = b.x, b.y
+	t.test(
+		"PIN-P3: at top speed nothing passes through a wall, a post or the cabinet, with one ball or three",
+		function()
+			for _, id in Tables.IDS do
+				local tbl = Tables.need(id)
+				local c = tbl.c
+				local rnd = lcg(2024)
+				local s = Physics.new(c, 17)
+				local ev: { number } = {}
+				local px: { number }, py: { number } = {}, {}
+				local function throw()
+					-- from the open middle of the table, as hard as a ball can go, any way
+					local a = rnd() * 2 * math.pi
+					Physics.addBall(
+						s,
+						Layout.XC - 0.1 + rnd() * 0.2,
+						1.7 + rnd() * 0.3,
+						math.cos(a) * Physics.MAX_SPEED,
+						math.sin(a) * Physics.MAX_SPEED
+					)
 				end
-				local n = #s.balls
-				local modes: { number } = {}
-				for k, b in s.balls do
-					modes[k] = b.mode
+				for _ = 1, 3 do
+					throw()
 				end
-				table.clear(ev)
-				Physics.step(c, s, rnd() < 0.4, rnd() < 0.4, ev)
-				for k = 1, n do
-					local b = s.balls[k]
-					if modes[k] == Physics.FREE and b.mode == Physics.FREE then
-						local hit = crossed(c, s, px[k], py[k], b.x, b.y)
-						t.eq(hit, 0, `{id}: tick {i}: the ball went through wall {hit} at {b.x}, {b.y}`)
-						-- inside the cabinet, and not inside a post or a bumper
-						t.truthy(b.x > R - 0.002 and b.x < Layout.WIDTH - R + 0.002, `{id}: x {b.x}`)
-						t.truthy(b.y < Layout.LENGTH - R + 0.002, `{id}: y {b.y}`)
-						for q = 1, c.nCir do
-							local dx, dy = b.x - c.cx[q], b.y - c.cy[q]
-							local deep = c.cr[q] + R - math.sqrt(dx * dx + dy * dy)
-							worst = math.max(worst, deep)
+				local worst = 0
+				for i = 1, 9600 do
+					for k, b in s.balls do
+						px[k], py[k] = b.x, b.y
+					end
+					local n = #s.balls
+					local modes: { number } = {}
+					for k, b in s.balls do
+						modes[k] = b.mode
+					end
+					table.clear(ev)
+					Physics.step(c, s, rnd() < 0.4, rnd() < 0.4, ev)
+					for k = 1, n do
+						local b = s.balls[k]
+						if modes[k] == Physics.FREE and b.mode == Physics.FREE then
+							local hit = crossed(c, s, px[k], py[k], b.x, b.y)
+							t.eq(hit, 0, `{id}: tick {i}: the ball went through wall {hit} at {b.x}, {b.y}`)
+							-- inside the cabinet, and not inside a post or a bumper
+							t.truthy(b.x > R - 0.002 and b.x < Layout.WIDTH - R + 0.002, `{id}: x {b.x}`)
+							t.truthy(b.y < Layout.LENGTH - R + 0.002, `{id}: y {b.y}`)
+							for q = 1, c.nCir do
+								local dx, dy = b.x - c.cx[q], b.y - c.cy[q]
+								local deep = c.cr[q] + R - math.sqrt(dx * dx + dy * dy)
+								worst = math.max(worst, deep)
+							end
+						end
+					end
+					if i % 160 == 0 then
+						-- fresh balls at top speed, and whatever is still about is thrown again
+						Physics.removeGone(s)
+						for _, b in s.balls do
+							if b.mode == Physics.FREE then
+								local a = rnd() * 2 * math.pi
+								b.vx, b.vy = math.cos(a) * Physics.MAX_SPEED, math.sin(a) * Physics.MAX_SPEED
+								b.asleep = false
+							end
+						end
+						while #s.balls < 3 do
+							throw()
 						end
 					end
 				end
-				if i % 160 == 0 then
-					-- fresh balls at top speed, and whatever is still about is thrown again
-					Physics.removeGone(s)
-					for _, b in s.balls do
-						if b.mode == Physics.FREE then
-							local a = rnd() * 2 * math.pi
-							b.vx, b.vy = math.cos(a) * Physics.MAX_SPEED, math.sin(a) * Physics.MAX_SPEED
-							b.asleep = false
-						end
-					end
-					while #s.balls < 3 do
-						throw()
-					end
-				end
+				t.truthy(worst < R * 0.5, `{id}: deepest a ball got into a post: {worst}`)
 			end
-			t.truthy(worst < R * 0.5, `{id}: deepest a ball got into a post: {worst}`)
 		end
-	end)
+	)
 
-	t.test("PIN-P3: the ball never passes through a flipper, at rest, held or swinging, from above at any speed", function()
-		local tbl = Tables.need("pinball_acorn")
-		local c = tbl.c
-		local rnd = lcg(5)
-		local through, shots = 0, 0
-		for trial = 1, 400 do
-			local s = Physics.new(c, trial)
-			local ev: { number } = {}
-			local side = if trial % 2 == 0 then 1 else 2
-			local along = 0.1 + rnd() * 0.85
-			local tx = c.fpx[side] + c.fmir[side] * along * c.flen[side] * 0.87
-			local speed = 3 + rnd() * (Physics.MAX_SPEED - 3)
-			local i = Physics.addBall(s, tx + (rnd() - 0.5) * 0.3, c.fpy[side] + 0.9, 0, 0)
-			local b = s.balls[i]
-			-- aimed at a point on the flipper
-			local ax, ay = tx - b.x, (c.fpy[side] - 0.05) - b.y
-			local d = math.sqrt(ax * ax + ay * ay)
-			b.vx, b.vy = ax / d * speed, ay / d * speed
-			local mode = trial % 3 -- 0 at rest, 1 held up, 2 flipped as the ball arrives
-			local flipAt = math.floor(0.75 / speed * 240) - math.floor(rnd() * 8)
-			if mode == 1 then
-				for _ = 1, 60 do
-					Physics.step(c, s, true, true, ev)
-				end
-				b.x, b.y = tx + (rnd() - 0.5) * 0.3, c.fpy[side] + 0.9
+	t.test(
+		"PIN-P3: the ball never passes through a flipper, at rest, held or swinging, from above at any speed",
+		function()
+			local tbl = Tables.need("pinball_acorn")
+			local c = tbl.c
+			local rnd = lcg(5)
+			local through, shots = 0, 0
+			for trial = 1, 400 do
+				local s = Physics.new(c, trial)
+				local ev: { number } = {}
+				local side = if trial % 2 == 0 then 1 else 2
+				local along = 0.1 + rnd() * 0.85
+				local tx = c.fpx[side] + c.fmir[side] * along * c.flen[side] * 0.87
+				local speed = 3 + rnd() * (Physics.MAX_SPEED - 3)
+				local i = Physics.addBall(s, tx + (rnd() - 0.5) * 0.3, c.fpy[side] + 0.9, 0, 0)
+				local b = s.balls[i]
+				-- aimed at a point on the flipper
+				local ax, ay = tx - b.x, (c.fpy[side] - 0.05) - b.y
+				local d = math.sqrt(ax * ax + ay * ay)
 				b.vx, b.vy = ax / d * speed, ay / d * speed
-			end
-			for k = 1, 90 do
-				local press = mode == 1 or (mode == 2 and k >= flipAt)
-				local along0, side0 = overFlipper(c, s, side, b)
-				Physics.step(c, s, press, press, ev)
-				if b.mode ~= Physics.FREE then
-					break
+				local mode = trial % 3 -- 0 at rest, 1 held up, 2 flipped as the ball arrives
+				local flipAt = math.floor(0.75 / speed * 240) - math.floor(rnd() * 8)
+				if mode == 1 then
+					for _ = 1, 60 do
+						Physics.step(c, s, true, true, ev)
+					end
+					b.x, b.y = tx + (rnd() - 0.5) * 0.3, c.fpy[side] + 0.9
+					b.vx, b.vy = ax / d * speed, ay / d * speed
 				end
-				-- on the other side of the flipper's middle line than a tick ago, while over its length both
-				-- times, is through it
-				local along1, side1 = overFlipper(c, s, side, b)
-				if
-					side0 * side1 < 0
-					and along0 > 0.03
-					and along0 < 0.97
-					and along1 > 0.03
-					and along1 < 0.97
-				then
-					through += 1
-					break
+				for k = 1, 90 do
+					local press = mode == 1 or (mode == 2 and k >= flipAt)
+					local along0, side0 = overFlipper(c, s, side, b)
+					Physics.step(c, s, press, press, ev)
+					if b.mode ~= Physics.FREE then
+						break
+					end
+					-- on the other side of the flipper's middle line than a tick ago, while over its length both
+					-- times, is through it
+					local along1, side1 = overFlipper(c, s, side, b)
+					if side0 * side1 < 0 and along0 > 0.03 and along0 < 0.97 and along1 > 0.03 and along1 < 0.97 then
+						through += 1
+						break
+					end
 				end
+				shots += 1
 			end
-			shots += 1
+			t.eq(through, 0, "balls that went through a flipper")
+			t.eq(shots, 400)
 		end
-		t.eq(through, 0, "balls that went through a flipper")
-		t.eq(shots, 400)
-	end)
+	)
 
 	t.test("a rest state is reached: a ball left alone on a dead table drains or comes to rest, every time", function()
 		for _, id in Tables.IDS do
@@ -441,7 +443,8 @@ return function(t: Test.T)
 				local s = Physics.new(tbl.c, 1)
 				s.dead = true
 				local ev: { number } = {}
-				local i = Physics.addBall(s, Layout.XC - 0.2 + rnd() * 0.4, 1.6 + rnd() * 0.4, rnd() * 16 - 8, rnd() * 14 - 2)
+				local i =
+					Physics.addBall(s, Layout.XC - 0.2 + rnd() * 0.4, 1.6 + rnd() * 0.4, rnd() * 16 - 8, rnd() * 14 - 2)
 				local b = s.balls[i]
 				local done = false
 				for _ = 1, 240 * 40 do
@@ -554,44 +557,47 @@ return function(t: Test.T)
 		t.falsy(weak, "a weak shot rolls back")
 	end)
 
-	t.test("a kick-out hole swallows a ball slow enough, holds it, throws it back out and takes no second ball", function()
-		local tbl = Tables.need("pinball_rodent")
-		local c = tbl.c
-		local sc = tbl.def.saucers[1]
-		local s = Physics.new(c, 4)
-		local ev: { number } = {}
-		local i = Physics.addBall(s, sc.x - 0.02, sc.y - 0.12, 0.3, 2.0)
-		local b = s.balls[i]
-		local held, out = 0, 0
-		for tick = 1, 240 * 4 do
-			table.clear(ev)
-			Physics.step(c, s, false, false, ev)
-			for k = 1, #ev, 4 do
-				if ev[k] == EV.SAUCER then
-					held = tick
-					-- a second ball arriving while the hole is full is not taken
-					Physics.addBall(s, sc.x, sc.y - 0.1, 0, 1.0)
-				elseif ev[k] == EV.EJECT then
-					out = tick
+	t.test(
+		"a kick-out hole swallows a ball slow enough, holds it, throws it back out and takes no second ball",
+		function()
+			local tbl = Tables.need("pinball_rodent")
+			local c = tbl.c
+			local sc = tbl.def.saucers[1]
+			local s = Physics.new(c, 4)
+			local ev: { number } = {}
+			local i = Physics.addBall(s, sc.x - 0.02, sc.y - 0.12, 0.3, 2.0)
+			local b = s.balls[i]
+			local held, out = 0, 0
+			for tick = 1, 240 * 4 do
+				table.clear(ev)
+				Physics.step(c, s, false, false, ev)
+				for k = 1, #ev, 4 do
+					if ev[k] == EV.SAUCER then
+						held = tick
+						-- a second ball arriving while the hole is full is not taken
+						Physics.addBall(s, sc.x, sc.y - 0.1, 0, 1.0)
+					elseif ev[k] == EV.EJECT then
+						out = tick
+					end
+				end
+				if out > 0 then
+					break
 				end
 			end
-			if out > 0 then
-				break
+			t.truthy(held > 0, "swallowed")
+			t.near(out - held, sc.holdTicks, 1, "held for its time")
+			t.eq(b.mode, Physics.FREE)
+			t.truthy(b.vy < -1, "thrown down the table")
+			t.eq(s.balls[2].mode, Physics.FREE, "the second ball stayed out")
+			-- too fast, the ball skips over the hole
+			local s2 = Physics.new(c, 4)
+			local j = Physics.addBall(s2, sc.x - 0.3, sc.y, sc.maxSpeed * 1.5, 0)
+			for _ = 1, 20 do
+				Physics.step(c, s2, false, false, ev)
 			end
+			t.neq(s2.balls[j].mode, Physics.HELD)
 		end
-		t.truthy(held > 0, "swallowed")
-		t.near(out - held, sc.holdTicks, 1, "held for its time")
-		t.eq(b.mode, Physics.FREE)
-		t.truthy(b.vy < -2, "thrown down the table")
-		t.eq(s.balls[2].mode, Physics.FREE, "the second ball stayed out")
-		-- too fast, the ball skips over the hole
-		local s2 = Physics.new(c, 4)
-		local j = Physics.addBall(s2, sc.x - 0.3, sc.y, sc.maxSpeed * 1.5, 0)
-		for _ = 1, 20 do
-			Physics.step(c, s2, false, false, ev)
-		end
-		t.neq(s2.balls[j].mode, Physics.HELD)
-	end)
+	)
 
 	t.test("a spinner spins as fast as the ball went through it, counts its turns and runs down", function()
 		local tbl = Tables.need("pinball_acorn")
