@@ -25,7 +25,7 @@ local Physics = require("./Physics")
 local def = Layout.new("pinball_acorn", "ACORN ATTACK")
 def.slopeDeg = 6
 def.gravity = Layout.gravityFor(6)
-def.plunger.vMin = 4.6
+def.plunger.vMin = 4.2
 def.plunger.vMax = 7.6
 
 Layout.addShell(def)
