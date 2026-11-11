@@ -3,8 +3,8 @@
 -- What a pinball table IS, as plain data, and the one place its dimensions come from (checklist C18: what is
 -- drawn is what is simulated). A table definition lists its walls, posts, pop bumpers, slingshots, flippers,
 -- targets, switches (rollovers, spinners), one-way gates, kick-out holes, ramps and the plunger. Three tables
--- (Tables/AcornAttack, SpicyRodent, SpaceSquirrel) are written on this one format and run on one physics core
--- (Physics). compile() turns a definition into flat arrays and a grid the physics reads at speed.
+-- (TableAcorn, TableSpicy, TableSpace) are written on this one format and run on one physics core (Physics).
+-- compile() turns a definition into flat arrays and a grid the physics reads at speed.
 --
 -- Playfield frame: x across, 0 at the player's left, WIDTH at the right; y up the table, 0 at the player's end
 -- (the drain), LENGTH at the back (under the backbox); h is height above the playfield (ramps only). All in
@@ -16,9 +16,10 @@
 -- toward the centre (0), positive up the table, for either hand.
 -- Pure; Lune-tested (tests/unit/pinball_layout.spec.luau).
 -- Interface: WIDTH, LENGTH, BALL_R, FIELD_X1, XC, TILT_RAD; MATERIALS; new(id, title) -> TableDef;
---   arc(cx, cy, r, deg0, deg1, n) -> pts; mirror(pts, xc?) -> pts; wall, post, addBottom (the flippers, slings,
---   inlanes and outlanes every table shares, from a few numbers); compile(def) -> Compiled; check(def) ->
---   (ok, why?); cabinetPoint(x, y, h) -> (across, up, along) for the bake and the client
+--   arc(cx, cy, r, deg0, deg1, n) -> pts; mirror(pts, xc?) -> pts; wall, post, lamp, cup; addShell (rails, arch,
+--   shooter lane), addBottom (the flippers, slings, inlanes and outlanes every table shares, from a few
+--   numbers); index(def) -> Index (element numbers by id); compile(def) -> Compiled; check(def) -> (ok, why?);
+--   cabinetPoint(x, y, h) -> (across, up, along) for the bake and the client
 
 local Det = require("./Det")
 
@@ -93,6 +94,7 @@ export type Plunger = {
 	autoPull: number, -- 0..1: the pull the machine itself uses (ball save, multiball)
 	laneTop: number, -- above this y the ball has left the shooter lane
 }
+export type Lamp = { id: string, x: number, y: number, colour: string }
 export type TableDef = {
 	id: string,
 	title: string,
@@ -109,7 +111,20 @@ export type TableDef = {
 	gates: { Gate },
 	saucers: { Saucer },
 	rails: { Rail },
+	lamps: { Lamp },
 	plunger: Plunger,
+}
+-- element numbers by id, as the physics reports them in its events
+export type Index = {
+	bumper: { [string]: number },
+	sling: { [string]: number },
+	flipper: { [string]: number },
+	target: { [string]: number },
+	sensor: { [string]: number },
+	gate: { [string]: number },
+	saucer: { [string]: number },
+	rail: { [string]: number },
+	lamp: { [string]: number },
 }
 
 -- segment kinds
@@ -218,6 +233,7 @@ function Layout.new(id: string, title: string): TableDef
 		gates = {},
 		saucers = {},
 		rails = {},
+		lamps = {},
 		plunger = {
 			x = Layout.LANE_X,
 			y = 0.3 + Layout.BALL_R,
@@ -267,6 +283,59 @@ function Layout.post(def: TableDef, x: number, y: number, r: number?, mat: strin
 	table.insert(def.posts, { x = x, y = y, r = r or 0.022, mat = mat or "rubber" })
 end
 
+function Layout.lamp(def: TableDef, id: string, x: number, y: number, colour: string)
+	table.insert(def.lamps, { id = id, x = x, y = y, colour = colour })
+end
+
+-- cup(def, x, y, r, openDeg, spanDeg): a metal horseshoe behind a kick-out hole at x, y, open toward openDeg
+-- (0 = +x, 90 = up the table), so a ball shot into it rattles dead and drops in.
+function Layout.cup(def: TableDef, x: number, y: number, r: number, openDeg: number, spanDeg: number?)
+	local half = (360 - (spanDeg or 150)) / 2
+	Layout.wall(def, "metal", Layout.arc(x, y, r, openDeg + 180 - half, openDeg + 180 + half, 10))
+end
+
+function Layout.index(def: TableDef): Index
+	local ix: Index = {
+		bumper = {},
+		sling = {},
+		flipper = {},
+		target = {},
+		sensor = {},
+		gate = {},
+		saucer = {},
+		rail = {},
+		lamp = {},
+	}
+	for i, v in def.bumpers do
+		ix.bumper[v.id] = i
+	end
+	for i, v in def.slings do
+		ix.sling[v.id] = i
+	end
+	for i, v in def.flippers do
+		ix.flipper[v.id] = i
+	end
+	for i, v in def.targets do
+		ix.target[v.id] = i
+	end
+	for i, v in def.sensors do
+		ix.sensor[v.id] = i
+	end
+	for i, v in def.gates do
+		ix.gate[v.id] = i
+	end
+	for i, v in def.saucers do
+		ix.saucer[v.id] = i
+	end
+	for i, v in def.rails do
+		ix.rail[v.id] = i
+	end
+	for i, v in def.lamps do
+		ix.lamp[v.id] = i
+	end
+	return ix
+end
+
 -- The outer shell every table shares: the left rail, the arch over the top, the right rail, the shooter lane
 -- with the plunger at its foot and the one-way gate at its head.
 function Layout.addShell(def: TableDef)
@@ -301,7 +370,7 @@ export type BottomSpec = {
 -- feeds each flipper and an outlane outside it that does not. Sensors: inlane_l, inlane_r, outlane_l, outlane_r.
 function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	local XC = Layout.XC
-	local len = spec.len or 0.3
+	local len = spec.len or 0.33
 	local rBase, rTip = 0.045, 0.028
 	local rest = spec.rest or Det.rad(-30)
 	local up = spec.up or Det.rad(28)
@@ -367,6 +436,33 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	local X1 = Layout.FIELD_X1
 	table.insert(def.sensors, { id = "outlane_r", kind = "rollover", x1 = X1 - xo, y1 = sy, x2 = X1, y2 = sy })
 	table.insert(def.sensors, { id = "inlane_r", kind = "rollover", x1 = X1 - xi, y1 = sy, x2 = X1 - xo, y2 = sy })
+end
+
+-- addRamp(def, rail): a ramp is a rail (the ball's path, up off the playfield) plus what stands on the playfield
+-- at its foot: the two flanks of the ramp for 0.4 studs behind the mouth and the wall under it, so a ball
+-- cannot roll in beside or under the ramp. Rubber posts at the two corners of the mouth.
+function Layout.addRamp(def: TableDef, rail: Rail)
+	table.insert(def.rails, rail)
+	local x0, y0 = rail.pts[1], rail.pts[2]
+	local dx, dy = rail.pts[4] - x0, rail.pts[5] - y0
+	local d = math.sqrt(dx * dx + dy * dy)
+	local tx, ty = dx / d, dy / d
+	local m = rail.mouth
+	local depth = 0.4
+	local lx, ly = x0 - ty * m, y0 + tx * m
+	local rx, ry = x0 + ty * m, y0 - tx * m
+	Layout.wall(def, "plastic", {
+		lx,
+		ly,
+		lx + tx * depth,
+		ly + ty * depth,
+		rx + tx * depth,
+		ry + ty * depth,
+		rx,
+		ry,
+	})
+	Layout.post(def, lx, ly, 0.022, "rubber")
+	Layout.post(def, rx, ry, 0.022, "rubber")
 end
 
 -- Where the end of a ramp's wire should drop a ball so it rolls down an inlane to a flipper.
@@ -691,6 +787,12 @@ function Layout.check(def: TableDef): (boolean, string?)
 			if why then
 				return false, why
 			end
+		end
+	end
+	for _, l in def.lamps do
+		local why = id("lamp", "lamp:" .. l.id) or pt(l.id, l.x, l.y)
+		if why then
+			return false, why
 		end
 	end
 	for _, f in def.flippers do
