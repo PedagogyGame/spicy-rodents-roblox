@@ -4,27 +4,34 @@
 -- real game's three lines would register it. They prove the framework names no game (nothing under src/ has
 -- heard of them) and they are the smallest worked example of each KIND of game the registry carries:
 --   test_coin     flow "turns"   call the coin, two calls each: hardware found by name under the site's Model,
---                                a server-decided outcome told to everyone, a computer player, a world
---                                scoreboard, a controller with its own keys, camera shot, scorecard and end card
+--                                a server-decided outcome told to everyone, computer players (the next one, or
+--                                one asked for by name from a button), a world scoreboard, a controller with
+--                                its own keys, camera shot, scorecard and end card
 --   test_rally    flow "live"    a ball between two ends: rules.step moves it, either seat may hit at any
---                                moment, a per-hit message to the controllers, a computer opponent that plays
---                                in real time, a server verb for a named seat, the idle clock without turns
+--                                moment, a per-hit message to the controllers stamped on the SHARED clock
+--                                (ctx.stamp on both sides), a computer opponent that plays in real time, a
+--                                server verb for a named seat, the idle clock without turns, and a second
+--                                prompt at the far end that joins the same game (StationDef.joins)
 --   test_machine  flow "solo"    one seat, a ball under gravity and a flipper: the client runs the fixed-step
---                                sim at once and stamps each input with its tick; the server replays the same
---                                sim a moment behind and settles the score; watchers are sent the pose
+--                                sim at once and keeps a log of its inputs by tick; ten times a second it
+--                                sends the next segment of that log, and the server replays each segment up
+--                                to the tick the client declared (never by its own clock) and settles the
+--                                score; watchers are sent the pose
 --   test_match    flow "match"   two sides against the clock: computers fill the sides at the start, a
---                                player joins while it is on, the arena replaces the walk-away radius, the
---                                result is a winning side with its own words
+--                                player joins while it is on (a computer makes room when the arena is full),
+--                                the arena replaces the walk-away radius, the game keeps Q and gamepad B for
+--                                itself (a crouch that slows the walk through ctx.pace), the result is a
+--                                winning side with its own words, and the arena can roll into its next match
 --   test_plain    a Spec and rules and nothing else: no server half, no client half (the framework's defaults)
 --   test_soon     a Spec that says `soon`: a station that turns people away with words
 -- All stand on one site that no data knows, "test_hall" (SITE, PLACE): hand `sites = { [SITE] = PLACE }` and
 -- `furnish = FakeGames.furnish` to tests/lib/MinigameRig.
 -- Requiring this file registers the games (once). Require it BEFORE anything that requires Shared/Net/Schemas:
 -- the wire's verb list is read from the registry when that module loads.
--- Interface: SITE; PLACE; STATIONS { coin, rally, machine, match, plain, soon }; furnish(roots, places);
---   Coin, Rally, Machine, Match, Plain (the rules); MachineSim { new, advance, GRACE, TICK }; seen (what the
---   games' `watch` hooks were handed: { game, msg, place }); controllers[game] (the controller last made);
---   tables[stationId] (the server Table last made)
+-- Interface: SITE; PLACE; STATIONS { coin, rally, rallyFar, machine, match, plain, soon }; furnish(roots,
+--   places); Coin, Rally, Machine, Match, Plain (the rules); MachineSim { new, advance, pack, unpack, TICK,
+--   SEGMENT, SLACK, MAX_SEGMENT }; seen (what the games' `watch` hooks were handed: { game, msg, place });
+--   controllers[game] (the controller last made); tables[stationId] (the server Table last made)
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local GameSpec = require("@shared/Minigames/GameSpec")
 local Games = require("@shared/Minigames/Games")
@@ -40,6 +47,7 @@ FakeGames.PLACE = { x = 500, z = -200, floorY = 10, yaw = 0.4 } :: GameSpec.Plac
 FakeGames.STATIONS = {
 	coin = "test_coin_1",
 	rally = "test_rally_1",
+	rallyFar = "test_rally_far", -- the far end's prompt: it joins test_rally_1
 	machine = "test_machine_2",
 	match = "test_match_1",
 	plain = "test_plain_1",
@@ -182,7 +190,7 @@ local CoinSpec: GameSpec.Spec = {
 	verbs = { "call" }, -- (not one of the wire's first verbs: it reaches the Net schema by being listed here)
 	prompt = { action = "Flip a coin", busy = "wait for the next toss" },
 	words = { unit = "call", removed = "You were taken off the coin table" },
-	computers = { { name = "Heads-up Hal", bias = "heads" } },
+	computers = { { name = "Heads-up Hal", bias = "heads" }, { name = "Tails Tina", bias = "tails" } },
 	stations = stationsOf("test_coin", FakeGames.STATIONS.coin, "Coin table", AT.coin, { reach = 12 }),
 }
 
@@ -282,7 +290,13 @@ local function coinClient(): any
 		end,
 		buttons = function(phase: string, _view: any): { { string } }?
 			if phase == "joined" or phase == "lobby" then
-				return { { "start", "Start now" }, { "addai", "Add a computer" }, { "leave", "Leave (Q)" } }
+				-- ("verb:word": the verb with one word. Here: the computer player of that name)
+				return {
+					{ "start", "Start now" },
+					{ "addai", "Add a computer" },
+					{ "addai:Tails Tina", "Add Tails Tina" },
+					{ "leave", "Leave (Q)" },
+				}
 			elseif phase == "done" then
 				return { { "again", "Play again" }, { "leave", "Leave (Q)" } }
 			end
@@ -474,7 +488,33 @@ local RallySpec: GameSpec.Spec = {
 	prompt = { action = "Play a rally" },
 	words = { removed = "You were taken off the court: you stood still too long" },
 	computers = { { name = "Wall", reach = 2 } },
-	stations = stationsOf("test_rally", FakeGames.STATIONS.rally, "Rally court", AT.rally),
+	-- one court, a prompt at each end: the far one is only a second way in to the same game
+	stations = function(sites: { [string]: GameSpec.Place }): { GameSpec.StationDef }
+		if sites[SITE] == nil then
+			return {}
+		end
+		return {
+			{
+				id = FakeGames.STATIONS.rally,
+				game = "test_rally",
+				label = "Rally court",
+				site = SITE,
+				x = AT.rally.x,
+				y = 3,
+				d = AT.rally.d,
+			},
+			{
+				id = FakeGames.STATIONS.rallyFar,
+				game = "test_rally",
+				label = "Rally court (far end)",
+				site = SITE,
+				x = AT.rally.x,
+				y = 3,
+				d = AT.rally.d + Rally.LENGTH,
+				joins = FakeGames.STATIONS.rally,
+			},
+		}
+	end,
 }
 
 local function rallyServer(ctx: any): any
@@ -487,9 +527,18 @@ local function rallyServer(ctx: any): any
 	local function leg(seat: number)
 		local g = ctx.session.game
 		self.legs += 1
-		-- one message per hit: every controller draws the same flight from it (no stream of positions)
-		ctx.broadcast({ kind = "rally_leg", seat = seat, from = g.state.pos, dir = g.state.dir, at = ctx.now() })
+		-- one message per hit: every controller draws the same flight from it (no stream of positions). It is
+		-- stamped on the SHARED clock (ctx.stamp), which the client reads too: ctx.now() is the service's own
+		-- and means nothing on a client
+		ctx.broadcast({ kind = "rally_leg", seat = seat, from = g.state.pos, dir = g.state.dir, at = ctx.stamp() })
 		ctx.dirty()
+	end
+
+	-- which prompt each player came in by (the court's own, or the far end's)
+	self.via = {}
+	function self.join(_self: any, player: any, via: any): (boolean, string?)
+		self.via[player] = via.id
+		return true
 	end
 
 	function self.input(_self: any, player: any, seat: number, verb: string, _args: { any }): (boolean?, string?)
@@ -564,6 +613,15 @@ local function rallyClient(): any
 					table.insert(self.legs, msg)
 				end
 			end
+			-- where the ball is NOW, from the last hit's one message: its stamp is on the shared clock, and so
+			-- is ctx.stamp() here
+			function self.ballNow(_self: any): number?
+				local last = self.legs[#self.legs]
+				if last == nil then
+					return nil
+				end
+				return last.from + last.dir * Rally.SPEED * (ctx.stamp() - last.at)
+			end
 			function self.onRefused(_self: any, msg: any)
 				table.insert(self.refused, msg.text)
 			end
@@ -576,12 +634,48 @@ local function rallyClient(): any
 end
 
 -- test_machine: solo ----------------------------------------------------------------------------------------------
--- The machine's fixed-step model, the same on both sides: the client steps it at once for its own ball, the
--- server steps it GRACE ticks behind so that an input stamped with its tick still arrives in time to be replayed.
+-- The machine's fixed-step model, the same on both sides. The client steps it at once for its own ball and keeps
+-- a log of what it did (the tick of each flip). It does NOT send a message per input: Minigame.Input carries 20
+-- messages a second and a dropped one is never answered, and one lost flip would make the server's game a
+-- different game. About ten times a second it sends the next SEGMENT of the log as one "log" message:
+-- { fromTick, toTick, packed flips } (arguments are at most 8 numbers, booleans or strings of 200 characters, so
+-- the flips travel packed in one string). The server replays each segment as it arrives, up to the tick the
+-- client declared and never by a clock of its own: a client that falls behind (one long frame) is replayed a
+-- little later and loses nothing. The server refuses only a segment that does not start where the last one
+-- ended, or that claims more ticks than the time since the launch allows (plus SLACK).
 local MachineSim = {}
 FakeGames.MachineSim = MachineSim
 MachineSim.TICK = 1 / 60
-MachineSim.GRACE = 20
+MachineSim.SEGMENT = 6 -- ticks before the client sends the next segment: ten messages a second
+MachineSim.SLACK = 30 -- ticks a client may be ahead of the server's own count of the time since the launch
+MachineSim.MAX_SEGMENT = 120 -- the longest segment the server takes in one message (a client catching up)
+
+-- The flips of a segment as one string: each flip's tick counted from the segment's first, "2,5".
+function MachineSim.pack(flips: { number }, fromTick: number): string
+	local out = {}
+	for _, tick in flips do
+		table.insert(out, tostring(tick - fromTick))
+	end
+	return table.concat(out, ",")
+end
+
+-- The ticks that flip in (fromTick, toTick], or nil if the string is not a packed segment.
+function MachineSim.unpack(packed: any, fromTick: number, toTick: number): { [number]: boolean }?
+	local flips: { [number]: boolean } = {}
+	if type(packed) ~= "string" then
+		return nil
+	end
+	local last = 0
+	for word in string.gmatch(packed, "[^,]+") do
+		local n = tonumber(word)
+		if n == nil or n % 1 ~= 0 or n <= last or fromTick + n > toTick then
+			return nil
+		end
+		last = n
+		flips[fromTick + n] = true
+	end
+	return flips
+end
 
 function MachineSim.new(): any
 	return { tick = 0, y = 10, vy = 0, score = 0, over = false }
@@ -613,11 +707,11 @@ Machine.def = {
 	authority = "server",
 	money = "none",
 }
-Machine.verbs = { plunge = true, flip = true, machine_settle = true }
+Machine.verbs = { plunge = true, log = true, machine_settle = true }
 Machine.serverVerbs = { machine_settle = true }
 
 function Machine.init(_seats: number, _seed: number): any
-	return { launched = false, flips = {}, lastTick = 0, final = false }
+	return { launched = false, lastTick = 0, final = false }
 end
 
 function Machine.input(state: any, _seat: number, verb: string, args: { any }?): (boolean, string?)
@@ -627,16 +721,16 @@ function Machine.input(state: any, _seat: number, verb: string, args: { any }?):
 		end
 		state.launched = true
 		return true
-	elseif verb == "flip" then
-		local tick = args and args[1]
+	elseif verb == "log" then
+		-- (the Table has replayed the segment; the rules only keep how far the game has been played)
+		local to = args and args[2]
 		if not state.launched then
 			return false, "Launch the ball first (Space)"
 		end
-		if type(tick) ~= "number" or tick % 1 ~= 0 or tick <= state.lastTick then
-			return false, "That flip came out of order"
+		if type(to) ~= "number" or to <= state.lastTick then
+			return false, "That part of the game arrived out of order"
 		end
-		state.flips[tick] = true
-		state.lastTick = tick
+		state.lastTick = to
 		return true
 	end
 	state.final = { score = args and args[1], ticks = args and args[2] }
@@ -661,7 +755,7 @@ local MachineSpec: GameSpec.Spec = {
 	rules = Machine,
 	flow = "solo",
 	session = { lobbySeconds = 0, doneSeconds = 5, idleSeconds = 3 },
-	verbs = { "plunge", "flip" },
+	verbs = { "plunge", "log" },
 	prompt = { action = "Play", object = "The machine" },
 	words = { start = "", removed = "The machine timed out" },
 	stations = stationsOf(
@@ -674,40 +768,47 @@ local MachineSpec: GameSpec.Spec = {
 }
 
 local function machineServer(ctx: any): any
-	local self: any = { ctx = ctx, sim = nil, t0 = 0, sent = 0, late = 0 }
+	local self: any = { ctx = ctx, sim = nil, t0 = 0, sent = 0, segments = 0 }
 	local model = ctx.root and ctx.root:FindFirstChild(`Machine{ctx.station.index}`)
 	local ball = model and model:FindFirstChild("Ball")
 	self.hw = { ball = ball }
 	FakeGames.tables[ctx.station.id] = self
 
-	function self.input(_self: any, player: any, _seat: number, verb: string, args: { any }): (boolean?, string?)
-		if verb == "plunge" then
-			local ok, why = ctx.apply(player, "plunge")
-			if ok then
-				self.sim, self.t0, self.sent = MachineSim.new(), ctx.now(), 0
-			end
-			return ok, why
-		elseif verb == "flip" then
-			local tick = args[1]
-			-- (the replay has passed that tick: the flip cannot count, and the player is told)
-			if self.sim and type(tick) == "number" and tick <= self.sim.tick then
-				self.late += 1
-				return false, "That flip arrived too late"
-			end
-			return ctx.apply(player, "flip", { tick })
-		end
-		return nil
-	end
-
-	function self.step(_self: any, _dt: number)
+	-- One segment of the player's log: checked, then replayed to the tick it declares.
+	local function replay(player: any, from: any, to: any, packed: any): (boolean, string?)
 		local sim = self.sim
-		local g = ctx.session.game
-		if sim == nil or g == nil or ctx.session.phase ~= "playing" then
-			return
+		if sim == nil then
+			return false, "Launch the ball first (Space)"
 		end
-		local due = math.floor((ctx.now() - self.t0) / MachineSim.TICK + 0.5) - MachineSim.GRACE
-		while sim.tick < due and not sim.over do
-			MachineSim.advance(sim, g.state.flips[sim.tick + 1] == true)
+		if
+			type(from) ~= "number"
+			or type(to) ~= "number"
+			or from % 1 ~= 0
+			or to % 1 ~= 0
+			or from ~= sim.tick -- it starts where the last one ended
+			or to <= from
+			or to - from > MachineSim.MAX_SEGMENT
+		then
+			return false, "That part of the game arrived out of order"
+		end
+		-- the only use of the server's clock: a bound on how far the game can have got since the launch (a
+		-- duration, so ctx.now() is the right clock for it). Being BEHIND that is always fine
+		local possible = math.floor((ctx.now() - self.t0) / MachineSim.TICK) + MachineSim.SLACK
+		if to > possible then
+			return false, "That part of the game is ahead of the clock"
+		end
+		local flips = MachineSim.unpack(packed, from, to)
+		if flips == nil then
+			return false, "That part of the game could not be read"
+		end
+		-- (through the Session: an accepted segment is what keeps the idle clock from taking the seat)
+		local ok, why = ctx.apply(player, "log", { from, to })
+		if not ok then
+			return false, why
+		end
+		self.segments += 1
+		while sim.tick < to and not sim.over do
+			MachineSim.advance(sim, flips[sim.tick + 1] == true)
 			-- watchers: the pose a few times a second (reliable; nobody needs every tick)
 			if sim.tick % 15 == 0 then
 				self.sent += 1
@@ -721,6 +822,20 @@ local function machineServer(ctx: any): any
 			self.sim = nil
 			ctx.server("machine_settle", { sim.score, sim.tick }, 1)
 		end
+		return true
+	end
+
+	function self.input(_self: any, player: any, _seat: number, verb: string, args: { any }): (boolean?, string?)
+		if verb == "plunge" then
+			local ok, why = ctx.apply(player, "plunge")
+			if ok then
+				self.sim, self.t0, self.sent, self.segments = MachineSim.new(), ctx.now(), 0, 0
+			end
+			return ok, why
+		elseif verb == "log" then
+			return replay(player, args[1], args[2], args[3])
+		end
+		return nil
 	end
 
 	function self.event(_self: any, e: any)
@@ -746,7 +861,17 @@ local function machineClient(): any
 		end,
 		placeless = true,
 		new = function(ctx: any): any
-			local self: any = { ctx = ctx, sim = nil, flip = false, acc = 0, refused = {}, final = nil, poses = 0 }
+			local self: any = {
+				ctx = ctx,
+				sim = nil,
+				flip = false,
+				acc = 0,
+				refused = {},
+				final = nil,
+				poses = 0,
+				flips = {}, -- the log not sent yet: the tick of each flip
+				sentTo = 0, -- the tick the server has been told up to
+			}
 			FakeGames.controllers.test_machine = self
 			local uis = (game :: any):GetService("UserInputService")
 			local run = (game :: any):GetService("RunService")
@@ -757,25 +882,35 @@ local function machineClient(): any
 					end
 					if io.KeyCode == Key.Space and self.sim == nil and self.final == nil then
 						-- the ball is in play on this screen at once; the server starts its copy when this lands
-						self.sim, self.acc = MachineSim.new(), 0
+						self.sim, self.acc, self.sentTo = MachineSim.new(), 0, 0
+						table.clear(self.flips)
 						ctx.controls(false)
 						ctx.send("plunge")
-					elseif io.KeyCode == Key.F and self.sim and not self.sim.over and not self.flip then
-						-- flip on the next tick here, and tell the server which tick that is
+					elseif io.KeyCode == Key.F and self.sim and not self.sim.over then
+						-- flip on the next tick here. Nothing is sent now: the flip goes into the log
 						self.flip = true
-						ctx.send("flip", { self.sim.tick + 1 })
 					end
 				end),
 				run.RenderStepped:Connect(function(dt: number)
 					local sim = self.sim
-					if sim == nil then
+					if sim == nil or sim.over then
 						return
 					end
 					self.acc += dt
-					while self.acc >= MachineSim.TICK - 1e-9 do
+					while self.acc >= MachineSim.TICK - 1e-9 and not sim.over do
 						self.acc -= MachineSim.TICK
+						if self.flip then
+							table.insert(self.flips, sim.tick + 1)
+						end
 						MachineSim.advance(sim, self.flip)
 						self.flip = false
+					end
+					-- the next segment of the log, once enough ticks have gone by (or the ball is lost): at
+					-- most one message a frame and about ten a second, however hard the keys are mashed
+					if sim.tick > self.sentTo and (sim.over or sim.tick - self.sentTo >= MachineSim.SEGMENT) then
+						ctx.send("log", { self.sentTo, sim.tick, MachineSim.pack(self.flips, self.sentTo) })
+						self.sentTo = sim.tick
+						table.clear(self.flips)
 					end
 					ctx.ui:status(`Score {sim.score}`)
 				end),
@@ -902,8 +1037,24 @@ local MatchSpec: GameSpec.Spec = {
 }
 
 local function matchServer(ctx: any): any
-	local self: any = { ctx = ctx, botAt = 0, tags = 0 }
+	local self: any = { ctx = ctx, botAt = 0, tags = 0, rollOn = false, nextAt = nil }
 	FakeGames.tables[ctx.station.id] = self
+
+	-- A person at a full arena: a computer makes room. The service seats the person in the seat it left (the
+	-- vacated seat first), so the sides stay as they were.
+	function self.join(_self: any, player: any, _via: any): (boolean, string?)
+		local s = ctx.session
+		if s.phase ~= "playing" or ctx.seatOf(player) ~= nil or #ctx.seated() < s.rules.def.seats then
+			return true
+		end
+		for _, key in ctx.seated() do
+			if type(key) == "table" and key.ai then
+				ctx.removeComputer(key)
+				return true
+			end
+		end
+		return false, "The arena is full of people: wait for the next match"
+	end
 
 	local function tag(seat: number, victim: number): (boolean, string?)
 		local ok, why = ctx.server("tag", { victim }, seat)
@@ -921,8 +1072,18 @@ local function matchServer(ctx: any): any
 		return tag(seat, tonumber(args[1]) or 0)
 	end
 
-	-- after the start the match is the Table's: here the bots (a real one runs its own remotes from ctx.net)
+	-- after the start the match is the Table's: here the bots
 	function self.step(_self: any, _dt: number)
+		-- the arena rolls into its next match by itself (rollOn): two seconds of end card, then the same people
+		-- and computers again, through the service's own play-again path
+		if ctx.session.phase == "done" and self.rollOn then
+			self.nextAt = self.nextAt or (ctx.now() + 2)
+			if ctx.now() >= self.nextAt then
+				self.nextAt = nil
+				ctx.again()
+			end
+			return
+		end
 		if ctx.session.phase ~= "playing" or ctx.now() < self.botAt then
 			return
 		end
@@ -955,13 +1116,51 @@ local function matchServer(ctx: any): any
 end
 
 local function matchClient(): any
+	local Key = roblox.Enum.KeyCode
 	return {
 		game = "test_match",
-		help = { how = { "Tag the other side before the clock runs out." }, keys = { "Q  leave" } },
+		help = {
+			how = { "Tag the other side before the clock runs out." },
+			keys = { "C / gamepad B  crouch", "Leave with the button" },
+		},
 		placeless = true,
+		-- The game's keys are read before the framework's: gamepad B crouches here and Q does nothing (leaving a
+		-- match is a deliberate press of the button), so both are swallowed and the controller reads B itself.
+		keys = { ButtonB = "", Q = "" },
+		buttons = function(phase: string, _view: any): { { string } }?
+			if phase == "joined" or phase == "lobby" then
+				return { { "start", "Start now" }, { "leave", "Leave the match" } }
+			elseif phase == "done" then
+				return { { "again", "Play again" }, { "leave", "Leave the match" } }
+			end
+			return { { "leave", "Leave the match" } }
+		end,
 		new = function(ctx: any): any
-			local self: any = { ctx = ctx, tags = 0, view = nil, you = nil }
+			local self: any = { ctx = ctx, tags = 0, view = nil, you = nil, crouched = false }
 			FakeGames.controllers.test_match = self
+			local uis = (game :: any):GetService("UserInputService")
+			-- a crouch: half the walking pace and no sprint while the key is down (the framework puts the pace
+			-- back when the game closes, crouched or not)
+			local function crouch(on: boolean)
+				self.crouched = on
+				if on then
+					ctx.pace(0.5, false)
+				else
+					ctx.pace(nil, nil)
+				end
+			end
+			local conns = {
+				uis.InputBegan:Connect(function(io: any, processed: boolean)
+					if not processed and (io.KeyCode == Key.C or io.KeyCode == Key.ButtonB) then
+						crouch(true)
+					end
+				end),
+				uis.InputEnded:Connect(function(io: any, _processed: boolean)
+					if io.KeyCode == Key.C or io.KeyCode == Key.ButtonB then
+						crouch(false)
+					end
+				end),
+			}
 			function self.onState(_self: any, msg: any)
 				self.view, self.you = msg.view, msg.you
 				local g = msg.view.game
@@ -974,7 +1173,11 @@ local function matchClient(): any
 					self.tags += 1
 				end
 			end
-			function self.stop(_self: any) end
+			function self.stop(_self: any)
+				for _, c in conns do
+					c:Disconnect()
+				end
+			end
 			return self
 		end,
 		endCard = function(view: any, _you: number?): any

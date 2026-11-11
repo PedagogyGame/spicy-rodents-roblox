@@ -336,16 +336,19 @@ function MinigameRig.play(fn: (w: World) -> (), opts: Opts?)
 		local realWarn = env.warn
 		local realHold, realCursor, realControls = CameraRig.hold, CameraRig.wantCursor, InputMap.setCharacterControls
 		local w: World? = nil
+		-- (warnings are caught from before the world is built: a Table that cannot be built says so there)
+		local warnings: { string } = {}
 		local ok, err = xpcall(function()
-			local world = build(opts)
-			w = world
 			env.warn = function(...: any)
 				local parts = {}
 				for _, p in { ... } do
 					table.insert(parts, tostring(p))
 				end
-				table.insert(world.warnings, table.concat(parts, " "))
+				table.insert(warnings, table.concat(parts, " "))
 			end
+			local world = build(opts)
+			world.warnings = warnings
+			w = world
 			CameraRig.hold = function(on: boolean)
 				world.held = on
 				table.insert(world.holds, on)
@@ -366,8 +369,8 @@ function MinigameRig.play(fn: (w: World) -> (), opts: Opts?)
 		CameraRig.hold, CameraRig.wantCursor = realHold, realCursor;
 		(InputMap :: any).setCharacterControls = realControls
 		if not ok then
-			local logged = if w and #w.warnings > 0
-				then `\nwarnings logged before that:\n{table.concat(w.warnings, "\n")}`
+			local logged = if #warnings > 0
+				then `\nwarnings logged before that:\n{table.concat(warnings, "\n")}`
 				else ""
 			error(tostring(err) .. logged, 0)
 		end

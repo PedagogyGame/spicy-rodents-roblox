@@ -168,7 +168,11 @@ local function townOf(self: any, games: { [string]: any }?): ServerGame.Town
 			if g.best then
 				return g.best(player, key, value, lower)
 			end
-			local who: any = if type(player) == "table" or typeof(player) == "Instance" then player.UserId else player
+			-- (by user id where there is one: a Player object is gone when its player leaves)
+			local who: any = player
+			if (type(player) == "table" or typeof(player) == "Instance") and player.UserId ~= nil then
+				who = player.UserId
+			end
 			local mine = bests[who]
 			if mine == nil then
 				mine = {}

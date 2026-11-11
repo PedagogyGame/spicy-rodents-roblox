@@ -22,8 +22,9 @@
 --   with an id every event from that id's "began" to its "ended" is handed over as ONE InputObject, as the
 --   engine does for a finger: a controller can follow a touch by the object, which is the only sound way);
 --   game:GetService("Players").LocalPlayer (with a PlayerGui); any other service is an empty fake instance;
---   task.spawn / defer run at once and task.delay waits for runDelayed(count?) (everything queued, or only the
---   first `count`, oldest first); events(names) and classes({ parts?,
+--   task.spawn / defer run at once and task.delay waits for runDelayed(which?, limit?) (everything queued, oldest
+--   first; `which(seconds)` picks by the delay asked for, `limit` stops after that many: a test can let one
+--   timer fire while later ones are still running); delayedCount(); events(names) and classes({ parts?,
 --   gui? }) teach it more event members and more BasePart / GuiObject classes (a game's own test asks for what
 --   its glue uses rather than editing the lists here); the fake UserInputService remembers what input() pressed
 --   (IsKeyDown, IsMouseButtonPressed)
@@ -310,20 +311,25 @@ local renderSteps: { [string]: (dt: number) -> () } = {}
 local fakeWorkspace: any = nil
 local fakeUis: any = nil
 local renderStepped: any = nil
-local delayed: { () -> () } = {}
+local delayed: { { seconds: number, fn: () -> () } } = {}
 local inputs: { [any]: { [string]: any } } = {} -- io.id -> the one InputObject of that touch, began to ended
 
--- Run what was handed to task.delay so far (in order), as if its time had come: all of it, or only the first
--- `count` (a timer that fires while later ones are still running).
-function FakeEngine.runDelayed(count: number?)
+-- Run what was handed to task.delay so far (oldest first), as if its time had come. All of it; or only the
+-- callbacks whose delay `which` picks (a 2.6 s reveal but not a 5 s timer), and no more than `limit` of them
+-- (the first of two timers, while the second is still running). The rest stay queued.
+function FakeEngine.runDelayed(which: ((seconds: number) -> boolean)?, limit: number?)
 	local list = delayed
 	delayed = {}
-	local n = math.min(count or #list, #list)
-	for i = n + 1, #list do
-		table.insert(delayed, list[i])
+	local run: { () -> () } = {}
+	for _, d in list do
+		if (which == nil or which(d.seconds)) and (limit == nil or #run < limit) then
+			table.insert(run, d.fn)
+		else
+			table.insert(delayed, d)
+		end
 	end
-	for i = 1, n do
-		list[i]()
+	for _, fn in run do
+		fn()
 	end
 end
 
@@ -510,8 +516,8 @@ function FakeEngine.install()
 		defer = function(fn: (...any) -> (), ...: any)
 			fn(...)
 		end,
-		delay = function(_seconds: number, fn: () -> ())
-			table.insert(delayed, fn)
+		delay = function(seconds: number, fn: () -> ())
+			table.insert(delayed, { seconds = seconds, fn = fn })
 		end,
 		wait = function(): number
 			return 0

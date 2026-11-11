@@ -195,7 +195,8 @@ return function(t)
 			do
 				t.truthy(table.find(verbs, v), v)
 			end
-			t.eq(table.find(verbs, "flip") ~= nil, true, "the machine's flip is a client verb")
+			t.eq(table.find(verbs, "log") ~= nil, true, "the machine's log is a client verb")
+			t.eq(table.find(verbs, "flip"), nil, "the coin's flip is the table's own: never on the wire")
 			t.eq(table.find(verbs, "machine_settle"), nil, "a server verb is never on the wire")
 			local payload = Schemas.REMOTES["Minigame.Input"].payload :: any
 			t.truthy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "call", args = { "heads" } }))
@@ -259,7 +260,7 @@ return function(t)
 			t.eq(n, 1, "a model with no origin is not a site")
 			-- the service puts every registered game's stations on the sites it is handed, and only those
 			local svc = MinigameService.new({ sites = sites, prompts = false })
-			t.eq(#svc.order, 6)
+			t.eq(#svc.order, 7, "six games, and the rally court's second way in")
 			t.truthy(svc.stations[S.coin] ~= nil and svc.stations.bowling_lane_1 == nil)
 			t.truthy(svc.stations[S.coin].tbl ~= nil and svc.stations[S.plain].tbl == nil)
 			t.eq(svc:sessionOf(S.soon), nil)
@@ -584,7 +585,7 @@ return function(t)
 	)
 
 	t.test(
-		"solo: the client steps the machine at once and stamps its inputs; the server replays them a moment behind and settles the same score",
+		"solo: the client steps the machine at once and logs its inputs; the server replays each segment of the log to the tick it declares and settles the same score",
 		function()
 			Rig.play(function(w)
 				local ID = S.machine
@@ -607,26 +608,47 @@ return function(t)
 				t.eq(w.controls[#w.controls], false, "the machine reads the keys itself")
 				Rig.run(w, 0.1)
 				t.truthy(tbl.sim ~= nil and session.game.state.launched)
-				-- a flip stamped with a tick the server's replay has already passed cannot count: refused, with words
 				t.truthy(Rig.untilTrue(w, 2, function()
-					return tbl.sim.tick >= 5
+					return tbl.sim.tick >= 6
 				end))
-				fire(w, ID, "flip", { 3 })
-				Rig.run(w, 0.15)
-				t.eq(c.refused[1], "That flip arrived too late")
-				t.truthy(Rig.has(w.toasts, "That flip arrived too late"))
-				-- two good flips, each felt at once here while the server is still GRACE ticks behind
+				t.truthy(
+					tbl.sim.tick < c.sim.tick,
+					"the server's replay follows the log: it is never ahead of the screen"
+				)
+				-- what the server will not take: a segment that does not start where the last one ended, one that
+				-- claims more of the game than the time since the launch allows, one that cannot be read. Each is
+				-- refused with words and changes nothing
+				local at = tbl.sim.tick
+				local ok, why = Rig.input(w, w.player, ID, "log", { at + 3, at + 9, "" })
+				t.truthy(not ok and why == "That part of the game arrived out of order", tostring(why))
+				ok, why = Rig.input(w, w.player, ID, "log", { at, at + 100, "" })
+				t.truthy(not ok and why == "That part of the game is ahead of the clock", tostring(why))
+				ok, why = Rig.input(w, w.player, ID, "log", { at, at + 2, "5" })
+				t.truthy(not ok and why == "That part of the game could not be read", tostring(why))
+				t.eq(tbl.sim.tick, at)
+				-- two good flips, each felt at once here; the server replays it when its segment arrives
 				for n = 1, 2 do
 					t.truthy(Rig.untilTrue(w, 3, function()
 						return c.sim.y <= 2.5 and c.sim.vy < 0
 					end))
+					local sent = #w.sent
 					Rig.key(Key.F, true)
+					t.eq(#w.sent, sent, "a flip is not a message: it goes into the log")
 					Rig.frame(w)
 					t.eq(c.sim.score, n * 10, "the flip landed on this screen in the next frame")
-					t.eq(tbl.sim.score, (n - 1) * 10, "the server has not reached that tick yet")
+					t.eq(tbl.sim.score, (n - 1) * 10, "the server has not replayed that tick yet")
 					t.truthy(tbl.sim.tick < c.sim.tick)
+					if n == 1 then
+						-- one long frame: this screen loses half a second (its step is clamped) and from here on
+						-- runs that far behind the server's own count of the time. Nothing it does is refused for it
+						c.acc -= 0.5
+					end
 				end
-				t.eq(#c.refused, 1, "both flips arrived in time")
+				t.eq(
+					#c.refused,
+					0,
+					"nothing was refused: the server replays to the tick it is told, not to its own clock"
+				)
 				-- no more flips: the ball drains here first, then the server's replay reaches the same end
 				t.truthy(Rig.untilTrue(w, 6, function()
 					return c.sim.over
@@ -640,6 +662,24 @@ return function(t)
 				t.eq(session.result.scores[1], c.sim.score, "the server's replay and the screen agree on the score")
 				t.eq(session.result.ticks, c.sim.tick, "and on the tick the ball was lost")
 				t.eq(c.final, 20)
+				-- the whole game went up as segments of the log: about ten messages a second, every one accepted
+				local logs = Rig.count(w.sent, "log")
+				t.eq(logs, tbl.segments, "every segment sent was replayed")
+				t.truthy(
+					logs >= c.sim.tick / 8 and logs <= c.sim.tick / 6 + 1,
+					`{logs} segments for {c.sim.tick} ticks`
+				)
+				local flipsSent = 0
+				for _, m in w.sent do
+					if m.verb == "log" and m.args[3] ~= "" then
+						flipsSent += 1
+						t.truthy(
+							type(m.args[3]) == "string" and #m.args[3] <= 200,
+							"the flips travel packed in one string"
+						)
+					end
+				end
+				t.eq(flipsSent, 2)
 				t.truthy(
 					Rig.last(w.got, "event", function(m)
 						return m.over == true and m.text == "Ball lost: 20 points"
