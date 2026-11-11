@@ -320,10 +320,10 @@ return function(t: any)
 		t.truthy(last.pos.y > 20, "well up the trunk")
 		local trunk = climb.props[1]
 		t.eq(trunk.kind, "trunk")
-		-- the drawn feet point stands off the bark by a little, on the side it came from (+Z)
+		-- the drawn feet point (the soles) is on the bark, on the side it came from (+Z)
 		local barkR = math.max(trunk.minRadius, trunk.radius * (1 - trunk.taper * last.motor.railT))
 		local off = last.pos.z - trunk.z - barkR
-		t.truthy(off > 0.1 and off < 0.6, `{off} studs off the bark`)
+		t.truthy(off > -0.02 and off < 0.1, `{off} studs off the bark`)
 		t.near(last.pos.x, trunk.x, 1e-3)
 
 		local wire = Path.simulate("squirrel", "wire")
