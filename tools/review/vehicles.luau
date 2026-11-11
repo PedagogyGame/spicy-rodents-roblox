@@ -1,0 +1,150 @@
+--!strict
+-- tools/review/vehicles: a vehicles-only review scene straight from Traffic/VehiclePuppet (no bake, no .rbxm),
+-- so a vehicle can be judged without the game. Nothing here ships.
+-- Usage (repo root): lune run tools/review/vehicles.luau [--out build/review/vehicles] [--res 1600x620]
+--   [kind[:#rrggbb] ...]      default: sedan:#6d7f8f patrol_car ambulance
+-- Writes <out>/scene.json (the tools/review/export.luau part format, group "lineup") and <out>/views.json with
+-- two views for tools/review/render.py: `front` (front three-quarter) and `rear` (rear three-quarter). The
+-- kinds stand twice, each row nearly square to its camera so the vehicles are about the same size in the
+-- frame: the front row faces its camera, the rear row (300 st behind that camera) is turned about. Both
+-- cameras look from the vehicles' right with the review sun on the faces they see.
+-- tools/review/vehicles.sh renders the two views and stacks them into one JPEG.
+local fs = require("@lune/fs")
+local process = require("@lune/process")
+local roblox = require("@lune/roblox")
+local serde = require("@lune/serde")
+
+local PartBuilder = require("../../src/shared/Avatar/PartBuilder")
+local VehiclePuppet = require("../../src/shared/Traffic/VehiclePuppet")
+
+local out = "build/review/vehicles"
+local res = "1600x620"
+local entries: { { kind: string, color: string? } } = {}
+local i = 1
+while i <= #process.args do
+	local a = process.args[i]
+	if a == "--out" then
+		out = process.args[i + 1]
+		i += 1
+	elseif a == "--res" then
+		res = process.args[i + 1]
+		i += 1
+	else
+		local kind, color = string.match(a, "^([%w_]+):(#%x+)$")
+		table.insert(entries, { kind = kind or a, color = color })
+	end
+	i += 1
+end
+if #entries == 0 then
+	entries = { { kind = "sedan", color = "#6d7f8f" }, { kind = "patrol_car" }, { kind = "ambulance" } }
+end
+
+local lib = {
+	Instance = roblox.Instance,
+	Vector3 = roblox.Vector3,
+	CFrame = roblox.CFrame,
+	Color3 = roblox.Color3,
+	Enum = roblox.Enum,
+}
+
+local function r4(n: number): number
+	return math.floor(n * 1e4 + 0.5) / 1e4
+end
+
+local parts: { any } = {}
+local labels: { any } = {}
+
+local function emit(model: any, path: string)
+	for _, p in model:GetDescendants() do
+		if p:IsA("BasePart") and p.Transparency < 0.95 then
+			local cf = p.CFrame
+			local x, y, z = cf.XVector, cf.YVector, cf.ZVector
+			table.insert(parts, {
+				g = "lineup",
+				p = `{path}.{p.Name}`,
+				s = if p.ClassName == "WedgePart" then "Wedge" else p.Shape.Name,
+				size = { r4(p.Size.X), r4(p.Size.Y), r4(p.Size.Z) },
+				pos = { r4(cf.Position.X), r4(cf.Position.Y), r4(cf.Position.Z) },
+				rot = { r4(x.X), r4(y.X), r4(z.X), r4(x.Y), r4(y.Y), r4(z.Y), r4(x.Z), r4(y.Z), r4(z.Z) },
+				c = {
+					math.floor(p.Color.R * 255 + 0.5),
+					math.floor(p.Color.G * 255 + 0.5),
+					math.floor(p.Color.B * 255 + 0.5),
+				},
+				t = p.Transparency,
+				m = p.Material.Name,
+			})
+		end
+	end
+end
+
+-- The camera looks along (-sin A, cos A) in (x, z): from the vehicles' right and front. A row runs 16
+-- degrees short of the perpendicular (cos A, sin A): square to the camera, each car's glossy side glass
+-- mirrors its neighbour's lamps into the picture as a coloured blot.
+local ANGLE = math.rad(38)
+local ROW = math.rad(22)
+local GAP = 15
+local ax, az = math.cos(ROW), math.sin(ROW)
+local n = #entries
+local views: { any } = {}
+for row, turned in { false, true } do
+	local originZ = if turned then -300 else 0
+	for k, e in entries do
+		local s = (k - (n + 1) / 2) * GAP
+		local spec = VehiclePuppet.spec(e.kind, { color = e.color, name = `{e.kind}_{row}` })
+		local cf = lib.CFrame.new(s * ax, VehiclePuppet.baseOffset(e.kind), originZ + s * az)
+		if turned then
+			cf *= lib.CFrame.Angles(0, math.pi, 0)
+		end
+		emit(PartBuilder.instantiate(spec, lib, cf), spec.name)
+		table.insert(labels, {
+			text = `{e.kind} ({PartBuilder.partCount(spec)} parts)`,
+			pos = { r4(s * ax), r4(VehiclePuppet.baseOffset(e.kind) * 2 + 1.1), r4(originZ + s * az) },
+			size = 0.62,
+		})
+	end
+	local span = (n - 1) * GAP * math.cos(ANGLE - ROW) + 13
+	local dist = span / 2 / math.tan(math.rad(21)) -- the row fills a 42 degree horizontal field
+	table.insert(views, {
+		name = if turned then "rear" else "front",
+		desc = if turned then "rear three-quarter" else "front three-quarter",
+		pos = { r4(math.sin(ANGLE) * dist), r4(dist * 0.3), r4(originZ - math.cos(ANGLE) * dist) },
+		look = { 0, 2.6, originZ },
+		fov = 17,
+		groups = { "lineup", "lineup_ground" },
+	})
+end
+
+if not fs.isDir(out) then
+	fs.writeDir(out)
+end
+fs.writeFile(
+	`{out}/scene.json`,
+	serde.encode("json", {
+		version = 1,
+		units = "studs, Roblox axes (Y up, -Z forward)",
+		parts = parts,
+		beams = {},
+		lineup = { ground = { y = 0, minX = -70, maxX = 70, minZ = -380, maxZ = 40 }, labels = labels },
+	}, false)
+)
+fs.writeFile(
+	`{out}/views.json`,
+	serde.encode("json", {
+		about = "generated by tools/review/vehicles.luau",
+		defaults = {
+			res = res,
+			samples = tonumber(process.env.REVIEW_SAMPLES) or 48,
+			groups = { "lineup", "lineup_ground" },
+		},
+		sun = {
+			dir = { 0.7, 0.55, -0.45 },
+			strength = 3.6,
+			color = { 1.0, 0.9, 0.78 },
+			angleDeg = 1.5,
+			skyStrength = 1.0,
+		},
+		views = views,
+	}, true)
+)
+print(`vehicles: {#parts} visible parts of {n} kinds x 2 rows -> {out}/scene.json, views.json`)
