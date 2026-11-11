@@ -7,7 +7,7 @@
 -- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
 -- These kinds are SHAPED (owner 2026-11-11: "the vehicles are extremely rough"), a vehicle from about forty
 -- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building):
--- sedan, patrol car, ambulance, delivery van, ice cream van. The rest are still the ten-block placeholder and
+-- sedan, patrol car, ambulance, delivery van, ice cream van, trolley. The rest are still the ten-block placeholder and
 -- follow the same recipe.
 -- Names follow Actors/RigSpec.car (RootPart, Body, WheelFL/FR/BL/BR, LightBar (+ LightBarB, the second
 -- beacon colour), Headlights, TailLights;
@@ -489,6 +489,71 @@ local function iceCreamVanParts(k: Kit, color: Rgb): number
 	return coneZ + 2
 end
 
+local TROLLEY_CREAM, TROLLEY_GOLD, TROLLEY_ROOF = "#e9dfc4", "#d8b04a", "#4b4e52"
+
+-- Trolley (CITY TROLLEY): a streetcar. A painted lower body with rounded ends, a cream window band with
+-- one long strip of glass let through it and cream pillars across the strip, upright glass at both ends,
+-- a grey roof with rounded edges and a raised monitor, the trolley pole trailing up to the top of the
+-- box, one round headlamp, a lit destination board, a dark door on the kerb side (local +X).
+local function trolleyParts(k: Kit, color: Rgb): number
+	local hw, hl, H = k.hw, k.hl, k.H
+	local cream, grey, glass, trim = hex(TROLLEY_CREAM), hex(TROLLEY_ROOF), hex(FIXED.glass), hex(FIXED.trim)
+	local bw, ends, R = hw - 0.3, hl - 0.25, 1.2
+	local sill, belt, top = 0.9, 4.4, H - 1.5
+	local z0, z1 = -ends + R, ends - R -- the straight flanks between the rounded ends
+
+	add(k, "Body", bw, sill, belt, z0, z1, color)
+	add(k, "Nose", bw - R, sill, belt, -ends, z0, color)
+	add(k, "Tail", bw - R, sill, belt, z1, ends, color)
+	add(k, "Cabin", bw, belt, top, z0, z1, cream)
+	add(k, "CabinF", bw - R, belt, top, -ends, z0, cream)
+	add(k, "CabinB", bw - R, belt, top, z1, ends, cream)
+	for _, c in
+		{
+			{ tag = "FL", sx = -1, z = z0 },
+			{ tag = "FR", sx = 1, z = z0 },
+			{ tag = "BL", sx = -1, z = z1 },
+			{ tag = "BR", sx = 1, z = z1 },
+		}
+	do
+		upright(k, `Corner{c.tag}`, c.sx * (bw - R), c.z, R, sill, top, color)
+	end
+
+	-- windows: one strip of glass through the car, four pillars across it; upright glass at the ends
+	local g0, g1 = z0 + 0.8, z1 - 0.8
+	add(k, "SideGlass", bw + 0.04, belt + 0.35, top - 0.55, g0, g1, glass).material = "Glass"
+	for i = 1, 4 do
+		local z = g0 + (g1 - g0) * i / 5
+		add(k, `Pillar{i}`, bw + 0.07, belt, top, z - 0.2, z + 0.2, cream)
+	end
+	add(k, "Windscreen", bw - R - 0.15, belt + 0.35, top - 0.75, -ends - 0.05, -ends + 0.3, glass).material = "Glass"
+	add(k, "RearWindow", bw - R - 0.15, belt + 0.35, top - 0.75, ends - 0.3, ends + 0.05, glass).material = "Glass"
+	add(k, "Board", 1.7, top - 0.6, top - 0.1, -ends - 0.07, -ends + 0.1, hex("#f6e7a6")).material = "Neon"
+	box(k, "Door", bw - 0.1, bw + 0.09, sill + 0.3, top - 0.55, g0 + 0.25, g0 + 2.4, hex("#2a2422"))
+	add(k, "Stripe", bw + 0.02, belt - 0.55, belt - 0.25, z0, z1, hex(TROLLEY_GOLD))
+	add(k, "Mirrors", hw, belt + 0.6, belt + 1.3, z0 + 0.05, z0 + 0.35, trim)
+
+	-- roof: a grey lid with rounded edges, the monitor along it, the pole trailing up and back
+	add(k, "Roof", bw - 0.9, top, top + 0.4, -ends + 0.5, ends - 0.5, grey)
+	along(k, "RoofEdgeL", -(bw - 0.9), top, 0.4, -ends + 0.53, ends - 0.53, grey)
+	along(k, "RoofEdgeR", bw - 0.9, top, 0.4, -ends + 0.53, ends - 0.53, grey)
+	add(k, "Monitor", 1.5, top + 0.4, top + 0.95, z0 + 2, z1 - 2, hex("#6a6d70"))
+	put(k, {
+		name = "Pole",
+		size = { 0.12, 0.12, 5 },
+		pos = { 0, k.bottom + H - 0.3, 2.4 },
+		pitch = -0.09,
+		color = trim,
+	})
+
+	running(k, bw, bw + 0.1, 1.15, 0.9, 1.32, 0.5, -hl * 0.62, hl * 0.62)
+	add(k, "BumperF", bw - R * 0.6, sill - 0.15, sill + 0.55, -hl, -ends + 0.5, trim)
+	add(k, "BumperB", bw - R * 0.6, sill - 0.15, sill + 0.55, ends - 0.5, hl, trim)
+	along(k, "Headlights", 0, 2.7, 0.5, -ends - 0.1, -ends + 0.2, hex(FIXED.head)).material = "Neon"
+	add(k, "TailLights", 1.5, 2.4, 2.85, ends - 0.05, ends + 0.05, hex(FIXED.tail)).material = "Neon"
+	return 0
+end
+
 -- Kinds drawn from shaped parts instead of the ten-block placeholder.
 local BUILDERS: { [string]: Builder } = {
 	sedan = sedanParts,
@@ -496,6 +561,7 @@ local BUILDERS: { [string]: Builder } = {
 	ambulance = ambulanceParts,
 	delivery_van = deliveryVanParts,
 	ice_cream_van = iceCreamVanParts,
+	trolley = trolleyParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against

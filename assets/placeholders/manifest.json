@@ -246,12 +246,12 @@
       "species": "car"
     },
     {
-      "bytes": 2389,
+      "bytes": 4062,
       "file": "vehicle_trolley.rbxm",
-      "joints": 9,
-      "parts": 10,
+      "joints": 39,
+      "parts": 40,
       "rigspec": true,
-      "sha": "2270d0d89de78d657b3bb429b0670a4e28a35a8aa9a213f2dabec44a5551854c",
+      "sha": "dc28d2ff8c7d01535d39168e031a2021062ab957cc5f97ee4007c1d1563beace",
       "sockets": 3,
       "species": "car"
     }

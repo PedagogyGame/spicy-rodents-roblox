@@ -13,9 +13,8 @@ local Boxes = require("@shared/Traffic/Boxes")
 
 -- Kinds drawn from shaped parts, and the rest with the part count of their ten-block placeholder. A kind
 -- moves from BLOCKS to SHAPED when it gets its builder.
-local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van" }
+local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley" }
 local BLOCKS: { [string]: number } = {
-	trolley = 10,
 	dump_truck = 10,
 	rv = 10,
 	cart = 10,
@@ -365,6 +364,41 @@ return function(t)
 			t.truthy(p.Skirt.pos[3] + p.Skirt.size[3] / 2 < p.ArchB.pos[3] - p.ArchB.size[2] / 2)
 		end
 	)
+
+	t.test("the trolley: a streetcar with rounded ends, a cream window band, a monitor roof and its pole", function()
+		local p = byName(VehiclePuppet.spec("trolley"))
+		local box = Boxes.get("trolley")
+		-- painted below, cream above, one strip of glass through the car with four pillars across it
+		t.truthy(p.Body.color.r > p.Body.color.g * 2, "the lower body is the trolley red")
+		t.truthy(lum(p.Cabin.color) > 0.7, "the window band is cream")
+		t.truthy(p.Cabin.pos[2] > p.Body.pos[2])
+		t.eq(p.SideGlass.material, "Glass")
+		t.truthy(p.SideGlass.size[3] > box.length * 0.75 and p.SideGlass.size[1] > p.Cabin.size[1])
+		for i = 1, 4 do
+			local pillar = p[`Pillar{i}`]
+			t.truthy(pillar.size[1] > p.SideGlass.size[1], `Pillar{i} stands proud of the glass`)
+			t.truthy(math.abs(pillar.pos[3]) < p.SideGlass.size[3] / 2, `Pillar{i} crosses the glass`)
+		end
+		-- rounded ends: an upright cylinder at each corner, a stud or more in radius
+		for _, name in { "CornerFL", "CornerFR", "CornerBL", "CornerBR" } do
+			t.eq(p[name].shape, "Cylinder")
+			t.near(p[name].roll :: number, math.pi / 2, 1e-9)
+			t.truthy(p[name].size[2] >= 2, `{name} is a generous round`)
+		end
+		t.truthy(p.Windscreen.pos[3] < 0 and p.RearWindow.pos[3] > 0, "glass at both ends")
+		-- one round headlamp, a lit destination board over the windscreen, a door on the kerb side
+		t.eq(p.Headlights.shape, "Cylinder")
+		t.eq(p.Headlights.material, "Neon")
+		t.eq(p.Board.material, "Neon")
+		t.truthy(p.Board.pos[2] > p.Windscreen.pos[2] and p.Board.pos[3] < 0)
+		t.truthy(p.Door.pos[1] - p.Door.size[1] / 2 > 0 and p.Door.pos[3] < 0, "the door is at the front on local +X")
+		-- the roof: a lid with rounded edges, the monitor on it, the pole trailing up to the top of the box
+		t.truthy(p.Monitor.pos[2] > p.Roof.pos[2] and p.Monitor.size[1] < p.Roof.size[1])
+		t.truthy((p.Pole.pitch :: number) < 0, "the pole rises toward the tail")
+		t.truthy(p.Pole.size[3] > 4 and p.Pole.size[1] < 0.2, "a thin pole")
+		local rise = p.Pole.size[3] / 2 * math.sin(-(p.Pole.pitch :: number)) + p.Pole.size[2] / 2
+		t.truthy(p.Pole.pos[2] + rise <= box.height / 2 and p.Pole.pos[2] + rise > box.height / 2 - 0.1)
+	end)
 
 	t.test("a kind not yet shaped is the ten-block placeholder, unchanged in part count", function()
 		local seen = 0
