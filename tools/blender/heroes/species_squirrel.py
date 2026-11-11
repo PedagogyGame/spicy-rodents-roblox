@@ -121,13 +121,14 @@ PLUME_LOBES = 24
 # The Spicy Rodent's tail is a rat's bare tail with three clumps of bottle-brush bristle left on it, each
 # knocked to one side: (place along the tail, half-length along it, half-width, half-thickness, sideways shift)
 RODENT_TUFTS = [
-    (0.20, 0.10, 0.115, 0.095, 0.045),
-    (0.29, 0.13, 0.165, 0.125, 0.0),
-    (0.54, 0.10, 0.125, 0.105, -0.06),
-    (0.62, 0.14, 0.195, 0.145, -0.015),
-    (0.70, 0.10, 0.125, 0.10, -0.055),
-    (0.90, 0.10, 0.12, 0.10, 0.03),
-    (0.97, 0.08, 0.095, 0.08, 0.0),
+    (0.18, 0.11, 0.10, 0.07, 0.05),
+    (0.27, 0.14, 0.165, 0.095, 0.01),
+    (0.36, 0.09, 0.10, 0.065, -0.045),
+    (0.53, 0.10, 0.12, 0.075, -0.065),
+    (0.62, 0.15, 0.20, 0.11, -0.02),
+    (0.71, 0.10, 0.125, 0.075, 0.05),
+    (0.89, 0.10, 0.12, 0.08, 0.03),
+    (0.97, 0.08, 0.095, 0.065, -0.01),
 ]
 _TAIL_PTS = np.array(TAIL0, dtype=np.float64)
 _TAIL_SEG = np.linalg.norm(np.diff(_TAIL_PTS, axis=0), axis=1)
@@ -165,6 +166,18 @@ def tail_coords(P):
         s[m] = (_TAIL_CUM[i] + tc[m]) / TAIL_LENGTH
         axis[m] = seg
     return s, P[:, 0].copy(), best, axis
+
+
+def tuft_distance(P):
+    """How far authored-space points are from the rodent's tail clumps, in clump radii: about 1 on a
+    clump's surface, more on the bare tail between them."""
+    P = np.asarray(P, dtype=np.float64)
+    best = np.full(len(P), 9.0)
+    for u, hl, hw, ht, dx in RODENT_TUFTS:
+        m, seg = tail_point(u)
+        q = (P - (m + [dx, 0, 0])) @ frame_from(seg)
+        best = np.minimum(best, np.linalg.norm(q / np.array([hw, hl, ht]), axis=1))
+    return best
 
 
 def plume_half_width(s, variant="squirrel"):
@@ -621,9 +634,10 @@ def pattern_field(c, n, dom, variant="squirrel"):
     trunk = (~np.char.startswith(ds, "Tail") & ~np.isin(ds, ["Head", "Jaw", "EarL", "EarR", "Neck"]) & ~legs
              & (y > -0.36) & (y < 0.5) & (z > 0.33))
     # the inside of the upper legs carries the belly colour; the outside is coat
-    inner_leg = np.char.endswith(ds, "_Upper") & (-np.sign(x) * n[:, 0] > 0.35) & (z > 0.45)
+    inner_leg = np.char.endswith(ds, "_Upper") & (-np.sign(x) * n[:, 0] > 0.35) & (z > 0.45) & (y < 0.2)
     line = 0.71 + 0.08 * _sstep(0.2, -0.5, y) + wob
     belly = _sstep(0.1, 0.45, -n[:, 2] * 0.8 + (line - z) * 2.5 - np.abs(x) * 1.5 + 0.15)
+    belly = belly * _sstep(0.34, 0.14, y)  # it stops ahead of the hind legs: from behind it was a pale band under the rump
     out[trunk] = belly[trunk]
     out[inner_leg] = _sstep(0.35, 0.6, (-np.sign(x) * n[:, 0])[inner_leg] - n[inner_leg, 2] * 0.3 + wob[inner_leg])
     # The chin, throat and cheeks are cream too, but that is PAINTED (cream_face below), not a mesh
@@ -785,11 +799,12 @@ def paint(tx, variant, tools):
     rough = 0.64 - 0.12 * (H - 0.5) + 0.08 * (1 - dorsal) + (big - 0.5) * 0.06
     rough = np.where(tail, rough + 0.04, rough)
     ov = np.zeros(n, dtype=bool)  # texels whose natural colour is overridden (alpha forced to 0)
-    bare = np.zeros(n, dtype=np.float32)  # how bare the skin is (no fur tufts grow where it is)
+    bare = np.zeros(n, dtype=np.float32)  # where no fur tufts grow: bare skin, and the face's pale fur
     natv = nat.copy()
     alpha0 = alpha.copy()  # the tint mask as the overrides alone leave it (grade() below does not touch it)
 
     def override(mask, col, a=0.0, r=None, k=None, skin=False):
+        """Paint col over the texels of mask (by k, 0..1). skin: no fur tufts grow there."""
         m = mask if k is None else mask & (k > 0)
         w = (np.ones(n) if k is None else k)[m]
         col = np.asarray(col, np.float32)
@@ -854,48 +869,49 @@ def paint(tx, variant, tools):
     ck = sst(0.12, 0.88, ck)
     if not rodent:
         ck = ck * (1 - sst(0.25, 0.7, shinw))  # the chest's cream stops at the elbow
-    override(hard == 0, cream[None, :] * (0.9 + 0.2 * fine)[:, None], k=ck * (hard == 0))
+    override(hard == 0, cream[None, :] * (0.9 + 0.2 * fine)[:, None], k=ck * (hard == 0), skin=True)
     # the pale ring round each eye, and paler whisker pads
     buff = _hex("#7d6048") if rodent else _hex("#dcb98a")
-    override(head, buff[None, :] * (0.9 + 0.2 * fine)[:, None], k=ring * (0.5 if rodent else 0.75) * (hard == 0))
+    override(head, buff[None, :] * (0.9 + 0.2 * fine)[:, None], k=ring * (0.5 if rodent else 0.75) * (hard == 0), skin=True)
     d_pad = np.minimum(
         np.linalg.norm(P - (lm["nose"] + [0.045, 0.05, -0.02]), axis=1),
         np.linalg.norm(P - (lm["nose"] + [-0.045, 0.05, -0.02]), axis=1),
     )
-    override(head, buff[None, :] * (0.92 + 0.16 * fine)[:, None], k=(1 - sst(0.03, 0.06, d_pad)) * 0.6 * (hard == 0))
+    override(head, buff[None, :] * (0.92 + 0.16 * fine)[:, None], k=(1 - sst(0.03, 0.06, d_pad)) * 0.6 * (hard == 0), skin=True)
     # rows of dark whisker spots on the pads
     spots = sst(0.72, 0.8, vn(P * 190.0, 61)) * (1 - sst(0.02, 0.045, d_pad))
-    override(head, _hex("#3a2a24"), k=spots * 0.7 * (hard == 0))
+    override(head, _hex("#3a2a24"), k=spots * 0.7 * (hard == 0), skin=True)
     # nose pad (rhinarium) and the dark lip line under it
     d_nose = np.linalg.norm(P - lm["nose"], axis=1)
-    override(head, _hex("#4e3530") * (0.85 + 0.3 * vn(P * 300.0, 3))[:, None] if False else _hex("#503631"), r=0.32, k=1 - sst(0.026, 0.036, d_nose))
+    override(head, _hex("#4e3530") * (0.85 + 0.3 * vn(P * 300.0, 3))[:, None] if False else _hex("#503631"), r=0.32, k=1 - sst(0.026, 0.036, d_nose), skin=True)
     # eyelid rims: bare dark skin right around the eyeball
     lid = 1 - sst(r_eye + 0.002, r_eye + 0.009, d_eye)
-    override(head, _hex("#7a2a2a") if rodent else _hex("#2a1e1a"), r=0.4, k=lid)
+    override(head, _hex("#7a2a2a") if rodent else _hex("#2a1e1a"), r=0.4, k=lid, skin=True)
     # inner ears: thin pinkish skin with fine hairs
     # inner ears: thin warm skin with fine hairs, the fur coming over the rim
     ec = np.where(P[:, :1] > 0, lm["earL"], lm["earR"])
     rim = 1 - sst(0.02, 0.045, np.linalg.norm(P - ec, axis=1))
     inner = ear & (N[:, 1] < -0.2)
     skin_e = (_hex("#7a4a40") if rodent else _hex("#9a6a5a")) * (0.85 + 0.3 * fine)[:, None]
-    override(ear, skin_e * 0.85, r=0.5, k=sst(-0.25, -0.6, N[:, 1]) * inner * rim * 0.6)
+    override(ear, skin_e * 0.85, r=0.5, k=sst(-0.25, -0.6, N[:, 1]) * inner * rim * 0.6, skin=True)
     # the backs of the ears are furred like the head, with a darker rim
     override(ear, _hex("#4a3026") if rodent else _hex("#5a3a2a"), k=rim * sst(-0.1, 0.4, N[:, 1]) * 0.35)
     # foot pads
-    override(feet, _hex("#5c4440"), r=0.5, k=sst(-0.4, -0.75, N[:, 2]) * feet)
+    override(feet, _hex("#5c4440"), r=0.5, k=sst(-0.4, -0.75, N[:, 2]) * feet, skin=True)
     # claws and teeth
-    override(hard == 1, _hex("#2b2320") * 1.0, r=0.28)
-    override(hard == 2, _hex("#e0b05a") if not rodent else _hex("#d8b25e"), r=0.22)
+    override(hard == 1, _hex("#2b2320") * 1.0, r=0.28, skin=True)
+    override(hard == 2, _hex("#e0b05a") if not rodent else _hex("#d8b25e"), r=0.22, skin=True)
     if rodent:
         skin = _hex("#8a7068")
         # a scorched darker back: the dorsal fur is almost black-brown along the spine
         scorch = sst(0.55, 0.95, N[:, 2]) * np.isin(dom, list(TORSO) + ["Neck", "Head"]) * (hard == 0)
         override(hard == 0, _hex("#1e1512") * (0.8 + 0.4 * fine)[:, None], a=0.0, k=scorch * 0.7)
         # --- the tail from behind: a rat's bare tail with three ragged clumps of bristle, smouldering ----
-        tuft = sst(0.075, 0.1, r_t) * tk  # on a clump: the brush stands off the tail's axis
-        ratty = (1 - sst(0.068, 0.09, r_t)) * tk * sst(0.02, 0.07, s_t)  # the bare stretches between
+        on_tuft = (1 - sst(1.12, 1.32, tuft_distance(P).astype(np.float32)))
+        tuft = on_tuft * tk  # on a clump of bristle
+        ratty = (1 - on_tuft) * tk * sst(0.02, 0.07, s_t)  # the bare stretches between
         rings = 0.86 + 0.14 * np.sin(s_t * TAIL_LENGTH * (2 * math.pi / 0.03))
-        rat = skin[None, :] * (rings * (0.82 + 0.3 * vn(P * 110.0, 71)))[:, None]
+        rat = _hex("#7d655d")[None, :] * (rings * (0.82 + 0.3 * vn(P * 110.0, 71)))[:, None]
         rat = rat * (1 - 0.55 * sst(0.7, 0.85, fine))[:, None]  # a few dark hairs left on it
         override(hard == 0, rat, r=0.5, k=ratty * 0.92, skin=True)
         grade(_hex("#1b1210")[None, :] * (0.7 + 0.6 * fine)[:, None], tuft * 0.8)
@@ -916,11 +932,11 @@ def paint(tx, variant, tools):
         dk = np.full(n, 9.0, np.float32)
         for kc, kr in rodent_knobs():
             dk = np.minimum(dk, np.linalg.norm((P - kc.astype(np.float32)) / (kr.astype(np.float32) * 1.15), axis=1))
-        knob = (1 - sst(0.95, 1.25, dk + (vn(P * 60.0, 77) - 0.5) * 0.25)) * (hard == 0)
-        override(hard == 0, _hex("#a38c82")[None, :] * (0.85 + 0.3 * vn(P * 140.0, 78))[:, None], r=0.5, k=knob * 0.9, skin=True)
-        mange = (sst(0.6, 0.67, fbm(P * 4.2, 3, seed=37)) * sst(-0.25, 0.05, y) * (1 - tk) * (1 - sst(0.1, 0.4, headw))
+        knob = (1 - sst(0.84, 1.08, dk + (vn(P * 60.0, 77) - 0.5) * 0.25)) * sst(0.3, 0.75, N[:, 2]) * (hard == 0)
+        override(hard == 0, _hex("#8f7a70")[None, :] * (0.8 + 0.4 * vn(P * 140.0, 78))[:, None], r=0.5, k=knob * 0.85, skin=True)
+        mange = (sst(0.58, 0.65, fbm(P * 4.2, 3, seed=37)) * sst(-0.25, 0.05, y) * (1 - tk) * (1 - sst(0.1, 0.4, headw))
                  * (1 - sst(0.3, 0.7, footw)) * (1 - m) * (hard == 0))
-        mcol = skin[None, :] * ((0.78 + 0.4 * vn(P * 90.0, 38)) * (1 - 0.5 * sst(0.72, 0.86, fine)))[:, None]
+        mcol = _hex("#96796f")[None, :] * ((0.8 + 0.4 * vn(P * 90.0, 38)) * (1 - 0.5 * sst(0.72, 0.86, fine)))[:, None]
         override(hard == 0, mcol, r=0.55, k=mange * 0.8, skin=True)
         # one small bald patch with an old pale scar across it
         for i, pt in enumerate(RODENT_PATCHES):
@@ -932,10 +948,10 @@ def paint(tx, variant, tools):
             override(hard == 0, col, r=0.5, k=k, skin=True)
             a, b = pt["stitch"]
             ds, _ts = _seg_dist(P, a, b)
-            override(hard == 0, _hex("#c9b0a6"), r=0.45, k=(1 - sst(0.004, 0.009, ds)) * (k > 0.3))
+            override(hard == 0, _hex("#c9b0a6"), r=0.45, k=(1 - sst(0.004, 0.009, ds)) * (k > 0.3), skin=True)
         # sleepless dark hollows round the eyes, in place of a squirrel's pale ring
         hollow = sst(r_eye + 0.004, r_eye + 0.014, d_eye) * (1 - sst(r_eye + 0.03, r_eye + 0.075, d_eye))
-        override(head, _hex("#170d0c") * (0.8 + 0.4 * fine)[:, None], k=hollow * 0.72 * (hard == 0))
+        override(head, _hex("#170d0c") * (0.8 + 0.4 * fine)[:, None], k=hollow * 0.72 * (hard == 0), skin=True)
         # the inside of the grin: dark, wet gum along the cut from each corner to the front
         gdrop = np.array([0, 0, RODENT_DZ])
         g0, g1, g2 = GRIN_FRONT + gdrop, GRIN_MID + gdrop, GRIN_CORNER + gdrop
@@ -944,13 +960,13 @@ def paint(tx, variant, tools):
             _seg_dist(P, g0, g1)[0], _seg_dist(P, g1, g2)[0],
             _seg_dist(P, g0 * flip, g1 * flip)[0], _seg_dist(P, g1 * flip, g2 * flip)[0],
         ])
-        override(head | (dom == "Jaw"), _hex("#2e0c0e"), r=0.3, k=(1 - sst(0.014, 0.03, dm)) * (hard == 0))
+        override(head | (dom == "Jaw"), _hex("#2e0c0e"), r=0.3, k=(1 - sst(0.014, 0.03, dm)) * (hard == 0), skin=True)
         # thin, patchy fur: grey-pink skin shows through here and there
         mn = fbm(P * 12.0, 3, seed=31)
         thin = sst(0.66, 0.76, mn) * (hard == 0) * (1 - np.clip(ck, 0, 1))
-        override(hard == 0, skin * (0.8 + 0.4 * vn(P * 90.0, 32))[:, None], r=0.55, k=thin * 0.5)
+        override(hard == 0, skin * (0.8 + 0.4 * vn(P * 90.0, 32))[:, None], r=0.55, k=thin * 0.5, skin=True)
         # sore, reddened eyelids
-        override(head, _hex("#7a2c2a"), r=0.4, k=(1 - sst(r_eye + 0.004, r_eye + 0.014, d_eye)) * 0.45)
+        override(head, _hex("#7a2c2a"), r=0.4, k=(1 - sst(r_eye + 0.004, r_eye + 0.014, d_eye)) * 0.45, skin=True)
     rgb = tools["finish_rgb"](grey, alpha, natv, region, tb, tp)
     # flatter relief on bare skin, claws and teeth
     flat = (alpha0 < 0.5) & ov
@@ -959,7 +975,7 @@ def paint(tx, variant, tools):
     # the crease where the tail leaves the rump baked as a dark ring: less occlusion round the root
     root = 1 - sst(0.1, 0.3, np.linalg.norm(P - np.array(TAIL0[0], np.float32), axis=1))
     return {
-        "cards": ((hard == 0) & ~flat & (bare < 0.4)).astype(np.float32),
+        "cards": ((hard == 0) & (bare < 0.4)).astype(np.float32),
         "rgb": rgb.astype(np.float32),
         "alpha": np.clip(alpha, 0, 1).astype(np.float32),
         "rough": np.clip(rough, 0.05, 1).astype(np.float32),
@@ -1053,7 +1069,7 @@ def card_density(c, n, dom, variant, group="coat"):
         d[tail] = ((1 - _sstep(0.55, 0.85, np.abs(n[:, 0]))) * _sstep(0.0, 0.08, s))[tail]
         return d
     if group == "bristle":  # the rodent's three clumps
-        d[tail] = _sstep(0.08, 0.1, r_ax)[tail]
+        d[tail] = (1 - _sstep(1.1, 1.3, tuft_distance(c)))[tail]
         return d
     if group == "hackle":  # along the rodent's spine and nape
         d[(torso | (dom == "Neck")) & (n[:, 2] > 0.7) & (np.abs(c[:, 0]) < 0.085)] = 1.0
@@ -1121,12 +1137,12 @@ def card_tufts(info, variant, group, rng):
                 "dir": d, "dir2": d2, "side": side, "cell": 8 + pair}
     if group == "plume":
         edge = plume_half_width(s, variant) - np.abs(xs)  # studs in from the feather's edge
-        cell = np.where(edge < 0.09, 10 + pair, np.where(rng.random(k) < 0.2, 14 + pair, coat_cell))
+        cell = np.where(edge < 0.09, 10 + pair, np.where(rng.random(k) < 0.2, 14, 2))  # the middle: narrow locks of one tone
         # one in three stands up off the face: seen from the side the feather is a brush, not a blade
         stand = rng.random(k) < 0.34
         lift = np.where(stand, rng.uniform(0.55, 1.0, k), rng.uniform(0.15, 0.4, k))
         cell = np.where(stand & (edge < 0.12), 8 + pair, cell)
-        return {"length": rng.uniform(0.15, 0.23, k), "width": rng.uniform(0.06, 0.09, k), "lift": lift,
+        return {"length": rng.uniform(0.17, 0.26, k), "width": rng.uniform(0.05, 0.078, k), "lift": lift,
                 "roll": np.where(stand, rng.uniform(-1.2, 1.2, k), rng.normal(0, 0.3, k)), "droop": np.full(k, 0.3), "cell": cell}
     if group == "bristle":
         # bottle-brush: straight out of the clump every way, leaning toward the tip
