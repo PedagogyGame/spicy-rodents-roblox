@@ -268,6 +268,16 @@ return function(t: any)
 				"faster legs at a faster walk"
 			)
 			t.eq(rate("Walk", 0.01, nil, clips.Walk.length), H.minRate)
+			-- the clips are authored to these strides (tools/blender/heroes/clips_squirrel.py: a planted paw
+			-- goes back under the body at exactly this much a cycle), so they change together or paws slide
+			for name, studs in { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 6.9, Stalk = 2.2 } do
+				t.eq(H.stride[name], studs, `{name} stride`)
+			end
+			-- along a wire: two small bounds over 6.9 studs, in step at any speed up to the rail's 18 studs/s
+			-- (with 4.5 the paws slid a third of every stride below that)
+			t.near(rate("Wire", 9, nil, clips.Wire.length), 9 / 6.9 * clips.Wire.length, 1e-9, "a slow wire")
+			t.near(rate("Wire", 17.9, nil, clips.Wire.length), 17.9 / 6.9 * clips.Wire.length, 1e-9)
+			t.eq(rate("Wire", 18, nil, clips.Wire.length), H.maxRate, "the rail's walk is the clip's fastest")
 			-- hanging still on a trunk holds the pose; idle and the leap play at their own speed
 			t.eq(rate("Climb", 0, nil, clips.Climb.length), 0)
 			t.truthy(rate("Climb", 10, nil, clips.Climb.length) > 0.5)

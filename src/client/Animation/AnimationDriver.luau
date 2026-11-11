@@ -344,8 +344,11 @@ end
 AnimationDriver.HERO = {
 	still = 0.5, -- studs/s under which it stands (or hangs on a trunk)
 	runAbove = 9, -- studs/s: a walk below, the bounding run above
-	-- studs travelled per clip cycle when no motor cadence is known (v5.4: one bound per 5.5 studs)
-	stride = { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 4.5, Stalk = 2.2 } :: { [string]: number },
+	-- studs travelled per clip cycle when no motor cadence is known (v5.4: one bound per 5.5 studs). The
+	-- clips are authored to these (tools/blender/heroes/clips_squirrel.py, its *_TRAVEL numbers): a planted
+	-- paw goes back under the body at exactly this much a cycle, so it stays where it was put. Wire is two
+	-- small bounds a cycle (6.9 studs: at the rail's 18 studs/s that is the fastest the clip may play)
+	stride = { Run = 5.5, Walk = 2.4, Climb = 3.6, Wire = 6.9, Stalk = 2.2 } :: { [string]: number },
 	minRate = 0.3,
 	maxRate = 2.6, -- faster than this the legs blur into noise
 	fade = 0.15, -- seconds: one clip's track fades out and the next fades in over this
