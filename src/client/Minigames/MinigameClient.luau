@@ -375,11 +375,12 @@ function MinigameClient.start(opts: { [string]: any }): any
 					list = cg.buttons(view.phase, view)
 				elseif view.phase == "lobby" then
 					-- a game with no buttons of its own gets the framework's
-					list = { { "start", "Start now" } }
+					local bar: { { string } } = { { "start", "Start now" } }
 					if a.computers then
-						table.insert(list, { "addai", "Add a computer" })
+						table.insert(bar, { "addai", "Add a computer" })
 					end
-					table.insert(list, LEAVE)
+					table.insert(bar, LEAVE)
+					list = bar
 				elseif view.phase == "done" then
 					list = { { "again", "Play again" }, LEAVE }
 				else
