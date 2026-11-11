@@ -595,7 +595,14 @@ return function(t)
 				t.eq(Rig.last(w.got, "left"), nil, "nobody was ever told the arena had reset")
 				t.eq(Session.seatOf(session, w.player), 1)
 				t.eq(Session.seatOf(session, di), 2)
-				t.eq(Rig.count(w.got, "event") >= 3, true)
+				-- (each next match began as any game does: its Table heard "start", the players read "Game on!")
+				local began = 0
+				for _, m in w.got do
+					if m.kind == "event" and m.text == "Game on!" then
+						began += 1
+					end
+				end
+				t.eq(began, 3)
 				-- outside the end card there is nothing to start again
 				ok, why = tbl.ctx.again()
 				t.truthy(not ok and why == "not finished")

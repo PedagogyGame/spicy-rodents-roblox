@@ -28,6 +28,26 @@
 -- player walks up and presses E; stations(sites) returns a game's stations for the sites that exist. A station
 -- with `joins = "<another station's id>"` is a second way in to that station's game (same game, and the station
 -- it names has a game of its own): a prompt and nothing else.
+-- WHAT EVERY GAME KEEPS TO (each is held by a spec: tests/isolated/minigames_framework.luau, minigames_registry):
+--   1. On the wire a game has Minigame.Input (its verbs, from its Spec) and Minigame.State (ctx.send / broadcast
+--      / everyone), and no remote of its own. Minigame.Input carries 20 messages a second (40 at once) and a
+--      dropped one is never answered; its arguments are at most 8 numbers, booleans or strings of 200 characters.
+--      So a stream of input (flippers, a tilt, a pull) is never a message per key or per frame: the client keeps
+--      a log by tick and sends its next segment about ten times a second, { fromTick, toTick, packed events },
+--      and the server replays to the tick the segment declares (tests/lib/FakeGames' machine is the example).
+--   2. Two clocks. The service's own (ServerGame.Ctx.now) is for durations on the server. Anything a client
+--      stamps and the server judges by time uses the shared clock: ctx.stamp() on both sides (or "which script,
+--      and how many seconds into it", which needs no clock at all).
+--   3. A game never takes another down. Its Table builds and steps on a site that lacks its furniture (hw = nil,
+--      nothing done, nothing sent), and says nothing to everyone while nobody is seated at it.
+--   4. A game's numbers live in its own Layout / Config module (Config/Tunables is read, never added to); its
+--      tools live in tools/games/<game>/ (already formatted and linted by tools/ci.sh).
+--   5. The player's walking pace is changed only through the client's ctx.pace; a game's keys are its `keys`
+--      (looked at before Q, gamepad B and Space; "" swallows one).
+--   6. A model two games share has one owner. The pool table model (Minigames/Pool: physics, cloth, tables, the
+--      shot script) is pool's: bumper pool reads it and keeps its own rules in Minigames/BumperPool. The rally
+--      model (Minigames/Rally: a ball in flight, a stamped swing and its reach) is racquetball's: volleyball
+--      reads it. The reader asks the owner for a change; it does not edit the other's folder.
 -- Pure. Interface: ALL; SERVICE_VERBS; get(game) -> Spec?; stations(sites) -> { StationDef } (registry order,
 --   ids unique); station(id, sites) -> StationDef?; verbs() -> { string } (everything a client may send, for
 --   Net/Schemas); check(spec) -> (ok, err?); register(spec) (tests: a game added at run time)
