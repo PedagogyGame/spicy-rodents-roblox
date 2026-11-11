@@ -69,7 +69,7 @@ MinigameService.PROMPT_DISTANCE = 9
 
 export type Opts = {
 	root: Instance?, -- Workspace.Attractions.BowlingAlley
-	place: AlleyLayout.Place,
+	place: { x: number, z: number, floorY: number, yaw: number }, -- AlleyLayout.Place
 	tunnels: { [number]: { { number } } }?, -- pair -> tunnel route world points (the ball's way back)
 	net: any?, -- Shared/Net instance (engine); nil = the events go to PlayerLike stubs only
 	canPlay: ((player: any) -> (boolean, string?))?,

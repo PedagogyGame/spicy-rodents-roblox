@@ -20,6 +20,9 @@ local Import = require("../Import")
 local Config = Import.shared("Paintball/Config") :: typeof(require("../../shared/Paintball/Config"))
 local Ballistics = Import.shared("Paintball/Ballistics") :: typeof(require("../../shared/Paintball/Ballistics"))
 local Magazine = Import.shared("Paintball/Magazine") :: typeof(require("../../shared/Paintball/Magazine"))
+-- (a module reached through Import carries its values' types but not its exported type names:
+-- this is the same type, taken from a value)
+type Mag = typeof(Magazine.new(1, 1, 1))
 local PoseHistory = require("./PoseHistory")
 local Projectiles = require("./Projectiles")
 local Splats = require("./Splats")
@@ -62,7 +65,7 @@ export type Body = {
 	pendingUp: boolean,
 	speed: number,
 	phase: number,
-	mag: Magazine.Mag,
+	mag: Mag,
 	nextThink: number,
 	rttEst: number,
 	nextPing: number,

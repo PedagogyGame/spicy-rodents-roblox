@@ -1,19 +1,12 @@
 # Known type errors: the debt tools/typecheck/main.luau tolerates. One line per file and message
 # (quoted types blanked): file <tab> how many <tab> message. The check fails on anything not listed
 # here. Fix errors, then run `lune run tools/typecheck/main.luau --update`; never add lines by hand.
-# 117 errors in total (luau-lsp 1.70.1).
+# 109 errors in total (luau-lsp 1.70.1).
 src/client/Animation/AnimationDriver.luau	2	TypeError: Unknown type '…'
 src/client/Camera/CameraRig.luau	1	TypeError: Expected this to be '…', but got '…'
 src/client/Minigames/MinigameClient.luau	1	TypeError: Function only returns 1 value, but 2 are required here
 src/client/Minigames/MinigameClient.luau	1	TypeError: Type "fortune_machine" cannot be compared with "bowling"
 src/client/Minigames/MinigameClient.luau	1	TypeError: Unknown type '…'
-src/server/Assets/HeroArt.luau	1	TypeError: Cannot call a value of the union type:
-src/server/Assets/HeroArt.luau	2	TypeError: Unknown type '…'
-src/server/Assets/TreeArt.luau	1	TypeError: Cannot call a value of the union type:
-src/server/Attractions/AttractionService.luau	1	TypeError: Function only returns 1 value, but 2 are required here
-src/server/Economy/Receipts.luau	1	TypeError: Unknown type '…'
-src/server/Minigames/MinigameService.luau	1	TypeError: Unknown type '…'
-src/server/Paintball/Harness.luau	1	TypeError: Unknown type '…'
 src/shared/Avatar/PuppetSpec.luau	1	TypeError: Cannot call a value of type { [string]: string } in union:
 src/shared/Avatar/PuppetSpec.luau	10	TypeError: Expected this to be '…', but got '…'
 src/shared/Avatar/PuppetSpec.luau	4	TypeError: Cannot cast '…' into '…' because the types are unrelated

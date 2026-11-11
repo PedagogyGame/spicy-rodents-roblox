@@ -181,7 +181,7 @@ function AttractionService.start(opts: Opts?): any?
 		table.insert(
 			conns,
 			game:GetService("RunService").Heartbeat:Connect(function(dt: number)
-				local good, err = pcall(step, math.min(dt, 0.1))
+				local good, err = pcall(step :: (number) -> any, math.min(dt, 0.1))
 				if not good then
 					warn(`[Attractions] step failed: {err}`)
 				end
