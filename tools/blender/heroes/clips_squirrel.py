@@ -570,31 +570,70 @@ def lagged_tail(K, f, base, name="tl", lag=1.2, gain=None):
     return [b + g * K(f - lag * i, name) for i, (b, g) in enumerate(zip(base, gain))]
 
 
+def track(table):
+    """A curve through {frame: value} that holds its ends and never overshoots a key (one-shots)."""
+    keys = sorted(table.items())
+    return lambda f: cyc(f, keys, wrap=False)
+
+
+# the tail's own shape when it streams behind (added to the root's rise): up a little, then trailing
+TAIL_STREAM = [0.0, 0.08, 0.10, 0.04, -0.06, -0.18, -0.30, -0.40]
+CFG_MID = {**CFG, "pivot": (0.0, 0.0, 0.62)}  # one-shots pitch about the middle of the body, not above it
+
+
 def leap(rig, n=24):
-    K = Keys({
-        0: dict(bob=0.0, surge=0.0, pitch=0.0, arch=0.12, hy=0.0, hz=0.0, hp=0.2, ht=0.15, fy=0.0, fz=0.0, fp=0.78, ft=0.15, tl=0.0, head=-0.08, ear=0.0),
-        5: dict(bob=-0.13, surge=0.04, pitch=0.06, arch=0.3, hy=-0.06, hp=0.15, fy=0.04, fp=1.0, tl=-0.35, head=0.04, ear=-0.2),
-        9: dict(bob=0.08, surge=-0.1, pitch=-0.28, arch=-0.32, hy=0.42, hz=0.05, hp=1.45, ht=0.1, fy=-0.36, fz=0.32, fp=2.1, ft=0.6, tl=-0.1, head=-0.16, ear=-0.5),
-        14: dict(bob=0.12, surge=-0.12, pitch=-0.06, arch=-0.36, hy=0.62, hz=0.22, hp=1.6, ht=0.5, fy=-0.46, fz=0.36, fp=1.1, ft=0.2, tl=-0.05, head=-0.06, ear=-0.55),
-        19: dict(bob=0.05, surge=-0.06, pitch=0.16, arch=0.0, hy=0.2, hz=0.3, hp=1.1, ht=0.6, fy=-0.34, fz=0.08, fp=0.55, ft=0.05, tl=0.1, head=0.02, ear=-0.4),
-        23: dict(bob=-0.04, surge=0.0, pitch=0.07, arch=0.16, hy=-0.04, hz=0.04, hp=0.4, ht=0.15, fy=-0.06, fz=0.0, fp=0.95, ft=0.15, tl=-0.05, head=-0.06, ear=-0.1),
-    })
+    """The leap, on the same frames as before (the game, or whatever drives the clip by the jump, can
+    count on them): 0 ready; 3 the crouch, haunches under and back bowed; 5 the take-off (Commit), hind
+    legs driving straight and the chest thrown up; 9 the stretch, forelegs reaching far ahead and hind
+    legs trailing straight back, the tail up behind as a rudder; 14 the top, level and spread; 19 the
+    reach (Recover), nose down, forelegs out for the ground and hind feet coming under; 21 braced for the
+    ground (the pose a long fall holds); 22 the landing taken up, chest dipping, back bowed, haunches
+    folding and the tail whipping down; 23 coming out of it. The right legs run half a frame behind the
+    left, and each tail segment a frame behind the one before."""
+    T = {name: track(tab) for name, tab in dict(
+        bob={0: -0.03, 3: -0.15, 5: 0.08, 9: 0.10, 14: 0.10, 19: 0.05, 21: 0.0, 22: -0.13, 23: -0.07},
+        surge={0: 0.0, 3: 0.05, 5: -0.10, 9: -0.06, 14: -0.04, 19: 0.0, 21: 0.02, 22: 0.04, 23: 0.02},
+        pitch={0: 0.02, 3: 0.10, 5: -0.34, 9: -0.26, 14: -0.02, 19: 0.26, 21: 0.24, 22: 0.16, 23: 0.06},
+        arch={0: 0.16, 3: 0.48, 5: -0.06, 9: -0.38, 14: -0.30, 19: 0.06, 21: 0.14, 22: 0.50, 23: 0.30},
+        fy={0: 0.0, 3: 0.0, 5: -0.25, 9: -0.56, 14: -0.50, 17: -0.40, 19: -0.28, 21: -0.20, 22: -0.12, 23: -0.03},
+        fz={0: 0.0, 3: 0.0, 5: 0.42, 9: 0.66, 14: 0.52, 19: 0.16, 21: 0.05, 22: 0.0, 23: 0.0},
+        fx={0: 0.0, 9: 0.02, 14: 0.11, 19: 0.04, 22: 0.02},
+        fp={0: 0.78, 3: 1.0, 5: 1.5, 9: 0.3, 14: 0.35, 19: 0.5, 21: 0.6, 22: 0.9, 23: 0.8},
+        ft={0: 0.15, 3: 0.2, 5: 1.2, 9: 0.2, 14: 0.15, 19: 0.2, 22: 0.2},
+        hy={0: -0.03, 3: -0.14, 5: 0.75, 9: 1.40, 14: 1.36, 19: 0.50, 21: 0.05, 22: -0.20, 23: -0.10},
+        hz={0: 0.0, 3: 0.0, 5: 0.0, 9: 0.36, 14: 0.52, 19: 0.36, 21: 0.10, 22: 0.0, 23: 0.0},
+        hx={0: 0.0, 3: 0.03, 9: 0.0, 14: 0.09, 19: 0.05, 22: 0.06, 23: 0.03},
+        hp={0: 0.15, 3: 0.12, 5: 1.4, 9: 2.8, 14: 2.9, 19: 1.3, 21: 0.5, 22: 0.25, 23: 0.2},
+        ht={0: 0.1, 3: 0.1, 5: 0.15, 9: 2.7, 14: 2.9, 19: 1.0, 21: 0.3, 22: 0.1},
+        tail={0: 0.30, 3: -0.05, 5: -0.10, 9: 0.48, 14: 0.34, 19: 0.80, 21: 0.72, 22: 0.0, 23: 0.24},
+        curl={0: 0.0, 9: -0.1, 14: 0.55, 19: 0.2, 22: -0.2, 23: 0.0},
+        head={0: -0.06, 3: 0.05, 5: -0.14, 9: -0.10, 14: -0.04, 19: 0.10, 22: 0.02, 23: -0.05},
+        ear={0: 0.0, 3: -0.25, 5: -0.5, 14: -0.55, 19: -0.4, 22: -0.2, 23: -0.1},
+    ).items()}
 
     def pose(i, n):
         f = float(i)
-        tp = lagged_tail(K, f, TAIL_BACK, lag=1.1)
+        legs = {}
+        for leg in LEGS:
+            pre = "f" if leg.startswith("Front") else "h"
+            ff = f - (0.5 if leg.endswith("R") else 0.0)
+            t = toe_rest(leg) + np.array([T[pre + "x"](ff) * side(leg), T[pre + "y"](ff), T[pre + "z"](ff)])
+            legs[leg] = (t, T[pre + "p"](ff), T[pre + "t"](ff), 0.25 if pre == "f" else 0.3)
+        elev = [T["tail"](f - 1.0 * k) + TAIL_STREAM[k] + T["curl"](f - 1.0 * k) * (k / 7) ** 2 for k in range(8)]
+        lat = [0.025 * k * math.sin(0.5 * (f - 1.2 * k)) for k in range(8)]
         P = {
-            "body": dict(bob=K(f, "bob"), surge=K(f, "surge"), pitch=K(f, "pitch")),
-            "spine": (K(f, "arch"), 0.0, 0.0),
-            "legs": keyed_legs(K, f, lag=0.6),
-            "head": (0.0, K(f, "head"), 0.0),
-            "tail": (tp, wave(8, 0.4 * f, 0.03, 0.5)),
-            "ears": ((K(f, "ear"), 0.1), (K(f, "ear"), -0.1)),
+            "body": dict(bob=T["bob"](f), surge=T["surge"](f), pitch=T["pitch"](f), roll=0.03 * math.sin(0.4 * f) * smooth(f / 6) * smooth((22 - f) / 3)),
+            "spine": (T["arch"](f), 0.0, 0.0),
+            "legs": legs,
+            "neck_pre": -0.6 * (T["pitch"](f) + 0.5 * T["arch"](f)),
+            "head": (0.0, T["head"](f), 0.0),
+            "tail_dirs": tail_dirs(elev, lat),
+            "ears": ((T["ear"](f), 0.1), (T["ear"](f - 0.7), -0.1)),
         }
-        return build_pose(rig, P, CFG)
+        return build_pose(rig, P, CFG_MID)
 
     return {"name": "Leap", "frames": n, "pose": pose, "loop": False, "priority": "Action",
-            "keys": [0, 5, 9, 14, 19, 23], "markers": ((5 / 30, "Commit", "takeoff"), (19 / 30, "Recover", "land")),
+            "keys": [0, 3, 5, 9, 14, 19, 21, 22], "markers": ((5 / 30, "Commit", "takeoff"), (19 / 30, "Recover", "land")),
             "brief": "leap"}
 
 
