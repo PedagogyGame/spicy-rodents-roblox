@@ -82,12 +82,7 @@ if not fs.isDir("build") then
 	fs.writeDir("build")
 end
 fs.writeFile(out, bytes)
-print(
-	`attractions: {#doc.attractions} building(s), {onVenues.sites} venue site(s) [{table.concat(
-		onVenues.built,
-		", "
-	)}], {parts} parts -> {out} ({#bytes} bytes) in {string.format(
-		"%.2f",
-		os.clock() - t0
-	)} s`
-)
+local built = table.concat(onVenues.built, ", ")
+local took = string.format("%.2f", os.clock() - t0)
+print(`attractions: {#doc.attractions} building(s), {onVenues.sites} venue site(s) [{built}], {parts} parts`)
+print(`attractions: -> {out} ({#bytes} bytes) in {took} s`)
