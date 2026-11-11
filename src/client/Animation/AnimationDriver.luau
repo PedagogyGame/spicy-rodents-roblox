@@ -42,7 +42,8 @@
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
 --   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount;
 --   heroClip(mode, speed, stalk) -> clip name (pure); heroRate(name, speed, cadence?, length) -> playback
---   speed (pure); HERO. The Spicy Rodent's hero body also gets Animation/Creep's twitches on top.
+--   speed (pure); HERO. The Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
+--   heroLayers(rig, t, seed) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
 
 local Gait = require("./Gait")
 local Creep = require("./Creep")
@@ -286,6 +287,40 @@ function AnimationDriver.heroRate(name: string, speed: number, cadence: number?,
 	return math.clamp(cyclesPerSecond * length, H.minRate, H.maxRate)
 end
 
+-- The seed of a rodent body's twitches (Animation/Creep), from its name: the same on every client.
+function AnimationDriver.creepSeed(name: string): number
+	return (#name * 7.31) % 97
+end
+
+-- The joint rotations a hero body gets on top of its clip at server time `t`, as
+-- { [boneName] = { rx, ry, rz } }: radians on the rig's own axes, each multiplied onto what the clip gave
+-- that bone as CFrame.Angles(rx, ry, rz). `rig` is the body's RigSpec attribute. So far only the Spicy
+-- Rodent ("rodent") has any: Animation/Creep's twitches. Pure: the driver below applies exactly this, and
+-- the offline motion preview (tools/review/motion_path.luau) reads it, so both show the same thing; a
+-- new layer belongs here.
+function AnimationDriver.heroLayers(rig: string, t: number, seed: number): { [string]: { number } }
+	local out: { [string]: { number } } = {}
+	if rig ~= "rodent" then
+		return out
+	end
+	local pose = Creep.pose(t, seed)
+	out.Head = { pose.head.pitch, pose.head.yaw, pose.head.roll }
+	out.Jaw = { -pose.jaw, 0, 0 } -- the jaw opens about -X (the authored bite)
+	out.EarL = { 0, 0, pose.earL }
+	out.EarR = { 0, 0, -pose.earR }
+	for i, yaw in pose.tail do
+		if yaw ~= 0 then
+			out[`Tail{i}`] = { 0, yaw, 0 }
+		end
+	end
+	out.Spine2 = { pose.chest, 0, pose.spine }
+	if pose.spine ~= 0 then
+		out.Spine1 = { 0, 0, pose.spine }
+		out.Spine3 = { 0, 0, pose.spine }
+	end
+	return out
+end
+
 -- The joints the gait drives, by RigSpec bone name: Motor6Ds on a part-built puppet, Bones on a skinned
 -- hero model (Server/Assets/HeroArt). The names and the axes are the same on both (the hero's bones rest
 -- with no rotation), so one pose serves either. A hero's region Motor6Ds (BodyMotor6D, ...) match no name.
@@ -475,7 +510,8 @@ function AnimationDriver.start(opts: Opts): Driver
 					bones[d.Name] = d
 				end
 			end
-			entries[model].creep = { seed = (#model.Name * 7.31) % 97, bones = bones, base = {}, wrote = {} }
+			entries[model].creep =
+				{ seed = AnimationDriver.creepSeed(model.Name), bones = bones, base = {}, wrote = {} }
 		end
 		count += 1
 	end
@@ -728,7 +764,6 @@ function AnimationDriver.start(opts: Opts): Driver
 			local creep = e.creep
 			if creep and e.hero then
 				-- the Spicy Rodent's twitches, multiplied onto what its clip gave each bone this frame
-				local pose = Creep.pose(workspace:GetServerTimeNow(), creep.seed)
 				local function layer(name: string, offset: CFrame)
 					local bone = creep.bones[name]
 					if bone == nil then
@@ -743,19 +778,8 @@ function AnimationDriver.start(opts: Opts): Driver
 					creep.wrote[bone] = out
 					bone.Transform = out
 				end
-				layer("Head", CFrame.Angles(pose.head.pitch, pose.head.yaw, pose.head.roll))
-				layer("Jaw", CFrame.Angles(-pose.jaw, 0, 0)) -- the jaw opens about -X (the authored bite)
-				layer("EarL", CFrame.Angles(0, 0, pose.earL))
-				layer("EarR", CFrame.Angles(0, 0, -pose.earR))
-				for i, yaw in pose.tail do
-					if yaw ~= 0 then
-						layer(`Tail{i}`, CFrame.Angles(0, yaw, 0))
-					end
-				end
-				layer("Spine2", CFrame.Angles(pose.chest, 0, pose.spine))
-				if pose.spine ~= 0 then
-					layer("Spine1", CFrame.Angles(0, 0, pose.spine))
-					layer("Spine3", CFrame.Angles(0, 0, pose.spine))
+				for name, r in AnimationDriver.heroLayers("rodent", workspace:GetServerTimeNow(), creep.seed) do
+					layer(name, CFrame.Angles(r[1], r[2], r[3]))
 				end
 			end
 			if p == nil or #e.joints == 0 or e.hero ~= nil then
