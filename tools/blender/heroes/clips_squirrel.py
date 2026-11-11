@@ -246,9 +246,11 @@ def idle(rig, n=90):
         ear_l = (0.16 * alert, -0.35 * (pulse(p, 0.20, 0.012) + pulse(p, 0.55, 0.012)))
         ear_r = (0.16 * alert, 0.35 * (pulse(p, 0.44, 0.012) + pulse(p, 0.88, 0.012)))
         P = {
-            "body": dict(bob=-0.095 + 0.005 * breath + 0.02 * alert - 0.01 * down, pitch=-0.03 + 0.004 * breath - 0.07 * alert + 0.06 * down,
-                         roll=0.04 * late, sway=-0.03 * late + 0.008 * math.sin(TAU * p), yaw=0.05 * late),
-            "spine": (0.26 + 0.02 * breath - 0.06 * alert, 0.16 * late, 0.08 * late),
+            # the weight goes over onto one haunch after each look (a tenth of a stud at the hips: enough to
+            # be seen from the play camera), the chest comes up when it is alert and dips for the sniff
+            "body": dict(bob=-0.095 + 0.005 * breath + 0.05 * alert - 0.025 * down - 0.02 * late * late, pitch=-0.03 + 0.004 * breath - 0.12 * alert + 0.09 * down,
+                         roll=0.09 * late, sway=-0.10 * late + 0.008 * math.sin(TAU * p), yaw=0.07 * late),
+            "spine": (0.26 + 0.03 * breath - 0.08 * alert, 0.16 * late, 0.08 * late),
             "legs": planted(dx=0.02, dy_back=-0.05),
             "head": (yaw, hp + sniff, 0.10 * late + 0.03 * math.sin(TAU * 3 * p)),
             "tail_dirs": tail_dirs(elev, lat),

@@ -764,18 +764,18 @@
      ],
      "pawSkateWhilePlanted": {
       "FrontL": 0.301,
-      "FrontR": 0.088,
+      "FrontR": 0.087,
       "BackL": 0.341,
       "BackR": 0.32
      },
      "idle": {
-      "pawDrift": 0.001,
-      "hipsBob": 0.014,
-      "headBob": 0.078,
+      "pawDrift": 0.002,
+      "hipsBob": 0.017,
+      "headBob": 0.111,
       "headYawDeg": 60.2,
-      "tailTipUpDown": 0.151,
-      "tailTipSideToSide": 1.109,
-      "spineFlexDeg": 2.3
+      "tailTipUpDown": 0.147,
+      "tailTipSideToSide": 1.156,
+      "spineFlexDeg": 3.5
      }
     },
     "hop": {
@@ -1672,18 +1672,18 @@
      ],
      "pawSkateWhilePlanted": {
       "FrontL": 0.284,
-      "FrontR": 0.106,
+      "FrontR": 0.105,
       "BackL": 0.341,
       "BackR": 0.32
      },
      "idle": {
-      "pawDrift": 0.293,
-      "hipsBob": 0.014,
-      "headBob": 0.1,
+      "pawDrift": 0.292,
+      "hipsBob": 0.017,
+      "headBob": 0.131,
       "headYawDeg": 78.5,
-      "tailTipUpDown": 0.821,
-      "tailTipSideToSide": 1.871,
-      "spineFlexDeg": 5.0
+      "tailTipUpDown": 0.799,
+      "tailTipSideToSide": 1.896,
+      "spineFlexDeg": 6.1
      }
     },
     "hop": {
