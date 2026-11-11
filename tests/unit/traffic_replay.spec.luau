@@ -212,26 +212,23 @@ return function(t)
 	)
 
 	t.test("the report: summary, JSON and the worst list", function()
-		local result = Replay.run({ scenario = "motorcycles" })
-		local text = Report.summary(result, 5, "lune run tools/sim/traffic_replay.luau --scenario motorcycles")
-		t.truthy(string.find(text, "appear", 1, true))
-		t.truthy(string.find(text, "#8 Morgan Rider", 1, true))
+		-- (the van and the trolley with the jerk limit set under their ordinary braking, so that every
+		-- stop and pull-away is an incident: the scenarios themselves no longer show any)
+		local result = Replay.run({ scenario = "stops", seconds = 30, thresholds = { ["stutter.accel"] = 5 } })
+		local text = Report.summary(result, 5, "lune run tools/sim/traffic_replay.luau --scenario stops")
+		t.truthy(string.find(text, "accel_spike", 1, true))
+		t.truthy(string.find(text, "#13 CITY TROLLEY", 1, true))
 		t.truthy(
-			string.find(
-				text,
-				"trace it: lune run tools/sim/traffic_replay.luau --scenario motorcycles --trace",
-				1,
-				true
-			)
+			string.find(text, "trace it: lune run tools/sim/traffic_replay.luau --scenario stops --trace", 1, true)
 		)
 		local worst = Report.worst(result, 10)
-		t.truthy(#worst >= 3)
+		t.eq(#worst, 2, "at most two of a kind")
 		for i = 2, #worst do
 			t.truthy(worst[i - 1].severity >= worst[i].severity, "most severe first")
 		end
 		local back = serde.decode("json", serde.encode("json", Report.json(result, "cmd")))
-		t.eq(back.scenario.name, "motorcycles")
-		t.eq(back.counts.appear, 2)
+		t.eq(back.scenario.name, "stops")
+		t.eq(back.counts.accel_spike, result.counts.accel_spike)
 		t.eq(#back.incidents, #result.incidents)
 		local first = back.incidents[1]
 		for _, field in { "kind", "t", "vehicle", "magnitude", "limit", "unit", "severity", "name" } do

@@ -70,6 +70,7 @@ export type Lane = {
 	polyRev: Poly?, -- polyline geometry walked in reverse (-1), kept right after `unify`
 	coordFor: { [number]: number }?, -- ping-pong vehicle lanes after `unify`: the coord per direction
 	returnLane: Lane?, -- one-way lanes after `link`: the lane a vehicle turns onto at this lane's end
+	kerb: number?, -- one-way lanes after `link`: the line along the kerb on their right (a parked rider's)
 	vehicle: boolean, -- a vehicle lane (handedness applies) rather than a sidewalk or rider lane
 	mirrored: boolean?, -- `unify` moved it to the right-hand side
 }
@@ -567,23 +568,31 @@ end
 -- mirrored across the centreline (`<id>~back`, returned). Where a rail lane runs alongside (the trolley
 -- beside the boulevard) both lanes are lengthened to end TURN_CLEAR beyond the rail lane's ends, so the
 -- turn is made clear of a trolley standing at its terminus (a long vehicle's tail swings out as it
--- turns: the RV's was 0.9 st inside the trolley). Call after `unify`.
+-- turns: the RV's was 0.9 st inside the trolley). Each lane also learns the line along the kerb on its
+-- right (`kerb`: KERB_INSET inside the edge of its road, nil where rails run between), where a rider
+-- parks between rides.
+-- Call after `unify`.
 LaneMath.TURN_CLEAR = Units.st(12)
+LaneMath.KERB_INSET = Units.st(1.8)
 function LaneMath.link(lanes: { [string]: Lane }, roads: { RoadRecord }, records: { LaneRecord }): { string }
 	local roadCoord: { [string]: number } = {}
+	local roadHalf: { [string]: number } = {}
 	local railRoad: { [string]: boolean } = {}
 	for _, r in roads do
 		if type(r.coord) == "number" then
 			roadCoord[r.id] = r.coord
+			roadHalf[r.id] = (r.width or 0) / 2
 			railRoad[r.id] = r.kind == "rail"
 		end
 	end
 	local roadOf: { [string]: number } = {}
+	local halfOf: { [string]: number } = {}
 	local rails: { Lane } = {}
 	for _, rec in records do
 		local first = if type(rec.roads) == "table" then rec.roads[1] else nil
 		if first and roadCoord[first] then
 			roadOf[rec.id] = roadCoord[first]
+			halfOf[rec.id] = roadHalf[first]
 			local lane = lanes[rec.id]
 			if railRoad[first] and lane and lane.shape == "straight" then
 				table.insert(rails, lane)
@@ -628,6 +637,25 @@ function LaneMath.link(lanes: { [string]: Lane }, roads: { RoadRecord }, records
 			back.returnLane, lane.returnLane = lane, back
 			lanes[back.id] = back
 			table.insert(made, back.id)
+		end
+		-- the kerb on the right of travel (right of +z is -x; right of +x is +z)
+		local half = halfOf[lane.source or id]
+		if road and half and half > LaneMath.KERB_INSET then
+			local reach = half - LaneMath.KERB_INSET
+			lane.kerb = road + (if lane.axis == "z" then -lane.dir else lane.dir) * reach
+			local other = lane.returnLane
+			if other then
+				other.kerb = road + (if other.axis == "z" then -other.dir else other.dir) * reach
+			end
+		end
+		-- (no kerb line across the rails: the trolley runs between the eastbound boulevard lane and its kerb)
+		for _, l in { lane, lane.returnLane or lane } do
+			for _, rail in rails do
+				local rc, k, c = rail.coord :: number, l.kerb, l.coord :: number
+				if k and rail.axis == l.axis and (rc - c) * (rc - k) < 0 then
+					l.kerb = nil
+				end
+			end
 		end
 		local back = lane.returnLane
 		if back then

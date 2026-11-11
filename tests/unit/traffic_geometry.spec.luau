@@ -157,6 +157,34 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"motorcycles: parked at the kerb between rides, out and round the boulevard and back in, never hidden",
+		function()
+			for _, id in { 8, 11 } do
+				local svc = service({ entry(id) })
+				local v = svc.byId[id]
+				t.truthy(v.visible, `{v.name} stands at the kerb from the start`)
+				t.eq(v.phase, "idle")
+				-- on the boulevard's south kerb (the north one is across the trolley's rails), level with its
+				-- v5.4 spawn point, clear of the westbound lane's traffic (z = -14, the RV 4 st wide each side)
+				local bayX, bayZ = v.x, v.z
+				t.near(bayX, if id == 8 then 740 else 1625, 1e-6)
+				t.near(bayZ, -(32.5 - LaneMath.KERB_INSET), 1e-6)
+				v.timer = 1
+				local events = drive(svc, id, 240, 0.12)
+				t.eq(events.pullout, 2, "two rides in 240 s")
+				t.eq(events.park, 2)
+				t.truthy((events.turn or 0) >= 4, "a turn at each end of the boulevard on every ride")
+				t.eq(events.wrap, nil)
+				t.eq(v.phase, "idle")
+				t.truthy(v.visible)
+				t.near(v.x, bayX, 1e-6, "back in the same bay")
+				t.near(v.z, bayZ, 1e-6)
+				t.eq(v.speed, 0)
+			end
+		end
+	)
+
 	t.test("ice cream loop: even speed by arc length, through both U-turns", function()
 		local lanes = LaneMath.load(records)
 		local loop = lanes.icecream_loop

@@ -171,6 +171,11 @@ function TrafficService.new(opts: Opts): TrafficService
 		elseif e.class == "trolley" then
 			cruise = st(10.7)
 		end
+		if e.class == "motorcycle" and not lane.kerb and lane.returnLane and lane.returnLane.kerb then
+			-- a rider parks at the kerb between rides, and this lane's kerb is across the trolley's rails:
+			-- it parks level with its spawn point on the other side of the road
+			lane = lane.returnLane
+		end
 		local v = AICarMotor.new(e, lane, { at = e.at, cruise = cruise, wait = e.wait, offset = e.offset })
 		v.y = self.heightAt(v.x, v.z) + st(0.04)
 		table.insert(self.vehicles, v)

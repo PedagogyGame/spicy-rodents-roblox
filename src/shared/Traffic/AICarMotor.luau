@@ -71,6 +71,9 @@ export type Vehicle = {
 	stop: Control.State,
 	moving: boolean, -- expected to be moving this tick (stuck detection)
 	held: boolean?, -- a dispatched trip waits on scene until released
+	home: LaneMath.Lane, -- the lane it started on (a rider's kerb bay is beside it; `lane` changes at a turn)
+	side: number?, -- studs to the right of its lane line (a rider at the kerb, pulling out or in)
+	away: boolean?, -- a rider that has left its home lane on this ride (its next pass of the bay ends it)
 	blocked: number?, -- seconds an emergency vehicle has been stopped for a person in its way
 }
 
@@ -116,8 +119,7 @@ function AICarMotor.new(
 		local z = if lane.axis == "z" then along else probe.z
 		s = LaneMath.arcOf(lane, x, z, dir)
 	end
-	local hidden = e.class == "motorcycle"
-		or e.class == "legacy_ambulance"
+	local hidden = e.class == "legacy_ambulance"
 		or e.class == "responder"
 		or e.class == "incident"
 		or e.class == "event"
@@ -134,7 +136,8 @@ function AICarMotor.new(
 		cruise = o.cruise or 0,
 		box = Boxes.get(e.kind),
 		visible = not hidden,
-		phase = if hidden then "idle" else "drive",
+		phase = if hidden or e.class == "motorcycle" then "idle" else "drive",
+		home = lane,
 		timer = o.wait or 0,
 		n = 0,
 		offset = o.offset or 0,
@@ -155,6 +158,13 @@ function AICarMotor.new(
 	end
 	local p = LaneMath.pointAt(lane, s, dir)
 	v.x, v.z, v.yaw = p.x, p.z, if e.class == "trolley" then math.pi / 2 else p.yaw
+	if e.class == "motorcycle" and lane.kerb then
+		-- parked at the kerb beside its spawn point (stepClass.motorcycle)
+		local side = math.abs(lane.kerb - (lane.coord :: number))
+		v.x += -math.cos(p.yaw) * side
+		v.z += math.sin(p.yaw) * side
+		v.side = side
+	end
 	return v
 end
 
@@ -742,20 +752,99 @@ stepClass.trolley = function(v, ctx, dt, events)
 	v.yaw = math.pi / 2 -- the body never rotates (§5.4)
 end
 
+-- A rider between rides stands parked at the kerb beside its spawn point; a ride pulls out from the kerb,
+-- goes once round its street (to the end, back along the other side, and round again) and pulls in where
+-- it started. v5.4's riders appeared in the middle of the boulevard at full speed and vanished at its
+-- end (§5.12): a pop in and a pop out in plain view every minute.
+local BAY_RUN = st(16) -- 40 st of road to pull out from the kerb or in to it
+local RIDER_ACCEL = st(4)
+local RIDER_BRAKE = st(8)
+
+local function smooth(u: number): number
+	local c = math.clamp(u, 0, 1)
+	return c * c * (3 - 2 * c)
+end
+
+-- shift(v, ctx, side, slope): v, placed on its lane line, moved `side` studs to its right and turned along
+-- a path whose distance from the line changes by `slope` per stud driven.
+local function shift(v: Vehicle, ctx: Ctx, side: number, slope: number)
+	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	local rx, rz = -fz, fx
+	v.x += rx * side
+	v.z += rz * side
+	v.yaw = math.atan2(fx + rx * slope, fz + rz * slope)
+	v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
+	v.side = side
+end
+
+-- May a rider pull out? Nothing is beside the bay, in the stretch it crosses to its lane, or about to be
+-- (three seconds of anything moving along there, whichever way: the trolley runs between the eastbound
+-- lane and its kerb).
+local function kerbClear(v: Vehicle, ctx: Ctx, bay: number): boolean
+	local lane = v.home
+	local p = LaneMath.pointAt(lane, v.spawnS, lane.dir)
+	local fx, fz = math.sin(p.yaw), math.cos(p.yaw)
+	local rx, rz = -fz, fx
+	for _, b in ctx.bodies do
+		if b.visible ~= false and b.id ~= v.id then
+			local dx, dz = b.x - p.x, b.z - p.z
+			local along, across = dx * fx + dz * fz, dx * rx + dz * rz
+			local reach = b.length / 2 + 3 * (b.speed or 0)
+			if
+				across > -(b.width / 2 + st(1.5))
+				and across < bay + b.width / 2
+				and along > -(reach + st(6))
+				and along < BAY_RUN + st(4) + reach
+			then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+-- bayPath(v, bay) -> side, slope: how far to the right of its lane line a rider is beside its bay, and
+-- how that changes per stud of lane: pulling out (the first BAY_RUN of a ride), pulling in (the last),
+-- 0 anywhere else.
+local function bayPath(v: Vehicle, bay: number): (number, number)
+	if v.lane ~= v.home or v.phase == "uturn" then
+		return 0, 0
+	end
+	if not v.away then
+		local u = (v.s - v.spawnS) / BAY_RUN
+		if u < 1 then
+			return bay * (1 - smooth(u)), -bay * 6 * math.max(u, 0) * (1 - u) / BAY_RUN
+		end
+	else
+		local u = 1 - (v.spawnS - v.s) / BAY_RUN
+		if u > 0 and u <= 1 then
+			return bay * smooth(u), bay * 6 * u * (1 - u) / BAY_RUN
+		end
+	end
+	return 0, 0
+end
+
 stepClass.motorcycle = function(v, ctx, dt, events)
+	local home = v.home
+	local bay = if home.kerb then math.abs(home.kerb - (home.coord :: number)) else 0
 	if v.phase == "idle" then
-		v.visible = false
+		v.visible, v.speed = true, 0
+		v.lane, v.dir, v.s = home, if home.dir == 0 then 1 else home.dir, v.spawnS
+		place(v, ctx, home)
+		shift(v, ctx, bay, 0)
 		v.timer -= dt
-		local spawn = LaneMath.pointAt(v.lane, v.spawnS, v.dir)
-		if v.timer <= 0 and spotClear(v, ctx, spawn.x, spawn.z) then
-			v.phase = "ride"
-			v.speed = v.cruise
-			appear(v, ctx, v.lane, v.spawnS)
-			table.insert(events, "appear")
+		if v.timer <= 0 and kerbClear(v, ctx, bay) then
+			v.phase, v.away = "ride", false
+			table.insert(events, "pullout")
 		end
 		return
 	end
 	local fx, fz = math.sin(v.yaw), math.cos(v.yaw)
+	-- the home stretch: back on its own lane after a turn at each end, the bay ahead
+	local toBay = math.huge
+	if v.away and v.lane == home and v.phase ~= "uturn" and v.s <= v.spawnS then
+		toBay = v.spawnS - v.s
+	end
 	if personNear(ctx, v.x + fx * st(2), v.z + fz * st(2), st(2), true) or playerCarAhead(v, ctx, st(2)) then
 		v.speed = 0
 	else
@@ -763,20 +852,37 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 		-- every slower car on the boulevard): its speed eases down with the gap, so it settles behind a
 		-- slower car at that car's speed instead of braking hard and pulling away again
 		local gap = gapAhead(v, fx, fz, st(24), st(1.2), sameWay(v, ctx, fx, fz))
-		local desired = math.min(v.cruise, math.max(0, (gap - st(2)) * 1.2))
-		v.speed = approach(v.speed, desired, (if desired < v.speed then st(8) else st(4)) * dt)
+		local desired = math.min(
+			v.cruise,
+			math.max(0, (gap - st(2)) * 1.2),
+			turnLimit(v, ctx),
+			math.sqrt(2 * RIDER_ACCEL * toBay) + st(0.2)
+		)
+		v.speed = approach(v.speed, desired, (if desired < v.speed then RIDER_BRAKE else RIDER_ACCEL) * dt)
 	end
-	local s = v.s + v.speed * dt
-	if s >= v.lane.length - st(3) then
-		v.phase = "idle"
-		v.visible = false
+	if toBay <= math.max(st(0.02), v.speed * dt) then
+		-- in at the kerb
+		v.phase, v.speed, v.away = "idle", 0, false
 		v.n += 1
 		v.timer = 53 + 22 * (v.id % 2) -- §5.12 wait 53 + 22 i
-		table.insert(events, "despawn")
+		v.s = v.spawnS
+		place(v, ctx, home)
+		shift(v, ctx, bay, 0)
+		table.insert(events, "park")
 		return
 	end
-	v.s = s
-	place(v, ctx, v.lane)
+	-- (slanting across to or from the kerb it covers less of the lane's length for the same ground)
+	local _, slant = bayPath(v, bay)
+	advanceLane(v, ctx, dt / math.sqrt(1 + slant * slant), events)
+	if v.lane ~= home then
+		v.away = true
+	end
+	local side, slope = bayPath(v, bay)
+	if side ~= 0 then
+		shift(v, ctx, side, slope)
+	else
+		v.side = 0
+	end
 end
 
 local POLY_ACCEL = st(5) -- 12.5 st/s2 pulling away

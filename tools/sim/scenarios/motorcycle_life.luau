@@ -4,8 +4,8 @@
 -- rider catches it); a person stands in the eastbound lane from 15 s to 19 s, in the rider's path; the
 -- rider rides to the end of its lane and hides. Its wait is then cut to 3 s so the second appearance
 -- (the same spawn, the same sedan further on) is seen too.
--- Measured on the base tree (riding through the sedan and the dead stop's leap back to speed are fixed
--- since: AICarMotor's rider follows the vehicle ahead and eases its speed):
+-- Measured on the base tree (all fixed since: AICarMotor's rider follows the vehicle ahead, eases its
+-- speed, and stands parked at the kerb between rides instead of popping in and out):
 --   * it pops into view at full speed mid-boulevard (x = 740 st, about 1,090 st inside the town) and pops
 --     out at x = 1,641 st, also mid-town (AICarMotor stepClass.motorcycle: appear at spawnS with
 --     `v.speed = v.cruise`; the despawn at `lane.length - 3 u` just hides it)
@@ -73,9 +73,10 @@ local scenario: Replay.Scenario = {
 			"float",
 			"box_overlap",
 			"accel_spike",
+			"appear",
+			"disappear",
 		},
 	},
-	known = { "appear", "disappear" },
 }
 
 return scenario
