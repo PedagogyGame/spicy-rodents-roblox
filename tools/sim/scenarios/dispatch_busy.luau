@@ -56,8 +56,24 @@ local scenario: Replay.Scenario = {
 			end
 		end
 	end,
-	expect = { none = { "teleport_unflagged", "sink", "float", "sim_yaw_snap", "yaw_jump" } },
-	known = { "box_overlap", "appear" },
+	-- and since: each responder stands parked in view in its own bay at the hospital kerb and pulls out
+	-- of it (three sent in the same tick used to appear in the same spot), a vehicle follows the one
+	-- ahead round the corners of its route, and every call goes by road
+	expect = {
+		none = {
+			"teleport_unflagged",
+			"sink",
+			"float",
+			"sim_yaw_snap",
+			"yaw_jump",
+			"box_overlap",
+			"appear",
+			"disappear",
+			"through_building",
+			"accel_spike",
+		},
+	},
+	known = { "off_road" },
 }
 
 return scenario

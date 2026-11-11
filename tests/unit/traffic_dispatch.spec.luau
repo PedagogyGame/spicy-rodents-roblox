@@ -1,8 +1,10 @@
 --!strict
 -- The responder ambulance as the medical sequence drives it (owner 2026-11-10: "there should be an
--- ambulance come"): a routed dispatch stays on the roads all the way (the W1 trunk-plus-L stand-in
--- does not), a held responder waits on scene until it is released, a release on the way turns it
--- round on arrival, and the three responders can be dispatched again after they come home. The
+-- ambulance come"): the three stand parked in view at the kerb of the hospital road (they used to be
+-- hidden, and popped into existence on the hospital drive when called), a dispatch pulls out of its bay
+-- and stays on the roads all the way, routed by the caller or by the service itself, a held responder
+-- waits on scene until it is released, a release on the way turns it round on arrival, and each comes
+-- home into its own bay and can be dispatched again. The
 -- responder is one of the fleet: it reaches the clients in the fleet's own pose stream (an even 15
 -- sends a second, each carrying the server's clock: Traffic/Ghost), with nothing of its own.
 local Data = require("@shared/Data")
@@ -45,13 +47,37 @@ return function(t)
 		return secs, worst
 	end
 
-	t.test("the responders park on the hospital drive and all three are free at the start", function()
+	t.test("the responders stand parked at the hospital road's kerb, in view, and all three are free", function()
 		local svc = service()
-		t.deepEq(svc:responderHome(), { -890, 737.5 })
+		-- their trips are routed from where the hospital drive meets the hospital road
+		t.deepEq(svc:responderHome(), { -890, 707.5 })
 		t.eq(svc:responderIdle(), 3)
+		local xs = {}
+		for _, v in svc.vehicles do
+			if v.class == "responder" then
+				t.truthy(v.visible, `{v.name} is in view`)
+				t.eq(v.phase, "idle")
+				-- on the north kerb (the road is 30 st wide about z = 707.5), facing east, on asphalt
+				t.near(v.z, 707.5 + 15 - 3.5, 1e-6)
+				t.near(v.yaw, math.pi / 2, 1e-9)
+				t.truthy(MedicalRoute.onRoad(roads, v.x, v.z, -v.box.width / 2), "its whole width on the road")
+				table.insert(xs, v.x)
+			end
+		end
+		t.deepEq(xs, { -924, -962, -1000 }, "34 st back from the junction, then 38 st apart")
+		-- and they stay put: nothing moves a parked ambulance
+		for _ = 1, 300 do
+			svc:step(1 / 30, {})
+		end
+		for i, v in svc.vehicles do
+			if v.class == "responder" then
+				t.truthy(v.visible and v.speed == 0)
+				t.near(v.z, 719, 1e-6, `{i}`)
+			end
+		end
 	end)
 
-	t.test("a routed dispatch to a mid-block stop never leaves the roads; the stand-in L does", function()
+	t.test("a dispatch to a mid-block stop never leaves the roads, routed by the caller or by the service", function()
 		local svc = service()
 		local home = svc:responderHome() :: { number }
 		local stage = MedicalRoute.stage(roads, 100, 250) :: MedicalRoute.Stage
@@ -59,7 +85,7 @@ return function(t)
 		local v = svc:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
 		t.truthy(v ~= nil)
 		t.eq(v.phase, "out")
-		t.truthy(v.visible, "it appears on the drive")
+		t.truthy(v.visible and not v.teleported, "it was in view at its bay: nothing appears, nothing jumps")
 		local secs, worst = drive(svc, v, 200, function(veh: any): boolean
 			return veh.phase == "hold"
 		end)
@@ -70,20 +96,28 @@ return function(t)
 				and math.abs(v.z - stage.z) <= LaneMath.POLY_OFFSET + 0.5
 		)
 		t.truthy(secs > 10 and secs < 90, `{secs} s to drive {MedicalRoute.length(trip)} studs`)
-		-- the same stop through the old trunk-plus-L: it drives up through the house blocks
-		local old = service()
-		local w = old:dispatchResponder({ 100, 250 })
-		local _, oldWorst = drive(old, w, 200, function(veh: any): boolean
+		-- the same call with no route given: the service finds the way by road itself (the W1 stand-in
+		-- drove the trunk and then an L up through the house blocks, 40 st and more off any road)
+		local own = service()
+		local w = own:dispatchResponder({ 100, 250 })
+		local _, ownWorst = drive(own, w, 200, function(veh: any): boolean
 			return veh.phase == "hold"
 		end)
-		t.truthy(oldWorst > 40, `the L tail was {oldWorst} studs off the road (the reason for routed trips)`)
+		t.eq(w.phase, "hold")
+		t.truthy(ownWorst <= MedicalRoute.JOIN_GAP, `{ownWorst} studs off the road at worst`)
+		t.truthy(
+			math.abs(w.x - stage.x) <= LaneMath.POLY_OFFSET + 0.5
+				and math.abs(w.z - stage.z) <= LaneMath.POLY_OFFSET + 0.5,
+			"at the point of the roads nearest the call"
+		)
 	end)
 
-	t.test("held: on scene until released, however long; then home, hidden and free again", function()
+	t.test("held: on scene until released, however long; then home into its bay, in view and free again", function()
 		local svc = service()
 		local home = svc:responderHome() :: { number }
 		local stage = MedicalRoute.stage(roads, -800, 300) :: MedicalRoute.Stage
 		local trip = MedicalRoute.trip(roads, home, stage) :: { { number } }
+		local bayX, bayZ, bayYaw = svc.byId[15].x, svc.byId[15].z, svc.byId[15].yaw
 		local v = svc:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
 		drive(svc, v, 120, function(veh: any): boolean
 			return veh.phase == "hold"
@@ -100,8 +134,12 @@ return function(t)
 			return veh.phase == "idle"
 		end)
 		t.eq(v.phase, "idle")
-		t.truthy(not v.visible, "hidden when parked")
-		t.truthy(back > 3 and back < 60, `{back} s home`)
+		t.truthy(v.visible, "parked in view")
+		t.near(v.x, bayX, 1e-6, "in the bay it left")
+		t.near(v.z, bayZ, 1e-6)
+		t.near(v.yaw, bayYaw, 1e-6, "facing the way it will leave")
+		t.eq(v.speed, 0)
+		t.truthy(back > 3 and back < 70, `{back} s home`)
 		t.truthy(worst <= MedicalRoute.JOIN_GAP)
 		t.eq(svc:responderIdle(), 3)
 		-- and it goes out again
@@ -111,7 +149,7 @@ return function(t)
 	end)
 
 	t.test(
-		"a dispatched ambulance is seen through the fleet's pose stream: stamped sends, a snap when it appears, an even drive",
+		"a dispatched ambulance is seen through the fleet's pose stream: stamped sends, in view from its bay and back, an even drive",
 		function()
 			local svc = service()
 			local sent: { buffer } = {}
@@ -152,16 +190,18 @@ return function(t)
 			local home = svc:responderHome() :: { number }
 			local stage = MedicalRoute.stage(roads, 100, 250) :: MedicalRoute.Stage
 			local trip = MedicalRoute.trip(roads, home, stage) :: { { number } }
-			-- parked: in the stream like every vehicle, and not drawn
+			-- parked: in the stream like every vehicle, and drawn where it stands
 			local id = nil
 			for _, v in svc.vehicles do
 				if v.class == "responder" and id == nil then
 					id = v.id
 				end
 			end
+			local bayX, bayZ = svc.byId[id].x, svc.byId[id].z
 			local parked = buf:sample(drawAt)[id]
 			t.truthy(parked ~= nil, "the parked responder is in the stream")
-			t.truthy(not parked.visible, "and hidden")
+			t.truthy(parked.visible and parked.stopped, "in view, standing")
+			t.truthy(math.sqrt((parked.x - bayX) ^ 2 + (parked.z - bayZ) ^ 2) < 0.1, "at its bay")
 			local v = svc:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
 			t.eq(v.id, id)
 			-- drawn at 60 Hz from the buffer: where the ghost is, frame by frame
@@ -195,8 +235,8 @@ return function(t)
 			t.eq(v.phase, "hold")
 			t.truthy(seen > 300, `the ghost was drawn on {seen} frames of the drive`)
 			t.truthy(
-				math.sqrt((first.x - home[1]) ^ 2 + (first.z - home[2]) ^ 2) < 12,
-				`it appears on the drive, not somewhere on the way there ({first.x}, {first.z})`
+				math.sqrt((first.x - bayX) ^ 2 + (first.z - bayZ) ^ 2) < 1,
+				`it pulls out from where it stood, it does not appear somewhere ({first.x}, {first.z})`
 			)
 			-- an even drive: no frame moves it further than its top speed allows (no freeze and catch-up)
 			local top = 0
@@ -223,14 +263,15 @@ return function(t)
 				frame(1 / 60)
 			end
 			t.eq(v.phase, "idle")
-			t.truthy(not buf:sample(drawAt)[id].visible, "hidden again at home")
+			local back = buf:sample(drawAt)[id]
+			t.truthy(back.visible and back.stopped, "in view at home")
+			t.truthy(math.sqrt((back.x - bayX) ^ 2 + (back.z - bayZ) ^ 2) < 0.1, "back in its bay")
 			t.truthy(worstStep <= top / 60 * 1.6 + 0.3, `{worstStep} studs in one frame on the way home`)
 			-- turning round at the scene is a U-turn it drives, onto the other side of the road (it used
 			-- to flip round on the spot and jump 15 st sideways): nothing on the way out, at the scene or
 			-- on the way home is a snap
 			t.eq(snaps, 0, "no snap: it drives the turn at the scene")
-			-- the flag lasts one tick on the vehicle; the stream sends every other tick; the service
-			-- keeps the jump for the next send, once
+			-- nothing about a call is a jump any more, so no send carries a flag for it
 			local svc2 = service()
 			local v2 = svc2:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
 			local function flagged(): boolean
@@ -241,11 +282,10 @@ return function(t)
 				end
 				return false
 			end
+			t.truthy(not v2.teleported, "pulling out of its bay is not a jump")
 			svc2:step(1 / 30, {})
 			svc2:step(1 / 30, {})
-			t.truthy(not v2.teleported, "two ticks after the dispatch the vehicle's own flag is down")
-			t.truthy(flagged(), "the appearance is in the next send all the same")
-			t.truthy(not flagged(), "and only in that one")
+			t.truthy(not flagged(), "and the next send says so")
 			drive(svc2, v2, 200, function(veh: any): boolean
 				return veh.phase == "hold"
 			end)
@@ -256,7 +296,8 @@ return function(t)
 			-- the turn: a half circle of POLY_OFFSET, driven, ending on the return side facing home
 			local sx, sz, syaw = v2.x, v2.z, v2.yaw
 			local turnSecs, worstTurn = 0, 0
-			while v2.phase == "turn" and turnSecs < 20 do
+			-- (it waits for a gap in the traffic on the main street before it swings out)
+			while v2.phase == "turn" and turnSecs < 90 do
 				local px, pz = v2.x, v2.z
 				svc2:step(1 / 30, {})
 				turnSecs += 1 / 30
@@ -265,7 +306,7 @@ return function(t)
 			end
 			t.eq(v2.phase, "back")
 			t.truthy(worstTurn < 1, `{worstTurn} studs in one tick of the turn`)
-			t.truthy(turnSecs > 2 and turnSecs < 8, `{turnSecs} s to turn round`)
+			t.truthy(turnSecs > 2 and turnSecs < 90, `{turnSecs} s to turn round`)
 			t.near(math.sqrt((v2.x - sx) ^ 2 + (v2.z - sz) ^ 2), 2 * LaneMath.POLY_OFFSET, 1.5)
 			t.near(math.abs(math.atan2(math.sin(v2.yaw - syaw), math.cos(v2.yaw - syaw))), math.pi, 0.05)
 			t.truthy(not flagged(), "nothing to flag")
@@ -308,10 +349,11 @@ return function(t)
 			local clearBack = drive(clear, c, 200, function(veh: any): boolean
 				return veh.phase == "idle"
 			end)
-			-- a townsperson a player holds, standing on the hospital drive in front of where the three
-			-- responders start (the walk to the hospital door every infected player is sent on ends
-			-- here): not one of the hospital's own, so the hard stop applies
-			local world = { people = { { kind = "human", x = -884, y = 0, z = 731, visible = true } } }
+			-- a townsperson a player holds, standing in the road just in front of the first responder's
+			-- bay (the walk to the hospital door every infected player is sent on passes here): not one
+			-- of the hospital's own, so the hard stop applies
+			local first = service().byId[15]
+			local world = { people = { { kind = "human", x = first.x + 8, y = 0, z = first.z - 1.5, visible = true } } }
 			local function run(svc: any, v: any, limit: number, stop: (v: any) -> boolean): number
 				local secs = 0
 				while secs < limit and not stop(v) do

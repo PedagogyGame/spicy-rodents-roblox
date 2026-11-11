@@ -74,6 +74,7 @@ export type Vehicle = {
 	home: LaneMath.Lane, -- the lane it started on (a rider's kerb bay is beside it; `lane` changes at a turn)
 	side: number?, -- studs to the right of its lane line (a rider at the kerb, pulling out or in)
 	away: boolean?, -- a rider that has left its home lane on this ride (its next pass of the bay ends it)
+	tour: LaneMath.Lane?, -- the arterial ambulance's round: a bay route (the service builds it)
 	blocked: number?, -- seconds an emergency vehicle has been stopped for a person in its way
 }
 
@@ -119,7 +120,8 @@ function AICarMotor.new(
 		local z = if lane.axis == "z" then along else probe.z
 		s = LaneMath.arcOf(lane, x, z, dir)
 	end
-	local hidden = e.class == "legacy_ambulance" or e.class == "responder" or e.class == "incident"
+	-- every vehicle is in view from the start: the emergency classes stand parked until they are sent
+	local parked = e.class == "legacy_ambulance" or e.class == "responder" or e.class == "incident"
 	local v: Vehicle = {
 		id = e.id,
 		name = e.name,
@@ -132,8 +134,8 @@ function AICarMotor.new(
 		speed = 0,
 		cruise = o.cruise or 0,
 		box = Boxes.get(e.kind),
-		visible = not hidden,
-		phase = if hidden or e.class == "motorcycle" or e.class == "event" then "idle" else "drive",
+		visible = true,
+		phase = if parked or e.class == "motorcycle" or e.class == "event" then "idle" else "drive",
 		home = lane,
 		timer = o.wait or 0,
 		n = 0,
@@ -179,6 +181,7 @@ function AICarMotor.body(v: Vehicle): LaneMath.Body
 		id = v.id,
 		emergency = EMERGENCY[v.class],
 		speed = v.speed,
+		back = v.class == "trolley" and v.dir < 0,
 	}
 end
 
@@ -202,7 +205,9 @@ local function gapAhead(
 			local psi = b.yaw
 			local otherAlong = math.abs(math.sin(psi) * fx + math.cos(psi) * fz) * b.length / 2
 				+ math.abs(math.cos(psi) * fx - math.sin(psi) * fz) * b.width / 2
-			if along > 0 and along < range + otherAlong and across < halfWidth + b.width / 2 + margin then
+			local otherAcross = math.abs(math.sin(psi) * fz - math.cos(psi) * fx) * b.length / 2
+				+ math.abs(math.cos(psi) * fz + math.sin(psi) * fx) * b.width / 2
+			if along > 0 and along < range + otherAlong and across < halfWidth + otherAcross + margin then
 				best = math.min(best, along - otherAlong - v.box.length / 2)
 			end
 		end
@@ -220,7 +225,8 @@ local function mergeConflict(v: Vehicle, ctx: Ctx, horizon: number): boolean
 	for _, b in ctx.bodies do
 		local bs = b.speed or 0
 		if b.visible ~= false and b.id ~= v.id and bs > 0.5 then
-			local bx, bz = math.sin(b.yaw), math.cos(b.yaw)
+			local way = if b.back then -1 else 1
+			local bx, bz = math.sin(b.yaw) * way, math.cos(b.yaw) * way
 			local px, pz = b.x - v.x, b.z - v.z
 			-- (one behind v is following it round the same turn: that one brakes for v, not v for it)
 			if math.abs(bx * fx + bz * fz) < 0.95 and px * fx + pz * fz > -v.box.length / 2 then
@@ -281,9 +287,10 @@ local CROSSING_YIELD: { [string]: boolean } = { sedan = true, heavy = true, moto
 --   * fleet vehicles heading its way (dot > 0.3; v5.4 counted only these: opposing traffic excluded, §6.1,
 --     the trolley deadlock);
 --   * an emergency vehicle crossing or entering its path (right of way), unless this vehicle is already
---     in the emergency vehicle's own way: then it keeps going to clear it, and the emergency vehicle waits
---     (drivePolyline). Without this the ambulances and incident cars, which yield to no vehicle in v5.4,
---     and the lane traffic drove through each other wherever a call route crosses a street;
+--     in the emergency vehicle's own way with a clear road in front of it: then it keeps going to clear
+--     it, and the emergency vehicle waits (drivePolyline). Without this the ambulances and incident cars,
+--     which yield to no vehicle in v5.4, and the lane traffic drove through each other wherever a call
+--     route crosses a street;
 --   * for the lane classes (sedan, heavy, motorcycle), other traffic crossing the lane (dot > -0.3, still
 --     not opposing): the ice cream van merging across the residential street at the end of each loop,
 --     the patrol car in its U-turn. The crossing classes themselves (van, patrol, trolley) keep v5.4's
@@ -297,7 +304,9 @@ local function bracesFor(v: Vehicle, b: LaneMath.Body, fx: number, fz: number): 
 		return true
 	end
 	if b.emergency == true then
-		return not inPath(b, AICarMotor.body(v), PRIORITY_GAP)
+		-- (in its way but with it standing right in front of this vehicle, there is nowhere to go)
+		local me = AICarMotor.body(v)
+		return not inPath(b, me, PRIORITY_GAP) or inPath(me, b, PRIORITY_GAP)
 	end
 	return CROSSING_YIELD[v.class] == true and dot > -0.3
 end
@@ -887,6 +896,7 @@ local TURN_SPEED = st(2.4) -- 6 st/s round the 5 st U-turn at the scene (POLY_OF
 local POLY_BRAKE = st(6) -- 15 st/s2 into a corner or the end of the route
 local CORNER_LATERAL = st(10) -- 25 st/s2 round a corner: 22 st/s through a 20 st one
 local FOLLOW_BRAKE = st(3) -- 7.5 st/s2 coming up behind a vehicle: half of POLY_BRAKE, so it can be held
+local HARD_BRAKE = st(20) -- 50 st/s2 for a vehicle suddenly in its way: all a vehicle can do
 
 -- fleetInWay(v, ctx, gap): an emergency vehicle's right of way ends at a vehicle already in its way
 -- (inPath): one ahead in its lane, or a lane vehicle still crossing in front of it (those that have not
@@ -913,16 +923,90 @@ local function fleetInWay(v: Vehicle, ctx: Ctx, gap: number): LaneMath.Body?
 	return nil
 end
 
--- What an emergency vehicle slows down behind: fleet vehicles heading its way and players' vehicles
--- (never a crossing emergency vehicle: fleetInWay decides which of the two waits).
-local function leaders(v: Vehicle, ctx: Ctx, fx: number, fz: number): { LaneMath.Body }
-	local out = {}
-	for _, b in ctx.bodies do
-		if b.id ~= v.id and (b.player == true or math.sin(b.yaw) * fx + math.cos(b.yaw) * fz > 0.3) then
-			table.insert(out, b)
+-- routeGap(v, ctx, lane, reach) -> studs: the free road in front of v's nose along the route it is
+-- driving, up to `reach`: to the first vehicle standing or driving on it the same way, or a player's
+-- vehicle (never a crossing emergency vehicle: fleetInWay decides which of the two waits). It follows the
+-- route round its corners: looking straight ahead, a responder coming round a corner drove into the one
+-- that had just turned in front of it.
+local ROUTE_STEP = st(1)
+local function routeGap(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, reach: number): number
+	local half = v.box.width / 2
+	local nose = (v.box.length - v.box.width) / 2
+	local last = LaneMath.length(lane, v.dir)
+	local d = ROUTE_STEP
+	while d <= reach + nose and v.s + d <= last do
+		local p = LaneMath.pointAt(lane, v.s + d, v.dir)
+		local fx, fz = math.sin(p.yaw), math.cos(p.yaw)
+		for _, b in ctx.bodies do
+			if b.visible ~= false and b.id ~= v.id then
+				local ux, uz = math.sin(b.yaw), math.cos(b.yaw)
+				if b.player == true or ux * fx + uz * fz > 0.3 then
+					-- b as a capsule along its heading
+					local hl = math.max(0, (b.length - b.width) / 2)
+					local dx, dz = p.x - b.x, p.z - b.z
+					local t = math.clamp(dx * ux + dz * uz, -hl, hl)
+					local cx, cz = dx - ux * t, dz - uz * t
+					local r = half + b.width / 2 + PATH_MARGIN
+					if cx * cx + cz * cz < r * r then
+						return math.max(0, d - nose - PATH_MARGIN)
+					end
+				end
+			end
+		end
+		d += ROUTE_STEP
+	end
+	return math.huge
+end
+
+-- routeConflict(v, ctx, lane, horizon) -> boolean: driving on along its route at its speed, will v meet
+-- a moving vehicle within `horizon` seconds, that vehicle keeping its heading and speed? Counted: one
+-- crossing the route, and one on the line the route is about to join that would leave v no gap to join
+-- into. Not counted: one in v's own line (v follows it, or it follows v), one coming the other way on
+-- its own side. The route is followed round its
+-- corners: an ambulance turning left across a lane has to see the car coming up that lane before it
+-- begins to turn, and one turning into a street the car that is about to pass the corner.
+local function routeConflict(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane, horizon: number): boolean
+	local last = LaneMath.length(lane, v.dir)
+	local speed = math.max(v.speed, st(2)) -- (standing, it asks about setting off)
+	local hx, hz = math.sin(v.yaw), math.cos(v.yaw)
+	local steps = 12
+	for i = 1, steps do
+		local tau = horizon * i / steps
+		local p = LaneMath.pointAt(lane, math.min(v.s + speed * tau, last), v.dir)
+		local fx, fz = math.sin(p.yaw), math.cos(p.yaw)
+		for _, b in ctx.bodies do
+			local bs = b.speed or 0
+			if b.visible ~= false and b.id ~= v.id and bs > 0.5 then
+				local way = if b.back then -1 else 1
+				local bx, bz = math.sin(b.yaw) * way, math.cos(b.yaw) * way
+				local dx, dz = b.x + bx * bs * tau - p.x, b.z + bz * bs * tau - p.z
+				local dot = bx * fx + bz * fz
+				if dot >= 0.95 then
+					-- going v's way there, on the line v is joining (one in v's own line already is
+					-- followed, or follows): v needs a gap to join into, a second and a half in front of
+					-- the one coming up behind and half a second behind the one in front
+					local along, across = dx * fx + dz * fz, math.abs(dx * fz - dz * fx)
+					local sameLine = bx * hx + bz * hz >= 0.95
+						and math.abs((b.x - v.x) * hz - (b.z - v.z) * hx) < (v.box.width + b.width) / 2
+					local room = (v.box.length + b.length) / 2 + st(0.8)
+					if
+						not sameLine
+						and across < (v.box.width + b.width) / 2 + st(0.4)
+						and along < room + 0.5 * speed
+						and -along < room + 1.5 * bs
+					then
+						return true
+					end
+				elseif dot > -0.95 then
+					local r = math.max(v.box.length + b.width, b.length + v.box.width) / 2 + st(0.8)
+					if dx * dx + dz * dz < r * r then
+						return true
+					end
+				end
+			end
 		end
 	end
-	return out
+	return false
 end
 
 -- polyline drive shared by the emergency classes: hard stop for people within r; returns true at the end.
@@ -947,21 +1031,28 @@ local function drivePolyline(
 		blocked = math.max(0, blocked - dt)
 	end
 	v.blocked = blocked
-	-- a vehicle already in its way (fleetInWay): one crossing in front of its nose is stopped for at once,
-	-- as is a player's car right in front of it; one ahead in its own lane is slowed down behind (below)
-	local queued = fleetInWay(v, ctx, PRIORITY_GAP)
+	-- a vehicle already in its way (fleetInWay): one crossing within its stopping distance is braked for
+	-- as hard as a vehicle can (it used to stop dead from any speed), as is a player's car right in front
+	-- of it; one ahead in its own lane is slowed down behind (below)
+	local stopping = v.speed * v.speed / (2 * HARD_BRAKE)
+	local queued = fleetInWay(v, ctx, PRIORITY_GAP + stopping)
 	local crossing = queued ~= nil and math.sin(queued.yaw) * fx + math.cos(queued.yaw) * fz <= 0.3
-	if (inWay and blocked <= AICarMotor.BLOCK_PATIENCE) or crossing or playerCarAhead(v, ctx, st(1.2)) then
-		v.speed = 0 -- the hard stop stays instant (traffic.md §5.8)
+	if inWay and blocked <= AICarMotor.BLOCK_PATIENCE then
+		v.speed = 0 -- the hard stop for a person stays instant (traffic.md §5.8)
+	elseif crossing or playerCarAhead(v, ctx, st(1.2) + stopping) then
+		v.speed = approach(v.speed, 0, HARD_BRAKE * dt)
 	else
 		-- pulls away, slows for each corner and brakes to a stop at the end (it used to run at full speed
 		-- from the first tick to the last: 0 to 31 st/s and back in one tick), and keeps behind a
 		-- vehicle ahead: it looks as far as it needs to stop (a player's car standing in the lane, the
 		-- other incident car parked on the same line) and follows a moving one at its speed
 		local reach = st(6) + v.speed * v.speed / (2 * FOLLOW_BRAKE)
-		local room = math.max(0, gapAhead(v, fx, fz, reach, v.box.width / 2, leaders(v, ctx, fx, fz)) - st(2))
+		local room = math.max(0, routeGap(v, ctx, lane, reach) - st(2))
+		-- right of way is not a wall to drive at: it holds back for a vehicle that is about to cross
+		-- its path and could not stop (they met in the middle of the crossing otherwise)
+		local giveWay = routeConflict(v, ctx, lane, 3)
 		local cap = math.min(
-			if inWay then math.min(speed, AICarMotor.BLOCK_CRAWL) else speed, -- edging past someone
+			if giveWay then 0 elseif inWay then math.min(speed, AICarMotor.BLOCK_CRAWL) else speed, -- edging past someone
 			LaneMath.cornerCap(lane, v.dir, v.s, CORNER_LATERAL, POLY_BRAKE),
 			math.max(math.sqrt(2 * POLY_BRAKE * math.max(0, len - v.s)), st(0.4)),
 			room * 1.2,
@@ -975,52 +1066,31 @@ local function drivePolyline(
 	-- incident cars' routes end one behind the other in the same lane, the second car's spot beyond the
 	-- first's): it has arrived where it stands, instead of waiting out the other's hold or driving
 	-- through it
-	local parkedAhead = queued ~= nil and queued.emergency == true and (queued.speed or 0) < 0.5
+	local ahead = if queued and not crossing then queued else nil
+	local parkedAhead = ahead ~= nil and ahead.emergency == true and (ahead.speed or 0) < 0.5
 	return v.s >= len - 1e-6 or (parkedAhead and v.speed < 0.5 and len - v.s < ARRIVE_QUEUED)
-end
-
-stepClass.legacy_ambulance = function(v, ctx, dt, events)
-	if v.phase == "idle" then
-		v.visible = false
-		v.timer -= dt
-		if v.timer <= 0 then
-			v.phase = "drive"
-			v.dir = 1
-			appear(v, ctx, v.lane, 0)
-			table.insert(events, "appear")
-		end
-		return
-	end
-	if v.phase == "park" then
-		v.speed = 0
-		v.timer -= dt
-		if v.timer <= 0 then
-			v.phase, v.timer, v.visible = "idle", 145, false
-			table.insert(events, "hide")
-		end
-		return
-	end
-	local lane = v.lane
-	local lastLeg = v.s > LaneMath.length(lane) - st(32)
-	local speed = if lastLeg
-		then (lane.speeds.ambulance_drive or st(10.625))
-		else (lane.speeds.ambulance_arterial or st(12.5))
-	if drivePolyline(v, ctx, lane, speed, st(5), dt) then
-		v.phase, v.timer = "park", 16
-		table.insert(events, "park")
-	end
 end
 
 -- dispatch(v, route, ctx, held?): start a responder or incident trip on `route` (a polyline Lane).
 -- With `held` the vehicle stays on scene until `release` instead of leaving on the scene timer.
+-- The vehicle is parked in view where the route begins (a kerbside bay, LaneMath.bayRoute) and simply
+-- pulls away; only if the route begins somewhere else is the move there a flagged jump.
 function AICarMotor.dispatch(v: Vehicle, route: LaneMath.Lane, ctx: Ctx, held: boolean?)
+	local px, pz, seen = v.x, v.z, v.visible
 	v.route = route
 	v.dir = 1
 	v.phase = "out"
 	v.timer = 0
 	v.blocked = 0
+	v.speed = 0
 	v.held = if held then true else nil -- nil: the plain scene timer; false (after release): leave at once
-	appear(v, ctx, route, 0)
+	v.s = 0
+	v.visible = true
+	place(v, ctx, route)
+	if not seen or (v.x - px) ^ 2 + (v.z - pz) ^ 2 > 1 then
+		v.teleported = true
+	end
+	syncBody(v, ctx)
 end
 
 -- release(v): a held trip may leave: at once when it is on scene, on arrival when still on the way.
@@ -1031,6 +1101,29 @@ function AICarMotor.release(v: Vehicle)
 	end
 end
 
+-- May a standing vehicle swing out across the road at (x, z): out of its bay, or round at the scene? Not
+-- while anything is moving near there (within a car length now, or within three seconds at its speed).
+local function clearToSwing(v: Vehicle, ctx: Ctx, x: number, z: number): boolean
+	for _, b in ctx.bodies do
+		local bs = b.speed or 0
+		if b.visible ~= false and b.id ~= v.id and bs > 0.5 then
+			local r = (v.box.length + b.length) / 2 + st(4) + 3 * bs
+			if (b.x - x) ^ 2 + (b.z - z) ^ 2 < r * r then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+local function bayClear(v: Vehicle, ctx: Ctx, lane: LaneMath.Lane): boolean
+	local p = LaneMath.pointAt(lane, math.min(st(8), LaneMath.length(lane, v.dir)), v.dir)
+	return clearToSwing(v, ctx, p.x, p.z)
+end
+
+-- A trip: out along the route, on scene, round (a U-turn it drives), back along the route's other side,
+-- and home: parked, in view, exactly where it set off from (a route that does not end where it began is
+-- finished with a second U-turn). Idle, the vehicle stands there.
 local function trip(
 	v: Vehicle,
 	ctx: Ctx,
@@ -1042,7 +1135,6 @@ local function trip(
 )
 	local route = v.route
 	if v.phase == "idle" or not route then
-		v.visible = false
 		v.speed = 0
 		return
 	end
@@ -1057,23 +1149,42 @@ local function trip(
 		place(v, ctx, route)
 		return
 	end
-	if v.phase == "turn" then
-		-- a U-turn onto the return side of the road (it used to flip round on the spot and jump 15 st
+	if v.phase == "turn" or v.phase == "park" then
+		-- a U-turn onto the other side of the road (it used to flip round on the spot and jump 15 st
 		-- sideways to the return path's start): a half circle of POLY_OFFSET from the end of the route
+		-- ("turn", at the scene) or from the end of the way back ("park", at home)
 		local r = LaneMath.POLY_OFFSET
+		local from = if v.phase == "turn" then 1 else -1
+		if v.timer <= 0 and v.speed <= 0 and not clearToSwing(v, ctx, v.x, v.z) then
+			return -- the turn crosses the other side of the road: wait for a gap
+		end
 		v.speed = approach(v.speed, TURN_SPEED, POLY_ACCEL * dt)
 		local d = v.timer + v.speed * dt
 		if d >= math.pi * r then
-			v.phase, v.dir, v.s, v.timer = "back", -1, math.min(d - math.pi * r, LaneMath.length(route, -1)), 0
-			place(v, ctx, route)
+			if v.phase == "turn" then
+				-- on along the way back from the point of it level with where it stood (it may have
+				-- stopped short of the route's end, behind another vehicle parked there)
+				local backLen = LaneMath.length(route, -1)
+				local s0 = math.clamp(LaneMath.length(route, 1) - v.s, 0, backLen)
+				v.phase, v.dir, v.s, v.timer = "back", -1, math.min(s0 + d - math.pi * r, backLen), 0
+				place(v, ctx, route)
+			else
+				v.dir, v.s, v.speed = 1, 0, 0
+				place(v, ctx, route)
+				v.phase, v.route, v.held, v.timer = "idle", nil, nil, 0
+				table.insert(events, "home")
+			end
 			return
 		end
 		v.timer = d
-		local e = LaneMath.pointAt(route, LaneMath.length(route, 1), 1)
+		local e = LaneMath.pointAt(route, if from == 1 then v.s else LaneMath.length(route, -1), from)
 		local p = LaneMath.halfTurn(e.x, e.z, e.yaw, r, d)
 		v.x, v.z, v.yaw = p.x, p.z, p.yaw
 		v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
 		return
+	end
+	if v.phase == "out" and v.s <= 0 and v.speed <= 0 and not bayClear(v, ctx, route) then
+		return -- still in its bay: something is passing
 	end
 	local done = drivePolyline(v, ctx, route, if v.phase == "out" then outSpeed else backSpeed, st(3.1), dt)
 	if done and v.phase == "out" then
@@ -1081,8 +1192,38 @@ local function trip(
 		v.phase, v.timer = "hold", if v.held == nil then holdSecs else 0
 		table.insert(events, "arrived")
 	elseif done then
-		v.phase, v.route, v.visible, v.held = "idle", nil, false, nil
-		table.insert(events, "home")
+		local e = LaneMath.pointAt(route, LaneMath.length(route, -1), -1)
+		local h = LaneMath.pointAt(route, 0, 1)
+		if (e.x - h.x) ^ 2 + (e.z - h.z) ^ 2 > 1 then
+			v.phase, v.timer = "park", 0 -- the way back ends across the road from where it set off
+		else
+			v.dir, v.s, v.speed = 1, 0, 0
+			place(v, ctx, route)
+			v.phase, v.route, v.held = "idle", nil, nil
+			table.insert(events, "home")
+		end
+	end
+end
+
+-- The arterial ambulance (§5.8): every four minutes it drives the north arterial to its far end and back.
+-- Between rounds it stands parked in view at its kerbside bay by the hospital (`tour`, a bay route the
+-- service builds). v5.4's appeared at the far end of the arterial at full speed, parked in the hospital
+-- drive and vanished there.
+stepClass.legacy_ambulance = function(v, ctx, dt, events)
+	local tour = v.tour
+	if v.phase == "idle" then
+		v.speed = 0
+		v.timer -= dt
+		if v.timer <= 0 and tour then
+			v.route, v.dir, v.s, v.phase, v.blocked, v.held = tour, 1, 0, "out", 0, nil
+			table.insert(events, "depart")
+		end
+		return
+	end
+	local speed = v.lane.speeds.ambulance_arterial or st(12.5)
+	trip(v, ctx, dt, events, speed, speed, 0)
+	if v.phase == "idle" then
+		v.timer = 16 + 145 -- §5.8: parked 16 s, then away 145 s: now in view at its bay for both
 	end
 end
 

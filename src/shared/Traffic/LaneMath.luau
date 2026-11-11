@@ -78,7 +78,7 @@ export type Lane = {
 export type Pose = { x: number, y: number, z: number, yaw: number }
 
 -- `player`: a player's vehicle (parked or driven), not a fleet member; `emergency`: a fleet vehicle
--- answering a call (right of way); `speed` in studs/s when known
+-- answering a call (right of way); `speed` in studs/s when known (never negative: see `back`)
 export type Body = {
 	x: number,
 	z: number,
@@ -89,6 +89,7 @@ export type Body = {
 	id: any?,
 	player: boolean?,
 	emergency: boolean?,
+	back: boolean?, -- it is moving against its own heading (the trolley, whose body never turns)
 	speed: number?,
 }
 
@@ -335,6 +336,69 @@ function LaneMath.makeRoute(id: string, pts: { { number } }, speeds: { [string]:
 		polyRev = LaneMath.poly(LaneMath.offsetRight(reversed(pts), d)),
 		vehicle = true,
 		mirrored = d ~= 0,
+	}
+end
+
+-- A trip that starts and ends in a kerbside bay. `centre` is the trip along road centrelines, its first
+-- point abeam the bay; the bay is `kerb` studs to the right of that point, facing along the first leg.
+-- Out: from the bay (BAY_LEAD straight on, then across to the keep-right line over BAY_RUN) and on along
+-- the centrelines kept right by `offset` (default POLY_OFFSET). Back: the same roads kept right the other
+-- way, past the bay on the far side to BAY_BACK behind it, round (a U-turn of radius `offset`) and into
+-- the bay from behind, ending exactly as it started. The first leg must be at least BAY_NEED long.
+-- An emergency vehicle parked in view at its bay pulls out and comes home like a car; it used to pop into
+-- existence where its route began and vanish there on its return.
+LaneMath.BAY_LEAD = Units.st(1.2)
+LaneMath.BAY_RUN = Units.st(7.2)
+LaneMath.BAY_BACK = Units.st(12)
+LaneMath.BAY_NEED = Units.st(13)
+function LaneMath.bayRoute(
+	id: string,
+	centre: { { number } },
+	kerb: number,
+	speeds: { [string]: number },
+	offset: number?
+): Lane
+	local off = offset or LaneMath.POLY_OFFSET
+	local c1, c2 = centre[1], centre[2]
+	local dx, dz = c2[1] - c1[1], c2[2] - c1[2]
+	local len = math.sqrt(dx * dx + dz * dz)
+	local fx, fz = dx / len, dz / len
+	local rx, rz = -fz, fx -- the right of travel
+	local function pt(along: number, across: number): { number }
+		return { c1[1] + fx * along + rx * across, c1[2] + fz * along + rz * across }
+	end
+	local lead, run = LaneMath.BAY_LEAD, LaneMath.BAY_RUN
+	local out = LaneMath.offsetRight(centre, off)
+	local outPath = { pt(0, kerb), pt(lead, kerb), pt(lead + run, off) }
+	for i = 2, #out do
+		table.insert(outPath, out[i])
+	end
+	local back = LaneMath.offsetRight(reversed(centre), off)
+	local backPath = table.create(#back + 4)
+	for i = 1, #back - 1 do
+		table.insert(backPath, back[i])
+	end
+	local behind = LaneMath.BAY_BACK
+	for _, p in { pt(-behind, -off), pt(-behind, off), pt(-(lead + run), off), pt(-lead, kerb), pt(0, kerb) } do
+		table.insert(backPath, p)
+	end
+	local poly = LaneMath.poly(outPath)
+	return {
+		id = id,
+		source = nil,
+		shape = "polyline",
+		axis = nil,
+		coord = nil,
+		startAt = 0,
+		endAt = poly.length,
+		dir = 1,
+		length = poly.length,
+		curve = nil,
+		speeds = speeds,
+		poly = poly,
+		polyRev = LaneMath.poly(backPath),
+		vehicle = true,
+		mirrored = true,
 	}
 end
 
@@ -948,7 +1012,12 @@ function LaneMath.vehicleAhead(
 			local psi = item.yaw
 			local otherAlong = math.abs(math.sin(psi) * fx + math.cos(psi) * fz) * item.length / 2
 				+ math.abs(math.cos(psi) * fx - math.sin(psi) * fz) * item.width / 2
-			if along > 0 and along < range + otherAlong and across < halfWidth + item.width / 2 + margin then
+			-- (and across the corridor it reaches as far as it is turned: a vehicle crossing the lane, or
+			-- swinging round a corner beside it, is as wide as it is long; v5.4 took its width whatever
+			-- its heading)
+			local otherAcross = math.abs(math.sin(psi) * fz - math.cos(psi) * fx) * item.length / 2
+				+ math.abs(math.cos(psi) * fz + math.sin(psi) * fx) * item.width / 2
+			if along > 0 and along < range + otherAlong and across < halfWidth + otherAcross + margin then
 				return true
 			end
 		end

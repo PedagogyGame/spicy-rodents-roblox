@@ -262,11 +262,34 @@ return function(t)
 			t.near(e.x, last[1], 1e-6)
 			t.near(e.z, last[2], 1e-6)
 		end
-		-- the legacy ambulance's whole run, tick by tick
+		-- the arterial ambulance's whole round, tick by tick: out of its bay by the hospital, along the
+		-- arterial to its far end, round, back, and into the bay again; in view all the way
 		local svc = service({ entry(14) })
-		svc.byId[14].timer = 0.1
-		local events = drive(svc, 14, 140, 0.15)
-		t.truthy((events.park or 0) >= 1, "it reached the hospital and parked")
+		local amb = svc.byId[14]
+		t.truthy(amb.visible, "parked in view from the start")
+		local bayX, bayZ = amb.x, amb.z
+		t.near(bayX, -890 + 42, 1e-6, "42 st beyond the junction of the hospital drive")
+		t.near(bayZ, 719, 1e-6, "at the north kerb of the hospital road")
+		amb.timer = 0.1
+		local dt = 1 / 30
+		local farthest = bayX
+		for _ = 1, 30 * 230 do
+			svc:step(dt)
+			t.truthy(amb.visible and not amb.teleported, "never hidden, never jumped")
+			farthest = math.max(farthest, amb.x)
+		end
+		local events = svc:stats().events
+		t.eq(events.depart, 1)
+		t.eq(events.arrived, 1, "it reached the far end of the arterial")
+		t.eq(events.home, 1, "and came home")
+		t.truthy(farthest > 1590, `it turned round at x = {farthest}`)
+		t.eq(amb.phase, "idle")
+		t.near(amb.x, bayX, 1e-6, "in its bay again")
+		t.near(amb.z, bayZ, 1e-6)
+		-- and tick by tick it drives like a vehicle the whole way
+		local again = service({ entry(14) })
+		again.byId[14].timer = 0.1
+		drive(again, 14, 230, 0.15)
 	end)
 
 	-- the overlap of two boxes on the ground (centre, HTML yaw, half width, half length): the smallest

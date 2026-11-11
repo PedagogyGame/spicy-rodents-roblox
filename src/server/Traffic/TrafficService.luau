@@ -27,6 +27,7 @@ local Control = Import.shared("Traffic/Control") :: typeof(require("../../shared
 local Fleet = Import.shared("Traffic/Fleet") :: typeof(require("../../shared/Traffic/Fleet"))
 local Ghost = Import.shared("Traffic/Ghost") :: typeof(require("../../shared/Traffic/Ghost"))
 local LaneMath = Import.shared("Traffic/LaneMath") :: typeof(require("../../shared/Traffic/LaneMath"))
+local MedicalRoute = Import.shared("Infection/MedicalRoute") :: typeof(require("../../shared/Infection/MedicalRoute"))
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 local Signal = Import.shared("Util/Signal") :: typeof(require("../../shared/Util/Signal"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
@@ -90,6 +91,11 @@ export type TrafficService = typeof(setmetatable(
 		prevActors: { [any]: { x: number, y: number, z: number } },
 		swept: SweptCollision.SweptCollision,
 		jumped: { [number]: boolean }, -- vehicles that teleported since the last poseRecords()
+		graph: any, -- the road centrelines and their joins (Infection/MedicalRoute.build over opts.roads)
+		-- where each emergency vehicle stands parked: the point of the road's centreline abeam its bay,
+		-- the heading of the road there, and how far to the right of the centreline the bay is
+		bays: { [number]: { cx: number, cz: number, fx: number, fz: number, kerb: number } },
+		home: { number }?, -- where the responders' trips are routed from (the junction beside their bays)
 		stops: { [string]: { StopLine } },
 		control: ControlData,
 		heightAt: (x: number, z: number) -> number,
@@ -119,6 +125,112 @@ local function nextRand(self: TrafficService): number
 	return bit32.bxor(t, bit32.rshift(t, 14)) / 4294967296
 end
 
+-- An incident car's pad at the station {x, z} in studs (the record gives it in v5.4 units).
+local function incidentStart(self: TrafficService, v: Vehicle): { number }
+	local starts = self.records.incident_police_route.path.resolved_start
+	local p = starts[(if v.id % 2 == 0 then 0 else 1) + 1]
+	return { st(p[1]), st(p[2]) }
+end
+
+-- generated/Roads records as the strips MedicalRoute reads (as World/Town.fromData makes them)
+local function stripsOf(roads: { any }): { any }
+	local strips = {}
+	for _, r in roads do
+		if (r.axis == "x" or r.axis == "z") and r.coord and r.width and r.start and r["end"] then
+			table.insert(strips, {
+				id = r.id,
+				kind = r.kind,
+				axis = r.axis,
+				coord = r.coord,
+				min = math.min(r.start, r["end"]),
+				max = math.max(r.start, r["end"]),
+				half = r.width * 0.5,
+			})
+		end
+	end
+	return strips
+end
+
+-- Where the emergency vehicles stand between calls, in view (they used to be hidden, and popped into
+-- existence on the hospital drive when called and out of it on their return).
+-- The ambulances park along the kerb of the hospital road: the responder trunk's second point is where
+-- the hospital drive meets that road (`home`: their trips are routed from there), its third gives the
+-- road's direction; the three responders' bays are behind the junction on the right-hand kerb, BAY_GAP
+-- apart, and the arterial ambulance's is beyond it. The incident cars park on their pads at the station.
+local BAY_FIRST = st(13.6) -- 34 st from the junction back to the first responder bay
+local BAY_GAP = st(15.2) -- 38 st from bay to bay: room to pull out past the ambulance in front
+local BAY_BEYOND = st(16.8) -- 42 st from the junction on to the arterial ambulance's bay
+local BAY_INSET = st(1.4) -- the bay's line is 3.5 st inside the road's edge
+local BAY_HOP = st(18) -- a call too close behind the bay to drive to: it pulls out this far and stands
+local function parkEmergency(self: TrafficService, roads: { any })
+	local trunk = self.records.responder_ambulance_trunk
+	local pts = trunk and trunk.path and trunk.path.points
+	if pts and #pts >= 3 then
+		local hx, hz = pts[2][1], pts[2][2]
+		local dx, dz = pts[3][1] - hx, pts[3][2] - hz
+		local len = math.sqrt(dx * dx + dz * dz)
+		local fx, fz = dx / len, dz / len
+		-- half the width of the road the bays are on
+		local half = st(6)
+		for _, s in stripsOf(roads) do
+			local along, across = if s.axis == "z" then hz else hx, if s.axis == "z" then hx else hz
+			local runs = if s.axis == "z" then math.abs(fz) > 0.9 else math.abs(fx) > 0.9
+			if
+				s.kind == "asphalt"
+				and runs
+				and math.abs(across - s.coord) < 1e-6
+				and along >= s.min
+				and along <= s.max
+			then
+				half = s.half
+			end
+		end
+		local kerb = half - BAY_INSET
+		self.home = { hx, hz }
+		local k = 0
+		for _, v in self.vehicles do
+			local along: number? = nil
+			if v.class == "responder" then
+				along = -(BAY_FIRST + BAY_GAP * k)
+				k += 1
+			elseif v.class == "legacy_ambulance" then
+				along = BAY_BEYOND
+			end
+			if along then
+				local bay = { cx = hx + fx * along, cz = hz + fz * along, fx = fx, fz = fz, kerb = kerb }
+				self.bays[v.id] = bay
+				v.x, v.z, v.yaw = bay.cx - fz * kerb, bay.cz + fx * kerb, math.atan2(fx, fz)
+				v.y = self.heightAt(v.x, v.z) + st(0.04)
+				if v.class == "legacy_ambulance" then
+					-- its round: from its bay along the arterial to its far end (the record's first point)
+					local far = v.lane.poly and self.records[v.lane.id] and self.records[v.lane.id].path.points[1]
+					if far then
+						v.tour = LaneMath.bayRoute(
+							`tour_{v.id}`,
+							{ { bay.cx, bay.cz }, { far[1], far[2] } },
+							kerb,
+							v.lane.speeds
+						)
+					end
+				end
+			end
+		end
+	end
+	-- the incident cars: on their pads, facing the way they leave
+	local rec = self.records.incident_police_route
+	local starts = rec and rec.path and rec.path.resolved_start
+	if starts then
+		for _, v in self.vehicles do
+			if v.class == "incident" then
+				local p = incidentStart(self, v)
+				local line = LaneMath.offsetRight({ p, { p[1] + 10, p[2] } }, LaneMath.POLY_OFFSET)
+				v.x, v.z, v.yaw = line[1][1], line[1][2], math.pi / 2
+				v.y = self.heightAt(v.x, v.z) + st(0.04)
+			end
+		end
+	end
+end
+
 function TrafficService.new(opts: Opts): TrafficService
 	local lanes = LaneMath.load(opts.lanes)
 	local unified = LaneMath.unify(lanes, opts.roads, opts.lanes)
@@ -139,6 +251,9 @@ function TrafficService.new(opts: Opts): TrafficService
 		prevActors = {},
 		swept = SweptCollision.new(),
 		jumped = {},
+		graph = MedicalRoute.build(stripsOf(opts.roads)),
+		bays = {},
+		home = nil :: { number }?,
 		stops = Control.resolve(control, lanes),
 		control = control,
 		heightAt = opts.heightAt or function(_x: number, _z: number): number
@@ -181,6 +296,7 @@ function TrafficService.new(opts: Opts): TrafficService
 		table.insert(self.vehicles, v)
 		self.byId[v.id] = v
 	end
+	parkEmergency(self, opts.roads)
 	return self
 end
 
@@ -405,27 +521,63 @@ export type DispatchOpts = {
 	hold: boolean?, -- stay on scene until releaseResponder (the patient is loaded first)
 }
 
+-- The road trip (centreline points) a responder drives from its bay. `trip` is the caller's, routed from
+-- `responderHome()` (the junction beside the bays), or nil: then it is the shortest way by road to the
+-- point of the roads nearest `dest`. A call the bay cannot drive forwards to (it lies behind the bay on
+-- the hospital road, or right beside it) is answered by pulling out BAY_HOP and standing there.
+local function tripFromBay(self: TrafficService, bay: any, dest: { number }, trip: { { number } }?): { { number } }
+	local c1 = { bay.cx, bay.cz }
+	local function ahead(p: { number }): number
+		return (p[1] - c1[1]) * bay.fx + (p[2] - c1[2]) * bay.fz
+	end
+	local pts: { { number } }? = nil
+	if trip and #trip >= 2 then
+		local home, second = trip[1], trip[2]
+		if (second[1] - home[1]) * bay.fx + (second[2] - home[2]) * bay.fz >= -1e-6 then
+			-- on from the junction, or off it to one side: the bay's road leads there
+			pts = { c1 }
+			for i, p in trip do
+				if i > 1 or ahead(p) > 1 then
+					table.insert(pts, { p[1], p[2] })
+				end
+			end
+		else
+			pts = { c1, { trip[#trip][1], trip[#trip][2] } } -- back along the bay's own road
+		end
+	else
+		local stage = MedicalRoute.stage(self.graph, dest[1], dest[2])
+		pts = if stage then MedicalRoute.trip(self.graph, c1, stage) else nil
+	end
+	if pts == nil or #pts < 2 or ahead(pts[2]) < LaneMath.BAY_NEED then
+		return { c1, { c1[1] + bay.fx * BAY_HOP, c1[2] + bay.fz * BAY_HOP } }
+	end
+	return pts
+end
+
 -- dispatchResponder(dest, opts?): the first idle responder drives to dest {x, z} (studs). Returns the
 -- vehicle or nil when all three are busy.
--- With opts.route the trip is exactly those road points (the medical sequence passes MedicalRoute's
--- shortest road path, every leg on asphalt). Without it the trip is the trunk plus an L to dest, the
--- W1 stand-in: that L leaves the roads for most destinations, so real dispatches pass a route.
+-- With opts.route the trip is those road points (the medical sequence passes MedicalRoute's shortest road
+-- path from `responderHome()`, every leg on asphalt); without it the service routes it by road itself
+-- (the W1 stand-in drove the trunk and then an L across the house blocks). Either way the responder
+-- pulls out of its own kerbside bay to start it and pulls back in at the end (LaneMath.bayRoute).
 function TrafficService.dispatchResponder(self: TrafficService, dest: { number }, opts: DispatchOpts?): Vehicle?
-	local rec = self.records.responder_ambulance_trunk
 	for _, v in self.vehicles do
 		if v.class == "responder" and v.phase == "idle" then
-			local pts: { { number } }
-			if opts and opts.route and #opts.route >= 2 then
-				pts = opts.route
+			local held = if opts and opts.hold then true else nil
+			local bay = self.bays[v.id]
+			local route
+			if bay then
+				local centre = tripFromBay(self, bay, dest, if opts then opts.route else nil)
+				route = LaneMath.bayRoute(`responder_{v.id}`, centre, bay.kerb, v.lane.speeds)
 			else
-				pts = table.clone(rec.path.points)
-				local last = pts[#pts]
-				table.insert(pts, { dest[1], last[2] })
-				table.insert(pts, { dest[1], dest[2] })
+				-- no hospital road in this service's data (a spec's own lanes): the route as given
+				local pts = if opts and opts.route and #opts.route >= 2 then opts.route else { { v.x, v.z }, dest }
+				route = LaneMath.makeRoute(`responder_{v.id}`, pts, v.lane.speeds)
 			end
-			local route = LaneMath.makeRoute(`responder_{v.id}`, pts, v.lane.speeds)
-			AICarMotor.dispatch(v, route, ctxFor(self, {}), if opts and opts.hold then true else nil)
-			self.jumped[v.id] = true -- it appears on the drive (dispatched between two ticks)
+			AICarMotor.dispatch(v, route, ctxFor(self, {}), held)
+			if v.teleported then
+				self.jumped[v.id] = true -- (dispatched between two ticks: the flag must reach the next send)
+			end
 			return v
 		end
 	end
@@ -450,24 +602,40 @@ function TrafficService.responderIdle(self: TrafficService): number
 	return n
 end
 
--- responderHome(): where the responders park (the trunk's first point, on the hospital drive).
+-- responderHome(): where the responders' trips start from, as road routing sees it: the junction of the
+-- hospital drive and the hospital road, beside their bays (the trunk's second point).
 function TrafficService.responderHome(self: TrafficService): { number }?
-	local rec = self.records.responder_ambulance_trunk
-	local first = rec and rec.path and rec.path.points and rec.path.points[1]
-	return if first then { first[1], first[2] } else nil
+	local home = self.home
+	return if home then { home[1], home[2] } else nil
 end
 
 -- dispatchIncident(scene): both incident cars from the station to the scene {x, z} (traffic.md §5.10).
+-- From its pad a car drives straight to the nearest road (the station has no drive in the town's data:
+-- that first stretch is open ground, with no building on it) and from there by road to the point of
+-- the roads nearest the scene. v5.4's route ran x = -300 u and then straight across the blocks to the
+-- scene, through whatever stood there.
 function TrafficService.dispatchIncident(self: TrafficService, scene: { number }): number
-	local rec = self.records.incident_police_route
 	local n = 0
 	for _, v in self.vehicles do
 		if v.class == "incident" and v.phase == "idle" then
-			local car = if v.id % 2 == 0 then 0 else 1
-			local start = rec.path.resolved_start[car + 1]
-			local route =
-				LaneMath.makeRoute(`incident_{v.id}`, LaneMath.incidentRoute(car, start, scene), v.lane.speeds)
+			local start = incidentStart(self, v)
+			local pts = { start }
+			local join = MedicalRoute.stage(self.graph, start[1], start[2])
+			local stage = MedicalRoute.stage(self.graph, scene[1], scene[2])
+			if join and stage then
+				table.insert(pts, { join.x, join.z })
+				local trip = MedicalRoute.trip(self.graph, { join.x, join.z }, stage)
+				for i = 2, if trip then #trip else 0 do
+					table.insert(pts, (trip :: { { number } })[i])
+				end
+			else
+				table.insert(pts, { scene[1], scene[2] })
+			end
+			local route = LaneMath.makeRoute(`incident_{v.id}`, pts, v.lane.speeds)
 			AICarMotor.dispatch(v, route, ctxFor(self, {}))
+			if v.teleported then
+				self.jumped[v.id] = true
+			end
 			n += 1
 		end
 	end

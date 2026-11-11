@@ -39,11 +39,19 @@ local scenario: Replay.Scenario = {
 			"position_jump",
 			"accel_spike",
 			"box_overlap",
+			-- and since: every call is routed by road (the responder's tail and the incident cars' route
+			-- ran straight across lots and through houses), and nobody pops in or out: the ambulances
+			-- stand parked at the hospital kerb and the incident cars on their pads
+			"through_building",
+			"appear",
+			"disappear",
+			"teleport_flagged",
 		},
 	},
-	-- shows today: routes straight across lots and through houses (LaneMath.incidentRoute and the
-	-- responder's tail are straight lines, not roads)
-	known = { "through_building", "off_road" },
+	-- shows today: the station has no drive in the town's data, so the incident cars cross open ground
+	-- (no building on it) from their pads to the nearest street; and where two roads' ends stop short of
+	-- each other a route crosses the strip between them (the joins MedicalRoute documents)
+	known = { "off_road" },
 	frame = function(sim: Replay.Sim)
 		if sim.wall >= 2 and not sim.state.responder then
 			sim.state.responder = true

@@ -135,9 +135,9 @@ return function(t)
 					t.truthy(s.y > 0 and s.y < 60 and math.abs(s.pitch) <= 0.5, "seated on the terrain")
 					checked += 1
 				end
-				-- the hidden vehicles park below the map
-				t.eq(frame.v[15].vis, false)
-				t.eq(frame.v[15].y, Ghost.HIDDEN_Y)
+				-- nobody is hidden: the responders stand parked at the hospital road's kerb
+				t.eq(frame.v[15].vis, true)
+				t.truthy(frame.v[15].y > 0 and frame.v[15].y < 60)
 			end
 			t.truthy(checked > 3000)
 			t.truthy(
