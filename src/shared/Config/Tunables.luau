@@ -83,6 +83,7 @@ Tunables.tree = {
 	              ambulanceTimeoutSecs = { v = 150, unit = "s", src = "no ambulance by then: the patient is taken in anyway (nobody is left on the pavement)" },
 	              transitMaxSecs = { v = 200, unit = "s", src = "a blocked return trip never strands a patient" },
 	              groanSecs = { v = { 12, 21 }, unit = "s", src = "humans_actors §7.2" },
+	              roadHoldSecs = { v = 6, unit = "s", src = "a collapse due on asphalt waits this long at most for the person to be off the road" },
 	              remindSecs = { v = 40, unit = "s", src = "a bitten player is told again what to do this often (one toast is easily missed)" },
 	              crowdChance = { v = 0.85, src = "owner: a crowd gathers sometimes" }, bystanders = { v = { 2, 4 }, src = "humans_actors §7.4" },
 	              bystanderRadius = { v = 72, unit = "u", src = "the v5.4 scene radius" }, bystanderRing = { v = 8, unit = "u", src = "humans_actors §7.4" },

@@ -50,6 +50,7 @@ export type Roads = {
 	lines: { Line },
 	nodes: { Node },
 	edges: { [number]: { { to: number, d: number } } },
+	strips: { Strip }, -- the asphalt strips as given (a merged line is as wide as its widest strip)
 }
 
 export type Stage = { x: number, z: number, axis: "x" | "z", dist: number, line: number }
@@ -123,7 +124,7 @@ function MedicalRoute.build(strips: { Strip }): Roads
 			})
 		end
 	end
-	local roads: Roads = { lines = lines, nodes = {}, edges = {} }
+	local roads: Roads = { lines = lines, nodes = {}, edges = {}, strips = sorted }
 	local gap = MedicalRoute.JOIN_GAP
 	for i, a in lines do
 		for j = i + 1, #lines do
@@ -176,12 +177,15 @@ function MedicalRoute.stage(roads: Roads, x: number, z: number): Stage?
 	return best
 end
 
--- onRoad(roads, x, z, pad?): is the point on asphalt (within a strip's half width plus pad)?
+-- onRoad(roads, x, z, pad?): is the point on asphalt (within a strip's half width plus pad)? Asked
+-- of the strips themselves, not the merged centrelines: the main street merges with the commercial
+-- boulevard, which is 20 studs wider, and by the merged width every pavement along the main street
+-- counted as road.
 function MedicalRoute.onRoad(roads: Roads, x: number, z: number, pad: number?): boolean
 	local p = pad or 0
-	for _, line in roads.lines do
-		local along, across = alongOf(line, x, z), if line.axis == "z" then x else z
-		if math.abs(across - line.coord) <= line.half + p and along >= line.min - p and along <= line.max + p then
+	for _, s in roads.strips do
+		local along, across = if s.axis == "z" then z else x, if s.axis == "z" then x else z
+		if math.abs(across - s.coord) <= s.half + p and along >= s.min - p and along <= s.max + p then
 			return true
 		end
 	end

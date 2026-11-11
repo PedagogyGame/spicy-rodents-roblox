@@ -774,4 +774,68 @@ return function(t)
 			t.eq(selfCured + bedCured, 1500)
 		end
 	)
+	t.test(
+		"nobody sits down in the road: a collapse that is due waits for the kerb, six seconds at most, and the dice are thrown once",
+		function()
+			local Q = table.clone(P)
+			Q.roadHoldSecs = 6
+			local road: Inputs = { controller = "ai", onRoad = true }
+			-- bitten, running across a street when the collapse falls due (at 1.5 s)
+			local rand = dice({ 0.1, 0 })
+			local case = InfectionRules.newCase(1, 0, AI, rand, Q)
+			t.eq(kinds(InfectionRules.advance(case, 1.5, road, rand, Q)), "")
+			t.eq(case.state, "bitten", "still running")
+			t.eq(kinds(InfectionRules.advance(case, 3, road, rand, Q)), "")
+			t.eq(kinds(InfectionRules.advance(case, 3.2, AI, rand, Q)), "collapse", "off the road: now")
+			-- someone who never gets off it collapses there after the hold (the ambulance then stops short)
+			rand = dice({ 0.1, 0 })
+			case = InfectionRules.newCase(2, 0, AI, rand, Q)
+			t.eq(kinds(InfectionRules.advance(case, 7.4, road, rand, Q)), "")
+			t.eq(kinds(InfectionRules.advance(case, 7.5, road, rand, Q)), "collapse")
+			-- symptomatic: the walk-in dice are thrown once; only the fall waits
+			rand = dice({ 0.9, 0, 0 })
+			case = InfectionRules.newCase(3, 0, AI, rand, Q)
+			InfectionRules.advance(case, 40, AI, rand, Q)
+			t.eq(case.state, "symptomatic")
+			t.eq(case.untilT, 48)
+			local draws = 0
+			local function no(): number
+				draws += 1
+				return 0.99
+			end
+			local onRoad: Inputs = { controller = "ai", routeLen = 500, onRoad = true }
+			t.eq(kinds(InfectionRules.advance(case, 48, onRoad, no, Q)), "")
+			t.truthy(case.falling, "the dice said collapse")
+			t.eq(draws, 1)
+			t.eq(InfectionRules.tell(case), "symptomatic", "the red eyes stay while they get off the road")
+			t.eq(kinds(InfectionRules.advance(case, 50, onRoad, no, Q)), "")
+			t.eq(draws, 1, "not thrown again while they wait")
+			t.eq(kinds(InfectionRules.advance(case, 51, { controller = "ai", routeLen = 500 }, no, Q)), "collapse")
+			t.eq(case.state, "down")
+			t.truthy(not case.falling)
+			-- a player who takes the body in that moment: no fall, and the AI decides afresh later
+			rand = dice({ 0.9, 0, 0 })
+			case = InfectionRules.newCase(4, 0, AI, rand, Q)
+			InfectionRules.advance(case, 40, AI, rand, Q)
+			InfectionRules.advance(case, 48, onRoad, no, Q)
+			t.truthy(case.falling)
+			InfectionRules.advance(case, 49, { controller = "player", onRoad = true }, no, Q)
+			t.eq(case.state, "symptomatic")
+			t.truthy(not case.falling)
+			-- a walk-in that overruns on a crossing takes the last steps to the kerb
+			rand = dice({ 0.9, 0, 0, 0 })
+			case = InfectionRules.newCase(5, 0, AI, rand, Q)
+			InfectionRules.advance(case, 40, AI, rand, Q)
+			InfectionRules.advance(case, 48, { controller = "ai", routeLen = 500 }, rand, Q)
+			t.eq(case.state, "walkin")
+			local late = case.untilT
+			t.eq(kinds(InfectionRules.advance(case, late + 1, road, rand, Q)), "")
+			t.eq(kinds(InfectionRules.advance(case, late + 2, AI, rand, Q)), "collapse")
+			-- with no hold set (the old params) nothing waits
+			rand = dice({ 0.1, 0 })
+			case = InfectionRules.newCase(6, 0, AI, rand, P)
+			t.eq(kinds(InfectionRules.advance(case, 1.5, road, rand, P)), "collapse")
+			t.eq(InfectionRules.defaults().roadHoldSecs, 6)
+		end
+	)
 end

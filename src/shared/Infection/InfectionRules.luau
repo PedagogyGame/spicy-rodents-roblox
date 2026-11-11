@@ -17,6 +17,9 @@
 --     clock starts again when an ambulance is assigned, so nobody is given up on while theirs is
 --     on its way)
 --   admitted --(a bed)--> treated --(hospital.treatSecs)--> released (cured)
+-- Nobody sits down in the road: a collapse that falls due while the person is on asphalt (the fact
+-- `onRoad`) waits until they are off it, roadHoldSecs at most. They are running or walking, so it
+-- is a moment; a patient in the road was parked on by their own ambulance.
 --
 -- THE ONLY CURE IS THE HOSPITAL: `infected` is cleared in one place, the step from treated to
 -- released. Nothing else clears it: not time, not the rodent's death (the old brief v2 §8 rule, cured
@@ -61,6 +64,7 @@ export type Params = {
 	treatSecs: number,
 	crewMaxSecs: number,
 	remindSecs: number, -- a held person is told again this often
+	roadHoldSecs: number?, -- a collapse due on asphalt waits this long at most for the kerb (nil: 0)
 }
 
 export type Case = {
@@ -79,6 +83,7 @@ export type Case = {
 	nextRemind: number, -- when the player holding the body is next told what to do
 	symptomsAt: number?, -- when the tell first showed
 	controller: string, -- who held the body at the last step ("ai" | "player")
+	falling: boolean, -- symptomatic, the dice have said "collapse": only waiting to be off the road
 }
 
 export type Inputs = {
@@ -86,6 +91,7 @@ export type Inputs = {
 	nearHospital: boolean?, -- on the hospital's grounds
 	atEntrance: boolean?, -- at the door or inside
 	routeLen: number?, -- studs of the walk-in route from here; nil = no route
+	onRoad: boolean?, -- standing on asphalt (a collapse waits for the kerb)
 	ambulance: string?, -- none | queued | assigned | arrived | returning | home
 	crewSecs: number?, -- valid with ambulance == "arrived"
 	hospital: string?, -- none | queued | bed | done
@@ -174,6 +180,7 @@ function InfectionRules.defaults(): Params
 		treatSecs = g("hospital.treatSecs"),
 		crewMaxSecs = 55, -- hospital_police_infection §7.5: walkTime = clamp(len / 3.45, 3, 55)
 		remindSecs = g("infection.remindSecs"),
+		roadHoldSecs = g("infection.roadHoldSecs"),
 	}
 end
 
@@ -185,6 +192,12 @@ local function enter(case: Case, state: string, now: number, untilT: number?)
 	case.state = state
 	case.since = now
 	case.untilT = untilT or math.huge
+	case.falling = false
+end
+
+-- may a collapse that is due happen here and now? Not on asphalt, until roadHoldSecs have passed
+local function offRoad(case: Case, now: number, inputs: Inputs, params: Params): boolean
+	return inputs.onRoad ~= true or now >= case.untilT + (params.roadHoldSecs or 0)
 end
 
 -- a message for the player holding the body; the next reminder is counted from it
@@ -227,6 +240,7 @@ function InfectionRules.newCase(
 		nextRemind = math.huge,
 		symptomsAt = nil,
 		controller = inputs.controller,
+		falling = false,
 	}
 	if immediate then
 		enter(case, "bitten", now, now + range(rand, params.collapseAfterSecs))
@@ -319,7 +333,7 @@ local function stepOnce(
 			enter(case, "incubating", now, case.bittenAt + range(rand, params.incubateSecs))
 			inform(case, now, params, effects, "bitten")
 			return true
-		elseif now >= case.untilT then
+		elseif now >= case.untilT and offRoad(case, now, inputs, params) then
 			collapse(case, now, rand, params, effects)
 			return true
 		end
@@ -334,6 +348,7 @@ local function stepOnce(
 	elseif state == "symptomatic" then
 		if player then
 			case.untilT = math.huge
+			case.falling = false
 			if inputs.atEntrance then
 				selfTreat(case, now, params, effects)
 				return true
@@ -343,18 +358,26 @@ local function stepOnce(
 				case.untilT = now + range(rand, params.symptomSecs) -- handed back to the AI
 			end
 			if now >= case.untilT then
-				local len = inputs.routeLen
-				local walk = len ~= nil
-					and (inputs.nearHospital == true or (len <= params.walkInMaxDist and rand() < params.walkInChance))
-				if walk and len then
-					local secs = math.min(len, params.walkInMaxDist) / math.max(0.1, params.walkInSpeed)
-					enter(case, "walkin", now, now + secs * 1.35 + 20)
-					table.insert(effects, { kind = "walkIn" })
-					table.insert(effects, { kind = "say", situation = "symptoms" })
-				else
-					collapse(case, now, rand, params, effects)
+				if not case.falling then
+					local len = inputs.routeLen
+					local walk = len ~= nil
+						and (
+							inputs.nearHospital == true
+							or (len <= params.walkInMaxDist and rand() < params.walkInChance)
+						)
+					if walk and len then
+						local secs = math.min(len, params.walkInMaxDist) / math.max(0.1, params.walkInSpeed)
+						enter(case, "walkin", now, now + secs * 1.35 + 20)
+						table.insert(effects, { kind = "walkIn" })
+						table.insert(effects, { kind = "say", situation = "symptoms" })
+						return true
+					end
+					case.falling = true -- the dice are thrown once; the fall itself may wait for the kerb
 				end
-				return true
+				if offRoad(case, now, inputs, params) then
+					collapse(case, now, rand, params, effects)
+					return true
+				end
 			end
 		end
 	elseif state == "walkin" then
@@ -368,7 +391,7 @@ local function stepOnce(
 			case.arrival = "walk"
 			table.insert(effects, { kind = "arrive", by = "walk" })
 			return true
-		elseif now >= case.untilT then
+		elseif now >= case.untilT and offRoad(case, now, inputs, params) then
 			collapse(case, now, rand, params, effects)
 			return true
 		end
