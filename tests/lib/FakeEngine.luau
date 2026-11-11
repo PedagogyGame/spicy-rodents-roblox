@@ -12,7 +12,8 @@
 -- `game:GetService` gives a RunService whose BindToRenderStep callbacks and RenderStepped signal the test
 -- fires itself (renderStep), a UserInputService with InputBegan / InputEnded / InputChanged signals the test
 -- fires (input) and a few settable facts (the mouse, a focused text box), an HttpService that can JSONEncode,
--- and empty stand-ins for anything else. workspace.CurrentCamera is a fake camera with a viewport.
+-- and empty stand-ins for anything else. workspace.CurrentCamera is a fake camera with a viewport that can
+-- turn a pixel into a ray and a world point into a pixel (ViewportPointToRay, WorldToViewportPoint).
 -- Interface: new(className, name?, props?) -> Instance; install(); uninstall(); with(fn); part(name, cframe,
 --   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v); workspace() -> the fake Workspace;
 --   renderStep(dt) (call every bound render step and RenderStepped); bound() -> how many render steps are
@@ -201,6 +202,32 @@ function methods.PivotTo(self: any, cf: any)
 	end
 	rawset(self, "_pivot", cf)
 	rawset(self, "_pivots", (rawget(self, "_pivots") or 0) + 1)
+end
+
+-- Camera:ViewportPointToRay / WorldToViewportPoint: a plain pinhole camera from the instance's CFrame (looking
+-- along -Z), its vertical FieldOfView in degrees and its ViewportSize. Pixels run right and DOWN from the top
+-- left, as the engine's do.
+function methods.ViewportPointToRay(self: any, x: number, y: number): any
+	local cf = rawget(self, "CFrame")
+	local size = rawget(self, "ViewportSize")
+	local half = math.tan(math.rad(rawget(self, "FieldOfView")) / 2)
+	local k = half / (size.Y / 2)
+	local dir = cf:VectorToWorldSpace(roblox.Vector3.new((x - size.X / 2) * k, -(y - size.Y / 2) * k, -1))
+	return roblox.Ray.new(cf.Position, dir.Unit)
+end
+
+function methods.WorldToViewportPoint(self: any, world: any): (any, boolean)
+	local cf = rawget(self, "CFrame")
+	local size = rawget(self, "ViewportSize")
+	local half = math.tan(math.rad(rawget(self, "FieldOfView")) / 2)
+	local p = cf:PointToObjectSpace(world)
+	local depth = -p.Z
+	if depth <= 0 then
+		return roblox.Vector3.new(0, 0, depth), false
+	end
+	local k = (size.Y / 2) / half
+	local px, py = size.X / 2 + p.X / depth * k, size.Y / 2 - p.Y / depth * k
+	return roblox.Vector3.new(px, py, depth), px >= 0 and px <= size.X and py >= 0 and py <= size.Y
 end
 
 function methods.GetFullName(self: any): string

@@ -15,7 +15,11 @@
 --            frame); the overhead monitor is rewritten (Scoreboard). A squirrel or the Spicy Rodent on a lane
 --            cannot break a game: the ball (or the sweep bar) knocks it into the gutter, the throw counts,
 --            and both sides are told (Bowling/Intruders; opts.animals / opts.knock from Boot/Game)
---   darts    Dartboard ("throw" { aimX, aimY, timing } resolved by the rules' seeded scatter; "mode" 501/cricket)
+--   darts    Dartboard ("throw" { aimX, aimY, timing } resolved by the rules' seeded scatter; "mode" 501/cricket).
+--            A turn's darts are pulled out a beat after the turn passes, and at the latest when the next turn's
+--            first dart lands (never together with it), or at once when the turn is skipped. A computer player
+--            there is a pub darts player of its own name (DART_AI): treble 20s, then a set-up and a double in
+--            501; down the numbers in cricket (dartsAim)
 --   fortune  FortuneCabinet (the prompt pulls the lever; reels; a printed fortune or taunt; never money)
 --   pool, bumper pool, pinball: the prompt says plainly they are not in this build yet
 -- Out: Net "Minigame.State" to the seated players: joined / state (Session.view + your seat) / event (banners)
@@ -26,7 +30,8 @@
 --   Service:input(player, payload) -> (ok, why?); Service:step(dt); Service:sessionOf(stationId);
 --   Service:stationOf(player) -> id?; Service:debugRoll(stationId, pins) -> (ok, why?); Service:debugDart(stationId,
 --   xmm, ymm) -> (ok, why?) (scripted throws for the engine smoke); Service:stations();
---   Service:stop(); GAMES; opts.animals() -> { { id, kind, x, y, z } } (squirrel-family bodies, world);
+--   Service:stop(); GAMES; DART_AI; dartsAim(rulesState, seat) -> (xmm, ymm) (a computer's next dart);
+--   opts.animals() -> { { id, kind, x, y, z } } (squirrel-family bodies, world);
 --   opts.knock(id, x, y, z, text) (move one clear and tell its player)
 
 local Import = require("../Import")
@@ -273,6 +278,59 @@ end
 
 -- Computer players (AI fill: "Add a computer" in a bowling or darts lobby) ----------------------------------------
 MinigameService.AI_DELAY = 2.2
+MinigameService.DART_AI = { "Treble Trev", "Bullseye Bea", "Oche Ollie" } -- (the bowlers' names stay at the lanes)
+
+-- The middle of a ring of segment n on the dartboard (mm): r 103 the treble, 166 the double, 134 the fat single.
+local function ringPoint(n: number, r: number): (number, number)
+	local idx = table.find(Darts.ORDER, n) or 1
+	local a = math.rad((idx - 1) * 18)
+	return r * math.sin(a), r * math.cos(a)
+end
+
+-- Where a computer points its next dart (board mm; g is the rules' state). 501: treble 20 while there is plenty
+-- left, then a single that leaves a double, then that double (50 is the bull). Cricket: the treble of the first
+-- number it has not closed, the bull last; with everything closed and still behind, a number a rival has open.
+function MinigameService.dartsAim(g: any, seat: number): (number, number)
+	local p = g.players[seat]
+	if p == nil then
+		return 0, 0
+	end
+	if g.mode == "501" then
+		local left = p.score
+		if left == 50 then
+			return 0, 0
+		elseif left <= 40 and left % 2 == 0 then
+			return ringPoint(left // 2, 166)
+		elseif left <= 40 then
+			return ringPoint(1, 134) -- an odd number: a single 1 leaves a double
+		elseif left <= 60 then
+			return ringPoint(left - 40, 134) -- leaves double 20
+		elseif left < 100 then
+			return ringPoint(20, 134)
+		end
+		return ringPoint(20, 103)
+	end
+	local want: number? = nil
+	for _, n in Darts.CRICKET do
+		if p.marks[n] < 3 then
+			want = n
+			break
+		end
+	end
+	if want == nil then
+		for _, n in Darts.CRICKET do
+			for i, q in g.players do
+				if i ~= seat and q.marks[n] < 3 then
+					want = want or n
+				end
+			end
+		end
+	end
+	if want == nil or want == 25 then
+		return 0, 0
+	end
+	return ringPoint(want, 103)
+end
 
 function MinigameService._addAi(self: any, st: Station): (boolean, string?)
 	local s = st.session
@@ -285,6 +343,9 @@ function MinigameService._addAi(self: any, st: Station): (boolean, string?)
 	self.aiCount = (self.aiCount or 0) + 1
 	local who = Referee.AI[(self.aiCount - 1) % #Referee.AI + 1]
 	local name = who.name .. " (computer)"
+	if st.kind == "dartboard" then
+		name = MinigameService.DART_AI[(self.aiCount - 1) % #MinigameService.DART_AI + 1] .. " (computer)"
+	end
 	local key = { ai = true, Name = name, skill = who.skill, UserId = -self.aiCount }
 	local ok, why = Session.join(s, key, name, self.clock)
 	st.dirty = true
@@ -329,7 +390,7 @@ function MinigameService._announceRoll(self: any, st: Station, seat: number?, sc
 end
 
 -- the computer's go: a bowler of its own skill (Bowling/Referee: the pocket on a full rack, the nearest pin on a
--- spare, with its own aim and power error) or a pub darts player (T20 or the bull, timing near the sweet spot)
+-- spare, with its own aim and power error) or a pub darts player (dartsAim, timing near the sweet spot)
 function MinigameService._aiTurn(self: any, st: Station, key: any)
 	if st.aiAt == nil then
 		st.aiAt = self.clock + MinigameService.AI_DELAY
@@ -348,12 +409,13 @@ function MinigameService._aiTurn(self: any, st: Station, key: any)
 		local seat = Session.seatOf(s, key)
 		local g = s.game and s.game.state
 		local aimX, aimY = 0, 103 -- T20
-		if g and g.mode == "501" and g.players[seat or 1].score <= 50 then
-			aimX, aimY = 0, 0
+		if g and seat then
+			aimX, aimY = MinigameService.dartsAim(g, seat)
 		end
+		local was = self:_cricketPoints(st, seat)
 		local ok = Session.apply(s, key, "throw", { aimX, aimY, 0.5 + st.rng.range(-0.09, 0.09) }, self.clock)
 		if ok then
-			self:_afterDart(st, seat)
+			self:_afterDart(st, seat, was)
 		end
 	end
 end
@@ -587,6 +649,7 @@ function MinigameService.leave(self: any, player: any, why: string?, text: strin
 		if st.kind == "lane" then
 			st.hw:reset(true)
 		elseif st.kind == "dartboard" then
+			st.clearAt = nil
 			st.hw:clear()
 			st.hw:idle(true)
 		end
@@ -599,6 +662,7 @@ function MinigameService._onStart(self: any, st: Station)
 	if st.kind == "lane" and st.hw then
 		st.hw:reset(true)
 	elseif st.kind == "dartboard" and st.hw then
+		st.clearAt = nil
 		st.hw:clear()
 		st.hw:idle(false)
 	end
@@ -707,21 +771,60 @@ function MinigameService.input(self: any, player: any, payload: any): (boolean, 
 			return false, "Wait for the dart to land"
 		end
 		local seat = Session.seatOf(s, player)
+		local was = self:_cricketPoints(st, seat)
 		local ok, why =
 			Session.apply(s, player, "throw", { num(args[1], 0), num(args[2], 0), num(args[3], 0.5) }, self.clock)
 		if ok then
-			self:_afterDart(st, seat)
+			self:_afterDart(st, seat, was)
 		end
 		return ok, why
 	end
 	return false, "That does not work at this game"
 end
 
-function MinigameService._afterDart(self: any, st: Station, seat: number?)
+-- The thrower's points before a dart (cricket only: what the dart then adds is what the banner says it scored).
+function MinigameService._cricketPoints(_self: any, st: Station, seat: number?): number?
+	local g = st.session.game
+	local state = g and g.state
+	local p = state and seat and state.players and state.players[seat]
+	return if p and state.mode == "cricket" then p.score else nil
+end
+
+-- What the banner says of a dart. 501: what it was and what it took off (or the bust, or the checkout). Cricket:
+-- a hit on the board is worth nothing by itself; only closing a number and the points it scored are said.
+local function dartText(hit: any, cricket: boolean, gained: number): string
+	if hit.event == "bust" then
+		return `BUST! ({hit.label})`
+	elseif hit.event == "checkout" then
+		return `CHECKOUT! {hit.label}`
+	elseif hit.event == "win" then
+		return `{hit.label} - closes it out!`
+	elseif not cricket then
+		return if hit.points > 0 then `{hit.label}  (+{hit.points})` else hit.label
+	end
+	local text = hit.label
+	if hit.event == "closed" then
+		text ..= " - closed"
+	elseif hit.event == "nothing" and hit.label ~= "MISS" then
+		text ..= " - no score"
+	end
+	if gained > 0 then
+		text ..= `  (+{gained})`
+	end
+	return text
+end
+
+function MinigameService._afterDart(self: any, st: Station, seat: number?, was: number?)
 	local s = st.session
 	local g = s.game
 	local hit = g and g.state.lastHit
 	if hit and st.hw then
+		-- the turn before's darts are still in the board (the next thrower was quick): they come out now, never
+		-- a beat later together with this one
+		if st.clearAt ~= nil then
+			st.clearAt = nil
+			st.hw:clear()
+		end
 		-- the dart leaves the thrower's hand when there is one
 		local from: Vector3? = nil
 		local key = seat and s.seats[seat]
@@ -731,18 +834,9 @@ function MinigameService._afterDart(self: any, st: Station, seat: number?)
 			from = hand.Position + Vector3.new(0, 0.6, 0)
 		end
 		st.hw:land(hit.x, hit.y, seat, from)
-		local text: string
-		if hit.event == "bust" then
-			text = `BUST! ({hit.label})`
-		elseif hit.event == "checkout" then
-			text = `CHECKOUT! {hit.label}`
-		elseif hit.event == "win" then
-			text = `{hit.label} - closes it out!`
-		elseif hit.event == "closed" then
-			text = `{hit.label} - closed`
-		else
-			text = if hit.points > 0 then `{hit.label}  (+{hit.points})` else hit.label
-		end
+		local cricket = g.state.mode == "cricket"
+		local line = seat and g.state.players[seat]
+		local gained = if cricket and was ~= nil and line then math.max(0, line.score - was) else 0
 		self:_broadcast(st, {
 			kind = "dart",
 			station = st.id,
@@ -750,8 +844,9 @@ function MinigameService._afterDart(self: any, st: Station, seat: number?)
 			y = hit.y,
 			label = hit.label,
 			points = hit.points,
+			gained = if cricket then gained else nil,
 			event = hit.event,
-			text = text,
+			text = dartText(hit, cricket, gained),
 			seat = hit.seat,
 		})
 		-- the turn passed (three darts or a bust): pull the darts out after a beat
@@ -790,9 +885,10 @@ function MinigameService.debugDart(self: any, id: string, xmm: number, ymm: numb
 	end
 	local s = st.session
 	local seat = Session.turn(s)
+	local was = self:_cricketPoints(st, seat)
 	local ok, why = Session.apply(s, "server", "land", { xmm, ymm }, self.clock)
 	if ok then
-		self:_afterDart(st, seat)
+		self:_afterDart(st, seat, was)
 	end
 	return ok, why
 end
@@ -1001,19 +1097,37 @@ function MinigameService.step(self: any, dt: number)
 					})
 				end
 			elseif e.kind == "timeout" then
+				local what = if st.kind == "dartboard" then "turn" else "frame"
 				self:_broadcast(st, {
 					kind = "event",
 					station = st.id,
-					text = `{s.names[e.seat] or "?"} took too long: that frame is skipped`,
+					text = `{s.names[e.seat] or "?"} took too long: that {what} is skipped`,
 				})
 				if st.kind == "lane" and st.hw then
 					st.hw:hold(nil)
 					st.hw.heldBy = nil
+				elseif st.kind == "dartboard" and st.hw then
+					-- the darts of the turn that was cut short come out with it
+					st.clearAt = nil
+					st.hw:clear()
+				end
+			elseif e.kind == "skipped" then
+				-- (a thrower who left: the rest of their turn was played out as misses)
+				if st.kind == "dartboard" and st.hw then
+					st.clearAt = nil
+					st.hw:clear()
 				end
 			elseif e.kind == "removed" and e.key ~= nil then
 				self.playerStation[e.key] = nil
 				st.seen[e.key] = nil
-				self:fire(e.key, { kind = "left", station = st.id, why = "idle" })
+				self:fire(e.key, {
+					kind = "left",
+					station = st.id,
+					why = "idle",
+					text = if st.kind == "dartboard"
+						then "You were taken off the dartboard: two turns in a row went unplayed"
+						else nil,
+				})
 			elseif e.kind == "done" then
 				local r = s.result
 				local w = r and r.winner and s.names[r.winner]
@@ -1032,6 +1146,7 @@ function MinigameService.step(self: any, dt: number)
 				if st.kind == "lane" and st.hw then
 					st.hw:reset(true)
 				elseif st.kind == "dartboard" and st.hw then
+					st.clearAt = nil
 					st.hw:clear()
 					st.hw:idle(true)
 				end
@@ -1043,7 +1158,14 @@ function MinigameService.step(self: any, dt: number)
 			if Session.seatOf(s, p) == nil and self.playerStation[p] == id then
 				self.playerStation[p] = nil
 				st.seen[p] = nil
-				self:fire(p, { kind = "left", station = id, why = "finished" })
+				self:fire(p, {
+					kind = "left",
+					station = id,
+					why = "finished",
+					text = if st.kind == "dartboard"
+						then "That game is over and the dartboard is free. Press E at the dartboard to play again."
+						else nil,
+				})
 				st.dirty = true
 			end
 		end
@@ -1060,6 +1182,7 @@ function MinigameService.step(self: any, dt: number)
 				if st.kind == "lane" and st.hw then
 					st.hw:reset(true)
 				elseif st.kind == "dartboard" and st.hw then
+					st.clearAt = nil
 					st.hw:clear()
 					st.hw:idle(true)
 				end
