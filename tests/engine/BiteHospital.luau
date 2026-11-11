@@ -240,7 +240,7 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 		check(heldBody:GetAttribute("Med") == nil, "Med shows while incubating")
 		-- the player walks in through the front doors and stands in reception
 		local r = layout.reception
-		heldBody:PivotTo(CFrame.new(r[1], at.Y, r[2]))
+		heldBody:PivotTo(CFrame.new(r[1], G.traffic.heightAt(r[1], r[2]) + 3.5, r[2]))
 		step(2.5)
 		check(infection:stateOf(heldId) == "treated", `in reception the case is {infection:stateOf(heldId)}`)
 		check(holder.attrs.Infected == "treating", `Infected attribute is {holder.attrs.Infected}`)
@@ -256,6 +256,12 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 	end
 
 	-- 3. nothing left behind ----------------------------------------------------------------------------
+	-- (the rodent may have caught somebody else who stood beside a victim: their case runs out first)
+	local drained, drainSecs = waitFor(900, function(): boolean
+		return next(infection:cases()) == nil and next(infection.leaving) == nil
+	end)
+	numbers.drainedAfter = drainSecs
+	check(drained, "a case is still open 15 minutes after the last bite")
 	step(5)
 	local orders, sunk = 0, 0
 	for _, a in world.actors do
@@ -278,7 +284,11 @@ function BiteHospital.run(_opts: { [string]: any }?): { [string]: any }
 	end
 	numbers.stats = infection:stats()
 	check(infection:stats().faults == 0, `{infection:stats().faults} contained faults`)
-	check(infection:stats().cured == 2, `{infection:stats().cured} cures`)
+	check(infection:stats().cured >= 2, `{infection:stats().cured} cures`)
+	check(
+		infection:stats().cured == infection:stats().cases,
+		`{infection:stats().cases} cases, {infection:stats().cured} cured`
+	)
 	local okLedger, errors = possession:check()
 	check(okLedger, `possession ledger: {table.concat(errors, "; ")}`)
 	G.stop()

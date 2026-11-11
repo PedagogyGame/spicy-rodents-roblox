@@ -4,7 +4,7 @@
 -- home; then a bitten person a player holds, told what to do and cured by standing in the hospital.
 -- Sent by: node tools/cloud/cloud.mjs run_engine_tests tools/cloud/tasks/bite_hospital_smoke.luau --version <v>
 --          --place ci --inject ci.project.json --inject-exclude generated
--- The run steps about 20 minutes of game time by hand (0.1 s frames).
+-- The run steps up to about 30 minutes of game time by hand (0.1 s frames).
 
 local ServerStorage = game:GetService("ServerStorage")
 
