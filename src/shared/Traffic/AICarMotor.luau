@@ -119,10 +119,7 @@ function AICarMotor.new(
 		local z = if lane.axis == "z" then along else probe.z
 		s = LaneMath.arcOf(lane, x, z, dir)
 	end
-	local hidden = e.class == "legacy_ambulance"
-		or e.class == "responder"
-		or e.class == "incident"
-		or e.class == "event"
+	local hidden = e.class == "legacy_ambulance" or e.class == "responder" or e.class == "incident"
 	local v: Vehicle = {
 		id = e.id,
 		name = e.name,
@@ -136,7 +133,7 @@ function AICarMotor.new(
 		cruise = o.cruise or 0,
 		box = Boxes.get(e.kind),
 		visible = not hidden,
-		phase = if hidden or e.class == "motorcycle" then "idle" else "drive",
+		phase = if hidden or e.class == "motorcycle" or e.class == "event" then "idle" else "drive",
 		home = lane,
 		timer = o.wait or 0,
 		n = 0,
@@ -1098,28 +1095,24 @@ stepClass.incident = function(v, ctx, dt, events)
 	trip(v, ctx, dt, events, v.lane.speeds.police_car or st(23), v.lane.speeds.police_car or st(23), 48)
 end
 
+-- The living-event sedans (§5.11): each glides from its home spot to its space at the event, stands there
+-- for the event and glides back. Between events it stands parked at its home spot: v5.4 hid it there
+-- and showed it again 29 minutes later, three cars side by side appearing out of nothing and vanishing
+-- where they stood.
 stepClass.event = function(v, ctx, dt, events)
 	local phase = (ctx.now - v.offset) % 2400
-	local t: number? = nil
+	local t = 0
 	if phase < 600 then
 		t = math.min(1, phase / 48)
 	elseif phase < 650 then
 		t = 1 - (phase - 600) / 50
 	end
-	if t == nil then
-		if v.visible then
-			table.insert(events, "hide")
-		end
-		v.visible, v.speed = false, 0
-		return
+	if phase < dt then
+		table.insert(events, "event")
 	end
-	if not v.visible then
-		v.visible = true
-		v.teleported = true
-		table.insert(events, "appear")
-	end
+	v.visible = true
 	local lane = v.lane
-	local s = (t :: number) * lane.length
+	local s = t * lane.length
 	v.speed = math.abs(s - v.s) / math.max(dt, 1e-6)
 	v.s = s
 	place(v, ctx, lane, math.pi) -- yaw PI throughout (§5.11)

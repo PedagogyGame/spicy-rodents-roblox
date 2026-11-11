@@ -6,8 +6,8 @@
 -- the second): at 60 s to 10 s before they leave, and at 135 s to 5 s before the second cycle.
 -- Measured on the base tree: each car pops into view at its home spot (about 1,110 st inside the town)
 -- and glides 35 st to its space at 0.73 st/s; on leaving it glides back and vanishes where it stands.
--- The glide itself is smooth; the pops are the port (AICarMotor stepClass.event: `visible` flips with
--- the cycle phase, no drive in or out).
+-- The glide itself is smooth; the pops were the port (AICarMotor stepClass.event: `visible` flipped with
+-- the cycle phase). Fixed since: between events the cars stand parked at their home spots.
 local Fleet = require("@shared/Traffic/Fleet")
 local Replay = require("../lib/Replay")
 
@@ -44,9 +44,10 @@ local scenario: Replay.Scenario = {
 			"ghost_visibility",
 			"sink",
 			"float",
+			"appear",
+			"disappear",
 		},
 	},
-	known = { "appear", "disappear" },
 }
 
 return scenario

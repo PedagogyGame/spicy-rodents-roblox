@@ -183,7 +183,10 @@ return function(t)
 		local stats = svc:stats()
 		for _, v in svc.vehicles do
 			if v.offset >= 1200 then
-				t.falsy(v.visible, `{v.name}: the softball event starts at 1200 s`)
+				-- the softball event starts at 1200 s: until then its cars stand parked at their home spots
+				t.truthy(v.visible, `{v.name}: parked in view, not hidden`)
+				t.near(v.x, start[v.id][1], 1e-6)
+				t.near(v.z, start[v.id][2], 1e-6)
 				continue
 			end
 			t.truthy(seen[v.id], `{v.name} ({v.class}) moved at least 5 u from its spawn`)
