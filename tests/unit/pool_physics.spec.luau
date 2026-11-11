@@ -168,18 +168,14 @@ return function(t)
 			local function off(side: number, degIn: number?): number
 				local a = math.rad(degIn or 45)
 				local v = 10
-				local w = world(
-					pool,
-					{ { id = 0, x = -2, z = pool.halfL - R - 0.3 } },
-					{
-						id = 0,
-						vx = v * math.cos(a),
-						vz = v * math.sin(a),
-						qx = v * math.cos(a),
-						qz = v * math.sin(a),
-						s = side,
-					}
-				)
+				local w = world(pool, { { id = 0, x = -2, z = pool.halfL - R - 0.3 } }, {
+					id = 0,
+					vx = v * math.cos(a),
+					vz = v * math.sin(a),
+					qx = v * math.cos(a),
+					qz = v * math.sin(a),
+					s = side,
+				})
 				untilEvents(w, 1)
 				local b = w.balls[1]
 				return math.deg(math.atan2(-b.vz, b.vx)) -- the angle off the cushion on the way out
