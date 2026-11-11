@@ -12,7 +12,19 @@ local scenario: Replay.Scenario = {
 	ci = 30,
 	entries = { Fleet.byClass("van")[1], Fleet.byClass("trolley")[1] },
 	expect = {
-		none = { "teleport_unflagged", "teleport_bit_dropped", "speed_stutter", "reverse_travel", "sink", "float" },
+		-- both used to stop dead from 9 to 14 st/s (a snap over the last 0.25 to 0.35 u), and the van surged and
+		-- dragged by up to 74 % around its U-turns (a 200-division arc table)
+		none = {
+			"teleport_unflagged",
+			"teleport_bit_dropped",
+			"speed_stutter",
+			"reverse_travel",
+			"sink",
+			"float",
+			"accel_spike",
+			"sim_jump_unflagged",
+			"position_jump",
+		},
 	},
 }
 

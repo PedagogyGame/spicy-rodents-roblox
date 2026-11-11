@@ -114,6 +114,7 @@ function LaneMath.isVehicleLane(id: string): boolean
 	return not (string.sub(id, 1, 8) == "sidewalk" or string.sub(id, 1, 7) == "novelty")
 end
 
+LaneMath.LOOP_ARC_DIVISIONS = 4000 -- arc-length table of loop lanes (the ice cream loop: 0.3 st apart)
 LaneMath.POLY_OFFSET = Units.st(3) -- keep-right offset for centreline polylines (inside an 18 u road's right half)
 
 function LaneMath.poly(pts: { { number } }): Poly
@@ -260,6 +261,13 @@ function LaneMath.fromRecord(rec: LaneRecord): (Lane?, string?)
 			pts[i] = Curve.vec3(p[1], 0, p[2])
 		end
 		local curve = Curve.new(pts, true)
+		local length = curve:getLength() -- v5.4's 200-division length (traffic.md verifier 13)
+		-- ...but a vehicle drives it by arc length, and 200 divisions are 6.5 st each on this loop: inside
+		-- one, the raw parameter's speed changes sharply where the long straights meet the tight U-turn
+		-- knots, so the van surged and dragged by up to 30 % going into each U-turn. A dense table maps arc
+		-- length to the parameter evenly (the length moves by under 0.1 %; `length` stays v5.4's).
+		curve.arcLengthDivisions = LaneMath.LOOP_ARC_DIVISIONS
+		curve._lengths = nil
 		return {
 			id = rec.id,
 			shape = "loop",
@@ -268,7 +276,7 @@ function LaneMath.fromRecord(rec: LaneRecord): (Lane?, string?)
 			startAt = 0,
 			endAt = 0,
 			dir = 1,
-			length = curve:getLength(),
+			length = length,
 			curve = curve,
 			speeds = speedsOf(rec),
 			speedRanges = rangesOf(rec),

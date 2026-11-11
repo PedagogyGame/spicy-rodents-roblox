@@ -85,4 +85,41 @@ return function(t)
 		t.truthy((events.turn or 0) >= 4, `turned {events.turn} times`)
 		t.truthy((events.stopped or 0) + (svc:stats().violations.rollingStop or 0) >= 4, "stop lines both ways")
 	end)
+
+	t.test("ice cream loop: even speed by arc length, through both U-turns", function()
+		local lanes = LaneMath.load(records)
+		local loop = lanes.icecream_loop
+		local step = 19 / 30 -- the van's cruise, one tick
+		local worst = 0
+		local s = 0
+		local p = LaneMath.pointAt(loop, 0)
+		while s < loop.length do
+			s += step
+			local q = LaneMath.pointAt(loop, s)
+			worst = math.max(worst, math.abs(math.sqrt((q.x - p.x) ^ 2 + (q.z - p.z) ^ 2) / step - 1))
+			p = q
+		end
+		t.truthy(worst < 0.02, `a tick's distance is off its arc length by {worst * 100} %`)
+	end)
+
+	t.test("van and trolley: braked into every stop, no lurch and no dead stop from speed", function()
+		for _, id in { 5, 13 } do
+			local svc = service({ entry(id) })
+			local v = svc.byId[id]
+			local dt = 1 / 30
+			local stops, last = 0, v.speed
+			for _ = 1, 30 * 200 do
+				local px, pz, pphase = v.x, v.z, v.phase
+				svc:step(dt)
+				local moved = math.sqrt((v.x - px) ^ 2 + (v.z - pz) ^ 2)
+				t.truthy(moved <= math.max(last, v.speed) * dt + 0.02, `{v.name}: {moved} st in a tick at {last} st/s`)
+				if v.phase == "dwell" and pphase ~= "dwell" then
+					stops += 1
+					t.truthy(last < 2.5, `{v.name}: stopped dead from {last} st/s`)
+				end
+				last = v.speed
+			end
+			t.truthy(stops >= 5, `{v.name}: {stops} stops`)
+		end
+	end)
 end

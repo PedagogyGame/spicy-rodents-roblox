@@ -400,7 +400,9 @@ stepClass.van = function(v, ctx, dt, events)
 		local danger = LaneMath.seesHazard(v.x, v.z, fx, fz, st(7.7), st(1.85), hazards(v, ctx, fx, fz, true)) ~= nil
 		local desired = if danger then 0 else math.min(v.cruise, math.sqrt(2 * st(5.0) * dist))
 		v.speed = approach(v.speed, desired, (if desired < v.speed then st(11) else st(4.5)) * dt)
-		if not danger and dist <= math.max(st(0.35), v.speed * dt + st(0.35)) then
+		-- arrive when this tick's step reaches the stop: the braking profile brings the van in at a crawl
+		-- (it used to snap the last 0.35 u + one step, a 1 st hop from 11 st/s to a dead stop)
+		if not danger and dist <= math.max(st(0.01), v.speed * dt) then
 			v.s = target
 			v.speed = 0
 			v.phase = "dwell"
@@ -435,7 +437,9 @@ stepClass.trolley = function(v, ctx, dt, events)
 		local desired = if danger then 0 else cap
 		v.speed = approach(v.speed, desired, (if desired < v.speed then st(12) else st(4.6)) * dt)
 		x += math.min(math.abs(delta), v.speed * dt) * d
-		if not danger and math.abs(destX - x) < st(0.25) then
+		-- arrive when the profile has brought it in (it used to snap the last 0.25 u: from about 5 st/s
+		-- the trolley lurched forward at 20 st/s for one tick and stopped dead)
+		if not danger and math.abs(destX - x) < st(0.01) then
 			x = destX
 			v.speed = 0
 			v.phase = "dwell"
