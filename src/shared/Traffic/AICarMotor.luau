@@ -615,6 +615,7 @@ stepClass.motorcycle = function(v, ctx, dt, events)
 end
 
 local POLY_ACCEL = st(5) -- 12.5 st/s2 pulling away
+local TURN_SPEED = st(3) -- 7.5 st/s round the 7.5 st U-turn at the scene: 1 rad/s
 local POLY_BRAKE = st(6) -- 15 st/s2 into a corner or the end of the route
 local CORNER_LATERAL = st(10) -- 25 st/s2 round a corner: 22 st/s through a 20 st one
 
@@ -634,10 +635,13 @@ local function drivePolyline(
 	else
 		-- pulls away, slows for each corner and brakes to a stop at the end (it used to run at full speed
 		-- from the first tick to the last: 0 to 31 st/s and back in one tick)
+		-- and keeps behind a vehicle ahead on the same route (both incident cars drive one polyline)
+		local gap = gapAhead(v, fx, fz, st(24), v.box.width / 2, sameWay(v, ctx, fx, fz))
 		local cap = math.min(
 			speed,
 			LaneMath.cornerCap(lane, v.dir, v.s, CORNER_LATERAL, POLY_BRAKE),
-			math.max(math.sqrt(2 * POLY_BRAKE * math.max(0, len - v.s)), st(0.4))
+			math.max(math.sqrt(2 * POLY_BRAKE * math.max(0, len - v.s)), st(0.4)),
+			math.max(0, (gap - st(2)) * 1.2)
 		)
 		v.speed = approach(v.speed, cap, (if cap < v.speed then POLY_BRAKE else POLY_ACCEL) * dt)
 	end
@@ -706,9 +710,27 @@ local function trip(
 		v.speed = 0
 		v.timer -= dt
 		if v.timer <= 0 then
-			v.phase, v.dir, v.s = "back", -1, 0
+			v.phase, v.timer = "turn", 0
 		end
 		place(v, ctx, route)
+		return
+	end
+	if v.phase == "turn" then
+		-- a U-turn onto the return side of the road (it used to flip round on the spot and jump 15 st
+		-- sideways to the return path's start): a half circle of POLY_OFFSET from the end of the route
+		local r = LaneMath.POLY_OFFSET
+		v.speed = approach(v.speed, TURN_SPEED, POLY_ACCEL * dt)
+		local d = v.timer + v.speed * dt
+		if d >= math.pi * r then
+			v.phase, v.dir, v.s, v.timer = "back", -1, math.min(d - math.pi * r, LaneMath.length(route, -1)), 0
+			place(v, ctx, route)
+			return
+		end
+		v.timer = d
+		local e = LaneMath.pointAt(route, LaneMath.length(route, 1), 1)
+		local p = LaneMath.halfTurn(e.x, e.z, e.yaw, r, d)
+		v.x, v.z, v.yaw = p.x, p.z, p.yaw
+		v.y = ctx.heightAt(v.x, v.z) + BASE_LIFT
 		return
 	end
 	local done = drivePolyline(v, ctx, route, if v.phase == "out" then outSpeed else backSpeed, st(3.1), dt)

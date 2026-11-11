@@ -600,6 +600,20 @@ function LaneMath.polyPoint(poly: Poly, s: number): (number, number, number)
 	return x, z, math.atan2(b[1] - a[1], b[2] - a[2])
 end
 
+-- halfTurn(x, z, yaw, r, d) -> pose: d studs into a left U-turn of radius r that starts at (x, z) heading
+-- `yaw` and ends 2r to its left heading the other way (the right of heading f is (-fz, fx), its left
+-- (fz, -fx)).
+function LaneMath.halfTurn(x: number, z: number, yaw: number, r: number, d: number): Pose
+	local fx, fz = math.sin(yaw), math.cos(yaw)
+	local lx, lz = fz, -fx
+	local phi = math.clamp(d / math.max(r, 1e-9), 0, math.pi)
+	local c, sn = math.cos(phi), math.sin(phi)
+	local px = x + r * lx * (1 - c) + r * fx * sn
+	local pz = z + r * lz * (1 - c) + r * fz * sn
+	local tx, tz = lx * sn + fx * c, lz * sn + fz * c
+	return { x = px, y = 0, z = pz, yaw = math.atan2(tx, tz) }
+end
+
 -- cornerCap(lane, dir, s, lateral, decel) -> speed: the fastest a vehicle at s may go so that it can
 -- slow, at `decel`, to take every rounded corner ahead at `lateral` sideways acceleration (math.huge on
 -- lanes without corners).
