@@ -32,6 +32,7 @@ type Harness = {
 	toasts: { { id: number, key: string } },
 	players: { [number]: boolean },
 	time: number,
+	worstMs: number, -- the longest single step of the service (it runs inside a server frame)
 	step: (secs: number, each: (() -> ())?) -> (),
 	runUntil: (limit: number, done: () -> boolean, each: (() -> ())?) -> boolean,
 	rodent: number,
@@ -64,6 +65,7 @@ return function(t)
 			toasts = {},
 			players = {},
 			time = 0,
+			worstMs = 0,
 			rodent = 0,
 		} :: any
 		for _, a in world.actors do
@@ -133,7 +135,9 @@ return function(t)
 				h.time += DT
 				TownAI.stepFrame(world, DT)
 				traffic:step(DT, trafficWorld())
+				local t0 = os.clock()
 				h.svc:step(DT)
+				h.worstMs = math.max(h.worstMs, (os.clock() - t0) * 1000)
 				if each then
 					each()
 				end
@@ -833,8 +837,11 @@ return function(t)
 				print(
 					`      seed {seed}: {n} cases ({table.concat(kinds, ", ")}): {s.dispatched} ambulance trips, {s.walkIns} walk-ins, {s.abandoned} without an ambulance, {s.crowds} crowds, {s.lines} lines; all home at {math.floor(
 						h.time
-					)} s`
+					)} s; longest service step {math.floor(h.worstMs * 10) / 10} ms`
 				)
+				-- the service runs inside a server frame: no step may hold one up for long (the path
+				-- searches are budgeted; this is Lune on a shared machine, so the bound is loose)
+				t.truthy(h.worstMs < 40, `seed {seed}: a service step took {h.worstMs} ms`)
 			end
 		end
 	)

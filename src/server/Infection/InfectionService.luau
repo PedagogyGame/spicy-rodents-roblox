@@ -125,6 +125,7 @@ InfectionService.SPOT_SPEAK = 0.65 -- share of spotters whose line is a "spottin
 InfectionService.FLEE_SPEED = 19 -- studs/s: a bitten staff member's run, the pedestrians' flee pace (7.6 u/s)
 InfectionService.CROWD_CANDIDATES = 8 -- the nearest people asked to a scene, at most
 InfectionService.CROWD_DETOUR = 60 -- studs a bystander will walk round a building, beyond the straight line
+InfectionService.CROWD_SEARCHES = 4 -- ways round a building looked for per scene, at most (a scene opens in one frame)
 InfectionService.HOME_SNAP = 45 -- studs: a townsperson's walk home ends on the pavement this near the bite
 InfectionService.RETRY_SECS = 20 -- a case whose step failed tries again after this, times its failures
 InfectionService.CREW_WALK_SECS = 12 -- the crew walks this long to a patient; anything further it runs
@@ -632,9 +633,14 @@ local function openScene(self: Service, rec: Record)
 	-- each comes by the straight line when it is clear, else round the building in the way (a short
 	-- detour only); someone with no way over is replaced by the next nearest
 	local detour = InfectionService.CROWD_DETOUR
+	local searches = 0
 	local placed = Bystanders.assign(people, spots, function(p: any, x: number, z: number): { { number } }?
 		if clearLine(self, p.x, p.z, x, z) then
 			return { { x, z } }
+		end
+		searches += 1
+		if searches > InfectionService.CROWD_SEARCHES then
+			return nil
 		end
 		local direct = math.sqrt((x - p.x) ^ 2 + (z - p.z) ^ 2)
 		return (FootPath.find(self.foot, p.x, p.z, x, z, { maxLength = direct + detour, maxNodes = 400 }))
