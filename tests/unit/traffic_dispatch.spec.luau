@@ -9,6 +9,7 @@ local Data = require("@shared/Data")
 local Town = require("@shared/World/Town")
 local MedicalRoute = require("@shared/Infection/MedicalRoute")
 local LaneMath = require("@shared/Traffic/LaneMath")
+local AICarMotor = require("@shared/Traffic/AICarMotor")
 local Ghost = require("@shared/Traffic/Ghost")
 local Schemas = require("@shared/Net/Schemas")
 local Net = require("@shared/Net/Net")
@@ -279,6 +280,91 @@ return function(t)
 		t.truthy(secs < 60, `{secs} s: no 30 s wait on scene`)
 		t.truthy((svc:stats().events.arrived or 0) == 1 and (svc:stats().events.home or 0) == 1)
 	end)
+
+	t.test(
+		"a person standing in the way is waited for, but not for ever: the responder edges past, reaches its scene and comes home",
+		function()
+			local home = service():responderHome() :: { number }
+			local stage = MedicalRoute.stage(roads, -800, 300) :: MedicalRoute.Stage
+			local trip = MedicalRoute.trip(roads, home, stage) :: { { number } }
+			-- the same trip with nobody about: how long it takes out and back
+			local clear = service()
+			local c = clear:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
+			local clearOut = drive(clear, c, 200, function(veh: any): boolean
+				return veh.phase == "hold"
+			end)
+			clear:releaseResponder(c)
+			local clearBack = drive(clear, c, 200, function(veh: any): boolean
+				return veh.phase == "idle"
+			end)
+			-- a townsperson a player holds, standing on the hospital drive in front of where the three
+			-- responders start (the walk to the hospital door every infected player is sent on ends
+			-- here): not one of the hospital's own, so the hard stop applies
+			local world = { people = { { kind = "human", x = -884, y = 0, z = 731, visible = true } } }
+			local function run(svc: any, v: any, limit: number, stop: (v: any) -> boolean): number
+				local secs = 0
+				while secs < limit and not stop(v) do
+					svc:step(1 / 30, world)
+					secs += 1 / 30
+				end
+				return secs
+			end
+			local svc = service()
+			local v = svc:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
+			local x0, z0 = v.x, v.z
+			run(svc, v, AICarMotor.BLOCK_PATIENCE - 0.5, function(): boolean
+				return false
+			end)
+			t.truthy(math.abs(v.x - x0) + math.abs(v.z - z0) < 0.01, "it stops for the person first")
+			t.eq(v.speed, 0)
+			local out = run(svc, v, 200, function(veh: any): boolean
+				return veh.phase == "hold"
+			end)
+			t.eq(v.phase, "hold", "it reached the scene all the same")
+			t.truthy(
+				out + AICarMotor.BLOCK_PATIENCE - 0.5 < clearOut + 12,
+				`{out} s after the wait; {clearOut} s with nobody in the way`
+			)
+			-- and home again, past the same person (the trip home ends where it began)
+			svc:releaseResponder(v)
+			local back = run(svc, v, 200, function(veh: any): boolean
+				return veh.phase == "idle"
+			end)
+			t.eq(v.phase, "idle", "it came home")
+			t.truthy(back < clearBack + 12, `{back} s home; {clearBack} s with nobody in the way`)
+			t.eq(svc:responderIdle(), 3)
+			-- all three at once, as when several people collapse: none is held at the start of its route
+			local three = service()
+			local out3 = {}
+			for _ = 1, 3 do
+				table.insert(out3, three:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true }))
+			end
+			run(three, out3[1], 200, function(): boolean
+				for _, veh in out3 do
+					if veh.phase ~= "hold" then
+						return false
+					end
+				end
+				return true
+			end)
+			for _, veh in out3 do
+				t.eq(veh.phase, "hold", `{veh.name} reached the scene`)
+			end
+			-- someone who only crosses in front is still stopped for, and the count runs down again
+			local cross = service()
+			local w = cross:dispatchResponder({ stage.x, stage.z }, { route = trip, hold = true })
+			run(cross, w, 2, function(): boolean
+				return false
+			end)
+			t.eq(w.speed, 0, "stopped while they cross")
+			table.clear(world.people)
+			run(cross, w, 3, function(): boolean
+				return false
+			end)
+			t.truthy(w.speed > AICarMotor.BLOCK_CRAWL, "then on at its own speed")
+			t.eq(w.blocked, 0, "and the wait is forgotten")
+		end
+	)
 
 	t.test("unheld dispatches keep the plain scene timer; three at once, a fourth is refused", function()
 		local svc = service()
