@@ -123,6 +123,15 @@ class _Field:
         back = np.maximum(0.0, -((P - k["B"]) * k["c0"]).sum(1))  # no wood behind the child's start
         return k["ax"].dist(P, k["Rsw"]) + 2.0 * back
 
+    def kof(self, i, P):
+        """Blend radius at P: tight in the axil, wide under the child (the wood runs out along the
+        parent below a bough)."""
+        k = self.kids[i]
+        if self.mode == "fork":
+            return k["k"]
+        under = _ss(0.5 - ((P - k["X0"]) * k["tp"]).sum(1) / (2.0 * k["rc"]))
+        return k["k"] * (0.75 + (k["flare"] - 0.75) * under)
+
     def others(self, i, P):
         d = self.par.dist(P)
         for j in range(len(self.kids)):
@@ -134,8 +143,8 @@ class _Field:
         dp = self.par.dist(P)
         dc = [self.dkid(i, P) for i in range(len(self.kids))]
         f = dp
-        for i, k in enumerate(self.kids):
-            f = _smin(f, dc[i], k["k"])
+        for i in range(len(self.kids)):
+            f = _smin(f, dc[i], self.kof(i, P))
         if self.ridge > 0:
             if self.mode == "fork":
                 k = min(self.kids[0]["k"], self.kids[1]["k"])
@@ -160,8 +169,15 @@ class _Field:
 
     def cast(self, P, d, tmax):
         """Walk from P (inside or on the skin) along d to the skin."""
-        lo, hi = np.zeros(len(P)), np.full(len(P), float(tmax))
-        for _ in range(30):
+        n = len(P)
+        lo, hi, done = np.zeros(n), np.full(n, float(tmax)), np.zeros(n, bool)
+        for t in np.linspace(0.0, float(tmax), 25):  # the FIRST way out (a child may overhang the ray)
+            out = (self(P + t * d) >= 0) & ~done
+            hi = np.where(out, t, hi)
+            lo = np.where(done | out, lo, t)
+            done |= out
+        lo = np.minimum(lo, hi)
+        for _ in range(26):
             mid = 0.5 * (lo + hi)
             inside = self(P + mid[:, None] * d) < 0
             lo, hi = np.where(inside, mid, lo), np.where(inside, hi, mid)
@@ -186,6 +202,14 @@ class _Build:
         self.tri.append((a, b, c))
         self.uv.append((ua, ub, uc))
 
+    def strip_uv(self, ia, ib, uva, uvb):
+        """Quads between two closed rings of equal count, each vertex with its own bark coordinates."""
+        n = len(ia)
+        for j in range(n):
+            j1 = (j + 1) % n
+            self.add(ia[j], ia[j1], ib[j1], tuple(uva[j]), tuple(uva[j1]), tuple(uvb[j1]))
+            self.add(ia[j], ib[j1], ib[j], tuple(uva[j]), tuple(uvb[j1]), tuple(uvb[j]))
+
     def strip(self, ia, ib, n, cols, urep, va, vb):
         """Quads between two rings of n vertices for the columns `cols` (may run past n: u goes on)."""
         for j in cols:
@@ -195,11 +219,11 @@ class _Build:
             self.add(ia[j0], ia[j1], ib[j1], A, Bq, Cq)
             self.add(ia[j0], ib[j1], ib[j0], A, Cq, D)
 
-    def stitch(self, A, Bl, O, c, e1, e2):
-        """Triangles between two closed loops round the axis (O, c). A, Bl: lists of (index, point, uv)."""
+    def stitch(self, A, Bl, angle):
+        """Triangles between two closed loops, matched by angle(points (n,3)) -> radians round a
+        centre both loops go round. A, Bl: lists of (index, point, uv)."""
         def ang(L):
-            rel = np.array([p for _, p, _ in L]) - O
-            return np.arctan2((rel * e2).sum(1), (rel * e1).sum(1))
+            return angle(np.array([p for _, p, _ in L]))
 
         aA = ang(A)
         if np.sum(_wrap(np.diff(np.append(aA, aA[0])))) < 0:
@@ -238,7 +262,7 @@ class _Build:
         return P[vid], inv.reshape(-1, 3), uniq[:, 1:], Nrm[vid], T
 
 
-def _kid(par, C, R, swell, fillet, sB):
+def _kid(par, C, R, swell, fillet, sB, flare=1.0):
     """A child ready for the field: densely sampled near its base, swollen toward the parent."""
     C, R = np.asarray(C, float), np.asarray(R, float)
     raw = Axis(C, R)
@@ -252,7 +276,7 @@ def _kid(par, C, R, swell, fillet, sB):
     out = par.dist(c) > 0
     hx = float(hs[int(np.argmax(out))]) if out.any() else span
     Rsw = r * (1 + swell * (1 - _ss((hs - hx) / (1.6 * rc))))
-    return {"ax": ax, "Rsw": Rsw, "rc": rc, "k": k, "hx": hx, "span": span, "B": C[0], "c0": ax.T[0],
+    return {"ax": ax, "Rsw": Rsw, "rc": rc, "k": k, "flare": max(flare, 0.75), "hx": hx, "span": span, "B": C[0], "c0": ax.T[0],
             "X0": ax.at(hx)[0][0], "tp": par.at(sB)[2][0]}
 
 
@@ -262,7 +286,7 @@ def _collar(F, i, nc, fracs, margin):
     ax = k["ax"]
     hA = k["span"]
     for h in np.linspace(min(k["hx"] + 1.6 * k["rc"], k["span"]), k["span"], 40):  # first ring clear of the blend
-        if F.others(i, ax.ring(h, nc)[0]).min() >= k["k"]:
+        if F(ax.ring(h, nc)[0]).min() >= -1e-4:
             hA = float(h)
             break
     ang = np.arange(nc) * (2 * math.pi / nc)
@@ -285,7 +309,7 @@ def _collar(F, i, nc, fracs, margin):
             continue
         P, e = S(hi + t * (hA - hi))
         no = F.grad(P, lambda Q: F.others(i, Q))
-        P = F.cast(P, _norm(e + (1 - t) ** 2 * no), 2.5 * k["k"])
+        P = F.cast(P, _norm(e + (1 - t) ** 2 * no), 2.5 * k["k"] * k["flare"])
         rings.append((P, F.grad(P)))
     return rings, hA
 
@@ -317,8 +341,43 @@ def _child_skin(b, F, i, rings, hA, nc, urep, vtile, kid_raw_s, cap=True):
     return idx[0]
 
 
+def top_line_cover(V, F, limbs, step=0.2):
+    """The ray test for the squirrel's feet. For each limb (C, R) rays are shot at the centre line
+    from outside, along the limb's top line (the frame normal: world up made perpendicular to the
+    limb; +X for a vertical limb), every `step` studs. Returns per limb the lowest value of
+    (height of the skin above the centre line - the limb's own radius there): >= 0 means the skin
+    never falls below the radius between vertices."""
+    A, E1, E2 = V[F[:, 0]], V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]
+    out = []
+    for C, R in limbs:
+        ax = Axis(C, R)
+        c, r, _, N, _ = ax.at(np.arange(0.0, ax.L, step))
+        O, d = c + N * (r[:, None] + 3.0), -N
+        free = np.ones(len(c), bool)  # only where the top line and the ray's start are in the open air
+        for C2, R2 in limbs:
+            if C2 is not C:
+                a2 = Axis(C2, R2)
+                free &= (a2.dist(c + N * r[:, None]) > 0) & (a2.dist(O) > 0)
+        O, d, r = O[free], d[free], r[free]
+        worst = np.inf
+        with np.errstate(divide="ignore", invalid="ignore"):
+            for o, dd, rr in zip(O, d, r):
+                pv = np.cross(dd[None], E2)
+                inv = 1.0 / (E1 * pv).sum(1)
+                tv = o[None] - A
+                u = (tv * pv).sum(1) * inv
+                qv = np.cross(tv, E1)
+                v = (qv @ dd) * inv
+                t = (E2 * qv).sum(1) * inv
+                hit = (u >= -1e-9) & (v >= -1e-9) & (u + v <= 1 + 1e-9) & (t > 0)
+                if hit.any():
+                    worst = min(worst, 3.0 - float(t[hit].min()))
+        out.append(worst)
+    return out
+
+
 def junction_mesh(parent, children, sides=10, child_sides=6, fillet=1.0, swell=0.16, ridge=0.10, collar_rings=2,
-                  u_rep=2, child_u_rep=1, v_tile=4.0, child_v_tile=None, saddle=9, fork_margin=0.22, start_normal=None,
+                  u_rep=2, child_u_rep=1, v_tile=4.0, child_v_tile=None, saddle=9, fork_margin=0.22, flare=1.7, start_normal=None,
                   cap_ends=True):
     """One skin for a parent limb and the children that leave it.
 
@@ -327,6 +386,9 @@ def junction_mesh(parent, children, sides=10, child_sides=6, fillet=1.0, swell=0
                   line - between its ends (a side branch) or at its last point (a fork: exactly two).
     sides         vertices round the parent (even); child_sides: round each child (int or one per child).
     fillet        blend radius as a fraction of the child's base radius (capped at 0.7 parent radii).
+    flare         side branch only: the blend radius under the child (the side toward the parent's base)
+                  as a multiple of fillet; in the axil it is 0.75 of fillet. A flare ring on the parent
+                  (child_sides vertices) carries the shape.
     swell         how much thicker the child is at its base (fraction of its radius), gone 1.6 radii out.
     ridge         height of the bark ridge in the axil, fraction of the child's radius (0 = none).
     collar_rings  rings between the valley ring and the child's first plain ring (cost: 2 x child_sides
@@ -354,7 +416,12 @@ def junction_mesh(parent, children, sides=10, child_sides=6, fillet=1.0, swell=0
         kd = [np.asarray(c[0], float) for c in children]
         m = _norm(_norm(kd[0][1] - kd[0][0]) - _norm(kd[1][1] - kd[1][0]))
         tp = _norm(P[-1] - P[-2])
-        par = Axis(P, Rp, start_normal, end_normal=np.cross(m, tp))
+        # the parent keeps its own frame (a vertex column on its top line); the wood splits along the
+        # two columns nearest the plane between the children
+        par = Axis(P, Rp, start_normal)
+        want = np.cross(m, tp)
+        ja = int(round(math.atan2(float(want @ par.B[-1]), float(want @ par.N[-1])) / (2 * math.pi / sides))) % sides
+        N_e = par.N[-1] * math.cos(ja * 2 * math.pi / sides) + par.B[-1] * math.sin(ja * 2 * math.pi / sides)
         kids = [_kid(par, c[0], c[1], swell, fillet, par.L) for c in children]
         F = _Field(par, kids, "fork", ridge)
         E, rp = P[-1], float(Rp[-1])
@@ -362,7 +429,7 @@ def junction_mesh(parent, children, sides=10, child_sides=6, fillet=1.0, swell=0
         for off in np.arange(0.3 * rp, 6 * rp, 0.1 * rp):  # the parent's last plain ring
             s_lo = par.L - off
             Q = par.ring(s_lo, sides)[0]
-            if min(F.dkid(0, Q).min() - kids[0]["k"], F.dkid(1, Q).min() - kids[1]["k"]) >= 0:
+            if F(Q).min() >= -1e-4:
                 break
         s_lo = max(s_lo, 0.0)
         st = [s for s in par.s if s < s_lo - 0.35 * rp] + [s_lo]
@@ -373,36 +440,45 @@ def junction_mesh(parent, children, sides=10, child_sides=6, fillet=1.0, swell=0
         ntri0 = len(b.tri)
         last = ridx[-1]
         Pl = par.ring(s_lo, sides)[0]
-        N_e, T_e = par.N[-1], par.T[-1]
+        T_e = par.T[-1]
         th_e = math.pi - math.atan2(float(par.at(s_lo)[1][0]), par.L - s_lo)
-        th = np.linspace(-th_e, th_e, saddle + 2)[1:-1]
+        # across the crotch: always a point level with the parent's end on each side (so the parent's
+        # own line stays a mesh edge right to its end), one below it if there is room, the rest above
+        low = [0.5 * (th_e + math.pi / 2)] if th_e - math.pi / 2 > math.radians(30) and saddle >= 7 else []
+        inner = np.linspace(-math.pi / 2, math.pi / 2, saddle - 2 * len(low))
+        th = np.concatenate([[-t for t in low], inner, low])
+        th[np.abs(th) < 1e-9] = 0.0
+        saddle = len(th)
         d = np.cos(th)[:, None] * T_e + np.sin(th)[:, None] * N_e
         Sp = F.cast(np.repeat(E[None], saddle, 0), d, par.L - s_lo + 8 * rp)
         sidx = b.pts(Sp, F.grad(Sp))
         sv = (par.L + (Sp - E) @ T_e) / v_tile
         h = sides // 2
+        # the valley between the children is the saddle line itself: each child's first ring sits a
+        # little way up its own bark, so the stitch to the saddle is made of broad triangles
+        ffr = list(np.linspace(0.3, 1.0, collar_rings + 1))
         for i in range(2):
-            rings, hA = _collar(F, i, ncs[i], fracs, fork_margin * kids[i]["rc"])
+            rings, hA = _collar(F, i, ncs[i], ffr, fork_margin * kids[i]["rc"])
             t0 = len(b.tri)
             c0 = _child_skin(b, F, i, rings, hA, ncs[i], child_u_rep, cvt, Axis(*children[i]).s, cap_ends)
-            body = 2 * ncs[i] * (len(fracs) - 1)
-            cols = range(0, h + 1) if i == 0 else range(h, sides + 1)
+            body = 2 * ncs[i] * (len(ffr) - 1)
+            cols = range(ja, ja + h + 1) if i == 0 else range(ja + h, ja + sides + 1)
             A = [(last[j % sides], Pl[j % sides], (j / sides * u_rep, s_lo / v_tile)) for j in cols]
             order = range(saddle) if i == 0 else range(saddle - 1, -1, -1)  # child 0: from -N round to +N
             for q in order:
                 if abs(th[q]) < 1e-9:
-                    u = (0.25 if i == 0 else 0.75) * u_rep
+                    u = (ja + (0.5 if i == 0 else 1.5) * h) / sides * u_rep
                 elif th[q] > 0:
-                    u = 0.0 if i == 0 else float(u_rep)
+                    u = (ja + (0 if i == 0 else sides)) / sides * u_rep
                 else:
-                    u = 0.5 * u_rep
+                    u = (ja + h) / sides * u_rep
                 A.append((sidx[q], Sp[q], (u, sv[q])))
             sp, ph = par.project(rings[0][0])
-            cen = math.pi / 2 if i == 0 else 3 * math.pi / 2
+            cen = (ja + (0.5 if i == 0 else 1.5) * h) * 2 * math.pi / sides
             ph = cen + _wrap(ph - cen)
             Bl = [(c0[j], rings[0][0][j], (ph[j] / (2 * math.pi) * u_rep, sp[j] / v_tile)) for j in range(ncs[i])]
             ax = kids[i]["ax"]
-            b.stitch(A, Bl, E, ax.T[0], ax.N[0], ax.B[0])
+            b.stitch(A, Bl, lambda X, ax=ax: np.arctan2((X - E) @ ax.B[0], (X - E) @ ax.N[0]))
             info["junction_tris"].append(len(A) + len(Bl) + body)
             info["ports"].append({"child": i, "first_plain_ring": hA, "parent_last_ring": s_lo})
             del t0
@@ -411,19 +487,33 @@ def junction_mesh(parent, children, sides=10, child_sides=6, fillet=1.0, swell=0
         sB = [float(par.project(np.asarray(c[0], float)[:1])[0][0]) for c in children]
         belts = []
         for i in range(nk):
-            kid = _kid(par, children[i][0], children[i][1], swell, fillet, sB[i])
+            kid = _kid(par, children[i][0], children[i][1], swell, fillet, sB[i], flare)
             F = _Field(par, [kid], "side", ridge)
             rings, hA = _collar(F, 0, ncs[i], fracs, 0.05 * kid["rc"])
-            sp, ph = par.project(rings[0][0])
+            # the flare ring: from each valley vertex out along the parent's bark, away from the child,
+            # about half way to where the blend ends (further below the child than above it)
+            sC, phC = par.project(rings[0][0])
+            cQ, rQ, _, NQ, BQ = par.at(sC)
+            nQ = np.cos(phC)[:, None] * NQ + np.sin(phC)[:, None] * BQ
+            Q = cQ + nQ * rQ[:, None]
+            g = F.grad(Q, lambda X: F.dkid(0, X))
+            gt = _norm(g - nQ * (g * nQ).sum(1, keepdims=True))
+            sD, phD = par.project(Q + gt * (0.55 * F.kof(0, Q))[:, None])
+            sD = np.clip(sD, 0.0, par.L)
+            cD, rD, _, ND, BD = par.at(sD)
+            nD = np.cos(phD)[:, None] * ND + np.sin(phD)[:, None] * BD
+            Dp = F.cast(cD + nD * rD[:, None], nD, 2.5 * kid["k"] * kid["flare"])
+            sp, ph = par.project(Dp)
             lim = []
-            for sgn, edge in ((-1, sp.min() - 0.9 * kid["rc"]), (1, sp.max() + 0.9 * kid["rc"])):
+            for sgn, edge in ((-1, sp.min() - 0.5 * kid["rc"]), (1, sp.max() + 0.5 * kid["rc"])):
                 s = sB[i]
-                for off in np.arange(0.3 * kid["rc"], 10 * kid["rc"], 0.1 * kid["rc"]):
+                for off in np.arange(0.3 * kid["rc"], 14 * kid["rc"], 0.1 * kid["rc"]):
                     s = sB[i] + sgn * off
-                    if (s - edge) * sgn >= 0 and F.dkid(0, par.ring(np.clip(s, 0, par.L), sides)[0]).min() >= kid["k"]:
+                    if (s - edge) * sgn >= 0 and F(par.ring(np.clip(s, 0, par.L), sides)[0]).min() >= -1e-4:
                         break
                 lim.append(float(np.clip(s, 0.0, par.L)))
-            belts.append({"lo": lim[0], "hi": lim[1], "F": F, "rings": rings, "hA": hA, "sp": sp, "ph": ph, "i": i})
+            belts.append({"lo": lim[0], "hi": lim[1], "F": F, "rings": rings, "hA": hA, "sp": sp, "ph": ph, "i": i,
+                          "D": Dp, "sC": sC, "phC": phC})
         belts.sort(key=lambda q: q["lo"])
         for q0, q1 in zip(belts[:-1], belts[1:]):
             if q1["lo"] < q0["hi"] - 1e-9:
@@ -455,10 +545,21 @@ def junction_mesh(parent, children, sides=10, child_sides=6, fillet=1.0, swell=0
             Plo, Phi = par.ring(s0, sides)[0], par.ring(s1, sides)[0]
             A = [(ridx[r][j % sides], Plo[j % sides], (j / sides * u_rep, s0 / v_tile)) for j in range(j_lo, j_hi + 1)]
             A += [(ridx[r + 1][j % sides], Phi[j % sides], (j / sides * u_rep, s1 / v_tile)) for j in range(j_hi, j_lo - 1, -1)]
-            Bl = [(c0[j], rings[0][0][j], (ph[j] / (2 * math.pi) * u_rep, q["sp"][j] / v_tile)) for j in range(ncs[i])]
-            ax = kid["ax"]
-            b.stitch(A, Bl, kid["X0"], ax.T[0], ax.N[0], ax.B[0])
-            info["junction_tris"].append(len(A) + len(Bl) + body - 2 * (j_hi - j_lo))
+            Dp = q["D"]
+            didx = b.pts(Dp, F.grad(Dp))
+            phC = ph0 + _wrap(q["phC"] - ph0)
+            uvD = np.stack([ph / (2 * math.pi) * u_rep, q["sp"] / v_tile], axis=1)
+            uvC = np.stack([phC / (2 * math.pi) * u_rep, q["sC"] / v_tile], axis=1)
+            b.strip_uv(didx, c0, uvD, uvC)  # the parent's bark runs up the flare to the valley
+            Bl = [(didx[j], Dp[j], tuple(uvD[j])) for j in range(ncs[i])]
+            s_c, ph_c, r_c = float(q["sp"].mean()), float(ph.mean()), float(par.at(q["sp"].mean())[1][0])
+
+            def unrolled(X):  # angle round the middle of the cut, on the parent's bark laid flat
+                sx, px = par.project(X)
+                return np.arctan2(sx - s_c, r_c * (ph0 + _wrap(px - ph0) - ph_c))
+
+            b.stitch(A, Bl, unrolled)
+            info["junction_tris"].append(len(A) + len(Bl) + body + 2 * ncs[i] - 2 * (j_hi - j_lo))
             info["ports"].append({"child": i, "first_plain_ring": q["hA"], "parent_rings": (s0, s1)})
             del t0
         if cap_ends:

@@ -164,6 +164,9 @@ def main():
         parent, kids, opts, sq, far = case(name)
         V, F, UV, N, info = jn.junction_mesh(parent, kids, **opts)
         print(name, {k: v for k, v in info.items() if k != "ports"}, info["ports"], flush=True)
+        fn = jn._norm(np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]))
+        print("  top-line cover (parent, children):", [round(x, 4) for x in jn.top_line_cover(V, F, [parent] + kids)],
+              " least facet.normal:", round(float((fn[:, None, :] * N[F]).sum(2).min()), 2), flush=True)
         if not args.check:
             print("wrote", render(name, V, F, UV, N, (sq, far), args), flush=True)
 
