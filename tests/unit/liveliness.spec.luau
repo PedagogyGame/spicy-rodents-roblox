@@ -207,7 +207,7 @@ return function(t: any)
 		local bendPeak, bendPeakAt = 0, 0
 		local trail, trailAt = 0, 0
 		-- (walking pace: the tail's ripple at speed is not in the way of the reading)
-		run(st, 0, 2.5, 120, function(now)
+		run(st, 0, 3.5, 120, function(now)
 			return input({ speed = 6, yawRate = quarterTurn(now, 0.5) })
 		end, function(now, pose)
 			local bend = sum(pose, SPINE, 2)

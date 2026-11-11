@@ -114,7 +114,8 @@ end
 -- Stand-in tracks ---------------------------------------------------------------------------------------
 -- What AnimationDriver.heroTracks needs of an AnimationTrack, and what the Animator then does with it:
 -- Play starts the clip from its beginning and brings its weight up over the fade; Stop takes the weight
--- down over the fade while the clip runs on; a looping clip wraps; a one-shot that reaches its end stops.
+-- down over the fade while the clip runs on at its speed; a looping clip wraps; a one-shot that reaches
+-- its end stops.
 -- Weights move in a straight line. Every hero track has the same priority (Movement), so two tracks
 -- mix by their weights.
 
@@ -128,7 +129,7 @@ export type Track = {
 	weight: number,
 	target: number,
 	fade: number,
-	Play: (self: Track, fade: number?) -> (),
+	Play: (self: Track, fade: number?) -> (), -- (TimePosition may be set after it: the clip starts there)
 	Stop: (self: Track, fade: number?) -> (),
 	AdjustSpeed: (self: Track, speed: number) -> (),
 }
@@ -614,8 +615,10 @@ function Path.simulate(variantName: string, takeName: string): Take
 		})
 	end
 
-	enliven(0, Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded), false)
-	record(0, keys(), {}, Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded), false)
+	enliven(0, Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded, visual.trunk), false)
+	record(0, keys(), {}, Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded, visual.trunk), false)
+	-- (Controllers/Squirrel's KinematicPose.action and airSeconds: how the body left its surface)
+	local action: string?, airSeconds: number? = nil, nil
 	local count = math.floor(def.seconds * Path.FPS + 0.5)
 	for i = 1, count do
 		local k = def.keys((i - 1) / Path.FPS, i)
@@ -635,8 +638,12 @@ function Path.simulate(variantName: string, takeName: string): Take
 		}
 		local _, events = SquirrelMotor.step(state, input, dt, world)
 		SquirrelVisual.frame(visual, state, world, dt, world.groundAt)
-		local mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded)
+		local mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded, visual.trunk)
 		local stalk = state.focus
+		local launched, seconds = Squirrel.launch(events :: any, state.vy)
+		if launched or mode ~= "air" then
+			action, airSeconds = launched, seconds
+		end
 		-- 2. the camera (CameraRig.orbit's render step)
 		orbitYaw, orbitElev = CameraRig.lookStep(orbitYaw, orbitElev, k.look * dt, 0, false)
 		local root = (drawn() * CFrame.new(0, hip, 0)).Position
@@ -644,7 +651,8 @@ function Path.simulate(variantName: string, takeName: string): Take
 		fx, fy, fz = CameraRig.focusStep(fx, fy, fz, tx, ty, tz, dt, lx, ly, lz)
 		lx, ly, lz = tx, ty, tz
 		-- 3. the animation (AnimationDriver's hero branch, then the Animator moves the tracks on)
-		local want = AnimationDriver.heroClip(mode, visual.moveSpeed, stalk)
+		local braking = live.accel < -AnimationDriver.HERO.brake
+		local want = AnimationDriver.heroClip(mode, visual.moveSpeed, stalk, action, player.current, braking)
 		local clip = clips[want]
 		player.current = AnimationDriver.heroTracks(
 			player.tracks,
@@ -652,7 +660,8 @@ function Path.simulate(variantName: string, takeName: string): Take
 			want,
 			player:track(want),
 			clip.loop,
-			AnimationDriver.heroRate(want, visual.moveSpeed, visual.cadence, clip.length)
+			AnimationDriver.heroRate(want, visual.moveSpeed, visual.cadence, clip.length, airSeconds),
+			AnimationDriver.heroStart(want, action)
 		)
 		player:advance(dt)
 		enliven(i, mode, stalk)

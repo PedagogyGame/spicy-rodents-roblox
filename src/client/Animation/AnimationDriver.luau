@@ -41,8 +41,9 @@
 -- step with the motor's stride. If a clip cannot be loaded the body falls back to the procedural gait.
 -- Interface: start(opts) -> Driver; Driver.stop(); DEFAULT_CLIPS; newSettle(); settle(state, y, dt) (pure);
 --   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount;
---   heroClip(mode, speed, stalk) -> clip name (pure); heroRate(name, speed, cadence?, length) -> playback
---   speed (pure); heroTracks(tracks, current, want, track, loop, rate) -> clip now playing; HERO. The
+--   heroClip(mode, speed, stalk, action?, was?, braking?) -> clip name (pure); heroRate(name, speed,
+--   cadence?, length, airSeconds?) -> playback speed (pure); heroStart(name, action?) -> seconds (pure);
+--   heroTracks(tracks, current, want, track, loop, rate, startAt?) -> clip now playing; HERO. The
 --   Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
 --   heroLayers(rig, t, seed, live?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
 --   Every hero body near the camera also gets Animation/Liveliness (how it answers its own movement):
@@ -264,34 +265,70 @@ AnimationDriver.HERO = {
 	maxRate = 2.6, -- faster than this the legs blur into noise
 	fade = 0.15, -- seconds: one clip's track fades out and the next fades in over this
 	refade = 0.1, -- a looping clip found stopped is started again over this
-	holdEnd = 0.06, -- a one-shot is frozen this close to its end (a long fall after a leap holds its last pose)
+	holdEnd = 0.06, -- a one-shot is frozen this close to its end
+	-- the one-shots that carry a body through the air, by the seconds into each at which the body leaves
+	-- the surface and at which it comes down (the clips' Commit and Recover markers), and where a fall
+	-- that was not a jump comes into it. The body is launched at once, so the clip starts at `launch`
+	-- (its crouch belongs on the ground) and is paced to reach `land` as the body does; a longer fall is
+	-- held there, reaching for the ground.
+	air = {
+		Leap = { launch = 5 / 30, land = 19 / 30, fall = 14 / 30 },
+		Pounce = { launch = 0.4, land = 0.7, fall = 0.55 },
+	} :: { [string]: { launch: number, land: number, fall: number } },
+	landRate = 1.6, -- a one-shot left for another clip (a landing) runs through its last keys at this rate as it fades
+	brake = 40, -- studs/s^2 of slowing from which a run is stopping: it keeps to Run, not Walk, until it stands
 }
 
-function AnimationDriver.heroClip(mode: string, speed: number, stalk: boolean): string
+-- `action` is how a body in the air left its surface ("leap" | "pounce"; nil: it fell); `was` the clip it
+-- played last frame and `braking` whether it is slowing hard (HERO.brake): a run that is stopping keeps to
+-- its run until it stands, the walk is for a body that ambles.
+function AnimationDriver.heroClip(
+	mode: string,
+	speed: number,
+	stalk: boolean,
+	action: string?,
+	was: string?,
+	braking: boolean?
+): string
 	local H = AnimationDriver.HERO
 	if mode == "air" then
-		return "Leap"
+		return if action == "pounce" then "Pounce" else "Leap"
 	elseif mode == "trunk" then
 		return "Climb"
 	elseif speed < H.still then
-		return "Idle"
+		-- a stalk that stops holds its creep where it is (heroRate), it does not stand up
+		return if stalk and mode == "ground" then "Stalk" else "Idle"
 	elseif mode == "rail" then
 		return "Wire"
 	elseif stalk then
 		return "Stalk"
 	end
-	return if speed < H.runAbove then "Walk" else "Run"
+	return if speed < H.runAbove and not (was == "Run" and braking) then "Walk" else "Run"
 end
 
 -- Playback speed for clip `name` of `length` seconds on a body moving at `speed`: one clip cycle per
 -- stride. `cadence` (rad/s of stride phase, from the kinematic motor) wins when it is known. A body
--- hanging still on a trunk holds its climb pose (0); Idle and Leap play at their own speed.
-function AnimationDriver.heroRate(name: string, speed: number, cadence: number?, length: number): number
+-- hanging still on a trunk holds its climb pose, and a stalk that has stopped its creep (0); Idle plays at
+-- its own speed; a leap or a pounce goes from its take-off to its landing in the `airSeconds` the motor
+-- expects the body to stay up (at its own speed when that is not known: a fall).
+function AnimationDriver.heroRate(
+	name: string,
+	speed: number,
+	cadence: number?,
+	length: number,
+	airSeconds: number?
+): number
 	local H = AnimationDriver.HERO
-	if name == "Idle" or name == "Leap" then
+	local air = H.air[name]
+	if air then
+		return if airSeconds and airSeconds > 0
+			then math.clamp((air.land - air.launch) / airSeconds, H.minRate, H.maxRate)
+			else 1
+	end
+	if name == "Idle" then
 		return 1
 	end
-	if name == "Climb" and speed < H.still then
+	if (name == "Climb" or name == "Stalk") and speed < H.still then
 		return 0
 	end
 	local stride = H.stride[name] or 5.5
@@ -303,33 +340,51 @@ function AnimationDriver.heroRate(name: string, speed: number, cadence: number?,
 	return math.clamp(cyclesPerSecond * length, H.minRate, H.maxRate)
 end
 
+-- Where a clip starts, seconds into it: a leap or a pounce at its take-off (the body is already in the
+-- air), a fall that nothing launched (`action` nil) further in; any other clip at its beginning.
+function AnimationDriver.heroStart(name: string, action: string?): number
+	local air = AnimationDriver.HERO.air[name]
+	return if air == nil then 0 elseif action then air.launch else air.fall
+end
+
 -- One frame of a hero body's clip tracks: `want` (heroClip) becomes the clip that plays, at `rate`
--- (heroRate). `tracks` holds the body's loaded tracks by clip name, `current` is the clip it played last
--- frame, `t` is the track of `want`, `loop` whether that clip loops. A change of clip crosses over in
--- HERO.fade seconds; a one-shot that has reached its end is frozen there. Returns the clip now playing.
--- It only calls Play, Stop and AdjustSpeed and reads IsPlaying, TimePosition and Length, so the offline
--- motion preview (tools/review/motion) runs this same function on stand-in tracks.
+-- (heroRate), from `startAt` seconds into it (heroStart; its beginning when not given). `tracks` holds
+-- the body's loaded tracks by clip name, `current` is the clip it played last frame, `t` is the track of
+-- `want`, `loop` whether that clip loops. A change of clip crosses over in HERO.fade seconds, and a
+-- one-shot that is left (a leap, on landing) runs through its last keys as it fades; a one-shot that has
+-- reached its end is frozen there, and one that carries a body through the air where it comes down (a long
+-- fall holds the reach). Returns the clip now playing. It only calls Play, Stop and AdjustSpeed, reads
+-- IsPlaying, Looped, TimePosition and Length and sets TimePosition, so the offline motion preview
+-- (tools/review/motion) runs this same function on stand-in tracks.
 function AnimationDriver.heroTracks(
 	tracks: { [string]: any },
 	current: string?,
 	want: string,
 	t: any,
 	loop: boolean,
-	rate: number
+	rate: number,
+	startAt: number?
 ): string
 	local H = AnimationDriver.HERO
 	if want ~= current then
 		for name, old in tracks do
 			if name ~= want and old.IsPlaying then
+				if not old.Looped then
+					old:AdjustSpeed(H.landRate)
+				end
 				old:Stop(H.fade)
 			end
 		end
 		t:Play(H.fade)
+		if startAt and startAt > 0 then
+			t.TimePosition = startAt
+		end
 	elseif not t.IsPlaying and loop then
 		t:Play(H.refade)
 	end
-	if not loop and t.Length > 0 and t.TimePosition >= t.Length - H.holdEnd then
-		t:AdjustSpeed(0) -- hold the last pose of a one-shot (a long fall after a leap)
+	local air = H.air[want]
+	if not loop and t.Length > 0 and t.TimePosition >= (if air then air.land else t.Length - H.holdEnd) then
+		t:AdjustSpeed(0) -- hold the pose (a long fall after a leap)
 	else
 		t:AdjustSpeed(rate)
 	end
@@ -778,7 +833,16 @@ function AnimationDriver.start(opts: Opts): Driver
 					elseif math.abs(e.root.CFrame.LookVector.Y) > 0.6 then "trunk"
 					else "ground"
 				e.mode = mode
-				local want = AnimationDriver.heroClip(mode, e.speed, kin ~= nil and kin.stalk == true)
+				local action = if kin then kin.action else nil
+				local braking = e.creep ~= nil and e.creep.live.accel < -AnimationDriver.HERO.brake
+				local want = AnimationDriver.heroClip(
+					mode,
+					e.speed,
+					kin ~= nil and kin.stalk == true,
+					action,
+					e.current,
+					braking
+				)
 				local clip = heroSet[want]
 				local t = if clip then track(e, want) else nil
 				if t == nil or clip == nil then
@@ -789,13 +853,15 @@ function AnimationDriver.start(opts: Opts): Driver
 					e.hero = nil
 					continue
 				end
+				local cadence, airSeconds = if kin then kin.cadence else nil, if kin then kin.airSeconds else nil
 				e.current = AnimationDriver.heroTracks(
 					e.tracks,
 					e.current,
 					want,
 					t,
 					clip.loop,
-					AnimationDriver.heroRate(want, e.speed, if kin then kin.cadence else nil, clip.length)
+					AnimationDriver.heroRate(want, e.speed, cadence, clip.length, airSeconds),
+					AnimationDriver.heroStart(want, action)
 				)
 				continue
 			end

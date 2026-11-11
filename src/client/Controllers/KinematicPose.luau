@@ -17,6 +17,10 @@ export type Pose = {
 	mode: string?,
 	stalk: boolean?, -- creeping (Ctrl)
 	winded: boolean?, -- out of fumes (the sprint meter ran out)
+	-- how a body in the air left its surface: "leap" | "pounce" (nil: it fell), and the seconds the motor
+	-- expects it to stay up
+	action: string?,
+	airSeconds: number?,
 }
 
 local KinematicPose = {}

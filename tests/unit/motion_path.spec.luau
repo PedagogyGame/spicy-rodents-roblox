@@ -25,10 +25,25 @@ return function(t: any)
 	t.test("the held body's mode and the clip crossover are the game's own (Squirrel.modeOf, HERO)", function()
 		t.eq(Squirrel.modeOf(false, 0, true), "ground")
 		t.eq(Squirrel.modeOf(false, 0, false), "air")
-		t.eq(Squirrel.modeOf(true, 0.2, false), "rail", "on a rail it is a trunk only once the climb pose shows")
+		t.eq(Squirrel.modeOf(true, 0.2, false), "rail")
 		t.eq(Squirrel.modeOf(true, 0.5, false), "rail")
-		t.eq(Squirrel.modeOf(true, 0.51, false), "trunk")
+		t.eq(Squirrel.modeOf(true, 0.51, false), "trunk", "leaving a trunk, while most of the climb pose still shows")
 		t.eq(Squirrel.modeOf(true, 1, true), "trunk")
+		t.eq(Squirrel.modeOf(true, 0, false, true), "trunk", "on a trunk from the moment it is taken")
+		t.eq(Squirrel.modeOf(true, 0.2, false, false), "rail")
+		t.eq(Squirrel.modeOf(false, 0, true, true), "ground")
+		-- how the motor's events sent the body up, and for how long gravity says
+		local g = SquirrelMotor.params.gravity
+		local action, seconds = Squirrel.launch({ { kind = "winded" }, { kind = "leap" } }, 30)
+		t.eq(action, "leap")
+		t.near(seconds :: number, 60 / g, 1e-9)
+		action, seconds = Squirrel.launch({ { kind = "pounce" } }, 8)
+		t.eq(action, "pounce")
+		t.near(seconds :: number, 16 / g, 1e-9)
+		action, seconds = Squirrel.launch({ { kind = "land" } }, -20)
+		t.eq(action, nil)
+		t.eq(seconds, nil)
+		t.eq((Squirrel.launch({}, 5)), nil)
 		-- the crossover the driver has always used (a change here changes what every body shows)
 		t.eq(H.fade, 0.15)
 		t.eq(H.refade, 0.1)
@@ -68,33 +83,60 @@ return function(t: any)
 		t.near(at, (21 * 2 * dt) % CLIPS.Run.length, 1e-9)
 	end)
 
-	t.test("stand-in tracks: a one-shot is frozen on its last pose, and starts again from its beginning", function()
-		local p = Path.newTracks(CLIPS)
-		p:prime("Run")
-		for _ = 1, 120 do
-			p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Leap", p:track("Leap"), false, 1)
+	t.test(
+		"stand-in tracks: a leap starts where it is told, is held where it comes down, and lands as it fades",
+		function()
+			local p = Path.newTracks(CLIPS)
+			p:prime("Run")
+			local air = H.air.Leap
+			local from = AnimationDriver.heroStart("Leap", "leap")
+			t.eq(from, air.launch, "a leap starts at its take-off: the body is already in the air")
+			t.eq(AnimationDriver.heroStart("Leap", nil), air.fall, "a fall further in")
+			t.eq(AnimationDriver.heroStart("Pounce", "pounce"), H.air.Pounce.launch)
+			t.eq(AnimationDriver.heroStart("Run", nil), 0)
+			p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Leap", p:track("Leap"), false, 1, from)
+			local leap = p:track("Leap")
+			t.eq(leap.TimePosition, from)
+			for _ = 1, 120 do
+				p:advance(dt)
+				p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Leap", p:track("Leap"), false, 1, from)
+			end
+			t.eq(leap.IsPlaying, true, "held, not ended")
+			t.eq(leap.Speed, 0)
+			t.truthy(leap.TimePosition >= air.land and leap.TimePosition < air.land + 2 * dt, "held on the reach")
+			t.eq(leap.weight, 1)
+			-- it lands: the run comes in, and the leap runs on through its landing keys as it fades
+			local held = leap.TimePosition
+			p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Run", p:track("Run"), true, 1, 0)
+			t.eq(leap.IsPlaying, false)
+			t.eq(leap.Speed, H.landRate)
 			p:advance(dt)
+			t.near(leap.TimePosition, held + H.landRate * dt, 1e-9)
+			t.near(leap.weight, 1 - dt / H.fade, 1e-9)
+			-- into the air again: from the take-off again
+			p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Leap", p:track("Leap"), false, 1, from)
+			t.eq(leap.TimePosition, from)
+			t.eq(leap.Speed, 1)
+			-- a one-shot that carries no body through the air is held at its end (the bite)
+			local b = Path.newTracks(CLIPS)
+			b:prime("Run")
+			for _ = 1, 200 do
+				b.current = AnimationDriver.heroTracks(b.tracks, b.current, "Bite", b:track("Bite"), false, 1)
+				b:advance(dt)
+			end
+			local bite = b:track("Bite")
+			t.eq(bite.Speed, 0)
+			t.truthy(bite.TimePosition >= CLIPS.Bite.length - H.holdEnd and bite.TimePosition < CLIPS.Bite.length)
+			-- left alone at full speed a one-shot ends and fades away
+			local q = Path.newTracks(CLIPS)
+			q:track("Leap"):Play(0)
+			for _ = 1, 80 do
+				q:advance(dt)
+			end
+			t.eq(q:track("Leap").IsPlaying, false)
+			t.eq(q:track("Leap").weight, 0)
 		end
-		local leap = p:track("Leap")
-		t.eq(leap.IsPlaying, true, "held, not ended")
-		t.eq(leap.Speed, 0)
-		t.truthy(leap.TimePosition >= CLIPS.Leap.length - H.holdEnd and leap.TimePosition < CLIPS.Leap.length)
-		t.eq(leap.weight, 1)
-		-- back to the run and into the air again
-		p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Run", p:track("Run"), true, 1)
-		p:advance(dt)
-		p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Leap", p:track("Leap"), false, 1)
-		t.eq(leap.TimePosition, 0)
-		t.eq(leap.Speed, 1)
-		-- left alone at full speed a one-shot ends and fades away
-		local q = Path.newTracks(CLIPS)
-		q:track("Leap"):Play(0)
-		for _ = 1, 80 do
-			q:advance(dt)
-		end
-		t.eq(q:track("Leap").IsPlaying, false)
-		t.eq(q:track("Leap").weight, 0)
-	end)
+	)
 
 	t.test("the camera's first distance comes from the body's size, as CameraRig.orbit takes it", function()
 		for name, variant in Path.VARIANTS do
@@ -222,26 +264,47 @@ return function(t: any)
 
 		local stop = Path.simulate("squirrel", "stop")
 		local final = stop.frames[#stop.frames]
+		-- a run that is braking keeps to its run until it stands: no walk on the way down
+		for _, f in stop.frames do
+			t.truthy(f.t < 1 or f.clip ~= "Walk", `Walk at {f.t} s of the stop`)
+		end
 		t.eq(final.clip, "Idle")
 		t.truthy(final.speed < 0.01 and final.groundSpeed < 0.01)
 		t.eq(#final.tracks, 1)
 	end)
 
-	t.test("leap: a hop and a leap, each in the air on the Leap clip, each landing", function()
+	t.test("leap: the hop on the Pounce clip and the leap on the Leap clip, each paced to its landing", function()
 		local take = Path.simulate("squirrel", "leap")
 		local events = {}
 		local highest, airFrames = 0, 0
-		for _, f in take.frames do
+		local lastAir: { [string]: any } = {}
+		local landedOn: { [string]: number } = {}
+		for i, f in take.frames do
 			for _, e in f.events do
 				table.insert(events, e)
 			end
 			highest = math.max(highest, f.pos.y)
 			if f.mode == "air" then
 				airFrames += 1
-				t.eq(f.clip, "Leap")
-				t.truthy(f.clipTime <= CLIPS.Leap.length)
+				-- the click's hop is a pounce, Space's is a leap; each starts at its take-off
+				local name = if f.t < 1.5 then "Pounce" else "Leap"
+				t.eq(f.clip, name)
+				local air = H.air[name]
+				t.truthy(f.clipTime >= air.launch and f.clipTime <= air.land + 0.03, `{name} at {f.clipTime}`)
+				t.truthy(f.clipRate > 0, "not frozen in the air: it is paced to the flight")
+				lastAir[name] = f
+			elseif take.frames[i - 1] and take.frames[i - 1].mode == "air" then
+				landedOn[take.frames[i - 1].clip] = take.frames[i - 1].clipTime
 			end
 		end
+		-- each comes down at its landing key, give or take a frame or two of the motor's own landing
+		t.near(landedOn.Pounce, H.air.Pounce.land, 0.06)
+		t.near(landedOn.Leap, H.air.Leap.land, 0.04)
+		t.near(
+			lastAir.Leap.clipRate,
+			(H.air.Leap.land - H.air.Leap.launch) / (2 * 31.25 / SquirrelMotor.params.gravity),
+			0.02
+		)
 		t.eq(table.concat(events, " "), "pounce land leap land")
 		t.truthy(highest > 0.85 * SquirrelMotor.leapApex() and highest <= SquirrelMotor.leapApex(), `apex {highest}`)
 		t.truthy(airFrames > 55, `{airFrames} frames in the air`)

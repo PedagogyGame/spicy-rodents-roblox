@@ -20,8 +20,8 @@ over the stretch); the tail tip's swing in the body's own frame; the head's bob,
 ranges. Paw joints are the ball of the hind foot and the knuckles of the fore paw (a couple of hundredths
 of a stud above the sole); `gap` is how far a planted one stays from the surface (ground, bark or wire).
 Per event: the turn (yaw rate, lean, and whether tail, spine or head answer it: the S against the same
-sprint run straight, moment for moment), the stop, the hop and the leap (what the Leap clip shows against
-what the body does), taking the trunk; and which clips are never shown. What the layers on top of the
+sprint run straight, moment for moment), the stop, the hop and the leap (what the clip that carries each
+through the air shows against what the body does), taking the trunk; and which clips are never shown. What the layers on top of the
 clips add to a stop, a leap and a landing (Animation/Liveliness: the dip of the nose, the lift of the tail,
 the pitch along the flight, the squash) is measured against the same frames with the clips alone.
 """
@@ -435,7 +435,8 @@ def air_event(take, window, clips=None, rig=None, up=1):
     if not air:
         return None
     first, last = air[0]["i"], air[-1]["i"]
-    leap = take["clips"]["Leap"]
+    shown = air[len(air) // 2]["clip"]  # the clip that carries it through the air (Leap, or Pounce for a pounce)
+    leap = take["clips"][shown]
     held = [f for f in air if f["clipRate"] == 0]
     after = frames[min(last + 1, len(frames) - 1) : min(last + 13, len(frames))]
     answer = None
@@ -462,9 +463,11 @@ def air_event(take, window, clips=None, rig=None, up=1):
         "airSeconds": r(len(air) / fps, 3),
         "apex": r(max(f["pos"]["y"] for f in air) - take["ground"]["y"], 2),
         "studsCovered": r(abs(frames[last]["pos"]["z"] - frames[first]["pos"]["z"]), 1),
-        "clip": air[len(air) // 2]["clip"],
+        "clip": shown,
         "clipSeconds": leap["length"],
-        "clipSecondsShownInAir": r(max(f["clipTime"] for f in air), 3),
+        "clipSecondsShownInAirFrom": r(min(f["clipTime"] for f in air if f["clip"] == shown), 3),
+        "clipSecondsShownInAir": r(max(f["clipTime"] for f in air if f["clip"] == shown), 3),
+        "clipRateInAir": r(np.mean([f["clipRate"] for f in air if f["clip"] == shown and f["clipRate"] > 0] or [0.0])),
         "secondsFrozenOnLastPose": r(len(held) / fps, 3),
         "speedToldInAir": r(np.mean([f["speed"] for f in air]), 1),
         "speedMovedInAir": r(np.mean([f["groundSpeed"] for f in air]), 1),
@@ -591,7 +594,7 @@ def table(doc):
         for key in ("hop", "leap"):
             if e.get(key):
                 a = e[key]
-                lines.append(f"{key}: {a['airSeconds']} s in the air, apex {a['apex']}, {a['studsCovered']} studs; {a['clip']} clip {a['clipSeconds']} s, shown to {a['clipSecondsShownInAir']} s, frozen {a['secondsFrozenOnLastPose']} s; "
+                lines.append(f"{key}: {a['airSeconds']} s in the air, apex {a['apex']}, {a['studsCovered']} studs; {a['clip']} clip {a['clipSeconds']} s, shown from {a['clipSecondsShownInAirFrom']} to {a['clipSecondsShownInAir']} s at x{a['clipRateInAir']}, frozen {a['secondsFrozenOnLastPose']} s; "
                              f"moved {a['speedMovedInAir']} st/s, told {a['speedToldInAir']}; after landing moved {a['speedMovedAfterLanding']}, told {a['speedToldAfterLanding']}")
                 if a.get("layers"):
                     k = a["layers"]

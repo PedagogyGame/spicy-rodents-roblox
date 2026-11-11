@@ -201,11 +201,11 @@ Liveliness.P = {
 	-- next segment (the bend runs down the tail).
 	tail = {
 		pass = 0.02,
-		omegaRoot = 16, -- side to side
-		omegaTip = 9,
-		liftOmegaRoot = 11, -- up and down: slower, so a throw hangs and comes back past rest
+		omegaRoot = 12, -- side to side: it catches up a quarter of a second late and swings once past
+		omegaTip = 7,
+		liftOmegaRoot = 11, -- up and down: a throw hangs and comes back past rest
 		liftOmegaTip = 7,
-		zeta = 0.3,
+		zeta = 0.25,
 		-- left behind in a turn: seconds of lag per segment at the root and at the tip (the angle is the
 		-- lag times the yaw rate), and where a segment stops
 		lagRoot = 0.011,
@@ -796,7 +796,7 @@ end
 -- nothing (nil), and starts from rest when it comes near again.
 function Liveliness.frame(st: State, s: Sample, dt: number): Pose?
 	if s.far then
-		st.seen, st.live = false, false
+		st.seen, st.live, st.accel = false, false, 0
 		return nil
 	end
 	return Liveliness.step(st, Liveliness.observe(st, s, dt), dt)
