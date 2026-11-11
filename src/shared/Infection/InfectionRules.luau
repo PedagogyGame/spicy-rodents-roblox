@@ -12,7 +12,7 @@
 --                                        '--(no route, too far, or the dice)--------> down
 --   down --(dispatchDelaySecs: the call)--> scene --(an ambulance is assigned)--> enroute
 --     --(it arrives)--> approach (the crew walks over) --> assess --> loading --> retrieve (the
---     patient is carried to the ambulance) --> transit (out of sight, driven in) --> admitted
+--     patient is walked to the ambulance by the crew) --> transit (out of sight, driven in) --> admitted
 --   scene | enroute --(no ambulance within ambulanceTimeoutSecs)--> transit (taken in anyway; the
 --     clock starts again when an ambulance is assigned, so nobody is given up on while theirs is
 --     on its way)
