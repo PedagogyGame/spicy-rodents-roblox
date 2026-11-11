@@ -97,14 +97,11 @@ def build_pose(rig, P, cfg):
             or elbow then keeps to its own side of the leg (bend_side)
       tail_dirs: where each tail segment points in the MODEL's frame, a vector each (tail_dirs()); the
             pelvis may pitch and roll under the tail without dragging it about
-      tail: (pitches, yaws), local, as before
-      turn: {bone: 3x3} more local rotation for a body bone, before the legs are placed"""
+      tail: (pitches, yaws), local, as before"""
     D = rig.identity()
     engine.body(D, cfg["pivot"], **P.get("body", {}))
     if "spine" in P:
         engine.spine(D, cfg["spine_bones"], *P["spine"])
-    for name, R in P.get("turn", {}).items():
-        D[name][0] = D[name][0] @ R
     W = rig.fk(D)
     for leg, (tgt, fp, tp, pl) in P.get("legs", {}).items():
         tgt = np.asarray(tgt, float)
