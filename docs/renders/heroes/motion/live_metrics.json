@@ -1,0 +1,1899 @@
+{
+ "format": "spicy-motion-metrics/1",
+ "units": "studs, seconds, degrees where a name says Deg; slide is studs per stance",
+ "plantedWithin": 0.015,
+ "variants": {
+  "squirrel": {
+   "gaits": {
+    "Run at the walk speed": {
+     "take": "walk",
+     "window": [
+      1,
+      3
+     ],
+     "surface": "ground",
+     "clip": "Run",
+     "clipRate": 1.524,
+     "speedTold": 18.0,
+     "speedMoved": 18.0,
+     "cyclePeriod": 0.3062,
+     "cyclesPerSecond": 3.27,
+     "travelPerCycle": 5.51,
+     "paws": {
+      "FrontL": {
+       "gap": 0.017,
+       "gapLeast": 0.008,
+       "lift": 0.15,
+       "strideClip": 0.495,
+       "plantedShare": 0.34,
+       "stances": 6,
+       "stanceSeconds": 0.0979,
+       "slide": 1.311,
+       "slideMax": 1.347,
+       "slidePath": 1.313,
+       "slideSpeed": 13.39,
+       "bodyTravelInStance": 1.762,
+       "clipTravelInStance": 0.452,
+       "upDownWhilePlanted": 0.02
+      },
+      "FrontR": {
+       "gap": 0.017,
+       "gapLeast": 0.01,
+       "lift": 0.148,
+       "strideClip": 0.493,
+       "plantedShare": 0.36,
+       "stances": 6,
+       "stanceSeconds": 0.1,
+       "slide": 1.345,
+       "slideMax": 1.348,
+       "slidePath": 1.346,
+       "slideSpeed": 13.45,
+       "bodyTravelInStance": 1.8,
+       "clipTravelInStance": 0.455,
+       "upDownWhilePlanted": 0.019
+      },
+      "BackL": {
+       "gap": 0.016,
+       "gapLeast": 0.009,
+       "lift": 0.127,
+       "strideClip": 0.631,
+       "plantedShare": 0.33,
+       "stances": 6,
+       "stanceSeconds": 0.0958,
+       "slide": 1.15,
+       "slideMax": 1.151,
+       "slidePath": 1.152,
+       "slideSpeed": 12.0,
+       "bodyTravelInStance": 1.725,
+       "clipTravelInStance": 0.575,
+       "upDownWhilePlanted": 0.021
+      },
+      "BackR": {
+       "gap": 0.017,
+       "gapLeast": 0.009,
+       "lift": 0.128,
+       "strideClip": 0.633,
+       "plantedShare": 0.32,
+       "stances": 6,
+       "stanceSeconds": 0.0972,
+       "slide": 1.169,
+       "slideMax": 1.209,
+       "slidePath": 1.171,
+       "slideSpeed": 12.03,
+       "bodyTravelInStance": 1.75,
+       "clipTravelInStance": 0.581,
+       "upDownWhilePlanted": 0.022
+      }
+     },
+     "fore": {
+      "slide": 1.328,
+      "stanceSeconds": 0.099,
+      "bodyTravelInStance": 1.781,
+      "clipTravelInStance": 0.454,
+      "strideClip": 0.494,
+      "upDownWhilePlanted": 0.019,
+      "gap": 0.017
+     },
+     "hind": {
+      "slide": 1.159,
+      "stanceSeconds": 0.0965,
+      "bodyTravelInStance": 1.738,
+      "clipTravelInStance": 0.578,
+      "strideClip": 0.632,
+      "upDownWhilePlanted": 0.021,
+      "gap": 0.016
+     },
+     "footSlide": 1.244,
+     "hipsBob": 0.126,
+     "shouldersBob": 0.167,
+     "spineFlexDeg": 36.5,
+     "spineFlexFromTo": [
+      -22.8,
+      13.7
+     ],
+     "spineSideBendDeg": 0.0,
+     "spineTwistDeg": 0.0,
+     "tailTipUpDown": 0.763,
+     "tailTipSideToSide": 0.4,
+     "tailSwingDeg": {
+      "upDown": 33.6,
+      "sideToSide": 15.5
+     },
+     "headBob": 0.183,
+     "headSurge": 0.022,
+     "headPitchDeg": 5.7,
+     "headYawDeg": 0.0,
+     "headRollDeg": 0.0
+    },
+    "Run at the sprint speed": {
+     "take": "sprint",
+     "window": [
+      1,
+      3.8
+     ],
+     "surface": "ground",
+     "clip": "Run",
+     "clipRate": 2.6,
+     "speedTold": 33.0,
+     "speedMoved": 33.0,
+     "cyclePeriod": 0.1795,
+     "cyclesPerSecond": 5.57,
+     "travelPerCycle": 5.92,
+     "paws": {
+      "FrontL": {
+       "gap": 0.017,
+       "gapLeast": 0.005,
+       "lift": 0.155,
+       "strideClip": 0.497,
+       "plantedShare": 0.33,
+       "stances": 15,
+       "stanceSeconds": 0.0567,
+       "slide": 1.419,
+       "slideMax": 1.476,
+       "slidePath": 1.421,
+       "slideSpeed": 25.04,
+       "bodyTravelInStance": 1.87,
+       "clipTravelInStance": 0.451,
+       "upDownWhilePlanted": 0.019
+      },
+      "FrontR": {
+       "gap": 0.018,
+       "gapLeast": 0.009,
+       "lift": 0.152,
+       "strideClip": 0.494,
+       "plantedShare": 0.33,
+       "stances": 15,
+       "stanceSeconds": 0.0569,
+       "slide": 1.427,
+       "slideMax": 1.476,
+       "slidePath": 1.429,
+       "slideSpeed": 25.07,
+       "bodyTravelInStance": 1.879,
+       "clipTravelInStance": 0.452,
+       "upDownWhilePlanted": 0.017
+      },
+      "BackL": {
+       "gap": 0.016,
+       "gapLeast": 0.006,
+       "lift": 0.134,
+       "strideClip": 0.634,
+       "plantedShare": 0.33,
+       "stances": 16,
+       "stanceSeconds": 0.0544,
+       "slide": 1.234,
+       "slideMax": 1.337,
+       "slidePath": 1.235,
+       "slideSpeed": 22.67,
+       "bodyTravelInStance": 1.796,
+       "clipTravelInStance": 0.562,
+       "upDownWhilePlanted": 0.02
+      },
+      "BackR": {
+       "gap": 0.016,
+       "gapLeast": 0.006,
+       "lift": 0.134,
+       "strideClip": 0.634,
+       "plantedShare": 0.33,
+       "stances": 16,
+       "stanceSeconds": 0.0544,
+       "slide": 1.233,
+       "slideMax": 1.338,
+       "slidePath": 1.234,
+       "slideSpeed": 22.65,
+       "bodyTravelInStance": 1.796,
+       "clipTravelInStance": 0.563,
+       "upDownWhilePlanted": 0.02
+      }
+     },
+     "fore": {
+      "slide": 1.423,
+      "stanceSeconds": 0.0568,
+      "bodyTravelInStance": 1.875,
+      "clipTravelInStance": 0.452,
+      "strideClip": 0.495,
+      "upDownWhilePlanted": 0.018,
+      "gap": 0.017
+     },
+     "hind": {
+      "slide": 1.234,
+      "stanceSeconds": 0.0544,
+      "bodyTravelInStance": 1.796,
+      "clipTravelInStance": 0.562,
+      "strideClip": 0.634,
+      "upDownWhilePlanted": 0.02,
+      "gap": 0.016
+     },
+     "footSlide": 1.329,
+     "hipsBob": 0.131,
+     "shouldersBob": 0.172,
+     "spineFlexDeg": 36.6,
+     "spineFlexFromTo": [
+      -22.9,
+      13.7
+     ],
+     "spineSideBendDeg": 0.0,
+     "spineTwistDeg": 0.0,
+     "tailTipUpDown": 0.772,
+     "tailTipSideToSide": 0.473,
+     "tailSwingDeg": {
+      "upDown": 34.2,
+      "sideToSide": 18.3
+     },
+     "headBob": 0.187,
+     "headSurge": 0.023,
+     "headPitchDeg": 6.4,
+     "headYawDeg": 0.0,
+     "headRollDeg": 0.0
+    },
+    "Run after the sprint ran out": {
+     "take": "sprint",
+     "window": [
+      4.8,
+      6
+     ],
+     "surface": "ground",
+     "clip": "Run",
+     "clipRate": 1.524,
+     "speedTold": 18.0,
+     "speedMoved": 18.0,
+     "cyclePeriod": 0.3062,
+     "cyclesPerSecond": 3.27,
+     "travelPerCycle": 5.51,
+     "paws": {
+      "FrontL": {
+       "gap": 0.015,
+       "gapLeast": 0.007,
+       "lift": 0.154,
+       "strideClip": 0.497,
+       "plantedShare": 0.34,
+       "stances": 4,
+       "stanceSeconds": 0.0979,
+       "slide": 1.309,
+       "slideMax": 1.344,
+       "slidePath": 1.311,
+       "slideSpeed": 13.36,
+       "bodyTravelInStance": 1.763,
+       "clipTravelInStance": 0.454,
+       "upDownWhilePlanted": 0.021
+      },
+      "FrontR": {
+       "gap": 0.015,
+       "gapLeast": 0.009,
+       "lift": 0.153,
+       "strideClip": 0.493,
+       "plantedShare": 0.35,
+       "stances": 4,
+       "stanceSeconds": 0.1,
+       "slide": 1.343,
+       "slideMax": 1.346,
+       "slidePath": 1.345,
+       "slideSpeed": 13.43,
+       "bodyTravelInStance": 1.8,
+       "clipTravelInStance": 0.457,
+       "upDownWhilePlanted": 0.02
+      },
+      "BackL": {
+       "gap": 0.017,
+       "gapLeast": 0.009,
+       "lift": 0.129,
+       "strideClip": 0.635,
+       "plantedShare": 0.32,
+       "stances": 3,
+       "stanceSeconds": 0.0958,
+       "slide": 1.149,
+       "slideMax": 1.15,
+       "slidePath": 1.151,
+       "slideSpeed": 11.99,
+       "bodyTravelInStance": 1.725,
+       "clipTravelInStance": 0.576,
+       "upDownWhilePlanted": 0.023
+      },
+      "BackR": {
+       "gap": 0.019,
+       "gapLeast": 0.011,
+       "lift": 0.125,
+       "strideClip": 0.633,
+       "plantedShare": 0.32,
+       "stances": 3,
+       "stanceSeconds": 0.0972,
+       "slide": 1.171,
+       "slideMax": 1.217,
+       "slidePath": 1.173,
+       "slideSpeed": 12.05,
+       "bodyTravelInStance": 1.75,
+       "clipTravelInStance": 0.579,
+       "upDownWhilePlanted": 0.02
+      }
+     },
+     "fore": {
+      "slide": 1.326,
+      "stanceSeconds": 0.099,
+      "bodyTravelInStance": 1.781,
+      "clipTravelInStance": 0.456,
+      "strideClip": 0.495,
+      "upDownWhilePlanted": 0.021,
+      "gap": 0.015
+     },
+     "hind": {
+      "slide": 1.16,
+      "stanceSeconds": 0.0965,
+      "bodyTravelInStance": 1.738,
+      "clipTravelInStance": 0.577,
+      "strideClip": 0.634,
+      "upDownWhilePlanted": 0.021,
+      "gap": 0.017
+     },
+     "footSlide": 1.243,
+     "hipsBob": 0.121,
+     "shouldersBob": 0.168,
+     "spineFlexDeg": 36.6,
+     "spineFlexFromTo": [
+      -22.8,
+      13.7
+     ],
+     "spineSideBendDeg": 0.0,
+     "spineTwistDeg": 0.0,
+     "tailTipUpDown": 0.781,
+     "tailTipSideToSide": 0.401,
+     "tailSwingDeg": {
+      "upDown": 34.3,
+      "sideToSide": 15.5
+     },
+     "headBob": 0.189,
+     "headSurge": 0.022,
+     "headPitchDeg": 5.2,
+     "headYawDeg": 0.0,
+     "headRollDeg": 0.0
+    },
+    "Stalk": {
+     "take": "stalk",
+     "window": [
+      1,
+      3
+     ],
+     "surface": "ground",
+     "clip": "Stalk",
+     "clipRate": 2.25,
+     "speedTold": 4.12,
+     "speedMoved": 4.12,
+     "cyclePeriod": 0.5333,
+     "cyclesPerSecond": 1.87,
+     "travelPerCycle": 2.2,
+     "paws": {
+      "FrontL": {
+       "gap": 0.02,
+       "gapLeast": 0.019,
+       "lift": 0.079,
+       "strideClip": 0.217,
+       "plantedShare": 0.78,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.509,
+       "slideMax": 1.51,
+       "slidePath": 1.515,
+       "slideSpeed": 3.62,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.209,
+       "upDownWhilePlanted": 0.015
+      },
+      "FrontR": {
+       "gap": 0.02,
+       "gapLeast": 0.019,
+       "lift": 0.079,
+       "strideClip": 0.217,
+       "plantedShare": 0.83,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.509,
+       "slideMax": 1.51,
+       "slidePath": 1.515,
+       "slideSpeed": 3.62,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.209,
+       "upDownWhilePlanted": 0.015
+      },
+      "BackL": {
+       "gap": 0.018,
+       "gapLeast": 0.018,
+       "lift": 0.075,
+       "strideClip": 0.236,
+       "plantedShare": 0.78,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.491,
+       "slideMax": 1.491,
+       "slidePath": 1.495,
+       "slideSpeed": 3.58,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.227,
+       "upDownWhilePlanted": 0.014
+      },
+      "BackR": {
+       "gap": 0.018,
+       "gapLeast": 0.018,
+       "lift": 0.075,
+       "strideClip": 0.236,
+       "plantedShare": 0.78,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.491,
+       "slideMax": 1.491,
+       "slidePath": 1.495,
+       "slideSpeed": 3.58,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.227,
+       "upDownWhilePlanted": 0.014
+      }
+     },
+     "fore": {
+      "slide": 1.509,
+      "stanceSeconds": 0.4167,
+      "bodyTravelInStance": 1.719,
+      "clipTravelInStance": 0.209,
+      "strideClip": 0.217,
+      "upDownWhilePlanted": 0.015,
+      "gap": 0.02
+     },
+     "hind": {
+      "slide": 1.491,
+      "stanceSeconds": 0.4167,
+      "bodyTravelInStance": 1.719,
+      "clipTravelInStance": 0.227,
+      "strideClip": 0.236,
+      "upDownWhilePlanted": 0.014,
+      "gap": 0.018
+     },
+     "footSlide": 1.5,
+     "hipsBob": 0.016,
+     "shouldersBob": 0.016,
+     "spineFlexDeg": 0.0,
+     "spineFlexFromTo": [
+      2.3,
+      2.3
+     ],
+     "spineSideBendDeg": 3.4,
+     "spineTwistDeg": 0.1,
+     "tailTipUpDown": 0.04,
+     "tailTipSideToSide": 0.635,
+     "tailSwingDeg": {
+      "upDown": 0.9,
+      "sideToSide": 24.8
+     },
+     "headBob": 0.016,
+     "headSurge": 0.0,
+     "headPitchDeg": 0.0,
+     "headYawDeg": 0.0,
+     "headRollDeg": 0.0
+    },
+    "Climb": {
+     "take": "climb",
+     "window": [
+      1.3,
+      2.9
+     ],
+     "surface": "bark",
+     "clip": "Climb",
+     "clipRate": 1.8,
+     "speedTold": 10.8,
+     "speedMoved": 10.8,
+     "cyclePeriod": 0.3333,
+     "cyclesPerSecond": 3.0,
+     "travelPerCycle": 3.6,
+     "paws": {
+      "FrontL": {
+       "gap": 0.08,
+       "gapLeast": 0.058,
+       "lift": 0.1,
+       "strideClip": 0.373,
+       "plantedShare": 0.55,
+       "stances": 4,
+       "stanceSeconds": 0.1792,
+       "slide": 1.586,
+       "slideMax": 1.586,
+       "slidePath": 1.588,
+       "slideSpeed": 8.85,
+       "bodyTravelInStance": 1.936,
+       "clipTravelInStance": 0.352,
+       "upDownWhilePlanted": 0.047
+      },
+      "FrontR": {
+       "gap": 0.08,
+       "gapLeast": 0.061,
+       "lift": 0.112,
+       "strideClip": 0.365,
+       "plantedShare": 0.56,
+       "stances": 5,
+       "stanceSeconds": 0.175,
+       "slide": 1.544,
+       "slideMax": 1.544,
+       "slidePath": 1.545,
+       "slideSpeed": 8.82,
+       "bodyTravelInStance": 1.891,
+       "clipTravelInStance": 0.349,
+       "upDownWhilePlanted": 0.044
+      },
+      "BackL": {
+       "gap": 0.144,
+       "gapLeast": 0.117,
+       "lift": 0.104,
+       "strideClip": 0.399,
+       "plantedShare": 0.58,
+       "stances": 4,
+       "stanceSeconds": 0.1917,
+       "slide": 1.724,
+       "slideMax": 1.724,
+       "slidePath": 1.737,
+       "slideSpeed": 8.99,
+       "bodyTravelInStance": 2.071,
+       "clipTravelInStance": 0.351,
+       "upDownWhilePlanted": 0.054
+      },
+      "BackR": {
+       "gap": 0.144,
+       "gapLeast": 0.12,
+       "lift": 0.117,
+       "strideClip": 0.392,
+       "plantedShare": 0.51,
+       "stances": 4,
+       "stanceSeconds": 0.1708,
+       "slide": 1.465,
+       "slideMax": 1.465,
+       "slidePath": 1.472,
+       "slideSpeed": 8.57,
+       "bodyTravelInStance": 1.846,
+       "clipTravelInStance": 0.384,
+       "upDownWhilePlanted": 0.054
+      }
+     },
+     "fore": {
+      "slide": 1.565,
+      "stanceSeconds": 0.1771,
+      "bodyTravelInStance": 1.913,
+      "clipTravelInStance": 0.35,
+      "strideClip": 0.369,
+      "upDownWhilePlanted": 0.045,
+      "gap": 0.08
+     },
+     "hind": {
+      "slide": 1.595,
+      "stanceSeconds": 0.1813,
+      "bodyTravelInStance": 1.959,
+      "clipTravelInStance": 0.367,
+      "strideClip": 0.396,
+      "upDownWhilePlanted": 0.054,
+      "gap": 0.144
+     },
+     "footSlide": 1.58,
+     "hipsBob": 0.07,
+     "shouldersBob": 0.109,
+     "spineFlexDeg": 22.9,
+     "spineFlexFromTo": [
+      -16.0,
+      6.9
+     ],
+     "spineSideBendDeg": 0.0,
+     "spineTwistDeg": 0.0,
+     "tailTipUpDown": 0.337,
+     "tailTipSideToSide": 0.577,
+     "tailSwingDeg": {
+      "upDown": 12.1,
+      "sideToSide": 23.8
+     },
+     "headBob": 0.095,
+     "headSurge": 0.031,
+     "headPitchDeg": 0.0,
+     "headYawDeg": 6.7,
+     "headRollDeg": 0.0
+    },
+    "Wire": {
+     "take": "wire",
+     "window": [
+      0.8,
+      2.9
+     ],
+     "surface": "wire",
+     "clip": "Wire",
+     "clipRate": 2.6,
+     "speedTold": 18.0,
+     "speedMoved": 18.0,
+     "cyclePeriod": 0.3846,
+     "cyclesPerSecond": 2.6,
+     "travelPerCycle": 6.92,
+     "paws": {
+      "FrontL": {
+       "gap": 0.498,
+       "gapLeast": 0.481,
+       "lift": 0.061,
+       "strideClip": 0.252,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.803,
+       "slideMax": 1.858,
+       "slidePath": 1.804,
+       "slideSpeed": 15.85,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.244,
+       "upDownWhilePlanted": 0.015
+      },
+      "FrontR": {
+       "gap": 0.498,
+       "gapLeast": 0.481,
+       "lift": 0.06,
+       "strideClip": 0.256,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.799,
+       "slideMax": 1.853,
+       "slidePath": 1.8,
+       "slideSpeed": 15.82,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.248,
+       "upDownWhilePlanted": 0.016
+      },
+      "BackL": {
+       "gap": 0.495,
+       "gapLeast": 0.491,
+       "lift": 0.06,
+       "strideClip": 0.275,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.781,
+       "slideMax": 1.834,
+       "slidePath": 1.781,
+       "slideSpeed": 15.65,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.267,
+       "upDownWhilePlanted": 0.016
+      },
+      "BackR": {
+       "gap": 0.495,
+       "gapLeast": 0.491,
+       "lift": 0.061,
+       "strideClip": 0.271,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.785,
+       "slideMax": 1.84,
+       "slidePath": 1.787,
+       "slideSpeed": 15.7,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.262,
+       "upDownWhilePlanted": 0.015
+      }
+     },
+     "fore": {
+      "slide": 1.801,
+      "stanceSeconds": 0.1138,
+      "bodyTravelInStance": 2.047,
+      "clipTravelInStance": 0.246,
+      "strideClip": 0.254,
+      "upDownWhilePlanted": 0.015,
+      "gap": 0.498
+     },
+     "hind": {
+      "slide": 1.783,
+      "stanceSeconds": 0.1138,
+      "bodyTravelInStance": 2.047,
+      "clipTravelInStance": 0.265,
+      "strideClip": 0.273,
+      "upDownWhilePlanted": 0.015,
+      "gap": 0.495
+     },
+     "footSlide": 1.792,
+     "hipsBob": 0.024,
+     "shouldersBob": 0.024,
+     "spineFlexDeg": 0.1,
+     "spineFlexFromTo": [
+      -6.9,
+      -6.8
+     ],
+     "spineSideBendDeg": 7.8,
+     "spineTwistDeg": 4.2,
+     "tailTipUpDown": 0.32,
+     "tailTipSideToSide": 1.991,
+     "tailSwingDeg": {
+      "upDown": 11.2,
+      "sideToSide": 89.3
+     },
+     "headBob": 0.025,
+     "headSurge": 0.003,
+     "headPitchDeg": 0.2,
+     "headYawDeg": 5.7,
+     "headRollDeg": 4.5
+    }
+   },
+   "events": {
+    "turn": {
+     "comparedWith": "sprint",
+     "left": {
+      "yawRateMeanDegPerSec": 173.7,
+      "yawRatePeakDegPerSec": 291.9,
+      "leanPeakDeg": 9.3,
+      "shouldersBankPeakDeg": 17.3,
+      "headRollPeakDeg": 5.1,
+      "tailTrailDeg": 13.14,
+      "tailTrailPeakDeg": 25.43,
+      "tailTrailPeakSecondsAfterYawRatePeak": 0.129,
+      "tailBackSecondsAfterItsPeak": 0.233,
+      "tailSwingsPastDeg": 1.2,
+      "spineIntoDeg": 13.5,
+      "spineIntoPeakDeg": 22.87,
+      "headIntoDeg": 18.64,
+      "headIntoPeakDeg": 30.52
+     },
+     "right": {
+      "yawRateMeanDegPerSec": -173.5,
+      "yawRatePeakDegPerSec": -291.9,
+      "leanPeakDeg": -9.3,
+      "shouldersBankPeakDeg": 16.1,
+      "headRollPeakDeg": 5.1,
+      "tailTrailDeg": 14.7,
+      "tailTrailPeakDeg": 25.01,
+      "tailTrailPeakSecondsAfterYawRatePeak": 0.108,
+      "tailBackSecondsAfterItsPeak": 0.25,
+      "tailSwingsPastDeg": 4.61,
+      "spineIntoDeg": 13.49,
+      "spineIntoPeakDeg": 22.26,
+      "headIntoDeg": 18.62,
+      "headIntoPeakDeg": 30.07
+     },
+     "tailLagSeconds": 0.0573,
+     "spineIntoPerTurnRate": 0.065,
+     "headIntoPerTurnRate": 0.094,
+     "anythingAnswersTheTurn": true
+    },
+    "stop": {
+     "secondsToStandstill": 0.4,
+     "secondsUntilAnimationToldStill": 0.25,
+     "secondsUntilIdleAlone": 0.383,
+     "studsCoveredStopping": 3.68,
+     "clipsOnTheWay": [
+      "Run",
+      "Idle"
+     ],
+     "pawSkateWhilePlanted": {
+      "FrontL": 1.531,
+      "FrontR": 2.385,
+      "BackL": 0.195,
+      "BackR": 0.21
+     },
+     "layers": {
+      "noseDipPeakDeg": 14.7,
+      "noseDipPeakAtSeconds": 0.25,
+      "noseBackPastLevelDeg": 1.8,
+      "tailLiftPeakDeg": 35.2,
+      "tailLiftPeakAtSeconds": 0.317,
+      "tailBackPastRestDeg": 9.3,
+      "hipsSinkStuds": 0.005,
+      "lowestToeGap": -0.021,
+      "lowestToeGapClipsAlone": -0.016,
+      "settledAfterSeconds": 1.063
+     },
+     "idle": {
+      "pawDrift": 0.007,
+      "hipsBob": 0.022,
+      "headBob": 0.013,
+      "headYawDeg": 53.3,
+      "tailTipUpDown": 0.283,
+      "tailTipSideToSide": 0.45,
+      "spineFlexDeg": 2.4
+     }
+    },
+    "hop": {
+     "layers": {
+      "noseUpPeakDeg": 3.5,
+      "noseDownPeakDeg": -0.1,
+      "tailLowPeakDeg": 2.7,
+      "tailHighPeakDeg": 0.8,
+      "landingSinkStuds": 0.011,
+      "landingSinkAtSecondsAfterLanding": 0.0,
+      "landingBounceStuds": 0.001,
+      "lowestToeGapAfterLanding": -0.007,
+      "lowestToeGapAfterLandingClipsAlone": -0.005
+     },
+     "airSeconds": 0.217,
+     "apex": 0.44,
+     "studsCovered": 5.3,
+     "clip": "Pounce",
+     "clipSeconds": 0.9667,
+     "clipSecondsShownInAirFrom": 0.423,
+     "clipSecondsShownInAir": 0.705,
+     "clipRateInAir": 1.406,
+     "secondsFrozenOnLastPose": 0.0,
+     "speedToldInAir": 18.0,
+     "speedMovedInAir": 26.2,
+     "speedMovedAfterLanding": 28.1,
+     "speedToldAfterLanding": 18.0
+    },
+    "leap": {
+     "layers": {
+      "noseUpPeakDeg": 21.4,
+      "noseDownPeakDeg": 18.3,
+      "tailLowPeakDeg": 24.1,
+      "tailHighPeakDeg": 29.2,
+      "landingSinkStuds": 0.052,
+      "landingSinkAtSecondsAfterLanding": 0.083,
+      "landingBounceStuds": 0.017,
+      "lowestToeGapAfterLanding": 0.003,
+      "lowestToeGapAfterLandingClipsAlone": 0.008
+     },
+     "airSeconds": 0.833,
+     "apex": 6.49,
+     "studsCovered": 19.8,
+     "clip": "Leap",
+     "clipSeconds": 0.7667,
+     "clipSecondsShownInAirFrom": 0.176,
+     "clipSecondsShownInAir": 0.641,
+     "clipRateInAir": 0.569,
+     "secondsFrozenOnLastPose": 0.0,
+     "speedToldInAir": 18.0,
+     "speedMovedInAir": 28.7,
+     "speedMovedAfterLanding": 20.5,
+     "speedToldAfterLanding": 18.0
+    },
+    "takingTheTrunk": {
+     "atSeconds": 0.333,
+     "clipsWhileTaking": [
+      [
+       "Climb",
+       0.15
+      ]
+     ],
+     "secondsUntilNoseUp": 0.55,
+     "pitchDeg": 81.9,
+     "peakSpeedOfTheDrawnBody": 55.3
+    }
+   },
+   "clipFramesShown": {
+    "Idle": 129,
+    "Walk": 9,
+    "Run": 957,
+    "Pounce": 13,
+    "Leap": 50,
+    "Climb": 161,
+    "Wire": 180,
+    "Stalk": 180
+   },
+   "clipsNeverShown": [
+    "Bite"
+   ],
+   "walkClipInPassing": [
+    {
+     "take": "walk",
+     "frames": 2,
+     "seconds": 0.033,
+     "speedFromTo": [
+      4.4,
+      7.8
+     ]
+    },
+    {
+     "take": "sprint",
+     "frames": 1,
+     "seconds": 0.017,
+     "speedFromTo": [
+      8.1,
+      8.1
+     ]
+    },
+    {
+     "take": "turn",
+     "frames": 1,
+     "seconds": 0.017,
+     "speedFromTo": [
+      8.1,
+      8.1
+     ]
+    },
+    {
+     "take": "stop",
+     "frames": 1,
+     "seconds": 0.017,
+     "speedFromTo": [
+      8.1,
+      8.1
+     ]
+    },
+    {
+     "take": "leap",
+     "frames": 2,
+     "seconds": 0.033,
+     "speedFromTo": [
+      4.4,
+      7.8
+     ]
+    },
+    {
+     "take": "climb",
+     "frames": 2,
+     "seconds": 0.033,
+     "speedFromTo": [
+      4.4,
+      7.8
+     ]
+    }
+   ],
+   "camera": {
+    "distance": 14.036,
+    "elevation": 0.3,
+    "fov": 70,
+    "lift": 1.395
+   },
+   "bodySize": [
+    2,
+    2.325,
+    3.509
+   ]
+  },
+  "rodent": {
+   "gaits": {
+    "Run at the walk speed": {
+     "take": "walk",
+     "window": [
+      1,
+      3
+     ],
+     "surface": "ground",
+     "clip": "Run",
+     "clipRate": 1.524,
+     "speedTold": 18.0,
+     "speedMoved": 18.0,
+     "cyclePeriod": 0.3062,
+     "cyclesPerSecond": 3.27,
+     "travelPerCycle": 5.51,
+     "paws": {
+      "FrontL": {
+       "gap": 0.017,
+       "gapLeast": 0.008,
+       "lift": 0.15,
+       "strideClip": 0.495,
+       "plantedShare": 0.34,
+       "stances": 6,
+       "stanceSeconds": 0.0979,
+       "slide": 1.311,
+       "slideMax": 1.347,
+       "slidePath": 1.313,
+       "slideSpeed": 13.39,
+       "bodyTravelInStance": 1.762,
+       "clipTravelInStance": 0.451,
+       "upDownWhilePlanted": 0.02
+      },
+      "FrontR": {
+       "gap": 0.017,
+       "gapLeast": 0.01,
+       "lift": 0.148,
+       "strideClip": 0.493,
+       "plantedShare": 0.36,
+       "stances": 6,
+       "stanceSeconds": 0.1,
+       "slide": 1.345,
+       "slideMax": 1.348,
+       "slidePath": 1.347,
+       "slideSpeed": 13.45,
+       "bodyTravelInStance": 1.8,
+       "clipTravelInStance": 0.455,
+       "upDownWhilePlanted": 0.019
+      },
+      "BackL": {
+       "gap": 0.016,
+       "gapLeast": 0.009,
+       "lift": 0.127,
+       "strideClip": 0.631,
+       "plantedShare": 0.33,
+       "stances": 6,
+       "stanceSeconds": 0.0958,
+       "slide": 1.15,
+       "slideMax": 1.151,
+       "slidePath": 1.152,
+       "slideSpeed": 12.0,
+       "bodyTravelInStance": 1.725,
+       "clipTravelInStance": 0.575,
+       "upDownWhilePlanted": 0.021
+      },
+      "BackR": {
+       "gap": 0.017,
+       "gapLeast": 0.009,
+       "lift": 0.128,
+       "strideClip": 0.633,
+       "plantedShare": 0.32,
+       "stances": 6,
+       "stanceSeconds": 0.0972,
+       "slide": 1.169,
+       "slideMax": 1.209,
+       "slidePath": 1.171,
+       "slideSpeed": 12.03,
+       "bodyTravelInStance": 1.75,
+       "clipTravelInStance": 0.581,
+       "upDownWhilePlanted": 0.022
+      }
+     },
+     "fore": {
+      "slide": 1.328,
+      "stanceSeconds": 0.099,
+      "bodyTravelInStance": 1.781,
+      "clipTravelInStance": 0.453,
+      "strideClip": 0.494,
+      "upDownWhilePlanted": 0.019,
+      "gap": 0.017
+     },
+     "hind": {
+      "slide": 1.159,
+      "stanceSeconds": 0.0965,
+      "bodyTravelInStance": 1.738,
+      "clipTravelInStance": 0.578,
+      "strideClip": 0.632,
+      "upDownWhilePlanted": 0.021,
+      "gap": 0.016
+     },
+     "footSlide": 1.244,
+     "hipsBob": 0.126,
+     "shouldersBob": 0.167,
+     "spineFlexDeg": 36.5,
+     "spineFlexFromTo": [
+      -22.8,
+      13.7
+     ],
+     "spineSideBendDeg": 0.0,
+     "spineTwistDeg": 0.0,
+     "tailTipUpDown": 0.798,
+     "tailTipSideToSide": 1.212,
+     "tailSwingDeg": {
+      "upDown": 37.7,
+      "sideToSide": 56.7
+     },
+     "headBob": 0.183,
+     "headSurge": 0.022,
+     "headPitchDeg": 6.2,
+     "headYawDeg": 18.3,
+     "headRollDeg": 42.1
+    },
+    "Run at the sprint speed": {
+     "take": "sprint",
+     "window": [
+      1,
+      3.8
+     ],
+     "surface": "ground",
+     "clip": "Run",
+     "clipRate": 2.6,
+     "speedTold": 33.0,
+     "speedMoved": 33.0,
+     "cyclePeriod": 0.1795,
+     "cyclesPerSecond": 5.57,
+     "travelPerCycle": 5.92,
+     "paws": {
+      "FrontL": {
+       "gap": 0.017,
+       "gapLeast": 0.005,
+       "lift": 0.155,
+       "strideClip": 0.496,
+       "plantedShare": 0.33,
+       "stances": 15,
+       "stanceSeconds": 0.0567,
+       "slide": 1.419,
+       "slideMax": 1.476,
+       "slidePath": 1.421,
+       "slideSpeed": 25.04,
+       "bodyTravelInStance": 1.87,
+       "clipTravelInStance": 0.451,
+       "upDownWhilePlanted": 0.019
+      },
+      "FrontR": {
+       "gap": 0.018,
+       "gapLeast": 0.009,
+       "lift": 0.152,
+       "strideClip": 0.495,
+       "plantedShare": 0.33,
+       "stances": 15,
+       "stanceSeconds": 0.0569,
+       "slide": 1.427,
+       "slideMax": 1.476,
+       "slidePath": 1.428,
+       "slideSpeed": 25.06,
+       "bodyTravelInStance": 1.879,
+       "clipTravelInStance": 0.452,
+       "upDownWhilePlanted": 0.017
+      },
+      "BackL": {
+       "gap": 0.016,
+       "gapLeast": 0.006,
+       "lift": 0.134,
+       "strideClip": 0.634,
+       "plantedShare": 0.33,
+       "stances": 16,
+       "stanceSeconds": 0.0544,
+       "slide": 1.234,
+       "slideMax": 1.337,
+       "slidePath": 1.235,
+       "slideSpeed": 22.67,
+       "bodyTravelInStance": 1.796,
+       "clipTravelInStance": 0.562,
+       "upDownWhilePlanted": 0.02
+      },
+      "BackR": {
+       "gap": 0.016,
+       "gapLeast": 0.006,
+       "lift": 0.134,
+       "strideClip": 0.634,
+       "plantedShare": 0.33,
+       "stances": 16,
+       "stanceSeconds": 0.0544,
+       "slide": 1.233,
+       "slideMax": 1.338,
+       "slidePath": 1.234,
+       "slideSpeed": 22.65,
+       "bodyTravelInStance": 1.796,
+       "clipTravelInStance": 0.563,
+       "upDownWhilePlanted": 0.02
+      }
+     },
+     "fore": {
+      "slide": 1.423,
+      "stanceSeconds": 0.0568,
+      "bodyTravelInStance": 1.875,
+      "clipTravelInStance": 0.452,
+      "strideClip": 0.495,
+      "upDownWhilePlanted": 0.018,
+      "gap": 0.017
+     },
+     "hind": {
+      "slide": 1.234,
+      "stanceSeconds": 0.0544,
+      "bodyTravelInStance": 1.796,
+      "clipTravelInStance": 0.562,
+      "strideClip": 0.634,
+      "upDownWhilePlanted": 0.02,
+      "gap": 0.016
+     },
+     "footSlide": 1.329,
+     "hipsBob": 0.131,
+     "shouldersBob": 0.172,
+     "spineFlexDeg": 36.6,
+     "spineFlexFromTo": [
+      -22.9,
+      13.7
+     ],
+     "spineSideBendDeg": 1.5,
+     "spineTwistDeg": 0.4,
+     "tailTipUpDown": 0.891,
+     "tailTipSideToSide": 1.3,
+     "tailSwingDeg": {
+      "upDown": 41.2,
+      "sideToSide": 68.3
+     },
+     "headBob": 0.187,
+     "headSurge": 0.024,
+     "headPitchDeg": 8.0,
+     "headYawDeg": 9.3,
+     "headRollDeg": 40.4
+    },
+    "Run after the sprint ran out": {
+     "take": "sprint",
+     "window": [
+      4.8,
+      6
+     ],
+     "surface": "ground",
+     "clip": "Run",
+     "clipRate": 1.524,
+     "speedTold": 18.0,
+     "speedMoved": 18.0,
+     "cyclePeriod": 0.3062,
+     "cyclesPerSecond": 3.27,
+     "travelPerCycle": 5.51,
+     "paws": {
+      "FrontL": {
+       "gap": 0.015,
+       "gapLeast": 0.007,
+       "lift": 0.154,
+       "strideClip": 0.496,
+       "plantedShare": 0.34,
+       "stances": 4,
+       "stanceSeconds": 0.0979,
+       "slide": 1.309,
+       "slideMax": 1.345,
+       "slidePath": 1.311,
+       "slideSpeed": 13.37,
+       "bodyTravelInStance": 1.763,
+       "clipTravelInStance": 0.453,
+       "upDownWhilePlanted": 0.021
+      },
+      "FrontR": {
+       "gap": 0.015,
+       "gapLeast": 0.009,
+       "lift": 0.153,
+       "strideClip": 0.493,
+       "plantedShare": 0.35,
+       "stances": 4,
+       "stanceSeconds": 0.1,
+       "slide": 1.344,
+       "slideMax": 1.347,
+       "slidePath": 1.345,
+       "slideSpeed": 13.44,
+       "bodyTravelInStance": 1.8,
+       "clipTravelInStance": 0.456,
+       "upDownWhilePlanted": 0.02
+      },
+      "BackL": {
+       "gap": 0.017,
+       "gapLeast": 0.009,
+       "lift": 0.129,
+       "strideClip": 0.635,
+       "plantedShare": 0.32,
+       "stances": 3,
+       "stanceSeconds": 0.0958,
+       "slide": 1.149,
+       "slideMax": 1.15,
+       "slidePath": 1.151,
+       "slideSpeed": 11.99,
+       "bodyTravelInStance": 1.725,
+       "clipTravelInStance": 0.576,
+       "upDownWhilePlanted": 0.023
+      },
+      "BackR": {
+       "gap": 0.019,
+       "gapLeast": 0.011,
+       "lift": 0.125,
+       "strideClip": 0.633,
+       "plantedShare": 0.32,
+       "stances": 3,
+       "stanceSeconds": 0.0972,
+       "slide": 1.171,
+       "slideMax": 1.217,
+       "slidePath": 1.173,
+       "slideSpeed": 12.05,
+       "bodyTravelInStance": 1.75,
+       "clipTravelInStance": 0.579,
+       "upDownWhilePlanted": 0.02
+      }
+     },
+     "fore": {
+      "slide": 1.327,
+      "stanceSeconds": 0.099,
+      "bodyTravelInStance": 1.781,
+      "clipTravelInStance": 0.455,
+      "strideClip": 0.494,
+      "upDownWhilePlanted": 0.021,
+      "gap": 0.015
+     },
+     "hind": {
+      "slide": 1.16,
+      "stanceSeconds": 0.0965,
+      "bodyTravelInStance": 1.738,
+      "clipTravelInStance": 0.577,
+      "strideClip": 0.634,
+      "upDownWhilePlanted": 0.021,
+      "gap": 0.017
+     },
+     "footSlide": 1.244,
+     "hipsBob": 0.121,
+     "shouldersBob": 0.168,
+     "spineFlexDeg": 36.6,
+     "spineFlexFromTo": [
+      -22.8,
+      13.7
+     ],
+     "spineSideBendDeg": 0.0,
+     "spineTwistDeg": 0.0,
+     "tailTipUpDown": 0.922,
+     "tailTipSideToSide": 1.28,
+     "tailSwingDeg": {
+      "upDown": 40.2,
+      "sideToSide": 59.3
+     },
+     "headBob": 0.189,
+     "headSurge": 0.022,
+     "headPitchDeg": 5.9,
+     "headYawDeg": 1.1,
+     "headRollDeg": 1.3
+    },
+    "Stalk": {
+     "take": "stalk",
+     "window": [
+      1,
+      3
+     ],
+     "surface": "ground",
+     "clip": "Stalk",
+     "clipRate": 2.25,
+     "speedTold": 4.12,
+     "speedMoved": 4.12,
+     "cyclePeriod": 0.5333,
+     "cyclesPerSecond": 1.87,
+     "travelPerCycle": 2.2,
+     "paws": {
+      "FrontL": {
+       "gap": 0.02,
+       "gapLeast": 0.019,
+       "lift": 0.079,
+       "strideClip": 0.217,
+       "plantedShare": 0.78,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.509,
+       "slideMax": 1.51,
+       "slidePath": 1.515,
+       "slideSpeed": 3.62,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.209,
+       "upDownWhilePlanted": 0.015
+      },
+      "FrontR": {
+       "gap": 0.02,
+       "gapLeast": 0.019,
+       "lift": 0.079,
+       "strideClip": 0.217,
+       "plantedShare": 0.83,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.509,
+       "slideMax": 1.51,
+       "slidePath": 1.515,
+       "slideSpeed": 3.62,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.209,
+       "upDownWhilePlanted": 0.015
+      },
+      "BackL": {
+       "gap": 0.018,
+       "gapLeast": 0.018,
+       "lift": 0.075,
+       "strideClip": 0.236,
+       "plantedShare": 0.78,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.491,
+       "slideMax": 1.491,
+       "slidePath": 1.495,
+       "slideSpeed": 3.58,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.227,
+       "upDownWhilePlanted": 0.014
+      },
+      "BackR": {
+       "gap": 0.018,
+       "gapLeast": 0.018,
+       "lift": 0.075,
+       "strideClip": 0.236,
+       "plantedShare": 0.78,
+       "stances": 3,
+       "stanceSeconds": 0.4167,
+       "slide": 1.491,
+       "slideMax": 1.491,
+       "slidePath": 1.495,
+       "slideSpeed": 3.58,
+       "bodyTravelInStance": 1.719,
+       "clipTravelInStance": 0.227,
+       "upDownWhilePlanted": 0.014
+      }
+     },
+     "fore": {
+      "slide": 1.509,
+      "stanceSeconds": 0.4167,
+      "bodyTravelInStance": 1.719,
+      "clipTravelInStance": 0.209,
+      "strideClip": 0.217,
+      "upDownWhilePlanted": 0.015,
+      "gap": 0.02
+     },
+     "hind": {
+      "slide": 1.491,
+      "stanceSeconds": 0.4167,
+      "bodyTravelInStance": 1.719,
+      "clipTravelInStance": 0.227,
+      "strideClip": 0.236,
+      "upDownWhilePlanted": 0.014,
+      "gap": 0.018
+     },
+     "footSlide": 1.5,
+     "hipsBob": 0.016,
+     "shouldersBob": 0.016,
+     "spineFlexDeg": 0.0,
+     "spineFlexFromTo": [
+      2.3,
+      2.3
+     ],
+     "spineSideBendDeg": 3.4,
+     "spineTwistDeg": 0.1,
+     "tailTipUpDown": 0.279,
+     "tailTipSideToSide": 1.433,
+     "tailSwingDeg": {
+      "upDown": 9.9,
+      "sideToSide": 60.3
+     },
+     "headBob": 0.016,
+     "headSurge": 0.001,
+     "headPitchDeg": 2.2,
+     "headYawDeg": 18.3,
+     "headRollDeg": 40.7
+    },
+    "Climb": {
+     "take": "climb",
+     "window": [
+      1.3,
+      2.9
+     ],
+     "surface": "bark",
+     "clip": "Climb",
+     "clipRate": 1.8,
+     "speedTold": 10.8,
+     "speedMoved": 10.8,
+     "cyclePeriod": 0.3333,
+     "cyclesPerSecond": 3.0,
+     "travelPerCycle": 3.6,
+     "paws": {
+      "FrontL": {
+       "gap": 0.08,
+       "gapLeast": 0.058,
+       "lift": 0.1,
+       "strideClip": 0.373,
+       "plantedShare": 0.55,
+       "stances": 4,
+       "stanceSeconds": 0.1792,
+       "slide": 1.586,
+       "slideMax": 1.586,
+       "slidePath": 1.588,
+       "slideSpeed": 8.85,
+       "bodyTravelInStance": 1.936,
+       "clipTravelInStance": 0.352,
+       "upDownWhilePlanted": 0.047
+      },
+      "FrontR": {
+       "gap": 0.08,
+       "gapLeast": 0.061,
+       "lift": 0.112,
+       "strideClip": 0.365,
+       "plantedShare": 0.56,
+       "stances": 5,
+       "stanceSeconds": 0.175,
+       "slide": 1.543,
+       "slideMax": 1.544,
+       "slidePath": 1.545,
+       "slideSpeed": 8.82,
+       "bodyTravelInStance": 1.891,
+       "clipTravelInStance": 0.35,
+       "upDownWhilePlanted": 0.044
+      },
+      "BackL": {
+       "gap": 0.144,
+       "gapLeast": 0.117,
+       "lift": 0.104,
+       "strideClip": 0.399,
+       "plantedShare": 0.58,
+       "stances": 4,
+       "stanceSeconds": 0.1917,
+       "slide": 1.724,
+       "slideMax": 1.724,
+       "slidePath": 1.737,
+       "slideSpeed": 8.99,
+       "bodyTravelInStance": 2.071,
+       "clipTravelInStance": 0.351,
+       "upDownWhilePlanted": 0.054
+      },
+      "BackR": {
+       "gap": 0.144,
+       "gapLeast": 0.12,
+       "lift": 0.117,
+       "strideClip": 0.392,
+       "plantedShare": 0.51,
+       "stances": 4,
+       "stanceSeconds": 0.1708,
+       "slide": 1.465,
+       "slideMax": 1.465,
+       "slidePath": 1.472,
+       "slideSpeed": 8.57,
+       "bodyTravelInStance": 1.846,
+       "clipTravelInStance": 0.384,
+       "upDownWhilePlanted": 0.054
+      }
+     },
+     "fore": {
+      "slide": 1.565,
+      "stanceSeconds": 0.1771,
+      "bodyTravelInStance": 1.913,
+      "clipTravelInStance": 0.351,
+      "strideClip": 0.369,
+      "upDownWhilePlanted": 0.045,
+      "gap": 0.08
+     },
+     "hind": {
+      "slide": 1.595,
+      "stanceSeconds": 0.1813,
+      "bodyTravelInStance": 1.959,
+      "clipTravelInStance": 0.367,
+      "strideClip": 0.396,
+      "upDownWhilePlanted": 0.054,
+      "gap": 0.144
+     },
+     "footSlide": 1.58,
+     "hipsBob": 0.07,
+     "shouldersBob": 0.109,
+     "spineFlexDeg": 22.9,
+     "spineFlexFromTo": [
+      -16.0,
+      6.9
+     ],
+     "spineSideBendDeg": 0.0,
+     "spineTwistDeg": 0.0,
+     "tailTipUpDown": 0.341,
+     "tailTipSideToSide": 0.801,
+     "tailSwingDeg": {
+      "upDown": 12.4,
+      "sideToSide": 32.6
+     },
+     "headBob": 0.095,
+     "headSurge": 0.031,
+     "headPitchDeg": 2.8,
+     "headYawDeg": 19.0,
+     "headRollDeg": 15.1
+    },
+    "Wire": {
+     "take": "wire",
+     "window": [
+      0.8,
+      2.9
+     ],
+     "surface": "wire",
+     "clip": "Wire",
+     "clipRate": 2.6,
+     "speedTold": 18.0,
+     "speedMoved": 18.0,
+     "cyclePeriod": 0.3846,
+     "cyclesPerSecond": 2.6,
+     "travelPerCycle": 6.92,
+     "paws": {
+      "FrontL": {
+       "gap": 0.498,
+       "gapLeast": 0.481,
+       "lift": 0.061,
+       "strideClip": 0.252,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.803,
+       "slideMax": 1.858,
+       "slidePath": 1.804,
+       "slideSpeed": 15.85,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.244,
+       "upDownWhilePlanted": 0.015
+      },
+      "FrontR": {
+       "gap": 0.498,
+       "gapLeast": 0.481,
+       "lift": 0.06,
+       "strideClip": 0.255,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.799,
+       "slideMax": 1.852,
+       "slidePath": 1.8,
+       "slideSpeed": 15.82,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.248,
+       "upDownWhilePlanted": 0.016
+      },
+      "BackL": {
+       "gap": 0.495,
+       "gapLeast": 0.491,
+       "lift": 0.06,
+       "strideClip": 0.275,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.781,
+       "slideMax": 1.834,
+       "slidePath": 1.781,
+       "slideSpeed": 15.65,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.267,
+       "upDownWhilePlanted": 0.016
+      },
+      "BackR": {
+       "gap": 0.495,
+       "gapLeast": 0.491,
+       "lift": 0.061,
+       "strideClip": 0.271,
+       "plantedShare": 0.61,
+       "stances": 10,
+       "stanceSeconds": 0.1138,
+       "slide": 1.785,
+       "slideMax": 1.84,
+       "slidePath": 1.787,
+       "slideSpeed": 15.7,
+       "bodyTravelInStance": 2.047,
+       "clipTravelInStance": 0.262,
+       "upDownWhilePlanted": 0.015
+      }
+     },
+     "fore": {
+      "slide": 1.801,
+      "stanceSeconds": 0.1138,
+      "bodyTravelInStance": 2.047,
+      "clipTravelInStance": 0.246,
+      "strideClip": 0.254,
+      "upDownWhilePlanted": 0.015,
+      "gap": 0.498
+     },
+     "hind": {
+      "slide": 1.783,
+      "stanceSeconds": 0.1138,
+      "bodyTravelInStance": 2.047,
+      "clipTravelInStance": 0.265,
+      "strideClip": 0.273,
+      "upDownWhilePlanted": 0.015,
+      "gap": 0.495
+     },
+     "footSlide": 1.792,
+     "hipsBob": 0.024,
+     "shouldersBob": 0.024,
+     "spineFlexDeg": 0.1,
+     "spineFlexFromTo": [
+      -6.9,
+      -6.8
+     ],
+     "spineSideBendDeg": 7.8,
+     "spineTwistDeg": 4.2,
+     "tailTipUpDown": 0.336,
+     "tailTipSideToSide": 1.991,
+     "tailSwingDeg": {
+      "upDown": 11.9,
+      "sideToSide": 89.3
+     },
+     "headBob": 0.025,
+     "headSurge": 0.003,
+     "headPitchDeg": 2.8,
+     "headYawDeg": 21.0,
+     "headRollDeg": 41.1
+    }
+   },
+   "events": {
+    "turn": {
+     "comparedWith": "sprint",
+     "left": {
+      "yawRateMeanDegPerSec": 173.7,
+      "yawRatePeakDegPerSec": 291.9,
+      "leanPeakDeg": 9.3,
+      "shouldersBankPeakDeg": 17.4,
+      "headRollPeakDeg": 4.2,
+      "tailTrailDeg": 13.14,
+      "tailTrailPeakDeg": 25.43,
+      "tailTrailPeakSecondsAfterYawRatePeak": 0.129,
+      "tailBackSecondsAfterItsPeak": 0.233,
+      "tailSwingsPastDeg": 1.2,
+      "spineIntoDeg": 13.5,
+      "spineIntoPeakDeg": 22.87,
+      "headIntoDeg": 18.99,
+      "headIntoPeakDeg": 30.64
+     },
+     "right": {
+      "yawRateMeanDegPerSec": -173.5,
+      "yawRatePeakDegPerSec": -291.9,
+      "leanPeakDeg": -9.3,
+      "shouldersBankPeakDeg": 16.1,
+      "headRollPeakDeg": 5.3,
+      "tailTrailDeg": 14.7,
+      "tailTrailPeakDeg": 25.01,
+      "tailTrailPeakSecondsAfterYawRatePeak": 0.108,
+      "tailBackSecondsAfterItsPeak": 0.25,
+      "tailSwingsPastDeg": 4.61,
+      "spineIntoDeg": 13.49,
+      "spineIntoPeakDeg": 22.26,
+      "headIntoDeg": 19.94,
+      "headIntoPeakDeg": 32.67
+     },
+     "tailLagSeconds": 0.0573,
+     "spineIntoPerTurnRate": 0.065,
+     "headIntoPerTurnRate": 0.0986,
+     "anythingAnswersTheTurn": true
+    },
+    "stop": {
+     "secondsToStandstill": 0.4,
+     "secondsUntilAnimationToldStill": 0.25,
+     "secondsUntilIdleAlone": 0.383,
+     "studsCoveredStopping": 3.68,
+     "clipsOnTheWay": [
+      "Run",
+      "Idle"
+     ],
+     "pawSkateWhilePlanted": {
+      "FrontL": 1.531,
+      "FrontR": 2.386,
+      "BackL": 0.195,
+      "BackR": 0.21
+     },
+     "layers": {
+      "noseDipPeakDeg": 14.7,
+      "noseDipPeakAtSeconds": 0.25,
+      "noseBackPastLevelDeg": 1.8,
+      "tailLiftPeakDeg": 35.6,
+      "tailLiftPeakAtSeconds": 0.333,
+      "tailBackPastRestDeg": 9.3,
+      "hipsSinkStuds": 0.005,
+      "lowestToeGap": -0.021,
+      "lowestToeGapClipsAlone": -0.016,
+      "settledAfterSeconds": 1.071
+     },
+     "idle": {
+      "pawDrift": 0.018,
+      "hipsBob": 0.022,
+      "headBob": 0.013,
+      "headYawDeg": 76.3,
+      "tailTipUpDown": 0.583,
+      "tailTipSideToSide": 1.225,
+      "spineFlexDeg": 2.4
+     }
+    },
+    "hop": {
+     "layers": {
+      "noseUpPeakDeg": 3.5,
+      "noseDownPeakDeg": -0.1,
+      "tailLowPeakDeg": 2.7,
+      "tailHighPeakDeg": 0.8,
+      "landingSinkStuds": 0.011,
+      "landingSinkAtSecondsAfterLanding": 0.0,
+      "landingBounceStuds": 0.001,
+      "lowestToeGapAfterLanding": -0.007,
+      "lowestToeGapAfterLandingClipsAlone": -0.005
+     },
+     "airSeconds": 0.217,
+     "apex": 0.44,
+     "studsCovered": 5.3,
+     "clip": "Pounce",
+     "clipSeconds": 0.9667,
+     "clipSecondsShownInAirFrom": 0.423,
+     "clipSecondsShownInAir": 0.705,
+     "clipRateInAir": 1.406,
+     "secondsFrozenOnLastPose": 0.0,
+     "speedToldInAir": 18.0,
+     "speedMovedInAir": 26.2,
+     "speedMovedAfterLanding": 28.1,
+     "speedToldAfterLanding": 18.0
+    },
+    "leap": {
+     "layers": {
+      "noseUpPeakDeg": 21.4,
+      "noseDownPeakDeg": 18.3,
+      "tailLowPeakDeg": 24.1,
+      "tailHighPeakDeg": 29.2,
+      "landingSinkStuds": 0.052,
+      "landingSinkAtSecondsAfterLanding": 0.083,
+      "landingBounceStuds": 0.017,
+      "lowestToeGapAfterLanding": 0.003,
+      "lowestToeGapAfterLandingClipsAlone": 0.008
+     },
+     "airSeconds": 0.833,
+     "apex": 6.49,
+     "studsCovered": 19.8,
+     "clip": "Leap",
+     "clipSeconds": 0.7667,
+     "clipSecondsShownInAirFrom": 0.176,
+     "clipSecondsShownInAir": 0.641,
+     "clipRateInAir": 0.569,
+     "secondsFrozenOnLastPose": 0.0,
+     "speedToldInAir": 18.0,
+     "speedMovedInAir": 28.7,
+     "speedMovedAfterLanding": 20.5,
+     "speedToldAfterLanding": 18.0
+    },
+    "takingTheTrunk": {
+     "atSeconds": 0.333,
+     "clipsWhileTaking": [
+      [
+       "Climb",
+       0.15
+      ]
+     ],
+     "secondsUntilNoseUp": 0.55,
+     "pitchDeg": 81.9,
+     "peakSpeedOfTheDrawnBody": 55.3
+    }
+   },
+   "clipFramesShown": {
+    "Idle": 129,
+    "Walk": 9,
+    "Run": 957,
+    "Pounce": 13,
+    "Leap": 50,
+    "Climb": 161,
+    "Wire": 180,
+    "Stalk": 180
+   },
+   "clipsNeverShown": [
+    "Bite"
+   ],
+   "walkClipInPassing": [
+    {
+     "take": "walk",
+     "frames": 2,
+     "seconds": 0.033,
+     "speedFromTo": [
+      4.4,
+      7.8
+     ]
+    },
+    {
+     "take": "sprint",
+     "frames": 1,
+     "seconds": 0.017,
+     "speedFromTo": [
+      8.1,
+      8.1
+     ]
+    },
+    {
+     "take": "turn",
+     "frames": 1,
+     "seconds": 0.017,
+     "speedFromTo": [
+      8.1,
+      8.1
+     ]
+    },
+    {
+     "take": "stop",
+     "frames": 1,
+     "seconds": 0.017,
+     "speedFromTo": [
+      8.1,
+      8.1
+     ]
+    },
+    {
+     "take": "leap",
+     "frames": 2,
+     "seconds": 0.033,
+     "speedFromTo": [
+      4.4,
+      7.8
+     ]
+    },
+    {
+     "take": "climb",
+     "frames": 2,
+     "seconds": 0.033,
+     "speedFromTo": [
+      4.4,
+      7.8
+     ]
+    }
+   ],
+   "camera": {
+    "distance": 14.016,
+    "elevation": 0.3,
+    "fov": 70,
+    "lift": 1.3614
+   },
+   "bodySize": [
+    2,
+    2.269,
+    3.504
+   ]
+  }
+ }
+}

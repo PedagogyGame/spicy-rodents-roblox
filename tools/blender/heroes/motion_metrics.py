@@ -20,8 +20,10 @@ over the stretch); the tail tip's swing in the body's own frame; the head's bob,
 ranges. Paw joints are the ball of the hind foot and the knuckles of the fore paw (a couple of hundredths
 of a stud above the sole); `gap` is how far a planted one stays from the surface (ground, bark or wire).
 Per event: the turn (yaw rate, lean, and whether tail, spine or head answer it: the S against the same
-sprint run straight, moment for moment), the stop, the hop and the leap (what the Leap clip shows against
-what the body does), taking the trunk; and which clips are never shown.
+sprint run straight, moment for moment), the stop, the hop and the leap (what the clip that carries each
+through the air shows against what the body does), taking the trunk; and which clips are never shown. What the layers on top of the
+clips add to a stop, a leap and a landing (Animation/Liveliness: the dip of the nose, the lift of the tail,
+the pitch along the flight, the squash) is measured against the same frames with the clips alone.
 """
 import argparse
 import json
@@ -240,7 +242,14 @@ def posture(s):
         "headPitchDeg": r(deg(span(headR[:, 0])), 1),
         "headYawDeg": r(deg(span(headR[:, 1])), 1),
         "headRollDeg": r(deg(span(headR[:, 2])), 1),
-    }, {"tailSide": tail_side, "spineSide": np.degrees(spine[:, 1]), "headYaw": np.degrees(headR[:, 1])}
+    }, {
+        "tailSide": tail_side,
+        "tailUp": tail_up,
+        "spineSide": np.degrees(spine[:, 1]),
+        "headYaw": np.degrees(headR[:, 1]),
+        "headRoll": np.degrees(headR[:, 2]),
+        "chestRoll": np.degrees(np.array([rel_angles(np.eye(3), W["Chest"][0])[2] for W in s.W])),
+    }
 
 
 def gait(take, clips, rig, window, up):
@@ -285,10 +294,14 @@ def turn_event(take, straight, clips, rig, up):
     """What the body does about a turn. The S is sprinted exactly as the straight sprint take is (same
     keys but for the mouse, same clock), so the clip and every layer that does not know about turning are
     the same in both at every moment: the difference between the two takes, moment for moment, is what
-    turning changes. Signs: `tailTrail` + is the tail tip left behind on the outside of the turn;
-    `spineInto` and `headInto` + are the chest (against the pelvis) and the head turned into it."""
+    turning changes. Signs: `tailTrail` + is the tail left behind: it still points where the body was
+    heading, so its tip is on the side the body turns to (to the left of a body turning left);
+    `spineInto` and `headInto` + are the chest (against the pelvis) and the head turned into the turn;
+    `bank` + is a roll into it (the drawn body's lean, and with the chest's own roll on top the
+    shoulders' whole bank; the head's is what is left of that at the head, 0 when it stays level)."""
     w = take["windows"]
     t0, t1 = w["turning"]
+    t1 = min(t1 + 0.5, take["seconds"], straight["seconds"] if straight is not None else t1 + 0.5)  # ... and the tail's way back
     s = Samples(take, clips, rig, t0, t1, up)
     _, ser = posture(s)
     if straight is not None:
@@ -297,22 +310,40 @@ def turn_event(take, straight, clips, rig, up):
         ref = {k: np.zeros_like(v) for k, v in ser.items()}
     rate = np.degrees(np.gradient(np.unwrap(s.col("yaw")), s.dt))  # + is a turn to the left
     way = np.sign(rate)
-    roll = np.degrees(s.col("roll"))
-    d_tail = ser["tailSide"] - ref["tailSide"]  # + toward the body's right
+    roll = np.degrees(s.col("roll"))  # + is the left side down
+    d_tail = -(ser["tailSide"] - ref["tailSide"])  # + toward the body's left
     d_spine = ser["spineSide"] - ref["spineSide"]  # + toward its left
     d_head = ser["headYaw"] - ref["headYaw"]
+    chest = roll + ser["chestRoll"] - ref["chestRoll"]
+    head = roll + ser["headRoll"] - ref["headRoll"]
     out = {"comparedWith": straight["take"] if straight is not None else None}
+    spans = {"left": (w["left"][0], w["right"][0]), "right": (w["right"][0], t1)}
     for key in ("left", "right"):
         m = (s.t >= w[key][0]) & (s.t <= w[key][1])
         peak = int(np.argmax(np.abs(rate[m])))
+        side = float(np.sign(rate[m][peak]))
+        # from the start of this turn to the start of the next: the tail's swing out and back
+        whole = (s.t >= spans[key][0]) & (s.t < spans[key][1])
+        tw = s.t[whole]
+        trail = d_tail[whole] * side
+        out_i = int(np.argmax(trail))
+        rate_i = int(np.argmax(rate[whole] * side))
+        back = np.nonzero(trail[out_i:] < 0.2 * trail[out_i])[0]
         out[key] = {
             "yawRateMeanDegPerSec": r(np.mean(rate[m]), 1),
             "yawRatePeakDegPerSec": r(rate[m][peak], 1),
             "leanPeakDeg": r(roll[m][int(np.argmax(np.abs(roll[m])))], 1),
+            "shouldersBankPeakDeg": r(np.max(chest[whole] * side), 1),
+            "headRollPeakDeg": r(np.max(np.abs(head[whole])), 1),
             "tailTrailDeg": r(np.mean(d_tail[m] * way[m]), 2),
-            "tailTrailPeakDeg": r(np.max(np.abs(d_tail[m])), 2),
+            "tailTrailPeakDeg": r(trail[out_i], 2),
+            "tailTrailPeakSecondsAfterYawRatePeak": r(tw[out_i] - tw[rate_i], 3),
+            "tailBackSecondsAfterItsPeak": r(tw[out_i + back[0]] - tw[out_i], 3) if len(back) else None,
+            "tailSwingsPastDeg": r(max(0.0, -float(np.min(trail[out_i:]))), 2),
             "spineIntoDeg": r(np.mean(d_spine[m] * way[m]), 2),
+            "spineIntoPeakDeg": r(np.max(d_spine[whole] * side), 2),
             "headIntoDeg": r(np.mean(d_head[m] * way[m]), 2),
+            "headIntoPeakDeg": r(np.max(d_head[whole] * side), 2),
         }
     # a tail that follows the body like a towed thing trails it by (seconds of lag) x (turn rate): the
     # slope of its trailing angle against the turn rate over the whole S is that lag, in seconds
@@ -321,6 +352,33 @@ def turn_event(take, straight, clips, rig, up):
     out["headIntoPerTurnRate"] = r(float(np.sum(d_head * rate) / max(np.sum(rate * rate), 1e-9)), 4)
     out["anythingAnswersTheTurn"] = bool(max(np.max(np.abs(d_tail)), np.max(np.abs(d_spine)), np.max(np.abs(d_head))) > 0.05)
     return out
+
+
+def layered(s, gap_fn):
+    """What the layers add over a stretch, against the same frames with the clips alone: the body's pitch
+    (the chest's nose-up angle in the body's frame, degrees), the tail's lift (the angle of its root-to-tip
+    line above level, degrees), the hips' height (studs), and the lowest any planted-or-not toe joint gets
+    to the surface with and without them (the joint rests about 0.02 above it)."""
+    def chest_pitch(Ws):
+        return np.degrees(np.array([rel_angles(np.eye(3), W["Chest"][0])[0] for W in Ws]))
+
+    def tail_up(Ws):
+        v = np.array([s.rig.tip(W, "Tail8") - W["Tail1"][1] for W in Ws])
+        return np.degrees(np.arctan2(v[:, 1], np.hypot(v[:, 0], v[:, 2])))
+
+    def hips(Ws):
+        return np.array([(W["BackL_Upper"][1][1] + W["BackR_Upper"][1][1]) / 2 for W in Ws])
+
+    def lowest(Ws):
+        return np.array([min(gap_fn(p + R @ W[f"{leg}_Toe"][1]) for leg in LEGS) for W, (R, p) in zip(Ws, s.body)])
+
+    return {
+        "pitch": chest_pitch(s.W) - chest_pitch(s.W0),
+        "tail": tail_up(s.W) - tail_up(s.W0),
+        "hips": hips(s.W) - hips(s.W0),
+        "toeGap": lowest(s.W),
+        "toeGapClips": lowest(s.W0),
+    }
 
 
 def stop_event(take, clips, rig, up):
@@ -344,6 +402,24 @@ def stop_event(take, clips, rig, up):
     for f in frames[i0 : idle + 1]:
         if not clips_seen or clips_seen[-1] != f["clip"]:
             clips_seen.append(f["clip"])
+    # the stop itself and the second after it: the dip and the tail's throw, over the clips alone
+    _, gap_fn = surface_of(take)
+    after = Samples(take, clips, rig, w[0], min(w[0] + 1.25, frames[-1]["t"]), up)
+    add = layered(after, gap_fn)
+    dip_i, lift_i = int(np.argmin(add["pitch"])), int(np.argmax(add["tail"]))
+    answer = {
+        "noseDipPeakDeg": r(-add["pitch"][dip_i], 1),
+        "noseDipPeakAtSeconds": r(after.t[dip_i] - w[0], 3),
+        "noseBackPastLevelDeg": r(max(0.0, float(np.max(add["pitch"][dip_i:]))), 1),
+        "tailLiftPeakDeg": r(add["tail"][lift_i], 1),
+        "tailLiftPeakAtSeconds": r(after.t[lift_i] - w[0], 3),
+        "tailBackPastRestDeg": r(max(0.0, -float(np.min(add["tail"][lift_i:]))), 1),
+        "hipsSinkStuds": r(-float(np.min(add["hips"]))),
+        "lowestToeGap": r(float(np.min(add["toeGap"]))),
+        "lowestToeGapClipsAlone": r(float(np.min(add["toeGapClips"]))),
+        "settledAfterSeconds": r(float(after.t[np.nonzero((np.abs(add["pitch"]) > 0.5) | (np.abs(add["tail"]) > 2.0))[0][-1]] - w[0]), 3)
+        if np.any((np.abs(add["pitch"]) > 0.5) | (np.abs(add["tail"]) > 2.0)) else 0.0,
+    }
     idle_s = Samples(take, clips, rig, take["windows"]["idle"][0] + 0.2, take["windows"]["idle"][1], 1)
     post, _ = posture(idle_s)
     drift = max(span(idle_s.world(idle_s.joint(f"{leg}_Toe"))[:, k]) for leg in LEGS for k in range(3))
@@ -354,11 +430,12 @@ def stop_event(take, clips, rig, up):
         "studsCoveredStopping": r(np.linalg.norm(b - a), 2),
         "clipsOnTheWay": clips_seen,
         "pawSkateWhilePlanted": skate,
+        "layers": answer,
         "idle": {"pawDrift": r(drift), **{k: post[k] for k in ("hipsBob", "headBob", "headYawDeg", "tailTipUpDown", "tailTipSideToSide", "spineFlexDeg")}},
     }
 
 
-def air_event(take, window):
+def air_event(take, window, clips=None, rig=None, up=1):
     frames = take["frames"]
     fps = take["fps"]
     i0, i1 = int(round(window[0] * fps)), int(round(window[1] * fps))
@@ -366,16 +443,39 @@ def air_event(take, window):
     if not air:
         return None
     first, last = air[0]["i"], air[-1]["i"]
-    leap = take["clips"]["Leap"]
+    shown = air[len(air) // 2]["clip"]  # the clip that carries it through the air (Leap, or Pounce for a pounce)
+    leap = take["clips"][shown]
     held = [f for f in air if f["clipRate"] == 0]
     after = frames[min(last + 1, len(frames) - 1) : min(last + 13, len(frames))]
+    answer = None
+    if clips is not None:
+        _, gap_fn = surface_of(take)
+        t_land = frames[min(last + 1, len(frames) - 1)]["t"]
+        s = Samples(take, clips, rig, frames[first]["t"], min(t_land + 0.6, frames[-1]["t"]), up)
+        add = layered(s, gap_fn)
+        air_m, land_m = s.t < t_land, s.t >= t_land
+        sink_i = int(np.argmin(np.where(land_m, add["hips"], 0.0)))
+        answer = {
+            "noseUpPeakDeg": r(float(np.max(add["pitch"][air_m])), 1),
+            "noseDownPeakDeg": r(-float(np.min(add["pitch"][air_m])), 1),
+            "tailLowPeakDeg": r(-float(np.min(add["tail"][air_m])), 1),
+            "tailHighPeakDeg": r(float(np.max(add["tail"][air_m])), 1),
+            "landingSinkStuds": r(-add["hips"][sink_i]),
+            "landingSinkAtSecondsAfterLanding": r(s.t[sink_i] - t_land, 3),
+            "landingBounceStuds": r(max(0.0, float(np.max(add["hips"][sink_i:])))),
+            "lowestToeGapAfterLanding": r(float(np.min(add["toeGap"][land_m]))),
+            "lowestToeGapAfterLandingClipsAlone": r(float(np.min(add["toeGapClips"][land_m]))),
+        }
     return {
+        "layers": answer,
         "airSeconds": r(len(air) / fps, 3),
         "apex": r(max(f["pos"]["y"] for f in air) - take["ground"]["y"], 2),
         "studsCovered": r(abs(frames[last]["pos"]["z"] - frames[first]["pos"]["z"]), 1),
-        "clip": air[len(air) // 2]["clip"],
+        "clip": shown,
         "clipSeconds": leap["length"],
-        "clipSecondsShownInAir": r(max(f["clipTime"] for f in air), 3),
+        "clipSecondsShownInAirFrom": r(min(f["clipTime"] for f in air if f["clip"] == shown), 3),
+        "clipSecondsShownInAir": r(max(f["clipTime"] for f in air if f["clip"] == shown), 3),
+        "clipRateInAir": r(np.mean([f["clipRate"] for f in air if f["clip"] == shown and f["clipRate"] > 0] or [0.0])),
         "secondsFrozenOnLastPose": r(len(held) / fps, 3),
         "speedToldInAir": r(np.mean([f["speed"] for f in air]), 1),
         "speedMovedInAir": r(np.mean([f["groundSpeed"] for f in air]), 1),
@@ -457,8 +557,8 @@ def measure(variant, motion, heroes, up):
     if "stop" in takes:
         out["events"]["stop"] = stop_event(takes["stop"], clips, rig, up)
     if "leap" in takes:
-        out["events"]["hop"] = air_event(takes["leap"], takes["leap"]["windows"]["hop"])
-        out["events"]["leap"] = air_event(takes["leap"], takes["leap"]["windows"]["leap"])
+        out["events"]["hop"] = air_event(takes["leap"], takes["leap"]["windows"]["hop"], clips, rig, up)
+        out["events"]["leap"] = air_event(takes["leap"], takes["leap"]["windows"]["leap"], clips, rig, up)
     if "climb" in takes:
         out["events"]["takingTheTrunk"] = mount_event(takes["climb"])
     shown, never = clip_use(takes)
@@ -489,14 +589,25 @@ def table(doc):
             lines.append(f"turn: yaw rate {t['left']['yawRatePeakDegPerSec']} / {t['right']['yawRatePeakDegPerSec']} deg/s, lean {t['left']['leanPeakDeg']} / {t['right']['leanPeakDeg']} deg; "
                          f"tail trails {t['left']['tailTrailDeg']} / {t['right']['tailTrailDeg']} deg (lag {t['tailLagSeconds']} s), spine into the turn {t['left']['spineIntoDeg']} / {t['right']['spineIntoDeg']} deg, "
                          f"head into the turn {t['left']['headIntoDeg']} / {t['right']['headIntoDeg']} deg; anything answers the turn: {t['anythingAnswersTheTurn']}")
+            for key in ("left", "right"):
+                k = t[key]
+                lines.append(f"  {key}: shoulders bank {k['shouldersBankPeakDeg']} deg at most (the drawn lean {k['leanPeakDeg']}), head roll {k['headRollPeakDeg']}; spine {k['spineIntoPeakDeg']} and head {k['headIntoPeakDeg']} deg into it at most; "
+                             f"tail trails {k['tailTrailPeakDeg']} deg at most, {k['tailTrailPeakSecondsAfterYawRatePeak']} s after the turn is fastest, back {k['tailBackSecondsAfterItsPeak']} s later, swings {k['tailSwingsPastDeg']} deg past")
         if "stop" in e:
             s = e["stop"]
             lines.append(f"stop: standstill after {s['secondsToStandstill']} s and {s['studsCoveredStopping']} studs; clips {' > '.join(s['clipsOnTheWay'])}; Idle alone after {s['secondsUntilIdleAlone']} s; paws skate {s['pawSkateWhilePlanted']}")
+            a = s["layers"]
+            lines.append(f"  the layers: nose dips {a['noseDipPeakDeg']} deg at {a['noseDipPeakAtSeconds']} s and comes back {a['noseBackPastLevelDeg']} past level; tail lifts {a['tailLiftPeakDeg']} deg at {a['tailLiftPeakAtSeconds']} s and swings back {a['tailBackPastRestDeg']} past rest; "
+                         f"hips sink {a['hipsSinkStuds']}; lowest toe {a['lowestToeGap']} from the ground (clips alone {a['lowestToeGapClipsAlone']}); settled after {a['settledAfterSeconds']} s; idle paw drift {s['idle']['pawDrift']}")
         for key in ("hop", "leap"):
             if e.get(key):
                 a = e[key]
-                lines.append(f"{key}: {a['airSeconds']} s in the air, apex {a['apex']}, {a['studsCovered']} studs; {a['clip']} clip {a['clipSeconds']} s, shown to {a['clipSecondsShownInAir']} s, frozen {a['secondsFrozenOnLastPose']} s; "
+                lines.append(f"{key}: {a['airSeconds']} s in the air, apex {a['apex']}, {a['studsCovered']} studs; {a['clip']} clip {a['clipSeconds']} s, shown from {a['clipSecondsShownInAirFrom']} to {a['clipSecondsShownInAir']} s at x{a['clipRateInAir']}, frozen {a['secondsFrozenOnLastPose']} s; "
                              f"moved {a['speedMovedInAir']} st/s, told {a['speedToldInAir']}; after landing moved {a['speedMovedAfterLanding']}, told {a['speedToldAfterLanding']}")
+                if a.get("layers"):
+                    k = a["layers"]
+                    lines.append(f"  the layers: nose up {k['noseUpPeakDeg']} deg rising, down {k['noseDownPeakDeg']} falling; tail low {k['tailLowPeakDeg']} then high {k['tailHighPeakDeg']} deg; landing sinks the hips {k['landingSinkStuds']} at {k['landingSinkAtSecondsAfterLanding']} s, bounce {k['landingBounceStuds']}; "
+                                 f"lowest toe after landing {k['lowestToeGapAfterLanding']} (clips alone {k['lowestToeGapAfterLandingClipsAlone']})")
         if e.get("takingTheTrunk"):
             k = e["takingTheTrunk"]
             lines.append(f"taking the trunk: clips {k['clipsWhileTaking']}, nose up after {k['secondsUntilNoseUp']} s")

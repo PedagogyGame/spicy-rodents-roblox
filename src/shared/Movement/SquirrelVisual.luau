@@ -107,7 +107,9 @@ SquirrelVisual.params = {
 	-- 0.2 u / 0.28 u, which reads as hovering beside a pole at this scale), and the rate at which pitch
 	-- and a heading switch ease
 	poleGap = 0.07,
-	barkGap = 0.3,
+	-- (0.3 until the sculpted body: its paws stood 0.4 studs off the bark, "floating"; the feet point is
+	-- the soles of a skinned hero, so it belongs on the bark the motor takes the trunk to have)
+	barkGap = 0,
 	poseRate = 16,
 }
 local P = SquirrelVisual.params

@@ -28,7 +28,8 @@
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
 --   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
---   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded) -> string (pure)
+--   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
+--   string (pure); launch(events, vy) -> action?, airSeconds? (pure)
 -- No side effects on require.
 
 local Import = require("../Import")
@@ -103,15 +104,28 @@ function Squirrel.movedFromOutside(gap: number, speed: number, frameDt: number):
 	return gap > Squirrel.OUTSIDE_SLACK + speed * math.max(frameDt, 0) * 2
 end
 
--- What the held body is doing, for a rig that plays clips (KinematicPose.mode): on a rail it is gripping
--- a "trunk" once more than half of the climb pose shows (SquirrelVisual's `climb`), else running a "rail";
--- off one it is on the "ground" or in the "air". Pure: the offline motion preview (tools/review/motion)
--- asks the same question.
-function Squirrel.modeOf(onRoute: boolean, climb: number, grounded: boolean): string
+-- What the held body is doing, for a rig that plays clips (KinematicPose.mode): on a rail it is on a
+-- "trunk" from the moment it takes one (`trunk`: SquirrelVisual's; the nose comes up over the next half
+-- second, and it should not trot a wire meanwhile) and while more than half of the climb pose still shows
+-- after it leaves one (SquirrelVisual's `climb`), else running a "rail"; off one it is on the "ground" or
+-- in the "air". Pure: the offline motion preview (tools/review/motion) asks the same question.
+function Squirrel.modeOf(onRoute: boolean, climb: number, grounded: boolean, trunk: boolean?): string
 	if onRoute then
-		return if climb > 0.5 then "trunk" else "rail"
+		return if trunk or climb > 0.5 then "trunk" else "rail"
 	end
 	return if grounded then "ground" else "air"
+end
+
+-- How this frame's motor events sent the body into the air, for a rig that plays clips
+-- (KinematicPose.action, airSeconds): "leap" or "pounce", and the seconds until gravity brings it back
+-- down to the height it left (`vy`: its vertical speed after the launch, studs/s). nil: nothing did.
+function Squirrel.launch(events: { { [string]: any } }, vy: number): (string?, number?)
+	for _, e in events do
+		if e.kind == "leap" or e.kind == "pounce" then
+			return e.kind, 2 * math.max(vy, 0) / SquirrelMotor.params.gravity
+		end
+	end
+	return nil, nil
 end
 
 function Squirrel.start(
@@ -272,8 +286,13 @@ function Squirrel.start(
 		-- what is drawn: the eased pose, about the feet point (yaw, then nose-up pitch and lean, then the hip)
 		local snapped = SquirrelVisual.frame(visual, state, motorWorld :: any, dt, world.groundAt)
 		kin.moveSpeed, kin.cadence, kin.climb = visual.moveSpeed, visual.cadence, visual.climb
-		kin.mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded)
+		kin.mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded, visual.trunk)
 		kin.stalk = state.focus
+		kin.winded = state.winded
+		local action, airSeconds = Squirrel.launch(events :: any, state.vy)
+		if action or kin.mode ~= "air" then
+			kin.action, kin.airSeconds = action, airSeconds
+		end
 		local cf = Units.yawCFrame(visual.yaw or state.yaw, Vector3.new(visual.x, visual.y, visual.z))
 			* CFrame.Angles(visual.pitch, 0, -visual.lean)
 			* CFrame.new(0, hip, 0)
