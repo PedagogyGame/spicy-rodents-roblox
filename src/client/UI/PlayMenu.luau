@@ -15,6 +15,7 @@
 -- down on small laptop screens (UIScale from the viewport, scaleFor); toasts wrap. Error lines name F9
 -- (the Developer Console), which works in a live game as well as Studio.
 -- Pure part (Lune-tested): CHOICES, helpLines(role, device) -> { string }, statusLine(attrs) -> string,
+--   sickLine(attrs) -> string? (a bitten player: what to do, under the status line),
 --   scaleFor(width, height) -> number.
 -- Engine part: start() -> Menu { loading(prepare) (yields until ready), open(), close(), isOpen(),
 --   setDevice(device?), banner(title, line, seconds?), toast(text, seconds?) }.
@@ -112,6 +113,20 @@ function PlayMenu.helpLines(role: string?, device: string?): { string }
 	end
 	table.insert(lines, "M  menu   ·   Esc > Reset  if you get stuck")
 	return lines
+end
+
+-- The line under the status for a player whose body the Spicy Rodent bit (the player attribute
+-- Infected, written by Server/Boot/Game from the infection service): what is wrong and what to do,
+-- on screen for as long as it is true. nil when there is nothing to say.
+PlayMenu.SICK = table.freeze({
+	infected = "INFECTED  ·  Walk into the hospital (far west of town) to be cured",
+	symptoms = "INFECTED, RED EYES  ·  Walk into the hospital (far west of town)",
+	treating = "BEING TREATED  ·  Stay inside the hospital",
+}) :: { [string]: string }
+
+function PlayMenu.sickLine(attrs: { [string]: any }): string?
+	local status = attrs.Infected
+	return if type(status) == "string" then PlayMenu.SICK[status] else nil
 end
 
 -- The status line from player attributes (PlayRole, Bites, Power, PowerStage, Health).
@@ -267,6 +282,23 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 		Visible = false,
 	})
 	corner(status, 8)
+	-- a bitten player's line, under the status (people have no health bar there)
+	local sick = text(gui, {
+		Name = "Sick",
+		Text = "",
+		Font = Enum.Font.GothamBold,
+		TextSize = 17,
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 84),
+		Size = UDim2.new(0.8, 0, 0, 26),
+		BackgroundTransparency = 0.25,
+		BackgroundColor3 = Color3.fromRGB(120, 10, 10),
+		Visible = false,
+	})
+	corner(sick, 8)
+	local sickLimit = Instance.new("UISizeConstraint")
+	sickLimit.MaxSize = Vector2.new(660, 26)
+	sickLimit.Parent = sick
 	local hpBack = Instance.new("Frame")
 	hpBack.AnchorPoint = Vector2.new(0.5, 0)
 	hpBack.Position = UDim2.new(0.5, 0, 0, 84)
@@ -471,6 +503,9 @@ function PlayMenu.start(onPick: (choice: string) -> ()): Menu
 			else PlayMenu.statusLine(a)
 		helpText.Text = `<b>{title}</b>\n` .. table.concat(lines, "\n")
 		status.Text = PlayMenu.statusLine(a)
+		local sickText = PlayMenu.sickLine(a)
+		sick.Text = sickText or ""
+		sick.Visible = sickText ~= nil and not isOpen
 		local h = a.Health :: number?
 		hpBack.Visible = h ~= nil and not isOpen
 		if h then

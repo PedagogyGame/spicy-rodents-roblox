@@ -6,6 +6,7 @@ local PlayRules = require("@shared/Combat/PlayRules")
 local PowerRules = require("@shared/Rodent/PowerRules")
 local LightingPreset = require("@shared/World/LightingPreset")
 local PlayMenu = require("@client/UI/PlayMenu")
+local Game = require("@server/Boot/Game")
 
 return function(t)
 	t.test("PlayRules: two kicks knock out a 100-health rodent; health never below 0", function()
@@ -106,5 +107,51 @@ return function(t)
 		t.truthy(has(PlayMenu.helpLines(nil), "menu"))
 		t.truthy(string.find(PlayMenu.statusLine({ PlayRole = "rodent", Bites = 3, Power = 300 }), "Bites 3", 1, true))
 		t.truthy(string.find(PlayMenu.statusLine({}), "menu", 1, true))
+	end)
+
+	t.test("Game.pickOfficer: Police and Drone picks skip an officer who is a patient or already played", function()
+		local function person(name: string, police: boolean, free: boolean, possessable: boolean): any
+			return { actor = name, police = police, free = free, possessable = possessable }
+		end
+		-- the first officer in the town's order collapsed a moment ago (not possessable): the pick
+		-- used to grab that body, teleport the patient to the patrol car and then be refused
+		local town = {
+			person("walker", false, true, true),
+			person("patient officer", true, true, false),
+			person("played officer", true, false, true),
+			person("free officer", true, true, true),
+			person("another officer", true, true, true),
+		}
+		t.eq(Game.pickOfficer(town), "free officer")
+		-- every officer is a patient or taken: any free, healthy person will do
+		town[4].possessable = false
+		town[5].free = false
+		t.eq(Game.pickOfficer(town), "walker")
+		-- nobody at all: a patient is never the answer
+		town[1].possessable = false
+		t.eq(Game.pickOfficer(town), nil)
+		t.eq(Game.pickOfficer({}), nil)
+		-- a refusal reads as a sentence, never as the log's reason
+		t.truthy(string.find(Game.refusalText("not possessable"), "collapsed", 1, true) ~= nil)
+		t.truthy(string.find(Game.refusalText("not possessable"), "possessable", 1, true) == nil)
+		t.truthy(string.find(Game.refusalText("body is driven"), "Someone else", 1, true) ~= nil)
+		t.eq(
+			Game.refusalText("Every squirrel is taken. Pick another body."),
+			"Every squirrel is taken. Pick another body."
+		)
+		t.eq(Game.refusalText(nil), "that body is busy")
+	end)
+
+	t.test("PlayMenu.sickLine: a bitten player's line says what is wrong and what to do; nothing otherwise", function()
+		t.eq(PlayMenu.sickLine({}), nil)
+		t.eq(PlayMenu.sickLine({ PlayRole = "townsperson" }), nil)
+		t.eq(PlayMenu.sickLine({ Infected = "no such status" }), nil)
+		t.eq(PlayMenu.sickLine({ Infected = false }), nil)
+		for status, word in { infected = "INFECTED", symptoms = "RED EYES", treating = "TREATED" } do
+			local line = PlayMenu.sickLine({ PlayRole = "townsperson", Infected = status }) :: string
+			t.truthy(line ~= nil and string.find(line, word, 1, true) ~= nil, `{status}: {line}`)
+			t.truthy(string.find(line, "hospital", 1, true) ~= nil, `{status} names the hospital`)
+			t.truthy(#line <= 70, `{status}: {#line} characters fit the line`)
+		end
 	end)
 end

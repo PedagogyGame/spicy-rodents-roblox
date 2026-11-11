@@ -23,9 +23,14 @@
 -- here after traffic): the person is infected and runs, collapses at once or shows symptoms later,
 -- an ambulance and a crowd come or they walk in, and the hospital is the only cure. The service
 -- writes the Med, Say and SayAt attributes on the bodies (clients draw the red eyes, the poses and
--- the speech bubbles) and sends the player holding a bitten body a "med" event that says what to do.
+-- the speech bubbles) and sends the player holding a bitten body a "med" event that says what to do;
+-- the same thing stays on screen through the player attribute Infected ("infected" | "symptoms" |
+-- "treating"; UI/PlayMenu draws a line under the status), refreshed once a second.
 -- Knocking the rodent out cures nobody (the old brief v2 §8 instant cure is off: Tunables
 -- infection.recentBiteSecs = 0).
+-- A patient (on the ground, in the ambulance, in a bed) is not possessable: Police and Drone picks
+-- skip such an officer (pickOfficer), and an officer who is moved to the patrol car for a pick that
+-- is then refused is put back where they were.
 -- Streaming and input (W1 client review): the device fleet (patrol cars, carts, bikes, the drone) is
 -- ModelStreamingMode Persistent, so a DeviceGranted model is never nil on the driver's client; the body a
 -- player holds is PersistentPerPlayer for that player (persist), so the client always finds its body;
@@ -36,7 +41,8 @@
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
---   InfectionService; nil when it could not start), townIdOf(actorId), stop() }
+--   InfectionService; nil when it could not start), townIdOf(actorId), stop() };
+--   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure)
 
 local Import = require("../Import")
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
@@ -72,6 +78,38 @@ local Game = {}
 
 Game.CHOICES = table.freeze({ "rodent", "squirrel", "townsperson", "police", "drone" })
 Game.PICK_COOLDOWN = 0.75
+Game.FAULT_LIMIT = 60 -- contained faults of the infection service within FAULT_WINDOW that switch it off
+Game.FAULT_WINDOW = 60 -- seconds
+
+-- What a player reads when a pick is refused (Actors/Possession's reasons are for the log).
+Game.REFUSALS = table.freeze({
+	["not possessable"] = "That person has just collapsed and is waiting for an ambulance. Pick again.",
+	["body is driven"] = "Someone else is playing that body. Pick again.",
+	["body was taken while streaming"] = "Someone else took that body first. Pick again.",
+}) :: { [string]: string }
+
+function Game.refusalText(why: string?): string
+	return if why then (Game.REFUSALS[why] or why) else "that body is busy"
+end
+
+export type OfficerCandidate = { actor: any, police: boolean, free: boolean, possessable: boolean }
+
+-- pickOfficer(people): the body for a player who picks Police or the drone: the first police officer
+-- who is free (the AI has the body) and possessable (not a patient on the ground, in the ambulance or
+-- in a bed: Infection/InfectionService), else the first such person of any post. `people` are the
+-- town's humans in their fixed order.
+function Game.pickOfficer(people: { OfficerCandidate }): any?
+	local fallback = nil
+	for _, p in people do
+		if p.free and p.possessable then
+			if p.police then
+				return p.actor
+			end
+			fallback = fallback or p.actor
+		end
+	end
+	return fallback
+end
 
 type PState = {
 	role: string?,
@@ -288,6 +326,7 @@ function Game.start(opts: Opts?): any
 	local shoutN = 0
 	local now = 0
 	local lastSay: { [number]: string } = {} -- town id -> the line last shown over that body
+	local sickShown: { [any]: string? } = {} -- player -> the Infected attribute as last written
 
 	local function fire(player: any, payload: { [string]: any })
 		if typeof(player) == "Instance" then
@@ -301,6 +340,7 @@ function Game.start(opts: Opts?): any
 
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
+	local infectionFault: (where: string, err: any) -> ()
 	local okI, errI = pcall(function()
 		infection = InfectionService.new({
 			world = world,
@@ -335,6 +375,9 @@ function Game.start(opts: Opts?): any
 			serverTime = function(): number
 				return workspace:GetServerTimeNow()
 			end,
+			onFault = function(where: string, err: any)
+				infectionFault(where, err)
+			end,
 		})
 	end)
 	if not okI then
@@ -348,15 +391,23 @@ function Game.start(opts: Opts?): any
 		end
 	end
 	-- a fault in the sequence must never stop traffic, bites or the pose stream: it is caught where
-	-- it is called, reported (the first few times) and, if it keeps failing, switched off
-	local infectionFaults = 0
-	local function infectionFault(where: string, err: any)
+	-- it is called (the service contains its own parts too and reports them here), warned about the
+	-- first few times and, if it keeps failing (FAULT_LIMIT within FAULT_WINDOW seconds), switched
+	-- off: every patient is let go where they are (in sight, playable), nobody is cured by it
+	local infectionFaults, faultsInWindow, windowStart = 0, 0, 0
+	function infectionFault(where: string, err: any)
 		infectionFaults += 1
-		if infectionFaults <= 3 then
+		if infectionFaults <= 5 then
 			warn(`[SpicyRodents] infection {where} failed: {err}`)
 		end
-		if infectionFaults == 60 then
+		if now - windowStart > Game.FAULT_WINDOW then
+			windowStart, faultsInWindow = now, 0
+		end
+		faultsInWindow += 1
+		if faultsInWindow >= Game.FAULT_LIMIT and infection ~= nil then
+			local dead = infection
 			infection = nil
+			pcall(dead.shutdown, dead)
 			warn("[SpicyRodents] the infection service keeps failing: switched off (bites still score)")
 		end
 	end
@@ -412,17 +463,19 @@ function Game.start(opts: Opts?): any
 	end
 
 	local function freeOfficer(): any?
-		local fallback = nil
+		local people: { OfficerCandidate } = {}
 		for _, a in world.actors do
-			local actor = rt.byTownId[a.id]
-			if a.species == "human" and possession:controllerOf(actor) == "ai" then
-				if a.post == "police" then
-					return actor
-				end
-				fallback = fallback or actor
+			if a.species == "human" then
+				local actor = rt.byTownId[a.id]
+				table.insert(people, {
+					actor = actor,
+					police = a.post == "police",
+					free = possession:controllerOf(actor) == "ai",
+					possessable = actor.possessable ~= false,
+				})
 			end
 		end
-		return fallback
+		return Game.pickOfficer(people)
 	end
 
 	local function deviceModel(prefix: string): Model?
@@ -513,10 +566,17 @@ function Game.start(opts: Opts?): any
 				yaw = math.atan2(root.CFrame.LookVector.X, root.CFrame.LookVector.Z)
 			end
 			if officer ~= current then
+				-- the officer is moved to the car first so the client streams that place in before the
+				-- hand-over; if the hand-over is then refused they are put back where they were
+				local at = world.actorsById[townIdOf[officer.id]]
+				local bx, bz, byaw = if at then at.x else nil, if at then at.z else nil, if at then at.yaw else 0
 				if spot then
 					placeAI(officer, spot.X, spot.Z, yaw)
 				end
 				ok, why = takeBody(player, officer)
+				if not ok and spot and bx and bz and possession:controllerOf(officer) == "ai" then
+					placeAI(officer, bx, bz, byaw)
+				end
 			else
 				if devices and typeof(player) == "Instance" then
 					devices:exitAll(player)
@@ -555,7 +615,7 @@ function Game.start(opts: Opts?): any
 			end
 			fire(player, { kind = "picked", role = choice, note = note })
 		else
-			fire(player, { kind = "refused", text = why or "that body is busy" })
+			fire(player, { kind = "refused", text = Game.refusalText(why) })
 		end
 		return ok, why
 	end
@@ -807,6 +867,16 @@ function Game.start(opts: Opts?): any
 					publish(player)
 				end
 			end
+			-- what a bitten player must do stays on their screen (the toast alone is easily missed)
+			for player in states do
+				local actor = possession:actorOf(player)
+				local townId = if actor then townIdOf[actor.id] else nil
+				local status = if infection and townId then infection:statusOf(townId) else nil
+				if sickShown[player] ~= status then
+					sickShown[player] = status
+					setAttr(player, "Infected", status)
+				end
+			end
 			for player, s in states do
 				if s.role == "rodent" then
 					if PowerRules.fade(s.power, fadeAcc) > 0 then
@@ -844,6 +914,7 @@ function Game.start(opts: Opts?): any
 		Players.PlayerRemoving:Connect(function(player: Player)
 			states[player] = nil
 			persisted[player] = nil
+			sickShown[player] = nil
 		end)
 	)
 	table.insert(conns, Players.PlayerAdded:Connect(noShiftLock))
