@@ -380,7 +380,7 @@ def setup_render(args):
     d = Vector((math.cos(sun_el) * math.sin(sun_az), -math.cos(sun_el) * math.cos(sun_az), math.sin(sun_el)))
     so.rotation_euler = (-d).to_track_quat("-Z", "Y").to_euler()
     # ground: grass with soft variation
-    bpy.ops.mesh.primitive_plane_add(size=900, location=(0, 0, 0))
+    bpy.ops.mesh.primitive_plane_add(size=9000, location=(0, 0, 0))  # (to the horizon, also from a giant's crown)
     g = bpy.context.active_object
     g.name = "Ground"
     gm = bpy.data.materials.new("Grass")

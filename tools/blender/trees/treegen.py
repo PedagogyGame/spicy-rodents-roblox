@@ -175,6 +175,7 @@ def classify(tree, trunk_route):
 #   tip/side  sprays at a branchlet's tip / at each of its nodes
 #   floor     lowest leaves, as a fraction of the height      top     crown top as a fraction of the height
 #   crown     limbs the leader throws out above the boughs    flat    0 = round crown, 1 = spreading flat top
+#   fill      how much of the leaf budget the crown is filled to (0.86 unless given)
 SPECIES = {
     "oak": dict(spacing=7.0, angle=(52, 76), len1=(21.0, 16.0), len2=(8.0, 13.0), sag=(0.030, 0.020), up=(0.050, 0.060),
                 kink=(0.20, 0.26), node=(3.6, 2.9), rise=(62, 112), card=(7.0, 6.2), droop=0.10, tip=3, side=1,
@@ -193,7 +194,7 @@ SPECIES = {
                    floor=0.10, top=0.95, crown=6, flat=0.2, twist=0.2),
     "apple": dict(spacing=3.2, angle=(50, 74), len1=(7.5, 5.5), len2=(3.0, 5.0), sag=(0.030, 0.020), up=(0.090, 0.090),
                   kink=(0.26, 0.30), node=(1.7, 1.4), rise=(58, 110), card=(3.8, 3.5), droop=0.08, tip=3, side=1,
-                  floor=0.26, top=0.98, crown=4, flat=0.3, twist=0.3),
+                  floor=0.26, top=0.98, crown=4, flat=0.3, twist=0.3, fill=0.5),
 }
 
 LEAF_SHAPE = {"oak": "oak", "elm": "elm", "sycamore": "palmate", "maple": "maple", "willow": "willow", "apple": "apple"}
@@ -1882,6 +1883,33 @@ class TreeBuilder:
                     d = norm(t * 0.5 + sv * sgn * 0.9 + Y * rng.uniform(-0.1, 0.35))
                     spray(pts[i] + rng.normal(0, 0.3, 3), d, 0.92)
                     sgn = -sgn
+        # fill: a crown that would leave much of its leaf budget unused gets more sprays, set loosely
+        # round the nodes of its branches, more of them toward the outside and the top of the crown
+        # (a small apple tree is full long before the budget is)
+        per = 4 if not willow else 6
+        room = (self.opts.get("leaf_budget", LEAF_BUDGET) - 60) // per
+        self.log["cards_first_pass"] = len(cards)
+        target = int(par.get("fill", 0.86) * room)
+        if len(cards) < target and self.branches:
+            nodes, wts = [], []
+            for br in self.branches:
+                pts = br["pts"]
+                n = len(pts)
+                first = 1 if br["level"] >= 2 else max(1, int(math.ceil(0.3 * (n - 1))))
+                for i in range(first, n):
+                    nodes.append((pts[i], norm(pts[min(i + 1, n - 1)] - pts[i - 1])))
+                    rel = pts[i] - ctr
+                    wts.append(0.45 + min(math.hypot(rel[0], rel[2]) / (rh + 6.0), 1.2) + 0.8 * max(rel[1], 0.0) / span)
+            wts = np.array(wts)
+            # (about a fifth of them will fall in a tunnel or below the floor)
+            pick = rng.choice(len(nodes), size=int((target - len(cards)) * 1.25), p=wts / wts.sum())
+            jit = (0.5 if self.sp == "apple" else 1.0) * sc
+            for j in pick:
+                p, t = nodes[j]
+                sv = norm(np.cross(t, Y) + 1e-9)
+                a = rng.uniform(0, 2 * math.pi)
+                d = norm(t * 0.4 + sv * math.cos(a) * 0.9 + Y * (0.1 + 0.45 * math.sin(a)))
+                spray(p + rng.normal(0, jit, 3) * np.array([1.0, 0.7, 1.0]), d, rng.uniform(0.84, 1.08))
         # keep the tunnels, the buildings and the floor clear
         kept = []
         floor = self.min_leaf_y
@@ -1925,7 +1953,6 @@ class TreeBuilder:
                         cd["V"], cd["c"] = V2, V2.mean(0)
                         kept.append(cd)
         budget = self.opts.get("leaf_budget", LEAF_BUDGET) - 60
-        per = 4 if not willow else 6
         self.log["cards_wanted"] = len(kept)
         C = np.array([k["c"] for k in kept]) if kept else np.zeros((0, 3))
         if len(kept) * per > budget:
@@ -1971,12 +1998,21 @@ class TreeBuilder:
     def build_apples(self):
         rng = self.rng
         n = 0
-        spots = [b["pts"][int(rng.integers(1, len(b["pts"])))] for b in self.branches if b["level"] >= 2]
-        rng.shuffle(spots)
-        for p in spots:
+        # the apples hang where they are seen: from the tips of the outer sprays, on the outside of
+        # the leaves, spread round the crown (no two within 2.5 studs)
+        c = self.crown[0]
+        tips = [cd["V"][-2:].mean(0) for cd in self.cards]
+        if not tips:
+            tips = [b["pts"][-1] for b in self.branches if b["level"] >= 2]
+        tips.sort(key=lambda p: -(math.hypot(p[0] - c[0], p[2] - c[2]) - 0.5 * p[1] + rng.normal(0, 3.5)))
+        hung = []
+        for p in tips:
             if n >= 28:
                 break
-            cpos = p + np.array([rng.normal(0, 0.4), -0.75 - 0.3 * rng.random(), rng.normal(0, 0.4)])
+            out = norm(np.array([p[0] - c[0], 0.0, p[2] - c[2]]) + 1e-9)
+            cpos = p + out * 0.15 + np.array([rng.normal(0, 0.15), -0.55 - 0.3 * rng.random(), rng.normal(0, 0.15)])
+            if hung and np.linalg.norm(np.array(hung) - cpos[None], axis=1).min() < 2.5:
+                continue
             if self.clearance(cpos[None])[0] < 0.7 or cpos[1] < 2.5:
                 continue
             ra = 0.62
@@ -1997,6 +2033,7 @@ class TreeBuilder:
                     a, b, c2, d2 = i * (lon + 1) + j, i * (lon + 1) + j + 1, (i + 1) * (lon + 1) + j + 1, (i + 1) * (lon + 1) + j
                     F += [(a, b, c2), (a, c2, d2)]
             self.fruit.add(np.array(V), np.array(F), np.array(UV), np.array(N))
+            hung.append(cpos)
             n += 1
         self.log["apples"] = n
 

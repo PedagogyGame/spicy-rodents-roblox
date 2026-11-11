@@ -88,7 +88,7 @@ def cameras(rails, H, aspect=16 / 9):
     out = np.array([math.cos(a), 0.0, math.sin(a)])
     R = 3.2 if H > 40 else 1.8
     drop = 11.0 if H > 40 else 5.5
-    base = np.array([fork[0], fork[1] - drop, fork[2]])
+    base = np.array([fork[0], max(fork[1] - drop, 1.2), fork[2]])  # (an apple tree forks 5 studs up: stay above ground)
     cams["fork"] = (base + out * (R + 2.4), fork + np.array([0, 3.5 if H > 40 else 2.0, 0]), 17.0)
     # level with the fork, from a neighbouring perch a little round from the gap: the collars side-on
     a2 = a + 0.55
