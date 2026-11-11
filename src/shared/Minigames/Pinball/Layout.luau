@@ -440,8 +440,9 @@ end
 
 -- addRamp(def, rail): a ramp is a rail (the ball's path, up off the playfield) plus what stands on the playfield
 -- at its foot: the two flanks of the ramp for 0.4 studs behind the mouth and the wall under it, so a ball
--- cannot roll in beside or under the ramp. Rubber posts at the two corners of the mouth.
-function Layout.addRamp(def: TableDef, rail: Rail)
+-- cannot roll in beside or under the ramp. Rubber posts at the two corners of the mouth. Returns the four
+-- corners of that body: mouth left, back left, back right, mouth right (left and right as the ball goes up).
+function Layout.addRamp(def: TableDef, rail: Rail): { number }
 	table.insert(def.rails, rail)
 	local x0, y0 = rail.pts[1], rail.pts[2]
 	local dx, dy = rail.pts[4] - x0, rail.pts[5] - y0
@@ -463,6 +464,7 @@ function Layout.addRamp(def: TableDef, rail: Rail)
 	})
 	Layout.post(def, lx, ly, 0.022, "rubber")
 	Layout.post(def, rx, ry, 0.022, "rubber")
+	return { lx, ly, lx + tx * depth, ly + ty * depth, rx + tx * depth, ry + ty * depth, rx, ry }
 end
 
 -- Where the end of a ramp's wire should drop a ball so it rolls down an inlane to a flipper.
@@ -621,14 +623,8 @@ function Layout.compile(def: TableDef): Compiled
 		seg(g.x1, g.y1, g.x2, g.y2, Layout.SEG_GATE, M.metal, i)
 	end
 	for i, s in def.sensors do
-		local n = sensor(
-			s.x1,
-			s.y1,
-			s.x2,
-			s.y2,
-			if s.kind == "spinner" then Layout.SEN_SPINNER else Layout.SEN_ROLLOVER,
-			i
-		)
+		local n =
+			sensor(s.x1, s.y1, s.x2, s.y2, if s.kind == "spinner" then Layout.SEN_SPINNER else Layout.SEN_ROLLOVER, i)
 		if s.kind == "spinner" then
 			table.insert(c.spinners, n)
 		end

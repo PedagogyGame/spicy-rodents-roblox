@@ -46,15 +46,16 @@ Physics.MAX_SUBSTEPS = 12
 Physics.ROLL_DECEL = 0.2 -- studs/s^2 of rolling resistance
 Physics.REST_V0 = 0.15 -- below this speed into a surface nothing bounces back
 Physics.REST_V1 = 0.6 -- from here up the surface's full liveliness
-Physics.FLIP_ACC_UP = 1000 -- rad/s^2 under the coil
+Physics.FLIP_ACC_UP = 1000 -- rad/s^2 under the power winding of the coil
+Physics.FLIP_ACC_HOLD = 250 -- rad/s^2 under the hold winding (once the flipper has reached its top stop)
 Physics.FLIP_W_MAX = 40 -- rad/s
 Physics.FLIP_ACC_DOWN = 240 -- rad/s^2 under the return spring
 Physics.FLIP_W_DOWN = 22
-Physics.FLIP_STOP_E = 0.25 -- how much of its speed the flipper keeps bouncing off the top stop
+Physics.FLIP_STOP_E = 0.12 -- how much of its speed the flipper keeps bouncing off the top stop
 Physics.FLIP_REST_E = 0.2 -- and off the bottom one
 Physics.FLIP_BOUNCE_MIN = 2 -- rad/s: slower than this it simply stops
 Physics.FLIP_E = 0.55 -- flipper rubber
-Physics.FLIP_MU = 0.12
+Physics.FLIP_MU = 0.4 -- flipper rubber grips: without it the ball is slung off the tip from anywhere
 Physics.BUMPER_KICK = 6.5 -- studs/s outward, whatever the ball came in at
 Physics.BUMPER_MIN = 0.3 -- the skirt needs this much of a touch to fire
 Physics.BUMPER_E = 0.5 -- a dead bumper (tilt, or too soft a touch) is a rubber post
@@ -123,6 +124,7 @@ export type State = {
 	fa: { number }, -- flipper angles
 	fw: { number }, -- flipper angular speeds
 	fp: { boolean }, -- flipper button as last seen
+	fh: { boolean }, -- the flipper has reached its top stop on this press (the coil is on its hold winding)
 	drop: { boolean }, -- per target: a drop target that is down
 	spinW: { number }, -- per sensor: spinner speed, turns/s
 	spinA: { number }, -- per sensor: fraction of the current turn
@@ -136,7 +138,8 @@ local R = Layout.BALL_R
 local R2 = R * R
 local DT = Physics.DT
 local INV_CELL = 1 / Layout.CELL
-local SEG_DROP, SEG_SLING, SEG_GATE, SEG_STANDUP = Layout.SEG_DROP, Layout.SEG_SLING, Layout.SEG_GATE, Layout.SEG_STANDUP
+local SEG_DROP, SEG_SLING, SEG_GATE, SEG_STANDUP =
+	Layout.SEG_DROP, Layout.SEG_SLING, Layout.SEG_GATE, Layout.SEG_STANDUP
 local CIR_BUMPER = Layout.CIR_BUMPER
 local SEN_ROLLOVER, SEN_SPINNER = Layout.SEN_ROLLOVER, Layout.SEN_SPINNER
 local sqrt, floor = math.sqrt, math.floor
@@ -155,6 +158,7 @@ function Physics.new(c: Layout.Compiled, seed: number): State
 		fa = {},
 		fw = {},
 		fp = {},
+		fh = {},
 		drop = table.create(#c.def.targets, false),
 		spinW = table.create(c.nSen, 0),
 		spinA = table.create(c.nSen, 0),
@@ -165,6 +169,7 @@ function Physics.new(c: Layout.Compiled, seed: number): State
 		s.fa[i] = c.frest[i]
 		s.fw[i] = 0
 		s.fp[i] = false
+		s.fh[i] = false
 	end
 	return s
 end
@@ -569,18 +574,20 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 		local pressed = not s.dead and ((c.fbtn[i] == 1 and left) or (c.fbtn[i] == 2 and right))
 		if pressed ~= s.fp[i] then
 			s.fp[i] = pressed
+			s.fh[i] = false
 			emit(ev, if pressed then EV.FLIP_UP else EV.FLIP_DOWN, i, 0, 0)
 		end
 		if pressed then
 			local up = c.fup[i]
 			if a0 < up or w ~= 0 then
-				w += Physics.FLIP_ACC_UP * DT
+				w += (if s.fh[i] then Physics.FLIP_ACC_HOLD else Physics.FLIP_ACC_UP) * DT
 				if w > Physics.FLIP_W_MAX then
 					w = Physics.FLIP_W_MAX
 				end
 				a1 = a0 + w * DT
 				if a1 >= up then
 					a1 = up
+					s.fh[i] = true
 					w = if w > Physics.FLIP_BOUNCE_MIN then -w * Physics.FLIP_STOP_E else 0
 				end
 			end
@@ -765,7 +772,15 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 					for j, sc in c.def.saucers do
 						local qx, qy = b.x - sc.x, b.y - sc.y
 						if qx * qx + qy * qy < sc.r * sc.r then
-							if b.vx * b.vx + b.vy * b.vy < sc.maxSpeed * sc.maxSpeed then
+							-- a hole that already holds a ball takes no other
+							local full = false
+							for _, o in balls do
+								if o.mode == HELD and o.ref == j then
+									full = true
+									break
+								end
+							end
+							if not full and b.vx * b.vx + b.vy * b.vy < sc.maxSpeed * sc.maxSpeed then
 								b.mode = HELD
 								b.ref = j
 								b.timer = sc.holdTicks

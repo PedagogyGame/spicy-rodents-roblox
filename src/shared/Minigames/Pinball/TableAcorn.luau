@@ -16,9 +16,11 @@
 --     multiplier.
 -- Geometry is in studs in Layout's playfield frame. Pure data and pure functions; Lune-tested
 -- (tests/unit/pinball_tables.spec.luau, pinball_rules.spec.luau).
--- Interface: def (Layout.TableDef), sheet (Sheet.Rules), ix (Layout.Index)
+-- Interface: a Machine.Table (id, title, def, ix, c, sheet) plus POINTS, SAY, MULTS
 
 local Layout = require("./Layout")
+local Machine = require("./Machine")
+local Physics = require("./Physics")
 
 local def = Layout.new("pinball_acorn", "ACORN ATTACK")
 def.slopeDeg = 6
@@ -71,10 +73,17 @@ do
 			x2 = ax + (bx - ax) * u1 - 0.004,
 			y2 = ay + (by - ay) * u1 - 0.008,
 		})
-		Layout.lamp(def, `acorn_{letters[i]}`, ax + (bx - ax) * (u0 + u1) / 2 + 0.09, ay + (by - ay) * (u0 + u1) / 2 - 0.05, "green")
+		Layout.lamp(
+			def,
+			`acorn_{letters[i]}`,
+			ax + (bx - ax) * (u0 + u1) / 2 + 0.09,
+			ay + (by - ay) * (u0 + u1) / 2 - 0.05,
+			"green"
+		)
 	end
 	Layout.wall(def, "wood", { 0.0, 2.2, ax, ay })
-	Layout.wall(def, "rubber", { 0.0, 2.34, bx - 0.07, by + 0.035, bx, by })
+	-- the rubber the targets fall back against stands close behind them, so no ball fits behind the bank
+	Layout.wall(def, "rubber", { ax - 0.0266, ay + 0.0138, bx - 0.0266, by + 0.0138 })
 	Layout.wall(def, "wood", { bx, by, 0.0, 3.02 })
 	Layout.post(def, bx, by)
 	Layout.post(def, ax, ay)
@@ -114,8 +123,258 @@ Layout.lamp(def, "shoot_again", XC, 0.35, "red")
 
 local ix = Layout.index(def)
 
-local TableAcorn = {}
-TableAcorn.def = def
-TableAcorn.ix = ix
+-- ---------------------------------------------------------------------------------------------------------
+-- The rule sheet
+-- ---------------------------------------------------------------------------------------------------------
+local CUE, EV = Machine.CUE, Physics.EV
+
+local SAY = {
+	SKILL = 101,
+	ACORN = 102,
+	BUMPERS_LIT = 103,
+	WINTER = 104,
+	SPINNER_LIT = 105,
+	LANES = 106,
+}
+local MULTS = { 1, 2, 3, 5 }
+local POINTS = {
+	bumper = 10,
+	bumperLit = 100,
+	sling = 10,
+	lane = 50,
+	lanesAll = 300,
+	skill = 500,
+	drop = 100,
+	bank = 1000,
+	spin = 10,
+	spinLit = 100,
+	oak = 50,
+	inlane = 50,
+	outlane = 100,
+	winter = 5000,
+	bonusMade = 100,
+	bonusAcorn = 500,
+}
+local HOARD_FULL = 5
+local HOARD_EXTRA = 3
+local RESET_TICKS = 150 -- the bank stands up again this long after its last target falls
+
+local TOP = { ix.sensor.top_1, ix.sensor.top_2, ix.sensor.top_3 }
+local BANK = { ix.target.acorn_a, ix.target.acorn_c, ix.target.acorn_o, ix.target.acorn_r, ix.target.acorn_n }
+local BANK_NAMES = { "a", "c", "o", "r", "n" }
+
+local function bit(n: number, i: number): boolean
+	return bit32.band(n, bit32.lshift(1, i - 1)) ~= 0
+end
+
+local function bankDown(m: Machine.State): number
+	local n = 0
+	for _, i in BANK do
+		if m.phys.drop[i] then
+			n += 1
+		end
+	end
+	return n
+end
+
+local sheet: Machine.Sheet = {
+	saveTicks = 2400, -- ten seconds: the gentlest of the three
+	maxScorePerSec = 4000,
+	scoreScale = "a good game is 20,000; 50,000 is a great one",
+	text = {
+		[101] = "SKILL SHOT",
+		[102] = "AN ACORN FOR THE HOARD",
+		[103] = "BUMPERS ARE LIT",
+		[104] = "WINTER IS COMING",
+		[105] = "SPINNER IS LIT",
+		[106] = "ALL THREE LANES",
+	},
+	init = function(): Machine.Numbers
+		return {
+			hoard = 0, -- acorns in the hoard, 0..4 (the fifth is WINTER and it starts again)
+			winters = 0,
+			mult = 1, -- index into MULTS
+			lanes = 0, -- bits: top lanes made
+			skillLane = 2,
+			bumpersLit = 0,
+			spinnerLit = 0,
+			made = 0, -- targets and lanes made on this ball
+			extraLit = 0,
+			resetIn = 0,
+		}
+	end,
+	ballStart = function(m, t, tbl, out)
+		t.lanes = 0
+		t.skillLane = 2
+		t.bumpersLit = 0
+		t.spinnerLit = 0
+		t.made = 0
+		t.resetIn = 0
+		Machine.raiseDrops(m, tbl, out)
+	end,
+	flip = function(_m, t, left)
+		-- lane change: the flipper buttons walk the lit lanes (and the skill-shot lane) across
+		local l = t.lanes
+		if left then
+			t.lanes = bit32.band(bit32.bor(bit32.rshift(l, 1), bit32.lshift(l, 2)), 7)
+			t.skillLane = if t.skillLane == 1 then 3 else t.skillLane - 1
+		else
+			t.lanes = bit32.band(bit32.bor(bit32.lshift(l, 1), bit32.rshift(l, 2)), 7)
+			t.skillLane = if t.skillLane == 3 then 1 else t.skillLane + 1
+		end
+	end,
+	event = function(m, t, _tbl, out, code, ref, value, _ball)
+		if code == EV.BUMPER then
+			if value == 1 then
+				Machine.add(m, if t.bumpersLit == 1 then POINTS.bumperLit else POINTS.bumper)
+			end
+		elseif code == EV.SLING then
+			Machine.add(m, POINTS.sling)
+		elseif code == EV.SPIN then
+			Machine.add(m, if t.spinnerLit == 1 then POINTS.spinLit else POINTS.spin)
+		elseif code == EV.ROLLOVER then
+			for i = 1, 3 do
+				if ref == TOP[i] then
+					Machine.add(m, POINTS.lane)
+					if m.skillLeft > 0 and t.skillLane == i then
+						Machine.add(m, POINTS.skill)
+						Machine.callout(m, out, SAY.SKILL, POINTS.skill)
+						Machine.cue(out, CUE.JINGLE, 1, 0)
+					end
+					m.skillLeft = 0
+					if not bit(t.lanes, i) then
+						t.lanes += bit32.lshift(1, i - 1)
+						t.made += 1
+						if t.lanes == 7 then
+							t.lanes = 0
+							t.bumpersLit = 1
+							Machine.add(m, POINTS.lanesAll)
+							Machine.callout(m, out, SAY.BUMPERS_LIT, POINTS.lanesAll)
+							Machine.cue(out, CUE.JINGLE, 2, 0)
+						end
+					end
+					return
+				end
+			end
+			if ref == ix.sensor.inlane_l or ref == ix.sensor.inlane_r then
+				Machine.add(m, POINTS.inlane)
+			elseif ref == ix.sensor.outlane_l or ref == ix.sensor.outlane_r then
+				Machine.add(m, POINTS.outlane)
+			end
+		elseif code == EV.DROP then
+			Machine.add(m, POINTS.drop)
+			t.made += 1
+			if bankDown(m) == #BANK then
+				t.hoard += 1
+				t.resetIn = RESET_TICKS
+				t.spinnerLit = 1
+				if t.mult < #MULTS then
+					t.mult += 1
+				end
+				Machine.add(m, POINTS.bank)
+				Machine.cue(out, CUE.JINGLE, 3, t.hoard)
+				if t.hoard >= HOARD_FULL then
+					t.hoard = 0
+					t.winters += 1
+					Machine.add(m, POINTS.winter)
+					Machine.callout(m, out, SAY.WINTER, POINTS.winter)
+					Machine.cue(out, CUE.JINGLE, 4, t.winters)
+				else
+					Machine.callout(m, out, SAY.ACORN, t.hoard)
+					if t.hoard == HOARD_EXTRA and m.extras[m.up] == 0 and t.extraLit == 0 then
+						t.extraLit = 1
+						Machine.callout(m, out, Machine.SAY.EXTRA_BALL_LIT, 0)
+					end
+				end
+			end
+		elseif code == EV.STANDUP then
+			Machine.add(m, POINTS.oak)
+			t.made += 1
+			if ref == ix.target.oak_r and t.extraLit == 1 then
+				t.extraLit = 0
+				Machine.extraBall(m, out)
+			end
+		end
+	end,
+	tick = function(m, t, tbl, out)
+		if t.resetIn > 0 then
+			t.resetIn -= 1
+			if t.resetIn == 0 then
+				if Machine.dropsClear(m, tbl) then
+					Machine.raiseDrops(m, tbl, out)
+				else
+					t.resetIn = 24
+				end
+			end
+		end
+	end,
+	drained = function(_m, _t, _tbl, _out, _saved) end,
+	bonus = function(_m, t)
+		return POINTS.bonusMade * t.made + POINTS.bonusAcorn * t.hoard, MULTS[t.mult]
+	end,
+	lamps = function(m, t, _tbl, lamp)
+		local L = ix.lamp
+		for i = 1, 3 do
+			if bit(t.lanes, i) then
+				lamp[L[`top_{i}`]] = 1
+			end
+		end
+		if m.skillLeft > 0 or not m.launched then
+			lamp[L[`top_{t.skillLane}`]] = 2
+		end
+		for i = 1, 3 do
+			lamp[L[`bumper_{i}`]] = if t.bumpersLit == 1 then 2 else 1
+		end
+		for i, target in BANK do
+			if not m.phys.drop[target] then
+				lamp[L[`acorn_{BANK_NAMES[i]}`]] = 1
+			end
+		end
+		lamp[L.spinner] = t.spinnerLit
+		lamp[L.oak_l] = 1
+		lamp[L.oak_r] = 1
+		for i = 1, HOARD_FULL do
+			if i <= t.hoard then
+				lamp[L[`hoard_{i}`]] = 1
+			end
+		end
+		if t.mult >= 2 then
+			lamp[L.bonus_2x] = 1
+		end
+		if t.mult >= 3 then
+			lamp[L.bonus_3x] = 1
+		end
+		if t.mult >= 4 then
+			lamp[L.bonus_5x] = 1
+		end
+		if t.extraLit == 1 then
+			lamp[L.extra_ball] = 2
+		end
+	end,
+	status = function(m, t)
+		if t.extraLit == 1 then
+			return "EXTRA BALL IS LIT AT THE RIGHT OAK TARGET"
+		end
+		local left = #BANK - bankDown(m)
+		if left == 0 then
+			return `ACORN {t.hoard} OF {HOARD_FULL} IS IN THE HOARD`
+		end
+		return `KNOCK DOWN A-C-O-R-N ({left} TO GO): {t.hoard} OF {HOARD_FULL} ACORNS IN THE HOARD`
+	end,
+}
+
+local TableAcorn = {
+	id = def.id,
+	title = def.title,
+	def = def,
+	ix = ix,
+	c = Layout.compile(def),
+	sheet = sheet,
+	POINTS = POINTS,
+	SAY = SAY,
+	MULTS = MULTS,
+	HOARD_FULL = HOARD_FULL,
+	HOARD_EXTRA = HOARD_EXTRA,
+}
 
 return TableAcorn
