@@ -23,9 +23,10 @@ local scenario: Replay.Scenario = {
 	ci = 40,
 	server = "live",
 	entries = { entry(3), entry(4) },
-	expect = { none = { "teleport_unflagged", "position_jump", "rubber_band", "yaw_jump", "sink", "float" } },
-	-- shows today: the cars surge and drag although they drive at a constant speed
-	known = { "speed_stutter" },
+	-- speed_stutter is fixed: a send is stamped with the instant of the tick its state is from
+	expect = {
+		none = { "teleport_unflagged", "position_jump", "rubber_band", "yaw_jump", "sink", "float", "speed_stutter" },
+	},
 }
 
 return scenario

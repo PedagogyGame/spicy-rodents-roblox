@@ -33,11 +33,20 @@ local scenario: Replay.Scenario = {
 	end,
 	-- holds today and must keep holding
 	expect = {
-		none = { "sim_jump_unflagged", "position_jump", "speed_stutter", "yaw_jump", "sideways_slide", "sink", "float" },
+		none = {
+			"sim_jump_unflagged",
+			"position_jump",
+			"speed_stutter",
+			"yaw_jump",
+			"sideways_slide",
+			"sink",
+			"float",
+			-- fixed: the flag is held until a send carries it (TrafficService.unsent)
+			"teleport_bit_dropped",
+			"teleport_unflagged",
+		},
 		some = { "teleport_flagged" },
 	},
-	-- shows today (the northbound sedan); see lib/Replay (known): move a kind to expect.none once fixed
-	known = { "teleport_bit_dropped", "teleport_unflagged" },
 }
 
 return scenario

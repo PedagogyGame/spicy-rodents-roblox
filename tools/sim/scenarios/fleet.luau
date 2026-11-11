@@ -23,10 +23,12 @@ local scenario: Replay.Scenario = {
 			"roll_missing",
 			"ghost_visibility",
 			"teleport_bit_lost",
+			"teleport_bit_dropped", -- the flag is held until a send carries it (TrafficService.unsent)
 		},
 	},
-	-- shows today (wraps whose flag misses the send; vehicles that share a lane)
-	known = { "teleport_bit_dropped", "teleport_unflagged", "box_overlap" },
+	-- shows today (vehicles that share a lane). On longer runs the patrol car's turn (patrol_turn: the
+	-- server moves it without a flag) still shows as teleport_unflagged, now drawn as a one-frame snap.
+	known = { "box_overlap" },
 }
 
 return scenario

@@ -95,6 +95,10 @@ export type TrafficService = typeof(setmetatable(
 		-- an observer called at the end of every simulation tick (the headless replay records the true
 		-- state from it); nil in the game
 		onTick: ((self: any) -> ())?,
+		-- vehicles teleported (wrap, appearance, dispatch) since the last pose send: the flag lives for one
+		-- 30 Hz tick, the sends go at 15 Hz, so without this half the wraps reached clients unflagged and
+		-- were drawn streaking across town (tools/sim: teleport_bit_dropped)
+		unsent: { [number]: boolean },
 	},
 	TrafficService
 ))
@@ -142,6 +146,7 @@ function TrafficService.new(opts: Opts): TrafficService
 		RunOver = Signal.new(),
 		unified = unified,
 		onTick = nil :: ((self: any) -> ())?,
+		unsent = {},
 	}, TrafficService)
 	for _, e in self.entries do
 		local lane = lanes[e.lane] or error(`TrafficService: fleet entry {e.id} names missing lane {e.lane}`)
@@ -274,6 +279,11 @@ function TrafficService.step(self: TrafficService, dt: number, world: World?): {
 		for _, h in oneTick(self, w) do
 			table.insert(all, h)
 		end
+		for _, v in self.vehicles do
+			if v.teleported then
+				self.unsent[v.id] = true
+			end
+		end
 	end
 	return all
 end
@@ -303,7 +313,8 @@ function TrafficService.poses(self: TrafficService): { SweptCollision.VehiclePos
 	return out
 end
 
--- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them).
+-- poseRecords(): the VehiclePoses stream records (Traffic/Ghost encoding; Net:stream sends them). A
+-- vehicle carries the teleport flag when it teleported in any tick since the last send (`unsent`).
 function TrafficService.poseRecords(self: TrafficService): { { [string]: number } }
 	local out = table.create(#self.vehicles)
 	for _, v in self.vehicles do
@@ -317,7 +328,7 @@ function TrafficService.poseRecords(self: TrafficService): { { [string]: number 
 				speed = v.speed,
 				visible = v.visible,
 				beacons = v.class == "responder" or v.class == "incident" or v.class == "legacy_ambulance",
-				teleported = v.teleported,
+				teleported = v.teleported or self.unsent[v.id] == true,
 				stopped = v.speed < 0.05,
 			})
 		)
@@ -328,7 +339,8 @@ end
 -- frame(dt, now, world, net?) -> hits: one server frame of traffic, exactly what Server/Boot/Game runs on
 -- every Heartbeat and what the headless replay (tools/sim) runs: the simulation steps its whole ticks,
 -- then, when `net` is given and Traffic/PoseStream's sender says a send is due, the pose records go out
--- with the server clock `now` (the caller's clock AFTER this frame) as their stamp.
+-- stamped with the instant their state belongs to: the server clock `now` (the caller's clock AFTER this
+-- frame) less the part of a tick not yet simulated.
 function TrafficService.frame(
 	self: TrafficService,
 	dt: number,
@@ -338,8 +350,12 @@ function TrafficService.frame(
 ): { SweptCollision.Hit }
 	local hits = self:step(dt, world)
 	if net then
-		local records = self.sender:frame(dt, now, self)
+		-- the records hold the state of the last whole tick, which is `acc` (the remainder not yet
+		-- simulated) older than the frame clock: stamp that instant, or a send that carries one tick
+		-- fewer than its neighbours is drawn as the car dragging, then surging (tools/sim live_server)
+		local records = self.sender:frame(dt, now - self.acc, self)
 		if records then
+			table.clear(self.unsent)
 			net:stream(nil, PoseStream.REMOTE, records)
 		end
 	end
