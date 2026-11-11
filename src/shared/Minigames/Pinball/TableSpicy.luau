@@ -75,7 +75,7 @@ do
 			dropY,
 			0,
 		},
-		mouth = 0.11,
+		mouth = 0.17,
 		minSpeed = 0.6,
 		exitSpeed = 1.2,
 		drag = 0.25,
@@ -89,20 +89,19 @@ do
 		table.insert(def.targets, { id = id, kind = "standup", x1 = x1, y1 = y1, x2 = x2, y2 = y2 })
 		Layout.lamp(def, id, lx, ly, "orange")
 	end
-	standup("spicy_s", 0.04, 2.0, 0.1, 2.11, 0.2, 1.98)
-	standup("spicy_p", 0.1, 2.13, 0.16, 2.24, 0.26, 2.11)
-	Layout.wall(def, "wood", { 0.0, 1.98, 0.04, 2.0 })
-	Layout.wall(def, "wood", { 0.16, 2.24, 0.0, 2.5 })
-	standup("spicy_i", 1.12, 2.86, 1.24, 2.86, 1.18, 2.74)
+	-- S and P stand one above the other on a bump in the left rail, both in reach of the left flipper's backhand
+	standup("spicy_s", 0.1, 2.13, 0.16, 2.24, 0.26, 2.11)
+	standup("spicy_p", 0.16, 2.26, 0.22, 2.37, 0.32, 2.24)
+	Layout.wall(def, "wood", { 0.0, 2.1, 0.1, 2.13 })
+	Layout.wall(def, "wood", { 0.22, 2.37, 0.0, 2.62 })
+	standup("spicy_i", 1.02, 2.86, 1.26, 2.86, 1.14, 2.74)
 	-- its back comes to a point, so a ball from above rolls off it
-	Layout.wall(def, "plastic", { 1.12, 2.86, 1.12, 2.92, 1.18, 2.98, 1.24, 2.92, 1.24, 2.86 })
-	Layout.post(def, 1.12, 2.86, 0.02, "rubber")
-	Layout.post(def, 1.24, 2.86, 0.02, "rubber")
-	standup("spicy_c", X1 - 0.16, 2.24, X1 - 0.1, 2.13, X1 - 0.26, 2.11)
-	standup("spicy_y", X1 - 0.1, 2.11, X1 - 0.04, 2.0, X1 - 0.2, 1.98)
-	Layout.wall(def, "wood", { X1, 1.98, X1 - 0.04, 2.0 })
+	Layout.wall(def, "plastic", { 1.02, 2.86, 1.02, 2.9, 1.14, 3.0, 1.26, 2.9, 1.26, 2.86 })
+	standup("spicy_c", X1 - 0.22, 2.37, X1 - 0.16, 2.26, X1 - 0.32, 2.24)
+	standup("spicy_y", X1 - 0.16, 2.24, X1 - 0.1, 2.13, X1 - 0.26, 2.11)
+	Layout.wall(def, "wood", { X1, 2.1, X1 - 0.1, 2.13 })
 	-- the bump's upper side is steep: a ball dribbling down the hot lane slides off it onto the right flipper
-	Layout.wall(def, "wood", { X1 - 0.16, 2.24, X1, 2.9 })
+	Layout.wall(def, "wood", { X1 - 0.22, 2.37, X1 - 0.02, 2.8, X1, 2.9 })
 end
 
 -- the hot lane up the right side; a ball that comes down it rolls off the bump above C and Y into the table
@@ -117,13 +116,13 @@ table.insert(def.saucers, {
 	id = "bite",
 	x = 1.58,
 	y = 3.52,
-	r = 0.075,
+	r = 0.1,
 	maxSpeed = 7,
 	vx = -0.19,
 	vy = -1.5,
 	holdTicks = 300,
 })
-Layout.cup(def, 1.58, 3.52, 0.125, 250, 130)
+Layout.cup(def, 1.58, 3.52, 0.16, 250, 130)
 Layout.lamp(def, "bite", 1.5, 3.28, "red")
 Layout.lamp(def, "extra_ball", 1.42, 3.12, "red")
 
@@ -434,6 +433,26 @@ local sheet: Machine.Sheet = {
 		end
 		local name = if lv == 3 then "RABID 3X" elseif lv == 2 then "FERAL 2X" else "CALM"
 		return `HEAT {math.floor(t.heat)}% ({name}): SHOOT THE WIRE TO FEED THE RODENT`
+	end,
+	wants = function(_m, t)
+		local list: { number } = {}
+		local bite = Machine.key(EV.SAUCER, ix.saucer.bite)
+		if t.extraLit == 1 or t.biteLit == 1 then
+			table.insert(list, bite)
+		end
+		-- the wire feeds the rodent best; then the letters still dark, the bite, the hot lane, the nest
+		table.insert(list, Machine.key(EV.RAIL_OUT, ix.rail.wire))
+		for i = 1, 5 do
+			if not bit(t.letters, i) then
+				table.insert(list, Machine.key(EV.STANDUP, LETTERS[i]))
+			end
+		end
+		table.insert(list, bite)
+		table.insert(list, Machine.key(EV.ROLLOVER, ix.sensor.hot_lane))
+		for i = 1, 3 do
+			table.insert(list, Machine.key(EV.BUMPER, i))
+		end
+		return list
 	end,
 }
 

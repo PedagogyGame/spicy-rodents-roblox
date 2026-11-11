@@ -37,21 +37,15 @@ local X1 = Layout.FIELD_X1
 local function mx(x: number): number
 	return 2 * XC - x
 end
+local POD_SPEED = 6.6 -- a ball crossing a pod's hole faster than this skips over it
+local RAMP_MOUTH = 0.16 -- half the width of a ramp's mouth
 
--- the orbit's inner guide: up the left, round under the arch, down the right, with the docking gap top right
+-- The orbit's inner guide: round under the arch, with the docking gap top right. Its two lower ends are laid
+-- further down, once the ramps stand (each runs down to the back of a ramp).
 local OR, OY = 0.885, 3.7
+local guideLeft = Layout.arc(XC, OY, OR, 180, 66, 20)
+local guideRight = Layout.arc(XC, OY, OR, 34, 0, 6)
 do
-	local left = { XC - OR, 2.6 }
-	for _, v in Layout.arc(XC, OY, OR, 180, 66, 20) do
-		table.insert(left, v)
-	end
-	Layout.wall(def, "metal", left)
-	local right = Layout.arc(XC, OY, OR, 34, 0, 6)
-	table.insert(right, XC + OR)
-	table.insert(right, 2.6)
-	Layout.wall(def, "metal", right)
-	Layout.post(def, XC - OR, 2.6)
-	Layout.post(def, XC + OR, 2.6)
 	local g1 = Layout.arc(XC, OY, OR, 66, 66, 1)
 	local g2 = Layout.arc(XC, OY, OR, 34, 34, 1)
 	Layout.post(def, g1[1], g1[2])
@@ -59,8 +53,6 @@ do
 	table.insert(def.sensors, { id = "dock", kind = "rollover", x1 = g1[1], y1 = g1[2], x2 = g2[1], y2 = g2[2] })
 	Layout.lamp(def, "dock", (g1[1] + g2[1]) / 2 - 0.1, (g1[2] + g2[2]) / 2 - 0.1, "blue")
 end
-table.insert(def.sensors, { id = "orbit_l", kind = "rollover", x1 = 0, y1 = 3.0, x2 = XC - OR, y2 = 3.0 })
-table.insert(def.sensors, { id = "orbit_r", kind = "rollover", x1 = XC + OR, y1 = 3.0, x2 = X1, y2 = 3.0 })
 table.insert(def.sensors, { id = "orbit_top", kind = "rollover", x1 = XC, y1 = OY + OR, x2 = XC, y2 = 4.9 })
 Layout.lamp(def, "orbit_l", 0.11, 2.45, "blue")
 Layout.lamp(def, "orbit_r", X1 - 0.11, 2.45, "blue")
@@ -102,65 +94,81 @@ do
 		ly,
 		0,
 	}
-	local body =
-		Layout.addRamp(def, { id = "ramp_l", pts = pts, mouth = 0.11, minSpeed = 0.6, exitSpeed = 1.2, drag = 0.2 })
+	local body = Layout.addRamp(
+		def,
+		{ id = "ramp_l", pts = pts, mouth = RAMP_MOUTH, minSpeed = 0.6, exitSpeed = 1.2, drag = 0.2 }
+	)
 	local mirrored: { number } = {}
 	for i = 1, #pts, 3 do
 		table.insert(mirrored, mx(pts[i]))
 		table.insert(mirrored, pts[i + 1])
 		table.insert(mirrored, pts[i + 2])
 	end
-	Layout.addRamp(def, { id = "ramp_r", pts = mirrored, mouth = 0.11, minSpeed = 0.6, exitSpeed = 1.2, drag = 0.2 })
+	Layout.addRamp(
+		def,
+		{ id = "ramp_r", pts = mirrored, mouth = RAMP_MOUTH, minSpeed = 0.6, exitSpeed = 1.2, drag = 0.2 }
+	)
 	Layout.lamp(def, "ramp_l", 0.82, 2.4, "white")
 	Layout.lamp(def, "ramp_r", mx(0.82), 2.4, "white")
 
-	-- The lock pods. Each is the blind end of the alley between the orbit's inner guide and a ramp: a kick-out
-	-- hole under a horseshoe, shot from the far flipper, that drops the ball back onto the flipper below it. A roof from the guide down to the back of the ramp
-	-- keeps a ball from the asteroid field out of the alley and sheds it into the middle of the table; every
-	-- wall of the alley slopes, so a ball that is not swallowed rolls back out.
-	local PX, PY, PR = 0.44, 2.86, 0.125
-	local alley = { XC - OR, 2.6 }
-	for _, v in Layout.arc(PX, PY, PR, 200, 20, 10) do
-		table.insert(alley, v)
+	-- F stands at the inner corner of the left ramp's mouth and L at the right ramp's: a standup target facing
+	-- down the table, between the ramp and the way up the middle
+	do
+		local cx, cy = body[7], body[8]
+		local x1, y1, x2, y2 = cx - 0.01, cy - 0.045, cx + 0.1, cy - 0.095
+		table.insert(def.targets, { id = "fuel_f", kind = "standup", x1 = x1, y1 = y1, x2 = x2, y2 = y2 })
+		table.insert(def.targets, { id = "fuel_l", kind = "standup", x1 = mx(x2), y1 = y2, x2 = mx(x1), y2 = y1 })
+		local back = { cx, cy, cx + 0.105, cy - 0.085 }
+		Layout.wall(def, "plastic", back)
+		Layout.wall(def, "plastic", Layout.mirror(back))
+		Layout.post(def, cx + 0.105, cy - 0.09, 0.02)
+		Layout.post(def, mx(cx + 0.105), cy - 0.09, 0.02)
+		Layout.lamp(def, "fuel_f", (x1 + x2) / 2, y2 - 0.1, "yellow")
+		Layout.lamp(def, "fuel_l", mx((x1 + x2) / 2), y2 - 0.1, "yellow")
 	end
-	-- the horseshoe's right end meets the ramp's left side
-	local endY = alley[#alley]
-	local u = (endY - body[2]) / (body[4] - body[2])
-	table.insert(alley, body[1] + (body[3] - body[1]) * u)
-	table.insert(alley, endY)
-	local roof = { XC - OR, 3.32, body[5], body[6] }
-	Layout.wall(def, "metal", alley)
-	Layout.wall(def, "metal", Layout.mirror(alley))
-	Layout.wall(def, "metal", roof)
-	Layout.wall(def, "metal", Layout.mirror(roof))
-	Layout.post(def, body[5], body[6])
-	Layout.post(def, mx(body[5]), body[6])
+
+	-- The orbit lanes. Everything outside a ramp is the way into the orbit: the inner guide runs from the back
+	-- of the ramp up to the arch, so the mouth of the lane is wide (the same-side flipper's backhand finds it,
+	-- and so does a late shot across the table) and narrows as it climbs.
+	local left = { body[3], body[4] }
+	table.move(guideLeft, 1, #guideLeft, 3, left)
+	Layout.wall(def, "metal", left)
+	local right = table.clone(guideRight)
+	table.insert(right, mx(body[3]))
+	table.insert(right, body[4])
+	Layout.wall(def, "metal", right)
+	local SY = body[4] + 0.07
+	local gx = body[3] + (guideLeft[1] - body[3]) * 0.07 / (guideLeft[2] - body[4])
+	table.insert(def.sensors, { id = "orbit_l", kind = "rollover", x1 = 0, y1 = SY, x2 = gx, y2 = SY })
+	table.insert(def.sensors, { id = "orbit_r", kind = "rollover", x1 = mx(gx), y1 = SY, x2 = X1, y2 = SY })
+
+	-- The lock pods: a kick-out hole in the floor of each orbit lane's mouth. A ball that comes up the lane
+	-- slowly drops in; a fast one skips over the hole and goes round the orbit. So the same lane is two shots,
+	-- told apart by how hard it is hit: an early, soft backhand for the pod, a later, harder one for the orbit.
+	local PX, PY = 0.27, 2.78
 	table.insert(
 		def.saucers,
-		{ id = "pod_1", x = PX, y = PY, r = 0.085, maxSpeed = 7, vx = 0.5, vy = -1.5, holdTicks = 240 }
+		{ id = "pod_1", x = PX, y = PY, r = 0.085, maxSpeed = POD_SPEED, vx = 0.45, vy = -1.2, holdTicks = 240 }
 	)
 	table.insert(
 		def.saucers,
-		{ id = "pod_2", x = mx(PX), y = PY, r = 0.085, maxSpeed = 7, vx = -0.5, vy = -1.5, holdTicks = 240 }
+		{ id = "pod_2", x = mx(PX), y = PY, r = 0.085, maxSpeed = POD_SPEED, vx = -0.45, vy = -1.2, holdTicks = 240 }
 	)
 end
-Layout.lamp(def, "pod_1", 0.52, 2.62, "green")
-Layout.lamp(def, "pod_2", mx(0.52), 2.62, "green")
-Layout.lamp(def, "extra_ball", 0.58, 2.48, "red")
+Layout.lamp(def, "pod_1", 0.27, 2.6, "green")
+Layout.lamp(def, "pod_2", mx(0.27), 2.6, "green")
+Layout.lamp(def, "extra_ball", 0.46, 2.48, "red")
 
--- F-U on the left rail, E-L on the right
+-- F-U-E-L: U on the left rail and E on the right (each flipper's own soft backhand); F and L stand at the
+-- inner corners of the two ramp mouths (laid with the ramps, above)
 do
-	local function standup(id: string, x1: number, y1: number, x2: number, y2: number, lx: number, ly: number)
-		table.insert(def.targets, { id = id, kind = "standup", x1 = x1, y1 = y1, x2 = x2, y2 = y2 })
-		Layout.lamp(def, id, lx, ly, "yellow")
-	end
-	standup("fuel_f", 0.04, 2.02, 0.09, 2.13, 0.2, 2.0)
-	standup("fuel_u", 0.09, 2.15, 0.14, 2.26, 0.25, 2.13)
-	Layout.wall(def, "wood", { 0.0, 2.0, 0.04, 2.02 })
+	table.insert(def.targets, { id = "fuel_u", kind = "standup", x1 = 0.07, y1 = 2.1, x2 = 0.14, y2 = 2.26 })
+	Layout.lamp(def, "fuel_u", 0.25, 2.13, "yellow")
+	Layout.wall(def, "wood", { 0.0, 2.02, 0.07, 2.1 })
 	Layout.wall(def, "wood", { 0.14, 2.26, 0.0, 2.5 })
-	standup("fuel_e", X1 - 0.14, 2.26, X1 - 0.09, 2.15, X1 - 0.25, 2.13)
-	standup("fuel_l", X1 - 0.09, 2.13, X1 - 0.04, 2.02, X1 - 0.2, 2.0)
-	Layout.wall(def, "wood", { X1, 2.0, X1 - 0.04, 2.02 })
+	table.insert(def.targets, { id = "fuel_e", kind = "standup", x1 = X1 - 0.14, y1 = 2.26, x2 = X1 - 0.07, y2 = 2.1 })
+	Layout.lamp(def, "fuel_e", X1 - 0.25, 2.13, "yellow")
+	Layout.wall(def, "wood", { X1, 2.02, X1 - 0.07, 2.1 })
 	Layout.wall(def, "wood", { X1 - 0.14, 2.26, X1, 2.5 })
 end
 
@@ -492,6 +500,34 @@ local sheet: Machine.Sheet = {
 			end
 		end
 		return `SPELL F-U-E-L ({need} TO GO) TO LIGHT THE LOCKS`
+	end,
+	wants = function(_m, t)
+		local list: { number } = {}
+		local ramps = { Machine.key(EV.RAIL_OUT, ix.rail.ramp_l), Machine.key(EV.RAIL_OUT, ix.rail.ramp_r) }
+		local orbit = Machine.key(EV.ROLLOVER, ix.sensor.orbit_top)
+		local pods = { Machine.key(EV.SAUCER, ix.saucer.pod_1), Machine.key(EV.SAUCER, ix.saucer.pod_2) }
+		if t.multi == 1 or t.count > 0 or t.locked >= LOCKS then
+			-- jackpots, or the ramp that starts the countdown
+			table.move(ramps, 1, 2, #list + 1, list)
+			table.insert(list, orbit)
+			return list
+		end
+		if t.extraLit == 1 then
+			table.insert(list, pods[1])
+		end
+		if t.locksLit == 1 then
+			table.move(pods, 1, 2, #list + 1, list)
+		else
+			for i = 1, 4 do
+				if not bit(t.fuel, i) then
+					table.insert(list, Machine.key(EV.STANDUP, FUEL[i]))
+				end
+			end
+		end
+		table.move(ramps, 1, 2, #list + 1, list)
+		table.insert(list, orbit)
+		table.move(pods, 1, 2, #list + 1, list)
+		return list
 	end,
 }
 

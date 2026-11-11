@@ -29,7 +29,7 @@ def.plunger.vMin = 4.2
 def.plunger.vMax = 7.6
 
 Layout.addShell(def)
-Layout.addBottom(def, { gap = 0.2, outlane = 0.16, inlane = 0.17, pivotY = 0.62 })
+Layout.addBottom(def, { gap = 0.18, outlane = 0.16, inlane = 0.17, pivotY = 0.62 })
 
 local XC = Layout.XC
 local X1 = Layout.FIELD_X1
@@ -59,9 +59,11 @@ for i, b in def.bumpers do
 	Layout.lamp(def, `bumper_{i}`, b.x, b.y, "white")
 end
 
--- the A-C-O-R-N bank on the left, turned to face the right flipper, with a wall behind it
+-- the A-C-O-R-N bank on the left, turned to face down the table, with a wall behind it. It stands where the
+-- left flipper's backhand goes (a ball flipped early, from near the pivot): the easiest shot on a flipper to
+-- time, so the gentlest table's goal is its gentlest shot. N is the hardest hit and A the softest.
 do
-	local ax, ay, bx, by = 0.1, 2.22, 0.36, 2.72
+	local ax, ay, bx, by = 0.2, 2.25, 0.5, 2.7
 	local letters = { "a", "c", "o", "r", "n" }
 	for i = 1, 5 do
 		local u0, u1 = (i - 1) / 5, i / 5
@@ -90,11 +92,12 @@ do
 end
 
 -- the spinner lane up the right side
-Layout.wall(def, "metal", { 1.95, 2.25, 1.95, 3.42 })
-Layout.post(def, 1.95, 2.25)
+-- (its guide leans out at the foot, so the lane's mouth is wide: the right flipper's backhand finds it)
+Layout.wall(def, "metal", { 1.74, 2.3, 1.95, 2.95, 1.95, 3.42 })
+Layout.post(def, 1.74, 2.3)
 Layout.post(def, 1.95, 3.42)
-table.insert(def.sensors, { id = "spinner", kind = "spinner", x1 = 1.95, y1 = 2.7, x2 = X1, y2 = 2.7 })
-Layout.lamp(def, "spinner", 2.08, 2.45, "red")
+table.insert(def.sensors, { id = "spinner", kind = "spinner", x1 = 1.95, y1 = 3.0, x2 = X1, y2 = 3.0 })
+Layout.lamp(def, "spinner", 2.0, 2.5, "red")
 
 -- two standup targets flanking the low bumper
 table.insert(def.targets, { id = "oak_l", kind = "standup", x1 = 0.5, y1 = 3.02, x2 = 0.6, y2 = 2.92 })
@@ -107,10 +110,10 @@ Layout.lamp(def, "oak_l", 0.6, 2.84, "yellow")
 Layout.lamp(def, "oak_r", 1.62, 2.84, "yellow")
 
 -- a kink in each rail above the outlanes leans a ball rolling down the side toward the inlane
-Layout.wall(def, "wood", { 0.0, 1.95, 0.13, 1.7 })
-Layout.wall(def, "wood", { X1, 1.95, X1 - 0.13, 1.7 })
-Layout.post(def, 0.13, 1.7)
-Layout.post(def, X1 - 0.13, 1.7)
+Layout.wall(def, "wood", { 0.0, 1.95, 0.2, 1.62 })
+Layout.wall(def, "wood", { X1, 1.95, X1 - 0.2, 1.62 })
+Layout.post(def, 0.2, 1.62)
+Layout.post(def, X1 - 0.2, 1.62)
 
 for i = 1, 5 do
 	Layout.lamp(def, `hoard_{i}`, XC - 0.3 + 0.1 * i, 1.75, "orange")
@@ -360,6 +363,27 @@ local sheet: Machine.Sheet = {
 			return `ACORN {t.hoard} OF {HOARD_FULL} IS IN THE HOARD`
 		end
 		return `KNOCK DOWN A-C-O-R-N ({left} TO GO): {t.hoard} OF {HOARD_FULL} ACORNS IN THE HOARD`
+	end,
+	wants = function(m, t)
+		local list: { number } = {}
+		if t.extraLit == 1 then
+			table.insert(list, Machine.key(EV.STANDUP, ix.target.oak_r))
+		end
+		-- the letters still standing, then the lit spinner, then anything that scores
+		for _, i in BANK do
+			if not m.phys.drop[i] then
+				table.insert(list, Machine.key(EV.DROP, i))
+			end
+		end
+		if t.spinnerLit == 1 then
+			table.insert(list, Machine.key(EV.SPINNER, ix.sensor.spinner))
+		end
+		table.insert(list, Machine.key(EV.STANDUP, ix.target.oak_l))
+		table.insert(list, Machine.key(EV.STANDUP, ix.target.oak_r))
+		for i = 1, 3 do
+			table.insert(list, Machine.key(EV.BUMPER, i))
+		end
+		return list
 	end,
 }
 

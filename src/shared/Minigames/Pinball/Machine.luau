@@ -26,6 +26,7 @@
 --   the tuning constants; new(table, seed, players) -> State; step(table, state, buttons, out);
 --   forfeit(table, state, out) (an abandoned ball is played out dead); lamps(table, state, into) -> into;
 --   for sheets: add, callout, cue, extraBall, feed, stat, raiseDrops, dropsClear, live(state) -> number;
+--   key(code, ref) -> shot key;
 --   clone(state) -> State; types Sheet, Table, State
 
 local Layout = require("./Layout")
@@ -187,6 +188,9 @@ export type Sheet = {
 	bonus: (m: State, t: Numbers) -> (number, number), -- base, multiplier
 	lamps: (m: State, t: Numbers, tbl: Table, lamp: { number }) -> (), -- 1 lit, 2 flashing
 	status: (m: State, t: Numbers) -> string, -- one line: what to shoot for now
+	-- what to shoot for now, as shot keys (Machine.key), the most wanted first: what the status line says,
+	-- in a form a computer player can aim by (Shots, Bot)
+	wants: (m: State, t: Numbers) -> { number },
 }
 
 export type Table = {
@@ -214,6 +218,12 @@ local function push(out: { number }, cue: number, a: number, b: number)
 	out[n + 1] = cue
 	out[n + 2] = a
 	out[n + 3] = b
+end
+
+-- key(code, ref): one number for "this happened at that element" (a Physics.EV code and the element's number):
+-- how a shot is named (Shots) and how a sheet says what it wants hit.
+function Machine.key(code: number, ref: number): number
+	return code * 1000 + ref
 end
 
 -- cue(out, cue, a, b): for sheets.

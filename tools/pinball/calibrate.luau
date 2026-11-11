@@ -15,10 +15,12 @@ local Bot = require("../../src/shared/Minigames/Pinball/Bot")
 local Layout = require("../../src/shared/Minigames/Pinball/Layout")
 local Machine = require("../../src/shared/Minigames/Pinball/Machine")
 local Physics = require("../../src/shared/Minigames/Pinball/Physics")
+local Shots = require("../../src/shared/Minigames/Pinball/Shots")
 local Tables = require("../../src/shared/Minigames/Pinball/Tables")
 
 local GAMES = tonumber(process.args[1]) or 40
 local ONLY = process.args[2]
+local ONLY_SHOTS = process.args[3] == "shots"
 
 local CUE, BTN, PHASE = Machine.CUE, Machine.BTN, Machine.PHASE
 local CUE_NAMES: { [number]: string } = {}
@@ -64,66 +66,44 @@ local function flipperReport(tbl: Machine.Table)
 		)} degrees, tip speed {fmt(Physics.FLIP_W_MAX * c.freach[1])} studs/s`
 	)
 
-	-- the shot table: a cradled ball is let go and flipped after a delay
-	local base = Machine.new(tbl, 7, 1)
-	local lane = tbl.def.sensors[tbl.ix.sensor.inlane_l]
-	local ball = base.phys.balls[1]
-	ball.x, ball.y = (lane.x1 + lane.x2) / 2, lane.y1 + 0.2
-	base.launched = true
-	local out: { number } = {}
-	for _ = 1, 1440 do
-		Machine.step(tbl, base, BTN.LEFT, out)
-		if base.phys.balls[1].asleep then
-			break
+	-- the shot curve: a cradled ball is let go and flipped after a delay (from the shot book's trials)
+	local trials = Shots.book(tbl).trials[1]
+	print(
+		"  shot curve, left flipper (ball let go from a cradle; angle from straight up, + across the table; one row every tenth of the flipper):"
+	)
+	print("    flip after   ball at   angle   speed   a tick later the angle is")
+	local nextAt = 0
+	local steady, worst = true, 0
+	for n, tr in trials do
+		if tr.angle ~= tr.angle or tr.along < 0 or tr.along > 1 then
+			continue
 		end
-	end
-	print("  shot table, left flipper (ball let go from a cradle; angle from straight up, + across the table):")
-	print("    flip after   ball at   angle   speed   reaches")
-	local last = -999
-	local steady = true
-	local rest = c.frest[1]
-	for delay = 60, 240, 12 do
-		local m = Machine.clone(base)
-		for _ = 1, delay do
-			Machine.step(tbl, m, 0, out)
+		local after = trials[n + 1]
+		local step = if after and after.angle == after.angle then after.angle - tr.angle else 0
+		if step < -0.3 then
+			steady = false
 		end
-		local b = m.phys.balls[1]
-		if b == nil then
-			break
-		end
-		local along = ((b.x - c.fpx[1]) * math.cos(rest) + (b.y - c.fpy[1]) * math.sin(rest)) / c.flen[1]
-		local angle, speed, top = 0 / 0, 0, 0
-		for _ = 1, 400 do
-			Machine.step(tbl, m, BTN.LEFT, out)
-			b = m.phys.balls[1]
-			if b == nil or b.mode ~= Physics.FREE then
-				break
-			end
-			top = math.max(top, b.y)
-			if angle ~= angle and b.y > c.fpy[1] + 0.4 and b.vy > 0 then
-				angle = math.deg(math.atan2(b.vx, b.vy))
-				speed = math.sqrt(b.vx * b.vx + b.vy * b.vy)
-			end
-		end
-		if angle == angle and along > 0.05 and along < 1.02 then
-			if angle < last - 2.5 then
-				steady = false
-			end
-			last = math.max(last, angle)
+		worst = math.max(worst, step)
+		if tr.along >= nextAt then
+			nextAt += 0.1
 			print(
 				string.format(
-					"    %4d ms    %5.2f    %+6.1f   %5.1f   y %.1f",
-					delay / 240 * 1000,
-					along,
-					angle,
-					speed,
-					top
+					"    %4.0f ms    %5.2f    %+6.1f   %5.1f   %+.2f degrees on",
+					tr.delay / 240 * 1000,
+					tr.along,
+					tr.angle,
+					tr.speed,
+					step
 				)
 			)
 		end
-		table.clear(out)
 	end
-	print(`    the angle rises steadily with the ball's place on the flipper: {if steady then "yes" else "NO"}`)
+	print(
+		`    the angle rises steadily with the ball's place on the flipper: {if steady then "yes" else "NO"}; the largest step from one tick to the next is {fmt(
+			worst,
+			2
+		)} degrees`
+	)
 
 	-- live catch: how far the ball hops off the raised flipper's face after landing on it
 	local upAngle = c.fup[1]
@@ -156,6 +136,34 @@ local function flipperReport(tbl: Machine.Table)
 		`  live catch (a ball dropped on the flipper hops {fmt(held, 2)} studs off it when it is held; flipped so long before the ball lands, the hop is):`
 	)
 	print("    " .. table.concat(parts, "   "))
+end
+
+local function shotsReport(tbl: Machine.Table)
+	local book = Shots.book(tbl)
+	print(
+		`  shot book (a cradled ball let go and flipped after every delay in turn; a window is how many ticks in a row reach the same thing; {Shots.FAIR_TICKS} ticks, two screen frames, is a fair shot):`
+	)
+	for i = 1, tbl.c.nFlip do
+		local rows = {}
+		for _, kk in book.keys do
+			local w = book.windows[i][kk]
+			if w and w.ticks >= 2 then
+				table.insert(
+					rows,
+					string.format(
+						"%s %d ticks (%.0f ms) at %.2f, %+.0f deg, %.0f st/s",
+						Shots.name(tbl, kk),
+						w.ticks,
+						w.ticks / 240 * 1000,
+						w.along,
+						w.angle,
+						w.speed
+					)
+				)
+			end
+		end
+		print(`    {tbl.def.flippers[i].id}: {table.concat(rows, "; ")}`)
+	end
 end
 
 local function plungerReport(tbl: Machine.Table)
@@ -211,19 +219,7 @@ local function plungerReport(tbl: Machine.Table)
 		table.insert(line, `    pull {fmt(pull, 2)} -> {first}{if skill then "  ** SKILL SHOT **" else ""}`)
 	end
 	print(table.concat(line, "\n"))
-	local lesson = Bot.learn(tbl)
-	local function spots(list: { number }): string
-		local parts = {}
-		for _, v in list do
-			table.insert(parts, fmt(v, 2))
-		end
-		return table.concat(parts, ", ")
-	end
-	print(
-		`  the wizard's lesson: plunge at {fmt(lesson.pull, 2)}; from a cradle, flip the left flipper when the ball is at {spots(
-			lesson.aim[1]
-		)} along it, the right at {spots(lesson.aim[2])} (best first)`
-	)
+	print(`  the wizard's lesson: plunge at {fmt(Bot.learn(tbl).pull, 2)} of a full pull`)
 end
 
 type Tally = { [string]: number }
@@ -390,6 +386,10 @@ for _, id in Tables.IDS do
 		)} s, {tbl.c.nSeg} wall pieces, {tbl.c.nCir} posts and bumpers`
 	)
 	flipperReport(tbl)
+	shotsReport(tbl)
+	if ONLY_SHOTS then
+		continue
+	end
 	plungerReport(tbl)
 	gamesReport(tbl)
 	costReport(tbl)
