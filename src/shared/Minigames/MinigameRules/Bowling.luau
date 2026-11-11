@@ -152,7 +152,7 @@ end
 function Bowling.total(rolls: { number }): number
 	local best = 0
 	for _, v in Bowling.score(rolls) do
-		if v then
+		if type(v) == "number" then
 			best = v
 		end
 	end

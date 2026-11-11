@@ -107,7 +107,9 @@ function Session.turn(s: Session): number?
 	if s.phase ~= "playing" or g == nil then
 		return nil
 	end
-	return g.rules.turn(g.state)
+	-- (every game so far takes turns; one that does not has nobody's turn)
+	local turn = g.rules.turn
+	return if turn then turn(g.state) else nil
 end
 
 function Session.turnKey(s: Session): any?
@@ -238,7 +240,11 @@ local function skipGone(s: Session, now: number, events: { Event })
 			break
 		end
 		local g = s.game :: Minigame.Game
-		g.rules.skipTurn(g.state)
+		local skip = g.rules.skipTurn
+		if skip == nil then
+			break -- a game with turns and no way to skip one: nothing more can be done here
+		end
+		skip(g.state)
 		table.insert(events, { kind = "skipped", seat = seat, why = "left" })
 		finishIfDone(s, now)
 	end
@@ -289,16 +295,16 @@ function Session.step(s: Session, now: number, busy: boolean?): { Event }
 	end
 	if s.phase == "playing" then
 		skipGone(s, now, events)
-		local tsec = s.opts.turnSeconds
-		if tsec == nil then
-			tsec = Session.DEFAULTS.turnSeconds
-		end
+		local tsec: number = s.opts.turnSeconds or Session.DEFAULTS.turnSeconds
 		local seat = Session.turn(s)
 		if busy then
 			s.turnStarted = now
 		elseif seat and tsec > 0 and now - s.turnStarted > tsec then
 			local g = s.game :: Minigame.Game
-			g.rules.skipTurn(g.state)
+			local skip = g.rules.skipTurn
+			if skip then
+				skip(g.state)
+			end
 			s.timeouts[seat] = (s.timeouts[seat] or 0) + 1
 			s.turnStarted = now
 			table.insert(events, { kind = "timeout", seat = seat, key = s.seats[seat] })
