@@ -40,18 +40,21 @@ Ghost.BIT_BEACONS = 2
 Ghost.BIT_TELEPORTED = 4
 Ghost.BIT_STOPPED = 8
 Ghost.SPEED_STEP = 0.5 -- studs/s per speed byte (max 127.5 st/s; the fastest vehicle is 67.5)
-Ghost.DELAY = 0.13 -- render this far behind the newest snapshot (about two sends)
+Ghost.DELAY = 0.13 -- render at least this far behind the least-delayed send (about two sends)
 -- Owner 2026-11-10: "some of the cars are glitching out". Snapshots were timed by when each packet
 -- ARRIVED, with barely one send interval of buffer: a late or lost packet froze every car and the next
--- one threw it forward. Three things now keep cars moving evenly:
---   * each send carries the server's own clock in a stamp record (id STAMP_ID, the seconds in x);
---     Ghost.newClock turns stamps into local times with the smallest delay seen, so snapshots are spaced
---     as the server spaced them however the packets bunch up
+-- one threw it forward. What now keeps cars moving evenly (each measured with tools/sim):
+--   * each send carries the server's own clock in a stamp record (id STAMP_ID, the seconds modulo
+--     STAMP_WRAP in x); snapshots are kept on that clock, in time order, copies dropped
+--   * the playout clock (newClock) decides which instant to draw: it buffers more on a jittery line and
+--     follows a server stall or a local clock step by steering, never by jumping
 --   * when the newest snapshot is older than the render time, a moving car carries on along its last
---     seen velocity for up to EXTRAPOLATE seconds (a stopped car has no velocity, so it does not creep)
+--     seen velocity for up to EXTRAPOLATE seconds (a stopped car has no velocity, so it does not creep):
+--     enough to ride out two or three lost sends (a 0.3 s wifi dropout) without a freeze and a hop
+--   * a jump no car could drive is snapped, never streaked (jumped)
 --   * on a slope the car pitches with the road (the height under its front and rear), not flat
 Ghost.STAMP_ID = 65535
-Ghost.EXTRAPOLATE = 0.12
+Ghost.EXTRAPOLATE = 0.25
 
 local TAU = 2 * math.pi
 
