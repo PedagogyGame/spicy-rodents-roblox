@@ -100,7 +100,8 @@ function LampPlan.plan(
 	end
 	local lamps: { Lamp } = {}
 	local taken: { { number } } = {}
-	for _, o in obstacles or {} do
+	local given: { { number } } = obstacles or {}
+	for _, o in given do
 		table.insert(taken, o)
 	end
 	local function crowded(x: number, z: number): boolean

@@ -271,7 +271,8 @@ function RouteProps.plans(
 	treeArt: { Trees.Art }?
 ): ({ Spec.BuildPlan }, { [number]: string })
 	local artByTrunk: { [number]: Trees.Art } = {}
-	for _, a in treeArt or {} do
+	local arts: { Trees.Art } = treeArt or {}
+	for _, a in arts do
 		artByTrunk[a.trunkRoute] = a
 	end
 	local groundAt: (number, number, number?) -> (number, boolean) = groundAtIn

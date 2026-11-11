@@ -96,7 +96,8 @@ function Surface.at(self: Surface, x: number, z: number, maxY: number?): (number
 	local best = self.heightAt(x, z)
 	local onPart = false
 	local limit = if maxY then maxY + 0.5 else math.huge
-	for _, t in self.cells[key(math.floor(x / CELL), math.floor(z / CELL))] or {} do
+	local tops: { Top } = self.cells[key(math.floor(x / CELL), math.floor(z / CELL))] or {}
+	for _, t in tops do
 		if t.ny > 0.5 and Geometry.containsXZ(t.box :: any, x, z, 0) then
 			local y = t.qy - (t.nx * (x - t.qx) + t.nz * (z - t.qz)) / t.ny
 			if y <= limit and y > best - 0.05 then
