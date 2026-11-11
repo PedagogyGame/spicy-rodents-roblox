@@ -910,7 +910,7 @@ def paint(tx, variant, tools):
         tcol = _hex("#7b4524")[None, :] * (1 - mid)[:, None] + _hex("#a85e30")[None, :] * mid[:, None]
         band = (1 - sst(0.03, 0.085, edge + (fine - 0.5) * 0.05)) * grow
         band = band * (0.88 - 0.4 * sst(0.55, 0.9, np.abs(N[:, 0])))  # (the thin edge, seen from the side, is not a black line)
-        tcol = tcol * (1 - band)[:, None] + _hex("#38231a")[None, :] * band[:, None]
+        tcol = tcol * (1 - band)[:, None] + _hex("#43291c")[None, :] * band[:, None]
         tcol = tcol * tone
         # streaks of pale hair tips lie over the dark band, more of them toward the edge (the fringe
         # itself is the cards': the mesh's edge stays dark under their roots)
@@ -1099,10 +1099,15 @@ def card_cells(variant):
                   dict(lock, ramp=dark), dict(tuft, ramp=dark)]
     else:
         # a guard hair of the tail's edge: dark where it leaves the brush, then pale to its thin tip
-        guard = ramp((0, "#3d2619"), (0.16, "#553622"), (0.38, "#bd9a6c"), (0.66, "#e0cba3"), (1, "#f0e3c8"))
-        over = ramp((0, "#7a4526"), (0.45, "#4a2d1e"), (0.8, "#55392a"), (1, "#a8875f"))
-        cells += [dict(strands=30, spread=0.2, bend=0.16, height=(0.45, 1.0), width=(0.012, 0.024), fade=0.92, opacity=0.8, ramp=guard),
-                  dict(strands=42, spread=0.27, bend=0.24, height=(0.4, 1.0), width=(0.012, 0.024), fade=0.92, opacity=0.8, ramp=guard),
+        # (many fine hairs to a card, thinning toward the tips: at the play camera's distance the fringe is a
+        # soft pale haze round the tail, not a row of spikes)
+        guard = ramp((0, "#452b1c"), (0.13, "#62422b"), (0.34, "#c2a072"), (0.66, "#e0cba3"), (1, "#f0e3c8"))
+        # the hairs that stand off the feather's faces: rust, darker past the middle, buff at the tip. (They
+        # were dark almost to the tip, and with the tail swung to one side and seen along its faces, as on a
+        # wire, it was a dark bristly sausage.)
+        over = ramp((0, "#8a4e29"), (0.4, "#69401f"), (0.7, "#6e4a2c"), (0.88, "#9c7c52"), (1, "#c6a97c"))
+        cells += [dict(strands=64, spread=0.24, bend=0.2, height=(0.4, 1.0), width=(0.009, 0.019), fade=0.88, opacity=0.68, ramp=guard),
+                  dict(strands=84, spread=0.3, bend=0.28, height=(0.35, 1.0), width=(0.009, 0.019), fade=0.88, opacity=0.68, ramp=guard),
                   dict(lock, strands=36, ramp=over), dict(tuft, strands=54, ramp=over)]
         pale = ramp((0, "#a8602f"), (0.6, "#bb7640"), (1, "#d9a568"))  # the flanks' and haunches' pale-tipped hair
         dark = ramp((0, "#6e3e22"), (0.6, "#553019"), (1, "#3d2518"))  # the dark-tipped hair of the spine's stripe
