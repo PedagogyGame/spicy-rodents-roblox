@@ -112,16 +112,19 @@ class Samples:
         self.frames.append(frames[i1])
         self.dt = 1.0 / (fps * up)
         self.raw = frames[i0 : i1 + 1]
-        self.W, self.body = [], []
+        # W: the joints as shown (clips and layers); W0: the clips alone (when a paw is down is the
+        # clip's business: a layer that shakes the chest must not read as steps)
+        self.W, self.W0, self.body = [], [], []
         for f in self.frames:
             self.t.append(f["t"])
             self.W.append(rig.fk(mp.frame_pose(clips, f)))
+            self.W0.append(rig.fk(mp.frame_pose(clips, f, layers=False)) if f.get("layers") else self.W[-1])
             self.body.append(mp.body_frame(f))
         self.t = np.array(self.t)
 
-    def model(self, fn):
+    def model(self, fn, layers=True):
         """(n, 3): a point per sample in the model's frame; fn(W) -> point."""
-        return np.array([fn(W) for W in self.W])
+        return np.array([fn(W) for W in (self.W if layers else self.W0)])
 
     def world(self, fn):
         return np.array([p + R @ fn(W) for W, (R, p) in zip(self.W, self.body)])
@@ -156,9 +159,9 @@ def stances(planted):
 def paw_metrics(s, gap_fn, leg):
     toe = s.world(s.joint(f"{leg}_Toe"))
     toe_model = s.model(s.joint(f"{leg}_Toe"))
-    # planted: the paw is down on the plane the body stands on (its height in the body's own frame is at
-    # its lowest); the gap is how far that leaves it from the real surface
-    planted = planted_mask(toe_model[:, 1], s.dt)
+    # planted: the clip has the paw down on the plane the body stands on (its height in the body's own
+    # frame is at its lowest); the gap is how far that leaves it from the real surface
+    planted = planted_mask(s.model(s.joint(f"{leg}_Toe"), layers=False)[:, 1], s.dt)
     gaps = np.array([gap_fn(q) for q in toe])
     runs = stances(planted)
     feet = np.array([p for _, p in s.body])
@@ -166,18 +169,20 @@ def paw_metrics(s, gap_fn, leg):
         "gap": r(gaps[planted].mean()),
         "gapLeast": r(gaps.min()),
         "lift": r(span(toe_model[:, 1])),
+        "strideClip": r(span(toe_model[:, 2])),  # the paw's reach fore and aft under the body, over the cycle
         "plantedShare": r(float(planted.mean()), 2),
         "stances": len(runs),
     }
     if not runs:
         return out
-    slide, path, secs, body, clip = [], [], [], [], []
+    slide, path, secs, body, clip, wobble = [], [], [], [], [], []
     for a, b in runs:
         slide.append(np.linalg.norm(toe[b] - toe[a]))
         path.append(np.sum(np.linalg.norm(np.diff(toe[a : b + 1], axis=0), axis=1)))
         secs.append((b - a) * s.dt)
         body.append(np.linalg.norm(feet[b] - feet[a]))
         clip.append(np.linalg.norm(toe_model[b] - toe_model[a]))
+        wobble.append(span(gaps[a : b + 1]))
     out.update(
         stanceSeconds=r(np.mean(secs), 4),
         slide=r(np.mean(slide)),
@@ -186,6 +191,7 @@ def paw_metrics(s, gap_fn, leg):
         slideSpeed=r(np.mean(slide) / max(np.mean(secs), 1e-9), 2),
         bodyTravelInStance=r(np.mean(body)),
         clipTravelInStance=r(np.mean(clip)),
+        upDownWhilePlanted=r(np.mean(wobble)),
     )
     return out
 
@@ -256,7 +262,8 @@ def gait(take, clips, rig, window, up):
     for pair, legs in (("fore", ("FrontL", "FrontR")), ("hind", ("BackL", "BackR"))):
         got = [out["paws"][leg] for leg in legs if "slide" in out["paws"][leg]]
         if got:
-            out[pair] = {k: r(np.mean([g[k] for g in got]), 4 if k == "stanceSeconds" else 3) for k in ("slide", "stanceSeconds", "bodyTravelInStance", "clipTravelInStance")}
+            keys = ("slide", "stanceSeconds", "bodyTravelInStance", "clipTravelInStance", "strideClip", "upDownWhilePlanted")
+            out[pair] = {k: r(np.mean([g[k] for g in got]), 4 if k == "stanceSeconds" else 3) for k in keys}
             out[pair]["gap"] = r(min(out["paws"][leg]["gap"] for leg in legs))
     out["footSlide"] = r(np.mean([out[p]["slide"] for p in ("fore", "hind") if p in out])) if ("fore" in out or "hind" in out) else None
     post, _ = posture(s)
@@ -266,44 +273,45 @@ def gait(take, clips, rig, window, up):
 
 # ---- events --------------------------------------------------------------------------------------------
 
-def turn_event(take, clips, rig, up):
+def turn_event(take, straight, clips, rig, up):
+    """What the body does about a turn. The S is sprinted exactly as the straight sprint take is (same
+    keys but for the mouse, same clock), so the clip and every layer that does not know about turning are
+    the same in both at every moment: the difference between the two takes, moment for moment, is what
+    turning changes. Signs: `tailTrail` + is the tail tip left behind on the outside of the turn;
+    `spineInto` and `headInto` + are the chest (against the pelvis) and the head turned into it."""
     w = take["windows"]
-    out = {}
-    series = {}
-    for key in ("straight", "left", "right"):
-        s = Samples(take, clips, rig, w[key][0], w[key][1], up)
-        post, ser = posture(s)
-        yaw = np.unwrap(s.col("yaw"))
-        rate = np.gradient(yaw, s.dt)
-        series[key] = ser
-        out[key] = {
-            "yawRateDegPerSec": r(deg(np.mean(rate)), 1),
-            "yawRatePeakDegPerSec": r(deg(rate[np.argmax(np.abs(rate))]), 1),
-            "leanPeakDeg": r(deg(s.col("roll")[np.argmax(np.abs(s.col("roll")))]), 1),
-            "tailSideMeanDeg": r(np.mean(ser["tailSide"]), 2),
-            "spineSideMeanDeg": r(np.mean(ser["spineSide"]), 2),
-            "headYawMeanDeg": r(np.mean(ser["headYaw"]), 2),
-        }
-    # what answers the turn: each mean against the straight run's (a tail that trails a left turn swings
-    # to the body's right, + here; a spine or head that leads it bends to the left, -)
-    base = out["straight"]
-    out["tailLagDeg"] = {k: r(out[k]["tailSideMeanDeg"] - base["tailSideMeanDeg"], 2) for k in ("left", "right")}
-    out["spineBendIntoTurnDeg"] = {k: r(out[k]["spineSideMeanDeg"] - base["spineSideMeanDeg"], 2) for k in ("left", "right")}
-    out["headLeadDeg"] = {k: r(out[k]["headYawMeanDeg"] - base["headYawMeanDeg"], 2) for k in ("left", "right")}
-    # how long after the body's heading the tail's follows it: the tail is rigid on the body unless a layer
-    # moves it, so its world heading is the body's plus its swing; the lag is the shift (in frames) that
-    # best lines the tail's world heading up with the body's over the whole turn
-    s = Samples(take, clips, rig, w["turning"][0], w["turning"][1], 1)
+    t0, t1 = w["turning"]
+    s = Samples(take, clips, rig, t0, t1, up)
     _, ser = posture(s)
-    body = np.degrees(np.unwrap(s.col("yaw")))
-    tail_world = body - ser["tailSide"]
-    best, best_err = 0, None
-    for shift in range(0, 20):
-        a, b = tail_world[shift:], body[: len(body) - shift]
-        err = float(np.mean((a - b - np.mean(a - b)) ** 2))
-        if best_err is None or err < best_err - 1e-9:
-            best, best_err = shift, err
-    out["tailLagSeconds"] = r(best / take["fps"], 3)
+    if straight is not None:
+        _, ref = posture(Samples(straight, clips, rig, t0, t1, up))
+    else:
+        ref = {k: np.zeros_like(v) for k, v in ser.items()}
+    rate = np.degrees(np.gradient(np.unwrap(s.col("yaw")), s.dt))  # + is a turn to the left
+    way = np.sign(rate)
+    roll = np.degrees(s.col("roll"))
+    d_tail = ser["tailSide"] - ref["tailSide"]  # + toward the body's right
+    d_spine = ser["spineSide"] - ref["spineSide"]  # + toward its left
+    d_head = ser["headYaw"] - ref["headYaw"]
+    out = {"comparedWith": straight["take"] if straight is not None else None}
+    for key in ("left", "right"):
+        m = (s.t >= w[key][0]) & (s.t <= w[key][1])
+        peak = int(np.argmax(np.abs(rate[m])))
+        out[key] = {
+            "yawRateMeanDegPerSec": r(np.mean(rate[m]), 1),
+            "yawRatePeakDegPerSec": r(rate[m][peak], 1),
+            "leanPeakDeg": r(roll[m][int(np.argmax(np.abs(roll[m])))], 1),
+            "tailTrailDeg": r(np.mean(d_tail[m] * way[m]), 2),
+            "tailTrailPeakDeg": r(np.max(np.abs(d_tail[m])), 2),
+            "spineIntoDeg": r(np.mean(d_spine[m] * way[m]), 2),
+            "headIntoDeg": r(np.mean(d_head[m] * way[m]), 2),
+        }
+    # a tail that follows the body like a towed thing trails it by (seconds of lag) x (turn rate): the
+    # slope of its trailing angle against the turn rate over the whole S is that lag, in seconds
+    out["tailLagSeconds"] = r(float(np.sum(d_tail * rate) / max(np.sum(rate * rate), 1e-9)), 4)
+    out["spineIntoPerTurnRate"] = r(float(np.sum(d_spine * rate) / max(np.sum(rate * rate), 1e-9)), 4)
+    out["headIntoPerTurnRate"] = r(float(np.sum(d_head * rate) / max(np.sum(rate * rate), 1e-9)), 4)
+    out["anythingAnswersTheTurn"] = bool(max(np.max(np.abs(d_tail)), np.max(np.abs(d_spine)), np.max(np.abs(d_head))) > 0.05)
     return out
 
 
@@ -320,7 +328,7 @@ def stop_event(take, clips, rig, up):
     skate = {}
     for leg in LEGS:
         toe = s.world(s.joint(f"{leg}_Toe"))
-        height = s.model(s.joint(f"{leg}_Toe"))[:, 1]
+        height = s.model(s.joint(f"{leg}_Toe"), layers=False)[:, 1]
         planted = planted_mask(height, s.dt)
         step = np.linalg.norm(np.diff(toe, axis=0), axis=1)
         skate[leg] = r(float(np.sum(step[planted[1:] & planted[:-1]])))
@@ -437,7 +445,7 @@ def measure(variant, motion, heroes, up):
         if take in takes:
             out["gaits"][label] = gait(takes[take], clips, rig, takes[take]["windows"][window], up)
     if "turn" in takes:
-        out["events"]["turn"] = turn_event(takes["turn"], clips, rig, up)
+        out["events"]["turn"] = turn_event(takes["turn"], takes.get("sprint"), clips, rig, up)
     if "stop" in takes:
         out["events"]["stop"] = stop_event(takes["stop"], clips, rig, up)
     if "leap" in takes:
@@ -471,8 +479,8 @@ def table(doc):
         if "turn" in e:
             t = e["turn"]
             lines.append(f"turn: yaw rate {t['left']['yawRatePeakDegPerSec']} / {t['right']['yawRatePeakDegPerSec']} deg/s, lean {t['left']['leanPeakDeg']} / {t['right']['leanPeakDeg']} deg; "
-                         f"tail lag {t['tailLagDeg']['left']} / {t['tailLagDeg']['right']} deg ({t['tailLagSeconds']} s), spine bend {t['spineBendIntoTurnDeg']['left']} / {t['spineBendIntoTurnDeg']['right']} deg, "
-                         f"head lead {t['headLeadDeg']['left']} / {t['headLeadDeg']['right']} deg")
+                         f"tail trails {t['left']['tailTrailDeg']} / {t['right']['tailTrailDeg']} deg (lag {t['tailLagSeconds']} s), spine into the turn {t['left']['spineIntoDeg']} / {t['right']['spineIntoDeg']} deg, "
+                         f"head into the turn {t['left']['headIntoDeg']} / {t['right']['headIntoDeg']} deg; anything answers the turn: {t['anythingAnswersTheTurn']}")
         if "stop" in e:
             s = e["stop"]
             lines.append(f"stop: standstill after {s['secondsToStandstill']} s and {s['studsCoveredStopping']} studs; clips {' > '.join(s['clipsOnTheWay'])}; Idle alone after {s['secondsUntilIdleAlone']} s; paws skate {s['pawSkateWhilePlanted']}")

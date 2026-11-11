@@ -344,7 +344,7 @@ def aim(cam, eye, target):
     cam.rotation_euler = (Vector(target) - Vector(eye)).to_track_quat("-Z", "Y").to_euler()
 
 
-def back_view(scene, cam, take, frame, res, zoom):
+def back_view(scene, cam, take, frame, res, zoom, points=None):
     """The play camera, cropped to `res` pixels around the body at `zoom` screen pixels per pixel."""
     eye, focus = vec(frame["cam"]), vec(frame["focus"])
     aim(cam, to_bl(eye), to_bl(focus))
@@ -354,18 +354,27 @@ def back_view(scene, cam, take, frame, res, zoom):
     cd.sensor_width = 36.0
     f_px = (GAME_SCREEN[1] / 2) / math.tan(math.radians(take["camera"]["fov"]) / 2) * zoom
     cd.lens = 36.0 * f_px / res[0]
-    # the middle of the picture: the body's middle, a little toward the tail
-    R, p = mp.body_frame(frame)
-    centre = p + R @ np.array([0.0, 0.62, 0.45])
     fwd = focus - eye
     fwd /= np.linalg.norm(fwd)
     right = np.cross(fwd, [0.0, 1.0, 0.0])
     right /= np.linalg.norm(right)
     up = np.cross(right, fwd)
-    d = centre - eye
-    depth = float(d @ fwd)
-    cd.shift_x = float(d @ right) / depth * f_px / res[0]
-    cd.shift_y = float(d @ up) / depth * f_px / res[0]
+
+    def on_screen(q):
+        d = q - eye
+        depth = float(d @ fwd)
+        return float(d @ right) / depth * f_px, float(d @ up) / depth * f_px, depth
+
+    # the middle of the picture. In a run of frames it is tied to the drawn feet point (a little up and
+    # toward the tail), so what the clip does to the body shows as movement in the picture; a single
+    # larger frame is centred on the joints themselves (a tail held over the back stays in it).
+    R, p = mp.body_frame(frame)
+    u, v, depth = on_screen(p + R @ np.array([0.0, 0.62, 0.45]))
+    if points is not None:
+        uv = np.array([on_screen(q)[:2] for q in points])
+        u, v = (uv[:, 0].min() + uv[:, 0].max()) / 2, (uv[:, 1].min() + uv[:, 1].max()) / 2
+    cd.shift_x = u / res[0]
+    cd.shift_y = v / res[0]
     scene.camera = cam
     scene.render.resolution_x, scene.render.resolution_y = res
     return depth
@@ -384,7 +393,10 @@ def side_view(scene, cam, take, frame, res, view):
         # the ground stays in the picture however high the body goes
         centre = np.array([p[0], take["ground"]["y"] + view["h"] * 0.5 - 0.6, p[2]]) + R @ np.array([0.0, 0.0, mid])
     else:
-        centre = p + R @ np.array([0.0, 0.0, mid]) + np.array([0.0, view["h"] * 0.5 - 0.5, 0.0])
+        # the feet point half a stud above the bottom of the picture (a stud above it over a wire or a
+        # bough, which the body is drawn above)
+        under = 1.0 if take["props"] else 0.5
+        centre = p + R @ np.array([0.0, 0.0, mid]) + np.array([0.0, view["h"] * 0.5 - under, 0.0])
     out = right * math.cos(SIDE_ELEV) + np.array([0.0, math.sin(SIDE_ELEV), 0.0])
     aim(cam, to_bl(centre + out * 60.0), to_bl(centre))
     cd = cam.data
@@ -415,7 +427,7 @@ def side_window(take):
     return dict(SIDE_VIEW)
 
 
-def render_take(opts, scene, arm, actions, clips, take):
+def render_take(opts, scene, arm, actions, clips, rig, take):
     tag = f"{take['variant']}_{take['take']}"
     out = os.path.join(opts.frames, tag)
     os.makedirs(out, exist_ok=True)
@@ -454,14 +466,17 @@ def render_take(opts, scene, arm, actions, clips, take):
         R, p = mp.body_frame(f)
         arm.matrix_world = mat4(R, p)
         bpy.context.view_layer.update()
-        return f
+        # the joints in the world (with the ear and tail tips and the toes): what a single frame is centred on
+        W = rig.fk(pose)
+        tips = [rig.tip(W, b) for b in ("Tail8", "EarL", "EarR", "FrontL_Toe", "FrontR_Toe", "BackL_Toe", "BackR_Toe")]
+        return f, [p + R @ q for q in [W[n][1] for n in rig.names] + tips]
 
     def info(i):
         f = frames[i]
         return {"i": i, "t": f["t"], "clip": f["clip"], "clipTime": f["clipTime"], "speed": f["speed"], "mode": f["mode"]}
 
     for i in sorted(set(small) | set(strip["large"])):
-        f = pose_frame(i)
+        f, joints = pose_frame(i)
         entry = info(i)
         if i in small:
             if "back" in opts.only:
@@ -475,7 +490,7 @@ def render_take(opts, scene, arm, actions, clips, take):
         if i in strip["large"]:
             if "back" in opts.only:
                 entry["backLarge"] = os.path.join(out, f"back_large_{i:04d}.png")
-                back_view(scene, back_cam, take, f, LARGE, LARGE_ZOOM)
+                back_view(scene, back_cam, take, f, LARGE, LARGE_ZOOM, joints)
                 render(scene, entry["backLarge"])
             if "side" in opts.only:
                 entry["sideLarge"] = os.path.join(out, f"side_large_{i:04d}.png")
@@ -547,6 +562,7 @@ def main(argv):
     lo, hi = mesh_bounds()
     actions = Actions(arm, scene.render.fps)
     clips = mp.load_clips(os.path.join(os.path.dirname(os.path.abspath(blend)), "clips"))
+    rig = mp.Rig(next(iter(clips.values())).doc["bones"])
     daylight(scene)
     setup_render(scene, opts.samples, opts.threads)
     status = 0
@@ -556,7 +572,7 @@ def main(argv):
         if gap > 0.03:
             print(f"WARNING: {blend} is not the size the take assumed (off by {gap:.3f} studs): "
                   f"update VARIANTS.{opts.variant}.mesh in tools/review/motion/Path.luau to min {lo.round(3).tolist()} max {hi.round(3).tolist()}", flush=True)
-        path, manifest = render_take(opts, scene, arm, actions, clips, take)
+        path, manifest = render_take(opts, scene, arm, actions, clips, rig, take)
         manifest["meshGap"] = round(gap, 4)
         with open(path, "w") as fh:
             json.dump(manifest, fh, indent=1)
