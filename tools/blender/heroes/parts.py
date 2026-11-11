@@ -411,6 +411,8 @@ def build_cards_grouped(sp, variant, lo, arm, W, bone_names, opts, out_dir, log=
         Wc = np.einsum("nk,nkb->nb", bary, W[tv])
         info = {"P": P, "N": Nn, "F": Fd, "dom": dom[pick], "rgb": cmap[py, px, :3].astype(np.float64)}
         t = sp.card_tufts(info, variant, name, rng)
+        keep = t.get("keep")  # optional: the cards the species wants made at all
+        n_made = 0
         for k in range(len(pick)):
             L, wdt = float(t["length"][k]), float(t["width"][k])
             n, f = Nn[k], Fd[k]
@@ -437,6 +439,9 @@ def build_cards_grouped(sp, variant, lo, arm, W, bone_names, opts, out_dir, log=
             v0, v1 = (cell // cols) / rows + 0.006, (cell // cols + 1) / rows - 0.006
             if rng.random() < 0.5:
                 u0, u1 = u1, u0
+            if keep is not None and not keep[k]:
+                continue  # (after the draw above: leaving a card out moves no other card)
+            n_made += 1
             for back in (False, True):
                 base = len(verts)
                 for pt, w in line:
@@ -453,7 +458,7 @@ def build_cards_grouped(sp, variant, lo, arm, W, bone_names, opts, out_dir, log=
                     else:
                         faces.append((lo_ + 1, lo_, hi_, hi_ + 1))
                         uvs.append([(u1, va), (u0, va), (u0, vb), (u1, vb)])
-        made[name] = len(pick)
+        made[name] = n_made
     if not faces:
         return None
     obj = bl.mesh_from_arrays("FurCards", np.array(verts), faces)

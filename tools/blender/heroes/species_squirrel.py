@@ -1250,7 +1250,10 @@ def card_tufts(info, variant, group, rng):
         stripe = ~head & (N[:, 2] > 0.6) & (np.abs(P[:, 0]) < 0.12)
         cell = np.where(~head & ~stripe & (sideways > 0.6) & (r < 0.3), 12 + pair, cell)
         cell = np.where(stripe & (r < 0.6), 14 + pair, cell)
-    return {"length": L, "width": Wd, "lift": lift, "roll": roll, "droop": droop, "cell": cell}
+    # No tufts on the face itself (the cheeks and the jaw; the ear tips keep theirs): a card there is drawn on
+    # both sides now, and on the cheek under the eye it showed as a flat patch. The faces are as they were.
+    face = np.isin(dom, ["Head", "Jaw"])
+    return {"length": L, "width": Wd, "lift": lift, "roll": roll, "droop": droop, "cell": cell, "keep": ~face}
 
 
 def blood_faces(lo, co, W, bone_names):
