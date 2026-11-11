@@ -13,9 +13,8 @@ local Boxes = require("@shared/Traffic/Boxes")
 
 -- Kinds drawn from shaped parts, and the rest with the part count of their ten-block placeholder. A kind
 -- moves from BLOCKS to SHAPED when it gets its builder.
-local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley" }
+local SHAPED = { "sedan", "patrol_car", "ambulance", "delivery_van", "ice_cream_van", "trolley", "dump_truck" }
 local BLOCKS: { [string]: number } = {
-	dump_truck = 10,
 	rv = 10,
 	cart = 10,
 	motorcycle = 10,
@@ -399,6 +398,42 @@ return function(t)
 		local rise = p.Pole.size[3] / 2 * math.sin(-(p.Pole.pitch :: number)) + p.Pole.size[2] / 2
 		t.truthy(p.Pole.pos[2] + rise <= box.height / 2 and p.Pole.pos[2] + rise > box.height / 2 - 0.1)
 	end)
+
+	t.test(
+		"the dump truck: a bonneted cab, an open tipper with a shield over the cab, two rear axles, a stack",
+		function()
+			local p = byName(VehiclePuppet.spec("dump_truck"))
+			local box = Boxes.get("dump_truck")
+			t.eq(p.Bonnet.shape, "Wedge")
+			t.eq(p.Windscreen.shape, "Wedge")
+			t.truthy(p.Cabin.pos[3] < 0 and p.Bed.pos[3] > 0, "cab in front, tipper behind")
+			-- the tipper: floor, two sides, headboard and tailgate around a load; the shield is the top of
+			-- the box and reaches forward over the cab roof
+			t.truthy(p.BedL.pos[1] < 0 and p.BedR.pos[1] > 0 and p.BedL.size[1] < 0.6, "thin side walls")
+			t.truthy(p.Headboard.pos[3] < p.Load.pos[3] and p.Tailgate.pos[3] > p.Load.pos[3])
+			t.truthy(p.Load.size[1] < p.Bed.size[1] - 0.5, "the load lies between the sides")
+			t.truthy(p.Load.pos[2] + p.Load.size[2] / 2 > p.BedL.pos[2] + p.BedL.size[2] / 2, "heaped over the rim")
+			t.near(p.Shield.pos[2] + p.Shield.size[2] / 2, box.height / 2, 1e-6)
+			t.truthy(p.Shield.pos[3] - p.Shield.size[3] / 2 < p.Cabin.pos[3] + p.Cabin.size[3] / 2 - 1, "over the cab")
+			t.truthy(p.Shield.pos[2] - p.Shield.size[2] / 2 > p.Cabin.pos[2] + p.Cabin.size[2] / 2, "clear of its roof")
+			for _, name in { "Rib1", "Rib2" } do
+				t.truthy(p[name].size[1] > p.Bed.size[1], `{name} shows on both flanks`)
+			end
+			-- big wheels; an arch on the cab only; the second rear axle is one roller with its own hubs
+			t.truthy(p.WheelFL.size[2] >= 3, "big wheels")
+			t.truthy(p.ArchF ~= nil and p.ArchB == nil, "the rear wheels stand bare under the tipper")
+			t.eq(p.Tandem.shape, "Cylinder")
+			t.near(p.Tandem.size[2], p.WheelBL.size[2], 1e-9)
+			t.truthy(p.Tandem.pos[3] > p.WheelBL.pos[3] + p.WheelBL.size[2] / 2, "behind the first rear axle")
+			t.truthy(p.HubsT.size[1] > p.Tandem.size[1], "its hub caps show")
+			t.eq(p.Stack.shape, "Cylinder")
+			t.truthy(p.Stack.pos[1] < 0 and p.Stack.size[1] > 4, "a tall exhaust on the driver's side")
+			t.truthy(
+				p.TailLights.pos[3] + p.TailLights.size[3] / 2 > box.length / 2 - 1e-6,
+				"the lamp strip is the tail"
+			)
+		end
+	)
 
 	t.test("a kind not yet shaped is the ten-block placeholder, unchanged in part count", function()
 		local seen = 0

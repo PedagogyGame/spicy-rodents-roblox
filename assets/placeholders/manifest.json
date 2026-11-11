@@ -186,12 +186,12 @@
       "species": "car"
     },
     {
-      "bytes": 2400,
+      "bytes": 4675,
       "file": "vehicle_dump_truck.rbxm",
-      "joints": 9,
-      "parts": 10,
+      "joints": 39,
+      "parts": 40,
       "rigspec": true,
-      "sha": "018426369f688a4bfe6e571a9b54afd64d417d965ab1db627d234aa59d7c1f24",
+      "sha": "5580b097cc9d9c3675f0e9e02a47c7e4f5e2d866b151e9a4725942e9a38b971e",
       "sockets": 3,
       "species": "car"
     },

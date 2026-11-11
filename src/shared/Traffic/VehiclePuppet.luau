@@ -7,7 +7,7 @@
 -- the visible body plus cabin fill the same envelope, so a player never dies to a car that looks smaller.
 -- These kinds are SHAPED (owner 2026-11-11: "the vehicles are extremely rough"), a vehicle from about forty
 -- plain parts, no meshes (the BUILDERS below; the way worldgen/Builders/Fixtures shapes a building):
--- sedan, patrol car, ambulance, delivery van, ice cream van, trolley. The rest are still the ten-block placeholder and
+-- sedan, patrol car, ambulance, delivery van, ice cream van, trolley, dump truck. The rest are still the ten-block placeholder and
 -- follow the same recipe.
 -- Names follow Actors/RigSpec.car (RootPart, Body, WheelFL/FR/BL/BR, LightBar (+ LightBarB, the second
 -- beacon colour), Headlights, TailLights;
@@ -554,6 +554,82 @@ local function trolleyParts(k: Kit, color: Rgb): number
 	return 0
 end
 
+-- Dump truck: a bonneted cab riding high on big wheels, an exhaust stack behind it, and an open tipper
+-- body on a dark chassis: floor, two ribbed sides, a headboard with a shield over the cab roof (the top
+-- of the box), a tailgate, a load of earth; two rear axles (the second is one roller through the truck).
+local function dumpTruckParts(k: Kit, color: Rgb): number
+	local hw, hl, H = k.hw, k.hl, k.H
+	local trim, seam, glass, tyre = hex(FIXED.trim), hex(FIXED.seam), hex(FIXED.glass), hex(FIXED.tyre)
+	local chrome = hex(FIXED.chrome)
+	local bw, ends, R = hw - 0.3, hl - 0.2, 0.7
+	local sill, waist, belt, roof = 1.4, 4.3, 5.3, H - 1.3
+	local s0, s1 = -ends + 3.3, -ends + 4.7 -- windscreen foot and head
+	local cabEnd = -ends + 7.6
+	local wheelR, wheelW = 1.6, 1.25
+	local axleF, axleB, axleT = -ends + 2.5, ends - 6.6, ends - 3.0
+
+	-- cab: the van's nose and bonnet under a short painted cabin
+	add(k, "Body", bw, sill, waist, -ends + R, cabEnd, color)
+	roundNose(k, bw, ends, R, sill, waist, color)
+	add(k, "Bonnet", bw, waist, belt, -ends + R, s0, color).shape = "Wedge"
+	add(k, "Scuttle", bw, waist, belt, s0, cabEnd, color)
+	add(k, "Cabin", bw, belt, roof, s1, cabEnd, color)
+	local screen = add(k, "Windscreen", bw - 0.14, belt, roof - 0.3, s0, s1, glass)
+	screen.shape, screen.material = "Wedge", "Glass"
+	add(k, "SideGlass", bw + 0.04, belt + 0.2, roof - 0.6, s1 + 0.3, cabEnd - 0.5, glass).material = "Glass"
+	add(k, "Mirrors", hw, belt + 0.3, belt + 1.2, s1 + 0.04, s1 + 0.32, trim)
+	upright(k, "Stack", -(bw + 0.06), cabEnd - 0.35, 0.22, waist, H - 0.5, chrome).material = "Metal"
+
+	-- chassis and tipper
+	local bed0, floor, rim = cabEnd + 0.75, 3.5, H - 2.1
+	add(k, "Chassis", bw - 1.4, 2.0, floor, cabEnd, ends - 0.2, trim)
+	add(k, "Bed", bw, floor, floor + 0.45, bed0, ends, color)
+	box(k, "BedL", -bw, -bw + 0.4, floor + 0.45, rim, bed0, ends, color)
+	box(k, "BedR", bw - 0.4, bw, floor + 0.45, rim, bed0, ends, color)
+	add(k, "Headboard", bw, floor + 0.45, H - 0.4, bed0, bed0 + 0.4, color)
+	add(k, "Shield", bw, H - 0.4, H, cabEnd - 2.2, bed0 + 0.4, color)
+	add(k, "Tailgate", bw - 0.4, floor + 0.45, rim, ends - 0.35, ends, color)
+	-- heaped above the rim, so the ribs (which run through the body) show on the flanks only
+	add(k, "Load", bw - 0.4, floor + 0.45, rim + 0.25, bed0 + 0.4, ends - 0.35, hex("#6b5a45")).material = "Slate"
+	local span = ends - bed0
+	for i = 1, 2 do
+		local z = bed0 + span * (i * 0.33 + 0.02)
+		add(k, `Rib{i}`, bw + 0.06, floor, rim, z - 0.18, z + 0.18, trim)
+	end
+
+	-- running gear: an arch on the cab's flank only; the rear wheels stand bare under the tipper
+	across(k, "ArchF", bw + 0.03, wheelR + 0.2, wheelR + 0.2, axleF, hex(FIXED.arch))
+	for _, a in { { tag = "F", z = axleF }, { tag = "B", z = axleB }, { tag = "T", z = axleT } } do
+		across(k, `Hubs{a.tag}`, bw + 0.15, wheelR * 0.45, wheelR, a.z, chrome).material = "Metal"
+	end
+	across(k, "Tandem", bw + 0.1, wheelR, wheelR, axleT, tyre)
+	for _, w in
+		{
+			{ name = "WheelFL", sx = -1, z = axleF },
+			{ name = "WheelFR", sx = 1, z = axleF },
+			{ name = "WheelBL", sx = -1, z = axleB },
+			{ name = "WheelBR", sx = 1, z = axleB },
+		}
+	do
+		put(k, {
+			name = w.name,
+			size = { wheelW, wheelR * 2, wheelR * 2 },
+			pos = { w.sx * (bw + 0.1 - wheelW / 2), k.bottom + wheelR, w.z },
+			color = tyre,
+			shape = "Cylinder",
+		})
+	end
+
+	add(k, "BumperF", bw + 0.06, sill - 0.2, sill + 0.7, -hl, -ends + 0.5, trim)
+	-- the tail: a cross-member under the tailgate carrying the lamp strip out to the end of the box
+	add(k, "BumperB", bw - 0.3, 1.7, floor, ends - 0.6, hl - 0.06, trim)
+	add(k, "TailLights", bw - 0.7, 2.3, 2.9, hl - 0.1, hl, hex(FIXED.tail)).material = "Neon"
+	local lamp = bw - R - 0.04
+	add(k, "Headlights", lamp, 2.45, 3.2, -ends - 0.05, -ends + 0.05, hex(FIXED.head)).material = "Neon"
+	add(k, "Grille", lamp * 0.6, 2.35, 3.5, -ends - 0.09, -ends + 0.05, seam)
+	return (s1 + cabEnd) / 2
+end
+
 -- Kinds drawn from shaped parts instead of the ten-block placeholder.
 local BUILDERS: { [string]: Builder } = {
 	sedan = sedanParts,
@@ -562,6 +638,7 @@ local BUILDERS: { [string]: Builder } = {
 	delivery_van = deliveryVanParts,
 	ice_cream_van = iceCreamVanParts,
 	trolley = trolleyParts,
+	dump_truck = dumpTruckParts,
 }
 
 -- The whole shaped model: the invisible root at the logical box, the kind's body, the beacon bar against
