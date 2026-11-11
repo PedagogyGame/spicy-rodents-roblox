@@ -294,6 +294,7 @@ def turn_event(take, straight, clips, rig, up):
     shoulders' whole bank; the head's is what is left of that at the head, 0 when it stays level)."""
     w = take["windows"]
     t0, t1 = w["turning"]
+    t1 = min(t1 + 0.5, take["seconds"], straight["seconds"] if straight is not None else t1 + 0.5)  # ... and the tail's way back
     s = Samples(take, clips, rig, t0, t1, up)
     _, ser = posture(s)
     if straight is not None:

@@ -119,6 +119,7 @@ export type State = {
 	tailPitchV: { number },
 	-- slow things
 	air: number, -- 0 on a surface .. 1 in the air (eased)
+	sinceAir: number, -- seconds on a surface since it was last in the air
 	still: number, -- 0 moving .. 1 standing (eased): how much of the idle flicks shows
 	effort: number, -- 0 rested .. 1 out of breath
 	breath: number, -- phase, radians
@@ -173,6 +174,9 @@ Liveliness.P = {
 		share = 0.85, -- of the slope
 		max = 0.45,
 		minPace = 6, -- studs/s under which a slope is read as if at this pace (a creep does not rear)
+		-- seconds after a landing from which the ground is read again, and by which it is read in full
+		-- (the drawn body eases down onto the ground for a fifth of a second: that is not a slope)
+		afterAir = { 0.25, 0.5 },
 		omega = 14,
 		zeta = 0.9,
 	},
@@ -303,7 +307,9 @@ local LEGS = {
 	{ "BackL_Upper", "BackL_Lower", "BackL_Foot", "BackL_Toe" },
 	{ "BackR_Upper", "BackR_Lower", "BackR_Foot", "BackR_Toe" },
 }
-local BREATH = { 0, 0.6, 0.4, -1 } -- the share of a breath each spine bone takes (they sum to 0)
+-- The share of a breath each spine bone takes: the back rises between the hips and the chest. They sum to
+-- 0 (the chest ends level) and so do they weighted by P.fold.foreSpine (the fore paws stay at their height).
+local BREATH = { -0.516, 0.6, 0.4, -0.484 }
 local TAILS: { string } = {}
 for i = 1, TAIL do
 	TAILS[i] = `Tail{i}`
@@ -362,6 +368,7 @@ function Liveliness.new(seed: number, rig: string?): State
 		tailPitch = zeros(TAIL),
 		tailPitchV = zeros(TAIL),
 		air = 0,
+		sinceAir = 1,
 		still = 0,
 		effort = 0,
 		breath = seed % 6.283,
@@ -487,6 +494,7 @@ local function rest(st: State, input: Input)
 		st.tailYaw[i], st.tailYawV[i], st.tailPitch[i], st.tailPitchV[i] = 0, 0, 0, 0
 	end
 	st.air = if input.mode == "air" then 1 else 0
+	st.sinceAir = if input.mode == "air" then 0 else 1
 end
 
 local function set(st: State, name: string, limit: { number }, rx: number, ry: number, rz: number): { number }
@@ -547,7 +555,8 @@ function Liveliness.step(st: State, input: Input, dt: number): Pose
 	local inAir = mode == "air"
 	local braced = if onGround then 1 elseif mode == "rail" then P.brake.rail elseif inAir then 0 else P.brake.trunk
 	local leanSpeed = P.turn.lean.slow + (1 - P.turn.lean.slow) * math.clamp(rawPace / P.sprint, 0, 1.2)
-	local settled = (1 - st.air) * (1 - st.air)
+	st.sinceAir = if inAir then 0 else st.sinceAir + dt
+	local settled = smooth(P.tilt.afterAir[1], P.tilt.afterAir[2], st.sinceAir)
 
 	local streamingWas = smooth(P.tail.rippleFrom, P.sprint, st.pace)
 	local n = math.clamp(math.ceil(dt * P.rate - 1e-9), 1, math.ceil(P.maxDt * P.rate))

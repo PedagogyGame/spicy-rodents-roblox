@@ -425,12 +425,14 @@ function AnimationDriver.heroLayers(
 			out[`Tail{i}`] = { 0, yaw, 0 }
 		end
 	end
-	-- the breath and the shudder are the back's (and the shudder the head's too): the chest takes both
-	-- back, so the fore paws it carries stay where they stand, and the neck takes the shudder up again
+	-- the breath and the shudder are the back's (and the shudder the head's too): the bones before and
+	-- after take the breath back and the chest takes the shudder back (by the rig's own lengths the chest
+	-- ends level and at its height), so the fore paws it carries stay where they stand; the neck takes the
+	-- shudder up again
+	out.Spine1 = { -0.645 * pose.chest, 0, pose.spine }
 	out.Spine2 = { pose.chest, 0, pose.spine }
-	out.Chest = { -pose.chest, 0, -3 * pose.spine }
+	out.Chest = { -0.355 * pose.chest, 0, -3 * pose.spine }
 	if pose.spine ~= 0 then
-		out.Spine1 = { 0, 0, pose.spine }
 		out.Spine3 = { 0, 0, pose.spine }
 		out.Neck = { 0, 0, 3 * pose.spine }
 	end

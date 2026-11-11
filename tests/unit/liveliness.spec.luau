@@ -385,6 +385,8 @@ return function(t: any)
 					bounce = math.max(bounce, ty)
 				end
 				roundMost = math.max(roundMost, at(pose, "Hips", 1) * 2)
+				-- the drawn body easing down onto the ground is not a slope to pitch along
+				t.truthy(math.abs(st.tilt) < 0.02, `tilt {st.tilt} at {now} s`)
 				if ty < -0.05 then
 					t.truthy(at(pose, "FrontL_Lower", 1) > 0 and at(pose, "BackL_Foot", 1) > 0, "all four legs fold")
 				end
@@ -867,7 +869,14 @@ return function(t: any)
 			else
 				t.eq(layers.Chest[3], 0)
 			end
-			t.near(layers.Spine2[1] + layers.Chest[1], 0, 1e-12, "nor does the breath pitch it")
+			t.near(layers.Spine1[1] + layers.Spine2[1] + layers.Chest[1], 0, 1e-12, "nor does the breath pitch it")
+			local F = P.fold.foreSpine
+			t.near(
+				F[1] * layers.Spine1[1] + F[2] * layers.Spine2[1] + F[4] * layers.Chest[1],
+				0,
+				1e-4,
+				"or lift the fore paws"
+			)
 		end
 		t.truthy(shudders > 20)
 		-- onto: offsets on the same axes add; the root's offset carries over
