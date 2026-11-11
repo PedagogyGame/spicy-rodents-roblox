@@ -81,6 +81,17 @@ return function(t: any)
 		local at = p:track("Run").TimePosition
 		t.truthy(at >= 0 and at < CLIPS.Run.length, `Run at {at}`)
 		t.near(at, (21 * 2 * dt) % CLIPS.Run.length, 1e-9)
+		-- it stands: the gait is held where it is as Idle comes in (its legs do not run on under it)
+		p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Idle", p:track("Idle"), true, 1)
+		t.eq(p:track("Run").IsPlaying, false)
+		t.eq(p:track("Run").Speed, 0)
+		p:advance(dt)
+		t.eq(p:track("Run").TimePosition, at)
+		t.near(p:track("Run").weight, 1 - dt / H.fade, 1e-12)
+		-- ... and runs again from its beginning at the rate asked
+		p.current = AnimationDriver.heroTracks(p.tracks, p.current, "Run", p:track("Run"), true, 2)
+		t.eq(p:track("Run").TimePosition, 0)
+		t.eq(p:track("Run").Speed, 2)
 	end)
 
 	t.test(
@@ -272,6 +283,49 @@ return function(t: any)
 		t.truthy(final.speed < 0.01 and final.groundSpeed < 0.01)
 		t.eq(#final.tracks, 1)
 	end)
+
+	t.test(
+		"a stop from a run or a sprint, let go anywhere in the bound, ends the bound with its feet under it",
+		function()
+			-- the stop take with the keys let go at other moments (the take itself is one moment of a sprint)
+			local def = Path.TAKE.stop
+			local keys = def.keys
+			local S = H.settle
+			local worstEarly, worstLate = S.at, S.at
+			for _, sprint in { true, false } do
+				for k = 0, 13 do
+					local release = 1.5 + k / 60
+					def.keys = function(time: number, i: number)
+						local held = keys(if time < release then 0 else 10, i)
+						held.sprint = held.sprint and sprint
+						return held
+					end
+					local take = Path.simulate("squirrel", "stop")
+					local runEnds: number? = nil
+					for _, f in take.frames do
+						if f.t >= release then
+							t.truthy(f.clip ~= "Walk", `Walk at {f.t} s (let go at {release}, sprint {sprint})`)
+							for _, tr in f.tracks do
+								if tr.clip == "Run" then
+									runEnds = tr.time
+								end
+							end
+						end
+					end
+					t.eq(take.frames[#take.frames].clip, "Idle")
+					-- where the run was left: between the fore paws' landing and the gathered pose, from where
+					-- the cross to Idle keeps every paw at the ground (in flight it hung there and its legs
+					-- went a quarter of a stud under on the way down)
+					local ends = runEnds :: number
+					worstEarly, worstLate = math.min(worstEarly, ends), math.max(worstLate, ends)
+				end
+			end
+			def.keys = keys
+			print(`      the run is left between {worstEarly} and {worstLate} s of its bound (gathered at {S.at})`)
+			t.truthy(worstEarly >= 0.04, `left at {worstEarly}`)
+			t.truthy(worstLate <= S.at + S.slack + 0.005, `left at {worstLate}`)
+		end
+	)
 
 	t.test("leap: the hop on the Pounce clip and the leap on the Leap clip, each paced to its landing", function()
 		local take = Path.simulate("squirrel", "leap")

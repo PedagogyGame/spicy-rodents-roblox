@@ -247,6 +247,29 @@ return function(t: any)
 			t.eq(pick("ground", 4, false, nil, "Run", false), "Walk")
 			t.eq(pick("ground", 4, false, nil, "Idle", true), "Walk")
 			t.eq(pick("ground", 0.1, false, nil, "Run", true), "Idle")
+			-- stopping, or easing off: a body let go loses a share of its speed each moment, so the bar
+			-- falls with the speed under the run's slowest (the motor's stop is 17 studs/s^2 per stud/s)
+			local braking, settle = AnimationDriver.heroBraking, AnimationDriver.heroSettle
+			t.truthy(braking(18, 300), "let go at a run")
+			t.falsy(braking(18, 30))
+			t.truthy(braking(2, 34), "still a stop near its end")
+			t.falsy(braking(2, 5), "easing off")
+			t.falsy(braking(5, 0))
+			t.falsy(braking(5, -60), "speeding up")
+			-- a run that is stopping finishes its bound: paced to reach the gathered pose (hind feet under
+			-- it) as it comes to stand, held there, and never whirled round to it
+			local S = H.settle
+			local runLength = clips.Run.length
+			t.truthy(S.at > 0 and S.at + S.slack < runLength and S.rate <= H.maxRate)
+			t.eq(settle("Run", 0.3, runLength, 18, 300, 1.5), 1.5, "at a run's speed it keeps its cadence")
+			t.eq(settle("Walk", 0.3, clips.Walk.length, 5, 85, 0.7), 0.7, "only the run")
+			t.eq(settle("Run", 0.3, runLength, 5, 2, 0.7), 0.7, "easing off")
+			t.eq(settle("Run", S.at, runLength, 5, 85, 0.7), 0, "there: held")
+			t.eq(settle("Run", S.at + S.slack / 2, runLength, 5, 85, 0.7), 0, "just past it: held")
+			local seconds = 5 / 85 * math.log(5 / H.still) -- until it stands
+			t.near(settle("Run", S.at - 0.1, runLength, 5, 85, 0.7), 0.1 / seconds, 1e-9, "arrives as it stands")
+			t.eq(settle("Run", S.at + 0.1, runLength, 5, 85, 0.7), S.rate, "most of a bound to go: as far as it gets")
+			t.eq(settle("Run", S.at - 0.1, runLength, H.still, 9, 0.3), S.rate, "standing now")
 			-- on a trunk it climbs (and hangs there when still); on a wire or bough it runs the wire clip
 			t.eq(pick("trunk", 10, false), "Climb")
 			t.eq(pick("trunk", 0, false), "Climb")

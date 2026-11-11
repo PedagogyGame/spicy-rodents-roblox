@@ -9,7 +9,7 @@
 --   2. Camera/CameraRig's orbit: lookStep (the mouse), focusStep (the smoothed point it looks at) and
 --      orbitOffset at the distance, elevation and field of view the game starts with (orbitFraming, ORBIT,
 --      FOV), behind the body;
---   3. Animation/AnimationDriver: heroClip, heroRate and heroTracks on stand-in tracks (Path.newTracks:
+--   3. Animation/AnimationDriver: heroClip, heroRate, heroSettle and heroTracks on stand-in tracks (Path.newTracks:
 --      what an AnimationTrack does with Play, Stop and AdjustSpeed), then, as its Stepped does, liveSample
 --      of the drawn root into Animation/Liveliness (how the body answers its own movement) and heroLayers
 --      (that pose, and the Spicy Rodent's twitches under it).
@@ -28,6 +28,7 @@
 --   rot             the same rotation as nine numbers, row-major (columns: right, up, back)
 --   root            the RootPart's centre (HipHeight above the feet along the body's up)
 --   speed, cadence  what the animation is told (KinematicPose.moveSpeed, studs/s, and rad/s of stride)
+--   slowing         how fast that speed is falling, studs/s^2 (what heroBraking and heroSettle go by)
 --   groundSpeed     how fast the drawn feet point really moves, studs/s (all three axes)
 --   mode, stalk     KinematicPose.mode and stalk
 --   clip, clipTime, clipRate  the clip heroClip chose, the seconds into it and its playback speed
@@ -540,6 +541,7 @@ function Path.simulate(variantName: string, takeName: string): Take
 	end
 
 	local frames = {}
+	local slowing = 0 -- (the driver's, for a held body: the fall of the speed it is told, frame to frame)
 	local px, py, pz = visual.x, visual.y, visual.z
 	local function record(i: number, k: Keys, events: { SquirrelMotor.Event }, mode: string, stalk: boolean)
 		local cf = drawn()
@@ -580,6 +582,7 @@ function Path.simulate(variantName: string, takeName: string): Take
 			root = vec(root.X, root.Y, root.Z),
 			speed = round(visual.moveSpeed),
 			cadence = round(visual.cadence),
+			slowing = round(slowing),
 			groundSpeed = round(if i == 0 then 0 else moved / dt),
 			mode = mode,
 			stalk = stalk,
@@ -637,7 +640,9 @@ function Path.simulate(variantName: string, takeName: string): Take
 			pounce = k.pounce,
 		}
 		local _, events = SquirrelMotor.step(state, input, dt, world)
+		local toldBefore = visual.moveSpeed
 		SquirrelVisual.frame(visual, state, world, dt, world.groundAt)
+		slowing = (toldBefore - visual.moveSpeed) / dt
 		local mode = Squirrel.modeOf(state.routeId ~= nil, visual.climb, state.grounded, visual.trunk)
 		local stalk = state.focus
 		local launched, seconds = Squirrel.launch(events :: any, state.vy)
@@ -651,16 +656,21 @@ function Path.simulate(variantName: string, takeName: string): Take
 		fx, fy, fz = CameraRig.focusStep(fx, fy, fz, tx, ty, tz, dt, lx, ly, lz)
 		lx, ly, lz = tx, ty, tz
 		-- 3. the animation (AnimationDriver's hero branch, then the Animator moves the tracks on)
-		local braking = live.accel < -AnimationDriver.HERO.brake
+		local braking = AnimationDriver.heroBraking(visual.moveSpeed, slowing)
 		local want = AnimationDriver.heroClip(mode, visual.moveSpeed, stalk, action, player.current, braking)
 		local clip = clips[want]
+		local track = player:track(want)
+		local rate = AnimationDriver.heroRate(want, visual.moveSpeed, visual.cadence, clip.length, airSeconds)
+		if want == player.current then
+			rate = AnimationDriver.heroSettle(want, track.TimePosition, clip.length, visual.moveSpeed, slowing, rate)
+		end
 		player.current = AnimationDriver.heroTracks(
 			player.tracks,
 			player.current,
 			want,
-			player:track(want),
+			track,
 			clip.loop,
-			AnimationDriver.heroRate(want, visual.moveSpeed, visual.cadence, clip.length, airSeconds),
+			rate,
 			AnimationDriver.heroStart(want, action)
 		)
 		player:advance(dt)

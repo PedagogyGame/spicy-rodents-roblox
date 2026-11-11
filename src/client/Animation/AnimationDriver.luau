@@ -57,6 +57,8 @@
 --   clipSpeed(speed, nominal?) -> playback speed (pure); gaitJoints(model) -> joints, tailCount;
 --   heroClip(mode, speed, stalk, action?, was?, braking?) -> clip name (pure); heroRate(name, speed,
 --   cadence?, length, airSeconds?) -> playback speed (pure); heroStart(name, action?) -> seconds (pure);
+--   heroBraking(speed, slowing) -> boolean (pure); heroSettle(name, time, length, speed, slowing, rate) ->
+--   playback speed (pure);
 --   heroTracks(tracks, current, want, track, loop, rate, startAt?) -> clip now playing; HERO. The
 --   Spicy Rodent's hero body also gets Animation/Creep's twitches on top:
 --   heroLayers(rig, t, seed, live?) -> { [bone]: { rx, ry, rz } } (pure); creepSeed(name) -> seed (pure).
@@ -364,11 +366,30 @@ AnimationDriver.HERO = {
 		Pounce = { launch = 0.4, land = 0.7, fall = 0.55 },
 	} :: { [string]: { launch: number, land: number, fall: number } },
 	landRate = 1.6, -- a one-shot left for another clip (a landing) runs through its last keys at this rate as it fades
-	brake = 40, -- studs/s^2 of slowing from which a run is stopping: it keeps to Run, not Walk, until it stands
+	-- studs/s^2 of slowing from which a run is stopping (heroBraking): it keeps to Run, not Walk, until it
+	-- stands. A stop dies away, so under runAbove the bar falls with the speed
+	brake = 40,
+	-- where a run that is stopping ends its last bound (heroSettle): `at` seconds into Run, the hind feet
+	-- planted under the body and the fore paws just lifted, from where the cross to Idle only sets the
+	-- fore paws down. A run found up to `slack` seconds past that is held; any other is taken there at
+	-- up to `rate` (from mid-flight that reaches the fore paws' landing, which also stands down cleanly)
+	settle = { at = 0.17, slack = 0.04, rate = 1.8 },
 }
 
+-- Whether a body moving at `speed` and losing `slowing` studs/s of it each second is stopping (and not
+-- easing off to a slower pace): HERO.brake at the run's slowest or faster, and in proportion below it (a
+-- body let go loses a fixed share of its speed each moment, so its slowing falls away with its speed).
+-- `slowing` is the motor's own for a held body (the fall of the speed the animation is told, frame to
+-- frame) and Animation/Liveliness's reading of the root for the others: that one is smoothed against the
+-- server's steps and trails the drawn body, which let a stop from an ordinary run reach the walk's speed
+-- before it read as a stop, and the Walk clip flashed on the way down.
+function AnimationDriver.heroBraking(speed: number, slowing: number): boolean
+	local H = AnimationDriver.HERO
+	return slowing > H.brake * math.clamp(speed / H.runAbove, 0, 1)
+end
+
 -- `action` is how a body in the air left its surface ("leap" | "pounce"; nil: it fell); `was` the clip it
--- played last frame and `braking` whether it is slowing hard (HERO.brake): a run that is stopping keeps to
+-- played last frame and `braking` whether it is stopping (heroBraking): a run that is stopping keeps to
 -- its run until it stands, the walk is for a body that ambles.
 function AnimationDriver.heroClip(
 	mode: string,
@@ -435,11 +456,40 @@ function AnimationDriver.heroStart(name: string, action: string?): number
 	return if air == nil then 0 elseif action then air.launch else air.fall
 end
 
+-- The playback speed of a run that is stopping (heroBraking of its `speed` and `slowing`, and under
+-- HERO.runAbove): `rate` (heroRate) for anything else. `time` is the seconds into the clip.
+-- A stopping body is caught anywhere in its bound; left to its cadence the clip all but freezes there,
+-- half the time in flight, and the cross to Idle then hangs it in the air and pushes its stretched legs
+-- a quarter of a stud through the ground on the way down. Instead the bound is finished: the clip is
+-- paced to reach HERO.settle.at as the body comes to stand (its speed dies away as an exponential, so
+-- that is speed / slowing * ln(speed / still) seconds from now), and held there.
+function AnimationDriver.heroSettle(
+	name: string,
+	time: number,
+	length: number,
+	speed: number,
+	slowing: number,
+	rate: number
+): number
+	local H = AnimationDriver.HERO
+	if name ~= "Run" or speed >= H.runAbove or length <= 0 or not AnimationDriver.heroBraking(speed, slowing) then
+		return rate
+	end
+	local S = H.settle
+	local left = (S.at - time) % length -- seconds of clip to go
+	if left > length - S.slack or left < 1e-3 then
+		return 0
+	end
+	local seconds = math.max(speed, H.still) / slowing * math.log(math.max(speed / H.still, 1))
+	return if seconds * S.rate <= left then S.rate else left / seconds
+end
+
 -- One frame of a hero body's clip tracks: `want` (heroClip) becomes the clip that plays, at `rate`
 -- (heroRate), from `startAt` seconds into it (heroStart; its beginning when not given). `tracks` holds
 -- the body's loaded tracks by clip name, `current` is the clip it played last frame, `t` is the track of
 -- `want`, `loop` whether that clip loops. A change of clip crosses over in HERO.fade seconds, and a
--- one-shot that is left (a leap, on landing) runs through its last keys as it fades; a one-shot that has
+-- one-shot that is left (a leap, on landing) runs through its last keys as it fades, while a gait left
+-- for Idle is held where it is (the body stands: its legs do not run on under it); a one-shot that has
 -- reached its end is frozen there, and one that carries a body through the air where it comes down (a long
 -- fall holds the reach). Returns the clip now playing. It only calls Play, Stop and AdjustSpeed, reads
 -- IsPlaying, Looped, TimePosition and Length and sets TimePosition, so the offline motion preview
@@ -459,6 +509,8 @@ function AnimationDriver.heroTracks(
 			if name ~= want and old.IsPlaying then
 				if not old.Looped then
 					old:AdjustSpeed(H.landRate)
+				elseif want == "Idle" then
+					old:AdjustSpeed(0)
 				end
 				old:Stop(H.fade)
 			end
@@ -971,6 +1023,7 @@ function AnimationDriver.start(opts: Opts): Driver
 				vy = 0
 			end
 			local kin = KinematicPose.get(e.body)
+			local toldBefore = e.speed
 			if kin then
 				-- the motor's own speed: what the body is seen to do never feeds the animation
 				e.speed, e.vy = kin.moveSpeed, 0
@@ -991,7 +1044,11 @@ function AnimationDriver.start(opts: Opts): Driver
 					else "ground"
 				e.mode = mode
 				local action = if kin then kin.action else nil
-				local braking = e.creep ~= nil and e.creep.live.accel < -AnimationDriver.HERO.brake
+				local slowing = if kin
+					then (toldBefore - e.speed) / math.max(dt, 1e-3)
+					elseif e.creep then -e.creep.live.accel
+					else 0
+				local braking = AnimationDriver.heroBraking(e.speed, slowing)
 				local want = AnimationDriver.heroClip(
 					mode,
 					e.speed,
@@ -1011,13 +1068,17 @@ function AnimationDriver.start(opts: Opts): Driver
 					continue
 				end
 				local cadence, airSeconds = if kin then kin.cadence else nil, if kin then kin.airSeconds else nil
+				local rate = AnimationDriver.heroRate(want, e.speed, cadence, clip.length, airSeconds)
+				if want == e.current then
+					rate = AnimationDriver.heroSettle(want, t.TimePosition, clip.length, e.speed, slowing, rate)
+				end
 				e.current = AnimationDriver.heroTracks(
 					e.tracks,
 					e.current,
 					want,
 					t,
 					clip.loop,
-					AnimationDriver.heroRate(want, e.speed, cadence, clip.length, airSeconds),
+					rate,
 					AnimationDriver.heroStart(want, action)
 				)
 				continue
