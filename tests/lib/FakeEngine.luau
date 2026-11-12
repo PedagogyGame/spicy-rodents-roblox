@@ -18,9 +18,16 @@
 --   parent?) -> Part; model(name, pivot, parent?) -> Model; isInstance(v); workspace() -> the fake Workspace;
 --   renderStep(dt) (call every bound render step and RenderStepped); bound() -> how many render steps are
 --   bound; signal() -> { Connect, fire }; uis() -> the fake UserInputService; input(kind "began" | "ended" |
---   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position? });
+--   "changed", io, processed?) (fire an input event; io = { KeyCode?, UserInputType, Delta?, Position?, id? };
+--   with an id every event from that id's "began" to its "ended" is handed over as ONE InputObject, as the
+--   engine does for a finger: a controller can follow a touch by the object, which is the only sound way);
 --   game:GetService("Players").LocalPlayer (with a PlayerGui); any other service is an empty fake instance;
---   task.spawn / defer run at once and task.delay waits for runDelayed()
+--   task.spawn / defer run at once and task.delay waits for runDelayed(which?, limit?) (everything queued, oldest
+--   first; `which(seconds)` picks by the delay asked for, `limit` stops after that many: a test can let one
+--   timer fire while later ones are still running); delayedCount(); events(names) and classes({ parts?,
+--   gui? }) teach it more event members and more BasePart / GuiObject classes (a game's own test asks for what
+--   its glue uses rather than editing the lists here); the fake UserInputService remembers what input() pressed
+--   (IsKeyDown, IsMouseButtonPressed)
 
 local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
@@ -48,6 +55,22 @@ local EVENTS: { [string]: boolean } = {
 	ChildAdded = true,
 	AncestryChanged = true,
 }
+
+-- A test's own additions (a game whose glue listens to an event or makes a class that is not listed above).
+function FakeEngine.events(names: { string })
+	for _, name in names do
+		EVENTS[name] = true
+	end
+end
+
+function FakeEngine.classes(more: { parts: { string }?, gui: { string }? })
+	for _, name in more.parts or {} do
+		BASE_PARTS[name] = true
+	end
+	for _, name in more.gui or {} do
+		GUI_OBJECTS[name] = true
+	end
+end
 
 local Inst = {}
 
@@ -288,15 +311,31 @@ local renderSteps: { [string]: (dt: number) -> () } = {}
 local fakeWorkspace: any = nil
 local fakeUis: any = nil
 local renderStepped: any = nil
-local delayed: { () -> () } = {}
+local delayed: { { seconds: number, fn: () -> () } } = {}
+local inputs: { [any]: { [string]: any } } = {} -- io.id -> the one InputObject of that touch, began to ended
 
--- Run everything handed to task.delay so far (in order), as if its time had come.
-function FakeEngine.runDelayed()
+-- Run what was handed to task.delay so far (oldest first), as if its time had come. All of it; or only the
+-- callbacks whose delay `which` picks (a 2.6 s reveal but not a 5 s timer), and no more than `limit` of them
+-- (the first of two timers, while the second is still running). The rest stay queued.
+function FakeEngine.runDelayed(which: ((seconds: number) -> boolean)?, limit: number?)
 	local list = delayed
 	delayed = {}
-	for _, fn in list do
+	local run: { () -> () } = {}
+	for _, d in list do
+		if (which == nil or which(d.seconds)) and (limit == nil or #run < limit) then
+			table.insert(run, d.fn)
+		else
+			table.insert(delayed, d)
+		end
+	end
+	for _, fn in run do
 		fn()
 	end
+end
+
+-- How many task.delay callbacks are waiting.
+function FakeEngine.delayedCount(): number
+	return #delayed
 end
 
 function FakeEngine.workspace(): any
@@ -353,16 +392,36 @@ end
 
 -- Fire an input event as the engine would: kind "began" | "ended" | "changed".
 function FakeEngine.input(kind: string, io: { [string]: any }, processed: boolean?)
-	local event = {
-		KeyCode = io.KeyCode or { Name = "Unknown" },
-		UserInputType = io.UserInputType or roblox.Enum.UserInputType.Keyboard,
-		Delta = io.Delta or roblox.Vector3.new(0, 0, 0),
-		Position = io.Position or roblox.Vector3.new(0, 0, 0),
-	}
+	-- (with an id: the same object for every event of that touch, a new one at its next "began")
+	local event: { [string]: any } = {}
+	if io.id ~= nil then
+		local kept = inputs[io.id]
+		if kept == nil or kind == "began" then
+			kept = {}
+			inputs[io.id] = kept
+		end
+		event = kept :: { [string]: any }
+		if kind == "ended" then
+			inputs[io.id] = nil
+		end
+	end
+	event.KeyCode = io.KeyCode or { Name = "Unknown" }
+	event.UserInputType = io.UserInputType or roblox.Enum.UserInputType.Keyboard
+	event.Delta = io.Delta or roblox.Vector3.new(0, 0, 0)
+	event.Position = io.Position or roblox.Vector3.new(0, 0, 0)
 	local sig = if kind == "began"
 		then fakeUis.InputBegan
 		elseif kind == "ended" then fakeUis.InputEnded
 		else fakeUis.InputChanged
+	-- what is held: the key or the mouse button, from its press to its release
+	if kind == "began" or kind == "ended" then
+		local held = if kind == "began" then true else nil
+		if io.KeyCode then
+			fakeUis.held[io.KeyCode] = held
+		elseif io.UserInputType then
+			fakeUis.held[io.UserInputType] = held
+		end
+	end
 	sig.fire(event, processed == true)
 end
 
@@ -378,6 +437,13 @@ local function fakeGame(): any
 		KeyboardEnabled = true,
 		mouse = roblox.Vector2.new(960, 540), -- the test moves this
 		focused = nil, -- a focused text box (anything non-nil) means the player is typing
+		held = {} :: { [any]: boolean }, -- keys and mouse buttons down now (input "began" until "ended")
+		IsKeyDown = function(self: any, code: any): boolean
+			return self.held[code] == true
+		end,
+		IsMouseButtonPressed = function(self: any, button: any): boolean
+			return self.held[button] == true
+		end,
 		GetMouseLocation = function(self: any): any
 			return self.mouse
 		end,
@@ -450,8 +516,8 @@ function FakeEngine.install()
 		defer = function(fn: (...any) -> (), ...: any)
 			fn(...)
 		end,
-		delay = function(_seconds: number, fn: () -> ())
-			table.insert(delayed, fn)
+		delay = function(seconds: number, fn: () -> ())
+			table.insert(delayed, { seconds = seconds, fn = fn })
 		end,
 		wait = function(): number
 			return 0
@@ -491,6 +557,7 @@ function FakeEngine.uninstall()
 	fakeUis = nil
 	renderStepped = nil
 	delayed = {}
+	inputs = {}
 end
 
 -- with: run fn with the engine globals in place; they are always taken away again, even if fn throws.

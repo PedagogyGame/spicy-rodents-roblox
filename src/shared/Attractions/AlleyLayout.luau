@@ -14,7 +14,8 @@
 --   pinLocal(lane, n) -> (X, D), rackSlot(lane) -> (X, Y, D), release(lane, offset) -> (X, Y, D),
 --   toWorld(place, X, Y, D) -> (x, y, z), toLocal(place, x, y, z) -> (X, Y, D), dirToWorld(place, dX, dD) ->
 --   (dx, dz), yawOf(place) -> world yaw of local +D, board(): dartboard frame, boardPoint(xmm, ymm) -> (X, Y, D),
---   boardFromLocal(Y, D) -> (xmm, ymm), stations() -> { Station }
+--   boardFromLocal(Y, D) -> (xmm, ymm). The stations (where a player presses E) are listed by each game's Spec
+--   (Shared/Minigames/Games.stations).
 
 local AlleyLayout = {}
 
@@ -199,83 +200,6 @@ AlleyLayout.PINBALLS = { { x = 30.5, theme = "acorn" }, { x = 35, theme = "roden
 AlleyLayout.PINBALL_D = -44.6
 AlleyLayout.FORTUNE = { x = 52.3, d = 26.3 }
 
-export type Station = {
-	id: string,
-	game: string,
-	kind: string, -- "lane" | "dartboard" | "fortune" | "pool" | "bumper_pool" | "pinball"
-	lane: number?,
-	x: number,
-	y: number,
-	d: number,
-	label: string,
-}
-
--- Every place a game is played (the bake puts a prompt part at each; MinigameService finds them by id).
-function AlleyLayout.stations(): { Station }
-	local out: { Station } = {}
-	for lane = 1, AlleyLayout.LANES do
-		table.insert(out, {
-			id = `bowling_lane_{lane}`,
-			game = "bowling",
-			kind = "lane",
-			lane = lane,
-			x = AlleyLayout.laneX(lane),
-			y = 3,
-			d = -9,
-			label = `Lane {lane}`,
-		})
-	end
-	local b = AlleyLayout.board()
-	table.insert(out, {
-		id = "darts_1",
-		game = "darts",
-		kind = "dartboard",
-		x = b.ocheX + 1.2,
-		y = 3,
-		d = b.d,
-		label = "Dartboard",
-	})
-	table.insert(out, {
-		id = "fortune_1",
-		game = "fortune_machine",
-		kind = "fortune",
-		x = AlleyLayout.FORTUNE.x - 1.6,
-		y = 3,
-		d = AlleyLayout.FORTUNE.d - 1.6,
-		label = "Madame Acorna",
-	})
-	for i, t in AlleyLayout.POOL_TABLES do
-		table.insert(out, {
-			id = `pool_{i}`,
-			game = "pool",
-			kind = "pool",
-			x = t.x,
-			y = 3,
-			d = t.d,
-			label = `Pool table {i}`,
-		})
-	end
-	table.insert(out, {
-		id = "bumper_pool_1",
-		game = "bumper_pool",
-		kind = "bumper_pool",
-		x = AlleyLayout.BUMPER_POOL.x,
-		y = 3,
-		d = AlleyLayout.BUMPER_POOL.d,
-		label = "Bumper pool",
-	})
-	for i, p in AlleyLayout.PINBALLS do
-		table.insert(out, {
-			id = `pinball_{i}`,
-			game = `pinball_{p.theme}`,
-			kind = "pinball",
-			x = p.x,
-			y = 3,
-			d = AlleyLayout.PINBALL_D + 3,
-			label = "Pinball",
-		})
-	end
-	return out
-end
+-- (Where each game is played is its own Spec's business: Shared/Minigames/Games.stations.)
 
 return AlleyLayout

@@ -6,7 +6,9 @@
 -- UI; verbs are edge-triggered keys, buttons and gamepad buttons. Tab and Esc stay reserved
 -- [squirrel_abilities §26]. The tilt labyrinth's fixed bindings are recorded in LABYRINTH and never
 -- remapped [brief v2 §13a].
--- Pure part: BINDINGS, LABYRINTH, HINTS(role), fromMoveVector(x, z). Engine part: start() -> Sampler
+-- Pure part: BINDINGS, LABYRINTH, HINTS(role), fromMoveVector(x, z), kicks(keyName, inMinigame) (is this
+-- key press a kick: F or gamepad X, and never while a minigame is open, when those keys are the game's).
+-- Engine part: start() -> Sampler
 -- with sample(cameraYaw) -> Frame (edges cleared on read) and stop(); typing(), ignore(io, processed),
 -- setCharacterControls(on).
 -- Robustness (W1 client review): the default ControlModule binds WASD and Space through
@@ -87,6 +89,15 @@ function InputMap.HINTS(role: string): string
 		return "WASD fly · Space up · Ctrl/Q down · Shift boost · E land"
 	end
 	return "Waiting for a body…"
+end
+
+-- Is this key press a person's kick? F and gamepad X, unless a minigame is open on this screen (`inMinigame` is
+-- the local player's "InMinigame" attribute, set by Minigames/MinigameClient): the keys are the game's then.
+function InputMap.kicks(keyName: string, inMinigame: any): boolean
+	if inMinigame ~= nil and inMinigame ~= false then
+		return false
+	end
+	return table.find(InputMap.BINDINGS.kick, keyName) ~= nil
 end
 
 -- ControlModule move vector (x right, z back) to the motors' fw/side.

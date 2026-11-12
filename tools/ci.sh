@@ -42,6 +42,13 @@ done_step() {
 
 LUAU_DIRS=(src tests tools/cloud/tasks tools/compile tools/anim tools/bake tools/bowling tools/pinball tools/sim tools/typecheck)
 
+# A minigame's own tools (calibrate, tune, measure) live in tools/games/<game>/: one directory for all of them,
+# so that a game adding a tool never edits the list above (tests/unit/tools_lint.spec.luau holds every tool
+# directory to being formatted and linted here).
+if [ -d tools/games ]; then
+	LUAU_DIRS+=(tools/games)
+fi
+
 step "stylua --check (StyLua $(stylua --version | awk '{print $2}'), Luau syntax)"
 stylua --check "${LUAU_DIRS[@]}"
 done_step

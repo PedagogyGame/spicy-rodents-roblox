@@ -158,7 +158,8 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 	if InputMap.ignore(io, processed) then
 		return
 	end
-	if io.KeyCode == Enum.KeyCode.F or io.KeyCode == Enum.KeyCode.ButtonX then
+	-- (not while a minigame is open: F and gamepad X are that game's keys then)
+	if InputMap.kicks(io.KeyCode.Name, Players.LocalPlayer:GetAttribute("InMinigame")) then
 		local st = client.state()
 		if st.species == "human" and st.device == nil then
 			kickRemote:FireServer()
