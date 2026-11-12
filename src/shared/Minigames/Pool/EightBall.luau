@@ -13,12 +13,19 @@
 --           gives the other player the cue ball in hand; the 8 potted on the break comes back on the foot
 --           spot; the 8 potted legally after your group is cleared wins; the 8 early or with a foul loses;
 --           a legal pot of your own ball keeps the table.
+--           The break is the shot that first touches the rack: a cue ball that touches nothing (a tap, a
+--           miss, a scratch on the way) is a foul and the rack is still to be broken, by the other player,
+--           from behind the head string. A cue ball that meets two balls lying together at the same instant
+--           has hit whichever of them is legal (a referee could not separate them either).
 --   POOL-R2 the 8 needs a called pocket (only the 8 is called): the 8 in any other pocket loses.
 --   POOL-R3 a scratch on the break gives ball in hand behind the head string; every other foul, anywhere.
 --   POOL-R4 on an open table a shot that pots a solid and a stripe leaves the table open (and the shooter on
 --           it); pots are taken in the order the balls dropped.
 --   POOL-R5 no ball can leave the table (the model never lifts one), so there is no such foul.
 --   POOL-R6 seats = 1 is practice: the same rules against no one; the result is shots taken and best run.
+--           A run is the balls a player pots for themselves in one visit: their own group (on the break,
+--           and while the table is open, everything that drops) and the winning 8. The other player's balls
+--           going down do not lengthen it.
 --   POOL-R7 an idle turn is a foul (skipTurn): the other player has the ball in hand.
 -- Pure and seeded: the same seed and the same inputs give the same game, byte for byte. Lune-tested
 -- (tests/unit/pool_eightball.spec.luau).
@@ -63,6 +70,7 @@ EightBall.HOW_TEXT = {
 export type PotAt = { ball: number, hole: number }
 export type Outcome = {
 	firstHit: number, -- the first ball the cue ball touched (0: none)
+	firstAll: { number }?, -- every ball it touched at that first instant (nil: only firstHit)
 	pots: { PotAt }, -- in the order they dropped; the cue ball is ball 0
 	railAfter: boolean, -- after the first contact some ball reached a cushion
 }
@@ -72,8 +80,8 @@ export type Last = {
 	foul: string?, -- a key of FOUL_TEXT
 	pots: { number }, -- balls in drop order
 	holes: { number }, -- and the pocket each went in
-	firstHit: number,
-	breakShot: boolean,
+	firstHit: number, -- the ball the shot is judged to have hit first (0: none)
+	breakShot: boolean, -- the rack had not been broken when it was played
 }
 export type State = {
 	seats: number,
@@ -211,7 +219,10 @@ function EightBall.apply(state: State, o: Outcome, rest: { Tables.Spot }?): stri
 	local called = state.called
 	state.shotNo += 1
 	state.shots[seat] += 1
-	state.broken = true
+	-- the rack is broken by the shot that first touches a ball; until then every shot is a break
+	if o.firstHit ~= 0 then
+		state.broken = true
+	end
 	state.inHand = "none"
 	state.called = 0
 	if rest then
@@ -251,18 +262,28 @@ function EightBall.apply(state: State, o: Outcome, rest: { Tables.Spot }?): stri
 		end
 	end
 	local anyPot = solids + stripes > 0 or eightHole > 0
-	-- was the first contact legal?
-	local legalFirst: boolean
-	if o.firstHit == 0 then
-		legalFirst = false
-	elseif breakShot then
-		legalFirst = true
-	elseif mine == nil then
-		legalFirst = o.firstHit ~= 8
-	elseif onEight then
-		legalFirst = o.firstHit == 8
-	else
-		legalFirst = EightBall.groupOf(o.firstHit) == mine
+	-- was the first contact legal? Two balls met at the same instant: either will do
+	local firstHit = o.firstHit
+	local legalFirst = false
+	if firstHit ~= 0 then
+		local met: { number } = o.firstAll or { firstHit }
+		for _, ball in met do
+			local ok: boolean
+			if breakShot then
+				ok = true
+			elseif mine == nil then
+				ok = ball ~= 8
+			elseif onEight then
+				ok = ball == 8
+			else
+				ok = EightBall.groupOf(ball) == mine
+			end
+			if ok then
+				legalFirst = true
+				firstHit = ball
+				break
+			end
+		end
 	end
 	local foul: string? = nil
 	if scratch then
@@ -320,7 +341,10 @@ function EightBall.apply(state: State, o: Outcome, rest: { Tables.Spot }?): stri
 		state.fouls[seat] += 1
 	end
 	if event == "continue" or event == "win" then
-		state.run[seat] += solids + stripes + (if event == "win" then 1 else 0)
+		-- a run is what the shooter potted for themselves: their own group (`mine` is the group this shot
+		-- took, if it took one), or everything on the break and while the table stays open; and the winning 8
+		local own = if breakShot or mine == nil then solids + stripes elseif mine == "solids" then solids else stripes
+		state.run[seat] += own + (if event == "win" then 1 else 0)
 		if state.run[seat] > state.bestRun[seat] then
 			state.bestRun[seat] = state.run[seat]
 		end
@@ -330,7 +354,8 @@ function EightBall.apply(state: State, o: Outcome, rest: { Tables.Spot }?): stri
 	if not state.done then
 		if event == "foul" then
 			state.seat = opp
-			state.inHand = if breakShot and scratch then "kitchen" else "anywhere"
+			-- behind the head string after a scratch on the break (POOL-R3), and while the rack is unbroken
+			state.inHand = if (breakShot and scratch) or not state.broken then "kitchen" else "anywhere"
 		elseif event == "pass" then
 			state.seat = opp
 		end
@@ -341,7 +366,7 @@ function EightBall.apply(state: State, o: Outcome, rest: { Tables.Spot }?): stri
 		foul = foul,
 		pots = potIds,
 		holes = potHoles,
-		firstHit = o.firstHit,
+		firstHit = firstHit,
 		breakShot = breakShot,
 	}
 	return event
@@ -426,7 +451,7 @@ function EightBall.input(state: State, seat: number, verb: string, args: { any }
 		state.lastScript = script
 		EightBall.apply(
 			state,
-			{ firstHit = script.first[1], pots = pots, railAfter = script.railAfter },
+			{ firstHit = script.first[1], firstAll = script.firstAll[1], pots = pots, railAfter = script.railAfter },
 			Shot.rest(script)
 		)
 		return true, nil
@@ -443,7 +468,15 @@ function EightBall.skipTurn(state: State)
 	state.fouls[seat] += 1
 	state.run[seat] = 0
 	state.called = 0
-	state.last = { seat = seat, event = "foul", foul = "idle", pots = {}, holes = {}, firstHit = 0, breakShot = false }
+	state.last = {
+		seat = seat,
+		event = "foul",
+		foul = "idle",
+		pots = {},
+		holes = {},
+		firstHit = 0,
+		breakShot = not state.broken,
+	}
 	state.lastScript = nil
 	state.seat = other(state, seat)
 	state.inHand = if state.broken then "anywhere" else "kitchen"

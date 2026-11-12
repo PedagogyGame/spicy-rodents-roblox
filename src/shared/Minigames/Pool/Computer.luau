@@ -282,7 +282,7 @@ local function works(
 	tipY: number
 ): boolean
 	local script = Shot.run(tb, spots, { Cue.strike(0, angle, power, 0, tipY, nil) })
-	if script.first[1] ~= o.ball then
+	if table.find(script.firstAll[1], o.ball) == nil then
 		return false
 	end
 	local potted = false
@@ -341,7 +341,11 @@ local function legalHit(
 		if breathe then
 			breathe()
 		end
-		if isLegal[script.first[1]] and script.railAfter then
+		local hit = false
+		for _, id in script.firstAll[1] do
+			hit = hit or isLegal[id] == true
+		end
+		if hit and script.railAfter then
 			local bad = false
 			for _, p in Shot.pots(script) do
 				if p.ball == 0 or p.ball == 8 then

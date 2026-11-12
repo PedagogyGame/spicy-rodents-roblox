@@ -332,6 +332,185 @@ return function(t)
 		t.truthy(l.done)
 	end)
 
+	t.test(
+		"POOL-R1 the break is the shot that first touches the rack: a tap or a miss leaves it to be broken",
+		function()
+			local function racked(s: EightBall.State, seed: number)
+				t.eq(#s.spots, 16)
+				local rack = Tables.rack(seed)
+				for _, r in rack do
+					if r.id ~= 0 then
+						for _, sp in s.spots do
+							if sp.id == r.id then
+								t.eq(sp.x, r.x, "the rack has not moved")
+								t.eq(sp.z, r.z)
+							end
+						end
+					end
+				end
+			end
+			-- a tap on the hold-to-shoot control: the cue ball stops short of everything
+			local s = EightBall.init(2, 11)
+			t.truthy(EightBall.input(s, 1, "shoot", { 0, 0.05 }))
+			local last = s.last :: EightBall.Last
+			t.eq(last.event, "foul")
+			t.eq(last.foul, "no_hit")
+			t.truthy(last.breakShot)
+			t.falsy(s.broken, "the rack is still to be broken")
+			t.eq(s.seat, 2, "by the other player")
+			t.eq(s.inHand, "kitchen", "from behind the head string, not from anywhere")
+			t.falsy(EightBall.canPlace(s, 0, 2), "not up against the rack")
+			t.truthy(EightBall.canPlace(s, 1, pool.headZ))
+			t.eq(#EightBall.legal(s, 2), 15, "anything may be hit on the break")
+			racked(s, 11)
+			-- seat 2's shot IS the break: a soft one into the rack that reaches no cushion stands (it was a no_rail
+			-- foul when the tap had already "broken" the table)
+			t.truthy(EightBall.input(s, 2, "shoot", { 0, 0.2 }))
+			last = s.last :: EightBall.Last
+			t.truthy(last.breakShot)
+			t.truthy(last.firstHit ~= 0)
+			t.truthy(
+				last.event ~= "foul" or last.foul == "scratch",
+				`a soft break is not a foul for want of a cushion ({last.foul})`
+			)
+			t.truthy(s.broken)
+			-- the cue ball goes in without touching the rack (off the head spot into a head corner)
+			local sc = EightBall.init(2, 11)
+			local corner = pool.holes[2]
+			local aim = Cue.angleOf(corner.x + corner.mx * 0.35, corner.z + corner.mz * 0.35 - pool.headZ)
+			t.truthy(EightBall.input(sc, 1, "shoot", { aim, 0.25 }))
+			last = sc.last :: EightBall.Last
+			t.eq(last.foul, "scratch")
+			t.deepEq(last.pots, { 0 })
+			t.eq(last.firstHit, 0)
+			t.falsy(sc.broken)
+			t.eq(sc.seat, 2)
+			t.eq(sc.inHand, "kitchen")
+			racked(sc, 11)
+			-- the 8 going down on the re-break comes back on the foot spot: it is a break, not "the 8 too early"
+			-- (smashing the rack after a tap ended the game at once in 5 racks of 300)
+			local e = EightBall.init(2, 11)
+			t.eq(EightBall.apply(e, { firstHit = 0, pots = {}, railAfter = false }), "foul")
+			t.falsy(e.broken)
+			t.eq(EightBall.apply(e, { firstHit = 1, pots = { pot(8, 5), pot(3, 6) }, railAfter = true }), "continue")
+			t.falsy(e.done, "not a loss")
+			t.truthy(e.onTable[8])
+			t.truthy(hasSpot(e, 8), "the 8 is back on the table")
+			t.truthy((e.last :: EightBall.Last).breakShot)
+			t.eq(e.group[2], nil, "and the table is open, as after any break")
+			t.eq(e.seat, 2)
+			t.truthy(e.broken)
+			-- an idle turn and then a miss: still nobody has broken
+			local idle = EightBall.init(2, 11)
+			EightBall.skipTurn(idle)
+			t.truthy((idle.last :: EightBall.Last).breakShot)
+			t.eq(EightBall.apply(idle, { firstHit = 0, pots = { pot(0, 3) }, railAfter = false }), "foul")
+			t.falsy(idle.broken)
+			t.eq(idle.seat, 1)
+			t.eq(idle.inHand, "kitchen")
+			-- once broken, a miss is an ordinary foul: ball in hand anywhere
+			EightBall.apply(idle, shot(1))
+			t.eq(EightBall.apply(idle, shot(0)), "foul")
+			t.eq(idle.inHand, "anywhere")
+			-- practice: the same player breaks again
+			local solo = EightBall.init(1, 11)
+			t.truthy(EightBall.input(solo, 1, "shoot", { 0, 0.05 }))
+			t.falsy(solo.broken)
+			t.eq(solo.seat, 1)
+			t.eq(solo.inHand, "kitchen")
+		end
+	)
+
+	t.test(
+		"POOL-R1 two balls met at the same instant: the hit is legal if either is, whatever the table's order",
+		function()
+			-- the referee alone: seat 2 has stripes; the cue ball meets the 9 and the 1 together
+			local function stripes(): EightBall.State
+				local s = EightBall.init(2, 1)
+				EightBall.apply(s, shot(1))
+				EightBall.apply(s, shot(11, { pot(11) }))
+				t.eq(s.seat, 2)
+				t.eq(s.group[2], "stripes")
+				return s
+			end
+			for _, all in { { 9, 1 }, { 1, 9 } } do
+				local s = stripes()
+				t.eq(EightBall.apply(s, { firstHit = all[1], firstAll = all, pots = {}, railAfter = true }), "pass")
+				t.eq((s.last :: EightBall.Last).foul, nil)
+				t.eq((s.last :: EightBall.Last).firstHit, 9, "judged to have hit the legal one")
+			end
+			-- neither is legal: a foul still
+			local bad = stripes()
+			t.eq(EightBall.apply(bad, { firstHit = 1, firstAll = { 1, 2 }, pots = {}, railAfter = true }), "foul")
+			t.eq((bad.last :: EightBall.Last).foul, "wrong_ball")
+			t.eq((bad.last :: EightBall.Last).firstHit, 1)
+			-- on the 8, the 8 and another together is a hit on the 8
+			local eight = onTheEight()
+			EightBall.input(eight, 2, "call", { 1 })
+			t.eq(EightBall.apply(eight, { firstHit = 12, firstAll = { 12, 8 }, pots = {}, railAfter = true }), "pass")
+			-- on the real table, in both orders of the table's list (it was a legal hit in one and a wrong-ball
+			-- foul with ball in hand in the other)
+			local R = Tables.BALL_R
+			local a = math.rad(60)
+			local gz = 1 - 2 * R
+			local place = {
+				[9] = { x = 0, z = 1 },
+				[1] = { x = (2 * R + 0.003) * math.sin(a), z = gz + (2 * R + 0.003) * math.cos(a) },
+			}
+			for _, order in { { 9, 1 }, { 1, 9 } } do
+				local s = stripes()
+				local spots: { Tables.Spot } = { { id = 0, x = 0, z = gz - 1 } }
+				for _, id in order do
+					table.insert(spots, { id = id, x = place[id].x, z = place[id].z })
+				end
+				table.insert(spots, { id = 8, x = -2, z = -4 })
+				s.spots = spots
+				t.truthy(EightBall.input(s, 2, "shoot", { 0, 0.3, 0, 0.8 }))
+				local script = EightBall.script(s) :: Shot.Script
+				local both = Shot.firstHits(script, 0)
+				table.sort(both)
+				t.deepEq(both, { 1, 9 }, "the cue ball did meet both at once")
+				local last = s.last :: EightBall.Last
+				t.truthy(last.foul ~= "wrong_ball", `order {order[1]}, {order[2]}: {last.foul}`)
+				t.eq(last.firstHit, 9)
+			end
+		end
+	)
+
+	t.test("POOL-R6 a run is the shooter's own balls: the other player's going down do not lengthen it", function()
+		local s = EightBall.init(2, 1)
+		-- the break: everything that drops is the breaker's
+		t.eq(EightBall.apply(s, shot(1, { pot(3), pot(12) })), "continue")
+		t.eq(s.run[1], 2)
+		-- open table, one of each: still open, both count
+		t.eq(EightBall.apply(s, shot(2, { pot(2), pot(13) })), "continue")
+		t.eq(s.group[1], nil)
+		t.eq(s.run[1], 4)
+		-- a clean solid takes solids
+		t.eq(EightBall.apply(s, shot(4, { pot(4) })), "continue")
+		t.eq(s.group[1], "solids")
+		t.eq(s.run[1], 5)
+		-- a solid with two stripes going down as well: one for the run, not three
+		t.eq(EightBall.apply(s, shot(5, { pot(5), pot(14), pot(15) })), "continue")
+		t.eq(s.run[1], 6)
+		t.eq(s.bestRun[1], 6)
+		t.eq(EightBall.apply(s, shot(6)), "pass")
+		t.eq(s.run[1], 0)
+		t.eq(s.bestRun[1], 6)
+		-- the stripes player: a stripe with two solids is a run of one
+		t.eq(EightBall.apply(s, shot(10, { pot(10), pot(6), pot(7) })), "continue")
+		t.eq(s.run[2], 1)
+		t.eq(s.bestRun[2], 1)
+		-- and the winning 8 counts
+		t.eq(EightBall.apply(s, shot(11, { pot(11) })), "continue")
+		t.eq(EightBall.apply(s, shot(9, { pot(9) })), "continue")
+		t.truthy(EightBall.onEight(s, 2))
+		EightBall.input(s, 2, "call", { 3 })
+		t.eq(EightBall.apply(s, shot(8, { pot(8, 3) })), "win")
+		t.eq((EightBall.result(s) :: any).bestRun[2], 4)
+		t.eq((EightBall.result(s) :: any).bestRun[1], 6)
+	end)
+
 	t.test("POOL-R7 an idle turn is a foul: the other player has the ball in hand", function()
 		local s = EightBall.init(2, 1)
 		EightBall.skipTurn(s)
