@@ -6,19 +6,24 @@
 -- fortune-teller cabinet), the back of house behind the pinsetters (workbench, shelves, spare pins, the
 -- mechanic's cart, a mop bucket, fluorescent tubes, EMPLOYEES ONLY) and the alley props (three big round
 -- dark-blue trash cans beside the tunnel vents, the push broom leaning by the door, crates).
+-- The pool tables, the bumper pool table and the pinball machines are their games' own furniture, built through
+-- the bake registry (tools/bake/GameBakes -> tools/bake/games/Pool, BumperPool, Pinball), one build per station.
 -- Names the server relies on: GamesRoom.Dartboard (Face part "BoardFace"), GamesRoom.Fortune.{Lever, Reel1..3,
 -- CardSlot}, GamesRoom.Pool<i>, GamesRoom.Pinball<i>, GamesRoom.BumperPool.
 -- Interface: build(kit, root) -> nothing
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
+local Games = require("../../../src/shared/Minigames/Games")
+local GameBakes = require("../GameBakes")
 
 local Rooms = {}
 local L = AlleyLayout
+-- games whose place in the games room's build order is fixed below (the lanes are Lanes.luau's)
+local ROOM_ORDER: { [string]: boolean } =
+	{ bowling = true, darts = true, fortune_machine = true, pool = true, bumper_pool = true, pinball = true }
 
 local WOOD = { 104, 66, 40 }
 local WOOD_DARK = { 70, 44, 28 }
-local FELT = { 30, 110, 70 }
-local BRASS = { 196, 160, 80 }
 local BLACK = { 24, 24, 26 }
 
 local function concourse(kit: any, root: any)
@@ -272,188 +277,6 @@ local function concourse(kit: any, root: any)
 	kit:light(l4, "PointLight", { Range = 24, Brightness = 0.9, Color = { 255, 244, 226 } })
 end
 
--- A pool table: frame, felt, cushions, pockets, legs; the 15 balls racked and the cue ball spotted.
-local POOL_COLS = {
-	{ 240, 200, 40 },
-	{ 30, 60, 170 },
-	{ 200, 30, 30 },
-	{ 90, 40, 140 },
-	{ 230, 110, 30 },
-	{ 30, 120, 60 },
-	{ 120, 30, 30 },
-	{ 20, 20, 20 },
-}
-local function poolTable(kit: any, parent: any, name: string, cx: number, cd: number)
-	local m = kit:model(parent, name)
-	local hl, hw = 5.4, 2.7 -- playing surface half length (D) and half width (X)
-	local top = 3.0
-	kit:box(m, "Felt", cx - hw, cx + hw, top - 0.3, top, cd - hl, cd + hl, FELT, "Fabric")
-	kit:box(m, "Slate", cx - hw - 0.7, cx + hw + 0.7, top - 1.0, top - 0.3, cd - hl - 0.7, cd + hl + 0.7, WOOD, "Wood")
-	for side = -1, 1, 2 do
-		kit:box(
-			m,
-			"RailLong",
-			cx + side * (hw + 0.35) - 0.35,
-			cx + side * (hw + 0.35) + 0.35,
-			top - 0.3,
-			top + 0.35,
-			cd - hl - 0.7,
-			cd + hl + 0.7,
-			WOOD,
-			"Wood"
-		)
-		kit:box(
-			m,
-			"CushionLong",
-			cx + side * (hw - 0.08) - 0.08,
-			cx + side * (hw - 0.08) + 0.08,
-			top,
-			top + 0.22,
-			cd - hl,
-			cd + hl,
-			{ 26, 96, 60 },
-			"Fabric"
-		)
-		kit:box(
-			m,
-			"RailShort",
-			cx - hw - 0.7,
-			cx + hw + 0.7,
-			top - 0.3,
-			top + 0.35,
-			cd + side * (hl + 0.35) - 0.35,
-			cd + side * (hl + 0.35) + 0.35,
-			WOOD,
-			"Wood"
-		)
-		kit:box(
-			m,
-			"CushionShort",
-			cx - hw,
-			cx + hw,
-			top,
-			top + 0.22,
-			cd + side * (hl - 0.08) - 0.08,
-			cd + side * (hl - 0.08) + 0.08,
-			{ 26, 96, 60 },
-			"Fabric"
-		)
-		for _, pd in { -hl, 0, hl } do
-			kit:cyl(
-				m,
-				"Pocket",
-				cx + side * hw,
-				top + 0.01,
-				cd + pd,
-				0.06,
-				0.62,
-				"Y",
-				BLACK,
-				"SmoothPlastic",
-				{ collide = false }
-			)
-		end
-		for _, ld in { -hl + 0.6, hl - 0.6 } do
-			kit:box(
-				m,
-				"Leg",
-				cx + side * (hw + 0.1) - 0.4,
-				cx + side * (hw + 0.1) + 0.4,
-				0,
-				top - 1.0,
-				cd + ld - 0.4,
-				cd + ld + 0.4,
-				WOOD_DARK,
-				"Wood"
-			)
-		end
-	end
-	for k = 0, 2 do
-		kit:cyl(
-			m,
-			"Diamond",
-			cx - hw - 0.35,
-			top + 0.36,
-			cd - hl / 2 + k * hl / 2,
-			0.02,
-			0.12,
-			"Y",
-			{ 236, 236, 220 },
-			"SmoothPlastic",
-			{ collide = false }
-		)
-	end
-	-- the rack at the foot spot (+D), cue ball at the head spot
-	local br = 0.24
-	local footD = cd + hl / 2
-	local n = 0
-	for row = 0, 4 do
-		for i = 0, row do
-			n += 1
-			local bx = cx + (i - row / 2) * br * 2.02
-			local bd = footD + row * br * 1.75
-			local col = POOL_COLS[((n - 1) % 8) + 1]
-			if n == 5 then
-				col = BLACK
-			end
-			kit:ball(m, "PoolBall", bx, top + br, bd, br * 2, col, "SmoothPlastic", { reflectance = 0.1 })
-		end
-	end
-	kit:ball(m, "CueBall", cx, top + br, cd - hl / 2, br * 2, { 245, 245, 240 }, "SmoothPlastic", { reflectance = 0.1 })
-	-- a cue lying on the rail
-	kit:cyl(m, "Cue", cx + hw + 0.35, top + 0.45, cd, 9.6, 0.1, "D", { 214, 180, 120 }, "Wood", { collide = false })
-	-- the lamp over the table (green shades, real light)
-	kit:box(m, "LampBar", cx - 0.15, cx + 0.15, 8.2, 8.4, cd - 4, cd + 4, BRASS, "Metal", { collide = false })
-	for _, ld in { -3, 0, 3 } do
-		kit:box(
-			m,
-			"Shade",
-			cx - 0.8,
-			cx + 0.8,
-			7.6,
-			8.2,
-			cd + ld - 0.8,
-			cd + ld + 0.8,
-			{ 20, 90, 50 },
-			"Glass",
-			{ collide = false }
-		)
-		kit:box(
-			m,
-			"Bulb",
-			cx - 0.5,
-			cx + 0.5,
-			7.55,
-			7.62,
-			cd + ld - 0.5,
-			cd + ld + 0.5,
-			{ 255, 236, 190 },
-			"Neon",
-			{ collide = false }
-		)
-	end
-	local glow = kit:box(
-		m,
-		"LampLight",
-		cx - 0.2,
-		cx + 0.2,
-		7.5,
-		7.55,
-		cd - 0.2,
-		cd + 0.2,
-		{ 255, 236, 190 },
-		"Neon",
-		{ collide = false }
-	)
-	kit:light(
-		glow,
-		"SurfaceLight",
-		{ Face = "Bottom", Range = 9, Angle = 90, Brightness = 2.2, Color = { 255, 238, 200 } }
-	)
-	kit:light(glow, "PointLight", { Range = 13, Brightness = 0.9, Color = { 255, 236, 200 }, Shadows = false })
-	return m
-end
-
 local function dartboard(kit: any, parent: any)
 	local b = L.board()
 	local m = kit:model(parent, "Dartboard")
@@ -637,185 +460,6 @@ local function dartboard(kit: any, parent: any)
 	end
 end
 
-local function pinball(kit: any, parent: any, i: number, px: number, theme: string)
-	local m = kit:model(parent, `Pinball{i}`)
-	local themes: { [string]: any } = {
-		acorn = { title = "ACORN ATTACK", body = { 150, 70, 30 }, accent = { 255, 200, 60 }, glow = { 255, 170, 40 } },
-		rodent = { title = "SPICY RODENT", body = { 160, 20, 30 }, accent = { 255, 90, 40 }, glow = { 255, 60, 40 } },
-		space = {
-			title = "SPACE SQUIRREL",
-			body = { 30, 30, 90 },
-			accent = { 120, 220, 255 },
-			glow = { 140, 120, 255 },
-		},
-	}
-	local th = themes[theme]
-	local d0 = L.PINBALL_D -- front (where the player stands is -D... the cabinet's front faces +D, into the room)
-	local w = 2.7
-	-- the body (slanted playfield), legs, the backbox standing up at the back (against the front wall)
-	kit:box(m, "Cabinet", px - w / 2, px + w / 2, 2.4, 3.6, d0 - 2.4, d0 + 2.6, th.body, "SmoothPlastic")
-	kit:at(m, "Glass", px, 3.75, d0 + 0.1, w - 0.2, 0.05, 5.0, { 160, 200, 220 }, "Glass", {
-		transparency = 0.4,
-		rot = kit.roblox.CFrame.Angles(0.12, 0, 0),
-	})
-	kit:at(m, "Playfield", px, 3.6, d0 + 0.1, w - 0.3, 0.04, 4.9, th.accent, "Neon", {
-		collide = false,
-		rot = kit.roblox.CFrame.Angles(0.12, 0, 0),
-	})
-	for _, pos in { { -0.6, -1.2 }, { 0.5, -0.6 }, { 0, -1.8 } } do
-		kit:cyl(
-			m,
-			"Bumper",
-			px + pos[1],
-			3.95 + pos[2] * -0.12,
-			d0 + pos[2],
-			0.35,
-			0.5,
-			"Y",
-			{ 255, 255, 255 },
-			"SmoothPlastic",
-			{ collide = false }
-		)
-	end
-	for side = -1, 1, 2 do
-		kit:at(m, "Flipper", px + side * 0.45, 3.7, d0 + 2.0, 0.6, 0.12, 0.12, { 240, 240, 240 }, "SmoothPlastic", {
-			collide = false,
-			rot = kit.roblox.CFrame.Angles(0, side * 0.5, 0),
-		})
-		kit:box(
-			m,
-			"Leg",
-			px + side * (w / 2 - 0.25) - 0.15,
-			px + side * (w / 2 - 0.25) + 0.15,
-			0,
-			2.4,
-			d0 + 2.0,
-			d0 + 2.3,
-			{ 180, 180, 186 },
-			"Metal"
-		)
-		kit:box(
-			m,
-			"Leg",
-			px + side * (w / 2 - 0.25) - 0.15,
-			px + side * (w / 2 - 0.25) + 0.15,
-			0,
-			2.4,
-			d0 - 2.2,
-			d0 - 1.9,
-			{ 180, 180, 186 },
-			"Metal"
-		)
-	end
-	kit:box(m, "Backbox", px - w / 2, px + w / 2, 3.6, 7.4, d0 - 2.6, d0 - 1.8, th.body, "SmoothPlastic")
-	local art = kit:box(
-		m,
-		"Backglass",
-		px - w / 2 + 0.15,
-		px + w / 2 - 0.15,
-		4.0,
-		7.2,
-		d0 - 1.81,
-		d0 - 1.76,
-		{ 20, 20, 30 },
-		"SmoothPlastic",
-		{ collide = false }
-	)
-	local g = kit:gui(art, "Front", 60)
-	kit:label(g, { Text = th.title, TextColor = th.accent, Font = "FredokaOne", Size = { 1, 0.45 }, Pos = { 0, 0.05 } })
-	kit:label(g, {
-		Text = "OUT OF ORDER\nback soon",
-		TextColor = { 255, 255, 255 },
-		Font = "GothamBold",
-		Size = { 1, 0.35 },
-		Pos = { 0, 0.6 },
-	})
-	kit:box(
-		m,
-		"BackboxGlow",
-		px - w / 2,
-		px + w / 2,
-		7.25,
-		7.4,
-		d0 - 1.85,
-		d0 - 1.7,
-		th.glow,
-		"Neon",
-		{ collide = false }
-	)
-	kit:box(
-		m,
-		"CoinDoor",
-		px - 0.4,
-		px + 0.4,
-		2.6,
-		3.3,
-		d0 + 2.6,
-		d0 + 2.64,
-		{ 60, 60, 64 },
-		"Metal",
-		{ collide = false }
-	)
-	kit:box(
-		m,
-		"FreePlay",
-		px - 0.35,
-		px + 0.35,
-		2.95,
-		3.15,
-		d0 + 2.64,
-		d0 + 2.66,
-		{ 80, 255, 120 },
-		"Neon",
-		{ collide = false }
-	)
-	m:SetAttribute("Theme", theme)
-end
-
-local function bumperPool(kit: any, parent: any)
-	local m = kit:model(parent, "BumperPool")
-	local p = L.BUMPER_POOL
-	local cx, cd = p.x, p.d
-	local hx, hd = 1.9, 2.8
-	local top = 3.0
-	kit:box(m, "Felt", cx - hx, cx + hx, top - 0.3, top, cd - hd, cd + hd, { 150, 30, 40 }, "Fabric")
-	kit:box(m, "Rail", cx - hx - 0.4, cx + hx + 0.4, top - 1.0, top + 0.3, cd - hd - 0.4, cd - hd, WOOD, "Wood")
-	kit:box(m, "Rail", cx - hx - 0.4, cx + hx + 0.4, top - 1.0, top + 0.3, cd + hd, cd + hd + 0.4, WOOD, "Wood")
-	kit:box(m, "Rail", cx - hx - 0.4, cx - hx, top - 1.0, top + 0.3, cd - hd, cd + hd, WOOD, "Wood")
-	kit:box(m, "Rail", cx + hx, cx + hx + 0.4, top - 1.0, top + 0.3, cd - hd, cd + hd, WOOD, "Wood")
-	kit:box(m, "Base", cx - 1.2, cx + 1.2, 0, top - 1.0, cd - 1.8, cd + 1.8, WOOD_DARK, "Wood")
-	for _, b in { { 0, -0.8 }, { 0, 0.8 }, { -0.7, 0 }, { 0.7, 0 }, { -0.4, -1.6 }, { 0.4, 1.6 } } do
-		kit:cyl(m, "Bumper", cx + b[1], top + 0.15, cd + b[2], 0.3, 0.22, "Y", { 40, 40, 44 }, "Rubber" :: any)
-	end
-	for side = -1, 1, 2 do
-		kit:cyl(
-			m,
-			"Cup",
-			cx,
-			top + 0.01,
-			cd + side * (hd - 0.5),
-			0.05,
-			0.4,
-			"Y",
-			BLACK,
-			"SmoothPlastic",
-			{ collide = false }
-		)
-		for k = 0, 4 do
-			kit:ball(
-				m,
-				"Ball",
-				cx - 1.0 + k * 0.5,
-				top + 0.2,
-				cd + side * (hd - 1.2),
-				0.4,
-				if side < 0 then { 200, 30, 30 } else { 240, 240, 240 },
-				"SmoothPlastic"
-			)
-		end
-	end
-end
-
 -- Madame Acorna: a fortune-teller booth with a squirrel seer behind glass, three reels, a lever and a card slot.
 local function fortune(kit: any, parent: any)
 	local m = kit:model(parent, "Fortune")
@@ -994,15 +638,26 @@ end
 
 local function gamesRoom(kit: any, root: any)
 	local m = kit:model(root, "GamesRoom")
-	for i, t in L.POOL_TABLES do
-		poolTable(kit, m, `Pool{i}`, t.x, t.d)
+	-- each game's furniture is its own (tools/bake/GameBakes): one build per station, in the room's old order
+	local stations = Games.stations({ bowling_alley = kit.place })
+	local function furnish(game: string)
+		for _, st in stations do
+			if st.game == game and st.site == "bowling_alley" then
+				GameBakes.build(game, kit, m, st, nil)
+			end
+		end
 	end
-	bumperPool(kit, m)
+	furnish("pool")
+	furnish("bumper_pool")
 	dartboard(kit, m)
-	for i, p in L.PINBALLS do
-		pinball(kit, m, i, p.x, p.theme)
-	end
+	furnish("pinball")
 	fortune(kit, m)
+	-- (and whatever a later game stands in this room)
+	for _, st in stations do
+		if st.site == "bowling_alley" and not ROOM_ORDER[st.game] then
+			GameBakes.build(st.game, kit, m, st, nil)
+		end
+	end
 	-- cue rack, wood panelling, a jukebox-style glow and the room's light
 	kit:box(m, "CueRack", L.X1 - 0.3, L.X1, 2, 7, -22, -18, WOOD_DARK, "Wood")
 	for k = 0, 5 do

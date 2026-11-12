@@ -790,4 +790,50 @@ return function(t)
 			end)
 		end
 	)
+
+	t.test(
+		"debugDart at a lane and debugRoll at the dartboard refuse and change nothing; each still works at its own station",
+		function()
+			FakeEngine.with(function()
+				local w = world()
+				local ann, dee = stub("Ann"), stub("Dee")
+				local s = seated(w, { ann })
+				untilReady(w)
+				t.truthy(lane(w):ready(), "a game is on and the lane is ready: a roll would be taken")
+				local announced = #w.all
+				-- a dart's two numbers handed to a lane: once this reached the lane's own script path with pins = 0
+				-- and a gutter ball was rolled and counted on the bowler's sheet
+				local ok, why = w.svc:debugDart(LANE, 0, 0)
+				t.falsy(ok)
+				t.eq(why, "no dartboard")
+				step(w, 0.5)
+				t.eq(#rolls(s, 1), 0, "nothing was rolled")
+				t.eq(#w.all, announced, "nothing was announced")
+				t.truthy(lane(w):ready())
+				-- and a pinfall handed to the dartboard
+				assert(w.svc:join(dee, "darts_1"))
+				assert(w.svc:input(dee, { gameId = "darts_1", seat = 1, verb = "start", args = {} }))
+				step(w, 0.2)
+				local darts = w.svc:sessionOf("darts_1")
+				t.eq(darts.phase, "playing")
+				ok, why = w.svc:debugRoll("darts_1", 5)
+				t.falsy(ok)
+				t.eq(why, "no lane")
+				ok, why = w.svc:debugRoll("nowhere", 5)
+				t.truthy(not ok and why == "no lane")
+				ok, why = w.svc:debugDart("fortune_1", 0, 0)
+				t.truthy(not ok and why == "no dartboard")
+				-- each still does its own work, through its own game's path
+				t.truthy(w.svc:debugRoll(LANE, 4))
+				untilReady(w)
+				t.deepEq(rolls(s, 1), { 4 })
+				t.truthy(w.svc:debugDart("darts_1", 0, 0))
+				t.eq(darts.game.rules.view(darts.game.state).seats[1].darts[1], "BULL")
+				-- the plain name takes whatever the station's own game takes
+				t.truthy(w.svc:debug(LANE, 3))
+				untilReady(w)
+				t.deepEq(rolls(s, 1), { 4, 3 })
+			end)
+		end
+	)
 end
