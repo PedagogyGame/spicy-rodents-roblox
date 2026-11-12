@@ -21,10 +21,13 @@
 --   Cushions: the speed into the cushion comes back times a restitution that falls from E_SOFT to E_HARD as
 --   the shot gets harder; the cushion's grip on the ball's side (speed along the cushion plus side spin)
 --   takes or gives up to MU of the hit, which is how running side widens the angle and check side narrows
---   it; a hard hit sinks in and comes off a little short (shorten: about a degree and a half between a soft
---   bank and a hard one for a ball that arrives rolling, and several more for one that arrives still
---   sliding, which a firm shot does); and the ball leaves with ROLL of a natural roll already on it, so a
---   bank learned once works again.
+--   it; a hard hit sinks in and comes off a little short (shorten: half a degree to a degree between a soft
+--   bank and a hard one for a ball that arrives rolling); and the ball leaves with part of a natural roll
+--   already on it both off the cushion (roll) and along it (keepAlong, rollAlong: the rubber grips the ball
+--   above its middle, so what roll it had along the cushion is mostly traded for the roll of its new speed).
+--   A firm centre-ball shot arrives still sliding and banks five or six degrees shorter than a soft one that
+--   arrives rolling: the two banks a player learns, and nothing wilder than that (the whole swing with power
+--   is pinned under 8 degrees in the spec), so a bank learned once works again.
 --   Jaws are cushions that give less back, with the point between cushion and jaw as a round corner: a ball
 --   that catches a point rattles. Posts (bumper pool) are small, lively rubber circles.
 --   Holes: a ball whose centre crosses a hole's rim is in the air and falls (Cloth). Down by the hole's
@@ -50,7 +53,7 @@ local Physics = {}
 
 Physics.DT = 1 / 240
 Physics.MAX_EVENTS = 64 -- contacts settled inside one step before the rest of the step is given up
-Physics.E_BALL = 0.94 -- ball to ball
+Physics.E_BALL = 0.96 -- ball to ball (with the rack's gaps it sets how much of a break reaches the pockets)
 Physics.TOUCH = 0.004 -- studs: balls this close are touching (they are struck together, as one wave)
 Physics.WAVE_SWEEPS = 40 -- the most sweeps over a wave's contacts
 -- friction between two balls: MU_BALL_MIN + MU_BALL_VAR / (1 + C1 u + C2 u^2), u = rubbing speed in studs/s
@@ -82,13 +85,47 @@ export type Response = {
 	mu: number, -- grip along the surface
 	shorten: number, -- share of the speed along the surface lost on the hardest hit
 	keep: number, -- share of the roll into the surface the ball keeps
-	roll: number, -- share of a natural roll it leaves with
+	roll: number, -- share of a natural roll off the surface it leaves with
+	keepAlong: number, -- share of its roll along the surface the ball keeps where the surface grips it
+	rollAlong: number, -- and the share of a natural roll along the surface it is given there
 }
 -- shorten is set against the falling restitution: a harder hit comes back slower, which alone would LENGTHEN
--- the angle, so the share taken along the cushion must outrun it for a hard bank to come off short
-Physics.CUSHION = { eSoft = 0.86, eHard = 0.7, hard = 24, mu = 0.25, shorten = 0.5, keep = 0.1, roll = 0.4 } :: Response
-Physics.JAW = { eSoft = 0.75, eHard = 0.7, hard = 20, mu = 0.2, shorten = 0.1, keep = 0.1, roll = 0.2 } :: Response
-Physics.POST = { eSoft = 0.92, eHard = 0.84, hard = 30, mu = 0.1, shorten = 0, keep = 0.1, roll = 0.4 } :: Response
+-- the angle, so the share taken along the cushion must outrun it for a hard bank to come off short. With
+-- keepAlong and rollAlong it sets how far a sliding ball's bank is from a rolling one's (tools/pool/calibrate
+-- prints the bank angle against power). A jaw and a post leave the roll along them alone.
+Physics.CUSHION = {
+	eSoft = 0.86,
+	eHard = 0.7,
+	hard = 24,
+	mu = 0.25,
+	shorten = 0.3,
+	keep = 0.1,
+	roll = 0.4,
+	keepAlong = 0.4,
+	rollAlong = 0.6,
+} :: Response
+Physics.JAW = {
+	eSoft = 0.75,
+	eHard = 0.7,
+	hard = 20,
+	mu = 0.2,
+	shorten = 0.1,
+	keep = 0.1,
+	roll = 0.2,
+	keepAlong = 1,
+	rollAlong = 0,
+} :: Response
+Physics.POST = {
+	eSoft = 0.92,
+	eHard = 0.84,
+	hard = 30,
+	mu = 0.1,
+	shorten = 0,
+	keep = 0.1,
+	roll = 0.4,
+	keepAlong = 1,
+	rollAlong = 0,
+} :: Response
 
 Physics.EV = {
 	ball = 1, -- a hit b (ball ids), speed = closing speed
@@ -213,9 +250,13 @@ local function bounce(b: Cloth.Ball, nx: number, nz: number, P: Response): numbe
 	local uh = vt + b.s
 	local pmax = P.mu * (1 + e) * vn
 	local p = uh * (2 / 7)
+	-- grip: 1 where the surface holds the ball's side for the whole hit, less where the ball skids along it
+	local grip = 1
 	if p > pmax then
+		grip = pmax / p
 		p = pmax
 	elseif p < -pmax then
+		grip = -pmax / p
 		p = -pmax
 	end
 	local vt2 = (vt - p) * (1 - P.shorten * h)
@@ -223,11 +264,12 @@ local function bounce(b: Cloth.Ball, nx: number, nz: number, P: Response): numbe
 	local qn = b.qx * nx + b.qz * nz
 	local qt = b.qx * tx + b.qz * tz
 	local qn2 = P.keep * qn + P.roll * vn2
+	local qt2 = qt + grip * (P.keepAlong * qt + P.rollAlong * vt2 - qt)
 	b.s -= 2.5 * p
 	b.vx = vn2 * nx + vt2 * tx
 	b.vz = vn2 * nz + vt2 * tz
-	b.qx = qn2 * nx + qt * tx
-	b.qz = qn2 * nz + qt * tz
+	b.qx = qn2 * nx + qt2 * tx
+	b.qz = qn2 * nz + qt2 * tz
 	return vn
 end
 

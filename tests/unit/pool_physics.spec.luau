@@ -223,20 +223,66 @@ return function(t)
 		local softOff, softSettled = bank(2, 1)
 		local hardOff, hardSettled = bank(22, 1)
 		t.truthy(
-			hardOff - softOff > 2 and hardOff - softOff < 7,
+			hardOff - softOff > 0.5 and hardOff - softOff < 4,
 			`a little: {hardOff - softOff} degrees off the cushion`
 		)
 		t.truthy(
-			hardSettled - softSettled > 0.8 and hardSettled - softSettled < 5,
+			hardSettled - softSettled > 0.3 and hardSettled - softSettled < 3,
 			`{hardSettled - softSettled} settled`
 		)
 		-- a rolling ball banks long of a mirror (its roll carries it on); a firm shot arrives still sliding and
-		-- banks short of one: the same cushion, the two banks a player learns
+		-- banks short of one: the same cushion, the two banks a player learns, five or six degrees apart
 		local _, rolling = bank(9, 1)
 		local _, sliding = bank(9, 0)
-		t.truthy(rolling < 45 and rolling > 36, `rolling in: {rolling}`)
-		t.truthy(sliding > 45 and sliding < 62, `sliding in: {sliding}`)
+		t.truthy(rolling < 45 and rolling > 39, `rolling in: {rolling}`)
+		t.truthy(sliding > 45 and sliding < 52, `sliding in: {sliding}`)
+		t.truthy(sliding - rolling > 3 and sliding - rolling < 8, `sliding against rolling: {sliding - rolling}`)
 	end)
+
+	t.test(
+		"POOL-P3 BP-P3 the same line at any power: a centre-ball bank moves under 8 degrees from soft to firm",
+		function()
+			-- through the cue, at 45 degrees into the long cushion from 2 studs away; the angle off the cushion
+			-- once the ball rolls again. A soft shot arrives rolling, a firm one still sliding: that, and the
+			-- cushion giving, is all the difference there is (it was 15 degrees before the cushion was retuned)
+			local function bankAt(power: number, tipY: number): number
+				local w = Physics.world(pool, { { id = 0, x = pool.halfW - R - 2, z = -4.6 } })
+				local st = Cue.strike(0, math.rad(45), power, 0, tipY, nil)
+				Physics.strike(w, 0, st.vx, st.vz, st.qx, st.qz, st.s)
+				untilEvents(w, 1)
+				t.eq(w.events[2], EV.cushion)
+				local b = w.balls[1]
+				local guard = 0
+				while math.abs(b.vx - b.qx) + math.abs(b.vz - b.qz) > 1e-6 do
+					Physics.step(w)
+					guard += 1
+					assert(guard < 2000, "it never rolled again")
+				end
+				t.eq(#w.events, ES, "rolling again before the next cushion")
+				return math.deg(math.atan2(-b.vx, b.vz))
+			end
+			local powers = { 0.2, 0.3, 0.35, 0.4, 0.5, 0.6 }
+			local lo, hi, last = math.huge, -math.huge, 0
+			for _, p in powers do
+				local a = bankAt(p, 0)
+				t.truthy(a > last - 0.5, `power {p}: never longer for being harder ({a} after {last})`)
+				lo, hi, last = math.min(lo, a), math.max(hi, a), a
+			end
+			t.truthy(hi - lo < 8, `centre ball: {lo} to {hi} degrees`)
+			t.truthy(hi - lo > 3, "a firm bank is still the shorter one")
+			t.truthy(lo > 40 and hi < 51, `near a mirror both ways ({lo}, {hi})`)
+			-- struck high (rolling from the tip) the bank is the same bank at every power
+			local flo, fhi = math.huge, -math.huge
+			for _, p in powers do
+				local a = bankAt(p, 0.8)
+				flo, fhi = math.min(flo, a), math.max(fhi, a)
+			end
+			t.truthy(fhi - flo < 1.5, `with follow: {flo} to {fhi} degrees`)
+			-- and each 0.05 of power moves it by a degree or two, not four and a half
+			t.truthy(math.abs(bankAt(0.4, 0) - bankAt(0.35, 0)) < 2.5)
+			t.truthy(math.abs(bankAt(0.45, 0) - bankAt(0.4, 0)) < 2.5)
+		end
+	)
 
 	t.test("POOL-P4 a clean pot drops: straight into a corner and straight into a side pocket", function()
 		for _, h in { 6, 4, 1, 3 } do
@@ -316,8 +362,8 @@ return function(t)
 				local from = { { id = 1, x = pool.halfW - R - g * 0.1 * R, z = 0.8 } }
 				local s = Shot.run(pool, from, { strike(1, 0, speed, 1) }, 6 / speed + 1.5)
 				local pot = Shot.pots(s)
-				if #pot > 0 then
-					t.eq(pot[1].hole, 6)
+				-- (a ball the corner turns away may run on and find another pocket: that is not this corner's pot)
+				if #pot > 0 and pot[1].hole == 6 then
 					pots += 1
 				elseif kinds(s, EV.jaw) > 0 then
 					rattles += 1
@@ -424,7 +470,10 @@ return function(t)
 	t.test(
 		"POOL-P5 over many breaks: something is potted often, the cue ball is not always lost, no two alike",
 		function()
-			local N = 60
+			-- the designer's band (tools/pool/calibrate.luau prints it over more racks): about one ball a break and
+			-- 35 to 45 % of breaks dry. It is pinned so that tuning a pocket, a cushion or the rack cannot quietly
+			-- dry the break out again
+			local N = 150
 			local pots, dry, scratches, far, head = 0, 0, 0, 0, 0
 			local layouts: { [string]: boolean } = {}
 			local distinct = 0
@@ -461,9 +510,9 @@ return function(t)
 				end
 			end
 			t.eq(distinct, N, "every break is its own")
-			t.truthy(pots / N > 0.4 and pots / N < 1.6, `balls potted per break {pots / N}`)
-			t.truthy(dry / N > 0.15 and dry / N < 0.65, `dry breaks {dry / N}`)
-			t.truthy(scratches / N < 0.4, `scratches {scratches / N}`)
+			t.truthy(pots / N > 0.65 and pots / N < 1.3, `balls potted per break {pots / N}`)
+			t.truthy(dry / N > 0.3 and dry / N < 0.48, `dry breaks {dry / N}`)
+			t.truthy(scratches / N < 0.3, `scratches {scratches / N}`)
 			t.truthy(scratches > 0, "but it can happen")
 			t.truthy(far / N >= 8, `balls more than 2 studs from the rack: {far / N} of 15`)
 			t.truthy(head / N >= 3.5, `balls up in the head half: {head / N}`)

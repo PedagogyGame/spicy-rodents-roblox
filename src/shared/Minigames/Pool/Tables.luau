@@ -116,7 +116,7 @@ Tables.CORNER_SHELF = 0.2
 Tables.SIDE_SHELF = 0.03
 Tables.POCKET_DEPTH = 0.085 -- half a radius: past this a ball is down
 Tables.RACK_GAP = 0.004 -- between racked balls, before the seeded jitter
-Tables.RACK_JITTER = 0.001
+Tables.RACK_JITTER = 0.0019 -- the most a racked ball sits off its place, in any direction (under half the gap)
 
 local eightBallTable: Table? = nil
 
@@ -289,10 +289,18 @@ function Tables.rack(seed: number): { Spot }
 	for row = 0, 4 do
 		for i = 0, row do
 			slot += 1
+			-- off its place by at most RACK_JITTER in any direction (two draws, pulled in to the circle), so two
+			-- neighbours can never be set into each other
+			local jx, jz = rng.range(-1, 1), rng.range(-1, 1)
+			local j2 = jx * jx + jz * jz
+			if j2 > 1 then
+				local j = math.sqrt(j2)
+				jx, jz = jx / j, jz / j
+			end
 			table.insert(out, {
 				id = order[slot],
-				x = (i - row / 2) * pitch + rng.range(-1, 1) * Tables.RACK_JITTER,
-				z = t.footZ + row * pitch * 0.8660254037844386 + rng.range(-1, 1) * Tables.RACK_JITTER,
+				x = (i - row / 2) * pitch + jx * Tables.RACK_JITTER,
+				z = t.footZ + row * pitch * 0.8660254037844386 + jz * Tables.RACK_JITTER,
 			})
 		end
 	end
