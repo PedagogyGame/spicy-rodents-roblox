@@ -3,9 +3,12 @@
 -- tables are tuned from numbers, not guesses. For each of the three machines it prints:
 --   * dead spots: places a ball comes to rest by itself with the flippers down, and balls that never drain
 --     (Survey; both must be none);
---   * the flipper: stroke and fall time, and the shot table (where the ball is on the flipper when you flip
---     against the angle and speed it leaves at: checklist PIN-P1 asks for it to rise steadily), the live catch;
---   * the plunger: what each strength of pull does first (the skill shot is the band that pays);
+--   * the flipper: stroke and fall time, how far it comes back off its top stop, how hard it hits a ball met
+--     in mid-stroke (the same wherever inside a tick the two meet), the shot table (where the ball is on the
+--     flipper when you flip against the angle and speed it leaves at: checklist PIN-P1 asks for it to rise
+--     steadily), and the live catch tick by tick (PIN-P2: how wide the moment is);
+--   * the plunger: with nobody at the flippers, the first thing the ball does after each strength of pull
+--     (the skill shot is the band that pays; too soft a pull does not leave the lane);
 --   * the computer players, NOVICE, REGULAR and WIZARD: scores (and where each would stand on the machine's
 --     board of best scores), how long a ball lasts, flips, what gets hit a game, how often each goal on the
 --     rule sheet is reached, where balls are lost;
