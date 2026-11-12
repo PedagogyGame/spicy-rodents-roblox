@@ -35,6 +35,10 @@
 --                         emitted does it in the next step), send them every splat so far, put them
 --                         in the audience now ("paintball_watch"). If the seats are now odd, seat a
 --                         bot (ctx.addComputer). Bots.sync.
+--   command(player, verb, args)   the framework's own table verbs are not a player's to send in a
+--                         match that starts itself, rolls on by itself and seats its own bots:
+--                         "start", "again", "addai" and "mode" are refused with words. ("leave" is
+--                         left to the framework.)
 --   input(player, seat, verb, args)   "reload" { t }: t clamped as a fire time is (Clock.stamp), then
 --                         Rules.reload(state, seat, t); false with words when it does nothing. Always
 --                         answered here (never nil: the framework would hand the raw t to the rules).
@@ -53,9 +57,9 @@
 --   inPlay(player, body)  the framework's walk-away check, for an arena: true while the body is
 --                         inside the arena volume (Arena.inVolume with a few studs to spare), and for
 --                         TRUST.placeGrace after the server moved it. False takes the player off.
---   screen(view), sig(view)   the monitors: every part named MONITOR under hw (the lobby's, and the
---                         old sets on each floor: the arena lane's bake) shows the phase, the clock
---                         and both scores; idle, it shows the station's name.
+--   screen(view), sig(view)   the monitors: every part named Arena.MONITOR under hw (the lobby's,
+--                         and the old sets on each floor: the arena lane's bake) shows the phase, the
+--                         clock and both scores; idle, it shows the station's name.
 --   prompt()              one action line for both prompts ("Paintball"): each label says the rest.
 --   doneText(view)        the end banner: Result.text.
 --   debug(...)            scripted outcomes for the engine check (tests/engine/PaintballFlow): at
@@ -130,12 +134,12 @@
 --   Layout, Harness  the S18 greybox and its hit-agreement harness: kept as the regression test of
 --                the rewind, and given a condition that stamps shots the contract's way (Clock.stamp,
 --                history at SNAP_HZ, view time from Clock.viewTime) with the 95 % bar at 150 ms.
--- Interface: new(ctx, deps?) -> Service; port(net) -> Port; MONITOR; types Port, Engine, PassDesk,
---   Deps, Stats, Service. Service: hw; join(player, via) -> (ok, why?); joined(player, seat, via);
---   input(player, seat, verb, args) -> (ok?, why?); step(dt); event(e); state(player, seat) ->
---   Extras?; inPlay(player, body) -> boolean; screen(view); sig(view) -> any; prompt() -> (action?,
---   object?); doneText(view) -> string?; debug(...) -> (ok, why?); onMove(player, rec);
---   onFire(player, rec); state() is ctx.session.game.state; watching(player) -> boolean; stats() -> Stats
+-- Interface: new(ctx, deps?) -> Service; port(net) -> Port; types Port, Engine, PassDesk, Deps, Stats,
+--   Service. Service: hw; join(player, via) -> (ok, why?); joined(player, seat, via); command(player,
+--   verb, args) -> (handled, ok?, why?); input(player, seat, verb, args) -> (ok?, why?); step(dt);
+--   event(e); state(player, seat) -> Extras?; inPlay(player, body) -> boolean; screen(view);
+--   sig(view) -> any; prompt() -> (action?, object?); doneText(view) -> string?; debug(...) -> (ok,
+--   why?); onMove(player, rec); onFire(player, rec); watching(player) -> boolean; stats() -> Stats
 
 local Import = require("../../Import")
 local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
@@ -213,6 +217,7 @@ export type Service = {
 	audience: { [any]: boolean },
 	join: (self: Service, player: any, via: ServerGame.StationDef) -> (boolean, string?),
 	joined: (self: Service, player: any, seat: number?, via: ServerGame.StationDef) -> (),
+	command: (self: Service, player: any, verb: string, args: { any }) -> (boolean, boolean?, string?),
 	input: (self: Service, player: any, seat: number, verb: string, args: { any }) -> (boolean?, string?),
 	step: (self: Service, dt: number) -> (),
 	event: (self: Service, e: ServerGame.Event) -> (),
@@ -230,10 +235,6 @@ export type Service = {
 }
 
 local PaintballService = {}
-
--- The name of every part under the arena's model that is a monitor (the arena lane's bake makes
--- them: one in the lobby, old sets about the floors); the service puts the score on each.
-PaintballService.MONITOR = "Monitor"
 
 -- The Port onto a Shared/Net instance (the game's: ServerGame.Ctx.net).
 function PaintballService.port(net: any): Port
@@ -295,6 +296,13 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 	end
 
 	function service.joined(_self: Service, _player: any, _seat: number?, _via: ServerGame.StationDef) end
+
+	function service.command(_self: Service, _player: any, verb: string, _args: { any }): (boolean, boolean?, string?)
+		if verb == "start" or verb == "again" or verb == "addai" or verb == "mode" then
+			return true, false, Contract.textFor("phase")
+		end
+		return false, nil, nil
+	end
 
 	function service.input(
 		_self: Service,

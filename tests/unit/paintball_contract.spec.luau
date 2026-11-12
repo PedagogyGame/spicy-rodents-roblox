@@ -830,7 +830,8 @@ return function(t)
 		has(ArenaData, { "build" }, "ArenaData")
 		has(PaintballService, { "new", "port" }, "PaintballService")
 		has(PaintballClient, { "watch", "new", "show", "link" }, "PaintballClient")
-		t.eq(PaintballService.MONITOR, "Monitor")
+		t.eq(Arena.MODEL, "PaintballArena")
+		t.eq(Arena.MONITOR, "Monitor")
 		-- the service on a bare framework context (no site model, no net, and no engine at all under this
 		-- runner): inert, and every hook is there. Built where the arena is not, it touches nothing
 		local sent = 0
@@ -848,6 +849,7 @@ return function(t)
 		has(service, {
 			"join",
 			"joined",
+			"command",
 			"input",
 			"step",
 			"event",
@@ -872,6 +874,11 @@ return function(t)
 		)
 		service:step(1 / Clock.TICK_HZ)
 		t.eq(sent, 0)
+		-- the framework's own table verbs are not a player's to send: the match starts, rolls on and fills itself
+		for _, verb in { "start", "again", "addai", "mode" } do
+			t.deepEq({ service:command("ada", verb, {}) }, { true, false, "Not now." }, verb)
+		end
+		t.eq((service:command("ada", "leave", {})), false, "leaving is the framework's")
 		-- the Port onto a Net: handlers in, buffers out
 		local fired: { any } = {}
 		local port = PaintballService.port({

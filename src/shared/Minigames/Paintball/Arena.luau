@@ -66,7 +66,7 @@
 --     crouching never changes what a body collides with: crouch changes the eye and the hit shape only;
 --   * a body cannot jump a rail (Body.JUMP_HEIGHT < RAIL_HEIGHT): floors are changed by the stairs.
 -- Interface: types Place, SitePlace, Spawn, Ramp, Room, NavNode, NavLink, Cover, Parts, Arena; constants;
---   PLACE, ORIGIN, DESK, GATE, MODEL; toWorld, toLocal, dirToWorld, dirToLocal, yawToWorld, yawToLocal,
+--   PLACE, ORIGIN, DESK, GATE, MODEL, MONITOR; toWorld, toLocal, dirToWorld, dirToLocal, yawToWorld, yawToLocal,
 --   fromSite, placeOf(site) -> Place, toSite(x, y, z) -> (X, Y, D), ofSite(X, Y, D) -> (x, y, z);
 --   inVolume(x, y, z, margin?) -> boolean; sweepBoxes, groundAt, rampHeight, inRoom; finish(parts) ->
 --   Arena; check(arena, teamMax) -> (ok, problems); T (type witnesses)
@@ -174,6 +174,9 @@ Arena.GATE = table.freeze({ x = 0, y = 0, z = 62, yaw = 0 }) :: Spawn
 -- The bake's one sub-model under the site's Model (Workspace.Attractions.f3_tv_station). It is the
 -- arena's "furniture" in the framework's sense: the server's Table is inert on a site without it.
 Arena.MODEL = "PaintballArena"
+-- The name of every part under that model that is a monitor (one in the lobby, old sets about the
+-- floors): the bake makes them, the server puts the phase, the clock and both scores on each.
+Arena.MONITOR = "Monitor"
 
 function Arena.toWorld(place: Place, x: number, y: number, z: number): (number, number, number)
 	local c, s = math.cos(place.yaw), math.sin(place.yaw)

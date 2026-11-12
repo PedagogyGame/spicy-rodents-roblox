@@ -24,6 +24,9 @@ local function new(ctx: ServerGame.Ctx): ServerGame.Table
 		joined = function(_self: any, player: any, seat: number?, via: ServerGame.StationDef)
 			service:joined(player, seat, via)
 		end,
+		command = function(_self: any, player: any, verb: string, args: { any }): (boolean, boolean?, string?)
+			return service:command(player, verb, args)
+		end,
 		input = function(_self: any, player: any, seat: number, verb: string, args: { any }): (boolean?, string?)
 			return service:input(player, seat, verb, args)
 		end,

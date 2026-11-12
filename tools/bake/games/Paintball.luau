@@ -13,8 +13,8 @@
 -- build is called once for each of paintball's two stations: build everything for the arena's own
 -- (station.id == Contract.STATION) and nothing for the pass desk's prompt (station.joins ~= nil).
 -- What the rest of paintball finds by name: ONE sub-model named Arena.MODEL ("PaintballArena") under parent (the
--- server's Table is inert on a site without it), and in it every monitor as a part named "Monitor"
--- (PaintballService.MONITOR: one in the lobby, old sets about the floors) for the server to put the score on.
+-- server's Table is inert on a site without it), and in it every monitor as a part named Arena.MONITOR
+-- ("Monitor": one in the lobby, old sets about the floors) for the server to put the score on.
 -- Interface: { build? } (a stub: none)
 
 return {}

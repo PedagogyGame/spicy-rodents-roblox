@@ -264,7 +264,9 @@ Contract.Rules = table.freeze({
 	briefingSecs = 10,
 	matchSecs = 480,
 	endCardSecs = 15, -- of end card before the service rolls into the next match (ctx.again)
-	endCardSpare = 3, -- the Session's doneSeconds is endCardSecs + this, so the table never resets first
+	-- the Session's doneSeconds is endCardSecs + this: the service rolls on with this much of it left, so
+	-- the table never resets first and the card's own countdown ("starts in N s") ends on 1
+	endCardSpare = 1,
 	-- PB-12: the pass
 	passCents = 20,
 	passDays = 5, -- in-game days
