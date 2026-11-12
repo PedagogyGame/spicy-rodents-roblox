@@ -16,7 +16,7 @@
 --   * Three orbits in one ball light the extra ball at the left pod (once a game).
 --   * End of ball: 10,000 for every ramp and orbit of that ball, times one more for every ball locked.
 -- Geometry is in studs in Layout's playfield frame. Pure data and pure functions; Lune-tested
--- (tests/unit/pinball_tables.spec.luau, pinball_rules.spec.luau).
+-- (tests/unit/pinball_layout.spec.luau, pinball_rules.spec.luau, pinball_shots.spec.luau).
 -- Interface: a Machine.Table (id, title, def, ix, c, sheet) plus POINTS, SAY, COMBO_TICKS, COUNT_TICKS, LOCKS
 
 local Layout = require("./Layout")
@@ -311,7 +311,7 @@ end
 local sheet: Machine.Sheet = {
 	saveTicks = 2160, -- nine seconds
 	maxScorePerSec = 600000,
-	scoreScale = "a good game is 1,500,000; five million is a great one",
+	scoreScale = "a good game is 1,500,000; ten million is a great one",
 	text = {
 		[101] = "DOCKED! SKILL SHOT",
 		[102] = "F-U-E-L! THE LOCKS ARE LIT",

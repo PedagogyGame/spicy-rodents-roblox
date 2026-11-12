@@ -41,7 +41,7 @@ HighScores.HOUSE = {
 		{ name = "COMET", score = 6000000 },
 		{ name = "ORBITER", score = 2500000 },
 		{ name = "BOOSTER", score = 800000 },
-		{ name = "CADET", score = 250000 },
+		{ name = "CADET", score = 500000 },
 	},
 } :: { [string]: { House } }
 

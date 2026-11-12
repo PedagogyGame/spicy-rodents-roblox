@@ -131,16 +131,21 @@ return function(t: Test.T)
 			for _, id in Tables.IDS do
 				local server = Replay.new(id, 4242, 2)
 				local watcher = Replay.new(id, 4242, 2)
-				local segments, numbers = 0, 0
+				local segments, numbers, longest = 0, 0, 0
 				local live = playLive(id, 4242, 2, 2, function(seat, seg)
-					-- across the wire and back: the segment is plain numbers
-					local copy = table.clone(seg)
+					-- across the wire and back: two numbers and a short string (InputLog.pack)
+					local from, to, packed = InputLog.pack(seg)
+					longest = math.max(longest, #packed)
+					local copy = InputLog.unpack(from, to, packed)
+					assert(copy, "the segment did not open again")
+					t.deepEq(copy, seg)
 					local ok, why = Replay.feed(server, seat, copy)
 					t.truthy(ok, why)
 					t.truthy(Replay.feed(watcher, seat, table.clone(seg), {}))
 					segments += 1
 					numbers += #seg
 				end)
+				t.truthy(longest <= InputLog.WIRE_CHARS, `{id}: the longest message was {longest} characters`)
 				t.truthy(Replay.over(server), `{id}: the replay reached the end of the game`)
 				t.eq(server.tick, live.tick)
 				t.eq(digest(server.m), digest(live.m), `{id}: the machines are identical`)
@@ -151,7 +156,7 @@ return function(t: Test.T)
 				-- the log is small: a few numbers a second
 				local seconds = live.tick / 240
 				t.truthy(numbers / seconds < 40, `{id}: {numbers / seconds} numbers a second`)
-				t.truthy(segments / seconds <= 5.1, "five segments a second")
+				t.truthy(segments / seconds <= 10.1, "ten segments a second (the wire carries twenty messages)")
 			end
 		end
 	)
@@ -241,7 +246,131 @@ return function(t: Test.T)
 			t.eq(Replay.pace(r, 2), 0)
 			t.eq(Replay.pace(r, 1), 240, "a second ahead")
 			t.eq(Replay.pace(r, 3), -240, "a second behind")
-			t.eq(Replay.SEGMENT_TICKS, 48)
+			t.eq(Replay.SEGMENT_TICKS, InputLog.WIRE_TICKS)
+			t.eq(Physics.HZ / Replay.SEGMENT_TICKS, 10, "ten segments a second")
+		end
+	)
+
+	t.test(
+		"PIN-P6: on the wire a segment is fromTick, toTick and one string of at most 200 characters, and opens again",
+		function()
+			-- every button and the analogue plunger, at the first and the last tick a segment can hold
+			local seg =
+				{ 7200, 7200 + InputLog.MAX_TICKS, 1, InputLog.BUTTONS_MAX, 2, 0, 500, BTN.LEFT, InputLog.MAX_TICKS, 5 }
+			local from, to, packed = InputLog.pack(seg)
+			t.eq(from, 7200)
+			t.eq(to, 7200 + InputLog.MAX_TICKS)
+			t.eq(#packed, 16, "four characters a change")
+			t.truthy(string.match(packed, "^[%w%-_]*$"), `plain characters only: {packed}`)
+			t.deepEq(InputLog.unpack(from, to, packed), seg)
+			t.truthy(InputLog.check(InputLog.unpack(from, to, packed), 7200))
+			-- nothing held and nothing changed: an empty string
+			local _, _, none = InputLog.pack({ 0, 24 })
+			t.eq(none, "")
+			t.deepEq(InputLog.unpack(0, 24, ""), { 0, 24 })
+			-- the most a message holds is more than the player's machine ever puts in one
+			t.eq(InputLog.WIRE_CHANGES * 4, InputLog.WIRE_CHARS)
+			t.truthy(InputLog.WIRE_TICKS <= InputLog.WIRE_CHANGES, "a change every tick of a segment still fits")
+			local full = { 0, 60 }
+			for i = 1, InputLog.WIRE_CHANGES do
+				table.insert(full, i)
+				table.insert(full, i % 2)
+			end
+			local _, _, long = InputLog.pack(full)
+			t.eq(#long, InputLog.WIRE_CHARS)
+			t.deepEq(InputLog.unpack(0, 60, long), full)
+			table.insert(full, 51)
+			table.insert(full, 0)
+			t.fails(function()
+				InputLog.pack(full)
+			end, "too many changes")
+			-- what is not a packed segment is nil, never an error; what unpacks still has to pass check()
+			for what, bad in
+				{
+					["a number"] = 5,
+					["not a multiple of four"] = "AAA",
+					["another alphabet"] = "AA A",
+					["a high first character"] = "QAAA",
+					["too long"] = string.rep("A", InputLog.WIRE_CHARS + 4),
+				} :: { [string]: any }
+			do
+				t.eq(InputLog.unpack(0, 24, bad), nil, what)
+			end
+			t.eq(InputLog.unpack("0", 24, ""), nil)
+			t.eq(InputLog.unpack(0, nil, ""), nil)
+			local zero = InputLog.unpack(0, 24, "AAAA")
+			t.deepEq(zero, { 0, 24, 0, 0 }, "offset 0 unpacks")
+			t.falsy(InputLog.check(zero, 0), "and is refused by check()")
+		end
+	)
+
+	t.test(
+		"PIN-P6: however the buttons are worked, the player's machine never cuts a segment too big for one message",
+		function()
+			local id = "pinball_acorn"
+			local live, server = Replay.new(id, 9, 1), Replay.new(id, 9, 1)
+			local rec = Replay.recorder(live)
+			local rng = 12345
+			local cuts = 0
+			local sent = ""
+			for tick = 1, 240 * 20 do
+				-- a different word of buttons on every tick: flippers, nudges, an analogue plunger
+				rng = (rng * 69069 + 1) % 4294967296
+				local buttons = Machine.buttons(rng // 65536 % 64, (tick % 32) / 31)
+				local seg = Replay.live(live, rec, buttons)
+				if seg then
+					cuts += 1
+					t.truthy(InputLog.changes(seg) <= InputLog.WIRE_CHANGES)
+					local from, to, packed = InputLog.pack(seg)
+					t.truthy(#packed <= InputLog.WIRE_CHARS)
+					local back = InputLog.unpack(from, to, packed)
+					assert(back, "the segment did not open again")
+					local ok, why = Replay.feed(server, live.m.up, back)
+					t.truthy(ok, why)
+					sent = digest(live.m)
+				end
+				if Replay.over(live) then
+					break
+				end
+			end
+			t.truthy(cuts >= 100, `{cuts} segments`)
+			t.eq(digest(server.m), sent, "and the server has the game as it stood at the last segment")
+		end
+	)
+
+	t.test(
+		"watchers: a copy of the replay taken in mid-ball, fed the segments that follow, is the same game to the end",
+		function()
+			local id = "pinball_space"
+			local server = Replay.new(id, 77, 2)
+			local late: Replay.State? = nil
+			local fed = 0
+			local live = playLive(id, 77, 2, 2, function(seat, seg)
+				local from, to, packed = InputLog.pack(seg)
+				local copy = InputLog.unpack(from, to, packed)
+				assert(copy, "the segment did not open again")
+				t.truthy(Replay.feed(server, seat, copy))
+				if late then
+					t.truthy(Replay.feed(late, seat, table.clone(seg)))
+				end
+				fed += 1
+				if fed == 150 then
+					-- somebody walks up fifteen seconds into the game: the server sends them its replay as it is
+					late = Replay.clone(server)
+					t.eq(digest(late), digest(server))
+					t.truthy(#server.m.phys.balls > 0 or server.m.phase ~= PHASE.PLAY)
+				end
+			end)
+			assert(late, "the game was long enough to walk up to")
+			t.truthy(Replay.over(late))
+			t.eq(digest(late), digest(server), "the latecomer's replay is the server's")
+			t.eq(digest(late.m), digest(live.m), "and the player's own machine")
+			-- the copy is its own: feeding one does not move the other
+			local a = Replay.new(id, 1, 1)
+			local b = Replay.clone(a)
+			t.truthy(Replay.feed(a, 1, { 0, 240 }))
+			t.eq(b.tick, 0)
+			t.eq(b.m.phys.tick, 0)
 		end
 	)
 

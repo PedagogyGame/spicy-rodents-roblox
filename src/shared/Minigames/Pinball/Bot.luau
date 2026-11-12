@@ -5,7 +5,8 @@
 -- never reaches into the model. Three skill levels:
 --   1 NOVICE  bats late and loosely at anything near a flipper, sometimes with both at once, and plunges at
 --             any strength;
---   2 REGULAR bats in good time, traps the ball on a raised flipper more often than not and then shoots it:
+--   2 REGULAR plunges for the skill shot (and misses it as often as not), bats in good time, traps the ball
+--             on a raised flipper more often than not and then shoots it:
 --             mostly at what the rule sheet wants (it knows the machine's main shots, and times them to a
 --             frame or two), otherwise from somewhere in the outer half of the flipper;
 --   3 WIZARD  traps whenever it can, reads what the rule sheet wants hit now (sheet.wants), looks the shot up
@@ -13,7 +14,7 @@
 --             table, as a good player learns a machine), lets the ball go and flips when it has rolled to
 --             that spot; it plunges for the skill shot and nudges a ball away from an outlane.
 -- Pinball has no computer opponent (checklist PIN-R5); the bot is the idle machine's attract mode, the way the
--- specs play whole games, and what tools/pinball/calibrate.luau measures the tables with.
+-- specs play whole games, and what tools/games/pinball/calibrate.luau measures the tables with.
 -- A bot's state is plain data with its own seeded stream; the same seed and the same machine give the same
 -- game. (learn() keeps what it has learnt per table: a memo of a pure function of the table.)
 -- Pure; Lune-tested (tests/unit/pinball_games.spec.luau).
@@ -67,9 +68,9 @@ Bot.LEVELS = {
 		aimTicks = 5,
 		aimLo = 0.45,
 		aimHi = 0.95,
-		learnt = false,
+		learnt = true,
 		book = 0.7,
-		pullSd = 0.12,
+		pullSd = 0.1,
 		nudges = false,
 		holdTicks = 45,
 		panic = 0.05,

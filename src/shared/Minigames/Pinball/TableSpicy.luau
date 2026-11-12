@@ -16,7 +16,7 @@
 --   * A drain costs half the heat.
 --   * End of ball: 1,000 for every wire and target of that ball, times the heat level reached.
 -- Geometry is in studs in Layout's playfield frame. Pure data and pure functions; Lune-tested
--- (tests/unit/pinball_tables.spec.luau, pinball_rules.spec.luau).
+-- (tests/unit/pinball_layout.spec.luau, pinball_rules.spec.luau, pinball_shots.spec.luau).
 -- Interface: a Machine.Table (id, title, def, ix, c, sheet) plus POINTS, SAY, HEAT, LEVEL_MULT, level(t)
 
 local Layout = require("./Layout")
@@ -249,7 +249,7 @@ end
 local sheet: Machine.Sheet = {
 	saveTicks = 1920, -- eight seconds: the hungry one
 	maxScorePerSec = 150000,
-	scoreScale = "a good game is 300,000; a million is a great one",
+	scoreScale = "a good game is 100,000; 500,000 is a great one",
 	text = {
 		[101] = "HOT SHOT",
 		[102] = "FERAL! ALL SCORES 2X",

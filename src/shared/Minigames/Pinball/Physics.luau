@@ -62,7 +62,7 @@ Physics.FLIP_STOP_E = 0.12 -- how much of its speed the flipper keeps bouncing o
 Physics.FLIP_REST_E = 0.2 -- and off the bottom one
 Physics.FLIP_BOUNCE_MIN = 2 -- rad/s: slower than this it simply stops
 Physics.FLIP_E = 0.55 -- flipper rubber
-Physics.FLIP_MU = 0.2 -- flipper rubber grips: with none the ball is slung off the tip from anywhere, with too much every shot leaves square to the flipper; this spreads the shots along its length (tools/pinball/calibrate.luau)
+Physics.FLIP_MU = 0.2 -- flipper rubber grips: with none the ball is slung off the tip from anywhere, with too much every shot leaves square to the flipper; this spreads the shots along its length (tools/games/pinball/calibrate.luau)
 Physics.BUMPER_KICK = 6.5 -- studs/s outward, whatever the ball came in at
 Physics.BUMPER_MIN = 0.3 -- the skirt needs this much of a touch to fire
 Physics.BUMPER_E = 0.5 -- a dead bumper (tilt, or too soft a touch) is a rubber post
@@ -159,7 +159,7 @@ local ROLL_V2 = Physics.ROLL_V * Physics.ROLL_V
 local ROLL_SLOW = Physics.ROLL_DECEL / Physics.ROLL_V
 -- what holds a ball up: something under it that leans it to the right, to the left, or a level floor
 local SUP_RIGHT, SUP_LEFT, SUP_BOTH = 1, 2, 3
-local SUP_LEAN = 0.02 -- a surface whose normal is this close to straight up the table is level
+local SUP_LEAN = 0.002 -- a surface whose normal is this close to straight up the table is level (a tenth of a degree)
 
 -- per-step scratch, rebuilt from the state at the top of every step (nothing is carried in it)
 local fMove: { boolean } = {} -- the flipper is not lying still on a stop this tick

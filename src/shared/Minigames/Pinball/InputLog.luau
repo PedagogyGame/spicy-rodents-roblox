@@ -9,15 +9,24 @@
 -- from the segment before, so a second of holding one flipper is four numbers.
 -- check() is the guard on what a client may send: whole numbers in range, offsets rising, no more ticks and no
 -- more changes than a segment may hold.
+-- On the wire (Minigames/Games rule 1: a message's arguments are at most 8 numbers, booleans or strings of 200
+-- characters, and a stream of input is one segment about ten times a second) a segment is three arguments:
+-- fromTick, toTick and its changes packed in one string, four characters a change (pack / unpack). 200
+-- characters hold WIRE_CHANGES changes, more than a segment of WIRE_TICKS ticks can have, so a segment the
+-- player's machine cuts always fits one message.
 -- Pure; Lune-tested (tests/unit/pinball_replay.spec.luau).
--- Interface: MAX_TICKS, MAX_CHANGES; recorder(tick) -> Recorder; push(rec, buttons); cut(rec) -> Segment;
---   check(segment, from) -> (ok, why?); play(segment, held, each) -> held; changes(segment) -> number
+-- Interface: MAX_TICKS, MAX_CHANGES, WIRE_TICKS, WIRE_CHANGES, WIRE_CHARS; recorder(tick) -> Recorder;
+--   push(rec, buttons); cut(rec) -> Segment; check(segment, from) -> (ok, why?); play(segment, held, each) ->
+--   held; changes(segment) -> number; pack(segment) -> (from, to, packed); unpack(from, to, packed) -> Segment?
 
 local InputLog = {}
 
 InputLog.MAX_TICKS = 720 -- three seconds a segment at most
 InputLog.MAX_CHANGES = 160 -- a person cannot change the buttons more often than this in one segment (a plunger pulled by a stick changes at every step of its travel)
 InputLog.BUTTONS_MAX = 4095 -- Machine.BUTTONS_MAX: seven button bits and an analogue plunger of 0..31 above them
+InputLog.WIRE_CHARS = 200 -- the longest string a message may carry
+InputLog.WIRE_CHANGES = 50 -- four characters a change
+InputLog.WIRE_TICKS = 24 -- the player's machine cuts a segment this often: ten messages a second
 
 export type Segment = { number }
 export type Recorder = {
@@ -97,6 +106,58 @@ function InputLog.check(seg: any, from: number): (boolean, string?)
 		last = offset
 	end
 	return true
+end
+
+-- The wire's alphabet: 64 characters that pass through any text channel unchanged. A change is 22 bits (the
+-- offset, 1..1023, above the 12 bits of buttons) in four characters, most significant first.
+local ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+local VALUE: { [number]: number } = {}
+for i = 1, #ALPHABET do
+	VALUE[string.byte(ALPHABET, i)] = i - 1
+end
+
+-- pack(segment): a segment as the three arguments of one message: fromTick, toTick, the changes in a string.
+-- (A segment cut by Replay.live always fits; one with more than WIRE_CHANGES changes is an error.)
+function InputLog.pack(seg: Segment): (number, number, string)
+	local n = InputLog.changes(seg)
+	assert(n <= InputLog.WIRE_CHANGES, "too many changes for one message")
+	local bytes = table.create(n * 4)
+	for i = 3, #seg, 2 do
+		local v = seg[i] * 4096 + seg[i + 1]
+		table.insert(bytes, string.byte(ALPHABET, v // 262144 + 1))
+		table.insert(bytes, string.byte(ALPHABET, v // 4096 % 64 + 1))
+		table.insert(bytes, string.byte(ALPHABET, v // 64 % 64 + 1))
+		table.insert(bytes, string.byte(ALPHABET, v % 64 + 1))
+	end
+	return seg[1], seg[2], string.char(table.unpack(bytes))
+end
+
+-- unpack(from, to, packed): the segment those three arguments stand for, or nil if they are not a packed
+-- segment at all (the wrong types, a string too long or of the wrong alphabet). What comes back still has to
+-- pass check(): unpack only reads, check() judges.
+function InputLog.unpack(from: any, to: any, packed: any): Segment?
+	if type(from) ~= "number" or type(to) ~= "number" or type(packed) ~= "string" then
+		return nil
+	end
+	local len = #packed
+	if len > InputLog.WIRE_CHARS or len % 4 ~= 0 then
+		return nil
+	end
+	local seg: Segment = { from, to }
+	for i = 1, len, 4 do
+		local a, b, c, d =
+			VALUE[string.byte(packed, i)],
+			VALUE[string.byte(packed, i + 1)],
+			VALUE[string.byte(packed, i + 2)],
+			VALUE[string.byte(packed, i + 3)]
+		if a == nil or b == nil or c == nil or d == nil or a > 15 then
+			return nil
+		end
+		local v = ((a * 64 + b) * 64 + c) * 64 + d
+		table.insert(seg, v // 4096)
+		table.insert(seg, v % 4096)
+	end
+	return seg
 end
 
 -- play(segment, held, each): call each(buttons) once for every tick of a checked segment, starting from the

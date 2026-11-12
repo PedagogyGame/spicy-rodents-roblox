@@ -1,22 +1,27 @@
 --!strict
--- tools/pinball/calibrate.luau: a developer's look at the pinball model (Shared/Minigames/Pinball) so the
+-- tools/games/pinball/calibrate.luau: a developer's look at the pinball model (Shared/Minigames/Pinball) so the
 -- tables are tuned from numbers, not guesses. For each of the three machines it prints:
+--   * dead spots: places a ball comes to rest by itself with the flippers down, and balls that never drain
+--     (Survey; both must be none);
 --   * the flipper: stroke and fall time, and the shot table (where the ball is on the flipper when you flip
 --     against the angle and speed it leaves at: checklist PIN-P1 asks for it to rise steadily), the live catch;
 --   * the plunger: what each strength of pull does first (the skill shot is the band that pays);
---   * the computer players, NOVICE, REGULAR and WIZARD: scores, how long a ball lasts, flips, what gets hit a
---     game, how often each goal on the rule sheet is reached, where balls are lost;
+--   * the computer players, NOVICE, REGULAR and WIZARD: scores (and where each would stand on the machine's
+--     board of best scores), how long a ball lasts, flips, what gets hit a game, how often each goal on the
+--     rule sheet is reached, where balls are lost;
 --   * what a step costs.
--- Usage, from the repo root: lune run tools/pinball/calibrate.luau [games per level, default 40] [table id part]
+-- Usage, from the repo root: lune run tools/games/pinball/calibrate.luau [games per level, default 40] [table id part]
 -- Interface: a script (prints a report); nothing is written.
 
 local process = require("@lune/process")
-local Bot = require("../../src/shared/Minigames/Pinball/Bot")
-local Layout = require("../../src/shared/Minigames/Pinball/Layout")
-local Machine = require("../../src/shared/Minigames/Pinball/Machine")
-local Physics = require("../../src/shared/Minigames/Pinball/Physics")
-local Shots = require("../../src/shared/Minigames/Pinball/Shots")
-local Tables = require("../../src/shared/Minigames/Pinball/Tables")
+local Bot = require("../../../src/shared/Minigames/Pinball/Bot")
+local HighScores = require("../../../src/shared/Minigames/Pinball/HighScores")
+local Layout = require("../../../src/shared/Minigames/Pinball/Layout")
+local Machine = require("../../../src/shared/Minigames/Pinball/Machine")
+local Physics = require("../../../src/shared/Minigames/Pinball/Physics")
+local Shots = require("../../../src/shared/Minigames/Pinball/Shots")
+local Survey = require("../../../src/shared/Minigames/Pinball/Survey")
+local Tables = require("../../../src/shared/Minigames/Pinball/Tables")
 
 local GAMES = tonumber(process.args[1]) or 40
 local ONLY = process.args[2]
@@ -136,6 +141,22 @@ local function flipperReport(tbl: Machine.Table)
 		`  live catch (a ball dropped on the flipper hops {fmt(held, 2)} studs off it when it is held; flipped so long before the ball lands, the hop is):`
 	)
 	print("    " .. table.concat(parts, "   "))
+end
+
+local function surveyReport(tbl: Machine.Table)
+	local report = Survey.rests(tbl, 1)
+	local where = {}
+	for i = 1, math.min(#report.rest, 12), 2 do
+		table.insert(where, string.format("%.2f, %.2f", report.rest[i], report.rest[i + 1]))
+	end
+	for i = 1, math.min(#report.moving, 12), 2 do
+		table.insert(where, string.format("never drains from %.2f, %.2f", report.moving[i], report.moving[i + 1]))
+	end
+	print(
+		`  dead spots (a ball let go at each of {report.tried} spots it can reach, flippers down): {#report.rest // 2} where it comes to rest by itself, {#report.moving // 2} that never drain; the slowest drain took {fmt(
+			report.slowest
+		)} s{if #where > 0 then " !! " .. table.concat(where, "; ") else ""}`
+	)
 end
 
 local function shotsReport(tbl: Machine.Table)
@@ -284,13 +305,27 @@ local function gamesReport(tbl: Machine.Table)
 		for _, v in scores do
 			sum += v
 		end
+		local median = scores[(#scores + 1) // 2]
+		local board = HighScores.new(tbl.id)
+		local onBoard = 0
+		for _, v in scores do
+			if HighScores.place(board, v) then
+				onBoard += 1
+			end
+		end
+		local place = HighScores.place(board, median)
 		print(
-			`    {Bot.NAMES[level]}: median {commas(scores[(#scores + 1) // 2])}, mean {commas(sum / #scores)}, best {commas(
-				scores[#scores]
-			)}, worst {commas(scores[1])}; a game lasts {fmt(ticks / GAMES / 240, 0)} s, a ball {fmt(
-				plays / balls / 240,
+			`    {Bot.NAMES[level]}: median {commas(median)}, quartiles {commas(scores[(#scores + 3) // 4])} and {commas(
+				scores[(3 * #scores + 1) // 4]
+			)}, mean {commas(sum / #scores)}, best {commas(scores[#scores])}, worst {commas(scores[1])}; a game lasts {fmt(
+				ticks / GAMES / 240,
 				0
-			)} s in play with {fmt(flips / balls, 0)} flips`
+			)} s, a ball {fmt(plays / balls / 240, 0)} s in play with {fmt(flips / balls, 0)} flips`
+		)
+		print(
+			`      on the house's board: {fmt(onBoard / #scores * 100, 0)}% of games make it; the median game {if place
+				then "takes place " .. place
+				else "does not make it"}`
 		)
 		local per = {}
 		for _, name in
@@ -385,6 +420,7 @@ for _, id in Tables.IDS do
 			0
 		)} s, {tbl.c.nSeg} wall pieces, {tbl.c.nCir} posts and bumpers`
 	)
+	surveyReport(tbl)
 	flipperReport(tbl)
 	shotsReport(tbl)
 	if ONLY_SHOTS then

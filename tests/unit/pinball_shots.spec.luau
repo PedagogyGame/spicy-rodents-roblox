@@ -6,6 +6,7 @@
 -- makeable shots; SPACE SQUIRREL's pods tell a soft shot from a hard one; and the WIZARD computer player,
 -- aiming by the book through the buttons alone, reaches each table's goal (PIN-R6 "one clear goal").
 local Bot = require("@shared/Minigames/Pinball/Bot")
+local HighScores = require("@shared/Minigames/Pinball/HighScores")
 local Machine = require("@shared/Minigames/Pinball/Machine")
 local Physics = require("@shared/Minigames/Pinball/Physics")
 local Shots = require("@shared/Minigames/Pinball/Shots")
@@ -296,6 +297,14 @@ return function(t: Test.T)
 			t.truthy(mid[3] > mid[2] * 1.3, `{id}: WIZARD {mid[3]} against REGULAR {mid[2]}`)
 			t.truthy(mid[2] > mid[1], `{id}: REGULAR {mid[2]} against NOVICE {mid[1]}`)
 			t.truthy(mid[3] > mid[1] * 2, `{id}: WIZARD {mid[3]} against NOVICE {mid[1]}`)
+			-- the machine's own board of best scores is set by these: a first game is near its foot, a very good
+			-- one is on it above the foot, and the top is still there to play for
+			local board = HighScores.new(id)
+			local foot, top = board.entries[HighScores.SIZE].score, board.entries[1].score
+			t.truthy(mid[1] > foot * 0.4 and mid[1] < foot * 2.5, `{id}: NOVICE {mid[1]} against the foot {foot}`)
+			local place = HighScores.place(board, mid[3])
+			t.truthy(place and place <= 4, `{id}: the WIZARD's middling game {mid[3]} takes place {place}`)
+			t.truthy(top > mid[3], `{id}: the top of the board {top} is above the WIZARD's middling game`)
 		end
 	end)
 end

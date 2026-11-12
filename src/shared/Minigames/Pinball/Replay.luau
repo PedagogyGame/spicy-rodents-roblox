@@ -13,7 +13,7 @@
 -- Time is the caller's to police: pace() says how far the replay is ahead of a clock, so a server can refuse
 -- a log that runs faster than real time and close a ball whose log has stopped coming.
 -- Pure; Lune-tested (tests/unit/pinball_replay.spec.luau).
--- Interface: new(tableId, seed, players) -> State; feed(r, seat, segment, out?) -> (ok, why?);
+-- Interface: new(tableId, seed, players) -> State; clone(r) -> State; feed(r, seat, segment, out?) -> (ok, why?);
 --   recorder(r) -> InputLog.Recorder and live(r, rec, buttons, out?) -> Segment? (the player's side);
 --   skip(r, out?) (the ball in play is abandoned and played out dead); retire(r, seat, out?) (a player has
 --   gone for good: their ball in play is played out dead, their later balls passed over, their score kept);
@@ -28,7 +28,7 @@ local Tables = require("./Tables")
 local Replay = {}
 
 Replay.GUARD_MIN_SECONDS = 5 -- the rate guard averages over at least this long
-Replay.SEGMENT_TICKS = 48 -- the player's machine sends its log five times a second
+Replay.SEGMENT_TICKS = InputLog.WIRE_TICKS -- the player's machine sends its log ten times a second
 
 export type State = {
 	id: string,
@@ -56,6 +56,14 @@ function Replay.new(tableId: string, seed: number, players: number): State
 		ballScore = 0,
 		ballTick = 0,
 	}
+end
+
+-- clone(r): the replay as it stands, a deep copy of plain data. It is what a watcher who walks up in the
+-- middle of a game is sent: fed the segments that follow, the copy goes on exactly as the original does.
+function Replay.clone(r: State): State
+	local copy = table.clone(r)
+	copy.m = Machine.clone(r.m)
+	return copy
 end
 
 function Replay.over(r: State): boolean
@@ -139,7 +147,8 @@ end
 --   local seg = Replay.live(r, rec, buttons, out)        once a tick
 -- live() steps the machine with the buttons held on this tick and records them; it returns a segment to
 -- send whenever one is due (every SEGMENT_TICKS, and exactly where a ball ends, so no segment ever runs
--- across two balls). Feeding those segments to another Replay gives the same game, bit for bit.
+-- across two balls). Feeding those segments to another Replay gives the same game, bit for bit. A segment
+-- from live() always fits one message (InputLog.pack).
 function Replay.recorder(r: State): InputLog.Recorder
 	return InputLog.recorder(r.tick)
 end
@@ -166,7 +175,7 @@ function Replay.live(r: State, rec: InputLog.Recorder, buttons: number, out: { n
 		r.ballScore = m.scores[m.up]
 		r.ballTick = r.tick
 		return seg
-	elseif rec.tick - rec.from >= Replay.SEGMENT_TICKS then
+	elseif rec.tick - rec.from >= Replay.SEGMENT_TICKS or #rec.pairs >= 2 * InputLog.WIRE_CHANGES then
 		r.held = buttons
 		return InputLog.cut(rec)
 	end

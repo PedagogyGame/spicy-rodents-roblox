@@ -40,7 +40,7 @@ done_step() {
 	printf -- "-- ok (%.1fs)\n" "$(echo "$end - $STEP_START" | bc)"
 }
 
-LUAU_DIRS=(src tests tools/cloud/tasks tools/compile tools/anim tools/bake tools/bowling tools/pinball tools/sim tools/typecheck)
+LUAU_DIRS=(src tests tools/cloud/tasks tools/compile tools/anim tools/bake tools/bowling tools/sim tools/typecheck)
 
 # A minigame's own tools (calibrate, tune, measure) live in tools/games/<game>/: one directory for all of them,
 # so that a game adding a tool never edits the list above (tests/unit/tools_lint.spec.luau holds every tool

@@ -16,7 +16,7 @@
 --   * End of ball: 100 for every target and lane made on that ball plus 500 an acorn in the hoard, times the
 --     multiplier.
 -- Geometry is in studs in Layout's playfield frame. Pure data and pure functions; Lune-tested
--- (tests/unit/pinball_tables.spec.luau, pinball_rules.spec.luau).
+-- (tests/unit/pinball_layout.spec.luau, pinball_rules.spec.luau, pinball_shots.spec.luau).
 -- Interface: a Machine.Table (id, title, def, ix, c, sheet) plus POINTS, SAY, MULTS
 
 local Layout = require("./Layout")
@@ -184,7 +184,7 @@ end
 local sheet: Machine.Sheet = {
 	saveTicks = 2400, -- ten seconds: the gentlest of the three
 	maxScorePerSec = 4000,
-	scoreScale = "a good game is 20,000; 50,000 is a great one",
+	scoreScale = "a good game is 10,000; 30,000 is a great one",
 	text = {
 		[101] = "SKILL SHOT",
 		[102] = "AN ACORN FOR THE HOARD",

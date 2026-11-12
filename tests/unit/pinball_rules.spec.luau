@@ -16,6 +16,12 @@ local Rules = require("@shared/Minigames/Pinball/Rules")
 local TableAcorn = require("@shared/Minigames/Pinball/TableAcorn")
 local TableSpace = require("@shared/Minigames/Pinball/TableSpace")
 local TableSpicy = require("@shared/Minigames/Pinball/TableSpicy")
+local Bot = require("@shared/Minigames/Pinball/Bot")
+local Games = require("@shared/Minigames/Games")
+local InputLog = require("@shared/Minigames/Pinball/InputLog")
+local PinballSpec = require("@shared/Minigames/Pinball/Spec")
+local Replay = require("@shared/Minigames/Pinball/Replay")
+local Tables = require("@shared/Minigames/Pinball/Tables")
 local Test = require("../lib/Test")
 
 local EV, CUE, BTN, PHASE = Physics.EV, Machine.CUE, Machine.BTN, Machine.PHASE
@@ -207,6 +213,70 @@ return function(t: Test.T)
 				tick(A, m, out, 200)
 				t.eq(A.MULTS[s.mult], ({ 1, 2, 3, 5, 5, 5 })[math.min(expect, 6)])
 			end
+		end
+	)
+
+	t.test(
+		"ACORN ATTACK: the bank remembers: a player's letters stay down for their next ball, each player their own",
+		function()
+			local m, out = inPlay(A, 2)
+			local bank =
+				{ aix.target.acorn_a, aix.target.acorn_c, aix.target.acorn_o, aix.target.acorn_r, aix.target.acorn_n }
+			local function knock(i: number)
+				m.phys.drop[bank[i]] = true
+				fire(A, m, out, EV.DROP, bank[i])
+			end
+			local function standing(): string
+				local word = ""
+				for i = 1, 5 do
+					word ..= if m.phys.drop[bank[i]] then "-" else string.sub("ACORN", i, i)
+				end
+				return word
+			end
+			-- lose the ball in play: straight down between the flippers, then on to the next ball
+			local function nextBall()
+				for _, b in m.phys.balls do
+					b.x, b.y, b.vx, b.vy, b.asleep = Layout.XC, 0.3, 0, -2, false
+				end
+				for _ = 1, 4000 do
+					Machine.step(A, m, 0, out)
+					if m.phase == PHASE.PLAY and m.ballTicks == 0 then
+						break
+					end
+				end
+				local b = m.phys.balls[1]
+				b.x, b.y, b.asleep = Layout.XC, 2.0, true
+				Machine.step(A, m, 0, out)
+				m.saveLeft, m.graceLeft = 0, 0
+			end
+			knock(1)
+			knock(3)
+			t.eq(standing(), "-C-RN")
+			t.eq(m.sheets[1].bank, 5, "A and O, as bits")
+			nextBall()
+			t.eq(m.up, 2)
+			t.eq(standing(), "ACORN", "the second player finds the whole bank standing")
+			t.eq(m.sheets[2].bank, 0)
+			knock(5)
+			nextBall()
+			t.eq(m.up, 1)
+			t.eq(m.ball, 2)
+			t.eq(standing(), "-C-RN", "the first player's letters are down again")
+			t.eq(Machine.lamps(A, m, {})[aix.lamp.acorn_a], 0)
+			t.eq(Machine.lamps(A, m, {})[aix.lamp.acorn_c], 1)
+			-- the rest of the bank on this ball finishes the acorn begun on the last one
+			knock(2)
+			knock(4)
+			t.eq(m.sheets[1].hoard, 0)
+			knock(5)
+			t.eq(m.sheets[1].hoard, 1, "five letters over two balls: an acorn")
+			t.eq(m.sheets[1].bank, 0, "and the bank starts again")
+			nextBall()
+			t.eq(m.up, 2)
+			t.eq(standing(), "ACOR-", "the second player's N is still down")
+			-- knocking the same letter twice is not two letters
+			fire(A, m, out, EV.DROP, bank[5])
+			t.eq(m.sheets[2].bank, 16)
 		end
 	)
 
@@ -742,10 +812,153 @@ return function(t: Test.T)
 			t.eq(rules.def.seats, 4)
 			t.eq(rules.def.authority, "client_replay")
 			t.truthy(rules.verbs.seg)
+			t.truthy(rules.verbs.log, "the segment as the wire carries it")
 			t.truthy(rules.serverVerbs and rules.serverVerbs.thump)
+			t.eq(type(rules.gone), "function", "the Session's word for a seat that has left")
 			t.eq(Rules.forTable(id), rules, "one rules table per machine")
 		end
 		t.eq(Rules.forTable("pinball_acorn").def.title, "ACORN ATTACK")
+	end)
+
+	t.test(
+		'PIN-R5: the registry\'s one game: "pinball", switched on by its station as acorn, rodent or space',
+		function()
+			local game = Rules.game
+			t.eq(Rules.GAME, "pinball")
+			t.eq(game.def.game, "pinball")
+			t.eq(game.def.money, "none")
+			t.eq(game.def.seats, 4)
+			t.eq(game.def.authority, "client_replay")
+			-- it is what the registry asks of a built game (Minigames/Games.check), turn-based, four verbs deep
+			local spec = table.clone(PinballSpec) :: any
+			spec.soon = nil
+			spec.rules = game
+			spec.flow = "turns"
+			spec.verbs = Rules.CLIENT_VERBS
+			local ok, why = Games.check(spec)
+			t.truthy(ok, why)
+			t.deepEq(Rules.CLIENT_VERBS, { "log" })
+			for _, verb in Rules.CLIENT_VERBS do
+				t.truthy(game.verbs[verb])
+				t.falsy(game.serverVerbs and game.serverVerbs[verb], "a client's verb is not a server's")
+				t.truthy(#verb <= 24)
+			end
+			for _, verb in { "machine", "thump", "retire" } do
+				t.truthy(game.serverVerbs and game.serverVerbs[verb], `{verb} is the server's`)
+			end
+			-- every station of the alley's games room names a machine there is
+			local stations = PinballSpec.stations({ bowling_alley = { x = 0, z = 0, floorY = 0, yaw = 0 } })
+			t.eq(#stations, 3)
+			local titles = {}
+			for _, st in stations do
+				local id = Tables.forVariant(st.variant)
+				assert(id, `no machine for variant {st.variant}`)
+				table.insert(titles, Tables.need(id).title)
+			end
+			t.deepEq(titles, { "ACORN ATTACK", "SPICY RODENT", "SPACE SQUIRREL" })
+			t.eq(Tables.forVariant("pinball_space"), "pinball_space", "a table id is taken as it is")
+			t.eq(Tables.forVariant("riverside"), nil)
+			t.eq(Tables.forVariant(nil), nil)
+
+			-- switched off until the station says which machine it is
+			local g = Minigame.start(game, 2, 5)
+			local turn = game.turn :: (any) -> number?
+			local view = game.view :: (any) -> { [string]: any }
+			t.eq(turn(g.state), 1)
+			t.eq(view(g.state).phase, "off")
+			t.eq(Minigame.result(g), nil)
+			t.eq(Rules.replay(g.state), nil)
+			local refused, words = Minigame.input(g, 1, "log", { 0, 24, "" })
+			t.falsy(refused)
+			t.eq(words, "the machine is not switched on")
+			t.falsy(Minigame.input(g, 1, "machine", { "riverside" }), "no such machine")
+			t.truthy(Minigame.input(g, 1, "machine", { "rodent" }))
+			t.falsy(Minigame.input(g, 1, "machine", { "space" }), "it is one machine for the whole game")
+			local v = view(g.state)
+			t.eq(v.game, "pinball")
+			t.eq(v.table, "pinball_rodent")
+			t.eq(v.variant, "rodent")
+			t.eq(v.title, "SPICY RODENT")
+			t.eq(v.phase, "play")
+			t.eq(v.up, 1)
+			local r = Rules.replay(g.state)
+			assert(r, "the replay is there once the machine is on")
+			t.eq(r.id, "pinball_rodent")
+			local own = Rules.forTable("pinball_acorn").init(1, 1)
+			t.eq(Rules.replay(own), own, "a machine's own state is its replay")
+
+			-- a whole two-player game through the wire's three arguments, checked against a replay fed directly
+			local tbl = Tables.need("pinball_rodent")
+			local direct = Replay.new("pinball_rodent", 5, 2)
+			local live = Replay.new("pinball_rodent", 5, 2)
+			local rec = Replay.recorder(live)
+			local bots = { Bot.new(1, 11), Bot.new(2, 12) }
+			local guard = 0
+			while not Replay.over(live) do
+				local seat = live.m.up
+				local seg = Replay.live(live, rec, Bot.step(bots[seat], tbl, live.m))
+				if seg then
+					t.eq(turn(g.state), seat, "the turn is the player whose ball is up")
+					local from, to, packed = InputLog.pack(seg)
+					local other = 3 - seat
+					t.falsy(Minigame.input(g, other, "log", { from, to, packed }), "not their ball")
+					local took, why2 = Minigame.input(g, seat, "log", { from, to, packed })
+					t.truthy(took, why2)
+					t.truthy(Replay.feed(direct, seat, seg))
+				end
+				guard += 1
+				assert(guard < 240 * 3600, "the game did not end")
+			end
+			t.eq(turn(g.state), nil, "the game is over: nobody's turn")
+			local result = Minigame.result(g)
+			assert(result, "a finished game has a result")
+			t.eq(result.scores[1], direct.m.scores[1])
+			t.eq(result.scores[2], direct.m.scores[2])
+			t.eq(result.scores[1], live.m.scores[1], "the score of record is the player's own game")
+			t.eq(view(g.state).phase, "over")
+			t.falsy(Minigame.input(g, 1, "log", { live.tick, live.tick + 24, "" }), "the game is over")
+			-- what is not a segment is refused in words, never an error
+			local g2 = Minigame.start(game, 1, 1)
+			t.truthy(Minigame.input(g2, 1, "machine", { "pinball_acorn" }))
+			t.falsy(Minigame.input(g2, 1, "log", { 0, 24 }))
+			t.falsy(Minigame.input(g2, 1, "log", { 0, 24, 7 }))
+			t.falsy(Minigame.input(g2, 1, "log", { 0, 24, "!!!!" }))
+			t.falsy(Minigame.input(g2, 1, "log", { 3, 24, "" }), "out of order")
+			t.falsy(Minigame.input(g2, 1, "log", {}))
+			t.truthy(Minigame.input(g2, 1, "log", { 0, 24, "" }))
+		end
+	)
+
+	t.test("PIN-R5, C13: a seat the Session says has gone is retired: the game goes on without it", function()
+		local game = Rules.game
+		local gone = game.gone :: (any, number) -> ()
+		local turn = game.turn :: (any) -> number?
+		local skip = game.skipTurn :: (any) -> ()
+		-- before the machine is on, a seat going and a turn skipped are nothing to the rules (and no error)
+		local off = Minigame.start(game, 2, 3)
+		gone(off.state, 2)
+		skip(off.state)
+		t.eq(turn(off.state), 1)
+		local g = Minigame.start(game, 3, 3)
+		t.truthy(Minigame.input(g, 1, "machine", { "acorn" }))
+		t.truthy(Minigame.input(g, 1, "log", { 0, 24, "" }))
+		gone(g.state, 1)
+		t.eq(turn(g.state), 2, "their ball was played out dead and the next player is up")
+		local r = Rules.replay(g.state)
+		assert(r, "the machine is on")
+		t.truthy(r.m.gone[1])
+		skip(g.state)
+		t.eq(turn(g.state), 3, "a skipped turn is a ball played out dead")
+		skip(g.state)
+		t.eq(turn(g.state), 2, "seat 1 is passed over")
+		-- the last two go as well: the game ends by itself, every score kept
+		gone(g.state, 2)
+		gone(g.state, 3)
+		t.eq(turn(g.state), nil)
+		local result = Minigame.result(g)
+		assert(result, "a finished game has a result")
+		t.eq(result.done, true)
+		t.eq(#result.scores, 3)
 	end)
 
 	t.test(
