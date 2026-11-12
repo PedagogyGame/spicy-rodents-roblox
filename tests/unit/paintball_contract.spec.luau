@@ -189,6 +189,8 @@ return function(t)
 		-- 150 ms of round trip: half of it down, plus the interpolation delay, is well inside the clamp
 		t.truthy(0.075 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE < Clock.MAX_REWIND)
 		t.truthy(Clock.STALE_SECS < Clock.DROP_SECS)
+		t.truthy(Clock.SYNC_SLACK > 2 / Clock.TICK_HZ and Clock.SYNC_SLACK <= Clock.MAX_LATE)
+		t.truthy(Clock.AUDIENCE_SECS <= 1, "somebody walking in sees the match within a second")
 	end)
 
 	t.test("time: the view time trails the newest snapshot by the interpolation delay and never runs back", function()
@@ -829,7 +831,8 @@ return function(t)
 		has(PaintballService, { "new", "port" }, "PaintballService")
 		has(PaintballClient, { "watch", "new", "show", "link" }, "PaintballClient")
 		t.eq(PaintballService.MONITOR, "Monitor")
-		-- the service on a bare framework context (no site model, no net): inert, and every hook is there
+		-- the service on a bare framework context (no site model, no net, and no engine at all under this
+		-- runner): inert, and every hook is there. Built where the arena is not, it touches nothing
 		local sent = 0
 		local ctx: any = {
 			station = { id = Contract.STATION },
@@ -883,10 +886,7 @@ return function(t)
 		port.fire("ada", "Splat", buffer.create(0))
 		t.eq(fired[1][2], "Paintball.Move")
 		t.deepEq({ fired[2][1], fired[2][2], fired[2][3] }, { "fire", "ada", "Splat" })
-		-- the seat of a player, on a bare client context
-		local seat = PaintballClient.new({ station = Contract.STATION, game = Contract.GAME } :: any)
-		has(seat, { "onState", "onMessage", "onRefused", "input", "step", "stop" }, "Seat")
-		t.eq(seat.mag.rounds, R.magazine)
+		-- (the client's seat and show are built where there is an engine: tests/isolated/paintball_contract)
 		-- the match model and the bots line up: a fresh State steps through the bots without a word
 		local state = Rules.init(1, 3)
 		t.eq(state.phase, "briefing")

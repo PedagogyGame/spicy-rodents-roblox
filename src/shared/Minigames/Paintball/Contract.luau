@@ -44,29 +44,39 @@
 --                         Rules.endCardSecs of it have passed and the next match begins with everyone
 --                         still seated; if only bots are left the framework resets the table.
 --
--- THE FOUR LANES AND THEIR FILES (no file is in two lanes; "new files" are ones the lane creates)
---   match-and-bots  Shared/Minigames/Paintball/Rules.luau and new files beside it named Match*.luau;
+-- THE FOUR LANES AND THEIR FILES (no file is in two lanes; "new files" are ones the lane creates; the
+-- checklist ids are the ones each lane answers for)
+--   match-and-bots  PB-2, PB-6, PB-7, PB-10, PB-14 (the clock and the phases).
+--                   Shared/Minigames/Paintball/Rules.luau and new files beside it named Match*.luau;
 --                   Server/Minigames/Paintball/Bots.luau and new files beside it named Bot*.luau;
 --                   tools/games/paintball/bots/ (calibration printouts); the specs
 --                   tests/unit/paintball_match*.spec.luau and paintball_bots*.spec.luau
---   arena           Shared/Minigames/Paintball/ArenaData.luau and new files beside it named
+--   arena           PB-5, and the navigation PB-10 walks on.
+--                   Shared/Minigames/Paintball/ArenaData.luau and new files beside it named
 --                   ArenaData*.luau or ArenaGrid*.luau; tools/bake/games/Paintball.luau (the registry's
 --                   bake stub) and tools/games/paintball/arena/; tests/unit/paintball_arena*.spec.luau
---   server          Server/Minigames/Games/Paintball.luau (the registry's server stub),
+--   server          PB-3, PB-4, PB-6 (the roster), PB-11, PB-12, PB-14 (in and out), PB-15.
+--                   Server/Minigames/Games/Paintball.luau (the registry's server stub),
 --                   Server/Minigames/Paintball/PaintballService.luau and any new file there not named
 --                   Bot*.luau; Server/Paintball/ (PoseHistory, Projectiles, Splats, Layout, Harness);
 --                   tests/unit/paintball_hitreg.spec.luau and paintball_server*.spec.luau,
 --                   tests/isolated/paintball_server*.luau, tests/engine/PaintballFlow.luau,
 --                   tools/cloud/tasks/paintball_*.luau, tools/games/paintball/server/
---   client          Client/Minigames/Games/Paintball.luau (the registry's client stub) and all of
+--   client          PB-1, PB-2 (the prediction and the pips), PB-4 (the paint), PB-7 (HUD, scoreboard,
+--                   end card), PB-8, PB-9, the controls and the rating; brief §14 (first person).
+--                   Client/Minigames/Games/Paintball.luau (the registry's client stub) and all of
 --                   Client/Minigames/Paintball/; tests/unit/paintball_client*.spec.luau,
 --                   tests/isolated/paintball_client*.luau, tools/games/paintball/client/
+--   (PB-13, garb, and decision D7, paint that fades on a player outside, come after the mechanics:
+--   no lane builds them now and nothing here depends on them.)
 -- Nobody edits: the frozen files (this folder's Contract, Body, Clock, Wire, Arena, Spec; Shared/Paintball's
 -- Config, Ballistics, Magazine), Net/Schemas.luau, tests/unit/paintball_contract.spec.luau,
--- tests/lib/PaintballRig.luau, and everything the framework's recipe says a game never edits (the four
--- registries, MinigameService, MinigameClient, MinigameUI, Session, Human.luau, InputMap, Boot/Game,
--- Main.client, tests/lib, tools/ci.sh, Config/Tunables). Nothing needs joining to the boot at the end:
--- the registries already hold paintball's four lines.
+-- tests/lib/PaintballRig.luau, tests/isolated/paintball_contract.luau, the note on paintball in the
+-- header of Minigames/Games.luau, and everything the framework's recipe says a game never
+-- edits (the four registries, MinigameService, MinigameClient, MinigameUI, Session, Human.luau,
+-- InputMap, Boot/Game, Main.client, tests/lib, tools/ci.sh, Config/Tunables). Nothing needs joining to
+-- the boot at the end: the registries already hold paintball's four lines, and the game appears in
+-- the world the day the arena lane's bake has a `build`.
 --
 -- THE DECISIONS, AND WHERE EACH IS WRITTEN DOWN
 --   0 the framework for everything but the stream; five

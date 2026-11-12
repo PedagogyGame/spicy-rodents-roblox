@@ -26,7 +26,8 @@
 --                         door: refuse with words when deps.fit says no ("infected": decision D6),
 --                         when the player holds no pass (pass.has; a pass is checked only here, so a
 --                         match in progress always finishes: D5), or when all Rules.slots seats are
---                         people ("full"). Then THE ROSTER: if a match is on and a bot is seated, take
+--                         people ("full"). A player who is already seated: true, nothing done.
+--                         Then THE ROSTER: if a match is on and a bot is seated, take
 --                         one off with ctx.removeComputer (the bot on the side with fewer people; a
 --                         tie: the lower seat) and the framework gives the person that seat.
 --   joined(player, seat)  the person is seated (the first one has just started the match: "start"
@@ -35,7 +36,8 @@
 --                         in the audience now ("paintball_watch"). If the seats are now odd, seat a
 --                         bot (ctx.addComputer). Bots.sync.
 --   input(player, seat, verb, args)   "reload" { t }: t clamped as a fire time is (Clock.stamp), then
---                         Rules.reload(state, seat, t); false with words when it does nothing.
+--                         Rules.reload(state, seat, t); false with words when it does nothing. Always
+--                         answered here (never nil: the framework would hand the raw t to the rules).
 --   step(dt)              THE LOOP, below. Runs before the Session's own step.
 --   event(e)              "start": a match begins. match += 1; Rules.sync(state, now); every splat,
 --                         ball and pose history is dropped; the audience is told (a new `match`). The

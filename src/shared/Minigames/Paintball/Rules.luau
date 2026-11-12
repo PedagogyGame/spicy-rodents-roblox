@@ -40,7 +40,9 @@
 --     Rules.protectSecs of protection.
 --   * view(): Contract.MatchView. result(): Contract.Result once ended, with the card: the winner or
 --     a draw, a row per slot that is on, most tags first, and the silly awards.
---   * input(): the one client verb, "reload" { t } (the service has already clamped t).
+--   * input(): the one client verb, "reload" { t }. The service answers a client's "reload" itself
+--     (its Table.input, with t clamped as a fire time is), so this is reached only if it did not:
+--     hold t inside [state.now - Clock.MAX_LATE, state.now] all the same, then reload().
 -- Interface: def; verbs; init(seats, seed) -> State; sync(state, stamp); step(state, dt); join(state,
 --   seat); gone(state, seat); input(state, seat, verb, args) -> (ok, why?); result(state) -> Result?;
 --   view(state) -> MatchView; drain(state) -> { Event }; slot(state, id) -> Slot?; canFire(state, id,
