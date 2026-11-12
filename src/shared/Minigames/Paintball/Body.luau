@@ -1,5 +1,5 @@
 --!strict
--- ReplicatedStorage.Shared.Paintball.Body
+-- ReplicatedStorage.Shared.Minigames.Paintball.Body
 -- The player body of the paintball contract (checklist PB-3, PB-9): heights, the hit shape, the eye,
 -- speeds, the crouch and the look angles, as one set of pure functions the client, the server and the
 -- bots all use. FROZEN: no lane edits this file.
@@ -19,21 +19,26 @@
 --
 -- CROUCH ON A HUMANOID BODY. Nothing about the Humanoid's collision changes: the arena has no gap
 -- lower than Arena.HEADROOM. Crouching is (1) the crouch fraction eased by crouchStep, (2) on the
--- owning client the camera lowered to eye(c) with Humanoid.CameraOffset and WalkSpeed set to
--- speed(c, sprint), (3) on the server the same crouchStep run from the crouch bit of the move stream,
--- so the hit shape sinks at the same rate for everybody and cannot be flicked, (4) on every other
--- screen the puppet drawn at that fraction. The client eases its own eye with the same function, so
--- it agrees with the server's shape to within its latency.
+-- owning client the camera lowered to eye(c) with Humanoid.CameraOffset and the walking pace set
+-- through the minigame framework's ctx.pace(pace(c, k), false) (Client/Minigames/ClientGame: the
+-- "MoveScale" and "NoSprint" attributes Controllers/Human reads every frame; nobody writes
+-- Humanoid.WalkSpeed), (3) on the server the same crouchStep run from the crouch bit of the move
+-- stream, so the hit shape sinks at the same rate for everybody and cannot be flicked, (4) on every
+-- other screen the puppet drawn at that fraction. The client eases its own eye with the same
+-- function, so it agrees with the server's shape to within its latency.
 --
 -- SPEEDS (studs/s): WALK is the town's (Client/Controllers/Human.WALK, so the door changes nothing),
--- SPRINT is WALK x Tunables paintball.sprintMult, CROUCH is half of WALK. A sprinting body cannot fire
--- and the marker comes back up SPRINT_FIRE_DELAY after sprint ends; the server judges "sprinting" from
--- the speed it measures (isSprinting), not from the client's word.
+-- SPRINT is WALK x Tunables paintball.sprintMult (slower than the town's sprint: the framework's
+-- Shift is switched off and the client ramps its own scale, k from 0 to 1 over SPRINT_RAMP_SECS),
+-- CROUCH is half of WALK. A sprinting body cannot fire and the marker comes back up
+-- SPRINT_FIRE_DELAY after sprint ends; the server judges "sprinting" from the speed it measures
+-- (isSprinting), not from the client's word.
 -- Interface: constants; top(c), eye(c), capsule(c) -> (low, high, radius); eyePoint(x, y, z, c);
---   crouchStep(c, want, dt) -> c; speed(c, sprint) -> studs/s; isSprinting(speed) -> boolean;
---   look(yaw, pitch) -> (dx, dy, dz); yawPitch(dx, dy, dz) -> (yaw, pitch); partAt(localY, c) -> 1..3
+--   crouchStep(c, want, dt) -> c; speed(c, sprint) -> studs/s; pace(c, k) -> the scale for ctx.pace;
+--   isSprinting(speed) -> boolean; look(yaw, pitch) -> (dx, dy, dz); yawPitch(dx, dy, dz) ->
+--   (yaw, pitch); partAt(localY, c) -> 1..3
 
-local Config = require("./Config")
+local Config = require("../../Paintball/Config")
 
 local Body = {}
 
@@ -51,7 +56,7 @@ Body.SPRINT = 17 * 1.4 -- 23.8
 Body.CROUCH_SPEED = 8.5
 Body.SPRINT_RAMP_SECS = 0.25 -- walk speed to sprint speed on the client (PB-9 "a short ramp up")
 Body.SPRINT_FIRE_DELAY = 0.15 -- after sprint ends the marker is up and may fire
-Body.JUMP_HEIGHT = 2 -- studs (Humanoid.JumpHeight in the arena): a hop, not a way over a rail
+Body.JUMP_HEIGHT = 2 -- studs (the client sets Humanoid.JumpHeight to this while in a match): a hop, not a way over a rail
 
 -- body parts a splat rides on, by height (the client's puppet has these three)
 Body.PARTS = table.freeze({ "legs", "torso", "head" })
@@ -90,6 +95,15 @@ function Body.speed(c: number, sprint: boolean): number
 		return Body.SPRINT
 	end
 	return Body.WALK + (Body.CROUCH_SPEED - Body.WALK) * clamp01(c)
+end
+
+-- What the owning client hands the framework's ctx.pace(scale, false): this body's speed over the
+-- town's walk, at crouch fraction c and sprint ramp k (0 walking, 1 at full sprint; a crouching body
+-- does not sprint). Between 0.5 and SPRINT / WALK, inside Controllers/Human's 0..2.
+function Body.pace(c: number, k: number): number
+	local sprint = if c <= 0 then clamp01(k) else 0
+	local speed = Body.speed(c, false) + (Body.SPRINT - Body.WALK) * sprint
+	return speed / Body.WALK
 end
 
 -- The server's reading of sprint from a measured horizontal speed.

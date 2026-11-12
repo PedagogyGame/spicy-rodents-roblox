@@ -1,9 +1,117 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Minigames.Games.Paintball
--- Paintball's client half on the minigame framework: NOT BUILT YET (its Spec, Shared/Minigames/Paintball/Spec, says
--- `soon`). This stub holds its line in Client/Minigames/ClientGames. To build it, return a ClientGame.ClientGame
--- (Client/Minigames/ClientGame lists what it may supply: help card, buttons, controller, scorecard, end card,
--- what watchers see, sounds); Games/Bowling and Games/Darts are worked examples.
--- Interface: { game } (a stub: nothing else)
+-- Paintball's client half on the minigame framework (Client/Minigames/ClientGame; brief v2 §13, §14):
+-- what the framework is told about the game, with the game itself in Client/Minigames/Paintball/
+-- (PaintballClient: the show anyone near sees, and the seat of a player in the match).
+-- OWNED BY THE CLIENT LANE (the registry's stub: its line in Client/Minigames/ClientGames exists).
+-- What is fixed by the paintball contract and must stay as it is here:
+--   keys     Q and gamepad B are swallowed: leaving a match is a deliberate press of the Leave
+--            button (shown with the held scoreboard, in the briefing and at the end card), and
+--            gamepad B crouches. Every other key is the controller's own to read.
+--   kinds    Wire.EVERYONE_KINDS: "paintball_watch" and "paintball_unwatch" reach `watch` whether or
+--            not the player is seated; that is how the show starts for somebody in the lobby.
+--   buttons  none while playing (the bar must be empty for the mouse to stay the look; the seat
+--            puts Leave up itself with ctx.setButtons while the scoreboard is held); Leave in the
+--            briefing's first moment and at the end card. No "Play again": the next match starts
+--            by itself.
+--   endCard  from view.result (Contract.Result): the framework's end card, counting down to the
+--            next match. The lane dresses it (the WBLW sports bulletin, the awards).
+--   sounds   the cues of PB-8, every id empty until the licensed sounds are chosen.
+-- Interface: a ClientGame.ClientGame
 
-return { game = "paintball" }
+local Import = require("../../Import")
+local Contract: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
+	Import.shared("Minigames/Paintball/Contract")
+local Wire: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wire)) =
+	Import.shared("Minigames/Paintball/Wire")
+local PaintballClient = require("../Paintball/PaintballClient")
+local ClientGame = require("../ClientGame")
+
+type Result = typeof(Contract.T.Result)
+
+local LEAVE = { "leave", "Leave the match" }
+
+local function buttons(phase: string, _view: { [string]: any }?): { { string } }?
+	if phase == "playing" then
+		return nil -- the seat's own: empty, or Leave while the scoreboard is held
+	end
+	return { LEAVE }
+end
+
+local function endCard(view: { [string]: any }, _you: number?): { [string]: any }?
+	local result = view.result :: Result?
+	if type(result) ~= "table" or type(result.card) ~= "table" then
+		return nil
+	end
+	local card = result.card
+	local seats = view.seats or {}
+	local rows = {}
+	for _, row in card.rows do
+		local seat = seats[row.id]
+		local team = Contract.TEAMS[row.team]
+		table.insert(rows, {
+			seat = row.id,
+			name = if seat then seat.name else "?",
+			gone = seat ~= nil and seat.gone == true,
+			place = if card.winner == 0 or card.winner == row.team then 1 else 2,
+			side = if team then team.name else "",
+			tags = row.tags,
+			outs = row.outs,
+			accuracy = `{math.floor(row.accuracy * 100 + 0.5)}%`,
+		})
+	end
+	return {
+		title = "FULL TIME",
+		line = result.text,
+		rows = rows,
+		cols = {
+			{ title = "", key = "place", x = 0.02, w = 0.06 },
+			{ title = "PLAYER", key = "name", x = 0.09, w = 0.37 },
+			{ title = "SIDE", key = "side", x = 0.47, w = 0.14 },
+			{ title = "TAGS", key = "tags", x = 0.62, w = 0.1, strong = true },
+			{ title = "OUT", key = "outs", x = 0.73, w = 0.1 },
+			{ title = "AIM", key = "accuracy", x = 0.84, w = 0.14 },
+		},
+		foot = "The next match starts in %d s.",
+	}
+end
+
+local Game: ClientGame.ClientGame = {
+	game = "paintball",
+	help = {
+		how = {
+			"Two teams, orange against teal. One hit and you are tagged out for a few seconds.",
+			"The ball takes time to arrive and drops a little: lead a runner, aim a touch high at range.",
+			"Five shots, then the marker reloads by itself.",
+		},
+		keys = {
+			"Mouse  look    Left button  fire    R  reload",
+			"Shift  sprint (the marker lowers)    C / Left Ctrl  crouch",
+			"Hold G  scoreboard and Leave",
+			"Gamepad: R2 fire, X reload, L3 sprint, B crouch",
+		},
+	},
+	keys = { Q = "", ButtonB = "" },
+	buttons = buttons,
+	kinds = table.clone(Wire.EVERYONE_KINDS),
+	watch = function(msg: { [string]: any }, place: ClientGame.Place?): any
+		return PaintballClient.watch(msg, place)
+	end,
+	new = function(ctx: ClientGame.Ctx): ClientGame.Controller
+		return PaintballClient.new(ctx)
+	end,
+	endCard = endCard,
+	sounds = {
+		["paintball.fire"] = "", -- your marker's pop
+		["paintball.fire_far"] = "", -- another marker, placed in space
+		["paintball.splat"] = "", -- a ball on a wall
+		["paintball.tag"] = "", -- YOU tagged someone
+		["paintball.tagged"] = "", -- you were tagged
+		["paintball.reload"] = "", -- the rattle
+		["paintball.dry"] = "", -- a click with nothing to fire
+		["paintball.step"] = "", -- footsteps (running loud, crouching silent)
+	},
+	words = { finished = "The match is over. Press E at the arena door to play again." },
+}
+
+return Game

@@ -1,5 +1,5 @@
 --!strict
--- ReplicatedStorage.Shared.Paintball.ArenaData
+-- ReplicatedStorage.Shared.Minigames.Paintball.ArenaData
 -- The arena as data (checklist PB-5). OWNED BY THE ARENA LANE; `build` keeps its name and signature.
 -- TODAY THIS IS A STAND-IN, so that the match, the bots, the server and the client can run against a
 -- real, valid arena from the first minute: the S18 greybox (Server/Paintball/Layout: five floors 14
@@ -11,11 +11,15 @@
 -- THE ARENA LANE REPLACES THE BODY OF build() with the real building (lobby and loading dock,
 -- newsroom, studios, control rooms, offices; about 25 cover pieces a floor; two real stairwells a
 -- storey; spawn rooms with two ways out) and hands back grid-backed `sweep` and `ground` that give
--- the reference's answers (Arena.sweepBoxes, Arena.groundAt). The bake (tools/bake/paintball.luau ->
--- build/Paintball.rbxm, which the project files already map to Workspace.Paintball) makes its parts
--- FROM this data at Arena.PLACE: one part per box, the same size in the same place, and one
--- invisible ramp part per ramp, in a model per floor so the building streams in pieces; the part list
--- is a pure function of the arena, so a spec can hold it to the boxes without a file.
+-- the reference's answers (Arena.sweepBoxes, Arena.groundAt). The bake is the lane's too: the
+-- framework's tools/bake/games/Paintball.luau, build(kit, parent, station, venue), which
+-- tools/bake/attractions.luau calls once for the arena's station (not for the desk's, which `joins`
+-- it) with a Kit in the SITE's frame (Arena.toSite turns each box) and the site's Model as parent. It
+-- makes its parts FROM this data: one sub-model named Arena.MODEL, in it a model per floor so the
+-- building streams in pieces, one part per box, the same size in the same place, and one invisible
+-- ramp part per ramp; the part list is a pure function of the arena, so a spec can hold it to the
+-- boxes without a file. The lobby annex (pass desk, garb counter, the wall monitor) is dressing
+-- outside the volume: parts only, no boxes.
 -- Interface: build() -> Arena (a fresh table each call; pure, the same every time)
 
 local Arena = require("./Arena")

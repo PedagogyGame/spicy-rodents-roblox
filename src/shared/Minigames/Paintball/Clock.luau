@@ -1,11 +1,17 @@
 --!strict
--- ReplicatedStorage.Shared.Paintball.Clock
+-- ReplicatedStorage.Shared.Minigames.Paintball.Clock
 -- Time in the paintball contract (checklist PB-1, PB-3): the rates, and how a shot is stamped by the
 -- client and clamped by the server for lag compensation. FROZEN: no lane edits this file.
 --
--- ONE CLOCK. Every time on the wire is SERVER TIME in seconds: workspace:GetServerTimeNow() on both
--- sides in the engine (Roblox keeps the client's copy within a few milliseconds), an injected clock in
--- the Lune tests. No message carries a client-local time and there is no clock sync of our own.
+-- ONE CLOCK. Every paintball time (on the wire, in the match model, in the bots, in the pose
+-- histories) is THE SHARED CLOCK in seconds: the minigame framework's ctx.stamp() on both sides, which
+-- is workspace:GetServerTimeNow() in the engine (Roblox keeps the client's copy within a few
+-- milliseconds) and the rig's own in the Lune tests. No message carries a client-local time and there
+-- is no clock sync of our own. The framework's OTHER clock, the service's ctx.now() (seconds of
+-- stepping since boot), is never put on the wire, never handed to Rules, Bots or a pose history and
+-- never compared with a stamp: paintball reads it only to see how long the end card has been up. The
+-- match model (Rules) is told the shared clock once a match (Rules.sync) and counts on from there
+-- with the steps the Session hands it; the service puts it right again if it strays SYNC_SLACK.
 --
 -- THE RATES. The server steps balls and bots every Heartbeat (TICK_HZ nominal, with the real dt). It
 -- sends one snapshot of every body SNAP_HZ times a second, and the client sends its own pose SEND_HZ
@@ -41,11 +47,11 @@
 --
 -- SILENCE. A player whose move stream stops for STALE_SECS keeps the last pose it sent: it stands
 -- still, can be hit, and cannot fire. After DROP_SECS it is taken out of the match and a bot takes the
--- slot (Contract "what the server does when a client stops sending").
+-- slot (the framework's ctx.leave with why "dropped"; Contract, decision 9).
 -- Interface: constants; newView() -> View; observe(view, snapTime, now); viewTime(view, now) -> t;
 --   stamp(now, vt, ft, lastFt?, estimate?) -> (f, late, rewind, clamped)
 
-local Config = require("./Config")
+local Config = require("../../Paintball/Config")
 
 export type View = { lag: number?, last: number }
 
@@ -61,6 +67,8 @@ Clock.MAX_LATE = 0.25 -- the most a shot's fire time may trail its arrival
 Clock.REWIND_TOLERANCE = 0.075 -- the S18 timestamp tolerance round the server's own estimate
 Clock.STALE_SECS = 0.5 -- move stream silent this long: the body holds its pose and cannot fire
 Clock.DROP_SECS = 5 -- silent this long: out of the match, a bot takes the slot
+Clock.SYNC_SLACK = 0.1 -- Rules' own count may stray this far from the shared clock before it is put right
+Clock.AUDIENCE_SECS = 0.5 -- how often the server looks who is near enough to be in the audience
 
 function Clock.newView(): View
 	return { lag = nil, last = -math.huge }

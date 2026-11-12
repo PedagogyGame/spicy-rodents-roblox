@@ -1,19 +1,29 @@
 --!strict
--- ReplicatedStorage.Shared.Paintball.Arena
+-- ReplicatedStorage.Shared.Minigames.Paintball.Arena
 -- The arena interface of the paintball contract (brief v2 §13; checklist PB-5): what the five-storey
 -- TV station IS to every piece of code. FROZEN: no lane edits this file. The arena lane fills in
--- Shared/Paintball/ArenaData.build(), which returns the `Arena` described here; everybody else only
+-- ArenaData.build() beside this file, which returns the `Arena` described here; everybody else only
 -- reads it.
 --
 -- THE FRAME. Every paintball position on the wire, in the match, in the bots and in the collision data
 -- is in the ARENA FRAME: the origin is the middle of the ground floor of the arena volume, +y is up,
 -- and the frame is the world moved to that origin and turned about Y by the site's yaw. It is a rigid,
 -- right-handed frame (a CFrame: CFrame.new(place.x, place.y, place.z) * CFrame.Angles(0, place.yaw, 0)),
--- NOT the site's X/Y/D frame of Shared/Attractions/AlleyLayout, which is mirrored in D:
+-- NOT the site's X/Y/D frame of Shared/Attractions/AlleyLayout (the frame of a minigame site: the
+-- station anchors of the Spec, the bake's Kit), which is mirrored in D:
 --   arena x = site X,  arena y = site Y,  arena z = 15 - site D   (the arena_origin anchor is at D = 15).
+-- toSite / ofSite convert a point; placeOf(site place) is the arena's Place from the site's Place, which
+-- is what the server (ServerGame.Ctx.place), the client (ClientGame.Ctx.place, or the `place` handed
+-- to ClientGame.watch) and the bake (kit.place) each hold: nobody sends the arena's place.
 -- The arena volume is x, z in [-HALF, HALF], y in [0, HEIGHT]; the lobby annex with the pass desk lies
 -- outside it on the +z side (z 60..90). Only the code that touches Instances converts, with toWorld /
 -- toLocal / dirToWorld / dirToLocal / yawToWorld below; pure code never sees a world coordinate.
+--
+-- THE VOLUME IS SEALED. No walkable opening joins the lobby and the arena, and no window is open: a
+-- ball never leaves the volume, and a body gets in only by the framework's prompt (GATE: the server
+-- puts it in its team's spawn room) and out only by Leave, by stepping into an `exits` room, or by
+-- being taken out. So nobody who is not in the match is ever inside it. The lobby may look in through
+-- glass (a box like any other: solid to balls and bodies).
 --
 -- WHAT AN ARENA HOLDS.
 --   boxes   flat list, six numbers per box (minX, minY, minZ, maxX, maxY, maxZ): everything SOLID. A
@@ -27,8 +37,9 @@
 --           collidable part per ramp, lying on the steps); balls ignore ramps and hit the `step` boxes
 --           under them. A step box's top never rises above the ramp surface over it.
 --   spawns, spawnRooms   per team (1, 2): at least RULES.teamMax spawn points inside that team's room.
---   exits, lobby   door volumes that end a player's match when stepped into (may be empty), and the
---           point in the lobby annex where anyone who leaves the match is put.
+--   exits, lobby   rooms inside the volume that end a player's match when stepped into (the way to
+--           walk out; may be empty), and the point in the lobby annex where anyone who leaves the
+--           match is put.
 --   nodes, links, cover   the bots' navigation graph: nodes on the walking surface, links a body can
 --           walk in a straight line ("walk": clear at chest height; "stair": along a ramp), and cover
 --           spots (a node plus (nx, nz), the horizontal unit vector from the spot towards the side it
@@ -54,14 +65,18 @@
 --   * nowhere a body can walk has less than HEADROOM above it and no opening is lower than that, so
 --     crouching never changes what a body collides with: crouch changes the eye and the hit shape only;
 --   * a body cannot jump a rail (Body.JUMP_HEIGHT < RAIL_HEIGHT): floors are changed by the stairs.
--- Interface: types Place, Spawn, Ramp, Room, NavNode, NavLink, Cover, Parts, Arena; constants; PLACE;
---   toWorld, toLocal, dirToWorld, dirToLocal, yawToWorld, yawToLocal, fromSite; sweepBoxes, groundAt,
---   rampHeight, inRoom; finish(parts) -> Arena; check(arena) -> (ok, problems); T (type witnesses)
+-- Interface: types Place, SitePlace, Spawn, Ramp, Room, NavNode, NavLink, Cover, Parts, Arena; constants;
+--   PLACE, ORIGIN, DESK, GATE, MODEL; toWorld, toLocal, dirToWorld, dirToLocal, yawToWorld, yawToLocal,
+--   fromSite, placeOf(site) -> Place, toSite(x, y, z) -> (X, Y, D), ofSite(X, Y, D) -> (x, y, z);
+--   inVolume(x, y, z, margin?) -> boolean; sweepBoxes, groundAt, rampHeight, inRoom; finish(parts) ->
+--   Arena; check(arena, teamMax) -> (ok, problems); T (type witnesses)
 
-local Ballistics = require("./Ballistics")
+local Ballistics = require("../../Paintball/Ballistics")
 
 -- where the arena origin is in the world, and how the frame is turned
 export type Place = { x: number, y: number, z: number, yaw: number }
+-- a minigame site's Place (Shared/Minigames/GameSpec.Place: the frame of AlleyLayout.toWorld)
+export type SitePlace = { x: number, z: number, floorY: number, yaw: number }
 export type Spawn = { x: number, y: number, z: number, yaw: number }
 export type Ramp = {
 	minX: number,
@@ -146,12 +161,19 @@ Arena.CHEST = 2.5 -- the height above the feet at which "walk" links and movemen
 Arena.AUDIENCE_MARGIN = 40 -- studs round the arena volume inside which a player is in the audience
 Arena.KIND = table.freeze({ slab = 1, wall = 2, pillar = 3, cover = 4, rail = 5, step = 6, prop = 7 })
 
--- The arena_origin anchor of f3_tv_station (data/expansion.json; generated/Expansion `world`). The
--- service is handed the real place when it is joined to the world; this is the default and what the
--- bake uses. Pinned against generated/Expansion by the contract spec.
+-- The arena_origin anchor of f3_tv_station in the site's frame (data/expansion.json: at [0, 0, 15]).
+Arena.ORIGIN = table.freeze({ x = 0, y = 0, d = 15 })
+-- Where that puts the arena in the world as the data stands (generated/Expansion `world`): the default
+-- for code that has no site Place to hand (a bare spec). Everything in the game derives its place
+-- with placeOf from the site's own Place. Pinned against generated/Expansion by the contract spec.
 Arena.PLACE = table.freeze({ x = 2080, y = 8.6, z = -905, yaw = 0 }) :: Place
--- The pass desk, in the arena frame (site anchor pass_desk at X -20, D -62).
+-- The pass desk, in the arena frame (site anchor pass_desk at X -20, D -62): the second prompt.
 Arena.DESK = table.freeze({ x = -20, y = 0, z = 77, yaw = 0 }) :: Spawn
+-- The arena door in the lobby (site X 0, D -47): the station's own prompt, "Join the match".
+Arena.GATE = table.freeze({ x = 0, y = 0, z = 62, yaw = 0 }) :: Spawn
+-- The bake's one sub-model under the site's Model (Workspace.Attractions.f3_tv_station). It is the
+-- arena's "furniture" in the framework's sense: the server's Table is inert on a site without it.
+Arena.MODEL = "PaintballArena"
 
 function Arena.toWorld(place: Place, x: number, y: number, z: number): (number, number, number)
 	local c, s = math.cos(place.yaw), math.sin(place.yaw)
@@ -189,14 +211,30 @@ end
 
 -- The arena's Place from a site in the AlleyLayout frame ({ x, z, floorY, yaw }) and the arena_origin
 -- anchor's (X, Y, D) in it. The arena frame keeps the site's yaw.
-function Arena.fromSite(
-	site: { x: number, z: number, floorY: number, yaw: number },
-	X: number,
-	Y: number,
-	D: number
-): Place
+function Arena.fromSite(site: SitePlace, X: number, Y: number, D: number): Place
 	local c, s = math.cos(site.yaw), math.sin(site.yaw)
 	return { x = site.x + X * c - D * s, y = site.floorY + Y, z = site.z - X * s - D * c, yaw = site.yaw }
+end
+
+-- The arena's Place from the site's own (the framework's ctx.place on either side; the bake's).
+function Arena.placeOf(site: SitePlace): Place
+	return Arena.fromSite(site, Arena.ORIGIN.x, Arena.ORIGIN.y, Arena.ORIGIN.d)
+end
+
+-- A point of the arena frame in the site's frame (what a StationDef and the bake's Kit take), and back.
+function Arena.toSite(x: number, y: number, z: number): (number, number, number)
+	return x + Arena.ORIGIN.x, y + Arena.ORIGIN.y, Arena.ORIGIN.d - z
+end
+
+function Arena.ofSite(X: number, Y: number, D: number): (number, number, number)
+	return X - Arena.ORIGIN.x, Y - Arena.ORIGIN.y, Arena.ORIGIN.d - D
+end
+
+-- Is a point inside the arena volume, grown by `margin` studs on every side?
+function Arena.inVolume(x: number, y: number, z: number, margin: number?): boolean
+	local m = margin or 0
+	local edge = Arena.HALF + m
+	return x >= -edge and x <= edge and z >= -edge and z <= edge and y >= -m and y <= Arena.HEIGHT + m
 end
 
 -- REFERENCE ball test: the first of `boxes` the segment enters (linear scan).
@@ -470,6 +508,7 @@ end
 -- Type witnesses (Contract, HOW TO IMPORT): from another root, type Arena = typeof(ArenaModule.T.Arena).
 Arena.T = ({} :: any) :: {
 	Place: Place,
+	SitePlace: SitePlace,
 	Spawn: Spawn,
 	Ramp: Ramp,
 	Room: Room,

@@ -1,67 +1,99 @@
 --!strict
--- ReplicatedStorage.Shared.Paintball.Wire
--- The paintball wire (checklist PB-1 to PB-4, PB-7): every message on every remote, with its payload,
--- direction, reliability and rate. Net/Schemas merges REMOTES into its own table, so Shared/Net checks
--- and rate-limits all of it; nothing else may be sent. FROZEN: no lane edits this file.
--- All positions and directions are in the arena frame (Arena); all times are server time (Clock).
+-- ReplicatedStorage.Shared.Minigames.Paintball.Wire
+-- The paintball wire (checklist PB-1 to PB-4, PB-7): every message, with its payload, direction,
+-- reliability and rate. FROZEN: no lane edits this file.
+-- All positions and directions are in the arena frame (Arena); all times are the shared clock (Clock).
+--
+-- TWO CARRIERS. Paintball is a game of the minigame registry, so what any game sends goes the
+-- framework's way: verbs on Minigame.Input ("reload", and the service's own "leave"), and table
+-- messages on Minigame.State through ctx.send / ctx.broadcast (KINDS below). For the real-time stream
+-- it keeps FIVE REMOTES OF ITS OWN (REMOTES below; Net/Schemas merges them into its table, so
+-- Shared/Net checks and rate-limits them and nothing else may be sent).
+-- WHY REMOTES OF ITS OWN, when the framework's first rule is that a game has none (the lead's steer,
+-- checked against the code):
+--   1. Minigame.Input is reliable, a table, and carries 20 messages a second for everything a player
+--      sends. A pose 20 times a second would take all of it, and a reliable ordered stream stalls
+--      behind every lost packet: one loss holds every later pose, and the click behind it, for a
+--      resend. A pose stream must be unreliable: a lost pose is replaced by the next one.
+--   2. The framework's recipe for paintball (send verbs; the server samples the replicated Humanoid
+--      bodies itself; players see each other's replicated bodies) leaves what the shooter saw outside
+--      our hands: how far behind the engine draws another player's body is not told to us and moves
+--      with the connection, so the rewind would be a guess, and 50 ms of error on a sprinting body is
+--      1.2 studs, the radius of the hit shape. Bots have no body in the world at all (the town lends
+--      none), so they need a stream of poses anyway. With ONE snapshot stream, drawn by every screen
+--      for bots and people alike at a view time the client states, the server rewinds to exactly what
+--      was on the shooter's screen (Clock; the keystone test of the contract spec).
+--   3. Minigame.State is reliable and a table. Sixteen bodies 20 times a second as reliable tables is
+--      several times the bytes and stalls on loss the same way. Snapshots and ball births are
+--      unreliable buffers; splats are reliable buffers (a late joiner is sent up to 400 in one).
+--   4. The click is reliable and small, but rides its own remote: its two f64 stamps arrive exact,
+--      Net drops a non-finite number before any code sees it, and its rate limit is its own, so a
+--      spray of clicks cannot starve Leave and nothing else can starve a click.
+--   What the code showed: the steer holds. Shared/Net already carries unreliable buffer remotes with a
+--   layout and a rate each (Motor.State is one), and the test rig refuses a remote only when it goes
+--   through the service's own net, so the service reaches the wire through a Port (PaintballService:
+--   ctx.net in the game; tests/lib/PaintballRig beside the rig). One thing changed: "Paintball.State"
+--   is gone, because once the framework carries the table messages nothing is left for it.
 --
 -- CLIENT TO SERVER
 --   Paintball.Move  unreliable, SEND_HZ a second, 27 bytes (layout Move). The client's own pose: t (when
 --                   it was sampled), seq, feet x y z, yaw, pitch, bits (BIT.crouch = wants to crouch,
---                   BIT.sprint, BIT.air). Stance and look direction ride here. Sent only while in a match.
+--                   BIT.sprint, BIT.air). Stance and look direction ride here. Sent only while seated.
 --   Paintball.Fire  reliable, 42 bytes (layout Fire). One per click that the client's own magazine
 --                   allowed: shot (the client's counter, echoed in the ack), vt and ft (Clock.stamp),
 --                   the origin (the eye point) and the unit look direction.
---   Paintball.Cmd   reliable table { verb, t? }: "pass" (buy one at the desk), "join", "leave",
---                   "reload" (t = when R was pressed).
--- SERVER TO CLIENT (only to the audience: players inside Arena.AUDIENCE_MARGIN of the arena volume)
---   Paintball.Snap  unreliable buffer, SNAP_HZ a second: an 11-byte head (t, seq, n) and 13 bytes a body
---                   (id, x y z, yaw, pitch, crouch fraction, bits). Every slot of the match is in every
---                   snapshot, the reader's own included. encodeSnap / decodeSnap; the pose history holds
---                   exactly quantPose of what was sent (Clock, "the history is the snapshot stream").
---   Paintball.Shot  unreliable stream of 35-byte Shot records, one batch a server tick: a ball was
---                   born (ball id, shooter slot, birth time t = the clamped fire time, origin, velocity).
---                   Every screen but the shooter's draws that ball with Ballistics from t and plays the
---                   marker's pop at the origin; the shooter already drew its own. Losing one loses a
---                   picture, never a result.
+--   Minigame.Input  verb "reload" { t }: R was pressed at t (the shared clock). The framework's "leave".
+-- SERVER TO THE AUDIENCE (everybody near: Arena.AUDIENCE_MARGIN; the seated are always in it)
+--   Paintball.Snap  unreliable buffer, SNAP_HZ a second: a 12-byte head (t, seq, match, n) and 13 bytes
+--                   a body (id, x y z, yaw, pitch, crouch fraction, bits). Every slot that is on is in
+--                   every snapshot, the reader's own included. encodeSnap / decodeSnap; the pose history
+--                   holds exactly quantPose of what was sent (Clock, "the history is the snapshot stream").
+--   Paintball.Shot  unreliable stream of 35-byte Shot records, one batch a server tick (at most
+--                   SHOTS_PER_MESSAGE in one): a ball was born (ball id, shooter slot, birth time t =
+--                   the clamped fire time, origin, velocity). Every screen but the shooter's draws that
+--                   ball with Ballistics from t and plays the marker's pop at the origin; the shooter
+--                   already drew its own. Losing one loses a picture, never a result.
 --   Splat           RELIABLE stream of 22-byte Splat records, one batch a server tick: a ball ended on
 --                   something. body = 0: on the building at x y z with the face normal `face`; body =
 --                   a slot id: on that body, x y z being the offset from its feet in its own frame
 --                   (toBody / fromBody), so it rides on the body. `seq` orders the pool: every client
 --                   keeps the newest Rules.splatPool wall splats by seq and so holds the same ones;
 --                   a body's splats stay until the match ends. A ball that hit nothing sends nothing.
+--                   Whoever comes into the audience is sent every splat so far as one batch.
 --                   (Declared unreliable before this contract; reliable now, because a splat must stay
 --                   on every screen: PB-4.)
---   Paintball.State reliable table { k = kind, ... }, checked by checkState against STATE:
---     pass     { ok, text, untilDay?, cents? }   the pass desk's answer
---     joined   { you, match, place, splats, now }   you are in: your slot id, the match, where the
---              arena is in the world, every splat so far (a buffer of Splat records)
---     watch    { match, place, splats, now }   you came into the audience without being in the match
---     unwatch  {}                              you left the audience: clear everything
---     left     { why, text }                   you are out of the match and back in the lobby
---     match    { match }                       the roster, the phase or the size changed (whole view)
---     tag      { by, id, ball, scores, at, x, y, z }   `by` tagged `id` out with that ball at x y z; the
---              new scores; `at` = when `id` respawns. THE hit marker and hit sound (PB-3, PB-8).
---     respawn  { id, x, y, z, yaw, at }        `id` is back at a spawn point; protected until `at`
---     ack      { shot, ok, ball?, why?, rounds, reloadAt? }   to the shooter only: the verdict on its
---              click, the server's magazine after it, and when a running reload ends
---     reload   { id, at }                      `id` began to reload, full again at `at` (the rattle)
---     refused  { what, why, text }             a "join", "pass", "reload" or "leave" was refused
---     correct  { x, y, z, yaw, why }           the server put your body back here
---     end      { card }                        the end card
---     say      { id, line, n? }                a bot's call-out (Contract.LINES)
+--   Minigame.State  kind "paintball_watch" { match, slots, now }: you are in the audience (sent on
+--                   coming near, at each new match and when the roster changes): who is in which slot,
+--                   for the puppets' colours and names; a new `match` clears every splat and ball.
+--                   kind "paintball_unwatch" {}: you are out of it, or the match is over and nobody is
+--                   left: clear everything. Both go by ctx.send to one player who may not be seated,
+--                   so they are the game's `kinds` (ClientGame.watch hears them).
+-- SERVER TO THE SEATED (Minigame.State, ctx.broadcast unless said; checkMessage holds each to KINDS)
+--   the framework's "state"  view.game = Contract.MatchView (roster, phase, clock, scores) and the
+--                   service's Contract.Extras (match, bots, your magazine); view.result at the end card
+--   paintball_tag      { by, id, ball, scores, at, x, y, z }   `by` tagged `id` out with that ball at
+--                      x y z; the new scores; `at` = when `id` respawns. THE hit marker and hit sound
+--                      (PB-3, PB-8).
+--   paintball_respawn  { id, x, y, z, yaw, at }   `id` stands at a spawn point; protected until `at`
+--   paintball_reload   { id, at }                 `id` began to reload, full again at `at` (the rattle)
+--   paintball_say      { id, line, n? }           a bot's call-out (Contract.LINES)
+--   paintball_ack      { shot, ok, ball?, why?, rounds, reloadAt? }   to the shooter only (ctx.send): the
+--                      verdict on its click, the server's magazine after it, when a running reload ends
+--   paintball_correct  { x, y, z, yaw, why }      to one player (ctx.send): the server put your body here
 --
 -- HOW MUCH (budget(16): 8 v 8, everyone firing as fast as the magazine allows): down about 7.1 kB/s
 -- (snapshots 4.4 kB/s, balls and splats 1.8 kB/s, the rest a guess at framing); up about 1.0 kB/s
--- (poses 0.5 kB/s). The contract spec holds these under 8 and 1.5 kB/s.
--- Interface: REMOTES; layouts Move, Fire, Shot, Splat, SnapHead, SnapBody; CMD_VERBS; BIT, has(bits,
---   bit); FACE, faceOf(nx, ny, nz), normalOf(face); encodeSnap(t, seq, bodies) -> buffer;
---   decodeSnap(b) -> (t?, seq, bodies); quantPose(x, y, z, crouch) -> the same four as a snapshot
---   returns them; between(a, ta, b, tb, t) -> (x, y, z, crouch); pack(layout, records) -> buffer; unpack(layout, b) -> records; toBody, fromBody;
---   STATE, checkState(msg) -> (ok, err?); budget(bodies) -> { snap, down, up }; T (type witnesses)
+-- (poses 0.5 kB/s). The contract spec holds these under 8 and 1.5 kB/s. The framework's "state" (about
+-- 1 kB once a second) is on top of that.
+-- Interface: REMOTES; layouts Move, Fire, Shot, Splat, SnapHead, SnapBody; SHOTS_PER_MESSAGE; VERBS;
+--   BIT, has(bits, bit); FACE, faceOf(nx, ny, nz), normalOf(face); encodeSnap(t, seq, match, bodies)
+--   -> buffer; decodeSnap(b) -> (t?, seq, match, bodies); quantPose(x, y, z, crouch) -> the same four
+--   as a snapshot returns them; between(a, ta, b, tb, t) -> (x, y, z, crouch); pack(layout, records)
+--   -> buffer; unpack(layout, b) -> records; toBody, fromBody; KINDS, EVERYONE_KINDS, checkMessage(msg)
+--   -> (ok, err?); budget(bodies) -> { snap, down, up }; T (type witnesses)
 
-local BufferCodec = require("../Util/BufferCodec")
-local Schema = require("../Util/Schema")
+local BufferCodec = require("../../Util/BufferCodec")
+local Schema = require("../../Util/Schema")
 local Clock = require("./Clock")
 local Contract = require("./Contract")
 
@@ -86,6 +118,8 @@ export type SnapBody = {
 	bits: number,
 }
 export type Record = { [string]: number }
+-- who holds a slot, for the audience ("paintball_watch")
+export type Watched = { id: number, team: number, name: string, bot: boolean }
 
 local Wire = {}
 
@@ -146,6 +180,7 @@ Wire.Splat = BufferCodec.layout({
 Wire.SnapHead = BufferCodec.layout({
 	{ name = "t", kind = "f64" },
 	{ name = "seq", kind = "u16" },
+	{ name = "match", kind = "u8" }, -- Extras.match % 256: a reader that sees it change clears its splats
 	{ name = "n", kind = "u8" },
 })
 
@@ -160,7 +195,13 @@ Wire.SnapBody = BufferCodec.layout({
 	{ name = "bits", kind = "u8" },
 })
 
-Wire.CMD_VERBS = table.freeze({ "pass", "join", "leave", "reload" })
+-- An unreliable message over about 900 bytes is not delivered: a Shot batch is cut to this many records
+-- (a full snapshot is 220 bytes).
+Wire.SHOTS_PER_MESSAGE = 25
+
+-- Paintball's verbs on Minigame.Input (the Spec's `verbs`, which is what puts them on the Net schema).
+--   reload { t }   R was pressed at t (the shared clock); refused with words when it does nothing
+Wire.VERBS = table.freeze({ "reload" })
 
 -- Flags of a pose. A client's Move may set crouch (it WANTS to crouch), sprint and air; the server
 -- sets all six in snapshots (crouch there still means "wants to": the shape is the crouch fraction).
@@ -263,11 +304,11 @@ function Wire.quantPose(x: number, y: number, z: number, crouch: number): (numbe
 		crouchByte(crouch) / 255
 end
 
-function Wire.encodeSnap(t: number, seq: number, bodies: { SnapBody }): buffer
+function Wire.encodeSnap(t: number, seq: number, match: number, bodies: { SnapBody }): buffer
 	local head, each = Wire.SnapHead, Wire.SnapBody
 	local n = #bodies
 	local b = buffer.create(head.size + n * each.size)
-	BufferCodec.encode(head, { t = t, seq = seq % 65536, n = n }, b, 0)
+	BufferCodec.encode(head, { t = t, seq = seq % 65536, match = match % 256, n = n }, b, 0)
 	local rec: Record = {}
 	for i, body in bodies do
 		rec.id, rec.x, rec.y, rec.z = body.id, body.x, body.y, body.z
@@ -278,15 +319,15 @@ function Wire.encodeSnap(t: number, seq: number, bodies: { SnapBody }): buffer
 	return b
 end
 
--- Returns the snapshot's time (nil when the buffer is not a snapshot), its seq and its bodies.
-function Wire.decodeSnap(b: any): (number?, number, { SnapBody })
+-- Returns the snapshot's time (nil when the buffer is not a snapshot), its seq, its match and its bodies.
+function Wire.decodeSnap(b: any): (number?, number, number, { SnapBody })
 	local head, each = Wire.SnapHead, Wire.SnapBody
 	if typeof(b) ~= "buffer" or buffer.len(b) < head.size then
-		return nil, 0, {}
+		return nil, 0, 0, {}
 	end
 	local h = BufferCodec.decode(head, b, 0)
 	if buffer.len(b) ~= head.size + h.n * each.size or h.t ~= h.t then
-		return nil, 0, {}
+		return nil, 0, 0, {}
 	end
 	local bodies: { SnapBody } = table.create(h.n)
 	for i = 1, h.n do
@@ -302,7 +343,7 @@ function Wire.decodeSnap(b: any): (number?, number, { SnapBody })
 			bits = r.bits,
 		}
 	end
-	return h.t, h.seq, bodies
+	return h.t, h.seq, h.match, bodies
 end
 
 -- THE interpolation: a body's position and crouch fraction at time t from the snapshots either side
@@ -320,7 +361,7 @@ function Wire.between(a: SnapBody, ta: number, b: SnapBody, tb: number, t: numbe
 	return a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, a.crouch + (b.crouch - a.crouch) * f
 end
 
--- Many fixed-size records in one buffer (Shot and Splat batches; the splats of "joined" and "watch").
+-- Many fixed-size records in one buffer (Shot and Splat batches).
 function Wire.pack(layout: BufferCodec.Layout, records: { Record }): buffer
 	local b = buffer.create(layout.size * #records)
 	for i, rec in records do
@@ -341,13 +382,11 @@ function Wire.unpack(layout: BufferCodec.Layout, b: any): { Record }
 	return out
 end
 
--- The reliable Paintball.State messages, by kind.
+-- Paintball's own kinds on Minigame.State (the framework's are joined, state, event, left, refused).
+-- The framework adds `station` to each (and `site` to one sent to everyone); every kind allows both.
 local num = Schema.num()
 local function int(min: number, max: number): Schema.Schema
 	return Schema.num({ min = min, max = max, int = true })
-end
-local function kind(k: string): Schema.Schema
-	return Schema.enum({ k })
 end
 local function keys(t: { [string]: any }): { string }
 	local out: { string } = {}
@@ -360,66 +399,26 @@ end
 local slots = Contract.Rules.slots
 local slotId = int(1, slots)
 local count = int(0, 1e6)
-local text = Schema.str({ max = 200 })
-local name = Schema.str({ max = 40 })
 local why = Schema.enum(keys(Contract.WHY))
 local scores = Schema.arr(count, 2)
-local bytes = Schema.custom(function(v: any): boolean
-	return typeof(v) == "buffer"
-end, "buffer")
-local slot = Schema.rec({
-	id = slotId,
-	team = int(1, 2),
-	name = name,
-	bot = Schema.bool(),
-	userId = num,
-	tags = count,
-	outs = count,
-})
-local match = Schema.rec({
-	matchId = count,
-	phase = Schema.enum(Contract.PHASES :: { string }),
-	endsAt = num,
-	size = int(Contract.Rules.teamMin, Contract.Rules.teamMax),
-	scores = scores,
-	slots = Schema.arr(slot, slots),
-})
-local place = Schema.rec({ x = num, y = num, z = num, yaw = num })
-local row = Schema.rec({
-	id = slotId,
-	name = name,
-	team = int(1, 2),
-	bot = Schema.bool(),
-	tags = count,
-	outs = count,
-	shots = count,
-	hits = count,
-	accuracy = Schema.num({ min = 0, max = 1 }),
-})
-local card = Schema.rec({
-	matchId = count,
-	winner = int(0, 2),
-	scores = scores,
-	rows = Schema.arr(row, slots),
-	awards = Schema.arr(Schema.rec({ title = name, id = slotId, name = name }), 8),
-	nextAt = num,
-})
+local function message(kind: string, fields: { [string]: Schema.Schema }): Schema.Schema
+	fields.kind = Schema.enum({ kind })
+	fields.station = Schema.opt(Schema.str({ max = 64 }))
+	fields.site = Schema.opt(Schema.str({ max = 64 }))
+	return Schema.rec(fields)
+end
 
-Wire.STATE = table.freeze({
-	pass = Schema.rec({
-		k = kind("pass"),
-		ok = Schema.bool(),
-		text = text,
-		untilDay = Schema.opt(num),
-		cents = Schema.opt(num),
+Wire.KINDS = table.freeze({
+	paintball_watch = message("paintball_watch", {
+		match = count,
+		slots = Schema.arr(
+			Schema.rec({ id = slotId, team = int(1, 2), name = Schema.str({ max = 60 }), bot = Schema.bool() }),
+			slots
+		),
+		now = num,
 	}),
-	joined = Schema.rec({ k = kind("joined"), you = slotId, match = match, place = place, splats = bytes, now = num }),
-	watch = Schema.rec({ k = kind("watch"), match = match, place = place, splats = bytes, now = num }),
-	unwatch = Schema.rec({ k = kind("unwatch") }),
-	left = Schema.rec({ k = kind("left"), why = why, text = text }),
-	match = Schema.rec({ k = kind("match"), match = match }),
-	tag = Schema.rec({
-		k = kind("tag"),
+	paintball_unwatch = message("paintball_unwatch", {}),
+	paintball_tag = message("paintball_tag", {
 		by = slotId,
 		id = slotId,
 		ball = int(0, 65535),
@@ -429,9 +428,14 @@ Wire.STATE = table.freeze({
 		y = num,
 		z = num,
 	}),
-	respawn = Schema.rec({ k = kind("respawn"), id = slotId, x = num, y = num, z = num, yaw = num, at = num }),
-	ack = Schema.rec({
-		k = kind("ack"),
+	paintball_respawn = message("paintball_respawn", { id = slotId, x = num, y = num, z = num, yaw = num, at = num }),
+	paintball_reload = message("paintball_reload", { id = slotId, at = num }),
+	paintball_say = message("paintball_say", {
+		id = slotId,
+		line = Schema.enum(keys(Contract.LINES)),
+		n = Schema.opt(num),
+	}),
+	paintball_ack = message("paintball_ack", {
 		shot = int(0, 65535),
 		ok = Schema.bool(),
 		ball = Schema.opt(int(0, 65535)),
@@ -439,43 +443,30 @@ Wire.STATE = table.freeze({
 		rounds = int(0, Contract.Rules.magazine),
 		reloadAt = Schema.opt(num),
 	}),
-	reload = Schema.rec({ k = kind("reload"), id = slotId, at = num }),
-	refused = Schema.rec({
-		k = kind("refused"),
-		what = Schema.enum(Wire.CMD_VERBS :: { string }),
-		why = why,
-		text = text,
-	}),
-	correct = Schema.rec({ k = kind("correct"), x = num, y = num, z = num, yaw = num, why = why }),
-	["end"] = Schema.rec({ k = kind("end"), card = card }),
-	say = Schema.rec({ k = kind("say"), id = slotId, line = Schema.enum(keys(Contract.LINES)), n = Schema.opt(num) }),
+	paintball_correct = message("paintball_correct", { x = num, y = num, z = num, yaw = num, why = why }),
 }) :: { [string]: Schema.Schema }
 
--- Is this a well-formed Paintball.State message? The server lane's tests hold everything it sends to
--- this; the client lane's tests feed it only messages that pass.
-function Wire.checkState(msg: any): (boolean, string?)
-	if type(msg) ~= "table" or type(msg.k) ~= "string" then
+-- The kinds that go to players who may not be seated (ctx.send to each of the audience): the client
+-- half lists exactly these as its `kinds`, so ClientGame.watch hears them.
+Wire.EVERYONE_KINDS = table.freeze({ "paintball_watch", "paintball_unwatch" })
+
+-- Is this a well-formed paintball message for Minigame.State? The server lane's tests hold everything
+-- it sends to this; the client lane's tests feed it only messages that pass.
+function Wire.checkMessage(msg: any): (boolean, string?)
+	if type(msg) ~= "table" or type(msg.kind) ~= "string" then
 		return false, "no kind"
 	end
-	local schema = Wire.STATE[msg.k]
+	local schema = Wire.KINDS[msg.kind]
 	if schema == nil then
-		return false, `unknown kind '{msg.k}'`
+		return false, `unknown kind '{msg.kind}'`
 	end
 	return Schema.check(schema, msg)
 end
 
--- The remotes. Net/Schemas copies these into Schemas.REMOTES.
+-- The remotes of paintball's own. Net/Schemas copies these into Schemas.REMOTES.
 local REMOTES: { [string]: Def } = {
 	["Paintball.Move"] = { dir = "c2s", reliable = false, rate = 30, burst = 45, layout = Wire.Move },
 	["Paintball.Fire"] = { dir = "c2s", reliable = true, rate = 8, burst = 12, layout = Wire.Fire },
-	["Paintball.Cmd"] = {
-		dir = "c2s",
-		reliable = true,
-		rate = 5,
-		burst = 10,
-		payload = Schema.rec({ verb = Schema.enum(Wire.CMD_VERBS :: { string }), t = Schema.opt(num) }),
-	},
-	["Paintball.State"] = { dir = "s2c", reliable = true },
 	["Paintball.Snap"] = { dir = "s2c", reliable = false },
 	["Paintball.Shot"] = { dir = "s2c", reliable = false, layout = Wire.Shot },
 	Splat = { dir = "s2c", reliable = true, layout = Wire.Splat },
@@ -496,6 +487,6 @@ function Wire.budget(bodies: number): { snap: number, down: number, up: number }
 end
 
 -- Type witnesses (see Contract.T).
-Wire.T = ({} :: any) :: { Def: Def, SnapBody: SnapBody, Record: Record }
+Wire.T = ({} :: any) :: { Def: Def, SnapBody: SnapBody, Record: Record, Watched: Watched }
 
 return Wire

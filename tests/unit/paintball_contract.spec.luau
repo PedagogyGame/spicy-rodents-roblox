@@ -1,18 +1,25 @@
 --!strict
--- The paintball contract (Shared/Paintball: Contract, Body, Clock, Wire, Arena) pinned against the
--- owner's bar (brief v2 §13, §14; checklist PB-1 to PB-15) and against itself. FROZEN with the
--- contract: no lane edits this spec. It also holds every lane's stub to its names, so a lane that
--- renames a function another lane calls fails here, and it runs Arena.check on whatever
--- ArenaData.build() returns, today's stand-in and the real building alike.
+-- The paintball contract (Shared/Minigames/Paintball: Contract, Body, Clock, Wire, Arena, Spec) pinned
+-- against the owner's bar (brief v2 §13, §14; checklist PB-1 to PB-15), against the minigame framework
+-- it sits in, and against itself. FROZEN with the contract: no lane edits this spec. It also holds
+-- every lane's stub to its names, so a lane that renames a function another lane calls fails here, and
+-- it runs Arena.check on whatever ArenaData.build() returns, today's stand-in and the real building
+-- alike. The cases that need the fake engine (paintball on the framework's rig, with its own remotes
+-- beside it) live in tests/isolated/paintball_contract.luau and are reported here one by one.
 local Ballistics = require("@shared/Paintball/Ballistics")
 local Config = require("@shared/Paintball/Config")
 local Magazine = require("@shared/Paintball/Magazine")
-local Contract = require("@shared/Paintball/Contract")
-local Body = require("@shared/Paintball/Body")
-local Clock = require("@shared/Paintball/Clock")
-local Wire = require("@shared/Paintball/Wire")
-local Arena = require("@shared/Paintball/Arena")
-local ArenaData = require("@shared/Paintball/ArenaData")
+local Contract = require("@shared/Minigames/Paintball/Contract")
+local Body = require("@shared/Minigames/Paintball/Body")
+local Clock = require("@shared/Minigames/Paintball/Clock")
+local Wire = require("@shared/Minigames/Paintball/Wire")
+local Arena = require("@shared/Minigames/Paintball/Arena")
+local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
+local Rules = require("@shared/Minigames/Paintball/Rules")
+local Spec = require("@shared/Minigames/Paintball/Spec")
+local Games = require("@shared/Minigames/Games")
+local Minigame = require("@shared/Minigames/Minigame")
+local Session = require("@shared/Minigames/Session")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local EconomyRules = require("@shared/Economy/EconomyRules")
 local Tunables = require("@shared/Config/Tunables")
@@ -20,13 +27,16 @@ local Net = require("@shared/Net/Net")
 local Schemas = require("@shared/Net/Schemas")
 local BufferCodec = require("@shared/Util/BufferCodec")
 local Log = require("@shared/Util/Log")
+local Schema = require("@shared/Util/Schema")
 local Human = require("@client/Controllers/Human")
-local Match = require("@server/Paintball/Match")
+local ClientGames = require("@client/Minigames/ClientGames")
+local PaintballClient = require("@client/Minigames/Paintball/PaintballClient")
+local ServerGames = require("@server/Minigames/ServerGames")
+local Bots = require("@server/Minigames/Paintball/Bots")
+local PaintballService = require("@server/Minigames/Paintball/PaintballService")
 local PoseHistory = require("@server/Paintball/PoseHistory")
 local Projectiles = require("@server/Paintball/Projectiles")
-local Bots = require("@server/Paintball/Bots")
-local PaintballService = require("@server/Paintball/PaintballService")
-local PaintballClient = require("@client/Paintball/PaintballClient")
+local Isolated = require("@tests/lib/Isolated")
 
 local R = Contract.Rules
 
@@ -67,6 +77,10 @@ return function(t)
 		t.eq(R.matchSecs, 480)
 		t.eq(Tunables.tree.paintball.matchSecs.v, R.matchSecs)
 		t.eq(R.briefingSecs, 10)
+		t.truthy(
+			R.endCardSecs >= 10 and R.endCardSpare > 0,
+			"an end card long enough to read, and never cut by a reset"
+		)
 		t.truthy(R.respawnSecs >= 3 and R.respawnSecs <= 5, "tagged out for 3 to 5 s")
 		t.eq(R.protectSecs, 2)
 		t.eq(R.friendlyFire, false)
@@ -77,7 +91,7 @@ return function(t)
 		t.eq(Tunables.tree.economy.paintballPassCents.v, R.passCents)
 		t.eq(Tunables.tree.economy.paintballPassDays.v, R.passDays)
 		t.eq(Contract.passShort(20, 7), "You need 20c; you have 7c")
-		t.deepEq(Contract.PHASES, { "idle", "briefing", "live", "ended" })
+		t.deepEq(Contract.PHASES, { "briefing", "live", "ended" })
 		t.eq(#Contract.TEAMS, 2)
 		for _, team in Contract.TEAMS do
 			-- decision D4: bright paint that is not blood red
@@ -85,6 +99,17 @@ return function(t)
 		end
 		t.eq(Contract.textFor("infected"), "See a doctor first.")
 		t.eq(Contract.textFor("no such code"), "Not now.")
+		-- odd seats one side, even seats the other; sixteen bots to draw on, no two of a name
+		t.eq(Contract.teamOf(1), 1)
+		t.eq(Contract.teamOf(2), 2)
+		t.eq(Contract.teamOf(15), 1)
+		t.eq(#Contract.BOTS, R.slots)
+		local names: { [string]: boolean } = {}
+		for _, bot in Contract.BOTS do
+			t.falsy(names[bot.name], bot.name)
+			names[bot.name] = true
+			t.truthy(bot.skill >= 0 and bot.skill <= 1)
+		end
 	end)
 
 	t.test("PB-9: the body: heights, the eye, the hit shape, crouch at 0.6, speeds", function()
@@ -107,6 +132,14 @@ return function(t)
 		t.eq(Body.speed(0, true), Body.SPRINT)
 		t.eq(Body.speed(1, true), Body.CROUCH_SPEED)
 		t.truthy(Body.isSprinting(Body.SPRINT) and not Body.isSprinting(Body.WALK))
+		-- the pace the client hands the framework's ctx.pace: Controllers/Human turns it back into these speeds
+		t.eq(Body.pace(0, 0), 1)
+		t.near(Body.pace(0, 1), Tunables.tree.paintball.sprintMult.v, 1e-9)
+		t.eq(Body.pace(1, 1), 0.5)
+		t.truthy(Body.pace(0, 1) <= Human.MAX_SCALE)
+		t.near(Human.speed(false, Body.pace(0, 1), true), Body.SPRINT, 1e-9)
+		t.near(Human.speed(true, Body.pace(1, 0), true), Body.CROUCH_SPEED, 1e-9)
+		t.near(Human.speed(false, Body.pace(0.5, 1), true), Body.speed(0.5, false), 1e-9)
 		-- the crouch eases over CROUCH_SECS, the same on both sides whatever the step
 		local c = 0
 		for _ = 1, 4 do
@@ -227,12 +260,12 @@ return function(t)
 				PoseHistory.push(history, now, qx, qy, qz)
 				seq += 1
 				local body = { id = 1, x = x, y = y, z = z, yaw = 0, pitch = 0, crouch = 0, bits = 0 }
-				table.insert(inbox, { at = now + down, b = Wire.encodeSnap(now, seq, { body }) })
+				table.insert(inbox, { at = now + down, b = Wire.encodeSnap(now, seq, 1, { body }) })
 				nextSnap += 1 / Clock.SNAP_HZ
 			end
 			-- the client, at the same instant on the shared clock
 			while inbox[1] and inbox[1].at <= now + 1e-9 do
-				local time, _, bodies = Wire.decodeSnap((table.remove(inbox, 1) :: any).b)
+				local time, _, _, bodies = Wire.decodeSnap((table.remove(inbox, 1) :: any).b)
 				Clock.observe(view, time :: number, now)
 				table.insert(snaps, { t = time :: number, body = bodies[1] })
 			end
@@ -290,78 +323,100 @@ return function(t)
 		t.eq(naive.hitBody, 0, "without the rewind the same ball passes behind where the body now is")
 	end)
 
-	t.test("wire: the remotes are in Net/Schemas with their direction, reliability, rate and size", function()
-		local expect = {
-			["Paintball.Move"] = { "c2s", false, 27 },
-			["Paintball.Fire"] = { "c2s", true, 42 },
-			["Paintball.Cmd"] = { "c2s", true, 0 },
-			["Paintball.State"] = { "s2c", true, 0 },
-			["Paintball.Snap"] = { "s2c", false, 0 },
-			["Paintball.Shot"] = { "s2c", false, 35 },
-			Splat = { "s2c", true, 22 },
-		}
-		local n = 0
-		for name, def in Wire.REMOTES do
-			n += 1
-			local e = expect[name]
-			t.truthy(e ~= nil, name)
-			t.eq(Schemas.REMOTES[name], def, name)
-			t.eq(def.dir, e[1], name)
-			t.eq(def.reliable, e[2], name)
-			t.eq(if def.layout then def.layout.size else 0, e[3], name)
+	t.test(
+		"wire: five remotes of paintball's own, in Net/Schemas with direction, reliability, rate and size",
+		function()
+			local expect = {
+				["Paintball.Move"] = { "c2s", false, 27 },
+				["Paintball.Fire"] = { "c2s", true, 42 },
+				["Paintball.Snap"] = { "s2c", false, 0 },
+				["Paintball.Shot"] = { "s2c", false, 35 },
+				Splat = { "s2c", true, 22 },
+			}
+			local n = 0
+			for name, def in Wire.REMOTES do
+				n += 1
+				local e = expect[name]
+				t.truthy(e ~= nil, name)
+				t.eq(Schemas.REMOTES[name], def, name)
+				t.eq(def.dir, e[1], name)
+				t.eq(def.reliable, e[2], name)
+				t.eq(if def.layout then def.layout.size else 0, e[3], name)
+			end
+			t.eq(n, 5)
+			-- nothing else of paintball's is a remote: every table message rides the framework's Minigame.State
+			for name in Schemas.REMOTES do
+				if string.sub(name, 1, 10) == "Paintball." or name == "Splat" then
+					t.truthy(Wire.REMOTES[name] ~= nil, `{name} is in Net/Schemas but not in the contract`)
+				end
+			end
+			t.eq(Wire.SnapHead.size, 12)
+			t.eq(Wire.SnapBody.size, 13)
+			-- an unreliable message stays under the size the engine delivers
+			t.truthy(Wire.SnapHead.size + R.slots * Wire.SnapBody.size < 900)
+			t.truthy(Wire.SHOTS_PER_MESSAGE * Wire.Shot.size < 900)
+			-- the client's send rate fits its bucket with room for jitter; so does the fastest honest fire
+			local move = Wire.REMOTES["Paintball.Move"]
+			t.truthy(move.rate :: number >= Clock.SEND_HZ * 1.25)
+			t.truthy(Wire.REMOTES["Paintball.Fire"].rate :: number >= 1.5 / R.fireInterval)
+			-- positions fit the quantised range
+			t.truthy(Wire.XZ > Arena.HALF + 1 and Wire.Y_LO < -1 and Wire.Y_HI > Arena.HEIGHT + Body.STAND_TOP)
 		end
-		t.eq(n, 7)
-		t.eq(Wire.SnapHead.size, 11)
-		t.eq(Wire.SnapBody.size, 13)
-		-- the client's send rate fits its bucket with room for jitter; so does the fastest honest fire
-		local move = Wire.REMOTES["Paintball.Move"]
-		t.truthy(move.rate :: number >= Clock.SEND_HZ * 1.25)
-		t.truthy(Wire.REMOTES["Paintball.Fire"].rate :: number >= 1.5 / R.fireInterval)
-		-- positions fit the quantised range
-		t.truthy(Wire.XZ > Arena.HALF + 1 and Wire.Y_LO < -1 and Wire.Y_HI > Arena.HEIGHT + Body.STAND_TOP)
-	end)
+	)
 
-	t.test("wire: Net takes a Move, a Fire and a Cmd, and drops what is malformed", function()
-		Log.capture()
-		local net = Net.new({
-			send = function() end,
-			players = function()
-				return {}
-			end,
-		}, {
-			clock = function()
-				return 0
-			end,
-		})
-		local got: { [string]: any } = {}
-		for _, name in { "Paintball.Move", "Paintball.Fire", "Paintball.Cmd" } do
-			net:on(name, function(_player, payload)
-				got[name] = payload
-			end)
+	t.test(
+		"wire: Net takes a Move and a Fire and drops what is malformed; reload is a verb of Minigame.Input",
+		function()
+			Log.capture()
+			local net = Net.new({
+				send = function() end,
+				players = function()
+					return {}
+				end,
+			}, {
+				clock = function()
+					return 0
+				end,
+			})
+			local got: { [string]: any } = {}
+			for _, name in { "Paintball.Move", "Paintball.Fire" } do
+				net:on(name, function(_player, payload)
+					got[name] = payload
+				end)
+			end
+			local p = { UserId = 7 }
+			local bits = Wire.BIT.crouch + Wire.BIT.air
+			local move = { t = 12.5, seq = 9, x = 1.5, y = 14, z = -20.25, yaw = 1, pitch = -0.5, bits = bits }
+			t.truthy(net:receive(p, "Paintball.Move", BufferCodec.encode(Wire.Move, move), 0))
+			t.eq(got["Paintball.Move"].t, 12.5)
+			t.eq(got["Paintball.Move"].z, -20.25)
+			t.near(got["Paintball.Move"].yaw, 1, 1e-4)
+			t.near(got["Paintball.Move"].pitch, -0.5, 1e-4)
+			t.truthy(Wire.has(got["Paintball.Move"].bits, Wire.BIT.crouch))
+			t.falsy(Wire.has(got["Paintball.Move"].bits, Wire.BIT.sprint))
+			t.deepEq({ net:receive(p, "Paintball.Move", buffer.create(26), 0) }, { false, "bad buffer" })
+			t.deepEq({ net:receive(p, "Paintball.Move", { x = 1 }, 0) }, { false, "bad buffer" })
+			local fire = { shot = 3, vt = 99.8, ft = 99.95, ox = 1, oy = 4.5, oz = 2, dx = 0, dy = 0, dz = -1 }
+			t.truthy(net:receive(p, "Paintball.Fire", BufferCodec.encode(Wire.Fire, fire), 0))
+			t.eq(got["Paintball.Fire"].vt, 99.8)
+			t.eq(got["Paintball.Fire"].shot, 3)
+			fire.dx = 0 / 0
+			t.deepEq(
+				{ net:receive(p, "Paintball.Fire", BufferCodec.encode(Wire.Fire, fire), 0) },
+				{ false, "non-finite" }
+			)
+			-- the old table messages are gone from the wire
+			t.deepEq({ net:receive(p, "Paintball.Cmd", { verb = "join" }, 0) }, { false, "unknown remote" })
+			t.eq(Schemas.REMOTES["Paintball.State"], nil)
+			-- R goes the framework's way, with its stamp
+			t.deepEq(Wire.VERBS, { "reload" })
+			t.deepEq(Spec.verbs, Wire.VERBS)
+			local input = Schemas.REMOTES["Minigame.Input"].payload :: any
+			t.truthy(Schema.check(input, { gameId = Contract.STATION, seat = 3, verb = "reload", args = { 1000.25 } }))
+			t.truthy(Schema.check(input, { gameId = Contract.STATION, seat = 3, verb = "leave", args = {} }))
+			t.falsy(Schema.check(input, { gameId = Contract.STATION, seat = 3, verb = "fire", args = {} }))
 		end
-		local p = { UserId = 7 }
-		local bits = Wire.BIT.crouch + Wire.BIT.air
-		local move = { t = 12.5, seq = 9, x = 1.5, y = 14, z = -20.25, yaw = 1, pitch = -0.5, bits = bits }
-		t.truthy(net:receive(p, "Paintball.Move", BufferCodec.encode(Wire.Move, move), 0))
-		t.eq(got["Paintball.Move"].t, 12.5)
-		t.eq(got["Paintball.Move"].z, -20.25)
-		t.near(got["Paintball.Move"].yaw, 1, 1e-4)
-		t.near(got["Paintball.Move"].pitch, -0.5, 1e-4)
-		t.truthy(Wire.has(got["Paintball.Move"].bits, Wire.BIT.crouch))
-		t.falsy(Wire.has(got["Paintball.Move"].bits, Wire.BIT.sprint))
-		t.deepEq({ net:receive(p, "Paintball.Move", buffer.create(26), 0) }, { false, "bad buffer" })
-		t.deepEq({ net:receive(p, "Paintball.Move", { x = 1 }, 0) }, { false, "bad buffer" })
-		local fire = { shot = 3, vt = 99.8, ft = 99.95, ox = 1, oy = 4.5, oz = 2, dx = 0, dy = 0, dz = -1 }
-		t.truthy(net:receive(p, "Paintball.Fire", BufferCodec.encode(Wire.Fire, fire), 0))
-		t.eq(got["Paintball.Fire"].vt, 99.8)
-		t.eq(got["Paintball.Fire"].shot, 3)
-		fire.dx = 0 / 0
-		t.deepEq({ net:receive(p, "Paintball.Fire", BufferCodec.encode(Wire.Fire, fire), 0) }, { false, "non-finite" })
-		t.truthy(net:receive(p, "Paintball.Cmd", { verb = "reload", t = 5 }, 0))
-		t.truthy(net:receive(p, "Paintball.Cmd", { verb = "join" }, 0))
-		t.deepEq({ net:receive(p, "Paintball.Cmd", { verb = "win" }, 0) }, { false, "schema" })
-		t.deepEq(Wire.CMD_VERBS, { "pass", "join", "leave", "reload" })
-	end)
+	)
 
 	t.test("wire: a snapshot round-trips, and quantPose is what comes back", function()
 		local bodies = {}
@@ -377,11 +432,12 @@ return function(t)
 				bits = id * 3 % 64,
 			}
 		end
-		local b = Wire.encodeSnap(1234.5678, 70000, bodies)
+		local b = Wire.encodeSnap(1234.5678, 70000, 258, bodies)
 		t.eq(buffer.len(b), Wire.SnapHead.size + R.slots * Wire.SnapBody.size)
-		local time, seq, back = Wire.decodeSnap(b)
+		local time, seq, match, back = Wire.decodeSnap(b)
 		t.eq(time, 1234.5678)
 		t.eq(seq, 70000 % 65536)
+		t.eq(match, 258 % 256)
 		t.eq(#back, R.slots)
 		for id, body in bodies do
 			local got = back[id]
@@ -427,54 +483,68 @@ return function(t)
 		t.near(fz, -1, 1e-9)
 	end)
 
-	t.test("wire: every kind of State message has a schema; good ones pass, bad ones do not", function()
-		local view = Match.view(Match.new())
-		view.slots = { { id = 1, team = 1, name = "Ada", bot = false, userId = 12, tags = 0, outs = 0 } }
-		local place = { x = Arena.PLACE.x, y = Arena.PLACE.y, z = Arena.PLACE.z, yaw = Arena.PLACE.yaw }
-		local card = Match.card(Match.new(), 0)
-		card.rows = {
-			{ id = 1, name = "Ada", team = 1, bot = false, tags = 3, outs = 1, shots = 20, hits = 3, accuracy = 0.15 },
-		}
-		card.awards = { { title = "Most Paint Wasted", id = 1, name = "Ada" } }
+	t.test("wire: every paintball kind on Minigame.State has a schema; good ones pass, bad ones do not", function()
 		local good: { { [string]: any } } = {
-			{ k = "pass", ok = false, text = Contract.passShort(20, 7), cents = 7 },
-			{ k = "joined", you = 1, match = view, place = place, splats = buffer.create(0), now = 5 },
-			{ k = "watch", match = view, place = place, splats = buffer.create(Wire.Splat.size), now = 5 },
-			{ k = "unwatch" },
-			{ k = "left", why = "dropped", text = Contract.textFor("dropped") },
-			{ k = "match", match = view },
-			{ k = "tag", by = 2, id = 1, ball = 17, scores = { 0, 1 }, at = 9, x = 0, y = 1, z = 2 },
-			{ k = "respawn", id = 1, x = 0, y = 0, z = 0, yaw = 0, at = 11 },
-			{ k = "ack", shot = 4, ok = true, ball = 17, rounds = 4 },
-			{ k = "ack", shot = 5, ok = false, why = "sprint", rounds = 4, reloadAt = 12 },
-			{ k = "reload", id = 1, at = 12 },
-			{ k = "refused", what = "join", why = "pass", text = Contract.textFor("pass") },
-			{ k = "correct", x = 0, y = 0, z = 0, yaw = 0, why = "fast" },
-			{ k = "end", card = card },
-			{ k = "say", id = 3, line = "floor", n = 3 },
+			{
+				kind = "paintball_watch",
+				match = 2,
+				slots = {
+					{ id = 1, team = 1, name = "Ada", bot = false },
+					{ id = 2, team = 2, name = "Rusty (computer)", bot = true },
+				},
+				now = 5,
+				station = Contract.STATION,
+			},
+			{ kind = "paintball_unwatch", station = Contract.STATION },
+			{ kind = "paintball_tag", by = 2, id = 1, ball = 17, scores = { 0, 1 }, at = 9, x = 0, y = 1, z = 2 },
+			{ kind = "paintball_respawn", id = 1, x = 0, y = 0, z = 0, yaw = 0, at = 11 },
+			{ kind = "paintball_reload", id = 1, at = 12 },
+			{ kind = "paintball_say", id = 3, line = "floor", n = 3 },
+			{ kind = "paintball_ack", shot = 4, ok = true, ball = 17, rounds = 4 },
+			{ kind = "paintball_ack", shot = 5, ok = false, why = "sprint", rounds = 4, reloadAt = 12 },
+			{ kind = "paintball_correct", x = 0, y = 0, z = 0, yaw = 0, why = "fast", station = Contract.STATION },
 		}
 		local seen: { [string]: boolean } = {}
 		for _, msg in good do
-			local ok, err = Wire.checkState(msg)
-			t.truthy(ok, `{msg.k}: {err}`)
-			seen[msg.k] = true
+			local ok, err = Wire.checkMessage(msg)
+			t.truthy(ok, `{msg.kind}: {err}`)
+			seen[msg.kind] = true
 		end
-		for k in Wire.STATE do
+		local kinds = 0
+		for k in Wire.KINDS do
+			kinds += 1
 			t.truthy(seen[k], `no example of '{k}'`)
+			t.eq(string.sub(k, 1, 10), "paintball_", "a game's kinds carry its name")
 		end
-		t.falsy((Wire.checkState({ k = "tag", by = 2, id = 1 })))
-		t.falsy(
-			(Wire.checkState({ k = "tag", by = 2, id = 99, ball = 1, scores = { 0, 1 }, at = 9, x = 0, y = 1, z = 2 }))
-		)
-		t.falsy((Wire.checkState({ k = "left", why = "because", text = "" })))
-		t.falsy((Wire.checkState({ k = "unwatch", extra = 1 })))
-		t.falsy((Wire.checkState({ k = "nope" })))
-		t.falsy((Wire.checkState("joined")))
+		t.eq(kinds, 8)
+		t.falsy((Wire.checkMessage({ kind = "paintball_tag", by = 2, id = 1 })))
+		t.falsy((Wire.checkMessage({
+			kind = "paintball_tag",
+			by = 2,
+			id = 99,
+			ball = 1,
+			scores = { 0, 1 },
+			at = 9,
+			x = 0,
+			y = 1,
+			z = 2,
+		})))
+		t.falsy((Wire.checkMessage({ kind = "paintball_correct", x = 0, y = 0, z = 0, yaw = 0, why = "because" })))
+		t.falsy((Wire.checkMessage({ kind = "paintball_unwatch", extra = 1 })))
+		t.falsy((Wire.checkMessage({ kind = "state" })), "the framework's kinds are not paintball's")
+		t.falsy((Wire.checkMessage("paintball_watch")))
+		-- the two that reach a player who is not seated are exactly the client half's `kinds`
+		t.deepEq(Wire.EVERYONE_KINDS, { "paintball_watch", "paintball_unwatch" })
+		local client = ClientGames.get(Contract.GAME) :: any
+		t.deepEq(client.kinds, Wire.EVERYONE_KINDS)
+		for _, kind in Wire.EVERYONE_KINDS do
+			t.eq((ClientGames.ownerOf(kind) :: any).game, Contract.GAME)
+		end
 	end)
 
 	t.test("wire: at 8 v 8 a player costs under 8 kB/s down and 1.5 kB/s up", function()
 		local b = Wire.budget(R.slots)
-		t.eq(b.snap, 219)
+		t.eq(b.snap, 220)
 		t.truthy(b.down < 8000, `down {b.down}`)
 		t.truthy(b.up < 1500, `up {b.up}`)
 		t.truthy(Wire.budget(2 * R.teamMin).down < b.down)
@@ -501,6 +571,19 @@ return function(t)
 		local wx, wy, wz = Arena.toWorld(place, Arena.DESK.x, Arena.DESK.y, Arena.DESK.z)
 		t.deepEq({ wx, wy, wz }, desk.world)
 		t.truthy(Arena.DESK.z > Arena.HALF, "the lobby annex is outside the arena volume, on +z")
+		t.truthy(Arena.GATE.z > Arena.HALF and Arena.GATE.z < Arena.DESK.z, "the arena door is in the lobby too")
+		-- the arena's place comes from the site's own, as every side holds it
+		t.deepEq(origin.at, { Arena.ORIGIN.x, Arena.ORIGIN.y, Arena.ORIGIN.d })
+		local venuePlace = { x = venue.place.x, z = venue.place.z, floorY = venue.place.floorY, yaw = venue.place.yaw }
+		local derived = Arena.placeOf(venuePlace)
+		t.deepEq({ derived.x, derived.y, derived.z, derived.yaw }, { place.x, place.y, place.z, place.yaw })
+		local X, Y, D = Arena.toSite(Arena.DESK.x, Arena.DESK.y, Arena.DESK.z)
+		t.deepEq({ X, Y, D }, desk.at)
+		t.deepEq({ Arena.ofSite(X, Y, D) }, { Arena.DESK.x, Arena.DESK.y, Arena.DESK.z })
+		t.truthy(Arena.inVolume(0, 1, 0) and Arena.inVolume(-60, 70, 60))
+		t.falsy(Arena.inVolume(Arena.GATE.x, 1, Arena.GATE.z), "the lobby is not in the volume")
+		t.truthy(Arena.inVolume(Arena.DESK.x, 1, Arena.DESK.z, Arena.AUDIENCE_MARGIN), "but it is in the audience")
+		t.falsy(Arena.inVolume(0, 1, Arena.HALF + Arena.AUDIENCE_MARGIN + 1, Arena.AUDIENCE_MARGIN))
 		-- fromSite agrees with the AlleyLayout frame the venue data is written in, at any yaw
 		local site = { x = 300, z = -40, floorY = 7, yaw = 0.7 }
 		local p = Arena.fromSite(site, origin.at[1], origin.at[2], origin.at[3])
@@ -600,60 +683,243 @@ return function(t)
 		t.eq(#problems, 3)
 	end)
 
+	t.test(
+		"the registry: paintball is a sound game of flow match, with the arena's station and the desk's prompt",
+		function()
+			local ok, err = Games.check(Spec)
+			t.truthy(ok, tostring(err))
+			t.truthy(Games.get(Contract.GAME) == Spec, "its line is in Shared/Minigames/Games")
+			t.eq(Spec.soon, nil)
+			t.eq(Spec.flow, "match")
+			t.truthy(Spec.rules == Rules)
+			t.truthy(Minigame.check(Rules))
+			t.eq(Rules.def.game, Contract.GAME)
+			t.eq(Rules.def.seats, R.slots)
+			t.eq(Rules.def.lateJoin, true)
+			t.eq(Rules.def.class, "arena")
+			t.truthy(Rules.verbs.reload)
+			t.eq(Rules.serverVerbs, nil, "the service calls the model directly: no server verb")
+			local session = Spec.session :: Session.Opts
+			t.eq(session.lobbySeconds, 0, "the first person in starts the match; the briefing is its lobby")
+			t.eq(session.doneSeconds, R.endCardSecs + R.endCardSpare)
+			t.eq(session.idleSeconds, nil)
+			t.eq(Spec.fill, 2 * R.teamMin)
+			t.truthy(Spec.computers == Contract.BOTS :: any)
+			-- no site, no station; on the site, the door and the desk
+			t.eq(#Spec.stations({}), 0)
+			local site = { x = 2080, z = -890, floorY = 8.6, yaw = 0 }
+			local list = Spec.stations({ [Contract.SITE] = site })
+			t.eq(#list, 2)
+			local door, desk = list[1], list[2]
+			t.eq(door.id, Contract.STATION)
+			t.eq(door.joins, nil)
+			t.eq(desk.id, Contract.DESK)
+			t.eq(desk.joins, Contract.STATION)
+			for _, st in list do
+				t.eq(st.game, Contract.GAME)
+				t.eq(st.site, Contract.SITE)
+			end
+			-- the desk's prompt is at the pass_desk anchor of the venue, the door's at the lobby's inner wall
+			t.deepEq({ desk.x, desk.d }, { -20, -62 })
+			t.deepEq({ door.x, door.d }, { 0, -47 })
+			t.truthy(door.d > -75 and door.d < -45, "inside the lobby annex (D -75..-45)")
+			t.deepEq({ Arena.ofSite(door.x, door.y, door.d) }, { Arena.GATE.x, 3, Arena.GATE.z })
+			-- both halves have their line, and a real module behind it
+			t.truthy(ServerGames.get(Contract.GAME) ~= nil, "the server half is more than a name")
+			local client = ClientGames.get(Contract.GAME) :: any
+			t.isType(client.new, "function")
+			t.isType(client.watch, "function")
+			t.deepEq(
+				client.keys,
+				{ Q = "", ButtonB = "" },
+				"Q and gamepad B are the game's: a deliberate Leave, a crouch"
+			)
+			t.deepEq(client.buttons("joined", nil), { { "leave", "Leave the match" } })
+			t.eq(client.buttons("playing", {}), nil, "the seat owns the bar while playing")
+			t.deepEq(
+				client.buttons("done", {}),
+				{ { "leave", "Leave the match" } },
+				"no Play again: the next match starts itself"
+			)
+			for _, cue in { "fire", "fire_far", "splat", "tag", "tagged", "reload", "dry", "step" } do
+				t.eq(client.sounds[`paintball.{cue}`], "", cue)
+			end
+		end
+	)
+
+	t.test(
+		"the Session on the match model: a join starts it, a seat is a slot, late seats join, sync moves its clock",
+		function()
+			local s = Session.new(Rules, Spec.session)
+			local ok, _, seat = Session.join(s, "ada", "Ada", 0)
+			t.truthy(ok)
+			t.eq(seat, 1)
+			t.eq(s.phase, "playing", "no lobby to wait in")
+			local state = (s.game :: Minigame.Game).state :: Rules.State
+			t.eq(state.phase, "briefing")
+			t.eq(state.endsAt, R.briefingSecs)
+			t.eq(#state.slots, 1)
+			-- a late seat (a bot filling a side, a friend) is a slot of the other team
+			local ok2, _, seat2 = Session.join(s, { ai = true, name = "Rusty" }, "Rusty (computer)", 1)
+			t.truthy(ok2)
+			t.eq(seat2, 2)
+			local slot = Rules.slot(state, 2) :: Rules.Slot
+			t.truthy(slot.on)
+			t.eq(slot.team, Contract.teamOf(2))
+			t.eq(slot.mag.rounds, R.magazine)
+			-- the view is the wire's MatchView: phase, clock, scores, a row a slot without gaps
+			local view = Session.view(s, 1)
+			t.eq(view.phase, "playing")
+			t.eq(#view.seats, 2)
+			local g = view.game
+			t.eq(g.phase, "briefing")
+			t.deepEq(g.scores, { 0, 0 })
+			t.eq(#g.slots, 2)
+			t.deepEq(g.slots[2], { id = 2, team = 2, on = true, tags = 0, outs = 0, shots = 0, hits = 0 })
+			t.truthy(g.size >= R.teamMin and g.size <= R.teamMax)
+			-- a seat left is a slot off; the same seat can be taken again
+			Session.leave(s, "ada", 2)
+			t.falsy((Rules.slot(state, 1) :: Rules.Slot).on)
+			local ok3, _, seat3 = Session.join(s, "bea", "Bea", 3)
+			t.truthy(ok3)
+			t.eq(seat3, 1, "the vacated seat first: the sides stay as they were")
+			t.truthy((Rules.slot(state, 1) :: Rules.Slot).on)
+			-- the model's clock: it counts from nothing until the service tells it the shared clock
+			Session.step(s, 4)
+			local before = state.now
+			t.truthy(before > 0 and before <= 4)
+			local left = state.endsAt - state.now
+			Rules.sync(state, 1000)
+			t.eq(state.now, 1000)
+			t.near(state.endsAt - state.now, left, 1e-9, "every time in the State moved with it")
+			t.near(Rules.view(state).endsAt, 1000 + left, 1e-9)
+			-- nothing fires, tags or ends on a clock nobody has run out
+			t.eq(Rules.result(state), nil)
+			t.deepEq(Rules.drain(state), {})
+		end
+	)
+
 	t.test("stubs: every lane's module keeps the names the other lanes call", function()
 		local function has(module: any, names: { string }, label: string)
 			for _, name in names do
 				t.isType(module[name], "function", `{label}.{name}`)
 			end
 		end
-		has(Match, {
-			"new",
-			"join",
-			"leave",
-			"slot",
-			"slotOf",
-			"humans",
+		has(Rules, {
+			"init",
+			"sync",
 			"step",
+			"join",
+			"gone",
+			"input",
+			"result",
+			"view",
 			"drain",
+			"slot",
 			"canFire",
 			"fire",
 			"reload",
 			"canBeHit",
-			"hit",
+			"tag",
 			"bits",
-			"view",
 			"card",
-		}, "Match")
+		}, "Rules")
 		has(Bots, { "new", "sync", "place", "step" }, "Bots")
 		has(ArenaData, { "build" }, "ArenaData")
-		has(PaintballService, { "new", "start" }, "PaintballService")
-		has(PaintballClient, { "new", "start" }, "PaintballClient")
-		local service = PaintballService.new({})
+		has(PaintballService, { "new", "port" }, "PaintballService")
+		has(PaintballClient, { "watch", "new", "show", "link" }, "PaintballClient")
+		t.eq(PaintballService.MONITOR, "Monitor")
+		-- the service on a bare framework context (no site model, no net): inert, and every hook is there
+		local sent = 0
+		local ctx: any = {
+			station = { id = Contract.STATION },
+			place = { x = 2080, z = -890, floorY = 8.6, yaw = 0 },
+			root = nil,
+			opts = {},
+			net = nil,
+			send = function()
+				sent += 1
+			end,
+		}
+		local service = PaintballService.new(ctx)
 		has(service, {
-			"buyPass",
 			"join",
-			"leave",
+			"joined",
+			"input",
+			"step",
+			"event",
+			"state",
+			"inPlay",
+			"screen",
+			"sig",
+			"prompt",
+			"doneText",
+			"debug",
 			"onMove",
 			"onFire",
-			"onCmd",
-			"step",
 			"watching",
 			"stats",
-			"stop",
 		}, "Service")
-		local client = PaintballClient.new({
-			send = function() end,
-			now = function()
-				return 0
+		t.eq(service.hw, nil)
+		t.eq(service.port, nil)
+		t.deepEq(
+			{ service.place.x, service.place.y, service.place.z },
+			{ Arena.PLACE.x, Arena.PLACE.y, Arena.PLACE.z },
+			"the arena's place from the site's"
+		)
+		service:step(1 / Clock.TICK_HZ)
+		t.eq(sent, 0)
+		-- the Port onto a Net: handlers in, buffers out
+		local fired: { any } = {}
+		local port = PaintballService.port({
+			on = function(_self: any, name: string, fn: any)
+				table.insert(fired, { "on", name, fn })
+			end,
+			fire = function(_self: any, player: any, name: string, payload: any)
+				table.insert(fired, { "fire", player, name, payload })
 			end,
 		})
-		has(client, { "onState", "onSnap", "onShots", "onSplats", "input", "step", "stop" }, "Client")
-		-- a match that nobody has joined is idle and its view is a well-formed wire message
-		local match = Match.new({ seed = 3 })
-		t.eq(match.phase, "idle")
-		t.eq(Match.humans(match), 0)
-		t.truthy(Wire.checkState({ k = "match", match = Match.view(match) }))
-		t.truthy(Wire.checkState({ k = "end", card = Match.card(match, 0) }))
-		t.deepEq(Bots.step(Bots.new(service.arena), match, {}, 0, 1 / Clock.TICK_HZ), {})
+		port.on("Paintball.Move", function() end)
+		port.fire("ada", "Splat", buffer.create(0))
+		t.eq(fired[1][2], "Paintball.Move")
+		t.deepEq({ fired[2][1], fired[2][2], fired[2][3] }, { "fire", "ada", "Splat" })
+		-- the seat of a player, on a bare client context
+		local seat = PaintballClient.new({ station = Contract.STATION, game = Contract.GAME } :: any)
+		has(seat, { "onState", "onMessage", "onRefused", "input", "step", "stop" }, "Seat")
+		t.eq(seat.mag.rounds, R.magazine)
+		-- the match model and the bots line up: a fresh State steps through the bots without a word
+		local state = Rules.init(1, 3)
+		t.eq(state.phase, "briefing")
+		t.deepEq(Bots.step(Bots.new(service.arena), state, {}, 0, 1 / Clock.TICK_HZ), {})
+		t.deepEq({ Rules.canFire(state, 1, 0) }, { false, "phase" })
+		-- the end card the framework draws from a finished view
+		local endCard = (ClientGames.get(Contract.GAME) :: any).endCard
+		t.eq(endCard({ seats = {}, result = nil }, 1), nil)
+		local card: Contract.EndCard = {
+			winner = 2,
+			scores = { 3, 5 },
+			rows = {
+				{ id = 2, team = 2, tags = 4, outs = 1, shots = 20, hits = 4, accuracy = 0.2 },
+				{ id = 1, team = 1, tags = 3, outs = 2, shots = 10, hits = 3, accuracy = 0.3 },
+			},
+			awards = { { title = "Most Paint Wasted", id = 2 } },
+		}
+		local result: Contract.Result =
+			{ done = true, scores = { 3, 4 }, winners = { 2 }, text = "Teal wins 5 - 3", card = card }
+		local sum = endCard({
+			seats = { { name = "Ada", gone = false }, { name = "Rusty (computer)", gone = false } },
+			result = result,
+		}, 1)
+		t.eq(sum.line, "Teal wins 5 - 3")
+		t.eq(#sum.rows, 2)
+		t.eq(sum.rows[1].name, "Rusty (computer)")
+		t.eq(sum.rows[1].place, 1)
+		t.eq(sum.rows[1].side, "Teal")
+		t.eq(sum.rows[2].place, 2)
+		t.eq(sum.rows[2].accuracy, "30%")
+		t.truthy(string.find(sum.foot, "%d", 1, true) ~= nil, "the foot counts down to the next match")
 	end)
+
+	-- paintball on the framework's rig, with its own remotes beside it (tests/lib/PaintballRig)
+	Isolated.register(t, "tests/isolated/paintball_contract")
 end
