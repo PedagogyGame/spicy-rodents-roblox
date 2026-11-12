@@ -242,8 +242,11 @@ return function(t: Test.T)
 		local hard, f2 = pop(9.0, false)
 		t.eq(f1, 1)
 		t.eq(f2, 1)
-		t.near(soft, Physics.BUMPER_KICK, 0.1, "a soft touch")
-		t.near(hard, Physics.BUMPER_KICK, 0.1, "a hard hit")
+		-- (the coil's own strength, give or take its seeded tenth: never what the ball came in with)
+		local spread = Physics.BUMPER_KICK * Physics.KICK_JITTER + 0.1
+		t.near(soft, Physics.BUMPER_KICK, spread, "a soft touch")
+		t.near(hard, Physics.BUMPER_KICK, spread, "a hard hit")
+		t.near(soft, hard, 0.1, "the same coil, the same seed: the same kick whatever came in")
 		t.truthy(soft > 1.0 * 3, "energy was added")
 		-- tilted, the bumper is a rubber post and adds nothing
 		local dead, f3 = pop(4.0, true)
@@ -281,7 +284,12 @@ return function(t: Test.T)
 			end
 			local out, fired = hit(0.5, 2.0)
 			t.eq(fired, 1)
-			t.near(out, Physics.SLING_KICK + 2.0 * Layout.MATERIALS.rubber.e, 0.25)
+			t.near(
+				out,
+				Physics.SLING_KICK + 2.0 * Layout.MATERIALS.rubber.e,
+				0.25 + Physics.SLING_KICK * Physics.KICK_JITTER,
+				"the bounce plus the kick (the coil varies by its seeded tenth)"
+			)
 			local _, softFired = hit(0.5, 0.4)
 			t.eq(softFired, 0, "too soft a touch")
 			local _, endFired = hit(0.04, 2.0)

@@ -46,6 +46,7 @@ Machine.SAVE_GRACE = 360 -- ticks after the ball save lamp goes out in which a d
 Machine.SKILL_TICKS = 1680 -- the skill shot is open this long after the ball leaves the shooter lane
 Machine.FEED_TICKS = 168 -- a ball the machine owes comes up to the plunger this long after the lane is clear
 Machine.AUTO_TICKS = 96 -- and is launched by the machine this long after that
+Machine.AUTO_SPREAD = 0.1 -- the machine's own launch varies by this much of a full pull either way
 Machine.NUDGE_SIDE = 0.85 -- studs/s a sideways nudge gives the ball
 Machine.NUDGE_UP = 0.7
 Machine.NUDGE_COOL = 36 -- ticks: a second press sooner than this is the same shove
@@ -700,8 +701,12 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 			m.autoIn -= 1
 			m.pull = 0
 			if m.autoIn == 0 then
-				Physics.launch(phys, resting, p.vMin + (p.vMax - p.vMin) * p.autoPull)
-				push(out, CUE.PLUNGE, 0, p.autoPull)
+				-- the machine's own kicker is never twice the same strength (seeded), so a ball it gives back
+				-- does not come down the table the same way every time
+				local pull = p.autoPull + (Physics.rand(phys) * 2 - 1) * Machine.AUTO_SPREAD
+				pull = math.clamp(pull, 0, 1)
+				Physics.launch(phys, resting, p.vMin + (p.vMax - p.vMin) * pull)
+				push(out, CUE.PLUNGE, 0, pull)
 			end
 		elseif buttons >= Machine.PULL_UNIT then
 			-- an analogue hand: the rod follows it, quickly but not at once
@@ -857,6 +862,7 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 					b.vy += 1 + Physics.rand(phys) * 2
 					b.asleep = false
 					b.still = 0
+					b.firm = 0
 				end
 			end
 			push(out, CUE.SEARCH, 0, 0)

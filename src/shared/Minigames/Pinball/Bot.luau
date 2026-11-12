@@ -5,8 +5,9 @@
 -- never reaches into the model. Three skill levels:
 --   1 NOVICE  bats late and loosely at anything near a flipper, sometimes with both at once, and plunges at
 --             any strength;
---   2 REGULAR bats in good time, traps the ball on a raised flipper about half the time and then shoots it
---             from somewhere in the outer half of the flipper;
+--   2 REGULAR bats in good time, traps the ball on a raised flipper more often than not and then shoots it:
+--             mostly at what the rule sheet wants (it knows the machine's main shots, and times them to a
+--             frame or two), otherwise from somewhere in the outer half of the flipper;
 --   3 WIZARD  traps whenever it can, reads what the rule sheet wants hit now (sheet.wants), looks the shot up
 --             in the table's shot book (Shots: where on the flipper to flip for it, learnt by measuring the
 --             table, as a good player learns a machine), lets the ball go and flips when it has rolled to
@@ -18,8 +19,8 @@
 -- Pure; Lune-tested (tests/unit/pinball_games.spec.luau).
 -- Interface: LEVELS, NAMES; new(level, seed) -> State; step(bot, table, machine) -> buttons;
 --   learn(table) -> Lesson (the plunger pull for the skill shot; about a tenth of a second of practice, once);
---   the WIZARD also needs the table's shot book (Shots.book: about a fifth of a second, once), so an attract
---   mode that must not hitch uses level 1 or 2, or asks for both before the first frame
+--   the REGULAR and the WIZARD also need the table's shot book (Shots.book: about a fifth of a second, once),
+--   so an attract mode that must not hitch uses level 1, or asks for the book (and learn) before the first frame
 
 local Det = require("./Det")
 local Layout = require("./Layout")
@@ -37,7 +38,8 @@ export type Level = {
 	aimTicks: number, -- how far off the moment it flips a ball it is timing (standard deviation, in ticks)
 	aimLo: number, -- without a learnt shot it picks a spot between these
 	aimHi: number,
-	learnt: boolean, -- uses the learnt spots and the skill-shot pull
+	learnt: boolean, -- plunges for the skill shot
+	book: number, -- how often it aims by the shot book (what the rule sheet wants now), 0..1; otherwise anywhere
 	pullSd: number,
 	nudges: boolean,
 	holdTicks: number, -- how long it keeps the button down after a flip
@@ -52,6 +54,7 @@ Bot.LEVELS = {
 		aimLo = 0.3,
 		aimHi = 1.0,
 		learnt = false,
+		book = 0,
 		pullSd = 0.3,
 		nudges = false,
 		holdTicks = 70,
@@ -61,15 +64,16 @@ Bot.LEVELS = {
 	{
 		lateMean = 3,
 		lateSd = 3,
-		aimTicks = 6,
+		aimTicks = 5,
 		aimLo = 0.45,
 		aimHi = 0.95,
 		learnt = false,
+		book = 0.7,
 		pullSd = 0.12,
 		nudges = false,
 		holdTicks = 45,
 		panic = 0.05,
-		trap = 0.5,
+		trap = 0.7,
 	},
 	{
 		lateMean = 1,
@@ -78,6 +82,7 @@ Bot.LEVELS = {
 		aimLo = 0.6,
 		aimHi = 0.9,
 		learnt = true,
+		book = 1,
 		pullSd = 0.03,
 		nudges = true,
 		holdTicks = 36,
@@ -220,7 +225,7 @@ end
 -- the first of those that this flipper can make; one who does not picks a spot somewhere out along it.
 local function chooseAim(bot: State, tbl: Machine.Table, level: Level, i: number, m: Machine.State): number
 	local spot = level.aimLo + rand(bot) * (level.aimHi - level.aimLo)
-	if level.learnt then
+	if level.book > 0 and (level.book >= 1 or rand(bot) < level.book) then
 		local book = Shots.book(tbl)
 		local mine = book.windows[i]
 		local first: Shots.Window?, second: Shots.Window? = nil, nil

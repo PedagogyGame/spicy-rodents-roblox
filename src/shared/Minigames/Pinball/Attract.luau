@@ -7,7 +7,8 @@
 --     turn: a wave up the table, a sweep across it, a ring spreading from the middle, and a sparkle.
 --   * page(): what the display says, turning a page every PAGE_TICKS: the machine's name and FREE PLAY, its
 --     best scores, what the game is about (the rule sheet's opening status line), the score scale.
--- A demonstration ball is a third thing and not in here: start a Machine and let Bot (level 1 or 2) hold the
+-- A demonstration ball is a third thing and not in here: start a Machine and let Bot (level 1, which needs no
+-- practice; or a better one, after asking for Shots.book and Bot.learn before the first frame) hold the
 -- buttons; Stream.read gives the frames. The show below costs nothing and needs no machine at all.
 -- Pure; Lune-tested (tests/unit/pinball_attract.spec.luau).
 -- Interface: FIGURE_TICKS, PAGE_TICKS, PAGES; lamps(table, tick, into) -> into (0 dark, 1 lit);

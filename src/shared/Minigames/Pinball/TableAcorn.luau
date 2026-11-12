@@ -8,7 +8,8 @@
 -- right flipper, a spinner in the lane up the right side for the left flipper, two standup targets.
 -- The rule sheet (one goal: fill the hoard before winter):
 --   * Knock down A-C-O-R-N: an acorn goes into the hoard, the bank resets, the bonus multiplier steps up
---     (2x, 3x, 5x at most) and the spinner is lit for 100 a turn until the ball ends.
+--     (2x, 3x, 5x at most) and the spinner is lit for 100 a turn until the ball ends. The letters a player
+--     has down stay down for that player's next ball (the gentlest table: the hoard is filled over a game).
 --   * All three top lanes: the bumpers are lit (100 a pop in place of 10) until the ball ends.
 --   * Three acorns in the hoard light the extra ball at the right standup (once a game).
 --   * Five acorns: WINTER IS COMING, 5,000 and the hoard starts again.
@@ -36,7 +37,7 @@ local X1 = Layout.FIELD_X1
 
 -- a rebound rubber across the arch on the left turns a hard plunge back toward the top lanes
 Layout.wall(def, "rubber", { 0.161, 4.3, 0.42, 4.15 })
-Layout.post(def, 0.42, 4.15)
+Layout.endPost(def, 0.42, 4.15, 0.161, 4.3)
 
 -- three top lanes between four wire guides
 local LANE_X = { 0.72, 0.95, 1.18, 1.41 }
@@ -87,7 +88,7 @@ do
 	-- the rubber the targets fall back against stands close behind them, so no ball fits behind the bank
 	Layout.wall(def, "rubber", { ax - 0.0266, ay + 0.0138, bx - 0.0266, by + 0.0138 })
 	Layout.wall(def, "wood", { bx, by, 0.0, 3.02 })
-	Layout.post(def, bx, by)
+	Layout.endPost(def, bx, by, 0.0, 3.02)
 	Layout.post(def, ax, ay)
 end
 
@@ -104,8 +105,8 @@ table.insert(def.targets, { id = "oak_l", kind = "standup", x1 = 0.5, y1 = 3.02,
 Layout.wall(def, "wood", { 0.5, 3.02, 0.46, 3.08 })
 table.insert(def.targets, { id = "oak_r", kind = "standup", x1 = 1.62, y1 = 2.92, x2 = 1.72, y2 = 3.02 })
 Layout.wall(def, "wood", { 1.72, 3.02, 1.76, 3.08 })
-Layout.post(def, 0.6, 2.92)
-Layout.post(def, 1.62, 2.92)
+Layout.endPost(def, 0.6, 2.92, 0.5, 3.02)
+Layout.endPost(def, 1.62, 2.92, 1.72, 3.02)
 Layout.lamp(def, "oak_l", 0.6, 2.84, "yellow")
 Layout.lamp(def, "oak_r", 1.62, 2.84, "yellow")
 
@@ -204,6 +205,7 @@ local sheet: Machine.Sheet = {
 			made = 0, -- targets and lanes made on this ball
 			extraLit = 0,
 			resetIn = 0,
+			bank = 0, -- bits: the letters this player has knocked down (kept from ball to ball)
 		}
 	end,
 	ballStart = function(m, t, tbl, out)
@@ -213,7 +215,14 @@ local sheet: Machine.Sheet = {
 		t.spinnerLit = 0
 		t.made = 0
 		t.resetIn = 0
+		-- the bank remembers: the letters this player has down stay down for their next ball (the machine
+		-- stands the bank up and drops theirs again), so the hoard is filled over a whole game
 		Machine.raiseDrops(m, tbl, out)
+		for i, target in BANK do
+			if bit(t.bank, i) then
+				m.phys.drop[target] = true
+			end
+		end
 	end,
 	flip = function(_m, t, left)
 		-- lane change: the flipper buttons walk the lit lanes (and the skill-shot lane) across
@@ -267,7 +276,13 @@ local sheet: Machine.Sheet = {
 		elseif code == EV.DROP then
 			Machine.add(m, POINTS.drop)
 			t.made += 1
+			for i, target in BANK do
+				if target == ref and not bit(t.bank, i) then
+					t.bank += bit32.lshift(1, i - 1)
+				end
+			end
 			if bankDown(m) == #BANK then
+				t.bank = 0
 				t.hoard += 1
 				t.resetIn = RESET_TICKS
 				t.spinnerLit = 1

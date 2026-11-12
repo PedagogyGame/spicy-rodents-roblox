@@ -48,7 +48,8 @@ local guideRight = Layout.arc(XC, OY, OR, 34, 0, 6)
 do
 	local g1 = Layout.arc(XC, OY, OR, 66, 66, 1)
 	local g2 = Layout.arc(XC, OY, OR, 34, 34, 1)
-	Layout.post(def, g1[1], g1[2])
+	-- (the left guide comes down to the gap at a gentle slope: its post is set flush, or a ball would sit on it)
+	Layout.endPost(def, g1[1], g1[2], guideLeft[#guideLeft - 3], guideLeft[#guideLeft - 2])
 	Layout.post(def, g2[1], g2[2])
 	table.insert(def.sensors, { id = "dock", kind = "rollover", x1 = g1[1], y1 = g1[2], x2 = g2[1], y2 = g2[2] })
 	Layout.lamp(def, "dock", (g1[1] + g2[1]) / 2 - 0.1, (g1[2] + g2[2]) / 2 - 0.1, "blue")
@@ -137,6 +138,16 @@ do
 	table.insert(right, mx(body[3]))
 	table.insert(right, body[4])
 	Layout.wall(def, "metal", right)
+	-- A roof over the back of each ramp, from part way up the guide down to the ramp's inner corner: without it
+	-- the guide and the ramp's back make a pocket that catches every ball that dribbles out of the asteroid
+	-- field. With it the ball rolls off toward the middle and falls past the ramp's mouth to the flippers.
+	do
+		local u = 0.33
+		local rx, ry = body[3] + (guideLeft[1] - body[3]) * u, body[4] + (guideLeft[2] - body[4]) * u
+		local roof = { rx, ry, body[5], body[6] }
+		Layout.wall(def, "plastic", roof)
+		Layout.wall(def, "plastic", Layout.mirror(roof))
+	end
 	local SY = body[4] + 0.07
 	local gx = body[3] + (guideLeft[1] - body[3]) * 0.07 / (guideLeft[2] - body[4])
 	table.insert(def.sensors, { id = "orbit_l", kind = "rollover", x1 = 0, y1 = SY, x2 = gx, y2 = SY })
@@ -162,14 +173,17 @@ Layout.lamp(def, "extra_ball", 0.46, 2.48, "red")
 -- F-U-E-L: U on the left rail and E on the right (each flipper's own soft backhand); F and L stand at the
 -- inner corners of the two ramp mouths (laid with the ramps, above)
 do
-	table.insert(def.targets, { id = "fuel_u", kind = "standup", x1 = 0.07, y1 = 2.1, x2 = 0.14, y2 = 2.26 })
-	Layout.lamp(def, "fuel_u", 0.25, 2.13, "yellow")
-	Layout.wall(def, "wood", { 0.0, 2.02, 0.07, 2.1 })
-	Layout.wall(def, "wood", { 0.14, 2.26, 0.0, 2.5 })
-	table.insert(def.targets, { id = "fuel_e", kind = "standup", x1 = X1 - 0.14, y1 = 2.26, x2 = X1 - 0.07, y2 = 2.1 })
-	Layout.lamp(def, "fuel_e", X1 - 0.25, 2.13, "yellow")
-	Layout.wall(def, "wood", { X1, 2.02, X1 - 0.07, 2.1 })
-	Layout.wall(def, "wood", { X1 - 0.14, 2.26, X1, 2.5 })
+	-- (the bump stands far enough out of the rail to be in the path of the soft backhand: a ball flipped as it
+	-- starts to roll off the cradle; a harder one passes inside it to the pod and the orbit)
+	local UX1, UY1, UX2, UY2 = 0.1, 2.14, 0.2, 2.34
+	table.insert(def.targets, { id = "fuel_u", kind = "standup", x1 = UX1, y1 = UY1, x2 = UX2, y2 = UY2 })
+	Layout.lamp(def, "fuel_u", UX2 + 0.1, UY1 + 0.03, "yellow")
+	Layout.wall(def, "wood", { 0.0, UY1 - 0.08, UX1, UY1 })
+	Layout.wall(def, "wood", { UX2, UY2, 0.0, UY2 + 0.28 })
+	table.insert(def.targets, { id = "fuel_e", kind = "standup", x1 = X1 - UX2, y1 = UY2, x2 = X1 - UX1, y2 = UY1 })
+	Layout.lamp(def, "fuel_e", X1 - UX2 - 0.1, UY1 + 0.03, "yellow")
+	Layout.wall(def, "wood", { X1, UY1 - 0.08, X1 - UX1, UY1 })
+	Layout.wall(def, "wood", { X1 - UX2, UY2, X1, UY2 + 0.28 })
 end
 
 -- a kink in each rail above the outlanes leans a ball coming down out of the orbit toward the inlane

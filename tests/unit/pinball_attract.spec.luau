@@ -91,26 +91,26 @@ return function(t: Test.T)
 		end
 	)
 
-	t.test(
-		"a demonstration ball needs no practice: NOVICE and REGULAR start at once, and a frame can be drawn",
-		function()
-			local tbl = Tables.need("pinball_space")
-			for level = 1, 2 do
-				t.falsy(Bot.LEVELS[level].learnt, "no shot book, no lesson")
-				local m = Machine.new(tbl, 3, 1)
-				local bot = Bot.new(level, 3)
-				local out: { number } = {}
-				local started = os.clock()
-				for _ = 1, 240 * 20 do
-					Machine.step(tbl, m, Bot.step(bot, tbl, m), out)
-				end
-				t.truthy(os.clock() - started < 0.5, "twenty seconds of demonstration in well under half a second")
-				local frame = Stream.read(tbl, m)
-				t.eq(#frame.lamps, #tbl.def.lamps)
-				t.truthy(m.launched, "it plunged by itself")
-			end
+	t.test("a demonstration ball needs no practice: the NOVICE starts at once, and a frame can be drawn", function()
+		-- (the NOVICE uses neither the shot book nor the plunger lesson, so nothing is measured before its
+		-- first frame; the REGULAR and the WIZARD aim by the book, a fifth of a second of work, once)
+		local tbl = Tables.need("pinball_space")
+		t.falsy(Bot.LEVELS[1].learnt, "no lesson")
+		t.eq(Bot.LEVELS[1].book, 0, "no shot book")
+		local m = Machine.new(tbl, 3, 1)
+		local bot = Bot.new(1, 3)
+		local out: { number } = {}
+		local started = os.clock()
+		local launched = false
+		for _ = 1, 240 * 20 do
+			Machine.step(tbl, m, Bot.step(bot, tbl, m), out)
+			launched = launched or m.launched
 		end
-	)
+		t.truthy(os.clock() - started < 0.5, "twenty seconds of demonstration in well under half a second")
+		local frame = Stream.read(tbl, m)
+		t.eq(#frame.lamps, #tbl.def.lamps)
+		t.truthy(launched, "it plunged by itself")
+	end)
 
 	t.test("the best scores: five places, best first, the house's own until somebody beats them", function()
 		for _, id in Tables.IDS do

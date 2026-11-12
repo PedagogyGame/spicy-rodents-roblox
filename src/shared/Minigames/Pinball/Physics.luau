@@ -21,7 +21,8 @@
 --   * Nothing tunnels. Each tick is cut into as many sub-steps as it takes for the ball and the flipper
 --     surfaces to move no more than SUB_TRAVEL (under a third of the ball's radius) relative to each other, and
 --     a wall is a line the ball's centre may not come within one radius of, from either side.
---   * Pop bumpers and slingshots ADD a fixed kick; MAX_SPEED caps the ball.
+--   * Pop bumpers and slingshots ADD a kick of their own (a fixed strength, give or take a seeded tenth, as a
+--     real coil varies); MAX_SPEED caps the ball.
 --   * Ramps are rails: a ball that enters the mouth fast enough rides the rail, loses speed climbing (height
 --     costs GRAVITY_H per stud) and rolls back out if it stalls. A kick-out hole swallows a slow ball and
 --     throws it back out. A spinner turns as fast as the ball went through it and runs down by itself.
@@ -47,6 +48,7 @@ Physics.MAX_SPEED = 30 -- studs/s (about 6.5 m/s on the real table)
 Physics.SUB_TRAVEL = Layout.BALL_R * 0.3
 Physics.MAX_SUBSTEPS = 12
 Physics.ROLL_DECEL = 0.2 -- studs/s^2 of rolling resistance
+Physics.ROLL_V = 0.5 -- below this speed the resistance fades with the speed, so it can never hold a ball still on a slope or balanced on a post (only a real pocket does that)
 Physics.REST_V0 = 0.15 -- below this speed into a surface nothing bounces back
 Physics.REST_V1 = 0.6 -- from here up the surface's full liveliness
 Physics.FLIP_ACC_UP = 2500 -- rad/s^2 under the power winding of the coil: it is at full speed a third of the way up, so the tip hits hard
@@ -65,6 +67,7 @@ Physics.BUMPER_KICK = 6.5 -- studs/s outward, whatever the ball came in at
 Physics.BUMPER_MIN = 0.3 -- the skirt needs this much of a touch to fire
 Physics.BUMPER_E = 0.5 -- a dead bumper (tilt, or too soft a touch) is a rubber post
 Physics.SLING_KICK = 5.0
+Physics.KICK_JITTER = 0.1 -- a coil never kicks twice the same: bumpers and slingshots vary by this share, seeded (so no ball is batted round the same loop for ever)
 Physics.SLING_MIN = 0.7
 Physics.DROP_MIN = 0.4 -- speed into a drop target that knocks it down
 Physics.DROP_E = 0.3
@@ -120,6 +123,9 @@ export type Ball = {
 	cool: number, -- ticks left of not being swallowed
 	still: number, -- ticks in a row slow and touching
 	hit: boolean, -- touched something this tick
+	sup: number, -- what is under it this tick (bits: something that leans it right, something that leans it left)
+	sup0: number, -- and the tick before
+	firm: number, -- ticks in a row slow and held up from both sides
 	asleep: boolean,
 }
 
@@ -148,6 +154,12 @@ local SEG_DROP, SEG_SLING, SEG_GATE, SEG_STANDUP =
 local CIR_BUMPER = Layout.CIR_BUMPER
 local SEN_ROLLOVER, SEN_SPINNER = Layout.SEN_ROLLOVER, Layout.SEN_SPINNER
 local sqrt, floor = math.sqrt, math.floor
+local bor = bit32.bor
+local ROLL_V2 = Physics.ROLL_V * Physics.ROLL_V
+local ROLL_SLOW = Physics.ROLL_DECEL / Physics.ROLL_V
+-- what holds a ball up: something under it that leans it to the right, to the left, or a level floor
+local SUP_RIGHT, SUP_LEFT, SUP_BOTH = 1, 2, 3
+local SUP_LEAN = 0.02 -- a surface whose normal is this close to straight up the table is level
 
 -- per-step scratch, rebuilt from the state at the top of every step (nothing is carried in it)
 local fMove: { boolean } = {} -- the flipper is not lying still on a stop this tick
@@ -204,6 +216,9 @@ function Physics.addBall(s: State, x: number, y: number, vx: number, vy: number)
 		cool = 0,
 		still = 0,
 		hit = false,
+		sup = 0,
+		sup0 = 0,
+		firm = 0,
 		asleep = false,
 	})
 	return #s.balls
@@ -229,6 +244,7 @@ function Physics.wake(s: State)
 	for _, b in s.balls do
 		b.asleep = false
 		b.still = 0
+		b.firm = 0
 	end
 end
 
@@ -240,6 +256,7 @@ function Physics.nudge(s: State, dvx: number, dvy: number)
 			b.vy += dvy
 			b.asleep = false
 			b.still = 0
+			b.firm = 0
 		end
 	end
 end
@@ -250,6 +267,7 @@ function Physics.launch(s: State, index: number, speed: number)
 		b.vy = speed
 		b.asleep = false
 		b.still = 0
+		b.firm = 0
 	end
 end
 
@@ -424,6 +442,17 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 		touched = true
 		b.x = x + nx * bestPen
 		b.y = y + ny * bestPen
+		if ny > 0.05 then
+			-- it is resting on this (if it is resting at all): which way does the thing lean it?
+			if nx > SUP_LEAN then
+				b.sup = bor(b.sup, SUP_RIGHT)
+			elseif nx < -SUP_LEAN then
+				b.sup = bor(b.sup, SUP_LEFT)
+			elseif bestKind == 1 and bestT > 0 and bestT < 1 then
+				-- the flat of a level wall (the plunger's tip); the crown of a post or a corner is not a floor
+				b.sup = SUP_BOTH
+			end
+		end
 		if bestKind == 3 then
 			-- the flipper: its surface is moving, so everything is measured against the surface
 			local i = bestI
@@ -475,7 +504,7 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 					e, mu = c.sE[id], c.sMu[id]
 					if kind == SEG_SLING then
 						if not s.dead and sp > Physics.SLING_MIN and bestT > 0.12 and bestT < 0.88 then
-							kick = Physics.SLING_KICK
+							kick = Physics.SLING_KICK * (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
 							emit(ev, EV.SLING, c.sRef[id], sp, bi)
 						end
 					elseif kind == SEG_DROP then
@@ -505,8 +534,9 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 							emit(ev, EV.BUMPER, c.cRef[i], 1, bi)
 							-- a bumper throws the ball out at its own speed, whatever came in
 							local vt = b.vy * nx - b.vx * ny
-							b.vx = Physics.BUMPER_KICK * nx - vt * ny
-							b.vy = Physics.BUMPER_KICK * ny + vt * nx
+							local out = Physics.BUMPER_KICK * (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
+							b.vx = out * nx - vt * ny
+							b.vy = out * ny + vt * nx
 							continue
 						end
 						e = Physics.BUMPER_E
@@ -710,6 +740,7 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 			if anyMoved and b.asleep then
 				b.asleep = false
 				b.still = 0
+				b.firm = 0
 			end
 			if not b.asleep then
 				anyFree = true
@@ -770,16 +801,15 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 				local x0, y0 = b.x, b.y
 				local vx, vy = b.vx, b.vy - g * h
 				local sp2 = vx * vx + vy * vy
-				if sp2 > 1e-12 then
-					local sp = sqrt(sp2)
-					local lose = Physics.ROLL_DECEL * h
-					if sp <= lose then
-						vx, vy = 0, 0
-					else
-						local keep = 1 - lose / sp
-						vx *= keep
-						vy *= keep
-					end
+				if sp2 >= ROLL_V2 then
+					local keep = 1 - Physics.ROLL_DECEL * h / sqrt(sp2)
+					vx *= keep
+					vy *= keep
+				else
+					-- slow: the resistance is in proportion to the speed (the same at ROLL_V, nothing at rest)
+					local keep = 1 - ROLL_SLOW * h
+					vx *= keep
+					vy *= keep
 				end
 				b.vx, b.vy = vx, vy
 				b.x = x0 + vx * h
@@ -849,6 +879,7 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 									b.x, b.y, b.z = r.x[1], r.y[1], r.h[1]
 									b.vx, b.vy = 0, 0
 									b.still = 0
+									b.firm = 0
 									emit(ev, EV.RAIL_IN, ri, va, bi)
 									break
 								end
@@ -880,6 +911,7 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 								b.x, b.y = sc.x, sc.y
 								b.vx, b.vy = 0, 0
 								b.still = 0
+								b.firm = 0
 								emit(ev, EV.SAUCER, j, 0, bi)
 								break
 							end
@@ -947,17 +979,28 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 				b.mode = GONE
 				emit(ev, EV.DRAIN, 0, b.x, bi)
 			elseif not b.asleep then
-				-- slow and touching something for a quarter of a second: it has come to rest
+				-- slow and touching something for a quarter of a second, and held from both sides (two things
+				-- under it that lean it opposite ways, or a level floor): it has come to rest. A ball that
+				-- only leans on one thing is rolling off it, however slowly
 				if b.hit and b.vx * b.vx + b.vy * b.vy < Physics.SLEEP_V * Physics.SLEEP_V then
 					b.still += 1
-					if b.still >= Physics.SLEEP_TICKS then
+					if bor(b.sup, b.sup0) == SUP_BOTH then
+						b.firm += 1
+					else
+						b.firm = 0
+					end
+					if b.still >= Physics.SLEEP_TICKS and b.firm >= Physics.SLEEP_TICKS then
 						b.asleep = true
 						b.vx, b.vy = 0, 0
 						b.still = 0
+						b.firm = 0
 					end
 				else
 					b.still = 0
+					b.firm = 0
 				end
+				b.sup0 = b.sup
+				b.sup = 0
 			end
 			b.hit = false
 		elseif mode == RAIL then

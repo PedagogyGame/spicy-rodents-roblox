@@ -16,7 +16,7 @@
 -- toward the centre (0), positive up the table, for either hand.
 -- Pure; Lune-tested (tests/unit/pinball_layout.spec.luau).
 -- Interface: WIDTH, LENGTH, BALL_R, FIELD_X1, XC, TILT_RAD; MATERIALS; new(id, title) -> TableDef;
---   arc(cx, cy, r, deg0, deg1, n) -> pts; mirror(pts, xc?) -> pts; wall, post, lamp, cup; addShell (rails, arch,
+--   arc(cx, cy, r, deg0, deg1, n) -> pts; mirror(pts, xc?) -> pts; wall, post, endPost, lamp, cup; addShell (rails, arch,
 --   shooter lane), addBottom (the flippers, slings, inlanes and outlanes every table shares, from a few
 --   numbers); index(def) -> Index (element numbers by id); compile(def) -> Compiled; check(def) -> (ok, why?);
 --   cabinetPoint(x, y, h) -> (across, up, along) for the bake and the client
@@ -283,6 +283,22 @@ function Layout.post(def: TableDef, x: number, y: number, r: number?, mat: strin
 	table.insert(def.posts, { x = x, y = y, r = r or 0.022, mat = mat or "rubber" })
 end
 
+-- endPost(def, x, y, fromX, fromY, r, mat): the post at the end (x, y) of a wall or a target that comes from
+-- (fromX, fromY), set back by its own radius so that the upper face of the wall runs onto the crown of the post
+-- without a step. (A post standing ON the end of a gently sloped wall makes a notch between the two, and a
+-- ball that dribbles down the wall with no speed left sits in it for ever.)
+function Layout.endPost(def: TableDef, x: number, y: number, fromX: number, fromY: number, r: number?, mat: string?)
+	local radius = r or 0.022
+	local dx, dy = x - fromX, y - fromY
+	local l = math.sqrt(dx * dx + dy * dy)
+	-- the wall's normal on its upper side (the side that faces up the table)
+	local nx, ny = -dy / l, dx / l
+	if ny < 0 then
+		nx, ny = -nx, -ny
+	end
+	Layout.post(def, x - nx * radius, y - ny * radius, radius, mat)
+end
+
 function Layout.lamp(def: TableDef, id: string, x: number, y: number, colour: string)
 	table.insert(def.lamps, { id = id, x = x, y = y, colour = colour })
 end
@@ -400,12 +416,18 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 		rest = rest,
 		up = up,
 	})
-	-- the inlane guide runs down to the flipper at the flipper's own resting slope, so a ball rolls off the
-	-- guide and along the flipper without a step
-	local slope = -Det.sin(rest) / Det.cos(rest)
+	-- The inlane guide runs down to the flipper in one line with the flipper's upper face as it lies at rest
+	-- (the face of a tapered flipper is a little steeper than its axis) and ends where that face leaves the
+	-- hub. So a ball rolls off the guide and on along the flipper without a step, a notch or a hop: one that
+	-- arrives with no speed left still rolls on, and one that arrives fast stays on the rubber.
+	local taperSin = (rBase - rTip) / len
+	local taperCos = math.sqrt(1 - taperSin * taperSin)
+	local faceSin = -Det.sin(rest) * taperCos + Det.cos(rest) * taperSin -- the face's fall, as an angle below level
+	local faceCos = Det.cos(rest) * taperCos + Det.sin(rest) * taperSin
+	local slope = faceSin / faceCos
 	local xo = spec.outlane
 	local xi = xo + spec.inlane
-	local gx1, gy1 = px - 0.012, py + rBase - 0.004
+	local gx1, gy1 = px + rBase * faceSin, py + rBase * faceCos
 	local gy0 = gy1 + (gx1 - xo) * slope
 	local function guideY(x: number): number
 		return gy0 - (x - xo) * slope

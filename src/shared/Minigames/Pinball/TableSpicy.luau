@@ -129,7 +129,7 @@ Layout.lamp(def, "extra_ball", 1.42, 3.12, "red")
 -- the nest: three pop bumpers top left, where a hard plunge comes down off the arch; a rebound rubber on the
 -- left rail turns a ball running down the rail into them
 Layout.wall(def, "rubber", { 0.0, 4.05, 0.17, 3.97 })
-Layout.post(def, 0.17, 3.97)
+Layout.endPost(def, 0.17, 3.97, 0.0, 4.05)
 table.insert(def.bumpers, { id = "bumper_1", x = 0.3, y = 3.72, r = 0.115 })
 table.insert(def.bumpers, { id = "bumper_2", x = 0.72, y = 3.86, r = 0.115 })
 table.insert(def.bumpers, { id = "bumper_3", x = 0.36, y = 3.28, r = 0.115 })

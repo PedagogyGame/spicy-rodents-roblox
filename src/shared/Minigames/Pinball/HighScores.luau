@@ -18,36 +18,40 @@ HighScores.NAME_MAX = 20
 
 export type Entry = { name: string, score: number, house: boolean }
 export type Board = { id: string, entries: { Entry } }
+export type House = { name: string, score: number }
 
 -- the house's scores per machine: the names are the machine's own cast, the numbers its own score scale
 HighScores.HOUSE = {
 	pinball_acorn = {
-		{ "OLD OAK", 40000 },
-		{ "CHESTNUT", 25000 },
-		{ "HAZEL", 15000 },
-		{ "BEECH", 8000 },
-		{ "SAPLING", 4000 },
+		{ name = "OLD OAK", score = 40000 },
+		{ name = "CHESTNUT", score = 25000 },
+		{ name = "HAZEL", score = 15000 },
+		{ name = "BEECH", score = 8000 },
+		{ name = "SAPLING", score = 4000 },
 	},
 	pinball_rodent = {
-		{ "THE RODENT", 900000 },
-		{ "SCORCH", 500000 },
-		{ "EMBER", 250000 },
-		{ "CINDER", 100000 },
-		{ "SPARK", 40000 },
+		{ name = "THE RODENT", score = 900000 },
+		{ name = "SCORCH", score = 500000 },
+		{ name = "EMBER", score = 250000 },
+		{ name = "CINDER", score = 100000 },
+		{ name = "SPARK", score = 40000 },
 	},
 	pinball_space = {
-		{ "MISSION CONTROL", 15000000 },
-		{ "COMET", 6000000 },
-		{ "ORBITER", 2500000 },
-		{ "BOOSTER", 800000 },
-		{ "CADET", 250000 },
+		{ name = "MISSION CONTROL", score = 15000000 },
+		{ name = "COMET", score = 6000000 },
+		{ name = "ORBITER", score = 2500000 },
+		{ name = "BOOSTER", score = 800000 },
+		{ name = "CADET", score = 250000 },
 	},
-} :: { [string]: { { any } } }
+} :: { [string]: { House } }
 
 function HighScores.new(tableId: string): Board
 	local board: Board = { id = tableId, entries = {} }
-	for _, e in HighScores.HOUSE[tableId] or {} do
-		table.insert(board.entries, { name = e[1], score = e[2], house = true })
+	local house = HighScores.HOUSE[tableId]
+	if house then
+		for _, e in house do
+			table.insert(board.entries, { name = e.name, score = e.score, house = true })
+		end
 	end
 	return board
 end

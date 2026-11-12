@@ -316,7 +316,7 @@ return function(t: Test.T)
 
 	t.test("PIN-P1: left and right flippers shoot mirror images of each other", function()
 		local l, r = cradle(LEFT), cradle(RIGHT)
-		for _, delay in { 100, 140, 180, 210 } do
+		for _, delay in { 70, 95, 120, 145 } do
 			local a, b = shot(l, LEFT, delay), shot(r, RIGHT, delay)
 			assert(a and b, "both shots left the flipper")
 			t.near(a.along, b.along, 0.01)
