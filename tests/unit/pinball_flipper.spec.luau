@@ -91,12 +91,21 @@ return function(t: Test.T)
 			end
 			local ms = ticks / Physics.HZ * 1000
 			t.truthy(ms >= 40 and ms <= 50, `stroke {ms} ms`)
-			-- it bounces a little off its stop and settles there
+			-- it comes a degree or two back off its stop (the hold winding is weak) and is home again within a
+			-- twentieth of a second
+			local back, away = 0, 0
 			for _ = 1, 60 do
 				Physics.step(c, s, true, false, ev)
+				if s.fa[LEFT] < c.fup[LEFT] then
+					away += 1
+					back = math.max(back, math.deg(c.fup[LEFT] - s.fa[LEFT]))
+				end
 			end
+			t.truthy(back >= 1 and back <= 4, `it comes {back} degrees back off the stop`)
+			t.truthy(away >= 6 and away <= 12, `and is {away} ticks coming home`)
 			t.eq(s.fa[LEFT], c.fup[LEFT])
 			t.eq(s.fw[LEFT], 0)
+			t.eq(s.fo[LEFT], 0, "a flipper lying on its stop has no surface speed")
 			-- and falls back slower, under its spring
 			local down = 0
 			while s.fa[LEFT] > c.frest[LEFT] and down < 200 do
@@ -113,7 +122,8 @@ return function(t: Test.T)
 		function()
 			local s = Physics.new(c, 1)
 			local ev: { number } = {}
-			for _ = 1, 30 do
+			-- (a quarter of a second: the stroke, and the flipper settled on its stop)
+			for _ = 1, 60 do
 				Physics.step(c, s, false, true, ev)
 			end
 			t.eq(s.fa[LEFT], c.frest[LEFT])
@@ -326,6 +336,58 @@ return function(t: Test.T)
 	end)
 
 	t.test(
+		"PIN-P1: a ball met in mid-stroke is hit as hard wherever inside a tick the two meet: no weak hits by chance",
+		function()
+			-- a ball falls onto the outer part of the left flipper while it is swinging up; dropped from a hair
+			-- higher each time, it meets the flipper a hair later, in every part of a tick in turn. The speed it
+			-- leaves at must move smoothly with the height: the surface's speed at the meeting, plus the bounce.
+			local mid = (c.frest[LEFT] + c.fup[LEFT]) / 2
+			local px = c.fpx[LEFT] + math.cos(mid) * c.flen[LEFT] * 0.7
+			local py = c.fpy[LEFT] + math.sin(mid) * c.flen[LEFT] * 0.7
+			local speeds: { number } = {}
+			local metAt: { [number]: boolean } = {}
+			for k = 0, 79 do
+				local s = Physics.new(c, 1)
+				local ev: { number } = {}
+				Physics.addBall(s, px, py + 0.22 + k * 0.0011, 0, -3)
+				local b = s.balls[1]
+				local met = 0
+				for tick = 1, 60 do
+					table.clear(ev)
+					Physics.step(c, s, true, false, ev)
+					for i = 1, #ev, 4 do
+						if ev[i] == Physics.EV.FLIPPER and met == 0 then
+							met = tick
+						end
+					end
+					if met > 0 and tick == met + 6 then
+						table.insert(speeds, math.sqrt(b.vx * b.vx + b.vy * b.vy))
+						break
+					end
+				end
+				t.truthy(met > 0, `drop {k} met the flipper`)
+				metAt[met] = true
+			end
+			t.eq(#speeds, 80)
+			local ticksSeen = 0
+			for _ in metAt do
+				ticksSeen += 1
+			end
+			t.truthy(ticksSeen >= 2, "the drops met the flipper in more than one tick, at every point inside one")
+			local low, high = math.huge, 0
+			for i = 2, #speeds do
+				local step = math.abs(speeds[i] - speeds[i - 1]) / speeds[i - 1]
+				t.truthy(step < 0.03, `drop {i}: {speeds[i - 1]} then {speeds[i]} studs/s (a jump of {step})`)
+				low, high = math.min(low, speeds[i]), math.max(high, speeds[i])
+			end
+			-- and every one is a real hit: faster than the surface alone could carry it (the bounce is on top)
+			local surface = Physics.FLIP_W_MAX * c.flen[LEFT] * 0.7
+			t.truthy(low > surface * 1.2, `the weakest ({low}) is well over the surface's own speed ({surface})`)
+			t.truthy(high < low * 1.25, `the spread is small ({low} to {high})`)
+		end
+	)
+
+	t.test(
 		"PIN-P2: a live catch: a flip timed so the flipper reaches its stop as the ball lands deadens the ball",
 		function()
 			-- a ball falls from up the table onto the middle of the left flipper; how far does it hop off the
@@ -355,7 +417,8 @@ return function(t: Test.T)
 			-- on a flipper held up all along it bounces
 			local held, landsAt = hop(1)
 			t.truthy(held > 0.1, `it hops off a held flipper ({held})`)
-			-- flipped so the stroke ends as it lands, the flipper is on the recoil and takes the bounce out
+			-- flipped so the stroke ends as it lands, the flipper is off its stop with only the hold winding on:
+			-- the ball meets the bat's own weight, not the coil, and the bounce is taken out
 			local best, window = math.huge, 0
 			for flipAt = landsAt - 24, landsAt - 6 do
 				local high = hop(flipAt)
@@ -365,11 +428,17 @@ return function(t: Test.T)
 				end
 			end
 			t.truthy(best < held * 0.35, `the best catch leaves under a third of the hop ({best} of {held})`)
-			t.truthy(window >= 2, `the window is at least two ticks wide ({window})`)
+			t.truthy(window >= 3, `the window is at least three ticks wide ({window})`)
 			t.truthy(window <= 8, `and it takes timing ({window})`)
 			-- flipped late, into the falling ball, it is a hit, not a catch
 			local late = hop(landsAt - 3)
 			t.truthy(late > held * 2, "a late flip bats it away")
+			-- flipped early, the flipper is home on its stop when the ball lands: the hop of a held flipper,
+			-- never more (a flipper coming home under the hold winding cannot bat a ball)
+			for flipAt = landsAt - 60, landsAt - 26, 2 do
+				local high = hop(flipAt)
+				t.truthy(high <= held * 1.1, `flipped {landsAt - flipAt} ticks early it hops {high} of {held}`)
+			end
 		end
 	)
 end

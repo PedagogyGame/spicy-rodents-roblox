@@ -56,8 +56,14 @@ local function flipperReport(tbl: Machine.Table)
 		Physics.step(c, s, true, false, ev)
 		up += 1
 	end
+	-- off the stop again: how far it comes back and how long it is coming home
+	local back, away = 0, 0
 	for _ = 1, 60 do
 		Physics.step(c, s, true, false, ev)
+		if s.fa[1] < c.fup[1] then
+			away += 1
+			back = math.max(back, math.deg(c.fup[1] - s.fa[1]))
+		end
 	end
 	local down = 0
 	while s.fa[1] > c.frest[1] and down < 400 do
@@ -68,7 +74,42 @@ local function flipperReport(tbl: Machine.Table)
 		`  flipper: stroke {fmt(up / 240 * 1000, 0)} ms, fall {fmt(down / 240 * 1000, 0)} ms, swing {fmt(
 			math.deg(c.fup[1] - c.frest[1]),
 			0
-		)} degrees, tip speed {fmt(Physics.FLIP_W_MAX * c.freach[1])} studs/s`
+		)} degrees, tip speed {fmt(Physics.FLIP_W_MAX * c.freach[1])} studs/s; at the top it comes {fmt(back)} degrees back off its stop and is home in {fmt(
+			away / 240 * 1000,
+			0
+		)} ms`
+	)
+
+	-- a ball met in mid-stroke: dropped from a hair higher each time, it meets the flipper at every point
+	-- inside a tick in turn; it must leave as fast each time
+	local mid = (c.frest[1] + c.fup[1]) / 2
+	local mx, my = c.fpx[1] + math.cos(mid) * c.flen[1] * 0.7, c.fpy[1] + math.sin(mid) * c.flen[1] * 0.7
+	local slow, fast = math.huge, 0
+	for k = 0, 79 do
+		local p = Physics.new(c, 1)
+		Physics.addBall(p, mx, my + 0.22 + k * 0.0011, 0, -3)
+		local b = p.balls[1]
+		local met = 0
+		for tick = 1, 60 do
+			table.clear(ev)
+			Physics.step(c, p, true, false, ev)
+			for i = 1, #ev, 4 do
+				if ev[i] == Physics.EV.FLIPPER and met == 0 then
+					met = tick
+				end
+			end
+			if met > 0 and tick == met + 6 then
+				local speed = math.sqrt(b.vx * b.vx + b.vy * b.vy)
+				slow, fast = math.min(slow, speed), math.max(fast, speed)
+				break
+			end
+		end
+	end
+	table.clear(ev)
+	print(
+		`  a ball falling at 3 studs/s met in mid-stroke, 0.7 of the way out (surface {fmt(
+			Physics.FLIP_W_MAX * c.flen[1] * 0.7
+		)} studs/s): it leaves at {fmt(slow)} to {fmt(fast)} studs/s, wherever inside a tick the two meet`
 	)
 
 	-- the shot curve: a cradled ball is let go and flipped after a delay (from the shot book's trials)
@@ -133,14 +174,25 @@ local function flipperReport(tbl: Machine.Table)
 	end
 	local held, landsAt = hop(1)
 	local parts = {}
-	for flipAt = landsAt - 22, landsAt - 6, 2 do
+	local window, first, last = 0, 0, 0
+	for flipAt = landsAt - 26, landsAt - 6 do
 		local high = hop(flipAt)
-		table.insert(parts, `{fmt((flipAt - landsAt) / 240 * 1000, 0)} ms: {fmt(high / held * 100, 0)}%`)
+		table.insert(parts, `{flipAt - landsAt}: {fmt(high / held * 100, 0)}%`)
+		if high < held / 2 then
+			window += 1
+			first = if first == 0 then flipAt - landsAt else first
+			last = flipAt - landsAt
+		end
 	end
 	print(
-		`  live catch (a ball dropped on the flipper hops {fmt(held, 2)} studs off it when it is held; flipped so long before the ball lands, the hop is):`
+		`  live catch (a ball dropped on the flipper hops {fmt(held, 2)} studs off it when it is held; flipped so many ticks before the ball lands, the hop is):`
 	)
-	print("    " .. table.concat(parts, "   "))
+	print("    " .. table.concat(parts, "  "))
+	print(
+		if window > 0
+			then `    the catch (under half the hop): {window} ticks ({fmt(window / 240 * 1000, 0)} ms), flipping {-first} to {-last} ticks ahead; earlier is a held flipper, later is a hit`
+			else "    NO live catch at this spot"
+	)
 end
 
 local function surveyReport(tbl: Machine.Table)

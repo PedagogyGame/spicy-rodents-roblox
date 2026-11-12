@@ -368,7 +368,7 @@ return function(t: Test.T)
 		t.falsy(m.tilted)
 		t.falsy(m.phys.dead)
 		t.eq(m.warnings, 0)
-		run(acorn, m, BTN.LEFT, 30, out)
+		run(acorn, m, BTN.LEFT, 60, out)
 		t.eq(m.phys.fa[1], acorn.c.fup[1], "the flippers are alive again")
 	end)
 

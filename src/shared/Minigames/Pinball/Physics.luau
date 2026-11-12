@@ -15,9 +15,11 @@
 --     rubber), a ball that meets it is HIT (it takes the surface's speed at the point of contact, pivot distance
 --     times angular speed, plus its bounce). So the tip hits harder than the base, and where the ball is on the
 --     flipper when the button goes down sets the angle it leaves at, smoothly: timing aims. A held flipper is a
---     solid slope (a ball can be cradled on it and stops dead); a flipper that has just hit its stop is on the
---     recoil, moving away, and a ball landing right then is deadened (a live catch). None of that is scripted;
---     it falls out of the collision.
+--     solid slope (a ball can be cradled on it and stops dead). A flipper that has just hit its stop comes a
+--     degree or two back off it and is brought home by the weak hold winding: for that thirtieth of a second
+--     it is moving away and then has nothing behind it but its own weight, so a ball landing right then is
+--     deadened (a live catch: ball against a bat of FLIP_BAT, by the conservation of momentum). None of that
+--     is scripted; it falls out of the collision.
 --   * Nothing tunnels. Each tick is cut into as many sub-steps as it takes for the ball and the flipper
 --     surfaces to move no more than SUB_TRAVEL (under a third of the ball's radius) relative to each other, and
 --     a wall is a line the ball's centre may not come within one radius of, from either side.
@@ -52,7 +54,7 @@ Physics.ROLL_V = 0.5 -- below this speed the resistance fades with the speed, so
 Physics.REST_V0 = 0.15 -- below this speed into a surface nothing bounces back
 Physics.REST_V1 = 0.6 -- from here up the surface's full liveliness
 Physics.FLIP_ACC_UP = 2500 -- rad/s^2 under the power winding of the coil: it is at full speed a third of the way up, so the tip hits hard
-Physics.FLIP_ACC_HOLD = 250 -- rad/s^2 under the hold winding (once the flipper has reached its top stop)
+Physics.FLIP_ACC_HOLD = 300 -- rad/s^2 under the hold winding (once the flipper has reached its top stop): weak, so the flipper comes a degree or two back off the stop and is about a thirtieth of a second coming home; that is the moment of the live catch (FLIP_BAT), and the weaker the winding the longer it lasts (tools/games/pinball/calibrate.luau)
 Physics.FLIP_W_MAX = 35 -- rad/s
 Physics.FLIP_W_SETTLE = 1.5 -- rad/s: how fast a flipper that has bounced off its top stop comes back to it
 Physics.FLIP_ACC_DOWN = 240 -- rad/s^2 under the return spring
@@ -62,6 +64,7 @@ Physics.FLIP_STOP_E = 0.12 -- how much of its speed the flipper keeps bouncing o
 Physics.FLIP_REST_E = 0.2 -- and off the bottom one
 Physics.FLIP_BOUNCE_MIN = 2 -- rad/s: slower than this it simply stops
 Physics.FLIP_E = 0.55 -- flipper rubber
+Physics.FLIP_BAT = 0.12 -- the bat's moment of inertia about its pivot, in ball masses times its length squared (a real bat and its link against a real ball): what a ball meets when the flipper is off its stop with only the hold winding on
 Physics.FLIP_MU = 0.2 -- flipper rubber grips: with none the ball is slung off the tip from anywhere, with too much every shot leaves square to the flipper; this spreads the shots along its length (tools/games/pinball/calibrate.luau)
 Physics.BUMPER_KICK = 6.5 -- studs/s outward, whatever the ball came in at
 Physics.BUMPER_MIN = 0.3 -- the skirt needs this much of a touch to fire
@@ -134,6 +137,7 @@ export type State = {
 	balls: { Ball },
 	fa: { number }, -- flipper angles
 	fw: { number }, -- flipper angular speeds
+	fo: { number }, -- how fast each flipper's surface turned over the last sub-step it moved in (about the table's +z, so a right flipper's is mirrored; 0 while it lies on a stop): a ball lying on it has this speed, and what the surface gains on top of it is a push, not a hit, whichever tick the sub-step belongs to
 	fp: { boolean }, -- flipper button as last seen
 	fh: { boolean }, -- the flipper has reached its top stop on this press (the coil is on its hold winding)
 	drop: { boolean }, -- per target: a drop target that is down
@@ -163,8 +167,7 @@ local SUP_LEAN = 0.002 -- a surface whose normal is this close to straight up th
 
 -- per-step scratch, rebuilt from the state at the top of every step (nothing is carried in it)
 local fMove: { boolean } = {} -- the flipper is not lying still on a stop this tick
-local fOm: { number } = {} -- angular speed of the surface over the sub-step in hand (mirrored: about +z of the table)
-local fRise: { number } = {} -- how much that speed changed from the sub-step before (rad/s, never negative)
+local fRise: { number } = {} -- how much the surface's speed (state.fo) changed from the sub-step before (rad/s, never negative)
 local fDx: { number } = {} -- the flipper's direction in the sub-step in hand
 local fDy: { number } = {}
 local subG = 0 -- the speed gravity alone adds in one sub-step
@@ -175,6 +178,7 @@ function Physics.new(c: Layout.Compiled, seed: number): State
 		balls = {},
 		fa = {},
 		fw = {},
+		fo = {},
 		fp = {},
 		fh = {},
 		drop = table.create(#c.def.targets, false),
@@ -186,6 +190,7 @@ function Physics.new(c: Layout.Compiled, seed: number): State
 	for i = 1, c.nFlip do
 		s.fa[i] = c.frest[i]
 		s.fw[i] = 0
+		s.fo[i] = 0
 		s.fp[i] = false
 		s.fh[i] = false
 	end
@@ -458,7 +463,7 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 			local i = bestI
 			local qx, qy = x - c.fpx[i], y - c.fpy[i]
 			local px, py = qx - nx * bestSd, qy - ny * bestSd
-			local om = fOm[i]
+			local om = s.fo[i]
 			local svx, svy = -om * py, om * px
 			local rvx, rvy = b.vx - svx, b.vy - svy
 			local vn = rvx * nx + rvy * ny
@@ -467,12 +472,27 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 				-- A flipper that is speeding up under a ball lying on it PUSHES the ball; it does not hit it. The
 				-- part of the closing speed that is only the surface gaining speed in this sub-step (and gravity
 				-- pressing the ball down) is taken up dead; what is left over is a hit and bounces.
-				local push = fRise[i] * sqrt(px * px + py * py) + subG
+				local arm = sqrt(px * px + py * py)
+				local push = fRise[i] * arm + subG
 				local hit = sp - push
 				if hit < 0 then
 					hit = 0
 				end
-				local out = Physics.FLIP_E * fade(hit) * hit
+				local e = Physics.FLIP_E
+				if s.fh[i] and s.fa[i] < c.fup[i] then
+					-- The flipper has come back off its stop and only the hold winding is on it: too weak to stand
+					-- against a hit, so what the ball meets is the bat's own weight. Ball against a bat whose weight
+					-- at the point of meeting is M balls leaves with (e M - 1) / (M + 1) of the closing speed, and M
+					-- is FLIP_BAT over the square of how far out they meet: lively close to the pivot, dead from about
+					-- a quarter of the way out. (The bat's own knock back is not drawn; the winding brings it home.)
+					local q = arm / c.flen[i]
+					local q2 = q * q
+					e = (e * Physics.FLIP_BAT - q2) / (Physics.FLIP_BAT + q2)
+					if e < 0 then
+						e = 0
+					end
+				end
+				local out = e * fade(hit) * hit
 				-- the rubber grips in proportion to how hard the two are pressed together (a ball merely lying on
 				-- the flipper rolls freely)
 				local grip = Physics.FLIP_MU * (sp + out - 2 * subG)
@@ -718,8 +738,10 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 		local a0, w = s.fa[i], s.fw[i]
 		local moving = w ~= 0 or (if pressed then a0 < c.fup[i] else a0 > c.frest[i])
 		fMove[i] = moving
-		fOm[i] = 0
 		fRise[i] = 0
+		if not moving then
+			s.fo[i] = 0
+		end
 		fDx[i] = c.fmir[i] * Det.cos(a0)
 		fDy[i] = Det.sin(a0)
 		if moving then
@@ -772,6 +794,7 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 			for i = 1, nF do
 				if fMove[i] then
 					turn(c, s, i, DT)
+					s.fo[i] = c.fmir[i] * s.fw[i]
 				end
 			end
 		end
@@ -780,12 +803,13 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 			if anyMoved then
 				for i = 1, nF do
 					if fMove[i] then
-						-- the surface's speed over this sub-step, and how much it rose since the one before
-						local before = fOm[i]
+						-- the surface's speed over this sub-step, and how much it rose since the one before (the last
+						-- sub-step of the tick before, at the top of a tick: a hit is as hard wherever in a tick it lands)
+						local before = s.fo[i]
 						local da = turn(c, s, i, h)
 						local om = c.fmir[i] * da / h
 						local rise = om - before
-						fOm[i] = om
+						s.fo[i] = om
 						fRise[i] = if rise < 0 then -rise else rise
 						local a = s.fa[i]
 						fDx[i] = c.fmir[i] * Det.cos(a)
