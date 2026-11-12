@@ -470,10 +470,10 @@ return function(t)
 	t.test(
 		"POOL-P5 over many breaks: something is potted often, the cue ball is not always lost, no two alike",
 		function()
-			-- the designer's band (tools/pool/calibrate.luau prints it over more racks): about one ball a break and
-			-- 35 to 45 % of breaks dry. It is pinned so that tuning a pocket, a cushion or the rack cannot quietly
-			-- dry the break out again
-			local N = 150
+			-- the designer's band: about one ball a break and 35 to 45 % of breaks dry (tools/pool/calibrate.luau
+			-- prints it). It is pinned so that tuning a pocket, a cushion, the rack or the balls cannot quietly dry
+			-- the break out again: it was half a ball a break and 60 % dry
+			local N = 200
 			local pots, dry, scratches, far, head = 0, 0, 0, 0, 0
 			local layouts: { [string]: boolean } = {}
 			local distinct = 0
@@ -510,9 +510,9 @@ return function(t)
 				end
 			end
 			t.eq(distinct, N, "every break is its own")
-			t.truthy(pots / N > 0.65 and pots / N < 1.3, `balls potted per break {pots / N}`)
-			t.truthy(dry / N > 0.3 and dry / N < 0.48, `dry breaks {dry / N}`)
-			t.truthy(scratches / N < 0.3, `scratches {scratches / N}`)
+			t.truthy(pots / N > 0.75 and pots / N < 1.25, `balls potted per break {pots / N}`)
+			t.truthy(dry / N > 0.3 and dry / N < 0.46, `dry breaks {dry / N}`)
+			t.truthy(scratches / N < 0.25, `scratches {scratches / N}`)
 			t.truthy(scratches > 0, "but it can happen")
 			t.truthy(far / N >= 8, `balls more than 2 studs from the rack: {far / N} of 15`)
 			t.truthy(head / N >= 3.5, `balls up in the head half: {head / N}`)
@@ -590,6 +590,40 @@ return function(t)
 			local st =
 				Cue.strike(1 + (k % 5), rng.range(-math.pi, math.pi), rng.range(0.2, 1), rng.range(-1, 1), 0, nil)
 			watch(world(bumper, Tables.bumperStart(), st), `bumper {k}`)
+		end
+	end)
+
+	t.test("energy never grows in one bounce, whatever speed, roll and side the ball brings to it", function()
+		-- a ball set a hair off the long cushion with any velocity, any roll (not only its own) and any side
+		-- spin: the cushion may turn its roll toward its new speed, but only out of what the hit gave up
+		local function bounced(vx: number, vz: number, qx: number, qz: number, s: number, label: string)
+			local w = Physics.world(pool, { { id = 0, x = pool.halfW - R - 1e-4, z = -2 } })
+			Physics.strike(w, 0, vx, vz, qx, qz, s)
+			local before = Physics.energy(w)
+			Physics.step(w)
+			t.eq(w.events[2], EV.cushion, label)
+			local after = Physics.energy(w)
+			t.truthy(after <= before * (1 + 1e-12), `{label}: {before} became {after}`)
+		end
+		-- the case that would cheat: skimming the cushion with just enough check side that its face does not
+		-- rub at all, sliding (no roll): it must not be handed a roll along the cushion for nothing
+		bounced(0.5, 10, 0, 0, -10, "a skim with check side")
+		bounced(0.5, -10, 0, 0, 10, "the same the other way")
+		bounced(3, 30, 0, 0, -30, "and hard")
+		local rng = Rng.new(99)
+		for k = 1, 400 do
+			local v = rng.range(0.5, 60)
+			local a = rng.range(-1.5, 1.5)
+			local q = rng.range(0, 1.2) * v
+			local qa = rng.range(-math.pi, math.pi)
+			bounced(
+				v * math.cos(a),
+				v * math.sin(a),
+				q * math.cos(qa),
+				q * math.sin(qa),
+				rng.range(-1.5, 1.5) * v,
+				`bounce {k}`
+			)
 		end
 	end)
 
@@ -683,6 +717,56 @@ return function(t)
 		t.truthy(w.contacts < 400, `{w.contacts} contacts`)
 		t.truthy(w.balls[2].z > w.balls[1].z + 2 * R - 1e-3, "and they never changed places")
 	end)
+
+	t.test(
+		"a ball leaning on another as they roll on is one push: one click, a few key points, not hundreds",
+		function()
+			-- slow, the back ball running a little across the line of centres: it slows less along that line than
+			-- the front one and leans on it step after step until they stop (it was an event and two key points
+			-- every step: one break in a hundred was a 9,000 number script with a buzz of clicks in it)
+			local a = math.rad(10)
+			local vb = 0.5 / math.cos(a)
+			local spots = { { id = 1, x = 0, z = 0 }, { id = 2, x = 0, z = 2 * R + 1e-4 } }
+			local back = strike(1, vb * math.sin(a), vb * math.cos(a), 1)
+			local front = strike(2, 0, 0.49, 1)
+			local w = Physics.world(pool, spots)
+			Physics.strike(w, 1, back.vx, back.vz, back.qx, back.qz, back.s)
+			Physics.strike(w, 2, front.vx, front.vz, front.qx, front.qz, front.s)
+			toRest(w)
+			t.truthy(w.contacts > 60, `they do lean: {w.contacts} contacts`)
+			local s = Shot.run(pool, spots, { back, front })
+			local clicks = 0
+			for _, c in Shot.cues(s) do
+				if c.name == "click" then
+					clicks += 1
+				end
+			end
+			t.eq(kinds(s, EV.ball), 1, "one ball event for the whole push")
+			t.eq(clicks, 1)
+			for i = 1, 2 do
+				local n = #s.tracks[i] / Physics.KEY_STRIDE
+				t.truthy(n <= 4 + w.t / Physics.KEY_QUIET, `ball {i}: {n} key points in {w.t} s`)
+			end
+			-- playback is never out by more than a hair, and ends exactly where the model did
+			local v = Physics.world(pool, spots)
+			Physics.strike(v, 1, back.vx, back.vz, back.qx, back.qz, back.s)
+			Physics.strike(v, 2, front.vx, front.vz, front.qx, front.qz, front.s)
+			local worst = 0
+			while Physics.step(v) do
+				for i = 1, 2 do
+					local x, z = Shot.pose(s, i, v.t)
+					worst = math.max(worst, math.abs(x - v.balls[i].x), math.abs(z - v.balls[i].z))
+				end
+			end
+			t.truthy(worst < 1e-4, `playback strays {worst} studs while they lean`)
+			for i = 1, 2 do
+				local x, z, _, mode = Shot.pose(s, i, s.tEnd)
+				t.near(x, w.balls[i].x, 1e-9)
+				t.near(z, w.balls[i].z, 1e-9)
+				t.eq(mode, Cloth.REST)
+			end
+		end
+	)
 
 	t.test("BP-P1 a bumper is lively rubber; a ball can rattle between two of them", function()
 		for _, v in { 3, 10, 25 } do

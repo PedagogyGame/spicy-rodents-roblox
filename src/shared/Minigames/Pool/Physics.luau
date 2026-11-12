@@ -23,9 +23,10 @@
 --   takes or gives up to MU of the hit, which is how running side widens the angle and check side narrows
 --   it; a hard hit sinks in and comes off a little short (shorten: half a degree to a degree between a soft
 --   bank and a hard one for a ball that arrives rolling); and the ball leaves with part of a natural roll
---   already on it both off the cushion (roll) and along it (keepAlong, rollAlong: the rubber grips the ball
---   above its middle, so what roll it had along the cushion is mostly traded for the roll of its new speed).
---   A firm centre-ball shot arrives still sliding and banks five or six degrees shorter than a soft one that
+--   already on it both off the cushion (roll) and along it (keepAlong, rollAlong: the rubber meets the ball
+--   above its middle, so what roll it had along the cushion is mostly traded for the roll of its new speed,
+--   by no more than the cushion's grip can turn it and never by more energy than the hit gave up).
+--   A firm centre-ball shot arrives still sliding and banks six or seven degrees shorter than a soft one that
 --   arrives rolling: the two banks a player learns, and nothing wilder than that (the whole swing with power
 --   is pinned under 8 degrees in the spec), so a bank learned once works again.
 --   Jaws are cushions that give less back, with the point between cushion and jaw as a round corner: a ball
@@ -42,9 +43,10 @@
 -- Everything in a step is + - * / and sqrt. Pure; Lune-tested (tests/unit/pool_physics.spec.luau).
 -- Interface: constants and the Response sets; world(table, spots) -> World; strike(world, id, vx, vz, qx,
 --   qz, s); step(world) -> moving; ball(world, id) -> Ball?; energy(world) -> number; moving(world) ->
---   boolean; EV (event kinds); world.contacts, world.knots (cost measures). world.events is flat { t, kind, a, b, speed, ... } (EVENT_STRIDE numbers each);
---   world.keys[i] is ball i's flat key points { t, x, z, vx, vz, qx, qz, s, y, mode, ... } (KEY_STRIDE each),
---   written whenever something changes its motion.
+--   boolean; EV (event kinds); world.contacts, world.knots (cost measures). world.events is flat { t, kind,
+--   a, b, speed, ... } (EVENT_STRIDE numbers each); world.keys[i] is ball i's flat key points { t, x, z, vx,
+--   vz, qx, qz, s, y, mode, ... } (KEY_STRIDE each), written whenever something changes its motion (one for
+--   an instant; a ball being pushed along by another gets one every KEY_QUIET, and the push is one event).
 
 local Cloth = require("./Cloth")
 local Tables = require("./Tables")
@@ -53,7 +55,9 @@ local Physics = {}
 
 Physics.DT = 1 / 240
 Physics.MAX_EVENTS = 64 -- contacts settled inside one step before the rest of the step is given up
-Physics.E_BALL = 0.96 -- ball to ball (with the rack's gaps it sets how much of a break reaches the pockets)
+-- ball to ball. With the rack's gaps it sets how much of a break reaches the pockets: 0.94 was half a ball a
+-- break and six breaks in ten dry, 0.97 is about one ball and four in ten (tools/pool/calibrate.luau)
+Physics.E_BALL = 0.97
 Physics.TOUCH = 0.004 -- studs: balls this close are touching (they are struck together, as one wave)
 Physics.WAVE_SWEEPS = 40 -- the most sweeps over a wave's contacts
 -- friction between two balls: MU_BALL_MIN + MU_BALL_VAR / (1 + C1 u + C2 u^2), u = rubbing speed in studs/s
@@ -62,6 +66,12 @@ Physics.MU_BALL_VAR = 0.108
 Physics.MU_BALL_C1 = 0.2016
 Physics.MU_BALL_C2 = 0.01694
 Physics.V_DEAD = 0.06 -- studs/s: below this a touch does not bounce at all
+-- Two balls rolling on together, one leaning on the other, touch again every step (a dead touch each time).
+-- That is one push, not hundreds of clicks: it is one event until the pair has been apart for PUSH_QUIET,
+-- and while it lasts a ball's key points are written every KEY_QUIET, not every step (between them playback
+-- is out by less than a ten-thousandth of a stud).
+Physics.PUSH_QUIET = 0.25
+Physics.KEY_QUIET = 1 / 30
 -- Two things closing more slowly than this are not in contact at all (the measure is closing speed times
 -- their distance, so about 3e-5 studs/s for two balls): without it two balls rolling on side by side would
 -- touch again and again for ever on the last bit of a rounding error.
@@ -147,6 +157,10 @@ export type World = {
 	steps: number,
 	events: { number },
 	keys: { { number } },
+	softT: { number }, -- per ball: when its last key point for a dead touch was written (-1: never)
+	late: { boolean }, -- per ball: a dead touch since then is not in its key points yet
+	lateN: number, -- how many balls are late
+	pushT: { [number]: number }, -- pair (i * 32 + j) -> when the two last touched dead
 	contacts: number, -- contacts settled so far (a cost measure)
 	knots: number, -- steps given up with contacts still unsettled (0 in every spec)
 }
@@ -158,7 +172,20 @@ function Physics.world(tb: Tables.Table, spots: { Tables.Spot }): World
 		balls[i] = Cloth.new(s.id, s.x, s.z)
 		keys[i] = {}
 	end
-	return { table = tb, balls = balls, t = 0, steps = 0, events = {}, keys = keys, contacts = 0, knots = 0 }
+	return {
+		table = tb,
+		balls = balls,
+		t = 0,
+		steps = 0,
+		events = {},
+		keys = keys,
+		softT = table.create(#spots, -1),
+		late = table.create(#spots, false),
+		lateN = 0,
+		pushT = {},
+		contacts = 0,
+		knots = 0,
+	}
 end
 
 function Physics.ball(w: World, id: number): Cloth.Ball?
@@ -179,10 +206,21 @@ local function indexOf(w: World, id: number): number
 	return 0
 end
 
+local KS = Physics.KEY_STRIDE
+
+-- A key point for ball i: its whole state at time t. Two things at the same instant (a ball driven into two
+-- others at once) are one key point: the later state replaces the earlier.
 local function key(w: World, i: number, t: number)
 	local b = w.balls[i]
 	local k = w.keys[i]
 	local n = #k
+	if n > 0 and k[n - KS + 1] == t then
+		n -= KS
+	end
+	if w.late[i] then
+		w.late[i] = false
+		w.lateN -= 1
+	end
 	k[n + 1] = t
 	k[n + 2] = b.x
 	k[n + 3] = b.z
@@ -193,6 +231,21 @@ local function key(w: World, i: number, t: number)
 	k[n + 8] = b.s
 	k[n + 9] = b.y
 	k[n + 10] = b.mode
+end
+
+-- A key point for a dead touch: written at once unless the ball had one in the last KEY_QUIET (it is being
+-- pushed along); then it is owed, and step() writes it when that time is up or the ball has stopped.
+local function softKey(w: World, i: number, t: number)
+	local last = w.softT[i]
+	if last >= 0 and t - last < Physics.KEY_QUIET then
+		if not w.late[i] then
+			w.late[i] = true
+			w.lateN += 1
+		end
+	else
+		key(w, i, t)
+		w.softT[i] = t
+	end
 end
 
 local function event(w: World, t: number, kind: number, a: number, b: number, speed: number)
@@ -250,13 +303,9 @@ local function bounce(b: Cloth.Ball, nx: number, nz: number, P: Response): numbe
 	local uh = vt + b.s
 	local pmax = P.mu * (1 + e) * vn
 	local p = uh * (2 / 7)
-	-- grip: 1 where the surface holds the ball's side for the whole hit, less where the ball skids along it
-	local grip = 1
 	if p > pmax then
-		grip = pmax / p
 		p = pmax
 	elseif p < -pmax then
-		grip = -pmax / p
 		p = -pmax
 	end
 	local vt2 = (vt - p) * (1 - P.shorten * h)
@@ -264,8 +313,28 @@ local function bounce(b: Cloth.Ball, nx: number, nz: number, P: Response): numbe
 	local qn = b.qx * nx + b.qz * nz
 	local qt = b.qx * tx + b.qz * tz
 	local qn2 = P.keep * qn + P.roll * vn2
-	local qt2 = qt + grip * (P.keepAlong * qt + P.rollAlong * vt2 - qt)
-	b.s -= 2.5 * p
+	local s2 = b.s - 2.5 * p
+	-- the roll along the surface is turned toward the roll of the ball's new speed, by no more than the
+	-- surface's grip can turn it (a ball that only brushes the cushion keeps the roll it came with)
+	local dq = P.keepAlong * qt + P.rollAlong * vt2 - qt
+	local dqMax = 2.5 * pmax
+	if dq > dqMax then
+		dq = dqMax
+	elseif dq < -dqMax then
+		dq = -dqMax
+	end
+	local qt2 = qt + dq
+	if qt2 * qt2 > qt * qt then
+		-- and never by more than the hit gave up: a bounce cannot add energy (1/2 v^2 + 1/5 (q^2 + s^2))
+		local before = 0.5 * (vn * vn + vt * vt) + 0.2 * (qn * qn + qt * qt + b.s * b.s)
+		local rest = 0.5 * (vn2 * vn2 + vt2 * vt2) + 0.2 * (qn2 * qn2 + s2 * s2)
+		local room = 5 * (before - rest)
+		if qt2 * qt2 > room then
+			local m = math.sqrt(if room > 0 then room else 0)
+			qt2 = if qt2 < 0 then -m else m
+		end
+	end
+	b.s = s2
 	b.vx = vn2 * nx + vt2 * tx
 	b.vz = vn2 * nz + vt2 * tz
 	b.qx = qn2 * nx + qt2 * tx
@@ -450,9 +519,21 @@ local function wave(w: World, t: number, R: number)
 			if b.mode == 0 then
 				b.mode = 1
 			end
-			event(w, t, 1, a.id, b.id, cu[c])
-			key(w, i, t)
-			key(w, j, t)
+			if cu[c] >= V_DEAD then
+				event(w, t, 1, a.id, b.id, cu[c])
+				key(w, i, t)
+				key(w, j, t)
+			else
+				-- a dead touch: one event for as long as the two stay together
+				local pair = i * 32 + j
+				local last = w.pushT[pair]
+				if last == nil or t - last > Physics.PUSH_QUIET then
+					event(w, t, 1, a.id, b.id, cu[c])
+				end
+				w.pushT[pair] = t
+				softKey(w, i, t)
+				softKey(w, j, t)
+			end
 		end
 	end
 end
@@ -823,6 +904,16 @@ function Physics.step(w: World): boolean
 	end
 	w.steps += 1
 	w.t = w.steps * Physics.DT
+	if w.lateN > 0 then
+		-- key points owed for dead touches (the balls are now where they are at the end of the step)
+		local tEnd = w.t
+		for i = 1, n do
+			if w.late[i] and (balls[i].mode ~= 1 or tEnd - w.softT[i] >= Physics.KEY_QUIET) then
+				key(w, i, tEnd)
+				w.softT[i] = tEnd
+			end
+		end
+	end
 	return anyMoving and Physics.moving(w)
 end
 

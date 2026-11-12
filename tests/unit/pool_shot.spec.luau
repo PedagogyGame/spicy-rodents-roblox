@@ -25,7 +25,7 @@ return function(t)
 			local w = Physics.world(pool, spots)
 			Physics.strike(w, st.id, st.vx, st.vz, st.qx, st.qz, st.s)
 			local moving = true
-			local worst = 0
+			local worst, pushed = 0, 0
 			local checked = 0
 			while moving do
 				moving = Physics.step(w)
@@ -35,7 +35,14 @@ return function(t)
 						if b.mode == Cloth.DOWN then
 							t.eq(mode, Cloth.DOWN, "a potted ball is down in the script too")
 						else
-							worst = math.max(worst, math.abs(x - b.x), math.abs(z - b.z), math.abs(y - b.y))
+							local off = math.max(math.abs(x - b.x), math.abs(z - b.z), math.abs(y - b.y))
+							if w.late[i] then
+								-- it is being pushed along by a ball leaning on it: its key points come every
+								-- KEY_QUIET, and between them it is out by a hair
+								pushed = math.max(pushed, off)
+							else
+								worst = math.max(worst, off)
+							end
 							checked += 1
 						end
 					end
@@ -43,6 +50,7 @@ return function(t)
 			end
 			t.truthy(checked > 1000)
 			t.truthy(worst < 1e-6, `seed {seed}: playback strays {worst} studs from the model`)
+			t.truthy(pushed < 2e-4, `seed {seed}: a pushed ball strays {pushed} studs`)
 		end
 	end)
 

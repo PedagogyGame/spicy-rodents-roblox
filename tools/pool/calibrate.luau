@@ -117,6 +117,29 @@ for _, v in { 6, 14, 30 } do
 	print(line)
 end
 
+print("== bank angle against power (through the cue at 45 degrees into the long cushion from 2 studs away;")
+print("   the angle off the cushion once the ball rolls again, and the share of the cue's speed it has left)")
+for _, row in { { "centre ball", 0 }, { "follow 0.8", 0.8 }, { "draw 0.5", -0.5 } } do
+	local line = `  {row[1]}:`
+	local lo, hi = math.huge, -math.huge
+	for _, power in { 0.15, 0.2, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6 } do
+		local w = Physics.world(pool, { { id = 0, x = pool.halfW - pool.ballR - 2, z = -4.6 } })
+		local st = Cue.strike(0, math.rad(45), power, 0, row[2] :: number, nil)
+		Physics.strike(w, 0, st.vx, st.vz, st.qx, st.qz, st.s)
+		untilEvents(w, 1)
+		local b = w.balls[1]
+		while #w.events == Physics.EVENT_STRIDE and math.abs(b.vz - b.qz) + math.abs(b.vx - b.qx) > 1e-6 do
+			if not Physics.step(w) then
+				break
+			end
+		end
+		local a = math.deg(math.atan2(-b.vx, b.vz))
+		lo, hi = math.min(lo, a), math.max(hi, a)
+		line ..= ` {f(power, 2)}: {f(a)} ({f(100 * math.sqrt(b.vx * b.vx + b.vz * b.vz) / Cue.speed(power), 0)} %)`
+	end
+	print(`{line}; swing {f(hi - lo)} degrees`)
+end
+
 print("== ball on ball")
 do
 	for _, cut in { 15, 30, 45, 60 } do
