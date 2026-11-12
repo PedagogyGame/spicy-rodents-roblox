@@ -189,7 +189,9 @@ end
 
 local function plungerReport(tbl: Machine.Table)
 	local p = tbl.def.plunger
-	print(`  plunger (full pull {fmt(p.pullTicks / 240, 2)} s; launch {p.vMin} to {p.vMax} studs/s):`)
+	print(
+		`  plunger (full pull {fmt(p.pullTicks / 240, 2)} s; launch {p.vMin} to {p.vMax} studs/s; nobody at the flippers: the first thing the ball does on its way down):`
+	)
 	local out: { number } = {}
 	local line = {}
 	for step = 1, 20 do
@@ -200,16 +202,20 @@ local function plungerReport(tbl: Machine.Table)
 			Machine.step(tbl, m, if k <= hold then BTN.PLUNGE else 0, out)
 		end
 		table.clear(out)
-		local first = "back to the plunger"
+		-- nobody at the flippers: the first switch the ball makes on its way down, in ten seconds
+		local NONE = ""
+		local first = NONE
 		local skill = false
-		for _ = 1, 1200 do
+		local launched = false
+		for _ = 1, 2400 do
 			Machine.step(tbl, m, 0, out)
+			launched = launched or m.launched
 			for i = 1, #out, 3 do
 				local cue = out[i]
-				if cue == CUE.JINGLE and m.skillLeft == 0 and not skill and first == "back to the plunger" then
+				if cue == CUE.JINGLE and m.skillLeft == 0 and not skill and first == NONE then
 					skill = true
 				end
-				if first == "back to the plunger" then
+				if first == NONE then
 					if cue == CUE.ROLLOVER then
 						first = tbl.def.sensors[out[i + 1]].id
 					elseif cue == CUE.BUMPER then
@@ -233,9 +239,14 @@ local function plungerReport(tbl: Machine.Table)
 				end
 			end
 			table.clear(out)
-			if m.phase ~= PHASE.PLAY then
+			if m.phase ~= PHASE.PLAY or first ~= NONE then
 				break
 			end
+		end
+		if first == NONE then
+			first = if launched
+				then "out of the lane and down the table past everything"
+				else "not out of the lane: back to the plunger"
 		end
 		table.insert(line, `    pull {fmt(pull, 2)} -> {first}{if skill then "  ** SKILL SHOT **" else ""}`)
 	end
