@@ -313,9 +313,11 @@ return function(t: Test.T)
 			t.falsy(server.drift, "the same model on the same log: no drift, ever")
 			t.truthy(distinct > sent * 0.9, `the sum moves with the game ({distinct} different in {sent})`)
 			-- a machine that has come apart (here: its ball moved a hair) says so with its next segment
-			local broken = Replay.clone(live)
+			-- (a copy of the server's replay stands exactly where the last segment ended)
+			t.truthy(not Replay.over(server), "the game is still on after thirty seconds")
+			local broken = Replay.clone(server)
 			local brokenRec = Replay.recorder(broken)
-			brokenRec.held = rec.held
+			brokenRec.held = broken.held
 			local ball = broken.m.phys.balls[1]
 			if ball then
 				ball.x += 0.001
