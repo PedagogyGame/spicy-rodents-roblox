@@ -9,6 +9,7 @@ local Layout = require("@shared/Minigames/Pinball/Layout")
 local Machine = require("@shared/Minigames/Pinball/Machine")
 local Physics = require("@shared/Minigames/Pinball/Physics")
 local Replay = require("@shared/Minigames/Pinball/Replay")
+local Rules = require("@shared/Minigames/Pinball/Rules")
 local Stream = require("@shared/Minigames/Pinball/Stream")
 local Tables = require("@shared/Minigames/Pinball/Tables")
 local Test = require("../lib/Test")
@@ -248,6 +249,105 @@ return function(t: Test.T)
 			t.eq(Replay.pace(r, 3), -240, "a second behind")
 			t.eq(Replay.SEGMENT_TICKS, InputLog.WIRE_TICKS)
 			t.eq(Physics.HZ / Replay.SEGMENT_TICKS, 10, "ten segments a second")
+			-- a ball the server played out by itself is not the log's: the next player's log is not "ahead" for it
+			local two = Replay.new("pinball_acorn", 1, 2)
+			t.truthy(Replay.feed(two, 1, { 0, 240 }))
+			Replay.skip(two)
+			t.eq(two.m.up, 2)
+			t.truthy(two.own > 1000, `the dead ball took {two.own} ticks, all the server's own`)
+			t.eq(two.tick, 240 + two.own)
+			t.eq(Replay.pace(two, 1), 0, "the log itself is exactly one second long")
+			t.truthy(Replay.feed(two, 2, { two.tick, two.tick + 240 }))
+			t.eq(Replay.pace(two, 2), 0)
+		end
+	)
+
+	t.test("idle: the replay knows how long the buttons have not changed, ball by ball", function()
+		local r = Replay.new("pinball_acorn", 1, 2)
+		t.eq(Replay.idleSeconds(r), 0)
+		t.truthy(Replay.feed(r, 1, { 0, 480 }))
+		t.eq(Replay.idleSeconds(r), 2, "two seconds with the ball on the plunger and nothing pressed")
+		-- a button held is not a button changed: a cradle held for ever is idle too
+		t.truthy(Replay.feed(r, 1, { 480, 720, 1, BTN.LEFT }))
+		t.near(Replay.idleSeconds(r), 239 / 240, 1e-9)
+		t.truthy(Replay.feed(r, 1, { 720, 960 }))
+		t.near(Replay.idleSeconds(r), 479 / 240, 1e-9)
+		t.truthy(Replay.feed(r, 1, { 960, 1200, 240, 0 }))
+		t.eq(Replay.idleSeconds(r), 0, "let go on the last tick")
+		-- the next ball starts the count again
+		t.truthy(Replay.feed(r, 1, { 1200, 1440 }))
+		Replay.skip(r)
+		t.eq(r.m.up, 2)
+		t.eq(Replay.idleSeconds(r), 0)
+		local rules = Rules.forTable("pinball_acorn")
+		local view = rules.view :: (any) -> { [string]: any }
+		t.eq(view(r).idle, 0)
+		t.eq(view(r).tick, r.tick, "the view's tick is where the next segment must start")
+	end)
+
+	t.test(
+		"sum: one number of the state; a segment that comes with another machine's sum is taken, and marked as drift",
+		function()
+			local id = "pinball_rodent"
+			local tbl = Tables.need(id)
+			local live, server = Replay.new(id, 21, 1), Replay.new(id, 21, 1)
+			t.eq(Replay.sum(live), Replay.sum(server))
+			local rec = Replay.recorder(live)
+			local bot = Bot.new(2, 5)
+			local sums: { [number]: boolean } = {}
+			local distinct, sent = 0, 0
+			for _ = 1, 240 * 30 do
+				local seg = Replay.live(live, rec, Bot.step(bot, tbl, live.m))
+				if seg then
+					local sum = Replay.sum(live)
+					t.truthy(sum % 1 == 0 and sum >= 0 and sum < 2 ^ 31, "a whole number that travels as it is")
+					t.truthy(Replay.feed(server, 1, seg, nil, sum))
+					t.eq(Replay.sum(server), sum)
+					sent += 1
+					if not sums[sum] then
+						sums[sum] = true
+						distinct += 1
+					end
+				end
+			end
+			t.falsy(server.drift, "the same model on the same log: no drift, ever")
+			t.truthy(distinct > sent * 0.9, `the sum moves with the game ({distinct} different in {sent})`)
+			-- a machine that has come apart (here: its ball moved a hair) says so with its next segment
+			local broken = Replay.clone(live)
+			local brokenRec = Replay.recorder(broken)
+			brokenRec.held = rec.held
+			local ball = broken.m.phys.balls[1]
+			if ball then
+				ball.x += 0.001
+			else
+				broken.m.scores[1] += 10
+			end
+			local seg: InputLog.Segment? = nil
+			while seg == nil do
+				seg = Replay.live(broken, brokenRec, 0)
+			end
+			t.truthy(Replay.feed(server, 1, seg, nil, Replay.sum(broken)), "the segment is taken all the same")
+			t.truthy(server.drift, "and the replay is marked: the player's machine is sent a copy to carry on from")
+			-- through the rules: the sum is the fourth argument of "log", and the view says drift
+			local rules = Rules.forTable(id)
+			local state = rules.init(1, 21)
+			local view = rules.view :: (any) -> { [string]: any }
+			local fresh = Replay.new(id, 21, 1)
+			local freshRec = Replay.recorder(fresh)
+			local first: InputLog.Segment? = nil
+			while first == nil do
+				first = Replay.live(fresh, freshRec, 0)
+			end
+			local from, to, packed = InputLog.pack(first)
+			t.truthy(rules.input(state, 1, "log", { from, to, packed, Replay.sum(fresh) }))
+			t.eq(view(state).drift, false)
+			local second: InputLog.Segment? = nil
+			while second == nil do
+				second = Replay.live(fresh, freshRec, 0)
+			end
+			from, to, packed = InputLog.pack(second)
+			t.truthy(rules.input(state, 1, "log", { from, to, packed, Replay.sum(fresh) + 1 }))
+			t.eq(view(state).drift, true)
 		end
 	)
 

@@ -10,15 +10,20 @@
 -- InputLog.check; a thump on the glass may only appear where the server granted one (an animal landed on the
 -- cabinet); the ball changing hands ends a segment early; and a score that climbs faster than the table's
 -- maxScorePerSec marks the replay suspect (it cannot happen by play; it would mean a fault in the model).
--- Time is the caller's to police: pace() says how far the replay is ahead of a clock, so a server can refuse
--- a log that runs faster than real time and close a ball whose log has stopped coming.
+-- Time is the caller's to police: pace() says how far the log is ahead of a clock (the ticks the server played
+-- by itself, a ball abandoned and played out dead, are not the log's and are left out), so a server can refuse
+-- a log that runs faster than real time; idle is how long the buttons in the log have not changed (a player
+-- who has walked off with the ball on the plunger, or holds a cradle for ever while others wait).
+-- Two machines that run the same model on the same log cannot differ; all the same, sum() is one number of
+-- the state for a client to send with its segment. feed() compares it and sets `drift` when they do not agree:
+-- the server's game stands, and the player's machine is sent a clone() to carry on from.
 -- Pure; Lune-tested (tests/unit/pinball_replay.spec.luau).
 -- Interface: new(tableId, seed, players) -> State; clone(r) -> State; feed(r, seat, segment, out?) -> (ok, why?);
 --   recorder(r) -> InputLog.Recorder and live(r, rec, buttons, out?) -> Segment? (the player's side);
 --   skip(r, out?) (the ball in play is abandoned and played out dead); retire(r, seat, out?) (a player has
 --   gone for good: their ball in play is played out dead, their later balls passed over, their score kept);
---   grantThump(r); pace(r, seconds) -> ticks
---   ahead; over(r) -> boolean; SEGMENT_TICKS, GUARD_MIN_SECONDS
+--   grantThump(r); pace(r, seconds) -> ticks ahead; idleSeconds(r) -> number; sum(r) -> number;
+--   over(r) -> boolean; SEGMENT_TICKS, GUARD_MIN_SECONDS; State { id, m, tick, own, idle, drift, suspect, ... }
 
 local InputLog = require("./InputLog")
 local Machine = require("./Machine")
@@ -34,6 +39,9 @@ export type State = {
 	id: string,
 	m: Machine.State,
 	tick: number, -- ticks replayed
+	own: number, -- of those, the ticks the server played by itself (a skipped or retired ball)
+	idle: number, -- ticks since the buttons in the log last changed (0 at every new ball)
+	drift: boolean, -- a segment came with a sum() that was not this replay's (the caller sends a clone and clears it)
 	held: number, -- the buttons at the end of the last segment
 	thumps: number, -- thumps the server has granted and the log has not yet used
 	suspect: boolean,
@@ -50,6 +58,9 @@ function Replay.new(tableId: string, seed: number, players: number): State
 		id = tableId,
 		m = Machine.new(tbl, seed, players),
 		tick = 0,
+		own = 0,
+		idle = 0,
+		drift = false,
 		held = 0,
 		thumps = 0,
 		suspect = false,
@@ -74,10 +85,29 @@ function Replay.grantThump(r: State)
 	r.thumps += 1
 end
 
--- pace(r, seconds): how many ticks the replay is ahead of a clock that has run for `seconds` since the game
--- started ticking (negative: behind).
+-- pace(r, seconds): how many ticks the log is ahead of a clock that has run for `seconds` since the game
+-- started ticking (negative: behind). Ticks the server played by itself are not counted.
 function Replay.pace(r: State, seconds: number): number
-	return r.tick - seconds * Physics.HZ
+	return r.tick - r.own - seconds * Physics.HZ
+end
+
+-- idleSeconds(r): how long the buttons in the log have not changed on this ball.
+function Replay.idleSeconds(r: State): number
+	return r.idle / Physics.HZ
+end
+
+-- sum(r): one whole number of the state as it stands (the tick, the scores, where every ball is to a millionth
+-- of a stud). Two replays of the same log have the same sum; two that have come apart almost surely do not.
+function Replay.sum(r: State): number
+	local m = r.m
+	local h = (r.tick * 31 + m.up * 7 + m.ball) % 2147483648
+	for _, score in m.scores do
+		h = (h * 33 + score) % 2147483648
+	end
+	for _, b in m.phys.balls do
+		h = (h * 33 + math.floor(b.x * 1e6) + math.floor(b.y * 1e6) * 7 + b.mode) % 2147483648
+	end
+	return h
 end
 
 local function guard(r: State, tbl: Machine.Table)
@@ -90,8 +120,9 @@ end
 
 local scratch: { number } = {}
 
--- feed(r, seat, segment, out): replay one segment of the log of the player in `seat`. Cues go to out.
-function Replay.feed(r: State, seat: number, seg: InputLog.Segment, out: { number }?): (boolean, string?)
+-- feed(r, seat, segment, out, sum): replay one segment of the log of the player in `seat`. Cues go to out.
+-- sum, if the player's machine sent one, is its sum() at the end of the segment.
+function Replay.feed(r: State, seat: number, seg: InputLog.Segment, out: { number }?, sum: number?): (boolean, string?)
 	local m = r.m
 	if m.phase == OVER then
 		return false, "the game is over"
@@ -121,20 +152,31 @@ function Replay.feed(r: State, seat: number, seg: InputLog.Segment, out: { numbe
 	local tbl = Tables.need(r.id)
 	local sink = out or scratch
 	local up = m.up
+	local last = r.held
 	local endHeld = InputLog.play(seg, r.held, function(buttons: number): boolean?
 		Machine.step(tbl, m, buttons, sink)
 		r.tick += 1
+		if buttons ~= last then
+			last = buttons
+			r.idle = 0
+		else
+			r.idle += 1
+		end
 		if m.phase == PLAY and m.ballTicks == 0 then
 			-- a new ball has just come up (this player's next, or the next player's)
 			guard(r, tbl)
 			r.ballScore = m.scores[m.up]
 			r.ballTick = r.tick
+			r.idle = 0
 			return true
 		end
 		return m.phase == OVER or m.up ~= up
 	end)
 	r.held = if m.phase == PLAY and m.ballTicks == 0 or m.phase == OVER then 0 else endHeld
 	guard(r, tbl)
+	if sum ~= nil and sum ~= Replay.sum(r) then
+		r.drift = true
+	end
 	if out == nil then
 		table.clear(scratch)
 	end
@@ -199,11 +241,13 @@ function Replay.skip(r: State, out: { number }?)
 	for _ = 1, limit do
 		Machine.step(tbl, m, 0, sink)
 		r.tick += 1
+		r.own += 1
 		if m.phase == OVER or (m.phase == PLAY and not m.forfeit) then
 			break
 		end
 	end
 	r.held = 0
+	r.idle = 0
 	r.ballScore = m.scores[m.up]
 	r.ballTick = r.tick
 	if out == nil then

@@ -7,8 +7,10 @@
 -- and sends its input log in segments; each segment is replayed here (Replay) and the replay is the game.
 -- turn() is the player whose ball is up; it moves on by itself when that ball has drained and its bonus is
 -- counted. skipTurn() abandons the ball in play (it is played out dead: the game's "miss").
--- A segment comes in as the verb "log" with the three arguments the wire carries, { fromTick, toTick, packed
--- changes } (InputLog.pack; Minigames/Games rule 1), or as "seg" with the segment itself (specs, tools).
+-- A segment comes in as the verb "log" with the arguments the wire carries, { fromTick, toTick, packed
+-- changes, sum? } (InputLog.pack; Minigames/Games rule 1; sum is the player's Replay.sum at toTick, optional),
+-- or as "seg" with the segment itself (specs, tools). view().tick is the acknowledgement: the next segment
+-- must start there.
 -- The server's own verb "thump" lets one thump on the glass into the log (an animal landed on the cabinet):
 -- it is a nudge that can warn but never tilt. The server's verb "retire" takes a seat out for good (the
 -- player walked away or was bitten, C13): the ball in play is played out dead, their later balls are passed
@@ -24,7 +26,8 @@
 -- Interface: forTable(tableId) -> Minigame.Rules (cached); game: Minigame.Rules; GAME, CLIENT_VERBS; GAMES
 --   (the three table ids); MAX_PLAYERS; replay(state) -> Replay.State? (the replay inside either shape's state);
 --   the rules' view(state) is { game, title, variant?, freePlay, phase, up, ball, balls, players = { { score,
---   gone, extraBall, stats } }, status, say, sayValue, saveOn, tilted, warnings, tick, suspect }; before the
+--   gone, extraBall, stats } }, status, say, sayValue, saveOn, tilted, warnings, tick, idle, drift, suspect };
+--   before the
 --   machine is named, game.view is { game = "pinball", freePlay = true, phase = "off" }
 
 local InputLog = require("./InputLog")
@@ -68,12 +71,14 @@ local function build(tableId: string): Minigame.Rules
 	function rules.input(state: any, seat: number, verb: string, args: { any }?): (boolean, string?)
 		local r = state :: Replay.State
 		if verb == "log" then
-			-- as it travels: fromTick, toTick, the changes packed in a string
+			-- as it travels: fromTick, toTick, the changes packed in a string; and, if the player's machine sends
+			-- it, its Replay.sum at toTick (the replay notes a difference as drift; the segment is taken all the same)
 			local seg = args and InputLog.unpack(args[1], args[2], args[3])
 			if seg == nil then
 				return false, "no segment"
 			end
-			return Replay.feed(r, seat, seg)
+			local sum = args and args[4]
+			return Replay.feed(r, seat, seg, nil, if type(sum) == "number" then sum else nil)
 		elseif verb == "seg" then
 			local seg = args and args[1]
 			if type(seg) ~= "table" then
@@ -173,6 +178,8 @@ local function build(tableId: string): Minigame.Rules
 			tilted = m.tilted,
 			warnings = m.warnings,
 			tick = r.tick,
+			idle = Replay.idleSeconds(r),
+			drift = r.drift,
 			suspect = r.suspect,
 		}
 	end
