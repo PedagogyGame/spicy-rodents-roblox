@@ -23,8 +23,8 @@
 --   kinds   one KIND code per box (slab, wall, pillar, cover, rail, step, prop), for the bake's looks,
 --           the splat's surface and the bots' reading of cover.
 --   ramps   the walking surface over each stair flight: an axis-aligned rectangle whose height rises
---           from y0 to y1 along one axis. Bodies walk on ramps (the bake makes one invisible part per
---           ramp that collides with characters only); balls ignore ramps and hit the `step` boxes
+--           from y0 to y1 along one axis. Bodies walk on ramps (the bake makes one invisible,
+--           collidable part per ramp, lying on the steps); balls ignore ramps and hit the `step` boxes
 --           under them. A step box's top never rises above the ramp surface over it.
 --   spawns, spawnRooms   per team (1, 2): at least RULES.teamMax spawn points inside that team's room.
 --   exits, lobby   door volumes that end a player's match when stepped into (may be empty), and the

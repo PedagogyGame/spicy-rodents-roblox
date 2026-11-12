@@ -75,6 +75,9 @@
         "F2": { "$path": { "optional": "build/Expansion_F2.rbxm" } },
         "F3": { "$path": { "optional": "build/Expansion_F3.rbxm" } },
         "F4": { "$path": { "optional": "build/Expansion_F4.rbxm" } }
+      },
+      "Paintball": {
+        "$path": { "optional": "build/Paintball.rbxm" }
       }
     },
 

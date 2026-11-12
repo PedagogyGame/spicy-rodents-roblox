@@ -11,9 +11,11 @@
 -- THE ARENA LANE REPLACES THE BODY OF build() with the real building (lobby and loading dock,
 -- newsroom, studios, control rooms, offices; about 25 cover pieces a floor; two real stairwells a
 -- storey; spawn rooms with two ways out) and hands back grid-backed `sweep` and `ground` that give
--- the reference's answers (Arena.sweepBoxes, Arena.groundAt). The bake (tools/bake/paintball.luau)
--- makes its parts FROM this data, one part per box and one invisible ramp part per ramp, so the
--- building and the collision data cannot differ.
+-- the reference's answers (Arena.sweepBoxes, Arena.groundAt). The bake (tools/bake/paintball.luau ->
+-- build/Paintball.rbxm, which the project files already map to Workspace.Paintball) makes its parts
+-- FROM this data at Arena.PLACE: one part per box, the same size in the same place, and one
+-- invisible ramp part per ramp, in a model per floor so the building streams in pieces; the part list
+-- is a pure function of the arena, so a spec can hold it to the boxes without a file.
 -- Interface: build() -> Arena (a fresh table each call; pure, the same every time)
 
 local Arena = require("./Arena")

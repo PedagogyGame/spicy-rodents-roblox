@@ -18,20 +18,46 @@
 --                       keeps the real one per slot (frozen)
 --   Server  PoseHistory, Projectiles, Splats, Layout, Harness: the server lane's (see PaintballService)
 --
--- THE FOUR LANES AND THEIR FILES (no file is in two lanes)
---   match-and-bots  Server/Paintball/Match.luau, Bots.luau (+ new files named Match*.luau, Bot*.luau
---                   there), tests/unit/paintball_match*.spec.luau, paintball_bots*.spec.luau
---   arena           Shared/Paintball/ArenaData.luau (+ new Arena?*.luau beside it, never Arena.luau),
---                   tools/bake/paintball.luau and tools/bake/paintball/, tests/unit/paintball_arena*.spec.luau
+-- THE FOUR LANES AND THEIR FILES (no file is in two lanes; "new files" are ones the lane creates)
+--   match-and-bots  Server/Paintball/Match.luau and Bots.luau, new files there named Match*.luau or
+--                   Bot*.luau, tools/paintball/ (calibration printouts), and the specs
+--                   tests/unit/paintball_match*.spec.luau and paintball_bots*.spec.luau
+--   arena           Shared/Paintball/ArenaData.luau and new files beside it named ArenaData*.luau or
+--                   ArenaGrid*.luau, tools/bake/paintball.luau and tools/bake/paintball/ (the bake:
+--                   build/Paintball.rbxm, already mapped to Workspace.Paintball by the three project
+--                   files as an optional path), and tests/unit/paintball_arena*.spec.luau
 --   server          Server/Paintball/PaintballService.luau, PoseHistory, Projectiles, Splats, Layout,
---                   Harness (+ any other new file there), tests/unit/paintball_hitreg.spec.luau,
---                   paintball_server*.spec.luau, tests/isolated/paintball_service.luau,
+--                   Harness and any other new file there, tests/unit/paintball_hitreg.spec.luau and
+--                   paintball_server*.spec.luau, tests/isolated/paintball_service*.luau,
 --                   tests/engine/Paintball.luau, tools/cloud/tasks/paintball_*.luau
 --   client          Client/Paintball/ (all of it), tests/unit/paintball_client*.spec.luau,
 --                   tests/isolated/paintball_client*.luau
--- Nobody edits: this folder's frozen files, Net/Schemas.luau, tests/unit/paintball_contract.spec.luau,
--- Boot/Game.luau, Main.client.luau, the project files, or anything under Minigames/ (another agent is
--- reshaping it). Joining the service and the client to the boot is done once, at the end.
+-- Nobody edits: this folder's frozen files (Contract, Body, Clock, Wire, Arena, Config, Ballistics,
+-- Magazine), Net/Schemas.luau, tests/unit/paintball_contract.spec.luau, Boot/Game.luau,
+-- Main.client.luau, the project files, tools/ci.sh, or anything under Minigames/ (another agent is
+-- reshaping it). Joining the service, the client and the pass-desk prompt to the boot is done once,
+-- at the end, through PaintballService.start and PaintballClient.start.
+--
+-- THE DECISIONS, AND WHERE EACH IS WRITTEN DOWN
+--   1 a person's movement: client moves, server checks       below, "who is trusted for what"
+--   2 crouch on a Humanoid body: eye and hit shape only      Body
+--   3 bots: pure poses on the server, no body in the world;
+--     every screen draws bots and people alike as puppets
+--     from the snapshot stream                               Clock, Server/Paintball/Bots
+--   4 first person: the server sets the body's CameraZone
+--     attribute; the existing camera code does the rest      Server/Paintball/PaintballService
+--   5 in and out: the player keeps the body they walked in
+--     with; teleported to a spawn room, back to the lobby    Server/Paintball/PaintballService
+--   6 who sees what: the AUDIENCE (anyone within
+--     Arena.AUDIENCE_MARGIN of the arena volume, which takes
+--     in the lobby) gets everything and draws the match; a
+--     player further off is sent nothing, and sees a closed
+--     building (the shell has no open window)                Server/Paintball/PaintballService
+--   7 splats: reliable records; a body's splat is an offset
+--     in that body's frame and rides on the puppet           Wire
+--   8 what is sent how often, and the bytes                  Wire, Clock
+--   9 a client that stops sending: holds its pose and cannot
+--     fire after 0.5 s, is replaced by a bot after 5 s       Clock
 --
 -- WHO IS TRUSTED FOR WHAT (TRUST below holds the numbers)
 --   The client moves its own body: it is the possessed R15 Humanoid body the player walked in with,

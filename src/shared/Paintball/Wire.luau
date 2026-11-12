@@ -57,7 +57,7 @@
 -- Interface: REMOTES; layouts Move, Fire, Shot, Splat, SnapHead, SnapBody; CMD_VERBS; BIT, has(bits,
 --   bit); FACE, faceOf(nx, ny, nz), normalOf(face); encodeSnap(t, seq, bodies) -> buffer;
 --   decodeSnap(b) -> (t?, seq, bodies); quantPose(x, y, z, crouch) -> the same four as a snapshot
---   returns them; pack(layout, records) -> buffer; unpack(layout, b) -> records; toBody, fromBody;
+--   returns them; between(a, ta, b, tb, t) -> (x, y, z, crouch); pack(layout, records) -> buffer; unpack(layout, b) -> records; toBody, fromBody;
 --   STATE, checkState(msg) -> (ok, err?); budget(bodies) -> { snap, down, up }; T (type witnesses)
 
 local BufferCodec = require("../Util/BufferCodec")
@@ -303,6 +303,21 @@ function Wire.decodeSnap(b: any): (number?, number, { SnapBody })
 		}
 	end
 	return h.t, h.seq, bodies
+end
+
+-- THE interpolation: a body's position and crouch fraction at time t from the snapshots either side
+-- of it (a at ta, the older; b at tb), in a straight line, held at b when t is past it and at a when
+-- t is before it. This is the arithmetic of Server/Paintball/PoseHistory.sample, so a client that
+-- draws with it shows exactly the bodies the server rewinds to (the contract spec proves the two
+-- equal). Yaw and pitch are the drawer's to smooth: no hit depends on them.
+function Wire.between(a: SnapBody, ta: number, b: SnapBody, tb: number, t: number): (number, number, number, number)
+	if t >= tb then
+		return b.x, b.y, b.z, b.crouch
+	elseif t <= ta then
+		return a.x, a.y, a.z, a.crouch
+	end
+	local f = (t - ta) / (tb - ta)
+	return a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, a.z + (b.z - a.z) * f, a.crouch + (b.crouch - a.crouch) * f
 end
 
 -- Many fixed-size records in one buffer (Shot and Splat batches; the splats of "joined" and "watch").

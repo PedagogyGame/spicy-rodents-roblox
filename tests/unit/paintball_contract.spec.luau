@@ -22,6 +22,8 @@ local BufferCodec = require("@shared/Util/BufferCodec")
 local Log = require("@shared/Util/Log")
 local Human = require("@client/Controllers/Human")
 local Match = require("@server/Paintball/Match")
+local PoseHistory = require("@server/Paintball/PoseHistory")
+local Projectiles = require("@server/Paintball/Projectiles")
 local Bots = require("@server/Paintball/Bots")
 local PaintballService = require("@server/Paintball/PaintballService")
 local PaintballClient = require("@client/Paintball/PaintballClient")
@@ -203,6 +205,89 @@ return function(t)
 		local _, _, r3 = Clock.stamp(now, now + 1, now, nil, 0.175)
 		t.near(r3, 0.175 - Clock.REWIND_TOLERANCE, 1e-9)
 		t.eq(select(3, Clock.stamp(now, now + 1, now, nil, nil)), 0)
+	end)
+
+	t.test("the keystone: what a client draws at its view time is what the server rewinds to, exactly", function()
+		-- a body running and strafing; the server snapshots it SNAP_HZ times a second, pushing the
+		-- quantised pose into the history; a client 60 ms away draws it at its view time
+		local function truth(time: number): (number, number, number)
+			return -30 + Body.SPRINT * time, Arena.FLOOR_HEIGHT, 12 + 6 * math.sin(time * 3)
+		end
+		local history = PoseHistory.new(Clock.HISTORY_SECS, Clock.SNAP_HZ)
+		local down = 0.06
+		local view = Clock.newView()
+		local inbox: { { at: number, b: buffer } } = {}
+		local snaps: { { t: number, body: Wire.SnapBody } } = {}
+		local nextSnap, seq, checked = 0, 0, 0
+		for frame = 0, 150 do
+			local now = frame / Clock.TICK_HZ
+			if now >= nextSnap - 1e-9 then
+				local x, y, z = truth(now)
+				local qx, qy, qz = Wire.quantPose(x, y, z, 0)
+				PoseHistory.push(history, now, qx, qy, qz)
+				seq += 1
+				local body = { id = 1, x = x, y = y, z = z, yaw = 0, pitch = 0, crouch = 0, bits = 0 }
+				table.insert(inbox, { at = now + down, b = Wire.encodeSnap(now, seq, { body }) })
+				nextSnap += 1 / Clock.SNAP_HZ
+			end
+			-- the client, at the same instant on the shared clock
+			while inbox[1] and inbox[1].at <= now + 1e-9 do
+				local time, _, bodies = Wire.decodeSnap((table.remove(inbox, 1) :: any).b)
+				Clock.observe(view, time :: number, now)
+				table.insert(snaps, { t = time :: number, body = bodies[1] })
+			end
+			if #snaps >= 3 then
+				local vt = Clock.viewTime(view, now)
+				local older, newer = snaps[1], snaps[2]
+				for i = 2, #snaps do
+					if snaps[i].t >= vt then
+						older, newer = snaps[i - 1], snaps[i]
+						break
+					end
+					older, newer = snaps[i], snaps[i]
+				end
+				local cx, cy, cz = Wire.between(older.body, older.t, newer.body, newer.t, vt)
+				local sx, sy, sz = PoseHistory.sample(history, vt)
+				t.deepEq({ cx, cy, cz }, { sx, sy, sz }, `frame {frame}`)
+				-- and the view is the past: about the delay plus the interpolation behind the truth
+				local tx = truth(vt)
+				t.near(cx, tx, 0.05)
+				t.near(now - vt, down + Clock.INTERP_SECS, 0.03)
+				checked += 1
+			end
+		end
+		t.truthy(checked > 100)
+		-- so a ball stamped the contract's way hits what was under the crosshair, and an unrewound one misses
+		local target = { id = 1, team = 2, history = history }
+		local now = 150 / Clock.TICK_HZ
+		local up = 0.04
+		local ft = now - up
+		local vt = ft - (down + Clock.INTERP_SECS)
+		local f, late, rewind = Clock.stamp(now, vt, ft, nil, down + Clock.INTERP_SECS)
+		t.near(late, up, 1e-9)
+		t.near(rewind, down + Clock.INTERP_SECS, 1e-9)
+		-- aimed, on the shooter's screen, at where the drawn body will be when a flat ball gets there
+		local dist = 30
+		local tof = dist / R.ballSpeed
+		local ax, ay, az = PoseHistory.sample(history, vt)
+		local lead = Body.SPRINT * tof
+		local vx, vy, vz = Ballistics.aim(ax + lead, ay + 3, az - dist, ax + lead, ay + 3, az, R.ballSpeed, R.ballDrop)
+		local sim = Projectiles.new({}, nil)
+		local rewound = Projectiles.fire(sim, 2, 1, ax + lead, ay + 3, az - dist, vx, vy, vz, rewind)
+		local naive = Projectiles.fire(sim, 2, 1, ax + lead, ay + 3, az - dist, vx, vy, vz, 0)
+		for k = 1, 40 do
+			-- the server keeps snapshotting the runner while the balls fly from the clamped fire time
+			local time = f + k / Clock.TICK_HZ
+			if time >= nextSnap - 1e-9 then
+				local x, y, z = truth(nextSnap)
+				local qx, qy, qz = Wire.quantPose(x, y, z, 0)
+				PoseHistory.push(history, nextSnap, qx, qy, qz)
+				nextSnap += 1 / Clock.SNAP_HZ
+			end
+			Projectiles.step(sim, time, 1 / Clock.TICK_HZ, { target })
+		end
+		t.eq(rewound.hitBody, 1, "the rewound ball tags the body the shooter led")
+		t.eq(naive.hitBody, 0, "without the rewind the same ball passes behind where the body now is")
 	end)
 
 	t.test("wire: the remotes are in Net/Schemas with their direction, reliability, rate and size", function()
