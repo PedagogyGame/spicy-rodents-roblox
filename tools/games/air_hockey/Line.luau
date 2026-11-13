@@ -6,8 +6,9 @@
 -- measurements (tools/games/air_hockey/netcode.luau) are run on: how far what a player is shown is from what
 -- the referee decided for the same instant.
 -- Interface: new(opts) -> Line; frame(line, dt?) (one frame of everybody); run(line, seconds) ; play(line,
---   limitSeconds) -> won; tell(line, msg) (a stream message to everyone, late like any other); hands.chaser(vigour?) / hands.still / hands.swinger(period) (a hand is fn(side, sim,
---   tick) -> (x, y, serve?): where that player's hand is, given what their own screen shows);
+--   limitSeconds) -> won; tell(line, msg) (a stream message to everyone, late like any other); hands.chaser(vigour?)
+--   / hands.still / hands.swinger(period) / hands.pointer(noise?) / hands.keeper (a hand is fn(side, sim, tick)
+--   -> (x, y, serve?): where that player's hand is, given what their own screen shows);
 --   Line.ref / .seats[side] / .watchers / .truth (the referee's puck and mallets by tick) / .samples[side]
 --   (what that seat was shown each frame); errors(line, side) -> { n, mean, p95, max } for: near / far (the
 --   puck against the referee's for the same instant, by the half it was in), own / other (the mallets, the
@@ -47,6 +48,27 @@ function Line.hands.chaser(vigour: number?): Hand
 		local wobble = math.sin(tick * 0.011 + side) * 0.03 * k
 		return x + wobble, y + math.cos(tick * 0.007) * 0.02 * k, sim.countdown > 0 and tick % 97 == 0
 	end
+end
+
+-- The plainest mouse hand there is: the pointer is put on the puck whenever the puck is in this player's half (a
+-- shade behind it, with a wobble of `noise` metres), and waits in front of the goal otherwise. It is what a new
+-- player does, and it is the hand that presses pucks into rails. (The wobble is a triangle wave, plain
+-- arithmetic: recorded results of matches played with this hand are the same on every machine.)
+function Line.hands.pointer(noise: number?): Hand
+	local n = noise or 0.02
+	return function(side: number, sim: Sim.State, tick: number): (number, number, boolean?)
+		local s = if side ~= 0 then 1 else -1
+		if sim.py * s > 0.02 then
+			local wobble = 4 * math.abs((tick / 480) % 1 - 0.5) - 1
+			return sim.px + wobble * n, sim.py + s * 0.03, false
+		end
+		return sim.px * 0.5, s * 0.9, false
+	end
+end
+
+-- A goalkeeper: along the goal line under the puck, never striking.
+function Line.hands.keeper(side: number, sim: Sim.State, _tick: number): (number, number, boolean?)
+	return math.clamp(sim.px, -0.2, 0.2), if side ~= 0 then 1.0 else -1.0, false
 end
 
 -- A hand that sweeps from side to side across its half, whatever the puck does (the worst case for anyone

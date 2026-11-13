@@ -18,18 +18,25 @@
 -- Two things are added that the simulation never reads (they are for sound and drawing): hitWhat / hitSpeed say
 -- what the last contact was and how hard; and the drag of one whole step is a constant (DECAY) instead of a call
 -- to exp on every machine, so that a client and the server never differ by a rounding of exp.
--- ONE RULE IS NOT HIS, and it is kept outside his step: play() is tick() followed by "a puck that has left the
--- table is put back for a serve". His simulation lets a puck out: a mallet pushed straight at a puck that rests
--- against a side rail squeezes it through the rail in about fifteen ticks (the rail is only looked for while
--- the puck is still inside it), and it never comes back, so the match never ends. It happens in his JavaScript
--- with the same inputs (tests/golden/air_hockey.json, the case "flaw: ..."; the port reproduces it bit for bit).
--- Nothing in tick() is changed to prevent it. A match is stepped with play(); tick() is his, alone.
+-- ONE RULE IS NOT HIS, and it is kept outside his step: play() is tick() followed by contain(), THE RAILS HOLD.
+-- His simulation lets a puck out: a mallet that presses a puck into a rail squeezes it through (a rail is only
+-- looked for while the puck is still inside it), and it never comes back, so the match never ends. It happens in
+-- his JavaScript with the same inputs (tests/golden/air_hockey.json, the case "flaw: ..."; the port reproduces
+-- it bit for bit), and with a plain mouse hand it happens several times a match (the pointer put on a puck that
+-- is running along a rail or into a corner). Nothing in tick() is changed. After his step, a puck whose centre
+-- is past a rail's face is put back on the face with its speed turned inward, and slid along the rail clear of
+-- the mallet that pressed it: the rally goes on. A step that ends with the puck on the table is his step and
+-- nothing else, so a match in which no puck is pressed out is his match to the last bit
+-- (tests/unit/air_hockey_sim.spec.luau; whole matches: tests/unit/air_hockey_opponents.spec.luau). The old
+-- answer, the puck put back for a serve, is kept only as a net under that (nothing known reaches it).
+-- A match is stepped with play(); tick() is his, alone.
 -- The state is one flat record of numbers (no vectors, nothing allocated in tick): it is stepped several hundred
 -- times a frame when a client replays.
 -- Pure. Interface: constants; new() -> State; reset(s); resetPuck(s); serve(s); setTarget(s, side, x, y);
 --   ai(s, side); tick(s, dt?, human?, computer?); play(s, human, computer) -> bool (one step of a match: his
---   tick, then the puck put back if it left the table; true if it was); offTable(s) -> bool; copy(dst, src) ->
---   dst; clone(s) -> State; hypot(x, y); fold(x, bound); FIELDS (every field, in a fixed order)
+--   tick, then the rails hold; true only if the puck had to be put back for a serve); contain(s) -> bool (the
+--   rails hold: true if it moved the puck); offTable(s) -> bool; copy(dst, src) -> dst; clone(s) -> State;
+--   hypot(x, y); fold(x, bound); FIELDS (every field, in a fixed order)
 
 local Sim = {}
 
@@ -511,13 +518,178 @@ function Sim.offTable(s: State): boolean
 	return ax > 0.62 or ay > 1.3 or (ay > HALF_LENGTH and ax > 0.235)
 end
 
--- One step of a match: his tick, then the table's own rule for a puck that got out: it is put back on the serve
--- spot (his ResetPuck: the side that conceded last serves, after the countdown). Returns true when that happened.
+-- NOT HIS (see the header): THE RAILS HOLD. Called after his step. A puck whose centre is past a face his step
+-- can no longer see (beyond a side rail, inside an end rail beside the goal, inside a wall of the goal slot or a
+-- post) is put back on that face with its speed turned inward; if a mallet is still on top of it there (that is
+-- how it got out: the mallet pressed it into the rail), it is slid along the rail to the mallet's edge and
+-- leaves as it would off that mallet. Returns true when it moved the puck. On the table it reads five numbers
+-- and changes nothing: a match in which no puck is ever pressed out is his step's match to the last bit.
+-- (PAST: further than his own rail test forgives a puck that is on its way out, 7.5 m/s * 1e-9 s)
+local PAST = 1e-8
+local SLOT_BULGE = 0.0302 -- how far a post reaches into the goal mouth at the end rail's face (sqrt(.044^2 - .032^2))
+
+-- Push the puck off one mallet along a rail it lies on (flags say which), or straight away from the mallet.
+local function unpin(
+	px: number,
+	py: number,
+	mx: number,
+	my: number,
+	onSide: boolean,
+	onEnd: boolean
+): (number, number, boolean)
+	local dx, dy = px - mx, py - my
+	if dx * dx + dy * dy >= (PADDLE_REACH - 1e-9) * (PADDLE_REACH - 1e-9) then
+		return px, py, false
+	end
+	-- where along its rail the puck just touches the mallet, the nearest such place first (a dead heat: the
+	-- one nearer the middle of the table)
+	local bx, by, best = px, py, math.huge
+	if onSide then
+		local a = PADDLE_REACH * PADDLE_REACH - dx * dx
+		local h = if a > 0 then sqrt(a) else 0
+		for sg = -1, 1, 2 do
+			local cy = my + sg * h
+			local d = abs(cy - py) + abs(cy) * 1e-6
+			if abs(cy) <= Y_RAIL and d < best then
+				bx, by, best = px, cy, d
+			end
+		end
+	end
+	if onEnd then
+		local a = PADDLE_REACH * PADDLE_REACH - dy * dy
+		local h = if a > 0 then sqrt(a) else 0
+		for sg = -1, 1, 2 do
+			local cx = mx + sg * h
+			local ax = abs(cx)
+			local d = abs(cx - px) + ax * 1e-6
+			if ax <= X_RAIL and (ax >= GOAL or ax <= GOAL - SLOT_BULGE - 1e-6) and d < best then
+				bx, by, best = cx, py, d
+			end
+		end
+	end
+	if best == math.huge then
+		-- (not on a rail, or no room along it: straight away from the mallet)
+		local l = hypot(dx, dy)
+		if l > 1e-9 then
+			bx, by = mx + dx / l * PADDLE_REACH, my + dy / l * PADDLE_REACH
+		else
+			bx, by = mx, my - (if my > 0 then PADDLE_REACH else -PADDLE_REACH)
+		end
+	end
+	return bx, by, true
+end
+
+function Sim.contain(s: State): boolean
+	local px, py = s.px, s.py
+	local ax, ay = abs(px), abs(py)
+	if ax <= X_RAIL + PAST and ay <= Y_RAIL + PAST then
+		return false -- (on the bed: nearly every step ends here)
+	end
+	local vx, vy = s.vx, s.vy
+	local e = s.restitution
+	local onSide, onEnd, moved = false, false, false
+	if ax > X_RAIL + PAST then
+		local sg = if px > 0 then 1 else -1
+		px, ax = sg * X_RAIL, X_RAIL
+		if vx * sg > 0 then
+			vx = -vx * e
+		end
+		onSide, moved = true, true
+	end
+	if ay > Y_RAIL + PAST then
+		local sg = if py > 0 then 1 else -1
+		if ax >= GOAL then
+			-- inside the end rail beside the goal
+			py, ay = sg * Y_RAIL, Y_RAIL
+			if vy * sg > 0 then
+				vy = -vy * e
+			end
+			onEnd, moved = true, true
+		else
+			if ay >= HALF_LENGTH and ax > X_CHANNEL + PAST then
+				-- inside a wall of the goal slot
+				local sx = if px > 0 then 1 else -1
+				px, ax = sx * X_CHANNEL, X_CHANNEL
+				if vx * sx > 0 then
+					vx = -vx * e
+				end
+				moved = true
+			end
+			-- inside a post
+			local cx, cy = if px > 0 then GOAL else -GOAL, sg * HALF_LENGTH
+			local qx, qy = px - cx, py - cy
+			local l = hypot(qx, qy)
+			if l < POST_REACH - PAST then
+				local nx, ny = 0, -sg
+				if l > 1e-9 then
+					nx, ny = qx / l, qy / l
+				end
+				px, py = cx + nx * POST_REACH, cy + ny * POST_REACH
+				local vn = vx * nx + vy * ny
+				if vn < 0 then
+					vx, vy = vx - (1 + e) * vn * nx, vy - (1 + e) * vn * ny
+				end
+				moved = true
+			end
+		end
+	end
+	if not moved then
+		return false -- (in the goal mouth or the slot, where it may be)
+	end
+	-- a mallet still on top of it: off along the rail, leaving as it would off that mallet
+	local what = Sim.HIT_RAIL
+	for side = 0, 1 do
+		local mx, my, mvx, mvy = s.p0x, s.p0y, s.v0x, s.v0y
+		if side ~= 0 then
+			mx, my, mvx, mvy = s.p1x, s.p1y, s.v1x, s.v1y
+		end
+		local nxp, nyp, pinned = unpin(px, py, mx, my, onSide, onEnd)
+		if pinned then
+			px, py = nxp, nyp
+			local qx, qy = px - mx, py - my
+			local l = hypot(qx, qy)
+			if l > 1e-9 then
+				local nx, ny = qx / l, qy / l
+				local vn = (vx - mvx) * nx + (vy - mvy) * ny
+				if vn < 0 then
+					local k = -(1 + 0.94) * vn
+					vx, vy = vx + nx * k, vy + ny * k
+				end
+			end
+			what = Sim.HIT_MALLET + side
+		end
+	end
+	-- (and never back into the rail it was put on)
+	if onSide and vx * px > 0 then
+		vx = -vx * e
+	end
+	if onEnd and vy * py > 0 then
+		vy = -vy * e
+	end
+	local n = hypot(vx, vy)
+	if n > s.maxSpeed then
+		local k = s.maxSpeed / n
+		vx, vy = vx * k, vy * k
+		n = s.maxSpeed
+	end
+	s.px, s.py, s.vx, s.vy = px, py, vx, vy
+	s.hitSerial += 1
+	s.hitWhat, s.hitSpeed = what, n
+	return true
+end
+
+-- One step of a match: his tick, then the rails hold (contain). Should a puck ever be off the table all the same
+-- (nothing known does it), it is put back on the serve spot of the half it left, to be served toward the other
+-- (the side it left from pushed it out), after the countdown. Returns true only when that happened.
 function Sim.play(s: State, human: number, computer: boolean): boolean
 	Sim.tick(s, Sim.STEP, human, computer)
-	if s.winner < 0 and s.countdown <= 0 and Sim.offTable(s) then
-		Sim.resetPuck(s)
-		return true
+	if s.winner < 0 and s.countdown <= 0 then
+		Sim.contain(s)
+		if Sim.offTable(s) then
+			s.serveSide = if s.py > 0 then 1 else 0
+			Sim.resetPuck(s)
+			return true
+		end
 	end
 	return false
 end
