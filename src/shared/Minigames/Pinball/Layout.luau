@@ -837,6 +837,10 @@ local function lanePasses(allSegs: { number }, allCirs: { number }, lane: Lane, 
 	local pad = 4 * Layout.BALL_R
 	local x0, y0 = math.min(lane.x1, lane.x2) - pad, math.min(lane.y1, lane.y2) - pad
 	local x1, y1 = math.max(lane.x1, lane.x2) + pad, math.max(lane.y1, lane.y2) + pad
+	-- (a line of the grid runs through the middle of the mouth, so the widest ball that fits the mouth is found
+	-- to the hair, and a lane and its mirror image measure the same)
+	x0 = lane.mx - math.ceil((lane.mx - x0) / LANE_GRID) * LANE_GRID
+	y0 = lane.my - math.ceil((lane.my - y0) / LANE_GRID) * LANE_GRID
 	local w, h = math.floor((x1 - x0) / LANE_GRID), math.floor((y1 - y0) / LANE_GRID)
 	local r2 = radius * radius
 	-- only what stands in the box

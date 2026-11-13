@@ -6,7 +6,9 @@
 -- top of the table and drops it in the right inlane, so the shot can be repeated), the S-P-I-C-Y standup
 -- targets (two left, one centre, two right), the kick-out hole "the bite" in a horseshoe top right for the
 -- left flipper, the hot lane up the right side (a soft plunge dribbles down it: the skill shot), three pop
--- bumpers in the nest top left, at the head of the channel the left flipper's hard backhand runs up.
+-- bumpers in the nest top left, at the head of the channel the left flipper's hard backhand runs up, where a
+-- hard plunge comes down off the arch (so the soft plunge is the only skill shot, and every other one starts
+-- with the bumpers).
 -- The rule sheet (one goal: feed the rodent to SUPER):
 --   * Everything feeds the HEAT meter: the wire most, then the bite, targets, bumpers. The meter cools all the
 --     time. At a third it is FERAL (all scores 2x), at two thirds RABID (3x), full is SUPER: 5x for twenty
@@ -36,13 +38,16 @@ Layout.addBottom(def, { gap = 0.26, outlane = 0.22, inlane = 0.21, pivotY = 0.62
 local XC = Layout.XC
 local X1 = Layout.FIELD_X1
 
--- the wire: up from the middle left, round the top above the playfield, down the right side to the right inlane
+-- the wire: up from the middle left, round the top above the playfield, down the right side to the right inlane.
+-- Its mouth is the widest thing on the table (over four balls): the wire is what the whole rule sheet is built
+-- on, and a player's buttons are read once a screen frame, so its window from either flipper is 11 ticks or
+-- more (near three frames at 60 a second) where an ordinary ramp's is 8
 do
 	local dropX, dropY = Layout.inlaneDrop(def, "right")
 	Layout.addRamp(def, {
 		id = "wire",
 		pts = {
-			0.8,
+			0.82,
 			2.45,
 			0,
 			0.6,
@@ -76,7 +81,7 @@ do
 			dropY,
 			0,
 		},
-		mouth = 0.2,
+		mouth = 0.27,
 		minSpeed = 0.6,
 		exitSpeed = 1.2,
 		drag = 0.25,
@@ -97,9 +102,9 @@ do
 	Layout.wall(def, "wood", { 0.0, 2.02, 0.14, 2.06 })
 	Layout.wall(def, "wood", { 0.3, 2.4, 0.0, 2.72 })
 	-- (I stands a ball and a half clear of the wire's flank, so a ball can fall between them)
-	standup("spicy_i", 1.09, 2.86, 1.31, 2.86, 1.2, 2.74)
+	standup("spicy_i", 1.11, 2.86, 1.31, 2.86, 1.21, 2.74)
 	-- its back comes to a point, so a ball from above rolls off it
-	Layout.wall(def, "plastic", { 1.09, 2.86, 1.09, 2.9, 1.2, 3.0, 1.31, 2.9, 1.31, 2.86 })
+	Layout.wall(def, "plastic", { 1.11, 2.86, 1.11, 2.9, 1.21, 3.0, 1.31, 2.9, 1.31, 2.86 })
 	standup("spicy_c", X1 - 0.3, 2.4, X1 - 0.24, 2.24, X1 - 0.4, 2.26)
 	standup("spicy_y", X1 - 0.24, 2.22, X1 - 0.14, 2.06, X1 - 0.34, 2.06)
 	Layout.wall(def, "wood", { X1, 2.02, X1 - 0.14, 2.06 })
@@ -131,10 +136,12 @@ Layout.lamp(def, "extra_ball", 1.42, 3.12, "red")
 
 -- the nest: three pop bumpers top left, at the head of the channel between the left rail and the wire. That
 -- channel is where the left flipper's hard backhand goes (a ball flipped a little later than for S and P),
--- so the nest is in play all game; a hard plunge comes down into it off the arch too, and a rebound rubber on
--- the left rail turns a ball running down the rail into it
-Layout.wall(def, "rubber", { 0.0, 4.05, 0.17, 3.97 })
-Layout.endPost(def, 0.17, 3.97, 0.0, 4.05)
+-- so the nest is in play all game; and a ball that comes round the arch (any plunge of half a pull or more) is
+-- turned off the left rail by a steep metal guide straight onto the top bumper, to be batted about between
+-- the three. (A level rebound rubber stood here once: it threw the ball back round the arch and down the hot
+-- lane, so a full pull was a skill shot too and the nest saw one ball a game.)
+Layout.wall(def, "metal", { 0.0, 4.25, 0.13, 3.92 })
+Layout.endPost(def, 0.13, 3.92, 0.0, 4.25, Layout.CAP_R, "metal")
 table.insert(def.bumpers, { id = "bumper_1", x = 0.3, y = 3.72, r = 0.115 })
 -- (the second stands over the gap between the wire and the I target: a ball shot up the middle meets it, and
 -- so does one coming down from the top of the table)

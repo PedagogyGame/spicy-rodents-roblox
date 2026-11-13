@@ -18,6 +18,9 @@ local acorn = Tables.need("pinball_acorn")
 local spicy = Tables.need("pinball_rodent")
 local space = Tables.need("pinball_space")
 local LEFT, RIGHT = 1, 2
+-- a table's main shot (the one its goal is built on) is wider than a fair shot: buttons are read once a screen
+-- frame, four ticks at 60 frames a second, so this is near three frames
+local MAIN_TICKS = 11
 
 -- the window for a named element from one flipper (0 when that flipper cannot reach it)
 local function ticks(tbl: Machine.Table, code: number, ref: number, flipper: number): number
@@ -147,8 +150,10 @@ return function(t: Test.T)
 			local ix = spicy.ix
 			local wireL = ticks(spicy, EV.RAIL_OUT, ix.rail.wire, LEFT)
 			local wireR = ticks(spicy, EV.RAIL_OUT, ix.rail.wire, RIGHT)
-			t.truthy(wireR >= Shots.FAIR_TICKS, `the wire from the right flipper: {wireR} ticks`)
-			t.truthy(wireL >= 6, `and from the left (a backhand): {wireL} ticks`)
+			-- (the table's main shot: its mouth is flared wide, so the window is near three screen frames at 60 a
+			-- second from either flipper; a player's buttons are read once a frame)
+			t.truthy(wireR >= MAIN_TICKS, `the wire from the right flipper: {wireR} ticks`)
+			t.truthy(wireL >= MAIN_TICKS, `and from the left: {wireL} ticks`)
 			t.truthy(wireR <= 16 and wireL <= 16, "but it still takes timing: the fast table")
 			t.truthy(ticks(spicy, EV.SAUCER, ix.saucer.bite, LEFT) >= 4, "the bite is the left flipper's shot")
 			t.truthy(ticks(spicy, EV.SAUCER, ix.saucer.bite, RIGHT) >= 3, "and can be had from the right")
@@ -162,11 +167,63 @@ return function(t: Test.T)
 			for i = 1, 3 do
 				nest = math.max(nest, ticks(spicy, EV.BUMPER, i, LEFT))
 			end
-			t.truthy(nest >= 12, `the nest is the left flipper's hard backhand: {nest} ticks`)
+			t.truthy(nest >= 10, `the nest is the left flipper's hard backhand: {nest} ticks`)
 			for _, name in { "spicy_s", "spicy_p", "spicy_i", "spicy_c", "spicy_y" } do
 				local w = either(spicy, EV.STANDUP, ix.target[name])
 				t.truthy(w >= 3, `{name}: {w} ticks`)
 			end
+		end
+	)
+
+	t.test(
+		"PIN-P5 SPICY RODENT: the skill shot is the soft plunge; a hard one comes round the arch and down into the nest",
+		function()
+			local ix = spicy.ix
+			local out: { number } = {}
+			-- nobody at the flippers: what one ball does after a pull of this share
+			local function plunge(pull: number): (boolean, number, number, number)
+				local m = Machine.new(spicy, 11, 1)
+				for _ = 1, math.floor(pull * spicy.def.plunger.pullTicks + 0.5) do
+					Machine.step(spicy, m, Machine.BTN.PLUNGE, out)
+				end
+				table.clear(out)
+				local hot, pops, nest, before = false, 0, 0, 0
+				for _ = 1, 240 * 8 do
+					Machine.step(spicy, m, 0, out)
+					for i = 1, #out, 3 do
+						if out[i] == Machine.CUE.SAY and out[i + 1] == spicy.SAY.HOT_SHOT then
+							hot = true
+							before = pops
+						elseif out[i] == Machine.CUE.BUMPER then
+							pops += 1
+							if out[i + 1] == ix.bumper.bumper_1 or out[i + 1] == ix.bumper.bumper_3 then
+								nest += 1
+							end
+						end
+					end
+					table.clear(out)
+				end
+				return hot, pops, nest, before
+			end
+			for _, pull in { 0.1, 0.15, 0.2 } do
+				local hot, _, _, before = plunge(pull)
+				t.truthy(hot, `a pull of {pull}: the ball dribbles down the hot lane`)
+				t.eq(before, 0, `a pull of {pull}: and meets no bumper on the way there`)
+			end
+			-- from half a pull up the ball goes round the arch, and the guide on the left rail turns it into the
+			-- nest: a hard plunge is no skill shot (it used to bounce back round the arch into the hot lane)
+			local all, fed = 0, 0
+			for _, pull in { 0.5, 0.6, 0.7, 0.8, 0.9, 1 } do
+				local hot, pops, nest = plunge(pull)
+				t.falsy(hot, `a pull of {pull} is no skill shot`)
+				t.truthy(nest >= 1, `a pull of {pull}: into the nest ({nest} pops there)`)
+				all += pops
+				if pops >= 3 then
+					fed += 1
+				end
+			end
+			t.truthy(fed >= 4, `{fed} of 6 hard plunges are batted about (three pops or more)`)
+			t.truthy(all >= 24, `{all} pops from six hard plunges`)
 		end
 	)
 

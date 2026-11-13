@@ -19,6 +19,7 @@
 --     from the field, how often each goal on the rule sheet is reached, where balls are lost;
 --   * what a step costs.
 -- Usage, from the repo root: lune run tools/games/pinball/calibrate.luau [games per level, default 40] [table id part]
+--   [stop: "shots" ends each table after its shot book, "plunger" after the plunger]
 -- Interface: a script (prints a report); nothing is written.
 
 local process = require("@lune/process")
@@ -33,7 +34,7 @@ local Tables = require("../../../src/shared/Minigames/Pinball/Tables")
 
 local GAMES = tonumber(process.args[1]) or 40
 local ONLY = process.args[2]
-local ONLY_SHOTS = process.args[3] == "shots"
+local STOP_AT = process.args[3] -- "shots": no plunger, games or cost; "plunger": no games or cost
 
 local CUE, BTN, PHASE = Machine.CUE, Machine.BTN, Machine.PHASE
 local CUE_NAMES: { [number]: string } = {}
@@ -650,10 +651,13 @@ for _, id in Tables.IDS do
 	lanesReport(tbl)
 	flipperReport(tbl)
 	shotsReport(tbl)
-	if ONLY_SHOTS then
+	if STOP_AT == "shots" then
 		continue
 	end
 	plungerReport(tbl)
+	if STOP_AT == "plunger" then
+		continue
+	end
 	gamesReport(tbl)
 	costReport(tbl)
 end
