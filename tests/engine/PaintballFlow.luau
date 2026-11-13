@@ -31,9 +31,11 @@
 -- scripted bots, since the real ones are other lanes'; tests/isolated/paintball_server_joined: with the real
 -- ones, once the lanes are joined); the check is itself checked before a cloud run is spent on it.
 -- Interface: run() -> Result (engine only: boots Server/Boot/Game); play(svc, deps, opts) -> Result { ok,
---   failures, numbers }
+--   failures, numbers }; walk(svc, deps, opts) -> Result and runWalk() -> Result (THE WALK, below); AIR
 
 local PaintballFlow = {}
+
+PaintballFlow.AIR = 4 -- Wire.BIT.air (pinned equal in tests/isolated/paintball_server_fire)
 
 export type Deps = { Arena: any, Contract: any, Clock: any }
 export type Opts = {
@@ -419,7 +421,279 @@ function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 	return { ok = #failures == 0, failures = failures, numbers = numbers }
 end
 
-function PaintballFlow.run(): { [string]: any }
+-- THE WALK (PaintballFlow.walk; Server/Minigames/Paintball/Stream, "provisional"): the movement rules held to a
+-- body that moves as bodies move. The service judges a person's Moves against the height rule (the
+-- footprint at an edge, the hop-and-fall envelope) and the body rule (the replicated body within
+-- TRUST.bodySlack), all tuned against scripted bodies. Here one person, with a pass, joins and, once the match
+-- is live, walks the building on its own navigation graph: out of the spawn room, up and down the stairs to
+-- every storey, to the atrium's side of each and up against its rail, and stands at the rail for
+-- `standSeconds`. Its Moves are sampled from ITS OWN BODY as its client would sample them (the feet point,
+-- the heading, in the air or not) twenty times a second, and the service reads the same body for the body
+-- rule. In the engine (runWalk) the body is the town's own R15 Humanoid, walked with Humanoid:MoveTo on a
+-- server with no clients (so it is the server's to simulate): stairs, ledges and the rail are met by the
+-- engine's own physics. The bots are told to stand still for the walk (Bots.step answers nothing): this is
+-- about movement, and a tag would send the person back to its room halfway.
+-- Held: no correction; every refusal is reported by the rule that refused it (Stats.movesRefusedBy); each
+-- storey reached; how many nodes of the route the body could not reach in time.
+-- opts: player (seated by the walk; it is given a pass at the desk first), step(seconds), drive(player, wx,
+--   wy, wz, dt) (move towards a world point: the engine's MoveTo, or a scripted body), feetOf(player) -> world
+--   feet point, airOf(player) -> boolean, standSeconds (default 10), nodeSeconds (default: the leg at a walk,
+--   twice over, and 3 more)
+export type WalkOpts = {
+	player: any,
+	step: (seconds: number) -> (),
+	drive: (player: any, wx: number, wy: number, wz: number, dt: number) -> (),
+	feetOf: (player: any) -> (number?, number?, number?),
+	airOf: ((player: any) -> boolean)?,
+	standSeconds: number?,
+	nodeSeconds: number?,
+}
+
+function PaintballFlow.walk(svc: any, deps: Deps, opts: WalkOpts): { [string]: any }
+	local failures: { string } = {}
+	local numbers: { [string]: any } = {}
+	local Arena, Contract, Clock = deps.Arena, deps.Contract, deps.Clock
+	local function check(cond: any, msg: string): boolean
+		if not cond then
+			table.insert(failures, msg)
+			return false
+		end
+		return true
+	end
+	local p = opts.player
+	local door = Contract.STATION
+	local st = svc.stations[door]
+	if st == nil or st.tbl == nil or st.hw == nil then
+		return { ok = false, failures = { "there is no paintball arena here" }, numbers = numbers }
+	end
+	local session = st.session
+	local service = st.tbl.service
+	local stats = service:stats()
+	local arena, place = service.arena, service.place
+	local function last(kind: string, pred: ((m: any) -> boolean)?): any
+		for i = #p.events, 1, -1 do
+			local m = p.events[i]
+			if m.kind == kind and (pred == nil or pred(m)) then
+				return m
+			end
+		end
+		return nil
+	end
+
+	svc:join(p, Contract.DESK)
+	local ok, why = svc:join(p, door)
+	if not check(ok, `the door refused the walker: {tostring(why)}`) then
+		return { ok = false, failures = failures, numbers = numbers }
+	end
+	-- the walker's client: its own body's pose, twenty times a second, with the placement number it was given
+	local seq = 0
+	local heading = 0
+	local function placement(): number
+		local seat = service.ctx.seatOf(p)
+		local placed = seat and last("paintball_respawn", function(m: any): boolean
+			return m.id == seat
+		end)
+		local fixed = last("paintball_correct")
+		local n = if placed then placed.place else 0
+		if fixed and fixed.place > n then
+			n = fixed.place
+		end
+		return n
+	end
+	local function send()
+		local wx, wy, wz = opts.feetOf(p)
+		if wx == nil or wy == nil or wz == nil then
+			return
+		end
+		local x, y, z = Arena.toLocal(place, wx, wy, wz)
+		seq += 1
+		service:onMove(p, {
+			t = service.ctx.stamp(),
+			seq = seq % 65536,
+			x = x,
+			y = y,
+			z = z,
+			yaw = heading,
+			pitch = 0,
+			bits = if opts.airOf and opts.airOf(p) then PaintballFlow.AIR else 0,
+			place = placement(),
+		})
+	end
+	local slice = 1 / Clock.SEND_HZ
+	local function tend(seconds: number, toward: { number }?)
+		for _ = 1, math.max(1, math.ceil(seconds / slice - 1e-6)) do
+			if toward ~= nil then
+				opts.drive(p, toward[1], toward[2], toward[3], slice)
+			end
+			send()
+			opts.step(slice)
+		end
+	end
+
+	-- live at once, with the bots standing still (see the header)
+	tend(0.5)
+	local state = session.game and session.game.state
+	if not check(state ~= nil, "no match began") then
+		return { ok = false, failures = failures, numbers = numbers }
+	end
+	svc:debug(door, "end") -- (the briefing's clock runs out: play begins)
+	tend(0.5)
+	check(state.phase == "live", `the match is {state.phase}, not live`)
+	tend(state.feel.protectSecs + 0.5)
+
+	-- the route: from the node nearest the body, by the building's own links, to a node on each storey and to
+	-- the atrium's side of each, and home again
+	local nodes, links = arena.nodes, arena.links
+	local seat = service.ctx.seatOf(p)
+	local team = if seat and state.slots[seat] then state.slots[seat].team else 0
+	local around: { [number]: { number } } = {}
+	for _, link in links do
+		around[link.a] = around[link.a] or {}
+		around[link.b] = around[link.b] or {}
+		table.insert(around[link.a], link.b)
+		table.insert(around[link.b], link.a)
+	end
+	local function nearest(): number?
+		local wx, wy, wz = opts.feetOf(p)
+		if wx == nil or wy == nil or wz == nil then
+			return nil
+		end
+		local x, y, z = Arena.toLocal(place, wx, wy, wz)
+		-- (the nearest the body can walk straight to: a node behind a wall is not where to start from)
+		local best, bestD = nil, math.huge
+		local chest = Arena.CHEST
+		for _, n in nodes do
+			local d = (n.x - x) ^ 2 + ((n.y - y) * 4) ^ 2 + (n.z - z) ^ 2
+			if d < bestD and arena.sweep(x, y + chest, z, n.x, n.y + chest, n.z) == nil then
+				best, bestD = n.id, d
+			end
+		end
+		return best
+	end
+	local function pathTo(from: number, goal: (n: any) -> boolean): { number }?
+		local cameFrom: { [number]: number } = { [from] = 0 }
+		local queue, head = { from }, 1
+		while head <= #queue do
+			local at = queue[head]
+			head += 1
+			if at ~= from and goal(nodes[at]) then
+				local path = {}
+				local n = at
+				while n ~= 0 do
+					table.insert(path, 1, n)
+					n = cameFrom[n]
+				end
+				return path
+			end
+			local list: { number } = around[at] or {}
+			for _, to in list do
+				local node = nodes[to]
+				-- (never through the other team's room: the walker would be refused there, rightly)
+				if cameFrom[to] == nil and (node.team == 0 or node.team == team) then
+					cameFrom[to] = at
+					table.insert(queue, to)
+				end
+			end
+		end
+		return nil
+	end
+	local reached: { [number]: boolean } = {}
+	local stuck = 0
+	local stuckAt: { string } = {}
+	local walked = 0
+	local function follow(path: { number })
+		for i = 1, #path do -- (from the node nearest the body: it is near it, not on it)
+			local n = nodes[path[i]]
+			local wx, wy, wz = Arena.toWorld(place, n.x, n.y, n.z)
+			local fx, _, fz = opts.feetOf(p)
+			local leg = if fx then math.sqrt((wx - fx) ^ 2 + (wz - (fz :: number)) ^ 2) else 10
+			local limit = opts.nodeSeconds or (2 * leg / 17 + 3)
+			local spent = 0
+			while spent < limit do
+				local x, _, z = opts.feetOf(p)
+				if x ~= nil and math.sqrt((wx - x) ^ 2 + (wz - (z :: number)) ^ 2) < 1.5 then
+					break
+				end
+				if x ~= nil then
+					heading = math.atan2(-(wx - x), -(wz - (z :: number)))
+				end
+				tend(slice, { wx, wy, wz })
+				spent += slice
+			end
+			if spent >= limit then
+				stuck += 1
+				local x, y, z = opts.feetOf(p)
+				if x ~= nil and y ~= nil and z ~= nil then
+					local lx, ly, lz = Arena.toLocal(place, x, y, z)
+					table.insert(
+						stuckAt,
+						string.format(
+							"node %d (%s, storey %d, at %.1f %.1f %.1f) from %.1f %.1f %.1f",
+							n.id,
+							n.kind,
+							n.floor,
+							n.x,
+							n.y,
+							n.z,
+							lx,
+							ly,
+							lz
+						)
+					)
+				end
+				return
+			end
+			walked += 1
+			reached[n.floor] = true
+		end
+	end
+	local side = Arena.ATRIUM + Arena.ATRIUM_SIDE
+	for floor = 0, Arena.FLOORS - 1 do
+		for _, goal in
+			{
+				function(n: any): boolean
+					return n.floor == floor and n.team == 0 and n.kind ~= "stair"
+				end,
+				function(n: any): boolean
+					return n.floor == floor and n.team == 0 and math.abs(n.x) <= side and math.abs(n.z) <= side
+				end,
+			}
+		do
+			local from = nearest()
+			local path = from and pathTo(from, goal)
+			if path ~= nil then
+				follow(path)
+			end
+		end
+		-- at the atrium's side: walk on towards the axis until the rail (or the edge) stops the body
+		local wx, wy, wz = Arena.toWorld(place, 0, floor * Arena.FLOOR_HEIGHT, 0)
+		tend(1.5, { wx, wy, wz })
+	end
+	-- stand at the rail of the top storey's atrium, looking down
+	tend(opts.standSeconds or 10)
+	numbers.storeys = 0
+	for _ in reached do
+		numbers.storeys += 1
+	end
+	numbers.nodesWalked = walked
+	numbers.nodesStuck = stuck
+	numbers.stuckAt = stuckAt
+	numbers.corrections = stats.corrections
+	numbers.movesAccepted = stats.movesAccepted
+	numbers.movesRefused = stats.movesRefused
+	numbers.movesRefusedBy = table.clone(stats.movesRefusedBy or {})
+	check(stats.corrections == 0, `an honest body was corrected {stats.corrections} times`)
+	check(numbers.storeys == Arena.FLOORS, `the walk reached {numbers.storeys} of {Arena.FLOORS} storeys`)
+	check(stats.movesAccepted > 0, "no Move of the walker was accepted")
+	svc:leave(p, "left")
+	opts.step(0.3)
+	return { ok = #failures == 0, failures = failures, numbers = numbers }
+end
+
+-- The engine's side of both checks: the game booted on a server with no clients, two PlayerLike stubs that
+-- have each picked a townsperson (an R15 body that the server simulates), and a step that moves the world on
+-- in real time. nil and words when the place has no attractions.
+local function boot(): (any, string?, number?)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local RunService = game:GetService("RunService")
@@ -445,11 +719,7 @@ function PaintballFlow.run(): { [string]: any }
 	local A = G.attractions
 	if A == nil then
 		G.stop()
-		return {
-			ok = false,
-			failures = { "Game.attractions is missing (is Workspace.Attractions in the place?)" },
-			numbers = { bootSeconds = bootSeconds },
-		}
+		return nil, "Game.attractions is missing (is Workspace.Attractions in the place?)", bootSeconds
 	end
 	local players: { any } = {}
 	local setup: { string } = {}
@@ -466,9 +736,15 @@ function PaintballFlow.run(): { [string]: any }
 		local actor = G.runtime.possession:actorOf(player)
 		return actor and actor.body
 	end
-	local result = PaintballFlow.play(A.minigames, deps, {
+	return {
+		G = G,
+		A = A,
+		deps = deps,
 		players = players,
-		holdCost = true,
+		setup = setup,
+		bootSeconds = bootSeconds,
+		bodyOf = bodyOf,
+		server = server,
 		-- the match runs on the clock clients share: the world is moved on in real time, a frame at a time
 		step = function(seconds: number)
 			local left = seconds
@@ -478,6 +754,21 @@ function PaintballFlow.run(): { [string]: any }
 				left -= dt
 			end
 		end,
+	},
+		nil,
+		bootSeconds
+end
+
+function PaintballFlow.run(): { [string]: any }
+	local b, words, bootSeconds = boot()
+	if b == nil then
+		return { ok = false, failures = { words }, numbers = { bootSeconds = bootSeconds } }
+	end
+	local bodyOf = b.bodyOf
+	local result = PaintballFlow.play(b.A.minigames, b.deps, {
+		players = b.players,
+		holdCost = true,
+		step = b.step,
 		positionOf = function(player: any): (number?, number?, number?)
 			local body = bodyOf(player)
 			local root = body and body.PrimaryPart
@@ -492,12 +783,69 @@ function PaintballFlow.run(): { [string]: any }
 			return root and root.CollisionGroup
 		end,
 	})
-	for _, f in setup do
+	for _, f in b.setup do
 		table.insert(result.failures, 1, f)
 	end
 	result.ok = #result.failures == 0
-	result.numbers.bootSeconds = bootSeconds
-	G.stop()
+	result.numbers.bootSeconds = b.bootSeconds
+	b.G.stop()
+	return result
+end
+
+-- The walk in the engine (see "THE WALK"): Ann's own R15 body, walked by its Humanoid, the bots standing still.
+function PaintballFlow.runWalk(): { [string]: any }
+	local b, words, bootSeconds = boot()
+	if b == nil then
+		return { ok = false, failures = { words }, numbers = { bootSeconds = bootSeconds } }
+	end
+	local folder = b.server:WaitForChild("Minigames"):WaitForChild("Paintball")
+	local Bots = (require :: any)(folder:WaitForChild("Bots"))
+	local RealEngine = (require :: any)(folder:WaitForChild("RealEngine"))
+	local hands = RealEngine.new()
+	local stepWas = Bots.step
+	Bots.step = function(): { any }
+		return {}
+	end
+	local bodyOf = b.bodyOf
+	local function humanoidOf(player: any): any
+		local body = bodyOf(player)
+		return body and body:FindFirstChildOfClass("Humanoid")
+	end
+	local ok, result = pcall(PaintballFlow.walk, b.A.minigames, b.deps, {
+		player = b.players[1],
+		step = b.step,
+		drive = function(player: any, wx: number, wy: number, wz: number)
+			local humanoid = humanoidOf(player)
+			if humanoid then
+				humanoid:MoveTo(Vector3.new(wx, wy, wz))
+			end
+		end,
+		feetOf = function(player: any): (number?, number?, number?)
+			local body = bodyOf(player)
+			if body == nil then
+				return nil, nil, nil
+			end
+			return hands.positionOf(body)
+		end,
+		airOf = function(player: any): boolean
+			local humanoid = humanoidOf(player)
+			if humanoid == nil then
+				return false
+			end
+			local state = humanoid:GetState()
+			return state == Enum.HumanoidStateType.Freefall or state == Enum.HumanoidStateType.Jumping
+		end,
+	})
+	Bots.step = stepWas
+	if not ok then
+		result = { ok = false, failures = { tostring(result) }, numbers = {} }
+	end
+	for _, f in b.setup do
+		table.insert(result.failures, 1, f)
+	end
+	result.ok = #result.failures == 0
+	result.numbers.bootSeconds = b.bootSeconds
+	b.G.stop()
 	return result
 end
 

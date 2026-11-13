@@ -138,8 +138,10 @@ local IDLE_RAD = 0.05
 -- PROVISIONAL (FOOT, FALL_FLOOR, LANDING and the body rule's placeGrace bypass): tuned against scripted bodies
 -- on the fake engine, whose replicated body is wherever the client's Move says. None has met a Roblox Humanoid
 -- on the stair cores, off an atrium edge or replicated with physics interpolation. tools/cloud/tasks/
--- paintball_flow.luau prints the refusals by rule (Stats.movesRefusedBy) for a real body when server checks
--- return; until a real body walks every stair and edge with no correction these numbers are a first guess.
+-- paintball_walk.luau walks a real R15 body over the whole building and prints the refusals by rule
+-- (Stats.movesRefusedBy) when server checks return; until it has run with no correction these numbers are
+-- a first guess. (A server with no clients simulates the body itself, so that check holds the height rule
+-- and the footprint to real physics; the body rule's replication lag needs a client, a Studio test.)
 local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands on
 local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
 local LANDING = 0.25 -- seconds after a fall in which the replicated body may still be coming down

@@ -10,6 +10,7 @@
 local Ballistics = require("@shared/Paintball/Ballistics")
 local Magazine = require("@shared/Paintball/Magazine")
 local Arena = require("@shared/Minigames/Paintball/Arena")
+local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
@@ -1094,6 +1095,82 @@ return function(t)
 			if not ok then
 				error(err, 0)
 			end
+		end
+	)
+
+	t.test(
+		"the walk (tests/engine/PaintballFlow.walk) passes here first: a body that walks the game's own building on its graph, up and down every stair to all five storeys and up to the atrium's rail on each, and stands there, is never corrected",
+		function()
+			t.eq(PaintballFlow.AIR, Wire.BIT.air)
+			-- (the bots stand still for the walk, as they do in the engine)
+			local stepWas = Bots.step;
+			(Bots :: any).step = function(): { Bots.Command }
+				return {}
+			end
+			local result: any = nil
+			local ok, err = pcall(Kit.play, function(kit: Kit.Kit)
+				local ann = kit.client("Ann", { auto = false })
+				local arena, place = kit.arena, kit.place
+				-- a scripted body: it walks at walking pace towards where it is driven, is stopped by anything
+				-- at chest height, steps up and down what a body steps (Arena.STEP_UP), and falls at the engine's
+				-- gravity off anything higher
+				local vy, falling = 0, false
+				local function feet(): (number, number, number)
+					local b = ann.stub.body
+					return Arena.toLocal(place, b.x, b.y, b.z)
+				end
+				result = PaintballFlow.walk(kit.w.svc, { Arena = Arena, Contract = Contract, Clock = Clock }, {
+					player = ann.stub,
+					step = kit.run,
+					standSeconds = 2,
+					drive = function(_player: any, wx: number, wy: number, wz: number, dt: number)
+						local x, y, z = feet()
+						local tx, _, tz = Arena.toLocal(place, wx, wy, wz)
+						local dx, dz = tx - x, tz - z
+						local d = math.sqrt(dx * dx + dz * dz)
+						local stepLen = math.min(d, Body.WALK * dt)
+						local nx, nz = x, z
+						if d > 1e-6 then
+							nx, nz = x + dx / d * stepLen, z + dz / d * stepLen
+							local chest = y + Arena.CHEST
+							if arena.sweep(x, chest, z, nx, chest, nz) ~= nil then
+								nx, nz = x, z
+							end
+						end
+						local g = arena.ground(nx, y, nz)
+						local ny = y
+						if not falling and g ~= nil and g >= y - 0.6 then
+							ny = g
+						else
+							falling = true
+							vy -= 196.2 * dt
+							ny = y + vy * dt
+							if g ~= nil and ny <= g then
+								ny, vy, falling = g, 0, false
+							end
+						end
+						local b = ann.stub.body
+						b.x, b.y, b.z = Arena.toWorld(place, nx, ny, nz)
+					end,
+					feetOf = function(player: any): (number?, number?, number?)
+						local b = player.body
+						return b.x, b.y, b.z
+					end,
+					airOf = function(): boolean
+						return falling
+					end,
+				})
+			end, { arena = ArenaData.build() });
+			(Bots :: any).step = stepWas
+			if not ok then
+				error(err, 0)
+			end
+			t.eq(table.concat(result.failures, "; "), "", "what the walk found")
+			t.eq(result.numbers.storeys, Arena.FLOORS)
+			t.eq(table.concat(result.numbers.stuckAt, "; "), "", "every node of the route was reached")
+			t.eq(result.numbers.corrections, 0)
+			t.deepEq(result.numbers.movesRefusedBy, {}, "not one Move refused")
+			t.truthy(result.numbers.nodesWalked > 40, `{result.numbers.nodesWalked} nodes walked`)
 		end
 	)
 
