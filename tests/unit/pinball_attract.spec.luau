@@ -137,6 +137,11 @@ return function(t: Test.T)
 		t.eq(board.entries[2].score, top)
 		t.eq(HighScores.add(board, "Cy", top + 1), 2, "the first to make a score keeps the place above")
 		t.eq(HighScores.add(board, "Dee", 1), nil, "too low: not entered")
+		-- a game the replay did not call fair (suspect, or out of pace) takes no place, whatever its score
+		local before = #board.entries
+		t.eq(HighScores.add(board, "Mallory", top * 10, false), nil, "not a fair game: not entered")
+		t.eq(#board.entries, before)
+		t.eq(board.entries[1].name, "Brook")
 		for i = 2, #board.entries do
 			t.truthy(board.entries[i].score <= board.entries[i - 1].score)
 		end

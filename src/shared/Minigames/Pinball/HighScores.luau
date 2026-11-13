@@ -8,7 +8,8 @@
 -- A board is plain data (it can be sent as it is and kept for the life of the server).
 -- Pure; Lune-tested (tests/unit/pinball_attract.spec.luau).
 -- Interface: SIZE, HOUSE; new(tableId) -> Board; place(board, score) -> number? (the place a score would
---   take); add(board, name, score) -> number? (enter it; the place it took); lines(board) -> { string };
+--   take); add(board, name, score, fair?) -> number? (enter it; the place it took; a game that was not fair,
+--   Replay.fair, is not entered); lines(board) -> { string };
 --   commas(n) -> string
 
 local HighScores = {}
@@ -73,8 +74,13 @@ function HighScores.place(board: Board, score: number): number?
 	return nil
 end
 
--- add(board, name, score): enter a finished game. Returns the place it took, or nil.
-function HighScores.add(board: Board, name: string, score: number): number?
+-- add(board, name, score, fair): enter a finished game. Returns the place it took, or nil. `fair` is the
+-- replay's word on the game (Replay.fair, the result's `fair`): a game that was suspect or out of pace keeps
+-- its score on the end card but takes no place here.
+function HighScores.add(board: Board, name: string, score: number, fair: boolean?): number?
+	if fair == false then
+		return nil
+	end
 	local at = HighScores.place(board, score)
 	if at == nil then
 		return nil

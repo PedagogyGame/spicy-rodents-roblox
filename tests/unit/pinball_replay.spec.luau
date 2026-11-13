@@ -142,7 +142,7 @@ return function(t: Test.T)
 					t.deepEq(copy, seg)
 					local ok, why = Replay.feed(server, seat, copy)
 					t.truthy(ok, why)
-					t.truthy(Replay.feed(watcher, seat, table.clone(seg), {}))
+					t.truthy(Replay.follow(watcher, seat, table.clone(seg), {}))
 					segments += 1
 					numbers += #seg
 				end)
@@ -223,44 +223,288 @@ return function(t: Test.T)
 	end)
 
 	t.test(
-		"squirrel: a thump in the log is refused unless the server granted it, and each grant is good once",
+		"squirrel: a thump in the log is refused unless the server granted it; a grant is good once and does not keep",
 		function()
 			local r = Replay.new("pinball_space", 3, 1)
 			local ok, why = Replay.feed(r, 1, { 0, 48, 5, BTN.THUMP, 6, 0 })
 			t.falsy(ok)
 			t.eq(why, "thump")
-			Replay.grantThump(r)
+			t.eq(r.tick, 0, "a refused segment plays nothing")
+			t.truthy(Replay.grantThump(r))
 			t.truthy(Replay.feed(r, 1, { 0, 48, 5, BTN.THUMP, 6, 0 }))
 			ok = Replay.feed(r, 1, { 48, 96, 5, BTN.THUMP, 6, 0 })
 			t.falsy(ok, "the grant is spent")
+			-- the same animal, the same thump: no second grant inside two seconds
+			t.eq(Replay.THUMP_TICKS, Machine.THUMP_COOL)
+			t.truthy(Replay.THUMP_TICKS >= 2 * Physics.HZ)
+			t.falsy(Replay.grantThump(r), "a second grant 48 ticks after the first is refused")
+			t.truthy(Replay.feed(r, 1, { 48, 48 + Replay.THUMP_TICKS }))
+			t.truthy(Replay.grantThump(r), "two seconds on, another animal may land")
 			-- holding the bit is one thump, not many
-			Replay.grantThump(r)
-			t.truthy(Replay.feed(r, 1, { 48, 96, 5, BTN.THUMP, 20, BTN.THUMP + BTN.LEFT, 30, 0 }))
+			local at = r.tick
+			t.truthy(Replay.feed(r, 1, { at, at + 48, 5, BTN.THUMP, 20, BTN.THUMP + BTN.LEFT, 30, 0 }))
+			-- a grant the log did not use does not keep: it cannot be saved up for a chosen moment
+			t.truthy(Replay.feed(r, 1, { r.tick, r.tick + Replay.THUMP_TICKS }))
+			t.truthy(Replay.grantThump(r))
+			for _ = 1, 3 do
+				t.truthy(Replay.feed(r, 1, { r.tick, r.tick + 240 }))
+			end
+			ok, why = Replay.feed(r, 1, { r.tick, r.tick + 48, 5, BTN.THUMP, 6, 0 })
+			t.falsy(ok, "three seconds after the grant it has lapsed")
+			t.eq(why, "thump")
+			-- through the rules: the server's verb says when it is too soon
+			local rules = Rules.forTable("pinball_space")
+			local state = rules.init(1, 3)
+			t.truthy(rules.input(state, 1, "thump"))
+			ok, why = rules.input(state, 1, "thump")
+			t.falsy(ok)
+			t.eq(why, "too soon")
 		end
 	)
 
 	t.test(
-		"pace: the replay knows how far it is ahead of a clock, so a server can refuse a log that outruns time",
+		"squirrel: the thump is judged by the server only: a watcher who was never given the grant follows the same game",
 		function()
-			local r = Replay.new("pinball_acorn", 1, 1)
-			t.truthy(Replay.feed(r, 1, { 0, 480 }))
-			t.eq(Replay.pace(r, 2), 0)
-			t.eq(Replay.pace(r, 1), 240, "a second ahead")
-			t.eq(Replay.pace(r, 3), -240, "a second behind")
-			t.eq(Replay.SEGMENT_TICKS, InputLog.WIRE_TICKS)
-			t.eq(Physics.HZ / Replay.SEGMENT_TICKS, 10, "ten segments a second")
-			-- a ball the server played out by itself is not the log's: the next player's log is not "ahead" for it
-			local two = Replay.new("pinball_acorn", 1, 2)
-			t.truthy(Replay.feed(two, 1, { 0, 240 }))
-			Replay.skip(two)
-			t.eq(two.m.up, 2)
-			t.truthy(two.own > 1000, `the dead ball took {two.own} ticks, all the server's own`)
-			t.eq(two.tick, 240 + two.own)
-			t.eq(Replay.pace(two, 1), 0, "the log itself is exactly one second long")
-			t.truthy(Replay.feed(two, 2, { two.tick, two.tick + 240 }))
-			t.eq(Replay.pace(two, 2), 0)
+			local id = "pinball_acorn"
+			local tbl = Tables.need(id)
+			-- the player's machine plays live; the server judges; a watcher copies the server's replay BEFORE the grant
+			local live, server = Replay.new(id, 12, 2), Replay.new(id, 12, 2)
+			local rec = Replay.recorder(live)
+			local bot = Bot.new(2, 3)
+			local watcher: Replay.State? = nil
+			local other = Replay.new(id, 12, 2) -- the second player's machine, following from the first tick
+			local granted, thumped, fed = false, false, 0
+			for tick = 1, 240 * 12 do
+				local buttons = Bot.step(bot, tbl, live.m)
+				if granted and not thumped and live.m.launched then
+					buttons += BTN.THUMP -- the player's machine was told of the thump and puts it in its log
+					thumped = true
+				end
+				local seg = Replay.live(live, rec, buttons)
+				if seg then
+					local ok, why = Replay.feed(server, 1, seg, nil, Replay.sum(live))
+					t.truthy(ok, why)
+					t.truthy(Replay.follow(other, 1, table.clone(seg)))
+					if watcher then
+						local wok, wwhy = Replay.follow(watcher, 1, table.clone(seg))
+						t.truthy(wok, `the watcher follows: {wwhy}`)
+						t.eq(watcher.tick, server.tick)
+						t.eq(Replay.sum(watcher), Replay.sum(server), "to the same sum")
+					end
+					fed += 1
+				end
+				if tick == 600 then
+					watcher = Replay.clone(server)
+				elseif tick == 900 then
+					t.truthy(Replay.grantThump(server))
+					granted = true
+				end
+			end
+			t.truthy(thumped, "the thump was in the log")
+			local w = watcher :: Replay.State
+			t.eq(w.thumps, 0, "the watcher never held a grant")
+			t.eq(digest(w.m), digest(server.m), "the watcher's machine is the server's")
+			t.eq(digest(other.m), digest(server.m), "and so is the other player's")
+			t.falsy(server.drift)
+			-- the judge still refuses what a follower lets through: the guard has not gone, it has moved
+			local judge, follower = Replay.new(id, 1, 1), Replay.new(id, 1, 1)
+			local seg = { 0, 48, 5, BTN.THUMP, 6, 0 }
+			t.falsy(Replay.feed(judge, 1, seg))
+			t.truthy(Replay.follow(follower, 1, seg))
+			-- a follower still checks the order and the form
+			local ok, why = Replay.follow(follower, 1, { 10, 96 })
+			t.falsy(ok)
+			t.eq(why, "out of order")
+			ok, why = Replay.follow(follower, 2, { 48, 96 })
+			t.falsy(ok)
+			t.eq(why, "not your ball")
 		end
 	)
+
+	t.test(
+		"time: the server tells the replay its clock; a ball's log may run half a second ahead and two behind, no further",
+		function()
+			t.eq(Replay.AHEAD_SECONDS, 0.5)
+			t.eq(Replay.BEHIND_SECONDS, 2)
+			t.eq(Replay.SEGMENT_TICKS, InputLog.WIRE_TICKS)
+			t.eq(Physics.HZ / Replay.SEGMENT_TICKS, 10, "ten segments a second")
+			-- with no clock told, time is not judged (specs, tools, a follower)
+			local free = Replay.new("pinball_acorn", 1, 1)
+			t.truthy(Replay.feed(free, 1, { 0, 720 }))
+			t.eq(Replay.pace(free), 0)
+			-- a burst: thirty seconds of log in one go. The server plays half a second of it and no more
+			local r = Replay.new("pinball_acorn", 1, 1)
+			t.eq(Replay.clock(r, 100), "ok", "the first word of the time starts the clock (any origin)")
+			local taken = 0
+			for i = 1, 300 do
+				local ok, why = Replay.feed(r, 1, { r.tick, r.tick + 24 })
+				if ok then
+					taken += 1
+				else
+					t.eq(why, "ahead")
+				end
+				t.truthy(i < 300 or not ok)
+			end
+			t.eq(taken, 5, "five segments are half a second")
+			t.eq(r.tick, 120, "nothing past the bound was simulated")
+			t.eq(Replay.pace(r), 120)
+			-- a refused segment played nothing, so the same segment is good once the clock has caught up
+			t.eq(Replay.clock(r, 100.125), "ok")
+			t.truthy(Replay.feed(r, 1, { 120, 144 }))
+			-- played in time, a log is never ahead and never behind
+			local honest = Replay.new("pinball_acorn", 1, 1)
+			for i = 0, 99 do
+				t.eq(Replay.clock(honest, 7 + i / 10), "ok")
+				t.truthy(Replay.feed(honest, 1, { honest.tick, honest.tick + 24 }))
+			end
+			t.falsy(honest.late)
+			t.truthy(Replay.fair(honest))
+			-- slow motion: a quarter of the speed. Two seconds behind comes after 2.7 s of it
+			local slow = Replay.new("pinball_acorn", 1, 2)
+			local verdict = "ok"
+			local seconds = 0
+			while verdict == "ok" and seconds < 10 do
+				seconds += 0.1
+				verdict = Replay.clock(slow, 50 + seconds)
+				if verdict == "ok" then
+					t.truthy(Replay.feed(slow, 1, { slow.tick, slow.tick + 6 }))
+				end
+			end
+			t.eq(verdict, "behind")
+			t.near(seconds, 2 / 0.75, 0.25, "0.75 s is lost in every second of quarter speed")
+			-- the caller takes the ball: it is played out dead, and the game is marked late
+			local epoch = slow.epoch
+			Replay.lapse(slow)
+			t.truthy(slow.late)
+			t.falsy(Replay.fair(slow), "a game that was out of pace is not fair")
+			t.eq(slow.m.up, 2, "the ball has gone to the next player")
+			t.eq(slow.epoch, epoch + 1, "every copy that was ahead of the server needs a clone")
+			t.truthy(slow.own > 1000, `the dead ball took {slow.own} ticks, all the server's own`)
+			-- time is measured ball by ball: the new ball starts level, whatever the last one cost
+			t.eq(Replay.pace(slow), 0)
+			t.eq(Replay.clock(slow, 50 + seconds + 0.1), "ok")
+			t.truthy(Replay.feed(slow, 2, { slow.tick, slow.tick + 24 }))
+			t.near(Replay.pace(slow), 0, 1e-6)
+			-- a clock never runs back
+			Replay.clock(slow, 1)
+			t.truthy(slow.now > 50)
+		end
+	)
+
+	t.test('time: through the rules the server\'s verb "clock" takes a ball that has fallen behind', function()
+		local rules = Rules.forTable("pinball_rodent")
+		local view = rules.view :: (any) -> { [string]: any }
+		t.truthy(rules.verbs.clock)
+		t.truthy(rules.serverVerbs and rules.serverVerbs.clock, "only the server tells the time")
+		local state = rules.init(2, 5)
+		t.truthy(rules.input(state, 1, "clock", { 10 }))
+		t.falsy(rules.input(state, 1, "clock", { "now" }))
+		t.falsy(rules.input(state, 1, "clock", { 0 / 0 }))
+		local from, to, packed = InputLog.pack({ 0, 24 })
+		t.truthy(rules.input(state, 1, "log", { from, to, packed }))
+		t.eq(view(state).pace, 0.1, "a tenth of a second of log at the clock's zero")
+		t.falsy(view(state).late)
+		t.eq(view(state).epoch, 0)
+		-- a log that runs ahead is refused whole and may be sent in again
+		local ok, why = true, nil :: string?
+		local tick = 24
+		for _ = 1, 10 do
+			from, to, packed = InputLog.pack({ tick, tick + 24 })
+			ok, why = rules.input(state, 1, "log", { from, to, packed })
+			if not ok then
+				break
+			end
+			tick += 24
+		end
+		t.falsy(ok)
+		t.eq(why, "ahead")
+		t.eq(view(state).tick, tick, "the acknowledgement has not moved")
+		t.truthy(rules.input(state, 1, "clock", { 10.5 }))
+		t.truthy(rules.input(state, 1, "log", { from, to, packed }))
+		-- the machine goes quiet: three seconds on, the server's clock takes the ball
+		t.truthy(rules.input(state, 1, "clock", { 12 }))
+		t.eq(rules.turn and rules.turn(state), 1, "a second and a half behind is a hitch")
+		t.truthy(rules.input(state, 1, "clock", { 14 }))
+		t.eq(rules.turn and rules.turn(state), 2, "more than two seconds behind: the ball is taken")
+		t.truthy(view(state).late)
+		t.eq(view(state).epoch, 1)
+		-- the game is played out; its result says it was not fair, and the board does not take it
+		for _ = 1, 8 do
+			if rules.skipTurn then
+				rules.skipTurn(state)
+			end
+		end
+		local result = rules.result(state)
+		assert(result, "the game is over")
+		t.eq(result.fair, false)
+		t.eq(result.late, true)
+		local clean = rules.init(1, 5)
+		for _ = 1, 3 do
+			(rules.skipTurn :: (any) -> ())(clean)
+		end
+		local cleanResult = rules.result(clean)
+		assert(cleanResult, "the game is over")
+		t.eq(cleanResult.fair, true)
+	end)
+
+	t.test("a segment that runs past the end of its ball is played to the end of the ball only, and says so", function()
+		local id = "pinball_acorn"
+		-- seat 1 plunges, never flips and sends three-second segments without cutting at the ball's end
+		local server, honest = Replay.new(id, 5, 2), Replay.new(id, 5, 2)
+		local played: number? = 0
+		local ok, why: string? = true, nil
+		local sent = 0
+		local first = { 0, 720, 1, BTN.PLUNGE, 250, 0 }
+		ok, why, played = Replay.feed(server, 1, first)
+		t.truthy(ok)
+		t.eq(why, nil)
+		t.eq(played, 720, "a whole segment says how many ticks it played")
+		t.truthy(Replay.feed(honest, 1, first))
+		sent = 720
+		for _ = 1, 40 do
+			ok, why, played = Replay.feed(server, 1, { sent, sent + 720 })
+			t.truthy(ok)
+			if why ~= nil then
+				break
+			end
+			-- (the honest machine cuts where the ball ends: fed tick by tick it stops there by itself)
+			t.truthy(Replay.feed(honest, 1, { sent, sent + 720 }))
+			sent += 720
+		end
+		t.eq(why, "overrun", "the segment that crossed the end of the ball says so")
+		t.eq(server.m.up, 2, "the ball has changed hands")
+		t.truthy((played :: number) < 720, `only {played} of its 720 ticks were this ball's`)
+		t.eq(server.tick, sent + (played :: number), "the replay stands where the ball ended")
+		t.truthy(server.drift, "the sender believes it is further on: it is sent a clone")
+		-- the ticks that were played are the same game an honest cut would have given
+		local exact = { sent, sent + (played :: number) }
+		ok, why = Replay.feed(honest, 1, exact)
+		t.truthy(ok)
+		t.eq(why, nil)
+		t.eq(digest(honest.m), digest(server.m))
+		-- the next player's first segment starts where the ball ended, not where the late sender thought
+		t.truthy(Replay.feed(server, 2, { server.tick, server.tick + 24 }))
+		ok, why = Replay.feed(server, 1, { sent + 720, sent + 1440 })
+		t.falsy(ok)
+		-- through the rules: the verb answers true, "overrun" and the view shows the drift
+		local rules = Rules.forTable(id)
+		local view = rules.view :: (any) -> { [string]: any }
+		local state = rules.init(2, 5)
+		t.truthy(rules.input(state, 1, "seg", { first }))
+		local at = 720
+		local rok, rwhy: string? = true, nil
+		for _ = 1, 40 do
+			rok, rwhy = rules.input(state, 1, "seg", { { at, at + 720 } })
+			if rwhy ~= nil then
+				break
+			end
+			at += 720
+		end
+		t.truthy(rok)
+		t.eq(rwhy, "overrun")
+		t.eq(view(state).drift, true)
+		t.eq(view(state).tick, server.tick - 24, "the acknowledgement is the tick the ball ended at")
+	end)
 
 	t.test("idle: the replay knows how long the buttons have not changed, ball by ball", function()
 		local r = Replay.new("pinball_acorn", 1, 2)

@@ -11,10 +11,16 @@
 -- changes, sum? } (InputLog.pack; Minigames/Games rule 1; sum is the player's Replay.sum at toTick, optional),
 -- or as "seg" with the segment itself (specs, tools). view().tick is the acknowledgement: the next segment
 -- must start there.
--- The server's own verb "thump" lets one thump on the glass into the log (an animal landed on the cabinet):
--- it is a nudge that can warn but never tilt. The server's verb "retire" takes a seat out for good (the
--- player walked away or was bitten, C13): the ball in play is played out dead, their later balls are passed
--- over and the score so far is kept; the Session's gone(state, seat) does the same.
+-- A "log" that runs past the end of its ball is played to the end of the ball and answered true, "overrun"
+-- (the view then shows drift: the sender is sent a clone); one that is ahead of the server's clock is refused
+-- "ahead" with nothing played, to be sent in again a moment later.
+-- The server's own verbs: "thump" lets one thump on the glass into the log (an animal landed on the cabinet):
+-- it is half a nudge that can warn but never tilt, and a second one inside two seconds is refused. "retire"
+-- takes a seat out for good (the player walked away or was bitten, C13): the ball in play is played out dead,
+-- their later balls are passed over and the score so far is kept; the Session's gone(state, seat) does the
+-- same. "clock" { seconds } tells the replay the server's time (Replay.clock), before every "log" and a few
+-- times a second besides: a ball whose log has fallen more than Replay.BEHIND_SECONDS behind is taken
+-- (Replay.lapse) and the game is marked late. result().fair says whether the game may go on the board.
 -- Free play: money is "none"; nothing here knows a credit, a replay award or a match number (PIN-R4).
 -- TWO SHAPES of the same rules:
 --   * forTable(tableId): one machine's rules; def.game is the table id (pinball_acorn, ...).
@@ -26,13 +32,14 @@
 -- Interface: forTable(tableId) -> Minigame.Rules (cached); game: Minigame.Rules; GAME, CLIENT_VERBS; GAMES
 --   (the three table ids); MAX_PLAYERS; replay(state) -> Replay.State? (the replay inside either shape's state);
 --   the rules' view(state) is { game, title, variant?, freePlay, phase, up, ball, balls, players = { { score,
---   gone, extraBall, stats } }, status, say, sayValue, saveOn, tilted, warnings, tick, idle, drift, suspect };
---   before the
---   machine is named, game.view is { game = "pinball", freePlay = true, phase = "off" }
+--   gone, extraBall, stats } }, status, say, sayValue, saveOn, tilted, warnings, tick, idle, drift, suspect,
+--   late, epoch, pace (seconds the ball's log is ahead of the clock) }; before the machine is named,
+--   game.view is { game = "pinball", freePlay = true, phase = "off" }
 
 local InputLog = require("./InputLog")
 local Machine = require("./Machine")
 local Minigame = require("../Minigame")
+local Physics = require("./Physics")
 local Replay = require("./Replay")
 local Tables = require("./Tables")
 
@@ -61,8 +68,8 @@ local function build(tableId: string): Minigame.Rules
 		authority = "client_replay",
 		money = "none",
 	} :: Minigame.Def
-	rules.verbs = { log = true, seg = true, thump = true, retire = true }
-	rules.serverVerbs = { thump = true, retire = true }
+	rules.verbs = { log = true, seg = true, thump = true, retire = true, clock = true }
+	rules.serverVerbs = { thump = true, retire = true, clock = true }
 
 	function rules.init(seats: number, seed: number): any
 		return Replay.new(tableId, seed, seats)
@@ -78,13 +85,25 @@ local function build(tableId: string): Minigame.Rules
 				return false, "no segment"
 			end
 			local sum = args and args[4]
-			return Replay.feed(r, seat, seg, nil, if type(sum) == "number" then sum else nil)
+			local ok, why = Replay.feed(r, seat, seg, nil, if type(sum) == "number" then sum else nil)
+			return ok, why
 		elseif verb == "seg" then
 			local seg = args and args[1]
 			if type(seg) ~= "table" then
 				return false, "no segment"
 			end
-			return Replay.feed(r, seat, seg)
+			local ok, why = Replay.feed(r, seat, seg)
+			return ok, why
+		elseif verb == "clock" then
+			-- the server's: its own time, in seconds. A ball whose log has fallen too far behind is taken
+			local seconds = args and args[1]
+			if type(seconds) ~= "number" or seconds ~= seconds then
+				return false, "no clock"
+			end
+			if Replay.clock(r, seconds) == "behind" then
+				Replay.lapse(r)
+			end
+			return true
 		elseif verb == "retire" then
 			-- the server's: this seat has gone for good (walked away, bitten); the score so far is kept
 			if Replay.over(r) then
@@ -96,7 +115,9 @@ local function build(tableId: string): Minigame.Rules
 			if Replay.over(r) then
 				return false, "the game is over"
 			end
-			Replay.grantThump(r)
+			if not Replay.grantThump(r) then
+				return false, "too soon"
+			end
 			return true
 		end
 		return false, "verb"
@@ -145,6 +166,8 @@ local function build(tableId: string): Minigame.Rules
 			winner = if tie then nil else winner,
 			stats = stats,
 			suspect = r.suspect,
+			late = r.late,
+			fair = Replay.fair(r), -- only a fair game takes a place on the machine's board (HighScores.add)
 		}
 	end
 
@@ -181,6 +204,9 @@ local function build(tableId: string): Minigame.Rules
 			idle = Replay.idleSeconds(r),
 			drift = r.drift,
 			suspect = r.suspect,
+			late = r.late,
+			epoch = r.epoch,
+			pace = Replay.pace(r) / Physics.HZ,
 		}
 	end
 
@@ -222,8 +248,8 @@ do
 		authority = "client_replay",
 		money = "none",
 	} :: Minigame.Def
-	game.verbs = { log = true, seg = true, machine = true, thump = true, retire = true }
-	game.serverVerbs = { machine = true, thump = true, retire = true }
+	game.verbs = { log = true, seg = true, machine = true, thump = true, retire = true, clock = true }
+	game.serverVerbs = { machine = true, thump = true, retire = true, clock = true }
 
 	function game.init(seats: number, seed: number): any
 		local st: Station = { seats = seats, seed = seed, rules = nil, r = nil }
@@ -302,7 +328,7 @@ do
 end
 
 -- replay(state): the Replay inside a rules state of either shape (nil while the registry's game is off). The
--- station's Table reads it for the pace guard, the cues and the frames (Replay.pace, Stream.read).
+-- station's Table reads it for the cues and the frames (Stream.read) and for fair() at the end.
 function Rules.replay(state: any): Replay.State?
 	if type(state) ~= "table" then
 		return nil
