@@ -107,7 +107,7 @@ return function(t)
 		end
 		t.eq(house + tree, kit.count)
 		t.truthy(house <= 170, `the house is {house} parts`)
-		t.truthy(tree <= 90, `the tree is {tree} parts`)
+		t.truthy(tree <= 100, `the tree is {tree} parts`)
 		print(`      the house {house} parts, the tree {tree}`)
 		t.truthy(yard:FindFirstChild("Tree_AlleyYard") ~= nil, "the tree's model is named for ClientWorld")
 		for i = 1, 6 do
@@ -287,7 +287,11 @@ return function(t)
 			t.truthy(nearest >= 2.0, `a leaf clump comes within {nearest} of a route or the leap`)
 			print(`      the nearest leaf clump is {string.format("%.1f", nearest)} st from a route or the leap`)
 			for _, b in boxes do
-				if string.sub(b.part.Name, 1, 5) == "Bough" or string.sub(b.part.Name, 1, 4) == "Limb" then
+				if
+					string.sub(b.part.Name, 1, 5) == "Bough"
+					or string.sub(b.part.Name, 1, 4) == "Limb"
+					or string.sub(b.part.Name, 1, 4) == "Twig"
+				then
 					t.truthy(not b.part.CanCollide and not b.part.CanQuery, `{b.part.Name} is drawn only`)
 				end
 			end

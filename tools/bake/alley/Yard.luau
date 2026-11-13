@@ -17,7 +17,7 @@
 -- NOT built into build/Attractions.rbxm yet: the alley's footprint, its bake spec and the expansion check know
 -- nothing of the annex (tools/review/alley_roof.luau bakes it for the review pictures).
 -- Interface: build(kit, root) -> Model; HOUSE_COLORS; CROWN; LEAF_CLUMPS (local {X, Y, D, diameter}); keepOut() ->
---   { {X, Y, D} }; boughRadius(id, t)
+--   { {X, Y, D} }; TWIGS; twig(i) -> (foot, tip, clump centre, clump diameter); boughRadius(id, t)
 local AlleyRoof = require("../../../src/shared/Attractions/AlleyRoof")
 local Curve = require("../../../src/shared/Routes/Curve")
 local SquirrelMotor = require("../../../src/shared/Movement/SquirrelMotor")
@@ -51,6 +51,14 @@ local DRESS = { collide = false }
 -- Where a route's line is at t (arc length), in the local frame.
 local function curveOf(id: number): Curve.Curve
 	return Curve.fromArrays(AlleyRoof.route(id).points)
+end
+
+-- The bark's radius of a bough at t: thicker at the fork.
+function Yard.boughRadius(id: number, t: number): number
+	if id == 9105 then
+		return 0.9 - 0.25 * t
+	end
+	return 0.85 - 0.2 * t
 end
 
 -- What the leaves keep clear of (local points): every route of the way up (a bough's at the squirrel's feet), and
@@ -90,16 +98,71 @@ end
 -- reaches over the games wing's parapet and toward the house, each at least TUNNEL from everything in keepOut() so
 -- a squirrel on a route or in the leap stays in sight, and inside the annex (and the footprint beside it).
 local TUNNEL = 2.4
-Yard.CROWN = { x = 163, y = 31, d = 33, rx = 19, ry = 9, rd = 14, count = 26 }
+Yard.CROWN = { x = 163, y = 31, d = 33, rx = 19, ry = 9, rd = 14, count = 30 }
+-- Twigs off the two running boughs, to the side and up, each carrying a small clump over the bough (so the boughs
+-- are not bare poles): { route, t, side (+1 left of the way from the fork, -1 right) }.
+Yard.TWIGS = {
+	{ 9106, 0.3, 1 },
+	{ 9106, 0.52, -1 },
+	{ 9106, 0.74, 1 },
+	{ 9106, 0.9, -1 },
+	{ 9105, 0.42, -1 },
+	{ 9105, 0.78, 1 },
+}
+
+-- twig(i): the twig's foot, its tip and its clump's centre (local), and the clump's diameter
+function Yard.twig(i: number): ({ number }, { number }, { number }, number)
+	local tw = Yard.TWIGS[i]
+	local id, u, side = tw[1], tw[2], tw[3]
+	local c = curveOf(id)
+	local p, tg = c:getPointAt(u), c:getTangentAt(u)
+	local l = math.sqrt(tg.x * tg.x + tg.z * tg.z)
+	local sx, sd = -tg.z / l * side, tg.x / l * side
+	local r = Yard.boughRadius(id, u)
+	local cy = p.y + LIFT - r
+	local foot = { p.x + sx * r * 0.8, cy, p.z + sd * r * 0.8 }
+	local tip = { p.x + sx * 3.6, cy + 3.4, p.z + sd * 3.6 }
+	local size = 6
+	return foot, tip, { p.x + sx * 4.6, cy + 5.2, p.z + sd * 4.6 }, size
+end
+
 Yard.LEAF_CLUMPS = (function(): { { number } }
 	local keep = Yard.keepOut()
 	local cr = Yard.CROWN
+	local clumps: { { number } } = {}
+	local function try(X: number, Y: number, D: number, size: number): boolean
+		if D + size / 2 > AlleyRoof.ANNEX.d1 or X + size / 2 > H.x0 - 1 then
+			return false
+		end
+		for _, q in keep do
+			local dx, dy, dd = q[1] - X, q[2] - Y, q[3] - D
+			if math.sqrt(dx * dx + dy * dy + dd * dd) - size / 2 < TUNNEL then
+				return false
+			end
+		end
+		-- spread out: overlapping, but not one inside another
+		for _, c in clumps do
+			if math.sqrt((c[1] - X) ^ 2 + (c[2] - Y) ^ 2 + (c[3] - D) ^ 2) < 0.6 * (c[4] + size) / 2 then
+				return false
+			end
+		end
+		local function q(n: number): number
+			return math.floor(n * 10 + 0.5) / 10
+		end
+		table.insert(clumps, { q(X), q(Y), q(D), q(size) })
+		return true
+	end
+	for i in Yard.TWIGS do
+		local _, _, c, size = Yard.twig(i)
+		if not try(c[1], c[2], c[3], size) then
+			error(`Yard: twig {i}'s clump would close the tunnel round a route`)
+		end
+	end
 	local seed = 20261113
 	local function rand(): number
 		seed = (seed * 1103515245 + 12345) % 2147483648
 		return seed / 2147483648
 	end
-	local clumps: { { number } } = {}
 	for _ = 1, 3000 do
 		if #clumps >= cr.count then
 			break
@@ -109,46 +172,12 @@ Yard.LEAF_CLUMPS = (function(): { { number } }
 		local D = cr.d + (2 * rand() - 1) * cr.rd
 		local size = 7 + 5 * rand()
 		local e = ((X - cr.x) / cr.rx) ^ 2 + ((Y - cr.y) / cr.ry) ^ 2 + ((D - cr.d) / cr.rd) ^ 2
-		if e > 1 or D + size / 2 > AlleyRoof.ANNEX.d1 or X + size / 2 > H.x0 - 1 then
-			continue
-		end
-		local ok = true
-		for _, q in keep do
-			local dx, dy, dd = q[1] - X, q[2] - Y, q[3] - D
-			if math.sqrt(dx * dx + dy * dy + dd * dd) - size / 2 < TUNNEL then
-				ok = false
-				break
-			end
-		end
-		-- spread out: overlapping, but not one inside another
-		for _, c in clumps do
-			if math.sqrt((c[1] - X) ^ 2 + (c[2] - Y) ^ 2 + (c[3] - D) ^ 2) < 0.6 * (c[4] + size) / 2 then
-				ok = false
-				break
-			end
-		end
-		if ok then
-			table.insert(
-				clumps,
-				{
-					math.floor(X * 10 + 0.5) / 10,
-					math.floor(Y * 10 + 0.5) / 10,
-					math.floor(D * 10 + 0.5) / 10,
-					math.floor(size * 10 + 0.5) / 10,
-				}
-			)
+		if e <= 1 then
+			try(X, Y, D, size)
 		end
 	end
 	return clumps
 end)()
-
--- The bark's radius of a bough at t: thicker at the fork.
-function Yard.boughRadius(id: number, t: number): number
-	if id == 9105 then
-		return 0.9 - 0.25 * t
-	end
-	return 0.85 - 0.2 * t
-end
 
 -- the roof's top surface over the north (d < ridge) or south slope
 local function roofTop(d: number): number
@@ -577,6 +606,9 @@ local function tree(kit: any, yard: any): any
 			table.insert(radii, rr)
 		end
 		limb(kit, m, `Bough{id}`, pts, radii, BARK_LIGHT, NOQUERY)
+		-- a rounded tip, not a sawn end
+		local tip = pts[#pts]
+		kit:ball(m, `Bough{id}_Tip`, tip[1], tip[2], tip[3], 2 * radii[#radii], BARK_LIGHT, "Wood", NOQUERY)
 	end
 	-- three side limbs that carry the crown (south, east and west), none on a route
 	limb(kit, m, "LimbS", {
@@ -594,6 +626,10 @@ local function tree(kit: any, yard: any): any
 		{ fork.x - 5, fork.y + 8, fork.z - 1 },
 		{ fork.x - 9, fork.y + 12, fork.z - 4 },
 	}, { 0.55, 0.4, 0.28 }, BARK, NOQUERY)
+	for i in Yard.TWIGS do
+		local foot, tip = Yard.twig(i)
+		limb(kit, m, `Twig{i}`, { foot, tip }, { 0.3, 0.16 }, BARK_LIGHT, NOQUERY)
+	end
 	-- the crown
 	for i, c in Yard.LEAF_CLUMPS do
 		kit:ball(m, `Leaves{i}`, c[1], c[2], c[3], c[4], if i % 3 == 0 then LEAF_DARK else LEAF, "LeafyGrass", NOQUERY)
