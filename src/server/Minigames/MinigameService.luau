@@ -77,6 +77,7 @@ export type Opts = {
 		charge: ((player: any, cents: number, why: string) -> (boolean, string?))?,
 		best: ((player: any, key: string, value: number?, lower: boolean?) -> number?)?,
 	}?,
+	paintball: { [string]: any }?, -- paintball's deps (PaintballService.Deps), read by its Table as ctx.opts.paintball
 }
 
 type Station = {

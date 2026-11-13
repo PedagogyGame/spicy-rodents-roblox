@@ -1038,6 +1038,19 @@ function Game.start(opts: Opts?): any
 					return out
 				end,
 			},
+			-- paintball (PaintballService.Deps): an infected player is refused at the arena door with "See a
+			-- doctor first." (decision D6), so nobody collapses in a match. The pass's money is ctx.town.charge,
+			-- the framework's stand-in until the wallet lands; its day is the shared clock's
+			paintball = {
+				fit = function(player: any): (boolean, string?)
+					local actor = possession:actorOf(player)
+					local townId = if actor then townIdOf[actor.id] else nil
+					if infection and townId and infection:statusOf(townId) ~= nil then
+						return false, "infected"
+					end
+					return true, nil
+				end,
+			},
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
 			animals = function(): { { [string]: any } }
 				local out = {}
