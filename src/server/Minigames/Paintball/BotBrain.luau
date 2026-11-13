@@ -26,7 +26,9 @@
 --            last seen), a route with its own taste (BotNav), a few seconds' watch there, then
 --            another. Behind low cover it bobs: crouched it is wholly hidden, standing it sees and
 --            shoots. Behind a pillar it steps out to a peek point and back, and looks past the
---            pillar's edges, not at it. A bot that has been nowhere else for nine seconds is
+--            pillar's edges, not at it. Fighting from open floor it JINKS: a quick step across
+--            its target's line, a shot or two, a step back, the other way next time (see JINK): it
+--            is never a turret. A bot that has been nowhere else for nine seconds is
 --            sent somewhere, whatever it was doing (PB-10: never stuck).
 --   moves    along the links of the graph in straight lines, feet on arena.ground, at Body's speeds
 --            with the match's feel; sprints only when nothing has been seen or heard for a while.
@@ -278,10 +280,11 @@ local THINK = 0.1 -- seconds between thoughts
 local QUIET = 3 -- seconds with nothing seen or heard before a bot sprints or reloads at leisure
 local SAY_EVERY = 12 -- seconds between one bot's call-outs
 local TEAM_SAY_EVERY = 8 -- and between one team's
--- JINK: a bot that fights from the open does not stand to be shot. Every second or so it takes a
+-- JINK: a bot that fights from the open does not stand to be shot. Every half second or so it takes a
 -- quick step across its target's line and, a moment later, back: a couple of strides either side of
--- where it stood, on level floor it can walk (the same test as a peek point). It fires as it goes,
--- with the error its own movement adds. Behind cover it has the cover instead.
+-- where it stood, on level floor it can walk (the same test as a peek point), mostly the other side
+-- from last time. It fires as it goes, with the error its own movement adds. Behind cover it has the
+-- cover instead. Every step of it is one a person's body could take (the sim's legs check).
 local JINK = 2.8 -- studs (inside what the stuck watch, and anybody watching, calls one place)
 local STUCK = 9 -- seconds in one place before the stuck watch sends a bot somewhere else
 local STUCK_REACH = 6 -- studs: "one place" is this far across
@@ -1115,13 +1118,13 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 		if cover == nil and (b.halt or b.mode == "hold") and now >= b.jinkAt then
 			if b.peekX == nil then
 				if jinkTo(b, pose.x, pose.z) then
-					b.jinkAt = now + rng.range(0.45, 1.0)
+					b.jinkAt = now + rng.range(0.35, 0.7)
 				else
 					b.jinkAt = now + 0.5
 				end
 			elseif b.jink and not b.peekBack then
 				b.peekBack = true
-				b.jinkAt = now + rng.range(0.4, 0.9)
+				b.jinkAt = now + rng.range(0.35, 0.75)
 			end
 		end
 	else

@@ -65,6 +65,7 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 	-- the one judge refused nothing a bot asked for: its own look, its own eye, never from a spawn
 	-- room, never sprinting, never an empty or hurried magazine
 	t.eq(s.refused, 0, "no command of a bot's was refused")
+	t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 	t.eq(s.tooSoon, 0)
 	-- nobody stuck, nobody kept in or camped on
 	t.truthy(s.still < 16, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
@@ -247,6 +248,7 @@ return function(t)
 		-- wide band round it
 		t.truthy(s.personWin > 0.35 and s.personWin < 0.9, `the stand-in won {s.personWin * 100}% of its exchanges`)
 		t.eq(s.refused, 0, "the stand-in's clicks pass the same judge")
+		t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 		t.truthy(s.stares <= 2, `{s.stares} times a bot followed somebody through a wall`)
 		t.eq(s.doorTrap, 0)
 		t.truthy(s.still < 20)
@@ -269,6 +271,7 @@ return function(t)
 			t.eq(n.ticks, 60 * Clock.TICK_HZ)
 			t.truthy(n.shots > 40 and n.tags > 5, `{n.shots} balls, {n.tags} tags`)
 			t.eq(n.refused, 0)
+			t.eq(n.legs, 0, "every step a brain took is one a person could have taken")
 			t.eq(n.neverLeft, 0)
 			t.truthy(n.botsMs < n.budgetMs)
 		end

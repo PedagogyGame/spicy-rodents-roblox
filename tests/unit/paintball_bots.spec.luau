@@ -476,6 +476,127 @@ return function(t)
 	end)
 
 	t.test(
+		"in the open with somebody to fight it does not stand to be shot: it jinks across their line and back",
+		function()
+			local at = groundNode(0, -24)
+			for seed = 1, 6 do
+				local c = closeUp(at, 0, seed)
+				local bx, bz = c.brain.x, c.brain.z
+				c.poses[1].x, c.poses[1].z = bx, bz - 28 -- the person: dead ahead, along -z
+				c.brain.mode = "hold" -- at a post in the open (no cover at this node)
+				c.brain.holdUntil = math.huge
+				t.truthy(nav.coverAt[at] == nil, "the node is open floor")
+				local left, right, turns, lastSide = 0, 0, 0, 0
+				local lastX = bx
+				for _ = 1, 6 * Clock.TICK_HZ do
+					stepClose(c, DT)
+					if c.brain.mode ~= "hold" then
+						break -- (empty in the open, it goes for cover or another spot: not this case's business)
+					end
+					local off = c.brain.x - bx
+					left, right = math.min(left, off), math.max(right, off)
+					local going = c.brain.x - lastX
+					local side = if going > 1e-6 then 1 elseif going < -1e-6 then -1 else 0
+					if side ~= 0 and lastSide == 0 then
+						turns += 1 -- it sets off from rest: a step out, or a step back
+					end
+					lastSide, lastX = side, c.brain.x
+					-- a couple of strides either side of where it stood, on the floor it stood on, at a walk
+					t.truthy(math.abs(off) <= 3 and math.abs(c.brain.z - bz) <= 0.5, `seed {seed}: {off} off its post`)
+					t.near(c.brain.y, 0, 1e-6)
+					t.truthy(math.abs(going) <= Body.speed(0, false, c.state.feel) * DT + 1e-6, "no faster than a walk")
+					t.falsy(Wire.has(c.poses[2].bits, BIT.sprint))
+				end
+				t.truthy(right - left >= 2.5, `seed {seed}: it moved {right - left} studs across the line`)
+				t.truthy(turns >= 3, `seed {seed}: out, back and out again at the least ({turns} steps)`)
+				t.truthy(#c.fired >= 3, `seed {seed}: and it fired as it went ({#c.fired} balls)`)
+				t.eq(c.brain.target, 1)
+			end
+			-- with nobody to fight it stands at its post: a jink is for a fight
+			local idle = closeUp(at, 0)
+			idle.poses[1].x, idle.poses[1].z = idle.brain.x, idle.brain.z + 28 -- behind it
+			idle.brain.mode = "hold"
+			idle.brain.holdUntil = math.huge
+			local x0, z0 = idle.brain.x, idle.brain.z
+			idle.brain.scanAt = math.huge
+			stepClose(idle, 1)
+			t.eq(idle.brain.target, nil)
+			t.deepEq({ idle.brain.x, idle.brain.z }, { x0, z0 })
+		end
+	)
+
+	t.test(
+		"the legs are a person's: the sim holds every step a brain takes to the rules a person's pose is held to",
+		function()
+			-- seat 1 a scripted person, seat 2 a bot (team 2); no brain runs: the case moves the bot by hand
+			local sim = Sim.new({ arena = arena, seed = 5, perSide = 4, dummies = 1, frozen = true })
+			Sim.run(sim, sim.start + R.briefingSecs + F.protectSecs + 0.5)
+			t.eq(sim.state.phase, "live")
+			local team = sim.state.slots[2].team
+			local pose = sim.poses[2]
+			local walk = Body.speed(0, false, sim.state.feel) * sim.dt
+			local sprint = Body.speed(0, true, sim.state.feel) * sim.dt
+			-- one step from (x0, 0, z0) to (x1, y1, z1): what the legs' check says of it
+			local function step(
+				x0: number,
+				z0: number,
+				x1: number,
+				y1: number,
+				z1: number,
+				bits: number?,
+				crouch: number?
+			): string?
+				pose.x, pose.y, pose.z, pose.crouch, pose.bits = x0, 0, z0, crouch or 0, 0
+				sim.legsAt[2] = nil
+				table.clear(sim.rec.legs)
+				Sim.legs(sim, sim.botWho, true)
+				t.eq(next(sim.rec.legs), nil, "standing on open floor is no offence")
+				pose.x, pose.y, pose.z, pose.bits = x1, y1, z1, bits or 0
+				Sim.legs(sim, sim.botWho, true)
+				local why = next(sim.rec.legs)
+				return why
+			end
+			t.eq(step(10, 40, 10 + walk, 0, 40), nil, "a walking step")
+			t.eq(step(10, 40, 10 + walk * 1.02, 0, 40), "bot:distance", "a hair over a walking step: no tolerance")
+			t.eq(step(10, 40, 10 + sprint, 0, 40, BIT.sprint), nil, "a sprinting step, with the bit shown")
+			t.eq(step(10, 40, 10 + sprint, 0, 40), "bot:distance", "the same step without the bit")
+			local crouched = Body.speed(1, false, sim.state.feel) * sim.dt
+			t.truthy(crouched < walk * 0.8)
+			t.eq(step(10, 40, 10 + crouched, 0, 40, BIT.crouch, 1), nil, "a crouched step")
+			t.eq(step(10, 40, 10 + walk, 0, 40, BIT.crouch, 1), "bot:distance", "crouched, at a walk")
+			t.eq(step(10, 40, 10, 1, 40), "bot:height", "off the floor")
+			t.eq(step(10, 40, arena.half + 1, 0, 40), "bot:inside", "out of the building")
+			local other = arena.spawns[3 - team][1]
+			t.eq(step(10, 40, other.x, other.y, other.z), "bot:room", "the other team's spawn room")
+			-- through a box: from a cover spot, straight through what shelters it, to the floor beyond
+			local through = 0
+			for _, cover in arena.cover do
+				local node = arena.nodes[cover.node]
+				if node.floor ~= 0 then
+					continue
+				end
+				for d = 1, 8, 0.25 do
+					local x, z = node.x + cover.nx * d, node.z + cover.nz * d
+					local chest = node.y + ArenaModule.CHEST
+					if
+						arena.ground(x, node.y + 0.6, z) == node.y
+						and arena.sweep(x, chest, z, x, chest + 0.01, z) == nil
+						and not ArenaModule.clearPath(arena.sweep, node.x, node.z, x, z, chest)
+					then
+						t.eq(step(node.x, node.z, x, 0, z), "bot:walls", `through the cover at node {cover.node}`)
+						through += 1
+						break
+					end
+				end
+			end
+			t.truthy(through >= 3, `{through} covers tried`)
+			-- out, it stands: any step is an offence
+			sim.state.slots[2].out = true
+			t.eq(step(10, 40, 10 + walk, 0, 40), "bot:distance", "tagged out, it does not walk")
+		end
+	)
+
+	t.test(
 		"hearing: a ball that goes by, a splat beside it, a team-mate tagged in view; not a ball that stopped short",
 		function()
 			local at = groundNode(0, -24)
@@ -610,6 +731,7 @@ return function(t)
 		-- the one judge refused nothing a bot asked for: its own look, its own eye, never from a spawn
 		-- room, never sprinting, never an empty or hurried magazine
 		t.eq(s.refused, 0)
+		t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 		t.eq(s.tooSoon, 0)
 		-- the magazine, from the record: never six balls without a reload's wait
 		local byShooter: { [number]: { number } } = {}
@@ -724,6 +846,7 @@ return function(t)
 		t.truthy(s.scores[1] >= 40 and s.scores[2] >= 40, `{s.scores[1]} - {s.scores[2]}`)
 		t.eq(#(Rules.result(sim.state) :: Contract.Result).card.rows, 16)
 		t.eq(s.refused, 0)
+		t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 		t.eq(s.tooSoon, 0)
 		t.truthy(s.still < 14, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
 		t.truthy(s.roomSlowest < 6)
@@ -913,6 +1036,7 @@ return function(t)
 		-- wide band round it
 		t.truthy(s.personWin > 0.35 and s.personWin < 0.85, `the stand-in won {s.personWin * 100}% of its exchanges`)
 		t.eq(s.refused, 0, "the stand-in's clicks pass the same judge")
+		t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 		t.truthy(s.stares <= 2, `{s.stares} times a bot followed somebody through a wall`)
 		t.eq(s.doorTrap, 0)
 		t.truthy(s.still < 14)
@@ -938,6 +1062,7 @@ return function(t)
 			t.eq(sim.state.feel.ballSpeed, speed)
 			t.truthy(s.tags > 10, `{s.tags} tags in 140 s at {speed}`)
 			t.eq(s.refused, 0)
+			t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 			for _, ball in sim.balls do
 				local v = math.sqrt(ball.vx ^ 2 + ball.vy ^ 2 + ball.vz ^ 2)
 				t.near(v, speed, 1e-6)

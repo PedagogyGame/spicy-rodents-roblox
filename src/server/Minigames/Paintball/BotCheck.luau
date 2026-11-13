@@ -9,11 +9,15 @@
 -- with Ballistics against arena.sweep and Hit.body, bodies judged where they are now.
 -- A failure is one of: the mean cost over the budget; nobody tagged; a bot's ball off its own look,
 -- from a spawn room or refused by the match; a bot that never left its spawn room or stood still for
--- STILL_LIMIT.
+-- STILL_LIMIT; a step a person's body could not have taken (through a box, off the walking surface,
+-- into the other team's spawn room, or further than Body.speed allows for its crouch and sprint bit:
+-- the rules a person's pose is held to, with none of a person's tolerances).
 -- The task script that sends it is tools/games/paintball/bots/engine_check.luau.
 -- Interface: run(opts?) -> Result; types Opts, Result
 
 local Import = require("../../Import")
+local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
+	Import.shared("Minigames/Paintball/Arena")
 local ArenaData: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.ArenaData)) =
 	Import.shared("Minigames/Paintball/ArenaData")
 local Ballistics: typeof(require(game.ReplicatedStorage.Shared.Paintball.Ballistics)) =
@@ -28,6 +32,8 @@ local Hit: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Hit)
 	Import.shared("Minigames/Paintball/Hit")
 local Rules: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Rules)) =
 	Import.shared("Minigames/Paintball/Rules")
+local Wire: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wire)) =
+	Import.shared("Minigames/Paintball/Wire")
 local BotNav = require("./BotNav")
 local Bots = require("./Bots")
 
@@ -52,6 +58,7 @@ export type Result = {
 		shots: number,
 		tags: number,
 		refused: number,
+		legs: number, -- steps a person's body could not have taken
 		stillWorst: number, -- seconds
 		neverLeft: number, -- bots that never left their spawn room
 	},
@@ -101,6 +108,9 @@ function BotCheck.run(opts: Opts?): Result
 	local left: { [number]: boolean } = {}
 	local stillAt: { [number]: { t: number, x: number, z: number } } = {}
 	local stillWorst = 0
+	local legs = 0
+	local legsFirst = ""
+	local stood: { [number]: { x: number, y: number, z: number, crouch: number } } = {}
 	local endAt = now + Contract.Rules.briefingSecs + seconds
 	local budget = Contract.COST.botsMs
 	while now < endAt do
@@ -116,6 +126,7 @@ function BotCheck.run(opts: Opts?): Result
 				end
 				pose.x, pose.y, pose.z, pose.yaw, pose.pitch, pose.crouch, pose.bits = sp.x, sp.y, sp.z, sp.yaw, 0, 0, 0
 				stillAt[e.id] = { t = now, x = sp.x, z = sp.z }
+				stood[e.id] = { x = sp.x, y = sp.y, z = sp.z, crouch = 0 }
 				if who[e.id] ~= nil then
 					Bots.place(bots, e.id, pose, now)
 				end
@@ -133,6 +144,44 @@ function BotCheck.run(opts: Opts?): Result
 			if ms > budget then
 				over += 1
 			end
+		end
+		-- the legs: each bot's step, held to what a person's pose is held to
+		for id in who do
+			local pose = poses[id]
+			local was = stood[id]
+			local slot = state.slots[id]
+			if pose == nil or was == nil then
+				continue
+			end
+			local x, y, z = pose.x, pose.y, pose.z
+			local flat = math.sqrt((x - was.x) ^ 2 + (z - was.z) ^ 2)
+			local chest = y + ArenaModule.CHEST
+			local ground = arena.ground(x, y + 0.6, z)
+			local most = if slot.out or state.phase ~= "live"
+				then 0
+				else Body.speed(was.crouch, Wire.has(pose.bits, Wire.BIT.sprint), state.feel) * dt
+			local why: string? = nil
+			if not ArenaModule.inVolume(x, y, z) or arena.sweep(x, chest, z, x, chest + 0.01, z) ~= nil then
+				why = "inside a box or out of the building"
+			elseif ArenaModule.inRoom(arena.spawnRooms[3 - slot.team], x, y, z) then
+				why = "in the other team's spawn room"
+			elseif ground == nil or math.abs(y - ground) > 0.05 then
+				why = "off the walking surface"
+			elseif
+				flat > 0
+				and not ArenaModule.clearPath(arena.sweep, was.x, was.z, x, z, math.max(was.y, y) + ArenaModule.CHEST)
+			then
+				why = "through a box"
+			elseif flat > most + 1e-6 then
+				why = "too far for its pace"
+			end
+			if why ~= nil then
+				legs += 1
+				if legsFirst == "" then
+					legsFirst = string.format("seat %d, %s, at (%.1f, %.1f, %.1f)", id, why, x, y, z)
+				end
+			end
+			was.x, was.y, was.z, was.crouch = x, y, z, pose.crouch
 		end
 		for _, cmd in commands do
 			if cmd.kind == "reload" then
@@ -260,6 +309,9 @@ function BotCheck.run(opts: Opts?): Result
 	if neverLeft > 0 then
 		table.insert(failures, `{neverLeft} bots never left their spawn room`)
 	end
+	if legs > 0 then
+		table.insert(failures, `{legs} steps a person's body could not have taken; the first: {legsFirst}`)
+	end
 	if stillWorst > STILL_LIMIT then
 		table.insert(failures, string.format("a bot stood still for %.0f s", stillWorst))
 	end
@@ -276,6 +328,7 @@ function BotCheck.run(opts: Opts?): Result
 			shots = shots,
 			tags = tags,
 			refused = refused,
+			legs = legs,
 			stillWorst = stillWorst,
 			neverLeft = neverLeft,
 		},

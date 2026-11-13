@@ -50,6 +50,7 @@ export type Summary = {
 	sweepsSecond: number,
 	sweepsCap: number, -- BOT.sightHz x the bots
 	refused: number, -- commands the judge refused
+	legs: number, -- steps a brain's body took that the server would refuse from a person (Sim, "THE LEGS")
 	tooSoon: number,
 	personTags: number, -- the stand-in people's tags on bots ...
 	personOuts: number, -- ... and bots' tags on them
@@ -194,6 +195,10 @@ function Report.summary(sim: Sim.Sim): Summary
 	for _, n in rec.refused do
 		refused += n
 	end
+	local legs = 0
+	for _, n in rec.legs do
+		legs += n
+	end
 	local ended = state.phase == "ended"
 	return {
 		finished = ended and result ~= nil,
@@ -231,6 +236,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		sweepsSecond = rec.sweepsSecond,
 		sweepsCap = Contract.BOT.sightHz * botCount,
 		refused = refused,
+		legs = legs,
 		tooSoon = rec.firedTooSoon,
 		personTags = personTags,
 		personOuts = personOuts,
@@ -374,6 +380,15 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	say(
 		`RULES: commands refused: {if #refused > 0 then table.concat(refused, ", ") else "none"}; `
 			.. `balls fired inside the fire interval: {s.tooSoon}`
+	)
+	local legs = {}
+	for key, n in sim.rec.legs do
+		table.insert(legs, `{key} x{n}`)
+	end
+	table.sort(legs)
+	say(
+		`  steps a person's body would have been refused (walls, floor, pace, rooms): `
+			.. (if #legs > 0 then `{table.concat(legs, ", ")}; the first: {sim.rec.legsFirst or "?"}` else "none")
 	)
 	say(
 		string.format(

@@ -23,12 +23,18 @@
 -- it where its last snapshot put it. It is how the calibration says "a fair player beats the average
 -- bot about three times in five"; it is nobody's idea of a real person and the owner's playtest is
 -- the judge.
+-- THE LEGS. A bot has no body for the server to check, so the sim checks every step every brain takes
+-- by the rules a person's reported pose is held to (Contract, "the server accepts a pose only if"):
+-- inside the building and no box, never in the other team's spawn room, feet on the walking surface,
+-- a clear path from the last pose (Arena.clearPath at chest height), and no further than Body.speed
+-- allows for the crouch it had and the sprint bit it shows, with none of a person's tolerances (no
+-- speedTolerance, no fall, no hop). Every step that fails is counted in rec.legs with its reason.
 -- THE RECORD (sim.rec) is what the specs pin and the tools print: every shot and whether it tagged
 -- its target, every tag with the range, the target's speed and whether the shooter had been facing
 -- it, each slot's time by storey, in its room, at cover, crouched and standing still, the stairs
 -- used, lives and how they ended, call-outs, refused commands, and the cost of Bots.step.
 -- Interface: FAIR; new(opts) -> Sim; tick(sim); run(sim, untilTime?) -> Sim (to the end of the match
---   by default); judge(sim, id, ox, oy, oz, vx, vy, vz) -> (ok, why?); shoot(sim, id, ox, oy, oz, vx,
+--   by default); legs(sim, who, isBot) (the legs' check, as tick runs it, for a spec to try by hand); judge(sim, id, ox, oy, oz, vx, vy, vz) -> (ok, why?); shoot(sim, id, ox, oy, oz, vx,
 --   vy, vz, list?, rewind?) -> (ok, why?); teleport(sim, id, x, y, z, yaw); types Opts, Sim, Record
 local Ballistics = require("@shared/Paintball/Ballistics")
 local Arena = require("@shared/Minigames/Paintball/Arena")
@@ -156,6 +162,10 @@ export type Record = {
 	sweepsMax: number, -- the most sight checks in one tick
 	sweepsSecond: number, -- the most by one list in any whole second
 	firedTooSoon: number, -- balls fired sooner after the last than the fire interval (must be 0)
+	-- steps a brain's body took that the server would have refused from a person (see "THE LEGS"):
+	-- "<bot|person>:<inside|room|height|walls|distance>" -> count (must be empty), and the first one, in words
+	legs: { [string]: number },
+	legsFirst: string?,
 }
 
 export type Sim = {
@@ -189,6 +199,7 @@ export type Sim = {
 	audit: { [number]: { [number]: { secs: number, bearing: number, x: number, z: number, told: boolean } } },
 	sweepWindow: { number },
 	sweepLast: number,
+	legsAt: { [number]: { x: number, y: number, z: number, crouch: number } }, -- by slot: where its last step left it
 }
 
 local R = Contract.Rules
@@ -318,6 +329,8 @@ function Sim.new(opts: Opts?): Sim
 		sweepsMax = 0,
 		sweepsSecond = 0,
 		firedTooSoon = 0,
+		legs = {},
+		legsFirst = nil,
 	}
 	for id, slot in state.slots do
 		rec.slots[id] = newSlotRecord(id, botWho[id] ~= nil, slot.team, arena.floors)
@@ -353,6 +366,7 @@ function Sim.new(opts: Opts?): Sim
 		audit = {},
 		sweepWindow = {},
 		sweepLast = 0,
+		legsAt = {},
 	}
 	Bots.sync(bots, state, botWho, sim.seenByBots, start)
 	if folk ~= nil then
@@ -892,6 +906,68 @@ local function observe(sim: Sim, span: number)
 		end
 	end
 end
+
+-- The legs (see the header): the step each brain's body has just taken, judged as a person's would be.
+local function legs(sim: Sim, who: { [number]: number }, isBot: boolean)
+	local state = sim.state
+	local arena = sim.arena
+	local feel = state.feel
+	local half = arena.half
+	for id in who do
+		local slot = state.slots[id]
+		local pose = sim.poses[id]
+		if slot == nil or pose == nil or not slot.on then
+			sim.legsAt[id] = nil
+			continue
+		end
+		local was = sim.legsAt[id]
+		if was == nil then
+			was = { x = pose.x, y = pose.y, z = pose.z, crouch = pose.crouch }
+			sim.legsAt[id] = was
+		end
+		local x, y, z = pose.x, pose.y, pose.z
+		local why: string? = nil
+		local flat = math.sqrt((x - was.x) ^ 2 + (z - was.z) ^ 2)
+		local chest = y + Arena.CHEST
+		local ground = arena.ground(x, y + 0.6, z)
+		-- (out, or not live: it stands)
+		local most = if slot.out or state.phase ~= "live"
+			then 0
+			else Body.speed(was.crouch, Wire.has(pose.bits, BIT.sprint), feel) * sim.dt
+		local outside = x < -half or x > half or z < -half or z > half or y < 0 or y > arena.height
+		if outside or arena.sweep(x, chest, z, x, chest + 0.01, z) ~= nil then
+			why = "inside"
+		elseif Arena.inRoom(arena.spawnRooms[3 - slot.team], x, y, z) then
+			why = "room"
+		elseif ground == nil or math.abs(y - ground) > 0.05 then
+			why = "height"
+		elseif flat > 0 and not Arena.clearPath(arena.sweep, was.x, was.z, x, z, math.max(was.y, y) + Arena.CHEST) then
+			why = "walls"
+		elseif flat > most + 1e-6 then
+			why = "distance"
+		end
+		if why ~= nil then
+			count(sim.rec.legs, `{if isBot then "bot" else "person"}:{why}`)
+			if sim.rec.legsFirst == nil then
+				sim.rec.legsFirst = string.format(
+					"seat %d at %.1f s: %s, from (%.2f, %.2f, %.2f) to (%.2f, %.2f, %.2f)",
+					id,
+					sim.now - sim.start,
+					why,
+					was.x,
+					was.y,
+					was.z,
+					x,
+					y,
+					z
+				)
+			end
+		end
+		was.x, was.y, was.z, was.crouch = x, y, z, pose.crouch
+	end
+end
+
+Sim.legs = legs
 
 local function handle(sim: Sim, list: Bots.Bots, commands: { Bots.Command }, isBot: boolean)
 	for _, cmd in commands do

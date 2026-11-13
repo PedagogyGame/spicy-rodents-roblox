@@ -170,6 +170,7 @@ return function(t)
 				-- nobody's company is a reason to break the rules
 				local s = Report.summary(sim)
 				t.eq(s.refused, 0)
+				t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 				t.eq(s.doorTrap, 0)
 				t.truthy(s.still < 14, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
 			end
@@ -211,5 +212,6 @@ return function(t)
 		t.truthy(s.personCompany > 0.5, `a bot of its team was near the stand-in {s.personCompany * 100}% of the time`)
 		t.truthy(s.scores[1] > 30 and s.scores[2] > 30, `{s.scores[1]} - {s.scores[2]}`)
 		t.eq(s.refused, 0)
+		t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 	end)
 end
