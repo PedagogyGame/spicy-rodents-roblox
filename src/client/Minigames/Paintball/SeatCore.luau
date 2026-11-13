@@ -16,7 +16,7 @@
 --   the pips   the predicted Magazine, put right by "paintball_ack" (its rounds minus the balls sent
 --              since), by a respawn, and once by the first "state".
 --   moving     the sprint ramp k (up over Body.SPRINT_RAMP_SECS while sprint is wanted, the body stands
---              and the stick is pushed; to 0 at once otherwise) and the crouch fraction c
+--              and the stick is pushed ahead, within Tuning.sprintCone; to 0 at once otherwise) and the crouch fraction c
 --              (Body.crouchStep), handed to ctx.pace and to the eye every frame; Wire.Move
 --              Clock.SEND_HZ times a second, never before the first placement nor while out.
 --   the origin THE SERVER JUDGES A BALL'S ORIGIN AGAINST THE POSES IT HAS BEEN TOLD (Contract, "the origin":
@@ -81,6 +81,7 @@ export type Action = "fire" | "reload" | "crouch" | "sprint" | "scores" | "leave
 -- (a spec hands in the ones it watches).
 --   pose      the REAL feet point, the unit look, and whether the body is off the floor; nil: no body
 --   push      how hard the stick or the keys are pushed, 0..1
+--   forward   how much of that push is straight ahead, -1 (back) .. 1, in the view's own frame
 --   place     pivot the body to a feet point and yaw (a placement)
 --   look      begin the one-frame turn of the look: a camera hold at this eye point along this yaw
 --   muzzle    where the marker's muzzle is drawn (the ball is drawn leaving it)
@@ -92,6 +93,7 @@ export type Action = "fire" | "reload" | "crouch" | "sprint" | "scores" | "leave
 export type Port = {
 	pose: (() -> (number?, number, number, number, number, number, boolean))?,
 	push: (() -> number)?,
+	forward: (() -> number)?,
 	place: ((x: number, y: number, z: number, yaw: number) -> ())?,
 	look: ((x: number, y: number, z: number, yaw: number) -> ())?,
 	muzzle: (() -> (number?, number, number))?,
@@ -964,12 +966,16 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		-- crouch, then the sprint ramp (a crouching body does not sprint)
 		self.c = Body.crouchStep(self.c, self.wantCrouch and not self.out, dt, self.feel)
 		local push = if port.push then port.push() else 1
+		-- a sprint runs only AHEAD, within Tuning.sprintCone of the way the view faces: no backpedalling or
+		-- strafing away from a fight at sprint pace
+		local ahead = if port.forward then port.forward() else push
 		local sprinting = self.wantSprint
 			and not self.wantCrouch
 			and self.c <= 0
 			and self.held == nil
 			and not self.out
 			and push >= tuning.sprintMove
+			and ahead >= push * math.cos(tuning.sprintCone)
 			and now >= self.firedAt + tuning.sprintAfterShot
 		if sprinting then
 			self.k = math.min(1, self.k + dt / Body.SPRINT_RAMP_SECS)

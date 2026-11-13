@@ -1802,6 +1802,33 @@ return function(t)
 		t.eq(b.paces[#b.paces].scale, nil)
 	end)
 
+	t.test("sprint runs ahead only: S or a sideways push with Shift never sprints, W and the diagonal ramp", function()
+		local b = Kit.playing()
+		local seat = b.seat
+		seat:input("sprint", true)
+		b.heading = math.pi -- S + Shift: backpedalling
+		Kit.run(b, 0.6)
+		t.eq(seat.k, 0, "no backpedalling at a sprint")
+		t.near(b.paces[#b.paces].scale :: number, 1, 1e-9, "at the walking pace")
+		b.heading = math.pi / 2 -- D + Shift: strafing
+		Kit.run(b, 0.6)
+		t.eq(seat.k, 0, "no strafing at a sprint")
+		b.heading = math.pi / 4 -- W + D: the diagonal
+		Kit.run(b, 0.05)
+		t.truthy(seat.k > 0 and seat.k < 1, "the diagonal ramps")
+		Kit.run(b, 0.6)
+		t.eq(seat.k, 1)
+		b.heading = math.pi -- turning back drops it at once
+		Kit.frame(b)
+		t.eq(seat.k, 0)
+		b.heading = 0 -- W + Shift
+		Kit.frame(b)
+		t.truthy(seat.k > 0, "W ramps")
+		Kit.run(b, 0.6)
+		t.eq(seat.k, 1)
+		t.near(b.paces[#b.paces].scale :: number, F.sprintMult, 1e-9)
+	end)
+
 	t.test(
 		"Shift held through a click: the ball is seen to leave, then the sprint picks up by itself; the whole cost",
 		function()

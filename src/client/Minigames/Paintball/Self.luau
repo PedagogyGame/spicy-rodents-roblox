@@ -40,6 +40,7 @@ type Place = typeof(ArenaModule.T.Place)
 export type Self = {
 	pose: () -> (number?, number, number, number, number, number, boolean),
 	push: () -> number,
+	forward: () -> number,
 	place: (x: number, y: number, z: number, yaw: number) -> (),
 	look: (x: number, y: number, z: number, yaw: number) -> (),
 	muzzle: () -> (number?, number, number),
@@ -129,9 +130,7 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 		return x, y, z, dx, dy, dz, air
 	end
 
-	-- How hard the player is pushing to move, 0..1: the stock controls' own vector (a stick's push is
-	-- analogue there), else the Humanoid's, else the keys.
-	function self.push(): number
+	local function stockControls(): any
 		if not controlsTried then
 			controlsTried = true
 			pcall(function()
@@ -143,9 +142,16 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 				end
 			end)
 		end
-		if controls then
+		return controls
+	end
+
+	-- How hard the player is pushing to move, 0..1: the stock controls' own vector (a stick's push is
+	-- analogue there), else the Humanoid's, else the keys.
+	function self.push(): number
+		local stock = stockControls()
+		if stock then
 			local ok, v = pcall(function()
-				return controls:GetMoveVector()
+				return stock:GetMoveVector()
 			end)
 			if ok and typeof(v) == "Vector3" then
 				return math.min(1, v.Magnitude)
@@ -161,6 +167,39 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 			end
 		end
 		return 0
+	end
+
+	-- How much of that push is straight ahead, -1 (straight back) .. 1, in the frame of the way the view
+	-- faces: the stock controls' vector is already in it (forward is -Z); the Humanoid's is in the
+	-- world's, turned by the camera's flat look; the keys count W and Up as ahead, S and Down as back.
+	function self.forward(): number
+		local stock = stockControls()
+		if stock then
+			local ok, v = pcall(function()
+				return stock:GetMoveVector()
+			end)
+			if ok and typeof(v) == "Vector3" then
+				return math.clamp(-v.Z, -1, 1)
+			end
+		end
+		local hum = humanoidOf(ctx.body())
+		local look = camera.CFrame.LookVector
+		local flat = Vector3.new(look.X, 0, look.Z)
+		if hum and typeof(hum.MoveDirection) == "Vector3" and flat.Magnitude > 1e-6 then
+			return math.clamp(hum.MoveDirection:Dot(flat.Unit), -1, 1)
+		end
+		local ahead = 0
+		for _, name in { "W", "Up" } do
+			if UIS:IsKeyDown((Enum.KeyCode :: any)[name]) then
+				ahead = 1
+			end
+		end
+		for _, name in { "S", "Down" } do
+			if UIS:IsKeyDown((Enum.KeyCode :: any)[name]) then
+				ahead -= 1
+			end
+		end
+		return ahead
 	end
 
 	function self.place(x: number, y: number, z: number, yaw: number)

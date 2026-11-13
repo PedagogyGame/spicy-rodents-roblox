@@ -14,6 +14,7 @@
 -- sprint (and is held until the marker is up, so the click is never lost) and the sprint does not pick
 -- up again until sprintAfterShot after the ball has left; a crouch ends it; the view widens and bobs
 -- harder (sprintFov, bobSprint), and every step is loud to everyone near (stepLoud).
+-- And it runs only ahead (sprintCone): nobody backpedals or strafes out of a fight at sprint pace.
 -- There is no stamina bar: the price is paid in readiness and noise, not in a meter.
 -- Pure data. Interface: the table; Tuning.T (its type witness)
 
@@ -119,6 +120,11 @@ local Tuning = {
 	-- How hard the stick or keys must be pushed for a sprint to run, 0..1. Standing still with Shift
 	-- held does not lower the marker.
 	sprintMove = 0.3,
+	-- Radians either side of straight ahead within which a push may sprint (0.87: about 50 degrees, so
+	-- W with A or D sprints on the diagonal; straight sideways or back never does). Wider and a player
+	-- strafes or backpedals out of a fight at sprint pace, paying only the lowered marker; narrower and a
+	-- stick held a little off true drops the sprint.
+	sprintCone = 0.87,
 	-- Touch: a full push of the stick starts a sprint, and it lasts until the stick is back under this.
 	touchSprintOn = 0.95,
 	touchSprintOff = 0.5,

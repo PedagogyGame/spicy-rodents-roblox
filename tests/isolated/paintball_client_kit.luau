@@ -44,6 +44,7 @@ export type Bench = {
 	seat: SeatCore.Seat,
 	pose: { x: number, y: number, z: number, yaw: number, pitch: number, air: boolean },
 	push: number,
+	heading: number, -- radians the push is off straight ahead (0 ahead, pi straight back)
 	sent: { [string]: { buffer } }, -- what went up the link, by remote
 	verbs: { { verb: string, args: { any } } },
 	sounds: { { cue: string, volume: number? } },
@@ -108,6 +109,7 @@ function Kit.bench(opts: { tuning: any?, noShow: boolean?, user: number?, dt: nu
 		arena = arena,
 		pose = { x = 0, y = 0, z = 30, yaw = 0, pitch = 0, air = false },
 		push = 1,
+		heading = 0,
 		sent = {},
 		verbs = {},
 		sounds = {},
@@ -194,6 +196,9 @@ function Kit.bench(opts: { tuning: any?, noShow: boolean?, user: number?, dt: nu
 			end,
 			push = function(): number
 				return b.push
+			end,
+			forward = function(): number
+				return b.push * math.cos(b.heading)
 			end,
 			place = function(x: number, y: number, z: number, yaw: number)
 				b.pose.x, b.pose.y, b.pose.z = x, y, z
