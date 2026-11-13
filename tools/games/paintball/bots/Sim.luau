@@ -27,9 +27,12 @@
 -- THE LEGS. A bot has no body for the server to check, so the sim checks every step every brain takes
 -- by the rules a person's reported pose is held to (Contract, "the server accepts a pose only if"):
 -- inside the building and no box, never in the other team's spawn room, feet on the walking surface,
--- a clear path from the last pose (Arena.clearPath at chest height), and no further than Body.speed
--- allows for the crouch it had and the sprint bit it shows, with none of a person's tolerances (no
--- speedTolerance, no fall, no hop). Every step that fails is counted in rec.legs with its reason.
+-- a clear path from the last pose (Arena.clearPath at chest height), and no further than a person's
+-- pace allows for the crouch it had and the sprint bit it shows: a person's client ramps a sprint up
+-- from walking pace over Body.SPRINT_RAMP_SECS (Body.pace with the ramp k, which rises every step the
+-- bit is up and drops to 0 when it is not), and so must a brain's body; with none of a person's
+-- tolerances (no speedTolerance, no fall, no hop). Every step that fails is counted in rec.legs with
+-- its reason.
 -- THE RECORD (sim.rec) is what the specs pin and the tools print: every shot and whether it tagged
 -- its target, every tag with the range, the target's speed and whether the shooter had been facing
 -- it, each slot's time by storey, in its room, at cover, crouched and standing still, the stairs
@@ -219,7 +222,7 @@ export type Sim = {
 	audit: { [number]: { [number]: { secs: number, bearing: number, x: number, z: number, told: boolean } } },
 	sweepWindow: { number },
 	sweepLast: number,
-	legsAt: { [number]: { x: number, y: number, z: number, crouch: number } }, -- by slot: where its last step left it
+	legsAt: { [number]: { x: number, y: number, z: number, crouch: number, k: number } }, -- by slot: where its last step left it, and its sprint ramp
 }
 
 local R = Contract.Rules
@@ -1060,12 +1063,15 @@ local function legs(sim: Sim, who: { [number]: number }, isBot: boolean)
 		end
 		local was = sim.legsAt[id]
 		if was == nil then
-			was = { x = pose.x, y = pose.y, z = pose.z, crouch = pose.crouch }
+			was = { x = pose.x, y = pose.y, z = pose.z, crouch = pose.crouch, k = 0 }
 			sim.legsAt[id] = was
 		end
+		-- the sprint ramp, as a person's client keeps it
+		local sprinting = Wire.has(pose.bits, BIT.sprint)
+		local k = if sprinting then math.min(1, was.k + sim.dt / Body.SPRINT_RAMP_SECS) else 0
 		local x, y, z = pose.x, pose.y, pose.z
 		if x == was.x and y == was.y and z == was.z then
-			was.crouch = pose.crouch
+			was.crouch, was.k = pose.crouch, k
 			continue -- standing where its last step was judged: nothing new to judge
 		end
 		local why: string? = nil
@@ -1075,7 +1081,7 @@ local function legs(sim: Sim, who: { [number]: number }, isBot: boolean)
 		-- (out, or not live: it stands)
 		local most = if slot.out or state.phase ~= "live"
 			then 0
-			else Body.speed(was.crouch, Wire.has(pose.bits, BIT.sprint), feel) * sim.dt
+			else Body.pace(was.crouch, k, feel) * Body.WALK * sim.dt
 		local outside = x < -half or x > half or z < -half or z > half or y < 0 or y > arena.height
 		if outside or arena.sweep(x, chest, z, x, chest + 0.01, z) ~= nil then
 			why = "inside"
@@ -1105,7 +1111,7 @@ local function legs(sim: Sim, who: { [number]: number }, isBot: boolean)
 				)
 			end
 		end
-		was.x, was.y, was.z, was.crouch = x, y, z, pose.crouch
+		was.x, was.y, was.z, was.crouch, was.k = x, y, z, pose.crouch, k
 	end
 end
 

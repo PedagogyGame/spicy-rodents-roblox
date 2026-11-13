@@ -37,7 +37,8 @@
 --            sent somewhere, whatever it was doing (PB-10: never stuck).
 
 --   moves    along the links of the graph in straight lines, feet on arena.ground, at Body's speeds
---            with the match's feel; sprints only when nothing has been seen or heard for a while.
+--            with the match's feel, gathering pace and slowing as a body does (PACE); sprints only
+--            when nothing has been seen or heard for a while.
 --   looks    turns its yaw and pitch towards what it wants to look at, never faster than
 --            Profile.turn: along its path, round its post, at a noise, at where a target vanished
 --            (the place, not the target: see "aims"), or along its AIM.
@@ -180,6 +181,7 @@ export type Brain = {
 	wantCrouch: boolean,
 	sprint: boolean,
 	sprintAt: number, -- when the sprint bit was last set
+	ramp: number, -- the sprint ramp, 0..1, as a person's client keeps it (see PACE)
 	speed: number, -- over the floor, this tick
 	wasOut: boolean,
 	-- the way
@@ -315,6 +317,15 @@ local JINK = 2.8 -- studs (inside what the stuck watch, and anybody watching, ca
 -- if the bot has looked away since (it must be SEEN to turn on a player before it can tag them).
 local FACING = math.rad(40)
 local SETTLE_NEAR = 0.4 -- of the angle a body's half-width makes: the look is settled within this, close up
+-- PACE: a bot's legs are a person's. From standing it gathers pace to a walk over START_SECS, and a
+-- sprint ramps up from walking pace over Body.SPRINT_RAMP_SECS exactly as a person's client ramps it
+-- (Body.pace with the ramp k), dropping at once when the sprint ends; at the end of its way (a post,
+-- a peek or a jink) it slows to a stop over STOP studs rather than stopping dead. The sim's legs
+-- check holds every step to the same ramp.
+local START_SECS = 0.12 -- standing to walking pace
+local ACCEL = Body.WALK / START_SECS
+local STOP_DECEL = 110 -- studs/s/s: slowing to a stop at the end of its way (a walk stops in about 1.3 studs)
+local STOP_CRAWL = 2.5 -- studs/s: no slower than this until it is there
 local OPEN_VIEW = 12 -- studs of clear view that make a direction worth looking in from a post
 -- ADVANCE: a bot that can see somebody it cannot reach (further off than Profile.range of ball
 -- flight) does not stand and look at them. On its way somewhere it keeps going; at a post it moves up,
@@ -399,6 +410,7 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		wantCrouch = false,
 		sprint = false,
 		sprintAt = -math.huge,
+		ramp = 0,
 		speed = 0,
 		wasOut = false,
 		mode = "wait",
@@ -481,7 +493,7 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 	release(b, squad)
 	b.placed = true
 	b.x, b.y, b.z, b.yaw, b.pitch = x, y, z, yaw, 0
-	b.crouch, b.wantCrouch, b.sprint, b.speed = 0, false, false, 0
+	b.crouch, b.wantCrouch, b.sprint, b.speed, b.ramp = 0, false, false, 0, 0
 	b.wasOut = false
 	b.mode = "wait"
 	b.path, b.leg, b.halt = nil, 1, false
@@ -1477,16 +1489,25 @@ local function move(b: Brain, state: State, now: number, dt: number)
 			tx, tz = node.x, node.z
 		end
 	end
+	local was = b.speed
 	b.speed = 0
 	if tx == nil then
 		b.sprint = false
+		b.ramp = 0
 		return
 	end
 	local sprint = b.sprint and not peeking and b.crouch <= 0
 	b.sprint = sprint
-	local speed = Body.speed(b.crouch, sprint, state.feel)
+	-- the pace (PACE): the sprint ramp a person's client keeps, gathering pace from standing, and
+	-- slowing at the end of the way
+	b.ramp = if sprint then math.min(1, b.ramp + dt / Body.SPRINT_RAMP_SECS) else 0
+	local speed = math.min(Body.pace(b.crouch, b.ramp, state.feel) * Body.WALK, was + ACCEL * dt)
 	local dx, dz = tx - b.x, tz - b.z
 	local d = math.sqrt(dx * dx + dz * dz)
+	local last = peeking or (path ~= nil and path[b.leg + 1] == nil)
+	if last then
+		speed = math.min(speed, math.max(STOP_CRAWL, math.sqrt(2 * STOP_DECEL * d)))
+	end
 	local step = speed * dt
 	if d <= step then
 		b.x, b.z = tx, tz

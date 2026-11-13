@@ -111,7 +111,7 @@ function BotCheck.run(opts: Opts?): Result
 	local stillWorst = 0
 	local legs = 0
 	local legsFirst = ""
-	local stood: { [number]: { x: number, y: number, z: number, crouch: number } } = {}
+	local stood: { [number]: { x: number, y: number, z: number, crouch: number, k: number } } = {}
 	local endAt = now + Contract.Rules.briefingSecs + seconds
 	local budget = Contract.COST.botsMs
 	while now < endAt do
@@ -127,7 +127,7 @@ function BotCheck.run(opts: Opts?): Result
 				end
 				pose.x, pose.y, pose.z, pose.yaw, pose.pitch, pose.crouch, pose.bits = sp.x, sp.y, sp.z, sp.yaw, 0, 0, 0
 				stillAt[e.id] = { t = now, x = sp.x, z = sp.z }
-				stood[e.id] = { x = sp.x, y = sp.y, z = sp.z, crouch = 0 }
+				stood[e.id] = { x = sp.x, y = sp.y, z = sp.z, crouch = 0, k = 0 }
 				if who[e.id] ~= nil then
 					Bots.place(bots, e.id, pose, now)
 				end
@@ -158,9 +158,13 @@ function BotCheck.run(opts: Opts?): Result
 			local flat = math.sqrt((x - was.x) ^ 2 + (z - was.z) ^ 2)
 			local chest = y + ArenaModule.CHEST
 			local ground = arena.ground(x, y + 0.6, z)
+			-- (a person's pace: the sprint ramps up from walking pace over Body.SPRINT_RAMP_SECS)
+			local k = if Wire.has(pose.bits, Wire.BIT.sprint)
+				then math.min(1, was.k + dt / Body.SPRINT_RAMP_SECS)
+				else 0
 			local most = if slot.out or state.phase ~= "live"
 				then 0
-				else Body.speed(was.crouch, Wire.has(pose.bits, Wire.BIT.sprint), state.feel) * dt
+				else Body.pace(was.crouch, k, state.feel) * Body.WALK * dt
 			local why: string? = nil
 			if not ArenaModule.inVolume(x, y, z) or arena.sweep(x, chest, z, x, chest + 0.01, z) ~= nil then
 				why = "inside a box or out of the building"
@@ -182,7 +186,7 @@ function BotCheck.run(opts: Opts?): Result
 					legsFirst = string.format("seat %d, %s, at (%.1f, %.1f, %.1f)", id, why, x, y, z)
 				end
 			end
-			was.x, was.y, was.z, was.crouch = x, y, z, pose.crouch
+			was.x, was.y, was.z, was.crouch, was.k = x, y, z, pose.crouch, k
 		end
 		for _, cmd in commands do
 			if cmd.kind == "reload" then
