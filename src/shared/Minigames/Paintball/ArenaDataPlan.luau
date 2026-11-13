@@ -178,6 +178,8 @@ Plan.LOOKS = table.freeze({
 	"keys_lit",
 	"screen",
 	"bulkhead",
+	"soil",
+	"stalk",
 })
 
 local LOOK: { [string]: number } = {}
@@ -759,6 +761,31 @@ function Plan.build(): Plan
 			on(level, KIND.prop, "keys_lit", x0 + 1.6, z0 + 0.5, x0 + 1.85, z1 - 0.5, RAIL, RAIL + 0.08)
 		end
 	end
+	-- a planter: low cover, with dry soil in it and what is left of the plants (dead stalks, a brown leaf on
+	-- each: thin boxes, and a ball stops on one as on anything drawn)
+	local stalks = 0
+	local function planter(level: number, x0: number, z0: number, x1: number, z1: number)
+		low(level, "planter", x0, z0, x1, z1)
+		on(level, KIND.prop, "soil", x0 + 0.3, z0 + 0.3, x1 - 0.3, z1 - 0.3, RAIL, RAIL + 0.06)
+		local alongX = (x1 - x0) > (z1 - z0)
+		local len = if alongX then x1 - x0 else z1 - z0
+		local count = math.max(2, math.floor(len / 2.2))
+		for k = 1, count do
+			stalks += 1
+			local along = len * (k - 0.5) / count
+			local off = ((stalks * 5) % 3 - 1) * 0.25
+			local x = if alongX then x0 + along else (x0 + x1) / 2 + off
+			local z = if alongX then (z0 + z1) / 2 + off else z0 + along
+			local h = 0.6 + ((stalks * 7) % 4) * 0.25
+			on(level, KIND.prop, "stalk", x - 0.1, z - 0.1, x + 0.1, z + 0.1, RAIL + 0.06, RAIL + h)
+			local leaf = RAIL + h * 0.6
+			if alongX then
+				on(level, KIND.prop, "stalk", x - 0.08, z - 0.5, x + 0.08, z + 0.5, leaf, leaf + 0.12)
+			else
+				on(level, KIND.prop, "stalk", x - 0.5, z - 0.08, x + 0.5, z + 0.08, leaf, leaf + 0.12)
+			end
+		end
+	end
 	-- two crates, one on the other
 	local function stack(level: number, look: string, x0: number, z0: number, x1: number, z1: number)
 		low(level, look, x0, z0, x1, z1)
@@ -1082,7 +1109,7 @@ function Plan.build(): Plan
 		stand(L, 55, -47)
 		-- the concourse
 		low(L, "bench", -27, 8, -25, 14)
-		low(L, "planter", -22, -22, -19, -19.6)
+		planter(L, -22, -22, -19, -19.6)
 		set(L, -27.5, -15, "+x")
 	end
 
@@ -1142,7 +1169,7 @@ function Plan.build(): Plan
 		console(L, 44, -50, 52, -47.5)
 		-- the concourse
 		low(L, "bench", -27, -4, -25, 4)
-		low(L, "planter", -22, 19.6, -19, 22)
+		planter(L, -22, 19.6, -19, 22)
 		-- the spawn rooms' own lights (ceiling fittings: nothing a body meets)
 		for _, z in { -9.5, 0, 9.5 } do
 			local i, j = on(L, KIND.prop, "ceiling_light", -56, z - 0.8, -48, z + 0.8, ceiling(L) - 0.4, ceiling(L))
@@ -1188,7 +1215,7 @@ function Plan.build(): Plan
 		low(L, "sheet", 50, -37, 56, -34.5)
 		-- the concourse
 		low(L, "bench", -22.5, -3, -20.5, 3)
-		low(L, "planter", -27, 22, -24, 24.4)
+		planter(L, -27, 22, -24, 24.4)
 		set(L, -18.5, -10, "-x")
 		-- the test card, on the cores' fronts: the last thing Channel 7 broadcast, seen across the atrium
 		bars(L, -8, 6, -CORE0 + 1, 2.4, 9)
@@ -1208,9 +1235,9 @@ function Plan.build(): Plan
 			tall(L, "cabinet", -59.4, z + 3, -57.8, z + 6.5, 7)
 		end
 		-- planters between the offices' corridor and the concourse
-		low(L, "planter", -31.5, -27, -29.5, -17)
-		low(L, "planter", -31.5, -9, -29.5, 9)
-		low(L, "planter", -31.5, 17, -29.5, 27)
+		planter(L, -31.5, -27, -29.5, -17)
+		planter(L, -31.5, -9, -29.5, 9)
+		planter(L, -31.5, 17, -29.5, 27)
 		low(L, "sheet", -42, -2, -39.5, 4)
 		-- the transmitter hall: cabinets in rows, a cable tray from each to the mast
 		local t1, t2 = tall(L, "transmitter", -26, -53.5, -10, -50.5, 9)

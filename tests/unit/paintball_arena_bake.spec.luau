@@ -411,6 +411,22 @@ return function(t)
 				end
 			end
 			t.truthy(lenses >= 80, `{lenses} lamps have glass`)
+			-- a planter has dry soil in it and dead stalks standing in the soil, none taller than a head
+			t.truthy(#byLook.soil >= 12, `{#byLook.soil} planters with soil`)
+			for _, i in byLook.soil do
+				local on = false
+				for _, j in byLook.planter do
+					on = on or touches(i, j)
+				end
+				t.truthy(on, `soil box {i} is in a planter`)
+			end
+			t.truthy(#byLook.stalk >= 60, `{#byLook.stalk} stalks and leaves`)
+			for _, i in byLook.stalk do
+				local k = (i - 1) * 6
+				local level = math.floor(b[k + 2] / Arena.FLOOR_HEIGHT)
+				t.truthy(b[k + 2] - level * Arena.FLOOR_HEIGHT >= Arena.RAIL_HEIGHT, "a stalk stands on its planter")
+				t.truthy(b[k + 5] - level * Arena.FLOOR_HEIGHT <= Arena.RAIL_HEIGHT + 1.5)
+			end
 			-- a stair core is lit: from the first floor up each has a bulkhead light on its wall over the door to
 			-- the concourse, above every head, and it gives light
 			local lit: { [number]: boolean } = {}

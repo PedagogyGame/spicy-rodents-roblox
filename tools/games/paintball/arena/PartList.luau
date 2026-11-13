@@ -194,6 +194,8 @@ local LOOK: { [string]: { any } } = {
 	keys_lit = { { 255, 176, 60 }, "Neon" },
 	screen = { { 26, 32, 42 }, "Glass" },
 	bulkhead = { { 226, 232, 236 }, "Neon" },
+	soil = { { 74, 62, 50 }, "Slate" },
+	stalk = { { 124, 104, 66 }, "Wood" },
 }
 PartList.LOOK = LOOK
 
