@@ -94,12 +94,12 @@ return function(t)
 		-- (tools/bake/games/Pool, BumperPool: a cut bed, six round leather pockets with their wells, jawed
 		-- cushions, sights, sixteen numbered and striped balls, a three-shade lamp, a score board and a cue stand:
 		-- 385 parts each, 103 for bumper pool) bring it to 6,351. The roof run's raised roof, vent, stairs and yard
-		-- (tools/bake/alley/Roof 673, RoofVent 101, RoofStairs 113, Yard 255) add 1,142 less the 108 of the flat
-		-- roof, its ceiling and lights they take over from Shell and Lanes: 7,385. The bound keeps the ~600 parts the
-		-- shop rooms were given over that.
+		-- (tools/bake/alley/Roof 673, RoofVent 101, RoofStairs 113, Yard 285 with the owner's ridge perches and
+		-- gutter brackets) add 1,172 less the 108 of the flat roof, its ceiling and lights they take over from Shell
+		-- and Lanes: 7,415. The bound keeps the ~600 parts the shop rooms were given over that.
 		t.truthy(#boxes > 4500 and #boxes < 8000, `{#boxes} parts`)
 		t.truthy(perTop.HallRoof <= 700, `the raised hall roof is {perTop.HallRoof} parts`)
-		t.truthy(perTop.Yard <= 270, `the yard is {perTop.Yard} parts`)
+		t.truthy(perTop.Yard <= 300, `the yard is {perTop.Yard} parts`)
 		t.truthy(perTop.RoofVent <= 140, `the rooftop vent is {perTop.RoofVent} parts`)
 		t.truthy(perTop.RoofStairs <= 160, `the stair and the guard platform are {perTop.RoofStairs} parts`)
 		t.truthy(perTop.Lanes <= L.LANES * 132, `the lanes are {perTop.Lanes} parts`)

@@ -5,8 +5,9 @@
 -- alley bake's Kit, as one Model "Yard" (the house, "House", and the tree, "Tree_AlleyYard": the client treats
 -- its "Trunk*" parts as a round trunk). It stands outside the alley's footprint, in AlleyRoof.ANNEX.
 --   House  a clapboard house (24 x 24, two storeys, gables west toward the tree and east, the ridge along X),
---          on a concrete plinth over the ground falling east; slate roof with a ridge cap, white rakes, fascia
---          and gutters, a brick chimney on the south slope, a porch and a red door on the north (street) side,
+--          on a concrete plinth over the ground falling east; slate roof with a ridge cap under the owner's ridge
+--          perch planks and grips (route 9103 on their top), white rakes, fascia and gutters on the owner's
+--          gutter brackets (tools/bake/alley/RoofKit: his kit's pieces that fit the house), a brick chimney on the south slope, a porch and a red door on the north (street) side,
 --          windows with white frames, sills and bars, green shutters on the street side; the downspout drawn
 --          round route 9101 (by the north-east corner), with its brackets, kick-out and splash block. Its setting:
 --          a flagstone path from the porch west to the walk beside the games wing, a mailbox where they meet, a
@@ -27,6 +28,7 @@
 local AlleyRoof = require("../../../src/shared/Attractions/AlleyRoof")
 local Curve = require("../../../src/shared/Routes/Curve")
 local Height = require("../../../src/shared/World/Height")
+local RoofKit = require("./RoofKit")
 local SquirrelMotor = require("../../../src/shared/Movement/SquirrelMotor")
 
 local Yard = {}
@@ -433,19 +435,34 @@ local function house(kit: any, yard: any): any
 	local dN, dS = H.d0 - ov, H.d1 + ov
 	board(kit, m, "RoofN", x0, x1, roofTop(H.d0) - ROOF_SLOPE * ov, dN, H.ridgeY, H.ridgeD, ROOF_T, ROOF, "Slate")
 	board(kit, m, "RoofS", x0, x1, H.ridgeY, H.ridgeD, roofTop(H.d1) - ROOF_SLOPE * ov, dS, ROOF_T, ROOF, "Slate")
+	-- the ridge: the owner's ridge perch planks (two, end to end, as in his kit) and their grips on the cap, the
+	-- planks' top the ridge route (RoofKit: his pieces at the game's scale)
 	local ridge = AlleyRoof.route(9103).points
+	local perch = RoofKit.piece("perches", "Ridge_Perch_0")
+	local plank = perch.size[2] * RoofKit.SCALE
 	kit:box(
 		m,
 		"RidgeCap",
 		x0,
 		x1,
-		H.ridgeY - 0.2,
-		ridge[1][2],
+		ridge[1][2] - plank - 0.3,
+		ridge[1][2] - plank,
 		H.ridgeD - 0.45,
 		H.ridgeD + 0.45,
 		{ 60, 62, 68 },
 		"Slate"
 	)
+	local mid = RoofKit.piece("perches", "Ridge_Perch_1")
+	-- (his point midway between the two planks, on their top, lands on the ridge's middle at the route's height)
+	local rref = { 0, perch.centre[2] + perch.size[2] / 2, (perch.centre[3] + mid.centre[3]) / 2 }
+	local rat = { (x0 + x1) / 2, ridge[1][2], H.ridgeD }
+	for i = 0, 1 do
+		RoofKit.lay(kit, m, "RidgePerch", RoofKit.piece("perches", `Ridge_Perch_{i}`), rref, rat, "WoodPlanks")
+		for j = 0, 7 do
+			local grip = RoofKit.piece("perches", `Ridge_Grip_{i}_{j}`)
+			RoofKit.lay(kit, m, "RidgeGrip", grip, rref, rat, "WoodPlanks", NOQUERY)
+		end
+	end
 	for _, side in { { x0 - 0.25, x0, "W" }, { x1, x1 + 0.25, "E" } } do
 		local a, b = side[1], side[2]
 		board(
@@ -484,6 +501,20 @@ local function house(kit: any, yard: any): any
 	kit:box(m, "FasciaS", x0, x1, eaveEdge - 0.65, eaveEdge - 0.05, dS, dS + 0.12, TRIM, "SmoothPlastic", DRESS)
 	kit:box(m, "GutterN", x0, x1, eaveEdge - 0.55, eaveEdge - 0.05, dN - 0.62, dN - 0.12, PIPE, "SmoothPlastic", DRESS)
 	kit:box(m, "GutterS", x0, x1, eaveEdge - 0.55, eaveEdge - 0.05, dS + 0.12, dS + 0.62, PIPE, "SmoothPlastic", DRESS)
+	-- the owner's gutter brackets at his spacing, those that fall on the gutters' length (his gutter's bottom on
+	-- this one's; his -x side is the north)
+	local gutter = RoofKit.piece("gutters", "Gutter_1")
+	local gutterBottom = gutter.centre[2] - gutter.size[2] / 2
+	for _, side in { { -1, dN - 0.37 }, { 1, dS + 0.37 } } do
+		local ref = { side[1] * gutter.centre[1], gutterBottom, 0 }
+		for j = 0, 11 do
+			local b = RoofKit.piece("gutters", `Gutter_Bracket_{side[1]}_{j}`)
+			if math.abs(b.centre[3]) * RoofKit.SCALE + b.size[3] * RoofKit.SCALE / 2 < (x1 - x0) / 2 - 0.1 then
+				local at = { (x0 + x1) / 2, eaveEdge - 0.55, side[2] }
+				RoofKit.lay(kit, m, "GutterBracket", b, ref, at, "Metal", NOQUERY)
+			end
+		end
+	end
 	-- trim: corner boards and the band between the storeys
 	for _, c in { { H.x0, H.d0 }, { H.x1, H.d0 }, { H.x0, H.d1 }, { H.x1, H.d1 } } do
 		kit:box(

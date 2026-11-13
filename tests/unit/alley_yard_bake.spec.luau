@@ -3,9 +3,10 @@
 -- in memory at the alley's place and held to the routes of Shared/Attractions/AlleyRoof:
 --   * it stays in the alley's footprint or the yard annex, inside its part budget;
 --   * what the squirrel runs on is drawn where the motor puts it: the downspout's pipe round route 9101; the
---     bough's TOP at the rail + 1.25 along 9105 with the rail inside the bark; the ridge cap's top on 9103; the
---     gutter route riding just over the north slope, and the body drawn on it (Routes/Motion.visualPose) and on the
---     ridge stands on the slates and the cap, not in the air;
+--     bough's TOP at the rail + 1.25 along 9105 with the rail inside the bark; the top of the owner's ridge perch
+--     planks on 9103 over its whole length, at his scale, on the cap; the gutter route riding just over the north
+--     slope, and the body drawn on it (Routes/Motion.visualPose) and on the ridge stands on the slates and the
+--     planks, not in the air; his gutter brackets under the gutters;
 --   * the trunk follows AlleyRoof.TREE.spine, tapering, the tree's only colliding part, with a baffle and no route;
 --   * the roof slopes collide (a squirrel that misses the leap lands on them), the boughs and leaves do not;
 --   * the leaf clumps keep a tunnel round every route and the leap's flight, so the squirrel stays in sight, and
@@ -114,7 +115,8 @@ return function(t)
 		t.eq(house + tree, kit.count)
 		-- (the plan's budget was about 120 for the house and 15 for a tree proxy; a part-built tree with a crown that
 		-- reads as one needs about a hundred, until the meshed tree replaces it)
-		t.truthy(house <= 170, `the house is {house} parts`)
+		-- (the house was 157 parts; the owner's ridge perches, grips and gutter brackets add 30)
+		t.truthy(house <= 200, `the house is {house} parts`)
 		t.truthy(tree <= 105, `the tree is {tree} parts`)
 		print(`      the house {house} parts (with its path, hedge and mailbox), the tree {tree}`)
 		t.truthy(yard:FindFirstChild("Tree_AlleyYard") ~= nil, "the tree's model is named for ClientWorld")
@@ -228,17 +230,42 @@ return function(t)
 	)
 
 	t.test(
-		"the roof: the ridge cap's top is the ridge route, the gutter route rides the north slope, both slopes collide",
+		"the roof: the ridge perches' top is the ridge route, the gutter route rides the north slope, both slopes collide",
 		function()
-			local cap = byName.RidgeCap
 			local ridge = R.route(9103).points
+			local cap = byName.RidgeCap
 			local _, capTop = AlleyLayout.toLocal(place, 0, cap.CFrame.Position.Y + cap.Size.Y / 2, 0)
-			t.near(capTop, ridge[1][2], 0.02)
-			local cx = AlleyLayout.toLocal(place, cap.CFrame.Position.X, 0, cap.CFrame.Position.Z)
-			t.truthy(
-				cx - cap.Size.X / 2 <= ridge[2][1] - 0.5 and cx + cap.Size.X / 2 >= ridge[1][1],
-				"the cap runs the route's length"
-			)
+			-- the owner's ridge perch planks (tools/bake/alley/RoofKit): his size at 3 studs per metre, square-on,
+			-- colliding, on the cap, their top the route, and between them the ridge's whole length but a gap
+			-- under a body's length where his kit leaves one between planks
+			local planks, brackets, grips = {}, 0, 0
+			for _, b in boxes do
+				if b.part.Name == "RidgePerch" then
+					table.insert(planks, b)
+				elseif b.part.Name == "GutterBracket" then
+					brackets += 1
+				elseif b.part.Name == "RidgeGrip" then
+					grips += 1
+				end
+			end
+			t.eq(#planks, 2)
+			t.eq(grips, 16)
+			t.eq(brackets, 12)
+			table.sort(planks, function(a, b)
+				return a.X < b.X
+			end)
+			for _, b in planks do
+				t.truthy(b.part.CanCollide, "a plank collides")
+				t.near(b.hx * 2, 12.0, 0.01)
+				t.near(b.hd * 2, 1.32, 0.01)
+				t.near(b.Y + b.hy, ridge[1][2], 0.02)
+				t.near(b.Y - b.hy, capTop, 0.02)
+				t.near(b.D, R.HOUSE.ridgeD, 0.02)
+			end
+			t.truthy(planks[1].X - planks[1].hx <= ridge[2][1] - 0.5, "the planks reach past the ridge's west end")
+			t.truthy(planks[2].X + planks[2].hx >= ridge[1][1], "the planks reach the ridge's east end")
+			local apart = (planks[2].X - planks[2].hx) - (planks[1].X + planks[1].hx)
+			t.truthy(apart > 0 and apart < 1.0, `the gap between the planks is {apart}`)
 			local roofN = byName.RoofN
 			t.truthy(roofN.CanCollide and byName.RoofS.CanCollide, "a squirrel that misses the leap lands on the roof")
 			local n = roofN.CFrame.YVector
@@ -252,7 +279,7 @@ return function(t)
 				end
 			end
 			-- the body as the client draws it (Motion.visualPose): on the gutter route and the ridge its feet stand on
-			-- the slates and on the cap, within 0.3 (a bough's 1.25 lift would float it over the roof)
+			-- the slates and on the planks, within 0.3 (a bough's 1.25 lift would float it over the roof)
 			local registry = Registry.fromRecords(R.records(place, alley.id) :: any)
 			local slopeTop = R.HOUSE.eaveY + (R.HOUSE.ridgeY - R.HOUSE.eaveY) / (R.HOUSE.ridgeD - R.HOUSE.d0)
 			local worst = 0
@@ -263,7 +290,7 @@ return function(t)
 					local pos = registry:pointAt(route, u)
 					local feet = Motion.visualPose({ registry = registry } :: any, route, u, pos)
 					local _, Y, D = AlleyLayout.toLocal(place, feet.x, feet.y, feet.z)
-					local under = if id == 9103 then capTop else slopeTop
+					local under = if id == 9103 then ridge[1][2] else slopeTop
 					if id == 9102 then
 						if D <= R.HOUSE.d0 + 0.2 or D >= R.HOUSE.ridgeD - 0.6 then
 							continue
