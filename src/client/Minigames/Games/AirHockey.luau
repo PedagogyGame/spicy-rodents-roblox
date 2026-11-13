@@ -6,7 +6,7 @@
 --     delay; first person or from above).
 --   Everyone near the table is sent the referee's stream ("air_hockey") and sees the same match on the same
 --     parts: watch() hands each message to Client/Minigames/AirHockey/Rink, which replays it. "air_hockey_seat"
---     is the referee's word to one player that an end is theirs.
+--     is the referee's word to one player that an end is theirs; "air_hockey_rest" says the table has reset.
 --   The lobby: Start, the computer's difficulty if nobody takes the other end (his Lounge / Club / Pro), Leave.
 --   The scorecard: both ends, who has them and the score; the end card says who won.
 --   Sound: named cue points only, no asset ids yet (a strike by its strength, a rail, a post, a goal for and
@@ -144,12 +144,17 @@ local entry: ClientGame.ClientGame = {
 		return if g and g.score then `{g.score[1]}-{g.score[2]}` else ""
 	end,
 	endCard = endCard,
-	kinds = { "air_hockey", "air_hockey_seat" },
+	kinds = { "air_hockey", "air_hockey_seat", "air_hockey_rest" },
 	watch = function(msg: { [string]: any }, place: ClientGame.Place?): any
-		if msg.kind == "air_hockey" and type(msg.station) == "string" then
+		if type(msg.station) ~= "string" then
+			return nil
+		end
+		if msg.kind == "air_hockey" then
 			local rink = Rink.get(msg.station, place)
 			Rink.push(rink, msg)
 			return rink
+		elseif msg.kind == "air_hockey_rest" then
+			Rink.rest(Rink.get(msg.station, place))
 		end
 		return nil
 	end,

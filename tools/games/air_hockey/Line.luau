@@ -221,7 +221,12 @@ local function truthAt(line: any, tickTime: number): { number }?
 		out[i] = a[i] + (b[i] - a[i]) * f
 	end
 	if math.abs(b[1] - a[1]) + math.abs(b[2] - a[2]) > 0.2 then
-		out[1], out[2] = b[1], b[2] -- (the puck was put back on its spot: nobody slides it there)
+		-- (the puck is put back on its spot within this tick: nobody slides it there)
+		if f < 0.5 then
+			out[1], out[2] = a[1], a[2]
+		else
+			out[1], out[2] = b[1], b[2]
+		end
 	end
 	return out
 end

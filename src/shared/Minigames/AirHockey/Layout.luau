@@ -41,9 +41,9 @@ Layout.PUCK = "Puck"
 Layout.MALLETS = { [0] = "MalletGlacier", [1] = "MalletEmber" }
 Layout.SCORE = "ScoreBoard" -- a part with a SurfaceGui on each long face, each with a TextLabel "Score"
 Layout.SIDE_NAMES = { [0] = "Glacier", [1] = "Ember" }
--- The moving pieces are small Models (the puck; a mallet's base, crown, stem and cap). The bake stands them at
--- home (the puck on the centre spot, the mallets where a match starts them) and whoever moves one slides it
--- from there: its pivot plus the world offset of (x - home x, y - home y).
+-- The moving pieces are small Models (the puck; a mallet's base, crown, stem and cap), each with its pivot on
+-- its own axis. The bake stands them at home (the puck on the centre spot, the mallets where a match starts
+-- them) and whoever moves one slides its pivot across the bed to toWorld(x, y), height and turn unchanged.
 Layout.HOME_PUCK = { 0, 0 }
 Layout.HOME_MALLET = { [0] = { 0, -0.8 }, [1] = { 0, 0.8 } }
 

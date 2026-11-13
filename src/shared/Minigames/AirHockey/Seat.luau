@@ -321,9 +321,14 @@ function Seat.view(seat: Seat): (number, number, number, number, number, number)
 	local py = p[2] + (s.py - p[2]) * f + seat.ey
 	local ax, ay = p[3] + (s.p0x - p[3]) * f, p[4] + (s.p0y - p[4]) * f
 	local bx, by = p[5] + (s.p1x - p[5]) * f, p[6] + (s.p1y - p[6]) * f
-	-- (a puck that was just put back on its spot is not slid there from the goal)
+	-- (a puck that is put back on its spot within this tick is not slid there from the goal: it is at whichever
+	-- end of the tick the clock is nearer)
 	if math.abs(s.px - p[1]) + math.abs(s.py - p[2]) > 0.2 then
-		px, py = s.px + seat.ex, s.py + seat.ey
+		if f < 0.5 then
+			px, py = p[1] + seat.ex, p[2] + seat.ey
+		else
+			px, py = s.px + seat.ex, s.py + seat.ey
+		end
 	end
 	if seat.side == 0 then
 		bx, by = bx + seat.ox, by + seat.oy

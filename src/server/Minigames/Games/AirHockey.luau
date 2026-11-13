@@ -20,8 +20,8 @@
 --     world is right for someone who was sent nothing, and puts them home when the table resets.
 -- Interface: a ServerGame { game = "air_hockey", new(ctx) -> Table }; Table.hw { model, puck, mallets, labels };
 --   Table.ref (the Referee while a match is on); Table:debug("goal", side) (the puck is put in front of that
---   end's opponent's goal, travelling in: the next ticks score it through the simulation's own goal line);
---   WATCH; MOVE_EVERY
+--   end's opponent's goal, travelling in: the next ticks score it through the simulation's own goal line) and
+--   Table:debug("score", glacier, ember); WATCH; MOVE_EVERY
 
 local Import = require("../../Import")
 local Layout =
@@ -68,11 +68,6 @@ local function hardware(root: Instance?): any
 		puck = puck,
 		mallets = { [0] = glacier, [1] = ember },
 		labels = labels,
-		home = {
-			puck = (puck :: any):GetPivot(),
-			[0] = (glacier :: any):GetPivot(),
-			[1] = (ember :: any):GetPivot(),
-		},
 	}
 end
 
@@ -89,11 +84,12 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		movedAt = 0,
 	}
 
-	-- a piece of the hardware slid to a point of the model (from where the bake stood it)
-	local function slide(piece: any, home: CFrame, hx: number, hy: number, x: number, y: number)
-		local ax, _, az = Layout.toWorld(ctx.place, hx, hy)
-		local bx, _, bz = Layout.toWorld(ctx.place, x, y)
-		piece:PivotTo(home + Vector3.new(bx - ax, 0, bz - az))
+	-- a piece of the hardware slid across the bed to a point of the model (its pivot is on its own axis; its
+	-- height and its turn stay as the bake made them)
+	local function slide(piece: any, x: number, y: number)
+		local wx, _, wz = Layout.toWorld(ctx.place, x, y)
+		local pivot = piece:GetPivot()
+		piece:PivotTo(pivot + Vector3.new(wx - pivot.Position.X, 0, wz - pivot.Position.Z))
 	end
 
 	local function show(sim: any)
@@ -101,16 +97,17 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		if hw == nil then
 			return
 		end
-		local hp, hm = Layout.HOME_PUCK, Layout.HOME_MALLET
 		if sim == nil then
-			slide(hw.puck, hw.home.puck, hp[1], hp[2], hp[1], hp[2])
-			slide(hw.mallets[0], hw.home[0], hm[0][1], hm[0][2], hm[0][1], hm[0][2])
-			slide(hw.mallets[1], hw.home[1], hm[1][1], hm[1][2], hm[1][1], hm[1][2])
+			-- at rest: where the bake stood them
+			local hp, hm = Layout.HOME_PUCK, Layout.HOME_MALLET
+			slide(hw.puck, hp[1], hp[2])
+			slide(hw.mallets[0], hm[0][1], hm[0][2])
+			slide(hw.mallets[1], hm[1][1], hm[1][2])
 			return
 		end
-		slide(hw.puck, hw.home.puck, hp[1], hp[2], sim.px, sim.py)
-		slide(hw.mallets[0], hw.home[0], hm[0][1], hm[0][2], sim.p0x, sim.p0y)
-		slide(hw.mallets[1], hw.home[1], hm[1][1], hm[1][2], sim.p1x, sim.p1y)
+		slide(hw.puck, sim.px, sim.py)
+		slide(hw.mallets[0], sim.p0x, sim.p0y)
+		slide(hw.mallets[1], sim.p1x, sim.p1y)
 	end
 
 	local function nowTick(): number
@@ -310,7 +307,8 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 	function self.event(_self: any, e: ServerGame.Event)
 		if e.kind == "start" then
 			begin()
-		elseif e.kind == "left" then
+		elseif e.kind == "left" or e.kind == "removed" then
+			-- (left: walked off, pressed Q, was taken out of the body; removed: their log stopped arriving)
 			local key = e.key
 			local side = self.sideOf[key]
 			self.sideOf[key] = nil
@@ -346,15 +344,46 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 				show(self.ref.sim)
 			end
 		elseif e.kind == "reset" then
+			local wasOn = self.ref ~= nil
 			self.ref = nil
 			table.clear(self.sideOf)
-			table.clear(self.watchers)
 			show(nil)
+			if wasOn then
+				-- everyone near is told the table is at rest (each screen moved the pieces itself; nobody is
+				-- seated now, so this goes to the people nearby one by one, never to everyone)
+				local told: { [any]: boolean } = {}
+				for key in self.watchers do
+					told[key] = true
+				end
+				for _, person in ctx.town.people() do
+					local d = Vector3.new(person.x, person.y, person.z) - ctx.anchor
+					if d.Magnitude <= Game.WATCH and not isComputer(person.key) then
+						told[person.key] = true
+					end
+				end
+				for key in told do
+					ctx.send(key, { kind = "air_hockey_rest", site = ctx.station.site })
+				end
+			end
+			table.clear(self.watchers)
 		end
 	end
 
 	function self.state(_self: any, player: any, _seat: number?): { [string]: any }?
-		return { side = self.sideOf[player] }
+		-- (the end they play, or before a match the end they asked for)
+		return { side = self.sideOf[player] or self.wish[player] }
+	end
+
+	-- while the computer has an end, the prompts say that a person may take it
+	function self.prompt(_self: any): (string?, string?)
+		if ctx.session.phase == "playing" then
+			for _, key in ctx.seated() do
+				if isComputer(key) then
+					return "Take the computer's end", nil
+				end
+			end
+		end
+		return nil, nil
 	end
 
 	function self.sig(_self: any, view: { [string]: any }): any
@@ -389,17 +418,29 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		return `{who} wins {math.max(a, b)}-{math.min(a, b)}`
 	end
 
-	-- A scripted goal for the engine checks: the puck is stood in front of the goal `side` attacks, travelling
-	-- in. The simulation scores it itself on the ticks that follow (when the hands' logs next arrive).
-	function self.debug(_self: any, what: any, side: any): (boolean, string?)
+	-- Scripted outcomes for the engine checks. ("goal", side): the puck is stood in front of the goal `side`
+	-- attacks, travelling in; the simulation scores it itself on the ticks that follow (when the hands' logs next
+	-- arrive). ("score", a, b): the score so far is set (both under seven). Everyone is sent the state as it
+	-- then stands, so every screen carries on from it.
+	function self.debug(_self: any, what: any, side: any, other: any): (boolean, string?)
 		local ref = self.ref
 		if ref == nil or ctx.session.phase ~= "playing" then
 			return false, "no match is on"
 		end
-		if what ~= "goal" or (side ~= 0 and side ~= 1) then
-			return false, "only a goal for end 0 or 1 can be scripted"
-		end
 		local sim = ref.sim
+		if what == "score" then
+			local a, b = ServerGame.num(side, -1), ServerGame.num(other, -1)
+			if a < 0 or b < 0 or a >= Sim.WIN or b >= Sim.WIN or a % 1 ~= 0 or b % 1 ~= 0 then
+				return false, "a score is two whole numbers under seven"
+			end
+			sim.score0, sim.score1 = a, b
+			ctx.server("goal", { 0, a, b }, 1)
+			tell(Referee.snapshot(ref))
+			return true
+		end
+		if what ~= "goal" or (side ~= 0 and side ~= 1) then
+			return false, "only a goal for end 0 or 1, or a score, can be scripted"
+		end
 		local s = if side == 0 then 1 else -1
 		sim.countdown = 0
 		sim.px, sim.py, sim.vx, sim.vy = 0, s * 1.2, 0, s * 5

@@ -12,9 +12,9 @@
 -- nothing is drawn and nothing breaks. A table nobody has heard from for IDLE seconds is let go (the render
 -- step is unbound when no table is being watched).
 -- Sound: every contact and goal of the replay is a named cue (cue(), also used by the controller).
--- Interface: get(station, place?) -> Rink; push(rink, msg) (a stream message for that station); take(rink) /
---   give(rink); show(rink, px, py, ax, ay, bx, by) (model metres); cue(sim, hit, goal, served, mine?) ;
---   watching() -> number of tables being drawn here; DELAY; IDLE; BIND; clock
+-- Interface: get(station, place?) -> Rink; push(rink, msg) (a stream message for that station); rest(rink) (the
+--   table has reset: the pieces go home); take(rink) / give(rink); show(rink, px, py, ax, ay, bx, by) (model metres); cue(sim, hit, goal, served, mine?) ;
+--   watching() -> number of tables being drawn here; reset() (specs); DELAY; IDLE; BIND
 
 local Import = require("../../Import")
 local Layout =
@@ -29,7 +29,6 @@ local Rink = {}
 Rink.DELAY = 36 -- ticks a bystander's view runs behind the newest tick received (0.15 s)
 Rink.IDLE = 2 -- seconds without a message before a watched table is let go
 Rink.BIND = "SpicyAirHockeyRink"
-Rink.clock = os.clock
 
 export type Rink = {
 	station: string,
@@ -40,7 +39,7 @@ export type Rink = {
 	cur: { number },
 	parts: any?,
 	seated: boolean, -- the local player's controller is drawing
-	heard: number, -- when the last message came
+	silent: number, -- seconds of frames since the last message came
 	watching: boolean,
 }
 
@@ -64,15 +63,7 @@ local function find(): any
 	if puck == nil or glacier == nil or ember == nil then
 		return nil
 	end
-	return {
-		puck = puck,
-		glacier = glacier,
-		ember = ember,
-		-- (where the bake stood them: every move is a slide from there)
-		homePuck = (puck :: any):GetPivot(),
-		homeGlacier = (glacier :: any):GetPivot(),
-		homeEmber = (ember :: any):GetPivot(),
-	}
+	return { puck = puck, glacier = glacier, ember = ember }
 end
 
 function Rink.get(station: string, place: any?): Rink
@@ -87,7 +78,7 @@ function Rink.get(station: string, place: any?): Rink
 			cur = { 0, 0, 0, -0.8, 0, 0.8 },
 			parts = nil,
 			seated = false,
-			heard = -math.huge,
+			silent = 0,
 			watching = false,
 		}
 		rinks[station] = rink
@@ -112,15 +103,16 @@ function Rink.show(rink: Rink, px: number, py: number, ax: number, ay: number, b
 			return
 		end
 	end
-	local function slide(piece: any, home: CFrame, hx: number, hy: number, x: number, y: number)
-		local x0, _, z0 = Layout.toWorld(place, hx, hy)
-		local x1, _, z1 = Layout.toWorld(place, x, y)
-		piece:PivotTo(home + Vector3.new(x1 - x0, 0, z1 - z0))
+	-- (a piece's pivot is on its own axis: it is slid across the bed, its height and its turn left as they are.
+	-- Never from a remembered "home": the server moves these same parts, so where one is now says nothing)
+	local function slide(piece: any, x: number, y: number)
+		local wx, _, wz = Layout.toWorld(place, x, y)
+		local pivot = piece:GetPivot()
+		piece:PivotTo(pivot + Vector3.new(wx - pivot.Position.X, 0, wz - pivot.Position.Z))
 	end
-	local hp, hm = Layout.HOME_PUCK, Layout.HOME_MALLET
-	slide(parts.puck, parts.homePuck, hp[1], hp[2], px, py)
-	slide(parts.glacier, parts.homeGlacier, hm[0][1], hm[0][2], ax, ay)
-	slide(parts.ember, parts.homeEmber, hm[1][1], hm[1][2], bx, by)
+	slide(parts.puck, px, py)
+	slide(parts.glacier, ax, ay)
+	slide(parts.ember, bx, by)
 end
 
 -- The sound of one tick: what the puck met and how hard, a serve, a goal. `mine` is the end the listener plays
@@ -157,21 +149,21 @@ local function keep(rink: Rink, sim: any)
 end
 
 local function frame(dt: number)
-	local now = Rink.clock()
 	local any = false
 	for _, rink in rinks do
 		if not rink.watching then
 			continue
 		end
 		local r = rink.replica
-		if rink.seated or (now - rink.heard > Rink.IDLE and r.tick >= r.head) then
+		rink.silent += dt
+		if rink.seated or (rink.silent > Rink.IDLE and r.tick >= r.head) then
 			rink.watching = false
 			continue
 		end
 		any = true
 		-- the view's own clock: this screen's frames, held DELAY ticks behind the newest tick known
 		-- (once the stream has stopped, the view runs on to its end)
-		local want = if now - rink.heard > 0.4 then r.head else r.head - Rink.DELAY
+		local want = if rink.silent > 0.4 then r.head else r.head - Rink.DELAY
 		rink.at += dt / Sim.STEP
 		if math.abs(rink.at - want) > 2 * Rink.DELAY then
 			rink.at = want
@@ -188,7 +180,12 @@ local function frame(dt: number)
 		local p, c = rink.prev, rink.cur
 		local px, py = p[1] + (c[1] - p[1]) * f, p[2] + (c[2] - p[2]) * f
 		if math.abs(c[1] - p[1]) + math.abs(c[2] - p[2]) > 0.2 then
-			px, py = c[1], c[2] -- (put back on its spot: nobody slides it there)
+			-- (put back on its spot within this tick: nobody slides it there)
+			if f < 0.5 then
+				px, py = p[1], p[2]
+			else
+				px, py = c[1], c[2]
+			end
 		end
 		Rink.show(
 			rink,
@@ -212,7 +209,7 @@ function Rink.push(rink: Rink, msg: any)
 	if not Replica.push(r, msg) then
 		return
 	end
-	rink.heard = Rink.clock()
+	rink.silent = 0
 	if r.jumps ~= jumps then
 		-- taken as it stands: the view starts there
 		rink.at = r.tick
@@ -238,6 +235,26 @@ end
 function Rink.give(rink: Rink)
 	rink.seated = false
 	rink.replica = Replica.new()
+end
+
+-- The server's word that the table is at rest: the pieces go home on this screen too (it moved them itself, so
+-- the server's own move of them would not show), and nothing is drawn until the next match.
+function Rink.rest(rink: Rink)
+	rink.replica = Replica.new()
+	rink.watching = false
+	if not rink.seated then
+		local hp, hm = Layout.HOME_PUCK, Layout.HOME_MALLET
+		Rink.show(rink, hp[1], hp[2], hm[0][1], hm[0][2], hm[1][1], hm[1][2])
+	end
+end
+
+-- Every table forgotten and the render step let go (the specs start each case from nothing).
+function Rink.reset()
+	table.clear(rinks)
+	if bound then
+		bound = false
+		game:GetService("RunService"):UnbindFromRenderStep(Rink.BIND)
+	end
 end
 
 function Rink.watching(): number

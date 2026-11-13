@@ -17,7 +17,8 @@
 -- Words on screen are his: READY WHEN YOU ARE, BEAUTIFUL SHOT, EMBER SCORES, MATCH WON, WELL PLAYED.
 -- The main client's rules (MinigameClient's header): the two views go through ctx.camera / ctx.releaseCamera;
 -- the cursor is MinigameUI's; everything connected here is disconnected in stop().
--- Interface: new(ctx) -> Controller { onState, onMessage, onRefused, stop }; HELP; KEY_SPEED; STICK_SPEED
+-- Interface: new(ctx) -> Controller { onState, onMessage, onRefused, stop }; HELP; KEY_SPEED; STICK_SPEED;
+--   current (the controller that is open now, for the specs: its .seat is the player's prediction)
 
 local Import = require("../../Import")
 local Layout =
@@ -47,6 +48,7 @@ Controller.HELP = {
 }
 Controller.KEY_SPEED = 1.8 -- metres a second: the keys' push on the mallet's target (his)
 Controller.STICK_SPEED = 2.6 -- and a stick held right over
+Controller.current = nil :: any
 local TAP_SECONDS = 0.3
 local TAP_PIXELS = 14
 
@@ -77,6 +79,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		stopped = false,
 	}
 	Rink.take(rink)
+	Controller.current = self
 
 	local function setCamera(snap: boolean)
 		local view = Layout.camera(self.side, self.overhead)
@@ -369,12 +372,17 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 			return
 		end
 		self.stopped = true
+		if Controller.current == self then
+			Controller.current = nil
+		end
 		for _, c in self.conns do
 			c:Disconnect()
 		end
 		table.clear(self.conns)
 		self.seat = nil
 		Rink.give(rink)
+		-- (the pieces are left where this screen last drew them only for a moment: the stream, if the match
+		-- goes on without this player, or the server's word that the table is at rest, moves them next)
 		ctx.ui:touch({}, function() end, function() end)
 		ctx.controls(true)
 		ctx.releaseCamera()
