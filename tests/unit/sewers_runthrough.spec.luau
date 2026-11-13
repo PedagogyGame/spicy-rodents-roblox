@@ -5,16 +5,19 @@
 -- real SquirrelMotor driven with scripted keys, and the envelope the server's MoveValidator applies to every frame.
 --   in only at a mouth, with E (facing in, standing on it); not from beside it, not from the street over a pipe
 --   out at every street mouth on its feet, still running
---   each pipe beats its surface way with W held: P1 and P2 at the street pace the motor runs today; P3 only at the
---   pipe pace (Tunables sewer.speedMult), which the motor does not apply yet (N2: the rail time is scaled to it)
+--   each pipe against its surface way, measured on the motor with W held, walking and sprinting: P1 (against the
+--   pavements round the crossing) and P2 (against the bridge) win at the street pace the motor runs today; P3 does
+--   NOT (its two shafts make it longer than the straight walk over the top), pinned as the known gap N2 (the motor
+--   does not apply route.speedMult, Tunables sewer.speedMult 1.25): flip it when the motor lane lands N2
 --   nothing through walls: the body's section along every route meets no part of the stand-in; inside, Space, Q, a
 --   click and E do nothing; the server refuses a body put into a pipe from the street or out of one through the road
 --   P1's crossing: W runs straight on, A or D turns into a side arm
--- And one known gap, pinned so the motor lane sees it: walking onto a grate heading in also goes down (Enclosure rule
--- 1 has no E-only mouth: the survey's hatch mouth N3).
+-- And two known gaps, pinned so the motor lane sees them and a green run says nothing it should not:
+--   N3: walking onto a grate heading in also goes down, against the owner's default "E only, never by walking onto
+--   a grate" (Enclosure rule 1 has no E-only mouth: the survey's hatch mouth). A defect, not a default.
+--   N2: P3 is slower than walking over the top at the street pace (above).
 local Data = require("@shared/Data")
 local Enclosure = require("@shared/Routes/Enclosure")
-local Motion = require("@shared/Routes/Motion")
 local RailWorld = require("@shared/Movement/RailWorld")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SewerLayout = require("@shared/World/SewerLayout")
@@ -115,7 +118,7 @@ return function(t)
 
 	-- the same two mouths over the top: W held, the view turned toward each corner of the way in turn, on flat ground
 	-- (the motor sets a level speed: slopes, the quay steps and the bridge's ramps do not slow it)
-	local function walkOver(fromId: string, toId: string): number
+	local function walkOver(fromId: string, toId: string, sprint: boolean?): number
 		local way = layout.surfaceWalk(fromId, toId) :: SewerLayout.SurfaceWay
 		local pts = way.points
 		local s = SquirrelMotor.new(pts[1].x, 0, pts[1].z)
@@ -125,7 +128,10 @@ return function(t)
 			while i < #pts and (pts[i].x - st.x) ^ 2 + (pts[i].z - st.z) ^ 2 < 1.0 do
 				i += 1
 			end
-			return BakedWorld.keys(BakedWorld.cameraYawToward(pts[i].x - st.x, pts[i].z - st.z), { fw = 1 })
+			return BakedWorld.keys(
+				BakedWorld.cameraYawToward(pts[i].x - st.x, pts[i].z - st.z),
+				{ fw = 1, sprint = sprint == true }
+			)
 		end, {
 			stop = function(st: State)
 				return i == #pts and (pts[i].x - st.x) ^ 2 + (pts[i].z - st.z) ^ 2 < 1.0
@@ -210,7 +216,7 @@ return function(t)
 	end)
 
 	t.test(
-		"walking across a grate does not go down; walking straight onto it heading in does (known gap N3)",
+		"walking across a grate does not go down; onto it heading in does (DEFECT, the known gap N3: not E only)",
 		function()
 			for _, m in layout.mouths do
 				-- across it, both ways, and out over its rung side from behind it: never in
@@ -231,36 +237,46 @@ return function(t)
 		end
 	)
 
-	t.test("each pipe beats its surface way with W held (P3 at the pipe pace)", function()
+	t.test("each pipe against its way over the top, walking and sprinting (P3: the known gap N2)", function()
 		local pace = Tunables.raw("sewer.speedMult")
-		local street = Motion.C.railWalk
-		for _, run in { { "P1.NW", "P1.SE" }, { "P1.NE", "P1.SW" }, { "P2.W", "P2.E" }, { "P3.S", "P3.N" } } do
-			local r = runThrough(run[1], run[2])
-			local over = walkOver(run[1], run[2])
-			-- the pace the motor ran the rails at, from the route lengths and the time on them
-			local a = mouth(run[1])
-			local length = 0
-			for id in r.trace.routes do
-				length += (reg:get(id) :: any).length
-			end
-			local ran = length / r.railSeconds
-			-- the rail time as it would be at the pipe pace (the identity once the motor applies route.speedMult)
-			local atPace = r.seconds - r.railSeconds + r.railSeconds * ran / (street * pace)
-			print(
-				string.format(
-					"      %s -> %s: pipe %.2f s (rails at %.1f st/s; %.2f s at x%.2f), over the top %.2f s",
-					run[1],
-					run[2],
-					r.seconds,
-					ran,
-					atPace,
-					pace,
-					over
+		for _, sprint in { false, true } do
+			for _, run in { { "P1.NW", "P1.SE" }, { "P1.NE", "P1.SW" }, { "P2.W", "P2.E" }, { "P3.S", "P3.N" } } do
+				local r = runThrough(run[1], run[2], function(_f: number, _st: State): SquirrelMotor.Input
+					return BakedWorld.keys(towards(mouth(run[1]), mouth(run[2])), { fw = 1, sprint = sprint })
+				end)
+				local over = walkOver(run[1], run[2], sprint)
+				-- the pace the motor ran the rails at, from the route lengths and the time on them
+				local a = mouth(run[1])
+				local length = 0
+				for id in r.trace.routes do
+					length += (reg:get(id) :: any).length
+				end
+				local ran = length / r.railSeconds
+				-- what N2 would make of it: the rail time at the pipe pace (a projection, for the motor lane; asserted
+				-- only as that)
+				local atPace = r.seconds - r.railSeconds + r.railSeconds / pace
+				print(
+					string.format(
+						"      %s %s -> %s: pipe %.2f s on the motor (rails at %.1f st/s), over the top %.2f s; with N2 x%.2f: %.2f s",
+						if sprint then "sprint" else "walk  ",
+						run[1],
+						run[2],
+						r.seconds,
+						ran,
+						over,
+						pace,
+						atPace
+					)
 				)
-			)
-			t.truthy(atPace < over, `{run[1]}: the pipe at its pace beats the surface way`)
-			if a.pipe ~= "P3" then
-				t.truthy(r.seconds < over, `{run[1]}: the pipe beats the surface way at the street pace`)
+				t.truthy(r.emerged, `{run[1]}: out`)
+				if a.pipe ~= "P3" then
+					t.truthy(r.seconds < over, `{run[1]}: the pipe beats the surface way on the motor`)
+				else
+					-- N2 (known gap): the motor runs P3 at the street pace and P3 does not win; this flips to
+					-- r.seconds < over when the motor applies route.speedMult
+					t.truthy(r.seconds >= over, `{run[1]}: N2 is still open (P3 {r.seconds} s, over the top {over} s)`)
+					t.truthy(atPace < over, `{run[1]}: at the pipe pace it would win`)
+				end
 			end
 		end
 	end)
