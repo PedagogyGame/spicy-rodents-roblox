@@ -363,6 +363,70 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"the owner's tuning: a number out of its range, or one that is no feel number, is refused with words; a faster, heavier ball and a slower trigger are in force from the next match and not before: every client is told, the server's ball flies and falls by the new numbers and the magazine keeps the new interval",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				local service = kit.service
+				local was = kit.state().feel
+				local ok, why = service:debug("tune", "ballSpeed", 500)
+				t.falsy(ok, "out of its range")
+				t.truthy(type(why) == "string" and string.find(why :: string, "ballSpeed", 1, true), why)
+				ok, why = service:debug("tune", "gravity", 1)
+				t.falsy(ok, "no such number")
+				t.truthy(type(why) == "string" and string.find(why :: string, "gravity", 1, true), why)
+				t.falsy((service:debug("tune", "ballSpeed", "fast")), "not a number")
+				t.truthy((service:debug("tune", "ballSpeed", 150)))
+				t.truthy((service:debug("tune", "ballDrop", 40)))
+				t.truthy((service:debug("tune", "fireInterval", 0.5)))
+				-- the match in play keeps its own
+				t.eq(kit.state().feel.ballSpeed, was.ballSpeed)
+				kit.walk(ada, -36, -2)
+				kit.run(0.2)
+				local old = ack(kit, ada, ada.fire(1, 0, 0))
+				t.truthy(old.ok)
+				kit.run(0.1)
+				t.deepEq({ bea.shots[#bea.shots].ball, bea.shots[#bea.shots].vx }, { old.ball, was.ballSpeed })
+				-- the next match is played with the new numbers, and everybody is told
+				t.truthy((service:debug("end")))
+				kit.run(1)
+				t.truthy(
+					kit.untilTrue(R.endCardSecs, function(): boolean
+						return service.match == 2
+					end),
+					"the service rolled on"
+				)
+				kit.run(0.6)
+				local feel = kit.state().feel
+				t.deepEq({ feel.ballSpeed, feel.ballDrop, feel.fireInterval }, { 150, 40, 0.5 })
+				t.eq(feel.reloadSecs, was.reloadSecs, "the rest as it was")
+				for _, c in { ada, bea } do
+					t.deepEq({ c.watch.match, c.watch.feel.ballSpeed, c.watch.feel.ballDrop }, { 2, 150, 40 })
+					t.deepEq({ c.extras.match, c.extras.feel.ballSpeed, c.extras.feel.fireInterval }, { 2, 150, 0.5 })
+				end
+				kit.live()
+				kit.walk(ada, -36, -2)
+				kit.run(0.2)
+				local first = ack(kit, ada, ada.fire(1, 0, 0))
+				t.truthy(first.ok)
+				-- a click a third of a second later was a shot with the old trigger, and is too fast for the new
+				kit.run(0.3)
+				local second = ack(kit, ada, ada.fire(1, 0, 0))
+				t.deepEq({ second.ok, second.why, second.rounds }, { false, "fast", R.magazine - 1 })
+				local born = bea.shots[#bea.shots]
+				t.deepEq({ born.ball, born.vx }, { first.ball, 150 })
+				-- and the ball comes down where the new speed and the new drop bring it
+				kit.run(1)
+				local splat = splatOf(bea, first.ball)
+				t.truthy(splat ~= nil, "the splat was sent")
+				-- (to the width of the chord a tick's flight is: a heavier ball bends more inside one tick)
+				t.near(splat.x, -36 + 150 * math.sqrt(Body.STAND_EYE / (40 / 2)), 0.05)
+				t.near(splat.y, 0, 1e-4)
+			end)
+		end
+	)
+
 	t.test("a crouched body behind a rail is not tagged by a ball 0.05 over it; standing, it is", function()
 		Kit.play(function(kit)
 			local ada, bea = people(kit, { "Ada", "Bea" })
