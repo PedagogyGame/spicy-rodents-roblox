@@ -247,7 +247,6 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 	end
 
 	-- THE CABINET (in the playfield's frame: its body is pitched with the playfield, the back legs are longer)
-	local body = Cabinet.BODY
 	local R = Cabinet.RAIL
 	local below = 0.85 -- the body's depth under the playfield
 	local G = Cabinet.GLASS_H
