@@ -418,6 +418,30 @@ return function(t)
 		end
 	)
 
+	-- SETTLED AT THE JOIN (the server lane's gap): Rules.result counts whoever is on the winning side at the end
+	-- as a winner, so after the first minute of live play nobody changes sides, out or not
+	t.test("a minute into live play, a tagged-out player may no longer change sides", function()
+		Kit.play(function(kit)
+			local ada = kit.client("Ada")
+			t.truthy((kit.join(ada)))
+			kit.run(0.3)
+			kit.live()
+			local state = kit.state()
+			local mine = teamOf(kit, ada)
+			local by = 0
+			for id, slot in state.slots do
+				if slot.on and slot.team ~= mine and by == 0 then
+					by = id
+				end
+			end
+			state.liveAt -= 61 -- (live play is a minute old)
+			t.truthy((kit.service:debug("tag", by, ada.seat)))
+			kit.run(0.1)
+			t.deepEq({ Rig.input(kit.w, ada.stub, Contract.STATION, "side", {}) }, { false, Contract.textFor("side") })
+			t.eq(teamOf(kit, ada), mine, "she stays on her side")
+		end, { realModel = true }) -- (the clock of live play is the real model's)
+	end)
+
 	t.test(
 		"a join during the end card is refused; the next match rolls on by itself with people on the sides they ended on",
 		function()

@@ -120,7 +120,9 @@
 --                         Clock.stamp(now, now, t, lastM, up)); Rules.reload(state, seat, m); false
 --                         with words when it does nothing.
 --                         "side" {}: honoured when the phase is "briefing" or the sender is tagged
---                         out, the sender has no ball in flight, and the other team has a bot (the
+--                         out in the first SIDE_LIVE (60) seconds of live play (later, a change would
+--                         make a winner of a loser on the end card), the sender has no ball in
+--                         flight, and the other team has a bot (the
 --                         lane's choice of which: one that is itself out, else one in its own spawn
 --                         room, else one in the fight; the lowest seat of the first kind there is):
 --                         Rules.assign the sender to the other team and that bot to
@@ -366,6 +368,9 @@ local R = Contract.Rules
 local T = Contract.TRUST
 local BIT = Wire.BIT
 local SIDE_EVERY = 3 -- seconds between two changes of side by one person (the header says why)
+-- seconds into live play after which nobody changes sides: Rules.result counts whoever is on the winning side at
+-- the end as a winner, so a late change would put a losing player on the end card as a winner
+local SIDE_LIVE = 60
 -- what debug("rewind", seconds) may set Clock.MAX_REWIND to (the pose history keeps Clock.HISTORY_SECS, a
 -- second, and a ball is judged at most MAX_REWIND + MAX_LATE back)
 local REWIND_MIN, REWIND_MAX = 0.1, 0.4
@@ -1324,7 +1329,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 				and slot.on
 				and not flying
 				and since >= SIDE_EVERY
-				and (state.phase == "briefing" or person.out)
+				and (state.phase == "briefing" or (person.out and now < state.liveAt + SIDE_LIVE))
 			then
 				local mine, other = slot.team, 3 - slot.team
 				local id = sideBot(state, other)
