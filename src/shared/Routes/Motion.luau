@@ -778,12 +778,25 @@ end
 
 -- Enclosed runs (Routes/Enclosure) -------------------------------------------------------------------------------
 
--- mouthOut(world, route, mouth): the unit vector pointing outside at a mouth: the record's `out`, else (at an end)
--- the route's own direction out of that end, level when it has any level part.
+-- mouthOut(world, route, mouth): the unit vector pointing outside at a mouth: the record's `out`; else, at an end, the
+-- heading of a "link" mouth's links[1] at its t (the bough it runs on to), else the route's own direction out of that
+-- end, level when it has any level part. Never the body's facing.
 function Motion.mouthOut(world: World, route: Route, mouth: Enclosure.Mouth): (number, number, number)
 	local out = mouth.out
 	if out then
 		return out.x, out.y, out.z
+	end
+	local first = mouth.links[1]
+	if mouth.opens == "link" and first then
+		local target = world.registry:get(first.route)
+		if target then
+			local tan = world.registry:tangentAt(target, math.clamp(first.t, 1e-4, 1 - 1e-4))
+			local x, z = tan.x * first.dir, tan.z * first.dir
+			local h = math.sqrt(x * x + z * z)
+			if h > Enclosure.C.minOutLevel then
+				return x / h, 0, z / h
+			end
+		end
 	end
 	local atStart = mouth.t < 0.5
 	local tan = world.registry:tangentAt(route, if atStart then 0 else 1)
@@ -795,6 +808,109 @@ function Motion.mouthOut(world: World, route: Route, mouth: Enclosure.Mouth): (n
 	end
 	local l = math.sqrt(x * x + y * y + z * z)
 	return x / l, y / l, z / l
+end
+
+-- outLevel(world, route, mouth): the mouth's `out` made level and unit, or nil when it does not lean out at least
+-- Enclosure.C.minOutLevel (a data error enclosureErrors reports; no launch is made from such a mouth).
+function Motion.outLevel(world: World, route: Route, mouth: Enclosure.Mouth): (number?, number?)
+	local ox, _, oz = Motion.mouthOut(world, route, mouth)
+	local h = math.sqrt(ox * ox + oz * oz)
+	if h < Enclosure.C.minOutLevel then
+		return nil, nil
+	end
+	return ox / h, oz / h
+end
+
+-- launchPoint(world, route, mouth): where a launch out of the mouth starts (Enclosure rule 3): the route's point at
+-- the mouth, out along `out` past the opening's face (`depth`) by Enclosure.C.clear. Never inside the shell.
+function Motion.launchPoint(world: World, route: Route, mouth: Enclosure.Mouth): Vec3
+	local p = world.registry:pointAt(route, mouth.t)
+	local ox, oy, oz = Motion.mouthOut(world, route, mouth)
+	local d = mouth.depth + Enclosure.C.clear
+	return Curve.vec3(p.x + ox * d, p.y + oy * d, p.z + oz * d)
+end
+
+-- the section's up by the default rule (world up squared to the line; on a stretch steeper than Enclosure.C.steep
+-- the last up it had, carried along from t = 0 in 0.2-stud slices), cached per route
+local sectionCache: { [Route]: { { number } } } = setmetatable({} :: any, { __mode = "k" }) :: any
+
+local function defaultUps(world: World, route: Route): { { number } }
+	local cached = sectionCache[route]
+	if cached then
+		return cached
+	end
+	local reg = world.registry
+	local n = math.max(1, math.ceil(route.length / 0.2))
+	local ups: { { number } } = {}
+	local px, py, pz = 0, 1, 0
+	for i = 0, n do
+		local t = i / n
+		local tan = reg:tangentAt(route, math.clamp(t, 1e-4, 1 - 1e-4))
+		local tl = math.max(math.sqrt(tan.x * tan.x + tan.y * tan.y + tan.z * tan.z), 1e-9)
+		local tx, ty, tz = tan.x / tl, tan.y / tl, tan.z / tl
+		local bx, by, bz = 0, 1, 0
+		if math.abs(ty) > Enclosure.C.steep then
+			bx, by, bz = px, py, pz
+		end
+		local k = bx * tx + by * ty + bz * tz
+		local ux, uy, uz = bx - k * tx, by - k * ty, bz - k * tz
+		local ul = math.sqrt(ux * ux + uy * uy + uz * uz)
+		if ul < 1e-6 then
+			ux, uy, uz, ul = px, py, pz, 1
+		end
+		px, py, pz = ux / ul, uy / ul, uz / ul
+		ups[i + 1] = { px, py, pz }
+	end
+	sectionCache[route] = ups
+	return ups
+end
+
+export type Section = {
+	tangent: Vec3, -- along the route (t increasing)
+	side: Vec3, -- across the section: tangent x up
+	up: Vec3, -- the body's back: headroom is measured along it; on a climb it points away from the wall
+	width: number,
+	headroom: number,
+	crawl: boolean,
+}
+
+-- section(world, route, t): the frame and clearance of an enclosed route at t (Enclosure: `up`, `upAt`, the default
+-- rule, width, height, crawl). For the drawn body (crouch where `crawl`; on a climb the belly faces -up), the camera
+-- and the clearance sweep. nil off an enclosed route.
+function Motion.section(world: World, route: Route, t: number): Section?
+	local spec = route.enclosure
+	if not spec then
+		return nil
+	end
+	local tan = world.registry:tangentAt(route, math.clamp(t, 1e-4, 1 - 1e-4))
+	local tl = math.max(math.sqrt(tan.x * tan.x + tan.y * tan.y + tan.z * tan.z), 1e-9)
+	local tx, ty, tz = tan.x / tl, tan.y / tl, tan.z / tl
+	local ux, uy, uz
+	local authored = Enclosure.upAt(spec, t)
+	if authored then
+		ux, uy, uz = authored.x, authored.y, authored.z
+	else
+		local ups = defaultUps(world, route)
+		local u = ups[math.clamp(math.floor(t * (#ups - 1) + 0.5) + 1, 1, #ups)]
+		ux, uy, uz = u[1], u[2], u[3]
+	end
+	local k = ux * tx + uy * ty + uz * tz
+	ux, uy, uz = ux - k * tx, uy - k * ty, uz - k * tz
+	local ul = math.sqrt(ux * ux + uy * uy + uz * uz)
+	if ul < 1e-6 then
+		ux, uy, uz, ul = 0, 1, 0, 1
+	end
+	ux, uy, uz = ux / ul, uy / ul, uz / ul
+	local sx, sy, sz = ty * uz - tz * uy, tz * ux - tx * uz, tx * uy - ty * ux
+	local headroom, crawl = Enclosure.headroom(spec, t)
+	return {
+		tangent = Curve.vec3(tx, ty, tz),
+		side = Curve.vec3(sx, sy, sz),
+		up = Curve.vec3(ux, uy, uz),
+		width = spec.width,
+		headroom = headroom,
+		crawl = crawl,
+	}
 end
 
 -- enclosed(world): does the registry hold any enclosed route? (cached)
@@ -847,51 +963,99 @@ function Motion.mouths(world: World): { MouthRef }
 	return list
 end
 
--- mouthEntry(world, x, y, z, moveX, moveZ): the way in for a body off the rails at (x, y, z) moving along
--- (moveX, moveZ) (Enclosure rule 1): the nearest mouth that opens ground, ledge or air, with the body within its
--- reach (level) and rise (height), not past it, and moving into it. nil when there is none.
-function Motion.mouthEntry(world: World, x: number, y: number, z: number, moveX: number, moveZ: number): EnterSpec?
-	local list = Motion.mouths(world)
-	if #list == 0 then
+-- does a body at (x, y, z) moving along (moveX, moveZ) get in at this mouth (Enclosure rule 1)? Returns the level
+-- distance to the mouth point, or nil.
+local function intoMouth(ref: MouthRef, x: number, y: number, z: number, moveX: number, moveZ: number): number?
+	local m = ref.mouth
+	if m.opens == "link" then
+		return nil
+	end
+	local dx, dz = x - ref.x, z - ref.z
+	local level = math.sqrt(dx * dx + dz * dz)
+	if level > m.reach or math.abs(y - ref.y) > m.rise then
 		return nil
 	end
 	local ml = math.sqrt(moveX * moveX + moveZ * moveZ)
 	if ml < 1e-6 then
 		return nil
 	end
+	local oh = math.sqrt(ref.ox * ref.ox + ref.oz * ref.oz)
+	if oh > 0.3 then
+		local ox, oz = ref.ox / oh, ref.oz / oh
+		-- on the outside of the mouth (or at most half a body past it) and moving in
+		if dx * ox + dz * oz < -Enclosure.C.behind then
+			return nil
+		end
+		if -(moveX * ox + moveZ * oz) / ml < Enclosure.C.intoDot then
+			return nil
+		end
+	end
+	return level
+end
+
+local function entrySpec(ref: MouthRef, x: number, y: number, z: number): EnterSpec
+	local d = math.sqrt((x - ref.x) ^ 2 + (y - ref.y) ^ 2 + (z - ref.z) ^ 2)
+	return { routeId = ref.routeId, t = ref.mouth.t, dir = if ref.inward ~= 0 then ref.inward else nil, d = d }
+end
+
+-- mouthEntry(world, x, y, z, moveX, moveZ): the way in for a body off the rails at (x, y, z) moving along
+-- (moveX, moveZ) (Enclosure rule 1): the nearest mouth that opens ground, ledge or air, with the body within its
+-- reach (level) and rise (height), not more than Enclosure.C.behind past it, and moving into it. nil when none.
+function Motion.mouthEntry(world: World, x: number, y: number, z: number, moveX: number, moveZ: number): EnterSpec?
+	local list = Motion.mouths(world)
+	if #list == 0 then
+		return nil
+	end
 	local best: MouthRef? = nil
 	local bestD = math.huge
 	for _, ref in list do
-		local m = ref.mouth
-		if m.opens == "link" then
-			continue
-		end
-		local dx, dz = x - ref.x, z - ref.z
-		local level = math.sqrt(dx * dx + dz * dz)
-		if level > m.reach or math.abs(y - ref.y) > m.rise then
-			continue
-		end
-		local oh = math.sqrt(ref.ox * ref.ox + ref.oz * ref.oz)
-		if oh > 0.3 then
-			local ox, oz = ref.ox / oh, ref.oz / oh
-			-- on the outside of the mouth (or a little past it) and moving in
-			if dx * ox + dz * oz < -Enclosure.C.behind then
-				continue
-			end
-			if -(moveX * ox + moveZ * oz) / ml < Enclosure.C.intoDot then
-				continue
-			end
-		end
-		if level < bestD then
+		local level = intoMouth(ref, x, y, z, moveX, moveZ)
+		if level and level < bestD then
 			best, bestD = ref, level
 		end
 	end
 	if not best then
 		return nil
 	end
-	local b = best :: MouthRef
-	local d = math.sqrt((x - b.x) ^ 2 + (y - b.y) ^ 2 + (z - b.z) ^ 2)
-	return { routeId = b.routeId, t = b.mouth.t, dir = if b.inward ~= 0 then b.inward else nil, d = d }
+	return entrySpec(best, x, y, z)
+end
+
+-- mouthEntrySwept(world, x0, y0, z0, x1, y1, z1, moveX, moveZ): as mouthEntry for a body that flew from the first
+-- point to the second in one substep (a leap or a pounce): the point of the segment nearest each mouth (level) is
+-- judged, so a fast flight through a mouth's disc is not missed. The enter spec is from the body's point now.
+function Motion.mouthEntrySwept(
+	world: World,
+	x0: number,
+	y0: number,
+	z0: number,
+	x1: number,
+	y1: number,
+	z1: number,
+	moveX: number,
+	moveZ: number
+): EnterSpec?
+	local list = Motion.mouths(world)
+	if #list == 0 then
+		return nil
+	end
+	local sx, sz = x1 - x0, z1 - z0
+	local ss = sx * sx + sz * sz
+	local best: MouthRef? = nil
+	local bestD = math.huge
+	for _, ref in list do
+		local f = 1
+		if ss > 1e-12 then
+			f = math.clamp(((ref.x - x0) * sx + (ref.z - z0) * sz) / ss, 0, 1)
+		end
+		local level = intoMouth(ref, x0 + sx * f, y0 + (y1 - y0) * f, z0 + sz * f, moveX, moveZ)
+		if level and level < bestD then
+			best, bestD = ref, level
+		end
+	end
+	if not best then
+		return nil
+	end
+	return entrySpec(best, x1, y1, z1)
 end
 
 -- openOnly(world): for nearestRoute off the rails: refuses every enclosed route (nil when the world has none, so
@@ -920,12 +1084,118 @@ function Motion.transferFilter(world: World, from: Route, fromT: number): ((rout
 	end
 end
 
+-- exitsAhead(world, route, t, dir): the authored ways off an enclosed route (Enclosure.exits: forks, part-way link
+-- mouths) that A/D may pick from here: within Enclosure.C.forkAhead studs ahead along `dir`, or within
+-- Enclosure.C.linkWindow behind. Empty off an enclosed route.
+function Motion.exitsAhead(_world: World, route: Route, t: number, dir: number): { Enclosure.Exit }
+	local spec = route.enclosure
+	local out: { Enclosure.Exit } = {}
+	if not spec then
+		return out
+	end
+	for _, e in Enclosure.exits(spec, route.length) do
+		local ahead = (e.t - t) * route.length * (if dir < 0 then -1 else 1)
+		if ahead <= Enclosure.C.forkAhead and ahead >= -Enclosure.C.linkWindow then
+			table.insert(out, e)
+		end
+	end
+	return out
+end
+
+-- exitOutward(world, route, e): the level direction from the exit's point on the route toward where it leads (the
+-- target's point, or the mouth's `out`, or the target's heading when the two nearly coincide): what A or D is
+-- judged against.
+function Motion.exitOutward(world: World, route: Route, e: Enclosure.Exit): (number, number)
+	local reg = world.registry
+	local p = reg:pointAt(route, e.t)
+	local target = reg:get(e.route)
+	if not target then
+		return 0, 0
+	end
+	local q = reg:pointAt(target, e.toT)
+	local dx, dz = q.x - p.x, q.z - p.z
+	local l = math.sqrt(dx * dx + dz * dz)
+	if l > 0.5 then
+		return dx / l, dz / l
+	end
+	local m = e.mouth
+	if m then
+		local o = m.out
+		if o then
+			local h = math.sqrt(o.x * o.x + o.z * o.z)
+			if h > 1e-6 then
+				return o.x / h, o.z / h
+			end
+		end
+	end
+	local tan = reg:tangentAt(target, math.clamp(e.toT, 1e-4, 1 - 1e-4))
+	local tx, tz = tan.x * e.dir, tan.z * e.dir
+	local tl = math.sqrt(tx * tx + tz * tz)
+	if tl > 1e-6 then
+		return tx / tl, tz / tl
+	end
+	return 0, 0
+end
+
+-- chooseExit(world, route, t, dir, cameraYaw, side, current): A/D on an enclosed route: the exit ahead on that side
+-- of the view (cycling on repeat, as chooseRouteJunction), or nil.
+function Motion.chooseExit(
+	world: World,
+	route: Route,
+	t: number,
+	dir: number,
+	cameraYaw: number,
+	side: number,
+	current: number?
+): Enclosure.Exit?
+	local rx, rz = Motion.cameraRightXZ(cameraYaw)
+	local choices: { { e: Enclosure.Exit, s: number } } = {}
+	for _, e in Motion.exitsAhead(world, route, t, dir) do
+		local ox, oz = Motion.exitOutward(world, route, e)
+		local s = side * (rx * ox + rz * oz)
+		if s > C.junctionSideMin then
+			table.insert(choices, { e = e, s = s })
+		end
+	end
+	if #choices == 0 then
+		return nil
+	end
+	table.sort(choices, function(a, b)
+		if a.s ~= b.s then
+			return a.s > b.s
+		end
+		return a.e.t < b.e.t
+	end)
+	local oldIndex = 0
+	for i, c in choices do
+		if c.e.route == current then
+			oldIndex = i
+			break
+		end
+	end
+	return (if oldIndex == 0 then choices[1] else choices[(oldIndex % #choices) + 1]).e
+end
+
 -- enclosureErrors(registry, known?): what the data of the registry's enclosed runs gets wrong that only the curves
--- show: a link (a mouth's or an end's) to a route that is not there (unless `known` lists it: a route of another
--- registry) or farther from where it is taken than a transfer reaches (C.enterMaxGap); a ground mouth whose
--- point is not at a route end (it is a door to walk out of). Empty when the data is sound. For the compilers.
+-- show: a link (a mouth's, an end's or a fork's) to a route that is not there (unless `known` lists it: a route of
+-- another registry) or farther from where it is taken than a transfer reaches (C.enterMaxGap); a mouth whose `out`
+-- (as resolved: Motion.mouthOut) does not lean out at least Enclosure.C.minOutLevel (a launch from it would have no
+-- heading: a vertical shaft's top needs an `out`); a ground mouth within C.walkInReach less its reach of a trunk the
+-- walk-in grab takes (that trunk would take the squirrel first). Empty when the data is sound. For the compilers.
 function Motion.enclosureErrors(registry: Registry.Registry, known: { [number]: boolean }?): { string }
 	local errs: { string } = {}
+	local world = { registry = registry } :: any
+	local feet: { TrunkFoot } = {}
+	local trunks: { Route } = {}
+	for _, r in registry:all() do
+		if r.kind == "trunk" then
+			table.insert(trunks, r)
+			if not r.flags.autoGrabExcluded then
+				local f = registry:foot(r)
+				table.insert(feet, { id = r.id, x = f.x, y = f.y, z = f.z, isPole = r.flags.isPole })
+			end
+		end
+	end
 	for _, route in registry:all() do
 		local spec = route.enclosure
 		if not spec then
@@ -954,9 +1224,57 @@ function Motion.enclosureErrors(registry: Registry.Registry, known: { [number]: 
 		if spec.atEnd then
 			check(1, spec.atEnd, "atEnd")
 		end
+		for i, f in spec.forks do
+			check(f.t, { route = f.route, t = f.toT, dir = f.dir }, `fork {i}`)
+		end
 		for i, m in spec.mouths do
 			for _, l in m.links do
 				check(m.t, l, `mouth {i}`)
+			end
+			local ox, _, oz = Motion.mouthOut(world, route, m)
+			if math.sqrt(ox * ox + oz * oz) < Enclosure.C.minOutLevel then
+				table.insert(
+					errs,
+					`route {route.id}: mouth {i} has no level way out (give it an out that leans out at least {Enclosure.C.minOutLevel})`
+				)
+			end
+			-- a launch must start outside the bark of any trunk the mouth is cut in (its `depth`)
+			local lp = Motion.launchPoint(world, route, m)
+			for _, trunk in trunks do
+				local a, b = registry:pointAt(trunk, 0), registry:pointAt(trunk, 1)
+				if lp.y < math.min(a.y, b.y) or lp.y > math.max(a.y, b.y) then
+					continue
+				end
+				local lo, hi = 0, 1
+				local rising = b.y >= a.y
+				for _ = 1, 30 do
+					local mid = (lo + hi) / 2
+					if (registry:pointAt(trunk, mid).y < lp.y) == rising then
+						lo = mid
+					else
+						hi = mid
+					end
+				end
+				local q = registry:pointAt(trunk, (lo + hi) / 2)
+				local d = math.sqrt((lp.x - q.x) ^ 2 + (lp.z - q.z) ^ 2)
+				if d < trunk.surfaceRadius then
+					table.insert(
+						errs,
+						`route {route.id}: mouth {i}'s launch point is {d} studs from trunk {trunk.id}'s axis, inside its bark ({trunk.surfaceRadius}): give the mouth a depth`
+					)
+				end
+			end
+			if m.opens == "ground" then
+				local p = registry:pointAt(route, m.t)
+				for _, foot in feet do
+					local d = math.sqrt((p.x - foot.x) ^ 2 + (p.z - foot.z) ^ 2)
+					if d < C.walkInReach - m.reach and math.abs(p.y - foot.y) <= C.maxRise then
+						table.insert(
+							errs,
+							`route {route.id}: ground mouth {i} is {d} studs from trunk {foot.id}'s foot, inside its walk-in grab: put it at least {C.walkInReach - m.reach} out`
+						)
+					end
+				end
 			end
 		end
 	end

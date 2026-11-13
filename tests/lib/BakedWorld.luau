@@ -835,21 +835,10 @@ function BakedWorld.alleyRecord(place: AlleyLayout.Place, r: { [string]: any }):
 	rec.sampleCount = Curve.sampleSteps(length / 2.5) + 1
 	rec.origin = rec.origin or "attraction"
 	rec.speedMult = 1
-	if r.enclosure and r.enclosure.mouths then
-		local e = table.clone(r.enclosure)
-		local mouths = {}
-		for _, m in r.enclosure.mouths do
-			local wm = table.clone(m)
-			if m.out then
-				local x0, y0, z0 = AlleyLayout.toWorld(place, 0, 0, 0)
-				local x1, y1, z1 = AlleyLayout.toWorld(place, m.out[1], m.out[2], m.out[3])
-				local l = math.sqrt((x1 - x0) ^ 2 + (y1 - y0) ^ 2 + (z1 - z0) ^ 2)
-				wm.out = { (x1 - x0) / l, (y1 - y0) / l, (z1 - z0) / l }
-			end
-			table.insert(mouths, wm)
-		end
-		e.mouths = mouths
-		rec.enclosure = e
+	if r.enclosure then
+		-- the compiler's own turn of `out`, `up`, `upAt` and `cavity` (tools/compile/lib/Attractions)
+		local Compile = require("../../tools/compile/lib/Attractions") :: any
+		rec.enclosure = Compile.worldEnclosure(place, r.enclosure)
 	end
 	return rec :: any
 end

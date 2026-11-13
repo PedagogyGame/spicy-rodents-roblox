@@ -45,6 +45,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -58,7 +61,7 @@ return {
 						isPole = false,
 						treeTravel = false,
 					},
-					note = "The ball return as one enclosed run (Shared/Routes/Enclosure): in at the bent grille in the alley wall (a ground mouth: walk in heading into it), under the back of house, the pit and the whole lane, up the ball lift inside the hood, and out with the head in the hood's mouth over the rack (a ledge mouth: Space or a click jumps out toward the bowler, Q drops onto the rack, S goes back); running back out of the grille steps onto the alley on its feet. A crawl under the pits. The ball rolls home along the same curve (Server/Attractions/AttractionService).",
+					note = "The ball return as one enclosed run (Shared/Routes/Enclosure): in at the bent grille in the alley wall (a ground mouth: walk in heading into it), under the back of house, the pit and the whole lane, up the ball lift inside the hood, and out with the head in the hood's mouth over the rack (a ledge mouth, its face 0.1 out: Space or a click is a short hop out onto the rack by the bowler, Q drops onto the rack, S or a view turned round goes back); running back out of the grille steps onto the alley on its feet. A crawl under the pits. The ball rolls home along the same curve (Server/Attractions/AttractionService).",
 					pair = 1,
 					points = {
 						{ -12.4, -3.48, 83 },
@@ -105,6 +108,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -118,7 +124,7 @@ return {
 						isPole = false,
 						treeTravel = false,
 					},
-					note = "The ball return as one enclosed run (Shared/Routes/Enclosure): in at the bent grille in the alley wall (a ground mouth: walk in heading into it), under the back of house, the pit and the whole lane, up the ball lift inside the hood, and out with the head in the hood's mouth over the rack (a ledge mouth: Space or a click jumps out toward the bowler, Q drops onto the rack, S goes back); running back out of the grille steps onto the alley on its feet. A crawl under the pits. The ball rolls home along the same curve (Server/Attractions/AttractionService).",
+					note = "The ball return as one enclosed run (Shared/Routes/Enclosure): in at the bent grille in the alley wall (a ground mouth: walk in heading into it), under the back of house, the pit and the whole lane, up the ball lift inside the hood, and out with the head in the hood's mouth over the rack (a ledge mouth, its face 0.1 out: Space or a click is a short hop out onto the rack by the bowler, Q drops onto the rack, S or a view turned round goes back); running back out of the grille steps onto the alley on its feet. A crawl under the pits. The ball rolls home along the same curve (Server/Attractions/AttractionService).",
 					pair = 2,
 					points = {
 						{ 0, -3.48, 83 },
@@ -165,6 +171,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -178,7 +187,7 @@ return {
 						isPole = false,
 						treeTravel = false,
 					},
-					note = "The ball return as one enclosed run (Shared/Routes/Enclosure): in at the bent grille in the alley wall (a ground mouth: walk in heading into it), under the back of house, the pit and the whole lane, up the ball lift inside the hood, and out with the head in the hood's mouth over the rack (a ledge mouth: Space or a click jumps out toward the bowler, Q drops onto the rack, S goes back); running back out of the grille steps onto the alley on its feet. A crawl under the pits. The ball rolls home along the same curve (Server/Attractions/AttractionService).",
+					note = "The ball return as one enclosed run (Shared/Routes/Enclosure): in at the bent grille in the alley wall (a ground mouth: walk in heading into it), under the back of house, the pit and the whole lane, up the ball lift inside the hood, and out with the head in the hood's mouth over the rack (a ledge mouth, its face 0.1 out: Space or a click is a short hop out onto the rack by the bowler, Q drops onto the rack, S or a view turned round goes back); running back out of the grille steps onto the alley on its feet. A crawl under the pits. The ball rolls home along the same curve (Server/Attractions/AttractionService).",
 					pair = 3,
 					points = {
 						{ 12.4, -3.48, 83 },
@@ -230,6 +239,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -294,6 +306,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -358,6 +373,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
