@@ -513,4 +513,234 @@ return function(t)
 			t.eq(a.x, 11)
 		end)
 	end)
+	t.test(
+		"a full cabin gets out on four spots of its own, one per seat, facing away from the cabin (review)",
+		function()
+			-- the review found all four riders of a cabin put on one spot at arrival (and the base's in its wall)
+			FakeEngine.with(function()
+				for _, station in SkyLift.STATIONS do
+					local other = if station == "base" then "summit" else "base"
+					local w = world({ start = 0 })
+					local riders = {}
+					for k = 1, SkyLift.SEATS do
+						local p = SkyLiftFlow.player(w, `Rider{k}`, "human", SkyLiftFlow.atGate(w, station))
+						local ok = w.svc:press(p, station)
+						t.eq(ok, true)
+						table.insert(riders, p)
+					end
+					local first = w.svc.waiters[riders[1]]
+					for _, p in riders do
+						t.eq(w.svc.waiters[p].cabin, first.cabin, "four to a cabin")
+					end
+					local arriveAt = first.arriveAt
+					while w.svc:time() < arriveAt + 0.5 do
+						SkyLiftFlow.step(w, 0.1)
+					end
+					local spots = {}
+					for _, p in riders do
+						t.eq(w.svc:busy(p), nil)
+						local seat = lastOf(p, "deviceGranted").value.seat
+						local x, y, z, yaw = SkyLift.alightSpot(other, seat)
+						local cf = p.body:GetPivot()
+						t.near(cf.Position.X, x, 1e-3, `{station} seat {seat} x`)
+						t.near(cf.Position.Z, z, 1e-3, `{station} seat {seat} z`)
+						t.near(cf.Position.Y, y + 3, 1e-3, `{station} seat {seat} stands on the platform`)
+						local look = cf.LookVector
+						t.near(look.X, -math.sin(yaw), 1e-3)
+						t.near(look.Z, -math.cos(yaw), 1e-3)
+						table.insert(spots, cf.Position)
+					end
+					for a = 1, #spots do
+						for b = a + 1, #spots do
+							local d = (spots[a] - spots[b]).Magnitude
+							t.truthy(d >= 1.2, `{station}: riders {a} and {b} put {d} apart`)
+						end
+					end
+				end
+			end)
+		end
+	)
+
+	t.test("stepping into the opening while a cabin stands there seats you at once; a full one says so", function()
+		-- the review: a child walks into the open cabin instead of pressing E. Standing at the opening (in front of
+		-- the shut screen) is enough: when the cabin comes and the leaves slide open, you are seated, no E
+		FakeEngine.with(function()
+			for _, station in SkyLift.STATIONS do
+				local st = (SkyLift.stations() :: any)[station]
+				local w = world({ start = 0 })
+				local at = roblox.CFrame.new(st.board.x, st.platformY + 3, st.board.z)
+				local p = SkyLiftFlow.player(w, "Kid", "human", at)
+				t.truthy(SkyLiftService.inOpening(station, at.Position))
+				-- the first window: from OPEN_LEAD before a board time
+				local b = SkyLiftService.window(station, w.svc:time())
+				while w.svc:time() < b - SkyLiftService.OPEN_LEAD - 0.3 do
+					SkyLiftFlow.step(w, 0.1)
+				end
+				t.eq(w.svc:busy(p), nil, `{station}: seated before the leaves opened`)
+				SkyLiftFlow.step(w, 0.5)
+				t.eq(w.svc:busy(p), "riding", `{station}: standing in the open doorway did not seat the kid`)
+				local g = lastOf(p, "deviceGranted")
+				t.truthy(g ~= nil and g.value.device == "ride", `{station}: no grant`)
+				t.truthy(w.svc:time() < b, `{station}: seated only at the board time`)
+				-- the cabin it went into is the one at the door
+				local _, _, _, _, phase, open = SkyLift.cabin(g.value.cabin, w.svc:time())
+				t.truthy(open and phase == station, `{station}: seated into a cabin with its doors shut`)
+
+				-- a full cabin: four booked already, the fifth steps in and is told, then rides the next
+				local w2 = world({ start = 0 })
+				local b2 = SkyLiftService.window(station, w2.svc:time())
+				local four = {}
+				for k = 1, SkyLift.SEATS do
+					local q = SkyLiftFlow.player(w2, `Early{k}`, "human", SkyLiftFlow.atGate(w2, station))
+					w2.svc:press(q, station)
+					table.insert(four, q)
+				end
+				t.eq(math.abs(w2.svc.waiters[four[1]].boardAt - b2) < 0.05, true)
+				local fifth = SkyLiftFlow.player(w2, "Fifth", "human", at)
+				while w2.svc:time() < b2 do
+					SkyLiftFlow.step(w2, 0.1)
+				end
+				t.eq(w2.svc:busy(fifth), "waiting", `{station}: the fifth was not put on the next cabin`)
+				local n = lastOf(fifth, "notice")
+				t.truthy(n ~= nil and string.find(n.text, "That cabin is full", 1, true) ~= nil, `{station}: no words`)
+				-- told once for this cabin, not every step
+				local told = 0
+				for _, e in fifth.events do
+					if e.kind == "notice" and string.find(e.text, "That cabin is full", 1, true) then
+						told += 1
+					end
+				end
+				t.eq(told, 1)
+				for _, q in four do
+					t.eq(w2.svc:busy(q), "riding")
+				end
+			end
+		end)
+	end)
+
+	t.test(
+		"a late friend joins the cabin in front of them while its doors are still open (grace to the doors)",
+		function()
+			-- the review: pressing E two seconds after the board time, with the doors open and a friend sitting in
+			-- the cabin, booked the next one 25.6 s later
+			FakeEngine.with(function()
+				for _, station in SkyLift.STATIONS do
+					local st = (SkyLift.stations() :: any)[station]
+					local w = world({ start = 0 })
+					local _, b = SkyLift.nextDeparture(station, 0)
+					local friend = SkyLiftFlow.player(w, "Friend", "human", SkyLiftFlow.atGate(w, station))
+					w.svc:press(friend, station)
+					while w.svc:time() < b + 2 do
+						SkyLiftFlow.step(w, 0.1)
+					end
+					t.eq(w.svc:busy(friend), "riding")
+					local late = SkyLiftFlow.player(w, "Late", "human", SkyLiftFlow.atGate(w, station))
+					local ok, text = w.svc:press(late, station)
+					t.eq(ok, true)
+					t.eq(text, SkyLiftService.WORDS.now)
+					SkyLiftFlow.step(w, 0.1)
+					t.eq(w.svc:busy(late), "riding", `{station}: the late friend was not seated`)
+					t.eq(
+						lastOf(late, "deviceGranted").value.cabin,
+						lastOf(friend, "deviceGranted").value.cabin,
+						`{station}: not in the friend's cabin`
+					)
+					-- after the doors close it is the next cabin
+					local close = b + (st.doorsCloseSigma - st.boardSigma) % SkyLift.period()
+					while w.svc:time() < close + 0.2 do
+						SkyLiftFlow.step(w, 0.1)
+					end
+					local later = SkyLiftFlow.player(w, "Later", "human", SkyLiftFlow.atGate(w, station))
+					local ok2, text2 = w.svc:press(later, station)
+					t.eq(ok2, true)
+					t.truthy(string.find(text2 or "", "Next cabin in", 1, true) ~= nil, `{station}: {text2}`)
+				end
+			end)
+		end
+	)
+
+	t.test(
+		"the board says NOW BOARDING only for the cabin at the door, counts down otherwise, and says FULL",
+		function()
+			FakeEngine.with(function()
+				for _, station in SkyLift.STATIONS do
+					local w = world({ start = 0 })
+					local P = SkyLift.period() / SkyLift.CABINS
+					for k = 0, math.ceil(2 * P / 0.25) do
+						local tq = k * 0.25
+						local text = SkyLiftService.boardText(w.svc, station, tq)
+						local _, nb = SkyLift.nextDeparture(station, tq)
+						local b = SkyLiftService.window(station, tq)
+						if text == "NOW BOARDING" then
+							t.truthy(
+								tq >= b - SkyLiftService.BOARDING_SHOW,
+								`{station}: boarding shown {b - tq} s early`
+							)
+						else
+							t.eq(text, `NEXT CABIN {math.max(0, math.ceil(nb - tq))} s`)
+						end
+					end
+					-- a full next cabin
+					local _, nb = SkyLift.nextDeparture(station, 0)
+					local tq = nb - SkyLiftService.BOARDING_SHOW - 3
+					if tq > 0 then
+						w.clock = 1000 + tq
+						for k = 1, SkyLift.SEATS do
+							local q = SkyLiftFlow.player(w, `Q{k}`, "human", SkyLiftFlow.atGate(w, station))
+							w.svc:press(q, station)
+						end
+						t.eq(SkyLiftService.boardText(w.svc, station, tq), "NEXT CABIN FULL")
+					end
+				end
+			end)
+		end
+	)
+
+	t.test("the platform screen's leaves slide open only while a cabin stands at the opening, then shut", function()
+		FakeEngine.with(function()
+			local root = bakedRoot()
+			for _, station in SkyLift.STATIONS do
+				local st = (SkyLift.stations() :: any)[station]
+				for i, dir in { -1, 1 } do
+					local leaf = FakeEngine.part(
+						`ScreenDoor{i}`,
+						roblox.CFrame.new(st.board.x + dir, st.platformY + 3.5, st.board.z),
+						root
+					)
+					leaf:SetAttribute("ScreenDoor", station)
+					leaf:SetAttribute("Slide", roblox.Vector3.new(dir * 1.9, 0, 0))
+				end
+			end
+			local w = world({ root = root, start = 0 })
+			for _, station in SkyLift.STATIONS do
+				t.eq(#w.svc.gates[station].leaves, 2)
+			end
+			local sawOpen, sawShut = { base = false, summit = false }, { base = false, summit = false }
+			for _ = 1, math.ceil(SkyLift.period() / 0.1) do
+				SkyLiftFlow.step(w, 0.1)
+				for _, station in SkyLift.STATIONS do
+					local gate = w.svc.gates[station]
+					local leaf = gate.leaves[1]
+					local moved = (leaf.part.CFrame.Position - leaf.home.Position).Magnitude
+					if moved > 1e-3 then
+						-- never open (even a little) unless a cabin stands in this station with its doors open
+						local any = false
+						for c = 1, SkyLift.CABINS do
+							local _, _, _, _, phase, doors = SkyLift.cabin(c, w.svc:time())
+							any = any or (doors and phase == station)
+						end
+						t.truthy(any, `{station}: the leaves open with no open cabin in the station`)
+						if moved > 1.8 then
+							sawOpen[station] = true
+						end
+					elseif moved < 1e-6 then
+						sawShut[station] = true
+					end
+				end
+			end
+			for _, station in SkyLift.STATIONS do
+				t.truthy(sawOpen[station] and sawShut[station], `{station}: the leaves never opened and shut`)
+			end
+		end)
+	end)
 end

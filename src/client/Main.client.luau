@@ -152,6 +152,14 @@ local okSL, errSL = pcall(SkyLiftView.start)
 if not okSL then
 	warn(`Client: SkyLiftView failed: {errSL}`)
 end
+-- the wait for a booked cabin, counted down on the HUD (the usual HUD back once seated or given up)
+pcall(SkyLiftView.watchWait, function(title: string?, hint: string?)
+	if title then
+		hud.set(title, hint or "")
+	else
+		client.refreshCamera()
+	end
+end)
 pcall(Telescope.start, {
 	hud = function(title: string?, hint: string?)
 		if title then

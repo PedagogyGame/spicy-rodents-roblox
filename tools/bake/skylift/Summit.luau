@@ -7,6 +7,9 @@
 --     platform's front end steps down to the hall floor by the terrace (D -25..-22), the only way on or off;
 --   the self-service gate across the boarding platform (BoardGate: Gate = "board", Station = "summit";
 --     BoardGateArm; NextCabinBoard with a TextLabel "Next"), "DOWN TO TOWN" and "WELCOME TO THE LOOKOUT" signs;
+--   platform screens: full-height collidable glass along both pit edges and behind the bullwheel, from the hall
+--     floor, with one OPENING at the board point closed by two sliding leaves ("ScreenDoor1/2": ScreenDoor =
+--     "summit", Slide = the open offset; the server slides them while a cabin stands there);
 --   the bullwheel (its underside clear of the grips), hub and gearbox on two steel gantries that stand on the
 --     platforms (the hall canopy carries nothing of the lift), guide rails along both strands, the haul rope
 --     round the bullwheel and out to the lip, pendant lamps, rails on the open side, yellow edge lines;
@@ -23,6 +26,7 @@ local Summit = {}
 
 Summit.BUDGET = 120
 Summit.TOP = 16.4
+Summit.OPENING = 4 -- the platform screen's opening at the board point
 
 local PLAT = SkyLift.PLATFORM_HEIGHT
 
@@ -96,6 +100,62 @@ function Summit.build(kit: Kit.Kit, parent: any, v: any): any
 		"SmoothPlastic",
 		line
 	)
+
+	-- the platform screens (as at the base): full-height collidable glass along both pit edges and behind the
+	-- bullwheel, down to the hall floor and out to the hall's front, so the pit can only be reached through the
+	-- opening at the board point; its two leaves (ScreenDoor = "summit", Slide) are slid open by the server while
+	-- a cabin stands there
+	local SCREEN_TOP = PLAT + 7.2
+	-- (measured with sweptClear grown by 0.25: the cabins swing out to X -44.2 and -25.8 round the bullwheel, to
+	-- D 20.9 behind it, and to X -44.9 where they leave the hall's front)
+	local XB0, XB1 = -44.5, -44.36 -- board side
+	local XA0, XA1 = -25.72, -25.58 -- alight side
+	local DW0, DW1 = 21.2, 21.34 -- behind the bullwheel
+	local BOARD_FROM = -24.5 -- the board side's screen starts here (0.5 short of the front: no one fits through)
+	local glassScreen = { transparency = 0.7, reflectance = 0.15 }
+	local bd = 5
+	for _, a in v.anchors do
+		if a.id == "board_down" then
+			bd = a.at[3]
+		end
+	end
+	local OPEN = Summit.OPENING
+	local o0, o1 = bd - OPEN / 2, bd + OPEN / 2
+	for _, seg in { { BOARD_FROM, o0 - 0.15 }, { o1 + 0.15, DW1 } } do
+		kit:box(fit, "ScreenBoard", XB0, XB1, 0, SCREEN_TOP, seg[1], seg[2], Common.GLASS, "Glass", glassScreen)
+	end
+	kit:box(fit, "ScreenAlight", XA0, XA1, 0, SCREEN_TOP, FRONT, DW1, Common.GLASS, "Glass", glassScreen)
+	kit:box(fit, "ScreenBack", XB1, XA0, 0, SCREEN_TOP, DW0, DW1, Common.GLASS, "Glass", glassScreen)
+	for _, r in
+		{
+			{ XB0 - 0.05, XB1 + 0.05, BOARD_FROM, DW1 },
+			{ XA0 - 0.05, XA1 + 0.05, FRONT, DW1 },
+			{ XB1, XA0, DW0 - 0.05, DW1 + 0.05 },
+		}
+	do
+		kit:box(fit, "ScreenHead", r[1], r[2], SCREEN_TOP, SCREEN_TOP + 0.3, r[3], r[4], Common.FRAME, "Metal")
+	end
+	for _, d in { o0 - 0.15, o1 } do
+		kit:box(fit, "ScreenJamb", XB0 - 0.08, XB1 + 0.02, PLAT, SCREEN_TOP, d, d + 0.15, Common.RED, "Metal")
+	end
+	for i, l in { { o0, bd, -1 }, { bd, o1, 1 } } do
+		local leaf = kit:box(
+			fit,
+			`ScreenDoor{i}`,
+			XB0 - 0.17,
+			XB0 - 0.05,
+			PLAT,
+			SCREEN_TOP - 0.1,
+			l[1],
+			l[2],
+			Common.GLASS,
+			"Glass",
+			{ transparency = 0.5, reflectance = 0.15 }
+		)
+		local open = kit:cf(0, 0, l[3] * (OPEN / 2 - 0.1)).Position - kit:cf(0, 0, 0).Position
+		leaf:SetAttribute("ScreenDoor", "summit")
+		leaf:SetAttribute("Slide", open)
+	end
 
 	-- rails along the hall's open side and across the boarding platform's front end
 	local railH = 3.4

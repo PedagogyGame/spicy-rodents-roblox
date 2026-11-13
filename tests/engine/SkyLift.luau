@@ -110,6 +110,15 @@ function SkyLiftFlow.stubTown(w: World): any
 		standOffset = function(_body: any): number
 			return 3
 		end,
+		players = function(): { any }
+			local out = {}
+			for _, p in w.players do
+				if not p.gone then
+					table.insert(out, p)
+				end
+			end
+			return out
+		end,
 	}
 end
 
@@ -247,9 +256,10 @@ local function rideOnce(w: World, check: (any, string) -> boolean, station: stri
 	check(n ~= nil and n.text == words, `{station}: arrival words were "{n and n.text}"`)
 	local st = SkyLift.stations()[other]
 	local pos = p.body:GetPivot().Position
-	local dAlight = math.sqrt((pos.X - st.alight.x) ^ 2 + (pos.Z - st.alight.z) ^ 2)
+	local sx, _, sz = SkyLift.alightSpot(other, seat)
+	local dAlight = math.sqrt((pos.X - sx) ^ 2 + (pos.Z - sz) ^ 2)
 	numbers.fromAlight = dAlight
-	check(math.abs(dAlight - w.Service.STEP_BACK) < 0.3, `{station}: stood {dAlight} from the alight point`)
+	check(dAlight < 0.3, `{station}: stood {dAlight} from seat {seat}'s spot on the platform`)
 	check(math.abs(pos.Y - (st.platformY + 3)) < 0.1, `{station}: not standing on the platform ({pos.Y})`)
 	check(p.body.PrimaryPart.Anchored == false, `{station}: root still anchored after the ride`)
 	check(p.body:GetAttribute("Ride") == nil and p.attrs.OnRide == nil, `{station}: ride attributes left behind`)
@@ -371,8 +381,9 @@ function SkyLiftFlow.play(Service: any, makeBody: (name: string, cf: CFrame) -> 
 			check(freed ~= nil, "the left body was never handed to its brain")
 			if freed then
 				local st = SkyLift.stations().summit
-				local d = math.sqrt((freed[1] - st.alight.x) ^ 2 + (freed[3] - st.alight.z) ^ 2)
-				check(math.abs(d - Service.STEP_BACK) < 0.3, `the left body was freed {d} from the alight point`)
+				local sx, _, sz = SkyLift.alightSpot("summit", b.seat)
+				local d = math.sqrt((freed[1] - sx) ^ 2 + (freed[3] - sz) ^ 2)
+				check(d < 0.3, `the left body was freed {d} from its seat's spot`)
 				check(math.abs(freed[2] - st.platformY) < 0.01, "the left body was freed off the platform")
 				check(math.abs(freed[5] - 1000 - arriveAt) <= 0.2, "the left body was freed at the wrong time")
 				numbers.orphanFreedAt = freed[5] - 1000 - arriveAt

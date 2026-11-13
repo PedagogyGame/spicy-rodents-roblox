@@ -18,9 +18,9 @@
 --     client re-places every body with a Ride attribute onto its own drawing of the cabin before each frame); the
 --     player gets DeviceGranted { device = "ride", kind = "gondola", ... } (first person on boarding; V still
 --     toggles: Client/Camera/CameraPolicy) and the player attribute OnRide = "sky_lift".
---   * At arriveAt the body stands STEP_BACK studs back from the far platform's alight point facing away from the
---     cabin, its root unanchored and handed back to its player, DeviceReleased("ride_end"), and the notice
---     "Welcome to the Lookout" or "Back in town".
+--   * At arriveAt the body stands on its seat's own spot of the far platform (SkyLift.alightSpot: four spots,
+--     apart from each other and clear of the walls) facing away from the cabin, its root unanchored and handed
+--     back to its player, DeviceReleased("ride_end"), and the notice "Welcome to the Lookout" or "Back in town".
 --   * A rider whose player leaves (or takes another body) mid-ride: the body is held (Town.hold: its brain stays
 --     suspended and the service keeps placing it on its seat) until the far platform, where it is handed to its
 --     brain standing on the platform. Never dropped in mid-air, never woken in a cabin.
@@ -60,10 +60,17 @@ SkyLiftService.__index = SkyLiftService
 SkyLiftService.FOLDER = "SkyLiftService" -- the service's own parts (gate posts, seats, lunches) under opts.parent
 SkyLiftService.WANDER = 14 -- studs from the gate before a waiting player's place is given up
 SkyLiftService.PROMPT_DISTANCE = 8
-SkyLiftService.BOARD_GRACE = 1.5 -- a cabin that passed the board point this recently can still be boarded
+SkyLiftService.BOARD_GRACE = 0.3 -- a booking stands until this long before the cabin's doors close (boardGrace)
+SkyLiftService.OPEN_LEAD = 1.5 -- the platform screen's leaves open this long before a cabin's board time
+SkyLiftService.CLOSE_LEAD = 0.8 -- ... and start to close this long before its doors do
+SkyLiftService.LEAF_RATE = 1.25 -- of the leaves' travel a second
+SkyLiftService.BOARDING_SHOW = 4 -- the board says NOW BOARDING from this long before the board time
+SkyLiftService.OPENING = 4 -- the platform screen's opening (tools/bake/skylift Station.OPENING, Summit.OPENING)
 SkyLiftService.MISSED = 3 -- a booking this far behind the clock (a server hitch) is moved to the next cabin
-SkyLiftService.ROOT_ABOVE_SEAT = SkyLift.EYE_ABOVE_SEAT - 1.5 -- a seated R15's root over the seat's top
-SkyLiftService.STEP_BACK = 3 -- studs from the alight point (beside the door) back onto the platform
+-- a seated R15's root over the seat's top: the one number the client draws riders with too
+-- (Client/Rides/SkyLiftView.SIT_ROOT = Client/Animation/AnimationDriver.SIT_SEAT; a spec keeps them equal)
+SkyLiftService.ROOT_ABOVE_SEAT = 1.35
+SkyLiftService.STEP_BACK = 3 -- (no bake) the gate post stands this far back from the board point
 SkyLiftService.LUNCH_CENTS = 10 -- the hilltop lunch, once a wallet exists (EconomyRules.PRICES.hilltop_lunch)
 SkyLiftService.LUNCH_SECS = 240 -- a served lunch clears itself after this long
 SkyLiftService.TELESCOPE_FOV = 15 -- degrees
@@ -81,6 +88,7 @@ SkyLiftService.WORDS = table.freeze({
 	upAction = "Ride the sky lift to the Lookout",
 	downAction = "Ride the sky lift down to town",
 	gateObject = "SKY LIFT (free)",
+	fullCabin = "That cabin is full: yours is the next one, in %d s",
 	telescopeAction = "Look through the telescope",
 	telescopeObject = "Free telescope",
 	counterAction = "Order the hilltop lunch",
@@ -136,6 +144,7 @@ export type Town = {
 	hold: (body: any) -> Hold?, -- the player let go of this body mid-ride: keep its brain asleep
 	standOffset: ((body: any) -> number)?, -- pivot height over the floor when standing (default 3)
 	charge: ((player: any, cents: number, why: string) -> (boolean, string?))?, -- nil: lunch is on the house
+	players: (() -> { any })?, -- everyone in the game (stepping into an open cabin seats them); nil: nobody
 	giveBack: ((player: any, body: any) -> ())?, -- hand the root's network ownership back (engine default)
 }
 -- Boot/Game's own objects, from which gameTown builds a Town
@@ -201,6 +210,9 @@ type Gate = {
 	labels: { any },
 	text: string?,
 	open: boolean,
+	leaves: { { part: any, home: CFrame, slide: Vector3 } }, -- the platform screen's leaves at the opening
+	leafFrac: number,
+	told: { [any]: number }, -- player -> the board time they were last told it was full
 }
 type Lunch = { player: any, table: string, spot: number, model: any, until_: number }
 
@@ -413,6 +425,9 @@ function SkyLiftService.new(opts: Opts): any
 			labels = {},
 			text = nil,
 			open = false,
+			leaves = {},
+			leafFrac = 0,
+			told = {},
 		}
 		if pillar then
 			local holder = (pillar :: any).Parent
@@ -438,6 +453,19 @@ function SkyLiftService.new(opts: Opts): any
 			end
 		end
 		self.gates[station] = gate
+	end
+	-- the platform screens' leaves (ScreenDoor = station, Slide = their open offset in world studs)
+	if root then
+		for _, d in (root :: Instance):GetDescendants() do
+			local st = if d:IsA("BasePart") then d:GetAttribute("ScreenDoor") else nil
+			local slide = d:GetAttribute("Slide")
+			if (st == "base" or st == "summit") and typeof(slide) == "Vector3" then
+				table.insert(
+					self.gates[st :: string].leaves,
+					{ part = d, home = (d :: any).CFrame, slide = slide :: Vector3 }
+				)
+			end
+		end
 	end
 
 	-- the Lookout: telescope and counter posts, from the venue's anchors
@@ -603,13 +631,35 @@ function SkyLiftService._free(self: any, key: string, seat: number)
 	end
 end
 
+-- How long after a cabin's board time a booking for it still stands: until just before its doors close (a friend
+-- who presses E while the doors are still open joins the cabin in front of them).
+function SkyLiftService.boardGrace(station: string): number
+	local st = (SkyLift.stations() :: any)[station]
+	return (st.doorsCloseSigma - st.boardSigma) % SkyLift.period() - SkyLiftService.BOARD_GRACE
+end
+
+-- The opening at `station`'s board point: the board time of the cabin it serves (the one at or coming to the
+-- door), and whether the screen's leaves are open for it now (OPEN_LEAD before that time until CLOSE_LEAD before
+-- its doors close).
+function SkyLiftService.window(station: string, t: number): (number, boolean, number)
+	local after = SkyLiftService.boardGrace(station) + SkyLiftService.BOARD_GRACE - SkyLiftService.CLOSE_LEAD
+	local cabin, b = SkyLift.nextDeparture(station, t - after)
+	return b, t >= b - SkyLiftService.OPEN_LEAD, cabin
+end
+
 -- E at a gate. Books the next cabin with room and says when; never silent.
 function SkyLiftService.press(self: any, player: any, station: string): (boolean, string?)
+	local ok, text = self:_press(player, station, false)
+	return ok, text
+end
+
+-- (quiet: a step into the opening; the caller says what happened)
+function SkyLiftService._press(self: any, player: any, station: string, quiet: boolean): (boolean, string?, Waiter?)
 	local W = SkyLiftService.WORDS
 	local town = self.town :: Town
-	local function no(text: string): (boolean, string?)
+	local function no(text: string): (boolean, string?, Waiter?)
 		town.refuse(player, text)
-		return false, text
+		return false, text, nil
 	end
 	if station ~= "base" and station ~= "summit" then
 		return no("No such station")
@@ -637,7 +687,7 @@ function SkyLiftService.press(self: any, player: any, station: string): (boolean
 	if at and distXZ(at, gate.at) > SkyLiftService.WANDER then
 		return no(W.notNear)
 	end
-	local cabin, seat, boardAt, arriveAt, key, skipped = self:_book(station, t - SkyLiftService.BOARD_GRACE)
+	local cabin, seat, boardAt, arriveAt, key, skipped = self:_book(station, t - SkyLiftService.boardGrace(station))
 	local waiter: Waiter = {
 		player = player,
 		station = station,
@@ -658,8 +708,71 @@ function SkyLiftService.press(self: any, player: any, station: string): (boolean
 		then W.now
 		elseif skipped then string.format(W.full, secs)
 		else string.format(W.booked, secs)
-	town.notify(player, text)
-	return true, text
+	if not quiet then
+		town.notify(player, text)
+	end
+	return true, text, waiter
+end
+
+-- Where a body stands relative to `station`'s opening: in front of it (or stepped through it) and within its width.
+function SkyLiftService.inOpening(station: string, pos: Vector3): boolean
+	local st = (SkyLift.stations() :: any)[station]
+	local dx, dz = pos.X - st.board.x, pos.Z - st.board.z
+	local y = st.boardYaw
+	local toward = dx * -math.sin(y) + dz * -math.cos(y) -- toward the cabin
+	local along = dx * math.cos(y) + dz * -math.sin(y)
+	return toward >= -1
+		and toward <= SkyLift.PLATFORM_OFFSET + 0.5
+		and math.abs(along) <= SkyLiftService.OPENING / 2 + 0.3
+		and math.abs(pos.Y - (st.platformY + 3)) <= 4
+end
+
+-- Whoever stands in an opening while its leaves are open is seated in that cabin at once if it has room (booked
+-- through the same path as E), and is told plainly when it is full.
+function SkyLiftService._stepIns(self: any, t: number)
+	local town = self.town :: Town
+	local list = town.players
+	if list == nil then
+		return
+	end
+	local okList, players = pcall(list)
+	if not okList or type(players) ~= "table" then
+		return
+	end
+	local W = SkyLiftService.WORDS
+	for station, gate in self.gates :: { [string]: Gate } do
+		local b, open = SkyLiftService.window(station, t)
+		if not open then
+			table.clear(gate.told)
+			continue
+		end
+		for _, player in players do
+			if self.riderOf[player] then
+				continue
+			end
+			local body = town.bodyOf(player)
+			local at = if body then pivotOf(body) else nil
+			if at == nil or not SkyLiftService.inOpening(station, at) then
+				continue
+			end
+			local w = self.waiters[player]
+			if w == nil then
+				local ok, _, nw = self:_press(player, station, true)
+				w = if ok then nw else nil
+				if not ok then
+					gate.told[player] = b -- (refused with its words: once per cabin)
+				end
+			end
+			if w and w.station == station then
+				if math.abs(w.boardAt - b) < 0.05 then
+					self:_board(w, t)
+				elseif gate.told[player] ~= b then
+					gate.told[player] = b
+					town.notify(player, string.format(W.fullCabin, math.max(0, math.ceil(w.boardAt - t))))
+				end
+			end
+		end
+	end
 end
 
 function SkyLiftService._unwait(self: any, w: Waiter, text: string?)
@@ -809,12 +922,8 @@ end
 
 function SkyLiftService._alight(self: any, ride: Ride)
 	local town = self.town :: Town
-	local st = (SkyLift.stations() :: any)[ride.other]
-	local back = SkyLiftService.STEP_BACK
-	local x = st.alight.x + back * math.sin(st.alightYaw)
-	local z = st.alight.z + back * math.cos(st.alightYaw)
-	local yaw = st.alightYaw + math.pi -- facing away from the cabin, onto the platform
-	local y = st.platformY
+	-- this seat's own spot on the far platform, facing away from the cabin (four riders never share one)
+	local x, y, z, yaw = SkyLift.alightSpot(ride.other, ride.seat)
 	if not ride.orphaned and (ride.player == nil or town.bodyOf(ride.player) ~= ride.body) then
 		self:_orphan(ride)
 	end
@@ -885,8 +994,28 @@ function SkyLiftService.gone(self: any, player: any)
 	end
 end
 
--- The gates' furniture: the next-cabin board (whole seconds), the arm (up while a cabin's doors are open there)
--- and the bell when they open.
+-- What the board over a gate says at t: NOW BOARDING from BOARDING_SHOW before a cabin's board time until its
+-- doors close; otherwise the seconds to the next one, or that it is full (every seat booked).
+function SkyLiftService.boardText(self: any, station: string, t: number): string
+	local b = SkyLiftService.window(station, t)
+	if t >= b - SkyLiftService.BOARDING_SHOW then
+		return "NOW BOARDING"
+	end
+	local _, boardAt = SkyLift.nextDeparture(station, t)
+	local key = `{station}:{math.floor(boardAt * 10 + 0.5)}`
+	local booking = self.bookings[key]
+	local taken = 0
+	for _ in booking or {} do
+		taken += 1
+	end
+	if taken >= SkyLift.SEATS then
+		return "NEXT CABIN FULL"
+	end
+	return `NEXT CABIN {math.max(0, math.ceil(boardAt - t))} s`
+end
+
+-- The gates' furniture: the next-cabin board (whole seconds), the screen's leaves and the arm (open while a cabin
+-- stands at the opening) and the bell when a cabin's doors open there.
 function SkyLiftService._furniture(self: any, t: number, dt: number)
 	local openAt: { [string]: boolean } = {}
 	for i = 1, SkyLift.CABINS do
@@ -901,14 +1030,9 @@ function SkyLiftService._furniture(self: any, t: number, dt: number)
 			play(gate.bell)
 		end
 		gate.open = open
+		local b, windowOpen = SkyLiftService.window(station, t)
 		if #gate.labels > 0 then
-			local text: string
-			if open then
-				text = "NOW BOARDING"
-			else
-				local _, boardAt = SkyLift.nextDeparture(station, t)
-				text = `NEXT CABIN {math.max(0, math.ceil(boardAt - t))} s`
-			end
+			local text = SkyLiftService.boardText(self, station, t)
 			if text ~= gate.text then
 				gate.text = text
 				for _, l in gate.labels do
@@ -916,9 +1040,21 @@ function SkyLiftService._furniture(self: any, t: number, dt: number)
 				end
 			end
 		end
+		-- the screen's leaves at the opening and the gate's arm: open for the cabin at the door, shut otherwise
+		local leafTarget = if windowOpen then 1 else 0
+		local lf = gate.leafFrac
+		local nlf = lf + math.clamp(leafTarget - lf, -dt * SkyLiftService.LEAF_RATE, dt * SkyLiftService.LEAF_RATE)
+		if nlf ~= lf then
+			gate.leafFrac = nlf
+			local e = nlf * nlf * (3 - 2 * nlf)
+			for _, leaf in gate.leaves do
+				leaf.part.CFrame = leaf.home + leaf.slide * e
+			end
+		end
+		local _ = b
 		local arm, home = gate.arm, gate.armHome
 		if arm and home then
-			local target = if open then 1 else 0
+			local target = if windowOpen then 1 else 0
 			local f = gate.armFrac
 			local nf = f + math.clamp(target - f, -dt * SkyLiftService.ARM_RATE, dt * SkyLiftService.ARM_RATE)
 			if nf ~= f then
@@ -969,6 +1105,10 @@ function SkyLiftService.step(self: any, dt: number?)
 		elseif t >= w.boardAt then
 			self:_board(w, t)
 		end
+	end
+	local okIn, errIn = pcall(self._stepIns, self, t)
+	if not okIn then
+		warn(`[SkyLift] step-ins failed: {errIn}`)
 	end
 	for i = #self.rides, 1, -1 do
 		local ride = self.rides[i]
@@ -1313,6 +1453,9 @@ function SkyLiftService.gameTown(parts: GameParts): Town
 			end
 		end,
 		charge = nil, -- the wallet (feat/wallet): Credits' charge(player, cents, why) goes here when it lands
+		players = function(): { any }
+			return game:GetService("Players"):GetPlayers()
+		end,
 	}
 end
 

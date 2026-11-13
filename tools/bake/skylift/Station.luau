@@ -6,7 +6,9 @@
 -- platforms (floor + 1.5): they sweep X -20.5..25, D -6.5..10.5 and leave through the open +X end.
 --   Platforms (Y 1.5): the front one (D -15..-6.4) where people board (anchor board, X -5), the back one
 --     (D 10.4..15) where they get out (alight_down), joined round the bullwheel's end by a walkway (X -25..-21.3: the cabins swing 8.9 out round the bullwheel);
---     between them the pit the cabins pass over (floor Y 0). Yellow edge lines.
+--     between them the pit the cabins pass over (floor Y 0). Yellow edge lines. Platform screens: full-height
+--     collidable glass along all three pit edges, one OPENING at the board point closed by two sliding leaves
+--     ("ScreenDoor1/2": attributes ScreenDoor = "base", Slide = open offset; the server slides them).
 --   The front door (X -9..-1) is at platform height; outside, steps down to the ground and the front walk.
 --   A glass fence across the front platform (D -10.5) with the self-service gate: "BoardGate" (the pillar that
 --     carries the prompt: attributes Gate = "board", Station = "base"), "BoardGateArm" (the swing bar, hinged at
@@ -27,6 +29,7 @@ local SkyLift = require("../../../src/shared/Rides/SkyLift")
 local Station = {}
 
 Station.BUDGET = 500
+Station.OPENING = 4 -- the platform screen's opening at the board point (a cabin's doorway is 3.4)
 
 local PLAT = SkyLift.PLATFORM_HEIGHT -- 1.5
 local EAVE, RIDGE = 15, 18
@@ -92,6 +95,63 @@ function Station.build(kit: Kit.Kit, parent: any, v: any): any
 		line
 	)
 
+	-- the platform screens (review: a child walked into an open cabin and dropped through its floor into the pit):
+	-- collidable glass along all three pit edges, just clear of the cabins' swept volume, full height so nobody
+	-- jumps over, with one opening at the board point. Two sliding leaves close it; the server slides them open
+	-- only while a cabin stands at that opening (attribute ScreenDoor = station, Slide = the leaf's open offset in
+	-- world studs) and seats whoever steps into it.
+	local SCREEN_TOP = PLAT + 7.2
+	local SF0, SF1 = FRONT_EDGE - 0.6, FRONT_EDGE - 0.45 -- the front screen's faces (the swept volume ends at -6.5)
+	local SB0, SB1 = BACK_EDGE + 0.45, BACK_EDGE + 0.6
+	local SW0, SW1 = WEST_EDGE - 0.15, WEST_EDGE - 0.03
+	local glassScreen = { transparency = 0.7, reflectance = 0.15 }
+	local boardAnchor = nil
+	for _, a in v.anchors do
+		if a.id == "board" then
+			boardAnchor = a
+		end
+	end
+	local ox = if boardAnchor then boardAnchor.at[1] else -5
+	local OPEN = Station.OPENING
+	local o0, o1 = ox - OPEN / 2, ox + OPEN / 2
+	local screenEnd = hw - 0.5 -- the mouth pier
+	for _, seg in { { SW0, o0 - 0.15 }, { o1 + 0.15, screenEnd } } do
+		kit:box(interior, "ScreenFront", seg[1], seg[2], PLAT, SCREEN_TOP, SF0, SF1, Common.GLASS, "Glass", glassScreen)
+	end
+	kit:box(interior, "ScreenBack", SW0, screenEnd, PLAT, SCREEN_TOP, SB0, SB1, Common.GLASS, "Glass", glassScreen)
+	kit:box(interior, "ScreenWest", SW0, SW1, PLAT, SCREEN_TOP, SF0, SB1, Common.GLASS, "Glass", glassScreen)
+	for _, r in
+		{
+			{ SW0, screenEnd, SF0 - 0.05, SF1 + 0.05 },
+			{ SW0, screenEnd, SB0 - 0.05, SB1 + 0.05 },
+			{ SW0 - 0.05, SW1 + 0.05, SF0, SB1 },
+		}
+	do
+		kit:box(interior, "ScreenHead", r[1], r[2], SCREEN_TOP, SCREEN_TOP + 0.3, r[3], r[4], Common.FRAME, "Metal")
+	end
+	for _, x in { o0 - 0.15, o1 } do
+		kit:box(interior, "ScreenJamb", x, x + 0.15, PLAT, SCREEN_TOP, SF0 - 0.08, SF1 + 0.02, Common.RED, "Metal")
+	end
+	-- the two leaves, on the platform side of the screen line, sliding apart along it
+	for i, l in { { o0, ox, -1 }, { ox, o1, 1 } } do
+		local leaf = kit:box(
+			interior,
+			`ScreenDoor{i}`,
+			l[1],
+			l[2],
+			PLAT,
+			SCREEN_TOP - 0.1,
+			SF0 - 0.17,
+			SF0 - 0.05,
+			Common.GLASS,
+			"Glass",
+			{ transparency = 0.5, reflectance = 0.15 }
+		)
+		local open = (kit:cf(l[3] * (OPEN / 2 - 0.1), 0, 0).Position - kit:cf(0, 0, 0).Position)
+		leaf:SetAttribute("ScreenDoor", "base")
+		leaf:SetAttribute("Slide", open)
+	end
+
 	-- walls: low wall, glass band, upper band; the front has the door, the +X end the cabins' mouth
 	local T = 0.5
 	local glass = { transparency = 0.6, reflectance = 0.1 }
@@ -137,7 +197,9 @@ function Station.build(kit: Kit.Kit, parent: any, v: any): any
 	kit:box(shell, "MouthPierFront", hw - T, hw, PLAT, EAVE, -hd + T, FRONT_EDGE, Common.CREAM, "SmoothPlastic")
 	kit:box(shell, "MouthPierBack", hw - T, hw, PLAT, EAVE, BACK_EDGE, hd - T, Common.CREAM, "SmoothPlastic")
 	kit:box(shell, "MouthLintel", hw - T, hw, 14.2, EAVE, FRONT_EDGE, BACK_EDGE, Common.RED, "SmoothPlastic")
-	kit:box(shell, "MouthSill", hw - T, hw + 0.2, -0.3, 0.2, FRONT_EDGE, BACK_EDGE, CD, "Concrete")
+	-- the mouth's sill: as high as the passing cabins' undersides allow (they clear it by 0.3), so nobody strolls
+	-- into the pit from outside
+	kit:box(shell, "MouthSill", hw - T, hw + 0.2, -0.3, PLAT - 0.5 - 0.3, FRONT_EDGE, BACK_EDGE, CD, "Concrete")
 	-- the red trim band at the eaves all round
 	kit:box(shell, "EaveTrimFront", -hw - 0.1, hw + 0.1, EAVE - 0.7, EAVE, -hd - 0.12, -hd, Common.RED, "SmoothPlastic")
 	kit:box(shell, "EaveTrimBack", -hw - 0.1, hw + 0.1, EAVE - 0.7, EAVE, hd, hd + 0.12, Common.RED, "SmoothPlastic")

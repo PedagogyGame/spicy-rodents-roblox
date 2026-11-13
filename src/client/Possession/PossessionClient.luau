@@ -26,7 +26,7 @@
 -- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(), Client.refreshCamera(),
 --   Client.flushInput(), Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure);
 --   reasonText(why) -> string? (pure; nil = say nothing); rideTarget(mode, cabin, seat, view) -> Model?;
---   rideWords(to) -> string (pure)
+--   rideWords(to) -> string (pure); resetWords(hasBody, device, to) -> string? (pure)
 
 local Import = require("../Import")
 local PossessionState =
@@ -119,6 +119,18 @@ function PossessionClient.rideTarget(mode: string, cabin: number, seat: number, 
 end
 
 -- What E says in a cabin (there is no getting off between the stations).
+-- What Reset says instead of moving the body (pure): nil when it should move it to a safe spot. A rider is not
+-- moved (the server refuses too): the words say where the cabin will let them off.
+function PossessionClient.resetWords(hasBody: boolean, device: string?, to: string?): string?
+	if not hasBody then
+		return "Nothing to reset: pick a body from the menu (M)"
+	end
+	if device == "ride" then
+		return PossessionClient.rideWords(to)
+	end
+	return nil
+end
+
 function PossessionClient.rideWords(to: string?): string
 	return if to == "base"
 		then "You are on the sky lift: you get off at the bottom"
@@ -553,8 +565,9 @@ function PossessionClient.start(opts: Opts): Client
 
 	routeReset(function()
 		metrics.resets += 1
-		if body == nil then
-			toast("Nothing to reset: pick a body from the menu (M)", 3)
+		local said = PossessionClient.resetWords(body ~= nil, device and device.device, device and device.to)
+		if said then
+			toast(said, 3) -- nothing to move (no body), or a rider: the cabin takes them to the platform
 			return
 		end
 		recover:FireServer()

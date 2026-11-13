@@ -13,6 +13,7 @@
 local SkyLift = require("@shared/Rides/SkyLift")
 local AnimationDriver = require("@client/Animation/AnimationDriver")
 local SkyLiftView = require("@client/Rides/SkyLiftView")
+local SkyLiftService = require("@server/Rides/SkyLiftService")
 local Telescope = require("@client/Rides/Telescope")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local roblox = require("@lune/roblox")
@@ -577,6 +578,13 @@ return function(t)
 			local rx, ry, rz, ryaw = SkyLiftView.rootAt(2, 3, 50)
 			t.deepEq({ rx, ry - SkyLiftView.SIT_ROOT, rz, ryaw }, { x, y, z, yaw })
 			t.eq(SkyLiftView.SIT_ROOT, AnimationDriver.SIT_SEAT, "the root over the seat is the sit clip's")
+			-- (review) the server places a rider's root at the same height the client draws it
+			t.eq(SkyLiftService.ROOT_ABOVE_SEAT, SkyLiftView.SIT_ROOT, "the server's seated root is the client's")
+			-- (review) a rider sits by its Ride attribute alone: Seat:Sit on an anchored root is unverified, and
+			-- without it the clip followed the root's 15 st/s and ran
+			t.eq(AnimationDriver.seated(nil, "3/2"), true)
+			t.eq(AnimationDriver.seated({}, nil), true)
+			t.eq(AnimationDriver.seated(nil, nil), false)
 			t.eq(SkyLiftView.advance(nil, DT, 12), 12, "first frame takes the server's")
 			t.near(SkyLiftView.advance(10, 0.1, 10.1), 10.1, 1e-9, "in step")
 			t.near(SkyLiftView.advance(10, 0.1, 10.5), 10.1 + 0.1 * SkyLiftView.SLEW, 1e-9, "slewed forward")
@@ -719,4 +727,43 @@ return function(t)
 			t.near(Telescope.zoom(15, -1), 15 * Telescope.ZOOM_STEP, 1e-9)
 		end)
 	end)
+	t.test(
+		"the wait for a booked cabin counts down on the HUD and clears when seated (review: nothing on screen)",
+		function()
+			FakeEngine.with(function()
+				t.deepEq({ SkyLiftView.waitWords(nil, 10) }, { nil, nil })
+				local title, hint = SkyLiftView.waitWords(30, 17.6)
+				t.eq(title, "Sky lift: your cabin in 13 s")
+				t.truthy(hint ~= nil and string.find(hint, "gate", 1, true) ~= nil)
+				t.eq((SkyLiftView.waitWords(30, 30.2)), "Sky lift: your cabin is here")
+				local player = game:GetService("Players").LocalPlayer
+				local heartbeat = game:GetService("RunService").Heartbeat
+				local clock = 100
+				local lines: { any } = {}
+				local stop = SkyLiftView.watchWait(function(a: string?, b: string?)
+					table.insert(lines, { a, b })
+				end, function(): number
+					return clock
+				end)
+				heartbeat.fire(0.1)
+				t.eq(#lines, 0, "nothing shown without a booking")
+				player:SetAttribute("SkyLiftBoardAt", 112)
+				for _ = 1, 30 do
+					clock += 0.1
+					heartbeat.fire(0.1)
+				end
+				t.truthy(#lines >= 3, `the countdown was shown {#lines} times in 3 s`)
+				t.eq(lines[1][1], "Sky lift: your cabin in 12 s")
+				local last = tonumber(string.match(lines[#lines][1], "in (%d+) s"))
+				t.truthy(last == 9 or last == 10, `after 3 s it said {lines[#lines][1]}`)
+				player:SetAttribute("SkyLiftBoardAt", nil)
+				heartbeat.fire(0.1)
+				t.deepEq(lines[#lines], { nil, nil }, "the usual HUD back once the booking is gone")
+				local n = #lines
+				heartbeat.fire(0.1)
+				t.eq(#lines, n, "and only once")
+				stop()
+			end)
+		end
+	)
 end

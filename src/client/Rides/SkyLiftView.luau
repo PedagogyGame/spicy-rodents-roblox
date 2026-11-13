@@ -33,7 +33,9 @@
 --   cabinModel(cabin) -> Model?; seatModel(cabin, seat) -> Model?; eye(cabin, seat) -> CFrame?;
 --   rideOf(body) -> (cabin?, seat?); parseRide(value) -> (cabin?, seat?) (pure); rootAt(cabin, seat, t) ->
 --   x, y, z, yaw (pure); advance(t?, dt, target) -> t (pure); hudFor(cabin, t) -> title, hint, secs, dest (pure);
---   spinAngle(t, radius, sign) -> radians (pure); BOARD_LINE, SIT_ROOT, SLEW, SNAP, SPIN_RANGE, BIND, FOLDER
+--   spinAngle(t, radius, sign) -> radians (pure); waitWords(boardAt, serverNow) -> title?, hint? (pure);
+--   watchWait(hud, now?) -> stop (the HUD line while a cabin is booked: the review found nothing on screen
+--   between the first toast and being seated); BOARD_LINE, SIT_ROOT, SLEW, SNAP, SPIN_RANGE, BIND, FOLDER
 --   opts = { now: (() -> number)? (server time; default workspace:GetServerTimeNow()), bind: boolean? (false:
 --   no render step, the caller calls frame) }
 
@@ -148,6 +150,56 @@ function SkyLiftView.hudFor(i: number, t: number): (string, string, number, stri
 		then "Doors opening: step out onto the platform. V: outside view."
 		else `Move the mouse to look around. V: outside view. {where} in {secs} s`
 	return title, hint, secs, dest
+end
+
+-- What the screen says while waiting for a booked cabin (the player's SkyLiftBoardAt attribute, server time):
+-- the title and hint, counting down; at the board time, that the cabin is here. nil when there is no booking.
+function SkyLiftView.waitWords(boardAt: any, serverNow: number): (string?, string?)
+	if type(boardAt) ~= "number" then
+		return nil, nil
+	end
+	local secs = math.ceil(boardAt - serverNow - 1e-9)
+	if secs <= 0 then
+		return "Sky lift: your cabin is here", "Boarding: step through the open doors, or wait by the gate"
+	end
+	return `Sky lift: your cabin in {secs} s`, "Wait by the gate, or stand at the glass doors by the platform edge"
+end
+
+-- Keep the HUD on the wait: `hud(title, hint)` each second while the local player has a booking, `hud(nil)`
+-- once it is gone (boarded, gave up). Returns a stop function.
+function SkyLiftView.watchWait(hud: (title: string?, hint: string?) -> (), now: (() -> number)?): () -> ()
+	local player = game:GetService("Players").LocalPlayer
+	local serverNow = now or function(): number
+		return workspace:GetServerTimeNow()
+	end
+	local shown = false
+	local acc = 1
+	local conn = game:GetService("RunService").Heartbeat:Connect(function(dt: number)
+		acc += dt
+		local boardAt = player:GetAttribute("SkyLiftBoardAt")
+		if boardAt == nil then
+			if shown then
+				shown = false
+				hud(nil, nil)
+			end
+			return
+		end
+		if acc < 0.25 and shown then
+			return
+		end
+		acc = 0
+		local title, hint = SkyLiftView.waitWords(boardAt, serverNow())
+		if title then
+			shown = true
+			hud(title, hint)
+		end
+	end)
+	return function()
+		conn:Disconnect()
+		if shown then
+			hud(nil, nil)
+		end
+	end
 end
 
 -- ===== the view =====

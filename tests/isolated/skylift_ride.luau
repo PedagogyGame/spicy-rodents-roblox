@@ -147,10 +147,15 @@ return function(t)
 				local booked = w.svc.waiters[p]
 				t.truthy(booked, `{from}: waiting`)
 				local cabin, seat = booked.cabin, booked.seat
-				t.truthy(string.find(lastOf(p, "notice").text, "Next cabin in", 1, true), `{from}: told when`)
-				while w.svc:time() < booked.boardAt + 0.1 do
+				-- (pressed while the last cabin's doors are still open, the booking is that cabin: "step in")
+				local told = lastOf(p, "notice").text
+				t.truthy(
+					string.find(told, "Next cabin in", 1, true) or told == SkyLiftService.WORDS.now,
+					`{from}: told when ({told})`
+				)
+				repeat
 					tick(0.1)
-				end
+				until w.svc:time() >= booked.boardAt + 0.1
 				-- boarding: the grant the client acts on
 				local g = lastOf(p, "deviceGranted")
 				t.truthy(g, `{from}: granted`)
