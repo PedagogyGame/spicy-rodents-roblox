@@ -527,6 +527,27 @@ return function(t)
 		t.truthy(fires[1].ft >= ends + M.gate, `not before the briefing's end + the gate ({fires[1].ft - ends})`)
 		t.truthy(fires[1].ft < ends + M.gate + 2 * DT)
 
+		-- a briefing cut short (the owner's debug("end") at the playtest: the server goes live nine seconds
+		-- before the end it announced): the server's word stands from when it is heard, and the marker is
+		-- not left dead until the old briefing would have run out. (Found against the real service.)
+		b = Kit.bench()
+		Kit.watch(b)
+		Kit.state(b, { phase = "briefing", endsAt = b.now() + 10 })
+		Kit.place(b, { at = b.now() - 1 })
+		Kit.run(b, 1)
+		press(b)
+		Kit.frame(b)
+		t.eq(#Kit.fires(b), 0, "still the briefing")
+		local heard = b.now()
+		Kit.state(b, { phase = "live", endsAt = heard + R.matchSecs })
+		t.truthy(b.seat:live(heard + M.gate), "live on the server's word")
+		t.falsy(b.seat:live(heard), "less the gate")
+		Kit.frame(b, 3)
+		press(b)
+		Kit.frame(b)
+		t.eq(#Kit.fires(b), 1, "the click fires, nine seconds before the old briefing's end")
+		t.eq(Kit.cues(b, "paintball.go"), 1, "and the horn sounded")
+
 		-- protection: nothing until `at` + MARGIN.gate
 		b = Kit.playing()
 		local safe = b.now() + 0.4

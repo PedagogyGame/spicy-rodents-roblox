@@ -556,6 +556,11 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			if type(game.phase) == "string" and type(game.endsAt) == "number" then
 				if game.phase == "briefing" then
 					briefEnds = game.endsAt
+				elseif game.phase == "live" and briefEnds ~= nil and now < briefEnds then
+					-- live before the briefing this seat was told of was due to end: it was cut short (the
+					-- owner's debug("end") at a playtest). The server's word stands, from the moment it is
+					-- heard: a marker that waited out a briefing nobody is in would be dead for ten seconds.
+					briefEnds = now
 				end
 				self.phase, self.endsAt = game.phase, game.endsAt
 			end
