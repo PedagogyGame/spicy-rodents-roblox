@@ -50,7 +50,7 @@
 --              count; being tagged out does not stop it), with a fifth more on the bounds, so a tremble of the mouse that the
 --              server does not count never hushes the warning: the HUD says so no later than the server
 --              would act (Rules.idleSecs).
--- Interface: new(ctx, opts) -> Seat; types Port, Opts, Seat, Feed. Seat: the framework's controller
+-- Interface: new(ctx, opts) -> Seat; floorOf(y) -> 1..FLOORS; relative(floors) -> words; types Port, Opts, Seat, Feed. Seat: the framework's controller
 --   (onState, onMessage, onRefused, stop) plus input(action, down), step(dt) and the fields below.
 
 local Import = require("../../Import")
@@ -164,6 +164,7 @@ export type Seat = {
 	tagFrom: { x: number, y: number, z: number }?, -- where the one who tagged you stood (as drawn)
 	result: any?, -- view.result at the end card (Contract.Result)
 	safeUntil: number, -- the protection of the last respawn ends
+	floor: number, -- the storey you stand on, 1..Arena.FLOORS (0: no body yet), shown under the clock
 	inRoom: boolean, -- standing in your own spawn room
 	nearRoom: boolean, -- in or within MARGIN.room of either spawn room: no ball may leave from here
 	legs: boolean, -- false while the legs are taken
@@ -194,6 +195,21 @@ export type Seat = {
 }
 
 local SeatCore = {}
+
+-- The storey (1..Arena.FLOORS) feet at height y stand on.
+function SeatCore.floorOf(y: number): number
+	return math.clamp(math.floor(y / ArenaModule.FLOOR_HEIGHT + 0.5) + 1, 1, ArenaModule.FLOORS)
+end
+
+-- A floor call-out said from where the reader stands: "this floor", "one up", "two down".
+function SeatCore.relative(diff: number): string
+	if diff == 0 then
+		return "this floor"
+	end
+	local words = { "one", "two", "three", "four" }
+	local n = words[math.abs(diff)] or tostring(math.abs(diff))
+	return `{n} {if diff > 0 then "up" else "down"}`
+end
 
 local R = Contract.Rules
 local M = Contract.MARGIN
@@ -271,6 +287,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		held = nil,
 		trigger = false,
 		autoHeld = false,
+		floor = 0,
 		firedAt = -math.huge,
 		fired = 0,
 		reloadFrom = -math.huge,
@@ -902,6 +919,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				local line = (Contract.LINES :: { [string]: string })[msg.line]
 				if line then
 					local text = if msg.line == "floor" then string.format(line, msg.n or 1) else line
+					if msg.line == "floor" and self.floor > 0 and msg.n ~= nil then
+						-- said from where the reader stands: up or down, and how far (the review)
+						text ..= ` ({SeatCore.relative(msg.n - self.floor)})`
+					end
 					feedLine(`{nameOf(msg.id)}: {text}`, slot.team, false, now)
 				end
 			end
@@ -1021,6 +1042,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 		if port.fov then
 			port.fov(tuning.sprintFov * self.k)
+		end
+		-- your own storey (a stair's middle landing counts as the floor it is nearer)
+		if has then
+			self.floor = SeatCore.floorOf(self.y)
 		end
 		-- your own room: safe, and no firing
 		local room = arena.spawnRooms[self.team]

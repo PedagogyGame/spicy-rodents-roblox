@@ -408,7 +408,9 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	local top = frame("Top", root, UDim2.fromOffset(TOP_W, TOP_H), UDim2.new(0.5, -TOP_W / 2, 0, 8), NAVY, 0.25)
 	round(top, 10)
 	local score1 = label("Score1", top, UDim2.fromOffset(70, 30), UDim2.fromOffset(8, 4), teamRgb(1), true)
-	local clock = label("Clock", top, UDim2.fromOffset(96, 30), UDim2.fromOffset(82, 4), WHITE, true)
+	local clock = label("Clock", top, UDim2.fromOffset(96, 22), UDim2.fromOffset(82, 2), WHITE, true)
+	-- your own storey, under the clock (a call-out names a floor: "They are on 3!")
+	local floorLine = label("Floor", top, UDim2.fromOffset(96, 12), UDim2.fromOffset(82, 24), WHITE, true)
 	local score2 = label("Score2", top, UDim2.fromOffset(70, 30), UDim2.fromOffset(182, 4), teamRgb(2), true)
 	local mine = frame("Mine", top, UDim2.fromOffset(54, 3), UDim2.fromOffset(16, 33), WHITE)
 	local phaseLine =
@@ -836,6 +838,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 			left += R.matchSecs -- live by the clock; the server's own word is on its way
 		end
 		set(clock, if ended then "FULL TIME" elseif phase == "" then "" else clockText(left))
+		set(floorLine, if seat.floor > 0 and phase ~= "" and not ended then `FLOOR {seat.floor}` else "")
 		clock.TextColor3 = if not starting and not ended and left <= tune.clockRed then rgb(WARN) else rgb(WHITE)
 		local side = Contract.TEAMS[seat.team]
 		local briefing = ""
