@@ -371,7 +371,12 @@ return function(t: Test.T)
 				end
 			end
 			t.eq(verdict, "behind")
-			t.near(seconds, 2 / 0.75, 0.25, "0.75 s is lost in every second of quarter speed")
+			t.near(
+				seconds,
+				2 / 0.75 + Replay.BEHIND_HOLD,
+				0.25,
+				"0.75 s is lost in every second of quarter speed, and the verdict waits BEHIND_HOLD"
+			)
 			-- the caller takes the ball: it is played out dead, and the game is marked late
 			local epoch = slow.epoch
 			Replay.lapse(slow)
@@ -388,6 +393,150 @@ return function(t: Test.T)
 			-- a clock never runs back
 			Replay.clock(slow, 1)
 			t.truthy(slow.now > 50)
+			-- the lateness is the slow seat's: the other player's score may still go on the board
+			t.truthy(slow.lateSeats[1])
+			t.falsy(slow.lateSeats[2])
+			t.falsy(Replay.fair(slow, 1))
+			t.truthy(Replay.fair(slow, 2))
+		end
+	)
+
+	t.test(
+		"time: a stall on the line is not slow play. Nothing arriving for three and a half seconds is never behind; the held-up log arrives in a burst, catches up and the ball, the next ball and the board place are kept",
+		function()
+			local r = Replay.new("pinball_rodent", 3, 2)
+			local tbl = Tables.need(r.id)
+			local bot = Bot.new(1, 4)
+			-- the player's own machine, played at full speed against the server's clock (0.1 s a step)
+			local live = Replay.new("pinball_rodent", 3, 2)
+			local liveRec = Replay.recorder(live)
+			local queue: { InputLog.Segment } = {}
+			local function play(seconds: number)
+				local due = live.tick + math.floor(seconds * Physics.HZ + 0.5)
+				while live.tick < due and live.m.up == 1 do
+					local seg = Replay.live(live, liveRec, Bot.step(bot, tbl, live.m))
+					if seg then
+						table.insert(queue, seg)
+					end
+				end
+			end
+			local now = 20
+			local function deliver(): (boolean, string?)
+				while #queue > 0 do
+					local ok, why = Replay.feed(r, 1, queue[1])
+					if not ok then
+						return false, why
+					end
+					table.remove(queue, 1)
+				end
+				return true
+			end
+			-- two seconds of ball one in time, the segments arriving a step later
+			t.eq(Replay.clock(r, now), "ok")
+			for _ = 1, 20 do
+				play(0.1)
+				now += 0.1
+				t.eq(Replay.clock(r, now), "ok")
+				t.truthy(deliver())
+			end
+			-- the line stalls for 3.5 s: the player plays on, nothing arrives; the clock never says "behind"
+			for _ = 1, 35 do
+				play(0.1)
+				now += 0.1
+				t.eq(Replay.clock(r, now), "ok", `stalled {now - 22} s`)
+			end
+			t.eq(r.m.up, 1, "the ball is still the player's")
+			t.falsy(r.late)
+			-- the held-up log arrives in one burst and is played at once (none of it is ahead of the clock)
+			t.truthy(deliver())
+			t.eq(r.tick, live.tick)
+			-- and play goes on in time: the verdict after the burst finds the log level with the clock
+			for _ = 1, 20 do
+				play(0.1)
+				now += 0.1
+				t.eq(Replay.clock(r, now), "ok")
+				t.truthy(deliver())
+			end
+			t.eq(r.epoch, 0, "the server never played by itself")
+			t.falsy(r.late)
+			t.truthy(Replay.fair(r, 1) and Replay.fair(r))
+			t.eq(Replay.sum(r), Replay.sum(live), "the server's game is the player's")
+		end
+	)
+
+	t.test(
+		"time: one player's balls in a row are one stretch of their clock (a ball ending does not restart it); a ball the server played itself starts the next player's clock afresh",
+		function()
+			local r = Replay.new("pinball_acorn", 1, 1)
+			local live = Replay.new("pinball_acorn", 1, 1)
+			local tbl = Tables.need(r.id)
+			local bot = Bot.new(1, 2)
+			local rec = Replay.recorder(live)
+			local now = 5
+			Replay.clock(r, now)
+			local ball = r.m.ball
+			local steps = 0
+			while r.ballTick == 0 and steps < 240 * 600 do
+				for _ = 1, 24 do
+					local seg = Replay.live(live, rec, Bot.step(bot, tbl, live.m))
+					if seg then
+						t.truthy(Replay.feed(r, 1, seg))
+					end
+				end
+				now += 0.1
+				steps += 24
+				t.eq(Replay.clock(r, now), "ok")
+			end
+			t.truthy(r.ballTick > 0 and r.m.ball >= ball, "ball one ended by the log")
+			t.eq(r.clockTick, 0, "the clock runs on from the first ball")
+			t.near(Replay.pace(r), 0, 30)
+			-- the server plays the ball out itself: the clock starts again from that moment
+			Replay.skip(r)
+			t.eq(r.clockTick, r.tick)
+			t.eq(r.ballClock, r.now)
+		end
+	)
+
+	t.test(
+		"retire: a seat that is not up leaves the ball in play alone (no epoch, the same sum); its balls are passed over at the next hand-over, whenever before it a copy is told",
+		function()
+			local r = Replay.new("pinball_acorn", 7, 3)
+			local copy = Replay.clone(r)
+			-- a ball launched and left to drain, the same hands on every copy (by the tick)
+			local function hands(tick: number): number
+				return if tick % 2000 < 200 then BTN.PLUNGE else 0
+			end
+			local rec1 = Replay.recorder(r)
+			for _ = 1, 600 do
+				Replay.live(r, rec1, hands(r.tick))
+			end
+			local sum, epoch = Replay.sum(r), r.epoch
+			t.falsy(Replay.retire(r, 2), "the ball in play was not taken")
+			t.eq(r.epoch, epoch)
+			t.eq(Replay.sum(r), sum)
+			t.truthy(r.m.gone[2])
+			-- a copy that is told later (it is ahead of the server, or behind it) reaches the same hand-over
+			local rec = Replay.recorder(copy)
+			for i = 1, 30000 do
+				if i == 900 then
+					t.falsy(Replay.retire(copy, 2))
+				end
+				Replay.live(copy, rec, hands(copy.tick))
+				if copy.m.up ~= 1 then
+					break
+				end
+			end
+			local rec2 = Replay.recorder(r)
+			while r.m.up == 1 do
+				Replay.live(r, rec2, hands(r.tick))
+			end
+			t.eq(copy.m.up, 3, "seat 2 is passed over")
+			t.eq(r.m.up, 3)
+			t.eq(Replay.sum(copy), Replay.sum(r))
+			-- the player up retiring is the server's own play: the ball is taken and the epoch rises
+			t.truthy(Replay.retire(r, 3))
+			t.eq(r.epoch, epoch + 1)
+			t.eq(r.m.up, 1)
 		end
 	)
 
@@ -421,13 +570,38 @@ return function(t: Test.T)
 		t.eq(view(state).tick, tick, "the acknowledgement has not moved")
 		t.truthy(rules.input(state, 1, "clock", { 10.5 }))
 		t.truthy(rules.input(state, 1, "log", { from, to, packed }))
-		-- the machine goes quiet: three seconds on, the server's clock takes the ball
+		-- the machine goes quiet (a stall on the line): nothing arriving is never behind, however long
 		t.truthy(rules.input(state, 1, "clock", { 12 }))
-		t.eq(rules.turn and rules.turn(state), 1, "a second and a half behind is a hitch")
 		t.truthy(rules.input(state, 1, "clock", { 14 }))
+		t.eq(rules.turn and rules.turn(state), 1, "a quiet line is not slow play")
+		t.falsy(view(state).late)
+		-- the held-up log comes in a burst and catches up
+		tick = 144
+		while tick + 24 <= 936 do
+			from, to, packed = InputLog.pack({ tick, tick + 24 })
+			t.truthy(rules.input(state, 1, "log", { from, to, packed }))
+			tick += 24
+		end
+		t.truthy(rules.input(state, 1, "clock", { 14.1 }))
+		t.eq(rules.turn and rules.turn(state), 1)
+		-- slow motion: the segments keep arriving but the log falls further and further behind; two seconds
+		-- behind, held for half a second, the ball is taken
+		local clock = 14.1
+		for _ = 1, 60 do
+			clock += 0.1
+			t.truthy(rules.input(state, 1, "clock", { clock }))
+			if rules.turn and rules.turn(state) ~= 1 then
+				break
+			end
+			from, to, packed = InputLog.pack({ tick, tick + 6 })
+			t.truthy(rules.input(state, 1, "log", { from, to, packed }))
+			tick += 6
+		end
 		t.eq(rules.turn and rules.turn(state), 2, "more than two seconds behind: the ball is taken")
+		t.near(clock, 14.1 + (480 - 72) / 180 + Replay.BEHIND_HOLD, 0.35)
 		t.truthy(view(state).late)
 		t.eq(view(state).epoch, 1)
+
 		-- the game is played out; its result says it was not fair, and the board does not take it
 		for _ = 1, 8 do
 			if rules.skipTurn then
@@ -847,6 +1021,17 @@ return function(t: Test.T)
 		local jumped = Stream.blend(b, c, 0.5)
 		t.eq(jumped.balls[1], 0.5)
 		t.eq(jumped.balls[2], 3.0)
+		-- two balls: the first jumps (fed to the plunger), the second rolls on and is still blended (each ball
+		-- is judged by itself, not every ball after the first that jumped)
+		local two0, two1 = Stream.read(tbl, m), Stream.read(tbl, m)
+		two0.nBalls, two1.nBalls = 2, 2
+		two0.balls = { 1.0, 2.0, 0, 3.0, 4.0, 0 }
+		two1.balls = { 4.5, 0.5, 0, 3.1, 4.2, 0 }
+		local half = Stream.blend(two0, two1, 0.5)
+		t.eq(half.balls[1], 4.5, "the jumped ball is where it is")
+		t.near(half.balls[4], 3.05, 1e-9, "the other ball is half way")
+		t.near(half.balls[5], 4.1, 1e-9)
+
 		-- the spinner turns the short way round
 		a.spin[1], b.spin[1] = 0.9, 0.1
 		t.near(Stream.blend(a, b, 0.5).spin[1], 0.0, 1e-9)

@@ -492,7 +492,7 @@ return function(t)
 				local server = tableOf(w, 1):replay()
 				t.eq(c.cab.r.m.scores[1], server.m.scores[1])
 				t.eq(sessionOf(w, 1).result.fair, true)
-				t.truthy(tableOf(w, 1).waited > 0, "segments that came in a burst waited for the clock")
+				t.eq(tableOf(w, 1).waited, 0, "nothing ran ahead: one player's balls are one stretch of their clock")
 				t.eq(#tableOf(w, 1).pending, 0)
 			end, opts(1, { lag = 12 }))
 		end

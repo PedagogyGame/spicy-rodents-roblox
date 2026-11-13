@@ -388,7 +388,8 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 				local places = {}
 				for seat = 1, #s.seats do
 					local score = (result.scores and result.scores[seat]) or 0
-					local place = HighScores.add(self.board, s.names[seat] or "?", score, result.fair)
+					local fair = if result.fairSeats then result.fairSeats[seat] else result.fair
+					local place = HighScores.add(self.board, s.names[seat] or "?", score, fair)
 					places[seat] = place or 0
 					local key = s.seats[seat]
 					if not isComputer(key) then

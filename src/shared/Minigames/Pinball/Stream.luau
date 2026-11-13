@@ -117,20 +117,23 @@ function Stream.blend(a: Frame, b: Frame, alpha: number, into: Frame?): Frame
 		f.scores[i] = b.scores[i]
 	end
 	local same = a.nBalls == b.nBalls
-	for i = 1, b.nBalls * 3 do
-		local to = b.balls[i]
-		local from = if same then a.balls[i] else to
-		-- a ball that jumped (fed to the plunger, kicked off a ramp's end) is not slid across the table
-		if same and (i % 3 == 1) then
+	for k = 0, b.nBalls - 1 do
+		-- a ball that jumped (fed to the plunger, kicked off a ramp's end) is not slid across the table; the
+		-- others are blended all the same (each ball is judged by itself)
+		local i = k * 3 + 1
+		local slide = same
+		if slide then
 			local dx = b.balls[i] - a.balls[i]
 			local dy = b.balls[i + 1] - a.balls[i + 1]
-			if dx * dx + dy * dy > 0.25 then
-				same = false
-				from = to
-			end
+			slide = dx * dx + dy * dy <= 0.25
 		end
-		f.balls[i] = from + (to - from) * alpha
+		for j = i, i + 2 do
+			local to = b.balls[j]
+			local from = if slide then a.balls[j] else to
+			f.balls[j] = from + (to - from) * alpha
+		end
 	end
+
 	for i = #f.balls, b.nBalls * 3 + 1, -1 do
 		f.balls[i] = nil
 	end
