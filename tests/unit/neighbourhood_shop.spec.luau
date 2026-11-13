@@ -233,6 +233,14 @@ return function(t)
 			local label =
 				shell:FindFirstChild("SignBoard"):FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel")
 			t.eq(label.Text, "THE NEIGHBOURHOOD SHOP")
+			-- the roof sign stands clear above his deck, under his ridge
+			local roofSign = shell:FindFirstChild("RoofSign")
+			local floorY = root:GetAttribute("ArtPivot").Position.Y
+			local bottom = roofSign.CFrame.Position.Y - roofSign.Size.Y / 2 - floorY
+			local signTop = roofSign.CFrame.Position.Y + roofSign.Size.Y / 2 - floorY
+			t.truthy(bottom > Shop.topside(art, Shop.ROOF_SIGN_D), "above the roof")
+			t.truthy(signTop < Shop.underside(art, 0), "below the ridge")
+			t.eq(roofSign:FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel").Text, Shop.SIGN)
 			local lamps = root:FindFirstChild("Lamps")
 			local lights = 0
 			for _, p in lamps:GetChildren() do

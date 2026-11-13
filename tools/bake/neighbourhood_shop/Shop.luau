@@ -31,6 +31,7 @@ Shop.CEILING_TOP = 13.02 -- the top of his ceiling slab (ROOF_Removable)
 Shop.HEADER_TOP = 12.6 -- the top of his shopfront (the window headers)
 Shop.SIDEWALK = -1.8 -- the forecourt's top: the sidewalk's (ground + 0.225) below the floor
 Shop.SIGN = "THE NEIGHBOURHOOD SHOP"
+Shop.ROOF_SIGN_D = -14.5 -- the roof sign's front face, a third of the way up the front slope
 
 local BRICK = { 132, 82, 66 }
 local CONCRETE = { 156, 152, 144 }
@@ -51,6 +52,17 @@ function Shop.underside(art: any, d: number): number
 	end
 	local c, up, t = deck.centre, deck.up, deck.size[2]
 	return c[2] + (-t / 2 - (d - c[3]) * up[3]) / up[2]
+end
+
+-- The top of his roof deck (under the shingles) above local depth d.
+function Shop.topside(art: any, d: number): number
+	local deck = art.roof.decks[1]
+	for _, k in art.roof.decks do
+		if (k.centre[3] >= 0) == (d >= 0) then
+			deck = k
+		end
+	end
+	return Shop.underside(art, d) + deck.size[2] / deck.up[2]
 end
 
 -- An oriented box from generated/ShopArt (centre, size along right/up/back, all in X, Y, D) as a local CFrame
@@ -177,6 +189,29 @@ function Shop.build(kit: Kit.Kit, parent: any, venue: any, art: any): any
 		gui,
 		{ Text = Shop.SIGN, TextColor = CREAM, Font = "Merriweather", Size = { 0.96, 0.8 }, Pos = { 0.02, 0.1 } }
 	)
+	-- the same name on a board standing on the front slope of his roof: the fascia sits in the eave's shadow
+	-- and reads only up close; this one reads from across the boulevard (letters 3 studs high)
+	local rd = Shop.ROOF_SIGN_D
+	local foot = Shop.topside(art, rd) + 0.7
+	local roofBoard = kit:box(shell, "RoofSign", -14, 14, foot, foot + 4.4, rd - 0.3, rd, DARK_WOOD, "Wood")
+	kit:label(
+		kit:gui(roofBoard, "Back", 30),
+		{ Text = Shop.SIGN, TextColor = CREAM, Font = "Merriweather", Size = { 0.94, 0.72 }, Pos = { 0.03, 0.14 } }
+	)
+	for _, x in { -10, 10 } do
+		kit:box(
+			shell,
+			"RoofSignPost",
+			x - 0.25,
+			x + 0.25,
+			Shop.topside(art, rd + 1) - 0.4,
+			foot + 0.2,
+			rd,
+			rd + 1,
+			DARK_WOOD,
+			"Wood"
+		)
+	end
 
 	-- forecourt and steps: from the sidewalk up to his threshold
 	local front = venue.site.d0
