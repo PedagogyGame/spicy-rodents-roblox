@@ -171,7 +171,12 @@ local function watch(msg: { [string]: any }, place: ClientGame.Place?): any
 			warn(`MinigameClient: a pool shot could not be played ({why})`)
 			return nil
 		end
-		Playback.play(place, def, script, { lead = msg.lead, onCue = cue })
+		-- (a replay of the winning shot is the same script on a slower clock)
+		Playback.play(place, def, script, {
+			lead = msg.lead,
+			onCue = cue,
+			speed = if msg.replay == true then msg.speed else nil,
+		})
 		return script
 	elseif msg.kind == "pool_rack" then
 		Playback.stop(def.id)

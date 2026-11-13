@@ -49,6 +49,10 @@ local game: CueTable.Game = {
 	end,
 	endWords = Words.bumperEnd,
 	board = Words.bumperBoard,
+	-- the last ball of five sunk by the winner's own shot, played again slowly
+	replay = function(state: any): boolean
+		return state.how == "five" and state.lastScript ~= nil and state.last ~= nil and state.last.event == "win"
+	end,
 }
 
 local entry: ServerGame.ServerGame = {

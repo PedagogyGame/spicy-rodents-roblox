@@ -28,7 +28,9 @@
 --   table (Tables.Table), idle(seed) -> spots (how the table lies when nobody plays), away(state) -> { [id]:
 --   true }? (balls kept out of sight), think(state, seat, level, seed, breathe) -> { Input }, snapshot(state)
 --   -> any, words(view, names, snapshot) -> string?, endWords(view, names) -> string, fix(state) (after a
---   scripted layout), opener(state, seat) (the winner of the last game starts this one), board(game view?,
+--   scripted layout), opener(state, seat) (the winner of the last game starts this one), replay(state) ->
+--   bool (the shot that ended the game is played again slowly on every screen: "<game>_shot" with replay =
+--   true and a speed), board(game view?,
 --   names, wins) -> string (the scoreboard beside the table; wins: games won by name this sitting) }.
 --   Table:debug("layout", spots, fields?) sets the table for a check; Table:debug("shoot", args) plays the
 --   turn's shot through the same path. TAIL, LEAD_PERSON, LEAD_COMPUTER, BETWEEN, ANIMAL_R
@@ -52,6 +54,8 @@ CueTable.LEAD_PERSON = 0.15 -- seconds before the strike: the cue's stroke
 CueTable.LEAD_COMPUTER = 1.0 -- a computer player's cue is drawn back and brought through on every screen
 CueTable.BETWEEN = 1.4 -- a computer player's pause between its own shots
 CueTable.THINK_SLICE = 0.004 -- seconds of thinking in one server step
+CueTable.REPLAY_SPEED = 0.4 -- the winning shot played again on every screen, this much slower
+CueTable.REPLAY_LEAD = 1.5 -- seconds after the shot is judged
 CueTable.ANIMAL_R = 0.45 -- studs: how near a rolling ball's centre comes to an animal before it is knocked off
 CueTable.TEXT = {
 	rolling = "Wait for the balls to stop",
@@ -77,6 +81,7 @@ export type Game = {
 	endWords: (view: { [string]: any }, names: { string }) -> string,
 	board: ((view: { [string]: any }?, names: { string }, wins: { [string]: number }) -> string)?,
 	fix: ((state: any) -> ())?,
+	replay: ((state: any) -> boolean)?,
 	opener: ((state: any, seat: number) -> ())?,
 }
 
@@ -106,6 +111,7 @@ function CueTable.new(ctx: ServerGame.Ctx, game: Game): ServerGame.Table
 	self.knocked = {} :: { [any]: boolean } -- animals already knocked off by the shot in flight
 	self.laid = nil :: { spots: { any }, away: { [number]: boolean }? }? -- the balls as last laid out
 	self.wins = {} :: { [string]: number } -- games won at this table, by name, since it was last empty
+	self.replayUntil = 0 -- the winning shot's slow replay is playing on the clients until then
 	local root = ctx.root
 	local room = root and root:FindFirstChild("GamesRoom")
 	local model = room and room:FindFirstChild(Furniture.modelName(game.game, ctx.station.index))
@@ -199,6 +205,7 @@ function CueTable._strike(
 		lead = lead,
 		ends = ctx.now() + lead + script.tEnd + CueTable.TAIL,
 		n = self.shots,
+		text = Wire.encode(script),
 	}
 	ctx.touch()
 	ctx.everyone({
@@ -207,7 +214,7 @@ function CueTable._strike(
 		n = self.shots,
 		seat = seat,
 		lead = lead,
-		text = Wire.encode(script),
+		text = self.pending.text,
 	})
 	ctx.dirty()
 	return true
@@ -239,6 +246,19 @@ function CueTable._land(self: any)
 			if text then
 				ctx.broadcast({ kind = "event", text = text, shot = p.n })
 			end
+		elseif self.game.replay and self.game.replay(state) then
+			-- the shot that won the game, again and slowly, on every screen that can see the table
+			ctx.everyone({
+				kind = self.game.game .. "_shot",
+				index = ctx.station.index,
+				n = p.n,
+				seat = p.seat,
+				lead = CueTable.REPLAY_LEAD,
+				replay = true,
+				speed = CueTable.REPLAY_SPEED,
+				text = p.text,
+			})
+			self.replayUntil = ctx.now() + CueTable.REPLAY_LEAD + p.script.tEnd / CueTable.REPLAY_SPEED + 3
 		end
 		self.pauseUntil = ctx.now() + CueTable.BETWEEN
 	else
@@ -437,10 +457,12 @@ function CueTable.event(self: any, e: ServerGame.Event)
 			self.hw:fresh()
 		end
 		self:_sync()
-		if cut then
-			-- (a shot was on its way when the table emptied: every screen stops playing it)
+		if cut or ctx.now() < self.replayUntil then
+			-- (a shot, or the winning shot's replay, was playing when the table emptied: every screen stops it and
+			-- shows the table as it now lies)
 			self:_rack(nil, true)
 		end
+		self.replayUntil = 0
 	elseif kind == "timeout" then
 		-- an idle turn has been played out by the rules (eight-ball: a foul, the ball in hand)
 		self.thinking = nil

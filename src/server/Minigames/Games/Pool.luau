@@ -60,6 +60,10 @@ local game: CueTable.Game = {
 			end
 		end
 	end,
+	-- the winning 8 into the called pocket, played again slowly
+	replay = function(state: any): boolean
+		return state.how == "eight"
+	end,
 	opener = function(state: any, seat: number)
 		state.seat = seat
 	end,

@@ -489,7 +489,10 @@ end
 
 function Controller.onMessage(self: any, msg: { [string]: any }, _watched: any?)
 	local mode = self.mode :: Game
-	if msg.kind == `{mode.game}_shot` then
+	if msg.kind == `{mode.game}_shot` and msg.replay == true then
+		-- the winning shot played again, slowly: watched from the top of the table
+		self.ctx.toast("The winning shot, again, slowly", 4)
+	elseif msg.kind == `{mode.game}_shot` then
 		if self.phase == "sent" or (msg.seat == self.you and self.phase ~= "off") then
 			-- my own shot is on its way: watch it
 			local g = self:_g()

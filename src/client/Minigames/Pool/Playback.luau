@@ -15,7 +15,9 @@
 -- the script's own rest (and each potted ball's home), which is exactly where the server lays the balls when
 -- the shot is judged (Server/Minigames/Pool/Hardware uses the same Furniture and Roll), so nothing pops when
 -- playback lets go. If the table is not on this client (streamed out) nothing is played.
--- Interface: play(place, def, script, opts { lead?, onCue? }) -> bool; stop(stationId) (cut short: nothing
+-- A slow replay (opts.speed under 1: the winning shot of a game, played again) is the same drawing on a slower
+-- clock: every pose, stroke and sound at its own moment of the script.
+-- Interface: play(place, def, script, opts { lead?, onCue?, speed? }) -> bool; stop(stationId) (cut short: nothing
 --   more is written); set(place, def, table, flat { id, x, z ... }, away { ids }?, fresh?) (lay the balls out:
 --   a new rack, a shot that did not count); put(place, def, table, id, x, z) (one ball on the cloth: the cue
 --   ball in the hand); playing(stationId) -> bool; now(stationId) -> seconds since the strike (negative
@@ -71,6 +73,7 @@ type Entry = {
 	cueAt: number,
 	onCue: ((name: string, volume: number) -> ())?,
 	strokes: { Stroke },
+	speed: number, -- 1, or less for a slow replay (script seconds per second)
 }
 
 local active: { [string]: Entry } = {}
@@ -262,7 +265,7 @@ end
 local function step()
 	local now = Playback.clock()
 	for id, e in active do
-		local t = now - e.t0
+		local t = (now - e.t0) * e.speed
 		local ok, err = pcall(write, e, t)
 		if not ok then
 			warn(`Pool playback: {id}: {err}`)
@@ -308,6 +311,7 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 	end
 	local o: { [string]: any } = opts or {}
 	local lead = math.clamp(tonumber(o.lead) or 0, 0, 5)
+	local pace = math.clamp(tonumber(o.speed) or 1, 0.1, 1)
 	local tb = Tables.byId(script.table)
 	local yaw = yawOf(place)
 	local rots: { [number]: { number } } = {}
@@ -378,6 +382,7 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 		cueAt = 1,
 		onCue = o.onCue,
 		strokes = strokes,
+		speed = pace,
 	}
 	-- (bound afresh with every shot: a binding is never assumed to have outlived what it was bound in)
 	local RunService = game:GetService("RunService")
@@ -448,7 +453,7 @@ end
 
 function Playback.now(stationId: string): number?
 	local e = active[stationId]
-	return if e then Playback.clock() - e.t0 else nil
+	return if e then (Playback.clock() - e.t0) * e.speed else nil
 end
 
 return Playback
