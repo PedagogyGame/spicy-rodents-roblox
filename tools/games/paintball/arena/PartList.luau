@@ -213,6 +213,7 @@ local LOOK: { [string]: { any } } = {
 	tapes_b = { { 96, 118, 140 }, "SmoothPlastic" },
 	screen = { { 26, 32, 42 }, "Glass" },
 	bulkhead = { { 226, 232, 236 }, "Neon" },
+	exit_sign = { { 30, 34, 32 }, "SmoothPlastic" },
 }
 PartList.LOOK = LOOK
 
@@ -228,6 +229,7 @@ local NAMES: { [string]: string } = {
 	ceiling_light = "StripLight",
 	bulkhead = "BulkheadLight",
 	on_air = "OnAir",
+	exit_sign = "ExitSign",
 }
 
 local function nameOf(look: string, kind: number): string

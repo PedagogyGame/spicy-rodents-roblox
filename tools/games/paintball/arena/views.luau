@@ -171,6 +171,13 @@ local VIEWS: { View } = {
 		fov = 85,
 	},
 	{
+		name = "pb_24_way_out",
+		desc = "Ground floor, the south hall: the way out's alcove, EXIT lit green over its mouth, its jambs green, the line on its floor a stride before the gate.",
+		feet = { 5, 0, 44 },
+		look = { 0, 4, 60 },
+		fov = 75,
+	},
+	{
 		name = "pb_18_outside",
 		desc = "The station from the street: five storeys of boarded windows, the annex and its door, the sign, the dead mast.",
 		feet = { -70, 0, 190 },

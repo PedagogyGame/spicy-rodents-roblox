@@ -181,6 +181,7 @@ Plan.LOOKS = table.freeze({
 	"tapes_b",
 	"screen",
 	"bulkhead",
+	"exit_sign",
 })
 
 local LOOK: { [string]: number } = {}
@@ -1015,7 +1016,7 @@ function Plan.build(): Plan
 		on(L, KIND.wall, W, -4, -half, -3, -55, 0, ceiling(L))
 		local l1, l2 = on(L, KIND.wall, W, -3, -half, 3, -59, DOOR, ceiling(L))
 		sign(l1, l2, "+z", "FIRE DOOR\nCHAINED", "stencil", "WAY OUT")
-		local m1, m2 = on(L, KIND.wall, W, -3, -55.5, 3, -55, DOOR + 1, ceiling(L), "gate")
+		local m1, m2 = on(L, KIND.wall, W, -3, -55.5, 3, -55, DOOR + 1, ceiling(L), "exit_sign")
 		table.insert(plan.signs, { box = m1, face = "+z", text = "NO EXIT", tone = "stencil" })
 		table.insert(plan.signs, { box = m2, face = "-z", text = "EXIT", tone = "green" })
 		table.insert(plan.lamps, { box = m2, range = 16, brightness = 0.7, tone = "exit" })
