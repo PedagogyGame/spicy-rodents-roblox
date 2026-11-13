@@ -12,7 +12,9 @@
 --     the hysteresis of Render/TownLights) the ceiling panel (Light) glows and its PointLight is on.
 --   * Riders: every body in Workspace.Bodies carrying a Ride attribute "<cabin>/<seat>" (the server's, lane 4)
 --     has its root put on that seat of the local cabin in the same render step, before the camera: the cabin and
---     its riders come from the same clock on this screen, so nobody shakes against the cabin they sit in.
+--     its riders come from the same clock on this screen, so nobody shakes against the cabin they sit in. The root
+--     goes SIT_ROOT over the seat's top, facing the seat's way. (Client/Animation/AnimationDriver's visual-root
+--     settle and ground probe must leave a body with a Ride attribute alone, or it hangs off its seat: joiner.)
 --   * Wheels: the bullwheels (and their hubs) in f4_lift_base and f4_lift_summit and the sheaves of the
 --     f4_lift_tower_<k> heads turn with the haul rope at LINE_SPEED, the right way round, while streamed in and
 --     within SPIN_RANGE of the camera (their baked poses are kept; the angle comes from the clock).
@@ -48,7 +50,7 @@ SkyLiftView.SNAP = 1 -- seconds: a bigger disagreement is taken at once
 SkyLiftView.SPIN_RANGE = 600 -- studs from the camera within which the wheels are turned
 SkyLiftView.BIND = "SpicySkyLift"
 SkyLiftView.FOLDER = "SkyLiftCabins"
-SkyLiftView.RIDERS_PERIOD = 0.25 -- seconds between looks for bodies with a Ride attribute
+SkyLiftView.RIDERS_PERIOD = 0.1 -- seconds between looks for bodies with a Ride attribute
 SkyLiftView.LIGHTS_PERIOD = 0.5 -- seconds between looks at the lamp level
 SkyLiftView.SCAN_PERIOD = 1 -- seconds between looks for the template and for streamed-in wheels
 SkyLiftView.WAIT_WARN = 30 -- seconds without a CabinTemplate before the console is told
