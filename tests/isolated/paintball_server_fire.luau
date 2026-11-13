@@ -427,6 +427,107 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"what one screen is sent at 8 v 8 with everybody firing as fast as the magazine allows, no two in step, is under the 8 kB a second the contract holds the stream to: the snapshots, every ball and every splat, and no click refused",
+		function()
+			Kit.play(function(kit)
+				local stats = kit.service:stats()
+				local list: { Kit.Client } = {}
+				for i = 1, R.slots do
+					local c = kit.client(`P{i}`)
+					assert(kit.join(c))
+					kit.run(0.1)
+					list[i] = c
+				end
+				kit.run(0.5)
+				kit.live()
+				local feel = kit.state().feel
+				-- everybody steps out of its room and paints the floor in front of it
+				local step = Body.WALK / 60
+				local start: { number } = {}
+				for i, c in list do
+					start[i] = c.x
+				end
+				for _ = 1, 60 do
+					for i, c in list do
+						local dir = if teamOf(kit, c) == 1 then 1 else -1
+						c.x += math.clamp(start[i] + 12 * dir - c.x, -step, step)
+						c.yaw, c.pitch = math.atan2(-dir, 0), -0.6
+					end
+					kit.frame()
+				end
+				kit.run(0.5)
+				-- each with a magazine of its own, as a client has: a click the moment it allows one
+				local mags: { any } = {}
+				for i in list do
+					mags[i] = Magazine.new(R.magazine, feel.fireInterval, feel.reloadSecs)
+				end
+				local watcher = list[1].stub
+				local REMOTES = { "Paintball.Snap", "Paintball.Shot", "Splat" }
+				local function sent(): (number, number)
+					local bytes, messages = 0, 0
+					for _, remote in REMOTES do
+						for _, payload in (watcher.streams and watcher.streams[remote]) or {} do
+							bytes += buffer.len(payload)
+							messages += 1
+						end
+					end
+					return bytes, messages
+				end
+				-- (no two of them in step: sixteen clicks in one frame would go out as one message, and a real
+				-- match's go out one by one)
+				for frame = 1, 16 * 7 do
+					local now = kit.now()
+					for i, c in list do
+						if frame > i * 7 and Magazine.canFire(mags[i], now) then
+							Magazine.fire(mags[i], now)
+							c.fire(Body.look(c.yaw, c.pitch))
+						end
+					end
+					kit.frame()
+				end
+				local SECONDS = 10
+				local bytesWere, messagesWere = sent()
+				local ballsWere = stats.balls
+				for _ = 1, SECONDS * 60 do
+					local now = kit.now()
+					for i, c in list do
+						if Magazine.canFire(mags[i], now) then
+							Magazine.fire(mags[i], now)
+							c.fire(Body.look(c.yaw, c.pitch))
+						end
+					end
+					kit.frame()
+				end
+				local bytes, messages = sent()
+				local balls = stats.balls - ballsWere
+				local budget = Wire.budget(R.slots)
+				-- (the wire's own guess at what the engine adds to a message: Wire.budget's FRAMING)
+				local perSec = ((bytes - bytesWere) + (messages - messagesWere) * 16) / SECONDS
+				local magazinePace = R.slots * R.magazine / ((R.magazine - 1) * feel.fireInterval + feel.reloadSecs)
+				t.eq(stats.shotsRefused, 0, "a client's own magazine and the server's agree on every click")
+				t.truthy(
+					balls / SECONDS > 0.95 * magazinePace,
+					`{balls / SECONDS} balls a second; the magazine allows {magazinePace}`
+				)
+				t.truthy(
+					perSec < 8000,
+					`{perSec} bytes a second to one screen; the contract holds the stream under 8000`
+				)
+				t.truthy(perSec > 0.75 * budget.stream, "and the measure is of the same thing the wire's budget is")
+				print(
+					string.format(
+						"  (8 v 8, %.1f balls a second: %.0f bytes a second to one screen in %.0f messages a second; Wire.budget(16).stream reckons %.0f)",
+						balls / SECONDS,
+						perSec,
+						(messages - messagesWere) / SECONDS,
+						budget.stream
+					)
+				)
+			end)
+		end
+	)
+
 	t.test("a crouched body behind a rail is not tagged by a ball 0.05 over it; standing, it is", function()
 		Kit.play(function(kit)
 			local ada, bea = people(kit, { "Ada", "Bea" })
