@@ -59,6 +59,42 @@ return function(t)
 		t.truthy(Tuning.muzzleBlend < 0.2, "the drawn ball is on the true line within a fifth of a second")
 	end)
 
+	t.test("touch: the buttons are on the screen, clear of each other and of the stock jump button", function()
+		-- the stock jump button (the PlayerModule's TouchJump): 70 px on a small screen, 120 on a large one
+		for _, screen in
+			{
+				{ name = "a phone", w = 844, h = 390, jump = { 844 - 95, 390 - 90, 70 } },
+				{ name = "a small phone", w = 667, h = 375, jump = { 667 - 95, 375 - 90, 70 } },
+				{ name = "a tablet", w = 1180, h = 820, jump = { 1180 - 170, 820 - 210, 120 } },
+			}
+		do
+			local rects: { { any } } = { { "the jump button", screen.jump[1], screen.jump[2], screen.jump[3] } }
+			for _, key in { "touchFire", "touchFireLeft", "touchReload", "touchCrouch", "touchScores" } do
+				local spec = (Tuning :: any)[key] :: { number }
+				local x, y = screen.w * spec[1] - spec[3] / 2, screen.h * spec[2] - spec[3] / 2
+				t.truthy(
+					x >= 0 and y >= 0 and x + spec[3] <= screen.w and y + spec[3] <= screen.h,
+					`{key} is on {screen.name}`
+				)
+				table.insert(rects, { key, x, y, spec[3] })
+			end
+			for i = 1, #rects do
+				for j = i + 1, #rects do
+					local a, b = rects[i], rects[j]
+					local apart = a[2] + a[4] <= b[2]
+						or b[2] + b[4] <= a[2]
+						or a[3] + a[4] <= b[3]
+						or b[3] + b[4] <= a[3]
+					t.truthy(apart, `{a[1]} and {b[1]} do not overlap on {screen.name}`)
+				end
+			end
+			-- FIRE is under the right thumb, SCORES is clear of the clock in the middle and the feed on the right
+			t.truthy(Tuning.touchFire[1] > 0.6 and Tuning.touchFireLeft[1] < 0.3)
+			local scores = Tuning.touchScores
+			t.truthy(screen.w * scores[1] + scores[3] / 2 <= screen.w / 2 - 130, "SCORES is left of the clock")
+		end
+	end)
+
 	t.test("one click, one ball: Wire.Fire with both stamps, the eye as origin, the unit look; and a pop", function()
 		local b = Kit.playing()
 		local at = b.now()

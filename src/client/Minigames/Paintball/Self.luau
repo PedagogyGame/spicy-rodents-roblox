@@ -5,7 +5,12 @@
 -- the player walked in with, and it writes only what the contract says a seat may:
 --   first person   the body's "CameraZone" attribute ("lockFirstPerson" while the seat is open, cleared
 --                  when it closes): Client/Possession and Camera/CameraPolicy do the locking
---   the eye        Humanoid.CameraOffset.Y (crouch and the landing dip); nothing about collision
+--   the eye        Humanoid.CameraOffset.Y, so that the camera is EXACTLY Body.eye(crouch) above the
+--                  feet (less the landing dip) whatever the body's own proportions: the stock camera
+--                  sits 1.5 above the root of an R15 body, which is 4.5 over the feet only for a root
+--                  3.0 up; this game's own people have theirs 3.2 up and an avatar's varies. The ball
+--                  leaves from Body.eye, so only with the camera there is what is under the crosshair
+--                  what is hit, and a crouched eye really under a rail. Nothing about collision.
 --   the view       Camera.FieldOfView (the sprint's widening, eased here), put back on closing
 --   the jump       Humanoid.JumpHeight = Body.JUMP_HEIGHT while seated, put back on closing
 --   a placement    PivotTo the placed feet point and yaw (the client owns its body's physics)
@@ -85,6 +90,19 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 			return hum.HipHeight + root.Size.Y / 2
 		end
 		return ROOT_HEIGHT
+	end
+
+	-- Where the stock first-person camera sits above the feet with no CameraOffset (the PlayerModule's
+	-- own rule: 1.5 above the root's centre, plus the root's extra half height, for an R15 body that
+	-- scales; 2 above it for one that does not).
+	local function stockEye(body: Model): number
+		local hum = humanoidOf(body)
+		local root = (if hum then hum.RootPart else nil) or body.PrimaryPart
+		local head = 1.5
+		if hum and root and hum.RigType == Enum.HumanoidRigType.R15 then
+			head = if hum.AutomaticScalingEnabled then 1.5 + (root.Size.Y - 2) / 2 else 2
+		end
+		return rootHeight(body) + head
 	end
 
 	local self = {} :: Self
@@ -177,13 +195,15 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 	end
 
 	function self.eye(offset: number)
-		if math.abs(offset - eyeNow) < 1e-4 then
+		local body = ctx.body()
+		local hum = humanoidOf(body)
+		if body == nil or hum == nil then
 			return
 		end
-		local hum = humanoidOf(ctx.body())
-		if hum then
-			eyeNow = offset
-			hum.CameraOffset = Vector3.new(0, offset, 0)
+		local y = Body.STAND_EYE + offset - stockEye(body)
+		if math.abs(y - eyeNow) >= 1e-4 then
+			eyeNow = y
+			hum.CameraOffset = Vector3.new(0, y, 0)
 		end
 	end
 

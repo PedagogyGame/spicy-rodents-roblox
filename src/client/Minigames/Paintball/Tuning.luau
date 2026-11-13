@@ -185,13 +185,16 @@ local Tuning = {
 	nameTagFar = 70,
 
 	-- TOUCH -----------------------------------------------------------------------------------------
-	-- The buttons, as fractions of the screen (centre x, centre y) and a size in pixels. FIRE at the
-	-- lower right does not sink its touch (a drag that starts on it still turns the view).
-	touchFire = { 0.86, 0.62, 96 },
+	-- The buttons, as fractions of the screen (centre x, centre y) and a size in pixels. FIRE on the
+	-- right does not sink its touch (a drag that starts on it still turns the view). THE LOWER RIGHT
+	-- CORNER IS LEFT ALONE: the stock jump button lives there (70 px on a phone, 120 on a tablet), and
+	-- so is the lower left below FIRE, which is the thumbstick's. SCORES sits left of the clock, clear
+	-- of the feed on the right and of Roblox's own buttons in the top left corner.
+	touchFire = { 0.8, 0.52, 96 },
 	touchFireLeft = { 0.12, 0.42, 76 },
-	touchReload = { 0.74, 0.8, 64 },
-	touchCrouch = { 0.93, 0.82, 64 },
-	touchScores = { 0.93, 0.12, 56 },
+	touchReload = { 0.7, 0.84, 64 },
+	touchCrouch = { 0.94, 0.48, 64 },
+	touchScores = { 0.24, 0.1, 56 },
 
 	-- SWITCHES --------------------------------------------------------------------------------------
 	-- Turn the look to the placement's yaw through a one-frame camera hold (the contract's "turn of

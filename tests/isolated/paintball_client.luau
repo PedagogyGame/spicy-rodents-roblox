@@ -1221,6 +1221,39 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"the eye is the contract's whatever the body: this game's own people stand with the root 3.2 up, not 3.0",
+		function()
+			play(function(s)
+				-- (Avatar/PuppetSpec: HipHeight 2.2 under a root 2 high; the stock camera would sit at 4.7)
+				s.hum.HipHeight = 2.2
+				playing(s)
+				local p = s.w.body.PrimaryPart.Position
+				local _, rootY = Arena.toLocal(s.place, p.X, p.Y, p.Z)
+				t.near(rootY, 3.2, 1e-6, "placed with its feet on the floor, not 0.2 into it")
+				t.near(s.hum.CameraOffset.Y, -0.2, 1e-6, "the camera is brought to Body.eye over the feet")
+				click(s)
+				s.run(0.3)
+				local fire = heard(s, "Paintball.Fire")[1]
+				t.near(fire.oy, Body.STAND_EYE, 1e-4, "which is where the ball leaves from: the crosshair is true")
+				local moves = heard(s, "Paintball.Move")
+				t.near(moves[#moves].y, 0, 1e-4, "and the feet point on the wire is the feet")
+				Rig.key(Key.C, true)
+				s.run(F.crouchSecs + 0.1)
+				t.near(3.2 + 1.5 + s.hum.CameraOffset.Y, Body.CROUCH_EYE, 1e-6, "crouched: the eye is at 2.7")
+				t.truthy(3.2 + 1.5 + s.hum.CameraOffset.Y < Arena.RAIL_HEIGHT, "under the rail for this body too")
+				Rig.key(Key.C, false)
+				s.run(0.4)
+				Rig.key(Key.G, true)
+				s.run(0.2)
+				Rig.click(s.w, "Leave the match")
+				s.run(0.3)
+				Rig.key(Key.G, false)
+				t.eq(s.hum.CameraOffset.Y, 0, "and the town has its own eye back")
+			end)
+		end
+	)
+
 	t.test("the cues: every sound the client asks for is one the game declares, each still without an id", function()
 		local declared = require("@client/Minigames/Games/Paintball").sounds
 		local names = {}
