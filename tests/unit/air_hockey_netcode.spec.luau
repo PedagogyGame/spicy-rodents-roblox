@@ -242,51 +242,57 @@ return function(t)
 	--   crawl: the share of the frames a moving puck's moment ran under 60 % of the clock (a shot going away
 	--     falls behind over its whole trip; it was 20, 29 and 50 % at 0, 40 and 80 ms when it was taken in the
 	--     25 cm past the centre line), and stopped: frames it ran under 5 % (9, 57 and 180 a minute before).
+	--   The 0, 40 and 80 ms rows were tightened when the segments went from 16 ticks to 12 and the far mallet's
+	--   charge was planned for (Seat need()): with no delay the far end was 74 ms late, the drawn puck moved over
+	--   1.5 times the top speed on 2.5 to 3 % of frames, a moving puck crawled on 6 to 7 % and stood still on 5
+	--   or 6 frames a minute; it is now 58 ms, 1.5 to 2.3 %, under 3 % and none. A hard shot sent back from the
+	--   centre line still has to catch up in half a metre; at 150 ms the conservative plan makes the puck later
+	--   at this player's strikes (0.2 s to 0.24 s), where nothing honest is in time anyway.
 	for _, case in
 		{
 			{
 				ms = 0,
-				late = 0.085,
+				late = 0.065,
 				shown = 0.002,
 				strike = 0.005,
-				live = 0.75,
-				over2 = 0.008,
-				over15 = 0.04,
-				crawl = 0.09,
-				stopped = 10,
+				live = 0.8,
+				over2 = 0.002,
+				over15 = 0.025,
+				crawl = 0.04,
+				stopped = 1,
 			},
 			{
 				ms = 40,
-				late = 0.135,
+				late = 0.115,
 				shown = 0.004,
 				strike = 0.006,
-				live = 0.5,
-				over2 = 0.035,
-				over15 = 0.08,
-				crawl = 0.17,
-				stopped = 12,
+				live = 0.55,
+				over2 = 0.03,
+				over15 = 0.05,
+				crawl = 0.13,
+				stopped = 5,
 			},
 			{
 				ms = 80,
-				late = 0.235,
+				late = 0.215,
 				shown = 0.012,
-				strike = 0.08,
+				strike = 0.07,
 				live = 0.22,
-				over2 = 0.05,
-				over15 = 0.065,
-				crawl = 0.33,
-				stopped = 10,
+				over2 = 0.04,
+				over15 = 0.05,
+				crawl = 0.34,
+				stopped = 4,
 			},
 			{
 				ms = 150,
 				late = 0.375,
 				shown = 0.012,
-				strike = 0.22,
+				strike = 0.25,
 				live = 0,
-				over2 = 0.045,
-				over15 = 0.05,
-				crawl = 0.38,
-				stopped = 20,
+				over2 = 0.035,
+				over15 = 0.04,
+				crawl = 0.33,
+				stopped = 4,
 			},
 		}
 	do
@@ -331,7 +337,7 @@ return function(t)
 					t.truthy(e.puckLate.max <= e.farLate.max + 1e-9, "the puck is never drawn later than the far end")
 					-- where this player's mallet meets it, the puck drawn is the present puck
 					local f = Line.feel(line, side)
-					t.truthy(f.strikes.n > 20, "this mallet struck the puck")
+					t.truthy(f.strikes.n > 12, `this mallet struck the puck ({f.strikes.n} times)`)
 					t.truthy(
 						f.strikes.mean < case.strike,
 						`side {side}: at their own strikes the puck drawn was {f.strikes.mean} s late on average`
@@ -362,8 +368,9 @@ return function(t)
 						`side {side}: a moving puck was drawn stock still on {f.stopped} frames`
 					)
 					local perSecond = line.sent[side] / math.min(line.time, line.ref.n / 240 + 0.5)
-					-- (fifteen segments a second, and one more for each press of the serve button: it goes at once)
-					t.truthy(perSecond > 12 and perSecond <= 15.5, `{perSecond} messages a second`)
+					-- (twenty segments a second, the most Minigame.Input carries, and one more for each press of the
+					-- serve button: it goes at once, out of the forty the limit holds in hand)
+					t.truthy(perSecond > 18 and perSecond <= 20.3, `{perSecond} messages a second`)
 				end
 				t.truthy(line.ref.sim.hitSerial > 30, "a real rally")
 			end

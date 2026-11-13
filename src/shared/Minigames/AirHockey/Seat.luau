@@ -6,7 +6,7 @@
 --     (`pred`), which is stepped to the present tick of the shared clock every frame. The mallet on their screen
 --     is that simulation's mallet: no delay at all, and exactly the mallet the referee will step when the log
 --     arrives, because both are given the same numbers on the same ticks;
---   * what the hand did goes into a log by tick, sent on in segments (Wire: ten or fifteen messages a second);
+--   * what the hand did goes into a log by tick, sent on in segments (Wire: ten or twenty messages a second);
 --   * the referee's stream comes back a moment later and is replayed exactly (Replica). The state it gives for
 --     tick c is compared with what this seat predicted for tick c (a ring of past predictions). Against the
 --     computer they are always the same, to the last bit: nothing is ever corrected, and the player has the
@@ -65,7 +65,7 @@
 --   heard(seat, fn) (fn(what, speed) for each contact the drawn puck has just passed: Sim.HIT_*, m/s);
 --   relax(seat, dt); Seat.pred / .tick / .replica / .resims / .ready; Seat.puckAt / .farAt (the ticks the puck
 --   and the far mallet are drawn at) / .late / .held (frames the puck was slowed into the edge of what is
---   certain); EASE; LEAD; RATE_MAX; DRAWN_MAX; MEET; FAST; LAND; LAND_RATE; LOOK; PAD; BRAKE
+--   certain); EASE; LEAD; RATE_MAX; DRAWN_MAX; MEET; FAST; LAND; LAND_RATE; LOOK; PAD; CHARGE; BRAKE
 
 local Replica = require("./Replica")
 local Sim = require("./Sim")
@@ -87,6 +87,8 @@ Seat.PAD = 2 -- ticks of lateness asked for beyond what is strictly needed
 Seat.MARGIN = 2 -- ticks the far end is drawn behind the newest the stream has brought at its latest
 Seat.SHRINK = 0.15 -- how fast `late` comes down when the stream is earlier than it was (ticks a tick)
 Seat.WINDOW = 72 -- ticks: the stream's lateness is the most it has been over the last one to two of these
+Seat.SPREAD = false
+Seat.CHARGE = 24 -- ticks: the longest the far mallet is planned to come at the puck unseen (need(); 0.1 s)
 Seat.BRAKE = 6 -- ticks: a puck that reaches the edge of what is certain is slowed into it over about this much
 local CAP = 1024 -- ticks of past predictions kept
 local WIDTH = #Wire.STATE
@@ -451,9 +453,13 @@ end
 -- to be here: the far mallet, last seen by the referee at (mx, my), is no faster than a hand, so it can have
 -- touched a puck `dist` away only if as many ticks have gone by as it takes to cover the gap. `late` at the
 -- mallet's own reach, a tick less for every 14.6 mm beyond it, nothing where no mallet of that end can come.
--- (the same rule as certain(), which is the hard edge under it)
+-- (the same rule as certain(), which is the hard edge under it.) `ahead`: how many ticks after the referee's
+-- word the puck is there. The far mallet may have come at it all that while (up to CHARGE), so the gap is that much
+-- shorter: a mallet that charges the puck is planned for, and the puck falls behind early and steadily instead
+-- of being stopped at the edge of what is certain when the charge is heard of (it was stopped there on about 5
+-- frames a minute with no delay on the line).
 local STRIDE = Sim.HUMAN_SPEED * Sim.STEP
-local function need(seat: Seat, px: number, py: number, mx: number, my: number, late: number): number
+local function need(seat: Seat, px: number, py: number, mx: number, my: number, late: number, ahead: number): number
 	local far = if seat.side == 0 then 1 else -1
 	local q = py * far
 	local limitX = Sim.HALF_WIDTH - Sim.PADDLE_RADIUS
@@ -464,7 +470,7 @@ local function need(seat: Seat, px: number, py: number, mx: number, my: number, 
 		return 0
 	end
 	local dx, dy = px - mx, py - my
-	local dist = math.sqrt(dx * dx + dy * dy)
+	local dist = math.sqrt(dx * dx + dy * dy) - math.clamp(ahead, 0, Seat.CHARGE) * STRIDE
 	return math.clamp(late - (dist - REACH) / STRIDE + Seat.PAD, 0, late)
 end
 
@@ -534,7 +540,7 @@ local function moments(seat: Seat, now: number, confirmed: number)
 			struck = struck or d[base + 6] == myHit
 		end
 		-- (a place that asks for nothing asks nothing of the rate either)
-		local wanted = need(seat, d[base + 1], d[base + 2], mx, my, late)
+		local wanted = need(seat, d[base + 1], d[base + 2], mx, my, late, tick - confirmed)
 		if wanted > 0 then
 			local ask = (wanted - behind) / math.max(tick - at, 1)
 			if ask > slope then
@@ -556,7 +562,7 @@ local function moments(seat: Seat, now: number, confirmed: number)
 				y = -2 * endY - y
 			end
 			local x = Sim.fold(px + vx * k, Sim.HALF_WIDTH - Sim.PUCK_RADIUS)
-			local wanted = need(seat, x, y, mx, my, late)
+			local wanted = need(seat, x, y, mx, my, late, seat.tick + k - confirmed)
 			if wanted > 0 then
 				local ask = (wanted - behind) / math.max(seat.tick + k - at, 1)
 				if ask > slope then

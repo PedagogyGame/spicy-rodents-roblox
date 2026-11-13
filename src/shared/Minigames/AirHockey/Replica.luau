@@ -5,7 +5,7 @@
 -- server decided, at every tick and not only at the end of each message.
 -- A seated player replays at once (step(r) to the newest tick): theirs is the state their own prediction is
 -- checked against. A watcher replays a little behind the newest tick, at the pace of their own frames
--- (step(r, upToTick)), which is how the puck moves smoothly on a screen that is sent fifteen messages a second.
+-- (step(r, upToTick)), which is how the puck moves smoothly on a screen that is sent twenty messages a second.
 -- Anyone can start from any message: a message that does not carry on from what is held (the first one, another
 -- match, a gap) is taken as it stands. If a replay ever ends somewhere other than the state its message carries,
 -- the message wins (and `desyncs` counts it: the specs hold that at zero).

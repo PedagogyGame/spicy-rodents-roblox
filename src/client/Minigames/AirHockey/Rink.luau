@@ -3,7 +3,7 @@
 -- The air hockey table on this screen: the puck and the two mallets of the baked table
 -- (Workspace.Attractions.<alley>.GamesRoom.AirHockey), moved every rendered frame, and the match as a BYSTANDER
 -- sees it. The server sends everyone near the table the referee's stream (Shared/Minigames/AirHockey/Wire:
--- fifteen messages a second at most); a Replica replays it tick by tick through the same simulation, a little
+-- twenty messages a second at most); a Replica replays it tick by tick through the same simulation, a little
 -- behind the newest tick (DELAY) and at the pace of this screen's own frames, drawn between ticks: the puck
 -- glides at any frame rate and is exactly the server's puck, a moment ago. It simulates nothing of its own.
 -- When the local player sits down at the table their controller (Client/Minigames/AirHockey/Controller) takes

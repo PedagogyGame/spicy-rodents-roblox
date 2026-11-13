@@ -32,7 +32,12 @@ local Sim = require("./Sim")
 local Wire = {}
 
 Wire.SEGMENT_SOLO = 24 -- ticks a segment of the log covers against the computer: ten messages a second
-Wire.SEGMENT_DUO = 16 -- and against a person: fifteen a second (the other player waits on it)
+-- and against a person: twenty a second, the most Minigame.Input carries (the other player's screen waits on
+-- it: every tick of it is a tick the far end is drawn late, and a tick the puck has to fall behind and catch up on
+-- every exchange. At 16 the far end was 18 ticks late on a perfect line, at 12 it is 14; a segment is sent once a
+-- whole SEGMENT_DUO is played, so a client at any frame rate sends twenty a second at most, and a serve's own
+-- segment comes out of the 40 the limit holds in hand)
+Wire.SEGMENT_DUO = 12
 Wire.SEGMENT_QUIET = 120 -- while nothing comes back from the server (a stalled line): two messages a second
 Wire.QUIET = 96 -- ticks without a word from the server before the line counts as stalled (0.4 s)
 Wire.MAX_SEGMENT = 1440 -- the longest stretch one message may cover (a client coming back from a long frame)

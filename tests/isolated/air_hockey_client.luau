@@ -893,9 +893,11 @@ return function(t)
 			t.truthy(tbl.ref.sim.hitSerial > 10, "a rally")
 			local worst, mean = apart(shown, truth(w))
 			t.truthy(worst[2] < EXACT, `Ann's own mallet is her hand ({worst[2]} m)`)
-			t.truthy(mean[1] < 0.2, `the puck on Ann's screen is {mean[1]} m from the referee's on average`)
+			-- (from the referee's puck of the same instant: the far half is drawn a moment ago, on purpose)
+			t.truthy(mean[1] < 0.25, `the puck on Ann's screen is {mean[1]} m from the referee's on average`)
+			-- (twenty segments a second at most: the most Minigame.Input carries, and the rig's Net drops the rest)
 			local logs = Rig.count(w.sent, "log")
-			t.truthy(logs / 20 > 12 and logs / 20 < 15.5, `{logs / 20} log messages a second against a person`)
+			t.truthy(logs / 20 > 16 and logs / 20 <= 20.3, `{logs / 20} log messages a second against a person`)
 			-- Bob's game stops answering: after the idle time he is taken off and the computer has his end
 			local n = tbl.ref.n
 			play(w, 7.5, hand)
