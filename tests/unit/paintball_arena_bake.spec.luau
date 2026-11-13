@@ -124,6 +124,99 @@ return function(t)
 		t.deepEq(again[n], parts[n])
 	end)
 
+	t.test("the paint: every painted sign lies on a face that can be seen; names, numbers and monitors on every storey", function()
+		local H = Arena.FLOOR_HEIGHT
+		local normals: { [string]: { number } } =
+			{ ["+x"] = { 1, 0 }, ["-x"] = { -1, 0 }, ["+z"] = { 0, 1 }, ["-z"] = { 0, -1 } }
+		local digits: { [number]: number } = {}
+		local stairs: { [number]: number } = {}
+		local named: { [number]: number } = {}
+		local painted = 0
+		local words: { [string]: boolean } = {}
+		for _, s in plan.signs do
+			local at, w, h = s.at, s.w, s.h
+			words[s.text] = true
+			if at and w and h then
+				painted += 1
+				local k = (s.box - 1) * 6
+				local b = plan.boxes
+				local nx, nz = normals[s.face][1], normals[s.face][2]
+				-- on the face: the box's own, and the whole rectangle within it
+				local faceAt = if nx > 0
+					then b[k + 4]
+					elseif nx < 0 then b[k + 1]
+					elseif nz > 0 then b[k + 6]
+					else b[k + 3]
+				t.near(if nx ~= 0 then at[1] else at[3], faceAt, 1e-9, `"{s.text}" is on its box's {s.face} face`)
+				local lo, hi = if nx ~= 0 then b[k + 3] else b[k + 1], if nx ~= 0 then b[k + 6] else b[k + 4]
+				local mid = if nx ~= 0 then at[3] else at[1]
+				t.truthy(mid - w / 2 >= lo - 1e-9 and mid + w / 2 <= hi + 1e-9, `"{s.text}" fits its face across`)
+				t.truthy(at[2] - h / 2 >= b[k + 2] - 1e-9 and at[2] + h / 2 <= b[k + 5] + 1e-9, `"{s.text}" fits its face`)
+				-- seen: nothing solid lies against the face at the sign's middle or its two ends, and there is
+				-- somewhere to read it from (two studs of air in front of it)
+				for _, side in { -0.45, 0, 0.45 } do
+					local x = at[1] + nx * 0.05 + (if nx == 0 then side * w else 0)
+					local z = at[3] + nz * 0.05 + (if nz == 0 then side * w else 0)
+					t.eq(
+						(arena.sweep(x, at[2], z, x + nx * 2, at[2], z + nz * 2)),
+						nil,
+						`"{s.text}" at ({at[1]}, {at[2]}, {at[3]}) is behind something`
+					)
+				end
+				local level = math.floor(at[2] / H)
+				if #s.text == 1 and tonumber(s.text) ~= nil then
+					t.eq(tonumber(s.text), level + 1, "a pillar's number is its storey's, counted from 1")
+					digits[level] = (digits[level] or 0) + 1
+				elseif s.text == "STAIRS" then
+					stairs[level] = (stairs[level] or 0) + 1
+				else
+					named[level] = (named[level] or 0) + 1
+				end
+			end
+		end
+		t.truthy(painted >= 200, `{painted} painted signs`)
+		for level = 0, Arena.FLOORS - 1 do
+			t.eq(digits[level], 16, `storey {level}: its number on four faces of four pillars`)
+			t.truthy((stairs[level] or 0) >= 4, `storey {level}: STAIRS over the cores' doors`)
+			t.truthy((named[level] or 0) >= 16, `storey {level}: {named[level]} names and notices`)
+		end
+		for _, text in
+			{ "STUDIO A", "STUDIO B", "NEWS STUDIO", "MASTER CONTROL", "TAPE LIBRARY", "ORANGE TEAM", "TEAL TEAM" }
+		do
+			t.truthy(words[text], `{text} is written somewhere`)
+		end
+		-- the part list lays each out inside its face
+		local rects = 0
+		for _, p in PartList.solids(plan) do
+			for _, s in p.signs or {} do
+				local r = s.rect
+				if r then
+					rects += 1
+					t.truthy(r[1] >= -1e-9 and r[2] >= -1e-9 and r[1] + r[3] <= 1 + 1e-9 and r[2] + r[4] <= 1 + 1e-9)
+					t.truthy(r[3] > 0.02 and r[4] > 0.02, "a sign is big enough to read")
+				end
+			end
+		end
+		t.eq(rects, painted)
+		-- the station's monitors: on every storey some hang from the ceiling, over every head, their screens
+		-- looking along the concourse and the gallery; the two teams' sides have the same number
+		for level = 0, Arena.FLOORS - 1 do
+			local hung, sides = 0, { 0, 0 }
+			for i, _ in plan.monitors do
+				local k = (i - 1) * 6
+				local b = plan.boxes
+				if math.floor(b[k + 2] / H) == level and b[k + 2] - level * H >= 8 then
+					hung += 1
+					t.truthy(b[k + 2] - level * H >= Arena.HEADROOM + 2, "a hung monitor is over every head")
+					local side = if (b[k + 1] + b[k + 4]) / 2 + (b[k + 3] + b[k + 6]) / 2 < 0 then 1 else 2
+					sides[side] += 1
+				end
+			end
+			t.eq(hung, 4, `storey {level} has four hung monitors`)
+			t.eq(sides[1], sides[2])
+		end
+	end)
+
 	t.test("the dressing is outside the arena: the lobby annex with the pass desk and its windows, the mast", function()
 		local parts = PartList.dressing(venue)
 		t.truthy(#parts > 300 and #parts < 800, `{#parts} parts of dressing`)

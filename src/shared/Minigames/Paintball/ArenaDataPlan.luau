@@ -38,7 +38,18 @@
 -- Pure. Interface: build() -> Plan (a fresh table each call); LOOKS (names, by code); DOOR
 local Arena = require("./Arena")
 
-export type Sign = { box: number, face: string, text: string, tone: string }
+-- Words on a box's face. Without `at` they fill the face; with it they are painted in the w x h rectangle
+-- whose middle is the point `at` (arena coordinates, on the face). `bg` is a painted panel behind them.
+export type Sign = {
+	box: number,
+	face: string,
+	text: string,
+	tone: string,
+	at: { number }?,
+	w: number?,
+	h: number?,
+	bg: string?,
+}
 export type Lamp = { box: number, range: number, brightness: number, tone: string }
 export type Flight = { f: number, side: number, dir: number, z: number }
 export type Doorway = { level: number, ax: number, az: number, bx: number, bz: number }
@@ -124,6 +135,9 @@ Plan.LOOKS = table.freeze({
 	"table",
 	"bench",
 	"stand",
+	"terminal",
+	"sheet",
+	"ceiling_dead",
 })
 
 local LOOK: { [string]: number } = {}
@@ -225,6 +239,70 @@ function Plan.build(): Plan
 	local function lamp(a: number, b: number, range: number, brightness: number, tone: string)
 		table.insert(plan.lamps, { box = a, range = range, brightness = brightness, tone = tone })
 		table.insert(plan.lamps, { box = b, range = range, brightness = brightness, tone = tone })
+	end
+	-- PAINT: words in a w x h rectangle on whichever box has a face looking `face` that holds the whole
+	-- rectangle about (x, y, z); the twin's are painted on the twin box (text2, or the same words). Paint
+	-- is not a solid and not a part: it is on the wall a ball stops on. Called after the boxes it is
+	-- painted on are made; a rectangle that lies on no one face is a mistake in this file.
+	local function faceBox(x: number, y: number, z: number, face: string, w: number, h: number): number
+		local e = 1e-6
+		for i = 1, #kinds do
+			local k = (i - 1) * 6
+			local x0, y0, z0, x1, y1, z1 =
+				boxes[k + 1], boxes[k + 2], boxes[k + 3], boxes[k + 4], boxes[k + 5], boxes[k + 6]
+			if y0 <= y - h / 2 + e and y1 >= y + h / 2 - e then
+				local alongX = x0 <= x - w / 2 + e and x1 >= x + w / 2 - e
+				local alongZ = z0 <= z - w / 2 + e and z1 >= z + w / 2 - e
+				if
+					(face == "+z" and math.abs(z1 - z) < e and alongX)
+					or (face == "-z" and math.abs(z0 - z) < e and alongX)
+					or (face == "+x" and math.abs(x1 - x) < e and alongZ)
+					or (face == "-x" and math.abs(x0 - x) < e and alongZ)
+				then
+					return i
+				end
+			end
+		end
+		error(`ArenaDataPlan: no face {face} holds a {w} x {h} sign at ({x}, {y}, {z})`)
+	end
+	local function paint(
+		x: number,
+		y: number,
+		z: number,
+		face: string,
+		w: number,
+		h: number,
+		text: string,
+		tone: string,
+		text2: string?,
+		bg: string?
+	)
+		table.insert(plan.signs, {
+			box = faceBox(x, y, z, face, w, h),
+			face = face,
+			text = text,
+			tone = tone,
+			at = { x, y, z },
+			w = w,
+			h = h,
+			bg = bg,
+		})
+		local back = opposite(face)
+		table.insert(plan.signs, {
+			box = faceBox(-x, y, -z, back, w, h),
+			face = back,
+			text = text2 or text,
+			tone = tone,
+			at = { -x, y, -z },
+			w = w,
+			h = h,
+			bg = bg,
+		})
+	end
+	-- a room's name over its doorway, on the lintel: (x, z) is the middle of the doorway on the face the
+	-- name is read from
+	local function over(level: number, x: number, z: number, face: string, w: number, text: string, text2: string?)
+		paint(x, level * H + DOOR + 1.5, z, face, w, 1.7, text, "white", text2, "plate")
 	end
 
 	-- A full-height wall 1 thick, with openings. `along` "x": it runs along x at z = c from a to b;
@@ -506,10 +584,27 @@ function Plan.build(): Plan
 		lamp(i, j, 26, 0.9, "warm")
 	end
 	-- a strip light on the ceiling (a box like any other: a ball stops on it)
+	-- (one fitting in five is dead: the same ones on both teams' sides)
+	local strips = 0
 	local function strip(level: number, x0: number, z0: number, x1: number, z1: number, tone: string?)
 		local c = ceiling(level)
+		strips += 1
+		if strips % 5 == 3 then
+			on(level, KIND.prop, "ceiling_dead", x0, z0, x1, z1, c - 0.4, c)
+			return
+		end
 		local i, j = on(level, KIND.prop, "ceiling_light", x0, z0, x1, z1, c - 0.4, c)
 		lamp(i, j, 34, 1.1, tone or "cold")
+	end
+	-- a monitor hung from the ceiling on a drop pole, its screen looking `face`: the lowest of it is 8.6
+	-- over the floor, above every head, so it is nobody's cover and in nobody's way
+	local function hung(level: number, x: number, z: number, face: string)
+		local alongX = face == "+z" or face == "-z"
+		local wx, wz = if alongX then 1.9 else 0.5, if alongX then 0.5 else 1.9
+		on(level, KIND.prop, "stand", x - 0.2, z - 0.2, x + 0.2, z + 0.2, 11, ceiling(level))
+		local a, b = on(level, KIND.prop, "monitor", x - wx, z - wz, x + wx, z + wz, 8.6, 11)
+		plan.monitors[a] = face
+		plan.monitors[b] = opposite(face)
 	end
 	-- a cable tray under the ceiling
 	local function tray(level: number, x0: number, z0: number, x1: number, z1: number)
@@ -562,6 +657,9 @@ function Plan.build(): Plan
 		strip(level, -4, -46, 4, -44)
 		tray(level, -27.5, -30, -26.5, 30)
 		tray(level, -59, -34, -31, -33)
+		-- the station's monitors over the concourse and the north gallery: the score, when it comes on air
+		hung(level, -23, 0, if level % 2 == 0 then "-z" else "+z")
+		hung(level, 0, -18.5, if level % 2 == 0 then "+x" else "-x")
 	end
 
 	-- STOREY 0: the loading dock and the workshop
@@ -639,7 +737,7 @@ function Plan.build(): Plan
 		wall(L, W, "x", -9.5, -half, -46, nil)
 		wall(L, W, "x", 9.5, -half, -46, nil)
 		wall(L, W, "z", -45.5, -10, 10, { { -6, 4, WINDOW }, { 0, 5 }, { 6, 4, WINDOW } })
-		low(L, "desk", -55, -1.5, -50, 1.5)
+		low(L, "sheet", -55, -1.5, -50, 1.5)
 		tall(L, "cabinet", -59, -9, -54, -7.4, 7)
 		-- cubicles: a cross of partitions with a desk in two of its corners
 		local function cubicle(x: number, z: number)
@@ -647,6 +745,9 @@ function Plan.build(): Plan
 			low(L, "cubicle", x - 0.3, z - 4.5, x + 0.3, z + 4.5)
 			low(L, "desk", x - 4.2, z + 0.3, x - 0.3, z + 2.3)
 			low(L, "desk", x + 0.3, z - 2.3, x + 4.2, z - 0.3)
+			-- a dead terminal on each desk
+			on(L, KIND.prop, "terminal", x - 3.3, z + 0.8, x - 1.5, z + 2, RAIL, RAIL + 1.4)
+			on(L, KIND.prop, "terminal", x + 1.5, z - 2, x + 3.3, z - 0.8, RAIL, RAIL + 1.4)
 		end
 		cubicle(-52, -20)
 		cubicle(-38.5, -21)
@@ -768,7 +869,7 @@ function Plan.build(): Plan
 		low(L, "console", 40, -48, 52, -45.5)
 		tall(L, "rack", 57.4, -57, 59.4, -51, 7)
 		tall(L, "case", 34, -58.5, 37, -55.5, 6.8)
-		low(L, "sofa", 50, -37, 56, -34.5)
+		low(L, "sheet", 50, -37, 56, -34.5)
 		-- the concourse
 		low(L, "bench", -22.5, -3, -20.5, 3)
 		low(L, "planter", -27, 22, -24, 24.4)
@@ -792,7 +893,7 @@ function Plan.build(): Plan
 		low(L, "planter", -31.5, -27, -29.5, -17)
 		low(L, "planter", -31.5, -9, -29.5, 9)
 		low(L, "planter", -31.5, 17, -29.5, 27)
-		low(L, "sofa", -42, -2, -39.5, 4)
+		low(L, "sheet", -42, -2, -39.5, 4)
 		-- the transmitter hall: cabinets in rows, a cable tray from each to the mast
 		local t1, t2 = tall(L, "transmitter", -26, -53.5, -10, -50.5, 9)
 		sign(t1, t2, "+z", "DANGER\nHIGH VOLTAGE", "yellow")
@@ -809,7 +910,7 @@ function Plan.build(): Plan
 		low(L, "sofa", -44, -58.5, -36, -56)
 		-- the north-east room: the station manager's office
 		low(L, "desk", 42, -52, 50, -49)
-		low(L, "sofa", 34, -42, 36.5, -35)
+		low(L, "sheet", 34, -42, 36.5, -35)
 		tall(L, "cabinet", 57.8, -58, 59.4, -52, 7)
 		set(L, 54, -38, "-x")
 		-- the concourse
@@ -832,6 +933,97 @@ function Plan.build(): Plan
 	for level = 1, floors - 1 do
 		on(level, KIND.prop, "cable", -14.6, -14.6, -14.2, -14.2, if level == 1 then 4 else 0, H)
 		on(level, KIND.prop, "cable", 13.9, -14.4, 14.2, -14.1, if level == 2 then 6 else 0, H)
+	end
+
+	-- PAINT, last, when every wall it is on stands: each room's name over its doors, STAIRS over the cores'
+	-- doors, the storey's number (1 to 5, as the station numbered them) on the four pillars at the
+	-- atrium's corners, and the notices the last crew left. Written for the north and west; the twin of each
+	-- is the south's and east's, with its own words where the rooms differ.
+	type Names = { hall: { string }, nw: { string }, ne: { string }, notice: { string } }
+	local NAMES: { Names } = {
+		{
+			hall = { "SCENERY STORE", "RECEPTION" },
+			nw = { "RACKING", "STORES" },
+			ne = { "CABLE STORE", "MAIL ROOM" },
+			notice = { "DOCK STAFF\nONLY", "VISITORS REPORT\nTO RECEPTION" },
+		},
+		{
+			hall = { "NEWS STUDIO", "SPORTS STUDIO" },
+			nw = { "EDIT SUITES", "FILM EDITING" },
+			ne = { "WEATHER", "TRAFFIC" },
+			notice = { "QUIET PLEASE\nNEWS ON AIR", "DEADLINE\n5:45 SHARP" },
+		},
+		{
+			hall = { "STUDIO A", "STUDIO B" },
+			nw = { "PROP STORE", "PROP STORE" },
+			ne = { "CONTROL A", "CONTROL B" },
+			notice = { "NO ENTRY ON\nRED LIGHT", "NO ENTRY ON\nRED LIGHT" },
+		},
+		{
+			hall = { "TAPE LIBRARY", "FILM VAULT" },
+			nw = { "TELECINE", "DUBBING" },
+			ne = { "AUDIO BOOTH", "VOICE BOOTH" },
+			notice = { "SIGN OUT\nEVERY TAPE", "ENGINEERS\nONLY" },
+		},
+		{
+			hall = { "TRANSMITTER", "TRANSMITTER" },
+			nw = { "BOARDROOM", "CANTEEN" },
+			ne = { "STATION MANAGER", "ACCOUNTS" },
+			notice = { "DANGER\nRF RADIATION", "DANGER\nRF RADIATION" },
+		},
+	}
+	for level = 0, floors - 1 do
+		local n = NAMES[level + 1]
+		local y = level * H
+		-- the hall line, read from the building's middle; and the doors between the halls and the corner rooms
+		local west = if level == 2 then -52 else -45
+		over(level, -23, -30, "+z", 7, n.hall[1], n.hall[2])
+		over(level, 23, -30, "+z", 7, n.hall[1], n.hall[2])
+		over(level, west, -30, "+z", 5.4, n.nw[1], n.nw[2])
+		over(level, 45, -30, "+z", 5.4, n.ne[1], n.ne[2])
+		over(level, -30, -45, "+x", 5.4, n.nw[1], n.nw[2])
+		over(level, -31, -45, "-x", 5.4, n.hall[1], n.hall[2])
+		local east = if level == 2 then -39 else -45
+		over(level, 30, east, "-x", 5.4, n.ne[1], n.ne[2])
+		over(level, 31, east, "+x", 5.4, n.hall[1], n.hall[2])
+		paint(-38.9, y + 6.3, -30, "+z", 6, 2.4, n.notice[1], "stencil", n.notice[2])
+		-- the stairs
+		local at = if level % 2 == 0 then -1 else 1
+		over(level, at * END, -31, "-z", 3.6, "STAIRS")
+		if level == 0 then
+			over(level, -at * END, -31, "-z", 3.6, "STAIRS")
+		else
+			over(level, at * 16, -26, if at < 0 then "-x" else "+x", 3.6, "STAIRS")
+			if level % 2 == 1 then
+				over(level, at * END, -21, "+z", 3.6, "STAIRS")
+			end
+		end
+		-- the storey's number, high on every face of the two northern pillars (and their twins)
+		local digit = tostring(level + 1)
+		for _, px in { -19, 19 } do
+			paint(px, y + 8.5, -18, "+z", 1.8, 3, digit, "white", nil, "plate")
+			paint(px, y + 8.5, -20, "-z", 1.8, 3, digit, "white", nil, "plate")
+			paint(px + 1, y + 8.5, -19, "+x", 1.8, 3, digit, "white", nil, "plate")
+			paint(px - 1, y + 8.5, -19, "-x", 1.8, 3, digit, "white", nil, "plate")
+		end
+	end
+	-- the wings
+	over(0, -30, -19.5, "+x", 5.4, "WORKSHOP", "GARAGE")
+	over(0, -30, 19.5, "+x", 5.4, "STORES", "DOCK STORES")
+	paint(60, 5, -25, "-x", 7, 3, "LOADING\nKEEP CLEAR", "yellow", "BAY 2\nSEALED")
+	over(1, -45, 0, "+x", 4.4, "EDITOR", "SPORTS EDITOR")
+	over(1, -52, -45, "+z", 4.4, "EDIT 1", "CUTTING 1")
+	over(1, -37, -45, "+z", 4.4, "EDIT 2", "CUTTING 2")
+	over(2, -30, -22, "+x", 5.4, "MAKE-UP", "MAKE-UP")
+	over(2, -30, 22, "+x", 5.4, "WARDROBE", "WARDROBE")
+	paint(-57.5, roomY + DOOR + 1.5, -13, "-z", 4.4, 1.7, "ORANGE TEAM", "white", "TEAL TEAM", "plate")
+	paint(-46.5, roomY + DOOR + 1.5, 13, "+z", 4.4, 1.7, "ORANGE TEAM", "white", "TEAL TEAM", "plate")
+	over(3, -30, -20, "+x", 5.4, "MASTER CONTROL", "CONTINUITY")
+	over(3, -30, 20, "+x", 5.4, "MASTER CONTROL", "CONTINUITY")
+	for i, z in { -22, -7, 7, 22 } do
+		local west = ({ "SALES", "NEWS DIRECTOR", "PROGRAMMES", "ENGINEERING" })[i]
+		local east = ({ "PERSONNEL", "LEGAL", "PROMOTIONS", "PAYROLL" })[i]
+		over(4, -43, z, "+x", 4.4, west, east)
 	end
 	return plan
 end

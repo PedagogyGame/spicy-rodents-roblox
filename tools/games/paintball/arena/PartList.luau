@@ -42,7 +42,9 @@ export type Part = {
 	ramp: number?,
 	curtain: number?, -- the team whose spawn room it shuts
 	screen: string?, -- NormalId: the face a monitor's screen is on
-	signs: { { face: string, text: string, tone: string } }?,
+	-- words on a face: filling it, or in `rect` = { left, top, width, height } as fractions of the face (as a
+	-- SurfaceGui lays it out for someone looking at it), with a painted panel behind them when `bg` is set
+	signs: { { face: string, text: string, tone: string, rect: { number }?, bg: string? } }?,
 	light: { range: number, brightness: number, color: { number } }?,
 }
 
@@ -62,6 +64,7 @@ PartList.TONE = {
 	green = { 90, 220, 120 },
 	yellow = { 240, 210, 60 },
 	stencil = { 30, 30, 34 },
+	plate = { 26, 28, 34 },
 	warm = { 255, 214, 170 },
 	cold = { 214, 232, 255 },
 }
@@ -73,9 +76,9 @@ local LOOK: { [string]: { any } } = {
 	floor3 = { { 146, 148, 144 }, "Slate" },
 	floor4 = { { 122, 90, 62 }, "WoodPlanks" },
 	roof = { { 76, 76, 80 }, "Concrete" },
-	skylight = { { 170, 200, 210 }, "Glass", 0.6 },
+	skylight = { { 170, 200, 210 }, "Glass", 0.7 },
 	shell = { { 134, 128, 118 }, "Concrete" },
-	glass = { { 150, 190, 200 }, "Glass", 0.55 },
+	glass = { { 170, 205, 212 }, "Glass", 0.8 },
 	gate = { { 70, 76, 84 }, "DiamondPlate" },
 	shutter = { { 96, 102, 106 }, "CorrodedMetal" },
 	wall0 = { { 140, 138, 130 }, "Concrete" },
@@ -128,6 +131,9 @@ local LOOK: { [string]: { any } } = {
 	table = { { 98, 66, 42 }, "Wood" },
 	bench = { { 112, 86, 62 }, "Wood" },
 	stand = { { 42, 42, 46 }, "Metal" },
+	terminal = { { 196, 188, 164 }, "SmoothPlastic" },
+	sheet = { { 214, 210, 198 }, "Fabric" },
+	ceiling_dead = { { 96, 98, 96 }, "SmoothPlastic" },
 }
 PartList.LOOK = LOOK
 
@@ -201,7 +207,27 @@ function PartList.solids(plan: ArenaDataPlan.Plan): { Part }
 		if s.text ~= "" then
 			local part = byBox[s.box]
 			local list = part.signs or {}
-			table.insert(list, { face = PartList.FACE[s.face], text = s.text, tone = s.tone })
+			local rect: { number }? = nil
+			local at, w, h = s.at, s.w, s.h
+			if at and w and h then
+				-- the face as its SurfaceGui lies: left to right for someone looking at it, top to bottom
+				local k = (s.box - 1) * 6
+				local x0, y0, z0, x1, y1, z1 =
+					boxes[k + 1], boxes[k + 2], boxes[k + 3], boxes[k + 4], boxes[k + 5], boxes[k + 6]
+				local u: number, width: number
+				if s.face == "+z" then
+					u, width = at[1] - x0, x1 - x0
+				elseif s.face == "-z" then
+					u, width = x1 - at[1], x1 - x0
+				elseif s.face == "+x" then
+					u, width = z1 - at[3], z1 - z0
+				else
+					u, width = at[3] - z0, z1 - z0
+				end
+				local height = y1 - y0
+				rect = { (u - w / 2) / width, (y1 - at[2] - h / 2) / height, w / width, h / height }
+			end
+			table.insert(list, { face = PartList.FACE[s.face], text = s.text, tone = s.tone, rect = rect, bg = s.bg })
 			part.signs = list
 		end
 	end

@@ -51,12 +51,27 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 		attrs = attrs,
 	}
 	local part = kit:box(group, p.name, p.x0, p.x1, p.y0, p.y1, p.d0, p.d1, p.color, p.material, opts)
+	-- one SurfaceGui a face, whatever is written on it
+	local guis: { [string]: any } = {}
 	local function gui(face: string): any
-		local w = math.max(p.x1 - p.x0, p.y1 - p.y0, p.d1 - p.d0)
-		return kit:gui(part, face, math.clamp(math.floor(900 / w), 8, 50))
+		local g = guis[face]
+		if g == nil then
+			local w = math.max(p.x1 - p.x0, p.y1 - p.y0, p.d1 - p.d0)
+			g = kit:gui(part, face, math.clamp(math.floor(900 / w), 8, 50))
+			guis[face] = g
+		end
+		return g
 	end
 	for _, s in p.signs or {} do
-		kit:label(gui(s.face), { Text = s.text, TextColor = PartList.TONE[s.tone], Font = "GothamBlack" })
+		local props: { [string]: any } = { Text = s.text, TextColor = PartList.TONE[s.tone], Font = "GothamBlack" }
+		if s.rect then
+			props.Pos = { s.rect[1], s.rect[2] }
+			props.Size = { s.rect[3], s.rect[4] }
+		end
+		if s.bg then
+			props.Bg = PartList.TONE[s.bg]
+		end
+		kit:label(gui(s.face), props)
 	end
 	if p.screen then
 		local screen = gui(p.screen)
