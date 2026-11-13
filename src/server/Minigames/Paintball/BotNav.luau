@@ -20,7 +20,7 @@
 --               the same place do not all file up one stair (PB-10: "do not all take one stair").
 -- Interface: build(arena) -> Nav; taste(nav, seed) -> { number }; route(nav, from, alt?, altCost?,
 --   to, team, taste) -> { node id }? (nil: no way); nearest(nav, x, y, z, team?) -> node id;
---   roomOf(nav, x, y, z) -> team or 0; atDoor(nav, team, x, y, z) -> boolean; KEEP_OFF, PEEK,
+--   roomOf(nav, x, y, z) -> team or 0; atDoor(nav, team, x, y, z, more?) -> boolean; KEEP_OFF, PEEK,
 --   DOORSTEP; types Nav, Peek
 
 local Import = require("../../Import")
@@ -194,15 +194,17 @@ function BotNav.build(arena: Arena): Nav
 	}
 end
 
--- Is a body of `team` at (x, y, z) on its own doorstep: within DOORSTEP of a way out of its spawn room?
-function BotNav.atDoor(nav: Nav, team: number, x: number, y: number, z: number): boolean
+-- Is a body of `team` at (x, y, z) on its own doorstep: within DOORSTEP (and `more`, if given) of a
+-- way out of its spawn room?
+function BotNav.atDoor(nav: Nav, team: number, x: number, y: number, z: number, more: number?): boolean
 	local list = nav.doors[team]
 	if list == nil then
 		return false
 	end
+	local reach = BotNav.DOORSTEP + (more or 0)
 	for _, id in list do
 		local node = nav.nodes[id]
-		if math.abs(node.y - y) < 3 and (node.x - x) ^ 2 + (node.z - z) ^ 2 <= BotNav.DOORSTEP * BotNav.DOORSTEP then
+		if math.abs(node.y - y) < 3 and (node.x - x) ^ 2 + (node.z - z) ^ 2 <= reach * reach then
 			return true
 		end
 	end

@@ -94,6 +94,9 @@ export type Shot = {
 	nth: number, -- 1 for the first ball at this target
 	tagged: boolean, -- the ball tagged that target
 	faced: boolean, -- the shooter's look had had that target inside the sight cone for BOT.faced
+	-- when the ball left, that target was on its own doorstep (BotNav.atDoor) and had not fired a ball
+	-- for DOOR_TRUCE: the ball a bot never fires
+	trap: boolean,
 }
 
 export type Tag = {
@@ -106,7 +109,7 @@ export type Tag = {
 	faced: boolean, -- the shooter's look had the victim inside the sight cone for BOT.faced before the ball
 	sinceRoom: number, -- seconds since the victim left its spawn room
 	doorstep: boolean, -- the victim was on its own doorstep (BotNav.atDoor)
-	quiet: boolean, -- and had not fired a ball for 4 s: the tag a bot never makes
+	quiet: boolean, -- and had not fired a ball for DOOR_TRUCE
 	stray: boolean, -- the ball was fired at somebody else
 	aware: boolean, -- the victim (a brain) had seen whoever tagged it within the last second
 	fought: boolean, -- and had fired at them
@@ -183,7 +186,7 @@ export type Sim = {
 	delay: number,
 	done: boolean,
 	rec: Record,
-	audit: { [number]: { [number]: { secs: number, x: number, z: number, told: boolean } } },
+	audit: { [number]: { [number]: { secs: number, bearing: number, x: number, z: number, told: boolean } } },
 	sweepWindow: { number },
 	sweepLast: number,
 }
@@ -193,6 +196,7 @@ local BOT = Contract.BOT
 local BIT = Wire.BIT
 local SNAP = 1 / Clock.SNAP_HZ
 local SAMPLE = 0.25 -- seconds between looks at what everybody is doing, for the record
+local DOOR_TRUCE = 4 -- seconds: the truce a bot keeps with somebody on their own doorstep (BotBrain)
 local COMPANY = 35 -- studs: a team-mate this near on the same storey is company
 local PERSON_POSE_LAG = 0.1 -- a person's snapshot pose is read this far back (Clock.poseTime: up + a send interval)
 
@@ -498,8 +502,13 @@ function Sim.shoot(
 		nth = if brain ~= nil then brain.balls else 1,
 		tagged = false,
 		faced = false,
+		trap = false,
 	}
 	local truth = if target ~= nil then sim.poses[target] else nil
+	if target ~= nil and truth ~= nil then
+		shot.trap = BotNav.atDoor(sim.nav, state.slots[target].team, truth.x, truth.y, truth.z)
+			and sim.now - (sim.lastShot[target] or -math.huge) > DOOR_TRUCE
+	end
 	if target ~= nil and truth ~= nil and list ~= nil then
 		shot.range = math.sqrt((truth.x - ox) ^ 2 + (truth.y - oy) ^ 2 + (truth.z - oz) ^ 2)
 		local track = list.squad.track[target]
@@ -629,7 +638,7 @@ local function stepBalls(sim: Sim)
 				faced = faced(sim, ball.by, struck, ball.born),
 				sinceRoom = sinceRoom,
 				doorstep = onStep,
-				quiet = onStep and now - (sim.lastShot[struck] or -math.huge) > 4,
+				quiet = onStep and now - (sim.lastShot[struck] or -math.huge) > DOOR_TRUCE,
 				stray = ball.shot.target ~= struck,
 				aware = aware,
 				fought = fought,
@@ -815,8 +824,13 @@ local function observe(sim: Sim, span: number)
 				end
 			end
 		end
-		-- the audit: a bot whose look stays on an opponent it has no line to and goes with it as it
-		-- moves: it is being followed through the wall
+		-- the audit: a bot whose look stays on an opponent it has no line to (within 4 degrees, at
+		-- every look for a second or more) while that body goes further ACROSS the look than "on it"
+		-- is wide at its range and its bearing from the bot swings by three times that width: the
+		-- look is going with it through the wall. (A look that rests on the place somebody vanished,
+		-- while they stand there or walk through it, follows nobody; nor does one that is on, or
+		-- turning on to, somebody in plain sight within 20 degrees of it, aim error and lead
+		-- included, with another behind the wall beyond.)
 		if sim.opts.audit and rs.bot then
 			local mine = sim.audit[id]
 			if mine == nil then
@@ -825,27 +839,49 @@ local function observe(sim: Sim, span: number)
 			end
 			local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
 			local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+			local hidden: { [number]: boolean } = {}
+			local explained = false
+			for other, os in state.slots do
+				local op = sim.poses[other]
+				if os.team == slot.team or not os.on or os.out or op == nil then
+					continue
+				end
+				local dx, dy, dz = op.x - ex, op.y + Arena.CHEST - ey, op.z - ez
+				local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+				local cos = if d > 1e-3 then (dx * lx + dy * ly + dz * lz) / d else 1
+				if cos > math.cos(math.rad(20)) then
+					if arena.sweep(ex, ey, ez, op.x, op.y + Arena.CHEST, op.z) == nil then
+						explained = true
+					elseif d > 4 and cos > math.cos(math.rad(4)) then
+						hidden[other] = true
+					end
+				end
+			end
 			for other, os in state.slots do
 				local op = sim.poses[other]
 				if os.team == slot.team or not os.on or os.out or op == nil then
 					mine[other] = nil
 					continue
 				end
-				local dx, dy, dz = op.x - ex, op.y + Arena.CHEST - ey, op.z - ez
-				local d = math.sqrt(dx * dx + dy * dy + dz * dz)
-				local on = d > 4 and dx * lx + dy * ly + dz * lz > math.cos(math.rad(4)) * d
-				if on and arena.sweep(ex, ey, ez, op.x, op.y + Arena.CHEST, op.z) ~= nil then
-					-- following it: it has gone further ACROSS the look than the 4 degrees are wide at its
-					-- range, and the look is still on it
+				if hidden[other] and not explained then
+					local dx, dy, dz = op.x - ex, op.y + Arena.CHEST - ey, op.z - ez
+					local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+					local bearing = math.atan2(-dx, -dz)
 					local streak = mine[other]
 					if streak == nil then
-						streak = { secs = 0, x = op.x, z = op.z, told = false }
+						streak = { secs = 0, bearing = bearing, x = op.x, z = op.z, told = false }
 						mine[other] = streak
 					end
 					streak.secs += span
 					local flat = math.max(1e-6, math.sqrt(lx * lx + lz * lz))
 					local across = math.abs((op.x - streak.x) * lz - (op.z - streak.z) * lx) / flat
-					if streak.secs >= 1 and across >= math.max(5, 0.2 * d) and not streak.told then
+					local swung = math.abs((bearing - streak.bearing + math.pi) % (2 * math.pi) - math.pi)
+					if
+						streak.secs >= 1
+						and across >= math.max(5, 0.2 * d)
+						and swung >= math.rad(12)
+						and not streak.told
+					then
 						streak.told = true
 						rs.stares += 1
 					end
@@ -907,6 +943,7 @@ function Sim.tick(sim: Sim)
 			pose.x, pose.y, pose.z, pose.yaw, pose.pitch, pose.crouch, pose.bits = sp.x, sp.y, sp.z, sp.yaw, 0, 0, 0
 			sim.history[id] = nil
 			sim.sprintAt[id] = nil
+			sim.audit[id] = nil
 			local rs = sim.rec.slots[id]
 			if rs == nil then
 				rs = newSlotRecord(id, sim.botWho[id] ~= nil, e.team :: number, arena.floors)

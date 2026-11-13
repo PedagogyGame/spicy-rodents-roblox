@@ -26,7 +26,7 @@
 --            last seen), a route with its own taste (BotNav), a few seconds' watch there, then
 --            another. Behind low cover it bobs: crouched it is wholly hidden, standing it sees and
 --            shoots. Behind a pillar it steps out to a peek point and back, and looks past the
---            pillar's edges, not at it. A bot that has not been anywhere else for ten seconds is
+--            pillar's edges, not at it. A bot that has been nowhere else for nine seconds is
 --            sent somewhere, whatever it was doing (PB-10: never stuck).
 --   moves    along the links of the graph in straight lines, feet on arena.ground, at Body's speeds
 --            with the match's feel; sprints only when nothing has been seen or heard for a while.
@@ -176,10 +176,9 @@ export type Brain = {
 	peekZ: number?,
 	peekBack: boolean, -- walking back from it to the node
 	peekAt: number, -- when it next steps out, or back
-	movedAt: number, -- when it was last somewhere else (the stuck watch)
-	watchAt: number, -- when the stuck watch may next send it off
-	movedX: number,
-	movedZ: number,
+	trail: { number }, -- where it was at each of the last STUCK seconds in play: x, z, x, z ... (the stuck watch)
+	trailAt: number, -- when the next point is due
+	stuck: boolean, -- the watch has found it stuck and it has not yet got a route away
 	-- the senses
 	con: { [number]: Contact },
 	nextSight: number,
@@ -274,15 +273,26 @@ local THINK = 0.1 -- seconds between thoughts
 local QUIET = 3 -- seconds with nothing seen or heard before a bot sprints or reloads at leisure
 local SAY_EVERY = 12 -- seconds between one bot's call-outs
 local TEAM_SAY_EVERY = 8 -- and between one team's
+local STUCK = 9 -- seconds in one place before the stuck watch sends a bot somewhere else
+local STUCK_REACH = 6 -- studs: "one place" is this far across
 local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
+-- (the truce as a bot keeps it is wider than the truce as it is promised: a bot aims at where it last
+-- saw its target, up to VIS ago, and a person is shown a tenth of a second late; neither may put a
+-- ball where the promise says none goes)
+local DOOR_TRUCE_SLACK = 0.5 -- seconds
+local DOOR_TRUCE_STRIDE = 10 -- studs
 local CHEST = ArenaModule.CHEST
--- COMPANY: a person is never left to play alone in a five-storey building. Up to ESCORTS bots of a
--- person's team choose their posts within a short run of where that person is (their team-mates know
--- where they are, as any player does from the name tags), move on when the person does, and so are
--- beside them when the paint flies. The rest of the team plays its own game.
-local ESCORTS = 2 -- bots that keep one person company, at most
+-- COMPANY: a person is not left to play alone in a five-storey building. One bot of a person's team
+-- (two, of a big team) chooses its posts within a short run of where that person is (their
+-- team-mates know where they are, as any player does from the name tags) and goes after them when
+-- they move on: at once up or down a stair, otherwise when they stop, so that one of the pair is
+-- always standing to cover the other. The rest of the team plays its own game. (Measured: two of a
+-- team of three bots tied to one person cost that team about ten tags a match; one costs it nothing.)
+local ESCORTS_SMALL, ESCORTS = 1, 2 -- bots that keep one person company, at most: of a team with up to
+local ESCORTS_SMALL_TEAM = 4 -- this many bots, and of a larger one
 local ESCORT_NEAR, ESCORT_FAR = 8, 28 -- studs from the person a post is looked for between
-local ESCORT_LEFT = 40 -- studs: the person has gone, the bot leaves its post to follow
+local ESCORT_LEFT = 40 -- studs: the person has gone; the bot leaves its post to follow once they stop
+local ESCORT_LOST = 60 -- studs: or at once, when they are this far off
 
 local function wrap(a: number): number
 	return (a + math.pi) % (2 * math.pi) - math.pi
@@ -336,10 +346,9 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		peekZ = nil,
 		peekBack = false,
 		peekAt = 0,
-		movedAt = 0,
-		watchAt = 0,
-		movedX = 0,
-		movedZ = 0,
+		trail = {},
+		trailAt = 0,
+		stuck = false,
 		con = {},
 		nextSight = 0,
 		nextThink = 0,
@@ -435,7 +444,9 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 	b.goAt = math.max(now, live) + (if state.phase == "briefing" then b.rng.range(0.1, 1.4) else b.rng.range(0.05, 0.5))
 	b.fresh = true
 	b.outbound = false
-	b.movedAt, b.movedX, b.movedZ = math.max(now, live), x, z
+	table.clear(b.trail)
+	b.trailAt = math.max(now, live) + 1
+	b.stuck = false
 	table.clear(b.con)
 	table.clear(b.whizz)
 	b.target = nil
@@ -657,7 +668,14 @@ local function buddyOf(b: Brain, squad: Squad, state: State): Track?
 			return nil
 		end
 	end
-	-- the nearest person of its team who has fewer than ESCORTS bots with them
+	-- the nearest person of its team who has fewer bots with them than a person gets
+	local mates = 0
+	for _, side in squad.side do
+		if side == b.team then
+			mates += 1
+		end
+	end
+	local most = if mates <= ESCORTS_SMALL_TEAM then ESCORTS_SMALL else ESCORTS
 	local best: number? = nil
 	local bestD = math.huge
 	for pid, team in squad.people do
@@ -673,7 +691,7 @@ local function buddyOf(b: Brain, squad: Squad, state: State): Track?
 			end
 		end
 		local d = (t.x - b.x) ^ 2 + (t.z - b.z) ^ 2 + ((t.y - b.y) * 3) ^ 2
-		if with < ESCORTS and d < bestD then
+		if with < most and d < bestD then
 			best, bestD = pid, d
 		end
 	end
@@ -706,7 +724,7 @@ local function postBeside(b: Brain, squad: Squad, buddy: Track): number
 		local score = rng.next() * 1.5 - math.abs(d - 15) / 10
 		local cover = nav.coverAt[id]
 		if cover ~= nil then
-			score += if cover.low then 1.2 else 0.9
+			score += if cover.low then 1.6 else 1.2
 		end
 		if score > bestScore then
 			best, bestScore = id, score
@@ -1085,17 +1103,16 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			local pal = squad.escort[b.id]
 			local palAt = if pal ~= nil then squad.track[pal] else nil
 			local palSlot = if pal ~= nil then state.slots[pal] else nil
-			if
-				palAt ~= nil
-				and palSlot ~= nil
-				and palSlot.on
-				and not palSlot.out
-				and (
-					math.abs(palAt.y - b.y) > nav.arena.floorHeight * 0.5
-					or (palAt.x - b.x) ^ 2 + (palAt.z - b.z) ^ 2 > ESCORT_LEFT * ESCORT_LEFT
-				)
-			then
-				b.holdUntil = math.min(b.holdUntil, now + 0.4)
+			if palAt ~= nil and palSlot ~= nil and palSlot.on and not palSlot.out then
+				local apart = (palAt.x - b.x) ^ 2 + (palAt.z - b.z) ^ 2
+				local upstairs = math.abs(palAt.y - b.y) > nav.arena.floorHeight * 0.5
+				-- on its storey it moves up when they have stopped (one covers while the other
+				-- moves); it goes after them at once when they are getting clean away or have
+				-- taken a stair
+				local stopped = palAt.vx * palAt.vx + palAt.vz * palAt.vz < 9
+				if upstairs or apart > ESCORT_LOST * ESCORT_LOST or (stopped and apart > ESCORT_LEFT * ESCORT_LEFT) then
+					b.holdUntil = math.min(b.holdUntil, now + 0.4)
+				end
 			end
 			if not hunted and now >= b.holdUntil and b.peekX == nil then
 				if not setOut(b, squad, pickGoal(b, squad, state, now)) then
@@ -1124,17 +1141,38 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			end
 		end
 	end
-	-- the stuck watch: a bot in play that has not been anywhere else for a long time goes somewhere
-	if (b.x - b.movedX) ^ 2 + (b.z - b.movedZ) ^ 2 > 9 then
-		b.movedAt, b.movedX, b.movedZ = now, b.x, b.z
-	elseif now - b.movedAt > 10 and state.phase == "live" then
-		-- wherever it was going or whoever it was fighting: somewhere else, and on its feet
-		if now >= b.watchAt then
-			b.watchAt = now + 1
-			b.peekBack = b.peekX ~= nil
-			b.pushUntil = now + 8
-			b.stance = "push"
-			setOut(b, squad, pickGoal(b, squad, state, now))
+	-- the stuck watch: a bot in play that has been nowhere else for STUCK seconds goes somewhere,
+	-- wherever it was going and whoever it was fighting. "Nowhere else" is measured the way anybody
+	-- watching would: every place it stood at in those seconds is within STUCK_REACH of where it stands
+	-- now (a peek out and back, a sidestep and a shuffle between two near posts are not going anywhere).
+	if now >= b.trailAt then
+		b.trailAt = now + 1
+		local trail = b.trail
+		table.insert(trail, b.x)
+		table.insert(trail, b.z)
+		if #trail > 2 * STUCK then
+			table.remove(trail, 1)
+			table.remove(trail, 1)
+		end
+		if #trail >= 2 * STUCK then
+			local stuck = true
+			for k = 1, #trail, 2 do
+				if (trail[k] - b.x) ^ 2 + (trail[k + 1] - b.z) ^ 2 > STUCK_REACH * STUCK_REACH then
+					stuck = false
+					break
+				end
+			end
+			b.stuck = stuck
+		end
+	end
+	if b.stuck then
+		-- on its feet and off (if no route is to be had this tick, it asks again at its next thought)
+		b.peekBack = b.peekX ~= nil
+		b.pushUntil = now + 8
+		b.stance = "push"
+		if setOut(b, squad, pickGoal(b, squad, state, now)) then
+			b.stuck = false
+			table.clear(b.trail)
 		end
 	end
 end
@@ -1417,12 +1455,13 @@ function BotBrain.step(
 		and now - b.sprintAt >= Body.SPRINT_FIRE_DELAY + 0.02
 		and BotNav.roomOf(b.nav, b.x, b.y, b.z) == 0
 		and BotNav.roomOf(b.nav, tx, ty, tz) == 0
-		and (now - (squad.firedAt[target] or -math.huge) < DOOR_TRUCE or not BotNav.atDoor(
+		and (now - (squad.firedAt[target] or -math.huge) < DOOR_TRUCE - DOOR_TRUCE_SLACK or not BotNav.atDoor(
 			b.nav,
 			3 - b.team,
 			tx,
 			ty,
-			tz
+			tz,
+			DOOR_TRUCE_STRIDE
 		))
 		and Rules.canBeHit(state, target, now)
 		and Rules.canFire(state, b.id, now)

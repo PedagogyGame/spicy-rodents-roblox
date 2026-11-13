@@ -35,8 +35,10 @@ export type Summary = {
 	roomSlowest: number, -- the longest any life took to leave its spawn room, seconds
 	roomMean: number,
 	doorTags: number, -- tags on somebody standing on their own doorstep (BotNav.atDoor)
-	doorTrap: number, -- of them, by a bot's ball AIMED at somebody who had not fired for 4 s (a bot never does it)
-	doorStray: number, -- and by a bot's ball fired at somebody else, that such a body walked into
+	doorStray: number, -- of them, somebody who had not fired for 4 s, by a bot's ball fired at somebody else
+	-- balls a bot fired AT somebody who was then on their own doorstep and had not fired for 4 s, tagged
+	-- or not (a bot never does it)
+	doorTrap: number,
 	lives: number,
 	coverShare: number, -- bots' time at a cover spot
 	crouchShare: number,
@@ -79,6 +81,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local bySpeed = { band("standing"), band("walking"), band("sprinting") }
 	local byOrder = { band("first ball"), band("second"), band("third on") }
 	local botShots, botTagged = 0, 0
+	local doorTrap = 0
 	for _, shot in rec.shots do
 		if not shot.bot then
 			continue
@@ -86,6 +89,9 @@ function Report.summary(sim: Sim.Sim): Summary
 		botShots += 1
 		if shot.tagged then
 			botTagged += 1
+		end
+		if shot.trap then
+			doorTrap += 1
 		end
 		if shot.target == nil then
 			continue
@@ -95,7 +101,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		add(bySpeed[if shot.speed < 4 then 1 elseif shot.speed < 20 then 2 else 3], shot.tagged)
 		add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
 	end
-	local facedOf, faced, doorTags, doorTrap, doorStray = 0, 0, 0, 0, 0
+	local facedOf, faced, doorTags, doorStray = 0, 0, 0, 0
 	local personTags, personOuts = 0, 0
 	for _, tag in rec.tags do
 		if tag.byBot then
@@ -106,12 +112,8 @@ function Report.summary(sim: Sim.Sim): Summary
 		end
 		if tag.doorstep then
 			doorTags += 1
-			if tag.quiet and tag.byBot then
-				if tag.stray then
-					doorStray += 1
-				else
-					doorTrap += 1
-				end
+			if tag.quiet and tag.byBot and tag.stray then
+				doorStray += 1
 			end
 		end
 		if not tag.byBot and tag.idBot then
@@ -340,8 +342,8 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	)
 	say(
 		`  spawn rooms: out in {string.format("%.1f", s.roomMean)} s on average, {string.format("%.1f", s.roomSlowest)} s at the slowest; `
-			.. `{s.doorTags} tagged on their own doorstep (a bot's ball aimed at somebody there who had not fired: {s.doorTrap}; `
-			.. `a stray one: {s.doorStray}); `
+			.. `{s.doorTags} tagged on their own doorstep ({s.doorStray} of them quiet, by a ball meant for somebody else); `
+			.. `balls a bot fired at somebody quiet on their doorstep: {s.doorTrap}; `
 			.. `{string.format("%.1f", s.camping)} bot-seconds watching a door`
 	)
 	if sim.opts.audit then

@@ -52,6 +52,14 @@
 -- each bot has taken, so two do not choose one; the storey each bot has made its own; when each
 -- slot last fired; and what each TEAM knows: the storey and the place it last saw an opponent,
 -- which is what "They are on three!" says aloud and what draws its bots towards a fight.
+-- TEAM-MATES TO A PERSON. A seat that is on and has no brain in this list is a person, as far as the
+-- bots can tell (the service never says who is who, and need not). What a person's play shows
+-- anybody, their team's bots take in: where a person's ball lands is where their team takes the
+-- other side to be, as if a bot had seen somebody there; where one of the team is tagged out
+-- likewise, when it knows of nothing newer. And one bot of a person's team (two, of a team with more
+-- than four bots) KEEPS THEM COMPANY: it takes its posts within a short run of them, goes after them
+-- to another storey at once and across a storey when they stop, and is back beside them after either
+-- has been out (BotBrain, COMPANY). Nothing in it reads more of anybody than any team-mate sees.
 -- THE CALL-OUTS (Contract.LINES; one a bot every twelve seconds, one a team every eight): "reloading"
 -- when it reloads with somebody about, "floor" (n = the storey, 1 to 5) when it first sees
 -- somebody on a storey its team has not just called, "cover" when it joins a team-mate's fight,
@@ -249,7 +257,11 @@ local function follow(
 	for id, slot in state.slots do
 		local pose = poses[id]
 		-- a seat that is on and is none of these bots is a person, as far as the bots can tell
-		people[id] = if slot.on and pose ~= nil and brains[id] == nil then slot.team else nil
+		if slot.on and pose ~= nil and brains[id] == nil then
+			people[id] = slot.team
+		else
+			people[id] = nil
+		end
 		if not slot.on or pose == nil then
 			track[id] = nil
 			continue

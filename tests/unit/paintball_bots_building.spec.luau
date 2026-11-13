@@ -67,12 +67,15 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 	t.eq(s.refused, 0, "no command of a bot's was refused")
 	t.eq(s.tooSoon, 0)
 	-- nobody stuck, nobody kept in or camped on
-	t.truthy(s.still < 20, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
+	t.truthy(s.still < 16, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
 	t.truthy(s.roomSlowest < 6, `the slowest out of a spawn room took {s.roomSlowest} s`)
 	t.truthy(s.roomMean < 3, `out of the spawn room in {s.roomMean} s on average`)
 	t.truthy(s.camping < 4, `{s.camping} bot-seconds watching the other team's door`)
-	t.eq(s.doorTrap, 0, "no bot aims at a quiet player on their own doorstep")
-	t.truthy(s.doorStray <= 8, `{s.doorStray} quiet players walked off their doorstep into a stray ball`)
+	t.eq(s.doorTrap, 0, "no bot fires a ball at a quiet player on their own doorstep")
+	t.truthy(
+		s.doorStray <= math.max(3, 0.04 * s.tags),
+		`{s.doorStray} quiet players walked off their doorstep into a ball meant for somebody else`
+	)
 	-- the whole building
 	for f, share in s.floorShare do
 		t.truthy(share >= 0.03, `storey {f} has {share * 100}% of the bots' time`)

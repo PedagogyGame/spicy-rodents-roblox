@@ -642,12 +642,16 @@ return function(t)
 
 	t.test("4 v 4: nobody is stuck, nobody camps a spawn room, nobody is trapped at theirs", function()
 		local _, s = four()
-		t.truthy(s.still < 20, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
+		-- (the stuck watch sends a bot off after nine seconds in one place; the rest is the walk away)
+		t.truthy(s.still < 14, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
 		t.truthy(s.roomSlowest < 6, `the slowest out of a spawn room took {s.roomSlowest} s`)
 		t.truthy(s.roomMean < 3)
 		t.truthy(s.camping < 3, `{s.camping} bot-seconds watching the other team's door`)
-		t.eq(s.doorTrap, 0, "no bot aims at a quiet player on their own doorstep")
-		t.truthy(s.doorStray <= 8, `{s.doorStray} quiet players walked off their doorstep into a stray ball`)
+		t.eq(s.doorTrap, 0, "no bot fires a ball at a quiet player on their own doorstep")
+		t.truthy(
+			s.doorStray <= math.max(3, 0.04 * s.tags),
+			`{s.doorStray} quiet players walked off their doorstep into a ball meant for somebody else`
+		)
 		t.truthy(s.lives > 60)
 	end)
 
@@ -721,9 +725,10 @@ return function(t)
 		t.eq(#(Rules.result(sim.state) :: Contract.Result).card.rows, 16)
 		t.eq(s.refused, 0)
 		t.eq(s.tooSoon, 0)
-		t.truthy(s.still < 20, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
+		t.truthy(s.still < 14, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
 		t.truthy(s.roomSlowest < 6)
 		t.truthy(s.camping < 4)
+		t.eq(s.doorTrap, 0, "no bot fires a ball at a quiet player on their own doorstep")
 		for f, share in s.floorShare do
 			t.truthy(share >= 0.03, `storey {f}`)
 		end
@@ -744,7 +749,7 @@ return function(t)
 			local function beat(mode: string): (number, number)
 				local speed = if mode == "still" then 0 elseif mode == "walk" then Body.WALK else Body.SPRINT
 				local shots, hits = 0, 0
-				for seed = 1, 2 do
+				for seed = 1, 4 do
 					local dir = 1
 					local sim = Sim.new({
 						arena = arena,
@@ -781,11 +786,14 @@ return function(t)
 			local stillShots, stillHits = beat("still")
 			local walkShots, walkHits = beat("walk")
 			local runShots, runHits = beat("sprint")
-			t.truthy(stillShots > 80 and walkShots > 80 and runShots > 80)
+			t.truthy(stillShots > 200 and walkShots > 200 and runShots > 200)
 			local still, walk, run = stillHits / stillShots, walkHits / walkShots, runHits / runShots
+			-- (over eight matches each: about one ball in five, one in ten, one in sixteen; four
+			-- matches each here, and the bands leave room for their luck)
 			t.truthy(still > 0.12 and still < 0.5, `standing: {still * 100}%`)
 			t.truthy(walk < still * 0.8, `walking: {walk * 100}% against {still * 100}%`)
-			t.truthy(run <= walk, `sprinting: {run * 100}% against {walk * 100}%`)
+			t.truthy(run < walk * 1.1, `sprinting: {run * 100}% against {walk * 100}%`)
+			t.truthy(run < still * 0.6, `sprinting: {run * 100}% against {still * 100}% standing`)
 			t.truthy(run > 0.01, "but nobody is safe")
 		end
 	)
@@ -907,7 +915,12 @@ return function(t)
 		t.eq(s.refused, 0, "the stand-in's clicks pass the same judge")
 		t.truthy(s.stares <= 2, `{s.stares} times a bot followed somebody through a wall`)
 		t.eq(s.doorTrap, 0)
-		t.truthy(s.still < 20)
+		t.truthy(s.still < 14)
+		-- one of its team's bots keeps it company (tests/unit/paintball_bots_team.spec.luau)
+		t.truthy(
+			s.personCompany > 0.35 and s.personCompany > s.botCompany + 0.1,
+			`a bot of its team was near the stand-in {s.personCompany * 100}% of the time, near another bot {s.botCompany * 100}%`
+		)
 		-- the bots tagged the person only after facing them
 		for _, tag in sim.rec.tags do
 			if tag.byBot and not tag.idBot then
