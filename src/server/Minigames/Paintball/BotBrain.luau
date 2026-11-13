@@ -46,11 +46,20 @@
 --            on at the speed it was going then (it never reads where a body it cannot see has got
 --            to, so a target that turns between two checks is led wrongly, as a person would lead
 --            it), and at the part of it that it saw: the middle of its shape, or its head when
---            that is all that shows over a rail. Ballistics.aim at where that will be when the ball arrives (x a lead factor that
---            is redrawn for every ball), plus an ERROR in yaw and pitch, so many sigmas, redrawn
---            for every ball and keeping some of the last one's (it walks its balls in). A sigma is
---            what the moment makes it: wider with range, with the target's speed, with the bot's
---            own, at a low skill, and widest on the first ball at a new target (the warning splat).
+--            that is all that shows over a rail. Its reading of their speed catches up over
+--            Profile.velLag from nothing when it first sees them (an eye does not know a speed at a
+--            glance). Ballistics.aim at where that will be when the ball arrives, with AIM's
+--            misjudgments, plus an ERROR in yaw and pitch, so many sigmas, redrawn for every ball and
+--            keeping some of the last one's. A sigma is what the moment makes it: wider with range,
+--            with the target's speed, with the bot's own, at a low skill, and widest on the first ball
+--            at a new target (the warning splat).
+--            AIM: a new target is MISJUDGED, as a person misjudges: the range it takes them to be at
+--            is off by a share drawn for that target (Profile.rangeSd), so it allows for too much drop
+--            or too little and its balls go over or under at range; and its lead is off by another
+--            (Profile.leadBias), so its balls go ahead of or behind a runner. Both are biases, not
+--            noise: every ball misses the same way until it sees where they go and walks them in
+--            (Profile.walkIn of each left after each ball). Close up neither matters; at range, and
+--            at a target on the move, they are what a bot must work through.
 --   fires    only along its own look, when the look has settled on the aim and has been turned
 --            towards the target for BOT.faced without a break (FACING), in bursts with pauses;
 --            only when Rules.canFire says so and the target may be hit; never while sprinting or
@@ -106,7 +115,12 @@ export type Profile = {
 	first: number, -- the error on the first ball at a new target, as a multiple
 	second: number, -- and on the second
 	keep: number, -- how much of one ball's error the next keeps (0..1)
-	leadSd: number, -- the spread of the lead factor round 1, at skill 0.5
+	leadSd: number, -- the spread of each ball's own lead factor round 1, at skill 0.5
+	-- A NEW TARGET IS MISJUDGED, and the misjudgment is walked in ball by ball (see AIM): at skill 0.5,
+	rangeSd: number, -- the spread of how wrong it takes the range to be (a share), so its drop allowance
+	leadBias: number, -- the spread of how wrong its lead is (a share of the lead)
+	walkIn: number, -- of either, the share left after each ball (it sees where its ball went)
+	velLag: number, -- seconds its reading of a target's speed takes to catch up with it
 	settle: number, -- radians: the look is on the aim when it is this near
 	range: number, -- seconds of ball flight: the furthest target it fires at
 	burstMax: number, -- balls in a burst, at most
@@ -126,8 +140,9 @@ type Contact = {
 	x: number, -- where it was when last seen ...
 	y: number,
 	z: number,
-	vx: number, -- ... how fast it was going over the floor ...
+	vx: number, -- ... how fast it took it to be going over the floor (read with Profile.velLag) ...
 	vz: number,
+	velAt: number, -- (when that reading was last brought up to date)
 	crouch: number, -- ... and how far it was crouched
 	high: boolean, -- all that was seen of it was its head (over a rail, over low cover)
 	tryHigh: boolean, -- the next sight check looks for its head, not its chest
@@ -232,6 +247,8 @@ export type Brain = {
 	errYaw: number, -- the error of the next ball, in sigmas (spread() says how wide a sigma is)
 	errPitch: number,
 	lead: number,
+	biasRange: number, -- how wrong it takes the present target's range to be, as a share (AIM) ...
+	biasLead: number, -- ... and its lead
 	burst: number, -- balls left in the burst
 	pauseUntil: number,
 	contactAt: number, -- when it last saw anybody
@@ -281,15 +298,19 @@ BotBrain.DEFAULT = table.freeze({
 	turn = BOT.turn,
 	gain = 9,
 	faced = BOT.faced,
-	errLo = math.rad(0.6),
-	errHi = math.rad(2.2),
+	errLo = math.rad(0.5),
+	errHi = math.rad(1.9),
 	errFar = 90,
 	errSpeed = 0.9,
 	errMove = 0.7,
 	first = 2.0,
 	second = 1.25,
 	keep = 0.3,
-	leadSd = 0.3,
+	leadSd = 0.15,
+	rangeSd = 0.3,
+	leadBias = 0.3,
+	walkIn = 0.55,
+	velLag = 0.15,
 	settle = math.rad(0.8),
 	range = 0.8,
 	burstMax = 3,
@@ -458,6 +479,8 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		errYaw = 0,
 		errPitch = 0,
 		lead = 1,
+		biasRange = 0,
+		biasLead = 0,
 		burst = 1,
 		pauseUntil = 0,
 		contactAt = -math.huge,
@@ -661,6 +684,7 @@ local function see(b: Brain, squad: Squad, state: State, poses: { [number]: Pose
 			z = 0,
 			vx = 0,
 			vz = 0,
+			velAt = now,
 			crouch = 0,
 			high = false,
 			tryHigh = false,
@@ -681,14 +705,20 @@ local function see(b: Brain, squad: Squad, state: State, poses: { [number]: Pose
 	c.high = c.tryHigh
 	if now - c.seen > LAPSE then
 		-- a new sighting: it sinks in after the reaction time (sooner if the bot was already alarmed
-		-- or has only just lost sight of this one)
+		-- or has only just lost sight of this one), and how fast they are going is not yet known
 		c.first = now
 		c.react = if now - b.alarm < 2.5 or now - c.seen < 3 then p.reactMin else reaction(b)
+		c.vx, c.vz, c.velAt = 0, 0, now
 	end
 	c.seen = now
 	c.x, c.y, c.z, c.crouch = pose.x, pose.y, pose.z, pose.crouch
+	-- its speed, read the way an eye reads it: catching up over Profile.velLag, not known at a glance
 	local track = squad.track[pick]
-	c.vx, c.vz = if track ~= nil then track.vx else 0, if track ~= nil then track.vz else 0
+	local tvx, tvz = if track ~= nil then track.vx else 0, if track ~= nil then track.vz else 0
+	local k = if p.velLag > 0 then math.min(1, (now - c.velAt) / p.velLag) else 1
+	c.vx += (tvx - c.vx) * k
+	c.vz += (tvz - c.vz) * k
+	c.velAt = now
 	b.contactAt = now
 	local floor = math.clamp(math.floor(pose.y / nav.arena.floorHeight + 0.5), 0, nav.arena.floors - 1)
 	squad.heat[b.team][floor + 1] = now
@@ -1188,6 +1218,9 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 		b.balls = 0
 		if best ~= nil then
 			b.errYaw, b.errPitch = 0, 0
+			local wrong = b.profile
+			b.biasRange = gauss(rng) * wrong.rangeSd * (1.5 - b.skill)
+			b.biasLead = gauss(rng) * wrong.leadBias * (1.5 - b.skill)
 			drawError(b)
 			newBurst(b)
 			b.pauseUntil = math.max(b.pauseUntil, now)
@@ -1763,10 +1796,13 @@ function BotBrain.step(
 		local dx, dy, dz = tx - ex, cy - ey, tz - ez
 		local d = math.sqrt(dx * dx + dy * dy + dz * dz)
 		ax, ay, az = dx, dy, dz
-		local flight = d / feel.ballSpeed * b.lead
+		local flight = d / feel.ballSpeed * b.lead * (1 + b.biasLead)
 		local wx, wz = tx + contact.vx * flight, tz + contact.vz * flight
 		local vx, vy, vz = Ballistics.aim(ex, ey, ez, wx, cy, wz, feel.ballSpeed, feel.ballDrop)
 		local yaw, pitch = Body.yawPitch(vx, vy, vz)
+		-- the drop it allows for is the drop at the range it takes them to be at (AIM)
+		local _, level = Body.yawPitch(wx - ex, cy - ey, wz - ez)
+		pitch += (pitch - level) * b.biasRange
 		local sigma = spread(b, d, math.sqrt(contact.vx * contact.vx + contact.vz * contact.vz))
 		b.wantYaw = wrap(yaw + b.errYaw * sigma)
 		b.wantPitch = math.clamp(pitch + b.errPitch * sigma * 0.6, -1.4, 1.4)
@@ -1831,6 +1867,8 @@ function BotBrain.step(
 		})
 		b.balls += 1
 		b.burst -= 1
+		b.biasRange *= p.walkIn
+		b.biasLead *= p.walkIn
 		if b.burst <= 0 then
 			newBurst(b)
 			b.pauseUntil = now + b.rng.range(p.pauseMin, p.pauseMax) * (1.3 - 0.6 * b.skill)

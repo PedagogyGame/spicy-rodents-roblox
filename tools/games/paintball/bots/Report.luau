@@ -76,6 +76,8 @@ export type Summary = {
 	personTags: number, -- the stand-in people's tags on bots ...
 	personOuts: number, -- ... and bots' tags on them
 	personWin: number, -- personTags / (personTags + personOuts); 0 with no people
+	-- the same by the range of the tag (a band's `shots` is the exchanges, `tags` the stand-in's wins)
+	personByRange: { Band },
 	personCompany: number, -- the share of the people's time in play with a bot of their own team near by
 	botCompany: number, -- the same for the bots: how much a bot is near another of its team anyway
 }
@@ -134,6 +136,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local facedOf, faced, doorTags, doorStray = 0, 0, 0, 0
 	local strayTags = 0
 	local personTags, personOuts = 0, 0
+	local personByRange = { band("under 20 studs"), band("20 to 40"), band("40 to 60"), band("over 60") }
 	for _, tag in rec.tags do
 		if tag.sinceRoom < BotBrain.TRUCE.out then
 			earlyTags += 1
@@ -156,6 +159,10 @@ function Report.summary(sim: Sim.Sim): Summary
 			personTags += 1
 		elseif tag.byBot and not tag.idBot then
 			personOuts += 1
+		end
+		if tag.byBot ~= tag.idBot then
+			local r = tag.range
+			add(personByRange[if r < 20 then 1 elseif r < 40 then 2 elseif r < 60 then 3 else 4], not tag.byBot)
 		end
 	end
 	local floorTime: { number } = table.create(arena.floors, 0)
@@ -303,6 +310,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		personTags = personTags,
 		personOuts = personOuts,
 		personWin = if personTags + personOuts > 0 then personTags / (personTags + personOuts) else 0,
+		personByRange = personByRange,
 		personCompany = if personPlay > 0 then personCompany / personPlay else 0,
 		botCompany = if play > 0 then botCompany / play else 0,
 	}
@@ -442,6 +450,7 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 			`THE STAND-IN PLAYER tagged a bot {s.personTags} times and was tagged by one {s.personOuts} times: `
 				.. `it wins {pct(s.personWin)} of its exchanges`
 		)
+		say("  its share by range: " .. bands(s.personByRange))
 		say(
 			`  a bot of its own team was near it {pct(s.personCompany)} of the time `
 				.. `(a bot has another near it {pct(s.botCompany)} of the time)`

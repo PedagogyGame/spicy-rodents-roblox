@@ -66,6 +66,7 @@ export type Opts = {
 	dt: number?, -- the step (default 1 / Clock.TICK_HZ)
 	arena: Arena.Arena?,
 	profile: BotBrain.Profile?, -- the stand-in's (default FAIR)
+	botProfile: BotBrain.Profile?, -- the bots' (default BotBrain.DEFAULT; the calibration tool tries others)
 	delay: number?, -- seconds late a stand-in sees the others (default 0.15)
 	skill: number?, -- every bot's skill (default: Contract.BOTS in order)
 	audit: boolean?, -- also look for bots that follow somebody through a wall (costs sweeps)
@@ -250,15 +251,21 @@ Sim.FAIR = table.freeze({
 	turn = 4 * math.pi, -- a wrist is faster than a bot is allowed to be
 	gain = 11,
 	faced = 0.2,
+	-- (a person's hand is steady in angle at any range: what range costs them is judging the drop and
+	-- the lead, below; and they read a speed more slowly than a bot does)
 	errLo = math.rad(0.9),
 	errHi = math.rad(2.1),
-	errFar = 60,
+	errFar = 100,
 	errSpeed = 0.8,
 	errMove = 0.6,
 	first = 1.5,
 	second = 1.15,
 	keep = 0.4,
-	leadSd = 0.22,
+	leadSd = 0.12,
+	rangeSd = 0.3,
+	leadBias = 0.3,
+	walkIn = 0.5,
+	velLag = 0.3,
 	settle = math.rad(0.8),
 	range = 0.9,
 	burstMax = 3,
@@ -345,7 +352,7 @@ function Sim.new(opts: Opts?): Sim
 		assert(ok and seat ~= nil, "a bot could not join")
 		botWho[seat] = o.skill or def.skill
 	end
-	local bots = Bots.new(arena, { seed = seed })
+	local bots = Bots.new(arena, { seed = seed, profile = o.botProfile })
 	local folk: Bots.Bots? = nil
 	if people > 0 then
 		folk = Bots.new(arena, { seed = seed + 7717, profile = o.profile or Sim.FAIR })

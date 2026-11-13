@@ -45,8 +45,11 @@
 --     a body it has no line to;
 --   * aim with Ballistics.aim(..., state.feel.ballSpeed, state.feel.ballDrop) at where the target
 --     will be, plus error, more of it at a low `skill`, and MOST OF IT ON THE FIRST BALL at a new
---     target: the first ball is the warning splat. A fair player beats the average bot (skill 0.5)
---     about three times in five;
+--     target: the first ball is the warning splat; and a new target is MISJUDGED (its range, so the
+--     drop to allow for, and its lead), the misjudgment walked in ball by ball (BotBrain, AIM). A fair
+--     player beats the average bot (skill 0.5) about three times in five: measured against a
+--     stand-in (tools/games/paintball/bots/calibrate.luau), UNVERIFIED until the owner's playtest,
+--     where the knob is the bots' skill: Contract.BOTS, or Opts.skill for every bot of a list;
 --   * take cover (arena.cover: stand behind high cover, crouch behind low cover and rails), peek, and
 --     fall back to reload; and MOVE UP on somebody they can see and cannot reach (further off than
 --     their range of ball flight) instead of standing to look at them;
@@ -156,6 +159,9 @@ export type Opts = {
 	-- the kind of player every brain of this list is (BotBrain.Profile); nil = a bot. The calibration
 	-- tool makes a second list with a profile of its own to stand in for a person.
 	profile: BotBrain.Profile?,
+	-- added to every bot's skill (Contract.BOTS' 0..1, kept inside it) in this list: how hard the bots
+	-- are, as one number to turn at a playtest (-0.5 the weakest, 0 as dealt, 0.5 the sharpest)
+	skill: number?,
 }
 
 -- A ball in flight, as the bots heard it born.
@@ -177,6 +183,7 @@ export type Bots = {
 	brains: { [number]: any }, -- by slot id: BotBrain.Brain
 	nav: BotNav.Nav,
 	profile: BotBrain.Profile,
+	skill: number, -- Opts.skill
 	squad: BotBrain.Squad,
 	flights: { [number]: { Flight } }, -- by shooter: its balls in flight, oldest first
 	ended: { [number]: Flight }, -- by shooter: the ball of its that was heard to end last
@@ -227,6 +234,7 @@ function Bots.new(arena: Arena, opts: Opts?): Bots
 		brains = {},
 		nav = BotNav.build(arena),
 		profile = o.profile or BotBrain.DEFAULT,
+		skill = math.clamp(o.skill or 0, -1, 1),
 		squad = newSquad(arena),
 		flights = {},
 		ended = {},
@@ -272,7 +280,7 @@ function Bots.sync(bots: Bots, state: State, who: { [number]: number }, poses: {
 		if slot == nil or not slot.on or brains[id] ~= nil then
 			continue
 		end
-		local brain = BotBrain.new(bots.nav, id, slot.team, skill, bots.seed, bots.profile)
+		local brain = BotBrain.new(bots.nav, id, slot.team, skill + bots.skill, bots.seed, bots.profile)
 		brains[id] = brain
 		local pose = poses[id]
 		if pose ~= nil and BotNav.roomOf(bots.nav, pose.x, pose.y, pose.z) ~= 3 - slot.team then

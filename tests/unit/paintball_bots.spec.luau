@@ -683,6 +683,81 @@ return function(t)
 		t.truthy(math.deg(rms[3]) > 0.5, `later balls {math.deg(rms[3])} deg off`)
 	end)
 
+	t.test(
+		"a new target is misjudged, range and lead, and walked in ball by ball; a runner's speed is read over a moment",
+		function()
+			local P = BotBrain.DEFAULT
+			local at = groundNode(0, -24)
+			-- a person standing 30 studs ahead; the bot's misjudgment of the range is set by hand
+			local c = closeUp(at, 0, 4)
+			local bx, bz = c.brain.x, c.brain.z
+			c.poses[1].x, c.poses[1].z = bx, bz - 30
+			stepClose(c, 0.7)
+			t.eq(c.brain.target, 1)
+			local brain = c.brain
+			brain.errYaw, brain.errPitch, brain.lead, brain.biasLead = 0, 0, 1, 0
+			brain.pauseUntil = math.huge -- (it holds its fire: only its aim is read)
+			local function wantPitch(bias: number): number
+				brain.biasRange = bias
+				stepClose(c, DT)
+				return brain.wantPitch
+			end
+			local exact = wantPitch(0)
+			local over = wantPitch(0.5)
+			local under = wantPitch(-0.5)
+			-- the drop it allows for at 30 studs: the aim's pitch above the straight line to the middle
+			local ex, ey, ez = Body.eyePoint(bx, 0, bz, brain.crouch)
+			local mid = (Body.LOW + Body.top(0) - Body.RADIUS) * 0.5
+			local _, level = Body.yawPitch(bx - ex, mid - ey, bz - 30 - ez)
+			local allowance = exact - level
+			t.truthy(allowance > 0, "a ball drops: it aims a little high")
+			t.near(over - exact, 0.5 * allowance, 1e-6, "taking them to be further off, it aims higher still")
+			t.near(exact - under, 0.5 * allowance, 1e-6, "and nearer, lower")
+			-- each ball it fires walks both misjudgments in
+			brain.biasRange, brain.biasLead = 0.4, -0.3
+			brain.pauseUntil = c.now
+			local before = #c.fired
+			for _ = 1, 3 * Clock.TICK_HZ do
+				stepClose(c, DT)
+				if #c.fired > before then
+					break
+				end
+			end
+			t.eq(#c.fired, before + 1)
+			t.near(brain.biasRange, 0.4 * P.walkIn, 1e-9)
+			t.near(brain.biasLead, -0.3 * P.walkIn, 1e-9)
+			-- a new target gets misjudgments of its own, wider at a low skill
+			local spread = { 0, 0 }
+			for k, skill in { 0.9, 0.1 } do
+				for seed = 1, 30 do
+					local d = closeUp(at, 0, seed)
+					d.brain.skill = skill
+					d.poses[1].x, d.poses[1].z = bx, bz - 30
+					stepClose(d, 0.7)
+					t.eq(d.brain.target, 1)
+					spread[k] += d.brain.biasRange ^ 2 + d.brain.biasLead ^ 2
+				end
+			end
+			t.truthy(spread[2] > spread[1] * 2, "a weak bot misjudges more")
+			t.truthy(spread[1] > 0, "and a good one still does")
+			-- a runner crossing its view: its speed is not known at a glance, it is read over a moment
+			local r = closeUp(at, 0, 5)
+			r.poses[1].x, r.poses[1].z = bx - 15, bz - 30
+			local read: { number } = {}
+			for _ = 1, math.floor(0.8 / DT) do
+				r.poses[1].x += Body.WALK * DT
+				stepClose(r, DT)
+				local con = r.brain.con[1]
+				if con ~= nil and con.seen > -math.huge then
+					table.insert(read, con.vx)
+				end
+			end
+			t.truthy(#read > 10, "it saw them")
+			t.truthy(read[1] < Body.WALK * 0.6, `at first sight it reads {read[1]} studs/s`)
+			t.truthy(read[#read] > Body.WALK * 0.85, `and soon {read[#read]}`)
+		end
+	)
+
 	t.test("it turns no faster than BOT.turn, respects the magazine like anybody, and fires in bursts", function()
 		local at = groundNode(0, -24)
 		local c = closeUp(at, 0)
