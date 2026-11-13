@@ -27,7 +27,7 @@
 -- pressing N is told so.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
---   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
+--   feedback(frame, events, onRoute) -> string? (pure); cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
 --   string (pure); launch(events, vy) -> action?, airSeconds? (pure)
 -- No side effects on require.
@@ -39,6 +39,7 @@ local SquirrelVisual =
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../shared/Routes/Enclosure"))
 local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
@@ -53,6 +54,13 @@ local HINTS: { [string]: string } = {
 	-- inside an enclosed run (Shared/Routes/Enclosure) away from its openings
 	noRoom = "No room to jump in here: run on to an opening",
 }
+
+-- The camera zone for the route the body is on (pure): "tunnel" on any enclosed run (Shared/Routes/Enclosure.zone:
+-- the ball return, a hollow tree's inside, whatever its origin), so CameraPolicy puts the camera inside with it; nil
+-- elsewhere.
+function Squirrel.cameraZone(route: any?): string?
+	return if Enclosure.zone(route) ~= nil then "tunnel" else nil
+end
 
 -- What to tell the player about this frame's verbs (pure; nil = nothing to say). `frame` is the
 -- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now.
@@ -278,14 +286,8 @@ function Squirrel.start(
 			shownStamina, shownWinded = state.stamina, state.winded
 			ctx.meter(state.stamina, state.winded)
 		end
-		-- the bowling alley's ball-return tunnel (and its vent): the camera rides low behind (CameraPolicy zone)
-		local zone = nil
-		if state.routeId then
-			local r = motorWorld.registry:get(state.routeId)
-			if r and r.origin == "attraction" then
-				zone = "tunnel"
-			end
-		end
+		-- any enclosed run (the ball return, a hollow tree's inside): the camera rides low behind (CameraPolicy zone)
+		local zone = Squirrel.cameraZone(if state.routeId then motorWorld.registry:get(state.routeId) else nil)
 		if body:GetAttribute("CameraZone") ~= zone then
 			body:SetAttribute("CameraZone", zone)
 		end

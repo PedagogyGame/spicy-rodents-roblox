@@ -26,7 +26,10 @@
         "d0": 54.2,
         "d1": 189.82,
         "for": "the owner's backstage, addendum D4",
-        "givesWayOnArrival": ["f2_liberty_green", "f3_steakhouse"]
+        "givesWayOnArrival": [
+          "f2_liberty_green",
+          "f3_steakhouse"
+        ]
       },
       "lanes": 18,
       "games": [
@@ -94,6 +97,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -157,6 +163,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -220,6 +229,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -283,6 +295,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -346,6 +361,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -409,6 +427,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -472,6 +493,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -535,6 +559,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],
@@ -598,6 +625,9 @@
                 "t": 1,
                 "opens": "ledge",
                 "out": [0, 0, -1],
+                "depth": 0.1,
+                "hop": 14,
+                "hopUp": 12,
                 "name": "rack"
               }
             ],

@@ -128,6 +128,74 @@ return function(t)
 		local _ = ev
 	end)
 
+	t.test("a leap or a pounce at a mouth goes in, or W gets in from wherever the body comes to rest", function()
+		-- at the grille from the alley, 2 to 8 studs out: in during the flight (the swept path through the mouth) or,
+		-- pressed into the opening by the wall, by W from there
+		for _, dist in { 2, 3, 4, 5, 6, 8 } do
+			for _, key in { "leap", "pounce" } do
+				local s = standing(0, 83 + dist, AlleyLayout.ALLEY_Y + 1, 0, -1)
+				local cam = camAlong(0, -1)
+				local trace = BakedWorld.drive(w, s, 120, function(f: number): SquirrelMotor.Input
+					return BakedWorld.keys(cam, { fw = if f <= 2 then 1 else 0, [key] = f == 2 })
+				end, {
+					validator = true,
+					stop = function(st, f)
+						return st.routeId ~= nil or (f > 3 and st.grounded and st.attackWindow == 0)
+					end,
+				})
+				if s.routeId == nil then
+					local _, _, D = local3(s.x, s.y, s.z)
+					BakedWorld.drive(w, s, 90, hold(cam), {
+						stop = function(st)
+							return st.routeId ~= nil
+						end,
+					})
+					t.eq(s.routeId, 9004, `{key} from {dist} studs: came to rest at D {D}, then W`)
+				else
+					t.eq(s.routeId, 9004, `{key} from {dist} studs: in during the flight`)
+					t.eq(s.attackWindow, 0, "going in ends the attack")
+				end
+				t.eq(trace.violations, 0)
+			end
+		end
+		-- at the hood from the rack in front of it (2 to 5 studs out; the rack runs 6.2 studs out, and from the floor
+		-- beyond it its end and its balls stop a walk: the rack moment's to shape): in during the flight where it passes
+		-- through the opening, else over the solid hood (it comes down behind it); never left in front of the hood
+		-- where W does not get in
+		local inFlight, over = 0, 0
+		for _, dist in { 2, 3, 4, 5 } do
+			for _, key in { "leap", "pounce" } do
+				local s = standing(0, AlleyLayout.HOOD_D1 - dist, 0.5, 0, 1)
+				local cam = camAlong(0, 1)
+				local trace = BakedWorld.drive(w, s, 120, function(f: number): SquirrelMotor.Input
+					return BakedWorld.keys(cam, { fw = if f <= 2 then 1 else 0, [key] = f == 2 })
+				end, {
+					validator = true,
+					stop = function(st, f)
+						return st.routeId ~= nil or (f > 3 and st.grounded and st.attackWindow == 0)
+					end,
+				})
+				t.eq(trace.violations, 0)
+				if s.routeId then
+					inFlight += 1
+					continue
+				end
+				local _, _, D = local3(s.x, s.y, s.z)
+				if D > AlleyLayout.HOOD_D0 then
+					over += 1
+				else
+					BakedWorld.drive(w, s, 120, hold(cam), {
+						stop = function(st)
+							return st.routeId ~= nil
+						end,
+					})
+					t.eq(s.routeId, 9004, `{key} from {dist} studs before the hood: came to rest at D {D}, then W`)
+				end
+			end
+		end
+		t.truthy(inFlight >= 1, `some flights go in through the hood's mouth ({inFlight}; {over} sailed over it)`)
+	end)
+
 	t.test("inside: Space, Q, a click and E do nothing, all the way along under the lane", function()
 		local cam = camAlong(0, -1)
 		local r = runOf(2)
@@ -165,25 +233,73 @@ return function(t)
 		end
 	end)
 
-	t.test("the rack: Space jumps out toward the bowlers; a click too; Q drops onto the rack; S goes back", function()
+	t.test("the rack: Space or a click hops out onto the rack by the bowler; Q drops onto it; S goes back", function()
 		local camAway = camAlong(1, 0)
-		local s = onRun(2, 1, -1)
-		press(s, camAway, "leap")
-		t.eq(s.routeId, nil)
-		BakedWorld.drive(w, s, 30, hold(camAway, { fw = 0 }))
-		local _, _, D = local3(s.x, s.y, s.z)
-		t.truthy(D < AlleyLayout.HOOD_D1 - 5, `out toward the bowlers, whatever the view (D {D})`)
-		local c = onRun(2, 1, -1)
-		press(c, camAway, "pounce")
-		t.eq(c.routeId, nil)
-		local q = onRun(2, 1, -1)
-		press(q, camAway, "drop")
-		BakedWorld.drive(w, q, 60, hold(camAway, { fw = 0 }))
-		local _, qY, qD = local3(q.x, q.y, q.z)
-		t.truthy(q.grounded and qD < AlleyLayout.HOOD_D1 + 0.5 and qY > 0.5, `dropped onto the rack (Y {qY}, D {qD})`)
+		for p = 1, AlleyLayout.PAIRS do
+			local px = AlleyLayout.pairX(p)
+			for _, key in { "leap", "pounce" } do
+				-- the mouth's short hop (data: hop 14, hopUp 12), out along the mouth whatever the view
+				local s = onRun(p, 1, -1)
+				local before = SquirrelMotor.clone(s)
+				press(s, camAway, key)
+				t.eq(s.routeId, nil)
+				t.eq(#SquirrelMotor.envelope(before, s, 1 / 60, w, false), 0, `{key}: the server accepts the hop`)
+				local _, y0, d0 = local3(s.x, s.y, s.z)
+				t.truthy(d0 < AlleyLayout.HOOD_D1, `{key} starts outside the hood's face (D {d0}, Y {y0})`)
+				BakedWorld.drive(w, s, 60, hold(camAway, { fw = 0 }), {
+					stop = function(st)
+						return st.grounded
+					end,
+				})
+				local X, Y, D = local3(s.x, s.y, s.z)
+				t.truthy(s.grounded, key)
+				t.truthy(
+					D <= -7 and D >= -10 and math.abs(X - px) < 0.01,
+					`pair {p}: {key} lands by the rack, not past the bowler (D {D})`
+				)
+				t.truthy(Y > AlleyLayout.RACK_Y - 0.5, `on the rack or a ball on it (Y {Y})`)
+			end
+			-- Q: out of the hood's face with a small push, down onto the rack's rails (never up through the bonnet)
+			local q = onRun(p, 1, -1)
+			press(q, camAway, "drop")
+			BakedWorld.drive(w, q, 60, hold(camAway, { fw = 0 }))
+			local _, qY, qD = local3(q.x, q.y, q.z)
+			t.truthy(q.grounded, "Q lands")
+			t.near(qY, 1.10, 0.1, `dropped onto the rack (Y {qY}, D {qD})`)
+			t.truthy(
+				qD < AlleyLayout.HOOD_D1 and qD > AlleyLayout.RACK_D1,
+				`in front of the hood, on the rack (D {qD})`
+			)
+		end
+		-- the opening's window is the head only: 0.6 studs back inside the hood Space, Q and a click do nothing
+		local r = runOf(2)
+		for _, back in { 0.6, 0.9, 1.2 } do
+			for _, key in { "leap", "drop", "pounce" } do
+				local s = onRun(2, 1 - back / r.length, 1)
+				local ev = press(s, camAway, key)
+				t.eq(s.routeId, 9004, `{key} {back} studs inside the hood`)
+				t.eq(#ev, 1)
+				t.eq(ev[1].reason, "noRoom")
+			end
+		end
 		local b = onRun(2, 1, -1)
 		BakedWorld.drive(w, b, 30, hold(camAlong(0, -1), { fw = -1 }))
 		t.truthy(b.routeId == 9004 and b.railT < 0.95, "S goes back down the hood")
+	end)
+
+	t.test("at the lip, the view turned round with W still held runs back down at once", function()
+		for _, wait in { 0, 5, 30 } do
+			local s = standing(0, 92, AlleyLayout.ALLEY_Y + 1, 0, -1)
+			local trace = BakedWorld.drive(w, s, 600, hold(camAlong(0, -1)), {
+				stop = function(st)
+					return st.routeId == 9004 and st.railT >= 1
+				end,
+			})
+			t.eq(BakedWorld.count(trace, "lip"), 1)
+			BakedWorld.drive(w, s, wait, hold(camAlong(0, -1), { fw = 0 }))
+			BakedWorld.drive(w, s, 30, hold(camAlong(0, 1)))
+			t.truthy(s.routeId == 9004 and s.railT < 0.95, `after {wait} frames released: back down at t {s.railT}`)
+		end
 	end)
 
 	t.test("back out at the grille on its feet; a turn-back inside", function()
@@ -247,6 +363,74 @@ return function(t)
 				codes[x.code] = true
 			end
 			t.truthy(codes.enclosure, "out of the duct up through the floor")
+			-- the same through the floor next to the hood with the packets late: one time budget (reaching the mouth
+			-- off the rails, then along the rail from it) within the gap, never each part in full
+			local r = runOf(2)
+			local function tAt(D: number): number
+				local lo, hi = 0, 1
+				for _ = 1, 50 do
+					local mid = (lo + hi) / 2
+					local q = reg:pointAt(r, mid)
+					local _, _, d = local3(q.x, q.y, q.z)
+					if d > D then
+						lo = mid
+					else
+						hi = mid
+					end
+				end
+				return lo
+			end
+			local cases = {
+				{ 0.1, { 1, 5, 10, 15 } },
+				{ 0.3, { 1, 5, 10, 15 } },
+				{ 0.45, { 5, 10, 15 } },
+			}
+			for _, case in cases do
+				local dt = case[1] :: number
+				for _, D in case[2] :: { number } do
+					local up = standing(0, D, 1.5, 0, -1)
+					local down = onRun(2, tAt(D), 1)
+					down.clock = up.clock + dt
+					local into = {}
+					for _, x in SquirrelMotor.envelope(up, down, dt, w, false) do
+						into[x.code] = true
+					end
+					t.truthy(into.enclosure, `into the duct through the floor at D {D}, {dt} s late`)
+					local back = SquirrelMotor.clone(down)
+					back.routeId = nil
+					back.x, back.y, back.z = up.x, up.y, up.z
+					back.grounded = true
+					back.clock = down.clock + dt
+					local outOf = {}
+					for _, x in SquirrelMotor.envelope(down, back, dt, w, false) do
+						outOf[x.code] = true
+					end
+					t.truthy(outOf.enclosure, `out of the duct through the floor at D {D}, {dt} s late`)
+				end
+			end
+		end
+	)
+
+	t.test(
+		"where a launch out of each mouth starts, nothing solid stands (the balls resting there are seen)",
+		function()
+			for p = 1, AlleyLayout.PAIRS do
+				for _, mb in BakedWorld.mouthClearance(baked, reg, runOf(p)) do
+					local names = {}
+					for _, part in mb.parts do
+						t.falsy(part.collide, `pair {p} {mb.mouth}: {part.path} is solid`)
+						table.insert(names, part.path)
+					end
+					table.sort(names)
+					-- the grille is clear; at the rack the body starts beside the pair's two balls resting at the hood (they do
+					-- not collide; the rack moment's builder decides where they rest when a squirrel comes out)
+					local want = if mb.mouth == "rack"
+						then { `Lanes.Lane{2 * p - 1}.Ball`, `Lanes.Lane{2 * p}.Ball` }
+						else {}
+					table.sort(want)
+					t.eq(table.concat(names, ","), table.concat(want, ","), `pair {p} {mb.mouth}`)
+				end
+			end
 		end
 	)
 

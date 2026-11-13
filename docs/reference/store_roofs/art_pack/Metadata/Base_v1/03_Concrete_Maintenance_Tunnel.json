@@ -1,0 +1,204 @@
+{
+  "title": "Concrete maintenance tunnel",
+  "footprint_m": [
+    6.64,
+    12
+  ],
+  "camera": [
+    -1.5,
+    -5.25,
+    1.7
+  ],
+  "look_at": [
+    0.5,
+    3.5,
+    1.85
+  ],
+  "description": "Dry utility route with pump set, rusted service lines, electrical panel, inset access-door panel, drain and cable trays. Side door is a decorative closed access panel, not a through-opening.",
+  "id": "03_Concrete_Maintenance_Tunnel",
+  "units": "meter",
+  "up_axis": "Y",
+  "blender_up_axis": "Z",
+  "origin": "center at walkway elevation 0",
+  "coordinate_conversion": "glTF (x,y,z) = Blender (x,z,-y)",
+  "connectors": [
+    {
+      "name": "PORT_03_North",
+      "position_m": [
+        0.0,
+        0.0,
+        -6.0
+      ],
+      "outward": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "nominal_width_m": 6,
+      "minimum_clear_width_m": 5.6,
+      "spring_height_m": 2.2,
+      "crown_height_m": 5.2
+    },
+    {
+      "name": "PORT_03_South",
+      "position_m": [
+        0.0,
+        0.0,
+        6.0
+      ],
+      "outward": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "nominal_width_m": 6,
+      "minimum_clear_width_m": 5.6,
+      "spring_height_m": 2.2,
+      "crown_height_m": 5.2
+    }
+  ],
+  "collision_boxes": [
+    {
+      "name": "Walls_Left",
+      "type": "box",
+      "center_m": [
+        -3.1600000858306885,
+        1.100000023841858,
+        -0.0
+      ],
+      "size_m": [
+        0.32,
+        2.2,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "solid"
+    },
+    {
+      "name": "Walls_Right",
+      "type": "box",
+      "center_m": [
+        3.1600000858306885,
+        1.100000023841858,
+        -0.0
+      ],
+      "size_m": [
+        0.32,
+        2.2,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "solid"
+    },
+    {
+      "name": "Floor_Dry",
+      "type": "box",
+      "center_m": [
+        0.0,
+        -0.2199999988079071,
+        -0.0
+      ],
+      "size_m": [
+        6,
+        0.44,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "walkable"
+    },
+    {
+      "name": "Pump_Plinth",
+      "type": "box",
+      "center_m": [
+        2.25,
+        0.11999999731779099,
+        -2.299999952316284
+      ],
+      "size_m": [
+        1.1,
+        0.24,
+        1.7
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "solid"
+    }
+  ],
+  "suggested_lights": [
+    {
+      "name": "LIGHT_03_01",
+      "position_m": [
+        -2.569999933242798,
+        2.380000114440918,
+        4.0
+      ],
+      "color_hex": "#9bd9db",
+      "suggested_range_m": 5.5,
+      "preview_watts": 95,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_03_02",
+      "position_m": [
+        2.569999933242798,
+        2.380000114440918,
+        4.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_03_03",
+      "position_m": [
+        -2.569999933242798,
+        2.380000114440918,
+        -0.0
+      ],
+      "color_hex": "#9bd9db",
+      "suggested_range_m": 5.5,
+      "preview_watts": 95,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_03_04",
+      "position_m": [
+        2.569999933242798,
+        2.380000114440918,
+        -0.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_03_05",
+      "position_m": [
+        -2.569999933242798,
+        2.380000114440918,
+        -4.0
+      ],
+      "color_hex": "#9bd9db",
+      "suggested_range_m": 5.5,
+      "preview_watts": 95,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_03_06",
+      "position_m": [
+        2.569999933242798,
+        2.380000114440918,
+        -4.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    }
+  ],
+  "water": "opaque static mesh; optional runtime flow shader",
+  "glb_bytes": 1355716,
+  "preview_note": "Blender preview lighting is separate from the exported mesh; actual Roblox/Three.js appearance requires engine lights.",
+  "playtest_status": "Not imported into the user game or Roblox Studio."
+}

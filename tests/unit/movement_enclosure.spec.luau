@@ -11,9 +11,12 @@
 --   2  a bough crossing 4 studs above the duct at z = 20 (an open route within E's reach of it)
 --   3  a climb (enclosure "t.tree", climb): a ground mouth at its foot, a knothole part-way linking bough 5, its top
 --      linking bough 4; 6 is the tree's outside trunk 1.5 studs from it
+--      (it says which side its wall is: `up`), a fork at t 0.15 into the dead-end pocket 12
 --   7, 8  two routes of one enclosure joined by authored end links 6 studs apart; 9 an open route starting right
 --      at 7's end (the old end-of-route switch would take it)
 --   10 a dead end
+--   11 a second passage of the same tree 3 studs from the climb through the wood (nothing authored joins them)
+--   13 a level run with a "ground" hole in its side part-way
 local Data = require("@shared/Data")
 local Enclosure = require("@shared/Routes/Enclosure")
 local Height = require("@shared/World/Height")
@@ -71,11 +74,14 @@ local function smallWorld(): SquirrelMotor.World
 		route(3, "tunnel", { { 20, 0, 0 }, { 20, 5, 0 }, { 20, 10, 0 } }, {
 			id = "t.tree",
 			climb = true,
+			up = { 0, 0, 1 }, -- the wall it clings to is on its -z side
 			mouths = {
 				{ t = 0, opens = "ground", out = { -1, 0, 0 } },
 				{ t = 0.5, opens = "link", out = { 1, 0, 0 }, links = { { route = 5, t = 0, dir = 1 } } },
+				-- no `out`: it leans out along bough 4 (Motion.mouthOut), never along the body's stale facing
 				{ t = 1, opens = "link", links = { { route = 4, t = 0, dir = 1 } } },
 			},
+			forks = { { t = 0.15, route = 12, toT = 0, dir = 1, name = "pocket" } },
 		}),
 		route(4, "branch", { { 21, 10, 0 }, { 30, 10, 0 } }),
 		route(5, "branch", { { 21.5, 5, 0 }, { 28, 5, 0 } }),
@@ -97,6 +103,22 @@ local function smallWorld(): SquirrelMotor.World
 			{ { 60, -3, 0 }, { 60, -3, 15 } },
 			{ id = "t.dead", mouths = { { t = 0, opens = "ground" } } }
 		),
+		-- a second passage up the same tree, 3 studs from the climb through the wood: nothing authored joins them
+		route(11, "tunnel", { { 20, 2, -3 }, { 20, 9, -3 } }, { id = "t.tree", climb = true, up = { 0, 0, 1 } }),
+		-- a dead-end pocket off the climb at t 0.15, joined by the climb's fork and its own start link back; its end
+		-- lies 0.8 studs from passage 11 (the old end-of-route switch would take it)
+		route(12, "tunnel", { { 20, 1.5, 0 }, { 20, 1.5, -2.4 } }, {
+			id = "t.tree",
+			atStart = { route = 3, t = 0.15, dir = 1 },
+		}),
+		-- a level run with a hole in its side part-way (onto the ground beside it)
+		route(13, "tunnel", { { 80, 0, 0 }, { 80, 0, 20 } }, {
+			id = "t.side",
+			mouths = {
+				{ t = 0, opens = "ground" },
+				{ t = 0.5, opens = "ground", out = { 1, 0, 0 }, depth = 0.4, name = "side hole" },
+			},
+		}),
 	}
 	-- the outside trunk stands closer to the climb's ground mouth than the walk-in reach; kept out of the walk-in
 	-- here so the walk toward the mouth is not taken by it (a real hollow puts its ground hole at least 3.8 studs
@@ -477,6 +499,15 @@ return function(t)
 			-- the knothole onto bough 242: where the shaft (straight up from height 1.4 to 33) passes the bough's height
 			local knotT = (out242.y - foot.y - 1.4) / (top - 1.4)
 			local a242 = math.rad(bearing242)
+			-- the shaft clings to the wall on bough 248's side: its back (`up`) faces the trunk's axis
+			local a248 = math.rad(bearing248)
+			local shaftUp = { -math.sin(a248), 0, -math.cos(a248) }
+			-- the bark's thickness from the shaft (0.9 out) to the outside: a launch through a hole starts beyond it
+			local depth = trunk.surfaceRadius - 0.9 + 0.1
+			-- a hideout pocket off the shaft at 15 studs, on the side away from the knothole (A/D picks it or the hole)
+			local hideH = 15
+			local hideT = (hideH - 1.4) / (top - 1.4)
+			local hideBearing = bearing242 + 180
 			local hollow = {
 				{
 					id = 9120,
@@ -507,18 +538,39 @@ return function(t)
 					enclosure = {
 						id = "hollow.H2",
 						climb = true,
+						up = shaftUp,
 						atStart = { route = 9120, t = 1, dir = -1 },
+						forks = { { t = hideT, route = 9122, toT = 0, dir = 1, name = "hideout" } },
 						mouths = {
 							{
 								t = knotT,
 								opens = "link",
 								out = { math.sin(a242), 0, math.cos(a242) },
+								depth = depth,
 								links = { { route = 242, t = t242, dir = 1 } },
 								name = "knothole",
 							},
-							{ t = 1, opens = "link", links = { { route = 248, t = t248, dir = 1 } }, name = "top" },
+							-- no `out`: it leans out along bough 248 (Motion.mouthOut)
+							{
+								t = 1,
+								opens = "link",
+								depth = depth,
+								links = { { route = 248, t = t248, dir = 1 } },
+								name = "top",
+							},
 						},
 					},
+				},
+				{
+					id = 9122,
+					name = "hollow H2 hideout",
+					kind = "tunnel",
+					pts = {
+						{ bearing248, 0.9, hideH },
+						{ hideBearing, 0.6, hideH + 0.1 },
+						{ hideBearing, 1.4, hideH + 0.2 },
+					},
+					enclosure = { id = "hollow.H2", atStart = { route = 9121, t = hideT, dir = 1 } },
 				},
 			}
 			local recs: { Rec } = {}
@@ -556,7 +608,10 @@ return function(t)
 				rec.origin = "hollow"
 				table.insert(recs, rec)
 			end
-			local errs = Enclosure.validateSet({ recs[#recs - 1], recs[#recs] }, { [242] = true, [248] = true })
+			local errs = Enclosure.validateSet(
+				{ recs[#recs - 2], recs[#recs - 1], recs[#recs] },
+				{ [242] = true, [248] = true }
+			)
 			t.eq(#errs, 0, table.concat(errs, "; "))
 			local hw = BakedWorld.recordsData(recs, data:forks())
 			local rail = (require("@shared/Movement/RailWorld") :: any).build(hw)
@@ -608,6 +663,71 @@ return function(t)
 			local atKnot = onRoute(world, 9121, knotT, 1)
 			press(atKnot, world, cam, "grab")
 			t.eq(atKnot.routeId, 242, "out through the knothole")
+			-- Q, Space and a click at the knothole start outside the bark (its depth) and land outside it
+			local fx0, _, fz0 = axisAt(0)
+			for _, key in { "drop", "leap", "pounce" } do
+				local k = onRoute(world, 9121, knotT, 1)
+				local before = SquirrelMotor.clone(k)
+				press(k, world, cam, key)
+				t.eq(k.routeId, nil, key)
+				t.eq(#SquirrelMotor.envelope(before, k, 1 / 60, world, false), 0, `{key}: the server accepts it`)
+				local ax, _, az = axisAt(k.y - foot.y)
+				local r0 = math.sqrt((k.x - ax) ^ 2 + (k.z - az) ^ 2)
+				t.truthy(r0 > trunk.surfaceRadius, `{key} starts {r0} studs from the axis, outside the bark`)
+				local flight = BakedWorld.drive(world, k, 240, hold(cam, { fw = 0 }), {
+					stop = function(st)
+						return st.grounded or st.routeId ~= nil
+					end,
+				})
+				local _ = flight
+				if k.grounded then
+					local rl = math.sqrt((k.x - fx0) ^ 2 + (k.z - fz0) ^ 2)
+					t.truthy(rl > trunk.surfaceRadius, `{key} lands {rl} studs from the axis, outside the bark`)
+				end
+			end
+			-- Space at the shaft's top (no `out` written) leaps along bough 248, whatever the view and the body's facing
+			local tan248 = harvest:tangentAt(b248, t248)
+			local want = math.atan2(tan248.x, tan248.z)
+			for _, view in { 0, math.pi / 2, math.pi, -math.pi / 2 } do
+				local s2 = onRoute(world, 9121, 1, 1)
+				s2.yaw = view + 1.1
+				press(s2, world, view, "leap")
+				t.eq(s2.routeId, nil)
+				local got = math.atan2(s2.vx, s2.vz)
+				t.near(math.abs((got - want + math.pi) % (2 * math.pi) - math.pi), 0, 1e-6, `leap heading, view {view}`)
+			end
+			-- A/D on the way up picks the knothole or the hideout (one key each); W carries the body onto it
+			local function climbWith(side: number, below: number): (number?, { [number]: boolean })
+				local c = onRoute(world, 9121, math.max(0, below - 3 / (top - 1.4)), 1)
+				local kx, kz = math.sin(a242), math.cos(a242)
+				-- a view across the trunk, with the knothole to its right
+				local camAcross = BakedWorld.cameraYawToward(kz, -kx)
+				local seen = {}
+				local tr = BakedWorld.drive(world, c, 300, function(f: number): SquirrelMotor.Input
+					return BakedWorld.keys(camAcross, { fw = 1, choose = if f == 1 then side else 0 })
+				end, {
+					validator = true,
+					stop = function(st)
+						return st.routeId ~= 9121
+					end,
+				})
+				for _, e in tr.events do
+					seen[e.routeId or 0] = true
+				end
+				t.eq(tr.violations, 0)
+				return c.routeId, seen
+			end
+			local right = climbWith(1, knotT)
+			local left = climbWith(-1, hideT)
+			t.eq(right, 242, "the key on the knothole's side takes the knothole")
+			t.eq(left, 9122, "the other key takes the hideout")
+			-- E on the shaft at the hideout takes it; E across the wood elsewhere takes nothing
+			local atHide = onRoute(world, 9121, hideT, 1)
+			press(atHide, world, cam, "grab")
+			t.eq(atHide.routeId, 9122, "E at the hideout")
+			local inPocket = onRoute(world, 9122, 0.9, 1)
+			press(inPocket, world, cam, "grab")
+			t.eq(inPocket.routeId, 9122, "E at the far end of the hideout reaches nothing through the wood")
 			-- walking into the trunk elsewhere still climbs the outside trunk
 			local far = toWorld(150, 9, 0)
 			local f = SquirrelMotor.new(far[1], Height.at(far[1], far[3]), far[3])
@@ -620,6 +740,209 @@ return function(t)
 			})
 			t.eq(f.routeId, 241, "the outside trunk, as before")
 			t.eq(BakedWorld.count(walk, "enter"), 0)
+		end
+	)
+
+	t.test(
+		"a pounce at a ground mouth goes in during the flight and the attack ends; a leap over it does not",
+		function()
+			for _, dist in { 2, 3, 4, 6, 8 } do
+				local s, cam = onGround(0, -dist, 0, 1)
+				local trace = BakedWorld.drive(w, s, 90, function(f: number): SquirrelMotor.Input
+					return BakedWorld.keys(cam, { pounce = f == 1 })
+				end, {
+					validator = true,
+					stop = function(st)
+						return st.routeId ~= nil
+					end,
+				})
+				t.eq(s.routeId, 1, `a pounce from {dist} studs goes in`)
+				t.eq(s.attackWindow, 0, "going in ends the attack")
+				t.eq(BakedWorld.count(trace, "enter"), 1)
+				t.truthy(trace.maxStep < 0.75, `eased in: {trace.maxStep}`)
+				t.eq(trace.violations, 0)
+			end
+			-- the swept check: a flight crossing the mouth's disc within one substep is caught (faster than the reach)
+			local p0 = Motion.mouthEntrySwept(w, 0, 0.5, -1.6, 0, 0.4, 1.0, 0, 50)
+			t.truthy(p0 ~= nil and p0.routeId == 1, "the segment through the disc")
+			t.eq(Motion.mouthEntry(w, 0, 0.5, -1.6, 0, 50), nil, "the start point alone is out of reach")
+			t.eq(Motion.mouthEntrySwept(w, 0, 0.5, -1.6, 0, 0.4, 1.0, 0, -50), nil, "moving out: not in")
+			-- a body pressed half its length past the mouth point (into an opening) still gets in; a body's length does not
+			local pressed, camP = onGround(0, 0.7, 0, 1)
+			BakedWorld.drive(w, pressed, 20, hold(camP))
+			t.eq(pressed.routeId, 1, "0.7 studs past the mouth point, heading in")
+			local deep, camD = onGround(0, 1.0, 0, 1)
+			BakedWorld.drive(w, deep, 20, hold(camD))
+			t.eq(deep.routeId, nil, "1 stud past: on the ground over the duct")
+		end
+	)
+
+	t.test("launches at a mouth start outside its face; Q pushes out; a hole part-way lets E step out", function()
+		-- the ledge mouth at z = 38: Q starts 0.9 studs out (Enclosure.C.clear) and moves on out
+		local q = onRoute(w, 1, 1, 1)
+		local before = SquirrelMotor.clone(q)
+		press(q, w, BakedWorld.cameraYawToward(-1, 0), "drop")
+		t.eq(q.routeId, nil)
+		t.truthy(q.z > 38 + Enclosure.C.clear - 0.05, `Q starts outside the face (z {q.z})`)
+		t.truthy(q.vz > 2, `and is pushed out along it ({q.vz})`)
+		t.eq(#SquirrelMotor.envelope(before, q, 1 / 60, w, false), 0)
+		-- the hole in run 13's side (depth 0.4): E at it steps out onto the ground beside the run, on its feet
+		local side = onRoute(w, 13, 0.5 + 0.6 / 20, 1)
+		local ev = kinds(press(side, w, BakedWorld.cameraYawToward(0, 1), "grab"))
+		t.eq(side.routeId, nil, ev)
+		t.truthy(string.find(ev, "emerge", 1, true) ~= nil, ev)
+		t.truthy(side.x > 80 + 0.4 + Enclosure.C.clear - 0.05, `outside the hole (x {side.x})`)
+		BakedWorld.drive(w, side, 30, hold(BakedWorld.cameraYawToward(1, 0), { fw = 0 }))
+		t.truthy(side.grounded and side.x > 81, "on its feet beside the run")
+		-- E away from the hole does nothing
+		local away = onRoute(w, 13, 0.3, 1)
+		press(away, w, BakedWorld.cameraYawToward(0, 1), "grab")
+		t.eq(away.routeId, 13)
+		-- and the hole is a way in: walking into it from the side, heading in
+		local walker, camW = onGround(83, 10, -1, 0)
+		BakedWorld.drive(w, walker, 60, hold(camW), {
+			stop = function(st)
+				return st.routeId ~= nil
+			end,
+		})
+		t.eq(walker.routeId, 13, "in through the side hole")
+	end)
+
+	t.test("a vertical shaft's top launches along the bough it opens onto, never the body's stale facing", function()
+		local cam = BakedWorld.cameraYawToward(0, -1)
+		for _, yaw in { 0, 1.1, -2.5 } do
+			for _, key in { "leap", "pounce" } do
+				local s = onRoute(w, 3, 1, 1)
+				s.yaw = yaw
+				press(s, w, cam, key)
+				t.eq(s.routeId, nil)
+				t.truthy(s.vx > 5 and math.abs(s.vz) < 1e-6, `{key} with the body facing {yaw}: along bough 4 (+x)`)
+			end
+		end
+		-- the data check: a vertical end mouth with nothing to lean out along is refused, as is a launch point
+		-- inside a trunk's bark
+		local bad = Registry.fromRecords({
+			route(1, "tunnel", { { 0, 0, 0 }, { 0, 10, 0 } }, {
+				id = "x",
+				climb = true,
+				up = { 1, 0, 0 },
+				mouths = { { t = 0, opens = "ground", out = { -1, 0, 0 } }, { t = 1, opens = "air" } },
+			}),
+			route(2, "trunk", { { 5, 0, 0 }, { 5, 20, 0 } }),
+			route(3, "tunnel", { { 5, 2, -0.5 }, { 5, 9, -0.5 } }, {
+				id = "y",
+				climb = true,
+				up = { 0, 0, -1 },
+				mouths = {
+					{ t = 0, opens = "air", out = { 0, 0, 1 } },
+					{ t = 0.6, opens = "air", out = { 0, 0, 1 }, depth = 1.0 },
+				},
+			}),
+		})
+		local errs = Motion.enclosureErrors(bad)
+		local text = table.concat(errs, "; ")
+		t.truthy(string.find(text, "route 1: mouth 2 has no level way out", 1, true) ~= nil, text)
+		t.truthy(string.find(text, "route 3: mouth 1's launch point", 1, true) ~= nil, text)
+		t.truthy(string.find(text, "route 3: mouth 2's launch point", 1, true) == nil, "deep enough: " .. text)
+		-- and a ground hole within the walk-in grab of a climbable trunk's foot
+		local near = Registry.fromRecords({
+			route(1, "tunnel", { { 3, 0, 0 }, { 0.5, 0, 0 } }, { id = "z", mouths = { { t = 0, opens = "ground" } } }),
+			route(2, "trunk", { { 0, 0, 0 }, { 0, 20, 0 } }),
+		})
+		local nearText = table.concat(Motion.enclosureErrors(near), "; ")
+		t.truthy(string.find(nearText, "inside its walk-in grab", 1, true) ~= nil, nearText)
+	end)
+
+	t.test(
+		"inside one tree only what is authored joins two passages: no E, end switch or server pass through wood",
+		function()
+			local cam = BakedWorld.cameraYawToward(1, 0)
+			-- the climb at y 7 is 3 studs from passage 11 (within E's reach): nothing
+			local s = onRoute(w, 3, 0.7, 1)
+			local ev = kinds(press(s, w, cam, "grab"))
+			t.eq(s.routeId, 3, ev)
+			-- the pocket's dead end lies 0.8 studs from passage 11: pinned there, once, never switched across
+			local p = onRoute(w, 12, 0.6, 1)
+			local camP = BakedWorld.cameraYawToward(0, -1)
+			local dead = BakedWorld.drive(w, p, 60, hold(camP))
+			t.eq(p.routeId, 12)
+			t.eq(BakedWorld.count(dead, "railEnd", "none"), 1)
+			press(p, w, camP, "grab")
+			t.eq(p.routeId, 12, "E at the pocket's end: nothing through the wood")
+			-- and back out of the pocket by its start link onto the climb
+			local back = BakedWorld.drive(w, p, 90, hold(camP, { fw = -1 }), {
+				stop = function(st)
+					return st.routeId ~= 12
+				end,
+			})
+			t.eq(p.routeId, 3, "out of the pocket onto the climb")
+			t.eq(back.violations, 0)
+			-- the server: one frame from the climb to passage 11 is through the wood
+			local a = onRoute(w, 3, 0.7, 1)
+			local b = onRoute(w, 11, (7 - 2) / 7, 1)
+			b.clock = a.clock + 1 / 60
+			local codes = {}
+			for _, x in SquirrelMotor.envelope(a, b, 1 / 60, w, false) do
+				codes[x.code] = true
+			end
+			t.truthy(codes.enclosure, "climb to passage 11 across the wood")
+			-- a late packet may hide two authored hops (bough 5, in at the knothole, down to the pocket's fork, into it);
+			-- the same move in one frame may not, and nothing authored ever joins the climb to passage 11
+			local function judged(from: SquirrelMotor.State, to: SquirrelMotor.State, dt: number): { [string]: boolean }
+				to.clock = from.clock + dt
+				local found = {}
+				for _, x in SquirrelMotor.envelope(from, to, dt, w, false) do
+					found[x.code] = true
+				end
+				return found
+			end
+			t.falsy(judged(onRoute(w, 5, 0.05, -1), onRoute(w, 12, 0.1, 1), 0.2).enclosure, "two hops in 0.2 s")
+			t.truthy(judged(onRoute(w, 5, 0.05, -1), onRoute(w, 12, 0.1, 1), 1 / 60).enclosure, "not in one frame")
+			t.truthy(judged(onRoute(w, 3, 0.7, 1), onRoute(w, 11, 5 / 7, 1), 0.2).enclosure, "nor through the wood")
+			-- A/D at the pocket's fork, then W: onto the pocket; the knothole by the other key
+			local function climbing(side: number): number?
+				local c = onRoute(w, 3, 0.02, 1)
+				BakedWorld.drive(w, c, 120, function(f: number): SquirrelMotor.Input
+					return BakedWorld.keys(cam, { fw = 1, choose = if f == 1 then side else 0 })
+				end, {
+					stop = function(st)
+						return st.routeId ~= 3
+					end,
+				})
+				return c.routeId
+			end
+			t.eq(climbing(-1), 12, "A: the pocket on the left")
+			t.eq(climbing(1), 5, "D: the knothole ahead on the right")
+		end
+	)
+
+	t.test(
+		"the section: an authored up on a climb; the default carried up a vertical stretch; the camera zone",
+		function()
+			local climb = w.registry:get(3) :: Registry.Route
+			local sc = Motion.section(w, climb, 0.5) :: Motion.Section
+			t.near(sc.up.z, 1, 1e-9, "the climb's back faces +z, its belly the wall at -z")
+			t.near(sc.tangent.y, 1, 1e-9)
+			t.near(math.abs(sc.side.x), 1, 1e-9)
+			t.eq(sc.width, Enclosure.C.width)
+			local duct = w.registry:get(1) :: Registry.Route
+			local flat = Motion.section(w, duct, 0.5) :: Motion.Section
+			t.truthy(flat.up.y > 0.99, "level: world up")
+			t.eq(Motion.section(w, w.registry:get(2) :: Registry.Route, 0.5), nil, "an open route has none")
+			-- any enclosed run gets the inside camera, whatever its origin (a hollow's routes are not "attraction")
+			t.eq(SquirrelController.cameraZone(climb), "tunnel")
+			t.eq(
+				SquirrelController.cameraZone({
+					id = 9,
+					kind = "tunnel",
+					length = 5,
+					origin = "hollow",
+					enclosure = climb.enclosure,
+				}),
+				"tunnel"
+			)
+			t.eq(SquirrelController.cameraZone(w.registry:get(2)), nil)
+			t.eq(SquirrelController.cameraZone(nil), nil)
 		end
 	)
 
@@ -657,6 +980,8 @@ return function(t)
 		t.truthy(w.graph:linked(3, 6))
 		t.falsy(linksOf(6)[3])
 		t.truthy(linksOf(3)[4], "the climb's top links its bough")
+		t.falsy(linksOf(3)[11], "nor the second passage through the wood")
+		t.falsy(linksOf(11)[3])
 	end)
 
 	t.test("the player is told: no room inside, and what the keys do with the head out of an opening", function()

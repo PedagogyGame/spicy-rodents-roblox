@@ -33,7 +33,17 @@ local function r6(n: number): number
 	return math.floor(n * 1e6 + 0.5) / 1e6
 end
 
--- the enclosure record in world terms: each mouth's `out` from the building's local frame [X, Y, D]
+-- a direction from the building's local frame [X, Y, D] to a world unit vector
+local function worldDir(place: any, v: { number }): { number }
+	local x0, y0, z0 = AlleyLayout.toWorld(place, 0, 0, 0)
+	local x1, y1, z1 = AlleyLayout.toWorld(place, v[1], v[2], v[3])
+	local dx, dy, dz = x1 - x0, y1 - y0, z1 - z0
+	local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+	return { r6(dx / len), r6(dy / len), r6(dz / len) }
+end
+
+-- the enclosure record in world terms (Shared/Routes/Enclosure): each mouth's `out`, the section's `up` and `upAt`,
+-- and the `cavity` from the building's local frame [X, Y, D]
 local function worldEnclosure(place: any, e: any): any
 	local out: { [string]: any } = table.clone(e)
 	if e.mouths then
@@ -41,18 +51,40 @@ local function worldEnclosure(place: any, e: any): any
 		for _, m in e.mouths do
 			local wm: { [string]: any } = table.clone(m)
 			if m.out then
-				local x0, y0, z0 = AlleyLayout.toWorld(place, 0, 0, 0)
-				local x1, y1, z1 = AlleyLayout.toWorld(place, m.out[1], m.out[2], m.out[3])
-				local dx, dy, dz = x1 - x0, y1 - y0, z1 - z0
-				local len = math.sqrt(dx * dx + dy * dy + dz * dz)
-				wm.out = { r6(dx / len), r6(dy / len), r6(dz / len) }
+				wm.out = worldDir(place, m.out)
 			end
 			table.insert(mouths, wm)
 		end
 		out.mouths = mouths
 	end
+	if e.up then
+		out.up = worldDir(place, e.up)
+	end
+	if e.upAt then
+		local keys = {}
+		for _, k in e.upAt do
+			local d = worldDir(place, { k[2], k[3], k[4] })
+			table.insert(keys, { k[1], d[1], d[2], d[3] })
+		end
+		out.upAt = keys
+	end
+	if e.cavity then
+		local c = e.cavity
+		local x, _, z = AlleyLayout.toWorld(place, c.axis[1], 0, c.axis[2])
+		local cav: { [string]: any } = { axis = { r4(x), r4(z) }, radius = c.radius }
+		if c.bottom then
+			local _, y = AlleyLayout.toWorld(place, c.axis[1], c.bottom, c.axis[2])
+			cav.bottom = r4(y)
+		end
+		if c.top then
+			local _, y = AlleyLayout.toWorld(place, c.axis[1], c.top, c.axis[2])
+			cav.top = r4(y)
+		end
+		out.cavity = cav
+	end
 	return out
 end
+Attractions.worldEnclosure = worldEnclosure
 
 function Attractions.compile(ctx: any): any?
 	local rel = "data/attractions.json"

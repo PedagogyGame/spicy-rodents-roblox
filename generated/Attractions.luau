@@ -53,6 +53,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -116,6 +119,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -179,6 +185,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -242,6 +251,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -305,6 +317,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -368,6 +383,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -431,6 +449,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -494,6 +515,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -557,6 +581,9 @@ return {
 							},
 							{
 								name = "rack",
+								depth = 0.1,
+								hop = 14,
+								hopUp = 12,
 								opens = "ledge",
 								out = { 0, 0, -1 },
 								t = 1,
@@ -625,6 +652,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -692,6 +722,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -759,6 +792,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -826,6 +862,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -893,6 +932,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -960,6 +1002,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -1027,6 +1072,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -1094,6 +1142,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
@@ -1161,6 +1212,9 @@ return {
 					},
 					{
 						name = "rack",
+						depth = 0.1,
+						hop = 14,
+						hopUp = 12,
 						opens = "ledge",
 						out = { 0, 0, 1 },
 						t = 1,
