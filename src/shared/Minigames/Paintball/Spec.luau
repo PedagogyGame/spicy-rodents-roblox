@@ -6,12 +6,15 @@
 --   rules     Rules (beside this file): the match model. A seat of the Session is a slot of the match.
 --   session   lobbySeconds = 0: the first person to join starts the match, and its own first phase,
 --             the briefing in the spawn rooms, is where friends catch up (anyone may join while a
---             match is on: rules.def.lateJoin). No idle clock: a player who stops sending is taken
---             off by the service (Clock.DROP_SECS). doneSeconds is the end card, a little longer than
---             Rules.endCardSecs, after which the service itself rolls into the next match (ctx.again).
+--             match is on: rules.def.lateJoin; nobody joins during the end card: the service's
+--             Table.join refuses). No idle clock of the framework's: the service takes off a player
+--             who stops sending (Clock.DROP_SECS) and one who stands still (Rules.idleSecs).
+--             doneSeconds is the end card, a little longer than Rules.endCardSecs, after which the
+--             service itself rolls into the next match (ctx.again).
 --   computers the bots (Contract.BOTS); fill = 8: four a side from the first moment (PB-6). The
 --             service keeps the sides even and at least four a side from then on (PaintballService).
---   verbs     "reload" (Wire.VERBS). Movement and the click go on paintball's own remotes (Wire).
+--   verbs     "reload" and "side" (Wire.VERBS). Movement and the click go on paintball's own
+--             remotes (Wire).
 --   stations  two, when the site is baked: the arena's own (its prompt is at the arena door in the
 --             lobby, Arena.GATE) and the pass desk (Arena.DESK), which `joins` it: the service's
 --             Table.join sells the pass there and seats nobody. The framework writes ONE action line

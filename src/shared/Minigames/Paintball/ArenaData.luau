@@ -3,11 +3,18 @@
 -- The arena as data (checklist PB-5). OWNED BY THE ARENA LANE; `build` keeps its name and signature.
 -- TODAY THIS IS A STAND-IN, so that the match, the bots, the server and the client can run against a
 -- real, valid arena from the first minute: the S18 greybox (Server/Paintball/Layout: five floors 14
--- studs apart, a 30 x 30 atrium, four pillars a floor) made honest enough to pass Arena.check: rails
--- on the east and west sides of the atrium, two straight stair flights a storey inside the atrium's
--- north and south edges (step boxes under a walking ramp, a landing at each end), two spawn rooms
--- in opposite corners of the ground floor, a 5 x 5 grid of navigation nodes a floor plus stair and
--- cover nodes. It has no rooms, no real cover, and nothing in it is baked.
+-- studs apart, a 30 x 30 atrium, four pillars a floor) made honest enough to pass Arena.check:
+--   * rails on the east and west sides of the atrium;
+--   * two switchback stairs inside the atrium's north and south edges: each storey's flight (14 step
+--     boxes under a walking ramp) ends on a landing where the next storey's flight begins, in the
+--     strip beside it, so going on up is a turn on the landing. Their sides are open: a body may drop
+--     off them (Arena, rules of the building);
+--   * two walled spawn rooms on the middle storey, against the west wall (team 1) and the east wall
+--     (team 2), each with a door at either end behind a baffle wall, a curtain box in each doorway and
+--     eight spawn points that no node outside can see;
+--   * a 5 x 5 grid of navigation nodes a floor, the stairs' nodes, the rooms' ways out, and cover
+--     spots beside the pillars and behind the rails.
+-- It has no other rooms, no real cover, and nothing in it is baked.
 -- THE ARENA LANE REPLACES THE BODY OF build() with the real building (lobby and loading dock,
 -- newsroom, studios, control rooms, offices; about 25 cover pieces a floor; two real stairwells a
 -- storey; spawn rooms with two ways out) and hands back grid-backed `sweep` and `ground` that give
@@ -16,10 +23,11 @@
 -- tools/bake/attractions.luau calls once for the arena's station (not for the desk's, which `joins`
 -- it) with a Kit in the SITE's frame (Arena.toSite turns each box) and the site's Model as parent. It
 -- makes its parts FROM this data: one sub-model named Arena.MODEL, in it a model per floor so the
--- building streams in pieces, one part per box, the same size in the same place, and one invisible
--- ramp part per ramp; the part list is a pure function of the arena, so a spec can hold it to the
--- boxes without a file. The lobby annex (pass desk, garb counter, the wall monitor) is dressing
--- outside the volume: parts only, no boxes.
+-- building streams in pieces, one part per box, the same size in the same place (a monitor inside the
+-- volume is a `prop` box's own part, named Arena.MONITOR), one invisible ramp part per ramp, and one
+-- see-through, non-colliding part per curtain named Arena.CURTAIN .. team; the part list is a pure
+-- function of the arena, so a spec can hold it to the boxes without a file. The lobby annex (pass
+-- desk, garb counter, the wall monitor) is dressing outside the volume: parts only, no boxes.
 -- Interface: build() -> Arena (a fresh table each call; pure, the same every time)
 
 local Arena = require("./Arena")
@@ -39,6 +47,16 @@ function ArenaData.build(): Arena.Arena
 		table.insert(boxes, math.max(y0, y1))
 		table.insert(boxes, math.max(z0, z1))
 		table.insert(kinds, kind)
+	end
+	local function room(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): Arena.Room
+		return {
+			minX = math.min(x0, x1),
+			minY = math.min(y0, y1),
+			minZ = math.min(z0, z1),
+			maxX = math.max(x0, x1),
+			maxY = math.max(y0, y1),
+			maxZ = math.max(z0, z1),
+		}
 	end
 	local top = floors * h
 	box(KIND.slab, -half, -1, -half, half, 0, half) -- the ground floor
@@ -64,17 +82,20 @@ function ArenaData.build(): Arena.Arena
 		end
 	end
 
-	-- two stair flights a storey, inside the atrium: the north one rises towards +x, the south one
-	-- towards -x; each is 14 steps under a ramp, with a landing level with the floor at each end
-	local RUN, STEPS = 21, 14
+	-- The stairs: on each of the north (side -1) and south (side 1) edges of the atrium, two strips 4
+	-- studs wide side by side. Even storeys climb in the outer strip, odd storeys in the inner one, each
+	-- the other way along x, so a flight ends on the landing (across both strips) the next begins on.
+	local RUN, STEPS, STRIP = 21, 14, 4
+	local END = (RUN / 2 + atrium) / 2 -- the middle of a landing, along x
 	local ramps: { Arena.Ramp } = {}
-	local stairEnds: { { number } } = {} -- { floor, lowX, highX, z }
+	local flights: { { f: number, side: number, dir: number, z: number } } = {}
 	for f = 0, floors - 2 do
 		local y0, y1 = f * h, (f + 1) * h
+		local inner = if f % 2 == 0 then 0 else STRIP
 		for _, side in { -1, 1 } do
-			local dir = -side -- north (z < 0) rises towards +x
-			local zIn, zOut = side * (atrium - 4), side * atrium
-			local z0, z1 = math.min(zIn, zOut), math.max(zIn, zOut)
+			local dir = (if f % 2 == 0 then 1 else -1) * -side -- the way it rises along x
+			local za, zb = side * (atrium - inner), side * (atrium - inner - STRIP)
+			local z0, z1 = math.min(za, zb), math.max(za, zb)
 			table.insert(ramps, {
 				minX = -RUN / 2,
 				minZ = z0,
@@ -91,12 +112,9 @@ function ArenaData.build(): Arena.Arena
 				local xa = -dir * RUN / 2 + dir * run * k
 				box(KIND.step, xa, y0 + k * (h / STEPS) - 1, z0, xa + dir * run, y0 + k * (h / STEPS), z1)
 			end
-			local lowX, highX = -dir * (RUN / 2), dir * (RUN / 2)
-			if f > 0 then
-				box(KIND.slab, lowX, y0 - 1, z0, -dir * atrium, y0, z1) -- the landing at the foot
-			end
-			box(KIND.slab, highX, y1 - 1, z0, dir * atrium, y1, z1) -- the landing at the head
-			table.insert(stairEnds, { f, (lowX - dir * atrium) / 2, (highX + dir * atrium) / 2, side * (atrium - 2) })
+			-- the landing at the head, across both strips: the foot of the next storey's flight too
+			box(KIND.slab, dir * RUN / 2, y1 - 1, side * (atrium - 2 * STRIP), dir * atrium, y1, side * atrium)
+			table.insert(flights, { f = f, side = side, dir = dir, z = (za + zb) / 2 })
 		end
 	end
 
@@ -106,6 +124,7 @@ function ArenaData.build(): Arena.Arena
 		ramps = ramps,
 		spawns = {},
 		spawnRooms = {},
+		curtains = {},
 		exits = {},
 		lobby = { x = -14, y = 0, z = 72, yaw = 0 },
 		nodes = {},
@@ -113,30 +132,40 @@ function ArenaData.build(): Arena.Arena
 		cover = {},
 	}
 
-	-- spawn rooms: opposite corners of the ground floor, eight points each, facing the middle
+	-- The spawn rooms, on the middle storey: team 1's against the west wall, team 2's the same room
+	-- turned half round against the east wall (s = 1, -1). Written for team 1: air from x -60 to -44,
+	-- z -12 to 12; a door in the north wall at its west end and one in the south wall at its east end;
+	-- inside each door a baffle wall, so that whoever looks in sees a wall and whoever walks in turns
+	-- along a corridor and comes into the room at the far end of the baffle.
+	local roomY = Arena.SPAWN_FLOOR * h
+	local wallTop = roomY + h - 1
+	local doorTop = roomY + Arena.HEADROOM
 	for team = 1, 2 do
-		local sign = if team == 1 then -1 else 1
-		parts.spawnRooms[team] = {
-			minX = math.min(sign * 59, sign * 45),
-			minY = 0,
-			minZ = math.min(sign * 59, sign * 31),
-			maxX = math.max(sign * 59, sign * 45),
-			maxY = Arena.HEADROOM,
-			maxZ = math.max(sign * 59, sign * 31),
+		local s = if team == 1 then 1 else -1
+		box(KIND.wall, s * -44, roomY, s * -13, s * -43, wallTop, s * 13) -- the wall towards the atrium
+		box(KIND.wall, s * -55, roomY, s * -13, s * -44, wallTop, s * -12) -- north wall (door: x -60..-55)
+		box(KIND.wall, s * -60, roomY, s * 12, s * -49, wallTop, s * 13) -- south wall (door: x -49..-44)
+		box(KIND.wall, s * -60, roomY, s * -7, s * -48, wallTop, s * -6) -- the baffle inside the north door
+		box(KIND.wall, s * -55, roomY, s * 6, s * -44, wallTop, s * 7) -- the baffle inside the south door
+		parts.spawnRooms[team] = room(s * -60, roomY, s * -12, s * -44, doorTop, s * 12)
+		parts.curtains[team] = {
+			room(s * -60, roomY, s * -13, s * -55, doorTop, s * -12),
+			room(s * -49, roomY, s * 12, s * -44, doorTop, s * 13),
 		}
 		local list: { Arena.Spawn } = {}
-		for _, x in { 55, 49 } do
-			for _, z in { 55, 49, 43, 37 } do
-				table.insert(
-					list,
-					{ x = sign * x, y = 0, z = sign * z, yaw = if team == 1 then -math.pi * 0.75 else math.pi * 0.25 }
-				)
+		for _, z in { -2.5, 2.5 } do
+			-- each row looks towards the gap at the end of the baffle on its side
+			local gx, gz = if z < 0 then -46 else -57.5, if z < 0 then -6.5 else 6.5
+			for _, x in { -57, -53, -49.5, -46 } do
+				local dx, dz = s * (gx - x), s * (gz - z)
+				table.insert(list, { x = s * x, y = roomY, z = s * z, yaw = math.atan2(-dx, -dz) })
 			end
 		end
 		parts.spawns[team] = list
 	end
 
-	-- navigation: a grid a floor, then the stairs, then cover beside the pillars and behind the rails
+	-- navigation: a grid a floor, then the stairs, the rooms' ways out, and cover beside the pillars
+	-- and behind the rails
 	local nodes, links = parts.nodes, parts.links
 	local function node(
 		x: number,
@@ -166,9 +195,10 @@ function ArenaData.build(): Arena.Arena
 		local c = Arena.CHEST
 		return (Arena.sweepBoxes(boxes, na.x, na.y + c, na.z, nb.x, nb.y + c, nb.z)) == nil
 	end
-	local grid: { [number]: { number } } = {}
-	local function nearest(floor: number, x: number, z: number): number?
-		local best: number?, bestD = nil, math.huge
+	local grid: { [number]: { number } } = {} -- the grid nodes of a floor that are in no spawn room
+	local hubs: { [number]: number } = {} -- by team: the grid node inside its spawn room
+	local function nearest(floor: number, x: number, z: number): number
+		local best, bestD = 0, math.huge
 		for _, id in grid[floor] do
 			local d = (nodes[id].x - x) ^ 2 + (nodes[id].z - z) ^ 2
 			if d < bestD then
@@ -188,7 +218,11 @@ function ArenaData.build(): Arena.Arena
 				end
 				local id = node(ix * STEP, f * h, iz * STEP, f, "open")
 				at[`{ix},{iz}`] = id
-				table.insert(grid[f], id)
+				if nodes[id].team == 0 then
+					table.insert(grid[f], id)
+				else
+					hubs[nodes[id].team] = id
+				end
 				local west, north = at[`{ix - 1},{iz}`], at[`{ix},{iz - 1}`]
 				if west and clear(west, id) then
 					link(west, id, "walk")
@@ -199,27 +233,62 @@ function ArenaData.build(): Arena.Arena
 			end
 		end
 	end
-	for _, e in stairEnds do
-		local f, lowX, highX, z = e[1], e[2], e[3], e[4]
-		local foot = node(lowX, f * h, z, f, "stair")
-		local head = node(highX, (f + 1) * h, z, f + 1, "stair")
+	-- the stairs: a node at the foot and at the head of every flight, a node on the floor beside each
+	-- landing, and a step across the landing from the head of one flight to the foot of the next
+	local beside: { [string]: number } = {} -- "floor:side" -> the node on the floor beside that landing
+	local heads: { [string]: number } = {}
+	for _, fl in flights do
+		local f, side, dir = fl.f, fl.side, fl.dir
+		local foot = node(-dir * END, f * h, fl.z, f, "stair")
+		local head = node(dir * END, (f + 1) * h, fl.z, f + 1, "stair")
 		link(foot, head, "stair")
-		link(foot, nearest(f, lowX, z * 1.6) :: number, "walk")
-		link(head, nearest(f + 1, highX, z * 1.6) :: number, "walk")
+		heads[`{f + 1}:{side}`] = head
+		local below = heads[`{f}:{side}`]
+		if below then
+			link(below, foot, "walk")
+		else
+			local onFloor = node(-dir * END, f * h, side * (atrium + 3), f, "open")
+			link(onFloor, foot, "walk")
+			link(onFloor, nearest(f, -dir * END, side * STEP), "walk")
+		end
+		local onFloor = node(dir * END, (f + 1) * h, side * (atrium + 3), f + 1, "open")
+		beside[`{f + 1}:{side}`] = onFloor
+		link(onFloor, head, "walk")
+		link(onFloor, nearest(f + 1, dir * END, side * STEP), "walk")
+	end
+	-- the rooms' ways out: from the grid node inside, round each baffle, along the corridor, out of the door
+	for team = 1, 2 do
+		local s = if team == 1 then 1 else -1
+		local hub = hubs[team]
+		local function chain(points: { { number } }): number
+			local last = hub
+			for _, p in points do
+				local id = node(s * p[1], roomY, s * p[2], Arena.SPAWN_FLOOR, "open")
+				link(last, id, "walk")
+				last = id
+			end
+			return last
+		end
+		local northOut = chain({ { -46, -6.5 }, { -46, -9.5 }, { -57.5, -9.5 }, { -57.5, -17 } })
+		local southOut = chain({ { -57.5, 6.5 }, { -57.5, 9.5 }, { -46.5, 9.5 }, { -46.5, 17 } })
+		-- the north door (for team 2, turned round: the south one) comes out on the stairs' side
+		link(northOut, beside[`{Arena.SPAWN_FLOOR}:{-s}`], "walk")
+		link(northOut, nearest(Arena.SPAWN_FLOOR, s * -48, s * -24), "walk")
+		link(southOut, nearest(Arena.SPAWN_FLOOR, s * -48, s * 24), "walk")
 	end
 	for f = 0, floors - 1 do
 		for _, c in pillars do
 			for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
 				-- the spot is 4.5 studs from the pillar's middle, sheltered from fire coming the other way
 				local id = node(c[1] + d[1] * 4.5, f * h, c[2] + d[2] * 4.5, f, "cover")
-				link(id, nearest(f, c[1] + d[1] * 12, c[2] + d[2] * 12) :: number, "walk")
+				link(id, nearest(f, c[1] + d[1] * 12, c[2] + d[2] * 12), "walk")
 				table.insert(parts.cover, { node = id, nx = -d[1], nz = -d[2], low = false })
 			end
 		end
 		if f >= 1 then
 			for _, side in { -1, 1 } do
 				local id = node(side * (atrium + 2.5), f * h, 0, f, "cover")
-				link(id, nearest(f, side * STEP, 0) :: number, "walk")
+				link(id, nearest(f, side * STEP, 0), "walk")
 				table.insert(parts.cover, { node = id, nx = -side, nz = 0, low = true })
 			end
 		end

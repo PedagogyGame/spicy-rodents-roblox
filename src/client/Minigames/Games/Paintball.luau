@@ -5,15 +5,17 @@
 -- (PaintballClient: the show anyone near sees, and the seat of a player in the match).
 -- OWNED BY THE CLIENT LANE (the registry's stub: its line in Client/Minigames/ClientGames exists).
 -- What is fixed by the paintball contract and must stay as it is here:
---   keys     Q and gamepad B are swallowed: leaving a match is a deliberate press of the Leave
---            button (shown with the held scoreboard, in the briefing and at the end card), and
---            gamepad B crouches. Every other key is the controller's own to read.
+--   keys     Q and gamepad B are swallowed: leaving a match is a deliberate Leave (a button shown
+--            with the scoreboard, in the briefing and at the end card; on a gamepad, Y while the
+--            scoreboard is held), and gamepad B crouches. Every other key is the controller's own to
+--            read (PaintballClient, "the controls, per device", fixes which).
 --   kinds    Wire.EVERYONE_KINDS: "paintball_watch" and "paintball_unwatch" reach `watch` whether or
 --            not the player is seated; that is how the show starts for somebody in the lobby.
 --   buttons  none while playing (the bar must be empty for the mouse to stay the look; the seat
---            puts Leave up itself with ctx.setButtons while the scoreboard is held); Leave in the
---            briefing's first moment and at the end card. No "Play again": the next match starts
---            by itself.
+--            puts Leave and Change sides up itself with ctx.setButtons while the scoreboard is
+--            shown and during the briefing: ids "leave" and "side", which the framework sends as
+--            those verbs); Leave in the briefing's first moment and at the end card. No "Play
+--            again": the next match starts by itself.
 --   endCard  from view.result (Contract.Result): the framework's end card, counting down to the
 --            next match. The lane dresses it (the WBLW sports bulletin, the awards).
 --   sounds   the cues of PB-8, every id empty until the licensed sounds are chosen.
@@ -83,12 +85,14 @@ local Game: ClientGame.ClientGame = {
 			"Two teams, orange against teal. One hit and you are tagged out for a few seconds.",
 			"The ball takes time to arrive and drops a little: lead a runner, aim a touch high at range.",
 			"Five shots, then the marker reloads by itself.",
+			"In your own spawn room you cannot be hit and cannot fire. The other team's is shut to you.",
 		},
 		keys = {
 			"Mouse  look    Left button  fire    R  reload",
 			"Shift  sprint (the marker lowers)    C / Left Ctrl  crouch",
-			"Hold G  scoreboard and Leave",
-			"Gamepad: R2 fire, X reload, L3 sprint, B crouch",
+			"Hold G  scoreboard, Leave, Change sides",
+			"Gamepad: R2 fire, X reload, L3 sprint, B crouch; hold View for the scoreboard (Y leaves)",
+			"Touch: FIRE (drag on it to keep looking), RELOAD, CROUCH, SCORES; push the stick fully to sprint",
 		},
 	},
 	keys = { Q = "", ButtonB = "" },

@@ -98,6 +98,7 @@ return function(t)
 							yaw = 1,
 							pitch = -0.5,
 							bits = Wire.BIT.crouch,
+							place = 2,
 						}
 						(link :: PaintballClient.Link).send("Paintball.Move", BufferCodec.encode(Wire.Move, rec))
 					end
@@ -111,6 +112,8 @@ return function(t)
 				t.eq(heard[sent].seq, sent)
 				t.truthy(Wire.has(heard[1].bits, Wire.BIT.crouch), "the stance rides on the pose")
 				t.near(heard[1].pitch, -0.5, 1e-4)
+				t.eq(heard[1].place, 2, "and the placement it obeyed")
+				t.truthy(heard[2].t > heard[1].t, "each pose says when it was sampled, on the shared clock")
 				-- down: a snapshot, as the service will send it, arrives `lag` frames later as the same bytes
 				local bodies = { { id = 1, x = 3, y = 0, z = 4, yaw = 0, pitch = 0, crouch = 1, bits = Wire.BIT.safe } }
 				local at = w.frames
@@ -134,7 +137,7 @@ return function(t)
 				service.port.fire(bob, "Splat", Wire.pack(Wire.Splat, {}))
 				t.eq(#bob.streams.Splat, 1)
 				-- and a stub's pose goes straight through Net to the service
-				local rec = { t = 0, seq = 1, x = 0, y = 0, z = 0, yaw = 0, pitch = 0, bits = 0 }
+				local rec = { t = 0, seq = 1, x = 0, y = 0, z = 0, yaw = 0, pitch = 0, bits = 0, place = 0 }
 				t.truthy(PaintballRig.send(wires, bob, "Paintball.Move", rec))
 				t.eq(#wires.heard["Paintball.Move"], sent + 1)
 				rec.x = 0 / 0
@@ -157,8 +160,9 @@ return function(t)
 				local watch = {
 					kind = "paintball_watch",
 					match = 3,
-					slots = { { id = 1, team = 1, name = "Ada", bot = false } },
+					slots = { { id = 1, team = 1, name = "Ada", bot = false, user = 41 } },
 					now = Rig.SERVER_TIME,
+					feel = Contract.feel({ ballSpeed = 120 }),
 				}
 				t.truthy(Wire.checkMessage(watch))
 				service.ctx.send(w.player, watch)
@@ -167,6 +171,7 @@ return function(t)
 				local show = PaintballClient.show() :: PaintballClient.Show
 				t.truthy(show ~= nil, "the show is on")
 				t.eq(show.match, 3)
+				t.eq(show.feel.ballSpeed, 120, "the match's feel came with it")
 				t.deepEq(show.place, PaintballRig.PLACE)
 				service.ctx.send(w.player, { kind = "paintball_unwatch" })
 				PaintballRig.run(wires, w, 0.3)

@@ -9,7 +9,11 @@
 --
 -- THE HIT SHAPE is a vertical capsule above the feet: axis from LOW to top(c) - RADIUS, radius RADIUS
 -- (the S18 capsule of Config.body standing; 0.6 of its height crouched, Tunables crouchHeightMult).
--- Garb never changes it (PB-13). The server judges every ball against this shape and nothing else.
+-- Garb never changes it (PB-13). The server judges every ball against this shape and nothing else,
+-- WITH NOTHING ADDED FOR THE BALL: a ball is its centre line, against a body as against a wall (Hit),
+-- so a body whose shape is wholly behind a wall cannot be tagged over or through it. (The S18 core
+-- added the ball's radius to a body and nothing to a wall; a crouched body's 3.36 then reached 3.61,
+-- over the 3.4 rail it was hiding behind.)
 --
 -- THE EYE is eye(c) above the feet: 4.5 standing, which is where the stock first-person camera of an
 -- R15 body already sits (root 3.0 above the feet + 1.5), so nothing moves at the arena door; 2.7
@@ -20,25 +24,32 @@
 -- CROUCH ON A HUMANOID BODY. Nothing about the Humanoid's collision changes: the arena has no gap
 -- lower than Arena.HEADROOM. Crouching is (1) the crouch fraction eased by crouchStep, (2) on the
 -- owning client the camera lowered to eye(c) with Humanoid.CameraOffset and the walking pace set
--- through the minigame framework's ctx.pace(pace(c, k), false) (Client/Minigames/ClientGame: the
+-- through the minigame framework's ctx.pace(pace(c, k, feel), false) (Client/Minigames/ClientGame: the
 -- "MoveScale" and "NoSprint" attributes Controllers/Human reads every frame; nobody writes
--- Humanoid.WalkSpeed), (3) on the server the same crouchStep run from the crouch bit of the move
--- stream, so the hit shape sinks at the same rate for everybody and cannot be flicked, (4) on every
--- other screen the puppet drawn at that fraction. The client eases its own eye with the same
--- function, so it agrees with the server's shape to within its latency.
+-- Humanoid.WalkSpeed), (3) on the server the same crouchStep run for every PERSON from the crouch bit
+-- of its newest accepted Move, once a snapshot tick (a bot eases its own fraction, in Bots.step, and
+-- the service does not touch it), so the hit shape sinks at the same rate for everybody and cannot be
+-- flicked, (4) on every other screen the puppet drawn at that fraction. The client eases its own eye
+-- with the same function, so it agrees with the server's shape to within its latency.
 --
 -- SPEEDS (studs/s): WALK is the town's (Client/Controllers/Human.WALK, so the door changes nothing),
--- SPRINT is WALK x Tunables paintball.sprintMult (slower than the town's sprint: the framework's
--- Shift is switched off and the client ramps its own scale, k from 0 to 1 over SPRINT_RAMP_SECS),
--- CROUCH is half of WALK. A sprinting body cannot fire and the marker comes back up
--- SPRINT_FIRE_DELAY after sprint ends; the server judges "sprinting" from the speed it measures
--- (isSprinting), not from the client's word.
+-- sprint is WALK x feel.sprintMult (slower than the town's sprint: the framework's Shift is switched
+-- off and the client ramps its own scale, k from 0 to 1 over SPRINT_RAMP_SECS), CROUCH_SPEED is half
+-- of WALK.
+-- SPRINT AND THE MARKER (PB-9; Contract, "the sprint bit is the fact"). The client's ramp k rises while
+-- sprint is wanted, the body is standing and no click is waiting, and DROPS TO 0 AT ONCE when sprint
+-- is let go, on a fire press, on a crouch and on being tagged: there is no ramp down. Every Move
+-- sampled while k > 0 carries BIT.sprint. The marker may fire SPRINT_FIRE_DELAY after the frame k
+-- dropped to 0; a fire press while sprinting ends the sprint and is held until then (Contract.MARGIN
+-- click), so a click is never dead. The server's side of it is one comparison of stamps (Contract,
+-- "a click is a shot when"); it never measures a speed to decide who is sprinting.
 -- Interface: constants; top(c), eye(c), capsule(c) -> (low, high, radius); eyePoint(x, y, z, c);
---   crouchStep(c, want, dt) -> c; speed(c, sprint) -> studs/s; pace(c, k) -> the scale for ctx.pace;
---   isSprinting(speed) -> boolean; look(yaw, pitch) -> (dx, dy, dz); yawPitch(dx, dy, dz) ->
---   (yaw, pitch); partAt(localY, c) -> 1..3
+--   crouchStep(c, want, dt, feel?) -> c; speed(c, sprint, feel?) -> studs/s; pace(c, k, feel?) -> the
+--   scale for ctx.pace; look(yaw, pitch) -> (dx, dy, dz); yawPitch(dx, dy, dz) -> (yaw, pitch);
+--   partAt(localY, c) -> 1..3. `feel` is the match's Contract.Feel; nil means the defaults.
 
 local Config = require("../../Paintball/Config")
+local Contract = require("./Contract")
 
 local Body = {}
 
@@ -49,12 +60,12 @@ Body.STAND_TOP = Config.body.high + Config.body.radius -- 5.6: the top of the st
 Body.CROUCH_TOP = Body.STAND_TOP * Body.CROUCH_MULT -- 3.36
 Body.STAND_EYE = 4.5
 Body.CROUCH_EYE = Body.STAND_EYE * Body.CROUCH_MULT -- 2.7
-Body.CROUCH_SECS = 0.2 -- standing to fully crouched, and back
+Body.CROUCH_SECS = Contract.FEEL.crouchSecs -- 0.2 at the default feel: standing to fully crouched, and back
 
 Body.WALK = 17
-Body.SPRINT = 17 * 1.4 -- 23.8
+Body.SPRINT = Body.WALK * Contract.FEEL.sprintMult -- 23.8 at the default feel
 Body.CROUCH_SPEED = 8.5
-Body.SPRINT_RAMP_SECS = 0.25 -- walk speed to sprint speed on the client (PB-9 "a short ramp up")
+Body.SPRINT_RAMP_SECS = 0.25 -- walk speed to sprint speed on the client (PB-9 "a short ramp up"); no ramp down
 Body.SPRINT_FIRE_DELAY = 0.15 -- after sprint ends the marker is up and may fire
 Body.JUMP_HEIGHT = 2 -- studs (the client sets Humanoid.JumpHeight to this while in a match): a hop, not a way over a rail
 
@@ -82,33 +93,29 @@ function Body.eyePoint(x: number, y: number, z: number, c: number): (number, num
 	return x, y + Body.eye(c), z
 end
 
--- One step of the crouch fraction towards crouched (want = true) or standing; linear, CROUCH_SECS
--- end to end. The server runs it once per snapshot tick, the client once per frame.
-function Body.crouchStep(c: number, want: boolean, dt: number): number
-	local step = dt / Body.CROUCH_SECS
+-- One step of the crouch fraction towards crouched (want = true) or standing; linear, feel.crouchSecs
+-- end to end. The server runs it once per snapshot tick for a person, the client once per frame, a
+-- bot's brain once per server tick.
+function Body.crouchStep(c: number, want: boolean, dt: number, feel: Contract.Feel?): number
+	local step = dt / (if feel then feel.crouchSecs else Body.CROUCH_SECS)
 	return if want then math.min(1, c + step) else math.max(0, c - step)
 end
 
 -- The fastest a body may move over the floor. Sprint needs a standing body.
-function Body.speed(c: number, sprint: boolean): number
+function Body.speed(c: number, sprint: boolean, feel: Contract.Feel?): number
 	if sprint and c <= 0 then
-		return Body.SPRINT
+		return Body.WALK * (if feel then feel.sprintMult else Contract.FEEL.sprintMult)
 	end
 	return Body.WALK + (Body.CROUCH_SPEED - Body.WALK) * clamp01(c)
 end
 
 -- What the owning client hands the framework's ctx.pace(scale, false): this body's speed over the
 -- town's walk, at crouch fraction c and sprint ramp k (0 walking, 1 at full sprint; a crouching body
--- does not sprint). Between 0.5 and SPRINT / WALK, inside Controllers/Human's 0..2.
-function Body.pace(c: number, k: number): number
+-- does not sprint). Between 0.5 and feel.sprintMult, inside Controllers/Human's 0..2.
+function Body.pace(c: number, k: number, feel: Contract.Feel?): number
 	local sprint = if c <= 0 then clamp01(k) else 0
-	local speed = Body.speed(c, false) + (Body.SPRINT - Body.WALK) * sprint
+	local speed = Body.speed(c, false, feel) + (Body.speed(0, true, feel) - Body.WALK) * sprint
 	return speed / Body.WALK
-end
-
--- The server's reading of sprint from a measured horizontal speed.
-function Body.isSprinting(speed: number): boolean
-	return speed > Body.WALK * 1.1
 end
 
 -- The look direction of (yaw, pitch): a body's CFrame in its frame is CFrame.new(x, y, z) *

@@ -14,7 +14,12 @@
 -- (station.id == Contract.STATION) and nothing for the pass desk's prompt (station.joins ~= nil).
 -- What the rest of paintball finds by name: ONE sub-model named Arena.MODEL ("PaintballArena") under parent (the
 -- server's Table is inert on a site without it), and in it every monitor as a part named Arena.MONITOR
--- ("Monitor": one in the lobby, old sets about the floors) for the server to put the score on.
+-- ("Monitor": one in the lobby, old sets about the floors) for the server to put the score on, and one part for
+-- each of arena.curtains[team] named Arena.CURTAIN .. team ("Curtain1", "Curtain2": see-through, in the team's
+-- colour, CanCollide false; a seated client makes the other team's solid on its own screen).
+-- Inside the arena volume, a part is either ONE box's own part or plainly not solid: a monitor on a floor is the
+-- part of a `prop` box (so a ball stops on it), never a part of its own in front of a wall. The lobby's monitor is
+-- outside the volume and is dressing.
 -- Interface: { build? } (a stub: none)
 
 return {}

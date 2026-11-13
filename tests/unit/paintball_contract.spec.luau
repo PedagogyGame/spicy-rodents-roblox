@@ -15,6 +15,7 @@ local Clock = require("@shared/Minigames/Paintball/Clock")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
+local Hit = require("@shared/Minigames/Paintball/Hit")
 local Rules = require("@shared/Minigames/Paintball/Rules")
 local Spec = require("@shared/Minigames/Paintball/Spec")
 local Games = require("@shared/Minigames/Games")
@@ -39,34 +40,90 @@ local Projectiles = require("@server/Paintball/Projectiles")
 local Isolated = require("@tests/lib/Isolated")
 
 local R = Contract.Rules
+local F = Contract.FEEL
 
 return function(t)
 	t.test("PB-1: a ball travels at 90 studs/s and drops a little: 45 studs in half a second, about 1.2 low", function()
-		t.eq(R.ballSpeed, 90)
-		t.eq(R.ballDrop, 9.8)
+		t.eq(F.ballSpeed, 90)
+		t.eq(F.ballDrop, 9.8)
 		t.eq(R.ballTtl, 1.5)
 		t.eq(R.ballRadius, 0.25)
-		local x, y = Ballistics.position(0, 0, 0, R.ballSpeed, 0, 0, R.ballDrop, 0.5)
+		local x, y = Ballistics.position(0, 0, 0, F.ballSpeed, 0, 0, F.ballDrop, 0.5)
 		t.near(x, 45, 1e-9)
 		t.near(y, -1.225, 1e-9)
-		-- the longest flat shot stays inside the arena: nothing is decided by the ttl
-		t.truthy(R.ballSpeed * R.ballTtl >= 2 * Arena.HALF)
-		t.eq(Tunables.tree.paintball.projectileSpeed.v, R.ballSpeed)
-		t.eq(Tunables.tree.paintball.drop.v, R.ballDrop)
+		-- the longest flat shot stays inside the arena, at the slowest speed a feel may have: nothing is
+		-- decided by the ttl
+		t.truthy(F.ballSpeed * R.ballTtl >= 2 * Arena.HALF)
+		t.truthy(Contract.FEEL_RANGE.ballSpeed[1] * R.ballTtl >= 2 * Arena.HALF)
+		t.eq(Tunables.tree.paintball.projectileSpeed.v, F.ballSpeed)
+		t.eq(Tunables.tree.paintball.drop.v, F.ballDrop)
 	end)
 
 	t.test("PB-2: five shots a quarter second apart, reload 1.6 s, by itself on the fifth or on R", function()
 		t.eq(R.magazine, 5)
-		t.eq(R.fireInterval, 0.25)
-		t.eq(R.reloadSecs, 1.6)
+		t.eq(F.fireInterval, 0.25)
+		t.eq(F.reloadSecs, 1.6)
 		t.eq(Tunables.tree.paintball.magazine.v, R.magazine)
-		local mag = Magazine.new(R.magazine, R.fireInterval, R.reloadSecs)
+		local mag = Magazine.new(R.magazine, F.fireInterval, F.reloadSecs)
 		for i = 0, 4 do
-			t.truthy(Magazine.fire(mag, i * R.fireInterval))
+			t.truthy(Magazine.fire(mag, i * F.fireInterval))
 		end
 		t.falsy(Magazine.fire(mag, 1.5), "no firing while reloading")
-		t.truthy(Magazine.fire(mag, 1.0 + R.reloadSecs), "full again 1.6 s after the fifth ball")
+		t.truthy(Magazine.fire(mag, 1.0 + F.reloadSecs), "full again 1.6 s after the fifth ball")
 		t.truthy(Magazine.reload(mag, 3.0), "R when not full")
+		-- a click a little early is held, never lost: at six clicks a second the held click leaves the
+		-- moment the interval is up, so the marker fires four balls a second, not three
+		t.truthy(Contract.MARGIN.click >= F.fireInterval - 1 / 6, "a held click covers the gap to the next ball")
+		t.truthy(Contract.MARGIN.click < F.fireInterval, "one click is held, not a queue")
+	end)
+
+	t.test("the feel: one table a match holds; the defaults, the ranges, a tuned copy", function()
+		t.deepEq(Contract.FEEL, {
+			ballSpeed = 90,
+			ballDrop = 9.8,
+			fireInterval = 0.25,
+			reloadSecs = 1.6,
+			sprintMult = 1.4,
+			crouchSecs = 0.2,
+			respawnSecs = 4,
+			protectSecs = 2,
+		})
+		t.eq(#Contract.FEEL_KEYS, 8)
+		for _, key in Contract.FEEL_KEYS do
+			local range = Contract.FEEL_RANGE[key]
+			local v = (Contract.FEEL :: any)[key]
+			t.truthy(range ~= nil and range[1] <= v and v <= range[2], key)
+		end
+		-- the defaults are the plan's (the S18 Config and Tunables), so nothing moved at the default feel
+		t.eq(F.ballSpeed, Config.projectile.speed)
+		t.eq(F.fireInterval, Config.fireInterval)
+		t.eq(F.reloadSecs, Config.reloadSecs)
+		t.eq(F.sprintMult, Tunables.tree.paintball.sprintMult.v)
+		-- a fresh copy each time; unknown keys and bad values dropped, numbers held in range
+		local a = Contract.feel()
+		t.deepEq(a, Contract.FEEL)
+		t.truthy(a ~= Contract.feel())
+		local b = Contract.feel({ ballSpeed = 120, reloadSecs = 99, nonsense = 1, crouchSecs = "fast" })
+		t.eq(b.ballSpeed, 120)
+		t.eq(b.reloadSecs, Contract.FEEL_RANGE.reloadSecs[2])
+		t.eq(b.crouchSecs, F.crouchSecs)
+		t.eq((b :: any).nonsense, nil)
+		-- the owner's playtest: one number changed, for the next match
+		local c, why = Contract.tuned(a, "ballSpeed", 150)
+		t.eq(why, nil)
+		t.eq((c :: Contract.Feel).ballSpeed, 150)
+		t.eq(a.ballSpeed, 90, "the table it was made from is untouched")
+		t.eq((Contract.tuned(a, "ballSpeed", 5000)), nil)
+		t.eq((Contract.tuned(a, "ballSpeed", "fast")), nil)
+		local none, words = Contract.tuned(a, "gravity", 1)
+		t.eq(none, nil)
+		t.isType(words, "string")
+		-- a feel goes on the wire as it is
+		t.truthy(Schema.check(Wire.FEEL, c))
+		t.falsy(Schema.check(Wire.FEEL, { ballSpeed = 90 }))
+		-- the fastest fire a feel may have still fits the click's rate limit, the fastest sprint the framework's pace
+		t.truthy(Wire.REMOTES["Paintball.Fire"].rate :: number >= 1.5 / Contract.FEEL_RANGE.fireInterval[1])
+		t.truthy(Contract.FEEL_RANGE.sprintMult[2] <= Human.MAX_SCALE)
 	end)
 
 	t.test("PB-6, PB-7, PB-12, PB-14: team sizes, the match clock, respawn, protection, the pass", function()
@@ -81,10 +138,16 @@ return function(t)
 			R.endCardSecs >= 10 and R.endCardSpare > 0,
 			"an end card long enough to read, and never cut by a reset"
 		)
-		t.truthy(R.respawnSecs >= 3 and R.respawnSecs <= 5, "tagged out for 3 to 5 s")
-		t.eq(R.protectSecs, 2)
+		t.truthy(F.respawnSecs >= 3 and F.respawnSecs <= 5, "tagged out for 3 to 5 s")
+		t.eq(F.protectSecs, 2)
 		t.eq(R.friendlyFire, false)
 		t.eq(R.splatPool, 400)
+		t.eq(R.bodySplats, 24)
+		t.eq(R.idleSecs, 60)
+		t.truthy(R.idleSecs > 4 * (F.respawnSecs + F.protectSecs), "nobody is idle for being tagged out a few times")
+		t.eq(Contract.nextMatch(6.2), "The next match starts in 7 s.")
+		t.eq(Contract.nextMatch(-3), "The next match starts in 1 s.")
+		t.eq(Contract.COLLISION_GROUP, "PaintballBody")
 		t.eq(R.passCents, 20)
 		t.eq(R.passDays, 5)
 		t.eq(EconomyRules.price("paintball_pass"), R.passCents)
@@ -131,7 +194,18 @@ return function(t)
 		t.eq(Body.speed(0, false), Body.WALK)
 		t.eq(Body.speed(0, true), Body.SPRINT)
 		t.eq(Body.speed(1, true), Body.CROUCH_SPEED)
-		t.truthy(Body.isSprinting(Body.SPRINT) and not Body.isSprinting(Body.WALK))
+		t.eq((Body :: any).isSprinting, nil, "nobody reads sprint from a measured speed: the sprint bit is the fact")
+		-- the match's feel is what the speeds, the pace and the crouch are read with
+		local quick = Contract.feel({ sprintMult = 1.6, crouchSecs = 0.1 })
+		t.near(Body.speed(0, true, quick), Body.WALK * 1.6, 1e-9)
+		t.eq(Body.speed(0, false, quick), Body.WALK)
+		t.near(Body.pace(0, 1, quick), 1.6, 1e-9)
+		t.near(Body.crouchStep(0, true, 0.05, quick), 0.5, 1e-9)
+		t.near(Body.crouchStep(0, true, 0.05), 0.25, 1e-9)
+		-- sprint and the marker: the server's gate is the client's less one send interval
+		t.eq(Body.SPRINT_FIRE_DELAY, 0.15)
+		t.near(Contract.MARGIN.sprint, 1 / Clock.SEND_HZ, 1e-12)
+		t.truthy(Body.SPRINT_FIRE_DELAY - Contract.MARGIN.sprint > 0)
 		-- the pace the client hands the framework's ctx.pace: Controllers/Human turns it back into these speeds
 		t.eq(Body.pace(0, 0), 1)
 		t.near(Body.pace(0, 1), Tunables.tree.paintball.sprintMult.v, 1e-9)
@@ -174,6 +248,106 @@ return function(t)
 		local x0, x1 = Arena.ATRIUM + 6, -Arena.ATRIUM - 6
 		t.truthy(arena.sweep(x0, y + Body.CROUCH_EYE, 0, x1, y + Body.CROUCH_EYE, 0) ~= nil, "crouched: blocked")
 		t.eq((arena.sweep(x0, y + Body.STAND_EYE, 0, x1, y + Body.STAND_EYE, 0)), nil)
+		t.eq(Arena.EYE, Body.STAND_EYE)
+	end)
+
+	t.test("PB-3, PB-5: the hit test: a ball is its centre line, a body is hit where it is entered", function()
+		-- the capsule alone: axis x = 0, z = 0, from 1 to 4.4 above the feet, radius 1.2 (a standing body)
+		local low, high, r = Body.capsule(0)
+		t.near(
+			Hit.capsule(-5, 2, 0, 5, 2, 0, 0, low, high, 0, r) :: number,
+			0.38,
+			1e-9,
+			"the side, where it is entered"
+		)
+		t.near(Hit.capsule(0, 10, 0, 0, 0, 0, 0, low, high, 0, r) :: number, 0.44, 1e-9, "the round top")
+		t.eq(Hit.capsule(-5, 2, 1.3, 5, 2, 1.3, 0, low, high, 0, r), nil, "a miss by a tenth of a stud")
+		t.eq(Hit.capsule(-5, 5.7, 0, 5, 5.7, 0, 0, low, high, 0, r), nil, "over the head")
+		t.eq(Hit.capsule(0.5, 3, 0, 9, 3, 0, 0, low, high, 0, r), 0, "a step that starts inside")
+		t.eq(Hit.capsule(-5, 2, 0, -2, 2, 0, 0, low, high, 0, r), nil, "a step that stops short")
+		local under = Hit.capsule(-3, -2, 0, 3, 4, 0, 0, low, high, 0, r) :: number
+		t.truthy(under > 0 and under < 0.5, "up into the round bottom")
+		local ex, ey = -3 + 6 * under, -2 + 6 * under
+		t.near(math.sqrt(ex * ex + (ey - low) ^ 2), r, 1e-9, "the entry point is on the shape")
+		-- nothing is added for the ball: the reach is the body's radius, so the entry is 1.2 from the axis
+		local s = Hit.capsule(-5, 2, 0, 5, 2, 0, 0, low, high, 0, r) :: number
+		t.near(-5 + 10 * s, -Body.RADIUS, 1e-9)
+
+		-- a body crouched behind the atrium rail of the stand-in arena (the rail's faces are at x = 15 and 15.5)
+		local arena = ArenaData.build()
+		local y = Arena.FLOOR_HEIGHT
+		local railTop = y + Arena.RAIL_HEIGHT
+		local bx = Arena.ATRIUM + 0.5 + 0.6 -- pressed against the rail: its shape pokes 0.1 out of the far face
+		t.truthy(bx - Body.RADIUS < Arena.ATRIUM, "the shape does poke through the rail")
+		-- (1) a level ball 0.05 above the rail passes over a fully crouched body, and tags a standing one
+		local over = railTop + 0.05
+		t.eq((arena.sweep(-10, over, 0, 30, over, 0)), nil, "the ball clears the rail")
+		t.eq((Hit.body(arena.sweep, -10, over, 0, 30, over, 0, bx, y, 0, 1)), nil, "crouched: not tagged over the rail")
+		t.truthy(Hit.body(arena.sweep, -10, over, 0, 30, over, 0, bx, y, 0, 0) ~= nil, "standing: tagged")
+		-- (the S18 test, with the ball's radius added to the body, tagged the crouched one)
+		local cl, ch = Body.capsule(1)
+		t.truthy(Ballistics.segmentCapsule(-10, over, 0, 30, over, 0, bx, y + cl, y + ch, 0, r + R.ballRadius) ~= nil)
+		-- (2) a ball at the crouched body's middle whose tick ends just short of the rail, inside the part
+		-- of the shape that pokes through: the old test called it a hit; the entry is covered, so it is none
+		local mid = y + 2
+		local stop = Arena.ATRIUM - 0.05
+		t.truthy(Ballistics.segmentCapsule(13.5, mid, 0, stop, mid, 0, bx, y + cl, y + ch, 0, r) ~= nil)
+		t.truthy(Hit.capsule(13.5, mid, 0, stop, mid, 0, bx, y + cl, y + ch, 0, r) ~= nil, "the shape is entered")
+		t.eq((Hit.body(arena.sweep, 13.5, mid, 0, stop, mid, 0, bx, y, 0, 1)), nil, "but the rail stands between")
+		-- the next tick starts inside the shape, still covered, and the ball stops on the rail where it is drawn
+		t.eq((Hit.body(arena.sweep, stop, mid, 0, stop + 1.5, mid, 0, bx, y, 0, 1)), nil)
+		local ws, nx = arena.sweep(stop, mid, 0, stop + 1.5, mid, 0)
+		t.truthy(ws ~= nil and nx == -1, "the rail's atrium face")
+		-- (3) the same body with no rail in the way is hit at the entry point, which is what is reported
+		local hs, hx, hy, hz = Hit.body(arena.sweep, 30, mid, 0, 14, mid, 0, bx, y, 0, 1)
+		t.truthy(hs ~= nil)
+		t.near(hx, bx + Body.RADIUS, 1e-9)
+		t.deepEq({ hy, hz }, { mid, 0 })
+		-- a ball flies under 3.4 studs a tick even at the fastest feel: the entry test loses nothing between ticks
+		t.truthy(Contract.FEEL_RANGE.ballSpeed[2] / Clock.TICK_HZ < 2 * Body.RADIUS + 1)
+	end)
+
+	t.test("trust: the numbers behind the move checks, and a path round a corner", function()
+		local T = Contract.TRUST
+		-- a walker's budget never runs dry and a sprinter's bit buys sprint pace
+		t.truthy(T.speedTolerance > 1 and T.speedTolerance <= 1.25)
+		t.truthy(T.moveGap >= 2 / Clock.SEND_HZ, "one lost Move costs nothing")
+		t.truthy(T.speedWindow >= 2 * T.moveGap)
+		t.truthy(T.moveAge <= Clock.HISTORY_SECS)
+		-- falling: the whole building is a shorter fall than the longest a body may be unsupported
+		t.truthy(T.fallSecs > math.sqrt(2 * Arena.HEIGHT / 196.2))
+		t.truthy(Body.JUMP_HEIGHT + T.jumpSlack < Arena.FLOOR_HEIGHT / 2, "a storey is never a jump")
+		-- a shot's origin: a crouched body that stays crouched cannot claim an eye over the rail
+		t.truthy(Body.CROUCH_EYE + T.originSlackY < Arena.RAIL_HEIGHT)
+		t.truthy(T.originSlack <= Body.RADIUS, "the origin is inside the body it came from")
+		-- the client's gates are the stricter by these
+		local M = Contract.MARGIN
+		t.truthy(M.room >= Body.WALK / Clock.SEND_HZ + T.originSlack, "a step past the newest Move is still clear")
+		t.truthy(M.gate > 0 and M.gate < 1 / Clock.SEND_HZ)
+		t.truthy(T.clockSlack >= M.gate)
+		-- the cost, shared out under the checklist's 1.5 ms
+		local C = Contract.COST
+		t.truthy(C.ballsMs + C.botsMs + C.restMs <= C.totalMs)
+		t.eq(C.totalMs, 1.5)
+		t.eq(C.atBots, R.slots - 1)
+		-- Arena.clearPath: the straight line, or either L (a pillar's corner cut by a lost pose)
+		local boxes = { 2, 0, 2, 6, 10, 6 }
+		local function sweep(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number)
+			return Arena.sweepBoxes(boxes, x0, y0, z0, x1, y1, z1)
+		end
+		t.truthy(Arena.clearPath(sweep, 0, 0, 1, 8, 2.5), "nothing in the way")
+		t.truthy(sweep(0, 2.5, 1, 7, 2.5, 5) ~= nil, "the straight line cuts the corner")
+		t.truthy(Arena.clearPath(sweep, 0, 1, 7, 5, 2.5), "along x then along z is clear")
+		t.truthy(Arena.clearPath(sweep, 1, 0, 5, 7, 2.5), "along z then along x is clear")
+		t.falsy(Arena.clearPath(sweep, 0, 4, 8, 4, 2.5), "straight through the pillar: no L helps")
+		t.falsy(Arena.clearPath(sweep, 4, 4, 8, 8, 2.5), "from inside it")
+		t.truthy(Arena.clearPath(sweep, 0, 4, 8, 4, 11), "over it")
+		-- a room, and a room grown sideways (the client's no-fire margin round a spawn room)
+		local room: Arena.Room = { minX = 0, minY = 28, minZ = 0, maxX = 10, maxY = 34, maxZ = 10 }
+		t.truthy(Arena.inRoom(room, 5, 28.1, 5))
+		t.falsy(Arena.inRoom(room, 11, 28.1, 5))
+		t.truthy(Arena.inRoom(room, 11, 28.1, 5, M.room))
+		t.falsy(Arena.inRoom(room, 5, 27, 5, M.room), "the margin is sideways only")
 	end)
 
 	t.test("time: the rates, and the history is long enough for the furthest rewind", function()
@@ -183,13 +357,20 @@ return function(t)
 		t.near(Clock.INTERP_SECS, 2 / Clock.SNAP_HZ, 1e-12)
 		t.eq(Clock.HISTORY_SECS, 1.0)
 		t.eq(Tunables.tree.paintball.lagHistorySecs.v, Clock.HISTORY_SECS)
-		t.eq(Clock.MAX_REWIND, Config.maxRewindSecs)
+		-- the furthest back a ball is judged: a 300 ms round trip (half of it down, plus the interpolation
+		-- delay), and no longer: it is how long after ducking a body can still be tagged
+		t.eq(Clock.MAX_REWIND, 0.25)
+		t.truthy(Clock.MAX_REWIND <= Config.maxRewindSecs)
+		t.near(0.15 + Clock.INTERP_SECS, Clock.MAX_REWIND, 1e-12)
 		-- a ball flown forward by MAX_LATE and rewound by MAX_REWIND still reads inside the history
 		t.truthy(Clock.MAX_LATE + Clock.MAX_REWIND + 1 / Clock.SNAP_HZ < Clock.HISTORY_SECS)
-		-- 150 ms of round trip: half of it down, plus the interpolation delay, is well inside the clamp
-		t.truthy(0.075 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE < Clock.MAX_REWIND)
+		-- 150 ms of round trip is inside the clamp with the whole tolerance to spare
+		t.truthy(0.075 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE <= Clock.MAX_REWIND)
 		t.truthy(Clock.STALE_SECS < Clock.DROP_SECS)
-		t.truthy(Clock.SYNC_SLACK > 2 / Clock.TICK_HZ and Clock.SYNC_SLACK <= Clock.MAX_LATE)
+		t.eq((Clock :: any).SYNC_SLACK, nil, "the model is slaved to the shared clock: there is no slack to keep")
+		-- the Moves the server keeps reach back past any fire time and any pose time it will ask for
+		t.truthy(Clock.MOVES_KEPT / Clock.SEND_HZ > Clock.MAX_LATE + 2 / Clock.SEND_HZ)
+		t.truthy(Clock.MAG_LATE >= Clock.MAX_LATE and Clock.MAG_LATE / F.fireInterval <= 2)
 		t.truthy(Clock.AUDIENCE_SECS <= 1, "somebody walking in sees the match within a second")
 	end)
 
@@ -216,30 +397,100 @@ return function(t)
 		t.truthy((view.lag :: number) < lag and (view.lag :: number) > lag * 0.9)
 	end)
 
-	t.test("time: a shot's stamps are clamped: fire time, lateness, rewind", function()
+	t.test("time: a shot's stamps are clamped: fire time, lateness, rewind, and the magazine's own time", function()
 		-- an honest shot at 150 ms round trip: 75 ms up, 75 ms down + interpolation
 		local now = 100
-		local ft = now - 0.075
+		local up = 0.075
+		local ft = now - up
 		local vt = ft - (0.075 + Clock.INTERP_SECS)
-		local f, late, rewind, clamped = Clock.stamp(now, vt, ft, nil, 0.075 + Clock.INTERP_SECS)
+		local f, late, rewind, clamped, m = Clock.stamp(now, vt, ft, nil, up)
 		t.near(f, ft, 1e-9)
 		t.near(late, 0.075, 1e-9)
 		t.near(rewind, 0.175, 1e-9)
 		t.falsy(clamped)
-		-- a fire time from the future or the distant past
-		t.eq((Clock.stamp(now, now - 0.2, now + 5, nil, nil)), now)
-		t.eq((Clock.stamp(now, now - 0.2, now - 5, nil, nil)), now - Clock.MAX_LATE)
-		-- never before the shooter's last shot
-		t.eq((Clock.stamp(now, now - 0.2, now - 0.2, now - 0.1, nil)), now - 0.1)
+		t.eq(m, ft, "an honest magazine time is the click")
+		-- a fire time from the future: the ball is born now; the magazine may be judged a clock's slack ahead
+		local f2, _, _, _, m2 = Clock.stamp(now, now - 0.2, now + 5, nil, nil)
+		t.eq(f2, now)
+		t.eq(m2, now + Contract.TRUST.clockSlack)
+		-- a fire time from the distant past, with no measure of the way up: MAX_LATE, and MAG_LATE
+		local f3, _, _, _, m3 = Clock.stamp(now, now - 0.2, now - 5, nil, nil)
+		t.eq(f3, now - Clock.MAX_LATE)
+		t.eq(m3, now - Clock.MAG_LATE)
+		-- THE LIAR'S BOUND: a client that always claims the oldest fire time is held to its own measured
+		-- delay plus the tolerance, not to MAX_LATE: under 7 studs of free flight, not 22
+		local f4, late4 = Clock.stamp(now, now - 0.5, now - Clock.MAX_LATE, nil, 0.02)
+		t.near(late4, 0.02 + Clock.REWIND_TOLERANCE, 1e-9)
+		t.near(f4, now - 0.095, 1e-9)
+		t.truthy(late4 * F.ballSpeed < 9)
+		-- and its rewind to the estimate's edge (the way down taken to be as long as the way up)
+		local _, _, r4, c4 = Clock.stamp(now, now - 0.5, now - Clock.MAX_LATE, nil, 0.02)
+		t.near(r4, 0.02 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE, 1e-9)
+		t.truthy(c4)
+		-- HONEST SHOTS THE NETWORK BUNCHED: three clicks a fire interval apart all arrive together half a
+		-- second late. Each ball is born as late as allowed, and each magazine time keeps its own stamp,
+		-- so the magazine refuses none of them
+		local mag = Magazine.new(R.magazine, F.fireInterval, F.reloadSecs)
+		local arrive = 50.5
+		local lastM: number? = nil
+		for i = 0, 2 do
+			local click = 50 + i * F.fireInterval
+			local bf, _, _, _, bm = Clock.stamp(arrive, click - 0.15, click, lastM, 0.05)
+			t.eq(bm, click, `shot {i + 1} keeps its own time`)
+			t.truthy(bf >= arrive - Clock.MAX_LATE and bf <= arrive)
+			t.truthy(Magazine.fire(mag, bm), `shot {i + 1} is not "too fast"`)
+			lastM = bm
+		end
+		-- a magazine time never runs back behind the shooter's last one
+		t.eq(select(5, Clock.stamp(now, now - 0.2, now - 0.3, now - 0.1, nil)), now - 0.1)
 		-- a view time claimed far in the past is held at MAX_REWIND, and at the estimate's edge
 		local _, _, r1, c1 = Clock.stamp(now, now - 3, now, nil, nil)
 		t.eq(r1, Clock.MAX_REWIND)
 		t.truthy(c1)
-		local _, _, r2 = Clock.stamp(now, now - 3, now, nil, 0.175)
-		t.near(r2, 0.175 + Clock.REWIND_TOLERANCE, 1e-9)
-		local _, _, r3 = Clock.stamp(now, now + 1, now, nil, 0.175)
-		t.near(r3, 0.175 - Clock.REWIND_TOLERANCE, 1e-9)
+		local _, _, r2 = Clock.stamp(now, now - 3, now, nil, 0.05)
+		t.near(r2, 0.05 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE, 1e-9)
+		local _, _, r3 = Clock.stamp(now, now + 1, now, nil, 0.075)
+		t.near(r3, 0.075 + Clock.INTERP_SECS - Clock.REWIND_TOLERANCE, 1e-9)
 		t.eq(select(3, Clock.stamp(now, now + 1, now, nil, nil)), 0)
+		-- a slow connection is covered to a 300 ms round trip and held there beyond it
+		local _, _, r5, c5 = Clock.stamp(now, now - 0.125 - 0.225, now - 0.125, nil, 0.125)
+		t.near(r5, 0.225, 1e-9)
+		t.falsy(c5)
+		local _, _, r6, c6 = Clock.stamp(now, now - 0.2 - 0.3, now - 0.2, nil, 0.2)
+		t.eq(r6, Clock.MAX_REWIND)
+		t.truthy(c6)
+	end)
+
+	t.test("time: a person's pose for a snapshot is read one send interval behind its Moves", function()
+		-- Moves sampled SEND_HZ times a second arrive 40 ms later with a few ms of jitter; the server reads
+		-- the pose at poseTime, and there is a Move on each side of that time at every snapshot tick
+		local up = Clock.newView()
+		local arrivals: { { t: number, at: number } } = {}
+		for i = 0, 60 do
+			local sampled = i / Clock.SEND_HZ + 0.013
+			table.insert(arrivals, { t = sampled, at = sampled + 0.04 + (i % 3) * 0.004 })
+		end
+		local have: { number } = {}
+		local last = -math.huge
+		local checked = 0
+		for frame = 0, 180 do
+			local now = frame / Clock.TICK_HZ
+			while arrivals[1] and arrivals[1].at <= now do
+				local a = table.remove(arrivals, 1) :: { t: number, at: number }
+				Clock.observe(up, a.t, a.at)
+				table.insert(have, a.t)
+			end
+			if frame % (Clock.TICK_HZ // Clock.SNAP_HZ) == 0 and #have >= 4 then
+				local pt = Clock.poseTime(up, now)
+				t.truthy(pt >= last, "the pose time never runs back")
+				last = pt
+				t.truthy(pt <= have[#have] + 0.005, `tick {frame}: a Move at the pose time, or within a few ms of it`)
+				t.truthy(pt >= have[#have - 3], `tick {frame}: and the pose time is no further back than it need be`)
+				checked += 1
+			end
+		end
+		t.truthy(checked > 40)
+		t.near(up.lag :: number, 0.045, 0.01)
 	end)
 
 	t.test("the keystone: what a client draws at its view time is what the server rewinds to, exactly", function()
@@ -298,15 +549,17 @@ return function(t)
 		local up = 0.04
 		local ft = now - up
 		local vt = ft - (down + Clock.INTERP_SECS)
-		local f, late, rewind = Clock.stamp(now, vt, ft, nil, down + Clock.INTERP_SECS)
+		-- (the server's measure of this shooter's way up is `up`; its way down is 20 ms longer, inside the tolerance)
+		local f, late, rewind, clamped = Clock.stamp(now, vt, ft, nil, up)
 		t.near(late, up, 1e-9)
 		t.near(rewind, down + Clock.INTERP_SECS, 1e-9)
+		t.falsy(clamped)
 		-- aimed, on the shooter's screen, at where the drawn body will be when a flat ball gets there
 		local dist = 30
-		local tof = dist / R.ballSpeed
+		local tof = dist / F.ballSpeed
 		local ax, ay, az = PoseHistory.sample(history, vt)
 		local lead = Body.SPRINT * tof
-		local vx, vy, vz = Ballistics.aim(ax + lead, ay + 3, az - dist, ax + lead, ay + 3, az, R.ballSpeed, R.ballDrop)
+		local vx, vy, vz = Ballistics.aim(ax + lead, ay + 3, az - dist, ax + lead, ay + 3, az, F.ballSpeed, F.ballDrop)
 		local sim = Projectiles.new({}, nil)
 		local rewound = Projectiles.fire(sim, 2, 1, ax + lead, ay + 3, az - dist, vx, vy, vz, rewind)
 		local naive = Projectiles.fire(sim, 2, 1, ax + lead, ay + 3, az - dist, vx, vy, vz, 0)
@@ -329,7 +582,7 @@ return function(t)
 		"wire: five remotes of paintball's own, in Net/Schemas with direction, reliability, rate and size",
 		function()
 			local expect = {
-				["Paintball.Move"] = { "c2s", false, 27 },
+				["Paintball.Move"] = { "c2s", false, 28 },
 				["Paintball.Fire"] = { "c2s", true, 42 },
 				["Paintball.Snap"] = { "s2c", false, 0 },
 				["Paintball.Shot"] = { "s2c", false, 35 },
@@ -360,7 +613,12 @@ return function(t)
 			-- the client's send rate fits its bucket with room for jitter; so does the fastest honest fire
 			local move = Wire.REMOTES["Paintball.Move"]
 			t.truthy(move.rate :: number >= Clock.SEND_HZ * 1.25)
-			t.truthy(Wire.REMOTES["Paintball.Fire"].rate :: number >= 1.5 / R.fireInterval)
+			t.truthy(Wire.REMOTES["Paintball.Fire"].rate :: number >= 1.5 / F.fireInterval)
+			-- the placement number a Move carries: 0 before the first, then 1 to PLACE_MAX and round again
+			t.eq(Wire.nextPlace(0), 1)
+			t.eq(Wire.nextPlace(7), 8)
+			t.eq(Wire.nextPlace(Wire.PLACE_MAX), 1)
+			t.eq(Wire.PLACE_MAX, 255)
 			-- positions fit the quantised range
 			t.truthy(Wire.XZ > Arena.HALF + 1 and Wire.Y_LO < -1 and Wire.Y_HI > Arena.HEIGHT + Body.STAND_TOP)
 		end
@@ -388,7 +646,8 @@ return function(t)
 			end
 			local p = { UserId = 7 }
 			local bits = Wire.BIT.crouch + Wire.BIT.air
-			local move = { t = 12.5, seq = 9, x = 1.5, y = 14, z = -20.25, yaw = 1, pitch = -0.5, bits = bits }
+			local move =
+				{ t = 12.5, seq = 9, x = 1.5, y = 14, z = -20.25, yaw = 1, pitch = -0.5, bits = bits, place = 3 }
 			t.truthy(net:receive(p, "Paintball.Move", BufferCodec.encode(Wire.Move, move), 0))
 			t.eq(got["Paintball.Move"].t, 12.5)
 			t.eq(got["Paintball.Move"].z, -20.25)
@@ -396,7 +655,8 @@ return function(t)
 			t.near(got["Paintball.Move"].pitch, -0.5, 1e-4)
 			t.truthy(Wire.has(got["Paintball.Move"].bits, Wire.BIT.crouch))
 			t.falsy(Wire.has(got["Paintball.Move"].bits, Wire.BIT.sprint))
-			t.deepEq({ net:receive(p, "Paintball.Move", buffer.create(26), 0) }, { false, "bad buffer" })
+			t.eq(got["Paintball.Move"].place, 3, "the placement the client last obeyed rides on every pose")
+			t.deepEq({ net:receive(p, "Paintball.Move", buffer.create(27), 0) }, { false, "bad buffer" })
 			t.deepEq({ net:receive(p, "Paintball.Move", { x = 1 }, 0) }, { false, "bad buffer" })
 			local fire = { shot = 3, vt = 99.8, ft = 99.95, ox = 1, oy = 4.5, oz = 2, dx = 0, dy = 0, dz = -1 }
 			t.truthy(net:receive(p, "Paintball.Fire", BufferCodec.encode(Wire.Fire, fire), 0))
@@ -410,11 +670,12 @@ return function(t)
 			-- the old table messages are gone from the wire
 			t.deepEq({ net:receive(p, "Paintball.Cmd", { verb = "join" }, 0) }, { false, "unknown remote" })
 			t.eq(Schemas.REMOTES["Paintball.State"], nil)
-			-- R goes the framework's way, with its stamp
-			t.deepEq(Wire.VERBS, { "reload" })
+			-- R goes the framework's way, with its stamp; so does a change of side
+			t.deepEq(Wire.VERBS, { "reload", "side" })
 			t.deepEq(Spec.verbs, Wire.VERBS)
 			local input = Schemas.REMOTES["Minigame.Input"].payload :: any
 			t.truthy(Schema.check(input, { gameId = Contract.STATION, seat = 3, verb = "reload", args = { 1000.25 } }))
+			t.truthy(Schema.check(input, { gameId = Contract.STATION, seat = 3, verb = "side", args = {} }))
 			t.truthy(Schema.check(input, { gameId = Contract.STATION, seat = 3, verb = "leave", args = {} }))
 			t.falsy(Schema.check(input, { gameId = Contract.STATION, seat = 3, verb = "fire", args = {} }))
 		end
@@ -491,20 +752,42 @@ return function(t)
 				kind = "paintball_watch",
 				match = 2,
 				slots = {
-					{ id = 1, team = 1, name = "Ada", bot = false },
-					{ id = 2, team = 2, name = "Rusty (computer)", bot = true },
+					{ id = 1, team = 1, name = "Ada", bot = false, user = 1234567 },
+					{ id = 2, team = 1, name = "Rusty (computer)", bot = true, user = 0 },
 				},
 				now = 5,
+				feel = Contract.feel({ ballSpeed = 120 }),
 				station = Contract.STATION,
 			},
 			{ kind = "paintball_unwatch", station = Contract.STATION },
-			{ kind = "paintball_tag", by = 2, id = 1, ball = 17, scores = { 0, 1 }, at = 9, x = 0, y = 1, z = 2 },
-			{ kind = "paintball_respawn", id = 1, x = 0, y = 0, z = 0, yaw = 0, at = 11 },
+			{
+				kind = "paintball_tag",
+				by = 2,
+				id = 1,
+				ball = 17,
+				scores = { 0, 1 },
+				tags = 3,
+				outs = 2,
+				at = 9,
+				x = 0,
+				y = 1,
+				z = 2,
+			},
+			{ kind = "paintball_respawn", id = 1, x = 0, y = 0, z = 0, yaw = 0, at = 11, place = 4 },
 			{ kind = "paintball_reload", id = 1, at = 12 },
 			{ kind = "paintball_say", id = 3, line = "floor", n = 3 },
 			{ kind = "paintball_ack", shot = 4, ok = true, ball = 17, rounds = 4 },
 			{ kind = "paintball_ack", shot = 5, ok = false, why = "sprint", rounds = 4, reloadAt = 12 },
-			{ kind = "paintball_correct", x = 0, y = 0, z = 0, yaw = 0, why = "fast", station = Contract.STATION },
+			{
+				kind = "paintball_correct",
+				x = 0,
+				y = 0,
+				z = 0,
+				yaw = 0,
+				why = "speed",
+				place = 5,
+				station = Contract.STATION,
+			},
 		}
 		local seen: { [string]: boolean } = {}
 		for _, msg in good do
@@ -526,12 +809,33 @@ return function(t)
 			id = 99,
 			ball = 1,
 			scores = { 0, 1 },
+			tags = 1,
+			outs = 1,
 			at = 9,
 			x = 0,
 			y = 1,
 			z = 2,
 		})))
-		t.falsy((Wire.checkMessage({ kind = "paintball_correct", x = 0, y = 0, z = 0, yaw = 0, why = "because" })))
+		t.falsy((Wire.checkMessage({
+			kind = "paintball_correct",
+			x = 0,
+			y = 0,
+			z = 0,
+			yaw = 0,
+			why = "because",
+			place = 1,
+		})))
+		-- a placement always says its number, and a watcher is always told the feel and whose body is whose
+		t.falsy((Wire.checkMessage({ kind = "paintball_respawn", id = 1, x = 0, y = 0, z = 0, yaw = 0, at = 11 })))
+		t.falsy((Wire.checkMessage({ kind = "paintball_correct", x = 0, y = 0, z = 0, yaw = 0, why = "wall" })))
+		t.falsy((Wire.checkMessage({ kind = "paintball_watch", match = 2, slots = {}, now = 5 })))
+		t.falsy((Wire.checkMessage({
+			kind = "paintball_watch",
+			match = 2,
+			slots = { { id = 1, team = 1, name = "Ada", bot = false } },
+			now = 5,
+			feel = Contract.feel(),
+		})))
 		t.falsy((Wire.checkMessage({ kind = "paintball_unwatch", extra = 1 })))
 		t.falsy((Wire.checkMessage({ kind = "state" })), "the framework's kinds are not paintball's")
 		t.falsy((Wire.checkMessage("paintball_watch")))
@@ -544,12 +848,20 @@ return function(t)
 		end
 	end)
 
-	t.test("wire: at 8 v 8 a player costs under 8 kB/s down and 1.5 kB/s up", function()
+	t.test("wire: at 8 v 8 a player costs under 8 kB/s of stream, 11.5 kB/s in all, and 1.5 kB/s up", function()
 		local b = Wire.budget(R.slots)
 		t.eq(b.snap, 220)
-		t.truthy(b.down < 8000, `down {b.down}`)
+		t.truthy(b.stream < 8000, `stream {b.stream}`)
+		-- the table messages are counted too: the framework's "state" for sixteen seats is the most of it,
+		-- which is why a tag does not send one
+		t.truthy(b.tables > 2000 and b.tables < 4000, `tables {b.tables}`)
+		t.near(b.down, b.stream + b.tables, 1e-9)
+		t.truthy(b.down < 11500, `down {b.down}`)
 		t.truthy(b.up < 1500, `up {b.up}`)
 		t.truthy(Wire.budget(2 * R.teamMin).down < b.down)
+		-- once, on coming into the audience: both splat pools, full
+		t.eq(b.join, (R.splatPool + R.slots * R.bodySplats) * Wire.Splat.size)
+		t.truthy(b.join < 18000)
 	end)
 
 	t.test("arena frame: a rigid frame at the arena_origin anchor; the pass desk is where the data puts it", function()
@@ -647,6 +959,66 @@ return function(t)
 		local again = ArenaData.build()
 		t.deepEq(again.boxes, arena.boxes)
 		t.eq(#again.nodes, #arena.nodes)
+		-- THE SPAWN ROOMS (decision 12): on the middle storey, opposite each other, a curtain in each doorway
+		t.eq(Arena.SPAWN_FLOOR, Arena.FLOORS // 2)
+		local midY = Arena.SPAWN_FLOOR * Arena.FLOOR_HEIGHT
+		for team = 1, 2 do
+			local room = arena.spawnRooms[team]
+			t.eq(room.minY, midY, `team {team}'s room is on the middle storey`)
+			t.eq(#arena.curtains[team], 2)
+			for _, sp in arena.spawns[team] do
+				t.truthy(Arena.inRoom(room, sp.x, sp.y + 0.1, sp.z))
+				-- a spawn point looks along the room, not into the wall behind it
+				local dx, _, dz = Body.look(sp.yaw, 0)
+				t.eq((arena.sweep(sp.x, sp.y + Arena.EYE, sp.z, sp.x + dx * 3, sp.y + Arena.EYE, sp.z + dz * 3)), nil)
+			end
+			for _, curtain in arena.curtains[team] do
+				-- a curtain is air (a ball and a team-mate pass), and it touches the room it shuts
+				local cx, cy, cz =
+					(curtain.minX + curtain.maxX) / 2, curtain.minY + Arena.CHEST, (curtain.minZ + curtain.maxZ) / 2
+				t.eq((arena.sweep(cx, cy, cz, cx, cy, cz)), nil)
+				t.truthy(Arena.inRoom(room, cx, cy, cz, 1.5), "a curtain hangs in a doorway of its room")
+			end
+		end
+		t.truthy(arena.spawnRooms[1].maxX < 0 and arena.spawnRooms[2].minX > 0, "one room on each side")
+		-- an opponent standing in a doorway sees a baffle wall, not the spawn points
+		local door = arena.curtains[1][1]
+		local ex, ez = (door.minX + door.maxX) / 2, (door.minZ + door.maxZ) / 2
+		for i, sp in arena.spawns[1] do
+			t.truthy(
+				arena.sweep(ex, midY + Arena.EYE, ez, sp.x, sp.y + Arena.CHEST, sp.z) ~= nil,
+				`spawn point {i} is hidden from the doorway`
+			)
+		end
+		-- THE STAIRS GO ON UP: from the ground to the top floor on one side is four flights and three
+		-- short steps across a landing, each flight's head beside the next one's foot
+		local stairs: { Arena.NavLink } = {}
+		for _, link in arena.links do
+			if link.kind == "stair" then
+				table.insert(stairs, link)
+			end
+		end
+		t.eq(#stairs, 2 * (Arena.FLOORS - 1))
+		for _, link in stairs do
+			local head = arena.nodes[link.b]
+			if head.floor < Arena.FLOORS - 1 then
+				local near = math.huge
+				for _, other in stairs do
+					local foot = arena.nodes[other.a]
+					if foot.floor == head.floor then
+						near = math.min(near, math.sqrt((foot.x - head.x) ^ 2 + (foot.z - head.z) ^ 2))
+					end
+				end
+				t.truthy(near <= Arena.STAIR_GAP, `the flight to floor {head.floor} goes on up within {near} studs`)
+			end
+		end
+		-- a body may drop off a stair's open side: there is ground under it, and nothing in the way
+		local flight = arena.ramps[1]
+		local sideZ = if math.abs(flight.minZ) < math.abs(flight.maxZ) then flight.minZ else flight.maxZ
+		local inward = if sideZ > 0 then -1 else 1
+		local halfway = (flight.y0 + flight.y1) / 2
+		t.eq(arena.ground(0, halfway, sideZ + inward * 2), 0, "the ground floor is under the stair's open side")
+		t.eq((arena.sweep(0, halfway + Arena.CHEST, sideZ - inward, 0, halfway + Arena.CHEST, sideZ + inward * 2)), nil)
 	end)
 
 	t.test("arena: the reference ball test and walking surface, and the checker catching a bad arena", function()
@@ -683,6 +1055,71 @@ return function(t)
 		local ok, problems = Arena.check(bad, R.teamMax)
 		t.falsy(ok)
 		t.eq(#problems, 3)
+		-- and the rules of the spawn room (decision 12), one broken at a time
+		local function broken(change: (a: Arena.Arena) -> ()): string
+			local a = ArenaData.build()
+			change(a)
+			local fine, list = Arena.check(a, R.teamMax)
+			t.falsy(fine)
+			return table.concat(list, "; ")
+		end
+		local function says(text: string, part: string)
+			t.truthy(string.find(text, part, 1, true) ~= nil, `'{part}' in: {text}`)
+		end
+		-- a spawn point in the corridor behind a door: whoever stands outside that door sees it
+		says(
+			broken(function(a)
+				local sp = a.spawns[1][1]
+				sp.x, sp.z = -57.5, -9.5
+			end),
+			"team 1's spawn points can be seen from outside the room"
+		)
+		-- a room that is not on the middle storey
+		says(
+			broken(function(a)
+				a.spawnRooms[2].minY = 0
+			end),
+			"team 2's spawn room is not on the middle storey"
+		)
+		-- a doorway with no curtain
+		says(
+			broken(function(a)
+				a.curtains[1] = { a.curtains[1][1] }
+			end),
+			"team 1's spawn room needs a curtain in each doorway"
+		)
+		-- one way out only: the link through one of the doors is gone
+		says(
+			broken(function(a)
+				for i, link in a.links do
+					local from, to = a.nodes[link.a], a.nodes[link.b]
+					if link.kind == "walk" and from.team == 1 and to.team == 0 then
+						table.remove(a.links, i)
+						break
+					end
+				end
+			end),
+			"team 1's spawn room needs two ways out"
+		)
+		-- stairs that do not go on up: a flight's foot dragged to the far end of the building
+		says(
+			broken(function(a)
+				for _, link in a.links do
+					local foot = a.nodes[link.a]
+					if link.kind == "stair" and foot.floor == 1 then
+						foot.x, foot.z = 40, 40
+					end
+				end
+			end),
+			"studs from the next flight up"
+		)
+		-- rooms side by side: nowhere is far from a respawn, but one team walks out into the other
+		says(
+			broken(function(a)
+				a.spawnRooms[2] = table.clone(a.spawnRooms[1])
+			end),
+			"the spawn rooms are not on opposite sides of the building"
+		)
 	end)
 
 	t.test(
@@ -787,17 +1224,73 @@ return function(t)
 			t.eq(seat3, 1, "the vacated seat first: the sides stay as they were")
 			t.truthy((Rules.slot(state, 1) :: Rules.Slot).on)
 			-- the model's clock: it counts from nothing until the service tells it the shared clock
+			t.falsy(state.synced)
 			Session.step(s, 4)
 			local before = state.now
 			t.truthy(before > 0 and before <= 4)
 			local left = state.endsAt - state.now
 			Rules.sync(state, 1000)
+			t.truthy(state.synced)
 			t.eq(state.now, 1000)
-			t.near(state.endsAt - state.now, left, 1e-9, "every time in the State moved with it")
+			t.near(state.endsAt - state.now, left, 1e-9, "the first sync moved every time in the State with it")
 			t.near(Rules.view(state).endsAt, 1000 + left, 1e-9)
+			-- from then on it is SLAVED to the shared clock: a step adds nothing of its own, and a later sync
+			-- sets the clock and moves no other time (a server hitch must not push a magazine or a respawn late)
+			local endsAt = state.endsAt
+			local slot1 = Rules.slot(state, 1) :: Rules.Slot
+			slot1.mag.nextFireAt = 1000.25
+			slot1.safeUntil = 1002
+			Rules.step(state, 0.1)
+			t.eq(state.now, 1000, "a step does not count a clock of its own")
+			Rules.sync(state, 1000.4)
+			t.eq(state.now, 1000.4)
+			t.eq(state.endsAt, endsAt)
+			t.eq(slot1.mag.nextFireAt, 1000.25)
+			t.eq(slot1.safeUntil, 1002)
 			-- nothing fires, tags or ends on a clock nobody has run out
 			t.eq(Rules.result(state), nil)
 			t.deepEq(Rules.drain(state), {})
+		end
+	)
+
+	t.test(
+		"teams: a slot's team is its own: dealt by seat, kept by the seat, levelled by who joins, changed by assign",
+		function()
+			local state = Rules.init(3, 1)
+			t.deepEq({ state.slots[1].team, state.slots[2].team, state.slots[3].team }, { 1, 2, 1 })
+			-- a new seat joins the smaller side, whatever its number; level sides fall back on the seat's parity
+			Rules.join(state, 4)
+			t.eq(state.slots[4].team, 2)
+			Rules.join(state, 5)
+			t.eq(state.slots[5].team, Contract.teamOf(5))
+			-- two friends on one side (the "side" verb; people kept together at the next match): the bots
+			-- that fill the match then all join the other side until it is level
+			local match = Rules.init(2, 1)
+			t.truthy(Rules.assign(match, 2, 1))
+			t.falsy(Rules.assign(match, 2, 1), "already there")
+			t.falsy(Rules.assign(match, 9, 1), "no such slot")
+			for seat = 3, 8 do
+				Rules.join(match, seat)
+			end
+			local sides = { 0, 0 }
+			for _, slot in match.slots do
+				sides[slot.team] += 1
+			end
+			t.deepEq(sides, { 4, 4 })
+			t.deepEq({ match.slots[1].team, match.slots[2].team }, { 1, 1 }, "the friends are still together")
+			t.eq(Rules.view(match).slots[2].team, 1, "and that is the team everybody is told")
+			-- a seat keeps its side when it changes hands: a person takes a bot's seat, a bot a person's
+			Rules.gone(match, 2)
+			Rules.join(match, 2)
+			t.eq(match.slots[2].team, 1)
+			t.truthy(match.slots[2].on)
+			-- the feel is the match's own, and tune rebuilds the magazines with it
+			t.deepEq(match.feel, Contract.FEEL)
+			Rules.tune(match, Contract.feel({ fireInterval = 0.4, reloadSecs = 2 }))
+			t.eq(match.feel.fireInterval, 0.4)
+			t.eq(match.slots[1].mag.fireInterval, 0.4)
+			t.eq(match.slots[1].mag.reloadSecs, 2)
+			t.eq(match.slots[1].mag.rounds, R.magazine)
 		end
 	)
 
@@ -809,10 +1302,12 @@ return function(t)
 		end
 		has(Rules, {
 			"init",
+			"tune",
 			"sync",
 			"step",
 			"join",
 			"gone",
+			"assign",
 			"input",
 			"result",
 			"view",
@@ -830,8 +1325,10 @@ return function(t)
 		has(ArenaData, { "build" }, "ArenaData")
 		has(PaintballService, { "new", "port" }, "PaintballService")
 		has(PaintballClient, { "watch", "new", "show", "link" }, "PaintballClient")
+		has(Hit, { "capsule", "body" }, "Hit")
 		t.eq(Arena.MODEL, "PaintballArena")
 		t.eq(Arena.MONITOR, "Monitor")
+		t.eq(Arena.CURTAIN, "Curtain")
 		-- the service on a bare framework context (no site model, no net, and no engine at all under this
 		-- runner): inert, and every hook is there. Built where the arena is not, it touches nothing
 		local sent = 0
@@ -879,6 +1376,38 @@ return function(t)
 			t.deepEq({ service:command("ada", verb, {}) }, { true, false, "Not now." }, verb)
 		end
 		t.eq((service:command("ada", "leave", {})), false, "leaving is the framework's")
+		-- the feel of the next match is the service's to hold, and one number of it can be turned (the playtest)
+		t.deepEq(service.feel, Contract.FEEL)
+		t.deepEq({ service:debug("tune", "ballSpeed", 120) }, { true, nil })
+		t.eq(service.feel.ballSpeed, 120)
+		t.eq(service.feel.ballDrop, F.ballDrop)
+		t.eq((service:debug("tune", "ballSpeed", 9000)), false)
+		t.eq(service.feel.ballSpeed, 120, "a refused change changes nothing")
+		local extras = service:state("ada", 1) :: Contract.Extras
+		t.eq(extras.shot, 0)
+		t.truthy(Schema.check(Wire.FEEL, extras.feel), "the Extras carry a feel the wire accepts")
+		-- every stat the contract names is there to be reported
+		local stats = service:stats() :: { [string]: number }
+		for _, name in
+			{
+				"steps",
+				"snapshots",
+				"balls",
+				"tags",
+				"movesAccepted",
+				"movesRefused",
+				"movesDropped",
+				"shotsRefused",
+				"corrections",
+				"rewindsClamped",
+				"stepMs",
+				"ballsMs",
+				"botsMs",
+				"restMs",
+			}
+		do
+			t.isType(stats[name], "number", name)
+		end
 		-- the Port onto a Net: handlers in, buffers out
 		local fired: { any } = {}
 		local port = PaintballService.port({
@@ -897,8 +1426,23 @@ return function(t)
 		-- the match model and the bots line up: a fresh State steps through the bots without a word
 		local state = Rules.init(1, 3)
 		t.eq(state.phase, "briefing")
-		t.deepEq(Bots.step(Bots.new(service.arena), state, {}, 0, 1 / Clock.TICK_HZ), {})
+		local heard: { Bots.Heard } = {
+			{ kind = "born", id = 2, x = 0, y = 4.5, z = 0, vx = 90, vy = 0, vz = 0 },
+			{ kind = "ended", id = 2, x = 20, y = 4, z = 0 },
+			{ kind = "tag", id = 1, by = 2, x = 20, y = 4, z = 0 },
+		}
+		t.deepEq(Bots.step(Bots.new(service.arena), state, {}, heard, 0, 1 / Clock.TICK_HZ), {})
 		t.deepEq({ Rules.canFire(state, 1, 0) }, { false, "phase" })
+		t.deepEq({ Rules.fire(state, 1, 0, 0) }, { false, "phase" })
+		t.eq(Rules.tag(state, 1, 1, 0, 0), false)
+		-- a bot is fair: it turns before it fires, it hears a near miss, it reacts no faster than a person
+		local B = Contract.BOT
+		t.truthy(B.reactMin >= 0.25 and B.reactMax <= 0.45 and B.reactMin < B.reactMax)
+		t.truthy(B.turn <= 2 * math.pi + 1e-9, "half a turn takes half a second: the puppet is seen to turn")
+		t.truthy(B.aimSlack <= math.rad(5))
+		t.truthy(B.sightHalf < math.pi / 2, "nobody is seen from behind")
+		t.truthy(B.hear >= 2 * Body.RADIUS)
+		t.truthy(B.faced <= B.reactMin)
 		-- the end card the framework draws from a finished view
 		local endCard = (ClientGames.get(Contract.GAME) :: any).endCard
 		t.eq(endCard({ seats = {}, result = nil }, 1), nil)

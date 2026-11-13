@@ -7,24 +7,48 @@
 -- and people alike from the snapshot stream (Shared/Minigames/Paintball/Clock).
 -- OWNED BY THE MATCH-AND-BOTS LANE. THIS IS A STUB: the functions keep their names and signatures.
 --
--- WHAT THE REAL BOTS DO, AND WITH WHAT:
+-- WHAT THE REAL BOTS DO, AND WITH WHAT (Contract.BOT holds the numbers named here):
 --   * move kinematically over the arena's navigation graph (arena.nodes, arena.links: "walk" links
 --     in a straight line, "stair" links along the ramp, feet on arena.ground) at the body's own
---     speeds (Body.speed), crouching with Body.crouchStep; they use both stairs of a storey, cross
---     and overlook the atrium, never stand in a spawn room once out of it, never stop for good
---     (PB-10: "never get stuck");
---   * see an opponent only along a clear line (arena.sweep from eye to chest), notice it 250 to 450
---     ms late, and aim with Ballistics.aim at where it will be, plus error, more of it at a low
---     `skill`; a fair player beats the average bot (skill 0.5) about three times in five;
+--     speeds (Body.speed with state.feel); a bot OWNS ITS CROUCH: it eases its own pose.crouch with
+--     Body.crouchStep(c, want, dt, state.feel) every tick and the service never touches it. They use
+--     both stairs of a storey, cross and overlook the atrium, never stop for good (PB-10: "never get
+--     stuck"), walk out of their own spawn room after a respawn and do not go back in, and never
+--     enter, stand at the door of, or shoot into the other team's (nodes with team ~= 0);
+--   * SEE an opponent only along a clear line (arena.sweep from eye to chest) and only inside
+--     BOT.sightHalf of where they are looking; a sight check per bot runs at most BOT.sightHz times a
+--     second and the bots' checks are spread over the ticks (no tick does more than its share);
+--   * HEAR what the service tells them (`heard`, below): a ball that is born, passes or lands within
+--     BOT.hear studs of a bot, whoever fired it, and a team-mate tagged where the bot could see,
+--     make it aware of the direction the ball came from. A bot that is shot at and missed does not
+--     stand there: it turns, ducks or moves;
+--   * act on anything seen or heard only after a reaction time between BOT.reactMin and BOT.reactMax;
+--   * TURN at no more than BOT.turn (yaw and pitch each), and fire ONLY ALONG THEIR OWN LOOK: a
+--     bot's pose yaw and pitch are where its marker points (the aim, lead and drop included), and the
+--     service drops a "fire" whose direction is more than BOT.aimSlack from Body.look(pose.yaw,
+--     pose.pitch). So a bot must be seen to turn on a player before it can tag them: the puppet is the
+--     tell. (The calibration tool reports how often a bot's pose had been within the sight cone of
+--     the player it tagged for BOT.faced seconds before the ball: the aim is nearly always.)
+--   * aim with Ballistics.aim(..., state.feel.ballSpeed, state.feel.ballDrop) at where the target
+--     will be, plus error, more of it at a low `skill`, and MOST OF IT ON THE FIRST BALL at a new
+--     target: the first ball is the warning splat. A fair player beats the average bot (skill 0.5)
+--     about three times in five;
 --   * take cover (arena.cover: stand behind high cover, crouch behind low cover and rails), peek, and
 --     fall back to reload;
---   * respect the match: they fire only when Rules.canFire says so, with the same five-ball magazine
---     and reload as a person, and never while sprinting.
--- A bot's shot is a command for the service, which calls Rules.fire and Projectiles.fire with no
--- rewind: a bot sees the server's present. Every `now` here is the shared clock (Clock): the same
--- time the State was synced to.
+--   * respect the match: they fire only when Rules.canFire(state, id, now) says so, with the same
+--     magazine and reload as a person, never while BIT.sprint is set in their pose or within
+--     Body.SPRINT_FIRE_DELAY of it, and never from inside a spawn room.
+-- A bot's shot is a command for the service, which checks the look (above), calls Rules.fire(state,
+-- id, now) and Projectiles.fire with no rewind: a bot sees the server's present. Every `now` here is
+-- the shared clock (Clock): the same time the State is synced to.
+-- COST (Contract.COST): Bots.step with COST.atBots bots costs under COST.botsMs a tick on average;
+-- the lane measures it in its calibration tool and the service reports it (Stats.botsMs).
+-- THE CALIBRATION TOOL (tools/games/paintball/bots/) takes a feel as input and prints its results
+-- (how often a scripted fair player beats the average bot; stuck, camping and one-stair checks; the
+-- facing figure above; the step's cost) at ball speeds 90, 120 and 150, so a faster ball can be
+-- judged at the owner's playtest without waiting for a new calibration.
 -- Interface: new(arena, opts?) -> Bots; sync(bots, state, who, poses, now); place(bots, id, pose,
---   now); step(bots, state, poses, now, dt) -> { Command }
+--   now); step(bots, state, poses, heard, now, dt) -> { Command }; types Command, Heard, Opts, Bots
 
 -- (types only: typeof never runs its require; see "HOW TO IMPORT" in Shared/Minigames/Paintball/Contract)
 type Arena = typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena).T.Arena)
@@ -32,7 +56,8 @@ type Pose = typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Con
 type State = typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Rules).T.State)
 
 -- What a bot asks the service to do this tick.
---   fire    a ball from (ox, oy, oz), the bot's eye point, with velocity (vx, vy, vz) of Rules.ballSpeed
+--   fire    a ball from (ox, oy, oz), the bot's eye point (Body.eyePoint of its pose), with velocity
+--           (vx, vy, vz) of length state.feel.ballSpeed along the bot's own look (see above)
 --   reload  R
 --   say     a call-out: `line` is a key of Contract.LINES, `n` its number if it has one
 export type Command = {
@@ -46,6 +71,23 @@ export type Command = {
 	vz: number?,
 	line: string?,
 	n: number?,
+}
+
+-- What the service saw since the last tick, for the bots to hear (arena frame). Every ball is here,
+-- people's and bots' alike.
+--   born    slot `id` fired: (x, y, z) is the origin, (vx, vy, vz) the velocity
+--   ended   a ball of slot `id` ended at (x, y, z), on a wall or on a body
+--   tag     slot `id` was tagged out by slot `by`; (x, y, z) is where the ball struck
+export type Heard = {
+	kind: "born" | "ended" | "tag",
+	id: number,
+	by: number?,
+	x: number,
+	y: number,
+	z: number,
+	vx: number?,
+	vy: number?,
+	vz: number?,
 }
 
 export type Opts = {
@@ -67,17 +109,25 @@ end
 
 -- Make the brains match the match: one for every slot a bot holds, none for a slot a person took or
 -- that is off. `who[id]` is that bot's skill (Contract.BOTS: 0..1, 0.5 the average bot); a slot
--- with no entry is not a bot. The service calls this after every seat taken or left. A new brain
--- starts from poses[id].
+-- with no entry is not a bot. The service calls this after every seat taken or left and after a
+-- change of side. A new brain starts from poses[id]; a brain whose slot changed team forgets its plan.
 function Bots.sync(_bots: Bots, _state: State, _who: { [number]: number }, _poses: { [number]: Pose }, _now: number) end
 
--- The service put this bot somewhere (the briefing, a respawn): forget the old path.
+-- The service put this bot somewhere (the briefing, a respawn, a change of side): forget the old path.
 function Bots.place(_bots: Bots, _id: number, _pose: Pose, _now: number) end
 
--- One server tick. `poses` holds every slot's present pose; a bot reads the others and writes its
--- own (x, y, z, yaw, pitch, crouch, and of bits only BIT.crouch, BIT.sprint and BIT.air). A bot that
--- is out stands still. Returns what the bots want done.
-function Bots.step(_bots: Bots, _state: State, _poses: { [number]: Pose }, _now: number, _dt: number): { Command }
+-- One server tick. `poses` holds every slot's present pose (a person's is the one last put in a
+-- snapshot); a bot reads the others and writes its own (x, y, z, yaw, pitch, crouch, and of bits only
+-- BIT.crouch, BIT.sprint and BIT.air). A bot that is out stands still. `heard` is what happened since
+-- the last tick. Returns what the bots want done.
+function Bots.step(
+	_bots: Bots,
+	_state: State,
+	_poses: { [number]: Pose },
+	_heard: { Heard },
+	_now: number,
+	_dt: number
+): { Command }
 	return {}
 end
 
