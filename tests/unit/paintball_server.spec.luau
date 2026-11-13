@@ -11,4 +11,5 @@ local Isolated = require("@tests/lib/Isolated")
 
 return function(t)
 	Isolated.register(t, "tests/isolated/paintball_server")
+	Isolated.register(t, "tests/isolated/paintball_server_fire")
 end

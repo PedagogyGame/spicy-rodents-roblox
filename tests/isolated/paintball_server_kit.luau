@@ -15,7 +15,7 @@
 -- ONLY IN AN ISOLATED RUN (it needs the rig).
 -- Interface: play(fn(kit), opts?) (opts: arena, feel, paintball = more Deps, service = more service opts,
 --   lag, realPass = the service's own pass desk instead of one that says everybody holds a pass); kit.w, kit.wires, kit.service, kit.state(), kit.now(), kit.frame(), kit.run(seconds),
---   kit.untilTrue(limit, cond), kit.client(name, opts?) -> Client (opts: delay frames, jitter frames, lose 0..1,
+--   kit.untilTrue(limit, cond), kit.client(name, opts?) -> Client (opts: delay frames each way or up and down, jitter, lose 0..1,
 --   seed), kit.join(client) -> (ok, why), kit.walk(client, x, z, speed?), kit.live() (cut the briefing short and
 --   let protection run out), kit.broken (schema failures); Client: seat, place, x, y, z, yaw, pitch, crouch,
 --   sprint, air, out, silent, events, acks, tags, move(), fire(dx, dy, dz, opts?) -> shot, aim(tx, ty, tz) ->
@@ -275,7 +275,7 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 				local sent = c.stub.events
 				while c.noted < #sent do
 					c.noted += 1
-					table.insert(c.inbox, { at = w.frames + c.delay, msg = sent[c.noted] })
+					table.insert(c.inbox, { at = w.frames + c.down, msg = sent[c.noted] })
 				end
 				for _, remote in { "Paintball.Snap", "Paintball.Shot", "Splat" } do
 					local list = c.stub.streams and c.stub.streams[remote]
@@ -287,7 +287,7 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 							local extra = if c.jitter > 0 then math.floor(c.rand() * (c.jitter + 1)) else 0
 							table.insert(
 								c.inbox,
-								{ at = w.frames + c.delay + extra, remote = remote, payload = list[seen] }
+								{ at = w.frames + c.down + extra, remote = remote, payload = list[seen] }
 							)
 						end
 					end
@@ -348,7 +348,8 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 				out = false,
 				silent = false,
 				auto = co.auto ~= false,
-				delay = co.delay or 0,
+				up = co.up or co.delay or 0,
+				down = co.down or co.delay or 0,
 				jitter = co.jitter or 0,
 				lose = co.lose or 0,
 				rand = lcg(co.seed or (#kit.clients + 11)),
@@ -395,7 +396,7 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 				local lost = c.lose > 0 and c.rand() < c.lose
 				if not lost then
 					local extra = if c.jitter > 0 then math.floor(c.rand() * (c.jitter + 1)) else 0
-					kit.later(c.delay + extra, function()
+					kit.later(c.up + extra, function()
 						PaintballRig.send(wires, stub, "Paintball.Move", rec)
 					end)
 				end
@@ -448,7 +449,7 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 				return dx / len, dy / len, dz / len
 			end
 			-- a click: Wire.Fire with its two stamps, the eye and the look; `over` replaces any field
-			function c.fire(dx: number, dy: number, dz: number, over: { [string]: number }?): number
+			function c.fire(dx: number, dy: number, dz: number, over: { [string]: number }?, held: number?): number
 				c.shot += 1
 				local ex, ey, ez = c.eye()
 				local rec: { [string]: number } = {
@@ -466,7 +467,7 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 					rec[k] = v
 				end
 				c.lastFire = rec
-				kit.later(c.delay, function()
+				kit.later(c.up + (held or 0), function()
 					PaintballRig.send(wires, stub, "Paintball.Fire", rec)
 				end)
 				return c.shot

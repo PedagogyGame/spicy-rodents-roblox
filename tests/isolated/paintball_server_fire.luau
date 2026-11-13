@@ -1,0 +1,700 @@
+--!strict
+-- tests/isolated/paintball_server_fire.luau: the click, on the paintball service in a whole game on the fake
+-- engine, for tests/unit/paintball_server.spec.luau (its own Lune process: tests/lib/Isolated). What makes a
+-- click a shot and what refuses it (the magazine, the sprint, the spawn room, the origin), what a liar gets
+-- for lying about its fire rate, its ammunition, where it stood and what it saw; every tag, the paint it
+-- leaves and who is told; two verdicts in one tick; a late joiner's splats; the bots' commands; and scripted
+-- clients at 0, 80, 150 and 300 ms of round trip with jitter and loss, each hitting what it saw.
+-- Interface: return function(t) (the spec shape)
+local Ballistics = require("@shared/Paintball/Ballistics")
+local Magazine = require("@shared/Paintball/Magazine")
+local Arena = require("@shared/Minigames/Paintball/Arena")
+local Body = require("@shared/Minigames/Paintball/Body")
+local Clock = require("@shared/Minigames/Paintball/Clock")
+local Contract = require("@shared/Minigames/Paintball/Contract")
+local Hit = require("@shared/Minigames/Paintball/Hit")
+local Rules = require("@shared/Minigames/Paintball/Rules")
+local Wire = require("@shared/Minigames/Paintball/Wire")
+local Bots = require("@server/Minigames/Paintball/Bots")
+local Kit = require("@tests/isolated/paintball_server_kit")
+
+local R = Contract.Rules
+local FRAME = 1 / 60
+
+local function teamOf(kit: Kit.Kit, c: Kit.Client): number
+	return kit.state().slots[c.seat].team
+end
+
+-- people in the hall, the first on team 1, the second on team 2, a third on team 1 again; the match live
+local function people(kit: Kit.Kit, names: { string }, copts: { { [string]: any } }?): ...Kit.Client
+	local out: { Kit.Client } = {}
+	for i, name in names do
+		local c = kit.client(name, if copts then copts[i] else nil)
+		assert(kit.join(c))
+		kit.run(0.1)
+		out[i] = c
+	end
+	kit.run(0.5)
+	for i, c in out do
+		assert(teamOf(kit, c) == (if i % 2 == 1 then 1 else 2), `{c.name} is on the wrong side for this case`)
+	end
+	kit.live()
+	return table.unpack(out)
+end
+
+local function ack(kit: Kit.Kit, c: Kit.Client, shot: number): any
+	kit.untilTrue(1, function(): boolean
+		return c.acks[shot] ~= nil
+	end)
+	return c.acks[shot] or error(`{c.name} heard no ack for shot {shot}`)
+end
+
+-- the splat a ball left, as this client was told
+local function splatOf(c: Kit.Client, ball: number): any
+	for _, rec in c.splats do
+		if rec.ball == ball then
+			return rec
+		end
+	end
+	return nil
+end
+
+return function(t)
+	t.test(
+		"a click is a shot: born at the eye along the look, told to everybody, acked with the magazine; five, then the reload; too fast and empty are refused",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				local stats = kit.service:stats()
+				kit.walk(ada, -36, -2)
+				kit.run(0.2)
+				local feel = kit.state().feel
+				local fired = kit.now()
+				local shot = ada.fire(1, 0, 0)
+				local a = ack(kit, ada, shot)
+				t.deepEq({ a.ok, a.rounds, a.why, a.reloadAt }, { true, R.magazine - 1, nil, nil })
+				t.eq(stats.balls, 1)
+				-- everybody in the audience is told of the ball: when it was born, from where, how fast
+				kit.run(0.1)
+				local born = bea.shots[1]
+				t.deepEq({ born.ball, born.id, born.t }, { a.ball, ada.seat, fired })
+				t.near(born.ox, -36, 1e-4)
+				t.near(born.oy, Body.STAND_EYE, 1e-4)
+				t.deepEq({ born.vx, born.vy, born.vz }, { feel.ballSpeed, 0, 0 })
+				-- it drops as it flies (4.9 t^2 from the eye) and ends on the floor: one splat, on a face, for all
+				kit.run(1.2)
+				local splat = splatOf(bea, a.ball)
+				t.truthy(splat ~= nil, "the splat was sent")
+				t.deepEq({ splat.body, splat.by, splat.team, splat.face }, { 0, ada.seat, 1, Wire.FACE.py })
+				local flight = math.sqrt(Body.STAND_EYE / (feel.ballDrop / 2))
+				t.near(splat.x, -36 + feel.ballSpeed * flight, 0.01, "where the drop brings it down")
+				t.near(splat.y, 0, 1e-4)
+				t.eq(splatOf(ada, a.ball).seq, splat.seq, "the same record on every screen")
+				-- a second click inside the fire interval is refused, and says so; the magazine is as it was
+				local second = ada.fire(1, 0, 0)
+				kit.run(0.1)
+				local third = ada.fire(1, 0, 0)
+				t.deepEq({ ack(kit, ada, second).ok, ack(kit, ada, second).rounds }, { true, 3 })
+				local refused = ack(kit, ada, third)
+				t.deepEq({ refused.ok, refused.why, refused.rounds, refused.ball }, { false, "fast", 3, nil })
+				t.eq(stats.shotsRefused, 1)
+				-- the rest of the magazine: the fifth ball starts the reload, and only the reloader is told
+				for want = 2, 0, -1 do
+					kit.run(feel.fireInterval + 0.02)
+					local next = ack(kit, ada, ada.fire(1, 0, 0))
+					t.deepEq({ next.ok, next.rounds }, { true, want })
+					if want == 0 then
+						t.near(next.reloadAt, ada.lastFire.ft + feel.reloadSecs, 1e-6)
+						kit.run(0.1)
+						local reload = ada.last("paintball_reload")
+						t.deepEq({ reload.id, reload.at }, { ada.seat, next.reloadAt })
+						t.eq(bea.count("paintball_reload"), 0)
+					end
+				end
+				kit.run(feel.fireInterval + 0.02)
+				local dry = ack(kit, ada, ada.fire(1, 0, 0))
+				t.deepEq({ dry.ok, dry.why, dry.rounds }, { false, "empty", 0 })
+				-- everybody else hears the reload from the bit in the snapshots
+				local snap = bea.snaps[#bea.snaps]
+				for _, body in snap.bodies do
+					if body.id == ada.seat then
+						t.truthy(Wire.has(body.bits, Wire.BIT.reload))
+					end
+				end
+				kit.run(feel.reloadSecs)
+				local full = ack(kit, ada, ada.fire(1, 0, 0))
+				t.deepEq({ full.ok, full.rounds }, { true, R.magazine - 1 })
+				t.eq(stats.balls, 6)
+				-- R on a magazine that is not full reloads; on a full one it is refused with words
+				t.deepEq(
+					{ kit.w.svc:input(ada.stub, { gameId = Contract.STATION, verb = "reload", args = { kit.now() } }) },
+					{ true, nil }
+				)
+				kit.run(feel.reloadSecs + 0.2)
+				local again =
+					{ kit.w.svc:input(ada.stub, { gameId = Contract.STATION, verb = "reload", args = { kit.now() } }) }
+				t.deepEq(again, { false, Contract.textFor("phase") })
+			end)
+		end
+	)
+
+	t.test("three shots bunched half a second late are all accepted, as three balls a fire interval apart", function()
+		Kit.play(function(kit)
+			local ada = people(kit, { "Ada", "Bea" })
+			kit.walk(ada, -36, -2)
+			kit.run(0.2)
+			local feel = kit.state().feel
+			-- three clicks a fire interval apart by the client's own magazine (each stamp is the last plus the
+			-- interval, as Magazine counts it); the first is held up 29 frames behind a lost packet, the
+			-- second 14, and all three reach the server in one frame, the oldest just under half a second late
+			local ft = kit.now()
+			local s1 = ada.fire(1, 0, 0, { ft = ft }, 29)
+			kit.run(15 * FRAME)
+			local s2 = ada.fire(1, 0, 0, { ft = ft + feel.fireInterval }, 14)
+			kit.run(14 * FRAME)
+			local s3 = ada.fire(1, 0, 0, { ft = ft + feel.fireInterval + feel.fireInterval })
+			kit.run(0.2)
+			for i, shot in { s1, s2, s3 } do
+				local a = ada.acks[shot]
+				t.truthy(a ~= nil and a.ok, `shot {i}: {a and a.why}`)
+				t.eq(a.rounds, R.magazine - i)
+			end
+			t.eq(kit.service:stats().shotsRefused, 0)
+		end)
+	end)
+
+	t.test("a click 0.15 s after the last sprint Move is accepted; one inside the delay is refused", function()
+		Kit.play(function(kit)
+			local ada = people(kit, { "Ada", "Bea" })
+			kit.walk(ada, -36, -2)
+			ada.sprint = true
+			kit.walk(ada, -30, -2, Body.WALK * kit.state().feel.sprintMult)
+			t.eq(kit.service:stats().movesRefused, 0, "the sprint bit buys sprint pace")
+			-- the last Move that carries the bit
+			ada.auto = false
+			local last = ada.move().t
+			ada.sprint = false
+			kit.run(1 / Clock.SEND_HZ)
+			ada.move()
+			local early = ada.fire(1, 0, 0)
+			t.deepEq({ ack(kit, ada, early).ok, ack(kit, ada, early).why }, { false, "sprint" })
+			ada.move()
+			kit.untilTrue(1, function(): boolean
+				return kit.now() >= last + Body.SPRINT_FIRE_DELAY - 1e-9
+			end)
+			ada.move()
+			local shot = ada.fire(1, 0, 0)
+			t.near(ada.lastFire.ft, last + Body.SPRINT_FIRE_DELAY, FRAME)
+			t.truthy(ack(kit, ada, shot).ok, tostring(ack(kit, ada, shot).why))
+		end)
+	end)
+
+	t.test("a shot from inside a spawn room is refused; a step outside it, it is a shot", function()
+		Kit.play(function(kit)
+			local ada = people(kit, { "Ada", "Bea" })
+			kit.run(0.3)
+			local inside = ack(kit, ada, ada.fire(1, 0, 0))
+			t.deepEq({ inside.ok, inside.why }, { false, "safe" })
+			-- her snapshot says so too: safe while she stands in her own room, whatever the protection clock says
+			local snap = ada.snaps[#ada.snaps]
+			for _, body in snap.bodies do
+				if body.id == ada.seat then
+					t.truthy(Wire.has(body.bits, Wire.BIT.safe))
+				end
+			end
+			kit.walk(ada, -39, -2) -- the room ends at x = -40
+			kit.run(0.2)
+			t.truthy(ack(kit, ada, ada.fire(1, 0, 0)).ok)
+		end)
+	end)
+
+	t.test(
+		"a liar about where the shot came from is refused: beyond a stud of the eye, through cover, from standing height while crouched, with no direction",
+		function()
+			Kit.play(function(kit)
+				local ada = people(kit, { "Ada", "Bea" })
+				local stats = kit.service:stats()
+				kit.walk(ada, -36, -2)
+				kit.walk(ada, -30.6, -5) -- pressed against the west face of the wall (x -30..-28)
+				kit.run(0.2)
+				local function refusedOrigin(over: { [string]: number }, what: string)
+					kit.run(0.3)
+					local a = ack(kit, ada, ada.fire(1, 0, 0, over))
+					t.deepEq({ a.ok, a.why }, { false, "origin" }, what)
+				end
+				refusedOrigin({ ox = -27 }, "from the far side of the wall")
+				refusedOrigin({ ox = -29.8 }, "within a stud, but inside the cover")
+				refusedOrigin({ oz = -5 + 1.5 }, "a stud and a half to one side")
+				refusedOrigin({ dx = 0 }, "no direction")
+				-- an honest shot from the eye, with the stud of slack a moving body needs
+				kit.run(0.3)
+				t.truthy(ack(kit, ada, ada.fire(-1, 0, 0, { oz = -5 + 0.8 })).ok)
+				-- crouched: the eye is at 2.7, and a shot from standing height is not hers
+				ada.crouch = true
+				kit.run(0.5)
+				t.near(kit.service.poses[ada.seat].crouch, 1, 1e-6, "the server eased her hit shape down")
+				refusedOrigin({ oy = Body.STAND_EYE }, "standing height while crouched")
+				kit.run(0.3)
+				local low = ack(kit, ada, ada.fire(-1, 0, 0))
+				t.truthy(low.ok, tostring(low.why))
+				t.near(ada.lastFire.oy, Body.CROUCH_EYE, 1e-9)
+				t.eq(stats.shotsRefused, 5)
+				t.eq(stats.balls, 2, "none of the refused clicks became a ball")
+			end, { arena = Kit.hall({ wall = true }) })
+		end
+	)
+
+	t.test(
+		"a tag: the ball ends where it entered the body, everyone seated hears who, the score and the tallies with no state message, the paint rides on the body, and the tagged come back with a full magazine",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				local st = kit.w.svc.stations[Contract.STATION]
+				kit.walk(ada, -36, -2)
+				kit.walk(bea, -6, -2) -- out of her room (x -20..-10), thirty studs from Ada
+				for _ = 1, 3 do
+					kit.run(0.3)
+					ack(kit, bea, bea.fire(0, 0, 1)) -- (Bea has fired three of her five)
+				end
+				kit.run(1.2)
+				local feel = kit.state().feel
+				local bx, by, bz = ada.drawn(bea.seat)
+				t.near(bx :: number, -6, 0.01, "Ada's screen draws Bea where she stands")
+				local shot = ada.fire(ada.aim(bx :: number, by + 3, bz))
+				local a = ack(kit, ada, shot)
+				t.truthy(a.ok)
+				t.truthy(kit.untilTrue(1, function(): boolean
+					return #bea.tags > 0
+				end))
+				t.truthy(kit.w.svc.clock - st.lastBroadcast > 2 * FRAME, "the tag did not send the framework's state")
+				local tag = bea.tags[1]
+				t.deepEq(
+					{ tag.by, tag.id, tag.ball, tag.scores, tag.tags, tag.outs },
+					{ ada.seat, bea.seat, a.ball, { 1, 0 }, 1, 1 }
+				)
+				t.near(tag.at, kit.now() + feel.respawnSecs, 2 * FRAME)
+				t.near(tag.x, -6 - Body.RADIUS, 0.01, "the entry point: the near side of her shape")
+				t.truthy(tag.y > 2 and tag.y < 3)
+				t.eq(#ada.tags, 1, "the shooter's hit marker is this message")
+				t.truthy(bea.out)
+				-- the splat is on her body: an offset in her own frame, which puts it back on the entry point
+				kit.run(0.1)
+				local splat = splatOf(ada, a.ball)
+				t.deepEq({ splat.body, splat.by, splat.team, splat.face }, { bea.seat, ada.seat, 1, 0 })
+				local pose = kit.service.poses[bea.seat]
+				local wx, wy, wz = Wire.fromBody(splat.x, splat.y, splat.z, pose.x, pose.y, pose.z, pose.yaw)
+				t.near(wx, tag.x, 0.01)
+				t.near(wy, tag.y, 0.01)
+				t.near(wz, tag.z, 0.01)
+				-- while out she cannot be tagged again, and a ball passes where she stood
+				local second = ack(kit, ada, ada.fire(ada.aim(bx :: number, by + 3, bz)))
+				kit.run(1.2)
+				t.eq(#bea.tags, 1)
+				t.eq(splatOf(ada, second.ball).body, 0, "it flew on to the wall")
+				-- back after respawnSecs, placed in her room, with all five
+				t.truthy(kit.untilTrue(feel.respawnSecs, function(): boolean
+					return not bea.out
+				end))
+				kit.run(1.1)
+				t.eq(bea.extras.rounds, R.magazine, "nobody comes back with the two balls they had left")
+				t.deepEq(bea.view.game.scores, { 1, 0 })
+				t.eq(kit.service:stats().tags, 1)
+			end, { arena = Kit.hall({ room2 = -20 }) })
+		end
+	)
+
+	t.test("a crouched body behind a rail is not tagged by a ball 0.05 over it; standing, it is", function()
+		Kit.play(function(kit)
+			local ada, bea = people(kit, { "Ada", "Bea" })
+			kit.walk(ada, -10, 0)
+			kit.walk(bea, 2.5, 0) -- behind the rail (x 0..0.5), her shape wholly east of it
+			ada.crouch, bea.crouch = true, true
+			kit.run(0.6)
+			t.near(kit.service.poses[bea.seat].crouch, 1, 1e-6)
+			-- from Ada's crouched eye, rising to pass 0.05 over the middle of the rail
+			local over = Arena.RAIL_HEIGHT + 0.05
+			local dx, dy, dz = ada.aim(0.25, over, 0)
+			local first = ack(kit, ada, ada.fire(dx, dy, dz))
+			t.truthy(first.ok, tostring(first.why))
+			kit.run(1.5)
+			t.eq(#bea.tags, 0, "crouched, she is lower than the ball's line")
+			t.eq(splatOf(ada, first.ball).body, 0)
+			-- she stands up; the same line now enters her shape
+			bea.crouch = false
+			kit.run(0.6)
+			local second = ack(kit, ada, ada.fire(dx, dy, dz))
+			kit.run(0.5)
+			t.eq(#bea.tags, 1)
+			t.eq(bea.tags[1].ball, second.ball)
+			t.near(bea.tags[1].x, 2.5 - Body.RADIUS, 0.01)
+			-- a ball a little lower stops on the rail, whoever is behind it
+			kit.run(0.3)
+			local lx, ly, lz = ada.aim(0.25, Arena.RAIL_HEIGHT - 0.3, 0)
+			local third = ack(kit, ada, ada.fire(lx, ly, lz))
+			kit.run(0.5)
+			local splat = splatOf(ada, third.ball)
+			t.deepEq({ splat.body, splat.face }, { 0, Wire.FACE.nx })
+			t.near(splat.x, 0, 1e-4)
+		end, { arena = Kit.hall({ rail = true, room2 = 10 }), feel = Contract.feel({ ballDrop = 0 }) })
+	end)
+
+	t.test(
+		"two tags in one tick resolve the same way every time: the older ball tags, the younger flies on; two who tag each other are both out",
+		function()
+			local function once(cyFirst: boolean): { any }
+				local log: { any } = {}
+				Kit.play(function(kit)
+					local ada, bea, cy = people(kit, { "Ada", "Bea", "Cy" })
+					-- Ada and Cy stand either side of the line to Bea, the same distance from her
+					kit.walk(ada, -36, -2)
+					kit.walk(cy, -36, 2)
+					kit.walk(bea, -6, 0)
+					kit.run(1.2)
+					local a1 = { ada.aim(-6, 3, 0) }
+					local c1 = { cy.aim(-6, 3, 0) }
+					local sa: number, sc: number
+					if cyFirst then
+						sc = cy.fire(c1[1], c1[2], c1[3])
+						sa = ada.fire(a1[1], a1[2], a1[3])
+					else
+						sa = ada.fire(a1[1], a1[2], a1[3])
+						sc = cy.fire(c1[1], c1[2], c1[3])
+					end
+					local ballA, ballC = ack(kit, ada, sa).ball, ack(kit, cy, sc).ball
+					kit.run(1.5)
+					t.eq(#bea.tags, 1, "one tag, not two")
+					local tag = bea.tags[1]
+					local elder = if cyFirst then cy else ada
+					t.eq(tag.by, elder.seat)
+					t.eq(tag.ball, if cyFirst then ballC else ballA)
+					local other = splatOf(bea, if cyFirst then ballA else ballC)
+					t.eq(other.body, 0, "the younger ball went on to the wall")
+					table.insert(log, { tag.by, tag.ball, tag.x, tag.y, tag.z, tag.at, other.x, other.y, other.z })
+					-- Bea comes back; she and Ada fire at each other in the same frame
+					kit.untilTrue(kit.state().feel.respawnSecs + 0.5, function(): boolean
+						return not bea.out
+					end)
+					kit.state().slots[bea.seat].safeUntil = kit.now()
+					kit.walk(bea, -6, -2)
+					kit.run(1.2)
+					local tb = { bea.aim(-36, 3, -2) }
+					local ta = { ada.aim(-6, 3, -2) }
+					bea.fire(tb[1], tb[2], tb[3])
+					ada.fire(ta[1], ta[2], ta[3])
+					kit.run(1.5)
+					t.eq(#ada.tags, 3, "three tags in all were heard")
+					t.truthy(ada.out and bea.out, "each ball was good whatever became of its shooter")
+					t.deepEq(ada.tags[3].scores, { 2, 1 })
+					for i = 2, 3 do
+						table.insert(log, { ada.tags[i].by, ada.tags[i].id, ada.tags[i].x, ada.tags[i].at })
+					end
+				end, { arena = Kit.hall({ room2 = -20 }) })
+				return log
+			end
+			local first = once(false)
+			t.deepEq(once(false), first, "the same again, number for number")
+			local swapped = once(true)
+			t.truthy(swapped[1][1] ~= first[1][1], "whoever fired first tags")
+		end
+	)
+
+	t.test(
+		"a late joiner gets the whole match and every splat: the batch is exactly the two pools, and a slot's paint goes when its occupant does",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				kit.walk(ada, -36, -2)
+				kit.walk(bea, -6, -2)
+				kit.run(1.2)
+				-- paint on the building, then on Bea
+				for i = 1, 3 do
+					ack(kit, ada, ada.fire(ada.aim(-36 + 10 * i, 0, 6)))
+					kit.run(0.3)
+				end
+				ack(kit, ada, ada.fire(ada.aim(-6, 3, -2)))
+				kit.run(1)
+				t.eq(#bea.tags, 1)
+				t.eq(#ada.splats, 4)
+				-- Dan walks up and joins
+				local dan = kit.client("Dan")
+				t.truthy((kit.join(dan)))
+				kit.run(1.2)
+				t.eq(#dan.splats, 4, "every splat of the match so far")
+				for i, rec in dan.splats do
+					t.deepEq(rec, ada.splats[i], "the same records, oldest first")
+				end
+				t.eq(dan.watch.match, 1)
+				t.eq(#dan.watch.slots, 8)
+				t.deepEq(dan.view.game.scores, { 1, 0 })
+				t.eq(dan.view.game.slots[ada.seat].tags, 1, "and the tallies")
+				t.truthy(dan.extras.feel.ballSpeed == kit.state().feel.ballSpeed)
+				t.eq(dan.extras.bots[ada.seat], false)
+				t.eq(dan.place, 1, "and is placed in a spawn room")
+				-- Bea leaves: a bot has her seat, and does not wear her paint
+				kit.w.svc:leave(bea.stub, "left")
+				kit.run(0.3)
+				local eve = kit.client("Eve")
+				t.truthy((kit.join(eve)))
+				kit.run(0.5)
+				t.eq(#eve.splats, 3, "the walls' paint only")
+				for _, rec in eve.splats do
+					t.eq(rec.body, 0)
+				end
+			end, { arena = Kit.hall({ room2 = -20 }) })
+		end
+	)
+
+	t.test(
+		"a liar about time gains nothing: a back-dated click is born no earlier than its own delay allows, a far view time is clamped and the body judged where the server holds it",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				local stats = kit.service:stats()
+				kit.walk(ada, -36, -2)
+				kit.walk(bea, -6, -8)
+				kit.run(1.2)
+				-- claimed fired a quarter of a second ago: 22 studs of free flight if it were believed
+				local now = kit.now()
+				local a = ack(kit, ada, ada.fire(1, 0, 0, { ft = now - Clock.MAX_LATE }))
+				t.truthy(a.ok)
+				kit.run(0.1)
+				local born = bea.shots[#bea.shots]
+				t.eq(born.ball, a.ball)
+				t.truthy(born.t >= now - Clock.REWIND_TOLERANCE - 2 * FRAME, `born {now - born.t} s back`)
+				-- Bea runs north; Ada claims she saw her a second ago and fires at where Bea was then
+				kit.walk(bea, -6, 8)
+				local clamped = stats.rewindsClamped
+				local sx, sy, sz = ada.aim(-6, 3, 8 - Body.WALK * 1)
+				local old = ack(kit, ada, ada.fire(sx, sy, sz, { vt = kit.now() - 1 }))
+				t.truthy(old.ok, "the click is a shot")
+				kit.run(1.2)
+				t.eq(stats.rewindsClamped, clamped + 1, "but its rewind is the server's own")
+				t.eq(#bea.tags, 0, "and it hits nobody who is no longer there")
+			end, { arena = Kit.hall({ room2 = -20 }) })
+		end
+	)
+
+	t.test(
+		"the bots: a fire command along the bot's own look is a ball from its eye, one off its look or from a spawn room is dropped; they hear every ball and tag; a call-out is broadcast",
+		function()
+			local stepWas = Bots.step
+			local script: { Bots.Command } = {}
+			local heardAll: { Bots.Heard } = {}
+			local steps = 0
+			(Bots :: any).step = function(_bots: any, _state: any, _poses: any, heard: { Bots.Heard }): { Bots.Command }
+				steps += 1
+				for _, h in heard do
+					table.insert(heardAll, h)
+				end
+				local out = script
+				script = {}
+				return out
+			end
+			local ok, err = pcall(Kit.play, function(kit: Kit.Kit)
+				local ada = people(kit, { "Ada" })
+				local stats = kit.service:stats()
+				local bot = 2 -- a bot of team 2
+				t.eq(kit.state().slots[bot].team, 2)
+				local pose = kit.service.poses[bot]
+				local speed = kit.state().feel.ballSpeed
+				local function fire(yawOff: number): Bots.Command
+					local lx, ly, lz = Body.look(pose.yaw + yawOff, pose.pitch)
+					return { id = bot, kind = "fire", vx = lx * speed, vy = ly * speed, vz = lz * speed }
+				end
+				-- from inside its spawn room: dropped
+				script = { fire(0) }
+				kit.run(0.1)
+				t.eq(stats.balls, 0)
+				-- its brain walks it out and turns it towards Ada's side
+				pose.x, pose.z, pose.yaw = 30, 0, math.pi / 2
+				script = { fire(math.rad(10)) }
+				kit.run(0.1)
+				t.eq(stats.balls, 0, "ten degrees off its own look: its puppet was not facing that way")
+				script = { fire(math.rad(2)) }
+				kit.run(0.1)
+				t.eq(stats.balls, 1)
+				local born = ada.shots[1]
+				t.eq(born.id, bot)
+				t.deepEq(
+					{ born.ox, born.oy, born.oz },
+					{ 30, Body.STAND_EYE, 0 },
+					"from its eye, whatever the command said"
+				)
+				t.near(math.sqrt(born.vx ^ 2 + born.vy ^ 2 + born.vz ^ 2), speed, 1e-3)
+				t.eq(kit.state().slots[bot].shots, 1, "through the match's own magazine")
+				-- it is in the snapshots where its brain put it, like anybody
+				local snap = ada.snaps[#ada.snaps]
+				t.near(snap.bodies[bot].x, 30, 0.01)
+				-- reload and a call-out
+				script = { { id = bot, kind = "reload" }, { id = bot, kind = "say", line = "reloading" } }
+				kit.run(0.1)
+				t.truthy(kit.state().slots[bot].mag.reloadDoneAt ~= nil)
+				local said = ada.last("paintball_say")
+				t.deepEq({ said.id, said.line }, { bot, "reloading" })
+				t.eq(ada.count("paintball_reload"), 0, "a bot's reload is nobody's message")
+				script = { { id = bot, kind = "say", line = "something rude" } }
+				kit.run(0.1)
+				t.eq(ada.count("paintball_say"), 1, "only the lines of the contract are said")
+				-- what the bots were told: the ball born, the ball ended; and a tag when there is one
+				kit.run(1.5)
+				local kinds: { [string]: number } = {}
+				for _, h in heardAll do
+					kinds[h.kind] = (kinds[h.kind] or 0) + 1
+				end
+				t.deepEq({ kinds.born, kinds.ended, kinds.tag }, { 1, 1, nil })
+				t.truthy((kit.service:debug("tag", bot, ada.seat)))
+				kit.run(0.1)
+				t.eq(heardAll[#heardAll].kind, "tag")
+				-- at the end card the bots stand where they stood
+				t.truthy((kit.service:debug("end")))
+				kit.run(0.5)
+				t.eq(kit.session.phase, "done")
+				local at = steps
+				kit.run(0.5)
+				t.eq(steps, at)
+			end);
+			(Bots :: any).step = stepWas
+			if not ok then
+				error(err, 0)
+			end
+		end
+	)
+
+	-- Scripted clients with a real connection's faults: a shooter and a runner, each with its own delay,
+	-- jitter and loss. The shooter aims at the runner WHERE ITS OWN SCREEN DRAWS HER (its snapshots, its view
+	-- time), leads her, and flies its own ball against the bodies it draws, frame by frame, as the client
+	-- lane's predicted ball does (Hit.body on the drawn pose). The server's verdict on each ball is then set
+	-- beside the shooter's own.
+	local function duel(rttMs: number, shots: number): { agree: number, shots: number, hits: number, refused: number }
+		local out = { agree = 0, shots = 0, hits = 0, refused = 0 }
+		local tagWas = Rules.tag
+		local ok, err = pcall(Kit.play, function(kit: Kit.Kit)
+			-- (the runner is hit and runs on: a tag here would send her back to her room after every hit)
+			local model = Rules.tag;
+			(Rules :: any).tag = function(): boolean
+				return false
+			end
+			local half = rttMs / 1000 / 2 * 60
+			local up, down = math.floor(half), math.ceil(half)
+			local net =
+				{ up = up, down = down, jitter = if rttMs > 0 then 2 else 0, lose = if rttMs > 0 then 0.05 else 0 }
+			local ada, bea = people(kit, { "Ada", "Bea" }, { net, net })
+			local arena = kit.arena
+			local feel = kit.state().feel
+			kit.walk(ada, -36, 0)
+			kit.walk(bea, -6, -8)
+			kit.run(1.5)
+			local rand = ada.rand
+			local mag = Magazine.new(R.magazine, feel.fireInterval, feel.reloadSecs) -- the shooter's own
+			local dir = 1
+			local flying: { any } = {}
+			local nextShot = kit.now() + 0.4
+			local fired = 0
+			local verdicts: { [number]: any } = {} -- by shot
+			for _ = 1, 60 * 90 do
+				-- the runner strafes between z = -8 and z = 8, crouching now and then
+				bea.z += dir * Body.speed(if bea.crouch then 1 else 0, false, feel) * FRAME
+				if bea.z > 8 or bea.z < -8 then
+					dir = -dir
+					bea.crouch = rand() < 0.3
+				end
+				-- the shooter's own ball, against what it draws
+				local vt = ada.viewTime()
+				for i = #flying, 1, -1 do
+					local b = flying[i]
+					local age0, age1 = b.age, kit.now() - b.ft
+					if age1 > age0 then
+						local p0x, p0y, p0z =
+							Ballistics.position(b.ox, b.oy, b.oz, b.vx, b.vy, b.vz, feel.ballDrop, age0)
+						local p1x, p1y, p1z =
+							Ballistics.position(b.ox, b.oy, b.oz, b.vx, b.vy, b.vz, feel.ballDrop, age1)
+						local wall = arena.sweep(p0x, p0y, p0z, p1x, p1y, p1z)
+						local x, y, z, c = ada.drawnAt(bea.seat, vt)
+						local s = if x ~= nil
+							then Hit.body(arena.sweep, p0x, p0y, p0z, p1x, p1y, p1z, x, y, z, c)
+							else nil
+						b.age = age1
+						if s ~= nil and (wall == nil or s < wall) then
+							verdicts[b.shot].saw = true
+							table.remove(flying, i)
+						elseif wall ~= nil or age1 >= R.ballTtl then
+							table.remove(flying, i)
+						end
+					end
+				end
+				if fired < shots and kit.now() >= nextShot and Magazine.canFire(mag, kit.now()) then
+					nextShot = kit.now() + 0.3 + rand() * 0.3
+					local x, y, z = ada.drawnAt(bea.seat, vt)
+					local x2, _, z2 = ada.drawnAt(bea.seat, vt - 0.1)
+					if x ~= nil and x2 ~= nil then
+						Magazine.fire(mag, kit.now())
+						-- lead her by the flight time, with a hand that is not quite steady
+						local ex, ey, ez = ada.eye()
+						local tof = math.sqrt((x - ex) ^ 2 + (z - ez) ^ 2) / feel.ballSpeed
+						local ax = x + (x - x2) / 0.1 * tof
+						local az = z + (z - z2) / 0.1 * tof + (rand() - 0.5) * 3.2
+						local ay = y + 1.5 + rand() * 3.5 -- (over 3.4 it meets her only if she stands)
+						local vx, vy, vz = Ballistics.aim(ex, ey, ez, ax, ay, az, feel.ballSpeed, feel.ballDrop)
+						local shot = ada.fire(vx / feel.ballSpeed, vy / feel.ballSpeed, vz / feel.ballSpeed)
+						fired += 1
+						verdicts[shot] = { saw = false }
+						table.insert(flying, {
+							shot = shot,
+							ft = ada.lastFire.ft,
+							age = 0,
+							ox = ex,
+							oy = ey,
+							oz = ez,
+							vx = vx,
+							vy = vy,
+							vz = vz,
+						})
+					end
+				end
+				kit.frame()
+				if fired >= shots and #flying == 0 and kit.now() > nextShot + 2 then
+					break
+				end
+			end
+			kit.run(1)
+			for shot, v in verdicts do
+				local a = ada.acks[shot]
+				if a == nil or not a.ok then
+					out.refused += 1
+					continue
+				end
+				local splat = splatOf(ada, a.ball)
+				local server = splat ~= nil and splat.body == bea.seat
+				out.shots += 1
+				out.hits += if server then 1 else 0
+				out.agree += if server == v.saw then 1 else 0
+			end
+			local stats = kit.service:stats()
+			assert(stats.corrections == 0, `{stats.corrections} corrections of honest clients at {rttMs} ms`);
+			(Rules :: any).tag = model
+		end, { arena = Kit.hall({ room2 = -20 }), feel = Contract.feel({ reloadSecs = 0.5 }) });
+		(Rules :: any).tag = tagWas
+		if not ok then
+			error(err, 0)
+		end
+		return out
+	end
+
+	for _, case in
+		{ { rtt = 0, bar = 0.99 }, { rtt = 80, bar = 0.95 }, { rtt = 150, bar = 0.95 }, { rtt = 300, bar = 0.85 } }
+	do
+		t.test(
+			`a shooter at {case.rtt} ms hits what it saw: the server agrees with its screen on at least {case.bar * 100} % of 100 shots at a runner who crouches`,
+			function()
+				local r = duel(case.rtt, 100)
+				t.eq(r.refused, 0, "an honest client's shot is never refused")
+				t.truthy(r.shots >= 95, `{r.shots} shots judged`)
+				t.truthy(
+					r.hits >= 5 and r.hits <= r.shots - 5,
+					`{r.hits} hits of {r.shots}: both verdicts were put to the test`
+				)
+				t.truthy(r.agree / r.shots >= case.bar, `agreement {r.agree} of {r.shots} at {case.rtt} ms`)
+			end
+		)
+	end
+end
