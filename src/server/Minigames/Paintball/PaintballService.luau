@@ -4,9 +4,24 @@
 -- paintball's Table in the minigame framework (Server/Minigames/Games/Paintball hands each hook of
 -- the Table to a method here). It owns the match loop, the five remotes, validation,
 -- lag-compensated hits, splats, the roster, the audience and the access pass.
--- OWNED BY THE SERVER LANE. THIS IS A STUB: `new`, `port` and the Service's methods keep their names
--- and signatures; the lane writes the bodies and may add files beside this one (not named Bot*.luau:
--- those are the match-and-bots lane's). The stub seats nobody ("The arena is closed.").
+-- OWNED BY THE SERVER LANE. `new`, `port` and the Service's methods keep the names and signatures the
+-- contract gave them. Beside this file, the lane's own: Stream (what is kept for a person, and the
+-- judgment of its Moves and of a shot's origin), PassDesk (the pass), RealEngine (the hands on real
+-- bodies). Files named Bot*.luau are the match-and-bots lane's.
+-- WHERE THE LANE READ THE CONTRACT ONE WAY OF TWO (each is one line of code, named here):
+--   * "sprint" (onFire c) counts only Moves stamped at or before f: a Move stamped after the click says
+--     nothing of it (Stream.sprinting);
+--   * the origin's "Body.JUMP_HEIGHT more while the newest Move says BIT.air" is allowed below the eye
+--     as well as above it: a body coming down from a hop is lower than its newest Move (Stream.originOk);
+--   * an unsupported pose is judged exactly as written (Stream, "the height rule"): it may not be more
+--     than TRUST.riseSlack above the last accepted pose, so a hop taken off a ledge is refused until it
+--     comes down past the ledge;
+--   * a slot's splats and pose history are emptied when its occupant changes, when the roster is read.
+-- AND TWO PLACES WHERE IT DID NOT DO AS WRITTEN, because as written a liar gains (both reported):
+--   * after a CORRECTION the distance budget is EMPTY, not full (Stream.placed): a full one hands half a
+--     second of free distance to whoever gets themselves refused, 28 studs a second on corrections alone;
+--   * a correction whose anchor hangs in mid-air (a "fall" that never came down) puts the body on the
+--     walking surface under it, not back in the air (correct()).
 --
 -- WHAT IT IS BUILT FROM. new(ctx, deps): ctx is the framework's ServerGame.Ctx for the arena's
 -- station; deps is ctx.opts.paintball (a spec's stand-ins; nil in the game). The arena is pure data
@@ -277,14 +292,40 @@ local ArenaData: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintbal
 	Import.shared("Minigames/Paintball/ArenaData")
 local Contract: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
 	Import.shared("Minigames/Paintball/Contract")
+local Body: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Body)) =
+	Import.shared("Minigames/Paintball/Body")
+local Clock: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Clock)) =
+	Import.shared("Minigames/Paintball/Clock")
+local Rules: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Rules)) =
+	Import.shared("Minigames/Paintball/Rules")
+local Wire: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wire)) =
+	Import.shared("Minigames/Paintball/Wire")
+local PoseHistory = require("../../Paintball/PoseHistory")
+local Projectiles = require("../../Paintball/Projectiles")
+local Splats = require("../../Paintball/Splats")
 local ServerGame = require("../ServerGame")
 local Bots = require("./Bots")
+local PassDeskModule = require("./PassDesk")
+local RealEngine = require("./RealEngine")
+local Stream = require("./Stream")
 
 type Arena = typeof(ArenaModule.T.Arena)
 type Place = typeof(ArenaModule.T.Place)
+type Spawn = typeof(ArenaModule.T.Spawn)
 type Pose = typeof(Contract.T.Pose)
 type Extras = typeof(Contract.T.Extras)
 type Feel = typeof(Contract.T.Feel)
+type Event = typeof(Contract.T.Event)
+type State = typeof(Rules.T.State)
+type SnapBody = typeof(Wire.T.SnapBody)
+type Watched = typeof(Wire.T.Watched)
+type Record = { [string]: number }
+type Person = Stream.Person
+
+local R = Contract.Rules
+local T = Contract.TRUST
+local BIT = Wire.BIT
+local AIM_COS = math.cos(Contract.BOT.aimSlack)
 
 -- The service's link to paintball's own remotes (Wire.REMOTES).
 --   on    hear a client-to-server remote ("Paintball.Move", "Paintball.Fire"): the record is already
@@ -397,11 +438,20 @@ local function noEngine(): Engine
 	}
 end
 
+local function isBot(key: any): boolean
+	return type(key) == "table" and key.ai == true
+end
+
+local function wrapAngle(a: number): number
+	return (a + math.pi) % (2 * math.pi) - math.pi
+end
+
 function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 	local d: Deps = deps or (ctx.opts.paintball :: Deps?) or {}
 	local arena = d.arena or ArenaData.build()
 	local root = ctx.root
 	local hw = if root then root:FindFirstChild(ArenaModule.MODEL) else nil
+	local place = ArenaModule.placeOf(ctx.place)
 	local stats: Stats = {
 		steps = 0,
 		snapshots = 0,
@@ -423,7 +473,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		deps = d,
 		hw = hw,
 		arena = arena,
-		place = ArenaModule.placeOf(ctx.place),
+		place = place,
 		port = nil,
 		bots = Bots.new(arena, { seed = d.seed }),
 		match = 0,
@@ -431,14 +481,719 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		poses = {},
 		audience = {},
 	} :: Service
-	-- (the stub has no engine of its own to give: the lane builds the real one here)
-	local _engine: Engine = d.engine or noEngine()
+	local engine: Engine = d.engine or (if hw ~= nil then RealEngine.new() else noEngine())
+	local pass: PassDesk = d.pass
+		or PassDeskModule.new(function(player: any, cents: number, why: string): (boolean, string?)
+			return ctx.town.charge(player, cents, why)
+		end, d.day or function(): number
+			return ctx.stamp() / PassDeskModule.daySecs()
+		end)
 
-	function service.join(_self: Service, _player: any, _via: ServerGame.StationDef): (boolean, string?)
-		return false, Contract.textFor("closed")
+	-- what the service keeps (see the header: by player, not by seat)
+	local people: { [any]: Person } = {}
+	local bySeat: { [number]: Person } = {} -- kept right at every seat taken, left and dealt again
+	local placeMemo: { [any]: number } = setmetatable({}, { __mode = "k" }) :: any -- a player's last placement number, ever
+	local placed: { [any]: boolean } = {} -- whom the service has put in the arena (and ghosted)
+	local sides: { [any]: number } = {} -- the team each person ended the last match on
+	local histories: { [number]: PoseHistory.History } = {} -- by slot
+	local targets: { Projectiles.Target } = {} -- every slot that is on, in slot order
+	local targetOf: { [number]: Projectiles.Target } = {}
+	local occupant: { [number]: any } = {} -- who held each slot when the roster was last read
+	local botSkill: { [number]: number } = {} -- Bots.sync's `who`: the slots bots hold
+	local sim: Projectiles.Sim = Projectiles.forArena(arena, service.feel)
+	local pools = Splats.pools(R.splatPool, R.bodySplats)
+	local heard: { Bots.Heard } = {}
+	local shotBatch: { Record } = {}
+	local splatBatch: { Record } = {}
+	local rosterDirty = false
+	local nextSnap = -math.huge
+	local snapSeq = 0
+	local nextAudience = -math.huge
+	local stepNow = 0
+	local lobbyCount = 0
+	local monitors: { any }? = nil
+
+	local function matchState(): State?
+		local s = ctx.session
+		if s ~= nil and (s.phase == "playing" or s.phase == "done") and s.game ~= nil then
+			return s.game.state
+		end
+		return nil
 	end
 
-	function service.joined(_self: Service, _player: any, _seat: number?, _via: ServerGame.StationDef) end
+	local function holderOf(seat: number): any
+		local s = ctx.session
+		local key = s.seats[seat]
+		if key ~= nil and not s.gone[seat] then
+			return key
+		end
+		return nil
+	end
+
+	local function toAudience(remote: string, payload: buffer)
+		local port = service.port
+		if port == nil then
+			return
+		end
+		for player in service.audience do
+			port.fire(player, remote, payload)
+		end
+	end
+
+	-- a body to a point of the arena frame
+	local function put(body: any, x: number, y: number, z: number, yaw: number)
+		local wx, wy, wz = ArenaModule.toWorld(place, x, y, z)
+		engine.teleport(body, wx, wy, wz, ArenaModule.yawToWorld(place, yaw))
+	end
+
+	-- Out of the arena: un-ghosted and stood in the lobby (a few studs apart, so a whole match that ends
+	-- at once does not land on one spot).
+	local function toLobby(player: any)
+		placed[player] = nil
+		local body = ctx.bodyOf(player)
+		if body == nil then
+			return
+		end
+		engine.ghost(body, false)
+		local lobby = arena.lobby
+		lobbyCount += 1
+		local k = lobbyCount % 8
+		put(body, lobby.x + (k % 4) * 3 - 4.5, lobby.y, lobby.z + (k // 4) * 3, lobby.yaw)
+	end
+
+	local function watchMessage(state: State): { [string]: any }
+		local slots: { Watched } = {}
+		for id, slot in state.slots do
+			local key = if slot.on then holderOf(id) else nil
+			if key ~= nil then
+				local user = 0
+				if not isBot(key) and type(key.UserId) == "number" and key.UserId > 0 then
+					user = key.UserId
+				end
+				table.insert(slots, {
+					id = id,
+					team = slot.team,
+					name = string.sub(ctx.nameOf(id), 1, 60),
+					bot = isBot(key),
+					user = user,
+				})
+			end
+		end
+		return {
+			kind = "paintball_watch",
+			match = service.match,
+			slots = slots,
+			now = ctx.stamp(),
+			feel = Contract.feel(state.feel :: any),
+		}
+	end
+
+	-- Somebody comes into the audience: who is where, then all the paint of the match so far.
+	local function admit(player: any, state: State)
+		service.audience[player] = true
+		ctx.send(player, watchMessage(state))
+		local port = service.port
+		local batch = Splats.batch(pools)
+		if port ~= nil and #batch > 0 then
+			port.fire(player, "Splat", Wire.pack(Wire.Splat, batch))
+		end
+	end
+
+	local function sideSizes(state: State): (number, number)
+		local one, two = 0, 0
+		for _, slot in state.slots do
+			if slot.on then
+				if slot.team == 1 then
+					one += 1
+				else
+					two += 1
+				end
+			end
+		end
+		return one, two
+	end
+
+	-- BALANCE: bots are added (never taken off) until the sides are level and at least teamMin each.
+	local function balance(state: State)
+		for _ = 1, R.slots do
+			local one, two = sideSizes(state)
+			if (one == two and one >= R.teamMin) or one + two >= R.slots then
+				return
+			end
+			if not ctx.addComputer() then
+				return
+			end
+		end
+	end
+
+	local function spawnOf(team: number, index: number?): Spawn
+		local list = arena.spawns[team]
+		return list[((index or 1) - 1) % #list + 1]
+	end
+
+	-- The roster changed (a seat taken or left, a side changed, a match begun): balance, read who holds
+	-- which slot, tell the bots and the audience.
+	local function refreshRoster(now: number)
+		rosterDirty = false
+		local state = matchState()
+		if state == nil then
+			return
+		end
+		if ctx.session.phase == "playing" then
+			balance(state)
+		end
+		rosterDirty = false -- (the bots balance seated raised it again)
+		table.clear(botSkill)
+		table.clear(targets)
+		table.clear(targetOf)
+		for id, slot in state.slots do
+			local key = if slot.on then holderOf(id) else nil
+			if occupant[id] ~= key then
+				-- another occupant: nobody wears the last one's paint or is rewound to where it stood
+				occupant[id] = key
+				Splats.clearBody(pools, id)
+				local history = histories[id]
+				if history then
+					PoseHistory.clear(history)
+				end
+				service.poses[id] = nil
+			end
+			if key == nil then
+				continue
+			end
+			if isBot(key) then
+				botSkill[id] = if type(key.skill) == "number" then key.skill else 0.5
+				if service.poses[id] == nil then
+					-- (its "respawn" event places it in the next step; until then a brain needs somewhere to be)
+					local sp = spawnOf(slot.team, slot.spawn)
+					service.poses[id] = { x = sp.x, y = sp.y, z = sp.z, yaw = sp.yaw, pitch = 0, crouch = 0, bits = 0 }
+				end
+			end
+			local history = histories[id]
+			if history == nil then
+				history = PoseHistory.new(Clock.HISTORY_SECS, Clock.SNAP_HZ)
+				histories[id] = history
+			end
+			local target: Projectiles.Target = {
+				id = id,
+				team = slot.team,
+				history = history,
+				live = false,
+				room = arena.spawnRooms[slot.team],
+			}
+			table.insert(targets, target)
+			targetOf[id] = target
+		end
+		Bots.sync(service.bots, state, botSkill, service.poses, now)
+		local message = watchMessage(state)
+		for player in service.audience do
+			ctx.send(player, table.clone(message))
+		end
+		ctx.dirty()
+	end
+
+	-- Who may be hit this instant, and where each body last was (the early reject).
+	local function refreshTargets(state: State, now: number)
+		local poses = service.poses
+		for _, target in targets do
+			local pose = poses[target.id]
+			if pose == nil then
+				target.live = false
+			else
+				target.live = Rules.canBeHit(state, target.id, now)
+				target.x, target.y, target.z = pose.x, pose.y, pose.z
+			end
+		end
+	end
+
+	-- Rules said yes: `by` tagged `id` out.
+	local function tagged(state: State, by: number, id: number, ball: number, x: number, y: number, z: number)
+		stats.tags += 1
+		local target = targetOf[id]
+		if target then
+			target.live = false
+		end
+		local person = bySeat[id]
+		if person then
+			person.out = true -- its Moves are dropped and its pose held, until its respawn
+		end
+		local victim, shooter = state.slots[id], state.slots[by]
+		ctx.broadcast({
+			kind = "paintball_tag",
+			by = by,
+			id = id,
+			ball = ball,
+			scores = { state.scores[1], state.scores[2] },
+			tags = if shooter then shooter.tags else 0,
+			outs = if victim then victim.outs else 0,
+			at = if victim then victim.outUntil else stepNow,
+			x = x,
+			y = y,
+			z = z,
+		})
+		table.insert(heard, { kind = "tag", id = id, by = by, x = x, y = y, z = z })
+	end
+
+	-- A ball ended (Projectiles hands each over the moment it does, before the next ball is stepped).
+	local function onEnd(ball: Projectiles.Ball)
+		local state = matchState()
+		if state == nil then
+			return
+		end
+		local hit = ball.hitBody
+		if hit ~= 0 then
+			local pose = service.poses[hit]
+			local lx, ly, lz =
+				Wire.toBody(ball.hx, ball.hy, ball.hz, ball.bx, ball.by, ball.bz, if pose then pose.yaw else 0)
+			table.insert(splatBatch, Splats.body(pools, ball.id, ball.shooter, ball.team, hit, lx, ly, lz))
+			table.insert(heard, { kind = "ended", id = ball.shooter, x = ball.hx, y = ball.hy, z = ball.hz })
+			if Rules.tag(state, ball.shooter, hit, stepNow, ball.born) then
+				tagged(state, ball.shooter, hit, ball.id, ball.hx, ball.hy, ball.hz)
+			end
+		elseif ball.hitWall then
+			local face = Wire.faceOf(ball.nx, ball.ny, ball.nz)
+			table.insert(
+				splatBatch,
+				Splats.wall(pools, ball.id, ball.shooter, ball.team, face, ball.hx, ball.hy, ball.hz)
+			)
+			table.insert(heard, { kind = "ended", id = ball.shooter, x = ball.hx, y = ball.hy, z = ball.hz })
+		end
+	end
+
+	-- A ball is born (a person's accepted click, a bot's command).
+	local function launch(
+		id: number,
+		team: number,
+		ox: number,
+		oy: number,
+		oz: number,
+		vx: number,
+		vy: number,
+		vz: number,
+		rewind: number,
+		born: number
+	): Projectiles.Ball
+		local ball = Projectiles.fire(sim, id, team, ox, oy, oz, vx, vy, vz, rewind, born)
+		stats.balls += 1
+		table.insert(
+			shotBatch,
+			{ ball = ball.id, id = id, t = born, ox = ox, oy = oy, oz = oz, vx = vx, vy = vy, vz = vz }
+		)
+		table.insert(heard, { kind = "born", id = id, x = ox, y = oy, z = oz, vx = vx, vy = vy, vz = vz })
+		return ball
+	end
+
+	-- The born balls and the splats of this tick go out to the audience.
+	local function flushBatches()
+		if #shotBatch > 0 then
+			local per = Wire.SHOTS_PER_MESSAGE
+			for from = 1, #shotBatch, per do
+				toAudience(
+					"Paintball.Shot",
+					Wire.pack(Wire.Shot, table.move(shotBatch, from, math.min(#shotBatch, from + per - 1), 1, {}))
+				)
+			end
+			shotBatch = {}
+		end
+		if #splatBatch > 0 then
+			toAudience("Splat", Wire.pack(Wire.Splat, splatBatch))
+			splatBatch = {}
+		end
+	end
+
+	-- A "respawn" event: the slot stands at its spawn point, with a new placement number if it is a person.
+	local function placeSlot(state: State, e: Event, now: number)
+		local id = e.id
+		local slot = if id then state.slots[id] else nil
+		if id == nil or slot == nil or not slot.on then
+			return
+		end
+		local team = e.team or slot.team
+		local sp = spawnOf(team, e.spawn)
+		local person = bySeat[id]
+		local placeNumber = 0
+		if person ~= nil then
+			Stream.placed(person, sp.x, sp.y, sp.z, sp.yaw, now, state.feel, true)
+			placeNumber = person.place
+			placeMemo[person.player] = placeNumber
+			local body = ctx.bodyOf(person.player)
+			if body ~= nil then
+				put(body, sp.x, sp.y, sp.z, sp.yaw)
+			end
+		end
+		local pose = service.poses[id]
+		if pose == nil then
+			pose = { x = 0, y = 0, z = 0, yaw = 0, pitch = 0, crouch = 0, bits = 0 }
+			service.poses[id] = pose
+		end
+		pose.x, pose.y, pose.z, pose.yaw, pose.pitch, pose.crouch, pose.bits = sp.x, sp.y, sp.z, sp.yaw, 0, 0, 0
+		if botSkill[id] ~= nil then
+			Bots.place(service.bots, id, pose, now)
+		end
+		local history = histories[id]
+		if history then
+			PoseHistory.clear(history) -- a new life: nothing of the old one is rewound to
+		end
+		local target = targetOf[id]
+		if target then
+			target.team = team
+			target.room = arena.spawnRooms[team]
+		end
+		ctx.broadcast({
+			kind = "paintball_respawn",
+			id = id,
+			x = sp.x,
+			y = sp.y,
+			z = sp.z,
+			yaw = sp.yaw,
+			at = e.at or now,
+			place = placeNumber,
+		})
+	end
+
+	-- The third refusal in a second: the real body goes back on the last accepted pose.
+	local function correct(person: Person, state: State, why: string?, now: number)
+		local a = person.anchor
+		-- (an anchor left in mid-air, by a fall that never ended, is no place to be put back to: the body
+		-- goes to the walking surface under it)
+		local ground = arena.ground(a.x, a.y, a.z)
+		if ground ~= nil and a.y > ground + Body.JUMP_HEIGHT + T.jumpSlack then
+			a = { t = a.t, x = a.x, y = ground, z = a.z, yaw = a.yaw, pitch = a.pitch, bits = a.bits }
+		end
+		Stream.placed(person, a.x, a.y, a.z, a.yaw, now, state.feel, false)
+		placeMemo[person.player] = person.place
+		local body = ctx.bodyOf(person.player)
+		if body ~= nil then
+			put(body, a.x, a.y, a.z, a.yaw)
+		end
+		stats.corrections += 1
+		ctx.send(person.player, {
+			kind = "paintball_correct",
+			x = a.x,
+			y = a.y,
+			z = a.z,
+			yaw = a.yaw,
+			why = if why ~= nil and (Contract.WHY :: { [string]: string })[why] ~= nil then why else "wall",
+			place = person.place,
+		})
+	end
+
+	-- A slot's magazine as it stands at `now`, without touching it: rounds, and when a running reload ends.
+	local function magazineOf(state: State, id: number, now: number): (number, number?)
+		local slot = state.slots[id]
+		if slot == nil then
+			return R.magazine, nil
+		end
+		local mag = slot.mag
+		local done = mag.reloadDoneAt
+		if done ~= nil and now >= done then
+			return mag.capacity, nil
+		end
+		return math.clamp(mag.rounds, 0, R.magazine), done
+	end
+
+	-- The snapshot tick T: every slot's pose, quantised, into its history and out to the audience.
+	local CLIENT_BITS = bit32.bor(BIT.crouch, BIT.sprint, BIT.air)
+	local function snapshot(state: State, tick: number)
+		local bodies: { SnapBody } = {}
+		local feel = state.feel
+		for id, slot in state.slots do
+			if not slot.on then
+				continue
+			end
+			local pose = service.poses[id]
+			if pose == nil then
+				continue -- (seated this very step: its placement comes with the next)
+			end
+			local person = bySeat[id]
+			if person ~= nil then
+				if person.place == 0 then
+					continue
+				end
+				if not person.out then
+					local x, y, z, yaw, pitch, bits = Stream.poseAt(person, Clock.poseTime(person.up, tick))
+					local moves = person.moves
+					local newest = if #moves > 0 then moves[#moves].bits else person.anchor.bits
+					person.crouch =
+						Body.crouchStep(person.crouch, Wire.has(newest, BIT.crouch), 1 / Clock.SNAP_HZ, feel)
+					pose.x, pose.y, pose.z, pose.yaw, pose.pitch = x, y, z, yaw, pitch
+					pose.crouch = person.crouch
+					pose.bits = bits
+				end
+			end
+			local bits = bit32.bor(bit32.band(pose.bits, CLIENT_BITS), Rules.bits(state, id, tick))
+			if ArenaModule.inRoom(arena.spawnRooms[slot.team], pose.x, pose.y + 0.1, pose.z) then
+				bits = bit32.bor(bits, BIT.safe)
+			end
+			local qx, qy, qz, qc = Wire.quantPose(pose.x, pose.y, pose.z, pose.crouch)
+			local history = histories[id]
+			if history ~= nil then
+				PoseHistory.push(history, tick, qx, qy, qz, qc)
+			end
+			if person ~= nil then
+				-- (a bot's pose is its brain's own: the service never writes it)
+				pose.x, pose.y, pose.z, pose.crouch, pose.bits = qx, qy, qz, qc, bits
+			end
+			table.insert(bodies, {
+				id = id,
+				x = qx,
+				y = qy,
+				z = qz,
+				yaw = wrapAngle(pose.yaw),
+				pitch = math.clamp(pose.pitch, -math.pi / 2, math.pi / 2),
+				crouch = qc,
+				bits = bits,
+			})
+		end
+		snapSeq += 1
+		stats.snapshots += 1
+		toAudience("Paintball.Snap", Wire.encodeSnap(tick, snapSeq, service.match, bodies))
+	end
+
+	-- The audience, and the sweep of anybody inside the arena who is not in the match.
+	local function audiencePass(state: State)
+		local seen: { [any]: boolean } = {}
+		for _, key in ctx.seated() do
+			if not isBot(key) then
+				seen[key] = true
+			end
+		end
+		for _, p in ctx.town.people() do
+			local x, y, z = ArenaModule.toLocal(place, p.x, p.y, p.z)
+			if ArenaModule.inVolume(x, y, z, ArenaModule.AUDIENCE_MARGIN) then
+				seen[p.key] = true
+				if ArenaModule.inVolume(x, y, z) and ctx.seatOf(p.key) == nil then
+					local body = ctx.bodyOf(p.key)
+					if body ~= nil then
+						engine.ghost(body, false)
+						put(body, arena.lobby.x, arena.lobby.y, arena.lobby.z, arena.lobby.yaw)
+					end
+				end
+			end
+		end
+		for player in seen do
+			if not service.audience[player] then
+				admit(player, state)
+			end
+		end
+		for player in service.audience do
+			if not seen[player] then
+				service.audience[player] = nil
+				ctx.send(player, { kind = "paintball_unwatch" })
+			end
+		end
+	end
+
+	-- ROLLING ON: the end card has had its time; every bot off, the next match with whoever is still seated.
+	local function roll()
+		for _, key in ctx.seated() do
+			if isBot(key) then
+				ctx.removeComputer(key)
+			end
+		end
+		ctx.again()
+	end
+
+	local function onStart(now: number)
+		local state = matchState()
+		if state == nil then
+			return
+		end
+		service.match += 1
+		Rules.tune(state, service.feel)
+		Rules.sync(state, now)
+		-- nothing of the last match is left: paint, balls, where anybody stood
+		Splats.reset(pools)
+		sim = Projectiles.forArena(arena, state.feel)
+		table.clear(histories)
+		table.clear(service.poses)
+		table.clear(occupant)
+		table.clear(targets)
+		table.clear(targetOf)
+		table.clear(botSkill)
+		heard, shotBatch, splatBatch = {}, {}, {}
+		-- the people still seated were dealt new seats
+		table.clear(bySeat)
+		for player, person in people do
+			local seat = ctx.seatOf(player)
+			if seat == nil then
+				people[player] = nil
+			else
+				person.seat = seat
+				bySeat[seat] = person
+				Stream.restart(person, now)
+			end
+		end
+		-- PEOPLE KEEP THEIR SIDES, in seat order, unless the side is already full of people
+		for seat = 1, #state.slots do
+			local person = bySeat[seat]
+			local want = if person then sides[person.player] else nil
+			if want ~= nil and state.slots[seat].team ~= want then
+				local there = 0
+				for id, slot in state.slots do
+					if slot.on and slot.team == want and bySeat[id] ~= nil then
+						there += 1
+					end
+				end
+				if there < R.teamMax then
+					Rules.assign(state, seat, want)
+				end
+			end
+		end
+		for player in placed do
+			if ctx.seatOf(player) == nil then
+				toLobby(player)
+			end
+		end
+		rosterDirty = true -- (the fill comes right after this event: the next step balances and tells the audience)
+		nextSnap = now
+	end
+
+	local function onLeft(e: ServerGame.Event, _now: number)
+		local key = e.key
+		rosterDirty = true
+		if isBot(key) then
+			return
+		end
+		local person = people[key]
+		if person == nil then
+			return
+		end
+		people[key] = nil
+		if bySeat[person.seat] == person then
+			bySeat[person.seat] = nil
+		end
+		placeMemo[key] = person.placeFrom
+		sides[key] = nil
+		toLobby(key)
+		-- a bot takes the seat (and its side) at once, while the match is on and a person remains
+		if ctx.session.phase == "playing" then
+			for _, other in ctx.seated() do
+				if not isBot(other) then
+					ctx.addComputer()
+					break
+				end
+			end
+		end
+	end
+
+	local function onReset()
+		for player in placed do
+			toLobby(player)
+		end
+		table.clear(people)
+		table.clear(bySeat)
+		table.clear(sides)
+		table.clear(histories)
+		table.clear(service.poses)
+		table.clear(occupant)
+		table.clear(targets)
+		table.clear(targetOf)
+		table.clear(botSkill)
+		Projectiles.clear(sim)
+		Splats.reset(pools)
+		heard, shotBatch, splatBatch = {}, {}, {}
+		rosterDirty = false
+		for player in service.audience do
+			ctx.send(player, { kind = "paintball_unwatch" })
+		end
+		table.clear(service.audience)
+	end
+
+	function service.join(_self: Service, player: any, via: ServerGame.StationDef): (boolean, string?)
+		if hw == nil then
+			return false, Contract.textFor("closed")
+		end
+		if via.id == Contract.DESK then
+			-- the pass desk sells and seats nobody: the framework shows the words either way
+			local _, words = pass.buy(player)
+			return false, words
+		end
+		if ctx.seatOf(player) ~= nil then
+			return true, nil
+		end
+		local s = ctx.session
+		if s.phase == "done" then
+			return false, Contract.nextMatch(s.doneEnds - ctx.now() - R.endCardSpare)
+		end
+		local fit = d.fit
+		if fit then
+			local ok, why = fit(player)
+			if not ok then
+				return false, Contract.textFor(why or "infected")
+			end
+		end
+		if not pass.has(player) then
+			return false, Contract.textFor("pass")
+		end
+		local humans = 0
+		local seatedBots: { any } = {}
+		for _, key in ctx.seated() do
+			if isBot(key) then
+				table.insert(seatedBots, key)
+			else
+				humans += 1
+			end
+		end
+		if humans >= R.slots then
+			return false, Contract.textFor("full")
+		end
+		-- THE ROSTER: a person who joins a match takes a bot's seat, on the side with fewer people
+		local state = matchState()
+		if state ~= nil and s.phase == "playing" and #seatedBots > 0 then
+			local count = { 0, 0 }
+			for seat, slot in state.slots do
+				local key = if slot.on then holderOf(seat) else nil
+				if key ~= nil and not isBot(key) then
+					count[slot.team] += 1
+				end
+			end
+			local want = if count[1] < count[2] then 1 elseif count[2] < count[1] then 2 else 0
+			local pick: any, pickSeat, pickOnSide = nil, math.huge, false
+			for _, key in seatedBots do
+				local seat = ctx.seatOf(key)
+				local slot = if seat then state.slots[seat] else nil
+				if seat ~= nil and slot ~= nil then
+					local onSide = want == 0 or slot.team == want
+					if (onSide and not pickOnSide) or (onSide == pickOnSide and seat < pickSeat) then
+						pick, pickSeat, pickOnSide = key, seat, onSide
+					end
+				end
+			end
+			if pick ~= nil then
+				ctx.removeComputer(pick)
+			end
+		end
+		return true, nil
+	end
+
+	function service.joined(_self: Service, player: any, seat: number?, _via: ServerGame.StationDef)
+		if hw == nil or seat == nil then
+			return
+		end
+		local state = matchState()
+		if state == nil then
+			return
+		end
+		local had = people[player]
+		if had ~= nil and had.seat == seat then
+			return -- (seated already, and pressed the prompt again)
+		end
+		local now = ctx.stamp()
+		local person = Stream.new(player, now, placeMemo[player])
+		person.seat = seat
+		people[player] = person
+		bySeat[seat] = person
+		local body = ctx.bodyOf(player)
+		if body ~= nil then
+			engine.ghost(body, true)
+		end
+		placed[player] = true
+		if not service.audience[player] then
+			admit(player, state)
+		end
+		refreshRoster(now)
+	end
 
 	function service.command(_self: Service, _player: any, verb: string, _args: { any }): (boolean, boolean?, string?)
 		if verb == "start" or verb == "again" or verb == "addai" or verb == "mode" then
@@ -447,41 +1202,320 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		return false, nil, nil
 	end
 
-	function service.input(
-		_self: Service,
-		_player: any,
-		_seat: number,
-		_verb: string,
-		_args: { any }
-	): (boolean?, string?)
+	function service.input(_self: Service, player: any, seat: number, verb: string, args: { any }): (boolean?, string?)
+		local state = matchState()
+		local person = people[player]
+		if state == nil or person == nil then
+			return false, Contract.textFor("phase")
+		end
+		local now = ctx.stamp()
+		if verb == "reload" then
+			local t = ServerGame.num(args[1], now)
+			local _, _, _, _, m = Clock.stamp(now, now, t, person.lastM, person.up.lag)
+			if Rules.reload(state, seat, m) then
+				return true, nil
+			end
+			return false, Contract.textFor("phase")
+		elseif verb == "side" then
+			if rosterDirty then
+				refreshRoster(now)
+			end
+			local slot = state.slots[seat]
+			local flying = false
+			for _, ball in sim.balls do
+				if ball.shooter == seat then
+					flying = true
+					break
+				end
+			end
+			if slot ~= nil and slot.on and not flying and (state.phase == "briefing" or person.out) then
+				local mine, other = slot.team, 3 - slot.team
+				for id, theirs in state.slots do
+					if theirs.on and theirs.team == other and botSkill[id] ~= nil then
+						Rules.assign(state, seat, other)
+						Rules.assign(state, id, mine)
+						refreshRoster(now)
+						return true, nil
+					end
+				end
+			end
+			return false, Contract.textFor("side")
+		end
 		return false, Contract.textFor("phase")
 	end
 
-	function service.step(_self: Service, _dt: number)
+	function service.step(_self: Service, dt: number)
+		if hw == nil then
+			return
+		end
+		local state = matchState()
+		if state == nil then
+			return
+		end
+		local started = os.clock()
 		stats.steps += 1
+		local now = ctx.stamp()
+		stepNow = now
+		local s = ctx.session
+		local playing = s.phase == "playing"
+		-- 0. the model is slaved to the shared clock
+		Rules.sync(state, now)
+		if not playing and s.doneEnds - ctx.now() <= R.endCardSpare then
+			roll()
+			return
+		end
+		if rosterDirty then
+			refreshRoster(now)
+		end
+		-- 1. what the match did
+		for _, e in Rules.drain(state) do
+			if e.kind == "respawn" then
+				placeSlot(state, e, now)
+			elseif e.kind == "phase" then
+				ctx.dirty()
+				if e.phase == "live" then
+					for _, person in people do
+						person.idleAt = now -- idleness is counted over live play only
+					end
+				end
+			elseif e.kind == "reload" then
+				local person = if e.id then bySeat[e.id] else nil
+				if person ~= nil then
+					ctx.send(person.player, { kind = "paintball_reload", id = e.id, at = e.at or now })
+				end
+			end
+		end
+		-- 2. people: silence, idleness, the way out
+		local leaving: { { any } }? = nil
+		for player, person in people do
+			local _, drop = Stream.silent(person, now)
+			local why: string? = nil
+			if drop then
+				why = "dropped"
+			elseif playing and person.place ~= 0 then
+				if state.phase == "live" and now - person.idleAt > R.idleSecs then
+					why = "idle"
+				else
+					local a = person.anchor
+					for _, room in arena.exits do
+						if ArenaModule.inRoom(room, a.x, a.y + 0.1, a.z) then
+							why = "exit"
+							break
+						end
+					end
+				end
+			end
+			if why ~= nil then
+				leaving = leaving or {}
+				table.insert(leaving :: { { any } }, { player, why })
+			end
+		end
+		if leaving then
+			for _, pair in leaving do
+				ctx.leave(pair[1], pair[2], Contract.textFor(pair[2]))
+			end
+			if matchState() ~= state then
+				return -- (the last person went: the table was reset under us)
+			end
+		end
+		local botsMs, ballsMs = 0, 0
+		if playing then
+			-- 3. the bots
+			local t3 = os.clock()
+			local commands = Bots.step(service.bots, state, service.poses, heard, now, dt)
+			heard = {}
+			for _, c in commands do
+				local id = c.id
+				local slot, pose = state.slots[id], service.poses[id]
+				if slot == nil or pose == nil or botSkill[id] == nil then
+					continue
+				end
+				if c.kind == "fire" then
+					local vx, vy, vz = c.vx or 0, c.vy or 0, c.vz or 0
+					local len = math.sqrt(vx * vx + vy * vy + vz * vz)
+					local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
+					-- a bot fires only along its own look, never from a spawn room, and only when the match agrees
+					if
+						len > 1e-6
+						and (vx * lx + vy * ly + vz * lz) / len >= AIM_COS
+						and not ArenaModule.inRoom(arena.spawnRooms[1], pose.x, pose.y + 0.1, pose.z)
+						and not ArenaModule.inRoom(arena.spawnRooms[2], pose.x, pose.y + 0.1, pose.z)
+						and Rules.fire(state, id, now)
+					then
+						local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+						local k = state.feel.ballSpeed / len
+						launch(id, slot.team, ex, ey, ez, vx * k, vy * k, vz * k, 0, now)
+					end
+				elseif c.kind == "reload" then
+					Rules.reload(state, id, now)
+				elseif c.kind == "say" then
+					local line = c.line
+					if line ~= nil and (Contract.LINES :: { [string]: string })[line] ~= nil then
+						ctx.broadcast({ kind = "paintball_say", id = id, line = line, n = c.n })
+					end
+				end
+			end
+			botsMs = (os.clock() - t3) * 1000
+			-- 4. the balls
+			local t4 = os.clock()
+			refreshTargets(state, now)
+			Projectiles.step(sim, now, dt, targets, onEnd)
+			ballsMs = (os.clock() - t4) * 1000
+		end
+		flushBatches()
+		-- 5. the snapshot tick
+		if now + 1e-6 >= nextSnap then
+			local interval = 1 / Clock.SNAP_HZ
+			nextSnap = if now - nextSnap > 2 * interval then now + interval else nextSnap + interval
+			snapshot(state, now)
+		end
+		-- 6. the audience and the sweep
+		if now >= nextAudience then
+			nextAudience = now + Clock.AUDIENCE_SECS
+			audiencePass(state)
+		end
+		local stepMs = (os.clock() - started) * 1000
+		stats.stepMs = stepMs
+		stats.botsMs = botsMs
+		stats.ballsMs = ballsMs
+		stats.restMs = math.max(0, stepMs - botsMs - ballsMs)
 	end
 
-	function service.event(_self: Service, _e: ServerGame.Event) end
+	function service.event(_self: Service, e: ServerGame.Event)
+		if hw == nil then
+			return
+		end
+		local kind = e.kind
+		if kind == "start" then
+			onStart(ctx.stamp())
+		elseif kind == "left" then
+			onLeft(e, ctx.stamp())
+		elseif kind == "done" then
+			local state = matchState()
+			if state ~= nil then
+				for player, person in people do
+					local slot = state.slots[person.seat]
+					if slot ~= nil then
+						sides[player] = slot.team
+					end
+				end
+			end
+		elseif kind == "reset" then
+			onReset()
+		end
+	end
 
-	function service.state(self: Service, _player: any, _seat: number?): Extras?
-		return {
+	function service.state(self: Service, player: any, seat: number?): Extras?
+		local state = matchState()
+		local extras: Extras = {
 			match = self.match,
 			bots = {},
-			rounds = Contract.Rules.magazine,
+			rounds = R.magazine,
 			reloadAt = 0,
 			shot = 0,
-			feel = self.feel,
+			feel = if state then state.feel else self.feel,
 		}
+		if state ~= nil then
+			for id, slot in state.slots do
+				extras.bots[id] = slot.on and isBot(holderOf(id))
+			end
+			if seat ~= nil then
+				local rounds, reloadAt = magazineOf(state, seat, ctx.stamp())
+				extras.rounds = rounds
+				extras.reloadAt = reloadAt or 0
+			end
+			local person = people[player]
+			if person ~= nil then
+				extras.shot = person.shot
+			end
+		end
+		return extras
 	end
 
-	function service.inPlay(_self: Service, _player: any, _body: Model?): boolean
-		return true
+	function service.inPlay(_self: Service, player: any, body: Model?): boolean
+		local person = people[player]
+		if person == nil or person.place == 0 then
+			return true -- not placed yet: still at the arena door
+		end
+		if ctx.stamp() - person.placedAt <= T.placeGrace then
+			return true
+		end
+		if body == nil then
+			return false
+		end
+		local wx, wy, wz = engine.positionOf(body)
+		if wx == nil or wy == nil or wz == nil then
+			return true
+		end
+		local x, y, z = ArenaModule.toLocal(place, wx, wy, wz)
+		return ArenaModule.inVolume(x, y, z, 4)
 	end
 
-	function service.screen(_self: Service, _view: { [string]: any }) end
+	-- the monitors: the lobby's and the old sets on each floor
+	local function clockText(seconds: number): string
+		local left = math.max(0, math.ceil(seconds))
+		return string.format("%d:%02d", left // 60, left % 60)
+	end
 
-	function service.sig(_self: Service, _view: { [string]: any }): any
-		return false
+	local function screenText(view: { [string]: any }): string
+		local g = view.game
+		if (view.phase ~= "playing" and view.phase ~= "done") or type(g) ~= "table" then
+			return ctx.station.label
+		end
+		local teams = Contract.TEAMS
+		local scores = if type(g.scores) == "table" then g.scores else { 0, 0 }
+		local line = `{string.upper(teams[1].name)} {scores[1] or 0}  -  {scores[2] or 0} {string.upper(teams[2].name)}`
+		if view.phase == "done" or g.phase == "ended" then
+			local result = view.result
+			return `{line}\n{if type(result) == "table" and type(result.text) == "string"
+				then result.text
+				else "FULL TIME"}`
+		end
+		local left = clockText((tonumber(g.endsAt) or 0) - ctx.stamp())
+		return `{line}\n{if g.phase == "briefing" then "STARTS IN " else ""}{left}`
+	end
+
+	function service.screen(_self: Service, view: { [string]: any })
+		if hw == nil then
+			return
+		end
+		local list: { any } = monitors or {}
+		if monitors == nil then
+			for _, part in hw:GetDescendants() do
+				if part.Name == ArenaModule.MONITOR and part:IsA("BasePart") then
+					table.insert(list, part)
+				end
+			end
+			monitors = list
+		end
+		local text = screenText(view)
+		for _, part in list do
+			local gui = part:FindFirstChild("PaintballScreen")
+			if gui == nil then
+				gui = Instance.new("SurfaceGui")
+				gui.Name = "PaintballScreen"
+				gui.Parent = part
+				local label = Instance.new("TextLabel")
+				label.Name = "Text"
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundColor3 = Color3.fromRGB(12, 14, 18)
+				label.TextColor3 = Color3.fromRGB(235, 235, 225)
+				label.TextScaled = true
+				label.Parent = gui
+			end
+			local label = gui:FindFirstChild("Text")
+			if label ~= nil then
+				label.Text = text
+			end
+		end
+	end
+
+	function service.sig(_self: Service, view: { [string]: any }): any
+		if hw == nil then
+			return false
+		end
+		-- (the clock on the monitors moves once a second: that is how often the framework asks)
+		return screenText(view)
 	end
 
 	function service.prompt(_self: Service): (string?, string?)
@@ -504,12 +1538,134 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			self.feel = feel
 			return true, nil
 		end
-		return false, Contract.textFor("closed")
+		local state = matchState()
+		if hw == nil or state == nil then
+			return false, Contract.textFor("closed")
+		end
+		local now = ctx.stamp()
+		stepNow = now
+		if what == "tag" then
+			-- slot `key` tags slot `value` out, through the match's own verdict
+			local by, id = tonumber(key), tonumber(value)
+			local pose = if id then self.poses[id] else nil
+			if by == nil or id == nil or state.slots[by] == nil or state.slots[id] == nil or pose == nil then
+				return false, "debug tag: by and id are slots of the match"
+			end
+			if not Rules.tag(state, by, id, now, now) then
+				return false, Contract.textFor("phase")
+			end
+			tagged(state, by, id, 0, pose.x, pose.y + ArenaModule.CHEST, pose.z)
+			return true, nil
+		elseif what == "end" then
+			-- the clock of the phase the match is in runs out now (in the briefing: play begins; live: it ends)
+			state.endsAt = now
+			return true, nil
+		end
+		return false, "debug: tag, end or tune"
 	end
 
-	function service.onMove(_self: Service, _player: any, _rec: { [string]: number }) end
+	function service.onMove(_self: Service, player: any, rec: { [string]: number })
+		local person = people[player]
+		if person == nil then
+			return
+		end
+		local state = matchState()
+		local slot = if state then state.slots[person.seat] else nil
+		if state == nil or slot == nil then
+			return
+		end
+		local now = ctx.stamp()
+		local bx: number?, by: number?, bz: number? = nil, nil, nil
+		local body = ctx.bodyOf(player)
+		if body ~= nil then
+			local wx, wy, wz = engine.positionOf(body)
+			if wx ~= nil and wy ~= nil and wz ~= nil then
+				bx, by, bz = ArenaModule.toLocal(place, wx, wy, wz)
+			end
+		end
+		local verdict, why =
+			Stream.judge(person, rec, now, arena, state.feel, arena.spawnRooms[3 - slot.team], bx, by, bz)
+		if verdict == "accepted" then
+			stats.movesAccepted += 1
+		elseif verdict == "dropped" then
+			stats.movesDropped += 1
+		else
+			stats.movesRefused += 1
+			if Stream.refused(person, now) then
+				correct(person, state, why, now)
+			end
+		end
+	end
 
-	function service.onFire(_self: Service, _player: any, _rec: { [string]: number }) end
+	function service.onFire(_self: Service, player: any, rec: { [string]: number })
+		local person = people[player]
+		if person == nil then
+			return
+		end
+		local state = matchState()
+		local id = person.seat
+		local slot = if state then state.slots[id] else nil
+		if state == nil or slot == nil then
+			return
+		end
+		local now = ctx.stamp()
+		stepNow = now
+		person.shot = rec.shot
+		local why: string? = nil
+		local ballId: number? = nil
+		if Stream.silent(person, now) then
+			why = "stale" -- a
+		else
+			-- b
+			local f, late, rewind, clamped, m = Clock.stamp(now, rec.vt, rec.ft, person.lastM, person.up.lag)
+			if clamped then
+				stats.rewindsClamped += 1
+			end
+			local x, y, z = Stream.poseAt(person, f)
+			local dx, dy, dz = rec.dx, rec.dy, rec.dz
+			local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+			if Stream.sprinting(person, f) then
+				why = "sprint" -- c
+			elseif
+				ArenaModule.inRoom(arena.spawnRooms[1], x, y + 0.1, z)
+				or ArenaModule.inRoom(arena.spawnRooms[2], x, y + 0.1, z)
+			then
+				why = "safe" -- d
+			elseif len < 1e-6 or not Stream.originOk(person, f, rec.ox, rec.oy, rec.oz, arena.sweep, state.feel) then
+				why = "origin" -- e
+			else
+				-- f
+				local ok, no = Rules.fire(state, id, f, m)
+				if not ok then
+					why = if no ~= nil and (Contract.WHY :: { [string]: string })[no] ~= nil then no else "phase"
+				else
+					local k = state.feel.ballSpeed / len
+					local ball = launch(id, slot.team, rec.ox, rec.oy, rec.oz, dx * k, dy * k, dz * k, rewind, f)
+					ballId = ball.id
+					person.lastM = m
+					person.idleAt = now
+					if late > 0 then
+						-- the part of its flight the shooter has already seen, against the bodies of those moments
+						refreshTargets(state, now)
+						Projectiles.advance(sim, ball, now, targets, onEnd)
+					end
+				end
+			end
+		end
+		if why ~= nil then
+			stats.shotsRefused += 1
+		end
+		local rounds, reloadAt = magazineOf(state, id, now)
+		ctx.send(player, {
+			kind = "paintball_ack",
+			shot = rec.shot,
+			ok = why == nil,
+			ball = ballId,
+			why = why,
+			rounds = rounds,
+			reloadAt = reloadAt,
+		})
+	end
 
 	function service.watching(self: Service, player: any): boolean
 		return self.audience[player] == true
