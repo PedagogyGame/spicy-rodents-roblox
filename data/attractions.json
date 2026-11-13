@@ -42,6 +42,15 @@
         "pinball_rodent",
         "pinball_space"
       ],
+      "annexes": [
+        {
+          "x0": 152,
+          "x1": 212,
+          "d0": 4,
+          "d1": 48,
+          "for": "the yard house and tree, addendum D9"
+        }
+      ],
       "routes": [
         {
           "id": 9002,
@@ -636,6 +645,484 @@
             ]
           },
           "note": "The ball return as one enclosed run (Shared/Routes/Enclosure): in at the bent grille in the alley wall (a ground mouth: walk in heading into it), down a short ramp into the duct, under the back of house, the pit and the whole lane at full height (the trough runs deep enough under the pits), up the riser through the hole in the approach floor into the hood, and out with the head in the hood's mouth over the rack (a ledge mouth: Space or a click jumps out toward the bowler, Q drops onto the rack, S goes back in); a crawl inside the hood. Running back out of the grille steps onto the alley on its feet. The ball rolls home along the same curve (Server/Attractions/AttractionService)."
+        },
+        {
+          "id": 9101,
+          "name": "alley yard house downspout",
+          "kind": "trunk",
+          "surfaceRadius": 0.35,
+          "flags": {
+            "autoGrabExcluded": false,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": true,
+            "treeTravel": false
+          },
+          "points": [
+            [206.5, -10.9, 7.6],
+            [206.5, -1.3, 7.6],
+            [206.5, 8.35, 7.6]
+          ],
+          "note": "On the house's north face by its north-east corner: run into it and the squirrel climbs (walk-in allowed, unlike the town's downspouts). Its top meets the gutter."
+        },
+        {
+          "id": 9102,
+          "name": "alley yard house gutter to roof",
+          "kind": "bridge",
+          "surfaceRadius": 0.6,
+          "visualOffset": 0,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [206.5, 8.35, 7.6],
+            [207.5, 17.1, 20]
+          ],
+          "note": "From the downspout's head up the north roof slope to the ridge's east end (exactly its first point: a joint short of it would be met part-way along the ridge and turned back east). Its line rides 0.15 over the slates, so the body is drawn on it (visualOffset 0, not a bough's lift)."
+        },
+        {
+          "id": 9103,
+          "name": "alley yard house ridge",
+          "kind": "roof",
+          "surfaceRadius": 0.5,
+          "flags": {
+            "autoGrabExcluded": false,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [207.5, 17.1, 20],
+            [184.5, 17.1, 20]
+          ],
+          "note": "The ridge, east to west. Its west end faces the tree: Space there leaps onto the house bough."
+        },
+        {
+          "id": 9105,
+          "name": "alley yard tree house bough and roof crossing",
+          "kind": "branch",
+          "surfaceRadius": 0.55,
+          "flags": {
+            "autoGrabExcluded": false,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": true
+          },
+          "points": [
+            [171.25, 23.1, 17],
+            [170.5, 22.6, 20],
+            [168.8, 20.6, 25.5],
+            [166.5, 17.5, 31.8],
+            [160, 17.12, 31],
+            [154.6, 16.8, 27.2],
+            [151.2, 16.35, 23.2],
+            [149.4, 16, 21.5],
+            [147.6, 15.25, 20.6],
+            [145.5, 14.3, 20]
+          ],
+          "note": "One limb from 3 st past where it crosses the ridge's line (D 20, 14 west of the ridge's end and 5.5 above it, where a leap west off the ridge's end lands on it held, sprinting or with no key), down to the trunk's top and on west as the roof crossing, drooping over the games wing's east parapet (1.0 above its coping) to end 0.7 above the wing roof: Q drops the squirrel onto it. One route, so once W carries the squirrel down the bough it carries on to the roof whatever the camera does."
+        },
+        {
+          "id": 9107,
+          "name": "alley roof vent duct",
+          "kind": "tunnel",
+          "surfaceRadius": 0.6,
+          "visualOffset": 0,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [117, 13.62, 16.5],
+            [115.2, 13.62, 16.5],
+            [112, 14.3, 16.5],
+            [108, 14.3, 16.5],
+            [105, 14.3, 16.5],
+            [104.6, 15.12, 16.5],
+            [101.4, 15.12, 16.5],
+            [100.35, 15, 16.5],
+            [100.05, 13.4, 16.5],
+            [99.6, 12.36, 16.5],
+            [98.6, 12.32, 16.5]
+          ],
+          "enclosure": {
+            "id": "alley.roofvent",
+            "hidden": true,
+            "width": 1.8,
+            "height": 1.8,
+            "mouths": [
+              {
+                "name": "louvre",
+                "t": 0,
+                "opens": "ground",
+                "out": [1, 0, 0]
+              },
+              {
+                "name": "boot",
+                "t": 1,
+                "opens": "link",
+                "links": [
+                  {
+                    "t": 0,
+                    "route": 9120,
+                    "dir": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "note": "In through the bent louvre slat, up the plenum, through the duct in the hall's raised east wall, down the elbow and out of the boot onto the truss chord over lane 18 (9120). Both ways."
+        },
+        {
+          "id": 9121,
+          "name": "alley rafter truss chord (D -10.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [100.4, 12.32, -10.5],
+            [-25.4, 12.32, -10.5]
+          ],
+          "note": "A truss's bottom chord, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9122,
+          "name": "alley rafter truss chord (D -1.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [100.4, 12.32, -1.5],
+            [-25.4, 12.32, -1.5]
+          ],
+          "note": "A truss's bottom chord, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9123,
+          "name": "alley rafter truss chord (D 7.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [100.4, 12.32, 7.5],
+            [-25.4, 12.32, 7.5]
+          ],
+          "note": "A truss's bottom chord, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9120,
+          "name": "alley rafter truss chord (D 16.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [98.6, 12.32, 16.5],
+            [-25.4, 12.32, 16.5]
+          ],
+          "note": "The chord the vent's boot opens onto, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9124,
+          "name": "alley rafter truss chord (D 25.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [100.4, 12.32, 25.5],
+            [-25.4, 12.32, 25.5]
+          ],
+          "note": "A truss's bottom chord, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9125,
+          "name": "alley rafter truss chord (D 34.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [100.4, 12.32, 34.5],
+            [-25.4, 12.32, 34.5]
+          ],
+          "note": "A truss's bottom chord, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9126,
+          "name": "alley rafter truss chord (D 43.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [100.4, 12.32, 43.5],
+            [-25.4, 12.32, 43.5]
+          ],
+          "note": "A truss's bottom chord, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9127,
+          "name": "alley rafter truss chord (D 52.5)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [100.4, 12.32, 52.5],
+            [-25.4, 12.32, 52.5]
+          ],
+          "note": "A truss's bottom chord, over the lanes from the east aisle to the west."
+        },
+        {
+          "id": 9130,
+          "name": "alley rafter light rail (lanes 1-2)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [-12.4, 10.2, 0],
+            [-12.4, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9131,
+          "name": "alley rafter light rail (lanes 3-4)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [8.881784197001252e-16, 10.2, 0],
+            [8.881784197001252e-16, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9132,
+          "name": "alley rafter light rail (lanes 5-6)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [12.4, 10.2, 0],
+            [12.4, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9133,
+          "name": "alley rafter light rail (lanes 7-8)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [24.8, 10.2, 0],
+            [24.8, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9134,
+          "name": "alley rafter light rail (lanes 9-10)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [37.2, 10.2, 0],
+            [37.2, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9135,
+          "name": "alley rafter light rail (lanes 11-12)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [49.6, 10.2, 0],
+            [49.6, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9136,
+          "name": "alley rafter light rail (lanes 13-14)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [62.00000000000001, 10.2, 0],
+            [62.00000000000001, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9137,
+          "name": "alley rafter light rail (lanes 15-16)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [74.4, 10.2, 0],
+            [74.4, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9138,
+          "name": "alley rafter light rail (lanes 17-18)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [86.80000000000001, 10.2, 0],
+            [86.80000000000001, 10.2, 53.8]
+          ],
+          "note": "The rail the lane lights hang from: 2.1 under the chords, right over the lamps."
+        },
+        {
+          "id": 9139,
+          "name": "alley rafter aisle brace (east)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [96.9, 12.32, -14.5],
+            [96.9, 12.32, 53]
+          ],
+          "note": "Across every chord along the aisle: the way from one truss to the next."
+        },
+        {
+          "id": 9140,
+          "name": "alley rafter aisle brace (west)",
+          "kind": "fence",
+          "surfaceRadius": 0.25,
+          "flags": {
+            "autoGrabExcluded": true,
+            "isPole": false,
+            "isGiant": false,
+            "fixedSurfaceZ": false,
+            "treeTravel": false
+          },
+          "points": [
+            [-22.3, 12.32, -14.5],
+            [-22.3, 12.32, 53]
+          ],
+          "note": "Across every chord along the aisle: the way from one truss to the next."
         }
       ]
     }

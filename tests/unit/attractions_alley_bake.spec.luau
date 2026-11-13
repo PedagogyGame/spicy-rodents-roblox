@@ -2,8 +2,9 @@
 -- The eighteen-lane bowling alley as it is baked (tools/bake/alley/Alley, the code that writes
 -- build/Attractions.rbxm), built in memory at its real place and measured against the floor plan
 -- (Shared/Attractions/AlleyLayout; brief addendum D4, D5):
---   * everything baked lies inside the footprint data/attractions.json declares (the expansion planner keeps the
---     neighbours out of that box), and the part count stays inside its budget;
+--   * everything baked lies inside the footprint data/attractions.json declares, or the annex it declares beside it
+--     (the roof run's yard; the expansion planner keeps the neighbours out of both), and the part count stays
+--     inside its budget;
 --   * A WALK TEST: a body 2 studs wide and 5.2 tall is flood-filled over the baked parts from the foot of the
 --     entrance ramp, standing on the plan's floors (AlleyLayout.floorAt). It reaches every staff post, the back of
 --     every approach, the spot behind every pinsetter and every minigame station; it can walk every leg of every
@@ -30,6 +31,10 @@ return function(t)
 	local alley = mod.attractions[1]
 	local place: AlleyLayout.Place = alley.place
 	local fp = alley.footprint
+	local grounds = { fp }
+	for _, an in alley.annexes or {} do
+		table.insert(grounds, an)
+	end
 	local kit = Kit.new(roblox, place)
 	local root = roblox.Instance.new("Model")
 	root.Name = "BowlingAlley"
@@ -67,11 +72,20 @@ return function(t)
 		for _, b in boxes do
 			perTop[b.top] = (perTop[b.top] or 0) + 1
 			if b.top ~= "TerrainCarve" then
-				local inside = b.X - b.hx >= fp.x0 - 0.01
-					and b.X + b.hx <= fp.x1 + 0.01
-					and b.D - b.hd >= fp.d0 - 0.01
-					and b.D + b.hd <= fp.d1 + 0.01
-				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint`)
+				-- (the footprint, or the annex the attraction declares beside it: the roof run's yard; a part may
+				-- straddle the seam, so its outline's corners and edge midpoints are each on one or the other)
+				local inside = true
+				for _, u in { -1, 0, 1 } do
+					for _, v in { -1, 0, 1 } do
+						local X, D = b.X + u * (b.hx - 0.01), b.D + v * (b.hd - 0.01)
+						local on = false
+						for _, g in grounds do
+							on = on or (X >= g.x0 and X <= g.x1 and D >= g.d0 and D <= g.d1)
+						end
+						inside = inside and on
+					end
+				end
+				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint and the annex`)
 			end
 		end
 		-- the budget: the building with the games' furniture (the shop rooms are still empty)

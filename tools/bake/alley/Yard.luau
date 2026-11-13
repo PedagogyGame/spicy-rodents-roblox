@@ -20,8 +20,7 @@
 --          route and the leap so a squirrel stays in sight, and of the guard's lines of sight from the platform to
 --          the ridge, the leap and the bough (AlleyRoof.guardEyes). Only the trunk collides; the rest neither
 --          collides nor takes queries.
--- NOT built into build/Attractions.rbxm yet: the alley's footprint, its bake spec and the expansion check know
--- nothing of the annex (tools/review/alley_roof.luau bakes it for the review pictures).
+-- Built by tools/bake/alley/Alley into build/Attractions.rbxm; the annex is data/attractions.json's `annexes`.
 -- Interface: build(kit, root) -> Model; HOUSE_COLORS; LEAF_TONES; CROWN (= AlleyRoof.TREE.crown); LEAF_CLUMPS
 --   (local {X, Y, D, diameter, tone}); keepOut() -> { {X, Y, D} }; sightLines() -> { { a, b } } (local points);
 --   TWIGS; twig(i) -> (foot, tip, clump centre, clump diameter); boughRadius(t); BOUGH_TIP; LOW_LIMBS

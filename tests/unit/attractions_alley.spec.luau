@@ -419,7 +419,14 @@ return function(t)
 	end)
 
 	t.test("routes: one enclosed run per pair, grille to hood, in the duct, its two mouths and a crawl", function()
-		t.eq(#mod.routes, AlleyLayout.PAIRS)
+		-- (one per pair; the alley's other routes are the roof run's, tests/unit/attractions_roofvent.spec.luau)
+		local runs = 0
+		for _, r in mod.routes do
+			if r.id < 9100 then
+				runs += 1
+			end
+		end
+		t.eq(runs, AlleyLayout.PAIRS)
 		local reg = data:routes()
 		for p = 1, AlleyLayout.PAIRS do
 			local run = reg:get(9000 + 2 * p)

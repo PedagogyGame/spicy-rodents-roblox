@@ -184,11 +184,13 @@ function AttractionService.start(opts: Opts?): any?
 	if ok and type(mod) == "table" and type((mod :: any).routes) == "table" then
 		for _, r in (mod :: any).routes do
 			if r.kind == "tunnel" or (r.kind == "bridge" and string.find(r.name, "tunnel", 1, true)) then
-				-- the pair is the route's own field (data/attractions.json); an older record names its first lane
-				local pair = if type(r.pair) == "number"
-					then r.pair
-					else ((tonumber(string.match(r.name, "lanes (%d+)")) or 0) + 1) // 2
-				tunnels[pair] = r.points
+				-- the pair is the route's own field (data/attractions.json); an older record names its first lane. A
+				-- tunnel of neither kind is not a ball return (the roof vent's duct, Shared/Attractions/AlleyRoof).
+				local lane = tonumber(string.match(r.name, "lanes (%d+)"))
+				local pair = if type(r.pair) == "number" then r.pair elseif lane then (lane + 1) // 2 else nil
+				if pair then
+					tunnels[pair] = r.points
+				end
 			end
 		end
 	end

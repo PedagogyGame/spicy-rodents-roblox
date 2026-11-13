@@ -10,7 +10,8 @@
 -- vector and checks the record (Enclosure.validate) and the set (Enclosure.validateSet: links name real routes,
 -- end links stay inside their enclosure, every enclosure has a way in; Motion.enclosureErrors: every link reaches
 -- its route within a transfer). Invariants: ids unique and clear of the
--- harvest, at least two points, every point inside the footprint, every enclosure valid.
+-- harvest, at least two points, every point inside the footprint or one of the attraction's `annexes` (ground beside
+-- the footprint it also bakes on: the bowling alley's yard, Shared/Attractions/AlleyRoof.ANNEX), every enclosure valid.
 -- Interface: compile(ctx) -> Module? (nil when the file is absent)
 local fs = require("@lune/fs")
 local Json = require("./Json")
@@ -103,7 +104,18 @@ function Attractions.compile(ctx: any): any?
 	local seen: { [number]: boolean } = {}
 	for _, a in doc.attractions do
 		local place = a.place
-		local fp = a.footprint
+		local grounds = { a.footprint }
+		for _, an in a.annexes or {} do
+			table.insert(grounds, an)
+		end
+		local function onGround(X: number, D: number): boolean
+			for _, g in grounds do
+				if X >= g.x0 and X <= g.x1 and D >= g.d0 and D <= g.d1 then
+					return true
+				end
+			end
+			return false
+		end
 		for _, r in a.routes do
 			ctx.invariant("attraction route id unique: " .. r.id, not seen[r.id])
 			ctx.invariant("attraction route id clear of the harvest: " .. r.id, not ctx.routeIds[r.id])
@@ -113,8 +125,8 @@ function Attractions.compile(ctx: any): any?
 			for _, p in r.points do
 				local X, Y, D = p[1], p[2], p[3]
 				ctx.invariant(
-					"attraction route point inside the footprint: " .. r.id,
-					X >= fp.x0 and X <= fp.x1 and D >= fp.d0 and D <= fp.d1,
+					"attraction route point inside the footprint or an annex: " .. r.id,
+					onGround(X, D),
 					string.format("(%.2f, %.2f, %.2f)", X, Y, D)
 				)
 				local x, y, z = AlleyLayout.toWorld(place, X, Y, D)

@@ -43,6 +43,7 @@
 
 local AlleyLayout = require("./AlleyLayout")
 local Curve = require("../Routes/Curve")
+local Enclosure = require("../Routes/Enclosure")
 
 local AlleyRoof = {}
 
@@ -54,25 +55,8 @@ export type Flags = {
 	fixedSurfaceZ: boolean,
 	treeTravel: boolean,
 }
--- Shared/Routes/Enclosure's Record (feat/run-through ff0c127), written out here so this file loads without it.
-export type LinkRecord = { route: number, t: number, dir: number }
-export type MouthRecord = {
-	t: number,
-	opens: string,
-	out: { number }?,
-	reach: number?,
-	rise: number?,
-	links: { LinkRecord }?,
-	name: string?,
-}
-export type EnclosureRecord = {
-	id: string,
-	climb: boolean?,
-	mouths: { MouthRecord }?,
-	width: number?,
-	height: number?,
-	hidden: boolean?,
-}
+export type MouthRecord = Enclosure.MouthRecord
+export type EnclosureRecord = Enclosure.Record
 -- As data/attractions.json writes a route (local [X, Y, D]); `enclosure` as Shared/Routes/Enclosure's Record with
 -- its mouths' `out` in the local frame.
 export type LocalRoute = {

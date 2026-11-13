@@ -59,6 +59,10 @@
           "properties": { "x0": { "type": "number" }, "x1": { "type": "number" }, "d0": { "type": "number" }, "d1": { "type": "number" }, "for": { "type": "string" },
             "givesWayOnArrival": { "type": "array", "items": { "type": "string" },
               "description": "venue ids (data/expansion.json) whose sites overlap the reserve today and give that ground up only when what it is kept for arrives" } } },
+        "annexes": { "type": "array",
+          "description": "ground beside the footprint that the attraction also bakes and runs routes over (local rectangles): the bake and the routes may use it, and the expansion check keeps every venue site, street and pad out of it as out of the footprint",
+          "items": { "type": "object", "required": ["x0", "x1", "d0", "d1", "for"], "additionalProperties": false,
+            "properties": { "x0": { "type": "number" }, "x1": { "type": "number" }, "d0": { "type": "number" }, "d1": { "type": "number" }, "for": { "type": "string" } } } },
         "routes": { "type": "array", "items": {
           "type": "object",
           "required": ["id", "name", "kind", "points", "surfaceRadius"],

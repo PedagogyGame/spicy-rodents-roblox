@@ -17,11 +17,11 @@
 --   * the house is the only way up (owner question Q11's default): no route end, ground leap or trunk reaches the
 --     bough. The house and the tree are drawn by tools/bake/alley/Yard (tests/unit/alley_yard_bake.spec.luau holds
 --     the drawing to these routes).
-local fs = require("@lune/fs")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local AlleyRoof = require("@shared/Attractions/AlleyRoof")
 local Curve = require("@shared/Routes/Curve")
 local Data = require("@shared/Data")
+local Enclosure = require("@shared/Routes/Enclosure")
 local Graph = require("@shared/Routes/Graph")
 local Height = require("@shared/World/Height")
 local Motion = require("@shared/Routes/Motion")
@@ -29,6 +29,7 @@ local Registry = require("@shared/Routes/Registry")
 local SpatialIndex = require("@shared/Routes/SpatialIndex")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local Expansion = require("../../tools/compile/lib/Expansion")
+local BakedWorld = require("../lib/BakedWorld")
 
 local R = AlleyRoof
 
@@ -72,14 +73,14 @@ return function(t)
 			kinds[k] = true
 		end
 		for _, r in alley.routes do
-			seen[r.id] = true
+			if r.id < 9100 then
+				seen[r.id] = true
+			end
 		end
-		local town = data:routes()
 		for _, r in R.routes() do
 			t.truthy(r.id >= 9101 and r.id <= 9140, `id {r.id} in the roof's block`)
-			t.truthy(not seen[r.id], `id {r.id} is unique and clear of data/attractions.json`)
+			t.truthy(not seen[r.id], `id {r.id} is unique and clear of the alley's own routes`)
 			seen[r.id] = true
-			t.eq(town:get(r.id), nil, `id {r.id} is not a route of the town`)
 			t.truthy(kinds[r.kind], `kind {r.kind}`)
 			t.truthy(#r.points >= 2, `route {r.id} has a line`)
 			for _, k in { "autoGrabExcluded", "isPole", "isGiant", "fixedSurfaceZ", "treeTravel" } do
@@ -104,6 +105,50 @@ return function(t)
 		t.eq(byId[9128], nil, "no chord route over the pinsetters (the backstage's ground)")
 		t.truthy(not R.isRafter(R.VENT) and not R.isRafter(9105))
 	end)
+
+	t.test(
+		"in the game: data/attractions.json carries the yard annex and these routes, compiled as AlleyRoof says",
+		function()
+			-- (tools/compile/alley_roof_routes.luau writes them from AlleyRoof; tools/compile turns them into world records)
+			t.eq(#alley.annexes, 1)
+			for _, k in { "x0", "x1", "d0", "d1", "for" } do
+				t.eq(alley.annexes[1][k], (R.ANNEX :: any)[k], `the annex's {k}`)
+			end
+			local inData: { [number]: any } = {}
+			for _, r in alley.routes do
+				inData[r.id] = r
+			end
+			local town = data:routes()
+			local function same(a: any, b: any, path: string)
+				if type(a) == "table" and type(b) == "table" then
+					for k, v in a do
+						same(v, b[k], `{path}.{k}`)
+					end
+					for k in b do
+						t.truthy(a[k] ~= nil, `{path}.{k} only in data/attractions.json`)
+					end
+				elseif type(a) == "number" and type(b) == "number" then
+					t.near(a, b, 1e-6, path)
+				else
+					t.eq(a, b, path)
+				end
+			end
+			for _, r in R.routes() do
+				local d = inData[r.id]
+				t.truthy(d ~= nil, `route {r.id} is in data/attractions.json`)
+				same(r, d, `route {r.id}`)
+				local live = town:get(r.id)
+				t.truthy(live ~= nil and live.origin == "attraction", `route {r.id} is in the game's registry`)
+			end
+			local compiled: { [number]: any } = {}
+			for _, rec in mod.routes do
+				compiled[rec.id] = rec
+			end
+			for _, rec in records do
+				same(rec, compiled[rec.id], `compiled {rec.id}`)
+			end
+		end
+	)
 
 	t.test(
 		"the ground: in the footprint or the yard annex, off every venue site, the reserve and lounge one",
@@ -321,23 +366,17 @@ return function(t)
 		end
 	)
 
-	t.test("the vent's enclosure record (the enclosed-run contract of feat/run-through)", function()
+	t.test("the vent's enclosure record (Shared/Routes/Enclosure, the enclosed-run contract)", function()
 		local rec = byId[R.VENT]
 		local e = rec.enclosure
-		-- Shared/Routes/Enclosure when it is in the tree (feat/run-through), by a computed path so this file loads
-		-- without it
-		local encPath = "@shared/Routes/" .. "Enclosure"
-		if fs.isFile("src/shared/Routes/Enclosure.luau") then
-			local Enclosure = (require :: any)(encPath)
-			local errs = Enclosure.validateSet(records)
-			t.eq(#errs, 0, table.concat(errs, "; "))
-			local spec = Enclosure.fromRecord(e)
-			local route = { id = R.VENT, kind = rec.kind, length = rec.length, enclosure = spec }
-			local chord = { id = 9120, kind = "fence", length = byId[9120].length }
-			t.truthy(Enclosure.allows(route, 1, chord, 0), "the boot hands over to the chord")
-			t.truthy(Enclosure.hidden(route, 0.5), "inside the duct a squirrel is out of sight")
-		end
-		-- the same rules written out (Enclosure.validate and validateSet as of feat/run-through ff0c127)
+		local errs = Enclosure.validateSet(records)
+		t.eq(#errs, 0, table.concat(errs, "; "))
+		local spec = Enclosure.fromRecord(e)
+		local route = { id = R.VENT, kind = rec.kind, length = rec.length, enclosure = spec }
+		local chord = { id = 9120, kind = "fence", length = byId[9120].length }
+		t.truthy(Enclosure.allows(route, 1, chord, 0), "the boot hands over to the chord")
+		t.truthy(Enclosure.allows(chord, 0, route, 1), "and the chord back into the boot (both ways, Q9)")
+		t.truthy(Enclosure.hidden(route, 0.5), "inside the duct a squirrel is out of sight")
 		t.eq(rec.kind, "tunnel")
 		t.eq(type(e.id), "string")
 		t.truthy(e.width >= 1.6 and e.height >= 1.7, "the section takes the body (1.6 x 1.7)")
@@ -792,27 +831,11 @@ return function(t)
 		end
 	)
 
-	-- THE CHAIN ON THE BAKED GEOMETRY: when tests/lib/BakedWorld (the enclosed-runs harness, feat/run-through) is in
-	-- the tree, the eighteen-lane alley and the yard are baked in memory by their own bake code and the chain runs
-	-- against their parts (the house's roof and plinth, the trunk, the wing's parapets and roof), not the stand-in.
-	t.test("the chain on the baked alley and yard (tests/lib/BakedWorld, when it is in the tree)", function()
-		if not fs.isFile("tests/lib/BakedWorld.luau") then
-			print("      (tests/lib/BakedWorld is not in this tree: the chain ran on the stand-in world above)")
-			return
-		end
-		local roblox = require("@lune/roblox")
-		local serde = require("@lune/serde")
-		local BakedWorld = (require :: any)("../lib/" .. "BakedWorld")
-		local Kit = require("../../tools/bake/alley/Kit")
-		local Alley = (require :: any)("../../tools/bake/alley/" .. "Alley")
-		local GameBakes = (require :: any)("../../tools/bake/" .. "GameBakes")
-		local Yard = require("../../tools/bake/alley/Yard")
-		local raw = serde.decode("json", fs.readFile("data/attractions.json")).attractions[1]
-		local kit = Kit.new(roblox, place)
-		local root = GameBakes.siteModel(roblox, "BowlingAlley", raw.id, place)
-		Alley.build(kit, root, raw)
-		Yard.build(kit, root)
-		local baked = BakedWorld.fromModel(root, { adjust = BakedWorld.alleyRuntime })
+	-- THE CHAIN ON THE BAKED GEOMETRY: the alley with its yard, baked in memory by its own bake code
+	-- (tests/lib/BakedWorld.bakeAlley: tools/bake/alley/Alley, as build/Attractions.rbxm), and the chain run against
+	-- its parts (the house's roof and plinth, the trunk, the wing's parapets and roof), not the stand-in.
+	t.test("the chain on the baked alley and yard (tests/lib/BakedWorld)", function()
+		local baked = BakedWorld.bakeAlley()
 		local motorWorld = baked:motorWorld(BakedWorld.recordsData(records))
 		for _, case in { { sprint = false, leap = "walk" }, { sprint = true, leap = "none" } } do
 			local trace, state = run(case.sprint, case.leap, { world = motorWorld })

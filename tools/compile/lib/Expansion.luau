@@ -301,7 +301,8 @@ function Expansion.groundStats(v: any): (number, number)
 	return lo, hi
 end
 
--- An attraction's footprint, and the ground it keeps for something not built yet (the bowling alley's backstage).
+-- An attraction's footprint, its annexes, and the ground it keeps for something not built yet (the bowling alley's
+-- backstage).
 -- A reserve's `givesWayOnArrival` names the venues whose sites may overlap it until that thing arrives (the owner's
 -- default: the park and the steakhouse give up that ground only when the backstage package is here): `yields`.
 local function attractionPolys(world: World): { { id: string, poly: Poly, yields: { [string]: boolean }? } }
@@ -314,6 +315,15 @@ local function attractionPolys(world: World): { { id: string, poly: Poly, yields
 			table.insert(poly, { x, z })
 		end
 		table.insert(out, { id = a.id, poly = poly })
+		-- ground beside the footprint the attraction also bakes on (the bowling alley's yard): as the footprint
+		for _, an in a.annexes or {} do
+			local apoly = {}
+			for _, c in { { an.x0, an.d0 }, { an.x1, an.d0 }, { an.x1, an.d1 }, { an.x0, an.d1 } } do
+				local x, _, z = AlleyLayout.toWorld(p, c[1], 0, c[2])
+				table.insert(apoly, { x, z })
+			end
+			table.insert(out, { id = a.id .. " (annex: " .. an["for"] .. ")", poly = apoly })
+		end
 		-- ground an attraction keeps free for something that has not been built yet (the bowling alley's backstage)
 		local rs = a.reserve
 		if rs then

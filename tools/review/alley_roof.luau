@@ -1,9 +1,10 @@
 --!strict
--- tools/review/alley_roof: adds the roof run's yard (tools/bake/alley/Yard: the house and the tree, which are not in
--- build/Attractions.rbxm yet) to a review scene exported by tools/review/export.luau, with two review-only extras:
--- the roof run's routes drawn as thin bright rods (group "routes": yellow the way up, orange the leap's flight with no
--- key held, cyan the vent and the rafters, which have no building yet) and a few squirrels (the placeholder puppet)
--- standing where the motor puts one (group "squirrels"). Views pick the groups (tools/review/views_alley_roof.json).
+-- tools/review/alley_roof: adds review-only extras for the alley's roof run (the yard, the raised hall roof, the vent,
+-- the stairs and the platform are in build/Attractions.rbxm, baked by tools/bake/alley/Alley) to a review scene
+-- exported by tools/review/export.luau: the roof run's routes drawn as thin bright rods (group "routes": yellow the
+-- way up, orange the leap's flight with no key held, cyan the vent and the rafters), plan outlines (group "plan"),
+-- and a few squirrels and people (the placeholder puppets) standing where the motor or a guard puts one (group
+-- "squirrels"). Views pick the groups (tools/review/views_alley_roof.json).
 -- Usage (repo root), after the bakes (tools/bake/main.luau, editor_ground.luau, attractions.luau, backdrop.luau):
 --   lune run tools/review/export.luau --out build/review_roof/scene.json
 --   lune run tools/review/alley_roof.luau [--scene build/review_roof/scene.json] [--placeholders assets/placeholders]
@@ -20,7 +21,6 @@ local AlleyRoof = require("../../src/shared/Attractions/AlleyRoof")
 local Curve = require("../../src/shared/Routes/Curve")
 local SquirrelMotor = require("../../src/shared/Movement/SquirrelMotor")
 local Kit = require("../bake/alley/Kit")
-local Yard = require("../bake/alley/Yard")
 
 local scenePath = "build/review_roof/scene.json"
 local placeholders = "assets/placeholders"
@@ -101,13 +101,6 @@ local place: AlleyLayout.Place =
 local kit = Kit.new(roblox, place)
 local holder = roblox.Instance.new("Model")
 holder.Name = "AlleyRoofReview"
-local yard = Yard.build(kit, holder)
-for _, d in yard:GetDescendants() do
-	if d:IsA("BasePart") then
-		emit("attractions", d)
-	end
-end
-
 -- the routes as rods (review only)
 local guides = kit:model(holder, "Routes")
 local YELLOW, ORANGE, CYAN = { 255, 214, 40 }, { 255, 120, 30 }, { 60, 220, 255 }
