@@ -1914,6 +1914,20 @@ return function(t)
 			Kit.place(b, { x = -52, z = 2, yaw = 1, at = b.now() })
 			Kit.frame(b, 3)
 			t.truthy((seat:idle(b.now()) :: number) < left - 1.9, "out and back, and still counting down")
+			-- a correction is not a respawn: the server judges the next Move from where the body was put back
+			-- against the pose its count began at, so a body put back a stud away has moved, here as there
+			Kit.message(b, {
+				kind = "paintball_correct",
+				x = -51,
+				y = b.pose.y,
+				z = 2,
+				yaw = 1,
+				why = "wall",
+				place = Wire.nextPlace(seat.place),
+			})
+			Kit.frame(b, 3)
+			t.eq(seat:idle(b.now()), nil, "put back a stud away is a move")
+			Kit.run(b, R.idleSecs - Tuning.idleWarn + 1)
 			-- a turn of the view is being there
 			b.pose.yaw += 0.1
 			Kit.frame(b)

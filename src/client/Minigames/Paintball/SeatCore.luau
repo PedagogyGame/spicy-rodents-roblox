@@ -40,8 +40,8 @@
 --              magazine, the legs back and the protection.
 --   idle       the seat counts idleness AS THE SERVER DOES (PaintballService, "idleness": the pose has
 --              stayed within 0.5 studs and 0.05 rad of where the count began and no ball has left, over
---              live play; a placement moves that pose and does not restart the count; being tagged out
---              does not stop it), with a fifth more on the bounds, so a tremble of the mouse that the
+--              live play; a respawn moves that pose, a correction does not, and neither restarts the
+--              count; being tagged out does not stop it), with a fifth more on the bounds, so a tremble of the mouse that the
 --              server does not count never hushes the warning: the HUD says so no later than the server
 --              would act (Rules.idleSecs).
 -- Interface: new(ctx, opts) -> Seat; types Port, Opts, Seat, Feed. Seat: the framework's controller
@@ -686,8 +686,6 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 		seat.place = msg.place
 		seat.x, seat.y, seat.z = msg.x, msg.y, msg.z
-		-- (the server's doing: it moves the pose idleness is measured from and does not restart the count)
-		idleX, idleY, idleZ, idleYaw, idlePitch = msg.x, msg.y, msg.z, msg.yaw, 0
 		moveAcc = SEND -- the server hears of the new place in the next frame
 		walked = 0
 		fallSpeed = 0
@@ -718,6 +716,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 	-- ramp at 0, the legs back, protected.
 	local function respawned(msg: { [string]: any }, now: number)
 		placed(msg)
+		-- (the server's doing, as the server lane does it: a respawn moves the pose idleness is measured
+		-- from and does not restart the count; a correction moves neither, so the body's next Move from
+		-- where it was put back is judged against the pose the count began at, here as there)
+		idleX, idleY, idleZ, idleYaw, idlePitch = msg.x, msg.y, msg.z, msg.yaw, 0
 		seat.mag.rounds = R.magazine
 		seat.mag.reloadDoneAt = nil
 		table.clear(unacked)
