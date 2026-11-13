@@ -1612,6 +1612,27 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"a cue placed in space keeps where it was and the floors between, so the screen plays it from there",
+		function()
+			local b = Kit.playing()
+			b.show.listener = { x = 0, y = Body.STAND_EYE, z = 30 }
+			table.clear(b.show.cues)
+			b.show:cue("paintball.step", 0.6, -10, 0, 40)
+			b.show:cue("paintball.step", 0.6, -10, Arena.FLOOR_HEIGHT + 1, 40)
+			b.show:cue("paintball.over", 0.8)
+			local level, up, flat = b.show.cues[1], b.show.cues[2], b.show.cues[3]
+			t.deepEq({ level.x, level.y, level.z, level.floors }, { -10, 0, 40, 0 }, "where it was, on your floor")
+			t.deepEq({ up.x, up.y, up.z, up.floors }, { -10, Arena.FLOOR_HEIGHT + 1, 40, 1 }, "a floor up")
+			t.truthy(
+				up.volume <= level.volume * Tuning.floorMuffle + 1e-9,
+				"and quieter for the floor (and the distance)"
+			)
+			t.eq(flat.x, nil, "a cue with no place is played as it is")
+			t.eq(flat.volume, 0.8)
+		end
+	)
+
 	t.test("your own footsteps: running loud, walking soft, crouched silent", function()
 		local b = Kit.playing()
 		local function walk(seconds: number, speed: number)

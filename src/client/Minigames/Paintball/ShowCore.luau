@@ -18,7 +18,9 @@
 --             Rules.splatPool, each slot's newest Rules.bodySplats. A predicted wall splat of your own
 --             is replaced by the server's record, or taken back after Tuning.predictedSplatSecs.
 --   cues      sounds as cue points with a volume worked out from where the listener stands (distance,
---             and Tuning.floorMuffle for every floor between): the caller plays and empties the list.
+--             and Tuning.floorMuffle for every floor between). A cue with a place keeps it (x, y, z, and
+--             the floors between), so the caller plays it FROM there and the ear hears which way it came
+--             from; the caller plays and empties the list.
 --   puffs     a small burst of paint where your own ball met a puppet (nothing else is claimed there:
 --             the hit marker, the sound and the splat on the body wait for the server's word).
 -- Everything is in the arena frame and on the shared clock.
@@ -118,7 +120,9 @@ export type Splat = {
 	shot: number, -- a predicted one: the click that made it
 }
 
-export type Cue = { cue: string, volume: number }
+-- x, y, z: where the sound is, in the arena frame (nil: nowhere in particular); floors: how many floors lie
+-- between it and the listener (its volume has paid for them already; the caller may also dull it)
+export type Cue = { cue: string, volume: number, x: number?, y: number?, z: number?, floors: number? }
 export type Puff = { x: number, y: number, z: number, team: number }
 type Snap = { t: number, bodies: { [number]: SnapBody } }
 
@@ -221,6 +225,7 @@ function ShowCore.new(opts: Opts): Show
 	function show.cue(self: Show, name: string, volume: number, x: number?, y: number?, z: number?)
 		local v = volume
 		local ear = self.listener
+		local floors: number? = nil
 		if ear and x and y and z then
 			local dx, dy, dz = x - ear.x, y - ear.y, z - ear.z
 			local d = math.sqrt(dx * dx + dy * dy + dz * dz)
@@ -229,8 +234,9 @@ function ShowCore.new(opts: Opts): Show
 			end
 			local k = d / tuning.soundHalf
 			v /= 1 + k * k
-			local floors = math.abs(y // ArenaModule.FLOOR_HEIGHT - ear.y // ArenaModule.FLOOR_HEIGHT)
-			v *= tuning.floorMuffle ^ floors
+			local between = math.abs(y // ArenaModule.FLOOR_HEIGHT - ear.y // ArenaModule.FLOOR_HEIGHT)
+			v *= tuning.floorMuffle ^ between
+			floors = between
 		end
 		if v < 0.02 then
 			return
@@ -238,7 +244,7 @@ function ShowCore.new(opts: Opts): Show
 		if #self.cues >= MAX_CUES then
 			table.remove(self.cues, 1)
 		end
-		table.insert(self.cues, { cue = name, volume = math.min(1, v) })
+		table.insert(self.cues, { cue = name, volume = math.min(1, v), x = x, y = y, z = z, floors = floors })
 	end
 
 	function show.teamOf(self: Show, id: number): number

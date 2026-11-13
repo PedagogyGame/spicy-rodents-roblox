@@ -16,8 +16,11 @@
 --   bodies   the replicated REAL bodies of the people in the match are hidden on this screen
 --            (LocalTransparencyModifier on the body whose DriverUserId attribute is a slot's `user`),
 --            and shown again when their owner leaves the roster or the show ends
---   sounds   the core's cues, played through the minigames' own cue layer
---   the ear  the core is told where the camera is, so its cues are placed in space
+--   sounds   the core's cues: one with a place (another's shot, step and reload, a splat) is played
+--            FROM there, a Sound under an Attachment, so the engine pans it and it is heard from the
+--            side it came from, and dulled for each floor between; the rest through the minigames' own
+--            cue layer (MinigameSounds.play), as are the seat's own sounds of your own marker
+--   the ear  the core is told where the camera is, so its cues' loudness is worked out from there
 -- Interface: new(show, tuning?) -> World { step(dt), stop(), folder }; counts() for a spec
 
 local Import = require("../../Import")
@@ -473,6 +476,60 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 		end
 	end
 
+	-- A sound placed in space: played FROM where it happened (a Sound under an Attachment there), so the
+	-- engine pans it and the ear hears where a shot, a step or a reload came from. Its loudness is the
+	-- core's (the distance and the floors): the engine's own roll-off is pushed out past Tuning.soundFar,
+	-- where the core has dropped the cue already. Each floor between dulls it as well as quietening it.
+	-- (The cue is counted in the minigames' own cue layer as play() counts it, and nothing is made while
+	-- its id is empty.)
+	local ears: Part? = nil
+	local function playAt(place: Place, cue: ShowCore.Cue)
+		local asked = MinigameSounds.counts()
+		asked[cue.cue] = (asked[cue.cue] or 0) + 1
+		local id = MinigameSounds.CUES[cue.cue]
+		if id == nil or id == "" then
+			return
+		end
+		local holder: Part
+		if ears ~= nil then
+			holder = ears
+		else
+			holder = part("Ears", Vector3.new(0.2, 0.2, 0.2), teamColor(0), folder)
+			holder.Transparency = 1
+			holder.CFrame = CFrame.new(0, 0, 0)
+			ears = holder
+		end
+		local wx, wy, wz = ArenaModule.toWorld(place, cue.x :: number, cue.y :: number, cue.z :: number)
+		local at = Instance.new("Attachment")
+		at.Name = "Cue"
+		at.Position = Vector3.new(wx, wy, wz) -- (the holder sits at the world's origin, unturned)
+		local sound = Instance.new("Sound")
+		sound.Name = `Minigame_{cue.cue}`
+		sound.SoundId = id
+		sound.Volume = math.clamp(cue.volume, 0, 1)
+		sound.RollOffMode = Enum.RollOffMode.Linear
+		sound.RollOffMinDistance = tune.soundFar
+		sound.RollOffMaxDistance = tune.soundFar * 2
+		local floors = cue.floors or 0
+		if floors > 0 then
+			local dull = Instance.new("EqualizerSoundEffect")
+			dull.HighGain = -math.min(60, tune.floorTreble * floors)
+			dull.MidGain = -math.min(30, tune.floorTreble * floors / 2)
+			dull.LowGain = 0
+			dull.Parent = sound
+		end
+		sound.Parent = at
+		at.Parent = holder
+		local function clear()
+			if at.Parent ~= nil then
+				at:Destroy()
+			end
+		end
+		sound.Ended:Connect(clear)
+		task.delay(tune.cueLife, clear)
+		sound:Play()
+	end
+
 	local world = { folder = folder } :: World
 
 	function world.step(_self: World, dt: number)
@@ -484,7 +541,11 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 			show.listener = { x = x, y = y, z = z }
 		end
 		for _, cue in show.cues do
-			MinigameSounds.play(cue.cue, cue.volume)
+			if place and cue.x and cue.y and cue.z then
+				playAt(place, cue)
+			else
+				MinigameSounds.play(cue.cue, cue.volume)
+			end
 		end
 		table.clear(show.cues)
 		hideAcc += dt

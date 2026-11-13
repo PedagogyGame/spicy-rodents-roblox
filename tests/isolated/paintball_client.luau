@@ -1551,6 +1551,90 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"sounds in space: another's shot is played from where it was fired, so it has a side; a floor between dulls it; your own are not placed",
+		function()
+			local MinigameSounds = require("@client/Minigames/MinigameSounds")
+			local saved = table.clone(MinigameSounds.CUES)
+			-- (no cue has an id yet: one is given one for the case, so something is made to look at; your own
+			-- marker's sounds go through the framework's 2D cue layer, which the fake engine cannot play)
+			MinigameSounds.CUES["paintball.fire_far"] = "rbxassetid://101"
+			local ok, err = pcall(play, function(s)
+				-- (the fake engine's Sound has no Play: the case gives it one that says it was started)
+				local env = getfenv(0) :: any
+				local plain = env.Instance.new
+				env.Instance.new = function(class: string, ...: any): any
+					local inst = plain(class, ...)
+					if class == "Sound" then
+						rawset(inst, "Play", function(self: any)
+							rawset(self, "Playing", true)
+						end)
+					end
+					return inst
+				end
+				playing(s)
+				local asked = MinigameSounds.counts()["paintball.fire_far"] or 0
+				-- an opponent fires from behind you on the left, on your floor; another from the floor above
+				local up = Arena.FLOOR_HEIGHT + 4
+				s.shots({
+					{ ball = 3, id = 2, t = s.now(), ox = -12, oy = 4, oz = 40, vx = 0, vy = 0, vz = 90 },
+					{ ball = 4, id = 4, t = s.now(), ox = 8, oy = up, oz = 20, vx = 0, vy = 0, vz = -90 },
+				})
+				s.run(0.4)
+				local placed: { [string]: any } = {}
+				local ears = named(s.show(), "Ears")
+				t.truthy(ears ~= nil, "the sounds placed in space hang in the show's folder")
+				for _, at in ears:GetChildren() do
+					t.eq(at.ClassName, "Attachment")
+					local sound = at:FindFirstChildOfClass("Sound")
+					t.truthy(sound ~= nil)
+					t.eq(sound.Playing, true)
+					t.truthy(sound.RollOffMinDistance >= Tuning.soundFar, "the loudness is the client's own fall")
+					placed[if at.Position.Y > Arena.FLOOR_HEIGHT then "up" else "level"] = at
+				end
+				t.eq(MinigameSounds.counts()["paintball.fire_far"], asked + 2, "counted as the cue layer counts")
+				local wx, wy, wz = Arena.toWorld(s.place, -12, 4, 40)
+				local level = placed.level
+				t.truthy(level ~= nil, "the shot on your floor is placed")
+				t.near(level.Position.X, wx, 1e-3, "where it was fired")
+				t.near(level.Position.Y, wy, 1e-3)
+				t.near(level.Position.Z, wz, 1e-3)
+				t.eq(level:FindFirstChildOfClass("Sound"):FindFirstChildOfClass("EqualizerSoundEffect"), nil)
+				-- it has a side: behind you and to your left, as the camera sees it
+				local cam = workspace.CurrentCamera.CFrame
+				local rel = cam:PointToObjectSpace(Vector3.new(wx, wy, wz))
+				t.truthy(rel.X < 0 and rel.Z > 0, "behind on the left")
+				local above = placed.up
+				t.truthy(above ~= nil, "the shot a floor up is placed")
+				local dull = above:FindFirstChildOfClass("Sound"):FindFirstChildOfClass("EqualizerSoundEffect")
+				t.truthy(dull ~= nil and dull.HighGain < 0, "a floor between dulls it")
+				t.truthy(
+					above:FindFirstChildOfClass("Sound").Volume < level:FindFirstChildOfClass("Sound").Volume,
+					"and quietens it"
+				)
+				-- your own shot is not placed: it is your own marker, in your hands
+				local before = #ears:GetChildren()
+				local fired = MinigameSounds.counts()["paintball.fire"] or 0
+				click(s)
+				s.run(0.1)
+				t.eq(#heard(s, "Paintball.Fire"), 1)
+				t.eq(MinigameSounds.counts()["paintball.fire"], fired + 1, "heard through the 2D cue layer")
+				t.eq(#ears:GetChildren(), before, "and not placed in space")
+				-- and a sound placed in space is cleared away when it ends
+				level:FindFirstChildOfClass("Sound").Ended.fire()
+				t.eq(level.Parent, nil)
+				env.Instance.new = plain
+			end)
+			table.clear(MinigameSounds.CUES)
+			for cue, id in saved do
+				MinigameSounds.CUES[cue] = id
+			end
+			if not ok then
+				error(err, 0)
+			end
+		end
+	)
+
 	t.test("the cues: every sound the client asks for is one the game declares, each still without an id", function()
 		local declared = require("@client/Minigames/Games/Paintball").sounds
 		local names = {}

@@ -178,11 +178,19 @@ local Tuning = {
 	cardSecs = 6,
 
 	-- SOUND (cue points only: nothing is synthesised; ids come from the owner's licensed set) -------
-	-- Studs at which a cue placed in space has fallen to half and to nothing.
+	-- Studs at which a cue placed in space has fallen to half and to nothing. (The fall is the client's own;
+	-- the engine only gives the sound its direction: it is played from where it happened with no roll-off of
+	-- the engine's inside soundFar, so footsteps behind you on the left are heard behind you on the left.)
 	soundHalf = 28,
 	soundFar = 110,
 	-- What each floor between you and a sound takes off it (PB-8: "muffled through floors").
 	floorMuffle = 0.45,
+	-- Decibels of treble (and half as much of the middle) each floor between takes off a sound placed in
+	-- space, so a fight through the ceiling is a thud, not a quieter crack. More: a floor sounds like concrete.
+	floorTreble = 12,
+	-- Seconds after which a sound placed in space is cleared away even if the engine never says it ended
+	-- (an id that failed to load). Longer than the longest cue; it only bounds what is left lying about.
+	cueLife = 5,
 	-- Volumes, 0..1.
 	volFire = 0.7,
 	volFireFar = 0.6,
