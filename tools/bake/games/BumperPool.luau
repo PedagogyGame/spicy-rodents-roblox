@@ -158,7 +158,8 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 	end
 
 	CueParts.lamp(t, m, L, 1)
-	CueParts.board(t, m, -(ow + 1.2), -(ol - 0.4), "BUMPER POOL\nWalk up and press E")
+	-- (beside the middle of the long side, beyond the ring a player walks: the ends are where people shoot from)
+	CueParts.board(t, m, -(ow + 2.2), 0, "BUMPER POOL\nWalk up and press E", true)
 
 	-- two short cues on a stand beside the table, and chalk on the rail (none of it in anybody's way)
 	local sx, sz = ow + 1.1, -(ol - 0.4)

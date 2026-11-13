@@ -19,7 +19,8 @@
 --   thickness on the left of the direction, -1 on the right, 0 centres it), T:rod(parent, name, x0, y0, z0,
 --   x1, y1, z1, diameter, color, material), T.kit, T.station; ball(T, parent, tableId, id, x, z) -> Model;
 --   lamp(T, parent, halfL, shades) -> Model ("Lamp": the clients hide it for the top view); board(T, parent,
---   x, z, text) -> Model ("ScoreBoard": a chalkboard on a post, its TextLabels "Score" written by the server)
+--   x, z, text, facesX?) -> Model ("ScoreBoard": a chalkboard on a post, its TextLabels "Score" written by the
+--   server; facesX turns its faces toward the table's long side)
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
 local Furniture = require("../../../src/shared/Minigames/Pool/Furniture")
@@ -311,16 +312,21 @@ local BOARD = { 34, 52, 40 }
 local CHALK_WHITE = { 236, 236, 226 }
 
 -- A little chalkboard on a post standing on the floor at (x, z) of the table's frame, its face across the
--- table's long axis (a label on each face, so it reads from either side): the server writes the score on it.
-function CueParts.board(t: any, parent: any, x: number, z: number, text: string): any
+-- table's long axis, or toward its long side with facesX (a label on each face, so it reads from either side):
+-- the server writes the score on it.
+function CueParts.board(t: any, parent: any, x: number, z: number, text: string, facesX: boolean?): any
 	local m = t.kit:model(parent, "ScoreBoard")
 	local floor = -Furniture.BED_Y
 	local y0, y1 = floor + 3.3, floor + 4.5
+	-- (half its width and half its depth along x and z: across the table's axis, or facing the long side)
+	local wx, wz = if facesX then 0.05 else 0.98, if facesX then 0.98 else 0.05
 	t:cyl(m, "BoardPost", x, (floor + y0) / 2, z, y0 - floor, 0.1, "Y", { 66, 40, 26 }, "Wood", LOOSE)
 	t:cyl(m, "BoardFoot", x, floor + 0.05, z, 0.1, 0.6, "Y", { 66, 40, 26 }, "Wood", LOOSE)
-	t:box(m, "BoardFrame", x - 0.98, x + 0.98, y0 - 0.06, y1 + 0.06, z - 0.05, z + 0.05, { 108, 68, 40 }, "Wood", LOOSE)
-	local slate = t:box(m, "Board", x - 0.9, x + 0.9, y0, y1, z - 0.06, z + 0.06, BOARD, "Slate", LOOSE)
-	for _, face in { "Front", "Back" } do
+	t:box(m, "BoardFrame", x - wx, x + wx, y0 - 0.06, y1 + 0.06, z - wz, z + wz, { 108, 68, 40 }, "Wood", LOOSE)
+	local sx = if facesX then 0.06 else 0.9
+	local sz = if facesX then 0.9 else 0.06
+	local slate = t:box(m, "Board", x - sx, x + sx, y0, y1, z - sz, z + sz, BOARD, "Slate", LOOSE)
+	for _, face in if facesX then { "Left", "Right" } else { "Front", "Back" } do
 		local gui = t.kit:gui(slate, face, 80)
 		t.kit:label(gui, {
 			Name = "Score",
