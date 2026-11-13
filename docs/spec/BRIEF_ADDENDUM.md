@@ -86,3 +86,6 @@ Brief v2 (`reference/Roblox_Rebuild_Brief_v2.md`) is authoritative. Two question
   - The squirrel's way in: up onto a neighbouring house's roof, a leap to a tree's branch, from the branch onto the alley's roof, and into an elaborate roof vent.
   - The vent leads into the top rafters over the lanes. A squirrel there must sneak: one that runs or is careless is spotted by the people below.
   - Metal stairs on the back of the alley let people (players) climb to the roof, keep watch and guard the area round the vent.
+- **D10. Order of work, and the world beyond the play.** Owner (2026-11-13): "work on alley roof vent, house roof branch, and work on sky lift if it is not finished, also I would like you to slowly, when it is convenient, put some attention on the background, culture and feel the game presents with far off backdrops and everything non-playable that compliments the world, do a sweep finding a few things or areas where more detail and further artistic effort would pay off".
+  - Now: the alley roof vent route (D9: the house roof, the branch, the alley roof, the vent, the rafters) and the sky lift to completion.
+  - Slowly, when convenient: a sweep of the backdrops and everything non-playable that complements the world (far scenery, the town's culture and feel), finding a few places where more detail and artistic effort would pay off.
