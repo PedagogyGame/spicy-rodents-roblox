@@ -11,6 +11,7 @@ local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Wire = require("@shared/Minigames/Paintball/Wire")
+local Bots = require("@server/Minigames/Paintball/Bots")
 local Rig = require("@tests/lib/MinigameRig")
 local PaintballRig = require("@tests/lib/PaintballRig")
 local Kit = require("@tests/isolated/paintball_server_kit")
@@ -358,50 +359,61 @@ return function(t)
 	t.test(
 		"a change of side takes the bot that pays least for it: one that is itself out, then one in its own spawn room, and one in the fight only when there is no other",
 		function()
-			for _, case in { "out", "room", "fight" } do
-				Kit.play(function(kit)
-					local ada = kit.client("Ada")
-					t.truthy((kit.join(ada)))
-					kit.run(0.3)
-					kit.live()
-					local mine = teamOf(kit, ada)
-					local other = 3 - mine
-					local state = kit.state()
-					local theirs: { number } = {}
-					for id, slot in state.slots do
-						if slot.on and slot.team == other then
-							table.insert(theirs, id)
+			-- (the bots stand where the case puts them: whatever brain is in the tree is not asked)
+			local stepWas = Bots.step;
+			(Bots :: any).step = function(): { Bots.Command }
+				return {}
+			end
+			local ok, err = pcall(function()
+				for _, case in { "out", "room", "fight" } do
+					Kit.play(function(kit)
+						local ada = kit.client("Ada")
+						t.truthy((kit.join(ada)))
+						kit.run(0.3)
+						kit.live()
+						local mine = teamOf(kit, ada)
+						local other = 3 - mine
+						local state = kit.state()
+						local theirs: { number } = {}
+						for id, slot in state.slots do
+							if slot.on and slot.team == other then
+								table.insert(theirs, id)
+							end
 						end
-					end
-					table.sort(theirs)
-					t.truthy(#theirs >= 3, `{#theirs} bots on the other side`)
-					-- every one of them out in the hall, in the fight
-					for i, id in theirs do
-						local p = kit.service.poses[id]
-						p.x, p.y, p.z = 0, 0, -12 + 6 * i
-					end
-					local want = theirs[1]
-					if case == "out" then
-						want = theirs[#theirs]
-						t.truthy((kit.service:debug("tag", ada.seat, want)))
-					elseif case == "room" then
-						want = theirs[#theirs - 1]
-						local spawn = kit.arena.spawns[other][1]
-						local p = kit.service.poses[want]
-						p.x, p.y, p.z = spawn.x, spawn.y, spawn.z
-					end
-					-- Ada is tagged out by the lowest of them, and asks to change sides
-					t.truthy((kit.service:debug("tag", theirs[1], ada.seat)))
-					kit.run(0.1)
-					t.deepEq({ Rig.input(kit.w, ada.stub, Contract.STATION, "side", {}) }, { true, nil })
-					t.eq(teamOf(kit, ada), other)
-					t.eq(state.slots[want].team, mine, `{case}: the bot that traded`)
-					for _, id in theirs do
-						if id ~= want then
-							t.eq(state.slots[id].team, other, `{case}: bot {id} stayed`)
+						table.sort(theirs)
+						t.truthy(#theirs >= 3, `{#theirs} bots on the other side`)
+						-- every one of them out in the hall, in the fight
+						for i, id in theirs do
+							local p = kit.service.poses[id]
+							p.x, p.y, p.z = 0, 0, -12 + 6 * i
 						end
-					end
-				end, { arena = Kit.hall({ room2 = 20 }) })
+						local want = theirs[1]
+						if case == "out" then
+							want = theirs[#theirs]
+							t.truthy((kit.service:debug("tag", ada.seat, want)))
+						elseif case == "room" then
+							want = theirs[#theirs - 1]
+							local spawn = kit.arena.spawns[other][1]
+							local p = kit.service.poses[want]
+							p.x, p.y, p.z = spawn.x, spawn.y, spawn.z
+						end
+						-- Ada is tagged out by the lowest of them, and asks to change sides
+						t.truthy((kit.service:debug("tag", theirs[1], ada.seat)))
+						kit.run(0.1)
+						t.deepEq({ Rig.input(kit.w, ada.stub, Contract.STATION, "side", {}) }, { true, nil })
+						t.eq(teamOf(kit, ada), other)
+						t.eq(state.slots[want].team, mine, `{case}: the bot that traded`)
+						for _, id in theirs do
+							if id ~= want then
+								t.eq(state.slots[id].team, other, `{case}: bot {id} stayed`)
+							end
+						end
+					end, { arena = Kit.hall({ room2 = 20 }) })
+				end
+			end);
+			(Bots :: any).step = stepWas
+			if not ok then
+				error(err, 0)
 			end
 		end
 	)
