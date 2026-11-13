@@ -179,6 +179,12 @@ function AirHockeyFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 	if tbl.hw and tbl.hw.labels[1] then
 		check(tbl.hw.labels[1].Text == "GLACIER  7  :  2  EMBER", `the board on the wall ("{tbl.hw.labels[1].Text}")`)
 	end
+	if tbl.hw and tbl.hw.prints[0] and tbl.hw.prints[1] then
+		check(
+			tbl.hw.prints[0].Text == "7 : 2" and tbl.hw.prints[1].Text == "2 : 7",
+			`each end's score in the bed, its own goals first ("{tbl.hw.prints[0].Text}", "{tbl.hw.prints[1].Text}")`
+		)
+	end
 	check(seat ~= nil and seat.replica.desyncs == 0, "a scripted goal is still the same match on every screen")
 
 	-- again, a second person, and everybody leaving ----------------------------------------------------------------

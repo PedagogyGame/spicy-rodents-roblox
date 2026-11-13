@@ -175,6 +175,54 @@ return function(t)
 			end
 		end
 		t.truthy(labels >= 1, "ScoreBoard has its Score label")
+		-- and each end's own score, lit in the bed: on the playing surface in that end's corner, clear of the
+		-- defensive arc and the touchline, and inside that player's first person view (which the board on the
+		-- wall is not) even on a screen as narrow as 4:3
+		local sp = Layout.SCORE_PRINT
+		for side = 0, 1 do
+			local s = if side ~= 0 then 1 else -1
+			local plate = m:FindFirstChild(Layout.SCORE_PRINTS[side])
+			t.truthy(plate, `{Layout.SCORE_PRINTS[side]} is baked`)
+			local found = 0
+			for _, d in plate:GetDescendants() do
+				if d.Name == "Score" and d:IsA("TextLabel") then
+					found += 1
+					t.eq(d.Text, "", "blank until a match is on")
+				end
+			end
+			t.eq(found, 1)
+			local X, Y, D = Layout.toLocal(sp.x, s * sp.y)
+			local at = plate.CFrame.Position
+			t.near(at.X, X, 1e-3)
+			t.near(at.Z, -D, 1e-3)
+			t.truthy(at.Y <= Y + 1e-6 and at.Y > Y - 0.02, "in the bed, under the puck")
+			t.truthy(sp.x - sp.w / 2 > 0.29 + 0.02, "clear of the defensive arc")
+			t.truthy(sp.x + sp.w / 2 < 0.596 - 0.02, "inside the touchline")
+			t.truthy(
+				sp.y + sp.h / 2 < Sim.HALF_LENGTH - 0.05 and sp.y - sp.h / 2 > 0.76 + 0.02,
+				"between the hash and the end"
+			)
+			-- through that end's first person camera
+			local cam = Layout.camera(side, false)
+			local fx, fy, fz = 0 - cam.eye[1], cam.target[2] - cam.eye[2], cam.target[3] - cam.eye[3]
+			local fl = math.sqrt(fx * fx + fy * fy + fz * fz)
+			fy, fz = fy / fl, fz / fl
+			local half = math.tan(math.rad(cam.fov / 2))
+			for _, corner in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+				local px = sp.x + corner[1] * sp.w / 2
+				local py = s * sp.y + corner[2] * sp.h / 2
+				local vx, vy, vz = px - cam.eye[1], py - cam.eye[2], Layout.BED_Z - cam.eye[3]
+				local depth = vy * fy + vz * fz
+				-- (the camera's right is the model's x, turned for the Ember end; its up is across the forward)
+				local up = (vz * math.abs(fy) - vy * fz * (if fy > 0 then 1 else -1)) / depth
+				t.truthy(depth > 0.3, "in front of the eye")
+				t.truthy(
+					math.abs(up) < half * 0.92,
+					`end {side}: the score print is inside the view, top to bottom ({up})`
+				)
+				t.truthy(math.abs(vx / depth) < half * (4 / 3) * 0.92, `end {side}: and side to side`)
+			end
+		end
 	end)
 
 	t.test(

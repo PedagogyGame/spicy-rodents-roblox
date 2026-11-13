@@ -9,7 +9,8 @@
 -- end to the west.
 -- What is built: the midnight ceramic cabinet on its two sleds with the champagne reveal and the aluminium
 -- tray; the pale bed with its centre line, centre circle, face-off ring, the two defensive arcs (glacier and
--- ember), service hashes, the A E R logotype and the 01 / 02 team numbers; the dark side and end rails with
+-- ember), service hashes, the A E R logotype and the 01 / 02 team numbers, and (ours) each end's score lit in
+-- the bed in the corner across from its number; the dark side and end rails with
 -- their titanium tops and cushions; the side LEDs split glacier blue / ember orange; each goal's dark mouth,
 -- bridge, lit lintel, rounded posts and puck return; the cooling fins and side badges; the two mallets (base,
 -- light seam, crown, stem, cap) and the puck (carbon disc, lit equator, brass crown) as small Models that the
@@ -17,8 +18,8 @@
 -- player stands (the Ember end's is that prompt's own: GamesRoom.AirHockeyEmberEnd). The recessed rail
 -- fasteners are there; his 1,500 air jets and the bevels are left to the mesh
 -- (docs/reference/air_hockey/AER_AirHockey.glb).
--- Names the game relies on (Layout): GamesRoom.AirHockey.{Puck, MalletGlacier, MalletEmber, ScoreBoard} and the
--- TextLabel "Score" on the board.
+-- Names the game relies on (Layout): GamesRoom.AirHockey.{Puck, MalletGlacier, MalletEmber, ScoreBoard,
+-- ScoreGlacier, ScoreEmber} and the TextLabel "Score" on the board and on each end's score print in the bed.
 -- Interface: { build(kit, parent, station, venue) }; PARTS (how many parts one table is, after a build)
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
@@ -146,7 +147,8 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 		w: number,
 		h: number,
 		color: { number },
-		turn: number
+		turn: number,
+		label: string?
 	)
 		local X, Y, D = Layout.toLocal(x, y, layer(8) - LAYER / 2)
 		local plate = kit:at(m, name, X, Y, D, w * K, LAYER * K, h * K, ICE, "SmoothPlastic", {
@@ -155,7 +157,10 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 			shadow = false,
 			rot = CFrame.Angles(0, turn * math.pi / 2, 0),
 		})
-		kit:label(kit:gui(plate, "Top", 120), { Text = text, TextColor = color, Font = "GothamBold" })
+		kit:label(
+			kit:gui(plate, "Top", 120),
+			{ Name = label or "TextLabel", Text = text, TextColor = color, Font = "GothamBold" }
+		)
 	end
 
 	-- A broad sculpted chassis over two architectural sled supports.
@@ -285,6 +290,21 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 			0.075,
 			if s < 0 then CYAN else CORAL,
 			s
+		)
+		-- The score, lit in the bed in the other corner of each end, that end's own goals first and read from
+		-- that end: the one place both players have in sight in his first person view and from above (the
+		-- board on the wall is the room's, and is over a player's shoulder). Blank until a match is on.
+		local p = Layout.SCORE_PRINT
+		print_(
+			Layout.SCORE_PRINTS[if s < 0 then 0 else 1],
+			"",
+			p.x,
+			s * p.y,
+			p.w,
+			p.h,
+			if s < 0 then CYAN else CORAL,
+			s,
+			"Score"
 		)
 	end
 	ring("CentreCircle", 0, 3, 0.205, 0.004, INK)

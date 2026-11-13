@@ -57,6 +57,25 @@ local function furnish(roots: { [string]: any }, places: { [string]: any })
 	local label = FakeEngine.new("TextLabel", "Score")
 	label.Text = ""
 	label.Parent = gui
+	-- (each end's own score, lit in the bed)
+	for side = 0, 1 do
+		local plate = FakeEngine.part(
+			Layout.SCORE_PRINTS[side],
+			at(Layout.SCORE_PRINT.x, (side * 2 - 1) * Layout.SCORE_PRINT.y, 0.9),
+			model
+		)
+		local top = FakeEngine.new("SurfaceGui", "Gui")
+		top.Parent = plate
+		local print = FakeEngine.new("TextLabel", "Score")
+		print.Text = ""
+		print.Parent = top
+	end
+end
+
+-- what an end's score print in the bed reads
+local function printed(w: Rig.World, side: number): string
+	local model = w.roots[SITE]:FindFirstChild("GamesRoom"):FindFirstChild(Layout.MODEL)
+	return model:FindFirstChild(Layout.SCORE_PRINTS[side]):FindFirstChild("Gui"):FindFirstChild("Score").Text
 end
 
 local function opts(more: { [string]: any }?): Rig.Opts
@@ -412,6 +431,9 @@ return function(t)
 			t.truthy(Rig.has(all, if sim.winner == 0 then "MATCH WON." else "WELL PLAYED."), Rig.screen(w))
 			t.truthy(Rig.has(all, "Play again") and Rig.has(all, "Leave"), Rig.screen(w))
 			t.eq(tbl.hw.labels[1].Text, `GLACIER  {a}  :  {b}  EMBER`)
+			-- and lit in the bed at each end, that end's own goals first (the wall is out of a player's view)
+			t.eq(printed(w, 0), `{a} : {b}`)
+			t.eq(printed(w, 1), `{b} : {a}`)
 			local over = Rig.last(w.got, "event", function(m)
 				return m.over == true
 			end)

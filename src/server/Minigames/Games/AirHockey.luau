@@ -23,7 +23,8 @@
 --     is missing the Table still runs the match and touches nothing. The clients draw the puck and the mallets
 --     every frame from their own replay; the server only moves its own copies ten times a second, so that the
 --     world is right for someone who was sent nothing, and puts them home when the table resets.
--- Interface: a ServerGame { game = "air_hockey", new(ctx) -> Table }; Table.hw { model, puck, mallets, labels };
+-- Interface: a ServerGame { game = "air_hockey", new(ctx) -> Table }; Table.hw { model, puck, mallets, labels,
+--   prints (each end's score label in the bed) };
 --   Table.ref (the Referee while a match is on); ASK_EVERY; SLOW_WINDOW, SLOW_TICKS, SLOW_AGAIN, SLOW_WORDS;
 --   Table:debug("goal", side) (the puck is put in front of that
 --   end's opponent's goal, travelling in: the next ticks score it through the simulation's own goal line) and
@@ -75,7 +76,19 @@ local function hardware(root: Instance?): any
 			end
 		end
 	end
+	local prints: { [number]: any } = {}
+	for side = 0, 1 do
+		local plate = model:FindFirstChild(Layout.SCORE_PRINTS[side])
+		if plate then
+			for _, d in plate:GetDescendants() do
+				if d.Name == "Score" then
+					prints[side] = d
+				end
+			end
+		end
+	end
 	return {
+		prints = prints,
 		model = model,
 		puck = puck,
 		mallets = { [0] = glacier, [1] = ember },
@@ -467,7 +480,8 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		return if g then `{g.score[1]}-{g.score[2]}` else ""
 	end
 
-	-- the board over the table: both ends' scores while a match is on, the game's name otherwise
+	-- the board over the table: both ends' scores while a match is on, the game's name otherwise; and each
+	-- end's score print in the bed (in a player's sight, which the board is not)
 	function self.screen(_self: any, view: { [string]: any })
 		local hw = self.hw
 		if hw == nil then
@@ -475,11 +489,19 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		end
 		local g = view.game
 		local text = "AIR HOCKEY  ·  FIRST TO 7"
-		if g and (view.phase == "playing" or view.phase == "done") then
+		local on = g ~= nil and (view.phase == "playing" or view.phase == "done")
+		if on then
 			text = `GLACIER  {g.score[1]}  :  {g.score[2]}  EMBER`
 		end
 		for _, label in hw.labels do
 			label.Text = text
+		end
+		-- (and in the bed at each end: that end's own goals first)
+		for side = 0, 1 do
+			local label = hw.prints[side]
+			if label then
+				label.Text = if on then `{g.score[side + 1]} : {g.score[2 - side]}` else ""
+			end
 		end
 	end
 
