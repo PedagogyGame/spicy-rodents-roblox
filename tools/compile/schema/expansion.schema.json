@@ -80,7 +80,7 @@
           "mall_small", "museum", "parasail_launch", "park", "racquet_club", "restaurant_bakery", "restaurant_cafe", "restaurant_chinese",
           "restaurant_diner", "restaurant_grill", "restaurant_hilltop", "restaurant_pizza", "restaurant_seafood", "restaurant_taco",
           "school", "shop_antique", "shop_barber", "shop_bookshop", "shop_corner", "shop_hardware", "shop_laundromat", "shop_music",
-          "shop_pet", "skylift_station", "steakhouse", "tv_station", "upgrade"] },
+          "shop_neighbourhood", "shop_pet", "skylift_station", "steakhouse", "tv_station", "upgrade"] },
         "name": { "type": "string", "minLength": 1 }, "district": { "type": "string" },
         "status": { "enum": ["new", "upgrade"] }, "existingLot": { "type": "string" }, "inside": { "type": "string" },
         "food": { "enum": ["bakery", "bar_and_grill", "cafe", "chinese", "diner", "hilltop_bistro", "ice_cream", "pizza", "seafood",
