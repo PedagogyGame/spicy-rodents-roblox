@@ -17,7 +17,12 @@
 --     than TRUST.riseSlack above the last accepted pose, so a hop taken off a ledge is refused until it
 --     comes down past the ledge;
 --   * a slot's splats and pose history are emptied when its occupant changes, when the roster is read.
--- AND TWO PLACES WHERE IT DID NOT DO AS WRITTEN, because as written a liar gains (both reported):
+--   * a body has a footprint (Stream, "the height rule"): a pose whose feet point is up to a stud past
+--     the edge of a floor is still standing on it. The contract's point test refuses an honest player
+--     who stands at an edge.
+-- AND THREE PLACES WHERE IT DID NOT DO AS WRITTEN, because as written a liar gains (all reported):
+--   * a fall must fall (Stream, "the height rule"): an unsupported pose that does not come down at a
+--     quarter of gravity or faster is refused, not allowed to walk level for the whole of TRUST.fallSecs;
 --   * after a CORRECTION the distance budget is EMPTY, not full (Stream.placed): a full one hands half a
 --     second of free distance to whoever gets themselves refused, 28 studs a second on corrections alone;
 --   * a correction whose anchor hangs in mid-air (a "fall" that never came down) puts the body on the

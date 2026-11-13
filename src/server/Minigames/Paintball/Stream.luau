@@ -10,9 +10,20 @@
 --   a click   sprinting() and originOk(): the two of the service's checks that read the Move buffer
 --   a pose    poseAt(): "the slot's pose at t", the straight line between the two Moves either side
 --             of t, held at the newest and at the oldest, the anchor when there are none
--- THE HEIGHT RULE is one function, supportedOrFalling(), written as the contract words it: an
--- unsupported pose is accepted while it is no more than TRUST.riseSlack above the last accepted pose
--- and the body has been unsupported no longer than TRUST.fallSecs by the Moves' own t.
+-- THE HEIGHT RULE is one function, supportedOrFalling(). As the contract words it: an unsupported pose
+-- is accepted while it is no more than TRUST.riseSlack above the last accepted pose and the body has
+-- been unsupported no longer than TRUST.fallSecs by the Moves' own t. Two things the contract does not
+-- say are added, one for the honest and one against a liar:
+--   A BODY HAS A FOOTPRINT. Arena.ground is asked about a point, and a body standing at the very edge
+--   of a floor or a landing (to look down the atrium, which everybody does) has its feet point past
+--   the edge while its feet are still on it. A pose is supported if the surface under it, OR under a
+--   point FOOT to any of its four sides, is. Without this an honest player at an edge is refused after
+--   fallSecs for as long as they stand there.
+--   A FALL MUST FALL. An unsupported body that is not coming down is flying: after `tau` seconds
+--   unsupported it must be at least FALL_FLOOR x tau^2 - FALL_SLACK below where the fall began (a
+--   quarter of the engine's gravity: a real fall is four times that). Without this a pose could be
+--   walked level out over the atrium for the whole of fallSecs: 25 studs at a walk, the atrium's 30 at
+--   a sprint.
 -- Interface: new(player, now, placeFrom?) -> Person; restart(person, now); placed(person, x, y, z, yaw,
 --   now, feel, stand); judge(person, rec, now, arena, feel, otherRoom?, bx?, by?, bz?) -> (verdict,
 --   why?); refused(person, now) -> correct; poseAt(person, t) -> (x, y, z, yaw, pitch, bits,
@@ -64,6 +75,7 @@ export type Person = {
 	heardAt: number, -- when a Move last got as far as being judged
 	out: boolean, -- tagged out: Moves are dropped and the pose is held until the respawn
 	fallSince: number?, -- the t of the first unsupported Move of the fall it is in
+	fallFromY: number, -- and that Move's height
 	refusals: { number }, -- when its recent Moves were refused (inside TRUST.refusalWindow)
 	idleAt: number, -- when it last moved, turned or fired
 	idleX: number,
@@ -79,6 +91,9 @@ local T = Contract.TRUST
 local BIT = Wire.BIT
 local IDLE_STUDS = 0.5
 local IDLE_RAD = 0.05
+local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands on
+local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
+local FALL_SLACK = 0.5
 
 local Stream = {}
 
@@ -106,6 +121,7 @@ function Stream.new(player: any, now: number, placeFrom: number?): Person
 		heardAt = now,
 		out = false,
 		fallSince = nil,
+		fallFromY = 0,
 		refusals = {},
 		idleAt = now,
 		idleX = 0,
@@ -178,16 +194,29 @@ local function supportedOrFalling(
 	if ground == nil or y < ground - T.groundSlack then
 		return false, false
 	end
-	if y <= ground + Body.JUMP_HEIGHT + T.jumpSlack then
+	local reach = Body.JUMP_HEIGHT + T.jumpSlack
+	if y <= ground + reach then
 		return true, false
 	end
-	-- not supported: a fall. It may not rise, and it may not last
+	-- a body has a footprint: at the very edge of a floor the feet point is past it
+	for i = 1, 4 do
+		local dx = if i == 1 then FOOT elseif i == 2 then -FOOT else 0
+		local dz = if i == 3 then FOOT elseif i == 4 then -FOOT else 0
+		local side = arena.ground(x + dx, y, z + dz)
+		if side ~= nil and y >= side - T.groundSlack and y <= side + reach then
+			return true, false
+		end
+	end
+	-- not supported: a fall. It may not rise, it may not last, and it must come down
 	if y > person.anchor.y + T.riseSlack then
 		return false, true
 	end
 	local since = person.fallSince
-	if since ~= nil and t - since > T.fallSecs then
-		return false, true
+	if since ~= nil then
+		local tau = t - since
+		if tau > T.fallSecs or y > person.fallFromY - (FALL_FLOOR * tau * tau - FALL_SLACK) then
+			return false, true
+		end
 	end
 	return true, true
 end
@@ -271,6 +300,7 @@ function Stream.judge(
 	if falling then
 		if person.fallSince == nil then
 			person.fallSince = t
+			person.fallFromY = y
 		end
 	else
 		person.fallSince = nil
