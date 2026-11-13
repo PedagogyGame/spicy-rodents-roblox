@@ -64,6 +64,37 @@ return function(t)
 		t.eq(#problems, 0, table.concat(problems, "\n"))
 	end)
 
+	case(
+		"the ground kept for the alley's backstage: only the venues it names overlap it until the package arrives",
+		function()
+			-- (the owner's default, venue map question 2: the park gives up its northern edge, and the steakhouse site its
+			-- eastern edge, only when the backstage arrives; until then both are drawn whole)
+			local alley = world.attractions[1] :: any
+			local rs = alley.reserve
+			t.eq(table.concat(rs.givesWayOnArrival, " "), "f2_liberty_green f3_steakhouse")
+			local ax0, _, az0 = AlleyLayout.toWorld(alley.place, rs.x0, 0, rs.d0)
+			local ax1, _, az1 = AlleyLayout.toWorld(alley.place, rs.x1, 0, rs.d1)
+			local rx0, rx1, rz0, rz1 = math.min(ax0, ax1), math.max(ax0, ax1), math.min(az0, az1), math.max(az0, az1)
+			local named: { [string]: boolean } = {}
+			for _, id in rs.givesWayOnArrival do
+				named[id] = true
+			end
+			for _, v in mod.venues do
+				local x0, x1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge
+				for _, c in Expansion.sitePoly(v) do
+					x0, x1 = math.min(x0, c[1]), math.max(x1, c[1])
+					z0, z1 = math.min(z0, c[2]), math.max(z1, c[2])
+				end
+				local over = x0 < rx1 - 0.01 and x1 > rx0 + 0.01 and z0 < rz1 - 0.01 and z1 > rz0 + 0.01
+				t.eq(over, named[v.id] == true, `{v.id} {if over then "overlaps" else "is clear of"} the reserve`)
+			end
+			-- the park as first drawn: z -724..-574, its bandstand inside it
+			local green = venue("f2_liberty_green")
+			t.eq(green.footprint.d, 150)
+			t.eq(green.position.z, -649)
+		end
+	)
+
 	case("the checker catches overlaps, an unreachable door, a floating floor and a missing pickup", function()
 		local bad = table.clone(mod)
 		bad.venues = table.clone(mod.venues)

@@ -1,7 +1,7 @@
 --!strict
 -- tools/bake/alley/Lanes built in memory (the same code that writes build/Attractions.rbxm): the names and
 -- properties the bowling server (Server/Minigames/BowlingLane) and the client's playback rely on are there.
--- Six lanes; each with its ball on the rack slot, ten pin models whose PrimaryPart "Body" stands on the pin's
+-- Eighteen lanes; each with its ball on the rack slot, ten pin models whose PrimaryPart "Body" stands on the pin's
 -- spot, anchored, colliding with nothing and fully visible (the server hides and shows pins by Transparency
 -- and the client assumes a shown pin is at 0), the sweep bar and its edge; and the LaneGuard that keeps people
 -- off the lanes.
@@ -18,7 +18,8 @@ return function(t)
 	root.Name = "BowlingAlley"
 	Lanes.build(kit, root)
 
-	t.test("six lanes, each with a ball on its rack slot, a sweep bar and ten pins on their spots", function()
+	t.test("eighteen lanes, each with a ball on its rack slot, a sweep bar and ten pins on their spots", function()
+		t.eq(AlleyLayout.LANES, 18)
 		local lanes = root:FindFirstChild("Lanes") :: any
 		t.truthy(lanes ~= nil)
 		for lane = 1, AlleyLayout.LANES do
@@ -73,5 +74,17 @@ return function(t)
 		t.eq(guard.CollisionGroup, "LaneGuard")
 		t.truthy(guard.CanCollide)
 		t.eq(guard.Transparency, 1)
+		-- and along the two outer side walls (lane 1's and lane 18's), too tall to jump: a person jumps 7.2
+		local sides = 0
+		for _, d in root:GetDescendants() do
+			if d.Name == "LaneGuardSide" then
+				sides += 1
+				t.eq(d.CollisionGroup, "LaneGuard")
+				t.truthy(d.CanCollide and not d.CanQuery and d.Transparency == 1)
+				t.truthy(d.Size.Y >= 9 - 1e-3, "taller than a jump")
+				t.truthy(d.Size.Z >= AlleyLayout.MACHINE_D0 - AlleyLayout.FOUL_D, "from the foul line to the masking")
+			end
+		end
+		t.eq(sides, 2)
 	end)
 end

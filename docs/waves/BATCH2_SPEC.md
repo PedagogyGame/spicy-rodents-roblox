@@ -70,7 +70,7 @@ town looks from the street. The data and these docs keep the v5.4 naming (`east_
 
 | id | name | runs | asphalt | sidewalks | meets existing |
 |---|---|---|---|---|---|
-| `xs_bowl_lane` | BOWL LANE | along x at z -312, x 903.75..1620 | 24 | 6 @ ±15 | cross street (rd_022, rd_024) |
+| `xs_bowl_lane` | BOWL LANE | along x at z -312, x 903.75..1660 | 24 | 6 @ ±15 | cross street (rd_022, rd_024) |
 | `xs_liberty_ave` | LIBERTY AVENUE | along z at x 867.5, z -1140..-537.5 | 45 | 8.25 @ ±30.25 | cross street end (rd_022) via `xp_liberty_taper` |
 | `xs_chapel_st` | CHAPEL STREET | along x at z -762.5, x 645..2300 | 50 | 8.75 @ ±30.25 | estate avenue end (rd_037/038/039) |
 | `xs_lift_road` | LIFT ROAD | along z at x -722.5, z -905..-610 | 37.5 | 6.25 @ ±25 | westside street end (rd_071/072/073) |
@@ -133,7 +133,7 @@ and one short walk per door that is more than 16 st from the network. **Owner of
 |---|---|---|---|---|---|---|---|
 | `f2_museum` | BELLWETHER MUSEUM OF TOWN HISTORY | 1000, -661 | -Z | 120 x 90 | 3 (0.25..2.41) | 2 / 34 | 1200 |
 | `f2_doctor` | DR. MAPLE'S FAMILY PRACTICE | 1100, -690 | -Z | 48 x 44 | 5.3 (0.91..4.71) | 1 / 15 | 650 |
-| `f2_liberty_green` | LIBERTY GREEN | 1270, -649 | -Z | 230 x 150 | 10.93 (5.51..10.93) | lawn | 500 |
+| `f2_liberty_green` | LIBERTY GREEN | 1270, -679 | -Z | 230 x 90 | 10.34 (5.75..10.34) | lawn | 500 |
 | `f2_gazebo` | LIBERTY BANDSTAND (inside the green) | 1270, -655 | -Z | 28 x 28 | 9.9 (8.74..9.35) | 1 / 16 | 250 |
 | `f2_community_garden` | LIBERTY COMMUNITY GARDEN | 1020, -830 | +Z | 90 x 50 | 1.59 (0.25..1.59) | lawn | 350 |
 | `f2_school` | BELLWETHER ELEMENTARY SCHOOL | 1560, -845 | +Z | 170 x 80 | 20.9 (16.93..20.31) | 2 / 30 | 1500 |
@@ -149,10 +149,10 @@ and one short walk per door that is more than 16 st from the network. **Owner of
 
 | id | name | at (x, z) | facing | footprint w x d | floorY (ground min..max) | storeys / height | part budget |
 |---|---|---|---|---|---|---|---|
-| `f3_steakhouse` | THE BRANDING IRON STEAKHOUSE | 1030, -366 | +Z | 96 x 64 (site 330 x 215) | 18.2 (14.07..17.61) | 1 / 20 | 1700 |
-| `f3_lounge_classic` | THE GILDED ACORN | 1399, -362 | +Z | 50 x 56 | 14.5 (10.64..13.92) | 1 / 22 | 1300 |
-| `f3_lounge_scifi` | NEBULA NINE | 1457, -362 | +Z | 50 x 56 | 11.6 (7.31..11.03) | 1 / 24 | 1300 |
-| `f3_racquet_club` | BELLWETHER RACQUET CLUB | 1526, -376 | +Z | 64 x 84 | 7.2 (0.78..6.63) | 1 / 30 | 650 |
+| `f3_steakhouse` | THE BRANDING IRON STEAKHOUSE | 1030, -366 | +Z | 96 x 64 (site 309 x 215) | 18.2 (14.07..17.61) | 1 / 20 | 1700 |
+| `f3_lounge_classic` | THE GILDED ACORN | 1487, -362 | +Z | 50 x 56 | 9.5 (4.95..8.94) | 1 / 22 | 1300 |
+| `f3_lounge_scifi` | NEBULA NINE | 1545, -362 | +Z | 50 x 56 | 5.7 (0.44..5.19) | 1 / 24 | 1300 |
+| `f3_racquet_club` | BELLWETHER RACQUET CLUB | 1614, -376 | +Z | 64 x 84 | 2.6 (0.25..2.1) | 1 / 30 | 650 |
 | `f3_mall` | ACORN COMMONS | 1540, 241 | -Z | 200 x 130 | 7.7 (0.25..7.16) | 2 / 32 | 2000 |
 | `f3_tv_station` | WBLW CHANNEL 7 (ABANDONED) | 2080, -890 | +Z | 120 x 150 | 8.6 (0.25..8.06) | 5 / 72 | 3500 |
 | `f3_hilltop` | THE LOOKOUT (+ sky-lift summit hall) | -1050, -1710 | yaw 0.85 (NE, toward town) | 100 x 50 | 116 (108.6..115.41) | 1 / 18 | 1000 |

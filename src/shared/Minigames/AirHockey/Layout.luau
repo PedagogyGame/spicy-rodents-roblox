@@ -30,7 +30,9 @@ Layout.SITE = "bowling_alley"
 Layout.SCALE = 10.8 / 2.54 -- studs per metre (the pool tables' own scale)
 Layout.BED_Z = 0.90 -- the playing surface in the model, metres
 Layout.BED_Y = 3.1 -- and in the room, studs above the floor
-Layout.CENTRE = { x = 36.5, d = 25.8 } -- the middle of the bed in the alley's frame
+-- the middle of the bed in the alley's frame: the place the alley's floor plan keeps for the table
+-- (AlleyLayout.AIR_HOCKEY; its yaw 0 is this file's turn: the table's length along local X, Glacier to the west)
+Layout.CENTRE = { x = AlleyLayout.AIR_HOCKEY.x, d = AlleyLayout.AIR_HOCKEY.d }
 -- the cabinet's reach from the middle of the bed, metres (side rails and cooling fins; end rails and puck return)
 Layout.HALF_WIDTH = 0.75
 Layout.HALF_LENGTH = 1.345
