@@ -64,10 +64,7 @@ if not skyOk then
 	warn(`Client: the sky did not start: {skyErr}`)
 end
 -- what spins on this computer only: the alley's rooftop fan (World/Spinners)
-local spinOk, spinErr = pcall(Spinners.start)
-if not spinOk then
-	warn(`Client: the spinners did not start: {spinErr}`)
-end
+Spinners.start()
 
 local pickRemote: RemoteEvent? = nil
 local menu = PlayMenu.start(function(choice: string)
