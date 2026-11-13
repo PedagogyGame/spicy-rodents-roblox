@@ -8,6 +8,7 @@
 -- Interface: summary(sim) -> Summary; lines(sim, summary?) -> { string }; type Summary
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Rules = require("@shared/Minigames/Paintball/Rules")
+local BotBrain = require("@server/Minigames/Paintball/BotBrain")
 local Sim = require("./Sim")
 
 export type Band = { label: string, shots: number, tags: number, rate: number }
@@ -34,6 +35,11 @@ export type Summary = {
 	stairBusiest: number, -- the largest share one flight has of its storey pair's traffic
 	still: number, -- the longest any bot stood still, seconds
 	stillSlot: number,
+	-- the longest any bot went with somebody in plain view within 25 studs, inside its cone, who could
+	-- be hit and was owed no truce, with balls to fire and firing none (Sim's SlotRecord.held) ...
+	held: number,
+	heldSlot: number,
+	heldSum: number, -- ... and the bot-seconds of such spells past their first second, all told
 	camping: number, -- bot-seconds spent watching the other team's door
 	stares: number, -- times a bot followed somebody through a wall (audited matches only)
 	roomSlowest: number, -- the longest any life took to leave its spawn room, seconds
@@ -43,9 +49,9 @@ export type Summary = {
 	-- balls a bot fired AT somebody who was then on their own doorstep and had not fired for 4 s, tagged
 	-- or not (a bot never does it)
 	doorTrap: number,
-	-- balls a bot fired AT somebody who had left their spawn room less than 4 s before and had not
-	-- fired since (a bot never does it), and all the tags, by anybody's ball, on somebody less than
-	-- 3 s out of their room
+	-- balls a bot fired AT somebody in their first strides out of their spawn room, as promised
+	-- (BotBrain, THE TRUCES: a bot never does it), and all the tags, by anybody's ball, on somebody
+	-- less than BotBrain.TRUCE.out after their first step out of their room this life
 	outTrap: number,
 	earlyTags: number,
 	lives: number,
@@ -129,7 +135,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local strayTags = 0
 	local personTags, personOuts = 0, 0
 	for _, tag in rec.tags do
-		if tag.sinceRoom < 3 then
+		if tag.sinceRoom < BotBrain.TRUCE.out then
 			earlyTags += 1
 		end
 		if tag.byBot and tag.stray then
@@ -157,6 +163,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local post, nose = 0, 0
 	local aimed, stared, stareLongest = 0, 0, 0
 	local still, stillSlot, camping, stares = 0, 0, 0, 0
+	local held, heldSlot, heldSum = 0, 0, 0
 	local roomSlowest, roomSum, lives = 0, 0, 0
 	local botCount = 0
 	local personPlay, personCompany, botCompany = 0, 0, 0
@@ -185,6 +192,10 @@ function Report.summary(sim: Sim.Sim): Summary
 		if rs.still > still then
 			still, stillSlot = rs.still, id
 		end
+		if rs.held > held then
+			held, heldSlot = rs.held, id
+		end
+		heldSum += rs.heldSum
 		for _, life in rs.lives do
 			local left = life.leftRoom
 			local from = math.max(life.from, state.liveAt)
@@ -256,6 +267,9 @@ function Report.summary(sim: Sim.Sim): Summary
 		stairBusiest = busiest,
 		still = still,
 		stillSlot = stillSlot,
+		held = held,
+		heldSlot = heldSlot,
+		heldSum = heldSum,
 		camping = camping,
 		stares = stares,
 		roomSlowest = roomSlowest,
@@ -397,6 +411,10 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	)
 	say(`  at a post with nobody to fight, their look ends on a wall within 5 studs {pct(s.noseShare)} of the time`)
 	say(
+		`  somebody in plain view within 25 studs, fair game, and no ball: {string.format("%.2f", s.held)} s at the longest `
+			.. `(seat {s.heldSlot}), {string.format("%.1f", s.heldSum)} bot-seconds past the first second all told`
+	)
+	say(
 		`  with somebody in view too far off to fire at, they stood and looked {pct(s.stareShare)} of their time with a target, `
 			.. `{string.format("%.1f", s.stareLongest)} s at the longest (they move up)`
 	)
@@ -405,8 +423,8 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 		`  spawn rooms: out in {string.format("%.1f", s.roomMean)} s on average, {string.format("%.1f", s.roomSlowest)} s at the slowest; `
 			.. `{s.doorTags} tagged on their own doorstep ({s.doorStray} of them quiet, by a ball meant for somebody else); `
 			.. `balls a bot fired at somebody quiet on their doorstep: {s.doorTrap}; `
-			.. `at somebody in their first 4 s out who had not fired: {s.outTrap}; `
-			.. `{s.earlyTags} of {s.tags} tags fell on somebody less than 3 s out of their room; `
+			.. `at somebody in their first {BotBrain.TRUCE.out} s out who had not fired: {s.outTrap}; `
+			.. `{s.earlyTags} of {s.tags} tags fell on somebody less than {BotBrain.TRUCE.out} s out of their room; `
 			.. `{string.format("%.1f", s.camping)} bot-seconds watching a door`
 	)
 	if sim.opts.audit then

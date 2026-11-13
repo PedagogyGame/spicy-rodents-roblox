@@ -102,10 +102,11 @@ export type Shot = {
 	tagged: boolean, -- the ball tagged that target
 	faced: boolean, -- the shooter's look had had that target inside the sight cone for BOT.faced
 	-- when the ball left, that target was on its own doorstep (BotNav.atDoor) and had not fired a ball
-	-- for DOOR_TRUCE: the ball a bot never fires
+	-- for DOOR_TRUCE, and was neither near the shooter nor looking at it (see `promised`): the ball a
+	-- bot never fires
 	trap: boolean,
-	-- when the ball left, that target had been out of its own spawn room for less than OUT_TRUCE and
-	-- had not fired a ball since: the other ball a bot never fires
+	-- when the ball left, that target had first stepped out of its spawn room this life less than
+	-- OUT_TRUCE before and had not fired a ball since, likewise: the other ball a bot never fires
 	fresh: boolean,
 }
 
@@ -137,6 +138,10 @@ export type SlotRecord = {
 	atCover: number,
 	crouched: number,
 	still: number, -- the longest spell without going anywhere (3 studs), in play
+	-- a bot's longest spell with an opponent in plain view within HELD_NEAR, inside its sight cone, who
+	-- could be hit and was owed no truce, while it had balls to fire and fired none (at anybody)
+	held: number,
+	heldSum: number, -- seconds of such spells past HELD_GRACE, all told
 	stillFrom: number,
 	stillX: number,
 	stillZ: number,
@@ -201,6 +206,8 @@ export type Sim = {
 	heard: { Bots.Heard },
 	sprintAt: { [number]: number },
 	homeAt: { [number]: number }, -- by slot: when its body was last inside its own spawn room
+	leftAt: { [number]: number }, -- by slot: when its body first stepped out of its room since its placement
+	heldFrom: { [number]: { [number]: number } }, -- by bot, by opponent: when the present held spell began
 	lastShot: { [number]: number },
 	nextSnap: number,
 	nextSample: number,
@@ -219,8 +226,9 @@ local BOT = Contract.BOT
 local BIT = Wire.BIT
 local SNAP = 1 / Clock.SNAP_HZ
 local SAMPLE = 0.25 -- seconds between looks at what everybody is doing, for the record
-local DOOR_TRUCE = 4 -- seconds: the truce a bot keeps with somebody on their own doorstep (BotBrain)
-local OUT_TRUCE = 4 -- seconds: and with somebody just out of their spawn room who has not fired (BotBrain)
+local TRUCE = BotBrain.TRUCE -- what a bot promises (BotBrain, THE TRUCES)
+local HELD_NEAR = 25 -- studs: an opponent this near in plain view is somebody a bot fires at
+local HELD_GRACE = 1 -- seconds of a held spell that are only the time it takes to notice, turn and settle
 local COMPANY = 35 -- studs: a team-mate this near on the same storey is company
 local NOSE = 5 -- studs: a look that ends this near is a look at a wall
 local PERSON_POSE_LAG = 0.1 -- a person's snapshot pose is read this far back (Clock.poseTime: up + a send interval)
@@ -252,6 +260,7 @@ Sim.FAIR = table.freeze({
 	burstMax = 3,
 	pauseMin = 0.3,
 	pauseMax = 0.7,
+	courtesy = false, -- a person keeps no truce, keeps nobody company and calls nothing out
 }) :: BotBrain.Profile
 
 local function newSlotRecord(id: number, bot: boolean, team: number, floors: number): SlotRecord
@@ -265,6 +274,8 @@ local function newSlotRecord(id: number, bot: boolean, team: number, floors: num
 		atCover = 0,
 		crouched = 0,
 		still = 0,
+		held = 0,
+		heldSum = 0,
 		stillFrom = 0,
 		stillX = 0,
 		stillZ = 0,
@@ -378,6 +389,8 @@ function Sim.new(opts: Opts?): Sim
 		heard = {},
 		sprintAt = {},
 		homeAt = {},
+		leftAt = {},
+		heldFrom = {},
 		lastShot = {},
 		nextSnap = start,
 		nextSample = start,
@@ -504,6 +517,37 @@ local function faced(sim: Sim, by: number, id: number, born: number): boolean
 	return true
 end
 
+-- Was `target` owed a truce by the bot `by` (BotBrain, THE TRUCES), as promised, judged on the truth:
+-- quiet on its own doorstep, or in its first OUT_TRUCE out of its room and yet to fire; and neither
+-- near the bot nor with its look on it. (With some room either side of what the brain keeps: the brain
+-- reads a person a tenth of a second late, and a look that has just come off a bot was on it.)
+local function promised(sim: Sim, by: number, target: number): boolean
+	local state = sim.state
+	local slot = state.slots[target]
+	local truth = sim.poses[target]
+	local mine = sim.poses[by]
+	if slot == nil or truth == nil or mine == nil then
+		return false
+	end
+	local now = sim.now
+	local fired = sim.lastShot[target] or -math.huge
+	local door = BotNav.atDoor(sim.nav, slot.team, truth.x, truth.y, truth.z) and now - fired > TRUCE.door
+	local left = sim.leftAt[target]
+	local fresh = left ~= nil and now - left < TRUCE.out and fired <= left
+	if not (door or fresh) then
+		return false
+	end
+	local dx, dz = mine.x - truth.x, mine.z - truth.z
+	if math.abs(mine.y - truth.y) < 4 and dx * dx + dz * dz < (TRUCE.near + 4) ^ 2 then
+		return false
+	end
+	local lx, ly, lz = Body.look(truth.yaw, truth.pitch)
+	local ex, ey, ez = Body.eyePoint(truth.x, truth.y, truth.z, truth.crouch)
+	local tx, ty, tz = mine.x - ex, mine.y + Arena.CHEST - ey, mine.z - ez
+	local d = math.sqrt(tx * tx + ty * ty + tz * tz)
+	return d < 1e-3 or (tx * lx + ty * ly + tz * lz) / d < math.cos(TRUCE.look + math.rad(15))
+end
+
 -- A click from slot `id`: judged, and on yes its ball is in flight. `list` is the list of brains the
 -- slot belongs to, if it has one (for the record: whom it was firing at); `rewind` is how far back
 -- the bodies are that this ball is judged against (a bot: 0; a person: what its screen showed).
@@ -543,11 +587,11 @@ function Sim.shoot(
 		fresh = false,
 	}
 	local truth = if target ~= nil then sim.poses[target] else nil
-	if target ~= nil and truth ~= nil then
+	if target ~= nil and truth ~= nil and promised(sim, id, target) then
+		local fired = sim.lastShot[target] or -math.huge
 		shot.trap = BotNav.atDoor(sim.nav, state.slots[target].team, truth.x, truth.y, truth.z)
-			and sim.now - (sim.lastShot[target] or -math.huge) > DOOR_TRUCE
-		local home = sim.homeAt[target] or -math.huge
-		shot.fresh = sim.now - home < OUT_TRUCE and (sim.lastShot[target] or -math.huge) <= home
+			and sim.now - fired > TRUCE.door
+		shot.fresh = not shot.trap
 	end
 	if target ~= nil and truth ~= nil and list ~= nil then
 		shot.range = math.sqrt((truth.x - ox) ^ 2 + (truth.y - oy) ^ 2 + (truth.z - oz) ^ 2)
@@ -681,7 +725,7 @@ local function stepBalls(sim: Sim)
 				faced = faced(sim, ball.by, struck, ball.born),
 				sinceRoom = sinceRoom,
 				doorstep = onStep,
-				quiet = onStep and now - (sim.lastShot[struck] or -math.huge) > DOOR_TRUCE,
+				quiet = onStep and now - (sim.lastShot[struck] or -math.huge) > TRUCE.door,
 				stray = ball.shot.target ~= struck,
 				aware = aware,
 				fought = fought,
@@ -844,6 +888,57 @@ local function observe(sim: Sim, span: number)
 		end
 		-- its nose to a wall: at a post, standing, nobody to fight, and the look ends within NOSE studs
 		local brain = if rs.bot then (sim.bots.brains :: { [number]: BotBrain.Brain })[id] else nil
+		-- held fire: somebody in plain view near by, inside its cone, who may be hit and is owed no truce,
+		-- and no ball from it although it has balls to fire (see SlotRecord.held)
+		if rs.bot then
+			local spells = sim.heldFrom[id]
+			if spells == nil then
+				spells = {}
+				sim.heldFrom[id] = spells
+			end
+			local mag = slot.mag
+			local armed = (mag.reloadDoneAt == nil or now >= (mag.reloadDoneAt :: number))
+				and mag.rounds > 0
+				and room == 0
+			local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
+			local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+			local cone = math.cos(BOT.sightHalf)
+			local fired = sim.lastShot[id] or -math.huge
+			for other, os in state.slots do
+				local op = sim.poses[other]
+				local inView = false
+				if armed and op ~= nil and os.on and not os.out and os.team ~= slot.team then
+					local dx, dy, dz = op.x - ex, op.y + Arena.CHEST - ey, op.z - ez
+					local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+					inView = d < HELD_NEAR
+						and d > 1e-3
+						and (dx * lx + dy * ly + dz * lz) >= cone * d
+						and Rules.canBeHit(state, other, now)
+						and not inAnyRoom(sim, op.x, op.y, op.z)
+						and not promised(sim, id, other)
+						and (
+							arena.sweep(ex, ey, ez, op.x, op.y + Arena.CHEST, op.z) == nil
+							or arena.sweep(ex, ey, ez, op.x, op.y + Body.top(op.crouch) - Body.RADIUS, op.z) == nil
+						)
+				end
+				if not inView then
+					spells[other] = nil
+					continue
+				end
+				local from = spells[other]
+				if from == nil or fired > from then
+					from = now
+					spells[other] = now
+				end
+				local held = now - from
+				if held > rs.held then
+					rs.held = held
+				end
+				if held > HELD_GRACE then
+					rs.heldSum += span
+				end
+			end
+		end
 		-- staring: it has a target, the target is further off than it fires, and it is not going anywhere
 		local aimedAt = if brain ~= nil and brain.target ~= nil then sim.poses[brain.target] else nil
 		if brain ~= nil and aimedAt ~= nil then
@@ -1079,6 +1174,8 @@ function Sim.tick(sim: Sim)
 			pose.x, pose.y, pose.z, pose.yaw, pose.pitch, pose.crouch, pose.bits = sp.x, sp.y, sp.z, sp.yaw, 0, 0, 0
 			sim.history[id] = nil
 			sim.sprintAt[id] = nil
+			sim.leftAt[id] = nil
+			sim.heldFrom[id] = nil
 			sim.audit[id] = nil
 			sim.legsAt[id] = nil -- (a placement is the service's move, not a step)
 			local rs = sim.rec.slots[id]
@@ -1147,6 +1244,8 @@ function Sim.tick(sim: Sim)
 		local slot = state.slots[id]
 		if slot ~= nil and BotNav.roomOf(sim.nav, pose.x, pose.y, pose.z) == slot.team then
 			sim.homeAt[id] = now
+		elseif slot ~= nil and sim.leftAt[id] == nil then
+			sim.leftAt[id] = now
 		end
 	end
 

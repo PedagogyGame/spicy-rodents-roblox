@@ -74,6 +74,7 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 	t.truthy(s.camping < 4, `{s.camping} bot-seconds watching the other team's door`)
 	t.eq(s.doorTrap, 0, "no bot fires a ball at a quiet player on their own doorstep")
 	t.eq(s.outTrap, 0, "nor at somebody in their first seconds out who has not fired")
+	t.truthy(s.held < 1.5, `a bot held its fire {s.held} s on somebody in plain view (seat {s.heldSlot})`)
 	t.truthy(
 		s.doorStray <= math.max(3, 0.04 * s.tags),
 		`{s.doorStray} quiet players walked off their doorstep into a ball meant for somebody else`

@@ -53,11 +53,10 @@
 --   fires    only along its own look, when the look has settled on the aim and has been turned
 --            towards the target for BOT.faced without a break (FACING), in bursts with pauses;
 --            only when Rules.canFire says so and the target may be hit; never while sprinting or
---            within Body.SPRINT_FIRE_DELAY of it; never from a spawn room, at somebody inside one, or
---            at somebody on their own doorstep who has not fired for DOOR_TRUCE (BotNav.atDoor:
---            nobody is tagged by a bot in the first strides out of their spawn room, and nobody
---            fights from their doorstep unanswered), or at somebody in their first OUT_TRUCE
---            seconds out of their spawn room who has not yet fired a ball (see OUT_TRUCE).
+--            within Body.SPRINT_FIRE_DELAY of it; never from a spawn room or at somebody inside one;
+--            and it keeps THE TRUCES (below): somebody quiet on their own doorstep, or in their first
+--            strides out of their spawn room, is not its target until they fire, come up close to it
+--            or square up to it.
 
 -- A PROFILE is the set of numbers that make a brain the kind of player it is. DEFAULT is the bot
 -- (the fairness numbers are Contract.BOT's); tools/games/paintball/bots passes another to stand in
@@ -112,6 +111,9 @@ export type Profile = {
 	burstMax: number, -- balls in a burst, at most
 	pauseMin: number, -- seconds between bursts
 	pauseMax: number,
+	-- a bot's courtesies (THE TRUCES; keeping a person of its team company; call-outs): true for a bot,
+	-- false for the stand-in person the calibration plays against them (a person keeps none of them)
+	courtesy: boolean,
 }
 
 -- A sighting of one opponent.
@@ -144,7 +146,10 @@ export type Squad = {
 	home: { [number]: number }, -- by bot: the storey it has made its own for this life
 	side: { [number]: number }, -- by bot: its team
 	firedAt: { [number]: number }, -- by slot: when it last fired a ball (everybody hears a marker)
-	homeAt: { [number]: number }, -- by slot: when it was last inside its own spawn room (see OUT_TRUCE)
+	homeAt: { [number]: number }, -- by slot: when it was last inside its own spawn room
+	leftAt: { [number]: number }, -- by slot: when it first stepped out of its spawn room after its last placement (THE TRUCES)
+	eyeOn: { [number]: number }, -- by slot: the bot of this list its look rests on (within TRUCE_LOOK), if any ...
+	eyeOnAt: { [number]: number }, -- ... since when
 	people: { [number]: number }, -- by slot: the team of a seat that is on and is not one of these bots (a person)
 	escort: { [number]: number }, -- by bot: the person of its team it is keeping company (see COMPANY)
 	sightLeft: number, -- sight checks left this tick (the tick's share: Bots.step sets it)
@@ -288,6 +293,7 @@ BotBrain.DEFAULT = table.freeze({
 	burstMax = 3,
 	pauseMin = 0.35,
 	pauseMax = 0.95,
+	courtesy = true,
 }) :: Profile
 
 local VIS = 0.36 -- a clear line confirmed this recently: the opponent is in sight
@@ -308,6 +314,7 @@ local JINK = 2.8 -- studs (inside what the stuck watch, and anybody watching, ca
 -- target, within this of it, for Profile.faced without a break: a sighting old enough is not enough
 -- if the bot has looked away since (it must be SEEN to turn on a player before it can tag them).
 local FACING = math.rad(40)
+local SETTLE_NEAR = 0.4 -- of the angle a body's half-width makes: the look is settled within this, close up
 local OPEN_VIEW = 12 -- studs of clear view that make a direction worth looking in from a post
 -- ADVANCE: a bot that can see somebody it cannot reach (further off than Profile.range of ball
 -- flight) does not stand and look at them. On its way somewhere it keeps going; at a post it moves up,
@@ -317,17 +324,27 @@ local ADVANCE_INSIDE = 0.75 -- of its range: how near the place it moves up to m
 local ADVANCE_OFF = 18 -- studs: and no nearer than this
 local STUCK = 9 -- seconds in one place before the stuck watch sends a bot somewhere else
 local STUCK_REACH = 6 -- studs: "one place" is this far across
+-- THE TRUCES: two courtesies a bot keeps so that nobody is spawn-trapped, and only those two, each as
+-- narrow as its purpose (a person keeps none: Profile.courtesy):
+--   DOORSTEP     somebody on their own doorstep (BotNav.atDoor) who has not fired a ball for DOOR_TRUCE;
+--   FIRST STRIDES somebody less than OUT_TRUCE out of their spawn room for the first time this life,
+--                who has not fired since.
+-- Either ends AT ONCE for a bot that the other has come within TRUCE_NEAR of, or has held their look
+-- on (within TRUCE_LOOK, for TRUCE_EYE): somebody who walks up to a bot, or squares up to it, is in a
+-- fight. And a bot keeping a truce does not stand and stare at them with its marker up: they are not
+-- its target (it goes on looking about and on its way, as if it had not noticed them yet), so the
+-- moment the truce ends it still has to turn on them, settle and be seen to face them (BOT.faced).
+-- (The truce as a bot keeps it is a little wider than it is promised, in time and in reach: a bot aims
+-- at where it last saw its target, up to VIS ago, and a person is shown a tenth of a second late;
+-- neither may put a ball where the promise says none goes. The promise is what Sim counts.)
 local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
--- (the truce as a bot keeps it is wider than the truce as it is promised: a bot aims at where it last
--- saw its target, up to VIS ago, and a person is shown a tenth of a second late; neither may put a
--- ball where the promise says none goes)
 local DOOR_TRUCE_SLACK = 0.5 -- seconds
 local DOOR_TRUCE_STRIDE = 10 -- studs
--- OUT_TRUCE: and nobody is fired at by a bot in their first seconds out of their spawn room, however
--- far they have got, until they fire a ball themselves: a life is not over before it has got anywhere.
--- (Kept wider than it is promised, like the doorstep's: OUT_TRUCE is the promise.)
-local OUT_TRUCE = 4 -- seconds since it was last inside its own spawn room
-local OUT_TRUCE_SLACK = 0.5 -- seconds
+local OUT_TRUCE = 1.5 -- seconds since it first stepped out of its spawn room this life
+local OUT_TRUCE_SLACK = 0.3 -- seconds
+local TRUCE_NEAR = 15 -- studs (over the floor, on one storey): this near a bot, there is no truce with it
+local TRUCE_LOOK = math.rad(10) -- a look this near a bot's chest is a look ON it ...
+local TRUCE_EYE = 0.35 -- ... once it has rested there this long (a glance across the room is not squaring up)
 local CHEST = ArenaModule.CHEST
 -- COMPANY: a person is not left to play alone in a five-storey building. One bot of a person's team
 -- (two, of a big team) chooses its posts within a short run of where that person is (their
@@ -546,6 +563,9 @@ function BotBrain.alert(b: Brain, x: number, y: number, z: number, now: number)
 end
 
 local function say(b: Brain, squad: Squad, now: number, out: { Command }, line: string, n: number?)
+	if not b.profile.courtesy then
+		return -- (the stand-in person says nothing)
+	end
 	if now - b.saidAt < SAY_EVERY or now - squad.saidAt[b.team] < TEAM_SAY_EVERY then
 		return
 	end
@@ -734,6 +754,9 @@ end
 -- has gone off on its own for a while.
 local function buddyOf(b: Brain, squad: Squad, state: State): Track?
 	local rng = b.rng
+	if not b.profile.courtesy then
+		return nil -- (the stand-in person plays its own game)
+	end
 	local had = squad.escort[b.id]
 	if had ~= nil then
 		local slot = state.slots[had]
@@ -1062,6 +1085,53 @@ local function jinkTo(b: Brain, tx: number, tz: number): boolean
 	return false
 end
 
+-- Is there a truce between this bot and `target`, whom it takes to be at (tx, ty, tz)? (See THE
+-- TRUCES: the target on its own doorstep and quiet, or in its first strides out of its spawn room and
+-- yet to fire; and neither close to this bot nor squared up to it.)
+local function truce(
+	b: Brain,
+	squad: Squad,
+	state: State,
+	target: number,
+	tx: number,
+	ty: number,
+	tz: number,
+	now: number
+): boolean
+	if not b.profile.courtesy then
+		return false
+	end
+	local dx, dz = tx - b.x, tz - b.z
+	if dx * dx + dz * dz < TRUCE_NEAR * TRUCE_NEAR and math.abs(ty - b.y) < 4 then
+		return false -- it has come up to this bot
+	end
+	if squad.eyeOn[target] == b.id and now - (squad.eyeOnAt[target] or now) >= TRUCE_EYE then
+		return false -- it has its marker on this bot
+	end
+	local never = -math.huge
+	local fired = squad.firedAt[target] or never
+	if
+		now - fired >= DOOR_TRUCE - DOOR_TRUCE_SLACK and BotNav.atDoor(b.nav, 3 - b.team, tx, ty, tz, DOOR_TRUCE_STRIDE)
+	then
+		return true
+	end
+	local left = squad.leftAt[target]
+	local slot = state.slots[target]
+	return left ~= nil
+		and slot ~= nil
+		and left >= slot.spawnAt
+		and now - left < OUT_TRUCE + OUT_TRUCE_SLACK
+		and fired <= left
+end
+
+BotBrain.TRUCE = table.freeze({
+	door = DOOR_TRUCE,
+	out = OUT_TRUCE,
+	near = TRUCE_NEAR,
+	look = TRUCE_LOOK,
+	eye = TRUCE_EYE,
+})
+
 -- Ten times a second: the target, the fight, the reload, the walk.
 local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Pose }, now: number, out: { Command })
 	local nav = b.nav
@@ -1079,6 +1149,9 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 		local pose = poses[eid]
 		if other == nil or pose == nil or not other.on or other.out or other.team == b.team then
 			continue
+		end
+		if truce(b, squad, state, eid, c.x, c.y, c.z, now) then
+			continue -- not its target: it has not noticed them yet, as far as anybody can tell (THE TRUCES)
 		end
 		local d = math.sqrt((c.x - b.x) ^ 2 + (c.y - b.y) ^ 2 + (c.z - b.z) ^ 2)
 		local score = d * (if eid == b.target then 0.7 else 1)
@@ -1564,25 +1637,6 @@ local function idleLook(b: Brain, squad: Squad, now: number)
 	b.wantYaw, b.wantPitch = b.scanYaw, b.scanPitch
 end
 
--- Is there a truce between this bot and `target`, whom it takes to be at (tx, ty, tz)? (See DOOR_TRUCE
--- and OUT_TRUCE: the target on its own doorstep and quiet; the target in its first seconds out of its
--- spawn room and yet to fire; the bot in its own first seconds out and not yet shot at.)
-local function truce(b: Brain, squad: Squad, target: number, tx: number, ty: number, tz: number, now: number): boolean
-	local never = -math.huge
-	local fired = squad.firedAt[target] or never
-	if
-		now - fired >= DOOR_TRUCE - DOOR_TRUCE_SLACK and BotNav.atDoor(b.nav, 3 - b.team, tx, ty, tz, DOOR_TRUCE_STRIDE)
-	then
-		return true
-	end
-	local home = squad.homeAt[target] or never
-	if now - home < OUT_TRUCE + OUT_TRUCE_SLACK and fired <= home then
-		return true
-	end
-	local mine = squad.homeAt[b.id] or never
-	return now - mine < OUT_TRUCE and b.alarm <= mine
-end
-
 -- One server tick of one bot. Appends its commands to `out`; writes its pose to `poses`.
 function BotBrain.step(
 	b: Brain,
@@ -1720,15 +1774,18 @@ function BotBrain.step(
 	else
 		b.facedWho = nil
 	end
-	-- fire? Only along the look as it now is, and only when it has settled on the aim
+	-- fire? Only along the look as it now is, and only when it has settled on the aim: within
+	-- Profile.settle, or close up within a share of how wide the target looks (nobody waits for a
+	-- perfect line on somebody filling the screen; what is left over is more error)
+	local settle = if aiming then math.max(p.settle, SETTLE_NEAR * math.atan(Body.RADIUS / math.max(range, 1))) else 0
 	if
 		aiming
 		and target ~= nil
 		and tpose ~= nil
 		and contact ~= nil
 		and now >= b.pauseUntil
-		and math.abs(wrap(b.wantYaw - b.yaw)) <= p.settle
-		and math.abs(b.wantPitch - b.pitch) <= p.settle
+		and math.abs(wrap(b.wantYaw - b.yaw)) <= settle
+		and math.abs(b.wantPitch - b.pitch) <= settle
 		and now - contact.first >= math.max(contact.react, p.faced)
 		and now - b.facedAt >= p.faced
 		and range <= p.range * feel.ballSpeed
@@ -1736,7 +1793,7 @@ function BotBrain.step(
 		and now - b.sprintAt >= Body.SPRINT_FIRE_DELAY + 0.02
 		and BotNav.roomOf(b.nav, b.x, b.y, b.z) == 0
 		and BotNav.roomOf(b.nav, tx, ty, tz) == 0
-		and not truce(b, squad, target, tx, ty, tz, now)
+		and not truce(b, squad, state, target, tx, ty, tz, now)
 		and Rules.canBeHit(state, target, now)
 		and Rules.canFire(state, b.id, now)
 	then

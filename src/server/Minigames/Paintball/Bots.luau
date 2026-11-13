@@ -47,11 +47,11 @@
 --   * respect the match: they fire only when Rules.canFire(state, id, now) says so, with the same
 --     magazine and reload as a person, never while BIT.sprint is set in their pose or within
 --     Body.SPRINT_FIRE_DELAY of it, and never from inside a spawn room;
---   * do not spawn-trap: no bot fires at somebody inside their spawn room, nor at somebody on
---     their own doorstep (BotNav.DOORSTEP) who has not fired a ball in the last few seconds, nor at
---     somebody in their first four seconds out of their spawn room who has not yet fired a ball
---     (BotBrain, OUT_TRUCE), and no bot chooses to stand within BotNav.KEEP_OFF of the other team's
---     doors.
+--   * do not spawn-trap: no bot fires at somebody inside their spawn room, nor (BotBrain, THE TRUCES)
+--     at somebody on their own doorstep (BotNav.DOORSTEP) who has not fired a ball in the last few
+--     seconds, nor at somebody in their first 1.5 s out of their spawn room who has not yet fired,
+--     unless they have come within 15 studs of that bot or held their look on it; and no bot
+--     chooses to stand within BotNav.KEEP_OFF of the other team's doors.
 
 -- A bot's shot is a command for the service, which checks the look (above), calls Rules.fire(state,
 -- id, now) and Projectiles.fire with no rewind: a bot sees the server's present. Every `now` here is
@@ -90,6 +90,8 @@ local BodyModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintba
 	Import.shared("Minigames/Paintball/Body")
 local ContractModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
 	Import.shared("Minigames/Paintball/Contract")
+local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
+	Import.shared("Minigames/Paintball/Arena")
 local BotBrain = require("./BotBrain")
 local BotNav = require("./BotNav")
 
@@ -156,6 +158,7 @@ export type Bots = {
 }
 
 local RULES = ContractModule.Rules
+local CHEST = ArenaModule.CHEST
 
 local Bots = {}
 
@@ -174,6 +177,9 @@ local function newSquad(arena: Arena): BotBrain.Squad
 		side = {},
 		firedAt = {},
 		homeAt = {},
+		leftAt = {},
+		eyeOn = {},
+		eyeOnAt = {},
 		people = {},
 		escort = {},
 		sightLeft = 0,
@@ -259,6 +265,7 @@ end
 -- between changes and smoothed.)
 local function follow(
 	nav: BotNav.Nav,
+	profile: BotBrain.Profile,
 	squad: BotBrain.Squad,
 	brains: { [number]: BotBrain.Brain },
 	state: State,
@@ -267,6 +274,8 @@ local function follow(
 )
 	local track = squad.track
 	local people = squad.people
+	local courtesy = profile.courtesy
+	local lookOn = math.cos(BotBrain.TRUCE.look)
 	for id, slot in state.slots do
 		local pose = poses[id]
 		-- a seat that is on and is none of these bots is a person, as far as the bots can tell
@@ -278,10 +287,41 @@ local function follow(
 		if not slot.on or pose == nil then
 			track[id] = nil
 			squad.homeAt[id] = nil
+			squad.leftAt[id] = nil
+			squad.eyeOn[id] = nil
 			continue
 		end
 		if BotNav.roomOf(nav, pose.x, pose.y, pose.z) == slot.team then
-			squad.homeAt[id] = now -- in its own spawn room (BotBrain, OUT_TRUCE)
+			squad.homeAt[id] = now -- in its own spawn room
+		elseif (squad.leftAt[id] or -math.huge) < slot.spawnAt then
+			squad.leftAt[id] = now -- its first step out since it was placed (BotBrain, THE TRUCES)
+		end
+		if courtesy then
+			-- the bot of this list its look rests on, if any (BotBrain, THE TRUCES): what anybody sees of a
+			-- marker pointed at them
+			local on: number? = nil
+			if not slot.out then
+				local lx, ly, lz = BodyModule.look(pose.yaw, pose.pitch)
+				local ex, ey, ez = BodyModule.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+				local best = lookOn
+				for bid, b in brains do
+					if b.team == slot.team or not b.placed then
+						continue
+					end
+					local dx, dy, dz = b.x - ex, b.y + CHEST - ey, b.z - ez
+					local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+					if d > 1e-3 and d < 150 then
+						local cos = (dx * lx + dy * ly + dz * lz) / d
+						if cos > best then
+							on, best = bid, cos
+						end
+					end
+				end
+			end
+			if on ~= squad.eyeOn[id] then
+				squad.eyeOn[id] = on
+				squad.eyeOnAt[id] = now
+			end
 		end
 		local t = track[id]
 		if t == nil then
@@ -444,7 +484,7 @@ function Bots.step(
 	end
 	local squad = bots.squad
 	squad.tick += 1
-	follow(bots.nav, squad, brains, state, poses, now)
+	follow(bots.nav, bots.profile, squad, brains, state, poses, now)
 	if #heard > 0 then
 		hear(bots, state, poses, heard, now, out)
 	end

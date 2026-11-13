@@ -87,6 +87,8 @@ local function closeUp(at: number, yaw: number, seed: number?): Close
 		{ x = node.x, y = node.y, z = node.z, yaw = yaw, pitch = 0, crouch = 0, bits = 0 },
 	}
 	Bots.sync(bots, state, { [2] = 0.5 }, poses, now)
+	-- (the person left their spawn room a while ago: no truce is owed them, THE TRUCES in BotBrain)
+	bots.squad.leftAt[1] = state.slots[1].spawnAt + 0.5
 	local brain = (bots.brains :: { [number]: BotBrain.Brain })[2]
 	brain.goAt = math.huge -- it stands where it was put until the case says otherwise
 	brain.scanAt, brain.scanYaw, brain.scanPitch = math.huge, yaw, 0 -- and looks where it looks
@@ -548,6 +550,103 @@ return function(t)
 			t.eq(#safe.fired, 0)
 			stepClose(safe, 1.5)
 			t.truthy(#safe.fired >= 1)
+		end
+	)
+
+	t.test(
+		"the truces are narrow: first strides and a quiet doorstep only, and over when somebody comes close or squares up",
+		function()
+			local TRUCE = BotBrain.TRUCE
+			local at = groundNode(0, -24)
+			-- a person who has just stepped out of their spawn room (as far as the bots can tell) and stands
+			-- `dist` studs in front of the bot, looking at it or away; nothing changes but what the case says
+			local function fresh(seed: number, dist: number, looking: boolean): Close
+				local c = closeUp(at, 0, seed)
+				local sp = arena.spawns[1][1]
+				c.poses[1].x, c.poses[1].y, c.poses[1].z = sp.x, sp.y, sp.z
+				stepClose(c, DT)
+				c.bots.squad.leftAt[1] = nil -- (as after a placement: its next step out is its first)
+				local bx, bz = c.brain.x, c.brain.z
+				c.poses[1].x, c.poses[1].y, c.poses[1].z = bx, 0, bz - dist
+				c.poses[1].yaw = if looking
+					then yawTo(bx, bz - dist, bx, bz)
+					else yawTo(bx, bz - dist, bx, bz) + math.pi
+				return c
+			end
+			local function firstBall(c: Close, within: number): number?
+				local from = c.now
+				for _ = 1, math.floor(within / DT + 0.5) do
+					stepClose(c, DT)
+					if #c.fired > 0 then
+						return c.now - from
+					end
+				end
+				return nil
+			end
+			for seed = 1, 8 do
+				-- first strides, 25 studs off, looking away: not its target (no stare), no ball for OUT_TRUCE ...
+				local c = fresh(seed, 25, false)
+				stepClose(c, TRUCE.out - 0.05)
+				t.eq(#c.fired, 0, `seed {seed}: a ball in somebody's first strides out`)
+				t.eq(c.brain.target, nil, `seed {seed}: it does not stand with its marker on them`)
+				t.truthy(c.brain.con[1] ~= nil and c.now - c.brain.con[1].seen < 0.4, "though it has seen them")
+				-- ... and then it is a fight like any other: the sighting has long sunk in
+				local late = firstBall(c, 2)
+				t.truthy(late ~= nil and late < 1.3, `seed {seed}: the first ball {late} s after the truce`)
+				-- looking at the bot: squared up to it, no truce
+				local square = fresh(seed, 25, true)
+				local squared = firstBall(square, TRUCE.out)
+				t.truthy(squared ~= nil and squared < 1.3, `seed {seed}: squared up, the first ball after {squared} s`)
+				-- walking straight up to it, looking away: no truce once inside TRUCE.near
+				local walk = fresh(seed, 32, false)
+				local inside: number? = nil
+				local fired: number? = nil
+				for _ = 1, 3 * Clock.TICK_HZ do
+					local p = walk.poses[1]
+					if walk.brain.z - p.z > 6 then
+						p.z += Body.WALK * DT
+					end
+					if inside == nil and walk.brain.z - p.z < TRUCE.near then
+						inside = walk.now
+					end
+					stepClose(walk, DT)
+					if #walk.fired > 0 then
+						fired = walk.now
+						break
+					end
+				end
+				t.truthy(inside ~= nil and fired ~= nil, `seed {seed}: walked up and was fired on`)
+				t.truthy((fired :: number) >= (inside :: number), "not before it came close")
+				t.truthy(
+					(fired :: number) - (inside :: number) < 0.8,
+					`seed {seed}: {(fired :: number) - (inside :: number)} s after it came close`
+				)
+			end
+			-- the doorstep: quiet on it, 21 studs from a bot, looking away: no ball for as long as it stays
+			-- quiet; squared up to the bot, a fight
+			local door = nav.nodes[nav.doors[1][1]]
+			local post = BotNav.nearest(nav, door.x + 18, door.y, door.z - 18, 2)
+			local node = arena.nodes[post]
+			local px, pz = door.x + 3.5, door.z - 3
+			t.truthy(BotNav.atDoor(nav, 1, px, door.y, pz), "the premise: on its own doorstep")
+			local flat = math.sqrt((node.x - px) ^ 2 + (node.z - pz) ^ 2)
+			t.truthy(flat > TRUCE.near + 2 and flat < 26, `the premise: {flat} studs from the bot`)
+			t.eq(arena.sweep(node.x, node.y + 4.5, node.z, px, door.y + ArenaModule.CHEST, pz), nil, "in plain view")
+			for _, looking in { false, true } do
+				local c = closeUp(post, yawTo(node.x, node.z, px, pz))
+				c.poses[1].x, c.poses[1].y, c.poses[1].z = px, door.y, pz
+				c.poses[1].yaw = yawTo(px, pz, node.x, node.z) + (if looking then 0 else math.pi)
+				local first = firstBall(c, 6)
+				if looking then
+					t.truthy(first ~= nil and first < 1.3, `squared up on the doorstep: the first ball after {first} s`)
+				else
+					t.eq(first, nil, "nobody quiet on their doorstep is fired on")
+					t.eq(c.brain.target, nil, "nor stared at")
+				end
+			end
+			-- the stand-in person keeps none of it
+			t.eq((Sim.FAIR :: any).courtesy, false)
+			t.eq((BotBrain.DEFAULT :: any).courtesy, true)
 		end
 	)
 
@@ -1061,6 +1160,9 @@ return function(t)
 		t.eq(s.doorTrap, 0, "no bot fires a ball at a quiet player on their own doorstep")
 		t.eq(s.outTrap, 0, "nor at somebody in their first seconds out who has not fired")
 		t.truthy(s.earlyTags <= math.max(2, 0.03 * s.tags), `{s.earlyTags} tags on somebody just out`)
+		-- and no truce, nor anything else, leaves a bot standing with somebody in plain view close by and
+		-- not firing: the time to notice, turn, settle and be seen to face them, and no more
+		t.truthy(s.held < 1.5, `a bot held its fire {s.held} s on somebody in plain view (seat {s.heldSlot})`)
 		t.truthy(
 			s.doorStray <= math.max(3, 0.04 * s.tags),
 			`{s.doorStray} quiet players walked off their doorstep into a ball meant for somebody else`
@@ -1343,6 +1445,8 @@ return function(t)
 		t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 		t.truthy(s.stares <= 2, `{s.stares} times a bot followed somebody through a wall`)
 		t.eq(s.doorTrap, 0)
+		t.eq(s.outTrap, 0)
+		t.truthy(s.held < 1.5, `a bot held its fire {s.held} s on somebody in plain view (seat {s.heldSlot})`)
 		t.truthy(s.still < 14)
 		-- one of its team's bots keeps it company (tests/unit/paintball_bots_team.spec.luau)
 		t.truthy(
