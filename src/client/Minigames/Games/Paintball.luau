@@ -3,7 +3,7 @@
 -- Paintball's client half on the minigame framework (Client/Minigames/ClientGame; brief v2 §13, §14):
 -- what the framework is told about the game, with the game itself in Client/Minigames/Paintball/
 -- (PaintballClient: the show anyone near sees, and the seat of a player in the match).
--- OWNED BY THE CLIENT LANE (the registry's stub: its line in Client/Minigames/ClientGames exists).
+-- OWNED BY THE CLIENT LANE (its line in Client/Minigames/ClientGames exists).
 -- What is fixed by the paintball contract and must stay as it is here:
 --   keys     Q and gamepad B are swallowed: leaving a match is a deliberate Leave (a button shown
 --            with the scoreboard, in the briefing and at the end card; on a gamepad, Y while the
@@ -17,7 +17,10 @@
 --            those verbs); Leave in the briefing's first moment and at the end card. No "Play
 --            again": the next match starts by itself.
 --   endCard  from view.result (Contract.Result): the framework's end card, counting down to the
---            next match. The lane dresses it (the WBLW sports bulletin, the awards).
+--            next match, headed as the WBLW Channel 7 sports bulletin: the winner's line, then every
+--            player's (side, tags, times out, aim), most tags first. The bulletin's awards are drawn
+--            beside it by the seat's own HUD (Client/Minigames/Paintball/Hud), which also takes the
+--            framework card's "Play again" away (the next match starts by itself).
 --   sounds   the cues of PB-8, every id empty until the licensed sounds are chosen.
 -- Interface: a ClientGame.ClientGame
 
@@ -63,7 +66,7 @@ local function endCard(view: { [string]: any }, _you: number?): { [string]: any 
 		})
 	end
 	return {
-		title = "FULL TIME",
+		title = "WBLW 7 SPORTS  ·  FULL TIME",
 		line = result.text,
 		rows = rows,
 		cols = {

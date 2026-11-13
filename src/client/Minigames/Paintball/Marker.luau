@@ -86,6 +86,11 @@ function Marker.new(seat: SeatCore.Seat, port: SelfPort.Self, tuning: typeof(Tun
 
 	function marker.step(self: Marker, dt: number)
 		local now = seat.now
+		-- tagged out: put away
+		local want = if seat.out then nil else camera
+		if model.Parent ~= want then
+			model.Parent = want
+		end
 		if team ~= seat.team then
 			team = seat.team
 			local t = Contract.TEAMS[team]

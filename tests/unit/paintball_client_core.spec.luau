@@ -499,6 +499,48 @@ return function(t)
 		t.eq(seat.mag.reloadDoneAt, at)
 	end)
 
+	t.test(
+		"an ack and a reload: R pressed after a click is not undone by that click's ack; a refused fifth ball is",
+		function()
+			local b = Kit.playing()
+			local seat = b.seat
+			press(b)
+			Kit.run(b, 0.1)
+			seat:input("reload", true)
+			local done = seat.mag.reloadDoneAt
+			t.truthy(done ~= nil)
+			-- the ack of the click before the R: the server had not heard of the reload yet
+			Kit.message(b, { kind = "paintball_ack", shot = 1, ok = true, ball = 3, rounds = 4 })
+			t.eq(seat.mag.reloadDoneAt, done, "the reload runs on: no flicker, no second rattle")
+			t.eq(Kit.cues(b, "paintball.reload"), 1)
+			-- the server's own word on the reload moves its end
+			Kit.message(b, { kind = "paintball_reload", id = 1, at = (done :: number) + 0.05 })
+			t.eq(seat.mag.reloadDoneAt, (done :: number) + 0.05)
+			t.eq(Kit.cues(b, "paintball.reload"), 1)
+			Kit.run(b, F.reloadSecs + 0.2)
+			t.eq(seat.mag.rounds, R.magazine)
+			-- five balls; the server refuses the fifth: the automatic reload it began is not running
+			for shot = 1, 5 do
+				press(b)
+				Kit.run(b, F.fireInterval + 0.02)
+				if shot < 5 then
+					Kit.message(
+						b,
+						{ kind = "paintball_ack", shot = shot + 1, ok = true, ball = shot, rounds = 5 - shot }
+					)
+				end
+			end
+			t.eq(seat.mag.rounds, 0)
+			t.truthy(seat.mag.reloadDoneAt ~= nil)
+			Kit.message(b, { kind = "paintball_ack", shot = 6, ok = false, why = "stale", rounds = 1 })
+			t.eq(seat.mag.rounds, 1, "the ball is back")
+			t.eq(seat.mag.reloadDoneAt, nil)
+			-- a reload the server starts that the client did not predict rattles when it is told
+			Kit.message(b, { kind = "paintball_reload", id = 1, at = b.now() + 1 })
+			t.eq(Kit.cues(b, "paintball.reload"), 3)
+		end
+	)
+
 	t.test("the first state after joining sets the magazine once (a late joiner into a running reload)", function()
 		local b = Kit.bench()
 		Kit.watch(b)

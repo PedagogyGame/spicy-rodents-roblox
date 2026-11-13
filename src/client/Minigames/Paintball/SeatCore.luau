@@ -653,15 +653,22 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			local mag = self.mag
 			Magazine.update(mag, now)
 			if since == 0 then
-				mag.rounds = rounds
 				if reloadAt ~= nil then
+					-- a reload the server reports is taken over
 					if mag.reloadDoneAt == nil then
 						self.reloadFrom = now
 					end
+					mag.rounds = rounds
 					mag.reloadDoneAt = reloadAt
-				elseif rounds > 0 then
+				elseif mag.reloadDoneAt == nil then
+					mag.rounds = rounds
+				elseif msg.ok ~= true and rounds > 0 and mag.rounds == 0 then
+					-- the automatic reload began on a ball the server did not let go: it is not running
+					mag.rounds = rounds
 					mag.reloadDoneAt = nil
 				end
+				-- (a reload of the player's own, pressed since that click, runs on: "paintball_reload"
+				-- or a refusal of the verb says what became of it)
 			elseif mag.reloadDoneAt == nil then
 				mag.rounds = math.max(0, rounds - since)
 			end

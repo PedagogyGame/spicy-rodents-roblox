@@ -48,6 +48,7 @@ local R = Contract.Rules
 local WHITE = { 245, 245, 245 }
 local NAVY = { 16, 20, 44 }
 local ROWS = R.teamMax
+local FIT = "PaintballFit" -- the UIScale this HUD hangs on the framework's end card on a small screen
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -147,7 +148,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	local clock = label("Clock", top, UDim2.fromOffset(96, 30), UDim2.fromOffset(82, 4), WHITE, true)
 	local score2 = label("Score2", top, UDim2.fromOffset(70, 30), UDim2.fromOffset(182, 4), teamRgb(2), true)
 	local mine = frame("Mine", top, UDim2.fromOffset(54, 3), UDim2.fromOffset(16, 33), WHITE)
-	local phaseLine = label("Phase", gui, UDim2.fromOffset(520, 24), UDim2.new(0.5, -260, 0, 50), WHITE, true)
+	local phaseLine = label("Phase", gui, UDim2.fromOffset(760, 24), UDim2.new(0.5, -380, 0, 50), WHITE, true)
 	local count =
 		label("Count", gui, UDim2.fromOffset(240, 110), UDim2.new(0.5, -120, 0.28, -55), { 255, 214, 92 }, true)
 
@@ -364,6 +365,34 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 				end
 			end
 		end
+		-- sixteen lines are taller than a phone: the card is scaled to fit the screen it is on
+		local vp = camera.ViewportSize
+		local fit = math.min(1, (vp.Y - 50) / card.Size.Y.Offset, (vp.X - 20) / card.Size.X.Offset)
+		local scale = card:FindFirstChild(FIT)
+		if fit < 0.999 then
+			if scale == nil then
+				local made = Instance.new("UIScale")
+				made.Name = FIT
+				made.Parent = card
+				scale = made
+			end
+			scale.Scale = fit
+			card.AnchorPoint = Vector2.new(0.5, 0.5)
+			card.Position = UDim2.fromScale(0.5, 0.5)
+		elseif scale then
+			scale.Scale = 1
+		end
+	end
+
+	-- (the framework's card is everybody's: what was hung on it comes off again)
+	local function undressSummary()
+		local ui = ctx.ui
+		local card = if ui then ui.summaryFrame else nil
+		local scale = if card then card:FindFirstChild(FIT) else nil
+		if scale then
+			scale:Destroy()
+			card.AnchorPoint = Vector2.new(0, 0)
+		end
 	end
 
 	function hud.step(_self: Hud, dt: number)
@@ -417,14 +446,13 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		set(clock, if ended then "FULL TIME" elseif phase == "" then "" else clockText(left))
 		clock.TextColor3 = if not starting and not ended and left <= 30 then rgb({ 255, 90, 80 }) else rgb(WHITE)
 		local side = Contract.TEAMS[seat.team]
-		set(
-			phaseLine,
-			if starting
-				then `BRIEFING   You are {if side then string.upper(side.name) else "?"}   The match starts in {math.ceil(
-					left
-				)} s`
-				else ""
-		)
+		local briefing = ""
+		if starting then
+			local name = if side then string.upper(side.name) else "?"
+			local hold = if UIS.TouchEnabled then "" else "   (hold G: scoreboard, Leave, Change sides)"
+			briefing = `BRIEFING   You are {name}   The match starts in {math.ceil(left)} s{hold}`
+		end
+		set(phaseLine, briefing)
 		local since = liveSince
 		if starting and left <= tune.briefCount then
 			set(count, tostring(math.max(1, math.ceil(left))))
@@ -535,6 +563,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	end
 
 	function hud.stop(_self: Hud)
+		undressSummary()
 		gui:Destroy()
 	end
 

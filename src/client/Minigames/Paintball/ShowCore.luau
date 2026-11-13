@@ -72,7 +72,7 @@ export type Puppet = {
 
 export type Ball = {
 	key: number, -- unique on this screen
-	ball: number, -- the server's ball id (your own: 0 until the ack)
+	ball: number, -- the server's ball id (your own: -1 until the ack)
 	by: number,
 	team: number,
 	own: boolean,
@@ -481,7 +481,7 @@ function ShowCore.new(opts: Opts): Show
 		for _, rec in records do
 			local flying: Ball? = nil
 			for _, b in self.balls do
-				if b.by == rec.by and (b.ball == rec.ball or (b.own and b.ball == 0)) and b.ball == rec.ball then
+				if b.by == rec.by and b.ball == rec.ball then
 					flying = b
 					break
 				end
@@ -525,7 +525,7 @@ function ShowCore.new(opts: Opts): Show
 		keys += 1
 		local ball: Ball = {
 			key = keys,
-			ball = 0,
+			ball = -1, -- (not known until the ack)
 			by = self.you,
 			team = self:teamOf(self.you),
 			own = true,
@@ -559,7 +559,7 @@ function ShowCore.new(opts: Opts): Show
 		for _, b in table.clone(self.balls) do
 			if b.own and b.shot == shot then
 				if ok then
-					b.ball = ballId or 0
+					b.ball = ballId or -1
 				else
 					removeBall(self, b)
 				end
@@ -569,11 +569,15 @@ function ShowCore.new(opts: Opts): Show
 			local s = self.walls[i]
 			if s.predicted and s.shot == shot then
 				if ok then
-					s.ball = ballId or 0
+					-- (its shape is picked from the ball's id, as the server's record's will be: drawn
+					-- afresh under a new key, so the record that replaces it looks the same)
+					s.ball = ballId or -1
+					predictedKeys -= 1
+					s.key = predictedKeys
 				else
 					table.remove(self.walls, i)
-					changed(self)
 				end
+				changed(self)
 			end
 		end
 	end
