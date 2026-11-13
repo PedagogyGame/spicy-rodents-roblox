@@ -121,6 +121,11 @@ cases.push(run({ name: 'mallet: a strike from rest', human: 0, computer: false, 
 cases.push(run({ name: 'serve: the countdown, then the serve', human: 0, computer: true, every: 1, ticks: 720 }));
 cases.push(run({ name: 'serve: a tap serves at once', human: 0, computer: true, every: 1, ticks: 480 },
   (g, tick) => tick === 30 ? [[30, -1]] : []));
+// his simulation's flaw, kept: a mallet pushed straight at a puck resting by a side rail squeezes it through the
+// rail, and it never comes back (the port must do exactly the same; the match is saved outside the step)
+cases.push(run({ name: 'flaw: a mallet presses a resting puck out through the side rail', human: 0, computer: false,
+  every: 1, ticks: 120, setup: { ...still, puck: [.58, -.5], velocity: [0, 0], paddle0: [.3, -.5] } },
+  (g, tick) => tick === 0 ? [[0, 0, .556, -.5]] : []));
 // two people (the computer off): both hands driven, every state of the first seconds, then sampled
 cases.push(run({ name: 'two people: seed 1', human: 0, computer: false, every: 1, ticks: 720 },
   both(hand(0, 101, 4, 1), hand(1, 202, 4, 1))));

@@ -18,11 +18,18 @@
 -- Two things are added that the simulation never reads (they are for sound and drawing): hitWhat / hitSpeed say
 -- what the last contact was and how hard; and the drag of one whole step is a constant (DECAY) instead of a call
 -- to exp on every machine, so that a client and the server never differ by a rounding of exp.
+-- ONE RULE IS NOT HIS, and it is kept outside his step: play() is tick() followed by "a puck that has left the
+-- table is put back for a serve". His simulation lets a puck out: a mallet pushed straight at a puck that rests
+-- against a side rail squeezes it through the rail in about fifteen ticks (the rail is only looked for while
+-- the puck is still inside it), and it never comes back, so the match never ends. It happens in his JavaScript
+-- with the same inputs (tests/golden/air_hockey.json, the case "flaw: ..."; the port reproduces it bit for bit).
+-- Nothing in tick() is changed to prevent it. A match is stepped with play(); tick() is his, alone.
 -- The state is one flat record of numbers (no vectors, nothing allocated in tick): it is stepped several hundred
 -- times a frame when a client replays.
 -- Pure. Interface: constants; new() -> State; reset(s); resetPuck(s); serve(s); setTarget(s, side, x, y);
---   ai(s, side); tick(s, dt?, human?, computer?); copy(dst, src) -> dst; clone(s) -> State; hypot(x, y);
---   fold(x, bound); FIELDS (every field, in a fixed order)
+--   ai(s, side); tick(s, dt?, human?, computer?); play(s, human, computer) -> bool (one step of a match: his
+--   tick, then the puck put back if it left the table; true if it was); offTable(s) -> bool; copy(dst, src) ->
+--   dst; clone(s) -> State; hypot(x, y); fold(x, bound); FIELDS (every field, in a fixed order)
 
 local Sim = {}
 
@@ -495,6 +502,24 @@ function Sim.tick(s: State, dtIn: number?, humanIn: number?, computerIn: boolean
 	s.px, s.py, s.vx, s.vy = px, py, vx, vy
 	s.p0x, s.p0y = s0x + v0x * dt, s0y + v0y * dt
 	s.p1x, s.p1y = s1x + v1x * dt, s1y + v1y * dt
+end
+
+-- NOT HIS (see the header). Is the puck's centre somewhere no table has it: beyond a side rail's face, deep past
+-- a goal line, or inside an end rail beside the goal?
+function Sim.offTable(s: State): boolean
+	local ax, ay = abs(s.px), abs(s.py)
+	return ax > 0.62 or ay > 1.3 or (ay > HALF_LENGTH and ax > 0.235)
+end
+
+-- One step of a match: his tick, then the table's own rule for a puck that got out: it is put back on the serve
+-- spot (his ResetPuck: the side that conceded last serves, after the countdown). Returns true when that happened.
+function Sim.play(s: State, human: number, computer: boolean): boolean
+	Sim.tick(s, Sim.STEP, human, computer)
+	if s.winner < 0 and s.countdown <= 0 and Sim.offTable(s) then
+		Sim.resetPuck(s)
+		return true
+	end
+	return false
 end
 
 return Sim

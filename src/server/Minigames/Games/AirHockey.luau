@@ -1,0 +1,413 @@
+--!strict
+-- ServerScriptService.Server.Minigames.Games.AirHockey
+-- Air hockey's server half on the minigame framework (Server/Minigames/ServerGame): the Table around the owner's
+-- AER / 01 table in the bowling alley's games room. THE SERVER DECIDES THE MATCH: the table's referee
+-- (Shared/Minigames/AirHockey/Referee) steps the one simulation that counts (Shared/Minigames/AirHockey/Sim, his,
+-- unchanged) from the players' hands, which arrive as logs by tick ("log": AirHockey/Wire), and the score the
+-- rules keep is the referee's.
+--   Ends: the prompt you pressed is the end you asked for (the Glacier end's is the table's own station, the
+--     Ember end's joins it); the first seat gets its wish, the second the other end, with words if it wished the
+--     same one.
+--   The computer: when a match starts with one person, the computer of the lobby's difficulty (the Spec's Lounge,
+--     Club, Pro) takes the other end. A person who presses a prompt while it plays takes its place at once, at
+--     its end, mid-match; a person who leaves a two-person match hands their end to the computer.
+--   The stream: every stretch of ticks the referee decides goes out as one "air_hockey" message (with the whole
+--     state at its end) to the seated and to everyone standing within WATCH studs: their clients replay it
+--     through the same simulation, so a watcher sees the same match. Nothing is sent while nobody is seated.
+--   The hardware (GamesRoom.AirHockey: Puck, MalletGlacier, MalletEmber, ScoreBoard) is found by name; where it
+--     is missing the Table still runs the match and touches nothing. The clients draw the puck and the mallets
+--     every frame from their own replay; the server only moves its own copies ten times a second, so that the
+--     world is right for someone who was sent nothing, and puts them home when the table resets.
+-- Interface: a ServerGame { game = "air_hockey", new(ctx) -> Table }; Table.hw { model, puck, mallets, labels };
+--   Table.ref (the Referee while a match is on); Table:debug("goal", side) (the puck is put in front of that
+--   end's opponent's goal, travelling in: the next ticks score it through the simulation's own goal line);
+--   WATCH; MOVE_EVERY
+
+local Import = require("../../Import")
+local Layout =
+	Import.shared("Minigames/AirHockey/Layout") :: typeof(require("../../../shared/Minigames/AirHockey/Layout"))
+local Referee =
+	Import.shared("Minigames/AirHockey/Referee") :: typeof(require("../../../shared/Minigames/AirHockey/Referee"))
+local Rules = Import.shared("Minigames/AirHockey/Rules") :: typeof(require("../../../shared/Minigames/AirHockey/Rules"))
+local Sim = Import.shared("Minigames/AirHockey/Sim") :: typeof(require("../../../shared/Minigames/AirHockey/Sim"))
+local ServerGame = require("../ServerGame")
+
+local Game = {}
+Game.game = "air_hockey"
+Game.WATCH = 80 -- studs from the table within which a bystander is sent the match
+Game.MOVE_EVERY = 0.1 -- seconds between the server's own moves of the puck and the mallets
+
+local function isComputer(key: any): boolean
+	return type(key) == "table" and key.ai == true
+end
+
+-- The table's parts, by name (nil where the site has no air hockey table).
+local function hardware(root: Instance?): any
+	local room = root and root:FindFirstChild("GamesRoom")
+	local model = room and room:FindFirstChild(Layout.MODEL)
+	if model == nil then
+		return nil
+	end
+	local puck = model:FindFirstChild(Layout.PUCK)
+	local glacier = model:FindFirstChild(Layout.MALLETS[0])
+	local ember = model:FindFirstChild(Layout.MALLETS[1])
+	if puck == nil or glacier == nil or ember == nil then
+		return nil
+	end
+	local labels: { any } = {}
+	local board = model:FindFirstChild(Layout.SCORE)
+	if board then
+		for _, d in board:GetDescendants() do
+			if d.Name == "Score" then
+				table.insert(labels, d)
+			end
+		end
+	end
+	return {
+		model = model,
+		puck = puck,
+		mallets = { [0] = glacier, [1] = ember },
+		labels = labels,
+		home = {
+			puck = (puck :: any):GetPivot(),
+			[0] = (glacier :: any):GetPivot(),
+			[1] = (ember :: any):GetPivot(),
+		},
+	}
+end
+
+function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
+	local self: any = {
+		ctx = ctx,
+		hw = hardware(ctx.root),
+		ref = nil, -- the Referee while a match is on
+		games = 0,
+		wish = {}, -- key -> the end whose prompt they pressed
+		sideOf = {}, -- key -> the end they play
+		watchers = {}, -- bystanders who are being sent the stream
+		watchAt = 0,
+		movedAt = 0,
+	}
+
+	-- a piece of the hardware slid to a point of the model (from where the bake stood it)
+	local function slide(piece: any, home: CFrame, hx: number, hy: number, x: number, y: number)
+		local ax, _, az = Layout.toWorld(ctx.place, hx, hy)
+		local bx, _, bz = Layout.toWorld(ctx.place, x, y)
+		piece:PivotTo(home + Vector3.new(bx - ax, 0, bz - az))
+	end
+
+	local function show(sim: any)
+		local hw = self.hw
+		if hw == nil then
+			return
+		end
+		local hp, hm = Layout.HOME_PUCK, Layout.HOME_MALLET
+		if sim == nil then
+			slide(hw.puck, hw.home.puck, hp[1], hp[2], hp[1], hp[2])
+			slide(hw.mallets[0], hw.home[0], hm[0][1], hm[0][2], hm[0][1], hm[0][2])
+			slide(hw.mallets[1], hw.home[1], hm[1][1], hm[1][2], hm[1][1], hm[1][2])
+			return
+		end
+		slide(hw.puck, hw.home.puck, hp[1], hp[2], sim.px, sim.py)
+		slide(hw.mallets[0], hw.home[0], hm[0][1], hm[0][2], sim.p0x, sim.p0y)
+		slide(hw.mallets[1], hw.home[1], hm[1][1], hm[1][2], sim.p1x, sim.p1y)
+	end
+
+	local function nowTick(): number
+		local ref = self.ref
+		return if ref then math.floor((ctx.stamp() - ref.t0) / Sim.STEP) else 0
+	end
+
+	-- everyone who is sent the match: the seated people, and the bystanders near the table
+	local function tell(payload: { [string]: any })
+		payload.site = ctx.station.site
+		for _, key in ctx.seated() do
+			if not isComputer(key) then
+				ctx.send(key, payload)
+			end
+		end
+		for key in self.watchers do
+			if ctx.seatOf(key) == nil then
+				ctx.send(key, payload)
+			end
+		end
+	end
+
+	-- Who stands near enough to be sent the match (looked at twice a second). Someone new is handed the state as
+	-- it stands; the stream carries on from there.
+	local function lookAround()
+		local near: { [any]: boolean } = {}
+		for _, person in ctx.town.people() do
+			if ctx.seatOf(person.key) == nil and not isComputer(person.key) then
+				local d = Vector3.new(person.x, person.y, person.z) - ctx.anchor
+				if d.Magnitude <= Game.WATCH then
+					near[person.key] = true
+					if not self.watchers[person.key] and self.ref then
+						local snap = Referee.snapshot(self.ref)
+						snap.site = ctx.station.site
+						ctx.send(person.key, snap)
+					end
+				end
+			end
+		end
+		self.watchers = near
+	end
+
+	-- The referee steps as far as the hands allow; what it decided goes out, and its goals go to the rules.
+	local function pump()
+		local ref = self.ref
+		if ref == nil or ctx.session.phase ~= "playing" then
+			return
+		end
+		local msg, goals = Referee.advance(ref, nowTick())
+		if msg then
+			tell(msg)
+		end
+		for _, goal in goals do
+			ctx.server("goal", { goal.side, goal.score0, goal.score1 }, 1)
+		end
+	end
+
+	local function seatMessage(key: any, side: number)
+		local ref = self.ref
+		ctx.send(key, {
+			kind = "air_hockey_seat",
+			g = ref.game,
+			side = side,
+			from = Referee.expects(ref, side),
+			t0 = ref.t0,
+		})
+	end
+
+	-- A match begins: ends by wish, the computer at the empty end, the referee, and everyone told.
+	local function begin()
+		local session = ctx.session
+		local first = session.seats[1]
+		local side1 = self.wish[first] or 0
+		ctx.server("sides", { side1 }, 1)
+		local mode = session.game.state.mode
+		local seated = ctx.seated()
+		if #seated < 2 then
+			ctx.addComputer(Rules.computerFor(mode))
+			seated = ctx.seated()
+		end
+		table.clear(self.sideOf)
+		local human = { [0] = false, [1] = false }
+		local difficulty = Sim.DIFFICULTY.medium
+		for _, key in seated do
+			local seat = ctx.seatOf(key)
+			local side = if seat == 1 then side1 else 1 - side1
+			self.sideOf[key] = side
+			if isComputer(key) then
+				difficulty = ServerGame.num(key.difficulty, difficulty)
+			else
+				human[side] = true
+				if self.wish[key] ~= nil and self.wish[key] ~= side then
+					ctx.send(key, {
+						kind = "event",
+						text = `That end was taken: you play the {Layout.SIDE_NAMES[side]} end`,
+					})
+				end
+			end
+		end
+		self.games += 1
+		self.ref = Referee.new({ t0 = ctx.stamp(), game = self.games, human = human, difficulty = difficulty })
+		lookAround()
+		for _, key in seated do
+			if not isComputer(key) then
+				seatMessage(key, self.sideOf[key])
+			end
+		end
+		tell(Referee.snapshot(self.ref))
+		show(self.ref.sim)
+		ctx.dirty()
+	end
+
+	function self.join(_self: any, player: any, via: ServerGame.StationDef): (boolean, string?)
+		self.wish[player] = Layout.sideOfStation(via.id) or 0
+		local session = ctx.session
+		if ctx.seatOf(player) ~= nil or (session.phase ~= "playing" and session.phase ~= "lobby") then
+			return true
+		end
+		local seated = ctx.seated()
+		if #seated < session.rules.def.seats then
+			return true
+		end
+		-- both ends are taken: a person takes the computer's
+		for _, key in seated do
+			if isComputer(key) then
+				ctx.removeComputer(key)
+				return true
+			end
+		end
+		return false, "Both ends are taken: watch this one, or wait for the next match"
+	end
+
+	function self.joined(_self: any, player: any, seat: number?, _via: ServerGame.StationDef)
+		local ref = self.ref
+		local session = ctx.session
+		if ref == nil or seat == nil or session.phase ~= "playing" or self.sideOf[player] ~= nil then
+			return
+		end
+		-- a person sat down while the match is on: the end the seat already had is theirs from this tick
+		local state = session.game.state
+		local side = state.sideOf[seat] or 0
+		self.sideOf[player] = side
+		Referee.control(ref, side, true)
+		seatMessage(player, side)
+		tell(Referee.snapshot(ref))
+		if self.wish[player] ~= side then
+			ctx.send(player, { kind = "event", text = `You play the {Layout.SIDE_NAMES[side]} end` })
+		end
+		ctx.dirty()
+	end
+
+	-- "log": a segment of a hand's log. Taken in any phase (a segment that arrives after the last goal is not an
+	-- error and gets no words); everything else is the service's.
+	function self.command(_self: any, player: any, verb: string, args: { any }): (boolean, boolean?, string?)
+		if verb ~= "log" then
+			return false
+		end
+		local ref = self.ref
+		local side = self.sideOf[player]
+		if ref == nil or side == nil or ctx.session.phase ~= "playing" or ctx.seatOf(player) == nil then
+			return true, true
+		end
+		local strings = {}
+		for i = 3, 8 do
+			if args[i] ~= nil then
+				table.insert(strings, args[i])
+			end
+		end
+		local ok, why = Referee.accept(ref, side, args[1], args[2], strings, nowTick())
+		if not ok then
+			return true, false, why
+		end
+		-- (through the Session: an accepted segment is what keeps the idle clock from taking the seat)
+		ctx.apply(player, "log", { args[1], args[2] })
+		pump()
+		return true, true
+	end
+
+	function self.step(_self: any, _dt: number)
+		local ref = self.ref
+		if ref == nil then
+			return
+		end
+		if ctx.session.phase == "playing" then
+			pump()
+			if ctx.now() - self.watchAt >= 0.5 then
+				self.watchAt = ctx.now()
+				lookAround()
+			end
+		end
+		if ctx.now() - self.movedAt >= Game.MOVE_EVERY then
+			self.movedAt = ctx.now()
+			show(ref.sim)
+		end
+	end
+
+	function self.event(_self: any, e: ServerGame.Event)
+		if e.kind == "start" then
+			begin()
+		elseif e.kind == "left" then
+			local key = e.key
+			local side = self.sideOf[key]
+			self.sideOf[key] = nil
+			self.wish[key] = nil
+			local ref = self.ref
+			if isComputer(key) or ref == nil or side == nil or ctx.session.phase ~= "playing" then
+				return
+			end
+			-- a person left a match that is on: if the other is still there, the computer takes the end
+			local stays = false
+			for _, other in ctx.seated() do
+				if not isComputer(other) then
+					stays = true
+				end
+			end
+			if stays and not Referee.over(ref) then
+				local leaver = ctx.nameOf(e.seat or 0)
+				local ok, _, computer = ctx.addComputer(Rules.computerFor(ctx.session.game.state.mode))
+				if ok and computer then
+					self.sideOf[computer] = side
+					ref.sim.difficulty = ServerGame.num(computer.difficulty, ref.sim.difficulty)
+					Referee.control(ref, side, false)
+					tell(Referee.snapshot(ref))
+					tell({
+						kind = "event",
+						text = `{leaver} left: the computer takes the {Layout.SIDE_NAMES[side]} end`,
+					})
+				end
+			end
+		elseif e.kind == "done" then
+			pump()
+			if self.ref then
+				show(self.ref.sim)
+			end
+		elseif e.kind == "reset" then
+			self.ref = nil
+			table.clear(self.sideOf)
+			table.clear(self.watchers)
+			show(nil)
+		end
+	end
+
+	function self.state(_self: any, player: any, _seat: number?): { [string]: any }?
+		return { side = self.sideOf[player] }
+	end
+
+	function self.sig(_self: any, view: { [string]: any }): any
+		local g = view.game
+		return if g then `{g.score[1]}-{g.score[2]}` else ""
+	end
+
+	-- the board over the table: both ends' scores while a match is on, the game's name otherwise
+	function self.screen(_self: any, view: { [string]: any })
+		local hw = self.hw
+		if hw == nil then
+			return
+		end
+		local g = view.game
+		local text = "AIR HOCKEY  ·  FIRST TO 7"
+		if g and (view.phase == "playing" or view.phase == "done") then
+			text = `GLACIER  {g.score[1]}  :  {g.score[2]}  EMBER`
+		end
+		for _, label in hw.labels do
+			label.Text = text
+		end
+	end
+
+	function self.doneText(_self: any, view: { [string]: any }): string?
+		local r = view.result
+		if r == nil or r.side == nil then
+			return nil
+		end
+		local seat = r.winner
+		local who = if seat and view.seats[seat] then view.seats[seat].name else Layout.SIDE_NAMES[r.side]
+		local a, b = r.score[1], r.score[2]
+		return `{who} wins {math.max(a, b)}-{math.min(a, b)}`
+	end
+
+	-- A scripted goal for the engine checks: the puck is stood in front of the goal `side` attacks, travelling
+	-- in. The simulation scores it itself on the ticks that follow (when the hands' logs next arrive).
+	function self.debug(_self: any, what: any, side: any): (boolean, string?)
+		local ref = self.ref
+		if ref == nil or ctx.session.phase ~= "playing" then
+			return false, "no match is on"
+		end
+		if what ~= "goal" or (side ~= 0 and side ~= 1) then
+			return false, "only a goal for end 0 or 1 can be scripted"
+		end
+		local sim = ref.sim
+		local s = if side == 0 then 1 else -1
+		sim.countdown = 0
+		sim.px, sim.py, sim.vx, sim.vy = 0, s * 1.2, 0, s * 5
+		tell(Referee.snapshot(ref))
+		return true
+	end
+
+	return self
+end
+
+return Game

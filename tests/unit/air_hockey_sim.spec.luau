@@ -193,6 +193,58 @@ return function(t)
 		t.eq(g.hitWhat, Sim.HIT_MALLET + 1)
 	end)
 
+	t.test("not his: a puck pressed out of the table is put back for a serve, outside his step", function()
+		-- (the golden case "flaw": his own simulation lets this puck out)
+		local function pinned(): Sim.State
+			local g = Sim.new()
+			g.countdown = 0
+			g.px, g.py, g.vx, g.vy = 0.58, -0.5, 0, 0
+			g.p0x, g.p0y, g.t0x, g.t0y = 0.3, -0.5, 0.3, -0.5
+			Sim.setTarget(g, 0, 0.556, -0.5)
+			return g
+		end
+		local his = pinned()
+		for _ = 1, 120 do
+			Sim.tick(his, Sim.STEP, 0, false)
+		end
+		t.truthy(his.px > 1, `his step alone: the puck is {his.px} m out and gone`)
+		local g = pinned()
+		local back = 0
+		for _ = 1, 120 do
+			if Sim.play(g, 0, false) then
+				back += 1
+				t.eq(g.py, -0.3)
+				t.eq(g.countdown, Sim.COUNTDOWN)
+			end
+			assert(math.abs(g.px) <= Sim.HALF_WIDTH + 0.04, "never drawn far off the table")
+		end
+		t.eq(back, 1)
+		t.eq(g.score0 + g.score1, 0, "nobody scores by it")
+		-- on the table play() is his tick and nothing else: whole matches agree
+		local a, b = Sim.new(), Sim.new()
+		for i = 1, 240 * 60 do
+			if i % 5 == 0 then
+				Sim.setTarget(a, 0, math.sin(i * 0.02) * 0.3, -0.7)
+				Sim.setTarget(b, 0, math.sin(i * 0.02) * 0.3, -0.7)
+			end
+			Sim.tick(a, Sim.STEP, 0, true)
+			t.eq(Sim.play(b, 0, true), false)
+		end
+		for _, k in Sim.FIELDS do
+			t.eq((a :: any)[k], (b :: any)[k], k)
+		end
+		-- where a puck may be, and may not
+		local s = Sim.new()
+		for _, p in { { 0.588, 0 }, { 0, 1.138 }, { 0.188, 1.27 }, { 0.2, 1.19 }, { -0.588, -1.138 } } do
+			s.px, s.py = p[1], p[2]
+			t.eq(Sim.offTable(s), false, `{p[1]}, {p[2]} is on the table`)
+		end
+		for _, p in { { 0.63, 0 }, { -0.7, 0.4 }, { 0.4, 1.18 }, { 0, 1.31 }, { -0.3, -1.2 } } do
+			s.px, s.py = p[1], p[2]
+			t.eq(Sim.offTable(s), true, `{p[1]}, {p[2]} is off the table`)
+		end
+	end)
+
 	t.test("fold and hypot are JavaScript's", function()
 		t.near(Sim.fold(0.7, 0.588), 0.476, 1e-12)
 		t.near(Sim.fold(-0.7, 0.588), -0.476, 1e-12)

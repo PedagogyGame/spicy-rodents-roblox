@@ -132,6 +132,17 @@ return function(t)
 	group("two people", "two driven hands, the computer off", 2)
 	group("computer", "a hand against the computer at each difficulty, either end", 6)
 	group("match", "whole matches to seven", 2)
+	group("flaw", "his own flaw (a pinned puck pressed out through the side rail)", 1)
+
+	t.test("golden: in his JavaScript too, a mallet presses a resting puck out of the table for good", function()
+		for _, case in load().cases do
+			if string.sub(case.name, 1, 4) == "flaw" then
+				local last = case.states[#case.states]
+				t.truthy(last[2] > Sim.HALF_WIDTH + 0.5, `after {last[1]} ticks his puck is at x = {last[2]} m`)
+				t.truthy(last[4] > 0, "and still leaving")
+			end
+		end
+	end)
 
 	t.test("golden: the matches were played to the end, by both routes", function()
 		local won = {}
