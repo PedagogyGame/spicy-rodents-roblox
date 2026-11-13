@@ -6,9 +6,15 @@
 -- for the S5/S19 scenarios). A RouteLike is { id, kind, length, points = { {x, y, z} }, links =
 -- { { s, to, toS } } }: points are the harvested samples (sampleCount from the record, rule 3),
 -- length is the polyline's arc length, links are the Graph's transfer pairs (any sample pair within
--- 1.7 u, routes_movement §3) at their closest sample pair. Links are computed on first use per route.
+-- 1.7 u, routes_movement §3) at their closest sample pair. Links are computed on first use per route. A link into or
+-- out of an enclosed run (Shared/Routes/Enclosure: the ball return, a hollow tree) is kept only where the enclosure's
+-- rules allow it at that pair (Enclosure.allows: a mouth that names the other route, or one enclosure), so a brain
+-- never steps through a wall; with no enclosed routes every link is as before.
 -- Interface: new(railWorld) -> Adapter { routes, byId(id), count }
 -- Pure; studs. No side effects on require.
+
+local Import = require("../Import")
+local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../shared/Routes/Enclosure"))
 
 export type Link = { s: number, to: number, toS: number }
 export type RouteLike = { id: number, kind: string, length: number, points: { { number } }, links: { Link } }
@@ -58,7 +64,19 @@ function RouteAdapter.new(rail: any): Adapter
 						end
 					end
 				end
-				table.insert(out, { s = ca[bi], to = other, toS = cums[other][bj] })
+				local ra, rb = registry:get(id), registry:get(other)
+				local walled = ra and rb and (ra.enclosure or rb.enclosure)
+				if
+					not walled
+					or Enclosure.allows(
+						ra :: any,
+						(bi - 1) / math.max(#pa - 1, 1),
+						rb :: any,
+						(bj - 1) / math.max(#pb - 1, 1)
+					)
+				then
+					table.insert(out, { s = ca[bi], to = other, toS = cums[other][bj] })
+				end
 			end
 		end
 		table.sort(out, function(a, b)
