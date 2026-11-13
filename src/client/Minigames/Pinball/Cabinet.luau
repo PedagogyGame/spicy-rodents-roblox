@@ -190,7 +190,7 @@ local function find(cab: Cab): any
 	return parts
 end
 
--- the playfield's frame in the world: point (x, y, h) is frame * (x, h, y)
+-- the playfield's frame in the world (Shared/Minigames/Pinball/Cabinet): point (x, y, h) is frame * (x, h, -y)
 local function frameOf(cab: Cab): CFrame?
 	local place = cab.place
 	if place == nil then
@@ -198,7 +198,10 @@ local function frameOf(cab: Cab): CFrame?
 	end
 	local X, Y, D = CabinetLayout.origin(cab.index)
 	local x, y, z = AlleyLayout.toWorld(place, X, Y, D)
-	return CFrame.new(x, y, z) * CFrame.Angles(0, place.yaw, 0) * CFrame.Angles(-CabinetLayout.TILT, 0, 0)
+	return CFrame.new(x, y, z)
+		* CFrame.Angles(0, place.yaw, 0)
+		* CFrame.Angles(0, math.pi, 0)
+		* CFrame.Angles(CabinetLayout.TILT, 0, 0)
 end
 
 local function setText(cab: Cab, name: string, text: string)
@@ -317,7 +320,7 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 	for i, part in parts.balls do
 		if i <= f.nBalls then
 			local k = (i - 1) * 3
-			part.CFrame = pf * CFrame.new(f.balls[k + 1], f.balls[k + 3] + Layout.BALL_R, f.balls[k + 2])
+			part.CFrame = pf * CFrame.new(f.balls[k + 1], f.balls[k + 3] + Layout.BALL_R, -f.balls[k + 2])
 			if part.Transparency ~= 0 then
 				part.Transparency = 0
 			end
@@ -331,7 +334,7 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 		local dx, dy = c.fmir[i] * math.cos(a), math.sin(a)
 		model:PivotTo(
 			pf
-				* CFrame.new(c.fpx[i], CabinetLayout.FLIPPER_H / 2, c.fpy[i])
+				* CFrame.new(c.fpx[i], CabinetLayout.FLIPPER_H / 2, -c.fpy[i])
 				* CFrame.Angles(0, CabinetLayout.turnOf(dx, dy), 0)
 		)
 	end
@@ -350,10 +353,10 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 		local home = parts.home[part]
 		part.CFrame = home * CFrame.Angles((f.spin[k] or 0) * math.pi * 2, 0, 0)
 	end
-	-- the plunger: the rod drawn back toward the player (its part's -Z: the rod lies along the playfield)
+	-- the plunger: the rod drawn back toward the player (its part's +Z: the rod lies along the playfield)
 	local plunger = parts.plunger
 	if plunger then
-		plunger:PivotTo(parts.home[plunger] * CFrame.new(0, 0, -(f.pull or 0) * CabinetLayout.PULL_TRAVEL))
+		plunger:PivotTo(parts.home[plunger] * CFrame.new(0, 0, (f.pull or 0) * CabinetLayout.PULL_TRAVEL))
 	end
 	-- the lamps, and what has just fired
 	lampsShow(cab, f.lamps)

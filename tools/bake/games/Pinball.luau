@@ -170,7 +170,8 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 	m:SetAttribute("Table", tbl.id)
 	local px, pd = Cabinet.at(index)
 	local W, L = Layout.WIDTH, Layout.LENGTH
-	local TILT = CFrame.Angles(-Cabinet.TILT, 0, 0)
+	-- the playfield's frame (Cabinet's header): X to the player's right, Y the normal, Z toward the player
+	local TILT = CFrame.Angles(0, math.pi, 0) * CFrame.Angles(Cabinet.TILT, 0, 0)
 	local loose = { collide = false, query = false, shadow = false }
 	local N = Cabinet.NAMES
 
@@ -324,7 +325,7 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 		collide = false,
 		rot = TILT,
 	})
-	kit:label(kit:gui(door, "Front", 80), {
+	kit:label(kit:gui(door, "Back", 80), {
 		Text = "FREE PLAY",
 		TextColor = { 80, 255, 120 },
 		Font = "Arcade",
@@ -473,8 +474,8 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 		for i = 1, #pts - 5, 3 do
 			local x1, y1, h1 = pts[i], pts[i + 1], pts[i + 2]
 			local x2, y2, h2 = pts[i + 3], pts[i + 4], pts[i + 5]
-			-- (in the playfield's part frame: X across, Y the normal, Z up the table)
-			local v = Vector3.new(x2 - x1, h2 - h1, y2 - y1)
+			-- (in the playfield's part frame: X across, Y the normal, Z down the table)
+			local v = Vector3.new(x2 - x1, h2 - h1, -(y2 - y1))
 			local len = v.Magnitude
 			local look = CFrame.lookAt(Vector3.new(0, 0, 0), v)
 			local X, Y, D = Cabinet.point(index, (x1 + x2) / 2, (y1 + y2) / 2, (h1 + h2) / 2 - 0.01)

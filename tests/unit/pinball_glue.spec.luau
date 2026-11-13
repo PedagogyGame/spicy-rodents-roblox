@@ -125,10 +125,14 @@ return function(t)
 			-- the prompt stands in front of the cabinet, within reach of where the player stands
 			local sx, sd = Cabinet.stance(i)
 			t.truthy(math.abs(st.d - sd) < 3 and math.abs(st.x - sx) < 1)
+			-- the player faces the machine (-D), so the playfield's right (x up to WIDTH) is on the alley's -X side
+			local leftX = Cabinet.point(i, 0, 1, 0)
+			local rightX = Cabinet.point(i, Layout.WIDTH, 1, 0)
+			t.truthy(rightX < leftX, "the shooter lane is on the player's right")
 			-- point() is Layout.cabinetPoint at the machine
 			local across, up, along = Layout.cabinetPoint(0.3, 2.1, 0.05)
 			local X, Y, D = Cabinet.point(i, 0.3, 2.1, 0.05)
-			t.near(X, x + across, 1e-9)
+			t.near(X, x - across, 1e-9)
 			t.near(Y, Cabinet.PF_Y + up, 1e-9)
 			t.near(D, d + Cabinet.PF_D - along, 1e-9)
 		end

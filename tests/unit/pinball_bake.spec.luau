@@ -36,7 +36,8 @@ local function frameOf(index: number): any
 	local x, y, z = AlleyLayout.toWorld(PLACE, X, Y, D)
 	return roblox.CFrame.new(x, y, z)
 		* roblox.CFrame.Angles(0, PLACE.yaw, 0)
-		* roblox.CFrame.Angles(-Cabinet.TILT, 0, 0)
+		* roblox.CFrame.Angles(0, math.pi, 0)
+		* roblox.CFrame.Angles(Cabinet.TILT, 0, 0)
 end
 
 local function world(index: number, x: number, y: number, h: number): any
@@ -118,7 +119,7 @@ return function(t)
 					local a = c.frest[i]
 					local dx, dy = c.fmir[i] * math.cos(a), math.sin(a)
 					local want = pf
-						* roblox.CFrame.new(c.fpx[i], Cabinet.FLIPPER_H / 2, c.fpy[i])
+						* roblox.CFrame.new(c.fpx[i], Cabinet.FLIPPER_H / 2, -c.fpy[i])
 						* roblox.CFrame.Angles(0, Cabinet.turnOf(dx, dy), 0)
 					local hub = m:FindFirstChild(`Flipper{i}`).PrimaryPart.CFrame
 					t.truthy((hub.Position - want.Position).Magnitude < 1e-4, `flipper {i} pivot`)
@@ -134,7 +135,7 @@ return function(t)
 				local ball = m:FindFirstChild("Ball1").CFrame.Position
 				t.truthy((ball - world(index, p.x, p.y, Layout.BALL_R)).Magnitude < 1e-4)
 				t.truthy(
-					(ball - (pf * roblox.CFrame.new(p.x, Layout.BALL_R, p.y)).Position).Magnitude < 1e-4,
+					(ball - (pf * roblox.CFrame.new(p.x, Layout.BALL_R, -p.y)).Position).Magnitude < 1e-4,
 					"the client's frame puts the ball on the same spot"
 				)
 				for i, l in def.lamps do

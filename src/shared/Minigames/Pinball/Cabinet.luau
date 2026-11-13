@@ -9,9 +9,11 @@
 -- from the player's left, y up the table, h above the surface: Layout). The machine's back is against the
 -- front wall (low D), its player stands on the +D side facing -D. point(index, x, y, h) is Layout.cabinetPoint
 -- set down at the machine: so the bake builds and the client draws exactly where the model simulates. In a
--- part's terms the playfield frame is: origin at the playfield's front left corner, part X across, part Y the
--- surface normal, part Z up the table; that frame is the alley's (after the site's yaw) turned by Angles(-TILT,
--- 0, 0) about X (rot()), and a playfield direction (dx, dy) is a turn of turnOf(dx, dy) about the normal.
+-- part's terms the playfield frame is: origin at the playfield's front left corner (as the player sees it: the
+-- player faces -D, so their right is the alley's -X), part X across to the player's right, part Y the surface
+-- normal, part Z down the table toward the player, so that point (x, y, h) is the frame * (x, h, -y); the frame
+-- is the alley's (after the site's yaw) turned by Angles(0, pi, 0) * Angles(TILT, 0, 0) (YAW_PI, TILT), and a
+-- playfield direction (dx, dy) is a turn of turnOf(dx, dy) about the normal.
 -- The camera (camera()) is the player's eye over the lockdown bar, worked out so that the whole playfield, both
 -- flippers and the plunger are in the picture on any screen from 4:3 to a wide phone.
 -- Pure. Interface: model(index) -> name; at(index) -> (X, D) of the cabinet's middle; TILT; PF_Y; PF_D (the
@@ -70,17 +72,17 @@ end
 function Cabinet.point(index: number, x: number, y: number, h: number): (number, number, number)
 	local px, pd = Cabinet.at(index)
 	local across, up, along = Layout.cabinetPoint(x, y, h)
-	return px + across, Cabinet.PF_Y + up, pd + Cabinet.PF_D - along
+	return px - across, Cabinet.PF_Y + up, pd + Cabinet.PF_D - along
 end
 
--- The playfield's origin (its front left corner, on the surface).
+-- The playfield's origin (its front left corner as the player sees it, on the surface).
 function Cabinet.origin(index: number): (number, number, number)
 	return Cabinet.point(index, 0, 0, 0)
 end
 
 -- The turn about the playfield's normal that lays a part's X along the playfield direction (dx, dy).
 function Cabinet.turnOf(dx: number, dy: number): number
-	return -math.atan2(dy, dx)
+	return math.atan2(dy, dx)
 end
 
 -- Where the player stands (the body's middle), facing the machine (-D).
