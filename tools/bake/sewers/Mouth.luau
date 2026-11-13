@@ -33,9 +33,12 @@ Mouth.FRAMES = {
 -- on open ground the iron frame fills the carve column and a concrete apron runs round it (the lawn and the verge:
 -- smooth terrain dips at the edge of a carved column, and the apron hides the dip), x0, x1, z0, z1
 Mouth.APRON = 0.8 -- studs round the column
+-- how deep an apron's concrete goes under the street: a skirt to the carved voxel's floor and past it, so where the
+-- lawn dips at a carved column's edge (or slopes away from a level frame) concrete shows, never the shaft's brick
+Mouth.APRON_DEPTH = 1.5
 Mouth.APRONS = {
-	-- the lawn; on its south side the alley's forecourt carve (tools/bake/attractions: down to 14.9 from z -340.2)
-	["P3.S"] = { 1303.2, 1308.8, -340.2, -335.2 },
+	-- the lawn, wholly: 4 studs clear of the alley's forecourt carve (tools/bake/attractions: down to 14.9 from z -340.2)
+	["P3.S"] = { 1303.2, 1308.8, -336.2, -331.2 },
 	["P3.N"] = { 1347.2, 1352.8, 32.39, 39.47 }, -- along the verge only: the boulevard and the kerb bound it
 }
 Mouth.OVERHANG = 0.3 -- studs past a carve column's edge where a quay's cover frame lies on the paving slab
@@ -103,7 +106,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 		for _, q in rectsMinus(apron, rect) do
 			local a, b = local2(q[1], q[3])
 			local c, d = local2(q[2], q[4])
-			kit:box(model, "Apron", plane, a, c, -Mouth.THICK, -0.01, b, d, { 150, 146, 138 }, "Concrete")
+			kit:box(model, "Apron", plane, a, c, -Mouth.APRON_DEPTH, -0.01, b, d, { 150, 146, 138 }, "Concrete")
 		end
 	end
 	local o = m.opening

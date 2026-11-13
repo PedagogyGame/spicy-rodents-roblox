@@ -126,7 +126,8 @@ export type Mouth = {
 	pipe: string,
 	space: string,
 	kind: string,
-	name: string,
+	name: string, -- by its street or landmark ("corner grate by the brick house")
+	toward: string, -- what a body faces walking in ("Main Street"): the words on screen
 	x: number,
 	y: number,
 	z: number,
@@ -881,6 +882,7 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 				space = p.space,
 				kind = m.kind,
 				name = m.name,
+				toward = m.toward or m.name,
 				x = m.at[1],
 				y = m.ground,
 				z = m.at[2],

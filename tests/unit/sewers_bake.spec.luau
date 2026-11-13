@@ -17,6 +17,7 @@ local roblox = require("@lune/roblox")
 local serde = require("@lune/serde")
 local Data = require("@shared/Data")
 local Enclosure = require("@shared/Routes/Enclosure")
+local Height = require("@shared/World/Height")
 local SewerLayout = require("@shared/World/SewerLayout")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local BakedWorld = require("@tests/lib/BakedWorld")
@@ -265,7 +266,25 @@ return function(t)
 				x += 0.25
 			end
 			t.eq(open, 0, `{m.id}: {open} points of the carved column's top show the hole`)
+			-- on open ground: the apron round the frame reaches down past the lawn under its edge (a skirt: concrete
+			-- shows where the lawn dips at the carved column or slopes away from the level frame, never the brick)
+			local apron = Mouth.APRONS[m.id]
+			if type(apron) == "table" then
+				local lowest = math.huge
+				for _, q in
+					{ { apron[1], apron[3] }, { apron[2], apron[3] }, { apron[1], apron[4] }, { apron[2], apron[4] } }
+				do
+					lowest = math.min(lowest, Height.at(q[1], q[2]))
+				end
+				t.truthy(top - Mouth.APRON_DEPTH <= lowest - 1.0, `{m.id}: the apron's skirt goes under the lawn`)
+			end
 		end
+		-- P3's lawn grate sits wholly on the lawn: its apron clear of the alley's forecourt carve (down to 14.9 from
+		-- z -340.2, tools/bake/attractions), so neither the lip nor the shaft's brick shows from the alley
+		local p3s = Mouth.APRONS["P3.S"] :: { number }
+		t.truthy(p3s[3] >= -340.2 + 3, `P3.S's apron starts {p3s[3] + 340.2} studs north of the forecourt's edge`)
+		local p3m = layout.mouth("P3.S") :: SewerLayout.Mouth
+		t.truthy(p3m.column.z0 > p3s[3] and p3m.column.z1 < p3s[4], "P3.S: the apron goes round its column")
 		-- the light grate on the boulevard lies on the road
 		local road = Pipe.ROAD_TOP.P3
 		for _, a in layout.anchors do

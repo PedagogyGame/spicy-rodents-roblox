@@ -58,10 +58,10 @@
       "walkway": -10.6,
       "note": "Under the Main Street / Centre Street crossing, corner to corner. A grate in each corner square of grass where the two verges meet (x and z 22.5..26.1), four arms on the diagonals to the owner's four-way junction under the middle of the junction. The vault's outer top is at -5.08, so the carve stops at -4 under ground 0: one whole voxel and the road over it.",
       "mouths": [
-        { "id": "P1.NW", "kind": "grate", "name": "north-west corner grate", "at": [-24.65, 24.65], "ground": 0, "rungs": "+z", "opening": [-26.1, -23.05, 22.5, 24.9] },
-        { "id": "P1.NE", "kind": "grate", "name": "north-east corner grate", "at": [24.65, 24.65], "ground": 0, "rungs": "+x", "opening": [22.5, 24.9, 23.05, 26.1] },
-        { "id": "P1.SE", "kind": "grate", "name": "south-east corner grate", "at": [24.65, -24.65], "ground": 0, "rungs": "+x", "opening": [22.5, 24.9, -26.1, -23.05] },
-        { "id": "P1.SW", "kind": "grate", "name": "south-west corner grate", "at": [-24.65, -24.65], "ground": 0, "rungs": "-z", "opening": [-26.1, -23.05, -24.9, -22.5] }
+        { "id": "P1.NW", "kind": "grate", "name": "corner grate by the brick house", "toward": "Main Street", "at": [-24.65, 24.65], "ground": 0, "rungs": "+z", "opening": [-26.1, -23.05, 22.5, 24.9] },
+        { "id": "P1.NE", "kind": "grate", "name": "corner grate by the blue cottage", "toward": "Centre Street", "at": [24.65, 24.65], "ground": 0, "rungs": "+x", "opening": [22.5, 24.9, 23.05, 26.1] },
+        { "id": "P1.SE", "kind": "grate", "name": "corner grate by the bungalow", "toward": "Centre Street", "at": [24.65, -24.65], "ground": 0, "rungs": "+x", "opening": [22.5, 24.9, -26.1, -23.05] },
+        { "id": "P1.SW", "kind": "grate", "name": "corner grate by the Victorian house", "toward": "Main Street", "at": [-24.65, -24.65], "ground": 0, "rungs": "-z", "opening": [-26.1, -23.05, -24.9, -22.5] }
       ],
       "junction": { "at": [0, 0], "straight": [[9301, 9303], [9302, 9304]] },
       "routes": [
@@ -84,8 +84,8 @@
       "walkway": -14.6,
       "note": "Quay to quay under the river, a dry maintenance tunnel (the owner's 'Dry Side / Mind Your Paws' passage). Under the river bed (-5) the carve stops at -8, leaving the mud voxel and 3 studs over it; the floor (-14.6) keeps 5.4 above the recovery floor (-20).",
       "mouths": [
-        { "id": "P2.W", "kind": "cover", "name": "west quay access cover", "at": [1960.65, 462], "ground": 20, "rungs": "-x" },
-        { "id": "P2.E", "kind": "cover", "name": "east quay access cover", "at": [2335.35, 462], "ground": 20, "rungs": "+x" }
+        { "id": "P2.W", "kind": "cover", "name": "town-side quay access cover", "toward": "the river", "at": [1960.65, 462], "ground": 20, "rungs": "-x" },
+        { "id": "P2.E", "kind": "cover", "name": "far-side quay access cover", "toward": "the river", "at": [2335.35, 462], "ground": 20, "rungs": "+x" }
       ],
       "routes": [
         { "id": 9311, "name": "old river culvert", "from": "P2.W", "to": "P2.E", "side": "left" }
@@ -103,15 +103,15 @@
       "walkway": -3.2,
       "note": "From the lawn in front of the bowling alley's doors to Main Street's north verge, under Bowl Lane and the boulevard (two traffic lanes, the trolley, the patrol car's beat). Graded to drain north: the walkway falls 4.0 -> 1.2 -> -2.8 -> -3.2 so the carve steps 12, 8, 4 under the falling ground.",
       "mouths": [
-        { "id": "P3.S", "kind": "grate", "name": "bowling alley lawn grate", "at": [1306, -339.35], "ground": 16.42, "rungs": "-z" },
-        { "id": "P3.N", "kind": "grate", "name": "Main Street north verge grate", "at": [1350, 37.35], "ground": 7.78, "rungs": "+z" }
+        { "id": "P3.S", "kind": "grate", "name": "bowling alley lawn grate", "toward": "Bowl Lane", "at": [1306, -335.35], "ground": 16.5, "rungs": "-z" },
+        { "id": "P3.N", "kind": "grate", "name": "Main Street north verge grate", "toward": "the boulevard", "at": [1350, 37.35], "ground": 7.78, "rungs": "+z" }
       ],
       "routes": [
         { "id": 9321, "name": "storm drain 3, Bowl Lane", "from": "P3.S", "to": "P3.N", "side": "left", "wFrom": 4.0, "wTo": -3.2, "via": [[1321.84, -203.74, 1.2], [1339.44, -53.04, -2.8]] }
       ],
       "lightGrates": [[1344.05, 0]],
       "surface": [
-        { "from": "P3.S", "to": "P3.N", "points": [[1306, -339.35], [1350, 37.35]], "note": "straight across Bowl Lane, through the shop-row gap, the boulevard's two lanes and the trolley rails" }
+        { "from": "P3.S", "to": "P3.N", "points": [[1306, -335.35], [1350, 37.35]], "note": "straight across Bowl Lane, through the shop-row gap, the boulevard's two lanes and the trolley rails" }
       ]
     }
   ]

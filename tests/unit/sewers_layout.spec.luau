@@ -437,7 +437,7 @@ return function(t)
 		local p3 = len(9321)
 		t.near(p1, 91.0, 1, "P1 corner to corner")
 		t.near(p2, 443.9, 1, "P2 quay to quay")
-		t.near(p3, 402.8, 1, "P3 lawn to verge")
+		t.near(p3, 398.9, 1, "P3 lawn to verge")
 		t.near(len(9302) + len(9304), p1, 1e-3, "both P1 diagonals")
 		local s1 = (layout.surfaceWalk("P1.NW", "P1.SE") :: any).length
 		local s2 = (layout.surfaceWalk("P2.W", "P2.E") :: any).length
