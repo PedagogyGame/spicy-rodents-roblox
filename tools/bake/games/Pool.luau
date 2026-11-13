@@ -1,203 +1,279 @@
 --!strict
 -- tools/bake/games/Pool: pool's furniture in the bowling alley's games room (brief v2 §13a), built once per
--- station through the bake registry (tools/bake/GameBakes). Two tables, racked and ready, each with its lamp.
--- The game is NOT BUILT YET: this is the set dressing the room had, moved here unchanged so that the game's
--- builder owns it. Rebuild it with uniquely named moving parts (the server and the client find parts by name).
+-- station through the bake registry (tools/bake/GameBakes): an eight-ball table as real hardware, drawn from
+-- the SAME numbers the game plays on (Shared/Minigames/Pool/Tables: the bed, the six cushion noses, the twelve
+-- jaw facings, the six holes; Pool/Furniture: heights, rails, the tray), so what is seen is what is simulated.
+--   the bed: the slate in its cloth (one part per piece: the cloth wrapped down the pocket's throat, as on a
+--     real table), cut round at the six pockets, each with a dark well a ball drops into and a round leather
+--     pocket behind it, its lip on the rail;
+--   six cushions between the pockets, a nose where the ball meets them and a top that rises to the rail, their
+--     ends cut back along the jaws' own lines (the jaw facings at the model's own angles);
+--   wooden rails with eighteen sights, cut away behind each pocket; aprons, a floor under the body, four legs;
+--   the head spot and the foot spot; two cubes of chalk;
+--   the tray under the foot rail where potted balls collect, each in its own place (Furniture.home);
+--   the sixteen balls as Models (CueParts.ball: numbered, solid and striped, the cue ball dotted), racked as an
+--     idle table lies (Tables.rack) with the cue ball on the head spot;
+--   a lamp of three green shades over the table (Model "Lamp"), a stand of cues beside it, and a chalkboard
+--     on a post by the head of the table (Model "ScoreBoard": the server writes the game and the sitting on it).
+-- The table stands where the station is (the Spec's StationDef: Attractions/AlleyLayout.POOL_TABLES) and
+-- nothing here knows where that is.
 -- Interface: { build(kit, parent, station, venue) }: kit = tools/bake/alley/Kit in the site's frame, parent =
---   the GamesRoom model, station = the Spec's StationDef (index, variant, x, d). Names: GamesRoom.Pool<index>.
+--   the GamesRoom model, station = the Spec's StationDef. Names the game finds: GamesRoom.Pool<index> with
+--   CueBall, Ball1..Ball15 (Models), Lamp and ScoreBoard.
+
+local Furniture = require("../../../src/shared/Minigames/Pool/Furniture")
+local Tables = require("../../../src/shared/Minigames/Pool/Tables")
+local CueParts = require("./CueParts")
 
 local Bake = {}
 
-local WOOD = { 104, 66, 40 }
-local WOOD_DARK = { 70, 44, 28 }
-local FELT = { 30, 110, 70 }
-local BRASS = { 196, 160, 80 }
-local BLACK = { 24, 24, 26 }
+local WOOD = { 108, 68, 40 }
+local WOOD_DARK = { 66, 40, 26 }
+local FELT = { 28, 112, 72 }
+local CUSHION = { 24, 98, 62 }
+local BLACK = { 14, 14, 16 }
+local LEATHER = { 46, 30, 22 }
+local PEARL = { 236, 234, 220 }
+local CHALK = { 60, 110, 190 }
+local MAPLE = { 222, 190, 136 }
 
--- A pool table: frame, felt, cushions, pockets, legs; the 15 balls racked and the cue ball spotted.
-local POOL_COLS = {
-	{ 240, 200, 40 },
-	{ 30, 60, 170 },
-	{ 200, 30, 30 },
-	{ 90, 40, 140 },
-	{ 230, 110, 30 },
-	{ 30, 120, 60 },
-	{ 120, 30, 30 },
-	{ 20, 20, 20 },
-}
-local function poolTable(kit: any, parent: any, name: string, cx: number, cd: number)
-	local m = kit:model(parent, name)
-	local hl, hw = 5.4, 2.7 -- playing surface half length (D) and half width (X)
-	local top = 3.0
-	kit:box(m, "Felt", cx - hw, cx + hw, top - 0.3, top, cd - hl, cd + hl, FELT, "Fabric")
-	kit:box(m, "Slate", cx - hw - 0.7, cx + hw + 0.7, top - 1.0, top - 0.3, cd - hl - 0.7, cd + hl + 0.7, WOOD, "Wood")
-	for side = -1, 1, 2 do
-		kit:box(
-			m,
-			"RailLong",
-			cx + side * (hw + 0.35) - 0.35,
-			cx + side * (hw + 0.35) + 0.35,
-			top - 0.3,
-			top + 0.35,
-			cd - hl - 0.7,
-			cd + hl + 0.7,
-			WOOD,
-			"Wood"
-		)
-		kit:box(
-			m,
-			"CushionLong",
-			cx + side * (hw - 0.08) - 0.08,
-			cx + side * (hw - 0.08) + 0.08,
-			top,
-			top + 0.22,
-			cd - hl,
-			cd + hl,
-			{ 26, 96, 60 },
-			"Fabric"
-		)
-		kit:box(
-			m,
-			"RailShort",
-			cx - hw - 0.7,
-			cx + hw + 0.7,
-			top - 0.3,
-			top + 0.35,
-			cd + side * (hl + 0.35) - 0.35,
-			cd + side * (hl + 0.35) + 0.35,
-			WOOD,
-			"Wood"
-		)
-		kit:box(
-			m,
-			"CushionShort",
-			cx - hw,
-			cx + hw,
-			top,
-			top + 0.22,
-			cd + side * (hl - 0.08) - 0.08,
-			cd + side * (hl - 0.08) + 0.08,
-			{ 26, 96, 60 },
-			"Fabric"
-		)
-		for _, pd in { -hl, 0, hl } do
-			kit:cyl(
-				m,
-				"Pocket",
-				cx + side * hw,
-				top + 0.01,
-				cd + pd,
-				0.06,
-				0.62,
-				"Y",
-				BLACK,
-				"SmoothPlastic",
-				{ collide = false }
-			)
+local F = Furniture
+local SOFT = { collide = false, query = false }
+
+function Bake.build(kit: any, parent: any, station: any, _venue: any?)
+	local tb = Tables.eightBall()
+	local t = CueParts.on(kit, station)
+	local m = kit:model(parent, Furniture.modelName("pool", station.index))
+	local W, L = tb.halfW, tb.halfL
+	local iw, il = W + F.CUSHION_BACK, L + F.CUSHION_BACK -- where the cloth ends and the wood begins
+	local ow, ol = Furniture.outer(tb)
+	local top = F.RAIL_H
+	local cushionTop = F.CUSHION_H + 0.04
+
+	-- the pockets: a round cut through cloth, slate and rail round each hole (four crossed rectangles, a circle
+	-- in sixteen steps), a dark well under it, and a round leather pocket: its wall behind the hole, and a lip
+	-- on the rail round the cut
+	local cuts: { { number } } = {}
+	for _, hole in tb.holes do
+		local R = hole.r * 0.95
+		for _, a in { 0.2618, 0.6545, 0.9163, 1.309 } do
+			local cx, cz = R * math.cos(a), R * math.sin(a)
+			table.insert(cuts, { hole.x - cx, hole.x + cx, hole.z - cz, hole.z + cz })
 		end
-		for _, ld in { -hl + 0.6, hl - 0.6 } do
-			kit:box(
+		local s = R
+		t:box(
+			m,
+			"PocketWell",
+			-- (inside the aprons: a well that reached through them showed as a black slot in the side)
+			math.max(hole.x - s - 0.2, -ow + 0.15),
+			math.min(hole.x + s + 0.2, ow - 0.15),
+			-F.WELL_DEPTH - 0.08,
+			-F.WELL_DEPTH,
+			math.max(hole.z - s - 0.2, -ol + 0.15),
+			math.min(hole.z + s + 0.2, ol - 0.15),
+			BLACK,
+			"SmoothPlastic",
+			SOFT
+		)
+		-- the well's sides, so nothing shows through it
+		for _, side in { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } } do
+			local ax, az = side[1], side[2]
+			local x0, x1 = hole.x - s - 0.03, hole.x + s + 0.03
+			local z0, z1 = hole.z - s - 0.03, hole.z + s + 0.03
+			if ax ~= 0 then
+				x0 = hole.x + ax * (s + 0.015) - 0.015
+				x1 = x0 + 0.03
+			else
+				z0 = hole.z + az * (s + 0.015) - 0.015
+				z1 = z0 + 0.03
+			end
+			t:box(m, "PocketLiner", x0, x1, -F.WELL_DEPTH, -F.CLOTH_T - F.SLATE_T, z0, z1, BLACK, "SmoothPlastic", SOFT)
+		end
+		-- the leather pocket: sixteen staves round the hole, up to the rail's top on the side away from the cloth
+		-- (never the side a ball comes in by, which stays open to the bed), and a lip round the cut on the rail
+		local n = 16
+		local stave = 2.6 * (R - 0.008) * math.tan(math.pi / n) + 0.01
+		for k = 0, n - 1 do
+			local a = (k + 0.5) * 2 * math.pi / n
+			local ux, uz = math.cos(a), math.sin(a)
+			local px, pz = hole.x + ux * (R - 0.02), hole.z + uz * (R - 0.02)
+			local tx, tz = -uz * stave / 2, ux * stave / 2
+			if ux * hole.mx + uz * hole.mz <= 0.15 then
+				t:slab(
+					m,
+					"PocketBack",
+					px - tx,
+					pz - tz,
+					px + tx,
+					pz + tz,
+					-F.WELL_DEPTH,
+					top - 0.004,
+					0.024,
+					0,
+					LEATHER,
+					"Fabric",
+					SOFT
+				)
+			end
+			local lx, lz = hole.x + ux * (R + 0.035), hole.z + uz * (R + 0.035)
+			if math.abs(lx) > iw + 0.01 or math.abs(lz) > il + 0.01 then
+				t:slab(
+					m,
+					"PocketLip",
+					lx - tx * 1.2,
+					lz - tz * 1.2,
+					lx + tx * 1.2,
+					lz + tz * 1.2,
+					top - 0.004,
+					top + 0.012,
+					0.07,
+					0,
+					LEATHER,
+					"Fabric",
+					SOFT
+				)
+			end
+		end
+	end
+	for _, r in kit:holes(-iw, iw, -il, il, cuts) do
+		-- (the slate shows only in the pockets' throats, where a real table's cloth is wrapped down over it: one
+		-- part for both keeps the bed's look at half its parts)
+		t:box(m, "Cloth", r[1], r[2], -F.CLOTH_T - F.SLATE_T, 0, r[3], r[4], FELT, "Fabric")
+	end
+
+	-- the rails: the wooden frame round the cloth, cut away behind each pocket
+	local ring: { { number } } = { { -iw, iw, -il, il } }
+	for _, c in cuts do
+		table.insert(ring, c)
+	end
+	for _, r in kit:holes(-ow, ow, -ol, ol, ring) do
+		t:box(m, "Rail", r[1], r[2], -F.CLOTH_T - F.SLATE_T, top, r[3], r[4], WOOD, "Wood")
+	end
+
+	-- the cushions (the noses the balls meet) and the jaws at their ends
+	for _, seg in tb.segs do
+		if seg.jaw then
+			-- its rubber lies on the side away from the pocket it leads into
+			local hx, hz, best = 0, 0, math.huge
+			local mx, mz = (seg.x1 + seg.x2) / 2, (seg.z1 + seg.z2) / 2
+			for _, hole in tb.holes do
+				local d = (hole.x - mx) ^ 2 + (hole.z - mz) ^ 2
+				if d < best then
+					hx, hz, best = hole.x, hole.z, d
+				end
+			end
+			local side = if (mx - hx) * -seg.tz + (mz - hz) * seg.tx > 0 then 1 else -1
+			t:slab(m, "Jaw", seg.x1, seg.z1, seg.x2, seg.z2, 0, cushionTop, 0.09, side, CUSHION, "Fabric")
+		elseif math.abs(seg.x1 - seg.x2) < 1e-9 then
+			-- a long cushion: its nose (where the ball meets it) up to CUSHION_H, its top rising back to the rail
+			local sx = if seg.x1 > 0 then 1 else -1
+			local x0, x1 =
+				math.min(seg.x1, seg.x1 + sx * F.CUSHION_BACK), math.max(seg.x1, seg.x1 + sx * F.CUSHION_BACK)
+			local z0, z1 = math.min(seg.z1, seg.z2), math.max(seg.z1, seg.z2)
+			t:box(m, "Cushion", x0, x1, 0, F.CUSHION_H, z0, z1, CUSHION, "Fabric")
+			t:wedge(m, "CushionTop", x0, x1, F.CUSHION_H, top, z0, z1, if sx > 0 then "x-" else "x+", CUSHION, "Fabric")
+		else
+			local sz = if seg.z1 > 0 then 1 else -1
+			local x0, x1 = math.min(seg.x1, seg.x2), math.max(seg.x1, seg.x2)
+			local z0, z1 =
+				math.min(seg.z1, seg.z1 + sz * F.CUSHION_BACK), math.max(seg.z1, seg.z1 + sz * F.CUSHION_BACK)
+			t:box(m, "Cushion", x0, x1, 0, F.CUSHION_H, z0, z1, CUSHION, "Fabric")
+			t:wedge(m, "CushionTop", x0, x1, F.CUSHION_H, top, z0, z1, if sz > 0 then "z-" else "z+", CUSHION, "Fabric")
+		end
+	end
+
+	-- the sights, the two spots, the chalk
+	for _, s in Furniture.sights(tb) do
+		t:cyl(m, "Sight", s.x, top + 0.002, s.z, 0.012, 2 * F.SIGHT_R, "Y", PEARL, "SmoothPlastic", SOFT)
+	end
+	for _, z in { tb.headZ, tb.footZ } do
+		t:cyl(m, "Spot", 0, 0.002, z, 0.006, 0.08, "Y", { 20, 84, 54 }, "SmoothPlastic", SOFT)
+	end
+	t:box(m, "Chalk", ow - 0.34, ow - 0.22, top, top + 0.1, -1.1, -0.98, CHALK, "SmoothPlastic", SOFT)
+	t:box(m, "Chalk", -ow + 0.2, -ow + 0.32, top, top + 0.1, 2.0, 2.12, CHALK, "SmoothPlastic", SOFT)
+
+	-- the body: aprons, a floor under it, legs
+	local under = -F.CLOTH_T - F.SLATE_T
+	t:box(m, "Apron", -ow, ow, -F.APRON_H, under, -ol, -ol + 0.14, WOOD, "Wood")
+	t:box(m, "Apron", -ow, ow, -F.APRON_H, under, ol - 0.14, ol, WOOD, "Wood")
+	t:box(m, "Apron", -ow, -ow + 0.14, -F.APRON_H, under, -ol + 0.14, ol - 0.14, WOOD, "Wood")
+	t:box(m, "Apron", ow - 0.14, ow, -F.APRON_H, under, -ol + 0.14, ol - 0.14, WOOD, "Wood")
+	t:box(m, "Belly", -ow + 0.14, ow - 0.14, -F.APRON_H, -F.APRON_H + 0.08, -ol + 0.14, ol - 0.14, WOOD_DARK, "Wood")
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local x, z = sx * (ow - 0.6), sz * (ol - 1.0)
+			t:box(
 				m,
 				"Leg",
-				cx + side * (hw + 0.1) - 0.4,
-				cx + side * (hw + 0.1) + 0.4,
-				0,
-				top - 1.0,
-				cd + ld - 0.4,
-				cd + ld + 0.4,
+				x - F.LEG_W / 2,
+				x + F.LEG_W / 2,
+				-F.BED_Y,
+				-F.APRON_H,
+				z - F.LEG_W / 2,
+				z + F.LEG_W / 2,
 				WOOD_DARK,
 				"Wood"
 			)
 		end
 	end
-	for k = 0, 2 do
-		kit:cyl(
-			m,
-			"Diamond",
-			cx - hw - 0.35,
-			top + 0.36,
-			cd - hl / 2 + k * hl / 2,
-			0.02,
-			0.12,
-			"Y",
-			{ 236, 236, 220 },
-			"SmoothPlastic",
-			{ collide = false }
-		)
-	end
-	-- the rack at the foot spot (+D), cue ball at the head spot
-	local br = 0.24
-	local footD = cd + hl / 2
-	local n = 0
-	for row = 0, 4 do
-		for i = 0, row do
-			n += 1
-			local bx = cx + (i - row / 2) * br * 2.02
-			local bd = footD + row * br * 1.75
-			local col = POOL_COLS[((n - 1) % 8) + 1]
-			if n == 5 then
-				col = BLACK
-			end
-			kit:ball(m, "PoolBall", bx, top + br, bd, br * 2, col, "SmoothPlastic", { reflectance = 0.1 })
-		end
-	end
-	kit:ball(m, "CueBall", cx, top + br, cd - hl / 2, br * 2, { 245, 245, 240 }, "SmoothPlastic", { reflectance = 0.1 })
-	-- a cue lying on the rail
-	kit:cyl(m, "Cue", cx + hw + 0.35, top + 0.45, cd, 9.6, 0.1, "D", { 214, 180, 120 }, "Wood", { collide = false })
-	-- the lamp over the table (green shades, real light)
-	kit:box(m, "LampBar", cx - 0.15, cx + 0.15, 8.2, 8.4, cd - 4, cd + 4, BRASS, "Metal", { collide = false })
-	for _, ld in { -3, 0, 3 } do
-		kit:box(
-			m,
-			"Shade",
-			cx - 0.8,
-			cx + 0.8,
-			7.6,
-			8.2,
-			cd + ld - 0.8,
-			cd + ld + 0.8,
-			{ 20, 90, 50 },
-			"Glass",
-			{ collide = false }
-		)
-		kit:box(
-			m,
-			"Bulb",
-			cx - 0.5,
-			cx + 0.5,
-			7.55,
-			7.62,
-			cd + ld - 0.5,
-			cd + ld + 0.5,
-			{ 255, 236, 190 },
-			"Neon",
-			{ collide = false }
-		)
-	end
-	local glow = kit:box(
-		m,
-		"LampLight",
-		cx - 0.2,
-		cx + 0.2,
-		7.5,
-		7.55,
-		cd - 0.2,
-		cd + 0.2,
-		{ 255, 236, 190 },
-		"Neon",
-		{ collide = false }
-	)
-	kit:light(
-		glow,
-		"SurfaceLight",
-		{ Face = "Bottom", Range = 9, Angle = 90, Brightness = 2.2, Color = { 255, 238, 200 } }
-	)
-	kit:light(glow, "PointLight", { Range = 13, Brightness = 0.9, Color = { 255, 236, 200 }, Shadows = false })
-	return m
-end
 
-function Bake.build(kit: any, parent: any, station: any, _venue: any?)
-	poolTable(kit, parent, `Pool{station.index}`, station.x, station.d)
+	-- the tray under the foot rail: fifteen places, lined with cloth
+	local r = tb.ballR
+	local _, trayY, trayZ = Furniture.tray(1)
+	local half = 7.5 * F.TRAY_SLOT + 0.12
+	local floorY = trayY - r
+	t:box(m, "Tray", -half, half, floorY - 0.07, floorY, ol - 0.02, trayZ + r + 0.1, FELT, "Fabric", SOFT)
+	t:box(m, "TrayLip", -half, half, floorY, floorY + 0.14, trayZ + r + 0.04, trayZ + r + 0.1, WOOD_DARK, "Wood", SOFT)
+	for _, sx in { -1, 1 } do
+		t:box(
+			m,
+			"TrayEnd",
+			sx * half - 0.03,
+			sx * half + 0.03,
+			floorY - 0.07,
+			floorY + 0.2,
+			ol - 0.02,
+			trayZ + r + 0.1,
+			WOOD_DARK,
+			"Wood",
+			SOFT
+		)
+	end
+
+	-- the balls, as an idle table lies: racked on the foot spot, the cue ball on the head spot
+	for _, s in Tables.rack(station.index or 1) do
+		CueParts.ball(t, m, "eightball", s.id, s.x, s.z)
+	end
+
+	CueParts.lamp(t, m, L, 3)
+
+	-- the scoreboard by the head of the table (the server writes the game on it)
+	CueParts.board(t, m, ow + 1.4, -(ol + 0.7), `TABLE {station.index or 1}\nEight-ball: walk up and press E`)
+
+	-- a stand of cues by the head of the table (uncollidable: nobody trips on it walking round)
+	local sx, sz = -(ow + 1.3), -(ol + 1.1)
+	local floor = -F.BED_Y
+	t:cyl(m, "CueStandBase", sx, floor + 0.06, sz, 0.12, 0.9, "Y", WOOD_DARK, "Wood", SOFT)
+	t:cyl(m, "CueStandPost", sx, floor + 1.7, sz, 3.3, 0.1, "Y", WOOD_DARK, "Wood", SOFT)
+	t:cyl(m, "CueStandRing", sx, floor + 2.9, sz, 0.08, 0.8, "Y", WOOD, "Wood", SOFT)
+	for k = 0, 3 do
+		local a = k * math.pi / 2 + 0.4
+		local cx, cz = sx + math.cos(a) * 0.3, sz + math.sin(a) * 0.3
+		t:rod(
+			m,
+			"Cue",
+			cx,
+			floor + 0.12,
+			cz,
+			cx - math.cos(a) * 0.08,
+			floor + 0.12 + F.CUE_LEN,
+			cz - math.sin(a) * 0.08,
+			0.08,
+			MAPLE,
+			"Wood"
+		)
+	end
+	return m
 end
 
 return Bake
