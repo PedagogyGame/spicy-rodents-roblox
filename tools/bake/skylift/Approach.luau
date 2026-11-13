@@ -464,7 +464,7 @@ function Approach.build(roblox: any, parent: any): any
 		lamp(kit0, lamps, `Lamp{i}`, road.coord + side * verge, e[1], -side, 0)
 	end
 	lamp(kit0, lamps, "LampTrailhead", lot.x0 + 20, lot.z0 + 2.5, 0, 1)
-	lamp(kit0, lamps, "LampStation", lot.x0 - 1.5, lot.z1 - 13, 1, 0)
+	lamp(kit0, lamps, "LampStation", lot.x0 - 1.5, lot.z1 - 32, 1, 0)
 
 	-- the hill trail
 	local trail = kit0:folder(m, "Trail")
