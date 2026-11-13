@@ -188,6 +188,128 @@ return function(t)
 	)
 
 	t.test(
+		"eight a side: sixteen people are a match with no bot in it and the seventeenth is refused (full); one leaves and a bot has the seat, another trades sides with that bot, and the seventeenth takes the seat from it; all sixteen walk and fire with nothing refused; at the next match every one of them is on the side they ended on, the two who crossed as well",
+		function()
+			Kit.play(function(kit)
+				local stats = kit.service:stats()
+				local people: { Kit.Client } = {}
+				for i = 1, R.slots do
+					-- (every sort of connection among them: 0 to 300 ms there and back, some with jitter and loss)
+					local c =
+						kit.client(`P{i}`, { delay = i % 10, jitter = i % 3, lose = if i % 4 == 0 then 0.05 else 0 })
+					t.truthy((kit.join(c)), `P{i} joins`)
+					people[i] = c
+					kit.run(0.1)
+				end
+				kit.run(0.5)
+				local r = roster(kit)
+				t.deepEq(
+					{ r.people, r.bots, r.sides, r.peopleSides },
+					{ R.slots, 0, { R.teamMax, R.teamMax }, { R.teamMax, R.teamMax } },
+					"eight people a side and no bot"
+				)
+				local late = kit.client("Late")
+				t.deepEq({ kit.join(late) }, { false, Contract.textFor("full") })
+				for _, c in people do
+					t.truthy(c.seat ~= nil and c.place ~= 0, `{c.name} is seated and placed`)
+					t.eq(#c.watch.slots, R.slots, "everybody is told of all sixteen")
+				end
+				-- (still the briefing) one leaves: a bot has the seat and the side
+				local goer, trader = people[1], people[2]
+				local seat, side = goer.seat, teamOf(kit, goer)
+				t.eq(teamOf(kit, trader), 3 - side, "the first two joined opposite each other")
+				kit.w.svc:leave(goer.stub, "left")
+				kit.run(0.3)
+				r = roster(kit)
+				t.deepEq({ r.people, r.bots, r.sides }, { R.slots - 1, 1, { R.teamMax, R.teamMax } })
+				t.truthy(isBot(kit.session.seats[seat]) and not kit.session.gone[seat], "a bot has the seat")
+				t.eq(kit.state().slots[seat].team, side, "and the side")
+				-- another trades sides with that bot, and the seventeenth takes the bot's seat on the side it now has
+				t.deepEq({ Rig.input(kit.w, trader.stub, Contract.STATION, "side", {}) }, { true, nil })
+				kit.run(0.3)
+				t.eq(teamOf(kit, trader), side)
+				t.truthy((kit.join(late)), "now there is room")
+				kit.run(0.5)
+				r = roster(kit)
+				t.deepEq(
+					{ r.people, r.bots, r.sides, r.peopleSides },
+					{ R.slots, 0, { R.teamMax, R.teamMax }, { R.teamMax, R.teamMax } }
+				)
+				t.eq(late.seat, seat, "the bot gave her its seat")
+				t.eq(teamOf(kit, late), 3 - side, "on the side the bot had after the trade")
+				people[1] = late
+				-- live: each walks a few studs out of its room and back along its own lane, clicking along its look
+				kit.live()
+				local start: { number } = {}
+				for i, c in people do
+					start[i] = c.x
+				end
+				local step = Body.WALK / 60
+				for frame = 1, 6 * 60 do
+					local out = frame <= 3 * 60
+					for i, c in people do
+						if c.seat ~= nil and not c.out then
+							local dir = if teamOf(kit, c) == 1 then 1 else -1
+							local dx = start[i] + (if out then 14 * dir else 0) - c.x
+							if math.abs(dx) > 1e-6 then
+								c.x += math.clamp(dx, -step, step)
+							end
+							c.yaw = math.atan2(-dir, 0)
+							if frame % 30 == i % 30 and math.abs(c.x - start[i]) > 11 then
+								c.fire(Body.look(c.yaw, 0))
+							end
+						end
+					end
+					kit.frame()
+				end
+				t.eq(stats.movesRefused, 0, "sixteen honest walkers, not one Move refused")
+				t.eq(stats.corrections, 0)
+				t.truthy(stats.movesAccepted > 16 * 60, `{stats.movesAccepted} Moves accepted`)
+				t.truthy(stats.balls >= R.slots, `{stats.balls} balls`)
+				local bad = 0
+				for _, c in people do
+					for _, a in c.acks do
+						if not a.ok and (a.why == "origin" or a.why == "sprint" or a.why == "stale") then
+							bad += 1
+						end
+					end
+				end
+				t.eq(bad, 0, "no click refused for what its own stream said")
+				local state = kit.state()
+				t.eq(state.scores[1] + state.scores[2], stats.tags, "the scores are the tags")
+				-- the clock runs out; the next match is the same sixteen on the same sides
+				local sidesWere: { number } = {}
+				for i, c in people do
+					sidesWere[i] = teamOf(kit, c)
+				end
+				t.truthy((kit.service:debug("end")))
+				kit.run(1)
+				t.eq(kit.session.phase, "done")
+				t.truthy(
+					kit.untilTrue(R.endCardSecs, function(): boolean
+						return kit.service.match == 2
+					end),
+					"the service rolled on"
+				)
+				kit.run(0.6)
+				r = roster(kit)
+				t.deepEq(
+					{ r.people, r.bots, r.sides, r.peopleSides },
+					{ R.slots, 0, { R.teamMax, R.teamMax }, { R.teamMax, R.teamMax } },
+					"the second match: the same sixteen, eight a side"
+				)
+				for i, c in people do
+					t.eq(teamOf(kit, c), sidesWere[i], `{c.name} is on the side it ended on`)
+					t.truthy(
+						Arena.inRoom(kit.arena.spawnRooms[sidesWere[i]], c.x, c.y + 0.1, c.z),
+						`{c.name} stands in its spawn room`
+					)
+				end
+			end, { arena = Kit.hall() })
+		end
+	)
+
+	t.test(
 		"a join during the end card is refused; the next match rolls on by itself with people on the sides they ended on",
 		function()
 			Kit.play(function(kit)

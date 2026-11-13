@@ -13,7 +13,10 @@
 --     nothing of it (Stream.sprinting);
 --   * the origin's "Body.JUMP_HEIGHT more while the newest Move says BIT.air" is allowed below the eye
 --     as well as above it: a body coming down from a hop is lower than its newest Move (Stream.originOk);
---   * a slot's splats and pose history are emptied when its occupant changes, when the roster is read.
+--   * a slot's splats and pose history are emptied when its occupant changes, when the roster is read;
+--   * at "start", "unless that team already has Rules.teamMax people" counts the people GOING to a side
+--     (their remembered sides, in seat order), not the people the new deal has just handed it: with
+--     sixteen people the deal fills both sides, and two who had crossed would each be refused (onStart).
 -- WHERE IT DID NOT DO AS WRITTEN, FOR THE HONEST PLAYER (as written each of these refuses or drops
 -- somebody who did nothing wrong; nothing another lane sends or hears changes; all reported):
 --   * a body has a footprint (Stream, "the height rule"): a pose whose feet point is up to a stud past
@@ -1041,20 +1044,33 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 				Stream.restart(person, now)
 			end
 		end
-		-- PEOPLE KEEP THEIR SIDES, in seat order, unless the side is already full of people
+		-- PEOPLE KEEP THEIR SIDES, in seat order, unless the side is already full of people. "Full" is
+		-- counted over the sides people are GOING to, not the ones the new deal happened to hand them: at
+		-- sixteen people the deal fills both sides, and counting those would leave two who had crossed
+		-- on each other's sides, each waiting for the other to move first.
+		local going = { 0, 0 }
+		local final: { [number]: number } = {}
 		for seat = 1, #state.slots do
 			local person = bySeat[seat]
 			local want = if person then sides[person.player] else nil
-			if want ~= nil and state.slots[seat].team ~= want then
-				local there = 0
-				for id, slot in state.slots do
-					if slot.on and slot.team == want and bySeat[id] ~= nil then
-						there += 1
-					end
-				end
-				if there < R.teamMax then
-					Rules.assign(state, seat, want)
-				end
+			if want ~= nil and going[want] < R.teamMax then
+				final[seat] = want
+				going[want] += 1
+			end
+		end
+		-- (anybody with no side to go back to stays where they were dealt, if there is room there)
+		for seat = 1, #state.slots do
+			if bySeat[seat] ~= nil and final[seat] == nil then
+				local dealt = state.slots[seat].team
+				local team = if going[dealt] < R.teamMax then dealt else 3 - dealt
+				final[seat] = team
+				going[team] += 1
+			end
+		end
+		for seat = 1, #state.slots do
+			local team = final[seat]
+			if team ~= nil and state.slots[seat].team ~= team then
+				Rules.assign(state, seat, team)
 			end
 		end
 		for player in placed do
