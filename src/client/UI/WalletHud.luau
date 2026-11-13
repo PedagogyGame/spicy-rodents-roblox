@@ -11,7 +11,8 @@
 --                deferred signals and replication carries the last write), so the amount shown is always what
 --                the balance really moved by since it was last drawn, and the reason is the note's only when
 --                the note accounts for all of it: three spends in one frame read "-67c  a kite and 2 more",
---                never "-67c  a kite"; a spend refunded in the same frame moves nothing and shows nothing.
+--                never "-67c  a kite"; a spend refunded in the same frame moves nothing and shows nothing
+--                (the count is still taken from its note, so the next total is not said to hold it).
 --   PocketMoney  cents of pocket money given at this join: said for POCKET_SECS when the wallet first shows and
 --                whenever more is given: "Pocket money: S$3.00 to spend". (It is given once, so someone who
 --                comes back is not told it again.)
@@ -371,8 +372,17 @@ function WalletHud.start(opts: Opts?): WalletHud
 		seqShown = seq or seqShown
 	end
 
+	-- A frame whose changes cancelled out (a spend refunded at once) moves no balance, so Cents does not
+	-- fire: the count is taken from the note alone, or the next total would be said to hold changes it does not.
+	local function drawNote()
+		if shown ~= nil and player:GetAttribute("Cents") == shown then
+			seqShown = WalletHud.parseNote(player:GetAttribute("CentsNote")) or seqShown
+		end
+	end
+
 	local conns: { RBXScriptConnection } = {}
 	table.insert(conns, player:GetAttributeChangedSignal("Cents"):Connect(drawBalance))
+	table.insert(conns, player:GetAttributeChangedSignal("CentsNote"):Connect(drawNote))
 	table.insert(conns, player:GetAttributeChangedSignal("PassUntil"):Connect(drawPass))
 	table.insert(conns, player:GetAttributeChangedSignal("PocketMoney"):Connect(drawPocket))
 	table.insert(conns, player:GetAttributeChangedSignal("InMinigame"):Connect(place))

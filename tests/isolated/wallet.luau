@@ -22,6 +22,7 @@ local RoleLab = require("@server/Roles/RoleLab")
 local RoleService = require("@server/Roles/RoleService")
 local PlayMenu = require("@client/UI/PlayMenu")
 local WalletHud = require("@client/UI/WalletHud")
+local WalletFlow = require("@tests/engine/WalletFlow")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local Rig = require("@tests/lib/MinigameRig")
 local fs = require("@lune/fs")
@@ -520,6 +521,71 @@ return function(t)
 	)
 
 	t.test(
+		"the engine check's own flow (tests/engine/WalletFlow) passes here first, on the game's wiring and a real MinigameService",
+		function()
+			-- what tests/engine/PlayBuild will do on the booted game: Game.wallet's hooks, with the minigames'
+			-- town built from them exactly as Game.start hands them to the AttractionService (games = { charge,
+			-- pass, ... }), and a PlayerLike stub that Game's fire answers through its events list
+			local serverTime = 5000
+			local warned: { string } = {}
+			local hooks = Game.wallet({
+				-- (the day clock as DayClock.publish answered it; no attribute has been changed since)
+				clock = { GetAttribute = function() end },
+				published = { epoch = serverTime, base = 9 * DAY, rate = 1 },
+				serverTime = function(): number
+					return serverTime
+				end,
+				fire = function(player: any, payload: { [string]: any })
+					-- Game.start's fire, for a PlayerLike stub
+					if type(player) == "table" and type(player.events) == "table" then
+						table.insert(player.events, payload)
+					end
+				end,
+				players = function(): { any }
+					return {}
+				end,
+				log = function() end,
+				warn = function(line: string)
+					table.insert(warned, line)
+				end,
+			})
+			local result: any = nil
+			Rig.play(function(r)
+				local smoke: any = { UserId = 4242, Name = "Smoke", Character = nil, attrs = {} }
+				result = WalletFlow.play(hooks.wallet, { player = smoke, town = r.svc.town })
+				-- the flow left the stub as a client would find it
+				t.eq(smoke.attrs.Cents, 268)
+				t.eq(smoke.attrs.PocketMoney, nil, "it ended by coming back, which gives nothing")
+				t.eq(smoke.attrs.PassUntil, 14 * DAY)
+				t.eq(#warned, 1, "the price that was missing was said in the server's log, once")
+				t.eq(smoke.events[#smoke.events].text, "The till is closed.")
+				t.eq(r.wallet.balance(r.player), 300, "the rig's own wallet was not the one asked")
+			end, {
+				sites = { [SITE] = PLACE },
+				furnish = FakeGames.furnish,
+				service = { games = { charge = hooks.charge, pass = hooks.pass } },
+			})
+			t.eq(table.concat(result.failures, "; "), "", "what the wallet check found")
+			t.truthy(result.ok)
+			t.truthy(result.numbers.town, "the minigames' town was checked too")
+			t.eq(result.numbers.pocket, 300)
+			t.near(result.numbers.passDays, 5)
+			t.eq(result.numbers.cents, 268)
+			-- and PlayBuild runs exactly this (it cannot run here: read that it does)
+			local src = fs.readFile("tests/engine/PlayBuild.luau")
+			t.truthy(string.find(src, 'script.Parent:WaitForChild("WalletFlow")', 1, true))
+			t.truthy(
+				string.find(
+					src,
+					"WalletFlow.play(wallet, { player = player, town = minigames and minigames.town })",
+					1,
+					true
+				)
+			)
+		end
+	)
+
+	t.test(
 		"roles: a member's purse is a face on the wallet, so Ladder pay, the queue's money term and the screen agree",
 		function()
 			FakeEngine.with(function()
@@ -772,10 +838,19 @@ return function(t)
 	)
 
 	-- ONCE PAINTBALL IS JOINED (its server lane is not on this branch: the case appears by itself the day its
-	-- test kit is in the tree, and was run on a scratch merge of the two branches before it was written down).
-	-- Paintball's desk must sell the TOWN's pass: PaintballService takes ctx.town.pass when nobody hands it one
-	-- (`d.pass or (if d.day == nil then ctx.town.pass else nil) or its own desk`), and its kit joins each
-	-- stand-in to the rig's wallet (`w.wallet.join(stub)` in kit.client), as arriving in the game does.
+	-- test kit is in the tree). It was run on a scratch merge of this branch with feat/paintball-server
+	-- (4bd804c): as the two stand it FAILS, because PaintballService builds a desk of its own on ctx.town.charge
+	-- (a second ledger: the money goes, the lounges stay shut). The join needs two lines, and with them this
+	-- case, all of paintball's own specs and the type check pass on the joined tree:
+	--   Server/Minigames/Paintball/PaintballService.new, where `pass` is chosen, the town's pass comes before
+	--   a desk of its own:
+	--       local pass: PassDesk = d.pass
+	--           or (if d.day == nil and ctx.town ~= nil then ctx.town.pass else nil)
+	--           or PassDeskModule.new(...)
+	--   tests/isolated/paintball_server_kit, kit.client: `w.wallet.join(stub)` after `Rig.stub(name)` (a
+	--   stand-in arrives in the game as everyone does; nobody is given a wallet by being charged).
+	-- The engine check tests/engine/PaintballFlow.run needs the same for its two stubs: G.wallet.join(p).
+	local JOIN = "PaintballService must take ctx.town.pass (the comment above this case has the two lines)"
 	if fs.isFile("tests/isolated/paintball_server_kit.luau") then
 		t.test(
 			"joined with paintball: the desk in the TV station sells the town's one pass, and a lounge door's pass opens the arena",
@@ -790,7 +865,7 @@ return function(t)
 					t.deepEq({ kit.join(ada) }, { false, Contract.textFor("pass") })
 					-- bought at Contract.DESK: the wallet holds it, so the lounge door opens and the corner shows it
 					t.deepEq({ kit.join(ada, Contract.DESK) }, { false, Contract.textFor("bought") })
-					t.truthy(wallet.pass.has(ada.stub), "a pass bought at the paintball desk opens the lounges")
+					t.truthy(wallet.pass.has(ada.stub), `a pass bought at the paintball desk opens the lounges: {JOIN}`)
 					t.eq(type(ada.stub.attrs.PassUntil), "number", "and the pass line shows in the corner")
 					t.eq(wallet.balance(ada.stub), 280)
 					t.deepEq({ wallet.pass.buy(ada.stub) }, { false, "You already have a pass." })
@@ -922,6 +997,17 @@ return function(t)
 			frame()
 			t.eq(hud.balance.Text, "Wallet  S$2.93")
 			t.falsy(hud.note.Visible, "no '+30c refund' for money that never visibly left")
+			-- and the two changes nobody saw are not counted into the next total: two spends in the next frame
+			-- read "and 1 more", not "and 3 more"
+			w.wallet.spend(player, 1, "bubble gum")
+			w.wallet.spend(player, 2, "a comic")
+			frame()
+			t.eq(hud.balance.Text, "Wallet  S$2.90")
+			t.eq(hud.note.Text, "-3c  a comic and 1 more")
+			w.wallet.add(player, 3, "a refund at the till")
+			frame()
+			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			FakeEngine.runDelayed()
 			-- the same over two frames (a handing-over that waited): down, then back up with its reason
 			local co = coroutine.create(function()
 				w.wallet.spend(player, 30, "a kite", function(): (boolean?, string?)
@@ -994,6 +1080,7 @@ return function(t)
 			hud.stop()
 			t.eq(hud.gui.Parent, nil)
 			t.eq(player:GetAttributeChangedSignal("Cents").count(), 0)
+			t.eq(player:GetAttributeChangedSignal("CentsNote").count(), 0)
 			t.eq(heartbeat.count(), 0)
 			w.wallet.spend(player, 1, "bubble gum")
 			frame()

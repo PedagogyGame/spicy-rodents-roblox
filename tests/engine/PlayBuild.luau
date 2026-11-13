@@ -7,7 +7,7 @@
 -- menu's five picks, the rodent biting a person (Power +100/+130, the victim flees), two kicks
 -- knocking the rodent out (health 100 -> 45 -> 0, released, back to the AI at full health), a scripted
 -- dart-out in front of a moving car (RUN OVER through the server's swept test), police beside a patrol
--- car and the possession ledger check.
+-- car, the town's wallet (tests/engine/WalletFlow) and the possession ledger check.
 -- Interface: run(opts?) -> Result (JSON-friendly)
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -269,39 +269,20 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		check(best < 16, `police officer {best} studs from the nearest patrol car (reach 16)`)
 	end
 
-	-- the wallet (Economy/Credits; added 2026-11-13 and NOT yet run in the cloud; the same steps are driven
-	-- headless against Game.wallet in tests/isolated/wallet.luau): pocket money on joining, a purchase, the pass
-	-- on the day clock, and the minigames' charge and pass all on the one balance ------------------------------
+	-- the wallet (Economy/Credits; added 2026-11-13 and NOT yet run in the cloud): tests/engine/WalletFlow, the
+	-- same flow the Lune suite runs first on Game.wallet (tests/isolated/wallet.luau): pocket money on joining,
+	-- a purchase, a refusal, the pass on the day clock, the minigames' charge and pass on the one balance, the
+	-- notice toast, leaving and coming back -------------------------------------------------------------------
 	local wallet = G.wallet
 	check(wallet ~= nil, "Game has no wallet")
 	if wallet then
-		wallet.join(player)
-		numbers.pocket = wallet.balance(player)
-		check(numbers.pocket == 300, `pocket money {numbers.pocket} (want 300)`)
-		check(player.attrs.Cents == 300, `Cents attribute {player.attrs.Cents}`)
-		local paid, paidWords = wallet.spend(player, 12, "coffee")
-		check(paid and paidWords == "Paid 12c for coffee. You have S$2.88.", `a coffee: {paidWords}`)
-		check(
-			player.attrs.Cents == 288 and string.match(tostring(player.attrs.CentsNote), "^%d+|%-12|coffee$") ~= nil,
-			`the balance on the player did not follow ({tostring(player.attrs.Cents)}, {tostring(player.attrs.CentsNote)})`
-		)
-		local short, shortWords = wallet.spend(player, 1000, "a jet ski")
-		check(not short and shortWords == "You need S$10.00; you have S$2.88.", `too dear: {shortWords}`)
-		local bought, boughtWords = wallet.pass.buy(player)
-		check(bought and wallet.pass.has(player), `the pass: {boughtWords}`)
-		numbers.passDays = wallet.pass.left(player)
-		check(math.abs(numbers.passDays - 5) < 0.01, `a new pass has {numbers.passDays} days`)
-		check(type(player.attrs.PassUntil) == "number", "no PassUntil on the player")
-		if G.attractions and G.attractions.minigames then
-			local okC, wordsC = G.attractions.minigames.town.charge(player, 1000, "a game")
-			check(
-				not okC and wordsC == "You need S$10.00; you have S$2.68.",
-				`ctx.town.charge is not the wallet: {wordsC}`
-			)
-			check(G.attractions.minigames.town.pass == wallet.pass, "ctx.town.pass is not the wallet's pass")
-			check(G.attractions.minigames.town.pass.has(player), "the games do not see the pass the wallet sold")
+		local WalletFlow = (require :: any)(script.Parent:WaitForChild("WalletFlow"))
+		local minigames = G.attractions and G.attractions.minigames
+		local found = WalletFlow.play(wallet, { player = player, town = minigames and minigames.town })
+		for _, failure in found.failures do
+			check(false, `wallet: {failure}`)
 		end
-		numbers.cents = wallet.balance(player)
+		numbers.wallet = found.numbers
 	end
 
 	local okLedger, errors = possession:check()
