@@ -65,14 +65,14 @@ local function curveOf(id: number): Curve.Curve
 	return Curve.fromArrays(AlleyRoof.route(id).points)
 end
 
--- The bark's radius of the limb on 9105 at t: thickest at the trunk's top, never under 0.68 (so the rail, 1.25
--- under the bark's top, stays inside the bark).
+-- The bark's radius of the limb on 9105 at t: thickest at the trunk's top (1.0), 0.68 at the house end, thinning to
+-- 0.5 at the end over the roof (where the rail, 1.25 under the bark's top, runs just under the thin end).
 function Yard.boughRadius(t: number): number
 	local f = AlleyRoof.BOUGH_FORK_T
 	if t <= f then
 		return 0.68 + 0.32 * t / f
 	end
-	return 1.0 - 0.32 * (t - f) / (1 - f)
+	return 1.0 - 0.5 * (t - f) / (1 - f)
 end
 
 -- The leap's flights off the ridge's west end (local {X, Y, D} feet), with no key held and with W held, sampled from
@@ -690,7 +690,25 @@ local function setting(kit: any, m: any)
 			local gy = groundY(kit, c[1], c[2])
 			lo, hi = math.min(lo, gy), math.max(hi, gy)
 		end
-		kit:box(m, name, x0, x1, lo - 0.6, hi + 2.4, e0, e1, HEDGE, "LeafyGrass", NOQUERY)
+		kit:box(m, name, x0, x1, lo - 0.6, hi + 1.9, e0, e1, HEDGE, "LeafyGrass", NOQUERY)
+		-- a rounded top along it
+		local alongD = e1 - e0 > x1 - x0
+		local w = if alongD then x1 - x0 else e1 - e0
+		local len = if alongD then e1 - e0 else x1 - x0
+		local cx, cd = (x0 + x1) / 2, (e0 + e1) / 2
+		kit:cyl(
+			m,
+			name .. "Top",
+			cx,
+			hi + 1.9,
+			cd,
+			len,
+			w - 0.05,
+			if alongD then "D" else "X",
+			HEDGE,
+			"LeafyGrass",
+			NOQUERY
+		)
 	end
 	for i, e in { { 10, 18.6 }, { 18.6, 27.2 }, { 27.2, 35.8 }, { 35.8, 44.0 } } do
 		hedge(`HedgeE{i}`, 210.4, 212.0, e[1], e[2])

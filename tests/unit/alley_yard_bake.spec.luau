@@ -183,42 +183,49 @@ return function(t)
 		end
 	end)
 
-	t.test("the bough: its top is the squirrel's feet (rail + 1.25), the rail inside the bark", function()
-		for _, id in { R.BOUGH } do
-			for _, s in samples(id, 80) do
-				-- the bark's top straight over the rail point: the highest point of the vertical line through it that is
-				-- on a bough segment's surface (inside its length, a little slack at the joints, where a ball rounds it)
-				local top = -math.huge
-				local inBark = false
-				for _, b in boxes do
-					local p = b.part
-					if
-						string.sub(p.Name, 1, #`Bough{id}_`) == `Bough{id}_`
-						and p.Shape == roblox.Enum.PartType.Cylinder
-					then
-						local c, ax, half, radius = axisOf(p)
-						local w = s.p - c
-						local vy = ax.Y
-						local qa = 1 - vy * vy
-						local qb = 2 * (w.Y - w:Dot(ax) * vy)
-						local qc = w:Dot(w) - w:Dot(ax) ^ 2 - radius * radius
-						local disc = qb * qb - 4 * qa * qc
-						if disc >= 0 and qa > 1e-9 then
-							local h = (-qb + math.sqrt(disc)) / (2 * qa)
-							local along = (w + V3.new(0, h, 0)):Dot(ax)
-							if math.abs(along) <= half + 0.3 then
-								top = math.max(top, h)
+	t.test(
+		"the bough: its top is the squirrel's feet (rail + 1.25), the rail in the bark (just under its thin end)",
+		function()
+			for _, id in { R.BOUGH } do
+				for _, s in samples(id, 80) do
+					-- the bark's top straight over the rail point: the highest point of the vertical line through it that is
+					-- on a bough segment's surface (inside its length, a little slack at the joints, where a ball rounds it)
+					local top = -math.huge
+					local inBark = false
+					for _, b in boxes do
+						local p = b.part
+						if
+							string.sub(p.Name, 1, #`Bough{id}_`) == `Bough{id}_`
+							and p.Shape == roblox.Enum.PartType.Cylinder
+						then
+							local c, ax, half, radius = axisOf(p)
+							local w = s.p - c
+							local vy = ax.Y
+							local qa = 1 - vy * vy
+							local qb = 2 * (w.Y - w:Dot(ax) * vy)
+							local qc = w:Dot(w) - w:Dot(ax) ^ 2 - radius * radius
+							local disc = qb * qb - 4 * qa * qc
+							if disc >= 0 and qa > 1e-9 then
+								local h = (-qb + math.sqrt(disc)) / (2 * qa)
+								local along = (w + V3.new(0, h, 0)):Dot(ax)
+								if math.abs(along) <= half + 0.3 then
+									top = math.max(top, h)
+								end
 							end
+							local _, d = onAxis(p, s.p)
+							-- (inside the bark, or under the thin end over the roof by at most 0.3)
+							inBark = inBark or d <= radius + (if s.t > 0.85 then 0.3 else 0)
 						end
-						local _, d = onAxis(p, s.p)
-						inBark = inBark or d <= radius
 					end
+					t.truthy(inBark, `route {id} at t {s.t} is inside the bark`)
+					t.truthy(
+						math.abs(top - LIFT) <= 0.15,
+						`route {id} at t {s.t}: the bough's top is {top} over the rail`
+					)
 				end
-				t.truthy(inBark, `route {id} at t {s.t} is inside the bark`)
-				t.truthy(math.abs(top - LIFT) <= 0.15, `route {id} at t {s.t}: the bough's top is {top} over the rail`)
 			end
 		end
-	end)
+	)
 
 	t.test(
 		"the roof: the ridge cap's top is the ridge route, the gutter route rides the north slope, both slopes collide",

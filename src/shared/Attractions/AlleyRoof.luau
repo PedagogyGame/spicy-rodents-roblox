@@ -23,9 +23,11 @@
 --   under the bough and falls into the yard, unless E is pressed in the air near it (E grabs a route within reach).
 --   The hint for lane L6: "Run to the end of the ridge, then Space".
 -- Retired ids: 9104 (the trunk's climb) and 9106 (the crossing, now part of 9105).
--- THE VENT: 9107 (kind "tunnel", the enclosed-run contract of Shared/Routes/Enclosure on feat/run-through): in
---   through one bent louvre slat of the air-handling unit on the wing roof, up the plenum, through the duct in the
---   hall's raised east wall, down the elbow and out of the boot onto the truss chord 9120.
+-- THE VENT: 9107 (kind "tunnel", the enclosed-run contract of Shared/Routes/Enclosure): in through one bent louvre
+--   slat of the air-handling unit on the wing roof (a ground mouth), up the plenum, through the duct in the hall's
+--   raised east wall, down the elbow and out of the boot (a link mouth) onto the truss chord 9120. The motor runs it
+--   today (tests/unit/attractions_roofvent.spec.luau drives the whole way in on the baked alley and yard); the unit,
+--   the duct and the raised roof around it are lanes L1 and L2.
 -- THE RAFTERS (planned with the raised hall roof, lane L1; no geometry yet): nine truss bottom chords 9120..9128
 --   (kind fence, Y 12.32; the ninth truss, over the pinsetters, is in the backstage's ground and carries none),
 --   nine light rails 9130..9138 over the lane pairs (Y 10.2, the lit and risky level) and two aisle braces 9139,
@@ -33,7 +35,7 @@
 -- Routes are written as data/attractions.json writes them (local points, explicit flags); records(place) turns them
 -- into world records the way tools/compile/lib/Attractions does. They are NOT in data/attractions.json yet: the
 -- house and the tree stand outside the alley's footprint, in ANNEX, which the compiler and the expansion check do
--- not know about yet; and 9107 needs the enclosed-run contract in the Registry.
+-- not know about yet.
 -- Pure. Interface: constants below; routes() -> { LocalRoute } (copies); route(id) -> LocalRoute;
 --   records(place, lotId?) -> { world route records }; lamps() -> { {X, Y, D} }; isRafter(id) -> boolean;
 --   inHall(X, D) -> boolean; inAnnex(X, D) -> boolean; inPlatform(X, D) -> string?; guardEyes() -> { {X, Y, D} };
