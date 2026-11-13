@@ -3039,7 +3039,7 @@ return {
 			},
 			ground = { max = 1.76, min = 0.25 },
 			height = 29,
-			notes = "The owner's second store (brief addendum D12; docs/reference/store_roofs, art_pack/GLB/04_Offbeat_Shop_Interior.glb), 3 studs to the metre: a 42 x 36 st interior (retail with its checkout, a cafe with five stools, a back office) under his 14 m gable roof (roof_rafter_kit/GLB/02_Full_Gable_Roof_14m.glb) widened 1.25 across the span. On Main Street's north sidewalk at its west end, facing south across the boulevard, beside the trolley stop. The interior and roof are the owner's meshes, loaded at boot by Server/Assets/ShopArt; the shell, colliders, lamps and steps are baked into build/Expansion_NeighbourhoodShop.rbxm (tools/bake/neighbourhood_shop.luau). Art only: nothing is sold, sat on or worn.",
+			notes = "The owner's second store (brief addendum D12; docs/reference/store_roofs, art_pack/GLB/04_Offbeat_Shop_Interior.glb), 3 studs to the metre: a 42 x 36 st interior (retail with its checkout, a cafe with five stools, a back office) under his 14 m gable roof (roof_rafter_kit/GLB/02_Full_Gable_Roof_14m.glb) widened 1.25 across the span. On Main Street's north sidewalk at its old-town end (the boulevard starts at x 617), facing south across it, 90 studs from the trolley stop. The interior and roof are the owner's meshes, loaded at boot by Server/Assets/ShopArt; the shell, colliders, lamps and steps are baked into build/Expansion_NeighbourhoodShop.rbxm (tools/bake/neighbourhood_shop.luau). Art only: nothing is sold, sat on or worn.",
 			partBudget = 300,
 			place = { x = 686, z = 70.625, yaw = 3.141593, floorY = 2.3 },
 			position = { x = 686, z = 70.625 },
