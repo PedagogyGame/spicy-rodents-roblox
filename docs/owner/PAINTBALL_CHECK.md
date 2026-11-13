@@ -4,11 +4,11 @@ Paintball is built, joined and reviewed on branch `feat/paintball`. Everything b
 
 ## Before you start
 
-1. **Bake the building.** The station is not in the place file: run `lune run tools/bake/attractions.luau` in the repository, then open Studio as usual (the bake writes `build/Attractions.rbxm`, which the project loads into `Workspace.Attractions.f3_tv_station`).
+1. **Bake the building.** The station is not in the place file: run `lune run tools/bake/attractions.luau` in the repository, then open Studio as usual (the bake writes `build/Attractions.rbxm`, which the project loads into `Workspace.Attractions`: the station is `f3_tv_station`, the street to it is `Ways`).
 2. **Paintball is free for now.** The 20c pass is sold at the desk, but until the wallet lands (`feat/wallet`) the town's charge always says yes, and the pass is forgotten when the server restarts. The lounges do not exist yet, so the pass opens nothing else.
-3. **Getting there.** The station stands alone in a field about 800 studs from the nearest built road (the street to it is not built: see "Not done"). In Studio, press Play, then in the command bar (Server view) run:
-   `game.Players:GetPlayers()[1].Character:PivotTo(CFrame.new(2080, 12, -800))`
-   That puts you on the grass in front of the lobby's door, facing it. Walk in (north).
+3. **Getting there.** On foot: go to the east end of the estate avenue, where it carries straight on as **Chapel Street**; a green fingerpost on the corner reads "WBLW CHANNEL 7 / PAINTBALL / 1435 studs". Follow Chapel Street east about 1,400 studs; the station is on your left behind a chain-link fence, its walk opposite the door (it takes a few minutes, which is worth doing once: the street, its lamps and the way the station comes into view are new). To skip the walk, press Play, then in the command bar (Server view) run:
+   `game.Players:GetPlayers()[1].Character:PivotTo(CFrame.new(2080, 14, -793))`
+   That puts you on Chapel Street's sidewalk at the end of the walk, the door straight ahead (north). Walk in.
 4. **Buy the pass and join.** Inside the lobby: the **pass desk** on the left (its prompt reads **Buy a pass**, press E), then the **arena door** in the middle of the far wall (press E). Bots fill every empty seat, 4 a side at least. You start in your team's spawn room for a 10-second briefing; first person is locked from the door until you leave.
 5. **Your tuning command** (see "Tuning it" below) only works for the place's owner (or anyone in Studio's own play test). A note on screen tells you so when you join.
 
@@ -58,6 +58,8 @@ Type in chat while you are in the match (after pressing E at the arena door):
 | `/pb rewind 0.3` | furthest back a ball is judged (lag compensation) | 0.1 to 0.4 |
 | `/pb botSkill -0.2` | bots easier (below 0) or harder (above 0) | -0.5 to 0.5 |
 
+The command knows you by the place's owner (`game.CreatorId`): if the game belongs to a group rather than to your own account, `/pb` works only in Studio's play test; tell me and I will add your user id. Anyone else who tries it is told "Only the place's owner can tune paintball."
+
 The answer appears on screen and in the feed, for example "Ball speed: 150 -> 120, from the next match". **Every change takes effect at the next match** (so no two screens disagree during one); `rewind` and `botSkill` too. Write down the numbers you like and tell me: I will make them the defaults.
 
 ## Sounds to choose
@@ -82,7 +84,7 @@ Twelve cues, all timed and placed (other players' are heard from where they happ
 ## Known not to be done
 
 - **Nothing has run in Studio or on a device.** The written engine checks (`tools/cloud/tasks/paintball_flow.luau`, `paintball_walk.luau`, `tools/games/paintball/*/engine_check.luau`, `arena/frame_check.luau`) wait for the key's Luau Execution permission. So the frame cost (under 1.5 ms beside the town), the stairs under a real body, and the movement tolerances are unmeasured. The five-minute check is point 5 above: walk every stair, watch for a correction.
-- **The way there and the outside.** No street, path or forecourt leads to the station; it stands on open grass, a clean box with neat boarded windows. Inside reads as a dead TV station, but there is no rubble or fallen ceiling. No picture of a match in play exists (every render is the empty building).
+- **The way there and the outside are done; inside is not quite.** Chapel Street now runs from the estate avenue to the station (fingerpost, lamps, a forecourt), and the front has rotted (boards gone and hanging, the sign's L fallen, rust, a fence with a panel down, weeds, a dead news van): pictures `pb_18`, `pb_25` and `pb_26` in `docs/renders/paintball/`. Inside reads as a dead TV station, but there is no rubble or fallen ceiling. No picture of a match in play exists (every render is the empty building).
 - **The pass** is free and not saved (above); the lounges it should open do not exist.
 - **Not built:** garb and the lobby's garb shop (PB-13), a wall monitor showing the live match (the lobby screens show the score and clock only), paint fading on a player who leaves (D7), gamepad aim slow-down, hiding chat bubbles over hidden opponents.
 - **Bots:** a scripted fair player beats the average bot about 3 times in 5 (the target), but single matches swing from 44 % to 82 %, and that player is a stand-in, not a person. `/pb botSkill` is the knob.
