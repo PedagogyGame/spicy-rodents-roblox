@@ -158,7 +158,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		pip[i] = frame(`Pip{i}`, pips, UDim2.fromOffset(20, 20), UDim2.fromOffset(8 + (i - 1) * 28, 0), WHITE)
 		round(pip[i], 10)
 	end
-	local reloadBar = frame("Reload", pips, UDim2.fromOffset(134, 6), UDim2.fromOffset(8, 26), { 50, 56, 90 })
+	local reloadBar = frame("ReloadBar", pips, UDim2.fromOffset(134, 6), UDim2.fromOffset(8, 26), { 50, 56, 90 })
 	local reloadFill = frame("Fill", reloadBar, UDim2.fromScale(0, 1), UDim2.fromOffset(0, 0), { 255, 214, 92 })
 	local reloadText =
 		label("ReloadText", pips, UDim2.fromOffset(134, 16), UDim2.fromOffset(8, -20), { 255, 214, 92 }, true)

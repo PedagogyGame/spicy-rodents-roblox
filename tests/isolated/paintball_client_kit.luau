@@ -39,6 +39,7 @@ export type Bench = {
 	controls: { boolean },
 	buttons: { { { string } } },
 	cameras: number, -- camera holds begun
+	held: boolean, -- a hold is up
 	releases: number,
 	placed: { { x: number, y: number, z: number, yaw: number } },
 	looks: { { x: number, y: number, z: number, yaw: number } },
@@ -101,6 +102,7 @@ function Kit.bench(opts: { tuning: any?, noShow: boolean? }?): Bench
 		controls = {},
 		buttons = {},
 		cameras = 0,
+		held = false,
 		releases = 0,
 		placed = {},
 		looks = {},
@@ -124,9 +126,14 @@ function Kit.bench(opts: { tuning: any?, noShow: boolean? }?): Bench
 			table.insert(b.verbs, { verb = verb, args = args or {} })
 		end,
 		camera = function()
-			b.cameras += 1
+			-- (a hold asked for again while it is up is still the one hold)
+			if not b.held then
+				b.held = true
+				b.cameras += 1
+			end
 		end,
 		releaseCamera = function()
+			b.held = false
 			b.releases += 1
 		end,
 		controls = function(on: boolean)
@@ -181,7 +188,9 @@ function Kit.bench(opts: { tuning: any?, noShow: boolean? }?): Bench
 			end,
 			look = function(x: number, y: number, z: number, yaw: number)
 				b.pose.yaw, b.pose.pitch = yaw, 0
-				table.insert(b.looks, { x = x, y = y, z = z, yaw = yaw })
+				if not b.held then
+					table.insert(b.looks, { x = x, y = y, z = z, yaw = yaw })
+				end
 				ctx.camera()
 			end,
 			eye = function(offset: number)

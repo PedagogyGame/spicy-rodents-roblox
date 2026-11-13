@@ -174,6 +174,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 	local moveAcc = SEND
 	local moveSeq = 0
 	local turnFrames = 0 -- frames of the look's hold still to run
+	local turnLook: { number }? = nil
 	local walked = 0
 	local fallSpeed = 0
 	local lastBar = ""
@@ -567,6 +568,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		if look and tuning.turnLook then
 			local ex, ey, ez = Body.eyePoint(msg.x, msg.y, msg.z, seat.c)
 			look(ex, ey, ez, msg.yaw)
+			turnLook = { ex, ey, ez, msg.yaw }
 			turnFrames = 2
 		end
 	end
@@ -734,11 +736,17 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 	function seat.step(self: Seat, dt: number)
 		local now = clock()
 		self.now = now
-		-- the turn of the look: one rendered frame, then the stock camera has it back
+		-- the turn of the look: one rendered frame, then the stock camera has it back. (The hold is
+		-- asked for again in its first frame: whichever of this step and the framework's own camera
+		-- step runs first, the framework's writes the placed CFrame as a cut both times and never eases.)
 		if turnFrames > 0 then
 			turnFrames -= 1
+			local again = turnLook
 			if turnFrames == 0 then
+				turnLook = nil
 				ctx.releaseCamera()
+			elseif again and port.look then
+				port.look(again[1], again[2], again[3], again[4])
 			end
 		end
 		local show = opts.show()
