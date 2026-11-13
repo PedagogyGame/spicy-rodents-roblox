@@ -10,10 +10,13 @@
 --   paintball_server_joined the service with nothing put in anything's place: the real match model, the real
 --                           brains and the game's own building. One line here while Rules is the contract's
 --                           stub; a whole match and a person among the bots once the lanes are joined
+--   paintball_server_meeting the client lane's own seat and show behind a connection, against the real service:
+--                           one line here while the client's cores are not in the tree
 local Isolated = require("@tests/lib/Isolated")
 
 return function(t)
 	Isolated.register(t, "tests/isolated/paintball_server")
 	Isolated.register(t, "tests/isolated/paintball_server_fire")
 	Isolated.register(t, "tests/isolated/paintball_server_joined")
+	Isolated.register(t, "tests/isolated/paintball_server_meeting")
 end

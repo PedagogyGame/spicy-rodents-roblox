@@ -24,7 +24,9 @@
 --   seed), kit.join(client) -> (ok, why), kit.walk(client, x, z, speed?), kit.live() (cut the briefing short and
 --   let protection run out), kit.broken (schema failures); Client: seat, place, x, y, z, yaw, pitch, crouch,
 --   sprint, air, out, silent, events, acks, tags, move(), fire(dx, dy, dz, opts?) -> shot, aim(tx, ty, tz) ->
---   dir, drawn(id) -> (x, y, z, crouch)?, last(kind, pred?), count(kind); hall(opts?) -> Arena; fakeEngine()
+--   dir, drawn(id) -> (x, y, z, crouch)?, last(kind, pred?), count(kind), onHear(msg)? and onStream(remote,
+--   payload)? (set by a case: called with everything the connection hears, after its delay); hall(opts?) ->
+--   Arena; fakeEngine()
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
@@ -240,9 +242,16 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 			elseif msg.kind == "paintball_watch" then
 				c.watch = msg
 			end
+			-- (a case that puts somebody else's client behind this connection hears everything too)
+			if c.onHear then
+				c.onHear(msg)
+			end
 		end
 
 		local function hearStream(c: Client, remote: string, payload: buffer)
+			if c.onStream then
+				c.onStream(remote, payload)
+			end
 			if remote == "Paintball.Snap" then
 				local t, _, _, bodies = Wire.decodeSnap(payload)
 				if t ~= nil then
