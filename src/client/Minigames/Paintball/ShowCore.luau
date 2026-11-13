@@ -12,8 +12,13 @@
 --             it; they stop on a wall by the arena's own test and on a body when the server's Splat
 --             record says so. YOUR OWN is predicted (predict): it flies in REAL time from the click
 --             and is tested every step the way the server tests it (arena.sweep, then Hit.body against
---             every opposing puppet where it is drawn, the first thing along the step winning; in a
---             frame longer than a server tick, where it was drawn at each step's own time).
+--             every opposing body, the first thing along the step winning). Told the click's view time
+--             (predict's vt), a step ending at age a tests each body where the snapshots put it at
+--             (birth + a) - rewind, the rewind being the click's own (ft - vt) held to Clock.MAX_REWIND
+--             as the server holds it: on a slow, jittery link the picture can be further back than the
+--             server will rewind, and the puff then goes where the server's verdict will. (Not told it,
+--             against every puppet where it is drawn; in a frame longer than a server tick, where it was
+--             drawn at each step's own time.)
 --   splats    the two pools of Wire, kept exactly as the server keeps them: the walls' newest
 --             Rules.splatPool, each slot's newest Rules.bodySplats. A predicted wall splat of your own
 --             is replaced by the server's record, or taken back after Tuning.predictedSplatSecs.
@@ -102,6 +107,9 @@ export type Ball = {
 	verdict: { [string]: number }?, -- another's: the server's Splat record, waiting for the picture
 	verdictAt: number,
 	splat: number?, -- your own: the key of the predicted wall splat it left
+	-- your own: how far back the server will judge it (Clock.stamp's rewind, as far as the client can tell:
+	-- its fire time less its view time, held to Clock.MAX_REWIND); nil: tested against the bodies as drawn
+	rewind: number?,
 }
 
 export type Splat = {
@@ -168,7 +176,8 @@ export type Show = {
 		vz: number,
 		mx: number?,
 		my: number?,
-		mz: number?
+		mz: number?,
+		vt: number?
 	) -> Ball,
 	verdict: (self: Show, shot: number, ok: boolean, ball: number?) -> (),
 	cue: (self: Show, name: string, volume: number, x: number?, y: number?, z: number?) -> (),
@@ -531,7 +540,8 @@ function ShowCore.new(opts: Opts): Show
 		vz: number,
 		mx: number?,
 		my: number?,
-		mz: number?
+		mz: number?,
+		vt: number?
 	): Ball
 		keys += 1
 		local ball: Ball = {
@@ -559,6 +569,7 @@ function ShowCore.new(opts: Opts): Show
 			verdict = nil,
 			verdictAt = 0,
 			splat = nil,
+			rewind = if vt then math.clamp(t0 - vt, 0, Clock.MAX_REWIND) else nil,
 		}
 		table.insert(self.balls, ball)
 		return ball
@@ -593,16 +604,42 @@ function ShowCore.new(opts: Opts): Show
 		end
 	end
 
-	-- May your ball tag this puppet where it is drawn? (The server skips the same bodies: PaintballService, "balls".)
+	-- May your ball tag this body? (The server skips the same bodies: PaintballService, "balls".)
+	local function canTag(
+		self: Show,
+		id: number,
+		side: number,
+		bits: number,
+		x: number,
+		y: number,
+		z: number,
+		team: number
+	): boolean
+		if id == self.you or side == 0 or side == team then
+			return false
+		end
+		if Wire.has(bits, BIT.out) or Wire.has(bits, BIT.safe) then
+			return false
+		end
+		local room = arena.spawnRooms[side]
+		return not (room ~= nil and ArenaModule.inRoom(room, x, y + 0.1, z))
+	end
+
+	-- ... where it is drawn
 	local function hittable(self: Show, p: Puppet, team: number): boolean
-		if p.id == self.you or p.team == 0 or p.team == team then
-			return false
+		return canTag(self, p.id, p.team, p.bits, p.x, p.y, p.z, team)
+	end
+
+	-- The two snapshots the stream holds round server time `at` (the older at or before it; held at the
+	-- first and at the newest), as the server's own history is read (Clock, "the history is the snapshot
+	-- stream").
+	local function around(at: number): (Snap?, Snap?)
+		for i = #snaps, 1, -1 do
+			if snaps[i].t <= at then
+				return snaps[i], snaps[i + 1] or snaps[i]
+			end
 		end
-		if Wire.has(p.bits, BIT.out) or Wire.has(p.bits, BIT.safe) then
-			return false
-		end
-		local room = arena.spawnRooms[p.team]
-		return not (room ~= nil and ArenaModule.inRoom(room, p.x, p.y + 0.1, p.z))
+		return snaps[1], snaps[1]
 	end
 
 	local function endOnWall(
@@ -664,7 +701,27 @@ function ShowCore.new(opts: Opts): Show
 			local best, nx, ny, nz = sweep(p0x, p0y, p0z, p1x, p1y, p1z)
 			local struck: Puppet? = nil
 			local hx, hy, hz = 0, 0, 0
-			if ball.own then
+			local tagged = false
+			if ball.own and ball.rewind ~= nil then
+				-- tested where the SERVER will test it: each body at (birth + age) - rewind, read from
+				-- the snapshots, with the rewind the server will allow (a slow, jittery connection's
+				-- picture can be further back than Clock.MAX_REWIND, and the server judges at the limit)
+				local at = ball.t0 + a1 - ball.rewind
+				local older, newer = around(at)
+				if older and newer then
+					for id, pa in older.bodies do
+						local pb = newer.bodies[id] or pa
+						local x, y, z, crouch = Wire.between(pa, older.t, pb, newer.t, at)
+						if canTag(self, id, self:teamOf(id), pa.bits, x, y, z, ball.team) then
+							local s, sx, sy, sz = Hit.body(sweep, p0x, p0y, p0z, p1x, p1y, p1z, x, y, z, crouch)
+							-- (a tie goes to the wall: Hit, rule 4)
+							if s ~= nil and (best == nil or s < best) then
+								best, tagged, hx, hy, hz = s, true, sx, sy, sz
+							end
+						end
+					end
+				end
+			elseif ball.own then
 				local back = if span > 0 then math.clamp((age - a1) / span, 0, 1) else 0
 				for _, p in self.puppets do
 					if hittable(self, p, ball.team) then
@@ -698,7 +755,7 @@ function ShowCore.new(opts: Opts): Show
 					end
 				end
 			end
-			if struck then
+			if struck or tagged then
 				removeBall(self, ball)
 				if ball.own then
 					-- a puff, and no more: the marker, the sound and the splat wait for the server

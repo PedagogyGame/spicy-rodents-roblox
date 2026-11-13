@@ -2017,7 +2017,7 @@ return function(t)
 	)
 
 	t.test(
-		"the predicted ball and the server's ball agree: walls to a hundredth of a stud, bodies 95 % of the time, at 150 ms and at 30, 60 and 144 frames a second",
+		"the predicted ball and the server's ball agree: walls to a hundredth of a stud, bodies 95 % of the time, at 150 ms and at 30, 60 and 144 frames a second, and over a jittery link at 150 and 300 ms",
 		function()
 			-- A server that follows the contract to the letter, for one click: the stamps through Clock.stamp, the
 			-- ball flown tick by tick from f, each step against the building (arena.sweep) and against the body
@@ -2079,6 +2079,15 @@ return function(t)
 				seed = (seed * 1103515245 + 12345) % 2147483648
 				return seed / 2147483648
 			end
+			-- the jitter of a link (its own seed: the aim of the steady cases is not moved by it)
+			local jseed = 4111
+			local function jitter(width: number): number
+				if width <= 0 then
+					return 0
+				end
+				jseed = (jseed * 1103515245 + 12345) % 2147483648
+				return (jseed / 2147483648 * 2 - 1) * width
+			end
 			-- the opponent: walking east and west along z = 4 beyond the rail, ducking behind it now and then
 			local function target(time: number): (number, number)
 				local tau = time - Kit.SERVER_TIME
@@ -2091,6 +2100,12 @@ return function(t)
 					{ dt = 1 / 60, lag = 0.075, shots = 150 },
 					{ dt = 1 / 30, lag = 0.075, shots = 150 },
 					{ dt = 1 / 144, lag = 0.075, shots = 150 },
+					-- a jittery link: each snapshot, each pose and each click on its way a random time, so the
+					-- client's view lag and the server's `up` (both Clock.observe: quick up, slow down) sit near
+					-- the top of the band; at 300 ms the picture is further back than Clock.MAX_REWIND
+					{ dt = 1 / 60, lag = 0.075, jitter = 0.025, shots = 150 },
+					{ dt = 1 / 60, lag = 0.15, jitter = 0.03, shots = 150 },
+					{ dt = 1 / 30, lag = 0.15, jitter = 0.03, shots = 150 },
 				}
 			do
 				local b = Kit.bench({ dt = case.dt })
@@ -2100,6 +2115,9 @@ return function(t)
 				local history: { { t: number, body: any } } = {}
 				local buffers: { buffer } = {}
 				local taken, delivered = 0, 0
+				local spread = (case :: any).jitter or 0
+				local arrives: { number } = {} -- when each snapshot reaches the client
+				local pending: { number } = {}
 				-- one frame of the client's, with the server's snapshots reaching it `lag` late
 				local function frame()
 					b.frames += 1
@@ -2113,10 +2131,16 @@ return function(t)
 						taken += 1
 						history[taken] = { t = time, body = bodies[1] } -- (as the wire carries it: quantised)
 						buffers[taken] = buf
+						arrives[taken] = time + math.max(0, case.lag + jitter(spread))
+						table.insert(pending, taken)
 					end
-					while delivered < taken and history[delivered + 1].t + case.lag <= now do
-						delivered += 1
-						b.show:onSnap(buffers[delivered])
+					-- (in the order they arrive, which a jittery link does not keep)
+					for i = #pending, 1, -1 do
+						if arrives[pending[i]] <= now then
+							delivered += 1
+							b.show:onSnap(buffers[pending[i]])
+							table.remove(pending, i)
+						end
 					end
 					b.show:step(b.dt)
 					b.seat:step(b.dt)
@@ -2174,12 +2198,41 @@ return function(t)
 				for _ = 1, math.ceil(2 / case.dt) do
 					frame()
 				end
-				-- the server's verdict on every click, each `lag` late on its way up
+				-- the server's verdict on every click, each `lag` late on its way up (and with the jitter, each pose
+				-- a random time on its way, the server's `up` fed through Clock.observe as the service feeds it,
+				-- and a click arriving with the pose it carries)
 				local fires = Kit.fires(b)
+				local poses: { { t: number, at: number } } = {}
+				for _, move in Kit.moves(b) do
+					table.insert(poses, { t = move.t, at = move.t + math.max(0, case.lag + jitter(spread)) })
+				end
+				table.sort(poses, function(p: { t: number, at: number }, q: { t: number, at: number }): boolean
+					return p.at < q.at
+				end)
+				local function upAt(rec: { [string]: number }): (number, number)
+					if spread <= 0 then
+						return rec.ft + case.lag, case.lag
+					end
+					local arrival = rec.ft + case.lag
+					for _, pose in poses do
+						if pose.t == rec.ft then
+							arrival = pose.at
+						end
+					end
+					local view = Clock.newView()
+					for _, pose in poses do
+						if pose.at > arrival then
+							break
+						end
+						Clock.observe(view, pose.t, pose.at)
+					end
+					return arrival, view.lag or case.lag
+				end
 				local agree, kinds = 0, { body = 0, wall = 0, none = 0 }
 				for n, mine in seen do
 					local rec = fires[n]
-					local theirs = serverBall(b.arena, history, rec, rec.ft + case.lag, case.lag, feel)
+					local arrival, up = upAt(rec)
+					local theirs = serverBall(b.arena, history, rec, arrival, up, feel)
 					kinds[theirs.kind] += 1
 					if mine.kind == theirs.kind then
 						agree += 1
@@ -2193,7 +2246,10 @@ return function(t)
 				end
 				total += #seen
 				print(
-					`      {math.floor(1 / case.dt + 0.5)} fps, {math.floor(case.lag * 2000 + 0.5)} ms round trip: {agree} of {#seen} balls end as the server's do ({kinds.body} on the body, {kinds.wall} on the building, {kinds.none} spent)`
+					`      {math.floor(1 / case.dt + 0.5)} fps, {math.floor(case.lag * 2000 + 0.5)} ms round trip{if spread
+							> 0
+						then ` (each way +/- {math.floor(spread * 1000 + 0.5)} ms)`
+						else ""}: {agree} of {#seen} balls end as the server's do ({kinds.body} on the body, {kinds.wall} on the building, {kinds.none} spent)`
 				)
 				t.truthy(
 					kinds.body >= #seen * 0.2 and kinds.wall >= #seen * 0.15,
@@ -2201,7 +2257,7 @@ return function(t)
 				)
 				t.truthy(agree >= #seen * 0.95, `{agree} of {#seen} agree (PB-3: at least 95 %)`)
 			end
-			t.truthy(total >= 600)
+			t.truthy(total >= 1050)
 			print(
 				`      worst distance between the two ends: {string.format("%.4f", worstWall)} studs on a wall, {string.format(
 					"%.3f",

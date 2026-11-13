@@ -517,7 +517,8 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				sent.dz * speed,
 				mx,
 				my,
-				mz
+				mz,
+				sent.vt
 			)
 		end
 		if mag.reloadDoneAt ~= nil then
