@@ -35,8 +35,8 @@
     },
     {
       "name": "ns_07_cafe_counter",
-      "desc": "From beyond the last stool (local -14, 5.2, 9), back along the stools and the counter to the windows.",
-      "pos": [700, 7.5, 79.6], "look": [697, 5, 52], "fov": 70
+      "desc": "From beyond the last stool (local -13, 5.2, 6.5), back along the stools and the counter to the windows.",
+      "pos": [699, 7.5, 77.1], "look": [697, 5, 52], "fov": 70
     },
     {
       "name": "ns_08_office",
