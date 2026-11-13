@@ -4,6 +4,7 @@
 local BumperPool = require("@shared/Minigames/Pool/BumperPool")
 local Cue = require("@shared/Minigames/Pool/Cue")
 local Minigame = require("@shared/Minigames/Minigame")
+local Physics = require("@shared/Minigames/Pool/Physics")
 local Shot = require("@shared/Minigames/Pool/Shot")
 local Tables = require("@shared/Minigames/Pool/Tables")
 
@@ -312,16 +313,218 @@ return function(t)
 		BumperPool.settle(s, { pot(3, 2) }, by(1))
 		t.eq(s.sunk[1], 1)
 		t.eq((s.last :: BumperPool.Last).awarded, 0, "nobody to be given balls")
-		BumperPool.settle(s, { pot(2, 1) }, by(1))
-		t.eq(s.sunk[1], 2, "either cup counts in practice")
 		BumperPool.skipTurn(s)
 		t.eq(s.seat, 1)
-		BumperPool.settle(s, { pot(1, 2), pot(4, 2), pot(5, 2) }, by(1))
+		BumperPool.settle(s, { pot(1, 2), pot(2, 2), pot(4, 2), pot(5, 2) }, by(1))
 		t.truthy(s.done)
 		t.eq(s.winner, 1)
 		local r = BumperPool.result(s) :: any
 		t.eq(r.scores[1], 5)
 		t.truthy(r.shots ~= nil)
+	end)
+
+	-- move a ball of the state to a place of the spec's choosing
+	local function put(s: BumperPool.State, ball: number, x: number, z: number)
+		for _, sp in s.spots do
+			if sp.id == ball then
+				sp.x, sp.z = x, z
+			end
+		end
+	end
+	local function spotOf(s: BumperPool.State, ball: number): Tables.Spot?
+		for _, sp in s.spots do
+			if sp.id == ball then
+				return sp
+			end
+		end
+		return nil
+	end
+
+	t.test("BP-R3 BP-R5 the opening: a ball the OTHER side's strike knocks in is not its owner's shot", function()
+		-- Seat 1's marked ball is sent into seat 2's resting ball 9, which drops in the foot cup (seat 1's cup,
+		-- the wrong one for seat 2). It counts for seat 2 with no penalty. It used to be charged to seat 2 as
+		-- "your own ball in the opponent's cup", and seat 1 was handed two free balls for doing it
+		-- (seat 2's marked ball is moved out of the lane in front of the cup; seat 1 plays a stop shot)
+		local s = BumperPool.init(2, 1)
+		put(s, 6, 1.2, 1)
+		put(s, 1, 0, 1.2)
+		put(s, 9, 0, 1.9)
+		t.truthy(BumperPool.input(s, 1, "shoot", { 1, 0, Cue.powerFor(3.4), 0, -0.2 }))
+		BumperPool.skipTurn(s) -- seat 2 does not strike at all
+		local last = s.last :: BumperPool.Last
+		t.deepEq(last.pots, { 9 }, "ball 9 went down")
+		t.deepEq(last.holes, { 2 }, "in the foot cup")
+		t.eq(last.awarded, 0, "nobody is given balls")
+		t.deepEq(last.dropped, {})
+		t.deepEq(s.sunk, { 0, 1 }, "it counts for its owner, and that is all")
+		t.eq(#BumperPool.mine(s, 1), 5, "none of seat 1's were dropped in for it")
+		t.eq(#BumperPool.mine(s, 2), 4)
+		-- the same with seat 2 striking its own marked ball at the same moment
+		local both = BumperPool.init(2, 1)
+		put(both, 6, 1.2, 1)
+		put(both, 1, 0, 1.2)
+		put(both, 9, 0, 1.9)
+		BumperPool.input(both, 2, "shoot", { 6, math.pi, 0.05, 0, 0.8 })
+		BumperPool.input(both, 1, "shoot", { 1, 0, Cue.powerFor(3.4), 0, -0.2 })
+		t.deepEq((both.last :: BumperPool.Last).pots, { 9 })
+		t.eq((both.last :: BumperPool.Last).awarded, 0)
+		t.deepEq(both.sunk, { 0, 1 })
+		-- Seat 1's strike knocks seat 2's resting ball 7 into seat 2's OWN cup while seat 2's marked ball is
+		-- still up. It counts for seat 2; it is not seat 2 sinking a ball before its marked one (BP-R4), and it
+		-- does not win seat 2 the next shot
+		local own = BumperPool.init(2, 1)
+		put(own, 1, 0, -1.2)
+		put(own, 7, 0, -1.9)
+		BumperPool.input(own, 1, "shoot", { 1, math.pi, Cue.powerFor(3.4), 0, -0.2 })
+		BumperPool.skipTurn(own)
+		local ol = own.last :: BumperPool.Last
+		t.deepEq(ol.pots, { 7 }, "ball 7 went down")
+		t.deepEq(ol.holes, { 1 }, "in the head cup, its own")
+		t.eq(ol.awarded, 0, "no penalty for a ball someone else sank")
+		t.deepEq(own.sunk, { 0, 1 })
+		t.eq(#BumperPool.mine(own, 1), 5)
+		t.falsy(own.markedDown[2])
+		t.eq(own.seat, 1, "and it does not win seat 2 the shot: seat 2 never struck")
+		-- the referee alone: a ball that is nobody's shot (shooterOf answers 0) counts and nothing else happens
+		local r = BumperPool.init(2, 1)
+		local again = BumperPool.settle(r, { pot(9, 2), pot(3, 2), pot(8, 1) }, function(_ball: number): number
+			return 0
+		end)
+		t.falsy(again[1])
+		t.falsy(again[2])
+		t.deepEq(r.sunk, { 1, 2 })
+		t.eq((r.last :: BumperPool.Last).awarded, 0)
+		-- a struck ball still answers to its owner: seat 1's opener into the head cup (the wrong one) gives
+		-- seat 2 two balls
+		local wrong = BumperPool.init(2, 1)
+		BumperPool.input(wrong, 1, "shoot", { 1, math.pi, Cue.powerFor(3.2), 0, 0.8 })
+		BumperPool.skipTurn(wrong)
+		local wl = wrong.last :: BumperPool.Last
+		t.deepEq(wl.pots, { 1 })
+		t.deepEq(wl.holes, { 1 })
+		t.eq(wl.awarded, 2)
+		t.eq(#wl.dropped, 2)
+		t.eq(wrong.sunk[2], 2)
+	end)
+
+	t.test(
+		"BP-R3 the opening is banked off the cushion on your own right: anything else cannot win the shot",
+		function()
+			t.eq(BumperPool.rightCushion(1), 2)
+			t.eq(BumperPool.rightCushion(2), 1)
+			t.truthy(bumper.segs[2].x1 > 0, "seat 1 shoots up the table: its right is +x")
+			t.truthy(bumper.segs[1].x1 < 0, "seat 2 shoots down it: its right is -x")
+			local angle = sinkingAngle()
+			-- both off their right: fair, and the two balls never meet
+			local fair = BumperPool.init(2, 4)
+			BumperPool.input(fair, 1, "shoot", { 1, angle, 0.2, 0, 0.8 })
+			BumperPool.input(fair, 2, "shoot", { 6, angle + math.pi, 0.2, 0, 0.8 })
+			t.deepEq((fair.last :: BumperPool.Last).offside, {})
+			local script = BumperPool.script(fair) :: Shot.Script
+			t.eq(Shot.firstHit(script, 1), 0, "the marked balls cross without touching")
+			t.eq(Shot.firstHit(script, 6), 0)
+			-- seat 1 sinks straight in from in front of its cup (no cushion); seat 2 banks off its right and
+			-- misses. The ball is down, but the next shot is seat 2's (it was seat 1's before)
+			local s = BumperPool.init(2, 4)
+			put(s, 1, 0, 1.3)
+			put(s, 6, -0.6, 1.5)
+			BumperPool.input(s, 1, "shoot", { 1, 0, Cue.powerFor(3.2), 0, 0.8 })
+			BumperPool.input(s, 2, "shoot", { 6, math.rad(180 + 38), 0.1, 0, 0.8 })
+			t.eq((Shot.firstTouch(BumperPool.script(s) :: Shot.Script, 6)), Physics.EV.cushion)
+			local last = s.last :: BumperPool.Last
+			t.deepEq(last.pots, { 1 })
+			t.eq(s.sunk[1], 1, "it still counts")
+			t.truthy(s.markedDown[1])
+			t.deepEq(last.offside, { 1 })
+			t.eq(s.phase, "play")
+			t.eq(s.seat, 2, "the fair opener shoots next")
+			-- the mirror image of the good bank, off seat 1's LEFT (the line seat 2's ball is coming down): it
+			-- sinks alone, and it is offside. Seat 2 only taps its ball (no cushion either): both offside, so the
+			-- ball lying nearer its cup has the shot, which is seat 2's, since seat 1's is down
+			local left = BumperPool.init(2, 4)
+			BumperPool.input(left, 1, "shoot", { 1, -angle, 0.2, 0, 0.8 })
+			BumperPool.input(left, 2, "shoot", { 6, math.rad(90), 0, 0, 0.8 })
+			local ll = left.last :: BumperPool.Last
+			t.deepEq(ll.pots, { 1 }, "the table is the same left to right")
+			t.deepEq(ll.offside, { 1, 2 })
+			t.eq(left.seat, 2)
+			-- an opener that is not struck at all cannot win the shot from a fair one that missed
+			local idle = BumperPool.init(2, 4)
+			BumperPool.input(idle, 1, "shoot", { 1, math.rad(38), 0.1, 0, 0.8 })
+			BumperPool.skipTurn(idle)
+			t.deepEq((idle.last :: BumperPool.Last).offside, {}, "only a struck ball can be offside")
+			t.eq(idle.seat, 1)
+		end
+	)
+
+	t.test("BP-R2 practice: only the far cup counts; a ball in the near cup goes back on its spot", function()
+		-- the referee alone
+		local s = BumperPool.init(1, 3)
+		local again = BumperPool.settle(s, { pot(2, 1) }, by(1))
+		t.falsy(again[1], "no extra shot for it")
+		t.eq(s.sunk[1], 0, "the cup beside the starting spots is not a sink")
+		t.deepEq((s.last :: BumperPool.Last).respotted, { 2 })
+		t.deepEq((s.last :: BumperPool.Last).pots, { 2 }, "it did go down, and the client shows it")
+		local back = spotOf(s, 2) :: Tables.Spot
+		t.eq(back.x, -Tables.SPOT_X[1])
+		t.eq(back.z, -Tables.CUP_Z, "back on its own spot")
+		t.eq(#s.spots, 5)
+		-- its spot taken: the nearest free place up the table from it
+		local taken = BumperPool.init(1, 3)
+		put(taken, 3, -Tables.SPOT_X[1] + 0.05, -Tables.CUP_Z + 0.02)
+		BumperPool.settle(taken, { pot(2, 1) }, by(1))
+		local near = spotOf(taken, 2) :: Tables.Spot
+		t.truthy(Tables.canPlace(bumper, near.x, near.z, taken.spots, 2), "touching nothing")
+		t.truthy(near.z > -Tables.CUP_Z and near.z < -Tables.CUP_Z + 0.6)
+		-- on the real table: a ball rolled into the cup at its own end
+		local real = BumperPool.init(1, 1)
+		put(real, 1, 1.2, 0.5)
+		put(real, 2, 0, -1.4)
+		t.truthy(BumperPool.input(real, 1, "shoot", { 2, math.pi, Cue.powerFor(3.2), 0, 0.8 }))
+		local last = real.last :: BumperPool.Last
+		t.deepEq(last.pots, { 2 })
+		t.deepEq(last.holes, { 1 }, "the head cup, beside where it started")
+		t.deepEq(last.respotted, { 2 })
+		t.eq(last.event, "pass", "no sink: the shot is counted and nothing more")
+		t.eq(real.sunk[1], 0)
+		t.eq(real.shots[1], 1)
+		t.falsy(real.done)
+		local again2 = spotOf(real, 2) :: Tables.Spot
+		t.eq(again2.x, -Tables.SPOT_X[1])
+		t.eq(again2.z, -Tables.CUP_Z)
+		t.eq(#real.spots, 5)
+		-- against an opponent nothing has changed: your own ball in their cup is down, and they drop two
+		local two = inPlay()
+		BumperPool.settle(two, { pot(1, 2) }, by(1))
+		BumperPool.settle(two, { pot(2, 1) }, by(1))
+		t.eq(two.sunk[1], 2)
+		t.deepEq((two.last :: BumperPool.Last).respotted, {})
+		t.eq((two.last :: BumperPool.Last).awarded, 2)
+	end)
+
+	t.test("banks made: a cushion touched before the cup's rim, not the one behind the cup on the way down", function()
+		-- straight at the cup from the front, firmly enough to reach the cushion behind it while dropping
+		local sank, touched = 0, 0
+		for _, speed in { 5, 6, 7, 8 } do
+			local s = BumperPool.init(1, 1)
+			put(s, 1, 0, Tables.CUP_Z - 1.26)
+			BumperPool.input(s, 1, "shoot", { 1, 0, Cue.powerFor(speed), 0, 0.8 })
+			if s.sunk[1] == 1 then
+				sank += 1
+				t.eq(s.banks[1], 0, `straight in at {speed} studs/s is not a bank`)
+				local script = BumperPool.script(s) :: Shot.Script
+				if script.rails[Shot.indexOf(script, 1) :: number] > 0 then
+					touched += 1
+				end
+			end
+		end
+		t.truthy(sank >= 3, "most of them drop")
+		t.truthy(touched >= 1, "and at least one touched the end cushion on its way down")
+		-- the opening bank off the side cushion is one
+		local s = BumperPool.init(1, 1)
+		BumperPool.input(s, 1, "shoot", { 1, sinkingAngle(), 0.2, 0, 0.8 })
+		t.eq(s.sunk[1], 1)
+		t.eq(s.banks[1], 1)
 	end)
 
 	t.test("shoot: your own ball, on the table, on your turn; the table plays it and the turn follows", function()

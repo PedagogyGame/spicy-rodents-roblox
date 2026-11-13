@@ -8,8 +8,16 @@
 -- line against the checklist:
 --   BP-R2 five each, one marked, starting on the spots round the cup at their own end (Tables.bumperStart).
 --   BP-R3 the opening: both players strike their marked ball in the SAME model run (each sends "shoot"; the
---         table plays when both are in). Whoever sinks theirs shoots next; if neither does, the ball lying
---         nearer its cup; if both do, each side's next ball goes on the marked ball's spot and they open again.
+--         table plays when both are in), banking it off the side cushion on their own RIGHT (seat 1: +x,
+--         seat 2: -x), so the two balls cross the table without meeting. Whoever sinks theirs shoots next; if
+--         neither does, the ball lying nearer its cup; if both do, each side's next ball goes on the marked
+--         ball's spot and they open again. An opener whose first touch is anything but that cushion (the
+--         other side's line, a bumper, another ball, nothing at all) is "offside": its ball stays where it
+--         went, but it cannot win the next shot from an opener that was played fairly.
+--         In the opening each struck ball answers to its owner, and any OTHER ball that goes down answers to
+--         the player whose strike reached it through the chain of contacts (nobody, if both did): your
+--         opponent knocking your resting ball into a cup is BP-R5's "counts for the opponent, no penalty",
+--         never your own foul.
 --   BP-R4 the marked ball must be sunk first: sink another of your own before it and the opponent drops two
 --         of their own balls straight into their cup (the table picks them as a player would: their marked
 --         ball if it is still up, then the balls lying farthest from their cup).
@@ -20,15 +28,21 @@
 --   BP-R7 an idle turn passes the shot (in the opening: that player's ball is simply not struck).
 --   Decision D2's fallback: init(seats, seed, false) leaves the opening out and plays in turn from seat 1
 --   (the marked ball must still go down first).
---   Practice (seats = 1): only your five are on the table; sink them in the fewest shots.
+--   Practice (seats = 1): only your five are on the table; sink them in the far cup in the fewest shots. A
+--   ball that drops in the cup beside its starting spots is put back on its spot, and the shot is counted.
+--   "Banks made" counts your own balls sunk off at least one cushion touched BEFORE the ball reached the cup's
+--   rim (the cushion just behind the cup, touched on the way down, does not make a straight shot a bank).
 -- Pure and seeded. Lune-tested (tests/unit/pool_bumper.spec.luau).
--- Interface: def, verbs; init(seats, seed, together?) -> State; input(state, seat, "shoot", { ball, angle, power, tipX?,
---   tipY? }); turn(state) (in the opening: the first seat that has not struck yet); waiting(state) -> { seats
---   that may strike now }; skipTurn(state); result(state); view(state); script(state) -> Shot.Script?;
---   settle(state, pots, shooterOf, rest?) (the referee alone); sideOf(ball); cupOf(seat) -> hole index;
---   markedOf(seat) -> ball id; mine(state, seat) -> { ball ids on the table }; HOW_TEXT
+-- Interface: def, verbs; init(seats, seed, together?) -> State; input(state, seat, "shoot", { ball, angle,
+--   power, tipX?, tipY? }); turn(state) (in the opening: the first seat that has not struck yet);
+--   waiting(state) -> { seats that may strike now }; skipTurn(state); result(state); view(state);
+--   script(state) -> Shot.Script?; settle(state, pots, shooterOf, rest?) (the referee alone; shooterOf may
+--   answer 0: nobody's shot); sideOf(ball); cupOf(seat) -> hole index; markedOf(seat) -> ball id;
+--   rightCushion(seat) -> the table segment an opener must bank off; mine(state, seat) -> { ball ids on the
+--   table }; HOW_TEXT
 
 local Cue = require("./Cue")
+local Physics = require("./Physics")
 local Shot = require("./Shot")
 local Tables = require("./Tables")
 
@@ -57,6 +71,8 @@ export type Last = {
 	holes: { number },
 	dropped: { number }, -- balls dropped in as a penalty award
 	awarded: number, -- the seat that was given them (0: no penalty)
+	respotted: { number }, -- practice: balls that went down the near cup and are back on their spots
+	offside: { number }, -- the opening: seats whose ball did not go off their right-hand cushion first
 }
 export type State = {
 	seats: number,
@@ -88,6 +104,12 @@ end
 
 function BumperPool.markedOf(seat: number): number
 	return (seat - 1) * 5 + 1
+end
+
+-- The side cushion on a player's right as they face their cup: the table's segment 2 (+x) for seat 1, who
+-- shoots up the table, and segment 1 (-x) for seat 2, who shoots down it. The opening is banked off it.
+function BumperPool.rightCushion(seat: number): number
+	return if seat == 1 then 2 else 1
 end
 
 function BumperPool.init(seats: number, seed: number, together: boolean?): State
@@ -197,8 +219,9 @@ local function award(state: State, seat: number, dropped: { number })
 end
 
 -- The referee: the balls that went down, in order, applied to the game. shooterOf(ball) is the seat whose
--- strike is answerable for that ball (the one shooter in ordinary play; in the opening, the ball's owner).
--- Returns the seats that sank one of their own in their own cup (they shoot again) and fills `last`.
+-- strike is answerable for that ball (the one shooter in ordinary play; in the opening, see resolveOpening),
+-- or 0 if nobody's is. Returns the seats that sank one of their own in their own cup (they shoot again) and
+-- fills `last`.
 function BumperPool.settle(
 	state: State,
 	pots: { PotAt },
@@ -210,6 +233,7 @@ function BumperPool.settle(
 	end
 	local again: { [number]: boolean } = {}
 	local potIds: { number }, potHoles: { number }, dropped: { number } = {}, {}, {}
+	local respotted: { number } = {}
 	local awarded = 0
 	for _, p in pots do
 		if state.done then
@@ -224,8 +248,21 @@ function BumperPool.settle(
 		local marked = p.ball == BumperPool.markedOf(owner)
 		table.insert(potIds, p.ball)
 		table.insert(potHoles, p.hole)
+		if opp == 0 and p.hole ~= BumperPool.cupOf(owner) then
+			-- practice: the cup beside the starting spots is not the target. Back on its spot (or the nearest
+			-- free place up the table from it)
+			local tb = Tables.bumper()
+			for _, sp in Tables.bumperStart({ owner == 1, owner == 2 }) do
+				if sp.id == p.ball then
+					local x, z = Tables.freeSpot(tb, sp.x, sp.z, state.spots, if owner == 1 then 1 else -1)
+					table.insert(state.spots, { id = p.ball, x = x, z = z })
+				end
+			end
+			table.insert(respotted, p.ball)
+			continue
+		end
 		state.sunk[owner] += 1
-		if p.hole == BumperPool.cupOf(owner) or opp == 0 then
+		if p.hole == BumperPool.cupOf(owner) then
 			if owner == shooter then
 				again[owner] = true
 				if p.cushions > 0 then
@@ -260,6 +297,8 @@ function BumperPool.settle(
 		holes = potHoles,
 		dropped = dropped,
 		awarded = awarded,
+		respotted = respotted,
+		offside = {},
 	}
 	return again
 end
@@ -304,20 +343,61 @@ local function resolveOpening(state: State)
 		state.phase = "play"
 		state.seat = 1
 		state.lastScript = nil
-		state.last = { shooters = {}, event = "idle", pots = {}, holes = {}, dropped = {}, awarded = 0 }
+		state.last = {
+			shooters = {},
+			event = "idle",
+			pots = {},
+			holes = {},
+			dropped = {},
+			awarded = 0,
+			respotted = {},
+			offside = {},
+		}
 		return
 	end
 	local script = Shot.run(tb, state.spots, strikes)
 	state.lastScript = script
-	local again = BumperPool.settle(state, potsOf(script), BumperPool.sideOf, Shot.rest(script))
+	-- who answers for each ball that went down: a struck ball, its owner; any other, the one player whose
+	-- strike reached it (through however many balls); nobody, if both strikes had a hand in it
+	local answers: { [number]: number } = {}
+	for _, p in Shot.pots(script) do
+		local shooter = 0
+		for k, seat in shooters do
+			if strikes[k].id == p.ball then
+				shooter = seat
+			end
+		end
+		if shooter == 0 then
+			for k, seat in shooters do
+				if p.by == bit32.lshift(1, k - 1) then
+					shooter = seat
+				end
+			end
+		end
+		answers[p.ball] = shooter
+	end
+	local again = BumperPool.settle(state, potsOf(script), function(ball: number): number
+		return answers[ball] or 0
+	end, Shot.rest(script))
+	-- was each opener a bank off the player's own right-hand cushion? (one that was not struck at all is no
+	-- fairer than one that went the wrong way, though only a struck one is called offside)
+	local fair: { [number]: boolean } = { false, false }
 	local last = state.last :: Last
+	for k, seat in shooters do
+		local kind, what = Shot.firstTouch(script, strikes[k].id)
+		fair[seat] = kind == Physics.EV.cushion and what == BumperPool.rightCushion(seat)
+		if not fair[seat] then
+			table.insert(last.offside, seat)
+		end
+	end
 	last.shooters = shooters
 	if state.done then
 		last.event = "win"
 		return
 	end
 	last.event = "opening"
-	if again[1] and again[2] then
+	local won1, won2 = again[1] == true and fair[1], again[2] == true and fair[2]
+	if won1 and won2 then
 		-- both sank: each side's next ball goes on the marked ball's spot and they open again
 		for s = 1, 2 do
 			local own = BumperPool.mine(state, s)
@@ -332,8 +412,11 @@ local function resolveOpening(state: State)
 		return
 	end
 	state.phase = "play"
-	if again[1] or again[2] then
-		state.seat = if again[1] then 1 else 2
+	if won1 or won2 then
+		state.seat = if won1 then 1 else 2
+	elseif fair[1] ~= fair[2] then
+		-- one of them was not played off its right-hand cushion (or not played at all): the other shoots
+		state.seat = if fair[1] then 1 else 2
 	else
 		local d1 = cupDistance(state, 1, state.openers[1])
 		local d2 = cupDistance(state, 2, state.openers[2])
@@ -424,7 +507,16 @@ function BumperPool.skipTurn(state: State)
 		end
 		return
 	end
-	state.last = { shooters = { state.seat }, event = "idle", pots = {}, holes = {}, dropped = {}, awarded = 0 }
+	state.last = {
+		shooters = { state.seat },
+		event = "idle",
+		pots = {},
+		holes = {},
+		dropped = {},
+		awarded = 0,
+		respotted = {},
+		offside = {},
+	}
 	state.lastScript = nil
 	if state.seats > 1 then
 		state.seat = 3 - state.seat

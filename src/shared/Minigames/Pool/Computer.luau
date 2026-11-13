@@ -12,14 +12,18 @@
 --   way a good player sees a shot before playing it. With nothing on, it plays a legal hit; on the 8 it
 --   calls the pocket; with the ball in hand it sets the cue ball down for its easiest shot; it breaks from
 --   the head spot.
---   Bumper pool: it finds its shot by trying candidates through the model (straight at the cup, off each
---   side cushion, off the end, and a fan of angles round each), scores what each leaves (down in the right
---   cup, down in the wrong one, or how near), and plays the best with its level's error. The marked ball
---   first, always.
+--   Bumper pool: the two better players find their shot by trying candidates through the model (straight at
+--   the cup, off the side cushion on their right, off the one on their left, off the end, and a fan of
+--   angles round each), score what each leaves (down in the right cup, down in the wrong one, or how near),
+--   and play the best with their level's error. The beginner looks and does not try anything: the straight
+--   line if it is clear, else the plain mirror bank off the cushion on his right (then his left), with a
+--   wide miss and a heavy hand. The marked ball first, always. In the opening every level banks off the
+--   cushion on its OWN right (seat 1: +x, seat 2: -x), as the rule asks: the two marked balls cross the
+--   table and never meet.
 -- Pure and seeded: the same state, level and seed give the same inputs. Lune-tested
 -- (tests/unit/pool_games.spec.luau: whole games to the end on several seeds).
 -- Thinking costs model runs (the best bumper pool player tries up to 144 shots, some tens of milliseconds in
--- all), so both entry points take an optional `breathe` function that is called after every model run: the
+-- all; the beginner none), so both entry points take an optional `breathe` function that is called after every model run: the
 -- server passes one that yields when its frame budget is spent (the computer player has two seconds before
 -- it must strike), and the answer is the same with or without it.
 -- Interface: POOL_PLAYERS, BUMPER_PLAYERS ({ name, level }); LEVELS; eightBall(state, level, seed,
@@ -29,6 +33,7 @@ local BumperPool = require("./BumperPool")
 local Cloth = require("./Cloth")
 local Cue = require("./Cue")
 local EightBall = require("./EightBall")
+local Physics = require("./Physics")
 local Rng = require("../../Util/Rng")
 local Shot = require("./Shot")
 local Tables = require("./Tables")
@@ -48,6 +53,11 @@ export type Level = {
 	touch: number, -- bumper pool: share of the power it is out by
 }
 
+-- the bumper pool beginner's miss and heavy hand (tools/pool/calibrate.luau prints what they come to: a ball
+-- down on about a shot in five, twenty-odd shots to sink five alone)
+local BOB_BANK = 7
+local BOB_TOUCH = 0.4
+
 Computer.LEVELS = {
 	{
 		aim = math.rad(1.7),
@@ -55,10 +65,10 @@ Computer.LEVELS = {
 		sims = 0,
 		breakPower = 0.8,
 		choices = 3,
-		fan = { 0, -3, 3 },
+		fan = {},
 		balls = 1,
-		bank = math.rad(3.6),
-		touch = 0.26,
+		bank = math.rad(BOB_BANK),
+		touch = BOB_TOUCH,
 	},
 	{
 		aim = math.rad(0.38),
@@ -68,8 +78,8 @@ Computer.LEVELS = {
 		choices = 2,
 		fan = { 0, -1.5, 1.5, -3.5, 3.5 },
 		balls = 2,
-		bank = math.rad(1.7),
-		touch = 0.13,
+		bank = math.rad(3.8),
+		touch = 0.26,
 	},
 	{
 		aim = math.rad(0.1),
@@ -479,6 +489,34 @@ function Computer.eightBall(state: EightBall.State, level: number, seed: number,
 	return out
 end
 
+-- Does the straight line between two points on the bumper table look clear: no ball (but `skip`) and no
+-- bumper within a ball's width of it?
+local function lineClear(
+	tb: Tables.Table,
+	spots: { Tables.Spot },
+	x1: number,
+	z1: number,
+	x2: number,
+	z2: number,
+	skip: number
+): boolean
+	if not clearPath(spots, x1, z1, x2, z2, skip, skip, 2 * tb.ballR) then
+		return false
+	end
+	local dx, dz = x2 - x1, z2 - z1
+	local len2 = dx * dx + dz * dz
+	for _, p in tb.posts do
+		local f = if len2 > 0 then ((p.x - x1) * dx + (p.z - z1) * dz) / len2 else 0
+		f = math.clamp(f, 0, 1)
+		local ex, ez = x1 + dx * f - p.x, z1 + dz * f - p.z
+		local lim = p.r + tb.ballR
+		if ex * ex + ez * ez < lim * lim then
+			return false
+		end
+	end
+	return true
+end
+
 -- What a tried bumper pool shot is worth to `seat`.
 local function bumperScore(state: BumperPool.State, seat: number, ball: number, script: Shot.Script): number
 	local tb = Tables.bumper()
@@ -490,7 +528,9 @@ local function bumperScore(state: BumperPool.State, seat: number, ball: number, 
 		local owner = BumperPool.sideOf(p.ball)
 		if owner ~= seat then
 			score -= 35 -- it counts for them
-		elseif p.hole == BumperPool.cupOf(seat) or state.seats < 2 then
+		elseif p.hole ~= BumperPool.cupOf(seat) and state.seats < 2 then
+			score -= 30 -- practice: back on its spot, and a shot gone
+		elseif p.hole == BumperPool.cupOf(seat) then
 			sunk += 1
 			if p.ball == marked then
 				markedDown = true
@@ -560,34 +600,82 @@ function Computer.bumper(
 	end
 	local wallX = tb.halfW - tb.ballR
 	local wallZ = tb.halfL - tb.ballR
+	-- the side cushion on this player's right as they face their cup (BumperPool.rightCushion)
+	local rightX = if seat == 1 then wallX else -wallX
+	local opening = state.phase == "opening"
 	local bestScore, bestBall, bestAngle, bestPower = -math.huge, balls[1], 0, 0.2
-	for _, id in balls do
+	-- arrive slowly enough to drop: a cup takes a ball by its speed
+	local function powerOver(len: number): number
+		return Cue.powerFor(math.sqrt(3.2 * 3.2 + 2 * Cloth.A_ROLL * len * 1.35))
+	end
+	if L.sims == 0 then
+		-- the beginner plays what he sees: the first of these lines that looks clear, and failing all of them
+		-- the bank off his right anyway
+		local id = balls[1]
+		local s = spotOf(state.spots, id) :: Tables.Spot
+		local function bank(wall: number): (number, number, boolean)
+			-- the mirror bank off a side cushion: aim at the cup's image in it
+			local ix = 2 * wall - cup.x
+			local dx, dz = ix - s.x, cup.z - s.z
+			local f = if dx ~= 0 then (wall - s.x) / dx else 0
+			local bx, bz = wall, s.z + f * dz
+			local clear = lineClear(tb, state.spots, s.x, s.z, bx, bz, id)
+				and lineClear(tb, state.spots, bx, bz, cup.x, cup.z, id)
+			return dx, dz, clear
+		end
+		local dx, dz, rightClear = bank(rightX)
+		if not opening then
+			if lineClear(tb, state.spots, s.x, s.z, cup.x, cup.z, id) then
+				dx, dz = cup.x - s.x, cup.z - s.z
+			elseif not rightClear then
+				local lx, lz, leftClear = bank(-rightX)
+				if leftClear then
+					dx, dz = lx, lz
+				end
+			end
+		end
+		bestBall = id
+		bestAngle = Cue.angleOf(dx, dz)
+		bestPower = math.clamp(powerOver(math.sqrt(dx * dx + dz * dz)), 0.03, 0.9)
+	end
+	local tried: { number } = if L.sims > 0 then balls else {}
+	for _, id in tried do
 		local s = spotOf(state.spots, id)
 		if s == nil then
 			continue
 		end
-		-- the lines: straight at the cup, off either side cushion, off the cushion behind the cup
+		-- the lines: straight at the cup, off the side cushion on the right, off the one on the left, off the
+		-- cushion behind the cup. The opening is the bank off the right and nothing else
 		local sz = if cup.z > 0 then 1 else -1
-		local lines = {
-			{ cup.x - s.x, cup.z - s.z },
-			{ 2 * wallX - cup.x - s.x, cup.z - s.z },
-			{ -2 * wallX - cup.x - s.x, cup.z - s.z },
-			{ cup.x - s.x, 2 * sz * wallZ - cup.z - s.z },
-		}
+		local right = { 2 * rightX - cup.x - s.x, cup.z - s.z }
+		local lines: { { number } } = if opening
+			then { right }
+			else {
+				{ cup.x - s.x, cup.z - s.z },
+				right,
+				{ -2 * rightX - cup.x - s.x, cup.z - s.z },
+				{ cup.x - s.x, 2 * sz * wallZ - cup.z - s.z },
+			}
 		for _, ln in lines do
 			local len = math.sqrt(ln[1] * ln[1] + ln[2] * ln[2])
 			if len < 1e-6 then
 				continue
 			end
 			local base = Cue.angleOf(ln[1], ln[2])
-			-- arrive slowly enough to drop: a cup takes a ball by its speed
-			local p0 = Cue.powerFor(math.sqrt(3.2 * 3.2 + 2 * Cloth.A_ROLL * len * 1.35))
+			local p0 = powerOver(len)
 			for _, off in L.fan do
-				for pk = 1, if L.sims > 0 then 2 else 1 do
+				for pk = 1, 2 do
 					local angle = base + math.rad(off)
 					local power = math.clamp(p0 * (if pk == 1 then 1 else 1.3), 0.03, 0.9)
 					local script = Shot.run(tb, state.spots, { Cue.strike(id, angle, power, 0, 0.8, nil) })
 					local score = bumperScore(state, seat, id, script)
+					if opening then
+						-- the rule: off the right-hand cushion before anything else
+						local kind, what = Shot.firstTouch(script, id)
+						if kind ~= Physics.EV.cushion or what ~= BumperPool.rightCushion(seat) then
+							score -= 200
+						end
+					end
 					if breathe then
 						breathe()
 					end

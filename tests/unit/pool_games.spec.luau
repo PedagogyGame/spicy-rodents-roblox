@@ -4,7 +4,9 @@
 -- through the same inputs a person gives, on several seeds.
 local BumperPool = require("@shared/Minigames/Pool/BumperPool")
 local Computer = require("@shared/Minigames/Pool/Computer")
+local Cue = require("@shared/Minigames/Pool/Cue")
 local EightBall = require("@shared/Minigames/Pool/EightBall")
+local Physics = require("@shared/Minigames/Pool/Physics")
 local Rng = require("@shared/Util/Rng")
 local Shot = require("@shared/Minigames/Pool/Shot")
 local Tables = require("@shared/Minigames/Pool/Tables")
@@ -222,20 +224,102 @@ return function(t)
 		t.deepEq(BumperPool.view(x), BumperPool.view(y))
 	end)
 
+	t.test(
+		"BP-R3 bumper pool: the computer players open off their own right, and the two marked balls cross",
+		function()
+			-- (every level used to try the +x cushion first, so the player in seat 2 banked off its LEFT, straight
+			-- down the line seat 1's ball was coming up: the two marked balls met in 51 to 60 openings of 60)
+			local EV = Physics.EV
+			for level = 1, 3 do
+				local met, sunk, offside = 0, 0, 0
+				local N = 20
+				for seed = 1, N do
+					local s = BumperPool.init(2, seed)
+					for _, seat in { 2, 1 } do
+						local inputs = Computer.bumper(s, seat, level, seed)
+						t.truthy(BumperPool.input(s, seat, inputs[1].verb, inputs[1].args))
+						-- it aims at the cushion on its own right: +x going up the table, -x coming down it
+						local dx = Cue.dirOf(inputs[1].args[2])
+						t.truthy(if seat == 1 then dx > 0 else dx < 0, `level {level}, seat {seat} aims to its right`)
+					end
+					local script = BumperPool.script(s) :: Shot.Script
+					for e = 1, #script.events, Physics.EVENT_STRIDE do
+						local a, b = script.events[e + 2], script.events[e + 3]
+						if script.events[e + 1] == EV.ball and math.min(a, b) == 1 and math.max(a, b) == 6 then
+							met += 1
+							break
+						end
+					end
+					sunk += s.sunk[1] + s.sunk[2]
+					offside += #(s.last :: BumperPool.Last).offside
+				end
+				if level == 1 then
+					-- the beginner's aim wanders seven degrees: now and then it clips a bumper on the way
+					t.truthy(met <= 1, `beginners: the marked balls met in {met} of {N} openings`)
+					t.truthy(offside <= N * 0.5, `{offside} of {2 * N} openers were not clean banks`)
+				else
+					t.eq(met, 0, `level {level}: the marked balls never meet`)
+					t.eq(offside, 0, `level {level}: every opener is a bank off the right-hand cushion`)
+				end
+				if level == 3 then
+					local rate = sunk / (2 * N)
+					t.truthy(rate >= 0.4 and rate <= 0.85, `the best player sinks its opener {rate} of the time`)
+				end
+			end
+		end
+	)
+
+	t.test("bumper pool: three levels, three bands (balls sunk a shot, playing alone)", function()
+		-- a newcomer with a first-bounce preview sinks about a ball in five shots: the beginner must be no
+		-- better than that (it was 40 %, by running a dozen candidate shots through the exact model)
+		local rate: { number } = {}
+		local each: { number } = {}
+		local N = 12
+		for level = 1, 3 do
+			local shots, sunk = 0, 0
+			for seed = 1, N do
+				local s = bumper({ level }, 600 + seed)
+				t.truthy(s.done)
+				shots += s.shots[1]
+				sunk += s.sunk[1]
+			end
+			rate[level] = sunk / shots
+			each[level] = shots / N
+		end
+		t.truthy(rate[1] > 0.16 and rate[1] < 0.3, `Bumper Bob sinks {rate[1]} a shot`)
+		t.truthy(each[1] > 16 and each[1] < 30, `and needs {each[1]} shots for his five`)
+		t.truthy(rate[2] > 0.32 and rate[2] < 0.48, `Bank-Shot Betty sinks {rate[2]} a shot`)
+		t.truthy(rate[3] > 0.47 and rate[3] < 0.7, `Cushion Carl sinks {rate[3]} a shot`)
+		t.truthy(each[3] < each[2] and each[2] < each[1], `{each[1]}, {each[2]}, {each[3]} shots for five`)
+	end)
+
 	t.test("thinking can be spread over frames: breathe is called after every model run and changes nothing", function()
-		-- bumper pool: the best player's whole search
+		-- bumper pool: the best player's whole search. In the opening there is one line (the bank off its
+		-- right) and the fan round it; in ordinary play four lines for each of two balls
 		local b = BumperPool.init(2, 9)
 		local runs = 0
 		local with = Computer.bumper(b, 1, 3, 9, function()
 			runs += 1
 		end)
 		t.deepEq(with, Computer.bumper(b, 1, 3, 9), "the same strike with or without it")
-		t.truthy(runs >= 36 and runs <= 144, `the best player tried {runs} shots`)
+		t.eq(runs, 2 * #Computer.LEVELS[3].fan, `the best player tried {runs} openings`)
+		local play = BumperPool.init(2, 9, false)
+		play.markedDown[1] = true
+		local inPlay = 0
+		local played = Computer.bumper(play, 1, 3, 9, function()
+			inPlay += 1
+		end)
+		t.deepEq(played, Computer.bumper(play, 1, 3, 9))
+		t.truthy(inPlay >= 36 and inPlay <= 144, `the best player tried {inPlay} shots`)
+		-- the beginner plays what it sees: no model runs at all
 		local beginner = 0
 		Computer.bumper(b, 1, 1, 9, function()
 			beginner += 1
 		end)
-		t.truthy(beginner >= 1 and beginner < runs, `the beginner tried {beginner}`)
+		Computer.bumper(play, 1, 1, 9, function()
+			beginner += 1
+		end)
+		t.eq(beginner, 0, `the beginner tried {beginner}`)
 		-- eight-ball: a table past its break, the best player looking ahead
 		local s = EightBall.init(2, 3)
 		EightBall.input(s, 1, "shoot", { 0, 1, 0, 0 })

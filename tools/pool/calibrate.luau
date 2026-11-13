@@ -2,8 +2,10 @@
 -- tools/pool/calibrate.luau: a developer's look at the cue-sport table model (Shared/Minigames/Pool) so its
 -- constants are tuned from numbers, not guesses. Prints: how the cloth slows a ball; what a cushion gives
 -- back and how side spin turns the angle; what follow, draw and stun do; how the pockets accept and refuse
--- by angle and speed (and how much tighter they play when hammered); the break (spread, pots, scratches, time to rest); bumper pool's cups against speed and
--- its posts; how each computer player does at both games; and what a step and a shot cost.
+-- by angle and speed (and how much tighter they play when hammered); how a bank moves with power; the break
+-- (spread, pots, dry breaks, scratches, time to rest, script size on the wire); bumper pool's cups against
+-- speed and its posts; how each computer player does at both games (and alone, and in bumper pool's
+-- opening); and what a step and a shot cost.
 -- Usage, from the repo root: lune run tools/pool/calibrate.luau [breaks, default 200] [games, default 12]
 -- Interface: a script (prints a report); nothing is written.
 
@@ -268,7 +270,7 @@ for _, kind in BREAK_KINDS do
 	print(`== the break ({BREAKS} racks: {kind[1]})`)
 	local pots, scratches, dry, head, tSum, tMax, contacts, steps, knots, sizeSum, sizeMax =
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-	local far = 0
+	local far, three, eight, bytesSum, bytesMax = 0, 0, 0, 0, 0
 	local same = 0
 	local firstLayout = ""
 	local started = os.clock()
@@ -283,11 +285,16 @@ for _, kind in BREAK_KINDS do
 				scratches += 1
 			else
 				np += 1
+				if p.ball == 8 then
+					eight += 1
+				end
 			end
 		end
 		pots += np
 		if np == 0 then
 			dry += 1
+		elseif np >= 3 then
+			three += 1
 		end
 		local layout = ""
 		for _, r in Shot.rest(s) do
@@ -317,11 +324,20 @@ for _, kind in BREAK_KINDS do
 		sizeMax = math.max(sizeMax, size)
 	end
 	local el = os.clock() - started
+	for seed = 1, BREAKS do
+		-- (packed outside the clock: the cost below is the model's alone)
+		local spots = Tables.rack(seed)
+		spots[1].x = kind[4]
+		local angle = Cue.angleOf(spots[2].x - spots[1].x, spots[2].z - spots[1].z)
+		local bytes = buffer.len(Shot.pack(Shot.run(pool, spots, { Cue.strike(0, angle, kind[2], 0, kind[3], seed) })))
+		bytesSum += bytes
+		bytesMax = math.max(bytesMax, bytes)
+	end
 	print(
-		`  balls potted per break {f(pots / BREAKS, 2)}; nothing potted {f(100 * dry / BREAKS, 0)} %; scratch {f(
-			100 * scratches / BREAKS,
+		`  balls potted per break {f(pots / BREAKS, 2)}; nothing potted {f(100 * dry / BREAKS, 0)} %; three or more {f(
+			100 * three / BREAKS,
 			0
-		)} %`
+		)} %; the 8 down {f(100 * eight / BREAKS)} %; scratch {f(100 * scratches / BREAKS, 0)} %`
 	)
 	print(
 		`  object balls ending in the head half {f(head / BREAKS)} of 15; more than 2 studs from the rack {f(
@@ -330,7 +346,9 @@ for _, kind in BREAK_KINDS do
 	)
 	print(`  at rest after {f(tSum / BREAKS)} s on average, {f(tMax)} s at most; breaks identical to the first: {same}`)
 	print(
-		`  contacts {f(contacts / BREAKS, 0)} a break; knots {knots}; script {f(sizeSum / BREAKS, 0)} numbers on average, {sizeMax} at most`
+		`  contacts {f(contacts / BREAKS, 0)} a break; knots {knots}; script {f(sizeSum / BREAKS, 0)} numbers on average, {sizeMax} at most; packed for the wire {f(
+			bytesSum / BREAKS / 1000
+		)} KB on average, {f(bytesMax / 1000)} KB at most`
 	)
 	print(
 		`  cost: {f(el / steps * 1e6, 2)} microseconds a step ({Physics.DT * 1000} ms steps), {f(el / BREAKS * 1000)} ms a break`
@@ -524,6 +542,61 @@ for _, pair in { { 1, 1 }, { 2, 2 }, { 3, 3 }, { 1, 2 }, { 2, 3 } } do
 	)
 end
 
+print(`== bumper pool, each computer player alone ({GAMES * 2} tables: balls sunk a shot, shots to sink five)`)
+for level = 1, 3 do
+	local shots, sunk, worst, banks = 0, 0, 0, 0
+	local n = GAMES * 2
+	for seed = 1, n do
+		local s = BumperPool.init(1, seed)
+		local turns = 0
+		while not s.done and turns < 400 do
+			local inputs = Computer.bumper(s, 1, level, seed)
+			BumperPool.input(s, 1, inputs[1].verb, inputs[1].args)
+			turns += 1
+		end
+		shots += s.shots[1]
+		sunk += s.sunk[1]
+		banks += s.banks[1]
+		worst = math.max(worst, s.shots[1])
+	end
+	print(
+		`  {Computer.BUMPER_PLAYERS[level].name}: sinks a ball on {f(100 * sunk / shots, 0)} % of shots; {f(shots / n)} shots for five (most {worst}); {f(
+			banks / n
+		)} of the five are banks`
+	)
+end
+
+print(`== bumper pool's opening, computer against computer ({GAMES * 4} openings each level)`)
+for level = 1, 3 do
+	local met, sunk, offside = 0, 0, 0
+	local n = GAMES * 4
+	for seed = 1, n do
+		local s = BumperPool.init(2, seed)
+		for _, seat in { 1, 2 } do
+			local inputs = Computer.bumper(s, seat, level, seed)
+			BumperPool.input(s, seat, inputs[1].verb, inputs[1].args)
+		end
+		local sc = s.lastScript
+		if sc then
+			for e = 1, #sc.events, Physics.EVENT_STRIDE do
+				local a, b = sc.events[e + 2], sc.events[e + 3]
+				if sc.events[e + 1] == EV.ball and math.min(a, b) == 1 and math.max(a, b) == 6 then
+					met += 1
+					break
+				end
+			end
+		end
+		sunk += s.sunk[1] + s.sunk[2]
+		offside += if s.last then #s.last.offside else 0
+	end
+	print(
+		`  {Computer.BUMPER_PLAYERS[level].name}: the marked balls met in {met} of {n}; an opener sinks {f(
+			100 * sunk / (2 * n),
+			0
+		)} % of the time; {offside} of {2 * n} were not clean banks off the right-hand cushion`
+	)
+end
+
 print("== cost of the aim preview (the same model, run to the first contact and a moment past it)")
 do
 	local spots = Tables.rack(1)
@@ -539,7 +612,7 @@ end
 print("== cost of ordinary shots (eight-ball, a game between the middle players)")
 do
 	local s = EightBall.init(2, 7)
-	local steps, contacts, ms, n, size, sizeMax = 0, 0, 0, 0, 0, 0
+	local steps, contacts, ms, n, size, sizeMax, bytes = 0, 0, 0, 0, 0, 0, 0
 	while not s.done and n < 300 do
 		local inputs = Computer.eightBall(s, 2, 7)
 		for _, inp in inputs do
@@ -556,11 +629,12 @@ do
 			contacts += sc.contacts
 			size += Shot.size(sc)
 			sizeMax = math.max(sizeMax, Shot.size(sc))
+			bytes += buffer.len(Shot.pack(sc))
 		end
 	end
 	print(
 		`  {n} shots: {f(ms / n, 2)} ms a shot, {f(steps / n, 0)} steps, {f(ms / steps * 1000, 2)} microseconds a step, {f(
 			contacts / n
-		)} contacts; script {f(size / n, 0)} numbers a shot ({sizeMax} at most)`
+		)} contacts; script {f(size / n, 0)} numbers a shot ({sizeMax} at most), {f(bytes / n, 0)} bytes packed`
 	)
 end
