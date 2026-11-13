@@ -3,7 +3,7 @@
 -- Paintball's controls, per device (the table is fixed in PaintballClient's header; this is the code
 -- that turns each device's keys into Seat.input calls). The seat reads its own keys: of the framework's,
 -- only Q and gamepad B are taken, by the game's `keys`.
---   keyboard and mouse   left button fire; R reload; Shift sprints while HELD; C or Left Ctrl crouches
+--   keyboard and mouse   left button fire; R reload; Shift (either) sprints while HELD; C or Left Ctrl crouches
 --                while HELD; G shows the scoreboard while HELD. (WASD, the mouse look and Space are
 --                the stock controls'.) A click while the scoreboard is up belongs to its buttons.
 --   gamepad      R2 fire; X reload; B crouch is a TOGGLE; L3 sprint is a TOGGLE that ends on a fire
@@ -39,7 +39,7 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 	local fireRight: GuiObject? = hud.touch.FireRight
 	local touchOn = fireRight ~= nil
 
-	local shift = false
+	local keyShift: { [string]: boolean } = {}
 	local keyCrouch: { [string]: boolean } = {}
 	local padCrouch, touchCrouch = false, false
 	local padSprint, touchSprint = false, false
@@ -53,7 +53,7 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 		if crouch then
 			padSprint, touchSprint = false, false
 		end
-		local sprint = shift or padSprint or touchSprint
+		local sprint = keyShift.LeftShift == true or keyShift.RightShift == true or padSprint or touchSprint
 		local scores = keyScores or padScores or touchScores
 		if crouch ~= crouchWas then
 			crouchWas = crouch
@@ -99,8 +99,8 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 						fire()
 					end
 				end
-			elseif key == "LeftShift" then
-				shift = true
+			elseif key == "LeftShift" or key == "RightShift" then
+				keyShift[key] = true
 				apply()
 			elseif key == "C" or key == "LeftControl" then
 				keyCrouch[key] = true
@@ -139,8 +139,8 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 		conns,
 		UIS.InputEnded:Connect(function(io: InputObject)
 			local key = io.KeyCode.Name
-			if key == "LeftShift" then
-				shift = false
+			if key == "LeftShift" or key == "RightShift" then
+				keyShift[key] = nil
 				apply()
 			elseif key == "C" or key == "LeftControl" then
 				keyCrouch[key] = nil

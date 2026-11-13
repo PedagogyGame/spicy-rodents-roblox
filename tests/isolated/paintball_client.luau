@@ -71,6 +71,7 @@ local function world(w: Rig.World, wires: PaintballRig.Wires): Server
 		FloorMaterial = roblox.Enum.Material.Plastic,
 	})
 	hum.Parent = w.body
+	rawset(w.player, "UserId", 41) -- (the roster the case sends names the player by it)
 	rawset(w.body.PrimaryPart, "Size", Vector3.new(2, 2, 1))
 	s.hum = hum
 	s.now = function(): number

@@ -13,6 +13,7 @@ local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Wire = require("@shared/Minigames/Paintball/Wire")
+local Marker = require("@client/Minigames/Paintball/Marker")
 local Tuning = require("@client/Minigames/Paintball/Tuning")
 
 local R = Contract.Rules
@@ -620,7 +621,8 @@ return function(t)
 	)
 
 	t.test("a placement that arrives before the seat knows its slot is kept and obeyed", function()
-		local b = Kit.bench()
+		-- (a client that cannot find itself in the roster: it learns its slot from "state" alone)
+		local b = Kit.bench({ user = 0 })
 		Kit.watch(b)
 		Kit.message(b, { kind = "paintball_respawn", id = 2, x = 50, y = 0, z = 0, yaw = 0, at = b.now(), place = 0 })
 		Kit.message(
@@ -631,7 +633,92 @@ return function(t)
 		Kit.state(b, { phase = "briefing", endsAt = b.now() + 10 })
 		t.eq(b.seat.place, 1)
 		t.near(b.pose.x, -50, 1e-9)
+		-- the roster names every slot's user: with it the seat knows its slot before any "state"
+		b = Kit.bench()
+		Kit.watch(b)
+		t.eq(b.seat.you, 1, "found by its UserId")
+		t.eq(b.seat.team, 1)
+		t.eq(b.show.you, 1)
+		Kit.message(
+			b,
+			{ kind = "paintball_respawn", id = 1, x = -50, y = 0, z = 4, yaw = 0.5, at = b.now(), place = 1 }
+		)
+		t.eq(b.seat.place, 1, "obeyed at once")
 	end)
+
+	t.test(
+		"a new match deals the seats again: nobody else's placement is obeyed, whichever message comes first",
+		function()
+			local roster = {
+				{ id = 1, team = 1, name = "Bea", bot = false, user = 13 },
+				{ id = 2, team = 2, name = "Ann", bot = false, user = 11 },
+				{ id = 3, team = 1, name = "Rusty", bot = true, user = 0 },
+				{ id = 4, team = 2, name = "Static", bot = true, user = 0 },
+			}
+			local seats =
+				{ { name = "Bea" }, { name = "Ann" }, { name = "Rusty (computer)" }, { name = "Static (computer)" } }
+			local slots = {}
+			for id = 1, 4 do
+				slots[id] =
+					{ id = id, team = if id % 2 == 1 then 1 else 2, on = true, tags = 0, outs = 0, shots = 0, hits = 0 }
+			end
+			for _, order in { "roster first", "placements first" } do
+				local b = Kit.playing()
+				local seat = b.seat
+				Kit.run(b, 0.5)
+				Kit.state(b, { phase = "ended", done = true })
+				t.eq(seat.phase, "ended")
+				-- the next match: Ann is dealt seat 2 (the person who held seat 1 left; Bea sits there now), on teal
+				local function placements()
+					-- Bea's, at seat 1 (Ann's old number), with a placement number that could be Ann's next
+					Kit.message(b, {
+						kind = "paintball_respawn",
+						id = 1,
+						x = -52,
+						y = 0,
+						z = 0,
+						yaw = 0,
+						at = b.now() + 2,
+						place = 2,
+					})
+					Kit.message(b, {
+						kind = "paintball_respawn",
+						id = 2,
+						x = 52,
+						y = 0,
+						z = 2,
+						yaw = 3,
+						at = b.now() + 2,
+						place = 2,
+					})
+				end
+				if order == "roster first" then
+					Kit.watch(b, roster, { match = 2 })
+					placements()
+				else
+					placements()
+					t.eq(seat.place, 1, `{order}: not obeyed while the end card is up`)
+					t.near(b.pose.x, 0, 1e-9)
+					Kit.watch(b, roster, { match = 2 })
+				end
+				Kit.state(
+					b,
+					{ you = 2, phase = "briefing", endsAt = b.now() + 10, match = 2, seats = seats, slots = slots }
+				)
+				t.eq(seat.you, 2, order)
+				t.eq(seat.team, 2, order)
+				t.eq(seat.place, 2, order)
+				t.near(b.pose.x, 52, 1e-9, `{order}: in teal's room, not in Bea's place`)
+				t.near(b.pose.z, 2, 1e-9)
+				t.eq(b.curtains[#b.curtains], 1, "the curtains that are shut to you changed with the side")
+				t.eq(b.show.you, 2)
+				Kit.run(b, 0.3)
+				local moves = Kit.moves(b)
+				t.eq(moves[#moves].place, 2)
+				t.near(moves[#moves].x, 52, 1e-6)
+			end
+		end
+	)
 
 	t.test(
 		"tagged out: the legs are taken, the pose stream stops, the HUD knows who; the respawn gives it all back",
@@ -1139,6 +1226,78 @@ return function(t)
 		local ball = b.show.balls[#b.show.balls]
 		t.near(math.sqrt(ball.vx ^ 2 + ball.vy ^ 2 + ball.vz ^ 2), 150, 1e-3)
 	end)
+
+	t.test(
+		"the marker in view shows the rhythm: down for the sprint and up again in 0.15 s, a kick, a tip for the reload",
+		function()
+			local b = Kit.playing()
+			local seat = b.seat
+			local down, tip, _, kick = Marker.pose(seat, b.now(), Tuning)
+			t.eq(down, 0, "up and ready")
+			t.eq(tip, 0)
+			t.truthy(kick < 1e-6)
+			seat:input("sprint", true)
+			Kit.run(b, 0.2)
+			down = Marker.pose(seat, b.now(), Tuning)
+			t.eq(down, 1, "down well before the ramp is full: the picture of cannot fire")
+			seat:input("sprint", false)
+			Kit.frame(b)
+			down = Marker.pose(seat, b.now(), Tuning)
+			t.truthy(down > 0.8, "it does not snap up")
+			Kit.run(b, Body.SPRINT_FIRE_DELAY / 2)
+			down = Marker.pose(seat, b.now(), Tuning)
+			t.near(
+				down,
+				1 - (b.now() - seat.sprintEndedAt) / Body.SPRINT_FIRE_DELAY,
+				1e-9,
+				"rising with the delay the seat waits"
+			)
+			t.truthy(down > 0.2 and down < 0.8)
+			Kit.run(b, Body.SPRINT_FIRE_DELAY)
+			down = Marker.pose(seat, b.now(), Tuning)
+			t.eq(down, 0, "up means may fire")
+			t.truthy(seat:ready(b.now()))
+			-- a shot kicks and comes home; the fifth tips the marker over for the reload, rattling
+			press(b)
+			_, _, _, kick = Marker.pose(seat, b.now(), Tuning)
+			t.eq(kick, 1)
+			Kit.run(b, 0.3)
+			_, _, _, kick = Marker.pose(seat, b.now(), Tuning)
+			t.truthy(kick < 0.02)
+			for _ = 1, 4 do
+				press(b)
+				Kit.run(b, 0.27)
+			end
+			Kit.run(b, F.reloadSecs / 2 - 0.27)
+			local rattled = 0
+			for _ = 1, 12 do
+				Kit.frame(b)
+				local _, over, rattle = Marker.pose(seat, b.now(), Tuning)
+				t.eq(over, 1, "tipped right over through the middle of the reload")
+				rattled = math.max(rattled, math.abs(rattle))
+			end
+			t.truthy(rattled > 0.5, "the hopper rattles")
+			Kit.run(b, F.reloadSecs / 2)
+			_, tip = Marker.pose(seat, b.now(), Tuning)
+			t.eq(tip, 0, "righted as the magazine fills")
+			-- tagged out: put away
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 2,
+				id = 1,
+				ball = 1,
+				scores = { 0, 1 },
+				tags = 1,
+				outs = 1,
+				at = b.now() + 4,
+				x = 0,
+				y = 3,
+				z = 30,
+			})
+			down = Marker.pose(seat, b.now(), Tuning)
+			t.eq(down, 1)
+		end
+	)
 
 	t.test("a bot's call-out reaches its own side's feed; stop() puts everything back", function()
 		local b = Kit.playing()

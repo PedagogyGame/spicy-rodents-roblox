@@ -39,6 +39,7 @@ export type Self = {
 	fov: (extra: number) -> (),
 	curtains: (team: number?) -> (),
 	lock: (on: boolean) -> (),
+	user: () -> number,
 	step: (dt: number) -> (),
 	muzzleAt: Vector3?,
 }
@@ -249,6 +250,11 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 			baseFov = nil
 			fovNow, fovWant = 0, 0
 		end
+	end
+
+	function self.user(): number
+		local id = game:GetService("Players").LocalPlayer.UserId
+		return if type(id) == "number" then id else 0
 	end
 
 	function self.step(dt: number)

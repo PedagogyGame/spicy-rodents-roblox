@@ -87,7 +87,7 @@ function Kit.arena(): Arena.Arena
 	})
 end
 
-function Kit.bench(opts: { tuning: any?, noShow: boolean? }?): Bench
+function Kit.bench(opts: { tuning: any?, noShow: boolean?, user: number? }?): Bench
 	local o = opts or {}
 	local arena = Kit.arena()
 	local b = {
@@ -204,6 +204,10 @@ function Kit.bench(opts: { tuning: any?, noShow: boolean? }?): Bench
 			end,
 			lock = function(on: boolean)
 				table.insert(b.locks, on)
+			end,
+			-- (the bench's player is Ann, user 11 of the default roster; 0: a client that cannot tell)
+			user = function(): number
+				return o.user or 11
 			end,
 		},
 	})
@@ -326,7 +330,9 @@ function Kit.watch(b: Bench, slots: { any }?, over: { [string]: any }?)
 	}
 	local ok, err = Wire.checkMessage(msg)
 	assert(ok, `not a message the server may send: {tostring(err)}`)
+	-- (as the framework does: the game's `watch` first, then the seated controller hears of it too)
 	b.show:onWatch(msg, nil)
+	b.seat:onMessage(msg, b.show)
 end
 
 function Kit.fires(b: Bench): { { [string]: number } }

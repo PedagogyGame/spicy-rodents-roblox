@@ -64,6 +64,7 @@ export type Action = "fire" | "reload" | "crouch" | "sprint" | "scores" | "leave
 --   fov       degrees the view is widened by
 --   curtains  the team whose curtains are solid on this screen (nil: none)
 --   lock      first person on (the CameraZone attribute) and the match's jump height; off puts both back
+--   user      this player's UserId (0: not known): how the seat finds its slot in "paintball_watch"
 export type Port = {
 	pose: (() -> (number?, number, number, number, number, number, boolean))?,
 	push: (() -> number)?,
@@ -74,6 +75,7 @@ export type Port = {
 	fov: ((extra: number) -> ())?,
 	curtains: ((team: number?) -> ())?,
 	lock: ((on: boolean) -> ())?,
+	user: (() -> number)?,
 }
 
 export type Opts = {
@@ -470,14 +472,13 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 	end
 
+	local iAm: (id: number, team: number?) -> ()
+	local flush: (now: number) -> ()
+
 	function seat.onState(self: Seat, msg: { [string]: any })
 		local now = clock()
-		if type(msg.you) == "number" then
-			self.you = msg.you
-			local show = opts.show()
-			if show then
-				show.you = msg.you
-			end
+		if type(msg.you) == "number" and msg.you ~= self.you then
+			iAm(msg.you, nil)
 		end
 		if type(msg.feel) == "table" then
 			rebuildMag(Contract.feel(msg.feel))
@@ -543,14 +544,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				end
 			end
 		end
-		bar()
-		if self.you ~= 0 and next(early) ~= nil then
-			local waiting = early[self.you]
-			table.clear(early)
-			if waiting and self.place == 0 then
-				self:onMessage(waiting, nil)
-			end
+		if self.phase ~= "ended" then
+			flush(now)
 		end
+		bar()
 	end
 
 	local function placed(msg: { [string]: any })
@@ -573,31 +570,74 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 	end
 
+	-- This seat is slot `id`: told by "state" (msg.you), and sooner by "paintball_watch", which names
+	-- every slot's user. The seats are dealt again at every new match, and the roster's message is the
+	-- one the server sends before it places anybody.
+	iAm = function(id: number, team: number?)
+		seat.you = id
+		local show = opts.show()
+		if show then
+			show.you = id
+		end
+		if team then
+			setTeam(team)
+		end
+	end
+
+	-- A placement of your own that makes you whole: (4) a full magazine with no reload running, the
+	-- ramp at 0, the legs back, protected.
+	local function respawned(msg: { [string]: any }, now: number)
+		placed(msg)
+		seat.mag.rounds = R.magazine
+		seat.mag.reloadDoneAt = nil
+		table.clear(unacked)
+		endSprint(now)
+		seat.held = nil
+		seat.out = false
+		seat.safeUntil = msg.at
+		if not seat.legs then
+			seat.legs = true
+			ctx.controls(true)
+		end
+	end
+
+	-- The placements kept while the slot was not known: yours is obeyed, the rest are dropped.
+	flush = function(now: number)
+		if seat.you ~= 0 and next(early) ~= nil then
+			local waiting = early[seat.you]
+			table.clear(early)
+			if waiting then
+				respawned(waiting, now)
+			end
+		end
+	end
+
 	function seat.onMessage(self: Seat, msg: { [string]: any }, _watched: any?)
 		local now = clock()
 		local kind = msg.kind
-		if kind == "paintball_respawn" then
-			if self.you == 0 then
-				-- (the roster's "state" is still on its way: kept until it says which slot is yours)
+		if kind == "paintball_watch" then
+			local me = if port.user then port.user() else 0
+			if me ~= 0 and type(msg.slots) == "table" then
+				for _, slot in msg.slots :: { any } do
+					if slot.user == me and slot.bot ~= true then
+						if slot.id ~= self.you or slot.team ~= self.team then
+							iAm(slot.id, slot.team)
+						end
+						flush(now)
+						break
+					end
+				end
+			end
+		elseif kind == "paintball_respawn" then
+			if self.you == 0 or self.phase == "ended" then
+				-- This seat does not know its slot yet (the roster is on its way), or still has the end
+				-- card up: nobody is placed during an end card, so this is the NEXT match's, whose seats
+				-- are dealt afresh. Kept until the roster or the state of that match says which is yours.
 				if type(msg.id) == "number" then
 					early[msg.id] = msg
 				end
-				return
-			elseif msg.id ~= self.you then
-				return
-			end
-			placed(msg)
-			-- (4) a full magazine with no reload running, the ramp at 0, the legs back, protected
-			self.mag.rounds = R.magazine
-			self.mag.reloadDoneAt = nil
-			table.clear(unacked)
-			endSprint(now)
-			self.held = nil
-			self.out = false
-			self.safeUntil = msg.at
-			if not self.legs then
-				self.legs = true
-				ctx.controls(true)
+			elseif msg.id == self.you then
+				respawned(msg, now)
 			end
 		elseif kind == "paintball_correct" then
 			placed(msg)
