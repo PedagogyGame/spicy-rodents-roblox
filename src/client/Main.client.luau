@@ -188,8 +188,9 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 			kickRemote:FireServer()
 		elseif io.KeyCode == Enum.KeyCode.F then
 			menu.toast(
-				if st.device
-					then "Get out first (E), then F kicks"
+				if st.device == "ride"
+					then "No kicking from a sky-lift cabin"
+					elseif st.device then "Get out first (E), then F kicks"
 					elseif st.species then "Only people can kick: animals pounce with a left click"
 					else "Pick a body from the menu first (M)",
 				2
