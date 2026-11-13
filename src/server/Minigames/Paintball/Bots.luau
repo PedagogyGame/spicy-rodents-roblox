@@ -218,6 +218,8 @@ local function newSquad(arena: Arena): BotBrain.Squad
 		eyeOnAt = {},
 		people = {},
 		escort = {},
+		stairAt = { {}, {} },
+		now = 0,
 		sightLeft = 0,
 		routeLeft = 0,
 		tick = 0,
@@ -516,7 +518,6 @@ local function hear(bots: Bots, state: State, heard: { Heard }, now: number, out
 			-- a team-mate tagged where a bot could see it: it knows, give or take a stride, where the
 			-- ball came from (not where the tagger has gone since)
 			local cosHalf = math.cos(profile.sightHalf)
-			local sweep = bots.arena.sweep
 			for id, b in brains do
 				if b.team ~= victim.team or not b.placed or id == h.id then
 					continue
@@ -528,20 +529,20 @@ local function hear(bots: Bots, state: State, heard: { Heard }, now: number, out
 				if d >= TAG_SEEN or d < 1e-3 or dx * lx + dy * ly + dz * lz < cosHalf * d then
 					continue
 				end
-				-- a clear line to where it struck: one of this tick's sight checks, and one of the bot's own
-				if squad.sightLeft <= 0 then
-					continue
-				end
-				squad.sightLeft -= 1
-				squad.sweeps += 1
-				b.nextSight = math.max(b.nextSight, now) + 1 / profile.sightHz
-				if sweep(ex, ey, ez, h.x - dx / d * 0.5, h.y - dy / d * 0.5, h.z - dz / d * 0.5) ~= nil then
-					continue
-				end
+				-- whether it had a clear line to where it struck is its next sight check's to say (BotBrain:
+				-- one of its own ten a second, not one more)
 				local rng = b.rng
 				local nx = (rng.next() * 2 - 1) * TAG_NOISE
 				local nz = (rng.next() * 2 - 1) * TAG_NOISE
-				BotBrain.alert(b, flight.x + nx, flight.y, flight.z + nz, now)
+				b.tagSeen = {
+					x = h.x - dx / d * 0.5,
+					y = h.y - dy / d * 0.5,
+					z = h.z - dz / d * 0.5,
+					ox = flight.x + nx,
+					oy = flight.y,
+					oz = flight.z + nz,
+					at = now,
+				}
 			end
 		end
 	end
@@ -566,6 +567,7 @@ function Bots.step(
 	end
 	local squad = bots.squad
 	squad.tick += 1
+	squad.now = now
 	follow(bots.nav, bots.profile, squad, brains, state, poses, now)
 	-- this tick's share of the sight checks (BOT.sightHz a bot a second, spread over the ticks) and one
 	-- route search; whoever is first in line changes every tick, so nobody is always last

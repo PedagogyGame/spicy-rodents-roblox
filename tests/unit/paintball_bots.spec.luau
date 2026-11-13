@@ -758,6 +758,65 @@ return function(t)
 		end
 	)
 
+	t.test("it gets down: shot at beside a rail it ducks behind it, and it reloads crouched at its post", function()
+		-- a post at the atrium's rail on the middle storey (low cover: a rail hides a crouched body)
+		local y = 2 * arena.floorHeight
+		local at = BotNav.nearest(nav, 17.5, y, 0, 2)
+		local cover = nav.coverAt[at]
+		t.truthy(cover ~= nil and cover.low, "the premise: a rail to get down behind")
+		local node = arena.nodes[at]
+		local function post(seed: number): Close
+			local c = closeUp(at, yawTo(node.x, node.z, -17, 0), seed)
+			c.poses[1].x, c.poses[1].y, c.poses[1].z = 0, 0, 60 -- (the person: nowhere it can see)
+			c.brain.mode = "hold"
+			c.brain.holdUntil = math.huge
+			c.brain.bobAt = math.huge -- (no bobbing of its own: only what the case does to it)
+			c.brain.wantCrouch = false
+			return c
+		end
+		for seed = 1, 4 do
+			-- a ball from across the atrium goes by its head: after its reaction time, down it goes
+			local c = post(seed)
+			stepClose(c, 0.3)
+			t.eq(c.poses[2].crouch, 0, "standing at the rail")
+			local ox, oy, oz = -17, y + 4.5, node.z
+			local s = F.ballSpeed
+			local dx, dy, dz = node.x - ox, node.y + 4.5 - oy, node.z + 1.5 - oz
+			local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+			stepClose(
+				c,
+				DT,
+				{ { kind = "born", id = 1, x = ox, y = oy, z = oz, vx = dx / d * s, vy = dy / d * s, vz = dz / d * s } }
+			)
+			stepClose(c, d / s + BOT.reactMax + F.crouchSecs + 0.1)
+			t.eq(c.poses[2].crouch, 1, `seed {seed}: shot at, it is down behind the rail`)
+			t.truthy(Wire.has(c.poses[2].bits, BIT.crouch))
+			-- and it does not stay down for good: it bobs up to look
+			local lowest = 1
+			for _ = 1, 4 * Clock.TICK_HZ do
+				stepClose(c, DT)
+				lowest = math.min(lowest, c.poses[2].crouch)
+			end
+			t.eq(lowest, 0, `seed {seed}: up again to look`)
+		end
+		-- empty at its post: it reloads crouched, and stands when it is done
+		local c = post(9)
+		local mag = c.state.slots[2].mag
+		mag.rounds = 0
+		t.truthy(Rules.reload(c.state, 2, c.now))
+		stepClose(c, F.crouchSecs + 0.1)
+		t.eq(c.poses[2].crouch, 1, "reloading, it is down")
+		stepClose(c, F.reloadSecs + F.crouchSecs + 0.1)
+		t.eq(c.poses[2].crouch, 0, "full again, it is up")
+		-- in the open as well: shot at where it stands, it is at least a smaller mark while it stands
+		local open = closeUp(groundNode(0, -24), 0)
+		open.brain.mode, open.brain.holdUntil = "hold", math.huge
+		open.brain.shiftAt = open.now -- (it moved only a moment ago: it stands for now)
+		BotBrain.alert(open.brain, 0, 4.5, -60, open.now)
+		stepClose(open, BOT.reactMax + F.crouchSecs + 0.05)
+		t.truthy(open.poses[2].crouch > 0.9, `in the open, shot at: crouch {open.poses[2].crouch}`)
+	end)
+
 	t.test("it turns no faster than BOT.turn, respects the magazine like anybody, and fires in bursts", function()
 		local at = groundNode(0, -24)
 		local c = closeUp(at, 0)
@@ -1312,9 +1371,12 @@ return function(t)
 				t.truthy(n >= 3, `a flight between storeys {f} and {f + 1} was used {n} times`)
 			end
 		end
-		t.truthy(s.stairBusiest <= 0.8, `one flight had {s.stairBusiest * 100}% of its storey's traffic`)
+		t.truthy(s.stairBusiest <= 0.7, `one flight had {s.stairBusiest * 100}% of its storey's traffic`)
 		t.truthy(s.coverShare > 0.15 and s.coverShare < 0.6, `{s.coverShare * 100}% of the time at cover`)
-		t.truthy(s.crouchShare > 0.005, "somebody crouched behind a rail")
+		t.truthy(
+			s.crouchShare > 0.03 and s.crouchShare < 0.3,
+			`crouched {s.crouchShare * 100}% of the time: behind rails, reloading, shot at`
+		)
 		t.truthy(s.sprintShare > 0.05 and s.sprintShare < 0.5)
 		-- at a post they look where there is something to see (what is left is a look at where a noise
 		-- came from or somebody vanished, and the look swinging past a pillar on its way)
@@ -1391,7 +1453,7 @@ return function(t)
 		for f, share in s.floorShare do
 			t.truthy(share >= 0.03, `storey {f}`)
 		end
-		t.truthy(s.stairBusiest <= 0.8)
+		t.truthy(s.stairBusiest <= 0.7)
 		t.truthy(s.faced >= s.facedOf * 0.97)
 		-- PB-15: the bots' share is 0.5 ms a tick at 15 bots; sixteen come in far under it here (the
 		-- bound is loose because other work shares this machine)

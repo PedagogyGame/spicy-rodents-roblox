@@ -23,10 +23,12 @@
 --               see something (over the atrium's rail, not at it); found the same lazy way.
 --   route       A* over the links. A team never enters the other team's room or its doors; its own
 --               room it only leaves (a step back into it costs BACK_IN). Each bot has a TASTE, a
---               fixed multiplier per link (stairs more than floors), so that eight bots asked for
---               the same place do not all file up one stair (PB-10: "do not all take one stair").
+--               fixed multiplier per link (stairs more than floors), and a flight its team has set
+--               out along in the last SHARE_SECS costs SHARE_COST more (the caller says which: `busy`),
+--               so that a team's bots asked for the same storey spread over its stairs instead of
+--               filing up one (PB-10: "do not all take one stair").
 -- Interface: build(arena) -> Nav; taste(nav, seed) -> { number }; route(nav, from, alt?, altCost?,
---   to, team, taste) -> { node id }? (nil: no way); nearest(nav, x, y, z, team?) -> node id;
+--   to, team, taste, busy?, now?) -> { node id }? (nil: no way); linkOf(nav, a, b) -> link index (0: none); nearest(nav, x, y, z, team?) -> node id;
 --   roomOf(nav, x, y, z) -> team or 0; atDoor(nav, team, x, y, z, more?) -> boolean; dip(nav, node) -> radians; views(nav, node)
 --   -> { studs } (direction k of VIEWS is yaw (k - 1) * 2 pi / VIEWS); KEEP_OFF, PEEK, DOORSTEP, VIEWS,
 --   VIEW_FAR; types Nav, Peek
@@ -92,6 +94,8 @@ BotNav.VIEW_FAR = 40 -- studs: no view is measured further
 local BACK_IN = 400 -- the cost of a step into one's own spawn room from outside it
 local STAIR_TASTE = 0.9 -- a stair link costs a bot up to this much more than its length, by its taste
 local FLOOR_TASTE = 0.35
+BotNav.SHARE_SECS = 20 -- seconds a flight one of a team's bots has set out along counts as busy ...
+BotNav.SHARE_COST = 30 -- ... and what it costs the team's next route on top: as far again as a short flight
 
 function BotNav.roomOf(nav: Nav, x: number, y: number, z: number): number
 	local rooms = nav.arena.spawnRooms
@@ -366,6 +370,20 @@ function BotNav.nearest(nav: Nav, x: number, y: number, z: number, team: number?
 	return best
 end
 
+-- The link between two neighbouring nodes; 0 when they are not neighbours.
+function BotNav.linkOf(nav: Nav, a: number, b: number): number
+	local list = nav.adjacent[a]
+	if list == nil then
+		return 0
+	end
+	for k = 1, #list, 3 do
+		if list[k] == b then
+			return list[k + 1]
+		end
+	end
+	return 0
+end
+
 -- The cheapest walk from `from` (or from `alt`, which costs `altCost` more to start at: the other
 -- end of the link the bot stands on) to `to`, as node ids starting with the node it sets out from.
 -- (A* with the straight line as its guess, which never overestimates: every link costs at least its
@@ -377,9 +395,14 @@ function BotNav.route(
 	altCost: number?,
 	to: number,
 	team: number,
-	taste: { number }
+	taste: { number },
+	busy: { [number]: number }?,
+	now: number?
 ): { number }?
 	local count = nav.count
+	local stair = nav.stair
+	local busySince = (now or 0) - BotNav.SHARE_SECS
+	local shareCost = BotNav.SHARE_COST
 	if to < 1 or to > count or from < 1 or from > count then
 		return nil
 	end
@@ -465,7 +488,14 @@ function BotNav.route(
 			if nextTeam == other or door[next] == other then
 				continue -- the other team's room and its doors are shut to this bot
 			end
-			local c = base + list[k + 2] * taste[list[k + 1]]
+			local link = list[k + 1]
+			local c = base + list[k + 2] * taste[link]
+			if busy ~= nil and stair[link] then
+				local used = busy[link]
+				if used ~= nil and used > busySince then
+					c += shareCost
+				end
+			end
 			if nextTeam == team and hereTeam ~= team then
 				c += BACK_IN
 			end

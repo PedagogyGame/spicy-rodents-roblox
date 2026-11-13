@@ -103,7 +103,7 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 		end
 		t.truthy(busy >= 2, `between storeys {f} and {f + 1} only {busy} flights were used`)
 	end
-	t.truthy(s.stairBusiest <= 0.85, `one flight had {s.stairBusiest * 100}% of its storey's traffic`)
+	t.truthy(s.stairBusiest <= 0.66, `one flight had {s.stairBusiest * 100}% of its storey's traffic`)
 	-- they face whom they tag
 	t.truthy(s.faced >= s.facedOf * 0.97, `{s.faced} of {s.facedOf} tags from a bot that had been facing its victim`)
 	-- and they miss believably: more at range, and with the first ball at somebody (read where the
@@ -254,7 +254,10 @@ return function(t)
 		t.truthy(hosed <= runs * 0.15, `{hosed} of {runs} bursts ran on past {BotBrain.DEFAULT.burstMax} balls`)
 		-- cover, the crouch, the sprint
 		t.truthy(s.coverShare > 0.1 and s.coverShare < 0.7, `{s.coverShare * 100}% of the time at cover`)
-		t.truthy(s.crouchShare > 0.003, "somebody crouched behind low cover")
+		t.truthy(
+			s.crouchShare > 0.04 and s.crouchShare < 0.3,
+			`crouched {s.crouchShare * 100}% of the time: behind low cover, reloading, shot at`
+		)
 		t.truthy(s.sprintShare > 0.05 and s.sprintShare < 0.6, `{s.sprintShare * 100}% sprinting`)
 		-- at a post they look where there is something to see (what is left is a look at where a noise
 		-- came from or somebody vanished, and the look swinging past a pillar on its way)

@@ -168,6 +168,8 @@ export type Squad = {
 	eyeOnAt: { [number]: number }, -- ... since when
 	people: { [number]: number }, -- by slot: the team of a seat that is on and is not one of these bots (a person)
 	escort: { [number]: number }, -- by bot: the person of its team it is keeping company (see COMPANY)
+	stairAt: { { [number]: number } }, -- by team, by link: when one of its bots last set out along that flight (BotNav.route's busy)
+	now: number, -- the clock of the present step (Bots.step sets it)
 	sightLeft: number, -- sight checks left this tick (the tick's share: Bots.step sets it)
 	routeLeft: number, -- route searches left this tick
 	tick: number,
@@ -234,6 +236,9 @@ export type Brain = {
 	alertZ: number,
 	alarm: number, -- when it last knew it was being shot at
 	whizz: { { at: number, x: number, y: number, z: number, by: number, seq: number } },
+	-- a team-mate tagged where it might have seen it (Bots): where the ball struck, and where it came
+	-- from as far as anybody watching could tell; its next sight check says whether it saw
+	tagSeen: { x: number, y: number, z: number, ox: number, oy: number, oz: number, at: number }?,
 	-- the fight
 	target: number?,
 	stance: "stand" | "push" | "cover",
@@ -337,6 +342,8 @@ local JINK = 2.8 -- studs (inside what the stuck watch, and anybody watching, ca
 -- target, within this of it, for Profile.faced without a break: a sighting old enough is not enough
 -- if the bot has looked away since (it must be SEEN to turn on a player before it can tag them).
 local FACING = math.rad(40)
+local TAG_SEEN_FOR = 0.3 -- seconds: a team-mate's tag not checked for by then is let go
+local DUCK_SECS = 1.4 -- seconds after it was last shot at that a bot standing its ground keeps down (DUCK)
 local SETTLE_NEAR = 0.4 -- of the angle a body's half-width makes: the look is settled within this, close up
 -- PACE: a bot's legs are a person's. From standing it gathers pace to a walk over START_SECS, and a
 -- sprint ramps up from walking pace over Body.SPRINT_RAMP_SECS exactly as a person's client ramps it
@@ -467,6 +474,7 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		alertZ = 0,
 		alarm = -math.huge,
 		whizz = {},
+		tagSeen = nil,
 		target = nil,
 		stance = "stand",
 		fightAt = 0,
@@ -564,6 +572,7 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 	b.stuck = false
 	table.clear(b.con)
 	table.clear(b.whizz)
+	b.tagSeen = nil
 	b.target = nil
 	b.alertAt = nil
 	b.alarm = -math.huge
@@ -773,9 +782,20 @@ local function routeTo(b: Brain, squad: Squad, to: number): boolean
 	end
 	squad.routeLeft -= 1
 	squad.routes += 1
-	local found = BotNav.route(b.nav, from, alt, 0, to, b.team, b.taste)
+	local busy = squad.stairAt[b.team]
+	local now = squad.now
+	local found = BotNav.route(b.nav, from, alt, 0, to, b.team, b.taste, busy, now)
 	if found == nil then
 		return false
+	end
+	-- the flights on its way are its team's for a while: the next route that would take them looks
+	-- at the other stairs first
+	local nav = b.nav
+	for i = 1, #found - 1 do
+		local link = BotNav.linkOf(nav, found[i], found[i + 1])
+		if link ~= 0 and nav.stair[link] then
+			busy[link] = now
+		end
 	end
 	b.path, b.leg = found, 1
 	if b.peekX ~= nil then
@@ -1761,14 +1781,35 @@ function BotBrain.step(
 			end
 		end
 	end
-	if now >= b.nextSight then
+	local tag = b.tagSeen
+	if tag ~= nil and now - tag.at > TAG_SEEN_FOR then
+		b.tagSeen = nil -- (too long ago to take it in now)
+	elseif tag ~= nil and now >= b.nextSight and squad.sightLeft > 0 then
+		-- this sight check is spent on whether it saw a team-mate struck: a clear line to the spot
+		b.tagSeen = nil
+		b.nextSight = now + 1 / p.sightHz
+		squad.sightLeft -= 1
+		squad.sweeps += 1
+		if b.nav.arena.sweep(b.x, b.y + Body.eye(b.crouch), b.z, tag.x, tag.y, tag.z) == nil then
+			BotBrain.alert(b, tag.ox, tag.oy, tag.oz, now)
+		end
+	elseif now >= b.nextSight then
 		see(b, squad, state, poses, now)
 	end
 	if now >= b.nextThink then
 		think(b, squad, state, poses, now, out)
 	end
 	move(b, state, now, dt)
-	b.crouch = Body.crouchStep(b.crouch, b.wantCrouch, dt, state.feel)
+	-- DUCK: standing its ground and going nowhere, it gets down while it reloads and for a moment after
+	-- it is shot at: wholly hidden behind low cover or a rail, and a smaller mark anywhere else
+	local mag = slot.mag
+	local reloading = mag.reloadDoneAt ~= nil and now < (mag.reloadDoneAt :: number)
+	local ducking = (b.mode == "hold" or b.halt)
+		and b.peekX == nil
+		and b.speed == 0
+		and (reloading or now - b.alarm < DUCK_SECS)
+	local down = b.wantCrouch or ducking
+	b.crouch = Body.crouchStep(b.crouch, down, dt, state.feel)
 	-- the look
 	local target = b.target
 	local tpose = if target ~= nil then poses[target] else nil
@@ -1877,7 +1918,7 @@ function BotBrain.step(
 	end
 	-- the pose everybody else is shown
 	local bits = 0
-	if b.wantCrouch then
+	if down then
 		bits += BIT.crouch
 	end
 	if b.sprint then

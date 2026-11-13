@@ -6,8 +6,9 @@
 -- it. A match BREAKS A RULE when it does not finish, a team does not score, a command is refused, a
 -- ball leaves inside the fire interval, a brain's body takes a step a person's would be refused, a
 -- bot aims at somebody quiet on their own doorstep, a bot watches the other team's door, a bot stands
--- still for STILL seconds, a life takes ROOM seconds to leave its spawn room, or a storey goes unused:
--- those are counted, and the script exits 1 if there were any.
+-- still for STILL seconds, a life takes ROOM seconds to leave its spawn room, a storey goes unused, one
+-- flight carries more than STAIR of its storey pair's stair traffic, or a bot holds its fire for HELD
+-- on somebody in plain view close by: those are counted, and the script exits 1 if there were any.
 -- Usage, from the repo root:
 --   lune run tools/games/paintball/bots/soak.luau [seeds a size, default 3] [first seed, default 101]
 --       [ball speed, default 90] [greybox] [audit]
@@ -21,6 +22,8 @@ local Sim = require("./Sim")
 
 local STILL = 20 -- seconds: the longest a bot may stand in one place (the brain's own watch acts at 9)
 local ROOM = 8 -- seconds: the longest a life may take to leave its spawn room
+local STAIR = 0.66 -- the largest share one flight may have of its storey pair's stair traffic (PB-10)
+local HELD = 2 -- seconds: the longest a bot may hold its fire on somebody in plain view close by
 
 local numbers: { number } = {}
 for _, arg in process.args do
@@ -100,6 +103,8 @@ for perSide = Contract.Rules.teamMin, Contract.Rules.teamMax do
 			note("slowest out of a spawn room (s)", s.roomSlowest, where)
 			note("least-used storey's share of the bots' time", least, where, true)
 			note("busiest flight's share of its storey's traffic", s.stairBusiest, where)
+			note("longest held fire on somebody in plain view (s)", s.held, where)
+			note("crouched (share of the bots' time), least", s.crouchShare, where, true)
 			note("look on a wall at a post (share)", s.noseShare, where)
 			note("fewest tags by the losing side", math.min(s.scores[1], s.scores[2]), where, true)
 			note(
@@ -138,6 +143,11 @@ for perSide = Contract.Rules.teamMin, Contract.Rules.teamMax do
 			rule(s.still < STILL, `seat {s.stillSlot} stood still for {string.format("%.1f", s.still)} s`)
 			rule(s.roomSlowest < ROOM, `a life took {string.format("%.1f", s.roomSlowest)} s to leave its spawn room`)
 			rule(least > 0, "a storey was never used")
+			rule(
+				s.stairBusiest <= STAIR,
+				`one flight took {math.floor(s.stairBusiest * 100 + 0.5)}% of its storey's stair traffic`
+			)
+			rule(s.held < HELD, `a bot held its fire {s.held} s on somebody in plain view (seat {s.heldSlot})`)
 			rule(s.sweepsSecond <= s.sweepsCap, `{s.sweepsSecond} sight checks in a second (cap {s.sweepsCap})`)
 		end
 	end
