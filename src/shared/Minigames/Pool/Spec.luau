@@ -1,22 +1,37 @@
 --!strict
 -- ReplicatedStorage.Shared.Minigames.Pool.Spec
--- Pool's line in the minigame registry (Minigames/Games). NOT BUILT YET: `soon` makes the station's prompt
--- say so and turns a player who presses E away with these words.
--- Eight-ball rules already exist and are tested (MinigameRules/Pool8Ball).
--- To build it: give this Spec its rules, flow, session, verbs and words and drop `soon` (the recipe is in the
--- header of Minigames/Games); the station list below already stands where the furniture is.
+-- Pool's line in the minigame registry (Minigames/Games): eight-ball on the two tables in the bowling alley's
+-- games room (Attractions/AlleyLayout.POOL_TABLES). Two seats, or one alone for practice; the rules are
+-- Pool/EightBall (which run the table model on every "shoot"); three computer players of three levels
+-- (Pool/Computer.POOL_PLAYERS: their level rides on the computer's key).
+-- A turn is a minute: a shot at pool is thought about. An idle turn is a foul (the rules' skipTurn).
 -- Pure. Interface: a GameSpec.Spec.
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
 local GameSpec = require("../GameSpec")
+local Computer = require("./Computer")
+local EightBall = require("./EightBall")
+
+local computers: { { [string]: any } } = {}
+for _, p in Computer.POOL_PLAYERS do
+	table.insert(computers, { name = p.name, level = p.level })
+end
 
 local Spec: GameSpec.Spec = {
 	game = "pool",
 	title = "Pool",
-	soon = "Pool is coming in the next build: the table is racked and waiting. Try the lanes, the darts or Madame Acorna!",
+	rules = EightBall,
 	flow = "turns",
-	verbs = {},
-	prompt = { action = "Play (soon)" },
+	session = { lobbySeconds = 10, turnSeconds = 60, doneSeconds = 30 },
+	verbs = { "shoot", "call", "place" },
+	prompt = { action = "Play pool", busy = "try the other table" },
+	words = {
+		start = "Eight-ball: break!",
+		unit = "shot",
+		removed = "You were taken off the pool table: two shots in a row went unplayed",
+		finished = "That game is over and the table is racked again. Press E at a pool table to play.",
+	},
+	computers = computers,
 	stations = function(sites: { [string]: GameSpec.Place }): { GameSpec.StationDef }
 		local out: { GameSpec.StationDef } = {}
 		if sites.bowling_alley == nil then
@@ -32,6 +47,8 @@ local Spec: GameSpec.Spec = {
 				y = 3,
 				d = t.d,
 				index = i,
+				-- (a player walks all the way round the table, and a step back from it)
+				reach = 22,
 			})
 		end
 		return out
