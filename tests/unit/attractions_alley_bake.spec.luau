@@ -89,9 +89,15 @@ return function(t)
 				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint and the annex`)
 			end
 		end
-		-- the budget: the building with the games' furniture (the shop rooms are still empty), and the roof run's
-		-- raised roof, vent, stairs and yard (tools/bake/alley/Roof, RoofVent, RoofStairs, Yard)
-		t.truthy(#boxes > 4500 and #boxes < 7000, `{#boxes} parts`)
+		-- the budget: the building with the games' furniture (the shop rooms are still empty). It was set at 6,200
+		-- over 5,598 parts with the pool tables as stand-ins (48 parts each, 24 for bumper pool); the real tables
+		-- (tools/bake/games/Pool, BumperPool: a cut bed, six round leather pockets with their wells, jawed
+		-- cushions, sights, sixteen numbered and striped balls, a three-shade lamp, a score board and a cue stand:
+		-- 385 parts each, 103 for bumper pool) bring it to 6,351. The roof run's raised roof, vent, stairs and yard
+		-- (tools/bake/alley/Roof 673, RoofVent 101, RoofStairs 113, Yard 255) add 1,142 less the 108 of the flat
+		-- roof, its ceiling and lights they take over from Shell and Lanes: 7,385. The bound keeps the ~600 parts the
+		-- shop rooms were given over that.
+		t.truthy(#boxes > 4500 and #boxes < 8000, `{#boxes} parts`)
 		t.truthy(perTop.HallRoof <= 700, `the raised hall roof is {perTop.HallRoof} parts`)
 		t.truthy(perTop.Yard <= 270, `the yard is {perTop.Yard} parts`)
 		t.truthy(perTop.RoofVent <= 140, `the rooftop vent is {perTop.RoofVent} parts`)

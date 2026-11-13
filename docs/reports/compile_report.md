@@ -1,6 +1,6 @@
 # Compile report: authored data -> `generated/`
 
-Generated 2026-11-13T21:44:24.163614699+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
+Generated 2026-11-13T22:37:08.079328145+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
 
 ## Inputs
 
@@ -103,8 +103,10 @@ Generated 2026-11-13T21:44:24.163614699+00:00 by `tools/compile` (Lune lune 0.11
 | single-chamber hollows | 9 | 9 | match |  |
 | lots whose params were validated against a paramSchema | 73 | 73 | match |  |
 | attraction routes (data/attractions.json) | 33 | 33 | match |  |
-| expansion venues (data/expansion.json) | 46 | 46 | match |  |
+| expansion venues (data/expansion.json) | 47 | 47 | match |  |
 | tree art models (data/art/tree_meshes.json) | 95 | 95 | match |  |
+| shop art meshes (his metadata: mesh_objects) | 355 | 355 | match |  |
+| shop art triangles (his metadata: triangle_count) | 41264 | 41264 | match |  |
 
 ## Lots per district
 
@@ -127,7 +129,7 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 ## Validation and invariants
 
 - Schema validation: 24 file(s), 0 error(s).
-- Invariants checked: 8669, failed: 0.
+- Invariants checked: 8762, failed: 0.
 - warning: 8 lane(s) reference no road id (yard glides, verges, templated routes): kept with roadNote only
 - warning: duplicate cast names (ids disambiguated with their source line): Avery, Sam
 
@@ -135,31 +137,32 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 
 | module | records | bytes | require (ms, Lune) | source |
 |---|---|---|---|---|
-| Lots | 243 | 190158 | 14.6 | data/authored/town/lots/*.json |
-| Roads | 116 | 41940 | 1.9 | data/authored/town/roads.json |
-| Lanes | 25 | 18253 | 1.3 | data/authored/town/lanes.json |
-| Cast | 87 | 71807 | 1.8 | data/authored/cast/cast.json |
-| RoutesCatalog | 60 | 41830 | 12.7 | data/authored/routes/catalog.json |
-| Wildlife | 95 | 61201 | 4.0 | data/authored/wildlife/*.json |
-| Routes_01 | 391 | 204760 | 24.7 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_02 | 447 | 204694 | 15.1 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_03 | 413 | 205046 | 10.2 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_04 | 81 | 36112 | 2.2 | data/harvest/routes.json (chunk 4 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Forks | 95 | 193316 | 10.4 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| LotTypes | 0 | 23026 | 1.6 | data/authored/lot_types.json |
-| Interiors | 0 | 11610 | 1.2 | data/interiors/*.json |
+| Lots | 243 | 190158 | 5.4 | data/authored/town/lots/*.json |
+| Roads | 116 | 41940 | 1.4 | data/authored/town/roads.json |
+| Lanes | 25 | 18253 | 1.1 | data/authored/town/lanes.json |
+| Cast | 87 | 71807 | 1.6 | data/authored/cast/cast.json |
+| RoutesCatalog | 60 | 41830 | 1.2 | data/authored/routes/catalog.json |
+| Wildlife | 95 | 61201 | 3.4 | data/authored/wildlife/*.json |
+| Routes_01 | 391 | 204760 | 9.1 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_02 | 447 | 204694 | 7.8 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_03 | 413 | 205046 | 7.5 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_04 | 81 | 36112 | 1.5 | data/harvest/routes.json (chunk 4 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Forks | 95 | 193316 | 7.9 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| LotTypes | 0 | 23026 | 1.5 | data/authored/lot_types.json |
+| Interiors | 0 | 11610 | 1.0 | data/interiors/*.json |
 | Buildings | 0 | 6132 | 0.7 | data/buildings/*.json |
 | HarvestPatches | 0 | 12240 | 0.5 | data/harvest_patches.json |
-| Population | 0 | 3184 | 0.5 | data/population.json |
-| Hollows | 0 | 6284 | 0.7 | data/hollows.json |
+| Population | 0 | 3184 | 0.4 | data/population.json |
+| Hollows | 0 | 6284 | 0.6 | data/hollows.json |
 | TerrainExtensions | 0 | 2379 | 0.4 | data/terrain_extensions.json |
 | Lighting | 0 | 1163 | 0.4 | data/authored/town/lighting.json |
-| Attractions | 33 | 59820 | 2.9 | data/attractions.json |
-| Expansion | 46 | 138283 | 8.6 | data/expansion.json |
+| Attractions | 33 | 59820 | 2.6 | data/attractions.json |
+| Expansion | 47 | 140939 | 8.4 | data/expansion.json |
 | TreeArt | 95 | 176791 | 7.5 | data/art/tree_meshes.json |
-| Index | 1 | 1714 | 0.5 | tools/compile (module list, counts and the harvest pin) |
+| ShopArt | 445 | 68298 | 4.0 | data/art/neighbourhood_shop.json |
+| Index | 1 | 1774 | 0.4 | tools/compile (module list, counts and the harvest pin) |
 
-Total 23 files, 1711743 bytes; largest Routes_03 (205046 bytes, 10.2 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
+Total 24 files, 1782757 bytes; largest Routes_03 (205046 bytes, 7.5 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
 
 ## Notes for the lead
 

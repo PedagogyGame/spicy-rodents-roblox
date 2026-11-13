@@ -701,6 +701,16 @@ def _attractions_module():
     return attractions_render
 
 
+def _art_module():
+    """tools/review/art_render.py (uploaded art: the FBX files a scene lists under "art"), when present."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import art_render
+    except ImportError:
+        return None
+    return art_render
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--scene", default="build/review/scene.json")
@@ -740,6 +750,9 @@ def main(argv):
     attractions = _attractions_module()
     if attractions:
         attractions.build(scene_data, globals())
+    art = _art_module() if scene_data.get("art") else None
+    if art:
+        art.build(scene_data, globals())
     defaults = vcfg.get("defaults", {})
     res = tuple(int(x) for x in (args.res or defaults.get("res", "960x540")).split("x"))
     cam = setup_render(res, defaults.get("samples", 24), args.threads)
