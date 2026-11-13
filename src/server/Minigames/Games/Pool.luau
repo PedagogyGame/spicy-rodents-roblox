@@ -45,6 +45,7 @@ local game: CueTable.Game = {
 		return Words.eightBall(view, names, took)
 	end,
 	endWords = Words.eightBallEnd,
+	board = nil, -- (set per table below: the board names its table)
 	-- a scripted layout: the balls that are up are the ones on the cloth
 	fix = function(state: any)
 		local up: { [number]: boolean } = {}
@@ -67,7 +68,12 @@ local game: CueTable.Game = {
 local entry: ServerGame.ServerGame = {
 	game = "pool",
 	new = function(ctx: ServerGame.Ctx): ServerGame.Table
-		return CueTable.new(ctx, game)
+		local mine = table.clone(game)
+		local title = `TABLE {ctx.station.index or 1}`
+		mine.board = function(view: { [string]: any }?, names: { string }, wins: { [string]: number }): string
+			return Words.eightBallBoard(title, view, names, wins)
+		end
+		return CueTable.new(ctx, mine)
 	end,
 }
 

@@ -10,12 +10,13 @@
 --   the tray under the foot rail where potted balls collect, each in its own place (Furniture.home);
 --   the sixteen balls as Models (CueParts.ball: numbered, solid and striped, the cue ball dotted), racked as an
 --     idle table lies (Tables.rack) with the cue ball on the head spot;
---   a lamp of three green shades over the table (Model "Lamp") and a stand of cues beside it.
+--   a lamp of three green shades over the table (Model "Lamp"), a stand of cues beside it, and a chalkboard
+--     on a post by the head of the table (Model "ScoreBoard": the server writes the game and the sitting on it).
 -- The table stands where the station is (the Spec's StationDef: Attractions/AlleyLayout.POOL_TABLES) and
 -- nothing here knows where that is.
 -- Interface: { build(kit, parent, station, venue) }: kit = tools/bake/alley/Kit in the site's frame, parent =
 --   the GamesRoom model, station = the Spec's StationDef. Names the game finds: GamesRoom.Pool<index> with
---   CueBall, Ball1..Ball15 (Models) and Lamp.
+--   CueBall, Ball1..Ball15 (Models), Lamp and ScoreBoard.
 
 local Furniture = require("../../../src/shared/Minigames/Pool/Furniture")
 local Tables = require("../../../src/shared/Minigames/Pool/Tables")
@@ -218,6 +219,9 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 	end
 
 	CueParts.lamp(t, m, L, 3)
+
+	-- the scoreboard by the head of the table (the server writes the game on it)
+	CueParts.board(t, m, ow + 1.4, -(ol + 0.7), `TABLE {station.index or 1}\nEight-ball: walk up and press E`)
 
 	-- a stand of cues by the head of the table (uncollidable: nobody trips on it walking round)
 	local sx, sz = -(ow + 1.3), -(ol + 1.1)

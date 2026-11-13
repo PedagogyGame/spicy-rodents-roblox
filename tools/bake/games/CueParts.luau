@@ -18,7 +18,8 @@
 --   x1, z1, x2, z2, y0, y1, thick, side, color, material, opts?) (a wall along a line; side +1 puts its
 --   thickness on the left of the direction, -1 on the right, 0 centres it), T:rod(parent, name, x0, y0, z0,
 --   x1, y1, z1, diameter, color, material), T.kit, T.station; ball(T, parent, tableId, id, x, z) -> Model;
---   lamp(T, parent, halfL, shades) -> Model ("Lamp": the clients hide it for the top view)
+--   lamp(T, parent, halfL, shades) -> Model ("Lamp": the clients hide it for the top view); board(T, parent,
+--   x, z, text) -> Model ("ScoreBoard": a chalkboard on a post, its TextLabels "Score" written by the server)
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
 local Furniture = require("../../../src/shared/Minigames/Pool/Furniture")
@@ -303,6 +304,33 @@ function CueParts.lamp(t: any, parent: any, halfL: number, shades: number): any
 	end
 	local glow = t:box(m, "LampLight", -0.1, 0.1, y - 0.08, y - 0.03, -0.1, 0.1, GLOW, "Neon", LOOSE)
 	t.kit:light(glow, "PointLight", { Range = 14, Brightness = 0.7, Color = { 255, 236, 200 }, Shadows = false })
+	return m
+end
+
+local BOARD = { 34, 52, 40 }
+local CHALK_WHITE = { 236, 236, 226 }
+
+-- A little chalkboard on a post standing on the floor at (x, z) of the table's frame, its face across the
+-- table's long axis (a label on each face, so it reads from either side): the server writes the score on it.
+function CueParts.board(t: any, parent: any, x: number, z: number, text: string): any
+	local m = t.kit:model(parent, "ScoreBoard")
+	local floor = -Furniture.BED_Y
+	local y0, y1 = floor + 3.3, floor + 4.5
+	t:cyl(m, "BoardPost", x, (floor + y0) / 2, z, y0 - floor, 0.1, "Y", { 66, 40, 26 }, "Wood", LOOSE)
+	t:cyl(m, "BoardFoot", x, floor + 0.05, z, 0.1, 0.6, "Y", { 66, 40, 26 }, "Wood", LOOSE)
+	t:box(m, "BoardFrame", x - 0.98, x + 0.98, y0 - 0.06, y1 + 0.06, z - 0.05, z + 0.05, { 108, 68, 40 }, "Wood", LOOSE)
+	local slate = t:box(m, "Board", x - 0.9, x + 0.9, y0, y1, z - 0.06, z + 0.06, BOARD, "Slate", LOOSE)
+	for _, face in { "Front", "Back" } do
+		local gui = t.kit:gui(slate, face, 80)
+		t.kit:label(gui, {
+			Name = "Score",
+			Text = text,
+			TextColor = CHALK_WHITE,
+			Font = "GothamMedium",
+			Size = { 0.92, 0.9 },
+			Pos = { 0.04, 0.05 },
+		})
+	end
 	return m
 end
 

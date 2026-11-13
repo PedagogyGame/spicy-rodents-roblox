@@ -14,7 +14,8 @@
 --   c, power) (the bar pulled and let go: the strike); shoot(w, c, angle, power, tipX?, tipY?); carry(w, c, x,
 --   z) (the ball in hand dragged there and set down); click(w, c, x, z) (a click on the table at that point);
 --   play(w, c, inputs) (a list of { verb, args } as Pool/Computer gives them, played by hand); settle(w, id,
---   limit?) -> bool (run until no shot is in flight at that table and the client has caught up)
+--   limit?) -> bool (run until no shot is in flight at that table and the client has caught up); board(w, id) ->
+--   the scoreboard's words
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local Furniture = require("@shared/Minigames/Pool/Furniture")
 local Games = require("@shared/Minigames/Games")
@@ -65,6 +66,13 @@ function PoolRig.furnish(roots: { [string]: any }, places: { [string]: AlleyLayo
 		end
 		local lamp = FakeEngine.model("Lamp", at(0, Furniture.LAMP_Y, 0), model)
 		FakeEngine.part("Shade", at(0, Furniture.LAMP_Y, 0), lamp)
+		-- the scoreboard: a chalkboard with a label the server writes on
+		local board = FakeEngine.model("ScoreBoard", at(0, 1, 0), model)
+		local slate = FakeEngine.part("Board", at(0, 1, 0), board)
+		local gui = FakeEngine.new("SurfaceGui", "Front")
+		gui.Parent = slate
+		local label = FakeEngine.new("TextLabel", "Score")
+		label.Parent = gui
 	end
 end
 
@@ -101,6 +109,16 @@ function PoolRig.state(w: any, stationId: string): any
 end
 
 -- A ball's Model as this screen has it, in the table's frame: x, z, and its centre's height above the cloth.
+-- What the scoreboard beside the table says.
+function PoolRig.board(w: any, stationId: string): string
+	local def = PoolRig.def(w, stationId)
+	local room = w.roots.bowling_alley:FindFirstChild("GamesRoom")
+	local model = room:FindFirstChild(Furniture.modelName(def.game, def.index))
+	local board = model:FindFirstChild("ScoreBoard")
+	local slate = board:FindFirstChild("Board")
+	return slate:FindFirstChild("Front"):FindFirstChild("Score").Text
+end
+
 function PoolRig.ball(w: any, stationId: string, ball: number): (number, number, number)
 	local def = PoolRig.def(w, stationId)
 	local at = Playback.ballAt(def, ball)

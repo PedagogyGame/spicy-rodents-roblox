@@ -15,7 +15,8 @@
 -- Interface: new(opts { model, place, station, table }) -> Hardware?; Hardware:layout(spots, away?) (away:
 --   ball ids kept out of sight, not in the tray); Hardware:show(script, t) (a shot in flight at time t);
 --   Hardware:landed(script) (turn every ball's number on to the end of the shot); Hardware:fresh() (every ball
---   faces the way it was baked); Hardware:position(id) -> Vector3?; Hardware.ids; SHOW
+--   faces the way it was baked); Hardware:board(text) (the scoreboard beside the table, "ScoreBoard": its
+--   TextLabels); Hardware:position(id) -> Vector3?; Hardware.ids; SHOW
 
 local Import = require("../../Import")
 local AlleyLayout =
@@ -59,6 +60,16 @@ function Hardware.new(opts: { [string]: any }): any
 	self.balls = balls
 	self.rots = rots
 	self.yaw = CFrame.Angles(0, AlleyLayout.yawOf(opts.place), 0)
+	-- the little scoreboard beside the table: every TextLabel under "ScoreBoard" (one on each face)
+	self.labels = {} :: { TextLabel }
+	local board = model:FindFirstChild("ScoreBoard")
+	if board then
+		for _, d in board:GetDescendants() do
+			if d:IsA("TextLabel") then
+				table.insert(self.labels, d)
+			end
+		end
+	end
 	self.shownAt = -1 -- the last coarse step shown of the shot in flight
 	return self
 end
@@ -126,6 +137,13 @@ end
 function Hardware.fresh(self: any)
 	for _, id in self.ids do
 		self.rots[id] = Roll.identity()
+	end
+end
+
+-- The scoreboard's words (every face of it).
+function Hardware.board(self: any, text: string)
+	for _, label in self.labels do
+		label.Text = text
 	end
 end
 

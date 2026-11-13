@@ -12,12 +12,13 @@
 --     (Furniture.home: the marked ball first);
 --   the ten balls as Models (CueParts.ball: five red, five white, the marked one of each spotted with the
 --     other colour) on their starting spots (Tables.bumperStart);
---   a lamp of one shade over the table (Model "Lamp") and a stand with two short cues beside it.
+--   a lamp of one shade over the table (Model "Lamp"), a stand with two short cues beside it, and a
+--     chalkboard on a post (Model "ScoreBoard": the server writes each side's balls down and the sitting).
 -- The table stands where the station is (the Spec's StationDef: Attractions/AlleyLayout.BUMPER_POOL) and
 -- nothing here knows where that is.
 -- Interface: { build(kit, parent, station, venue) }: kit = tools/bake/alley/Kit in the site's frame, parent =
 --   the GamesRoom model, station = the Spec's StationDef. Names the game finds: GamesRoom.BumperPool with
---   Ball1..Ball10 (Models) and Lamp.
+--   Ball1..Ball10 (Models), Lamp and ScoreBoard.
 
 local Furniture = require("../../../src/shared/Minigames/Pool/Furniture")
 local Tables = require("../../../src/shared/Minigames/Pool/Tables")
@@ -157,6 +158,7 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 	end
 
 	CueParts.lamp(t, m, L, 1)
+	CueParts.board(t, m, -(ow + 1.2), -(ol - 0.4), "BUMPER POOL\nWalk up and press E")
 
 	-- two short cues on a stand beside the table, and chalk on the rail (none of it in anybody's way)
 	local sx, sz = ow + 1.1, -(ol - 0.4)

@@ -28,7 +28,8 @@
 --   table (Tables.Table), idle(seed) -> spots (how the table lies when nobody plays), away(state) -> { [id]:
 --   true }? (balls kept out of sight), think(state, seat, level, seed, breathe) -> { Input }, snapshot(state)
 --   -> any, words(view, names, snapshot) -> string?, endWords(view, names) -> string, fix(state) (after a
---   scripted layout), opener(state, seat) (the winner of the last game starts this one) }.
+--   scripted layout), opener(state, seat) (the winner of the last game starts this one), board(game view?,
+--   names, wins) -> string (the scoreboard beside the table; wins: games won by name this sitting) }.
 --   Table:debug("layout", spots, fields?) sets the table for a check; Table:debug("shoot", args) plays the
 --   turn's shot through the same path. TAIL, LEAD_PERSON, LEAD_COMPUTER, BETWEEN, ANIMAL_R
 
@@ -74,6 +75,7 @@ export type Game = {
 	snapshot: (state: any) -> any,
 	words: (view: { [string]: any }, names: { string }, snapshot: any) -> string?,
 	endWords: (view: { [string]: any }, names: { string }) -> string,
+	board: ((view: { [string]: any }?, names: { string }, wins: { [string]: number }) -> string)?,
 	fix: ((state: any) -> ())?,
 	opener: ((state: any, seat: number) -> ())?,
 }
@@ -103,6 +105,7 @@ function CueTable.new(ctx: ServerGame.Ctx, game: Game): ServerGame.Table
 	self.winner = nil :: any -- who won the last game here (they start the next)
 	self.knocked = {} :: { [any]: boolean } -- animals already knocked off by the shot in flight
 	self.laid = nil :: { spots: { any }, away: { [number]: boolean }? }? -- the balls as last laid out
+	self.wins = {} :: { [string]: number } -- games won at this table, by name, since it was last empty
 	local root = ctx.root
 	local room = root and root:FindFirstChild("GamesRoom")
 	local model = room and room:FindFirstChild(Furniture.modelName(game.game, ctx.station.index))
@@ -424,6 +427,8 @@ function CueTable.event(self: any, e: ServerGame.Event)
 		self:_sync()
 		self:_rack(nil, true)
 	elseif kind == "reset" then
+		-- (the table is empty: a new sitting begins)
+		self.wins = {}
 		local cut = self.pending ~= nil
 		self.pending = nil
 		self.thinking = nil
@@ -455,6 +460,31 @@ function CueTable.event(self: any, e: ServerGame.Event)
 		local r = ctx.session.result
 		local w = r and r.winner
 		self.winner = if w then ctx.session.seats[w] else nil
+		local name = if w then ctx.session.names[w] else nil
+		if name then
+			self.wins[name] = (self.wins[name] or 0) + 1
+		end
+	end
+end
+
+-- The scoreboard beside the table (when it is built): the game's own words for it, and the games won here this
+-- sitting.
+function CueTable.sig(self: any, view: { [string]: any }): any
+	local board = self.game.board
+	if board == nil or self.hw == nil then
+		return ""
+	end
+	local names: { string } = {}
+	for i, seat in view.seats or {} do
+		names[i] = seat.name
+	end
+	return board(if view.phase == "playing" or view.phase == "done" then view.game else nil, names, self.wins)
+end
+
+function CueTable.screen(self: any, view: { [string]: any })
+	local hw = self.hw
+	if hw then
+		hw:board(self:sig(view))
 	end
 end
 

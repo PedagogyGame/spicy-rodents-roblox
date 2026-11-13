@@ -214,6 +214,10 @@ return function(t)
 			t.truthy(sawFoulWords or state.fouls[1] + state.fouls[2] == 0, "a foul was never put in words")
 			-- nothing was dropped by the Net, nothing warned (the rig fails the case otherwise); few messages went up
 			t.truthy(#w.sent < mine * 4 + 20, `{#w.sent} messages for {mine} shots`)
+			-- the scoreboard by the table: the game as it ended, and the game won this sitting
+			local board = PoolRig.board(w, ID)
+			t.truthy(string.find(board, "TABLE 1", 1, true), board)
+			t.truthy(string.find(board, `Games won: {session.names[state.winner]} 1`, 1, true), board)
 			-- play again: the winner breaks
 			local winner = state.winner
 			Rig.click(w, "Play again")

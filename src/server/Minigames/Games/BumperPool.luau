@@ -48,6 +48,7 @@ local game: CueTable.Game = {
 		return Words.bumper(view, names)
 	end,
 	endWords = Words.bumperEnd,
+	board = Words.bumperBoard,
 }
 
 local entry: ServerGame.ServerGame = {

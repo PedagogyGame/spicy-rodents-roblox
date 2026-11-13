@@ -10,7 +10,8 @@
 --   names, took?) -> string? (the last shot; took: the group the shooter has just been given); eightBallEnd(
 --   game view, names) -> string (how the game ended); group(game view, seat) -> "solids" | "stripes" | "open
 --   table"; bumper(game view, names) -> string?; bumperEnd(game view, names) -> string; refusal(why) -> words
---   for a rules' refusal
+--   for a rules' refusal; eightBallBoard(title, game view?, names, wins) / bumperBoard(game view?, names,
+--   wins) -> the scoreboard beside the table (wins: games won by name this sitting)
 
 local BumperPool = require("./BumperPool")
 local EightBall = require("./EightBall")
@@ -168,6 +169,70 @@ function Words.bumperEnd(g: { [string]: any }, names: { string }): string
 	end
 	local loser = nameOf(names, if g.winner == 1 then 2 else 1)
 	return `{winner} wins: {loser} {how}.`
+end
+
+-- The games won at a table this sitting, for its scoreboard: "Ann 2  -  Bob 1" (most first), or "".
+local function sitting(wins: { [string]: number }): string
+	local list: { { name: string, n: number } } = {}
+	for name, n in wins do
+		table.insert(list, { name = name, n = n })
+	end
+	table.sort(list, function(a, b)
+		if a.n ~= b.n then
+			return a.n > b.n
+		end
+		return a.name < b.name
+	end)
+	local parts: { string } = {}
+	for _, w in list do
+		table.insert(parts, `{w.name} {w.n}`)
+	end
+	return if #parts > 0 then "Games won: " .. table.concat(parts, "  -  ") else ""
+end
+
+-- The scoreboard beside an eight-ball table: who is on which group and how many are left, and the sitting.
+function Words.eightBallBoard(
+	title: string,
+	g: { [string]: any }?,
+	names: { string },
+	wins: { [string]: number }
+): string
+	local lines: { string } = { title }
+	if g == nil then
+		table.insert(lines, "Eight-ball: walk up and press E")
+	else
+		for s, name in names do
+			local group = Words.group(g, s)
+			local left = (g.left and g.left[s]) or 7
+			local on = if group == "open table" then "open table" else `{group}, {left} left`
+			local turn = if g.turn == s then "  <" else ""
+			table.insert(lines, `{name}: {on}{turn}`)
+		end
+	end
+	local won = sitting(wins)
+	if won ~= "" then
+		table.insert(lines, won)
+	end
+	return table.concat(lines, "\n")
+end
+
+-- The scoreboard beside the bumper pool table: each side's balls down of five, and the sitting.
+function Words.bumperBoard(g: { [string]: any }?, names: { string }, wins: { [string]: number }): string
+	local lines: { string } = { "BUMPER POOL" }
+	if g == nil then
+		table.insert(lines, "Walk up and press E")
+	else
+		local colours = { "red", "white" }
+		for s, name in names do
+			local turn = if g.turn == s then "  <" else ""
+			table.insert(lines, `{name} ({colours[s] or ""}): {(g.sunk and g.sunk[s]) or 0} of 5{turn}`)
+		end
+	end
+	local won = sitting(wins)
+	if won ~= "" then
+		table.insert(lines, won)
+	end
+	return table.concat(lines, "\n")
 end
 
 local REFUSALS: { [string]: string } = {
