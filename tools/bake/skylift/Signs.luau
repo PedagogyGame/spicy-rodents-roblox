@@ -88,22 +88,22 @@ local function fingerpost(kit0: Kit.Kit, parent: any, s: Spot)
 	local m = kit0:model(parent, s.name)
 	m.ModelStreamingMode = roblox.Enum.ModelStreamingMode.Atomic
 	kit0:cyl(m, "Base", x, g + 0.15, -z, 0.5, 0.9, "Y", POST, "Metal")
-	kit0:cyl(m, "Post", x, g + 4.4, -z, 9.6, 0.36, "Y", POST, "Metal")
-	kit0:ball(m, "Finial", x, g + 9.3, -z, 0.55, Common.RED, "Metal", { collide = false, query = false })
+	kit0:cyl(m, "Post", x, g + 4.9, -z, 10.6, 0.4, "Y", POST, "Metal")
+	kit0:ball(m, "Finial", x, g + 10.3, -z, 0.6, Common.RED, "Metal", { collide = false, query = false })
 	for i, a in s.arms :: { { any } } do
 		local text, dx, dz = a[1] :: string, a[2] :: number, a[3] :: number
-		local len = if #text > 9 then 4.6 else 3.8
+		local len = if #text > 9 then 5.4 else 4.4
 		local yaw = math.atan2(-dz, dx)
-		local y = g + 8.3 - (i - 1) * 1.15
+		local y = g + 9.2 - (i - 1) * 1.4
 		local bx, bz = x + dx * (0.25 + len / 2), z + dz * (0.25 + len / 2)
-		local board = kit0:at(m, "Arm", bx, y, -bz, len, 0.9, 0.16, BOARD, "SmoothPlastic", {
+		local board = kit0:at(m, "Arm", bx, y, -bz, len, 1.15, 0.16, BOARD, "SmoothPlastic", {
 			collide = false,
 			query = false,
 			rot = CFrame.Angles(0, yaw, 0),
 		})
 		-- the pointed end: a square turned 45 degrees on the arm's tip
 		local tx, tz = x + dx * (0.25 + len), z + dz * (0.25 + len)
-		kit0:at(m, "ArmTip", tx, y, -tz, 0.64, 0.64, 0.16, BOARD, "SmoothPlastic", {
+		kit0:at(m, "ArmTip", tx, y, -tz, 0.81, 0.81, 0.16, BOARD, "SmoothPlastic", {
 			collide = false,
 			query = false,
 			rot = CFrame.Angles(0, yaw, 0) * CFrame.Angles(0, 0, math.pi / 4),
