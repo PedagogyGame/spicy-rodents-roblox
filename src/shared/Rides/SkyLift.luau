@@ -74,6 +74,17 @@
 --     ever occupy (grown by margin); bakes keep every part's corners and centre clear
 --   rideTime(station) -> seconds from boarding at `station` to alighting at the other one
 --   clock(serverNow, epoch) -> t
+--   build(ride, baseVenue, summitVenue) -> Model and use(Model?): specs only (edited data); nil restores the
+--     compiled data. The model is built on the first call, from Data.default():module("Expansion").
+--
+-- Numbers on the compiled data (rides_skylift.spec): loop 1,802 st; lap 153.6 s; a cabin every 25.6 s; doors open
+-- 17.5 s per station; a ride 65 s either way; tower heads 26 st over the ground (32 at the first and last);
+-- cabin undersides at least 8.7 st over the ground outside 30 st of the stations, 3.1 st inside that apron.
+-- Up close (venue-local, measured with sweptClear): in the Lookout's lift hall the cabins sweep X -44..-26.5,
+-- D -25..20.5 (platforms: X -50..-44 to board going down, X -26.5..-20 to alight); they leave the hall's front
+-- through X -44..-27.3 and cross the terrace strip (D -47..-25) at deck height at X below -27.5, so the terrace
+-- stays at X -24 and up. In the base station they sweep X -20.5..25, D -6.5..10.5 (board from the front platform,
+-- D -15..-6.5; alight on the back one, D 10.5..15) and leave through its +X face.
 --
 -- Lane notes: the bakes (lanes 2, 3, 7) never put anything inside sweptClear; the server (lane 4) seats at
 -- nextDeparture's boardAt and alights at arriveAt; the client (lane 5) calls cabin() each frame for six local
