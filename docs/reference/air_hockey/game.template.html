@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AER / 01 — Precision Air Hockey</title>
+<style>
+:root{color-scheme:dark;--ice:#65e3f5;--ember:#ff7a60;--muted:#879da9}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071017;color:#e9f5fa;font-family:Arial,Helvetica,sans-serif}canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;outline:none}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid var(--ice);outline-offset:5px}.hud{position:fixed;inset:0;pointer-events:none;background:linear-gradient(#061018b0,transparent 24%,transparent 78%,#061018e0)}.brand{position:absolute;top:35px;left:40px}.wordmark{font-size:23px;letter-spacing:8px;font-weight:700}.sub{margin-top:9px;font-size:9px;letter-spacing:2.5px;color:var(--muted)}.scoreboard{position:absolute;top:28px;left:50%;transform:translateX(-50%);display:flex;gap:28px;align-items:center;background:#0a1720c0;border:1px solid #ffffff16;border-radius:18px;padding:16px 28px;backdrop-filter:blur(18px)}.team{text-align:center;min-width:66px}.team b{font-size:40px;font-weight:400;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-2px}.team small{display:block;font-size:8px;letter-spacing:2px;margin-top:8px}.cyan{color:var(--ice)}.coral{color:var(--ember)}.divider{font-size:9px;color:#8199a7;letter-spacing:1.6px;text-align:center;line-height:1.8}.utility{position:absolute;right:32px;top:36px;display:flex;gap:9px;pointer-events:auto}.utility button{border:1px solid #ffffff24;background:#0d1c26a0;border-radius:50%;width:40px;height:40px;color:#bed2dc;font-size:17px}.foot{position:absolute;bottom:24px;left:40px;right:40px;display:flex;justify-content:space-between;align-items:center;gap:20px}.controls{font-size:10px;letter-spacing:.3px;color:#829aa8;line-height:2}kbd{font-family:inherit;font-size:9px;border:1px solid #ffffff30;border-radius:4px;padding:3px 5px;margin-right:4px;color:#d5e5ed}.foot-note{font-size:9px;letter-spacing:1.6px;color:#708998;white-space:nowrap}.intro{position:fixed;inset:0;background:linear-gradient(90deg,#061018e8 0%,#061018bb 28%,#06101808 75%);display:flex;align-items:center;padding:9vw;pointer-events:none}.intro-content{max-width:440px;pointer-events:auto}.eyebrow{color:var(--ice);font-size:10px;letter-spacing:3px;text-transform:uppercase;display:flex;align-items:center;gap:12px}.eyebrow:before{content:'';height:1px;width:30px;background:var(--ice)}h1{font-size:clamp(54px,7vw,112px);line-height:.92;letter-spacing:-5px;margin:26px 0 24px;font-weight:600}h1 span{color:var(--ice)}.intro p{font-size:14px;line-height:1.8;color:#a3bbc8;max-width:300px;margin-bottom:30px}.play{border:0;border-radius:9px;padding:17px 27px;background:var(--ice);color:#05212c;font-weight:700;font-size:12px;letter-spacing:1px;box-shadow:0 4px 50px #12a7ce24}.play span{margin-left:30px;font-size:18px}.difficulty{display:block;background:none;border:0;padding:17px 0;color:#859fac;font-size:10px;letter-spacing:1px}.difficulty strong{color:#d6e9f2;margin-left:8px;font-weight:400}.message{position:absolute;top:24%;left:50%;transform:translateX(-50%);text-align:center;font-size:24px;letter-spacing:4px;text-shadow:0 3px 25px #000;white-space:nowrap}.message small{display:block;margin-top:12px;font-size:10px;letter-spacing:2px;color:#c0d3de}.status{position:absolute;bottom:85px;left:50%;transform:translateX(-50%);color:#b4cbd8;font-size:11px;letter-spacing:1px;text-shadow:0 2px 12px #000}.hidden{display:none!important}.pulse{animation:pop .5s ease-out}@keyframes pop{0%{transform:scale(1.3);filter:brightness(2)}100%{transform:scale(1)}}.error{position:fixed;inset:20%;padding:40px;background:#0d1c26;border-radius:20px;color:#e8f6fb;z-index:20}.mobile{display:none}.live .intro{display:none}
+@media(max-width:700px){.brand{left:20px;top:24px}.wordmark{font-size:16px;letter-spacing:5px}.sub{font-size:7px;letter-spacing:1px}.scoreboard{top:85px;padding:10px 20px;gap:20px}.team b{font-size:29px}.team small{font-size:7px}.utility{right:17px;top:20px}.utility button{width:32px;height:32px}.intro{padding:8vw;background:linear-gradient(90deg,#061018e8,#06101844)}h1{letter-spacing:-3px}.intro-content{margin-top:35px}.foot{left:20px;right:20px;bottom:15px}.controls{font-size:8px}.foot-note{display:none}.message{top:30%;font-size:19px}.mobile{display:inline}.desktop{display:none}.status{bottom:90px;width:100%;text-align:center;font-size:10px}}
+</style></head><body>
+<canvas id="view" aria-label="Interactive three-dimensional air hockey table" tabindex="0"></canvas>
+<div class="hud"><div class="brand"><div class="wordmark">AER / 01</div><div class="sub">PRECISION AIR SYSTEM</div></div>
+<div class="scoreboard" aria-label="Score"><div class="team cyan" id="cyanTeam"><b id="score0">00</b><small id="team0">GLACIER · YOU</small></div><div class="divider">FIRST<br>TO 7</div><div class="team coral" id="coralTeam"><b id="score1">00</b><small id="team1">EMBER · AI</small></div></div>
+<div class="utility"><button id="sound" title="Toggle sound (M)" aria-label="Toggle sound">♪</button><button id="pause" title="Pause / resume (P)" aria-label="Pause or resume">Ⅱ</button><button id="camera" title="Change camera (V)" aria-label="Change camera">◈</button></div>
+<div class="message hidden" id="message" role="status"></div><div class="status hidden" id="status">Move your mouse. Your mallet follows.</div>
+<div class="foot"><div class="controls desktop"><kbd>MOUSE</kbd> move &nbsp; <kbd>SPACE</kbd> serve &nbsp; <kbd>TAB</kbd> switch end &nbsp; <kbd>V</kbd> camera &nbsp; <kbd>P</kbd> pause &nbsp; <kbd>R</kbd> new match</div><div class="controls mobile">TOUCH & DRAG to move your mallet · tap the table to serve</div><div class="foot-note">240 Hz PHYSICS &nbsp; / &nbsp; DESIGNED TO FLOW</div></div></div>
+<div class="intro" id="intro"><div class="intro-content"><div class="eyebrow">The arcade, refined.</div><h1>PLAY<br>THE <span>AIR.</span></h1><p>A little friction. A lot of feeling.<br>Take your place at the table and find your next perfect shot.</p><button class="play" id="play">TAKE YOUR POSITION <span>↗</span></button><button class="difficulty" id="difficulty">OPPONENT <strong>CLUB / MEDIUM ↻</strong></button></div></div>
+<script id="arena-data" type="application/json">__ARENA_DATA__</script>
+<script>
+'use strict';
+__PHYSICS__
+const $=id=>document.getElementById(id),canvas=$('view');
+const gl=canvas.getContext('webgl2',{antialias:true,alpha:false,powerPreference:'high-performance'});
+if(!gl){document.body.innerHTML='<div class="error">This game needs a browser with WebGL 2. Open it in a current version of Chrome, Edge, Firefox, or Safari.</div>';throw Error('WebGL2 required')}
+const DATA=JSON.parse($('arena-data').textContent),game=new HockeyGame();
+let started=false,human=0,overview=false,muted=false,audio=null,acc=0,last=0,hit=0,goal=0,noticeUntil=0,startTime=0;
+const vsub=(a,b)=>a.map((x,i)=>x-b[i]),vadd=(a,b)=>a.map((x,i)=>x+b[i]),vscale=(a,s)=>a.map(x=>x*s),vdot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0),norm=a=>vscale(a,1/Math.hypot(...a)),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+function matrixMul(a,b){let r=new Float32Array(16);for(let c=0;c<4;c++)for(let row=0;row<4;row++)for(let k=0;k<4;k++)r[c*4+row]+=a[k*4+row]*b[c*4+k];return r}
+function perspective(fov,aspect,n=.04,f=80){let t=1/Math.tan(fov/2);return new Float32Array([t/aspect,0,0,0,0,t,0,0,0,0,(f+n)/(n-f),-1,0,0,2*f*n/(n-f),0])}
+function lookAt(e,t){let z=norm(vsub(e,t)),x=norm(cross([0,0,1],z)),y=cross(z,x);return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-vdot(x,e),-vdot(y,e),-vdot(z,e),1])}
+function ortho(l,r,b,t,n,f){return new Float32Array([2/(r-l),0,0,0,0,2/(t-b),0,0,0,0,-2/(f-n),0,-(r+l)/(r-l),-(t+b)/(t-b),-(f+n)/(f-n),1])}
+function program(v,f){let p=gl.createProgram();for(let [type,src] of [[gl.VERTEX_SHADER,v],[gl.FRAGMENT_SHADER,f]]){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));gl.attachShader(p,s)}gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p}
+const vs=`#version 300 es
+precision highp float;
+layout(location=0) in vec3 position;layout(location=1) in vec3 normal;
+uniform mat4 vp,lightVP;uniform vec3 offset;out vec3 P,N;out vec4 shadowP;
+void main(){P=position+offset;N=normal;shadowP=lightVP*vec4(P,1.);gl_Position=vp*vec4(P,1.);}`;
+const fs=`#version 300 es
+precision highp float;
+in vec3 P,N;in vec4 shadowP;out vec4 color;uniform vec3 tint,eye;uniform float metal,rough,glow;uniform highp sampler2DShadow shadowMap;
+vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
+void main(){vec3 n=normalize(N),v=normalize(eye-P),l=normalize(vec3(-2.,-3.,7.)-P);vec3 sc=shadowP.xyz/shadowP.w*.5+.5;
+float sh=0.;for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)sh+=texture(shadowMap,vec3(sc.xy+vec2(x,y)/2048.,sc.z-.0007));sh/=9.;
+vec3 diffuse=vec3(.15,.20,.25)+max(dot(n,l),0.)*vec3(1.2,1.3,1.4)*(.22+.78*sh);
+diffuse+=max(dot(n,normalize(vec3(-2.,0.,1.5)-P)),0.)*vec3(.02,.25,.40);
+diffuse+=max(dot(n,normalize(vec3(2.,2.,2.5)-P)),0.)*vec3(.38,.08,.03);
+vec3 h=normalize(v+l);float sp=pow(max(dot(n,h),0.),mix(150.,8.,rough))*(1.-rough*.6)*sh;
+vec3 c=tint*diffuse*(1.-metal*.35)+mix(vec3(.10),tint,metal)*sp*3.+tint*glow;
+float fog=1.-exp(-length(P-eye)*.024);c=mix(c,vec3(.012,.022,.032),fog);
+color=vec4(pow(aces(c),vec3(1./2.2)),1.);}`;
+const main=program(vs,fs),depth=program(`#version 300 es
+layout(location=0) in vec3 position;uniform mat4 vp;uniform vec3 offset;void main(){gl_Position=vp*vec4(position+offset,1.);}`,`#version 300 es
+precision highp float;void main(){}`);
+const uniform=(p,n)=>gl.getUniformLocation(p,n),U={};for(let n of ['vp','lightVP','offset','tint','eye','metal','rough','glow','shadowMap'])U[n]=uniform(main,n);
+const D={vp:uniform(depth,'vp'),offset:uniform(depth,'offset')};
+function mesh(s){let vao=gl.createVertexArray();gl.bindVertexArray(vao);
+ for(let [i,a] of [[0,s.positions],[1,s.normals]]){let b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a),gl.STATIC_DRAW);gl.enableVertexAttribArray(i);gl.vertexAttribPointer(i,3,gl.FLOAT,false,0,0)}
+ let b=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint32Array(s.indices),gl.STATIC_DRAW);return {vao,count:s.indices.length,mat:DATA.materials[s.material]}}
+let parts={};for(let [name,sections] of Object.entries(DATA.parts))parts[name]=sections.map(mesh);
+const floor=mesh({positions:[-40,-40,-.009,40,-40,-.009,40,40,-.009,-40,40,-.009],normals:[0,0,1,0,0,1,0,0,1,0,0,1],indices:[0,1,2,0,2,3],material:0});floor.mat={color:[.015,.025,.038],metal:.25,rough:.65,glow:0};parts.floor=[floor];
+const shadowTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,shadowTex);gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,2048,2048,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_MODE,gl.COMPARE_REF_TO_TEXTURE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_FUNC,gl.LEQUAL);
+const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,shadowTex,0);gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+const lightVP=matrixMul(ortho(-2.4,2.4,-2.7,2.7,.1,15),lookAt([-2,-3,7],[0,0,.5]));
+gl.enable(gl.DEPTH_TEST);gl.clearColor(.015,.026,.039,1);
+let eye=[3.1,-4.2,3.0],target=[0,0,.66],fov=58*Math.PI/180;
+function offset(name){if(name==='puck')return [...game.puck,.90];if(name==='malletA')return [...game.paddles[0].p,.90];if(name==='malletB')return [...game.paddles[1].p,.90];return [0,0,0]}
+function drawScene(p,shadow=false){for(let [name,meshes] of Object.entries(parts)){if(shadow&&name==='floor')continue;gl.uniform3fv(shadow?D.offset:U.offset,offset(name));for(let m of meshes){gl.bindVertexArray(m.vao);if(!shadow){gl.uniform3fv(U.tint,m.mat.color);gl.uniform1f(U.metal,m.mat.metal);gl.uniform1f(U.rough,m.mat.rough);gl.uniform1f(U.glow,m.mat.glow)}gl.drawElements(gl.TRIANGLES,m.count,gl.UNSIGNED_INT,0)}}}
+function resize(){let d=Math.min(devicePixelRatio||1,1.65),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}}
+function render(t){resize();
+ if(!started){eye=[3.15+Math.sin(t*.00015)*.12,-4.2,3.05];target=[-.15,0,.70];fov=42*Math.PI/180}
+ else if(overview){eye=[0,-.001,innerWidth<700?6.7:5.7];target=[0,0,.9];fov=48*Math.PI/180}
+ else {let s=human?1:-1;eye=[0,s*1.82,1.70];target=[0,-s*.18,.90];fov=64*Math.PI/180}
+ let projection=perspective(fov,canvas.width/canvas.height);if(!started&&innerWidth>700)projection[8]=-.33;let vp=matrixMul(projection,lookAt(eye,target));
+ gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.viewport(0,0,2048,2048);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(depth);gl.uniformMatrix4fv(D.vp,false,lightVP);drawScene(depth,true);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(main);gl.uniformMatrix4fv(U.vp,false,vp);gl.uniformMatrix4fv(U.lightVP,false,lightVP);gl.uniform3fv(U.eye,eye);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,shadowTex);gl.uniform1i(U.shadowMap,0);drawScene(main);
+}
+function aim(x,y){if(!started||game.paused)return;let forward=norm(vsub(target,eye)),right=norm(cross(forward,[0,0,1])),up=cross(right,forward);let nx=x/innerWidth*2-1,ny=1-y/innerHeight*2,tan=Math.tan(fov/2),dir=norm(vadd(forward,vadd(vscale(right,nx*tan*innerWidth/innerHeight),vscale(up,ny*tan))));if(dir[2]<-.001){let t=(.9-eye[2])/dir[2];game.setTarget(human,[eye[0]+dir[0]*t,eye[1]+dir[1]*t])}}
+canvas.addEventListener('pointermove',e=>aim(e.clientX,e.clientY));canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);if(game.countdown>0)game.serve();aim(e.clientX,e.clientY);audioStart()});
+function audioStart(){if(!audio){try{audio=new (window.AudioContext||window.webkitAudioContext)()}catch(e){muted=true}}if(audio?.state==='suspended')audio.resume()}
+function tone(freq,dur=.08,volume=.05){if(muted||!audio)return;let o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.setValueAtTime(freq,audio.currentTime);o.frequency.exponentialRampToValueAtTime(freq*.65,audio.currentTime+dur);g.gain.setValueAtTime(volume,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+dur)}
+function start(){started=true;game.reset();document.body.classList.add('live');$('intro').classList.add('hidden');$('status').classList.remove('hidden');startTime=performance.now();audioStart();canvas.focus()}
+function pause(){if(!started)return;game.paused=!game.paused;$('pause').textContent=game.paused?'▶':'Ⅱ'}
+function swap(){human=1-human;$('team0').textContent=human?'GLACIER · AI':'GLACIER · YOU';$('team1').textContent=human?'EMBER · YOU':'EMBER · AI'}
+function restart(){game.reset();$('pause').textContent='Ⅱ';noticeUntil=0;startTime=performance.now()}
+$('play').onclick=start;$('pause').onclick=pause;$('camera').onclick=()=>overview=!overview;$('sound').onclick=()=>{audioStart();muted=!muted;$('sound').textContent=muted?'×':'♪'};
+let difficulty=1;$('difficulty').onclick=()=>{difficulty=(difficulty+1)%3;game.difficulty=[.62,1,1.38][difficulty];$('difficulty').innerHTML='OPPONENT <strong>'+['LOUNGE / EASY','CLUB / MEDIUM','PRO / HARD'][difficulty]+' ↻</strong>'};
+const keys=new Set();window.addEventListener('keydown',e=>{if(['Tab','Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.repeat)return;keys.add(e.code);if(!started){if(e.code==='Enter'||e.code==='Space')start();return}if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='Tab')swap();if(e.code==='KeyV')overview=!overview;if(e.code==='KeyR')restart();if(e.code==='Space'&&game.countdown>0)game.serve();if(e.code==='KeyM')$('sound').click()});window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>{keys.clear();if(started&&!game.paused)pause()});
+function ui(t){for(let i=0;i<2;i++)$('score'+i).textContent=String(game.score[i]).padStart(2,'0');let text='';
+ if(game.winner>=0)text=(game.winner===human?'MATCH WON.':'WELL PLAYED.')+'<small>PRESS R TO PLAY AGAIN · FIRST TO SEVEN</small>';
+ else if(game.paused)text='TAKE A BREATHER.<small>P TO RESUME</small>';
+ else if(t<noticeUntil)text=(game.lastGoal===human?'BEAUTIFUL SHOT.':'EMBER SCORES.').replace('EMBER',game.lastGoal?'EMBER':'GLACIER');
+ else if(game.countdown>0&&started)text='READY WHEN YOU ARE.<small>SPACE OR TAP TO SERVE</small>';
+ $('message').innerHTML=text;$('message').classList.toggle('hidden',!text);
+ $('status').classList.toggle('hidden',!started||t-startTime>7000||game.paused);
+}
+function frame(t){let dt=Math.min((t-last)/1000,.1);last=t;if(started){acc+=dt;let sx=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0),sy=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);if(sx||sy){let s=human?-1:1,m=game.paddles[human];game.setTarget(human,add(m.target,[sx*s*dt*1.8,sy*s*dt*1.8]))}while(acc>=1/240){game.tick(1/240,human);acc-=1/240}if(game.hitSerial!==hit){tone(300+Math.hypot(...game.velocity)*70,.065,.055);hit=game.hitSerial}if(game.goalSerial!==goal){goal=game.goalSerial;noticeUntil=t+1100;tone(660,.3,.08);setTimeout(()=>tone(990,.35,.06),100);let el=$(game.lastGoal?'coralTeam':'cyanTeam');el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse')}}render(t);ui(t);requestAnimationFrame(frame)}
+window.AER={game,start,swap,restart,get human(){return human},get overview(){return overview},get started(){return started},render};requestAnimationFrame(frame);
+</script></body></html>

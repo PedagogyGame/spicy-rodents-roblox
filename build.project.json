@@ -81,7 +81,35 @@
     "Lighting": {
       "$properties": {
         "Technology": "Future",
-        "GeographicLatitude": 39
+        "LightingStyle": "Realistic",
+        "GlobalShadows": true,
+        "ShadowSoftness": 0.25,
+        "GeographicLatitude": 39,
+        "ClockTime": 16,
+        "Brightness": 2.6,
+        "ExposureCompensation": 0.16,
+        "ColorShift_Top": [1.0, 0.8784, 0.6706],
+        "ColorShift_Bottom": [0.3373, 0.4, 0.2902],
+        "OutdoorAmbient": [0.6353, 0.6314, 0.502],
+        "Ambient": [0.4196, 0.4157, 0.3529],
+        "EnvironmentDiffuseScale": 0.6,
+        "EnvironmentSpecularScale": 0.3
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": { "Density": 0.28, "Offset": 0.25, "Color": [0.7843, 0.8196, 0.7412], "Decay": [0.7255, 0.6314, 0.4941], "Glare": 0.2, "Haze": 1.5 }
+      },
+      "Grade": {
+        "$className": "ColorCorrectionEffect",
+        "$properties": { "Contrast": 0.05, "Saturation": -0.05, "Brightness": 0, "TintColor": [1, 1, 1] }
+      },
+      "Bloom": {
+        "$className": "BloomEffect",
+        "$properties": { "Intensity": 0.3, "Size": 28, "Threshold": 1.5 }
+      },
+      "SunRays": {
+        "$className": "SunRaysEffect",
+        "$properties": { "Intensity": 0.06, "Spread": 0.6 }
       }
     },
 

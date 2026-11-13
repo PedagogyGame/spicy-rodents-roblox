@@ -1,0 +1,69 @@
+{
+  "title": "Spicy Rodent \u2014 Tunnels, Shop and Skateboards",
+  "date": "2026-11-13",
+  "scope": "Original visual assets only. The existing game was not modified.",
+  "glb_count": 11,
+  "assets": [
+    {
+      "file": "GLB/01_Brick_Sewer_Passage.glb",
+      "size_bytes": 1620904,
+      "sha256": "688c09d32d4f48189aafb5c26f88bb18c26bf1c12cd520096e27c77d3134b58e"
+    },
+    {
+      "file": "GLB/02_Four_Way_Sewer_Junction.glb",
+      "size_bytes": 1977212,
+      "sha256": "7dd88f224e27bf3c09d9c858a78e2e194e6976c32c03d3099e207c86c802aed1"
+    },
+    {
+      "file": "GLB/03_Concrete_Maintenance_Tunnel.glb",
+      "size_bytes": 1355716,
+      "sha256": "3b9300f8b61b486c31c8c96478dfebf30401495ddb15b17d8d60b52fc1bd6690"
+    },
+    {
+      "file": "GLB/04_Offbeat_Shop_Interior.glb",
+      "size_bytes": 3449976,
+      "sha256": "c13a0c25efca0c8fe03144e1799169283cc7fe5965c02cdb488aa6572b4a1f84"
+    },
+    {
+      "file": "GLB/Skateboards/01_Lunar_Moth.glb",
+      "size_bytes": 132488,
+      "sha256": "45bd403c4c18049ac3556062a25f877693babc968042a1744a98cf6960e599a3"
+    },
+    {
+      "file": "GLB/Skateboards/02_Static_Weekend.glb",
+      "size_bytes": 134696,
+      "sha256": "c07f361d4511f500d7418acd66883e4b4fa59c068b96863b7e02974bd65cec2e"
+    },
+    {
+      "file": "GLB/Skateboards/03_Ochre_Run.glb",
+      "size_bytes": 129148,
+      "sha256": "7403a1b521fde838aeee892fe00c697d6d4d8b25fca24fc745ccc11ab1f4427f"
+    },
+    {
+      "file": "GLB/Skateboards/04_Concrete_Fern.glb",
+      "size_bytes": 132560,
+      "sha256": "1185abab32ef111f68379ac73d708cbf560e7c224b074db02d66361fa7f92caa"
+    },
+    {
+      "file": "GLB/Skateboards/05_Tidal_Check.glb",
+      "size_bytes": 129652,
+      "sha256": "66ae12d311fb02ce4d1217aac3d0d6fa63004b30e231f7687c990b9080a3105d"
+    },
+    {
+      "file": "GLB/Skateboards/06_Ghost_Fish.glb",
+      "size_bytes": 130000,
+      "sha256": "659026712c81264af95a8a08aee5854e9cdb3db5d7ea40d9360bcc30883a75b6"
+    },
+    {
+      "file": "GLB/Skateboards/07_Violet_Comet.glb",
+      "size_bytes": 129728,
+      "sha256": "40e11e3358bf49c6caf0624c0e189f48df557f4926e6537dfc66deb1253b3f03"
+    }
+  ],
+  "editable_blender_sources": [
+    "Source/04_Offbeat_Shop_Interior.blend",
+    "Source/Sewer_Modules.blend",
+    "Source/Skateboards.blend"
+  ],
+  "verification": "GLB structure and geometry validated; exported scenes reimported and rendered in Blender. No live Roblox Studio playtest."
+}

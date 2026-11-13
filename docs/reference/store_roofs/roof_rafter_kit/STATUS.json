@@ -1,0 +1,42 @@
+{
+  "project": "Spicy Rodent \u2014 handoff staging / no existing files modified",
+  "asOf": "2026-11-13",
+  "store": {
+    "state": "recovered_complete",
+    "deliverable": "Spicy_Rodent_Complete_v2.zip (provided separately)",
+    "runtime_tested": false
+  },
+  "rafters": {
+    "state": "new_art_kit",
+    "deliverable": "GLB/01_Exposed_Rafter_Bay_2m.glb",
+    "runtime_tested": false
+  },
+  "roof": {
+    "state": "new_art_kit",
+    "deliverable": "GLB/02_Full_Gable_Roof_14m.glb plus route/collider/detail modules",
+    "runtime_tested": false
+  },
+  "roof_route": {
+    "state": "data_handoff_only",
+    "deliverable": "Specs/roof_route_graph.json, Specs/RoofRouteData.luau",
+    "runtime_tested": false
+  },
+  "paintball": {
+    "state": "specification_needed; no runnable implementation supplied"
+  },
+  "sky_lift": {
+    "state": "specification_needed; no runnable implementation supplied"
+  },
+  "pool": {
+    "state": "existing v5.4 town context; separate new work not supplied"
+  },
+  "alley": {
+    "state": "not implemented in this kit"
+  },
+  "wallet": {
+    "state": "not implemented in this kit; server-authoritative transaction design required"
+  },
+  "run_through_agents": {
+    "state": "no background agents running in this chat; static QA included; Roblox playtesting needed"
+  }
+}

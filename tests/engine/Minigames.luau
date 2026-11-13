@@ -122,13 +122,14 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 		end
 	end
 	check(doorPrompts == 2, `{doorPrompts} push-bar door prompts`)
-	-- the tunnels: routes in the registry; the vent's foot stands on the alley paving; the duct is air
+	-- the ball returns: one enclosed route per pair in the registry; its alley mouth stands on the alley paving; the
+	-- duct is air
 	local data = (require :: any)(Shared:WaitForChild("Data")).default()
 	local reg = data:routes()
-	for id = 9001, 9006 do
+	for _, id in { 9002, 9004, 9006 } do
 		check(reg:get(id) ~= nil, `route {id} missing from the registry`)
 	end
-	local vent = reg:get(9003)
+	local vent = reg:get(9004)
 	if vent then
 		local foot = reg:foot(vent)
 		local hit = workspace:Raycast(Vector3.new(foot.x, foot.y + 2, foot.z), Vector3.new(0, -4, 0))

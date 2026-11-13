@@ -23,3 +23,18 @@ These already fire at the right moments in the game and are silent. Fill the ass
 | `sweep` | not fired yet (the pinsetter is drawn by the server) | a machine clank and whirr, about 2.5 s |
 
 Eight sounds if each is uploaded; fewer if library sounds fit.
+
+### Air hockey (`src/client/Minigames/Games/AirHockey.luau`, table `sounds`)
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `air_hockey.strike` | a mallet meets the puck, when the contact is seen; volume from how hard | a sharp plastic clack |
+| `air_hockey.rail` | the puck comes off a side or end rail; volume from how hard | a shorter, duller knock |
+| `air_hockey.post` | the puck comes off a goal post | a small metal tick |
+| `air_hockey.serve` | each time the puck is let go (the countdown running out, or a press) | a soft puff of air |
+| `air_hockey.goal_for` | you scored | the puck dropping into the goal, then a short bright sting |
+| `air_hockey.goal_against` | they scored | the same drop, then a lower sting |
+| `air_hockey.goal` | a goal at a table you are watching | the drop alone |
+| `air_hockey.win` | the match is yours | a short win sting |
+| `air_hockey.lose` | the match is theirs | a short falling sting |
+
+Nine sounds if each is uploaded. The owner's own game makes these as tones in code (`docs/reference/air_hockey/`); the strike, rail and post could be one recording at three pitches.

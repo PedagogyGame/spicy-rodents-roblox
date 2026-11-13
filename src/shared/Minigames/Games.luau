@@ -84,6 +84,7 @@ Games.ALL = {
 	require("./Jenga/Spec"),
 	require("./Labyrinth/Spec"),
 	require("./Paintball/Spec"),
+	require("./AirHockey/Spec"),
 } :: { Spec }
 
 local FLOWS: { [string]: boolean } = { turns = true, solo = true, live = true, match = true }

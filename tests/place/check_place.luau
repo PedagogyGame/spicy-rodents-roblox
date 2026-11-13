@@ -74,6 +74,18 @@ local function propertyMatches(inst: any, name: string, expected: any): (boolean
 	if type(expected) == "number" and type(actual) == "number" then
 		return math.abs(actual - expected) < 1e-6, `{name}: expected {expected}, got {actual}`
 	end
+	-- a colour is written in a project file as three numbers from 0 to 1 (to four places) and is held
+	-- by the place as single-precision floats
+	if actualType == "Color3" and type(expected) == "table" and #expected == 3 then
+		local c = actual :: any
+		local got = { c.R, c.G, c.B }
+		for i = 1, 3 do
+			if type(expected[i]) ~= "number" or math.abs(got[i] - expected[i]) > 1e-3 then
+				return false, `{name}: expected {expected[1]}, {expected[2]}, {expected[3]}, got {tostring(actual)}`
+			end
+		end
+		return true, ""
+	end
 	return actual == expected, `{name}: expected {tostring(expected)}, got {tostring(actual)}`
 end
 
