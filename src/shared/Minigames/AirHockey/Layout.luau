@@ -45,7 +45,7 @@ Layout.SCORE = "ScoreBoard" -- a part with a SurfaceGui on each long face, each 
 -- each end's own score, lit in the bed in the corner across from its team number (a plate with a SurfaceGui on
 -- top holding a TextLabel "Score"): model metres, the Ember end's at +y, each read from its own end
 Layout.SCORE_PRINTS = { [0] = "ScoreGlacier", [1] = "ScoreEmber" }
-Layout.SCORE_PRINT = { x = 0.44, y = 1.02, w = 0.2, h = 0.075 }
+Layout.SCORE_PRINT = { x = 0.445, y = 0.99, w = 0.25, h = 0.12 }
 Layout.SIDE_NAMES = { [0] = "Glacier", [1] = "Ember" }
 -- The moving pieces are small Models (the puck; a mallet's base, crown, stem and cap), each with its pivot on
 -- its own axis. The bake stands them at home (the puck on the centre spot, the mallets where a match starts

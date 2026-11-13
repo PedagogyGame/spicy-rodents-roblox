@@ -45,6 +45,8 @@ local WHITE = col(0.85, 0.95, 1) -- 09 warm white light
 local INK = col(0.075, 0.19, 0.25) -- 10 printed slate
 local BRASS = col(0.52, 0.35, 0.16) -- 12 champagne alloy
 local PUCK = col(0.021, 0.027, 0.035) -- 13 puck carbon
+-- (ours) the score lit in the bed: each end's colour, Glacier's deepened to be read on the pale bed
+local SCORE_INK = { [0] = col(0.004, 0.2, 0.34), [1] = CORAL }
 
 local SOFT = { collide = false }
 -- The printed bed is built up in layers a millimetre apart, the topmost exactly at the playing surface (the
@@ -302,7 +304,7 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 			s * p.y,
 			p.w,
 			p.h,
-			if s < 0 then CYAN else CORAL,
+			SCORE_INK[if s < 0 then 0 else 1],
 			s,
 			"Score"
 		)

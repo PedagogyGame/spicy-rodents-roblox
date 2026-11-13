@@ -35,7 +35,7 @@ Your keyboard speed is 1.8 metres a second. The mouse, a finger and a stick held
    - Move the mallet through the puck to strike it. Hold it still to block. It stays in your half.
    - **Space** (or a click, gamepad **A**, a tap, the SERVE button) serves while the puck waits.
    - **V** (gamepad **X**, the VIEW button) swaps to the view from above and back.
-5. First to seven. **Q** leaves at any time. **H** (or the HELP button) hides and shows the help card.
+5. First to seven. **Q** (gamepad **B**) leaves at any time. **H** (gamepad **Y**, the HELP button) hides and shows the help card.
 
 A second person can press **E** at either end while you play the computer: they take the computer's end at once, mid-match. If they leave, the computer takes it back.
 
