@@ -6,6 +6,12 @@
 -- officers (2.3 u/s walk, 5.5 u/s chase); the patrol car itself is a device, not this brain.
 -- A Directive (Brains/Directive; the bite-to-hospital sequence) overrides the beat while it is set:
 -- onEvent({ type = "medical", mode = ... }) sets or clears it.
+-- The stakeout (the storm drains, BRIEF_ADDENDUM D8; Server/World/SewerService): an officer who saw the rodent
+-- go down a drain runs to the spot beside that grate (`x`, `z`), stands there facing it (`faceX`, `faceZ`)
+-- for `secs` from arriving (Tunables sewer.stakeoutSecs), says so on arriving (ctx.emit("stakeout")), then
+-- walks back to the beat. Officers never go to the other end. A walk that has not arrived after `giveUp`
+-- seconds (default STAKEOUT_GIVE_UP) is dropped. onEvent({ type = "stakeout", ... }) sets it; a medical
+-- directive still comes first.
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -31,6 +37,19 @@ type Brain = Common.Brain & {
 	respondZ: number,
 	respondUntil: number,
 	directive: Directive.State,
+	stakeout: Stakeout?,
+}
+
+-- the grate an officer is watching: where to stand and what to face; holdLeft counts down from arrival
+type Stakeout = {
+	x: number,
+	z: number,
+	faceX: number,
+	faceZ: number,
+	secs: number,
+	holdLeft: number?, -- nil while walking there
+	walkLeft: number, -- seconds left to get there
+	mouth: string?,
 }
 
 local Officer = {}
@@ -39,6 +58,49 @@ local WALK = Units.st(2.3)
 local CHASE = Units.st(5.5)
 local REACH = Units.st(1.2)
 local CORNER_PAUSE = 1.0
+Officer.STAKEOUT_REACH = 0.8 -- studs: at the stand point
+Officer.STAKEOUT_GIVE_UP = 60 -- s: a walk to the grate that has not arrived by then is dropped
+
+-- the stakeout's step; true while it holds the officer
+local function stakeout(self: Brain, dt: number, ctx: Common.Ctx): boolean
+	local s = self.stakeout
+	if s == nil then
+		return false
+	end
+	local actor = self.actor
+	local intent = actor.intent
+	if s.holdLeft == nil then
+		s.walkLeft -= dt
+		local d = Common.dist2d(actor.x, actor.z, s.x, s.z)
+		if d <= Officer.STAKEOUT_REACH then
+			s.holdLeft = s.secs
+			if ctx.emit then
+				ctx.emit("stakeout", actor)
+			end
+		elseif s.walkLeft <= 0 then
+			self.stakeout = nil
+			return false
+		else
+			intent.mode = "walk"
+			intent.tx, intent.tz = s.x, s.z
+			intent.laneAxis = nil
+			-- running, slowing over the last few studs so the officer stops on the spot
+			intent.speed = math.clamp(d * 3, WALK, CHASE)
+			intent.turnRate = 6
+			intent.damp = 8
+			return true
+		end
+	end
+	local left = (s.holdLeft :: number) - dt
+	if left <= 0 then
+		self.stakeout = nil
+		return false
+	end
+	s.holdLeft = left
+	intent.mode = "stand"
+	intent.heading = Common.yawOf(s.faceX - actor.x, s.faceZ - actor.z)
+	return true
+end
 
 local Methods = {}
 Methods.__index = Methods
@@ -47,6 +109,9 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	local actor = self.actor
 	local intent = actor.intent
 	if Directive.think(self.directive, actor, dt, ctx) then
+		return
+	end
+	if stakeout(self, dt, ctx) then
 		return
 	end
 	if ctx.now < self.respondUntil then
@@ -92,6 +157,7 @@ function Methods.suspend(self: Brain): Common.Snapshot
 		respondX = self.respondX,
 		respondZ = self.respondZ,
 		directive = Directive.snapshot(self.directive),
+		stakeout = if self.stakeout then table.clone(self.stakeout) else nil,
 	}
 end
 
@@ -102,6 +168,7 @@ function Methods.resume(self: Brain, snapshot: Common.Snapshot)
 	self.respondX = snapshot.respondX or 0
 	self.respondZ = snapshot.respondZ or 0
 	Directive.restore(self.directive, snapshot.directive)
+	self.stakeout = if snapshot.stakeout then table.clone(snapshot.stakeout) else nil
 	Common.halt(self.actor) -- no walking on the old intent before the next think
 end
 
@@ -111,6 +178,17 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 		self.respondUntil = evt.untilTime
 	elseif evt.type == "medical" then
 		Directive.set(self.directive, evt)
+	elseif evt.type == "stakeout" then
+		self.stakeout = {
+			x = evt.x,
+			z = evt.z,
+			faceX = evt.faceX,
+			faceZ = evt.faceZ,
+			secs = evt.secs,
+			holdLeft = nil,
+			walkLeft = evt.giveUp or Officer.STAKEOUT_GIVE_UP,
+			mouth = evt.mouth,
+		}
 	end
 end
 
@@ -138,6 +216,7 @@ function Officer.new(actor: Common.Actor, params: Params): Common.Brain
 		respondZ = 0,
 		respondUntil = 0,
 		directive = Directive.new(),
+		stakeout = nil,
 	}, Methods)
 	local prev = points[(start - 2) % 4 + 1]
 	actor.x, actor.z = prev[1], prev[2]
