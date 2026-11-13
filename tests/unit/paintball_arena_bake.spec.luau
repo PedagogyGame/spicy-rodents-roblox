@@ -659,6 +659,61 @@ return function(t)
 		t.truthy(topOfMast - (Arena.HEIGHT + 1) >= 70, "the mast is some eighty studs tall")
 	end)
 
+	-- The review (2026-11-13): "from outside the building does not read as abandoned: neat, identical boarded
+	-- windows, the sign whole". The pictures are pb_18_outside and pb_25_forecourt (docs/renders/paintball).
+	t.test(
+		"from the street the station is left to rot: boards gone, hanging and smashed through, a letter off the sign, a fence with a panel down, weeds, a dead van",
+		function()
+			local parts = PartList.dressing(venue)
+			local panes, smashed, hanging = 0, 0, 0
+			local boards = 0
+			local named: { [string]: number } = {}
+			for _, p in parts do
+				named[p.name] = (named[p.name] or 0) + 1
+				if p.name == "Pane" then
+					panes += 1
+					if p.color[1] < 10 then
+						smashed += 1
+					end
+				elseif p.name == "Board" then
+					boards += 1
+					if p.tilt ~= nil then
+						hanging += 1
+					end
+				end
+			end
+			t.truthy(boards < 2 * panes - 10, `{boards} boards over {panes} windows: some have lost theirs`)
+			t.truthy(smashed >= 3, `{smashed} windows smashed through`)
+			t.truthy(hanging >= 3, `{hanging} boards hanging`)
+			local sign, letter = nil, nil
+			for _, p in parts do
+				if p.name == "Sign" then
+					sign = p
+				elseif p.name == "SignLetter" then
+					letter = p
+				end
+			end
+			assert(sign ~= nil and letter ~= nil, "the sign and its fallen letter")
+			t.truthy(sign.signs ~= nil and (sign.signs :: any)[1].text ~= "WBLW 7", "a letter is missing from the sign")
+			t.eq((letter.signs :: any)[1].text, "L")
+			t.truthy(
+				(named.FenceDown or 0) == 1 and (named.Fence or 0) >= 8,
+				"a fence along the street with one panel down"
+			)
+			t.truthy((named.Weeds or 0) >= 10)
+			t.truthy((named.Van or 0) == 1 and (named.VanWheel or 0) == 4)
+			t.truthy((named.Rust or 0) >= 5)
+			-- the fence keeps clear of the walk (arena x -4 .. 4) and the van keeps off the walk and the landing
+			for _, p in parts do
+				local x0, _, _ = Arena.ofSite(p.x0, p.y0, p.d0)
+				local x1, _, _ = Arena.ofSite(p.x1, p.y1, p.d1)
+				if string.sub(p.name, 1, 5) == "Fence" or string.sub(p.name, 1, 3) == "Van" then
+					t.truthy(math.min(x0, x1) >= 4 or math.max(x0, x1) <= -4, `{p.name} on the walk`)
+				end
+			end
+		end
+	)
+
 	local function bake(place: AlleyLayout.Place): (any, any, { [string]: any })
 		local folder = roblox.Instance.new("Folder")
 		local places = { [Contract.SITE] = place }

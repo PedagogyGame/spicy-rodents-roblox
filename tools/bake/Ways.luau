@@ -273,7 +273,7 @@ end
 local function postPlan(post: Post, id: string): Spec.BuildPlan
 	local g = Height.at(post.x, post.z)
 	local top = g + Ways.POST_HEIGHT
-	local boardLen, boardH = 11, 2.4
+	local boardLen, boardH = 15, 4.2
 	-- the board's long side runs along the street; its centre is set off from the post towards the venue
 	local yaw = if post.axis == "x" then 0 else math.pi / 2
 	local off = post.toward * (boardLen / 2 - 0.4)

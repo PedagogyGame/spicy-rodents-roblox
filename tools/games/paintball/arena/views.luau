@@ -194,6 +194,22 @@ local VIEWS: { View } = {
 		wide = true,
 		air = true,
 	},
+	{
+		name = "pb_25_forecourt",
+		desc = "From Chapel Street's sidewalk by the walk: the fence with its panel down, the dead news van, weeds, the annex door, the rotted front and the sign with its L fallen.",
+		feet = { -14, 0, 113 },
+		look = { 12, 9, 88 },
+		fov = 78,
+		wide = true,
+	},
+	{
+		name = "pb_26_junction",
+		desc = "The way there: where the estate avenue becomes Chapel Street, the fingerpost to the station and the street's lamps running east.",
+		feet = { -1452, 0, 117 },
+		look = { -1380, 5, 104 },
+		fov = 70,
+		wide = true,
+	},
 }
 
 local out = process.args[1] or "build/review/paintball_views.json"

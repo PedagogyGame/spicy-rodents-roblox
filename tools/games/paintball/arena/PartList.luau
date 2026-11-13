@@ -13,12 +13,19 @@
 --                  pass desk and the garb counter in front of the two windows onto the atrium, the lobby's
 --                  monitor, benches, lights), and the building from the street (the plinth down to the lowest
 --                  ground, the entrance steps, boarded windows on every storey, the sign, the parapet, plant on
---                  the roof and the dead mast). None of it is inside the volume, so none of it needs a box.
+--                  the roof and the dead mast), left to rot (the review, 2026-11-13: "from outside the building
+--                  does not read as abandoned"): boards gone, hanging or smashed through, a letter fallen off the
+--                  sign and lying on the annex roof, rust run down the front, a chain-link fence along the
+--                  street with a panel down, weeds, and the station's old news van dead on the forecourt. None
+--                  of it is inside the volume, so none of it needs a box. The fence, the van and the weeds stand
+--                  on the terrain (World/Height under Arena.PLACE: the station's own place in the world).
 -- Interface: solids(plan) -> { Part }; dressing(venue?) -> { Part }; LOOK = { [look name] = { colour, material,
 --   transparency? } }; TEAM = { colour of team 1's paint, of team 2's }; FACE = { [arena face] = NormalId name };
 --   type Part
 local Arena = require("../../../../src/shared/Minigames/Paintball/Arena")
 local ArenaDataPlan = require("../../../../src/shared/Minigames/Paintball/ArenaDataPlan")
+local Height = require("../../../../src/shared/World/Height")
+local TerrainExtensions = require("../../../../generated/TerrainExtensions")
 
 export type Part = {
 	group: string, -- the sub-model of Arena.MODEL it goes in
@@ -51,6 +58,11 @@ export type Part = {
 }
 
 local PartList = {}
+
+-- the fence along the street (arena z: just off the street's sidewalk, the way's lamps on its street side) and
+-- the panel that is down (the one from this x to ten studs on)
+PartList.FENCE_Z = 105.5
+PartList.FENCE_GAP = 20
 
 -- team 1 is orange, team 2 teal (decision D4: no red)
 PartList.TEAM = { { 240, 130, 40 }, { 30, 170, 170 } }
@@ -453,6 +465,7 @@ function PartList.dressing(venue: any?): { Part }
 	end
 	local CONCRETE, DARK, TRIM = { 134, 128, 118 }, { 60, 62, 66 }, { 206, 196, 170 }
 	local WOOD, BOARD = { 122, 92, 62 }, { 150, 118, 76 }
+	local RUST = { 116, 74, 46 }
 	local ORANGE, TEAL = PartList.TEAM[1], PartList.TEAM[2]
 	local ghost = { collide = false, shadow = false }
 	local WINDOW = ArenaDataPlan.WINDOW
@@ -581,73 +594,139 @@ function PartList.dressing(venue: any?): { Part }
 	end
 	-- the annex's parapet and the station's sign on the tower above it
 	add("Outside", "AnnexParapet", -half - 1, ROOF + 1, Z1, half + 1, ROOF + 2.5, Z1 + 1, CONCRETE, "Concrete")
+	-- (its L is gone: it lies face up on the annex roof below; the strap hangs from one bolt)
 	local sign = add("Outside", "Sign", -26, 30, Z0, 26, 42, Z0 + 0.8, { 34, 40, 60 }, "SmoothPlastic")
-	sign.signs = { { face = "Back", text = "WBLW 7", tone = "gold" } }
-	local strap = add("Outside", "SignStrap", -20, 25, Z0, 20, 29, Z0 + 0.6, { 34, 40, 60 }, "SmoothPlastic")
+	sign.signs = { { face = "Back", text = "WB  W 7", tone = "gold" } }
+	local strap = add("Outside", "SignStrap", -20, 24.2, Z0, 20, 28.2, Z0 + 0.6, { 34, 40, 60 }, "SmoothPlastic")
 	strap.signs = { { face = "Back", text = "EYEWITNESS NEWS", tone = "white" } }
+	strap.tilt = -0.07
+	local fallen = add(
+		"Outside",
+		"SignLetter",
+		-9,
+		ROOF + 1,
+		Z0 + 6,
+		-4,
+		ROOF + 1.4,
+		Z0 + 12,
+		{ 34, 40, 60 },
+		"SmoothPlastic",
+		ghost
+	)
+	fallen.signs = { { face = "Top", text = "L", tone = "gold" } }
+	fallen.tilt = 0.08
 	-- boarded windows on every storey of the tower: a dark pane and two planks nailed over it
+	-- (the rot, the same window to window every bake: one in five has lost its lower board, one in eleven is
+	-- smashed through, both boards gone and the hole black; on the two long faces one in seven has its upper
+	-- board hanging from one nail)
 	local function window(face: string, at: number, y: number, tag: number)
 		local w, h = 3.5, 5.5
 		local out0, out1 = half + 1, half + 1.25
 		local skew = ((tag * 7) % 5 - 2) * 0.25
+		local smashed = tag % 11 == 4
+		local lower = not smashed and tag % 5 ~= 0
+		local upper = not smashed
+		local hang = face == "+z" or face == "-z"
+		hang = hang and tag % 7 == 3
+		local glass = if smashed then { 6, 6, 8 } else { 26, 30, 36 }
 		if face == "+x" or face == "-x" then
 			local s = if face == "+x" then 1 else -1
-			add("Outside", "Pane", s * out0, y, at - w, s * out1, y + h, at + w, { 26, 30, 36 }, "SmoothPlastic", ghost)
-			add(
-				"Outside",
-				"Board",
-				s * out1,
-				y + 1 + skew,
-				at - w - 0.5,
-				s * (out1 + 0.25),
-				y + 2,
-				at + w + 0.5,
-				BOARD,
-				"WoodPlanks",
-				ghost
-			)
-			add(
-				"Outside",
-				"Board",
-				s * out1,
-				y + 3.4 - skew,
-				at - w - 0.5,
-				s * (out1 + 0.25),
-				y + 4.4,
-				at + w + 0.5,
-				BOARD,
-				"WoodPlanks",
-				ghost
-			)
+			add("Outside", "Pane", s * out0, y, at - w, s * out1, y + h, at + w, glass, "SmoothPlastic", ghost)
+			if lower then
+				add(
+					"Outside",
+					"Board",
+					s * out1,
+					y + 1 + skew,
+					at - w - 0.5,
+					s * (out1 + 0.25),
+					y + 2,
+					at + w + 0.5,
+					BOARD,
+					"WoodPlanks",
+					ghost
+				)
+			end
+			if upper then
+				add(
+					"Outside",
+					"Board",
+					s * out1,
+					y + 3.4 - skew,
+					at - w - 0.5,
+					s * (out1 + 0.25),
+					y + 4.4,
+					at + w + 0.5,
+					BOARD,
+					"WoodPlanks",
+					ghost
+				)
+			end
 		else
 			local s = if face == "+z" then 1 else -1
-			add("Outside", "Pane", at - w, y, s * out0, at + w, y + h, s * out1, { 26, 30, 36 }, "SmoothPlastic", ghost)
-			add(
-				"Outside",
-				"Board",
-				at - w - 0.5,
-				y + 1 + skew,
-				s * out1,
-				at + w + 0.5,
-				y + 2,
-				s * (out1 + 0.25),
-				BOARD,
-				"WoodPlanks",
-				ghost
-			)
-			add(
-				"Outside",
-				"Board",
-				at - w - 0.5,
-				y + 3.4 - skew,
-				s * out1,
-				at + w + 0.5,
-				y + 4.4,
-				s * (out1 + 0.25),
-				BOARD,
-				"WoodPlanks",
-				ghost
-			)
+			add("Outside", "Pane", at - w, y, s * out0, at + w, y + h, s * out1, glass, "SmoothPlastic", ghost)
+			if lower then
+				add(
+					"Outside",
+					"Board",
+					at - w - 0.5,
+					y + 1 + skew,
+					s * out1,
+					at + w + 0.5,
+					y + 2,
+					s * (out1 + 0.25),
+					BOARD,
+					"WoodPlanks",
+					ghost
+				)
+			end
+			if upper and hang then
+				-- held by its left nail, the right end swung down across the pane
+				local b = add(
+					"Outside",
+					"Board",
+					at - w - 0.3,
+					y + 2.2,
+					s * out1,
+					at + w + 0.7,
+					y + 3.2,
+					s * (out1 + 0.25),
+					BOARD,
+					"WoodPlanks",
+					ghost
+				)
+				b.tilt = -0.5 * s
+			elseif upper then
+				add(
+					"Outside",
+					"Board",
+					at - w - 0.5,
+					y + 3.4 - skew,
+					s * out1,
+					at + w + 0.5,
+					y + 4.4,
+					s * (out1 + 0.25),
+					BOARD,
+					"WoodPlanks",
+					ghost
+				)
+			end
+			if face == "+z" and tag % 3 == 0 then
+				-- rust run down from the sill
+				add(
+					"Outside",
+					"Rust",
+					at - 0.6,
+					y - 4.5,
+					s * out0,
+					at + 0.1,
+					y,
+					s * (out0 + 0.04),
+					RUST,
+					"Concrete",
+					ghost
+				)
+			end
 		end
 	end
 	local tag = 0
@@ -797,6 +876,131 @@ function PartList.dressing(venue: any?): { Part }
 		base + 50,
 		MZ + 2.6,
 		{ 226, 222, 212 },
+		"Metal",
+		ghost
+	)
+
+	-- THE ROT ON THE STREET SIDE: rust under the sign, a fence along the street with a panel down, weeds, the van
+	for i, x in { -21, -12.5, -2, 9, 18.5 } do
+		local long = 4 + (i * 5) % 4
+		add("Outside", "Rust", x, 24.2 - long, Z0, x + 0.5 + (i % 2) * 0.3, 24.2, Z0 + 0.04, RUST, "Concrete", ghost)
+	end
+	-- the ground under a point of the arena frame (the station in its own place), in the arena frame's height
+	Height.configure(TerrainExtensions)
+	local function groundAt(x: number, z: number): number
+		local wx, _, wz = Arena.toWorld(Arena.PLACE, x, 0, z)
+		return Height.at(wx, wz) - Arena.PLACE.y
+	end
+	-- the fence: posts every ten studs along the street, a gate's width open at the walk (x -4 .. 4), one panel
+	-- fallen flat on the forecourt and the post at its far end leaning
+	local FZ = PartList.FENCE_Z
+	local STEEL = { 112, 116, 120 }
+	local posts = { -60, -50, -40, -30, -20, -10, -6, 6, 10, 20, 30, 40, 50, 60 }
+	for i, x in posts do
+		local g = groundAt(x, FZ)
+		local post = add("Outside", "FencePost", x - 0.2, deep, FZ - 0.2, x + 0.2, g + 7, FZ + 0.2, STEEL, "Metal")
+		if x == PartList.FENCE_GAP + 10 then
+			post.tilt = -0.18
+		end
+		local nx = posts[i + 1]
+		if nx == nil or (x == -6 and nx == 6) then
+			continue
+		end
+		local gm = math.min(g, groundAt(nx, FZ))
+		if x == PartList.FENCE_GAP then
+			-- down: lying on the forecourt, face up
+			local gl = groundAt(x + 5, FZ - 4)
+			add("Outside", "FenceDown", x + 0.4, gl + 0.25, FZ - 6.8, nx - 0.4, gl + 0.35, FZ - 0.8, STEEL, "Metal", {
+				collide = false,
+				shadow = false,
+				transparency = 0.72,
+			})
+			continue
+		end
+		add("Outside", "FenceRail", x, g + 6.6, FZ - 0.08, nx, g + 6.8, FZ + 0.08, STEEL, "Metal", ghost)
+		add("Outside", "Fence", x + 0.2, gm + 0.3, FZ - 0.05, nx - 0.2, g + 6.6, FZ + 0.05, STEEL, "Metal", {
+			transparency = 0.78,
+			shadow = false,
+		})
+	end
+	-- weeds: along the foot of the front and the fence, and through the forecourt
+	local WEED = { { 86, 112, 50 }, { 112, 120, 58 }, { 70, 92, 44 } }
+	for i = 1, 22 do
+		local x = -56 + ((i * 37) % 112)
+		local z = if i % 3 == 0 then Z1 + 2.2 elseif i % 3 == 1 then FZ - 1 else Z1 + 6 + (i * 13) % 10
+		if math.abs(x) < 10 and z > Z1 + 1 and z < Z1 + 7 then
+			continue -- not on the landing
+		end
+		local g = groundAt(x, z)
+		local r = 0.3 + (i % 4) * 0.15
+		add(
+			"Outside",
+			"Weeds",
+			x - r,
+			g,
+			z - r,
+			x + r,
+			g + 0.4 + (i % 3) * 0.35,
+			z + r,
+			WEED[i % 3 + 1],
+			"Grass",
+			ghost
+		)
+	end
+	-- the news van, dead on the forecourt east of the walk: a box body, the cab, a black windscreen, four wheels
+	-- (the front near one flat, so it leans), a dish on the roof and the station's name down its street side
+	local VX0, VX1, VZ0, VZ1 = 20, 36, Z1 + 6, Z1 + 12.5
+	local gv = groundAt((VX0 + VX1) / 2, (VZ0 + VZ1) / 2)
+	local VAN = { 214, 210, 196 }
+	local body = add("Outside", "Van", VX0, gv + 1.3, VZ0, VX1 - 4, gv + 8, VZ1, VAN, "SmoothPlastic")
+	body.tilt = 0.035
+	body.signs = { { face = "Back", text = "WBLW 7 NEWS", tone = "plate" } }
+	local cab = add("Outside", "VanCab", VX1 - 4, gv + 1.3, VZ0, VX1, gv + 5.6, VZ1, VAN, "SmoothPlastic")
+	cab.tilt = 0.035
+	add(
+		"Outside",
+		"VanScreen",
+		VX1 - 0.05,
+		gv + 4.2,
+		VZ0 + 0.5,
+		VX1 + 0.05,
+		gv + 5.4,
+		VZ1 - 0.5,
+		{ 6, 6, 8 },
+		"Glass",
+		ghost
+	)
+	add("Outside", "VanStripe", VX0, gv + 3.6, VZ1, VX1, gv + 4.2, VZ1 + 0.04, { 40, 70, 150 }, "SmoothPlastic", ghost)
+	add("Outside", "VanRust", VX0 + 1, gv + 1.3, VZ1, VX0 + 4, gv + 2.6, VZ1 + 0.05, RUST, "CorrodedMetal", ghost)
+	for _, w in { { VX0 + 2.5, VZ0, 0 }, { VX0 + 2.5, VZ1, 0 }, { VX1 - 2.5, VZ0, 0 }, { VX1 - 2.5, VZ1, 0.6 } } do
+		local flat = w[3]
+		add(
+			"Outside",
+			"VanWheel",
+			w[1] - 1.3,
+			gv - 0.2,
+			w[2] - 0.45,
+			w[1] + 1.3,
+			gv + 2.4 - flat,
+			w[2] + 0.45,
+			{ 24, 24, 26 },
+			"Rubber",
+			ghost
+		)
+	end
+	local dish =
+		add("Outside", "VanDish", VX0 + 3, gv + 8, VZ0 + 1.5, VX0 + 8, gv + 8.5, VZ1 - 1.5, VAN, "Metal", ghost)
+	dish.tilt = 0.4
+	add(
+		"Outside",
+		"VanMast",
+		VX0 + 5.3,
+		gv + 8,
+		(VZ0 + VZ1) / 2 - 0.2,
+		VX0 + 5.7,
+		gv + 9.2,
+		(VZ0 + VZ1) / 2 + 0.2,
+		{ 70, 72, 74 },
 		"Metal",
 		ghost
 	)

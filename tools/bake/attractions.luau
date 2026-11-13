@@ -87,7 +87,8 @@ for _, m in folder:GetChildren() do
 	local id = m:GetAttribute("Site")
 	if type(id) == "string" and venues[id] ~= nil then
 		builtVenues[id] = venues[id]
-		labels[id] = { venues[id].name }
+		-- (the name without its note: "WBLW CHANNEL 7 (ABANDONED)" reads "WBLW CHANNEL 7")
+		labels[id] = { (string.gsub(venues[id].name, "%s*%b()", "")) }
 	end
 end
 for _, st in stations do
