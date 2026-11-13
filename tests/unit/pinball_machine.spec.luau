@@ -398,30 +398,45 @@ return function(t: Test.T)
 		t.eq(m.say, SAY.THUMP)
 		t.eq(Machine.TEXT[SAY.THUMP], "SOMETHING THUMPED THE GLASS!")
 		t.eq(m.warnings, 0)
-		for _ = 1, 12 do
-			b.x, b.y, b.vx, b.vy, b.asleep = Layout.XC, 2.4, 0, 0, false
-			Machine.step(acorn, m, 0, out)
-			Machine.step(acorn, m, BTN.THUMP, out)
+		t.near(m.bob, Machine.THUMP_BOB, 1e-9, "half a nudge of swing on the tilt bob")
+		t.truthy(Machine.THUMP_BOB <= 0.5)
+		-- on top of the player's own shoving it can be the swing that warns: the first warning, never the second
+		local function shoved(warnings: number): Machine.State
+			local s = Machine.new(acorn, 1, 1)
+			launch(acorn, s, 0.9, out)
+			park(acorn, s, BTN.NUDGE_L, 1, out)
+			park(acorn, s, 0, 20, out)
+			s.warnings = warnings
+			t.truthy(s.bob + Machine.THUMP_BOB > Machine.BOB_LIMIT)
+			park(acorn, s, BTN.THUMP, 1, out)
+			return s
 		end
-		t.truthy(m.warnings >= 1, "a storm of thumps can warn")
-		t.truthy(m.warnings <= Machine.WARNINGS)
-		t.falsy(m.tilted, "but never tilts")
-		t.eq(count(out, CUE.TILT), 0)
+		local first = shoved(0)
+		t.eq(first.warnings, 1, "a thump while the bob is swinging can warn")
+		t.falsy(first.tilted)
+		local second = shoved(1)
+		t.eq(second.warnings, 1, "it never spends the last warning")
+		t.falsy(second.tilted)
 		-- and with both warnings already spent by the player, a thump still does not tilt
-		m.warnings = Machine.WARNINGS
-		m.bob = Machine.BOB_LIMIT
-		Machine.step(acorn, m, 0, out)
-		Machine.step(acorn, m, BTN.THUMP, out)
-		t.falsy(m.tilted)
+		local spent = shoved(Machine.WARNINGS)
+		t.eq(spent.warnings, Machine.WARNINGS)
+		t.falsy(spent.tilted)
+		t.eq(count(out, CUE.TILT), 0)
 	end)
 
-	t.test("PIN-R4: one extra ball at most per player per game; it is the same player's ball again", function()
+	t.test("PIN-R4: one extra ball at most per game; it is the same player's ball again", function()
 		local m = Machine.new(acorn, 1, 2)
 		local out: { number } = {}
 		launch(acorn, m, 0.9, out)
+		t.eq(Machine.EXTRA_BALLS, 1, "one in the whole game, whoever earns it")
+		-- player 2's sheet has its extra ball lit from an earlier ball
+		m.sheets[2].extraLit = 1
+		t.truthy(Machine.extraOpen(m))
 		t.truthy(Machine.extraBall(m, out))
+		t.falsy(Machine.extraOpen(m))
 		t.falsy(Machine.extraBall(m, out), "never a second one")
 		t.eq(m.extras[1], 1)
+		t.eq(m.sheets[2].extraLit, 0, "every player's extra-ball light goes out once it is taken")
 		t.eq(count(out, CUE.EXTRA_BALL), 1)
 		t.eq(Machine.lamps(acorn, m, {})[acorn.ix.lamp.shoot_again] > 0, true)
 		m.saveLeft, m.graceLeft = 0, 0
@@ -436,26 +451,25 @@ return function(t: Test.T)
 		t.eq(m.ball, 1, "the same ball number")
 		t.eq(m.say, SAY.SHOOT_AGAIN)
 		t.falsy(m.shootAgain)
-		-- the second player can still earn theirs; the first cannot earn another
+		-- it was the game's one: neither player can earn another
 		t.falsy(Machine.extraBall(m, out))
 		loseBall(acorn, m, out)
 		t.eq(m.up, 2)
-		t.truthy(Machine.extraBall(m, out))
-		-- in all: player 1 plays four balls, never five
-		local starts = 0
+		t.falsy(Machine.extraBall(m, out), "player 2 cannot earn a second extra ball for the game")
+		t.eq(m.extras[2], 0)
+		-- in all: seven balls are played, never eight
 		for _ = 1, 12 do
 			if m.phase == PHASE.OVER then
 				break
-			end
-			if m.up == 1 then
-				starts += 1
 			end
 			loseBall(acorn, m, out)
 		end
 		t.eq(m.phase, PHASE.OVER)
 		t.eq(m.stats[1].balls, 4)
+		t.eq(m.stats[2].balls, 3)
 		t.eq(m.stats[1].extraBalls, 1)
-		t.eq(starts, 2)
+		t.eq(m.stats[2].extraBalls, 0)
+		t.eq(count(out, CUE.EXTRA_BALL), 1)
 	end)
 
 	t.test("PIN-R4: free play: the machine knows no credit, no coin, no replay award and no match number", function()
@@ -609,6 +623,131 @@ return function(t: Test.T)
 			end
 		end
 	)
+
+	t.test(
+		"PIN-R5: a player who leaves with an extra ball owed is not given it: the next player still here is up",
+		function()
+			for _, when in { "in mid-ball", "during the bonus count" } do
+				local m = Machine.new(acorn, 1, 2)
+				local out: { number } = {}
+				launch(acorn, m, 0.9, out)
+				t.truthy(Machine.extraBall(m, out), when)
+				t.truthy(m.shootAgain)
+				if when == "during the bonus count" then
+					m.saveLeft, m.graceLeft = 0, 0
+					lose(m)
+					for _ = 1, 600 do
+						Machine.step(acorn, m, 0, out)
+						if m.phase == PHASE.BONUS then
+							break
+						end
+					end
+					t.eq(m.phase, PHASE.BONUS, when)
+				end
+				Machine.retire(acorn, m, 1, out)
+				t.falsy(m.shootAgain, `{when}: the ball owed went with the player`)
+				for _ = 1, Machine.FORFEIT_TICKS + 4000 do
+					Machine.step(acorn, m, 0, out)
+					if m.phase == PHASE.PLAY and m.ballTicks == 0 and not m.forfeit then
+						break
+					end
+				end
+				t.eq(m.phase, PHASE.PLAY, when)
+				t.eq(m.up, 2, `{when}: player 2's ball stands on the plunger`)
+				t.falsy(m.forfeit, when)
+				t.eq(m.stats[1].extraBalls, 0, `{when}: the extra ball was never played`)
+				t.eq(count(out, CUE.SAY, SAY.SHOOT_AGAIN), 0, when)
+			end
+			-- and whatever the state says, a ball is never started for a seat that has gone
+			local m = Machine.new(acorn, 1, 2)
+			local out: { number } = {}
+			launch(acorn, m, 0.9, out)
+			Machine.retire(acorn, m, 1, out)
+			m.shootAgain = true
+			for _ = 1, Machine.FORFEIT_TICKS + 4000 do
+				Machine.step(acorn, m, 0, out)
+				if m.phase == PHASE.PLAY and m.ballTicks == 0 and not m.forfeit then
+					break
+				end
+			end
+			t.eq(m.up, 2)
+		end
+	)
+
+	t.test("squirrel: any number of thumps and then one nudge from the player is never a tilt", function()
+		for _, gap in { 2, 24, 100, 240, 480, 700 } do
+			local m = Machine.new(acorn, 1, 1)
+			local out: { number } = {}
+			launch(acorn, m, 0.9, out)
+			for _ = 1, 30 do
+				park(acorn, m, BTN.THUMP, 1, out)
+				park(acorn, m, 0, gap - 1, out)
+			end
+			t.truthy(m.warnings < Machine.WARNINGS, `thumps {gap} ticks apart left the last warning alone`)
+			t.truthy(m.bob < Machine.BOB_LIMIT, `thumps {gap} ticks apart did not pin the bob ({m.bob})`)
+			t.falsy(m.tilted)
+			park(acorn, m, BTN.NUDGE_L, 1, out)
+			t.falsy(m.tilted, `thumps {gap} ticks apart, then the player's one nudge: no tilt`)
+			t.eq(count(out, CUE.TILT), 0)
+		end
+		-- thumps by themselves, however many, never even warn: a second one inside THUMP_COOL is the same thump
+		local m = Machine.new(acorn, 1, 1)
+		local out: { number } = {}
+		launch(acorn, m, 0.9, out)
+		for _ = 1, 40 do
+			park(acorn, m, BTN.THUMP, 1, out)
+			park(acorn, m, 0, 23, out)
+		end
+		t.eq(m.warnings, 0)
+		t.eq(count(out, CUE.TILT_WARN), 0)
+		t.truthy(Machine.THUMP_COOL >= 2 * Physics.HZ, "two seconds between thumps")
+		t.truthy(count(out, CUE.NUDGE, 4) <= 40 * 24 // Machine.THUMP_COOL + 1)
+	end)
+
+	t.test("PIN-R3: a tilted machine is dark and its rule sheet sees nothing but the drain", function()
+		for _, id in Tables.IDS do
+			local tbl = Tables.need(id)
+			local m = Machine.new(tbl, 3, 1)
+			local out: { number } = {}
+			launch(tbl, m, 0.9, out)
+			for _ = 1, 6 do
+				park(tbl, m, BTN.NUDGE_L, 1, out)
+				park(tbl, m, 0, Machine.NUDGE_COOL + 2, out)
+			end
+			t.truthy(m.tilted, id)
+			local before = digest(m.sheets[1])
+			local score = m.scores[1]
+			local stats = digest(m.stats[1])
+			table.clear(out)
+			-- the dead ball is thrown round the table from a dozen places for twenty seconds
+			for k = 1, 12 do
+				for _, b in m.phys.balls do
+					if b.mode == Physics.FREE then
+						b.x, b.y = 0.3 + 0.15 * k, 2.2 + 0.1 * (k % 5)
+						b.vx, b.vy, b.asleep = if k % 2 == 0 then 3 else -3, 5, false
+					end
+				end
+				for _ = 1, 400 do
+					Machine.step(tbl, m, BTN.LEFT + BTN.RIGHT, out)
+					if m.phase ~= PHASE.PLAY then
+						break
+					end
+					t.eq(digest(m.sheets[1]), before, `{id}: the sheet is frozen`)
+				end
+				if m.phase ~= PHASE.PLAY then
+					break
+				end
+				for _, lamp in Machine.lamps(tbl, m, {}) do
+					t.eq(lamp, 0, `{id}: every lamp is out`)
+				end
+			end
+			t.eq(m.scores[1], score, id)
+			t.eq(digest(m.stats[1]), stats, `{id}: nothing a dead ball hits is counted`)
+			t.eq(count(out, CUE.SAY), 0, `{id}: nothing is said after TILT`)
+			t.eq(count(out, CUE.JINGLE), 0, `{id}: no jingle`)
+			t.eq(count(out, CUE.EXTRA_BALL), 0, id)
+		end
+	end)
 
 	t.test("determinism: the same seed and the same buttons give the same machine, cue for cue", function()
 		for _, id in Tables.IDS do

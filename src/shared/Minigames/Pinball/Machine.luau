@@ -10,14 +10,17 @@
 --   * a ball save runs for the table's own time from the moment the ball enters the playfield: a ball lost in
 --     it comes back to the plunger and is launched by the machine;
 --   * nudges shove the ball and swing the tilt bob: two warnings a ball, the third TILTS (flippers, bumpers
---     and slingshots dead, the ball and its bonus lost). A thump on the glass from outside (an animal landing
---     on the cabinet) is one nudge that can warn but never tilt;
+--     and slingshots dead, every lamp out, the rule sheet deaf to everything but the drain, the ball and its
+--     bonus lost). A thump on the glass from outside (an animal landing on the cabinet) is half a nudge: on
+--     top of the player's own shoving it can be the swing that brings the first warning, never the last
+--     warning and never the tilt, and thumps closer together than THUMP_COOL are one thump;
 --   * the end-of-ball bonus is counted out step by step with its multiplier;
---   * one extra ball at most per player per game, earned by play; no credits, no replays, no match number;
+--   * one extra ball at most per game (EXTRA_BALLS, whoever earns it: once it is taken every player's
+--     extra-ball light goes out), earned by play; no credits, no replays, no match number;
 --   * a ball that sits still where no flipper holds it is found by a ball search (a seeded kick), so a game
 --     can always be finished;
 --   * a player who has gone for good (walked away, bitten) is retired: the ball in play is played out dead,
---     their later balls are passed over, their score stands.
+--     their later balls are passed over (an extra ball they were owed among them), their score stands.
 -- What each table scores, lights and says is its rule sheet (Sheet, in TableAcorn / TableSpicy / TableSpace):
 -- the machine hands every switch event from the physics to the sheet and offers it add(), callout(),
 -- extraBall(), feed() and the like.
@@ -31,7 +34,8 @@
 --   forfeit(table, state, out) (an abandoned ball is played out dead); retire(table, state, seat, out) (a
 --   player has gone for good); buttons(bits, pull) -> the number step() takes; pullOf(buttons) -> 0..31;
 --   lamps(table, state, into) -> into;
---   for sheets: add, callout, cue, extraBall, feed, stat, raiseDrops, dropsClear, live(state) -> number;
+--   for sheets: add, callout, cue, extraBall, extraOpen, feed, save, stat, raiseDrops, dropsClear,
+--   live(state) -> number;
 --   key(code, ref) -> shot key;
 --   clone(state) -> State; types Sheet, Table, State
 
@@ -41,6 +45,7 @@ local Physics = require("./Physics")
 local Machine = {}
 
 Machine.BALLS = 3
+Machine.EXTRA_BALLS = 1 -- extra balls in a whole game, whoever earns them (checklist PIN-R4: "one extra ball at most per game")
 Machine.MAX_PLAYERS = 4
 Machine.SAVE_GRACE = 360 -- ticks after the ball save lamp goes out in which a drain is still given back
 Machine.SKILL_TICKS = 1680 -- the skill shot is open this long after the ball leaves the shooter lane
@@ -53,6 +58,8 @@ Machine.NUDGE_COOL = 36 -- ticks: a second press sooner than this is the same sh
 Machine.BOB_LIMIT = 1.5 -- the tilt bob touches its ring past this
 Machine.BOB_SETTLE = 300 -- ticks for one nudge's swing to die away
 Machine.WARNINGS = 2 -- warnings a ball; the next one tilts
+Machine.THUMP_BOB = 0.5 -- a thump on the glass swings the bob half as far as a nudge
+Machine.THUMP_COOL = 480 -- ticks: a second thump sooner than this is the same thump (two seconds)
 Machine.BONUS_STEPS = 16
 Machine.BONUS_STEP_TICKS = 20
 Machine.BONUS_HOLD = 240 -- ticks the counted bonus stays on the display
@@ -147,7 +154,7 @@ export type State = {
 	up: number, -- the player whose ball it is
 	ball: number, -- that player's ball number, 1..BALLS
 	scores: { number },
-	extras: { number }, -- per player: extra balls earned this game (never more than one)
+	extras: { number }, -- per player: extra balls earned this game (EXTRA_BALLS in all, between them)
 	sheets: { Numbers }, -- per player: the table's own state
 	stats: { Numbers }, -- per player: bumpers, ramps, targets, bestBonus, ...
 	shootAgain: boolean,
@@ -159,6 +166,7 @@ export type State = {
 	prev: number, -- the buttons as last seen
 	bob: number,
 	nudgeCool: number,
+	thumpCool: number, -- ticks in which another thump on the glass is the same thump
 	warnings: number,
 	tilted: boolean,
 	forfeit: boolean,
@@ -199,6 +207,9 @@ export type Sheet = {
 	tick: (m: State, t: Numbers, tbl: Table, out: { number }) -> (),
 	flip: (m: State, t: Numbers, left: boolean) -> (), -- a flipper button went down (lane change)
 	drained: (m: State, t: Numbers, tbl: Table, out: { number }, saved: boolean) -> (),
+	-- the machine has just tilted: from here to the end of the ball the sheet is told of nothing but drains
+	-- (no event, no flip, no tick), so whatever was running (a countdown, a mode) is put away here
+	tilted: (m: State, t: Numbers, tbl: Table, out: { number }) -> (),
 	bonus: (m: State, t: Numbers) -> (number, number), -- base, multiplier
 	lamps: (m: State, t: Numbers, tbl: Table, lamp: { number }) -> (), -- 1 lit, 2 flashing
 	status: (m: State, t: Numbers) -> string, -- one line: what to shoot for now
@@ -281,16 +292,45 @@ function Machine.stat(m: State, key: string, n: number?)
 	s[key] = (s[key] or 0) + (n or 1)
 end
 
--- extraBall(m, out): the one extra ball a player can earn in a game. True when it was given.
+-- extraOpen(m): the game's extra ball has not been taken yet (a sheet lights its extra-ball shot only then).
+function Machine.extraOpen(m: State): boolean
+	local taken = 0
+	for _, n in m.extras do
+		taken += n
+	end
+	return taken < Machine.EXTRA_BALLS
+end
+
+-- extraBall(m, out): the one extra ball of the game, for the player up. True when it was given. Once it is
+-- taken, the extra-ball light on every player's sheet (a sheet's own `extraLit`) goes out.
 function Machine.extraBall(m: State, out: { number }): boolean
-	if m.tilted or m.extras[m.up] >= 1 then
+	if m.tilted or m.phase ~= PLAY or m.gone[m.up] or not Machine.extraOpen(m) then
 		return false
 	end
-	m.extras[m.up] = 1
+	m.extras[m.up] += 1
 	m.shootAgain = true
+	if not Machine.extraOpen(m) then
+		for _, sheet in m.sheets do
+			if sheet.extraLit ~= nil then
+				sheet.extraLit = 0
+			end
+		end
+	end
 	push(out, CUE.EXTRA_BALL, m.up, 0)
 	Machine.callout(m, out, SAY.EXTRA_BALL, 0)
 	return true
+end
+
+-- save(m, ticks): the ball save runs for at least this long from now (a sheet's own save: the start of a
+-- multiball). Nothing on a tilted or abandoned ball.
+function Machine.save(m: State, ticks: number)
+	if m.tilted or m.forfeit or m.phase ~= PLAY then
+		return
+	end
+	if ticks > m.saveLeft then
+		m.saveLeft = ticks
+	end
+	m.graceLeft = 0
 end
 
 -- feed(m, n): the machine owes the plunger n more balls (a lock, a multiball); it launches them itself.
@@ -368,6 +408,7 @@ local function startBall(m: State, tbl: Table, out: { number })
 	m.pull = 0
 	m.bob = 0
 	m.nudgeCool = 0
+	m.thumpCool = 0
 	m.warnings = 0
 	m.tilted = false
 	m.forfeit = false
@@ -407,6 +448,7 @@ function Machine.new(tbl: Table, seed: number, players: number): State
 		prev = 0,
 		bob = 0,
 		nudgeCool = 0,
+		thumpCool = 0,
 		warnings = 0,
 		tilted = false,
 		forfeit = false,
@@ -485,8 +527,10 @@ local function endBall(m: State, tbl: Table, out: { number })
 end
 
 local function nextBall(m: State, tbl: Table, out: { number })
-	if m.shootAgain then
-		m.shootAgain = false
+	-- an extra ball is the same player's ball again; one owed to a player who has gone is owed to nobody
+	local again = m.shootAgain and not m.gone[m.up]
+	m.shootAgain = false
+	if again then
 		m.stats[m.up].extraBalls += 1
 		Machine.callout(m, out, SAY.SHOOT_AGAIN, m.up)
 		startBall(m, tbl, out)
@@ -514,7 +558,7 @@ local function nextBall(m: State, tbl: Table, out: { number })
 	startBall(m, tbl, out)
 end
 
-local function tilt(m: State, out: { number })
+local function tilt(m: State, tbl: Table, out: { number })
 	m.tilted = true
 	m.phys.dead = true
 	m.saveLeft = 0
@@ -528,6 +572,7 @@ local function tilt(m: State, out: { number })
 			b.timer = 1
 		end
 	end
+	tbl.sheet.tilted(m, m.sheets[m.up], tbl, out)
 	push(out, CUE.TILT, m.up, 0)
 	Machine.callout(m, out, SAY.TILT, 0)
 end
@@ -555,12 +600,13 @@ local function nudge(m: State, tbl: Table, out: { number }, way: number)
 		local side = if Physics.rand(phys) < 0.5 then -0.4 else 0.4
 		Physics.nudge(phys, side, 0.3)
 	end
-	m.bob += 1
+	m.bob += if way == 4 then Machine.THUMP_BOB else 1
 	if m.bob > Machine.BOB_LIMIT then
 		m.bob = Machine.BOB_LIMIT
 		if way == 4 then
-			-- a thump from outside can warn but never tilt (and never spends the last warning)
-			if m.warnings < Machine.WARNINGS then
+			-- a thump from outside can be the swing that warns, but it never tilts and never spends the last
+			-- warning: that one is the player's own, so their next honest nudge is at worst a warning
+			if m.warnings < Machine.WARNINGS - 1 then
 				m.warnings += 1
 				push(out, CUE.TILT_WARN, m.warnings, 0)
 			end
@@ -570,7 +616,7 @@ local function nudge(m: State, tbl: Table, out: { number }, way: number)
 			push(out, CUE.TILT_WARN, m.warnings, 0)
 			Machine.callout(m, out, SAY.TILT_WARNING, m.warnings)
 		else
-			tilt(m, out)
+			tilt(m, tbl, out)
 		end
 	elseif way == 4 then
 		Machine.callout(m, out, SAY.THUMP, 0)
@@ -672,7 +718,11 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 			m.bob = 0
 		end
 	end
-	if band(pressed, BTN.THUMP) ~= 0 then
+	if m.thumpCool > 0 then
+		m.thumpCool -= 1
+	end
+	if band(pressed, BTN.THUMP) ~= 0 and m.thumpCool == 0 then
+		m.thumpCool = Machine.THUMP_COOL
 		nudge(m, tbl, out, 4)
 	end
 	if band(pressed, BTN.NUDGE_L + BTN.NUDGE_R + BTN.NUDGE_UP) ~= 0 and m.nudgeCool == 0 then
@@ -746,7 +796,9 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 		end
 		if code == EV.DRAIN then
 			drains += 1
-		else
+		elseif not m.tilted then
+			-- (a tilted machine's switches are dead: the sheet sees nothing a dead ball rolls over, and nothing
+			-- it hits is counted)
 			if code == EV.BUMPER and value == 1 then
 				Machine.stat(m, "bumpers")
 			elseif code == EV.STANDUP or code == EV.DROP then
@@ -802,7 +854,9 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 		end
 	end
 
-	sheet.tick(m, t, tbl, out)
+	if not m.tilted then
+		sheet.tick(m, t, tbl, out)
+	end
 
 	-- balls the machine owes come up to the plunger one at a time, when the lane is clear
 	if m.queue > 0 then
@@ -924,18 +978,23 @@ function Machine.retire(tbl: Table, m: State, seat: number, out: { number })
 		m.phys.dead = true
 		push(out, CUE.GAME_OVER, 0, 0)
 		Machine.callout(m, out, SAY.GAME_OVER, 0)
-	elseif m.up == seat and m.phase == PLAY then
-		Machine.forfeit(tbl, m, out)
+	elseif m.up == seat then
+		-- an extra ball owed to them is owed to nobody now
+		m.shootAgain = false
+		if m.phase == PLAY then
+			Machine.forfeit(tbl, m, out)
+		end
 	end
 end
 
--- lamps(table, state, into): every lamp on the playfield by number: 0 dark, 1 lit, 2 flashing.
+-- lamps(table, state, into): every lamp on the playfield by number: 0 dark, 1 lit, 2 flashing. A tilted
+-- machine is dark.
 function Machine.lamps(tbl: Table, m: State, into: { number }): { number }
 	local n = #tbl.def.lamps
 	for i = 1, n do
 		into[i] = 0
 	end
-	if m.phase ~= OVER then
+	if m.phase ~= OVER and not m.tilted then
 		tbl.sheet.lamps(m, m.sheets[m.up], tbl, into)
 		local again = tbl.ix.lamp.shoot_again
 		if again then

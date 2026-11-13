@@ -299,7 +299,7 @@ local sheet: Machine.Sheet = {
 					Machine.cue(out, CUE.JINGLE, 4, t.winters)
 				else
 					Machine.callout(m, out, SAY.ACORN, t.hoard)
-					if t.hoard == HOARD_EXTRA and m.extras[m.up] == 0 and t.extraLit == 0 then
+					if t.hoard == HOARD_EXTRA and Machine.extraOpen(m) and t.extraLit == 0 then
 						t.extraLit = 1
 						Machine.callout(m, out, Machine.SAY.EXTRA_BALL_LIT, 0)
 					end
@@ -327,6 +327,9 @@ local sheet: Machine.Sheet = {
 		end
 	end,
 	drained = function(_m, _t, _tbl, _out, _saved) end,
+	tilted = function(_m, t, _tbl, _out)
+		t.resetIn = 0
+	end,
 	bonus = function(_m, t)
 		return POINTS.bonusMade * t.made + POINTS.bonusAcorn * t.hoard, MULTS[t.mult]
 	end,

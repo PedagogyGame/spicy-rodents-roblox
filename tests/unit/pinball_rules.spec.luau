@@ -60,6 +60,34 @@ local function tick(tbl: Machine.Table, m: Machine.State, out: { number }, ticks
 	end
 end
 
+-- shove the cabinet until it tilts (the ball held in the open middle meanwhile)
+local function tiltNow(tbl: Machine.Table, m: Machine.State, out: { number })
+	for _ = 1, 8 do
+		if m.tilted then
+			return
+		end
+		for k = 1, Machine.NUDGE_COOL + 2 do
+			for _, b in m.phys.balls do
+				if b.mode == Physics.FREE and b.x < Layout.FIELD_X1 then
+					b.x, b.y, b.vx, b.vy, b.asleep = Layout.XC, 2.0, 0, 0, true
+				end
+			end
+			Machine.step(tbl, m, if k == 1 then BTN.NUDGE_L else 0, out)
+		end
+	end
+	assert(m.tilted, "the machine did not tilt")
+end
+
+local function jingles(out: { number }): number
+	local n = 0
+	for i = 1, #out, 3 do
+		if out[i] == CUE.JINGLE then
+			n += 1
+		end
+	end
+	return n
+end
+
 local function said(out: { number }, say: number): number
 	local n = 0
 	for i = 1, #out, 3 do
@@ -790,6 +818,219 @@ return function(t: Test.T)
 			t.eq(said(out2, P.SAY.DOCKED), 1)
 			fire(P, m2, out2, EV.ROLLOVER, pix.sensor.dock)
 			t.eq(m2.scores[1], PP.docked + PP.dock)
+		end
+	)
+
+	t.test(
+		"SPACE SQUIRREL: the ball lost inside the countdown does not take the prize back: LIFTOFF at once",
+		function()
+			local m, out = inPlay(P)
+			local s = m.sheets[1]
+			s.locksLit = 1
+			for i, name in { "pod_1", "pod_2" } do
+				local pod = P.def.saucers[pix.saucer[name]]
+				local b = m.phys.balls[i]
+				b.mode, b.ref, b.timer, b.x, b.y, b.asleep =
+					Physics.HELD, pix.saucer[name], pod.holdTicks, pod.x, pod.y, false
+				fire(P, m, out, EV.SAUCER, pix.saucer[name], 0, i)
+				tick(P, m, out, Machine.FEED_TICKS + 5)
+			end
+			t.eq(s.locked, 2)
+			m.saveLeft, m.graceLeft = 0, 0
+			fire(P, m, out, EV.RAIL_OUT, pix.rail.ramp_r, 1)
+			t.eq(s.count, P.COUNT_TICKS)
+			tick(P, m, out, 300)
+			-- the one loose ball goes down the middle with the count at 2
+			for _, b in m.phys.balls do
+				if b.mode == Physics.FREE then
+					b.x, b.y, b.vx, b.vy, b.asleep = Layout.XC, 0.3, 0, -2, false
+				end
+			end
+			for _ = 1, 40 do
+				Machine.step(P, m, 0, out)
+			end
+			t.eq(m.phase, PHASE.PLAY, "the ball is not over")
+			t.eq(said(out, P.SAY.LIFTOFF), 1, "the rocket goes at once")
+			t.eq(s.count, 0)
+			t.eq(s.multi, 1)
+			t.eq(s.multiballs, 1)
+			t.eq(Machine.live(m), 3, "both pods fire and the plunger makes the three up")
+			t.eq(m.queue, 1)
+			-- LIFTOFF starts a ball save of its own: a ball lost in its first seconds comes back
+			t.truthy(m.saveLeft > 0, "a ball save runs from LIFTOFF")
+			t.eq(P.LIFTOFF_SAVE, 5 * 240)
+			t.near(m.saveLeft, P.LIFTOFF_SAVE, 40)
+			for _ = 1, 120 do
+				Machine.step(P, m, 0, out)
+			end
+			local saves = 0
+			for _, b in m.phys.balls do
+				if b.mode == Physics.FREE and b.x < Layout.FIELD_X1 then
+					b.x, b.y, b.vx, b.vy, b.asleep = Layout.XC, 0.3, 0, -2, false
+					saves += 1
+					break
+				end
+			end
+			t.eq(saves, 1)
+			for _ = 1, 40 do
+				Machine.step(P, m, 0, out)
+			end
+			t.eq(said(out, Machine.SAY.BALL_SAVED), 1)
+			t.eq(Machine.live(m), 3, "it is given back")
+			-- the ordinary countdown ends in the same LIFTOFF with the same save
+			local m2, out2 = inPlay(P)
+			local s2 = m2.sheets[1]
+			s2.locked = 2
+			fire(P, m2, out2, EV.RAIL_OUT, pix.rail.ramp_l, 1)
+			tick(P, m2, out2, P.COUNT_TICKS + 1)
+			t.eq(s2.multi, 1)
+			t.near(m2.saveLeft, P.LIFTOFF_SAVE, 2)
+			-- a ball saved by the ordinary ball save is not lost, so the count simply runs on
+			local m3, out3 = inPlay(P)
+			local s3 = m3.sheets[1]
+			s3.locked = 2
+			fire(P, m3, out3, EV.RAIL_OUT, pix.rail.ramp_l, 1)
+			m3.saveLeft = 2000
+			local b3 = m3.phys.balls[1]
+			b3.x, b3.y, b3.vx, b3.vy, b3.asleep = Layout.XC, 0.3, 0, -2, false
+			for _ = 1, 40 do
+				Machine.step(P, m3, 0, out3)
+			end
+			t.eq(s3.multi, 0)
+			t.truthy(s3.count > 0, "still counting")
+			t.eq(said(out3, P.SAY.LIFTOFF), 0)
+		end
+	)
+
+	t.test(
+		"PIN-R3 SPACE SQUIRREL: a tilt stops the countdown, and a dead ball in a lit pod is kicked out, not locked",
+		function()
+			-- the countdown
+			local m, out = inPlay(P)
+			local s = m.sheets[1]
+			s.locked = 2
+			fire(P, m, out, EV.RAIL_OUT, pix.rail.ramp_l, 1)
+			t.eq(s.count, P.COUNT_TICKS)
+			tiltNow(P, m, out)
+			t.eq(s.count, 0, "no countdown on a tilted machine")
+			table.clear(out)
+			tick(P, m, out, P.COUNT_TICKS + 10)
+			t.eq(s.multi, 0, "and no LIFTOFF into a dead multiball")
+			t.eq(said(out, P.SAY.COUNT), 0)
+			t.eq(said(out, P.SAY.LIFTOFF), 0)
+			t.eq(s.locked, 2, "the locks the player has are still theirs for the next ball")
+			-- the lit pod
+			local m2, out2 = inPlay(P)
+			local s2 = m2.sheets[1]
+			s2.locksLit = 1
+			tiltNow(P, m2, out2)
+			table.clear(out2)
+			local pod = P.def.saucers[pix.saucer.pod_1]
+			local b = m2.phys.balls[1]
+			b.x, b.y, b.vx, b.vy, b.asleep = pod.x, pod.y + 0.3, 0, -1, false
+			local fell = false
+			for _ = 1, 200 do
+				Machine.step(P, m2, 0, out2)
+				if b.mode == Physics.HELD then
+					fell = true
+					break
+				end
+			end
+			t.truthy(fell, "the dead ball rolled into the pod")
+			t.truthy(b.timer > 0, "the pod will kick it out")
+			t.eq(s2.locked, 0, "no lock")
+			t.eq(m2.queue, 0, "no new ball is served")
+			t.eq(said(out2, P.SAY.LOCKED), 0)
+			t.eq(jingles(out2), 0)
+			for _ = 1, pod.holdTicks + 5 do
+				Machine.step(P, m2, 0, out2)
+			end
+			t.eq(b.mode, Physics.FREE, "kicked out")
+			t.eq(#m2.phys.balls, 1)
+		end
+	)
+
+	t.test(
+		"PIN-R3: on a tilted machine a dead ball does not knock letters down for the bank or put a lit extra ball out",
+		function()
+			-- ACORN: a dead ball fired into the bank
+			local m, out = inPlay(A)
+			local s = m.sheets[1]
+			s.extraLit = 1
+			tiltNow(A, m, out)
+			local b = m.phys.balls[1]
+			local hits = 0
+			for _, name in { "acorn_c", "acorn_o", "acorn_r" } do
+				local target = A.def.targets[aix.target[name]]
+				local mx, my = (target.x1 + target.x2) / 2, (target.y1 + target.y2) / 2
+				b.x, b.y, b.vx, b.vy, b.asleep = mx + 0.2, my - 0.14, -4, 2.8, false
+				for _ = 1, 40 do
+					Machine.step(A, m, 0, out)
+				end
+				if m.phys.drop[aix.target[name]] then
+					hits += 1
+				end
+			end
+			t.truthy(hits >= 2, `the dead ball knocked {hits} targets over`)
+			t.eq(s.made, 0, "nothing was made")
+			t.eq(s.bank, 0, "no letter is remembered")
+			-- the lit extra-ball target
+			local oak = A.def.targets[aix.target.oak_r]
+			b.x, b.y, b.vx, b.vy, b.asleep = (oak.x1 + oak.x2) / 2 - 0.1, (oak.y1 + oak.y2) / 2 - 0.1, 3, 3, false
+			for _ = 1, 30 do
+				Machine.step(A, m, 0, out)
+			end
+			t.eq(s.extraLit, 1, "the light is still there for the next ball")
+			t.falsy(m.shootAgain)
+			-- SPICY: the bite
+			local m2, out2 = inPlay(S)
+			local s2 = m2.sheets[1]
+			s2.extraLit = 1
+			s2.biteLit = 1
+			tiltNow(S, m2, out2)
+			local bite = S.def.saucers[six.saucer.bite]
+			local b2 = m2.phys.balls[1]
+			b2.x, b2.y, b2.vx, b2.vy, b2.asleep = bite.x, bite.y - 0.2, 0, 2, false
+			local held = false
+			for _ = 1, 120 do
+				Machine.step(S, m2, 0, out2)
+				held = held or b2.mode == Physics.HELD
+			end
+			t.truthy(held, "the dead ball went into the bite")
+			t.eq(s2.extraLit, 1)
+			t.eq(s2.biteLit, 1)
+			t.falsy(m2.shootAgain)
+		end
+	)
+
+	t.test(
+		"PIN-R5, C13: a seat that leaves with an extra ball owed: the turn is the next seat still present",
+		function()
+			for _, when in { "in mid-ball", "during the bonus count" } do
+				local rules = Rules.forTable("pinball_space")
+				local g = Minigame.start(rules, 2, 5)
+				local turn = rules.turn :: (any) -> number?
+				local gone = rules.gone :: (any, number) -> ()
+				local r = Rules.replay(g.state)
+				assert(r, "a replay")
+				t.truthy(Minigame.input(g, 1, "seg", { { 0, 600, 1, BTN.PLUNGE, 250, 0 } }))
+				t.truthy(Machine.extraBall(r.m, {}), when)
+				if when == "during the bonus count" then
+					r.m.saveLeft, r.m.graceLeft = 0, 0
+					for _, b in r.m.phys.balls do
+						b.x, b.y, b.vx, b.vy, b.asleep = Layout.XC, 0.3, 0, -2, false
+					end
+					t.truthy(Minigame.input(g, 1, "seg", { { 600, 660 } }))
+					t.eq(r.m.phase, PHASE.BONUS)
+				end
+				gone(g.state, 1)
+				t.eq(turn(g.state), 2, when)
+				t.eq(r.m.up, 2, when)
+				t.falsy(r.m.forfeit, when)
+				t.eq(r.m.ballTicks, 0, `{when}: seat 2's fresh ball stands on the plunger`)
+				local ok, why = Minigame.input(g, 2, "seg", { { r.tick, r.tick + 24 } })
+				t.truthy(ok, `{when}: seat 2's first segment is taken ({why})`)
+			end
 		end
 	)
 

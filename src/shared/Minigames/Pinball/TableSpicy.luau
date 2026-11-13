@@ -296,7 +296,7 @@ local sheet: Machine.Sheet = {
 				t.made += 1
 				Machine.callout(m, out, SAY.WIRE, t.wires)
 				warm(m, t, out, HEAT.wire)
-				if t.wires % WIRES_FOR_EXTRA == 0 and m.extras[m.up] == 0 and t.extraLit == 0 then
+				if t.wires % WIRES_FOR_EXTRA == 0 and Machine.extraOpen(m) and t.extraLit == 0 then
 					t.extraLit = 1
 					Machine.callout(m, out, Machine.SAY.EXTRA_BALL_LIT, 0)
 				end
@@ -381,6 +381,7 @@ local sheet: Machine.Sheet = {
 			t.heat /= 2
 		end
 	end,
+	tilted = function(_m, _t, _tbl, _out) end,
 	bonus = function(_m, t)
 		return POINTS.bonusEach * t.made, LEVEL_MULT[t.peak]
 	end,
@@ -388,7 +389,8 @@ local sheet: Machine.Sheet = {
 		local L = ix.lamp
 		local lv = level(t)
 		local flash = if lv == 4 then 2 else 1
-		lamp[L.wire] = if t.extraLit == 0 and t.wires % WIRES_FOR_EXTRA == WIRES_FOR_EXTRA - 1 then 2 else flash
+		local next = t.extraLit == 0 and Machine.extraOpen(m) and t.wires % WIRES_FOR_EXTRA == WIRES_FOR_EXTRA - 1
+		lamp[L.wire] = if next then 2 else flash
 		for i = 1, 5 do
 			if bit(t.letters, i) then
 				lamp[L[`spicy_{LETTER_NAMES[i]}`]] = flash

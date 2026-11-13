@@ -298,7 +298,7 @@ local function flowShot(m: Machine.State, t: Machine.Numbers, out: { number }, r
 	if not ramp then
 		t.orbits += 1
 		Machine.stat(m, "orbits")
-		if t.orbits == ORBITS_FOR_EXTRA and m.extras[m.up] == 0 and t.extraLit == 0 then
+		if t.orbits == ORBITS_FOR_EXTRA and Machine.extraOpen(m) and t.extraLit == 0 then
 			t.extraLit = 1
 			Machine.callout(m, out, Machine.SAY.EXTRA_BALL_LIT, 0)
 		end
