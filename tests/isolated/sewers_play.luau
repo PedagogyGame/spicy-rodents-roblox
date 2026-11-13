@@ -11,7 +11,7 @@
 --     render step run; Workspace.Sewers is a fake-engine copy of the real bake's lights (each light at its
 --     attachment's world point, with the bake's Space attributes and pipe models), so S3's lamp lookup is held to
 --     what S1 really bakes
--- What it shows: "E: down the drain" on the grate before E; in with E, through the chamber, out on its feet at the
+-- What it shows: "E or W: down the drain" on the grate before E; in with E, through the chamber, out on its feet at the
 -- far corner; the crossroads' baked lights on while inside and every light back as baked after; "W: climb out" at
 -- the top of the far shaft; the people who saw it go say so, the officer watches the NW grate for sewer.stakeoutSecs
 -- and says "It went down the drain!", nobody spots the rodent while it is under the street, and the officer never
@@ -222,7 +222,7 @@ return function(t)
 			for _ = 1, 60 do
 				frame()
 			end
-			t.truthy((said["E: down the drain"] or 0) >= 30, "on the grate facing in: E: down the drain")
+			t.truthy((said[SewerAmbience.PROMPT.down] or 0) >= 30, "on the grate facing in: E or W: down the drain")
 			t.eq(svc:underground(rodent.id), nil, "on the grate it is still in the street")
 			-- E, then W held with the view toward the far corner, until it has stood out on the street 30 frames
 			local cam = BakedWorld.cameraYawToward(se.x - nw.x, se.z - nw.z)
@@ -251,7 +251,10 @@ return function(t)
 			t.eq(svc:underground(rodent.id), nil, "back in the open")
 			t.truthy((said["W: climb out"] or 0) >= 5, "the top of the far shaft: W: climb out")
 			t.truthy(insideFrames > 200, `inside for {insideFrames} frames`)
-			t.eq(crossroadsLit, #lights["sewer.crossroads"], "every baked crossroads light on inside")
+			t.truthy(
+				crossroadsLit >= 3 and crossroadsLit <= SewerAmbience.C.maxLit,
+				`the crossroads lights round the body on inside ({crossroadsLit} of {#lights["sewer.crossroads"]})`
+			)
 			t.eq(otherLit, 0, "no other drain's lights")
 			t.eq(spotsUnder, 0, "nobody spotted it under the street")
 			-- the linger runs out: every light as baked, the reverb back

@@ -225,7 +225,10 @@ return function(t)
 			local said: { [string]: number } = {}
 			local placeSeen, maxLevel = nil, 0
 			local insideFrames, crossroadsLit, otherLit, maxShadows = 0, 0, 0, 0
+			local farLit = 0
 			local cameraGrade: any = nil
+			local outAt = false
+			local downAfterOut = 0
 			for _, p in poses do
 				pose(r, p)
 				local prompt = h.prompt()
@@ -233,10 +236,24 @@ return function(t)
 					said[prompt] = (said[prompt] or 0) + 1
 				end
 				maxLevel = math.max(maxLevel, h.level())
+				if insideFrames > 0 and layout.contains(p.x, p.y, p.z) == nil and h.space() == nil then
+					outAt = true -- came up: the run goes on along the street from here
+				end
+				if outAt and prompt and string.find(prompt, "down the drain", 1, true) then
+					downAfterOut += 1
+				end
 				if h.space() then
 					insideFrames += 1
 					placeSeen = h.place()
 					crossroadsLit = math.max(crossroadsLit, lit(r.lights["sewer.crossroads"]))
+					-- only the lamps round the body: none farther than C.lampRadius
+					for _, l in r.lights["sewer.crossroads"] do
+						local q = if l.Parent:IsA("Attachment") then l.Parent.WorldPosition else l.Parent.Position
+						local d = math.sqrt((q.X - p.x) ^ 2 + (q.Y - p.y) ^ 2 + (q.Z - p.z) ^ 2)
+						if l.Enabled and d > SewerAmbience.C.lampRadius + 6 then
+							farLit += 1
+						end
+					end
 					otherLit = math.max(otherLit, lit(r.lights["sewer.culvert"]) + lit(r.lights["sewer.bowllane"]))
 					local pointLights = {}
 					for _, l in r.lights["sewer.crossroads"] do
@@ -249,11 +266,23 @@ return function(t)
 					cameraGrade = workspace.CurrentCamera:FindFirstChild("SewerGrade")
 				end
 			end
-			t.truthy((said["E: down the drain"] or 0) >= 30, "standing on the grate facing in: E: down the drain")
+			local P = SewerAmbience.PROMPT
+			t.truthy((said[P.down] or 0) >= 30, "standing on the grate facing in: E or W: down the drain")
 			t.truthy((said["W: climb out"] or 0) >= 10, "the top of the far shaft: W: climb out")
+			t.truthy((said[P.crossingNow] or 0) >= 1, "the crossing's A / D, where it works")
+			t.truthy(
+				(said[string.format(P.armStraight, (layout.mouth("P1.SE") :: Mouth).name)] or 0) >= 30,
+				"past the crossing: straight on, out by the bungalow"
+			)
+			t.truthy(outAt, "came out")
+			t.eq(downAfterOut, 0, "coming up, the screen never says to go back down")
 			t.truthy(insideFrames > 200, `inside for {insideFrames} frames`)
 			t.eq(placeSeen, "UNDERGROUND · STORM DRAIN 1 CROSSROADS")
-			t.eq(crossroadsLit, #r.lights["sewer.crossroads"], "every light of the crossroads on inside")
+			t.truthy(
+				crossroadsLit >= 3 and crossroadsLit <= SewerAmbience.C.maxLit,
+				`the lamps round the body on inside ({crossroadsLit} of {#r.lights["sewer.crossroads"]})`
+			)
+			t.eq(farLit, 0, "no lamp far from the body on")
 			t.eq(otherLit, 0, "no other drain's lights")
 			t.eq(maxShadows, 2, "shadows on the two nearest lamps only")
 			t.truthy(maxLevel > 0.9, "the inside look came in")
@@ -317,16 +346,33 @@ return function(t)
 			local r = rig()
 			local street = workspace:FindFirstChild("StreetLamp"):FindFirstChild("Light")
 			local most = 0
+			local ever: { [any]: boolean } = {}
 			for _, p in run("P2.E", "P2.W") do
 				pose(r, p)
 				if r.handle.space() then
 					t.eq(lit(r.lights["sewer.crossroads"]) + lit(r.lights["sewer.bowllane"]), 0)
 					most = math.max(most, lit(r.lights["sewer.culvert"]))
+					for _, l in r.lights["sewer.culvert"] do
+						if l.Enabled then
+							ever[l] = true
+						end
+					end
 					t.eq(r.handle.place(), "UNDERGROUND · OLD RIVER CULVERT 1911")
 				end
 				t.truthy(street.Enabled and street.Shadows, "the town's lamp")
 			end
-			t.eq(most, #r.lights["sewer.culvert"])
+			local n = 0
+			for _ in ever do
+				n += 1
+			end
+			print(
+				`      the culvert: at most {most} of its {#r.lights["sewer.culvert"]} lights on at once, {n} on along the run`
+			)
+			t.truthy(
+				most >= 2 and most <= SewerAmbience.C.maxLit,
+				`at most {SewerAmbience.C.maxLit} on at once ({most})`
+			)
+			t.truthy(n >= #r.lights["sewer.culvert"] - 4, "the window moves along with the body")
 			local c = r.handle.counts()
 			t.eq(c["sewer.riverHum"], 1)
 			t.eq(c["sewer.trickle"], nil)
@@ -377,10 +423,10 @@ return function(t)
 			local m = layout.mouth("P3.S") :: Mouth
 			local prompt = r.gui:FindFirstChild("Prompt")
 			pose(r, { x = m.x, y = m.y, z = m.z, yaw = math.atan2(-m.out.x, -m.out.z) })
-			t.eq(prompt.Text, "E: down the drain")
+			t.eq(prompt.Text, SewerAmbience.PROMPT.down)
 			t.truthy(prompt.Visible)
 			pose(r, { x = m.x, y = m.y, z = m.z, yaw = math.atan2(m.out.x, m.out.z) })
-			t.truthy(string.find(prompt.Text, "then E: down the drain", 1, true) ~= nil, prompt.Text)
+			t.eq(prompt.Text, "Turn round to face Bowl Lane: walking in or E goes down the drain")
 			pose(r, { x = m.x + 20, y = m.y, z = m.z, yaw = 0 })
 			t.eq(prompt.Visible, false)
 			r.handle.stop()

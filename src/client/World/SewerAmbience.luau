@@ -11,9 +11,15 @@
 --     nearest lamps only; every light is put back exactly as the bake left it on the way out. The water's textures
 --     scroll along the flow.
 --   * the sound: SoundService.AmbientReverb = SewerPipe (restored exactly on the way out) and the named cues below.
---   * the words: a place name at the top of the screen ("UNDERGROUND · STORM DRAIN 1 CROSSROADS"), and the key
---     to press: "E: down the drain" on a grate (only where E really goes in: on it, facing in), "W: climb out" in
---     the top of a shaft; the controller's refusals reworded for a drain (filter: "No room to jump down here").
+--   * the words: a place name at the top of the screen ("UNDERGROUND · STORM DRAIN 1 CROSSROADS"), and what
+--     the keys do here, as the motor really does it (Enclosure rule 1: a body on a grate moving into the opening goes
+--     down with or without E; the contract has no E-only mouth yet): "E or W: down the drain" on a grate facing in,
+--     "Turn left / right / round to face Main Street: walking in or E goes down the drain" on it facing elsewhere
+--     (turning is walking, and walking into the opening goes in), how to step onto it near one; none of those for
+--     C.promptHold after coming up (the body is running away from the grate); "W: climb out" in the top of a shaft;
+--     in drain 1, the crossing's A / D as it comes up and which arm was taken; the controller's refusals reworded for
+--     a drain (filter: "No room to jump down here"). No compass words: the game's map has east at -x
+--     (Shared/Map/MapModel), so a grate is told by what it faces (its `toward`: a street, the river).
 -- Sound cues (SewerAmbience.CUES, cue -> asset id). NOTHING IS UPLOADED AND NOTHING PLAYS YET: every id is empty, so
 -- play() is silent and only counted; filling an id in (docs/AUDIO_BUDGET.md, Sewers) makes it sound.
 --   sewer.grateIn / grateOut   going down / coming up out of a mouth
@@ -26,10 +32,14 @@
 --   sewer.hiss                 the small alligator (v5.4's idle predator for the sewer: a sound and a line, nothing
 --                              to see): still for C.hissAfter seconds underground; the toast is HISS_LINE
 --   sewer.carOverhead, sewer.trolleyOverhead   named, not fired yet (they need the traffic poses over a pipe)
+-- Lamps: only the space's lamps within C.lampRadius of the body are on (at most C.maxLit, the nearest), moving with
+-- it as it runs; shadows on the C.shadowLamps nearest. A 370-stud culvert never has all its 34 lights on.
 -- Who goes down: squirrels and the Spicy Rodent (a person, the fox or a deer never sees the prompt and is never
 -- "inside"). Computer squirrels are not this client's business.
--- Interface (pure): C; CUES; HISS_LINE; placeName(pipe) -> string; canGoDown(species?, variant?) -> boolean;
---   shaftAt(layout, x, y, z) -> Mouth?; prompt(layout, view) -> string?; grade(level) -> { brightness, contrast,
+-- Interface (pure): C; CUES; HISS_LINE; PROMPT; placeName(pipe) -> string; canGoDown(species?, variant?) -> boolean;
+--   shaftAt(layout, x, y, z) -> Mouth?; prompt(layout, view) -> string?; turnWord(fx, fz, dx, dz) -> string;
+--   crossing(layout, view) -> string?; armAt(layout, x, z) -> Mouth?; litLamps(points, at, radius, max) -> { index };
+--   grade(level) -> { brightness, contrast,
 --   saturation, tint }; focus(level) -> { far, distance, radius }; reword(text, underground) -> string;
 --   cuePoints(layout) -> { CuePoint }; loopFor(layout, space) -> cue?
 -- Engine: start(ctx) -> Handle; ctx = { current: () -> Model?, state: (() -> { species: string? })?,
@@ -57,6 +67,11 @@ local SewerAmbience = {}
 
 SewerAmbience.C = {
 	linger = 0.3, -- s: the inside look and sound hold this long after the body leaves a drain's volume
+	promptHold = 1.0, -- s: no "down the drain" words for this long after the body leaves a drain's volume
+	crossingHint = 14, -- studs (level) from drain 1's crossing, running toward it: the side arms are named
+	armFlash = 2.0, -- s: which arm the body took at the crossing stays on screen this long
+	lampRadius = 40, -- studs from the body: the space's lamps on within it, off beyond (moving with the body)
+	maxLit = 8, -- at most this many of the space's lights on at once (the nearest)
 	ease = 6, -- per second: how fast the look comes in and goes
 	near = 3.5, -- studs (level) from a mouth point within which the way in is explained
 	climbWindow = 6, -- studs under the street: the top of a shaft, where "W: climb out" shows
@@ -92,11 +107,16 @@ SewerAmbience.CUES = {
 SewerAmbience.HISS_LINE = "A low hiss and a ripple in the sewer water…"
 
 local PROMPT = {
-	down = "E: down the drain",
-	face = "Face the opening's way (%s), then E: down the drain",
-	step = "Step onto the %s: E goes down the drain",
+	down = "E or W: down the drain",
+	face = "Turn %s to face %s: walking in or E goes down the drain",
+	step = "Onto the %s facing %s goes down the drain",
 	climb = "W: climb out",
+	crossingAhead = "The crossing: A or D there turns into a side arm (W: straight on)",
+	crossingNow = "A / D now: a side arm (W: straight on)",
+	armSide = "Side arm: out at the %s",
+	armStraight = "Straight on: out at the %s",
 }
+SewerAmbience.PROMPT = PROMPT
 
 -- the controller's refusals (Controllers/Squirrel hint reasons) as they read in a drain
 local REWORD: { [string]: string } = {
@@ -128,12 +148,19 @@ function SewerAmbience.shaftAt(layout: Layout, x: number, y: number, z: number):
 	return nil
 end
 
-local COMPASS = { "north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west" }
--- (world: north = +z, east = +x)
-local function compass(dx: number, dz: number): string
-	local a = math.atan2(dx, dz) -- 0 north, pi/2 east
-	local i = math.floor(a / (math.pi / 4) + 0.5) % 8
-	return COMPASS[i + 1]
+-- Which way to turn, from facing (fx, fz) to facing (dx, dz), as the player sees the animal from behind: "round"
+-- past 135 degrees, else "left" or "right" (Roblox: LookVector x Up is the right; facing +z, +x is on the left).
+function SewerAmbience.turnWord(fx: number, fz: number, dx: number, dz: number): string
+	local fl, dl = math.sqrt(fx * fx + fz * fz), math.sqrt(dx * dx + dz * dz)
+	if fl < 1e-6 or dl < 1e-6 then
+		return "round"
+	end
+	local cos = (fx * dx + fz * dz) / (fl * dl)
+	if cos < -0.7 then
+		return "round"
+	end
+	-- the right of a facing (fx, fz) is (-fz, fx)
+	return if (-fz * dx + fx * dz) > 0 then "right" else "left"
 end
 
 export type View = {
@@ -145,12 +172,106 @@ export type View = {
 	vy: number, -- studs/s, up
 	canGo: boolean, -- a squirrel or the rodent
 	space: string?, -- SewerLayout.contains at the feet
+	mx: number?, -- the way the body is moving (level, any length; 0 or nil: still)
+	mz: number?,
+	since: number?, -- s since the body was last in a drain's volume (nil: long ago)
 }
 
--- What to press here (nil: nothing to say). On a mouth: E goes in exactly where the motor takes it in (Enclosure
--- rule 1 for a body facing the way it stands: within the mouth's reach, within C.rise of its height, not more than
--- C.behind past it, facing in within acos(C.intoDot)); near one, how to get there. In the top C.climbWindow studs of
--- a shaft and not dropping: W climbs out.
+-- the chamber whose pipe holds `space` (drain 1's crossing), or nil
+local function chamberOf(layout: Layout, space: string): any
+	for _, p in layout.pipes do
+		if p.space == space and p.chamber then
+			for _, ch in layout.chambers do
+				if ch.id == p.chamber then
+					return ch
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- The arm of drain 1 the point (x, z) lies along, by its street mouth (the mouth whose bearing from the crossing is
+-- nearest the point's), or nil away from a crossing's pipe.
+function SewerAmbience.armAt(layout: Layout, x: number, z: number): Mouth?
+	for _, ch in layout.chambers do
+		local cx, cz = ch.crossing.x, ch.crossing.z
+		local dx, dz = x - cx, z - cz
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d < 1e-6 then
+			return nil
+		end
+		local best: Mouth? = nil
+		local bestCos = -2
+		for _, m in layout.mouths do
+			if m.space == ch.space then
+				local mx, mz = m.x - cx, m.z - cz
+				local ml = math.sqrt(mx * mx + mz * mz)
+				local cos = (dx * mx + dz * mz) / (d * ml)
+				if cos > bestCos then
+					best, bestCos = m, cos
+				end
+			end
+		end
+		if best then
+			return best
+		end
+	end
+	return nil
+end
+
+-- In drain 1, running toward the crossing: the words for its side arms (nil elsewhere). Within Enclosure.C.forkAhead
+-- of it A or D takes a side arm (the motor offers the forks only that far ahead: a press before is not kept), so
+-- "now" shows there; from C.crossingHint it is announced.
+function SewerAmbience.crossing(layout: Layout, view: View): string?
+	if view.space == nil then
+		return nil
+	end
+	local ch = chamberOf(layout, view.space :: string)
+	if ch == nil then
+		return nil
+	end
+	local dx, dz = ch.crossing.x - view.x, ch.crossing.z - view.z
+	local d = math.sqrt(dx * dx + dz * dz)
+	local mx, mz = view.mx or 0, view.mz or 0
+	local ml = math.sqrt(mx * mx + mz * mz)
+	if ml < 1e-6 or d < 0.5 or d > SewerAmbience.C.crossingHint then
+		return nil
+	end
+	if (mx * dx + mz * dz) / (ml * d) < 0.7 then
+		return nil -- not running at it
+	end
+	return if d <= Enclosure.C.forkAhead then PROMPT.crossingNow else PROMPT.crossingAhead
+end
+
+-- The lights to have on: the indices of `points` (the lights' places) within `radius` of `at`, the nearest `max`.
+function SewerAmbience.litLamps(points: { Vector3 }, at: Vector3, radius: number, max: number): { number }
+	local near: { { i: number, d: number } } = {}
+	for i, p in points do
+		local d = (p - at).Magnitude
+		if d <= radius then
+			table.insert(near, { i = i, d = d })
+		end
+	end
+	table.sort(near, function(a, b)
+		if a.d ~= b.d then
+			return a.d < b.d
+		end
+		return a.i < b.i
+	end)
+	local out = {}
+	for k = 1, math.min(max, #near) do
+		out[k] = near[k].i
+	end
+	return out
+end
+
+-- What the keys do here (nil: nothing to say). On a mouth facing in: E or W goes down, exactly where the motor takes
+-- it in (Enclosure rule 1 for a body facing the way it stands: within the mouth's reach, within C.rise of its height,
+-- not more than C.behind past it, facing in within acos(C.intoDot)); on it facing elsewhere: which way to turn, and
+-- that walking in goes down; near one, that stepping onto it facing its `toward` goes down. Nothing of that for
+-- C.promptHold after coming up. In the top C.climbWindow studs of a shaft and not dropping: W climbs out; in drain 1
+-- running at the crossing: its A / D.
 function SewerAmbience.prompt(layout: Layout, view: View): string?
 	if not view.canGo then
 		return nil
@@ -161,7 +282,10 @@ function SewerAmbience.prompt(layout: Layout, view: View): string?
 		if m and view.y >= m.shaft.top - SewerAmbience.C.climbWindow and view.vy >= SewerAmbience.C.descending then
 			return PROMPT.climb
 		end
-		return nil
+		return SewerAmbience.crossing(layout, view)
+	end
+	if view.since ~= nil and view.since < SewerAmbience.C.promptHold then
+		return nil -- just come up: running away from the grate, nothing to say about going back down
 	end
 	local m, level = layout.nearestMouth(view.x, view.z, SewerAmbience.C.near)
 	if m == nil or math.abs(view.y - m.y) > EC.rise + 0.5 then
@@ -170,13 +294,13 @@ function SewerAmbience.prompt(layout: Layout, view: View): string?
 	local dx, dz = view.x - m.x, view.z - m.z
 	local past = dx * m.out.x + dz * m.out.z < -EC.behind
 	if level > m.reach or past or math.abs(view.y - m.y) > EC.rise then
-		return string.format(PROMPT.step, m.kind)
+		return string.format(PROMPT.step, m.kind, m.toward)
 	end
 	local fl = math.sqrt(view.fx * view.fx + view.fz * view.fz)
 	if fl > 1e-6 and -(view.fx * m.out.x + view.fz * m.out.z) / fl >= EC.intoDot then
 		return PROMPT.down
 	end
-	return string.format(PROMPT.face, compass(-m.out.x, -m.out.z))
+	return string.format(PROMPT.face, SewerAmbience.turnWord(view.fx, view.fz, -m.out.x, -m.out.z), m.toward)
 end
 
 -- The colour grade at `level` (0 outside, 1 inside): darker, cooler, a little flatter, never black. The darkening is
@@ -466,18 +590,38 @@ function SewerAmbience.start(ctx: Context): Handle
 						local shadows = if d:IsA("PointLight") or d:IsA("SpotLight") then (d :: any).Shadows else nil
 						savedLights[l] = { enabled = l.Enabled, shadows = shadows }
 					end
-					l.Enabled = true
 				else
 					table.insert(flows, d :: Texture)
 				end
 			end
 		end
 	end
+	-- the lights near the body on (C.lampRadius, the nearest C.maxLit), the rest as the bake left them; shadows on
+	-- the nearest lamps
 	local function shadowNearest(at: Vector3)
+		local places: { Vector3 } = {}
+		local placed: { Light } = {}
+		for _, l in lights do
+			local p = lightPosition(l)
+			if p then
+				table.insert(places, p)
+				table.insert(placed, l)
+			end
+		end
+		local on: { [Light]: boolean } = {}
+		for _, i in SewerAmbience.litLamps(places, at, C.lampRadius, C.maxLit) do
+			on[placed[i]] = true
+		end
+		for _, l in lights do
+			local want = on[l] == true or (savedLights[l] ~= nil and (savedLights[l] :: Saved).enabled)
+			if l.Enabled ~= want then
+				l.Enabled = want
+			end
+		end
 		local ranked: { { light: Light, d: number } } = {}
 		-- (only PointLights cast the lamps' shadows; the beams keep what the bake gave them)
 		for _, l in lights do
-			if l:IsA("PointLight") then
+			if l:IsA("PointLight") and on[l] then
 				local p = lightPosition(l)
 				if p then
 					table.insert(ranked, { light = l :: Light, d = (p - at).Magnitude })
@@ -516,6 +660,9 @@ function SewerAmbience.start(ctx: Context): Handle
 	local dripIn = rng.range(C.drip[1], C.drip[2])
 	local stillFor, hissed = 0, false
 	local lampClock, scanClock = 0, 0
+	local approachArm: Mouth? = nil -- drain 1: the arm the body ran in along, toward the crossing
+	local flashText: string? = nil
+	local flashLeft = 0
 
 	local function nearestPoint(cue: string, space: string, at: Vector3): Vector3
 		local best, bestD = at, math.huge
@@ -596,12 +743,28 @@ function SewerAmbience.start(ctx: Context): Handle
 			here = if can then layout.contains(p.X, feet, p.Z) else nil
 			local look = root.CFrame.LookVector
 			local vy = if lastPos and dt > 0 then (feet - lastPos.Y) / dt else 0
-			view = { x = p.X, y = feet, z = p.Z, fx = look.X, fz = look.Z, vy = vy, canGo = can, space = here }
+			local mx = if lastPos then p.X - lastPos.X else 0
+			local mz = if lastPos then p.Z - lastPos.Z else 0
+			view = {
+				x = p.X,
+				y = feet,
+				z = p.Z,
+				fx = look.X,
+				fz = look.Z,
+				vy = vy,
+				canGo = can,
+				space = here,
+				mx = mx,
+				mz = mz,
+			}
 		end
 		if here then
 			lastInside, sinceInside = here, 0
 		else
 			sinceInside += dt
+		end
+		if view and sinceInside < math.huge then
+			view.since = sinceInside
 		end
 		local want = if here then here elseif sinceInside < C.linger then lastInside else nil
 		if want ~= current then
@@ -687,9 +850,36 @@ function SewerAmbience.start(ctx: Context): Handle
 				end
 			end
 		end
+		-- drain 1's crossing: which arm the body came along, and once past it which it took
+		flashLeft = math.max(0, flashLeft - dt)
+		if layout and view and here then
+			local ch = chamberOf(layout, here :: string)
+			if ch then
+				local dx, dz = view.x - ch.crossing.x, view.z - ch.crossing.z
+				local d = math.sqrt(dx * dx + dz * dz)
+				local outward = (view.mx or 0) * dx + (view.mz or 0) * dz
+				local arm = SewerAmbience.armAt(layout, view.x, view.z)
+				if d > 3 and outward < 0 then
+					approachArm = arm
+				elseif d > 3 and outward > 0 and approachArm and arm and arm ~= approachArm then
+					local a, b = approachArm :: Mouth, arm :: Mouth
+					local ax, az = a.x - ch.crossing.x, a.z - ch.crossing.z
+					local bx, bz = b.x - ch.crossing.x, b.z - ch.crossing.z
+					local cos = (ax * bx + az * bz) / math.sqrt((ax * ax + az * az) * (bx * bx + bz * bz))
+					flashText = string.format(if cos < -0.7 then PROMPT.armStraight else PROMPT.armSide, b.name)
+					flashLeft = C.armFlash
+					approachArm = nil
+				end
+			end
+		elseif not here then
+			approachArm = nil
+		end
 		lastPos = feetPos
 
 		promptText = if layout and view then SewerAmbience.prompt(layout, view) else nil
+		if flashLeft > 0 and promptText ~= PROMPT.climb then
+			promptText = flashText
+		end
 		setLabel(promptLabel, promptText)
 		local pipe = if current then pipeBySpace[current :: string] else nil
 		setLabel(placeLabel, if pipe then SewerAmbience.placeName(pipe) else nil)

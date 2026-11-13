@@ -1,7 +1,11 @@
 --!strict
 -- The storm drains felt from inside, on the client (Client/World/SewerAmbience; lane S3 of the sewer plan). Here, the
 -- pure part against the real motor on the pipes' stand-in (tests/lib/SewerStandIn on tests/lib/BakedWorld):
---   "E: down the drain" shows exactly where E takes the body down (every mouth, a ring of places and facings)
+--   the words on a grate tell the truth: "E or W: down the drain" exactly where E takes the body down (every mouth, a
+--   ring of places and facings), and there W goes down too; on a grate facing elsewhere, turning to face the opening
+--   (W held toward it) goes down, as the words say (the contract has no E-only mouth: Enclosure rule 1, gap N3);
+--   which way to turn, by what the grate faces, never a compass word (the game's map has east at -x)
+--   drain 1's crossing: A / D announced running at it and "now" only where the motor takes it; which arm was taken
 --   "W: climb out" shows in the top of a shaft on the way out of every run, never on the way down or in a passage
 --   the controller's refusals inside a drain (Space, Q, a click, E: the motor's hints) read as a drain's
 --   the place names, the cue points inside their pipes, every cue named in docs/AUDIO_BUDGET.md with no id yet
@@ -9,7 +13,9 @@
 -- touched) is in tests/isolated/sewer_ambience.luau, run in its own Lune process (tests/lib/Isolated says why); each
 -- of its cases is reported here as its own test.
 local fs = require("@lune/fs")
+local roblox = require("@lune/roblox")
 local Data = require("@shared/Data")
+local Enclosure = require("@shared/Routes/Enclosure")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SewerLayout = require("@shared/World/SewerLayout")
 local SewerAmbience = require("@client/World/SewerAmbience")
@@ -52,8 +58,24 @@ return function(t)
 		}
 	end
 
-	t.test("'E: down the drain' shows exactly where E goes down: every mouth, a ring of places and facings", function()
-		local said, went = 0, 0
+	local P = SewerAmbience.PROMPT
+	-- W held with the view toward (dx, dz) for up to `frames`: did the body go down this mouth's pipe?
+	local function walksIn(x: number, z: number, yaw: number, dx: number, dz: number, m: Mouth, frames: number): boolean
+		local s = SquirrelMotor.new(x, baked.groundAt(x, z, m.y + 3), z)
+		s.yaw = yaw
+		local tr = BakedWorld.drive(w, s, frames, function(): SquirrelMotor.Input
+			return BakedWorld.keys(BakedWorld.cameraYawToward(dx, dz), { fw = 1 })
+		end, {
+			stop = function(st: State): boolean
+				return st.routeId ~= nil
+			end,
+		})
+		local _ = tr
+		return s.routeId ~= nil and layout.spaceOf(s.routeId) == m.space
+	end
+
+	t.test("the words on a grate tell the truth: E or W where E goes down, turning in goes down too", function()
+		local said, went, turned, turnedIn = 0, 0, 0, 0
 		for _, m in layout.mouths do
 			for _, r in { 0, 0.5, 1.0, 1.4, 1.7, 2.5 } do
 				for k = 0, 7 do
@@ -66,13 +88,25 @@ return function(t)
 						local _, events = SquirrelMotor.step(s, BakedWorld.keys(0, { grab = true }), 1 / 60, w)
 						local entered = s.routeId ~= nil and layout.spaceOf(s.routeId) == m.space
 						local where = `{m.id} r {r} a {k} facing {f}`
-						t.eq(
-							text == "E: down the drain",
-							entered,
-							`{where}: says "{tostring(text)}", went down {entered}`
-						)
+						t.eq(text == P.down, entered, `{where}: says "{tostring(text)}", went down {entered}`)
 						if entered then
 							went += 1
+							-- and W there goes down too, as the words say
+							t.truthy(
+								walksIn(x, z, f * math.pi / 4 + 0.1, -m.out.x, -m.out.z, m, 10),
+								`{where}: W goes in`
+							)
+						end
+						if text and string.sub(text, 1, 5) == "Turn " then
+							turned += 1
+							t.truthy(string.find(text, m.toward, 1, true) ~= nil, `{where}: names what it faces`)
+							for _, word in { "north", "south", "east", "west" } do
+								t.truthy(string.find(text, word, 1, true) == nil, `{where}: no compass word ("{text}")`)
+							end
+							-- turning toward the opening, W held: down it goes (Enclosure rule 1; no E-only mouth, N3)
+							if walksIn(x, z, f * math.pi / 4 + 0.1, -m.out.x, -m.out.z, m, 30) then
+								turnedIn += 1
+							end
 						end
 						if r <= 2.5 and text == nil then
 							-- within C.near of a mouth something is always said (how to get in)
@@ -88,13 +122,15 @@ return function(t)
 		end
 		t.truthy(went >= 8 * 10, `went down from {went} places`)
 		t.truthy(said > went, "near a mouth but not on it facing in, the way in is explained")
+		print(`      on a grate facing elsewhere: {turned} places told to turn; turning in went down from {turnedIn}`)
+		t.truthy(turned > 0 and turnedIn >= turned * 0.9, "turning in goes down, as the words say")
 	end)
 
 	t.test("a person, the fox or a deer is never told to go down a drain", function()
 		for _, m in layout.mouths do
 			local s = SquirrelMotor.new(m.x, m.y, m.z)
 			s.yaw = math.atan2(-m.out.x, -m.out.z)
-			t.eq(SewerAmbience.prompt(layout, viewOf(s, 0, true)), "E: down the drain", m.id)
+			t.eq(SewerAmbience.prompt(layout, viewOf(s, 0, true)), P.down, m.id)
 			t.eq(SewerAmbience.prompt(layout, viewOf(s, 0, false)), nil, m.id)
 		end
 		t.truthy(SewerAmbience.canGoDown("squirrel", nil))
@@ -219,6 +255,95 @@ return function(t)
 		t.truthy(g1.tint[3] > g1.tint[1], "cooler (more blue than red)")
 		t.eq(SewerAmbience.focus(0).far, 0)
 		t.truthy(SewerAmbience.focus(1).far > 0, "the far end softens")
+	end)
+
+	t.test("which way to turn, as seen from behind; the arm of drain 1 a point lies along", function()
+		-- facing +z (yaw 0): +x is on the left (Shared/Map/MapModel)
+		t.eq(SewerAmbience.turnWord(0, 1, 1, 0), "left")
+		t.eq(SewerAmbience.turnWord(0, 1, -1, 0), "right")
+		t.eq(SewerAmbience.turnWord(0, 1, 0, -1), "round")
+		t.eq(SewerAmbience.turnWord(1, 0, 0, 1), "right")
+		for _, m in layout.mouthsOf("P1") do
+			local ch = layout.chambers[1]
+			local x, z = ch.crossing.x + (m.x - ch.crossing.x) * 0.3, ch.crossing.z + (m.z - ch.crossing.z) * 0.3
+			t.eq(SewerAmbience.armAt(layout, x, z), m, m.id)
+		end
+	end)
+
+	t.test("drain 1's crossing: A / D announced running at it, 'now' only where the motor takes it", function()
+		local reg = w.registry
+		local ch = layout.chambers[1]
+		for _, r in layout.routes do
+			local route = reg:get(r.id) :: any
+			if layout.spaceOf(r.id) ~= "sewer.crossroads" then
+				continue
+			end
+			local nowSeen, aheadSeen = 0, 0
+			for i = 0, 400 do
+				local tt = i / 400
+				local q = reg:pointAt(route, tt)
+				local q2 = reg:pointAt(route, math.min(1, tt + 0.0025))
+				local view: SewerAmbience.View = {
+					x = q.x,
+					y = q.y,
+					z = q.z,
+					fx = q2.x - q.x,
+					fz = q2.z - q.z,
+					vy = 0,
+					canGo = true,
+					space = layout.contains(q.x, q.y, q.z),
+					mx = q2.x - q.x,
+					mz = q2.z - q.z,
+				}
+				local text = SewerAmbience.prompt(layout, view)
+				local d = math.sqrt((q.x - ch.crossing.x) ^ 2 + (q.z - ch.crossing.z) ^ 2)
+				if text == P.crossingNow then
+					nowSeen += 1
+					t.truthy(
+						d <= Enclosure.C.forkAhead,
+						`{r.id} t {tt}: "now" {d} studs off (forks within {Enclosure.C.forkAhead})`
+					)
+				elseif text == P.crossingAhead then
+					aheadSeen += 1
+					t.truthy(
+						d > Enclosure.C.forkAhead and d <= SewerAmbience.C.crossingHint,
+						`{r.id} t {tt}: ahead at {d}`
+					)
+				end
+				-- running away from the crossing: nothing about it
+				local back: SewerAmbience.View = table.clone(view)
+				back.mx, back.mz = -view.mx :: number, -view.mz :: number
+				local bt = SewerAmbience.prompt(layout, back)
+				t.truthy(bt ~= P.crossingNow and bt ~= P.crossingAhead, `{r.id} t {tt}: not running at it`)
+			end
+			t.truthy(nowSeen > 0 and aheadSeen > 0, `{r.id}: announced ({aheadSeen}) and now ({nowSeen})`)
+		end
+	end)
+
+	t.test("just come up out of a drain: nothing said about going back down for C.promptHold", function()
+		for _, m in layout.mouths do
+			local s = SquirrelMotor.new(m.x, m.y, m.z)
+			s.yaw = math.atan2(-m.out.x, -m.out.z)
+			local v = viewOf(s)
+			v.since = 0.2
+			t.eq(SewerAmbience.prompt(layout, v), nil, `{m.id}: just out`)
+			v.since = SewerAmbience.C.promptHold + 0.1
+			t.eq(SewerAmbience.prompt(layout, v), P.down, `{m.id}: a moment later`)
+		end
+	end)
+
+	t.test("the lamps on: the nearest within the radius, at most the cap", function()
+		local pts = {}
+		for i = 1, 30 do
+			table.insert(pts, roblox.Vector3.new(i * 12, 0, 0))
+		end
+		local on = SewerAmbience.litLamps(pts :: any, roblox.Vector3.new(100, 0, 0) :: any, 40, 8)
+		t.truthy(#on <= 8 and #on >= 6, `{#on} on`)
+		for _, i in on do
+			t.truthy(math.abs(pts[i].X - 100) <= 40)
+		end
+		t.eq(#SewerAmbience.litLamps(pts :: any, roblox.Vector3.new(100, 0, 0), 40, 3), 3)
+		t.eq(#SewerAmbience.litLamps(pts :: any, roblox.Vector3.new(5000, 0, 0), 40, 8), 0)
 	end)
 
 	Isolated.register(t, "tests/isolated/sewer_ambience")
