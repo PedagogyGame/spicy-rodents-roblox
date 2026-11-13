@@ -225,6 +225,103 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"what dresses the inside is boxes too: ceilings under floors, glass on lamps, the test card, the van",
+		function()
+			local b = plan.boxes
+			local byLook: { [string]: { number } } = {}
+			for i = 1, n do
+				local look = ArenaDataPlan.LOOKS[plan.looks[i]]
+				byLook[look] = byLook[look] or {}
+				table.insert(byLook[look], i)
+			end
+			local function touches(i: number, j: number): boolean
+				local p, q = (i - 1) * 6, (j - 1) * 6
+				local e = 1e-6
+				return b[p + 1] <= b[q + 4] + e
+					and b[q + 1] <= b[p + 4] + e
+					and b[p + 2] <= b[q + 5] + e
+					and b[q + 2] <= b[p + 5] + e
+					and b[p + 3] <= b[q + 6] + e
+					and b[q + 3] <= b[p + 6] + e
+			end
+			-- a storey's slab is a ceiling with a floor on it: the same footprint, nothing between
+			for level = 0, Arena.FLOORS - 1 do
+				local ceilings = byLook[`ceiling{level}`] or {}
+				t.truthy(#ceilings >= 4, `storey {level} has a ceiling of its own`)
+				local over = if level == Arena.FLOORS - 1 then "roof" else `floor{level + 1}`
+				for _, i in ceilings do
+					local k = (i - 1) * 6
+					t.eq(plan.kinds[i], Arena.KIND.slab)
+					t.near(
+						b[k + 2],
+						(level + 1) * Arena.FLOOR_HEIGHT - (if level == Arena.FLOORS - 1 then 0 else 1),
+						1e-9
+					)
+					local found = false
+					for _, j in byLook[over] do
+						local q = (j - 1) * 6
+						if
+							b[q + 1] == b[k + 1]
+							and b[q + 3] == b[k + 3]
+							and b[q + 4] == b[k + 4]
+							and b[q + 6] == b[k + 6]
+							and b[q + 2] == b[k + 5]
+						then
+							found = true
+							t.near(b[q + 5] - b[k + 2], 1, 1e-9, "the two layers make a slab a stud thick")
+						end
+					end
+					t.truthy(found, `ceiling box {i} has its floor on it`)
+				end
+				t.truthy(PartList.LOOK[`ceiling{level}`][1] ~= PartList.LOOK[over][1], "and is not its colour")
+			end
+			-- every lamp's glass is on a lamp
+			local lenses = 0
+			for _, look in { "lens_lit", "lens_dead" } do
+				for _, i in byLook[look] or {} do
+					lenses += 1
+					local on = false
+					for _, j in byLook.lamp do
+						on = on or touches(i, j)
+					end
+					for _, j in byLook.container do
+						on = on or touches(i, j) -- (the van's headlamps; on its twin, the container's reflectors)
+					end
+					for _, j in byLook.van_cab do
+						on = on or touches(i, j)
+					end
+					t.truthy(on, `lens box {i} is on a lamp`)
+				end
+			end
+			t.truthy(lenses >= 80, `{lenses} lamps have glass`)
+			-- the test card: seven bars side by side on each core's front, on the third storey
+			local span: { { number } } = { { math.huge, -math.huge }, { math.huge, -math.huge } }
+			for _, look in { "bar_white", "bar_yellow", "bar_cyan", "bar_green", "bar_magenta", "bar_red", "bar_blue" } do
+				local list = byLook[look] or {}
+				t.eq(#list, 2, `the {look} of the north core's card and of the south's`)
+				for _, i in list do
+					local k = (i - 1) * 6
+					t.eq(math.floor(b[k + 2] / Arena.FLOOR_HEIGHT), 3)
+					t.near(b[k + 6] - b[k + 3], 0.15, 1e-9, "a bar is paint-thin, proud of the wall")
+					local side = if b[k + 3] < 0 then 1 else 2
+					span[side][1] = math.min(span[side][1], b[k + 1])
+					span[side][2] = math.max(span[side][2], b[k + 4])
+				end
+			end
+			t.near(span[1][2] - span[1][1], 14, 1e-9)
+			t.near(span[2][2] - span[2][1], 14, 1e-9)
+			-- the outside-broadcast van, east of the atrium: six wheels, a windscreen, a dish; make-up has mirrors
+			t.eq(#byLook.tyre, 6)
+			t.eq(#byLook.windscreen, 1)
+			t.eq(#byLook.dish, 1)
+			t.truthy(b[(byLook.windscreen[1] - 1) * 6 + 1] > 0, "the van is the east one")
+			t.eq(#byLook.mirror, 4)
+			t.eq(#byLook.mirror, #byLook.bulbs)
+			t.truthy(#byLook.tapes_a + #byLook.tapes_b >= 150, "the shelving carries its stock")
+		end
+	)
+
 	t.test("the dressing is outside the arena: the lobby annex with the pass desk and its windows, the mast", function()
 		local parts = PartList.dressing(venue)
 		t.truthy(#parts > 300 and #parts < 800, `{#parts} parts of dressing`)
