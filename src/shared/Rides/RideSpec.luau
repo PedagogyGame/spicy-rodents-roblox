@@ -2,10 +2,12 @@
 -- ReplicatedStorage.Shared.Rides.RideSpec
 -- The `Ride` contract (BUILD_PLAN §1.4, §3.16; brief v2 §15: rides have no controls and no score; the
 -- jet ski is the steerable exception and lives in Vehicles): a def plus a pure path sampler and an exit
--- point. W1 ships the contract and ONE stub ride (the sky lift as a straight cable between two points;
--- W3c/W4b take its ends from lot data). Pure.
--- Interface: RIDES; def(ride) -> Def?; check(def) -> (ok, err?); pathAt(def, t) -> (x, y, z); exitPoint(def) -> (x, y, z);
---            duration(def) -> seconds
+-- point. The sky lift's def takes its points from the compiled layout (data/expansion.json rides.sky_lift,
+-- the cable's centre line bullwheel to bullwheel); Rides/SkyLift owns its loop, cabins and timetable. Pure.
+-- Interface: rides() -> { [id]: Def }; def(ride) -> Def?; check(def) -> (ok, err?); pathAt(def, t) -> (x, y, z);
+--            exitPoint(def) -> (x, y, z); duration(def) -> seconds
+
+local Data = require("../Data")
 
 export type Def = {
 	ride: string,
@@ -19,21 +21,37 @@ export type Def = {
 
 local RideSpec = {}
 
-RideSpec.RIDES = {
-	-- stub ends until lot data: base near the park, top on the hill (studs)
-	sky_lift = {
-		ride = "sky_lift",
-		kind = "cable",
-		points = { { 0, 10, 0 }, { 0, 160, 600 } },
-		speed = 6 * 2.5,
-		controls = false,
-		score = false,
-		camera = "firstPerson",
-	},
-} :: { [string]: Def }
+local rides: { [string]: Def }? = nil
+
+function RideSpec.rides(): { [string]: Def }
+	if rides == nil then
+		local built: { [string]: Def } = {}
+		local exp = Data.default():module("Expansion") :: any
+		for _, r in exp.rides or {} do
+			if r.id == "sky_lift" then
+				local pts: { { number } } = {}
+				for _, p in r.points do
+					table.insert(pts, { p[1], p[2], p[3] })
+				end
+				local def: Def = {
+					ride = r.id,
+					kind = "cable",
+					points = pts,
+					speed = r.speed,
+					controls = false,
+					score = false,
+					camera = r.camera,
+				}
+				built.sky_lift = table.freeze(def)
+			end
+		end
+		rides = built
+	end
+	return rides :: { [string]: Def }
+end
 
 function RideSpec.def(ride: string): Def?
-	return RideSpec.RIDES[ride]
+	return RideSpec.rides()[ride]
 end
 
 function RideSpec.check(d: Def): (boolean, string?)
