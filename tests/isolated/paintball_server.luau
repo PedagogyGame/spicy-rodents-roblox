@@ -689,11 +689,24 @@ return function(t)
 					{ Contract.COLLISION_GROUP, Contract.COLLISION_GROUP }
 				)
 				t.truthy(kit.service:inPlay(w.player, body))
-				-- her client is the contract's stub: it sends no pose, so she is silent, and then taken off
+				-- while her client is the contract's stub it sends no pose: she is silent, and then taken off. Once
+				-- the client lane's own client is behind the rig's player it speaks for her, and she leaves by
+				-- the framework instead: either way the service's hands put her body back
 				kit.run(Clock.DROP_SECS + T.placeGrace + 0.5)
-				t.eq(kit.session.phase, "idle")
-				local left = Rig.last(w.got, "left")
-				t.truthy(left ~= nil and left.why == "dropped", "she was told why")
+				if kit.session.phase == "idle" then
+					local left = Rig.last(w.got, "left")
+					t.truthy(left ~= nil and left.why == "dropped", "she was told why")
+				else
+					local stats = kit.service:stats()
+					t.eq(
+						stats.movesRefused,
+						0,
+						`her own client's Moves are not refused ({stats.movesAccepted} accepted, {stats.movesDropped} dropped)`
+					)
+					w.svc:leave(w.player, "left")
+					kit.run(0.5)
+					t.eq(kit.session.phase, "idle")
+				end
 				x, y, z = Arena.toLocal(kit.place, root.Position.X, root.Position.Y, root.Position.Z)
 				t.falsy(Arena.inVolume(x, y, z), "back in the lobby")
 				t.deepEq({ root.CollisionGroup, limb.CollisionGroup }, { "Default", "Default" })
