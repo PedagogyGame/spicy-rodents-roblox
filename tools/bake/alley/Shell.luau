@@ -488,6 +488,11 @@ end
 -- The storefront between xa and xb: a brick base course, piers about every 8 studs, glass between them with a
 -- mullion and a transom, and the brick band above.
 local function glazedFront(kit: any, w: any, xa: number, xb: number)
+	if xb - xa < 3 then
+		-- (too narrow for a window: brick to the door's jamb)
+		kit:box(w, "FrontSolid", xa, xb, 0, H, OD0, L.FRONT_D, C.brick, "Brick")
+		return
+	end
 	local n = math.max(1, math.floor((xb - xa) / 8 + 0.5))
 	local bay = (xb - xa) / n
 	kit:box(w, "FrontBase", xa, xb, 0, 1.2, OD0, L.FRONT_D, C.brickDark, "Brick")
@@ -568,17 +573,30 @@ local function walls(kit: any, root: any, data: any)
 		local jamb = if side < 0 then ent.x0 - 0.8 else ent.x1
 		kit:box(w, "DoorJamb", jamb, jamb + 0.8, 0, 7.6, OD0, L.FRONT_D, C.brick, "Brick")
 		local hingeX = if side < 0 then ent.x0 else ent.x1
-		kit:at(w, "EntranceDoor", hingeX - side * 0.1, 3.6, L.FRONT_D + 0.3 + 1.8, 0.1, 7.0, 3.6, C.glass, "Glass", {
-			collide = false,
-			transparency = 0.5,
-			reflectance = 0.2,
-		})
+		local leaf = (ent.x1 - ent.x0) / 4 -- a pair of double doors, each leaf a quarter of the opening, propped open
+		kit:at(
+			w,
+			"EntranceDoor",
+			hingeX - side * 0.1,
+			3.6,
+			L.FRONT_D + 0.3 + leaf / 2,
+			0.1,
+			7.0,
+			leaf,
+			C.glass,
+			"Glass",
+			{
+				collide = false,
+				transparency = 0.5,
+				reflectance = 0.2,
+			}
+		)
 		kit:at(
 			w,
 			"DoorPull",
 			hingeX - side * 0.25,
 			3.6,
-			L.FRONT_D + 0.3 + 3.2,
+			L.FRONT_D + 0.3 + leaf - 0.4,
 			0.1,
 			2.2,
 			0.12,
@@ -614,8 +632,9 @@ local function walls(kit: any, root: any, data: any)
 	end
 	-- what is behind each stretch of the front
 	sign(kit, w, "SignBallShop", -23, -5, 9.2, 11.6, "PRO SHOP - BOWLING BALLS")
-	sign(kit, w, "SignGifts", 44.5, 53.5, 9.2, 11.6, "GIFTS")
-	sign(kit, w, "SignSnack", 61, 81, 9.2, 11.6, "SNACK BAR - NACHOS 5c")
+	local gz, sz = L.zone("gift_shop"), L.zone("snack_bar")
+	sign(kit, w, "SignGifts", (gz.x0 + gz.x1) / 2 - 4.5, (gz.x0 + gz.x1) / 2 + 4.5, 9.2, 11.6, "GIFTS")
+	sign(kit, w, "SignSnack", (sz.x0 + sz.x1) / 2 - 10, (sz.x0 + sz.x1) / 2 + 10, 9.2, 11.6, "SNACK BAR - NACHOS 5c")
 	sign(kit, w, "SignGames", 106, 145, 9.2, 11.6, "GAMES ROOM - POOL - PINBALL - AIR HOCKEY - DARTS")
 	-- parapet and coping round the roof (the rear's are the back module's)
 	local function parapet(name: string, x0: number, x1: number, d0: number, d1: number)
@@ -698,6 +717,41 @@ local function walls(kit: any, root: any, data: any)
 			C.plaster,
 			"Plaster"
 		)
+	end
+	-- glass shopfronts in the cross walls (kind "glass": the gift shop's onto the lobby): a sill, the glass, mullions
+	for _, o in L.OPENINGS do
+		if o.kind == "glass" and o.axis == "d" then
+			kit:box(w, "ShopfrontSill", o.at - T / 2, o.at + T / 2, 0, 1.2, o.a, o.b, C.orange, "SmoothPlastic")
+			kit:box(
+				w,
+				"ShopfrontGlass",
+				o.at - 0.08,
+				o.at + 0.08,
+				1.2,
+				o.head,
+				o.a,
+				o.b,
+				C.glass,
+				"Glass",
+				{ transparency = 0.6, reflectance = 0.15, shadow = false }
+			)
+			local n = math.max(1, math.floor((o.b - o.a) / 3 + 0.5))
+			for k = 0, n do
+				local d = o.a + (o.b - o.a) * k / n
+				kit:box(
+					w,
+					"ShopfrontMullion",
+					o.at - 0.12,
+					o.at + 0.12,
+					1.2,
+					o.head,
+					math.max(o.a, d - 0.08),
+					math.min(o.b, d + 0.08),
+					C.frame,
+					"Metal"
+				)
+			end
+		end
 	end
 	-- each aisle ends at the machine-room wall (an open doorway; the back module is beyond)
 	local md = L.MACHINE_D1

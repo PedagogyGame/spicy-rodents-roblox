@@ -189,8 +189,24 @@ return function(t)
 			end
 			t.eq(sides, 0, `{o.id}'s two rooms are on opposite sides of its wall`)
 		end
-		-- the main doors are on the Alley Walk's line (data/expansion.json xpath_alley_walk, x 1322)
+		-- the way in is a foyer, not a passage: 12-stud double doors into a lobby at least 20 wide, the gift shop opening
+		-- onto it with a door and glass; the shoe desk's counter starts 8 studs in from the doors, and the queue in
+		-- front of it (the counter is 1.8 deep; the queue 2 more) stays 4 studs off the line walked in through the doors
 		local ent = L.opening("entrance")
+		local lobby = L.zone("lobby")
+		t.truthy(ent.b - ent.a >= 12, `the main doors are {ent.b - ent.a} wide`)
+		t.truthy(lobby.x1 - lobby.x0 >= 20, `the lobby is {lobby.x1 - lobby.x0} wide`)
+		local giftDoor, giftGlass = false, 0
+		for _, o in L.OPENINGS do
+			local joins = table.find(o.between, "lobby") ~= nil and table.find(o.between, "gift_shop") ~= nil
+			giftDoor = giftDoor or (joins and o.kind == "door")
+			giftGlass += if joins and o.kind == "glass" then o.b - o.a else 0
+		end
+		t.truthy(giftDoor and giftGlass >= 8, `the gift shop's door and {giftGlass} studs of window onto the lobby`)
+		local desk = L.opening("shoe_desk")
+		t.truthy(desk.a >= L.FRONT_D + 8, "the shoe desk's counter starts 8 in from the doors")
+		t.truthy(desk.at + 0.9 + 2 <= (ent.a + ent.b) / 2 - 4, "its queue is off the walking line")
+		-- the main doors are on the Alley Walk's line (data/expansion.json xpath_alley_walk, x 1322)
 		local ex = AlleyLayout.toWorld(place, (ent.a + ent.b) / 2, 0, ent.at)
 		t.near(ex, 1322, 1e-6)
 	end)

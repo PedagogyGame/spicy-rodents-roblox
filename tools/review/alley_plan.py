@@ -50,6 +50,7 @@ OPENING_COL = {
     "counter": (226, 120, 20),
     "window": (226, 120, 20),
     "exit": (200, 40, 40),
+    "glass": (90, 170, 220),
 }
 OPENING_WORD = {
     "door": "door",
@@ -58,6 +59,7 @@ OPENING_WORD = {
     "counter": "counter",
     "window": "window",
     "exit": "exit doors",
+    "glass": "shop window",
 }
 SKIP_MODELS = {
     "Foundation", "Tunnels", "TerrainCarve", "Ceilings", "HouseLights", "LaneLights", "Scoreboards", "Floors",

@@ -327,15 +327,16 @@ export type Zone = {
 local T = AlleyLayout.PARTITION_T
 local FD, CD = AlleyLayout.FRONT_D, AlleyLayout.CONCOURSE_D0
 -- the front rooms' cross walls stand on these lines (each wall T thick, centred)
-AlleyLayout.FRONT_WALLS_X = { -2, 14, 30, 54, 88 }
-AlleyLayout.ENTRANCE = { x0 = 18, x1 = 26 } -- the main doors in the front wall (on the Alley Walk's line)
+-- (the lobby is 21.4 wide: a foyer, not a passage; the gift shop gives it a glass shopfront and a door)
+AlleyLayout.FRONT_WALLS_X = { -2, 14, 36, 57, 88 }
+AlleyLayout.ENTRANCE = { x0 = 16, x1 = 28 } -- the main double doors, 12 wide, on the Alley Walk's line (x 1322)
 
 AlleyLayout.ZONES = {
 	{ id = "ball_shop", label = "BOWLING BALL SHOP", x0 = AlleyLayout.X0, x1 = -2 - T / 2, d0 = FD, d1 = CD - T },
 	{ id = "shoe_rental", label = "SHOE RENTAL", x0 = -2 + T / 2, x1 = 14 - T / 2, d0 = FD, d1 = CD - T },
-	{ id = "lobby", label = "LOBBY", x0 = 14 + T / 2, x1 = 30 - T / 2, d0 = FD, d1 = CD, open = true },
-	{ id = "gift_shop", label = "GIFT SHOP", x0 = 30 + T / 2, x1 = 54 - T / 2, d0 = FD, d1 = CD - T },
-	{ id = "snack_bar", label = "SNACK BAR", x0 = 54 + T / 2, x1 = 88 - T / 2, d0 = FD, d1 = CD - T },
+	{ id = "lobby", label = "LOBBY", x0 = 14 + T / 2, x1 = 36 - T / 2, d0 = FD, d1 = CD, open = true },
+	{ id = "gift_shop", label = "GIFT SHOP", x0 = 36 + T / 2, x1 = 57 - T / 2, d0 = FD, d1 = CD - T },
+	{ id = "snack_bar", label = "SNACK BAR", x0 = 57 + T / 2, x1 = 88 - T / 2, d0 = FD, d1 = CD - T },
 	{ id = "lockers", label = "LOCKERS", x0 = 88 + T / 2, x1 = AlleyLayout.HALL_X1, d0 = FD, d1 = CD, open = true },
 	{ id = "concourse", label = "CONCOURSE", x0 = AlleyLayout.X0, x1 = AlleyLayout.HALL_X1, d0 = CD, d1 = -24 },
 	{
@@ -429,7 +430,8 @@ end
 -- D a .. b. `head` is the height of the opening's top. kind: "door" (a doorway), "arch" (a wide cased opening),
 -- "counter" (a serving opening: its counter leaves COUNTER_GAP clear at the far end for the staff to walk
 -- through), "window" (a serving opening with a counter the whole width), "open" (no wall at all, a beam
--- overhead), "exit" (the steel push-bar doors).
+-- overhead), "exit" (the steel push-bar doors), "glass" (a shopfront: a low sill and glass to `head`, seen
+-- through, not walked through).
 export type Opening = {
 	id: string,
 	axis: string,
@@ -456,7 +458,7 @@ AlleyLayout.OPENINGS = {
 		axis = "x",
 		at = CD,
 		a = 14 + T / 2,
-		b = 30 - T / 2,
+		b = 36 - T / 2,
 		head = 9,
 		kind = "open",
 		between = { "lobby", "concourse" },
@@ -475,7 +477,7 @@ AlleyLayout.OPENINGS = {
 		id = "shoe_desk",
 		axis = "d",
 		at = 14,
-		a = -64,
+		a = -60, -- (the counter starts 8 in from the doors: its queue is off the way in)
 		b = -50,
 		head = 8.4,
 		kind = "counter",
@@ -495,17 +497,47 @@ AlleyLayout.OPENINGS = {
 		id = "gift_shop_door",
 		axis = "x",
 		at = CD,
-		a = 38,
-		b = 46,
+		a = 41,
+		b = 49,
 		head = 7.2,
 		kind = "door",
 		between = { "gift_shop", "concourse" },
 	},
 	{
+		id = "gift_lobby_door",
+		axis = "d",
+		at = 36,
+		a = -60,
+		b = -54,
+		head = 7.2,
+		kind = "door",
+		between = { "lobby", "gift_shop" },
+	},
+	{
+		id = "gift_window_front",
+		axis = "d",
+		at = 36,
+		a = -67,
+		b = -61.2,
+		head = 7.6,
+		kind = "glass",
+		between = { "lobby", "gift_shop" },
+	},
+	{
+		id = "gift_window_back",
+		axis = "d",
+		at = 36,
+		a = -52.8,
+		b = -49.2,
+		head = 7.6,
+		kind = "glass",
+		between = { "lobby", "gift_shop" },
+	},
+	{
 		id = "snack_counter",
 		axis = "x",
 		at = CD,
-		a = 58,
+		a = 60,
 		b = 84,
 		head = 8.4,
 		kind = "counter",
@@ -673,7 +705,7 @@ AlleyLayout.POSTS = {
 	{ id = "ball_counter", x = -8, d = -53, zone = "ball_shop", face = { 0, 1 }, what = "the ball shop's counter" },
 	{ id = "ball_wall", x = -23, d = -58, zone = "ball_shop", face = { -1, 0 }, what = "the wall of balls" },
 	{ id = "ball_drill", x = -20, d = -65, zone = "ball_shop", face = { 0, -1 }, what = "the drilling bench" },
-	{ id = "gift_counter", x = 34, d = -62, zone = "gift_shop", face = { 1, 0 }, what = "the gift shop's counter" },
+	{ id = "gift_counter", x = 46, d = -64, zone = "gift_shop", face = { 0, 1 }, what = "the gift shop's counter" },
 	{ id = "gift_shelves", x = 50, d = -58, zone = "gift_shop", face = { 1, 0 }, what = "the souvenir shelves" },
 	{ id = "snack_till", x = 62, d = -51.5, zone = "snack_bar", face = { 0, 1 }, what = "the snack bar's till" },
 	{ id = "snack_grill", x = 70, d = -65, zone = "snack_bar", face = { 0, -1 }, what = "the grill and fryer" },
@@ -764,7 +796,9 @@ AlleyLayout.ROUTES = {
 	-- the ball shop, from its door
 	ball_shop = { { -12, -36 }, { -13, -44 }, { -13, -53 }, { -8, -53 }, { -23, -58 }, { -20, -65 } },
 	-- the gift shop, from its door
-	gift_shop = { { 37, -36 }, { 42, -44 }, { 42, -55 }, { 34, -62 }, { 50, -58 } },
+	gift_shop = { { 45, -36 }, { 45, -44 }, { 45, -55 }, { 46, -64 }, { 50, -58 } },
+	-- the gift shop from the lobby, through its door in the shopfront
+	gift_lobby = { { 22, -57 }, { 33, -57 }, { 39, -57 }, { 46, -64 } },
 	-- the snack bar: from the concourse through the gap at the counter's end to the grill, the till and the fridge
 	snack_bar = { { 86, -36 }, { 82.5, -44 }, { 82.5, -50 }, { 82.5, -58 }, { 70, -65 }, { 62, -51.5 }, { 85, -62 } },
 	-- the west aisle from the concourse to the machine-room door, and the east aisle
