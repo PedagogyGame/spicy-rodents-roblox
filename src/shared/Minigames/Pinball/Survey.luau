@@ -8,12 +8,16 @@
 -- measurement (tools/games/pinball/calibrate.luau prints the count) and held to it (the specs demand none).
 --   * reachable(): every spot a ball's centre can get to from the middle of the table, on a grid: a flood
 --     fill over the places where the ball overlaps no wall, post, target or bumper. (The space behind a
---     target bank or inside a slingshot is closed and is not reached.)
+--     target bank or inside a slingshot is closed and is not reached.) The fill itself walks a grid twice as
+--     fine as the one it reports, so it finds its way down every lane a ball can roll into (a lane 1.4 balls
+--     across leaves the ball's centre a corridor of a twentieth of a stud); the spots it reports are every
+--     other one, GRID apart.
 --   * drop(): a ball let go at one spot on a live table with nobody at the buttons: it drains, or comes to
 --     rest (a dead spot), or is still moving after the time allowed (batted round a loop for ever).
 --   * rests(): drop() from every nth reachable spot outside the shooter lane (a ball does rest on the plunger).
 -- Pure; Lune-tested (tests/unit/pinball_pockets.spec.luau).
--- Interface: GRID; reachable(table, grid?) -> { number } (x, y pairs); drop(table, x, y, vx, seconds) ->
+-- Interface: GRID; free(table, x, y) -> boolean (a ball centred here overlaps nothing solid);
+--   reachable(table, grid?) -> { number } (x, y pairs); drop(table, x, y, vx, seconds) ->
 --   ("drained" | "rest" | "moving", x, y, ticks); rests(table, every?, seconds?) -> Report
 
 local Layout = require("./Layout")
@@ -64,14 +68,20 @@ local function clear(c: Layout.Compiled, x: number, y: number): boolean
 	return true
 end
 
+-- free(table, x, y): a ball centred here overlaps nothing solid (it is a place a ball can be).
+function Survey.free(tbl: Machine.Table, x: number, y: number): boolean
+	return clear(tbl.c, x, y)
+end
+
 -- reachable(table, grid): the grid spots a ball's centre can get to from the middle of the playfield.
 function Survey.reachable(tbl: Machine.Table, grid: number?): { number }
 	local c = tbl.c
-	local g = grid or Survey.GRID
+	local spacing = grid or Survey.GRID
+	local g = spacing / 2 -- the fill walks twice as fine as it reports
 	local w, h = math.floor(Layout.WIDTH / g), math.floor(Layout.LENGTH / g)
 	local seen: { [number]: boolean } = {}
 	local out: { number } = {}
-	local stack = { math.floor(Layout.XC / g), math.floor(1.7 / g) }
+	local stack = { 2 * math.floor(Layout.XC / spacing), 2 * math.floor(1.7 / spacing) }
 	while #stack > 0 do
 		local iy = table.remove(stack) :: number
 		local ix = table.remove(stack) :: number
@@ -84,8 +94,10 @@ function Survey.reachable(tbl: Machine.Table, grid: number?): { number }
 		if y < c.drainY + 0.1 or not clear(c, x, y) then
 			continue
 		end
-		table.insert(out, x)
-		table.insert(out, y)
+		if ix % 2 == 0 and iy % 2 == 0 then
+			table.insert(out, x)
+			table.insert(out, y)
+		end
 		-- the four neighbours (a step is much less than a ball across, so no wall is stepped over)
 		local n = #stack
 		stack[n + 1], stack[n + 2] = ix + 1, iy

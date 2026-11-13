@@ -30,7 +30,7 @@ def.plunger.vMin = 4.8
 def.plunger.vMax = 8.6
 
 Layout.addShell(def)
-Layout.addBottom(def, { gap = 0.26, outlane = 0.2, inlane = 0.16, pivotY = 0.62 })
+Layout.addBottom(def, { gap = 0.26, outlane = 0.22, inlane = 0.21, pivotY = 0.62 })
 
 local XC = Layout.XC
 local X1 = Layout.FIELD_X1

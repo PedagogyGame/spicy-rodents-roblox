@@ -8,8 +8,12 @@
 --   * The ball rolls on a sloped table: gravity down the table all the time, a little rolling resistance,
 --     rubber that is lively and metal and wood that are dead (a bounce keeps a share of the speed INTO the
 --     surface; slow touches keep none, so a ball can roll along a guide and come to rest in a corner).
---   * A flipper is a rotating body, not a paddle that teleports. It is driven up at FLIP_ACC_UP (a full stroke
---     in about 45 ms), falls back slower under its spring, and bounces a little off its stops. Its motion is
+--   * A flipper is a rotating body, not a paddle that teleports. Its coil pulls it up at FLIP_ACC_UP all the
+--     way to the top stop (a full stroke in about 45 ms; it is still gaining speed when it gets there, which
+--     is what sends a ball flipped early, from near the pivot, back up the flipper's own side with power: the
+--     ball takes most of its speed late in the stroke, when the face is turned that way; and a press of one
+--     screen frame is a small flick, not half a stroke). It falls back slower under its spring, and bounces a
+--     little off its stops. Its motion is
 --     worked out exactly inside every sub-step, so its surface gains speed smoothly: a ball lying on it is
 --     PUSHED (it rides the surface, sliding out toward the tip as the flipper whirls, gripped a little by the
 --     rubber), a ball that meets it is HIT (it takes the surface's speed at the point of contact, pivot distance
@@ -23,8 +27,9 @@
 --   * Nothing tunnels. Each tick is cut into as many sub-steps as it takes for the ball and the flipper
 --     surfaces to move no more than SUB_TRAVEL (under a third of the ball's radius) relative to each other, and
 --     a wall is a line the ball's centre may not come within one radius of, from either side.
---   * Pop bumpers and slingshots ADD a kick of their own (a fixed strength, give or take a seeded tenth, as a
---     real coil varies); MAX_SPEED caps the ball.
+--   * Pop bumpers and slingshots ADD a kick of their own on top of the ball's rebound (a fixed strength, give
+--     or take a seeded tenth, as a real coil varies; about three quarters of a full flip); MAX_SPEED caps the
+--     ball.
 --   * Ramps are rails: a ball that enters the mouth fast enough rides the rail, loses speed climbing (height
 --     costs GRAVITY_H per stud) and rolls back out if it stalls. A kick-out hole swallows a slow ball and
 --     throws it back out. A spinner turns as fast as the ball went through it and runs down by itself.
@@ -48,28 +53,29 @@ Physics.HZ = 240
 Physics.DT = 1 / 240
 Physics.MAX_SPEED = 30 -- studs/s (about 6.5 m/s on the real table)
 Physics.SUB_TRAVEL = Layout.BALL_R * 0.3
-Physics.MAX_SUBSTEPS = 12
+Physics.MAX_SUBSTEPS = 14
+Physics.STROKE_SUBSTEPS = 12 -- while a coil is driving a flipper up a tick is cut at least this fine: the flipper is gaining speed all the way, so when inside the tick a ball meets it decides how hard it is hit (to about a hundredth)
 Physics.ROLL_DECEL = 0.2 -- studs/s^2 of rolling resistance
 Physics.ROLL_V = 0.5 -- below this speed the resistance fades with the speed, so it can never hold a ball still on a slope or balanced on a post (only a real pocket does that)
 Physics.REST_V0 = 0.15 -- below this speed into a surface nothing bounces back
 Physics.REST_V1 = 0.6 -- from here up the surface's full liveliness
-Physics.FLIP_ACC_UP = 2500 -- rad/s^2 under the power winding of the coil: it is at full speed a third of the way up, so the tip hits hard
+Physics.FLIP_ACC_UP = 1150 -- rad/s^2 under the power winding of the coil, which pulls all the way to the top stop
 Physics.FLIP_ACC_HOLD = 300 -- rad/s^2 under the hold winding (once the flipper has reached its top stop): weak, so the flipper comes a degree or two back off the stop and is about a thirtieth of a second coming home; that is the moment of the live catch (FLIP_BAT), and the weaker the winding the longer it lasts (tools/games/pinball/calibrate.luau)
-Physics.FLIP_W_MAX = 35 -- rad/s
+Physics.FLIP_W_MAX = 52.5 -- rad/s: just over what the stroke reaches by itself at the top stop
 Physics.FLIP_W_SETTLE = 1.5 -- rad/s: how fast a flipper that has bounced off its top stop comes back to it
 Physics.FLIP_ACC_DOWN = 240 -- rad/s^2 under the return spring
 Physics.FLIP_ACC_BRAKE = 2500 -- rad/s^2 that stops a flipper let go on its way up
 Physics.FLIP_W_DOWN = 22
-Physics.FLIP_STOP_E = 0.12 -- how much of its speed the flipper keeps bouncing off the top stop
+Physics.FLIP_STOP_E = 0.08 -- how much of its speed the flipper keeps bouncing off the top stop
 Physics.FLIP_REST_E = 0.2 -- and off the bottom one
 Physics.FLIP_BOUNCE_MIN = 2 -- rad/s: slower than this it simply stops
 Physics.FLIP_E = 0.55 -- flipper rubber
 Physics.FLIP_BAT = 0.12 -- the bat's moment of inertia about its pivot, in ball masses times its length squared (a real bat and its link against a real ball): what a ball meets when the flipper is off its stop with only the hold winding on
 Physics.FLIP_MU = 0.2 -- flipper rubber grips: with none the ball is slung off the tip from anywhere, with too much every shot leaves square to the flipper; this spreads the shots along its length (tools/games/pinball/calibrate.luau)
-Physics.BUMPER_KICK = 6.5 -- studs/s outward, whatever the ball came in at
+Physics.BUMPER_KICK = 9 -- studs/s the ring adds outward, on top of the ball's own rebound off the body (three quarters of a full flip)
 Physics.BUMPER_MIN = 0.3 -- the skirt needs this much of a touch to fire
 Physics.BUMPER_E = 0.5 -- a dead bumper (tilt, or too soft a touch) is a rubber post
-Physics.SLING_KICK = 5.0
+Physics.SLING_KICK = 8 -- studs/s the kicker arm adds, on top of the rebound off the rubber
 Physics.KICK_JITTER = 0.1 -- a coil never kicks twice the same: bumpers and slingshots vary by this share, seeded (so no ball is batted round the same loop for ever)
 Physics.SLING_MIN = 0.7
 Physics.DROP_MIN = 0.4 -- speed into a drop target that knocks it down
@@ -171,6 +177,7 @@ local fRise: { number } = {} -- how much the surface's speed (state.fo) changed 
 local fDx: { number } = {} -- the flipper's direction in the sub-step in hand
 local fDy: { number } = {}
 local subG = 0 -- the speed gravity alone adds in one sub-step
+local turnT = 0 -- how long the flipper was really moving in the last turn() (less than the step when it met its top stop inside it)
 
 function Physics.new(c: Layout.Compiled, seed: number): State
 	local s: State = {
@@ -552,9 +559,11 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 					if c.cKind[i] == CIR_BUMPER then
 						if not s.dead and sp > Physics.BUMPER_MIN then
 							emit(ev, EV.BUMPER, c.cRef[i], 1, bi)
-							-- a bumper throws the ball out at its own speed, whatever came in
+							-- the ring comes down on the ball and throws it out: its own kick on top of the ball's
+							-- rebound off the body, so a hard shot comes back harder than a touch
 							local vt = b.vy * nx - b.vx * ny
-							local out = Physics.BUMPER_KICK * (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
+							local out = Physics.BUMPER_E * sp
+								+ Physics.BUMPER_KICK * (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
 							b.vx = out * nx - vt * ny
 							b.vy = out * ny + vt * nx
 							continue
@@ -630,6 +639,7 @@ end
 local function turn(c: Layout.Compiled, s: State, i: number, dt: number): number
 	local a0, w = s.fa[i], s.fw[i]
 	local start = a0
+	turnT = dt
 	local rest, up = c.frest[i], c.fup[i]
 	local a1, w1
 	if s.fp[i] then
@@ -654,6 +664,11 @@ local function turn(c: Layout.Compiled, s: State, i: number, dt: number): number
 			a1 = a0 + w * dt + 0.5 * acc * dt * dt
 		end
 		if a1 >= up then
+			-- it meets the stop part way through the step: it was moving for that part only (so its surface was
+			-- as fast as ever right up to the stop, however the step happens to be cut)
+			if a1 > a0 then
+				turnT = dt * (up - a0) / (a1 - a0)
+			end
 			a1 = up
 			s.fh[i] = true
 			w1 = if w1 > Physics.FLIP_BOUNCE_MIN then -w1 * Physics.FLIP_STOP_E else 0
@@ -728,6 +743,7 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 	-- the flippers: read the buttons, and see how far each could turn in this tick
 	local reachMoved = 0
 	local anyMoved = false
+	local stroke = false
 	for i = 1, nF do
 		local pressed = not s.dead and ((c.fbtn[i] == 1 and left) or (c.fbtn[i] == 2 and right))
 		if pressed ~= s.fp[i] then
@@ -746,6 +762,9 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 		fDy[i] = Det.sin(a0)
 		if moving then
 			anyMoved = true
+			if pressed and not s.fh[i] then
+				stroke = true
+			end
 			local moved = ((if w < 0 then -w else w) + Physics.FLIP_ACC_UP * DT) * DT * (c.freach[i] + R)
 			if moved > reachMoved then
 				reachMoved = moved
@@ -776,6 +795,9 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 	local n = 1
 	if anyFree then
 		n = math.ceil(((sqrt(top2) + g * DT) * DT + reachMoved) / Physics.SUB_TRAVEL)
+		if stroke and n < Physics.STROKE_SUBSTEPS then
+			n = Physics.STROKE_SUBSTEPS
+		end
 		if n < 1 then
 			n = 1
 		elseif n > Physics.MAX_SUBSTEPS then
@@ -807,7 +829,7 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 						-- sub-step of the tick before, at the top of a tick: a hit is as hard wherever in a tick it lands)
 						local before = s.fo[i]
 						local da = turn(c, s, i, h)
-						local om = c.fmir[i] * da / h
+						local om = if turnT > 1e-9 then c.fmir[i] * da / turnT else 0
 						local rise = om - before
 						s.fo[i] = om
 						fRise[i] = if rise < 0 then -rise else rise

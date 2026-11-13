@@ -185,7 +185,12 @@ return function(t: Test.T)
 						local what = `{id} flipper {i}, let go at {vy}`
 						t.eq(b.mode, Physics.GONE, `{what}: it rolled off the tip and drained`)
 						t.truthy(furthest > 0.95, `{what}: it rolled the whole flipper ({furthest})`)
-						t.truthy(worst < 0.012, `{what}: it never left the rubber by more than a hair ({worst})`)
+						-- (thrown down the lane it lands on the guide with a bounce, which has died to a hair by
+						-- the time it is on the flipper; let go, it never leaves the rubber at all)
+						t.truthy(
+							worst < (if vy == 0 then 0.012 else 0.02),
+							`{what}: it never left the rubber by more than a hair ({worst})`
+						)
 						t.truthy(slowest > 0.3, `{what}: it never stopped on the way ({slowest})`)
 					end
 				end
@@ -330,7 +335,9 @@ return function(t: Test.T)
 		local lo, hi = math.huge, 0
 		for _, v in a do
 			lo, hi = math.min(lo, v), math.max(hi, v)
-			t.truthy(math.abs(v - Physics.BUMPER_KICK) <= Physics.BUMPER_KICK * Physics.KICK_JITTER + 0.1, `{v}`)
+			-- (the ball arrives at 3 studs/s: its rebound off the body, and the ring's kick on top)
+			local kick = v - Physics.BUMPER_E * 3
+			t.truthy(math.abs(kick - Physics.BUMPER_KICK) <= Physics.BUMPER_KICK * Physics.KICK_JITTER + 0.1, `{v}`)
 		end
 		t.truthy(hi - lo > 0.1, `six pops are not six copies ({lo} to {hi})`)
 		t.truthy(Physics.KICK_JITTER > 0 and Physics.KICK_JITTER <= 0.15)

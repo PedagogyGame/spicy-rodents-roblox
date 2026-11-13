@@ -30,7 +30,7 @@ def.plunger.vMin = 4.2
 def.plunger.vMax = 7.6
 
 Layout.addShell(def)
-Layout.addBottom(def, { gap = 0.18, outlane = 0.16, inlane = 0.17, pivotY = 0.62 })
+Layout.addBottom(def, { gap = 0.18, outlane = 0.19, inlane = 0.22, pivotY = 0.62 })
 
 local XC = Layout.XC
 local X1 = Layout.FIELD_X1
@@ -111,10 +111,10 @@ Layout.lamp(def, "oak_l", 0.6, 2.84, "yellow")
 Layout.lamp(def, "oak_r", 1.62, 2.84, "yellow")
 
 -- a kink in each rail above the outlanes leans a ball rolling down the side toward the inlane
-Layout.wall(def, "wood", { 0.0, 1.95, 0.2, 1.62 })
-Layout.wall(def, "wood", { X1, 1.95, X1 - 0.2, 1.62 })
-Layout.post(def, 0.2, 1.62)
-Layout.post(def, X1 - 0.2, 1.62)
+Layout.wall(def, "wood", { 0.0, 1.98, 0.23, 1.67 })
+Layout.wall(def, "wood", { X1, 1.98, X1 - 0.23, 1.67 })
+Layout.post(def, 0.23, 1.67)
+Layout.post(def, X1 - 0.23, 1.67)
 
 for i = 1, 5 do
 	Layout.lamp(def, `hoard_{i}`, XC - 0.3 + 0.1 * i, 1.75, "orange")

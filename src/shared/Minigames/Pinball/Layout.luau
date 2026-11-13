@@ -19,6 +19,8 @@
 --   arc(cx, cy, r, deg0, deg1, n) -> pts; mirror(pts, xc?) -> pts; wall, post, endPost, lamp, cup; addShell (rails, arch,
 --   shooter lane), addBottom (the flippers, slings, inlanes and outlanes every table shares, from a few
 --   numbers); index(def) -> Index (element numbers by id); compile(def) -> Compiled; check(def) -> (ok, why?);
+--   LANE_MIN (the least a lane may be across, in ball diameters) and laneWidth(def, lane) -> ball diameters
+--   (the widest ball that could roll from above the lane's mouth down to its switch);
 --   cabinetPoint(x, y, h) -> (across, up, along) for the bake and the client
 
 local Det = require("./Det")
@@ -36,6 +38,8 @@ Layout.TILT_RAD = 0.12 -- the playfield's pitch in the cabinet as baked (what th
 local TILT_SIN, TILT_COS = 0.11971220728891936, 0.9928086358538663
 
 Layout.CELL = 0.2 -- grid cell size
+Layout.LANE_MIN = 1.3 -- a lane a ball rolls into is at least this many ball diameters across, all the way down (a real lane is about 1.4)
+Layout.CAP_R = 0.012 -- the cap on the top of a lane divider (a wire guide's rounded end)
 Layout.GRID_PAD = Layout.BALL_R + 0.04
 
 export type Material = { e: number, mu: number, code: number }
@@ -95,6 +99,20 @@ export type Plunger = {
 	laneTop: number, -- above this y the ball has left the shooter lane
 }
 export type Lamp = { id: string, x: number, y: number, colour: string }
+-- a lane a ball must be able to ROLL into (an inlane, an outlane): from a spot out in the open playfield
+-- (x1, y1) to a spot on its switch (x2, y2), with the middle of its mouth between (mx, my; the mouth is
+-- `mouth` studs across, clear). check() measures how wide a ball could make that trip and refuses a lane
+-- under LANE_MIN: at one ball across, a ball rattles on the posts of the mouth and almost never goes in.
+export type Lane = {
+	id: string,
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+	mx: number,
+	my: number,
+	mouth: number,
+}
 export type TableDef = {
 	id: string,
 	title: string,
@@ -112,6 +130,7 @@ export type TableDef = {
 	saucers: { Saucer },
 	rails: { Rail },
 	lamps: { Lamp },
+	lanes: { Lane },
 	plunger: Plunger,
 }
 -- element numbers by id, as the physics reports them in its events
@@ -234,6 +253,7 @@ function Layout.new(id: string, title: string): TableDef
 		saucers = {},
 		rails = {},
 		lamps = {},
+		lanes = {},
 		plunger = {
 			x = Layout.LANE_X,
 			y = 0.3 + Layout.BALL_R,
@@ -374,16 +394,21 @@ end
 
 export type BottomSpec = {
 	gap: number, -- clear space between the flipper tips at rest
-	outlane: number, -- width of each outlane
-	inlane: number, -- width of each inlane
+	outlane: number, -- from the side rail to the lane divider
+	inlane: number, -- from the divider to the back of the slingshot
 	pivotY: number,
 	len: number?,
 	rest: number?,
 	up: number?,
+	chan: number?, -- the inlane's channel under the slingshot, measured straight up (default 0.225)
+	foot: number?, -- how far the slingshot's lower corner stands from the flipper's pivot (default 0.08)
 }
 
 -- The bottom of the table every machine shares in shape: two flippers, a slingshot above each, an inlane that
 -- feeds each flipper and an outlane outside it that does not. Sensors: inlane_l, inlane_r, outlane_l, outlane_r.
+-- The lanes are lanes a ball rolls into: the divider between them ends in a small cap (CAP_R), not a post, and
+-- every mouth and the channel under the slingshot are at least 1.4 balls across with the widths the tables
+-- give (check() holds them to LANE_MIN). def.lanes lists the four.
 function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	local XC = Layout.XC
 	local len = spec.len or 0.33
@@ -432,11 +457,12 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	local function guideY(x: number): number
 		return gy0 - (x - xo) * slope
 	end
-	local chan = 0.2 -- the channel under the slingshot, measured straight up
+	local chan = spec.chan or 0.225 -- the channel under the slingshot, measured straight up
 	local bx, by = xi, guideY(xi) + chan
-	local cxs = px - 0.1
+	local cxs = px - (spec.foot or 0.08)
 	local cys = guideY(cxs) + chan
 	local ax, ay = xi, by + 0.38
+	local cap = Layout.CAP_R
 	local divTop = gy0 + 0.42
 	local left: { { mat: string, pts: { number } } } = {
 		{ mat = "metal", pts = { xo, divTop, xo, gy0, gx1, gy1 } }, -- the divider and the inlane guide
@@ -446,7 +472,10 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 		Layout.wall(def, w.mat, w.pts)
 		Layout.wall(def, w.mat, Layout.mirror(w.pts))
 	end
-	for _, p in { { xo, divTop }, { ax, ay }, { bx, by }, { cxs, cys } } do
+	-- the divider's rounded top (a ball that lands on it falls to one side or the other)
+	Layout.post(def, xo, divTop, cap, "metal")
+	Layout.post(def, 2 * XC - xo, divTop, cap, "metal")
+	for _, p in { { ax, ay }, { bx, by }, { cxs, cys } } do
 		Layout.post(def, p[1], p[2], 0.022, "rubber")
 		Layout.post(def, 2 * XC - p[1], p[2], 0.022, "rubber")
 	end
@@ -458,6 +487,20 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	local X1 = Layout.FIELD_X1
 	table.insert(def.sensors, { id = "outlane_r", kind = "rollover", x1 = X1 - xo, y1 = sy, x2 = X1, y2 = sy })
 	table.insert(def.sensors, { id = "inlane_r", kind = "rollover", x1 = X1 - xi, y1 = sy, x2 = X1 - xo, y2 = sy })
+	-- the four lanes, each from the open middle of the table above the slingshots to a spot on its switch
+	local openY = ay + 0.3
+	local inX, inW = (xo + cap + xi - 0.022) / 2, xi - 0.022 - xo - cap
+	local outX, outW = (xo - cap) / 2, xo - cap
+	local function lane(name: string, toX: number, mouthX: number, mouthY: number, width: number)
+		table.insert(
+			def.lanes,
+			{ id = name, x1 = XC, y1 = openY, x2 = toX, y2 = sy, mx = mouthX, my = mouthY, mouth = width }
+		)
+	end
+	lane("outlane_l", outX, outX, divTop, outW)
+	lane("inlane_l", (xo + xi) / 2, inX, math.max(divTop, ay), inW)
+	lane("outlane_r", X1 - outX, X1 - outX, divTop, outW)
+	lane("inlane_r", X1 - (xo + xi) / 2, X1 - inX, math.max(divTop, ay), inW)
 end
 
 -- addRamp(def, rail): a ramp is a rail (the ball's path, up off the playfield) plus what stands on the playfield
@@ -709,6 +752,137 @@ function Layout.compile(def: TableDef): Compiled
 	return c
 end
 
+-- every solid thing of a definition as flat lists: segments (x1, y1, x2, y2) and circles (x, y, r)
+local function solids(def: TableDef): ({ number }, { number })
+	local segs: { number } = {}
+	local cirs: { number } = {}
+	local function seg(x1: number, y1: number, x2: number, y2: number)
+		local n = #segs
+		segs[n + 1], segs[n + 2], segs[n + 3], segs[n + 4] = x1, y1, x2, y2
+	end
+	for _, w in def.walls do
+		for i = 1, #w.pts - 3, 2 do
+			seg(w.pts[i], w.pts[i + 1], w.pts[i + 2], w.pts[i + 3])
+		end
+	end
+	for _, v in def.slings do
+		seg(v.x1, v.y1, v.x2, v.y2)
+	end
+	for _, v in def.targets do
+		seg(v.x1, v.y1, v.x2, v.y2)
+	end
+	for _, v in def.posts do
+		local n = #cirs
+		cirs[n + 1], cirs[n + 2], cirs[n + 3] = v.x, v.y, v.r
+	end
+	for _, v in def.bumpers do
+		local n = #cirs
+		cirs[n + 1], cirs[n + 2], cirs[n + 3] = v.x, v.y, v.r
+	end
+	return segs, cirs
+end
+
+-- can a ball of this radius get from one end of the lane to the other (from the open playfield down to the
+-- switch)? A flood fill over a fine grid in the box that holds both ends.
+local LANE_GRID = 0.005
+local function lanePasses(allSegs: { number }, allCirs: { number }, lane: Lane, radius: number): boolean
+	local pad = 4 * Layout.BALL_R
+	local x0, y0 = math.min(lane.x1, lane.x2) - pad, math.min(lane.y1, lane.y2) - pad
+	local x1, y1 = math.max(lane.x1, lane.x2) + pad, math.max(lane.y1, lane.y2) + pad
+	local w, h = math.floor((x1 - x0) / LANE_GRID), math.floor((y1 - y0) / LANE_GRID)
+	local r2 = radius * radius
+	-- only what stands in the box
+	local segs: { number } = {}
+	local cirs: { number } = {}
+	for i = 1, #allSegs, 4 do
+		local ax, ay, bx, by = allSegs[i], allSegs[i + 1], allSegs[i + 2], allSegs[i + 3]
+		if
+			math.max(ax, bx) > x0 - radius
+			and math.min(ax, bx) < x1 + radius
+			and math.max(ay, by) > y0 - radius
+			and math.min(ay, by) < y1 + radius
+		then
+			local n = #segs
+			segs[n + 1], segs[n + 2], segs[n + 3], segs[n + 4] = ax, ay, bx, by
+		end
+	end
+	for i = 1, #allCirs, 3 do
+		local cx, cy, cr = allCirs[i], allCirs[i + 1], allCirs[i + 2] + radius
+		if cx > x0 - cr and cx < x1 + cr and cy > y0 - cr and cy < y1 + cr then
+			local n = #cirs
+			cirs[n + 1], cirs[n + 2], cirs[n + 3] = cx, cy, allCirs[i + 2]
+		end
+	end
+	local function clear(x: number, y: number): boolean
+		for i = 1, #segs, 4 do
+			local ax, ay = segs[i], segs[i + 1]
+			local dx, dy = segs[i + 2] - ax, segs[i + 3] - ay
+			local len2 = dx * dx + dy * dy
+			local t = if len2 > 0 then math.clamp(((x - ax) * dx + (y - ay) * dy) / len2, 0, 1) else 0
+			local qx, qy = x - (ax + dx * t), y - (ay + dy * t)
+			if qx * qx + qy * qy < r2 then
+				return false
+			end
+		end
+		for i = 1, #cirs, 3 do
+			local qx, qy = x - cirs[i], y - cirs[i + 1]
+			local rr = radius + cirs[i + 2]
+			if qx * qx + qy * qy < rr * rr then
+				return false
+			end
+		end
+		return true
+	end
+	local goalX, goalY = math.floor((lane.x2 - x0) / LANE_GRID), math.floor((lane.y2 - y0) / LANE_GRID)
+	local seen: { [number]: boolean } = {}
+	local stack = { math.floor((lane.x1 - x0) / LANE_GRID), math.floor((lane.y1 - y0) / LANE_GRID) }
+	while #stack > 0 do
+		local iy = table.remove(stack) :: number
+		local ix = table.remove(stack) :: number
+		if ix < 0 or iy < 0 or ix > w or iy > h then
+			continue
+		end
+		local key = iy * 4096 + ix
+		if seen[key] then
+			continue
+		end
+		seen[key] = true
+		if not clear(x0 + ix * LANE_GRID, y0 + iy * LANE_GRID) then
+			continue
+		end
+		-- (close to the switch is there: the grid is finer than any gap, but the goal itself may fall on a line)
+		if math.abs(ix - goalX) <= 2 and math.abs(iy - goalY) <= 2 then
+			return true
+		end
+		local n = #stack
+		stack[n + 1], stack[n + 2] = ix + 1, iy
+		stack[n + 3], stack[n + 4] = ix - 1, iy
+		stack[n + 5], stack[n + 6] = ix, iy - 1
+		stack[n + 7], stack[n + 8] = ix, iy + 1
+	end
+	return false
+end
+
+-- laneWidth(def, lane): how wide the way into the lane is at its narrowest, in ball diameters: the widest ball
+-- that could make the trip from the open playfield to the switch (to a fiftieth of a ball; 0 when not even
+-- a ball can; 3 stands for "three or more").
+function Layout.laneWidth(def: TableDef, lane: Lane): number
+	local segs, cirs = solids(def)
+	local lo, hi = 0, 3
+	if lanePasses(segs, cirs, lane, hi * Layout.BALL_R) then
+		return hi
+	end
+	for _ = 1, 8 do
+		local mid = (lo + hi) / 2
+		if lanePasses(segs, cirs, lane, mid * Layout.BALL_R) then
+			lo = mid
+		else
+			hi = mid
+		end
+	end
+	return lo
+end
+
 local function inField(x: number, y: number): boolean
 	return x >= -1e-9 and x <= Layout.WIDTH + 1e-9 and y >= -1e-9 and y <= Layout.LENGTH + 1e-9
 end
@@ -824,6 +998,23 @@ function Layout.check(def: TableDef): (boolean, string?)
 	end
 	if #def.flippers < 2 then
 		return false, "a table needs two flippers"
+	end
+	-- a lane is a lane: a ball rolls into it, it does not rattle on the posts of its mouth
+	if #def.lanes > 0 then
+		local segs, cirs = solids(def)
+		for _, lane in def.lanes do
+			local why = id("lane", "lane:" .. lane.id) or pt(lane.id, lane.x1, lane.y1) or pt(lane.id, lane.x2, lane.y2)
+			if why then
+				return false, why
+			end
+			if not lanePasses(segs, cirs, lane, Layout.LANE_MIN * Layout.BALL_R) then
+				return false,
+					`lane {lane.id} is under {Layout.LANE_MIN} ball diameters across ({string.format(
+						"%.2f",
+						Layout.laneWidth(def, lane)
+					)})`
+			end
+		end
 	end
 	if not (def.gravity > 0) then
 		return false, "gravity"

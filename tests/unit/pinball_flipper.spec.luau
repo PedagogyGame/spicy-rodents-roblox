@@ -345,6 +345,7 @@ return function(t: Test.T)
 			local px = c.fpx[LEFT] + math.cos(mid) * c.flen[LEFT] * 0.7
 			local py = c.fpy[LEFT] + math.sin(mid) * c.flen[LEFT] * 0.7
 			local speeds: { number } = {}
+			local surfaces: { number } = {}
 			local metAt: { [number]: boolean } = {}
 			for k = 0, 79 do
 				local s = Physics.new(c, 1)
@@ -358,6 +359,10 @@ return function(t: Test.T)
 					for i = 1, #ev, 4 do
 						if ev[i] == Physics.EV.FLIPPER and met == 0 then
 							met = tick
+							-- how fast the flipper's surface was under the ball in the tick they met (the coil
+							-- drives it all the way up, so it is faster the later they meet)
+							local qx, qy = b.x - c.fpx[LEFT], b.y - c.fpy[LEFT]
+							table.insert(surfaces, math.abs(s.fo[LEFT]) * math.sqrt(qx * qx + qy * qy))
 						end
 					end
 					if met > 0 and tick == met + 6 then
@@ -380,10 +385,17 @@ return function(t: Test.T)
 				t.truthy(step < 0.03, `drop {i}: {speeds[i - 1]} then {speeds[i]} studs/s (a jump of {step})`)
 				low, high = math.min(low, speeds[i]), math.max(high, speeds[i])
 			end
-			-- and every one is a real hit: faster than the surface alone could carry it (the bounce is on top)
-			local surface = Physics.FLIP_W_MAX * c.flen[LEFT] * 0.7
-			t.truthy(low > surface * 1.2, `the weakest ({low}) is well over the surface's own speed ({surface})`)
-			t.truthy(high < low * 1.25, `the spread is small ({low} to {high})`)
+			-- and every one is a real hit: faster than the surface alone could carry it (the bounce is on top),
+			-- and no faster than a full bounce off that surface
+			t.eq(#surfaces, 80)
+			for i, speed in speeds do
+				local surface = surfaces[i]
+				t.truthy(speed > surface * 1.2, `drop {i}: {speed} is well over the surface's own speed ({surface})`)
+				t.truthy(speed < (surface + 3) * (1 + Physics.FLIP_E) * 1.1, `drop {i}: {speed} off a surface at {surface}`)
+			end
+			-- the coil pulls all the way to the stop: a ball met later in the stroke is hit harder, never weaker
+			t.truthy(speeds[80] > speeds[1], `met later, hit harder ({speeds[1]} then {speeds[80]})`)
+			t.truthy(high < low * 1.5, `the spread is the stroke's own ({low} to {high})`)
 		end
 	)
 

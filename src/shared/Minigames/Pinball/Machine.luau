@@ -207,9 +207,9 @@ export type Sheet = {
 	tick: (m: State, t: Numbers, tbl: Table, out: { number }) -> (),
 	flip: (m: State, t: Numbers, left: boolean) -> (), -- a flipper button went down (lane change)
 	drained: (m: State, t: Numbers, tbl: Table, out: { number }, saved: boolean) -> (),
-	-- the machine has just gone dead. On a tilt the sheet is told of nothing but drains from here to the end of
-	-- the ball (no event, no flip, no tick); on an abandoned ball (forfeit) the switches still count but nobody
-	-- is playing. Either way whatever was running (a countdown, a mode) is put away here
+	-- the machine has just gone dead (a tilt, or a ball abandoned: forfeit). From here to the end of the ball
+	-- the sheet is told of nothing but drains (no event, no flip, no tick), so whatever was running (a
+	-- countdown, a mode) is put away here
 	tilted: (m: State, t: Numbers, tbl: Table, out: { number }) -> (),
 	bonus: (m: State, t: Numbers) -> (number, number), -- base, multiplier
 	lamps: (m: State, t: Numbers, tbl: Table, lamp: { number }) -> (), -- 1 lit, 2 flashing
@@ -797,9 +797,9 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 		end
 		if code == EV.DRAIN then
 			drains += 1
-		elseif not m.tilted then
-			-- (a tilted machine's switches are dead: the sheet sees nothing a dead ball rolls over, and nothing
-			-- it hits is counted)
+		elseif not m.tilted and not forfeit then
+			-- (a tilted machine's switches are dead, and so are an abandoned ball's: the sheet sees nothing a
+			-- dead ball rolls over, and nothing it hits is counted)
 			if code == EV.BUMPER and value == 1 then
 				Machine.stat(m, "bumpers")
 			elseif code == EV.STANDUP or code == EV.DROP then
@@ -855,7 +855,7 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 		end
 	end
 
-	if not m.tilted then
+	if not m.tilted and not forfeit then
 		sheet.tick(m, t, tbl, out)
 	end
 
@@ -936,8 +936,9 @@ function Machine.step(tbl: Table, m: State, buttons: number, out: { number })
 end
 
 -- forfeit(table, state, out): the player has walked away from this ball (an idle turn, a bite): the flippers
--- go dead, the machine launches the ball itself and it is left to drain; no ball save, no bonus is lost that
--- was earned. The caller keeps stepping; the ball ends within FORFEIT_TICKS.
+-- and the switches go dead, the machine launches the ball itself and it is left to drain; no ball save, no
+-- score for what a dead ball rolls over, no bonus lost that was earned. The caller keeps stepping; the ball
+-- ends within FORFEIT_TICKS.
 function Machine.forfeit(tbl: Table, m: State, out: { number })
 	if m.phase ~= PLAY or m.forfeit then
 		return
