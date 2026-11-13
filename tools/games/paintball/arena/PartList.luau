@@ -88,12 +88,16 @@ PartList.TONE = {
 	frame = { 164, 156, 140 },
 	pane = { 30, 36, 44 },
 	board = { 108, 84, 56 },
+	-- a ceiling tile lying where it fell
+	tile = { 204, 200, 184 },
+	-- the top of a rail, worn pale by hands
+	worn = { 196, 190, 168 },
 }
 
 local LOOK: { [string]: { any } } = {
 	floor0 = { { 92, 92, 94 }, "Concrete" },
 	floor1 = { { 62, 80, 98 }, "Fabric" },
-	floor2 = { { 40, 40, 44 }, "SmoothPlastic" },
+	floor2 = { { 54, 54, 60 }, "SmoothPlastic" },
 	floor3 = { { 146, 148, 144 }, "Slate" },
 	floor4 = { { 98, 108, 82 }, "Fabric" },
 	roof = { { 76, 76, 80 }, "Concrete" },
@@ -104,7 +108,7 @@ local LOOK: { [string]: { any } } = {
 	shutter = { { 96, 102, 106 }, "CorrodedMetal" },
 	wall0 = { { 140, 138, 130 }, "Concrete" },
 	wall1 = { { 178, 170, 148 }, "SmoothPlastic" },
-	wall2 = { { 64, 62, 70 }, "Fabric" },
+	wall2 = { { 78, 76, 88 }, "Fabric" },
 	wall3 = { { 112, 126, 132 }, "SmoothPlastic" },
 	wall4 = { { 118, 86, 60 }, "WoodPlanks" },
 	core = { { 106, 106, 110 }, "Concrete" },
@@ -189,6 +193,7 @@ local LOOK: { [string]: { any } } = {
 	keys = { { 206, 200, 182 }, "SmoothPlastic" },
 	keys_lit = { { 255, 176, 60 }, "Neon" },
 	screen = { { 26, 32, 42 }, "Glass" },
+	bulkhead = { { 226, 232, 236 }, "Neon" },
 }
 PartList.LOOK = LOOK
 
@@ -202,6 +207,7 @@ local NAMES: { [string]: string } = {
 	spawn1 = "SpawnWall",
 	spawn2 = "SpawnWall",
 	ceiling_light = "StripLight",
+	bulkhead = "BulkheadLight",
 	on_air = "OnAir",
 }
 
@@ -255,7 +261,12 @@ function PartList.solids(plan: ArenaDataPlan.Plan): { Part }
 			collide = true,
 			box = i,
 			screen = if screen then PartList.FACE[screen] else nil,
-			shadow = if look == "skylight" or look == "glass" or look == "ceiling_light" then false else nil,
+			shadow = if look == "skylight"
+					or look == "glass"
+					or look == "ceiling_light"
+					or look == "bulkhead"
+				then false
+				else nil,
 		}
 		byBox[i] = part
 		table.insert(out, part)

@@ -177,6 +177,7 @@ Plan.LOOKS = table.freeze({
 	"keys",
 	"keys_lit",
 	"screen",
+	"bulkhead",
 })
 
 local LOOK: { [string]: number } = {}
@@ -637,6 +638,11 @@ function Plan.build(): Plan
 			-- the end walls: a doorway to the concourse at the landing's end, solid at the other
 			wall(level, "core", "z", at * (atrium + 0.5), -CORE1, -CORE0, { { -(CORE0 + CORE1) / 2, 4 } })
 			wall(level, "core", "z", -at * (atrium + 0.5), -CORE1, -CORE0, nil)
+			-- a bulkhead light inside, over the door to the concourse: a box proud of the wall like any other,
+			-- above every head. The cores have no ceiling of their own to hang a strip from
+			local inner = at * atrium
+			local i, j = on(level, KIND.prop, "bulkhead", inner - at * 0.3, -27.2, inner, -24.8, 9.2, 10.2)
+			lamp(i, j, 28, 1.0, "cold")
 			if level % 2 == 1 then
 				wall(level, "core", "x", -CORE0 + 0.5, -atrium - 1, atrium + 1, { door })
 			else
@@ -1311,6 +1317,19 @@ function Plan.build(): Plan
 			over(level, -at * END, -31, "-z", 3.6, "STAIRS")
 		else
 			over(level, at * 16, -26, if at < 0 then "-x" else "+x", 3.6, "STAIRS")
+			-- and inside the core, beside that door, the storey's number: which landing this is
+			paint(
+				at * atrium,
+				y + 5.5,
+				-29,
+				if at < 0 then "+x" else "-x",
+				1.8,
+				3,
+				tostring(level + 1),
+				"white",
+				nil,
+				"plate"
+			)
 			if level % 2 == 1 then
 				over(level, at * END, -21, "+z", 3.6, "STAIRS")
 			end
@@ -1329,6 +1348,24 @@ function Plan.build(): Plan
 	over(0, -30, 19.5, "+x", 5.4, "STORES", "DOCK STORES")
 	paint(60, 5, -25, "-x", 7, 3, "LOADING\nKEEP CLEAR", "yellow", "BAY 2\nSEALED")
 	over(1, -45, 0, "+x", 4.4, "EDITOR", "SPORTS EDITOR")
+	-- the newsroom's clocks, on the wall of the editor's office: every one stopped a minute before the news at six
+	-- that never went out; under them the day's board
+	for i, city in { "NEW YORK", "LONDON", "TOKYO" } do
+		local time = ({ "5:59", "10:59", "7:59" })[i]
+		paint(-58 + (i - 1) * 4.5, H + 10.6, -10, "-z", 3.6, 2.6, `{city}\n{time}`, "white", nil, "plate")
+	end
+	paint(
+		-53.5,
+		H + 5.6,
+		-10,
+		"-z",
+		11,
+		4.6,
+		"TODAY\nCITY HALL 10AM\nSQUIRREL SIGHTINGS UP\nSIX O'CLOCK: LEAD T.B.A.",
+		"stencil",
+		"FIXTURES\nBOWLING LEAGUE FINAL\nAIR HOCKEY, TABLE 2\nSIX O'CLOCK: T.B.A.",
+		"paper"
+	)
 	over(1, -52, -45, "+z", 4.4, "EDIT 1", "CUTTING 1")
 	over(1, -37, -45, "+z", 4.4, "EDIT 2", "CUTTING 2")
 	over(2, -30, -22, "+x", 5.4, "MAKE-UP", "MAKE-UP")
@@ -1350,6 +1387,28 @@ function Plan.build(): Plan
 	paint(-8.5, H + 10.2, -CORE0 + 1, "+z", 9, 1.7, "OFF THE AIR", "white")
 	paint(5.5, H + 10.2, -CORE0 + 1, "+z", 9, 1.7, "SINCE 1979", "white")
 	paint(-44, roomY + 6.2, 0, "-x", 10, 2.6, "SAFE IN HERE\nNO FIRING", "white")
+
+	-- THE RAILS' TOPS are worn pale: a band along the top of both long faces of every rail and parapet, and the
+	-- top itself, so that the edge of a gallery reads from across the atrium and from the storey above
+	for i = 1, #kinds do
+		if kinds[i] == KIND.rail then
+			local k = (i - 1) * 6
+			local x0, z0, x1, y1, z1 = boxes[k + 1], boxes[k + 3], boxes[k + 4], boxes[k + 5], boxes[k + 6]
+			local mx, mz, band = (x0 + x1) / 2, (z0 + z1) / 2, 0.35
+			local marks = plan.marks
+			local y = y1 - band / 2
+			if x1 - x0 > z1 - z0 then
+				local w = x1 - x0
+				table.insert(marks, { box = i, face = "+z", at = { mx, y, z1 }, w = w, h = band, tone = "worn" })
+				table.insert(marks, { box = i, face = "-z", at = { mx, y, z0 }, w = w, h = band, tone = "worn" })
+			else
+				local w = z1 - z0
+				table.insert(marks, { box = i, face = "+x", at = { x1, y, mz }, w = w, h = band, tone = "worn" })
+				table.insert(marks, { box = i, face = "-x", at = { x0, y, mz }, w = w, h = band, tone = "worn" })
+			end
+			table.insert(marks, { box = i, face = "+y", at = { mx, y1, mz }, w = x1 - x0, h = z1 - z0, tone = "worn" })
+		end
+	end
 
 	-- MARKS, when everything stands (see `daub`): what the last crew left on the floors and what the years did
 	-- to the walls. Written for the north and west; the twin of each is the south's and east's.
@@ -1435,6 +1494,17 @@ function Plan.build(): Plan
 			end
 			for i, z in { -48, -26, -3, 14, 38, 52 } do
 				wallMark("+x", -half, z - 0.5, z + 0.5, c - ({ 4.4, 6, 3, 5.2, 3.6, 5.8 })[i], c, "streak")
+			end
+		end
+
+		-- THE TILED CEILINGS (the newsroom's storey and the control rooms') have dropped tiles on the concourse and
+		-- the galleries: a square of tile on the floor, here and there a broken one
+		for _, level in { 1, 3 } do
+			y = level * H
+			for i, at in { { -27, -20 }, { -19, 3 }, { -25, 9.5 }, { -21, 25 }, { -9, -19.5 }, { 6, -17.5 } } do
+				local w, d = if i % 3 == 0 then 1.2 else 2, if i % 3 == 1 then 1.3 else 2
+				local x, z = at[1] + (level - 1) * 0.7, at[2] - (level - 1) * 0.9
+				floorMark(y, x, z, x + w, z + d, "tile")
 			end
 		end
 

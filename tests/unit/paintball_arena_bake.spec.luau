@@ -182,12 +182,26 @@ return function(t)
 			end
 			t.truthy(painted >= 200, `{painted} painted signs`)
 			for level = 0, Arena.FLOORS - 1 do
-				t.eq(digits[level], 16, `storey {level}: its number on four faces of four pillars`)
+				-- (and, from the first floor up, inside each stair core beside the door to the concourse)
+				t.eq(
+					digits[level],
+					if level == 0 then 16 else 18,
+					`storey {level}: its number on four faces of four pillars, and in both cores`
+				)
 				t.truthy((stairs[level] or 0) >= 4, `storey {level}: STAIRS over the cores' doors`)
 				t.truthy((named[level] or 0) >= 16, `storey {level}: {named[level]} names and notices`)
 			end
 			for _, text in
-				{ "STUDIO A", "STUDIO B", "NEWS STUDIO", "MASTER CONTROL", "TAPE LIBRARY", "ORANGE TEAM", "TEAL TEAM" }
+				{
+					"STUDIO A",
+					"STUDIO B",
+					"NEWS STUDIO",
+					"MASTER CONTROL",
+					"TAPE LIBRARY",
+					"ORANGE TEAM",
+					"TEAL TEAM",
+					"LONDON\n10:59", -- the newsroom's clocks stopped a minute before the news at six
+				}
 			do
 				t.truthy(words[text], `{text} is written somewhere`)
 			end
@@ -274,6 +288,20 @@ return function(t)
 				end
 			end
 			t.truthy(#plan.marks >= 300, `{#plan.marks} marks`)
+			-- every rail and parapet has its top worn pale: the top and a band along both long faces
+			local worn: { [number]: number } = {}
+			for _, m in plan.marks do
+				if m.tone == "worn" then
+					worn[m.box] = (worn[m.box] or 0) + 1
+					t.eq(plan.kinds[m.box], Arena.KIND.rail)
+					t.near(m.at[2] + (if m.face == "+y" then 0 else m.h / 2), b[(m.box - 1) * 6 + 5], e)
+				end
+			end
+			for i = 1, n do
+				if plan.kinds[i] == Arena.KIND.rail then
+					t.eq(worn[i], 3, `rail box {i} has a worn top`)
+				end
+			end
 			t.truthy(tops >= 200 and walls >= 100, `{tops} on floors and tops, {walls} on walls`)
 			t.eq(sides[1], sides[2])
 			for level = 0, Arena.FLOORS - 1 do
@@ -383,6 +411,30 @@ return function(t)
 				end
 			end
 			t.truthy(lenses >= 80, `{lenses} lamps have glass`)
+			-- a stair core is lit: from the first floor up each has a bulkhead light on its wall over the door to
+			-- the concourse, above every head, and it gives light
+			local lit: { [number]: boolean } = {}
+			for _, l in plan.lamps do
+				lit[l.box] = true
+			end
+			local perStorey: { [number]: number } = {}
+			for _, i in byLook.bulkhead or {} do
+				local k = (i - 1) * 6
+				local level = math.floor(b[k + 2] / Arena.FLOOR_HEIGHT)
+				perStorey[level] = (perStorey[level] or 0) + 1
+				t.truthy(lit[i], "a bulkhead light is lit")
+				t.truthy(
+					b[k + 2] - level * Arena.FLOOR_HEIGHT >= ArenaDataPlan.DOOR + 1,
+					"over the door, over every head"
+				)
+				local z = math.abs((b[k + 3] + b[k + 6]) / 2)
+				t.truthy(
+					z > 22 and z < 30 and math.abs(b[k + 1]) <= Arena.ATRIUM and math.abs(b[k + 4]) <= Arena.ATRIUM
+				)
+			end
+			for level = 1, Arena.FLOORS - 1 do
+				t.eq(perStorey[level], 2, `storey {level}: a light in each core`)
+			end
 			-- the test card: seven bars side by side on each core's front, on the third storey
 			local span: { { number } } = { { math.huge, -math.huge }, { math.huge, -math.huge } }
 			for _, look in { "bar_white", "bar_yellow", "bar_cyan", "bar_green", "bar_magenta", "bar_red", "bar_blue" } do
