@@ -186,10 +186,11 @@ return function(t)
 		t.truthy(w.blocked(wx, wz, place.floorY + AlleyLayout.ALLEY_Y))
 		local ax, _, az = AlleyLayout.toWorld(place, 6.2, 0, 92)
 		t.falsy(w.blocked(ax, az, place.floorY + AlleyLayout.ALLEY_Y))
-		-- straight up from the duct floor at D 55: the kickback board hangs into the duct
+		-- straight up from the duct floor at D 55: the duct's own ceiling (the six-lane house's kickback board hung
+		-- 1.2 into the duct here; it now stands on the floor beside the decks)
 		local kx, ky, kz = AlleyLayout.toWorld(place, 0, AlleyLayout.DUCT_FLOOR + 0.2, 55)
-		local _, hit = w.raycast(kx, ky, kz, 0, 3, 0)
-		t.eq(hit and hit.path, "Masking.Kickback")
+		local _, hit = w.raycast(kx, ky, kz, 0, 4, 0)
+		t.eq(hit and hit.path, "Tunnels.Tunnel2.Ceiling1")
 	end)
 
 	t.test("the survey's numbers: the old vent pulls the squirrel 5 studs in at 0.32 s; the rack at 5.42 s", function()
@@ -225,7 +226,9 @@ return function(t)
 		t.near(D1, 83.10, 0.01)
 		t.near(trace.maxStep, 5.04, 0.01, "one frame's jump onto the vent")
 		t.near(trace.seconds, 5.42, 0.01)
-		-- and the tunnel's body passes through the kickback board for 15.5 studs (survey: 1.2 wide, 1.5 high)
+		-- and the tunnel's body (survey: 1.2 wide, 1.5 high) on the old route, which runs 0.9 above today's duct floor,
+		-- meets the kickback only over the pits now (5.4 studs; the survey's 15.5 included the stretch beside the
+		-- decks, where the board no longer hangs into the duct)
 		local hits =
 			BakedWorld.clearance(w, mw.registry, mw.registry:get(9004) :: Registry.Route, { width = 1.2, height = 1.5 })
 		local kick = nil
@@ -235,6 +238,6 @@ return function(t)
 			end
 		end
 		t.truthy(kick ~= nil)
-		t.near((kick :: any).studs, 15.5, 0.2)
+		t.near((kick :: any).studs, 5.4, 0.2)
 	end)
 end

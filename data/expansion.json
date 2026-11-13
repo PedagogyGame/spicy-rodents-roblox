@@ -24,11 +24,11 @@
       "axis": "x",
       "coord": -312,
       "start": 903.75,
-      "end": 1620,
+      "end": 1660,
       "width": 24,
       "sidewalk": { "width": 6, "offset": 15 },
       "joins": ["rd_022_commercial_cross_x347", "rd_024_commercial_sidewalk_x364.5"],
-      "notes": "New lane south of Main Street (centre z -312, clear of the cross-street lamp R13 at z -288): from the cross street east past the steakhouse, the bowling alley's front steps, the antique store, both lounges and the racquet club to a turning circle (xp_bowl_lane_turn). Two lanes, no traffic AI."
+      "notes": "New lane south of Main Street (centre z -312, clear of the cross-street lamp R13 at z -288): from the cross street east past the steakhouse, the eighteen-lane bowling alley (its front x 1273..1450), the antique store, both lounges and the racquet club (moved 88 east of where they were first drawn, 2026-11-13) to a turning circle (xp_bowl_lane_turn). Two lanes, no traffic AI."
     },
     {
       "id": "xs_liberty_ave",
@@ -127,7 +127,7 @@
       "id": "xp_bowl_lane_turn",
       "family": "F2",
       "kind": "asphalt",
-      "rect": { "x0": 1615, "z0": -336, "x1": 1667, "z1": -288 },
+      "rect": { "x0": 1655, "z0": -336, "x1": 1707, "z1": -288 },
       "notes": "turning circle at the east end of Bowl Lane"
     },
     {
@@ -278,15 +278,15 @@
       "kind": "concrete",
       "width": 8,
       "points": [[1322, -47.6], [1322, -294]],
-      "notes": "Alley Walk: Main Street south sidewalk to Bowl Lane, between Chili's and the bookshop; the bowling alley's front steps are straight across the lane."
+      "notes": "Alley Walk: Main Street south sidewalk to Bowl Lane, between Chili's and the bookshop; the bowling alley's main doors are straight across the lane."
     },
     {
       "id": "xpath_alley_steps",
       "family": "F2",
       "kind": "concrete",
-      "width": 10,
-      "points": [[1322, -330], [1322, -341]],
-      "notes": "Bowl Lane south sidewalk to the alley's front steps"
+      "width": 12,
+      "points": [[1322, -330], [1322, -338]],
+      "notes": "Bowl Lane south sidewalk to the foot of the alley's entrance ramp (the main doors are on x 1318..1326)"
     },
     {
       "id": "xpath_hill_trail",
@@ -1280,7 +1280,7 @@
       ],
       "features": ["lawn_paths", "benches", "lamps", "flower_beds", "notice_board"],
       "partBudget": 500,
-      "notes": "The new green between the steakhouse and Chapel Street, facing the school and the church; the bandstand sits inside it."
+      "notes": "The new green between the steakhouse and Chapel Street, facing the school and the church; the bandstand sits inside it. Its northern edge (about z -610..-574) lies in the ground the bowling alley keeps for the owner's backstage (data/attractions.json reserve, givesWayOnArrival): by the owner's default the green gives that edge up only when the backstage package arrives, and keeps its bandstand. Until then it is the green's."
     },
     {
       "id": "f2_gazebo",
@@ -1701,7 +1701,7 @@
         "kitchen_dumpster"
       ],
       "partBudget": 1700,
-      "notes": "Front onto Bowl Lane; the bar, deck and sand court stretch east toward the bowling alley (x 1271)."
+      "notes": "Front onto Bowl Lane; the bar, deck and sand court stretch east toward the bowling alley (x 1271). The site's eastern 21 studs (x 1234..1255) lie in the ground the bowling alley keeps for the owner's backstage (data/attractions.json reserve, givesWayOnArrival): by the owner's default they are given up only when the backstage package arrives; nothing anchored stands there."
     },
     {
       "id": "f3_lounge_classic",
@@ -1711,15 +1711,15 @@
       "district": "leisure_quarter",
       "status": "new",
       "approval": "lounge one (1940s)",
-      "position": { "x": 1399, "z": -362 },
+      "position": { "x": 1487, "z": -362 },
       "facing": "+Z",
       "yaw": 0,
       "footprint": { "w": 50, "d": 56 },
       "site": { "x0": -25, "x1": 25, "d0": -28, "d1": 28 },
       "storeys": 1,
       "height": 22,
-      "floorY": 14.5,
-      "ground": { "min": 10.64, "max": 13.92 },
+      "floorY": 9.5,
+      "ground": { "min": 4.95, "max": 8.94 },
       "entrances": [
         { "id": "front", "at": [0, -28], "width": 6, "kind": "double_door", "path": "frontage" }
       ],
@@ -1763,15 +1763,15 @@
       "district": "leisure_quarter",
       "status": "new",
       "approval": "lounge two (sci-fi)",
-      "position": { "x": 1457, "z": -362 },
+      "position": { "x": 1545, "z": -362 },
       "facing": "+Z",
       "yaw": 0,
       "footprint": { "w": 50, "d": 56 },
       "site": { "x0": -25, "x1": 25, "d0": -28, "d1": 28 },
       "storeys": 1,
       "height": 24,
-      "floorY": 11.6,
-      "ground": { "min": 7.31, "max": 11.03 },
+      "floorY": 5.7,
+      "ground": { "min": 0.44, "max": 5.19 },
       "entrances": [
         { "id": "front", "at": [0, -28], "width": 6, "kind": "double_door", "path": "frontage" }
       ],
@@ -1801,15 +1801,15 @@
       "district": "leisure_quarter",
       "status": "new",
       "approval": "racquetball court",
-      "position": { "x": 1526, "z": -376 },
+      "position": { "x": 1614, "z": -376 },
       "facing": "+Z",
       "yaw": 0,
       "footprint": { "w": 64, "d": 84 },
       "site": { "x0": -32, "x1": 32, "d0": -42, "d1": 42 },
       "storeys": 1,
       "height": 30,
-      "floorY": 7.2,
-      "ground": { "min": 0.78, "max": 6.63 },
+      "floorY": 2.6,
+      "ground": { "min": 0.25, "max": 2.1 },
       "entrances": [
         { "id": "front", "at": [0, -42], "width": 6, "kind": "double_door", "path": "frontage" }
       ],

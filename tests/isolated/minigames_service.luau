@@ -836,4 +836,116 @@ return function(t)
 			end)
 		end
 	)
+
+	t.test(
+		"lane 18 is a whole station: a game of real throws there moves its own ball and pins and no other lane's",
+		function()
+			FakeEngine.with(function()
+				local w = world()
+				local far = `bowling_lane_{AlleyLayout.LANES}`
+				local p = stub("Eve")
+				t.truthy(w.svc:join(p, far))
+				t.truthy(w.svc:input(p, { gameId = far, seat = 1, verb = "start", args = {} }))
+				local s = w.svc:sessionOf(far)
+				t.eq(s.phase, "playing")
+				step(w, 0.2)
+				local hw = w.svc.stations[far].hw
+				local other = lane(w)
+				t.eq(hw.lane, AlleyLayout.LANES)
+				-- the hardware is where the plan puts lane 18: its head pin on its own spot
+				local hx, hd = AlleyLayout.pinLocal(AlleyLayout.LANES, 1)
+				local home = hw.pins[1].home.Position
+				local X, _, D = AlleyLayout.toLocal(PLACE, home.X, home.Y, home.Z)
+				t.near(X, hx, 1e-3)
+				t.near(D, hd, 1e-3)
+				local otherBall = other.ball.CFrame.Position
+				local otherPivots = rawget(other.pins[1].model, "_pivots") or 0
+				local balls, guard = 0, 0
+				local sawOnLane = false
+				while s.phase == "playing" and guard < 40 do
+					guard += 1
+					t.truthy(hw:ready(), "lane 18 is ready for each ball")
+					local ok, why = w.svc:input(p, { gameId = far, seat = 1, verb = "release", args = POCKET })
+					t.truthy(ok, why)
+					balls += 1
+					local roll = w.all[#w.all]
+					t.eq(roll.kind, "roll")
+					t.eq(roll.lane, AlleyLayout.LANES)
+					local tt = 0
+					while not hw:ready() and tt < 20 do
+						w.svc:step(0.05)
+						tt += 0.05
+						local c = hw.ball.CFrame
+						local bx, _, bd = AlleyLayout.toLocal(PLACE, c.X, c.Y, c.Z)
+						if bd > 20 and bd < 50 then
+							sawOnLane = true
+							-- on its own bed, eleven lanes east of where the six-lane house ended
+							t.truthy(math.abs(bx - AlleyLayout.laneX(AlleyLayout.LANES)) < AlleyLayout.PITCH / 2)
+						end
+					end
+					t.truthy(tt < 12, `a ball took {tt} s from hand to hand on lane 18`)
+				end
+				t.truthy(sawOnLane, "the ball ran lane 18")
+				t.eq(s.phase, "done")
+				t.eq(#s.game.state.rolls[1], balls)
+				-- nobody else's lane was touched
+				t.truthy((other.ball.CFrame.Position - otherBall).Magnitude < 1e-6)
+				t.eq(rawget(other.pins[1].model, "_pivots") or 0, otherPivots)
+				t.eq(w.svc:sessionOf(LANE).phase, "idle", "lane 3 never had a game")
+			end)
+		end
+	)
+
+	t.test(
+		"an empty house: eighteen lanes and the games room wait idle, without a write or a word, and a step costs next to nothing",
+		function()
+			FakeEngine.with(function()
+				local w = world()
+				local stations = 0
+				for _ in w.svc.stations do
+					stations += 1
+				end
+				t.eq(stations, #w.svc.order)
+				t.truthy(stations >= AlleyLayout.LANES + 8, `{stations} stations`)
+				local pivots: { [any]: number } = {}
+				local balls: { [any]: any } = {}
+				for laneNo = 1, AlleyLayout.LANES do
+					local hw = w.svc.stations[`bowling_lane_{laneNo}`].hw
+					for n = 1, 10 do
+						pivots[hw.pins[n].model] = rawget(hw.pins[n].model, "_pivots") or 0
+					end
+					balls[hw] = hw.ball.CFrame.Position
+				end
+				-- two minutes of an empty house at 60 frames a second
+				local frames = 7200
+				local t0 = os.clock()
+				for _ = 1, frames do
+					w.svc:step(1 / 60)
+				end
+				local perStep = (os.clock() - t0) / frames
+				for _, id in w.svc.order do
+					-- (a station whose game is not open yet has no session at all)
+					local sess = w.svc:sessionOf(id)
+					t.truthy(sess == nil or sess.phase == "idle", `{id} is not idle with nobody at it`)
+				end
+				for model, n in pivots do
+					t.eq(rawget(model, "_pivots") or 0, n, "an idle lane's pins are never written")
+				end
+				for hw, at in balls do
+					t.truthy((hw.ball.CFrame.Position - at).Magnitude < 1e-9, "an idle lane's ball is never moved")
+				end
+				t.eq(#w.all, 0, "nothing is sent to anyone")
+				print(
+					string.format(
+						"      empty house: %d stations, %.2f microseconds a server step (%d steps)",
+						stations,
+						perStep * 1e6,
+						frames
+					)
+				)
+				-- a frame is 16,667 microseconds; a loaded test machine still keeps an empty house under 1 % of it
+				t.truthy(perStep < 160e-6, `an idle step took {perStep * 1e6} microseconds`)
+			end)
+		end
+	)
 end

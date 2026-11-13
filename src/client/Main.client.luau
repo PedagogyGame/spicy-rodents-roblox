@@ -7,6 +7,7 @@
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
+-- UI/WalletHud keeps the wallet's balance in the corner (and the pocket money and pass lines).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
 -- The S2 test place runs its own S2Client and this script steps aside there.
@@ -31,6 +32,7 @@ local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local MedicalView = require("./Render/MedicalView")
 local SpeechBubbles = require("./UI/SpeechBubbles")
+local WalletHud = require("./UI/WalletHud")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
@@ -96,6 +98,12 @@ local kickRemote = kickR :: RemoteEvent
 local eventRemote = eventR :: RemoteEvent
 
 AnimationDriver.start({ container = bodies })
+-- the wallet in the corner, always (the server writes the balance on the Player: Server/Economy/Credits)
+local walletOk, walletErr = pcall(WalletHud.start)
+if not walletOk then
+	warn(`Client: WalletHud failed: {walletErr}`)
+	menu.toast("The wallet display did not start: press F9 and send the red lines", 10)
+end
 -- what townspeople say, and what a bitten person looks like (owner 2026-11-10)
 task.spawn(function()
 	local okS, errS = pcall(SpeechBubbles.start, { bodies = bodies :: Instance })
