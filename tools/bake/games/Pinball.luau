@@ -313,7 +313,7 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 		1.5,
 		0.06,
 		apronTop + 0.16,
-		math.pi,
+		0, -- (its Top face's lettering reads from the player's side: the face's up is the part's -Z, up the table)
 		th.apron,
 		"SmoothPlastic"
 	)
