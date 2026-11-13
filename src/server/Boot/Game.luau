@@ -446,10 +446,17 @@ function Game.start(opts: Opts?): any
 
 	-- the storm drains (World/SewerService): the carve (after the terrain write above), cover, the police at the grate
 	local sewers: any = nil
+	local sewersBaked = workspace:FindFirstChild("Sewers") ~= nil
+	if not sewersBaked then
+		warn(
+			"[SpicyRodents] Workspace.Sewers missing (run lune run tools/bake/sewers.luau and rebuild): no drains carved"
+		)
+	end
 	local okW, errW = pcall(function()
 		sewers = SewerService.start({
 			world = world,
-			carve = o.terrain ~= false,
+			-- no pipes drawn, no holes in the ground (an open shaft with nothing under it)
+			carve = o.terrain ~= false and sewersBaked,
 			speech = infection and infection.speech,
 			clock = function(): number
 				return if infection then infection.now else world.now
