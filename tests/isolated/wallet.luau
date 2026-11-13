@@ -20,6 +20,7 @@ local Game = require("@server/Boot/Game")
 local Credits = require("@server/Economy/Credits")
 local RoleLab = require("@server/Roles/RoleLab")
 local RoleService = require("@server/Roles/RoleService")
+local MinigameService = require("@server/Minigames/MinigameService")
 local PlayMenu = require("@client/UI/PlayMenu")
 local WalletHud = require("@client/UI/WalletHud")
 local WalletFlow = require("@tests/engine/WalletFlow")
@@ -858,6 +859,9 @@ return function(t)
 			-- THAT charge on the same terms: paintball's own specs record their charge this way
 			local charged: { any } = {}
 			Rig.play(function(r)
+				-- and the server's log says so, once: in the game that would be a second record of who holds a pass
+				t.deepEq(r.warnings, { MinigameService.NO_PASS_WARNING })
+				table.clear(r.warnings)
 				local desk = FakeGames.tables[S.match].ctx.town.pass
 				t.truthy(desk ~= r.wallet.pass)
 				t.falsy(desk.has(r.player))
@@ -889,6 +893,37 @@ return function(t)
 					},
 				},
 			})
+			-- the stand-in renews in the last day as the wallet's pass does, the new days on the end of the old
+			FakeEngine.with(function()
+				local now = 5000
+				rawset(workspace :: any, "GetServerTimeNow", function(): number
+					return now
+				end)
+				-- selene: allow(deprecated)
+				local env = getfenv(0) :: any
+				local realWarn, said = env.warn, {}
+				env.warn = function(line: string)
+					table.insert(said, line)
+				end
+				local svc = MinigameService.new({
+					sites = { [SITE] = { place = PLACE } },
+					prompts = false,
+					games = {
+						charge = function(): (boolean, string?)
+							return true
+						end,
+					},
+				})
+				env.warn = realWarn
+				t.deepEq(said, { MinigameService.NO_PASS_WARNING })
+				local desk, ann = svc.town.pass, { UserId = 5 }
+				t.truthy(desk.buy(ann))
+				now += 4 * DAY
+				t.deepEq({ desk.buy(ann) }, { false, "You already have a pass." })
+				now += DAY - 10
+				t.deepEq({ desk.buy(ann) }, { true, "Pass renewed: five more days of paintball and both lounges." })
+				t.near(desk.left(ann), 5 + 10 / DAY)
+			end)
 			-- the real fortune teller with the real wallet behind the town: a pull is free, as the brief demands
 			Rig.play(function(r)
 				local before = r.wallet.balance(r.player)

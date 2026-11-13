@@ -342,6 +342,9 @@ return function(t)
 			local charged, lent, handedBack = {}, 0, 0
 			Rig.play(
 				function(w)
+					-- (a charge with no pass: the service keeps a stand-in pass and says so in the server's log)
+					t.deepEq(w.warnings, { MinigameService.NO_PASS_WARNING })
+					table.clear(w.warnings)
 					local town = FakeGames.tables[S.match].ctx.town
 					local ok, words = town.charge(w.player, 20, "a paintball pass")
 					t.truthy(not ok and words == "You need 20 cents for a pass")
@@ -396,8 +399,10 @@ return function(t)
 						charge = function(): (boolean, string?)
 							return false, "the town's own wallet"
 						end,
+						pass = svc.town.pass, -- (the town hands in its pass with its charge: no warning)
 					},
 				})
+				t.truthy(A.minigames.town.pass == svc.town.pass, "the pass handed through as it is")
 				t.truthy(A ~= nil, "the attraction service started on a bare alley")
 				local ok, words = A.minigames.town.charge({ UserId = 1 }, 5, "x")
 				t.truthy(not ok and words == "the town's own wallet")

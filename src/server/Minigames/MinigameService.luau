@@ -160,15 +160,19 @@ local function passOn(charge: (player: any, cents: number, why: string) -> (bool
 		has = has,
 		buy = function(player: any): (boolean, string)
 			local s = spec()
-			if has(player) then
+			-- (as the wallet's: a holder with a day or more left is refused; in the last day it is renewed)
+			local renewing = has(player)
+			if renewing and left(player) >= 1 then
 				return false, s.has
 			end
 			local ok, words = charge(player, s.cents, s.why)
 			if not ok then
 				return false, if type(words) == "string" and words ~= "" then words else s.offer
 			end
-			ends[who(player)] = sharedClock() + s.days * daySeconds()
-			return true, s.bought
+			local now = sharedClock()
+			local had = ends[who(player)]
+			ends[who(player)] = (if had and had > now then had else now) + s.days * daySeconds()
+			return true, if renewing then s.renewed or s.bought else s.bought
 		end,
 		left = left,
 		untilDay = function(player: any): number?
@@ -189,8 +193,15 @@ end
 -- none: nobody to lend a body (nil), nothing charged (true; the game hands in the town's wallet: Boot/Game),
 -- a pass desk of the service's own on that charge (the game hands in the wallet's pass), bests kept only as
 -- long as this server runs, and the only people known being the ones at the tables.
+MinigameService.NO_PASS_WARNING = "[Minigames] given a charge but no pass: this service keeps a pass desk of its "
+	.. "own, which the lounges cannot read. Hand in the town's (games.pass = wallet.pass, as Boot/Game does)."
+
 local function townOf(self: any, games: { [string]: any }?): ServerGame.Town
 	local g: { [string]: any } = games or {}
+	if g.charge ~= nil and g.pass == nil then
+		-- (a bare service, with no charge either, is a test's: its stand-in pass harms nobody)
+		warn(MinigameService.NO_PASS_WARNING)
+	end
 	local bests: { [any]: { [string]: number } } = {}
 	local function charge(player: any, cents: number, why: string): (boolean, string?)
 		if g.charge then
