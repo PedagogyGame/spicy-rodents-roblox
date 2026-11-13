@@ -62,7 +62,7 @@ local Tuning = require("./Tuning")
 
 export type Hud = {
 	gui: ScreenGui,
-	aim: ScreenGui, -- the view-centred layer (IgnoreGuiInset): the crosshair, the hit marker, the ring, the washes
+	aim: ScreenGui, -- the view-centred layer (no insets): the crosshair, the hit marker, the ring, the washes
 	touch: { [string]: GuiObject }, -- FireRight (a Frame), FireLeft, Reload, Crouch, Scores (buttons); empty without touch
 	step: (self: Hud, dt: number) -> (),
 	stop: (self: Hud) -> (),

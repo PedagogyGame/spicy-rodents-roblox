@@ -505,6 +505,53 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"under the crosshair is where the ball leaves for: the stock camera half a stud behind the eye, any aim",
+		function()
+			play(function(s)
+				playing(s)
+				local w = s.w
+				local cam = workspace.CurrentCamera
+				local layer = named(s.hud(), "Cross").Parent
+				t.eq(layer.ScreenInsets, roblox.Enum.ScreenInsets.None, "the crosshair is the middle of the whole view")
+				local vp = cam.ViewportSize
+				local ex, ey, ez = Body.eyePoint(0, 0, 30, 0)
+				local eye = Vector3.new(Arena.toWorld(s.place, ex, ey, ez))
+				local shots = 0
+				for _, look in { { 0, 0 }, { 0.9, 0.3 }, { -2.4, -0.7 }, { 3.0, 0.05 }, { 1.2, -1.1 } } do
+					-- the stock first-person camera: on the look's own line, half a stud BEHIND the eye
+					local dx, dy, dz = Arena.dirToWorld(s.place, Body.look(look[1], look[2]))
+					local dir = Vector3.new(dx, dy, dz)
+					local cf = CFrame.lookAt(eye - dir * 0.5, eye + dir)
+					rawset(cam, "CFrame", cf)
+					w.camWas = cf
+					s.run(F.fireInterval + 0.1)
+					click(s)
+					s.run(0.1)
+					shots += 1
+					local fires = heard(s, "Paintball.Fire")
+					t.eq(#fires, shots)
+					local fire = fires[shots]
+					-- the ball leaves the EYE (the body's, not the camera's place) ...
+					t.near(fire.ox, ex, 1e-3)
+					t.near(fire.oy, ey, 1e-3)
+					t.near(fire.oz, ez, 1e-3)
+					-- ... along a line that, sixty studs out, is the pixel in the dead middle of the view
+					local fx, fy, fz =
+						Arena.toWorld(s.place, fire.ox + fire.dx * 60, fire.oy + fire.dy * 60, fire.oz + fire.dz * 60)
+					local px, on = cam:WorldToViewportPoint(Vector3.new(fx, fy, fz))
+					t.truthy(on)
+					t.near(px.X, vp.X / 2, 0.05, `aim {look[1]}, {look[2]}: {px.X - vp.X / 2} px off across`)
+					t.near(px.Y, vp.Y / 2, 0.05, `aim {look[1]}, {look[2]}: {px.Y - vp.Y / 2} px off up or down`)
+					-- and the pose the server is told is the body's place, not the camera's
+					local moves = heard(s, "Paintball.Move")
+					t.near(moves[#moves].x, 0, 1e-3)
+					t.near(moves[#moves].z, 30, 1e-3)
+				end
+			end)
+		end
+	)
+
 	t.test("six clicks a second fire four balls and Net drops none; five, then the reload shows and rattles", function()
 		play(function(s)
 			playing(s)
