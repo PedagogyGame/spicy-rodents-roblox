@@ -9,6 +9,8 @@ with the views of tools/review/views_sewers.json whose "pipe" is that pipe, leav
 the terrain mesh, and adds, after its scene is built:
   the attraction lights and text (tools/review/attractions_render.py: every lamp lit, as the client lights a space
   while a squirrel is in it)
+  the art window: a view with "window": true leaves out the modules farther than Client/World/SewerArt's radius from
+  the eye (the game draws only those near the body)
   the owner's modules: each art slot's FBX (the very file that was uploaded: tools/blender/sewers/export_modules.py,
   axis_forward Z, axis_up Y, 1 Blender unit = 1 stud) placed where the engine pivots its Model (ArtPivot), in review
   group "art"
@@ -53,6 +55,7 @@ def place_art(scene):
             if o.parent is None:
                 o.matrix_world = m @ mw
             o["review_group"] = a.get("group", "art")
+            o["art_pos"] = list(p)
     print(f"sewers review: {len(scene.get('art', []))} art slots from {len(cache)} files", flush=True)
 
 
@@ -73,6 +76,34 @@ def cut_holes(holes):
         return inner(name, g, colors, keep_out, drop)
 
     render.grid_mesh = grid_mesh
+
+
+ART_RADIUS = 48.0  # Client/World/SewerArt C.radius: the game draws a module only this near the body
+
+
+class Window:
+    """Stands in for render.py's backdrop module: before a view with "window": true, the modules farther than
+    ART_RADIUS from the eye are left out, as Client/World/SewerArt draws them for a squirrel there."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    def build(self, scene, g):
+        if self.inner:
+            self.inner.build(scene, g)
+
+    def before_view(self, v, vcfg):
+        if self.inner and hasattr(self.inner, "before_view"):
+            self.inner.before_view(v, vcfg)
+        if not v.get("window"):
+            return
+        e = v["pos"]
+        for ob in bpy.data.objects:
+            p = ob.get("art_pos")
+            if p is not None and not ob.hide_render:
+                d = ((p[0] - e[0]) ** 2 + (p[1] - e[1]) ** 2 + (p[2] - e[2]) ** 2) ** 0.5
+                if d > ART_RADIUS:
+                    ob.hide_render = True
 
 
 class Shim:
@@ -105,6 +136,8 @@ def main():
         names = [n for n in names if n in wanted]
     inner = render._attractions_module()
     render._attractions_module = lambda: Shim(inner)
+    backdrop = render._backdrop_module()
+    render._backdrop_module = lambda: Window(backdrop)
     scene = os.path.join(ROOT, "build", "review", f"sewers_{a.pipe}.json")
     with open(scene) as fh:
         cut_holes(json.load(fh).get("holes", []))

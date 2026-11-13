@@ -1,701 +1,1285 @@
 {
- "about": "THE STORM DRAINS review views (tools/bake/sewers/review.py renders them; tools/review/render.py's format). Make: lune run tools/review/export.luau; lune run tools/bake/sewers.luau; for each pipe, lune run tools/bake/sewers/review.luau --pipe <P>; then /root/.cache/spicy-rodents/venv/bin/python -I tools/bake/sewers/review.py --pipe <P>. 'pipe' says which scene a view belongs to. Inside a pipe the eye is a squirrel's (a stud over the walkway, on the route's lane); from the pavement a person's. Every lamp is lit (the client lights a space while a squirrel is in it) and the owner's modules are drawn from the FBX files that were uploaded, where the engine pivots them.",
- "defaults": {
-  "res": "800x450",
-  "samples": 16,
-  "groups": [
-   "town",
-   "terrain",
-   "sewers",
-   "art",
-   "attractions"
+  "about": "THE STORM DRAINS review views (tools/bake/sewers/review.py renders them; tools/review/render.py's format). Make: lune run tools/review/export.luau; lune run tools/bake/sewers.luau; for each pipe, lune run tools/bake/sewers/review.luau --pipe <P>; then /root/.cache/spicy-rodents/venv/bin/python -I tools/bake/sewers/review.py --pipe <P>. 'pipe' says which scene a view belongs to. Inside a pipe the eye is a squirrel's (a stud over the walkway, on the route's lane); from the pavement a person's. Every lamp is lit (the client lights a space while a squirrel is in it) and the owner's modules are drawn from the FBX files that were uploaded, where the engine pivots them. A view with \"window\": true draws the owner's modules only within Client/World/SewerArt's radius (48 studs) of the eye, as the game does for a squirrel inside (the lining hidden there); \"_parts\" views draw the parts lining, the fall-back when a module does not load; views from outside draw the lining, as the game does for anyone not in the drain.",
+  "defaults": {
+    "res": "800x450",
+    "samples": 16,
+    "groups": [
+      "town",
+      "terrain",
+      "sewers",
+      "art",
+      "attractions"
+    ]
+  },
+  "sun": {
+    "dir": [
+      0.7,
+      0.55,
+      -0.45
+    ],
+    "strength": 3.6,
+    "color": [
+      1.0,
+      0.86,
+      0.68
+    ],
+    "angleDeg": 1.5,
+    "skyStrength": 1.0
+  },
+  "views": [
+    {
+      "name": "p1nw_street",
+      "pipe": "P1",
+      "desc": "corner grate by the brick house (P1.NW) from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        -29.58,
+        4.82,
+        28.7
+      ],
+      "look": [
+        -24.58,
+        0,
+        23.7
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1nw_down",
+      "pipe": "P1",
+      "desc": "a squirrel's eye just under the corner grate by the brick house (P1.NW), looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        -24.65,
+        -0.7,
+        24.45
+      ],
+      "look": [
+        -24.65,
+        -10.1,
+        22.1
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1ne_street",
+      "pipe": "P1",
+      "desc": "corner grate by the blue cottage (P1.NE) from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        28.7,
+        4.82,
+        29.58
+      ],
+      "look": [
+        23.7,
+        0,
+        24.58
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1ne_down",
+      "pipe": "P1",
+      "desc": "a squirrel's eye just under the corner grate by the blue cottage (P1.NE), looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        24.45,
+        -0.7,
+        24.65
+      ],
+      "look": [
+        22.1,
+        -10.1,
+        24.65
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1se_street",
+      "pipe": "P1",
+      "desc": "corner grate by the bungalow (P1.SE) from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        28.7,
+        4.82,
+        -29.58
+      ],
+      "look": [
+        23.7,
+        0,
+        -24.58
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1se_down",
+      "pipe": "P1",
+      "desc": "a squirrel's eye just under the corner grate by the bungalow (P1.SE), looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        24.45,
+        -0.7,
+        -24.65
+      ],
+      "look": [
+        22.1,
+        -10.1,
+        -24.65
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1sw_street",
+      "pipe": "P1",
+      "desc": "corner grate by the Victorian house (P1.SW) from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        -29.58,
+        4.82,
+        -28.7
+      ],
+      "look": [
+        -24.58,
+        0,
+        -23.7
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1sw_down",
+      "pipe": "P1",
+      "desc": "a squirrel's eye just under the corner grate by the Victorian house (P1.SW), looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        -24.65,
+        -0.7,
+        -24.45
+      ],
+      "look": [
+        -24.65,
+        -10.1,
+        -22.1
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_1_foot",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        -23.66,
+        -9.6,
+        23.66
+      ],
+      "look": [
+        -13.76,
+        -9.8,
+        13.76
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_1_foot_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        -23.66,
+        -9.6,
+        23.66
+      ],
+      "look": [
+        -13.76,
+        -9.8,
+        13.76
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_1_run50",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        -15.72,
+        -9.6,
+        15.72
+      ],
+      "look": [
+        -5.82,
+        -9.75,
+        5.82
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_1_run50_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        -15.72,
+        -9.6,
+        15.72
+      ],
+      "look": [
+        -5.82,
+        -9.75,
+        5.82
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_2_foot",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        23.66,
+        -9.6,
+        23.66
+      ],
+      "look": [
+        13.76,
+        -9.8,
+        13.76
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_2_foot_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        23.66,
+        -9.6,
+        23.66
+      ],
+      "look": [
+        13.76,
+        -9.8,
+        13.76
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_2_run50",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        14.59,
+        -9.6,
+        14.59
+      ],
+      "look": [
+        4.69,
+        -9.75,
+        4.69
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_2_run50_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        14.59,
+        -9.6,
+        14.59
+      ],
+      "look": [
+        4.69,
+        -9.75,
+        4.69
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_3_foot",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        23.66,
+        -9.6,
+        -23.66
+      ],
+      "look": [
+        13.76,
+        -9.8,
+        -13.76
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_3_foot_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        23.66,
+        -9.6,
+        -23.66
+      ],
+      "look": [
+        13.76,
+        -9.8,
+        -13.76
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_3_run50",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        14.59,
+        -9.6,
+        -14.59
+      ],
+      "look": [
+        4.69,
+        -9.75,
+        -4.69
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_3_run50_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        14.59,
+        -9.6,
+        -14.59
+      ],
+      "look": [
+        4.69,
+        -9.75,
+        -4.69
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_4_foot",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        -23.66,
+        -9.6,
+        -23.66
+      ],
+      "look": [
+        -13.76,
+        -9.8,
+        -13.76
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_4_foot_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        -23.66,
+        -9.6,
+        -23.66
+      ],
+      "look": [
+        -13.76,
+        -9.8,
+        -13.76
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_4_run50",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        -15.72,
+        -9.6,
+        -15.72
+      ],
+      "look": [
+        -5.82,
+        -9.75,
+        -5.82
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p1_4_run50_parts",
+      "pipe": "P1",
+      "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        -15.72,
+        -9.6,
+        -15.72
+      ],
+      "look": [
+        -5.82,
+        -9.75,
+        -5.82
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2w_street",
+      "pipe": "P2",
+      "desc": "town-side quay access cover (P2.W) from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        1955.5,
+        24.7,
+        464.5
+      ],
+      "look": [
+        1962.0,
+        20,
+        462.0
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2w_down",
+      "pipe": "P2",
+      "desc": "a squirrel's eye just under the town-side quay access cover (P2.W), looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        1960.85,
+        19.3,
+        462.0
+      ],
+      "look": [
+        1963.2,
+        -14.1,
+        462.0
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2e_street",
+      "pipe": "P2",
+      "desc": "far-side quay access cover (P2.E) from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        2340.5,
+        24.7,
+        464.5
+      ],
+      "look": [
+        2334.0,
+        20,
+        462.0
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2e_down",
+      "pipe": "P2",
+      "desc": "a squirrel's eye just under the far-side quay access cover (P2.E), looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        2335.15,
+        19.3,
+        462.0
+      ],
+      "look": [
+        2332.8,
+        -14.1,
+        462.0
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2_1_foot",
+      "pipe": "P2",
+      "desc": "The old river culvert: at the foot of the shaft, along the run (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1962.05,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        1976.05,
+        -13.8,
+        462.0
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p2_1_foot_parts",
+      "pipe": "P2",
+      "desc": "The old river culvert: at the foot of the shaft, along the run (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1962.05,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        1976.05,
+        -13.8,
+        462.0
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2_1_footend",
+      "pipe": "P2",
+      "desc": "The old river culvert: at the foot of the far shaft, back along the run; the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        2333.95,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        2319.95,
+        -13.8,
+        462.0
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p2_1_footend_parts",
+      "pipe": "P2",
+      "desc": "The old river culvert: at the foot of the far shaft, back along the run; the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        2333.95,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        2319.95,
+        -13.8,
+        462.0
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2_1_run33",
+      "pipe": "P2",
+      "desc": "The old river culvert: 33% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        2084.88,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        2098.88,
+        -13.75,
+        462.0
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p2_1_run33_parts",
+      "pipe": "P2",
+      "desc": "The old river culvert: 33% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        2084.88,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        2098.88,
+        -13.75,
+        462.0
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2_1_run66",
+      "pipe": "P2",
+      "desc": "The old river culvert: 66% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        2211.12,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        2225.12,
+        -13.75,
+        462.0
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p2_1_run66_parts",
+      "pipe": "P2",
+      "desc": "The old river culvert: 66% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        2211.12,
+        -13.6,
+        462.0
+      ],
+      "look": [
+        2225.12,
+        -13.75,
+        462.0
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3s_street",
+      "pipe": "P3",
+      "desc": "bowling alley lawn grate from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        1310.5,
+        21.02,
+        -340.5
+      ],
+      "look": [
+        1306.0,
+        16.5,
+        -334.0
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3s_down",
+      "pipe": "P3",
+      "desc": "a squirrel's eye just under the bowling alley lawn grate, looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        1306.0,
+        15.8,
+        -335.15
+      ],
+      "look": [
+        1306.0,
+        4.5,
+        -332.8
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3n_street",
+      "pipe": "P3",
+      "desc": "Main Street north verge grate from the pavement, at a person's eye; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        1352.5,
+        12.38,
+        43.0
+      ],
+      "look": [
+        1350.0,
+        7.78,
+        36.0
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3n_down",
+      "pipe": "P3",
+      "desc": "a squirrel's eye just under the Main Street north verge grate, looking down the shaft at the ladder; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        1350.0,
+        7.08,
+        37.15
+      ],
+      "look": [
+        1350.0,
+        -2.7,
+        34.8
+      ],
+      "fov": 85,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3_1_foot",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: at the foot of the shaft, along the run (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1306.16,
+        4.97,
+        -333.96
+      ],
+      "look": [
+        1307.79,
+        4.77,
+        -320.05
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p3_1_foot_parts",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: at the foot of the shaft, along the run (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1306.16,
+        4.97,
+        -333.96
+      ],
+      "look": [
+        1307.79,
+        4.77,
+        -320.05
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3_1_footend",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: at the foot of the far shaft, back along the run; the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1349.84,
+        -2.19,
+        35.96
+      ],
+      "look": [
+        1348.21,
+        -2.39,
+        22.05
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p3_1_footend_parts",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: at the foot of the far shaft, back along the run; the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1349.84,
+        -2.19,
+        35.96
+      ],
+      "look": [
+        1348.21,
+        -2.39,
+        22.05
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3_1_run33",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: 33% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1320.59,
+        2.42,
+        -214.45
+      ],
+      "look": [
+        1322.21,
+        2.27,
+        -200.54
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p3_1_run33_parts",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: 33% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1320.59,
+        2.42,
+        -214.45
+      ],
+      "look": [
+        1322.21,
+        2.27,
+        -200.54
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3_1_run66",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: 66% along, looking on (squirrel's eye); the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1335.41,
+        -0.88,
+        -87.55
+      ],
+      "look": [
+        1337.03,
+        -1.03,
+        -73.65
+      ],
+      "fov": 75,
+      "window": true
+    },
+    {
+      "name": "p3_1_run66_parts",
+      "pipe": "P3",
+      "desc": "Storm drain 3: Bowl Lane: 66% along, looking on (squirrel's eye); the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1335.41,
+        -0.88,
+        -87.55
+      ],
+      "look": [
+        1337.03,
+        -1.03,
+        -73.65
+      ],
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1nw_up",
+      "pipe": "P1",
+      "desc": "up the corner grate by the brick house (P1.NW)'s shaft from its foot; the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        -24.65,
+        -9.4,
+        22.3
+      ],
+      "look": [
+        -24.64,
+        0,
+        23.3
+      ],
+      "fov": 80,
+      "window": true
+    },
+    {
+      "name": "p1nw_up_parts",
+      "pipe": "P1",
+      "desc": "up the corner grate by the brick house (P1.NW)'s shaft from its foot; the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        -24.65,
+        -9.4,
+        22.3
+      ],
+      "look": [
+        -24.64,
+        0,
+        23.3
+      ],
+      "fov": 80,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p2w_up",
+      "pipe": "P2",
+      "desc": "up the town-side quay access cover (P2.W)'s shaft from its foot; the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1963.0,
+        -13.4,
+        462.0
+      ],
+      "look": [
+        1962.01,
+        20,
+        462
+      ],
+      "fov": 80,
+      "window": true
+    },
+    {
+      "name": "p2w_up_parts",
+      "pipe": "P2",
+      "desc": "up the town-side quay access cover (P2.W)'s shaft from its foot; the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1963.0,
+        -13.4,
+        462.0
+      ],
+      "look": [
+        1962.01,
+        20,
+        462
+      ],
+      "fov": 80,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3s_up",
+      "pipe": "P3",
+      "desc": "up the bowling alley lawn grate's shaft from its foot; the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1306.0,
+        5.2,
+        -333.0
+      ],
+      "look": [
+        1306.01,
+        16.5,
+        -334
+      ],
+      "fov": 80,
+      "window": true
+    },
+    {
+      "name": "p3s_up_parts",
+      "pipe": "P3",
+      "desc": "up the bowling alley lawn grate's shaft from its foot; the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1306.0,
+        5.2,
+        -333.0
+      ],
+      "look": [
+        1306.01,
+        16.5,
+        -334
+      ],
+      "fov": 80,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_chamber",
+      "pipe": "P1",
+      "desc": "the chamber under the crossing from the brick-house arm (P1.NW)'s arch: the junction, the fashion stand; the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        -6.86,
+        -9.3,
+        4.6
+      ],
+      "look": [
+        -0.76,
+        -10.0,
+        -1.5
+      ],
+      "fov": 80,
+      "window": true
+    },
+    {
+      "name": "p1_chamber_parts",
+      "pipe": "P1",
+      "desc": "the chamber under the crossing from the brick-house arm (P1.NW)'s arch: the junction, the fashion stand; the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        -6.86,
+        -9.3,
+        4.6
+      ],
+      "look": [
+        -0.76,
+        -10.0,
+        -1.5
+      ],
+      "fov": 80,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_chamber_stand",
+      "pipe": "P1",
+      "desc": "across the chamber to the fashion stand; the owner's modules as the game draws them for a squirrel here (within 48 studs; beyond, the backing)",
+      "pos": [
+        1.6,
+        -9.6,
+        2.6
+      ],
+      "look": [
+        -4.95,
+        -9.7,
+        0
+      ],
+      "fov": 70,
+      "window": true
+    },
+    {
+      "name": "p1_chamber_stand_parts",
+      "pipe": "P1",
+      "desc": "across the chamber to the fashion stand; the parts lining only: what the game draws if the modules do not load (the fall-back)",
+      "pos": [
+        1.6,
+        -9.6,
+        2.6
+      ],
+      "look": [
+        -4.95,
+        -9.7,
+        0
+      ],
+      "fov": 70,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p1_crossing",
+      "pipe": "P1",
+      "desc": "the crossing from above Centre Street north of it: the four grates and the lid; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        -18,
+        20,
+        54
+      ],
+      "look": [
+        0,
+        0,
+        0
+      ],
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    },
+    {
+      "name": "p3_lightgrate_street",
+      "pipe": "P3",
+      "desc": "the light grate in the boulevard from the south sidewalk; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "pos": [
+        1346.05,
+        14.1,
+        -7.0
+      ],
+      "look": [
+        1344.05,
+        9.5,
+        0
+      ],
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "sewers",
+        "lining",
+        "attractions"
+      ]
+    }
   ]
- },
- "sun": {
-  "dir": [
-   0.7,
-   0.55,
-   -0.45
-  ],
-  "strength": 3.6,
-  "color": [
-   1.0,
-   0.86,
-   0.68
-  ],
-  "angleDeg": 1.5,
-  "skyStrength": 1.0
- },
- "views": [
-  {
-   "name": "p1nw_street",
-   "pipe": "P1",
-   "desc": "north-west corner grate from the pavement, at a person's eye",
-   "pos": [
-    -29.58,
-    4.82,
-    28.7
-   ],
-   "look": [
-    -24.58,
-    0,
-    23.7
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p1nw_down",
-   "pipe": "P1",
-   "desc": "a squirrel's eye just under the north-west corner grate, looking down the shaft at the ladder",
-   "pos": [
-    -24.65,
-    -0.7,
-    24.45
-   ],
-   "look": [
-    -24.65,
-    -10.1,
-    22.1
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p1ne_street",
-   "pipe": "P1",
-   "desc": "north-east corner grate from the pavement, at a person's eye",
-   "pos": [
-    28.7,
-    4.82,
-    29.58
-   ],
-   "look": [
-    23.7,
-    0,
-    24.58
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p1ne_down",
-   "pipe": "P1",
-   "desc": "a squirrel's eye just under the north-east corner grate, looking down the shaft at the ladder",
-   "pos": [
-    24.45,
-    -0.7,
-    24.65
-   ],
-   "look": [
-    22.1,
-    -10.1,
-    24.65
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p1se_street",
-   "pipe": "P1",
-   "desc": "south-east corner grate from the pavement, at a person's eye",
-   "pos": [
-    28.7,
-    4.82,
-    -29.58
-   ],
-   "look": [
-    23.7,
-    0,
-    -24.58
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p1se_down",
-   "pipe": "P1",
-   "desc": "a squirrel's eye just under the south-east corner grate, looking down the shaft at the ladder",
-   "pos": [
-    24.45,
-    -0.7,
-    -24.65
-   ],
-   "look": [
-    22.1,
-    -10.1,
-    -24.65
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p1sw_street",
-   "pipe": "P1",
-   "desc": "south-west corner grate from the pavement, at a person's eye",
-   "pos": [
-    -29.58,
-    4.82,
-    -28.7
-   ],
-   "look": [
-    -24.58,
-    0,
-    -23.7
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p1sw_down",
-   "pipe": "P1",
-   "desc": "a squirrel's eye just under the south-west corner grate, looking down the shaft at the ladder",
-   "pos": [
-    -24.65,
-    -0.7,
-    -24.45
-   ],
-   "look": [
-    -24.65,
-    -10.1,
-    -22.1
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p1_1_foot",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye)",
-   "pos": [
-    -23.66,
-    -9.6,
-    23.66
-   ],
-   "look": [
-    -13.76,
-    -9.8,
-    13.76
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1_1_run50",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye)",
-   "pos": [
-    -15.72,
-    -9.6,
-    15.72
-   ],
-   "look": [
-    -5.82,
-    -9.75,
-    5.82
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1_2_foot",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye)",
-   "pos": [
-    23.66,
-    -9.6,
-    23.66
-   ],
-   "look": [
-    13.76,
-    -9.8,
-    13.76
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1_2_run50",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye)",
-   "pos": [
-    14.59,
-    -9.6,
-    14.59
-   ],
-   "look": [
-    4.69,
-    -9.75,
-    4.69
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1_3_foot",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye)",
-   "pos": [
-    23.66,
-    -9.6,
-    -23.66
-   ],
-   "look": [
-    13.76,
-    -9.8,
-    -13.76
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1_3_run50",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye)",
-   "pos": [
-    14.59,
-    -9.6,
-    -14.59
-   ],
-   "look": [
-    4.69,
-    -9.75,
-    -4.69
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1_4_foot",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: at the foot of the shaft, along the run (squirrel's eye)",
-   "pos": [
-    -23.66,
-    -9.6,
-    -23.66
-   ],
-   "look": [
-    -13.76,
-    -9.8,
-    -13.76
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1_4_run50",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye)",
-   "pos": [
-    -15.72,
-    -9.6,
-    -15.72
-   ],
-   "look": [
-    -5.82,
-    -9.75,
-    -5.82
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p2w_street",
-   "pipe": "P2",
-   "desc": "west quay access cover from the pavement, at a person's eye",
-   "pos": [
-    1955.5,
-    24.7,
-    464.5
-   ],
-   "look": [
-    1962.0,
-    20,
-    462.0
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p2w_down",
-   "pipe": "P2",
-   "desc": "a squirrel's eye just under the west quay access cover, looking down the shaft at the ladder",
-   "pos": [
-    1960.85,
-    19.3,
-    462.0
-   ],
-   "look": [
-    1963.2,
-    -14.1,
-    462.0
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p2e_street",
-   "pipe": "P2",
-   "desc": "east quay access cover from the pavement, at a person's eye",
-   "pos": [
-    2340.5,
-    24.7,
-    464.5
-   ],
-   "look": [
-    2334.0,
-    20,
-    462.0
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p2e_down",
-   "pipe": "P2",
-   "desc": "a squirrel's eye just under the east quay access cover, looking down the shaft at the ladder",
-   "pos": [
-    2335.15,
-    19.3,
-    462.0
-   ],
-   "look": [
-    2332.8,
-    -14.1,
-    462.0
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p2_1_foot",
-   "pipe": "P2",
-   "desc": "The old river culvert: at the foot of the shaft, along the run (squirrel's eye)",
-   "pos": [
-    1962.05,
-    -13.6,
-    462.0
-   ],
-   "look": [
-    1976.05,
-    -13.8,
-    462.0
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p2_1_footend",
-   "pipe": "P2",
-   "desc": "The old river culvert: at the foot of the far shaft, back along the run",
-   "pos": [
-    2333.95,
-    -13.6,
-    462.0
-   ],
-   "look": [
-    2319.95,
-    -13.8,
-    462.0
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p2_1_run33",
-   "pipe": "P2",
-   "desc": "The old river culvert: 33% along, looking on (squirrel's eye)",
-   "pos": [
-    2084.88,
-    -13.6,
-    462.0
-   ],
-   "look": [
-    2098.88,
-    -13.75,
-    462.0
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p2_1_run66",
-   "pipe": "P2",
-   "desc": "The old river culvert: 66% along, looking on (squirrel's eye)",
-   "pos": [
-    2211.12,
-    -13.6,
-    462.0
-   ],
-   "look": [
-    2225.12,
-    -13.75,
-    462.0
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p3s_street",
-   "pipe": "P3",
-   "desc": "bowling alley lawn grate from the pavement, at a person's eye",
-   "pos": [
-    1310.5,
-    21.02,
-    -344.5
-   ],
-   "look": [
-    1306.0,
-    16.42,
-    -338.0
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p3s_down",
-   "pipe": "P3",
-   "desc": "a squirrel's eye just under the bowling alley lawn grate, looking down the shaft at the ladder",
-   "pos": [
-    1306.0,
-    15.72,
-    -339.15
-   ],
-   "look": [
-    1306.0,
-    4.5,
-    -336.8
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p3n_street",
-   "pipe": "P3",
-   "desc": "Main Street north verge grate from the pavement, at a person's eye",
-   "pos": [
-    1352.5,
-    12.38,
-    43.0
-   ],
-   "look": [
-    1350.0,
-    7.78,
-    36.0
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p3n_down",
-   "pipe": "P3",
-   "desc": "a squirrel's eye just under the Main Street north verge grate, looking down the shaft at the ladder",
-   "pos": [
-    1350.0,
-    7.08,
-    37.15
-   ],
-   "look": [
-    1350.0,
-    -2.7,
-    34.8
-   ],
-   "fov": 85
-  },
-  {
-   "name": "p3_1_foot",
-   "pipe": "P3",
-   "desc": "Storm drain 3: Bowl Lane: at the foot of the shaft, along the run (squirrel's eye)",
-   "pos": [
-    1306.16,
-    4.97,
-    -337.96
-   ],
-   "look": [
-    1307.79,
-    4.77,
-    -324.05
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p3_1_footend",
-   "pipe": "P3",
-   "desc": "Storm drain 3: Bowl Lane: at the foot of the far shaft, back along the run",
-   "pos": [
-    1349.84,
-    -2.19,
-    35.96
-   ],
-   "look": [
-    1348.21,
-    -2.39,
-    22.05
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p3_1_run33",
-   "pipe": "P3",
-   "desc": "Storm drain 3: Bowl Lane: 33% along, looking on (squirrel's eye)",
-   "pos": [
-    1320.59,
-    2.42,
-    -214.45
-   ],
-   "look": [
-    1322.21,
-    2.27,
-    -200.54
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p3_1_run66",
-   "pipe": "P3",
-   "desc": "Storm drain 3: Bowl Lane: 66% along, looking on (squirrel's eye)",
-   "pos": [
-    1335.41,
-    -0.88,
-    -87.55
-   ],
-   "look": [
-    1337.03,
-    -1.03,
-    -73.65
-   ],
-   "fov": 75
-  },
-  {
-   "name": "p1nw_up",
-   "pipe": "P1",
-   "desc": "up the north-west corner grate's shaft from its foot",
-   "pos": [
-    -24.65,
-    -9.4,
-    22.3
-   ],
-   "look": [
-    -24.64,
-    0,
-    23.3
-   ],
-   "fov": 80
-  },
-  {
-   "name": "p2w_up",
-   "pipe": "P2",
-   "desc": "up the west quay access cover's shaft from its foot",
-   "pos": [
-    1963.0,
-    -13.4,
-    462.0
-   ],
-   "look": [
-    1962.01,
-    20,
-    462
-   ],
-   "fov": 80
-  },
-  {
-   "name": "p3s_up",
-   "pipe": "P3",
-   "desc": "up the bowling alley lawn grate's shaft from its foot",
-   "pos": [
-    1306.0,
-    5.2,
-    -337.0
-   ],
-   "look": [
-    1306.01,
-    16.42,
-    -338
-   ],
-   "fov": 80
-  },
-  {
-   "name": "p1_chamber",
-   "pipe": "P1",
-   "desc": "the chamber under the crossing from the north-west arm's arch: the junction, the fashion stand",
-   "pos": [
-    -6.86,
-    -9.3,
-    4.6
-   ],
-   "look": [
-    -0.76,
-    -10.0,
-    -1.5
-   ],
-   "fov": 80
-  },
-  {
-   "name": "p1_chamber_stand",
-   "pipe": "P1",
-   "desc": "across the chamber to the fashion stand",
-   "pos": [
-    1.6,
-    -9.6,
-    2.6
-   ],
-   "look": [
-    -4.95,
-    -9.7,
-    0
-   ],
-   "fov": 70
-  },
-  {
-   "name": "p1_crossing",
-   "pipe": "P1",
-   "desc": "the crossing from above Centre Street north of it: the four grates and the lid",
-   "pos": [
-    -18,
-    20,
-    54
-   ],
-   "look": [
-    0,
-    0,
-    0
-   ],
-   "fov": 60
-  },
-  {
-   "name": "p3_lightgrate_street",
-   "pipe": "P3",
-   "desc": "the light grate in the boulevard from the south sidewalk",
-   "pos": [
-    1346.05,
-    14.1,
-    -7.0
-   ],
-   "look": [
-    1344.05,
-    9.5,
-    0
-   ],
-   "fov": 55
-  },
-  {
-   "name": "p1_1_run50_parts",
-   "pipe": "P1",
-   "desc": "Storm drain 1: the crossroads: 50% along, looking on (squirrel's eye); the parts lining only (his modules not loaded)",
-   "pos": [
-    -15.72,
-    -9.6,
-    15.72
-   ],
-   "look": [
-    -5.82,
-    -9.75,
-    5.82
-   ],
-   "fov": 75,
-   "groups": [
-    "town",
-    "terrain",
-    "sewers",
-    "lining",
-    "attractions"
-   ]
-  },
-  {
-   "name": "p2_1_run33_parts",
-   "pipe": "P2",
-   "desc": "The old river culvert: 33% along, looking on (squirrel's eye); the parts lining only (his modules not loaded)",
-   "pos": [
-    2084.88,
-    -13.6,
-    462.0
-   ],
-   "look": [
-    2098.88,
-    -13.75,
-    462.0
-   ],
-   "fov": 75,
-   "groups": [
-    "town",
-    "terrain",
-    "sewers",
-    "lining",
-    "attractions"
-   ]
-  }
- ]
 }
