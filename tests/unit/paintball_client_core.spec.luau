@@ -14,6 +14,7 @@ local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Hit = require("@shared/Minigames/Paintball/Hit")
 local Wire = require("@shared/Minigames/Paintball/Wire")
+local Hud = require("@client/Minigames/Paintball/Hud")
 local Marker = require("@client/Minigames/Paintball/Marker")
 local Tuning = require("@client/Minigames/Paintball/Tuning")
 
@@ -94,6 +95,122 @@ return function(t)
 			t.truthy(screen.w * scores[1] + scores[3] / 2 <= screen.w / 2 - 130, "SCORES is left of the clock")
 		end
 	end)
+
+	t.test(
+		"the HUD on every screen, a small phone to 4K: every piece on the screen, none on another or under a thumb",
+		function()
+			local function apart(a: Hud.Rect, b: Hud.Rect): boolean
+				return a.x + a.w <= b.x + 1e-6
+					or b.x + b.w <= a.x + 1e-6
+					or a.y + a.h <= b.y + 1e-6
+					or b.y + b.h <= a.y + 1e-6
+			end
+			local screens: { { any } } = {
+				-- name, wide, tall, touch (a phone's HUD has the height left under Roblox's top bar)
+				{ "an old small phone", 568, 320, true },
+				{ "a small phone", 667, 375, true },
+				{ "a small phone under the top bar", 667, 339, true },
+				{ "a phone", 844, 390, true },
+				{ "a phone under the top bar", 844, 332, true },
+				{ "a big phone", 932, 430, true },
+				{ "a small tablet", 1024, 768, true },
+				{ "a tablet", 1180, 820, true },
+				{ "a window dragged small", 800, 600, false },
+				{ "a small laptop", 1280, 720, false },
+				{ "a laptop", 1366, 768, false },
+				{ "a laptop with a touch screen", 1366, 768, true },
+				{ "a monitor", 1920, 1080, false },
+				{ "a wide monitor", 2560, 1080, false },
+				{ "4K", 3840, 2160, false },
+			}
+			for _, screen in screens do
+				local name, vw, vh, touch = screen[1], screen[2], screen[3], screen[4]
+				local lay = Hud.layout(vw, vh, touch, Tuning, 16)
+				local r = lay.rects
+				t.truthy(lay.scale >= Tuning.hudSmallest, `{name}: never smaller than words can be read`)
+				t.truthy(20 * lay.scale >= 13.9, `{name}: a line of the feed is {20 * lay.scale} px tall`)
+				t.truthy(lay.aim >= 1, `{name}: the crosshair is never scaled down`)
+				-- on the screen, all of it
+				for key, rect in r do
+					t.truthy(
+						rect.x >= -1e-6
+							and rect.y >= -1e-6
+							and rect.x + rect.w <= vw + 1e-6
+							and rect.y + rect.h <= vh + 1e-6,
+						`{name}: {key} is on the screen ({rect.x}, {rect.y}, {rect.w} x {rect.h})`
+					)
+				end
+				-- what is up while playing: none on another, none under a thumb (or the stock jump button)
+				local playing = { "Top", "Feed", "Pips", "Status", "Phase" }
+				local thumbs: { [string]: Hud.Rect } = {}
+				if touch then
+					for _, key in { "FireRight", "FireLeft", "Reload", "Crouch", "Scores" } do
+						t.truthy(r[key] ~= nil, `{name}: {key}`)
+						thumbs[key] = r[key]
+					end
+					local small = math.min(vw, vh) <= 500
+					local size = if small then 70 else 120
+					thumbs.Jump = if small
+						then { x = vw - 95, y = vh - 90, w = size, h = size }
+						else { x = vw - 170, y = vh - 210, w = size, h = size }
+				end
+				for i, a in playing do
+					for j = i + 1, #playing do
+						t.truthy(apart(r[a], r[playing[j]]), `{name}: {a} and {playing[j]} do not overlap`)
+					end
+					for key, thumb in thumbs do
+						t.truthy(apart(r[a], thumb), `{name}: {a} is not under {key}`)
+					end
+				end
+				-- the briefing's line is clear of the top bar, the pips and every button
+				t.truthy(apart(r.Phase, r.Top), `{name}: the briefing's line is under the top bar`)
+				t.truthy(apart(r.Phase, r.Pips))
+				for key, thumb in thumbs do
+					t.truthy(apart(r.Phase, thumb), `{name}: the briefing's line is not under {key}`)
+				end
+				-- the crosshair's own space: nothing of the HUD within a sixteenth of the screen's height of the middle
+				local keep = vh * 0.06
+				local middle = { x = vw / 2 - keep, y = vh / 2 - keep, w = 2 * keep, h = 2 * keep }
+				for _, key in { "Top", "Feed", "Pips", "Status", "Phase" } do
+					t.truthy(apart(r[key], middle), `{name}: {key} keeps out of the middle of the view`)
+				end
+				-- the end: every line of the card on the screen (checked above), the awards beside or under it
+				t.truthy(lay.card > 0.35, `{name}: the end card is fitted at {lay.card}`)
+				t.truthy(lay.awards > 0, `{name}: there is room for the bulletin's awards`)
+				t.truthy(apart(r.Awards, r.Card), `{name}: the awards are not on the end card`)
+				-- the scoreboard and the controls card fit
+				t.truthy(lay.board > 0.6 and lay.help > 0.6, `{name}: board {lay.board}, help {lay.help}`)
+			end
+			-- the screen it was drawn for is as it was drawn: nothing moved on a monitor
+			local desk = Hud.layout(1920, 1080, false, Tuning, 16)
+			t.eq(desk.scale, 1)
+			t.eq(desk.feedY, 8, "the feed beside the top bar")
+			t.eq(desk.statusY, 70)
+			t.eq(desk.statusW, 560)
+			t.eq(desk.card, 1, "the framework's card as the framework draws it")
+			t.eq(desk.help, 1)
+			t.eq(desk.awards, 1)
+			t.eq(desk.rects.Awards.x, 12)
+			t.eq(Hud.layout(3840, 2160, false).scale, 2, "4K is not a HUD for ants")
+			-- a phone: one size for all of it; the feed under the top bar; the status clear of the thumbs
+			local phone = Hud.layout(667, 375, true, Tuning, 16)
+			t.near(phone.scale, 667 / Tuning.hudFitWide, 1e-9)
+			t.truthy(phone.feedY > 8, "the feed has dropped under the top bar")
+			t.truthy(phone.card < 1 and phone.help < 1)
+			-- a phone held upright is not what this is drawn for, but nothing leaves the screen
+			local up = Hud.layout(390, 844, true, Tuning, 16)
+			for key, rect in up.rects do
+				t.truthy(
+					rect.x >= -1e-6
+						and rect.x + rect.w <= 390 + 1e-6
+						and rect.y >= -1e-6
+						and rect.y + rect.h <= 844 + 1e-6,
+					`upright: {key} is on the screen`
+				)
+			end
+			t.truthy(up.board < 1, "the scoreboard is fitted to the narrow screen")
+		end
+	)
 
 	t.test("one click, one ball: Wire.Fire with both stamps, the eye as origin, the unit look; and a pop", function()
 		local b = Kit.playing()

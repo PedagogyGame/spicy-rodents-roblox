@@ -122,6 +122,17 @@ local Tuning = {
 	noteSecs = 1.6,
 	-- Seconds between two dry clicks: a held or mashed trigger on an empty marker ticks, it does not buzz.
 	drySecs = 0.18,
+	-- Seconds the reload's word and bar flash after a dry click: the eye is told what the ear was.
+	dryFlashSecs = 0.14,
+	-- THE SIZE OF THE HUD. It is drawn for a screen hudFitWide by hudFitTall; on a smaller one (a phone)
+	-- the whole of it shrinks together, never below hudSmallest (under that, words stop being read); on
+	-- one larger than hudBigWide by hudBigTall it grows, so 4K is not a HUD for ants. The crosshair
+	-- never shrinks and the touch buttons never change: a thumb is the same size on every phone.
+	hudFitWide = 900,
+	hudFitTall = 480,
+	hudSmallest = 0.7,
+	hudBigWide = 1920,
+	hudBigTall = 1080,
 	-- The crosshair: its gap and arm length in pixels at rest, and how much wider while the marker
 	-- cannot fire (down, reloading, safe): the gap IS the "not ready" light.
 	crossGap = 5,

@@ -21,6 +21,7 @@ local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
+local Hud = require("@client/Minigames/Paintball/Hud")
 local PaintballClient = require("@client/Minigames/Paintball/PaintballClient")
 local Tuning = require("@client/Minigames/Paintball/Tuning")
 local FakeEngine = require("@tests/lib/FakeEngine")
@@ -323,6 +324,10 @@ return function(t)
 				t.truthy(Rig.has(words, "BRIEFING"), table.concat(words, " | "))
 				t.truthy(Rig.has(words, "You are ORANGE") or Rig.has(words, "You are TEAL"))
 				t.truthy(Rig.has(words, "The match starts in"))
+				t.truthy(
+					Rig.has(words, "Hold G: scoreboard, Leave, Change sides"),
+					"how to reach what cannot be clicked"
+				)
 				local screen = Rig.screen(w)
 				t.truthy(string.find(screen, "Left button  fire", 1, true), "the controls card")
 				t.truthy(Rig.button(w.gui, "Leave the match") ~= nil, "a deliberate Leave")
@@ -1043,6 +1048,133 @@ return function(t)
 				s.run(0.2)
 				t.falsy(named(hud, "Board").Visible)
 			end, { rig = { touch = true } })
+		end
+	)
+
+	t.test(
+		"a phone: the briefing in two lines of its own and no card over the thumbs; the whole HUD at a phone's size",
+		function()
+			play(function(s)
+				local w = s.w
+				local cam = workspace.CurrentCamera
+				rawset(cam, "ViewportSize", roblox.Vector2.new(667, 375))
+				join(s)
+				local hud = s.hud()
+				local lay = Hud.layout(667, 375, true, Tuning, nil)
+				-- thumbs only: the framework's card (a third of this screen, over the left FIRE, mostly about keys)
+				-- stays away, and the briefing says what a phone's player needs under the crosshair
+				t.eq(w.gui:FindFirstChild("Help").Visible, false)
+				local words = Rig.texts(hud)
+				t.truthy(Rig.has(words, "One hit tags you out"), table.concat(words, " | "))
+				t.truthy(Rig.has(words, "Drag on FIRE to keep looking"))
+				t.truthy(Rig.has(words, "BRIEFING") and Rig.has(words, "The match starts in"))
+				t.falsy(Rig.has(words, "Hold G"), "no keys on a phone")
+				-- one size for all of it, and the pieces where the layout (held to every screen by the spec) says
+				local root = named(hud, "Root")
+				t.near(root:FindFirstChild("PaintballFit").Scale, lay.scale, 1e-4)
+				t.near(lay.scale, 667 / Tuning.hudFitWide, 1e-4)
+				t.near(root.Size.X.Scale, 1 / lay.scale, 1e-4, "the scaled screen fills the real one")
+				t.eq(named(hud, "Top").Parent, root)
+				t.eq(named(hud, "Cross"):FindFirstChild("PaintballFit").Scale, 1, "the crosshair is never scaled down")
+				local feed = named(hud, "Feed")
+				t.near(feed.Position.Y.Offset, lay.feedY, 1)
+				t.truthy(lay.feedY > 8, "the feed has dropped under the top bar")
+				local status = named(hud, "Status")
+				t.near(status.Position.Y.Offset, lay.statusY, 1)
+				t.truthy(lay.statusY > 70, "the status line has moved clear of FIRE")
+				local fire = named(hud, "FireRight")
+				t.near(fire.Position.X.Offset, lay.rects.FireRight.x, 1)
+				t.near(fire.Position.Y.Offset, lay.rects.FireRight.y, 1)
+				t.eq(fire.Size.X.Offset, Tuning.touchFire[3], "a thumb's button is the same size on every phone")
+				-- the match goes live: a touch on FIRE where it now is fires
+				s.live()
+				s.respawn()
+				s.run(0.3)
+				local r = lay.rects.FireRight
+				Rig.touch("a", "began", r.x + r.w / 2, r.y + r.h / 2)
+				Rig.touch("a", "ended", r.x + r.w / 2, r.y + r.h / 2)
+				s.run(0.2)
+				t.eq(#heard(s, "Paintball.Fire"), 1)
+				Rig.touch("b", "began", r.x - 30, r.y - 30)
+				Rig.touch("b", "ended", r.x - 30, r.y - 30)
+				s.run(0.4)
+				t.eq(#heard(s, "Paintball.Fire"), 1, "beside it only looks")
+				-- the scoreboard fits; turned to a tablet, everything is put where that screen wants it
+				named(hud, "Scores").MouseButton1Down.fire()
+				s.run(0.4)
+				t.truthy(named(hud, "Board").Visible)
+				t.eq(named(hud, "Board"):FindFirstChild("PaintballFit").Scale, lay.board)
+				rawset(cam, "ViewportSize", roblox.Vector2.new(1180, 820))
+				s.run(0.1)
+				t.eq(root:FindFirstChild("PaintballFit").Scale, 1)
+				t.near(fire.Position.X.Offset, Hud.layout(1180, 820, true, Tuning, nil).rects.FireRight.x, 1)
+				rawset(cam, "ViewportSize", roblox.Vector2.new(1920, 1080))
+			end, { rig = { touch = true } })
+		end
+	)
+
+	t.test(
+		"tagged as the clock runs out: the end card counts nobody back, the legs are free, and Y on a gamepad leaves",
+		function()
+			play(function(s)
+				playing(s)
+				local w = s.w
+				local foe = opponent(s)
+				s.broadcast({
+					kind = "paintball_tag",
+					by = foe,
+					id = s.you,
+					ball = 5,
+					scores = { 0, 1 },
+					tags = 1,
+					outs = 1,
+					at = s.now() + F.respawnSecs,
+					x = 1,
+					y = 3,
+					z = 30,
+				})
+				s.run(0.3)
+				local hud = s.hud()
+				t.truthy(Rig.has(Rig.texts(hud), "TAGGED OUT by"))
+				t.deepEq(w.controls, { false })
+				-- full time, before the respawn
+				local state = s.state()
+				local rows = {}
+				for id, slot in state.slots do
+					if slot.on then
+						table.insert(
+							rows,
+							{ id = id, team = slot.team, tags = 1, outs = 1, shots = 5, hits = 1, accuracy = 0.2 }
+						)
+					end
+				end
+				local real = Rules.result
+				Rules.result = function(): any
+					return {
+						done = true,
+						scores = {},
+						winners = {},
+						text = "A draw, 1 all",
+						card = { winner = 0, scores = { 1, 1 }, rows = rows, awards = {} },
+					}
+				end
+				state.phase = "ended"
+				s.run(1.5)
+				Rules.result = real
+				t.eq(s.service.ctx.session.phase, "done")
+				local words = Rig.texts(hud)
+				t.falsy(Rig.has(words, "TAGGED OUT"), table.concat(words, " | "))
+				t.falsy(named(hud, "TaggedFrom").Visible)
+				t.deepEq(w.controls, { false, true }, "people may walk at the end card, the tagged too")
+				t.falsy(named(hud, "Awards").Visible, "no awards, no empty panel")
+				local sent = #heard(s, "Paintball.Move")
+				s.run(0.5)
+				t.eq(#heard(s, "Paintball.Move"), sent, "still out to the server: no pose is sent for it to drop")
+				-- Y alone leaves from the end card (in a fight it wants View held)
+				pad(Key.ButtonY, true)
+				s.run(0.3)
+				t.eq(w.client.active(), nil, "left")
+			end)
 		end
 	)
 

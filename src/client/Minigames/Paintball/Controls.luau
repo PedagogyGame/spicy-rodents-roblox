@@ -8,7 +8,8 @@
 --                the stock controls'.) A click while the scoreboard is up belongs to its buttons.
 --   gamepad      R2 fire; X reload; B crouch is a TOGGLE; L3 sprint is a TOGGLE that ends on a fire
 --                press, on a crouch and when the stick is let go (Tuning.padSprintOff); View shows the
---                scoreboard while HELD, and while it is held Y leaves and D-pad up changes sides.
+--                scoreboard while HELD, and while it is held Y leaves and D-pad up changes sides; at the
+--                end card Y leaves by itself.
 --   touch        the right FIRE does not sink its touch: its press is read here from the touch itself
 --                (inside Hud.fireRect), and the same finger's drag still turns the view; a second FIRE
 --                on the left, RELOAD, CROUCH (a TOGGLE) and SCORES (a TOGGLE) are buttons. Sprint
@@ -125,7 +126,8 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 				padScores = true
 				apply()
 			elseif key == "ButtonY" then
-				if padScores then
+				-- (at the end card the button says so, and there is no fight to slip out of)
+				if padScores or seat.phase == "ended" then
 					seat:input("leave", true)
 				end
 			elseif key == "DPadUp" then
