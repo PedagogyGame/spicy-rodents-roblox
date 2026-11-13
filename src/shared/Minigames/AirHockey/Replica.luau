@@ -10,7 +10,8 @@
 -- match, a gap) is taken as it stands. If a replay ever ends somewhere other than the state its message carries,
 -- the message wins (and `desyncs` counts it: the specs hold that at zero).
 -- Pure. Interface: new() -> Replica; push(r, msg) -> bool (false: not a stream message); step(r, upTo?, onTick?)
---   -> ticks stepped (onTick(sim, tick, hit, goal) after each: hit / goal say the tick had a contact / a goal);
+--   -> ticks stepped (onTick(sim, tick, hit, goal, served) after each: the tick had a contact / a goal / the
+--   puck was let go on it);
 --   Replica.sim / .tick (the state held and its tick) / .head (the newest tick known) / .game / .t0 / .mode /
 --   .jumps (times a message was taken as it stands) / .desyncs
 
@@ -101,7 +102,7 @@ end
 function Replica.step(
 	r: Replica,
 	upTo: number?,
-	onTick: ((sim: Sim.State, tick: number, hit: boolean, goal: boolean) -> ())?
+	onTick: ((sim: Sim.State, tick: number, hit: boolean, goal: boolean, served: boolean) -> ())?
 ): number
 	local limit = math.min(upTo or r.head, r.head)
 	local sim = r.sim
@@ -125,11 +126,12 @@ function Replica.step(
 		local stop = math.min(limit, msg.n)
 		while r.tick < stop do
 			local tick = r.tick + 1
+			local waiting = sim.countdown > 0
 			for side = 0, 1 do
 				local e = (events :: any)[side][tick]
 				if e then
-					if e[3] and sim.countdown > 0 then
-						Sim.serve(sim)
+					if e[3] then
+						Sim.press(sim, computer)
 					end
 					if e[1] then
 						local x, y = Wire.target(side, e[1], e[2])
@@ -142,7 +144,13 @@ function Replica.step(
 			r.tick = tick
 			stepped += 1
 			if onTick then
-				onTick(sim, tick, sim.hitSerial ~= hits, sim.goalSerial ~= goals)
+				onTick(
+					sim,
+					tick,
+					sim.hitSerial ~= hits,
+					sim.goalSerial ~= goals,
+					waiting and sim.countdown <= 0 and sim.winner < 0
+				)
 			end
 		end
 		if r.tick >= msg.n then

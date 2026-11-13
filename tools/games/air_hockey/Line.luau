@@ -17,12 +17,16 @@
 --   of the frames with the puck in this player's own half on which it was drawn where it was, to 5 mm);
 --   smooth(line, side);
 --   opts = { humans = { [0] = bool, [1] = bool }, lag = { [0] = frames, [1] = frames } (each way), hands =
---   { [side] = hand }, difficulty?, fps? (60), watchers? (how many, each `watchLag` frames away) }
+--   { [side] = hand }, difficulty?, fps? (60), watchers? (how many, each `watchLag` frames away), lose? (fn(side,
+--   from, to, nth) -> true: that log message is lost on the way up) }; line.stall[side] = frames (that side's
+--   line up is held that much longer from now on: set it and clear it to make a stall); line.lost;
+--   a refusal the referee says can be mended is answered as the table answers it (Seat.resume)
 
 local Referee = require("../../../src/shared/Minigames/AirHockey/Referee")
 local Replica = require("../../../src/shared/Minigames/AirHockey/Replica")
 local Seat = require("../../../src/shared/Minigames/AirHockey/Seat")
 local Sim = require("../../../src/shared/Minigames/AirHockey/Sim")
+local Wire = require("../../../src/shared/Minigames/AirHockey/Wire")
 
 local Line = {}
 
@@ -103,6 +107,10 @@ function Line.new(opts: { [string]: any }): any
 		downAt = { [0] = 0, [1] = 0 },
 		refused = {},
 		goals = {},
+		lose = opts.lose, -- (side, from, to, nth) -> true: that log message never arrives
+		lost = 0,
+		stall = {}, -- side -> frames that side's next messages up are held back (a stalled line)
+		askedAt = {},
 	}
 	local s = line.ref.sim
 	line.truth[0] = { s.px, s.py, s.p0x, s.p0y, s.p1x, s.p1y }
@@ -161,9 +169,30 @@ function Line.frame(line: any, dtIn: number?)
 		local m = line.up[i]
 		if m.at <= line.frames then
 			table.remove(line.up, i)
-			local ok, why = Referee.accept(line.ref, m.side, m.from, m.to, m.strings, math.floor(nowTick))
+			local ok, why, behind = Referee.accept(line.ref, m.side, m.from, m.to, m.strings, math.floor(nowTick))
+			local other = line.seats[1 - m.side]
+			if ok and other and Referee.mode(line.ref) == "2" then
+				-- (the table passes a press of the serve button on to the other player at once)
+				for _, tick in Wire.presses(m.strings, m.from, m.to) or {} do
+					if tick > line.ref.n then
+						local side = 1 - m.side
+						line.downAt[side] = math.max(line.downAt[side], line.frames + line.lag[side])
+						table.insert(line.down, { at = line.downAt[side], pressed = tick, to = other })
+					end
+				end
+			end
 			if not ok then
 				table.insert(line.refused, `{m.side}: {why}`)
+				if behind and line.frames - (line.askedAt[m.side] or -1e9) >= line.fps / 4 then
+					-- (the table's word to that player: send your log again from here; four times a second at most)
+					line.askedAt[m.side] = line.frames
+					line.downAt[m.side] = math.max(line.downAt[m.side], line.frames + line.lag[m.side])
+					table.insert(line.down, {
+						at = line.downAt[m.side],
+						resume = Referee.expects(line.ref, m.side),
+						to = line.seats[m.side],
+					})
+				end
 			end
 			pump(line)
 		else
@@ -181,6 +210,10 @@ function Line.frame(line: any, dtIn: number?)
 				Replica.push(m.watcher, m.msg)
 			elseif m.begin then
 				Seat.begin(m.to, m.begin[1], m.begin[2])
+			elseif m.resume then
+				Seat.resume(m.to, m.resume)
+			elseif m.pressed then
+				Seat.pressed(m.to, m.pressed)
 			else
 				Seat.push(m.to, m.msg)
 			end
@@ -201,7 +234,11 @@ function Line.frame(line: any, dtIn: number?)
 		Seat.relax(seat, dt)
 		Seat.step(seat, nowTick, function(from: number, to: number, strings: { string })
 			line.sent[side] += 1
-			line.upAt[side] = math.max(line.upAt[side], line.frames + line.lag[side])
+			if line.lose and line.lose(side, from, to, line.sent[side]) then
+				line.lost += 1
+				return
+			end
+			line.upAt[side] = math.max(line.upAt[side], line.frames + line.lag[side] + (line.stall[side] or 0))
 			table.insert(line.up, { at = line.upAt[side], side = side, from = from, to = to, strings = strings })
 		end)
 		if seat.ready then

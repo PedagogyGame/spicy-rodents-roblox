@@ -12,10 +12,14 @@
 --     part of that log is dropped when it comes (it is still taken, so that player's log stays in one piece;
 --     the stream tells them what was played instead). Only as a match starts is a hand waited for longer
 --     (Wire.START_WAIT), until its first segment has come.
--- A log segment is refused only if it does not start where that player's last one ended, is too long, or claims
--- ticks the shared clock has not reached (plus Wire.SLACK).
+-- A log segment is refused only if it starts AFTER where that player's log has got to (a segment before it never
+-- came: accept says so with `behind`, and the table asks that player to send from expects() again), is too
+-- long, or claims ticks the shared clock has not reached (plus Wire.SLACK). A segment that starts before that
+-- point is a repeat of what is here: the part already held is skipped and the rest taken.
+-- cut[side] counts the ticks played without that side's hand (a line too slow for a live match).
 -- Pure. Interface: new(opts { t0, game, human = { [0] = bool, [1] = bool }, difficulty }) -> Referee;
---   accept(r, side, from, to, strings, nowTick) -> (ok, why?); advance(r, nowTick) -> (message?, { goal }) (the
+--   accept(r, side, from, to, strings, nowTick) -> (ok, why?, behind?) (behind: refused because an earlier
+--   segment is missing or this one is ahead of the clock: sending again from expects() mends it); advance(r, nowTick) -> (message?, { goal }) (the
 --   stream message for the ticks just decided, and the goals scored in them: { side, score0, score1, winner });
 --   snapshot(r) -> message (no ticks: the state as it stands, for someone arriving); control(r, side, human);
 --   mode(r) -> "0" | "1" | "2" | nil; expects(r, side) -> the tick that side's next segment must start from;
@@ -37,6 +41,7 @@ export type Referee = {
 	recv: { [number]: number }, -- side -> the tick up to which that side's hand is known or was played without
 	events: { [number]: { [number]: any } }, -- side -> the events not yet played, by tick
 	cuts: number, -- ticks played without waiting for a late hand
+	cut: { [number]: number }, -- the same, by the side whose hand was late
 	fresh: { [number]: boolean }, -- side -> a person there from the start whose first segment has not come yet
 }
 
@@ -53,6 +58,7 @@ function Referee.new(opts: { t0: number, game: number, human: { [number]: boolea
 		recv = { [0] = 0, [1] = 0 },
 		events = { [0] = {}, [1] = {} },
 		cuts = 0,
+		cut = { [0] = 0, [1] = 0 },
 		fresh = { [0] = opts.human[0] == true, [1] = opts.human[1] == true },
 	}
 end
@@ -93,7 +99,7 @@ function Referee.accept(
 	to: any,
 	strings: { any },
 	nowTick: number
-): (boolean, string?)
+): (boolean, string?, boolean?)
 	if not r.human[side] then
 		return false, "The computer is playing that end"
 	end
@@ -102,23 +108,30 @@ function Referee.accept(
 		or type(to) ~= "number"
 		or from % 1 ~= 0
 		or to % 1 ~= 0
-		or from ~= r.got[side]
+		or from < 0
 		or to <= from
 		or to - from > Wire.MAX_SEGMENT
 	then
-		return false, "That part of the game arrived out of order"
+		return false, "That part of the game could not be read"
+	end
+	local got = r.got[side]
+	if from > got then
+		return false, "That part of the game arrived out of order", true
 	end
 	if to > nowTick + Wire.SLACK then
-		return false, "That part of the game is ahead of the clock"
+		return false, "That part of the game is ahead of the clock", true
 	end
 	local events = Wire.unpack(strings, from, to)
 	if events == nil then
 		return false, "That part of the game could not be read"
 	end
+	if to <= got then
+		return true -- (all of it is here already)
+	end
 	local mine = r.events[side]
 	for tick, e in events do
-		-- (ticks already played without this hand are gone)
-		if tick > r.n then
+		-- (what is here already is kept as it came; ticks already played without this hand are gone)
+		if tick > got and tick > r.n then
 			mine[tick] = e
 		end
 	end
@@ -185,8 +198,8 @@ function Referee.advance(r: Referee, nowTick: number): ({ [string]: any }?, { Go
 				if e then
 					r.events[side][tick] = nil
 					played[side][tick] = e
-					if e[3] and sim.countdown > 0 then
-						Sim.serve(sim)
+					if e[3] then
+						Sim.press(sim, computer)
 					end
 					if e[1] then
 						local x, y = Wire.target(side, e[1], e[2])
@@ -196,6 +209,7 @@ function Referee.advance(r: Referee, nowTick: number): ({ [string]: any }?, { Go
 				if tick > r.recv[side] then
 					-- played without this hand: its log, when it comes, starts after this tick
 					r.cuts += 1
+					r.cut[side] += 1
 				end
 			end
 		end

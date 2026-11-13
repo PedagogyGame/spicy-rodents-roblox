@@ -36,6 +36,7 @@ local function furnish(roots: { [string]: any }, places: { [string]: any })
 	-- (each case from nothing: no table remembered from the case before)
 	Rink.reset()
 	Controller.current = nil
+	table.clear(MinigameSounds.counts())
 	local place = places[SITE]
 	local room = FakeEngine.new("Folder", "GamesRoom")
 	room.Parent = roots[SITE]
@@ -105,9 +106,15 @@ local function botFrame(w: Rig.World, b: any)
 	while b.read < #events do
 		b.read += 1
 		local msg = events[b.read]
-		if msg.kind == "air_hockey_seat" then
+		if msg.kind == "air_hockey_seat" and msg.again then
+			if b.seat then
+				Seat.resume(b.seat, msg.from)
+			end
+		elseif msg.kind == "air_hockey_seat" then
 			b.seat = Seat.new(msg.side)
 			Seat.begin(b.seat, msg.g, msg.from)
+		elseif msg.kind == "air_hockey_press" and b.seat then
+			Seat.pressed(b.seat, msg.tick)
 		elseif msg.kind == "air_hockey" and b.seat then
 			Seat.push(b.seat, msg)
 		elseif msg.kind == "left" then
@@ -164,20 +171,78 @@ local function play(w: Rig.World, seconds: number, hand: any?, bots: { any }?, s
 	end
 end
 
--- What the referee decided, tick by tick, from the stream the client was sent.
-local function truth(w: Rig.World): { [number]: { number } }
+-- What the referee decided, tick by tick, from the stream the client was sent (and, as the second result, how
+-- many times the puck was let go in it).
+local function truth(w: Rig.World): ({ [number]: { number } }, number)
 	local r = Replica.new()
 	local out: { [number]: { number } } = {}
+	local serves = 0
 	for _, msg in w.got do
 		if msg.kind == "air_hockey" then
 			Replica.push(r, msg)
 			out[r.tick] = out[r.tick] or { r.sim.px, r.sim.py, r.sim.p0x, r.sim.p0y, r.sim.p1x, r.sim.p1y }
-			Replica.step(r, nil, function(sim: any, tick: number)
+			Replica.step(r, nil, function(sim: any, tick: number, _hit: boolean, _goal: boolean, served: boolean)
 				out[tick] = { sim.px, sim.py, sim.p0x, sim.p0y, sim.p1x, sim.p1y }
+				if served then
+					serves += 1
+				end
 			end)
 		end
 	end
+	return out, serves
+end
+
+-- A point of the bed on the screen (pixels), through the camera as it is.
+local function onScreen(w: Rig.World, x: number, y: number): any
+	local wx, wy, wz = Layout.toWorld(w.places[SITE], x, y)
+	return (workspace.CurrentCamera:WorldToViewportPoint(roblox.Vector3.new(wx, wy, wz)))
+end
+
+-- Every part of the HUD that is drawn now, as rectangles of the screen: { name, x0, y0, x1, y1 } (pixels).
+local function hud(): { { any } }
+	local ui = Controller.current.ctx.ui
+	local size = workspace.CurrentCamera.ViewportSize
+	local out: { { any } } = {}
+	local function rect(frame: any): (number, number, number, number)
+		local p, z = frame.Position, frame.Size
+		local x0 = p.X.Scale * size.X + p.X.Offset
+		local y0 = p.Y.Scale * size.Y + p.Y.Offset
+		return x0, y0, x0 + z.X.Scale * size.X + z.X.Offset, y0 + z.Y.Scale * size.Y + z.Y.Offset
+	end
+	if ui.helpFrame.Visible then
+		table.insert(out, { "help", rect(ui.helpFrame) })
+	end
+	if ui.statusLabel.Visible and ui.statusLabel.Text ~= "" then
+		table.insert(out, { "status", rect(ui.statusLabel) })
+	end
+	if ui.card.Visible then
+		table.insert(out, { "card", rect(ui.card) })
+	end
+	-- a bar is as wide as its buttons (laid out from its left edge, 8 pixels apart)
+	for _, bar in { { "buttons", ui.buttonBar }, { "touch", ui.touchBar } } do
+		local x0, y0, _, y1 = rect(bar[2])
+		local width = 0
+		for _, child in bar[2]:GetChildren() do
+			if child:IsA("TextButton") then
+				width += child.Size.X.Offset + 8
+			end
+		end
+		if width > 0 and bar[2].Visible ~= false then
+			table.insert(out, { bar[1], x0, y0, x0 + width - 8, y1 })
+		end
+	end
 	return out
+end
+
+-- The part of the HUD that lies over a point of the bed (model metres), if any.
+local function covered(w: Rig.World, x: number, y: number): string?
+	local p = onScreen(w, x, y)
+	for _, r in hud() do
+		if p.X >= r[2] and p.X <= r[4] and p.Y >= r[3] and p.Y <= r[5] then
+			return `{r[1]} ({r[2]}, {r[3]} to {r[4]}, {r[5]}) lies over the bed at {x}, {y} (pixel {p.X}, {p.Y})`
+		end
+	end
+	return nil
 end
 
 -- How far what was shown is from what was decided for the same tick (metres): the worst and the mean, for the
@@ -297,13 +362,19 @@ return function(t)
 			Rig.click(w, "Pro (hard)")
 			Rig.run(w, 0.3)
 			t.truthy(Rig.button(w.gui, "> Pro (hard)"), Rig.screen(w))
-			Rig.key(Key.Space, true)
-			Rig.key(Key.Space, false)
+			-- (Space hammered, as players do: the second and third are on their way with the first)
+			for _ = 1, 3 do
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.frame(w)
+			end
 			Rig.run(w, 0.3)
 			t.eq(session.phase, "playing")
 			t.eq(seatedNames(w), "Ann, Pro (computer)")
 			t.eq(tbl.ref.sim.difficulty, Sim.DIFFICULTY.hard)
 			t.eq(Rig.count(w.sent, "start"), 1, "Space started the lobby once")
+			t.eq(#w.toasts, 1, "the only words so far are the welcome: " .. table.concat(w.toasts, " | "))
+			t.truthy(tbl.ref.sim.countdown > 0, "and none of them was a serve: the countdown runs")
 			t.truthy(Rig.button(w.gui, "View (V)") and Rig.button(w.gui, "Leave (Q)"), Rig.screen(w))
 			t.truthy(Rig.has(Rig.texts(w.gui), "READY WHEN YOU ARE."), Rig.screen(w))
 			t.eq(prompt.ActionText, "Take the computer's end")
@@ -353,8 +424,14 @@ return function(t)
 			t.truthy((counts["air_hockey.strike"] or 0) > 10, "strikes")
 			t.truthy((counts["air_hockey.rail"] or 0) > 5, "rails")
 			t.eq((counts["air_hockey.goal_for"] or 0) + (counts["air_hockey.goal_against"] or 0), a + b)
-			t.truthy((counts["air_hockey.serve"] or 0) >= 1)
-			t.eq((counts["air_hockey.win"] or 0) + (counts["air_hockey.lose"] or 0), 1)
+			t.eq(counts["air_hockey.goal_for"] or 0, a, "a goal for is heard as one")
+			-- the serve is heard each time the puck is let go: once to start, once after every goal but the last
+			local _, serves = truth(w)
+			t.eq(serves, a + b)
+			t.eq(counts["air_hockey.serve"] or 0, serves, "one serve cue for each serve")
+			-- and the winner hears the winner's cue (the table's word, not this screen's guess)
+			t.eq(counts["air_hockey.win"] or 0, if sim.winner == 0 then 1 else 0)
+			t.eq(counts["air_hockey.lose"] or 0, if sim.winner == 0 then 0 else 1)
 			for cue, id in MinigameSounds.CUES do
 				if string.sub(cue, 1, 11) == "air_hockey." then
 					t.eq(id, "", cue)
@@ -403,6 +480,13 @@ return function(t)
 			Rig.run(w, 0.3)
 			t.eq(sim.countdown, 0, "served at once")
 			t.eq(Rig.count(w.sent, "start"), 1, "Space was a serve this time, not a start")
+			t.eq(MinigameSounds.counts()["air_hockey.serve"], 1, "and the serve was heard, once")
+			-- she stands on the mat at her end, facing down the table
+			local root = w.body.PrimaryPart
+			local X, D = Layout.stance(1)
+			local at = roblox.Vector3.new(AlleyLayout.toWorld(w.places[SITE], X, 0, D))
+			local flat = roblox.Vector3.new(root.Position.X - at.X, 0, root.Position.Z - at.Z)
+			t.truthy(flat.Magnitude < 1, `the body is {flat.Magnitude} studs from the Ember end's mat`)
 			-- the mouse: the mallet goes to the bed under the pointer, at once on this screen
 			local x1, y1 = where(w, Layout.MALLETS[1])
 			point(w, 0.3, 0.5)
@@ -439,11 +523,41 @@ return function(t)
 			x2, y2 = where(w, Layout.MALLETS[1])
 			t.near(x2 - kx, -Controller.KEY_SPEED * 0.25, 0.02, "D: 1.8 m/s to the player's right")
 			t.near(y2 - ky, Controller.KEY_SPEED * 0.25, 0.02, "S: toward the player")
+			-- Shift held: the keys push as fast as the mallet goes
+			Rig.key(Key.LeftShift, true)
+			Rig.key(Key.A, true)
+			Rig.run(w, 0.2)
+			Rig.key(Key.A, false)
+			Rig.key(Key.LeftShift, false)
+			Rig.run(w, 0.4)
+			local fx = where(w, Layout.MALLETS[1])
+			t.near(fx - x2, Sim.HUMAN_SPEED * 0.2, 0.03, "Shift + A: 3.5 m/s to the player's left")
+			x2, y2 = where(w, Layout.MALLETS[1])
+			-- typing in chat: W, A, S and D are letters, and the mallet stays where it is
+			uis.focused = {}
+			Rig.key(Key.D, true)
+			Rig.key(Key.W, true)
+			Rig.run(w, 0.3)
+			Rig.key(Key.D, false)
+			Rig.key(Key.W, false)
+			uis.focused = nil
+			Rig.run(w, 0.2)
+			local tx, ty = where(w, Layout.MALLETS[1])
+			t.near(tx, x2, 1e-4, "typing a d did not move the mallet")
+			t.near(ty, y2, 1e-4, "nor a w")
+			t.near(sim.p1x, x2, 1e-3, "and the referee's mallet stayed with it")
 			-- a gamepad's left stick
+			-- (held right over: the mallet drawn runs at a mallet's own top speed, as the mouse's does)
 			rawset(uis, "GetGamepadState", function(): { any }
 				return { { KeyCode = Key.Thumbstick1, Position = roblox.Vector3.new(0, 1, 0) } }
 			end)
-			Rig.run(w, 0.1)
+			Rig.run(w, 0.05)
+			local _, ya = where(w, Layout.MALLETS[1])
+			Rig.frame(w)
+			Rig.frame(w)
+			Rig.frame(w)
+			local _, yb = where(w, Layout.MALLETS[1])
+			t.near((ya - yb) * 20, Sim.HUMAN_SPEED, 0.05, "a stick held over moves the drawn mallet at 3.5 m/s")
 			rawset(uis, "GetGamepadState", function(): { any }
 				return {}
 			end)
@@ -451,6 +565,12 @@ return function(t)
 			local sx, sy = where(w, Layout.MALLETS[1])
 			t.near(sy - y2, -Controller.STICK_SPEED * 0.1, 0.03, "the stick pushed away from the player")
 			t.near(sx, x2, 0.01)
+			t.eq(Controller.STICK_SPEED, Sim.HUMAN_SPEED)
+			-- half over: a quarter of the way up the curve, for placing a block; inside the dead zone: nothing
+			local hx, hy = Controller.stick(0, 0.15 + 0.85 / 2)
+			t.near(hy, Sim.HUMAN_SPEED / 4, 1e-9)
+			t.eq(hx, 0)
+			t.eq(select(2, Controller.stick(0.1, 0.1)), 0)
 			-- V: from above, your end at the bottom; again: back
 			Rig.key(Key.V, true)
 			Rig.key(Key.V, false)
@@ -465,9 +585,29 @@ return function(t)
 			x2, y2 = where(w, Layout.MALLETS[1])
 			t.near(x2, -0.2, 3e-3, "the pointer steers through the view from above too")
 			t.near(y2, 0.9, 3e-3)
+			-- the view changes under a pointer that is held still: the mallet goes to the point now under it
+			local pointer = uis.mouse
 			Rig.click(w, "View (V)")
-			Rig.run(w, 1)
+			Rig.run(w, 2.5)
 			t.truthy((workspace.CurrentCamera.CFrame.Position - eye).Magnitude < 0.05, "and back to first person")
+			t.eq(uis.mouse, pointer, "(the mouse did not move)")
+			local mx, my = where(w, Layout.MALLETS[1])
+			local under = onScreen(w, mx, my)
+			t.truthy(
+				math.abs(under.X - pointer.X) < 3 and math.abs(under.Y - pointer.Y) < 3,
+				`after the change of view the mallet is under the still pointer ({under.X}, {under.Y} against {pointer.X}, {pointer.Y})`
+			)
+			-- a goal is said once: the banner has the words, the status line keeps the score
+			t.truthy(w.svc:debug(ID, "goal", 1))
+			Rig.run(w, 0.4)
+			local said = 0
+			for _, text in Rig.texts(w.gui) do
+				if string.find(text, "SHOT", 1, true) or string.find(text, "SCORES", 1, true) then
+					said += 1
+				end
+			end
+			t.eq(said, 1, "the goal's words are on the screen once: " .. Rig.screen(w))
+			t.truthy(Rig.has(Rig.texts(w.gui), "You 1 : "), "the status line keeps the score: " .. Rig.screen(w))
 			-- typing in chat moves nothing
 			uis.focused = {}
 			Rig.key(Key.V, true)
@@ -475,7 +615,7 @@ return function(t)
 			Rig.run(w, 0.5)
 			t.truthy((workspace.CurrentCamera.CFrame.Position - eye).Magnitude < 0.05)
 			uis.focused = nil
-			t.eq(#w.toasts > 0 and Rig.has(w.toasts, "refused"), false)
+			t.eq(#w.toasts, 1, "nothing was refused: " .. table.concat(w.toasts, " | "))
 		end, opts({ stand = { site = SITE, x = select(1, Layout.stance(1)), y = 3, d = select(2, Layout.stance(1)) } }))
 	end)
 
@@ -488,15 +628,26 @@ return function(t)
 			local sim = tableOf(w).ref.sim
 			t.truthy(sim.countdown > 0)
 			local all = Rig.texts(w.gui)
-			t.truthy(Rig.has(all, "SERVE") and Rig.has(all, "VIEW"), "touch buttons: " .. Rig.screen(w))
+			t.truthy(Rig.has(all, "HELP") and Rig.has(all, "View") and Rig.has(all, "Leave"), Rig.screen(w))
+			t.truthy(Rig.has(all, "Tap to serve"), Rig.screen(w))
+			-- the help card was put away as the match began (it lies over the player's half); HELP brings it back
+			local ui = Controller.current.ctx.ui
+			t.eq(ui.helpFrame.Visible, false, "the help card is put away on a touch screen")
+			local help = Rig.button(w.gui, "HELP")
+			help.MouseButton1Down.fire()
+			help.MouseButton1Up.fire()
+			t.eq(ui.helpFrame.Visible, true)
+			help.MouseButton1Down.fire()
+			help.MouseButton1Up.fire()
+			t.eq(ui.helpFrame.Visible, false)
 			-- a drag: the mallet's place on the screen moves by the finger's pixels
 			local cam = workspace.CurrentCamera
-			local function onScreen(): any
+			local function malletAt(): any
 				local x, y = where(w, Layout.MALLETS[0])
 				return cam:WorldToViewportPoint(roblox.Vector3.new(Layout.toWorld(w.places[SITE], x, y)))
 			end
 			Rig.run(w, 0.3)
-			local before = onScreen()
+			local before = malletAt()
 			Rig.touch(1, "began", 300, 800)
 			for i = 1, 20 do
 				Rig.touch(1, "changed", 300 + i * 10, 800 - i * 4)
@@ -504,7 +655,7 @@ return function(t)
 			end
 			Rig.touch(1, "ended", 500, 720)
 			Rig.run(w, 0.6)
-			local after = onScreen()
+			local after = malletAt()
 			t.near(after.X - before.X, 200, 3, "200 pixels right")
 			t.near(after.Y - before.Y, -80, 3, "80 pixels up")
 			local function served(): boolean
@@ -521,7 +672,7 @@ return function(t)
 			Rig.touch(2, "began", 100, 100)
 			Rig.touch(2, "changed", 900, 900)
 			Rig.run(w, 0.3)
-			local still = onScreen()
+			local still = malletAt()
 			t.near(still.X, after.X, 2)
 			Rig.touch(2, "ended", 900, 900)
 			Rig.touch(1, "ended", 600, 700)
@@ -616,7 +767,7 @@ return function(t)
 			t.eq(why, "Both ends are taken: watch this one, or wait for the next match")
 			-- Bob leaves: the computer has the Ember end again, and Ann is told
 			w.svc:leave(bob.stub, "left")
-			play(w, 0.5, hand)
+			play(w, 1, hand)
 			t.eq(seatedNames(w), "Ann, Club (computer)")
 			t.eq(Referee_mode(tbl), "0")
 			t.truthy(Rig.has(Rig.texts(w.gui), "Bob left: the computer takes the Ember end"), Rig.screen(w))
@@ -690,12 +841,17 @@ return function(t)
 				Rig.play(function(w)
 					Rig.press(w, ID)
 					Rig.run(w, 0.3 + lag / 30)
-					-- (Bob lets every countdown run out: an early serve of his is the one thing Ann's screen cannot
-					-- know of in time, and it is not what is measured here)
+					-- (Bob presses his serve button during every countdown, as people do: between two people the
+					-- puck is let go a moment after the press, so Ann's screen has heard of it before it moves)
 					local chase = Line.hands.chaser(2)
+					local pressed = 0
 					local bob = bot(w, "Bob", function(side: number, sim: any, tick: number): (number, number, boolean)
 						local x, y = chase(side, sim, tick)
-						return x, y, false
+						local press = sim.countdown > 0.6 and sim.countdown < 1.0
+						if press then
+							pressed += 1
+						end
+						return x, y, press
 					end)
 					t.truthy(w.svc:join(bob.stub, EMBER))
 					Rig.click(w, "Start (Space)")
@@ -724,6 +880,13 @@ return function(t)
 					t.truthy(d.farLate > 2 * ms / 1000, "(and no earlier than the line allows)")
 					t.truthy(d.puckLate < d.farLate, `the puck {d.puckLate} s on average (now in Ann's own half)`)
 					t.truthy((MinigameSounds.counts()["air_hockey.strike"] or 0) > 3, "strikes are heard")
+					-- Bob's early serves were serves (the countdown was cut short), and each was heard once
+					t.truthy(pressed > 0, "Bob pressed his serve button")
+					local _, serves = truth(w)
+					local goals = tbl.ref.sim.score0 + tbl.ref.sim.score1
+					t.truthy(serves >= 1 and serves >= goals, `{serves} serves, {goals} goals`)
+					local heard = MinigameSounds.counts()["air_hockey.serve"] or 0
+					t.truthy(math.abs(heard - serves) <= 1, `{heard} serve cues for {serves} serves`)
 				end, opts({ lag = lag }))
 			end
 		)
@@ -771,6 +934,12 @@ return function(t)
 				end
 			end
 			t.truthy(n > 300)
+			-- a goal, the countdown, the serve: a bystander hears the puck let go
+			local heard = MinigameSounds.counts()["air_hockey.serve"] or 0
+			t.truthy(w.svc:debug(ID, "goal", 0))
+			play(w, 2.5, nil, { bob })
+			t.truthy((MinigameSounds.counts()["air_hockey.goal"] or 0) >= 1, "a bystander hears the goal")
+			t.truthy((MinigameSounds.counts()["air_hockey.serve"] or 0) > heard, "and the puck let go after it")
 			t.truthy(late <= 2 * Rink.DELAY, `never more than {late} ticks behind`)
 			t.truthy(moved > n * 0.75, `the puck moved on {moved} of {n} frames (it rests during the countdowns)`)
 			-- Bob leaves: the table rests, the stream stops, and a little later nothing is being drawn
@@ -791,12 +960,18 @@ return function(t)
 			Rig.press(w, ID)
 			Rig.run(w, 0.3)
 			t.eq(session.phase, "lobby")
+			-- (Q twice: the second is on its way with the first, and is not refused with words)
+			Rig.key(Key.Q, true)
+			Rig.key(Key.Q, false)
+			Rig.frame(w)
 			Rig.key(Key.Q, true)
 			Rig.key(Key.Q, false)
 			Rig.run(w, 0.4)
 			t.eq(session.phase, "idle")
 			t.eq(w.client.active(), nil)
 			t.eq(w.held, false)
+			t.eq(Rig.count(w.sent, "leave"), 1, "leave was sent once")
+			t.eq(Rig.has(w.toasts, "You are not at that game"), false, table.concat(w.toasts, " | "))
 			-- the lobby runs out by itself: the match starts, the computer at the other end
 			Rig.press(w, ID)
 			Rig.run(w, 8.6)
@@ -810,9 +985,20 @@ return function(t)
 			t.deepEq(session.result.score, { 7, 0 })
 			t.truthy(Rig.has(Rig.texts(w.gui), "MATCH WON."), Rig.screen(w))
 			-- Play again: the same people, a new match at once
+			-- (clicked twice, and Space hammered on top: one new match, and nothing refused)
 			local games = tbl.games
 			Rig.click(w, "Play again")
+			Rig.frame(w)
+			Rig.click(w, "Play again")
+			Rig.key(Key.Space, true)
+			Rig.key(Key.Space, false)
 			Rig.run(w, 0.5)
+			t.eq(Rig.has(w.toasts, "not finished"), false, table.concat(w.toasts, " | "))
+			t.eq(Rig.has(w.toasts, "already"), false, table.concat(w.toasts, " | "))
+			-- (and the table itself takes a second again or start that crosses the first without words: the end
+			-- card's own buttons are not this controller's)
+			t.truthy(Rig.input(w, w.player, ID, "again"))
+			t.truthy(Rig.input(w, w.player, ID, "start"))
 			t.eq(session.phase, "playing")
 			t.eq(tbl.games, games + 1)
 			t.eq(seatedNames(w), "Ann, Club (computer)")
@@ -853,6 +1039,321 @@ return function(t)
 			t.eq(session.phase, "idle")
 			t.truthy(Rig.has(w.toasts, "Only people can play here"))
 		end, opts())
+	end)
+
+	t.test("E from beside the table: you are stood on the mat at your end, out of your own view", function()
+		Rig.play(
+			function(w)
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				local root = w.body.PrimaryPart
+				local X, D = Layout.stance(0)
+				local mat = roblox.Vector3.new(AlleyLayout.toWorld(w.places[SITE], X, 0, D))
+				local flat = roblox.Vector3.new(root.Position.X - mat.X, 0, root.Position.Z - mat.Z)
+				t.truthy(flat.Magnitude < 1, `the body is {flat.Magnitude} studs from the mat (it was 7 away)`)
+				local box = Layout.standing(0)
+				local lx, _, ld = AlleyLayout.toLocal(w.places[SITE], root.Position.X, 0, root.Position.Z)
+				t.truthy(lx >= box.x0 and lx <= box.x1 and ld >= box.d0 and ld <= box.d1, "inside the standing room")
+				-- facing down the table
+				local centre = roblox.Vector3.new(Layout.toWorld(w.places[SITE], 0, 0))
+				local to = roblox.Vector3.new(centre.X - root.Position.X, 0, centre.Z - root.Position.Z).Unit
+				t.truthy(root.CFrame.LookVector:Dot(to) > 0.99, "facing the table")
+				-- and nowhere in the first-person view: not the middle of the body, not the head, not a shoulder
+				local cam = workspace.CurrentCamera
+				for _, offset in { { 0, 0, 0 }, { 0, 2, 0 }, { 1.5, 1, 0 }, { -1.5, 1, 0 }, { 0, -2.5, 0 } } do
+					local q = root.CFrame:PointToWorldSpace(roblox.Vector3.new(offset[1], offset[2], offset[3]))
+					local _, inView = cam:WorldToViewportPoint(q)
+					t.eq(inView, false, `the body ({offset[1]}, {offset[2]}) is not in the player's own view`)
+				end
+				-- the match starts and is played from there: the body is not moved again, and stays in reach
+				Rig.click(w, "Start (Space)")
+				play(w, 3, Line.hands.chaser(1))
+				t.eq(w.svc:sessionOf(ID).phase, "playing")
+				local flat2 = roblox.Vector3.new(root.Position.X - mat.X, 0, root.Position.Z - mat.Z)
+				t.truthy(flat2.Magnitude < 1)
+			end,
+			opts({
+				stand = {
+					site = SITE,
+					x = select(1, Layout.stance(0)) + 2,
+					y = 3,
+					d = select(2, Layout.stance(0)) - 6.5,
+				},
+			})
+		)
+	end)
+
+	for _, screen in { { 844, 390 }, { 667, 375 } } do
+		t.test(`a {screen[1]} by {screen[2]} phone: from above, and no part of the HUD lies over the bed`, function()
+			Rig.play(function(w)
+				rawset(workspace.CurrentCamera, "ViewportSize", roblox.Vector2.new(screen[1], screen[2]))
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				local ui = Controller.current.ctx.ui
+				t.eq(Controller.short(), true)
+				t.eq(ui.helpFrame.Visible, true, "the help card is up in the lobby, to be read")
+				local above = Layout.camera(0, true)
+				local up = roblox.Vector3.new(Layout.toWorld(w.places[SITE], above.eye[1], above.eye[2], above.eye[3]))
+				t.truthy((workspace.CurrentCamera.CFrame.Position - up).Magnitude < 0.05, "a phone opens from above")
+				Rig.click(w, "Start (Space)")
+				Rig.run(w, 0.4)
+				t.eq(ui.helpFrame.Visible, false, "and is put away as the match starts")
+				local sim = tableOf(w).ref.sim
+				t.truthy(sim.countdown > 0)
+				t.truthy(Rig.has(Rig.texts(w.gui), "Tap to serve"), Rig.screen(w))
+				-- a tap serves; from then on nothing lies over any part of the bed: both goals, both mallets'
+				-- reach, the corners
+				Rig.touch(1, "began", 400, 200)
+				Rig.frame(w)
+				Rig.touch(1, "ended", 400, 200)
+				Rig.run(w, 0.4)
+				t.eq(sim.countdown, 0, "the tap served")
+				t.eq(ui.statusLabel.Visible, false, "the status line is only up while the puck waits")
+				local rects = {}
+				for _, r in hud() do
+					table.insert(rects, r[1])
+				end
+				t.deepEq(rects, { "card", "buttons", "touch" })
+				local size = workspace.CurrentCamera.ViewportSize
+				for i = 0, 20 do
+					for j = 0, 40 do
+						local x = -Sim.HALF_WIDTH + i / 20 * 2 * Sim.HALF_WIDTH
+						local y = -Sim.HALF_LENGTH + j / 40 * 2 * Sim.HALF_LENGTH
+						local why = covered(w, x, y)
+						t.eq(why, nil, why)
+						local q = onScreen(w, x, y)
+						t.truthy(
+							q.X >= 0 and q.X <= size.X and q.Y >= 0 and q.Y <= size.Y,
+							"the whole bed is on the screen"
+						)
+					end
+				end
+				-- the finger still moves the mallet, from above
+				local before = onScreen(w, where(w, Layout.MALLETS[0]))
+				Rig.touch(2, "began", 100, 300)
+				for i = 1, 10 do
+					Rig.touch(2, "changed", 100 + i * 3, 300 - i * 2)
+					Rig.frame(w)
+				end
+				Rig.touch(2, "ended", 130, 280)
+				Rig.run(w, 0.5)
+				local after = onScreen(w, where(w, Layout.MALLETS[0]))
+				t.near(after.X - before.X, 30, 2)
+				t.near(after.Y - before.Y, -20, 2)
+				-- View swaps to first person and back
+				Rig.click(w, "View")
+				Rig.run(w, 2.5)
+				local first = Layout.camera(0, false)
+				local eye = roblox.Vector3.new(Layout.toWorld(w.places[SITE], first.eye[1], first.eye[2], first.eye[3]))
+				t.truthy((workspace.CurrentCamera.CFrame.Position - eye).Magnitude < 0.05)
+			end, opts({ touch = true }))
+		end)
+	end
+
+	t.test("a full screen: the HUD leaves the bed alone in first person, and the card is in its corner", function()
+		Rig.play(function(w)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			Rig.click(w, "Start (Space)")
+			Rig.run(w, 2)
+			t.eq(Controller.small(), false)
+			t.eq(Controller.current.ctx.ui.helpFrame.Visible, true, "with a keyboard the card stays until H")
+			local hidden = 0
+			for i = 0, 20 do
+				for j = 0, 40 do
+					if
+						covered(
+							w,
+							-Sim.HALF_WIDTH + i / 20 * 2 * Sim.HALF_WIDTH,
+							-Sim.HALF_LENGTH + j / 40 * 2 * Sim.HALF_LENGTH
+						)
+					then
+						hidden += 1
+					end
+				end
+			end
+			t.truthy(
+				hidden <= 0.02 * 21 * 41,
+				`{hidden} of {21 * 41} points of the bed are under the HUD at 1920 by 1080`
+			)
+			t.eq(covered(w, 0, Sim.HALF_LENGTH), nil, "the far goal is in sight")
+		end, opts())
+	end)
+
+	t.test("a lost part of the log is asked for again: the match goes on, exact, and nobody is told off", function()
+		Rig.play(function(w)
+			local session = w.svc:sessionOf(ID)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			Rig.click(w, "Start (Space)")
+			Rig.run(w, 0.4)
+			local tbl = tableOf(w)
+			local hand = Line.hands.chaser(1)
+			local shown = {}
+			play(w, 3, hand, nil, shown)
+			-- one message of the log never arrives
+			local lost = false
+			for i, m in w.up do
+				if m.payload.verb == "log" then
+					table.remove(w.up, i)
+					lost = true
+					break
+				end
+			end
+			if not lost then
+				-- (none on the way this frame: the next one sent is the one lost)
+				local sent = Rig.count(w.sent, "log")
+				Rig.untilTrue(w, 1, function()
+					return Rig.count(w.sent, "log") > sent
+				end)
+				for i, m in w.up do
+					if m.payload.verb == "log" then
+						table.remove(w.up, i)
+						lost = true
+						break
+					end
+				end
+			end
+			t.truthy(lost, "a log message was lost on the way")
+			local toasts = #w.toasts
+			play(w, 6, hand, nil, shown)
+			t.eq(session.phase, "playing", "she was not taken off")
+			t.eq(#w.toasts, toasts, "no words about it: " .. table.concat(w.toasts, " | "))
+			t.truthy(nowTick(w) - tbl.ref.n < 96, `the referee is {nowTick(w) - tbl.ref.n} ticks behind the clock`)
+			local again = Rig.last(w.got, "air_hockey_seat", function(m)
+				return m.again == true
+			end)
+			t.truthy(again, "the table asked for the log again")
+			-- and nothing of her hand was lost: the whole match on her screen is still the referee's, uncorrected
+			local seat = Controller.current.seat
+			t.eq(seat.resims, 0)
+			t.eq(seat.replica.desyncs, 0)
+			local worst, _, n = apart(shown, truth(w))
+			t.truthy(n > 400)
+			t.truthy(worst[1] < EXACT and worst[2] < EXACT, `puck {worst[1]} m, mallet {worst[2]} m`)
+		end, opts())
+	end)
+
+	t.test(
+		"a line that stalls for three seconds and then delivers everything at once: a handful of messages",
+		function()
+			Rig.play(function(w)
+				local session = w.svc:sessionOf(ID)
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				Rig.click(w, "Start (Space)")
+				Rig.run(w, 0.4)
+				local tbl = tableOf(w)
+				local hand = Line.hands.chaser(1)
+				play(w, 3, hand)
+				-- nothing gets through either way for three seconds
+				local release = w.frames + 180
+				local sentBefore = Rig.count(w.sent, "log")
+				for _ = 1, 180 do
+					for _, m in w.up do
+						m.at = math.max(m.at, release)
+					end
+					for _, m in w.down do
+						m.at = math.max(m.at, release)
+					end
+					play(w, 1 / 60, hand)
+				end
+				local queued = Rig.count(w.sent, "log") - sentBefore
+				t.truthy(
+					queued <= 16,
+					`{queued} log messages were queued in the stall (the Net lets 40 through at once and drops the rest)`
+				)
+				-- the worst case all the same: two of them are dropped as the queue is delivered
+				local dropped = 0
+				for i = #w.up, 1, -1 do
+					if w.up[i].payload.verb == "log" and dropped < 2 and i % 2 == 0 then
+						table.remove(w.up, i)
+						dropped += 1
+					end
+				end
+				local toasts = #w.toasts
+				play(w, 4, hand)
+				t.eq(session.phase, "playing")
+				t.eq(#w.toasts, toasts, table.concat(w.toasts, " | "))
+				t.truthy(nowTick(w) - tbl.ref.n < 96, `the referee is {nowTick(w) - tbl.ref.n} ticks behind the clock`)
+				t.eq(Controller.current.seat.replica.desyncs, 0)
+				local logs = Rig.count(w.sent, "log")
+				play(w, 2, hand)
+				t.truthy(Rig.count(w.sent, "log") - logs >= 18, "and the log is back to ten messages a second")
+			end, opts())
+		end
+	)
+
+	t.test("against a person: a lost part of the log is mended there too, and her mallet is hers again", function()
+		Rig.play(function(w)
+			local session = w.svc:sessionOf(ID)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			local bob = bot(w, "Bob", Line.hands.chaser(1.5))
+			t.truthy(w.svc:join(bob.stub, EMBER))
+			Rig.click(w, "Start (Space)")
+			Rig.run(w, 0.4)
+			local tbl = tableOf(w)
+			local hand = Line.hands.chaser(1)
+			play(w, 3, hand, { bob })
+			local lost = Rig.untilTrue(w, 1, function()
+				botFrame(w, bob)
+				for i, m in w.up do
+					if m.payload.verb == "log" then
+						table.remove(w.up, i)
+						return true
+					end
+				end
+				return false
+			end)
+			t.truthy(lost)
+			local toasts = #w.toasts
+			play(w, 2, hand, { bob })
+			local shown = {}
+			play(w, 6, hand, { bob }, shown)
+			t.eq(session.phase, "playing")
+			t.eq(seatedNames(w), "Ann, Bob", "nobody was taken off")
+			t.eq(#w.toasts, toasts, table.concat(w.toasts, " | "))
+			t.eq(#bob.refused, 0)
+			local worst = apart(shown, truth(w))
+			t.truthy(worst[2] < EXACT, `Ann's mallet on her screen is the referee's again ({worst[2]} m)`)
+			t.truthy(tbl.ref.got[0] > nowTick(w) - 96, "her log is up to the clock")
+		end, opts())
+	end)
+
+	t.test("against a person on a line too slow for a live match (400 ms each way): she is told so", function()
+		Rig.play(function(w)
+			local Game = require("@server/Minigames/Games/AirHockey")
+			Rig.press(w, ID)
+			Rig.run(w, 1.2)
+			local bob = bot(w, "Bob", Line.hands.chaser(1.5))
+			t.truthy(w.svc:join(bob.stub, EMBER))
+			Rig.click(w, "Start (Space)")
+			Rig.run(w, 1.2)
+			local tbl = tableOf(w)
+			t.eq(Referee_mode(tbl), "2")
+			play(w, 10, Line.hands.chaser(1), { bob })
+			t.truthy(tbl.ref.cut[0] > 240, `{tbl.ref.cut[0]} ticks were played without her hand`)
+			t.eq(tbl.ref.cut[1], 0, "none without his")
+			local told = Rig.last(w.got, "event", function(m)
+				return m.text == Game.SLOW_WORDS
+			end)
+			t.truthy(told, "she is told her connection is too slow for a live match")
+			t.eq(
+				Rig.last(bob.stub.events, "event", function(m)
+					return m.text == Game.SLOW_WORDS
+				end),
+				nil,
+				"he is not"
+			)
+			local times = 0
+			for _, m in w.got do
+				if m.kind == "event" and m.text == Game.SLOW_WORDS then
+					times += 1
+				end
+			end
+			t.truthy(times <= 2, `told {times} times in ten seconds, not on every tick`)
+		end, opts({ lag = 24 }))
 	end)
 
 	t.test("the server check's flow (tests/engine/AirHockeyFlow) passes on this service", function()

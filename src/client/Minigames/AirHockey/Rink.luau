@@ -11,7 +11,7 @@
 -- are written. The parts are found lazily and may be missing (streaming, a place without the table): then
 -- nothing is drawn and nothing breaks. A table nobody has heard from for IDLE seconds is let go (the render
 -- step is unbound when no table is being watched).
--- Sound: every contact and goal of the replay is a named cue (cue(), also used by the controller).
+-- Sound: every contact, serve and goal of the replay is a named cue (cue(), also used by the controller).
 -- Interface: get(station, place?) -> Rink; push(rink, msg) (a stream message for that station); rest(rink) (the
 --   table has reset: the pieces go home); take(rink) / give(rink); show(rink, px, py, ax, ay, bx, by) (model metres); cue(sim, hit, goal, served, mine?);
 --   contact(what, speed) (one contact's sound);
@@ -178,9 +178,9 @@ local function frame(dt: number)
 		end
 		rink.at = math.clamp(rink.at, r.tick - 1, r.head)
 		local whole = math.floor(rink.at)
-		Replica.step(r, whole + 1, function(sim: any, _tick: number, hit: boolean, goal: boolean)
+		Replica.step(r, whole + 1, function(sim: any, _tick: number, hit: boolean, goal: boolean, served: boolean)
 			keep(rink, sim)
-			Rink.cue(sim, hit, goal, false, nil)
+			Rink.cue(sim, hit, goal, served, nil)
 		end)
 		local f = math.clamp(rink.at - (r.tick - 1), 0, 1)
 		local p, c = rink.prev, rink.cur

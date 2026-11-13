@@ -67,20 +67,30 @@ return function(t)
 		t.eq(Wire.unpack({ "000000" }, 0, 10), nil, "tick 0 of a segment is the one before it")
 	end)
 
-	t.test("referee: a log must carry on from itself, be short enough and not ahead of the clock", function()
+	t.test("referee: a log is taken in order; a repeat is skipped, a gap is refused and can be mended", function()
 		local r = Referee.new({ t0 = 0, game = 1, human = { [0] = true, [1] = false } })
 		t.eq(Referee.mode(r), "0")
-		local ok, why = Referee.accept(r, 0, 0, 24, { "010000" }, 30)
+		local ok, why, behind = Referee.accept(r, 0, 0, 24, { "010000" }, 30)
 		t.truthy(ok, why)
-		ok, why = Referee.accept(r, 0, 0, 24, {}, 60)
+		-- the same segment again (a resend that crossed the first on the way): taken, and nothing changes
+		ok, why = Referee.accept(r, 0, 0, 24, { "01zzzz" }, 60)
+		t.truthy(ok, why)
+		t.eq(Referee.expects(r, 0), 24)
+		-- a segment after one that never came: refused, and the table is told that sending again will mend it
+		ok, why, behind = Referee.accept(r, 0, 48, 72, {}, 100)
 		t.eq(ok, false)
 		t.eq(why, "That part of the game arrived out of order")
-		ok, why = Referee.accept(r, 0, 24, 24 + Wire.MAX_SEGMENT + 1, {}, 99999)
+		t.eq(behind, true)
+		t.eq(Referee.expects(r, 0), 24, "it still expects the log from where it has it")
+		ok, why, behind = Referee.accept(r, 0, 24, 24 + Wire.MAX_SEGMENT + 1, {}, 99999)
 		t.eq(ok, false)
-		ok, why = Referee.accept(r, 0, 24, 400, {}, 100)
+		t.eq(behind, nil)
+		ok, why, behind = Referee.accept(r, 0, 24, 400, {}, 100)
 		t.eq(why, "That part of the game is ahead of the clock")
-		ok, why = Referee.accept(r, 0, 24, 48, { "zz" }, 100)
+		t.eq(behind, true)
+		ok, why, behind = Referee.accept(r, 0, 24, 48, { "zz" }, 100)
 		t.eq(why, "That part of the game could not be read")
+		t.eq(behind, nil)
 		ok, why = Referee.accept(r, 1, 0, 24, {}, 100)
 		t.eq(why, "The computer is playing that end")
 		ok, why = Referee.accept(r, 0, 24.5, 48, {}, 100)
@@ -92,6 +102,16 @@ return function(t)
 		t.eq(r.n, 24)
 		t.eq(msg.a, "010000")
 		t.eq(Referee.advance(r, 5000), nil, "against the computer the referee never steps by the clock")
+		-- the mend: everything from tick 24 again in one segment, overlapping nothing; then a segment that
+		-- overlaps what is here gives only its new part
+		ok, why = Referee.accept(r, 0, 24, 72, { "0G0000" }, 100)
+		t.truthy(ok, why)
+		ok, why = Referee.accept(r, 0, 48, 96, { "020101" .. "0W0202" }, 100)
+		t.truthy(ok, why)
+		t.eq(Referee.expects(r, 0), 96)
+		msg = Referee.advance(r, 100) :: any
+		t.eq(msg.n, 96)
+		t.eq(msg.a, "0G0000" .. "0u0202", "tick 40 as first sent; tick 50 was already here; tick 80 is new")
 	end)
 
 	for _, ms in { 0, 80, 150 } do
@@ -131,6 +151,64 @@ return function(t)
 			t.eq(watcher.sim.score1, line.ref.sim.score1)
 		end)
 	end
+
+	t.test(
+		"a log heals itself: one message in forty is lost, and the screen is still the match to the last bit",
+		function()
+			local line = Line.new({
+				humans = { [0] = true, [1] = false },
+				lag = { [0] = 5, [1] = 5 },
+				hands = { [0] = Line.hands.chaser(1) },
+				difficulty = Sim.DIFFICULTY.hard,
+				lose = function(_side: number, _from: number, _to: number, nth: number): boolean
+					return nth % 40 == 17
+				end,
+			})
+			t.truthy(Line.play(line, 300), "the match is played to seven")
+			Line.run(line, 1)
+			t.truthy(line.lost >= 5, `{line.lost} log messages were lost on the way`)
+			local seat = line.seats[0]
+			local e = Line.errors(line, 0)
+			t.eq(seat.resims, 0, "nothing was ever corrected: no part of the hand was lost")
+			t.eq(seat.replica.desyncs, 0)
+			t.eq(e.near.max, 0)
+			t.eq(e.far.max, 0)
+			t.eq(e.own.max, 0, "the mallet on the screen is the mallet the referee played")
+			t.eq(seat.pred.score0, line.ref.sim.score0)
+			t.eq(seat.pred.score1, line.ref.sim.score1)
+			-- each loss was noticed at the next segment and mended by one resend
+			t.truthy(#line.refused >= line.lost, "the segments after a lost one were refused...")
+			for _, why in line.refused do
+				t.eq(why, "0: That part of the game arrived out of order")
+			end
+			t.truthy(line.ref.n > (line.time - 1) * 240 - 120, "...and the referee was up with the clock to the end")
+		end
+	)
+
+	t.test("a line that stalls: the log is sent in long segments while nothing comes back, and catches up", function()
+		local line = Line.new({
+			humans = { [0] = true, [1] = false },
+			lag = { [0] = 3, [1] = 3 },
+			hands = { [0] = Line.hands.chaser(1) },
+		})
+		Line.run(line, 4)
+		local sent = line.sent[0]
+		-- nothing arrives either way for three seconds, then all of it at once
+		line.stall[0] = 180
+		local held = line.lag[0]
+		line.lag[0] = 183
+		Line.run(line, 3)
+		local during = line.sent[0] - sent
+		t.truthy(during <= 14, `{during} messages were sent into the stalled line (it would be 30 at the usual rate)`)
+		line.stall[0], line.lag[0] = nil, held
+		Line.run(line, 6)
+		t.eq(#line.refused, 0, table.concat(line.refused, "; "))
+		t.truthy(line.ref.n > line.time * 240 - 120, "the referee is up with the clock again")
+		t.eq(line.seats[0].replica.desyncs, 0)
+		local after = line.sent[0]
+		Line.run(line, 2)
+		t.truthy(line.sent[0] - after >= 19, "and the log is back to ten messages a second")
+	end)
 
 	t.test("against the computer from the Ember end, at a frame rate that is no multiple of the ticks", function()
 		local line = Line.new({
@@ -211,7 +289,8 @@ return function(t)
 						`side {side}: puck in the near half off by {e.near.mean} m on average`
 					)
 					local perSecond = line.sent[side] / math.min(line.time, line.ref.n / 240 + 0.5)
-					t.truthy(perSecond > 12 and perSecond <= 15.01, `{perSecond} messages a second`)
+					-- (fifteen segments a second, and one more for each press of the serve button: it goes at once)
+					t.truthy(perSecond > 12 and perSecond <= 15.5, `{perSecond} messages a second`)
 				end
 				t.truthy(line.ref.sim.hitSerial > 30, "a real rally")
 			end

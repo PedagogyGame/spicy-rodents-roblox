@@ -14,12 +14,18 @@
 --   The stream: every stretch of ticks the referee decides goes out as one "air_hockey" message (with the whole
 --     state at its end) to the seated and to everyone standing within WATCH studs: their clients replay it
 --     through the same simulation, so a watcher sees the same match. Nothing is sent while nobody is seated.
+--   A log that has lost a segment on the way is not refused with words: that player is sent the tick their log
+--     is expected from ("air_hockey_seat" with again = true) and their Seat sends it again from there. A player
+--     whose hand keeps arriving too late to be waited for (two people, a slow line) is told so in words.
+--   Between two people a press of the serve button is passed on to the other player the moment it arrives
+--     ("air_hockey_press"): the puck leaves Sim.SERVE_LEAD after the press, on the same tick on both screens.
 --   The hardware (GamesRoom.AirHockey: Puck, MalletGlacier, MalletEmber, ScoreBoard) is found by name; where it
 --     is missing the Table still runs the match and touches nothing. The clients draw the puck and the mallets
 --     every frame from their own replay; the server only moves its own copies ten times a second, so that the
 --     world is right for someone who was sent nothing, and puts them home when the table resets.
 -- Interface: a ServerGame { game = "air_hockey", new(ctx) -> Table }; Table.hw { model, puck, mallets, labels };
---   Table.ref (the Referee while a match is on); Table:debug("goal", side) (the puck is put in front of that
+--   Table.ref (the Referee while a match is on); ASK_EVERY; SLOW_WINDOW, SLOW_TICKS, SLOW_AGAIN, SLOW_WORDS;
+--   Table:debug("goal", side) (the puck is put in front of that
 --   end's opponent's goal, travelling in: the next ticks score it through the simulation's own goal line) and
 --   Table:debug("score", glacier, ember); WATCH; MOVE_EVERY
 
@@ -30,12 +36,18 @@ local Referee =
 	Import.shared("Minigames/AirHockey/Referee") :: typeof(require("../../../shared/Minigames/AirHockey/Referee"))
 local Rules = Import.shared("Minigames/AirHockey/Rules") :: typeof(require("../../../shared/Minigames/AirHockey/Rules"))
 local Sim = Import.shared("Minigames/AirHockey/Sim") :: typeof(require("../../../shared/Minigames/AirHockey/Sim"))
+local Wire = Import.shared("Minigames/AirHockey/Wire") :: typeof(require("../../../shared/Minigames/AirHockey/Wire"))
 local ServerGame = require("../ServerGame")
 
 local Game = {}
 Game.game = "air_hockey"
 Game.WATCH = 80 -- studs from the table within which a bystander is sent the match
 Game.MOVE_EVERY = 0.1 -- seconds between the server's own moves of the puck and the mallets
+Game.ASK_EVERY = 0.25 -- seconds between two requests to one player to send their log again
+Game.SLOW_WINDOW = 2 -- seconds: a hand played without for more than SLOW_TICKS of them is told so...
+Game.SLOW_TICKS = 120
+Game.SLOW_AGAIN = 12 -- ...and not again for this long
+Game.SLOW_WORDS = "Your connection is too slow for a live match: your mallet is arriving late"
 
 local function isComputer(key: any): boolean
 	return type(key) == "table" and key.ai == true
@@ -80,6 +92,10 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		wish = {}, -- key -> the end whose prompt they pressed
 		sideOf = {}, -- key -> the end they play
 		watchers = {}, -- bystanders who are being sent the stream
+		askedAt = {}, -- key -> when they were last asked to send their log again
+		cutAt = 0, -- when the hands' lateness was last looked at, what it was then, and who was last told
+		cutWas = { [0] = 0, [1] = 0 },
+		toldSlow = {},
 		watchAt = 0,
 		movedAt = 0,
 	}
@@ -165,7 +181,9 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		end
 	end
 
-	local function seatMessage(key: any, side: number)
+	-- The referee's word to one player: this end is yours from tick `from` (again = true: you hold it already,
+	-- and your log is expected from `from`: send it again from there).
+	local function seatMessage(key: any, side: number, again: boolean?)
 		local ref = self.ref
 		ctx.send(key, {
 			kind = "air_hockey_seat",
@@ -173,6 +191,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 			side = side,
 			from = Referee.expects(ref, side),
 			t0 = ref.t0,
+			again = again == true,
 		})
 	end
 
@@ -209,6 +228,9 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		end
 		self.games += 1
 		self.ref = Referee.new({ t0 = ctx.stamp(), game = self.games, human = human, difficulty = difficulty })
+		self.cutAt, self.cutWas = ctx.now(), { [0] = 0, [1] = 0 }
+		table.clear(self.toldSlow)
+		table.clear(self.askedAt)
 		lookAround()
 		for _, key in seated do
 			if not isComputer(key) then
@@ -263,6 +285,16 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 	-- error and gets no words); everything else is the service's.
 	function self.command(_self: any, player: any, verb: string, args: { any }): (boolean, boolean?, string?)
 		if verb ~= "log" then
+			-- A second Space or a second click on Play again that crossed the first on the way: what it asked
+			-- for has happened, so it is taken without words (not refused as "already playing").
+			local phase = ctx.session.phase
+			if ctx.seatOf(player) ~= nil then
+				if verb == "start" and phase == "playing" then
+					return true, true
+				elseif verb == "again" and (phase == "lobby" or phase == "playing") then
+					return true, true
+				end
+			end
 			return false
 		end
 		local ref = self.ref
@@ -276,9 +308,35 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 				table.insert(strings, args[i])
 			end
 		end
-		local ok, why = Referee.accept(ref, side, args[1], args[2], strings, nowTick())
+		local ok, why, behind = Referee.accept(ref, side, args[1], args[2], strings, nowTick())
 		if not ok then
+			if behind then
+				-- A segment before this one never came (lost, or dropped by the rate limit as a stalled line
+				-- delivered its queue), or this one is ahead of the clock. No words: the player is told the
+				-- tick their log is expected from, and their Seat sends it again from there.
+				if ctx.now() - (self.askedAt[player] or -1e9) >= Game.ASK_EVERY then
+					self.askedAt[player] = ctx.now()
+					seatMessage(player, side, true)
+				end
+				return true, true
+			end
 			return true, false, why
+		end
+		-- between two people a press of the serve button is passed on to the other player at once: the puck
+		-- leaves Sim.SERVE_LEAD after the press, and their screen should know before it does
+		if Referee.mode(ref) == "2" then
+			local presses = Wire.presses(strings, args[1], args[2])
+			if presses and #presses > 0 then
+				for _, key in ctx.seated() do
+					if key ~= player and not isComputer(key) then
+						for _, tick in presses do
+							if tick > ref.n then
+								ctx.send(key, { kind = "air_hockey_press", g = ref.game, side = side, tick = tick })
+							end
+						end
+					end
+				end
+			end
 		end
 		-- (through the Session: an accepted segment is what keeps the idle clock from taking the seat)
 		ctx.apply(player, "log", { args[1], args[2] })
@@ -296,6 +354,24 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 			if ctx.now() - self.watchAt >= 0.5 then
 				self.watchAt = ctx.now()
 				lookAround()
+			end
+			if ctx.now() - self.cutAt >= Game.SLOW_WINDOW then
+				-- a hand the match keeps playing on without: that player is told why their mallet is late
+				self.cutAt = ctx.now()
+				for _, key in ctx.seated() do
+					local side = self.sideOf[key]
+					if side ~= nil and not isComputer(key) then
+						local cut = ref.cut[side]
+						if
+							cut - self.cutWas[side] > Game.SLOW_TICKS
+							and ctx.now() - (self.toldSlow[key] or -1e9) >= Game.SLOW_AGAIN
+						then
+							self.toldSlow[key] = ctx.now()
+							ctx.send(key, { kind = "event", text = Game.SLOW_WORDS })
+						end
+						self.cutWas[side] = cut
+					end
+				end
 			end
 		end
 		if ctx.now() - self.movedAt >= Game.MOVE_EVERY then

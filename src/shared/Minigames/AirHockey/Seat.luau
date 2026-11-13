@@ -34,17 +34,20 @@
 --         the prediction is the referee's match to be, because everything else in it is this player's own
 --         hand and the table.
 --     So what is on a player's screen against a person is the referee's match: this end now, the far end a
---     moment ago. One thing is still a guess, because it is no mallet's doing: that the other player has not
---     just served (Space during the countdown). If they have, the puck is found a little way along its serve
---     when the referee's word comes, and it is eased there over EASE seconds, as any correction under the
---     moment drawn would be.
+--     moment ago. The other player's serve button is no mallet's doing, and it is not guessed either: between
+--     two people a press lets the puck go Sim.SERVE_LEAD later, and the table passes the press on at once
+--     (pressed()), so this screen knows of it before the puck moves (on a line slower than about 180 ms each
+--     way the word comes after the puck has left: it is then found a little way along its serve and eased
+--     there over EASE seconds, as any correction under the moment drawn would be).
 -- Pure (no engine): the client's controller feeds it the clock, the hand and the stream; specs and the netcode
 -- measurements (tools/games/air_hockey/netcode.luau) drive it the same way.
 -- Interface: new(side) -> Seat; begin(seat, game, from) (the referee's word that this seat's log starts at tick
---   `from` of match `game`); push(seat, msg) (a stream message); aim(seat, x, y) (the hand, model metres);
+--   `from` of match `game`); resume(seat, from) (its word that a segment was lost: the log is sent again from
+--   there); pressed(seat, tick) (its word that the other player pressed their serve button on that tick);
+--   push(seat, msg) (a stream message); aim(seat, x, y) (the hand, model metres);
 --   serve(seat); step(seat, now, send, onTick?, onConfirmed?) (now: the shared clock's tick, fractional;
---   send(from, to, strings); onTick(sim, tick, hit, goal) for each newly predicted tick; onConfirmed the same
---   for each tick the referee decided); view(seat) -> (puck x, y, mallet0 x, y, mallet1 x, y) as drawn now;
+--   send(from, to, strings); onTick(sim, tick, hit, goal, served) for each newly predicted tick; onConfirmed
+--   the same for each tick the referee decided); view(seat) -> (puck x, y, mallet0 x, y, mallet1 x, y) as drawn now;
 --   heard(seat, fn) (fn(what, speed) for each contact the drawn puck has just passed: Sim.HIT_*, m/s);
 --   relax(seat, dt); Seat.pred / .tick / .replica / .resims / .ready; Seat.puckAt / .farAt (the ticks the puck
 --   and the far mallet are drawn at) / .late; EASE; LEAD; SLOW; FAST
@@ -109,6 +112,11 @@ export type Seat = {
 	gapBefore: number,
 	gapSince: number,
 	heardTo: number, -- contacts up to this tick have been sounded
+	headWas: number, -- the newest tick the stream had brought at the last step, and the clock when it last grew
+	wordAt: number,
+	flush: boolean, -- the log holds a serve that has not been sent: the next segment goes at once
+	theirs: { [number]: boolean }, -- ticks on which the other player pressed their serve button (the table's word)
+	stale: boolean, -- such a word came for a tick already predicted: the prediction is rebuilt
 }
 
 function Seat.new(side: number): Seat
@@ -149,6 +157,11 @@ function Seat.new(side: number): Seat
 		gapBefore = 0,
 		gapSince = 0,
 		heardTo = 0,
+		headWas = -1,
+		wordAt = 0,
+		flush = false,
+		theirs = {},
+		stale = false,
 	}
 end
 
@@ -159,6 +172,32 @@ function Seat.begin(seat: Seat, game: number, from: number)
 	seat.ready = false
 	table.clear(seat.log)
 	seat.lastX, seat.lastY = nil, nil
+end
+
+-- The referee's word that it has this hand's log only up to tick `from` (a segment was lost on the way): the
+-- log is sent again from there, in one segment, at the next step. Every event the referee has not decided is
+-- still held here, so nothing of the hand is lost and nothing on this screen changes.
+function Seat.resume(seat: Seat, from: number)
+	if seat.from == nil or from % 1 ~= 0 or from < 0 then
+		return
+	end
+	seat.sentTo = math.min(from, seat.tick)
+	seat.flush = true
+end
+
+-- The table's word that the OTHER player pressed their serve button on tick `tick` (it is passed on the moment
+-- their log brings it, before the referee has played that tick). The press cuts the countdown to
+-- Sim.SERVE_LEAD, so this screen knows when the puck will leave before it does. It is the other player's own
+-- deed, not a guess; should the referee not have taken it after all, its stream says so and the prediction is
+-- rebuilt as for anything else.
+function Seat.pressed(seat: Seat, tick: number)
+	if tick % 1 ~= 0 or tick <= seat.replica.tick then
+		return
+	end
+	seat.theirs[tick] = true
+	if tick <= seat.tick then
+		seat.stale = true
+	end
 end
 
 function Seat.push(seat: Seat, msg: any): boolean
@@ -253,10 +292,13 @@ end
 local function advance(seat: Seat)
 	local sim = seat.pred
 	local tick = seat.tick + 1
+	if seat.theirs[tick] and seat.mode == "2" then
+		Sim.press(sim, false)
+	end
 	local e = seat.log[tick]
 	if e then
-		if e[3] and sim.countdown > 0 then
-			Sim.serve(sim)
+		if e[3] then
+			Sim.press(sim, seat.mode ~= "2")
 		end
 		if e[1] then
 			local x, y = Wire.target(seat.side, e[1], e[2])
@@ -442,8 +484,8 @@ function Seat.step(
 	seat: Seat,
 	now: number,
 	send: (from: number, to: number, strings: { string }) -> (),
-	onTick: ((sim: Sim.State, tick: number, hit: boolean, goal: boolean) -> ())?,
-	onConfirmed: ((sim: Sim.State, tick: number, hit: boolean, goal: boolean) -> ())?
+	onTick: ((sim: Sim.State, tick: number, hit: boolean, goal: boolean, served: boolean) -> ())?,
+	onConfirmed: ((sim: Sim.State, tick: number, hit: boolean, goal: boolean, served: boolean) -> ())?
 )
 	local r = seat.replica
 	-- where things were drawn, to ease out whatever the referee's word changes under them
@@ -452,13 +494,16 @@ function Seat.step(
 	if wasReady then
 		bx, by, bfx, bfy = drawnNow(seat)
 	end
-	Replica.step(r, nil, function(sim: Sim.State, tick: number, hit: boolean, goal: boolean)
+	Replica.step(r, nil, function(sim: Sim.State, tick: number, hit: boolean, goal: boolean, served: boolean)
 		-- (what the referee decided of a tick replaces what was predicted of it)
 		believe(seat, tick, sim)
 		if onConfirmed then
-			onConfirmed(sim, tick, hit, goal)
+			onConfirmed(sim, tick, hit, goal, served)
 		end
 	end)
+	if r.head ~= seat.headWas then
+		seat.headWas, seat.wordAt = r.head, now
+	end
 	if seat.from == nil or r.game == nil or r.game ~= seat.game then
 		return
 	end
@@ -479,7 +524,7 @@ function Seat.step(
 		-- (the referee may hold another aim for this mallet than the hand's: the hand is logged afresh)
 		seat.lastX, seat.lastY = nil, nil
 		snapped = true
-	elseif r.mode ~= seat.mode or not predicted(seat, confirmed, r.sim) then
+	elseif r.mode ~= seat.mode or seat.stale or not predicted(seat, confirmed, r.sim) then
 		seat.resims += 1
 		local mode = seat.mode
 		rebuild(seat)
@@ -507,10 +552,16 @@ function Seat.step(
 			seat.ox, seat.oy = 0, 0
 		end
 	end
+	seat.stale = false
 	-- the log before the referee's tick is history
 	for tick in seat.log do
 		if tick <= confirmed and tick <= seat.sentTo then
 			seat.log[tick] = nil
+		end
+	end
+	for tick in seat.theirs do
+		if tick <= confirmed then
+			seat.theirs[tick] = nil
 		end
 	end
 	-- to the tick the clock is in the middle of: the screen shows the moment `now` itself, between the last
@@ -528,20 +579,29 @@ function Seat.step(
 				e = { seat.wantX :: any, seat.wantY :: any }
 				seat.lastX, seat.lastY = seat.wantX, seat.wantY
 			end
-			if seat.serving and seat.pred.countdown > 0 then
+			-- (a serve button counts while the puck waits; between two people only until one has been pressed)
+			local waiting = seat.pred.countdown
+			if seat.serving and waiting > 0 and (seat.mode ~= "2" or waiting > Sim.SERVE_LEAD) then
 				e = e or { false, false }
 				e[3] = true
+				seat.flush = true
 			end
 			seat.serving = false -- (a press with no countdown running is not kept for the next one)
 			if e then
 				seat.log[tick] = e
 			end
 		end
-		local hits, goals = seat.pred.hitSerial, seat.pred.goalSerial
+		local hits, goals, waiting = seat.pred.hitSerial, seat.pred.goalSerial, seat.pred.countdown
 		advance(seat)
 		if onTick and tick > seat.told then
 			seat.told = tick
-			onTick(seat.pred, tick, seat.pred.hitSerial ~= hits, seat.pred.goalSerial ~= goals)
+			onTick(
+				seat.pred,
+				tick,
+				seat.pred.hitSerial ~= hits,
+				seat.pred.goalSerial ~= goals,
+				waiting > 0 and waiting ~= math.huge and seat.pred.countdown <= 0
+			)
 		end
 	end
 	if seat.tick < target then
@@ -551,9 +611,15 @@ function Seat.step(
 	-- the moment that is drawn: the tick the prediction is at, less what is left of it
 	moments(seat, seat.tick - 1 + seat.frac, confirmed)
 	-- the next segment of the log, once it is long enough (or the match is won on this screen)
+	-- (a serve goes at once: the other screen must hear of it before the puck leaves. While nothing comes back
+	-- from the server the segments are long: a stalled line is not handed dozens of messages to deliver at once)
 	local length = if seat.mode == "2" then Wire.SEGMENT_DUO else Wire.SEGMENT_SOLO
+	if now - seat.wordAt > Wire.QUIET then
+		length = Wire.SEGMENT_QUIET
+	end
 	local upTo = math.min(seat.tick, seat.sentTo + Wire.MAX_SEGMENT)
-	if upTo > seat.sentTo and (upTo - seat.sentTo >= length or seat.pred.winner >= 0) then
+	if upTo > seat.sentTo and (upTo - seat.sentTo >= length or seat.pred.winner >= 0 or seat.flush) then
+		seat.flush = false
 		local events: { [number]: any } = {}
 		for tick, e in seat.log do
 			if tick > seat.sentTo and tick <= upTo then

@@ -32,7 +32,8 @@
 -- A match is stepped with play(); tick() is his, alone.
 -- The state is one flat record of numbers (no vectors, nothing allocated in tick): it is stepped several hundred
 -- times a frame when a client replays.
--- Pure. Interface: constants; new() -> State; reset(s); resetPuck(s); serve(s); setTarget(s, side, x, y);
+-- Pure. Interface: constants; new() -> State; reset(s); resetPuck(s); serve(s); press(s, computer) (a player's
+--   serve button: at once against the computer, SERVE_LEAD later between two people); setTarget(s, side, x, y);
 --   ai(s, side); tick(s, dt?, human?, computer?); play(s, human, computer) -> bool (one step of a match: his
 --   tick, then the rails hold; true only if the puck had to be put back for a serve); contain(s) -> bool (the
 --   rails hold: true if it moved the puck); offTable(s) -> bool; copy(dst, src) -> dst; clone(s) -> State;
@@ -50,6 +51,7 @@ Sim.POST_RADIUS = 0.012
 Sim.GOAL_DEPTH = 1.245 -- a goal counts when the puck's far edge is this deep (its centre at 1.277)
 Sim.WIN = 7
 Sim.COUNTDOWN = 1.25
+Sim.SERVE_LEAD = 96 / 240 -- (not his) between two people: a serve button lets the puck go this much later
 Sim.DRAG = 0.08
 Sim.RESTITUTION = 0.95
 Sim.PADDLE_RESTITUTION = 0.94
@@ -255,6 +257,22 @@ function Sim.serve(s: State)
 		s.countdown = 0
 		s.vx = if s.goalSerial % 2 ~= 0 then -0.34 else 0.34
 		s.vy = if s.serveSide ~= 0 then -1.25 else 1.25
+	end
+end
+
+-- NOT HIS (the timing only): a player's serve button, pressed while the puck waits. Against the computer it is
+-- his: the puck is let go at once. Between two people the puck is let go SERVE_LEAD later (the countdown is cut
+-- to that, never lengthened): the other player's screen cannot know of the press sooner, and a puck that has
+-- already left when the news arrives would have to jump. Both screens and the referee apply the press on the
+-- same tick, so the puck leaves on the same tick everywhere.
+function Sim.press(s: State, computer: boolean)
+	if s.countdown <= 0 or s.winner >= 0 then
+		return
+	end
+	if computer then
+		Sim.serve(s)
+	elseif s.countdown > Sim.SERVE_LEAD then
+		s.countdown = Sim.SERVE_LEAD
 	end
 end
 

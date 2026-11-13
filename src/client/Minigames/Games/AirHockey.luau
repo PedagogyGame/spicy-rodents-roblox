@@ -6,13 +6,18 @@
 --     delay; first person or from above).
 --   Everyone near the table is sent the referee's stream ("air_hockey") and sees the same match on the same
 --     parts: watch() hands each message to Client/Minigames/AirHockey/Rink, which replays it. "air_hockey_seat"
---     is the referee's word to one player that an end is theirs; "air_hockey_rest" says the table has reset.
---   The lobby: Start, the computer's difficulty if nobody takes the other end (his Lounge / Club / Pro), Leave.
---   The scorecard: both ends, who has them and the score; the end card says who won.
+--     is the referee's word to one player that an end is theirs (or that their log must be sent again from a
+--     tick), "air_hockey_press" that the other player pressed their serve button, and "air_hockey_rest" that the
+--     table has reset.
+--   The lobby: Start, the computer's difficulty if nobody takes the other end (his Lounge / Club / Pro), Leave:
+--     the controller's own bar, as every bar is while the game is open.
+--   The scorecard: both ends, who has them and the score (a strip in the top corner on a small screen); the end
+--     card says who won.
 --   Sound: named cue points only, no asset ids yet (a strike by its strength, a rail, a post, a goal for and
 --     against, a goal seen by a bystander, the serve, the match won and lost).
--- Space is the game's own key (serve; in the lobby it starts, as everywhere), so the framework's is swallowed.
--- Interface: a ClientGame.ClientGame
+-- Space is the game's own key (serve; in the lobby it starts, as everywhere), and so are Q and gamepad B (leave):
+-- the framework's are swallowed and the controller sends each once.
+-- Interface: a ClientGame.ClientGame; SMALL_CARD is read by the specs through card()
 
 local Import = require("../../Import")
 local Layout =
@@ -22,7 +27,8 @@ local ClientGame = require("../ClientGame")
 local Controller = require("../AirHockey/Controller")
 local Rink = require("../AirHockey/Rink")
 
-local MODE_WORDS = { easy = "Lounge (easy)", medium = "Club (medium)", hard = "Pro (hard)" }
+-- the scorecard on a small screen: a strip in the top right corner (pixels; `top` clears the Roblox top bar)
+local SMALL_CARD = { w = 216, h = 50, right = 10, top = 44 }
 
 -- seat -> the end it plays, from a view (before the match starts: the first seat at Glacier)
 local function sideOf(view: { [string]: any }, seat: number): number
@@ -34,10 +40,46 @@ local function sideOf(view: { [string]: any }, seat: number): number
 	return if seat == 1 then 0 else 1
 end
 
+-- The scorecard. On a full screen: both ends, who has them and the score, in the bottom corner. On a touch
+-- device or a short screen (Controller.small) the bottom corner is the player's own half of the bed, so the
+-- card is a strip in the top corner, clear of the table from either end.
 local function card(frame: Frame, view: { [string]: any }, you: number?, kit: any)
 	local C, label = kit.C, kit.label
 	local g = view.game
 	local score = (g and g.score) or { 0, 0 }
+	local names = { [0] = "the computer", [1] = "the computer" }
+	if view.phase == "lobby" then
+		names = { [0] = "open", [1] = "open" }
+	end
+	for seat, s in view.seats or {} do
+		if not s.gone then
+			names[sideOf(view, seat)] = s.name .. (if seat == you then " (you)" else "")
+		end
+	end
+	if Controller.small() then
+		frame.Size = UDim2.fromOffset(SMALL_CARD.w, SMALL_CARD.h)
+		frame.Position = UDim2.new(1, -SMALL_CARD.w - SMALL_CARD.right, 0, SMALL_CARD.top)
+		for side = 0, 1 do
+			local y = 3 + side * 22
+			label(
+				frame,
+				`{string.upper(Layout.SIDE_NAMES[side])}  {names[side]}`,
+				UDim2.new(0.8, -6, 0, 20),
+				UDim2.fromOffset(6, y),
+				if side == 0 then C.CYAN else C.GOLD,
+				Enum.Font.GothamBold
+			)
+			label(
+				frame,
+				tostring(score[side + 1] or 0),
+				UDim2.new(0.2, -4, 0, 20),
+				UDim2.new(0.8, 0, 0, y),
+				C.GOLD,
+				Enum.Font.FredokaOne
+			)
+		end
+		return
+	end
 	frame.Size = UDim2.fromOffset(360, 112)
 	frame.Position = UDim2.new(1, -372, 1, -124)
 	label(
@@ -48,15 +90,6 @@ local function card(frame: Frame, view: { [string]: any }, you: number?, kit: an
 		C.GOLD,
 		Enum.Font.FredokaOne
 	)
-	local names = { [0] = "the computer", [1] = "the computer" }
-	if view.phase == "lobby" then
-		names = { [0] = "open", [1] = "open" }
-	end
-	for seat, s in view.seats or {} do
-		if not s.gone then
-			names[sideOf(view, seat)] = s.name .. (if seat == you then " (you)" else "")
-		end
-	end
 	for side = 0, 1 do
 		local y = 30 + side * 38
 		label(
@@ -121,30 +154,26 @@ local entry: ClientGame.ClientGame = {
 	title = function(_msg: { [string]: any }): string
 		return "Air hockey"
 	end,
-	buttons = function(phase: string, view: { [string]: any }?): { { string } }?
-		if phase == "joined" or phase == "lobby" then
-			local mode = (view and view.mode) or "medium"
-			local bar: { { string } } = { { "start", "Start (Space)" } }
-			for _, m in Rules.MODES do
-				table.insert(bar, { m, (if m == mode then "> " else "") .. MODE_WORDS[m] })
-			end
-			table.insert(bar, { "leave", "Leave (Q)" })
-			return bar
-		elseif phase == "done" then
-			return { { "again", "Play again" }, { "leave", "Leave (Q)" } }
+	buttons = function(phase: string, _view: { [string]: any }?): { { string } }?
+		if phase == "joined" then
+			-- (until the table's first word; from then on every bar is the controller's own, so that a button
+			-- pressed twice is sent once)
+			return { { "leave", "Leave (Q)" } }
 		end
-		-- (while a match is on the controller's own bar is up: View, Leave)
 		return nil
 	end,
-	keys = { Space = "" },
+	-- Space serves (in the lobby it starts), and Q and gamepad B leave: all three are read by the controller,
+	-- which sends each once
+	keys = { Space = "", Q = "", ButtonB = "" },
 	new = Controller.new,
 	card = card,
 	cardSig = function(view: { [string]: any }): any
 		local g = view.game
-		return if g and g.score then `{g.score[1]}-{g.score[2]}` else ""
+		return (if g and g.score then `{g.score[1]}-{g.score[2]}` else "")
+			.. (if Controller.small() then " small" else "")
 	end,
 	endCard = endCard,
-	kinds = { "air_hockey", "air_hockey_seat", "air_hockey_rest" },
+	kinds = { "air_hockey", "air_hockey_seat", "air_hockey_press", "air_hockey_rest" },
 	watch = function(msg: { [string]: any }, place: ClientGame.Place?): any
 		if type(msg.station) ~= "string" then
 			return nil
@@ -162,7 +191,7 @@ local entry: ClientGame.ClientGame = {
 		["air_hockey.strike"] = "", -- a mallet meets the puck (volume: how hard)
 		["air_hockey.rail"] = "", -- the puck off a rail
 		["air_hockey.post"] = "", -- the puck off a goal post
-		["air_hockey.serve"] = "", -- the puck is let go
+		["air_hockey.serve"] = "", -- the puck is let go (every serve: the countdown running out, or a press)
 		["air_hockey.goal_for"] = "", -- you scored
 		["air_hockey.goal_against"] = "", -- they scored
 		["air_hockey.goal"] = "", -- a goal at a table you are watching

@@ -14,9 +14,15 @@
 -- against the computer, "2" both), a, b (the events each person's side was given, as one string each), s (the
 -- whole state at tick n, STATE order), t0 (when tick 0 was, on the shared clock) }. Anyone can start from any
 -- message (s is everything), and whoever holds the state at n0 gets the state at n by replaying the events.
--- Pure. Interface: SEGMENT_SOLO, SEGMENT_DUO, MAX_SEGMENT, SLACK, MAX_BEHIND, START_WAIT, STRING, EVENT; quantise(side, x,
+-- A LOG HEALS ITSELF. The referee takes a segment that starts at or before the tick it has that player's log up
+-- to (what it already has is skipped) and refuses only one that starts after it (a segment before it never
+-- came: lost, or dropped by the rate limit when a stalled line delivers its queue at once). The table then tells
+-- that player the tick it expects, and their Seat sends everything from there again in one segment: it still
+-- holds every event the referee has not decided. While nothing comes back from the server a Seat sends long
+-- segments (SEGMENT_QUIET), so that a line stalled for seconds queues a handful of messages, not dozens.
+-- Pure. Interface: SEGMENT_SOLO, SEGMENT_DUO, SEGMENT_QUIET, QUIET, MAX_SEGMENT, SLACK, MAX_BEHIND, START_WAIT, STRING, EVENT; quantise(side, x,
 --   y) -> (qx, qy); target(side, qx, qy) -> (x, y); snap(side, x, y) -> (x, y); pack(events, from) -> { string };
---   unpack(strings, from, to) -> events? ; join(events, from) -> string; state(sim) -> { number };
+--   unpack(strings, from, to) -> events? ; presses(strings, from, to) -> { tick }? ; join(events, from) -> string; state(sim) -> { number };
 --   load(sim, list) -> bool; same(sim, list) -> bool; STATE
 -- An events table is { [tick] = { qx, qy } | { qx, qy, true } | { false, false, true } } (the third entry: a
 -- serve on that tick; qx false: no new target).
@@ -27,6 +33,8 @@ local Wire = {}
 
 Wire.SEGMENT_SOLO = 24 -- ticks a segment of the log covers against the computer: ten messages a second
 Wire.SEGMENT_DUO = 16 -- and against a person: fifteen a second (the other player waits on it)
+Wire.SEGMENT_QUIET = 120 -- while nothing comes back from the server (a stalled line): two messages a second
+Wire.QUIET = 96 -- ticks without a word from the server before the line counts as stalled (0.4 s)
 Wire.MAX_SEGMENT = 1440 -- the longest stretch one message may cover (a client coming back from a long frame)
 Wire.SLACK = 72 -- ticks a client may be ahead of the server's reading of the shared clock (0.3 s)
 Wire.MAX_BEHIND = 96 -- with two people: the referee waits this long (0.4 s) for a hand, then plays on without it
@@ -146,6 +154,22 @@ function Wire.unpack(strings: { any }, from: number, to: number): { [number]: an
 		end
 	end
 	return events
+end
+
+-- The ticks of a segment on which its player pressed their serve button (nil: not a segment), in order.
+function Wire.presses(strings: { any }, from: number, to: number): { number }?
+	local events = Wire.unpack(strings, from, to)
+	if events == nil then
+		return nil
+	end
+	local out: { number } = {}
+	for tick, e in events do
+		if e[3] then
+			table.insert(out, tick)
+		end
+	end
+	table.sort(out)
+	return out
 end
 
 -- The whole state, as a list (what a match is at one tick: enough to carry on from).
