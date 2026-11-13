@@ -15,7 +15,8 @@
 --   canopy forks: nearby, choose, take,       §12, L4386-4456
 --     side-step, W auto-take
 --   visual placement                          §14, L6769-6820
--- and the geometry of enclosed runs (Routes/Enclosure: mouths, entry, the transfer filter). Every enclosure rule
+-- and the geometry of enclosed runs (Routes/Enclosure: mouths and their `out`, entry (also swept), launch points,
+-- the section, the exits A/D picks, the transfer filter, the data check enclosureErrors). Every enclosure rule
 -- applies only to routes that carry `enclosure` (kind "tunnel"); with none in the world every function here
 -- answers exactly as before.
 -- Everything takes a `World` ({ registry, index, graph }) and plain numbers; no engine types. All

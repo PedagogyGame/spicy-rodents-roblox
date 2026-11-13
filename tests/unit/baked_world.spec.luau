@@ -114,6 +114,27 @@ return function(t)
 		t.eq(w.blocked(40, 0, -1), false)
 	end)
 
+	t.test("walls as the client sees them: a tree's bough cylinders are looked past, its trunk is round", function()
+		local m = roblox.Instance.new("Model")
+		local V, CF = roblox.Vector3, roblox.CFrame
+		local tree = roblox.Instance.new("Model")
+		tree.Name = "Tree_7"
+		tree.Parent = m
+		-- a trunk 8 across standing up (a cylinder's axis is its X), and a bough cylinder at body height beside it
+		part(tree, "Trunk_1", "Part", V.new(20, 8, 8), CF.new(0, 10, 0) * CF.Angles(0, 0, math.pi / 2), {
+			Shape = roblox.Enum.PartType.Cylinder,
+		})
+		part(tree, "R12_1", "Part", V.new(10, 1, 1), CF.new(12, 1, 0), { Shape = roblox.Enum.PartType.Cylinder })
+		-- the same bough shape outside a tree is a wall
+		part(m, "Pipe", "Part", V.new(10, 1, 1), CF.new(12, 1, 30), { Shape = roblox.Enum.PartType.Cylinder })
+		local w = BakedWorld.fromModel(m)
+		t.eq(w.blocked(12, 0, 0), false, "the bough cylinder is looked past")
+		t.eq(w.blocked(12, 30, 0), true, "a cylinder that is not a tree's bough is a wall")
+		-- by the trunk's round section from the probe's centre (radius 4 + the probe 0.35), not by its 8 x 8 box
+		t.eq(w.blocked(3.2, 3.2, 0), false, "at the box's corner, 4.5 from the axis")
+		t.eq(w.blocked(3.0, 0, 0), true, "into the bark")
+	end)
+
 	t.test("clearance: a body swept along a line reports what it passes through, and where", function()
 		local m = roblox.Instance.new("Model")
 		local V, CF = roblox.Vector3, roblox.CFrame

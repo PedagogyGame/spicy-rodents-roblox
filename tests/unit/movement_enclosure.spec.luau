@@ -886,6 +886,19 @@ return function(t)
 				codes[x.code] = true
 			end
 			t.truthy(codes.enclosure, "climb to passage 11 across the wood")
+			-- a late packet may hide two authored hops (bough 5, in at the knothole, down to the pocket's fork, into it);
+			-- the same move in one frame may not, and nothing authored ever joins the climb to passage 11
+			local function judged(from: SquirrelMotor.State, to: SquirrelMotor.State, dt: number): { [string]: boolean }
+				to.clock = from.clock + dt
+				local found = {}
+				for _, x in SquirrelMotor.envelope(from, to, dt, w, false) do
+					found[x.code] = true
+				end
+				return found
+			end
+			t.falsy(judged(onRoute(w, 5, 0.05, -1), onRoute(w, 12, 0.1, 1), 0.2).enclosure, "two hops in 0.2 s")
+			t.truthy(judged(onRoute(w, 5, 0.05, -1), onRoute(w, 12, 0.1, 1), 1 / 60).enclosure, "not in one frame")
+			t.truthy(judged(onRoute(w, 3, 0.7, 1), onRoute(w, 11, 5 / 7, 1), 0.2).enclosure, "nor through the wood")
 			-- A/D at the pocket's fork, then W: onto the pocket; the knothole by the other key
 			local function climbing(side: number): number?
 				local c = onRoute(w, 3, 0.02, 1)

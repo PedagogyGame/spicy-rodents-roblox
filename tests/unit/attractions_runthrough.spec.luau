@@ -447,6 +447,26 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"where a launch out of each mouth starts, nothing solid stands (the balls resting there are seen)",
+		function()
+			for p = 1, 3 do
+				for _, mb in BakedWorld.mouthClearance(baked, reg, runOf(p)) do
+					local names = {}
+					for _, part in mb.parts do
+						t.falsy(part.collide, `pair {p} {mb.mouth}: {part.path} is solid`)
+						table.insert(names, part.path)
+					end
+					table.sort(names)
+					-- the grille is clear; at the rack the body starts beside the pair's two balls resting at the hood (they do
+					-- not collide; the rack moment's builder decides where they rest when a squirrel comes out)
+					local want = if mb.mouth == "rack" then `Lanes.Lane{2 * p - 1}.Ball,Lanes.Lane{2 * p}.Ball` else ""
+					t.eq(table.concat(names, ","), want, `pair {p} {mb.mouth}`)
+				end
+			end
+		end
+	)
+
 	t.test("the duct builder's list: what the building as baked today puts in the animal's way, by name", function()
 		for p = 1, 3 do
 			local expected: { [string]: boolean } = {}

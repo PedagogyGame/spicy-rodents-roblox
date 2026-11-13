@@ -27,7 +27,7 @@
 -- pressing N is told so.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
---   feedback(frame, events, onRoute) -> string? (pure); hipOf(body, measured) -> studs;
+--   feedback(frame, events, onRoute) -> string? (pure); cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
 --   string (pure); launch(events, vy) -> action?, airSeconds? (pure)
 -- No side effects on require.

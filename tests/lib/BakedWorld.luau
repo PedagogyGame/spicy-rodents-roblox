@@ -14,7 +14,9 @@
 --                                terrain (World/Height lowered inside the carve boxes): Client/World/ClientWorld
 --   world.blocked(x, z, y)       ClientWorld's body box (half 1.0, from STEP to BODY_TOP over the feet; its lowest
 --                                BODY_RISE counts at the core only) against colliding parts; blockedCore,
---                                blockedHalf as there
+--                                blockedHalf as there. As ClientWorld's wall test: a tree's bough cylinders
+--                                (Tree_<id>.R<route>_<i>) are looked past and a trunk cylinder (Tree_<id>.Trunk*)
+--                                is tested by its round section (ClientWorld.isBough, isTrunk, trunkClear)
 --   world.raycast(origin, dir, filter?) -> (t, part)?   nearest hit along origin + dir * t, t in [0, 1]
 --   world.containing(x, y, z, filter?) -> { Part }       the solids holding a point
 --   world.overlapBox(cx, cy, cz, axes, half, filter?) -> { Part }   solids overlapping an oriented box
@@ -22,10 +24,11 @@
 -- Clearance. BakedWorld.clearance(world, registry, route, opts?) sweeps the animal's section (Enclosure.BODY width,
 -- headroom BODY.height, or the record's crawl height where the record declares a crawl) along a route in slices of
 -- `step` studs and reports every part it passes through: { name, path, collide, visible, t0, t1, studs }, merged
--- per part, in route order. The section stands on the route line (the feet), from `lift` (0.1) up; it leans with
--- the route on a slope and stands across a vertical climb. What lies lower than `lift` (0.15) above the line is
--- walked over. A route of kind trunk or a climb is swept as a square
--- column round the line.
+-- per part, in route order. The section stands on the route line (the feet), from `lift` (0.15) up along its up
+-- (the record's `up` / `upAt` where written, else Motion.section's default: world up squared to the line, carried
+-- up a vertical stretch). What lies lower than `lift` above the line is walked over. A route of kind trunk or a
+-- climb is swept as a square column round the line. BakedWorld.mouthClearance(world, registry, route) lists what
+-- stands where each mouth's launch starts (Motion.launchPoint: the body's box there must be clear).
 -- Driving. BakedWorld.drive(world, state, frames, keys, opts?) -> Trace runs SquirrelMotor.step at 1/60 s with the
 -- input `keys(frame, state)` returns (nil stops), recording every frame's position, route, t and events, the
 -- largest move in one frame, the routes visited, and (opts.validator) each frame's envelope violations.
@@ -34,7 +37,9 @@
 local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local ClientWorld = require("@client/World/ClientWorld")
 local Enclosure = require("@shared/Routes/Enclosure")
+local Motion = require("@shared/Routes/Motion")
 local Height = require("@shared/World/Height")
 local RailWorld = require("@shared/Movement/RailWorld")
 local Registry = require("@shared/Routes/Registry")
@@ -586,9 +591,26 @@ function BakedWorld.fromModel(root: any, opts: { adjust: ((part: Part, inst: any
 	end
 
 	local AXES = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } }
+	-- ClientWorld's wall test (its `solid`): a tree's invisible bough cylinders are looked past, and a tree's trunk is
+	-- tested by its round section from the probe's centre (ClientWorld.trunkClear), not by its box
 	local function boxHit(x: number, z: number, ylo: number, yhi: number, half: number): Part?
-		local hits = world.overlapBox(x, (ylo + yhi) / 2, z, AXES, { half, (yhi - ylo) / 2, half }, colliding)
-		return hits[1]
+		local cy = (ylo + yhi) / 2
+		local hits = world.overlapBox(x, cy, z, AXES, { half, (yhi - ylo) / 2, half }, colliding)
+		for _, p in hits do
+			local parentName = string.match(p.path, "([^%.]+)%.[^%.]+$") or ""
+			if ClientWorld.isBough(p.name, parentName) then
+				continue
+			end
+			if ClientWorld.isTrunk(p.name, parentName) and p.shape == "cylinder" then
+				-- a cylinder's axis is its local X: the distance from it is in local Y and Z; its radius is the half Y
+				local _, ly, lz = toPart(p, x, cy, z)
+				if ClientWorld.trunkClear(math.sqrt(ly * ly + lz * lz), p.hy) then
+					continue
+				end
+			end
+			return p
+		end
+		return nil
 	end
 
 	-- ClientWorld.blocked: the body box from STEP + BODY_RISE to BODY_TOP at the half-width, and from STEP at the core
@@ -752,10 +774,11 @@ function BakedWorld.clearance(
 		else
 			-- the body stands up from the route line: world up made square to the line (on a vertical climb, the
 			-- last up it had)
-			local up = { 0, 1, 0 }
+			local authored = if spec then Enclosure.upAt(spec, t) else nil
+			local up = if authored then { authored.x, authored.y, authored.z } else { 0, 1, 0 }
 			local k = dot(up, T)
 			local u = norm({ up[1] - k * T[1], up[2] - k * T[2], up[3] - k * T[3] })
-			if u == nil or math.abs(k) > 0.97 then
+			if u == nil or (authored == nil and math.abs(k) > Enclosure.C.steep) then
 				local pk = dot(prevUp, T)
 				u = norm({ prevUp[1] - pk * T[1], prevUp[2] - pk * T[2], prevUp[3] - pk * T[3] })
 			end
@@ -799,6 +822,39 @@ function BakedWorld.clearance(
 	local out: { Blockage } = {}
 	for _, part in order do
 		table.insert(out, byPart[part])
+	end
+	return out
+end
+
+export type MouthBlockage = { mouth: string, t: number, parts: { Part } }
+
+-- mouthClearance(world, registry, route, filter?): for each mouth of an enclosed route, the solids in the body's box
+-- (Enclosure.BODY width square, BODY.height tall, standing on the launch point) where a launch out of it starts
+-- (Motion.launchPoint): a mouth whose list is not empty launches the body into something.
+function BakedWorld.mouthClearance(
+	world: World,
+	registry: Registry.Registry,
+	route: Registry.Route,
+	filter: Filter?
+): { MouthBlockage }
+	local out: { MouthBlockage } = {}
+	local spec = route.enclosure
+	if not spec then
+		return out
+	end
+	local motorish = { registry = registry } :: any
+	for i, m in spec.mouths do
+		local p = Motion.launchPoint(motorish, route, m)
+		local w, h = Enclosure.BODY.width, Enclosure.BODY.height
+		local parts = world.overlapBox(
+			p.x,
+			p.y + 0.15 + (h - 0.15) / 2,
+			p.z,
+			{ { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } },
+			{ w / 2, (h - 0.15) / 2, w / 2 },
+			filter or solidOrSeen
+		)
+		table.insert(out, { mouth = m.name or `mouth {i}`, t = m.t, parts = parts })
 	end
 	return out
 end

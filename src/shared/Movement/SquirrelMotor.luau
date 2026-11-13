@@ -17,11 +17,15 @@
 --   AIR     ballistic while attackWindow > 0; landing clears committedAirborne
 -- Edge actions per frame: leap (Space), drop (Q), grab (E), choose (A/D), pounce (left click).
 -- ENCLOSED RUNS (Routes/Enclosure; kind "tunnel": the ball return, a hollow tree's inside): got into only at a mouth,
--- moving into it, eased like a transfer; inside and away from a mouth Space, Q and a click do nothing (hint
--- "noRoom") and E, A/D and the end-of-route switch never pass the wall; at a mouth they launch along its `out`; an
--- end mouth lets the body out as it says (step out on the ground: "emerge"; stop with the head out: "lip"; run on
--- along its link), an end without one takes its authored end link, else stops ("railEnd" once per arrival). Every
--- one of these applies only to routes that carry `enclosure`: every other route behaves exactly as before.
+-- moving into it (walking, falling, leaping or pouncing: the flight's swept path counts and going in ends the
+-- attack), eased like a transfer; inside and away from a mouth Space, Q and a click do nothing (hint "noRoom") and
+-- E, A/D and the end-of-route switch never pass the wall; at a mouth they launch from outside its face
+-- (Motion.launchPoint) along its `out` (a mouth's `hop` makes Space and a click a short hop; Q pushes out); an end
+-- mouth lets the body out as it says (step out on the ground: "emerge"; stop with the head out: "lip", where a view
+-- turned round with W held turns back; run on along its link), an end without one takes its authored end link,
+-- else stops ("railEnd" once per arrival); A/D picks an authored fork or part-way link ahead, taken as W passes it
+-- ("forkTaken" / "mouthLink"), E takes one within reach or steps out of a part-way opening ("emerge"). Every one of
+-- these applies only to routes that carry `enclosure`: every other route behaves exactly as before.
 -- The motor is pure: `step(state, input, dt, world)` mutates and returns `state` plus a list of
 -- events, uses only the Routes modules and the `world.groundAt`/`world.blocked` callbacks, and runs
 -- under Lune. `serialize`/`deserialize` give the flat snapshot that possession hands over
@@ -1540,9 +1544,30 @@ function SquirrelMotor.envelope(
 		elseif prevRoute and nextRoute and prevRoute.id ~= nextRoute.id then
 			-- an authored connection (an end link, a fork, a mouth's link): a declared junction
 			authored = Enclosure.linked(prevRoute, nextRoute)
-			if
-				not Enclosure.allows(prevRoute, prev.railT, nextRoute, next.railT, along(prevRoute), along(nextRoute))
-			then
+			local allowed =
+				Enclosure.allows(prevRoute, prev.railT, nextRoute, next.railT, along(prevRoute), along(nextRoute))
+			if not allowed and dt > E.shortDt then
+				-- a late packet can hide two authored hops (a bough, the knothole's shaft, the floor below): through a
+				-- route either record names, connected to both (the transfer gap check below still bounds the distance)
+				local mids = Enclosure.neighbours(prevRoute)
+				for _, id in Enclosure.neighbours(nextRoute) do
+					table.insert(mids, id)
+				end
+				for _, id in mids do
+					local mid = reg:get(id)
+					if
+						mid
+						and mid.id ~= prevRoute.id
+						and mid.id ~= nextRoute.id
+						and Enclosure.allows(prevRoute, prev.railT, mid, 0.5, along(prevRoute), mid.length)
+						and Enclosure.allows(mid, 0.5, nextRoute, next.railT, mid.length, along(nextRoute))
+					then
+						allowed, authored = true, true
+						break
+					end
+				end
+			end
+			if not allowed then
 				add(out, "enclosure", 1, `crossed the wall from route {prevRoute.id} to route {nextRoute.id}`)
 			end
 		end

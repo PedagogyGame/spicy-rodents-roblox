@@ -95,7 +95,7 @@
 --   mouthAt(spec, length, t), mouthNear(spec, length, t, slack), endMouth(spec, length, atStart),
 --   endLink(spec, atStart), inside(route, t), hidden(route, t), zone(route), headroom(spec, t), upAt(spec, t),
 --   names(mouth, routeId), connects(a, aT, b, bT, slackA?, slackB?), allows(from, fromT, to, toT, slackFrom?,
---   slackTo?), linked(a, b), exits(spec, length)
+--   slackTo?), linked(a, b), neighbours(route), exits(spec, length)
 
 local Curve = require("./Curve")
 
@@ -737,6 +737,38 @@ function Enclosure.allows(
 	end
 	return Enclosure.connects(from, fromT, to, toT, slackFrom, slackTo)
 		or Enclosure.connects(to, toT, from, fromT, slackTo, slackFrom)
+end
+
+-- neighbours(route): the ids its enclosure record names (end links, forks, mouths' links), each once; empty off an
+-- enclosed route. The validator looks for a hidden middle hop among them when packets come late.
+function Enclosure.neighbours(route: RouteLike): { number }
+	local out: { number } = {}
+	local seen: { [number]: boolean } = {}
+	local spec = route.enclosure
+	if not spec then
+		return out
+	end
+	local function add(id: number)
+		if not seen[id] then
+			seen[id] = true
+			table.insert(out, id)
+		end
+	end
+	if spec.atStart then
+		add(spec.atStart.route)
+	end
+	if spec.atEnd then
+		add(spec.atEnd.route)
+	end
+	for _, f in spec.forks do
+		add(f.route)
+	end
+	for _, m in spec.mouths do
+		for _, l in m.links do
+			add(l.route)
+		end
+	end
+	return out
 end
 
 -- linked(a, b): does either route's enclosure record name the other (an end link, a fork or a mouth's link)? The
