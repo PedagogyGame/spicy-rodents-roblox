@@ -90,6 +90,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		animalAt = -math.huge,
 		over = nil, -- the last game's places on the board, by seat
 		syncedAt = {}, -- key -> when they were last sent a snapshot
+		waited = 0, -- segments that had to wait for the clock (for the record)
 	}
 
 	local function replay(): any
@@ -257,6 +258,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 			return true, true
 		end
 		if not feed(player, args) then
+			self.waited += 1
 			table.insert(self.pending, { key = player, args = table.clone(args) })
 		end
 		return true, true
