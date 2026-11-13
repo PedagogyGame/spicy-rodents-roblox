@@ -290,10 +290,12 @@ return function(t: Test.T)
 			end
 			local out, fired = hit(0.5, 2.0)
 			t.eq(fired, 1)
+			-- (ACORN ATTACK's coils are old: its own share of the standard kick)
+			local kick = Physics.SLING_KICK * tbl.def.kick
 			t.near(
 				out,
-				Physics.SLING_KICK + 2.0 * Layout.MATERIALS.rubber.e,
-				0.25 + Physics.SLING_KICK * Physics.KICK_JITTER,
+				kick + 2.0 * Layout.MATERIALS.rubber.e,
+				0.25 + kick * Physics.KICK_JITTER,
 				"the bounce plus the kick (the coil varies by its seeded tenth)"
 			)
 			local _, softFired = hit(0.5, 0.4)
@@ -686,4 +688,72 @@ return function(t: Test.T)
 		-- 240 steps a second at this cost is well under one per cent of a frame's budget
 		t.truthy(micros < 60, `{micros} microseconds a step`)
 	end)
+	t.test("PIN-R6: each machine has its own coils: the old table kicks softest, the fast one hardest", function()
+		local acorn, spicy, space =
+			Tables.need("pinball_acorn"), Tables.need("pinball_rodent"), Tables.need("pinball_space")
+		t.truthy(acorn.def.kick < space.def.kick and space.def.kick < spicy.def.kick)
+		t.eq(space.def.kick, 1)
+		-- the same touch on a bumper of each: the kick is the table's share of the standard one
+		local function pop(tbl: Machine.Table): number
+			local bump = tbl.def.bumpers[1]
+			local s = Physics.new(tbl.c, 4)
+			local ev: { number } = {}
+			local b = s.balls[Physics.addBall(s, bump.x, bump.y + bump.r + R + 0.01, 0, -2)]
+			for _ = 1, 3 do
+				Physics.step(tbl.c, s, false, false, ev)
+			end
+			return b.vy - Physics.BUMPER_E * 2
+		end
+		for _, tbl in { acorn, spicy, space } do
+			local kick = Physics.BUMPER_KICK * tbl.def.kick
+			t.near(pop(tbl), kick, kick * Physics.KICK_JITTER + 0.15, tbl.id)
+		end
+		t.truthy(
+			pop(spicy) > pop(acorn) * 1.3,
+			"SPICY RODENT's bumpers throw a ball a good deal harder than ACORN ATTACK's"
+		)
+	end)
+
+	t.test(
+		"a scoop is a hole under a hood: it takes a ball that rolls into its mouth and lets one from behind ride over",
+		function()
+			local def = Layout.new("scoop", "SCOOP")
+			Layout.addShell(def)
+			Layout.addBottom(def, { gap = 0.2, outlane = 0.19, inlane = 0.22, pivotY = 0.62 })
+			table.insert(def.saucers, {
+				id = "scoop",
+				x = 1.0,
+				y = 2.5,
+				r = 0.085,
+				maxSpeed = 8,
+				vx = 0,
+				vy = -1,
+				holdTicks = 100,
+				ax = 0,
+				ay = 1,
+			})
+			table.insert(
+				def.saucers,
+				{ id = "hole", x = 1.6, y = 2.5, r = 0.085, maxSpeed = 8, vx = 0, vy = -1, holdTicks = 100 }
+			)
+			local c = Layout.compile(def)
+			local function over(x: number, fromY: number, vy: number): boolean
+				local s = Physics.new(c, 1)
+				local ev: { number } = {}
+				local b = s.balls[Physics.addBall(s, x, fromY, 0, vy)]
+				for _ = 1, 120 do
+					Physics.step(c, s, false, false, ev)
+					if b.mode == Physics.HELD then
+						return true
+					end
+				end
+				return false
+			end
+			t.truthy(over(1.0, 2.2, 4), "rolling up into the scoop's mouth: taken")
+			t.falsy(over(1.0, 2.8, -4), "coming down over its hood: not taken")
+			t.falsy(over(1.0, 2.2, 12), "too fast: it skips over")
+			t.truthy(over(1.6, 2.2, 4), "a plain hole takes a ball from below")
+			t.truthy(over(1.6, 2.8, -4), "and from above")
+		end
+	)
 end

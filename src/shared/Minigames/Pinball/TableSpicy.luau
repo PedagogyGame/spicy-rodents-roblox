@@ -6,7 +6,7 @@
 -- top of the table and drops it in the right inlane, so the shot can be repeated), the S-P-I-C-Y standup
 -- targets (two left, one centre, two right), the kick-out hole "the bite" in a horseshoe top right for the
 -- left flipper, the hot lane up the right side (a soft plunge dribbles down it: the skill shot), three pop
--- bumpers in the nest top left.
+-- bumpers in the nest top left, at the head of the channel the left flipper's hard backhand runs up.
 -- The rule sheet (one goal: feed the rodent to SUPER):
 --   * Everything feeds the HEAT meter: the wire most, then the bite, targets, bumpers. The meter cools all the
 --     time. At a third it is FERAL (all scores 2x), at two thirds RABID (3x), full is SUPER: 5x for twenty
@@ -26,6 +26,7 @@ local Physics = require("./Physics")
 local def = Layout.new("pinball_rodent", "SPICY RODENT")
 def.slopeDeg = 7
 def.gravity = Layout.gravityFor(7)
+def.kick = 1.2 -- hot coils: everything on this table kicks harder
 def.plunger.vMin = 4.8
 def.plunger.vMax = 8.6
 
@@ -75,7 +76,7 @@ do
 			dropY,
 			0,
 		},
-		mouth = 0.17,
+		mouth = 0.2,
 		minSpeed = 0.6,
 		exitSpeed = 1.2,
 		drag = 0.25,
@@ -89,19 +90,21 @@ do
 		table.insert(def.targets, { id = id, kind = "standup", x1 = x1, y1 = y1, x2 = x2, y2 = y2 })
 		Layout.lamp(def, id, lx, ly, "orange")
 	end
-	-- S and P stand one above the other on a bump in the left rail, both in reach of the left flipper's backhand
-	standup("spicy_s", 0.1, 2.13, 0.16, 2.24, 0.26, 2.11)
-	standup("spicy_p", 0.16, 2.26, 0.22, 2.37, 0.32, 2.24)
-	Layout.wall(def, "wood", { 0.0, 2.1, 0.1, 2.13 })
-	Layout.wall(def, "wood", { 0.22, 2.37, 0.0, 2.62 })
-	standup("spicy_i", 1.02, 2.86, 1.26, 2.86, 1.14, 2.74)
+	-- S and P stand one above the other on a bump in the left rail, both in the left flipper's backhand (S
+	-- the earliest and softest, P a little later and harder)
+	standup("spicy_s", 0.14, 2.06, 0.24, 2.22, 0.34, 2.06)
+	standup("spicy_p", 0.24, 2.24, 0.3, 2.4, 0.4, 2.26)
+	Layout.wall(def, "wood", { 0.0, 2.02, 0.14, 2.06 })
+	Layout.wall(def, "wood", { 0.3, 2.4, 0.0, 2.72 })
+	-- (I stands a ball and a half clear of the wire's flank, so a ball can fall between them)
+	standup("spicy_i", 1.09, 2.86, 1.31, 2.86, 1.2, 2.74)
 	-- its back comes to a point, so a ball from above rolls off it
-	Layout.wall(def, "plastic", { 1.02, 2.86, 1.02, 2.9, 1.14, 3.0, 1.26, 2.9, 1.26, 2.86 })
-	standup("spicy_c", X1 - 0.22, 2.37, X1 - 0.16, 2.26, X1 - 0.32, 2.24)
-	standup("spicy_y", X1 - 0.16, 2.24, X1 - 0.1, 2.13, X1 - 0.26, 2.11)
-	Layout.wall(def, "wood", { X1, 2.1, X1 - 0.1, 2.13 })
+	Layout.wall(def, "plastic", { 1.09, 2.86, 1.09, 2.9, 1.2, 3.0, 1.31, 2.9, 1.31, 2.86 })
+	standup("spicy_c", X1 - 0.3, 2.4, X1 - 0.24, 2.24, X1 - 0.4, 2.26)
+	standup("spicy_y", X1 - 0.24, 2.22, X1 - 0.14, 2.06, X1 - 0.34, 2.06)
+	Layout.wall(def, "wood", { X1, 2.02, X1 - 0.14, 2.06 })
 	-- the bump's upper side is steep: a ball dribbling down the hot lane slides off it onto the right flipper
-	Layout.wall(def, "wood", { X1 - 0.22, 2.37, X1 - 0.02, 2.8, X1, 2.9 })
+	Layout.wall(def, "wood", { X1 - 0.3, 2.4, X1 - 0.02, 2.82, X1, 2.92 })
 end
 
 -- the hot lane up the right side; a ball that comes down it rolls off the bump above C and Y into the table
@@ -117,21 +120,25 @@ table.insert(def.saucers, {
 	x = 1.58,
 	y = 3.52,
 	r = 0.1,
-	maxSpeed = 7,
+	maxSpeed = 9.5,
 	vx = -0.19,
 	vy = -1.5,
 	holdTicks = 300,
 })
-Layout.cup(def, 1.58, 3.52, 0.16, 250, 130)
+Layout.cup(def, 1.58, 3.52, 0.165, 256, 150)
 Layout.lamp(def, "bite", 1.5, 3.28, "red")
 Layout.lamp(def, "extra_ball", 1.42, 3.12, "red")
 
--- the nest: three pop bumpers top left, where a hard plunge comes down off the arch; a rebound rubber on the
--- left rail turns a ball running down the rail into them
+-- the nest: three pop bumpers top left, at the head of the channel between the left rail and the wire. That
+-- channel is where the left flipper's hard backhand goes (a ball flipped a little later than for S and P),
+-- so the nest is in play all game; a hard plunge comes down into it off the arch too, and a rebound rubber on
+-- the left rail turns a ball running down the rail into it
 Layout.wall(def, "rubber", { 0.0, 4.05, 0.17, 3.97 })
 Layout.endPost(def, 0.17, 3.97, 0.0, 4.05)
 table.insert(def.bumpers, { id = "bumper_1", x = 0.3, y = 3.72, r = 0.115 })
-table.insert(def.bumpers, { id = "bumper_2", x = 0.72, y = 3.86, r = 0.115 })
+-- (the second stands over the gap between the wire and the I target: a ball shot up the middle meets it, and
+-- so does one coming down from the top of the table)
+table.insert(def.bumpers, { id = "bumper_2", x = 0.98, y = 3.45, r = 0.115 })
 table.insert(def.bumpers, { id = "bumper_3", x = 0.36, y = 3.28, r = 0.115 })
 for i, b in def.bumpers do
 	Layout.lamp(def, `bumper_{i}`, b.x, b.y, "red")

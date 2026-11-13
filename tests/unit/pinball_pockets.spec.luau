@@ -337,9 +337,33 @@ return function(t: Test.T)
 			lo, hi = math.min(lo, v), math.max(hi, v)
 			-- (the ball arrives at 3 studs/s: its rebound off the body, and the ring's kick on top)
 			local kick = v - Physics.BUMPER_E * 3
-			t.truthy(math.abs(kick - Physics.BUMPER_KICK) <= Physics.BUMPER_KICK * Physics.KICK_JITTER + 0.1, `{v}`)
+			local coil = Physics.BUMPER_KICK * tbl.def.kick
+			t.truthy(math.abs(kick - coil) <= coil * Physics.KICK_JITTER + 0.1, `{v}`)
 		end
 		t.truthy(hi - lo > 0.1, `six pops are not six copies ({lo} to {hi})`)
 		t.truthy(Physics.KICK_JITTER > 0 and Physics.KICK_JITTER <= 0.15)
+	end)
+	t.test("the survey goes down every lane: the inlanes and the outlanes are surveyed for dead spots too", function()
+		for _, id in Tables.IDS do
+			local tbl = Tables.need(id)
+			local spots = Survey.reachable(tbl)
+			for _, lane in tbl.def.lanes do
+				-- spots inside the lane proper: below its mouth, above its switch, between its two sides
+				local half = lane.mouth / 2
+				local inside = 0
+				for i = 1, #spots, 2 do
+					local x, y = spots[i], spots[i + 1]
+					if math.abs(x - lane.mx) < half and y < lane.my - 0.05 and y > lane.y2 then
+						inside += 1
+						-- and nothing let go there comes to rest: it rolls on down the lane
+						if inside % 3 == 1 then
+							local what = Survey.drop(tbl, x, y, 0, 20)
+							t.eq(what, "drained", `{id} {lane.id}: a ball let go at {x}, {y}`)
+						end
+					end
+				end
+				t.truthy(inside >= 3, `{id} {lane.id}: {inside} surveyed spots inside the lane`)
+			end
+		end
 	end)
 end

@@ -3,15 +3,20 @@
 -- tables are tuned from numbers, not guesses. For each of the three machines it prints:
 --   * dead spots: places a ball comes to rest by itself with the flippers down, and balls that never drain
 --     (Survey; both must be none);
---   * the flipper: stroke and fall time, how far it comes back off its top stop, how hard it hits a ball met
---     in mid-stroke (the same wherever inside a tick the two meet), the shot table (where the ball is on the
---     flipper when you flip against the angle and speed it leaves at: checklist PIN-P1 asks for it to rise
---     steadily), and the live catch tick by tick (PIN-P2: how wide the moment is);
+--   * the lanes: how wide each inlane and outlane is at its narrowest, in balls (Layout.laneWidth; a real lane
+--     is about 1.4), and from how many places across its mouth a falling ball goes in;
+--   * the flipper: stroke and fall time, the tip's speed at the top stop, how far it comes back off the stop,
+--     how hard it hits a ball met in mid-stroke, the shot table (where the ball is on the flipper when you
+--     flip against the angle and speed it leaves at: checklist PIN-P1 asks for it to rise steadily), a tap
+--     (how far the flipper rises for a press of so many ticks: what one screen frame at 60 and at 30 a second
+--     gives), the tap pass, and the live catch tick by tick (PIN-P2: how wide the moment is);
+--   * the shot book, each window in ticks and in screen frames at 60 and at 30 a second;
 --   * the plunger: with nobody at the flippers, the first thing the ball does after each strength of pull
 --     (the skill shot is the band that pays; too soft a pull does not leave the lane);
 --   * the computer players, NOVICE, REGULAR and WIZARD: scores (and where each would stand on the machine's
---     board of best scores), how long a ball lasts, flips, what gets hit a game, how often each goal on the
---     rule sheet is reached, where balls are lost;
+--     board of best scores), how long a ball lasts, flips, how fast the ball is (mean, how much of the time
+--     it is slow or fast, the top speed seen), what gets hit a game, how often a ball rolls into each lane
+--     from the field, how often each goal on the rule sheet is reached, where balls are lost;
 --   * what a step costs.
 -- Usage, from the repo root: lune run tools/games/pinball/calibrate.luau [games per level, default 40] [table id part]
 -- Interface: a script (prints a report); nothing is written.
@@ -73,14 +78,32 @@ local function flipperReport(tbl: Machine.Table)
 		Physics.step(c, s, false, false, ev)
 		down += 1
 	end
+	-- the coil pulls all the way up: the tip is at its fastest as it meets the stop
+	local topW = math.sqrt(2 * Physics.FLIP_ACC_UP * (c.fup[1] - c.frest[1]))
+	topW = math.min(topW, Physics.FLIP_W_MAX)
 	print(
 		`  flipper: stroke {fmt(up / 240 * 1000, 0)} ms, fall {fmt(down / 240 * 1000, 0)} ms, swing {fmt(
 			math.deg(c.fup[1] - c.frest[1]),
 			0
-		)} degrees, tip speed {fmt(Physics.FLIP_W_MAX * c.freach[1])} studs/s; at the top it comes {fmt(back)} degrees back off its stop and is home in {fmt(
-			away / 240 * 1000,
-			0
-		)} ms`
+		)} degrees, tip speed at the top stop {fmt(topW * c.freach[1])} studs/s ({fmt(topW * c.freach[1] / 2)} half way up); at the top it comes {fmt(
+			back
+		)} degrees back off its stop and is home in {fmt(away / 240 * 1000, 0)} ms`
+	)
+	-- a tap: how far the flipper rises for a press of so many ticks
+	local taps = {}
+	local swing = c.fup[1] - c.frest[1]
+	for press = 1, 9 do
+		local p = Physics.new(c, 1)
+		local peak = c.frest[1]
+		for tick = 1, 80 do
+			Physics.step(c, p, tick <= press, false, ev)
+			peak = math.max(peak, p.fa[1])
+		end
+		table.insert(taps, `{press}: {fmt((peak - c.frest[1]) / swing * 100, 0)}%`)
+	end
+	table.clear(ev)
+	print(
+		`  a tap (press for so many ticks: how much of the swing the flipper makes): {table.concat(taps, "  ")}; one screen frame is 4 ticks at 60 a second and 8 at 30`
 	)
 
 	-- a ball met in mid-stroke: dropped from a hair higher each time, it meets the flipper at every point
@@ -196,6 +219,100 @@ local function flipperReport(tbl: Machine.Table)
 			then `    the catch (under half the hop): {window} ticks ({fmt(window / 240 * 1000, 0)} ms), flipping {-first} to {-last} ticks ahead; earlier is a held flipper, later is a hit`
 			else "    NO live catch at this spot"
 	)
+
+	-- the tap pass: a ball cradled on the left flipper is let go and, as it rolls down, given a tap; the right
+	-- flipper is held up to catch it. Counted: the taps that leave the ball at rest on the right flipper
+	-- without it ever having gone faster than a pass does
+	local base = Physics.new(c, 1)
+	local lane = tbl.def.sensors[tbl.ix.sensor.inlane_l]
+	Physics.addBall(base, (lane.x1 + lane.x2) / 2, lane.y1 + 0.2, 0, 0)
+	for _ = 1, 240 * 8 do
+		Physics.step(c, base, true, false, ev)
+		if base.balls[1].asleep then
+			break
+		end
+	end
+	local passes, tried, best = 0, 0, ""
+	for delay = 60, 160, 4 do
+		for press = 2, 8 do
+			local holder = Machine.new(tbl, 1, 1)
+			holder.phys = base
+			local p = Machine.clone(holder).phys
+			local b = p.balls[1]
+			local fastest = 0
+			tried += 1
+			for tick = 1, 240 * 3 do
+				Physics.step(c, p, tick > delay and tick <= delay + press, tick > delay + press, ev)
+				if tick > delay then
+					fastest = math.max(fastest, math.sqrt(b.vx * b.vx + b.vy * b.vy))
+				end
+				if b.mode ~= Physics.FREE then
+					break
+				elseif b.asleep then
+					if b.x > Layout.XC and fastest < 6 then
+						passes += 1
+						if best == "" then
+							best = `let go, {delay} ticks on a tap of {press} ticks`
+						end
+					end
+					break
+				end
+			end
+		end
+	end
+	table.clear(ev)
+	print(
+		`  tap pass (cradle on the left flipper, let go, a tap of 2 to 8 ticks as the ball rolls down, the right flipper held up): {passes} of {tried} taps tried leave the ball caught on the right flipper{if best
+				~= ""
+			then " (the first: " .. best .. ")"
+			else ""}`
+	)
+end
+
+local function lanesReport(tbl: Machine.Table)
+	local c = tbl.c
+	local ev: { number } = {}
+	local rows = {}
+	for _, lane in tbl.def.lanes do
+		local sensor = tbl.ix.sensor[lane.id]
+		local got, tried = 0, 0
+		local off = -lane.mouth / 2
+		while off <= lane.mouth / 2 + 1e-9 do
+			local x, y = lane.mx + off, lane.my + 0.11
+			off += 0.01
+			if not Survey.free(tbl, x, y) then
+				continue
+			end
+			tried += 1
+			local s = Physics.new(c, 1)
+			Physics.addBall(s, x, y, 0, -2)
+			local done = false
+			for _ = 1, 240 * 3 do
+				table.clear(ev)
+				Physics.step(c, s, false, false, ev)
+				for e = 1, #ev, 4 do
+					if ev[e] == Physics.EV.ROLLOVER and ev[e + 1] == sensor then
+						got += 1
+						done = true
+						break
+					end
+				end
+				if done or s.balls[1].mode ~= Physics.FREE then
+					break
+				end
+			end
+		end
+		table.insert(
+			rows,
+			`{lane.id} {fmt(Layout.laneWidth(tbl.def, lane), 2)} balls across, in from {got} of {tried} places`
+		)
+	end
+	print(
+		`  lanes (the narrowest of the way in from the open table, in balls; a ball falling at 2 studs/s let go just above the mouth, every hundredth of a stud across it): {table.concat(
+			rows,
+			"; "
+		)}`
+	)
 end
 
 local function surveyReport(tbl: Machine.Table)
@@ -217,7 +334,7 @@ end
 local function shotsReport(tbl: Machine.Table)
 	local book = Shots.book(tbl)
 	print(
-		`  shot book (a cradled ball let go and flipped after every delay in turn; a window is how many ticks in a row reach the same thing; {Shots.FAIR_TICKS} ticks, two screen frames, is a fair shot):`
+		`  shot book (a cradled ball let go and flipped after every delay in turn; a window is how many ticks in a row reach the same thing; {Shots.FAIR_TICKS} ticks, two screen frames at 60 a second and one at 30, is a fair shot; "f60" and "f30" are the window in frames):`
 	)
 	for i = 1, tbl.c.nFlip do
 		local rows = {}
@@ -227,10 +344,12 @@ local function shotsReport(tbl: Machine.Table)
 				table.insert(
 					rows,
 					string.format(
-						"%s %d ticks (%.0f ms) at %.2f, %+.0f deg, %.0f st/s",
+						"%s %d ticks (%.0f ms, %.1f f60, %.1f f30) at %.2f, %+.0f deg, %.0f st/s",
 						Shots.name(tbl, kk),
 						w.ticks,
 						w.ticks / 240 * 1000,
+						w.ticks / 4,
+						w.ticks / 8,
 						w.along,
 						w.angle,
 						w.speed
@@ -320,6 +439,8 @@ local function gamesReport(tbl: Machine.Table)
 		local says: Tally = {}
 		local gamesWith: Tally = {}
 		local lost: Tally = { centre = 0, left = 0, right = 0 }
+		local lanes: Tally = {}
+		local speedSum, speedN, slow, fast, top = 0, 0, 0, 0, 0
 		local clock = 0
 		for seed = 1, GAMES do
 			local m = Machine.new(tbl, seed, 1)
@@ -333,6 +454,20 @@ local function gamesReport(tbl: Machine.Table)
 				n += 1
 				if m.phase == PHASE.PLAY and m.launched then
 					plays += 1
+					-- how fast the ball is while it is out on the playfield (not cradled, not in the shooter lane)
+					for _, b in m.phys.balls do
+						if b.mode == Physics.FREE and b.x < Layout.FIELD_X1 and not b.asleep then
+							local v = math.sqrt(b.vx * b.vx + b.vy * b.vy)
+							speedSum += v
+							speedN += 1
+							if v < 5 then
+								slow += 1
+							elseif v > 15 then
+								fast += 1
+							end
+							top = math.max(top, v)
+						end
+					end
 				end
 				for i = 1, #out, 3 do
 					local cue = out[i]
@@ -351,6 +486,11 @@ local function gamesReport(tbl: Machine.Table)
 						lost[where] += 1
 					elseif cue == CUE.FLIP_UP then
 						flips += 1
+					elseif cue == CUE.ROLLOVER then
+						local name = tbl.def.sensors[out[i + 1]].id
+						if string.find(name, "lane_", 1, true) then
+							lanes[name] = (lanes[name] or 0) + 1
+						end
 					end
 				end
 				table.clear(out)
@@ -418,6 +558,21 @@ local function gamesReport(tbl: Machine.Table)
 			end
 		end
 		print("      a game: " .. table.concat(per, ", "))
+		print(
+			`      the ball: mean {fmt(speedSum / math.max(speedN, 1))} studs/s out on the playfield, under 5 for {fmt(
+				slow / math.max(speedN, 1) * 100,
+				0
+			)}% of the time and over 15 for {fmt(fast / math.max(speedN, 1) * 100, 1)}%, top speed seen {fmt(top)}`
+		)
+		local laneRows = {}
+		for _, name in { "inlane_l", "inlane_r", "outlane_l", "outlane_r" } do
+			table.insert(laneRows, `{name} {fmt((lanes[name] or 0) / GAMES)}`)
+		end
+		print(
+			`      lanes rolled into, a game (a ramp's wire drops its ball in an inlane too: {fmt(
+				(cues.RAMP_OUT or 0) / GAMES
+			)} ramp ends a game, made or rolled back): {table.concat(laneRows, ", ")}`
+		)
 		local drains = lost.centre + lost.left + lost.right
 		print(
 			`      balls lost: centre {fmt(lost.centre / drains * 100, 0)}%, left outlane {fmt(
@@ -448,11 +603,16 @@ local function costReport(tbl: Machine.Table)
 	end
 	local steps = 0
 	local worst = 0
+	-- (balls are let go only where a ball can get to: not inside a ramp's body or behind a target bank)
+	local spots = Survey.reachable(tbl)
 	local started = os.clock()
 	for round = 1, 60 do
 		Physics.removeGone(s)
 		while #s.balls < 3 do
-			Physics.addBall(s, 0.5 + rnd(), 2.2 + rnd() * 2, rnd() * 16 - 8, rnd() * 16 - 8)
+			local at = 2 * math.floor(rnd() * (#spots // 2)) + 1
+			if spots[at + 1] > 2.2 and spots[at] < Layout.FIELD_X1 then
+				Physics.addBall(s, spots[at], spots[at + 1], rnd() * 16 - 8, rnd() * 16 - 8)
+			end
 		end
 		local t0 = os.clock()
 		for i = 1, 1200 do
@@ -487,6 +647,7 @@ for _, id in Tables.IDS do
 		)} s, {tbl.c.nSeg} wall pieces, {tbl.c.nCir} posts and bumpers`
 	)
 	surveyReport(tbl)
+	lanesReport(tbl)
 	flipperReport(tbl)
 	shotsReport(tbl)
 	if ONLY_SHOTS then

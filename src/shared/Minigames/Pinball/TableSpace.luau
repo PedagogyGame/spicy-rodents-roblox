@@ -6,7 +6,8 @@
 -- three-ball multiball. Scores run to the millions.
 -- The playfield: the orbit lane inside both rails and under the arch; inside it the asteroid field of three
 -- pop bumpers, reached up the middle or through the docking gap top right (a soft plunge falls through it:
--- the skill shot); the two ramps; a lock pod beside each ramp; F-U and E-L standup targets on the rails.
+-- the skill shot); the two ramps; a lock pod beside each ramp; the F-U-E-L standup targets at the corners of
+-- the two ramp mouths; a ball guide on each rail that turns the orbit's return into the inlane.
 -- The rule sheet (one goal: LIFTOFF):
 --   * F-U-E-L lights the locks. A ball shot into a lit pod stays there and a new ball comes to the plunger.
 --   * With both pods full, either ramp starts the countdown: 3, 2, 1, LIFTOFF, both pods fire and three balls
@@ -34,15 +35,15 @@ def.plunger.vMin = 4.7
 def.plunger.vMax = 9.2
 
 Layout.addShell(def)
-Layout.addBottom(def, { gap = 0.22, outlane = 0.19, inlane = 0.215, pivotY = 0.62 })
+Layout.addBottom(def, { gap = 0.22, outlane = 0.19, inlane = 0.215, pivotY = 0.62, lead = 0.17 })
 
 local XC = Layout.XC
 local X1 = Layout.FIELD_X1
 local function mx(x: number): number
 	return 2 * XC - x
 end
-local POD_SPEED = 6.6 -- a ball crossing a pod's hole faster than this skips over it
-local RAMP_MOUTH = 0.16 -- half the width of a ramp's mouth
+local POD_SPEED = 10 -- a ball crossing a pod's hole faster than this skips over it
+local RAMP_MOUTH = 0.18 -- half the width of a ramp's mouth
 
 -- The orbit's inner guide: round under the arch, with the docking gap top right. Its two lower ends are laid
 -- further down, once the ramps stand (each runs down to the back of a ramp).
@@ -63,9 +64,11 @@ Layout.lamp(def, "orbit_l", 0.11, 2.45, "blue")
 Layout.lamp(def, "orbit_r", X1 - 0.11, 2.45, "blue")
 
 -- the asteroid field
-table.insert(def.bumpers, { id = "bumper_1", x = 0.84, y = 3.98, r = 0.11 })
-table.insert(def.bumpers, { id = "bumper_2", x = 1.375, y = 3.98, r = 0.11 })
-table.insert(def.bumpers, { id = "bumper_3", x = XC, y = 3.56, r = 0.11 })
+-- (the lowest one stands just above the throat between the two ramps, so a ball shot up the middle meets it
+-- at once and anything that comes down out of the field is batted about on its way)
+table.insert(def.bumpers, { id = "bumper_1", x = 0.85, y = 3.66, r = 0.11 })
+table.insert(def.bumpers, { id = "bumper_2", x = 1.365, y = 3.66, r = 0.11 })
+table.insert(def.bumpers, { id = "bumper_3", x = XC, y = 3.2, r = 0.11 })
 for i, b in def.bumpers do
 	Layout.lamp(def, `bumper_{i}`, b.x, b.y, "blue")
 end
@@ -74,11 +77,11 @@ end
 do
 	local lx, ly = Layout.inlaneDrop(def, "left")
 	local pts = {
-		0.75,
-		2.62,
+		0.765,
+		2.55,
 		0,
-		0.58,
-		3.32,
+		0.6,
+		3.3,
 		0.25,
 		0.44,
 		3.62,
@@ -120,16 +123,32 @@ do
 	-- down the table, between the ramp and the way up the middle
 	do
 		local cx, cy = body[7], body[8]
-		local x1, y1, x2, y2 = cx - 0.01, cy - 0.045, cx + 0.1, cy - 0.095
+		local x1, y1, x2, y2 = cx - 0.005, cy - 0.04, cx + 0.075, cy - 0.076
 		table.insert(def.targets, { id = "fuel_f", kind = "standup", x1 = x1, y1 = y1, x2 = x2, y2 = y2 })
 		table.insert(def.targets, { id = "fuel_l", kind = "standup", x1 = mx(x2), y1 = y2, x2 = mx(x1), y2 = y1 })
-		local back = { cx, cy, cx + 0.105, cy - 0.085 }
+		-- (its back runs up to the ramp's inner flank; the way up the middle between F and L stays a ball and
+		-- a half wide)
+		local back = { x2, y2, body[5], body[6] }
 		Layout.wall(def, "plastic", back)
 		Layout.wall(def, "plastic", Layout.mirror(back))
-		Layout.post(def, cx + 0.105, cy - 0.09, 0.02)
-		Layout.post(def, mx(cx + 0.105), cy - 0.09, 0.02)
 		Layout.lamp(def, "fuel_f", (x1 + x2) / 2, y2 - 0.1, "yellow")
 		Layout.lamp(def, "fuel_l", mx((x1 + x2) / 2), y2 - 0.1, "yellow")
+	end
+
+	-- U stands at the outer corner of the left ramp's mouth and E at the right ramp's, each turned to face the
+	-- flipper across the table: a late shot, between the ramp and the far orbit lane. (They are off the rails,
+	-- so a ball that comes down a rail out of the orbit has a clear run to the ball guide and the inlane.)
+	do
+		local ox, oy = body[1], body[2]
+		local x1, y1, x2, y2 = ox - 0.125, oy - 0.07, ox - 0.005, oy - 0.022
+		table.insert(def.targets, { id = "fuel_u", kind = "standup", x1 = x1, y1 = y1, x2 = x2, y2 = y2 })
+		table.insert(def.targets, { id = "fuel_e", kind = "standup", x1 = mx(x2), y1 = y2, x2 = mx(x1), y2 = y1 })
+		-- its back runs up to the ramp's flank, so nothing gets behind it
+		local back = { x1, y1, body[3], body[4] }
+		Layout.wall(def, "plastic", back)
+		Layout.wall(def, "plastic", Layout.mirror(back))
+		Layout.lamp(def, "fuel_u", (x1 + x2) / 2 + 0.03, y1 - 0.1, "yellow")
+		Layout.lamp(def, "fuel_e", mx((x1 + x2) / 2 + 0.03), y1 - 0.1, "yellow")
 	end
 
 	-- The orbit lanes. Everything outside a ramp is the way into the orbit: the inner guide runs from the back
@@ -157,44 +176,44 @@ do
 	table.insert(def.sensors, { id = "orbit_l", kind = "rollover", x1 = 0, y1 = SY, x2 = gx, y2 = SY })
 	table.insert(def.sensors, { id = "orbit_r", kind = "rollover", x1 = mx(gx), y1 = SY, x2 = X1, y2 = SY })
 
-	-- The lock pods: a kick-out hole in the floor of each orbit lane's mouth. A ball that comes up the lane
-	-- slowly drops in; a fast one skips over the hole and goes round the orbit. So the same lane is two shots,
-	-- told apart by how hard it is hit: an early, soft backhand for the pod, a later, harder one for the orbit.
-	local PX, PY = 0.27, 2.78
-	table.insert(
-		def.saucers,
-		{ id = "pod_1", x = PX, y = PY, r = 0.085, maxSpeed = POD_SPEED, vx = 0.45, vy = -1.2, holdTicks = 240 }
-	)
-	table.insert(
-		def.saucers,
-		{ id = "pod_2", x = mx(PX), y = PY, r = 0.085, maxSpeed = POD_SPEED, vx = -0.45, vy = -1.2, holdTicks = 240 }
-	)
+	-- The lock pods: a scoop in the floor of each orbit lane's mouth, its hood toward the top of the table. A
+	-- ball that comes up the lane slowly drops in; a fast one skips over it and goes round the orbit; one that
+	-- comes DOWN the lane out of the orbit rides over the hood, so the orbit's return is never swallowed. So
+	-- the flipper's own side is three shots, told apart by timing: the earliest, softest backhand for the
+	-- pod, a later, harder one for the orbit, and the latest and hardest for the standup at the ramp's corner.
+	local PX, PY = 0.17, 2.72
+	table.insert(def.saucers, {
+		id = "pod_1",
+		x = PX,
+		y = PY,
+		r = 0.085,
+		maxSpeed = POD_SPEED,
+		vx = 0.3,
+		vy = -1.2,
+		holdTicks = 240,
+		ax = 0,
+		ay = 1,
+	})
+	table.insert(def.saucers, {
+		id = "pod_2",
+		x = mx(PX),
+		y = PY,
+		r = 0.085,
+		maxSpeed = POD_SPEED,
+		vx = -0.3,
+		vy = -1.2,
+		holdTicks = 240,
+		ax = 0,
+		ay = 1,
+	})
 end
-Layout.lamp(def, "pod_1", 0.27, 2.6, "green")
-Layout.lamp(def, "pod_2", mx(0.27), 2.6, "green")
-Layout.lamp(def, "extra_ball", 0.46, 2.48, "red")
+Layout.lamp(def, "pod_1", 0.17, 2.54, "green")
+Layout.lamp(def, "pod_2", mx(0.17), 2.54, "green")
+Layout.lamp(def, "extra_ball", 0.3, 2.4, "red")
 
--- F-U-E-L: U on the left rail and E on the right (each flipper's own soft backhand); F and L stand at the
--- inner corners of the two ramp mouths (laid with the ramps, above)
-do
-	-- (the bump stands far enough out of the rail to be in the path of the soft backhand: a ball flipped as it
-	-- starts to roll off the cradle; a harder one passes inside it to the pod and the orbit)
-	local UX1, UY1, UX2, UY2 = 0.1, 2.14, 0.2, 2.34
-	table.insert(def.targets, { id = "fuel_u", kind = "standup", x1 = UX1, y1 = UY1, x2 = UX2, y2 = UY2 })
-	Layout.lamp(def, "fuel_u", UX2 + 0.1, UY1 + 0.03, "yellow")
-	Layout.wall(def, "wood", { 0.0, UY1 - 0.08, UX1, UY1 })
-	Layout.wall(def, "wood", { UX2, UY2, 0.0, UY2 + 0.28 })
-	table.insert(def.targets, { id = "fuel_e", kind = "standup", x1 = X1 - UX2, y1 = UY2, x2 = X1 - UX1, y2 = UY1 })
-	Layout.lamp(def, "fuel_e", X1 - UX2 - 0.1, UY1 + 0.03, "yellow")
-	Layout.wall(def, "wood", { X1, UY1 - 0.08, X1 - UX1, UY1 })
-	Layout.wall(def, "wood", { X1 - UX2, UY2, X1, UY2 + 0.28 })
-end
-
--- a kink in each rail above the outlanes leans a ball coming down out of the orbit toward the inlane
-Layout.wall(def, "wood", { 0.0, 1.92, 0.15, 1.66 })
-Layout.wall(def, "wood", { X1, 1.92, X1 - 0.15, 1.66 })
-Layout.post(def, 0.15, 1.66)
-Layout.post(def, X1 - 0.15, 1.66)
+-- a ball guide on each rail turns a ball coming down out of the orbit into the inlane, so the orbit feeds the
+-- flipper on the far side and the table flows
+Layout.railGuide(def, { 0.0, 2.5, 0.165, 1.68 })
 
 for i = 1, 3 do
 	Layout.lamp(def, `count_{i}`, XC - 0.4 + 0.2 * i, 2.1, "red")
@@ -320,7 +339,7 @@ end
 local sheet: Machine.Sheet = {
 	saveTicks = 2160, -- nine seconds
 	maxScorePerSec = 600000,
-	scoreScale = "a good game is 1,500,000; ten million is a great one",
+	scoreScale = "a good game is 2,000,000; twenty million is a great one",
 	text = {
 		[101] = "DOCKED! SKILL SHOT",
 		[102] = "F-U-E-L! THE LOCKS ARE LIT",

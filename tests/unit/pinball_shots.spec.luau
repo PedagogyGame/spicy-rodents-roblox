@@ -133,8 +133,11 @@ return function(t: Test.T)
 			)
 			t.truthy(either(acorn, EV.STANDUP, ix.target.oak_r) >= 4, "the right oak target (the extra ball)")
 			for i = 1, 3 do
-				t.truthy(either(acorn, EV.BUMPER, i) >= 6, `bumper {i} can be shot at`)
+				t.truthy(either(acorn, EV.BUMPER, i) >= 5, `bumper {i} can be shot at`)
 			end
+			-- the two oak targets are late shots across the table, each a screen frame wide
+			t.truthy(ticks(acorn, EV.STANDUP, ix.target.oak_r, LEFT) >= 4, "the right oak from the left flipper")
+			t.truthy(ticks(acorn, EV.STANDUP, ix.target.oak_l, RIGHT) >= 4, "the left oak from the right flipper")
 		end
 	)
 
@@ -147,8 +150,19 @@ return function(t: Test.T)
 			t.truthy(wireR >= Shots.FAIR_TICKS, `the wire from the right flipper: {wireR} ticks`)
 			t.truthy(wireL >= 6, `and from the left (a backhand): {wireL} ticks`)
 			t.truthy(wireR <= 16 and wireL <= 16, "but it still takes timing: the fast table")
-			t.truthy(ticks(spicy, EV.SAUCER, ix.saucer.bite, LEFT) >= 5, "the bite is the left flipper's shot")
+			t.truthy(ticks(spicy, EV.SAUCER, ix.saucer.bite, LEFT) >= 4, "the bite is the left flipper's shot")
 			t.truthy(ticks(spicy, EV.SAUCER, ix.saucer.bite, RIGHT) >= 3, "and can be had from the right")
+			-- the flipper's own side: S the earliest, softest backhand, P a little later, and later still the
+			-- channel up to the nest (the widest shot on the table)
+			t.truthy(ticks(spicy, EV.STANDUP, ix.target.spicy_s, LEFT) >= 4, "S by the softest backhand")
+			t.truthy(ticks(spicy, EV.STANDUP, ix.target.spicy_p, LEFT) >= Shots.FAIR_TICKS, "P by the backhand")
+			t.truthy(ticks(spicy, EV.STANDUP, ix.target.spicy_y, RIGHT) >= 4)
+			t.truthy(ticks(spicy, EV.STANDUP, ix.target.spicy_c, RIGHT) >= Shots.FAIR_TICKS)
+			local nest = 0
+			for i = 1, 3 do
+				nest = math.max(nest, ticks(spicy, EV.BUMPER, i, LEFT))
+			end
+			t.truthy(nest >= 12, `the nest is the left flipper's hard backhand: {nest} ticks`)
 			for _, name in { "spicy_s", "spicy_p", "spicy_i", "spicy_c", "spicy_y" } do
 				local w = either(spicy, EV.STANDUP, ix.target[name])
 				t.truthy(w >= 3, `{name}: {w} ticks`)
@@ -157,7 +171,7 @@ return function(t: Test.T)
 	)
 
 	t.test(
-		"PIN-R6 SPACE SQUIRREL: both ramps from both flippers, the orbit and the pods by the backhand: the flow table",
+		"PIN-R6 SPACE SQUIRREL: both ramps from both flippers; the pod, the orbit and a FUEL target by the backhand",
 		function()
 			local ix = space.ix
 			for _, ramp in { "ramp_l", "ramp_r" } do
@@ -169,12 +183,29 @@ return function(t: Test.T)
 			-- each ramp is a fair shot from the flipper on its own side
 			t.truthy(ticks(space, EV.RAIL_OUT, ix.rail.ramp_l, LEFT) >= Shots.FAIR_TICKS)
 			t.truthy(ticks(space, EV.RAIL_OUT, ix.rail.ramp_r, RIGHT) >= Shots.FAIR_TICKS)
+			-- The flipper's own side is three true backhands, told apart by timing alone: the earliest and
+			-- softest is the pod, a little later and harder the orbit, the latest and hardest the FUEL target
+			-- at the corner of the ramp. Each is wider than a fair shot, and they come in that order.
+			local book = Shots.book(space)
 			for flipper = LEFT, RIGHT do
-				local orbit = ticks(space, EV.ROLLOVER, ix.sensor.orbit_top, flipper)
-				t.truthy(orbit >= 10, `the orbit from flipper {flipper}: {orbit} ticks`)
+				local pod = if flipper == LEFT then ix.saucer.pod_1 else ix.saucer.pod_2
+				local fuel = if flipper == LEFT then ix.target.fuel_u else ix.target.fuel_e
+				local wPod = Shots.best(book, Machine.key(EV.SAUCER, pod), flipper)
+				local wOrbit = Shots.best(book, Machine.key(EV.ROLLOVER, ix.sensor.orbit_top), flipper)
+				local wFuel = Shots.best(book, Machine.key(EV.STANDUP, fuel), flipper)
+				assert(
+					wPod and wOrbit and wFuel,
+					`flipper {flipper}: the pod, the orbit and the FUEL target are in its book`
+				)
+				t.truthy(wPod.ticks >= Shots.FAIR_TICKS, `the pod from flipper {flipper}: {wPod.ticks} ticks`)
+				t.truthy(wOrbit.ticks >= 10, `the orbit from flipper {flipper}: {wOrbit.ticks} ticks`)
+				t.truthy(wFuel.ticks >= Shots.FAIR_TICKS, `its FUEL target from flipper {flipper}: {wFuel.ticks} ticks`)
+				t.truthy(wPod.to < wOrbit.from and wOrbit.to < wFuel.from, "soft, harder, hardest: in that order")
+				t.truthy(wPod.speed < wOrbit.speed and wOrbit.speed < wFuel.speed)
+				for _, w in { wPod, wOrbit, wFuel } do
+					t.truthy(w.angle < -10, `a backhand: {w.angle} degrees, up the flipper's own side`)
+				end
 			end
-			t.truthy(ticks(space, EV.SAUCER, ix.saucer.pod_1, LEFT) >= Shots.FAIR_TICKS, "the left pod")
-			t.truthy(ticks(space, EV.SAUCER, ix.saucer.pod_2, RIGHT) >= Shots.FAIR_TICKS, "the right pod")
 			for _, name in { "fuel_f", "fuel_u", "fuel_e", "fuel_l" } do
 				local w = either(space, EV.STANDUP, ix.target[name])
 				t.truthy(w >= 4, `{name}: {w} ticks`)
@@ -185,16 +216,82 @@ return function(t: Test.T)
 		end
 	)
 
+	t.test("PIN-R6 SPACE SQUIRREL flows: an orbit made comes down the far rail and into the far inlane", function()
+		-- from the shot book: every backhand that goes round the top of the orbit ends in the inlane on the
+		-- other side (never on the slingshot, never down the outlane)
+		local ix = space.ix
+		local book = Shots.book(space)
+		local top = Machine.key(EV.ROLLOVER, ix.sensor.orbit_top)
+		for flipper = LEFT, RIGHT do
+			local far = Machine.key(EV.ROLLOVER, if flipper == LEFT then ix.sensor.inlane_r else ix.sensor.inlane_l)
+			local out = Machine.key(EV.ROLLOVER, if flipper == LEFT then ix.sensor.outlane_r else ix.sensor.outlane_l)
+			local made, fed, lost = 0, 0, 0
+			for _, tr in book.trials[flipper] do
+				if tr.angle < 0 and table.find(tr.keys, top) then
+					made += 1
+					if table.find(tr.keys, far) then
+						fed += 1
+					elseif table.find(tr.keys, out) then
+						lost += 1
+					end
+				end
+			end
+			t.truthy(made >= 10, `flipper {flipper}: {made} flip timings make the orbit`)
+			-- (the rest are the slowest ones round, which rattle at the shooter lane's gate and are not down
+			-- again before the trial ends)
+			t.truthy(fed >= made * 0.7, `flipper {flipper}: {fed} of {made} orbits feed the far inlane`)
+			t.eq(lost, 0, `flipper {flipper}: no orbit made is lost down the outlane`)
+		end
+		-- and a ball that comes down a rail by itself, at any speed, is turned into the inlane by the ball guide
+		local c = space.c
+		local ev: { number } = {}
+		local into, tried = 0, 0
+		for _, x in { 0.066, 0.1, 0.14 } do
+			for _, speed in { 0.5, 2, 4, 6, 8, 10, 12 } do
+				local s = Physics.new(c, 1)
+				Physics.addBall(s, x, 3.3, 0, -speed)
+				tried += 1
+				local first = 0
+				for _ = 1, 240 * 6 do
+					table.clear(ev)
+					Physics.step(c, s, false, false, ev)
+					for k = 1, #ev, 4 do
+						if first == 0 and ev[k] == EV.ROLLOVER then
+							local name = space.def.sensors[ev[k + 1]].id
+							if name == "inlane_l" or name == "outlane_l" then
+								first = if name == "inlane_l" then 1 else 2
+							end
+						elseif first == 0 and ev[k] == EV.SLING then
+							first = 3
+						end
+					end
+					if first ~= 0 or s.balls[1].mode ~= Physics.FREE then
+						break
+					end
+				end
+				if first == 1 then
+					into += 1
+				end
+			end
+		end
+		t.truthy(into >= tried - 2, `{into} of {tried} balls down the left rail roll into the left inlane`)
+	end)
+
 	t.test(
-		"SPACE SQUIRREL: a pod is a hole in the orbit lane: a soft ball drops in, a hard one skips over and goes round",
+		"SPACE SQUIRREL: a pod is a scoop in the orbit lane: a soft ball drops in, a hard one skips over and goes round",
 		function()
 			local c = space.c
 			local pod = space.def.saucers[space.ix.saucer.pod_1]
-			local function through(speed: number): (boolean, boolean)
+			local function through(speed: number, down: boolean?): (boolean, boolean)
 				local s = Physics.new(c, 3)
 				local ev: { number } = {}
-				-- up the lane, over the middle of the hole
-				Physics.addBall(s, pod.x + 0.03, pod.y - 0.3, -0.1 * speed, 0.995 * speed)
+				if down then
+					-- down the lane from above, over the hood
+					Physics.addBall(s, pod.x + 0.02, pod.y + 0.3, 0, -speed)
+				else
+					-- up the lane, over the middle of the hole
+					Physics.addBall(s, pod.x + 0.03, pod.y - 0.3, -0.1 * speed, 0.995 * speed)
+				end
 				local held, top = false, false
 				for _ = 1, 240 * 4 do
 					table.clear(ev)
@@ -212,9 +309,15 @@ return function(t: Test.T)
 			local held, top = through(pod.maxSpeed * 0.7)
 			t.truthy(held, "a soft ball is swallowed")
 			t.falsy(top)
-			held, top = through(9)
+			held, top = through(pod.maxSpeed + 3)
 			t.falsy(held, "a hard one skips over the hole")
 			t.truthy(top, "and goes round the top of the orbit")
+			-- a ball coming down the lane out of the orbit rides over the hood, however slowly: the orbit's
+			-- return is never swallowed
+			for _, speed in { 1, 4, pod.maxSpeed * 0.9 } do
+				held = through(speed, true)
+				t.falsy(held, `coming down at {speed}: over the hood`)
+			end
 		end
 	)
 

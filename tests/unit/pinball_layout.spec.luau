@@ -7,6 +7,8 @@
 local Det = require("@shared/Minigames/Pinball/Det")
 local Layout = require("@shared/Minigames/Pinball/Layout")
 local Machine = require("@shared/Minigames/Pinball/Machine")
+local Physics = require("@shared/Minigames/Pinball/Physics")
+local Survey = require("@shared/Minigames/Pinball/Survey")
 local Tables = require("@shared/Minigames/Pinball/Tables")
 local Test = require("../lib/Test")
 
@@ -121,6 +123,56 @@ return function(t: Test.T)
 				t.truthy(out.x2 - out.x1 > 2 * Layout.BALL_R, "outlane width")
 				t.truthy(tbl.ix.lamp.shoot_again, "a shoot-again lamp")
 				t.truthy(tbl.ix.lamp.extra_ball, "an extra-ball lamp")
+			end
+		)
+
+		t.test(
+			`{def.title}: its lanes are lanes a ball rolls into: 1.3 balls across at the least, all the way in`,
+			function()
+				t.eq(Layout.LANE_MIN, 1.3)
+				t.eq(#def.lanes, 4, "two inlanes and two outlanes")
+				for _, lane in def.lanes do
+					local width = Layout.laneWidth(def, lane)
+					t.truthy(width >= 1.35, `{lane.id} is {width} balls across at its narrowest`)
+					t.truthy(
+						lane.mouth >= 1.4 * 2 * Layout.BALL_R,
+						`{lane.id}: the mouth is {lane.mouth / 0.125} balls`
+					)
+					t.truthy(tbl.ix.sensor[lane.id], `{lane.id} has its switch`)
+					-- a ball falling at 2 studs/s let go just above the mouth, at every hundredth of a stud across
+					-- it: it goes in from more than half of them (at one ball across it went in from one in forty)
+					local sensor = tbl.ix.sensor[lane.id]
+					local got, tried = 0, 0
+					local ev: { number } = {}
+					local off = -lane.mouth / 2
+					while off <= lane.mouth / 2 + 1e-9 do
+						local x, y = lane.mx + off, lane.my + 0.11
+						off += 0.01
+						if not Survey.free(tbl, x, y) then
+							continue
+						end
+						tried += 1
+						local s = Physics.new(tbl.c, 1)
+						Physics.addBall(s, x, y, 0, -2)
+						local done = false
+						for _ = 1, 240 * 3 do
+							table.clear(ev)
+							Physics.step(tbl.c, s, false, false, ev)
+							for k = 1, #ev, 4 do
+								if ev[k] == Physics.EV.ROLLOVER and ev[k + 1] == sensor then
+									got += 1
+									done = true
+									break
+								end
+							end
+							if done or s.balls[1].mode ~= Physics.FREE then
+								break
+							end
+						end
+					end
+					t.truthy(tried >= 8, `{lane.id}: {tried} places across the mouth`)
+					t.truthy(got * 2 > tried, `{lane.id}: a falling ball goes in from {got} of {tried} places`)
+				end
 			end
 		)
 
@@ -242,4 +294,38 @@ return function(t: Test.T)
 		t.truthy(s.sheet.maxScorePerSec * 2 < p.sheet.maxScorePerSec)
 		t.neq(a.sheet.saveTicks, s.sheet.saveTicks)
 	end)
+	t.test(
+		"Layout.check refuses a lane a ball would rattle in: a mouth under 1.3 balls, or one that is shut",
+		function()
+			local function bottom(outlane: number, inlane: number): Layout.TableDef
+				local def = Layout.new("lanes", "LANES")
+				Layout.addShell(def)
+				Layout.addBottom(def, { gap = 0.2, outlane = outlane, inlane = inlane, pivotY = 0.62 })
+				return def
+			end
+			local good = bottom(0.19, 0.22)
+			local ok, why = Layout.check(good)
+			t.truthy(ok, why)
+			-- the inlane as it was first built: 0.17 between the divider and the slingshot, a mouth of one ball
+			local narrow = bottom(0.19, 0.17)
+			ok, why = Layout.check(narrow)
+			t.falsy(ok)
+			t.truthy(why and string.find(why, "inlane_l", 1, true), why)
+			t.truthy(why and string.find(why, "under 1.3 ball diameters", 1, true), why)
+			t.truthy(Layout.laneWidth(narrow, narrow.lanes[2]) < 1.3)
+			-- and the outlane
+			ok, why = Layout.check(bottom(0.16, 0.22))
+			t.falsy(ok)
+			t.truthy(why and string.find(why, "outlane_l", 1, true), why)
+			-- a post stood in a good lane's mouth shuts it for a ball of 1.3
+			local lane = good.lanes[2]
+			Layout.post(good, lane.mx, lane.my, 0.03)
+			ok, why = Layout.check(good)
+			t.falsy(ok)
+			t.truthy(why and string.find(why, "inlane_l", 1, true), why)
+			-- the width is the narrowest of the whole way in, in ball diameters
+			local wide = bottom(0.25, 0.3)
+			t.truthy(Layout.laneWidth(wide, wide.lanes[1]) > Layout.laneWidth(bottom(0.19, 0.3), wide.lanes[1]))
+		end
+	)
 end

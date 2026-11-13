@@ -18,7 +18,7 @@
 -- Interface: WIDTH, LENGTH, BALL_R, FIELD_X1, XC, TILT_RAD; MATERIALS; new(id, title) -> TableDef;
 --   arc(cx, cy, r, deg0, deg1, n) -> pts; mirror(pts, xc?) -> pts; wall, post, endPost, lamp, cup; addShell (rails, arch,
 --   shooter lane), addBottom (the flippers, slings, inlanes and outlanes every table shares, from a few
---   numbers); index(def) -> Index (element numbers by id); compile(def) -> Compiled; check(def) -> (ok, why?);
+--   numbers), railGuide (the curved guide on each rail that feeds the inlane); index(def) -> Index (element numbers by id); compile(def) -> Compiled; check(def) -> (ok, why?);
 --   LANE_MIN (the least a lane may be across, in ball diameters) and laneWidth(def, lane) -> ball diameters
 --   (the widest ball that could roll from above the lane's mouth down to its switch);
 --   cabinetPoint(x, y, h) -> (across, up, along) for the bake and the client
@@ -80,6 +80,10 @@ export type Saucer = {
 	vx: number, -- the kick-out
 	vy: number,
 	holdTicks: number,
+	-- a scoop (a hole under a hood): only a ball moving this way falls in (ax, ay: a direction; a ball whose
+	-- velocity has no part along it rides over the hood). Without them the hole takes a ball from any side
+	ax: number?,
+	ay: number?,
 }
 export type Rail = {
 	id: string,
@@ -118,6 +122,7 @@ export type TableDef = {
 	title: string,
 	gravity: number, -- studs/s^2 down the table (slope and rolling already in it)
 	slopeDeg: number, -- what that gravity stands for, for the record
+	kick: number, -- how hard this machine's bumpers and slingshots kick, as a share of Physics.BUMPER_KICK and SLING_KICK (1: the standard coils; an old electro-mechanical table's are weaker, a fast table's stronger)
 	drainY: number, -- a ball whose centre is below this is gone
 	walls: { Wall },
 	posts: { Post },
@@ -163,6 +168,7 @@ Layout.SEN_RAIL = 3
 export type Compiled = {
 	def: TableDef,
 	gravity: number,
+	kick: number,
 	drainY: number,
 	-- segments
 	nSeg: number,
@@ -241,6 +247,7 @@ function Layout.new(id: string, title: string): TableDef
 		title = title,
 		gravity = 3.64,
 		slopeDeg = 6.5,
+		kick = 1,
 		drainY = 0.12,
 		walls = {},
 		posts = {},
@@ -402,6 +409,12 @@ export type BottomSpec = {
 	up: number?,
 	chan: number?, -- the inlane's channel under the slingshot, measured straight up (default 0.225)
 	foot: number?, -- how far the slingshot's lower corner stands from the flipper's pivot (default 0.08)
+	-- a lead-in on the inlane's inner side: a short metal guide standing straight up from the slingshot's top
+	-- corner, this tall (the slingshot's back carried on upward), so that with the table's railGuide the mouth
+	-- is a funnel: a ball that comes off the rail guide at speed is stopped dead and drops into the lane, where
+	-- it would have bounced off the corner post and across the table. (Straight up, it stands clear of the
+	-- flipper's own backhand, which passes just inside it.)
+	lead: number?,
 }
 
 -- The bottom of the table every machine shares in shape: two flippers, a slingshot above each, an inlane that
@@ -475,9 +488,21 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	-- the divider's rounded top (a ball that lands on it falls to one side or the other)
 	Layout.post(def, xo, divTop, cap, "metal")
 	Layout.post(def, 2 * XC - xo, divTop, cap, "metal")
-	for _, p in { { ax, ay }, { bx, by }, { cxs, cys } } do
-		Layout.post(def, p[1], p[2], 0.022, "rubber")
-		Layout.post(def, 2 * XC - p[1], p[2], 0.022, "rubber")
+	local lead = spec.lead or 0
+	for i, p in { { ax, ay }, { bx, by }, { cxs, cys } } do
+		-- (with a lead-in the slingshot's top corner is in the middle of a straight guide: no post there, or
+		-- its rubber would throw a ball that has come down the lane's mouth back out over the divider)
+		if i > 1 or lead <= 0 then
+			Layout.post(def, p[1], p[2], 0.022, "rubber")
+			Layout.post(def, 2 * XC - p[1], p[2], 0.022, "rubber")
+		end
+	end
+	if lead > 0 then
+		local tx, ty = ax, ay + lead
+		Layout.wall(def, "metal", { ax, ay, tx, ty })
+		Layout.wall(def, "metal", { 2 * XC - ax, ay, 2 * XC - tx, ty })
+		Layout.post(def, tx, ty, cap, "metal")
+		Layout.post(def, 2 * XC - tx, ty, cap, "metal")
 	end
 	table.insert(def.slings, { id = "sling_l", x1 = ax, y1 = ay, x2 = cxs, y2 = cys })
 	table.insert(def.slings, { id = "sling_r", x1 = 2 * XC - ax, y1 = ay, x2 = 2 * XC - cxs, y2 = cys })
@@ -489,7 +514,8 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	table.insert(def.sensors, { id = "inlane_r", kind = "rollover", x1 = X1 - xi, y1 = sy, x2 = X1 - xo, y2 = sy })
 	-- the four lanes, each from the open middle of the table above the slingshots to a spot on its switch
 	local openY = ay + 0.3
-	local inX, inW = (xo + cap + xi - 0.022) / 2, xi - 0.022 - xo - cap
+	local corner = if lead > 0 then 0 else 0.022
+	local inX, inW = (xo + cap + xi - corner) / 2, xi - corner - xo - cap
 	local outX, outW = (xo - cap) / 2, xo - cap
 	local function lane(name: string, toX: number, mouthX: number, mouthY: number, width: number)
 		table.insert(
@@ -501,6 +527,27 @@ function Layout.addBottom(def: TableDef, spec: BottomSpec)
 	lane("inlane_l", (xo + xi) / 2, inX, math.max(divTop, ay), inW)
 	lane("outlane_r", X1 - outX, X1 - outX, divTop, outW)
 	lane("inlane_r", X1 - (xo + xi) / 2, X1 - inX, math.max(divTop, ay), inW)
+end
+
+-- railGuide(def, pts): a ball guide on each side rail above the lanes (pts: x, y pairs for the left one, from
+-- the rail down and inward; the right one is its mirror). It is a curve of metal, dead and smooth, so a ball
+-- that comes down the rail (out of an orbit, off a bumper) is turned by a few degrees at each piece and leaves
+-- its end still running, aimed into the inlane's mouth; one that only dribbles down it drops off the end onto
+-- the lane divider and may fall either way. The end is capped like the divider (CAP_R).
+function Layout.railGuide(def: TableDef, pts: { number })
+	Layout.wall(def, "metal", pts)
+	Layout.wall(def, "metal", Layout.mirror(pts, Layout.FIELD_X1 / 2))
+	local n = #pts
+	Layout.endPost(def, pts[n - 1], pts[n], pts[n - 3], pts[n - 2], Layout.CAP_R, "metal")
+	Layout.endPost(
+		def,
+		Layout.FIELD_X1 - pts[n - 1],
+		pts[n],
+		Layout.FIELD_X1 - pts[n - 3],
+		pts[n - 2],
+		Layout.CAP_R,
+		"metal"
+	)
 end
 
 -- addRamp(def, rail): a ramp is a rail (the ball's path, up off the playfield) plus what stands on the playfield
@@ -560,6 +607,7 @@ function Layout.compile(def: TableDef): Compiled
 	local c: Compiled = {
 		def = def,
 		gravity = def.gravity,
+		kick = def.kick,
 		drainY = def.drainY,
 		nSeg = 0,
 		sx = {},
@@ -1018,6 +1066,9 @@ function Layout.check(def: TableDef): (boolean, string?)
 	end
 	if not (def.gravity > 0) then
 		return false, "gravity"
+	end
+	if not (def.kick >= 0.5 and def.kick <= 1.5) then
+		return false, "kick"
 	end
 	return true
 end

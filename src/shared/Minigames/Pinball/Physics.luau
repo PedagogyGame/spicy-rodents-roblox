@@ -32,7 +32,7 @@
 --     ball.
 --   * Ramps are rails: a ball that enters the mouth fast enough rides the rail, loses speed climbing (height
 --     costs GRAVITY_H per stud) and rolls back out if it stalls. A kick-out hole swallows a slow ball and
---     throws it back out. A spinner turns as fast as the ball went through it and runs down by itself.
+--     throws it back out (a scoop, a hole under a hood, only one that is moving into its mouth). A spinner turns as fast as the ball went through it and runs down by itself.
 --
 -- State is plain data (numbers, booleans, arrays): step() reads the state and the two flipper buttons, writes
 -- the state, and appends what happened to an event list (four numbers per event: code, ref, value, ball).
@@ -72,7 +72,7 @@ Physics.FLIP_BOUNCE_MIN = 2 -- rad/s: slower than this it simply stops
 Physics.FLIP_E = 0.55 -- flipper rubber
 Physics.FLIP_BAT = 0.12 -- the bat's moment of inertia about its pivot, in ball masses times its length squared (a real bat and its link against a real ball): what a ball meets when the flipper is off its stop with only the hold winding on
 Physics.FLIP_MU = 0.2 -- flipper rubber grips: with none the ball is slung off the tip from anywhere, with too much every shot leaves square to the flipper; this spreads the shots along its length (tools/games/pinball/calibrate.luau)
-Physics.BUMPER_KICK = 9 -- studs/s the ring adds outward, on top of the ball's own rebound off the body (three quarters of a full flip)
+Physics.BUMPER_KICK = 9 -- studs/s the ring adds outward, on top of the ball's own rebound off the body (half the tip's speed, more than a soft flip); times the table's own kick (Layout.TableDef.kick)
 Physics.BUMPER_MIN = 0.3 -- the skirt needs this much of a touch to fire
 Physics.BUMPER_E = 0.5 -- a dead bumper (tilt, or too soft a touch) is a rubber post
 Physics.SLING_KICK = 8 -- studs/s the kicker arm adds, on top of the rebound off the rubber
@@ -531,7 +531,7 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 					e, mu = c.sE[id], c.sMu[id]
 					if kind == SEG_SLING then
 						if not s.dead and sp > Physics.SLING_MIN and bestT > 0.12 and bestT < 0.88 then
-							kick = Physics.SLING_KICK * (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
+							kick = Physics.SLING_KICK * c.kick * (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
 							emit(ev, EV.SLING, c.sRef[id], sp, bi)
 						end
 					elseif kind == SEG_DROP then
@@ -563,7 +563,9 @@ local function collide(c: Layout.Compiled, s: State, b: Ball, bi: number, ev: { 
 							-- rebound off the body, so a hard shot comes back harder than a touch
 							local vt = b.vy * nx - b.vx * ny
 							local out = Physics.BUMPER_E * sp
-								+ Physics.BUMPER_KICK * (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
+								+ Physics.BUMPER_KICK
+									* c.kick
+									* (1 + (Physics.rand(s) * 2 - 1) * Physics.KICK_JITTER)
 							b.vx = out * nx - vt * ny
 							b.vy = out * ny + vt * nx
 							continue
@@ -949,6 +951,11 @@ function Physics.step(c: Layout.Compiled, s: State, left: boolean, right: boolea
 									full = true
 									break
 								end
+							end
+							-- (a scoop takes only a ball that is moving into its mouth)
+							local ax, ay = sc.ax, sc.ay
+							if ax ~= nil and ay ~= nil and b.vx * ax + b.vy * ay <= 0 then
+								full = true
 							end
 							if not full and b.vx * b.vx + b.vy * b.vy < sc.maxSpeed * sc.maxSpeed then
 								b.mode = HELD

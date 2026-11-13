@@ -927,7 +927,8 @@ return function(t: Test.T)
 			table.clear(out2)
 			local pod = P.def.saucers[pix.saucer.pod_1]
 			local b = m2.phys.balls[1]
-			b.x, b.y, b.vx, b.vy, b.asleep = pod.x, pod.y + 0.3, 0, -1, false
+			-- (a pod is a scoop: its mouth is toward the flippers, so the dead ball is rolled up into it)
+			b.x, b.y, b.vx, b.vy, b.asleep = pod.x, pod.y - 0.25, 0, 3, false
 			local fell = false
 			for _ = 1, 200 do
 				Machine.step(P, m2, 0, out2)

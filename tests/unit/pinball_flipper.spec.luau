@@ -391,7 +391,10 @@ return function(t: Test.T)
 			for i, speed in speeds do
 				local surface = surfaces[i]
 				t.truthy(speed > surface * 1.2, `drop {i}: {speed} is well over the surface's own speed ({surface})`)
-				t.truthy(speed < (surface + 3) * (1 + Physics.FLIP_E) * 1.1, `drop {i}: {speed} off a surface at {surface}`)
+				t.truthy(
+					speed < (surface + 3) * (1 + Physics.FLIP_E) * 1.1,
+					`drop {i}: {speed} off a surface at {surface}`
+				)
 			end
 			-- the coil pulls all the way to the stop: a ball met later in the stroke is hit harder, never weaker
 			t.truthy(speeds[80] > speeds[1], `met later, hit harder ({speeds[1]} then {speeds[80]})`)
@@ -453,4 +456,133 @@ return function(t: Test.T)
 			end
 		end
 	)
+	t.test(
+		"PIN-P1: the coil pulls all the way to the top stop: an early flip goes well up the flipper's own side, with power",
+		function()
+			-- the flipper is still gaining speed when it meets its stop
+			local s = Physics.new(c, 1)
+			local ev: { number } = {}
+			local speeds: { number } = {}
+			while s.fa[LEFT] < c.fup[LEFT] and #speeds < 100 do
+				Physics.step(c, s, true, false, ev)
+				if s.fw[LEFT] > 0 then
+					table.insert(speeds, s.fw[LEFT])
+				end
+			end
+			t.truthy(#speeds >= 8, `a stroke of {#speeds} ticks`)
+			for i = 2, #speeds do
+				t.truthy(speeds[i] > speeds[i - 1], `tick {i}: still gaining speed ({speeds[i - 1]} then {speeds[i]})`)
+			end
+			t.truthy(speeds[#speeds] > 2 * speeds[#speeds // 2] * 0.85, "about twice as fast at the top as half way")
+			-- so a ball flipped from the inner third of the flipper takes most of its speed late, when the face is
+			-- turned toward the flipper's own side: a backhand, and not a weak one
+			local base = cradle(LEFT)
+			local inner = 0
+			local softest, hardest = math.huge, 0
+			for delay = 40, 200 do
+				local sh = shot(base, LEFT, delay)
+				if sh and sh.along >= 0.03 and sh.along <= 0.35 then
+					inner += 1
+					t.truthy(sh.angle < -13, `from {sh.along} of the flipper the ball leaves at {sh.angle} degrees`)
+					t.truthy(sh.angle > -25, `{sh.angle} degrees`)
+					t.truthy(sh.speed >= 8, `from {sh.along} it leaves at {sh.speed} studs/s`)
+					softest, hardest = math.min(softest, sh.speed), math.max(hardest, sh.speed)
+				end
+			end
+			t.truthy(inner >= 30, `{inner} flip timings on the inner third`)
+			-- the inner third is not one shot: the later the flip, the harder the backhand
+			t.truthy(hardest > softest * 1.6, `{softest} to {hardest} studs/s along the inner third`)
+			-- and a ball that rolls onto the flipper off the inlane (it crosses the pivot at about 1.5 studs/s),
+			-- flipped early: 12 degrees and more to the flipper's own side, at 10 studs/s and more (with the coil
+			-- at full speed a third of the way up it was 5 to 7 degrees, from anywhere on the inner third)
+			local lane = tbl.def.sensors[tbl.ix.sensor.inlane_l]
+			local best = 0
+			for delay = 0, 60, 2 do
+				local p = Physics.new(c, 1)
+				local b = p.balls[Physics.addBall(p, (lane.x1 + lane.x2) / 2, lane.y1 + 0.25, 0, 0)]
+				-- roll down the inlane until it is at the pivot
+				for _ = 1, 240 * 4 do
+					Physics.step(c, p, false, false, ev)
+					if alongOf(LEFT, b) > 0 then
+						break
+					end
+				end
+				for _ = 1, delay do
+					Physics.step(c, p, false, false, ev)
+				end
+				local along = alongOf(LEFT, b)
+				for _ = 1, 200 do
+					Physics.step(c, p, true, false, ev)
+					if b.mode ~= Physics.FREE then
+						break
+					end
+					if b.y > c.fpy[LEFT] + 0.4 and b.vy > 0 then
+						local angle = math.deg(math.atan2(b.vx, b.vy))
+						local speed = math.sqrt(b.vx * b.vx + b.vy * b.vy)
+						if along > 0.02 and along < 0.3 and angle < -12 and speed >= 10 then
+							best += 1
+						end
+						break
+					end
+				end
+			end
+			t.truthy(best >= 6, `{best} early flips of a rolling ball are backhands with power`)
+		end
+	)
+
+	t.test(
+		"PIN-P1: a tap is a flick: a press of one screen frame at 60 a second raises the flipper a fifth of its swing",
+		function()
+			local swing = c.fup[LEFT] - c.frest[LEFT]
+			local function rise(press: number): number
+				local s = Physics.new(c, 1)
+				local ev: { number } = {}
+				local peak = c.frest[LEFT]
+				for tick = 1, 80 do
+					Physics.step(c, s, tick <= press, false, ev)
+					peak = math.max(peak, s.fa[LEFT])
+				end
+				return (peak - c.frest[LEFT]) / swing
+			end
+			-- (with the coil at full strength from the first tick, four ticks were half a stroke)
+			t.truthy(rise(4) < 0.25, `one frame at 60: {rise(4)} of the swing`)
+			t.truthy(rise(4) > 0.1, "and it is a flick, not nothing")
+			t.truthy(rise(2) < 0.08)
+			t.truthy(rise(8) > 0.7 and rise(8) < 1, `two frames at 60, one at 30: {rise(8)} of the swing`)
+			t.eq(rise(12), 1, "three frames: a full stroke")
+			-- how far it rises grows smoothly with how long the button is down
+			for press = 2, 9 do
+				t.truthy(rise(press) > rise(press - 1), `{press} ticks`)
+			end
+		end
+	)
+
+	t.test("PIN-P2: a tap pass: a cradled ball let go and given a tap is caught on the other flipper", function()
+		local base = cradle(LEFT)
+		local ev: { number } = {}
+		local passes = 0
+		for delay = 60, 160, 4 do
+			for press = 2, 8 do
+				local s = clone(base)
+				local b = s.balls[1]
+				local fastest = 0
+				for tick = 1, 240 * 3 do
+					Physics.step(c, s, tick > delay and tick <= delay + press, tick > delay + press, ev)
+					if tick > delay then
+						fastest = math.max(fastest, math.sqrt(b.vx * b.vx + b.vy * b.vy))
+					end
+					if b.mode ~= Physics.FREE then
+						break
+					elseif b.asleep then
+						-- at rest on the right flipper, and it was never a shot: a pass
+						if b.x > Layout.XC and fastest < 6 then
+							passes += 1
+						end
+						break
+					end
+				end
+			end
+		end
+		t.truthy(passes >= 3, `{passes} taps pass the ball across`)
+	end)
 end

@@ -26,11 +26,12 @@ local Physics = require("./Physics")
 local def = Layout.new("pinball_acorn", "ACORN ATTACK")
 def.slopeDeg = 6
 def.gravity = Layout.gravityFor(6)
+def.kick = 0.75 -- old coils: its bumpers and slingshots are the softest of the three
 def.plunger.vMin = 4.2
 def.plunger.vMax = 7.6
 
 Layout.addShell(def)
-Layout.addBottom(def, { gap = 0.18, outlane = 0.19, inlane = 0.22, pivotY = 0.62 })
+Layout.addBottom(def, { gap = 0.18, outlane = 0.19, inlane = 0.22, pivotY = 0.62, lead = 0.17 })
 
 local XC = Layout.XC
 local X1 = Layout.FIELD_X1
@@ -100,21 +101,21 @@ Layout.post(def, 1.95, 3.42)
 table.insert(def.sensors, { id = "spinner", kind = "spinner", x1 = 1.95, y1 = 3.0, x2 = X1, y2 = 3.0 })
 Layout.lamp(def, "spinner", 2.0, 2.5, "red")
 
--- two standup targets flanking the low bumper
-table.insert(def.targets, { id = "oak_l", kind = "standup", x1 = 0.5, y1 = 3.02, x2 = 0.6, y2 = 2.92 })
-Layout.wall(def, "wood", { 0.5, 3.02, 0.46, 3.08 })
-table.insert(def.targets, { id = "oak_r", kind = "standup", x1 = 1.62, y1 = 2.92, x2 = 1.72, y2 = 3.02 })
-Layout.wall(def, "wood", { 1.72, 3.02, 1.76, 3.08 })
-Layout.endPost(def, 0.6, 2.92, 0.5, 3.02)
-Layout.endPost(def, 1.62, 2.92, 1.72, 3.02)
-Layout.lamp(def, "oak_l", 0.6, 2.84, "yellow")
-Layout.lamp(def, "oak_r", 1.62, 2.84, "yellow")
+-- two standup targets flanking the low bumper, each turned to face the flipper across the table (a late shot,
+-- outside the low bumper); its back comes to a point, so a ball from above rolls off it
+do
+	local x1, y1, x2, y2 = 1.56, 2.99, 1.72, 2.93
+	table.insert(def.targets, { id = "oak_r", kind = "standup", x1 = x1, y1 = y1, x2 = x2, y2 = y2 })
+	table.insert(def.targets, { id = "oak_l", kind = "standup", x1 = X1 - x2, y1 = y2, x2 = X1 - x1, y2 = y1 })
+	local back = { x1, y1, 1.66, 3.1, x2, y2 }
+	Layout.wall(def, "wood", back)
+	Layout.wall(def, "wood", Layout.mirror(back, X1 / 2))
+	Layout.lamp(def, "oak_r", 1.6, 2.86, "yellow")
+	Layout.lamp(def, "oak_l", X1 - 1.6, 2.86, "yellow")
+end
 
--- a kink in each rail above the outlanes leans a ball rolling down the side toward the inlane
-Layout.wall(def, "wood", { 0.0, 1.98, 0.23, 1.67 })
-Layout.wall(def, "wood", { X1, 1.98, X1 - 0.23, 1.67 })
-Layout.post(def, 0.23, 1.67)
-Layout.post(def, X1 - 0.23, 1.67)
+-- a ball guide on each rail turns a ball rolling down the side into the inlane (the gentlest table)
+Layout.railGuide(def, { 0.0, 2.16, 0.165, 1.68 })
 
 for i = 1, 5 do
 	Layout.lamp(def, `hoard_{i}`, XC - 0.3 + 0.1 * i, 1.75, "orange")

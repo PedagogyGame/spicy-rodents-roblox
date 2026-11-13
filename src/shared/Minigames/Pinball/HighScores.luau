@@ -38,10 +38,10 @@ HighScores.HOUSE = {
 		{ name = "SPARK", score = 40000 },
 	},
 	pinball_space = {
-		{ name = "MISSION CONTROL", score = 15000000 },
-		{ name = "COMET", score = 6000000 },
-		{ name = "ORBITER", score = 2500000 },
-		{ name = "BOOSTER", score = 800000 },
+		{ name = "MISSION CONTROL", score = 60000000 },
+		{ name = "COMET", score = 20000000 },
+		{ name = "ORBITER", score = 6000000 },
+		{ name = "BOOSTER", score = 1500000 },
 		{ name = "CADET", score = 500000 },
 	},
 } :: { [string]: { House } }
