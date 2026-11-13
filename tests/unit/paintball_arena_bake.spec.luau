@@ -288,20 +288,6 @@ return function(t)
 				end
 			end
 			t.truthy(#plan.marks >= 300, `{#plan.marks} marks`)
-			-- every rail and parapet has its top worn pale: the top and a band along both long faces
-			local worn: { [number]: number } = {}
-			for _, m in plan.marks do
-				if m.tone == "worn" then
-					worn[m.box] = (worn[m.box] or 0) + 1
-					t.eq(plan.kinds[m.box], Arena.KIND.rail)
-					t.near(m.at[2] + (if m.face == "+y" then 0 else m.h / 2), b[(m.box - 1) * 6 + 5], e)
-				end
-			end
-			for i = 1, n do
-				if plan.kinds[i] == Arena.KIND.rail then
-					t.eq(worn[i], 3, `rail box {i} has a worn top`)
-				end
-			end
 			t.truthy(tops >= 200 and walls >= 100, `{tops} on floors and tops, {walls} on walls`)
 			t.eq(sides[1], sides[2])
 			for level = 0, Arena.FLOORS - 1 do

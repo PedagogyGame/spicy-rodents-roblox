@@ -1415,28 +1415,6 @@ function Plan.build(): Plan
 	paint(5.5, H + 10.2, -CORE0 + 1, "+z", 9, 1.7, "SINCE 1979", "white")
 	paint(-44, roomY + 6.2, 0, "-x", 10, 2.6, "SAFE IN HERE\nNO FIRING", "white")
 
-	-- THE RAILS' TOPS are worn pale: a band along the top of both long faces of every rail and parapet, and the
-	-- top itself, so that the edge of a gallery reads from across the atrium and from the storey above
-	for i = 1, #kinds do
-		if kinds[i] == KIND.rail then
-			local k = (i - 1) * 6
-			local x0, z0, x1, y1, z1 = boxes[k + 1], boxes[k + 3], boxes[k + 4], boxes[k + 5], boxes[k + 6]
-			local mx, mz, band = (x0 + x1) / 2, (z0 + z1) / 2, 0.35
-			local marks = plan.marks
-			local y = y1 - band / 2
-			if x1 - x0 > z1 - z0 then
-				local w = x1 - x0
-				table.insert(marks, { box = i, face = "+z", at = { mx, y, z1 }, w = w, h = band, tone = "worn" })
-				table.insert(marks, { box = i, face = "-z", at = { mx, y, z0 }, w = w, h = band, tone = "worn" })
-			else
-				local w = z1 - z0
-				table.insert(marks, { box = i, face = "+x", at = { x1, y, mz }, w = w, h = band, tone = "worn" })
-				table.insert(marks, { box = i, face = "-x", at = { x0, y, mz }, w = w, h = band, tone = "worn" })
-			end
-			table.insert(marks, { box = i, face = "+y", at = { mx, y1, mz }, w = x1 - x0, h = z1 - z0, tone = "worn" })
-		end
-	end
-
 	-- MARKS, when everything stands (see `daub`): what the last crew left on the floors and what the years did
 	-- to the walls. Written for the north and west; the twin of each is the south's and east's.
 	do

@@ -1,7 +1,8 @@
 --!strict
 -- tools/games/paintball/arena/survey: the arena lane's own look at the building as data.
 --   lune run tools/games/paintball/arena/survey.luau [--maps <dir>]
--- Prints what ArenaData.build() holds (boxes by kind, nodes and links by storey, cover spots), runs Arena.check,
+-- Prints what ArenaData.build() holds (boxes by kind, nodes and links by storey, cover spots) and how many parts
+-- the bake makes of it, runs Arena.check,
 -- times the build and the two queries, and with --maps writes one top-down picture a storey (<dir>/level<N>.ppm,
 -- 4 pixels a stud: solids by height, nodes, links, cover spots, spawn points) for the eye.
 local fs = require("@lune/fs")
@@ -10,6 +11,7 @@ local Arena = require("../../../../src/shared/Minigames/Paintball/Arena")
 local ArenaData = require("../../../../src/shared/Minigames/Paintball/ArenaData")
 local Contract = require("../../../../src/shared/Minigames/Paintball/Contract")
 local NavBuild = require("./NavBuild")
+local PartList = require("./PartList")
 local Reach = require("./Reach")
 
 local maps: string? = nil
@@ -51,6 +53,25 @@ for code = 1, 7 do
 end
 print(`arena: {n} boxes ({table.concat(parts, ", ")}), {#arena.ramps} ramps`)
 print(string.format("arena: first build %.0f ms, each later build %.1f ms", first * 1000, again * 1000))
+-- what the bake makes of it: a part a box, a ramp, a curtain, and the dressing outside the volume
+do
+	local plan = ArenaData.plan()
+	local solids, dressing = PartList.solids(plan), PartList.dressing(nil)
+	local lights = 0
+	for _, p in solids do
+		if p.light then
+			lights += 1
+		end
+	end
+	for _, p in dressing do
+		if p.light then
+			lights += 1
+		end
+	end
+	print(
+		`arena: the bake is {#solids + #dressing} parts ({#solids} in the volume, {#dressing} of lobby and outside), {lights} lights, {#plan.signs} signs, {#plan.marks} marks`
+	)
+end
 local perFloor: { [number]: number } = {}
 for _, node in arena.nodes do
 	perFloor[node.floor] = (perFloor[node.floor] or 0) + 1

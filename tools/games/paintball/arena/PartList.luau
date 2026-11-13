@@ -90,8 +90,6 @@ PartList.TONE = {
 	board = { 108, 84, 56 },
 	-- a ceiling tile lying where it fell
 	tile = { 204, 200, 184 },
-	-- the top of a rail, worn pale by hands
-	worn = { 196, 190, 168 },
 }
 
 local LOOK: { [string]: { any } } = {
@@ -113,7 +111,8 @@ local LOOK: { [string]: { any } } = {
 	wall4 = { { 118, 86, 60 }, "WoodPlanks" },
 	core = { { 106, 106, 110 }, "Concrete" },
 	pillar = { { 152, 148, 140 }, "Concrete" },
-	rail = { { 58, 62, 68 }, "Metal" },
+	-- (the rails are pale against every storey's floor: the edge of a gallery reads across the atrium)
+	rail = { { 178, 168, 132 }, "Metal" },
 	parapet = { { 122, 120, 114 }, "Concrete" },
 	step = { { 90, 90, 94 }, "Concrete" },
 	landing = { { 100, 100, 104 }, "Concrete" },

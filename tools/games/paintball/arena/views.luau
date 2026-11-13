@@ -61,9 +61,10 @@ local VIEWS: { View } = {
 	},
 	{
 		name = "pb_05_newsroom",
-		desc = "First floor, the newsroom from the concourse: cubicles, desks, the editor's office behind its windows.",
-		feet = { -24, F, -6 },
-		look = { -52, F + 3, -18 },
+		desc = "First floor, the newsroom's north bay: cubicles and dead terminals, the stopped clocks and the day's board on the editor's wall, a boarded window in the west wall.",
+		feet = { -32, F, -27.5 },
+		look = { -55, F + 5, -10 },
+		fov = 78,
 	},
 	{
 		name = "pb_06_news_set",
