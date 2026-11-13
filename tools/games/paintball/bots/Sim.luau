@@ -108,6 +108,8 @@ export type Tag = {
 	doorstep: boolean, -- the victim was on its own doorstep (BotNav.atDoor)
 	quiet: boolean, -- and had not fired a ball for 4 s: the tag a bot never makes
 	stray: boolean, -- the ball was fired at somebody else
+	aware: boolean, -- the victim (a brain) had seen whoever tagged it within the last second
+	fought: boolean, -- and had fired at them
 }
 
 type Life = { from: number, leftRoom: number?, ended: number? }
@@ -128,6 +130,7 @@ export type SlotRecord = {
 	walked: number, -- studs
 	camping: number, -- seconds standing still near the other team's door with a line to it
 	stares: number, -- times it followed an opponent through a wall (audit only)
+	company: number, -- seconds with a bot of its own team within COMPANY studs on its storey
 	lives: { Life },
 	sprinted: number,
 	lastX: number,
@@ -190,6 +193,7 @@ local BOT = Contract.BOT
 local BIT = Wire.BIT
 local SNAP = 1 / Clock.SNAP_HZ
 local SAMPLE = 0.25 -- seconds between looks at what everybody is doing, for the record
+local COMPANY = 35 -- studs: a team-mate this near on the same storey is company
 local PERSON_POSE_LAG = 0.1 -- a person's snapshot pose is read this far back (Clock.poseTime: up + a send interval)
 
 local Sim = {}
@@ -238,6 +242,7 @@ local function newSlotRecord(id: number, bot: boolean, team: number, floors: num
 		walked = 0,
 		camping = 0,
 		stares = 0,
+		company = 0,
 		lives = {},
 		sprinted = 0,
 		lastX = 0,
@@ -601,6 +606,15 @@ local function stepBalls(sim: Sim)
 				and BotNav.atDoor(sim.nav, state.slots[struck].team, victim.x, victim.y, victim.z)
 			local life = if rs ~= nil then rs.lives[#rs.lives] else nil
 			local sinceRoom = math.huge
+			local aware, fought = false, false
+			for _, list in { sim.bots, sim.folk :: any } do
+				local vb = if list ~= nil then (list.brains :: { [number]: BotBrain.Brain })[struck] else nil
+				if vb ~= nil then
+					local c = (vb.con :: { [number]: any })[ball.by]
+					aware = c ~= nil and now - c.seen < 1
+					fought = vb.target == ball.by and vb.balls > 0
+				end
+			end
 			if life ~= nil then
 				life.ended = now
 				sinceRoom = if life.leftRoom ~= nil then now - life.leftRoom else 0
@@ -617,6 +631,8 @@ local function stepBalls(sim: Sim)
 				doorstep = onStep,
 				quiet = onStep and now - (sim.lastShot[struck] or -math.huge) > 4,
 				stray = ball.shot.target ~= struck,
+				aware = aware,
+				fought = fought,
 			})
 		end
 	end
@@ -756,6 +772,23 @@ local function observe(sim: Sim, span: number)
 			rs.stillX, rs.stillZ = pose.x, pose.z
 		elseif room ~= slot.team then
 			rs.still = math.max(rs.still, now - rs.stillFrom)
+		end
+		-- company: a bot of its own team near by on this storey
+		for other, mate in state.slots do
+			local mp = sim.poses[other]
+			if
+				other ~= id
+				and mp ~= nil
+				and mate.on
+				and not mate.out
+				and mate.team == slot.team
+				and sim.botWho[other] ~= nil
+				and math.abs(mp.y - pose.y) < 5
+				and (mp.x - pose.x) ^ 2 + (mp.z - pose.z) ^ 2 < COMPANY * COMPANY
+			then
+				rs.company += span
+				break
+			end
 		end
 		-- at cover: within a stride of a cover spot of this storey
 		for node, _ in nav.coverAt do

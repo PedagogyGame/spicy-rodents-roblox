@@ -129,6 +129,8 @@ export type Squad = {
 	home: { [number]: number }, -- by bot: the storey it has made its own for this life
 	side: { [number]: number }, -- by bot: its team
 	firedAt: { [number]: number }, -- by slot: when it last fired a ball (everybody hears a marker)
+	people: { [number]: number }, -- by slot: the team of a seat that is on and is not one of these bots (a person)
+	escort: { [number]: number }, -- by bot: the person of its team it is keeping company (see COMPANY)
 	sightLeft: number, -- sight checks left this tick (the tick's share: Bots.step sets it)
 	routeLeft: number, -- route searches left this tick
 	tick: number,
@@ -250,12 +252,12 @@ BotBrain.DEFAULT = table.freeze({
 	gain = 9,
 	faced = BOT.faced,
 	errLo = math.rad(0.7),
-	errHi = math.rad(2.9),
+	errHi = math.rad(2.5),
 	errFar = 90,
 	errSpeed = 0.9,
 	errMove = 0.7,
 	first = 2.0,
-	second = 1.4,
+	second = 1.25,
 	keep = 0.3,
 	leadSd = 0.3,
 	settle = math.rad(0.8),
@@ -274,6 +276,13 @@ local SAY_EVERY = 12 -- seconds between one bot's call-outs
 local TEAM_SAY_EVERY = 8 -- and between one team's
 local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
 local CHEST = ArenaModule.CHEST
+-- COMPANY: a person is never left to play alone in a five-storey building. Up to ESCORTS bots of a
+-- person's team choose their posts within a short run of where that person is (their team-mates know
+-- where they are, as any player does from the name tags), move on when the person does, and so are
+-- beside them when the paint flies. The rest of the team plays its own game.
+local ESCORTS = 2 -- bots that keep one person company, at most
+local ESCORT_NEAR, ESCORT_FAR = 8, 28 -- studs from the person a post is looked for between
+local ESCORT_LEFT = 40 -- studs: the person has gone, the bot leaves its post to follow
 
 local function wrap(a: number): number
 	return (a + math.pi) % (2 * math.pi) - math.pi
@@ -630,10 +639,93 @@ end
 
 -- Where to go and stand next. A storey first (this one or a neighbour mostly; where opponents were
 -- last seen; fewer if team-mates are already there), then the best of a handful of its nodes.
-local function pickGoal(b: Brain, squad: Squad, now: number): number
+-- The person this bot keeps company, where they are now; nil when it has nobody, they are out, or it
+-- has gone off on its own for a while.
+local function buddyOf(b: Brain, squad: Squad, state: State): Track?
+	local rng = b.rng
+	local had = squad.escort[b.id]
+	if had ~= nil then
+		local slot = state.slots[had]
+		if slot == nil or not slot.on or slot.team ~= b.team or squad.people[had] == nil then
+			squad.escort[b.id] = nil -- they left, changed sides, or a bot has the seat now
+		elseif slot.out then
+			return nil -- they are out: it plays on by itself until they are back
+		elseif rng.next() < 0.85 then
+			return squad.track[had]
+		else
+			squad.escort[b.id] = nil
+			return nil
+		end
+	end
+	-- the nearest person of its team who has fewer than ESCORTS bots with them
+	local best: number? = nil
+	local bestD = math.huge
+	for pid, team in squad.people do
+		local slot = state.slots[pid]
+		local t = squad.track[pid]
+		if team ~= b.team or t == nil or slot == nil or slot.out then
+			continue
+		end
+		local with = 0
+		for _, who in squad.escort do
+			if who == pid then
+				with += 1
+			end
+		end
+		local d = (t.x - b.x) ^ 2 + (t.z - b.z) ^ 2 + ((t.y - b.y) * 3) ^ 2
+		if with < ESCORTS and d < bestD then
+			best, bestD = pid, d
+		end
+	end
+	if best ~= nil and rng.next() < 0.6 then
+		squad.escort[b.id] = best
+		return squad.track[best]
+	end
+	return nil
+end
+
+-- A post beside the person it keeps company: on their storey, a short run from them, cover if there is
+-- some; 0 when there is none to be had.
+local function postBeside(b: Brain, squad: Squad, buddy: Track): number
 	local nav = b.nav
 	local arena = nav.arena
 	local rng = b.rng
+	local floor = math.clamp(math.floor(buddy.y / arena.floorHeight + 0.5), 0, arena.floors - 1)
+	local keepOff = nav.keepOff[b.team]
+	local best, bestScore = 0, -math.huge
+	for _, id in nav.goals[floor + 1] do
+		local node = nav.nodes[id]
+		local d = math.sqrt((node.x - buddy.x) ^ 2 + (node.z - buddy.z) ^ 2)
+		if d < ESCORT_NEAR or d > ESCORT_FAR or keepOff[id] or id == b.at then
+			continue
+		end
+		local holder = squad.claimed[id]
+		if holder ~= nil and holder ~= b.id then
+			continue
+		end
+		local score = rng.next() * 1.5 - math.abs(d - 15) / 10
+		local cover = nav.coverAt[id]
+		if cover ~= nil then
+			score += if cover.low then 1.2 else 0.9
+		end
+		if score > bestScore then
+			best, bestScore = id, score
+		end
+	end
+	return best
+end
+
+local function pickGoal(b: Brain, squad: Squad, state: State, now: number): number
+	local nav = b.nav
+	local arena = nav.arena
+	local rng = b.rng
+	local buddy = buddyOf(b, squad, state)
+	if buddy ~= nil then
+		local post = postBeside(b, squad, buddy)
+		if post ~= 0 then
+			return post
+		end
+	end
 	local here = math.clamp(math.floor(b.y / arena.floorHeight + 0.5), 0, arena.floors - 1)
 	local heat = squad.heat[b.team]
 	local total = 0
@@ -947,7 +1039,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			b.fightAt = now
 			b.stance = "push"
 			if not sidestep(b, squad, now, pose.x, pose.z) then
-				setOut(b, squad, pickGoal(b, squad, now))
+				setOut(b, squad, pickGoal(b, squad, state, now))
 			end
 		end
 	else
@@ -963,7 +1055,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 		end
 		if b.mode == "wait" then
 			if now >= b.goAt and state.phase == "live" then
-				if setOut(b, squad, pickGoal(b, squad, now)) then
+				if setOut(b, squad, pickGoal(b, squad, state, now)) then
 					b.fresh = false
 					b.outbound = true
 				else
@@ -989,8 +1081,24 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 				end
 			end
 			b.huntable = false -- decided, once
+			-- the person it keeps company has moved on: so does it
+			local pal = squad.escort[b.id]
+			local palAt = if pal ~= nil then squad.track[pal] else nil
+			local palSlot = if pal ~= nil then state.slots[pal] else nil
+			if
+				palAt ~= nil
+				and palSlot ~= nil
+				and palSlot.on
+				and not palSlot.out
+				and (
+					math.abs(palAt.y - b.y) > nav.arena.floorHeight * 0.5
+					or (palAt.x - b.x) ^ 2 + (palAt.z - b.z) ^ 2 > ESCORT_LEFT * ESCORT_LEFT
+				)
+			then
+				b.holdUntil = math.min(b.holdUntil, now + 0.4)
+			end
 			if not hunted and now >= b.holdUntil and b.peekX == nil then
-				if not setOut(b, squad, pickGoal(b, squad, now)) then
+				if not setOut(b, squad, pickGoal(b, squad, state, now)) then
 					b.holdUntil = now + 0.5
 				end
 			elseif not hunted and cover ~= nil then
@@ -1026,7 +1134,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			b.peekBack = b.peekX ~= nil
 			b.pushUntil = now + 8
 			b.stance = "push"
-			setOut(b, squad, pickGoal(b, squad, now))
+			setOut(b, squad, pickGoal(b, squad, state, now))
 		end
 	end
 end

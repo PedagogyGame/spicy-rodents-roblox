@@ -154,6 +154,8 @@ local function newSquad(arena: Arena): BotBrain.Squad
 		home = {},
 		side = {},
 		firedAt = {},
+		people = {},
+		escort = {},
 		sightLeft = 0,
 		routeLeft = 0,
 		tick = 0,
@@ -202,6 +204,7 @@ function Bots.sync(bots: Bots, state: State, who: { [number]: number }, poses: {
 			end
 			bots.squad.home[id] = nil
 			bots.squad.side[id] = nil
+			bots.squad.escort[id] = nil
 			brains[id] = nil
 		end
 	end
@@ -234,10 +237,19 @@ end
 -- Where every body is and how fast it is going over the floor, from the poses as they change. (A
 -- person's pose changes at the snapshot rate, a bot's every tick: the speed is taken over the time
 -- between changes and smoothed.)
-local function follow(squad: BotBrain.Squad, state: State, poses: { [number]: Pose }, now: number)
+local function follow(
+	squad: BotBrain.Squad,
+	brains: { [number]: BotBrain.Brain },
+	state: State,
+	poses: { [number]: Pose },
+	now: number
+)
 	local track = squad.track
+	local people = squad.people
 	for id, slot in state.slots do
 		local pose = poses[id]
+		-- a seat that is on and is none of these bots is a person, as far as the bots can tell
+		people[id] = if slot.on and pose ~= nil and brains[id] == nil then slot.team else nil
 		if not slot.on or pose == nil then
 			track[id] = nil
 			continue
@@ -265,6 +277,17 @@ local function follow(squad: BotBrain.Squad, state: State, poses: { [number]: Po
 	end
 end
 
+-- A team is told of a place where there is a fight (a person's ball landed there, one of its own was
+-- tagged there): the storey is hot, and that is where its bots take the other side to be.
+local function told(bots: Bots, team: number, x: number, y: number, z: number, now: number)
+	local arena = bots.arena
+	local squad = bots.squad
+	local floor = math.clamp(math.floor(y / arena.floorHeight + 0.5), 0, arena.floors - 1)
+	squad.heat[team][floor + 1] = now
+	local spot = squad.spot[team]
+	spot.x, spot.y, spot.z, spot.at = x, floor * arena.floorHeight, z, now
+end
+
 -- What the service heard, shared out among the brains.
 local function hear(
 	bots: Bots,
@@ -275,6 +298,7 @@ local function hear(
 	out: { Command }
 )
 	local brains = bots.brains :: { [number]: BotBrain.Brain }
+	local squad = bots.squad
 	local profile = bots.profile
 	local reach = profile.hear * profile.hear
 	local ttl = RULES.ballTtl
@@ -319,6 +343,11 @@ local function hear(
 			if flight == nil or shooter == nil then
 				continue
 			end
+			if squad.people[h.id] == shooter.team then
+				-- a person's ball: their team's bots take it that somebody is where it went ("over
+				-- there!"), as they would a sighting of their own
+				told(bots, shooter.team, h.x, h.y, h.z, now)
+			end
 			for id, b in brains do
 				if b.team == shooter.team or not b.placed or id == h.id then
 					continue
@@ -345,6 +374,10 @@ local function hear(
 			local from = poses[by]
 			if victim == nil or from == nil then
 				continue
+			end
+			-- "I am out!": the team knows where one of its own went down, if it knows nothing newer
+			if now - squad.spot[victim.team].at > 3 then
+				told(bots, victim.team, h.x, h.y - BodyModule.STAND_EYE * 0.6, h.z, now)
 			end
 			-- a team-mate tagged where a bot could see: it knows where that came from
 			local cosHalf = math.cos(profile.sightHalf)
@@ -382,7 +415,7 @@ function Bots.step(
 	end
 	local squad = bots.squad
 	squad.tick += 1
-	follow(squad, state, poses, now)
+	follow(squad, brains, state, poses, now)
 	if #heard > 0 then
 		hear(bots, state, poses, heard, now, out)
 	end
