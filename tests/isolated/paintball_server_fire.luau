@@ -1090,6 +1090,11 @@ return function(t)
 				t.falsy((kit.service:debug("rewind", 0.5)))
 				t.falsy((kit.service:debug("rewind", "soon")))
 				t.eq(Clock.MAX_REWIND, 0.3, "a refused value changes nothing")
+				-- (and how hard the bots are, the same way)
+				t.deepEq({ kit.service:debug("botSkill", -0.2) }, { true, nil })
+				t.eq((kit.service.bots :: any).skill, -0.2)
+				t.falsy((kit.service:debug("botSkill", 0.9)))
+				t.eq((kit.service.bots :: any).skill, -0.2)
 			end);
 			(Clock :: any).MAX_REWIND = was
 			if not ok then

@@ -164,7 +164,8 @@
 --                         from the next match, (false, words) for a bad key or value (written in the
 --                         stub already); "rewind" (seconds, 0.1 to 0.4): Clock.MAX_REWIND on this
 --                         server, from the next match (the lane's own: a knob for the owner's playtest
---                         at a slow connection; reported).
+--                         at a slow connection; reported); "botSkill" (-0.5 to 0.5): the bots' Opts.skill,
+--                         for every bot seated from then on (the owner's knob for how hard they are).
 -- THE ROSTER, AND BALANCE. A slot's team is its own (Rules, "teams"). The service changes who is on
 -- which side in three ways only: it chooses WHICH bot gives its seat to a person who joins (above);
 -- it trades a person and a bot on the "side" verb; it puts people back on their sides at "start".
@@ -1651,6 +1652,15 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			end
 			(Clock :: any).MAX_REWIND = secs
 			return true, nil
+		elseif what == "botSkill" then
+			-- how hard the bots are, for the owner's playtest (the bots' Opts.skill: added to every bot's
+			-- Contract.BOTS skill), for every bot seated from now on: the next match's
+			local skill = tonumber(key)
+			if skill == nil or skill ~= skill or skill < -0.5 or skill > 0.5 then
+				return false, "debug botSkill: -0.5 to 0.5"
+			end
+			(self.bots :: any).skill = skill
+			return true, nil
 		end
 		local state = matchState()
 		if hw == nil or state == nil then
@@ -1675,7 +1685,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			state.endsAt = now
 			return true, nil
 		end
-		return false, "debug: tag, end, tune or rewind"
+		return false, "debug: tag, end, tune, rewind or botSkill"
 	end
 
 	function service.onMove(_self: Service, player: any, rec: { [string]: number })
