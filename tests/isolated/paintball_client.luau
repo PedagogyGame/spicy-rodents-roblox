@@ -803,10 +803,29 @@ return function(t)
 				stand(s, -30, 0, 0)
 				s.run(0.3)
 				t.truthy(Rig.has(Rig.texts(hud), "PROTECTED"))
+				-- the protected moment is not one line of words: a border round the screen in your colour, a bar
+				-- that drains, and the marker a ghost of itself
+				local shield = named(hud, "Shield")
+				t.truthy(shield.Visible, "the border")
+				local mine = Contract.TEAMS[s.state().slots[s.you].team].color
+				t.near(named(shield, "Top").BackgroundColor3.G * 255, mine[2], 1, "in your team's colour")
+				local bar = named(shield, "ShieldBar"):FindFirstChild("Fill")
+				local full = bar.Size.X.Scale
+				t.truthy(full > 0.5 and full < 1, "the bar has begun to drain")
+				local marker = workspace.CurrentCamera:FindFirstChild("PaintballMarker")
+				t.eq(
+					marker:FindFirstChild("Body").Transparency,
+					Tuning.markerGhost,
+					"the marker is a ghost: it cannot fire"
+				)
 				click(s)
 				s.run(0.2)
 				t.eq(#heard(s, "Paintball.Fire"), 1)
+				t.truthy(bar.Size.X.Scale < full, "draining")
 				s.run(F.protectSecs)
+				t.falsy(shield.Visible, "gone the moment it is over")
+				t.eq(marker:FindFirstChild("Body").Transparency, 0, "and the marker is solid again")
+				t.falsy(Rig.has(Rig.texts(hud), "PROTECTED"))
 				click(s)
 				s.run(0.2)
 				t.eq(#heard(s, "Paintball.Fire"), 2, "and after it, one does")
@@ -1176,4 +1195,103 @@ return function(t)
 			end)
 		end
 	)
+
+	t.test(
+		"standing idle: the screen says so before the server takes the player off; a turn of the view answers it",
+		function()
+			play(function(s)
+				playing(s)
+				local hud = s.hud()
+				s.run(R.idleSecs - Tuning.idleWarn - 2)
+				t.falsy(Rig.has(Rig.texts(hud), "Still there?"), "not yet")
+				s.run(4)
+				local words = Rig.texts(hud)
+				t.truthy(
+					Rig.has(words, "Still there? Move, or you are taken out of the match in"),
+					table.concat(words, " | ")
+				)
+				aim(s, 0.3, 0)
+				s.run(0.2)
+				t.falsy(Rig.has(Rig.texts(hud), "Still there?"), "looking round is being there")
+				-- and the marker still answers
+				click(s)
+				s.run(0.2)
+				t.eq(#heard(s, "Paintball.Fire"), 1)
+			end)
+		end
+	)
+
+	t.test("the cues: every sound the client asks for is one the game declares, each still without an id", function()
+		local declared = require("@client/Minigames/Games/Paintball").sounds
+		local names = {}
+		for cue, id in declared do
+			t.eq(id, "", `{cue}: no id until the licensed sounds are chosen`)
+			t.truthy(string.sub(cue, 1, 10) == "paintball.", cue)
+			table.insert(names, cue)
+		end
+		t.eq(#names, 11)
+		-- every cue a seat and a show can ask for, gathered from a played stretch on the headless bench
+		local b = Kit.playing()
+		Kit.snap(b, { Kit.body(2, 6, 0, 24) }, b.now() - 0.1)
+		Kit.snap(b, { Kit.body(2, 6, 0, 24, { bits = BIT.reload }) }, b.now())
+		b.show:onShots(
+			Wire.pack(
+				Wire.Shot,
+				{ { ball = 3, id = 2, t = b.now(), ox = 6, oy = 4, oz = 24, vx = 0, vy = 0, vz = -90 } }
+			)
+		)
+		local asked: { [string]: boolean } = {}
+		local function gather()
+			for _, sound in b.sounds do
+				asked[sound.cue] = true
+			end
+			for _, sound in b.show.cues do
+				asked[sound.cue] = true
+			end
+		end
+		for _ = 1, 6 do
+			b.seat:input("fire", true)
+			Kit.run(b, 0.3)
+		end
+		b.seat:input("fire", true) -- (dry)
+		for step = 1, 240 do
+			b.pose.x = step * 0.2 -- (walking: footsteps)
+			Kit.frame(b)
+		end
+		gather()
+		Kit.message(b, {
+			kind = "paintball_tag",
+			by = 1,
+			id = 2,
+			ball = 3,
+			scores = { 1, 0 },
+			tags = 1,
+			outs = 1,
+			at = b.now() + 4,
+			x = 0,
+			y = 3,
+			z = 0,
+		})
+		Kit.message(b, {
+			kind = "paintball_tag",
+			by = 2,
+			id = 1,
+			ball = 4,
+			scores = { 1, 1 },
+			tags = 1,
+			outs = 1,
+			at = b.now() + 4,
+			x = 0,
+			y = 3,
+			z = 0,
+		})
+		Kit.place(b)
+		gather()
+		for cue in asked do
+			t.truthy(declared[cue] ~= nil, `{cue} is asked for and must be declared`)
+		end
+		for _, cue in { "fire", "fire_far", "splat", "tag", "tagged", "reload", "dry", "step", "ready", "back" } do
+			t.truthy(asked[`paintball.{cue}`], `{cue} was heard in a played stretch`)
+		end
+	end)
 end

@@ -8,7 +8,7 @@
 -- rail (Arena.RAIL_HEIGHT high) across at z = 10 (x -10..10); team 1's spawn room against the west wall (x
 -- -60..-44, z -12..12), team 2's against the east. The player stands at (0, 0, 30) looking north (yaw 0, along
 -- -z) unless a case moves it.
--- Interface: arena() -> Arena; bench(opts?) -> Bench; frame(b, n?); run(b, seconds); state(b, over?) -> msg (and
+-- Interface: arena() -> Arena; bench(opts?) -> Bench (opts.dt: another frame time than DT); frame(b, n?); run(b, seconds); state(b, over?) -> msg (and
 --   hands it to the seat); message(b, msg) (checked, then to the seat); snap(b, bodies, t?); watch(b, slots?,
 --   over?); body(id, x, y, z, more?) -> a snapshot body; fires(b) / moves(b) -> decoded records; cues(b, cue) ->
 --   how many times it was asked for; SERVER_TIME; DT
@@ -26,6 +26,7 @@ Kit.DT = 1 / 60
 
 export type Bench = {
 	frames: number,
+	dt: number, -- seconds a frame (Kit.DT unless the bench was asked for another frame rate)
 	now: () -> number,
 	arena: Arena.Arena,
 	show: ShowCore.Show,
@@ -87,11 +88,12 @@ function Kit.arena(): Arena.Arena
 	})
 end
 
-function Kit.bench(opts: { tuning: any?, noShow: boolean?, user: number? }?): Bench
+function Kit.bench(opts: { tuning: any?, noShow: boolean?, user: number?, dt: number? }?): Bench
 	local o = opts or {}
 	local arena = Kit.arena()
 	local b = {
 		frames = 0,
+		dt = o.dt or Kit.DT,
 		arena = arena,
 		pose = { x = 0, y = 0, z = 30, yaw = 0, pitch = 0, air = false },
 		push = 1,
@@ -113,7 +115,7 @@ function Kit.bench(opts: { tuning: any?, noShow: boolean?, user: number? }?): Be
 		toasts = {},
 	} :: Bench
 	b.now = function(): number
-		return Kit.SERVER_TIME + b.frames * Kit.DT
+		return Kit.SERVER_TIME + b.frames * b.dt
 	end
 	b.show = ShowCore.new({ arena = arena, now = b.now, tuning = o.tuning })
 	local ctx: any = {
@@ -218,13 +220,13 @@ end
 function Kit.frame(b: Bench, n: number?)
 	for _ = 1, n or 1 do
 		b.frames += 1
-		b.show:step(Kit.DT)
-		b.seat:step(Kit.DT)
+		b.show:step(b.dt)
+		b.seat:step(b.dt)
 	end
 end
 
 function Kit.run(b: Bench, seconds: number)
-	Kit.frame(b, math.max(1, math.floor(seconds * 60 + 0.5)))
+	Kit.frame(b, math.max(1, math.floor(seconds / b.dt + 0.5)))
 end
 
 local function roster(): ({ any }, { any }, { boolean })

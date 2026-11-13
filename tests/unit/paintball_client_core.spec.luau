@@ -12,6 +12,7 @@ local Arena = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
+local Hit = require("@shared/Minigames/Paintball/Hit")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local Marker = require("@client/Minigames/Paintball/Marker")
 local Tuning = require("@client/Minigames/Paintball/Tuning")
@@ -1318,4 +1319,358 @@ return function(t)
 		t.eq(b.fov, 0)
 		t.eq(b.paces[#b.paces].scale, nil)
 	end)
+
+	t.test(
+		"Shift held through a click: the ball is seen to leave, then the sprint picks up by itself; the whole cost",
+		function()
+			local b = Kit.playing()
+			local seat = b.seat
+			seat:input("sprint", true)
+			Kit.run(b, 0.5)
+			local at = b.now()
+			press(b)
+			Kit.run(b, 1)
+			local fires = Kit.fires(b)
+			t.eq(#fires, 1)
+			local ft = fires[1].ft
+			-- no pose says "sprinting" between the press and Tuning.sprintAfterShot after the ball left: the
+			-- click is on its way before the first pose that carries the bit again
+			local back: number? = nil
+			for _, move in Kit.moves(b) do
+				if Wire.has(move.bits, BIT.sprint) and move.t > at then
+					back = back or move.t
+				end
+			end
+			t.truthy(back ~= nil, "Shift was held all along: the sprint came back by itself")
+			t.truthy((back :: number) >= ft + Tuning.sprintAfterShot - 1e-9, "not before the shot has been seen")
+			t.truthy((back :: number) < ft + Tuning.sprintAfterShot + 1 / Clock.SEND_HZ + 2 * DT)
+			t.eq(seat.k, 1, "and is at full pace again")
+			-- what a shot costs a sprinter, start to finish: the marker up, the shot seen, the ramp
+			local cost = Body.SPRINT_FIRE_DELAY + Tuning.sprintAfterShot + Body.SPRINT_RAMP_SECS
+			t.truthy(cost < 0.6, `a sprinter who fires is back at full pace in {cost} s`)
+			-- with the number at 0 the sprint is back the very next frame (it is the table's to turn)
+			local tuned = table.clone(Tuning)
+			tuned.sprintAfterShot = 0
+			b = Kit.playing({ tuning = tuned })
+			b.seat:input("sprint", true)
+			Kit.run(b, 0.5)
+			press(b)
+			Kit.run(b, Body.SPRINT_FIRE_DELAY + 3 * DT)
+			t.eq(#Kit.fires(b), 1)
+			t.truthy(b.seat.k > 0)
+		end
+	)
+
+	t.test(
+		"the rhythm is heard: a click when the magazine is full again, the horn when the match goes live, back from out",
+		function()
+			local b = Kit.playing()
+			local seat = b.seat
+			for _ = 1, 5 do
+				press(b)
+				Kit.run(b, F.fireInterval + 0.02)
+			end
+			t.eq(Kit.cues(b, "paintball.reload"), 1, "the rattle as the fifth ball leaves")
+			t.eq(Kit.cues(b, "paintball.ready"), 0)
+			Kit.run(b, F.reloadSecs)
+			t.eq(Kit.cues(b, "paintball.ready"), 1, "the click that says full again")
+			Kit.run(b, 1)
+			t.eq(Kit.cues(b, "paintball.ready"), 1, "once")
+			-- R: the same two sounds
+			press(b)
+			Kit.run(b, 0.3)
+			seat:input("reload", true)
+			Kit.run(b, F.reloadSecs + 0.1)
+			t.eq(Kit.cues(b, "paintball.reload"), 2)
+			t.eq(Kit.cues(b, "paintball.ready"), 2)
+			-- a reload the server did not start ends without it
+			press(b)
+			Kit.run(b, 0.3)
+			seat:input("reload", true)
+			seat:onRefused({ kind = "refused", verb = "reload", text = "Not now." })
+			Kit.run(b, F.reloadSecs + 0.1)
+			t.eq(Kit.cues(b, "paintball.ready"), 2)
+
+			-- the horn, for a seat that stood through the briefing: by the clock, once
+			b = Kit.bench()
+			Kit.watch(b)
+			local ends = b.now() + 0.5
+			Kit.state(b, { phase = "briefing", endsAt = ends })
+			Kit.place(b, { at = ends + F.protectSecs })
+			Kit.run(b, 0.4)
+			t.eq(Kit.cues(b, "paintball.go"), 0)
+			Kit.run(b, 0.3)
+			t.eq(Kit.cues(b, "paintball.go"), 1)
+			Kit.state(b, { phase = "live", endsAt = ends + R.matchSecs })
+			Kit.run(b, 0.5)
+			t.eq(Kit.cues(b, "paintball.go"), 1, "the server's own word does not sound it again")
+			t.eq(Kit.cues(Kit.playing(), "paintball.go"), 0, "somebody who joins a running match hears none")
+
+			-- tagged out and back: protected for as long as the server says, and it is heard
+			b = Kit.playing()
+			seat = b.seat
+			t.eq(Kit.cues(b, "paintball.back"), 0, "not for the first placement")
+			t.eq(seat:protected(b.now()), nil)
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 2,
+				id = 1,
+				ball = 7,
+				scores = { 0, 1 },
+				tags = 1,
+				outs = 1,
+				at = b.now() + F.respawnSecs,
+				x = 0,
+				y = 3,
+				z = 30,
+			})
+			Kit.run(b, 0.5)
+			t.eq(seat:protected(b.now()), nil, "out is not protected: it is out")
+			Kit.place(b, { at = b.now() + F.protectSecs })
+			t.eq(Kit.cues(b, "paintball.back"), 1)
+			t.near(seat:protected(b.now()) :: number, F.protectSecs, 1e-9)
+			Kit.run(b, 1)
+			t.near(seat:protected(b.now()) :: number, F.protectSecs - 1, 1e-6, "counting down")
+			Kit.run(b, F.protectSecs - 1 + 0.05)
+			t.eq(seat:protected(b.now()), nil)
+		end
+	)
+
+	t.test(
+		"standing idle: the seat warns before the server would take the player off; moving, turning or firing is being there",
+		function()
+			local b = Kit.playing()
+			local seat = b.seat
+			t.eq(seat:idle(b.now()), nil)
+			Kit.run(b, R.idleSecs - Tuning.idleWarn - 1)
+			t.eq(seat:idle(b.now()), nil, "not yet")
+			Kit.run(b, 2)
+			local left = seat:idle(b.now()) :: number
+			t.truthy(
+				left ~= nil and left <= Tuning.idleWarn and left > Tuning.idleWarn - 2,
+				"the warning, counting down"
+			)
+			Kit.run(b, 3)
+			t.truthy((seat:idle(b.now()) :: number) < left - 2.9)
+			-- a turn of the view is being there
+			b.pose.yaw += 0.05
+			Kit.frame(b)
+			t.eq(seat:idle(b.now()), nil)
+			-- so is a step, and so is a ball
+			Kit.run(b, R.idleSecs - Tuning.idleWarn + 1)
+			t.truthy(seat:idle(b.now()) ~= nil)
+			b.pose.x += 0.5
+			Kit.frame(b)
+			t.eq(seat:idle(b.now()), nil)
+			Kit.run(b, R.idleSecs - Tuning.idleWarn + 1)
+			t.truthy(seat:idle(b.now()) ~= nil)
+			press(b)
+			Kit.frame(b)
+			t.eq(seat:idle(b.now()), nil)
+			-- the briefing does not count: the server counts live play
+			b = Kit.bench()
+			Kit.watch(b)
+			Kit.state(b, { phase = "briefing", endsAt = b.now() + 200 })
+			Kit.place(b)
+			Kit.run(b, R.idleSecs + 5)
+			t.eq(b.seat:idle(b.now()), nil)
+		end
+	)
+
+	t.test(
+		"the predicted ball and the server's ball agree: walls to a hundredth of a stud, bodies 95 % of the time, at 150 ms and at 30, 60 and 144 frames a second",
+		function()
+			-- A server that follows the contract to the letter, for one click: the stamps through Clock.stamp, the
+			-- ball flown tick by tick from f, each step against the building (arena.sweep) and against the body
+			-- where the snapshot stream puts it at (f + age) - rewind (Clock, "the history is the snapshot
+			-- stream"), by Hit.body, a tie to the wall.
+			type Shot = { kind: string, x: number, y: number, z: number }
+			local TICK = 1 / Clock.TICK_HZ
+			local function serverBall(
+				arena: Arena.Arena,
+				history: { { t: number, body: any } },
+				rec: { [string]: number },
+				arrival: number,
+				up: number,
+				feel: Contract.Feel
+			): Shot
+				local f, _late, rewind = Clock.stamp(arrival, rec.vt, rec.ft, nil, up)
+				local len = math.sqrt(rec.dx ^ 2 + rec.dy ^ 2 + rec.dz ^ 2)
+				local vx, vy, vz =
+					rec.dx / len * feel.ballSpeed, rec.dy / len * feel.ballSpeed, rec.dz / len * feel.ballSpeed
+				local function poseAt(time: number): (number, number, number, number)
+					for i = #history, 1, -1 do
+						if history[i].t <= time then
+							local a, b = history[i], history[i + 1] or history[i]
+							return Wire.between(a.body, a.t, b.body, b.t, time)
+						end
+					end
+					local first = history[1].body
+					return first.x, first.y, first.z, first.crouch
+				end
+				-- (its ticks are its own: off the client's frames by a few milliseconds)
+				local nextTick = (math.floor((f - Kit.SERVER_TIME - 0.004) / TICK) + 1) * TICK + Kit.SERVER_TIME + 0.004
+				local a0 = 0
+				while a0 < R.ballTtl do
+					local a1 = math.min(nextTick - f, R.ballTtl)
+					local p0x, p0y, p0z = Ballistics.position(rec.ox, rec.oy, rec.oz, vx, vy, vz, feel.ballDrop, a0)
+					local p1x, p1y, p1z = Ballistics.position(rec.ox, rec.oy, rec.oz, vx, vy, vz, feel.ballDrop, a1)
+					local best = arena.sweep(p0x, p0y, p0z, p1x, p1y, p1z)
+					local x, y, z, crouch = poseAt(f + a1 - rewind)
+					local s, hx, hy, hz = Hit.body(arena.sweep, p0x, p0y, p0z, p1x, p1y, p1z, x, y, z, crouch)
+					if s ~= nil and (best == nil or s < best) then
+						return { kind = "body", x = hx, y = hy, z = hz }
+					elseif best ~= nil then
+						return {
+							kind = "wall",
+							x = p0x + (p1x - p0x) * best,
+							y = p0y + (p1y - p0y) * best,
+							z = p0z + (p1z - p0z) * best,
+						}
+					end
+					a0 = a1
+					nextTick += TICK
+				end
+				return { kind = "none", x = 0, y = 0, z = 0 }
+			end
+
+			local feel = Contract.feel({ reloadSecs = 0.5 })
+			local seed = 20261113
+			local function rand(): number
+				seed = (seed * 1103515245 + 12345) % 2147483648
+				return seed / 2147483648
+			end
+			-- the opponent: walking east and west along z = 4 beyond the rail, ducking behind it now and then
+			local function target(time: number): (number, number)
+				local tau = time - Kit.SERVER_TIME
+				return 12 * math.sin(1.3 * tau), math.clamp(math.sin(0.9 * tau) * 4 - 2, 0, 1)
+			end
+			local total, worstWall, worstBody = 0, 0, 0
+			for _, case in
+				{
+					{ dt = 1 / 60, lag = 0, shots = 150 },
+					{ dt = 1 / 60, lag = 0.075, shots = 150 },
+					{ dt = 1 / 30, lag = 0.075, shots = 150 },
+					{ dt = 1 / 144, lag = 0.075, shots = 150 },
+				}
+			do
+				local b = Kit.bench({ dt = case.dt })
+				Kit.watch(b, nil, { feel = feel })
+				Kit.state(b, { phase = "live", feel = feel, endsAt = b.now() + 5000 })
+				Kit.place(b)
+				local history: { { t: number, body: any } } = {}
+				local buffers: { buffer } = {}
+				local taken, delivered = 0, 0
+				-- one frame of the client's, with the server's snapshots reaching it `lag` late
+				local function frame()
+					b.frames += 1
+					local now = b.now()
+					while Kit.SERVER_TIME + taken / Clock.SNAP_HZ <= now do
+						local time = Kit.SERVER_TIME + taken / Clock.SNAP_HZ
+						local x, crouch = target(time)
+						local buf =
+							Wire.encodeSnap(time, taken, b.show.match, { Kit.body(2, x, 0, 4, { crouch = crouch }) })
+						local _, _, _, bodies = Wire.decodeSnap(buf)
+						taken += 1
+						history[taken] = { t = time, body = bodies[1] } -- (as the wire carries it: quantised)
+						buffers[taken] = buf
+					end
+					while delivered < taken and history[delivered + 1].t + case.lag <= now do
+						delivered += 1
+						b.show:onSnap(buffers[delivered])
+					end
+					b.show:step(b.dt)
+					b.seat:step(b.dt)
+				end
+				for _ = 1, math.ceil(1 / case.dt) do
+					frame()
+				end
+				local seen: { Shot } = {}
+				local flight = 26 / feel.ballSpeed
+				for n = 1, case.shots do
+					for _ = 1, math.ceil(1 / case.dt) do
+						if b.seat:ready(b.now()) then
+							break
+						end
+						frame() -- (the marker's own rhythm: the interval, and the reload after every fifth)
+					end
+					-- aim somewhere round where the opponent will be drawn when the ball gets there: on it, beside
+					-- it, over its head, into the rail in front of it
+					local x = target(b.now() + flight - case.lag - Clock.INTERP_SECS)
+					local ax, ay = x + (rand() - 0.5) * 4, 3.3 + rand() * 2.9
+					b.pose.yaw, b.pose.pitch = Body.yawPitch(ax - 0, ay - Body.STAND_EYE, 4 - 30)
+					local puffs = #b.show.puffs
+					press(b)
+					for _ = 1, math.ceil(1 / case.dt) do
+						if #Kit.fires(b) >= n then
+							break
+						end
+						frame()
+					end
+					t.eq(#Kit.fires(b), n, "the ball left")
+					for _ = 1, math.ceil(2 / case.dt) do
+						local flying = false
+						for _, ball in b.show.balls do
+							flying = flying or ball.own
+						end
+						if not flying then
+							break
+						end
+						frame()
+					end
+					local shot = Kit.fires(b)[n].shot
+					local mine: Shot = { kind = "none", x = 0, y = 0, z = 0 }
+					if #b.show.puffs > puffs then
+						local puff = b.show.puffs[#b.show.puffs]
+						mine = { kind = "body", x = puff.x, y = puff.y, z = puff.z }
+					else
+						for _, splat in b.show.walls do
+							if splat.predicted and splat.shot == shot then
+								mine = { kind = "wall", x = splat.x, y = splat.y, z = splat.z }
+							end
+						end
+					end
+					seen[n] = mine
+				end
+				for _ = 1, math.ceil(2 / case.dt) do
+					frame()
+				end
+				-- the server's verdict on every click, each `lag` late on its way up
+				local fires = Kit.fires(b)
+				local agree, kinds = 0, { body = 0, wall = 0, none = 0 }
+				for n, mine in seen do
+					local rec = fires[n]
+					local theirs = serverBall(b.arena, history, rec, rec.ft + case.lag, case.lag, feel)
+					kinds[theirs.kind] += 1
+					if mine.kind == theirs.kind then
+						agree += 1
+						local d = math.sqrt((mine.x - theirs.x) ^ 2 + (mine.y - theirs.y) ^ 2 + (mine.z - theirs.z) ^ 2)
+						if mine.kind == "wall" then
+							worstWall = math.max(worstWall, d)
+						elseif mine.kind == "body" then
+							worstBody = math.max(worstBody, d)
+						end
+					end
+				end
+				total += #seen
+				print(
+					`      {math.floor(1 / case.dt + 0.5)} fps, {math.floor(case.lag * 2000 + 0.5)} ms round trip: {agree} of {#seen} balls end as the server's do ({kinds.body} on the body, {kinds.wall} on the building, {kinds.none} spent)`
+				)
+				t.truthy(
+					kinds.body >= #seen * 0.2 and kinds.wall >= #seen * 0.15,
+					"the aim was spread over body and building"
+				)
+				t.truthy(agree >= #seen * 0.95, `{agree} of {#seen} agree (PB-3: at least 95 %)`)
+			end
+			t.truthy(total >= 600)
+			print(
+				`      worst distance between the two ends: {string.format("%.4f", worstWall)} studs on a wall, {string.format(
+					"%.3f",
+					worstBody
+				)} on a body`
+			)
+			t.truthy(worstWall < 0.01, "on the building the predicted splat is where the server's record will be")
+			t.truthy(worstBody < Tuning.predictedSplatSnap, "and on a body, inside the tolerance")
+		end
+	)
 end

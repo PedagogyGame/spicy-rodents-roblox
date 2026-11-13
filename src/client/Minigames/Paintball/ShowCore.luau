@@ -12,7 +12,8 @@
 --             it; they stop on a wall by the arena's own test and on a body when the server's Splat
 --             record says so. YOUR OWN is predicted (predict): it flies in REAL time from the click
 --             and is tested every step the way the server tests it (arena.sweep, then Hit.body against
---             every opposing puppet where it is drawn, the first thing along the step winning).
+--             every opposing puppet where it is drawn, the first thing along the step winning; in a
+--             frame longer than a server tick, where it was drawn at each step's own time).
 --   splats    the two pools of Wire, kept exactly as the server keeps them: the walls' newest
 --             Rules.splatPool, each slot's newest Rules.bodySplats. A predicted wall splat of your own
 --             is replaced by the server's record, or taken back after Tuning.predictedSplatSecs.
@@ -68,6 +69,10 @@ export type Puppet = {
 	hand: boolean, -- tagged out: the hand is up
 	outAt: number?, -- when its out bit was first drawn
 	walked: number, -- studs since its last footstep
+	wx: number, -- where it was drawn in the frame before this one (a slow frame flies a ball in several
+	wy: number, -- steps, and each is tested against the body where it was drawn at that step's own time)
+	wz: number,
+	wc: number,
 }
 
 export type Ball = {
@@ -631,8 +636,12 @@ function ShowCore.new(opts: Opts): Show
 	end
 
 	-- One ball up to `age`: flown in steps no longer than the server's, each tested as the server
-	-- tests it. Returns false when the ball ended.
-	local function fly(self: Show, ball: Ball, age: number): boolean
+	-- tests it. `span` is how long this frame was: a frame longer than a server tick (a phone at 30
+	-- frames a second) flies your ball in several steps, and a step that ended part of a frame ago is
+	-- tested against each body where it was drawn THEN (between the last frame's picture and this
+	-- one's), as the server tests each of its ticks against the bodies of that tick. Returns false when
+	-- the ball ended.
+	local function fly(self: Show, ball: Ball, age: number, span: number): boolean
 		local g = self.feel.ballDrop
 		local sweep = arena.sweep
 		while ball.age < age do
@@ -650,9 +659,22 @@ function ShowCore.new(opts: Opts): Show
 			local struck: Puppet? = nil
 			local hx, hy, hz = 0, 0, 0
 			if ball.own then
+				local back = if span > 0 then math.clamp((age - a1) / span, 0, 1) else 0
 				for _, p in self.puppets do
 					if hittable(self, p, ball.team) then
-						local s, x, y, z = Hit.body(sweep, p0x, p0y, p0z, p1x, p1y, p1z, p.x, p.y, p.z, p.crouch)
+						local s, x, y, z = Hit.body(
+							sweep,
+							p0x,
+							p0y,
+							p0z,
+							p1x,
+							p1y,
+							p1z,
+							p.x + (p.wx - p.x) * back,
+							p.y + (p.wy - p.y) * back,
+							p.z + (p.wz - p.z) * back,
+							p.crouch + (p.wc - p.crouch) * back
+						)
 						-- (a tie goes to the wall: Hit, rule 4)
 						if s ~= nil and (best == nil or s < best) then
 							best, struck, hx, hy, hz = s, p, x, y, z
@@ -742,6 +764,10 @@ function ShowCore.new(opts: Opts): Show
 						hand = false,
 						outAt = nil,
 						walked = 0,
+						wx = x,
+						wy = y,
+						wz = z,
+						wc = crouch,
 					}
 					self.puppets[id] = p
 				else
@@ -767,6 +793,7 @@ function ShowCore.new(opts: Opts): Show
 					p.yaw = turn(p.yaw, yaw, k)
 					p.pitch += (pitch - p.pitch) * k
 				end
+				p.wx, p.wy, p.wz, p.wc = p.x, p.y, p.z, p.crouch
 				p.x, p.y, p.z, p.crouch = x, y, z, crouch
 				local was = p.bits
 				p.bits = pa.bits
@@ -795,7 +822,7 @@ function ShowCore.new(opts: Opts): Show
 		for _, ball in table.clone(self.balls) do
 			if ball.own then
 				local age = t - ball.t0
-				if fly(self, ball, age) then
+				if fly(self, ball, age, dt) then
 					-- drawn leaving the muzzle, sliding onto the true line
 					local blend = math.max(0, 1 - ball.age / tuning.muzzleBlend)
 					ball.x += ball.mx * blend
@@ -813,7 +840,7 @@ function ShowCore.new(opts: Opts): Show
 				end
 				local alive = true
 				if age > 0 then
-					alive = fly(self, ball, age)
+					alive = fly(self, ball, age, dt)
 				end
 				local rec = ball.verdict
 				if alive and rec and t - ball.verdictAt > tuning.ballCatchUp then

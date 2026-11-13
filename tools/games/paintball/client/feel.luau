@@ -184,6 +184,11 @@ print(
 	)} studs further on); steps are heard at volume {Tuning.stepLoud} against {Tuning.stepQuiet} walking and 0 crouched`
 )
 print(
+	`  with Shift held through the click the sprint picks up {Tuning.sprintAfterShot} s after the ball and is at full pace {f(
+		Body.SPRINT_FIRE_DELAY + Tuning.sprintAfterShot + Body.SPRINT_RAMP_SECS
+	)} s after the click`
+)
+print(
 	`  crouch: the eye goes from {Body.STAND_EYE} to {f(Body.CROUCH_EYE, 1)} in {feel.crouchSecs} s; a rail is {Arena.RAIL_HEIGHT}: a peek up and back down is {f(
 		2 * feel.crouchSecs
 	)} s`
