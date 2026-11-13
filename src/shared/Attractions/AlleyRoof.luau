@@ -39,7 +39,7 @@
 -- Pure. Interface: constants below; routes() -> { LocalRoute } (copies); route(id) -> LocalRoute;
 --   records(place, lotId?) -> { world route records }; lamps() -> { {X, Y, D} }; isRafter(id) -> boolean;
 --   inHall(X, D) -> boolean; inAnnex(X, D) -> boolean; inPlatform(X, D) -> string?; guardEyes() -> { {X, Y, D} };
---   CHAIN, RETIRED, BOUGH_FORK_T.
+--   CHAIN, RETIRED, BOUGH_FORK_T; the ids RIDGE, BOUGH, VENT, FIRST_RAFTER, LAST_RAFTER.
 
 local AlleyLayout = require("./AlleyLayout")
 local Curve = require("../Routes/Curve")
@@ -379,7 +379,8 @@ end
 -- The order a squirrel takes them on the way in (between 9103 and 9105 the leap; between 9105 and 9107 the roof).
 AlleyRoof.CHAIN = { 9101, 9102, 9103, 9105, 9107, 9120 }
 AlleyRoof.RETIRED = { 9104, 9106 }
-AlleyRoof.BOUGH = 9105
+AlleyRoof.RIDGE = 9103 -- (its west end, t = 1, is where the leap goes from)
+AlleyRoof.BOUGH = 9105 -- (its end, t = 1, hangs over the wing roof: Q drops onto it)
 AlleyRoof.VENT = 9107
 AlleyRoof.FIRST_RAFTER = 9120
 AlleyRoof.LAST_RAFTER = 9140
