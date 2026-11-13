@@ -1,0 +1,28 @@
+{
+  "_": "The eighteen-lane bowling alley (brief addendum D4, D5; Shared/Attractions/AlleyLayout). Local to world: x = 1300 + X, y = 16.5 + Y, z = -420 - D; eye height is the floor + 5.2. Render: lune run tools/review/export.luau --out build/review_alley/scene.json; then render.py --scene build/review_alley/scene.json --views tools/review/views_alley.json --out build/review_alley. The labelled plan is tools/review/alley_plan.luau + alley_plan.py. Committed pictures: docs/renders/alley18/.",
+  "defaults": { "res": "960x540", "samples": 20, "groups": ["attractions", "terrain"] },
+  "sun": { "dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0 },
+  "views": [
+    {"name": "01_front_from_across_bowl_lane", "desc": "The whole front (177 st) from 120 st north of it, across the planned Bowl Lane, at eye height.", "pos": [1361, 5.2, -232], "look": [1361, 22, -352], "fov": 78, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
+    {"name": "02_front_from_the_west", "desc": "The front along its length from the north-west: the ball shop's windows, the canopy, the pylon.", "pos": [1262, 5.2, -318], "look": [1345, 20, -352], "fov": 70, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
+    {"name": "03_entrance", "desc": "The main doors from the foot of the ramp (where the walk from Bowl Lane arrives).", "pos": [1322, 5.2, -334], "look": [1322, 20.5, -352], "fov": 72, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
+    {"name": "04_lobby_from_the_doors", "desc": "Just inside the main doors: the lobby, the shoe desk on the left, the concourse and the lanes beyond.", "pos": [1322, 21.7, -354.5], "look": [1321, 20.2, -400], "fov": 82},
+    {"name": "05_concourse_looking_east", "desc": "The concourse from its west end: front rooms on the left, settees and lanes on the right.", "pos": [1277.5, 21.7, -384], "look": [1400, 20, -385], "fov": 78},
+    {"name": "06_concourse_looking_west", "desc": "The concourse from its east end (by the games-room arch).", "pos": [1398, 21.7, -384], "look": [1276, 20, -385], "fov": 78},
+    {"name": "07_down_lane_1", "desc": "A bowler's view down lane 1.", "pos": [1284.5, 21.7, -410], "look": [1284.5, 17.5, -476], "fov": 60},
+    {"name": "08_down_lane_9", "desc": "A bowler's view down lane 9.", "pos": [1334.1, 21.7, -410], "look": [1334.1, 17.5, -476], "fov": 60},
+    {"name": "09_down_lane_18", "desc": "A bowler's view down lane 18.", "pos": [1389.9, 21.7, -410], "look": [1389.9, 17.5, -476], "fov": 60},
+    {"name": "10_hall_across_the_lanes", "desc": "All eighteen lanes from the west aisle, behind the approaches.", "pos": [1277, 23.5, -402], "look": [1392, 18.5, -446], "fov": 80},
+    {"name": "11_games_room_from_the_front", "desc": "The games room from its front wall looking to the back: pinball on the left wall behind the camera, pool tables right, bumper pool and air hockey's floor left, the fortune teller in the far corner.", "pos": [1425, 21.7, -354.5], "look": [1424, 19.2, -450], "fov": 84},
+    {"name": "12_games_room_from_the_back", "desc": "The games room from its back wall looking to the front.", "pos": [1424, 21.7, -447.5], "look": [1424, 19.2, -352], "fov": 84},
+    {"name": "13_games_room_from_the_arch", "desc": "Walking in from the concourse through the arch.", "pos": [1402.5, 21.7, -381], "look": [1440, 19, -392], "fov": 82},
+    {"name": "14_ball_shop", "desc": "The bowling ball shop (finished, empty) from its door.", "pos": [1287, 21.7, -373], "look": [1284, 19.6, -352], "fov": 84},
+    {"name": "15_shoe_rental_desk", "desc": "The shoe rental desk from the lobby.", "pos": [1326, 21.7, -361], "look": [1306, 19.6, -364], "fov": 76},
+    {"name": "16_gift_shop", "desc": "The gift shop (finished, empty) from its door.", "pos": [1342, 21.7, -373], "look": [1341, 19.6, -352], "fov": 84},
+    {"name": "17_snack_bar", "desc": "The snack bar's counter from the snack tables.", "pos": [1371, 21.7, -385], "look": [1371, 20, -360], "fov": 80},
+    {"name": "18_behind_the_lanes", "desc": "The interim back corridor from inside the west machine-room door: the eighteen stand-in pinsetters on the left.", "pos": [1278, 21.7, -493], "look": [1400, 19.8, -494], "fov": 78},
+    {"name": "19_rear_alley", "desc": "The rear alley from its east end: the exit stoop, the blue cans, the broom, the fence.", "pos": [1412, 18.4, -512], "look": [1285, 15.5, -509], "fov": 70},
+    {"name": "20_tunnel", "desc": "Squirrel's eye in the fifth ball-return tunnel, looking toward the bowlers.", "pos": [1337.2, 14.3, -480], "look": [1337.2, 14.3, -420], "fov": 80},
+    {"name": "21_aerial", "desc": "The building on its site from the north-east, 110 st up.", "pos": [1500, 130, -250], "look": [1355, 16, -430], "fov": 55, "groups": ["attractions", "terrain", "town"]}
+  ]
+}
