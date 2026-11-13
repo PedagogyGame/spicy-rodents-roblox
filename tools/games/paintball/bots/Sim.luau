@@ -876,8 +876,9 @@ local function observe(sim: Sim, span: number)
 				break
 			end
 		end
-		-- camping: standing still for some seconds near the other team's door, with a line to it
-		if now - rs.stillFrom > 4 then
+		-- camping: standing still for some seconds near the other team's door, with a line to it (and
+		-- standing now: the first strides away from a post outside it, which cross that ground, are not)
+		if now - rs.stillFrom > 4 and moved < 1 then
 			for node, owner in nav.door do
 				if owner ~= 0 and owner ~= slot.team then
 					local n = nav.nodes[node]
