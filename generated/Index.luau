@@ -69,6 +69,10 @@ return {
 			count = 60,
 			chunks = { "RoutesCatalog" },
 		},
+		ShopArt = {
+			count = 1,
+			chunks = { "ShopArt" },
+		},
 		TerrainExtensions = {
 			count = 1,
 			chunks = { "TerrainExtensions" },

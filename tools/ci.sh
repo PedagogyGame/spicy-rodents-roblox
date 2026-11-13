@@ -73,6 +73,18 @@ if [ "$NO_BUILD" -eq 1 ]; then
 	exit 0
 fi
 
+# The Neighbourhood Shop's shell (Workspace.Expansion.NeighbourhoodShop) is its own bake of a few dozen parts, a
+# second's work: CI bakes it every run, so every place below has the shop (an optional path that is missing is
+# left out of a place without a word, and the shop would silently not exist).
+step "bake the Neighbourhood Shop's shell (tools/bake/neighbourhood_shop.luau -> build/Expansion_NeighbourhoodShop.rbxm)"
+lune run tools/bake/neighbourhood_shop.luau
+done_step
+
+# The sky lift and the Lookout (Workspace.Expansion.F4) are their own bake too, for the same reason.
+step "bake the sky lift and the Lookout (tools/bake/skylift.luau -> build/Expansion_F4.rbxm)"
+lune run tools/bake/skylift.luau
+done_step
+
 step "rojo build (Rojo $(rojo --version | awk '{print $2}')): default -> build/SpicyRodents.rbxl + .rbxlx"
 rojo build default.project.json -o build/SpicyRodents.rbxl
 rojo build default.project.json -o build/SpicyRodents.rbxlx

@@ -7,7 +7,8 @@
 -- walls to the peak at the ridge line (lot params eaveU/peakU/ridge; lot-type heightU otherwise).
 -- These are the pure, server-and-client answers the motors and validators need (wall tests,
 -- roofs to land on); the engine's own baked parts collide for physics bodies.
--- Interface: new(cell?) -> Colliders; add(c, box); fromData(data, seatAt?) -> Colliders;
+-- Interface: new(cell?) -> Colliders; add(c, box); fromData(data, seatAt?) -> Colliders (the solid lots and the
+--   built expansion venues); addBuiltVenues(c, data) -> n;
 --   query(c, minX, minZ, maxX, maxZ) -> { Box }; pointIn(c, x, z, y, pad?) -> Box?;
 --   blocked(c, x0, z0, x1, z1, r, refY) -> boolean (swept circle, studs); roofAt(c, x, z, refY) -> number?
 -- Pure; studs. No side effects on require.
@@ -97,7 +98,43 @@ function Colliders.fromData(data: any, seatAt: ((x: number, z: number) -> number
 			ridge = ridge,
 		})
 	end
+	Colliders.addBuiltVenues(c, data)
 	return c
+end
+
+-- The expansion venues that are built (generated/Expansion: a venue with `built`, the bake that makes it, such
+-- as the owner's Neighbourhood Shop): its footprint as a box from the lowest ground under it, a gable from
+-- half its height up to its full height with the ridge along its longer side. Planned venues are not boxes:
+-- nothing stands there yet.
+function Colliders.addBuiltVenues(c: Colliders, data: any): number
+	local ex = data:module("Expansion") :: any
+	local n = 0
+	for _, v in (if ex and ex.venues then ex.venues else {}) :: { any } do
+		local poly = v.footPoly
+		if v.built == nil or poly == nil or #poly < 3 then
+			continue
+		end
+		local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+		for _, p in poly do
+			minX, maxX = math.min(minX, p[1]), math.max(maxX, p[1])
+			minZ, maxZ = math.min(minZ, p[2]), math.max(maxZ, p[2])
+		end
+		local y0 = if v.ground then v.ground.min else v.floorY
+		local w, d = maxX - minX, maxZ - minZ
+		Colliders.add(c, {
+			id = v.id,
+			cx = (minX + maxX) / 2,
+			cz = (minZ + maxZ) / 2,
+			hw = w / 2,
+			hd = d / 2,
+			y0 = y0,
+			eave = v.floorY + v.height * 0.5,
+			peak = v.floorY + v.height,
+			ridge = if w >= d then "x" else "z",
+		})
+		n += 1
+	end
+	return n
 end
 
 function Colliders.query(c: Colliders, minX: number, minZ: number, maxX: number, maxZ: number): { Box }

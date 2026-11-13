@@ -7,8 +7,11 @@
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
+-- UI/WalletHud keeps the wallet's balance in the corner (and the pocket money and pass lines).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
+-- The sky lift (Client/Rides/SkyLiftView: the six cabins drawn from the shared clock) and the Lookout's telescope
+-- (Client/Rides/Telescope, entered on the server's "telescope" event) start after the minigames.
 -- The S2 test place runs its own S2Client and this script steps aside there.
 -- Live-server robustness (W1 client review): Shift Lock is switched off (Shift is sprint); the Roblox
 -- Reset button does nothing until a body is handed over (then PossessionClient routes it to the safe-
@@ -31,10 +34,14 @@ local PossessionClient = require("./Possession/PossessionClient")
 local VehicleView = require("./Render/VehicleView")
 local MedicalView = require("./Render/MedicalView")
 local SpeechBubbles = require("./UI/SpeechBubbles")
+local WalletHud = require("./UI/WalletHud")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
 local CameraRig = require("./Camera/CameraRig")
+local FarTown = require("./Render/FarTown")
+local SkyLiftView = require("./Rides/SkyLiftView")
+local Telescope = require("./Rides/Telescope")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -96,6 +103,12 @@ local kickRemote = kickR :: RemoteEvent
 local eventRemote = eventR :: RemoteEvent
 
 AnimationDriver.start({ container = bodies })
+-- the wallet in the corner, always (the server writes the balance on the Player: Server/Economy/Credits)
+local walletOk, walletErr = pcall(WalletHud.start)
+if not walletOk then
+	warn(`Client: WalletHud failed: {walletErr}`)
+	menu.toast("The wallet display did not start: press F9 and send the red lines", 10)
+end
 -- what townspeople say, and what a bitten person looks like (owner 2026-11-10)
 task.spawn(function()
 	local okS, errS = pcall(SpeechBubbles.start, { bodies = bodies :: Instance })
@@ -142,6 +155,44 @@ task.spawn(function()
 	end
 end)
 
+-- the sky lift's cabins (drawn here from the clock) and the Lookout's telescope (its HUD lines; no walking while
+-- looking; the usual HUD and camera back after)
+local okSL, errSL = pcall(SkyLiftView.start)
+if not okSL then
+	warn(`Client: SkyLiftView failed: {errSL}`)
+end
+-- the town from far off (the Lookout, the cabins, the drone): far houses with roofs and lit windows, lamp dots
+-- and tree crowns where the real lots have streamed out
+local okFar, errFar = pcall(FarTown.start)
+if not okFar then
+	warn(`Client: FarTown failed: {errFar}`)
+end
+-- the wait for a booked cabin, counted down on the HUD (the usual HUD back once seated or given up)
+pcall(SkyLiftView.watchWait, function(title: string?, hint: string?)
+	if title then
+		hud.set(title, hint or "")
+	else
+		client.refreshCamera()
+	end
+end)
+pcall(Telescope.start, {
+	hud = function(title: string?, hint: string?)
+		if title then
+			hud.set(title, hint or "")
+		else
+			client.refreshCamera()
+		end
+	end,
+	onChange = function(on: boolean)
+		InputMap.setCharacterControls(not on and client.state().device == nil)
+		-- the server streams the town the telescope looks at; stepping back gives the Lookout back
+		local look = if on then nil else game:GetService("ReplicatedStorage"):FindFirstChild("SkyLiftLook")
+		if look and look:IsA("RemoteEvent") then
+			look:FireServer("off")
+		end
+	end,
+})
+
 -- keep the help panel in step with vehicles and the drone
 local lastDevice: string? = nil
 game:GetService("RunService").Heartbeat:Connect(function()
@@ -165,8 +216,9 @@ UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
 			kickRemote:FireServer()
 		elseif io.KeyCode == Enum.KeyCode.F then
 			menu.toast(
-				if st.device
-					then "Get out first (E), then F kicks"
+				if st.device == "ride"
+					then "No kicking from a sky-lift cabin"
+					elseif st.device then "Get out first (E), then F kicks"
 					elseif st.species then "Only people can kick: animals pounce with a left click"
 					else "Pick a body from the menu first (M)",
 				2
@@ -189,6 +241,18 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 		menu.toast(if msg.note then tostring(msg.note) else (names[msg.role] or "Here you go"), 4)
 	elseif kind == "refused" then
 		menu.toast(tostring(msg.text), 3)
+	elseif kind == "telescope" then
+		-- the Lookout's telescope (Server/Rides/SkyLiftService): look through the baked one
+		local exp = workspace:FindFirstChild("Expansion")
+		local hill = exp and exp:FindFirstChild("F4") and (exp :: any).F4:FindFirstChild("f3_hilltop")
+		local scope = hill and hill:FindFirstChild("Telescope", true)
+		local post = workspace:FindFirstChild("SkyLiftService")
+		local prompt = post
+			and post:FindFirstChild("TelescopePost")
+			and (post :: any).TelescopePost:FindFirstChild("SkyLiftPrompt", true)
+		if scope == nil or not Telescope.enter(scope, prompt) then
+			menu.toast(tostring(msg.text or "The telescope has not loaded yet"), 3)
+		end
 	elseif kind == "notice" then
 		-- something the game did to you that you should read (a bowling ball knocked you off a lane)
 		menu.toast(tostring(msg.text), 4)

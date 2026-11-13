@@ -74,8 +74,13 @@ return function(t)
 				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint`)
 			end
 		end
-		-- the budget: the building with the games' furniture (the shop rooms are still empty)
-		t.truthy(#boxes > 4500 and #boxes < 6200, `{#boxes} parts`)
+		-- the budget: the building with the games' furniture (the shop rooms are still empty). It was set at 6,200
+		-- over 5,598 parts with the pool tables as stand-ins (48 parts each, 24 for bumper pool); the real tables
+		-- (tools/bake/games/Pool, BumperPool: a cut bed, six round leather pockets with their wells, jawed
+		-- cushions, sights, sixteen numbered and striped balls, a three-shade lamp, a score board and a cue stand:
+		-- 385 parts each, 103 for bumper pool) bring it to 6,351. The bound keeps the ~600 parts the shop rooms
+		-- were given over that.
+		t.truthy(#boxes > 4500 and #boxes < 6950, `{#boxes} parts`)
 		t.truthy(perTop.Lanes <= L.LANES * 132, `the lanes are {perTop.Lanes} parts`)
 		t.truthy(perTop.BackModule < 450, `the back module is {perTop.BackModule} parts`)
 		t.eq(
