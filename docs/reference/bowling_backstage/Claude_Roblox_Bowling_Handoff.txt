@@ -1,0 +1,271 @@
+UPLOAD THIS PDF TO CLAUDE CHAT
+
+
+
+Bowling backstage: complete handoff
+An explorable service environment behind eighteen bowling lanes, prepared for integration into an existing Roblox game.
+
+
+
+
+Editable source + FBX/GLB assets + collision proxies + placement data + visual references
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                             1
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+What Claude should do
+
+The integration goal                                                              The important details
+Add this authored backstage behind the bowling alley already in the               Office and separate staff/supply room; lockers and personal
+game. Preserve the existing public lanes, controls, scoring, ball physics         belongings; two mop trolleys; lane conditioner; repair benches, motors,
+and functional pins. Use the supplied meshes instead of rebuilding the            belts and tools; upper spare-parts stock; and a wire bin of damaged
+environment from screenshots.                                                     pins.
+
+                                                                                  The office entrance has a paper schedule, old-fashioned punch clock
+The approved design
+                                                                                  and hanging time-card pockets. Recent additions are nine floor mats,
+- Generic detailed 3D cartoon art at believable human scale.                      four varied wall cabinets with coat hangers and workwear, and one
+                                                                                  ordinary corner security camera.
+- An irregular 53 x 35 metre footprint, about 2.4 times the initial floor area;
+rooms and workshop extend back and to the right.
+                                                                                  What remains for the target game
+- Offset storage lofts, bridges, long ramp, rear lookout and stairs. Avoid
+                                                                                  Upload/import the assets under the correct Roblox owner or group;
+compressing it into a small rectangular room.
+                                                                                  align them to the existing lanes; review collisions and materials;
+- Exposed pinsetter workings, visible ball returns and low ledges. Preserve       connect visual mechanisms to existing game events; and playtest
+the narrow crawl route for a small squirrel character.                            character access and device performance.
+- Warm amber capsule lamps, cream and teal paint, golden rails, rafters,          The squirrel character is not included. The custom squirrel warning poster
+pipes, instruments and a little corner dampness.                                  and pepper were deferred. No existing Roblox game code or place has
+                                                                                  been changed by this work.
+
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                                  2
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Expanded plan and connection layout
+
+
+
+
+The footprint is 1,549.5 square metres. The office and staff room sit farther back at different angles; the workshop occupies the side wing. All eighteen
+service-front connections, head-pin base spots and ledges are listed in Data/layout.json.
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                               3
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Pinsetter hardware and low traversal routes
+
+
+
+
+Service side: open machinery, projecting ledges and the new floor mats.         Low view along the ball-return channel. Its opening is intentional.
+
+
+
+
+Preserve the mechanics and openings
+
+Eighteen bays contain setting decks, sweeps, elevators, distributors, reserve pins, gears, belts, motors, supports and bearings. Nine paired returns run
+between them.
+
+Use the separate collision asset
+
+Do not put one large collision box around the machine bank. The low access ledges and return channels are intended for a small squirrel; fit must be tested
+with the actual character.
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                              4
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Upper storage, bridges and rear stairs
+
+
+
+
+The storage platforms have offset edges and open circulation.                  A rear bridge reaches a lookout with a second route down.
+
+
+
+
+Keep the expanded circulation
+
+The main ramp rises to a storage level about 3.63 metres above the floor. Narrow bridges connect platforms; the rear stairs complete a ground-level loop.
+
+Retain the reference tour
+
+The editable Blender source keeps an 85-second walkthrough on frames 1-2040 at 24 fps. It is an authoring reference, not a replacement for the game
+camera.
+
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                               5
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Office and staff / cleaning storage
+
+
+
+
+Office: desk, monitor, chair, binders, repair log, mug and wall clock.        Staff storage: lockers, bag, lunch cooler, supplies and mop equipment.
+
+
+
+
+Distinct rear rooms
+
+Their furnished assets have been moved back and splayed at different angles. The latest source additionally contains entrance mats and a side-wall office
+cabinet.
+
+Everyday backstage character
+
+Keep personal belongings, cleaning supplies, practical workplace posters, the schedule, punch clock and hanging time-card pockets. Avoid replacing these
+with generic empty rooms.
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                               6
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Side workshop and rear court
+
+
+
+
+The extended side wing holds maintenance equipment and parts.                  The rear court connects the offset rooms and circulation routes.
+
+
+
+
+Repair and maintenance props
+
+The set contains a lane-conditioning machine, rolling tool chest, workbenches, spare motors and belts, hand tools, cartons and a square wire bin containing
+damaged pins.
+
+Use references as design evidence
+
+These images explain the approved layout. The editable source and current game exports contain the complete final scene, including the last mat and
+cabinet additions.
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                             7
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Latest everyday details
+
+
+
+
+Mismatched cabinets, wire hangers, workwear and a floor runner.                A regular ivory box camera on a short wall bracket, aimed down.
+
+
+
+
+Recent additions are part of the complete asset
+
+There are nine floor mats and four wall cabinets across the environment. Hooks and wire hangers sit below the cabinets, with jackets and a yellow vest. An
+existing utility stand was moved clear of the runner.
+
+Keep the camera ordinary
+
+The security camera is a modeled prop with a lens, shallow hood, mounting plate, cable and conduit. It has no scripted surveillance behavior.
+
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                            8
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Roblox import and placement contract
+
+Import the real assets                                                      Coordinates and scale
+- Use Imports/Backstage_Visuals.glb, or the equivalent FBX. Do not import   ServiceFrontCenter is the shared floor anchor at the eighteen short
+both copies.                                                                lane-tail interfaces. +X points toward lane 18; +Y is up; +Z points
+                                                                            toward the customer lanes. Backstage extends toward -Z.
+- Import Backstage_Collision.glb / .fbx as a separate model. Keep Merge
+Meshes OFF for both imports.                                                One source metre is converted to 1/0.28 studs. The authored lane pitch
+                                                                            is 5.714286 studs; the full floor spans about 189.3 x 125 studs. Exact
+- Use the experience owner or group for uploaded assets. Keep scene
+position and imported pivots. Choose Scale Unit: Stud.                      positions are in Data/layout.json.
+
+- The optional Studio/Backstage_Import_Tools.rbxmx contains five helper     Four calibration markers define the origin and ten-stud right, back and up
+ModuleScripts, not the geometry. Review it before invoking Prepare on the   vectors. The helper measures them to correct importer scale and
+imported models.                                                            orientation before applying the requested target CFrame.
+
+- Set the convex proxy MeshParts to Hull collision fidelity in Studio       If the existing lane pitch is P studs, use uniform scale P / 5.714286 after
+Properties. The helper anchors them, makes them transparent and keeps       finding the correct front-center placement. Preserve the relative geometry
+visuals noncollidable.                                                      of the ledges, machines and crawl spaces.
+
+                                                                            Import, scaling and collision instructions are expanded in
+Existing gameplay stays authoritative                                       ROBLOX_IMPORT_GUIDE.txt. The helper code and source mapping are
+Hide the supplied demonstration pins and return balls where the game        included in the asset package.
+already owns those objects. The package does not implement bowling
+scoring or physical pinsetter simulation.
+
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                             9
+CLAUDE CHAT / ROBLOX STUDIO
+
+
+
+Files, validation and the next conversation
+
+What the asset download contains                                            Measured checks
+Source/                                                                     - 1,154 visual mesh nodes; 541,632 triangles in total.
+
+Editable Blender scene, native animation and a prepared export scene.       - Largest mesh: 11,916 triangles, below the 20,000-triangle per-mesh limit.
+
+Imports/                                                                    - 669 simplified collision pieces and 243 articulated source objects.
+
+Full FBX and GLB visual and collision files; 38 modular FBX exports.        - FBX and GLB visuals and collisions reopened in Blender with matching
+                                                                            scale and visual bounds. 0 final topology warning nodes.
+Data/
+                                                                            Still required: Studio import and playtest
+Exact layout, original-object inventory, material palette, node mappings,
+motion groups and sampled loop transforms.                                  The existing game has not been opened or changed. Asset upload,
+                                                                            target-game placement, material tuning, character collision checks and
+Studio/
+                                                                            device performance tests remain for Studio.
+Readable Luau import helpers and a ready-to-insert helper model. Nothing
+runs automatically on insertion.                                            Primary references
+
+References/ and Validation/                                                 Claude upload support
+
+                                                                            Roblox 3D Importer
+Visual references, mesh-budget reports and format reimport results.
+                                                                            Roblox mesh specifications
+Upload to Claude chat
+                                                                            Roblox units
+Start with this PDF and CLAUDE_HANDOFF.txt. Add Data/layout.json for
+exact placement. Keep the large binary meshes locally for Studio; do not
+rename them as text files.
+
+
+
+
+BOWLING BACKSTAGE | LATEST DETAILED SCENE | NOVEMBER 12, 2026                                                                                        10
+
