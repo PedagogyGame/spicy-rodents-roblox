@@ -203,8 +203,7 @@ for _, d in model:GetDescendants() do
 	if d:IsA("SurfaceGui") and d.Name == "Paint" then
 		labels += #d:GetChildren()
 		local face = d.Parent :: BasePart
-		paintCanvas =
-			math.max(paintCanvas, d.PixelsPerStud * math.max(face.Size.X, face.Size.Y, face.Size.Z))
+		paintCanvas = math.max(paintCanvas, d.PixelsPerStud * math.max(face.Size.X, face.Size.Y, face.Size.Z))
 		if d.LightInfluence ~= 1 then
 			fail("paint is lit by the room")
 		end
