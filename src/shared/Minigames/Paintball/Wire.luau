@@ -45,10 +45,11 @@
 --                   BIT.air), and place: the number of the last placement the client obeyed (0: none
 --                   yet). The server DROPS a Move whose place is not the slot's current one (Contract,
 --                   "who is trusted": it was sampled before a respawn or a correction reached the
---                   client). Sent only while seated, and not while tagged out.
+--                   client). Sent only while seated, after the first placement, and not while tagged out.
 --   Paintball.Fire  reliable, 42 bytes (layout Fire). One per ball the client's own magazine let go:
---                   shot (the client's counter, from 1, echoed in the ack), vt and ft (Clock.stamp),
---                   the origin (the eye point) and the unit look direction.
+--                   shot (the client's counter: 1, 2 ... 65535, 1 ..., echoed in the ack; nobody does
+--                   arithmetic on it), vt and ft (Clock.stamp), the origin (the eye point) and the unit
+--                   look direction.
 --   Minigame.Input  verb "reload" { t }: R was pressed at t (the shared clock). Verb "side" {}: put me
 --                   on the other team (PaintballService, "the roster"). The framework's "leave".
 -- SERVER TO THE AUDIENCE (everybody near: Arena.AUDIENCE_MARGIN; the seated are always in it)

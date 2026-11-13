@@ -23,8 +23,12 @@
 -- defaults); the match in play keeps its own (state.feel), and everything below that says `feel`
 -- means state.feel.
 --
--- WHAT THE SERVICE KEEPS FOR A PERSON'S SLOT (all of it starts afresh when a person takes the seat)
---   place     the placement number (Wire.nextPlace each time the server moves the body; 0 at first)
+-- WHAT THE SERVICE KEEPS FOR A PERSON. It is kept BY PLAYER, not by seat (the people still seated are
+-- dealt new seats at every new match, and their clients' controllers live on across it); "the slot's"
+-- below means "of the person who holds that slot". All of it starts afresh when a person is seated
+-- (joined); at a new match (`start`) `place`, `up`, `lastM` and `shot` carry on and the rest starts afresh.
+--   place     the placement number (Wire.nextPlace each time the server moves the body; 0 until the
+--             first placement: until then the person's Moves are dropped and inPlay says yes)
 --   moves     the last Clock.MOVES_KEPT accepted Moves, by their own t; emptied by every placement
 --   anchor    the last accepted pose (after a placement: the pose the server placed)
 --   up        a Clock.View fed by Clock.observe(up, move.t, now) for every Move that gets as far as
@@ -95,8 +99,9 @@
 --                         "paintball_unwatch" to the audience.
 --   state(player, seat)   Contract.Extras for that player's "state" message.
 --   inPlay(player, body)  the framework's walk-away check, for an arena: true while the body is
---                         inside the arena volume (Arena.inVolume with 4 studs to spare), and for
---                         TRUST.placeGrace after the server moved it. False takes the player off.
+--                         inside the arena volume (Arena.inVolume with 4 studs to spare), until the
+--                         server has first placed it, and for TRUST.placeGrace after the server
+--                         moved it. False takes the player off.
 --   screen(view), sig(view)   the monitors: every part named Arena.MONITOR under hw (the lobby's,
 --                         and the old sets on each floor: the arena lane's bake) shows the phase, the
 --                         clock and both scores; idle, it shows the station's name.
@@ -120,8 +125,12 @@
 -- teamMin a side). If only bots are left the framework resets.
 --
 -- THE LOOP (step(dt), every server step; now = ctx.stamp())
---   0. Nothing at all unless hw is there and ctx.session.phase is "playing" (PB-15: an idle arena
---      costs nothing). Rules.sync(state, now): the model is slaved to the shared clock (Rules, "time").
+--   0. Nothing at all unless hw is there and ctx.session.phase is "playing" or "done" (PB-15: an
+--      idle arena costs nothing). Rules.sync(state, now): the model is slaved to the shared clock
+--      (Rules, "time"). DURING THE END CARD ("done") people may still walk about and see each other:
+--      of the steps below only 1, the silence of 2 (no idleness), 5 and 6 run, the bots stand where
+--      they stood, nothing is fired (Rules refuses: the phase), and the roll into the next match is
+--      watched for (above).
 --   1. Rules.drain(state):
 --      "phase"    ctx.dirty() (the view carries it).
 --      "respawn"  place the slot at arena.spawns[team][spawn]. A person: place = Wire.nextPlace(place);
@@ -185,8 +194,9 @@
 --   Everything in the step that is not 3 or 4 is Stats.restMs. The shares are Contract.COST.
 -- THE REMOTES (Wire; Shared/Net has checked shape and rate before the port hands a record over)
 --   onMove   a person's pose (Contract, "who is trusted", is the rule; this is the order).
---            a. Not seated here, or the session is not "playing": dropped.
---            b. The slot is out, or rec.place is not the slot's place: dropped (Stats.movesDropped).
+--            a. Not seated here, or the session is neither "playing" nor "done": dropped.
+--            b. The slot has not been placed yet (place = 0), is out, or rec.place is not the slot's
+--               place: dropped (Stats.movesDropped).
 --            c. rec.t not later than the last accepted Move's t, later than now + TRUST.clockSlack, or
 --               older than now - TRUST.moveAge: dropped (movesDropped).
 --            d. Clock.observe(up, rec.t, now); heardAt = now.
@@ -202,10 +212,10 @@
 --               inside TRUST.refusalWindow is a CORRECTION (Stats.corrections): place =
 --               Wire.nextPlace(place), engine.teleport to the anchor, `moves` emptied, the budget
 --               full, ctx.send "paintball_correct" { x, y, z, yaw, why (the last refusal's), place }.
---   onFire   a click. Not seated here or not "playing": dropped without a word. Otherwise EVERY Fire
---            gets one "paintball_ack" (ctx.send) carrying the slot's magazine as it then stands, and
---            `shot` becomes rec.shot. In order, the first failure refuses (ok = false, its why;
---            Stats.shotsRefused):
+--   onFire   a click. Not seated here, or the session neither "playing" nor "done": dropped without a
+--            word. Otherwise EVERY Fire gets one "paintball_ack" (ctx.send) carrying the slot's
+--            magazine as it then stands, and `shot` becomes rec.shot. In order, the first failure
+--            refuses (ok = false, its why; Stats.shotsRefused):
 --            a. the slot is silent (step 2): "stale";
 --            b. f, late, rewind, clamped, m = Clock.stamp(now, rec.vt, rec.ft, lastM, up.lag)
 --               (clamped counts in Stats.rewindsClamped);

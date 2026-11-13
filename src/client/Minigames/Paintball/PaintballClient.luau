@@ -62,7 +62,8 @@
 --                the shared clock in the frame it is sampled, the REAL feet point through
 --                Arena.toLocal, yaw and pitch from the camera's look through Arena.dirToLocal and
 --                Body.yawPitch, BIT.crouch = crouch is wanted, BIT.sprint = k > 0, BIT.air, and
---                place). No Move is sent while you are tagged out.
+--                place). No Move is sent before your first placement (seat.place = 0: you are still at
+--                the arena door) nor while you are tagged out.
 --   firing       one click, one ball, never hitscan. A fire press asks for a ball; it leaves in the
 --                first frame in which ALL of these hold (each is the client's side of Contract.MARGIN,
 --                stricter than the server's, so the server never refuses a ball that was drawn):
