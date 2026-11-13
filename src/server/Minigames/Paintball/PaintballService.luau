@@ -13,13 +13,15 @@
 --     nothing of it (Stream.sprinting);
 --   * the origin's "Body.JUMP_HEIGHT more while the newest Move says BIT.air" is allowed below the eye
 --     as well as above it: a body coming down from a hop is lower than its newest Move (Stream.originOk);
---   * an unsupported pose is judged exactly as written (Stream, "the height rule"): it may not be more
---     than TRUST.riseSlack above the last accepted pose, so a hop taken off a ledge is refused until it
---     comes down past the ledge;
 --   * a slot's splats and pose history are emptied when its occupant changes, when the roster is read.
+-- WHERE IT DID NOT DO AS WRITTEN, FOR THE HONEST PLAYER (as written each of these refuses or drops
+-- somebody who did nothing wrong; nothing another lane sends or hears changes; all reported):
 --   * a body has a footprint (Stream, "the height rule"): a pose whose feet point is up to a stud past
---     the edge of a floor is still standing on it. The contract's point test refuses an honest player
---     who stands at an edge.
+--     the edge of a floor is still standing on it. The contract's point test refuses a player who
+--     stands at an edge;
+--   * a running jump off a ledge is a hop (Stream, "the height rule"): an unsupported pose may be as
+--     high as a hop from the surface the body last stood on, not merely "no higher than the last
+--     accepted pose" (which refuses every Move of the hop that rises past the edge);
 --   * the body rule (onMove e, "the body") counts height only for a body that stands: while a pose is
 --     falling, and a quarter of a second after, the replicated body is still on its way down behind its
 --     own Moves and only the sideways distance is held to TRUST.bodySlack (Stream, "the body rule");
@@ -29,9 +31,10 @@
 --     back than Clock.MAG_LATE (onFire; Stream, "a click that came late"): as written, a strafing
 --     shooter's click behind one lost packet is refused, which the lane guide's own "three shots
 --     bunched half a second late are all accepted" says it must not be.
--- AND THREE PLACES WHERE IT DID NOT DO AS WRITTEN, because as written a liar gains (all reported):
---   * a fall must fall (Stream, "the height rule"): an unsupported pose that does not come down at a
---     quarter of gravity or faster is refused, not allowed to walk level for the whole of TRUST.fallSecs;
+-- AND WHERE IT DID NOT DO AS WRITTEN BECAUSE AS WRITTEN A LIAR GAINS (all reported):
+--   * a fall must fall (Stream, "the height rule"): an unsupported pose must come down at a quarter of
+--     gravity or faster from the height of a hop; it is not allowed to walk level for the whole of
+--     TRUST.fallSecs (a third of a second is what is left of that);
 --   * after a CORRECTION the distance budget is EMPTY, not full (Stream.placed): a full one hands half a
 --     second of free distance to whoever gets themselves refused, 28 studs a second on corrections alone;
 --   * a correction whose anchor hangs in mid-air (a "fall" that never came down) puts the body on the

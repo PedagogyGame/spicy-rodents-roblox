@@ -3,10 +3,10 @@
 -- (Server/Minigames/Paintball/Stream; Shared/Minigames/Paintball/Contract, "who is trusted for what"), and
 -- the pass desk (Server/Minigames/Paintball/PassDesk; checklist PB-12). Pure: the whole-game cases are in
 -- tests/unit/paintball_server.spec.luau. Here each rule is held on its own, with the contract's numbers, in
--- the stand-in building: the time rules, the distance budget and what refills it, the height rule (as the
--- contract words it, a hop taken off a ledge included, with the two things Stream adds: a body's footprint
--- at an edge, and a fall that must fall), the pose at a time, the sprint window, the origin of a shot, and
--- silence.
+-- the stand-in building: the time rules, the distance budget and what refills it, the height rule (Stream's
+-- header says where it is not the contract's wording: a body's footprint at an edge, a running jump off a
+-- ledge, a fall that must fall), the body rule, the pose at a time, the sprint window, the origin of a
+-- shot, a click that came late, and silence.
 local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local ArenaModule = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
@@ -181,8 +181,10 @@ return function(t)
 	)
 
 	t.test(
-		"the height rule: a jump on the floor and a drop are free, a body at an edge still stands on it, a rise in the air is refused, and a fall must fall",
+		"the height rule: a jump on the floor, a drop and a running jump off a ledge are free; a body at an edge still stands on it; higher than a hop, level on air and a glide are refused",
 		function()
+			local G = 196.2 -- the engine's gravity, studs/s^2
+			local V = math.sqrt(2 * G * Body.JUMP_HEIGHT) -- the speed a hop leaves the ground at
 			-- on the first storey's slab, north of the atrium
 			local person, send = placed(-5, FLOOR, -17)
 			-- a jump where it stands: up to JUMP_HEIGHT + jumpSlack over the floor is supported
@@ -205,6 +207,7 @@ return function(t)
 			t.eq((fall({ t = 100.3, z = -5, y = FLOOR - 6, bits = Wire.BIT.air })), "accepted", "and dropping")
 			t.eq((fall({ t = 100.45, z = -4, y = 0 })), "accepted", "to the floor below")
 			t.eq(faller.fallSince, nil)
+			t.eq(faller.standY, 0, "it stands on the ground floor now")
 			-- A BODY HAS A FOOTPRINT: a feet point up to a stud past the edge is still standing on the landing,
 			-- for as long as it likes (the contract's point test would refuse it after TRUST.fallSecs)
 			local edger, edge = placed(12.5, FLOOR, -8)
@@ -219,46 +222,75 @@ return function(t)
 				"accepted",
 				"and it may hop there"
 			)
-			-- THE HOP OFF A LEDGE. As written, an unsupported pose may be no more than TRUST.riseSlack above the
-			-- last accepted one: stepping off and dropping is free, and a hop taken off the edge is refused while
-			-- it is still rising. (Reported as a gap in the contract: the rise ought to be measured from where
-			-- the body left the ground. It is one function, Stream's supportedOrFalling.)
+			-- THE RUNNING JUMP OFF A LEDGE: she sprints south, jumps a stud before the edge and sails out over
+			-- the ground floor. Every Move of the arc is accepted, at any phase of the send clock (the contract
+			-- as written refuses the ones that rise with nothing under them: three of them is a yank back)
+			local sprint = Body.speed(0, true, Contract.feel())
+			for phase = 0, 4 do
+				local jumper, jump = placed(12.5, FLOOR, -8)
+				local t0 = 100.2 + phase * 0.01 -- when she leaves the ground, at z = -8
+				local refused = 0
+				local i = 0
+				while true do
+					i += 1
+					local now = 100 + i * SEND
+					local z = -8 - sprint * (t0 - now) -- (walking up to the take-off; z < -8 before it)
+					local tau = now - t0
+					local y = FLOOR
+					if tau > 0 then
+						y = math.max(0, FLOOR + V * tau - G / 2 * tau * tau)
+					end
+					local bits = Wire.BIT.sprint + (if tau > 0 and y > 0 then Wire.BIT.air else 0)
+					if jump({ t = now, z = z, y = y, bits = bits }) ~= "accepted" then
+						refused += 1
+					end
+					if tau > 0 and y == 0 then
+						break
+					end
+				end
+				t.eq(refused, 0, `a running jump off the landing, phase {phase}`)
+				t.eq(jumper.standY, 0)
+			end
+			-- no higher than a hop from where it last stood
 			local hopper, hop = placed(12.5, FLOOR, -8)
-			t.eq(
-				(hop({ t = 100.05, z = -7.5, y = FLOOR + 0.5, bits = Wire.BIT.air })),
-				"accepted",
-				"still over the landing"
-			)
+			t.eq((hop({ t = 100.05, z = -7.5, y = FLOOR + 0.5, bits = Wire.BIT.air })), "accepted", "over the landing")
+			t.eq(hopper.standY, FLOOR, "a body in the air keeps the surface it took off from")
 			t.deepEq(
-				{ hop({ t = 100.1, z = -5.5, y = FLOOR + 1.2, bits = Wire.BIT.air }) },
+				{ hop({ t = 100.1, z = -5.5, y = FLOOR + Body.JUMP_HEIGHT + T.jumpSlack + 0.2, bits = Wire.BIT.air }) },
 				{ "refused", "wall" },
-				"rising, with nothing under it"
+				"higher than a hop, with nothing under it"
 			)
-			t.eq(
-				(hop({ t = 100.15, z = -5.2, y = FLOOR + 0.5, bits = Wire.BIT.air })),
-				"accepted",
-				"coming down past where it left"
-			)
+			t.eq((hop({ t = 100.15, z = -5.2, y = FLOOR + 1.9, bits = Wire.BIT.air })), "accepted", "the top of a hop")
 			t.truthy(hopper.fallSince ~= nil, "it is falling")
-			t.eq((hop({ t = 100.3, z = -4.5, y = FLOOR - 4, bits = Wire.BIT.air })), "accepted")
-			-- A FALL MUST FALL: a "fall" that does not come down is flying, and is refused within a fifth of a
-			-- second (the contract as written lets it walk level for the whole of TRUST.fallSecs)
+			t.eq((hop({ t = 100.35, z = -4.5, y = FLOOR - 4, bits = Wire.BIT.air })), "accepted")
+			t.deepEq(
+				{ hop({ t = 100.45, z = -4.2, y = FLOOR + 1.9, bits = Wire.BIT.air }) },
+				{ "refused", "wall" },
+				"and no second hop in the air"
+			)
+			-- A FALL MUST FALL: a pose that stays level on air is refused after a third of a second (the contract
+			-- as written lets it walk level for the whole of TRUST.fallSecs)
 			local hover, hang = placed(12.5, FLOOR, -8)
-			t.eq((hang({ t = 100.05, z = -5, bits = Wire.BIT.air })), "accepted", "the first Move past the edge")
-			t.eq((hang({ t = 100.15, z = -5, bits = Wire.BIT.air })), "accepted", "a tenth of a second is no fall yet")
-			t.deepEq({ hang({ t = 100.25, z = -5, bits = Wire.BIT.air }) }, { "refused", "wall" }, "hovering")
-			t.deepEq({ hang({ t = 100.3, z = -4.5, bits = Wire.BIT.air }) }, { "refused", "wall" }, "walking on air")
+			local level = 0
+			for i = 1, 12 do
+				if hang({ t = 100 + i * SEND, z = -5 + i * 0.5, bits = Wire.BIT.air }) == "accepted" then
+					level = i * SEND
+				else
+					break
+				end
+			end
+			t.truthy(level >= 0.25 and level <= 0.4, `walking on air lasted {level} s`)
 			t.truthy(hover.fallSince ~= nil)
-			-- a feather fall (an eighth of gravity) is refused; half of gravity is a fall (the engine's is 196.2,
-			-- and the rule asks for a quarter of it)
+			-- a feather fall (an eighth of gravity) is refused; half of gravity is a fall (the rule asks for a
+			-- quarter of the engine's)
 			for _, case in { { 1 / 8, false }, { 1 / 2, true } } do
 				local share, honest = case[1] :: number, case[2] :: boolean
 				local _, drift = placed(12.5, FLOOR, -8)
 				t.eq((drift({ t = 100.05, z = -5, bits = Wire.BIT.air })), "accepted")
 				local all = true
-				for i = 1, 5 do
+				for i = 1, 20 do
 					local tau = i * 0.05
-					local y = FLOOR - share * 196.2 / 2 * tau * tau
+					local y = math.max(0, FLOOR - share * G / 2 * tau * tau)
 					all = all and drift({ t = 100.05 + tau, z = -5, y = y, bits = Wire.BIT.air }) == "accepted"
 				end
 				t.eq(all, honest, `a fall at {share} of gravity`)
@@ -267,7 +299,7 @@ return function(t)
 			local long, drop = placed(12.5, FLOOR, -8)
 			t.eq((drop({ t = 100.05, z = -5, bits = Wire.BIT.air })), "accepted")
 			long.fallSince = 100.05 - T.fallSecs
-			long.fallFromY = FLOOR + 400
+			long.standY = FLOOR + 400
 			t.deepEq({ drop({ t = 100.1, z = -5, y = FLOOR - 0.5, bits = Wire.BIT.air }) }, { "refused", "wall" })
 		end
 	)

@@ -7,23 +7,32 @@
 --   a Move    judge(): dropped (an old placement number, an out slot, a bad or old stamp), refused with
 --             a Contract.WHY code (inside, height, walls, distance, the body: the first failure wins)
 --             or accepted, in which case it becomes the anchor and joins the last Clock.MOVES_KEPT
---   a click   sprinting() and originOk(): the two of the service's checks that read the Move buffer
+--   a click   clickOk(): the three of the service's checks that read the Move buffer (the sprint
+--             window, the spawn rooms, the origin), all at one time
 --   a pose    poseAt(): "the slot's pose at t", the straight line between the two Moves either side
 --             of t, held at the newest and at the oldest, the anchor when there are none
--- THE HEIGHT RULE is one function, supportedOrFalling(). As the contract words it: an unsupported pose
--- is accepted while it is no more than TRUST.riseSlack above the last accepted pose and the body has
--- been unsupported no longer than TRUST.fallSecs by the Moves' own t. Two things the contract does not
--- say are added, one for the honest and one against a liar:
+-- THE HEIGHT RULE is one function, supportedOrFalling(). The contract words it: a pose no higher than
+-- the walking surface under it + Body.JUMP_HEIGHT + TRUST.jumpSlack is SUPPORTED; an unsupported pose
+-- is accepted while it does not rise (TRUST.riseSlack above the last accepted pose) and has not been
+-- unsupported, by the Moves' own t, for longer than TRUST.fallSecs. Here supported is as written, with
+-- one thing added, and unsupported is ONE ENVELOPE in the place of the two clauses:
 --   A BODY HAS A FOOTPRINT. Arena.ground is asked about a point, and a body standing at the very edge
 --   of a floor or a landing (to look down the atrium, which everybody does) has its feet point past
 --   the edge while its feet are still on it. A pose is supported if the surface under it, OR under a
 --   point FOOT to any of its four sides, is. Without this an honest player at an edge is refused after
 --   fallSecs for as long as they stand there.
---   A FALL MUST FALL. An unsupported body that is not coming down is flying: after `tau` seconds
---   unsupported it must be at least FALL_FLOOR x tau^2 - FALL_SLACK below where the fall began (a
---   quarter of the engine's gravity: a real fall is four times that). Without this a pose could be
---   walked level out over the atrium for the whole of fallSecs: 25 studs at a walk, the atrium's 30 at
---   a sprint.
+--   A FALL IS A HOP AT THE MOST, AND IT MUST FALL. `standY` is the walking surface the body last stood
+--   on (within TRUST.groundSlack of it: a body in the air keeps the one it took off from, so a hop
+--   taken running down a stair is a hop from the step it left). An unsupported pose, `tau` seconds
+--   after the first unsupported Move of its fall, may be no higher than standY + JUMP_HEIGHT +
+--   jumpSlack - FALL_FLOOR x tau^2 (a quarter of the engine's gravity: a real fall is four times
+--   that), and tau may be no more than fallSecs. So a body may step off an
+--   edge and drop, and may RUN AND JUMP off it (the whole arc of a hop from the edge lies under the
+--   envelope, with a third of a stud to spare); it may not go higher than a hop, stay level for more
+--   than a third of a second, or glide. As written, the hop is refused (its Moves rise, with nothing
+--   under them, above the last accepted pose: every running jump off a balcony was three refusals and
+--   a yank back to the edge), and a pose may be walked level out over the atrium for the whole of
+--   fallSecs (25 studs at a walk, the atrium's 30 at a sprint). (Both reported.)
 -- THE BODY RULE (Contract, "the body": a pose within TRUST.bodySlack of the replicated body) is kept
 -- sideways always and up-and-down only for a body that stands: the replicated body trails its own
 -- client's Moves by the engine's physics replication, and a body dropping down the atrium at 100 studs
@@ -89,7 +98,7 @@ export type Person = {
 	heardAt: number, -- when a Move last got as far as being judged
 	out: boolean, -- tagged out: Moves are dropped and the pose is held until the respawn
 	fallSince: number?, -- the t of the first unsupported Move of the fall it is in
-	fallFromY: number, -- and that Move's height
+	standY: number, -- the walking surface the body last stood on (the one a hop or a fall began from)
 	fellAt: number, -- the t of the last accepted Move that was falling
 	crouchLog: { number }, -- (tick, crouch fraction) pairs of the last CROUCH_KEPT snapshot ticks, oldest first
 	refusals: { number }, -- when its recent Moves were refused (inside TRUST.refusalWindow)
@@ -109,7 +118,6 @@ local IDLE_STUDS = 0.5
 local IDLE_RAD = 0.05
 local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands on
 local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
-local FALL_SLACK = 0.5
 local LANDING = 0.25 -- seconds after a fall in which the replicated body may still be coming down
 local CROUCH_KEPT = 14 -- snapshot ticks of crouch kept (0.7 s: past Clock.MAG_LATE and a tick each side)
 
@@ -139,7 +147,7 @@ function Stream.new(player: any, now: number, placeFrom: number?): Person
 		heardAt = now,
 		out = false,
 		fallSince = nil,
-		fallFromY = 0,
+		standY = 0,
 		fellAt = -math.huge,
 		crouchLog = {},
 		refusals = {},
@@ -204,11 +212,13 @@ function Stream.placed(
 	-- its first Move after the correction fills the budget with that Move's own time.
 	person.budget = if stand then fullBudget(person.crouch, feel) else 0
 	person.fallSince = nil
+	person.standY = y
 	person.fellAt = -math.huge
 	table.clear(person.refusals)
 end
 
--- THE HEIGHT RULE (Contract, "height"). Returns ok, and whether the pose is unsupported (falling).
+-- THE HEIGHT RULE (Contract, "height"; the header says where it is not as written). Returns ok, whether
+-- the pose is unsupported (falling), and for a supported pose the surface it stands on.
 local function supportedOrFalling(
 	person: Person,
 	arena: Arena,
@@ -216,14 +226,14 @@ local function supportedOrFalling(
 	x: number,
 	y: number,
 	z: number
-): (boolean, boolean)
+): (boolean, boolean, number)
 	local ground = arena.ground(x, y, z)
 	if ground == nil or y < ground - T.groundSlack then
-		return false, false
+		return false, false, 0
 	end
 	local reach = Body.JUMP_HEIGHT + T.jumpSlack
 	if y <= ground + reach then
-		return true, false
+		return true, false, ground
 	end
 	-- a body has a footprint: at the very edge of a floor the feet point is past it
 	for i = 1, 4 do
@@ -231,21 +241,16 @@ local function supportedOrFalling(
 		local dz = if i == 3 then FOOT elseif i == 4 then -FOOT else 0
 		local side = arena.ground(x + dx, y, z + dz)
 		if side ~= nil and y >= side - T.groundSlack and y <= side + reach then
-			return true, false
+			return true, false, side
 		end
 	end
-	-- not supported: a fall. It may not rise, it may not last, and it must come down
-	if y > person.anchor.y + T.riseSlack then
-		return false, true
-	end
+	-- not supported: no higher than a hop from where it last stood, coming down, and not for long
 	local since = person.fallSince
-	if since ~= nil then
-		local tau = t - since
-		if tau > T.fallSecs or y > person.fallFromY - (FALL_FLOOR * tau * tau - FALL_SLACK) then
-			return false, true
-		end
+	local tau = if since ~= nil then t - since else 0
+	if tau > T.fallSecs or y > person.standY + reach - FALL_FLOOR * tau * tau then
+		return false, true, 0
 	end
-	return true, true
+	return true, true, 0
 end
 
 -- Judge one Move record (Wire.Move, already decoded and checked finite by Shared/Net). `otherRoom` is
@@ -290,7 +295,7 @@ function Stream.judge(
 		return "refused", "wall"
 	end
 	-- height
-	local ok, falling = supportedOrFalling(person, arena, t, x, y, z)
+	local ok, falling, surface = supportedOrFalling(person, arena, t, x, y, z)
 	if not ok then
 		return "refused", "wall"
 	end
@@ -330,11 +335,13 @@ function Stream.judge(
 	if falling then
 		if person.fallSince == nil then
 			person.fallSince = t
-			person.fallFromY = y
 		end
 		person.fellAt = t
 	else
 		person.fallSince = nil
+		if y <= surface + T.groundSlack then
+			person.standY = surface -- (on the ground: a body in a hop keeps the surface it took off from)
+		end
 	end
 	local ix, iy, iz = x - person.idleX, y - person.idleY, z - person.idleZ
 	if

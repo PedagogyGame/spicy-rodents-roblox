@@ -46,8 +46,8 @@ local function teamOf(kit: Kit.Kit, c: Kit.Client): number
 end
 
 -- two people in the hall, one a side, the match live and both out of their spawn rooms' protection
-local function pair(kit: Kit.Kit): (Kit.Client, Kit.Client)
-	local ada, bea = kit.client("Ada"), kit.client("Bea")
+local function pair(kit: Kit.Kit, copts: { [string]: any }?): (Kit.Client, Kit.Client)
+	local ada, bea = kit.client("Ada", copts), kit.client("Bea")
 	assert(kit.join(ada))
 	assert(kit.join(bea))
 	kit.run(0.2)
@@ -405,7 +405,60 @@ return function(t)
 	end)
 
 	t.test(
-		"walking out over the edge without falling lasts no longer than a fall may, and ends on the floor below",
+		"a running jump off a ledge costs nothing: every Move of the arc is accepted, at 0 and at 150 ms, and she lands where a jump lands",
+		function()
+			for _, delay in { 0, 5 } do
+				Kit.play(function(kit)
+					local ada = pair(kit, { delay = delay, jitter = if delay > 0 then 2 else 0 })
+					local stats = kit.service:stats()
+					local top = Arena.FLOOR_HEIGHT
+					local sprint = Body.speed(0, true, kit.state().feel)
+					kit.walk(ada, -36, -2)
+					local before = ada.stub.body.teleports
+					-- she sprints east, leaves the ground a stud before the edge (x = -30) and sails out
+					ada.sprint = true
+					kit.walk(ada, -31, -2, sprint)
+					local g, v = 196.2, math.sqrt(2 * 196.2 * Body.JUMP_HEIGHT)
+					-- (the body the server sees is the engine's replica of hers, nine frames behind her own Moves:
+					-- ten studs above her by the end of the drop)
+					local tau = 0
+					local trail: { { number } } = {}
+					local function replica()
+						table.insert(trail, { ada.x, ada.y, ada.z })
+						local was = trail[math.max(1, #trail - 9)]
+						local body = ada.stub.body
+						body.x, body.y, body.z = Arena.toWorld(kit.place, was[1], was[2], was[3])
+					end
+					ada.bodyApart = true
+					ada.air = true
+					while ada.y > 0 do
+						tau += 1 / 60
+						ada.x += sprint / 60
+						ada.y = math.max(0, top + v * tau - g / 2 * tau * tau)
+						replica()
+						kit.frame()
+					end
+					ada.air = false
+					for _ = 1, 10 do
+						ada.x += sprint / 60
+						replica()
+						kit.frame()
+					end
+					ada.bodyApart = false
+					kit.walk(ada, ada.x + 4, -2, sprint)
+					kit.run(0.5)
+					t.eq(stats.movesRefused, 0, `no Move of the jump was refused ({delay} frames of delay each way)`)
+					t.eq(stats.corrections, 0)
+					t.eq(ada.stub.body.teleports, before, "and her body was never put back")
+					t.near(kit.service.poses[ada.seat].y, 0, 0.01)
+					t.truthy(kit.service.poses[ada.seat].x > -30 + 10, "a dozen studs out from the ledge")
+				end, { arena = Kit.hall({ ledge = true }) })
+			end
+		end
+	)
+
+	t.test(
+		"walking out over the edge without falling lasts a third of a second, and ends on the floor below",
 		function()
 			Kit.play(function(kit)
 				local ada = pair(kit)
@@ -418,9 +471,10 @@ return function(t)
 				local fix = ada.last("paintball_correct")
 				t.eq(fix.y, 0, "put down on the floor under where it hung")
 				local reach = fix.x - -30
-				t.truthy(reach <= Body.WALK * T.speedTolerance * (T.fallSecs + 0.2), `{reach} studs of air`)
+				-- (a stud of footprint at the edge, then no longer level than a hop is)
+				t.truthy(reach <= 1 + Body.WALK * 0.45, `{reach} studs of air`)
 				t.eq(ada.y, 0)
-				t.truthy(top > 0)
+				t.truthy(top > 0 and T.fallSecs > 0.45)
 			end, { arena = Kit.hall({ ledge = true }) })
 		end
 	)
