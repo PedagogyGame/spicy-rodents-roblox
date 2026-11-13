@@ -536,7 +536,11 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			return
 		end
 		for player in service.audience do
-			port.fire(player, remote, payload)
+			-- (a player who has left the game is dropped from the audience at its next pass: nothing is
+			-- fired at one in the meantime)
+			if typeof(player) ~= "Instance" or (player :: Instance).Parent ~= nil then
+				port.fire(player, remote, payload)
+			end
 		end
 	end
 
@@ -1047,6 +1051,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		end
 		rosterDirty = true -- (the fill comes right after this event: the next step balances and tells the audience)
 		nextSnap = now
+		monitors = nil -- (looked for again: the building may have been baked or streamed in since)
 	end
 
 	local function onLeft(e: ServerGame.Event, _now: number)
@@ -1094,6 +1099,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		Splats.reset(pools)
 		heard, shotBatch, splatBatch = {}, {}, {}
 		rosterDirty = false
+		monitors = nil
 		for player in service.audience do
 			ctx.send(player, { kind = "paintball_unwatch" })
 		end

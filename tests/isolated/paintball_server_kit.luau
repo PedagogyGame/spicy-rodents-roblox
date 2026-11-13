@@ -14,7 +14,8 @@
 -- Every Minigame.State message any client hears is held to Wire.checkMessage as it is heard.
 -- ONLY IN AN ISOLATED RUN (it needs the rig).
 -- Interface: play(fn(kit), opts?) (opts: arena, feel, paintball = more Deps, service = more service opts,
---   lag, realPass = the service's own pass desk instead of one that says everybody holds a pass); kit.w, kit.wires, kit.service, kit.state(), kit.now(), kit.frame(), kit.run(seconds),
+--   lag, realPass = the service's own pass desk instead of one that says everybody holds a pass, realEngine =
+--   the service's own Engine, on the fake engine's Instances, instead of the fake one); kit.w, kit.wires, kit.service, kit.state(), kit.now(), kit.frame(), kit.run(seconds),
 --   kit.untilTrue(limit, cond), kit.client(name, opts?) -> Client (opts: delay frames each way or up and down, jitter, lose 0..1,
 --   seed), kit.join(client) -> (ok, why), kit.walk(client, x, z, speed?), kit.live() (cut the briefing short and
 --   let protection run out), kit.broken (schema failures); Client: seat, place, x, y, z, yaw, pitch, crouch,
@@ -146,7 +147,10 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 	local undo = Model.install()
 	local wires = PaintballRig.new({ lag = o.lag })
 	local arena = o.arena or Kit.hall()
-	local deps: { [string]: any } = { arena = arena, engine = Kit.fakeEngine(), feel = o.feel, seed = 5 }
+	local deps: { [string]: any } = { arena = arena, feel = o.feel, seed = 5 }
+	if not o.realEngine then
+		deps.engine = Kit.fakeEngine()
+	end
 	if not o.realPass then
 		-- (everybody holds a pass, unless the case is about the pass)
 		deps.pass = {

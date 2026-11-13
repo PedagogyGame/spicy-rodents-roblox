@@ -581,4 +581,69 @@ return function(t)
 			end)
 		end
 	)
+
+	t.test(
+		"the monitors: the station's name while the arena is empty, both scores and the clock during a match, the result at the end card",
+		function()
+			Kit.play(function(kit)
+				local FakeEngine = require("@tests/lib/FakeEngine")
+				local roblox = require("@lune/roblox")
+				local monitor = FakeEngine.part(Arena.MONITOR, roblox.CFrame.new(0, 0, 0), kit.service.hw)
+				local function shown(): string
+					local gui = monitor:FindFirstChild("PaintballScreen")
+					local label = gui and gui:FindFirstChild("Text")
+					return if label then label.Text else ""
+				end
+				local ada, bea = pair(kit)
+				kit.run(1.1)
+				t.truthy(string.find(shown(), "ORANGE 0  -  0 TEAL", 1, true), shown())
+				t.truthy(string.find(shown(), "\n7:5%d$"), "eight minutes on the clock, counting down: " .. shown())
+				t.truthy((kit.service:debug("tag", bea.seat, ada.seat)))
+				kit.run(1.1)
+				t.truthy(string.find(shown(), "ORANGE 0  -  1 TEAL", 1, true), shown())
+				t.truthy((kit.service:debug("end")))
+				kit.run(1.2)
+				t.truthy(string.find(shown(), "Teal wins 1 - 0", 1, true), shown())
+				kit.w.svc:leave(ada.stub, "left")
+				kit.w.svc:leave(bea.stub, "left")
+				kit.run(1.2)
+				t.eq(shown(), "Paintball match")
+			end)
+		end
+	)
+
+	t.test(
+		"the service's own hands on a real body: the rig's player joins at the prompt, her body is put in her spawn room in the match's collision group, and back in the lobby in its own group when she is dropped",
+		function()
+			Kit.play(function(kit)
+				local w = kit.w
+				local body = w.body
+				local FakeEngine = require("@tests/lib/FakeEngine")
+				body.Parent = FakeEngine.workspace() -- (a body that is in the world: one with no parent is gone)
+				local limb = FakeEngine.part("LeftFoot", body.PrimaryPart.CFrame, body)
+				Rig.press(w, Contract.STATION)
+				kit.run(0.5)
+				t.truthy(kit.session.seats[1] == w.player and not kit.session.gone[1], "she is seated")
+				local root = body.PrimaryPart
+				local sp = kit.arena.spawns[1][1]
+				local x, y, z = Arena.toLocal(kit.place, root.Position.X, root.Position.Y, root.Position.Z)
+				t.near(x, sp.x, 1e-3)
+				t.near(y, sp.y + 3, 1e-3, "her root stands its own height over the spawn point")
+				t.near(z, sp.z, 1e-3)
+				t.deepEq(
+					{ root.CollisionGroup, limb.CollisionGroup },
+					{ Contract.COLLISION_GROUP, Contract.COLLISION_GROUP }
+				)
+				t.truthy(kit.service:inPlay(w.player, body))
+				-- her client is the contract's stub: it sends no pose, so she is silent, and then taken off
+				kit.run(Clock.DROP_SECS + T.placeGrace + 0.5)
+				t.eq(kit.session.phase, "idle")
+				local left = Rig.last(w.got, "left")
+				t.truthy(left ~= nil and left.why == "dropped", "she was told why")
+				x, y, z = Arena.toLocal(kit.place, root.Position.X, root.Position.Y, root.Position.Z)
+				t.falsy(Arena.inVolume(x, y, z), "back in the lobby")
+				t.deepEq({ root.CollisionGroup, limb.CollisionGroup }, { "Default", "Default" })
+			end, { realEngine = true })
+		end
+	)
 end
