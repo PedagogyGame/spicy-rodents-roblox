@@ -10,7 +10,7 @@
 --                       pocket with the rack, the tray; the bumper pool table from its end and from above
 -- With "play" a table is shown as a game leaves it (a spread of balls, some down in the tray) instead of an
 -- idle rack. Usage, from the repo root:
---   lune run tools/games/pool/review_scene.luau [out dir, default build/review_pool] [play]
+--   lune run tools/games/pool/review_scene.luau [out dir, default build/review_pool] [play] [nolamp]
 --   /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene <out>/scene.json \
 --       --views <out>/views.json --out <out>
 -- Interface: a script; writes the three files and prints what it wrote.
@@ -29,6 +29,7 @@ local attractionsExport = require("../../review/attractions_export")
 
 local OUT = process.args[1] or "build/review_pool"
 local PLAY = process.args[2] == "play"
+local NOLAMP = process.args[3] == "nolamp"
 local PLACE: AlleyLayout.Place = { x = 0, z = 0, floorY = 0, yaw = 0 }
 
 local kit = Kit.new(roblox, PLACE)
@@ -116,6 +117,16 @@ end
 if PLAY then
 	for _, st in stations do
 		spread(st)
+	end
+end
+-- "nolamp": the lamps taken down, as the game hides them for the top view
+if NOLAMP then
+	for _, st in stations do
+		local model = room:FindFirstChild(Furniture.modelName(st.game, st.index))
+		local lamp = model and model:FindFirstChild("Lamp")
+		if lamp then
+			lamp:Destroy()
+		end
 	end
 end
 

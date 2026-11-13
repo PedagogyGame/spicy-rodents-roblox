@@ -29,6 +29,7 @@ local FELT = { 28, 112, 72 }
 local CUSHION = { 24, 98, 62 }
 local SLATE = { 44, 46, 50 }
 local BLACK = { 14, 14, 16 }
+local LEATHER = { 46, 30, 22 }
 local PEARL = { 236, 234, 220 }
 local CHALK = { 60, 110, 190 }
 local MAPLE = { 222, 190, 136 }
@@ -54,12 +55,13 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 		t:box(
 			m,
 			"PocketWell",
-			hole.x - s - 0.2,
-			hole.x + s + 0.2,
+			-- (inside the aprons: a well that reached through them showed as a black slot in the side)
+			math.max(hole.x - s - 0.2, -ow + 0.15),
+			math.min(hole.x + s + 0.2, ow - 0.15),
 			-F.WELL_DEPTH - 0.08,
 			-F.WELL_DEPTH,
-			hole.z - s - 0.2,
-			hole.z + s + 0.2,
+			math.max(hole.z - s - 0.2, -ol + 0.15),
+			math.min(hole.z + s + 0.2, ol - 0.15),
 			BLACK,
 			"SmoothPlastic",
 			SOFT
@@ -77,6 +79,20 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 				z1 = z0 + 0.03
 			end
 			t:box(m, "PocketLiner", x0, x1, -F.WELL_DEPTH, -F.CLOTH_T - F.SLATE_T, z0, z1, BLACK, "SmoothPlastic", SOFT)
+			-- the leather facing at the back of the pocket, up to the rail's top: the sides away from the cloth
+			-- (never the side a ball comes in by, which stays open to the bed)
+			if ax * hole.mx + az * hole.mz <= 1e-9 then
+				local bx0, bx1 = hole.x - s + 0.002, hole.x + s - 0.002
+				local bz0, bz1 = hole.z - s + 0.002, hole.z + s - 0.002
+				if ax ~= 0 then
+					bx0 = hole.x + ax * (s - 0.014) - 0.012
+					bx1 = bx0 + 0.024
+				else
+					bz0 = hole.z + az * (s - 0.014) - 0.012
+					bz1 = bz0 + 0.024
+				end
+				t:box(m, "PocketBack", bx0, bx1, -F.CLOTH_T - F.SLATE_T, top - 0.004, bz0, bz1, LEATHER, "Fabric", SOFT)
+			end
 		end
 	end
 	for _, r in kit:holes(-iw, iw, -il, il, cuts) do
