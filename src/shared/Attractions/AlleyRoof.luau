@@ -81,7 +81,8 @@ local STUDS_PER_UNIT = 2.5 -- as tools/compile (the sample count is v5.4's, on t
 
 -- The ground kept for the yard house and its tree: outside the alley's footprint (X -42..152), outside the
 -- backstage reserve (D >= 54.2) and lounge one (world x 1462..1512, z -334..-390 = X 162..212, D -86..-30).
-AlleyRoof.ANNEX = { x0 = 152, x1 = 212, d0 = 4, d1 = 40, ["for"] = "the yard house and tree, addendum D9" }
+-- (D to 48, not the survey's 40: the tree's crown reaches 16 south of its trunk.)
+AlleyRoof.ANNEX = { x0 = 152, x1 = 212, d0 = 4, d1 = 48, ["for"] = "the yard house and tree, addendum D9" }
 
 -- THE BUILDING AS IT STANDS (feat/alley-18, tools/bake/alley/Shell) -----------------------------------------------
 -- The games wing's roof: membrane on top of the 1.6 slab, parapets 1.2 tall with a 0.2 coping.
