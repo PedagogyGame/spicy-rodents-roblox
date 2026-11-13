@@ -1,0 +1,9968 @@
+{
+ "$schema": "art/neighbourhood_shop v1",
+ "src": "tools/blender/neighbourhood_shop (export_shop.py: the owner's GLBs as FBX in studs; publish.py: the upload).",
+ "placement": "InsertService:LoadAsset(assetId):GetChildren()[1] is a Model whose pivot is the FBX origin = the centre of the shop floor; PivotTo(the venue's pivot) puts every MeshPart at its `centre` (venue frame at yaw 0). Each MeshPart is unrotated. Untextured materials may arrive grey: Server/Assets/ShopArt paints a MeshPart without a SurfaceAppearance with its `colour`; `alpha` < 1 is glass.",
+ "assets": {
+  "proof": {
+   "assetId": "125385667175324",
+   "moderation": "Approved",
+   "displayName": "SR shop proof cafe stools",
+   "fbxBytes": 101948,
+   "sha": "900ee378c59a2e27"
+  },
+  "shop": {
+   "assetId": "123466732493677",
+   "moderation": "Approved",
+   "displayName": "SR The Neighbourhood Shop interior",
+   "fbxBytes": 6577244,
+   "sha": "5e93e3d3f015a6b6"
+  },
+  "roof": {
+   "assetId": "129861597929647",
+   "moderation": "Approved",
+   "displayName": "SR Neighbourhood Shop gable roof",
+   "fbxBytes": 362668,
+   "sha": "1dff9840e9a85506"
+  }
+ },
+ "units": "studs; the venue frame at yaw 0 (X across, Y up, Z = -D), origin at the centre of the shop floor",
+ "scale": 3.0,
+ "roof": {
+  "span": 1.25,
+  "run": 1.04,
+  "turn": "-90 degrees about the vertical (ridge along X, chimney at +Z)",
+  "box": {
+   "centre": [
+    0.0,
+    22.7663,
+    0.0
+   ],
+   "size": [
+    46.6128,
+    18.6975,
+    43.2375
+   ]
+  },
+  "decks": {
+   "RoofDeck_West": {
+    "name": "RoofDeck_West",
+    "centre": [
+     0.0,
+     21.1931,
+     10.2188
+    ],
+    "size": [
+     46.488,
+     0.5257,
+     24.4875
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ],
+    "back": [
+     0.0,
+     -0.5508,
+     0.8346
+    ]
+   },
+   "RoofDeck_East": {
+    "name": "RoofDeck_East",
+    "centre": [
+     0.0,
+     21.1931,
+     -10.2188
+    ],
+    "size": [
+     46.488,
+     0.5257,
+     24.4875
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ],
+    "back": [
+     0.0,
+     0.5508,
+     0.8346
+    ]
+   }
+  }
+ },
+ "sources": {
+  "shop": {
+   "file": "docs/reference/store_roofs/art_pack/GLB/04_Offbeat_Shop_Interior.glb",
+   "sha256": "8816221f32f25bc7ac295a668bd0674eb52ae02c603958a88dbdd6b2ea1cda18"
+  },
+  "metadata": {
+   "file": "docs/reference/store_roofs/art_pack/Metadata/04_Offbeat_Shop_Interior.json",
+   "sha256": "8f9ddb5efd9f69b312a45663caea7c07d82dc955c6b4cce977bc773b352e6f52"
+  },
+  "roof": {
+   "file": "docs/reference/store_roofs/roof_rafter_kit/GLB/02_Full_Gable_Roof_14m.glb",
+   "sha256": "5056f48d270928f7c3058e317e4947ec949a481da6cb2c0d22e189f30b1655c0"
+  },
+  "roofColliders": {
+   "file": "docs/reference/store_roofs/roof_rafter_kit/GLB/04_Roof_Collider_Proxies.glb",
+   "sha256": "432eb745533cc99cc30ccd954b17289b44d8968523ec4b1ef3ef7fbea3a0db86"
+  }
+ },
+ "entrance": {
+  "node": "PORT_ShopEntrance",
+  "at": [
+   11.34,
+   0.0,
+   18.0
+  ],
+  "clearWidth": 4.5
+ },
+ "colliders": [
+  {
+   "name": "RetailFloor",
+   "centre": [
+    9.0,
+    -0.36,
+    0.0
+   ],
+   "size": [
+    24.0,
+    0.72,
+    36.0
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "CafeFloor",
+   "centre": [
+    -12.0,
+    -0.33,
+    4.5
+   ],
+   "size": [
+    18.0,
+    0.66,
+    27.0
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "OfficeFloor",
+   "centre": [
+    -12.0,
+    -0.33,
+    -13.5
+   ],
+   "size": [
+    18.0,
+    0.66,
+    9.0
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "Left",
+   "centre": [
+    21.36,
+    6.3,
+    0.0
+   ],
+   "size": [
+    0.72,
+    12.6,
+    36.72
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "Back",
+   "centre": [
+    0.0,
+    6.3,
+    -18.36
+   ],
+   "size": [
+    43.44,
+    12.6,
+    0.72
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "Right",
+   "centre": [
+    -21.36,
+    6.3,
+    0.0
+   ],
+   "size": [
+    0.72,
+    12.6,
+    36.72
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "RoomDivider",
+   "centre": [
+    -3.0,
+    6.3,
+    -7.35
+   ],
+   "size": [
+    0.48,
+    12.6,
+    21.3
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "RoomDivider",
+   "centre": [
+    -3.0,
+    6.3,
+    14.85
+   ],
+   "size": [
+    0.48,
+    12.6,
+    6.3
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "OfficePartition",
+   "centre": [
+    -7.95,
+    6.3,
+    -9.0
+   ],
+   "size": [
+    9.9,
+    12.6,
+    0.48
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "OfficePartition",
+   "centre": [
+    -19.05,
+    6.3,
+    -9.0
+   ],
+   "size": [
+    3.9,
+    12.6,
+    0.48
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "RetailCheckout",
+   "centre": [
+    11.25,
+    1.68,
+    -11.55
+   ],
+   "size": [
+    14.85,
+    3.54,
+    2.94
+   ],
+   "from": "metadata"
+  },
+  {
+   "name": "CafeCounter",
+   "centre": [
+    -18.6,
+    1.65,
+    1.2
+   ],
+   "size": [
+    3.6,
+    3.48,
+    18.0
+   ],
+   "from": "metadata"
+  }
+ ],
+ "front": {
+  "FRONT_Piers": [
+   {
+    "centre": [
+     -19.2,
+     6.3,
+     18.0
+    ],
+    "size": [
+     3.6,
+     12.6,
+     0.54
+    ]
+   },
+   {
+    "centre": [
+     -3.0,
+     6.3,
+     18.0
+    ],
+    "size": [
+     0.6,
+     12.6,
+     0.54
+    ]
+   },
+   {
+    "centre": [
+     8.85,
+     6.3,
+     18.0
+    ],
+    "size": [
+     0.45,
+     12.6,
+     0.54
+    ]
+   },
+   {
+    "centre": [
+     13.8,
+     6.3,
+     18.0
+    ],
+    "size": [
+     0.45,
+     12.6,
+     0.54
+    ]
+   },
+   {
+    "centre": [
+     19.05,
+     6.3,
+     18.0
+    ],
+    "size": [
+     3.9,
+     12.6,
+     0.54
+    ]
+   }
+  ],
+  "FRONT_WindowSills": [
+   {
+    "centre": [
+     -11.7,
+     1.26,
+     18.0
+    ],
+    "size": [
+     15.0,
+     2.52,
+     0.66
+    ]
+   },
+   {
+    "centre": [
+     3.0,
+     1.26,
+     18.0
+    ],
+    "size": [
+     11.1,
+     2.52,
+     0.66
+    ]
+   }
+  ],
+  "FRONT_WindowHeader": [
+   {
+    "centre": [
+     -11.7,
+     11.55,
+     18.0
+    ],
+    "size": [
+     15.0,
+     2.1,
+     0.66
+    ]
+   },
+   {
+    "centre": [
+     3.0,
+     11.55,
+     18.0
+    ],
+    "size": [
+     11.1,
+     2.1,
+     0.66
+    ]
+   }
+  ],
+  "FRONT_LeftSill": [
+   {
+    "centre": [
+     16.44,
+     1.26,
+     18.0
+    ],
+    "size": [
+     5.16,
+     2.52,
+     0.66
+    ]
+   }
+  ],
+  "FRONT_LeftHeader": [
+   {
+    "centre": [
+     16.44,
+     11.55,
+     18.0
+    ],
+    "size": [
+     5.16,
+     2.1,
+     0.66
+    ]
+   }
+  ],
+  "DOOR_OpenFrame": [
+   {
+    "centre": [
+     8.79,
+     4.5,
+     13.68
+    ],
+    "size": [
+     0.195,
+     9.0,
+     0.21
+    ]
+   },
+   {
+    "centre": [
+     8.79,
+     0.12,
+     15.81
+    ],
+    "size": [
+     0.195,
+     0.24,
+     4.26
+    ]
+   },
+   {
+    "centre": [
+     8.79,
+     1.86,
+     15.81
+    ],
+    "size": [
+     0.195,
+     0.24,
+     4.26
+    ]
+   },
+   {
+    "centre": [
+     8.79,
+     8.88,
+     15.81
+    ],
+    "size": [
+     0.195,
+     0.24,
+     4.26
+    ]
+   },
+   {
+    "centre": [
+     8.79,
+     4.5,
+     17.94
+    ],
+    "size": [
+     0.195,
+     9.0,
+     0.21
+    ]
+   }
+  ],
+  "WALL_OfficeSide": [
+   {
+    "centre": [
+     -9.0,
+     6.3,
+     -13.5
+    ],
+    "size": [
+     0.42,
+     12.6,
+     9.0
+    ]
+   }
+  ],
+  "TRIM_PassagePosts": [
+   {
+    "centre": [
+     -3.0,
+     4.35,
+     3.3
+    ],
+    "size": [
+     0.66,
+     8.7,
+     0.48
+    ]
+   },
+   {
+    "centre": [
+     -3.0,
+     4.35,
+     11.7
+    ],
+    "size": [
+     0.66,
+     8.7,
+     0.48
+    ]
+   }
+  ]
+ },
+ "lamps": [
+  {
+   "kind": "pendant",
+   "at": [
+    -17.7,
+    9.4275,
+    0.9
+   ],
+   "size": [
+    1.08,
+    0.045,
+    1.08
+   ]
+  },
+  {
+   "kind": "pendant",
+   "at": [
+    -14.4,
+    8.9775,
+    -14.1
+   ],
+   "size": [
+    1.08,
+    0.045,
+    1.08
+   ]
+  },
+  {
+   "kind": "pendant",
+   "at": [
+    -9.3,
+    8.8275,
+    6.9
+   ],
+   "size": [
+    1.08,
+    0.045,
+    1.08
+   ]
+  },
+  {
+   "kind": "pendant",
+   "at": [
+    11.1,
+    9.5775,
+    -13.65
+   ],
+   "size": [
+    1.44,
+    0.045,
+    1.44
+   ]
+  },
+  {
+   "kind": "pendant",
+   "at": [
+    11.1,
+    8.8275,
+    -0.9
+   ],
+   "size": [
+    1.44,
+    0.045,
+    1.44
+   ]
+  },
+  {
+   "kind": "pendant",
+   "at": [
+    14.1,
+    8.9775,
+    9.3
+   ],
+   "size": [
+    1.44,
+    0.045,
+    1.44
+   ]
+  },
+  {
+   "kind": "desk",
+   "at": [
+    -11.01,
+    3.96,
+    -15.9
+   ],
+   "size": [
+    0.9,
+    0.42,
+    0.9
+   ]
+  }
+ ],
+ "roofColliders": [
+  {
+   "name": "COLLIDER_RidgePerch",
+   "centre": [
+    0.0,
+    28.9875,
+    0.0
+   ],
+   "size": [
+    39.936,
+    0.45,
+    1.8
+   ],
+   "right": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "up": [
+    0.0,
+    1.0,
+    0.0
+   ],
+   "back": [
+    0.0,
+    0.0,
+    1.0
+   ]
+  },
+  {
+   "name": "COLLIDER_RoofSlope_-1",
+   "centre": [
+    0.0,
+    21.75,
+    9.375
+   ],
+   "size": [
+    43.68,
+    0.3007,
+    22.4656
+   ],
+   "right": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "up": [
+    0.0,
+    0.8346,
+    0.5508
+   ],
+   "back": [
+    0.0,
+    -0.5508,
+    0.8346
+   ]
+  },
+  {
+   "name": "COLLIDER_RoofSlope_1",
+   "centre": [
+    0.0,
+    21.75,
+    -9.375
+   ],
+   "size": [
+    43.68,
+    0.3007,
+    22.4656
+   ],
+   "right": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "up": [
+    0.0,
+    0.8346,
+    -0.5508
+   ],
+   "back": [
+    0.0,
+    0.5508,
+    0.8346
+   ]
+  }
+ ],
+ "shop": [
+  {
+   "name": "ANTIQUE_BoatHull",
+   "centre": [
+    -8.4,
+    7.98,
+    -8.4
+   ],
+   "size": [
+    3.96,
+    0.78,
+    0.66
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "ANTIQUE_BoatMast",
+   "centre": [
+    -8.4,
+    9.42,
+    -8.4
+   ],
+   "size": [
+    0.108,
+    2.46,
+    0.0935
+   ],
+   "tris": 20,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "ANTIQUE_BoatSails",
+   "centre": [
+    -8.49,
+    9.45,
+    -8.4
+   ],
+   "size": [
+    2.94,
+    1.92,
+    0.036
+   ],
+   "tris": 16,
+   "material": "CreamCloth",
+   "colour": [
+    219,
+    214,
+    192
+   ]
+  },
+  {
+   "name": "ANTIQUE_ClockFace",
+   "centre": [
+    -20.4825,
+    8.25,
+    12.36
+   ],
+   "size": [
+    0.045,
+    1.74,
+    1.74
+   ],
+   "tris": 76,
+   "material": "Paper",
+   "colour": [
+    227,
+    219,
+    196
+   ]
+  },
+  {
+   "name": "ANTIQUE_ClockHands",
+   "centre": [
+    -20.4,
+    8.4143,
+    12.5897
+   ],
+   "size": [
+    0.072,
+    0.8114,
+    0.528
+   ],
+   "tris": 32,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "ANTIQUE_ClockRim",
+   "centre": [
+    -20.625,
+    8.25,
+    12.36
+   ],
+   "size": [
+    0.21,
+    1.98,
+    1.98
+   ],
+   "tris": 76,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "ANTIQUE_ClockTicks",
+   "centre": [
+    -20.4,
+    8.25,
+    12.36
+   ],
+   "size": [
+    0.048,
+    1.56,
+    1.56
+   ],
+   "tris": 144,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "ANTIQUE_TruckBed",
+   "centre": [
+    -20.19,
+    8.64,
+    -5.43
+   ],
+   "size": [
+    0.78,
+    0.54,
+    1.02
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "ANTIQUE_TruckBonnet",
+   "centre": [
+    -20.19,
+    8.46,
+    -3.24
+   ],
+   "size": [
+    0.72,
+    0.36,
+    0.66
+   ],
+   "tris": 12,
+   "material": "Red",
+   "colour": [
+    186,
+    77,
+    60
+   ]
+  },
+  {
+   "name": "ANTIQUE_TruckCab",
+   "centre": [
+    -20.19,
+    8.79,
+    -3.99
+   ],
+   "size": [
+    0.75,
+    0.75,
+    0.81
+   ],
+   "tris": 12,
+   "material": "PatinaSteel",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "steel_basecolor"
+  },
+  {
+   "name": "ANTIQUE_TruckChassis",
+   "centre": [
+    -20.19,
+    8.34,
+    -4.8
+   ],
+   "size": [
+    0.75,
+    0.36,
+    2.34
+   ],
+   "tris": 12,
+   "material": "Red",
+   "colour": [
+    186,
+    77,
+    60
+   ]
+  },
+  {
+   "name": "ANTIQUE_TruckWheels",
+   "centre": [
+    -20.19,
+    8.25,
+    -4.65
+   ],
+   "size": [
+    1.26,
+    0.5136,
+    2.34
+   ],
+   "tris": 144,
+   "material": "Rubber",
+   "colour": [
+    44,
+    46,
+    45
+   ]
+  },
+  {
+   "name": "ART_AfterHours",
+   "centre": [
+    20.928,
+    8.4,
+    5.4
+   ],
+   "size": [
+    0.036,
+    3.48,
+    2.55
+   ],
+   "tris": 12,
+   "material": "PosterHours",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "poster_after_hours"
+  },
+  {
+   "name": "ART_AfterHours_Frame",
+   "centre": [
+    20.91,
+    8.4,
+    5.4
+   ],
+   "size": [
+    0.21,
+    3.9,
+    2.97
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "ART_FictionalFern",
+   "centre": [
+    -3.282,
+    7.35,
+    -6.3
+   ],
+   "size": [
+    0.036,
+    2.955,
+    2.16
+   ],
+   "tris": 12,
+   "material": "PortraitFern",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "portrait_miss_fern"
+  },
+  {
+   "name": "ART_FictionalFern_Frame",
+   "centre": [
+    -3.3,
+    7.35,
+    -6.3
+   ],
+   "size": [
+    0.21,
+    3.375,
+    2.58
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "ART_FictionalVesper",
+   "centre": [
+    -3.282,
+    7.35,
+    -2.7
+   ],
+   "size": [
+    0.036,
+    3.48,
+    2.55
+   ],
+   "tris": 12,
+   "material": "PortraitVesper",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "portrait_mr_vesper"
+  },
+  {
+   "name": "ART_FictionalVesper_Frame",
+   "centre": [
+    -3.3,
+    7.35,
+    -2.7
+   ],
+   "size": [
+    0.21,
+    3.9,
+    2.97
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "ART_RooftopSocialClub",
+   "centre": [
+    20.928,
+    8.1,
+    -7.95
+   ],
+   "size": [
+    0.036,
+    2.481,
+    1.86
+   ],
+   "tris": 12,
+   "material": "PosterRooftop",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "poster_rooftop"
+  },
+  {
+   "name": "ART_SmallJoys",
+   "centre": [
+    20.928,
+    8.1,
+    -11.4
+   ],
+   "size": [
+    0.036,
+    2.952,
+    2.16
+   ],
+   "tris": 12,
+   "material": "PosterJoys",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "poster_small_joys"
+  },
+  {
+   "name": "ART_SmallJoys_Frame",
+   "centre": [
+    20.91,
+    8.1,
+    -11.4
+   ],
+   "size": [
+    0.21,
+    3.372,
+    2.58
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "ART_TheSpiceSquirrels",
+   "centre": [
+    -2.718,
+    7.86,
+    -0.66
+   ],
+   "size": [
+    0.036,
+    4.95,
+    3.7125
+   ],
+   "tris": 12,
+   "material": "PosterBand",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "spice_squirrels"
+  },
+  {
+   "name": "ART_TheSpiceSquirrels_Frame",
+   "centre": [
+    -2.7,
+    7.86,
+    -0.66
+   ],
+   "size": [
+    0.21,
+    5.37,
+    4.1325
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "BEAMS_Ceiling",
+   "centre": [
+    0.0,
+    12.15,
+    1.5
+   ],
+   "size": [
+    42.6,
+    0.66,
+    27.48
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_Acorn_Cap",
+   "centre": [
+    -18.36,
+    4.4895,
+    3.45
+   ],
+   "size": [
+    0.24,
+    0.051,
+    0.24
+   ],
+   "tris": 64,
+   "material": "Salvaged_Dark_Wood",
+   "colour": [
+    155,
+    127,
+    101
+   ]
+  },
+  {
+   "name": "CAFE_Acorn_Knob",
+   "centre": [
+    -18.36,
+    4.431,
+    3.45
+   ],
+   "size": [
+    0.228,
+    0.27,
+    0.228
+   ],
+   "tris": 320,
+   "material": "Exposed_Wood_Edge",
+   "colour": [
+    203,
+    179,
+    142
+   ]
+  },
+  {
+   "name": "CAFE_Acorn_Stem",
+   "centre": [
+    -18.379,
+    4.5506,
+    3.45
+   ],
+   "size": [
+    0.0734,
+    0.11,
+    0.0409
+   ],
+   "tris": 28,
+   "material": "Salvaged_Dark_Wood",
+   "colour": [
+    155,
+    127,
+    101
+   ]
+  },
+  {
+   "name": "CAFE_AntiqueShelf",
+   "centre": [
+    -20.25,
+    7.71,
+    -4.65
+   ],
+   "size": [
+    1.26,
+    0.225,
+    5.4
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_BoatShelf",
+   "centre": [
+    -8.4,
+    7.5,
+    -8.52
+   ],
+   "size": [
+    4.5,
+    0.24,
+    1.08
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_ChairRail",
+   "centre": [
+    -20.64,
+    3.99,
+    4.5
+   ],
+   "size": [
+    0.3,
+    0.24,
+    27.0
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_Chair_A_Back",
+   "centre": [
+    -8.4,
+    2.235,
+    11.46
+   ],
+   "size": [
+    1.218,
+    1.65,
+    0.138
+   ],
+   "tris": 56,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_Chair_A_Backrest",
+   "centre": [
+    -8.4,
+    2.73,
+    11.46
+   ],
+   "size": [
+    1.26,
+    0.63,
+    0.18
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_Chair_A_Legs",
+   "centre": [
+    -8.4,
+    0.735,
+    12.0
+   ],
+   "size": [
+    1.17,
+    1.2949,
+    1.17
+   ],
+   "tris": 112,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_Chair_A_Seat",
+   "centre": [
+    -8.4,
+    1.41,
+    12.0
+   ],
+   "size": [
+    1.26,
+    0.21,
+    1.26
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_Chair_B_Back",
+   "centre": [
+    -8.4,
+    2.235,
+    16.89
+   ],
+   "size": [
+    1.218,
+    1.65,
+    0.138
+   ],
+   "tris": 56,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_Chair_B_Backrest",
+   "centre": [
+    -8.4,
+    2.73,
+    16.89
+   ],
+   "size": [
+    1.26,
+    0.63,
+    0.18
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_Chair_B_Legs",
+   "centre": [
+    -8.4,
+    0.735,
+    16.35
+   ],
+   "size": [
+    1.17,
+    1.2949,
+    1.17
+   ],
+   "tris": 112,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_Chair_B_Seat",
+   "centre": [
+    -8.4,
+    1.41,
+    16.35
+   ],
+   "size": [
+    1.26,
+    0.21,
+    1.26
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_CoffeeUrn",
+   "centre": [
+    -18.9,
+    4.17,
+    9.15
+   ],
+   "size": [
+    0.78,
+    1.38,
+    0.78
+   ],
+   "tris": 44,
+   "material": "PatinaSteel",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "steel_basecolor"
+  },
+  {
+   "name": "CAFE_CoffeeUrnLid",
+   "centre": [
+    -18.9,
+    4.92,
+    9.15
+   ],
+   "size": [
+    0.84,
+    0.33,
+    0.7989
+   ],
+   "tris": 60,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Cork_Coaster",
+   "centre": [
+    -17.46,
+    3.474,
+    -0.435
+   ],
+   "size": [
+    0.36,
+    0.018,
+    3.45
+   ],
+   "tris": 192,
+   "material": "Exposed_Wood_Edge",
+   "colour": [
+    203,
+    179,
+    142
+   ]
+  },
+  {
+   "name": "CAFE_CounterBattens",
+   "centre": [
+    -17.04,
+    1.56,
+    1.35
+   ],
+   "size": [
+    0.18,
+    2.88,
+    16.11
+   ],
+   "tris": 72,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_CounterBody",
+   "centre": [
+    -18.6,
+    1.56,
+    1.2
+   ],
+   "size": [
+    3.0,
+    3.12,
+    17.4
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_CounterTop",
+   "centre": [
+    -18.6,
+    3.27,
+    1.2
+   ],
+   "size": [
+    3.6,
+    0.36,
+    18.0
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_Cups",
+   "centre": [
+    -18.72,
+    3.675,
+    7.44
+   ],
+   "size": [
+    1.29,
+    0.39,
+    0.3138
+   ],
+   "tris": 108,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "CAFE_Jar_Label",
+   "centre": [
+    -17.997,
+    3.87,
+    3.45
+   ],
+   "size": [
+    0.0,
+    0.198,
+    0.435
+   ],
+   "tris": 2,
+   "material": "CAFE_Jar_Label_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_41"
+  },
+  {
+   "name": "CAFE_Jar_Wood_Lid",
+   "centre": [
+    -18.36,
+    4.2675,
+    3.45
+   ],
+   "size": [
+    0.762,
+    0.105,
+    0.762
+   ],
+   "tris": 128,
+   "material": "Exposed_Wood_Edge",
+   "colour": [
+    203,
+    179,
+    142
+   ]
+  },
+  {
+   "name": "CAFE_Long_Way_Home_Print",
+   "centre": [
+    -3.315,
+    7.47,
+    1.08
+   ],
+   "size": [
+    0.0,
+    1.605,
+    2.4
+   ],
+   "tris": 2,
+   "material": "CAFE_Long_Way_Home_Print_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_39"
+  },
+  {
+   "name": "CAFE_Long_Way_Home_Print_Frame",
+   "centre": [
+    -3.315,
+    7.47,
+    1.08
+   ],
+   "size": [
+    0.168,
+    1.917,
+    2.712
+   ],
+   "tris": 64,
+   "material": "Salvaged_Dark_Wood",
+   "colour": [
+    155,
+    127,
+    101
+   ]
+  },
+  {
+   "name": "CAFE_Lost_Found_Jar",
+   "centre": [
+    -18.36,
+    3.84,
+    3.45
+   ],
+   "size": [
+    0.72,
+    0.75,
+    0.72
+   ],
+   "tris": 128,
+   "material": "Glazed_Green_Ceramic",
+   "colour": [
+    155,
+    178,
+    166
+   ]
+  },
+  {
+   "name": "CAFE_Regulars_Plaque",
+   "centre": [
+    -20.805,
+    5.64,
+    12.45
+   ],
+   "size": [
+    0.0,
+    1.08,
+    2.46
+   ],
+   "tris": 2,
+   "material": "CAFE_Regulars_Plaque_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_40"
+  },
+  {
+   "name": "CAFE_Regulars_Plaque_Frame",
+   "centre": [
+    -20.805,
+    5.64,
+    12.45
+   ],
+   "size": [
+    0.168,
+    1.392,
+    2.772
+   ],
+   "tris": 64,
+   "material": "Salvaged_Dark_Wood",
+   "colour": [
+    155,
+    127,
+    101
+   ]
+  },
+  {
+   "name": "CAFE_Stool_01_Footrest",
+   "centre": [
+    -14.64,
+    0.87,
+    -5.4
+   ],
+   "size": [
+    1.308,
+    0.108,
+    1.308
+   ],
+   "tris": 96,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_01_Legs",
+   "centre": [
+    -14.64,
+    1.2,
+    -5.4
+   ],
+   "size": [
+    1.3675,
+    2.2336,
+    1.3675
+   ],
+   "tris": 112,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_01_Seat",
+   "centre": [
+    -14.64,
+    2.415,
+    -5.4
+   ],
+   "size": [
+    1.44,
+    0.21,
+    1.4039
+   ],
+   "tris": 52,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_Stool_02_Footrest",
+   "centre": [
+    -14.64,
+    0.87,
+    -2.16
+   ],
+   "size": [
+    1.308,
+    0.108,
+    1.308
+   ],
+   "tris": 96,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_02_Legs",
+   "centre": [
+    -14.64,
+    1.2,
+    -2.16
+   ],
+   "size": [
+    1.3675,
+    2.2336,
+    1.3675
+   ],
+   "tris": 112,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_02_Seat",
+   "centre": [
+    -14.64,
+    2.415,
+    -2.16
+   ],
+   "size": [
+    1.44,
+    0.21,
+    1.4039
+   ],
+   "tris": 52,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_Stool_03_Footrest",
+   "centre": [
+    -14.64,
+    0.87,
+    1.08
+   ],
+   "size": [
+    1.308,
+    0.108,
+    1.308
+   ],
+   "tris": 96,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_03_Legs",
+   "centre": [
+    -14.64,
+    1.2,
+    1.08
+   ],
+   "size": [
+    1.3675,
+    2.2336,
+    1.3675
+   ],
+   "tris": 112,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_03_Seat",
+   "centre": [
+    -14.64,
+    2.415,
+    1.08
+   ],
+   "size": [
+    1.44,
+    0.21,
+    1.4039
+   ],
+   "tris": 52,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_Stool_04_Footrest",
+   "centre": [
+    -14.64,
+    0.87,
+    4.32
+   ],
+   "size": [
+    1.308,
+    0.108,
+    1.308
+   ],
+   "tris": 96,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_04_Legs",
+   "centre": [
+    -14.64,
+    1.2,
+    4.32
+   ],
+   "size": [
+    1.3675,
+    2.2336,
+    1.3675
+   ],
+   "tris": 112,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_04_Seat",
+   "centre": [
+    -14.64,
+    2.415,
+    4.32
+   ],
+   "size": [
+    1.44,
+    0.21,
+    1.4039
+   ],
+   "tris": 52,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_Stool_05_Footrest",
+   "centre": [
+    -14.64,
+    0.87,
+    7.56
+   ],
+   "size": [
+    1.308,
+    0.108,
+    1.308
+   ],
+   "tris": 96,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_05_Legs",
+   "centre": [
+    -14.64,
+    1.2,
+    7.56
+   ],
+   "size": [
+    1.3675,
+    2.2336,
+    1.3674
+   ],
+   "tris": 112,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_Stool_05_Seat",
+   "centre": [
+    -14.64,
+    2.415,
+    7.56
+   ],
+   "size": [
+    1.44,
+    0.21,
+    1.4039
+   ],
+   "tris": 52,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CAFE_VintageRegister_Base",
+   "centre": [
+    -18.36,
+    3.72,
+    -4.5
+   ],
+   "size": [
+    1.98,
+    0.57,
+    1.68
+   ],
+   "tris": 12,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_VintageRegister_Display",
+   "centre": [
+    -18.36,
+    5.64,
+    -4.89
+   ],
+   "size": [
+    1.35,
+    0.51,
+    0.24
+   ],
+   "tris": 12,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_VintageRegister_DisplayGlass",
+   "centre": [
+    -18.36,
+    5.64,
+    -4.74
+   ],
+   "size": [
+    1.05,
+    0.3,
+    0.036
+   ],
+   "tris": 12,
+   "material": "Paper",
+   "colour": [
+    227,
+    219,
+    196
+   ]
+  },
+  {
+   "name": "CAFE_VintageRegister_Dome",
+   "centre": [
+    -18.36,
+    4.89,
+    -4.74
+   ],
+   "size": [
+    1.68,
+    1.56,
+    1.2
+   ],
+   "tris": 120,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "CAFE_VintageRegister_Drawer",
+   "centre": [
+    -18.36,
+    4.11,
+    -4.5
+   ],
+   "size": [
+    1.71,
+    0.36,
+    1.41
+   ],
+   "tris": 12,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "CAFE_VintageRegister_Handle",
+   "centre": [
+    -18.36,
+    3.84,
+    -3.6
+   ],
+   "size": [
+    0.69,
+    0.105,
+    0.12
+   ],
+   "tris": 12,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "CAFE_VintageRegister_Keys",
+   "centre": [
+    -18.36,
+    4.44,
+    -3.72
+   ],
+   "size": [
+    1.434,
+    0.06,
+    0.594
+   ],
+   "tris": 420,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "CAFE_WindowTable_Legs",
+   "centre": [
+    -8.4,
+    1.14,
+    14.1
+   ],
+   "size": [
+    3.15,
+    2.28,
+    2.1
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CAFE_WindowTable_Top",
+   "centre": [
+    -8.4,
+    2.28,
+    14.1
+   ],
+   "size": [
+    3.6,
+    0.27,
+    2.55
+   ],
+   "tris": 12,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "CAFE_WoodWainscot",
+   "centre": [
+    -20.88,
+    1.98,
+    4.2825
+   ],
+   "size": [
+    0.3,
+    3.9,
+    26.493
+   ],
+   "tris": 360,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "CLOTHES_DenimPatches",
+   "centre": [
+    8.31,
+    4.2,
+    10.341
+   ],
+   "size": [
+    3.18,
+    0.54,
+    0.156
+   ],
+   "tris": 36,
+   "material": "CreamCloth",
+   "colour": [
+    219,
+    214,
+    192
+   ]
+  },
+  {
+   "name": "CLOTHES_DenimPatches.001",
+   "centre": [
+    7.65,
+    4.68,
+    10.341
+   ],
+   "size": [
+    3.09,
+    0.3,
+    0.156
+   ],
+   "tris": 36,
+   "material": "RustCloth",
+   "colour": [
+    162,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "CLOTHES_Hangers",
+   "centre": [
+    8.625,
+    5.505,
+    5.685
+   ],
+   "size": [
+    20.4017,
+    0.4437,
+    9.342
+   ],
+   "tris": 360,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "CLOTHES_TeeGraphics",
+   "centre": [
+    0.45,
+    4.35,
+    1.194
+   ],
+   "size": [
+    3.18,
+    0.51,
+    0.15
+   ],
+   "tris": 36,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "CLOTHES_clear_signal",
+   "centre": [
+    0.45,
+    4.305,
+    1.11
+   ],
+   "size": [
+    5.64,
+    1.83,
+    0.255
+   ],
+   "tris": 132,
+   "material": "CreamCloth",
+   "colour": [
+    219,
+    214,
+    192
+   ]
+  },
+  {
+   "name": "CLOTHES_loose_wire",
+   "centre": [
+    7.95,
+    4.29,
+    10.26
+   ],
+   "size": [
+    4.56,
+    1.86,
+    0.255
+   ],
+   "tris": 60,
+   "material": "Denim",
+   "colour": [
+    101,
+    134,
+    155
+   ]
+  },
+  {
+   "name": "CLOTHES_midnight_static",
+   "centre": [
+    16.8,
+    3.435,
+    1.71
+   ],
+   "size": [
+    5.82,
+    3.57,
+    0.255
+   ],
+   "tris": 132,
+   "material": "BlackCloth",
+   "colour": [
+    45,
+    44,
+    49
+   ]
+  },
+  {
+   "name": "DETAIL_ChiliAcorn",
+   "centre": [
+    7.65,
+    2.4,
+    -10.209
+   ],
+   "size": [
+    0.66,
+    0.66,
+    0.036
+   ],
+   "tris": 12,
+   "material": "ChiliAcorn",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "chili_acorn"
+  },
+  {
+   "name": "DETAIL_ExposedConduit",
+   "centre": [
+    11.1375,
+    11.1,
+    -1.7625
+   ],
+   "size": [
+    19.275,
+    0.15,
+    31.725
+   ],
+   "tris": 56,
+   "material": "PatinaSteel",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "steel_basecolor"
+  },
+  {
+   "name": "DOOR_Handle",
+   "centre": [
+    8.61,
+    3.15,
+    14.4
+   ],
+   "size": [
+    0.24,
+    0.105,
+    0.72
+   ],
+   "tris": 12,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "DOOR_KickPanel",
+   "centre": [
+    8.76,
+    0.93,
+    15.81
+   ],
+   "size": [
+    0.12,
+    1.5,
+    3.81
+   ],
+   "tris": 12,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "DOOR_OpenFrame",
+   "centre": [
+    8.79,
+    4.5,
+    15.81
+   ],
+   "size": [
+    0.195,
+    9.0,
+    4.47
+   ],
+   "tris": 60,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "DOOR_OpenGlass",
+   "centre": [
+    8.76,
+    4.95,
+    15.81
+   ],
+   "size": [
+    0.054,
+    6.45,
+    3.78
+   ],
+   "tris": 12,
+   "material": "WindowGlass",
+   "colour": [
+    216,
+    235,
+    230
+   ],
+   "alpha": 0.115
+  },
+  {
+   "name": "Deck_Cache_Run",
+   "centre": [
+    10.5,
+    9.1089,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal.002",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip.002",
+   "materials": [
+    "Grip_Charcoal.002",
+    "Graphic_Cache_Run",
+    "Maple_Ply_Edge.002"
+   ]
+  },
+  {
+   "name": "Deck_Concrete_Fern",
+   "centre": [
+    10.86,
+    5.8389,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip",
+   "materials": [
+    "Grip_Charcoal",
+    "Graphic_Concrete_Fern",
+    "Maple_Ply_Edge"
+   ]
+  },
+  {
+   "name": "Deck_Ghost_Fish",
+   "centre": [
+    6.0,
+    5.8389,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip",
+   "materials": [
+    "Grip_Charcoal",
+    "Graphic_Ghost_Fish",
+    "Maple_Ply_Edge"
+   ]
+  },
+  {
+   "name": "Deck_Live_Wire",
+   "centre": [
+    15.15,
+    9.1089,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal.001",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip.001",
+   "materials": [
+    "Grip_Charcoal.001",
+    "Graphic_Live_Wire",
+    "Maple_Ply_Edge.001"
+   ]
+  },
+  {
+   "name": "Deck_Lunar_Moth",
+   "centre": [
+    18.15,
+    5.8389,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip",
+   "materials": [
+    "Grip_Charcoal",
+    "Graphic_Lunar_Moth",
+    "Maple_Ply_Edge"
+   ]
+  },
+  {
+   "name": "Deck_Ochre_Run",
+   "centre": [
+    13.29,
+    5.8389,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip",
+   "materials": [
+    "Grip_Charcoal",
+    "Graphic_Ochre_Run",
+    "Maple_Ply_Edge"
+   ]
+  },
+  {
+   "name": "Deck_Static_Weekend",
+   "centre": [
+    15.72,
+    5.8389,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip",
+   "materials": [
+    "Grip_Charcoal",
+    "Graphic_Static_Weekend",
+    "Maple_Ply_Edge"
+   ]
+  },
+  {
+   "name": "Deck_Tidal_Check",
+   "centre": [
+    8.43,
+    5.8389,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip",
+   "materials": [
+    "Grip_Charcoal",
+    "Graphic_Tidal_Check",
+    "Maple_Ply_Edge"
+   ]
+  },
+  {
+   "name": "Deck_Violet_Comet",
+   "centre": [
+    3.57,
+    5.8389,
+    -16.8711
+   ],
+   "size": [
+    0.63,
+    1.7671,
+    1.7671
+   ],
+   "tris": 296,
+   "material": "Grip_Charcoal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "grip",
+   "materials": [
+    "Grip_Charcoal",
+    "Graphic_Violet_Comet",
+    "Maple_Ply_Edge"
+   ]
+  },
+  {
+   "name": "FLAG_Belgium",
+   "centre": [
+    0.45,
+    9.15,
+    -17.928
+   ],
+   "size": [
+    3.6,
+    2.4,
+    0.036
+   ],
+   "tris": 12,
+   "material": "Belgium",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "flag_belgium"
+  },
+  {
+   "name": "FLAG_HangingCords",
+   "centre": [
+    0.7523,
+    11.52,
+    6.6
+   ],
+   "size": [
+    4.2434,
+    1.14,
+    0.0457
+   ],
+   "tris": 32,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "FLAG_Jamaica",
+   "centre": [
+    0.75,
+    9.84,
+    6.582
+   ],
+   "size": [
+    4.2,
+    2.1,
+    0.036
+   ],
+   "tris": 12,
+   "material": "Jamaica",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "flag_jamaica"
+  },
+  {
+   "name": "FLOOR_Cafe",
+   "centre": [
+    -12.0,
+    -0.33,
+    4.5
+   ],
+   "size": [
+    18.0,
+    0.66,
+    27.0
+   ],
+   "tris": 276,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "FLOOR_Office",
+   "centre": [
+    -12.0,
+    -0.33,
+    -13.5
+   ],
+   "size": [
+    18.0,
+    0.66,
+    9.0
+   ],
+   "tris": 56,
+   "material": "Concrete",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "concrete_basecolor"
+  },
+  {
+   "name": "FLOOR_Retail",
+   "centre": [
+    9.0,
+    -0.36,
+    0.0
+   ],
+   "size": [
+    24.0,
+    0.72,
+    36.0
+   ],
+   "tris": 248,
+   "material": "Concrete",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "concrete_basecolor"
+  },
+  {
+   "name": "FRONT_LeftHeader",
+   "centre": [
+    16.44,
+    11.55,
+    18.0
+   ],
+   "size": [
+    5.16,
+    2.1,
+    0.66
+   ],
+   "tris": 12,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "FRONT_LeftSill",
+   "centre": [
+    16.44,
+    1.26,
+    18.0
+   ],
+   "size": [
+    5.16,
+    2.52,
+    0.66
+   ],
+   "tris": 12,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "FRONT_Piers",
+   "centre": [
+    0.0,
+    6.3,
+    18.0
+   ],
+   "size": [
+    42.0,
+    12.6,
+    0.54
+   ],
+   "tris": 60,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "FRONT_WindowHeader",
+   "centre": [
+    -5.325,
+    11.55,
+    18.0
+   ],
+   "size": [
+    27.75,
+    2.1,
+    0.66
+   ],
+   "tris": 24,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "FRONT_WindowSills",
+   "centre": [
+    -5.325,
+    1.26,
+    18.0
+   ],
+   "size": [
+    27.75,
+    2.52,
+    0.66
+   ],
+   "tris": 24,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Cache_Run",
+   "centre": [
+    10.5,
+    9.7082,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners.002",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Concrete_Fern",
+   "centre": [
+    10.86,
+    6.4382,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Ghost_Fish",
+   "centre": [
+    6.0,
+    6.4382,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Live_Wire",
+   "centre": [
+    15.15,
+    9.7082,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners.001",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Lunar_Moth",
+   "centre": [
+    18.15,
+    6.4382,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Ochre_Run",
+   "centre": [
+    13.29,
+    6.4382,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Static_Weekend",
+   "centre": [
+    15.72,
+    6.4382,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Tidal_Check",
+   "centre": [
+    8.43,
+    6.4382,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Front_Violet_Comet",
+   "centre": [
+    3.57,
+    6.4382,
+    -17.3325
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Cache_Run",
+   "centre": [
+    10.5,
+    8.6475,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners.002",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Concrete_Fern",
+   "centre": [
+    10.86,
+    5.3775,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Ghost_Fish",
+   "centre": [
+    6.0,
+    5.3775,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Live_Wire",
+   "centre": [
+    15.15,
+    8.6475,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners.001",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Lunar_Moth",
+   "centre": [
+    18.15,
+    5.3775,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Ochre_Run",
+   "centre": [
+    13.29,
+    5.3775,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Static_Weekend",
+   "centre": [
+    15.72,
+    5.3775,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Tidal_Check",
+   "centre": [
+    8.43,
+    5.3775,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "Fasteners_Rear_Violet_Comet",
+   "centre": [
+    3.57,
+    5.3775,
+    -16.2718
+   ],
+   "size": [
+    0.1431,
+    0.0989,
+    0.0989
+   ],
+   "tris": 80,
+   "material": "Dark_Fasteners",
+   "colour": [
+    53,
+    58,
+    60
+   ]
+  },
+  {
+   "name": "JACKET_Back_Wire",
+   "centre": [
+    20.712,
+    7.9424,
+    -1.59
+   ],
+   "size": [
+    0.0145,
+    0.0916,
+    1.1434
+   ],
+   "tris": 576,
+   "material": "Ochre_Stitching",
+   "colour": [
+    213,
+    198,
+    169
+   ]
+  },
+  {
+   "name": "JACKET_Chest_Pocket",
+   "centre": [
+    20.085,
+    7.68,
+    -2.016
+   ],
+   "size": [
+    0.054,
+    0.45,
+    0.438
+   ],
+   "tris": 12,
+   "material": "Faded_Canvas_Seams",
+   "colour": [
+    137,
+    148,
+    135
+   ]
+  },
+  {
+   "name": "JACKET_Collar",
+   "centre": [
+    20.0775,
+    8.3745,
+    -1.59
+   ],
+   "size": [
+    0.123,
+    0.351,
+    1.08
+   ],
+   "tris": 4,
+   "material": "Faded_Canvas_Seams",
+   "colour": [
+    137,
+    148,
+    135
+   ]
+  },
+  {
+   "name": "JACKET_Cuff",
+   "centre": [
+    20.358,
+    6.81,
+    -1.59
+   ],
+   "size": [
+    0.3998,
+    0.3186,
+    3.2099
+   ],
+   "tris": 192,
+   "material": "Faded_Canvas_Seams",
+   "colour": [
+    137,
+    148,
+    135
+   ]
+  },
+  {
+   "name": "JACKET_Cuff_Button",
+   "centre": [
+    20.1555,
+    6.81,
+    -1.59
+   ],
+   "size": [
+    0.021,
+    0.054,
+    2.844
+   ],
+   "tris": 96,
+   "material": "Aged_Brass_Hardware",
+   "colour": [
+    194,
+    171,
+    131
+   ]
+  },
+  {
+   "name": "JACKET_Hanger",
+   "centre": [
+    20.46,
+    8.609,
+    -1.59
+   ],
+   "size": [
+    0.036,
+    0.394,
+    1.3967
+   ],
+   "tris": 96,
+   "material": "Exposed_Wood_Edge.001",
+   "colour": [
+    203,
+    179,
+    142
+   ]
+  },
+  {
+   "name": "JACKET_Hem",
+   "centre": [
+    20.16,
+    6.591,
+    -1.59
+   ],
+   "size": [
+    0.048,
+    0.129,
+    1.422
+   ],
+   "tris": 12,
+   "material": "Faded_Canvas_Seams",
+   "colour": [
+    137,
+    148,
+    135
+   ]
+  },
+  {
+   "name": "JACKET_Hem_Stitch",
+   "centre": [
+    20.124,
+    6.582,
+    -1.569
+   ],
+   "size": [
+    0.0054,
+    0.0054,
+    1.362
+   ],
+   "tris": 528,
+   "material": "Ochre_Stitching",
+   "colour": [
+    213,
+    198,
+    169
+   ]
+  },
+  {
+   "name": "JACKET_Hook",
+   "centre": [
+    20.46,
+    8.9073,
+    -1.5123
+   ],
+   "size": [
+    0.024,
+    0.2346,
+    0.1794
+   ],
+   "tris": 128,
+   "material": "Aged_Brass_Hardware",
+   "colour": [
+    194,
+    171,
+    131
+   ]
+  },
+  {
+   "name": "JACKET_Night_Route_Acorn_Patch",
+   "centre": [
+    20.064,
+    7.89,
+    -1.173
+   ],
+   "size": [
+    0.0,
+    0.405,
+    0.405
+   ],
+   "tris": 2,
+   "material": "JACKET_Night_Route_Acorn_Patch_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_50"
+  },
+  {
+   "name": "JACKET_Night_Route_Body",
+   "centre": [
+    20.3991,
+    7.5375,
+    -1.591
+   ],
+   "size": [
+    0.6221,
+    2.025,
+    1.7458
+   ],
+   "tris": 560,
+   "material": "Night_Route_Heavy_Canvas",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_48"
+  },
+  {
+   "name": "JACKET_Pocket_Button",
+   "centre": [
+    19.9965,
+    7.92,
+    -2.016
+   ],
+   "size": [
+    0.015,
+    0.054,
+    0.054
+   ],
+   "tris": 48,
+   "material": "Aged_Brass_Hardware",
+   "colour": [
+    194,
+    171,
+    131
+   ]
+  },
+  {
+   "name": "JACKET_Pocket_Flap",
+   "centre": [
+    20.04,
+    7.935,
+    -2.016
+   ],
+   "size": [
+    0.054,
+    0.141,
+    0.471
+   ],
+   "tris": 12,
+   "material": "Night_Route_Heavy_Canvas",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_48"
+  },
+  {
+   "name": "JACKET_Pocket_Stitch",
+   "centre": [
+    20.049,
+    7.6755,
+    -2.0175
+   ],
+   "size": [
+    0.0054,
+    0.411,
+    0.4104
+   ],
+   "tris": 384,
+   "material": "Ochre_Stitching",
+   "colour": [
+    213,
+    198,
+    169
+   ]
+  },
+  {
+   "name": "JACKET_Shoulder_Seam",
+   "centre": [
+    20.1945,
+    8.3239,
+    -1.59
+   ],
+   "size": [
+    0.0904,
+    0.2167,
+    1.746
+   ],
+   "tris": 96,
+   "material": "Ochre_Stitching",
+   "colour": [
+    213,
+    198,
+    169
+   ]
+  },
+  {
+   "name": "JACKET_Sleeve_L",
+   "centre": [
+    20.4,
+    7.5239,
+    -2.5727
+   ],
+   "size": [
+    0.6,
+    1.5719,
+    1.0953
+   ],
+   "tris": 384,
+   "material": "Night_Route_Heavy_Canvas",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_48"
+  },
+  {
+   "name": "JACKET_Sleeve_R",
+   "centre": [
+    20.4,
+    7.5239,
+    -0.6073
+   ],
+   "size": [
+    0.6,
+    1.5719,
+    1.0953
+   ],
+   "tris": 384,
+   "material": "Night_Route_Heavy_Canvas",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_48"
+  },
+  {
+   "name": "JACKET_Zip_Tape",
+   "centre": [
+    20.085,
+    7.446,
+    -1.59
+   ],
+   "size": [
+    0.045,
+    1.62,
+    0.075
+   ],
+   "tris": 12,
+   "material": "Faded_Canvas_Seams",
+   "colour": [
+    137,
+    148,
+    135
+   ]
+  },
+  {
+   "name": "JACKET_Zipper_Pull",
+   "centre": [
+    20.022,
+    8.235,
+    -1.581
+   ],
+   "size": [
+    0.024,
+    0.117,
+    0.054
+   ],
+   "tris": 12,
+   "material": "Aged_Brass_Hardware",
+   "colour": [
+    194,
+    171,
+    131
+   ]
+  },
+  {
+   "name": "JACKET_Zipper_Teeth",
+   "centre": [
+    20.049,
+    7.464,
+    -1.59
+   ],
+   "size": [
+    0.015,
+    1.503,
+    0.045
+   ],
+   "tris": 864,
+   "material": "Aged_Brass_Hardware",
+   "colour": [
+    194,
+    171,
+    131
+   ]
+  },
+  {
+   "name": "KNICK_Books",
+   "centre": [
+    16.7255,
+    3.1058,
+    -4.5
+   ],
+   "size": [
+    5.697,
+    5.0298,
+    0.75
+   ],
+   "tris": 84,
+   "material": "RustCloth",
+   "colour": [
+    162,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "KNICK_Books.001",
+   "centre": [
+    16.3381,
+    3.0777,
+    -4.5
+   ],
+   "size": [
+    4.9612,
+    4.9601,
+    0.75
+   ],
+   "tris": 60,
+   "material": "BookGreen",
+   "colour": [
+    95,
+    129,
+    115
+   ]
+  },
+  {
+   "name": "KNICK_Books.002",
+   "centre": [
+    16.3428,
+    3.1093,
+    -4.5
+   ],
+   "size": [
+    3.4209,
+    4.8229,
+    0.75
+   ],
+   "tris": 24,
+   "material": "BookBlue",
+   "colour": [
+    85,
+    108,
+    132
+   ]
+  },
+  {
+   "name": "KNICK_Books.003",
+   "centre": [
+    17.0824,
+    5.11,
+    -4.5
+   ],
+   "size": [
+    1.9118,
+    1.0797,
+    0.75
+   ],
+   "tris": 24,
+   "material": "Paper",
+   "colour": [
+    227,
+    219,
+    196
+   ]
+  },
+  {
+   "name": "KNICK_CameraLens",
+   "centre": [
+    1.35,
+    3.9,
+    -4.665
+   ],
+   "size": [
+    0.39,
+    0.39,
+    0.27
+   ],
+   "tris": 44,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "KNICK_Ceramics",
+   "centre": [
+    16.5495,
+    5.035,
+    -4.35
+   ],
+   "size": [
+    6.141,
+    4.63,
+    0.5136
+   ],
+   "tris": 600,
+   "material": "Clay",
+   "colour": [
+    175,
+    121,
+    87
+   ]
+  },
+  {
+   "name": "KNICK_Ceramics.001",
+   "centre": [
+    16.5495,
+    5.035,
+    -4.35
+   ],
+   "size": [
+    3.441,
+    4.63,
+    0.5136
+   ],
+   "tris": 400,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "KNICK_EnamelPins",
+   "centre": [
+    9.75,
+    2.7705,
+    2.4
+   ],
+   "size": [
+    0.21,
+    0.021,
+    0.51
+   ],
+   "tris": 56,
+   "material": "Red",
+   "colour": [
+    186,
+    77,
+    60
+   ]
+  },
+  {
+   "name": "KNICK_EnamelPins.001",
+   "centre": [
+    9.39,
+    2.7705,
+    2.4
+   ],
+   "size": [
+    0.21,
+    0.021,
+    0.51
+   ],
+   "tris": 56,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "KNICK_EnamelPins.002",
+   "centre": [
+    9.03,
+    2.7705,
+    2.4
+   ],
+   "size": [
+    0.21,
+    0.021,
+    0.51
+   ],
+   "tris": 56,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "KNICK_OldCamera",
+   "centre": [
+    1.35,
+    3.9,
+    -5.1
+   ],
+   "size": [
+    0.93,
+    0.6,
+    0.48
+   ],
+   "tris": 12,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "KNICK_PinTray",
+   "centre": [
+    9.3,
+    2.67,
+    2.4
+   ],
+   "size": [
+    1.2,
+    0.12,
+    0.75
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "KNICK_RecordLabels",
+   "centre": [
+    0.63,
+    1.74,
+    -5.0625
+   ],
+   "size": [
+    2.91,
+    0.2568,
+    0.045
+   ],
+   "tris": 180,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "KNICK_RecordSleeves",
+   "centre": [
+    0.63,
+    1.74,
+    -5.16
+   ],
+   "size": [
+    3.18,
+    0.96,
+    0.084
+   ],
+   "tris": 36,
+   "material": "BlackCloth",
+   "colour": [
+    45,
+    44,
+    49
+   ]
+  },
+  {
+   "name": "KNICK_RecordSleeves.001",
+   "centre": [
+    0.63,
+    1.74,
+    -5.16
+   ],
+   "size": [
+    1.86,
+    0.96,
+    0.084
+   ],
+   "tris": 24,
+   "material": "Paper",
+   "colour": [
+    227,
+    219,
+    196
+   ]
+  },
+  {
+   "name": "KNICK_TinyPlanter0",
+   "centre": [
+    1.86,
+    6.0225,
+    -5.1
+   ],
+   "size": [
+    0.63,
+    0.405,
+    0.63
+   ],
+   "tris": 140,
+   "material": "ClayGrey",
+   "colour": [
+    142,
+    151,
+    142
+   ]
+  },
+  {
+   "name": "KNICK_TinyPlanter0_Soil",
+   "centre": [
+    1.86,
+    6.105,
+    -5.1
+   ],
+   "size": [
+    0.3696,
+    0.06,
+    0.3696
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "KNICK_TinyPlanter1",
+   "centre": [
+    0.57,
+    6.0225,
+    -5.1
+   ],
+   "size": [
+    0.63,
+    0.405,
+    0.63
+   ],
+   "tris": 140,
+   "material": "ClayGrey",
+   "colour": [
+    142,
+    151,
+    142
+   ]
+  },
+  {
+   "name": "KNICK_TinyPlanter1_Soil",
+   "centre": [
+    0.57,
+    6.105,
+    -5.1
+   ],
+   "size": [
+    0.3696,
+    0.06,
+    0.3696
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "KNICK_TinyPlanter2",
+   "centre": [
+    -0.72,
+    6.0225,
+    -5.1
+   ],
+   "size": [
+    0.63,
+    0.405,
+    0.63
+   ],
+   "tris": 140,
+   "material": "ClayGrey",
+   "colour": [
+    142,
+    151,
+    142
+   ]
+  },
+  {
+   "name": "KNICK_TinyPlanter2_Soil",
+   "centre": [
+    -0.72,
+    6.105,
+    -5.1
+   ],
+   "size": [
+    0.3696,
+    0.06,
+    0.3696
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "KNICK_TrinketBowls",
+   "centre": [
+    0.525,
+    0.8325,
+    -5.1
+   ],
+   "size": [
+    2.82,
+    0.345,
+    1.17
+   ],
+   "tris": 280,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "LIGHT_Cords",
+   "centre": [
+    -1.8,
+    10.845,
+    -2.4
+   ],
+   "size": [
+    31.872,
+    2.79,
+    23.4624
+   ],
+   "tris": 120,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "LIGHT_Diffusers",
+   "centre": [
+    -1.71,
+    9.2025,
+    -2.31
+   ],
+   "size": [
+    33.06,
+    0.795,
+    24.66
+   ],
+   "tris": 264,
+   "material": "Lamp",
+   "colour": [
+    250,
+    209,
+    132
+   ]
+  },
+  {
+   "name": "LIGHT_Shades",
+   "centre": [
+    -1.695,
+    9.63,
+    -2.175
+   ],
+   "size": [
+    33.33,
+    1.26,
+    24.69
+   ],
+   "tris": 132,
+   "material": "PatinaSteel",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "steel_basecolor"
+  },
+  {
+   "name": "LIGHT_Shades.001",
+   "centre": [
+    -1.545,
+    9.255,
+    -3.6
+   ],
+   "size": [
+    27.03,
+    0.81,
+    22.32
+   ],
+   "tris": 132,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "MENU_Drinks",
+   "centre": [
+    -20.838,
+    6.75,
+    6.36
+   ],
+   "size": [
+    0.036,
+    3.522,
+    2.64
+   ],
+   "tris": 12,
+   "material": "MenuDrinks",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "menu_drinks"
+  },
+  {
+   "name": "MENU_Drinks_Frame",
+   "centre": [
+    -20.82,
+    6.75,
+    6.36
+   ],
+   "size": [
+    0.21,
+    3.942,
+    3.06
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "MENU_Food",
+   "centre": [
+    -20.838,
+    6.75,
+    2.25
+   ],
+   "size": [
+    0.036,
+    4.08,
+    3.06
+   ],
+   "tris": 12,
+   "material": "MenuFood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "menu_food"
+  },
+  {
+   "name": "MENU_Food_Frame",
+   "centre": [
+    -20.82,
+    6.75,
+    2.25
+   ],
+   "size": [
+    0.21,
+    4.5,
+    3.48
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "MERCH_Beanies",
+   "centre": [
+    10.8,
+    2.85,
+    3.3
+   ],
+   "size": [
+    0.7989,
+    0.96,
+    0.7598
+   ],
+   "tris": 80,
+   "material": "BlackCloth",
+   "colour": [
+    45,
+    44,
+    49
+   ]
+  },
+  {
+   "name": "MERCH_Beanies.001",
+   "centre": [
+    9.75,
+    2.85,
+    3.3
+   ],
+   "size": [
+    0.7989,
+    0.96,
+    0.7598
+   ],
+   "tris": 80,
+   "material": "RustCloth",
+   "colour": [
+    162,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "MERCH_Beanies.002",
+   "centre": [
+    8.7,
+    2.85,
+    3.3
+   ],
+   "size": [
+    0.7989,
+    0.96,
+    0.7598
+   ],
+   "tris": 80,
+   "material": "BookGreen",
+   "colour": [
+    95,
+    129,
+    115
+   ]
+  },
+  {
+   "name": "MERCH_Boots",
+   "centre": [
+    7.38,
+    3.15,
+    3.0999
+   ],
+   "size": [
+    1.47,
+    1.2,
+    1.2402
+   ],
+   "tris": 88,
+   "material": "Leather",
+   "colour": [
+    124,
+    85,
+    53
+   ]
+  },
+  {
+   "name": "MERCH_HatBands",
+   "centre": [
+    16.74,
+    2.85,
+    9.78
+   ],
+   "size": [
+    4.23,
+    0.09,
+    0.81
+   ],
+   "tris": 288,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "MERCH_PleatedSkirt",
+   "centre": [
+    19.35,
+    3.585,
+    1.65
+   ],
+   "size": [
+    2.34,
+    1.95,
+    0.165
+   ],
+   "tris": 12,
+   "material": "BlackCloth",
+   "colour": [
+    45,
+    44,
+    49
+   ]
+  },
+  {
+   "name": "MERCH_SkirtPleats",
+   "centre": [
+    19.3534,
+    3.57,
+    1.77
+   ],
+   "size": [
+    1.5042,
+    1.7518,
+    0.0685
+   ],
+   "tris": 80,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "MERCH_WesternHats",
+   "centre": [
+    16.74,
+    2.8725,
+    9.78
+   ],
+   "size": [
+    5.1,
+    0.735,
+    1.26
+   ],
+   "tris": 348,
+   "material": "Leather",
+   "colour": [
+    124,
+    85,
+    53
+   ]
+  },
+  {
+   "name": "OFFICE_BeadCurtainRod",
+   "centre": [
+    -15.0,
+    7.59,
+    -8.91
+   ],
+   "size": [
+    4.5,
+    0.1712,
+    0.18
+   ],
+   "tris": 36,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "OFFICE_BeadStrings",
+   "centre": [
+    -15.006,
+    4.185,
+    -8.91
+   ],
+   "size": [
+    4.056,
+    6.57,
+    0.024
+   ],
+   "tris": 204,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "OFFICE_Beads",
+   "centre": [
+    -14.8852,
+    4.275,
+    -8.91
+   ],
+   "size": [
+    3.8787,
+    6.48,
+    0.1038
+   ],
+   "tris": 2100,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "OFFICE_Beads.001",
+   "centre": [
+    -15.1372,
+    4.275,
+    -8.91
+   ],
+   "size": [
+    3.8787,
+    6.48,
+    0.1038
+   ],
+   "tris": 2100,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "OFFICE_Beads.002",
+   "centre": [
+    -15.0112,
+    4.275,
+    -8.91
+   ],
+   "size": [
+    3.1227,
+    6.48,
+    0.1038
+   ],
+   "tris": 1280,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "OFFICE_Blotter",
+   "centre": [
+    -12.9,
+    2.52,
+    -15.36
+   ],
+   "size": [
+    2.4,
+    0.036,
+    1.38
+   ],
+   "tris": 12,
+   "material": "BookGreen",
+   "colour": [
+    95,
+    129,
+    115
+   ]
+  },
+  {
+   "name": "OFFICE_Chair_Back",
+   "centre": [
+    -12.9,
+    2.235,
+    -12.42
+   ],
+   "size": [
+    1.218,
+    1.65,
+    0.138
+   ],
+   "tris": 56,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "OFFICE_Chair_Backrest",
+   "centre": [
+    -12.9,
+    2.73,
+    -12.42
+   ],
+   "size": [
+    1.26,
+    0.63,
+    0.18
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "OFFICE_Chair_Legs",
+   "centre": [
+    -12.9,
+    0.735,
+    -12.96
+   ],
+   "size": [
+    1.17,
+    1.2949,
+    1.17
+   ],
+   "tris": 112,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "OFFICE_Chair_Seat",
+   "centre": [
+    -12.9,
+    1.41,
+    -12.96
+   ],
+   "size": [
+    1.26,
+    0.21,
+    1.26
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "OFFICE_Desk",
+   "centre": [
+    -12.9,
+    2.34,
+    -15.48
+   ],
+   "size": [
+    5.4,
+    0.27,
+    2.4
+   ],
+   "tris": 12,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "OFFICE_DeskLamp",
+   "centre": [
+    -11.01,
+    3.12,
+    -15.9
+   ],
+   "size": [
+    0.12,
+    1.26,
+    0.12
+   ],
+   "tris": 28,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "OFFICE_DeskLampBase",
+   "centre": [
+    -11.01,
+    2.535,
+    -15.9
+   ],
+   "size": [
+    0.66,
+    0.09,
+    0.66
+   ],
+   "tris": 44,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "OFFICE_DeskLampShade",
+   "centre": [
+    -11.01,
+    3.96,
+    -15.9
+   ],
+   "size": [
+    0.9,
+    0.42,
+    0.9
+   ],
+   "tris": 44,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "OFFICE_DeskLegs",
+   "centre": [
+    -12.9,
+    1.11,
+    -15.48
+   ],
+   "size": [
+    5.04,
+    2.22,
+    1.86
+   ],
+   "tris": 24,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "OFFICE_DrawerFaces",
+   "centre": [
+    -19.05,
+    2.04,
+    -15.06
+   ],
+   "size": [
+    1.86,
+    3.78,
+    0.075
+   ],
+   "tris": 36,
+   "material": "PatinaSteel",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "steel_basecolor"
+  },
+  {
+   "name": "OFFICE_DrawerHandles",
+   "centre": [
+    -19.05,
+    2.25,
+    -14.97
+   ],
+   "size": [
+    0.66,
+    2.745,
+    0.105
+   ],
+   "tris": 36,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "OFFICE_FilingCabinet",
+   "centre": [
+    -19.05,
+    2.1,
+    -16.05
+   ],
+   "size": [
+    2.1,
+    4.2,
+    1.92
+   ],
+   "tris": 12,
+   "material": "PatinaSteel",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "steel_basecolor"
+  },
+  {
+   "name": "OFFICE_Notes",
+   "centre": [
+    -12.84,
+    6.285,
+    -17.85
+   ],
+   "size": [
+    3.66,
+    1.26,
+    0.024
+   ],
+   "tris": 60,
+   "material": "Paper",
+   "colour": [
+    227,
+    219,
+    196
+   ]
+  },
+  {
+   "name": "OFFICE_Noticeboard",
+   "centre": [
+    -12.9,
+    6.15,
+    -17.94
+   ],
+   "size": [
+    4.65,
+    2.55,
+    0.12
+   ],
+   "tris": 12,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "OFFICE_Papers",
+   "centre": [
+    -13.65,
+    2.58,
+    -15.21
+   ],
+   "size": [
+    0.69,
+    0.075,
+    0.9
+   ],
+   "tris": 12,
+   "material": "Paper",
+   "colour": [
+    227,
+    219,
+    196
+   ]
+  },
+  {
+   "name": "PLANT_BambooCafe_Leaves",
+   "centre": [
+    -18.5566,
+    5.0542,
+    15.817
+   ],
+   "size": [
+    4.9339,
+    3.1973,
+    4.8948
+   ],
+   "tris": 504,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_BambooCafe_Nodes",
+   "centre": [
+    -18.6321,
+    3.8708,
+    15.9
+   ],
+   "size": [
+    1.2318,
+    3.1631,
+    1.2635
+   ],
+   "tris": 1176,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_BambooCafe_Pot",
+   "centre": [
+    -18.6,
+    0.7275,
+    15.9
+   ],
+   "size": [
+    2.01,
+    1.455,
+    2.01
+   ],
+   "tris": 140,
+   "material": "ClayGrey",
+   "colour": [
+    142,
+    151,
+    142
+   ]
+  },
+  {
+   "name": "PLANT_BambooCafe_Pot_Soil",
+   "centre": [
+    -18.6,
+    1.335,
+    15.9
+   ],
+   "size": [
+    1.584,
+    0.06,
+    1.584
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_BambooCafe_Stems",
+   "centre": [
+    -18.633,
+    3.9557,
+    15.9
+   ],
+   "size": [
+    1.5853,
+    5.2195,
+    1.626
+   ],
+   "tris": 168,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_BambooCafe_Twigs",
+   "centre": [
+    -18.6953,
+    4.9372,
+    15.9002
+   ],
+   "size": [
+    3.7874,
+    3.3354,
+    3.8817
+   ],
+   "tris": 336,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_BambooTall_Leaves",
+   "centre": [
+    19.3907,
+    5.9785,
+    15.5118
+   ],
+   "size": [
+    5.0365,
+    3.9055,
+    4.9897
+   ],
+   "tris": 504,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_BambooTall_Nodes",
+   "centre": [
+    19.3152,
+    4.4822,
+    15.6
+   ],
+   "size": [
+    1.3345,
+    4.1159,
+    1.3688
+   ],
+   "tris": 1176,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_BambooTall_Pot",
+   "centre": [
+    19.35,
+    0.795,
+    15.6
+   ],
+   "size": [
+    2.19,
+    1.59,
+    2.19
+   ],
+   "tris": 140,
+   "material": "Clay",
+   "colour": [
+    175,
+    121,
+    87
+   ]
+  },
+  {
+   "name": "PLANT_BambooTall_Pot_Soil",
+   "centre": [
+    19.35,
+    1.47,
+    15.6
+   ],
+   "size": [
+    1.7424,
+    0.06,
+    1.7424
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_BambooTall_Stems",
+   "centre": [
+    19.3143,
+    4.7259,
+    15.6
+   ],
+   "size": [
+    1.688,
+    6.4885,
+    1.7314
+   ],
+   "tris": 168,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_BambooTall_Twigs",
+   "centre": [
+    19.252,
+    5.8615,
+    15.6002
+   ],
+   "size": [
+    3.8901,
+    4.0436,
+    3.9869
+   ],
+   "tris": 336,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_Counter_Leaves",
+   "centre": [
+    4.6069,
+    4.9636,
+    -11.1796
+   ],
+   "size": [
+    2.1939,
+    1.1673,
+    1.4608
+   ],
+   "tris": 32,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_Counter_Leaves.001",
+   "centre": [
+    4.6759,
+    5.04,
+    -11.7328
+   ],
+   "size": [
+    2.1933,
+    1.1673,
+    1.9057
+   ],
+   "tris": 56,
+   "material": "Leaves",
+   "colour": [
+    72,
+    129,
+    85
+   ]
+  },
+  {
+   "name": "PLANT_Counter_Pot",
+   "centre": [
+    4.65,
+    3.8625,
+    -11.55
+   ],
+   "size": [
+    0.93,
+    0.645,
+    0.93
+   ],
+   "tris": 140,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "PLANT_Counter_Pot_Soil",
+   "centre": [
+    4.65,
+    4.065,
+    -11.55
+   ],
+   "size": [
+    0.6336,
+    0.06,
+    0.6336
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_Counter_Stems",
+   "centre": [
+    4.6537,
+    4.5525,
+    -11.55
+   ],
+   "size": [
+    0.1426,
+    0.945,
+    0.1462
+   ],
+   "tris": 24,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_FernCafe_Leaves",
+   "centre": [
+    -5.0066,
+    2.475,
+    -5.9883
+   ],
+   "size": [
+    2.8867,
+    2.1,
+    1.6735
+   ],
+   "tris": 32,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_FernCafe_Leaves.001",
+   "centre": [
+    -4.9159,
+    2.745,
+    -6.6314
+   ],
+   "size": [
+    2.8859,
+    2.28,
+    2.9257
+   ],
+   "tris": 64,
+   "material": "Leaves",
+   "colour": [
+    72,
+    129,
+    85
+   ]
+  },
+  {
+   "name": "PLANT_FernCafe_Pot",
+   "centre": [
+    -4.95,
+    0.615,
+    -6.6
+   ],
+   "size": [
+    1.71,
+    1.23,
+    1.71
+   ],
+   "tris": 140,
+   "material": "ClayGrey",
+   "colour": [
+    142,
+    151,
+    142
+   ]
+  },
+  {
+   "name": "PLANT_FernCafe_Pot_Soil",
+   "centre": [
+    -4.95,
+    1.11,
+    -6.6
+   ],
+   "size": [
+    1.32,
+    0.06,
+    1.32
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_FernCafe_Stems",
+   "centre": [
+    -4.9463,
+    2.34,
+    -6.6
+   ],
+   "size": [
+    0.1426,
+    2.43,
+    0.1462
+   ],
+   "tris": 24,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_HighShelf_Leaves",
+   "centre": [
+    1.6069,
+    7.3527,
+    -4.7896
+   ],
+   "size": [
+    2.1939,
+    1.2655,
+    1.4609
+   ],
+   "tris": 32,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_HighShelf_Leaves.001",
+   "centre": [
+    1.6759,
+    7.44,
+    -5.3428
+   ],
+   "size": [
+    2.1933,
+    1.2655,
+    1.9057
+   ],
+   "tris": 56,
+   "material": "Leaves",
+   "colour": [
+    72,
+    129,
+    85
+   ]
+  },
+  {
+   "name": "PLANT_HighShelf_Pot",
+   "centre": [
+    1.65,
+    6.2475,
+    -5.16
+   ],
+   "size": [
+    0.81,
+    0.555,
+    0.81
+   ],
+   "tris": 140,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "PLANT_HighShelf_Pot_Soil",
+   "centre": [
+    1.65,
+    6.405,
+    -5.16
+   ],
+   "size": [
+    0.528,
+    0.06,
+    0.528
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_HighShelf_Stems",
+   "centre": [
+    1.6537,
+    6.96,
+    -5.16
+   ],
+   "size": [
+    0.1426,
+    1.08,
+    0.1462
+   ],
+   "tris": 24,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_Office_Leaves",
+   "centre": [
+    -17.2931,
+    2.2255,
+    -16.4296
+   ],
+   "size": [
+    2.1939,
+    2.0509,
+    1.4608
+   ],
+   "tris": 32,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_Office_Leaves.001",
+   "centre": [
+    -17.2241,
+    2.4,
+    -16.9828
+   ],
+   "size": [
+    2.1933,
+    2.0509,
+    1.9057
+   ],
+   "tris": 56,
+   "material": "Leaves",
+   "colour": [
+    72,
+    129,
+    85
+   ]
+  },
+  {
+   "name": "PLANT_Office_Pot",
+   "centre": [
+    -17.25,
+    0.5025,
+    -16.8
+   ],
+   "size": [
+    1.41,
+    1.005,
+    1.41
+   ],
+   "tris": 140,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "PLANT_Office_Pot_Soil",
+   "centre": [
+    -17.25,
+    0.885,
+    -16.8
+   ],
+   "size": [
+    1.056,
+    0.06,
+    1.056
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_Office_Stems",
+   "centre": [
+    -17.2463,
+    1.98,
+    -16.8
+   ],
+   "size": [
+    0.1426,
+    2.16,
+    0.1462
+   ],
+   "tris": 24,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_RubberDivider_Leaves",
+   "centre": [
+    -1.0931,
+    2.9414,
+    14.1704
+   ],
+   "size": [
+    2.1939,
+    3.0327,
+    1.4608
+   ],
+   "tris": 32,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_RubberDivider_Leaves.001",
+   "centre": [
+    -1.0241,
+    3.225,
+    13.6172
+   ],
+   "size": [
+    2.1933,
+    3.0327,
+    1.9057
+   ],
+   "tris": 56,
+   "material": "Leaves",
+   "colour": [
+    72,
+    129,
+    85
+   ]
+  },
+  {
+   "name": "PLANT_RubberDivider_Pot",
+   "centre": [
+    -1.05,
+    0.615,
+    13.8
+   ],
+   "size": [
+    1.71,
+    1.23,
+    1.71
+   ],
+   "tris": 140,
+   "material": "Porcelain",
+   "colour": [
+    229,
+    221,
+    200
+   ]
+  },
+  {
+   "name": "PLANT_RubberDivider_Pot_Soil",
+   "centre": [
+    -1.05,
+    1.11,
+    13.8
+   ],
+   "size": [
+    1.32,
+    0.06,
+    1.32
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_RubberDivider_Stems",
+   "centre": [
+    -1.0463,
+    2.88,
+    13.8
+   ],
+   "size": [
+    0.1426,
+    3.51,
+    0.1462
+   ],
+   "tris": 24,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_RubberEntrance_Leaves",
+   "centre": [
+    7.0069,
+    3.2236,
+    16.0304
+   ],
+   "size": [
+    2.1939,
+    3.3273,
+    1.4608
+   ],
+   "tris": 32,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_RubberEntrance_Leaves.001",
+   "centre": [
+    7.0759,
+    3.54,
+    15.4772
+   ],
+   "size": [
+    2.1933,
+    3.3273,
+    1.9057
+   ],
+   "tris": 56,
+   "material": "Leaves",
+   "colour": [
+    72,
+    129,
+    85
+   ]
+  },
+  {
+   "name": "PLANT_RubberEntrance_Pot",
+   "centre": [
+    7.05,
+    0.6825,
+    15.66
+   ],
+   "size": [
+    1.89,
+    1.365,
+    1.89
+   ],
+   "tris": 140,
+   "material": "Clay",
+   "colour": [
+    175,
+    121,
+    87
+   ]
+  },
+  {
+   "name": "PLANT_RubberEntrance_Pot_Soil",
+   "centre": [
+    7.05,
+    1.245,
+    15.66
+   ],
+   "size": [
+    1.4784,
+    0.06,
+    1.4784
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_RubberEntrance_Stems",
+   "centre": [
+    7.0537,
+    3.2175,
+    15.66
+   ],
+   "size": [
+    0.1426,
+    3.915,
+    0.1462
+   ],
+   "tris": 24,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "PLANT_Table_Leaves",
+   "centre": [
+    -8.4566,
+    3.585,
+    14.7117
+   ],
+   "size": [
+    2.8867,
+    0.93,
+    1.6735
+   ],
+   "tris": 32,
+   "material": "LeavesLight",
+   "colour": [
+    118,
+    158,
+    89
+   ]
+  },
+  {
+   "name": "PLANT_Table_Leaves.001",
+   "centre": [
+    -8.3659,
+    3.66,
+    14.0686
+   ],
+   "size": [
+    2.8859,
+    0.98,
+    2.9257
+   ],
+   "tris": 64,
+   "material": "Leaves",
+   "colour": [
+    72,
+    129,
+    85
+   ]
+  },
+  {
+   "name": "PLANT_Table_Pot",
+   "centre": [
+    -8.4,
+    2.6925,
+    14.1
+   ],
+   "size": [
+    0.69,
+    0.465,
+    0.69
+   ],
+   "tris": 140,
+   "material": "ClayGrey",
+   "colour": [
+    142,
+    151,
+    142
+   ]
+  },
+  {
+   "name": "PLANT_Table_Pot_Soil",
+   "centre": [
+    -8.4,
+    2.805,
+    14.1
+   ],
+   "size": [
+    0.4224,
+    0.06,
+    0.4224
+   ],
+   "tris": 44,
+   "material": "Soil",
+   "colour": [
+    66,
+    58,
+    44
+   ]
+  },
+  {
+   "name": "PLANT_Table_Stems",
+   "centre": [
+    -8.3963,
+    3.1575,
+    14.1
+   ],
+   "size": [
+    0.1426,
+    0.675,
+    0.1462
+   ],
+   "tris": 24,
+   "material": "Bamboo",
+   "colour": [
+    134,
+    162,
+    91
+   ]
+  },
+  {
+   "name": "RACK_clear_signal",
+   "centre": [
+    0.45,
+    2.9963,
+    1.05
+   ],
+   "size": [
+    5.37,
+    5.8575,
+    1.5
+   ],
+   "tris": 108,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "RACK_loose_wire",
+   "centre": [
+    7.95,
+    2.9963,
+    10.2
+   ],
+   "size": [
+    5.37,
+    5.8575,
+    1.5
+   ],
+   "tris": 108,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "RACK_midnight_static",
+   "centre": [
+    16.8,
+    2.9963,
+    1.65
+   ],
+   "size": [
+    5.37,
+    5.8575,
+    1.5
+   ],
+   "tris": 108,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "RETAIL_AngledBoardSupport",
+   "centre": [
+    10.86,
+    4.92,
+    -16.14
+   ],
+   "size": [
+    17.4,
+    0.255,
+    2.1
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "RETAIL_Bell",
+   "centre": [
+    6.0,
+    3.6,
+    -11.4
+   ],
+   "size": [
+    0.48,
+    0.33,
+    0.48
+   ],
+   "tris": 72,
+   "material": "WornBrass",
+   "colour": [
+    175,
+    147,
+    91
+   ]
+  },
+  {
+   "name": "RETAIL_CheckoutBody",
+   "centre": [
+    11.25,
+    1.59,
+    -11.55
+   ],
+   "size": [
+    14.4,
+    3.18,
+    2.55
+   ],
+   "tris": 12,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "RETAIL_CheckoutRepairBattens",
+   "centre": [
+    11.175,
+    1.62,
+    -10.2
+   ],
+   "size": [
+    13.275,
+    2.94,
+    0.12
+   ],
+   "tris": 48,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "RETAIL_CheckoutTop",
+   "centre": [
+    11.25,
+    3.3,
+    -11.55
+   ],
+   "size": [
+    14.85,
+    0.36,
+    2.94
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "RETAIL_DisplayTable_Legs",
+   "centre": [
+    9.0,
+    1.2,
+    3.0
+   ],
+   "size": [
+    5.25,
+    2.4,
+    2.7
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "RETAIL_DisplayTable_Top",
+   "centre": [
+    9.0,
+    2.4,
+    3.0
+   ],
+   "size": [
+    5.7,
+    0.27,
+    3.15
+   ],
+   "tris": 12,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "RETAIL_HatBench_Legs",
+   "centre": [
+    16.65,
+    1.02,
+    9.75
+   ],
+   "size": [
+    5.1,
+    2.04,
+    1.65
+   ],
+   "tris": 48,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "RETAIL_HatBench_Top",
+   "centre": [
+    16.65,
+    2.04,
+    9.75
+   ],
+   "size": [
+    5.55,
+    0.27,
+    2.1
+   ],
+   "tris": 12,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "RETAIL_Ledger",
+   "centre": [
+    11.1,
+    3.57,
+    -11.52
+   ],
+   "size": [
+    1.08,
+    0.135,
+    0.78
+   ],
+   "tris": 12,
+   "material": "BookGreen",
+   "colour": [
+    95,
+    129,
+    115
+   ]
+  },
+  {
+   "name": "RETAIL_SkateRack",
+   "centre": [
+    10.8,
+    6.675,
+    -16.95
+   ],
+   "size": [
+    16.41,
+    5.55,
+    0.21
+   ],
+   "tris": 56,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "RETAIL_SkateRackCrossbar",
+   "centre": [
+    10.8,
+    5.7,
+    -16.95
+   ],
+   "size": [
+    17.1,
+    2.94,
+    0.27
+   ],
+   "tris": 24,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "RETAIL_SmallShelf_Back",
+   "centre": [
+    0.36,
+    2.925,
+    -5.895
+   ],
+   "size": [
+    4.5,
+    5.85,
+    0.15
+   ],
+   "tris": 12,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "RETAIL_SmallShelf_Shelves",
+   "centre": [
+    0.36,
+    3.0,
+    -5.25
+   ],
+   "size": [
+    4.5,
+    4.995,
+    1.44
+   ],
+   "tris": 36,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "RETAIL_SmallShelf_Sides",
+   "centre": [
+    0.36,
+    2.925,
+    -5.25
+   ],
+   "size": [
+    4.5,
+    5.85,
+    1.44
+   ],
+   "tris": 24,
+   "material": "AmberWood",
+   "colour": [
+    160,
+    121,
+    77
+   ]
+  },
+  {
+   "name": "RETAIL_Till",
+   "centre": [
+    15.75,
+    3.9,
+    -11.55
+   ],
+   "size": [
+    1.74,
+    0.87,
+    1.32
+   ],
+   "tris": 12,
+   "material": "PatinaSteel",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "steel_basecolor"
+  },
+  {
+   "name": "RETAIL_TillDisplay",
+   "centre": [
+    15.75,
+    4.65,
+    -11.85
+   ],
+   "size": [
+    1.35,
+    0.66,
+    0.27
+   ],
+   "tris": 12,
+   "material": "BlackIron",
+   "colour": [
+    47,
+    54,
+    54
+   ]
+  },
+  {
+   "name": "RETAIL_WallShelving_Back",
+   "centre": [
+    15.9,
+    3.525,
+    -5.4
+   ],
+   "size": [
+    8.4,
+    7.05,
+    0.15
+   ],
+   "tris": 12,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "RETAIL_WallShelving_Shelves",
+   "centre": [
+    15.9,
+    3.6,
+    -4.65
+   ],
+   "size": [
+    8.4,
+    6.195,
+    1.65
+   ],
+   "tris": 48,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "RETAIL_WallShelving_Sides",
+   "centre": [
+    15.9,
+    3.525,
+    -4.65
+   ],
+   "size": [
+    8.4,
+    7.05,
+    1.65
+   ],
+   "tris": 24,
+   "material": "Plywood",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "plywood_basecolor"
+  },
+  {
+   "name": "ROOF_Removable",
+   "centre": [
+    0.0,
+    12.81,
+    0.0
+   ],
+   "size": [
+    43.5,
+    0.42,
+    37.5
+   ],
+   "tris": 12,
+   "material": "CreamPlaster",
+   "colour": [
+    211,
+    205,
+    184
+   ]
+  },
+  {
+   "name": "SIGN_clear_signal",
+   "centre": [
+    0.45,
+    6.39,
+    1.227
+   ],
+   "size": [
+    3.3,
+    0.825,
+    0.036
+   ],
+   "tris": 12,
+   "material": "Tag_clear_signal",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "tag_clear_signal"
+  },
+  {
+   "name": "SIGN_dustline",
+   "centre": [
+    16.65,
+    3.99,
+    9.642
+   ],
+   "size": [
+    3.24,
+    0.81,
+    0.036
+   ],
+   "tris": 12,
+   "material": "Tag_dustline",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "tag_dustline"
+  },
+  {
+   "name": "SIGN_loose_wire",
+   "centre": [
+    7.95,
+    6.39,
+    10.377
+   ],
+   "size": [
+    3.3,
+    0.825,
+    0.036
+   ],
+   "tris": 12,
+   "material": "Tag_loose_wire",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "tag_loose_wire"
+  },
+  {
+   "name": "SIGN_midnight_static",
+   "centre": [
+    16.8,
+    6.39,
+    1.827
+   ],
+   "size": [
+    3.3,
+    0.825,
+    0.036
+   ],
+   "tris": 12,
+   "material": "Tag_midnight_static",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "tag_midnight_static"
+  },
+  {
+   "name": "SPECIALS_Cache_Run_Tag",
+   "centre": [
+    10.5,
+    8.1,
+    -15.39
+   ],
+   "size": [
+    1.65,
+    0.51,
+    0.0
+   ],
+   "tris": 2,
+   "material": "SPECIALS_Cache_Run_Tag_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_37"
+  },
+  {
+   "name": "SPECIALS_Iron_Brackets",
+   "centre": [
+    12.75,
+    7.4168,
+    -16.7501
+   ],
+   "size": [
+    8.508,
+    1.5943,
+    2.3533
+   ],
+   "tris": 144,
+   "material": "Blackened_Steel",
+   "colour": [
+    113,
+    121,
+    119
+   ]
+  },
+  {
+   "name": "SPECIALS_Jacket_Tag",
+   "centre": [
+    20.79,
+    5.94,
+    -1.59
+   ],
+   "size": [
+    0.0,
+    0.6,
+    2.28
+   ],
+   "tris": 2,
+   "material": "SPECIALS_Jacket_Tag_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_38"
+  },
+  {
+   "name": "SPECIALS_Live_Wire_Tag",
+   "centre": [
+    15.15,
+    8.1,
+    -15.39
+   ],
+   "size": [
+    1.65,
+    0.51,
+    0.0
+   ],
+   "tris": 2,
+   "material": "SPECIALS_Live_Wire_Tag_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_36"
+  },
+  {
+   "name": "SPECIALS_Series_Sign",
+   "centre": [
+    12.75,
+    11.61,
+    -17.1
+   ],
+   "size": [
+    7.65,
+    0.6,
+    0.0
+   ],
+   "tris": 2,
+   "material": "SPECIALS_Series_Sign_Printed_Texture",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "Image_35"
+  },
+  {
+   "name": "SPECIALS_Upper_Shelf",
+   "centre": [
+    12.75,
+    8.265,
+    -16.47
+   ],
+   "size": [
+    10.95,
+    0.225,
+    1.98
+   ],
+   "tris": 12,
+   "material": "Salvaged_Dark_Wood",
+   "colour": [
+    155,
+    127,
+    101
+   ]
+  },
+  {
+   "name": "SPECIALS_Worn_Shelf_Lip",
+   "centre": [
+    12.75,
+    8.31,
+    -15.42
+   ],
+   "size": [
+    11.01,
+    0.3,
+    0.105
+   ],
+   "tris": 12,
+   "material": "Exposed_Wood_Edge",
+   "colour": [
+    203,
+    179,
+    142
+   ]
+  },
+  {
+   "name": "TRIM_PassagePosts",
+   "centre": [
+    -3.0,
+    4.35,
+    7.5
+   ],
+   "size": [
+    0.66,
+    8.7,
+    8.88
+   ],
+   "tris": 24,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "Truck_Front_Cache_Run",
+   "centre": [
+    10.5,
+    9.7735,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium.002",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium.002",
+    "Dark_Fasteners.002",
+    "Truck_Rubber_Bushings.002"
+   ]
+  },
+  {
+   "name": "Truck_Front_Concrete_Fern",
+   "centre": [
+    10.86,
+    6.5035,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Front_Ghost_Fish",
+   "centre": [
+    6.0,
+    6.5035,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Front_Live_Wire",
+   "centre": [
+    15.15,
+    9.7735,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium.001",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium.001",
+    "Dark_Fasteners.001",
+    "Truck_Rubber_Bushings.001"
+   ]
+  },
+  {
+   "name": "Truck_Front_Lunar_Moth",
+   "centre": [
+    18.15,
+    6.5035,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Front_Ochre_Run",
+   "centre": [
+    13.29,
+    6.5035,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Front_Static_Weekend",
+   "centre": [
+    15.72,
+    6.5035,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Front_Tidal_Check",
+   "centre": [
+    8.43,
+    6.5035,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Front_Violet_Comet",
+   "centre": [
+    3.57,
+    6.5035,
+    -17.2672
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Cache_Run",
+   "centre": [
+    10.5,
+    8.7128,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium.002",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium.002",
+    "Dark_Fasteners.002",
+    "Truck_Rubber_Bushings.002"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Concrete_Fern",
+   "centre": [
+    10.86,
+    5.4428,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Ghost_Fish",
+   "centre": [
+    6.0,
+    5.4428,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Live_Wire",
+   "centre": [
+    15.15,
+    8.7128,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium.001",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium.001",
+    "Dark_Fasteners.001",
+    "Truck_Rubber_Bushings.001"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Lunar_Moth",
+   "centre": [
+    18.15,
+    5.4428,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Ochre_Run",
+   "centre": [
+    13.29,
+    5.4428,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Static_Weekend",
+   "centre": [
+    15.72,
+    5.4428,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Tidal_Check",
+   "centre": [
+    8.43,
+    5.4428,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "Truck_Rear_Violet_Comet",
+   "centre": [
+    3.57,
+    5.4428,
+    -16.2065
+   ],
+   "size": [
+    0.63,
+    0.207,
+    0.207
+   ],
+   "tris": 108,
+   "material": "Brushed_Aluminium",
+   "colour": [
+    184,
+    192,
+    197
+   ],
+   "materials": [
+    "Brushed_Aluminium",
+    "Dark_Fasteners",
+    "Truck_Rubber_Bushings"
+   ]
+  },
+  {
+   "name": "WALL_Back",
+   "centre": [
+    0.0,
+    6.3,
+    -18.36
+   ],
+   "size": [
+    43.44,
+    12.6,
+    0.72
+   ],
+   "tris": 156,
+   "material": "Brick",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "brick_basecolor"
+  },
+  {
+   "name": "WALL_DividerLintel",
+   "centre": [
+    -3.0,
+    10.95,
+    7.5
+   ],
+   "size": [
+    0.54,
+    3.3,
+    8.4
+   ],
+   "tris": 12,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "WALL_Left",
+   "centre": [
+    21.36,
+    6.3,
+    -0.0
+   ],
+   "size": [
+    0.72,
+    12.6,
+    36.72
+   ],
+   "tris": 124,
+   "material": "Brick",
+   "colour": [
+    231,
+    231,
+    231
+   ],
+   "texture": "brick_basecolor"
+  },
+  {
+   "name": "WALL_OfficeLintel",
+   "centre": [
+    -15.0,
+    10.05,
+    -9.0
+   ],
+   "size": [
+    4.2,
+    5.1,
+    0.54
+   ],
+   "tris": 12,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "WALL_OfficePartition",
+   "centre": [
+    -12.0,
+    6.3,
+    -9.0
+   ],
+   "size": [
+    18.0,
+    12.6,
+    0.48
+   ],
+   "tris": 24,
+   "material": "TealPaint",
+   "colour": [
+    93,
+    142,
+    137
+   ]
+  },
+  {
+   "name": "WALL_OfficeSide",
+   "centre": [
+    -9.0,
+    6.3,
+    -13.5
+   ],
+   "size": [
+    0.42,
+    12.6,
+    9.0
+   ],
+   "tris": 12,
+   "material": "CreamPlaster",
+   "colour": [
+    211,
+    205,
+    184
+   ]
+  },
+  {
+   "name": "WALL_Right",
+   "centre": [
+    -21.36,
+    6.3,
+    0.0
+   ],
+   "size": [
+    0.72,
+    12.6,
+    36.72
+   ],
+   "tris": 12,
+   "material": "CreamPlaster",
+   "colour": [
+    211,
+    205,
+    184
+   ]
+  },
+  {
+   "name": "WALL_RoomDivider",
+   "centre": [
+    -3.0,
+    6.3,
+    0.0
+   ],
+   "size": [
+    0.48,
+    12.6,
+    36.0
+   ],
+   "tris": 24,
+   "material": "CreamPlaster",
+   "colour": [
+    211,
+    205,
+    184
+   ]
+  },
+  {
+   "name": "WINDOW_Frames",
+   "centre": [
+    -0.1425,
+    6.54,
+    18.0
+   ],
+   "size": [
+    38.325,
+    8.13,
+    0.39
+   ],
+   "tris": 144,
+   "material": "DarkWood",
+   "colour": [
+    118,
+    87,
+    60
+   ]
+  },
+  {
+   "name": "WINDOW_LeftGlass",
+   "centre": [
+    16.44,
+    6.54,
+    18.075
+   ],
+   "size": [
+    4.89,
+    7.68,
+    0.045
+   ],
+   "tris": 12,
+   "material": "WindowGlass",
+   "colour": [
+    216,
+    235,
+    230
+   ],
+   "alpha": 0.115
+  },
+  {
+   "name": "WINDOW_RemovableGlass",
+   "centre": [
+    -5.325,
+    6.54,
+    18.075
+   ],
+   "size": [
+    27.51,
+    7.68,
+    0.045
+   ],
+   "tris": 24,
+   "material": "WindowGlass",
+   "colour": [
+    216,
+    235,
+    230
+   ],
+   "alpha": 0.115
+  },
+  {
+   "name": "Wheel_FrontL_Cache_Run",
+   "centre": [
+    10.773,
+    9.862,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Cache_Run",
+   "colour": [
+    218,
+    211,
+    175
+   ],
+   "materials": [
+    "Wheels_Cache_Run",
+    "Wheel_Core.002"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Concrete_Fern",
+   "centre": [
+    11.133,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Concrete_Fern",
+   "colour": [
+    216,
+    222,
+    189
+   ],
+   "materials": [
+    "Wheels_Concrete_Fern",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Ghost_Fish",
+   "centre": [
+    6.273,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ghost_Fish",
+   "colour": [
+    188,
+    221,
+    216
+   ],
+   "materials": [
+    "Wheels_Ghost_Fish",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Live_Wire",
+   "centre": [
+    15.423,
+    9.862,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Live_Wire",
+   "colour": [
+    225,
+    160,
+    111
+   ],
+   "materials": [
+    "Wheels_Live_Wire",
+    "Wheel_Core.001"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Lunar_Moth",
+   "centre": [
+    18.423,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Lunar_Moth",
+   "colour": [
+    226,
+    222,
+    205
+   ],
+   "materials": [
+    "Wheels_Lunar_Moth",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Ochre_Run",
+   "centre": [
+    13.563,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ochre_Run",
+   "colour": [
+    223,
+    209,
+    179
+   ],
+   "materials": [
+    "Wheels_Ochre_Run",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Static_Weekend",
+   "centre": [
+    15.993,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Static_Weekend",
+   "colour": [
+    226,
+    206,
+    142
+   ],
+   "materials": [
+    "Wheels_Static_Weekend",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Tidal_Check",
+   "centre": [
+    8.703,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Tidal_Check",
+   "colour": [
+    231,
+    191,
+    151
+   ],
+   "materials": [
+    "Wheels_Tidal_Check",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontL_Violet_Comet",
+   "centre": [
+    3.843,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Violet_Comet",
+   "colour": [
+    215,
+    186,
+    225
+   ],
+   "materials": [
+    "Wheels_Violet_Comet",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Cache_Run",
+   "centre": [
+    10.227,
+    9.862,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Cache_Run",
+   "colour": [
+    218,
+    211,
+    175
+   ],
+   "materials": [
+    "Wheels_Cache_Run",
+    "Wheel_Core.002"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Concrete_Fern",
+   "centre": [
+    10.587,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Concrete_Fern",
+   "colour": [
+    216,
+    222,
+    189
+   ],
+   "materials": [
+    "Wheels_Concrete_Fern",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Ghost_Fish",
+   "centre": [
+    5.727,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ghost_Fish",
+   "colour": [
+    188,
+    221,
+    216
+   ],
+   "materials": [
+    "Wheels_Ghost_Fish",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Live_Wire",
+   "centre": [
+    14.877,
+    9.862,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Live_Wire",
+   "colour": [
+    225,
+    160,
+    111
+   ],
+   "materials": [
+    "Wheels_Live_Wire",
+    "Wheel_Core.001"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Lunar_Moth",
+   "centre": [
+    17.877,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Lunar_Moth",
+   "colour": [
+    226,
+    222,
+    205
+   ],
+   "materials": [
+    "Wheels_Lunar_Moth",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Ochre_Run",
+   "centre": [
+    13.017,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ochre_Run",
+   "colour": [
+    223,
+    209,
+    179
+   ],
+   "materials": [
+    "Wheels_Ochre_Run",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Static_Weekend",
+   "centre": [
+    15.447,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Static_Weekend",
+   "colour": [
+    226,
+    206,
+    142
+   ],
+   "materials": [
+    "Wheels_Static_Weekend",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Tidal_Check",
+   "centre": [
+    8.157,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Tidal_Check",
+   "colour": [
+    231,
+    191,
+    151
+   ],
+   "materials": [
+    "Wheels_Tidal_Check",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_FrontR_Violet_Comet",
+   "centre": [
+    3.297,
+    6.592,
+    -17.1787
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Violet_Comet",
+   "colour": [
+    215,
+    186,
+    225
+   ],
+   "materials": [
+    "Wheels_Violet_Comet",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Cache_Run",
+   "centre": [
+    10.773,
+    8.8013,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Cache_Run",
+   "colour": [
+    218,
+    211,
+    175
+   ],
+   "materials": [
+    "Wheels_Cache_Run",
+    "Wheel_Core.002"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Concrete_Fern",
+   "centre": [
+    11.133,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Concrete_Fern",
+   "colour": [
+    216,
+    222,
+    189
+   ],
+   "materials": [
+    "Wheels_Concrete_Fern",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Ghost_Fish",
+   "centre": [
+    6.273,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ghost_Fish",
+   "colour": [
+    188,
+    221,
+    216
+   ],
+   "materials": [
+    "Wheels_Ghost_Fish",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Live_Wire",
+   "centre": [
+    15.423,
+    8.8013,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Live_Wire",
+   "colour": [
+    225,
+    160,
+    111
+   ],
+   "materials": [
+    "Wheels_Live_Wire",
+    "Wheel_Core.001"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Lunar_Moth",
+   "centre": [
+    18.423,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Lunar_Moth",
+   "colour": [
+    226,
+    222,
+    205
+   ],
+   "materials": [
+    "Wheels_Lunar_Moth",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Ochre_Run",
+   "centre": [
+    13.563,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ochre_Run",
+   "colour": [
+    223,
+    209,
+    179
+   ],
+   "materials": [
+    "Wheels_Ochre_Run",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Static_Weekend",
+   "centre": [
+    15.993,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Static_Weekend",
+   "colour": [
+    226,
+    206,
+    142
+   ],
+   "materials": [
+    "Wheels_Static_Weekend",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Tidal_Check",
+   "centre": [
+    8.703,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Tidal_Check",
+   "colour": [
+    231,
+    191,
+    151
+   ],
+   "materials": [
+    "Wheels_Tidal_Check",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearL_Violet_Comet",
+   "centre": [
+    3.843,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Violet_Comet",
+   "colour": [
+    215,
+    186,
+    225
+   ],
+   "materials": [
+    "Wheels_Violet_Comet",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Cache_Run",
+   "centre": [
+    10.227,
+    8.8013,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Cache_Run",
+   "colour": [
+    218,
+    211,
+    175
+   ],
+   "materials": [
+    "Wheels_Cache_Run",
+    "Wheel_Core.002"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Concrete_Fern",
+   "centre": [
+    10.587,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Concrete_Fern",
+   "colour": [
+    216,
+    222,
+    189
+   ],
+   "materials": [
+    "Wheels_Concrete_Fern",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Ghost_Fish",
+   "centre": [
+    5.727,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ghost_Fish",
+   "colour": [
+    188,
+    221,
+    216
+   ],
+   "materials": [
+    "Wheels_Ghost_Fish",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Live_Wire",
+   "centre": [
+    14.877,
+    8.8013,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Live_Wire",
+   "colour": [
+    225,
+    160,
+    111
+   ],
+   "materials": [
+    "Wheels_Live_Wire",
+    "Wheel_Core.001"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Lunar_Moth",
+   "centre": [
+    17.877,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Lunar_Moth",
+   "colour": [
+    226,
+    222,
+    205
+   ],
+   "materials": [
+    "Wheels_Lunar_Moth",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Ochre_Run",
+   "centre": [
+    13.017,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Ochre_Run",
+   "colour": [
+    223,
+    209,
+    179
+   ],
+   "materials": [
+    "Wheels_Ochre_Run",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Static_Weekend",
+   "centre": [
+    15.447,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Static_Weekend",
+   "colour": [
+    226,
+    206,
+    142
+   ],
+   "materials": [
+    "Wheels_Static_Weekend",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Tidal_Check",
+   "centre": [
+    8.157,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Tidal_Check",
+   "colour": [
+    231,
+    191,
+    151
+   ],
+   "materials": [
+    "Wheels_Tidal_Check",
+    "Wheel_Core"
+   ]
+  },
+  {
+   "name": "Wheel_RearR_Violet_Comet",
+   "centre": [
+    3.297,
+    5.5313,
+    -16.118
+   ],
+   "size": [
+    0.078,
+    0.1594,
+    0.1594
+   ],
+   "tris": 140,
+   "material": "Wheels_Violet_Comet",
+   "colour": [
+    215,
+    186,
+    225
+   ],
+   "materials": [
+    "Wheels_Violet_Comet",
+    "Wheel_Core"
+   ]
+  }
+ ],
+ "roofMeshes": [
+  {
+   "name": "AsphaltShingleBand_-1_00",
+   "centre": [
+    0.0,
+    27.9374,
+    0.4831
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.001",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_01",
+   "centre": [
+    0.0,
+    27.3243,
+    1.412
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.002",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_02",
+   "centre": [
+    0.0,
+    26.7112,
+    2.341
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.003",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_03",
+   "centre": [
+    0.0,
+    26.098,
+    3.27
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.004",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_04",
+   "centre": [
+    0.0,
+    25.4849,
+    4.199
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.005",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_05",
+   "centre": [
+    0.0,
+    24.8718,
+    5.128
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.006",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_06",
+   "centre": [
+    0.0,
+    24.2587,
+    6.0569
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.007",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_07",
+   "centre": [
+    0.0,
+    23.6455,
+    6.9859
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.008",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_08",
+   "centre": [
+    0.0,
+    23.0324,
+    7.9149
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.009",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_09",
+   "centre": [
+    0.0,
+    22.4193,
+    8.8439
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.010",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_10",
+   "centre": [
+    0.0,
+    21.8062,
+    9.7728
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.011",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_11",
+   "centre": [
+    0.0,
+    21.1931,
+    10.7018
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.012",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_12",
+   "centre": [
+    0.0,
+    20.5799,
+    11.6308
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.013",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_13",
+   "centre": [
+    0.0,
+    19.9668,
+    12.5598
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.014",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_14",
+   "centre": [
+    0.0,
+    19.3537,
+    13.4888
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.015",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_15",
+   "centre": [
+    0.0,
+    18.7406,
+    14.4177
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.016",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_16",
+   "centre": [
+    0.0,
+    18.1274,
+    15.3467
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.017",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_17",
+   "centre": [
+    0.0,
+    17.5143,
+    16.2757
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.018",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_18",
+   "centre": [
+    0.0,
+    16.9012,
+    17.2047
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.019",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_19",
+   "centre": [
+    0.0,
+    16.288,
+    18.1336
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.020",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_20",
+   "centre": [
+    0.0,
+    15.6749,
+    19.0626
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.021",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_-1_21",
+   "centre": [
+    0.0,
+    15.0618,
+    19.9916
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.022",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_00",
+   "centre": [
+    0.0,
+    27.9374,
+    -0.4831
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.041",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_01",
+   "centre": [
+    0.0,
+    27.3243,
+    -1.412
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.042",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_02",
+   "centre": [
+    0.0,
+    26.7112,
+    -2.341
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.043",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_03",
+   "centre": [
+    0.0,
+    26.098,
+    -3.27
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.044",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_04",
+   "centre": [
+    0.0,
+    25.4849,
+    -4.199
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.045",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_05",
+   "centre": [
+    0.0,
+    24.8718,
+    -5.128
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.046",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_06",
+   "centre": [
+    0.0,
+    24.2587,
+    -6.0569
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.047",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_07",
+   "centre": [
+    0.0,
+    23.6455,
+    -6.9859
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.048",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_08",
+   "centre": [
+    0.0,
+    23.0324,
+    -7.9149
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.049",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_09",
+   "centre": [
+    0.0,
+    22.4193,
+    -8.8439
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.050",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_10",
+   "centre": [
+    0.0,
+    21.8062,
+    -9.7728
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.051",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_11",
+   "centre": [
+    0.0,
+    21.1931,
+    -10.7018
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.052",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_12",
+   "centre": [
+    0.0,
+    20.5799,
+    -11.6308
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.053",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_13",
+   "centre": [
+    0.0,
+    19.9668,
+    -12.5598
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.054",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_14",
+   "centre": [
+    0.0,
+    19.3537,
+    -13.4888
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.055",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_15",
+   "centre": [
+    0.0,
+    18.7406,
+    -14.4177
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.056",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_16",
+   "centre": [
+    0.0,
+    18.1274,
+    -15.3467
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.057",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_17",
+   "centre": [
+    0.0,
+    17.5143,
+    -16.2757
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.058",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_18",
+   "centre": [
+    0.0,
+    16.9012,
+    -17.2047
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.059",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_19",
+   "centre": [
+    0.0,
+    16.288,
+    -18.1336
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.060",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_20",
+   "centre": [
+    0.0,
+    15.6749,
+    -19.0626
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.061",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "AsphaltShingleBand_1_21",
+   "centre": [
+    0.0,
+    15.0618,
+    -19.9916
+   ],
+   "size": [
+    46.488,
+    0.694,
+    1.0033
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.062",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Brick_Body",
+   "centre": [
+    11.856,
+    26.9775,
+    -7.875
+   ],
+   "size": [
+    2.7456,
+    8.25,
+    3.5625
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.081",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Cap",
+   "centre": [
+    11.856,
+    31.2525,
+    -7.875
+   ],
+   "size": [
+    3.3696,
+    0.7125,
+    4.275
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.082",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Flue",
+   "centre": [
+    11.856,
+    31.7775,
+    -7.875
+   ],
+   "size": [
+    1.6536,
+    0.675,
+    2.0625
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.083",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Mortar_6.34",
+   "centre": [
+    11.856,
+    23.79,
+    -7.875
+   ],
+   "size": [
+    2.8142,
+    0.0938,
+    3.6262
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.084",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Mortar_6.69",
+   "centre": [
+    11.856,
+    25.1025,
+    -7.875
+   ],
+   "size": [
+    2.8142,
+    0.0938,
+    3.6262
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.085",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Mortar_7.04",
+   "centre": [
+    11.856,
+    26.415,
+    -7.875
+   ],
+   "size": [
+    2.8142,
+    0.0938,
+    3.6262
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.086",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Mortar_7.39",
+   "centre": [
+    11.856,
+    27.7275,
+    -7.875
+   ],
+   "size": [
+    2.8142,
+    0.0938,
+    3.6262
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.087",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Mortar_7.74",
+   "centre": [
+    11.856,
+    29.04,
+    -7.875
+   ],
+   "size": [
+    2.8142,
+    0.0937,
+    3.6262
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.088",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Chimney_Mortar_8.09",
+   "centre": [
+    11.856,
+    30.3525,
+    -7.875
+   ],
+   "size": [
+    2.8142,
+    0.0937,
+    3.6262
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.089",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Fascia_-1",
+   "centre": [
+    0.0,
+    14.1488,
+    20.4375
+   ],
+   "size": [
+    46.488,
+    1.0125,
+    0.675
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.023",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "Fascia_1",
+   "centre": [
+    0.0,
+    14.1488,
+    -20.4375
+   ],
+   "size": [
+    46.488,
+    1.0125,
+    0.675
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.063",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "GutterRun_-1",
+   "centre": [
+    0.0,
+    13.7362,
+    21.1875
+   ],
+   "size": [
+    46.488,
+    0.6375,
+    0.8625
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.024",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "GutterRun_1",
+   "centre": [
+    0.0,
+    13.7362,
+    -21.1875
+   ],
+   "size": [
+    46.488,
+    0.6375,
+    0.8625
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.064",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_00",
+   "centre": [
+    -20.592,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.025",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_01",
+   "centre": [
+    -17.6503,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.026",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_02",
+   "centre": [
+    -14.7086,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.027",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_03",
+   "centre": [
+    -11.7669,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.028",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_04",
+   "centre": [
+    -8.8251,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.029",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_05",
+   "centre": [
+    -5.8834,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.030",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_06",
+   "centre": [
+    -2.9417,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.031",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_07",
+   "centre": [
+    -0.0,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.032",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_08",
+   "centre": [
+    2.9417,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.033",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_09",
+   "centre": [
+    5.8834,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.034",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_10",
+   "centre": [
+    8.8251,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.035",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_11",
+   "centre": [
+    11.7669,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.036",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_12",
+   "centre": [
+    14.7086,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.037",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_13",
+   "centre": [
+    17.6503,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.038",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_-1_14",
+   "centre": [
+    20.592,
+    14.8875,
+    18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.039",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_00",
+   "centre": [
+    -20.592,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.065",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_01",
+   "centre": [
+    -17.6503,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.066",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_02",
+   "centre": [
+    -14.7086,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.067",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_03",
+   "centre": [
+    -11.7669,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.068",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_04",
+   "centre": [
+    -8.8251,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.069",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_05",
+   "centre": [
+    -5.8834,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.070",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_06",
+   "centre": [
+    -2.9417,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.071",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_07",
+   "centre": [
+    0.0,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.072",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_08",
+   "centre": [
+    2.9417,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.073",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_09",
+   "centre": [
+    5.8834,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.074",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_10",
+   "centre": [
+    8.8251,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.075",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_11",
+   "centre": [
+    11.7669,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.076",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_12",
+   "centre": [
+    14.7086,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.077",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_13",
+   "centre": [
+    17.6503,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.078",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RafterTail_1_14",
+   "centre": [
+    20.592,
+    14.8875,
+    -18.9375
+   ],
+   "size": [
+    0.468,
+    2.8723,
+    4.133
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.079",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RidgeCap",
+   "centre": [
+    0.0,
+    28.35,
+    0.0
+   ],
+   "size": [
+    46.6128,
+    0.6,
+    1.1625
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.080",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RoofDeck_East",
+   "centre": [
+    0.0,
+    21.1931,
+    -10.2188
+   ],
+   "size": [
+    46.488,
+    13.9269,
+    20.7267
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial.040",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  },
+  {
+   "name": "RoofDeck_West",
+   "centre": [
+    0.0,
+    21.1931,
+    10.2188
+   ],
+   "size": [
+    46.488,
+    13.9269,
+    20.7267
+   ],
+   "tris": 12,
+   "material": "DefaultMaterial",
+   "colour": [
+    231,
+    231,
+    231
+   ]
+  }
+ ]
+}
