@@ -14,6 +14,9 @@
 --   * the origin's "Body.JUMP_HEIGHT more while the newest Move says BIT.air" is allowed below the eye
 --     as well as above it: a body coming down from a hop is lower than its newest Move (Stream.originOk);
 --   * a slot's splats and pose history are emptied when its occupant changes, when the roster is read;
+--   * a person who trades sides in the briefing stands, until the match has placed them anew, in
+--     what has just become the other team's spawn room: their Moves from there are dropped, not refused
+--     as "inside the other team's spawn room" (the "side" verb; Stream, owedSince);
 --   * at "start", "unless that team already has Rules.teamMax people" counts the people GOING to a side
 --     (their remembered sides, in seat order), not the people the new deal has just handed it: with
 --     sixteen people the deal fills both sides, and two who had crossed would each be refused (onStart).
@@ -1269,6 +1272,11 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 					if theirs.on and theirs.team == other and botSkill[id] ~= nil then
 						Rules.assign(state, seat, other)
 						Rules.assign(state, id, mine)
+						if not person.out then
+							-- (the room it stands in is the other side's from this moment: the Moves it sends
+							-- from there, until the match has placed it in its own, are dropped, not refused)
+							person.owedSince = now
+						end
 						refreshRoster(now)
 						return true, nil
 					end

@@ -12,6 +12,7 @@ local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local Rig = require("@tests/lib/MinigameRig")
+local PaintballRig = require("@tests/lib/PaintballRig")
 local Kit = require("@tests/isolated/paintball_server_kit")
 
 local R = Contract.Rules
@@ -226,8 +227,14 @@ return function(t)
 				t.eq(kit.state().slots[seat].team, side, "and the side")
 				-- another trades sides with that bot, and the seventeenth takes the bot's seat on the side it now has
 				t.deepEq({ Rig.input(kit.w, trader.stub, Contract.STATION, "side", {}) }, { true, nil })
+				-- (a Move of hers that was on its way arrives before the match has put her in her new side's
+				-- room: she stands in what is now the other side's, and it is dropped, not held against her)
+				local refusedWas, droppedWas = stats.movesRefused, stats.movesDropped
+				PaintballRig.send(kit.wires, trader.stub, "Paintball.Move", trader.move({ t = kit.now() + 0.001 }))
+				t.deepEq({ stats.movesRefused - refusedWas, stats.movesDropped - droppedWas }, { 0, 1 })
 				kit.run(0.3)
 				t.eq(teamOf(kit, trader), side)
+				t.truthy(Arena.inRoom(kit.arena.spawnRooms[side], trader.x, trader.y + 0.1, trader.z), "placed in it")
 				t.truthy((kit.join(late)), "now there is room")
 				kit.run(0.5)
 				r = roster(kit)

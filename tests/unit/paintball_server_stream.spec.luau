@@ -46,7 +46,7 @@ end
 
 return function(t)
 	t.test(
-		"a Move is dropped, not refused: before the first placement, with another placement number, out, or with a bad stamp",
+		"a Move is dropped, not refused: before the first placement, with another placement number, out, owed a placement after a change of side, or with a bad stamp",
 		function()
 			local feel = Contract.feel()
 			local arena = Greybox.build()
@@ -70,6 +70,16 @@ return function(t)
 			t.eq((send({ t = 100.3 })), "dropped", "tagged out")
 			t.eq(#person.moves, 1)
 			t.eq(#person.refusals, 0)
+			-- its side has just been changed: until the match places it (a second at the most) its Moves, which
+			-- come from the room that is now the other side's, are dropped
+			local trader, tell = placed(20, 0, 0)
+			trader.owedSince = 100.1
+			t.eq((tell({ t = 100.15 }, 100.15)), "dropped", "owed a placement")
+			t.eq((tell({ t = 100.2 }, 100.1 + T.placeGrace + 0.01)), "accepted", "a placement that never came")
+			trader.owedSince = 101.2
+			Stream.placed(trader, 20, 0, 0, 0, 101.25, feel, true)
+			t.eq(trader.owedSince, nil, "the placement came")
+			t.eq((tell({ t = 101.3, place = trader.place }, 101.3)), "accepted")
 			-- a placement number outlives a re-seating: the next one counts on from the last ever given
 			local again = Stream.new("ada", 200, person.place)
 			Stream.placed(again, 0, 0, 0, 0, 200, feel, true)

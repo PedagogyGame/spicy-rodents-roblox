@@ -97,6 +97,10 @@ export type Person = {
 	shot: number, -- the counter of its last judged click
 	heardAt: number, -- when a Move last got as far as being judged
 	out: boolean, -- tagged out: Moves are dropped and the pose is held until the respawn
+	-- when its side was changed under it (the "side" verb) while it was in play: the match owes it a
+	-- placement in its new side's room, and until that comes (for TRUST.placeGrace at the most) its Moves
+	-- are dropped: they are from the room that has just become the other side's
+	owedSince: number?,
 	fallSince: number?, -- the t of the first unsupported Move of the fall it is in
 	standY: number, -- the walking surface the body last stood on (the one a hop or a fall began from)
 	fellAt: number, -- the t of the last accepted Move that was falling
@@ -146,6 +150,7 @@ function Stream.new(player: any, now: number, placeFrom: number?): Person
 		shot = 0,
 		heardAt = now,
 		out = false,
+		owedSince = nil,
 		fallSince = nil,
 		standY = 0,
 		fellAt = -math.huge,
@@ -168,6 +173,7 @@ function Stream.restart(person: Person, now: number)
 	person.crouch = 0
 	person.heardAt = now
 	person.out = false
+	person.owedSince = nil
 	person.fallSince = nil
 	person.fellAt = -math.huge
 	table.clear(person.crouchLog)
@@ -191,6 +197,7 @@ function Stream.placed(
 	person.place = place
 	person.placeFrom = place
 	person.placedAt = now
+	person.owedSince = nil
 	-- (silence is measured from here: a client that was tagged out has sent nothing since the tag, and
 	-- is owed the whole of Clock.DROP_SECS to be heard from again, not what the respawn left of it)
 	person.heardAt = now
@@ -271,6 +278,14 @@ function Stream.judge(
 	-- b. not placed yet, tagged out, or sampled before the client knew of its last placement
 	if person.place == 0 or person.out or rec.place ~= person.place then
 		return "dropped", nil
+	end
+	-- (its side has just been changed and its new placement has not come yet)
+	local owed = person.owedSince
+	if owed ~= nil then
+		if now - owed <= T.placeGrace then
+			return "dropped", nil
+		end
+		person.owedSince = nil
 	end
 	-- c. the stream is unreliable and unordered: only a newer stamp, and a believable one
 	local t = rec.t
