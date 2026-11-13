@@ -26,6 +26,12 @@
 --     (printed by the child process: `lune run tests/lib/isolated_main.luau tests/isolated/paintball_client_joined`
 --     shows it; the spec runner keeps only pass and fail): balls fired and acked, how many met a body on this
 --     screen against the tags the server counted, times tagged out, the bots' balls drawn, poses accepted.
+--   * TWO PEOPLE: somebody is in the match already (a scripted person: Moves and clicks through the real
+--     Shared/Net, as the server lane's own cases send them), has walked out and painted a wall. The player
+--     joins the running match: on the other side, in a bot's seat, shown the match so far (the roster with a
+--     person in it, the paint), protected, the controls card up for a moment; is tagged by the other person
+--     (who it was, and the tick that points at her); changes sides while out, to play WITH her; she leaves and
+--     a bot has her seat and her name is off her puppet.
 -- Interface: return function(t) (the spec shape); real() -> boolean
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
@@ -66,7 +72,10 @@ end
 local function engine(): { [string]: any }
 	return {
 		positionOf = function(body: any): (number?, number?, number?)
-			local root = if FakeEngine.isInstance(body) then body.PrimaryPart else nil
+			if not FakeEngine.isInstance(body) then
+				return body.x, body.y, body.z -- (a scripted person's body is a plain table in world studs)
+			end
+			local root = body.PrimaryPart
 			if root == nil then
 				return nil, nil, nil
 			end
@@ -75,6 +84,8 @@ local function engine(): { [string]: any }
 		teleport = function(body: any, x: number, y: number, z: number, yaw: number)
 			if FakeEngine.isInstance(body) then
 				body:PivotTo(CFrame.new(x, y + ROOT, z) * CFrame.Angles(0, yaw, 0))
+			else
+				body.x, body.y, body.z = x, y, z
 			end
 		end,
 		ghost = function(_body: any, _on: boolean) end,
@@ -90,6 +101,8 @@ type Visit = {
 	hum: any,
 	target: { x: number, z: number }?, -- where the legs are walking to
 	hop: number?, -- frames into a jump (nil: on the floor)
+	each: { () -> () }, -- what else a case does once a frame (a scripted person's own stream)
+	others: number, -- clicks a scripted person sent (the wire's record does not say whose a click is)
 	checked: number, -- how many of w.got have been held to the wire
 	unknown: { string }, -- messages the wire does not know
 	now: () -> number,
@@ -117,6 +130,8 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 		place = service.place,
 		target = nil,
 		hop = nil,
+		each = {},
+		others = 0,
 		checked = 0,
 		unknown = {},
 	} :: Visit
@@ -190,6 +205,9 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 	end
 	v.frame = function()
 		legs()
+		for _, fn in v.each do
+			fn()
+		end
 		PaintballRig.frame(wires, w)
 		-- every message of paintball's own that reaches the client is one the wire knows
 		while v.checked < #w.got do
@@ -258,14 +276,15 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 		return ok, refused
 	end
 	v.fires = function(): number
-		return #(wires.heard["Paintball.Fire"] or {})
+		return #(wires.heard["Paintball.Fire"] or {}) - v.others
 	end
 	return v
 end
 
 -- A case in the real game. Returns false, and plays nothing, where the service behind the door is the stub.
-local function play(fn: (v: Visit) -> (), opts: { asleep: boolean?, lag: number?, lose: number? }?): boolean
-	local o = opts or {}
+type PlayOpts = { asleep: boolean?, lag: number?, lose: number?, first: ((v: Visit) -> ())? }
+local function play(fn: (v: Visit) -> (), opts: PlayOpts?): boolean
+	local o: PlayOpts = opts or {}
 	-- (lag: frames each way, for the stream and for the framework's messages alike; lose: one unreliable
 	-- message down in this many is lost)
 	local every = o.lose
@@ -291,6 +310,10 @@ local function play(fn: (v: Visit) -> (), opts: { asleep: boolean?, lag: number?
 		function(w: Rig.World)
 			PaintballRig.attach(wires, w)
 			local v = visit(w, wires)
+			-- (what happens before the player walks up: somebody else's match already running)
+			if o.first then
+				o.first(v)
+			end
 			Rig.press(w, STATION)
 			if not v.untilTrue(1.5, function(): boolean
 				return w.client.active() == STATION
@@ -443,6 +466,101 @@ local function settled(v: Visit, t: any, what: string)
 	t.eq(refused, 0, `{what}: no ball that was drawn refused`)
 	t.eq(ok, v.fires(), `{what}: every click the server heard is acked`)
 	t.eq(stats.shotsRefused, 0)
+end
+
+-- A SCRIPTED PERSON in the match beside the player: a PlayerLike stub with a body, who sends her own pose
+-- twenty times a second and her clicks through the real Shared/Net, each click with its own Move first (as
+-- the real client does), and walks at walking pace. She hears what the service sends her (stub.events).
+type Person = {
+	stub: any,
+	seat: number,
+	team: number,
+	x: number,
+	y: number,
+	z: number,
+	yaw: number,
+	place: number,
+	out: boolean,
+	walkTo: (x: number, z: number) -> (),
+	fire: (yaw: number) -> (),
+}
+
+local function person(v: Visit, name: string): Person
+	local w, wires = v.w, v.wires
+	local stub = Rig.stub(name)
+	local gx, gy, gz = Arena.toWorld(v.place, Arena.GATE.x + 3, 0, Arena.GATE.z + 4)
+	stub.body = { x = gx, y = gy, z = gz }
+	table.insert(w.people, { key = stub, name = name, species = "human", x = gx, y = gy, z = gz })
+	local ok, why = w.svc:join(stub, STATION)
+	assert(ok, `{name} is seated: {tostring(why)}`)
+	local p = { stub = stub, seat = 0, team = 0, x = 0, y = 0, z = 0, yaw = 0, place = 0, out = false } :: Person
+	local heard = 0
+	local seq, shot = 0, 0
+	local function move()
+		seq += 1
+		stub.body.x, stub.body.y, stub.body.z = Arena.toWorld(v.place, p.x, p.y, p.z)
+		PaintballRig.send(wires, stub, "Paintball.Move", {
+			t = v.now(),
+			seq = seq % 65536,
+			x = p.x,
+			y = p.y,
+			z = p.z,
+			yaw = p.yaw,
+			pitch = 0,
+			bits = 0,
+			place = p.place,
+		})
+	end
+	table.insert(v.each, function()
+		while heard < #stub.events do
+			heard += 1
+			local msg = stub.events[heard]
+			if msg.kind == "joined" then
+				p.seat = msg.seat
+			elseif msg.kind == "paintball_respawn" and msg.id == p.seat then
+				p.x, p.y, p.z, p.yaw, p.place, p.out = msg.x, msg.y, msg.z, msg.yaw, msg.place, false
+			elseif msg.kind == "paintball_tag" and msg.id == p.seat then
+				p.out = true
+			end
+		end
+		if p.place ~= 0 and not p.out and w.frames % 3 == 0 then
+			move()
+		end
+	end)
+	p.walkTo = function(x: number, z: number)
+		for _ = 1, 1800 do
+			local dx, dz = x - p.x, z - p.z
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d < 1e-6 then
+				return
+			end
+			local step = math.min(d, Body.WALK / 60)
+			p.x += dx / d * step
+			p.z += dz / d * step
+			v.frame()
+		end
+	end
+	p.fire = function(yaw: number)
+		shot += 1
+		v.others += 1
+		p.yaw = yaw
+		v.frame()
+		move()
+		local dx, dy, dz = Body.look(yaw, 0)
+		local now = v.now()
+		PaintballRig.send(wires, stub, "Paintball.Fire", {
+			shot = shot,
+			vt = now - 0.1,
+			ft = now,
+			ox = p.x,
+			oy = p.y + Body.STAND_EYE,
+			oz = p.z,
+			dx = dx,
+			dy = dy,
+			dz = dz,
+		})
+	end
+	return p
 end
 
 return function(t)
@@ -889,4 +1007,117 @@ return function(t)
 		nil
 	)
 	fight("and a minute at 300 ms with one unreliable packet in twenty lost: the same", 60, 9, 20)
+
+	t.test(
+		"two people: the player joins a running match on the other side and is shown it so far; is tagged by the other person and told who and where from; changes sides to play with her; she leaves and a bot has her seat",
+		function()
+			local bea: Person
+			play(function(v)
+				local w = v.w
+				v.run(0.5)
+				local seat = v.seat()
+				local show = PaintballClient.show()
+				assert(show, "the show is on")
+				-- A LATE SEAT: a bot's, on the side with fewer people, in a match already live
+				t.truthy(seat.you ~= bea.seat and seat.you >= 1)
+				t.truthy(seat.team ~= bea.team, "on the other side from the person already in: the sides stay level")
+				t.eq(seat.phase, "live", "the match is running")
+				t.truthy(seat.place >= 1 and inOwnRoom(v), "placed in its spawn room")
+				t.truthy(seat:protected(v.now()) ~= nil, "protected as it comes in")
+				t.truthy(string.find(Rig.screen(w), "Left button  fire", 1, true), "the controls card, for a moment")
+				-- the match so far: the roster with a person in it, and her paint on the wall
+				local her = show.slots[bea.seat]
+				t.truthy(her ~= nil and her.bot == false and her.name == "Bea", "the roster knows Bea is a person")
+				local paint = 0
+				for _, splat in show.walls do
+					if splat.by == bea.seat then
+						paint += 1
+					end
+				end
+				t.eq(paint, R.magazine, "the paint of the match so far is on the walls")
+				local puppet = show.puppets[bea.seat]
+				t.truthy(puppet ~= nil and puppet.shown, "and she is drawn")
+				t.near(puppet.x, bea.x, 0.5, "where she stands")
+				t.near(puppet.z, bea.z, 0.5)
+				settled(v, t, "the late seat")
+				-- TAGGED BY HER: who, and the tick that points at where she stood
+				t.truthy(v.untilTrue(seat.feel.protectSecs + 1, function(): boolean
+					return seat:protected(v.now()) == nil
+				end))
+				local ok, why = v.service:debug("tag", bea.seat, seat.you)
+				t.truthy(ok, tostring(why))
+				t.truthy(v.untilTrue(1, function(): boolean
+					return seat.out
+				end))
+				v.run(0.3)
+				local words = v.words()
+				t.truthy(Rig.has(words, "TAGGED OUT by Bea"), table.concat(words, " | "))
+				t.truthy(Rig.has(words, "Bea tagged Ann"), "and in the feed")
+				local from = seat.tagFrom
+				assert(from, "where the ball came from is known")
+				t.near(from.x, bea.x, 0.5)
+				t.near(from.z, bea.z, 0.5)
+				-- CHANGE SIDES while out: to play WITH her (the other side has a bot to trade with)
+				local was = seat.team
+				Rig.key(Key.G, true)
+				v.run(0.2)
+				Rig.click(w, "Change sides")
+				v.run(0.5)
+				Rig.key(Key.G, false)
+				t.truthy(
+					v.untilTrue(2, function(): boolean
+						return seat.team ~= was
+					end),
+					"the side changed"
+				)
+				t.eq(seat.team, bea.team, "friends on one side")
+				t.eq(v.state().slots[seat.you].team, seat.team)
+				t.truthy(
+					v.untilTrue(seat.feel.respawnSecs + 1.5, function(): boolean
+						return not seat.out
+					end),
+					"placed on the new side"
+				)
+				v.run(0.2)
+				t.truthy(inOwnRoom(v), "in the new side's spawn room")
+				t.eq(show:teamOf(seat.you), seat.team, "the show knows it too")
+				local puppets = show.puppets[bea.seat]
+				t.eq(puppets.team, seat.team, "and Bea's puppet is a team-mate's now")
+				-- SHE LEAVES: a bot has her seat, and the roster says so on this screen
+				w.svc:leave(bea.stub)
+				t.truthy(
+					v.untilTrue(2, function(): boolean
+						local slot = show.slots[bea.seat]
+						return slot ~= nil and slot.bot == true
+					end),
+					"a bot has her seat"
+				)
+				t.truthy(show.slots[bea.seat].name ~= "Bea")
+				settled(v, t, "two people")
+				t.eq(w.client.active(), STATION, "and the player plays on")
+			end, {
+				asleep = true,
+				first = function(v)
+					-- Bea starts a match, walks out of her spawn room and empties a magazine at a wall
+					bea = person(v, "Bea")
+					v.run(0.5)
+					t.truthy(bea.seat >= 1 and bea.place >= 1, "Bea is seated and placed")
+					bea.team = v.state().slots[bea.seat].team
+					t.truthy(v.service:debug("end"))
+					v.run(v.state().feel.protectSecs + 0.5)
+					local route = wayOut(v.arena, bea.x, bea.y, bea.z, 2)
+					for _, node in route do
+						bea.walkTo(node.x, node.z)
+					end
+					local yaw = wallYaw(v.arena, bea.x, bea.y, bea.z, 12, 60)
+					for _ = 1, R.magazine do
+						bea.fire(yaw)
+						v.run(v.state().feel.fireInterval + 0.05)
+					end
+					v.run(1.5)
+					t.eq(v.service:stats().shotsRefused, 0, "the scripted person's own clicks were good")
+				end,
+			})
+		end
+	)
 end
