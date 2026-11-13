@@ -126,6 +126,8 @@ export type Seat = {
 	out: boolean,
 	outUntil: number,
 	outBy: number,
+	tagFrom: { x: number, y: number, z: number }?, -- where the one who tagged you stood (as drawn)
+	result: any?, -- view.result at the end card (Contract.Result)
 	safeUntil: number, -- the protection of the last respawn ends
 	inRoom: boolean, -- standing in your own spawn room
 	legs: boolean, -- false while the legs are taken
@@ -216,6 +218,8 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		out = false,
 		outUntil = 0,
 		outBy = 0,
+		tagFrom = nil,
+		result = nil,
 		safeUntil = -math.huge,
 		inRoom = false,
 		legs = true,
@@ -514,9 +518,12 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				self.phase, self.endsAt = game.phase, game.endsAt
 			end
 		end
-		if type(view) == "table" and view.phase == "done" then
-			self.phase = "ended"
-			self.held = nil
+		if type(view) == "table" then
+			self.result = view.result
+			if view.phase == "done" then
+				self.phase = "ended"
+				self.held = nil
+			end
 		end
 		if firstState then
 			firstState = false
@@ -615,6 +622,9 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				self.out = true
 				self.outUntil = msg.at
 				self.outBy = msg.by
+				local show = opts.show()
+				local from = if show then show.puppets[msg.by] else nil
+				self.tagFrom = if from then { x = from.x, y = from.y, z = from.z } else nil
 				self.goggleAt = now
 				self.held = nil
 				endSprint(now)
