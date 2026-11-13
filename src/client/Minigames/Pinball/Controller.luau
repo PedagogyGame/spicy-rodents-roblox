@@ -104,6 +104,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		asked = {},
 		conns = {},
 		stood = false,
+		touchOn = nil, -- the touch bar as it was last put up
 		camOn = false,
 		mouseLock = nil,
 		fingers = {}, -- touch InputObject -> "left" | "right" | "pull"
@@ -174,6 +175,11 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 	end
 
 	local function touchBar(on: boolean)
+		-- (put up once: the bar is not rebuilt under a thumb that is holding NUDGE)
+		if self.touchOn == on then
+			return
+		end
+		self.touchOn = on
 		if on then
 			ctx.ui:touch({ { "nudge", "NUDGE" } }, function(_id: string)
 				Hands.press(self.hands, "touchNudge", BTN.NUDGE_UP)
