@@ -201,10 +201,13 @@
 --      an accepted shot, restarts it; a placement by the server does not. A pose inside an
 --      arena.exits room: ctx.leave(player, "exit", its words). Each arrives back as "left".
 --   3. Bots.step(bots, state, poses, heard, now, dt): `heard` is every ball born, ball ended and tag
---      since the last tick (people's and bots'). The bots move their own poses. A "fire" command is
---      DROPPED unless its direction is within BOT.aimSlack of Body.look(pose.yaw, pose.pitch), the
---      bot's pose is in no spawn room, and Rules.fire(state, id, now) agrees; then the ball is born
---      now with no rewind. "reload" goes through Rules.reload; "say" out as "paintball_say".
+--      since the last tick (people's and bots'; a ball's "ended" before its "tag"). The bots move their
+--      own poses. A "fire" command is DROPPED unless Bots.judge agrees: its direction within
+--      BOT.aimSlack of Body.look(pose.yaw, pose.pitch), its origin at the pose's eye, the pose in no
+--      spawn room, no BIT.sprint in the pose nor within Body.SPRINT_FIRE_DELAY - MARGIN.sprint, then
+--      Rules.fire(state, id, now); the ball is born now with no rewind. "reload" goes through
+--      Rules.reload; "say" out as "paintball_say". A bot's POSE is not judged at run time: the
+--      match-and-bots lane's Sim legs check and BotCheck pin every brain step to a person's rules.
 --      Its cost is Stats.botsMs.
 --   4. Balls (Stats.ballsMs): Projectiles.step against arena.sweep and, with Hit.body, against every
 --      slot that is on, is on the other team from the ball (the ball keeps the team it was born with),
@@ -362,7 +365,6 @@ type Person = Stream.Person
 local R = Contract.Rules
 local T = Contract.TRUST
 local BIT = Wire.BIT
-local AIM_COS = math.cos(Contract.BOT.aimSlack)
 local SIDE_EVERY = 3 -- seconds between two changes of side by one person (the header says why)
 -- what debug("rewind", seconds) may set Clock.MAX_REWIND to (the pose history keeps Clock.HISTORY_SECS, a
 -- second, and a ball is judged at most MAX_REWIND + MAX_LATE back)
@@ -1431,17 +1433,11 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 					continue
 				end
 				if c.kind == "fire" then
-					local vx, vy, vz = c.vx or 0, c.vy or 0, c.vz or 0
-					local len = math.sqrt(vx * vx + vy * vy + vz * vz)
-					local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
-					-- a bot fires only along its own look, never from a spawn room, and only when the match agrees
-					if
-						len > 1e-6
-						and (vx * lx + vy * ly + vz * lz) / len >= AIM_COS
-						and not ArenaModule.inRoom(arena.spawnRooms[1], pose.x, pose.y + 0.1, pose.z)
-						and not ArenaModule.inRoom(arena.spawnRooms[2], pose.x, pose.y + 0.1, pose.z)
-						and Rules.fire(state, id, now)
-					then
+					-- judged by the one judge the bots' own checks use (Bots.judge): along its own look, from its
+					-- eye, never from a spawn room, never inside the sprint delay, and only when the match agrees
+					if Bots.judge(service.bots, state, id, pose, c, now) then
+						local vx, vy, vz = c.vx or 0, c.vy or 0, c.vz or 0
+						local len = math.sqrt(vx * vx + vy * vy + vz * vz)
 						local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
 						local k = state.feel.ballSpeed / len
 						launch(id, slot.team, ex, ey, ez, vx * k, vy * k, vz * k, 0, now)
