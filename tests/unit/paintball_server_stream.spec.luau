@@ -251,6 +251,48 @@ return function(t)
 				t.eq(refused, 0, `a running jump off the landing, phase {phase}`)
 				t.eq(jumper.standY, 0)
 			end
+			-- A HOP TAKEN RUNNING DOWN A STAIR is a hop from the step it left: the stair falls away under the
+			-- body faster than the hop comes down, so its Moves are "unsupported" over the lower steps
+			for index, ramp in ArenaData.build().ramps do
+				if index > 4 then
+					break
+				end
+				local along = if ramp.axis == "x" then ramp.maxX - ramp.minX else ramp.maxZ - ramp.minZ
+				local cx, cz = (ramp.minX + ramp.maxX) / 2, (ramp.minZ + ramp.maxZ) / 2
+				-- a point `d` studs down the flight from its head, on its middle line
+				local function down(d: number): (number, number, number)
+					local a = 1 - d / along -- 1 at the head
+					local k = if ramp.dir > 0 then a else 1 - a
+					local x = if ramp.axis == "x" then ramp.minX + (ramp.maxX - ramp.minX) * k else cx
+					local z = if ramp.axis == "z" then ramp.minZ + (ramp.maxZ - ramp.minZ) * k else cz
+					return x, ramp.y0 + (ramp.y1 - ramp.y0) * a, z
+				end
+				local x0, y0, z0 = down(1)
+				local stair = Stream.new("dee", 100)
+				Stream.placed(stair, x0, y0, z0, 0, 100, Contract.feel(), true)
+				local arena = ArenaData.build()
+				local refused = 0
+				local takeoff, takeoffY = 100.15, 0
+				for i = 1, 200 do
+					local now = 100 + i * SEND
+					local d = 1 + sprint * (now - 100)
+					if d > along - 0.5 then
+						break
+					end
+					local x, y, z = down(d)
+					if now < takeoff then
+						takeoffY = y
+					else
+						local tau = now - takeoff
+						y = math.max(y, takeoffY + V * tau - G / 2 * tau * tau)
+					end
+					local rec = { t = now, x = x, y = y, z = z, yaw = 0, pitch = 0, bits = Wire.BIT.sprint, place = 1 }
+					if Stream.judge(stair, rec, now, arena, Contract.feel()) ~= "accepted" then
+						refused += 1
+					end
+				end
+				t.eq(refused, 0, `a hop taken running down flight {index}`)
+			end
 			-- no higher than a hop from where it last stood
 			local hopper, hop = placed(12.5, FLOOR, -8)
 			t.eq((hop({ t = 100.05, z = -7.5, y = FLOOR + 0.5, bits = Wire.BIT.air })), "accepted", "over the landing")
