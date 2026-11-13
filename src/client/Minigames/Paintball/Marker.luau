@@ -45,8 +45,8 @@ function Marker.pose(seat: SeatCore.Seat, now: number, tuning: typeof(Tuning.T))
 	local tip, rattle = 0, 0
 	local r = seat:reloading(now)
 	if r ~= nil then
-		-- over in the first sixth, back in the last
-		tip = math.min(1, r * 6, (1 - r) * 6)
+		-- over in the first part of the reload, back in the last (Tuning.reloadTipShare)
+		tip = math.min(1, r / tuning.reloadTipShare, (1 - r) / tuning.reloadTipShare)
 		rattle = math.sin(r * tuning.reloadShakes * 2 * math.pi) * tip
 	end
 	local kick = math.exp(-tuning.kickRecover * math.max(0, now - seat.firedAt))

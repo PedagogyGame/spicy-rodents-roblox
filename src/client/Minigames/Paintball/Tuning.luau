@@ -40,6 +40,11 @@ local Tuning = {
 	-- Seconds another player's ball may go on flying after the server said what it hit, while the
 	-- picture (drawn a view-lag behind) catches up with the verdict.
 	ballCatchUp = 0.35,
+	-- The streak behind a ball: seconds of its flight it is long (2.7 studs at 90 studs/s) and how
+	-- see-through it is (0 solid .. 1 gone). None and a ball is a dot the eye loses at speed; long and
+	-- solid and it reads as a beam, which a paintball is not.
+	ballStreak = 0.03,
+	ballStreakFade = 0.45,
 
 	-- THE MARKER IN VIEW ----------------------------------------------------------------------------
 	-- Where the marker sits in the view: studs right, down and forward of the eye. Further right and
@@ -73,6 +78,10 @@ local Tuning = {
 	reloadSink = 0.12,
 	reloadShakes = 5,
 	reloadShake = 0.05,
+	-- The share of the reload the marker takes to tip over, and again to right itself at the end. The
+	-- righting is the tell that the next ball is nearly there: shorter and it snaps, longer and the
+	-- marker looks ready before it is.
+	reloadTipShare = 1 / 6,
 	-- How quickly the marker goes down and comes up, 1/s (a tap of Shift does not snap it), how early in
 	-- the sprint's ramp it is fully down (3: down by a third of the ramp), and radians it swings in
 	-- across the body when down.
@@ -81,8 +90,8 @@ local Tuning = {
 	sprintSwing = 0.5,
 	-- Studs out at which the barrel's line meets the crosshair's. Nearer toes the marker in harder.
 	markerConverge = 40,
-	-- How see-through the marker is while you are protected (0 solid .. 1 gone): the same ghost every
-	-- protected player is drawn as, so "cannot fire, cannot be hit" has one look.
+	-- How see-through the marker is while you are protected (0 solid .. 1 gone), and every puppet that
+	-- cannot be hit (protected, in its own spawn room, tagged): "cannot fire, cannot be hit" has one look.
 	markerGhost = 0.6,
 
 	-- THE EYE ---------------------------------------------------------------------------------------

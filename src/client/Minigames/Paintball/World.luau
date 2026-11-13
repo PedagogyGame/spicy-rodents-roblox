@@ -5,9 +5,11 @@
 -- screen, anchored, and neither collides nor answers a raycast, and lives in one Folder under the
 -- camera, so stop() leaves nothing behind.
 --   puppets  one blocky figure per shown slot (legs, torso in the team's colour, head with goggles, a
---            toy marker along its look, a name tag), standing where the core drew it and sunk with its
---            crouch; see-through while it cannot be hit; a hand straight up when it is tagged out
---   balls    a small bright ball in the team's colour for every ball in flight
+--            toy marker along its look), standing where the core drew it and sunk with its crouch;
+--            see-through while it cannot be hit; a hand straight up when it is tagged out. A NAME TAG
+--            over a team-mate only: an opponent's name would float over the rail they crouch behind
+--   balls    a small bright ball in the team's colour for every ball in flight, with a short streak
+--            behind it (Tuning.ballStreak) so the eye can follow it and read its drop
 --   splats   the two pools: a flat blot on the wall's face, and blots that ride on a puppet; three
 --            sizes and two shapes picked from the ball's id, the same on every screen
 --   puffs    a quarter-second burst where your own ball met a puppet
@@ -82,6 +84,8 @@ type Figure = {
 	marker: Part,
 	hand: Part,
 	tag: TextLabel,
+	board: BillboardGui,
+	named: boolean,
 	team: number,
 	name: string,
 	crouch: number,
@@ -98,6 +102,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 
 	local figures: { [number]: Figure } = {}
 	local balls: { [number]: Part } = {}
+	local streaks: { [number]: Part } = {}
 	local wallSplats: { [number]: Part } = {}
 	local bodySplats: { [number]: { [number]: Part } } = {}
 	local puffs: { { part: Part, age: number } } = {}
@@ -128,13 +133,16 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 			marker = part("Marker", Vector3.new(0.3, 0.4, 1.8), Color3.fromRGB(70, 200, 90), model),
 			hand = part("Hand", Vector3.new(0.4, 2.2, 0.4), color, model),
 			tag = Instance.new("TextLabel"),
+			board = Instance.new("BillboardGui"),
+			named = true,
 			team = team,
 			name = name,
 			crouch = -1,
 			faded = false,
 		}
-		local board = Instance.new("BillboardGui")
+		local board = fig.board
 		board.Name = "NameTag"
+		board.Enabled = true
 		board.Size = UDim2.fromOffset(160, 26)
 		board.StudsOffset = Vector3.new(0, 1.4, 0)
 		board.MaxDistance = tune.nameTagFar
@@ -177,11 +185,18 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 				fig.legs.Size = Vector3.new(LEGS[1] * 2, top * 0.45, LEGS[2] * 2)
 				fig.torso.Size = Vector3.new(TORSO[1] * 2, top * 0.35, TORSO[2] * 2)
 			end
+			-- a name over a head is how a TEAM-MATE is told (PB-13); an opponent has none, so nobody
+			-- crouched behind a rail is given away by a word floating over it. (The audience reads every name.)
+			local named = show.you == 0 or p.team == show:teamOf(show.you)
+			if named ~= fig.named then
+				fig.named = named
+				fig.board.Enabled = named
+			end
 			-- it cannot be hit (protected, in its own room, or out): see-through says so before you fire
 			local faded = Wire.has(p.bits, BIT.safe) or Wire.has(p.bits, BIT.out)
 			if faded ~= fig.faded then
 				fig.faded = faded
-				local a = if faded then 0.55 else 0
+				local a = if faded then tune.markerGhost else 0
 				for _, piece in { fig.legs, fig.torso, fig.head, fig.goggles, fig.marker, fig.hand } do
 					piece.Transparency = a
 				end
@@ -237,12 +252,43 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 				p = had
 			end
 			local wx, wy, wz = ArenaModule.toWorld(place, ball.x, ball.y, ball.z)
-			p.CFrame = CFrame.new(wx, wy, wz)
+			local at = Vector3.new(wx, wy, wz)
+			p.CFrame = CFrame.new(at)
+			-- the streak: a short tail back along the flight, never longer than the ball has flown (none
+			-- at the muzzle). It is what lets the eye follow a ball at speed and read its drop.
+			local vx, vy, vz = ball.vx, ball.vy - show.feel.ballDrop * ball.age, ball.vz
+			local speed = math.sqrt(vx * vx + vy * vy + vz * vz)
+			local long = math.min(tune.ballStreak, ball.age) * speed
+			local tail: Part? = streaks[ball.key]
+			if long > 0.2 then
+				local t: Part
+				if tail == nil then
+					t = part("Streak", Vector3.new(1, 1, 1), teamColor(ball.team), folder)
+					t.Material = Enum.Material.Neon
+					t.Transparency = tune.ballStreakFade
+					streaks[ball.key] = t
+				else
+					t = tail
+				end
+				local dx, dy, dz = ArenaModule.dirToWorld(place, vx / speed, vy / speed, vz / speed)
+				local thick = Contract.Rules.ballRadius * 1.2
+				t.Size = Vector3.new(thick, thick, long)
+				t.CFrame = CFrame.lookAt(at, at + Vector3.new(dx, dy, dz)) * CFrame.new(0, 0, long / 2)
+			elseif tail then
+				tail:Destroy()
+				streaks[ball.key] = nil
+			end
 		end
 		for key, p in balls do
 			if not seen[key] then
 				p:Destroy()
 				balls[key] = nil
+			end
+		end
+		for key, p in streaks do
+			if not seen[key] then
+				p:Destroy()
+				streaks[key] = nil
 			end
 		end
 	end
@@ -388,8 +434,9 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 
 	local function setHidden(body: Instance, on: boolean)
 		for _, d in body:GetDescendants() do
-			if d:IsA("BasePart") then
-				d.LocalTransparencyModifier = if on then 1 else 0
+			-- (a face is a Decal with a modifier of its own: left alone it would hang in the air)
+			if d:IsA("BasePart") or d:IsA("Decal") then
+				(d :: any).LocalTransparencyModifier = if on then 1 else 0
 			end
 		end
 	end
@@ -468,6 +515,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 		table.clear(hidden)
 		table.clear(figures)
 		table.clear(balls)
+		table.clear(streaks)
 		table.clear(wallSplats)
 		table.clear(bodySplats)
 		table.clear(puffs)

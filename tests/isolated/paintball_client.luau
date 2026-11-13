@@ -623,7 +623,8 @@ return function(t)
 				local function body(name: string, user: number): any
 					local m = FakeEngine.model(name, CFrame.new(0, 0, 0), bodies)
 					m:SetAttribute("DriverUserId", user)
-					FakeEngine.part("Torso", CFrame.new(0, 0, 0), m)
+					local torso = FakeEngine.part("Torso", CFrame.new(0, 0, 0), m)
+					FakeEngine.new("Decal", "face").Parent = torso
 					return m
 				end
 				local inMatch, passerBy = body("Cy", 77), body("Dee", 78)
@@ -661,6 +662,8 @@ return function(t)
 				t.near(torso.Color.R * 255, orange[1], 1)
 				t.near(torso.Color.G * 255, orange[2], 1)
 				t.eq(named(puppet, "NameTag"):FindFirstChildOfClass("TextLabel").Text, "Cy")
+				t.eq(named(puppet, "NameTag").Enabled, true, "the audience reads every name")
+				t.eq(named(show:FindFirstChild("Puppet2"), "NameTag").Enabled, true)
 				local at = torso.CFrame.Position
 				local x, y = Arena.toLocal(s.place, at.X, at.Y, at.Z)
 				t.truthy(x > 0.3 and x < 1.1, "where the snapshots put it, a view-lag behind")
@@ -676,6 +679,11 @@ return function(t)
 				end
 				-- the real body of the person in the match is hidden here; the passer-by is not
 				t.eq(inMatch:FindFirstChild("Torso").LocalTransparencyModifier, 1)
+				t.eq(
+					named(inMatch, "face").LocalTransparencyModifier,
+					1,
+					"and its face with it: no face hangs in the air"
+				)
 				t.eq(passerBy:FindFirstChild("Torso").LocalTransparencyModifier, nil)
 				-- a ball from a Shot record, and paint: on a wall, and riding on a puppet
 				s.shots({ { ball = 3, id = 2, t = s.now(), ox = 10, oy = 18, oz = 5, vx = 0, vy = 0, vz = -90 } })
@@ -714,6 +722,7 @@ return function(t)
 				})
 				s.run(0.8, people())
 				t.eq(inMatch:FindFirstChild("Torso").LocalTransparencyModifier, 0)
+				t.eq(named(inMatch, "face").LocalTransparencyModifier, 0)
 				t.eq(count(show, "Splat"), 1, "the wall's stays")
 				-- out of the audience: everything goes
 				s.send({ kind = "paintball_unwatch" })
@@ -735,8 +744,20 @@ return function(t)
 				end
 				s.run(0.5, bodies())
 				t.eq(count(s.show(), "Puppet"), 2, "your own slot is not drawn")
+				-- a name over a team-mate's head and none over an opponent's (it would float over the rail they hide behind)
+				t.eq(named(s.show():FindFirstChild(`Puppet{friend}`), "NameTag").Enabled, true)
+				t.eq(named(s.show():FindFirstChild(`Puppet{foe}`), "NameTag").Enabled, false)
 				click(s)
-				s.run(0.45, bodies())
+				-- the ball has a short streak behind it once it has flown: along its flight, never past the muzzle
+				s.run(0.1, bodies())
+				local ball, streak = named(s.show(), "Ball"), named(s.show(), "Streak")
+				t.truthy(ball ~= nil and streak ~= nil, "a ball, and the streak the eye follows")
+				t.near(streak.Size.Z, Tuning.ballStreak * F.ballSpeed, 0.05)
+				local back = streak.CFrame.Position - ball.CFrame.Position
+				local dx, dy, dz = Arena.dirToWorld(s.place, 0, 0, 1) -- (it flies north, along -z: the tail is to the south)
+				t.near(back.Unit:Dot(Vector3.new(dx, dy, dz)), 1, 1e-3, "behind the ball")
+				s.run(0.35, bodies())
+				t.eq(named(s.show(), "Streak"), nil, "gone with its ball")
 				t.eq(count(s.show(), "Ball"), 0, "through the team-mate, onto the opponent")
 				t.eq(count(s.show(), "Splat"), 0, "no splat of your own on a body")
 				local hud = s.hud()
