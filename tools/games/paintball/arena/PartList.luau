@@ -90,6 +90,13 @@ PartList.TONE = {
 	board = { 108, 84, 56 },
 	-- a ceiling tile lying where it fell
 	tile = { 204, 200, 184 },
+	-- the transmitter's cabinet doors: the seams between them, a meter's face, dead lamps, a vent
+	seam = { 22, 24, 26 },
+	meter = { 196, 192, 168 },
+	lamp_red = { 120, 40, 36 },
+	lamp_amber = { 136, 100, 34 },
+	lamp_green = { 44, 92, 54 },
+	grille = { 40, 42, 46 },
 }
 
 local LOOK: { [string]: { any } } = {
@@ -102,8 +109,9 @@ local LOOK: { [string]: { any } } = {
 	skylight = { { 170, 200, 210 }, "Glass", 0.7 },
 	shell = { { 134, 128, 118 }, "Concrete" },
 	-- (the lobby's windows onto the match are NOT the Glass material: the engine does not draw other see-through
-	-- things behind Glass, and a match is full of them: balls' trails, splats, the curtains)
-	glass = { { 196, 220, 224 }, "SmoothPlastic", 0.84 },
+	-- things behind Glass, and a match is full of them: balls' trails, splats, the curtains); a dark tint, so the
+	-- lit lobby does not lay a pale veil over the dimmer hall behind it
+	glass = { { 128, 148, 154 }, "SmoothPlastic", 0.87 },
 	gate = { { 70, 76, 84 }, "DiamondPlate" },
 	shutter = { { 96, 102, 106 }, "CorrodedMetal" },
 	wall0 = { { 140, 138, 130 }, "Concrete" },

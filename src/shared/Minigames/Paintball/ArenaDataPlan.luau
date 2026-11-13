@@ -1487,6 +1487,30 @@ function Plan.build(): Plan
 			papers(y, { { -47.5, z + 1.8 }, { -46, z - 2.6 } })
 		end
 		papers(y + RAIL, { { -52, -46.5 }, { -47.5, -45.2 }, { -43, -46.6 }, { -40.5, -45 } })
+		-- the transmitter's cabinets are cabinets, not slabs: on each long face a door every four studs (the seams
+		-- between them), and on each door a meter, three dead lamps and a vent near the floor. Not on the face
+		-- that carries DANGER, HIGH VOLTAGE.
+		local function doors(face: string, c: number, x0: number, x1: number)
+			for x = x0 + 4, x1 - 4, 4 do
+				wallMark(face, c, x - 0.06, x + 0.06, y + 0.3, y + 8.7, "seam")
+			end
+			for bx = x0, x1 - 4, 4 do
+				local m = bx + 2
+				wallMark(face, c, m - 1, m + 1, y + 6.2, y + 7.4, "meter")
+				for k, dead in { "lamp_red", "lamp_amber", "lamp_green" } do
+					local lx = m - 1 + (k - 1) * 0.8
+					wallMark(face, c, lx, lx + 0.4, y + 5.3, y + 5.7, dead)
+				end
+				wallMark(face, c, m - 1.3, m + 1.3, y + 0.8, y + 2.6, "grille")
+			end
+		end
+		doors("-z", -53.5, -26, -10)
+		doors("+z", -50.5, 10, 26)
+		doors("-z", -53.5, 10, 26)
+		doors("+z", -42.5, -18, -2)
+		doors("-z", -45.5, -18, -2)
+		doors("+z", -42.5, 4, 20)
+		doors("-z", -45.5, 4, 20)
 
 		-- EVERY STOREY: where the roof and the pipes have leaked, a stain on the floor of the concourse, of the
 		-- hall and of the wing, and streaks down the inside of the outer walls from the ceiling

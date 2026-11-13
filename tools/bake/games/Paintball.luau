@@ -74,6 +74,7 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 		end
 		return g
 	end
+	local stacked: { [any]: number } = {}
 	for _, s in p.signs or {} do
 		local props: { [string]: any } = { Text = s.text, TextColor = PartList.TONE[s.tone], Font = "GothamBlack" }
 		if s.rect then
@@ -83,10 +84,15 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 		if s.bg then
 			props.Bg = PartList.TONE[s.bg]
 		end
-		local label = kit:label(gui(s.face, s.paint), props)
+		local g = gui(s.face, s.paint)
+		local label = kit:label(g, props)
 		if s.paint and s.bg then
 			label.BorderSizePixel = 0
 		end
+		-- marks on one face are drawn in the plan's order (a meter on a cabinet's door, a board across a window's
+		-- pane): the engine's order for siblings of one ZIndex is not a promise
+		stacked[g] = (stacked[g] or 0) + 1
+		label.ZIndex = stacked[g]
 	end
 	if p.screen then
 		local screen = gui(p.screen)

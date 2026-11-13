@@ -308,6 +308,37 @@ return function(t)
 				end
 			end
 			t.truthy(#plan.marks >= 300, `{#plan.marks} marks`)
+			-- the transmitter's cabinets have doors: on every long face but the one that says DANGER, a seam every
+			-- four studs and on each door a meter, three lamps and a vent
+			local transmitter = table.find(ArenaDataPlan.LOOKS, "transmitter")
+			local cabinets, faced = 0, 0
+			for i, look in plan.looks do
+				-- (the hall's, on the top storey: telecine's machines below wear the same look)
+				if look ~= transmitter or plan.boxes[(i - 1) * 6 + 2] < 4 * Arena.FLOOR_HEIGHT - 0.01 then
+					continue
+				end
+				cabinets += 1
+				for _, face in { "+z", "-z" } do
+					local meters, seams = 0, 0
+					for _, m in plan.marks do
+						if m.box == i and m.face == face then
+							meters += if m.tone == "meter" then 1 else 0
+							seams += if m.tone == "seam" then 1 else 0
+						end
+					end
+					local warned = false
+					for _, sign in plan.signs do
+						warned = warned or (sign.box == i and sign.face == face)
+					end
+					if not warned then
+						faced += 1
+						t.eq(meters, 4, `transmitter {i} {face}: four doors with meters`)
+						t.eq(seams, 3, `transmitter {i} {face}: three seams`)
+					end
+				end
+			end
+			t.eq(cabinets, 8)
+			t.eq(faced, 14)
 			t.truthy(tops >= 200 and walls >= 100, `{tops} on floors and tops, {walls} on walls`)
 			t.eq(sides[1], sides[2])
 			for level = 0, Arena.FLOORS - 1 do
@@ -717,6 +748,14 @@ return function(t)
 			if d:IsA("SurfaceGui") and d.Name == "Paint" then
 				t.eq(d.LightInfluence, 1)
 				labels += #d:GetChildren()
+				-- one face's marks are stacked in the plan's order, each over the one before (a meter on a door)
+				local z = {}
+				for _, label in d:GetChildren() do
+					z[label.ZIndex] = true
+				end
+				for k = 1, #d:GetChildren() do
+					t.truthy(z[k], `a Paint's labels are stacked 1 to n ({k})`)
+				end
 			end
 		end
 		t.eq(labels, #plan.marks)
