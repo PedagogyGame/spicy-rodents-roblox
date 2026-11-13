@@ -183,6 +183,36 @@ return function(t)
 		t.truthy(hits > 3000 and hits < checked - 2000, `{hits} of them hit something: both answers are well tried`)
 	end)
 
+	t.test("a segment without end, of absurd length or of no number: the reference's answer, at once", function()
+		local inf, nan = math.huge, 0 / 0
+		local cases: { { number } } = {
+			{ 0, 20, 0, inf, 20, 0 },
+			{ 0, 20, 0, -inf, 20, 0 },
+			{ 0, 3, 0, 0, inf, 0 },
+			{ -1e12, 20, 3, 1e12, 20, 3 },
+			{ 1e12, 5, -1e12, -1e12, 5, 1e12 },
+			{ 0, 1e12, 0, 0, -1e12, 0 },
+			{ 5e11, 20, 0, 6e11, 20, 0 }, -- wholly beyond the grid along its longest axis
+			{ -6e11, 20, 0, -5e11, 21, 1 },
+			{ nan, 20, 0, 10, 20, 0 },
+			{ 0, 20, 0, 10, nan, 0 },
+			{ inf, 20, 0, -inf, 20, 0 },
+			{ 1e308, 1e308, 0, 1e308, 1e308, 1 }, -- finite, but the sum is not
+		}
+		local t0 = os.clock()
+		for _, c in cases do
+			local s, nx, ny, nz, index = arena.sweep(c[1], c[2], c[3], c[4], c[5], c[6])
+			local rs, rx, ry, rz, rindex = Arena.sweepBoxes(boxes, c[1], c[2], c[3], c[4], c[5], c[6])
+			local same = (s == rs or (s ~= s and rs ~= rs)) and nx == rx and ny == ry and nz == rz and index == rindex
+			t.truthy(same, `({table.concat(c :: any, ", ")}): {s} box {index}, the reference {rs} box {rindex}`)
+		end
+		t.truthy(os.clock() - t0 < 1, `{os.clock() - t0} s for {#cases} segments`)
+		-- the walking surface too
+		for _, p in { { nan, 20, 0 }, { 0, nan, 0 }, { inf, 0, 0 }, { 0, inf, 0 }, { -inf, -inf, -inf } } do
+			t.eq(arena.ground(p[1], p[2], p[3]), Arena.groundAt(boxes, arena.ramps, p[1], p[2], p[3]))
+		end
+	end)
+
 	t.test("the grid's walking surface gives the reference's answer on thousands of points", function()
 		local rnd = random(771)
 		local found = 0

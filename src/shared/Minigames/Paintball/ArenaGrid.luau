@@ -13,7 +13,11 @@
 --   ground  a 2D grid of columns, each listing the boxes and ramps over it; the reference's own
 --           comparisons on that short list.
 -- A question that leaves the grid (the lobby, a ball past the roof) is clamped to it: nothing solid is
--- outside, because the grid is laid over the bounds of every box.
+-- outside, because the grid is laid over the bounds of every box. So the walk only steps through the slabs
+-- that lie over the grid (a segment a million studs long walks the same few dozen), and one that misses the
+-- grid along its longest axis misses everything. A question with a number that is not finite (an infinity, a
+-- NaN: a bot's aim gone wrong) is put to the reference itself, so its answer is the reference's and it can
+-- never walk forever.
 -- Pure. Interface: new(boxes, ramps) -> (sweep: Arena.Sweep, ground: Arena.Ground, stats: { cells, entries })
 
 local Ballistics = require("../../Paintball/Ballistics")
@@ -111,6 +115,10 @@ function ArenaGrid.new(
 		y1: number,
 		z1: number
 	): (number?, number, number, number, number)
+		local sum = x0 + y0 + z0 + x1 + y1 + z1
+		if sum - sum ~= 0 then
+			return Arena.sweepBoxes(boxes, x0, y0, z0, x1, y1, z1) -- an infinity or a NaN
+		end
 		question += 1
 		local q = question
 		local best: number? = nil
@@ -128,12 +136,25 @@ function ArenaGrid.new(
 		end
 		local first = math.floor((p0 - o) / CELL)
 		local last = math.floor((p0 + d - o) / CELL)
+		local whole = first == last -- the segment lies in one slab: its piece there is all of it
 		local step = if last >= first then 1 else -1
+		-- only the slabs over the grid (and the one either side of it) can hold anything
+		if step > 0 then
+			if first > count or last < -1 then
+				return nil, 0, 0, 0, 0
+			end
+			first, last = math.max(first, -1), math.min(last, count)
+		else
+			if last > count or first < -1 then
+				return nil, 0, 0, 0, 0
+			end
+			first, last = math.min(first, count), math.max(last, -1)
+		end
 		local slab = first
 		while true do
 			-- the piece of the segment inside this slab of the longest axis, as fractions ta..tb
 			local ta, tb = 0, 1
-			if slab ~= first or slab ~= last then
+			if not whole then
 				local lo, hi = o + slab * CELL, o + (slab + 1) * CELL
 				if step > 0 then
 					ta, tb = (lo - p0) / d, (hi - p0) / d
@@ -142,7 +163,7 @@ function ArenaGrid.new(
 				end
 				ta, tb = math.max(0, ta), math.min(1, tb)
 			end
-			if slab >= -1 and slab <= count then
+			do
 				local xa, xb = x0 + dx * ta, x0 + dx * tb
 				local ya, yb = y0 + dy * ta, y0 + dy * tb
 				local za, zb = z0 + dz * ta, z0 + dz * tb
