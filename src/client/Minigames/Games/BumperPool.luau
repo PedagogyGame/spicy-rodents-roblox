@@ -153,7 +153,8 @@ local mode: CueController.Game = {
 			local who = names[view.turn or 0] or "?"
 			return `{lead}{who} is at the table. Walk round and watch; T is the top view.`
 		elseif phase == "sent" or phase == "watch" then
-			return "Your shot is on its way."
+			-- (what the last shot came to, a penalty included, stays on the line until mine has come to rest)
+			return `{lead}Your shot is on its way.`
 		end
 		local seat = you or 1
 		local sunk = (g.sunk and g.sunk[seat]) or 0

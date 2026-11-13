@@ -128,7 +128,8 @@ local mode: CueController.Game = {
 			local on = if view.turn then Words.group(g, view.turn) else ""
 			return `{lead}{who} is at the table ({on}). Walk round and watch; T is the top view.`
 		elseif phase == "sent" or phase == "watch" then
-			return "Your shot is on its way."
+			-- (the other's foul that gave me the ball in hand is still the last shot until mine has come to rest)
+			return `{lead}Your shot is on its way.`
 		end
 		local what: string
 		if not g.broken then

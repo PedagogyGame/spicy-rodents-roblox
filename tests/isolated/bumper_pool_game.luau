@@ -196,6 +196,39 @@ return function(t)
 				end
 			end
 			t.truthy(PoolRig.settle(w, ID))
+			-- both marked balls down, each off its own right-hand cushion: the next ball of each side goes on the
+			-- marked spot and the two open again (BumperPool's resolveOpening). Which way it goes depends on the
+			-- table's seed (the station's place in Games.stations), so play the opening out as the rules say.
+			local reopened = 0
+			local openers = { 1, 6 }
+			while state.phase == "opening" and reopened < 4 do
+				reopened += 1
+				local last = assert(state.last, "the opening left no result")
+				t.eq(last.event, "opening")
+				t.eq(#last.offside, 0, "an opening is played again only when both were fair")
+				for s = 1, 2 do
+					t.truthy(table.find(last.pots, openers[s]) ~= nil, `seat {s}'s opening ball {openers[s]} went down`)
+					t.eq(state.openers[s], BumperPool.mine(state, s)[1], `seat {s}'s next ball opens`)
+					openers[s] = state.openers[s]
+				end
+				atRest(t, w, `opening {reopened}`)
+				t.truthy(
+					Rig.untilTrue(w, 3, function()
+						return c.phase == "aim"
+					end),
+					`opening {reopened + 1}: phase {c.phase}`
+				)
+				t.eq(c.sel, state.openers[1], "the ball to open with is picked for me")
+				local before = Rig.count(w.got, "bumper_pool_shot")
+				PoolRig.play(w, c, Computer.bumper(state, 1, 3, 5 + reopened))
+				t.truthy(
+					Rig.untilTrue(w, 12, function()
+						return Rig.count(w.got, "bumper_pool_shot") > before
+					end),
+					`opening {reopened + 1} was never played`
+				)
+				t.truthy(PoolRig.settle(w, ID))
+			end
 			t.eq(state.phase, "play")
 			atRest(t, w, "after the opening")
 			-- the rest of the game, turn by turn
