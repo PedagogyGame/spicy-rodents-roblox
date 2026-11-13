@@ -13,9 +13,16 @@
 --
 -- THE WAY UP (ordinary routes the motor already runs):
 --   9101 the yard house's downspout (trunk, walked into) -> 9102 gutter to roof (bridge) -> 9103 the ridge (roof);
---   a leap west off the ridge's end lands on 9105, the tree's house bough (branch), which runs down to the fork;
---   9104 the tree's trunk (trunk) also climbs to that fork; 9106 the roof crossing (bridge) leaves the fork over
---   the wing's east parapet and ends 1.9 above the wing roof: Q drops the squirrel onto it.
+--   a leap west off the ridge's end lands on 9105, the tree's house bough (branch), which runs down past the trunk's
+--   top and on as the roof crossing, drooping over the wing's east parapet to end 0.7 above the wing roof: Q drops
+--   the squirrel onto it. The house is the only way up (owner question Q11, default): the tree's trunk carries no
+--   route (a squirrel baffle on it says why), so nothing reaches 9105 but the leap.
+-- WHERE THE LEAP WORKS (tests/unit/attractions_roofvent.spec.luau sweeps it): from the ridge's west end, where
+--   holding W stops the squirrel, Space catches the bough whatever is held. Earlier along the ridge only a sprint
+--   carries far enough (from about 15 st short of the end); a walking leap from more than about 5 st short passes
+--   under the bough and falls into the yard, unless E is pressed in the air near it (E grabs a route within reach).
+--   The hint for lane L6: "Run to the end of the ridge, then Space".
+-- Retired ids: 9104 (the trunk's climb) and 9106 (the crossing, now part of 9105).
 -- THE VENT: 9107 (kind "tunnel", the enclosed-run contract of Shared/Routes/Enclosure on feat/run-through): in
 --   through one bent louvre slat of the air-handling unit on the wing roof, up the plenum, through the duct in the
 --   hall's raised east wall, down the elbow and out of the boot onto the truss chord 9120.
@@ -29,7 +36,8 @@
 -- not know about yet; and 9107 needs the enclosed-run contract in the Registry.
 -- Pure. Interface: constants below; routes() -> { LocalRoute } (copies); route(id) -> LocalRoute;
 --   records(place, lotId?) -> { world route records }; lamps() -> { {X, Y, D} }; isRafter(id) -> boolean;
---   inHall(X, D) -> boolean; inAnnex(X, D) -> boolean; CHAIN, RAFTERS.
+--   inHall(X, D) -> boolean; inAnnex(X, D) -> boolean; inPlatform(X, D) -> string?; guardEyes() -> { {X, Y, D} };
+--   CHAIN, RETIRED, BOUGH_FORK_T.
 
 local AlleyLayout = require("./AlleyLayout")
 local Curve = require("../Routes/Curve")
@@ -127,8 +135,11 @@ AlleyRoof.AHU = {
 	louvre = { x = 116, d0 = 13, d1 = 20 },
 	stack = { x = 110, d = 16.5, r = 2.2, y0 = 19.0, y1 = 20.6 },
 }
--- The squirrel's way in: one bent louvre slat, the curb cut so the sill is the membrane.
+-- The squirrel's way in: one bent louvre slat, the curb cut so the sill is the membrane. In front of the louvre a
+-- strip of bare membrane (the apron, X 116.4..118.0) carries no grating: the platform's louvre strip starts behind
+-- it, so the mouth and the first stretch of 9107 lie on the membrane and the guard sees the bent slat over the apron.
 AlleyRoof.MOUTH = { x = 117.0, y = 13.62, d = 16.5, slat = { d0 = 15.6, d1 = 17.4, y0 = 13.6, y1 = 15.4 } }
+AlleyRoof.APRON = { x0 = 116.4, x1 = 118.0, d0 = 8, d1 = 22.5 }
 -- (the duct's sleeve runs through the hall's east wall, X 101..101.8)
 AlleyRoof.DUCT = { x0 = 101.0, x1 = 104, d0 = 15.5, d1 = 17.5, y0 = 15.0, y1 = 17.0 }
 AlleyRoof.ELBOW = { x0 = 99.6, x1 = 101, d0 = 15.5, d1 = 17.5, y0 = 12.32, y1 = 17.0 }
@@ -162,7 +173,7 @@ AlleyRoof.PLATFORM = {
 	y = 13.72, -- top of the 0.1 grating
 	rects = {
 		{ x0 = 101.8, x1 = 121, d0 = 22.5, d1 = 30, name = "walkway" },
-		{ x0 = 116.4, x1 = 121, d0 = 8, d1 = 22.5, name = "louvre strip" },
+		{ x0 = 118.0, x1 = 121, d0 = 8, d1 = 22.5, name = "louvre strip" },
 		{ x0 = 101.8, x1 = 121, d0 = 8, d1 = 10.6, name = "north strip" },
 	},
 }
@@ -180,6 +191,10 @@ AlleyRoof.PEOPLE_FENCE = {
 	wallY1 = 29.7,
 }
 AlleyRoof.GUARD = { x = 118.5, d = 16.5, eyeY = 18.9 }
+-- Where else on the platform a guard looks out from toward the yard: the louvre strip's two outer corners and the
+-- walkway's south-east corner (eye 5.2 over the grating). The yard's leaves keep clear of the lines from these to the
+-- ridge, the leap and the bough (tools/bake/alley/Yard.keepOut).
+AlleyRoof.LOOKOUTS = { { x = 120.5, d = 8.5 }, { x = 120.5, d = 22 }, { x = 120.5, d = 29.5 } }
 
 -- THE YARD (lane L3: tools/bake/alley/Yard) -------------------------------------------------------------------------
 -- A plain two-storey house (not one of the enterable homes), gables facing west (toward the tree) and east, the
@@ -197,7 +212,21 @@ AlleyRoof.HOUSE = {
 	overhang = 0.8,
 }
 -- The tree: trunk base 16 east and 1 south of the wing's south-east corner, outside the footprint and the reserve.
-AlleyRoof.TREE = { x = 166, y = -7.5, d = 32, trunkR = 1.4, crownR = 18 }
+-- spine: the trunk's axis from its foot to the fork (the top of the trunk, where 9105 bends from bough to crossing);
+-- trunkR the bark at the foot, forkR at the fork. No route climbs it (Q11): a sheet-metal squirrel baffle round it
+-- (baffle: its lower and upper rim heights and outer radius) is the cue. crown: the envelope of the leaf clumps'
+-- centres (an ellipsoid, radii rx, ry, rd), the clumps at most maxClump across and at most `count` of them; a later
+-- builder sizing clearances or the meshed tree reads this, and tools/bake/alley/Yard scatters the clumps in it.
+AlleyRoof.TREE = {
+	x = 166,
+	y = -7.5,
+	d = 32,
+	trunkR = 2.0,
+	forkR = 1.15,
+	spine = { { 166, -7.4, 32 }, { 166.3, 5.0, 32 }, { 166.5, 17.5, 31.8 } },
+	baffle = { y0 = -3.2, y1 = -1.6, r = 3.6 },
+	crown = { x = 164, y = 26, d = 34, rx = 20, ry = 12, rd = 14, maxClump = 11, count = 38 },
+}
 
 -- THE ROUTES --------------------------------------------------------------------------------------------------------
 local function flags(grab: boolean, surfaceZ: boolean, tree: boolean): Flags
@@ -220,10 +249,12 @@ local ROUTES: { LocalRoute } = {
 		name = "alley yard house gutter to roof",
 		kind = "bridge",
 		surfaceRadius = 0.6,
+		visualOffset = 0,
 		flags = flags(true, false, false),
 		points = { { 206.5, 8.35, 7.6 }, { 207.5, 17.1, 20.0 } },
 		note = "From the downspout's head up the north roof slope to the ridge's east end (exactly its first point: "
-			.. "a joint short of it would be met part-way along the ridge and turned back east).",
+			.. "a joint short of it would be met part-way along the ridge and turned back east). Its line rides "
+			.. "0.15 over the slates, so the body is drawn on it (visualOffset 0, not a bough's lift).",
 	},
 	{
 		id = 9103,
@@ -235,41 +266,28 @@ local ROUTES: { LocalRoute } = {
 		note = "The ridge, east to west. Its west end faces the tree: Space there leaps onto the house bough.",
 	},
 	{
-		id = 9104,
-		name = "alley yard tree trunk",
-		kind = "trunk",
-		surfaceRadius = 1.4,
-		flags = flags(false, false, true),
-		points = { { 166, -7.2, 32 }, { 166.3, 5.0, 32 }, { 166.5, 17.5, 31.8 } },
-		note = "The tree beside the games wing, from its foot to the fork (world y 34.0).",
-	},
-	{
 		id = 9105,
-		name = "alley yard tree house bough",
+		name = "alley yard tree house bough and roof crossing",
 		kind = "branch",
 		surfaceRadius = 0.55,
 		flags = flags(false, false, true),
-		points = { { 166.5, 17.5, 31.8 }, { 168.8, 20.6, 25.5 }, { 170.5, 22.6, 20.0 }, { 172.5, 24.0, 12.0 } },
-		note = "From the fork up toward the house: it crosses the ridge's line (D 20) 14 west of the ridge's end "
-			.. "and 5.5 above it, where a leap west off the ridge lands on it held, sprinting or with no key.",
-	},
-	{
-		id = 9106,
-		name = "alley yard tree roof crossing",
-		kind = "bridge",
-		surfaceRadius = 0.6,
-		flags = flags(false, false, true),
 		points = {
+			{ 171.25, 23.1, 17.0 },
+			{ 170.5, 22.6, 20.0 },
+			{ 168.8, 20.6, 25.5 },
 			{ 166.5, 17.5, 31.8 },
-			{ 160.0, 17.3, 31.0 },
-			{ 154.6, 16.9, 27.2 },
-			{ 151.2, 16.3, 23.2 },
+			{ 160.0, 17.12, 31.0 },
+			{ 154.6, 16.8, 27.2 },
+			{ 151.2, 16.35, 23.2 },
 			{ 149.4, 16.0, 21.5 },
-			{ 146.0, 15.5, 20.0 },
+			{ 147.6, 15.25, 20.6 },
+			{ 145.5, 14.3, 20.0 },
 		},
-		note = "From the fork west, then over the games wing's east parapet (1.0 above its coping); it ends 1.9 above "
-			.. "the wing roof: Q drops the squirrel onto it. It leaves the fork heading west-south-west, along the "
-			.. "bough's own way down, so running down the bough carries on onto it.",
+		note = "One limb from 3 st past where it crosses the ridge's line (D 20, 14 west of the ridge's end and 5.5 "
+			.. "above it, where a leap west off the ridge's end lands on it held, sprinting or with no key), down to "
+			.. "the trunk's top and on west as the roof crossing, drooping over the games wing's east parapet (1.0 "
+			.. "above its coping) to end 0.7 above the wing roof: Q drops the squirrel onto it. One route, so once "
+			.. "W carries the squirrel down the bough it carries on to the roof whatever the camera does.",
 	},
 	{
 		id = 9107,
@@ -356,8 +374,10 @@ do
 	end
 end
 
--- The order a squirrel takes them on the way in (the trunk 9104 is the other way up to the fork).
-AlleyRoof.CHAIN = { 9101, 9102, 9103, 9105, 9106, 9107, 9120 }
+-- The order a squirrel takes them on the way in (between 9103 and 9105 the leap; between 9105 and 9107 the roof).
+AlleyRoof.CHAIN = { 9101, 9102, 9103, 9105, 9107, 9120 }
+AlleyRoof.RETIRED = { 9104, 9106 }
+AlleyRoof.BOUGH = 9105
 AlleyRoof.VENT = 9107
 AlleyRoof.FIRST_RAFTER = 9120
 AlleyRoof.LAST_RAFTER = 9140
@@ -366,6 +386,22 @@ local byId: { [number]: LocalRoute } = {}
 for _, r in ROUTES do
 	byId[r.id] = r
 end
+
+-- Where on 9105 (arc-length t) the trunk's top is: the bough above it, the crossing below.
+AlleyRoof.BOUGH_FORK_T = (function(): number
+	local pts = byId[9105].points
+	local fork = AlleyRoof.TREE.spine[#AlleyRoof.TREE.spine]
+	local c = Curve.fromArrays(pts)
+	local best, bestT = math.huge, 0
+	for i = 0, 2000 do
+		local p = c:getPointAt(i / 2000)
+		local d = (p.x - fork[1]) ^ 2 + (p.y - fork[2]) ^ 2 + (p.z - fork[3]) ^ 2
+		if d < best then
+			best, bestT = d, i / 2000
+		end
+	end
+	return bestT
+end)()
 
 local function deepCopy(v: any): any
 	if type(v) ~= "table" then
@@ -471,6 +507,26 @@ end
 
 function AlleyRoof.inAnnex(X: number, D: number): boolean
 	return inRect(AlleyRoof.ANNEX, X, D)
+end
+
+-- The platform rectangle a point lies on (its name), or nil.
+function AlleyRoof.inPlatform(X: number, D: number): string?
+	for _, r in AlleyRoof.PLATFORM.rects do
+		if inRect(r :: any, X, D) then
+			return r.name
+		end
+	end
+	return nil
+end
+
+-- The guard's eye at the louvre, then at each lookout (local {X, Y, D}).
+function AlleyRoof.guardEyes(): { { number } }
+	local g = AlleyRoof.GUARD
+	local out = { { g.x, g.eyeY, g.d } }
+	for _, l in AlleyRoof.LOOKOUTS do
+		table.insert(out, { l.x, g.eyeY, l.d })
+	end
+	return out
 end
 
 return AlleyRoof

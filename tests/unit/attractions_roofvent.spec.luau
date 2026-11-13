@@ -3,15 +3,20 @@
 --   * the routes are well formed, their ids clear of the alley's own (9001-9018) and of the harvest, every flag
 --     explicit, every point in the alley's footprint or the yard annex, none on a venue's site, the backstage
 --     reserve or lounge one, and no other route of the town near enough to be grabbed by mistake;
---   * the joints the motor's end-of-route switch needs (Motion.C.autoSwitchGap), the bough across the ridge's line,
---     the crossing over the parapet and down to the roof, the vent's run inside the duct boxes;
+--   * the joints the motor's end-of-route switch needs (Motion.C.autoSwitchGap), the bough across the ridge's line
+--     with a 3-st stub past the catch, through the trunk's top and drooping over the parapet to end just over the
+--     roof, the vent's run inside the duct boxes and off the platform's grating (the apron in front of the louvre);
 --   * the vent's enclosure record: checked by Shared/Routes/Enclosure (the enclosed-run contract) when that module
 --     is in the tree, else by the same rules written out here;
 --   * THE CHAIN WITH THE REAL MOTOR: Movement/SquirrelMotor, scripted keys at 60 Hz on a stand-in world (the
 --     terrain, the games wing's roof): run into the downspout, climb, the gutter, the ridge, leap west off its end
---     (W held, Shift held, no key: every one lands on the house bough), down the bough, onto the crossing, Q onto
---     the wing roof, and walk to the louvre. The house and the tree are drawn by tools/bake/alley/Yard
---     (tests/unit/alley_yard_bake.spec.luau holds the drawing to these routes).
+--     (W held, Shift held, no key: every one lands on the house bough), down the bough and on along the crossing, Q
+--     onto the wing roof, and walk to the louvre;
+--   * where the leap works: Space swept over the ridge's last third with each key, E in the air, at 30/60/240 Hz;
+--   * on the bough, W with the camera turned any way runs to the roof (or 3 st up to the house end, then on);
+--   * the house is the only way up (owner question Q11's default): no route end, ground leap or trunk reaches the
+--     bough. The house and the tree are drawn by tools/bake/alley/Yard (tests/unit/alley_yard_bake.spec.luau holds
+--     the drawing to these routes).
 local fs = require("@lune/fs")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local AlleyRoof = require("@shared/Attractions/AlleyRoof")
@@ -87,8 +92,12 @@ return function(t)
 		t.eq(byId[9101].flags.autoGrabExcluded, false)
 		t.eq(byId[9101].flags.fixedSurfaceZ, true)
 		t.eq(byId[9102].flags.autoGrabExcluded, true)
-		t.eq(byId[9104].flags.treeTravel, true)
-		t.eq(#R.routes(), 7 + 8 + 9 + 2)
+		t.eq(byId[9105].flags.treeTravel, true)
+		t.eq(#R.routes(), 5 + 8 + 9 + 2)
+		-- the trunk's climb and the separate crossing are retired (Q11: the house is the only way up)
+		for _, id in R.RETIRED do
+			t.eq(byId[id], nil, `route {id} is retired`)
+		end
 		for id = R.FIRST_RAFTER, R.LAST_RAFTER do
 			t.truthy(R.isRafter(id) == (byId[id] ~= nil), `rafter {id}`)
 		end
@@ -138,6 +147,7 @@ return function(t)
 				check(c[1], c[2], "the house")
 			end
 			check(R.TREE.x - R.TREE.trunkR, R.TREE.d + R.TREE.trunkR, "the tree's foot")
+			check(R.TREE.x + R.TREE.baffle.r, R.TREE.d + R.TREE.baffle.r, "the tree's baffle")
 			-- the annex's corners are clear of every venue site too (lounge one is the nearest, north of it)
 			for _, c in annexPoly do
 				for _, v in venues do
@@ -180,56 +190,78 @@ return function(t)
 		)
 	end)
 
-	t.test("the joints: downspout, gutter, ridge; the fork; the vent's boot onto the chord", function()
-		local gap = Motion.C.autoSwitchGap
-		t.truthy(dist(pt(9101, 1), pt(9102, 0)) < 1e-3, "the downspout's head is the gutter's foot")
-		t.truthy(gap > 0 and dist(pt(9102, 1), pt(9103, 0)) < 1e-3, "the gutter's head is the ridge's east end")
-		t.truthy(dist(pt(9104, 1), pt(9105, 0)) < 1e-3, "the trunk's top is the bough's foot")
-		t.truthy(dist(pt(9104, 1), pt(9106, 0)) < 1e-3, "the trunk's top is the crossing's foot")
-		t.truthy(dist(pt(9107, 1), pt(9120, 0)) < 1e-3, "the boot opens onto the chord")
-		-- the downspout's foot is a step above the ground at it
-		local foot = pt(9101, 0)
-		local g = Height.at(foot.x, foot.z)
-		t.truthy(foot.y - g > 0 and foot.y - g < 0.8, `the downspout's foot is {foot.y - g} over the ground`)
-		local trunkFoot = pt(9104, 0)
-		local tg = Height.at(trunkFoot.x, trunkFoot.z)
-		t.truthy(math.abs(trunkFoot.y - tg) < 0.8, `the trunk's foot is {trunkFoot.y - tg} from the ground`)
-		-- the downspout stands 0.4 off the north wall (its pipe drawn round the line)
-		local _, _, D = toLocal(foot)
-		t.near(R.HOUSE.d0 - D, 0.4, 1e-6)
-	end)
+	t.test(
+		"the joints: downspout, gutter, ridge; the bough through the trunk's top; the vent's boot onto the chord",
+		function()
+			local gap = Motion.C.autoSwitchGap
+			t.truthy(dist(pt(9101, 1), pt(9102, 0)) < 1e-3, "the downspout's head is the gutter's foot")
+			t.truthy(gap > 0 and dist(pt(9102, 1), pt(9103, 0)) < 1e-3, "the gutter's head is the ridge's east end")
+			t.truthy(dist(pt(9107, 1), pt(9120, 0)) < 1e-3, "the boot opens onto the chord")
+			-- the bough passes through the trunk's top (where the tree bake joins them)
+			local fork = R.TREE.spine[#R.TREE.spine]
+			local fx, fy, fz = AlleyLayout.toWorld(place, fork[1], fork[2], fork[3])
+			t.truthy(dist(pt(9105, R.BOUGH_FORK_T), Curve.vec3(fx, fy, fz)) < 0.05, "the bough meets the trunk's top")
+			t.truthy(R.BOUGH_FORK_T > 0.15 and R.BOUGH_FORK_T < 0.5, `the trunk's top at t {R.BOUGH_FORK_T}`)
+			-- the downspout's foot is a step above the ground at it; the trunk stands on the ground
+			local foot = pt(9101, 0)
+			local g = Height.at(foot.x, foot.z)
+			t.truthy(foot.y - g > 0 and foot.y - g < 0.8, `the downspout's foot is {foot.y - g} over the ground`)
+			local s = R.TREE.spine[1]
+			local tx, ty, tz = AlleyLayout.toWorld(place, s[1], s[2], s[3])
+			t.truthy(
+				math.abs(ty - Height.at(tx, tz)) < 0.8,
+				`the trunk's foot is {ty - Height.at(tx, tz)} from the ground`
+			)
+			-- the downspout stands 0.4 off the north wall (its pipe drawn round the line)
+			local _, _, D = toLocal(foot)
+			t.near(R.HOUSE.d0 - D, 0.4, 1e-6)
+		end
+	)
 
 	t.test("the leap's geometry: the bough crosses the ridge's line above and beyond its end", function()
-		-- where the bough passes D 20 (the ridge's line)
+		-- where the bough (above the trunk's top) passes D 20 (the ridge's line)
 		local bough = registry:get(9105) :: Registry.Route
 		local best, bestT = math.huge, 0
 		for i = 0, 400 do
-			local p = registry:pointAt(bough, i / 400)
+			local u = R.BOUGH_FORK_T * i / 400
+			local p = registry:pointAt(bough, u)
 			local _, _, D = toLocal(p)
 			if math.abs(D - R.HOUSE.ridgeD) < best then
-				best, bestT = math.abs(D - R.HOUSE.ridgeD), i / 400
+				best, bestT = math.abs(D - R.HOUSE.ridgeD), u
 			end
 		end
 		local X, Y = toLocal(registry:pointAt(bough, bestT))
 		local endX, endY = toLocal(pt(9103, 1))
 		t.truthy(endX - X > 12 and endX - X < 16, `the bough crosses the ridge's line {endX - X} west of its end`)
 		t.truthy(Y - endY > 4.5 and Y - endY < 6.2, `and {Y - endY} above it`)
+		-- the house end is a short stub past the catch (3 st: room for a landing, not a climb to a dead end)
+		local stub = registry:get(9105).length * bestT
+		t.truthy(stub > 2.5 and stub < 4, `the bough runs {stub} st past where the leap lands`)
 		-- the crossing: over the wing's east parapet clear of the coping, and its end over the roof membrane
-		local crossing = registry:get(9106) :: Registry.Route
+		local crossing = registry:get(9105) :: Registry.Route
 		for i = 0, 400 do
 			local cx, cy, cd = toLocal(registry:pointAt(crossing, i / 400))
 			if cx >= R.WING_ROOF.x1 and cx <= R.WING_ROOF.outerX1 and cd <= R.WING_ROOF.outerD1 then
 				t.truthy(cy - R.WING_ROOF.copingY >= 0.8, `{cy - R.WING_ROOF.copingY} over the coping at X {cx}`)
 			end
 		end
-		local ex, ey, ed = toLocal(pt(9106, 1))
+		local ex, ey, ed = toLocal(pt(9105, 1))
 		t.truthy(ex > R.WING_ROOF.x0 + 30 and ex < R.WING_ROOF.x1 - 1 and ed < R.WING_ROOF.d1 - 2, "ends over the roof")
-		t.truthy(ey - R.WING_ROOF.y > 1.2 and ey - R.WING_ROOF.y < 2.5, `ends {ey - R.WING_ROOF.y} over the membrane`)
-		-- the crossing leaves the fork carrying on the bough's own way down (the end-of-route switch takes it)
-		local down = registry:tangentAt(bough, 0)
-		local on = registry:tangentAt(crossing, 0)
-		local cont = -(down.x * on.x + down.y * on.y + down.z * on.z)
-		t.truthy(cont > 0, `the crossing carries on from the bough (continuity {cont})`)
+		t.truthy(ey - R.WING_ROOF.y > 0.5 and ey - R.WING_ROOF.y < 1.0, `ends {ey - R.WING_ROOF.y} over the membrane`)
+		-- it droops: past the trunk's top it never rises, and it falls far more steeply toward the tip
+		local prevY = math.huge
+		for i = 0, 40 do
+			local u = R.BOUGH_FORK_T + (1 - R.BOUGH_FORK_T) * i / 40
+			local _, y = toLocal(pt(9105, u))
+			t.truthy(y <= prevY + 0.01, `the crossing rises at t {u}`)
+			prevY = y
+		end
+		local function drop(u0: number, u1: number): number
+			local _, y0 = toLocal(pt(9105, R.BOUGH_FORK_T + (1 - R.BOUGH_FORK_T) * u0))
+			local _, y1 = toLocal(pt(9105, R.BOUGH_FORK_T + (1 - R.BOUGH_FORK_T) * u1))
+			return y0 - y1
+		end
+		t.truthy(drop(0.75, 1) > 3 * drop(0.2, 0.45), `the tip droops ({drop(0.75, 1)} against {drop(0.2, 0.45)})`)
 	end)
 
 	t.test(
@@ -262,6 +294,19 @@ return function(t)
 					end
 				end
 				t.truthy(inside, `vent sample {i} at ({X}, {Y}, {D}) is inside the unit and its duct`)
+			end
+			-- no grating over the vent's run: the mouth and the first stretch lie on the bare apron in front of the
+			-- louvre, a body's half-width (0.8) clear of the platform's louvre strip; the guard stands on the strip
+			for i = 0, 200 do
+				local X, _, D = toLocal(registry:pointAt(vent, i / 200))
+				t.eq(R.inPlatform(X, D), nil, `vent sample {i} at ({X}, {D}) lies under the platform's grating`)
+				t.eq(R.inPlatform(X + 0.8, D), nil, `vent sample {i}: the body's half-width reaches the grating`)
+			end
+			local a = R.APRON
+			t.truthy(R.MOUTH.x > a.x0 and R.MOUTH.x < a.x1 and R.MOUTH.d > a.d0 and R.MOUTH.d < a.d1, "on the apron")
+			t.eq(R.inPlatform(R.GUARD.x, R.GUARD.d), "louvre strip", "the guard stands on the louvre strip")
+			for _, e in R.guardEyes() do
+				t.truthy(R.inPlatform(e[1], e[3]) ~= nil, `the lookout at ({e[1]}, {e[3]}) is on the platform`)
 			end
 			-- a person on the platform at the louvre: their kick (7 st) reaches the mouth, not the boot
 			local g = R.GUARD
@@ -347,14 +392,32 @@ return function(t)
 	local mouthX, mouthY, mouthZ = AlleyLayout.toWorld(place, R.MOUTH.x, R.MOUTH.y, R.MOUTH.d)
 	local mouth = Curve.vec3(mouthX, mouthY, mouthZ)
 
-	-- run(sprint, leapKeys): the whole way from the ground north of the downspout to the louvre. leapKeys: "walk"
-	-- (W held through the leap), "sprint" (Shift and W), "none" (Space alone, nothing held in the air).
-	local function run(sprint: boolean, leapKeys: string): (Trace, SquirrelMotor.State)
-		local foot = pt(9101, 0)
-		local sx, sz = foot.x, foot.z + 7 -- seven studs north of the pipe (world +Z), facing it
-		local state = SquirrelMotor.new(sx, Height.at(sx, sz), sz)
-		state.yaw = 0
-		local trace: Trace = {
+	local FORK_T = R.BOUGH_FORK_T
+	local LIFT = Motion.C.visualBranchLift
+
+	local function deepCopy(v: any): any
+		if type(v) ~= "table" then
+			return v
+		end
+		local out = {}
+		for k, x in v do
+			out[k] = deepCopy(x)
+		end
+		return out
+	end
+
+	type Opts = {
+		leapAtX: number?, -- local X on the ridge to press Space at (else its end, where W stops the squirrel)
+		hz: number?, -- frames per second (60)
+		grabNear: boolean?, -- press E in the air whenever the bough is the route within E's reach
+		boughYaw: number?, -- the camera's (world) yaw when W is first pressed on the bough (else down it)
+		stopAfterCatch: boolean?,
+		from: SquirrelMotor.State?, -- start from this state (a copy) ...
+		startPhase: string?, -- ... in this phase ("pipe")
+	}
+
+	local function newTrace(): Trace
+		return {
 			visits = {},
 			events = {},
 			catches = {},
@@ -364,8 +427,29 @@ return function(t)
 			frames = 0,
 			phase = "pipe",
 		}
-		local onBough = 0
-		for frame = 1, 60 * 40 do
+	end
+
+	-- run(sprint, leapKeys, opts): the whole way from the ground north of the downspout to the louvre. leapKeys:
+	-- "walk" (W held through the leap), "sprint" (Shift and W), "none" (Space alone, nothing held in the air).
+	local function run(sprint: boolean, leapKeys: string, opts: Opts?): (Trace, SquirrelMotor.State, { [string]: any })
+		local o: Opts = opts or {}
+		local hz = o.hz or 60
+		local dt = 1 / hz
+		local state: SquirrelMotor.State
+		if o.from then
+			state = deepCopy(o.from)
+		else
+			local foot = pt(9101, 0)
+			local sx, sz = foot.x, foot.z + 7 -- seven studs north of the pipe (world +Z), facing it
+			state = SquirrelMotor.new(sx, Height.at(sx, sz), sz)
+			state.yaw = 0
+		end
+		local trace = newTrace()
+		trace.phase = o.startPhase or "pipe"
+		local info: { [string]: any } = {}
+		local onBough, release = 0, 0
+		local boughYaw = o.boughYaw
+		for frame = 1, hz * 40 do
 			trace.frames = frame
 			local input = SquirrelMotor.idleInput(0)
 			local phase = trace.phase
@@ -374,8 +458,15 @@ return function(t)
 				-- run at the pipe (camera behind, looking south), up it, up the gutter; on the ridge look west
 				input.fw, input.sprint = 1, sprint
 				input.cameraYaw = if rid == 9103 then math.pi / 2 else 0
-				if rid == 9103 and state.railT >= 1 then
-					trace.phase = "leap"
+				if rid == 9103 then
+					local X = toLocal(Curve.vec3(state.x, state.y, state.z))
+					if info.ridge == nil then
+						info.ridge = deepCopy(state)
+					end
+					if state.railT >= 1 or (o.leapAtX ~= nil and X <= o.leapAtX) then
+						trace.phase = "leap"
+						info.leapX = X
+					end
 				end
 			elseif phase == "leap" then
 				input.cameraYaw = math.pi / 2
@@ -387,29 +478,45 @@ return function(t)
 				input.cameraYaw = math.pi / 2
 				input.fw = if leapKeys == "none" then 0 else 1
 				input.sprint = leapKeys == "sprint"
-				if rid == 9105 then
+				if o.grabNear then
+					local near = Motion.nearestRoute(world :: any, state.x, state.y, state.z, Motion.C.airGrab)
+					input.grab = near ~= nil and near.routeId == R.BOUGH
+				end
+				if rid == R.BOUGH then
 					trace.phase = "bough"
+					info.caught = deepCopy(state)
+					info.catchT = state.railT
+					if o.stopAfterCatch then
+						break
+					end
+				elseif rid == 9103 then
+					trace.phase = "back on the ridge"
+					break
 				elseif state.grounded then
 					trace.phase = "missed"
+					info.landed = toLocal(Curve.vec3(state.x, state.y, state.z))
 					break
 				end
 			elseif phase == "bough" then
-				-- let go of the keys, look down the bough at the fork, run down it
+				-- let go of the keys, look down the bough (or where boughYaw says), run on; at the house end of the
+				-- bough, let go, look down it and go again
 				onBough += 1
-				input.cameraYaw = yawToward(state, pt(9105, 0))
-				input.fw = if onBough <= 3 then 0 else 1
+				input.cameraYaw = boughYaw or yawToward(state, pt(R.BOUGH, if state.railT < FORK_T then FORK_T else 1))
+				input.fw = if onBough <= 3 or release > 0 then 0 else 1
 				input.sprint = sprint
-				if rid == 9106 then
-					trace.phase = "crossing"
-				elseif rid ~= 9105 then
+				release = math.max(0, release - 1)
+				if rid ~= R.BOUGH then
 					trace.phase = "lost on " .. tostring(rid)
 					break
-				end
-			elseif phase == "crossing" then
-				input.cameraYaw = yawToward(state, pt(9106, 1))
-				input.fw, input.sprint = 1, sprint
-				if rid == 9106 and state.railT >= 1 then
+				elseif state.railT >= 1 then
 					trace.phase = "drop"
+				elseif state.railT <= 0 and onBough > 10 and release == 0 and boughYaw ~= nil then
+					info.houseEnd = deepCopy(state)
+					boughYaw = nil
+					release = 3
+				end
+				if math.abs(state.railT - FORK_T) < 0.01 then
+					info.pastFork = true
 				end
 			elseif phase == "drop" then
 				input.cameraYaw = yawToward(state, mouth)
@@ -429,12 +536,16 @@ return function(t)
 				end
 			end
 			local ox, oy, oz = state.x, state.y, state.z
-			local _, events = SquirrelMotor.step(state, input, 1 / 60, world :: any)
+			local _, events = SquirrelMotor.step(state, input, dt, world :: any)
 			for _, e in events do
 				trace.events[e.kind] = (trace.events[e.kind] or 0) + 1
 				if e.kind == "catch" and e.routeId then
 					table.insert(trace.catches, e.routeId)
 				end
+			end
+			if rid == nil and state.routeId == R.BOUGH then
+				-- the catch: how far the drawn feet move up onto the bough's top (a bough's top is the rail + 1.25)
+				info.catchRise = state.y + LIFT - oy
 			end
 			local moved = math.sqrt((state.x - ox) ^ 2 + (state.y - oy) ^ 2 + (state.z - oz) ^ 2)
 			-- (the walk-in grab puts the body on the pipe's line in one frame, as v5.4's did: up to the walk-in
@@ -451,7 +562,7 @@ return function(t)
 				table.insert(trace.visits, here)
 			end
 		end
-		return trace, state
+		return trace, state, info
 	end
 
 	for _, case in
@@ -466,7 +577,7 @@ return function(t)
 		t.test(
 			`the chain with the real motor ({label}): pipe, gutter, ridge, leap onto the bough, crossing, roof, louvre`,
 			function()
-				local trace, state = run(case.sprint, case.leap)
+				local trace, state, info = run(case.sprint, case.leap)
 				if trace.phase ~= "louvre" then
 					local ev = {}
 					for k, n in trace.events do
@@ -478,8 +589,9 @@ return function(t)
 				end
 				local seq = table.concat(trace.visits, " ")
 				t.eq(trace.phase, "louvre", `got as far as "{trace.phase}" (routes {seq}) after {trace.frames} frames`)
-				t.eq(seq, "0 9101 9102 9103 0 9105 9106 0", "the routes in order")
-				t.eq(trace.catches[1], 9105, "the leap off the ridge catches the house bough")
+				t.eq(seq, "0 9101 9102 9103 0 9105 0", "the routes in order")
+				t.eq(trace.catches[1], R.BOUGH, "the leap off the ridge catches the house bough")
+				t.truthy(info.pastFork, "down the bough, past the trunk's top, on along the crossing")
 				t.truthy(
 					(trace.attachMove or 0) <= Motion.C.walkInReach + 0.5,
 					`the walk-in grab moves {trace.attachMove}`
@@ -493,25 +605,164 @@ return function(t)
 		)
 	end
 
-	t.test("the other way up: the trunk climbs to the fork and W carries on onto the crossing", function()
-		local foot = pt(9104, 0)
-		-- approach from the east (the house side), looking west at the trunk
-		local sx, sz = foot.x + 7, foot.z
-		local state = SquirrelMotor.new(sx, Height.at(sx, sz), sz)
-		state.yaw = math.pi / 2
-		local visits: { number } = {}
-		for _ = 1, 60 * 15 do
-			local input = SquirrelMotor.idleInput(if state.routeId == 9104 then math.pi / 2 else math.pi / 2)
-			input.fw = 1
-			SquirrelMotor.step(state, input, 1 / 60, world :: any)
-			local here = state.routeId or 0
-			if visits[#visits] ~= here then
-				table.insert(visits, here)
+	-- the climb to the ridge, once per pace (the sweeps below start from the squirrel as it steps onto the ridge)
+	local onRidge: { [boolean]: SquirrelMotor.State } = {}
+	local function ridgeStart(sprint: boolean): SquirrelMotor.State
+		if not onRidge[sprint] then
+			local _, _, info = run(sprint, "walk", { stopAfterCatch = true })
+			onRidge[sprint] = info.ridge
+		end
+		return onRidge[sprint]
+	end
+
+	t.test(
+		"where the leap works: the last third of the ridge swept, W, Shift+W and no key, at 30, 60 and 240 Hz",
+		function()
+			local endX = toLocal(pt(9103, 1))
+			local startX = toLocal(pt(9103, 0))
+			local third = (startX - endX) / 3
+			local rows = {}
+			local windows: { [string]: number } = {}
+			for _, mode in { "walk", "sprint", "none", "walk+E" } do
+				local keys = if mode == "walk+E" then "walk" else mode
+				local sprint = mode == "sprint"
+				-- (from the ridge's end, Space with the squirrel stopped there; then from points short of it)
+				local window, misses = 0, {}
+				local back = 0
+				local rises = {}
+				for k = 0, 16 do
+					local short = third * k / 16
+					local _, _, info = run(sprint, keys, {
+						from = ridgeStart(sprint),
+						leapAtX = if k == 0 then nil else endX + short,
+						stopAfterCatch = true,
+						grabNear = mode == "walk+E",
+					})
+					if info.caught then
+						if #misses == 0 then
+							window = short
+						end
+						table.insert(rises, info.catchRise)
+					elseif info.landed then
+						table.insert(misses, string.format("%.1f", short))
+					else
+						back += 1
+					end
+				end
+				windows[mode] = window
+				local maxRise = 0
+				for _, r in rises do
+					maxRise = math.max(maxRise, r)
+				end
+				table.insert(
+					rows,
+					`{mode}: catches from the end to {string.format("%.1f", window)} st short of it (falls from {misses[1] or "-"} st short; {back} back on the ridge; the drawn body rises {string.format(
+						"%.2f",
+						rises[1] or 0
+					)} at the catch from the end, up to {string.format("%.2f", maxRise)})`
+				)
 			end
-			if state.routeId == 9106 then
-				break
+			print(`      the ridge's last third ({string.format("%.1f", third)} st): {table.concat(rows, "; ")}`)
+			t.truthy(windows.walk >= 3.5, `holding W, the leap catches from up to {windows.walk} st short of the end`)
+			t.truthy(windows.none >= 3.5, `no key held, the leap catches from up to {windows.none} st short of the end`)
+			t.truthy(windows.sprint >= third - 0.01, `sprinting, up to {windows.sprint} st short`)
+			t.truthy(windows["walk+E"] >= windows.walk, "E in the air never makes it worse")
+			-- from the end it catches at every frame rate, with every key, and lands the body on the bough's top within the
+			-- motor's catch reach
+			for _, hz in { 30, 60, 240 } do
+				for _, keys in { "walk", "sprint", "none" } do
+					local _, _, info = run(keys == "sprint", keys, { from = ridgeStart(keys == "sprint"), hz = hz })
+					t.truthy(info.caught ~= nil, `{hz} Hz, {keys}: the leap from the ridge's end catches the bough`)
+					t.truthy(
+						math.abs(info.catchRise or math.huge) <= Motion.C.airCatch + LIFT,
+						`{hz} Hz, {keys}: the body moves {info.catchRise} at the catch`
+					)
+				end
 			end
 		end
-		t.eq(table.concat(visits, " "), "0 9104 9106", "trunk, then the crossing (looking west at the fork)")
+	)
+
+	t.test("on the bough: looking anywhere, W runs on to the roof, or up 3 st to the house end and then on", function()
+		local _, _, caught = run(false, "walk", { from = ridgeStart(false), stopAfterCatch = true })
+		local start = caught.caught :: SquirrelMotor.State
+		t.truthy(start ~= nil, "caught")
+		local catchP = Curve.vec3(start.x, start.y, start.z)
+		local up, down = {}, {}
+		for deg = 0, 345, 15 do
+			local trace, state, info =
+				run(false, "walk", { from = start, startPhase = "bough", boughYaw = math.rad(deg) })
+			local _ = trace
+			t.truthy(state.routeId ~= nil or trace.phase ~= "missed", `yaw {deg}: fell off`)
+			if info.houseEnd then
+				local h = info.houseEnd :: SquirrelMotor.State
+				local d = dist(Curve.vec3(h.x, h.y, h.z), catchP)
+				t.truthy(d <= 4, `yaw {deg}: the house end is {d} st from the catch`)
+				table.insert(up, deg)
+			else
+				table.insert(down, deg)
+			end
+			t.eq(trace.phase, "louvre", `yaw {deg}: ended "{trace.phase}" (routes {table.concat(trace.visits, " ")})`)
+		end
+		print(
+			`      W first pressed looking at yaw (deg): down the bough {table.concat(down, ",")}; up to the house end {table.concat(
+				up,
+				","
+			)}`
+		)
 	end)
+
+	t.test(
+		"the house is the only way up: nothing reaches the bough from the ground, the trunk or another route",
+		function()
+			local bough = registry:get(R.BOUGH) :: Registry.Route
+			local samples = registry:samples(bough)
+			-- no other route's end is within E's reach on a rail or the end-of-route switch of the bough
+			local reach = Motion.C.eSearch + Motion.C.autoSwitchGap
+			for _, r in records do
+				if r.id ~= R.BOUGH then
+					local route = registry:get(r.id) :: Registry.Route
+					for _, u in { 0, 1 } do
+						local e = registry:pointAt(route, u)
+						for _, s in samples do
+							t.truthy(dist(e, s) > reach, `route {r.id}'s end at t {u} is {dist(e, s)} from the bough`)
+						end
+					end
+				end
+			end
+			-- from the ground (outside the wing), a leap's apex plus E's reach falls short of every point of the bough
+			local apex = SquirrelMotor.leapApex()
+			local nearest = math.huge
+			for _, s in samples do
+				local X = toLocal(s)
+				if X > R.WING_ROOF.outerX1 + 0.5 then
+					nearest = math.min(nearest, s.y - Height.at(s.x, s.z) - apex)
+				end
+			end
+			t.truthy(nearest > Motion.C.airGrab + 1, `from the ground the bough is {nearest} past a leap's apex`)
+			-- with the motor: run at the trunk from eight sides, leap at it, E at the top of the leap: never on a route
+			local T = R.TREE
+			local trunkWorld = table.clone(world) :: any
+			trunkWorld.blocked = function(x: number, z: number, y: number): boolean
+				local X, Y, D = AlleyLayout.toLocal(place, x, y, z)
+				return Y < T.spine[#T.spine][2] and (X - T.x) ^ 2 + (D - T.d) ^ 2 <= (T.trunkR + 0.4) ^ 2
+			end
+			local tx, _, tz = AlleyLayout.toWorld(place, T.x, 0, T.d)
+			for k = 0, 7 do
+				local a = k * math.pi / 4
+				local sx, sz = tx + 8 * math.sin(a), tz + 8 * math.cos(a)
+				local state = SquirrelMotor.new(sx, Height.at(sx, sz), sz)
+				local face = math.atan2(-(tx - sx), -(tz - sz)) -- the camera behind, looking at the trunk
+				local onRoute: number? = nil
+				for frame = 1, 60 * 6 do
+					local input = SquirrelMotor.idleInput(face)
+					input.fw = 1
+					input.leap = frame % 60 == 0
+					input.grab = state.vy < 0.5 and not state.grounded
+					SquirrelMotor.step(state, input, 1 / 60, trunkWorld)
+					onRoute = onRoute or state.routeId
+				end
+				t.eq(onRoute, nil, `from side {k}: the squirrel got onto route {onRoute}`)
+			end
+		end
+	)
 end
