@@ -45,8 +45,8 @@
     },
     {
       "name": "lk_hall_from_cabin",
-      "desc": "The lift hall from an arriving cabin's door (local -27.3, 6.6, 2: cabin floor 1.5 + a standing eye) across the alight platform's place to the restaurant door and the window into the dining room.",
-      "pos": [-1069.5, 122.6, -1690.8], "look": [-1075.3, 120.5, -1706.9], "fov": 70
+      "desc": "The lift hall from an arriving cabin's door (local -27.3, 6.6, 4: cabin floor 1.5 + a standing eye) across the alight platform's place: the window into the dining room, the welcome board, the open front.",
+      "pos": [-1071.0, 122.6, -1692.1], "look": [-1055.4, 120.8, -1688.8], "fov": 75
     },
     {
       "name": "lk_hall_mouth",

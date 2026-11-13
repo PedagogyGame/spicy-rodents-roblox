@@ -272,6 +272,25 @@ local function hall(kit: Kit, root: any, sky: { SkyItem })
 		kit:box(m, "HallDoorJamb", -20.2, -19, 0, D.height + 0.3, d - 0.25, d + 0.25, C.bronze, "Metal")
 	end
 	kit:box(m, "HallDoorHead", -20.2, -19, D.height, D.height + 0.35, D.d0 - 0.5, D.d1 + 0.5, C.bronze, "Metal")
+	-- way signs over the door, both sides, and a welcome board for those stepping off a cabin
+	local over = kit:box(m, "DoorSign", -20.35, -18.85, 9.3, 10.7, D.d0, D.d1, C.dark, "SmoothPlastic", DECOR)
+	kit:label(kit:gui(over, "Left", 40), { Text = "RESTAURANT  ·  TERRACE  ·  TRAIL TO TOWN", TextColor = C.white })
+	kit:label(kit:gui(over, "Right", 40), { Text = "SKY LIFT  ·  CABINS DOWN TO TOWN", TextColor = C.white })
+	local welcome = kit:box(m, "WelcomeBoard", -20.2, -20, 3.2, 8.2, -23, -17.5, { 40, 58, 52 }, "SmoothPlastic", DECOR)
+	local wg = kit:gui(welcome, "Left", 40)
+	kit:label(
+		wg,
+		{ Text = "WELCOME TO THE LOOKOUT", TextColor = { 255, 226, 170 }, Size = { 0.9, 0.2 }, Pos = { 0.05, 0.06 } }
+	)
+	kit:label(wg, {
+		Text = "Lookout Hill: the highest ground for miles\n\nThe restaurant and the terrace: through the door at the back\nThe telescope on the terrace is free\nCabins down to town leave from the far platform",
+		TextColor = C.white,
+		Size = { 0.9, 0.62 },
+		Pos = { 0.05, 0.32 },
+		Font = "Gotham",
+		TextXAlignment = kit.roblox.Enum.TextXAlignment.Left,
+	})
+	kit:box(m, "WelcomeFrame", -20.15, -20, 3.0, 8.4, -23.2, -17.3, C.bronze, "Metal", DECOR)
 	-- front piers either side of the opening, the head beam over it (above every hanger: 12.6) and the sign
 	for _, r in { { -50, H.open0 }, { H.open1, -19.2 } } do
 		local p = kit:box(m, "FrontPier", r[1], r[2], 0, top - 1, -25.6, -24, C.stone, "Slate")
@@ -536,6 +555,16 @@ local function diningShell(kit: Kit, root: any, sky: { SkyItem })
 			local dl = kit:cyl(m, "CeilingLight", x, under(d) - 0.2, d, 0.1, 0.9, "Y", C.warm, "Neon", DECOR)
 			kit:light(dl, "PointLight", { Color = C.warm, Brightness = 0.8, Range = 20, Shadows = false })
 		end
+	end
+	-- the back of the room: a row over the fireside corner and the bar, sconces on the back wall
+	for _, x in { -10.2, 5, 20.2 } do
+		local dl = kit:cyl(m, "CeilingLight", x, under(17) - 0.2, 17, 0.1, 0.9, "Y", C.warm, "Neon", DECOR)
+		kit:light(dl, "PointLight", { Color = C.warm, Brightness = 0.7, Range = 18, Shadows = false })
+	end
+	for _, x in { -9, 9, 17 } do
+		kit:box(m, "SconcePlate", x - 0.3, x + 0.3, 5.6, 6.6, 23.6, 23.8, C.bronze, "Metal", DECOR)
+		local sc = kit:cyl(m, "Sconce", x, 6.3, 23.2, 0.9, 0.7, "Y", C.warm, "Neon", DECOR)
+		kit:light(sc, "PointLight", { Color = C.warm, Brightness = 0.8, Range = 12, Shadows = false })
 	end
 	-- interior ceiling and glulam beams
 	plank(
@@ -813,7 +842,7 @@ local function diningInside(kit: Kit, root: any, venue: any)
 	kit:box(m, "Firebox", -2.6, 2.6, 0.6, 3.8, 21.7, 22.4, C.dark, "Slate", { collide = false })
 	kit:box(m, "Hearth", -5, 5, 0, 0.4, 19.8, 21.8, C.stoneCap, "Concrete")
 	local fire = kit:box(m, "FireGlow", -1.4, 1.4, 0.7, 1.6, 21.75, 21.85, C.fire, "Neon", DECOR)
-	kit:light(fire, "PointLight", { Color = { 255, 150, 70 }, Brightness = 1.2, Range = 14, Shadows = true })
+	kit:light(fire, "PointLight", { Color = { 255, 150, 70 }, Brightness = 2, Range = 18, Shadows = true })
 	for i = -1, 1 do
 		kit:cyl(m, "Log", i * 0.8, 0.75, 22.6, 2.4, 0.4, "X", { 96, 64, 42 }, "Wood", DECOR)
 	end
