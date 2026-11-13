@@ -211,7 +211,11 @@ return function(t)
 		t.eq(g0.contrast, 0)
 		t.eq(g0.saturation, 0)
 		t.eq(g0.tint[1] + g0.tint[2] + g0.tint[3], 765)
-		t.truthy(g1.brightness < 0 and g1.brightness > -0.25, "darker, not black")
+		t.truthy(g1.brightness < 0 and g1.brightness >= -0.03, "darker by the tint, not by an added black")
+		t.truthy(
+			math.min(g1.tint[1], g1.tint[2], g1.tint[3]) >= 0.75 * 255,
+			"the tint keeps three quarters of the light"
+		)
 		t.truthy(g1.tint[3] > g1.tint[1], "cooler (more blue than red)")
 		t.eq(SewerAmbience.focus(0).far, 0)
 		t.truthy(SewerAmbience.focus(1).far > 0, "the far end softens")

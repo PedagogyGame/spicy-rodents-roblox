@@ -179,16 +179,19 @@ function SewerAmbience.prompt(layout: Layout, view: View): string?
 	return string.format(PROMPT.face, compass(-m.out.x, -m.out.z))
 end
 
--- The colour grade at `level` (0 outside, 1 inside): darker, cooler, a little flatter, never black.
+-- The colour grade at `level` (0 outside, 1 inside): darker, cooler, a little flatter, never black. The darkening is
+-- the tint (a multiply: a lamp-lit wall keeps its shape); Brightness is added to every pixel, and at -0.1 it crushed a
+-- lamp-lit pipe to black between the lamps (docs/renders/sewers/S3_look_brick_run_first_grade_too_dark.png), so it
+-- stays a hair (S3_look_brick_run, _culvert, _chamber: the owner's modules before and after, approximated off-engine).
 function SewerAmbience.grade(
 	level: number
 ): { brightness: number, contrast: number, saturation: number, tint: { number } }
 	local l = math.clamp(level, 0, 1)
 	return {
-		brightness = -0.1 * l,
-		contrast = 0.12 * l,
-		saturation = -0.3 * l,
-		tint = { 255 - 40 * l, 255 - 25 * l, 255 - 30 * l },
+		brightness = -0.02 * l,
+		contrast = 0.06 * l,
+		saturation = -0.2 * l,
+		tint = { 255 - 50 * l, 255 - 38 * l, 255 - 36 * l },
 	}
 end
 
@@ -512,7 +515,7 @@ function SewerAmbience.start(ctx: Context): Handle
 	local echoRun, rungRun = 0, 0
 	local dripIn = rng.range(C.drip[1], C.drip[2])
 	local stillFor, hissed = 0, false
-	local lampClock, scanClock, clock = 0, 0, 0
+	local lampClock, scanClock = 0, 0
 
 	local function nearestPoint(cue: string, space: string, at: Vector3): Vector3
 		local best, bestD = at, math.huge
@@ -568,7 +571,6 @@ function SewerAmbience.start(ctx: Context): Handle
 	end
 
 	local function step(dt: number)
-		clock += dt
 		local body = ctx.current()
 		if body ~= lastBody then
 			-- a new body (or none): whatever the last one was in ends now
