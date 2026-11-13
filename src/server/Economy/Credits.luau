@@ -10,11 +10,15 @@
 -- HOW A SHOP CHARGES A PLAYER (on the server, where the prompt fires; a client is never believed about money):
 --     local ok, words = wallet.spend(player, 12, "coffee")
 --     if not ok then
---         tell(player, words)       -- "You need 12c; you have 7c": show it as it is
+--         wallet.tell(player, words)   -- "You need 12c; you have 7c": show it as it is
 --         return
 --     end
---     pourTheCoffee(player)         -- the money is gone: hand the thing over
---     tell(player, words)           -- "Paid 12c for coffee. You have S$2.88."
+--     pourTheCoffee(player)            -- the money is gone: hand the thing over
+--     wallet.tell(player, words)       -- "Paid 12c for coffee. You have S$2.88."
+--   wallet.tell(player, words) puts a line on that player's screen for a few seconds (in the game: the
+--   "notice" toast every refusal uses). The balance in the corner has already changed by then, with
+--   "-12c  coffee" above it, so a shop with its own way of speaking (a clerk's bubble, a receipt) may say
+--   the words there instead; a refusal must always be said somewhere.
 --   `why` names the thing in a few lower-case words ("coffee", "a kite", "lane shoes"): it is logged and set
 --   into the words. The price is whole cents (Economy/EconomyRules.price(id) has the list).
 --   If handing the thing over can fail or has to wait, pass it in, and a failure is never charged:
@@ -28,7 +32,7 @@
 --     if wallet.pass.has(player) then
 --         letIn(player)             -- wallet.pass.words(player): "4.2 in-game days left (about 50 minutes)"
 --     else
---         tell(player, "Members only: a pass is 20c for five in-game days.")
+--         wallet.tell(player, "Members only: a pass is 20c for five in-game days.")
 --     end
 --   and where the pass is sold (the desk, a lounge door's prompt):
 --     local ok, words = wallet.pass.buy(player)   -- (true, "Pass bought: five days of paintball and both
@@ -53,9 +57,9 @@
 -- require.
 -- Interface: new(deps?) -> Wallet { join(player) -> cents of pocket money given, leave(player),
 --   balance(player) -> cents, can(player, cents) -> (ok, words), spend(player, cents, why, deliver?) -> (ok,
---   words), add(player, cents, why) -> (ok, words), purse(player) -> Purse (joins the player if need be),
---   pass { has, buy, left, untilDay, words }, log() -> the last changes of every account, export(player) ->
---   Bank.Saved?, bank (the Bank itself) }; PASS; types Deps, Wallet, Pass
+--   words), add(player, cents, why) -> (ok, words), tell(player, words), purse(player) -> Purse (joins the
+--   player if need be), pass { has, buy, left, untilDay, words }, log() -> the last changes of every account,
+--   export(player) -> Bank.Saved?, bank (the Bank itself) }; PASS; types Deps, Wallet, Pass
 
 local Import = require("../Import")
 local Bank = Import.shared("Economy/Bank") :: typeof(require("../../shared/Economy/Bank"))
@@ -82,6 +86,8 @@ export type Deps = {
 	pocket: (() -> number)?, -- pocket money in cents (default EconomyRules.pocketMoney: the tunable)
 	setAttr: ((player: any, name: string, value: any) -> ())?, -- default: the Player's attribute (a stub's attrs)
 	log: ((line: string) -> ())?, -- one line per change (default: the server's output, tag Wallet)
+	-- put words on a player's screen (Boot/Game: its "notice" toast; default: a PlayerLike stub's events list)
+	tell: ((player: any, words: string) -> ())?,
 }
 
 export type Pass = {
@@ -99,6 +105,7 @@ export type Wallet = {
 	can: (player: any, cents: number) -> (boolean, string),
 	spend: (player: any, cents: number, why: string, deliver: (() -> (boolean?, string?))?) -> (boolean, string),
 	add: (player: any, cents: number, why: string) -> (boolean, string),
+	tell: (player: any, words: string) -> (), -- the words a spend, a refusal or a door has for a player, on their screen
 	purse: (player: any) -> Purse,
 	pass: Pass,
 	log: () -> { Entry },
@@ -126,6 +133,12 @@ local function defaultSetAttr(player: any, name: string, value: any)
 	end
 end
 
+local function defaultTell(player: any, words: string)
+	if type(player) == "table" and type(player.events) == "table" then
+		table.insert(player.events, { kind = "notice", text = words }) -- what Boot/Game would send them
+	end
+end
+
 function Credits.new(deps: Deps?): Wallet
 	local d: Deps = deps or {}
 	local born = os.clock()
@@ -134,6 +147,7 @@ function Credits.new(deps: Deps?): Wallet
 	end
 	local daySeconds = d.daySeconds or (Tunables.get("clock.realSecondsPerDay") :: number)
 	local setAttr = d.setAttr or defaultSetAttr
+	local tell = d.tell or defaultTell
 	local logger = Log.new("Wallet")
 	local say = d.log or function(line: string)
 		logger:info(line)
@@ -228,6 +242,11 @@ function Credits.new(deps: Deps?): Wallet
 		end,
 		add = function(player: any, cents: number, why: string): (boolean, string)
 			return bank:add(who(player), cents, tostring(why))
+		end,
+		tell = function(player: any, words: string)
+			if type(words) == "string" and words ~= "" then
+				tell(player, words)
+			end
 		end,
 		purse = function(player: any): Purse
 			join(player) -- (nothing more for someone already here; a new Player object for a known id is taken up)

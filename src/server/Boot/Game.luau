@@ -39,7 +39,8 @@
 -- Money (Economy/Credits, the town's one wallet): made here on the day clock and handed down. A joining
 -- player gets an account and pocket money through RoleService's purse (ActorsRuntime opts.purse), with the
 -- once-a-second sweep as the safety net; a leaving player's account is closed and kept; the minigames'
--- ctx.town.charge is wallet.spend. Every later shop, door and counter takes this same `wallet`.
+-- ctx.town.charge is wallet.spend; wallet.tell(player, words) is the "notice" toast on that player's screen.
+-- Every later shop, door and counter takes this same `wallet`.
 -- Engine only inside the functions; no side effects on require.
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, wallet (Economy/Credits: spend, add, balance,
 --   pass), pick(player, choice) -> (ok, why?),
@@ -200,7 +201,13 @@ function Game.start(opts: Opts?): any
 	local dayClock = DayClock.publish(ReplicatedStorage) -- the day cycle: every client derives it (Client/World/Sky)
 	-- the town's one wallet, on the game clock (a pass is sold in in-game days; the attributes are read each
 	-- time, so a re-anchored clock is followed)
+	local tellPlayer: ((player: any, text: string) -> ())? = nil -- (set once the remotes exist, below)
 	local wallet = Credits.new({
+		tell = function(player: any, text: string)
+			if tellPlayer then
+				tellPlayer(player, text)
+			end
+		end,
 		gameSeconds = function(): number
 			return Game.gameSeconds(
 				workspace:GetServerTimeNow(),
@@ -375,6 +382,10 @@ function Game.start(opts: Opts?): any
 		elseif type(player) == "table" and type(player.events) == "table" then
 			table.insert(player.events, payload) -- PlayerLike stub (engine smoke): what the client would get
 		end
+	end
+	-- wallet.tell: a shop's or a door's words for one player, as the toast every refusal uses
+	tellPlayer = function(player: any, text: string)
+		fire(player, { kind = "notice", text = text })
 	end
 
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)

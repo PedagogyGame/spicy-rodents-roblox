@@ -20,8 +20,11 @@
 --   Workspace.Attractions with the bake's Site / Origin attributes); stand = { site, x, y, d } where the
 --   player's body starts (default: the first site's origin, 3 up); service = extra MinigameService opts; lag
 --   (frames each way, default 3); seed; touch (a touch device). The service's opts.games.people lists the
---   player and whoever a case adds to w.people ({ key, name, x, y, z }); body / charge / best are the
---   service's own stand-ins unless opts.service.games says otherwise.
+--   player and whoever a case adds to w.people ({ key, name, x, y, z }); body / best are the service's own
+--   stand-ins unless opts.service.games says otherwise. charge is the REAL wallet (w.wallet: a
+--   Server/Economy/Credits of the rig's own, wired as Boot/Game wires the town's), so every game played on
+--   the rig is played with real money behind ctx.town.charge: the player has the game's pocket money
+--   (S$3.00), and anyone else a game charges is joined first, as everyone in the game has been.
 -- Interface: play(fn, opts?); frame(w); run(w, seconds); untilTrue(w, limit, cond) -> bool; press(w, stationId)
 --   (the station's prompt is triggered by the player); prompt(w, stationId) -> ProximityPrompt; walkTo(w, site,
 --   x, y, d); texts(root) -> { string } (every word drawn, nothing hidden); has(list, needle); screen(w) ->
@@ -35,6 +38,7 @@ local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local Data = require("@shared/Data")
 local Schema = require("@shared/Util/Schema")
 local Sites = require("@shared/Minigames/Sites")
+local Credits = require("@server/Economy/Credits")
 local MinigameService = require("@server/Minigames/MinigameService")
 local CameraRig = require("@client/Camera/CameraRig")
 local InputMap = require("@client/Input/InputMap")
@@ -64,6 +68,7 @@ export type World = {
 	places: { [string]: Place },
 	roots: { [string]: any }, -- each site's Model under Workspace.Attractions
 	player: any,
+	wallet: Credits.Wallet, -- the money behind ctx.town.charge (the player has joined: pocket money)
 	body: any,
 	gui: any, -- PlayerGui.MinigameUI
 	input: any, -- the Minigame.Input remote
@@ -174,6 +179,7 @@ local function build(opts: Opts?): World
 		places = places,
 		roots = roots,
 		player = player,
+		wallet = nil :: any,
 		body = body,
 		gui = nil,
 		input = input,
@@ -200,6 +206,15 @@ local function build(opts: Opts?): World
 		cursors = {},
 		controls = {},
 	}
+	-- the town's wallet, on a game clock that runs with the rig's frames (it opens on day 9, as the game does)
+	w.wallet = Credits.new({
+		gameSeconds = function(): number
+			return 9 * 720 + w.frames / 60
+		end,
+		daySeconds = 720,
+		log = function() end,
+	})
+	w.wallet.join(player)
 	-- the clock both sides share (ctx.stamp on the server, Ctx.stamp on the client): never the service's own
 	rawset(workspace, "GetServerTimeNow", function(_self: any): number
 		return MinigameRig.SERVER_TIME + w.frames / 60
@@ -274,6 +289,11 @@ local function build(opts: Opts?): World
 			end,
 		},
 		games = {
+			-- Boot/Game's line (and, as there, whoever is charged has an account: everyone in the game joined)
+			charge = function(p: any, cents: number, why: string): (boolean, string?)
+				w.wallet.join(p)
+				return w.wallet.spend(p, cents, why)
+			end,
 			people = function(): { any }
 				local q = w.body.PrimaryPart.Position
 				local out: { any } = { { key = player, name = "Ann", species = w.species, x = q.X, y = q.Y, z = q.Z } }

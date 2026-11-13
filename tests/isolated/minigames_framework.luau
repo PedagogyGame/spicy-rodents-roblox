@@ -314,9 +314,15 @@ return function(t)
 				-- nobody to lend yet: a computer player has no body, and handing one back is harmless
 				t.eq(town.body("Wall", roblox.CFrame.new(0, 0, 0)), nil)
 				town.release(w.body)
-				-- no wallet yet: everything is free
-				local ok, words = town.charge(w.player, 20, "a paintball pass")
-				t.truthy(ok and words == nil)
+				-- the rig's town has the real wallet (Server/Economy/Credits), as the game's has: money is taken,
+				-- with words to show, and a price above the balance is refused in words
+				t.eq(w.wallet.balance(w.player), 300)
+				t.deepEq(
+					{ town.charge(w.player, 20, "a paintball pass") },
+					{ true, "Paid 20c for a paintball pass. You have S$2.80." }
+				)
+				t.deepEq({ town.charge(w.player, 500, "the arena") }, { false, "You need 500c; you have 280c" })
+				t.eq(w.wallet.balance(w.player), 280)
 				-- no profile yet: a best is kept for as long as the server runs, per person and per key
 				t.eq(town.best(w.player, "machine"), nil)
 				t.eq(town.best(w.player, "machine", 50), 50)

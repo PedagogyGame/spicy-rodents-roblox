@@ -247,6 +247,56 @@ return function(t)
 		t.eq(stub.attrs.PassUntil, 14 * DAY)
 	end)
 
+	t.test("tell: a shop's words reach the one player's screen, as the header's example writes it", function()
+		-- the game's wallet: Boot/Game hands in its "notice" toast
+		local told: { any } = {}
+		local wallet = Credits.new({
+			daySeconds = DAY,
+			log = function() end,
+			tell = function(player: any, words: string)
+				table.insert(told, { player.Name, words })
+			end,
+		})
+		local ann: any = { UserId = 7, Name = "Ann" }
+		wallet.join(ann)
+		-- the header's coffee counter, word for word
+		local function counter(player: any, cents: number)
+			local ok, words = wallet.spend(player, cents, "coffee")
+			if not ok then
+				wallet.tell(player, words)
+				return
+			end
+			wallet.tell(player, words)
+		end
+		counter(ann, 12)
+		counter(ann, 500)
+		wallet.tell(ann, "") -- nothing to say: nothing sent
+		t.deepEq(told, {
+			{ "Ann", "Paid 12c for coffee. You have S$2.88." },
+			{ "Ann", "You need 500c; you have 288c" },
+		})
+		-- the header's door
+		local function door(player: any): boolean
+			if wallet.pass.has(player) then
+				return true
+			end
+			wallet.tell(player, "Members only: a pass is 20c for five in-game days.")
+			return false
+		end
+		t.falsy(door(ann))
+		t.eq(told[3][2], "Members only: a pass is 20c for five in-game days.")
+		t.deepEq({ wallet.pass.buy(ann) }, { true, "Pass bought: five days of paintball and both lounges." })
+		t.truthy(door(ann))
+		t.eq(#told, 3)
+		-- with nothing handed in, a PlayerLike stub (the engine smoke's player) finds the line among its events
+		local w = town()
+		local stub: any = { UserId = 4243, Name = "Smoke", events = {} }
+		w.wallet.join(stub)
+		w.wallet.tell(stub, "The till is closed.")
+		t.deepEq(stub.events, { { kind = "notice", text = "The till is closed." } })
+		w.wallet.tell({ UserId = 1 }, "nobody to tell: harmless")
+	end)
+
 	t.test(
 		"roles: a member's purse is the wallet's, so Ladder pay, the queue's money term and the screen agree",
 		function()
