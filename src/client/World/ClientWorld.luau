@@ -43,6 +43,7 @@ local Ground = Import.shared("World/Ground") :: typeof(require("../../shared/Wor
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
+local CollisionGroups = Import.shared("World/CollisionGroups") :: typeof(require("../../shared/World/CollisionGroups"))
 
 export type ClientWorld = {
 	groundAt: (x: number, z: number, refY: number) -> number,
@@ -135,6 +136,24 @@ function ClientWorld.get(): ClientWorld
 	walls.FilterType = Enum.RaycastFilterType.Exclude
 	walls.RespectCanCollide = true
 	walls.MaxParts = 24
+	-- the squirrel's queries run in its own collision group (Shared/World/CollisionGroups): the alley roof's people
+	-- fence lets it through, the fence on the people's stair does not. The server registers the groups; until they
+	-- have reached this computer the queries stay in Default.
+	task.spawn(function()
+		local PhysicsService = game:GetService("PhysicsService")
+		for _ = 1, 60 do
+			local ok, ready = pcall(function()
+				return PhysicsService:IsCollisionGroupRegistered(CollisionGroups.SQUIRREL_PROBE)
+			end)
+			if ok and ready then
+				ray.CollisionGroup = CollisionGroups.SQUIRREL_PROBE
+				overlap.CollisionGroup = CollisionGroups.SQUIRREL_PROBE
+				walls.CollisionGroup = CollisionGroups.SQUIRREL_PROBE
+				return
+			end
+			task.wait(1)
+		end
+	end)
 	local function solid(found: { BasePart }, x: number, cy: number, z: number): boolean
 		for _, part in found do
 			local parent = part.Parent

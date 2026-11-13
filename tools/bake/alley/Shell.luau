@@ -646,7 +646,8 @@ local function walls(kit: any, root: any, data: any)
 	-- (the west parapet stops where the raised hall roof's clerestory wall stands on it: tools/bake/alley/Roof)
 	parapet("West", OX0, L.X0, L.FRONT_D, AlleyRoof.HALL_ROOF.northD0)
 	parapet("WingEast", L.X1, OX1, L.FRONT_D, GD1 + L.WALL_T)
-	parapet("WingBack", OHX1, L.X1, GD1, GD1 + L.WALL_T)
+	-- (cut where the roof run's stair reaches the roof: tools/bake/alley/RoofStairs)
+	parapet("WingBack", AlleyRoof.STAIR.parapetCut.x1, L.X1, GD1, GD1 + L.WALL_T)
 	-- roof deck (the ceilings hang under it) and the plant on it, over the front rooms and the wing. Over the lanes
 	-- (AlleyLayout.HALL_ROOF) the roof is the model HallRoof, the roof run's raised roof: tools/bake/alley/Roof.
 	local hr = L.HALL_ROOF

@@ -164,9 +164,10 @@ AlleyRoof.DUCT = { x0 = 101.0, x1 = 104.12, d0 = 15.5, d1 = 17.5, y0 = 15.0, y1 
 AlleyRoof.ELBOW = { x0 = 98.0, x1 = 101, d0 = 15.5, d1 = 17.5, y0 = 12.32, y1 = 17.3 }
 AlleyRoof.BOOT = { x0 = 98.0, x1 = 99.6, d0 = 15.5, d1 = 17.5, y0 = 12.32, y1 = 14.3 }
 
--- THE STAIRS AND THE GUARD PLATFORM (lane L2; planned) -------------------------------------------------------------
+-- THE STAIRS AND THE GUARD PLATFORM (lane L2: tools/bake/alley/RoofStairs) -----------------------------------------
 -- In the open yard behind the games wing, against its back wall: 27 risers of 0.734 in three flights of nine, eight
--- treads of 1.5 each, landings between, the top landing level with the platform.
+-- treads of 1.5 each, landings between, the top landing level with the platform. Each flight has an invisible ramp
+-- through its nosings for people's feet (from a tread out past its foot up to its landing).
 AlleyRoof.STAIR = {
 	d0 = 31.2,
 	d1 = 35.2,
@@ -196,19 +197,36 @@ AlleyRoof.PLATFORM = {
 		{ x0 = 101.8, x1 = 121, d0 = 8, d1 = 10.6, name = "north strip" },
 	},
 }
--- People stay on the platform: a visible rail (squirrels pass under its 1.8 bottom rail) and an invisible wall up to
--- Y 29.7 (a person jumps about 7.2 onto the 5.3-high unit).
+-- People stay round the vent (owner question Q6's default): the platform, the apron, the unit's sides and the gap
+-- between the unit and the hall, inside these lines (east, north, and south along the wing's back parapet beside the
+-- stair's cut). On each a visible rail (squirrels pass under its bottom rail, between its posts) and an invisible wall
+-- up to wallY1 that people meet and squirrels do not (collision group PeopleFence, Shared/World/CollisionGroups):
+-- a person jumps about 7.2. posts: where the east line's posts stand (the squirrel's way from the crossing to the
+-- louvre passes between two). caps: invisible people-only blocks over the unit and the duct, so nobody stands on them,
+-- and on the hall's east coping beside the platform and the stair's top, so nobody who climbs a rail gets onto the
+-- hall's roof.
 AlleyRoof.PEOPLE_FENCE = {
 	lines = {
-		{ x0 = 121, x1 = 121, d0 = 8, d1 = 30 },
+		{ x0 = 121, x1 = 121, d0 = 8, d1 = 30.8 },
 		{ x0 = 101.8, x1 = 121, d0 = 8, d1 = 8 },
+		{ x0 = 105, x1 = 121, d0 = 30.4, d1 = 30.4 },
 	},
 	railTop = 3.6,
 	bottomRail = 1.8,
 	postPitch = 3,
+	posts = { d0 = 9.5, x0 = 104 },
 	wallY0 = 13.72,
 	wallY1 = 29.7,
+	caps = {
+		{ x0 = 101.8, x1 = 116.4, d0 = 10.6, d1 = 22.4, y0 = 19.05, y1 = 29.7, name = "over the unit" },
+		{ x0 = 101.8, x1 = 104.12, d0 = 15.3, d1 = 17.7, y0 = 17.25, y1 = 19.05, name = "over the duct" },
+		{ x0 = 101.0, x1 = 101.9, d0 = 7.5, d1 = 36, y0 = 24.0, y1 = 32, name = "on the hall's east coping" },
+	},
 }
+-- Squirrels stay off the people's stair onto the roof (owner question Q12's default: the house is the only way up):
+-- an invisible wall people pass and squirrels do not (collision group SquirrelFence) along the wing's back wall over
+-- the top flight and its landings, from below a leap's reach off the middle landing to above one off the top.
+AlleyRoof.SQUIRREL_FENCE = { x0 = 101.8, x1 = 121, d0 = 30.8, d1 = 31.0, y0 = 7.0, y1 = 22.6 }
 AlleyRoof.GUARD = { x = 118.5, d = 16.5, eyeY = 18.9 }
 -- Where else on the platform a guard looks out from toward the yard: the louvre strip's two outer corners and the
 -- walkway's south-east corner (eye 5.2 over the grating). The yard's leaves keep clear of the lines from these to the

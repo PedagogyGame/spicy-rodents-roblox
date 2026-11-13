@@ -10,6 +10,8 @@
 -- sphere; CornerWedges, MeshParts and unions are taken as their box (said in `shape`). Parts under a model named
 -- "TerrainCarve" are not solids: they lower the terrain (as Server/Attractions/AttractionService carves it at
 -- boot). Overlap tests are exact separating-axis tests between convex solids, so a 0.08-stud plank is found.
+-- What stops the squirrel is a colliding part whose collision group meets the squirrel's queries' (SquirrelProbe:
+-- Shared/World/CollisionGroups; the alley roof's people fence does not): Part.squirrelSolid.
 --   world.groundAt(x, z, refY)   what a ray down from refY + 1.5 meets first among colliding parts, else the
 --                                terrain (World/Height lowered inside the carve boxes): Client/World/ClientWorld
 --   world.blocked(x, z, y)       ClientWorld's body box (half 1.0, from STEP to BODY_TOP over the feet; its lowest
@@ -38,6 +40,7 @@ local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local ClientWorld = require("@client/World/ClientWorld")
+local CollisionGroups = require("@shared/World/CollisionGroups")
 local Enclosure = require("@shared/Routes/Enclosure")
 local Motion = require("@shared/Routes/Motion")
 local Height = require("@shared/World/Height")
@@ -54,6 +57,8 @@ export type Part = {
 	shape: string, -- "block" | "wedge" | "cylinder" | "ball" | "box" (taken as its box)
 	collide: boolean,
 	query: boolean,
+	group: string, -- its CollisionGroup (Shared/World/CollisionGroups)
+	squirrelSolid: boolean, -- collides and its group meets the squirrel's queries' (SquirrelProbe)
 	visible: boolean,
 	transparency: number,
 	-- frame: centre and unit axes (the part's X, Y, Z in world space), half size
@@ -253,6 +258,10 @@ local function makePart(inst: any, path: string): Part
 	local ey = math.abs(ax[2]) * hx + math.abs(ay[2]) * hy + math.abs(az[2]) * hz
 	local ez = math.abs(ax[3]) * hx + math.abs(ay[3]) * hy + math.abs(az[3]) * hz
 	local transparency = inst.Transparency :: number
+	local okGroup, group = pcall(function()
+		return inst.CollisionGroup
+	end)
+	local g = if okGroup and type(group) == "string" and group ~= "" then group else CollisionGroups.DEFAULT
 	return {
 		name = inst.Name,
 		path = path,
@@ -260,6 +269,8 @@ local function makePart(inst: any, path: string): Part
 		shape = shape,
 		collide = inst.CanCollide == true,
 		query = inst.CanQuery ~= false,
+		group = g,
+		squirrelSolid = inst.CanCollide == true and CollisionGroups.solidToSquirrel(g),
 		visible = transparency < 1,
 		transparency = transparency,
 		px = p.X,
@@ -541,8 +552,10 @@ function BakedWorld.fromModel(root: any, opts: { adjust: ((part: Part, inst: any
 		return nil, nil
 	end
 
+	-- what stops the squirrel: a colliding part whose collision group meets the squirrel's queries' (the alley
+	-- roof's people fence does not; Shared/World/CollisionGroups)
 	local function colliding(p: Part): boolean
-		return p.collide
+		return p.squirrelSolid
 	end
 
 	function world.groundPart(x: number, z: number, refY: number): (number, Part?)
@@ -687,6 +700,7 @@ end
 function BakedWorld.alleyRuntime(part: Part, inst: any)
 	if part.name == "Ball" and inst.Parent and string.match(inst.Parent.Name, "^Lane%d+$") then
 		part.collide = false
+		part.squirrelSolid = false
 	end
 end
 
@@ -730,7 +744,7 @@ export type ClearanceOptions = {
 }
 
 local function solidOrSeen(p: Part): boolean
-	return p.collide or p.visible
+	return p.squirrelSolid or p.visible
 end
 
 -- clearance(world, registry, route, opts?): every part the animal's section passes through along the route.
