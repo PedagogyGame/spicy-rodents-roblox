@@ -36,8 +36,9 @@
 --              client's, so a click then waits, as it waits for the fire interval, until the eye is within
 --              the server's 0.4 of where it is going. A single change holds nothing: the pop-up shot over
 --              a rail leaves the instant the click is made.
---   placements pivot the body, take the number, turn the look for one frame, and for a respawn a full
---              magazine, the legs back and the protection.
+--   placements pivot the body and take the number; a respawn also turns the look for one frame and gives
+--              a full magazine, the legs back and the protection. A correction leaves the look alone: the
+--              player's own yaw and pitch are kept (the server's yaw is the last pose it took, up to a second old).
 --   idle       the seat counts idleness AS THE SERVER DOES (PaintballService, "idleness": the pose has
 --              stayed within 0.5 studs and 0.05 rad of where the count began and no ball has left, over
 --              live play; a respawn moves that pose, a correction does not, and neither restarts the
@@ -678,8 +679,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		bar()
 	end
 
-	local function placed(msg: { [string]: any })
-		-- (1) the body, (2) the number, (3) the look
+	-- `turn`: a respawn turns the look to the placed yaw; a correction never does (it comes mid-fight, with the
+	-- yaw of the last pose the server took, up to a second old: turning to it would snap the aim away and level)
+	local function placed(msg: { [string]: any }, turn: boolean)
+		-- (1) the body, (2) the number, (3) the look (a respawn's only)
 		local place = port.place
 		if place then
 			place(msg.x, msg.y, msg.z, msg.yaw)
@@ -690,7 +693,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		walked = 0
 		fallSpeed = 0
 		local look = port.look
-		if look and tuning.turnLook then
+		if turn and look and tuning.turnLook then
 			local ex, ey, ez = Body.eyePoint(msg.x, msg.y, msg.z, seat.c)
 			look(ex, ey, ez, msg.yaw)
 			turnLook = { ex, ey, ez, msg.yaw }
@@ -715,7 +718,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 	-- A placement of your own that makes you whole: (4) a full magazine with no reload running, the
 	-- ramp at 0, the legs back, protected.
 	local function respawned(msg: { [string]: any }, now: number)
-		placed(msg)
+		placed(msg, true)
 		-- (the server's doing, as the server lane does it: a respawn moves the pose idleness is measured
 		-- from and does not restart the count; a correction moves neither, so the body's next Move from
 		-- where it was put back is judged against the pose the count began at, here as there)
@@ -775,7 +778,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				respawned(msg, now)
 			end
 		elseif kind == "paintball_correct" then
-			placed(msg)
+			placed(msg, false)
 			say(Contract.textFor(tostring(msg.why)), now)
 		elseif kind == "paintball_tag" then
 			if type(msg.scores) == "table" then

@@ -978,10 +978,15 @@ return function(t)
 				end
 			end
 			t.truthy(old > 0 and new > 0)
-			-- the look is turned to the placement's yaw through ONE frame of camera hold, then let go
-			t.eq(b.cameras, 2, "one hold for the first placement, one for this")
+			-- a correction never turns the look: no camera hold, the player's own aim kept
+			t.eq(b.cameras, 1, "the first placement's hold only")
+			t.eq(b.releases, 1)
+			-- the look of a respawn is turned to the placement's yaw through ONE frame of camera hold, then let go
+			Kit.place(b, { x = 0, z = 30, yaw = 0.7 })
+			Kit.frame(b, 3)
+			t.eq(b.cameras, 2, "one hold for the first placement, one for the respawn")
 			t.eq(b.releases, 2)
-			t.near(b.looks[#b.looks].yaw, 1.5, 1e-9)
+			t.near(b.looks[#b.looks].yaw, 0.7, 1e-9)
 			t.near(b.looks[#b.looks].y, Body.STAND_EYE, 1e-9, "from the eye")
 			-- the switch for a Studio that says the stock camera does not carry on from it
 			local tuning = table.clone(Tuning) :: any
@@ -989,6 +994,35 @@ return function(t)
 			local c = Kit.playing({ tuning = tuning })
 			t.eq(c.cameras, 0)
 			t.eq(c.seat.place, 1, "and nothing else changes")
+		end
+	)
+
+	t.test(
+		"a correction mid-fight keeps the player's aim: no camera hold, the yaw and the pitch are left alone",
+		function()
+			-- (the server's correction carries the yaw of the last pose it took, up to a second old: turning the view
+			-- to it, levelled, would snap a player aiming up and to the left at someone round to face away)
+			local b = Kit.playing()
+			local seat = b.seat
+			Kit.run(b, 0.3)
+			local holds, looks = b.cameras, #b.looks
+			b.pose.yaw, b.pose.pitch = 1.2, 0.35
+			Kit.frame(b)
+			Kit.message(b, { kind = "paintball_correct", x = 2, y = 0, z = 28, yaw = 0.2, why = "speed", place = 2 })
+			Kit.frame(b, 3)
+			t.eq(b.cameras, holds, "no camera hold")
+			t.eq(#b.looks, looks, "the look is not turned")
+			t.eq(b.held, false)
+			t.near(b.pose.yaw, 1.2, 1e-9, "the player's own yaw")
+			t.near(b.pose.pitch, 0.35, 1e-9, "and pitch")
+			t.near(seat.yaw, 1.2, 1e-6)
+			t.near(seat.pitch, 0.35, 1e-6)
+			t.deepEq(b.placed[#b.placed], { x = 2, y = 0, z = 28, yaw = 0.2 }, "the body is still put back")
+			t.eq(seat.place, 2)
+			local moves = Kit.moves(b)
+			local last = moves[#moves]
+			t.eq(last.place, 2)
+			t.near(last.pitch, 0.35, 1e-3, "and the stream carries the aim the player kept")
 		end
 	)
 

@@ -1467,8 +1467,15 @@ return function(t)
 				t.near(moves[#moves].x, 15, 1e-3)
 				t.near(moves[#moves].yaw, 0.4, 1e-3, "the look rides on the pose")
 				t.near(moves[#moves].pitch, 0.1, 1e-3)
+				local holds = #s.w.holds
 				s.send({ kind = "paintball_correct", x = 2, y = 0, z = 28, yaw = 0, why = "speed", place = 2 })
 				s.run(0.4)
+				t.eq(#s.w.holds, holds, "a correction takes no camera hold: the look is not turned")
+				local look = workspace.CurrentCamera.CFrame.LookVector
+				local dx, dy, dz = Arena.dirToWorld(s.place, Body.look(0.4, 0.1))
+				t.near(look.X, dx, 1e-4, "the player's own aim is kept")
+				t.near(look.Y, dy, 1e-4)
+				t.near(look.Z, dz, 1e-4)
 				for _, move in heard(s, "Paintball.Move") do
 					if move.place == 2 then
 						t.near(move.x, 2, 1e-3, "never the new number from the old place")
@@ -1479,6 +1486,8 @@ return function(t)
 				end
 				moves = heard(s, "Paintball.Move")
 				t.eq(moves[#moves].place, 2)
+				t.near(moves[#moves].yaw, 0.4, 1e-3, "the stream carries the aim kept, not the server's old yaw")
+				t.near(moves[#moves].pitch, 0.1, 1e-3)
 				t.truthy(Rig.has(Rig.texts(s.hud()), Contract.textFor("speed")), "and the screen says why")
 			end)
 		end

@@ -52,12 +52,15 @@
 --                placed feet point and yaw yourself (you are its network owner; the message and the
 --                server's own teleport do not arrive in a fixed order, and a Move must never carry the
 --                new placement number from the old place); (2) seat.place = msg.place, which every
---                Move from now on carries; (3) THE TURN OF THE LOOK: ctx.camera(a CFrame at your eye
---                looking along the placed yaw, level, nil, true) for one rendered frame, then
+--                Move from now on carries; (3) FOR A RESPAWN ONLY, THE TURN OF THE LOOK: ctx.camera(a
+--                CFrame at your eye looking along the placed yaw, level, nil, true) for one rendered
+--                frame, then
 --                ctx.releaseCamera(): the stock first-person camera carries on from the CFrame it
 --                finds, so you come back looking out of the spawn room, not at the wall you were
 --                tagged against. (That the stock camera does carry on from it is to be seen once in
---                Studio; if it does not, the lane leaves step 3 out and nothing else changes.)
+--                Studio; if it does not, the lane leaves step 3 out and nothing else changes.) A
+--                correction never turns the look: it comes mid-fight with the yaw of the last pose the
+--                server took (up to a second old), and the player's own yaw and pitch are kept.
 --                Nothing else here writes the camera's CFrame (the rig fails a case that does so
 --                outside a hold). (4) for a respawn: the predicted magazine is full with no reload
 --                running, the sprint ramp is 0, the legs are yours again (ctx.controls(true)), and
