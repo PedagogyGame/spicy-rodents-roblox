@@ -287,6 +287,35 @@ return function(t)
 				t.eq(s.hum.JumpHeight, Body.JUMP_HEIGHT, "a hop, not a way over a rail")
 				t.eq(s.hum.UseJumpPower, false)
 				t.eq(FakeEngine.bound(), 1, "one render step for all of paintball")
+				-- the lock is KEPT, not set once: another script writing the body's zone does not let the view out
+				w.body:SetAttribute("CameraZone", "tunnel")
+				s.run(0.05)
+				t.eq(w.body:GetAttribute("CameraZone"), "lockFirstPerson", "first person for the whole match")
+				-- and it follows the player onto another body (the seat opened before this one streamed in)
+				local first = w.body
+				local second = FakeEngine.model("Ann2", first.PrimaryPart.CFrame, nil)
+				second.PrimaryPart = FakeEngine.part("HumanoidRootPart", first.PrimaryPart.CFrame, second)
+				local hum2 = FakeEngine.new("Humanoid", "Humanoid", {
+					HipHeight = 2,
+					JumpHeight = 7.2,
+					UseJumpPower = true,
+					CameraOffset = Vector3.new(0, 0, 0),
+					FloorMaterial = roblox.Enum.Material.Plastic,
+				})
+				hum2.Parent = second
+				rawset(second.PrimaryPart, "Size", Vector3.new(2, 2, 1))
+				w.body = second
+				s.run(0.05)
+				t.eq(second:GetAttribute("CameraZone"), "lockFirstPerson")
+				t.eq(hum2.JumpHeight, Body.JUMP_HEIGHT)
+				t.eq(first:GetAttribute("CameraZone"), nil, "the body left behind is as it was found")
+				t.eq(s.hum.JumpHeight, 7.2)
+				t.eq(s.hum.UseJumpPower, true)
+				w.body = first
+				s.run(0.05)
+				t.eq(first:GetAttribute("CameraZone"), "lockFirstPerson")
+				t.eq(second:GetAttribute("CameraZone"), nil)
+				t.eq(hum2.JumpHeight, 7.2)
 				-- the briefing: the controls card is the framework's help card; the HUD says which side and how long
 				local hud = s.hud()
 				t.truthy(hud ~= nil)

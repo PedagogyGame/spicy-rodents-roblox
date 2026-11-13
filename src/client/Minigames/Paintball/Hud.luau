@@ -513,11 +513,11 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		local words = ""
 		local safe = if starting then nil else seat:protected(now)
 		local idle = seat:idle(now)
-		if seat.out then
+		if ended or phase == "" then
+			words = "" -- (the end card has the screen; somebody tagged in the last seconds is not counted back)
+		elseif seat.out then
 			local by = seat.names[seat.outBy] or "someone"
 			words = `TAGGED OUT by {by}   back in {math.max(1, math.ceil(seat.outUntil - now))}`
-		elseif ended or phase == "" then
-			words = ""
 		elseif safe ~= nil then
 			words = `PROTECTED  {string.format("%.1f", safe)} s   you cannot be hit and cannot fire`
 		elseif idle ~= nil then
@@ -544,7 +544,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 
 		-- where it came from: a tick on a ring, turned towards the one who tagged you
 		local showTick = false
-		if seat.out then
+		if seat.out and not ended then
 			local from = seat.tagFrom
 			if from then
 				local dx, dz = from.x - seat.x, from.z - seat.z

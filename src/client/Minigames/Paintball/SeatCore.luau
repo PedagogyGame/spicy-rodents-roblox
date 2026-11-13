@@ -564,6 +564,13 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			if view.phase == "done" then
 				self.phase = "ended"
 				self.held = nil
+				-- the end card: people may walk about (the contract). Somebody tagged in the last seconds
+				-- has no respawn coming until the next match, so their legs come back here. (They stay
+				-- `out` for the stream's sake: the server drops an out slot's Moves until it places them.)
+				if not self.legs then
+					self.legs = true
+					ctx.controls(true)
+				end
 			end
 		end
 		if firstState then
@@ -713,7 +720,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				self.goggleAt = now
 				self.held = nil
 				endSprint(now)
-				if self.legs then
+				if self.legs and self.phase ~= "ended" then
 					self.legs = false
 					ctx.controls(false)
 				end

@@ -817,6 +817,61 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"tagged in the last seconds: the end card gives the legs back and sends no pose; the next match makes you whole",
+		function()
+			local b = Kit.playing()
+			local seat = b.seat
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 2,
+				id = 1,
+				ball = 7,
+				scores = { 0, 1 },
+				tags = 1,
+				outs = 1,
+				at = b.now() + F.respawnSecs,
+				x = 0,
+				y = 3,
+				z = 30,
+			})
+			t.deepEq(b.controls, { false })
+			Kit.run(b, 1)
+			-- the clock runs out before the respawn: no placement is coming for fifteen seconds
+			Kit.state(b, { phase = "ended", done = true })
+			t.eq(seat.phase, "ended")
+			t.deepEq(b.controls, { false, true }, "people may walk at the end card, the tagged too")
+			local sent = #Kit.moves(b)
+			b.pose.x = 5
+			Kit.run(b, 1)
+			t.eq(#Kit.moves(b), sent, "still out to the server: it would drop the poses, so none is sent")
+			t.eq(Kit.cues(b, "paintball.step"), 0, "(and nobody hears the walk)")
+			-- a tag that lands as the card comes up takes nobody's legs
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 4,
+				id = 1,
+				ball = 9,
+				scores = { 0, 2 },
+				tags = 1,
+				outs = 2,
+				at = b.now() + F.respawnSecs,
+				x = 0,
+				y = 3,
+				z = 30,
+			})
+			t.deepEq(b.controls, { false, true })
+			-- the next match: the roster, then the placement
+			Kit.watch(b, nil, { match = 2 })
+			Kit.state(b, { phase = "briefing", endsAt = b.now() + R.briefingSecs, match = 2 })
+			Kit.place(b, { x = -52, z = 0, at = b.now() + R.briefingSecs, place = 2 })
+			t.falsy(seat.out)
+			t.deepEq(b.controls, { false, true }, "the legs were back already: not given twice")
+			Kit.run(b, 0.3)
+			t.truthy(#Kit.moves(b) > sent, "the stream is back")
+		end
+	)
+
 	t.test("YOU tagged someone: the hit marker and the hit sound come on the server's word and never before", function()
 		local b = Kit.playing()
 		local seat = b.seat

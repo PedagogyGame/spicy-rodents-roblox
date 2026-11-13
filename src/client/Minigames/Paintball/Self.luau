@@ -4,7 +4,10 @@
 -- asks for, on the real Instances. It is the one place of the client that reads and writes the body
 -- the player walked in with, and it writes only what the contract says a seat may:
 --   first person   the body's "CameraZone" attribute ("lockFirstPerson" while the seat is open, cleared
---                  when it closes): Client/Possession and Camera/CameraPolicy do the locking
+--                  when it closes): Client/Possession and Camera/CameraPolicy do the locking. It is
+--                  KEPT every frame, on whatever body the player has now, so nothing that happens in a
+--                  match (a body that streams in late, another script writing the zone) lets the view
+--                  out to third person
 --   the eye        Humanoid.CameraOffset.Y, so that the camera is EXACTLY Body.eye(crouch) above the
 --                  feet (less the landing dip) whatever the body's own proportions: the stock camera
 --                  sits 1.5 above the root of an R15 body, which is 4.5 over the feet only for a root
@@ -78,6 +81,8 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 	local wasJumpPower: boolean? = nil
 	local solid: number? = nil
 	local curtainAcc = 0
+	local locked = false
+	local lockedBody: Model? = nil
 
 	local function humanoidOf(body: Model?): Humanoid?
 		return if body then body:FindFirstChildOfClass("Humanoid") else nil
@@ -235,23 +240,27 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 		applyCurtains()
 	end
 
-	function self.lock(on: boolean)
-		local body = ctx.body()
+	-- First person and the match's jump on one body; `off` puts back what was found there.
+	local function engage(body: Model?)
+		lockedBody = body
+		if body == nil then
+			return
+		end
+		body:SetAttribute("CameraZone", "lockFirstPerson")
 		local hum = humanoidOf(body)
-		if on then
-			if body then
-				body:SetAttribute("CameraZone", "lockFirstPerson")
-			end
-			baseFov = camera.FieldOfView
-			if hum then
-				wasJump, wasJumpPower = hum.JumpHeight, hum.UseJumpPower
-				hum.UseJumpPower = false
-				hum.JumpHeight = Body.JUMP_HEIGHT
-			end
-		else
-			if body then
-				body:SetAttribute("CameraZone", nil)
-			end
+		if hum then
+			wasJump, wasJumpPower = hum.JumpHeight, hum.UseJumpPower
+			hum.UseJumpPower = false
+			hum.JumpHeight = Body.JUMP_HEIGHT
+		end
+	end
+
+	local function disengage()
+		local body = lockedBody
+		lockedBody = nil
+		if body ~= nil then
+			body:SetAttribute("CameraZone", nil)
+			local hum = humanoidOf(body)
 			if hum then
 				if wasJump ~= nil then
 					hum.JumpHeight = wasJump
@@ -261,8 +270,18 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 				end
 				hum.CameraOffset = Vector3.new(0, 0, 0)
 			end
-			eyeNow = 0
-			wasJump, wasJumpPower = nil, nil
+		end
+		eyeNow = 0
+		wasJump, wasJumpPower = nil, nil
+	end
+
+	function self.lock(on: boolean)
+		locked = on
+		if on then
+			baseFov = camera.FieldOfView
+			engage(ctx.body())
+		else
+			disengage()
 			local fov = baseFov
 			if fov ~= nil then
 				camera.FieldOfView = fov
@@ -290,6 +309,18 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 			-- own default when a camera hold is let go, which is in the middle of a match here)
 			if math.abs(camera.FieldOfView - (fov + fovNow)) > 1e-4 then
 				camera.FieldOfView = fov + fovNow
+			end
+		end
+		-- THE LOCK IS KEPT, not set once: the body the seat opened on may not have been there yet, may
+		-- be another one now, or something else may have written its zone. First person for the whole
+		-- match is the brief's (section 14), so it is looked at every frame (one attribute read).
+		if locked then
+			local body = ctx.body()
+			if body ~= lockedBody then
+				disengage()
+				engage(body)
+			elseif body ~= nil and body:GetAttribute("CameraZone") ~= "lockFirstPerson" then
+				body:SetAttribute("CameraZone", "lockFirstPerson")
 			end
 		end
 		-- the building streams in piece by piece: the curtains are looked for again
