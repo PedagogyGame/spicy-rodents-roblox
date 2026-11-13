@@ -39,8 +39,8 @@
     },
     {
       "name": "lk_telescope_view",
-      "desc": "Over the telescope (local 15, 5, -41) toward the town 2,000 studs away: the second vantage.",
-      "pos": [-1009.3, 121.0, -1694.2], "look": [-739.6, 56.0, -1457.3], "fov": 55,
+      "desc": "Over the telescope's shoulder (local 13.5, 7.6, -38.5) toward the town 2,000 studs away: the second vantage.",
+      "pos": [-1012.2, 123.6, -1694.7], "look": [-739.6, 56.0, -1457.3], "fov": 55,
       "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
     },
     {
