@@ -14,8 +14,9 @@
 -- bridge, lit lintel, rounded posts and puck return; the cooling fins and side badges; the two mallets (base,
 -- light seam, crown, stem, cap) and the puck (carbon disc, lit equator, brass crown) as small Models that the
 -- game slides about; a score panel on the wall behind, two lamps in the ceiling and a mat at each end where a
--- player stands (the Ember end's is that prompt's own: GamesRoom.AirHockeyEmberEnd). His 1,500 air jets, the
--- bevels and the rail fasteners are left to the mesh (docs/reference/air_hockey/AER_AirHockey.glb).
+-- player stands (the Ember end's is that prompt's own: GamesRoom.AirHockeyEmberEnd). The recessed rail
+-- fasteners are there; his 1,500 air jets and the bevels are left to the mesh
+-- (docs/reference/air_hockey/AER_AirHockey.glb).
 -- Names the game relies on (Layout): GamesRoom.AirHockey.{Puck, MalletGlacier, MalletEmber, ScoreBoard} and the
 -- TextLabel "Score" on the board.
 -- Interface: { build(kit, parent, station, venue) }; PARTS (how many parts one table is, after a build)
@@ -57,9 +58,13 @@ end
 local function mat(kit: any, into: any, side: number)
 	local r = Layout.standing(side)
 	local led = if side == 0 then LED_CYAN else LED_CORAL
-	local inner = if side == 0 then r.x1 else r.x0
+	-- (the lit edge is the mat's own, on the side nearest the table)
+	local e0, e1 = r.x0, r.x0 + 0.12
+	if side == 0 then
+		e0, e1 = r.x1 - 0.12, r.x1
+	end
 	kit:box(into, "Mat", r.x0, r.x1, 0, 0.03, r.d0 + 0.5, r.d1 - 0.5, { 20, 24, 30 }, "Fabric", SOFT)
-	kit:box(into, "MatEdge", inner - 0.06, inner + 0.06, 0, 0.035, r.d0 + 0.5, r.d1 - 0.5, led, "Neon", SOFT)
+	kit:box(into, "MatEdge", e0, e1, 0, 0.035, r.d0 + 0.5, r.d1 - 0.5, led, "Neon", SOFT)
 end
 
 function Bake.build(kit: any, parent: any, station: any, _venue: any?)
@@ -219,6 +224,9 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 				"Neon",
 				SOFT
 			)
+		end
+		for _, y in { -1.12, -0.93, 0.93, 1.12 } do
+			disc(m, "RailFastener", x, y, 0.9965, 0.010, 0.003, BLACK, "SmoothPlastic", SOFT)
 		end
 		box(m, "UnderLight", sx * 0.739, 0, 0.645, 0.008, 2.34, 0.012, LED_CYAN, "Neon", SOFT)
 		for j = 0, 12, 2 do
