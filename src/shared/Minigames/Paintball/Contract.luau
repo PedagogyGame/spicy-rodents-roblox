@@ -102,7 +102,9 @@
 --      body's CameraZone attribute while the game is open;
 --      the camera's CFrame is written only inside a
 --      ctx.camera hold of one frame, to turn the look to
---      the yaw of a placement                               Client/Minigames/Paintball/PaintballClient
+--      the yaw of a RESPAWN (a paintball_correct never
+--      turns the look: its yaw is the last pose the server
+--      took, up to a second old)                            Client/Minigames/Paintball/PaintballClient
 --    5 in and out: the player keeps the body they walked in
 --      with; put in a spawn room on joining, in the lobby
 --      on leaving; the town goes on outside; bodies in a
@@ -476,6 +478,28 @@ Contract.TRUST = table.freeze({
 	refusalWindow = 1.0,
 	placeGrace = 1.0, -- seconds after the server moved a body in which the framework's inPlay says yes unasked
 })
+-- SETTLED AT THE JOIN: the server lane's readings of the move rules above, each one rule in
+-- Server/Minigames/Paintball/Stream (whose header gives the reasons), are the contract's:
+--   for the honest player  a body has a footprint up to a stud past a floor's edge; an unsupported pose
+--                          may be a hop above the surface last stood on; the body rule holds only the
+--                          sideways distance while falling and for 0.25 s after, and is not kept for
+--                          placeGrace after a placement; silence is counted from a placement as well as
+--                          from a Move; a click later than its own delay explains is judged at its own
+--                          stamp for where it left from, no further back than Stream.lateWindow (at most
+--                          Clock.MAG_LATE), while the sprint, the spawn rooms and the stance are held to f
+--                          as well
+--   against the liar       a fall must come down at a quarter of gravity or faster from hop height (not
+--                          walk level for fallSecs); the distance budget is EMPTY after a correction; a
+--                          correction anchored in mid-air puts the body on the walking surface under it;
+--                          the 'side' verb is honoured once in 3 s a person, and only in the briefing or
+--                          while tagged out in the first minute of live play (a later change would make a
+--                          winner of a loser on the end card)
+--   one way of two         'sprint' counts only Moves stamped at or before f; the origin's allowance for
+--                          a body in the air also applies below the eye; at 'start' a side's teamMax
+--                          counts the people going to it
+--   idleness               a respawn moves the idle pose to the placed pose and does not restart the count;
+--                          a correction moves neither; while a slot is out no Move is judged, so nothing
+--                          the body does while out counts as being there (the client's warning follows it)
 
 -- Decision 14: where the client and the server judge the same thing from different knowledge, the
 -- client's gate is the stricter by a named margin, so an honest client's shot is never refused after
@@ -502,6 +526,10 @@ Contract.MARGIN = table.freeze({
 --   balls   Projectiles.step with `atBalls` balls in flight against 16 bodies (the server lane)
 --   bots    Bots.step with `atBots` bots, their sight checks spread over ticks (the match-and-bots lane)
 --   rest    everything else in the service's step: moves, snapshots, events, the audience
+-- Each share is a MEAN per tick. In the engine (tests/engine/PaintballFlow) the whole step's mean and 95th
+-- centile are held under totalMs and its worst under a quarter of a frame. A single route search of the
+-- bots costs about 0.2 ms on the real building, so a tick where several re-route at once runs past the
+-- bots' mean: the bots' Report gives the tick 99 in 100 come under (0.10 ms with 8 bots), not pinned here.
 Contract.COST = table.freeze({
 	ballsMs = 0.4,
 	atBalls = 48,
@@ -516,7 +544,10 @@ Contract.BOT = table.freeze({
 	reactMin = 0.25, -- seconds between a bot seeing or hearing something and acting on it
 	reactMax = 0.45,
 	sightHalf = math.rad(60), -- it sees inside this angle either side of where it looks
-	hear = 6, -- studs: a ball that passes or lands this near, whoever fired it, is heard
+	-- studs: a ball of the other side's that passes or lands this near is heard (a team-mate's tells a bot
+	-- nothing it needs), and so is a team-mate tagged; the service hands them over with a ball's "ended"
+	-- before its "tag" in the same tick
+	hear = 6,
 	turn = 2 * math.pi, -- radians a second: the fastest its yaw and its pitch change
 	aimSlack = math.rad(3), -- a fire command further than this from the bot's own look is dropped
 	sightHz = 10, -- line-of-sight checks a bot a second, at most

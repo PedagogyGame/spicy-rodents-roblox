@@ -200,8 +200,9 @@
 --      IDLENESS, counted only while the phase is "live": a person whose accepted pose has stayed
 --      within 0.5 studs and 0.05 rad (yaw and pitch) of the `idle` pose and who has fired no accepted
 --      shot for Rules.idleSecs: ctx.leave(player, "idle", its words). A Move beyond those bounds, or
---      an accepted shot, restarts it; a placement by the server does not. A pose inside an
---      arena.exits room: ctx.leave(player, "exit", its words). Each arrives back as "left".
+--      an accepted shot, restarts it; a placement by the server does not (a respawn moves the `idle`
+--      pose to the placed pose, a correction moves neither; while out no Move is judged, so nothing
+--      the body does then counts). A pose inside an arena.exits room: ctx.leave(player, "exit", its words). Each arrives back as "left".
 --   3. Bots.step(bots, state, poses, heard, now, dt): `heard` is every ball born, ball ended and tag
 --      since the last tick (people's and bots'; a ball's "ended" before its "tag"). The bots move their
 --      own poses. A "fire" command is DROPPED unless Bots.judge agrees: its direction within

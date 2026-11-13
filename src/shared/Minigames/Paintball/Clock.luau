@@ -71,9 +71,12 @@
 -- client that back-dates its Moves as well, to raise `up`, has made itself a slow connection in every
 -- respect, its own body drawn that much later too; MAX_LATE and MAX_REWIND are what bound that, as
 -- they bound a truly slow one.)
--- MAX_REWIND is 0.25 s, not the S18 core's 0.4: it covers a 300 ms round trip (0.15 down + the
+-- MAX_REWIND is 0.25 s, not the S18 core's 0.4: it covers a steady 300 ms round trip (0.15 down + the
 -- interpolation), and it is how long after ducking behind a rail a body can still be tagged by what a
--- slow shooter saw.
+-- slow shooter saw. A JITTERY 300 ms link sits near the top of its band (observe rises fast and falls
+-- slowly), so there about 90 % of shots agree with the shooter's screen, not 95 %: 0.3 s would mend it,
+-- at the price of shots landing later behind cover. The owner's call at the playtest
+-- (PaintballService debug("rewind", s) tries it on one server; the client's drawing keeps this number).
 --
 -- SILENCE. A player whose move stream stops for STALE_SECS keeps the last pose it sent: it stands
 -- still, can be hit, and cannot fire. After DROP_SECS it is taken out of the match and a bot takes the
