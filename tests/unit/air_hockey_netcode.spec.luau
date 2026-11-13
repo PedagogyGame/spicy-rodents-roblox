@@ -231,12 +231,63 @@ return function(t)
 	-- Two people. What is drawn is the referee's match, not all of it at one moment: this end now, the far end as
 	-- late as the stream (Seat's header). Bounds in metres on a 2.34 m bed and in seconds; the measured figures
 	-- are printed by `lune run tools/games/air_hockey/netcode.luau`.
+	-- The lateness (one round trip and a segment: `late`) is paid on every exchange, and these cases bound how:
+	--   strike / live: at this player's own strikes the puck drawn is the present puck, and a puck coming to
+	--     them in their own half is (a hard shot on a slow line is in this half before its word is: nothing
+	--     honest can show it there in time, which is what the 80 and 150 ms rows say);
+	--   over2 / over15: the share of frames on which the drawn puck moved more than 2 / 1.5 times as far as
+	--     the table's top speed allows (it hurries across the far half to be the present puck at the mallet;
+	--     it was 2 to 3 % of frames at every latency, each over half a metre, before the catching up started
+	--     at the referee's word and aimed at the mallet instead of the centre line);
+	--   crawl: the share of the frames a moving puck's moment ran under 60 % of the clock (a shot going away
+	--     falls behind over its whole trip; it was 20, 29 and 50 % at 0, 40 and 80 ms when it was taken in the
+	--     25 cm past the centre line), and stopped: frames it ran under 5 % (9, 57 and 180 a minute before).
 	for _, case in
 		{
-			{ ms = 0, late = 0.085, shown = 0.002, live = 0.95, near = 0.01 },
-			{ ms = 40, late = 0.135, shown = 0.004, live = 0.88, near = 0.03 },
-			{ ms = 80, late = 0.235, shown = 0.012, live = 0.7, near = 0.2 },
-			{ ms = 150, late = 0.375, shown = 0.012, live = 0.45, near = 0.45 },
+			{
+				ms = 0,
+				late = 0.085,
+				shown = 0.002,
+				strike = 0.005,
+				live = 0.75,
+				over2 = 0.008,
+				over15 = 0.04,
+				crawl = 0.09,
+				stopped = 10,
+			},
+			{
+				ms = 40,
+				late = 0.135,
+				shown = 0.004,
+				strike = 0.006,
+				live = 0.5,
+				over2 = 0.035,
+				over15 = 0.08,
+				crawl = 0.17,
+				stopped = 12,
+			},
+			{
+				ms = 80,
+				late = 0.235,
+				shown = 0.012,
+				strike = 0.08,
+				live = 0.22,
+				over2 = 0.05,
+				over15 = 0.065,
+				crawl = 0.33,
+				stopped = 10,
+			},
+			{
+				ms = 150,
+				late = 0.375,
+				shown = 0.012,
+				strike = 0.22,
+				live = 0,
+				over2 = 0.045,
+				over15 = 0.05,
+				crawl = 0.38,
+				stopped = 20,
+			},
 		}
 	do
 		local frames = math.floor(case.ms / 1000 * 60 + 0.5)
@@ -278,15 +329,37 @@ return function(t)
 					)
 					t.truthy(e.puckShown.p95 < 0.005, `side {side}: and within {e.puckShown.p95} m on 95 frames in 100`)
 					t.truthy(e.puckLate.max <= e.farLate.max + 1e-9, "the puck is never drawn later than the far end")
-					-- in this player's own half it is the present puck (the rest: a strike at the far end is
-					-- not known here yet, or the puck is being brought to the present)
+					-- where this player's mallet meets it, the puck drawn is the present puck
+					local f = Line.feel(line, side)
+					t.truthy(f.strikes.n > 20, "this mallet struck the puck")
 					t.truthy(
-						e.nearLive > case.live,
-						`side {side}: in their own half the puck drawn is the present puck on {e.nearLive * 100} % of frames`
+						f.strikes.mean < case.strike,
+						`side {side}: at their own strikes the puck drawn was {f.strikes.mean} s late on average`
 					)
 					t.truthy(
-						e.near.mean < case.near,
-						`side {side}: puck in the near half off by {e.near.mean} m on average`
+						f.incomingLive >= f.incoming * case.live,
+						`side {side}: coming to them in their own half the puck drawn is the present puck on {f.incomingLive} of {f.incoming} frames`
+					)
+					-- and it neither skips nor crawls more than the lateness makes it
+					t.truthy(
+						f.over2 <= f.frames * case.over2,
+						`side {side}: the drawn puck moved over twice the table's top speed on {f.over2} of {f.frames} frames`
+					)
+					t.truthy(
+						f.over15 <= f.frames * case.over15,
+						`side {side}: the drawn puck moved over 1.5 times the table's top speed on {f.over15} of {f.frames} frames`
+					)
+					t.truthy(
+						f.maxStep <= Seat.FAST * Sim.MAX_SPEED / 60 + 1e-6,
+						`side {side}: the drawn puck went {f.maxStep} m in one frame`
+					)
+					t.truthy(
+						f.crawl <= f.moving * case.crawl,
+						`side {side}: a moving puck was drawn under 60 % of its speed on {f.crawl} of {f.moving} frames`
+					)
+					t.truthy(
+						f.stopped <= case.stopped,
+						`side {side}: a moving puck was drawn stock still on {f.stopped} frames`
 					)
 					local perSecond = line.sent[side] / math.min(line.time, line.ref.n / 240 + 0.5)
 					-- (fifteen segments a second, and one more for each press of the serve button: it goes at once)
@@ -298,7 +371,7 @@ return function(t)
 	end
 
 	t.test(
-		"two people: the moment the puck is drawn at never runs backward, slows to no less than SLOW, and a sound is heard when its contact is seen",
+		"two people: the moment the puck is drawn at never runs backward or faster than FAST, and a sound is heard when its contact is seen",
 		function()
 			local line = Line.new({
 				humans = { [0] = true, [1] = true },
@@ -318,7 +391,8 @@ return function(t)
 						local step = seat.puckAt - last
 						t.truthy(step >= -1e-9, "the puck's moment went back")
 						t.truthy(seat.farAt - lastFar >= -1e-9, "the far mallet's moment went back")
-						if step > 0 then
+						-- (a puck put on its spot for a serve is drawn there at once: that is no hurry)
+						if step > 0 and seat.pred.countdown <= 0 then
 							slowest, fastest = math.min(slowest, step / 4), math.max(fastest, step / 4)
 						end
 					end
@@ -335,7 +409,8 @@ return function(t)
 				end
 			end
 			t.truthy(fastest <= Seat.FAST + 1e-6, `quickened to {fastest} of its speed at most`)
-			t.truthy(fastest > 2, "a puck coming back was brought to the present")
+			t.truthy(fastest > 1.5, "a puck coming back was brought to the present")
+			t.truthy(slowest < 0.9, "and one going away fell behind")
 			t.truthy(contacts > 40, "a rally")
 			t.truthy(heard >= contacts * 0.9 and heard <= contacts + 2, `{heard} contacts heard of {contacts} decided`)
 		end

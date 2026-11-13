@@ -15,7 +15,13 @@
 --   same), puckShown / farShown (the puck and the far mallet against the referee's for the moment each was
 --   drawn at), puckLate / farLate (how far behind the clock that moment was, seconds), and nearLive (the share
 --   of the frames with the puck in this player's own half on which it was drawn where it was, to 5 mm);
---   smooth(line, side);
+--   smooth(line, side); feel(line, side) -> what the drawn puck did frame by frame between two people: frames,
+--   over15 / over2 (frames, not counting a puck put back on its spot, on which the drawn puck moved more than
+--   1.5 / 2 times as far as the table's top speed allows), maxStep (metres in one frame), moving (frames the
+--   puck drawn was really moving over 1.5 m/s), crawl (of those, the frames its moment ran at under 60 % of the
+--   clock), stopped (under 5 %), longestCrawl (seconds), incoming / incomingLive (frames the present puck was in
+--   this player's half and coming to them, and those of them on which it was drawn where it was, to 5 mm),
+--   strikes (how late the drawn puck was, seconds, at each strike by this player's mallet: { n, mean, p95, max });
 --   opts = { humans = { [0] = bool, [1] = bool }, lag = { [0] = frames, [1] = frames } (each way), hands =
 --   { [side] = hand }, difficulty?, fps? (60), watchers? (how many, each `watchLag` frames away), lose? (fn(side,
 --   from, to, nth) -> true: that log message is lost on the way up) }; line.stall[side] = frames (that side's
@@ -102,6 +108,8 @@ function Line.new(opts: { [string]: any }): any
 		truth = {}, -- tick -> { px, py, p0x, p0y, p1x, p1y }
 		truthRep = Replica.new(),
 		samples = { [0] = {}, [1] = {} },
+		strikes = { [0] = {}, [1] = {} }, -- how late the drawn puck was (seconds) at each strike by that mallet
+		hitsSeen = { [0] = 0, [1] = 0 },
 		sent = { [0] = 0, [1] = 0 },
 		upAt = { [0] = 0, [1] = 0 },
 		downAt = { [0] = 0, [1] = 0 },
@@ -241,6 +249,12 @@ function Line.frame(line: any, dtIn: number?)
 			line.upAt[side] = math.max(line.upAt[side], line.frames + line.lag[side] + (line.stall[side] or 0))
 			table.insert(line.up, { at = line.upAt[side], side = side, from = from, to = to, strings = strings })
 		end)
+		if seat.ready and seat.pred.hitSerial ~= line.hitsSeen[side] then
+			line.hitsSeen[side] = seat.pred.hitSerial
+			if seat.mode == "2" and seat.pred.hitWhat == Sim.HIT_MALLET + side then
+				table.insert(line.strikes[side], (seat.tick - seat.puckAt) / 240)
+			end
+		end
 		if seat.ready then
 			local px, py, ax, ay, bx, by = Seat.view(seat)
 			table.insert(line.samples[side], { nowTick, px, py, ax, ay, bx, by, seat.resims, seat.puckAt, seat.farAt })
@@ -407,6 +421,88 @@ function Line.smooth(line: any, side: number): { [string]: number }
 			out.malletOver += 1
 		end
 		out.malletMax = math.max(out.malletMax, vm)
+	end
+	return out
+end
+
+-- What the drawn puck did on `side`'s screen, frame by frame, between two people (see the header). A puck that
+-- hurries or dawdles is counted here; where it is against the referee's is errors().
+function Line.feel(line: any, side: number): { [string]: any }
+	local s = line.samples[side]
+	local mine = if side ~= 0 then 1 else -1
+	local played = math.min(#s, math.floor(line.ref.n / 240 * line.fps))
+	local out = {
+		frames = 0,
+		over15 = 0,
+		over2 = 0,
+		maxStep = 0,
+		moving = 0,
+		crawl = 0,
+		stopped = 0,
+		longestCrawl = 0,
+		incoming = 0,
+		incomingLive = 0,
+		strikes = summary(table.clone(line.strikes[side])),
+	}
+	local run = 0
+	local function onSpot(x: number, y: number): boolean
+		return math.abs(x) < 1e-6 and math.abs(math.abs(y) - 0.3) < 1e-6
+	end
+	for i = 2, played do
+		local a, b = s[i - 1], s[i]
+		local ticks = b[1] - a[1]
+		local step = math.sqrt((b[2] - a[2]) ^ 2 + (b[3] - a[3]) ^ 2)
+		local waiting = onSpot(b[2], b[3])
+		out.frames += 1
+		if not (waiting and step > 0.05) then
+			local allowed = Sim.MAX_SPEED * ticks / 240
+			if step > allowed * 1.5 then
+				out.over15 += 1
+			end
+			if step > allowed * 2 then
+				out.over2 += 1
+			end
+			out.maxStep = math.max(out.maxStep, step)
+		end
+		-- how fast the referee's puck was really going at the moment drawn, and how fast that moment ran
+		local at = math.floor(b[9])
+		local t0, t1 = line.truth[at], line.truth[at + 1]
+		local speed = 0
+		if t0 and t1 then
+			speed = math.sqrt((t1[1] - t0[1]) ^ 2 + (t1[2] - t0[2]) ^ 2) * 240
+			if speed > 20 then
+				speed = 0 -- (put back on its spot)
+			end
+		end
+		local rate = (b[9] - a[9]) / ticks
+		if not waiting and speed > 1.5 then
+			out.moving += 1
+			if rate < 0.6 then
+				out.crawl += 1
+				run += 1
+				out.longestCrawl = math.max(out.longestCrawl, run / line.fps)
+				if rate < 0.05 then
+					out.stopped += 1
+				end
+			else
+				run = 0
+			end
+		else
+			run = 0
+		end
+		-- the present puck, coming to this player in their own half: is it the one drawn?
+		local n0 = math.floor(b[1])
+		local p0, p1 = line.truth[n0], line.truth[n0 + 1]
+		if p0 and p1 and not waiting then
+			local f = b[1] - n0
+			local tx, ty = p0[1] + (p1[1] - p0[1]) * f, p0[2] + (p1[2] - p0[2]) * f
+			if ty * mine > 0 and (p1[2] - p0[2]) * mine * 240 > 0.3 then
+				out.incoming += 1
+				if math.sqrt((b[2] - tx) ^ 2 + (b[3] - ty) ^ 2) < 0.005 then
+					out.incomingLive += 1
+				end
+			end
+		end
 	end
 	return out
 end

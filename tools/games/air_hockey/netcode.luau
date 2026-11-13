@@ -64,7 +64,7 @@ for _, ms in { 0, 40, 80, 150 } do
 		local sm = Line.smooth(line, side)
 		print(
 			string.format(
-				"      drawn puck faster than the table allows on %d of %d frames (fastest %.1f m/s), half a metre or more in one frame on %d (%d goals put it back on its spot; the rest are a puck quickened to the present); far mallet faster than a hand on %d (fastest %.1f m/s)",
+				"      drawn puck faster than the table allows on %d of %d frames (fastest %.1f m/s), half a metre or more in one frame on %d (%d goals put it back on its spot; the rest are a puck hurried to the present); far mallet faster than a hand on %d (fastest %.1f m/s)",
 				sm.puckOver,
 				sm.frames,
 				sm.puckMax,
@@ -72,6 +72,23 @@ for _, ms in { 0, 40, 80, 150 } do
 				#line.goals,
 				sm.malletOver,
 				sm.malletMax
+			)
+		)
+		local f = Line.feel(line, side)
+		print(
+			string.format(
+				"      the puck's moment: more than 1.5 times the table's top speed on %d frames, more than twice on %d (furthest in one frame %.2f m); under 60 %% of the clock on %.1f %% of the frames it was moving (longest %.0f ms), stopped on %d; coming to this player in their half it is the present puck on %.1f %% of frames; at this mallet's %d strikes it was %.0f ms late on average (95th %.0f, worst %.0f)",
+				f.over15,
+				f.over2,
+				f.maxStep,
+				f.crawl / math.max(f.moving, 1) * 100,
+				f.longestCrawl * 1000,
+				f.stopped,
+				f.incomingLive / math.max(f.incoming, 1) * 100,
+				f.strikes.n,
+				f.strikes.mean * 1000,
+				f.strikes.p95 * 1000,
+				f.strikes.max * 1000
 			)
 		)
 		local e = Line.errors(line, side)

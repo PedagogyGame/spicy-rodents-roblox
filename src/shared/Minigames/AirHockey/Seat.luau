@@ -22,21 +22,27 @@
 --       - the far mallet: the referee's, as late as the stream is (`late`, a slow envelope of the gap between
 --         the clock and the newest tick decided: one round trip and a segment). It is the other player's real
 --         hand, smooth, a moment ago: never a guess;
---       - the puck: as late as it MUST be and no later. Where the far mallet could have touched it since the
---         referee last saw that mallet, the puck has to be drawn late enough for the referee's word to be
---         here: as late as the far mallet where the two touch (a strike at the far end is seen: the puck
---         comes off the mallet that struck it), less and less with distance from that mallet (a mallet is no
---         faster than 3.5 m/s), not at all beyond its reach (need()). Everywhere else it is drawn now: all of
---         this player's half, and a far half the other mallet is nowhere near. So the moment drawn has to
---         fall behind the clock while a shot travels to the far mallet and catch up as the puck comes back,
---         and BOTH ARE SPREAD OVER THE WHOLE TRIP, never taken at one place: every frame the puck's path is
---         looked along (what is believed of it, and LOOK ticks beyond the present) for the place that will
---         ask the most lateness for the time left to reach it, and the puck is drawn at the one steady rate
---         that just gets there (a shot sent away is drawn a little slower from the mallet that struck it, all
---         the way: at 60 to 85 % of its speed on a good line, and it never crawls and never stops). Coming
---         back it is drawn quicker, by no more than RATE_MAX and never quicker than DRAWN_MAX metres a
---         second, from the moment the referee's word of the strike is here, because the time left to meet it
---         is what matters most; the last of the catch-up is eased (LAND). No part of a shot is skipped.
+--       - the puck: as late as it MUST be and no later, and THE PRESENT PUCK WHERE THIS MALLET CAN MEET IT.
+--         Where the far mallet could have touched it since the referee last saw that mallet, the puck has to
+--         be drawn late enough for the referee's word to be here: as late as the far mallet where the two
+--         touch, less and less with distance from that mallet (a mallet is no faster than 3.5 m/s), not at
+--         all beyond its reach (need()). Everywhere else it may be drawn now. So the moment drawn has to fall
+--         behind the clock while a shot travels to the far mallet and catch up as the puck comes back:
+--           GOING AWAY the falling behind is spread over the whole trip, never taken at one place: every frame
+--           the puck's path is looked along (what is believed of it, and LOOK ticks beyond the present) for
+--           the place that will ask the most lateness for the time left to reach it, and the puck is drawn at
+--           the one steady rate that just gets there. A shot is drawn a little slower from the mallet that
+--           struck it, all the way (about three quarters of its speed on a good line); it never stops.
+--           COMING BACK the catching up starts the moment the referee's word of the strike is here, wherever
+--           the puck is then drawn, and is over by the time the puck is MEET in front of this player's mallet
+--           (or at the centre line, if the mallet is further forward than that): from there on what is drawn
+--           is the present puck, so a strike lands where it is seen to land. Where there is time it is gentle
+--           (no faster than RATE_MAX, never drawn quicker than DRAWN_MAX, the last of it eased over LAND);
+--           where there is not (a hard shot on a slow line is in this half before its word is) it is as fast
+--           as it takes, FAST at the most. The lateness is one round trip and a segment whatever is done with
+--           it: it can be shown as a puck that arrives late at the mallet, or as a puck that hurries across
+--           the far half, and the second is chosen because the first makes a player miss what they see.
+--         No part of a shot is skipped: the drawn puck passes through every place the real one did.
 --       - and never a guess: the puck is drawn no further on than the prediction is CERTAIN, which is as far
 --         as the far mallet, wherever its hand went, cannot have touched the puck (certain()). Up to there
 --         the prediction is the referee's match to be, because everything else in it is this player's own
@@ -58,8 +64,8 @@
 --   the same for each tick the referee decided); view(seat) -> (puck x, y, mallet0 x, y, mallet1 x, y) as drawn now;
 --   heard(seat, fn) (fn(what, speed) for each contact the drawn puck has just passed: Sim.HIT_*, m/s);
 --   relax(seat, dt); Seat.pred / .tick / .replica / .resims / .ready; Seat.puckAt / .farAt (the ticks the puck
---   and the far mallet are drawn at) / .late / .held (frames the puck was kept from running on by the edge of
---   what is certain); EASE; LEAD; RATE_MAX; DRAWN_MAX; DRAWN_STRUCK; LAND; LAND_RATE; LOOK; PAD; BRAKE
+--   and the far mallet are drawn at) / .late / .held (frames the puck was slowed into the edge of what is
+--   certain); EASE; LEAD; RATE_MAX; DRAWN_MAX; MEET; FAST; LAND; LAND_RATE; LOOK; PAD; BRAKE
 
 local Replica = require("./Replica")
 local Sim = require("./Sim")
@@ -70,11 +76,12 @@ local Seat = {}
 Seat.EASE = 0.07 -- seconds: the time constant a correction of the drawn puck is eased out over
 Seat.SNAP = 0.6 -- metres: a correction larger than this is not eased (the puck was served, or scored)
 Seat.LEAD = 480 -- ticks the prediction may run ahead of the referee's last word (2 s: then it waits)
-Seat.RATE_MAX = 2 -- against a person: the moment the puck is drawn at runs no faster than this against the clock...
+Seat.RATE_MAX = 2 -- against a person, where there is time: the moment the puck is drawn at runs no faster than this...
 Seat.DRAWN_MAX = 1.45 * Sim.MAX_SPEED -- ...and never so fast that the puck is drawn quicker than this (m/s)
-Seat.DRAWN_STRUCK = 1.9 * Sim.MAX_SPEED -- (or than this, once this player's own mallet has struck a puck drawn late)
-Seat.LAND = 8 -- ticks: the last of a catch-up is taken gently (the rate falls over about this much lateness...
-Seat.LAND_RATE = 0.3 -- ...to no less than this above the clock's, until the puck drawn is the present puck)
+Seat.MEET = 0.15 -- metres in front of this player's mallet: from there on the puck drawn is the present puck...
+Seat.FAST = 4 -- ...whatever rate it takes to be that in time, up to this much against the clock
+Seat.LAND = 4 -- ticks: the last of a gentle catch-up is eased (the rate falls over about this much lateness...
+Seat.LAND_RATE = 0.5 -- ...to no less than this above the clock's, until the puck drawn is the present puck)
 Seat.LOOK = 96 -- ticks beyond the present the puck's path is looked along for where it will have to be late
 Seat.PAD = 2 -- ticks of lateness asked for beyond what is strictly needed
 Seat.MARGIN = 2 -- ticks the far end is drawn behind the newest the stream has brought at its latest
@@ -489,7 +496,7 @@ local function moments(seat: Seat, now: number, confirmed: number)
 	end
 	-- The puck (see the header). How late it must be drawn at each place of its path ahead, and the one steady
 	-- rate that gets it late enough for the most demanding of them in the time left; where none asks for
-	-- more than it has, it catches up.
+	-- more than it has, or it is on its way to this player's mallet, it catches up.
 	local s = seat.pred
 	local r = seat.replica.sim
 	local late = seat.late
@@ -509,7 +516,7 @@ local function moments(seat: Seat, now: number, confirmed: number)
 	local slope = -math.huge
 	local waiting = false
 	local struck = false -- this player's own mallet has struck the puck between the moment drawn and now
-	local mine = Sim.HIT_MALLET + seat.side
+	local myHit = Sim.HIT_MALLET + seat.side
 	local hits = d[((first - 1) % CAP) * DRAWN + 5]
 	for tick = first, seat.tick do
 		local slot = tick % CAP
@@ -524,15 +531,21 @@ local function moments(seat: Seat, now: number, confirmed: number)
 		end
 		if d[base + 5] ~= hits then
 			hits = d[base + 5]
-			struck = struck or d[base + 6] == mine
+			struck = struck or d[base + 6] == myHit
 		end
-		local ask = (need(seat, d[base + 1], d[base + 2], mx, my, late) - behind) / math.max(tick - at, 1)
-		if ask > slope then
-			slope = ask
+		-- (a place that asks for nothing asks nothing of the rate either)
+		local wanted = need(seat, d[base + 1], d[base + 2], mx, my, late)
+		if wanted > 0 then
+			local ask = (wanted - behind) / math.max(tick - at, 1)
+			if ask > slope then
+				slope = ask
+			end
 		end
 	end
-	-- ...and along the way it is going, beyond the present (a straight run off the side rails; an end turns it)
-	if s.countdown <= 0 and s.winner < 0 then
+	-- ...and along the way it is going, beyond the present (a straight run off the side rails; an end turns it).
+	-- Only a puck going away is looked ahead for: one coming to this player is wanted as it is, now.
+	local farward = if seat.side == 0 then s.vy > 0 else s.vy < 0
+	if s.countdown <= 0 and s.winner < 0 and farward then
 		local px, py, vx, vy = s.px, s.py, s.vx * Sim.STEP, s.vy * Sim.STEP
 		local endY = Sim.HALF_LENGTH - Sim.PUCK_RADIUS
 		for k = 4, Seat.LOOK, 4 do
@@ -543,9 +556,12 @@ local function moments(seat: Seat, now: number, confirmed: number)
 				y = -2 * endY - y
 			end
 			local x = Sim.fold(px + vx * k, Sim.HALF_WIDTH - Sim.PUCK_RADIUS)
-			local ask = (need(seat, x, y, mx, my, late) - behind) / math.max(seat.tick + k - at, 1)
-			if ask > slope then
-				slope = ask
+			local wanted = need(seat, x, y, mx, my, late)
+			if wanted > 0 then
+				local ask = (wanted - behind) / math.max(seat.tick + k - at, 1)
+				if ask > slope then
+					slope = ask
+				end
 			end
 		end
 	end
@@ -553,41 +569,56 @@ local function moments(seat: Seat, now: number, confirmed: number)
 	-- is drawn, where the stream is later than `late` has it)
 	local sure = certain(seat, confirmed)
 	local cap = math.max(if sure >= seat.tick then now else sure, farWant)
+	-- how soon the puck must be the present puck: before this player's mallet can meet it (see the header)
+	local mine = if seat.side == 0 then -1 else 1
+	local own = (if seat.side == 0 then s.p0y else s.p1y) * mine
+	local into = s.py * mine -- how far into this player's half the present puck is (metres; negative: the far half)
+	local line = math.max(own - Seat.MEET, 0)
+	local coming = s.vy * mine * Sim.STEP -- metres a tick toward this player's end
+	local due = math.huge -- ticks until the present puck is where it must be drawn as it is
+	if s.countdown > 0 or s.winner >= 0 or sure < seat.tick then
+		-- (nothing is due while the puck waits, or while where it is now is only a guess)
+		due = math.huge
+	elseif struck or (into >= line and coming > 0) then
+		due = 0
+	elseif coming > 0 then
+		due = (line - into) / coming
+	end
 	local rate: number
 	if waiting then
 		-- (a puck waiting for its serve is drawn now wherever it lies: this player's own serve is seen at once)
 		at = math.min(now, cap)
 		rate = 1
-	elseif slope > 0 then
+	elseif slope > 0 and due == math.huge then
 		rate = 1 / (1 + slope)
 	else
-		-- nothing ahead asks for more lateness than it has: it catches up, as fast as it may be drawn, gently
-		-- at the last, and no faster than keeps it late enough at every place ahead
-		-- (what this player's own mallet has already struck is brought to the present soonest: the strike is
-		-- seen where the mallet is)
-		local most = if struck then Seat.DRAWN_STRUCK else Seat.DRAWN_MAX
+		-- Nothing ahead asks for more lateness than it has (or the puck is on its way to this player's mallet,
+		-- which comes first): it catches up. Gently where there is time: no faster than RATE_MAX, never drawn
+		-- quicker than DRAWN_MAX, the last of it eased. As fast as it takes where there is not: at the one
+		-- steady rate that makes it the present puck by the time this mallet can meet it (FAST at the most).
 		rate = 1 + math.min(Seat.RATE_MAX - 1, math.max(behind / Seat.LAND, Seat.LAND_RATE))
-		if struck then
-			rate = 1 + Seat.RATE_MAX
-		end
 		local slot = math.floor(at) % CAP
-		local next = (math.floor(at) + 1) % CAP
-		if seat.drawnTick[slot + 1] == math.floor(at) and seat.drawnTick[next + 1] == math.floor(at) + 1 then
-			local dx = d[next * DRAWN + 1] - d[slot * DRAWN + 1]
-			local dy = d[next * DRAWN + 2] - d[slot * DRAWN + 2]
+		local after = (math.floor(at) + 1) % CAP
+		if seat.drawnTick[slot + 1] == math.floor(at) and seat.drawnTick[after + 1] == math.floor(at) + 1 then
+			local dx = d[after * DRAWN + 1] - d[slot * DRAWN + 1]
+			local dy = d[after * DRAWN + 2] - d[slot * DRAWN + 2]
 			local speed = math.sqrt(dx * dx + dy * dy) / Sim.STEP
-			if speed * rate > most then
-				rate = math.max(1, most / speed)
+			if speed * rate > Seat.DRAWN_MAX then
+				rate = math.max(1, Seat.DRAWN_MAX / speed)
 			end
 		end
-		if slope > -1 then
+		if due < math.huge then
+			rate = math.max(rate, math.min(1 + behind / math.max(due, 0.5 * dt), Seat.FAST))
+		end
+		-- (and no faster than keeps it late enough at every place between the moment drawn and now)
+		if slope > -1 and due == math.huge then
 			rate = math.min(rate, 1 / (1 + slope))
 		end
 	end
 	local next = at + rate * dt
 	-- the edge of what is certain: slowed into it, never run into it (and never past it)
 	local room = cap - at
-	if rate * dt > room then
+	if cap < now and rate * dt > room then
 		seat.held += 1
 		next = at + math.max(math.min(room, room * dt / Seat.BRAKE), 0)
 	end
