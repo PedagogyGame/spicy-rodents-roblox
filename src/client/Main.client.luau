@@ -37,6 +37,7 @@ local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
 local CameraRig = require("./Camera/CameraRig")
+local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
 local Telescope = require("./Rides/Telescope")
 
@@ -151,6 +152,12 @@ end)
 local okSL, errSL = pcall(SkyLiftView.start)
 if not okSL then
 	warn(`Client: SkyLiftView failed: {errSL}`)
+end
+-- the town from far off (the Lookout, the cabins, the drone): far houses with roofs and lit windows, lamp dots
+-- and tree crowns where the real lots have streamed out
+local okFar, errFar = pcall(FarTown.start)
+if not okFar then
+	warn(`Client: FarTown failed: {errFar}`)
 end
 -- the wait for a booked cabin, counted down on the HUD (the usual HUD back once seated or given up)
 pcall(SkyLiftView.watchWait, function(title: string?, hint: string?)

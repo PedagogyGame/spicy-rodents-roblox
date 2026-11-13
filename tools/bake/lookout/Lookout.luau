@@ -17,7 +17,8 @@
 --     `counter`, lane 4's prompt), a fireside corner at the back, the kitchen behind the counter (closed).
 --     The door to the lift hall is in the wall X = -20 at D 15..23 (HALL_DOOR).
 --   * Terrace X -24..50 (east of the cabins' sweep, which reaches X -27.5 at deck height), D -47..-25, on posts
---     over the slope, glass rail with its cap at 3.3 (below a seated eye at 4.5), four tables (terrace_1..4) with
+--     over the slope, glass rail (the town-facing run frameless under a thin steel top at 2.8, the sides with an oak
+--     cap at 3.3, both below a seated eye at 4.5), four tables (terrace_1..4) with
 --     parasols, the free telescope (anchor `telescope`), a bench by the west rail to watch the cabins.
 --   * Terrace steps (entrance terrace_steps, X 11..19 at D -47): straight down the slope to the trail head at
 --     D -47 - STEPS.run; they stand on the trail's path (BATCH2 §2.2: pads and paths excepted from the site).
@@ -45,7 +46,9 @@ end
 
 Lookout.HALL = { x0 = -50, x1 = -20, open0 = -47, open1 = -23, roof = 18, beamY = 15.6 }
 Lookout.HALL_DOOR = { x = -20, d0 = 15, d1 = 23, height = 8.5 }
-Lookout.TERRACE = { x0 = -24, x1 = 49.7, d0 = -46.7, d1 = -25, railTop = 3.3 }
+-- railTop: the side runs' oak cap; frontTop: the town-facing run, frameless glass under a thin steel top, low
+-- enough to stay under the town from a seat (review: the oak cap at 3.3 lay on the town band from the tables)
+Lookout.TERRACE = { x0 = -24, x1 = 49.7, d0 = -46.7, d1 = -25, railTop = 3.3, frontTop = 2.8 }
 -- run (how far beyond D -47 the flight and its landing reach) and footY (the landing's top) are filled in by build
 Lookout.STEPS = { x0 = 11, x1 = 19, rise = 0.75, tread = 1.0, run = 0, footY = 0 }
 Lookout.SKIRT_BOTTOM = -9.4 -- local y: ground.min - 2 = 106.6
@@ -964,8 +967,17 @@ end
 
 ---------------------------------------------------------------------------------------------------------------
 -- The terrace: deck on posts, glass rail, tables with parasols, the telescope, lanterns, the bench, the steps
-local function railRun(kit: Kit, parent: any, axis: string, fixed: number, a0: number, a1: number, top: number)
-	local n = math.max(1, math.ceil((a1 - a0) / 5.5))
+local function railRun(
+	kit: Kit,
+	parent: any,
+	axis: string,
+	fixed: number,
+	a0: number,
+	a1: number,
+	top: number,
+	slim: boolean?
+)
+	local n = math.max(1, math.ceil((a1 - a0) / (if slim then 8 else 5.5)))
 	local step = (a1 - a0) / n
 	local function box(name: string, u0: number, u1: number, y0: number, y1: number, t: number, c, mat: string, o: any?)
 		if axis == "X" then
@@ -973,24 +985,30 @@ local function railRun(kit: Kit, parent: any, axis: string, fixed: number, a0: n
 		end
 		return kit:box(parent, name, fixed - t, fixed + t, y0, y1, u0, u1, c, mat, o)
 	end
+	local post = if slim then 0.08 else 0.15
+	local capH = if slim then 0.1 else 0.2
 	for i = 0, n do
 		local u = a0 + i * step
-		box("RailPost", u - 0.15, u + 0.15, 0, top - 0.2, 0.15, C.steel, "Metal")
+		box("RailPost", u - post, u + post, 0, top - capH, post, C.steel, "Metal")
 		if i < n then
 			box(
 				"RailGlass",
-				u + 0.18,
-				u + step - 0.18,
+				u + post + 0.03,
+				u + step - post - 0.03,
 				0.3,
-				top - 0.35,
+				top - capH - 0.05,
 				0.06,
 				C.glass,
 				"Glass",
-				{ transparency = 0.72, reflectance = 0.06 }
+				{ transparency = if slim then 0.8 else 0.72, reflectance = 0.06 }
 			)
 		end
 	end
-	box("RailCap", a0 - 0.2, a1 + 0.2, top - 0.2, top, 0.25, C.oak, "Wood")
+	if slim then
+		box("RailTop", a0 - 0.1, a1 + 0.1, top - capH, top, 0.06, C.steel, "Metal")
+	else
+		box("RailCap", a0 - 0.2, a1 + 0.2, top - capH, top, 0.25, C.oak, "Wood")
+	end
 end
 
 local function telescope(kit: Kit, parent: any, X: number, D: number)
@@ -1049,8 +1067,8 @@ local function terrace(kit: Kit, root: any, venue: any, sky: { SkyItem })
 	end
 	-- the glass rail, broken at the steps
 	local S = Lookout.STEPS
-	railRun(kit, m, "X", T.d0 + 0.3, T.x0 + 0.3, S.x0, T.railTop)
-	railRun(kit, m, "X", T.d0 + 0.3, S.x1, T.x1 - 0.3, T.railTop)
+	railRun(kit, m, "X", T.d0 + 0.3, T.x0 + 0.3, S.x0, T.frontTop, true)
+	railRun(kit, m, "X", T.d0 + 0.3, S.x1, T.x1 - 0.3, T.frontTop, true)
 	railRun(kit, m, "D", T.x0 + 0.3, T.d0 + 0.3, T.d1, T.railTop)
 	railRun(kit, m, "D", T.x1 - 0.3, T.d0 + 0.3, T.d1, T.railTop)
 	-- tables with parasols (anchors terrace_1..4) and a candle jar each (lit at night)
@@ -1098,11 +1116,9 @@ local function terrace(kit: Kit, root: any, venue: any, sky: { SkyItem })
 	-- the free telescope (anchor `telescope`) looking over the town
 	local ta = anchorAt.telescope or { 15, 0, -44 }
 	telescope(kit, m, ta[1], ta[3])
-	-- lanterns on the rail posts, planters at the corners, a bench by the west rail to watch the cabins
-	for _, x in { -12.9, 0.9, 27, 41.3 } do
-		lantern(kit, m, x, T.d0 + 0.3, T.railTop + 0.5)
-	end
-	for _, d in { -40.6, -31.9 } do
+	-- lanterns on the side rails' posts (none on the town-facing run: they sat on the town band from a seat),
+	-- planters at the corners, a bench by the west rail to watch the cabins
+	for _, d in { -42.2, -35.6, -29 } do
 		lantern(kit, m, T.x1 - 0.3, d, T.railTop + 0.5)
 		lantern(kit, m, T.x0 + 0.3, d, T.railTop + 0.5)
 	end

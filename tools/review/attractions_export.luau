@@ -15,6 +15,8 @@
 --               stand on the line at lift time SKYLIFT_T (env, default 40 s), doors as Shared/Rides/SkyLift has
 --               them then. The fine terrain grid is grown (same step, same values where it was) to take in the
 --               bake's extent, so the hill under the lift is drawn at the town's resolution.
+--   fartown     the town from far off as the client draws it (addFarTown below): groups fartown, fartown_day,
+--               fartown_night, fartown_trees
 -- Usage: require("./attractions_export")(scene) from export.luau (a no-op with a note when nothing is baked);
 --   require("./attractions_export")(scene, path) adds that one file.
 local fs = require("@lune/fs")
@@ -292,6 +294,112 @@ local function addFile(scene: any, file: string)
 	)
 end
 
+-- The town from far off as a client draws it (Client/Render/FarTown from Shared/World/FarTown): the Skyline's
+-- massing boxes of build/Town.rbxm planned into far houses, the TreeArt crowns and the lamp heads. Groups:
+-- "fartown" (bodies, roofs, caps), "fartown_day" (dark window bands), "fartown_night" (the bands, the lit ones as
+-- Neon in their warm colour, and a 3-stud glow on every lamp head: the game's fixed-size dot), "fartown_trees".
+-- A view from the hill that leaves out "town" and takes these shows what streaming leaves on the screen there.
+local function addFarTown(scene: any)
+	if not fs.isFile("build/Town.rbxm") then
+		return
+	end
+	local FarTown = require("../../src/shared/World/FarTown")
+	local Lots = require("../../generated/Lots") :: any
+	local TreeArt = require("../../generated/TreeArt") :: any
+	local town = roblox.deserializeModel(fs.readFile("build/Town.rbxm"))[1]
+	local skyline = town:FindFirstChild("Skyline", true)
+	if skyline == nil then
+		print("fartown: no Skyline in build/Town.rbxm")
+		return
+	end
+	local byId = {}
+	for _, lot in Lots do
+		if type(lot.id) == "string" then
+			byId[lot.id] = lot
+		end
+	end
+	local boxes, heads = {}, {}
+	for _, d in skyline:GetChildren() do
+		if d:IsA("BasePart") then
+			local lotId = d:GetAttribute("Lot")
+			local p, s = d.CFrame.Position, d.Size
+			if type(lotId) == "string" then
+				table.insert(boxes, {
+					lot = lotId,
+					cx = p.X,
+					cy = p.Y,
+					cz = p.Z,
+					sx = s.X,
+					sy = s.Y,
+					sz = s.Z,
+					color = rgb(d.Color),
+				})
+			elseif string.sub(d.Name, 1, 5) == "Head_" then
+				table.insert(heads, p)
+			end
+		end
+	end
+	local n = 0
+	local function put(group: string, name: string, shape: string, cf: any, size: { number }, c: { number }, m: string)
+		table.insert(scene.parts, {
+			g = group,
+			p = `FarTown.{name}`,
+			s = shape,
+			size = size,
+			pos = v3(cf.Position),
+			rot = rotOf(cf),
+			c = c,
+			t = 0,
+			m = m,
+		})
+		n += 1
+	end
+	for _, pc in FarTown.plan(boxes, byId) do
+		local cf = roblox.CFrame.new(pc.x, pc.y, pc.z) * roblox.CFrame.Angles(0, pc.yaw, 0)
+		local size = { r4(pc.sx), r4(pc.sy), r4(pc.sz) }
+		if pc.band then
+			put("fartown_day", pc.lot, "Block", cf, size, FarTown.GLASS :: any, "SmoothPlastic")
+			if pc.lit then
+				put("fartown_night", pc.lot, "Block", cf, size, pc.litColor or pc.color, "Neon")
+			else
+				put("fartown_night", pc.lot, "Block", cf, size, FarTown.GLASS :: any, "SmoothPlastic")
+			end
+		else
+			put("fartown", pc.lot, if pc.shape == "Wedge" then "Wedge" else "Block", cf, size, pc.color, pc.material)
+		end
+	end
+	for _, c in FarTown.crowns(TreeArt) do
+		local th = c.trunkTop - c.trunkBase
+		local tcf = roblox.CFrame.new(c.x, c.trunkBase + th / 2, c.z) * roblox.CFrame.Angles(0, 0, math.pi / 2)
+		put(
+			"fartown_trees",
+			"Trunk",
+			"Cylinder",
+			tcf,
+			{ r4(th), r4(c.trunkD), r4(c.trunkD) },
+			FarTown.BARK :: any,
+			"Wood"
+		)
+		for _, b in c.balls do
+			local d = r4(b[4])
+			put("fartown_trees", "Crown", "Ball", roblox.CFrame.new(b[1], b[2], b[3]), { d, d, d }, b[5], "Grass")
+		end
+	end
+	for _, h in heads do
+		put(
+			"fartown_night",
+			"LampGlow",
+			"Ball",
+			roblox.CFrame.new(h.X, h.Y, h.Z),
+			{ 3, 3, 3 },
+			{ 255, 214, 150 },
+			"Neon"
+		)
+	end
+	scene.stats.groups.fartown = n
+	print(`fartown: {#boxes} buildings, {#heads} lamp heads, {n} far-view parts`)
+end
+
 return function(scene: any, path: string?)
 	if path then
 		if fs.isFile(path) then
@@ -325,4 +433,5 @@ return function(scene: any, path: string?)
 	for _, f in files do
 		addFile(scene, f)
 	end
+	addFarTown(scene)
 end

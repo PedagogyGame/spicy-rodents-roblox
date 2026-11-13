@@ -319,15 +319,48 @@ return function(t)
 			end
 		end
 		local seatedEye = SkyLift.SEAT_HEIGHT + SkyLift.EYE_ABOVE_SEAT
-		local caps = 0
+		local caps, tops = 0, 0
+		-- (review) from a seat at a terrace table the town lies 3 to 6.3 degrees below the horizon (the nearest
+		-- houses 950 st off, about 105 st down); the town-facing run must stay under that from every seat
+		local seats = {}
+		for _, a in venue.anchors do
+			if string.match(a.id, "^terrace_%d$") then
+				table.insert(seats, { a.at[1], a.at[3] + 1.6 }) -- the chair on the building's side of the table
+			end
+		end
+		t.eq(#seats, 4)
 		for _, d in terrace:GetDescendants() do
-			if d:IsA("BasePart") and (d.Name == "RailCap" or d.Name == "RailGlass" or d.Name == "RailPost") then
+			if
+				d:IsA("BasePart")
+				and (d.Name == "RailCap" or d.Name == "RailTop" or d.Name == "RailGlass" or d.Name == "RailPost")
+			then
 				local top = d.CFrame.Position.Y + d.Size.Y / 2 - venue.floorY
 				t.truthy(top <= T.railTop + 1e-6 and top < seatedEye - 1, `{d.Name} top {top}`)
 				caps += if d.Name == "RailCap" then 1 else 0
+				tops += if d.Name == "RailTop" then 1 else 0
+				local p = d.CFrame.Position
+				local X, _, D = AlleyLayout.toLocal(place, p.X, p.Y, p.Z)
+				-- (the side runs' corner posts stand at the ends, off to either side of every seat's view)
+				local corner = math.abs(X - (T.x0 + 0.3)) < 0.5 or math.abs(X - (T.x1 - 0.3)) < 0.5
+				if D < T.d0 + 1 and not corner then
+					t.truthy(top <= T.frontTop + 1e-4, `the town-facing {d.Name} top {top}`)
+					for _, seat in seats do
+						local dist = math.abs(seat[2] - D)
+						local below = math.deg(math.atan2(seatedEye - top, dist))
+						t.truthy(below > 6.5, `{d.Name} at X {X} is {below} degrees under a seated eye`)
+					end
+				end
 			end
 		end
-		t.eq(caps, 4) -- the front either side of the steps, the west and east ends
+		t.eq(caps, 2) -- the west and east ends
+		t.eq(tops, 2) -- the town-facing run either side of the steps
+		for _, d in terrace:GetDescendants() do
+			if d.Name == "LanternGlass" then
+				local p = d.CFrame.Position
+				local _, _, D = AlleyLayout.toLocal(place, p.X, p.Y, p.Z)
+				t.truthy(D > T.d0 + 1, "no lantern on the town-facing run")
+			end
+		end
 		local scope = terrace:FindFirstChild("Telescope")
 		t.truthy(scope ~= nil)
 		local head = scope:FindFirstChild("Head")
