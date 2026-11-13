@@ -62,7 +62,7 @@
 -- and over a rail from a crouch.)
 -- Interface: new(player, now, placeFrom?) -> Person; restart(person, now); placed(person, x, y, z, yaw,
 --   now, feel, stand); judge(person, rec, now, arena, feel, otherRoom?, bx?, by?, bz?) -> (verdict,
---   why?); refused(person, now) -> correct; poseAt(person, t) -> (x, y, z, yaw, pitch, bits,
+--   why?, rule?); RULES; refused(person, now) -> correct; poseAt(person, t) -> (x, y, z, yaw, pitch, bits,
 --   newestT); ease(person, tick, feel) -> crouch; crouchAt(person, t) -> crouch; sprinting(person, f)
 --   -> boolean; originOk(person, f, ox, oy, oz, sweep, feel, now?) -> boolean; clickOk(person, f, ox,
 --   oy, oz, arena, feel) -> why?; lateWindow(person) -> seconds; lateClickOk(person, click, f, ox, oy,
@@ -135,6 +135,11 @@ local T = Contract.TRUST
 local BIT = Wire.BIT
 local IDLE_STUDS = 0.5
 local IDLE_RAD = 0.05
+-- PROVISIONAL (FOOT, FALL_FLOOR, LANDING and the body rule's placeGrace bypass): tuned against scripted bodies
+-- on the fake engine, whose replicated body is wherever the client's Move says. None has met a Roblox Humanoid
+-- on the stair cores, off an atrium edge or replicated with physics interpolation. tools/cloud/tasks/
+-- paintball_flow.luau prints the refusals by rule (Stats.movesRefusedBy) for a real body when server checks
+-- return; until a real body walks every stair and edge with no correction these numbers are a first guess.
 local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands on
 local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
 local LANDING = 0.25 -- seconds after a fall in which the replicated body may still be coming down
@@ -142,6 +147,11 @@ local CROUCH_KEPT = 14 -- snapshot ticks of crouch kept (0.7 s: past Clock.MAG_L
 local LOST_FLOOR = 0.2 -- seconds: the least a lost reliable packet waits before it is sent again
 
 local Stream = {}
+
+-- The rules a Move can be refused by (judge's third result; Stats.movesRefusedBy counts by them): outside the
+-- volume or inside a box, inside the other team's spawn room, the height rule, a wall between it and the
+-- anchor, the distance budget, the replicated body.
+Stream.RULES = table.freeze({ "inside", "room", "height", "walls", "speed", "body" })
 
 local function fullBudget(crouch: number, feel: Feel): number
 	return Body.speed(crouch, false, feel) * T.speedTolerance * T.speedWindow
@@ -278,8 +288,9 @@ end
 
 -- Judge one Move record (Wire.Move, already decoded and checked finite by Shared/Net). `otherRoom` is
 -- the other team's spawn room; (bx, by, bz) the replicated body's real feet point in the arena frame,
--- when the engine knows it. Returns the verdict and, for a refusal, the Contract.WHY code. An accepted
--- Move is taken in here; a refused one is to be handed to refused() by the caller.
+-- when the engine knows it. Returns the verdict and, for a refusal, the Contract.WHY code and the rule
+-- that refused it (Stream.RULES: what Stats counts refusals by, so a real body's refusals say which rule
+-- they meet). An accepted Move is taken in here; a refused one is to be handed to refused() by the caller.
 function Stream.judge(
 	person: Person,
 	rec: { [string]: number },
@@ -290,23 +301,23 @@ function Stream.judge(
 	bx: number?,
 	by: number?,
 	bz: number?
-): (Verdict, string?)
+): (Verdict, string?, string?)
 	-- b. not placed yet, tagged out, or sampled before the client knew of its last placement
 	if person.place == 0 or person.out or rec.place ~= person.place then
-		return "dropped", nil
+		return "dropped", nil, nil
 	end
 	-- (its side has just been changed and its new placement has not come yet)
 	local owed = person.owedSince
 	if owed ~= nil then
 		if now - owed <= T.placeGrace then
-			return "dropped", nil
+			return "dropped", nil, nil
 		end
 		person.owedSince = nil
 	end
 	-- c. the stream is unreliable and unordered: only a newer stamp, and a believable one
 	local t = rec.t
 	if t <= person.lastT or t > now + T.clockSlack or t < now - T.moveAge then
-		return "dropped", nil
+		return "dropped", nil, nil
 	end
 	-- d. it is judged: the upstream delay and the silence are measured from here
 	Clock.observe(person.up, t, now)
@@ -316,23 +327,23 @@ function Stream.judge(
 	local half = ArenaModule.HALF
 	-- e. inside
 	if x < -half or x > half or z < -half or z > half or y < -T.groundSlack or y > ArenaModule.HEIGHT then
-		return "refused", "wall"
+		return "refused", "wall", "inside"
 	end
 	local chest = y + ArenaModule.CHEST
 	if arena.sweep(x, chest, z, x, chest + 0.01, z) ~= nil then
-		return "refused", "wall"
+		return "refused", "wall", "inside"
 	end
 	if otherRoom ~= nil and ArenaModule.inRoom(otherRoom, x, y + 0.1, z) then
-		return "refused", "wall"
+		return "refused", "wall", "room"
 	end
 	-- height
 	local ok, falling, surface = supportedOrFalling(person, arena, t, x, y, z)
 	if not ok then
-		return "refused", "wall"
+		return "refused", "wall", "height"
 	end
 	-- walls
 	if not ArenaModule.clearPath(arena.sweep, a.x, a.z, x, z, math.max(a.y, y) + ArenaModule.CHEST) then
-		return "refused", "wall"
+		return "refused", "wall", "walls"
 	end
 	-- distance: the budget fills from the Moves' own t, never from arrival
 	local gap = math.min(t - person.lastT, T.moveGap)
@@ -341,7 +352,7 @@ function Stream.judge(
 	local dx, dz = x - a.x, z - a.z
 	local step = math.sqrt(dx * dx + dz * dz)
 	if step > budget then
-		return "refused", "speed"
+		return "refused", "speed", "speed"
 	end
 	-- the body (sideways always; up and down only for a body that stands; not while the server's own
 	-- placement may not have reached the body it reads: see the header)
@@ -351,7 +362,7 @@ function Stream.judge(
 			ey = 0
 		end
 		if ex * ex + ey * ey + ez * ez > T.bodySlack * T.bodySlack then
-			return "refused", "wall"
+			return "refused", "wall", "body"
 		end
 	end
 	-- f. accepted
@@ -385,7 +396,7 @@ function Stream.judge(
 		person.idleX, person.idleY, person.idleZ = x, y, z
 		person.idleYaw, person.idlePitch = rec.yaw, rec.pitch
 	end
-	return "accepted", nil
+	return "accepted", nil, nil
 end
 
 -- A Move was refused. True when it is the TRUST.refusalsBeforeCorrect-th inside TRUST.refusalWindow:

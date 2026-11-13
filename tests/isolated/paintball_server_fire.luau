@@ -396,6 +396,7 @@ return function(t)
 				t.truthy(low.ok, tostring(low.why))
 				t.near(ada.lastFire.oy, Body.CROUCH_EYE, 1e-9)
 				t.eq(stats.shotsRefused, 5)
+				t.deepEq(stats.shotsRefusedBy, { origin = 5 }, "counted by why")
 				t.eq(stats.balls, 2, "none of the refused clicks became a ball")
 			end, { arena = Kit.hall({ wall = true }) })
 		end

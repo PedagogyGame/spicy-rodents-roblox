@@ -145,11 +145,15 @@ return function(t)
 		"inside: out of the volume, in a box, in the other team's spawn room and through a wall are each refused as a wall; the third refusal in a second is a correction",
 		function()
 			local person, send, arena = placed(-35, 0, -30)
-			t.deepEq({ send({ t = 100.05, x = -35, z = -35 }) }, { "refused", "wall" }, "inside a pillar")
+			t.deepEq({ send({ t = 100.05, x = -35, z = -35 }) }, { "refused", "wall", "inside" }, "inside a pillar")
 			t.falsy(Stream.refused(person, 100.05))
-			t.deepEq({ send({ t = 100.1, x = -35, y = -3 }) }, { "refused", "wall" }, "under the floor")
+			t.deepEq({ send({ t = 100.1, x = -35, y = -3 }) }, { "refused", "wall", "inside" }, "under the floor")
 			t.falsy(Stream.refused(person, 100.1))
-			t.deepEq({ send({ t = 100.15, x = -35, z = -39 }) }, { "refused", "wall" }, "the far side of the pillar")
+			t.deepEq(
+				{ send({ t = 100.15, x = -35, z = -39 }) },
+				{ "refused", "wall", "walls" },
+				"the far side of the pillar"
+			)
 			t.truthy(Stream.refused(person, 100.15), "three inside TRUST.refusalWindow")
 			t.eq(person.anchor.z, -30, "a refused pose never becomes the anchor")
 			t.eq(#person.moves, 0)
@@ -163,7 +167,7 @@ return function(t)
 			local cx, cz = (room.minX + room.maxX) / 2, (room.minZ + room.maxZ) / 2
 			local near, step = placed(cx, room.minY, room.maxZ + 3)
 			t.eq(near.place, 1)
-			t.deepEq({ step({ t = 100.05, x = cx, y = room.minY, z = cz }) }, { "refused", "wall" })
+			t.deepEq({ step({ t = 100.05, x = cx, y = room.minY, z = cz }) }, { "refused", "wall", "room" })
 			-- the body: a pose far from where the replicated body really is
 			local feel = Contract.feel()
 			local apart = Stream.new("bea", 98)
@@ -171,7 +175,7 @@ return function(t)
 			local rec = { t = 100.05, x = 20, y = 0, z = 0.5, yaw = 0, pitch = 0, bits = 0, place = 1 }
 			t.deepEq(
 				{ Stream.judge(apart, rec, 100.05, arena, feel, nil, 20, 0, T.bodySlack + 1) },
-				{ "refused", "wall" }
+				{ "refused", "wall", "body" }
 			)
 			t.eq((Stream.judge(apart, rec, 100.05, arena, feel, nil, 20, 0, T.bodySlack - 1)), "accepted")
 			-- ... but only sideways while it falls: a body dropping off the landing (x 10.5..15, z -15..-7, a
@@ -204,7 +208,7 @@ return function(t)
 			local eager = Stream.new("eve", 98)
 			Stream.placed(eager, 20, 0, 0, 0, 100, feel, true)
 			local far = { t = 100.05, x = 20, y = 0, z = 30, yaw = 0, pitch = 0, bits = 0, place = eager.place }
-			t.deepEq({ Stream.judge(eager, far, 100.05, arena, feel, nil, 20, 0, 30) }, { "refused", "speed" })
+			t.deepEq({ Stream.judge(eager, far, 100.05, arena, feel, nil, 20, 0, 30) }, { "refused", "speed", "speed" })
 		end
 	)
 
@@ -222,7 +226,7 @@ return function(t)
 			t.eq(person.fallSince, nil)
 			t.deepEq(
 				{ send({ t = 100.25, y = FLOOR + Body.JUMP_HEIGHT + T.jumpSlack + 0.5 }) },
-				{ "refused", "wall" },
+				{ "refused", "wall", "height" },
 				"higher than a jump"
 			)
 			-- the landing at the head of the ground floor's north flight (x 10.5..15, z -15..-7, level with the
@@ -327,7 +331,7 @@ return function(t)
 			t.eq(hopper.standY, FLOOR, "a body in the air keeps the surface it took off from")
 			t.deepEq(
 				{ hop({ t = 100.1, z = -5.5, y = FLOOR + Body.JUMP_HEIGHT + T.jumpSlack + 0.2, bits = Wire.BIT.air }) },
-				{ "refused", "wall" },
+				{ "refused", "wall", "height" },
 				"higher than a hop, with nothing under it"
 			)
 			t.eq((hop({ t = 100.15, z = -5.2, y = FLOOR + 1.9, bits = Wire.BIT.air })), "accepted", "the top of a hop")
@@ -335,7 +339,7 @@ return function(t)
 			t.eq((hop({ t = 100.35, z = -4.5, y = FLOOR - 4, bits = Wire.BIT.air })), "accepted")
 			t.deepEq(
 				{ hop({ t = 100.45, z = -4.2, y = FLOOR + 1.9, bits = Wire.BIT.air }) },
-				{ "refused", "wall" },
+				{ "refused", "wall", "height" },
 				"and no second hop in the air"
 			)
 			-- A FALL MUST FALL: a pose that stays level on air is refused after a third of a second (the contract
@@ -370,7 +374,10 @@ return function(t)
 			t.eq((drop({ t = 100.05, z = -5, bits = Wire.BIT.air })), "accepted")
 			long.fallSince = 100.05 - T.fallSecs
 			long.standY = FLOOR + 400
-			t.deepEq({ drop({ t = 100.1, z = -5, y = FLOOR - 0.5, bits = Wire.BIT.air }) }, { "refused", "wall" })
+			t.deepEq(
+				{ drop({ t = 100.1, z = -5, y = FLOOR - 0.5, bits = Wire.BIT.air }) },
+				{ "refused", "wall", "height" }
+			)
 		end
 	)
 

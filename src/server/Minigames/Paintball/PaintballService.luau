@@ -120,8 +120,10 @@
 --                         Clock.stamp(now, now, t, lastM, up)); Rules.reload(state, seat, m); false
 --                         with words when it does nothing.
 --                         "side" {}: honoured when the phase is "briefing" or the sender is tagged
---                         out, the sender has no ball in flight, and the other team has a bot (take
---                         the lowest seat): Rules.assign the sender to the other team and that bot to
+--                         out, the sender has no ball in flight, and the other team has a bot (the
+--                         lane's choice of which: one that is itself out, else one in its own spawn
+--                         room, else one in the fight; the lowest seat of the first kind there is):
+--                         Rules.assign the sender to the other team and that bot to
 --                         the sender's, Bots.sync, ctx.dirty(), "paintball_watch" to the audience.
 --                         Otherwise false with Contract.textFor("side").
 --   step(dt)              THE LOOP, below. Runs before the Session's own step.
@@ -408,6 +410,10 @@ export type Stats = {
 	movesRefused: number,
 	movesDropped: number, -- a stale placement number, an out slot, a bad or old t
 	shotsRefused: number,
+	-- the refusals by what refused them: a Move by the rule of Stream.RULES, a click by its Contract.WHY code
+	-- (what a real server's check prints, so an honest body's refusals say which rule they meet)
+	movesRefusedBy: { [string]: number },
+	shotsRefusedBy: { [string]: number },
 	corrections: number,
 	rewindsClamped: number, -- shots whose claimed rewind was outside the server's bounds
 	stepMs: number, -- the last step's cost; its three shares (Contract.COST):
@@ -494,6 +500,8 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		movesRefused = 0,
 		movesDropped = 0,
 		shotsRefused = 0,
+		movesRefusedBy = {},
+		shotsRefusedBy = {},
 		corrections = 0,
 		rewindsClamped = 0,
 		stepMs = 0,
@@ -1251,6 +1259,29 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		return false, nil, nil
 	end
 
+	-- Which bot of `team` trades places on the "side" verb. The trade puts that bot back in a spawn room with
+	-- a full magazine and its protection, so the one that pays least for it: a bot that is itself tagged out,
+	-- then one standing in its own spawn room, then (only then) one in the fight; the lowest seat of the
+	-- first kind there is. nil: that team has no bot.
+	local function sideBot(state: State, team: number): number?
+		local best: number?, rank = nil, math.huge
+		for id, theirs in state.slots do
+			if theirs.on and theirs.team == team and botSkill[id] ~= nil then
+				local pose = service.poses[id]
+				local r = if theirs.out
+					then 1
+					elseif
+						pose ~= nil and ArenaModule.inRoom(arena.spawnRooms[team], pose.x, pose.y + 0.1, pose.z)
+					then 2
+					else 3
+				if r < rank or (r == rank and best ~= nil and id < best) then
+					best, rank = id, r
+				end
+			end
+		end
+		return best
+	end
+
 	function service.input(_self: Service, player: any, seat: number, verb: string, args: { any }): (boolean?, string?)
 		local state = matchState()
 		local person = people[player]
@@ -1286,19 +1317,18 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 				and (state.phase == "briefing" or person.out)
 			then
 				local mine, other = slot.team, 3 - slot.team
-				for id, theirs in state.slots do
-					if theirs.on and theirs.team == other and botSkill[id] ~= nil then
-						sideAt[player] = now
-						Rules.assign(state, seat, other)
-						Rules.assign(state, id, mine)
-						if not person.out then
-							-- (the room it stands in is the other side's from this moment: the Moves it sends
-							-- from there, until the match has placed it in its own, are dropped, not refused)
-							person.owedSince = now
-						end
-						refreshRoster(now)
-						return true, nil
+				local id = sideBot(state, other)
+				if id ~= nil then
+					sideAt[player] = now
+					Rules.assign(state, seat, other)
+					Rules.assign(state, id, mine)
+					if not person.out then
+						-- (the room it stands in is the other side's from this moment: the Moves it sends
+						-- from there, until the match has placed it in its own, are dropped, not refused)
+						person.owedSince = now
 					end
+					refreshRoster(now)
+					return true, nil
 				end
 			end
 			return false, Contract.textFor("side")
@@ -1645,7 +1675,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 				bx, by, bz = ArenaModule.toLocal(place, wx, wy, wz)
 			end
 		end
-		local verdict, why =
+		local verdict, why, rule =
 			Stream.judge(person, rec, now, arena, state.feel, arena.spawnRooms[3 - slot.team], bx, by, bz)
 		if verdict == "accepted" then
 			stats.movesAccepted += 1
@@ -1653,6 +1683,8 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			stats.movesDropped += 1
 		else
 			stats.movesRefused += 1
+			local key = rule or "?"
+			stats.movesRefusedBy[key] = (stats.movesRefusedBy[key] or 0) + 1
 			if Stream.refused(person, now) then
 				correct(person, state, why, now)
 			end
@@ -1723,6 +1755,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		end
 		if why ~= nil then
 			stats.shotsRefused += 1
+			stats.shotsRefusedBy[why] = (stats.shotsRefusedBy[why] or 0) + 1
 		end
 		local rounds, reloadAt = magazineOf(state, id, now)
 		ctx.send(player, {
