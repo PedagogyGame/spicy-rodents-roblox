@@ -63,8 +63,9 @@
 -- mouths; Enclosure.zone(route) is the enclosure id (the camera's zone); Enclosure.hidden(route, t) is inside
 -- and `hidden`. Nut storage (later) will be stations at a t on an enclosed route.
 -- Interface: KIND, BODY, C, validate(rec, kind), validateSet(records), fromRecord(rec), mouthAt(spec, length, t),
---   endMouth(spec, length, atStart), endLink(spec, atStart), inside(route, t), hidden(route, t), zone(route),
---   headroom(spec, t), allows(from, fromT, to, toT), names(mouth, routeId)
+--   mouthNear(spec, length, t, slack), endMouth(spec, length, atStart), endLink(spec, atStart), inside(route, t),
+--   hidden(route, t), zone(route), headroom(spec, t), allows(from, fromT, to, toT, slackFrom?, slackTo?),
+--   names(mouth, routeId), linked(a, b)
 
 local Curve = require("./Curve")
 
@@ -371,11 +372,17 @@ end
 
 -- mouthAt(spec, length, t): the mouth whose window holds t (the nearest when two would), or nil.
 function Enclosure.mouthAt(spec: Spec, length: number, t: number): Mouth?
+	return Enclosure.mouthNear(spec, length, t, 0)
+end
+
+-- mouthNear(spec, length, t, slack): as mouthAt with every window widened by `slack` studs (the validator: how far
+-- the body could have run along the route between two packets).
+function Enclosure.mouthNear(spec: Spec, length: number, t: number, slack: number): Mouth?
 	local best: Mouth? = nil
 	local bestGap = math.huge
 	for _, m in spec.mouths do
 		local gap = math.abs(t - m.t) * length
-		if gap <= m.reach + 1e-9 and gap < bestGap then
+		if gap <= m.reach + slack + 1e-9 and gap < bestGap then
 			best, bestGap = m, gap
 		end
 	end
@@ -434,7 +441,15 @@ end
 -- an end-of-route switch)? Rule 5. Two open routes: always (the old rules decide). Within one enclosure:
 -- always. Otherwise each enclosed side must be at one of its mouths, and the pair must be named by a mouth's
 -- links on either side.
-function Enclosure.allows(from: RouteLike, fromT: number, to: RouteLike, toT: number): boolean
+-- `slackFrom` / `slackTo` (studs, default 0) widen the mouth windows on either side (the validator's reach).
+function Enclosure.allows(
+	from: RouteLike,
+	fromT: number,
+	to: RouteLike,
+	toT: number,
+	slackFrom: number?,
+	slackTo: number?
+): boolean
 	local a, b = from.enclosure, to.enclosure
 	if a == nil and b == nil then
 		return true
@@ -442,12 +457,31 @@ function Enclosure.allows(from: RouteLike, fromT: number, to: RouteLike, toT: nu
 	if a ~= nil and b ~= nil and a.id == b.id then
 		return true
 	end
-	local ma = if a then Enclosure.mouthAt(a, from.length, fromT) else nil
-	local mb = if b then Enclosure.mouthAt(b, to.length, toT) else nil
+	local ma = if a then Enclosure.mouthNear(a, from.length, fromT, slackFrom or 0) else nil
+	local mb = if b then Enclosure.mouthNear(b, to.length, toT, slackTo or 0) else nil
 	if (a ~= nil and ma == nil) or (b ~= nil and mb == nil) then
 		return false
 	end
 	return (ma ~= nil and Enclosure.names(ma, to.id)) or (mb ~= nil and Enclosure.names(mb, from.id))
+end
+
+-- linked(a, b): does either route's enclosure record name the other (an authored end link or a mouth's link)?
+-- The validator prices such a transfer as a declared junction, whatever the gap the Graph sees.
+function Enclosure.linked(a: RouteLike, b: RouteLike): boolean
+	for _, pair in { { a, b }, { b, a } } do
+		local spec, other = pair[1].enclosure, pair[2]
+		if spec then
+			if (spec.atStart and spec.atStart.route == other.id) or (spec.atEnd and spec.atEnd.route == other.id) then
+				return true
+			end
+			for _, m in spec.mouths do
+				if Enclosure.names(m, other.id) then
+					return true
+				end
+			end
+		end
+	end
+	return false
 end
 
 return Enclosure

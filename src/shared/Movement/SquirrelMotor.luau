@@ -16,6 +16,12 @@
 --           tangent; W/S only
 --   AIR     ballistic while attackWindow > 0; landing clears committedAirborne
 -- Edge actions per frame: leap (Space), drop (Q), grab (E), choose (A/D), pounce (left click).
+-- ENCLOSED RUNS (Routes/Enclosure; kind "tunnel": the ball return, a hollow tree's inside): got into only at a mouth,
+-- moving into it, eased like a transfer; inside and away from a mouth Space, Q and a click do nothing (hint
+-- "noRoom") and E, A/D and the end-of-route switch never pass the wall; at a mouth they launch along its `out`; an
+-- end mouth lets the body out as it says (step out on the ground: "emerge"; stop with the head out: "lip"; run on
+-- along its link), an end without one takes its authored end link, else stops ("railEnd" once per arrival). Every
+-- one of these applies only to routes that carry `enclosure`: every other route behaves exactly as before.
 -- The motor is pure: `step(state, input, dt, world)` mutates and returns `state` plus a list of
 -- events, uses only the Routes modules and the `world.groundAt`/`world.blocked` callbacks, and runs
 -- under Lune. `serialize`/`deserialize` give the flat snapshot that possession hands over
@@ -25,6 +31,7 @@
 -- are collected in `SquirrelMotor.params` so the Tunables tree can take them over in W1.
 
 local Curve = require("../Routes/Curve")
+local Enclosure = require("../Routes/Enclosure")
 local Trampoline = require("./Trampoline")
 local Motion = require("../Routes/Motion")
 local Registry = require("../Routes/Registry")
@@ -431,8 +438,16 @@ local function clearPendingFork(state: State)
 	state.pendingFork = nil
 end
 
--- enterRoute(found) (L5826-5869). Returns false when the transfer is refused.
-local function enterRoute(state: State, world: World, spec: Motion.EnterSpec, input: Input, events: { Event }): boolean
+-- enterRoute(found) (L5826-5869). Returns false when the transfer is refused. `ease` eases the body onto the rail from
+-- off the rails too (an enclosed run's mouth: Enclosure rule 1), as a rail-to-rail transfer always is.
+local function enterRoute(
+	state: State,
+	world: World,
+	spec: Motion.EnterSpec,
+	input: Input,
+	events: { Event },
+	ease: boolean?
+): boolean
 	local target = route(world, spec.routeId)
 	if not target or spec.t ~= spec.t then
 		return false
@@ -446,7 +461,7 @@ local function enterRoute(state: State, world: World, spec: Motion.EnterSpec, in
 		return false
 	end
 	local fromRouteId = state.routeId
-	if wasOnRoute and gap > C.bridgeMinGap then
+	if (wasOnRoute or ease == true) and gap > C.bridgeMinGap then
 		state.bridge = {
 			fx = state.x,
 			fy = state.y,
@@ -535,12 +550,62 @@ local function onTrunk(state: State, world: World): boolean
 	return r ~= nil and r.kind == "trunk"
 end
 
+-- On an enclosed run a launch (Space, Q, a click) is allowed only at a mouth, and goes out along it (Enclosure
+-- rules 2 and 3). Returns whether the launch may happen and, at a mouth, the heading out. Off an enclosed run:
+-- (true, nil), and the caller does exactly what it always did.
+local function launchGate(state: State, world: World, events: { Event }): (boolean, number?)
+	local r = route(world, state.routeId)
+	local spec = if r then r.enclosure else nil
+	if not r or not spec then
+		return true, nil
+	end
+	local m = Enclosure.mouthAt(spec, r.length, state.railT)
+	if not m then
+		push(events, "hint", nil, r.id, "noRoom")
+		return false, nil
+	end
+	local ox, _, oz = Motion.mouthOut(world, r, m)
+	if ox * ox + oz * oz < 1e-6 then
+		return true, state.yaw
+	end
+	return true, math.atan2(ox, oz)
+end
+
+-- take an enclosure's authored link (an end link or a mouth's link): the same key keeps going (dir x sign(fw)). A
+-- link that cannot be taken (no such route, or farther than a transfer reaches: a data error Motion.enclosureErrors
+-- reports) is not tried, so it never refuses once a frame.
+local function takeLink(state: State, world: World, link: Enclosure.Link, input: Input, events: { Event }): boolean
+	local target = route(world, link.route)
+	if not target then
+		return false
+	end
+	local dest = world.registry:pointAt(target, link.t)
+	if math.sqrt((dest.x - state.x) ^ 2 + (dest.y - state.y) ^ 2 + (dest.z - state.z) ^ 2) > C.enterMaxGap then
+		return false
+	end
+	local sense = if input.fw < 0 then -1 else 1
+	if not enterRoute(state, world, { routeId = link.route, t = link.t, dir = link.dir * sense }, input, events) then
+		return false
+	end
+	state.railDir = link.dir * sense
+	state.routeWasMoving = input.fw ~= 0
+	local heading = Motion.headingAlong(world, target, link.t, link.dir)
+	if heading then
+		state.yaw = heading
+	end
+	return true
+end
+
 -- Edge actions (key handler L5659-5681, leap L5922, attemptPounce L6482) --------------------------------
 
 local function doLeap(state: State, world: World, events: { Event })
 	if state.routeId or state.grounded then
-		local heading =
-			SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
+		local allowed, outHeading = launchGate(state, world, events)
+		if not allowed then
+			return
+		end
+		local heading = outHeading
+			or SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
 		-- a leap off the ground spends some of the sprint meter, so hopping is not a free sprint; a leap
 		-- off a rail is always a full one (the gaps between branches and wires are built for it)
 		local tired = false
@@ -568,6 +633,9 @@ end
 
 local function doDrop(state: State, world: World, events: { Event })
 	if state.routeId then
+		if not (launchGate(state, world, events)) then
+			return
+		end
 		local from = state.routeId
 		launchFromVisibleRoute(state, world)
 		clearPendingFork(state)
@@ -584,8 +652,12 @@ local function doPounce(state: State, world: World, input: Input, events: { Even
 	if state.cooldown > 0 then
 		return
 	end
-	local heading =
-		SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
+	local allowed, outHeading = launchGate(state, world, events)
+	if not allowed then
+		return
+	end
+	local heading = outHeading
+		or SquirrelMotor.attackHeading(onTrunk(state, world), state.trunkNormalX, state.trunkNormalZ, state.yaw)
 	local vx, vy, vz =
 		SquirrelMotor.pounceVelocity(input.cameraPitch, state.focus, state.moveSpeed, state.boostRemaining > 0, heading)
 	local from = state.routeId
@@ -658,6 +730,17 @@ end
 local function doGrab(state: State, world: World, input: Input, events: { Event })
 	local r = route(world, state.routeId)
 	if r then
+		-- at a mouth of an enclosed run that links outside (a knothole onto a bough), E takes the link
+		local enc = r.enclosure
+		if enc then
+			local m = Enclosure.mouthAt(enc, r.length, state.railT)
+			if m and #m.links > 0 then
+				if takeLink(state, world, m.links[1], input, events) then
+					push(events, "mouthLink", m.links[1].route, r.id)
+					return
+				end
+			end
+		end
 		-- takeSelectedFork() first (key handler), then attachRoute's rail branch
 		if state.pendingFork then
 			local fork = world.graph:forkOf(state.pendingFork)
@@ -692,19 +775,33 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 			push(events, "hint", nil, nil, "climbCloser")
 			return
 		end
-		local next = Motion.nearestRoute(world, state.x, state.y, state.z, C.eSearch, r.id)
+		local next = Motion.nearestRoute(
+			world,
+			state.x,
+			state.y,
+			state.z,
+			C.eSearch,
+			r.id,
+			Motion.transferFilter(world, r, state.railT)
+		)
 		if next and Motion.canTransfer(next.d, true) then
 			enterRoute(state, world, { routeId = next.routeId, t = next.t, d = next.d }, input, events)
 		else
 			push(events, "hint", nil, nil, "noTransfer")
 		end
 	else
+		-- facing into an enclosed run's mouth within its reach: in through the mouth (Enclosure rule 1)
+		local mouth = Motion.mouthEntry(world, state.x, state.y, state.z, math.sin(state.yaw), math.cos(state.yaw))
+		if mouth and enterRoute(state, world, mouth, input, events, true) then
+			push(events, "enter", mouth.routeId)
+			return
+		end
 		local found: Motion.Candidate? = nil
 		if state.grounded then
 			found = Motion.groundTrunkCandidate(world, state.x, state.y, state.z, C.groundReachE)
 		end
 		if not found then
-			found = Motion.nearestRoute(world, state.x, state.y, state.z, C.airGrab)
+			found = Motion.nearestRoute(world, state.x, state.y, state.z, C.airGrab, nil, Motion.openOnly(world))
 		end
 		if found then
 			enterRoute(state, world, { routeId = found.routeId, t = found.t, d = found.d }, input, events)
@@ -851,6 +948,27 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 
 	local oldX, oldY, oldZ = state.x, state.y, state.z
 
+	-- into an enclosed run through a mouth (Enclosure rule 1): moving into it within its reach, on the ground or in
+	-- the air; eased onto the rail. Nothing happens here in a world without enclosed runs.
+	if not rail and state.attackWindow == 0 then
+		local mvx, mvz = 0, 0
+		if state.grounded then
+			if moving and state.moveSpeed > P.autoGrabMinSpeed then
+				mvx = -math.sin(input.cameraYaw) * fw + math.cos(input.cameraYaw) * side
+				mvz = -math.cos(input.cameraYaw) * fw - math.sin(input.cameraYaw) * side
+			end
+		else
+			mvx, mvz = state.vx, state.vz
+		end
+		if mvx ~= 0 or mvz ~= 0 then
+			local mouth = Motion.mouthEntry(world, state.x, state.y, state.z, mvx, mvz)
+			if mouth and enterRoute(state, world, mouth, input, events, true) then
+				push(events, "enter", mouth.routeId)
+				rail = route(world, state.routeId)
+			end
+		end
+	end
+
 	-- walk-in auto-grab (L6630-6642)
 	if not rail and state.grounded and state.attackWindow == 0 and fw > 0 and state.moveSpeed > P.autoGrabMinSpeed then
 		local nearby = Motion.groundTrunkCandidate(world, state.x, state.y, state.z, C.walkInReach)
@@ -899,7 +1017,60 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 					end
 				end
 			end
-			if state.routeId == rs.id and (state.railT > 1 or state.railT < 0) then
+			local emergedAt: number? = nil
+			if state.routeId == rs.id and (state.railT >= 1 or state.railT <= 0) and rs.enclosure and fw ~= 0 then
+				-- the end of an enclosed run (reached, or pressed against): its mouth or its authored link says what
+				-- comes next (rules 3, 4); `arrived` only on the substep that got there
+				local atStart = state.railT <= 0
+				local arrived = if atStart then before > 0 else before < 1
+				state.railT = math.clamp(state.railT, 0, 1)
+				if fw ~= 0 then
+					local spec = rs.enclosure :: Enclosure.Spec
+					local m = Enclosure.endMouth(spec, rs.length, atStart)
+					local link = Enclosure.endLink(spec, atStart)
+					if m and m.opens == "ground" then
+						-- step out onto the ground on its feet, still running, heading out of the mouth
+						local ox, _, oz = Motion.mouthOut(world, rs, m)
+						local h = math.sqrt(ox * ox + oz * oz)
+						if h < 1e-3 then
+							ox, oz, h = math.sin(state.yaw), math.cos(state.yaw), 1
+						end
+						ox, oz = ox / h, oz / h
+						clearPendingFork(state)
+						state.routeId = nil
+						state.bridge = nil
+						state.selectedJunction = nil
+						state.routeWasMoving = false
+						state.grounded = true
+						state.committedAirborne = false
+						state.railLeap = false
+						state.airFromRoute = nil
+						state.yaw = math.atan2(ox, oz)
+						state.vx, state.vy, state.vz = ox * state.moveSpeed, 0, oz * state.moveSpeed
+						emergedAt = if atStart then 0 else 1
+						push(events, "emerge", nil, rs.id)
+					elseif m and m.opens == "link" and #m.links > 0 then
+						if takeLink(state, world, m.links[1], input, events) then
+							push(events, "autoSwitch", m.links[1].route, rs.id)
+						elseif arrived then
+							push(events, "railEnd", rs.id, nil, "link")
+						end
+					elseif m then
+						-- a ledge or a hole in the air: stop with the head out; Space, a click or Q goes out
+						if arrived then
+							push(events, "lip", rs.id, nil, m.opens)
+						end
+					elseif link then
+						if takeLink(state, world, link, input, events) then
+							push(events, "autoSwitch", link.route, rs.id)
+						elseif arrived then
+							push(events, "railEnd", rs.id, nil, "link")
+						end
+					elseif arrived then
+						push(events, "railEnd", rs.id, nil, "none")
+					end
+				end
+			elseif state.routeId == rs.id and (state.railT > 1 or state.railT < 0) then
 				local atStart = state.railT < 0
 				state.railT = math.clamp(state.railT, 0, 1)
 				if fw ~= 0 then
@@ -919,24 +1090,30 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 					end
 				end
 			end
-			local current = route(world, state.routeId) :: Registry.Route
-			if current.id ~= rs.id then
-				state.railT = math.clamp(state.railT, 0, 1)
-			end
-			if not state.bridge then
-				local p = reg:pointAt(current, state.railT)
+			if emergedAt then
+				-- out of the mouth: on the ground at the route's end, running (the ground takes over next substep)
+				local p = reg:pointAt(rs, emergedAt)
 				state.x, state.y, state.z = p.x, p.y, p.z
+			else
+				local current = route(world, state.routeId) :: Registry.Route
+				if current.id ~= rs.id then
+					state.railT = math.clamp(state.railT, 0, 1)
+				end
+				if not state.bridge then
+					local p = reg:pointAt(current, state.railT)
+					state.x, state.y, state.z = p.x, p.y, p.z
+				end
+				local tangent = reg:tangentAt(current, state.railT)
+				if
+					tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z > 0.1
+					and math.abs(tangent.x) + math.abs(tangent.z) > C.tangentYawMin
+				then
+					local sense = if fw ~= 0 then math.sign(fw) * state.railDir else state.railDir
+					local angle = math.atan2(sense * tangent.x, sense * tangent.z)
+					state.yaw = Motion.turnToward(state.yaw, angle, C.yawRate, dt)
+				end
+				state.vx, state.vy, state.vz = 0, 0, 0
 			end
-			local tangent = reg:tangentAt(current, state.railT)
-			if
-				tangent.x * tangent.x + tangent.y * tangent.y + tangent.z * tangent.z > 0.1
-				and math.abs(tangent.x) + math.abs(tangent.z) > C.tangentYawMin
-			then
-				local sense = if fw ~= 0 then math.sign(fw) * state.railDir else state.railDir
-				local angle = math.atan2(sense * tangent.x, sense * tangent.z)
-				state.yaw = Motion.turnToward(state.yaw, angle, C.yawRate, dt)
-			end
-			state.vx, state.vy, state.vz = 0, 0, 0
 		end
 	else
 		state.routeWasMoving = false
@@ -1085,7 +1262,10 @@ end
 -- motor's own constant times a tolerance plus one substep of slack; `boosted` is the SERVER's knowledge
 -- of the chili boost (the packet's boostRemaining is never trusted). Position is checked against the
 -- rail, speeds against the per-kind caps, arcs against gravity, launches against jump/pounce, rail
--- changes against the route graph and the transfer gaps, and ground moves against world.crosses.
+-- changes against the route graph and the transfer gaps, and ground moves against world.crosses. Enclosed runs
+-- (Routes/Enclosure) add one check, only where a move touches one ("enclosure"): a body gets on only within reach
+-- of a mouth that opens to the outside, gets off only at a mouth, and changes rail across the wall only where a
+-- mouth's links say (an authored link is a declared junction, whatever gap the Graph sees).
 
 export type Violation = { code: string, severity: number, detail: string }
 
@@ -1154,6 +1334,50 @@ function SquirrelMotor.envelope(
 	end
 	local groundCap = SquirrelMotor.groundCap(boosted) * E.speedTol
 	local launchXZ = SquirrelMotor.launchCapXZ(boosted) * E.launchTol
+
+	-- 0. Enclosed runs: in and out only at a mouth, across the wall only where a mouth says.
+	local prevEnc = if prevRoute then prevRoute.enclosure else nil
+	local nextEnc = if nextRoute then nextRoute.enclosure else nil
+	local authored = false
+	if prevEnc or nextEnc then
+		-- how far along a rail the body could have run between the packets
+		local function along(r: Registry.Route): number
+			local cap = SquirrelMotor.railCap(r.flags.treeTravel, boosted)
+			return cap * E.railTol * dt + cap * P.substep + E.posSlack
+		end
+		if nextRoute and nextEnc and not prevRoute then
+			local slack = along(nextRoute)
+			local vPrev = math.sqrt(prev.vx ^ 2 + prev.vy ^ 2 + prev.vz ^ 2)
+			local travel = math.max(groundCap, vPrev, launchXZ) * dt + E.posSlack
+			local ok = false
+			for _, m in nextEnc.mouths do
+				if m.opens ~= "link" and math.abs(next.railT - m.t) * nextRoute.length <= m.reach + slack then
+					local p = reg:pointAt(nextRoute, m.t)
+					local d = math.sqrt((p.x - prev.x) ^ 2 + (p.z - prev.z) ^ 2)
+					if d <= m.reach + travel and math.abs(p.y - prev.y) <= m.rise + travel then
+						ok = true
+						break
+					end
+				end
+			end
+			if not ok then
+				add(out, "enclosure", 1, `got onto enclosed route {nextRoute.id} away from its mouths`)
+			end
+		elseif prevRoute and prevEnc and not nextRoute then
+			if not Enclosure.mouthNear(prevEnc, prevRoute.length, prev.railT, along(prevRoute)) then
+				add(out, "enclosure", 1, `left enclosed route {prevRoute.id} away from its mouths (t {prev.railT})`)
+			end
+		elseif prevRoute and nextRoute and prevRoute.id ~= nextRoute.id then
+			-- an authored link, or two routes of one enclosure: a declared junction
+			authored = Enclosure.linked(prevRoute, nextRoute)
+				or (prevEnc ~= nil and nextEnc ~= nil and prevEnc.id == nextEnc.id)
+			if
+				not Enclosure.allows(prevRoute, prev.railT, nextRoute, next.railT, along(prevRoute), along(nextRoute))
+			then
+				add(out, "enclosure", 1, `crossed the wall from route {prevRoute.id} to route {nextRoute.id}`)
+			end
+		end
+	end
 	local launchUp = P.leapUp * E.launchTol
 	local pounceUp = (P.pounceUpBase + P.pounceUpPitch * math.sin(P.pouncePitchMax)) * E.launchTol
 	local pounceUpMin = (P.pounceUpBase + P.pounceUpPitch * math.sin(P.pouncePitchMin)) / E.launchTol
@@ -1288,7 +1512,7 @@ function SquirrelMotor.envelope(
 				if next.railT > E.forkEnterMaxT + nextCap * E.railTol * dt / nextRoute.length then
 					add(out, "transfer", 1, `{relation} hop landed at t {next.railT}`)
 				end
-			elseif relation == nil and not twoHop and gap > C.explicitGap + travel then
+			elseif relation == nil and not twoHop and not authored and gap > C.explicitGap + travel then
 				add(out, "transfer", 1, `unrelated routes {prevRoute.id} -> {nextRoute.id}, gap {gap} st`)
 			end
 		end
