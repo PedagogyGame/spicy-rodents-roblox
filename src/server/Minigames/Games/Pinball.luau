@@ -16,16 +16,24 @@
 --     watchers (everyone within WATCH studs of the cabinet, looked for every LOOK seconds), as "pinball". They
 --     play it on their own copies (Replay.follow) and draw about half a second behind;
 --   * resync by snapshot ("pinball_sync"): to the player whose log the replay says has drifted (a sum that is
---     not the server's, a segment past the end of a ball, a gap in the log), to everyone whenever the server
---     played by itself (the replay's epoch rose: a ball skipped by the turn clock, a player who left, a ball
---     that lapsed), and to each watcher as they walk up;
+--     not the server's, a segment past the end of a ball, a gap in the log; not more than once a SYNC_AGAIN),
+--     to everyone whenever the server played by itself (the replay's epoch rose: a ball skipped by the turn
+--     clock, the player up who left, a ball that lapsed), and to each watcher as they walk up (during the end
+--     card too: they see the game that has just ended, with its board). Each snapshot to a person is numbered
+--     (`v`) and their machine echoes the number with every segment it cuts after it: a segment cut before the
+--     snapshot reached them (still on its way) is dropped without a word, so it never calls for another one;
+--   * a player who leaves while it is not their ball changes nothing about the ball in play: the server does not
+--     play by itself and nobody is put back; every copy is told "pinball_retire" { seat, tick } and passes the
+--     seat over at the next hand-over (the player up at once, a follower when its copy reaches that tick);
 --   * an animal that lands on the cabinet (ctx.opts.animals) thumps the glass: the rules grant one thump
 --     (server verb "thump") and the player whose ball it is is told to let it into their log ("pinball_thump");
 --   * a player whose buttons have not changed for IDLE seconds (a ball left on the plunger, a cradle held for
 --     ever while others wait) is taken off: their ball is played out and their score kept (rules.gone);
 --   * the board: each machine keeps its best scores for as long as the server runs (Pinball/HighScores; only a
---     fair game, Replay.fair, takes a place), each player's best on each machine is ctx.town.best's
---     ("pinball_<variant>"), and the board is written on the cabinet (attribute "Best") for every client;
+--     fair player, Replay.fair(r, seat), takes a place), each player's best on each machine is ctx.town.best's
+--     ("pinball_<variant>"), and the board is written on the cabinet (attribute "Best") for every client; the
+--     end card hears each seat's place on the board and whether it was a personal best (state: place, best,
+--     newBest; "pinball_over" carries the same for its receiver);
 --   * an idle machine: nothing is sent to anyone while nobody is seated, except "pinball_idle" to each person
 --     who walks up near it (their client runs the attract show from the clock and the board).
 -- Nothing on the cabinet is moved here: every client near it draws the ball, the flippers and the lamps from
@@ -89,8 +97,15 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		lookAt = -math.huge,
 		animalAt = -math.huge,
 		over = nil, -- the last game's places on the board, by seat
+		bests = nil, -- the last game's personal bests, by seat: { best, new }
+		overMsg = nil, -- the last game's "pinball_over" (for a watcher who walks up during the end card)
 		syncedAt = {}, -- key -> when they were last sent a snapshot
+		syncN = {}, -- key -> the number of the last snapshot they were sent (their segments echo it)
+		owed = {}, -- key -> why: a snapshot held back by SYNC_AGAIN, sent when it may be
+		noted = {}, -- seat -> true: everyone has been told this seat retired
 		waited = 0, -- segments that had to wait for the clock (for the record)
+		stale = 0, -- segments dropped because they were cut before their sender's last snapshot (for the record)
+		syncs = 0, -- snapshots sent (for the record)
 	}
 
 	local function replay(): any
@@ -133,15 +148,29 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		if r == nil then
 			return
 		end
+		local v = (self.syncN[key] or 0) + 1
+		self.syncN[key] = v
 		self.syncedAt[key] = ctx.now()
+		self.owed[key] = nil
+		self.syncs += 1
 		ctx.send(key, {
 			kind = "pinball_sync",
 			g = self.games,
 			n = self.n,
+			v = v,
 			why = why,
 			table = tableId,
 			snap = Wire.snapshot(r),
 		})
+	end
+
+	-- a snapshot for one player, at once if SYNC_AGAIN allows, else as soon as it does
+	local function resync(key: any, why: string)
+		if ctx.now() - (self.syncedAt[key] or -math.huge) >= Game.SYNC_AGAIN then
+			sync(key, why)
+		else
+			self.owed[key] = why
+		end
 	end
 
 	local function syncAll(why: string)
@@ -173,6 +202,12 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		if r == nil or ctx.session.phase ~= "playing" then
 			return true
 		end
+		if (tonumber(args[5]) or 0) ~= (self.syncN[key] or 0) then
+			-- cut before the last snapshot reached its sender: their machine has gone back to the snapshot and
+			-- sends these ticks again (or the ball is no longer theirs). Dropped without a word.
+			self.stale += 1
+			return true
+		end
 		clock()
 		r = replay()
 		if r == nil or ctx.session.phase ~= "playing" then
@@ -199,7 +234,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 			end
 			if r.drift then
 				r.drift = false
-				sync(key, "drift")
+				resync(key, "drift")
 			end
 			-- (no ctx.dirty() here: the scorecard is redrawn by the service's own second-by-second state, the
 			-- backglass on every screen is drawn from the game itself; a ball changing hands is the Session's turn)
@@ -214,12 +249,8 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		-- carries on from the server's game. Not more than once a SYNC_AGAIN: the segments already on their way
 		-- when a snapshot went out do not follow on either, and need no second one. (A segment for a ball that
 		-- is no longer theirs needs nothing: the snapshot that moved the game on has gone to them already.)
-		if
-			why ~= "not your ball"
-			and why ~= "the game is over"
-			and ctx.now() - (self.syncedAt[key] or -math.huge) >= Game.SYNC_AGAIN
-		then
-			sync(key, if why == "out of order" then (if from > r.tick then "gap" else "behind") else tostring(why))
+		if why ~= "not your ball" and why ~= "the game is over" then
+			resync(key, if why == "out of order" then (if from > r.tick then "gap" else "behind") else tostring(why))
 		end
 		return true
 	end
@@ -276,9 +307,13 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 				if d.Magnitude <= Game.WATCH then
 					near[person.key] = true
 					if not self.watchers[person.key] then
-						if r ~= nil and ctx.session.phase == "playing" then
-							self.watchers[person.key] = true
+						local phase = ctx.session.phase
+						if r ~= nil and (phase == "playing" or phase == "done") then
+							-- the game as it stands; during the end card, the game that has just ended and its board
 							sync(person.key, "watch")
+							if phase == "done" and self.overMsg then
+								ctx.send(person.key, table.clone(self.overMsg))
+							end
 						else
 							ctx.send(person.key, { kind = "pinball_idle", table = tableId })
 						end
@@ -339,6 +374,13 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 			end
 			drain()
 			checkEpoch()
+			for key, why in self.owed do
+				if ctx.seatOf(key) == nil then
+					self.owed[key] = nil
+				elseif ctx.now() - (self.syncedAt[key] or -math.huge) >= Game.SYNC_AGAIN then
+					sync(key, why)
+				end
+			end
 			local r = replay()
 			if r and ctx.session.phase == "playing" and Replay.idleSeconds(r) > Game.IDLE then
 				local key = ctx.session.seats[r.m.up]
@@ -371,7 +413,11 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 			self.games += 1
 			self.n = 0
 			self.over = nil
+			self.bests = nil
+			self.overMsg = nil
 			table.clear(self.pending)
+			table.clear(self.owed)
+			table.clear(self.noted)
 			ctx.server("machine", { variant or tableId })
 			clock()
 			local r = replay()
@@ -379,24 +425,50 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 			syncAll("start")
 			ctx.dirty()
 		elseif e.kind == "left" or e.kind == "removed" or e.kind == "timeout" or e.kind == "skipped" then
+			local epoch = self.epoch
 			checkEpoch()
+			-- a seat that was not up has gone: the ball in play goes on untouched, and every copy is told to pass
+			-- the seat over at the next hand-over (from the server's tick on: a follower behind it waits for it)
+			local r = replay()
+			local seat = e.seat
+			if
+				r
+				and seat
+				and self.epoch == epoch
+				and not Replay.over(r)
+				and r.m.gone[seat]
+				and not self.noted[seat]
+			then
+				self.noted[seat] = true
+				local note = { kind = "pinball_retire", g = self.games, seat = seat, tick = r.tick }
+				for _, key in followers() do
+					ctx.send(key, table.clone(note))
+				end
+			end
 		elseif e.kind == "done" then
 			local s = ctx.session
 			local result = s.result
 			local r = replay()
 			if result and r then
 				local places = {}
+				local bests = {}
 				for seat = 1, #s.seats do
 					local score = (result.scores and result.scores[seat]) or 0
 					local fair = if result.fairSeats then result.fairSeats[seat] else result.fair
 					local place = HighScores.add(self.board, s.names[seat] or "?", score, fair)
 					places[seat] = place or 0
 					local key = s.seats[seat]
-					if not isComputer(key) then
-						ctx.town.best(key, `pinball_{variant or tableId}`, score, false)
+					if key ~= nil and not isComputer(key) then
+						local name = `pinball_{variant or tableId}`
+						local before = ctx.town.best(key, name)
+						local best = ctx.town.best(key, name, score, false) or score
+						bests[seat] = { best = best, new = score > 0 and (before == nil or score > before) }
+					else
+						bests[seat] = { best = score, new = false }
 					end
 				end
 				self.over = places
+				self.bests = bests
 				writeBoard()
 				local msg = {
 					kind = "pinball_over",
@@ -405,8 +477,16 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 					places = places,
 					fair = result.fair ~= false,
 				}
+				self.overMsg = msg
 				for _, key in followers() do
-					ctx.send(key, table.clone(msg))
+					local mine = table.clone(msg)
+					local seat = ctx.seatOf(key)
+					if seat and bests[seat] then
+						mine.seat = seat
+						mine.best = bests[seat].best
+						mine.newBest = bests[seat].new
+					end
+					ctx.send(key, mine)
 				end
 			end
 		elseif e.kind == "reset" then
@@ -425,10 +505,13 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 	end
 
 	function self.state(_self: any, _player: any, seat: number?): { [string]: any }?
+		local pb = self.bests and seat and self.bests[seat]
 		return {
 			machine = tableId,
 			board = if self.over then HighScores.lines(self.board) else nil,
 			place = if self.over and seat then self.over[seat] else nil,
+			best = if pb then pb.best else nil,
+			newBest = if pb then pb.new else nil,
 		}
 	end
 

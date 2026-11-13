@@ -142,14 +142,17 @@ local function handFrame(h: any)
 end
 
 -- Another person at the machine: a PlayerLike stub with a copy of the game of its own, fed what the service
--- sends it (snapshots, relayed segments) and playing its own balls live with the computer player's hands, its
--- log sent as the client sends it (InputLog.pack and the sum).
-local function person(name: string, seed: number): any
+-- sends it (snapshots, relayed segments, a seat that has gone) and playing its own balls live with the computer
+-- player's hands, its log sent as the client sends it (InputLog.pack, the sum and the snapshot's number). The
+-- stub is on a line as slow as the rig's own (w.lag frames each way, or `lag`): what the service sends it is
+-- read that many frames later, and what it sends reaches the service that many frames later, in order.
+local function person(name: string, seed: number, lag: number?): any
 	return {
 		stub = Rig.stub(name),
 		read = 0,
 		r = nil,
 		g = 0,
+		v = 0,
 		seat = nil,
 		bot = Bot.new(1, seed),
 		live = false,
@@ -158,33 +161,63 @@ local function person(name: string, seed: number): any
 		frame0 = 0,
 		sent = 0,
 		refused = {},
+		notes = {},
+		lag = lag,
+		seenAt = {}, -- event index -> the frame it was sent at
+		outbox = {}, -- { at, verb, args }
 		stopped = false, -- (stops sending: a line gone dead)
 	}
 end
 
 local function personFrame(w: Rig.World, p: any, id: string)
+	local lag = p.lag or w.lag
 	local events = p.stub.events
-	while p.read < #events do
+	for i = #p.seenAt + 1, #events do
+		p.seenAt[i] = w.frames
+	end
+	-- what was sent to it on the way in
+	while p.read < #events and w.frames - p.seenAt[p.read + 1] >= lag do
 		p.read += 1
 		local msg = events[p.read]
 		if msg.kind == "pinball_sync" then
 			p.r = Wire.restore(msg.snap)
 			p.g = msg.g
+			p.v = msg.v or p.v
 			p.live = false
 		elseif msg.kind == "pinball" and p.r and msg.g == p.g and not p.live then
 			local seg = InputLog.unpack(msg.from, msg.to, msg.packed)
 			if seg then
 				Replay.follow(p.r, msg.seat, seg)
 			end
+		elseif msg.kind == "pinball_retire" and msg.g == p.g then
+			table.insert(p.notes, msg)
 		elseif msg.kind == "state" then
 			p.seat = msg.you or p.seat
 		elseif msg.kind == "joined" then
 			p.seat = msg.seat
 		end
 	end
+	-- what it sent, on the way out
+	while p.outbox[1] and p.outbox[1].at <= w.frames do
+		local item = table.remove(p.outbox, 1)
+		local ok, why = Rig.input(w, p.stub, id, item.verb, item.args)
+		if not ok then
+			table.insert(p.refused, tostring(why))
+		end
+	end
 	local r = p.r
 	if r == nil or p.stopped then
 		return
+	end
+	-- a seat that has gone is passed over from the server's tick on (at once while this copy is ahead of it)
+	for i = #p.notes, 1, -1 do
+		local note = p.notes[i]
+		if p.live or r.tick >= note.tick then
+			if r.m.up ~= note.seat then
+				Replay.retire(r, note.seat)
+			end
+			table.remove(p.notes, i)
+		end
 	end
 	local mine = p.seat ~= nil and not Replay.over(r) and r.m.up == p.seat
 	if mine and not p.live then
@@ -202,11 +235,9 @@ local function personFrame(w: Rig.World, p: any, id: string)
 			local seg = Replay.live(r, p.rec, Bot.step(p.bot, tbl, r.m))
 			if seg then
 				local a, b, c = InputLog.pack(seg)
-				local ok, why = Rig.input(w, p.stub, id, "log", { a, b, c, Replay.sum(r) })
+				table.insert(p.outbox, { at = w.frames + lag, verb = "log", args = { a, b, c, Replay.sum(r), p.v } })
 				p.sent += 1
-				if not ok then
-					table.insert(p.refused, tostring(why))
-				end
+
 				if Replay.over(r) or r.m.up ~= p.seat then
 					p.live = false
 					break
@@ -512,16 +543,29 @@ return function(t)
 				playFor(w, 6, h)
 				local c = Controller.current
 				local syncs = Rig.count(w.got, "pinball_sync")
+				local rolled = c.rolled
 				c.cab.r.m.scores[1] += 7 -- (a copy that has come apart from the server's)
-				playFor(w, 2, h)
+				local back, last = 0, c.cab.r.tick
+				playFor(w, 3, h, function()
+					if c.live then
+						if c.cab.r.tick < last then
+							back += 1
+						end
+						last = c.cab.r.tick
+					end
+					return false
+				end)
 				t.eq(Rig.count(w.got, "pinball_sync"), syncs + 1, "one snapshot put it right")
 				t.eq(Rig.last(w.got, "pinball_sync").why, "drift")
+				t.eq(c.rolled, rolled + 1, "this player's own hands were played again on the server's game")
+				t.eq(back, 0, "and the ball never went back in time")
+				t.truthy(tableOf(w, 1).stale > 0, "the segments cut before the snapshot arrived were dropped quietly")
 				t.truthy(playFor(w, 600, h, function()
 					return sessionOf(w, 1).phase == "done"
 				end))
 				t.eq(c.cab.r.m.scores[1], tableOf(w, 1):replay().m.scores[1])
 				t.eq(Rig.count(w.got, "pinball_sync"), syncs + 1, "and no more were needed")
-			end, opts(1))
+			end, opts(1, { lag = 9 }))
 		end
 	)
 
@@ -544,15 +588,26 @@ return function(t)
 					table.insert(animals, { id = 1, kind = "squirrel", x = x, y = y, z = z })
 					playFor(w, 1.5, h)
 					t.eq(Rig.count(w.got, "pinball_thump"), 1)
-					t.truthy(Rig.has(w.toasts, "thumped the glass") or Rig.count(w.got, "event") > 0)
+					local said = Rig.last(w.got, "event", function(m: any): boolean
+						return string.find(tostring(m.text), "thumped the glass", 1, true) ~= nil
+					end)
+					t.truthy(said ~= nil, "the words were sent")
+					t.truthy(Rig.has(Rig.texts(w.gui), "thumped the glass"), Rig.screen(w))
 					table.clear(animals)
 					playFor(w, 2, h)
 					local r = tableOf(w, 1):replay()
-					t.eq(Controller.current.cab.r.m.scores[1], Controller.current.cab.r.m.scores[1])
 					t.falsy(r.m.tilted, "a thump never tilts")
+					local syncs = Rig.count(w.got, "pinball_sync")
+					-- the thump went into the log where the server granted it: the two games are one to the end
+					t.truthy(playFor(w, 900, h, function()
+						return sessionOf(w, 1).phase == "done"
+					end))
+					t.eq(Controller.current.cab.r.m.scores[1], tableOf(w, 1):replay().m.scores[1])
+					t.eq(Rig.count(w.got, "pinball_sync"), syncs, "no resync was needed")
 					t.eq(#w.broken, 0)
 				end,
 				opts(1, {
+					lag = 9,
 					service = {
 						animals = function(): { any }
 							return animals
@@ -560,6 +615,134 @@ return function(t)
 					},
 				})
 			)
+		end
+	)
+
+	t.test(
+		"at 150 ms each way: a waiting player who leaves during your ball changes nothing on your screen (no rewind, no snapshot, nothing you pressed is lost); their balls are passed over",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(1)
+				local bob = person("Bob", 21)
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				t.truthy(w.svc:join(bob.stub, ID))
+				Rig.run(w, 0.3)
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 0.5)
+				local h = hand(1, 8)
+				local c = Controller.current
+				t.truthy(playFor(w, 60, h, function()
+					return c.live and c.cab.r.m.ballTicks > 1200
+				end, { bob }, ID))
+				local syncs = Rig.count(w.got, "pinball_sync")
+				w.svc:leave(bob.stub, "left")
+				local back, last = 0, c.cab.r.tick
+				playFor(w, 3, h, function()
+					if c.live then
+						if c.cab.r.tick < last then
+							back += 1
+						end
+						last = c.cab.r.tick
+					end
+					return false
+				end)
+				t.eq(back, 0, "the ball never went back")
+				t.eq(Rig.count(w.got, "pinball_sync"), syncs, "no snapshot")
+				t.truthy(c.cab.r.m.gone[2], "Ann's copy passes Bob over")
+				t.truthy(playFor(w, 900, h, function()
+					return sessionOf(w, 1).phase == "done"
+				end))
+				local server = tableOf(w, 1)
+				t.eq(c.cab.r.m.scores[1], server:replay().m.scores[1], "the server's game is Ann's")
+				t.eq(server.stale, 0, "nothing she sent was dropped")
+				t.eq(Rig.count(w.got, "pinball_sync"), syncs, "to the end")
+				t.eq(sessionOf(w, 1).result.fair, true)
+			end, opts(1, { lag = 9 }))
+		end
+	)
+
+	t.test(
+		"at 150 ms each way, a two-and-a-half second stall in the middle of a ball (nothing crosses the line, then it all arrives at once): the ball, the next ball and the place on the board are kept",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(2)
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 0.6)
+				local h = hand(1, 12)
+				local c = Controller.current
+				t.truthy(playFor(w, 60, h, function()
+					return c.live and c.cab.r.m.ballTicks > 900
+				end))
+				local server = tableOf(w, 2)
+				table.clear(server.board.entries) -- (a board with room: any fair score takes a place)
+				local ball = server:replay().m.ball
+				local syncs = Rig.count(w.got, "pinball_sync")
+				-- the stall
+				local lag = w.lag
+				w.lag = 1e6
+				playFor(w, 2.5, h)
+				t.eq(server:replay().m.ball, ball, "the server did not take the ball while nothing arrived")
+				w.lag = lag
+				for _, list in { w.up, w.down } do
+					for _, m in list do
+						if m.at > w.frames + lag then
+							m.at = w.frames + 1
+						end
+					end
+				end
+				playFor(w, 2, h)
+				local r = server:replay()
+				t.eq(r.epoch, 0, "the server never played by itself")
+				t.falsy(r.late)
+				t.eq(Rig.count(w.got, "pinball_sync"), syncs, "no snapshot was needed")
+				t.truthy(playFor(w, 900, h, function()
+					return sessionOf(w, 2).phase == "done"
+				end))
+				t.eq(c.cab.r.m.scores[1], server:replay().m.scores[1])
+				t.eq(sessionOf(w, 2).result.fair, true)
+				Rig.run(w, 0.4)
+				local state = Rig.last(w.got, "state")
+				t.eq(state and state.place, 1, "a place on the machine's board")
+			end, opts(2, { lag = 9 }))
+		end
+	)
+
+	t.test(
+		"a watcher who walks up during the end card sees the game that has just ended (its score and GAME OVER), not the attract show",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(3)
+				local bob = person("Bob", 3)
+				Rig.walkTo(w, SITE, 60, 3, 0)
+				t.truthy(w.svc:join(bob.stub, ID))
+				Rig.run(w, 0.2)
+				t.truthy(Rig.input(w, bob.stub, ID, "start"))
+				playFor(w, 6, nil, nil, { bob }, ID)
+				for _ = 1, 3 do
+					t.truthy(w.svc:debug(ID, "drain"))
+					playFor(w, 0.5, nil, nil, { bob }, ID)
+				end
+				t.eq(sessionOf(w, 3).phase, "done")
+				local X, D = CabinetLayout.stance(3)
+				Rig.walkTo(w, SITE, X + 2, 3, D + 3)
+				playFor(w, 2, nil, nil, { bob }, ID)
+				local idle = 0
+				for _, m in w.got do
+					if m.kind == "pinball_idle" and m.station == ID then
+						idle += 1
+					end
+				end
+				t.eq(idle, 0, "not told the machine is idle")
+				t.truthy(Rig.last(w.got, "pinball_sync") ~= nil, "sent the game that ended")
+				t.truthy(Rig.last(w.got, "pinball_over") ~= nil, "and its board")
+				t.eq(label(w, 3, "Info"), "GAME OVER")
+				t.eq(label(w, 3, "Title"), "SPACE SQUIRREL")
+			end, opts(3))
 		end
 	)
 

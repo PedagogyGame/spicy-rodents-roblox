@@ -12,6 +12,8 @@
 --     behind the newest, blended between kept frames, at the pace of this screen's own frames: smooth at any
 --     frame rate, and the real ball. A snapshot ("pinball_sync") puts the copy right (a watcher who walks up,
 --     the server having played by itself);
+--   A player who leaves while it is not their ball is passed over at the next hand-over ("pinball_retire": the
+--     copy applies it once it has reached the server's tick, or at once if it is the live copy, ahead of it);
 --   * idle: the attract show (Pinball/Attract: the lamp figures and the backglass pages, a pure function of the
 --     shared clock, so every screen shows the same), the best scores (the cabinet's "Best" attribute, which
 --     the server writes) and the flippers at rest.
@@ -21,6 +23,7 @@
 -- and nothing breaks. A cabinet is drawn only while it is awake (a message about it came, and this player's
 -- body is within SLEEP studs); the render step is unbound when none is.
 -- Interface: get(station, place?, index?, tableId?) -> Cab; sync(cab, msg) -> bool; segment(cab, msg) -> bool;
+--   retire(cab, msg) (a seat that has gone, from a tick on);
 --   rebase(cab); idle(cab); over(cab, msg); show(cab, frame, dt?) (the controller's live frames); cue(cab, cue, a, b) (one
 --   cue: its sound and its flash); CUE_NAMES; cueName(variant, cue) -> string; SOUNDS (every cue name, for the
 --   game's sounds); step(dt) (the render step; specs call it); reset() (specs); awake() -> number; DELAY;
@@ -120,6 +123,7 @@ export type Cab = {
 	out: { number },
 	frame: any,
 	lampsIdle: { number },
+	notes: { any }, -- seats retired, waiting for this copy to reach the server's tick: { seat, tick }
 }
 
 local cabs: { [string]: Cab } = {}
@@ -458,6 +462,7 @@ function Cabinet.get(station: string, place: any?, index: number?, tableId: stri
 			out = {},
 			frame = nil,
 			lampsIdle = {},
+			notes = {},
 		}
 		cabs[station] = cab
 	end
@@ -479,6 +484,34 @@ local function keep(cab: Cab)
 	end
 end
 
+-- the seats that have gone, from the server's tick on (the live copy is ahead of the server: at once). A seat
+-- that is up on this copy at that tick would be a copy that has come apart: left for the snapshot that follows.
+local function applyNotes(cab: Cab)
+	local r = cab.r
+	if r == nil then
+		return
+	end
+	for i = #cab.notes, 1, -1 do
+		local note = cab.notes[i]
+		if cab.live or r.tick >= note.tick then
+			if r.m.up ~= note.seat or r.m.gone[note.seat] then
+				Replay.retire(r, note.seat)
+			end
+			table.remove(cab.notes, i)
+		end
+	end
+end
+
+-- retire(cab, msg): a seat that was not up has gone for good ("pinball_retire" { g, seat, tick }).
+function Cabinet.retire(cab: Cab, msg: { [string]: any })
+	local seat, tick = tonumber(msg.seat), tonumber(msg.tick)
+	if cab.r == nil or msg.g ~= cab.g or seat == nil or tick == nil then
+		return
+	end
+	table.insert(cab.notes, { seat = seat, tick = tick })
+	applyNotes(cab)
+end
+
 -- sync(cab, msg): a snapshot of the game as the server has it. True if it was taken.
 function Cabinet.sync(cab: Cab, msg: { [string]: any }): boolean
 	local r = Wire.restore(msg.snap)
@@ -492,9 +525,7 @@ function Cabinet.sync(cab: Cab, msg: { [string]: any }): boolean
 	table.clear(cab.cues)
 	keep(cab)
 	cab.at = r.tick
-	if Replay.over(r) then
-		cab.mode = "follow"
-	end
+	applyNotes(cab)
 	wake(cab)
 	return true
 end
@@ -531,6 +562,7 @@ function Cabinet.segment(cab: Cab, msg: { [string]: any }): boolean
 	if seg == nil or seat == nil or seg[1] ~= r.tick then
 		return false
 	end
+	applyNotes(cab)
 	wake(cab)
 	-- in pieces of CHUNK ticks, so that a frame is kept every CHUNK ticks
 	local from, to = seg[1], seg[2]
@@ -566,6 +598,7 @@ function Cabinet.idle(cab: Cab)
 	cab.g = 0
 	table.clear(cab.frames)
 	table.clear(cab.cues)
+	table.clear(cab.notes)
 	cab.reel = 0
 	wake(cab)
 end

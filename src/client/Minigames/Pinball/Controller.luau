@@ -61,6 +61,9 @@ Controller.HELP = {
 	},
 }
 Controller.SEND_EVERY = 0.09 -- seconds: at most this often a segment of the log goes out
+Controller.CHASE_LIMIT = 10 -- seconds: a frame hitch up to this long is caught up (the ball played on), longer is not
+Controller.HIST_TICKS = 4800 -- ticks of this player's own hands kept to play again from a snapshot (20 s)
+
 Controller.STRIP = { x0 = 0.84, y0 = 0.5, drag = 0.3 } -- the touch plunger: right of x0, below y0; a full pull is drag of the screen's height
 Controller.current = nil :: any
 
@@ -95,7 +98,12 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		tick0 = 0, -- the tick and the clock when the live play (re)started
 		clock0 = 0,
 		clock = 0, -- seconds of frames since the game opened
-		queue = {}, -- segments not sent yet: { seg, ends a ball }
+		queue = {}, -- segments not sent yet: { seg, ends a ball, sum, v }
+		v = 0, -- the number of the last snapshot the server sent (every segment cut after it echoes it)
+		hist = {}, -- the buttons of every tick played live since histFrom (to play again from a snapshot)
+		histFrom = 0,
+		liveTick = 0, -- the tick the live copy had reached at the end of the last frame
+		rolled = 0, -- snapshots taken by playing this player's own hands again from them (specs)
 		sentAt = -math.huge,
 		sent = 0, -- segments sent (specs)
 		thump = false,
@@ -206,6 +214,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 			if
 				last
 				and not last.ends
+				and last.v == item.v
 				and InputLog.changes(last.seg) + InputLog.changes(item.seg) <= InputLog.WIRE_CHANGES
 				and item.seg[2] - last.seg[1] <= InputLog.MAX_TICKS
 			then
@@ -213,13 +222,13 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 				last.ends = item.ends
 				last.sum = item.sum
 			else
-				table.insert(blocks, { seg = item.seg, ends = item.ends, sum = item.sum })
+				table.insert(blocks, { seg = item.seg, ends = item.ends, sum = item.sum, v = item.v })
 			end
 		end
 		table.clear(q)
 		for _, b in blocks do
 			local from, to, packed = InputLog.pack(b.seg)
-			ctx.send("log", { from, to, packed, b.sum })
+			ctx.send("log", { from, to, packed, b.sum, b.v })
 			self.sent += 1
 		end
 		self.sentAt = self.clock
@@ -235,7 +244,12 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		self.rec = Replay.recorder(r)
 		self.tick0 = r.tick
 		self.clock0 = self.clock
+		self.histFrom = r.tick
+		self.liveTick = r.tick
+		table.clear(self.hist)
 		table.clear(self.queue)
+		-- (a key pressed or held while it was not this player's ball does not carry into it)
+		Hands.clear(self.hands)
 		ctx.controls(false)
 		stand()
 		setCamera(not self.camOn)
@@ -292,6 +306,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 				buttons = bit32.bor(buttons, BTN.THUMP)
 			end
 			local up = r.m.up
+			self.hist[r.tick - self.histFrom + 1] = buttons
 			local seg = Replay.live(r, rec, buttons, out)
 			for i = 1, #out, 3 do
 				Cabinet.cue(cab, out[i], out[i + 1], out[i + 2])
@@ -300,14 +315,26 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 			if seg then
 				local m = r.m
 				local ends = m.phase == OVER or m.up ~= up or (m.phase == PLAY and m.ballTicks == 0)
-				table.insert(self.queue, { seg = seg, ends = ends, sum = Replay.sum(r) })
+				table.insert(self.queue, { seg = seg, ends = ends, sum = Replay.sum(r), v = self.v })
 				if m.phase == OVER or m.up ~= self.seat then
 					break
 				end
 			end
 		end
-		if r.tick < due - 2 * Physics.HZ then
-			-- (a hitch longer than two seconds: the clock is not chased, the game carries on from here)
+		self.liveTick = r.tick
+		local kept = #self.hist
+		if kept > 2 * Controller.HIST_TICKS then
+			-- (only the last HIST_TICKS are kept: a snapshot is never further behind than a round trip)
+			local drop = kept - Controller.HIST_TICKS
+			table.move(self.hist, drop + 1, kept, 1)
+			for i = kept - drop + 1, kept do
+				self.hist[i] = nil
+			end
+			self.histFrom += drop
+		end
+		if r.tick < due - Controller.CHASE_LIMIT * Physics.HZ then
+			-- (a hitch longer than CHASE_LIMIT: the clock is not chased, the game carries on from here. Shorter
+			-- ones are caught up two seconds a frame, so the log keeps time with the server's clock)
 			self.tick0 = r.tick
 			self.clock0 = self.clock
 		end
@@ -464,12 +491,55 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		end
 	end
 
+	-- A snapshot while this player's ball is live: the server's game at its tick, which is behind this screen's.
+	-- When the ball is still this player's, their own hands from that tick on (kept tick by tick) are played
+	-- again on it up to where this screen had got to, and sent again under the snapshot's number: the ball does
+	-- not jump back in time and nothing pressed is lost (it lands where the server's game puts it, if that
+	-- differs). Otherwise (the server took the ball) the copy carries on from the snapshot.
+	local function rollForward(): boolean
+		local r = cab.r
+		local back = self.liveTick
+		if
+			r == nil
+			or cab.g ~= self.g
+			or r.m.phase == OVER
+			or r.m.up ~= self.seat
+			or r.tick < self.histFrom
+			or r.tick > back
+		then
+			return false
+		end
+		self.rec = Replay.recorder(r)
+		table.clear(self.queue)
+		local out = self.out
+		while r.tick < back do
+			local buttons = self.hist[r.tick - self.histFrom + 1] or 0
+			local up = r.m.up
+			local seg = Replay.live(r, self.rec, buttons, out)
+			table.clear(out) -- (heard once already)
+			if seg then
+				local m = r.m
+				local ends = m.phase == OVER or m.up ~= up or (m.phase == PLAY and m.ballTicks == 0)
+				table.insert(self.queue, { seg = seg, ends = ends, sum = Replay.sum(r), v = self.v })
+				if m.phase == OVER or m.up ~= self.seat then
+					break
+				end
+			end
+		end
+		self.liveTick = r.tick
+		self.rolled += 1
+		self.frame = Stream.read(cab.tbl, r.m, self.frame)
+		flush(true)
+		return true
+	end
+
 	function self.onMessage(_self: any, msg: { [string]: any }, _watched: any?)
 		local kind = msg.kind
 		if kind == "pinball_sync" then
 			self.g = tonumber(msg.g) or self.g
-			if self.live then
-				-- the server's game, from which this ball carries on (a drift, a gap, the server's own play)
+			self.v = tonumber(msg.v) or self.v
+			if self.live and not rollForward() then
+				-- the server's game, from which this ball carries on (the server played by itself)
 				self.live = false
 				cab.live = false
 				ctx.controls(true)

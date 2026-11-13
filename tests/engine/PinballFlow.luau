@@ -50,6 +50,8 @@ function PinballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 		live: boolean,
 		rec: any,
 		syncs: number,
+		v: number, -- the number of the last snapshot (echoed with every segment)
+		notes: { any }, -- seats retired, to pass over from a tick on
 		refused: { string },
 	}
 	local function hand(p: any, id: string, seed: number): Hand
@@ -64,6 +66,8 @@ function PinballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 			live = false,
 			rec = nil,
 			syncs = 0,
+			v = 0,
+			notes = {},
 			refused = {},
 		}
 	end
@@ -76,6 +80,7 @@ function PinballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 				if msg.kind == "pinball_sync" then
 					h.r = Wire.restore(msg.snap)
 					h.g = msg.g
+					h.v = msg.v or h.v
 					h.live = false
 					h.syncs += 1
 				elseif msg.kind == "pinball" and h.r and msg.g == h.g and not h.live then
@@ -83,6 +88,8 @@ function PinballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 					if seg then
 						Replay.follow(h.r, msg.seat, seg)
 					end
+				elseif msg.kind == "pinball_retire" and msg.g == h.g then
+					table.insert(h.notes, msg)
 				elseif msg.kind == "state" then
 					h.seat = msg.you or h.seat
 				elseif msg.kind == "joined" then
@@ -94,7 +101,18 @@ function PinballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 		if r == nil then
 			return
 		end
+		-- a seat retired is passed over once this copy has reached the server's tick (at once if it is ahead)
+		for i = #h.notes, 1, -1 do
+			local note = h.notes[i]
+			if h.live or r.tick >= note.tick then
+				if r.m.up ~= note.seat then
+					Replay.retire(r, note.seat)
+				end
+				table.remove(h.notes, i)
+			end
+		end
 		local mine = h.seat ~= nil and not Replay.over(r) and r.m.up == h.seat
+
 		if mine and not h.live then
 			h.live = true
 			h.rec = Replay.recorder(r)
@@ -110,7 +128,7 @@ function PinballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 			if seg then
 				local a, b, c = InputLog.pack(seg)
 				local ok, why =
-					svc:input(h.p, { gameId = h.id, seat = 1, verb = "log", args = { a, b, c, Replay.sum(r) } })
+					svc:input(h.p, { gameId = h.id, seat = 1, verb = "log", args = { a, b, c, Replay.sum(r), h.v } })
 				if not ok then
 					table.insert(h.refused, tostring(why))
 				end

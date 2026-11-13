@@ -148,7 +148,7 @@ local entry: ClientGame.ClientGame = {
 		return `{g.ball}:{g.up}:{table.concat(s, ",")}`
 	end,
 	endCard = endCard,
-	kinds = { "pinball", "pinball_sync", "pinball_idle", "pinball_over", "pinball_thump" },
+	kinds = { "pinball", "pinball_sync", "pinball_idle", "pinball_over", "pinball_thump", "pinball_retire" },
 	watch = function(msg: { [string]: any }, place: ClientGame.Place?): any
 		if type(msg.station) ~= "string" then
 			return nil
@@ -163,6 +163,8 @@ local entry: ClientGame.ClientGame = {
 			Cabinet.idle(cab)
 		elseif kind == "pinball_over" then
 			Cabinet.over(cab, msg)
+		elseif kind == "pinball_retire" then
+			Cabinet.retire(cab, msg)
 		end
 		return cab
 	end,
