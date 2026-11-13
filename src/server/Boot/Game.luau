@@ -1164,8 +1164,8 @@ function Game.start(opts: Opts?): any
 				end,
 			},
 			-- paintball (PaintballService.Deps): an infected player is refused at the arena door with "See a
-			-- doctor first." (decision D6), so nobody collapses in a match. The pass's money is ctx.town.charge,
-			-- the framework's stand-in until the wallet lands; its day is the shared clock's
+			-- doctor first." (decision D6), so nobody collapses in a match. Its pass desk sells the town's one
+			-- pass, games.pass above (the wallet's), so a pass bought there opens both lounges too
 			paintball = {
 				fit = function(player: any): (boolean, string?)
 					local actor = possession:actorOf(player)

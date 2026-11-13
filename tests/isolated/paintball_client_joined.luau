@@ -48,6 +48,7 @@ local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local Magazine = require("@shared/Paintball/Magazine")
 local Bots = require("@server/Minigames/Paintball/Bots")
+local MinigameService = require("@server/Minigames/MinigameService")
 local PaintballClient = require("@client/Minigames/Paintball/PaintballClient")
 local Tuning = require("@client/Minigames/Paintball/Tuning")
 local FakeEngine = require("@tests/lib/FakeEngine")
@@ -292,7 +293,8 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 end
 
 -- A case in the real game. Returns false, and plays nothing, where the service behind the door is the stub.
--- purse: no pass is held; the real pass desk sells one through the town's charge, out of this purse
+-- purse: no pass is held; the desk sells one through the town's charge, out of this purse (the framework's
+-- stand-in pass on that charge: in the game the town's pass is the wallet's, tests/isolated/wallet)
 type Purse = { cents: number, paid: { string } }
 type PlayOpts = { asleep: boolean?, lag: number?, lose: number?, first: ((v: Visit) -> ())?, purse: Purse? }
 local function play(fn: (v: Visit) -> (), opts: PlayOpts?): boolean
@@ -343,7 +345,7 @@ local function play(fn: (v: Visit) -> (), opts: PlayOpts?): boolean
 					engine = engine(),
 					seed = 7,
 					pass = if o.purse
-						then nil -- (the service's own desk, on the town's charge below)
+						then nil -- (the town's pass: the framework's stand-in, on the town's charge below)
 						else {
 							has = function(): boolean
 								return true
@@ -1250,7 +1252,7 @@ return function(t)
 		end
 	)
 
-	-- FROM THE STREET, the join's own end-to-end case: the real pass desk on the town's money, the door, a short
+	-- FROM THE STREET, the join's own end-to-end case: the pass desk on the town's money, the door, a short
 	-- match among the real bots to the end card, and out again
 	t.test(
 		"from the street: a person walks to the station, buys the pass at the desk, joins, plays a short match against the real bots to the end card, and leaves",
@@ -1335,6 +1337,10 @@ return function(t)
 				purse = purse,
 				first = function(v)
 					local w = v.w
+					-- (the purse is this case's own charge, so the pass is the framework's stand-in on it, on the
+					-- same terms as the wallet's; the framework says once that a charge came without the town's pass)
+					t.deepEq(w.warnings, { MinigameService.NO_PASS_WARNING })
+					table.clear(w.warnings)
 					-- IN THE STREET in front of the station, out of the audience's reach, with 27c and no pass
 					local sx, sy, sz = Arena.toWorld(v.place, 0, 0, 106)
 					-- a real street: the station's walk, which meets Chapel Street, which runs on to the town's

@@ -730,6 +730,8 @@ local function boot(): (any, string?, number?)
 		if not ok then
 			table.insert(setup, `{name} could not pick a townsperson: {tostring(why)}`)
 		end
+		-- (arriving in the game opens a wallet with pocket money: the pass is the wallet's, 20c of it)
+		G.wallet.join(p)
 		players[i] = p
 	end
 	local function bodyOf(player: any): any

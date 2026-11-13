@@ -306,11 +306,14 @@
 -- Contract.COLLISION_GROUP, which does not collide with itself and collides with everything else as
 -- the default group does; engine.ghost(body, false) puts the parts back in the group they were in.
 -- First person is the client's own doing (Client/Minigames/Paintball/PaintballClient).
--- THE PASS (PB-12). `pass` is deps.pass, else the lane's own on ctx.town.charge(player,
--- Rules.passCents, "a paintball pass") (a stand-in that takes nothing until the town has a wallet;
--- honour a false and show its words): a pass runs Rules.passDays in-game days from deps.day(), and
--- is remembered for as long as the server runs, and beyond it in deps.passStore (the profile) when
--- whoever boots the game hands one over (PassDesk, "a store").
+-- THE PASS (PB-12). `pass` is deps.pass, else THE TOWN'S ONE PASS, ctx.town.pass (in the game the
+-- wallet's, Server/Economy/Credits wallet.pass: 20c from the player's pocket money for five in-game days,
+-- and the same pass opens both lounges, so a pass bought at this desk lets them into a lounge and one
+-- bought at a lounge door lets them in here). Only where no town pass is handed in (a spec that runs the
+-- service alone), or a spec hands in a day clock of its own (deps.day), is the lane's own desk used: on
+-- ctx.town.charge(player, Rules.passCents, "a paintball pass") (honour a false and show its words), a
+-- pass running Rules.passDays in-game days from deps.day(), remembered for as long as the server runs,
+-- and beyond it in deps.passStore when one is handed over (PassDesk, "a store").
 -- THE S18 CORE in Server/Paintball is this lane's to extend, keeping tests/unit/paintball_hitreg.spec green:
 --   PoseHistory  gains a crouch channel beside x, y, z (same ring, same interpolation), so a crouched
 --                body is judged crouched (PB-3); built with Clock.HISTORY_SECS at Clock.SNAP_HZ here.
@@ -422,9 +425,9 @@ export type Deps = {
 	arena: Arena?, -- default ArenaData.build()
 	seed: number?,
 	feel: Feel?, -- the feel of the first match; default Contract.feel()
-	pass: PassDesk?, -- default: the lane's own, on ctx.town.charge
+	pass: PassDesk?, -- default: the town's one, ctx.town.pass (else the lane's own, on ctx.town.charge)
 	fit: ((player: any) -> (boolean, string?))?, -- fit to play? (false, a Contract.WHY code): "infected"
-	day: (() -> number)?, -- the in-game day, for the pass
+	day: (() -> number)?, -- the in-game day, for the lane's own pass desk (given one, that desk is used)
 	-- where passes outlive the server (the profile; PassDesk.Store): nil, remembered while the server runs
 	passStore: PassDeskModule.Store?,
 	-- may this player tune the feel at a playtest (the "tune" verb)? Default: the place's owner (the user who
@@ -586,7 +589,9 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		audience = {},
 	} :: Service
 	local engine: Engine = d.engine or (if hw ~= nil then RealEngine.new() else noEngine())
+	-- the town's one pass (the wallet's: the lounges read it too); the lane's own desk only without one
 	local pass: PassDesk = d.pass
+		or (if d.day == nil and ctx.town ~= nil then ctx.town.pass else nil)
 		or PassDeskModule.new(function(player: any, cents: number, why: string): (boolean, string?)
 			return ctx.town.charge(player, cents, why)
 		end, d.day or function(): number

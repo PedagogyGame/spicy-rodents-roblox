@@ -12,6 +12,7 @@ local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local Bots = require("@server/Minigames/Paintball/Bots")
+local MinigameService = require("@server/Minigames/MinigameService")
 local Rig = require("@tests/lib/MinigameRig")
 local PaintballRig = require("@tests/lib/PaintballRig")
 local Kit = require("@tests/isolated/paintball_server_kit")
@@ -67,6 +68,10 @@ return function(t)
 			local day = 3
 			local purse = 100
 			Kit.play(function(kit)
+				-- (the lane's own desk, on this case's charge and day: in the game the pass is the town's one, the
+				-- wallet's, and the framework says once that a charge came without it)
+				t.deepEq(kit.w.warnings, { MinigameService.NO_PASS_WARNING })
+				table.clear(kit.w.warnings)
 				local ada = kit.client("Ada")
 				t.deepEq({ kit.join(ada) }, { false, Contract.textFor("pass") })
 				t.eq(kit.session.phase, "idle", "nobody was seated")

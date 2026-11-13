@@ -393,6 +393,9 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 		function kit.client(name: string, copts: { [string]: any }?): Client
 			local co: { [string]: any } = copts or {}
 			local stub = Rig.stub(name)
+			-- (a stand-in arrives in the game as everyone does, with a wallet and its pocket money: nobody is
+			-- given one by being charged, and the pass is the wallet's)
+			w.wallet.join(stub)
 			local gx, gy, gz = Arena.toWorld(place, Arena.GATE.x + #kit.clients * 2, 0, Arena.GATE.z + 4)
 			stub.body = { x = gx, y = gy, z = gz, yaw = 0, ghost = false, teleports = 0 }
 			local c: Client = {
