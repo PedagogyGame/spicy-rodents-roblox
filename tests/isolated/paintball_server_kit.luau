@@ -26,7 +26,7 @@
 --   sprint, air, out, silent, events, acks, tags, move(), fire(dx, dy, dz, opts?) -> shot, aim(tx, ty, tz) ->
 --   dir, drawn(id) -> (x, y, z, crouch)?, last(kind, pred?), count(kind), onHear(msg)? and onStream(remote,
 --   payload)? (set by a case: called with everything the connection hears, after its delay); hall(opts?) ->
---   Arena; fakeEngine()
+--   Arena; fakeEngine(); REAL, JOINED; laneBuilt(path) -> boolean; waiting(t, what)
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
@@ -37,12 +37,39 @@ local FakeEngine = require("@tests/lib/FakeEngine")
 local PaintballRig = require("@tests/lib/PaintballRig")
 local Rig = require("@tests/lib/MinigameRig")
 local Model = require("@tests/isolated/paintball_server_model")
+local fs = require("@lune/fs")
 local process = require("@lune/process")
 
 local Kit = {}
 
 -- the real match model and brains are left in place (the lanes are joined, and somebody asked)
 Kit.REAL = process.env.PAINTBALL_REAL == "1"
+-- the lanes ARE joined (set by whoever joins them): a case that would wait for another lane's work fails instead
+Kit.JOINED = process.env.PAINTBALL_JOINED == "1"
+
+-- Is another lane's work in this tree? Decided from the file on disk (repo-relative path), never from whether a
+-- require of it succeeds: a lane's file that is there and fails to load, or a model that errors, must turn a
+-- case red, not into the one green line that says "not here yet". A file that is there but still carries the
+-- contract's "THIS IS A STUB" header is not the lane's work.
+function Kit.laneBuilt(path: string): boolean
+	local ok, source = pcall(fs.readFile, path)
+	if not ok or type(source) ~= "string" then
+		return false
+	end
+	return string.find(source, "THIS IS A STUB", 1, true) == nil
+end
+
+-- What a case does when another lane's work is not in this tree: one passing line that says so, unless the
+-- lanes are said to be joined (Kit.JOINED), when it is a failure.
+function Kit.waiting(t: any, what: string)
+	if Kit.JOINED then
+		t.test(`PAINTBALL_JOINED=1 but {what}`, function()
+			error(`the lanes are said to be joined, but {what}`, 0)
+		end)
+	else
+		t.test(`{what}, so nothing of it is proven here`, function() end)
+	end
+end
 
 export type Client = { [string]: any }
 export type Kit = { [string]: any }

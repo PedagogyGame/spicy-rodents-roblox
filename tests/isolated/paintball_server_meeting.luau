@@ -16,8 +16,9 @@
 --   * a click while sprinting leaves when the marker is up, and is a shot;
 --   * the seat's ball tags a body it was aimed at, and the seat is told; tagged in its turn it stops sending,
 --     and comes back placed anew with a full magazine, its Moves accepted again.
--- THIS RUNS BY ITSELF ONCE THE CLIENT LANE'S CORES ARE IN THE TREE (it asks for them by name; in the server
--- lane's own tree they are not there, the one case here says so and passes, and nothing is proven). It leans
+-- THIS RUNS BY ITSELF ONCE THE CLIENT LANE'S CORES ARE IN THE TREE (it looks for their files on disk; in the
+-- server lane's own tree they are not there, the one case here says so and passes, and nothing is proven; with
+-- PAINTBALL_JOINED=1 that line is a failure, and a core whose file is there but does not load is always one). It leans
 -- on the client lane's own names (SeatCore.new, Seat.input / step / onState / onMessage / onRefused and the
 -- fields you, team, place, out, fired, mag, hitAt; ShowCore.new, Show.onWatch / onSnap / onShots / onSplats /
 -- step): if those move, this case is the first to say so, and it is the server lane's to mend.
@@ -36,28 +37,35 @@ local Kit = require("@tests/isolated/paintball_server_kit")
 local R = Contract.Rules
 local FRAME = 1 / 60
 
--- the client lane's cores, if they are in this tree
+-- the client lane's cores, if they are in this tree. Decided by the files on disk (Kit.laneBuilt): a core that
+-- is there must load and have its `new`, or the case fails with why.
+local SEAT_FILE = "src/client/Minigames/Paintball/SeatCore.luau"
+local SHOW_FILE = "src/client/Minigames/Paintball/ShowCore.luau"
 local function cores(): (any, any)
-	local function ask(path: string): any
-		local ok, module = pcall(function(): any
-			return (require :: any)(path)
-		end)
-		return if ok and type(module) == "table" and type(module.new) == "function" then module else nil
+	local function ask(file: string, path: string): any
+		if not Kit.laneBuilt(file) then
+			return nil
+		end
+		local module = (require :: any)(path)
+		assert(type(module) == "table" and type(module.new) == "function", `{path} has no new()`)
+		return module
 	end
-	return ask("@client/Minigames/Paintball/SeatCore"), ask("@client/Minigames/Paintball/ShowCore")
+	return ask(SEAT_FILE, "@client/Minigames/Paintball/SeatCore"),
+		ask(SHOW_FILE, "@client/Minigames/Paintball/ShowCore")
 end
 
--- Is the match model the real one? (The stub never leaves the briefing.)
+-- Is the match model the real one? By the file (Kit.laneBuilt); a real one that errors fails the case.
 local function realModel(): boolean
-	local ok, live = pcall(function(): boolean
-		local state = Rules.init(2, 1)
-		Rules.sync(state, 1000)
-		Rules.step(state, 0)
-		Rules.sync(state, 1000 + R.briefingSecs + 1)
-		Rules.step(state, 0.1)
-		return state.phase == "live"
-	end)
-	return ok and live
+	if not Kit.laneBuilt("src/shared/Minigames/Paintball/Rules.luau") then
+		return false
+	end
+	local state = Rules.init(2, 1)
+	Rules.sync(state, 1000)
+	Rules.step(state, 0)
+	Rules.sync(state, 1000 + R.briefingSecs + 1)
+	Rules.step(state, 0.1)
+	assert(state.phase == "live", `the real match model did not go live after its briefing (phase {state.phase})`)
+	return true
 end
 
 -- The client lane's seat and show behind one of the kit's connections, and the player's body in front of
@@ -231,11 +239,17 @@ local function meet(kit: Kit.Kit, c: Kit.Client, SeatCore: any, ShowCore: any): 
 end
 
 return function(t)
-	local SeatCore, ShowCore = cores()
+	local ok, SeatCore, ShowCore = pcall(cores)
+	if not ok then
+		t.test("the client lane's cores load", function()
+			error(SeatCore, 0)
+		end)
+		return
+	end
 	if SeatCore == nil or ShowCore == nil then
-		t.test(
-			"the client lane's cores are not in this tree (Client/Minigames/Paintball/SeatCore, ShowCore), so the two halves do not meet here and nothing of it is proven",
-			function() end
+		Kit.waiting(
+			t,
+			"the client lane's cores are not in this tree (Client/Minigames/Paintball/SeatCore, ShowCore): the two halves do not meet here"
 		)
 		return
 	end

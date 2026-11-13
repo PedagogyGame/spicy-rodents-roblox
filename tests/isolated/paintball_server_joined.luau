@@ -6,9 +6,10 @@
 -- anything's place: the real PaintballService on the real match model (Shared/Minigames/Paintball/Rules),
 -- the real brains (Server/Minigames/Paintball/Bots) and the game's own building (ArenaData.build()),
 -- building-blind (every place is read from the arena's own spawn points and navigation graph).
--- THEY RUN BY THEMSELVES ONCE THE MATCH MODEL IS REAL. real() asks the model the one thing the stub cannot
--- do (go live when its briefing is over); while it cannot, the one case here says so and passes, and nothing
--- is proven. So in the server lane's own tree this file is one line of a report, and in the joined tree it is:
+-- THEY RUN BY THEMSELVES ONCE THE MATCH MODEL IS REAL. real() looks at Rules.luau on disk: while it is the
+-- contract's stub the one case here says so and passes, and nothing is proven (with PAINTBALL_JOINED=1 that
+-- line is a failure); once it is the lane's own, it must go live when its briefing is over, and a model that
+-- errors or does not fails the case with why. So in the server lane's own tree this file is one line of a report, and in the joined tree it is:
 --   * the server check (tests/engine/PaintballFlow) with the real match and the real brains in the real
 --     building: the pass, four a side, the briefing, the bots' own balls and tags, a scripted tag, the end
 --     card, the next match, leaving;
@@ -37,17 +38,21 @@ local Kit = require("@tests/isolated/paintball_server_kit")
 
 local R = Contract.Rules
 
--- Is the match model the real one? The stub seats slots and keeps its clock, and never leaves the briefing.
+-- Is the match model the real one? Decided by the file (Kit.laneBuilt: Rules.luau no longer the contract's
+-- stub). When it is the real one it must go live when its briefing is over: an error, or a model that does not,
+-- fails here with what went wrong (never a quiet "not joined").
+local RULES_FILE = "src/shared/Minigames/Paintball/Rules.luau"
 local function real(): boolean
-	local ok, live = pcall(function(): boolean
-		local state = Rules.init(2, 1)
-		Rules.sync(state, 1000)
-		Rules.step(state, 0)
-		Rules.sync(state, 1000 + R.briefingSecs + 1)
-		Rules.step(state, 0.1)
-		return state.phase == "live"
-	end)
-	return ok and live
+	if not Kit.laneBuilt(RULES_FILE) then
+		return false
+	end
+	local state = Rules.init(2, 1)
+	Rules.sync(state, 1000)
+	Rules.step(state, 0)
+	Rules.sync(state, 1000 + R.briefingSecs + 1)
+	Rules.step(state, 0.1)
+	assert(state.phase == "live", `the real match model did not go live after its briefing (phase {state.phase})`)
+	return true
 end
 
 -- The nodes to walk from `from` to the nearest node that is `beyond` links outside every spawn room, by the
@@ -166,11 +171,15 @@ local function patrol(kit: Kit.Kit, c: Kit.Client, every: number): Patrol
 end
 
 return function(t)
-	if not real() then
-		t.test(
-			"the lanes are not joined here: the match model is the contract's stub (it never goes live), so the joined cases wait and nothing of them is proven",
-			function() end
-		)
+	local asked, isReal = pcall(real)
+	if not asked then
+		t.test("joined: the real match model works", function()
+			error(isReal, 0)
+		end)
+		return
+	end
+	if not isReal then
+		Kit.waiting(t, "the lanes are not joined here: the match model is the contract's stub (it never goes live)")
 		return
 	end
 
