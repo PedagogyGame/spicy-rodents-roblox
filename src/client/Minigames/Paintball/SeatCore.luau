@@ -38,8 +38,12 @@
 --              a rail leaves the instant the click is made.
 --   placements pivot the body, take the number, turn the look for one frame, and for a respawn a full
 --              magazine, the legs back and the protection.
---   idle       the seat knows how long its player has neither moved, turned nor fired while the match
---              is live, so the HUD can say so before the server takes them off (Rules.idleSecs).
+--   idle       the seat counts idleness AS THE SERVER DOES (PaintballService, "idleness": the pose has
+--              stayed within 0.5 studs and 0.05 rad of where the count began and no ball has left, over
+--              live play; a placement moves that pose and does not restart the count; being tagged out
+--              does not stop it), with a fifth more on the bounds, so a tremble of the mouse that the
+--              server does not count never hushes the warning: the HUD says so no later than the server
+--              would act (Rules.idleSecs).
 -- Interface: new(ctx, opts) -> Seat; types Port, Opts, Seat, Feed. Seat: the framework's controller
 --   (onState, onMessage, onRefused, stop) plus input(action, down), step(dt) and the fields below.
 
@@ -181,6 +185,10 @@ local R = Contract.Rules
 local M = Contract.MARGIN
 local BIT = Wire.BIT
 local SEND = 1 / Clock.SEND_HZ
+-- Idleness, the server's bounds (the prose of PaintballService, "idleness": 0.5 studs, 0.05 rad) and a fifth
+-- more: the client never thinks its player moved when the server does not.
+local IDLE_STUDS = 0.6
+local IDLE_RAD = 0.06
 -- Moves sent ahead of the stream's turn for a change of stance: at most TELL_MOST at once, refilled at
 -- TELL_RATE a second. With the stream's twenty and a ball's own Move (at most one a fire interval) the remote
 -- stays inside Shared/Net's thirty a second however the keys are mashed.
@@ -678,6 +686,8 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 		seat.place = msg.place
 		seat.x, seat.y, seat.z = msg.x, msg.y, msg.z
+		-- (the server's doing: it moves the pose idleness is measured from and does not restart the count)
+		idleX, idleY, idleZ, idleYaw, idlePitch = msg.x, msg.y, msg.z, msg.yaw, 0
 		moveAcc = SEND -- the server hears of the new place in the next frame
 		walked = 0
 		fallSpeed = 0
@@ -717,7 +727,6 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			ctx.sound("paintball.back", tuning.volBack)
 		end
 		seat.out = false
-		seat.activeAt = now
 		seat.safeUntil = msg.at
 		if not seat.legs then
 			seat.legs = true
@@ -979,15 +988,16 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		wasLive = liveNow
 		-- idle: moving, turning and firing are what the server counts as being there
 		if has then
-			local moved = math.abs(self.x - idleX) + math.abs(self.y - idleY) + math.abs(self.z - idleZ) > 0.05
-			local turned = math.abs(self.yaw - idleYaw) + math.abs(self.pitch - idlePitch) > 0.002
+			local ix, iy, iz = self.x - idleX, self.y - idleY, self.z - idleZ
+			local moved = ix * ix + iy * iy + iz * iz > IDLE_STUDS * IDLE_STUDS
+			local turned = math.abs(self.yaw - idleYaw) > IDLE_RAD or math.abs(self.pitch - idlePitch) > IDLE_RAD
 			if moved or turned then
 				idleX, idleY, idleZ, idleYaw, idlePitch = self.x, self.y, self.z, self.yaw, self.pitch
 				self.activeAt = now
 			end
 		end
-		if not liveNow or self.out then
-			self.activeAt = now
+		if not liveNow then
+			self.activeAt = now -- (the server counts live play only)
 		end
 		-- a waiting press
 		tryFire(now)

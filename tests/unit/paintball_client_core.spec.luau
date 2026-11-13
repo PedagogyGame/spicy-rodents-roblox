@@ -1889,14 +1889,43 @@ return function(t)
 			)
 			Kit.run(b, 3)
 			t.truthy((seat:idle(b.now()) :: number) < left - 2.9)
+			-- a tremble the server does not count (it wants half a stud, or a twentieth of a radian) does not
+			-- hush the warning: the screen is never later than the server
+			b.pose.yaw += 0.04
+			b.pose.x += 0.3
+			Kit.frame(b)
+			t.truthy(seat:idle(b.now()) ~= nil, "a tremble is not being there")
+			-- nor does being tagged out and placed again: the server's count runs through both
+			left = seat:idle(b.now()) :: number
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 2,
+				id = 1,
+				ball = 3,
+				scores = { 0, 1 },
+				tags = 1,
+				outs = 1,
+				at = b.now() + 2,
+				x = 0,
+				y = 3,
+				z = 30,
+			})
+			Kit.run(b, 2)
+			Kit.place(b, { x = -52, z = 2, yaw = 1, at = b.now() })
+			Kit.frame(b, 3)
+			t.truthy((seat:idle(b.now()) :: number) < left - 1.9, "out and back, and still counting down")
 			-- a turn of the view is being there
-			b.pose.yaw += 0.05
+			b.pose.yaw += 0.1
 			Kit.frame(b)
 			t.eq(seat:idle(b.now()), nil)
 			-- so is a step, and so is a ball
+			Kit.place(b, { x = 0, z = 30, at = b.now() })
+			Kit.frame(b, 3)
+			b.pose.yaw = 0
+			Kit.frame(b)
 			Kit.run(b, R.idleSecs - Tuning.idleWarn + 1)
 			t.truthy(seat:idle(b.now()) ~= nil)
-			b.pose.x += 0.5
+			b.pose.x += 1
 			Kit.frame(b)
 			t.eq(seat:idle(b.now()), nil)
 			Kit.run(b, R.idleSecs - Tuning.idleWarn + 1)
