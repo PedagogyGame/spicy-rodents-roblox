@@ -180,7 +180,24 @@ function methods.IsA(self: any, class: string): boolean
 end
 
 function methods.SetAttribute(self: any, name: string, value: any)
-	rawget(self, "_attrs")[name] = value
+	local attrs = rawget(self, "_attrs")
+	local was = attrs[name]
+	attrs[name] = value
+	-- (as the engine: the changed signal fires only when the value is a different one)
+	local signals = rawget(self, "_attrSignals")
+	if signals and signals[name] and was ~= value then
+		signals[name].fire()
+	end
+end
+
+function methods.GetAttributeChangedSignal(self: any, name: string): any
+	local signals = rawget(self, "_attrSignals")
+	if signals == nil then
+		signals = {}
+		rawset(self, "_attrSignals", signals)
+	end
+	signals[name] = signals[name] or FakeEngine.signal()
+	return signals[name]
 end
 
 function methods.GetAttribute(self: any, name: string): any

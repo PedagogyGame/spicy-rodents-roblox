@@ -16,8 +16,11 @@
 -- what is behind it depends on the build: people() lists everyone with a body in the game itself (in a bare
 -- test: whoever is seated); body() lends a townsperson to stand in for a computer player and returns nil while
 -- there is nobody to lend (draw the computer on the clients from your script then, as the ball is); charge()
--- takes money and says yes to everything while there is no wallet; best() keeps a personal best for as long as
--- the server runs until there is a profile to keep it in.
+-- takes money from the player's wallet: in the game it is the town's (Server/Economy/Credits: wallet.spend,
+-- wired in Boot/Game), so it returns (true, "Paid 20c for a pass. You have S$2.80.") or (false, "You need 20c;
+-- you have 7c") and the words can be shown as they are; only a bare test's service, given no wallet, says yes
+-- to everything and takes nothing. best() keeps a personal best for as long as the server runs until there is
+-- a profile to keep it in.
 -- Computer players: the Spec names them; ctx.addComputer(name?) seats one (by name, else the next one not at
 -- this table) and returns ok, why, key. After the start it works only in a game whose rules say
 -- def.lateJoin = true (with rules.join). ctx.removeComputer(key) takes one off (the rules' gone() hears it; a
@@ -79,7 +82,7 @@ export type Town = {
 	people: () -> { Person }, -- everyone with a body, wherever they are (a loose ball, a near-only show)
 	body: (name: string, cframe: CFrame) -> Model?, -- a townsperson lent to stand in for a computer (nil: none yet)
 	release: (model: Model) -> (), -- hand a lent body back
-	charge: (player: any, cents: number, why: string) -> (boolean, string?), -- (false, words) refuses; free for now
+	charge: (player: any, cents: number, why: string) -> (boolean, string?), -- the wallet: ok, and words to show
 	-- a personal best: hand in a value (lower = true when less is better), get the best so far; nil value reads
 	best: (player: any, key: string, value: number?, lower: boolean?) -> number?,
 }

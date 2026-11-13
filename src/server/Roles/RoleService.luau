@@ -13,6 +13,9 @@
 --   forceRole (Role Lab): moves a player to any rung, logging when that exceeds the rung's cap.
 -- Body changes go through Possession:swap (rule 12: Possession's onHandoff wires SweptCollision and
 -- MoveValidator). Pure Luau over injected deps, so Lune drives it with PlayerLike stubs.
+-- Money: a member's purse is the town wallet's when deps.purse is given (Economy/Credits: wallet.purse), so
+-- Ladder pay lands in the one wallet; stats.cents (the human queue's money term) is always the purse's
+-- balance, whoever changed it (a shop, a pass, wages).
 -- No side effects on require.
 -- Interface: new(deps) -> Roles; Roles:onJoin(player) -> JoinResult, onLeave(player), admittedCount(),
 --            report(event) -> {Transition}, roleOf(player) -> (rung?, subrole?), stats(player), queue(rung),
@@ -57,6 +60,7 @@ export type Deps = {
 	now: (() -> number)?, -- seconds (default os.clock)
 	notify: ((player: any, kind: string, data: any) -> ())?, -- offers, idle warnings, toasts
 	onTransition: ((t: Transition) -> ())?, -- InfectionService, PoliceService, HUD hooks
+	purse: ((player: any) -> Purse)?, -- the town wallet's purse for a joining player (default: one of its own, at 0)
 }
 
 export type Member = LadderPlayer & { player: any, purse: Purse, jailedUntil: number? }
@@ -131,6 +135,10 @@ function RoleService.new(deps: Deps): Roles
 	} :: Roles
 
 	local function players(self: Roles): { [any]: LadderPlayer }
+		-- the queue's money term is the purse as it stands now (money is spent and earned outside the Ladder too)
+		for _, m in self.members do
+			m.stats.cents = m.purse.cents
+		end
 		return self.members :: any
 	end
 
@@ -306,12 +314,13 @@ function RoleService.new(deps: Deps): Roles
 		end
 		self.admitted[key] = true
 		self.admittedN += 1
+		local purse: Purse = if deps.purse then deps.purse(player) else Wallet.purse(0)
 		local m = {
 			id = key,
 			player = player,
 			rung = "human",
-			stats = { activeMinutes = 0, activeGameDays = 0, cents = 0, reputation = 0 },
-			purse = Wallet.purse(0),
+			stats = { activeMinutes = 0, activeGameDays = 0, cents = purse.cents, reputation = 0 },
+			purse = purse,
 		} :: Member
 		self.members[key] = m
 		self.lastInput[key] = clock()
@@ -368,6 +377,9 @@ function RoleService.new(deps: Deps): Roles
 
 	function roles.stats(self: Roles, player: any): Stats?
 		local m = self.members[player.UserId]
+		if m then
+			m.stats.cents = m.purse.cents
+		end
 		return if m then m.stats else nil
 	end
 

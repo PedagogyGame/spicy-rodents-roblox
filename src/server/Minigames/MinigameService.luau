@@ -128,8 +128,8 @@ local function sharedClock(): number
 end
 
 -- What the games may ask of the rest of the town, each member with a harmless stand-in when the caller gave
--- none: nobody to lend a body (nil), nothing charged (true), bests kept only as long as this server runs, and
--- the only people known being the ones at the tables.
+-- none: nobody to lend a body (nil), nothing charged (true; the game hands in the town's wallet: Boot/Game),
+-- bests kept only as long as this server runs, and the only people known being the ones at the tables.
 local function townOf(self: any, games: { [string]: any }?): ServerGame.Town
 	local g: { [string]: any } = games or {}
 	local bests: { [any]: { [string]: number } } = {}
