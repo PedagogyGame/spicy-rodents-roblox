@@ -49,7 +49,12 @@ SkyLiftView.BOARD_LINE = "Riding the sky lift. Move the mouse to look around. V:
 SkyLiftView.SIT_ROOT = 1.35 -- an R15 root above what it sits on (Client/Animation/AnimationDriver.SIT_SEAT)
 SkyLiftView.SLEW = 0.05 -- the most the smoothed clock gains or loses on the server's, per second of frames
 SkyLiftView.SNAP = 1 -- seconds: a bigger disagreement is taken at once
-SkyLiftView.SPIN_RANGE = 600 -- studs from the camera within which the wheels are turned
+SkyLiftView.SPIN_RANGE = 250 -- studs from the camera within which the wheels are turned
+-- a cabin further than FAR_RANGE from the camera is moved at most every FAR_PERIOD (at 1,200 studs a 0.25 s step
+-- of 3.75 studs is under a fifth of a degree); a nearer one, and so the rider's own, every frame
+SkyLiftView.FAR_RANGE = 1200
+SkyLiftView.FAR_PERIOD = 0.25
+SkyLiftView.SHADOW_SIZE = 2.5 -- cabin parts smaller than this (their size's length) cast no shadow
 SkyLiftView.BIND = "SpicySkyLift"
 SkyLiftView.FOLDER = "SkyLiftCabins"
 SkyLiftView.RIDERS_PERIOD = 0.1 -- seconds between looks for bodies with a Ride attribute
@@ -80,6 +85,7 @@ type State = {
 	waited: number,
 	warned: boolean,
 	scanAcc: number,
+	farAcc: number,
 	ridersAcc: number,
 	lightsAcc: number,
 	riders: { any },
@@ -275,6 +281,9 @@ local function makeCabins(s: State, tpl: any)
 		for _, d in m:GetDescendants() do
 			if d:IsA("BasePart") then
 				d.Anchored = true
+				if d.Size.Magnitude < SkyLiftView.SHADOW_SIZE then
+					d.CastShadow = false -- (small detail: no visible shadow, and every cabin moves every frame)
+				end
 				table.insert(cab.parts, { part = d, rel = inv * d.CFrame, leaf = leafOf[d] or 0 })
 			end
 		end
@@ -455,15 +464,28 @@ function SkyLiftView.frame(dt: number)
 		end
 	end
 
+	local before = s.t
 	local t = SkyLiftView.advance(s.t, dt, now(s))
 	s.t = t
 	local parts, cframes = s.parts, s.cframes
 	table.clear(parts)
 	table.clear(cframes)
 	local n = 0
-	-- the cabins and their doors
+	-- the cabins and their doors (far ones only every FAR_PERIOD)
+	local cam = workspace.CurrentCamera
+	local camPos = cam and cam.CFrame.Position
+	s.farAcc += dt
+	-- (a jump of the clock, as at the first frame or a snap to the server's, redraws every cabin)
+	local farDue = s.farAcc >= SkyLiftView.FAR_PERIOD or before == nil or math.abs(t - before - dt) > 0.5
+	if farDue then
+		s.farAcc = 0
+	end
+	local far2 = SkyLiftView.FAR_RANGE * SkyLiftView.FAR_RANGE
 	for i, cab in s.cabins do
 		local x, y, z, yaw = SkyLift.cabin(i, t)
+		if not farDue and camPos and (x - camPos.X) ^ 2 + (y - camPos.Y) ^ 2 + (z - camPos.Z) ^ 2 > far2 then
+			continue
+		end
 		local cf = CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0)
 		local f = SkyLift.doorFrac(i, t)
 		local fore = cf * CFrame.new(0, 0, cab.slide[1] * f)
@@ -476,8 +498,6 @@ function SkyLiftView.frame(dt: number)
 		end
 	end
 	-- the wheels near the camera
-	local cam = workspace.CurrentCamera
-	local camPos = cam and cam.CFrame.Position
 	for _, list in s.wheels do
 		for _, w in list do
 			if camPos and (w.part.Position - camPos).Magnitude > SkyLiftView.SPIN_RANGE then
@@ -515,6 +535,7 @@ function SkyLiftView.start(opts: Opts?): () -> ()
 		waited = 0,
 		warned = false,
 		scanAcc = SkyLiftView.SCAN_PERIOD,
+		farAcc = SkyLiftView.FAR_PERIOD,
 		ridersAcc = SkyLiftView.RIDERS_PERIOD,
 		lightsAcc = SkyLiftView.LIGHTS_PERIOD,
 		riders = {},

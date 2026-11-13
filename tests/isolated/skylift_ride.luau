@@ -127,11 +127,17 @@ return function(t)
 			clock.now = w.clock
 			-- the client: the view on the same server clock, bound to the render step
 			local stopView = SkyLiftView.start()
+			-- the camera follows the player's body, as on a screen (the view moves far cabins less often)
+			local subject: any = nil
 			local function tick(seconds: number)
 				for _ = 1, math.max(1, math.ceil(seconds / DT - 1e-9)) do
 					w.clock += DT
 					clock.now = w.clock
 					w.svc:step(DT)
+					local root = subject and subject.body and subject.body.PrimaryPart
+					if root then
+						rawset(ws.CurrentCamera, "CFrame", roblox.CFrame.new(root.Position))
+					end
 					FakeEngine.renderStep(DT)
 				end
 			end
@@ -139,6 +145,7 @@ return function(t)
 			t.eq(#ws:FindFirstChild(SkyLiftView.FOLDER):GetChildren(), SkyLift.CABINS, "six cabins on this screen")
 
 			local p = SkyLiftFlow.player(w, "Ann", "human", SkyLiftFlow.atGate(w, "base"))
+			subject = p
 			for _, leg in { { "base", "summit" }, { "summit", "base" } } do
 				local from, to = leg[1], leg[2]
 				-- the gate
@@ -199,7 +206,9 @@ return function(t)
 					end
 				end
 				t.eq(worst < 0.05, true, `{from}: rider {worst} studs off the view's seat`)
-				t.eq(worstServer < 0.05, true, `{from}: server seat {worstServer} studs off the timetable`)
+				-- (the server places riders every PLACE_PERIOD: at most one period's travel behind the timetable)
+				local serverLimit = SkyLift.LINE_SPEED * SkyLiftService.PLACE_PERIOD + 0.05
+				t.eq(worstServer < serverLimit, true, `{from}: server seat {worstServer} studs off the timetable`)
 				-- V: the cabin from outside, and back
 				local third =
 					CameraPolicy.modeFor({ species = "human", vehicle = "gondola", firstPersonToggle = false })

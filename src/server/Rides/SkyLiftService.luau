@@ -71,6 +71,9 @@ SkyLiftService.MISSED = 3 -- a booking this far behind the clock (a server hitch
 -- a seated R15's root over the seat's top: the one number the client draws riders with too
 -- (Client/Rides/SkyLiftView.SIT_ROOT = Client/Animation/AnimationDriver.SIT_SEAT; a spec keeps them equal)
 SkyLiftService.ROOT_ABOVE_SEAT = 1.35
+-- seconds between the server's placings of a rider (and its seat): every screen draws riders from its own clock
+-- (Client/Rides/SkyLiftView), so the server's copy is for perception and replication only (review: 60 Hz cost)
+SkyLiftService.PLACE_PERIOD = 0.1
 SkyLiftService.STEP_BACK = 3 -- (no bake) the gate post stands this far back from the board point
 SkyLiftService.LUNCH_CENTS = 10 -- the hilltop lunch, once a wallet exists (EconomyRules.PRICES.hilltop_lunch)
 SkyLiftService.LUNCH_SECS = 240 -- a served lunch clears itself after this long
@@ -219,6 +222,7 @@ type Ride = {
 	hold: Hold?,
 	orphaned: boolean, -- its player let go of it (hold may still be nil when the game could not hold it)
 	outing: boolean?, -- a townsperson on an outing to the Lookout (no player ever held it)
+	placedT: number?, -- the lift clock at its last placing
 	laps: number?, -- legs a left-behind body has ridden on, waiting to be let off out of sight
 }
 type Diner = { body: any, hold: Hold, chair: number, untilT: number }
@@ -959,6 +963,11 @@ function SkyLiftService._move(self: any, ride: Ride, t: number)
 	if not ride.orphaned and (ride.player == nil or self.town.bodyOf(ride.player) ~= ride.body) then
 		self:_orphan(ride)
 	end
+	local last = ride.placedT
+	if last and t >= last and t - last < SkyLiftService.PLACE_PERIOD - 1e-6 then
+		return
+	end
+	ride.placedT = t
 	local seatCf, rootCf, x, y, z, yaw = seatCFrames(ride.cabin, ride.seat, t)
 	ride.seatPart.CFrame = seatCf
 	if ride.hold then

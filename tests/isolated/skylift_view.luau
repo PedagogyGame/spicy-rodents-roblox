@@ -291,6 +291,9 @@ return function(t)
 		function()
 			FakeEngine.with(function()
 				local rig = newRig()
+				-- the camera over the middle of the line: every cabin within FAR_RANGE (moved every frame)
+				local a, b = SkyLift.stations().base.wheel, SkyLift.stations().summit.wheel
+				rawset(FakeEngine.workspace().CurrentCamera, "CFrame", CF.new((a.x + b.x) / 2, 80, (a.z + b.z) / 2))
 				local stop = SkyLiftView.start()
 				local seed = 7
 				local function wobble(): number -- 0..1, a small LCG (no Random on the fake engine)
@@ -327,6 +330,71 @@ return function(t)
 				t.truthy(worst <= limit, `a cabin moved {worst} in a frame (limit {limit})`)
 				t.truthy(drift < 0.1, `the smoothed clock strayed {drift} s`)
 				t.truthy(stations.base > 0 and stations.summit > 0, "the lap went through both stations")
+				stop()
+			end)
+		end
+	)
+
+	t.test(
+		"cost (review): far cabins move every FAR_PERIOD, near ones every frame; small parts cast no shadow",
+		function()
+			FakeEngine.with(function()
+				local rig = newRig()
+				local cam = FakeEngine.workspace().CurrentCamera
+				-- 2,500 studs out in town: every cabin is far
+				rawset(cam, "CFrame", CF.new(1500, 40, 1000))
+				local stop = SkyLiftView.start()
+				rig.now = EPOCH + 10
+				FakeEngine.renderStep(DT)
+				local function origin(i: number): any
+					return SkyLiftView.cabinModel(i):FindFirstChild("Origin").Position
+				end
+				local moved, frames = 0, 0
+				local last = origin(1)
+				for _ = 1, 60 do
+					rig.now += DT
+					FakeEngine.renderStep(DT)
+					frames += 1
+					local p = origin(1)
+					if (p - last).Magnitude > 1e-6 then
+						moved += 1
+						-- when it moves, it is where the clock says
+						local x, y, z = SkyLift.cabin(1, SkyLiftView.clock() :: number)
+						t.truthy((p - V3.new(x, y, z)).Magnitude < 0.05, "a far cabin drawn off its place")
+					end
+					last = p
+				end
+				local most = math.ceil(frames * DT / SkyLiftView.FAR_PERIOD) + 1
+				t.truthy(
+					moved >= 2 and moved <= most,
+					`a far cabin moved in {moved} of {frames} frames (at most {most})`
+				)
+				-- the camera in cabin 2 (riding): that cabin is moved every frame
+				moved = 0
+				for _ = 1, 30 do
+					local x, y, z = SkyLift.cabin(2, SkyLiftView.clock() :: number)
+					rawset(cam, "CFrame", CF.new(x, y + 5, z))
+					local before = origin(2)
+					rig.now += DT
+					FakeEngine.renderStep(DT)
+					if (origin(2) - before).Magnitude > 1e-6 then
+						moved += 1
+					end
+				end
+				t.eq(moved, 30, "the rider's own cabin skipped frames")
+				-- small detail parts cast no shadow; the body does
+				local small, big = 0, 0
+				for _, d in SkyLiftView.cabinModel(1):GetDescendants() do
+					if d:IsA("BasePart") then
+						if d.Size.Magnitude < SkyLiftView.SHADOW_SIZE then
+							t.eq(d.CastShadow, false, d.Name)
+							small += 1
+						else
+							big += 1
+						end
+					end
+				end
+				t.truthy(small > 0 and big > 0, `{small} small, {big} big parts`)
 				stop()
 			end)
 		end

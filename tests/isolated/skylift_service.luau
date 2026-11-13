@@ -799,6 +799,36 @@ return function(t)
 			end)
 		end
 	)
+	t.test("cost (review): a rider is placed by the server every PLACE_PERIOD, not every Heartbeat", function()
+		FakeEngine.with(function()
+			local w = world({ start = 0 })
+			local p = SkyLiftFlow.player(w, "Ann", "human", SkyLiftFlow.atGate(w, "base"))
+			w.svc:press(p, "base")
+			local b = w.svc.waiters[p]
+			while w.svc:time() < b.boardAt + 2 do
+				SkyLiftFlow.step(w, 1 / 60, 1 / 60)
+			end
+			t.eq(w.svc:busy(p), "riding")
+			local placings, last = 0, p.body:GetPivot().Position
+			local steps = 180 -- three seconds of Heartbeats
+			for _ = 1, steps do
+				SkyLiftFlow.step(w, 1 / 60, 1 / 60)
+				local now = p.body:GetPivot().Position
+				if (now - last).Magnitude > 1e-6 then
+					placings += 1
+					-- and each placing is the timetable's seat at that moment
+					local x, y, z = SkyLift.seat(b.cabin, b.seat, w.svc:time())
+					local want = y + SkyLiftService.ROOT_ABOVE_SEAT
+					t.truthy(math.abs(now.X - x) < 0.05 and math.abs(now.Z - z) < 0.05, "placed off the seat")
+					t.truthy(math.abs(now.Y - want) < 0.05, `placed {now.Y - want} off the seat's height`)
+				end
+				last = now
+			end
+			local want = 3 / SkyLiftService.PLACE_PERIOD
+			t.truthy(placings >= want - 2 and placings <= want + 2, `{placings} placings in 3 s (want about {want})`)
+		end)
+	end)
+
 	-- a town whose AI townspeople can be fetched (Town.recruit) and sent home (Town.home), for the Lookout's life
 	local function lively(w: any, max: number): { any }
 		local made = {}
