@@ -1,0 +1,376 @@
+{
+  "about": "sky lift scratch views",
+  "defaults": {
+    "res": "960x540",
+    "samples": 20
+  },
+  "sun": {
+    "angleDeg": 1.5,
+    "color": [
+      1,
+      0.86,
+      0.68
+    ],
+    "dir": [
+      0.7,
+      0.55,
+      -0.45
+    ],
+    "skyStrength": 1,
+    "strength": 3.6
+  },
+  "views": [
+    {
+      "aboveGround": true,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -775.3553137894224,
+        6.5,
+        -903.1067541918992
+      ],
+      "name": "sl_station_front",
+      "pos": [
+        -738.1758966616161,
+        5.5,
+        -924.2181478464304
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 70,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -782.1449254123024,
+        10.9,
+        -926.1480469943973
+      ],
+      "name": "sl_station_platform",
+      "pos": [
+        -760.8825634110348,
+        12.3,
+        -890.0764243232858
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 70,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -772.0502570892713,
+        11.7,
+        -880.9916778816356
+      ],
+      "name": "sl_station_back",
+      "pos": [
+        -793.9189490670427,
+        12.3,
+        -917.9132205252109
+      ]
+    },
+    {
+      "aboveGround": true,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -893.3,
+        11.996007882062223,
+        -1223.69
+      ],
+      "name": "sl_tower_close",
+      "pos": [
+        -870.4058735287268,
+        5.5,
+        -1219.2336592233817
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -893.3,
+        32.7,
+        -1223.69
+      ],
+      "name": "sl_tower_head",
+      "pos": [
+        -883.4683030720163,
+        31.200000000000003,
+        -1234.705340916934
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -890.6781383437904,
+        23.515755230703405,
+        -1227.0169481520009
+      ],
+      "name": "sl_cabin_seat1",
+      "pos": [
+        -883.8514465582176,
+        26.515755230703405,
+        -1208.2181109734731
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -879.004495390461,
+        23.515755230703405,
+        -1194.8709365767183
+      ],
+      "name": "sl_cabin_seat3",
+      "pos": [
+        -885.8311871760337,
+        26.515755230703405,
+        -1213.669773755246
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 75,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -865.1514488889252,
+        20.515755230703405,
+        -1223.520074480437
+      ],
+      "name": "sl_cabin_window",
+      "pos": [
+        -881.2196093532237,
+        26.515755230703405,
+        -1209.1738478234531
+      ]
+    },
+    {
+      "aboveGround": true,
+      "fov": 55,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -1027.48,
+        114.74,
+        -1593.29
+      ],
+      "name": "sl_line_from_base",
+      "pos": [
+        -771.8136991150117,
+        5.5,
+        -942.3426684223336
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -1000,
+        60,
+        -1500
+      ],
+      "name": "sl_air_hill",
+      "pos": [
+        -650,
+        220,
+        -700
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -1030,
+        80,
+        -1640
+      ],
+      "name": "sl_air_hill_close",
+      "pos": [
+        -820,
+        190,
+        -1380
+      ]
+    },
+    {
+      "aboveGround": false,
+      "fov": 70,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -1089.9223731279246,
+        120,
+        -1691.8284804203179
+      ],
+      "name": "sl_summit_hall",
+      "pos": [
+        -1044.5650498436241,
+        123.1,
+        -1675.276645945449
+      ]
+    },
+    {
+      "aboveGround": true,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -966,
+        6,
+        -1506
+      ],
+      "name": "sl_trail_steep",
+      "pos": [
+        -918,
+        5.5,
+        -1452
+      ]
+    },
+    {
+      "aboveGround": true,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -1062,
+        1,
+        -1534
+      ],
+      "name": "sl_trail_bank",
+      "pos": [
+        -978,
+        5.5,
+        -1497
+      ]
+    },
+    {
+      "aboveGround": true,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -1030,
+        6,
+        -1524
+      ],
+      "name": "sl_trail_bank_below",
+      "pos": [
+        -1010,
+        4,
+        -1488
+      ]
+    },
+    {
+      "aboveGround": true,
+      "fov": 60,
+      "groups": [
+        "town",
+        "terrain",
+        "attractions",
+        "backdrop",
+        "backdrop_terrain"
+      ],
+      "look": [
+        -745,
+        8,
+        -905
+      ],
+      "name": "sl_road_up",
+      "pos": [
+        -722.5,
+        5.5,
+        -650
+      ]
+    }
+  ]
+}

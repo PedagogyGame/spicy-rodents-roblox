@@ -1,0 +1,200 @@
+{
+ "about": "The way to the sky lift signposted (review fix: tools/bake/skylift/Signs and the station's frontage). Bake and export as review_views.json says, then render.py --views docs/renders/skylift/signs_views.json.",
+ "defaults": {
+  "res": "960x540",
+  "samples": 20
+ },
+ "views": [
+  {
+   "name": "s_centre_finger",
+   "desc": "The town's central crossing, from the north-east corner: the fingerpost on the south-west corner pointing west to the sky lift.",
+   "pos": [
+    -12,
+    5.6,
+    -14
+   ],
+   "look": [
+    -33.4,
+    7.4,
+    -33.4
+   ],
+   "fov": 60,
+   "aboveGround": true,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ]
+  },
+  {
+   "name": "s_westside_mid",
+   "desc": "The westside street where the centre's cross street comes in: the fingerpost on the east sidewalk pointing south.",
+   "pos": [
+    -716,
+    5.6,
+    6
+   ],
+   "look": [
+    -695,
+    7.4,
+    -24
+   ],
+   "fov": 60,
+   "aboveGround": true,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ]
+  },
+  {
+   "name": "s_street_end",
+   "desc": "Walking south down the westside street toward its end: the pylon where Lift Road begins, the station beyond.",
+   "pos": [
+    -728,
+    5.6,
+    -520
+   ],
+   "look": [
+    -752,
+    14,
+    -660
+   ],
+   "fov": 60,
+   "aboveGround": true,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ]
+  },
+  {
+   "name": "s_lift_road",
+   "desc": "Lift Road from the pylon: the banners on the lamp posts, the shelter with its map board, the station at the end.",
+   "pos": [
+    -735,
+    5.6,
+    -640
+   ],
+   "look": [
+    -725,
+    7,
+    -800
+   ],
+   "fov": 60,
+   "aboveGround": true,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ]
+  },
+  {
+   "name": "s_station_front",
+   "desc": "The base station from the car park: the canopy over the steps, the benches, the bike rack and the flags.",
+   "pos": [
+    -738.18,
+    5.5,
+    -924.22
+   ],
+   "look": [
+    -775.36,
+    7.5,
+    -903.11
+   ],
+   "fov": 60,
+   "aboveGround": true,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ]
+  },
+  {
+   "name": "s_street_end_night",
+   "desc": "The street's end at night: the floodlit pylon and Lift Road's lamps.",
+   "pos": [
+    -728,
+    5.6,
+    -520
+   ],
+   "look": [
+    -752,
+    14,
+    -660
+   ],
+   "fov": 60,
+   "aboveGround": true,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ],
+   "light": {
+    "sun": [
+     0.482,
+     0.835,
+     0.267
+    ],
+    "sunStrength": 0.16,
+    "sunColor": [
+     0.62,
+     0.72,
+     1.0
+    ],
+    "sky": {
+     "zenith": [
+      0.004,
+      0.006,
+      0.022
+     ],
+     "mid": [
+      0.008,
+      0.012,
+      0.035
+     ],
+     "horizon": [
+      0.03,
+      0.04,
+      0.075
+     ],
+     "ground": [
+      0.01,
+      0.012,
+      0.02
+     ],
+     "strength": 1.0
+    },
+    "haze": {
+     "color": [
+      0.025,
+      0.032,
+      0.055
+     ],
+     "start": 300,
+     "half": 3800,
+     "max": 0.9
+    },
+    "neon": 14,
+    "cardTint": [
+     0.35,
+     0.4,
+     0.55
+    ],
+    "cardStrength": 0.12
+   }
+  }
+ ]
+}

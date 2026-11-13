@@ -2,6 +2,7 @@
 -- W1 §4.4 #5: CameraPolicy modes (brief v2 §14), InputMap's pure parts and the controller choice.
 local CameraPolicy = require("@client/Camera/CameraPolicy")
 local InputMap = require("@client/Input/InputMap")
+local CameraRig = require("@client/Camera/CameraRig")
 local PossessionClient = require("@client/Possession/PossessionClient")
 
 return function(t)
@@ -55,5 +56,39 @@ return function(t)
 		t.eq(PossessionClient.controllerFor("squirrel", "spicy"), "squirrel")
 		t.eq(PossessionClient.controllerFor("fox"), "quadruped")
 		t.eq(PossessionClient.controllerFor("deer"), "quadruped")
+	end)
+
+	t.test("the gondola's free look (review: no test): yaw wraps, pitch clamps, I inverts, any start", function()
+		local P = CameraRig.CABIN_PITCH
+		local tau = 2 * math.pi
+		-- the mouse right turns the view right (yaw down), all the way round and wrapped into [0, 2 pi)
+		local yaw, pitch = 0.1, 0
+		for _ = 1, 40 do
+			yaw, pitch = CameraRig.cabinLook(yaw, pitch, 0.2, 0, false)
+			t.truthy(yaw >= 0 and yaw < tau, `yaw {yaw} not wrapped`)
+		end
+		t.near(yaw, (0.1 - 8) % tau, 1e-9, "forty turns of 0.2")
+		t.eq(pitch, 0)
+		-- up and down: the mouse down looks down, clamped at the limits either way
+		local _, down = CameraRig.cabinLook(0, 0, 0, 0.3, false)
+		t.near(down, -0.3, 1e-9)
+		local _, low = CameraRig.cabinLook(0, P.min + 0.1, 0, 5, false)
+		t.eq(low, P.min)
+		local _, high = CameraRig.cabinLook(0, P.max - 0.1, 0, -5, false)
+		t.eq(high, P.max)
+		-- I: inverted, the same mouse looks up
+		local _, up = CameraRig.cabinLook(0, 0, 0, 0.3, true)
+		t.near(up, 0.3, 1e-9)
+		t.truthy(P.min < 0 and P.max > 0, "the limits straddle level")
+	end)
+
+	t.test("Reset in a cabin says where you get off and moves nothing; on foot it moves you (review)", function()
+		t.eq(PossessionClient.resetWords(true, "ride", "summit"), PossessionClient.rideWords("summit"))
+		t.eq(PossessionClient.resetWords(true, "ride", "base"), PossessionClient.rideWords("base"))
+		t.truthy(string.find(PossessionClient.rideWords("base"), "bottom", 1, true) ~= nil)
+		t.truthy(string.find(PossessionClient.rideWords("summit"), "top", 1, true) ~= nil)
+		t.eq(PossessionClient.resetWords(true, nil, nil), nil, "on foot Reset moves the body")
+		t.eq(PossessionClient.resetWords(true, "vehicle", nil), nil, "a car is not a ride")
+		t.truthy(PossessionClient.resetWords(false, nil, nil) ~= nil, "no body: words, not a silent press")
 	end)
 end
