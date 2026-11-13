@@ -54,6 +54,15 @@ function WalletFlow.play(wallet: any, opts: Opts): { [string]: any }
 		`the balance on the player did not follow ({tostring(attrs.Cents)}, {tostring(attrs.CentsNote)})`
 	)
 
+	-- a sale by id, as the shops sell (the list's price and the thing's name), handed over and then given back
+	local served = false
+	local byId, byIdWords = wallet.buy(player, "nachos", function(): (boolean?, string?)
+		served = true
+		return true
+	end)
+	check(byId and served and byIdWords == "Paid 5c for nachos. You have S$2.83.", `by id: {tostring(byIdWords)}`)
+	wallet.add(player, 5, "nachos handed back")
+
 	-- too dear, and a price that is missing
 	local short, shortWords = wallet.spend(player, 1000, "a jet ski")
 	check(not short and shortWords == "You need S$10.00; you have S$2.88.", `too dear: {tostring(shortWords)}`)
