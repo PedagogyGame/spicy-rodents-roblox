@@ -20,6 +20,15 @@
 --   * a body has a footprint (Stream, "the height rule"): a pose whose feet point is up to a stud past
 --     the edge of a floor is still standing on it. The contract's point test refuses an honest player
 --     who stands at an edge.
+--   * the body rule (onMove e, "the body") counts height only for a body that stands: while a pose is
+--     falling, and a quarter of a second after, the replicated body is still on its way down behind its
+--     own Moves and only the sideways distance is held to TRUST.bodySlack (Stream, "the body rule");
+--   * silence is measured from a placement as well as from a Move (Stream.placed): a client back from
+--     being tagged out is owed all of Clock.DROP_SECS, not what its time out left of it;
+--   * a click that came later than its own delay explains is also judged at its own stamp, no further
+--     back than Clock.MAG_LATE (onFire; Stream, "a click that came late"): as written, a strafing
+--     shooter's click behind one lost packet is refused, which the lane guide's own "three shots
+--     bunched half a second late are all accepted" says it must not be.
 -- AND THREE PLACES WHERE IT DID NOT DO AS WRITTEN, because as written a liar gains (all reported):
 --   * a fall must fall (Stream, "the height rule"): an unsupported pose that does not come down at a
 --     quarter of gravity or faster is refused, not allowed to walk level for the whole of TRUST.fallSecs;
@@ -921,12 +930,8 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 				end
 				if not person.out then
 					local x, y, z, yaw, pitch, bits = Stream.poseAt(person, Clock.poseTime(person.up, tick))
-					local moves = person.moves
-					local newest = if #moves > 0 then moves[#moves].bits else person.anchor.bits
-					person.crouch =
-						Body.crouchStep(person.crouch, Wire.has(newest, BIT.crouch), 1 / Clock.SNAP_HZ, feel)
 					pose.x, pose.y, pose.z, pose.yaw, pose.pitch = x, y, z, yaw, pitch
-					pose.crouch = person.crouch
+					pose.crouch = Stream.ease(person, tick, feel)
 					pose.bits = bits
 				end
 			end
@@ -1632,19 +1637,26 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			if clamped then
 				stats.rewindsClamped += 1
 			end
-			local x, y, z = Stream.poseAt(person, f)
 			local dx, dy, dz = rec.dx, rec.dy, rec.dz
 			local len = math.sqrt(dx * dx + dy * dy + dz * dz)
-			if Stream.sprinting(person, f) then
-				why = "sprint" -- c
-			elseif
-				ArenaModule.inRoom(arena.spawnRooms[1], x, y + 0.1, z)
-				or ArenaModule.inRoom(arena.spawnRooms[2], x, y + 0.1, z)
-			then
-				why = "safe" -- d
-			elseif len < 1e-6 or not Stream.originOk(person, f, rec.ox, rec.oy, rec.oz, arena.sweep, state.feel) then
-				why = "origin" -- e
-			else
+			-- c, d, e: the sprint window, the spawn rooms and the origin, at f
+			why = Stream.clickOk(person, f, rec.ox, rec.oy, rec.oz, arena, state.feel)
+			if why ~= nil then
+				-- a click that came later than its own delay explains (a lost packet sent again) is also
+				-- judged where and how its body was when it was clicked, no further back than the magazine's
+				-- bound (Stream, "a click that came late")
+				local click = math.max(rec.ft, now - Clock.MAG_LATE)
+				if
+					click < f - 1e-6
+					and Stream.clickOk(person, click, rec.ox, rec.oy, rec.oz, arena, state.feel, now) == nil
+				then
+					why = nil
+				end
+			end
+			if why == nil and len < 1e-6 then
+				why = "origin" -- (a direction of no length)
+			end
+			if why == nil then
 				-- f
 				local ok, no = Rules.fire(state, id, f, m)
 				if not ok then

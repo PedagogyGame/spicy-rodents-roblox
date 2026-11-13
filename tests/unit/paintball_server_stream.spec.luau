@@ -163,6 +163,20 @@ return function(t)
 				{ "refused", "wall" }
 			)
 			t.eq((Stream.judge(apart, rec, 100.05, arena, feel, nil, 20, 0, T.bodySlack - 1)), "accepted")
+			-- ... but only sideways while it falls: a body dropping off the landing (x 10.5..15, z -15..-7, a
+			-- storey up) is replicated a tenth of a second behind its own Moves, a dozen studs higher
+			local faller = Stream.new("cyd", 100)
+			Stream.placed(faller, 12.5, FLOOR, -8, 0, 100, feel, true)
+			local function drop(at: number, z: number, y: number, bodyY: number, bodyZ: number?): Stream.Verdict
+				local move = { t = at, x = 12.5, y = y, z = z, yaw = 0, pitch = 0, bits = Wire.BIT.air, place = 1 }
+				return (Stream.judge(faller, move, at, arena, feel, nil, 12.5, bodyY, bodyZ or z))
+			end
+			t.eq(drop(100.05, -5.5, FLOOR - 0.3, FLOOR), "accepted")
+			t.eq(drop(100.25, -5, FLOOR - 4, FLOOR + 8), "accepted", "falling: the body is twelve studs behind it")
+			t.eq(drop(100.3, -5, FLOOR - 6, FLOOR - 6, -5 - T.bodySlack - 1), "refused", "sideways it still counts")
+			t.eq(drop(100.4, -4.5, 0, 9), "accepted", "landed, the body still coming down")
+			t.eq(drop(100.5, -4.5, 0, 3), "accepted")
+			t.eq(drop(100.7, -4.5, 0, 9), "refused", "a body that stands is held to it up and down as well")
 		end
 	)
 
@@ -354,14 +368,88 @@ return function(t)
 		t.deepEq({ Stream.silent(person, 101.2 + Clock.DROP_SECS + 0.01) }, { true, true })
 		person.out = true
 		t.deepEq({ Stream.silent(person, 150) }, { false, false }, "a client sends nothing while tagged out")
+		-- back from being out: the silence is measured from the placement, not from before the tag
+		Stream.placed(person, 20, 0, -40, 0, 150, feel, true)
+		t.deepEq({ Stream.silent(person, 150 + T.placeGrace) }, { false, false })
+		t.deepEq({ Stream.silent(person, 150 + T.placeGrace + 0.01) }, { true, false }, "it may not fire unheard")
+		t.deepEq({ Stream.silent(person, 150 + Clock.DROP_SECS - 0.01) }, { true, false })
+		t.deepEq({ Stream.silent(person, 150 + Clock.DROP_SECS + 0.01) }, { true, true })
+		Stream.placed(person, 20, 0, -40, 0, 160, feel, true)
 		-- a new match: the placement number, the upstream delay and the magazine time carry on
 		person.lastM = 101
 		Stream.restart(person, 200)
-		t.deepEq({ person.place, person.lastM, person.out, #person.moves }, { 1, 101, false, 0 })
+		t.deepEq({ person.place, person.lastM, person.out, #person.moves }, { 3, 101, false, 0 })
 		t.truthy(person.up.lag ~= nil)
 		Stream.placed(person, 0, 0, 0, 0, 200, feel, true)
-		t.eq(person.place, 2)
+		t.eq(person.place, 4)
 	end)
+
+	t.test(
+		"a click that came late is judged where and how its body was when it was clicked: the pose, the sprint window, the rooms and the stance of that time, and no click is judged at a time it was not made",
+		function()
+			local person, send, arena = placed(20, 0, -40)
+			local feel = Contract.feel()
+			local eye = Body.STAND_EYE
+			-- she strafes north at a walk, a Move every send interval, and the server ticks its crouch as it goes
+			local z = -40
+			local function walk(from: number, to: number, bits: number?)
+				local at = from
+				while at < to - 1e-9 do
+					at += SEND
+					z += Body.WALK * SEND
+					t.eq((send({ t = at, z = z, bits = bits or 0 })), "accepted")
+					Stream.ease(person, at, feel)
+				end
+			end
+			walk(100, 100.6)
+			local clickZ = z -- where she was at 100.6, when she clicked
+			walk(100.6, 100.9)
+			-- the click reaches the server at 100.9 behind a lost packet; her delay is nothing, so f = 100.825
+			local f = 100.9 - Clock.REWIND_TOLERANCE
+			t.eq(Stream.clickOk(person, f, 20, eye, clickZ, arena, feel), "origin", "at f she has walked on")
+			t.eq(Stream.clickOk(person, 100.6, 20, eye, clickZ, arena, feel, 100.9), nil, "at the click she was there")
+			t.eq(
+				Stream.clickOk(person, 100.6, 20 + T.originSlack + 0.5, eye, clickZ, arena, feel, 100.9),
+				"origin",
+				"and nowhere else"
+			)
+			t.eq(
+				Stream.clickOk(person, 100.4, 20, eye, clickZ, arena, feel, 100.9),
+				"origin",
+				"nor at another time than the one it names"
+			)
+			-- she ran on after the click: the sprint Moves stamped after it say nothing of it
+			walk(100.9, 101.1, Wire.BIT.sprint)
+			t.eq(Stream.clickOk(person, 101.1, 20, eye, clickZ, arena, feel), "sprint")
+			t.eq(Stream.clickOk(person, 100.6, 20, eye, clickZ, arena, feel, 101.1), nil)
+			t.eq(Stream.clickOk(person, 101.0, 20, eye, z, arena, feel, 101.1), "sprint", "a click made while running")
+			-- the stance is the one the server held then: she ducked after the click, and is fully crouched now
+			local ducker, duck = placed(20, 0, -40)
+			local at = 100
+			for i = 1, 16 do
+				at += SEND
+				duck({ t = at, bits = if i > 6 then Wire.BIT.crouch else 0 })
+				Stream.ease(ducker, at, feel)
+			end
+			t.eq(ducker.crouch, 1)
+			t.eq(Stream.crouchAt(ducker, 100.3), 0, "standing then")
+			t.eq(Stream.crouchAt(ducker, 100.45), 0.75, "three ticks into the crouch")
+			t.eq(Stream.crouchAt(ducker, 99), 0, "before the log: its oldest")
+			t.eq(Stream.clickOk(ducker, 100.8, 20, eye, -40, arena, feel), "origin", "standing height while crouched")
+			t.eq(Stream.clickOk(ducker, 100.3, 20, eye, -40, arena, feel, 100.8), nil, "a click made standing")
+			t.eq(
+				Stream.clickOk(ducker, 100.6, 20, eye, -40, arena, feel, 100.8),
+				"origin",
+				"a click made crouched is not a standing shot"
+			)
+			-- the rooms: a click made inside her own spawn room is no shot, whenever it arrives
+			local room = arena.spawnRooms[1]
+			local cx, cz = (room.minX + room.maxX) / 2, (room.minZ + room.maxZ) / 2
+			local homer = placed(cx, room.minY, cz)
+			t.eq(Stream.clickOk(homer, 100, cx, room.minY + eye, cz, arena, feel), "safe")
+			t.eq(Stream.clickOk(homer, 99.8, cx, room.minY + eye, cz, arena, feel, 100), "safe")
+		end
+	)
 
 	t.test(
 		"the pass desk: sold once for 20c through the town, good for five game days from the minute of buying, kept by user",

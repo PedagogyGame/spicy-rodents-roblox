@@ -24,11 +24,25 @@
 --   quarter of the engine's gravity: a real fall is four times that). Without this a pose could be
 --   walked level out over the atrium for the whole of fallSecs: 25 studs at a walk, the atrium's 30 at
 --   a sprint.
+-- THE BODY RULE (Contract, "the body": a pose within TRUST.bodySlack of the replicated body) is kept
+-- sideways always and up-and-down only for a body that stands: the replicated body trails its own
+-- client's Moves by the engine's physics replication, and a body dropping down the atrium at 100 studs
+-- a second is more than bodySlack behind its Move within a tenth of a second. While a pose is falling,
+-- and for LANDING seconds after, the height rule alone judges how high it is.
+-- A CLICK THAT CAME LATE (clickOk). The contract judges a click at f, the fire time held to the
+-- shooter's own delay. A click behind a lost packet arrives later than that delay explains: f is then
+-- later than the click, the body has walked on, and a strafing shooter's honest shot would be refused
+-- ("origin"; "sprint" if they ran on after it). Such a click is ALSO judged at its own stamp, no
+-- further back than Clock.MAG_LATE (the bound the contract gives the magazine for the same reason):
+-- the sprint window, the spawn rooms, the eye and the stance, all at that one time, from the Moves and
+-- the crouch the server itself held then. What a liar gains: a shot from where and how they really
+-- stood up to MAG_LATE ago, born no earlier than f. (Reported.)
 -- Interface: new(player, now, placeFrom?) -> Person; restart(person, now); placed(person, x, y, z, yaw,
 --   now, feel, stand); judge(person, rec, now, arena, feel, otherRoom?, bx?, by?, bz?) -> (verdict,
 --   why?); refused(person, now) -> correct; poseAt(person, t) -> (x, y, z, yaw, pitch, bits,
---   newestT); sprinting(person, f) -> boolean; originOk(person, f, ox, oy, oz, sweep, feel) -> boolean;
---   silent(person, now) -> (stale, drop); types Move, Person, Verdict
+--   newestT); ease(person, tick, feel) -> crouch; crouchAt(person, t) -> crouch; sprinting(person, f)
+--   -> boolean; originOk(person, f, ox, oy, oz, sweep, feel, now?) -> boolean; clickOk(person, at, ox,
+--   oy, oz, arena, feel, now?) -> why?; silent(person, now) -> (stale, drop); types Move, Person, Verdict
 
 local Import = require("../../Import")
 local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
@@ -76,6 +90,8 @@ export type Person = {
 	out: boolean, -- tagged out: Moves are dropped and the pose is held until the respawn
 	fallSince: number?, -- the t of the first unsupported Move of the fall it is in
 	fallFromY: number, -- and that Move's height
+	fellAt: number, -- the t of the last accepted Move that was falling
+	crouchLog: { number }, -- (tick, crouch fraction) pairs of the last CROUCH_KEPT snapshot ticks, oldest first
 	refusals: { number }, -- when its recent Moves were refused (inside TRUST.refusalWindow)
 	idleAt: number, -- when it last moved, turned or fired
 	idleX: number,
@@ -94,6 +110,8 @@ local IDLE_RAD = 0.05
 local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands on
 local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
 local FALL_SLACK = 0.5
+local LANDING = 0.25 -- seconds after a fall in which the replicated body may still be coming down
+local CROUCH_KEPT = 14 -- snapshot ticks of crouch kept (0.7 s: past Clock.MAG_LATE and a tick each side)
 
 local Stream = {}
 
@@ -122,6 +140,8 @@ function Stream.new(player: any, now: number, placeFrom: number?): Person
 		out = false,
 		fallSince = nil,
 		fallFromY = 0,
+		fellAt = -math.huge,
+		crouchLog = {},
 		refusals = {},
 		idleAt = now,
 		idleX = 0,
@@ -141,6 +161,8 @@ function Stream.restart(person: Person, now: number)
 	person.heardAt = now
 	person.out = false
 	person.fallSince = nil
+	person.fellAt = -math.huge
+	table.clear(person.crouchLog)
 	table.clear(person.refusals)
 	person.idleAt = now
 end
@@ -161,12 +183,16 @@ function Stream.placed(
 	person.place = place
 	person.placeFrom = place
 	person.placedAt = now
+	-- (silence is measured from here: a client that was tagged out has sent nothing since the tag, and
+	-- is owed the whole of Clock.DROP_SECS to be heard from again, not what the respawn left of it)
+	person.heardAt = now
 	table.clear(person.moves)
 	local bits = if stand then 0 else bit32.band(person.anchor.bits, BIT.crouch)
 	-- (its t is the placement's own time: a shot fired before any Move has come is costed from here)
 	person.anchor = { t = now, x = x, y = y, z = z, yaw = yaw, pitch = 0, bits = bits }
 	if stand then
 		person.crouch = 0
+		table.clear(person.crouchLog)
 		person.out = false
 		-- (a placement is the server's doing: it does not restart the idle clock, but the pose idleness is
 		-- measured against is the one the body now stands at)
@@ -178,6 +204,7 @@ function Stream.placed(
 	-- its first Move after the correction fills the budget with that Move's own time.
 	person.budget = if stand then fullBudget(person.crouch, feel) else 0
 	person.fallSince = nil
+	person.fellAt = -math.huge
 	table.clear(person.refusals)
 end
 
@@ -280,9 +307,12 @@ function Stream.judge(
 	if step > budget then
 		return "refused", "speed"
 	end
-	-- the body
+	-- the body (sideways always; up and down only for a body that stands: see the header)
 	if bx ~= nil and by ~= nil and bz ~= nil then
 		local ex, ey, ez = x - bx, y - by, z - bz
+		if falling or t - person.fellAt <= LANDING then
+			ey = 0
+		end
 		if ex * ex + ey * ey + ez * ez > T.bodySlack * T.bodySlack then
 			return "refused", "wall"
 		end
@@ -302,6 +332,7 @@ function Stream.judge(
 			person.fallSince = t
 			person.fallFromY = y
 		end
+		person.fellAt = t
 	else
 		person.fallSince = nil
 	end
@@ -361,6 +392,39 @@ function Stream.poseAt(person: Person, t: number): (number, number, number, numb
 	return oldest.x, oldest.y, oldest.z, oldest.yaw, oldest.pitch, oldest.bits, newest.t
 end
 
+-- The snapshot tick `tick`: the crouch fraction takes one step towards what the newest Move's crouch bit
+-- asks for (Body.crouchStep over one snapshot interval), and the step is logged.
+function Stream.ease(person: Person, tick: number, feel: Feel): number
+	local moves = person.moves
+	local newest = if #moves > 0 then moves[#moves].bits else person.anchor.bits
+	local c = Body.crouchStep(person.crouch, Wire.has(newest, BIT.crouch), 1 / Clock.SNAP_HZ, feel)
+	person.crouch = c
+	local log = person.crouchLog
+	if #log >= 2 * CROUCH_KEPT then
+		table.remove(log, 1)
+		table.remove(log, 1)
+	end
+	table.insert(log, tick)
+	table.insert(log, c)
+	return c
+end
+
+-- The crouch fraction the server held at time t: that of the newest logged tick at or before t, the
+-- oldest logged when t is before them all, the present one when nothing is logged.
+function Stream.crouchAt(person: Person, t: number): number
+	local log = person.crouchLog
+	local n = #log
+	if n == 0 then
+		return person.crouch
+	end
+	for i = n - 1, 1, -2 do
+		if log[i] <= t then
+			return log[i + 1]
+		end
+	end
+	return log[2]
+end
+
 -- Was the marker down at fire time f? A Move stamped inside (f - SPRINT_FIRE_DELAY + MARGIN.sprint, f]
 -- carries BIT.sprint. (A Move stamped after f says nothing of the click: sprint may begin again the
 -- frame after the ball has left, and an unreliable Move may overtake the reliable click.)
@@ -375,6 +439,9 @@ function Stream.sprinting(person: Person, f: number): boolean
 end
 
 -- Did a shot leave from this person's own eye at fire time f (Contract, "the origin")?
+-- With `now` (a click judged at its own stamp, earlier than the contract's f: clickOk) the stance is
+-- the one the server held when the Moves of that time were arriving: the crouch logged at f + the
+-- upstream delay, and where the crouch bit of the Move at f was heading.
 function Stream.originOk(
 	person: Person,
 	f: number,
@@ -382,23 +449,57 @@ function Stream.originOk(
 	oy: number,
 	oz: number,
 	sweep: Sweep,
-	feel: Feel
+	feel: Feel,
+	now: number?
 ): boolean
-	local x, y, z, _, _, _, newestT = Stream.poseAt(person, f)
+	local x, y, z, _, _, bitsAt, newestT = Stream.poseAt(person, f)
 	local newestBits = if #person.moves > 0 then person.moves[#person.moves].bits else person.anchor.bits
+	local crouch = person.crouch
+	if now ~= nil then
+		crouch = Stream.crouchAt(person, math.min(now, f + (person.up.lag or 0)))
+		newestBits = bitsAt
+	end
 	local past = math.max(0, f - newestT)
-	local reach = T.originSlack + Body.speed(person.crouch, false, feel) * past
+	local reach = T.originSlack + Body.speed(crouch, false, feel) * past
 	local dx, dz = ox - x, oz - z
 	if dx * dx + dz * dz > reach * reach then
 		return false
 	end
-	local eyeA = Body.eye(person.crouch)
+	local eyeA = Body.eye(crouch)
 	local eyeB = Body.eye(if Wire.has(newestBits, BIT.crouch) then 1 else 0)
 	local slack = T.originSlackY + (if Wire.has(newestBits, BIT.air) then Body.JUMP_HEIGHT else 0)
 	if oy < y + math.min(eyeA, eyeB) - slack or oy > y + math.max(eyeA, eyeB) + slack then
 		return false
 	end
 	return ArenaModule.clearPath(sweep, x, z, ox, oz, oy)
+end
+
+-- The three things a click is judged on from the shooter's own stream, all at one time `at`
+-- (PaintballService.onFire c, d, e): the sprint window, the spawn rooms, the origin. Returns the
+-- Contract.WHY code of the first that refuses it, or nil. `now` is given when `at` is the click's own
+-- stamp and not the contract's f (see the header, "a click that came late").
+function Stream.clickOk(
+	person: Person,
+	at: number,
+	ox: number,
+	oy: number,
+	oz: number,
+	arena: Arena,
+	feel: Feel,
+	now: number?
+): string?
+	if Stream.sprinting(person, at) then
+		return "sprint"
+	end
+	local x, y, z = Stream.poseAt(person, at)
+	local rooms = arena.spawnRooms
+	if ArenaModule.inRoom(rooms[1], x, y + 0.1, z) or ArenaModule.inRoom(rooms[2], x, y + 0.1, z) then
+		return "safe"
+	end
+	if not Stream.originOk(person, at, ox, oy, oz, arena.sweep, feel, now) then
+		return "origin"
+	end
+	return nil
 end
 
 -- Silence (Clock, "silence"): not measured while out, before the first placement, or within

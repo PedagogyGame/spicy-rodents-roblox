@@ -164,6 +164,59 @@ return function(t)
 		end)
 	end)
 
+	t.test(
+		"a strafing shooter's click held up behind a lost packet is still a shot, from where she clicked; a liar who back-dates a click gets nothing but a shot from where she really stood, at most half a second ago",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				local stats = kit.service:stats()
+				kit.walk(ada, -36, -10)
+				kit.run(0.2)
+				local function strafe(seconds: number)
+					for _ = 1, math.floor(seconds * 60 + 0.5) do
+						ada.z += Body.WALK * FRAME
+						kit.frame()
+					end
+				end
+				-- she walks north and clicks as she goes; the click is 15 frames behind a lost packet
+				strafe(0.5)
+				local clicked, at = kit.now(), ada.z
+				local shot = ada.fire(1, 0, 0, nil, 15)
+				strafe(0.5)
+				local a = ada.acks[shot]
+				t.truthy(a ~= nil and a.ok, `the late click: {a and a.why}`)
+				local born = bea.shots[#bea.shots]
+				t.eq(born.ball, a.ball)
+				t.near(born.oz, at, 1e-3, "the ball leaves from where she clicked")
+				t.truthy(
+					born.t >= clicked + 15 * FRAME - Clock.REWIND_TOLERANCE - 2 * FRAME,
+					`but is born no earlier than her own delay allows ({born.t - clicked} s after the click)`
+				)
+				t.eq(stats.shotsRefused, 0)
+				-- THE LIAR. She stands, walks on for 0.45 s, and stamps a click 0.45 s back from where she stood
+				-- then: that is a shot (she was there), born no earlier than f
+				kit.run(0.7)
+				local stoodZ = ada.z
+				strafe(0.45)
+				local now = kit.now()
+				local back = ack(kit, ada, ada.fire(1, 0, 0, { ft = now - 0.45, oz = stoodZ }))
+				t.truthy(back.ok, tostring(back.why))
+				t.truthy(bea.shots[#bea.shots].t >= now - Clock.REWIND_TOLERANCE - 2 * FRAME)
+				-- from where she never stood, it is not
+				kit.run(0.3)
+				local never = ack(kit, ada, ada.fire(1, 0, 0, { ft = kit.now() - 0.45, ox = -33, oz = stoodZ }))
+				t.deepEq({ never.ok, never.why }, { false, "origin" })
+				-- and not from where she stood a second ago: no click is judged further back than Clock.MAG_LATE
+				kit.run(0.7)
+				local longAgo = ada.z
+				strafe(1)
+				local old = ack(kit, ada, ada.fire(1, 0, 0, { ft = kit.now() - 1, oz = longAgo }))
+				t.deepEq({ old.ok, old.why }, { false, "origin" })
+				t.eq(stats.corrections, 0)
+			end)
+		end
+	)
+
 	t.test("a click 0.15 s after the last sprint Move is accepted; one inside the delay is refused", function()
 		Kit.play(function(kit)
 			local ada = people(kit, { "Ada", "Bea" })
@@ -682,7 +735,7 @@ return function(t)
 	end
 
 	for _, case in
-		{ { rtt = 0, bar = 0.99 }, { rtt = 80, bar = 0.95 }, { rtt = 150, bar = 0.95 }, { rtt = 300, bar = 0.85 } }
+		{ { rtt = 0, bar = 0.99 }, { rtt = 80, bar = 0.95 }, { rtt = 150, bar = 0.95 }, { rtt = 300, bar = 0.9 } }
 	do
 		t.test(
 			`a shooter at {case.rtt} ms hits what it saw: the server agrees with its screen on at least {case.bar * 100} % of 100 shots at a runner who crouches`,
@@ -698,6 +751,27 @@ return function(t)
 			end
 		)
 	end
+
+	-- WHERE THE 300 ms SHOOTER'S MISSES COME FROM (measured: 92 of 100 agree). Its picture is its upstream
+	-- delay (0.15 s, more with jitter) plus the interpolation (0.1 s) behind the server, and the contract
+	-- judges no ball further back than Clock.MAX_REWIND = 0.25 s: the last few hundredths are cut off and a
+	-- runner is judged half a stud on from where she was drawn. The case below is the evidence, for whoever
+	-- owns the contract: with the bound at 0.3 s the same hundred shots agree as at 150 ms. (Clock is
+	-- frozen: the constant is turned here for the length of this case only.)
+	t.test(
+		"what a 300 ms shooter still loses is the rewind bound's doing: with Clock.MAX_REWIND at 0.3 s the server agrees on at least 95 % of the same shots",
+		function()
+			local was = Clock.MAX_REWIND;
+			(Clock :: any).MAX_REWIND = 0.3
+			local ok, r = pcall(duel, 300, 100);
+			(Clock :: any).MAX_REWIND = was
+			if not ok then
+				error(r, 0)
+			end
+			t.eq(r.refused, 0)
+			t.truthy(r.agree / r.shots >= 0.95, `agreement {r.agree} of {r.shots} at 300 ms with a 0.3 s bound`)
+		end
+	)
 
 	t.test(
 		"the server check (tests/engine/PaintballFlow) passes here first: the pass, a match of bots round one person, a scripted tag, the end card, the next match, leaving",
