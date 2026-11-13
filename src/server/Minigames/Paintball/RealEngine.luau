@@ -8,7 +8,10 @@
 -- ghost(body, true) puts every part of the body in Contract.COLLISION_GROUP, which does not collide
 -- with itself and collides with everything else as the default group does, and remembers the group
 -- each part was in (the attribute WAS); ghost(body, false) puts each part back. The group is
--- registered the first time it is needed.
+-- registered the first time it is needed. A part that joins a ghosted body later (an accessory loaded
+-- after the join, a tool, a limb the avatar code rebuilds) is ghosted as it arrives, until the body is
+-- un-ghosted: as first built only the parts there at the join were, and a late hat or arm still blocked
+-- a corridor a stud to one side of where the puppet is drawn.
 -- Interface: new() -> PaintballService.Engine { positionOf, teleport, ghost }; WAS; ROOT_ABOVE_FEET
 
 local Import = require("../../Import")
@@ -48,6 +51,7 @@ function RealEngine.new(): {
 	ghost: (body: any, on: boolean) -> (),
 }
 	local registered = false
+	local watching: { [any]: any } = setmetatable({}, { __mode = "k" }) :: any -- body -> its DescendantAdded connection
 	local function register()
 		if registered then
 			return
@@ -92,16 +96,19 @@ function RealEngine.new(): {
 				register()
 			end
 			local group = Contract.COLLISION_GROUP
+			local function into(part: any)
+				if part:GetAttribute(RealEngine.WAS) == nil then
+					part:SetAttribute(RealEngine.WAS, part.CollisionGroup or "Default")
+				end
+				part.CollisionGroup = group
+			end
 			for _, child in (body :: Instance):GetDescendants() do
 				if not child:IsA("BasePart") then
 					continue
 				end
 				local part = child :: any
 				if on then
-					if part:GetAttribute(RealEngine.WAS) == nil then
-						part:SetAttribute(RealEngine.WAS, part.CollisionGroup or "Default")
-					end
-					part.CollisionGroup = group
+					into(part)
 				else
 					local was = part:GetAttribute(RealEngine.WAS)
 					if was ~= nil then
@@ -109,6 +116,21 @@ function RealEngine.new(): {
 						part:SetAttribute(RealEngine.WAS, nil)
 					end
 				end
+			end
+			local conn = watching[body]
+			if on and conn == nil then
+				pcall(function()
+					watching[body] = (body :: any).DescendantAdded:Connect(function(child: any)
+						if child:IsA("BasePart") then
+							into(child)
+						end
+					end)
+				end)
+			elseif not on and conn ~= nil then
+				watching[body] = nil
+				pcall(function()
+					conn:Disconnect()
+				end)
 			end
 		end,
 	}

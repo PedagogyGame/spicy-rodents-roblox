@@ -906,6 +906,7 @@ return function(t)
 				local w = kit.w
 				local body = w.body
 				local FakeEngine = require("@tests/lib/FakeEngine")
+				FakeEngine.events({ "DescendantAdded" })
 				body.Parent = FakeEngine.workspace() -- (a body that is in the world: one with no parent is gone)
 				local limb = FakeEngine.part("LeftFoot", body.PrimaryPart.CFrame, body)
 				Rig.press(w, Contract.STATION)
@@ -922,6 +923,11 @@ return function(t)
 					{ Contract.COLLISION_GROUP, Contract.COLLISION_GROUP }
 				)
 				t.truthy(kit.service:inPlay(w.player, body))
+				-- a part that joins her body later (a hat loaded after the join) is ghosted as it arrives
+				local hat = FakeEngine.part("Hat", body.PrimaryPart.CFrame, body)
+				t.truthy(hat.CollisionGroup ~= Contract.COLLISION_GROUP)
+				body.DescendantAdded.fire(hat)
+				t.eq(hat.CollisionGroup, Contract.COLLISION_GROUP, "the late hat passes through bodies too")
 				-- while her client is the contract's stub it sends no pose: she is silent, and then taken off. Once
 				-- the client lane's own client is behind the rig's player it speaks for her, and she leaves by
 				-- the framework instead: either way the service's hands put her body back
@@ -942,7 +948,14 @@ return function(t)
 				end
 				x, y, z = Arena.toLocal(kit.place, root.Position.X, root.Position.Y, root.Position.Z)
 				t.falsy(Arena.inVolume(x, y, z), "back in the lobby")
-				t.deepEq({ root.CollisionGroup, limb.CollisionGroup }, { "Default", "Default" })
+				t.deepEq(
+					{ root.CollisionGroup, limb.CollisionGroup, hat.CollisionGroup },
+					{ "Default", "Default", "Default" }
+				)
+				-- and once she is out of the match a part that joins her body is left alone
+				local cane = FakeEngine.part("Cane", body.PrimaryPart.CFrame, body)
+				body.DescendantAdded.fire(cane)
+				t.truthy(cane.CollisionGroup ~= Contract.COLLISION_GROUP)
 			end, { realEngine = true })
 		end
 	)
