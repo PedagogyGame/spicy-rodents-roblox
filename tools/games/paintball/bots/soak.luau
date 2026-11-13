@@ -133,6 +133,7 @@ for perSide = Contract.Rules.teamMin, Contract.Rules.teamMax do
 			rule(s.tooSoon == 0, `{s.tooSoon} balls inside the fire interval`)
 			rule(s.legs == 0, `{s.legs} steps a person's body would be refused ({sim.rec.legsFirst or "?"})`)
 			rule(s.doorTrap == 0, `{s.doorTrap} balls aimed at somebody quiet on their doorstep`)
+			rule(s.outTrap == 0, `{s.outTrap} balls aimed at somebody just out of their room who had not fired`)
 			rule(s.camping == 0, `{s.camping} bot-seconds watching the other team's door`)
 			rule(s.still < STILL, `seat {s.stillSlot} stood still for {string.format("%.1f", s.still)} s`)
 			rule(s.roomSlowest < ROOM, `a life took {string.format("%.1f", s.roomSlowest)} s to leave its spawn room`)

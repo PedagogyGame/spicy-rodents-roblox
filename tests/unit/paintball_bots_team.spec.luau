@@ -174,6 +174,7 @@ return function(t)
 				t.eq(s.refused, 0)
 				t.eq(s.legs, 0, "every step a brain took is one a person could have taken")
 				t.eq(s.doorTrap, 0)
+				t.eq(s.outTrap, 0)
 				t.truthy(s.still < 14, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
 			end
 			-- (a bot that is alone up there is tagged out now and then and has two flights to climb

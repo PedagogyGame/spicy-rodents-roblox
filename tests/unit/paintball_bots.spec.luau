@@ -501,6 +501,39 @@ return function(t)
 		end
 	)
 
+	t.test("the first ball at a new target is the widest (the warning splat); the later ones close in", function()
+		-- a person standing still 28 studs off, forty bots in turn: how far each ball's line passes from
+		-- the person's centre line, sideways, by which ball of the sighting it is
+		local at = groundNode(0, -24)
+		local sum = { 0, 0, 0 }
+		local count = { 0, 0, 0 }
+		for seed = 1, 40 do
+			local c = closeUp(at, math.rad(10), seed)
+			local bx, bz = c.brain.x, c.brain.z
+			local px, pz = bx + 3, bz - 28
+			c.poses[1].x, c.poses[1].z = px, pz
+			stepClose(c, 3)
+			local want = yawTo(bx, bz, px, pz)
+			for i, cmd in c.fired do
+				local got = yawTo(0, 0, cmd.vx :: number, cmd.vz :: number)
+				local off = math.abs((got - want + math.pi) % (2 * math.pi) - math.pi)
+				local k = math.min(i, 3)
+				sum[k] += off * off
+				count[k] += 1
+			end
+		end
+		t.eq(count[1], 40, "every bot fired")
+		t.truthy(count[3] >= 40, `{count[3]} third and later balls`)
+		local rms = {}
+		for k = 1, 3 do
+			rms[k] = math.sqrt(sum[k] / count[k])
+		end
+		t.truthy(rms[1] > rms[3] * 1.4, `first ball {math.deg(rms[1])} deg off, later {math.deg(rms[3])} deg`)
+		t.truthy(rms[2] > rms[3] * 0.9 and rms[2] < rms[1], "the second between")
+		-- and none is a turret: even the later balls are off by something at this range
+		t.truthy(math.deg(rms[3]) > 0.5, `later balls {math.deg(rms[3])} deg off`)
+	end)
+
 	t.test("it turns no faster than BOT.turn, respects the magazine like anybody, and fires in bursts", function()
 		local at = groundNode(0, -24)
 		local c = closeUp(at, 0)
@@ -976,6 +1009,8 @@ return function(t)
 		t.truthy(s.roomMean < 3)
 		t.truthy(s.camping < 3, `{s.camping} bot-seconds watching the other team's door`)
 		t.eq(s.doorTrap, 0, "no bot fires a ball at a quiet player on their own doorstep")
+		t.eq(s.outTrap, 0, "nor at somebody in their first seconds out who has not fired")
+		t.truthy(s.earlyTags <= math.max(2, 0.03 * s.tags), `{s.earlyTags} tags on somebody just out`)
 		t.truthy(
 			s.doorStray <= math.max(3, 0.04 * s.tags),
 			`{s.doorStray} quiet players walked off their doorstep into a ball meant for somebody else`
@@ -1016,8 +1051,11 @@ return function(t)
 			t.truthy(near.rate > 0.25, "close up a bot is dangerous")
 			local standing, walking = s.bySpeed[1], s.bySpeed[2]
 			t.truthy(standing.rate > walking.rate * 1.2, "a moving target is harder")
+			-- (over a whole match most first balls go at long range, where nearly every ball misses, so the
+			-- warning splat shows only as a lower rate here; it is measured close up, ball by ball, in
+			-- "the first ball at a new target is the widest")
 			local first, later = s.byOrder[1], s.byOrder[3]
-			t.truthy(first.rate < later.rate * 0.8, "the first ball is the warning splat")
+			t.truthy(first.rate < later.rate, "the first ball is the warning splat")
 			t.truthy(
 				s.faced >= s.facedOf * 0.97,
 				`{s.faced} of {s.facedOf} tags from a bot that had been facing its victim`
