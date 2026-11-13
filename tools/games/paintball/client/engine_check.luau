@@ -20,7 +20,11 @@
 --     and each team has curtains by the names the client makes solid
 -- What it cannot ask: anything with a screen, a camera or a player (a Luau Execution task has no client). That
 -- the stock first-person camera carries on from a one-frame hold, that a non-sinking FIRE leaves its drag to
--- the camera, and where the crosshair sits against the camera's middle are for Studio and a device.
+-- the camera, and where the crosshair sits against the camera's middle are for Studio and a device. So are:
+-- that NO NAME, HEALTH BAR OR CHAT BUBBLE is drawn over a hidden opponent's real body (two players in Studio's
+-- local server, one crouched behind a rail: the other sees no label there; this script only checks that the
+-- properties World writes take their values); that a shot fired behind you on the left is heard from there;
+-- and that holding View on a gamepad, then pressing A, does not leave the match.
 -- NOT YET RUN in the engine: the session that wrote it (2026-11-13) had the cloud tools off limits. Under plain
 -- Lune it runs the cores part from the files on disk and notes that the engine's facts were not asked;
 -- tests/unit/paintball_client_core.spec.luau requires it and holds it to that.
@@ -61,6 +65,35 @@ if inEngine then
 		(part :: any).LocalTransparencyModifier = 1
 		(face :: any).LocalTransparencyModifier = 1
 		return (part :: any).LocalTransparencyModifier == 1 and (face :: any).LocalTransparencyModifier == 1
+	end)
+	check("a hidden body's Humanoid draws no name and no health bar (World.setHidden)", function()
+		local hum = Instance.new("Humanoid")
+		hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.Viewer
+		hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.DisplayWhenDamaged
+		hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+		return hum.DisplayDistanceType == Enum.HumanoidDisplayDistanceType.None
+			and hum.HealthDisplayType == Enum.HumanoidHealthDisplayType.AlwaysOff
+	end)
+	check("a sound placed in space: a Sound in an Attachment, its roll-off pushed out, a floor's dulling", function()
+		local holder = Instance.new("Part")
+		holder.CFrame = CFrame.new(0, 0, 0)
+		local at = Instance.new("Attachment")
+		at.Position = Vector3.new(12, 4, -30)
+		at.Parent = holder
+		local sound = Instance.new("Sound")
+		sound.RollOffMode = Enum.RollOffMode.Linear
+		sound.RollOffMinDistance = 110
+		sound.RollOffMaxDistance = 220
+		local dull = Instance.new("EqualizerSoundEffect")
+		dull.HighGain = -12
+		dull.MidGain = -6
+		dull.LowGain = 0
+		dull.Parent = sound
+		sound.Parent = at
+		local ok = near(sound.RollOffMinDistance, 110) and near(dull.HighGain, -12) and near(at.WorldPosition.X, 12)
+		holder:Destroy()
+		return ok
 	end)
 	check("the HUD's pieces: IgnoreGuiInset, Modal, UIScale, a square that follows the height, a name tag", function()
 		local gui = Instance.new("ScreenGui")

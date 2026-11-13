@@ -14,8 +14,9 @@
 --            sizes and two shapes picked from the ball's id, the same on every screen
 --   puffs    a quarter-second burst where your own ball met a puppet
 --   bodies   the replicated REAL bodies of the people in the match are hidden on this screen
---            (LocalTransparencyModifier on the body whose DriverUserId attribute is a slot's `user`),
---            and shown again when their owner leaves the roster or the show ends
+--            (LocalTransparencyModifier on the body whose DriverUserId attribute is a slot's `user`,
+--            and its Humanoid's name and health bar turned off, so no label floats over where the
+--            person really is), and shown again when their owner leaves the roster or the show ends
 --   sounds   the core's cues: one with a place (another's shot, step and reload, a splat) is played
 --            FROM there, a Sound under an Attachment, so the engine pans it and it is heard from the
 --            side it came from, and dulled for each floor between; the rest through the minigames' own
@@ -435,11 +436,33 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 		end
 	end
 
+	-- what a hidden body's Humanoid drew over its head before it was hidden, to be put back
+	local overhead: { [Humanoid]: { Enum.HumanoidDisplayDistanceType | Enum.HumanoidHealthDisplayType } } = {}
 	local function setHidden(body: Instance, on: boolean)
 		for _, d in body:GetDescendants() do
 			-- (a face is a Decal with a modifier of its own: left alone it would hang in the air)
 			if d:IsA("BasePart") or d:IsA("Decal") then
 				(d :: any).LocalTransparencyModifier = if on then 1 else 0
+			elseif d:IsA("Humanoid") then
+				-- the name and the health bar the engine draws over a driven body: on a hidden body they
+				-- would float over where the person REALLY is, ahead of the puppet, perhaps through a wall
+				-- (the puppets name team-mates only). A local write, kept again every look (the server may
+				-- write it afresh), and the first value seen put back.
+				local hum = d :: Humanoid
+				if on then
+					if overhead[hum] == nil then
+						overhead[hum] = { hum.DisplayDistanceType, hum.HealthDisplayType }
+					end
+					hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+					hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+				else
+					local was = overhead[hum]
+					if was then
+						overhead[hum] = nil
+						hum.DisplayDistanceType = was[1] :: Enum.HumanoidDisplayDistanceType
+						hum.HealthDisplayType = was[2] :: Enum.HumanoidHealthDisplayType
+					end
+				end
 			end
 		end
 	end
@@ -574,6 +597,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 			end
 		end
 		table.clear(hidden)
+		table.clear(overhead)
 		table.clear(figures)
 		table.clear(balls)
 		table.clear(streaks)

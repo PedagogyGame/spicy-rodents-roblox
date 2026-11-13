@@ -711,6 +711,12 @@ return function(t)
 					m:SetAttribute("DriverUserId", user)
 					local torso = FakeEngine.part("Torso", CFrame.new(0, 0, 0), m)
 					FakeEngine.new("Decal", "face").Parent = torso
+					-- (a body a player drives shows the player's name: Server/Actors/ActorService.nameLabel)
+					FakeEngine.new("Humanoid", "Humanoid", {
+						DisplayDistanceType = roblox.Enum.HumanoidDisplayDistanceType.Viewer,
+						HealthDisplayType = roblox.Enum.HumanoidHealthDisplayType.DisplayWhenDamaged,
+					}).Parent =
+						m
 					return m
 				end
 				local inMatch, passerBy = body("Cy", 77), body("Dee", 78)
@@ -771,6 +777,15 @@ return function(t)
 					"and its face with it: no face hangs in the air"
 				)
 				t.eq(passerBy:FindFirstChild("Torso").LocalTransparencyModifier, nil)
+				-- and no name or health bar floats over where the hidden person really is
+				local hum = inMatch:FindFirstChild("Humanoid")
+				t.eq(hum.DisplayDistanceType, roblox.Enum.HumanoidDisplayDistanceType.None)
+				t.eq(hum.HealthDisplayType, roblox.Enum.HumanoidHealthDisplayType.AlwaysOff)
+				t.eq(
+					passerBy:FindFirstChild("Humanoid").DisplayDistanceType,
+					roblox.Enum.HumanoidDisplayDistanceType.Viewer,
+					"the passer-by keeps their name"
+				)
 				-- a ball from a Shot record, and paint: on a wall, and riding on a puppet
 				s.shots({ { ball = 3, id = 2, t = s.now(), ox = 10, oy = 18, oz = 5, vx = 0, vy = 0, vz = -90 } })
 				s.run(0.3, people())
@@ -809,6 +824,15 @@ return function(t)
 				s.run(0.8, people())
 				t.eq(inMatch:FindFirstChild("Torso").LocalTransparencyModifier, 0)
 				t.eq(named(inMatch, "face").LocalTransparencyModifier, 0)
+				t.eq(
+					inMatch:FindFirstChild("Humanoid").DisplayDistanceType,
+					roblox.Enum.HumanoidDisplayDistanceType.Viewer,
+					"and their name is put back"
+				)
+				t.eq(
+					inMatch:FindFirstChild("Humanoid").HealthDisplayType,
+					roblox.Enum.HumanoidHealthDisplayType.DisplayWhenDamaged
+				)
 				t.eq(count(show, "Splat"), 1, "the wall's stays")
 				-- out of the audience: everything goes
 				s.send({ kind = "paintball_unwatch" })
