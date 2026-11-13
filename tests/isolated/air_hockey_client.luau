@@ -238,6 +238,11 @@ local function hud(): { { any } }
 	if ui.card.Visible then
 		table.insert(out, { "card", rect(ui.card) })
 	end
+	-- (a banner is its words, while they are up: PINCHED is said mid-rally)
+	local banner = ui.bannerLabel
+	if banner.Text ~= "" and banner.TextTransparency < 1 then
+		table.insert(out, { "banner", rect(banner) })
+	end
 	-- a bar is as wide as its buttons (laid out from its left edge, 8 pixels apart)
 	for _, bar in { { "buttons", ui.buttonBar }, { "touch", ui.touchBar } } do
 		local x0, y0, _, y1 = rect(bar[2])
@@ -534,6 +539,91 @@ return function(t)
 			t.eq(session.phase, "idle")
 			local px, py = where(w, Layout.PUCK)
 			t.truthy(math.abs(px) < 1e-3 and math.abs(py) < 1e-3, "the table is put to rest")
+		end, opts())
+	end)
+
+	-- The rails hold (Sim.contain, outside his step): a puck a mallet presses into a rail pops out along it and
+	-- the rally goes on, and the player is told in a word. The pointer put on the puck is the hand that does it.
+	-- every banner said from now on, with the frame it was said on
+	local function listen(w: Rig.World, said: { { any } })
+		local ui = Controller.current.ctx.ui
+		local banner = ui.banner
+		ui.banner = function(self: any, text: string, big: boolean?)
+			table.insert(said, { w.frames, text })
+			return banner(self, text, big)
+		end
+	end
+	local function pinched(said: { { any } }): ({ number }, number)
+		local at, off = {}, 0
+		for _, b in said do
+			if b[2] == Controller.PINCHED then
+				table.insert(at, b[1])
+			elseif string.find(b[2], "OFF THE TABLE", 1, true) then
+				off += 1
+			end
+		end
+		return at, off
+	end
+
+	t.test(
+		"a puck pressed into a rail against the computer: it stays on the table and the player reads PINCHED",
+		function()
+			Rig.play(function(w)
+				local session = w.svc:sessionOf(ID)
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				Rig.click(w, "Pro (hard)")
+				Rig.run(w, 0.2)
+				Rig.click(w, "Start (Space)")
+				Rig.run(w, 0.3)
+				local tbl = tableOf(w)
+				local said = {}
+				listen(w, said)
+				play(w, 120, Line.hands.pointer(0.02), nil, nil, function()
+					return session.phase ~= "playing"
+				end)
+				local sim = tbl.ref.sim
+				t.truthy(
+					sim.heldSerial >= 2,
+					`the rails held the puck {sim.heldSerial} times (his rails would have let it out)`
+				)
+				local at, off = pinched(said)
+				t.eq(off, 0, "no puck ever left the table to be served again")
+				t.truthy(#at >= 1 and #at <= sim.heldSerial, `PINCHED was said {#at} times for {sim.heldSerial} holds`)
+				for i = 2, #at do
+					t.truthy(at[i] - at[i - 1] >= Controller.PINCH_AGAIN * 60 - 1, "not again within PINCH_AGAIN")
+				end
+				-- every serve was a goal's (and the first): nothing was put back for a serve
+				local _, serves = truth(w)
+				t.eq(serves, sim.score0 + sim.score1 + (if sim.winner >= 0 then 0 else 1))
+				t.eq(Controller.current.seat.resims, 0, "and nothing on the screen was corrected")
+			end, opts())
+		end
+	)
+
+	t.test("a puck pressed into a rail against a person: PINCHED is said when the referee has said it", function()
+		Rig.play(function(w)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			local bob = bot(w, "Bob", Line.hands.pointer(0.03))
+			t.truthy(w.svc:join(bob.stub, ID))
+			Rig.run(w, 0.3)
+			Rig.click(w, "Start (Space)")
+			Rig.run(w, 0.3)
+			local tbl = tableOf(w)
+			t.eq(Referee_mode(tbl), "2")
+			local said = {}
+			listen(w, said)
+			local held = 0
+			play(w, 60, Line.hands.pointer(0.02), { bob }, nil, function()
+				held = tbl.ref.sim.heldSerial
+				return w.svc:sessionOf(ID).phase ~= "playing"
+			end)
+			held = tbl.ref.sim.heldSerial
+			t.truthy(held >= 1, `the rails held {held} times`)
+			local at, off = pinched(said)
+			t.eq(off, 0)
+			t.truthy(#at >= 1 and #at <= held, `PINCHED was said {#at} times for {held} holds`)
 		end, opts())
 	end)
 
@@ -1198,11 +1288,13 @@ return function(t)
 				Rig.run(w, 0.4)
 				t.eq(sim.countdown, 0, "the tap served")
 				t.eq(ui.statusLabel.Visible, false, "the status line is only up while the puck waits")
+				-- (the one word said mid-rally is up too: the rails held a puck. From above it is beside the bed)
+				Controller.current.say(Controller.PINCHED, false)
 				local rects = {}
 				for _, r in hud() do
 					table.insert(rects, r[1])
 				end
-				t.deepEq(rects, { "card", "buttons", "touch" })
+				t.deepEq(rects, { "card", "banner", "buttons", "touch" })
 				local size = workspace.CurrentCamera.ViewportSize
 				for i = 0, 20 do
 					for j = 0, 40 do

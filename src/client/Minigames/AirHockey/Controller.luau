@@ -19,20 +19,27 @@
 -- late, and it is never guessed: the far end is drawn a moment ago, as the referee decided it, and this end now
 -- (Seat's header).
 -- Words on screen are his: READY WHEN YOU ARE, BEAUTIFUL SHOT, EMBER SCORES, MATCH WON, WELL PLAYED. A goal is
--- said once, on the banner; the status line keeps the score.
+-- said once, on the banner; the status line keeps the score. One word is ours: PINCHED. His simulation lets a
+-- puck that a mallet presses into a rail out through the rail; the table holds it in (Sim.contain: it is put back
+-- on the rail, slid clear of the mallet and leaves as it would off that mallet, and the rally goes on). That
+-- pop out from under the mallet is said, as the rail's sound is heard, the moment it happens on this player's
+-- match (against a person, when the referee has said it), and not again for PINCH_AGAIN seconds.
 -- SMALL SCREENS AND TOUCH: the whole bed has to stay in sight, so when a match starts on a touch device or a
 -- short screen the help card is put away (HELP brings it back), the status line is only up while the puck
 -- waits, and the scorecard is a strip in the top corner (Client/Minigames/Games/AirHockey.card). On a short
 -- screen (a phone) the game opens in the view from above, where the bed stands clear of every button; View
--- still swaps to first person.
+-- still swaps to first person. The banner (a goal's words, PINCHED) is said in the top left corner there, beside
+-- the bed (MinigameUI's banner is across the top middle, which from above is the far end of the bed); it is put
+-- back where it was when the game closes.
 -- NOTHING IS ASKED TWICE: Space in the lobby starts once, Play again and Leave are sent once, Q is this
 -- controller's (it leaves, once): a second press while the first is on its way is swallowed, not refused.
 -- The main client's rules (MinigameClient's header): the two views go through ctx.camera / ctx.releaseCamera;
 -- the cursor is MinigameUI's; everything connected here is disconnected in stop().
 -- Interface: new(ctx) -> Controller { onState, onMessage, onRefused, stop }; HELP; KEY_SPEED; STICK_SPEED;
 --   STICK_DEAD; stick(x, y) -> (vx, vy) (a stick's position as the push it gives, metres a second); small() ->
---   bool (a touch device or a short screen); short() -> bool; SMALL_HEIGHT; MODE_WORDS; current (the controller that is open now, for the
---   specs: its .seat is the player's prediction)
+--   bool (a touch device or a short screen); short() -> bool; SMALL_HEIGHT; MODE_WORDS; PINCHED; PINCH_AGAIN;
+--   SMALL_BANNER; current (the controller that is open now, for the specs: its .seat is the player's prediction;
+--   its .say(text, big) is the banner as this game says it)
 
 local Import = require("../../Import")
 local Layout =
@@ -68,6 +75,11 @@ Controller.STICK_SPEED = Sim.HUMAN_SPEED -- a stick held right over: as fast as 
 Controller.STICK_DEAD = 0.15
 Controller.SMALL_HEIGHT = 600 -- pixels: a screen shorter than this is a small one
 Controller.MODE_WORDS = { easy = "Lounge (easy)", medium = "Club (medium)", hard = "Pro (hard)" }
+Controller.PINCHED = "PINCHED. PLAY ON." -- the rails held a puck a mallet pressed into them (see the header)
+Controller.PINCH_AGAIN = 3 -- seconds before it is said again
+-- a small screen's banner, in the top left corner beside the bed seen from above: pixels from the left and the
+-- top, and how much narrower than half the screen it is (the bed's half-width from above on a phone is under 90)
+Controller.SMALL_BANNER = { left = 12, top = 50, short = 110 }
 Controller.current = nil :: any
 local TAP_SECONDS = 0.3
 local TAP_PIXELS = 14
@@ -128,12 +140,29 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		waiting = true, -- the puck was waiting for its serve at the last tick played here, and which tick
 		tickWas = -1,
 		said = 0, -- goals of this match said so far (Sim.goalSerial)
+		pinches = setmetatable({}, { __mode = "k" }), -- each simulation's Sim.heldSerial when it was last looked at
+		pinchedAt = -math.huge, -- when PINCHED was last said
 		conns = {},
 		hidHelp = false, -- this controller put the help card away (a small screen): it brings it back
 		stopped = false,
 	}
 	Rink.take(rink)
 	Controller.current = self
+	local bannerAt = ctx.ui.bannerLabel and ctx.ui.bannerLabel.Position -- (put back in stop())
+
+	-- A banner, as this game says it: on a small screen in the top left corner, clear of the bed.
+	local function say(text: string, big: boolean)
+		ctx.ui:banner(text, big)
+		local label = ctx.ui.bannerLabel
+		if label ~= nil and Controller.small() then
+			local b = Controller.SMALL_BANNER
+			label.Position = UDim2.fromOffset(b.left, b.top)
+			label.Size = UDim2.new(0.5, -b.short, 0, if big then 48 else 34)
+		elseif label ~= nil and bannerAt ~= nil then
+			label.Position = bannerAt
+		end
+	end
+	self.say = say
 
 	local function setCamera(snap: boolean)
 		local view = Layout.camera(self.side, self.overhead)
@@ -367,7 +396,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		local text = if sim.lastGoal == self.side
 			then "BEAUTIFUL SHOT."
 			else `{string.upper(Layout.SIDE_NAMES[sim.lastGoal] or "")} SCORES.`
-		ctx.ui:banner(text, true)
+		say(text, true)
 	end
 
 	-- A goal is said once, whichever way this screen first hears of it (said: the goals said so far).
@@ -379,6 +408,18 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		end
 	end
 
+	-- The rails held the puck (Sim.contain): said in a word, once in a while (the rail's sound is the contact's).
+	local function pinch(sim: any)
+		local was = self.pinches[sim]
+		self.pinches[sim] = sim.heldSerial
+		if was ~= nil and sim.heldSerial > was then
+			if self.clock - self.pinchedAt >= Controller.PINCH_AGAIN then
+				self.pinchedAt = self.clock
+				say(Controller.PINCHED, false)
+			end
+		end
+	end
+
 	-- One tick as this screen plays it (the prediction): against the computer it is the referee's tick, so a
 	-- goal is said here; a serve is sounded here whoever the other end is (this player's own press, or the
 	-- countdown running out, is known at once).
@@ -386,6 +427,9 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		local duo = self.seat ~= nil and self.seat.mode == "2"
 		if scored and not duo then
 			goal(sim)
+		end
+		if not duo then
+			pinch(sim)
 		end
 		if served then
 			self.servedAt = if duo then tick else nil
@@ -402,7 +446,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 			and sim.countdown ~= math.huge
 		then
 			-- (the net under the rails: a puck that left the table all the same was put back)
-			ctx.ui:banner("PUCK OFF THE TABLE. SERVED AGAIN.", false)
+			say("PUCK OFF THE TABLE. SERVED AGAIN.", false)
 		end
 		self.waiting, self.tickWas = waiting, tick
 	end
@@ -416,6 +460,9 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 			goal(sim)
 		end
 		local duo = self.seat ~= nil and self.seat.mode == "2"
+		if duo then
+			pinch(sim)
+		end
 		if served and duo then
 			local mine = self.servedAt
 			if mine ~= nil and math.abs(mine - tick) <= Sim.COUNTDOWN / Sim.STEP then
@@ -614,6 +661,9 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 		table.clear(self.conns)
 		self.seat = nil
 		Rink.give(rink)
+		if bannerAt ~= nil and ctx.ui.bannerLabel ~= nil then
+			ctx.ui.bannerLabel.Position = bannerAt
+		end
 		-- (the pieces are left where this screen last drew them only for a moment: the stream, if the match
 		-- goes on without this player, or the server's word that the table is at rest, moves them next)
 		ctx.ui:touch({}, function() end, function() end)

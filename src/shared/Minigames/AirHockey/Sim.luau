@@ -28,7 +28,9 @@
 -- the mallet that pressed it: the rally goes on. A step that ends with the puck on the table is his step and
 -- nothing else, so a match in which no puck is pressed out is his match to the last bit
 -- (tests/unit/air_hockey_sim.spec.luau; whole matches: tests/unit/air_hockey_opponents.spec.luau). The old
--- answer, the puck put back for a serve, is kept only as a net under that (nothing known reaches it).
+-- answer, the puck put back for a serve, is kept only as a net under that (nothing known reaches it). Each time
+-- the rails hold, heldSerial counts it (not his, not on the wire, never read by the simulation): the players'
+-- screens say so in a word (PINCHED), so that a puck that pops out from under a mallet is never unexplained.
 -- A match is stepped with play(); tick() is his, alone.
 -- The state is one flat record of numbers (no vectors, nothing allocated in tick): it is stepped several hundred
 -- times a frame when a client replays.
@@ -112,6 +114,7 @@ export type State = {
 	paused: boolean,
 	hitWhat: number, -- (not read by the simulation) the last contact: HIT_RAIL, HIT_POST, HIT_MALLET + side
 	hitSpeed: number, -- (not read by the simulation) how fast the puck met it along the normal, m/s
+	heldSerial: number, -- (not his, not read by the simulation, not on the wire) times the rails held (contain)
 }
 
 Sim.FIELDS = {
@@ -146,6 +149,7 @@ Sim.FIELDS = {
 	"paused",
 	"hitWhat",
 	"hitSpeed",
+	"heldSerial",
 }
 
 local sqrt = math.sqrt
@@ -234,6 +238,7 @@ function Sim.new(): State
 		paused = false,
 		hitWhat = -1,
 		hitSpeed = 0,
+		heldSerial = 0,
 	}
 	Sim.reset(s)
 	return s
@@ -693,6 +698,7 @@ function Sim.contain(s: State): boolean
 	s.px, s.py, s.vx, s.vy = px, py, vx, vy
 	s.hitSerial += 1
 	s.hitWhat, s.hitSpeed = what, n
+	s.heldSerial += 1
 	return true
 end
 

@@ -226,6 +226,7 @@ return function(t)
 			t.truthy(Sim.hypot(g.vx, g.vy) <= g.maxSpeed + 1e-9)
 		end
 		t.truthy(held >= 1, "the rail held at least once")
+		t.eq(g.heldSerial, held, "each time the rails held is counted (the players' screens say PINCHED)")
 		t.eq(g.score0 + g.score1, 0, "nobody scores by it")
 		-- the puck is clear of the mallet that pressed it
 		t.truthy(Sim.hypot(g.px - g.p0x, g.py - g.p0y) >= Sim.PUCK_RADIUS + Sim.PADDLE_RADIUS - 1e-6)
