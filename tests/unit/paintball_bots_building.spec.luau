@@ -109,17 +109,17 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 	-- and they miss believably: more at range, and with the first ball at somebody (read where the
 	-- error decides: see Report's byOrder)
 	t.truthy(s.byRange[1].rate > s.byRange[3].rate * 2, "the hit rate falls with range")
-	-- On the real building a whole match tags only a handful of far balls (11 of 196 first balls against
-	-- 4 of 116 later ones in the 8 v 8), so here the first ball must only not be clearly the better one:
-	-- no more than two standard errors above the later balls. The warning splat itself is measured ball
-	-- by ball, close up, in paintball_bots.spec ("the first ball at a new target is the widest").
+	-- The warning splat in a whole match: the first ball at somebody 40 studs off or more passes wider of them
+	-- than the later balls do, by a fifth at least (the median closest approach, Sim's Shot.miss; on the real
+	-- building about 8.6 against 5.6 studs in the 4 v 4, 11.0 against 6.9 in the 8 v 8). The review found the
+	-- tag counts this used to compare too few to show anything (11 of 196 first balls against 4 of 116 later
+	-- ones); the miss of every ball is not. It is also measured ball by ball, close up, in paintball_bots.spec
+	-- ("the first ball at a new target is the widest").
 	local first, later = s.byOrder[1], s.byOrder[3]
 	if first.shots >= 50 and later.shots >= 50 then
-		local pooled = (first.tags + later.tags) / (first.shots + later.shots)
-		local se = math.sqrt(pooled * (1 - pooled) * (1 / first.shots + 1 / later.shots))
 		t.truthy(
-			first.rate < later.rate + 2 * se,
-			`the first ball is the warning splat: {first.rate * 100}% of {first.shots} tagged, later {later.rate * 100}% of {later.shots}`
+			s.missByOrder[1] > s.missByOrder[3] * 1.2,
+			`the first ball is the warning splat: it passes {s.missByOrder[1]} studs from its target (median of {first.shots}), later balls {s.missByOrder[3]} (of {later.shots})`
 		)
 	end
 end

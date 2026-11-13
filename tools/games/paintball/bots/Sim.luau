@@ -105,6 +105,10 @@ export type Shot = {
 	nth: number, -- 1 for the first ball at this target
 	storeys: number, -- how many storeys apart the shooter and that target stood (0: on one floor)
 	tagged: boolean, -- the ball tagged that target
+	-- the closest the ball came to that target's chest (studs) over the flight it had, judged against the
+	-- target where the ball's own judge saw it (its rewind); math.huge with no target. The warning splat
+	-- shows here in whole matches, where the few far tags are too few to show anything (the review, PB-10)
+	miss: number,
 	faced: boolean, -- the shooter's look had had that target inside the sight cone for BOT.faced
 	-- when the ball left, that target was on its own doorstep (BotNav.atDoor) and had not fired a ball
 	-- for DOOR_TRUCE, and was neither near the shooter nor looking at it (see `promised`): the ball a
@@ -579,6 +583,7 @@ function Sim.shoot(
 		nth = if brain ~= nil then brain.balls else 1,
 		storeys = 0,
 		tagged = false,
+		miss = math.huge,
 		faced = false,
 		trap = false,
 		fresh = false,
@@ -640,6 +645,41 @@ local function fire(sim: Sim, list: Bots.Bots, cmd: Bots.Command, isBot: boolean
 	)
 end
 
+-- The ball's closest approach to its shot's target over this step's flight (the fraction `upTo` of the step
+-- p0 to p1 that it flew), kept in shot.miss.
+local function closest(
+	sim: Sim,
+	ball: Ball,
+	p0x: number,
+	p0y: number,
+	p0z: number,
+	p1x: number,
+	p1y: number,
+	p1z: number,
+	upTo: number
+)
+	local target = ball.shot.target
+	if target == nil then
+		return
+	end
+	local x, y, z = sample(sim, target, sim.now - ball.rewind)
+	if x == nil then
+		return
+	end
+	local cy = y + Arena.CHEST
+	local dx, dy, dz = (p1x - p0x) * upTo, (p1y - p0y) * upTo, (p1z - p0z) * upTo
+	local len2 = dx * dx + dy * dy + dz * dz
+	local u = 0
+	if len2 > 1e-9 then
+		u = math.clamp(((x - p0x) * dx + (cy - p0y) * dy + (z - p0z) * dz) / len2, 0, 1)
+	end
+	local ex, ey, ez = p0x + dx * u - x, p0y + dy * u - cy, p0z + dz * u - z
+	local d = math.sqrt(ex * ex + ey * ey + ez * ez)
+	if d < ball.shot.miss then
+		ball.shot.miss = d
+	end
+end
+
 local function stepBalls(sim: Sim)
 	local state = sim.state
 	local arena = sim.arena
@@ -676,12 +716,14 @@ local function stepBalls(sim: Sim)
 			end
 		end
 		if best == nil then
+			closest(sim, ball, p0x, p0y, p0z, p1x, p1y, p1z, 1)
 			ball.age = t1
 			if t1 >= R.ballTtl then
 				table.remove(balls, i)
 			end
 			continue
 		end
+		closest(sim, ball, p0x, p0y, p0z, p1x, p1y, p1z, best)
 		table.remove(balls, i)
 		if struck == nil then
 			local s = best

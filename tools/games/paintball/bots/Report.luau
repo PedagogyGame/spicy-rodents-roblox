@@ -26,6 +26,9 @@ export type Summary = {
 	-- the first ball at a target, the second, the rest, at 40 studs and over (nearer, a later ball is
 	-- fired only at somebody the first missed, the harder targets, and the rate says little of the aim)
 	byOrder: { Band },
+	-- the same balls' median closest approach to their target (studs; Sim's Shot.miss), first, second, rest:
+	-- the warning splat reads here, where a match's handful of far tags cannot show it
+	missByOrder: { number },
 	byStorey: { Band }, -- at somebody on the shooter's own storey, and at somebody on another (the atrium)
 	facedOf: number, -- bot tags counted for the facing figure: those on whoever the bot was firing at
 	faced: number, -- of them, the bot had faced its victim for BOT.faced
@@ -96,6 +99,21 @@ local function add(b: Band, tagged: boolean)
 	b.rate = b.tags / b.shots
 end
 
+-- The middle value of a list (0 for none).
+local function median(list: { number }): number
+	if #list == 0 then
+		return 0
+	end
+	local sorted = table.clone(list)
+	table.sort(sorted)
+	local n = #sorted
+	local half = math.floor(n / 2)
+	if n % 2 == 1 then
+		return sorted[half + 1]
+	end
+	return (sorted[half] + sorted[half + 1]) / 2
+end
+
 function Report.summary(sim: Sim.Sim): Summary
 	local rec = sim.rec
 	local state = sim.state
@@ -105,6 +123,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local bySpeed = { band("standing"), band("walking"), band("sprinting") }
 	local byOrder = { band("first ball"), band("second"), band("third on") }
 	local byStorey = { band("on its own storey"), band("up or down the atrium and the stairs") }
+	local misses: { { number } } = { {}, {}, {} }
 	local botShots, botTagged = 0, 0
 	local doorTrap = 0
 	local outTrap, earlyTags = 0, 0
@@ -129,7 +148,11 @@ function Report.summary(sim: Sim.Sim): Summary
 		add(byRange[if r < 20 then 1 elseif r < 40 then 2 elseif r < 60 then 3 else 4], shot.tagged)
 		add(bySpeed[if shot.speed < 4 then 1 elseif shot.speed < 20 then 2 else 3], shot.tagged)
 		if r >= 40 then
-			add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
+			local nth = math.min(3, math.max(1, shot.nth))
+			add(byOrder[nth], shot.tagged)
+			if shot.miss < math.huge then
+				table.insert(misses[nth], shot.miss)
+			end
 		end
 		add(byStorey[if shot.storeys == 0 then 1 else 2], shot.tagged)
 	end
@@ -265,6 +288,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		byRange = byRange,
 		bySpeed = bySpeed,
 		byOrder = byOrder,
+		missByOrder = { median(misses[1]), median(misses[2]), median(misses[3]) },
 		byStorey = byStorey,
 		facedOf = facedOf,
 		faced = faced,
@@ -395,6 +419,14 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	say("  by range:  " .. bands(s.byRange))
 	say("  by target: " .. bands(s.bySpeed))
 	say("  by ball, at 40 studs and over:   " .. bands(s.byOrder))
+	say(
+		string.format(
+			"  median miss by ball, 40 and over: first %.2f, second %.2f, third on %.2f studs",
+			s.missByOrder[1],
+			s.missByOrder[2],
+			s.missByOrder[3]
+		)
+	)
 	say("  by storey: " .. bands(s.byStorey))
 	say(
 		`  facing: {s.faced} of {s.facedOf} tags a bot aimed came from one that had its victim in view for `
