@@ -65,6 +65,23 @@ local function groundRange(kit: Kit.Kit, r: number): (number, number)
 	return lo, hi
 end
 
+-- a sheave (diameter 1.2, 0.32 thick, axle across the line) at tower-local (x, cy, d): its box's corners, edge
+-- middles and centre all clear of the cabins' swept volume by SHEAVE_MARGIN
+Towers.SHEAVE_MARGIN = 0.05
+local function wheelClear(kit: Kit.Kit, x: number, cy: number, d: number): boolean
+	for _, i in { -1, 0, 1 } do
+		for _, j in { -1, 0, 1 } do
+			for _, k in { -1, 0, 1 } do
+				local p = kit:cf(x + i * 0.16, cy + j * 0.6, d + k * 0.6).Position
+				if not SkyLift.sweptClear(p.X, p.Y, p.Z, Towers.SHEAVE_MARGIN) then
+					return false
+				end
+			end
+		end
+	end
+	return true
+end
+
 function Towers.build(roblox: any, parent: any): { any }
 	local out = {}
 	for _, t in SkyLift.towers() do
@@ -136,7 +153,12 @@ function Towers.build(roblox: any, parent: any): { any }
 			for _, d in { -1.35, 1.35 } do
 				local g = if d < 0 then gb else gf
 				local rope = cable + g * d
-				local cy = rope + 0.95 + math.abs(g) * 1.35 + 0.6
+				-- as low over the rope as the passing grips allow: the lowest centre whose wheel box clears the
+				-- cabins' swept volume by SHEAVE_MARGIN (the grips reach GRIP_ABOVE over the rope)
+				local cy = rope + SkyLift.GRIP_ABOVE + 0.6
+				while not wheelClear(kit, x, cy, d) and cy < rope + 4 do
+					cy += 0.05
+				end
 				table.insert(wheels, { d, cy })
 				kit:cyl(m, "Sheave", x, cy, d, 0.32, 1.2, "X", Common.STEEL_DARK, "Metal", {
 					collide = false,

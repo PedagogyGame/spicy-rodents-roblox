@@ -4,7 +4,7 @@
 --   the models and their attributes (BATCH2 §2.2), streaming modes, part budgets;
 --   anchors within 0.5 of their data points; tower crossarms over SkyLift.towers()' heads, across the line;
 --   every part anchored and under 2,048 st; no part (corners, edge middles and centre) inside the cabins' swept
---     volume grown by 0.25 st, except the haul rope (which the grips clamp);
+--     volume grown by 0.25 st (the sheaves by Towers.SHEAVE_MARGIN), except the haul rope (the grips clamp it);
 --   the cabin template: Persistent, its pivot part at the frame origin, everything inside the outer box or the
 --     hanger column, collides with nothing, four Seats whose tops and facings match SkyLift.SEAT_LOCAL, each
 --     with its EyeSocket EYE_ABOVE_SEAT over the seat; the two door leaves with their travel;
@@ -15,6 +15,7 @@ local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local SkyLift = require("@shared/Rides/SkyLift")
 local Bake = require("../../tools/bake/skylift/Bake")
 local Common = require("../../tools/bake/skylift/Common")
+local Towers = require("../../tools/bake/skylift/Towers")
 
 local MARGIN = 0.25
 
@@ -121,11 +122,13 @@ return function(t)
 	t.test("nothing but the rope inside the cabins' swept volume (grown by 0.25)", function()
 		local function clear(p: any): boolean
 			local cf, s = p.CFrame, p.Size
+			-- the sheaves sit as close over the rope as the grips allow (Towers.SHEAVE_MARGIN)
+			local margin = if p.Name == "Sheave" then Towers.SHEAVE_MARGIN else MARGIN
 			for i = -1, 1 do
 				for j = -1, 1 do
 					for k = -1, 1 do
 						local q = (cf * CFrame.new(i * s.X / 2, j * s.Y / 2, k * s.Z / 2)).Position
-						if not SkyLift.sweptClear(q.X, q.Y, q.Z, MARGIN) then
+						if not SkyLift.sweptClear(q.X, q.Y, q.Z, margin) then
 							return false
 						end
 					end

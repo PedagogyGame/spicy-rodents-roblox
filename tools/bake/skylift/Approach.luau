@@ -714,6 +714,32 @@ function Approach.build(roblox: any, parent: any): any
 			shrubs += 1
 		end
 	end
+	-- along the line: a rock and a shrub at the foot of each tower, where the mower cannot reach
+	for _, tw in SkyLift.towers() do
+		local c, s = math.cos(tw.yaw), math.sin(tw.yaw)
+		local rx, rz = tw.x + c * 4.6 + s * 2.2, tw.z - s * 4.6 + c * 2.2
+		local sx, sz = tw.x - c * 4.4 - s * 3.0, tw.z + s * 4.4 - c * 3.0
+		if ok(rx, rz, 2, 1.5) then
+			local r = 1.6 + rnd() * 1.4
+			kit0:at(dress, "Rock", rx, ground(rx, rz) + r * 0.2, -rz, r * 1.4, r * 0.7, r, Common.ROCK, "Slate", {
+				rot = CFrame.Angles(rnd() * 0.3, rnd() * math.pi, rnd() * 0.3),
+			})
+		end
+		if ok(sx, sz, 3, 1.5) then
+			local r = 2.4 + rnd() * 1.2
+			kit0:ball(
+				dress,
+				"Shrub",
+				sx,
+				ground(sx, sz) + r * 0.3,
+				-sz,
+				r,
+				Common.SHRUB,
+				"Grass",
+				{ collide = false, query = false }
+			)
+		end
+	end
 	m:SetAttribute("Trees", trees)
 	m:SetAttribute("TrailPieces", #pieces)
 	return m
