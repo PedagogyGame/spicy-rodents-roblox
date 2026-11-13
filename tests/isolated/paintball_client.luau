@@ -1444,7 +1444,7 @@ return function(t)
 			t.truthy(string.sub(cue, 1, 10) == "paintball.", cue)
 			table.insert(names, cue)
 		end
-		t.eq(#names, 11)
+		t.eq(#names, 12)
 		-- every cue a seat and a show can ask for, gathered from a played stretch on the headless bench
 		local b = Kit.playing()
 		Kit.snap(b, { Kit.body(2, 6, 0, 24) }, b.now() - 0.1)
@@ -1501,11 +1501,12 @@ return function(t)
 			z = 0,
 		})
 		Kit.place(b)
+		Kit.state(b, { phase = "ended", done = true })
 		gather()
 		for cue in asked do
 			t.truthy(declared[cue] ~= nil, `{cue} is asked for and must be declared`)
 		end
-		for _, cue in { "fire", "fire_far", "splat", "tag", "tagged", "reload", "dry", "step", "ready", "back" } do
+		for _, cue in { "fire", "fire_far", "splat", "tag", "tagged", "reload", "dry", "step", "ready", "back", "over" } do
 			t.truthy(asked[`paintball.{cue}`], `{cue} was heard in a played stretch`)
 		end
 	end)

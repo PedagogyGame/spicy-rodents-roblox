@@ -516,6 +516,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 
 	function seat.onState(self: Seat, msg: { [string]: any })
 		local now = clock()
+		local was = self.phase
 		if type(msg.you) == "number" and msg.you ~= self.you then
 			iAm(msg.you, nil)
 		end
@@ -562,6 +563,9 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		if type(view) == "table" then
 			self.result = view.result
 			if view.phase == "done" then
+				if was ~= "ended" and was ~= "" then
+					ctx.sound("paintball.over", tuning.volGo) -- full time: the whistle
+				end
 				self.phase = "ended"
 				self.held = nil
 				-- the end card: people may walk about (the contract). Somebody tagged in the last seconds
@@ -706,9 +710,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			local mine = msg.by == self.you or msg.id == self.you
 			feedLine(`{nameOf(msg.by)} tagged {nameOf(msg.id)}`, if by then by.team else 0, mine, now)
 			if msg.by == self.you then
-				-- THE hit marker and hit sound: only ever on the server's word
+				-- THE hit marker and hit sound: only ever on the server's word (and who it was, in words)
 				self.hitAt = now
 				ctx.sound("paintball.tag", tuning.volTag)
+				say(`You tagged {nameOf(msg.id)}`, now)
 			end
 			if msg.id == self.you then
 				self.out = true
