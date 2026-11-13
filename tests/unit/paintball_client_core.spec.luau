@@ -757,6 +757,203 @@ return function(t)
 		end
 	)
 
+	t.test("a click carries its pose, and a change of stance is told at once, not at the stream's next turn", function()
+		local b = Kit.playing()
+		-- a click: a Move with the click's own stamp goes up before the Fire
+		Kit.frame(b, 2) -- (the last of them a frame in which no Move was due)
+		local before = #Kit.moves(b)
+		press(b)
+		Kit.frame(b)
+		local fire = Kit.fires(b)[1]
+		local moves = Kit.moves(b)
+		t.eq(#moves, before + 1, "one Move with the click")
+		t.eq(moves[#moves].t, fire.ft, "stamped as the click is: the pose at the fire time is the pose it left from")
+		t.near(moves[#moves].y + Body.STAND_EYE, fire.oy, 1e-6)
+		for i = 2, #moves do
+			t.truthy(moves[i].t > moves[i - 1].t, "no two Moves carry one stamp")
+		end
+		-- the crouch key: the Move that says so goes in the very next frame, whenever the last one went
+		Kit.run(b, 1)
+		b = Kit.playing()
+		Kit.frame(b)
+		before = #Kit.moves(b)
+		b.seat:input("crouch", true)
+		Kit.frame(b)
+		moves = Kit.moves(b)
+		t.eq(#moves, before + 1)
+		t.truthy(Wire.has(moves[#moves].bits, BIT.crouch), "the server hears of the crouch a frame after the key")
+		b.seat:input("crouch", false)
+		Kit.frame(b)
+		moves = Kit.moves(b)
+		t.eq(#moves, before + 2)
+		t.falsy(Wire.has(moves[#moves].bits, BIT.crouch), "and of standing up")
+		-- the feet leave the floor
+		Kit.run(b, 1)
+		before = #Kit.moves(b)
+		b.pose.y, b.pose.air = 0.4, true
+		Kit.frame(b)
+		moves = Kit.moves(b)
+		t.truthy(#moves >= before + 1)
+		t.truthy(Wire.has(moves[#moves].bits, BIT.air), "a jump is told in its first frame")
+		b.pose.y, b.pose.air = 0, false
+		-- however the keys are mashed the stream stays inside the remote's rate (thirty a second, forty-five at once)
+		b = Kit.playing()
+		for i = 1, 240 do
+			b.seat:input("crouch", i % 2 == 0) -- thirty changes a second
+			b.pose.air = i % 3 == 0
+			if i % 4 == 0 then
+				press(b)
+			end
+			Kit.frame(b)
+		end
+		moves = Kit.moves(b)
+		local rate, burst = 30, 45
+		local tokens = burst
+		for i, move in moves do
+			if i > 1 then
+				tokens = math.min(burst, tokens + (move.t - moves[i - 1].t) * rate)
+			end
+			tokens -= 1
+			t.truthy(tokens >= 0, `Move {i} would be dropped by Net's rate limit`)
+		end
+	end)
+
+	t.test(
+		"the origin: crouching, standing, tapping crouch and jumping with clicks at every moment, no ball leaves from where a to-the-letter server would refuse it; at 0, 150 and 300 ms, and with the click's own Move lost",
+		function()
+			-- The server's side of "the origin", to the letter of the contract: its own crouch fraction eased
+			-- once a snapshot tick from the crouch bit of the newest Move it has; the slot's pose at the fire
+			-- time read from the Moves it has (between the two either side, held at the newest); the eye
+			-- between the two eye heights, originSlackY either way, the jump's height more while the newest
+			-- Move says "in the air". A Move sent at t arrives `lat` later, as the Fire does.
+			local T = Contract.TRUST
+			local function judge(moves: { { [string]: number } }, fire: { [string]: number }, lat: number): boolean
+				local arrives = fire.ft + lat
+				local c = 0
+				local at = 1 -- the next Move to arrive
+				local newest: { [string]: number }? = nil
+				local tick = moves[1].t
+				while tick <= arrives do
+					while at <= #moves and moves[at].t + lat <= tick do
+						newest = moves[at]
+						at += 1
+					end
+					if newest then
+						c = Body.crouchStep(c, Wire.has(newest.bits, BIT.crouch), 1 / Clock.SNAP_HZ, F)
+					end
+					tick += 1 / Clock.SNAP_HZ
+				end
+				while at <= #moves and moves[at].t + lat <= arrives do
+					newest = moves[at]
+					at += 1
+				end
+				assert(newest, "the server has a Move")
+				-- the pose at f
+				local y = newest.y
+				for i = at - 1, 2, -1 do
+					local a, z = moves[i - 1], moves[i]
+					if a.t <= fire.ft and fire.ft <= z.t then
+						local k = if z.t > a.t then (fire.ft - a.t) / (z.t - a.t) else 1
+						y = a.y + (z.y - a.y) * k
+						break
+					end
+				end
+				local eyeA = Body.eye(c)
+				local eyeB = Body.eye(if Wire.has(newest.bits, BIT.crouch) then 1 else 0)
+				local slack = T.originSlackY + (if Wire.has(newest.bits, BIT.air) then Body.JUMP_HEIGHT else 0)
+				return fire.oy >= y + math.min(eyeA, eyeB) - slack and fire.oy <= y + math.max(eyeA, eyeB) + slack
+			end
+			local seed = 12345
+			local function rnd(): number
+				seed = (seed * 1103515245 + 12345) % 2147483648
+				return seed / 2147483648
+			end
+			local total, popUps = 0, 0
+			for _, case in
+				{
+					{ lat = 0, lost = false },
+					{ lat = 0.075, lost = false },
+					{ lat = 0.15, lost = false },
+					{ lat = 0.075, lost = true },
+					{ lat = 0.15, lost = true },
+				}
+			do
+				local b = Kit.playing()
+				local crouched = false
+				local tapLeft = 0 -- frames until a tap's second half
+				local jump: number? = nil -- seconds into a jump
+				local sinceFlip = 1
+				for _ = 1, 45 * 60 do
+					-- a jump as the engine throws a body: 28 studs/s up against 196.2, two studs high
+					if jump ~= nil then
+						jump += b.dt
+						local y = 28 * jump - 98.1 * jump * jump
+						if y <= 0 then
+							jump = nil
+							b.pose.y, b.pose.air = 0, false
+						else
+							b.pose.y, b.pose.air = y, true
+						end
+					elseif rnd() < 0.006 then
+						jump = 0
+					end
+					-- the crouch key: held for a while, let go, and now and then tapped
+					sinceFlip += b.dt
+					if tapLeft > 0 then
+						tapLeft -= 1
+						if tapLeft == 0 then
+							crouched = not crouched
+							b.seat:input("crouch", crouched)
+							sinceFlip = 0
+						end
+					elseif sinceFlip > 0.3 and rnd() < 0.02 then
+						crouched = not crouched
+						b.seat:input("crouch", crouched)
+						sinceFlip = 0
+						if rnd() < 0.4 then
+							tapLeft = 1 + math.floor(rnd() * 8) -- back again within nine frames
+						end
+					end
+					-- clicks at every moment, and on purpose in the first moments of a change (the pop-up shot)
+					if rnd() < 0.05 or (sinceFlip < 0.2 and rnd() < 0.3) then
+						press(b)
+					end
+					Kit.frame(b)
+				end
+				local moves = Kit.moves(b)
+				local fires = Kit.fires(b)
+				if case.lost then
+					-- every click's own Move never arrives: the stance told at once must do by itself
+					local stamps: { [number]: boolean } = {}
+					for _, fire in fires do
+						stamps[fire.ft] = true
+					end
+					local kept = {}
+					for _, move in moves do
+						if not stamps[move.t] then
+							table.insert(kept, move)
+						end
+					end
+					moves = kept
+				end
+				t.truthy(#fires >= 60, `{#fires} balls`)
+				for i, fire in fires do
+					total += 1
+					local eye = fire.oy - b.pose.y
+					if eye > Body.CROUCH_EYE + 0.45 and eye < Body.STAND_EYE - 0.45 then
+						popUps += 1
+					end
+					t.truthy(
+						judge(moves, fire, case.lat),
+						`ball {i} at {case.lat * 2000} ms round trip{if case.lost then ", its own Move lost" else ""}: the origin {fire.oy} would be refused`
+					)
+				end
+			end
+			-- (and the guard is not a ban: plenty of balls left from an eye in the middle of its travel)
+			t.truthy(popUps >= 20, `{popUps} of {total} balls left in mid-crouch`)
+		end
+	)
+
 	t.test(
 		"a placement: the body is pivoted first, so no Move carries a new placement number from the old place",
 		function()

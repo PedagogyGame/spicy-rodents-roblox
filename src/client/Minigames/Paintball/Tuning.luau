@@ -105,6 +105,16 @@ local Tuning = {
 	landDipMax = 0.45,
 	landRecover = 9,
 
+	-- A TAP OF CROUCH -------------------------------------------------------------------------------
+	-- Seconds inside which two changes of the crouch key count as a tap (down and straight up again, or
+	-- the other way). After one the server's own idea of how far you are crouched may be on the far side
+	-- of yours, so a click then waits until your eye is within tapSlack studs short of the 0.4 the server
+	-- allows of where it is going: under a tenth of a second, and never for a plain crouch or a plain
+	-- stand. Shorter than a slow connection's round trip plus the crouch itself and a ball fired through a
+	-- tap can be refused after it was drawn; longer only makes a slow crouch-spam fire a hair later.
+	tapWindow = 0.6,
+	tapSlack = 0.05,
+
 	-- SPRINT ----------------------------------------------------------------------------------------
 	-- How hard the stick or keys must be pushed for a sprint to run, 0..1. Standing still with Shift
 	-- held does not lower the marker.

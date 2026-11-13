@@ -46,7 +46,7 @@ local Key = roblox.Enum.KeyCode
 local CFrame, Vector3 = roblox.CFrame, roblox.Vector3
 local STATION = Contract.STATION
 local ROOT = 3 -- the fake body's root above its feet (HipHeight 2 + half a root 2 tall)
-local SECONDS = 90 -- of live play among the real bots
+local HOP_FRAMES = 30 -- a jump lasts half a second
 local USER = 41
 
 -- Is the match model the real one? The stub keeps its seats and its clock and never leaves the briefing.
@@ -89,6 +89,7 @@ type Visit = {
 	place: Arena.Place,
 	hum: any,
 	target: { x: number, z: number }?, -- where the legs are walking to
+	hop: number?, -- frames into a jump (nil: on the floor)
 	checked: number, -- how many of w.got have been held to the wire
 	unknown: { string }, -- messages the wire does not know
 	now: () -> number,
@@ -115,6 +116,7 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 		arena = service.arena,
 		place = service.place,
 		target = nil,
+		hop = nil,
 		checked = 0,
 		unknown = {},
 	} :: Visit
@@ -157,22 +159,33 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 			walking = want
 			Rig.key(Key.W, want)
 		end
-		if target == nil or not free then
+		local hop = v.hop
+		if (target == nil or not free) and hop == nil then
 			return
 		end
 		local x, y, z = v.feet()
-		local dx, dz = target.x - x, target.z - z
-		local d = math.sqrt(dx * dx + dz * dz)
-		local scale = w.body:GetAttribute("MoveScale")
-		local step = Body.WALK * (if type(scale) == "number" then scale else 1) / 60
-		if d <= step then
-			x, z = target.x, target.z
-			v.target = nil
-		else
-			x, z = x + dx / d * step, z + dz / d * step
+		if target ~= nil and free then
+			local dx, dz = target.x - x, target.z - z
+			local d = math.sqrt(dx * dx + dz * dz)
+			local scale = w.body:GetAttribute("MoveScale")
+			local step = Body.WALK * (if type(scale) == "number" then scale else 1) / 60
+			if d <= step then
+				x, z = target.x, target.z
+				v.target = nil
+			else
+				x, z = x + dx / d * step, z + dz / d * step
+			end
 		end
 		local ground = v.arena.ground(x, y + 0.5, z) or y
-		local wx, wy, wz = Arena.toWorld(v.place, x, ground, z)
+		-- a hop: up to the match's jump height and down again in half a second, off the floor meanwhile
+		local up = 0
+		if hop ~= nil then
+			local u = (hop + 1) / HOP_FRAMES
+			v.hop = if u < 1 then hop + 1 else nil
+			up = if u < 1 then 4 * Body.JUMP_HEIGHT * u * (1 - u) else 0
+			hum.FloorMaterial = if u < 1 then roblox.Enum.Material.Air else roblox.Enum.Material.Plastic
+		end
+		local wx, wy, wz = Arena.toWorld(v.place, x, ground + up, z)
 		w.body:PivotTo(CFrame.new(wx, wy + ROOT, wz))
 	end
 	v.frame = function()
@@ -251,11 +264,22 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 end
 
 -- A case in the real game. Returns false, and plays nothing, where the service behind the door is the stub.
-local function play(fn: (v: Visit) -> (), opts: { asleep: boolean? }?): boolean
-	local wires = PaintballRig.new()
+local function play(fn: (v: Visit) -> (), opts: { asleep: boolean?, lag: number?, lose: number? }?): boolean
+	local o = opts or {}
+	-- (lag: frames each way, for the stream and for the framework's messages alike; lose: one unreliable
+	-- message down in this many is lost)
+	local every = o.lose
+	local wires = PaintballRig.new({
+		lag = o.lag,
+		lose = if every
+			then function(_remote: string, n: number): boolean
+				return n % every == 0
+			end
+			else nil,
+	})
 	local brains = Bots :: any
 	local step = brains.step
-	if opts and opts.asleep then
+	if o.asleep then
 		-- the brains asleep: every bot stands where the match put it and wants nothing done
 		brains.step = function(): { any }
 			return {}
@@ -278,6 +302,7 @@ local function play(fn: (v: Visit) -> (), opts: { asleep: boolean? }?): boolean
 			assert(#v.unknown == 0, `a message the wire does not know: {table.concat(v.unknown, "; ")}`)
 		end,
 		PaintballRig.opts(wires, {
+			lag = o.lag,
 			service = {
 				paintball = {
 					engine = engine(),
@@ -699,9 +724,12 @@ return function(t)
 		end
 	)
 
-	t.test(
-		"a minute and a half among the real bots: patrolling, aiming at whoever is in sight and firing as fast as the marker lets go; nothing of an honest client is refused",
-		function()
+	-- A fight among the real bots at one connection: `seconds` of live play, `lag` frames each way, one
+	-- unreliable message down in `lose` lost. The player walks six links out of the spawn room and patrols
+	-- there: one leg walked, the next sprinted, the next crouched, a hop now and then; looks at the nearest
+	-- opponent in clear sight and clicks all the while.
+	local function fight(name: string, seconds: number, lag: number, lose: number?)
+		t.test(name, function()
 			local line = ""
 			play(function(v)
 				v.run(0.5)
@@ -712,6 +740,7 @@ return function(t)
 				end))
 				local route: { Arena.NavNode } = {}
 				local leg = 1
+				local legs = 0
 				local placed = -1
 				local outs, back = 0, 0
 				local wasOut = false
@@ -724,7 +753,8 @@ return function(t)
 				local folder = workspace.CurrentCamera:FindFirstChild("PaintballShow")
 				local puffSeen: { [any]: boolean } = {}
 				local puffs = 0
-				for _ = 1, SECONDS * 60 do
+				local hops, sprints, crouches = 0, 0, 0
+				for _ = 1, seconds * 60 do
 					frames += 1
 					for _, ball in show.balls do
 						if not ball.own and ball.born and not seen[ball.key] then
@@ -756,13 +786,27 @@ return function(t)
 						v.target = nil
 					end
 					if v.target == nil and #route > 0 and not seat.out then
-						-- out along the route, then to and fro on its last link
+						-- out along the route, then to and fro on its last link: walked, sprinted, crouched in turn
 						if leg > #route then
 							leg = #route - 1
 						end
 						local node = route[leg]
 						v.target = { x = node.x, z = node.z }
 						leg += 1
+						legs += 1
+						local mode = if leg <= #route then 0 else legs % 3
+						Rig.key(Key.LeftShift, mode == 1)
+						Rig.key(Key.C, mode == 2)
+						if mode == 1 then
+							sprints += 1
+						elseif mode == 2 then
+							crouches += 1
+						end
+					end
+					-- a hop every four seconds or so, wherever the legs are (never crouched: C is held)
+					if frames % 251 == 0 and v.hop == nil and not seat.out and not seat.wantCrouch then
+						v.hop = 0
+						hops += 1
 					end
 					-- the look: at the nearest opponent in clear sight (aimed a little high for the drop, not
 					-- led: a walker is often missed, as a person misses), else at a wall
@@ -804,7 +848,9 @@ return function(t)
 				end
 				-- quiet for a moment, so every click has its answer
 				v.target = nil
-				v.run(1.0)
+				Rig.key(Key.LeftShift, false)
+				Rig.key(Key.C, false)
+				v.run(1.0 + lag / 30)
 				local stats = v.service:stats()
 				local ok, refused = v.acks()
 				local tags, mine = 0, 0
@@ -817,10 +863,10 @@ return function(t)
 					end
 				end
 				line =
-					`{SECONDS} s among the real bots: {v.fires()} balls fired ({ok} acked, {refused} refused); an opponent in sight {sighted} times, {puffs} balls met a body on this screen and the server counted {mine} tags; tagged out {outs} time(s); {others} of the bots' balls drawn, {tags} tags heard; {stats.movesAccepted} poses accepted, {stats.movesRefused} refused, {stats.movesDropped} dropped, {stats.corrections} corrections`
+					`{seconds} s among the real bots at {math.floor(lag * 2000 / 60 + 0.5)} ms round trip: {v.fires()} balls fired ({ok} acked, {refused} refused); {sprints} legs sprinted, {crouches} crouched, {hops} hops; an opponent in sight {sighted} times, {puffs} balls met a body on this screen and the server counted {mine} tags; tagged out {outs} time(s); {others} of the bots' balls drawn, {tags} tags heard; {stats.movesAccepted} poses accepted, {stats.movesRefused} refused, {stats.movesDropped} dropped, {stats.corrections} corrections`
 				print("      " .. line)
 				settled(v, t, "among the bots")
-				t.truthy(v.fires() >= 60, "the marker was fired all the way through")
+				t.truthy(v.fires() >= seconds / 2, "the marker was fired all the way through")
 				t.eq(back, if seat.out then outs - 1 else outs, "every time out was followed by a respawn")
 				if not seat.out and seat.mag.reloadDoneAt == nil then
 					t.eq(seat.mag.rounds, serverRounds(v), "the pips are the server's count")
@@ -831,8 +877,16 @@ return function(t)
 				for _, splat in show.walls do
 					t.falsy(splat.predicted, "no predicted splat is left waiting")
 				end
-			end)
+			end, { lag = lag, lose = lose })
 			t.truthy(line ~= "")
-		end
+		end)
+	end
+
+	fight(
+		"a minute and a half among the real bots at 100 ms: walking, sprinting, crouching, hopping, aiming at whoever is in sight and firing as fast as the marker lets go; nothing of an honest client is refused",
+		90,
+		3,
+		nil
 	)
+	fight("and a minute at 300 ms with one unreliable packet in twenty lost: the same", 60, 9, 20)
 end

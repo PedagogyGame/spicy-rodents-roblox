@@ -19,6 +19,23 @@
 --              and the stick is pushed; to 0 at once otherwise) and the crouch fraction c
 --              (Body.crouchStep), handed to ctx.pace and to the eye every frame; Wire.Move
 --              Clock.SEND_HZ times a second, never before the first placement nor while out.
+--   the origin THE SERVER JUDGES A BALL'S ORIGIN AGAINST THE POSES IT HAS BEEN TOLD (Contract, "the origin":
+--              the eye over the slot's own pose at the fire time, between the eye heights of the crouch
+--              fraction it keeps and of where the newest Move's crouch bit is heading, 0.4 either way, and
+--              the jump's height more while the newest Move says "in the air"). A pose stream of twenty a
+--              second leaves it up to 50 ms behind an eye that moves 9 studs a second through a crouch and
+--              a body that leaves the floor at 28, so a shot in the first moment of standing up from behind
+--              a rail, or of a jump, would be refused after its ball was drawn (found against the real
+--              service: two balls in a hundred and sixty). Three things, all the client's own, close that:
+--              (1) A CLICK CARRIES ITS POSE: in the frame a ball leaves, a Move with the click's own stamp
+--              goes first, so "the pose at the fire time" is the very pose the ball left from; (2) A
+--              CHANGE OF STANCE IS TOLD AT ONCE: the crouch key going down or up, and the feet leaving the
+--              floor, send a Move in that frame and not at the stream's next turn (a few a second at most,
+--              inside the remote's rate); (3) AFTER A QUICK DOUBLE CHANGE (a tap of crouch: down and up
+--              inside Tuning.tapWindow) the server's own crouch fraction may be on the far side of the
+--              client's, so a click then waits, as it waits for the fire interval, until the eye is within
+--              the server's 0.4 of where it is going. A single change holds nothing: the pop-up shot over
+--              a rail leaves the instant the click is made.
 --   placements pivot the body, take the number, turn the look for one frame, and for a respawn a full
 --              magazine, the legs back and the protection.
 --   idle       the seat knows how long its player has neither moved, turned nor fired while the match
@@ -164,6 +181,11 @@ local R = Contract.Rules
 local M = Contract.MARGIN
 local BIT = Wire.BIT
 local SEND = 1 / Clock.SEND_HZ
+-- Moves sent ahead of the stream's turn for a change of stance: at most TELL_MOST at once, refilled at
+-- TELL_RATE a second. With the stream's twenty and a ball's own Move (at most one a fire interval) the remote
+-- stays inside Shared/Net's thirty a second however the keys are mashed.
+local TELL_MOST = 3
+local TELL_RATE = 3
 local LEAVE = { "leave", "Leave the match" }
 local SIDE = { "side", "Change sides" }
 
@@ -180,6 +202,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 	local briefEnds: number? = nil -- the end of the briefing this seat saw (the gate of "live")
 	local moveAcc = SEND
 	local moveSeq = 0
+	local lastMoveT = -math.huge -- the stamp of the last Move sent (two never carry the same one)
+	local tell = false -- a Move is owed at once: the stance changed, the feet left the floor
+	local tellBudget = TELL_MOST -- how many such Moves may still go (it refills: the remote has a rate)
+	local flipLast, flipPrev = -math.huge, -math.huge -- when the crouch key last changed, and the time before
 	local turnFrames = 0 -- frames of the look's hold still to run
 	local turnLook: { number }? = nil
 	local walked = 0
@@ -337,6 +363,13 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			return "hold", nil
 		elseif now < mag.nextFireAt then
 			return "hold", nil
+		elseif now - flipPrev < tuning.tapWindow then
+			-- a quick double change of stance (see the header, "the origin"): the eye must be within the
+			-- server's slack of where it is going before a ball may leave from it
+			local going = Body.eye(if seat.wantCrouch then 1 else 0)
+			if math.abs(Body.eye(seat.c) - going) > Contract.TRUST.originSlackY - tuning.tapSlack then
+				return "hold", nil
+			end
 		end
 		return "go", nil
 	end
@@ -386,6 +419,34 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		ctx.sound("paintball.reload", tuning.volReload)
 	end
 
+	-- The pose as it stands, up the link, stamped `now`. False when there is none to send (no body, no
+	-- placement yet, tagged out) or one with this stamp has gone already.
+	local function sendPose(now: number): boolean
+		if not (hasPose and link and seat.place ~= 0 and not seat.out and seat.you ~= 0) or now <= lastMoveT then
+			return false
+		end
+		lastMoveT = now
+		moveSeq = (moveSeq + 1) % 65536
+		local bits = (if seat.wantCrouch then BIT.crouch else 0)
+			+ (if seat.k > 0 then BIT.sprint else 0)
+			+ (if seat.air then BIT.air else 0)
+		link.send(
+			"Paintball.Move",
+			BufferCodec.encode(Wire.Move, {
+				t = now,
+				seq = moveSeq,
+				x = seat.x,
+				y = seat.y,
+				z = seat.z,
+				yaw = seat.yaw,
+				pitch = seat.pitch,
+				bits = bits,
+				place = seat.place,
+			})
+		)
+		return true
+	end
+
 	-- A ball leaves. Returns false when it could not (no body to fire from).
 	local function fire(now: number): boolean
 		if not sample() then
@@ -412,6 +473,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			dz = lookZ,
 		})
 		if link then
+			-- the click carries its pose: the server reads "the pose at the fire time" from this very Move
+			if sendPose(now) then
+				moveAcc = 0
+			end
 			link.send("Paintball.Fire", payload)
 		end
 		table.insert(unacked, shot)
@@ -823,6 +888,10 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				end
 			end
 		elseif action == "crouch" then
+			if down ~= self.wantCrouch then
+				flipPrev, flipLast = flipLast, now
+				tell = true
+			end
 			self.wantCrouch = down
 			if down then
 				endSprint(now)
@@ -863,6 +932,9 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 		local wasAir, wasY = self.air, self.y
 		local has = sample()
+		if has and self.air and not wasAir then
+			tell = true -- the feet left the floor: the server allows the jump's height only once it is told
+		end
 		-- the landing dip
 		if has and dt > 0 then
 			local vy = (self.y - wasY) / dt
@@ -920,29 +992,20 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		-- a waiting press
 		tryFire(now)
 		settle(now)
-		-- the pose, SEND_HZ times a second
+		-- the pose, SEND_HZ times a second; at once, ahead of its turn, when the stance changed
 		moveAcc += dt
-		if moveAcc >= SEND - 1e-6 then
+		tellBudget = math.min(TELL_MOST, tellBudget + dt * TELL_RATE)
+		if tell and tellBudget >= 1 then
+			tell = false
+			if sendPose(now) then
+				tellBudget -= 1
+				moveAcc = 0
+			end
+		elseif moveAcc >= SEND - 1e-6 then
 			moveAcc = math.min(moveAcc - SEND, SEND)
-			if has and link and self.place ~= 0 and not self.out and self.you ~= 0 then
-				moveSeq = (moveSeq + 1) % 65536
-				local bits = (if self.wantCrouch then BIT.crouch else 0)
-					+ (if self.k > 0 then BIT.sprint else 0)
-					+ (if self.air then BIT.air else 0)
-				link.send(
-					"Paintball.Move",
-					BufferCodec.encode(Wire.Move, {
-						t = now,
-						seq = moveSeq,
-						x = self.x,
-						y = self.y,
-						z = self.z,
-						yaw = self.yaw,
-						pitch = self.pitch,
-						bits = bits,
-						place = self.place,
-					})
-				)
+			tell = false
+			if has then
+				sendPose(now)
 			end
 		end
 		-- your own footsteps: loud running, soft walking, silent crouched
