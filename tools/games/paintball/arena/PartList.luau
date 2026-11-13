@@ -7,7 +7,7 @@
 --                  model from the storey it stands on ("Floor0" .. "Floor4", "Roof"). A `monitor` box's part is
 --                  named Arena.MONITOR and carries the face its screen is on; signs, marks (paint that is not
 --                  a sign: tape, cables on a floor, stains) and lamps ride on their box's part. Then one invisible, collidable part for each stair ramp, lying on its steps
---                  (bodies walk on it; nothing asks it where a ball is), and one see-through, non-colliding
+--                  (bodies walk on it; nothing asks it where a ball is, but the engine's raycast does meet it: see the bake), and one see-through, non-colliding
 --                  part for each spawn-room curtain, named Arena.CURTAIN .. team, in the team's colour.
 --   dressing(venue)   everything OUTSIDE the arena volume, parts only: the lobby annex (floor, walls, roof, the
 --                  pass desk and the garb counter in front of the two windows onto the atrium, the lobby's
@@ -375,7 +375,6 @@ function PartList.solids(plan: ArenaDataPlan.Plan): { Part }
 			material = "SmoothPlastic",
 			transparency = 1,
 			collide = true,
-			query = false,
 			shadow = false,
 			tilt = angle,
 			ramp = i,

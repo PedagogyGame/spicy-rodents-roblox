@@ -10,8 +10,11 @@
 -- WHAT THE REST OF PAINTBALL FINDS BY NAME, all under ONE sub-model of the site's Model named Arena.MODEL
 -- ("PaintballArena"; attribute Boxes = how many collision boxes it was baked from):
 --   Floor0 .. Floor4, Roof   a Model a storey (the building streams in pieces): one Part for each box, with the
---             attribute Box = its index in arena.boxes; an invisible Part "Ramp" for each stair ramp (CanCollide,
---             not CanQuery: bodies walk on it, a raycast passes it); on the middle storey one Part for each
+--             attribute Box = its index in arena.boxes; an invisible Part "Ramp" for each stair ramp, attribute Ramp
+--             = its index (CanCollide: bodies walk on it. The engine honours CanQuery = false only on a part that
+--             does not collide, so a ramp IS hit by workspace:Raycast, up to half a stud over the steps: a ray that
+--             stands for a ball or an eye takes an Include list of the parts with a Box attribute, or leaves out
+--             the parts named Ramp); on the middle storey one Part for each
 --             spawn-room doorway named Arena.CURTAIN .. team ("Curtain1", "Curtain2": see-through, in the team's
 --             colour, CanCollide false; a seated client makes the other team's solid on its own screen).
 --   Monitor   every part named Arena.MONITOR (old sets on carts about the floors, master control's wall, one in
@@ -23,13 +26,21 @@
 --   Paint     words are SurfaceGuis on their box's part; the plan's marks (tape, cables lying on a floor, stains,
 --             papers, a floor's words) are labels in a second SurfaceGui named "Paint" on the same face, under
 --             the signs, lit by the room (LightInfluence 1). Nothing of either is a part.
--- Lights are PointLights without shadows inside the strip lights, stage lamps and lobby fittings.
+-- Lights are PointLights without shadows inside the strip lights, stage lamps and lobby fittings, each with the
+-- attribute ArenaLight = true: baked on, so the building is lit whatever else runs; a client may switch them off
+-- while its camera is further than Arena.AUDIENCE_MARGIN outside the volume, where none of them can be seen.
+-- PB-15: every SurfaceGui of the building and the lobby (words, paint, screens) stops drawing past GUI_DISTANCE
+-- (paint) or SIGN_DISTANCE (words, screens) studs, so the town does not draw the station's insides; the street's
+-- own signs (Outside) are seen from anywhere.
 -- Interface: { build(kit, parent, station, venue) }
 local Arena = require("../../../src/shared/Minigames/Paintball/Arena")
 local ArenaData = require("../../../src/shared/Minigames/Paintball/ArenaData")
 local PartList = require("../../games/paintball/arena/PartList")
 
 local Bake = {}
+
+Bake.GUI_DISTANCE = 2 * Arena.HALF -- studs: paint (tape, stains, a floor's words) is not drawn from further
+Bake.SIGN_DISTANCE = 160 -- studs: nor are the words on the walls and the monitors' screens
 
 local function make(kit: any, model: any, groups: { [string]: any }, p: PartList.Part): any
 	local group = groups[p.group]
@@ -44,6 +55,9 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 	end
 	if p.screen then
 		attrs.ScreenFace = p.screen
+	end
+	if p.ramp then
+		attrs.Ramp = p.ramp
 	end
 	local opts = {
 		collide = p.collide,
@@ -63,6 +77,9 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 		if g == nil then
 			local w = math.max(p.x1 - p.x0, p.y1 - p.y0, p.d1 - p.d0)
 			g = kit:gui(part, face, math.clamp(math.floor(900 / w), 8, 50))
+			if p.group ~= "Outside" then
+				g.MaxDistance = if paint then Bake.GUI_DISTANCE else Bake.SIGN_DISTANCE
+			end
 			if paint then
 				g.Name = "Paint"
 				g.LightInfluence = 1
@@ -102,11 +119,12 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 		label.Name = "Text"
 	end
 	if p.light then
-		kit:light(
+		local light = kit:light(
 			part,
 			"PointLight",
 			{ Color = p.light.color, Range = p.light.range, Brightness = p.light.brightness, Shadows = false }
 		)
+		light:SetAttribute("ArenaLight", true)
 	end
 	return part
 end

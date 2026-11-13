@@ -5,9 +5,14 @@
 --   1. the model: Workspace has one Model named Arena.MODEL with its storeys, the lobby and the outside;
 --   2. the parts: one for every box of ArenaData.build(), where the box is and of its size, solid and seen; a
 --      Ramp for every flight (walked on, not ray-cast); curtains that stop nothing; monitors with their Screen;
---   3. the rays: RAYS segments from open points inside the volume, each asked of workspace:Raycast (the arena's
---      model only) and of arena.sweep: the same hit or the same miss, the hit points within TOLERANCE studs and
---      the same face. A ray that grazes an edge may differ; more than GRAZES of them fails the check.
+--   3. the rays: RAYS segments from open points inside the volume, each asked of workspace:Raycast and of
+--      arena.sweep: the same hit or the same miss, the hit points within TOLERANCE studs and the same face. A ray
+--      that grazes an edge may differ; more than GRAZES of them fails the check. The ray's Include list is the
+--      parts with a Box attribute and the curtains (which it must pass): NOT the whole model, because a Ramp
+--      collides, and the engine honours CanQuery = false only on a part that does not, so a ray over a flight
+--      would stop on the invisible ramp half a stud above the step a ball stops on. That is the rule for every
+--      ray that stands for a ball or an eye. The check measures it too: a ray straight down over the middle of each
+--      flight, asked of the whole model, reports what it meets (numbers.rampsHit).
 --   4. the paint: every mark of the plan is a label in a SurfaceGui named "Paint" on its box's part; the widest
 --      painted face's canvas is reported (numbers.paintCanvas, in pixels: the floors are the largest).
 -- NOT YET RUN in the engine: the session that wrote it (2026-11-13) had the cloud tools off limits. It does not
@@ -82,8 +87,8 @@ for _, d in model:GetDescendants() do
 			end
 		elseif d.Name == "Ramp" then
 			ramps += 1
-			if not d.CanCollide or d.CanQuery then
-				fail("a ramp must be walked on and not ray-cast")
+			if not d.CanCollide or typeof(d:GetAttribute("Ramp")) ~= "number" then
+				fail("a ramp must be walked on, and carry its number")
 			end
 		end
 		if d.Name == Arena.MONITOR then
@@ -149,11 +154,36 @@ if curtains[1] ~= #arena.curtains[1] or curtains[2] ~= #arena.curtains[2] then
 	fail(`curtains: {curtains[1]} and {curtains[2]}`)
 end
 
--- the rays
+-- the rays: against the boxes' own parts and the curtains, never the ramps
+local include: { Instance } = {}
+for _, d in model:GetDescendants() do
+	if
+		d:IsA("BasePart") and (d:GetAttribute("Box") ~= nil or string.sub(d.Name, 1, #Arena.CURTAIN) == Arena.CURTAIN)
+	then
+		table.insert(include, d)
+	end
+end
 local params = RaycastParams.new()
 params.FilterType = Enum.RaycastFilterType.Include
-params.FilterDescendantsInstances = { model }
+params.FilterDescendantsInstances = include
 params.IgnoreWater = true
+-- what a ray that takes the whole model meets over the stairs (the ramp, if the engine casts against it)
+local whole = RaycastParams.new()
+whole.FilterType = Enum.RaycastFilterType.Include
+whole.FilterDescendantsInstances = { model }
+local rampsHit = 0
+for _, r in arena.ramps do
+	local x, z = (r.minX + r.maxX) / 2, (r.minZ + r.maxZ) / 2
+	local ox, oy, oz = Arena.toWorld(place, x, r.y1 + 3, z)
+	local hit = Workspace:Raycast(Vector3.new(ox, oy, oz), Vector3.new(0, -(r.y1 - r.y0 + 6), 0), whole)
+	if hit and hit.Instance.Name == "Ramp" then
+		rampsHit += 1
+	end
+	local boxed = Workspace:Raycast(Vector3.new(ox, oy, oz), Vector3.new(0, -(r.y1 - r.y0 + 6), 0), params)
+	if boxed == nil or boxed.Instance:GetAttribute("Box") == nil then
+		fail(`over flight ({x}, {z}) the boxes' ray meets no step`)
+	end
+end
 local rng = Random.new(20261113)
 local cast, hits, grazes, worst = 0, 0, 0, 0
 while cast < RAYS do
@@ -239,6 +269,7 @@ return {
 		parts = parts,
 		boxes = n,
 		ramps = ramps,
+		rampsHit = rampsHit,
 		monitors = monitors,
 		marks = labels,
 		paintCanvas = paintCanvas,

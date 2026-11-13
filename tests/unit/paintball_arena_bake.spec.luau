@@ -86,7 +86,7 @@ return function(t)
 				ramps += 1
 				local r = plan.ramps[p.ramp]
 				t.eq(p.name, "Ramp")
-				t.truthy(p.collide and p.query == false and p.transparency == 1)
+				t.truthy(p.collide and p.query == nil and p.transparency == 1, "walked on, unseen, and honest about rays")
 				local angle = p.tilt :: number
 				t.near(math.tan(math.abs(angle)), (r.y1 - r.y0) / (r.maxX - r.minX), 1e-9)
 				t.eq(angle > 0, r.dir > 0)
@@ -671,11 +671,28 @@ return function(t)
 			"the data puts the arena where Arena.PLACE says"
 		)
 		local seen: { [number]: boolean } = {}
-		local monitors, curtains, ramps, lights, parts = 0, { 0, 0 }, 0, 0, 0
+		local monitors, curtains, ramps, lights, parts, guis = 0, { 0, 0 }, 0, 0, 0, 0
 		for _, d in model:GetDescendants() do
 			if d:IsA("PointLight") then
 				lights += 1
 				t.falsy(d.Shadows)
+				t.eq(d:GetAttribute("ArenaLight"), true, "a light says it is the arena's (a client may switch it off)")
+			end
+			-- PB-15: nothing of the building's inside or the lobby is drawn from the town
+			if d:IsA("SurfaceGui") then
+				guis += 1
+				local outside = d:FindFirstAncestor("Outside") ~= nil
+				if outside then
+					t.eq(d.MaxDistance, 0, "the street's signs are seen from anywhere")
+				else
+					t.truthy(
+						d.MaxDistance > 0 and d.MaxDistance <= 160,
+						`{d:GetFullName()} is drawn from {d.MaxDistance}`
+					)
+					if d.Name == "Paint" then
+						t.truthy(d.MaxDistance <= 2 * Arena.HALF)
+					end
+				end
 			end
 			if not d:IsA("BasePart") then
 				continue
@@ -703,7 +720,9 @@ return function(t)
 				t.truthy(d.CanCollide and d.CanQuery and d.Transparency < 0.9, `box {i}'s part is solid and seen`)
 			elseif d.Name == "Ramp" then
 				ramps += 1
-				t.truthy(d.CanCollide and not d.CanQuery and d.Transparency == 1)
+				-- (walked on, unseen; the engine's raycast meets it whatever CanQuery says, so it is named and numbered
+				-- for a ray to leave out)
+				t.truthy(d.CanCollide and d.Transparency == 1 and d:GetAttribute("Ramp") ~= nil)
 			else
 				-- anything else inside the arena is plainly not solid
 				if Arena.inVolume(lx, ly, lz) then
@@ -740,7 +759,8 @@ return function(t)
 		t.eq(ramps, #arena.ramps)
 		t.deepEq(curtains, { 2, 2 })
 		t.truthy(monitors >= 13, `{monitors} monitors, the lobby's among them`)
-		t.truthy(lights >= 60, `{lights} lights`)
+		t.truthy(lights >= 40 and lights <= 120, `{lights} lights`)
+		t.truthy(guis <= 480, `{guis} SurfaceGuis`)
 		-- the marks are labels in a SurfaceGui named Paint, lit by the room; each label lies in the world where
 		-- the plan put its mark (a Top face's canvas runs left to right along the part's X and top to bottom
 		-- along its Z, as tools/review/attractions_export draws it)
