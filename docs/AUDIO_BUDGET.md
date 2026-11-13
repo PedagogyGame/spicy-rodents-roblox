@@ -38,3 +38,21 @@ Eight sounds if each is uploaded; fewer if library sounds fit.
 | `air_hockey.lose` | the match is theirs | a short falling sting |
 
 Nine sounds if each is uploaded. The owner's own game makes these as tones in code (`docs/reference/air_hockey/`); the strike, rail and post could be one recording at three pitches.
+
+### Sewers (`src/client/World/SewerAmbience.luau`, table `CUES`)
+The storm drains (BRIEF_ADDENDUM D8). Mild: water, echoes and drips, nothing dirty. While the squirrel is inside, the client also sets `SoundService.AmbientReverb` to `SewerPipe` and puts it back on the way out, so most of these can be dry library sounds.
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `sewer.grateIn` | the squirrel goes down a grate or quay cover | a light iron rattle and a soft drop |
+| `sewer.grateOut` | it comes up out of one (or the body changes while inside) | the same rattle, shorter |
+| `sewer.rung` | every stud climbed or descended in a shaft | a small claw tick on iron |
+| `sewer.footEcho` | every 2.75 studs run along a passage | a soft patter with a short echo |
+| `sewer.drip` | at random every 2 to 6 s while inside, at the nearest drip point | one clear water drip |
+| `sewer.trickle` | a loop while inside a brick drain (P1, P3) | running water in a narrow channel |
+| `sewer.riverHum` | a loop while inside the dry culvert under the river (P2) | a low, muffled rush from above |
+| `sewer.streetMurmur` | a loop while within 8 studs (level) of a mouth, from below | muffled traffic and voices through a grate |
+| `sewer.hiss` | the squirrel has stood still underground until the idle warning (D34; v5.4's small alligator), with the line "A low hiss and a ripple in the sewer water…" | a low hiss and a small splash, never seen |
+| `sewer.carOverhead` | not fired yet (needs the traffic poses over a pipe) | a car passing over a manhole lid, a dull double thump |
+| `sewer.trolleyOverhead` | not fired yet (as above, the trolley over P3) | a heavier rumble and a rail clack |
+
+Eleven sounds if each is uploaded. The loops (trickle, riverHum, streetMurmur) and the drip are the ones that make the place; the rest could share two or three recordings.
