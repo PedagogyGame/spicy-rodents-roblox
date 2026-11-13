@@ -68,6 +68,7 @@ export type StationDef = {
 	d: number,
 	index: number?,
 	variant: string?,
+	action: string?, -- a `joins` prompt's own action line (GameSpec.StationDef)
 	reach: number?,
 	joins: string?,
 }

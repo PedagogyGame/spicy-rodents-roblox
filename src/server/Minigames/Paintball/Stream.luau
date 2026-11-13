@@ -90,7 +90,7 @@
 --   t, feel?) -> (least, most); sprinting(person, f) -> boolean; originOk(person, f, ox, oy, oz, sweep,
 --   feel, ground?) -> boolean; aimOk(person, f, dx, dy, dz) -> boolean; clickOk(person, f, ox, oy, oz,
 --   arena, feel) -> why?; lateWindow(person, rtt?) -> seconds; lateClickOk(person, click, f, ox, oy, oz,
---   arena, feel, now) -> why?; silent(person, now) -> (stale, drop); types Move, Person, Verdict
+--   arena, feel, now) -> why?; silent(person, now) -> (stale, drop); inAnnex(x, y, z) -> boolean; types Move, Person, Verdict
 
 local Import = require("../../Import")
 local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
@@ -690,6 +690,12 @@ function Stream.aimOk(person: Person, f: number, dx: number, dy: number, dz: num
 	end
 	-- (the click's own frame was heard and the ball does not leave along its look: refused)
 	return not heard
+end
+
+-- Is an arena-frame point inside the lobby annex (z from the arena's south wall to its front door, one storey)?
+function Stream.inAnnex(x: number, y: number, z: number): boolean
+	local half = ArenaModule.HALF
+	return math.abs(x) <= half + 1 and z >= half and z <= half + 31 and y >= -2 and y <= 16
 end
 
 local function inEitherRoom(arena: Arena, x: number, y: number, z: number): boolean

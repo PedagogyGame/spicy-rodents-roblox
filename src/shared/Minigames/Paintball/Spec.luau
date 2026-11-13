@@ -17,10 +17,11 @@
 --             remotes (Wire).
 --   stations  two, when the site is baked: the arena's own (its prompt is at the arena door in the
 --             lobby, Arena.GATE) and the pass desk (Arena.DESK), which `joins` it: the service's
---             Table.join sells the pass there and seats nobody. The framework writes ONE action line
---             on both prompts (Table.prompt is not told which prompt it is asked for), so each
---             station's label says what its prompt does; the label of the arena's own is also what
---             the framework's toasts call the game ("You joined Paintball match.").
+--             Table.join sells the pass there and seats nobody. The desk's prompt carries an action line
+--             of its own ("Buy a pass": the station's `action`, settled at the review: it read "Join the
+--             match", and pressing it bought a pass); each station's label says what its prompt is; the
+--             label of the arena's own is also what the framework's toasts call the game ("You joined
+--             Paintball match.").
 -- The arena has no walk-away radius: the service's Table.inPlay says who is still in the match.
 -- Pure. Interface: a GameSpec.Spec.
 
@@ -67,6 +68,7 @@ local Spec: GameSpec.Spec = {
 				id = Contract.DESK,
 				game = Contract.GAME,
 				label = "Pass desk: 20c for five days",
+				action = "Buy a pass",
 				site = Contract.SITE,
 				x = dx,
 				y = dy,

@@ -23,6 +23,9 @@ export type StationDef = {
 	-- station is only a prompt, and pressing it seats the player at the station named here, whose Table is told
 	-- which prompt was pressed (Table.join's `via`)
 	joins: string?,
+	-- a `joins` prompt's own action line, when it does something other than seat you ("Buy a pass"); default:
+	-- the joined station's
+	action: string?,
 }
 
 export type Flow = "turns" | "solo" | "live" | "match"

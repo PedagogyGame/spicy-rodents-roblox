@@ -998,7 +998,7 @@ function Game.start(opts: Opts?): any
 					return false, "Pick a person from the menu first (M)"
 				end
 				if actor.species ~= "human" then
-					return false, "Only people can play. Animals can watch (or sneak through the ball return)"
+					return false, "Only people can play. Animals can watch"
 				end
 				if
 					devices

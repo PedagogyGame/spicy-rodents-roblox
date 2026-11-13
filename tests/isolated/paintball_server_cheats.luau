@@ -284,4 +284,37 @@ return function(t)
 			})
 		end
 	)
+
+	t.test(
+		"PB-11: a squirrel in the lobby annex or the arena is put out on the street; one outside is left alone",
+		function()
+			local knocked: { { [string]: any } } = {}
+			local critters: { { [string]: any } } = {}
+			Kit.play(function(kit)
+				people(kit, { "Ada", "Bea" })
+				local place = kit.place
+				local lx, ly, lz = Arena.toWorld(place, -14, 0, 75) -- in the annex, by the pass desk
+				local ox, oy, oz = Arena.toWorld(place, 0, 0, 130) -- out on the street
+				table.insert(critters, { id = "sq1", kind = "squirrel", x = lx, y = ly + 0.5, z = lz })
+				table.insert(critters, { id = "sq2", kind = "squirrel", x = ox, y = oy + 0.5, z = oz })
+				kit.run(1.2)
+				t.truthy(#knocked >= 1)
+				for _, k in knocked do
+					t.eq(k.id, "sq1", "only the one inside")
+					local x, _, z = Arena.toLocal(place, k.x, k.y, k.z)
+					t.truthy(z > Arena.HALF + 31 and math.abs(x) < 5, "put out in front of the door")
+					t.truthy(string.find(k.text, "for people", 1, true) ~= nil)
+				end
+			end, {
+				service = {
+					animals = function(): { { [string]: any } }
+						return critters
+					end,
+					knock = function(id: any, x: number, y: number, z: number, text: string)
+						table.insert(knocked, { id = id, x = x, y = y, z = z, text = text })
+					end,
+				},
+			})
+		end
+	)
 end

@@ -1350,6 +1350,9 @@ return function(t)
 					inLobby = true
 					v.run(1)
 					t.eq(PaintballClient.show(), nil, "an empty arena costs nothing")
+					-- the desk's prompt says what it does (the review: it read "Join the match")
+					t.eq(Rig.prompt(w, Contract.DESK).ActionText, "Buy a pass")
+					t.truthy(Rig.prompt(w, Contract.STATION).ActionText ~= "Buy a pass")
 					-- THE DESK: 20c for the pass, once; a second press says so and takes nothing
 					local toasts = #w.toasts
 					Rig.press(w, Contract.DESK)

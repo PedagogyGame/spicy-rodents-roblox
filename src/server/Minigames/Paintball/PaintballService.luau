@@ -508,6 +508,10 @@ local function noEngine(): Engine
 	}
 end
 
+-- where an animal found inside the station is put (the arena frame: the street in front of the annex's door)
+local STREET = table.freeze({ x = 0, y = 0, z = 100 })
+local ANIMALS_OUT = "The TV station is for people: animals stay outside."
+
 -- seconds a shooter's ball births are kept apart by, less than a fire interval (onFire, "the births")
 local BIRTH_MARGIN = 0.05
 
@@ -1082,6 +1086,19 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 						engine.ghost(body, false)
 						put(body, arena.lobby.x, arena.lobby.y, arena.lobby.z, arena.lobby.yaw)
 					end
+				end
+			end
+		end
+		-- RODENT-FREE (PB-11): a squirrel or the Spicy Rodent inside the station, the annex included (its front door
+		-- is open), is put back out on the street in front of it and told why (the town's own knock, as a bowling
+		-- lane in play does). Found at the review: the annex was open to animals.
+		local animals, knock = ctx.opts.animals, ctx.opts.knock
+		if animals ~= nil and knock ~= nil then
+			for _, a in animals() do
+				local x, y, z = ArenaModule.toLocal(place, a.x, a.y, a.z)
+				if ArenaModule.inVolume(x, y, z) or Stream.inAnnex(x, y, z) then
+					local wx, wy, wz = ArenaModule.toWorld(place, STREET.x, STREET.y, STREET.z)
+					knock(a.id, wx, wy, wz, ANIMALS_OUT)
 				end
 			end
 		end

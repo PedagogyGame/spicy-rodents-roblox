@@ -1204,6 +1204,8 @@ return function(t)
 			t.eq(door.joins, nil)
 			t.eq(desk.id, Contract.DESK)
 			t.eq(desk.joins, Contract.STATION)
+			t.eq(desk.action, "Buy a pass", "the desk's prompt says what it does")
+			t.eq(door.action, nil)
 			for _, st in list do
 				t.eq(st.game, Contract.GAME)
 				t.eq(st.site, Contract.SITE)
