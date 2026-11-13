@@ -17,6 +17,7 @@
 -- Pure: no engine calls except inside `fromGenerated`, which is the engine-side constructor.
 
 local Curve = require("./Curve")
+local Enclosure = require("./Enclosure")
 local Units = require("../Config/Units")
 
 local Registry = {}
@@ -42,6 +43,8 @@ export type RouteRecord = {
 	sampleCount: number?,
 	lotId: string?,
 	flags: RouteFlags?,
+	-- kind "tunnel" only: the enclosed run this route belongs to (Routes/Enclosure; world coordinates)
+	enclosure: Enclosure.Record?,
 }
 
 export type RouteFlags = {
@@ -68,6 +71,7 @@ export type Route = {
 	lotId: string?,
 	flags: RouteFlags,
 	patched: string?, -- the harvest_patches action applied (Routes/Patches), nil when as harvested
+	enclosure: Enclosure.Spec?, -- kind "tunnel" only (Routes/Enclosure); nil on every other route
 	_curve: Curve.Curve?,
 	_samples: { Vec3 }?,
 }
@@ -93,7 +97,7 @@ export type Registry = typeof(setmetatable(
 ))
 
 Registry.TREE_TRAVEL_KINDS = { trunk = true, branch = true, bridge = true, lookout = true }
-Registry.KINDS = { "trunk", "branch", "bridge", "lookout", "roof", "wire", "fence", "trampoline" }
+Registry.KINDS = { "trunk", "branch", "bridge", "lookout", "roof", "wire", "fence", "trampoline", "tunnel" }
 
 -- Explicit attributes for the v5.4 name regexes (routes_movement §4; D8 replaces the regexes).
 function Registry.deriveFlags(name: string, kind: string): RouteFlags
@@ -117,6 +121,15 @@ local function toRoute(rec: RouteRecord, studsPerUnit: number): Route
 	-- Without a record count, the harvested length in HTML units reproduces the game's own ceil(3L) for
 	-- every route (verified in tests/unit/routes_registry.spec.luau against data/harvest/routes.json).
 	local sampleCount: number = rec.sampleCount or (Curve.sampleSteps(rec.length / studsPerUnit) + 1)
+	-- an enclosed run (kind "tunnel") must carry a valid enclosure record and no other kind may: fail loudly
+	local enclosure: Enclosure.Spec? = nil
+	if rec.enclosure ~= nil or rec.kind == Enclosure.KIND then
+		local errs = Enclosure.validate(rec.enclosure, rec.kind)
+		if #errs > 0 then
+			error(`Registry: route {rec.id}: {table.concat(errs, "; ")}`)
+		end
+		enclosure = Enclosure.fromRecord(rec.enclosure :: Enclosure.Record)
+	end
 	local center: Vec3? = nil
 	if rec.center then
 		center = Curve.vec3(rec.center[1], rec.center[2], rec.center[3])
@@ -137,6 +150,7 @@ local function toRoute(rec: RouteRecord, studsPerUnit: number): Route
 		lotId = rec.lotId,
 		flags = rec.flags or Registry.deriveFlags(rec.name, rec.kind),
 		patched = nil,
+		enclosure = enclosure,
 		_curve = nil,
 		_samples = nil,
 	}

@@ -6,7 +6,7 @@
 -- throw with the pure models in Shared/Minigames/Bowling), so REAL throws run here through the input path; a
 -- lane's pinfall is also scripted with MinigameService:debugRoll where a known score is wanted (the same scoring,
 -- pinsetter and ball-return path), and darts with debugDart (the rules' server verb "land"). Checks: the alley is
--- there with its stations, prompts, pins, balls, doors and the carved tunnels; the six tunnel routes are in the
+-- there with its stations, prompts, pins, balls, doors and the carved tunnels; the eighteen tunnel routes are in the
 -- Routes registry and the vent's foot stands on the alley paving; two players bowl a full game in turn (a perfect
 -- 300 against 9-0 frames = 90; turn order by frame; the overhead monitor shows 300); a third player is turned
 -- away mid-game, an animal is turned away, a player who walks off mid-game has the rest of their frames played
@@ -70,16 +70,17 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 		end
 	end
 	numbers.alleyParts = parts
-	check(parts > 1500, `alley has {parts} parts`)
+	check(parts > 4500, `alley has {parts} parts`)
 	numbers.carved = A.carved
-	check((A.carved or 0) >= 3, `terrain carves {A.carved}`)
+	check((A.carved or 0) >= AlleyLayout.PAIRS, `terrain carves {A.carved}`)
 	local stationCount = 0
 	for _ in svc.stations do
 		stationCount += 1
 	end
 	numbers.stations = stationCount
 	-- every station the registry lists for the sites that were baked (Shared/Minigames/Games): the alley's
-	-- fourteen (6 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball) and whatever the venues' games add
+	-- twenty-eight (18 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball, the two ends of the air hockey table)
+	-- and whatever the venues' games add
 	local sites: { [string]: any } = A.sites or {}
 	local places: { [string]: any } = {}
 	numbers.sites = 0
@@ -90,7 +91,7 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	local registered = #Games.stations(places)
 	numbers.registeredStations = registered
 	check(stationCount == registered, `stations {stationCount}, the registry lists {registered}`)
-	check(stationCount >= 14, `stations {stationCount} (the alley alone has 14)`)
+	check(stationCount >= 28, `stations {stationCount} (the alley alone has 28)`)
 	-- each has its prompt, in its own site's folder
 	local promptCount = 0
 	for _, site in sites do
@@ -104,7 +105,7 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 		end
 	end
 	check(promptCount == stationCount, `{promptCount} minigame prompts for {stationCount} stations`)
-	for lane = 1, 6 do
+	for lane = 1, AlleyLayout.LANES do
 		local lm = alley and alley.Lanes:FindFirstChild(`Lane{lane}`)
 		local pins = lm and lm:FindFirstChild("Pins")
 		check(pins and #pins:GetChildren() == 10, `lane {lane}: 10 pins`)
@@ -122,13 +123,15 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 		end
 	end
 	check(doorPrompts == 2, `{doorPrompts} push-bar door prompts`)
-	-- the tunnels: routes in the registry; the vent's foot stands on the alley paving; the duct is air
+	-- the ball returns: one enclosed route per pair in the registry; its alley mouth stands on the alley paving; the
+	-- duct is air
 	local data = (require :: any)(Shared:WaitForChild("Data")).default()
 	local reg = data:routes()
-	for id = 9001, 9006 do
+	for p = 1, AlleyLayout.PAIRS do
+		local id = 9000 + 2 * p
 		check(reg:get(id) ~= nil, `route {id} missing from the registry`)
 	end
-	local vent = reg:get(9003)
+	local vent = reg:get(9004)
 	if vent then
 		local foot = reg:foot(vent)
 		local hit = workspace:Raycast(Vector3.new(foot.x, foot.y + 2, foot.z), Vector3.new(0, -4, 0))

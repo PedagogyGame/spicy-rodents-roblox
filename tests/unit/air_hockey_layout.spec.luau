@@ -15,7 +15,7 @@ local Sim = require("@shared/Minigames/AirHockey/Sim")
 local Games = require("@shared/Minigames/Games")
 local Bake = require("../../tools/bake/games/AirHockey")
 local Kit = require("../../tools/bake/alley/Kit")
-local Rooms = require("../../tools/bake/alley/Rooms")
+local GamesRoom = require("../../tools/bake/alley/GamesRoom")
 
 local FLAT: AlleyLayout.Place = { x = 0, z = 0, floorY = 0, yaw = 0 }
 local TURNED: AlleyLayout.Place = { x = 1300, z = -420, floorY = 16.5, yaw = 0.6 }
@@ -47,7 +47,7 @@ end
 local function builtRoom(): any
 	local kit = Kit.new(roblox, FLAT)
 	local root = roblox.Instance.new("Model")
-	Rooms.build(kit, root)
+	GamesRoom.build(kit, root)
 	return root:FindFirstChild("GamesRoom")
 end
 
@@ -258,7 +258,8 @@ return function(t)
 			local room = builtRoom()
 			local foot = Layout.footprint()
 			local mine: { Box } = { foot, Layout.standing(0), Layout.standing(1) }
-			-- inside the walls (the room: X 26..56, D -48..30; the partition and the back wall are 0.3 thick inside)
+			-- inside the walls (the room: AlleyLayout.GAME_ROOM_X0 .. X1 across, FRONT_D .. GAME_ROOM_D1 deep; the
+			-- partition and the back wall are 0.3 thick inside)
 			for _, b in mine do
 				t.truthy(
 					b.x0 >= AlleyLayout.GAME_ROOM_X0 + 0.5 and b.x1 <= AlleyLayout.X1 - 0.5,
@@ -268,8 +269,13 @@ return function(t)
 					b.d1 <= AlleyLayout.GAME_ROOM_D1 - 0.5 and b.d0 >= AlleyLayout.FRONT_D + 0.5,
 					"inside the back wall"
 				)
-				-- the two openings from the lanes are at D -24..-14 and -2..8: nothing of the table is in front of them
-				t.truthy(b.d0 >= 8 + 6, "well clear of the doorways")
+				-- the openings into the room from the hall (AlleyLayout.OPENINGS): nothing of the table is in front of
+				-- them, with 6 studs to spare
+				for _, o in AlleyLayout.OPENINGS do
+					if o.axis == "d" and o.at == AlleyLayout.GAME_ROOM_X0 and table.find(o.between, "games_room") then
+						t.truthy(b.d0 >= o.b + 6 or b.d1 <= o.a - 6, `well clear of the doorway {o.id}`)
+					end
+				end
 			end
 			-- what the bake built is inside the footprint and the two standing rooms (the score board and the lamps
 			-- are on the wall and the ceiling above head height)

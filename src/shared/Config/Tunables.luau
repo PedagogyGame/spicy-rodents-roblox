@@ -115,6 +115,7 @@ Tunables.tree = {
 	           stinkFillPerMin = { v = 1.2 }, stinkFireMin = { v = 95 }, stinkCost = { v = 30 },
 	           stinkRepelRadius = { v = 8, unit = "u" }, stinkRepelSecs = { v = 4, unit = "s" } },
 	economy = { minWageCentsPerHour = { v = 2, src = "brief v2 §13a" }, robuxToCents = { v = 400, src = "about 1 R$ = 4 S$" },
+	            pocketMoneyCents = { v = 300, unit = "Spicy cents", src = "plan default until jobs pay: a player is given S$3.00 once per server, on first joining (every corner-store item once is 204c)" },
 	            paintballPassCents = { v = 20 }, paintballPassDays = { v = 5, unit = "game days", src = "Q2" }, garbSetCents = { v = 100 },
 	            fashionUnlockLifetimeCents = { v = 150, src = "v5.4's 150 lifetime coins gate the fashion stand (rev 4, CR3 VD-3)" } },
 	reputation = { votesPerDay = { v = { up = 5, down = 5 }, unit = "per game day", src = "v2 §13a (Q2)" }, voteWeightClamp = { v = { 0.25, 1.5 } },

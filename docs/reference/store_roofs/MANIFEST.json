@@ -1,0 +1,22 @@
+{
+  "project": "Spicy Rodent",
+  "date": "2026-11-13",
+  "disclosure": "Recovered store art, new roof assets, isolated unintegrated Luau prototypes. No original game files edited or Roblox Studio playtests performed.",
+  "contents": [
+    {
+      "name": "01_Store_and_Tunnels/Spicy_Rodent_Complete_v2.zip",
+      "bytes": 53553758,
+      "sha256": "53d98c1b90250ffbadf7a93e9242ad31dbc4005ee2fb8b76edf303934bd02e35"
+    },
+    {
+      "name": "02_Roofs_and_Rafters/Spicy_Rodent_Roof_Rafter_Kit_v1.zip",
+      "bytes": 94195,
+      "sha256": "751e66edcf36ae94f750e5db9d3087905ec9b871bc9f2513082f9cd2408b1d4f"
+    },
+    {
+      "name": "03_Luau_Gameplay_Prototypes/Spicy_Rodent_Luau_Prototype_Kit_v1.zip",
+      "bytes": 13720,
+      "sha256": "060b6c0215b49ee48e0e2f60498533479d79fada2868e72621cee76be3fb13a6"
+    }
+  ]
+}
