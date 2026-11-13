@@ -9,7 +9,9 @@
 --   gamepad      R2 fire; X reload; B crouch is a TOGGLE; L3 sprint is a TOGGLE that ends on a fire
 --                press, on a crouch and when the stick is let go (Tuning.padSprintOff); View shows the
 --                scoreboard while HELD, and while it is held Y leaves and D-pad up changes sides; at the
---                end card Y leaves by itself.
+--                end card Y leaves by itself. (View is also Roblox's own switch into picking a button
+--                with the pad, and the D-pad then moves that pick: these three are obeyed even when the
+--                engine counts the press as its own, so the board and its two verbs never depend on it.)
 --   touch        the right FIRE does not sink its touch: its press is read here from the touch itself
 --                (inside Hud.fireRect), and the same finger's drag still turns the view; a second FIRE
 --                on the left, RELOAD, CROUCH (a TOGGLE) and SCORES (a TOGGLE) are buttons. Sprint
@@ -32,6 +34,9 @@ export type Controls = {
 }
 
 local Controls = {}
+
+-- gamepad keys that are obeyed although the engine's own UI took the press (see the header)
+local PAD_OVER_UI: { [string]: boolean } = { ButtonSelect = true, ButtonY = true, DPadUp = true }
 
 function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tuning: typeof(Tuning.T)?): Controls
 	local tune = tuning or Tuning
@@ -83,11 +88,11 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 	table.insert(
 		conns,
 		UIS.InputBegan:Connect(function(io: InputObject, processed: boolean)
-			if InputMap.ignore(io, processed) then
-				return
-			end
 			local kind = io.UserInputType
 			local key = io.KeyCode.Name
+			if InputMap.ignore(io, processed and not PAD_OVER_UI[key]) then
+				return
+			end
 			if kind == Enum.UserInputType.MouseButton1 then
 				if not seat.board then
 					fire()

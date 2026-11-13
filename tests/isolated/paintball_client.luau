@@ -1026,6 +1026,23 @@ return function(t)
 				pad(Key.ButtonY, true)
 				s.run(0.2)
 				t.eq(w.client.active(), STATION)
+				-- View is also Roblox's own switch into picking a button with the pad: a press the engine counted
+				-- as its own still brings the board up, and D-pad up (which would then move the pick) still
+				-- changes sides. A trigger pulled over a button is still not a shot.
+				local io = { KeyCode = Key.ButtonSelect, UserInputType = Kind.Gamepad1 }
+				FakeEngine.input("began", io, true)
+				s.run(0.3)
+				t.truthy(named(s.hud(), "Board").Visible, "the board, whoever else took the press")
+				FakeEngine.input("began", { KeyCode = Key.DPadUp, UserInputType = Kind.Gamepad1 }, true)
+				s.run(0.3)
+				t.truthy(Rig.last(w.sent, "side") ~= nil, "D-pad up changes sides with the board held")
+				local fired = #heard(s, "Paintball.Fire")
+				FakeEngine.input("began", { KeyCode = Key.ButtonR2, UserInputType = Kind.Gamepad1 }, true)
+				s.run(0.3)
+				t.eq(#heard(s, "Paintball.Fire"), fired)
+				pad(Key.ButtonSelect, false)
+				s.run(0.3)
+				t.falsy(named(s.hud(), "Board").Visible)
 				pad(Key.ButtonSelect, true)
 				s.run(0.3)
 				t.truthy(named(s.hud(), "Board").Visible)

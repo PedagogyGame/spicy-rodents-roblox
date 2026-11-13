@@ -137,7 +137,9 @@ function Marker.new(seat: SeatCore.Seat, port: SelfPort.Self, tuning: typeof(Tun
 		-- (the lowering eases both ways: a tap of Shift does not snap it)
 		self.down += (down - self.down) * (1 - math.exp(-tune.markerEase * dt))
 		local d = self.down
-		local toe = math.atan2(tune.markerRight, tune.markerConverge) -- the barrel points at the crosshair's line out there
+		-- the barrel points at the crosshair's line out there: in from the right, and up from below
+		local toe = math.atan2(tune.markerRight, tune.markerConverge)
+		local lift = math.atan2(tune.markerDown, tune.markerConverge)
 		local at = cf
 			* CFrame.new(
 				tune.markerRight + bobX,
@@ -145,7 +147,7 @@ function Marker.new(seat: SeatCore.Seat, port: SelfPort.Self, tuning: typeof(Tun
 				-tune.markerForward + kick * tune.kickBack
 			)
 			* CFrame.Angles(
-				-d * tune.sprintTip + kick * tune.kickUp - swayPitch + rattle * tune.reloadShake,
+				lift - d * tune.sprintTip + kick * tune.kickUp - swayPitch + rattle * tune.reloadShake,
 				toe - swayYaw + d * tune.sprintSwing,
 				-tip * tune.reloadTip
 			)
