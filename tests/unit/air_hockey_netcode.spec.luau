@@ -5,9 +5,10 @@
 --   Against the computer the player's own screen IS the match: at 0, 80 and 150 ms each way the puck and both
 --   mallets shown are the referee's to the last bit at every frame of whole matches, nothing is ever corrected,
 --   and the hand's log is ten messages a second.
---   Against a person the player's own mallet is still exactly their hand, with no delay; the puck in their own
---   half is theirs to within a hair; only what the OTHER hand has just done arrives late, and the bounds below
---   say by how much.
+--   Against a person the player's own mallet is still exactly their hand, with no delay. What the OTHER hand
+--   does cannot be known at once, and it is never guessed on the screen: the far mallet and the puck in the far
+--   half are drawn a moment late, from what the referee decided, and the puck in the player's own half is the
+--   present puck. The bounds below say how late, and how exactly what is drawn is the referee's match.
 -- Also here: the wire format, the referee's refusals, a hand that is late, a seat that changes hands mid-match,
 -- a watcher who arrives late.
 local Referee = require("@shared/Minigames/AirHockey/Referee")
@@ -149,41 +150,117 @@ return function(t)
 		t.truthy(line.ref.n > 240 * 35, "the referee kept up through the hitch")
 	end)
 
-	-- Two people. Bounds in metres on a 2.34 m bed; the measured figures are printed by
-	-- `lune run tools/games/air_hockey/netcode.luau`.
+	-- Two people. What is drawn is the referee's match, not all of it at one moment: this end now, the far end as
+	-- late as the stream (Seat's header). Bounds in metres on a 2.34 m bed and in seconds; the measured figures
+	-- are printed by `lune run tools/games/air_hockey/netcode.luau`.
 	for _, case in
 		{
-			{ ms = 0, near = 0.02, far = 0.06 },
-			{ ms = 80, near = 0.15, far = 0.25 },
-			{ ms = 150, near = 0.3, far = 0.25 },
+			{ ms = 0, late = 0.085, shown = 0.002, live = 0.95, near = 0.01 },
+			{ ms = 40, late = 0.135, shown = 0.004, live = 0.88, near = 0.03 },
+			{ ms = 80, late = 0.235, shown = 0.012, live = 0.7, near = 0.2 },
+			{ ms = 150, late = 0.375, shown = 0.012, live = 0.45, near = 0.45 },
 		}
 	do
 		local frames = math.floor(case.ms / 1000 * 60 + 0.5)
-		t.test(`two people at {case.ms} ms each way: your own hand is never late, the far hand is`, function()
+		t.test(
+			`two people at {case.ms} ms each way: your hand is now, the far end is the referee's a moment ago`,
+			function()
+				local line = Line.new({
+					humans = { [0] = true, [1] = true },
+					lag = { [0] = frames, [1] = frames },
+					hands = { [0] = Line.hands.chaser(1), [1] = Line.hands.chaser(2) },
+				})
+				Line.run(line, 60)
+				t.eq(#line.refused, 0, table.concat(line.refused, "; "))
+				t.eq(line.ref.cuts, 0, "neither hand was late enough to be played without")
+				for side = 0, 1 do
+					local seat = line.seats[side]
+					local e = Line.errors(line, side)
+					local sm = Line.smooth(line, side)
+					t.eq(seat.replica.desyncs, 0)
+					t.truthy(
+						e.own.max < 1e-9,
+						`a player's own mallet is their hand, with no delay (off by {e.own.max} m)`
+					)
+					-- the far mallet: the other player's real hand, never a guess, and never faster than a hand
+					t.truthy(
+						e.farShown.p95 < 1e-5,
+						`side {side}: the far mallet drawn is the referee's ({e.farShown.p95} m)`
+					)
+					t.truthy(e.farShown.mean < 0.002, `side {side}: far mallet off by {e.farShown.mean} m on average`)
+					t.truthy(e.farLate.p95 < case.late, `side {side}: the far mallet is drawn {e.farLate.p95} s late`)
+					t.truthy(
+						sm.malletOver <= sm.frames * 0.002,
+						`side {side}: the far mallet moved faster than a hand on {sm.malletOver} frames`
+					)
+					-- the puck: the referee's puck of the moment it is drawn at, and never later than the far mallet
+					t.truthy(
+						e.puckShown.mean < case.shown,
+						`side {side}: the puck drawn is {e.puckShown.mean} m from the referee's on average`
+					)
+					t.truthy(e.puckShown.p95 < 0.005, `side {side}: and within {e.puckShown.p95} m on 95 frames in 100`)
+					t.truthy(e.puckLate.max <= e.farLate.max + 1e-9, "the puck is never drawn later than the far end")
+					-- in this player's own half it is the present puck (the rest: a strike at the far end is
+					-- not known here yet, or the puck is being brought to the present)
+					t.truthy(
+						e.nearLive > case.live,
+						`side {side}: in their own half the puck drawn is the present puck on {e.nearLive * 100} % of frames`
+					)
+					t.truthy(
+						e.near.mean < case.near,
+						`side {side}: puck in the near half off by {e.near.mean} m on average`
+					)
+					local perSecond = line.sent[side] / math.min(line.time, line.ref.n / 240 + 0.5)
+					t.truthy(perSecond > 12 and perSecond <= 15.01, `{perSecond} messages a second`)
+				end
+				t.truthy(line.ref.sim.hitSerial > 30, "a real rally")
+			end
+		)
+	end
+
+	t.test(
+		"two people: the moment the puck is drawn at never runs backward, slows to no less than SLOW, and a sound is heard when its contact is seen",
+		function()
 			local line = Line.new({
 				humans = { [0] = true, [1] = true },
-				lag = { [0] = frames, [1] = frames },
+				lag = { [0] = 3, [1] = 3 },
 				hands = { [0] = Line.hands.chaser(1), [1] = Line.hands.chaser(2) },
 			})
-			Line.run(line, 60)
-			t.eq(#line.refused, 0, table.concat(line.refused, "; "))
-			t.eq(line.ref.cuts, 0, "neither hand was late enough to be played without")
-			for side = 0, 1 do
-				local seat = line.seats[side]
-				local e = Line.errors(line, side)
-				t.eq(seat.replica.desyncs, 0)
-				t.truthy(e.own.max < 1e-9, `a player's own mallet is their hand, with no delay (off by {e.own.max} m)`)
-				t.truthy(
-					e.near.mean < case.near,
-					`side {side}: puck in the near half off by {e.near.mean} m on average`
-				)
-				t.truthy(e.far.mean < case.far, `side {side}: puck in the far half off by {e.far.mean} m on average`)
-				local perSecond = line.sent[side] / math.min(line.time, line.ref.n / 240 + 0.5)
-				t.truthy(perSecond > 12 and perSecond <= 15.01, `{perSecond} messages a second`)
+			local seat = line.seats[0]
+			local last, lastFar = nil :: number?, nil :: number?
+			local heard, contacts = 0, 0
+			local slowest, fastest = math.huge, 0
+			for _ = 1, 60 * 30 do
+				local hits = line.ref.sim.hitSerial
+				Line.frame(line)
+				contacts += line.ref.sim.hitSerial - hits
+				if seat.ready and seat.mode == "2" and line.ref.sim.winner < 0 then
+					if last and lastFar then
+						local step = seat.puckAt - last
+						t.truthy(step >= -1e-9, "the puck's moment went back")
+						t.truthy(seat.farAt - lastFar >= -1e-9, "the far mallet's moment went back")
+						if step > 0 then
+							slowest, fastest = math.min(slowest, step / 4), math.max(fastest, step / 4)
+						end
+					end
+					last, lastFar = seat.puckAt, seat.farAt
+					t.truthy(
+						seat.puckAt <= seat.tick and seat.puckAt >= seat.farAt - 1e-9,
+						"between the far end's moment and now"
+					)
+					Seat.heard(seat, function(what: number, speed: number)
+						heard += 1
+						t.truthy(what >= Sim.HIT_RAIL and what <= Sim.HIT_MALLET + 1)
+						t.truthy(speed >= 0 and speed <= 2 * Sim.MAX_SPEED + 3.5)
+					end)
+				end
 			end
-			t.truthy(line.ref.sim.hitSerial > 30, "a real rally")
-		end)
-	end
+			t.truthy(fastest <= Seat.FAST + 1e-6, `quickened to {fastest} of its speed at most`)
+			t.truthy(fastest > 2, "a puck coming back was brought to the present")
+			t.truthy(contacts > 40, "a rally")
+			t.truthy(heard >= contacts * 0.9 and heard <= contacts + 2, `{heard} contacts heard of {contacts} decided`)
+		end
+	)
 
 	t.test("two people: a hand that stops arriving is not waited for, and comes back into the match", function()
 		local line = Line.new({

@@ -13,7 +13,8 @@
 -- drawn between ticks (Client/Minigames/AirHockey/Rink.show); the log of the hand is sent on in segments, never a
 -- message a frame; the referee's stream comes back and is checked against what was shown. Against the computer
 -- that is the whole of his single-player game on this screen; against a person only the other hand arrives
--- late (Seat's header says what is done about it).
+-- late, and it is never guessed: the far end is drawn a moment ago, as the referee decided it, and this end now
+-- (Seat's header).
 -- Words on screen are his: READY WHEN YOU ARE, BEAUTIFUL SHOT, EMBER SCORES, MATCH WON, WELL PLAYED.
 -- The main client's rules (MinigameClient's header): the two views go through ctx.camera / ctx.releaseCamera;
 -- the cursor is MinigameUI's; everything connected here is disconnected in stop().
@@ -294,11 +295,11 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 						table.insert(args, text)
 					end
 					ctx.send("log", args)
-				end, function(sim: any, _tick: number, hit: boolean, goal: boolean)
-					-- what this screen predicts: the contacts at once; against the computer the goals too (they
-					-- are the referee's, tick for tick)
-					Rink.cue(sim, hit, goal and not duo, false, self.side)
+				end, function(sim: any, _tick: number, _hit: boolean, goal: boolean)
+					-- against the computer a goal is said the tick this screen plays it (it is the referee's,
+					-- tick for tick)
 					if goal and not duo then
+						Rink.cue(sim, false, true, false, self.side)
 						goalWords(sim)
 					end
 				end, function(sim: any, _tick: number, _hit: boolean, goal: boolean)
@@ -310,6 +311,8 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 				end)
 			end
 			if seat.ready then
+				-- a contact is heard when the puck drawn meets it (this end's at once, the far end's when seen)
+				Seat.heard(seat, Rink.contact)
 				Rink.show(rink, Seat.view(seat))
 				status(words(if seat.mode == "2" then seat.replica.sim else seat.pred, seat.mode))
 			end

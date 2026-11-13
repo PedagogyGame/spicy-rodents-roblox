@@ -14,7 +14,7 @@
 -- against the computer, "2" both), a, b (the events each person's side was given, as one string each), s (the
 -- whole state at tick n, STATE order), t0 (when tick 0 was, on the shared clock) }. Anyone can start from any
 -- message (s is everything), and whoever holds the state at n0 gets the state at n by replaying the events.
--- Pure. Interface: SEGMENT_SOLO, SEGMENT_DUO, MAX_SEGMENT, SLACK, MAX_BEHIND, STRING, EVENT; quantise(side, x,
+-- Pure. Interface: SEGMENT_SOLO, SEGMENT_DUO, MAX_SEGMENT, SLACK, MAX_BEHIND, START_WAIT, STRING, EVENT; quantise(side, x,
 --   y) -> (qx, qy); target(side, qx, qy) -> (x, y); snap(side, x, y) -> (x, y); pack(events, from) -> { string };
 --   unpack(strings, from, to) -> events? ; join(events, from) -> string; state(sim) -> { number };
 --   load(sim, list) -> bool; same(sim, list) -> bool; STATE
@@ -30,6 +30,7 @@ Wire.SEGMENT_DUO = 16 -- and against a person: fifteen a second (the other playe
 Wire.MAX_SEGMENT = 1440 -- the longest stretch one message may cover (a client coming back from a long frame)
 Wire.SLACK = 72 -- ticks a client may be ahead of the server's reading of the shared clock (0.3 s)
 Wire.MAX_BEHIND = 96 -- with two people: the referee waits this long (0.4 s) for a hand, then plays on without it
+Wire.START_WAIT = 480 -- as a match starts: ticks (2 s) a player's first segment is waited for before that
 Wire.STRING = 198 -- characters in one argument (33 events)
 Wire.EVENT = 6
 Wire.STEPS = 4095

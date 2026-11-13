@@ -13,7 +13,8 @@
 -- step is unbound when no table is being watched).
 -- Sound: every contact and goal of the replay is a named cue (cue(), also used by the controller).
 -- Interface: get(station, place?) -> Rink; push(rink, msg) (a stream message for that station); rest(rink) (the
---   table has reset: the pieces go home); take(rink) / give(rink); show(rink, px, py, ax, ay, bx, by) (model metres); cue(sim, hit, goal, served, mine?) ;
+--   table has reset: the pieces go home); take(rink) / give(rink); show(rink, px, py, ax, ay, bx, by) (model metres); cue(sim, hit, goal, served, mine?);
+--   contact(what, speed) (one contact's sound);
 --   watching() -> number of tables being drawn here; reset() (specs); DELAY; IDLE; BIND
 
 local Import = require("../../Import")
@@ -115,18 +116,23 @@ function Rink.show(rink: Rink, px: number, py: number, ax: number, ay: number, b
 	slide(parts.ember, bx, by)
 end
 
+-- The sound of one contact: what the puck met (Sim.HIT_*) and how hard (metres a second along the normal).
+function Rink.contact(what: number, speed: number)
+	local volume = math.clamp(0.25 + speed / Sim.MAX_SPEED * 0.75, 0, 1)
+	if what >= Sim.HIT_MALLET then
+		MinigameSounds.play("air_hockey.strike", volume)
+	elseif what == Sim.HIT_POST then
+		MinigameSounds.play("air_hockey.post", volume)
+	else
+		MinigameSounds.play("air_hockey.rail", volume)
+	end
+end
+
 -- The sound of one tick: what the puck met and how hard, a serve, a goal. `mine` is the end the listener plays
 -- (nil for a bystander).
 function Rink.cue(sim: any, hit: boolean, goal: boolean, served: boolean, mine: number?)
 	if hit then
-		local volume = math.clamp(0.25 + sim.hitSpeed / Sim.MAX_SPEED * 0.75, 0, 1)
-		if sim.hitWhat >= Sim.HIT_MALLET then
-			MinigameSounds.play("air_hockey.strike", volume)
-		elseif sim.hitWhat == Sim.HIT_POST then
-			MinigameSounds.play("air_hockey.post", volume)
-		else
-			MinigameSounds.play("air_hockey.rail", volume)
-		end
+		Rink.contact(sim.hitWhat, sim.hitSpeed)
 	end
 	if served then
 		MinigameSounds.play("air_hockey.serve", 0.5)

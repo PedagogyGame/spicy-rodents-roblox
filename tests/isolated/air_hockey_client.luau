@@ -158,7 +158,8 @@ local function play(w: Rig.World, seconds: number, hand: any?, bots: { any }?, s
 			local px, py = where(w, Layout.PUCK)
 			local ax, ay = where(w, Layout.MALLETS[0])
 			local bx, by = where(w, Layout.MALLETS[1])
-			table.insert(shown, { nowTick(w), px, py, ax, ay, bx, by })
+			local seat = c and c.seat
+			table.insert(shown, { nowTick(w), px, py, ax, ay, bx, by, seat and seat.puckAt, seat and seat.farAt })
 		end
 	end
 end
@@ -197,6 +198,50 @@ local function apart(shown: { any }, decided: { [number]: { number } }): ({ numb
 		end
 	end
 	return worst, { sum[1] / math.max(n, 1), sum[2] / math.max(n, 1), sum[3] / math.max(n, 1) }, n
+end
+
+-- Against a person the far end is drawn a moment ago (Seat): how far the puck and the far mallet shown were
+-- from what the referee decided for the moments they were drawn at (metres, mean and worst), and how late those
+-- moments were (seconds, mean).
+local function apartDrawn(shown: { any }, decided: { [number]: { number } }, far: number): { [string]: number }
+	local function at(tickTime: number): { number }?
+		local t0 = math.floor(tickTime)
+		local a, b = decided[t0], decided[t0 + 1]
+		local f = tickTime - t0
+		if a == nil or (b == nil and f > 0) then
+			return nil
+		end
+		if f == 0 or b == nil then
+			return a
+		end
+		local out = {}
+		for i = 1, 6 do
+			out[i] = a[i] + (b[i] - a[i]) * f
+		end
+		if math.abs(b[1] - a[1]) + math.abs(b[2] - a[2]) > 0.2 then
+			out[1], out[2] = if f < 0.5 then a[1] else b[1], if f < 0.5 then a[2] else b[2]
+		end
+		return out
+	end
+	local out = { n = 0, puck = 0, puckWorst = 0, mallet = 0, malletWorst = 0, puckLate = 0, farLate = 0 }
+	for _, s in shown do
+		local p, m = s[8] and at(s[8]), s[9] and at(s[9])
+		if p and m then
+			out.n += 1
+			local e = math.sqrt((s[2] - p[1]) ^ 2 + (s[3] - p[2]) ^ 2)
+			out.puck += e
+			out.puckWorst = math.max(out.puckWorst, e)
+			e = math.sqrt((s[4 + far * 2] - m[3 + far * 2]) ^ 2 + (s[5 + far * 2] - m[4 + far * 2]) ^ 2)
+			out.mallet += e
+			out.malletWorst = math.max(out.malletWorst, e)
+			out.puckLate += (s[1] - s[8]) / 240
+			out.farLate += (s[1] - s[9]) / 240
+		end
+	end
+	for _, k in { "puck", "mallet", "puckLate", "farLate" } do
+		out[k] /= math.max(out.n, 1)
+	end
+	return out
 end
 
 -- (positions pass through the engine's single-precision vectors a thousand studs from the origin)
@@ -636,6 +681,53 @@ return function(t)
 			t.eq(Rig.prompt(w, ID).ActionText, "Play air hockey")
 		end, opts())
 	end)
+
+	for _, ms in { 0, 80, 150 } do
+		local lag = math.floor(ms / 1000 * 60 + 0.5)
+		t.test(
+			`against a person at {ms} ms each way: your mallet is your hand, the far end is the referee's a moment ago`,
+			function()
+				Rig.play(function(w)
+					Rig.press(w, ID)
+					Rig.run(w, 0.3 + lag / 30)
+					-- (Bob lets every countdown run out: an early serve of his is the one thing Ann's screen cannot
+					-- know of in time, and it is not what is measured here)
+					local chase = Line.hands.chaser(2)
+					local bob = bot(w, "Bob", function(side: number, sim: any, tick: number): (number, number, boolean)
+						local x, y = chase(side, sim, tick)
+						return x, y, false
+					end)
+					t.truthy(w.svc:join(bob.stub, EMBER))
+					Rig.click(w, "Start (Space)")
+					Rig.run(w, 0.5 + lag / 30)
+					local tbl = tableOf(w)
+					t.eq(Referee_mode(tbl), "2")
+					local shown = {}
+					play(w, 20, Line.hands.chaser(1), { bob }, shown, function()
+						return tbl.ref == nil or Referee.over(tbl.ref)
+					end)
+					t.eq(#bob.refused, 0, table.concat(bob.refused, "; "))
+					local seat = Controller.current.seat
+					t.eq(seat.replica.desyncs, 0)
+					local decided = truth(w)
+					local worst = apart(shown, decided)
+					t.truthy(worst[2] < EXACT, `Ann's own mallet is her hand, now ({worst[2]} m)`)
+					local d = apartDrawn(shown, decided, 1)
+					t.truthy(d.n > 600, `{d.n} frames compared`)
+					t.truthy(d.malletWorst < 1e-3, `the far mallet drawn is the referee's (worst {d.malletWorst} m)`)
+					t.truthy(
+						d.puckWorst < 1e-3,
+						`the puck drawn is the referee's ({d.puck} m on average, worst {d.puckWorst}; {tbl.ref.cuts} ticks cut)`
+					)
+					-- how late the far end is: this line's round trip, the other hand's segment, a frame or two
+					t.truthy(d.farLate < (2 * ms + 150) / 1000, `the far mallet is drawn {d.farLate} s late`)
+					t.truthy(d.farLate > 2 * ms / 1000, "(and no earlier than the line allows)")
+					t.truthy(d.puckLate < d.farLate, `the puck {d.puckLate} s on average (now in Ann's own half)`)
+					t.truthy((MinigameSounds.counts()["air_hockey.strike"] or 0) > 3, "strikes are heard")
+				end, opts({ lag = lag }))
+			end
+		)
+	end
 
 	t.test("someone walking up late watches the same match; it is not sent to someone far away", function()
 		Rig.play(function(w)

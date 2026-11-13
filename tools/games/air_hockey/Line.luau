@@ -9,7 +9,12 @@
 --   limitSeconds) -> won; tell(line, msg) (a stream message to everyone, late like any other); hands.chaser(vigour?) / hands.still / hands.swinger(period) (a hand is fn(side, sim,
 --   tick) -> (x, y, serve?): where that player's hand is, given what their own screen shows);
 --   Line.ref / .seats[side] / .watchers / .truth (the referee's puck and mallets by tick) / .samples[side]
---   (what that seat was shown each frame); errors(line, side) -> { n, mean, p95, max } by where the puck was;
+--   (what that seat was shown each frame); errors(line, side) -> { n, mean, p95, max } for: near / far (the
+--   puck against the referee's for the same instant, by the half it was in), own / other (the mallets, the
+--   same), puckShown / farShown (the puck and the far mallet against the referee's for the moment each was
+--   drawn at), puckLate / farLate (how far behind the clock that moment was, seconds), and nearLive (the share
+--   of the frames with the puck in this player's own half on which it was drawn where it was, to 5 mm);
+--   smooth(line, side);
 --   opts = { humans = { [0] = bool, [1] = bool }, lag = { [0] = frames, [1] = frames } (each way), hands =
 --   { [side] = hand }, difficulty?, fps? (60), watchers? (how many, each `watchLag` frames away) }
 
@@ -179,7 +184,7 @@ function Line.frame(line: any, dtIn: number?)
 		end)
 		if seat.ready then
 			local px, py, ax, ay, bx, by = Seat.view(seat)
-			table.insert(line.samples[side], { nowTick, px, py, ax, ay, bx, by, seat.resims })
+			table.insert(line.samples[side], { nowTick, px, py, ax, ay, bx, by, seat.resims, seat.puckAt, seat.farAt })
 		end
 	end
 	-- watchers replay a little behind the newest tick they have
@@ -251,8 +256,28 @@ end
 function Line.errors(line: any, side: number): { [string]: any }
 	local s = if side ~= 0 then 1 else -1
 	local near, far, own, other = {}, {}, {}, {}
+	local puckShown, farShown, puckLate, farLate = {}, {}, {}, {}
 	local undecided = 0
+	local nearFrames, nearLive = 0, 0
 	for _, sample in line.samples[side] do
+		-- against what the referee decided for the moments the puck and the far mallet were drawn at
+		local atPuck, atFar = truthAt(line, sample[9]), truthAt(line, sample[10])
+		if sample[1] > line.ref.n then
+			atPuck, atFar = nil, nil -- (the match is over: the clock runs on, the table does not)
+		end
+		if atPuck then
+			table.insert(puckShown, math.sqrt((sample[2] - atPuck[1]) ^ 2 + (sample[3] - atPuck[2]) ^ 2))
+			table.insert(puckLate, (sample[1] - sample[9]) / 240)
+		end
+		if atFar then
+			table.insert(
+				farShown,
+				math.sqrt(
+					(sample[6 - side * 2] - atFar[5 - side * 2]) ^ 2 + (sample[7 - side * 2] - atFar[6 - side * 2]) ^ 2
+				)
+			)
+			table.insert(farLate, (sample[1] - sample[10]) / 240)
+		end
 		local truth = truthAt(line, sample[1])
 		if truth == nil then
 			undecided += 1
@@ -260,6 +285,12 @@ function Line.errors(line: any, side: number): { [string]: any }
 		end
 		local dp = math.sqrt((sample[2] - truth[1]) ^ 2 + (sample[3] - truth[2]) ^ 2)
 		table.insert(if truth[2] * s > 0 then near else far, dp)
+		if truth[2] * s > 0 then
+			nearFrames += 1
+			if dp < 0.005 then
+				nearLive += 1
+			end
+		end
 		local mine = math.sqrt(
 			(sample[4 + side * 2] - truth[3 + side * 2]) ^ 2 + (sample[5 + side * 2] - truth[4 + side * 2]) ^ 2
 		)
@@ -274,10 +305,51 @@ function Line.errors(line: any, side: number): { [string]: any }
 		far = summary(far),
 		own = summary(own),
 		other = summary(other),
+		nearLive = if nearFrames > 0 then nearLive / nearFrames else 1,
+		puckShown = summary(puckShown),
+		farShown = summary(farShown),
+		puckLate = summary(puckLate),
+		farLate = summary(farLate),
 		undecided = undecided,
 		resims = line.seats[side].resims,
 		frames = #line.samples[side],
 	}
+end
+
+-- How smoothly `side` was shown the match, frame to frame: the speed of the drawn puck and of the drawn far
+-- mallet between one frame and the next, against what the table allows (7.5 m/s for the puck, 3.5 for a hand).
+-- { frames, jumps (frames the drawn puck moved half a metre or more, which no quickening does: it was put back
+-- on its spot after a goal, or it teleported; line.goals says how many goals there were), puckOver (other frames the drawn puck
+-- moved faster than 1.15 x 7.5 m/s), puckOver2 (than 15 m/s), puckMax, malletOver (the far mallet faster than
+-- 1.15 x 3.5 m/s), malletMax }
+function Line.smooth(line: any, side: number): { [string]: number }
+	local s = line.samples[side]
+	local fps = line.fps
+	local out = { frames = 0, puckOver = 0, puckOver2 = 0, puckMax = 0, malletOver = 0, malletMax = 0, jumps = 0 }
+	local fi = 6 - side * 2
+	for i = 2, #s do
+		local a, b = s[i - 1], s[i]
+		local d = math.sqrt((b[2] - a[2]) ^ 2 + (b[3] - a[3]) ^ 2)
+		if d >= 0.5 then
+			out.jumps += 1
+		else
+			local v = d * fps
+			out.frames += 1
+			if v > 7.5 * 1.15 then
+				out.puckOver += 1
+			end
+			if v > 15 then
+				out.puckOver2 += 1
+			end
+			out.puckMax = math.max(out.puckMax, v)
+		end
+		local vm = math.sqrt((b[fi] - a[fi]) ^ 2 + (b[fi + 1] - a[fi + 1]) ^ 2) * fps
+		if vm > 3.5 * 1.15 then
+			out.malletOver += 1
+		end
+		out.malletMax = math.max(out.malletMax, vm)
+	end
+	return out
 end
 
 return Line

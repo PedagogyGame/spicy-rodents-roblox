@@ -2,7 +2,10 @@
 -- tools/games/air_hockey/netcode.luau: how far what an air hockey player is shown is from what the server
 -- decided, measured. Whole matches are played over a made-up network (tools/games/air_hockey/Line: the real
 -- referee, the real Seats and Replicas, every message delivered late) at 0, 80 and 150 ms each way, against the
--- computer and between two people, and the distances are printed in millimetres on the 2.34 m bed.
+-- computer and between two people, and the distances are printed in millimetres on the 2.34 m bed. Between two
+-- people the far end is drawn a moment ago (Shared/Minigames/AirHockey/Seat): the lines say how far the puck and
+-- the far mallet drawn are from the referee's of the same instant, and from the referee's of the moment each
+-- was drawn at, how late that moment was, and how smoothly they moved from frame to frame.
 -- Run: lune run tools/games/air_hockey/netcode.luau [seconds of play per case, default 90]
 local process = require("@lune/process")
 local Seat = require("../../../src/shared/Minigames/AirHockey/Seat")
@@ -48,7 +51,7 @@ for _, ms in { 0, 80, 150 } do
 	row(`{ms} ms each way`, Line.errors(line, 0))
 end
 print("two people (each line: one player's screen):")
-for _, ms in { 0, 80, 150 } do
+for _, ms in { 0, 40, 80, 150 } do
 	local frames = math.floor(ms / 1000 * 60 + 0.5)
 	local line = Line.new({
 		humans = { [0] = true, [1] = true },
@@ -58,6 +61,36 @@ for _, ms in { 0, 80, 150 } do
 	Line.run(line, seconds)
 	for side = 0, 1 do
 		row(`{ms} ms each way, {if side == 0 then "Glacier" else "Ember"}`, Line.errors(line, side))
+		local sm = Line.smooth(line, side)
+		print(
+			string.format(
+				"      drawn puck faster than the table allows on %d of %d frames (fastest %.1f m/s), half a metre or more in one frame on %d (%d goals put it back on its spot; the rest are a puck quickened to the present); far mallet faster than a hand on %d (fastest %.1f m/s)",
+				sm.puckOver,
+				sm.frames,
+				sm.puckMax,
+				sm.jumps,
+				#line.goals,
+				sm.malletOver,
+				sm.malletMax
+			)
+		)
+		local e = Line.errors(line, side)
+		print(
+			string.format(
+				"      against the moment drawn: puck %s /%s /%s mm, drawn %3.0f ms late on average (95th %3.0f), in the player's own half it is the present puck on %4.1f%% of frames; far mallet %s /%s /%s mm, %3.0f ms late (95th %3.0f)",
+				mm(e.puckShown.mean),
+				mm(e.puckShown.p95),
+				mm(e.puckShown.max),
+				e.puckLate.mean * 1000,
+				e.puckLate.p95 * 1000,
+				e.nearLive * 100,
+				mm(e.farShown.mean),
+				mm(e.farShown.p95),
+				mm(e.farShown.max),
+				e.farLate.mean * 1000,
+				e.farLate.p95 * 1000
+			)
+		)
 	end
 	print(
 		`    referee: {line.ref.n} ticks, {line.ref.sim.hitSerial} contacts, {line.ref.sim.score0}-{line.ref.sim.score1}, {line.ref.cuts} ticks played without a late hand, {#line.refused} refusals`

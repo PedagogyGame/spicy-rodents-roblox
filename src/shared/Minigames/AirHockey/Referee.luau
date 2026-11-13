@@ -10,7 +10,8 @@
 --   two people: it steps as far as BOTH logs have arrived. A hand that is more than Wire.MAX_BEHIND ticks behind
 --     the clock is not waited for: the match plays on with that mallet held where it was aimed, and the late
 --     part of that log is dropped when it comes (it is still taken, so that player's log stays in one piece;
---     the stream tells them what was played instead).
+--     the stream tells them what was played instead). Only as a match starts is a hand waited for longer
+--     (Wire.START_WAIT), until its first segment has come.
 -- A log segment is refused only if it does not start where that player's last one ended, is too long, or claims
 -- ticks the shared clock has not reached (plus Wire.SLACK).
 -- Pure. Interface: new(opts { t0, game, human = { [0] = bool, [1] = bool }, difficulty }) -> Referee;
@@ -36,6 +37,7 @@ export type Referee = {
 	recv: { [number]: number }, -- side -> the tick up to which that side's hand is known or was played without
 	events: { [number]: { [number]: any } }, -- side -> the events not yet played, by tick
 	cuts: number, -- ticks played without waiting for a late hand
+	fresh: { [number]: boolean }, -- side -> a person there from the start whose first segment has not come yet
 }
 
 function Referee.new(opts: { t0: number, game: number, human: { [number]: boolean }, difficulty: number? }): Referee
@@ -51,6 +53,7 @@ function Referee.new(opts: { t0: number, game: number, human: { [number]: boolea
 		recv = { [0] = 0, [1] = 0 },
 		events = { [0] = {}, [1] = {} },
 		cuts = 0,
+		fresh = { [0] = opts.human[0] == true, [1] = opts.human[1] == true },
 	}
 end
 
@@ -79,6 +82,7 @@ function Referee.control(r: Referee, side: number, human: boolean)
 	r.human[side] = human
 	r.got[side] = r.n
 	r.recv[side] = r.n
+	r.fresh[side] = false
 	table.clear(r.events[side])
 end
 
@@ -120,6 +124,7 @@ function Referee.accept(
 	end
 	r.got[side] = to
 	r.recv[side] = math.max(r.recv[side], to)
+	r.fresh[side] = false
 	return true
 end
 
@@ -157,6 +162,11 @@ function Referee.advance(r: Referee, nowTick: number): ({ [string]: any }?, { Go
 		-- wait for both hands, but not for long: past MAX_BEHIND the match goes on (never beyond the hand that
 		-- did arrive, and never beyond the clock)
 		target = math.max(slow, math.min(fast, nowTick - Wire.MAX_BEHIND))
+		if (r.fresh[0] or r.fresh[1]) and nowTick < Wire.START_WAIT then
+			-- (as a match starts, a player who has only just been told is waited for a little longer: nothing
+			-- of the hand they had on the table before the first serve is thrown away)
+			target = slow
+		end
 	else
 		target = r.recv[if mode == "0" then 0 else 1]
 	end
