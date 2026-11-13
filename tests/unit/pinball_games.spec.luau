@@ -397,4 +397,58 @@ return function(t: Test.T)
 		end
 		t.falsy(result.suspect)
 	end)
+
+	t.test(
+		"PIN-P4, PIN-R6: the bumpers are in play all game on every table, and the fast table is the quick one",
+		function()
+			-- sixteen games by the REGULAR on each table: how often a bumper pops in a game, how fast the ball is
+			-- while it is out on the playfield (not asleep in a cradle, not in the shooter lane), how long a ball lasts
+			local function measure(id: string): (number, number, number)
+				local tbl = Tables.need(id)
+				local games = 16
+				local pops, speed, moving, played, balls = 0, 0, 0, 0, 0
+				local out: { number } = {}
+				for seed = 1, games do
+					local m = Machine.new(tbl, seed, 1)
+					local bot = Bot.new(2, seed * 13 + 2)
+					local ticks = 0
+					while m.phase ~= PHASE.OVER and ticks < HOUR do
+						Machine.step(tbl, m, Bot.step(bot, tbl, m), out)
+						ticks += 1
+						if m.phase == PHASE.PLAY and m.launched then
+							played += 1
+							for _, b in m.phys.balls do
+								if b.mode == Physics.FREE and b.x < Layout.FIELD_X1 and not b.asleep then
+									speed += math.sqrt(b.vx * b.vx + b.vy * b.vy)
+									moving += 1
+								end
+							end
+						end
+						pops += count(out, CUE.BUMPER)
+						balls += count(out, CUE.BALL_END)
+						table.clear(out)
+					end
+				end
+				return pops / games, speed / moving, played / balls / Physics.HZ
+			end
+			local acornPops, acornSpeed, acornBall = measure("pinball_acorn")
+			local spicyPops, spicySpeed, spicyBall = measure("pinball_rodent")
+			local spacePops = measure("pinball_space")
+			-- (the nest on SPICY RODENT saw 7 pops a game and the asteroid field 6 when neither stood in the
+			-- ball's ordinary way)
+			t.truthy(acornPops >= 25, `ACORN ATTACK: {acornPops} pops a game`)
+			t.truthy(spicyPops >= 25, `SPICY RODENT: {spicyPops} pops a game`)
+			-- (the flow table is played on its ramps and orbits; its bumpers are the way up the middle)
+			t.truthy(spacePops >= 12, `SPACE SQUIRREL: {spacePops} pops a game`)
+			-- the fast table: steeper, hotter coils. Its ball moves quicker than the old table's and is lost sooner
+			t.truthy(
+				spicySpeed >= acornSpeed * 1.08,
+				`the ball on SPICY RODENT {spicySpeed}, on ACORN ATTACK {acornSpeed}`
+			)
+			t.truthy(
+				spicyBall <= acornBall * 0.8,
+				`a ball lasts {spicyBall} s on SPICY RODENT, {acornBall} s on ACORN ATTACK`
+			)
+		end
+	)
 end
