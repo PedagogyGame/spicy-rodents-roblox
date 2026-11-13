@@ -242,7 +242,7 @@ local function think(h: Harness, b: Body, viewSampler: Projectiles.Sampler)
 		if b.isBot then
 			x, y, z = o.x, o.y, o.z
 		else
-			x, y, z = viewSampler(o, now - actualDelay)
+			x, y, z = viewSampler(o :: any, now - actualDelay)
 		end
 		if math.abs(y - b.y) > 5 then
 			continue
@@ -265,7 +265,7 @@ local function think(h: Harness, b: Body, viewSampler: Projectiles.Sampler)
 	-- lead the target with its apparent velocity
 	local vx, vz = target.vx, target.vz
 	if not b.isBot then
-		local x2, _, z2 = viewSampler(target, now - actualDelay - 0.1)
+		local x2, _, z2 = viewSampler(target :: any, now - actualDelay - 0.1)
 		vx, vz = (bx - x2) / 0.1, (bz - z2) / 0.1
 	end
 	local cfg = Config.projectile

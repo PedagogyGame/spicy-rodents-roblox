@@ -113,7 +113,8 @@ function Splats.wall(
 	z: number
 ): Record
 	pools.seq += 1
-	local rec: Record = { seq = pools.seq, ball = ball, by = by, body = 0, team = team, face = face, x = x, y = y, z = z }
+	local rec: Record =
+		{ seq = pools.seq, ball = ball, by = by, body = 0, team = team, face = face, x = x, y = y, z = z }
 	put(pools.walls, rec)
 	return rec
 end
