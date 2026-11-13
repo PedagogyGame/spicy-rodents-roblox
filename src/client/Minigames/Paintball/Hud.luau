@@ -38,9 +38,10 @@
 -- crosshair is never scaled DOWN (a thin line stays a whole pixel) and the touch buttons never at all
 -- (a thumb is the same size on every phone).
 -- TWO ScreenGuis under PlayerGui, both destroyed by stop(), BECAUSE THE CROSSHAIR MUST BE WHERE THE BALL GOES.
---   "PaintballAim"  IgnoreGuiInset = true: its middle is the middle of the VIEW, which is the line the camera
---                   looks along and the ball leaves on. On it: the crosshair, the hit marker, the ring's tick,
---                   and the two washes over the whole screen (the goggles, the protection's border).
+--   "PaintballAim"  the WHOLE screen (ScreenInsets = None: no top bar, no notch, no home bar taken off): its
+--                   middle is the middle of the VIEW, which is the line the camera looks along and the ball
+--                   leaves on. On it: the crosshair, the hit marker, the ring's tick, and the two washes over
+--                   the whole screen (the goggles, the protection's border).
 --   "PaintballHud"  everything else, under Roblox's own top bar like the rest of the game's UI. A ScreenGui
 --                   that respects the top bar's inset is that much shorter than the view, so ITS middle is half
 --                   the bar's height (18 to 29 px) BELOW the view's: a crosshair drawn there would say the ball
@@ -361,6 +362,9 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	aim.Name = "PaintballAim"
 	aim.ResetOnSpawn = false
 	aim.IgnoreGuiInset = true
+	-- (no insets at all: on a phone "ignore the top bar" still keeps clear of the notch and the home bar, and a
+	-- screen cut unevenly by those would have its middle off the camera's again)
+	aim.ScreenInsets = Enum.ScreenInsets.None
 	aim.DisplayOrder = 18 -- under the HUD's own words, and under everything of the framework's
 	aim.Parent = gui.Parent
 	-- the system cursor as it was found: off while the crosshair is the aim, put back in stop()

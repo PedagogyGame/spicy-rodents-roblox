@@ -6,7 +6,7 @@
 --   THE ENGINE'S FACTS (needs nothing of ours)
 --     every property the client writes exists and takes the value: Humanoid.CameraOffset / JumpHeight /
 --       UseJumpPower (the eye and the hop: Self), LocalTransparencyModifier on a part and on a Decal (the real
---       bodies hidden: World), ScreenGui.IgnoreGuiInset (the crosshair's layer: Hud), GuiButton.Modal (what
+--       bodies hidden: World), ScreenGui.ScreenInsets = None (the crosshair's layer: Hud), GuiButton.Modal (what
 --       frees a first-person mouse), UIScale, BillboardGui.MaxDistance, Camera.FieldOfView
 --     every enum item and key the client names exists (RenderPriority.Camera, CameraMode.LockFirstPerson, the
 --       gamepad's buttons, Material.Air for "off the floor")
@@ -65,6 +65,7 @@ if inEngine then
 	check("the HUD's pieces: IgnoreGuiInset, Modal, UIScale, a square that follows the height, a name tag", function()
 		local gui = Instance.new("ScreenGui")
 		gui.IgnoreGuiInset = true
+		gui.ScreenInsets = Enum.ScreenInsets.None
 		gui.ResetOnSpawn = false
 		gui.DisplayOrder = 18
 		local button = Instance.new("TextButton")
@@ -79,7 +80,11 @@ if inEngine then
 		local board = Instance.new("BillboardGui")
 		board.MaxDistance = 70
 		board.StudsOffset = Vector3.new(0, 1.4, 0)
-		return gui.IgnoreGuiInset and button.Modal and near(scale.Scale, 0.7) and board.MaxDistance == 70
+		return gui.IgnoreGuiInset
+			and gui.ScreenInsets == Enum.ScreenInsets.None
+			and button.Modal
+			and near(scale.Scale, 0.7)
+			and board.MaxDistance == 70
 	end)
 	check("the camera's view can be widened", function()
 		local camera = Instance.new("Camera")

@@ -424,6 +424,7 @@ return function(t)
 				local layer = cross.Parent
 				t.eq(layer.Name, "PaintballAim")
 				t.eq(layer.IgnoreGuiInset, true, "the whole screen: its middle is the camera's")
+				t.eq(layer.ScreenInsets, roblox.Enum.ScreenInsets.None, "notch and home bar included")
 				t.truthy(hud.IgnoreGuiInset ~= true, "the words stay under the top bar")
 				t.eq(cross.Position.X.Scale, 0.5)
 				t.eq(cross.Position.Y.Scale, 0.5)
