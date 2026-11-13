@@ -5,7 +5,7 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 ## 0. State on 2026-11-13 (read this before anything below; older sections are history where they differ)
 - **How the owner wants the work done (standing):** small reviewed steps, clean code, his deliveries adapted where they fit and left out (and listed) where they conflict, important questions put to him with a default built in and never waited on, everything tested by us. His decisions since the brief are in `docs/spec/BRIEF_ADDENDUM.md` (D1 to D13): read them.
 - **The experience is "Spicy Rodent" (singular)**: universe 10775476638, main place 106044514609985. Never touch the duplicate "Spicy Rodents" (10775476357 / 71294450489810).
-- **Live in the game: version 41**, built from `2fd420d`, published 2026-11-11 on the owner's go. Each publish needs a new explicit go from the owner (one go covers one publish), with Studio closed first.
+- **Live in the game: version 47**, built from `57a49f4`, published 2026-11-13 on the owner's go after a clean full check script (1,387 specs, the builds, the place checks, the type check). It adds, over version 41, everything listed under "On `w0-foundation` since version 41" below: air hockey, playable pool and bumper pool, the eighteen-lane alley, the wallet, the enclosed-run ball return, the Neighbourhood Shop, the realistic lighting. Each publish needs a new explicit go from the owner (one go covers one publish), with Studio closed first.
 - **In version 41, all with the full check script passing (and the server checks, until the key lost that permission; see below):**
   - the bite-to-hospital sequence and the townspeople's lines;
   - nicer buildings and furnished interiors that can be walked into, and the map clean-up (`Builders/Fixtures`: pergolas, doghouses, market stalls, the gazebo, the clock tower and masts; town 26,729 parts, budget 27,000);
@@ -16,7 +16,7 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 - **Nobody has seen any of it on a screen.** The checks are headless. The owner's look at version 41 decides: the squirrel's run and back view, the run manners (how often, how strong), the bite lunge while running, the cars and the new vehicle shapes, the interiors under the camera, bowling, darts.
 - **Known and unverified:** the car fixes had no independent verification pass, and with them the game's step costs more (a fast-forwarded hospital run takes 18 s where it took 12; a traffic tick is about 1.3 ms at worst).
 - **The key lost the Luau Execution permission on 2026-11-11 at about 21:30 UTC** (`universe.place.luau-execution-session:write` on universe 10775476638): every `run_engine_tests` returns 403 until the owner restores it in the Creator Dashboard. Saving and publishing still work. Until then nothing new has had a server check; run the standard set (HANDOFF 4) on the first build after it returns.
-- **On `w0-foundation` since version 41 (not yet published; each publish needs the owner's go):**
+- **On `w0-foundation` since version 41 (published in version 47):**
   - the minigame framework (one registry line per game on the server, the client and the bake);
   - the pool and bumper pool table model and the pinball model (three tables): pure and headless, not yet playable;
   - air hockey, the ninth game (the owner's AER game, his physics ported exactly), playable;
