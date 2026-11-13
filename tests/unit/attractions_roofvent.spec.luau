@@ -6,8 +6,8 @@
 --   * the joints the motor's end-of-route switch needs (Motion.C.autoSwitchGap), the bough across the ridge's line
 --     with a 3-st stub past the catch, through the trunk's top and drooping over the parapet to end just over the
 --     roof, the vent's run inside the duct boxes and off the platform's grating (the apron in front of the louvre);
---   * the vent's enclosure record: checked by Shared/Routes/Enclosure (the enclosed-run contract) when that module
---     is in the tree, else by the same rules written out here;
+--   * in the game: data/attractions.json carries the annex and these routes, compiled as AlleyRoof says;
+--   * the vent's enclosure record: checked by Shared/Routes/Enclosure (the enclosed-run contract), both ways;
 --   * THE CHAIN WITH THE REAL MOTOR: Movement/SquirrelMotor, scripted keys at 60 Hz on a stand-in world (the
 --     terrain, the games wing's roof): run into the downspout, climb, the gutter, the ridge, leap west off its end
 --     (W held, Shift held, no key: every one lands on the house bough), down the bough and on along the crossing, Q
@@ -16,7 +16,13 @@
 --   * on the bough, W with the camera turned any way runs to the roof (or 3 st up to the house end, then on);
 --   * the house is the only way up (owner question Q11's default): no route end, ground leap or trunk reaches the
 --     bough. The house and the tree are drawn by tools/bake/alley/Yard (tests/unit/alley_yard_bake.spec.luau holds
---     the drawing to these routes).
+--     the drawing to these routes);
+--   * THE WHOLE WAY ON THE REAL BAKE (tests/lib/BakedWorld.bakeAlley: the yard, the raised roof, the vent, the stair
+--     and the platform as build/Attractions.rbxm has them), walking and sprinting: from the ground up the house, the
+--     leap, the bough and the crossing, Q onto the roof, in at the bent slat, along the duct and down the drop onto
+--     the chord; along it, back into the boot, out of the louvre, E onto the crossing's tip, up it over the parapet
+--     and Q down into the yard. No frame moves more than 1.5 st, and the drawn body's middle never passes through a
+--     part solid to the squirrel.
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local AlleyRoof = require("@shared/Attractions/AlleyRoof")
 local Curve = require("@shared/Routes/Curve")
@@ -35,6 +41,7 @@ local R = AlleyRoof
 
 type Trace = {
 	visits: { number }, -- route ids in the order they were ridden (air and ground as 0)
+	through: { string }, -- moves that passed through a solid (opts.baked)
 	events: { [string]: number },
 	catches: { number },
 	maxMove: number,
@@ -453,9 +460,23 @@ return function(t)
 		stopAfterCatch: boolean?,
 		world: any?, -- the world to run in (else the stand-in)
 		intoVent: boolean?, -- at the louvre, go on in through the bent slat, along the duct and out onto the chord
+		back: boolean?, -- ... then along the chord, back into the boot, out of the louvre, E onto the crossing's tip,
+		-- up it over the parapet and Q down into the yard
+		baked: any?, -- a tests/lib/BakedWorld world: every frame's move is checked against its solids (nothing passed)
 		from: SquirrelMotor.State?, -- start from this state (a copy) ...
 		startPhase: string?, -- ... in this phase ("pipe")
 	}
+
+	-- the body's middle as the client draws it, for a squirrel on `rid` (or off any route) at feet `p`
+	local poseWorld = { registry = registry } :: any
+	local function middle(rid: number?, tt: number, p: Curve.Vec3): Curve.Vec3
+		local route = if rid then registry:get(rid) else nil
+		if route == nil then
+			return Curve.vec3(p.x, p.y + 0.85, p.z)
+		end
+		local q = Motion.visualPose(poseWorld, route, tt, p)
+		return if route.kind == "trunk" then q else Curve.vec3(q.x, q.y + 0.85, q.z)
+	end
 
 	local function newTrace(): Trace
 		return {
@@ -465,6 +486,7 @@ return function(t)
 			maxMove = 0,
 			maxMoveAt = nil,
 			attachMove = nil,
+			through = {},
 			frames = 0,
 			phase = "pipe",
 		}
@@ -597,10 +619,61 @@ return function(t)
 				input.fw = 1
 				if rid == R.FIRST_RAFTER then
 					trace.phase = "rafters"
+					info.rafterFrame = frame
+					if not o.back then
+						break
+					end
+				end
+			elseif phase == "rafters" then
+				-- along the chord over the lanes for a second, let go, then turn round and walk back into the boot
+				local out = frame - info.rafterFrame
+				input.cameraYaw = yawToward(state, pt(R.FIRST_RAFTER, 1))
+				input.fw = if out < 60 then 1 else 0
+				input.sprint = sprint
+				if out >= 66 then
+					trace.phase = "to the boot"
+				end
+			elseif phase == "to the boot" then
+				input.cameraYaw = yawToward(state, pt(R.VENT, 0.9))
+				input.fw, input.sprint = 1, sprint
+				if rid == R.VENT then
+					trace.phase = "back in the vent"
+				end
+			elseif phase == "back in the vent" then
+				input.cameraYaw = yawToward(state, pt(R.VENT, 0))
+				input.fw = 1
+				if rid == nil and state.grounded then
+					trace.phase = "back on the roof"
+				end
+			elseif phase == "back on the roof" then
+				-- walk to the crossing's tip and grab it (E)
+				local tip = pt(R.BOUGH, 1)
+				input.cameraYaw = yawToward(state, tip)
+				input.fw, input.sprint = 1, sprint
+				input.grab = math.sqrt((state.x - tip.x) ^ 2 + (state.z - tip.z) ^ 2) < 1.0
+				if rid == R.BOUGH then
+					trace.phase = "up the crossing"
+				end
+			elseif phase == "up the crossing" then
+				input.cameraYaw = yawToward(state, pt(R.BOUGH, FORK_T))
+				input.fw, input.sprint = 1, sprint
+				local X = toLocal(Curve.vec3(state.x, state.y, state.z))
+				if rid ~= R.BOUGH then
+					trace.phase = "lost on " .. tostring(rid)
+					break
+				elseif X > R.WING_ROOF.outerX1 + 2 then
+					input.drop = true
+					trace.phase = "down into the yard"
+				end
+			elseif phase == "down into the yard" then
+				input.cameraYaw = yawToward(state, pt(R.BOUGH, FORK_T))
+				if state.grounded then
+					trace.phase = "yard"
 					break
 				end
 			end
 			local ox, oy, oz = state.x, state.y, state.z
+			local prevT = state.railT
 			local _, events = SquirrelMotor.step(state, input, dt, (o.world or world) :: any)
 			for _, e in events do
 				trace.events[e.kind] = (trace.events[e.kind] or 0) + 1
@@ -613,12 +686,27 @@ return function(t)
 				info.catchRise = state.y + LIFT - oy
 			end
 			local moved = math.sqrt((state.x - ox) ^ 2 + (state.y - oy) ^ 2 + (state.z - oz) ^ 2)
+			if o.baked then
+				-- nothing passed through: the body's middle as the client draws it (Motion.visualPose: off a pipe's
+				-- side, lifted on a bough; 0.85 over the feet, or the pose itself on a climb) from where it was to where
+				-- it is meets no part solid to the squirrel
+				local a = middle(rid, prevT, Curve.vec3(ox, oy, oz))
+				local b = middle(state.routeId, state.railT, Curve.vec3(state.x, state.y, state.z))
+				local hit, part = o.baked.raycast(a.x, a.y, a.z, b.x - a.x, b.y - a.y, b.z - a.z, function(q)
+					return q.squirrelSolid
+				end)
+				if hit and part then
+					table.insert(trace.through, `{phase} frame {frame} route {tostring(rid)}: {part.path}`)
+				end
+			end
 			-- (the walk-in grab puts the body on the pipe's line in one frame, as v5.4's did: up to the walk-in
 			-- reach; the drawn body stands off the pipe on its +Z side, Motion.visualPose)
 			local attached = rid == nil and state.routeId ~= nil and trace.events.attach == 1
+			-- (a free fall off the crossing into the yard is not a move along the way)
+			local falling = phase == "down into the yard"
 			if attached then
 				trace.attachMove = moved
-			elseif moved > trace.maxMove then
+			elseif moved > trace.maxMove and not falling then
 				trace.maxMove = moved
 				trace.maxMoveAt = `{phase} frame {frame} route {tostring(rid)} -> {tostring(state.routeId)}`
 			end
@@ -834,40 +922,36 @@ return function(t)
 	-- THE CHAIN ON THE BAKED GEOMETRY: the alley with its yard, baked in memory by its own bake code
 	-- (tests/lib/BakedWorld.bakeAlley: tools/bake/alley/Alley, as build/Attractions.rbxm), and the chain run against
 	-- its parts (the house's roof and plinth, the trunk, the wing's parapets and roof), not the stand-in.
-	t.test("the chain on the baked alley and yard (tests/lib/BakedWorld)", function()
+	t.test("the chain on the baked alley: from the yard to the rafters and back, walking and sprinting", function()
 		local baked = BakedWorld.bakeAlley()
 		local motorWorld = baked:motorWorld(BakedWorld.recordsData(records))
 		for _, case in { { sprint = false, leap = "walk" }, { sprint = true, leap = "none" } } do
-			local trace, state = run(case.sprint, case.leap, { world = motorWorld })
-			local seq = table.concat(trace.visits, " ")
 			local label = `{if case.sprint then "sprinting" else "walking"}, leap with {case.leap}`
-			t.truthy(
-				trace.phase == "louvre" or state.routeId == R.VENT,
-				`{label}: got as far as "{trace.phase}" (routes {seq}) at ({state.x}, {state.y}, {state.z})`
+			local trace, state =
+				run(case.sprint, case.leap, { world = motorWorld, intoVent = true, back = true, baked = baked })
+			local seq = table.concat(trace.visits, " ")
+			t.eq(
+				trace.phase,
+				"yard",
+				`{label}: got as far as "{trace.phase}" (routes {seq}) at route {state.routeId} t {state.railT}`
 			)
-			local want = "0 9101 9102 9103 0 9105 0"
-			t.eq(string.sub(seq, 1, #want), want, `{label}: {seq}`)
+			t.eq(seq, "0 9101 9102 9103 0 9105 0 9107 9120 9107 0 9105 0", `{label}: the routes in and out`)
 			t.truthy(trace.maxMove <= 1.5, `{label}: a frame moves {trace.maxMove} ({trace.maxMoveAt})`)
+			t.eq(
+				#trace.through,
+				0,
+				`{label}: passed through {table.concat(trace.through, "; ", 1, math.min(#trace.through, 6))}`
+			)
+			-- back on the ground in the yard, beside the games wing
+			local X, Y, D = toLocal(Curve.vec3(state.x, state.y, state.z))
+			t.truthy(X > R.WING_ROOF.outerX1 and Y < 0, `{label}: ends in the yard at ({X}, {Y}, {D})`)
+			t.near(state.y, Height.at(state.x, state.z), 0.3, `{label}: on the ground`)
 			print(
-				`      on the baked alley and yard, {label}: routes {seq} in {string.format("%.1f", trace.frames / 60)} s`
+				`      on the baked alley, {label}: {seq}, {trace.frames} frames ({string.format(
+					"%.1f",
+					trace.frames / 60
+				)} s), largest move {string.format("%.2f", trace.maxMove)} st, nothing passed through`
 			)
 		end
-		-- and on: into the bent louvre slat, along the duct (the enclosed-run motor rules) and out of the boot onto
-		-- the chord (the unit, the duct and the raised roof are lanes L1 and L2: no parts of them yet)
-		local trace, state = run(false, "walk", { world = motorWorld, intoVent = true })
-		local seq = table.concat(trace.visits, " ")
-		print(
-			`      ... and on into the vent: routes {seq}, "{trace.phase}" after {string.format(
-				"%.1f",
-				trace.frames / 60
-			)} s`
-		)
-		t.eq(
-			trace.phase,
-			"rafters",
-			`into the vent: "{trace.phase}" (routes {seq}) at route {state.routeId} t {state.railT}`
-		)
-		t.eq(seq, "0 9101 9102 9103 0 9105 0 9107 9120", "the whole way in")
-		t.truthy(trace.maxMove <= 1.5, `into the vent: a frame moves {trace.maxMove} ({trace.maxMoveAt})`)
 	end)
 end
