@@ -5,9 +5,11 @@
 -- (Contract.BOTS), with a brain here; it has NO body in the world. The service keeps one table of
 -- poses for every slot (arena frame), a bot's brain moves its own entry, and every client draws bots
 -- and people alike from the snapshot stream (Shared/Minigames/Paintball/Clock).
--- OWNED BY THE MATCH-AND-BOTS LANE. THIS IS A STUB: the functions keep their names and signatures.
+-- OWNED BY THE MATCH-AND-BOTS LANE. The functions keep the names and signatures the contract gave them.
+-- This file is the list of brains and what they share; BotBrain (beside it) is one bot's thinking,
+-- BotNav what a bot knows of the building.
 --
--- WHAT THE REAL BOTS DO, AND WITH WHAT (Contract.BOT holds the numbers named here):
+-- WHAT THE BOTS DO, AND WITH WHAT (Contract.BOT holds the numbers named here):
 --   * move kinematically over the arena's navigation graph (arena.nodes, arena.links: "walk" links
 --     in a straight line, "stair" links along the ramp, feet on arena.ground) at the body's own
 --     speeds (Body.speed with state.feel); a bot OWNS ITS CROUCH: it eases its own pose.crouch with
@@ -18,17 +20,16 @@
 --   * SEE an opponent only along a clear line (arena.sweep from eye to chest) and only inside
 --     BOT.sightHalf of where they are looking; a sight check per bot runs at most BOT.sightHz times a
 --     second and the bots' checks are spread over the ticks (no tick does more than its share);
---   * HEAR what the service tells them (`heard`, below): a ball that is born, passes or lands within
---     BOT.hear studs of a bot, whoever fired it, and a team-mate tagged where the bot could see,
---     make it aware of the direction the ball came from. A bot that is shot at and missed does not
---     stand there: it turns, ducks or moves;
+--   * HEAR what the service tells them (`heard`, below): an OPPONENT'S ball that is born, passes or
+--     lands within BOT.hear studs of a bot, and a team-mate tagged where the bot could see, make it
+--     aware of the direction the ball came from. A bot that is shot at and missed does not stand
+--     there: it turns, ducks or moves. (A team-mate's ball going by tells it nothing it needs.)
 --   * act on anything seen or heard only after a reaction time between BOT.reactMin and BOT.reactMax;
 --   * TURN at no more than BOT.turn (yaw and pitch each), and fire ONLY ALONG THEIR OWN LOOK: a
 --     bot's pose yaw and pitch are where its marker points (the aim, lead and drop included), and the
 --     service drops a "fire" whose direction is more than BOT.aimSlack from Body.look(pose.yaw,
 --     pose.pitch). So a bot must be seen to turn on a player before it can tag them: the puppet is the
---     tell. (The calibration tool reports how often a bot's pose had been within the sight cone of
---     the player it tagged for BOT.faced seconds before the ball: the aim is nearly always.)
+--     tell. A ball is never fired at a sighting younger than BOT.faced.
 --   * aim with Ballistics.aim(..., state.feel.ballSpeed, state.feel.ballDrop) at where the target
 --     will be, plus error, more of it at a low `skill`, and MOST OF IT ON THE FIRST BALL at a new
 --     target: the first ball is the warning splat. A fair player beats the average bot (skill 0.5)
@@ -41,6 +42,12 @@
 -- A bot's shot is a command for the service, which checks the look (above), calls Rules.fire(state,
 -- id, now) and Projectiles.fire with no rewind: a bot sees the server's present. Every `now` here is
 -- the shared clock (Clock): the same time the State is synced to.
+-- WHAT THE BOTS SHARE (the Squad): where every body is and how fast it is going (worked out here
+-- once a tick from `poses`, for everybody's lead); which post each bot has taken, so two do not
+-- choose one; and what each TEAM knows: the storey and the place it last saw an opponent, which is
+-- what "They are on three!" says aloud and what draws its bots towards a fight.
+-- A BOT WITHOUT A POSE DOES NOTHING: a brain made by sync before the service has placed its slot
+-- (the "respawn" event comes a step or two after the seat is taken) waits for place().
 -- COST (Contract.COST): Bots.step with COST.atBots bots costs under COST.botsMs a tick on average;
 -- the lane measures it in its calibration tool and the service reports it (Stats.botsMs).
 -- THE CALIBRATION TOOL (tools/games/paintball/bots/) takes a feel as input and prints its results
@@ -49,6 +56,14 @@
 -- judged at the owner's playtest without waiting for a new calibration.
 -- Interface: new(arena, opts?) -> Bots; sync(bots, state, who, poses, now); place(bots, id, pose,
 --   now); step(bots, state, poses, heard, now, dt) -> { Command }; types Command, Heard, Opts, Bots
+
+local Import = require("../../Import")
+local BodyModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Body)) =
+	Import.shared("Minigames/Paintball/Body")
+local ContractModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
+	Import.shared("Minigames/Paintball/Contract")
+local BotBrain = require("./BotBrain")
+local BotNav = require("./BotNav")
 
 -- (types only: typeof never runs its require; see "HOW TO IMPORT" in Shared/Minigames/Paintball/Contract)
 type Arena = typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena).T.Arena)
@@ -92,43 +107,289 @@ export type Heard = {
 
 export type Opts = {
 	seed: number?,
+	-- the kind of player every brain of this list is (BotBrain.Profile); nil = a bot. The calibration
+	-- tool makes a second list with a profile of its own to stand in for a person.
+	profile: BotBrain.Profile?,
 }
+
+-- A ball in flight, as the bots heard it born.
+type Flight = { at: number, x: number, y: number, z: number, seq: number }
 
 export type Bots = {
 	arena: Arena,
 	seed: number,
-	brains: { [number]: any }, -- by slot id; the lane's own shape
+	brains: { [number]: any }, -- by slot id: BotBrain.Brain
+	nav: BotNav.Nav,
+	profile: BotBrain.Profile,
+	squad: BotBrain.Squad,
+	flights: { [number]: { Flight } }, -- by shooter: its balls in flight, oldest first
+	seq: number,
+	state: State?, -- the match the squad's knowledge belongs to
 }
+
+local RULES = ContractModule.Rules
 
 local Bots = {}
 
+local function newSquad(arena: Arena): BotBrain.Squad
+	local never = -math.huge
+	return {
+		track = {},
+		claimed = {},
+		heat = { table.create(arena.floors, never), table.create(arena.floors, never) },
+		spot = { { x = 0, y = 0, z = 0, at = never }, { x = 0, y = 0, z = 0, at = never } },
+		saidAt = { never, never },
+		calledFloor = { -1, -1 },
+		calledAt = { never, never },
+		home = {},
+		side = {},
+		sightLeft = 0,
+		routeLeft = 0,
+		tick = 0,
+		sweeps = 0,
+		routes = 0,
+	}
+end
+
 function Bots.new(arena: Arena, opts: Opts?): Bots
 	local o: Opts = opts or {}
-	return { arena = arena, seed = o.seed or 1, brains = {} }
+	return {
+		arena = arena,
+		seed = o.seed or 1,
+		brains = {},
+		nav = BotNav.build(arena),
+		profile = o.profile or BotBrain.DEFAULT,
+		squad = newSquad(arena),
+		flights = {},
+		seq = 0,
+		state = nil,
+	}
+end
+
+-- A new match: nothing the bots knew of the last one is true of this one.
+local function fresh(bots: Bots, state: State)
+	if bots.state ~= state then
+		bots.state = state
+		bots.squad = newSquad(bots.arena)
+		table.clear(bots.flights)
+		table.clear(bots.brains)
+	end
 end
 
 -- Make the brains match the match: one for every slot a bot holds, none for a slot a person took or
 -- that is off. `who[id]` is that bot's skill (Contract.BOTS: 0..1, 0.5 the average bot); a slot
 -- with no entry is not a bot. The service calls this after every seat taken or left and after a
 -- change of side. A new brain starts from poses[id]; a brain whose slot changed team forgets its plan.
-function Bots.sync(_bots: Bots, _state: State, _who: { [number]: number }, _poses: { [number]: Pose }, _now: number) end
+function Bots.sync(bots: Bots, state: State, who: { [number]: number }, poses: { [number]: Pose }, now: number)
+	fresh(bots, state)
+	local brains = bots.brains :: { [number]: BotBrain.Brain }
+	for id, brain in brains do
+		local slot = state.slots[id]
+		if who[id] == nil or slot == nil or not slot.on or slot.team ~= brain.team then
+			if brain.goal ~= 0 and bots.squad.claimed[brain.goal] == id then
+				bots.squad.claimed[brain.goal] = nil
+			end
+			bots.squad.home[id] = nil
+			bots.squad.side[id] = nil
+			brains[id] = nil
+		end
+	end
+	for id, skill in who do
+		local slot = state.slots[id]
+		if slot == nil or not slot.on or brains[id] ~= nil then
+			continue
+		end
+		local brain = BotBrain.new(bots.nav, id, slot.team, skill, bots.seed, bots.profile)
+		brains[id] = brain
+		local pose = poses[id]
+		if pose ~= nil and BotNav.roomOf(bots.nav, pose.x, pose.y, pose.z) ~= 3 - slot.team then
+			-- (a slot that has just changed sides still stands in the room it is leaving: its brain
+			-- waits for the placement that is on its way)
+			BotBrain.place(brain, bots.squad, pose.x, pose.y, pose.z, pose.yaw, state, now)
+		end
+	end
+end
 
 -- The service put this bot somewhere (the briefing, a respawn, a change of side): forget the old path.
-function Bots.place(_bots: Bots, _id: number, _pose: Pose, _now: number) end
+function Bots.place(bots: Bots, id: number, pose: Pose, now: number)
+	local brain = (bots.brains :: { [number]: BotBrain.Brain })[id]
+	local state = bots.state
+	if brain == nil or state == nil then
+		return
+	end
+	BotBrain.place(brain, bots.squad, pose.x, pose.y, pose.z, pose.yaw, state, now)
+end
+
+-- Where every body is and how fast it is going over the floor, from the poses as they change. (A
+-- person's pose changes at the snapshot rate, a bot's every tick: the speed is taken over the time
+-- between changes and smoothed.)
+local function follow(squad: BotBrain.Squad, state: State, poses: { [number]: Pose }, now: number)
+	local track = squad.track
+	for id, slot in state.slots do
+		local pose = poses[id]
+		if not slot.on or pose == nil then
+			track[id] = nil
+			continue
+		end
+		local t = track[id]
+		if t == nil then
+			track[id] = { x = pose.x, y = pose.y, z = pose.z, vx = 0, vz = 0, t = now }
+			continue
+		end
+		local dt = now - t.t
+		local dx, dz = pose.x - t.x, pose.z - t.z
+		if dx ~= 0 or dz ~= 0 then
+			if dt > 1e-4 and dx * dx + dz * dz < 36 then
+				local k = math.min(1, dt / 0.12)
+				t.vx += (dx / dt - t.vx) * k
+				t.vz += (dz / dt - t.vz) * k
+			else
+				t.vx, t.vz = 0, 0 -- it was put somewhere else
+			end
+			t.x, t.y, t.z, t.t = pose.x, pose.y, pose.z, now
+		elseif dt > 0.15 then
+			t.vx, t.vz = 0, 0 -- it has stopped
+			t.y = pose.y
+		end
+	end
+end
+
+-- What the service heard, shared out among the brains.
+local function hear(
+	bots: Bots,
+	state: State,
+	poses: { [number]: Pose },
+	heard: { Heard },
+	now: number,
+	out: { Command }
+)
+	local brains = bots.brains :: { [number]: BotBrain.Brain }
+	local profile = bots.profile
+	local reach = profile.hear * profile.hear
+	local ttl = RULES.ballTtl
+	for _, h in heard do
+		local shooter = state.slots[if h.kind == "tag" then h.by or 0 else h.id]
+		if h.kind == "born" then
+			local vx, vy, vz = h.vx or 0, h.vy or 0, h.vz or 0
+			local vv = vx * vx + vy * vy + vz * vz
+			bots.seq += 1
+			local list = bots.flights[h.id]
+			if list == nil then
+				list = {}
+				bots.flights[h.id] = list
+			end
+			table.insert(list, { at = now, x = h.x, y = h.y, z = h.z, seq = bots.seq })
+			if shooter == nil or vv < 1 then
+				continue
+			end
+			for id, b in brains do
+				if b.team == shooter.team or not b.placed or id == h.id then
+					continue
+				end
+				-- where the ball's line comes nearest this bot's chest, and when
+				local cx, cy, cz = b.x - h.x, b.y + BodyModule.STAND_EYE * 0.6 - h.y, b.z - h.z
+				local along = math.clamp((cx * vx + cy * vy + cz * vz) / vv, 0, ttl)
+				local dx, dy, dz = cx - vx * along, cy - vy * along, cz - vz * along
+				if dx * dx + dy * dy + dz * dz <= reach and #b.whizz < 6 then
+					table.insert(b.whizz, { at = now + along, x = h.x, y = h.y, z = h.z, by = h.id, seq = bots.seq })
+				end
+			end
+		elseif h.kind == "ended" then
+			-- which ball: the shooter's oldest still in flight
+			local list = bots.flights[h.id]
+			local flight: Flight? = nil
+			if list ~= nil then
+				while #list > 0 and now - list[1].at > ttl + 0.1 do
+					table.remove(list, 1)
+				end
+				flight = table.remove(list, 1)
+			end
+			if flight == nil or shooter == nil then
+				continue
+			end
+			for id, b in brains do
+				if b.team == shooter.team or not b.placed or id == h.id then
+					continue
+				end
+				-- it stopped before it got here: it never went by
+				local whizz = b.whizz
+				for i = #whizz, 1, -1 do
+					if whizz[i].seq == flight.seq and whizz[i].at > now then
+						table.remove(whizz, i)
+					end
+				end
+				local dx, dy, dz = h.x - b.x, h.y - (b.y + BodyModule.STAND_EYE * 0.6), h.z - b.z
+				if dx * dx + dy * dy + dz * dz <= reach then
+					BotBrain.alert(b, flight.x, flight.y, flight.z, now) -- a splat beside it
+				end
+			end
+		elseif h.kind == "tag" then
+			local by = h.by or 0
+			local tagger = brains[by]
+			if tagger ~= nil and tagger.placed then
+				BotBrain.say(tagger, bots.squad, now, out, "tagged")
+			end
+			local victim = state.slots[h.id]
+			local from = poses[by]
+			if victim == nil or from == nil then
+				continue
+			end
+			-- a team-mate tagged where a bot could see: it knows where that came from
+			local cosHalf = math.cos(profile.sightHalf)
+			for id, b in brains do
+				if b.team ~= victim.team or not b.placed or id == h.id then
+					continue
+				end
+				local dx, dy, dz = h.x - b.x, h.y - (b.y + BodyModule.eye(b.crouch)), h.z - b.z
+				local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+				local lx, ly, lz = BodyModule.look(b.yaw, b.pitch)
+				if d < 45 and d > 1e-3 and dx * lx + dy * ly + dz * lz >= cosHalf * d then
+					BotBrain.alert(b, from.x, from.y + BodyModule.STAND_EYE, from.z, now)
+				end
+			end
+		end
+	end
+end
 
 -- One server tick. `poses` holds every slot's present pose (a person's is the one last put in a
 -- snapshot); a bot reads the others and writes its own (x, y, z, yaw, pitch, crouch, and of bits only
 -- BIT.crouch, BIT.sprint and BIT.air). A bot that is out stands still. `heard` is what happened since
 -- the last tick. Returns what the bots want done.
 function Bots.step(
-	_bots: Bots,
-	_state: State,
-	_poses: { [number]: Pose },
-	_heard: { Heard },
-	_now: number,
-	_dt: number
+	bots: Bots,
+	state: State,
+	poses: { [number]: Pose },
+	heard: { Heard },
+	now: number,
+	dt: number
 ): { Command }
-	return {}
+	local out: { Command } = {}
+	local brains = bots.brains :: { [number]: BotBrain.Brain }
+	if next(brains) == nil or bots.state ~= state then
+		return out
+	end
+	local squad = bots.squad
+	squad.tick += 1
+	follow(squad, state, poses, now)
+	if #heard > 0 then
+		hear(bots, state, poses, heard, now, out)
+	end
+	-- this tick's share of the sight checks (BOT.sightHz a bot a second, spread over the ticks) and one
+	-- route search; whoever is first in line changes every tick, so nobody is always last
+	local count = 0
+	for _ in brains do
+		count += 1
+	end
+	squad.sightLeft = math.max(1, math.ceil(count * bots.profile.sightHz * dt - 1e-6))
+	squad.routeLeft = 1
+	local first = squad.tick % RULES.slots
+	for k = 1, RULES.slots do
+		local brain = brains[(first + k - 1) % RULES.slots + 1]
+		if brain ~= nil then
+			BotBrain.step(brain, squad, state, poses, now, dt, out)
+		end
+	end
+	return out
 end
 
 return Bots
