@@ -119,8 +119,8 @@ local VIEWS: { View } = {
 	{
 		name = "pb_14_transmitter",
 		desc = "Fourth floor, the transmitter hall: cabinet rows, cable trays to the mast.",
-		feet = { -27, 4 * F, -33 },
-		look = { 0, 4 * F + 4, -50 },
+		feet = { -20.5, 4 * F, -33 },
+		look = { -3, 4 * F + 4, -50 },
 	},
 	{
 		name = "pb_15_offices",
@@ -150,10 +150,24 @@ local VIEWS: { View } = {
 	},
 	{
 		name = "pb_17_lobby_window",
-		desc = "The lobby's east window: reception, the hall door and the atrium floor beyond, as a visitor sees the match.",
-		feet = { 31, 0, 66 },
-		look = { 17, 4, 24 },
-		fov = 60,
+		desc = "The lobby's east window, as a visitor sees the match: through reception and the hall's wide doorway, up the east concourse and across that side of the atrium's floor.",
+		feet = { 25.5, 0, 63.5 },
+		look = { 15, 3.5, 0 },
+		fov = 65,
+	},
+	{
+		name = "pb_22_desk_window",
+		desc = "At the pass desk: the counter and its card, and behind it the west window onto the concourse and the atrium.",
+		feet = { -21, 0, 80 },
+		look = { -22, 4, 30 },
+		fov = 70,
+	},
+	{
+		name = "pb_23_atrium_down",
+		desc = "First floor, at the gap in the east rail looking down into the atrium: the station's number painted on the floor, the fallen rig either side of it, its cables.",
+		feet = { 16.6, F, 10 },
+		look = { -3, 0, -4 },
+		fov = 85,
 	},
 	{
 		name = "pb_18_outside",

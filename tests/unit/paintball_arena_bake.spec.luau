@@ -195,7 +195,7 @@ return function(t)
 			for _, p in PartList.solids(plan) do
 				for _, s in p.signs or {} do
 					local r = s.rect
-					if r then
+					if r and not s.paint then
 						rects += 1
 						t.truthy(
 							r[1] >= -1e-9 and r[2] >= -1e-9 and r[1] + r[3] <= 1 + 1e-9 and r[2] + r[4] <= 1 + 1e-9
@@ -222,6 +222,93 @@ return function(t)
 				t.eq(hung, 4, `storey {level} has four hung monitors`)
 				t.eq(sides[1], sides[2])
 			end
+		end
+	)
+
+	t.test(
+		"the marks: tape, cables, stains and papers lie on the faces of boxes; both teams' sides the same",
+		function()
+			local b = plan.boxes
+			local e = 1e-9
+			local sides = { 0, 0 }
+			local tops, walls, words = 0, 0, {} :: { [string]: { number } }
+			local byStorey: { [number]: number } = {}
+			for _, m in plan.marks do
+				local k = (m.box - 1) * 6
+				local at, w, h = m.at, m.w, m.h
+				t.truthy(PartList.TONE[m.tone] ~= nil, `the tone {m.tone} is a colour`)
+				t.truthy(w > 0.05 and h > 0.05)
+				if m.face == "+y" then
+					tops += 1
+					t.near(at[2], b[k + 5], e, "a floor mark is on its box's top")
+					t.truthy(at[1] - w / 2 >= b[k + 1] - e and at[1] + w / 2 <= b[k + 4] + e, "and within it along x")
+					t.truthy(at[3] - h / 2 >= b[k + 3] - e and at[3] + h / 2 <= b[k + 6] + e, "and along z")
+					-- it is somewhere a floor is: the walking surface, a stage or a desk's top, never a ceiling fitting
+					local level = math.floor((at[2] + 0.01) / Arena.FLOOR_HEIGHT)
+					t.truthy(at[2] - level * Arena.FLOOR_HEIGHT <= Arena.RAIL_HEIGHT + 1e-6, "no higher than a desk")
+					byStorey[level] = (byStorey[level] or 0) + 1
+				else
+					walls += 1
+					local alongX = m.face == "+z" or m.face == "-z"
+					local plane = if m.face == "+z"
+						then b[k + 6]
+						elseif m.face == "-z" then b[k + 3]
+						elseif m.face == "+x" then b[k + 4]
+						else b[k + 1]
+					t.near(if alongX then at[3] else at[1], plane, e, `a wall mark is on its box's {m.face} face`)
+					local mid = if alongX then at[1] else at[3]
+					local lo, hi = if alongX then b[k + 1] else b[k + 3], if alongX then b[k + 4] else b[k + 6]
+					t.truthy(mid - w / 2 >= lo - e and mid + w / 2 <= hi + e)
+					t.truthy(at[2] - h / 2 >= b[k + 2] - e and at[2] + h / 2 <= b[k + 5] + e)
+				end
+				local text = m.text
+				if text then
+					t.eq(m.face, "+y", "only a floor has words among the marks")
+					words[text] = at
+				end
+				-- which team's half: the middle of the atrium's floor is nobody's
+				if math.abs(at[1]) > 5 or math.abs(at[3]) > 5 then
+					local side = if at[1] + at[3] < 0 then 1 else 2
+					sides[side] += 1
+				end
+			end
+			t.truthy(#plan.marks >= 300, `{#plan.marks} marks`)
+			t.truthy(tops >= 200 and walls >= 100, `{tops} on floors and tops, {walls} on walls`)
+			t.eq(sides[1], sides[2])
+			for level = 0, Arena.FLOORS - 1 do
+				t.truthy((byStorey[level] or 0) >= 12, `storey {level} has {byStorey[level]} marks on its floors`)
+			end
+			-- each team's name is on the floor of its own spawn room; the station's number on the atrium's
+			for team, name in { "ORANGE TEAM", "TEAL TEAM" } do
+				local at = words[name]
+				t.truthy(at ~= nil, `{name} is on a floor`)
+				t.truthy(
+					Arena.inRoom(arena.spawnRooms[team], at[1], at[2] + 1, at[3]),
+					`{name} is in team {team}'s room`
+				)
+			end
+			t.truthy(words["7"] ~= nil and math.abs(words["7"][1]) < 1 and words["7"][2] == 0)
+			-- every colour a sign is written in is one too
+			for _, sign in plan.signs do
+				t.truthy(PartList.TONE[sign.tone] ~= nil, `the tone {sign.tone}`)
+				t.truthy(sign.bg == nil or PartList.TONE[sign.bg] ~= nil)
+			end
+			-- the part list lays each mark out inside its face, as paint
+			local laid = 0
+			for _, p in PartList.solids(plan) do
+				for _, sign in p.signs or {} do
+					if sign.paint then
+						laid += 1
+						local r = sign.rect :: { number }
+						t.truthy(
+							r[1] >= -1e-9 and r[2] >= -1e-9 and r[1] + r[3] <= 1 + 1e-9 and r[2] + r[4] <= 1 + 1e-9
+						)
+						t.truthy(r[3] > 0 and r[4] > 0)
+						t.truthy((sign.bg ~= nil) == (sign.text == " "), "a mark is a colour or it is words")
+					end
+				end
+			end
+			t.eq(laid, #plan.marks)
 		end
 	)
 
@@ -506,6 +593,55 @@ return function(t)
 		t.deepEq(curtains, { 2, 2 })
 		t.truthy(monitors >= 13, `{monitors} monitors, the lobby's among them`)
 		t.truthy(lights >= 60, `{lights} lights`)
+		-- the marks are labels in a SurfaceGui named Paint, lit by the room; each label lies in the world where
+		-- the plan put its mark (a Top face's canvas runs left to right along the part's X and top to bottom
+		-- along its Z, as tools/review/attractions_export draws it)
+		local byBox: { [number]: any } = {}
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d:GetAttribute("Box") ~= nil then
+				byBox[d:GetAttribute("Box")] = d
+			end
+		end
+		local labels = 0
+		for _, d in model:GetDescendants() do
+			if d:IsA("SurfaceGui") and d.Name == "Paint" then
+				t.eq(d.LightInfluence, 1)
+				labels += #d:GetChildren()
+			end
+		end
+		t.eq(labels, #plan.marks)
+		local placed = 0
+		for i, m in plan.marks do
+			if m.face ~= "+y" or i % 5 ~= 0 then
+				continue
+			end
+			local part = byBox[m.box]
+			local found = false
+			for _, g in part:GetChildren() do
+				if g:IsA("SurfaceGui") and g.Name == "Paint" and g.Face.Name == "Top" then
+					for _, label in g:GetChildren() do
+						local cx = label.Position.X.Scale + label.Size.X.Scale / 2
+						local cz = label.Position.Y.Scale + label.Size.Y.Scale / 2
+						local world = part.CFrame:PointToWorldSpace(
+							roblox.Vector3.new((cx - 0.5) * part.Size.X, part.Size.Y / 2, (cz - 0.5) * part.Size.Z)
+						)
+						local lx, ly, lz = Arena.toLocal(where, world.X, world.Y, world.Z)
+						if
+							math.abs(lx - m.at[1]) < 1e-3
+							and math.abs(ly - m.at[2]) < 1e-3
+							and math.abs(lz - m.at[3]) < 1e-3
+							and math.abs(label.Size.X.Scale * part.Size.X - m.w) < 1e-3
+							and math.abs(label.Size.Y.Scale * part.Size.Z - m.h) < 1e-3
+						then
+							found = true
+						end
+					end
+				end
+			end
+			t.truthy(found, `mark {i} is painted where the plan put it`)
+			placed += 1
+		end
+		t.truthy(placed >= 40)
 		-- the station's prompts are in the lobby the bake made: on its floor, clear of the counters
 		local floor = (model:FindFirstChild("Lobby") :: any):FindFirstChild("Floor") :: any
 		for _, st in Games.stations({ [Contract.SITE] = place }) do

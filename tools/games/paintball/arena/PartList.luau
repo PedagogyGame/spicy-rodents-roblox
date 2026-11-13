@@ -5,8 +5,8 @@
 --   solids(plan)   one part for each box: the same size in the same place (turned into the SITE's frame with
 --                  Arena.toSite: X = x, Y = y, D = 15 - z), its colour and material from the box's look, its
 --                  model from the storey it stands on ("Floor0" .. "Floor4", "Roof"). A `monitor` box's part is
---                  named Arena.MONITOR and carries the face its screen is on; signs and lamps ride on their
---                  box's part. Then one invisible, collidable part for each stair ramp, lying on its steps
+--                  named Arena.MONITOR and carries the face its screen is on; signs, marks (paint that is not
+--                  a sign: tape, cables on a floor, stains) and lamps ride on their box's part. Then one invisible, collidable part for each stair ramp, lying on its steps
 --                  (bodies walk on it; nothing asks it where a ball is), and one see-through, non-colliding
 --                  part for each spawn-room curtain, named Arena.CURTAIN .. team, in the team's colour.
 --   dressing(venue)   everything OUTSIDE the arena volume, parts only: the lobby annex (floor, walls, roof, the
@@ -43,8 +43,10 @@ export type Part = {
 	curtain: number?, -- the team whose spawn room it shuts
 	screen: string?, -- NormalId: the face a monitor's screen is on
 	-- words on a face: filling it, or in `rect` = { left, top, width, height } as fractions of the face (as a
-	-- SurfaceGui lays it out for someone looking at it), with a painted panel behind them when `bg` is set
-	signs: { { face: string, text: string, tone: string, rect: { number }?, bg: string? } }?,
+	-- SurfaceGui lays it out for someone looking at it; on a Top face left to right is +x and top to bottom +z),
+	-- with a painted panel behind them when `bg` is set. `paint`: one of the plan's marks (a rectangle of the
+	-- colour `bg` when it has no words): paint takes the room's light, a sign is lit of itself
+	signs: { { face: string, text: string, tone: string, rect: { number }?, bg: string?, paint: boolean? } }?,
 	light: { range: number, brightness: number, color: { number } }?,
 }
 
@@ -67,6 +69,21 @@ PartList.TONE = {
 	plate = { 26, 28, 34 },
 	warm = { 255, 214, 170 },
 	cold = { 214, 232, 255 },
+	-- the plan's marks: tape and chalk on a floor, a cable lying on it, oil, paper, the gold of the station's
+	-- number on the atrium's floor; a stain on each storey's floor (darker than it, but dust on the studios'
+	-- black); a streak down an outer wall
+	tape = { 226, 190, 44 },
+	chalk = { 214, 212, 200 },
+	cable = { 20, 20, 22 },
+	oil = { 50, 50, 54 },
+	paper = { 226, 222, 206 },
+	floor_gold = { 176, 146, 72 },
+	stain0 = { 76, 76, 80 },
+	stain1 = { 50, 66, 82 },
+	stain2 = { 54, 54, 60 },
+	stain3 = { 124, 127, 123 },
+	stain4 = { 82, 92, 68 },
+	streak = { 100, 94, 86 },
 }
 
 local LOOK: { [string]: { any } } = {
@@ -78,7 +95,7 @@ local LOOK: { [string]: { any } } = {
 	roof = { { 76, 76, 80 }, "Concrete" },
 	skylight = { { 170, 200, 210 }, "Glass", 0.7 },
 	shell = { { 134, 128, 118 }, "Concrete" },
-	glass = { { 170, 205, 212 }, "Glass", 0.8 },
+	glass = { { 196, 220, 224 }, "Glass", 0.86 },
 	gate = { { 70, 76, 84 }, "DiamondPlate" },
 	shutter = { { 96, 102, 106 }, "CorrodedMetal" },
 	wall0 = { { 140, 138, 130 }, "Concrete" },
@@ -267,6 +284,40 @@ function PartList.solids(plan: ArenaDataPlan.Plan): { Part }
 			part.signs = list
 		end
 	end
+	for _, m in plan.marks do
+		local part = byBox[m.box]
+		local list = part.signs or {}
+		local k = (m.box - 1) * 6
+		local x0, y0, z0, x1, y1, z1 =
+			boxes[k + 1], boxes[k + 2], boxes[k + 3], boxes[k + 4], boxes[k + 5], boxes[k + 6]
+		local at, w, h = m.at, m.w, m.h
+		local rect: { number }
+		if m.face == "+y" then
+			rect = { (at[1] - w / 2 - x0) / (x1 - x0), (at[3] - h / 2 - z0) / (z1 - z0), w / (x1 - x0), h / (z1 - z0) }
+		else
+			local u: number, width: number
+			if m.face == "+z" then
+				u, width = at[1] - x0, x1 - x0
+			elseif m.face == "-z" then
+				u, width = x1 - at[1], x1 - x0
+			elseif m.face == "+x" then
+				u, width = z1 - at[3], z1 - z0
+			else
+				u, width = at[3] - z0, z1 - z0
+			end
+			rect = { (u - w / 2) / width, (y1 - at[2] - h / 2) / (y1 - y0), w / width, h / (y1 - y0) }
+		end
+		-- (a mark without words is a label of one space on a ground of its colour)
+		table.insert(list, {
+			face = PartList.FACE[m.face],
+			text = m.text or " ",
+			tone = m.tone,
+			rect = rect,
+			bg = if m.text then nil else m.tone,
+			paint = true,
+		})
+		part.signs = list
+	end
 	for _, l in plan.lamps do
 		byBox[l.box].light = { range = l.range, brightness = l.brightness, color = PartList.TONE[l.tone] }
 	end
@@ -369,6 +420,7 @@ function PartList.dressing(venue: any?): { Part }
 	local WOOD, BOARD = { 122, 92, 62 }, { 150, 118, 76 }
 	local ORANGE, TEAL = PartList.TEAM[1], PartList.TEAM[2]
 	local ghost = { collide = false, shadow = false }
+	local WINDOW = ArenaDataPlan.WINDOW
 
 	-- THE LOBBY ANNEX: z 61 .. 90 (the arena's south wall is its back wall), one storey
 	local Z0, Z1, ROOF = half + 1, 90, 13
@@ -410,12 +462,15 @@ function PartList.dressing(venue: any?): { Part }
 	local mat = add("Lobby", "GateMat", -4, 0, Z0, 4, 0.1, Z0 + 5, ORANGE, "Fabric", ghost)
 	mat.signs = { { face = "Top", text = "JOIN THE MATCH", tone = "stencil" } }
 	-- the lobby's monitor, on the wall beside the gate: the live match
-	add("Lobby", Arena.MONITOR, 6.5, 4.5, Z0, 19.5, 11, Z0 + 0.5, { 44, 44, 48 }, "SmoothPlastic", { screen = "Back" })
-	add("Lobby", "MonitorFrame", 6, 4, Z0, 20, 11.5, Z0 + 0.3, DARK, "Metal")
+	add("Lobby", Arena.MONITOR, 6.5, 4.6, Z0, 15.5, 9.7, Z0 + 0.5, { 44, 44, 48 }, "SmoothPlastic", { screen = "Back" })
+	add("Lobby", "MonitorFrame", 6, 4.1, Z0, 16, 10.2, Z0 + 0.3, DARK, "Metal")
 	-- the frames of the two windows onto the atrium (the glass is the arena's own)
 	for _, s in { -1, 1 } do
-		add("Lobby", "WindowSill", s * 21.5, 1, Z0, s * 38.5, 1.5, Z0 + 0.8, TRIM, "SmoothPlastic")
-		add("Lobby", "WindowHead", s * 21.5, 9, Z0, s * 38.5, 9.5, Z0 + 0.5, TRIM, "SmoothPlastic")
+		local w0, w1, sill, head = WINDOW[1] - 0.5, WINDOW[2] + 0.5, WINDOW[3], WINDOW[4]
+		add("Lobby", "WindowSill", s * w0, sill - 0.5, Z0, s * w1, sill, Z0 + 0.8, TRIM, "SmoothPlastic")
+		add("Lobby", "WindowHead", s * w0, head, Z0, s * w1, head + 0.5, Z0 + 0.5, TRIM, "SmoothPlastic")
+		add("Lobby", "WindowJamb", s * w0, sill, Z0, s * (w0 + 0.5), head, Z0 + 0.5, TRIM, "SmoothPlastic")
+		add("Lobby", "WindowJamb", s * (w1 - 0.5), sill, Z0, s * w1, head, Z0 + 0.5, TRIM, "SmoothPlastic")
 	end
 	-- the pass desk (west) and the garb counter (east): a counter with the prompt in front of it, a board over it
 	local function counter(x: number, text: string, sub: string, color: { number })
@@ -435,24 +490,25 @@ function PartList.dressing(venue: any?): { Part }
 	end
 	counter(Arena.DESK.x, "PASS DESK", "20c\nFIVE DAYS", ORANGE)
 	counter(-Arena.DESK.x, "GARB SHOP", "S$1 A SET", TEAL)
-	-- garb on a rail behind the east counter, in both teams' colours
+	-- garb on a rail against the back wall east of the east window, in both teams' colours
+	local GARB = WINDOW[2] + 4
 	for i = 0, 5 do
-		local x = -Arena.DESK.x - 5 + i * 2
+		local x = GARB + 1 + i * 2
 		add(
 			"Lobby",
 			"Garb",
 			x,
 			3.8,
-			Z0 + 3,
+			Z0 + 0.5,
 			x + 1.4,
 			7.4,
-			Z0 + 3.5,
+			Z0 + 1,
 			if i % 2 == 0 then ORANGE else TEAL,
 			"Fabric",
 			ghost
 		)
 	end
-	add("Lobby", "GarbRail", -Arena.DESK.x - 6, 7.4, Z0 + 3.1, -Arena.DESK.x + 6, 7.6, Z0 + 3.4, DARK, "Metal", ghost)
+	add("Lobby", "GarbRail", GARB, 7.4, Z0 + 0.6, GARB + 12, 7.6, Z0 + 0.9, DARK, "Metal", ghost)
 	-- benches, a rules board, ceiling lights
 	for _, x in { -48, 48 } do
 		add("Lobby", "Bench", x - 5, 0, 80, x + 5, 1.6, 82.4, WOOD, "Wood")

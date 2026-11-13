@@ -4,8 +4,8 @@
       --scene build/review/scene.json --views build/review/paintball_views.json --out build/review/paintball
 
 The same arguments as tools/review/render.py, and the same renderer: this file only imports it and puts back
-three facts of the engine that matter INDOORS and that the stock review render leaves out (it was written for the
-town in sunlight). Without them a sealed building renders black, which the game's is not.
+four facts of the engine that matter INDOORS and that the stock review render leaves out (it was written for the
+town in sunlight). Without the first three a sealed building renders black, which the game's is not.
   1. A light baked with Shadows = false passes through everything in the engine. Every light of the arena is one
      (tools/bake/games/Paintball), and each sits INSIDE its own fitting: Cycles would shut it in its box. Here the
      lights inside the views file's "indoor" box cast no shadow.
@@ -14,6 +14,9 @@ town in sunlight). Without them a sealed building renders black, which the game'
      (inverse square times 1 - (d / Range)^2).
   3. Lighting.Ambient (LightingPreset.GOLDEN.ambient) is added to every surface in the engine, sunlit or not.
      Here it is six shadowless suns along the axes whose strengths add up to the views file's "ambient".
+  4. A label's background is drawn. The stock review draws a SurfaceGui's words only; the arena's paint (the
+     plates behind its door names, and its marks: tape, cables lying on a floor, stains, papers) is labels with a
+     background colour. Here each is a rectangle of that colour on its face, lit like the face.
 It remains an approximation of the engine's light, for reading the place: what is where, what colour, what
 can be seen from an eye point. It says nothing certain about how bright the game is.
 """
@@ -81,6 +84,45 @@ def _indoors(cfg, scene_lights):
     return done
 
 
+def _lin(c):
+    c = c / 255.0
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _grounds(texts):
+    """Every label's background, as a rectangle on its face just under the words."""
+    mats = {}
+    done = 0
+    for i, T in enumerate(texts):
+        bg = T.get("bg")
+        w, h = float(T.get("w", 0)), float(T.get("h", 0))
+        if not bg or w <= 0 or h <= 0:
+            continue
+        key = tuple(bg)
+        mat = mats.get(key)
+        if mat is None:
+            mat = bpy.data.materials.new(f"pb_ground_{len(mats)}")
+            mat.use_nodes = True
+            bsdf = mat.node_tree.nodes.get("Principled BSDF")
+            bsdf.inputs["Base Color"].default_value = (_lin(bg[0]), _lin(bg[1]), _lin(bg[2]), 1.0)
+            bsdf.inputs["Roughness"].default_value = 0.75
+            mats[key] = mat
+        r = review.rb_to_bl(T["right"]).normalized()
+        u = review.rb_to_bl(T["up"]).normalized()
+        n = review.rb_to_bl(T["normal"]).normalized()
+        c = review.rb_to_bl(T["pos"]) - n * 0.003  # the words lie 0.006 off the face
+        verts = [c - r * (w / 2) - u * (h / 2), c + r * (w / 2) - u * (h / 2), c + r * (w / 2) + u * (h / 2), c - r * (w / 2) + u * (h / 2)]
+        me = bpy.data.meshes.new(f"pb_ground_{i}")
+        me.from_pydata([tuple(v) for v in verts], [], [(0, 1, 2, 3)])
+        me.materials.append(mat)
+        ob = bpy.data.objects.new(me.name, me)
+        bpy.context.scene.collection.objects.link(ob)
+        ob.visible_shadow = False
+        ob["review_group"] = "attractions"
+        done += 1
+    return done
+
+
 def _ambient(cfg):
     amb = cfg.get("ambient")
     if not amb:
@@ -108,19 +150,25 @@ def main(argv):
         cfg = json.load(fh)
     stock = review.setup_render
     scene_lights = []
+    scene_texts = []
     load = json.load
 
     def loading(fh):
         data = load(fh)
         if isinstance(data, dict) and "attractions" in data:
             scene_lights.extend(data["attractions"].get("lights", []))
+            scene_texts.extend(data["attractions"].get("texts", []))
         return data
 
     def setup_render(res, samples, threads):
         cam = stock(res, samples, threads)
         n = _indoors(cfg, scene_lights)
         _ambient(cfg)
-        print(f"review: paintball arena: {n} indoor lights without shadows, ranged; ambient added", flush=True)
+        g = _grounds(scene_texts)
+        print(
+            f"review: paintball arena: {n} indoor lights without shadows, ranged; ambient added; {g} painted grounds",
+            flush=True,
+        )
         return cam
 
     review.setup_render = setup_render

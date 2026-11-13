@@ -50,6 +50,10 @@ export type Sign = {
 	h: number?,
 	bg: string?,
 }
+-- Paint that is not a sign: a w x h rectangle of one colour about the point `at` on a box's face (tape, a cable
+-- lying on a floor, a stain, a sheet of paper), or words written on a floor. On "+y" (the top of a floor, a
+-- stage, a desk) w lies along x and h along z, and words read to someone looking north.
+export type Mark = { box: number, face: string, at: { number }, w: number, h: number, tone: string, text: string? }
 export type Lamp = { box: number, range: number, brightness: number, tone: string }
 export type Flight = { f: number, side: number, dir: number, z: number }
 export type Doorway = { level: number, ax: number, az: number, bx: number, bz: number }
@@ -67,12 +71,16 @@ export type Plan = {
 	doorways: { Doorway }, -- the two points either side of every doorway: the navigation graph has a node at each
 	monitors: { [number]: string }, -- box -> the face its screen is on ("+x", "-x", "+z", "-z")
 	signs: { Sign }, -- words on a box's face
+	marks: { Mark }, -- paint on a box's face that is not a sign
 	lamps: { Lamp }, -- boxes that give light
 }
 
 local Plan = {}
 
 Plan.DOOR = 8 -- studs: the height of a doorway under its lintel
+-- the lobby's two windows in the south wall, either side of the gate: from |x| = WINDOW[1] to WINDOW[2],
+-- from WINDOW[3] to WINDOW[4] above the ground
+Plan.WINDOW = table.freeze({ 17, 30, 1.5, 9 })
 Plan.LOOKS = table.freeze({
 	"floor0",
 	"floor1",
@@ -198,6 +206,7 @@ function Plan.build(): Plan
 		doorways = {},
 		monitors = {},
 		signs = {},
+		marks = {},
 		lamps = {},
 	}
 
@@ -336,6 +345,132 @@ function Plan.build(): Plan
 		paint(x, level * H + DOOR + 1.5, z, face, w, 1.7, text, "white", text2, "plate")
 	end
 
+	-- MARKS: paint that is not a sign. `daub` paints the rectangle a0..a1 by b0..b1 lying in the plane of the
+	-- faces looking `face` at the coordinate c ("+y": a is x, b is z, c the height of the tops; "+z" and "-z":
+	-- a is x, b is the height; "+x" and "-x": a is z, b is the height): every box with a face in that plane
+	-- takes the part of the rectangle that lies on it, so a cable painted across two slabs is on both and a
+	-- stain across a doorway is on the wall either side. Words (a floor's) must lie whole on one box. Like a
+	-- sign, a mark is not a solid and not a part. Call it when the boxes it is on stand.
+	local function daub(
+		face: string,
+		c: number,
+		a0: number,
+		a1: number,
+		b0: number,
+		b1: number,
+		tone: string,
+		text: string?
+	)
+		local e = 1e-6
+		local found = false
+		for i = 1, #kinds do
+			local k = (i - 1) * 6
+			local x0, y0, z0, x1, y1, z1 =
+				boxes[k + 1], boxes[k + 2], boxes[k + 3], boxes[k + 4], boxes[k + 5], boxes[k + 6]
+			local plane: number, p0: number, p1: number, q0: number, q1: number
+			if face == "+y" then
+				plane, p0, p1, q0, q1 = y1, x0, x1, z0, z1
+			elseif face == "+z" then
+				plane, p0, p1, q0, q1 = z1, x0, x1, y0, y1
+			elseif face == "-z" then
+				plane, p0, p1, q0, q1 = z0, x0, x1, y0, y1
+			elseif face == "+x" then
+				plane, p0, p1, q0, q1 = x1, z0, z1, y0, y1
+			else
+				plane, p0, p1, q0, q1 = x0, z0, z1, y0, y1
+			end
+			if math.abs(plane - c) < e then
+				local u0, u1 = math.max(a0, p0), math.min(a1, p1)
+				local v0, v1 = math.max(b0, q0), math.min(b1, q1)
+				local whole = u0 <= a0 + e and u1 >= a1 - e and v0 <= b0 + e and v1 >= b1 - e
+				if u1 - u0 > 0.05 and v1 - v0 > 0.05 and (text == nil or whole) then
+					found = true
+					local mu, mv = (u0 + u1) / 2, (v0 + v1) / 2
+					local at = if face == "+y"
+						then { mu, c, mv }
+						elseif face == "+z" or face == "-z" then { mu, mv, c }
+						else { c, mv, mu }
+					table.insert(
+						plan.marks,
+						{ box = i, face = face, at = at, w = u1 - u0, h = v1 - v0, tone = tone, text = text }
+					)
+				end
+			end
+		end
+		if not found then
+			error(`ArenaDataPlan: no face {face} at {c} takes the mark ({a0}, {b0}) to ({a1}, {b1})`)
+		end
+	end
+	-- on a top at the height y, and on its twin's
+	local function floorMark(y: number, x0: number, z0: number, x1: number, z1: number, tone: string, tone2: string?)
+		daub("+y", y, math.min(x0, x1), math.max(x0, x1), math.min(z0, z1), math.max(z0, z1), tone)
+		daub("+y", y, -math.max(x0, x1), -math.min(x0, x1), -math.max(z0, z1), -math.min(z0, z1), tone2 or tone)
+	end
+	-- words on a floor, w along x and h along z about (x, z); the twin's words read the same way round
+	local function floorWords(
+		y: number,
+		x: number,
+		z: number,
+		w: number,
+		h: number,
+		text: string,
+		tone: string,
+		text2: string?
+	)
+		daub("+y", y, x - w / 2, x + w / 2, z - h / 2, z + h / 2, tone, text)
+		daub("+y", y, -x - w / 2, -x + w / 2, -z - h / 2, -z + h / 2, tone, text2 or text)
+	end
+	-- on the walls looking `face` in the plane c, from a0 to a1 along them and h0 to h1 in height; the twin's
+	local function wallMark(
+		face: string,
+		c: number,
+		a0: number,
+		a1: number,
+		h0: number,
+		h1: number,
+		tone: string,
+		tone2: string?
+	)
+		daub(face, c, math.min(a0, a1), math.max(a0, a1), h0, h1, tone)
+		daub(opposite(face), -c, -math.max(a0, a1), -math.min(a0, a1), h0, h1, tone2 or tone)
+	end
+	-- a cable lying on a floor: runs along x or along z between the points { x, z }, CABLE wide
+	local CABLE = 0.4
+	local function cable(y: number, points: { { number } }, tone: string?)
+		for i = 1, #points - 1 do
+			local a, b = points[i], points[i + 1]
+			floorMark(
+				y,
+				math.min(a[1], b[1]) - CABLE / 2,
+				math.min(a[2], b[2]) - CABLE / 2,
+				math.max(a[1], b[1]) + CABLE / 2,
+				math.max(a[2], b[2]) + CABLE / 2,
+				tone or "cable"
+			)
+		end
+	end
+	-- a camera's place taped on a studio floor: a T behind the pedestal at (x, z) and its number
+	local function taped(y: number, x: number, z: number, number: string)
+		floorMark(y, x - 1.5, z + 1.3, x + 1.5, z + 1.6, "tape")
+		floorMark(y, x - 0.15, z + 1.6, x + 0.15, z + 2.5, "tape")
+		floorWords(y, x + 2.3, z + 0.4, 1.2, 1.5, number, "tape")
+	end
+	-- a stain on a floor about (x, z), some seven studs by six: four rectangles laid over one another, so that
+	-- its edge is not a rectangle's
+	local function stain(y: number, x: number, z: number, tone: string)
+		floorMark(y, x - 3, z - 1.2, x + 3, z + 1.3, tone)
+		floorMark(y, x - 2.2, z - 2.2, x + 2, z + 2, tone)
+		floorMark(y, x - 1, z - 2.9, x + 1.2, z + 2.7, tone)
+		floorMark(y, x - 3.6, z - 0.4, x + 3.4, z + 0.5, tone)
+	end
+	-- sheets of paper left on a top at the height y: each { x, z } is a sheet's corner
+	local function papers(y: number, sheets: { { number } })
+		for i, at in sheets do
+			local w, d = if i % 2 == 0 then 0.9 else 1.2, if i % 2 == 0 then 1.2 else 0.9
+			floorMark(y, at[1], at[2], at[1] + w, at[2] + d, "paper")
+		end
+	end
+
 	-- A full-height wall 1 thick, with openings. `along` "x": it runs along x at z = c from a to b;
 	-- "z": along z at x = c. Each opening is { centre, width, kind? }: a doorway (a lintel over it
 	-- from DOOR up, and a `doorways` entry: a point either side of it), or with WINDOW after them a sill
@@ -384,6 +519,7 @@ function Plan.build(): Plan
 	end
 
 	-- THE SHELL: the ground, the roof with its glass over the atrium, the outer walls storey by storey
+	local WIN0, WIN1 = Plan.WINDOW[1], Plan.WINDOW[2]
 	raw(KIND.slab, "floor0", -half, -1, -half, half, 0, half)
 	local top = floors * H
 	-- (a slab is two layers, each a box: what is walked on, FLOOR thick, and under it the ceiling of the storey
@@ -405,24 +541,26 @@ function Plan.build(): Plan
 		local y1 = if level == floors - 1 then top + 1 else (level + 1) * H - 1
 		if level == 0 then
 			-- the east wall's loading shutter (its twin on the west wall is boarded up), and the south
-			-- wall: the arena gate behind the lobby's prompt and the two windows the lobby looks in by
+			-- wall: the arena gate behind the lobby's prompt and the two windows the lobby looks in by. Each
+			-- window is as wide as the concourse it looks up (x 17 to 30): through the hall and its wide
+			-- doorway a visitor sees the length of the concourse and that side of the atrium's floor
 			pair(KIND.wall, "shell", half, y0, -half, half + 1, y1, -29)
 			pair(KIND.wall, "shutter", half, y0, -29, half + 1, 10, -21)
 			pair(KIND.wall, "shell", half, 10, -29, half + 1, y1, -21)
 			pair(KIND.wall, "shell", half, y0, -21, half + 1, y1, half)
 			raw(KIND.wall, "shell", -half - 1, y0, -half - 1, half + 1, y1, -half)
 			local z0, z1 = half, half + 1
-			raw(KIND.wall, "shell", -half - 1, y0, z0, -38, y1, z1)
-			raw(KIND.wall, "shell", 38, y0, z0, half + 1, y1, z1)
-			raw(KIND.wall, "shell", -22, y0, z0, -4, y1, z1)
-			raw(KIND.wall, "shell", 4, y0, z0, 22, y1, z1)
+			raw(KIND.wall, "shell", -half - 1, y0, z0, -WIN1, y1, z1)
+			raw(KIND.wall, "shell", WIN1, y0, z0, half + 1, y1, z1)
+			raw(KIND.wall, "shell", -WIN0, y0, z0, -4, y1, z1)
+			raw(KIND.wall, "shell", 4, y0, z0, WIN0, y1, z1)
 			local gate = raw(KIND.wall, "gate", -4, y0, z0, 4, 9, z1)
 			raw(KIND.wall, "shell", -4, 9, z0, 4, y1, z1)
 			table.insert(plan.signs, { box = gate, face = "-z", text = "EXIT", tone = "green" })
 			for _, s in { -1, 1 } do
-				raw(KIND.wall, "shell", s * 22, y0, z0, s * 38, 1.5, z1)
-				raw(KIND.wall, "glass", s * 22, 1.5, z0, s * 38, 9, z1)
-				raw(KIND.wall, "shell", s * 22, 9, z0, s * 38, y1, z1)
+				raw(KIND.wall, "shell", s * WIN0, y0, z0, s * WIN1, 1.5, z1)
+				raw(KIND.wall, "glass", s * WIN0, 1.5, z0, s * WIN1, 9, z1)
+				raw(KIND.wall, "shell", s * WIN0, 9, z0, s * WIN1, y1, z1)
 			end
 		else
 			pair(KIND.wall, "shell", half, y0, -half, half + 1, y1, half)
@@ -772,8 +910,10 @@ function Plan.build(): Plan
 		-- second storey, the offices' front wall on the fourth)
 		local west = if level == 2 then -52 elseif level == 4 then -37 else -45
 		local east = if level == 4 then 37 else 45
-		wall(level, look, "x", -30.5, -half, -atrium - 1, { { west, 6 }, { -23, 8 } })
-		wall(level, look, "x", -30.5, atrium + 1, half, { { 23, 8 }, { east, 6 } })
+		-- (on the ground the concourse's doorway is twelve wide: the lobby's window looks up it)
+		local wide = if level == 0 then 12 else 8
+		wall(level, look, "x", -30.5, -half, -atrium - 1, { { west, 6 }, { -23, wide } })
+		wall(level, look, "x", -30.5, atrium + 1, half, { { 23, wide }, { east, 6 } })
 		-- strip lights and cable trays along the concourse and the halls
 		strip(level, -24, -12, -22, -4)
 		strip(level, -24, 4, -22, 12)
@@ -816,8 +956,10 @@ function Plan.build(): Plan
 		local f1, f2 = on(L, KIND.prop, "flat", -14, -41, -4, -40, 0, 10, "set_warm")
 		sign(f1, f2, "+z", "SCENERY\nSTUDIO B", "stencil", "WBLW 7\nRECEPTION")
 		on(L, KIND.prop, "flat", 4, -50, 14, -49, 0, 10, "set_warm")
-		on(L, KIND.prop, "flat", 20, -54, 21, -44, 0, 10, "flat")
-		on(L, KIND.prop, "flat", -22, -56, -21, -46, 0, 10, "flat")
+		-- (nothing stands between x 17 and 30 on either side of this hall: its twin's lanes are what the
+		-- lobby's windows look up)
+		on(L, KIND.prop, "flat", 14, -54, 15, -44, 0, 10, "flat")
+		on(L, KIND.prop, "flat", -16, -56, -15, -46, 0, 10, "flat")
 		low(L, "crate", -10, -52, -6.6, -48.6, "sofa")
 		stack(L, "crate", 8, -40.4, 11.4, -37)
 		low(L, "drum", -3, -35.5, 0.4, -32.5, "planter")
@@ -895,6 +1037,9 @@ function Plan.build(): Plan
 			-- a dead terminal on each desk
 			on(L, KIND.prop, "terminal", x - 3.3, z + 0.8, x - 1.5, z + 2, RAIL, RAIL + 1.4)
 			on(L, KIND.prop, "terminal", x + 1.5, z - 2, x + 3.3, z - 0.8, RAIL, RAIL + 1.4)
+			-- the last day's copy, on the desks and on the carpet
+			papers(L * H + RAIL, { { x - 1.3, z + 0.6 }, { x + 0.4, z - 1.8 } })
+			papers(L * H, { { x + 1.2, z + 1.5 }, { x - 2.6, z - 1.9 }, { x + 2.8, z + 3.1 } })
 		end
 		cubicle(-52, -20)
 		cubicle(-38.5, -21)
@@ -1198,6 +1343,99 @@ function Plan.build(): Plan
 		local west = ({ "SALES", "NEWS DIRECTOR", "PROGRAMMES", "ENGINEERING" })[i]
 		local east = ({ "PERSONNEL", "LEGAL", "PROMOTIONS", "PAYROLL" })[i]
 		over(4, -43, z, "+x", 4.4, west, east)
+	end
+	-- what the station's end left on its walls
+	paint(-60, 6.5, -4, "+x", 6.4, 3.4, "CONDEMNED\nKEEP OUT", "red")
+	paint(-8.5, H + 10.2, -CORE0 + 1, "+z", 9, 1.7, "OFF THE AIR", "white")
+	paint(5.5, H + 10.2, -CORE0 + 1, "+z", 9, 1.7, "SINCE 1979", "white")
+	paint(-44, roomY + 6.2, 0, "-x", 10, 2.6, "SAFE IN HERE\nNO FIRING", "white")
+
+	-- MARKS, when everything stands (see `daub`): what the last crew left on the floors and what the years did
+	-- to the walls. Written for the north and west; the twin of each is the south's and east's.
+	do
+		-- STOREY 0: the bay the container stands in (east: the van), and oil under its nose
+		floorMark(0, -59.4, 0.5, -38.4, 0.8, "chalk")
+		floorMark(0, -59.4, 8.2, -38.4, 8.5, "chalk")
+		floorMark(0, -38.7, 0.5, -38.4, 8.5, "chalk")
+		floorMark(0, -42.5, 3.2, -37, 6, "oil")
+		floorMark(0, -40, 5, -35.5, 7.4, "oil")
+		-- the sealed bay in the west wall (east: inside the loading shutter), boxed in tape
+		floorMark(0, -59.4, 20.4, -51.6, 20.8, "tape")
+		floorMark(0, -59.4, 29.2, -51.6, 29.6, "tape")
+		floorMark(0, -52, 20.4, -51.6, 29.6, "tape")
+		floorWords(0, -55.6, 27.6, 7, 1.4, "KEEP CLEAR", "tape")
+		-- the atrium's floor: the station's number in its frame, to be read from the galleries, and the cables
+		-- the rig came down with
+		daub("+y", 0, -3, 3, -3.6, 3.6, "floor_gold", "7")
+		floorMark(0, -4.8, -4.8, 4.8, -4.3, "floor_gold")
+		floorMark(0, -4.8, -4.8, -4.3, 4.8, "floor_gold")
+		cable(0, { { 1.6, -9.6 }, { 1.6, -13.4 }, { -13, -13.4 }, { -13, -17.5 } })
+		cable(0, { { -13.6, -8.4 }, { -16.4, -8.4 }, { -16.4, 3 } })
+
+		-- STOREY 1: the news studio's cameras have their places taped on the floor and their cables run along
+		-- the wall to the west; the riser's edge is taped
+		local y = H
+		taped(y, -10, -35, "1")
+		taped(y, 1.5, -34.5, "2")
+		taped(y, 12, -36, "3")
+		cable(y, { { -10.7, -34 }, { -10.7, -31.6 }, { -29, -31.6 } })
+		cable(y, { { 0.8, -33.5 }, { 0.8, -32.2 }, { -29, -32.2 } })
+		cable(y, { { 11.3, -35 }, { 11.3, -32.8 }, { -29, -32.8 } })
+		floorMark(y + 1, -10, -39.5, 10, -39.1, "tape")
+
+		-- STOREY 2: Studio A the same, its cables through the door to its control room; the spawn rooms have
+		-- their team's name on the floor and a line round the walls
+		y = 2 * H
+		taped(y, -10, -39, "1")
+		taped(y, 0, -37, "2")
+		taped(y, 11, -40, "3")
+		cable(y, { { -9.3, -38 }, { -9.3, -33.4 }, { 27.6, -33.4 }, { 27.6, -39.3 }, { 33, -39.3 } })
+		cable(y, { { 0.7, -36 }, { 0.7, -34 }, { 27, -34 }, { 27, -38.7 }, { 33, -38.7 } })
+		cable(y, { { 11.7, -39 }, { 11.7, -34.6 }, { 26.4, -34.6 }, { 26.4, -38.1 }, { 33, -38.1 } })
+		floorMark(y + 1, -14, -46.5, 14, -46.1, "tape")
+		floorWords(y, -52, 0, 12, 2.2, "ORANGE TEAM", "white", "TEAL TEAM")
+		wallMark("-x", -44, -5.8, 5.8, y + 2.9, y + 3.3, "chalk")
+		wallMark("+x", -60, -5.8, 5.8, y + 2.9, y + 3.3, "chalk")
+		wallMark("+z", -6, -59.8, -48.2, y + 2.9, y + 3.3, "chalk")
+		wallMark("-z", 6, -54.8, -44.2, y + 2.9, y + 3.3, "chalk")
+
+		-- STOREY 3: master control's cables, from the consoles to the racks and to the monitor wall; what fell
+		-- off the tape library's shelves
+		y = 3 * H
+		cable(y, { { -47.3, -12 }, { -45.2, -12 }, { -45.2, -26.6 }, { -52, -26.6 }, { -52, -27.4 } })
+		cable(y, { { -38.3, 5 }, { -36.4, 5 }, { -36.4, 27.4 } })
+		cable(y, { { -50.2, -14 }, { -58.4, -14 } })
+		papers(y, { { -9, -48.3 }, { -6.5, -47.2 }, { 1.3, -48.8 }, { 6.2, -47.4 }, { -17, -48.6 }, { 15.6, -47.6 } })
+
+		-- STOREY 4: a line on the floor in front of each row of the transmitter's cabinets; the offices' and
+		-- the boardroom's papers
+		y = 4 * H
+		floorMark(y, -26.5, -50.1, -9.5, -49.8, "tape")
+		floorMark(y, 9.5, -50.1, 26.5, -49.8, "tape")
+		floorMark(y, -18.5, -42.1, -1.5, -41.8, "tape")
+		floorMark(y, 3.5, -42.1, 20.5, -41.8, "tape")
+		for _, z in { -22.5, -7.5, 7.5, 22.5 } do
+			papers(y + RAIL, { { -54, z - 0.9 }, { -51.6, z - 0.2 } })
+			papers(y, { { -47.5, z + 1.8 }, { -46, z - 2.6 } })
+		end
+		papers(y + RAIL, { { -52, -46.5 }, { -47.5, -45.2 }, { -43, -46.6 }, { -40.5, -45 } })
+
+		-- EVERY STOREY: where the roof and the pipes have leaked, a stain on the floor of the concourse, of the
+		-- hall and of the wing, and streaks down the inside of the outer walls from the ceiling
+		for level = 0, floors - 1 do
+			local tone = `stain{level}`
+			y = level * H
+			stain(y, -24, 19.5, tone)
+			stain(y, -5, -36, tone)
+			stain(y, -37.5, 10.5, tone)
+			local c = y + ceiling(level)
+			for i, x in { -52, -37.5, -9, 7.5, 23, 44 } do
+				wallMark("+z", -half, x - 0.5, x + 0.5, c - ({ 5, 3.2, 6, 4, 2.6, 5.4 })[i], c, "streak")
+			end
+			for i, z in { -48, -26, -3, 14, 38, 52 } do
+				wallMark("+x", -half, z - 0.5, z + 0.5, c - ({ 4.4, 6, 3, 5.2, 3.6, 5.8 })[i], c, "streak")
+			end
+		end
 	end
 	return plan
 end

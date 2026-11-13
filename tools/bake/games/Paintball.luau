@@ -20,6 +20,9 @@
 --             Inside the volume a monitor is a `prop` box's own part: a ball stops on it.
 --   Lobby, Outside   the annex with the pass desk and the two windows onto the atrium, and the building from the
 --             street: parts only, all outside the arena volume.
+--   Paint     words are SurfaceGuis on their box's part; the plan's marks (tape, cables lying on a floor, stains,
+--             papers, a floor's words) are labels in a second SurfaceGui named "Paint" on the same face, under
+--             the signs, lit by the room (LightInfluence 1). Nothing of either is a part.
 -- Lights are PointLights without shadows inside the strip lights, stage lamps and lobby fittings.
 -- Interface: { build(kit, parent, station, venue) }
 local Arena = require("../../../src/shared/Minigames/Paintball/Arena")
@@ -51,14 +54,23 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 		attrs = attrs,
 	}
 	local part = kit:box(group, p.name, p.x0, p.x1, p.y0, p.y1, p.d0, p.d1, p.color, p.material, opts)
-	-- one SurfaceGui a face, whatever is written on it
+	-- one SurfaceGui a face for its signs (lit of themselves, as the kit makes them), and one under it, named
+	-- "Paint", for its marks: tape, cables, stains and a floor's words take the room's light like the face
 	local guis: { [string]: any } = {}
-	local function gui(face: string): any
-		local g = guis[face]
+	local function gui(face: string, paint: boolean?): any
+		local key = if paint then "Paint" .. face else face
+		local g = guis[key]
 		if g == nil then
 			local w = math.max(p.x1 - p.x0, p.y1 - p.y0, p.d1 - p.d0)
 			g = kit:gui(part, face, math.clamp(math.floor(900 / w), 8, 50))
-			guis[face] = g
+			if paint then
+				g.Name = "Paint"
+				g.LightInfluence = 1
+				g.Brightness = 1
+			else
+				g.ZOffset = 1
+			end
+			guis[key] = g
 		end
 		return g
 	end
@@ -71,7 +83,10 @@ local function make(kit: any, model: any, groups: { [string]: any }, p: PartList
 		if s.bg then
 			props.Bg = PartList.TONE[s.bg]
 		end
-		kit:label(gui(s.face), props)
+		local label = kit:label(gui(s.face, s.paint), props)
+		if s.paint and s.bg then
+			label.BorderSizePixel = 0
+		end
 	end
 	if p.screen then
 		local screen = gui(p.screen)
