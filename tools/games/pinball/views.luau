@@ -46,7 +46,9 @@ end
 
 for index = 1, #AlleyLayout.PINBALLS do
 	local who = NAMES[index] or tostring(index)
-	local v = Cabinet.camera(index, 16 / 9)
+	-- (on a 16:9 screen the display stands beside the table, so the camera keeps only a sliver at the top)
+	local reserve = { top = 0.02, bottom = 0.02 }
+	local v = Cabinet.camera(index, 16 / 9, "play", reserve)
 	add(
 		`pb_{who}_player`,
 		`Pinball {index} ({who}): the player's view over the lockdown bar (Cabinet.camera, 16:9).`,
@@ -54,6 +56,16 @@ for index = 1, #AlleyLayout.PINBALLS do
 		room(v.target[1], v.target[2], v.target[3]),
 		v.fov
 	)
+	if who == "rodent" then
+		local hv = Cabinet.camera(index, 16 / 9, "high", reserve)
+		add(
+			`pb_{who}_high`,
+			`Pinball {index} ({who}): the second view (V), leaning out over the glass (Cabinet.camera "high", 16:9).`,
+			room(hv.eye[1], hv.eye[2], hv.eye[3]),
+			room(hv.target[1], hv.target[2], hv.target[3]),
+			hv.fov
+		)
+	end
 	-- straight down the playfield's normal, the far end at the top of the picture
 	local a, b = field(index, 1.2, 2.45, 0), field(index, 1.2, 3.45, 0)
 	add(

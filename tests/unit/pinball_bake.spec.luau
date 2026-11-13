@@ -193,4 +193,38 @@ return function(t)
 			end
 		end
 	)
+
+	t.test(
+		"the art: each table's story painted by its own lamps (ACORN's letters, RODENT's heat ladder, SPACE's countdown), a ground behind each backglass, the glass smooth and nearly clear, the light over the top lanes soft",
+		function()
+			local want = {
+				acorn = { "A", "C", "O", "R", "N", "THE HOARD", "FILL THE HOARD BEFORE WINTER" },
+				rodent = { "S", "P", "I", "C", "Y", "CALM", "FERAL", "RABID", "SUPER", "THE WIRE", "THE BITE" },
+				space = { "F", "U", "E", "L", "3", "2", "1", "LAUNCH", "LOCK", "COUNTDOWN TO MULTIBALL" },
+			}
+			for _, m in built do
+				local theme = m:GetAttribute("Theme")
+				local art = m:FindFirstChild(Cabinet.NAMES.playfield):FindFirstChild("Art")
+				t.truthy(art ~= nil, `{theme}: the playfield is painted`)
+				local words: { [string]: boolean } = {}
+				for _, l in art:GetChildren() do
+					words[l.Text] = true
+					-- every word lies on the board
+					local p, z = l.Position, l.Size
+					t.truthy(p.X.Scale >= -0.01 and p.X.Scale + z.X.Scale <= 1.01, `{theme}: {l.Text} across`)
+					t.truthy(p.Y.Scale >= -0.01 and p.Y.Scale + z.Y.Scale <= 1.01, `{theme}: {l.Text} along`)
+				end
+				for _, word in want[theme] do
+					t.truthy(words[word], `{theme}: "{word}" is painted`)
+				end
+				local ground = m:FindFirstChild(Cabinet.NAMES.backglass):FindFirstChild("Art")
+				t.truthy(ground and ground:FindFirstChild("Ground"), `{theme}: the backglass has its ground`)
+				local glass = m:FindFirstChild("Glass")
+				t.truthy(glass.Material ~= roblox.Enum.Material.Glass, "no Glass material (it bends the view)")
+				t.truthy(glass.Transparency >= 0.9, "nearly clear")
+				local light = m:FindFirstChild("Backbox"):FindFirstChildOfClass("SpotLight")
+				t.truthy(light and light.Brightness <= 0.6, "a soft light")
+			end
+		end
+	)
 end

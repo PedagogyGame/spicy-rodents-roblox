@@ -28,6 +28,7 @@ local Tables = require("../../../src/shared/Minigames/Pinball/Tables")
 local Bake = {}
 Bake.BUDGET = 160 -- parts a machine at most
 Bake.SIMPLIFY = 0.02 -- studs: how far a drawn guide may stray from the model's (a third of the ball's radius)
+Bake.GLASS_CLEAR = 0.94 -- the glass's transparency (smooth: no veil, no bending)
 
 type RGB = { number }
 export type Theme = {
@@ -157,6 +158,149 @@ local function simplify(pts: { number }, eps: number): { number }
 		end
 	end
 	return out
+end
+
+-- THE ART. Painted on the playfield (a SurfaceGui on its top face, no parts): each table's story by its own
+-- lamps (Bake.ART: words beside a lamp of the model's, by the lamp's id, so they stand where the model has
+-- them), and its line across the middle. The face's up is up the table; x across from the player's left.
+-- { text, lamp id (or nil: x, y given), dx, dy, w, h, colour? } in playfield studs
+type Paint = { text: string, lamp: string?, x: number?, y: number?, dx: number, dy: number, w: number, h: number }
+Bake.ART = {
+	acorn = {
+		{ text = "A", lamp = "acorn_a", dx = 0.08, dy = -0.03, w = 0.11, h = 0.11 },
+		{ text = "C", lamp = "acorn_c", dx = 0.08, dy = -0.03, w = 0.11, h = 0.11 },
+		{ text = "O", lamp = "acorn_o", dx = 0.08, dy = -0.03, w = 0.11, h = 0.11 },
+		{ text = "R", lamp = "acorn_r", dx = 0.08, dy = -0.03, w = 0.11, h = 0.11 },
+		{ text = "N", lamp = "acorn_n", dx = 0.08, dy = -0.03, w = 0.11, h = 0.11 },
+		{ text = "THE HOARD", lamp = "hoard_3", dx = 0, dy = 0.1, w = 0.6, h = 0.08 },
+		{ text = "2X", lamp = "bonus_2x", dx = 0, dy = -0.08, w = 0.12, h = 0.06 },
+		{ text = "3X", lamp = "bonus_3x", dx = 0, dy = -0.08, w = 0.12, h = 0.06 },
+		{ text = "5X", lamp = "bonus_5x", dx = 0, dy = -0.08, w = 0.12, h = 0.06 },
+		{ text = "SPIN", lamp = "spinner", dx = 0, dy = -0.09, w = 0.3, h = 0.07 },
+		{ text = "OAK", lamp = "oak_r", dx = 0, dy = 0.09, w = 0.2, h = 0.07 },
+		{ text = "OAK", lamp = "oak_l", dx = 0, dy = 0.09, w = 0.2, h = 0.07 },
+		{ text = "EXTRA BALL", lamp = "extra_ball", dx = 0, dy = -0.08, w = 0.4, h = 0.06 },
+		{ text = "SHOOT AGAIN", lamp = "shoot_again", dx = 0, dy = -0.085, w = 0.42, h = 0.05 },
+		{ text = "FILL THE HOARD BEFORE WINTER", x = Layout.XC, y = 1.25, dx = 0, dy = 0, w = 0.95, h = 0.08 },
+	},
+	rodent = {
+		{ text = "S", lamp = "spicy_s", dx = 0.08, dy = 0, w = 0.11, h = 0.11 },
+		{ text = "P", lamp = "spicy_p", dx = 0.08, dy = 0, w = 0.11, h = 0.11 },
+		{ text = "I", lamp = "spicy_i", dx = 0, dy = 0.09, w = 0.11, h = 0.11 },
+		{ text = "C", lamp = "spicy_c", dx = -0.08, dy = 0, w = 0.11, h = 0.11 },
+		{ text = "Y", lamp = "spicy_y", dx = -0.08, dy = 0, w = 0.11, h = 0.11 },
+		{ text = "CALM", lamp = "heat_1", dx = -0.27, dy = 0, w = 0.3, h = 0.07 },
+		{ text = "FERAL", lamp = "feral", dx = -0.22, dy = 0, w = 0.32, h = 0.07 },
+		{ text = "RABID", lamp = "rabid", dx = -0.22, dy = 0, w = 0.32, h = 0.07 },
+		{ text = "SUPER", lamp = "super", dx = -0.22, dy = 0, w = 0.32, h = 0.07 },
+		{ text = "THE WIRE", lamp = "wire", dx = 0, dy = 0.09, w = 0.42, h = 0.07 },
+		{ text = "THE BITE", lamp = "bite", dx = -0.1, dy = -0.09, w = 0.42, h = 0.07 },
+		{ text = "HOT LANE", lamp = "hot_lane", dx = 0, dy = 0.09, w = 0.4, h = 0.06 },
+		{ text = "EXTRA BALL", lamp = "extra_ball", dx = 0, dy = -0.07, w = 0.4, h = 0.06 },
+		{ text = "SHOOT AGAIN", lamp = "shoot_again", dx = 0, dy = -0.085, w = 0.42, h = 0.05 },
+		{ text = "CLIMB TO SUPER", x = Layout.XC, y = 1.02, dx = 0, dy = 0, w = 0.7, h = 0.09 },
+	},
+	space = {
+		{ text = "F", lamp = "fuel_f", dx = 0, dy = -0.08, w = 0.11, h = 0.11 },
+		{ text = "U", lamp = "fuel_u", dx = 0, dy = -0.08, w = 0.11, h = 0.11 },
+		{ text = "E", lamp = "fuel_e", dx = 0, dy = -0.08, w = 0.11, h = 0.11 },
+		{ text = "L", lamp = "fuel_l", dx = 0, dy = -0.08, w = 0.11, h = 0.11 },
+		{ text = "3", lamp = "count_1", dx = 0, dy = -0.09, w = 0.11, h = 0.11 },
+		{ text = "2", lamp = "count_2", dx = 0, dy = -0.09, w = 0.11, h = 0.11 },
+		{ text = "1", lamp = "count_3", dx = 0, dy = -0.09, w = 0.11, h = 0.11 },
+		{ text = "LAUNCH", lamp = "count_2", dx = 0, dy = 0.1, w = 0.4, h = 0.07 },
+		{ text = "COMBO", lamp = "combo_3", dx = 0, dy = -0.09, w = 0.36, h = 0.07 },
+		{ text = "JACKPOT", lamp = "jackpot", dx = 0, dy = 0.09, w = 0.4, h = 0.07 },
+		{ text = "ORBIT", lamp = "orbit_l", dx = 0.12, dy = -0.12, w = 0.24, h = 0.06 },
+		{ text = "ORBIT", lamp = "orbit_r", dx = -0.12, dy = -0.12, w = 0.24, h = 0.06 },
+		{ text = "RAMP", lamp = "ramp_l", dx = 0, dy = -0.08, w = 0.22, h = 0.06 },
+		{ text = "RAMP", lamp = "ramp_r", dx = 0, dy = -0.08, w = 0.22, h = 0.06 },
+		{ text = "LOCK", lamp = "pod_1", dx = 0, dy = -0.1, w = 0.22, h = 0.06 },
+		{ text = "LOCK", lamp = "pod_2", dx = 0, dy = -0.1, w = 0.22, h = 0.06 },
+		{ text = "SHOOT AGAIN", lamp = "shoot_again", dx = 0, dy = -0.085, w = 0.42, h = 0.05 },
+		{ text = "COUNTDOWN TO MULTIBALL", x = Layout.XC, y = 1.22, dx = 0, dy = 0, w = 0.95, h = 0.08 },
+	},
+} :: { [string]: { Paint } }
+
+local function paint(kit: any, field: any, tbl: any, variant: string, th: Theme)
+	local W, L = Layout.WIDTH, Layout.LENGTH
+	local g = kit:gui(field, "Top", 200)
+	g.Name = "Art"
+	local lamps: { [string]: any } = {}
+	for _, l in tbl.def.lamps do
+		lamps[l.id] = l
+	end
+	for _, p in Bake.ART[variant] or {} do
+		local lamp = p.lamp and lamps[p.lamp]
+		assert(p.lamp == nil or lamp ~= nil, `{tbl.id}: no lamp {p.lamp} to paint beside`)
+		local x = (if lamp then lamp.x else p.x or 0) + p.dx
+		local y = (if lamp then lamp.y else p.y or 0) + p.dy
+		-- (the face's up is up the table; it runs from y = -0.16 to L, x from 0 to W)
+		local label = kit:label(g, {
+			Text = p.text,
+			TextColor = th.ink,
+			Font = "GothamBlack",
+			Size = { p.w / W, p.h / (L + 0.16) },
+			Pos = { (x - p.w / 2) / W, (L - y - p.h / 2) / (L + 0.16) },
+		})
+		label.Name = "Paint"
+	end
+end
+
+-- The backglass's ground behind the lettering (a second SurfaceGui behind "Display": in the game, not drawn by
+-- the offline renders, which draw lettering only): the table's dark ground fading into its glow, and its emblem
+-- (ACORN ATTACK: the autumn sun over the oak; SPICY RODENT: a heat glow rising; SPACE SQUIRREL: a ringed planet).
+local function backglassArt(kit: any, glass: any, variant: string, th: Theme)
+	local r = kit.roblox
+	local g = kit:gui(glass, "Front", 60)
+	g.Name = "Art"
+	g.ZOffset = -1
+	local function rgb(c: RGB): any
+		return r.Color3.fromRGB(c[1], c[2], c[3])
+	end
+	local ground = r.Instance.new("Frame")
+	ground.Name = "Ground"
+	ground.Size = r.UDim2.fromScale(1, 1)
+	ground.BorderSizePixel = 0
+	ground.BackgroundColor3 = r.Color3.new(1, 1, 1)
+	ground.Parent = g
+	local grad = r.Instance.new("UIGradient")
+	grad.Rotation = 90
+	grad.Color = r.ColorSequence.new(rgb(th.art), rgb({ th.glow[1] * 0.45, th.glow[2] * 0.45, th.glow[3] * 0.45 }))
+	grad.Parent = ground
+	local function disc(name: string, x: number, y: number, size: number, color: RGB, transparency: number): any
+		local f = r.Instance.new("Frame")
+		f.Name = name
+		f.AnchorPoint = r.Vector2.new(0.5, 0.5)
+		f.Position = r.UDim2.fromScale(x, y)
+		f.Size = r.UDim2.fromScale(size, size)
+		f.BackgroundColor3 = rgb(color)
+		f.BackgroundTransparency = transparency
+		f.BorderSizePixel = 0
+		local ratio = r.Instance.new("UIAspectRatioConstraint")
+		ratio.Parent = f
+		local corner = r.Instance.new("UICorner")
+		corner.CornerRadius = r.UDim.new(0.5, 0)
+		corner.Parent = f
+		f.Parent = g
+		return f
+	end
+	if variant == "acorn" then
+		disc("Sun", 0.78, 0.36, 0.5, { 255, 170, 60 }, 0.55)
+		disc("Oak", 0.2, 0.78, 0.7, { 70, 44, 20 }, 0.2)
+	elseif variant == "rodent" then
+		disc("Heat", 0.5, 0.95, 1.1, { 255, 80, 20 }, 0.5)
+		disc("Core", 0.5, 0.98, 0.6, { 255, 200, 60 }, 0.55)
+	else
+		local planet = disc("Planet", 0.74, 0.42, 0.42, { 120, 90, 230 }, 0.35)
+		local ring = r.Instance.new("UIStroke")
+		ring.Color = rgb(th.ink)
+		ring.Thickness = 3
+		ring.Parent = planet
+		for i, s in { { 0.1, 0.2 }, { 0.3, 0.12 }, { 0.42, 0.3 }, { 0.15, 0.62 }, { 0.9, 0.12 }, { 0.6, 0.7 } } do
+			disc(`Star{i}`, s[1], s[2], 0.025, { 255, 255, 255 }, 0.1)
+		end
+	end
 end
 
 local function machine(kit: any, parent: any, index: number, variant: string)
@@ -294,14 +438,17 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 	)
 	on(m, "BackWall", W / 2, L + 0.04, (G - below) / 2, W + 2 * R, G + below, 0.08, 0, th.body, finish, solid)
 	on(m, "LockdownBar", W / 2, -0.21, G + 0.08, W + 2 * R + 0.04, 0.05, 0.13, 0, CHROME, "Metal", solid)
-	on(m, "Glass", W / 2, L / 2, G, W, 0.02, L, 0, { 200, 225, 235 }, "Glass", {
+	-- (smooth and nearly clear: the engine's Glass material bends what lies behind it at high settings, and the
+	-- player's own screen does not draw it at all while their ball is live)
+	on(m, "Glass", W / 2, L / 2, G, W, 0.02, L, 0, { 200, 225, 235 }, "SmoothPlastic", {
 		collide = false,
 		query = false,
 		shadow = false,
-		transparency = 0.88,
+		transparency = Bake.GLASS_CLEAR,
 	})
 	-- the playfield board, its apron and the machine's name across it
-	on(m, N.playfield, W / 2, L / 2 - 0.08, -0.03, W, 0.06, L + 0.16, 0, th.field, "SmoothPlastic", solid)
+	local field = on(m, N.playfield, W / 2, L / 2 - 0.08, -0.03, W, 0.06, L + 0.16, 0, th.field, "SmoothPlastic", solid)
+	paint(kit, field, tbl, variant, th)
 	local apronTop = def.drainY + 0.1
 	local apron = on(
 		m,
@@ -364,7 +511,7 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 		finish
 	)
 	-- a soft light down over the playfield from the backbox's foot (the lamps under a real backbox)
-	kit:light(box, "SpotLight", { Face = "Bottom", Range = 7, Brightness = 1.2, Angle = 70, Color = th.glow })
+	kit:light(box, "SpotLight", { Face = "Bottom", Range = 6, Brightness = 0.55, Angle = 100, Color = th.glow })
 	local glass = kit:box(
 		m,
 		N.backglass,
@@ -397,6 +544,7 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 		local l = kit:label(g, { Text = text, TextColor = color, Font = font, Size = { 0.94, h }, Pos = { 0.03, y } })
 		l.Name = name
 	end
+	backglassArt(kit, glass, variant, th)
 	line("Title", tbl.title, 0.03, 0.2, th.ink, th.font)
 	line("Score", "FREE PLAY", 0.26, 0.24, { 255, 255, 255 }, "Arcade")
 	line("Info", "1 TO 4 PLAYERS", 0.52, 0.1, th.ink, "GothamBold")
