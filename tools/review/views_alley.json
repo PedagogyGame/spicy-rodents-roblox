@@ -3,9 +3,9 @@
   "defaults": { "res": "960x540", "samples": 20, "groups": ["attractions", "terrain"] },
   "sun": { "dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0 },
   "views": [
-    {"name": "01_front_from_across_bowl_lane", "desc": "The whole front (177 st) from 120 st north of it, across the planned Bowl Lane, at eye height.", "pos": [1361, 5.2, -232], "look": [1361, 22, -352], "fov": 78, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
-    {"name": "02_front_from_the_west", "desc": "The front along its length from the north-west: the ball shop's windows, the canopy, the pylon.", "pos": [1262, 5.2, -318], "look": [1345, 20, -352], "fov": 70, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
-    {"name": "03_entrance", "desc": "The main doors from the foot of the ramp (where the walk from Bowl Lane arrives).", "pos": [1322, 5.2, -334], "look": [1322, 20.5, -352], "fov": 72, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
+    {"name": "01_front_from_across_bowl_lane", "desc": "The whole front (177 st) from 90 st north of it, across the planned Bowl Lane, at eye height.", "pos": [1361, 5.2, -262], "look": [1361, 7, -352], "fov": 88, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
+    {"name": "02_front_from_the_west", "desc": "The front along its length from the north-west: the ball shop's windows, the canopy, the pylon.", "pos": [1262, 5.2, -318], "look": [1345, 8, -352], "fov": 70, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
+    {"name": "03_entrance", "desc": "The main doors from the planned sidewalk of Bowl Lane, straight up the ramp.", "pos": [1322, 5.2, -326], "look": [1322, 7.5, -352], "fov": 72, "aboveGround": true, "groups": ["attractions", "terrain", "town"]},
     {"name": "04_lobby_from_the_doors", "desc": "Just inside the main doors: the lobby, the shoe desk on the left, the concourse and the lanes beyond.", "pos": [1322, 21.7, -354.5], "look": [1321, 20.2, -400], "fov": 82},
     {"name": "05_concourse_looking_east", "desc": "The concourse from its west end: front rooms on the left, settees and lanes on the right.", "pos": [1277.5, 21.7, -384], "look": [1400, 20, -385], "fov": 78},
     {"name": "06_concourse_looking_west", "desc": "The concourse from its east end (by the games-room arch).", "pos": [1398, 21.7, -384], "look": [1276, 20, -385], "fov": 78},

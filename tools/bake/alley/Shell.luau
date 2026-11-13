@@ -634,7 +634,7 @@ local function walls(kit: any, root: any, data: any)
 		kit:box(w, `RoofUnitFan{i}`, hx - 1.4, hx + 1.4, H + 2.6, H + 2.8, hd - 1.4, hd + 1.4, { 90, 92, 92 }, "Metal")
 	end
 	-- the games-room partition with its two cased openings
-	Shell.wallD(kit, w, "GamesWall", HX1, HX1 + T, L.FRONT_D, GD1, CEIL, openingsOn("d", HX1), C.wallLow, "Plaster")
+	Shell.wallD(kit, w, "GamesWall", HX1, HX1 + T, L.FRONT_D, GD1, CEIL, openingsOn("d", HX1), C.wallHigh, "Plaster")
 	for _, id in { "games_arch", "games_side" } do
 		local o = L.opening(id)
 		kit:box(
@@ -652,7 +652,7 @@ local function walls(kit: any, root: any, data: any)
 		)
 	end
 	-- the wall between the front rooms and the concourse: doors, serving openings, the open lobby and lockers
-	Shell.wallX(kit, w, "FrontRoomsWall", L.X0, HX1, CD - T, CD, CEIL, openingsOn("x", CD), C.wallLow, "Plaster")
+	Shell.wallX(kit, w, "FrontRoomsWall", L.X0, HX1, CD - T, CD, CEIL, openingsOn("x", CD), C.wallHigh, "Plaster")
 	for _, o in L.OPENINGS do
 		if o.axis == "x" and o.at == CD then
 			kit:box(
@@ -670,7 +670,8 @@ local function walls(kit: any, root: any, data: any)
 			)
 		end
 	end
-	-- the front rooms' cross walls (the shoe desk's serving opening is in the one beside the lobby)
+	-- the front rooms' cross walls (the shoe desk's serving opening is in the one beside the lobby): light
+	-- plaster, so the lobby a newcomer walks into and the shops are bright rooms, not navy boxes
 	for _, x in fw do
 		Shell.wallD(
 			kit,
@@ -682,7 +683,7 @@ local function walls(kit: any, root: any, data: any)
 			CD - T,
 			CEIL,
 			openingsOn("d", x),
-			C.wallLow,
+			C.plaster,
 			"Plaster"
 		)
 	end
