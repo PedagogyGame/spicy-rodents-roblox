@@ -151,9 +151,9 @@ local VIEWS: { View } = {
 	{
 		name = "pb_17_lobby_window",
 		desc = "The lobby's east window, as a visitor sees the match: through reception and the hall's wide doorway, up the east concourse and across that side of the atrium's floor.",
-		feet = { 25.5, 0, 63.5 },
-		look = { 15, 3.5, 0 },
-		fov = 65,
+		feet = { 24, 0, 62.4 },
+		look = { 19.5, 4, 0 },
+		fov = 72,
 	},
 	{
 		name = "pb_22_desk_window",

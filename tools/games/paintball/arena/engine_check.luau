@@ -8,8 +8,14 @@
 --   3. the rays: RAYS segments from open points inside the volume, each asked of workspace:Raycast (the arena's
 --      model only) and of arena.sweep: the same hit or the same miss, the hit points within TOLERANCE studs and
 --      the same face. A ray that grazes an edge may differ; more than GRAZES of them fails the check.
+--   4. the paint: every mark of the plan is a label in a SurfaceGui named "Paint" on its box's part; the widest
+--      painted face's canvas is reported (numbers.paintCanvas, in pixels: the floors are the largest).
 -- NOT YET RUN in the engine: the session that wrote it (2026-11-13) had the cloud tools off limits. It does not
--- walk a body up the stairs: that wants a Humanoid and a player's eye, at the playtest.
+-- walk a body up the stairs: that wants a Humanoid and a player's eye, at the playtest. And one thing only an eye
+-- in the place can settle: which way round a Top face's SurfaceGui lies. The bake takes it as the review renders
+-- draw it (left to right along the part's X, top to bottom along its Z). Stand on the first floor's gallery and
+-- look down: the 7 on the atrium's floor is inside its square frame and the taped T behind each studio camera is
+-- behind it; if they are mirrored along z, PartList's rect for "+y" is the one line to change.
 -- Sent by: node tools/cloud/cloud.mjs run_engine_tests tools/games/paintball/arena/engine_check.luau --version <v> --place ci
 -- (a saved CI place built from ci.project.json with build/Attractions.rbxm baked in)
 
@@ -190,6 +196,24 @@ while cast < RAYS do
 		worst = math.max(worst, gap)
 	end
 end
+-- the paint
+local marks = #ArenaData.plan().marks
+local labels, paintCanvas = 0, 0
+for _, d in model:GetDescendants() do
+	if d:IsA("SurfaceGui") and d.Name == "Paint" then
+		labels += #d:GetChildren()
+		local face = d.Parent :: BasePart
+		paintCanvas =
+			math.max(paintCanvas, d.PixelsPerStud * math.max(face.Size.X, face.Size.Y, face.Size.Z))
+		if d.LightInfluence ~= 1 then
+			fail("paint is lit by the room")
+		end
+	end
+end
+if labels ~= marks then
+	fail(`{labels} painted labels for {marks} marks`)
+end
+
 if grazes > GRAZES then
 	fail(`{grazes} of {cast} rays disagree: over {GRAZES}`)
 elseif misplaced == 0 and #failures > 0 then
@@ -217,6 +241,8 @@ return {
 		boxes = n,
 		ramps = ramps,
 		monitors = monitors,
+		marks = labels,
+		paintCanvas = paintCanvas,
 		rays = cast,
 		hits = hits,
 		grazes = grazes,

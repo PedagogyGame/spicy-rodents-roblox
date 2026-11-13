@@ -601,5 +601,24 @@ return function(t)
 			"from inside the lobby's east window to the atrium floor"
 		)
 		t.truthy(sees({ x = -28, y = 0, z = Arena.HALF - 0.1 }, stand, { x = -13, y = 0, z = 7 }, stand))
+		-- and straight up the concourse each window is as wide as, to its far end the building's length away:
+		-- from anywhere along the glass
+		for _, side in { -1, 1 } do
+			for x = ArenaDataPlan.WINDOW[1] + 2, ArenaDataPlan.WINDOW[2] - 2, 2 do
+				t.truthy(
+					sees({ x = side * x, y = 0, z = Arena.HALF - 0.1 }, stand, { x = side * 23, y = 0, z = -28 }, stand),
+					`from the window at x = {side * x} up the concourse`
+				)
+			end
+		end
+		-- the glass is where the plan's WINDOW says, and it is glass from sill to head
+		for _, side in { -1, 1 } do
+			for _, x in { ArenaDataPlan.WINDOW[1] + 0.1, ArenaDataPlan.WINDOW[2] - 0.1 } do
+				for _, y in { ArenaDataPlan.WINDOW[3] + 0.1, ArenaDataPlan.WINDOW[4] - 0.1 } do
+					local _, _, _, _, index = arena.sweep(side * x, y, 50, side * x, y, 70)
+					t.eq(ArenaDataPlan.LOOKS[plan.looks[index]], "glass")
+				end
+			end
+		end
 	end)
 end

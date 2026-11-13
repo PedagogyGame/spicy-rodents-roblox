@@ -84,6 +84,10 @@ PartList.TONE = {
 	stain3 = { 124, 127, 123 },
 	stain4 = { 82, 92, 68 },
 	streak = { 100, 94, 86 },
+	-- a boarded window seen from inside: its frame, the dark glass, the boards across it
+	frame = { 164, 156, 140 },
+	pane = { 30, 36, 44 },
+	board = { 108, 84, 56 },
 }
 
 local LOOK: { [string]: { any } } = {

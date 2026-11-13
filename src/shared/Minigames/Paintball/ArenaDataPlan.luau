@@ -1436,6 +1436,31 @@ function Plan.build(): Plan
 				wallMark("+x", -half, z - 0.5, z + 0.5, c - ({ 4.4, 6, 3, 5.2, 3.6, 5.8 })[i], c, "streak")
 			end
 		end
+
+		-- THE WINDOWS, boarded up from the street (tools/games/paintball/arena/PartList nails the boards on outside):
+		-- the same windows from inside, on the outer walls: a frame, the dark glass, the boards across it. The
+		-- wall is whole: a ball stops on it as on any wall. None where the annex, the gate, the lobby's own
+		-- windows, the loading bays or a notice are.
+		local tag = 0
+		local function boarded(face: string, c: number, at: number, level: number)
+			tag += 1
+			local skew = ((tag * 7) % 5 - 2) * 0.25
+			local y0 = level * H
+			wallMark(face, c, at - 3.9, at + 3.9, y0 + 3.6, y0 + 9.9, "frame")
+			wallMark(face, c, at - 3.5, at + 3.5, y0 + 4, y0 + 9.5, "pane")
+			wallMark(face, c, at - 3.5, at + 3.5, y0 + 5 + skew, y0 + 6, "board")
+			wallMark(face, c, at - 3.5, at + 3.5, y0 + 7.4 - skew, y0 + 8.4, "board")
+		end
+		for level = 0, floors - 1 do
+			for _, at in { -44, -22, 0, 22, 44 } do
+				if level > 0 or math.abs(at) == 44 then
+					boarded("+z", -half, at, level)
+				end
+				if level > 0 or (at ~= 22 and at ~= 0) then
+					boarded("+x", -half, at, level)
+				end
+			end
+		end
 	end
 	return plan
 end
