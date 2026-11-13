@@ -6,8 +6,8 @@ Run tools/blender/neighbourhood_shop/export_shop.py first. For proof.fbx (the fi
 proved on a small piece first), shop.fbx and roof.fbx this runs
   node tools/cloud/cloud.mjs upload_asset <fbx> --type Model --name <name>
 (the CLI holds the shared cloud write lock and token buckets; the proxy injects the key, nothing here handles
-one) and keeps each result in <build>/uploads/<tag>.json with the FBX's hash, so a rerun only uploads what
-changed. Then it writes data/art/neighbourhood_shop.json: the asset ids and moderation states, and the
+one) and keeps each result in <build>/uploads/<tag>.json with a digest of what the Model holds (content_digest),
+so a rerun only uploads what changed. Then it writes data/art/neighbourhood_shop.json: the asset ids and moderation states, and the
 manifest the bake (tools/bake/neighbourhood_shop.luau) and the loader (Server/Assets/ShopArt) read.
 """
 import argparse
@@ -30,17 +30,25 @@ UPLOADS = [
 ]
 
 
-def sha(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        h.update(fh.read())
-    return h.hexdigest()[:16]
+PIECES = {"proof": "shop", "shop": "shop", "roof": "roofMeshes"}
 
 
-def upload(build, tag, fbx, name, desc, skip):
+def content_digest(manifest, tag):
+    """What a Model holds, as the manifest records it (the FBX bytes carry export timestamps, so the file's own
+    hash changes on every export): its meshes (names, places, sizes, triangles, materials, colours), the
+    sources' checksums, the scale and the roof's fitting."""
+    meshes = manifest[PIECES[tag]]
+    if tag == "proof":
+        meshes = [m for m in meshes if m["name"].startswith("CAFE_Stool_")]
+    blob = json.dumps({"meshes": meshes, "sources": manifest["sources"], "scale": manifest["scale"],
+                       "roof": {k: manifest["roof"][k] for k in ("span", "run", "turn")} if tag == "roof" else None},
+                      sort_keys=True)
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def upload(build, tag, fbx, name, desc, skip, digest):
     rec_path = os.path.join(build, "uploads", f"{tag}.json")
     path = os.path.join(build, fbx)
-    digest = sha(path)
     if os.path.exists(rec_path):
         with open(rec_path) as fh:
             old = json.load(fh)
@@ -76,7 +84,7 @@ def main():
         manifest = json.load(fh)
     assets = {}
     for tag, fbx, name, desc in UPLOADS:
-        res = upload(build, tag, fbx, name, desc, a.skip_upload)
+        res = upload(build, tag, fbx, name, desc, a.skip_upload, content_digest(manifest, tag))
         assets[tag] = {
             "assetId": res.get("assetId"),
             "moderation": res.get("moderationState"),

@@ -265,6 +265,34 @@ def oriented_box(o):
     }
 
 
+def vertex_colours_to_materials(objs):
+    """His roof is coloured per vertex (one colour per mesh). The engine's importer may or may not keep vertex
+    colours, and a MeshPart's Color may multiply them, so each mesh's colour moves into its material's base
+    colour (the very same colour) and the colour attribute is dropped: the loader can then paint it exactly."""
+    moved = 0
+    for o in objs:
+        me = o.data
+        if not me.color_attributes:
+            continue
+        a = me.color_attributes[0]
+        n = len(a.data)
+        lin = [sum(d.color[i] for d in a.data) / n for i in range(3)]
+        for mat in me.materials:
+            if not mat or not mat.node_tree:
+                continue
+            bsdf = next((x for x in mat.node_tree.nodes if x.type == "BSDF_PRINCIPLED"), None)
+            if bsdf is None:
+                continue
+            s = bsdf.inputs["Base Color"]
+            for link in list(s.links):
+                mat.node_tree.links.remove(link)
+            s.default_value = (lin[0], lin[1], lin[2], 1.0)
+        while me.color_attributes:
+            me.color_attributes.remove(me.color_attributes[0])
+        moved += 1
+    return moved
+
+
 def roof_matrix():
     rot = Matrix.Rotation(-math.pi / 2, 4, "Z")  # run (Blender y) -> Blender x; the chimney onto the back slope
     s = SCALE
@@ -318,6 +346,7 @@ def main():
     reset()
     roof = import_glb(ROOF_GLB)
     bake_transforms(roof, roof_matrix())
+    vertex_colours_to_materials(roof)
     roof_meshes = mesh_records(roof)
     lo = Vector((min(bounds(o)[0].x for o in roof), min(bounds(o)[0].y for o in roof), min(bounds(o)[0].z for o in roof)))
     hi = Vector((max(bounds(o)[1].x for o in roof), max(bounds(o)[1].y for o in roof), max(bounds(o)[1].z for o in roof)))

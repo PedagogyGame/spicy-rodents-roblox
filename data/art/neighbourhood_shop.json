@@ -8,21 +8,21 @@
    "moderation": "Approved",
    "displayName": "SR shop proof cafe stools",
    "fbxBytes": 101948,
-   "sha": "900ee378c59a2e27"
+   "sha": "d1c0ab8f02814df9"
   },
   "shop": {
    "assetId": "123466732493677",
    "moderation": "Approved",
    "displayName": "SR The Neighbourhood Shop interior",
    "fbxBytes": 6577244,
-   "sha": "5e93e3d3f015a6b6"
+   "sha": "511747b3243bce03"
   },
   "roof": {
-   "assetId": "129861597929647",
+   "assetId": "95196494982380",
    "moderation": "Approved",
    "displayName": "SR Neighbourhood Shop gable roof",
-   "fbxBytes": 362668,
-   "sha": "1dff9840e9a85506"
+   "fbxBytes": 324236,
+   "sha": "01f28f672bd0aac5"
   }
  },
  "units": "studs; the venue frame at yaw 0 (X across, Y up, Z = -D), origin at the centre of the shop floor",
@@ -8179,9 +8179,9 @@
    "tris": 12,
    "material": "DefaultMaterial.001",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8199,9 +8199,9 @@
    "tris": 12,
    "material": "DefaultMaterial.002",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8219,9 +8219,9 @@
    "tris": 12,
    "material": "DefaultMaterial.003",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8239,9 +8239,9 @@
    "tris": 12,
    "material": "DefaultMaterial.004",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8259,9 +8259,9 @@
    "tris": 12,
    "material": "DefaultMaterial.005",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8279,9 +8279,9 @@
    "tris": 12,
    "material": "DefaultMaterial.006",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8299,9 +8299,9 @@
    "tris": 12,
    "material": "DefaultMaterial.007",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8319,9 +8319,9 @@
    "tris": 12,
    "material": "DefaultMaterial.008",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8339,9 +8339,9 @@
    "tris": 12,
    "material": "DefaultMaterial.009",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8359,9 +8359,9 @@
    "tris": 12,
    "material": "DefaultMaterial.010",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8379,9 +8379,9 @@
    "tris": 12,
    "material": "DefaultMaterial.011",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8399,9 +8399,9 @@
    "tris": 12,
    "material": "DefaultMaterial.012",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8419,9 +8419,9 @@
    "tris": 12,
    "material": "DefaultMaterial.013",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8439,9 +8439,9 @@
    "tris": 12,
    "material": "DefaultMaterial.014",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8459,9 +8459,9 @@
    "tris": 12,
    "material": "DefaultMaterial.015",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8479,9 +8479,9 @@
    "tris": 12,
    "material": "DefaultMaterial.016",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8499,9 +8499,9 @@
    "tris": 12,
    "material": "DefaultMaterial.017",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8519,9 +8519,9 @@
    "tris": 12,
    "material": "DefaultMaterial.018",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8539,9 +8539,9 @@
    "tris": 12,
    "material": "DefaultMaterial.019",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8559,9 +8559,9 @@
    "tris": 12,
    "material": "DefaultMaterial.020",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8579,9 +8579,9 @@
    "tris": 12,
    "material": "DefaultMaterial.021",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8599,9 +8599,9 @@
    "tris": 12,
    "material": "DefaultMaterial.022",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8619,9 +8619,9 @@
    "tris": 12,
    "material": "DefaultMaterial.041",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8639,9 +8639,9 @@
    "tris": 12,
    "material": "DefaultMaterial.042",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8659,9 +8659,9 @@
    "tris": 12,
    "material": "DefaultMaterial.043",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8679,9 +8679,9 @@
    "tris": 12,
    "material": "DefaultMaterial.044",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8699,9 +8699,9 @@
    "tris": 12,
    "material": "DefaultMaterial.045",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8719,9 +8719,9 @@
    "tris": 12,
    "material": "DefaultMaterial.046",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8739,9 +8739,9 @@
    "tris": 12,
    "material": "DefaultMaterial.047",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8759,9 +8759,9 @@
    "tris": 12,
    "material": "DefaultMaterial.048",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8779,9 +8779,9 @@
    "tris": 12,
    "material": "DefaultMaterial.049",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8799,9 +8799,9 @@
    "tris": 12,
    "material": "DefaultMaterial.050",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8819,9 +8819,9 @@
    "tris": 12,
    "material": "DefaultMaterial.051",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8839,9 +8839,9 @@
    "tris": 12,
    "material": "DefaultMaterial.052",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8859,9 +8859,9 @@
    "tris": 12,
    "material": "DefaultMaterial.053",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8879,9 +8879,9 @@
    "tris": 12,
    "material": "DefaultMaterial.054",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8899,9 +8899,9 @@
    "tris": 12,
    "material": "DefaultMaterial.055",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8919,9 +8919,9 @@
    "tris": 12,
    "material": "DefaultMaterial.056",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8939,9 +8939,9 @@
    "tris": 12,
    "material": "DefaultMaterial.057",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -8959,9 +8959,9 @@
    "tris": 12,
    "material": "DefaultMaterial.058",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -8979,9 +8979,9 @@
    "tris": 12,
    "material": "DefaultMaterial.059",
    "colour": [
-    231,
-    231,
-    231
+    140,
+    148,
+    153
    ]
   },
   {
@@ -8999,9 +8999,9 @@
    "tris": 12,
    "material": "DefaultMaterial.060",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -9019,9 +9019,9 @@
    "tris": 12,
    "material": "DefaultMaterial.061",
    "colour": [
-    231,
-    231,
-    231
+    173,
+    179,
+    183
    ]
   },
   {
@@ -9039,9 +9039,9 @@
    "tris": 12,
    "material": "DefaultMaterial.062",
    "colour": [
-    231,
-    231,
-    231
+    159,
+    165,
+    173
    ]
   },
   {
@@ -9059,9 +9059,9 @@
    "tris": 12,
    "material": "DefaultMaterial.081",
    "colour": [
-    231,
-    231,
-    231
+    197,
+    165,
+    149
    ]
   },
   {
@@ -9079,9 +9079,9 @@
    "tris": 12,
    "material": "DefaultMaterial.082",
    "colour": [
-    231,
-    231,
-    231
+    234,
+    229,
+    218
    ]
   },
   {
@@ -9099,9 +9099,9 @@
    "tris": 12,
    "material": "DefaultMaterial.083",
    "colour": [
-    231,
-    231,
-    231
+    138,
+    139,
+    142
    ]
   },
   {
@@ -9119,9 +9119,9 @@
    "tris": 12,
    "material": "DefaultMaterial.084",
    "colour": [
-    231,
-    231,
-    231
+    234,
+    229,
+    218
    ]
   },
   {
@@ -9139,9 +9139,9 @@
    "tris": 12,
    "material": "DefaultMaterial.085",
    "colour": [
-    231,
-    231,
-    231
+    234,
+    229,
+    218
    ]
   },
   {
@@ -9159,9 +9159,9 @@
    "tris": 12,
    "material": "DefaultMaterial.086",
    "colour": [
-    231,
-    231,
-    231
+    234,
+    229,
+    218
    ]
   },
   {
@@ -9179,9 +9179,9 @@
    "tris": 12,
    "material": "DefaultMaterial.087",
    "colour": [
-    231,
-    231,
-    231
+    234,
+    229,
+    218
    ]
   },
   {
@@ -9199,9 +9199,9 @@
    "tris": 12,
    "material": "DefaultMaterial.088",
    "colour": [
-    231,
-    231,
-    231
+    234,
+    229,
+    218
    ]
   },
   {
@@ -9219,9 +9219,9 @@
    "tris": 12,
    "material": "DefaultMaterial.089",
    "colour": [
-    231,
-    231,
-    231
+    234,
+    229,
+    218
    ]
   },
   {
@@ -9239,9 +9239,9 @@
    "tris": 12,
    "material": "DefaultMaterial.023",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9259,9 +9259,9 @@
    "tris": 12,
    "material": "DefaultMaterial.063",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9279,9 +9279,9 @@
    "tris": 12,
    "material": "DefaultMaterial.024",
    "colour": [
-    231,
-    231,
-    231
+    162,
+    173,
+    175
    ]
   },
   {
@@ -9299,9 +9299,9 @@
    "tris": 12,
    "material": "DefaultMaterial.064",
    "colour": [
-    231,
-    231,
-    231
+    162,
+    173,
+    175
    ]
   },
   {
@@ -9319,9 +9319,9 @@
    "tris": 12,
    "material": "DefaultMaterial.025",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9339,9 +9339,9 @@
    "tris": 12,
    "material": "DefaultMaterial.026",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9359,9 +9359,9 @@
    "tris": 12,
    "material": "DefaultMaterial.027",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9379,9 +9379,9 @@
    "tris": 12,
    "material": "DefaultMaterial.028",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9399,9 +9399,9 @@
    "tris": 12,
    "material": "DefaultMaterial.029",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9419,9 +9419,9 @@
    "tris": 12,
    "material": "DefaultMaterial.030",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9439,9 +9439,9 @@
    "tris": 12,
    "material": "DefaultMaterial.031",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9459,9 +9459,9 @@
    "tris": 12,
    "material": "DefaultMaterial.032",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9479,9 +9479,9 @@
    "tris": 12,
    "material": "DefaultMaterial.033",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9499,9 +9499,9 @@
    "tris": 12,
    "material": "DefaultMaterial.034",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9519,9 +9519,9 @@
    "tris": 12,
    "material": "DefaultMaterial.035",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9539,9 +9539,9 @@
    "tris": 12,
    "material": "DefaultMaterial.036",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9559,9 +9559,9 @@
    "tris": 12,
    "material": "DefaultMaterial.037",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9579,9 +9579,9 @@
    "tris": 12,
    "material": "DefaultMaterial.038",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9599,9 +9599,9 @@
    "tris": 12,
    "material": "DefaultMaterial.039",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9619,9 +9619,9 @@
    "tris": 12,
    "material": "DefaultMaterial.065",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9639,9 +9639,9 @@
    "tris": 12,
    "material": "DefaultMaterial.066",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9659,9 +9659,9 @@
    "tris": 12,
    "material": "DefaultMaterial.067",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9679,9 +9679,9 @@
    "tris": 12,
    "material": "DefaultMaterial.068",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9699,9 +9699,9 @@
    "tris": 12,
    "material": "DefaultMaterial.069",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9719,9 +9719,9 @@
    "tris": 12,
    "material": "DefaultMaterial.070",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9739,9 +9739,9 @@
    "tris": 12,
    "material": "DefaultMaterial.071",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9759,9 +9759,9 @@
    "tris": 12,
    "material": "DefaultMaterial.072",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9779,9 +9779,9 @@
    "tris": 12,
    "material": "DefaultMaterial.073",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9799,9 +9799,9 @@
    "tris": 12,
    "material": "DefaultMaterial.074",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9819,9 +9819,9 @@
    "tris": 12,
    "material": "DefaultMaterial.075",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9839,9 +9839,9 @@
    "tris": 12,
    "material": "DefaultMaterial.076",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9859,9 +9859,9 @@
    "tris": 12,
    "material": "DefaultMaterial.077",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9879,9 +9879,9 @@
    "tris": 12,
    "material": "DefaultMaterial.078",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9899,9 +9899,9 @@
    "tris": 12,
    "material": "DefaultMaterial.079",
    "colour": [
-    231,
-    231,
-    231
+    216,
+    192,
+    157
    ]
   },
   {
@@ -9919,9 +9919,9 @@
    "tris": 12,
    "material": "DefaultMaterial.080",
    "colour": [
-    231,
-    231,
-    231
+    138,
+    139,
+    142
    ]
   },
   {
@@ -9939,9 +9939,9 @@
    "tris": 12,
    "material": "DefaultMaterial.040",
    "colour": [
-    231,
-    231,
-    231
+    160,
+    134,
+    108
    ]
   },
   {
@@ -9959,9 +9959,9 @@
    "tris": 12,
    "material": "DefaultMaterial",
    "colour": [
-    231,
-    231,
-    231
+    160,
+    134,
+    108
    ]
   }
  ]
