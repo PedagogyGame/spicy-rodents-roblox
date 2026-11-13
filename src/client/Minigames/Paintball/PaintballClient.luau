@@ -4,21 +4,10 @@
 -- paintball's ClientGame in the minigame framework (Client/Minigames/Games/Paintball hands the
 -- framework's `watch` and `new` to this module): first person, the marker, firing and reloading with
 -- a predicted ball, sprint and crouch, the HUD, the other bodies, balls and splats, the sounds.
--- OWNED BY THE CLIENT LANE, with the whole of Client/Minigames/Paintball/. `watch`, `new`, `link`
--- and the methods keep the names and signatures of the contract's stub. It does not edit Camera/,
--- Controllers/, Input/, Possession/, UI/ or the framework (MinigameClient, ClientGame, MinigameUI).
--- THE FILES OF THIS FOLDER
---   Tuning     the one table of the client's feel numbers, each with what it does to the hands
---   ShowCore   the show, headless: puppets, balls, the two splat pools, cues, the predicted ball
---   SeatCore   the seat, headless: the gates and the held click, the magazine, sprint and crouch,
---              the pose stream, placements, tagged out and back
---   World      the show drawn (puppets, balls, splats; the real bodies hidden; the cues played)
---   Self       the player's own body: its pose, the eye, the lock, placements, the curtains
---   Marker     the marker in view
---   Hud        the crosshair, the pips, the clock and scores, the feed, the scoreboard, touch buttons
---   Controls   keyboard and mouse, gamepad, touch: each device's keys into Seat.input
---   this file  joins them: one show on a screen, one seat, ONE render step that runs the show, then
---              the seat, then draws (so the seat's ball is tested against this frame's puppets)
+-- OWNED BY THE CLIENT LANE, with the whole of Client/Minigames/Paintball/. THIS IS A STUB: `watch`,
+-- `new`, `link` and the methods keep their names and signatures; the lane writes the bodies and adds
+-- its own files in this folder. It does not edit Camera/, Controllers/, Input/, Possession/, UI/ or
+-- the framework (MinigameClient, ClientGame, MinigameUI).
 --
 -- TWO PARTS, because a player in the lobby watches a match they are not in.
 --   THE SHOW   what anyone in the audience sees: every slot as a puppet, the balls, the splats, the
@@ -30,8 +19,7 @@
 --              pose and the click, predicts, draws the marker and the HUD.
 -- THE CORE IS HEADLESS: both parts are state machines fed by messages, stream buffers and the
 -- player's actions, with the clock, the Link and everything on screen injected (Deps), so the lane
--- proves them under Lune; what touches Instances sits behind `screen` (Deps.screen: nil is the real
--- screen wherever there is an engine and none under bare Lune; false is headless everywhere).
+-- proves them under Lune; what touches Instances sits behind `screen`.
 -- THE FEEL: every number of Contract.FEEL the client uses (the ball's speed and drop, the fire
 -- interval, the reload, the sprint multiple, the crouch time) is THIS MATCH'S, from "paintball_watch"
 -- (show.feel) and the Extras of "state" (seat.feel); never Contract.FEEL or Shared/Paintball/Config.
@@ -175,86 +163,72 @@
 local Import = require("../../Import")
 local ArenaData: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.ArenaData)) =
 	Import.shared("Minigames/Paintball/ArenaData")
+local Clock: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Clock)) =
+	Import.shared("Minigames/Paintball/Clock")
+local Contract: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
+	Import.shared("Minigames/Paintball/Contract")
+local Magazine: typeof(require(game.ReplicatedStorage.Shared.Paintball.Magazine)) = Import.shared("Paintball/Magazine")
 local ClientGame = require("../ClientGame")
-local Controls = require("./Controls")
-local Hud = require("./Hud")
-local Marker = require("./Marker")
-local SeatCore = require("./SeatCore")
-local SelfPort = require("./Self")
-local ShowCore = require("./ShowCore")
-local Tuning = require("./Tuning")
-local World = require("./World")
 
 type Arena = typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena).T.Arena)
+type Feel = typeof(Contract.T.Feel)
+type Mag = typeof(Magazine.new(1, 1, 1))
+type View = typeof(Clock.newView())
 
 -- The client's link to paintball's own remotes (Wire.REMOTES).
 --   send    a buffer up: "Paintball.Move" (Wire.Move), "Paintball.Fire" (Wire.Fire)
 --   listen  hear a buffer coming down: "Paintball.Snap", "Paintball.Shot", "Splat"; returns the undo
-export type Link = SeatCore.Link
+export type Link = {
+	send: (remote: string, payload: buffer) -> (),
+	listen: (remote: string, fn: (payload: any) -> ()) -> () -> (),
+}
 
 -- What the player can do (see THE CONTROLS). "crouch", "sprint" and "scores" are states; the rest
 -- are presses.
-export type Action = SeatCore.Action
+export type Action = "fire" | "reload" | "crouch" | "sprint" | "scores" | "leave" | "side"
 
 export type Deps = {
 	now: (() -> number)?, -- the shared clock; default workspace:GetServerTimeNow() (ClientGame.Ctx.stamp)
 	link: Link?, -- default link(); nil: nothing is sent and no stream is heard
 	arena: Arena?, -- default ArenaData.build()
-	-- everything that touches Instances: nil = the real screen where there is an engine (none under
-	-- bare Lune); false = headless; a SeatCore.Port = a spec's own stand-in for the player's body
-	screen: any?,
-	tuning: typeof(Tuning.T)?, -- default Tuning
+	screen: any?, -- the lane's own port to everything that touches Instances; nil = headless
 }
 
--- The show: the match as anyone in the audience sees it (ShowCore.Show: arena, match, feel, place,
--- view, onWatch, onSnap, onShots, onSplats, step, stop, and what it draws).
-export type Show = ShowCore.Show
+-- The show: the match as anyone in the audience sees it.
+export type Show = {
+	arena: Arena,
+	match: number, -- the match being shown; 0 before the first "paintball_watch"
+	feel: Feel, -- that match's feel (from "paintball_watch")
+	place: ClientGame.Place?, -- the site's place, as the framework told it
+	view: View,
+	onWatch: (self: Show, msg: { [string]: any }, place: ClientGame.Place?) -> (),
+	onSnap: (self: Show, payload: any) -> (), -- a Paintball.Snap buffer (Wire.decodeSnap)
+	onShots: (self: Show, payload: any) -> (), -- a Paintball.Shot buffer (Wire.unpack(Wire.Shot, payload))
+	onSplats: (self: Show, payload: any) -> (), -- a Splat buffer (Wire.unpack(Wire.Splat, payload))
+	step: (self: Show, dt: number) -> (),
+	stop: (self: Show) -> (),
+}
 
--- The seat: the framework's controller for a player in the match, and what the input code drives
--- (SeatCore.Seat: ctx, you, feel, mag, shot, place, onState, onMessage, onRefused, input, step, stop).
-export type Seat = SeatCore.Seat
+-- The seat: the framework's controller for a player in the match (a ClientGame.Controller), and what
+-- the lane's own input code drives.
+export type Seat = {
+	ctx: ClientGame.Ctx,
+	you: number, -- this player's slot id; 0 until the first "state"
+	feel: Feel, -- this match's feel (from the Extras of "state")
+	mag: Mag, -- the predicted magazine
+	shot: number, -- the counter sent with the last Fire (0: none yet)
+	place: number, -- the number of the last placement obeyed (0: none yet); every Move carries it
+	onState: (self: Seat, msg: { [string]: any }) -> (), -- the framework's "state": view.game, Extras
+	onMessage: (self: Seat, msg: { [string]: any }, watched: any?) -> (), -- paintball's kinds (Wire.KINDS)
+	onRefused: (self: Seat, msg: { [string]: any }) -> (),
+	input: (self: Seat, action: Action, down: boolean) -> (),
+	step: (self: Seat, dt: number) -> (), -- one frame
+	stop: (self: Seat) -> (),
+}
 
 local PaintballClient = {}
 
-local RENDER_STEP = "SpicyPaintball"
-
--- What is on this screen. One show and one seat at most; `engine` is the `game` they were made
--- under (a fresh fake engine in the next spec case finds nothing left over from the last).
-type Stage = {
-	engine: any,
-	show: Show?,
-	world: World.World?,
-	undo: { () -> () }, -- the show's stream listeners
-	watched: boolean, -- the server has said "paintball_watch" (not a show the seat made for itself)
-	seat: Seat?,
-	parts: { { step: (self: any, dt: number) -> () } }, -- the seat's own drawers, in the order they run
-	bound: boolean,
-}
-
-local function empty(): Stage
-	return {
-		engine = if game ~= nil then game else nil,
-		show = nil,
-		world = nil,
-		undo = {},
-		watched = false,
-		seat = nil,
-		parts = {},
-		bound = false,
-	}
-end
-
-local stage: Stage = empty()
-
-local function hasEngine(): boolean
-	return game ~= nil and workspace ~= nil
-end
-
-local function fresh()
-	if stage.engine ~= game then
-		stage = empty()
-	end
-end
+local current: Show? = nil
 
 -- The Link onto the engine's remotes (the folder ReplicatedStorage.Net that the server's Shared/Net
 -- makes; tests/lib/PaintballRig puts fakes there). Nil where paintball's remotes are not to be found:
@@ -284,224 +258,90 @@ function PaintballClient.link(): Link?
 	}
 end
 
-local function defaultNow(): number
-	return workspace:GetServerTimeNow()
-end
+local function newShow(deps: Deps): Show
+	local show = {
+		arena = deps.arena or ArenaData.build(),
+		match = 0,
+		feel = Contract.feel(),
+		place = nil,
+		view = Clock.newView(),
+	} :: Show
 
--- ONE render step for everything of paintball's on this screen: the show first (this frame's
--- puppets), then the seat (its ball is tested against them), then what is drawn.
-local function frame(dt: number)
-	local show, seat = stage.show, stage.seat
-	if show then
-		show:step(dt)
+	function show.onWatch(self: Show, msg: { [string]: any }, place: ClientGame.Place?)
+		self.place = place
+		if type(msg.match) == "number" then
+			self.match = msg.match
+		end
+		if type(msg.feel) == "table" then
+			self.feel = Contract.feel(msg.feel)
+		end
 	end
-	if seat then
-		seat:step(dt)
-	end
-	for _, piece in stage.parts do
-		piece:step(dt)
-	end
-	local world = stage.world
-	if world then
-		world:step(dt)
-	end
-end
 
-local function bind()
-	local want = stage.show ~= nil or stage.seat ~= nil
-	if not hasEngine() or want == stage.bound then
-		return
-	end
-	stage.bound = want
-	local RunService = game:GetService("RunService")
-	if want then
-		-- (after the camera has moved for the frame: the marker hangs off where the camera IS)
-		RunService:BindToRenderStep(RENDER_STEP, Enum.RenderPriority.Camera.Value + 5, frame)
-	else
-		RunService:UnbindFromRenderStep(RENDER_STEP)
-	end
-end
+	function show.onSnap(_self: Show, _payload: any) end
 
-local function openShow(deps: Deps): Show
-	local now = deps.now or defaultNow
-	local show = ShowCore.new({ arena = deps.arena or ArenaData.build(), now = now, tuning = deps.tuning or Tuning })
-	stage.show = show
-	local link = deps.link
-	if link == nil and hasEngine() then
-		link = PaintballClient.link()
-	end
-	if link then
-		table.insert(
-			stage.undo,
-			link.listen("Paintball.Snap", function(payload: any)
-				show:onSnap(payload)
-			end)
-		)
-		table.insert(
-			stage.undo,
-			link.listen("Paintball.Shot", function(payload: any)
-				show:onShots(payload)
-			end)
-		)
-		table.insert(
-			stage.undo,
-			link.listen("Splat", function(payload: any)
-				show:onSplats(payload)
-			end)
-		)
-	end
-	if deps.screen == nil and hasEngine() then
-		stage.world = World.new(show, deps.tuning)
-	end
-	local seat = stage.seat
-	if seat then
-		show.you = seat.you
-	end
-	bind()
+	function show.onShots(_self: Show, _payload: any) end
+
+	function show.onSplats(_self: Show, _payload: any) end
+
+	function show.step(_self: Show, _dt: number) end
+
+	function show.stop(_self: Show) end
+
 	return show
-end
-
-local function closeShow()
-	local show = stage.show
-	if show == nil then
-		return
-	end
-	for _, undo in stage.undo do
-		undo()
-	end
-	table.clear(stage.undo)
-	local world = stage.world
-	stage.world = nil
-	if world then
-		world:stop()
-	end
-	stage.show = nil
-	stage.watched = false
-	show:stop()
-	bind()
 end
 
 -- The show on this screen, if one is on.
 function PaintballClient.show(): Show?
-	fresh()
-	return stage.show
-end
-
--- The seat on this screen, if the player is in the match.
-function PaintballClient.seat(): Seat?
-	fresh()
-	return stage.seat
+	return current
 end
 
 -- The framework's `watch`: called for "paintball_watch" and "paintball_unwatch" whether or not the
 -- player is seated. Returns the show (nil once it has ended); the framework hands that to the
 -- seat's onMessage as `watched`.
 function PaintballClient.watch(msg: { [string]: any }, place: ClientGame.Place?, deps: Deps?): Show?
-	fresh()
 	if msg.kind == "paintball_unwatch" then
-		stage.watched = false
-		if stage.seat ~= nil then
-			-- (a seat keeps its show until it closes: its own ball and splats live there)
-			return stage.show
+		local ended = current
+		current = nil
+		if ended then
+			ended:stop()
 		end
-		closeShow()
 		return nil
 	end
-	local show: Show = stage.show or openShow(deps or {})
-	stage.watched = true
+	local show: Show = current or newShow(deps or {})
+	current = show
 	show:onWatch(msg, place)
 	return show
 end
 
 -- The framework's `new`: the controller for a seat in the match.
-function PaintballClient.new(ctx: ClientGame.Ctx, deps: Deps?): Seat
-	fresh()
-	local d: Deps = deps or {}
-	local now = d.now or ctx.stamp
-	-- a player in the match always has a show (the server's "paintball_watch" is on its way)
-	local show: Show = stage.show or openShow(d)
-	if ctx.place ~= nil and show.frame == nil then
-		show:onWatch({}, ctx.place)
-	end
-	local real = d.screen == nil and hasEngine()
-	local port: SelfPort.Self? = nil
-	if real then
-		port = SelfPort.new(ctx, function()
-			local on = stage.show
-			return if on then on.frame else nil
-		end, d.tuning)
-	end
-	local link = d.link
-	if link == nil and hasEngine() then
-		link = PaintballClient.link()
-	end
-	local seat = SeatCore.new(ctx, {
-		now = now,
-		link = link,
-		arena = show.arena,
-		port = port or (if type(d.screen) == "table" then d.screen else nil),
-		show = function(): Show?
-			return stage.show
-		end,
-		tuning = d.tuning,
-	})
-	stage.seat = seat
-	local closers: { () -> () } = {}
-	if port then
-		local body = port
-		local marker = Marker.new(seat, body, d.tuning)
-		local hud = Hud.new(seat, ctx, d.tuning)
-		local controls = Controls.new(seat, hud, body, d.tuning)
-		-- the keys' states first, the body's own easing, then what is drawn from the seat
-		stage.parts = {
-			controls,
-			{
-				step = function(_self: any, dt: number)
-					body.step(dt)
-				end,
-			},
-			marker,
-			hud,
-		}
-		closers = {
-			function()
-				controls:stop()
-			end,
-			function()
-				marker:stop()
-			end,
-			function()
-				hud:stop()
-			end,
-		}
-	end
-	-- stop(): the framework's, however the game closes. Everything of the seat's goes; the show stays
-	-- for as long as the server keeps this screen in the audience.
-	local stopCore = seat.stop
-	local stopped = false
-	seat.stop = function(self: Seat)
-		if stopped then
-			return
-		end
-		stopped = true
-		for _, close in closers do
-			close()
-		end
-		stopCore(self)
-		if stage.seat == self then
-			stage.seat = nil
-			stage.parts = {}
-			local on = stage.show
-			if on then
-				on.you = 0
-				if not stage.watched then
-					closeShow()
-				end
-			end
-			bind()
+function PaintballClient.new(ctx: ClientGame.Ctx, _deps: Deps?): Seat
+	local R = Contract.Rules
+	local feel = Contract.feel()
+	local seat = {
+		ctx = ctx,
+		you = 0,
+		feel = feel,
+		mag = Magazine.new(R.magazine, feel.fireInterval, feel.reloadSecs),
+		shot = 0,
+		place = 0,
+	} :: Seat
+
+	function seat.onState(self: Seat, msg: { [string]: any })
+		if type(msg.you) == "number" then
+			self.you = msg.you
 		end
 	end
-	bind()
+
+	function seat.onMessage(_self: Seat, _msg: { [string]: any }, _watched: any?) end
+
+	function seat.onRefused(_self: Seat, _msg: { [string]: any }) end
+
+	function seat.input(_self: Seat, _action: Action, _down: boolean) end
+
+	function seat.step(_self: Seat, _dt: number) end
+
+	function seat.stop(_self: Seat) end
+
 	return seat
 end
 
