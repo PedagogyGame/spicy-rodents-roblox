@@ -1,0 +1,160 @@
+{
+ "about": "The sky lift joined (lane 6): build/Expansion_F4.rbxm through tools/review/attractions_export (six cabins posed at SKYLIFT_T = 40 s). lune run tools/bake/skylift.luau; lune run tools/review/export.luau; then render.py --views docs/renders/skylift/joined_views.json.",
+ "defaults": {
+  "res": "960x540",
+  "samples": 20
+ },
+ "sun": {
+  "angleDeg": 1.5,
+  "color": [
+   1,
+   0.86,
+   0.68
+  ],
+  "dir": [
+   0.7,
+   0.55,
+   -0.45
+  ],
+  "skyStrength": 1,
+  "strength": 3.6
+ },
+ "views": [
+  {
+   "aboveGround": false,
+   "fov": 70,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ],
+   "look": [
+    -1089.9223731279246,
+    120,
+    -1691.8284804203179
+   ],
+   "name": "j_summit_hall",
+   "pos": [
+    -1044.5650498436241,
+    123.1,
+    -1675.276645945449
+   ],
+   "desc": "The summit hall with the Lookout built round the lift platforms, cabin 6 in the hall (t 40)"
+  },
+  {
+   "name": "j_hall_from_cabin",
+   "desc": "From a cabin door in the summit hall: platforms, gate, welcome board and the door to the dining room",
+   "pos": [
+    -1071.0,
+    122.6,
+    -1692.1
+   ],
+   "look": [
+    -1055.4,
+    120.8,
+    -1688.8
+   ],
+   "fov": 75,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ]
+  },
+  {
+   "aboveGround": false,
+   "fov": 70,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ],
+   "look": [
+    -782.1449254123024,
+    10.9,
+    -926.1480469943973
+   ],
+   "name": "j_station_platform",
+   "pos": [
+    -760.8825634110348,
+    12.3,
+    -890.0764243232858
+   ],
+   "desc": "The base platform with cabin 3 boarding (t 40), the gate and the next-cabin board"
+  },
+  {
+   "aboveGround": true,
+   "fov": 55,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ],
+   "look": [
+    -1027.48,
+    114.74,
+    -1593.29
+   ],
+   "name": "j_line_from_base",
+   "pos": [
+    -771.8136991150117,
+    5.5,
+    -942.3426684223336
+   ],
+   "desc": "The line from the base: six cabins posed by the review export (t 40)"
+  },
+  {
+   "aboveGround": false,
+   "fov": 60,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ],
+   "look": [
+    -1000,
+    60,
+    -1500
+   ],
+   "name": "j_air_hill",
+   "pos": [
+    -650,
+    220,
+    -700
+   ],
+   "desc": "The hill from the air: towers, cabins, trail and the Lookout on the crown"
+  },
+  {
+   "name": "j_cabin5_view",
+   "desc": "Riding down: cabin 5 seat 1 near the summit, looking down the line at the town (the second vantage)",
+   "pos": [
+    -1027.74,
+    111.66,
+    -1583.47
+   ],
+   "look": [
+    -1017.4,
+    108.2,
+    -1555.3
+   ],
+   "fov": 75,
+   "groups": [
+    "town",
+    "terrain",
+    "attractions",
+    "backdrop",
+    "backdrop_terrain"
+   ]
+  }
+ ]
+}

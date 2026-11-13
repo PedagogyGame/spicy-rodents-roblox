@@ -23,3 +23,21 @@ These already fire at the right moments in the game and are silent. Fill the ass
 | `sweep` | not fired yet (the pinsetter is drawn by the server) | a machine clank and whirr, about 2.5 s |
 
 Eight sounds if each is uploaded; fewer if library sounds fit.
+
+### Sky lift and the Lookout (branch `feat/skylift`; nothing uploaded, nothing synthesised)
+The server makes these as Sound instances with empty ids (`src/server/Rides/SkyLiftService.luau`, table `CUES`):
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `SkyLift.StationBell` | on each gate post, when a cabin's doors open there | a single soft station chime |
+| `SkyLift.CounterBell` | on the Lookout's counter, when a lunch is served | a small service bell |
+| `SkyLift.TelescopeClick` | on the telescope, when someone looks through it | a coin-viewer click |
+
+Named but not placed yet (no Sound instance exists; the natural trigger is given):
+| Cue | Trigger | Wanted |
+|---|---|---|
+| `SkyLift.CableHum` | looped in the rider's cabin (Client/Rides/SkyLiftView) | a low steady hum of rope and wheels |
+| `SkyLift.DoorsOpen` / `SkyLift.DoorsClose` | `SkyLift.doorFrac` rising from 0 / falling to 0 | a pneumatic slide, about 1 s |
+| `SkyLift.TowerClunk` | a cabin's grip passing a tower's sheaves | a soft double clunk |
+| `SkyLift.WindAtHeight` | looped, louder the higher the cabin | wind round a cabin |
+| `Telescope.Click` | Client/Rides/Telescope in and out | the same click as the server's |
+| `Lookout.Fireplace`, `Lookout.DiningRoom`, `Lookout.TerraceWind` | looped at the fire, in the dining room, on the terrace | crackle; low murmur and cutlery; wind |
