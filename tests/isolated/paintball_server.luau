@@ -318,6 +318,41 @@ return function(t)
 	)
 
 	t.test(
+		"changing sides is not a toy: each change takes a bot out of the match and puts it in a spawn room, so a second one inside three seconds is refused, and after them it is honoured again",
+		function()
+			Kit.play(function(kit)
+				local ada = kit.client("Ada")
+				t.truthy((kit.join(ada)))
+				kit.run(0.2)
+				local side = teamOf(kit, ada)
+				local function press(): (boolean?, string?)
+					return Rig.input(kit.w, ada.stub, Contract.STATION, "side", {})
+				end
+				t.deepEq({ press() }, { true, nil })
+				kit.run(0.2)
+				t.eq(teamOf(kit, ada), 3 - side)
+				local respawns = ada.count("paintball_respawn")
+				-- a client that sends the verb again and again (the framework lets twenty a second through)
+				for _ = 1, 10 do
+					t.deepEq({ press() }, { false, Contract.textFor("side") })
+					kit.run(0.1)
+				end
+				t.eq(teamOf(kit, ada), 3 - side, "she is where her one change put her")
+				t.eq(ada.count("paintball_respawn"), respawns, "and no bot was moved again")
+				local r = roster(kit)
+				t.deepEq({ r.sides, r.people }, { { 4, 4 }, 1 })
+				-- three seconds after the change (still the briefing) she may change her mind
+				kit.run(2)
+				t.eq(kit.state().phase, "briefing")
+				t.deepEq({ press() }, { true, nil })
+				kit.run(0.2)
+				t.eq(teamOf(kit, ada), side)
+				t.truthy(Arena.inRoom(kit.arena.spawnRooms[side], ada.x, ada.y + 0.1, ada.z))
+			end)
+		end
+	)
+
+	t.test(
 		"a join during the end card is refused; the next match rolls on by itself with people on the sides they ended on",
 		function()
 			Kit.play(function(kit)

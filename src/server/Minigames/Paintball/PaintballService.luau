@@ -47,7 +47,11 @@
 --   * after a CORRECTION the distance budget is EMPTY, not full (Stream.placed): a full one hands half a
 --     second of free distance to whoever gets themselves refused, 28 studs a second on corrections alone;
 --   * a correction whose anchor hangs in mid-air (a "fall" that never came down) puts the body on the
---     walking surface under it, not back in the air (correct()).
+--     walking surface under it, not back in the air (correct());
+--   * the "side" verb is honoured for one person once in SIDE_EVERY seconds: every change puts a bot
+--     of the other side, wherever it is fighting, back in a spawn room with a full magazine and its
+--     protection (Rules.assign), and a client that sends the verb as fast as the framework lets it
+--     through (twenty a second, tagged out, there and back) would keep both sides' bots out of the match.
 --
 -- WHAT IT IS BUILT FROM. new(ctx, deps): ctx is the framework's ServerGame.Ctx for the arena's
 -- station; deps is ctx.opts.paintball (a spec's stand-ins; nil in the game). The arena is pure data
@@ -352,6 +356,7 @@ local R = Contract.Rules
 local T = Contract.TRUST
 local BIT = Wire.BIT
 local AIM_COS = math.cos(Contract.BOT.aimSlack)
+local SIDE_EVERY = 3 -- seconds between two changes of side by one person (the header says why)
 
 -- The service's link to paintball's own remotes (Wire.REMOTES).
 --   on    hear a client-to-server remote ("Paintball.Move", "Paintball.Fire"): the record is already
@@ -521,6 +526,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 	local placeMemo: { [any]: number } = setmetatable({}, { __mode = "k" }) :: any -- a player's last placement number, ever
 	local placed: { [any]: boolean } = {} -- whom the service has put in the arena (and ghosted)
 	local sides: { [any]: number } = {} -- the team each person ended the last match on
+	local sideAt: { [any]: number } = setmetatable({}, { __mode = "k" }) :: any -- when each person last changed sides
 	local histories: { [number]: PoseHistory.History } = {} -- by slot
 	local targets: { Projectiles.Target } = {} -- every slot that is on, in slot order
 	local targetOf: { [number]: Projectiles.Target } = {}
@@ -1269,10 +1275,18 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 					break
 				end
 			end
-			if slot ~= nil and slot.on and not flying and (state.phase == "briefing" or person.out) then
+			local since = now - (sideAt[player] or -math.huge)
+			if
+				slot ~= nil
+				and slot.on
+				and not flying
+				and since >= SIDE_EVERY
+				and (state.phase == "briefing" or person.out)
+			then
 				local mine, other = slot.team, 3 - slot.team
 				for id, theirs in state.slots do
 					if theirs.on and theirs.team == other and botSkill[id] ~= nil then
+						sideAt[player] = now
 						Rules.assign(state, seat, other)
 						Rules.assign(state, id, mine)
 						if not person.out then
