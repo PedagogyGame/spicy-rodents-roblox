@@ -16,6 +16,7 @@ local Hit = require("@shared/Minigames/Paintball/Hit")
 local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local Bots = require("@server/Minigames/Paintball/Bots")
+local PaintballFlow = require("@tests/engine/PaintballFlow")
 local Kit = require("@tests/isolated/paintball_server_kit")
 
 local R = Contract.Rules
@@ -697,4 +698,61 @@ return function(t)
 			end
 		)
 	end
+
+	t.test(
+		"the server check (tests/engine/PaintballFlow) passes here first: the pass, a match of bots round one person, a scripted tag, the end card, the next match, leaving",
+		function()
+			-- (the real bots are another lane's: here a brain of four lines walks each bot out of its spawn room
+			-- and has them fire along their own look in turn, four balls a second in all)
+			local stepWas = Bots.step;
+			(Bots :: any).step = function(
+				_bots: any,
+				state: Rules.State,
+				poses: any,
+				_heard: any,
+				now: number
+			): { Bots.Command }
+				local out: { Bots.Command } = {}
+				local speed = state.feel.ballSpeed
+				for id, slot in state.slots do
+					local pose = poses[id]
+					if id == 1 or pose == nil or not slot.on or slot.out then
+						continue
+					end
+					pose.x, pose.z = if slot.team == 1 then -36 else 36, id - 4
+					pose.yaw = if slot.team == 1 then -math.pi / 2 else math.pi / 2
+					if math.floor(now * 4) ~= math.floor((now - FRAME) * 4) and id == math.floor(now * 4) % 8 + 1 then
+						local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
+						table.insert(out, { id = id, kind = "fire", vx = lx * speed, vy = ly * speed, vz = lz * speed })
+					end
+				end
+				return out
+			end
+			local result: any = nil
+			local ok, err = pcall(Kit.play, function(kit: Kit.Kit)
+				local ann, bob = kit.client("Ann", { auto = false }), kit.client("Bob", { auto = false })
+				result = PaintballFlow.play(kit.w.svc, { Arena = Arena, Contract = Contract, Clock = Clock }, {
+					players = { ann.stub, bob.stub },
+					step = kit.run,
+					liveSeconds = 6,
+					positionOf = function(player: any): (number?, number?, number?)
+						return player.body.x, player.body.y + 3, player.body.z
+					end,
+					groupOf = function(player: any): string?
+						return if player.body.ghost then Contract.COLLISION_GROUP else "Default"
+					end,
+				})
+			end, { realPass = true });
+			(Bots :: any).step = stepWas
+			if not ok then
+				error(err, 0)
+			end
+			t.deepEq(result.failures, {})
+			t.truthy(result.ok)
+			t.truthy(result.numbers.balls >= 3, `{result.numbers.balls} balls`) -- (lined up as they are, nearly every ball tags)
+			t.truthy(result.numbers.tags > 0, "the bots tagged each other")
+			t.truthy(type(result.numbers.banner) == "string")
+			t.isType(result.numbers.stepMs.avg, "number")
+		end
+	)
 end
