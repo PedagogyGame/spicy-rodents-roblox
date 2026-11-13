@@ -363,6 +363,13 @@ return function(t)
 			t.truthy(EightBall.canPlace(s, 1, pool.headZ))
 			t.eq(#EightBall.legal(s, 2), 15, "anything may be hit on the break")
 			racked(s, 11)
+			for _, sp in s.spots do
+				if sp.id == 0 then
+					-- it had rolled past the head string: it may not be played from there
+					t.eq(sp.x, 0)
+					t.eq(sp.z, pool.headZ, "the cue ball is back on the head spot")
+				end
+			end
 			-- seat 2's shot IS the break: a soft one into the rack that reaches no cushion stands (it was a no_rail
 			-- foul when the tap had already "broken" the table)
 			t.truthy(EightBall.input(s, 2, "shoot", { 0, 0.2 }))

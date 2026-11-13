@@ -15,8 +15,9 @@
 --           a legal pot of your own ball keeps the table.
 --           The break is the shot that first touches the rack: a cue ball that touches nothing (a tap, a
 --           miss, a scratch on the way) is a foul and the rack is still to be broken, by the other player,
---           from behind the head string. A cue ball that meets two balls lying together at the same instant
---           has hit whichever of them is legal (a referee could not separate them either).
+--           from behind the head string (a cue ball that stopped past it goes back on the head spot). A cue
+--           ball that meets two balls lying together at the same instant has hit whichever of them is legal
+--           (a referee could not separate them either).
 --   POOL-R2 the 8 needs a called pocket (only the 8 is called): the 8 in any other pocket loses.
 --   POOL-R3 a scratch on the break gives ball in hand behind the head string; every other foul, anywhere.
 --   POOL-R4 on an open table a shot that pots a solid and a stripe leaves the table open (and the shooter on
@@ -356,6 +357,16 @@ function EightBall.apply(state: State, o: Outcome, rest: { Tables.Spot }?): stri
 			state.seat = opp
 			-- behind the head string after a scratch on the break (POOL-R3), and while the rack is unbroken
 			state.inHand = if (breakShot and scratch) or not state.broken then "kitchen" else "anywhere"
+			if state.inHand == "kitchen" then
+				-- a cue ball lying past the head string (a tap that stopped short of the rack) is brought back
+				-- to the head spot, so the break cannot be played from where it lies
+				for _, sp in state.spots do
+					if sp.id == 0 and not Tables.inKitchen(tb, sp.z) then
+						sp.x, sp.z = 0, -1e6 -- out of the way while a free place is found
+						sp.x, sp.z = Tables.freeSpot(tb, 0, tb.headZ, state.spots, -1)
+					end
+				end
+			end
 		elseif event == "pass" then
 			state.seat = opp
 		end

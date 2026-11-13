@@ -14,10 +14,10 @@
 --         ball's spot and they open again. An opener whose first touch is anything but that cushion (the
 --         other side's line, a bumper, another ball, nothing at all) is "offside": its ball stays where it
 --         went, but it cannot win the next shot from an opener that was played fairly.
---         In the opening each struck ball answers to its owner, and any OTHER ball that goes down answers to
---         the player whose strike reached it through the chain of contacts (nobody, if both did): your
---         opponent knocking your resting ball into a cup is BP-R5's "counts for the opponent, no penalty",
---         never your own foul.
+--         In the opening a ball that goes down answers to the player whose strike reached it through the
+--         chain of contacts, and to nobody if both strikes did: your opponent knocking your resting ball (or
+--         your marked ball as it runs) into a cup is BP-R5's "counts for the opponent, no penalty", never
+--         your own foul.
 --   BP-R4 the marked ball must be sunk first: sink another of your own before it and the opponent drops two
 --         of their own balls straight into their cup (the table picks them as a player would: their marked
 --         ball if it is still up, then the balls lying farthest from their cup).
@@ -357,21 +357,15 @@ local function resolveOpening(state: State)
 	end
 	local script = Shot.run(tb, state.spots, strikes)
 	state.lastScript = script
-	-- who answers for each ball that went down: a struck ball, its owner; any other, the one player whose
-	-- strike reached it (through however many balls); nobody, if both strikes had a hand in it
+	-- who answers for each ball that went down: the one player whose strike reached it (a struck ball that
+	-- nothing of the other side's touched is its striker's; a resting ball is whoever's chain of contacts
+	-- knocked it in); nobody, if both strikes had a hand in it
 	local answers: { [number]: number } = {}
 	for _, p in Shot.pots(script) do
 		local shooter = 0
 		for k, seat in shooters do
-			if strikes[k].id == p.ball then
+			if p.by == bit32.lshift(1, k - 1) then
 				shooter = seat
-			end
-		end
-		if shooter == 0 then
-			for k, seat in shooters do
-				if p.by == bit32.lshift(1, k - 1) then
-					shooter = seat
-				end
 			end
 		end
 		answers[p.ball] = shooter

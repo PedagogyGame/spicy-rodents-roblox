@@ -394,7 +394,23 @@ return function(t)
 		t.falsy(again[2])
 		t.deepEq(r.sunk, { 1, 2 })
 		t.eq((r.last :: BumperPool.Last).awarded, 0)
-		-- a struck ball still answers to its owner: seat 1's opener into the head cup (the wrong one) gives
+		-- the two struck balls meet (seat 1 plays straight up the table at seat 2's marked ball, which has been
+		-- rolled a little way to meet it) and seat 2's goes down in the cup behind it, the wrong one for it.
+		-- Both strikes had a hand in that: it counts for seat 2 and nobody is given anything
+		local clash = BumperPool.init(2, 1)
+		put(clash, 1, 0, 0.9)
+		BumperPool.input(clash, 2, "shoot", { 6, math.pi, 0, 0, 0.8 })
+		BumperPool.input(clash, 1, "shoot", { 1, 0, Cue.powerFor(4), 0, -0.2 })
+		local cl = clash.last :: BumperPool.Last
+		t.eq(Shot.firstHit(BumperPool.script(clash) :: Shot.Script, 1), 6, "they met")
+		t.deepEq(cl.pots, { 6 })
+		t.deepEq(cl.holes, { 2 })
+		t.eq(cl.awarded, 0)
+		t.deepEq(clash.sunk, { 0, 1 })
+		t.truthy(clash.markedDown[2])
+		t.deepEq(cl.offside, { 1, 2 }, "neither was a bank")
+		-- a struck ball that nothing else touched answers to its striker: seat 1's opener into the head cup
+		-- (the wrong one) gives
 		-- seat 2 two balls
 		local wrong = BumperPool.init(2, 1)
 		BumperPool.input(wrong, 1, "shoot", { 1, math.pi, Cue.powerFor(3.2), 0, 0.8 })

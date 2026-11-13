@@ -32,7 +32,7 @@ local Tables = require("./Tables")
 
 local Shot = {}
 
-Shot.VERSION = 1
+Shot.VERSION = 2 -- 2: a pot carries whose strike reached it; firstAll and touch; the wire format
 Shot.MAX_T = 40 -- seconds: no shot on these tables runs this long (the longest break is about a third of it)
 Shot.REST_PAD = 0.35 -- seconds after the last ball stops before the shot is over
 Shot.SINK = 0.5 -- studs below the cloth at which a pocketed ball is out of sight

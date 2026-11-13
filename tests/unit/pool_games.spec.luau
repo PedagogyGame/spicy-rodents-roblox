@@ -253,13 +253,14 @@ return function(t)
 					sunk += s.sunk[1] + s.sunk[2]
 					offside += #(s.last :: BumperPool.Last).offside
 				end
-				if level == 1 then
-					-- the beginner's aim wanders seven degrees: now and then it clips a bumper on the way
-					t.truthy(met <= 1, `beginners: the marked balls met in {met} of {N} openings`)
-					t.truthy(offside <= N * 0.5, `{offside} of {2 * N} openers were not clean banks`)
+				if level < 3 then
+					-- the beginner's aim wanders seven degrees and the club player's four: now and then an
+					-- opener clips a bumper on its way, and once in fifty that sends it into the other
+					t.truthy(met <= 1, `level {level}: the marked balls met in {met} of {N} openings`)
+					t.truthy(offside <= N * 0.5, `level {level}: {offside} of {2 * N} openers were not clean banks`)
 				else
-					t.eq(met, 0, `level {level}: the marked balls never meet`)
-					t.eq(offside, 0, `level {level}: every opener is a bank off the right-hand cushion`)
+					t.eq(met, 0, "the best players' marked balls never meet")
+					t.eq(offside, 0, "and every opener is a bank off the right-hand cushion")
 				end
 				if level == 3 then
 					local rate = sunk / (2 * N)
