@@ -9,6 +9,8 @@
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
+-- The sky lift (Client/Rides/SkyLiftView: the six cabins drawn from the shared clock) and the Lookout's telescope
+-- (Client/Rides/Telescope, entered on the server's "telescope" event) start after the minigames.
 -- The S2 test place runs its own S2Client and this script steps aside there.
 -- Live-server robustness (W1 client review): Shift Lock is switched off (Shift is sprint); the Roblox
 -- Reset button does nothing until a body is handed over (then PossessionClient routes it to the safe-
@@ -35,6 +37,8 @@ local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
 local CameraRig = require("./Camera/CameraRig")
+local SkyLiftView = require("./Rides/SkyLiftView")
+local Telescope = require("./Rides/Telescope")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -142,6 +146,25 @@ task.spawn(function()
 	end
 end)
 
+-- the sky lift's cabins (drawn here from the clock) and the Lookout's telescope (its HUD lines; no walking while
+-- looking; the usual HUD and camera back after)
+local okSL, errSL = pcall(SkyLiftView.start)
+if not okSL then
+	warn(`Client: SkyLiftView failed: {errSL}`)
+end
+pcall(Telescope.start, {
+	hud = function(title: string?, hint: string?)
+		if title then
+			hud.set(title, hint or "")
+		else
+			client.refreshCamera()
+		end
+	end,
+	onChange = function(on: boolean)
+		InputMap.setCharacterControls(not on and client.state().device == nil)
+	end,
+})
+
 -- keep the help panel in step with vehicles and the drone
 local lastDevice: string? = nil
 game:GetService("RunService").Heartbeat:Connect(function()
@@ -189,6 +212,18 @@ eventRemote.OnClientEvent:Connect(function(msg: { [string]: any })
 		menu.toast(if msg.note then tostring(msg.note) else (names[msg.role] or "Here you go"), 4)
 	elseif kind == "refused" then
 		menu.toast(tostring(msg.text), 3)
+	elseif kind == "telescope" then
+		-- the Lookout's telescope (Server/Rides/SkyLiftService): look through the baked one
+		local exp = workspace:FindFirstChild("Expansion")
+		local hill = exp and exp:FindFirstChild("F4") and (exp :: any).F4:FindFirstChild("f3_hilltop")
+		local scope = hill and hill:FindFirstChild("Telescope", true)
+		local post = workspace:FindFirstChild("SkyLiftService")
+		local prompt = post
+			and post:FindFirstChild("TelescopePost")
+			and (post :: any).TelescopePost:FindFirstChild("SkyLiftPrompt", true)
+		if scope == nil or not Telescope.enter(scope, prompt) then
+			menu.toast(tostring(msg.text or "The telescope has not loaded yet"), 3)
+		end
 	elseif kind == "notice" then
 		-- something the game did to you that you should read (a bowling ball knocked you off a lane)
 		menu.toast(tostring(msg.text), 4)

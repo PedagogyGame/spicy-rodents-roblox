@@ -41,7 +41,8 @@
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
---   InfectionService; nil when it could not start), townIdOf(actorId), stop() };
+--   InfectionService; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could not
+--   start), townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure)
 -- For a bitten player the hospital's door is published as the Workspace attribute HospitalDoor (a
@@ -63,6 +64,7 @@ local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
+local SkyLiftService = require("../Rides/SkyLiftService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
 local TreeArt = require("../Assets/TreeArt")
@@ -291,6 +293,7 @@ function Game.start(opts: Opts?): any
 	local world = rt.world
 	local possession = rt.possession
 	local devices = rt.devices
+	local skylift: any = nil -- the sky lift (section 6 below): riders are refused a new body, a car and a game
 	-- the fleet is small (10 models): always on every client, so E never hands over a nil model
 	if devices then
 		for _, model in devices.models do
@@ -538,6 +541,10 @@ function Game.start(opts: Opts?): any
 			return false, "unknown choice"
 		end
 		local s = stateOf(player)
+		if skylift and skylift:busy(player) == "riding" then
+			fire(player, { kind = "refused", text = SkyLiftService.WORDS.riding })
+			return false, "riding"
+		end
 		local clock = os.clock()
 		if clock - s.lastPick < Game.PICK_COOLDOWN then
 			return false, "one moment…"
@@ -1000,6 +1007,9 @@ function Game.start(opts: Opts?): any
 				if actor.species ~= "human" then
 					return false, "Only people can play. Animals can watch (or sneak through the ball return)"
 				end
+				if skylift and skylift:busy(player) then
+					return false, "Not while you are on (or waiting for) the sky lift"
+				end
 				if
 					devices
 					and type(player.UserId) == "number"
@@ -1084,6 +1094,38 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] bowling alley failed to open: {errA}`)
 	end
 
+	-- 6. the sky lift up the hill to the Lookout (Workspace.Expansion.F4; people only; brief v2 line 250)
+	stage(0.98, "Starting the sky lift")
+	local okL, errL = pcall(function()
+		skylift = SkyLiftService.start({
+			game = {
+				possession = possession,
+				runtime = rt,
+				devices = devices,
+				fire = fire,
+				attractions = function(): any
+					return attractions
+				end,
+			},
+			heartbeat = o.heartbeat ~= false,
+			terrain = o.terrain ~= false,
+		})
+	end)
+	if not okL then
+		warn(`[SpicyRodents] sky lift failed to start: {errL}`)
+	end
+	if skylift and devices then
+		-- E mid-ride: no car from a cabin (the client says so too); true, so the client is not told "released"
+		local interact = devices.interact
+		devices.interact = function(svc: any, player: Player): (boolean, string?)
+			if skylift:busy(player) == "riding" then
+				fire(player, { kind = "refused", text = SkyLiftService.WORDS.riding })
+				return true, nil
+			end
+			return interact(svc, player)
+		end
+	end
+
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -1121,12 +1163,16 @@ function Game.start(opts: Opts?): any
 			if attractions and o.heartbeat == false then
 				attractions.step(dt)
 			end
+			if skylift and o.heartbeat == false then
+				skylift:step(dt)
+			end
 		end,
 		stateOf = stateOf,
 		health = healthOf,
 		placeAI = placeAI,
 		attractions = attractions,
 		infection = infection,
+		skylift = skylift,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -1134,6 +1180,9 @@ function Game.start(opts: Opts?): any
 			rt.stop()
 			if attractions then
 				attractions.stop()
+			end
+			if skylift then
+				skylift:stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

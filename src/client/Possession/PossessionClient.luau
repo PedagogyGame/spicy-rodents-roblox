@@ -17,9 +17,16 @@
 -- its driver); the default character controls are on for a person on foot and off in a vehicle or the
 -- drone (the standing officer no longer walks off while the drone flies); E, V and Reset always answer
 -- on screen; device refusals are said in plain words (reasonText).
+-- The sky lift (Server/Rides/SkyLiftService, Client/Rides/SkyLiftView): DeviceGranted { device = "ride", kind =
+-- "gondola", cabin, seat, to } has no model (every screen draws the cabins from the shared clock): the walking
+-- controller stops, the camera goes to the seat's eye in first person with free look (V: the cabin from outside),
+-- the HUD says where it is going and how long, and E says you get off at the other end. DeviceReleased
+-- ("ride_end", "ride_left") gives the legs and the usual camera back on the platform. While the Lookout's telescope
+-- is up (Client/Rides/Telescope) E and Q are its keys.
 -- Interface: start(opts) -> Client; Client.metrics, Client.markRequest(), Client.current(), Client.refreshCamera(),
 --   Client.flushInput(), Client.state() -> { species, device, decision }; controllerFor(species) -> string (pure);
---   reasonText(why) -> string? (pure; nil = say nothing)
+--   reasonText(why) -> string? (pure; nil = say nothing); rideTarget(mode, cabin, seat, view) -> Model?;
+--   rideWords(to) -> string (pure)
 
 local Import = require("../Import")
 local PossessionState =
@@ -33,6 +40,8 @@ local Squirrel = require("../Controllers/Squirrel")
 local Quadruped = require("../Controllers/Quadruped")
 local Vehicle = require("../Controllers/Vehicle")
 local Drone = require("../Controllers/Drone")
+local SkyLiftView = require("../Rides/SkyLiftView")
+local Telescope = require("../Rides/Telescope")
 
 export type Opts = {
 	bodies: Instance, -- the folder holding every body
@@ -80,6 +89,8 @@ local REASONS: { [string]: string } = {
 	["the drone is in use"] = "Someone else is flying the drone",
 	["no body"] = "Pick a body from the menu first (M)",
 	["cannot"] = "You cannot get in right now",
+	ride_end = "", -- the sky lift: the arrival words come as their own notice
+	ride_left = "",
 }
 function PossessionClient.reasonText(why: string?): string?
 	if why == nil then
@@ -96,6 +107,22 @@ function PossessionClient.reasonText(why: string?): string?
 		return "That car is locked: police cars are for officers (pick Police)"
 	end
 	return `Cannot do that: {why}`
+end
+
+-- What the camera rides with on the sky lift: the seat (its EyeSocket) in first person, the whole cabin from
+-- outside. `view` is Client/Rides/SkyLiftView (its local cabins); nil until the cabin template has streamed in.
+function PossessionClient.rideTarget(mode: string, cabin: number, seat: number, view: any): Model?
+	if mode == "vehicleFirst" then
+		return view.seatModel(cabin, seat)
+	end
+	return view.cabinModel(cabin)
+end
+
+-- What E says in a cabin (there is no getting off between the stations).
+function PossessionClient.rideWords(to: string?): string
+	return if to == "base"
+		then "You are on the sky lift: you get off at the bottom"
+		else "You are on the sky lift: you get off at the top"
 end
 
 local function findBody(player: Player, bodies: Instance, actorId: string, timeout: number): Model?
@@ -190,7 +217,8 @@ function PossessionClient.start(opts: Opts): Client
 	local stopController: (() -> ())? = nil
 	local body: Model? = nil
 	local payloadNow: { [string]: any }? = nil
-	local device: { device: string, model: Model, kind: string? }? = nil
+	local device: { device: string, model: Model?, kind: string?, cabin: number?, seat: number?, to: string? }? = nil
+	local rideConn: RBXScriptConnection? = nil
 	local fpToggle = false
 	local decision: { [string]: any } = CameraPolicy.modeFor({})
 	local zoneConn: RBXScriptConnection? = nil
@@ -211,23 +239,51 @@ function PossessionClient.start(opts: Opts): Client
 		end
 	end
 
+	-- the ride's HUD: where the cabin is going and the seconds to the platform (Client/Rides/SkyLiftView)
+	local function rideHud()
+		local d = device
+		if hud and d then
+			local t = SkyLiftView.clock()
+			if t then
+				local title, hint = SkyLiftView.hudFor(d.cabin or 1, t)
+				hud.set(title, hint)
+			else
+				hud.set("Sky lift", SkyLiftView.BOARD_LINE)
+			end
+		end
+	end
+
 	local function applyCamera()
 		local p = payloadNow
+		local riding = device ~= nil and device.device == "ride"
 		local ctx = {
 			species = if p then (if p.variant == "spicy" then "rodent" else p.species) else nil,
-			vehicle = if device and device.device == "vehicle" then device.kind else nil,
+			vehicle = if device and device.device == "vehicle" then device.kind elseif riding then "gondola" else nil,
 			drone = device ~= nil and device.device == "drone",
 			firstPersonToggle = fpToggle,
 			zone = if body then body:GetAttribute("CameraZone") :: string? else nil,
 			chase = if body then body:GetAttribute("ChaseLock") == true else false,
 		}
 		decision = CameraPolicy.modeFor(ctx)
-		CameraRig.apply(decision :: any, {
-			body = body,
-			vehicle = if device and device.device == "vehicle" then device.model else nil,
-			drone = if device and device.device == "drone" then device.model else nil,
-		})
-		if hud then
+		local d = device
+		if d and riding then
+			local target = PossessionClient.rideTarget(decision.mode, d.cabin or 1, d.seat or 1, SkyLiftView) :: Model?
+			d.model = target
+			if target then
+				CameraRig.apply(decision :: any, { body = body, vehicle = target, free = true })
+			elseif body then
+				CameraRig.follow(body) -- the cabins have not streamed in yet: the ride tick tries again
+			end
+		else
+			CameraRig.apply(decision :: any, {
+				body = body,
+				vehicle = if device and device.device == "vehicle" then device.model else nil,
+				drone = if device and device.device == "drone" then device.model else nil,
+			})
+		end
+		if riding then
+			rideHud()
+		elseif hud then
 			local role = if device
 				then device.device
 				elseif p then PossessionClient.controllerFor(p.species, p.variant)
@@ -339,6 +395,53 @@ function PossessionClient.start(opts: Opts): Client
 
 	if deviceGranted then
 		deviceGranted.OnClientEvent:Connect(function(info: { [string]: any })
+			if info.device == "ride" then
+				-- the sky lift: seated by the server, drawn here from the clock; first person on boarding
+				stop()
+				device = {
+					device = "ride",
+					model = nil,
+					kind = info.kind,
+					cabin = tonumber(info.cabin),
+					seat = tonumber(info.seat),
+					to = info.to,
+				}
+				setJump(false)
+				InputMap.setCharacterControls(false)
+				local hum = if body then body:FindFirstChildOfClass("Humanoid") else nil
+				if hum then
+					hum:Move(Vector3.zero)
+				end
+				fpToggle = true
+				applyCamera()
+				toast(SkyLiftView.BOARD_LINE, 4)
+				if rideConn then
+					rideConn:Disconnect()
+				end
+				local acc = 0
+				rideConn = game:GetService("RunService").Heartbeat:Connect(function(dt: number)
+					local d = device
+					if d == nil or d.device ~= "ride" then
+						if rideConn then
+							rideConn:Disconnect()
+							rideConn = nil
+						end
+						return
+					end
+					acc += dt
+					if acc >= 1 then
+						-- once a second: the HUD's countdown; the camera again only while the cabins are loading
+						-- (applying it resets the free look)
+						acc = 0
+						if d.model == nil then
+							applyCamera()
+						else
+							rideHud()
+						end
+					end
+				end)
+				return
+			end
 			local model = info.model :: Model?
 			if model == nil or rootOf(model :: Model, 3) == nil then
 				-- not streamed in on this computer: get out again rather than drive nothing
@@ -415,6 +518,13 @@ function PossessionClient.start(opts: Opts): Client
 		-- E (pad Y) enters or leaves a vehicle or the drone; only people drive, and a squirrel's E is
 		-- its grab (InputMap). F is the townsperson's kick (Client/Main, PlayNet.Kick).
 		local onFoot = payloadNow ~= nil and payloadNow.species == "human"
+		if Telescope.active() and (name == "E" or name == "Q" or name == "ButtonY" or name == "ButtonB") then
+			return -- the telescope's own keys (Client/Rides/Telescope steps back)
+		end
+		if (name == "E" or name == "ButtonY") and device and device.device == "ride" then
+			toast(PossessionClient.rideWords(device.to), 2.5)
+			return
+		end
 		if name == "E" or name == "ButtonY" then
 			-- a minigame or door prompt on screen (or a game in progress) owns E (Client/Minigames)
 			if device == nil and (player:GetAttribute("PromptVisible") or player:GetAttribute("InMinigame")) then

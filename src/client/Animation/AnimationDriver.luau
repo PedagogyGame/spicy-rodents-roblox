@@ -941,6 +941,13 @@ function AnimationDriver.start(opts: Opts): Driver
 			return
 		end
 		local anchored = e.root.Anchored
+		if e.body:GetAttribute("Ride") ~= nil then
+			-- on the sky lift (Client/Rides/SkyLiftView puts the root on its seat each frame): no settle, no probe
+			e.settle.live = false
+			e.fix, e.fixTarget = 0, 0
+			applyOffset(e, 0)
+			return
+		end
 		if KinematicPose.get(e.body) then
 			if not e.kin then
 				e.kin = true
