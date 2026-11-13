@@ -557,6 +557,7 @@ return function(t)
 			elseif
 				not swap
 				and b.top ~= "Walls"
+				and b.top ~= "RoofVent" -- (the vent's drop stands on a truss's plate inside the hall: tools/bake/alley/RoofVent)
 				and b.X + b.hx > hr.x0 + 0.01
 				and b.X - b.hx < hr.x1 - 0.01
 				and b.D + b.hd > hr.d0 + 0.01

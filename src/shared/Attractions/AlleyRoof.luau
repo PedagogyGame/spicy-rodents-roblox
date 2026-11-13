@@ -138,22 +138,31 @@ AlleyRoof.BRACE_D = { d0 = -14.5, d1 = 53.0 }
 -- also asks for an eye near floor height).
 AlleyRoof.HALL_WATCH = { x0 = -26, x1 = 101, d0 = -48, d1 = 66.5 }
 
--- THE VENT (lane L2; planned) ---------------------------------------------------------------------------------------
+-- THE VENT (lane L2: tools/bake/alley/RoofVent) ---------------------------------------------------------------------
+-- The air-handling unit on the wing roof against the hall's raised east wall: a curb, the housing (louvres on its east
+-- face, access doors on its north face, an exhaust stack with a fan on top). Inside, a sheet-metal channel along
+-- D 15.6..17.4 under the coil deck (channelY1) carries 9107 from the louvre up the plenum's ramp and step to the duct.
 AlleyRoof.AHU = {
 	curb = { x0 = 103.6, x1 = 116.4, y0 = 13.6, y1 = 14.2, d0 = 10.6, d1 = 22.4 },
 	housing = { x0 = 104, x1 = 116, y0 = 14.2, y1 = 19.0, d0 = 11, d1 = 22 },
-	louvre = { x = 116, d0 = 13, d1 = 20 },
+	louvre = { x = 116, d0 = 13, d1 = 20, y0 = 14.3, y1 = 18.6, slats = 15 },
 	stack = { x = 110, d = 16.5, r = 2.2, y0 = 19.0, y1 = 20.6 },
+	channelY1 = 17.0,
+	skin = 0.12,
 }
 -- The squirrel's way in: one bent louvre slat, the curb cut so the sill is the membrane. In front of the louvre a
 -- strip of bare membrane (the apron, X 116.4..118.0) carries no grating: the platform's louvre strip starts behind
 -- it, so the mouth and the first stretch of 9107 lie on the membrane and the guard sees the bent slat over the apron.
-AlleyRoof.MOUTH = { x = 117.0, y = 13.62, d = 16.5, slat = { d0 = 15.6, d1 = 17.4, y0 = 13.6, y1 = 15.4 } }
+-- slat: the opening the bent slat leaves (the slats below y1 are gone across d0..d1).
+AlleyRoof.MOUTH = { x = 117.0, y = 13.62, d = 16.5, slat = { d0 = 15.6, d1 = 17.4, y0 = 13.6, y1 = 15.5 } }
 AlleyRoof.APRON = { x0 = 116.4, x1 = 118.0, d0 = 8, d1 = 22.5 }
--- (the duct's sleeve runs through the hall's east wall, X 101..101.8)
-AlleyRoof.DUCT = { x0 = 101.0, x1 = 104, d0 = 15.5, d1 = 17.5, y0 = 15.0, y1 = 17.0 }
-AlleyRoof.ELBOW = { x0 = 99.6, x1 = 101, d0 = 15.5, d1 = 17.5, y0 = 12.32, y1 = 17.0 }
-AlleyRoof.BOOT = { x0 = 98.6, x1 = 101, d0 = 15.5, d1 = 17.5, y0 = 12.32, y1 = 14.3 }
+-- The duct from the housing's west face through the hall's east wall (X 101..101.8: its sleeve), then the drop: one
+-- box (the elbow, x0..x1) standing on the D 16.5 truss's plate between its lattice planes, deep enough west for the
+-- body dropping down it with its back to the west; the boot is its foot, open to the west (a grille hung from its
+-- lintel, swung up) onto the plate, route 9120.
+AlleyRoof.DUCT = { x0 = 101.0, x1 = 104.12, d0 = 15.5, d1 = 17.5, y0 = 15.0, y1 = 17.2 }
+AlleyRoof.ELBOW = { x0 = 98.0, x1 = 101, d0 = 15.5, d1 = 17.5, y0 = 12.32, y1 = 17.3 }
+AlleyRoof.BOOT = { x0 = 98.0, x1 = 99.6, d0 = 15.5, d1 = 17.5, y0 = 12.32, y1 = 14.3 }
 
 -- THE STAIRS AND THE GUARD PLATFORM (lane L2; planned) -------------------------------------------------------------
 -- In the open yard behind the games wing, against its back wall: 27 risers of 0.734 in three flights of nine, eight
@@ -338,9 +347,12 @@ local ROUTES: { LocalRoute } = {
 do
 	-- (no route on the ninth truss, D 61.5: it stands over the pinsetters, in the ground kept for the backstage)
 	local chordIds = { 9121, 9122, 9123, 9120, 9124, 9125, 9126, 9127 }
+	-- (9120 starts where the vent's boot hands over: 9107's last point)
+	local ventPts = ROUTES[#ROUTES].points
+	local ventEnd = ventPts[#ventPts]
 	for i, id in chordIds do
 		local d = AlleyRoof.TRUSS_D[i]
-		local fromX = if id == 9120 then AlleyRoof.BOOT.x0 else 100.4
+		local fromX = if id == 9120 then ventEnd[1] else 100.4
 		table.insert(ROUTES, {
 			id = id,
 			name = `alley rafter truss chord (D {d})`,

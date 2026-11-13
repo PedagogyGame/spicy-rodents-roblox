@@ -73,11 +73,13 @@ return function(t)
 			for i = 0, 40 do
 				local p = registry:pointAt(route, i / 40)
 				local rise = apex + 1.7
-				-- (another rafter overhead is where a leap from a light rail is meant to go: up onto a plate)
+				-- (another rafter overhead is where a leap from a light rail is meant to go: up onto a plate; 9120's
+				-- first 0.6 st is inside the vent's boot, where the drop stands over it)
+				local inBoot = toLocal(p.x, p.y, p.z) > R.ELBOW.x0 - 0.1
 				local hit, part = world.raycast(p.x, p.y + 0.01, p.z, 0, rise, 0, function(q)
 					return q.collide and q.name ~= "Plate" and q.name ~= "Rail" and string.sub(q.name, 1, 5) ~= "Brace"
 				end)
-				t.eq(hit, nil, `route {route.id} t {i / 40}: a leap meets {part and part.path}`)
+				t.truthy(hit == nil or inBoot, `route {route.id} t {i / 40}: a leap meets {part and part.path}`)
 				local _, Y = toLocal(p.x, p.y, p.z)
 				t.truthy(Y + rise <= HR.deckY0, `route {route.id}: a leap's top {Y + rise} under the deck`)
 			end

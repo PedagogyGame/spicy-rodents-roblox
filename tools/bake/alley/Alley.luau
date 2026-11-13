@@ -14,6 +14,7 @@
 --   the roof run (BRIEF_ADDENDUM D9, D10; Shared/Attractions/AlleyRoof):
 --   Roof        the lane hall's raised roof (the model HallRoof): clerestory walls, deck, steel trusses, braces,
 --               light rails and the lane lights
+--   RoofVent    the air-handling unit on the wing roof, its duct through the hall's wall and the drop onto a truss
 --   Yard        the house and the tree behind the games wing, in the attraction's annex (data/attractions.json)
 -- Interface: build(kit, root, data) -> nothing (data: the attraction's record of data/attractions.json)
 
@@ -24,6 +25,7 @@ local GamesRoom = require("./GamesRoom")
 local BackModule = require("./BackModule")
 local Forecourt = require("./Forecourt")
 local Roof = require("./Roof")
+local RoofVent = require("./RoofVent")
 local Yard = require("./Yard")
 
 local Alley = {}
@@ -36,6 +38,7 @@ function Alley.build(kit: any, root: any, data: any)
 	BackModule.build(kit, root)
 	Forecourt.build(kit, root, data)
 	Roof.build(kit, root)
+	RoofVent.build(kit, root)
 	Yard.build(kit, root)
 end
 

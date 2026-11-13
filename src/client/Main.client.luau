@@ -1,9 +1,9 @@
 --!strict
 -- StarterPlayer.StarterPlayerScripts.Client.Main
 -- Client entry of the first playable build (owner directive 2026-11-09; BUILD_PLAN §1.3, §4.4 #5):
--- the day cycle (World/Sky) and the loading screen first (UI/PlayMenu: server boot progress, then the climbing
--- routes prepared on this computer), then the AnimationDriver over every body (D3), the traffic ghosts
--- (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
+-- the day cycle (World/Sky), what spins (World/Spinners) and the loading screen first (UI/PlayMenu: server boot
+-- progress, then the climbing routes prepared on this computer), then the AnimationDriver over every body (D3), the
+-- traffic ghosts (Render/VehicleView), PossessionClient (controllers, cameras, devices, Reset routing) and the menu
 -- (pick Spicy Rodent, Squirrel, Townsperson, Police or the Police drone; PlayNet.Pick). F kicks
 -- (PlayNet.Kick) when on foot as a person. Server messages (PlayNet.Event) become toasts and banners:
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
@@ -36,6 +36,7 @@ local WalletHud = require("./UI/WalletHud")
 local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
+local Spinners = require("./World/Spinners")
 local CameraRig = require("./Camera/CameraRig")
 
 local Players = game:GetService("Players")
@@ -61,6 +62,11 @@ end)
 local skyOk, skyErr = pcall(Sky.start)
 if not skyOk then
 	warn(`Client: the sky did not start: {skyErr}`)
+end
+-- what spins on this computer only: the alley's rooftop fan (World/Spinners)
+local spinOk, spinErr = pcall(Spinners.start)
+if not spinOk then
+	warn(`Client: the spinners did not start: {spinErr}`)
 end
 
 local pickRemote: RemoteEvent? = nil
