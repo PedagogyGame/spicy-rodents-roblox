@@ -3,8 +3,10 @@
 -- station through the bake registry (tools/bake/GameBakes): an eight-ball table as real hardware, drawn from
 -- the SAME numbers the game plays on (Shared/Minigames/Pool/Tables: the bed, the six cushion noses, the twelve
 -- jaw facings, the six holes; Pool/Furniture: heights, rails, the tray), so what is seen is what is simulated.
---   the bed: cloth on slate, cut away at the six pockets, each with a dark well a ball drops into;
---   six cushions between the pockets, their ends cut back along the jaws' own lines;
+--   the bed: cloth on slate, cut round at the six pockets, each with a dark well a ball drops into and a
+--     round leather pocket behind it, its lip on the rail;
+--   six cushions between the pockets, a nose where the ball meets them and a top that rises to the rail, their
+--     ends cut back along the jaws' own lines (the jaw facings at the model's own angles);
 --   wooden rails with eighteen sights, cut away behind each pocket; aprons, a floor under the body, four legs;
 --   the head spot and the foot spot; two cubes of chalk;
 --   the tray under the foot rail where potted balls collect, each in its own place (Furniture.home);
@@ -48,11 +50,17 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 	local top = F.RAIL_H
 	local cushionTop = F.CUSHION_H + 0.04
 
-	-- the pockets: a square cut through cloth, slate and rail round each hole, and a dark well under it
+	-- the pockets: a round cut through cloth, slate and rail round each hole (four crossed rectangles, a circle
+	-- in sixteen steps), a dark well under it, and a round leather pocket: its wall behind the hole, and a lip
+	-- on the rail round the cut
 	local cuts: { { number } } = {}
 	for _, hole in tb.holes do
-		local s = hole.r * 0.92
-		table.insert(cuts, { hole.x - s, hole.x + s, hole.z - s, hole.z + s })
+		local R = hole.r * 0.95
+		for _, a in { 0.2618, 0.6545, 0.9163, 1.309 } do
+			local cx, cz = R * math.cos(a), R * math.sin(a)
+			table.insert(cuts, { hole.x - cx, hole.x + cx, hole.z - cz, hole.z + cz })
+		end
+		local s = R
 		t:box(
 			m,
 			"PocketWell",
@@ -80,19 +88,50 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 				z1 = z0 + 0.03
 			end
 			t:box(m, "PocketLiner", x0, x1, -F.WELL_DEPTH, -F.CLOTH_T - F.SLATE_T, z0, z1, BLACK, "SmoothPlastic", SOFT)
-			-- the leather facing at the back of the pocket, up to the rail's top: the sides away from the cloth
-			-- (never the side a ball comes in by, which stays open to the bed)
-			if ax * hole.mx + az * hole.mz <= 1e-9 then
-				local bx0, bx1 = hole.x - s + 0.002, hole.x + s - 0.002
-				local bz0, bz1 = hole.z - s + 0.002, hole.z + s - 0.002
-				if ax ~= 0 then
-					bx0 = hole.x + ax * (s - 0.014) - 0.012
-					bx1 = bx0 + 0.024
-				else
-					bz0 = hole.z + az * (s - 0.014) - 0.012
-					bz1 = bz0 + 0.024
-				end
-				t:box(m, "PocketBack", bx0, bx1, -F.CLOTH_T - F.SLATE_T, top - 0.004, bz0, bz1, LEATHER, "Fabric", SOFT)
+		end
+		-- the leather pocket: sixteen staves round the hole, up to the rail's top on the side away from the cloth
+		-- (never the side a ball comes in by, which stays open to the bed), and a lip round the cut on the rail
+		local n = 16
+		local stave = 2.6 * (R - 0.008) * math.tan(math.pi / n) + 0.01
+		for k = 0, n - 1 do
+			local a = (k + 0.5) * 2 * math.pi / n
+			local ux, uz = math.cos(a), math.sin(a)
+			local px, pz = hole.x + ux * (R - 0.02), hole.z + uz * (R - 0.02)
+			local tx, tz = -uz * stave / 2, ux * stave / 2
+			if ux * hole.mx + uz * hole.mz <= 0.15 then
+				t:slab(
+					m,
+					"PocketBack",
+					px - tx,
+					pz - tz,
+					px + tx,
+					pz + tz,
+					-F.WELL_DEPTH,
+					top - 0.004,
+					0.024,
+					0,
+					LEATHER,
+					"Fabric",
+					SOFT
+				)
+			end
+			local lx, lz = hole.x + ux * (R + 0.035), hole.z + uz * (R + 0.035)
+			if math.abs(lx) > iw + 0.01 or math.abs(lz) > il + 0.01 then
+				t:slab(
+					m,
+					"PocketLip",
+					lx - tx * 1.2,
+					lz - tz * 1.2,
+					lx + tx * 1.2,
+					lz + tz * 1.2,
+					top - 0.004,
+					top + 0.012,
+					0.07,
+					0,
+					LEATHER,
+					"Fabric",
+					SOFT
+				)
 			end
 		end
 	end
@@ -125,33 +164,20 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 			local side = if (mx - hx) * -seg.tz + (mz - hz) * seg.tx > 0 then 1 else -1
 			t:slab(m, "Jaw", seg.x1, seg.z1, seg.x2, seg.z2, 0, cushionTop, 0.09, side, CUSHION, "Fabric")
 		elseif math.abs(seg.x1 - seg.x2) < 1e-9 then
+			-- a long cushion: its nose (where the ball meets it) up to CUSHION_H, its top rising back to the rail
 			local sx = if seg.x1 > 0 then 1 else -1
-			t:box(
-				m,
-				"Cushion",
-				seg.x1,
-				seg.x1 + sx * F.CUSHION_BACK,
-				0,
-				cushionTop,
-				math.min(seg.z1, seg.z2),
-				math.max(seg.z1, seg.z2),
-				CUSHION,
-				"Fabric"
-			)
+			local x0, x1 =
+				math.min(seg.x1, seg.x1 + sx * F.CUSHION_BACK), math.max(seg.x1, seg.x1 + sx * F.CUSHION_BACK)
+			local z0, z1 = math.min(seg.z1, seg.z2), math.max(seg.z1, seg.z2)
+			t:box(m, "Cushion", x0, x1, 0, F.CUSHION_H, z0, z1, CUSHION, "Fabric")
+			t:wedge(m, "CushionTop", x0, x1, F.CUSHION_H, top, z0, z1, if sx > 0 then "x-" else "x+", CUSHION, "Fabric")
 		else
 			local sz = if seg.z1 > 0 then 1 else -1
-			t:box(
-				m,
-				"Cushion",
-				math.min(seg.x1, seg.x2),
-				math.max(seg.x1, seg.x2),
-				0,
-				cushionTop,
-				seg.z1,
-				seg.z1 + sz * F.CUSHION_BACK,
-				CUSHION,
-				"Fabric"
-			)
+			local x0, x1 = math.min(seg.x1, seg.x2), math.max(seg.x1, seg.x2)
+			local z0, z1 =
+				math.min(seg.z1, seg.z1 + sz * F.CUSHION_BACK), math.max(seg.z1, seg.z1 + sz * F.CUSHION_BACK)
+			t:box(m, "Cushion", x0, x1, 0, F.CUSHION_H, z0, z1, CUSHION, "Fabric")
+			t:wedge(m, "CushionTop", x0, x1, F.CUSHION_H, top, z0, z1, if sz > 0 then "z-" else "z+", CUSHION, "Fabric")
 		end
 	end
 

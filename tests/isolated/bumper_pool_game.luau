@@ -15,6 +15,7 @@ local Furniture = require("@shared/Minigames/Pool/Furniture")
 local Shot = require("@shared/Minigames/Pool/Shot")
 local Tables = require("@shared/Minigames/Pool/Tables")
 local Wire = require("@shared/Minigames/Pool/Wire")
+local CueController = require("@client/Minigames/Pool/CueController")
 local Playback = require("@client/Minigames/Pool/Playback")
 local BumperPoolFlow = require("@tests/engine/BumperPoolFlow")
 local PoolRig = require("@tests/pool/PoolRig")
@@ -337,6 +338,108 @@ return function(t)
 			t.truthy(PoolRig.settle(w, ID))
 		end, opts())
 	end)
+
+	t.test(
+		"touch on a slow line (150 ms each way): practice played by finger, every ball picked and aimed by hand",
+		function()
+			Rig.play(function(w)
+				PoolRig.clock(w)
+				start(w)
+				local c = PoolRig.controller(ID)
+				local state = PoolRig.state(w, ID)
+				local cam = workspace.CurrentCamera
+				local function pixel(x: number, z: number): (number, number)
+					local wx, wy, wz = Furniture.world(c.place, c.def, x, TABLE.ballR, z)
+					local p = cam:WorldToViewportPoint(roblox.Vector3.new(wx, wy, wz))
+					return p.X, p.Y
+				end
+				local function tap(id: string, x: number, y: number)
+					Rig.touch(id, "began", x, y)
+					Rig.frame(w)
+					Rig.touch(id, "ended", x, y)
+					Rig.frame(w)
+				end
+				local shots = 0
+				local guard = 0
+				while state.done ~= true and guard < 40 do
+					guard += 1
+					t.truthy(PoolRig.settle(w, ID))
+					if state.done then
+						break
+					end
+					t.truthy(
+						Rig.untilTrue(w, 3, function()
+							return c.phase == "aim"
+						end),
+						`my turn came back ({c.phase}, shot {guard}, live {c.live}, rolling {c.rolling}, done {state.done}, playing {Playback.playing(
+							ID
+						)}, session {w.svc:sessionOf(ID).phase})`
+					)
+					local input = Computer.bumper(state, 1, 3, 500 + guard)[1]
+					local a = input.args
+					-- the top view (its button), a tap on the ball to strike, a finger on the cloth along the aim
+					local top = assert(Rig.button(w.gui, "TOP VIEW"), Rig.screen(w))
+					if not c.top then
+						top.MouseButton1Down.fire()
+						top.MouseButton1Up.fire()
+					end
+					Rig.run(w, 0.5)
+					if c.sel ~= a[1] then
+						local s = c.byId[a[1]]
+						local x, y = pixel(s.x, s.z)
+						tap(`pick{guard}`, x, y)
+					end
+					t.eq(c.sel, a[1], "the tapped ball is the one struck")
+					local s = c.byId[a[1]]
+					local dx, dz = math.sin(a[2]), math.cos(a[2])
+					-- (a point clear of every other ball, so the touch is only a pointing)
+					local reach = 0.6
+					for _, far in { 0.6, 1.0, 1.5, 2.2, 3 } do
+						local px, pz = s.x + dx * far, s.z + dz * far
+						local clear = math.abs(px) < TABLE.halfW - 0.1 and math.abs(pz) < TABLE.halfL - 0.1
+						for _, o in c.spots do
+							if
+								o.id ~= a[1] and (o.x - px) ^ 2 + (o.z - pz) ^ 2 < (CueController.BALL_REACH + 0.1) ^ 2
+							then
+								clear = false
+							end
+						end
+						if clear then
+							reach = far
+							break
+						end
+					end
+					local x, y = pixel(s.x + dx * reach, s.z + dz * reach)
+					Rig.touch(`aim{guard}`, "began", x, y)
+					Rig.frame(w)
+					Rig.touch(`aim{guard}`, "ended", x, y)
+					Rig.frame(w)
+					t.near(c.angle, a[2], 0.02, "the cue points where the finger is")
+					-- the spin on the cue-ball picture, then HOLD TO SHOOT for the power
+					if (a[4] or 0) ~= 0 or (a[5] or 0) ~= 0 then
+						local ax, ay, as = c:pad()
+						local rr = as / 2 - as * 0.16 / 2
+						tap(`tip{guard}`, ax + as / 2 + (a[4] or 0) * rr, ay + as / 2 - (a[5] or 0) * rr)
+					end
+					local hold = assert(Rig.button(w.gui, "HOLD TO SHOOT"), Rig.screen(w))
+					hold.MouseButton1Down.fire()
+					Rig.run(w, a[3] * CueController.RISE)
+					hold.MouseButton1Up.fire()
+					t.truthy(
+						Rig.untilTrue(w, 2, function()
+							return c.phase ~= "aim"
+						end),
+						"the shot went"
+					)
+					shots += 1
+				end
+				t.truthy(state.done, `practice finished in {shots} shots`)
+				t.eq(state.sunk[1], 5, "all five down")
+				Rig.run(w, 1)
+				t.truthy(string.find(Rig.screen(w), "All five are down", 1, true), Rig.screen(w))
+			end, opts({ touch = true, lag = 9 }))
+		end
+	)
 
 	t.test("the server check's flow (tests/engine/BumperPoolFlow) passes on this service", function()
 		Rig.play(function(w)

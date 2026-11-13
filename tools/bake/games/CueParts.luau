@@ -108,6 +108,51 @@ function T.ball(
 	return self.kit:ball(parent, name, self.cx + x, self.y0 + y, self.cd + z, diameter, color, material, opts)
 end
 
+-- A wedge filling [x0, x1] x [y0, y1] x [z0, z1], its slope rising from y0 on the side `low` ("x-", "x+", "z-" or
+-- "z+") to y1 on the opposite side (a cushion's top, falling from the rail to its nose). A Roblox WedgePart rises
+-- from its front (-Z) to its back (+Z); turned by CFrame.Angles(0, a, 0) its Z axis is (sin a, -cos a) in (X, D).
+function T.wedge(
+	self: any,
+	parent: any,
+	name: string,
+	x0: number,
+	x1: number,
+	y0: number,
+	y1: number,
+	z0: number,
+	z1: number,
+	low: string,
+	color: { number },
+	material: string,
+	opts: any?
+): any
+	local a: number
+	local along: number -- the wedge's length (its X) and its depth (its Z)
+	local deep: number
+	if low == "x-" or low == "x+" then
+		a = if low == "x-" then math.pi / 2 else -math.pi / 2
+		along, deep = z1 - z0, x1 - x0
+	else
+		a = if low == "z-" then math.pi else 0
+		along, deep = x1 - x0, z1 - z0
+	end
+	local o: { [string]: any } = table.clone(opts or {})
+	o.rot = self.kit.roblox.CFrame.Angles(0, a, 0)
+	return self.kit:wedge(
+		parent,
+		name,
+		self.cx + (x0 + x1) / 2,
+		self.y0 + (y0 + y1) / 2,
+		self.cd + (z0 + z1) / 2,
+		along,
+		y1 - y0,
+		deep,
+		color,
+		material,
+		o
+	)
+end
+
 -- A wall from (x1, z1) to (x2, z2), y0 to y1 high and `thick` wide. In the site's frame a part turned by
 -- CFrame.Angles(0, a, 0) has its X axis along (cos a, sin a) in (X, D).
 function T.slab(
@@ -179,6 +224,7 @@ function T.rod(
 end
 
 local LOOSE = { collide = false, query = false, shadow = false }
+CueParts.BULGE = 0.012 -- studs a striped ball's white caps stand proud of its colour at the poles
 local SKIN = { collide = false, query = false, reflectance = 0.14 }
 local INK = { 22, 22, 24 }
 local DOT_RED = { 206, 36, 36 }
@@ -236,9 +282,11 @@ function CueParts.ball(t: any, parent: any, tableId: string, id: number, x: numb
 		end
 	else
 		if striped then
-			-- two white spheres, a hair smaller and a hair toward each pole: they cross the skin at the band's edge
+			-- two white spheres toward each pole: they cross the skin at the band's edge and stand clear of it
+			-- everywhere else (by up to BULGE at the pole), so the white always wins over the colour beneath and a
+			-- turning ball never flickers between the two
 			local edge = 0.44 * r
-			local bulge = 0.003
+			local bulge = CueParts.BULGE
 			local h = r - edge + bulge
 			local capR = (r * r - edge * edge + h * h) / (2 * h)
 			local lift = r + bulge - capR

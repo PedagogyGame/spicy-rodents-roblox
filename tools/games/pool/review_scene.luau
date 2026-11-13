@@ -10,7 +10,8 @@
 --                       pocket with the rack, the tray; the bumper pool table from its end and from above
 -- With "play" a table is shown as a game leaves it (a spread of balls, some down in the tray) instead of an
 -- idle rack. Usage, from the repo root:
---   lune run tools/games/pool/review_scene.luau [out dir, default build/review_pool] [play] [nolamp]
+--   lune run tools/games/pool/review_scene.luau [out dir, default build/review_pool] [play] [nolamp] [roll]
+-- ("roll": table 2 shows striped balls turned four ways, and the view pool2_roll looks at them)
 --   /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene <out>/scene.json \
 --       --views <out>/views.json --out <out>
 -- Interface: a script; writes the three files and prints what it wrote.
@@ -30,6 +31,7 @@ local attractionsExport = require("../../review/attractions_export")
 local OUT = process.args[1] or "build/review_pool"
 local PLAY = process.args[2] == "play"
 local NOLAMP = process.args[3] == "nolamp"
+local ROLL = process.args[4] == "roll"
 local PLACE: AlleyLayout.Place = { x = 0, z = 0, floorY = 0, yaw = 0 }
 
 local kit = Kit.new(roblox, PLACE)
@@ -119,6 +121,38 @@ if PLAY then
 		spread(st)
 	end
 end
+-- "roll": on pool table 2, the 11 and the 13 four times each, turned a little further every time as a rolling ball
+-- turns (and a solid beside them), to look at a striped ball from every side
+if ROLL then
+	for _, st in stations do
+		if st.game ~= "pool" or st.index ~= 2 then
+			continue
+		end
+		local model = room:FindFirstChild(Furniture.modelName(st.game, st.index))
+		local tb = Tables.eightBall()
+		for row, id in { 11, 13, 3 } do
+			local ball = model and model:FindFirstChild(Furniture.ballName(id))
+			if ball == nil then
+				continue
+			end
+			for k = 0, 3 do
+				local copy = ball:Clone()
+				copy.Name = `Roll{id}_{k}`
+				copy.Parent = model
+				local skin = copy:FindFirstChild("Skin")
+				local wx, wy, wz = Furniture.world(PLACE, st, -0.9 + k * 0.6, tb.ballR, -1 + row * 0.6)
+				local to = roblox.CFrame.new(wx, wy, wz) * roblox.CFrame.Angles(k * 0.55, k * 0.3, 0)
+				local by = to * skin.CFrame:Inverse()
+				for _, p in copy:GetDescendants() do
+					if p:IsA("BasePart") then
+						p.CFrame = by * p.CFrame
+					end
+				end
+			end
+		end
+	end
+end
+
 -- "nolamp": the lamps taken down, as the game hides them for the top view
 if NOLAMP then
 	for _, st in stations do
@@ -153,6 +187,15 @@ for _, st in stations do
 	local hw, hl = Furniture.outer(tb)
 	local tag = if st.game == "pool" then `pool{st.index}` else "bumper"
 	if st.game == "pool" and st.index ~= 1 then
+		if ROLL then
+			view(
+				"pool2_roll",
+				"Pool table 2: the 11, the 13 and the 3, each turned four ways as a rolling ball turns, close.",
+				world(st, 0, 0.75, -1.6),
+				world(st, 0, 0.05, 0.3),
+				38
+			)
+		end
 		continue
 	end
 	-- the shooter's stance at the head of the table: eyes of a person standing behind the head rail

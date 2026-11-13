@@ -5,10 +5,9 @@
 --   the shooter's controller is Pool/CueController (aim line and ghost ball, the cue drawn back for power, the
 --     tip, walking round the table, the top view), given what is bumper pool's own below: there is no cue
 --     ball, you strike one of YOUR five (the marked one first; click another, or R, 1 to 5, the D-pad), in
---     the opening only your marked ball; in the opening both players strike (the first seat, then the
---     second: the service hands a turn game's input only to the seat whose turn it is) and the table plays
---     the two strikes together when the second is in; the cue first points at your cup, or in the opening at the bank off
---     the cushion on your right;
+--     the opening only your marked ball; in the opening both players strike, in either order (the server's
+--     table takes either opener's strike), and the table plays the two strikes together when the second is
+--     in; the cue first points at your cup, or in the opening at the bank off the cushion on your right;
 --   what EVERYONE sees: "bumper_pool_shot" is one shot's script (Shared/Minigames/Pool/Wire), played back on
 --     the table's balls by Pool/Playback whether or not you are in that game (the opening's two strokes
 --     together); "bumper_pool_rack" lays the balls out;

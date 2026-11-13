@@ -18,11 +18,20 @@
 --   WALK  V gives your legs and your own camera back: walk round the table, and V again takes the shot from
 --         where you stand (the line from you through the ball).
 --   Bumper pool: click one of your balls (or R) to choose which to strike.
--- After the strike the camera rises to watch the balls run (the top view for a break) until the last one has
--- stopped. Between turns your legs and camera are your own; T still gives the top view to watch from.
--- Gamepad: left stick aims (L1 / R1 nudge), right stick sets the spin, hold and release R2, Y top view, X
--- walk, D-pad moves a ball in hand, picks the pocket or the ball, A sets the ball down. Touch: drag to aim,
--- drag the dot, pull the bar, and the hold buttons (HOLD TO SHOOT, TOP VIEW, WALK, DONE).
+-- You stand a little to the left of the line and your own body is hidden while the view is down the cue (the
+-- eye never sits in your head). Letting go brings the cue through at once; the view stays down the cue until
+-- the tip has met the ball, then rises, eased, to watch the balls run (the break cuts to the top view just
+-- after the crack) until the last one has stopped. While you aim, your aim is told to the server about eight
+-- times a second, so the other player and anyone watching see your cue swing (Playback.aim). Between turns
+-- your legs are your own and the camera follows the other player's shot from behind its line (V: your own
+-- camera; T: the top view). The winning shot's slow replay is watched from beyond its pocket, and the end card
+-- waits for it (replaying()).
+-- A / D start with a hair and gather speed while held (Shift: fine). Gamepad: left stick aims (its push
+-- squared; L1 / R1 nudge, and walk the aim while held), right stick moves the spin and leaves it (R3
+-- centres), hold and release R2, Y top view, X walk, D-pad moves a ball in hand, picks the pocket or the ball,
+-- A sets the ball down. Touch: drag to aim (FINE AIM held, or a second finger down, makes it fine; the roll of
+-- a lifting finger is not aim), drag the dot, pull the bar, and the hold buttons (HOLD TO SHOOT, FINE AIM,
+-- TOP VIEW, WALK, DONE).
 -- The main client's rules (MinigameClient's header): shots go through ctx.camera / ctx.releaseCamera; the
 -- cursor is the one MinigameUI's buttons ask for; nothing from before a hand-over of the keys counts; nothing
 -- is left bound after stop(). A finger is followed by its InputObject. One "shoot" (and a "place" or "call"
@@ -30,7 +39,10 @@
 -- Interface: new(ctx, mode: Game) -> Controller (onState, onMessage, onRefused, stop); Controller facts a spec
 --   reads: phase ("off" | "place" | "aim" | "walk" | "sent" | "watch"), angle, power, tipX, tipY, sel,
 --   pocket, top, preview; pad() / strip() -> the widgets' rectangles in pixels; live[stationId] -> the
---   Controller open at that station; constants (TURN, DRAG, RISE, MIN_POWER ...)
+--   Controller open at that station; strokeLeft(stationId, seat) -> seconds until my own cue meets the ball,
+--   or nil; aiming(stationId, seat) -> is it my own aim; replaying() -> is a replay holding the end card back;
+--   device() -> "keyboard" | "gamepad" | "touch"; help(how, keys by device) -> the How-to-play card;
+--   constants (TURN, DRAG, RISE, MIN_POWER, STROKE, HOLD_CUE, RISE_CAM ...)
 
 local Import = require("../../Import")
 local AlleyLayout =
