@@ -275,11 +275,16 @@ return function(t)
 				local function refusedOrigin(over: { [string]: number }, what: string)
 					kit.run(0.3)
 					local a = ack(kit, ada, ada.fire(1, 0, 0, over))
-					t.deepEq({ a.ok, a.why }, { false, "origin" }, what)
+					t.deepEq(
+						{ a.ok, a.why },
+						{ false, "origin" },
+						`{what} (the server said {tostring(a.ok)}, {tostring(a.why)})`
+					)
 				end
 				refusedOrigin({ ox = -27 }, "from the far side of the wall")
 				refusedOrigin({ ox = -29.8 }, "within a stud, but inside the cover")
-				refusedOrigin({ oz = -5 + 1.5 }, "a stud and a half to one side")
+				-- (the slack is a stud, and walking pace for the twentieth of a second since her newest Move: 1.85 at the most)
+				refusedOrigin({ oz = -5 + 2.5 }, "two and a half studs to one side")
 				refusedOrigin({ dx = 0 }, "no direction")
 				-- an honest shot from the eye, with the stud of slack a moving body needs
 				kit.run(0.3)
@@ -859,7 +864,7 @@ return function(t)
 			if not ok then
 				error(err, 0)
 			end
-			t.deepEq(result.failures, {})
+			t.eq(table.concat(result.failures, "; "), "", "what the server check found")
 			t.truthy(result.ok)
 			t.truthy(result.numbers.balls >= 3, `{result.numbers.balls} balls`) -- (lined up as they are, nearly every ball tags)
 			t.truthy(result.numbers.tags > 0, "the bots tagged each other")

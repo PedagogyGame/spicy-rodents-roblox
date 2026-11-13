@@ -2,12 +2,17 @@
 -- ServerStorage.EngineTests.PaintballFlow (CI place only; injected with --inject ci.project.json or a saved version)
 -- A whole paintball match on a server with no clients, bots only (brief v2 §13; checklist PB-6, PB-12, PB-14,
 -- PB-15), as plain results. One PlayerLike stub buys a pass and joins at the arena door (a match needs one
--- person or the framework closes the table) and stands in its spawn room for the whole of it, its pose
--- handed to the service twenty times a second as its client would send it; the bots play. What is checked:
+-- person or the framework closes the table) and stands in its spawn room for the whole of it, looking a
+-- little to one side and the other (a person who neither moves, turns nor fires for a minute of live play is
+-- taken off), its pose handed to the service twenty times a second as its client would send it; the bots
+-- play. What is checked:
 --   the pass     no seat without one; the desk sells it once and seats nobody
 --   the roster   one person and seven bots, four a side; everybody placed in a spawn room, the person's own
 --                body moved there and put in the bodies' collision group
---   the match    the briefing, then live: snapshots twenty a second, the bots' balls, tags that add up to
+--   the match    the briefing, then live: snapshots twenty a second, the bots' balls (the watch goes on,
+--                up to `ballWait` more seconds, until the first: the real brains take their time to find
+--                each other in five storeys, and those of the person's side keep her company, so with her in
+--                her room half of them stay near it), tags that add up to
 --                the scores; a click from inside the spawn room refused with its reason; one scripted tag
 --                (MinigameService:debug(station, "tag", by, id)) heard with the new score, and that slot
 --                back in play after its respawn time
@@ -18,11 +23,11 @@
 --                group, the audience is told, and the arena costs nothing more
 -- and what the service's step cost while the match was live (Stats: the whole step and its three shares).
 -- TIME IS REAL HERE: the match is slaved to the clock clients share (workspace:GetServerTimeNow), so the
--- briefing takes its ten seconds; the whole flow is about a minute. play() takes any MinigameService and a
+-- briefing takes its ten seconds; the whole flow is one to three minutes. play() takes any MinigameService and a
 -- `step(seconds)` that moves the world on by that long, so the Lune suite runs this same flow on the fake
 -- engine first (tests/isolated/paintball_server_fire: there with the server lane's scripted match model and
--- scripted bots, since the real ones are other lanes'); the check is itself checked before a cloud run is
--- spent on it.
+-- scripted bots, since the real ones are other lanes'; tests/isolated/paintball_server_joined: with the real
+-- ones, once the lanes are joined); the check is itself checked before a cloud run is spent on it.
 -- Interface: run() -> Result (engine only: boots Server/Boot/Game); play(svc, deps, opts) -> Result { ok,
 --   failures, numbers }
 
@@ -35,6 +40,7 @@ export type Opts = {
 	positionOf: ((player: any) -> (number?, number?, number?))?, -- a player's body's root, world studs
 	groupOf: ((player: any) -> string?)?, -- the collision group its body is in
 	liveSeconds: number?, -- how long the bots are watched playing (default 12)
+	ballWait: number?, -- how much longer the watch goes on for the bots' first ball (default 120)
 }
 
 function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
@@ -132,7 +138,8 @@ function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 					x = placed.x,
 					y = placed.y,
 					z = placed.z,
-					yaw = placed.yaw,
+					-- (she looks about: nobody who is there stands like a statue for a minute)
+					yaw = placed.yaw + 0.3 * math.sin(service.ctx.stamp() * 0.7),
 					pitch = 0,
 					bits = 0,
 					place = placed.place,
@@ -214,11 +221,19 @@ function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 	check(stateLive ~= nil and stateLive.view.game.phase == "live", "the seated were told it is live")
 
 	-- 4. the bots play
-	local watchFor = opts.liveSeconds or 12
 	local snaps, ballsWere = stats.snapshots, stats.balls
+	local watchFrom = service.ctx.stamp()
 	sampling = true
-	tend(watchFor)
+	tend(opts.liveSeconds or 12)
+	-- (and on, until the first ball: see the header)
+	if stats.balls == ballsWere then
+		tend(opts.ballWait or 120, function(): boolean
+			return stats.balls > ballsWere
+		end)
+		tend(1)
+	end
 	sampling = false
+	local watchFor = service.ctx.stamp() - watchFrom
 	numbers.liveSeconds = watchFor
 	numbers.snapshots = stats.snapshots - snaps
 	numbers.balls = stats.balls - ballsWere
@@ -227,7 +242,7 @@ function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 		numbers.snapshots >= watchFor * Clock.SNAP_HZ * 0.8,
 		`{numbers.snapshots} snapshots in {watchFor} s (the rate is {Clock.SNAP_HZ} a second)`
 	)
-	check(numbers.balls > 0, "no bot fired a ball")
+	check(numbers.balls > 0, `no bot fired a ball in {watchFor} s of live play`)
 	local state = stateOf()
 	check(state.scores[1] + state.scores[2] == stats.tags, "the scores are the tags")
 	check(count(p1, "paintball_tag") == stats.tags, "every tag was told to the seated")
@@ -239,7 +254,11 @@ function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 		end
 		numbers[name] = { avg = if #list > 0 then sum / #list else 0, max = worst }
 	end
-	check(stats.movesRefused == 0 and stats.corrections == 0, "the person, standing still, was never refused")
+	check(
+		stats.movesRefused == 0 and stats.corrections == 0,
+		"the person, standing where she was put, was never refused"
+	)
+	check(session.phase == "playing" and service.ctx.seatOf(p1) == seat, "the person is still in her seat")
 	-- a click from inside the spawn room
 	service:onFire(p1, {
 		shot = 1,

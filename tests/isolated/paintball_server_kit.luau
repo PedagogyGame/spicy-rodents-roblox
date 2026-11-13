@@ -2,7 +2,11 @@
 -- tests/isolated/paintball_server_kit.luau: what the paintball server lane's cases share. A case is a whole
 -- game on the fake engine (tests/lib/MinigameRig with paintball's remotes beside it, tests/lib/PaintballRig):
 -- the real MinigameService, Session and PaintballService, with
---   * the scripted match model in the stub Rules' place (tests/isolated/paintball_server_model);
+--   * the scripted match model in the stub Rules' place (tests/isolated/paintball_server_model). WHEN THE
+--     LANES ARE JOINED the same cases can be run against the real model and the real brains: with
+--     PAINTBALL_REAL=1 in the environment (or opts.realModel) nothing is put in Rules' place, so every case
+--     says where the server lane's reading of the match differs from the match-and-bots lane's own
+--     (`PAINTBALL_REAL=1 lune run tests/run.luau paintball_server`; Kit.REAL says which is in force);
 --   * SCRIPTED CLIENTS for the people in the match: PlayerLike stubs that send Wire.Move twenty times a second
 --     and Wire.Fire when told, through the real Shared/Net (PaintballRig.send), each with its own delay in
 --     frames either way, jitter and loss, and that hear what the service sends them the same delay later
@@ -31,8 +35,12 @@ local FakeEngine = require("@tests/lib/FakeEngine")
 local PaintballRig = require("@tests/lib/PaintballRig")
 local Rig = require("@tests/lib/MinigameRig")
 local Model = require("@tests/isolated/paintball_server_model")
+local process = require("@lune/process")
 
 local Kit = {}
+
+-- the real match model and brains are left in place (the lanes are joined, and somebody asked)
+Kit.REAL = process.env.PAINTBALL_REAL == "1"
 
 export type Client = { [string]: any }
 export type Kit = { [string]: any }
@@ -144,7 +152,8 @@ end
 
 function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 	local o: { [string]: any } = opts or {}
-	local undo = Model.install()
+	local real = Kit.REAL or o.realModel == true
+	local undo = if real then function() end else Model.install()
 	local wires = PaintballRig.new({ lag = o.lag })
 	local arena = o.arena or Kit.hall()
 	local deps: { [string]: any } = { arena = arena, feel = o.feel, seed = 5 }
@@ -509,7 +518,15 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 		-- the briefing cut short, and everybody's protection run out: the match is live and anyone may fire
 		function kit.live()
 			local state = kit.state()
-			Model.liveNow(state, kit.now())
+			if real then
+				-- (the real model's own way into live play: its briefing clock run out)
+				state.endsAt = kit.now()
+				kit.untilTrue(1, function(): boolean
+					return state.phase == "live"
+				end)
+			else
+				Model.liveNow(state, kit.now())
+			end
 			for _, slot in state.slots do
 				slot.safeUntil = kit.now()
 			end
