@@ -387,7 +387,7 @@ function SkyLiftService.new(opts: Opts): any
 		local pillar = baked[station]
 		local at: Vector3
 		if pillar then
-			at = (pillar :: any).Position + Vector3.new(0, 0.6, 0)
+			at = (pillar :: any).CFrame.Position + Vector3.new(0, 0.6, 0)
 		else
 			-- no bake: by the board point, STEP_BACK back from the door, at chest height
 			at = Vector3.new(
@@ -423,7 +423,7 @@ function SkyLiftService.new(opts: Opts): any
 				-- the bake's HingeX is in the venue's frame: which end of the arm is it?
 				local hingeX = arm:GetAttribute("HingeX")
 				if type(hingeX) == "number" then
-					local p = (arm :: any).Position
+					local p = (arm :: any).CFrame.Position
 					local lx = AlleyLayout.toLocal(placeOf(venueOf(st.venue)), p.X, p.Y, p.Z)
 					gate.armSide = if hingeX >= lx then 1 else -1
 				end
