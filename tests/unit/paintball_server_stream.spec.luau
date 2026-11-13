@@ -573,4 +573,54 @@ return function(t)
 			t.eq(PassDesk.daySecs(), 720, "a game day is the town's twelve minutes")
 		end
 	)
+
+	t.test(
+		"the pass desk charges once however the desk is pressed: a second press while the town is still taking the money is answered and costs nothing; a town that fails leaves the desk open",
+		function()
+			local charged = 0
+			local waiting: thread? = nil
+			local fail = false
+			local desk = PassDesk.new(function(_player: any, _cents: number, _why: string): (boolean, string?)
+				if fail then
+					error("the wallet is away", 0)
+				end
+				charged += 1
+				waiting = coroutine.running()
+				coroutine.yield() -- (a wallet kept in a store takes its time)
+				return true, nil
+			end, function(): number
+				return 1
+			end)
+			local ada, bea = { UserId = 41 }, { UserId = 42 }
+			local first: { any } = {}
+			local press = coroutine.create(function()
+				first = { desk.buy(ada) }
+			end)
+			coroutine.resume(press)
+			t.eq(charged, 1, "the town is taking the money")
+			t.falsy(desk.has(ada), "no pass until it is paid for")
+			-- she presses again (and from another Player object of hers) before the first has come back
+			t.deepEq({ desk.buy(ada) }, { false, Contract.textFor("phase") })
+			t.deepEq({ desk.buy({ UserId = 41 }) }, { false, Contract.textFor("phase") })
+			t.eq(charged, 1, "charged once")
+			coroutine.resume(waiting :: thread)
+			t.deepEq(first, { true, Contract.textFor("bought") })
+			t.truthy(desk.has(ada))
+			t.deepEq({ desk.buy(ada) }, { false, Contract.textFor("has_pass") })
+			t.eq(charged, 1)
+			-- a town that fails: the fault is shown, nothing is sold, and the desk is not left shut
+			fail = true
+			t.falsy(pcall(desk.buy, bea), "the town's fault is not swallowed")
+			t.falsy(desk.has(bea))
+			fail = false
+			local second = coroutine.create(function()
+				first = { desk.buy(bea) }
+			end)
+			coroutine.resume(second)
+			t.eq(charged, 2, "the desk is open to her again")
+			coroutine.resume(waiting :: thread)
+			t.deepEq(first, { true, Contract.textFor("bought") })
+			t.truthy(desk.has(bea))
+		end
+	)
 end
