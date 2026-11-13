@@ -58,6 +58,8 @@ SpeechRules.CHANCE = table.freeze({
 	symptoms = 1,
 	crew = 1,
 	cured = 1,
+	drain = 0.8,
+	stakeout = 1,
 }) :: { [string]: number }
 
 -- How often a spotting line is the owner's own, when it was not the last line said in town.

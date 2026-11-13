@@ -57,7 +57,8 @@
 -- Interface: new(opts) -> Service; :bite(victimId, biterId?, by?) -> boolean (a new infection began);
 --   :onSpotted(observerId, threatId); :step(dt); :isInfected(id); :biteable(id); :stateOf(id) ->
 --   string?; :statusOf(id) -> string? (for the player holding `id`); :townPercent(); :trafficFlags(id)
---   -> boolean; :cases() -> { [id]: Case }; :walkRoute(x, z) -> ({ {x, z} }?, length);
+--   -> boolean; :cases() -> { [id]: Case }; :feared() -> { actor } (the squirrels people are afraid of now:
+--   the rodent and infected squirrels, not those hidden down a drain); :walkRoute(x, z) -> ({ {x, z} }?, length);
 --   :sidewalkRoute(x, z) -> ({ {x, z} }?, length) (the pavements only); :shutdown(); :stats();
 --   TOASTS; TICK; SINK
 -- Ids are TownAI actor ids. Positions in studs.
@@ -666,15 +667,26 @@ end
 
 -- scenes -----------------------------------------------------------------------------------------
 
--- the squirrels people are afraid of, in sight: the Spicy Rodent and any infected squirrel
+-- the squirrels people are afraid of, in sight: the Spicy Rodent and any infected squirrel, unless something
+-- hides it (down a storm drain: AI/TownAI's cover), so nobody is scared by one under the street
 local function threats(self: Service): { any }
 	local out = {}
-	for _, o in self.world.actors do
-		if o.species == "squirrel" and (o.variant == "spicy" or o.infected == true) and (o.lift or 0) == 0 then
+	local world = self.world
+	for _, o in world.actors do
+		if
+			o.species == "squirrel"
+			and (o.variant == "spicy" or o.infected == true)
+			and (o.lift or 0) == 0
+			and TownAI.covered(world, o.id) == nil
+		then
 			table.insert(out, o)
 		end
 	end
 	return out
+end
+
+function InfectionService.feared(self: Service): { any }
+	return threats(self)
 end
 
 -- the threat within `r` studs of (x, z) that is nearest, if any

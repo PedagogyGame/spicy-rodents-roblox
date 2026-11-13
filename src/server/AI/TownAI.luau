@@ -12,10 +12,19 @@
 -- World/Ground over Town pavement (walkers never take roofs). Steppable and pure: Lune runs the
 -- SimFull-style liveness test; Server/Actors/ActorsRuntime adds bodies and possession in the engine.
 -- Brains report what the services care about through ctx.emit (a person spotting a squirrel):
--- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them.
+-- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them, and each
+-- one is also handed at once to every listener (listen), so a service that needs to hear them does not
+-- race the one that drains the queue.
+-- COVER (the storm drains, BRIEF_ADDENDUM D8; Server/World/SewerService installs it with setCover): a
+-- squirrel-species actor the cover hides (`under(x, y, z)` names a space) is taken out of the threat
+-- grid, so every brain that looks for squirrels through it (people spotting, the fox hunting, the deer
+-- startling) loses it, unseen and unheard, as in v5.4. A change is an event, "covered" (with `space`) or
+-- "uncovered". A body let go while hidden is put back where the cover says (`surface`: the drain's
+-- mouth) before the AI takes it. With no cover set nothing changes.
 -- Interface: build(opts) -> World; stepFrame(world, dt) -> FrameMetrics; liveness(world) -> Liveness;
 --   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn);
---   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?)
+--   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?);
+--   listen(world, fn) -> unlisten; setCover(world, cover?); covered(world, id) -> space?
 -- Pure; studs. Nothing runs until stepFrame is called (rule 4).
 
 local Import = require("../Import")
@@ -59,7 +68,15 @@ export type Opts = {
 
 export type FrameMetrics = { brainMs: number, motorMs: number, gridMs: number, totalMs: number, ticked: number }
 
-export type Event = { kind: string, id: number, other: number?, t: number }
+export type Event = { kind: string, id: number, other: number?, t: number, space: string? }
+
+-- What hides a squirrel (the storm drains). under: the space whose volume holds the point (world studs, the
+-- actor's own y), nil in the open. surface: where a body let go at that point is put (ground-level y, and the
+-- yaw to face), nil to leave it where it is.
+export type Cover = {
+	under: (x: number, y: number, z: number) -> string?,
+	surface: ((x: number, y: number, z: number) -> (number?, number?, number?, number?))?,
+}
 
 export type World = {
 	opts: Opts,
@@ -80,6 +97,9 @@ export type World = {
 	possessed: { [number]: boolean }, -- actor ids driven by players (their brains are suspended)
 	nextId: number,
 	events: { Event }, -- what the brains reported since the last drainEvents
+	listeners: { (ev: Event) -> () }, -- told of every event as it is emitted
+	cover: Cover?,
+	covered: { [number]: string? }, -- squirrel-species actor id -> the space hiding it (refreshed every frame)
 }
 
 local TownAI = {}
@@ -133,6 +153,39 @@ local function shopSites(data: any): { { number } }
 	return out
 end
 
+-- emit: queue an event (the newest MAX_EVENTS are kept) and tell every listener now.
+function TownAI.emit(world: World, ev: Event)
+	local events = world.events
+	if #events >= TownAI.MAX_EVENTS then
+		table.remove(events, 1)
+	end
+	table.insert(events, ev)
+	for _, fn in table.clone(world.listeners) do
+		fn(ev)
+	end
+end
+
+-- the threat grid for one squirrel-species actor: out of it while the cover hides it, and an event when that
+-- changes
+local function placeThreat(world: World, actor: Common.Actor)
+	local cover = world.cover
+	local space = if cover then cover.under(actor.x, actor.y, actor.z) else nil
+	local was = world.covered[actor.id]
+	if space ~= was then
+		world.covered[actor.id] = space
+		if space then
+			TownAI.emit(world, { kind = "covered", id = actor.id, t = world.now, space = space })
+		else
+			TownAI.emit(world, { kind = "uncovered", id = actor.id, t = world.now, space = was })
+		end
+	end
+	if space then
+		world.grid:remove(actor.id)
+	else
+		world.grid:set(actor.id, actor.x, actor.z)
+	end
+end
+
 function TownAI.build(opts: Opts): World
 	local data = opts.data
 	local rng = mulberry32(opts.seed or 1)
@@ -183,13 +236,12 @@ function TownAI.build(opts: Opts): World
 		possessed = {},
 		nextId = 0,
 		events = {},
+		listeners = {},
+		cover = nil,
+		covered = {},
 	}
 	ctx.emit = function(kind: string, actor: Common.Actor, other: Common.Actor?)
-		local events = world.events
-		if #events >= TownAI.MAX_EVENTS then
-			table.remove(events, 1)
-		end
-		table.insert(events, { kind = kind, id = actor.id, other = if other then other.id else nil, t = world.now })
+		TownAI.emit(world, { kind = kind, id = actor.id, other = if other then other.id else nil, t = world.now })
 	end
 	local counts = world.counts
 
@@ -363,7 +415,7 @@ function TownAI.build(opts: Opts): World
 	end
 	for _, actor in actors do
 		if actor.species == "squirrel" then
-			grid:set(actor.id, actor.x, actor.z)
+			placeThreat(world, actor)
 		end
 	end
 	scheduler:setFocus(function()
@@ -374,6 +426,31 @@ end
 
 function TownAI.setFocus(world: World, fn: () -> { BrainScheduler.Focus })
 	world.scheduler:setFocus(fn)
+end
+
+-- listen: fn(ev) is called with every event as it is emitted (inside stepFrame, after the brains that
+-- emit it have thought). Returns the call that stops it.
+function TownAI.listen(world: World, fn: (ev: Event) -> ()): () -> ()
+	table.insert(world.listeners, fn)
+	return function()
+		local i = table.find(world.listeners, fn)
+		if i then
+			table.remove(world.listeners, i)
+		end
+	end
+end
+
+-- setCover: what hides a squirrel from now on (nil: nothing does; every hidden actor is in the open again).
+function TownAI.setCover(world: World, cover: Cover?)
+	world.cover = cover
+	if cover == nil then
+		table.clear(world.covered)
+	end
+end
+
+-- covered: the space hiding actor `id` as of the last frame, nil when it is in the open.
+function TownAI.covered(world: World, id: number): string?
+	return world.covered[id]
 end
 
 -- One 60 Hz server frame: brains (budgeted, LOD), AI motors for every AI-driven actor, threat grid.
@@ -392,10 +469,9 @@ function TownAI.stepFrame(world: World, dt: number): FrameMetrics
 		end
 	end
 	local t2 = os.clock()
-	local grid = world.grid
 	for _, actor in world.actors do
 		if actor.species == "squirrel" then
-			grid:set(actor.id, actor.x, actor.z)
+			placeThreat(world, actor)
 		end
 	end
 	local t3 = os.clock()
@@ -422,6 +498,15 @@ end
 function TownAI.resume(world: World, id: number, x: number, y: number, z: number, yaw: number?)
 	local actor = world.actorsById[id]
 	world.possessed[id] = nil
+	-- let go where the cover hides it (down a drain): the AI takes it at the way out
+	local cover = world.cover
+	if cover and cover.surface and cover.under(x, y, z) then
+		local sx, sy, sz, syaw = cover.surface(x, y, z)
+		if sx and sy and sz then
+			x, y, z = sx, sy + actor.hip, sz
+			yaw = syaw or yaw
+		end
+	end
 	actor.x, actor.y, actor.z = x, y, z
 	if yaw then
 		actor.yaw = yaw
