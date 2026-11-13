@@ -8,7 +8,8 @@
 -- origin "attraction" and explicit flags. A route of kind "tunnel" carries its `enclosure` record (Shared/Routes/
 -- Enclosure: the enclosed-run contract); the compiler turns each mouth's `out` from the local frame into a world unit
 -- vector and checks the record (Enclosure.validate) and the set (Enclosure.validateSet: links name real routes,
--- end links stay inside their enclosure, every enclosure has a way in). Invariants: ids unique and clear of the
+-- end links stay inside their enclosure, every enclosure has a way in; Motion.enclosureErrors: every link reaches
+-- its route within a transfer). Invariants: ids unique and clear of the
 -- harvest, at least two points, every point inside the footprint, every enclosure valid.
 -- Interface: compile(ctx) -> Module? (nil when the file is absent)
 local fs = require("@lune/fs")
@@ -17,6 +18,8 @@ local Schema = require("./Schema")
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
 local Curve = require("../../../src/shared/Routes/Curve")
 local Enclosure = require("../../../src/shared/Routes/Enclosure")
+local Motion = require("../../../src/shared/Routes/Motion")
+local Registry = require("../../../src/shared/Routes/Registry")
 
 local Attractions = {}
 
@@ -123,6 +126,11 @@ function Attractions.compile(ctx: any): any?
 	end
 	local setErrs = Enclosure.validateSet(routes, ctx.routeIds)
 	ctx.invariant("attraction enclosures consistent", #setErrs == 0, table.concat(setErrs, "; "))
+	if #setErrs == 0 then
+		-- what only the curves show: every link reaches its route within a transfer
+		local linkErrs = Motion.enclosureErrors(Registry.fromRecords(routes :: any), ctx.routeIds)
+		ctx.invariant("attraction enclosure links reach", #linkErrs == 0, table.concat(linkErrs, "; "))
+	end
 	ctx.compare("attraction routes (data/attractions.json)", #routes, #routes)
 	return {
 		name = "Attractions",

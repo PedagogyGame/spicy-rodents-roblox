@@ -1,6 +1,6 @@
 # Compile report: authored data -> `generated/`
 
-Generated 2026-11-09T21:10:22.974944421+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
+Generated 2026-11-13T17:35:10.283954996+00:00 by `tools/compile` (Lune lune 0.11.1). Command: `lune run tools/compile/main.luau compile` (see `tools/compile/README.md`). Staleness gate: `lune run tools/compile/main.luau check`.
 
 ## Inputs
 
@@ -102,7 +102,7 @@ Generated 2026-11-09T21:10:22.974944421+00:00 by `tools/compile` (Lune lune 0.11
 | escape hollows | 1 | 1 | match |  |
 | single-chamber hollows | 9 | 9 | match |  |
 | lots whose params were validated against a paramSchema | 73 | 73 | match |  |
-| attraction routes (data/attractions.json) | 6 | 6 | match |  |
+| attraction routes (data/attractions.json) | 3 | 3 | match |  |
 | expansion venues (data/expansion.json) | 46 | 46 | match |  |
 | tree art models (data/art/tree_meshes.json) | 95 | 95 | match |  |
 
@@ -127,7 +127,7 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 ## Validation and invariants
 
 - Schema validation: 24 file(s), 0 error(s).
-- Invariants checked: 8373, failed: 0.
+- Invariants checked: 8365, failed: 0.
 - warning: 8 lane(s) reference no road id (yard glides, verges, templated routes): kept with roadNote only
 - warning: duplicate cast names (ids disambiguated with their source line): Avery, Sam
 
@@ -135,17 +135,17 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 
 | module | records | bytes | require (ms, Lune) | source |
 |---|---|---|---|---|
-| Lots | 243 | 190158 | 7.0 | data/authored/town/lots/*.json |
-| Roads | 116 | 41940 | 1.7 | data/authored/town/roads.json |
+| Lots | 243 | 190158 | 6.5 | data/authored/town/lots/*.json |
+| Roads | 116 | 41940 | 1.9 | data/authored/town/roads.json |
 | Lanes | 25 | 18253 | 1.4 | data/authored/town/lanes.json |
 | Cast | 87 | 71807 | 1.7 | data/authored/cast/cast.json |
 | RoutesCatalog | 60 | 41830 | 1.2 | data/authored/routes/catalog.json |
-| Wildlife | 95 | 61201 | 3.5 | data/authored/wildlife/*.json |
-| Routes_01 | 391 | 204760 | 11.6 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_02 | 447 | 204694 | 8.5 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_03 | 413 | 205046 | 8.0 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Routes_04 | 81 | 36112 | 1.7 | data/harvest/routes.json (chunk 4 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
-| Forks | 95 | 193316 | 8.0 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Wildlife | 95 | 61201 | 7.9 | data/authored/wildlife/*.json |
+| Routes_01 | 391 | 204760 | 10.1 | data/harvest/routes.json (chunk 1 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_02 | 447 | 204694 | 8.9 | data/harvest/routes.json (chunk 2 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_03 | 413 | 205046 | 10.2 | data/harvest/routes.json (chunk 3 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Routes_04 | 81 | 36112 | 2.0 | data/harvest/routes.json (chunk 4 of 4; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
+| Forks | 95 | 193316 | 12.8 | data/harvest/forks.json (canopyForks; pinned to v5.4 HTML SHA-256 fc48b387e51ce3a454898d58d1cb3dda891b22ffad7110cdcd0ade6c777a6227) |
 | LotTypes | 0 | 23026 | 1.6 | data/authored/lot_types.json |
 | Interiors | 0 | 11610 | 1.0 | data/interiors/*.json |
 | Buildings | 0 | 6132 | 0.7 | data/buildings/*.json |
@@ -153,13 +153,13 @@ Distinct lot types: 74 (ambient_npcs, ambulance_bay, atrium, backyard_doghouse, 
 | Population | 0 | 3184 | 0.5 | data/population.json |
 | Hollows | 0 | 6284 | 0.7 | data/hollows.json |
 | TerrainExtensions | 0 | 2379 | 0.5 | data/terrain_extensions.json |
-| Lighting | 0 | 1163 | 0.5 | data/authored/town/lighting.json |
-| Attractions | 6 | 10825 | 0.9 | data/attractions.json |
-| Expansion | 46 | 137595 | 9.0 | data/expansion.json |
-| TreeArt | 95 | 176791 | 7.7 | data/art/tree_meshes.json |
+| Lighting | 0 | 1163 | 0.3 | data/authored/town/lighting.json |
+| Attractions | 3 | 10728 | 0.8 | data/attractions.json |
+| Expansion | 46 | 137595 | 13.2 | data/expansion.json |
+| TreeArt | 95 | 176791 | 7.5 | data/art/tree_meshes.json |
 | Index | 1 | 1714 | 0.5 | tools/compile (module list, counts and the harvest pin) |
 
-Total 23 files, 1662060 bytes; largest Routes_03 (205046 bytes, 8.0 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
+Total 23 files, 1661963 bytes; largest Routes_03 (205046 bytes, 10.2 ms to require under Lune). Routes are chunked at about 200 KB per module; `Index.luau` lists the chunks and counts.
 
 ## Notes for the lead
 

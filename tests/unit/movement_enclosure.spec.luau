@@ -22,6 +22,7 @@ local Registry = require("@shared/Routes/Registry")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local MoveValidator = require("@server/Movement/MoveValidator")
 local RouteAdapter = require("@server/AI/RouteAdapter")
+local SquirrelController = require("@client/Controllers/Squirrel")
 local BakedWorld = require("@tests/lib/BakedWorld")
 
 type Rec = Registry.RouteRecord
@@ -522,6 +523,9 @@ return function(t)
 			}
 			local recs: { Rec } = {}
 			for _, r in harvest:all() do
+				if r.origin == "attraction" then
+					continue -- the town's harvested routes only (the alley's runs are far away)
+				end
 				local pts = {}
 				for i, p in r.points do
 					pts[i] = { p.x, p.y, p.z }
@@ -653,5 +657,13 @@ return function(t)
 		t.truthy(w.graph:linked(3, 6))
 		t.falsy(linksOf(6)[3])
 		t.truthy(linksOf(3)[4], "the climb's top links its bough")
+	end)
+
+	t.test("the player is told: no room inside, and what the keys do with the head out of an opening", function()
+		local frame = { grab = false, leap = true }
+		local noRoom = SquirrelController.feedback(frame, { { kind = "hint", reason = "noRoom" } }, true)
+		t.truthy(noRoom ~= nil and string.find(noRoom, "No room", 1, true) ~= nil)
+		local lip = SquirrelController.feedback({ grab = false }, { { kind = "lip", reason = "ledge" } }, true)
+		t.truthy(lip ~= nil and string.find(lip, "Space", 1, true) ~= nil)
 	end)
 end
