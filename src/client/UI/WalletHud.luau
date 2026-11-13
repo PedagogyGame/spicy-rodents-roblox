@@ -15,7 +15,9 @@
 --                (the count is still taken from its note, so the next total is not said to hold it).
 --   PocketMoney  cents of pocket money given at this join: said for POCKET_SECS when the wallet first shows and
 --                whenever more is given: "Pocket money: S$3.00 to spend". (It is given once, so someone who
---                comes back is not told it again.)
+--                comes back is not told it again.) Said only while the stack can be seen: a join comes as the
+--                role menu opens, which hides the stack on a narrow screen, so the line waits for the menu to
+--                shut, and is said again in full if the menu hides it part-way.
 --   PassUntil    the game second the paintball pass runs out: while it has time left a line between the two
 --                says how much, in in-game days and real minutes, recounted once a second from the day clock
 --                (the ReplicatedStorage attributes Server/Boot/DayClock publishes): "Pass: 4.2 days (50 min)".
@@ -236,6 +238,7 @@ function WalletHud.start(opts: Opts?): WalletHud
 		return if camera then camera.ViewportSize.X else 1280
 	end
 	local placedAt: number? = nil
+	local onShown: ((shown: boolean) -> ())? = nil -- (set below, once the lines exist)
 	local function place()
 		local inMinigame = player:GetAttribute("InMinigame") ~= nil
 		if touch then
@@ -254,6 +257,9 @@ function WalletHud.start(opts: Opts?): WalletHud
 		local show = not WalletHud.underMenu(menuOpen(), viewportWidth())
 		if stack.Visible ~= show then
 			stack.Visible = show
+			if onShown then
+				onShown(show)
+			end
 		end
 	end
 	stack.Visible = true
@@ -341,10 +347,33 @@ function WalletHud.start(opts: Opts?): WalletHud
 			say(WalletHud.PASS_OVER, WHITE, WalletHud.PASS_OVER_SECS)
 		end
 	end
+	-- The pocket money line is said only while the stack can be seen: given while the role menu hides it (every
+	-- join on a phone, or in a narrow Studio window), it waits until the menu shuts; hidden again before its
+	-- time is up, it is said again in full when the stack comes back.
+	local pocketDue: number? = nil -- cents still to be said
+	local pocketToken: number? = nil -- the note's token while the line is up
+	local function sayPocket()
+		if pocketDue ~= nil and stack.Visible then
+			say(WalletHud.pocketText(pocketDue), WHITE, WalletHud.POCKET_SECS)
+			pocketToken = noteToken
+			pocketDue = nil
+		end
+	end
 	local function drawPocket()
 		local given = player:GetAttribute("PocketMoney")
 		if type(given) == "number" and given > 0 and shown ~= nil then
-			say(WalletHud.pocketText(given), WHITE, WalletHud.POCKET_SECS)
+			pocketDue = given
+			sayPocket()
+		end
+	end
+	onShown = function(visible: boolean)
+		if visible then
+			sayPocket()
+		elseif pocketToken == noteToken and note.Visible then
+			-- hidden while it was being said: say it again when the stack is back
+			local given = player:GetAttribute("PocketMoney")
+			pocketDue = if type(given) == "number" and given > 0 then given else nil
+			pocketToken = nil
 		end
 	end
 	local function drawBalance()

@@ -1374,4 +1374,94 @@ return function(t)
 			end)
 		end
 	)
+
+	t.test(
+		"the pocket money line waits for the role menu to shut on a narrow screen, and is never lost under it",
+		function()
+			FakeEngine.with(function()
+				FakeEngine.deferAttributes(true)
+				local w = town()
+				local player = (game :: any):GetService("Players").LocalPlayer
+				local heartbeat = (game :: any):GetService("RunService").Heartbeat
+				local camera = (workspace :: any).CurrentCamera
+				-- the review's case: Studio with its side panels open (900 wide), the role menu open as the HUD
+				-- starts (Client/Main starts it as the loading screen gives way to the menu), the join behind it
+				rawset(camera, "ViewportSize", roblox.Vector2.new(900, 700))
+				local play = FakeEngine.new("ScreenGui", WalletHud.MENU_GUI)
+				play.Parent = player:FindFirstChild("PlayerGui")
+				local menu = FakeEngine.new("Frame", WalletHud.MENU)
+				menu.Visible = true
+				menu.Parent = play
+				local hud = WalletHud.start({
+					now = function(): number
+						return w.t
+					end,
+					daySeconds = DAY,
+				})
+				local stack = hud.gui:FindFirstChild("Stack")
+				w.wallet.join(player)
+				FakeEngine.frame()
+				t.falsy(stack.Visible, "under the open menu")
+				t.eq(hud.balance.Text, "Wallet  S$3.00")
+				-- 25 seconds of choosing a role: any timer there was has run out
+				for _ = 1, 25 do
+					heartbeat.fire(1)
+				end
+				FakeEngine.runDelayed()
+				t.falsy(stack.Visible)
+				-- the menu shuts: the stack is back, and the line is said now, for its full time
+				menu.Visible = false
+				heartbeat.fire(1 / 60)
+				t.truthy(stack.Visible)
+				t.truthy(hud.note.Visible, "the pocket money line, after all")
+				t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+				t.eq(FakeEngine.delayedCount(), 1, "one timer: the line's own")
+				-- the menu opens again part-way through: said again in full when it shuts
+				menu.Visible = true
+				heartbeat.fire(1 / 60)
+				t.falsy(stack.Visible)
+				FakeEngine.runDelayed()
+				menu.Visible = false
+				heartbeat.fire(1 / 60)
+				t.truthy(hud.note.Visible)
+				t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+				-- once it has had its time it is not said again
+				FakeEngine.runDelayed()
+				t.falsy(hud.note.Visible)
+				menu.Visible = true
+				heartbeat.fire(1 / 60)
+				menu.Visible = false
+				heartbeat.fire(1 / 60)
+				t.falsy(hud.note.Visible, "said once")
+				-- a purchase's line is not mistaken for it: hidden part-way, it is simply gone
+				t.truthy(w.wallet.spend(player, 12, "coffee"))
+				FakeEngine.frame()
+				t.eq(hud.note.Text, "-12c  coffee")
+				menu.Visible = true
+				heartbeat.fire(1 / 60)
+				FakeEngine.runDelayed()
+				menu.Visible = false
+				heartbeat.fire(1 / 60)
+				t.falsy(hud.note.Visible)
+				t.eq(hud.balance.Text, "Wallet  S$2.88")
+				-- on a wide screen nothing waits: the line is up the moment the money is
+				-- (a new server: a fresh wallet, and a client that has been told nothing yet)
+				hud.stop()
+				for _, name in { "Cents", "CentsNote", "PocketMoney" } do
+					player:SetAttribute(name, nil)
+				end
+				FakeEngine.frame()
+				rawset(camera, "ViewportSize", roblox.Vector2.new(1920, 1080))
+				menu.Visible = true
+				local wide = WalletHud.start({ daySeconds = DAY })
+				t.falsy(wide.balance.Visible)
+				town().wallet.join(player)
+				FakeEngine.frame()
+				t.truthy(wide.gui:FindFirstChild("Stack").Visible, "room beside the menu")
+				t.truthy(wide.note.Visible)
+				t.eq(wide.note.Text, "Pocket money: S$3.00 to spend")
+				wide.stop()
+			end)
+		end
+	)
 end
