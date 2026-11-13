@@ -487,9 +487,9 @@ local function gamesReport(tbl: Machine.Table)
 					elseif cue == CUE.FLIP_UP then
 						flips += 1
 					elseif cue == CUE.ROLLOVER then
-						local name = tbl.def.sensors[out[i + 1]].id
-						if string.find(name, "lane_", 1, true) then
-							lanes[name] = (lanes[name] or 0) + 1
+						local lane = tbl.def.sensors[out[i + 1]].id
+						if string.find(lane, "lane_", 1, true) then
+							lanes[lane] = (lanes[lane] or 0) + 1
 						end
 					end
 				end
