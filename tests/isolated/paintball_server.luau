@@ -14,6 +14,7 @@ local Wire = require("@shared/Minigames/Paintball/Wire")
 local Rig = require("@tests/lib/MinigameRig")
 local PaintballRig = require("@tests/lib/PaintballRig")
 local Kit = require("@tests/isolated/paintball_server_kit")
+local Silent = require("@tests/isolated/paintball_server_silent")
 
 local R = Contract.Rules
 local T = Contract.TRUST
@@ -840,6 +841,75 @@ return function(t)
 				t.falsy(Arena.inVolume(x, y, z), "back in the lobby")
 				t.deepEq({ root.CollisionGroup, limb.CollisionGroup }, { "Default", "Default" })
 			end, { realEngine = true })
+		end
+	)
+
+	t.test(
+		"the silent stand-in, for another lane's cases that play the server themselves: the real service is built and bound and says not a word (nobody placed, nothing sent, Moves and clicks unanswered, nobody dropped); the real one is back after the undo",
+		function()
+			local undo = Silent.install()
+			local ok, err = pcall(Kit.play, function(kit)
+				local ada = kit.client("Ada")
+				t.deepEq({ kit.join(ada) }, { false, Contract.textFor("closed") }, "its own join seats nobody")
+				-- the case plays the server: it opens the door itself, and the framework seats her
+				kit.service.join = function(): (boolean, string?)
+					return true, nil
+				end
+				t.truthy(kit.join(ada))
+				kit.run(0.5)
+				t.eq(kit.session.phase, "playing")
+				t.truthy(ada.seat ~= nil, "the framework seated her")
+				t.truthy(kit.service.port ~= nil and kit.service.hw ~= nil, "the real service, bound to the wire")
+				-- she speaks (Moves twenty a second, a click), then says nothing for longer than any silence allowed
+				ada.place = 1
+				kit.run(1)
+				ada.fire(1, 0, 0)
+				kit.run(1)
+				t.truthy(#(kit.wires.heard["Paintball.Move"] or {}) >= 15, "her Moves reached the service")
+				t.eq(#(kit.wires.heard["Paintball.Fire"] or {}), 1, "and her click")
+				ada.silent = true
+				kit.run(Clock.DROP_SECS + T.placeGrace + 1)
+				-- not a word from the service
+				local said = 0
+				for _, m in ada.events do
+					if type(m.kind) == "string" and string.sub(m.kind, 1, 10) == "paintball_" then
+						said += 1
+					end
+				end
+				t.eq(said, 0, "no paintball message")
+				local streamed = 0
+				for _, list in ada.stub.streams or {} do
+					streamed += #list
+				end
+				t.eq(streamed, 0, "no snapshot, shot or splat")
+				t.deepEq({ ada.stub.body.teleports, ada.stub.body.ghost }, { 0, false }, "her body untouched")
+				local stats = kit.service:stats()
+				t.deepEq(
+					{ stats.movesAccepted, stats.movesRefused, stats.movesDropped, stats.snapshots, stats.balls },
+					{ 0, 0, 0, 0, 0 },
+					"nothing judged, nothing flown"
+				)
+				t.eq(kit.session.phase, "playing", "and nobody dropped")
+				t.deepEq(
+					{ kit.service:debug("tune", "ballSpeed", 120) },
+					{ true, nil },
+					"the owner's tuning still answers"
+				)
+				t.eq(kit.service.feel.ballSpeed, 120)
+			end)
+			undo()
+			if not ok then
+				error(err, 0)
+			end
+			-- the real service is back: a seat is a placement, and the audience is told
+			Kit.play(function(kit)
+				local ada = kit.client("Ada")
+				assert(kit.join(ada))
+				kit.run(0.5)
+				t.truthy(ada.last("paintball_respawn") ~= nil, "placed by the real service")
+				t.truthy(ada.last("paintball_watch") ~= nil)
+				t.truthy(ada.stub.body.teleports > 0)
+			end)
 		end
 	)
 end
