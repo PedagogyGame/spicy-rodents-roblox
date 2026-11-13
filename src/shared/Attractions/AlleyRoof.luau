@@ -115,8 +115,9 @@ AlleyRoof.CHORD = { y0 = 12.0, y1 = 12.32, width = 0.5, topY0 = 20.2, topY1 = 20
 AlleyRoof.LIGHT_RAIL = { y = 10.2, d0 = 0, d1 = 53.8, lampY = 9.9 }
 AlleyRoof.BRACE_X = { 96.9, -22.3 }
 AlleyRoof.BRACE_D = { d0 = -14.5, d1 = 53.0 }
--- Where people stand to see the rafters: the lane hall from the front rooms' wall to the masking, near the floor.
-AlleyRoof.HALL_WATCH = { x0 = -26, x1 = 101, d0 = -48, d1 = 66.5, y0 = -2, y1 = 4 }
+-- Where people stand to see the rafters: the lane hall from the front rooms' wall to the masking (Stealth/RafterWatch
+-- also asks for an eye near floor height).
+AlleyRoof.HALL_WATCH = { x0 = -26, x1 = 101, d0 = -48, d1 = 66.5 }
 
 -- THE VENT (lane L2; planned) ---------------------------------------------------------------------------------------
 AlleyRoof.AHU = {
