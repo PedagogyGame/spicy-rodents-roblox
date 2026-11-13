@@ -32,7 +32,8 @@
 --   3  master control behind windows, the tape library's shelving, telecine, the audio booth.
 --   4  offices, the boardroom, the transmitter hall; the hanging half of the lighting rig under the
 --      glass roof.
--- HEIGHTS A BODY MEETS: every low piece is exactly Arena.RAIL_HEIGHT above what it stands on (a
+-- HEIGHTS A BODY MEETS: every rail is exactly Arena.RAIL_HEIGHT and every piece of low cover exactly
+-- Arena.COVER_HEIGHT above what it stands on (a
 -- crouched body is hidden, a standing eye sees over) and NOTHING SOLID STANDS ON A LOW PIECE: what lies on
 -- a console, a planter or a desk top is paint (keys, soil, papers), so a ball aimed just over low cover
 -- flies over all of it. A piece that carries something solid (a desk with a terminal or a mirror, a cart
@@ -191,7 +192,7 @@ end
 
 function Plan.build(): Plan
 	local KIND = Arena.KIND
-	local H, RAIL = Arena.FLOOR_HEIGHT, Arena.RAIL_HEIGHT
+	local H, RAIL, COVER = Arena.FLOOR_HEIGHT, Arena.RAIL_HEIGHT, Arena.COVER_HEIGHT
 	local half, atrium, floors = Arena.HALF, Arena.ATRIUM, Arena.FLOORS
 	local DOOR = Plan.DOOR
 	local boxes: { number } = {}
@@ -479,7 +480,7 @@ function Plan.build(): Plan
 	-- A full-height wall 1 thick, with openings. `along` "x": it runs along x at z = c from a to b;
 	-- "z": along z at x = c. Each opening is { centre, width, kind? }: a doorway (a lintel over it
 	-- from DOOR up, and a `doorways` entry: a point either side of it), or with WINDOW after them a sill
-	-- RAIL_HEIGHT high with the lintel over it (low cover to shoot over; nobody walks through).
+	-- COVER_HEIGHT high with the lintel over it (low cover to shoot over; nobody walks through).
 	type Opening = { number }
 	local WINDOW = 1
 	local function wall(
@@ -512,7 +513,7 @@ function Plan.build(): Plan
 			piece(cursor, p, 0, top, KIND.wall)
 			piece(p, q, DOOR, top, KIND.wall)
 			if o[3] == WINDOW then
-				piece(p, q, 0, RAIL, KIND.cover)
+				piece(p, q, 0, COVER, KIND.cover)
 			elseif along == "x" then
 				doorway(level, o[1], c - 2.6, o[1], c + 2.6)
 			else
@@ -719,7 +720,7 @@ function Plan.build(): Plan
 		z1: number,
 		look2: string?
 	): (number, number)
-		return on(level, KIND.cover, look, x0, z0, x1, z1, 0, RAIL, look2)
+		return on(level, KIND.cover, look, x0, z0, x1, z1, 0, COVER, look2)
 	end
 	local function tall(
 		level: number,
@@ -767,7 +768,7 @@ function Plan.build(): Plan
 	-- (paint, not boxes: a ball aimed over a console flies over its keys)
 	local function console(level: number, x0: number, z0: number, x1: number, z1: number)
 		low(level, "console", x0, z0, x1, z1)
-		local y = level * H + RAIL
+		local y = level * H + COVER
 		if (x1 - x0) > (z1 - z0) then
 			floorMark(y, x0 + 0.5, z0 + 0.5, x1 - 0.5, z0 + 1.2, "keys")
 			floorMark(y, x0 + 0.5, z0 + 1.6, x1 - 0.5, z0 + 1.85, "keys_lamp")
@@ -781,7 +782,7 @@ function Plan.build(): Plan
 	local leaves = 0
 	local function planter(level: number, x0: number, z0: number, x1: number, z1: number)
 		low(level, "planter", x0, z0, x1, z1)
-		local y = level * H + RAIL
+		local y = level * H + COVER
 		floorMark(y, x0 + 0.3, z0 + 0.3, x1 - 0.3, z1 - 0.3, "soil")
 		local alongX = (x1 - x0) > (z1 - z0)
 		local len = if alongX then x1 - x0 else z1 - z0
@@ -1101,10 +1102,10 @@ function Plan.build(): Plan
 		tall(L, "cabinet", -58, 28.4, -52, 30, 7)
 		-- the news set in the north hall: the desk on its riser, the wall behind it, three cameras
 		on(L, KIND.slab, "riser", -10, -51, 10, -39, 0, 1)
-		local d1, d2 = on(L, KIND.cover, "news_desk", -7, -47, 7, -45, 1, 1 + RAIL)
+		local d1, d2 = on(L, KIND.cover, "news_desk", -7, -47, 7, -45, 1, 1 + COVER)
 		sign(d1, d2, "+z", "WBLW 7 NEWS", "gold", "WBLW 7 SPORTS")
-		on(L, KIND.cover, "news_desk", -7, -45, -5.5, -41.5, 1, 1 + RAIL)
-		on(L, KIND.cover, "news_desk", 5.5, -45, 7, -41.5, 1, 1 + RAIL)
+		on(L, KIND.cover, "news_desk", -7, -45, -5.5, -41.5, 1, 1 + COVER)
+		on(L, KIND.cover, "news_desk", 5.5, -45, 7, -41.5, 1, 1 + COVER)
 		local b1, b2 = on(L, KIND.prop, "set_blue", -12, -54.5, 12, -53.5, 0, 11, "set_warm")
 		sign(b1, b2, "+z", "EYEWITNESS\nNEWS AT SIX", "white", "CHANNEL 7\nSPORTS DESK")
 		camera(L, -10, -35, 0, -1)
@@ -1165,7 +1166,7 @@ function Plan.build(): Plan
 		sign(s1, s2, "+z", "GOOD MORNING\nBELLWETHER", "white", "THE LATE\nMOVIE")
 		on(L, KIND.prop, "set_warm", 4, -53, 12, -52, 1, 10, "set_blue")
 		on(L, KIND.prop, "set_warm", -13, -52, -12, -47, 1, 10, "set_blue")
-		on(L, KIND.cover, "sofa", -3, -51, 3, -49, 1, 1 + RAIL)
+		on(L, KIND.cover, "sofa", -3, -51, 3, -49, 1, 1 + COVER)
 		camera(L, -10, -39, 0, -1)
 		camera(L, 0, -37, 0, -1)
 		camera(L, 11, -40, 0, -1)
@@ -1507,10 +1508,10 @@ function Plan.build(): Plan
 		floorMark(y, -18.5, -42.1, -1.5, -41.8, "tape")
 		floorMark(y, 3.5, -42.1, 20.5, -41.8, "tape")
 		for _, z in { -22.5, -7.5, 7.5, 22.5 } do
-			papers(y + RAIL, { { -54, z - 0.9 }, { -51.6, z - 0.2 } })
+			papers(y + COVER, { { -54, z - 0.9 }, { -51.6, z - 0.2 } })
 			papers(y, { { -47.5, z + 1.8 }, { -46, z - 2.6 } })
 		end
-		papers(y + RAIL, { { -52, -46.5 }, { -47.5, -45.2 }, { -43, -46.6 }, { -40.5, -45 } })
+		papers(y + COVER, { { -52, -46.5 }, { -47.5, -45.2 }, { -43, -46.6 }, { -40.5, -45 } })
 		-- the transmitter's cabinets are cabinets, not slabs: on each long face a door every four studs (the seams
 		-- between them), and on each door a meter, three dead lamps and a vent near the floor. Not on the face
 		-- that carries DANGER, HIGH VOLTAGE.

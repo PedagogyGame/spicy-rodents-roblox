@@ -242,6 +242,11 @@ return function(t)
 		t.truthy(Body.JUMP_HEIGHT + Contract.TRUST.jumpSlack < Arena.RAIL_HEIGHT, "nor does the server think it might")
 		t.truthy(Arena.HEADROOM > Body.STAND_TOP, "crouching is never needed to fit")
 		t.truthy(Arena.CHEST < Arena.RAIL_HEIGHT, "a rail stops a walking body")
+		-- the rooms' low cover is a little higher than a rail: a standing eye near it cannot reach over onto the
+		-- crown of a crouched head (settled at the join; tools/games/paintball/arena/LowCover)
+		t.truthy(Arena.COVER_HEIGHT >= Body.CROUCH_TOP + 0.3, "low cover hides the crown from a standing eye nearby")
+		t.truthy(Body.STAND_EYE - R.ballRadius > Arena.COVER_HEIGHT, "a standing eye shoots over low cover")
+		t.truthy(Body.JUMP_HEIGHT < Arena.COVER_HEIGHT - Arena.STEP_UP, "a jump does not clear low cover")
 		-- with the ball test itself: a rail on the atrium's edge of the stand-in arena
 		local arena = ArenaData.build()
 		local y = Arena.FLOOR_HEIGHT

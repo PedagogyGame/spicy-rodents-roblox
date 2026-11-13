@@ -11,7 +11,9 @@
 -- 0.04 studs, so any eye nearer than some thirty studs sees over the cover onto the top of the head. No place the
 -- arena could put a spot mends that (a body cannot stand nearer the face than its own width). With every low piece
 -- raised to ENOUGH no shooter straight out tags any low spot of the arena: the change the contract needs (the
--- lane's report, contractGaps).
+-- lane's report, contractGaps). SETTLED AT THE JOIN: raising only the rooms' low cover (KIND.cover) to ENOUGH
+-- is enough (no low spot is then tagged, with the atrium's rails left at RAIL_HEIGHT, which keeps a standing
+-- eye at a rail looking down across the atrium), so that is Arena.COVER_HEIGHT.
 -- Pure. Interface: probe(sweep, ground, x, y, z, nx, nz) -> (tags, aims, lowest): the aims that tag, of how many,
 --   and the lowest point a tag lands at above the feet (math.huge for none); raised(boxes, kinds, rail) -> boxes: a
 --   copy of the boxes with every low piece (cover, rail) raised to `rail` above its foot; ENOUGH; DISTANCES; SPREAD
@@ -92,10 +94,10 @@ end
 
 function LowCover.raised(boxes: { number }, kinds: { number }, rail: number): { number }
 	local out = table.clone(boxes)
-	local by = rail - Arena.RAIL_HEIGHT
 	for i, kind in kinds do
+		local k = (i - 1) * 6
 		if kind == Arena.KIND.cover or kind == Arena.KIND.rail then
-			out[(i - 1) * 6 + 5] += by
+			out[k + 5] = math.max(out[k + 5], out[k + 2] + rail)
 		end
 	end
 	return out

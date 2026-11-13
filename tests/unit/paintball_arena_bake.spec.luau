@@ -284,7 +284,10 @@ return function(t)
 					t.truthy(at[3] - h / 2 >= b[k + 3] - e and at[3] + h / 2 <= b[k + 6] + e, "and along z")
 					-- it is somewhere a floor is: the walking surface, a stage or a desk's top, never a ceiling fitting
 					local level = math.floor((at[2] + 0.01) / Arena.FLOOR_HEIGHT)
-					t.truthy(at[2] - level * Arena.FLOOR_HEIGHT <= Arena.RAIL_HEIGHT + 1e-6, "no higher than a desk")
+					t.truthy(
+						at[2] - level * Arena.FLOOR_HEIGHT <= math.max(Arena.RAIL_HEIGHT, Arena.COVER_HEIGHT) + 1e-6,
+						"no higher than a desk"
+					)
 					byStorey[level] = (byStorey[level] or 0) + 1
 				else
 					walls += 1

@@ -19,7 +19,7 @@
 --   spawn rooms   a hub in each and one chain of nodes round each baffle and out of each door: each door has
 --           exactly ONE link across it (from the last node inside to the first outside, in that order), which
 --           is what Arena.check counts as a way out. No other link crosses a room's edge.
---   cover   beside every low piece (Arena.RAIL_HEIGHT above the spot's floor: low = true) and every tall one a
+--   cover   beside every low piece (Arena.RAIL_HEIGHT or COVER_HEIGHT above the spot's floor: low = true) and every tall one a
 --           body can hide behind (pillars, racks, flats, crates on crates), a spot where a body can stand, OFF_LOW
 --           studs from a low piece's face (as close as a body gets: the closer, the less of a crouched head a
 --           standing shooter's ball can reach over it) or OFF from a tall one's; (nx, nz) points from the spot into
@@ -440,7 +440,7 @@ function Nav.build(
 		local height = y1 - y0
 		-- low cover is a cover or rail piece (nothing stands on one); a rail-high prop that carries something (a
 		-- desk with its terminal, a cart with its set) gives a spot only where what it carries hides a standing body
-		local railHigh = math.abs(height - RAIL) < 0.05
+		local railHigh = math.abs(height - RAIL) < 0.05 or math.abs(height - Arena.COVER_HEIGHT) < 0.05
 		local low = railHigh and (kind == KIND.cover or kind == KIND.rail)
 		local sx, sz = x1 - x0, z1 - z0
 		if not railHigh and height < Arena.HEADROOM then

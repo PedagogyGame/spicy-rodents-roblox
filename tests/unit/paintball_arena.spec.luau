@@ -374,7 +374,8 @@ return function(t)
 				local x0, y0, z0, x1, y1, z1 = box(i)
 				local kind = kinds[i]
 				if kind == KIND.cover or kind == KIND.rail then
-					t.near(y1 - y0, Arena.RAIL_HEIGHT, 1e-9, `low piece {i} is rail height`)
+					local height = if kind == KIND.rail then Arena.RAIL_HEIGHT else Arena.COVER_HEIGHT
+					t.near(y1 - y0, height, 1e-9, `low piece {i} is rail or cover height`)
 					-- it stands on a floor or a riser: the walking surface beside it is its foot
 					local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
 					local foot = arena.ground(cx, y0, cz)
@@ -424,7 +425,7 @@ return function(t)
 					t.eq(standing, nil, `cover {i} is low: a standing eye sees over it`)
 					-- and a crouched body there is not tagged by a level ball from the far side, a standing one is
 					local fx, fz = node.x + c.nx * 8, node.z + c.nz * 8
-					local y = node.y + Arena.RAIL_HEIGHT + 0.3
+					local y = node.y + math.max(Arena.RAIL_HEIGHT, Arena.COVER_HEIGHT) + 0.3
 					if arena.sweep(fx, y, fz, node.x, y, node.z) == nil then
 						t.eq((Hit.body(arena.sweep, fx, y, fz, node.x, y, node.z, node.x, node.y, node.z, 1)), nil)
 						t.truthy(Hit.body(arena.sweep, fx, y, fz, node.x, y, node.z, node.x, node.y, node.z, 0) ~= nil)
@@ -459,33 +460,12 @@ return function(t)
 				end
 				return spots, tagged, aims, lowest
 			end
-			if Arena.RAIL_HEIGHT >= LowCover.ENOUGH then
-				-- the contract's rail is high enough: the real arena is held to it
-				local spots, tagged, aims = exposed(arena.sweep, arena.ground)
-				t.truthy(spots >= 60 and aims >= 10000, `{spots} low spots, {aims} aims`)
-				t.eq(tagged, 0, `{tagged} of {spots} low spots: a crouched body there is tagged over its cover`)
-			else
-				-- CONTRACT GAP (the lane's report): Arena.RAIL_HEIGHT 3.4 stands 0.04 over Body.CROUCH_TOP, so a standing
-				-- eye nearer than some thirty studs reaches over low cover onto the crown of a crouched head. What the
-				-- arena owes is pinned here: with every low piece at LowCover.ENOUGH, no shooter tags any low spot (a spot
-				-- too far from its piece, or anything standing on one, fails this) ...
-				local raised = LowCover.raised(plan.boxes, plan.kinds, LowCover.ENOUGH)
-				local sweep, ground = ArenaGrid.new(raised, plan.ramps)
-				local spots, tagged, aims = exposed(sweep, ground)
-				t.truthy(spots >= 60 and aims >= 10000, `{spots} low spots, {aims} aims`)
-				t.eq(
-					tagged,
-					0,
-					`at rail height {LowCover.ENOUGH}, {tagged} of {spots} low spots are tagged over their cover`
-				)
-				-- ... and with the contract's own numbers today, a tag lands on the crown only, never lower
-				local _, today, _, lowest = exposed(arena.sweep, arena.ground)
-				t.truthy(today > 0, "the gap is still there: drop this branch when the contract's rail is raised")
-				t.truthy(
-					lowest >= Body.CROUCH_TOP - 0.3,
-					`a crouched body behind low cover is tagged {Body.CROUCH_TOP - lowest} studs under its crown`
-				)
-			end
+			-- the rooms' low cover is Arena.COVER_HEIGHT (settled at the join: at RAIL_HEIGHT, 0.04 over the crouched
+			-- crown, 86 of 130 low spots were tagged over their cover); the real arena is held to it
+			t.truthy(Arena.COVER_HEIGHT >= LowCover.ENOUGH)
+			local spots, tagged, aims = exposed(arena.sweep, arena.ground)
+			t.truthy(spots >= 60 and aims >= 10000, `{spots} low spots, {aims} aims`)
+			t.eq(tagged, 0, `{tagged} of {spots} low spots: a crouched body there is tagged over its cover`)
 		end
 	)
 

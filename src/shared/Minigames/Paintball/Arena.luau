@@ -58,7 +58,7 @@
 --   nodes, links, cover   the bots' navigation graph: nodes on the walking surface, links a body can
 --           walk in a straight line ("walk": clear at chest height; "stair": along a ramp), and cover
 --           spots (a node plus (nx, nz), the horizontal unit vector from the spot towards the side it
---           is sheltered from; low = RAIL_HEIGHT cover that only hides a crouched body).
+--           is sheltered from; low = RAIL_HEIGHT or COVER_HEIGHT cover that only hides a crouched body).
 --   sweep(x0, y0, z0, x1, y1, z1) -> (s?, nx, ny, nz, box)   THE ball test: the first box the segment
 --           enters, as the fraction s in [0, 1] along it, the face normal and the box's index (1-based;
 --           0 with s = nil when nothing is hit). The predicted ball on the client, the real ball on the
@@ -187,7 +187,12 @@ Arena.FLOORS = 5
 Arena.FLOOR_HEIGHT = 14 -- floor to floor
 Arena.HEIGHT = 70 -- FLOORS * FLOOR_HEIGHT: the underside of the roof
 Arena.ATRIUM = 15 -- half the 30 x 30 atrium
-Arena.RAIL_HEIGHT = 3.4 -- atrium rails and low cover, above the floor they stand on
+Arena.RAIL_HEIGHT = 3.4 -- atrium rails and parapets, above the floor they stand on
+-- low cover in the rooms (KIND.cover: half walls, sills, consoles, desks of the news set), above what it stands on.
+-- Higher than a rail: at RAIL_HEIGHT, 0.04 over Body.CROUCH_TOP, a standing eye within some thirty studs reached
+-- over it onto the crown of a crouched head (86 of 130 low spots; tools/games/paintball/arena/LowCover). The
+-- atrium's rails stay lower so that a standing eye at one still looks down across the atrium a storey below.
+Arena.COVER_HEIGHT = 3.7
 Arena.HEADROOM = 6.5 -- least clear height over any walking surface and through any opening
 Arena.STEP_UP = 1.2 -- the tallest ledge a walking body climbs without jumping
 Arena.CHEST = 2.5 -- the height above the feet at which "walk" links and movement are tested for walls
