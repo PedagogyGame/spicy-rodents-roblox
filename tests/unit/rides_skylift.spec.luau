@@ -429,26 +429,22 @@ return function(t)
 		t.truthy(RideSpec.check(d))
 		t.deepEq(d.points, ride.points)
 		t.eq(d.speed, SkyLift.LINE_SPEED)
-		t.falsy(
-			RideSpec.check({
-				ride = "sky_lift",
-				kind = "cable",
-				points = ride.points,
-				speed = 15,
-				controls = true,
-				score = false,
-			})
-		)
-		t.falsy(
-			RideSpec.check({
-				ride = "sky_lift",
-				kind = "cable",
-				points = ride.points,
-				speed = 15,
-				controls = false,
-				score = true,
-			})
-		)
+		t.falsy(RideSpec.check({
+			ride = "sky_lift",
+			kind = "cable",
+			points = ride.points,
+			speed = 15,
+			controls = true,
+			score = false,
+		}))
+		t.falsy(RideSpec.check({
+			ride = "sky_lift",
+			kind = "cable",
+			points = ride.points,
+			speed = 15,
+			controls = false,
+			score = true,
+		}))
 		t.eq(SkyLift.clock(1000.5, 900), 100.5)
 		t.eq(SkyLift.EPOCH_ATTRIBUTE, "SkyLiftEpoch")
 	end)
