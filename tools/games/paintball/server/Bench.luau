@@ -24,7 +24,9 @@
 --   make every other number in that run a little worse). Result: per-tick medians and 95th centiles in
 --   milliseconds { balls, rest, step, moves, fires, tick } (tick = everything the arena costs a frame: the
 --   two handlers and the step), inFlight (mean), shotsPerSec, sweepsPerTick, sweepMs, downBytesPerSec (the
---   stream to one member of the audience), stats (the service's own)
+--   stream to one member of the audience), stats (the service's own), yard and slow (the yardstick: how
+--   fast the machine was running Luau during the run, and how much slower that is than the quiet machine
+--   the budgets were measured on); yardstick(runs?) -> ms; YARD_QUIET
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
@@ -53,10 +55,39 @@ export type Result = {
 	sweepMs: number,
 	downBytesPerSec: number,
 	stats: PaintballService.Stats,
+	yard: number, -- the yardstick's median during the run, ms
+	slow: number, -- max(1, yard / YARD_QUIET): how much slower than the quiet machine this run was
 }
 
 local SLOTS = Contract.Rules.slots
 local DT = 1 / Clock.TICK_HZ
+
+-- THE YARDSTICK. A budget in milliseconds is a statement about the code, and a number of milliseconds
+-- is also a statement about the machine: on a shared machine whose neighbours are busy the same Luau
+-- runs up to 1.6 times slower from one second to the next (measured here: the tick at 80 balls 0.75 ms
+-- and 1.20 ms in one minute, with nothing changed). So beside the service a run times a fixed piece of
+-- pure Luau of the kind the service runs (float arithmetic, table reads and writes, calls into the
+-- math library), every YARD_EVERY-th tick, between the ticks it measures: Result.yard is its median
+-- and Result.slow = max(1, yard / YARD_QUIET) is how much slower than the quiet machine the budgets
+-- were measured on this run was. tests/unit/paintball_server_cost.spec.luau holds a run to its budget
+-- times `slow`: a slower service fails it on any machine, and a busy machine does not.
+-- YARD_QUIET is the yardstick on the machine the pinned numbers were measured on, when it was quiet
+-- (0.106 ms, when the tick at 80 balls was 0.75 ms and the balls' share at 48 was 0.35 ms).
+Bench.YARD_QUIET = 0.106
+local YARD_EVERY = 4
+local yardCells = table.create(64, 0)
+local function yard(): number
+	local cells = yardCells
+	local t0 = os.clock()
+	local acc = 0
+	for i = 1, 20000 do
+		local k = i % 64 + 1
+		local v = cells[k] * 0.5 + math.sqrt(i)
+		cells[k] = v
+		acc += math.min(v, i)
+	end
+	return (os.clock() - t0) * 1000 + acc * 0
+end
 
 local function lcg(seed: number): () -> number
 	local s = seed
@@ -319,6 +350,7 @@ local function measure(opts: Opts?): Result
 	local onMove, onFire = handlers["Paintball.Move"], handlers["Paintball.Fire"]
 	local stats = service:stats()
 	local ballsMs, restMs, stepMs, movesMs, firesMs, tickMs = {}, {}, {}, {}, {}, {}
+	local yardMs: { number } = {}
 	local inFlightSum, shotsWere, shooter = 0, 0, 0
 	local warm = math.floor(1.5 / DT)
 	local total = warm + math.floor(seconds / DT)
@@ -389,10 +421,16 @@ local function measure(opts: Opts?): Result
 			table.insert(stepMs, stats.stepMs)
 			table.insert(tickMs, (t3 - t0) * 1000)
 			inFlightSum += flying
+			if frame % YARD_EVERY == 0 then
+				table.insert(yardMs, yard())
+			end
 		end
 	end
 	local frames = total - warm
+	local yardMedian = spread(yardMs).median
 	return {
+		yard = yardMedian,
+		slow = math.max(1, yardMedian / Bench.YARD_QUIET),
 		balls = spread(ballsMs),
 		rest = spread(restMs),
 		step = spread(stepMs),
@@ -417,6 +455,17 @@ function Bench.run(opts: Opts?): Result
 		error(result, 0)
 	end
 	return result
+end
+
+-- The median of `runs` goes at the yardstick (default 15), in milliseconds: how fast this machine is
+-- running Luau at this moment (see YARD_QUIET).
+function Bench.yardstick(runs: number?): number
+	local times: { number } = {}
+	for _ = 1, runs or 15 do
+		table.insert(times, yard())
+	end
+	table.sort(times)
+	return times[math.ceil(#times / 2)]
 end
 
 return Bench

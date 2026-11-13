@@ -15,27 +15,36 @@
 -- Measured where this was written (Lune, one core of a shared machine), in the Greybox: 0.70 ms the tick
 -- at 80 balls; at 48 balls, balls 0.34 ms, everything else 0.10 ms. In the arena lane's building as it
 -- stood on 13 November (1,461 boxes behind its grid), tried beside this lane's work: 0.15 ms the tick at
--- 80 balls. A budget is a statement about the code, not about how busy the machine is, so a run that
--- misses is given two more chances before the spec fails.
+-- 80 balls. A BUDGET IS A STATEMENT ABOUT THE CODE, NOT ABOUT HOW BUSY THE MACHINE IS. On a shared
+-- machine the same code runs up to 1.6 times slower from one second to the next (0.75 ms and 1.20 ms the
+-- tick at 80 balls inside one minute, nothing changed), so every run times a yardstick of plain Luau
+-- between its ticks (Bench, "the yardstick") and is held to its budget times `slow`, how much slower
+-- than the quiet machine of those numbers the yardstick says the run was (never less than 1: a faster
+-- machine is held to the budget as written). A run that still misses is given two more chances.
 local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Bench = require("../../tools/games/paintball/server/Bench")
 
 local COST = Contract.COST
 
--- the best of up to three runs by `score` (lower is better), stopping at the first that is `good`
+-- the best of up to three runs by `score` (lower is better; milliseconds, taken at the quiet machine's
+-- speed: divided by the run's `slow`), stopping at the first that is `good`
 local function best(opts: Bench.Opts, score: (r: Bench.Result) -> number, good: number): Bench.Result
 	local kept: Bench.Result? = nil
 	for _ = 1, 3 do
 		local r = Bench.run(opts)
-		if kept == nil or score(r) < score(kept) then
+		if kept == nil or score(r) / r.slow < score(kept) / kept.slow then
 			kept = r
 		end
-		if score(r) < good then
+		if score(r) / r.slow < good then
 			break
 		end
 	end
 	return kept :: Bench.Result
+end
+
+local function busy(r: Bench.Result): string
+	return string.format("the machine ran %.2f times slower than when the budget was measured", r.slow)
 end
 
 return function(t)
@@ -57,8 +66,8 @@ return function(t)
 				t.truthy(r.stats.movesAccepted > 16 * 20 * 2, "every Move was judged")
 				t.truthy(r.stats.snapshots >= 20 * 2)
 				t.truthy(
-					r.tick.median < budget,
-					`the tick costs {r.tick.median} ms (95th centile {r.tick.p95}); the budget is {budget}`
+					r.tick.median < budget * r.slow,
+					`the tick costs {r.tick.median} ms (95th centile {r.tick.p95}); the budget is {budget}; {busy(r)}`
 				)
 			end
 		)
@@ -70,17 +79,21 @@ return function(t)
 			local r = best({ balls = COST.atBalls, seconds = 2 }, function(run)
 				return run.balls.median
 			end, COST.ballsMs)
-			t.truthy(r.balls.median < COST.ballsMs * 1.25, `balls {r.balls.median} ms; the share is {COST.ballsMs}`)
+			t.truthy(
+				r.balls.median < COST.ballsMs * 1.25 * r.slow,
+				`balls {r.balls.median} ms; the share is {COST.ballsMs}; {busy(r)}`
+			)
 			local rest = r.rest.median + r.moves.median + r.fires.median
-			t.truthy(rest < COST.restMs, `everything else {rest} ms; the share is {COST.restMs}`)
-			t.truthy(r.rest.p95 < COST.restMs, `a snapshot tick's rest {r.rest.p95} ms`)
+			t.truthy(rest < COST.restMs * r.slow, `everything else {rest} ms; the share is {COST.restMs}; {busy(r)}`)
+			t.truthy(r.rest.p95 < COST.restMs * r.slow, `a snapshot tick's rest {r.rest.p95} ms; {busy(r)}`)
 		end
 	)
 
 	t.test("an arena with nobody firing costs a tenth of a millisecond: the Moves and the snapshots", function()
 		local r = Bench.run({ balls = 0, seconds = 1 })
 		t.eq(r.stats.balls, 0)
-		t.truthy(r.tick.median < 0.3, `{r.tick.median} ms`)
+		t.truthy(r.yard > 0 and r.slow >= 1, "the yardstick was timed beside it")
+		t.truthy(r.tick.median < 0.3 * r.slow, `{r.tick.median} ms; {busy(r)}`)
 		-- and what one screen is sent: the snapshot stream alone, 20 a second of 16 bodies
 		t.truthy(r.downBytesPerSec > 4000 and r.downBytesPerSec < 5000, `{r.downBytesPerSec} bytes a second`)
 	end)

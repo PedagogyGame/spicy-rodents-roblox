@@ -52,12 +52,14 @@ do
 		)
 		print(
 			string.format(
-				"          of which the building's own ball test: %.0f calls, %s ms a tick; refused: %d Moves, %d clicks; down to one screen %.1f kB/s",
+				"          of which the building's own ball test: %.0f calls, %s ms a tick; refused: %d Moves, %d clicks; down to one screen %.1f kB/s; the yardstick %s ms (the machine %.2f times slower than when the budgets were measured)",
 				counted.sweepsPerTick,
 				ms(counted.sweepMs),
 				r.stats.movesRefused,
 				r.stats.shotsRefused,
-				r.downBytesPerSec / 1000
+				r.downBytesPerSec / 1000,
+				ms(r.yard),
+				r.slow
 			)
 		)
 	end
