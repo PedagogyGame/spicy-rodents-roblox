@@ -201,8 +201,10 @@ return function(t)
 			local payload = Schemas.REMOTES["Minigame.Input"].payload :: any
 			t.truthy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "call", args = { "heads" } }))
 			t.falsy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "dance", args = {} }))
-			-- the bowling alley alone: the fourteen stations it has always had, the built ones first and in the order
-			-- their seeded streams were numbered in
+			-- the bowling alley alone: a station per lane (eighteen since brief addendum D5), then the games room's
+			-- eight (darts, the fortune teller, two pool tables, bumper pool, three pinball machines), in registry
+			-- order. A station's seeded stream is numbered by its place in this list, so the twelve new lanes moved
+			-- every later station's stream along by twelve: each is still its own and still repeats for a seed.
 			local alley = Sites.fromData(Data.default(), false)
 			t.truthy(alley.bowling_alley ~= nil)
 			local list = Games.stations(alley)
@@ -212,11 +214,12 @@ return function(t)
 				t.eq(st.site, "bowling_alley")
 				t.eq((Games.get(st.game) :: any).game, st.game)
 			end
-			t.truthy(#list >= 14, `{#list} stations in the alley`)
-			t.eq(
-				table.concat(ids, " ", 1, 8),
-				"bowling_lane_1 bowling_lane_2 bowling_lane_3 bowling_lane_4 bowling_lane_5 bowling_lane_6 darts_1 fortune_1"
-			)
+			t.truthy(#list >= 26, `{#list} stations in the alley`)
+			local lanes = {}
+			for lane = 1, 18 do
+				table.insert(lanes, `bowling_lane_{lane}`)
+			end
+			t.eq(table.concat(ids, " ", 1, 20), table.concat(lanes, " ") .. " darts_1 fortune_1")
 			t.eq((Games.station("darts_1", alley) :: any).label, "Dartboard")
 			t.eq((Games.station(S.machine, { [SITE] = PLACE }) :: any).variant, "retro")
 			t.eq(Games.station(S.machine, alley), nil, "a station is only on the site it stands on")

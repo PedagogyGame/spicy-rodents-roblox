@@ -11,7 +11,7 @@ return {
 			name = "BELLWETHER BOWL",
 			district = "east_commercial",
 			["type"] = "bowling_alley",
-			footprint = { d0 = -82, d1 = 102, x0 = -30, x1 = 152 },
+			footprint = { d0 = -82, d1 = 102, x0 = -42, x1 = 152 },
 			games = {
 				"bowling",
 				"darts",
@@ -24,6 +24,13 @@ return {
 			},
 			lanes = 18,
 			place = { x = 1300, z = -420, yaw = 0, floorY = 16.5 },
+			reserve = {
+				d0 = 54.2,
+				d1 = 189.82,
+				["for"] = "the owner's backstage, addendum D4",
+				x0 = -65.5,
+				x1 = 180.79,
+			},
 			routes = {
 				{
 					id = 9001,

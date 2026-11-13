@@ -311,6 +311,16 @@ local function attractionPolys(world: World): { { id: string, poly: Poly } }
 			table.insert(poly, { x, z })
 		end
 		table.insert(out, { id = a.id, poly = poly })
+		-- ground an attraction keeps free for something that has not been built yet (the bowling alley's backstage)
+		local rs = a.reserve
+		if rs then
+			local kept = {}
+			for _, c in { { rs.x0, rs.d0 }, { rs.x1, rs.d0 }, { rs.x1, rs.d1 }, { rs.x0, rs.d1 } } do
+				local x, _, z = AlleyLayout.toWorld(p, c[1], 0, c[2])
+				table.insert(kept, { x, z })
+			end
+			table.insert(out, { id = a.id .. " (ground reserved for " .. rs["for"] .. ")", poly = kept })
+		end
 	end
 	return out
 end

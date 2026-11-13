@@ -19,6 +19,8 @@
           "properties": { "x": { "type": "number" }, "z": { "type": "number" }, "floorY": { "type": "number" }, "yaw": { "type": "number" } } },
         "footprint": { "type": "object", "required": ["x0", "x1", "d0", "d1"], "additionalProperties": false,
           "properties": { "x0": { "type": "number" }, "x1": { "type": "number" }, "d0": { "type": "number" }, "d1": { "type": "number" } } },
+        "reserve": { "type": "object", "required": ["x0", "x1", "d0", "d1", "for"], "additionalProperties": false,
+          "properties": { "x0": { "type": "number" }, "x1": { "type": "number" }, "d0": { "type": "number" }, "d1": { "type": "number" }, "for": { "type": "string" } } },
         "routes": { "type": "array", "items": {
           "type": "object",
           "required": ["id", "name", "kind", "points", "surfaceRadius"],

@@ -1,6 +1,6 @@
 {
   "$schema": "../tools/compile/schema/attractions.schema.json",
-  "src": "brief v2 §13a (bowling alley: fully playable lanes, the ball-return tunnel as a real squirrel route); brief addendum D4, D5 (eighteen lanes, the larger games room, the shops, the backstage behind the lanes); BUILD_PLAN §3.16-§3.17, W3c #15. Placement: the east commercial grass south of Bowl Lane (studs: the building x 1273.2..1449.8, z -351.2..-501.6; with the forecourt ramp, the rear alley and its fence x 1270..1452, z -338..-522). The origin, floor and yaw are the six-lane house's: lanes 1 to 6 did not move. The site slopes down to the east and to the rear: the front-west corner is cut up to 0.5 st into the ground (a terrain carve box) and the east wing stands on a plinth up to 7 st tall; the alley paving (floorY - 3.5) is above the highest ground behind the lanes. Units: STUDS (not HTML units). Route points are in the alley's local frame [X across the lanes, Y above the floor, D down the lane from the foul line]; tools/compile turns them into world points with Shared/Attractions/AlleyLayout.toWorld. The footprint is everything the alley bakes (the expansion planner keeps every venue site, street and pad out of it).",
+  "src": "brief v2 §13a (bowling alley: fully playable lanes, the ball-return tunnel as a real squirrel route); brief addendum D4, D5 (eighteen lanes, the larger games room, the shops, the backstage behind the lanes); BUILD_PLAN §3.16-§3.17, W3c #15. Placement: the east commercial grass south of Bowl Lane (studs: the building x 1273.2..1449.8, z -351.2..-501.6; with the forecourt ramp, the rear alley, its end ramps and its fence x 1258..1452, z -338..-522). The origin, floor and yaw are the six-lane house's: lanes 1 to 6 did not move. The site slopes down to the east and to the rear: the front-west corner is cut up to 0.5 st into the ground (a terrain carve box) and the east wing stands on a plinth up to 7 st tall; the alley paving (floorY - 3.5) is above the highest ground behind the lanes. Units: STUDS (not HTML units). Route points are in the alley's local frame [X across the lanes, Y above the floor, D down the lane from the foul line]; tools/compile turns them into world points with Shared/Attractions/AlleyLayout.toWorld. The footprint is everything the alley bakes (the expansion planner keeps every venue site, street and pad out of it).",
   "units": "studs",
   "attractions": [
     {
@@ -15,10 +15,17 @@
         "yaw": 0
       },
       "footprint": {
-        "x0": -30,
+        "x0": -42,
         "x1": 152,
         "d0": -82,
         "d1": 102
+      },
+      "reserve": {
+        "x0": -65.5,
+        "x1": 180.79,
+        "d0": 54.2,
+        "d1": 189.82,
+        "for": "the owner's backstage, addendum D4"
       },
       "lanes": 18,
       "games": [

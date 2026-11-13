@@ -12,12 +12,6 @@
 -- lane shortened to 56 studs foul line to head pin so a roll takes about two seconds.
 -- THE FLOOR PLAN (eighteen lanes; brief addendum D4, D5) is the second half of this file: the building's outline,
 -- the rooms as named rectangles (ZONES), every door and counter opening (OPENINGS), where the games-room tables
--- stand and the clear floor each needs (GAMES), where the staff stand and walk (POSTS, ROUTES), the floors a
--- body can stand on (FLOORS, floorAt), and the owner's backstage (BACKSTAGE: anchor, scale, the volume kept for
--- it, and the interim back module it replaces whole). The bake reads all of it; nothing about the plan is a
--- number in a bake file.
--- THE FLOOR PLAN (eighteen lanes; brief addendum D4, D5) is the second half of this file: the building's outline,
--- the rooms as named rectangles (ZONES), every door and counter opening (OPENINGS), where the games-room tables
 -- stand and the clear floor each needs (standing), where the staff stand and walk (POSTS, ROUTES), the floors a
 -- body can stand on (FLOORS, floorAt), and the owner's backstage (BACKSTAGE: anchor, scale, the volume kept for
 -- it, and the interim back module it replaces whole). The bake reads all of it; nothing about the plan is a
@@ -99,7 +93,7 @@ AlleyLayout.CEILING_Y = 12
 AlleyLayout.ROOF_Y = 13.6
 AlleyLayout.LANE_BLOCK_X0 = AlleyLayout.LANE1_X - AlleyLayout.PITCH / 2 -- -18.6: the lane block's west edge
 AlleyLayout.LANE_BLOCK_X1 = AlleyLayout.LANE_BLOCK_X0 + AlleyLayout.LANES * AlleyLayout.PITCH -- 93.0
-AlleyLayout.LANE_BLOCK_X = -AlleyLayout.LANE_BLOCK_X0 -- (the old half width, 18.6: the block is no longer centred)
+-- (LANE_BLOCK_X, the six-lane house's half width, is gone on purpose: the block is no longer centred on X 0.)
 AlleyLayout.GAME_ROOM_X0 = AlleyLayout.HALL_X1 -- the games room (pool, bumper pool, darts, pinball, air hockey,
 AlleyLayout.GAME_ROOM_D0 = AlleyLayout.FRONT_D -- the fortune teller): the hall face of its partition, and its
 AlleyLayout.GAME_ROOM_D1 = 30 -- front and back walls' inner faces
@@ -295,12 +289,12 @@ export type Zone = {
 local T = AlleyLayout.PARTITION_T
 local FD, CD = AlleyLayout.FRONT_D, AlleyLayout.CONCOURSE_D0
 -- the front rooms' cross walls stand on these lines (each wall T thick, centred)
-AlleyLayout.FRONT_WALLS_X = { 2, 14, 30, 54, 88 }
+AlleyLayout.FRONT_WALLS_X = { -2, 14, 30, 54, 88 }
 AlleyLayout.ENTRANCE = { x0 = 18, x1 = 26 } -- the main doors in the front wall (on the Alley Walk's line)
 
 AlleyLayout.ZONES = {
-	{ id = "ball_shop", label = "BOWLING BALL SHOP", x0 = AlleyLayout.X0, x1 = 2 - T / 2, d0 = FD, d1 = CD - T },
-	{ id = "shoe_rental", label = "SHOE RENTAL", x0 = 2 + T / 2, x1 = 14 - T / 2, d0 = FD, d1 = CD - T },
+	{ id = "ball_shop", label = "BOWLING BALL SHOP", x0 = AlleyLayout.X0, x1 = -2 - T / 2, d0 = FD, d1 = CD - T },
+	{ id = "shoe_rental", label = "SHOE RENTAL", x0 = -2 + T / 2, x1 = 14 - T / 2, d0 = FD, d1 = CD - T },
 	{ id = "lobby", label = "LOBBY", x0 = 14 + T / 2, x1 = 30 - T / 2, d0 = FD, d1 = CD, open = true },
 	{ id = "gift_shop", label = "GIFT SHOP", x0 = 30 + T / 2, x1 = 54 - T / 2, d0 = FD, d1 = CD - T },
 	{ id = "snack_bar", label = "SNACK BAR", x0 = 54 + T / 2, x1 = 88 - T / 2, d0 = FD, d1 = CD - T },
@@ -395,8 +389,9 @@ end
 -- Openings: every way through a wall. `axis` "x": the wall runs across the building on the line D = at and the
 -- opening spans X a .. b; `axis` "d": the wall runs down the building on the line X = at and the opening spans
 -- D a .. b. `head` is the height of the opening's top. kind: "door" (a doorway), "arch" (a wide cased opening),
--- "counter" (a serving opening: its counter is the room's furniture and leaves COUNTER_GAP clear at one end for
--- the staff), "open" (no wall at all, a beam overhead), "exit" (the steel push-bar doors).
+-- "counter" (a serving opening: its counter leaves COUNTER_GAP clear at the far end for the staff to walk
+-- through), "window" (a serving opening with a counter the whole width), "open" (no wall at all, a beam
+-- overhead), "exit" (the steel push-bar doors).
 export type Opening = {
 	id: string,
 	axis: string,
@@ -455,7 +450,7 @@ AlleyLayout.OPENINGS = {
 		a = 5,
 		b = 11,
 		head = 8.4,
-		kind = "counter",
+		kind = "window",
 		between = { "shoe_rental", "concourse" },
 	},
 	{
@@ -556,6 +551,23 @@ AlleyLayout.STOOP = { x0 = -27.4, x1 = -17.6, depth = 3.4, steps = 6, tread = 0.
 AlleyLayout.LANDING = { x0 = 13, x1 = 31, d0 = FD - 7 }
 AlleyLayout.RAMP = { x0 = 16, x1 = 28, d0 = FD - 14, y0 = -0.6 }
 
+-- Where the ground stands at or above the finished floor (the front-west corner of the site: the street rises to
+-- the west and the front rooms were pushed 20 studs up the slope) the boot terrain is cut back to just under the
+-- floor slab, inside the walls only: the bake turns each into a carve box (Server/Attractions/AttractionService
+-- fills it with air), and the placement spec lets the ground stand above floor level nowhere else.
+export type Cut = { id: string, x0: number, x1: number, d0: number, d1: number, y0: number, y1: number }
+AlleyLayout.SITE_CUTS = {
+	{
+		id = "FrontWest",
+		x0 = AlleyLayout.X0 - AlleyLayout.WALL_T + 0.2,
+		x1 = 48,
+		d0 = FD - AlleyLayout.WALL_T + 0.2,
+		d1 = -34,
+		y0 = -0.38,
+		y1 = 7,
+	},
+} :: { Cut }
+
 -- Floors: where a body that takes its height from data (the computer-driven people) stands. `y` is the top of the
 -- floor; a ramp runs from y at d0 to y1 at d1. Later rectangles win where two overlap.
 export type Floor = { id: string, x0: number, x1: number, d0: number, d1: number, y: number, y1: number? }
@@ -618,7 +630,7 @@ end
 export type Post = { id: string, x: number, d: number, zone: string, face: { number }?, what: string }
 AlleyLayout.POSTS = {
 	{ id = "shoe_desk", x = 10.5, d = -57, zone = "shoe_rental", face = { 1, 0 }, what = "behind the shoe desk" },
-	{ id = "shoe_shelves", x = 5, d = -62, zone = "shoe_rental", face = { -1, 0 }, what = "the shoe cubbies" },
+	{ id = "shoe_shelves", x = 1, d = -62, zone = "shoe_rental", face = { -1, 0 }, what = "the shoe cubbies" },
 	{ id = "shoe_returns", x = 8, d = -51, zone = "shoe_rental", face = { 0, 1 }, what = "the returns window" },
 	{ id = "ball_counter", x = -8, d = -53, zone = "ball_shop", face = { 0, 1 }, what = "the ball shop's counter" },
 	{ id = "ball_wall", x = -23, d = -58, zone = "ball_shop", face = { -1, 0 }, what = "the wall of balls" },
@@ -649,8 +661,8 @@ AlleyLayout.POSTS = {
 	{ id = "games_floor", x = 122, d = -26, zone = "games_room", what = "the middle of the games room" },
 	{ id = "games_front", x = 136, d = -60, zone = "games_room", what = "the games room's front corner" },
 	{ id = "games_back", x = 132, d = 22, zone = "games_room", what = "the games room's back" },
-	{ id = "bench", x = -7, d = 77, zone = "back_corridor", face = { 0, 1 }, what = "the mechanic's bench" },
-	{ id = "pin_shelf", x = 9, d = 77, zone = "back_corridor", face = { 0, 1 }, what = "the spare pins" },
+	{ id = "bench", x = -7, d = 76.5, zone = "back_corridor", face = { 0, 1 }, what = "the mechanic's bench" },
+	{ id = "pin_shelf", x = 9, d = 76.5, zone = "back_corridor", face = { 0, 1 }, what = "the spare pins" },
 	{ id = "corridor_west", x = -22.5, d = 72, zone = "back_corridor", what = "inside the west machine-room door" },
 	{ id = "corridor_east", x = 97, d = 72, zone = "back_corridor", what = "inside the east machine-room door" },
 	{
@@ -708,7 +720,9 @@ AlleyLayout.ROUTES = {
 	-- the length of the concourse, behind the settees
 	concourse = { { -22.5, -36 }, { -12, -36 }, { 22, -36 }, { 37, -36 }, { 70, -36 }, { 86, -36 }, { 97, -36 } },
 	-- the shoe desk: the cubbies, the desk, the returns window
-	shoe_desk = { { 5, -62 }, { 10.5, -57 }, { 8, -51 } },
+	shoe_desk = { { 1, -62 }, { 10.5, -57 }, { 8, -51 } },
+	-- out of the shoe rental through the gap at the desk's end, into the lobby
+	shoe_out = { { 10.5, -57 }, { 10.5, -51.5 }, { 22, -51.5 }, { 22, -36 } },
 	-- the ball shop, from its door
 	ball_shop = { { -12, -36 }, { -13, -44 }, { -13, -53 }, { -8, -53 }, { -23, -58 }, { -20, -65 } },
 	-- the gift shop, from its door
@@ -723,7 +737,7 @@ AlleyLayout.ROUTES = {
 	-- the bin run: the back corridor, out through the push-bar doors, down the stoop steps to the cans
 	bins = { { -22.5, 72 }, { -22.5, 78.5 }, { -22.5, 83.4 }, { -22.5, 91.5 }, { -12, 91.5 }, { -12, 87 } },
 	-- the mechanic's bench and the spare pins
-	bench = { { -22.5, 72 }, { -15.5, 74 }, { -7, 77 }, { 9, 77 } },
+	bench = { { -22.5, 72 }, { -15.5, 74 }, { -7, 76.5 }, { 9, 76.5 } },
 	-- the games room: in at the arch, round the tables, out at the side opening into the east aisle
 	games_room = {
 		{ 97, -39 },
@@ -770,8 +784,12 @@ end
 --   size: "about 189.3 x 125 studs" as authored (an irregular footprint: rooms and the workshop reach back and
 --     to one side), so about 205.4 x 135.6 at our scale; the storage lofts are 3.63 m (12.96 authored studs,
 --     14.07 of ours) above the floor, higher than the hall's 12-stud ceiling: the backstage brings its own roof.
---   reserve: the box the site keeps clear for it: the full width centred on the anchor (the true outline may sit
---     to either side), from the service front back by the full depth, up to a roof over the lofts.
+--   reserve: the box the site keeps clear for it (data/attractions.json `reserve`; the expansion compiler keeps
+--     every venue site, street and pad out of it): from the service front back by the full depth, up to a roof
+--     over the lofts, and across the building wide enough for either reading of "rooms and workshop extend back
+--     and to the right" until layout.json settles it: the outline centred on the anchor, or the machine bank flush
+--     with lane 1 and the whole side wing beyond lane 18.
+--   interim: the box of the interim back module (below), which the backstage replaces.
 --   interimFrom: until it arrives, everything behind the pinsetters (D > interimFrom: the back corridor, the rear
 --     wall, the exit doors, the stoop, the rear alley and its fence) and the stand-in pinsetter machines are the
 --     bake's "BackModule" (and "Doors"): one model the backstage replaces whole. The lanes' own playing parts
@@ -790,8 +808,20 @@ do
 		scale = scale,
 		size = { x = w, d = d },
 		loftY = loft,
-		reserve = { x0 = anchorX - w / 2, x1 = anchorX + w / 2, d0 = anchorD, d1 = anchorD + d, y1 = loft + 14 },
+		reserve = {
+			x0 = anchorX - w / 2,
+			x1 = AlleyLayout.LANE_BLOCK_X0 - 6 + w,
+			d0 = anchorD,
+			d1 = anchorD + d,
+			y1 = loft + 14,
+		},
 		interimFrom = AlleyLayout.MACHINE_D1,
+		interim = {
+			x0 = AlleyLayout.zone("rear_alley").x0,
+			x1 = AlleyLayout.zone("rear_alley").x1,
+			d0 = AlleyLayout.MACHINE_D1,
+			d1 = AlleyLayout.ALLEY_D1 + 1,
+		},
 		bays = AlleyLayout.LANES,
 		returns = AlleyLayout.PAIRS,
 	}

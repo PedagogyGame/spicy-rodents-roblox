@@ -166,7 +166,7 @@ local function foundation(kit: any, root: any)
 		kit:box(f, `PitBase{i}`, r[1], r[2], FLOOR_BOTTOM, L.PIT_Y - 0.15, r[3], r[4], C.foundation, "Concrete")
 	end
 	-- the games wing stands on its own plinth (the ground falls away to the east: up to 7 studs of it shows)
-	kit:box(f, "WingBase", OHX1, OX1, FLOOR_BOTTOM, L.DUCT_CEIL, OD0, GD1 + L.WALL_T, C.foundation, "Concrete")
+	kit:box(f, "WingBase", OHX1, OX1, FLOOR_BOTTOM - 2, L.DUCT_CEIL, OD0, GD1 + L.WALL_T, C.foundation, "Concrete")
 end
 
 -- The ball-return duct under each pair: floor, the return track, ribbed walls, a ceiling of lane-bed joists,
@@ -238,9 +238,11 @@ local function ducts(kit: any, root: any)
 			kit:box(m, `Ceiling{i}`, a - 0.2, b + 0.2, s[3] - 0.08, s[3], s[1], s[2], { 70, 52, 36 }, "WoodPlanks")
 		end
 		local d = L.SHAFT_D1 + 2
+		local ribN = 0
 		while d < L.REAR_WALL_D - 1 do
 			local ceil = if d > L.DECK_END and d < L.PIT_END then L.PIT_Y - 0.15 else L.DUCT_CEIL
-			for side = -1, 1, 2 do
+			ribN += 1
+			for side = -1, if ribN % 2 == 1 then 1 else -2, 2 do
 				kit:box(
 					m,
 					"Rib",
@@ -609,7 +611,7 @@ local function walls(kit: any, root: any, data: any)
 		)
 	end
 	-- what is behind each stretch of the front
-	sign(kit, w, "SignBallShop", -22, -5, 9.2, 11.6, "PRO SHOP - BOWLING BALLS")
+	sign(kit, w, "SignBallShop", -23, -5, 9.2, 11.6, "PRO SHOP - BOWLING BALLS")
 	sign(kit, w, "SignGifts", 44.5, 53.5, 9.2, 11.6, "GIFTS")
 	sign(kit, w, "SignSnack", 61, 81, 9.2, 11.6, "SNACK BAR - NACHOS 5c")
 	sign(kit, w, "SignGames", 106, 145, 9.2, 11.6, "GAMES ROOM - POOL - PINBALL - AIR HOCKEY - DARTS")
@@ -797,16 +799,18 @@ local function lights(kit: any, root: any)
 	end
 end
 
--- Where the ground stands above the floor (the front-west corner, by up to half a stud) the terrain is cut back
--- to just under the floor slab, inside the walls only.
+-- Where the ground stands at or above the floor (AlleyLayout.SITE_CUTS: the front-west corner) the terrain is cut
+-- back to just under the floor slab, inside the walls only.
 local function siteCut(kit: any, root: any)
 	local carve = root:FindFirstChild("TerrainCarve") or kit:folder(root, "TerrainCarve")
-	kit:box(carve, "FrontWest", OX0 + 0.2, 20, -0.38, 7, OD0 + 0.2, -44, { 255, 0, 0 }, "SmoothPlastic", {
-		collide = false,
-		query = false,
-		transparency = 1,
-		shadow = false,
-	})
+	for _, c in L.SITE_CUTS do
+		kit:box(carve, c.id, c.x0, c.x1, c.y0, c.y1, c.d0, c.d1, { 255, 0, 0 }, "SmoothPlastic", {
+			collide = false,
+			query = false,
+			transparency = 1,
+			shadow = false,
+		})
+	end
 end
 
 function Shell.build(kit: any, root: any, data: any)
