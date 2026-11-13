@@ -35,6 +35,11 @@
 --   * STANDING IDLE: the player only trembles the mouse and shuffles a foot (inside the server's bounds), is
 --     tagged and comes back; the HUD says "Still there?" a full Tuning.idleWarn before the real server takes
 --     the player off by its idle rule, and first person is let go.
+--   * FROM THE STREET (the join's end-to-end case): no pass and 27c in the purse, the player walks from the
+--     street in front of the station into the lobby (shown the match from the audience's edge), buys the
+--     pass at the desk through the town's charge (20c taken once; a second press says so and takes
+--     nothing), joins at the arena door, plays a short match among the real bots to the end card, leaves
+--     from it, and walks back out into the street (the show ends).
 -- Interface: return function(t) (the spec shape); real() -> boolean
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
@@ -286,7 +291,9 @@ local function visit(w: Rig.World, wires: PaintballRig.Wires): Visit
 end
 
 -- A case in the real game. Returns false, and plays nothing, where the service behind the door is the stub.
-type PlayOpts = { asleep: boolean?, lag: number?, lose: number?, first: ((v: Visit) -> ())? }
+-- purse: no pass is held; the real pass desk sells one through the town's charge, out of this purse
+type Purse = { cents: number, paid: { string } }
+type PlayOpts = { asleep: boolean?, lag: number?, lose: number?, first: ((v: Visit) -> ())?, purse: Purse? }
 local function play(fn: (v: Visit) -> (), opts: PlayOpts?): boolean
 	local o: PlayOpts = opts or {}
 	-- (lag: frames each way, for the stream and for the framework's messages alike; lose: one unreliable
@@ -334,15 +341,30 @@ local function play(fn: (v: Visit) -> (), opts: PlayOpts?): boolean
 				paintball = {
 					engine = engine(),
 					seed = 7,
-					pass = {
-						has = function(): boolean
-							return true
-						end,
-						buy = function(): (boolean, string)
-							return false, Contract.textFor("has_pass")
-						end,
-					},
+					pass = if o.purse
+						then nil -- (the service's own desk, on the town's charge below)
+						else {
+							has = function(): boolean
+								return true
+							end,
+							buy = function(): (boolean, string)
+								return false, Contract.textFor("has_pass")
+							end,
+						},
 				},
+				games = if o.purse
+					then {
+						charge = function(_player: any, cents: number, why: string): (boolean, string?)
+							local purse = o.purse :: Purse
+							if purse.cents < cents then
+								return false, Contract.passShort(cents, purse.cents)
+							end
+							purse.cents -= cents
+							table.insert(purse.paid, why)
+							return true, nil
+						end,
+					}
+					else nil,
 			},
 		})
 	)
@@ -1200,6 +1222,130 @@ return function(t)
 				)
 				t.eq(w.body:GetAttribute("CameraZone"), nil, "and first person was let go")
 			end, { asleep = true })
+		end
+	)
+
+	-- FROM THE STREET, the join's own end-to-end case: the real pass desk on the town's money, the door, a short
+	-- match among the real bots to the end card, and out again
+	t.test(
+		"from the street: a person walks to the station, buys the pass at the desk, joins, plays a short match against the real bots to the end card, and leaves",
+		function()
+			local purse: Purse = { cents = 27, paid = {} }
+			local inLobby = false
+			local seated = play(function(v)
+				local w = v.w
+				t.truthy(inLobby, "the walk to the desk came first")
+				v.run(0.5)
+				local seat = v.seat()
+				-- SEATED: first person, the spawn room, the briefing
+				t.eq(w.body:GetAttribute("CameraZone"), "lockFirstPerson", "brief 14: first person in the match")
+				t.truthy(inOwnRoom(v), "placed in its own spawn room")
+				t.eq(seat.phase, "briefing")
+				t.eq(#purse.paid, 1, "the door charges nothing: the pass is checked, not sold")
+				-- LIVE: out of the room and five balls at a wall
+				t.truthy(v.service:debug("end"))
+				t.truthy(
+					v.untilTrue(2, function(): boolean
+						return seat.phase == "live"
+					end),
+					"the match goes live"
+				)
+				t.truthy(v.untilTrue(4, function(): boolean
+					return seat:protected(v.now()) == nil
+				end))
+				walkOut(v, t)
+				local x, y, z = v.feet()
+				v.look(wallYaw(v.arena, x, y, z, 12, 60), 0)
+				v.run(0.2)
+				for _ = 1, 6 do
+					Rig.mouse(true)
+					Rig.mouse(false)
+					v.run(0.3)
+				end
+				-- the real bots have their way with the building for a few seconds; the player keeps firing
+				for _ = 1, 8 * 4 do
+					Rig.mouse(true)
+					Rig.mouse(false)
+					v.run(0.25)
+				end
+				local show = PaintballClient.show()
+				assert(show, "the show is on")
+				t.truthy(v.fires() >= 5, `{v.fires()} balls fired`)
+				t.truthy(#show.walls > 0, "paint on the walls")
+				local stats = v.service:stats()
+				t.eq(stats.movesRefused, 0, "no pose of an honest client refused")
+				-- FULL TIME: the bulletin with every player's line
+				t.truthy(v.service:debug("end"))
+				t.truthy(
+					v.untilTrue(2, function(): boolean
+						return seat.phase == "ended"
+					end),
+					"the client hears full time"
+				)
+				v.run(0.5)
+				local screen = Rig.screen(w)
+				t.truthy(string.find(screen, "FULL TIME", 1, true), screen)
+				t.truthy(string.find(screen, "The next match starts in", 1, true))
+				-- LEAVE from the end card: first person is let go and the server walks the body to the lobby
+				Rig.click(w, "Leave the match")
+				v.run(0.5)
+				t.eq(w.client.active(), nil, "left")
+				t.eq(PaintballClient.seat(), nil)
+				t.eq(w.body:GetAttribute("CameraZone"), nil, "first person released")
+				local lx, _, lz = v.feet()
+				t.truthy(not Arena.inVolume(lx, 1, lz), "the server put the body in the lobby")
+				-- the last person gone, the match is over and nothing more is shown (the bots do not play alone)
+				t.truthy(
+					v.untilTrue(2, function(): boolean
+						return PaintballClient.show() == nil
+					end),
+					"the show is over"
+				)
+				-- and back out into the street
+				t.truthy(v.walk(0, 88, 10) and v.walk(0, 106, 10), "out of the front door")
+				v.run(1)
+				t.eq(PaintballClient.show(), nil)
+				t.eq(purse.cents, 7, "20c, once")
+			end, {
+				purse = purse,
+				first = function(v)
+					local w = v.w
+					-- IN THE STREET in front of the station, out of the audience's reach, with 27c and no pass
+					local sx, sy, sz = Arena.toWorld(v.place, 0, 0, 106)
+					w.body:PivotTo(CFrame.new(sx, sy + ROOT, sz))
+					v.run(1)
+					t.eq(PaintballClient.show(), nil, "nothing of the match is shown in the street")
+					-- the door is shut to a player with no pass
+					Rig.press(w, STATION)
+					v.run(0.5)
+					t.eq(w.client.active(), nil, "no pass, no match")
+					-- THE WALK: through the front door into the lobby, to the pass desk (an empty arena shows nothing:
+					-- no match is on until somebody joins)
+					t.truthy(v.walk(0, 88, 10), "to the front door")
+					t.truthy(v.walk(Arena.DESK.x, Arena.DESK.z + 3, 10), "to the pass desk")
+					inLobby = true
+					v.run(1)
+					t.eq(PaintballClient.show(), nil, "an empty arena costs nothing")
+					-- THE DESK: 20c for the pass, once; a second press says so and takes nothing
+					local toasts = #w.toasts
+					Rig.press(w, Contract.DESK)
+					v.run(0.5)
+					t.eq(purse.cents, 7, "20c taken")
+					t.deepEq(purse.paid, { "a paintball pass" })
+					t.eq(w.client.active(), nil, "the desk seats nobody")
+					t.truthy(
+						Rig.has({ table.unpack(w.toasts, toasts + 1) }, Contract.textFor("bought")),
+						table.concat(w.toasts, " | ")
+					)
+					Rig.press(w, Contract.DESK)
+					v.run(0.5)
+					t.eq(purse.cents, 7, "nothing more")
+					t.truthy(Rig.has(w.toasts, Contract.textFor("has_pass")), table.concat(w.toasts, " | "))
+					-- to the arena door (play presses it)
+					t.truthy(v.walk(Arena.GATE.x, Arena.GATE.z + 3, 10), "to the arena door")
+				end,
+			})
+			t.truthy(seated, "seated at the door with the pass")
 		end
 	)
 end
