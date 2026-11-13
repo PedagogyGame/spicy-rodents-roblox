@@ -52,6 +52,48 @@ type Ctx = {
 	slots: number, -- passage modules numbered so far (Slot01 ...)
 }
 
+-- What the client's art window (Client/World/SewerArt) needs of a module, from the manifest (data/art/sewer_modules.json):
+-- its triangles and meshes (the budget), its half extents in the module frame (X across, Y up, Z along), and one mesh
+-- to check the placement by (the largest: its name and its centre in the module frame, where it must arrive under
+-- the slot's ArtPivot, or the client keeps the parts lining).
+function Pipe.moduleFacts(
+	kit: Kit.Kit,
+	entry: any
+): { tris: number, meshes: number, half: any, check: string, checkAt: any }
+	local V = kit.roblox.Vector3
+	if entry == nil or entry.meshes == nil then
+		return { tris = 0, meshes = 0, half = V.new(0, 0, 0), check = "", checkAt = V.new(0, 0, 0) }
+	end
+	local hx, hy, hz = 0, 0, 0
+	local best, bestOff = nil :: any, -1
+	local names: { [string]: number } = {}
+	for _, m in entry.meshes do
+		names[m.name] = (names[m.name] or 0) + 1
+	end
+	for _, m in entry.meshes do
+		local c, s = m.centre, m.size
+		hx = math.max(hx, math.abs(c[1]) + s[1] / 2)
+		hy = math.max(hy, math.abs(c[2]) + s[2] / 2)
+		hz = math.max(hz, math.abs(c[3]) + s[3] / 2)
+		-- the check mesh: a sizeable one with a name of its own, as far off the origin as there is (a turn or a
+		-- mirror moves it, as well as a shift)
+		local off = c[1] * c[1] + c[2] * c[2] + c[3] * c[3]
+		if names[m.name] == 1 and math.max(s[1], s[2], s[3]) >= 0.5 and off > bestOff then
+			best, bestOff = m, off
+		end
+	end
+	local r2 = function(n: number): number
+		return math.floor(n * 100 + 0.5) / 100
+	end
+	return {
+		tris = entry.tris or 0,
+		meshes = #entry.meshes,
+		half = V.new(r2(hx), r2(hy), r2(hz)),
+		check = if best then best.name else "",
+		checkAt = if best then V.new(best.centre[1], best.centre[2], best.centre[3]) else V.new(0, 0, 0),
+	}
+end
+
 local function v3(kit: Kit.Kit, p: Plan.Vec3): any
 	return kit.roblox.Vector3.new(p.x, p.y, p.z)
 end
@@ -329,10 +371,16 @@ function Pipe.build(
 		slot = function(name: string, variant: string, pivot: any)
 			made += 1
 			local entry = art and art.modules and art.modules[variant]
+			local m = Pipe.moduleFacts(kit, entry)
 			kit:model(artFolder, name, {
 				ArtModule = variant,
 				ArtAsset = if entry and entry.assetId then tostring(entry.assetId) else "",
 				ArtPivot = pivot,
+				ArtTris = m.tris,
+				ArtMeshes = m.meshes,
+				ArtHalf = m.half,
+				ArtCheck = m.check,
+				ArtCheckAt = m.checkAt,
 				Pipe = pipe.id,
 				Space = pipe.space,
 			})

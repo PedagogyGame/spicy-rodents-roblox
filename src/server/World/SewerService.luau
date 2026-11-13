@@ -32,10 +32,13 @@
 --     chamber for Cosmetics/FashionStand to read.
 --   * The alligator (v5.4's idle predator in the sewer): a sound and a line only, never seen. idleWarning(id)
 --     gives the line and the cue for the idle release's warning (D34) when the body is down a drain.
+--   * The owner's modules: loadArt puts each module the bake's slots name into ReplicatedStorage.SewerArt once
+--     (Boot/Game calls it in a task when Workspace.Sewers is there); Client/World/SewerArt draws them near the body.
 -- Sound: named cue points only (CUES); every id is empty until audio exists. Nothing is uploaded.
 -- Interface: new(opts) -> Service (pure: installs the cover, unless opts.cover is false, and a listener on the
 --   TownAI world); start(opts) -> Service (new, then the carve on workspace.Terrain unless opts.carve is false);
---   carve(terrain, boxes) -> count; fed(lastBiteAt?, now) -> boolean; Service: :underground(id) -> space?;
+--   carve(terrain, boxes) -> count; loadArt(root, into, insert?) -> (loaded, failed); fed(lastBiteAt?, now) ->
+--   boolean; Service: :underground(id) -> space?;
 --   :mayBite(id); :isRefuge(id); :healRate(id, fed) ->
 --   hp/s; :heal(id, health, maxHealth, dt, fed) -> health; :surface(x, y, z) -> (x, y, z, yaw)?; :reentry(deathX,
 --   deathZ) -> Mouth?; :fashionStand() -> Anchor?; :idleWarning(id) -> Warning?; :lost() -> { Lost } (the
@@ -228,6 +231,56 @@ function SewerService.start(opts: Opts): Service
 		self.carved = SewerService.carve(terrain, self.layout.carveBoxes())
 	end
 	return self
+end
+
+-- loadArt(root, into, insert?): the owner's modules each slot of the bake names (ArtModule, ArtAsset on the slots
+-- under root, Workspace.Sewers), each loaded once (InsertService:LoadAsset) and kept in `into` (ReplicatedStorage.
+-- SewerArt) as a Model named after its module, every part visual only (no collision, query or touch: the bake's
+-- lining keeps those); Client/World/SewerArt draws copies near the body. Yields (call it in a task). Returns the
+-- modules loaded and the ones that failed, with why; a failure leaves that module out (its drains stay in parts).
+function SewerService.loadArt(root: Instance, into: Instance, insert: any?): ({ string }, { [string]: string })
+	local service = insert or game:GetService("InsertService")
+	local want: { [string]: string } = {}
+	local order: { string } = {}
+	for _, d in root:GetDescendants() do
+		local module, asset = d:GetAttribute("ArtModule"), d:GetAttribute("ArtAsset")
+		if type(module) == "string" and type(asset) == "string" and asset ~= "" and want[module] == nil then
+			want[module] = asset
+			table.insert(order, module)
+		end
+	end
+	table.sort(order)
+	local loaded: { string } = {}
+	local failed: { [string]: string } = {}
+	for _, module in order do
+		if into:FindFirstChild(module) then
+			table.insert(loaded, module)
+			continue
+		end
+		local ok, result = pcall(function()
+			return service:LoadAsset(tonumber(want[module]))
+		end)
+		local model = if ok and result then result:GetChildren()[1] else nil
+		if model == nil or not model:IsA("Model") then
+			failed[module] = if ok then "the asset holds no Model" else tostring(result)
+			continue
+		end
+		model.Name = module
+		for _, p in model:GetDescendants() do
+			if p:IsA("BasePart") then
+				p.Anchored = true
+				p.CanCollide = false
+				p.CanQuery = false
+				p.CanTouch = false
+			end
+		end
+		model.Parent = into
+		table.insert(loaded, module)
+		if result then
+			result:Destroy()
+		end
+	end
+	return loaded, failed
 end
 
 -- fed(lastBiteAt, now): the rodent bit someone within Tunables rodent.fedWindowDays game days (real seconds on the

@@ -1,6 +1,6 @@
 --!strict
 -- ServerStorage.EngineTests.Sewers (CI place only). Written for the day Open Cloud Luau Execution works for the key
--- again (lost 2026-11-11): nothing runs it yet. Its task script would be tools/cloud/tasks/sewers_smoke.luau, the
+-- again (lost 2026-11-11): nothing runs it yet. Its task script is tools/cloud/tasks/sewers_smoke.luau, the
 -- same shape as backdrop_smoke.luau (require this module, run(), print and return the result).
 -- The storm drains in the real engine (BRIEF_ADDENDUM D8; Shared/World/SewerLayout, the bake build/Sewers.rbxm as
 -- Workspace.Sewers, Server/World/SewerService), the things only the engine can say:
@@ -13,6 +13,8 @@
 --   * the owner's modules (data/art/sewer_modules.json): each ArtAsset loads (InsertService), is one Model whose
 --     meshes stand upright and centred on the pivot as the export assumed (the bounding box, in the pivot's frame,
 --     against the union of the manifest's mesh boxes): what S1 could not see without the engine
+--   * the same modules as the game gets them: Server/World/SewerService.loadArt into a folder, each copied to a
+--     slot's pivot, its check mesh where Client/World/SewerArt looks for it (else the game shows plain parts)
 --   * the service in the engine: the cover is on the town AI's world, and it stops cleanly
 -- Interface: run() -> Result { ok, failures, numbers } (JSON-friendly); samples(layout) -> { {pipe, x, y, z} } (pure:
 --   the points the carve is read at; tests/unit/sewers_play holds them inside the layout's pipes and ART_BOX to the
@@ -240,6 +242,51 @@ function Sewers.run(): { [string]: any }
 				end
 			end
 		end
+	end
+
+	-- the modules as the game loads and draws them: SewerService.loadArt (Boot/Game), then each slot's check mesh where
+	-- Client/World/SewerArt's own check looks for it (a module that fails it stays in plain parts in the game)
+	local bake = workspace:FindFirstChild("Sewers")
+	if bake then
+		local store = Instance.new("Folder")
+		store.Name = "SewerArtEngineTest"
+		store.Parent = ReplicatedStorage
+		local okL, got, failed = pcall(SewerService.loadArt, bake, store)
+		check(okL, `loadArt failed: {got}`)
+		if okL then
+			numbers.artLoaded = got
+			for module, why in failed do
+				check(false, `loadArt: {module} did not load: {why}`)
+			end
+			local client = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts")
+			local artModule = client and client:FindFirstChild("SewerArt", true)
+			local SewerArt = if artModule then (require :: any)(artModule) else nil
+			check(SewerArt ~= nil, "Client/World/SewerArt not found under StarterPlayerScripts")
+			local done: { [string]: boolean } = {}
+			for _, d in bake:GetDescendants() do
+				local module = d:GetAttribute("ArtModule")
+				if SewerArt and type(module) == "string" and not done[module] and store:FindFirstChild(module) then
+					done[module] = true
+					local copy = (store:FindFirstChild(module) :: Model):Clone()
+					local slot = {
+						module = module,
+						space = "",
+						pivot = d:GetAttribute("ArtPivot"),
+						tris = 0,
+						meshes = 0,
+						check = d:GetAttribute("ArtCheck"),
+						checkAt = d:GetAttribute("ArtCheckAt"),
+					}
+					copy:PivotTo(slot.pivot)
+					check(
+						SewerArt.placedRight(copy, slot, SewerArt.C.checkTol),
+						`{module}: its check mesh {slot.check} is not where the client looks (the game draws parts)`
+					)
+					copy:Destroy()
+				end
+			end
+		end
+		store:Destroy()
 	end
 
 	svc:stop()

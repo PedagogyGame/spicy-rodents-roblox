@@ -10,7 +10,8 @@
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
 -- Inside a storm drain World/SewerAmbience gives the look, the lamps and the key hints, and rewords the
--- controls' refusals (every PossessionClient toast passes through its filter).
+-- controls' refusals (every PossessionClient toast passes through its filter); World/SewerArt draws the
+-- owner's modules near the body.
 -- The S2 test place runs its own S2Client and this script steps aside there.
 -- Live-server robustness (W1 client review): Shift Lock is switched off (Shift is sprint); the Roblox
 -- Reset button does nothing until a body is handed over (then PossessionClient routes it to the safe-
@@ -38,6 +39,7 @@ local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
 local CameraRig = require("./Camera/CameraRig")
 local SewerAmbience = require("./World/SewerAmbience")
+local SewerArt = require("./World/SewerArt")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -149,6 +151,11 @@ if okSewer then
 	sewer = sewerOrErr
 else
 	warn(`Client: SewerAmbience failed: {sewerOrErr}`)
+end
+-- inside a storm drain: the owner's modules near the body, the parts lining hidden here only (World/SewerArt)
+local okArt, artErr = pcall(SewerArt.start, { current = client.current })
+if not okArt then
+	warn(`Client: SewerArt failed: {artErr}`)
 end
 
 -- the bowling alley's games: walk up to a lane, the dartboard or the fortune teller and press E

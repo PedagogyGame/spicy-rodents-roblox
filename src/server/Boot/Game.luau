@@ -475,6 +475,29 @@ function Game.start(opts: Opts?): any
 		sewers = nil
 		warn(`[SpicyRodents] the storm drains did not start (the pipes run, nobody loses the rodent there): {errW}`)
 	end
+	-- the owner's sewer modules, once each, for the clients to draw near the body (Client/World/SewerArt); a module
+	-- that does not load leaves its drains in the bake's plain parts
+	if sewersBaked then
+		local store = ReplicatedStorage:FindFirstChild("SewerArt")
+		if store == nil then
+			local f = Instance.new("Folder")
+			f.Name = "SewerArt"
+			f.Parent = ReplicatedStorage
+			store = f
+		end
+		task.spawn(function()
+			local okA, loaded, failed =
+				pcall(SewerService.loadArt, workspace:FindFirstChild("Sewers") :: Instance, store)
+			if not okA then
+				warn(`[SpicyRodents] the sewer modules did not load (the drains stay in plain parts): {loaded}`)
+				return
+			end
+			for module, why in failed do
+				warn(`[SpicyRodents] sewer module {module} did not load (its drains stay in plain parts): {why}`)
+			end
+			print(`[SpicyRodents] sewer modules loaded: {table.concat(loaded, ", ")}`)
+		end)
+	end
 
 	local function stateOf(player: any): PState
 		local s = states[player]

@@ -20,6 +20,7 @@ local Enclosure = require("@shared/Routes/Enclosure")
 local Height = require("@shared/World/Height")
 local SewerLayout = require("@shared/World/SewerLayout")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
+local SewerArt = require("@client/World/SewerArt")
 local BakedWorld = require("@tests/lib/BakedWorld")
 local Build = require("../../tools/bake/sewers/Build")
 local Cues = require("../../tools/bake/sewers/Cues")
@@ -229,6 +230,77 @@ return function(t)
 		end
 		t.eq(slots, report.slots)
 	end)
+
+	t.test(
+		"the owner's modules as the client draws them: what each slot carries, every window within budget",
+		function()
+			local C = SewerArt.C
+			local list: { SewerArt.Slot } = {}
+			for _, pipe in layout.pipes do
+				for _, s in (root:FindFirstChild(pipe.id) :: any).Art:GetChildren() do
+					local entry = art.modules[s:GetAttribute("ArtModule")]
+					t.eq(s:GetAttribute("ArtTris"), entry.tris, `{pipe.id}.{s.Name}: its triangles`)
+					t.eq(s:GetAttribute("ArtMeshes"), #entry.meshes, `{pipe.id}.{s.Name}: its meshes`)
+					-- the check mesh: one name in the module, where the manifest has it
+					local check = s:GetAttribute("ArtCheck")
+					local n, found = 0, nil
+					for _, m in entry.meshes do
+						if m.name == check then
+							n += 1
+							found = m
+						end
+					end
+					t.eq(n, 1, `{pipe.id}.{s.Name}: the check mesh {check} is one of a kind`)
+					local at = s:GetAttribute("ArtCheckAt")
+					t.truthy(
+						found
+							and (at - roblox.Vector3.new(found.centre[1], found.centre[2], found.centre[3])).Magnitude
+								< 1e-4
+					)
+					table.insert(list, {
+						module = s:GetAttribute("ArtModule"),
+						space = pipe.space,
+						pivot = s:GetAttribute("ArtPivot"),
+						tris = s:GetAttribute("ArtTris"),
+						meshes = s:GetAttribute("ArtMeshes"),
+					})
+				end
+			end
+			-- every 2 studs along every route: what the window there draws
+			local worst = { tris = 0, meshes = 0, slots = 0 }
+			local whole: { [string]: number } = {}
+			for _, s in list do
+				whole[s.space] = (whole[s.space] or 0) + s.tris
+			end
+			for _, r in layout.routes do
+				local route = reg:get(r.id) :: any
+				local space = layout.spaceOf(r.id) :: string
+				local steps = math.ceil(route.length / 2)
+				for k = 0, steps do
+					local p = reg:pointAt(route, k / steps)
+					local win = SewerArt.window(
+						list :: any,
+						space,
+						roblox.Vector3.new(p.x, p.y, p.z) :: any,
+						C.radius,
+						C.maxSlots
+					)
+					local tris, meshes = SewerArt.cost(list, win)
+					worst.tris = math.max(worst.tris, tris)
+					worst.meshes = math.max(worst.meshes, meshes)
+					worst.slots = math.max(worst.slots, #win)
+					t.truthy(
+						tris <= C.budgetTris,
+						`route {r.id} at {k * 2} st: {tris} triangles (budget {C.budgetTris})`
+					)
+					t.truthy(meshes <= C.budgetMeshes, `route {r.id} at {k * 2} st: {meshes} meshes`)
+				end
+			end
+			print(
+				`      the art window: at most {worst.slots} modules, {worst.tris} triangles, {worst.meshes} meshes at once (whole pipes: crossroads {whole["sewer.crossroads"]}, culvert {whole["sewer.culvert"]}, Bowl Lane {whole["sewer.bowllane"]} triangles)`
+			)
+		end
+	)
 
 	t.test("the mouths: the opening, the street over it, every carve column's top covered", function()
 		t.truthy(fs.isFile("build/Town.rbxm"), "build/Town.rbxm (lune run tools/bake/main.luau)")
