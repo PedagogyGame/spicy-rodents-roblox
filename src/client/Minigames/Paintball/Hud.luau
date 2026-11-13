@@ -15,8 +15,8 @@
 --                  paint on the goggles that clears over Tuning.goggleSecs
 --   the feed       who tagged whom, top right, a few lines, each a few seconds
 --   the briefing   the framework's own How-to-play card is the controls card (shown through the
---                  briefing, put away when the match goes live; H brings it back), the side you are
---                  on, and the count to the start
+--                  briefing and through a late joiner's first Tuning.cardSecs, put away when the match
+--                  is live; H brings it back), the side you are on, and the count to the start
 --   the scoreboard held on G / View / SCORES: both sides, tags and times out; with it a button the
 --                  size of a pixel that is Modal, which is what frees a first-person mouse to press
 --                  Leave and Change sides
@@ -296,6 +296,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	local hud = { gui = gui, touch = touch } :: Hud
 	local lastPhase = ""
 	local liveSince: number? = nil
+	local opened: number? = nil
 	local boardAcc = 1
 
 	function hud.fireRect(_self: Hud): (number, number, number, number)
@@ -405,12 +406,19 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		if ui and ui.card and ui.card.Visible ~= false then
 			ui.card.Visible = false
 		end
-		local stage = if starting then "briefing" elseif ended then "ended" else "live"
+		-- (somebody who joins a match already running reads the card through their first moments)
+		local openedAt: number = opened or now
+		opened = openedAt
+		local stage = if starting
+			then "briefing"
+			elseif ended then "ended"
+			elseif now - openedAt < tune.cardSecs then "fresh"
+			else "live"
 		if stage ~= lastPhase then
 			if ui and ui.helpFrame then
-				ui.helpFrame.Visible = stage == "briefing"
+				ui.helpFrame.Visible = stage == "briefing" or stage == "fresh"
 			end
-			if stage == "live" and lastPhase == "briefing" then
+			if lastPhase == "briefing" and (stage == "live" or stage == "fresh") then
 				liveSince = now
 			end
 			lastPhase = stage

@@ -112,6 +112,9 @@ local Tuning = {
 	crossWide = 9,
 	-- Seconds of the briefing left at which the count is shown big in the middle.
 	briefCount = 5,
+	-- Seconds the controls card stays up for somebody who joins a match already running (it is up
+	-- through the whole briefing for everyone else; H shows and hides it at any time).
+	cardSecs = 6,
 
 	-- SOUND (cue points only: nothing is synthesised; ids come from the owner's licensed set) -------
 	-- Studs at which a cue placed in space has fallen to half and to nothing.

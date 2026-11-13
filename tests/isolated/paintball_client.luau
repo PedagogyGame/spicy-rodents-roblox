@@ -828,9 +828,11 @@ return function(t)
 				t.falsy(named(hud, "Modal").Visible)
 				t.eq(
 					w.gui:FindFirstChild("Help").Visible,
-					false,
-					"the controls card went away when the match went live"
+					true,
+					"the controls card stays up through a joiner's first moments"
 				)
+				s.run(Tuning.cardSecs)
+				t.eq(w.gui:FindFirstChild("Help").Visible, false, "and is put away once the match is on")
 				Rig.key(Key.G, true)
 				s.run(0.4)
 				t.truthy(named(hud, "Board").Visible)
