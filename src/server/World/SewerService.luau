@@ -8,8 +8,11 @@
 --     4-stud grid), so the pipes the bake draws are open air. It runs when start() is called: Boot/Game calls it
 --     after the terrain is written (any later terrain write would fill the pipes again).
 --   * Cover: a squirrel the layout says is underground (SewerLayout.contains) is out of AI/TownAI's threat grid
---     (TownAI.addCover: one cover among any others, removed again by stop), so people do not see or hear it, the fox does not hunt it, the deer do not start; and
---     Infection/InfectionService leaves it out of the crowd's fears. As in v5.4, where the sewer hid the player.
+--     (TownAI.addCover: one cover among any others, removed again by stop), so people do not see or hear it, the
+--     fox does not hunt it, the deer do not start; and Infection/InfectionService leaves it out of the crowd's
+--     fears. As in v5.4, where the sewer hid the player. The cover is the layout's volume (SewerLayout.contains),
+--     not Enclosure.hidden: it hides a body the AI holds or one let go as well as one on a route, and the server
+--     does not keep a held body's route.
 --   * Seen going down: when a squirrel goes under, the people who saw it at the grate (Actors/Perception's spot
 --     test on the mouth, or a spot of it in the last C.witnessWindow) react. Up to C.speakers bystanders say a
 --     "drain" line (Speech/SpeechRules limits). If it was the Spicy Rodent, every officer who saw it is sent to
@@ -25,7 +28,8 @@
 --   * Let go underground: a body a player lets go of in a pipe is put at the nearest mouth of that pipe, standing,
 --     facing out, before the AI takes it (TownAI.resume asks the cover).
 --   * Refuge: the rodent heals in a pipe at the hollow rate (Tunables rodent.regenHollow) only while fed (bit
---     someone within rodent.fedWindowDays game days, D33 rev 4): healRate / heal, for the code that keeps health.
+--     someone within rodent.fedWindowDays game days, D33 rev 4): healRate / heal; Boot/Game heals the player's
+--     rodent with it each second.
 --   * The rodent's re-entry after a death (BUILD_PLAN R5 S-10, Roles/Ladder rodentReentry): reentry() picks the
 --     mouth (SewerLayout.reentryMouth, away from the death, nobody near).
 --   * The fashion stand's new home (brief v2 decision 20; BUILD_PLAN W4 #9): fashionStand() is the anchor in P1's
