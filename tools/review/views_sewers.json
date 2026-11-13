@@ -622,11 +622,11 @@
   {
    "name": "p1_crossing",
    "pipe": "P1",
-   "desc": "the crossing from above the north-west corner: the four grates and the lid",
+   "desc": "the crossing from above Centre Street north of it: the four grates and the lid",
    "pos": [
-    -46,
-    16,
-    46
+    -18,
+    20,
+    54
    ],
    "look": [
     0,
