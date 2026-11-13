@@ -4,7 +4,8 @@
 -- SAME numbers the game plays on (Shared/Minigames/Pool/Tables.bumper: the bed, the four cushion noses, the
 -- twelve posts and the two cups; Pool/Furniture: heights, rails, the trays), so what is seen is what is
 -- simulated.
---   the bed: blue cloth on slate, cut away at the two cups, each a black hole with a bright rim;
+--   the bed: the slate in its blue cloth (one part per piece), cut away at the two cups, each a black hole with
+--     a bright rim;
 --   four cushions round the bed and a wooden rail outside them; aprons, legs, a floor under the body;
 --   twelve posts (a cross of eight in the middle with its one-ball gap, two flanking each cup), each a dark
 --     pin with its rubber ring at the height a ball meets it and a bright cap;
@@ -30,7 +31,6 @@ local WOOD = { 112, 70, 40 }
 local WOOD_DARK = { 66, 40, 26 }
 local FELT = { 34, 78, 140 }
 local CUSHION = { 28, 66, 120 }
-local SLATE = { 44, 46, 50 }
 local BLACK = { 12, 12, 14 }
 local CHROME = { 200, 200, 206 }
 local RUBBER = { 30, 30, 32 }
@@ -77,8 +77,8 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 		)
 	end
 	for _, r in kit:holes(-iw, iw, -il, il, cuts) do
-		t:box(m, "Cloth", r[1], r[2], -F.CLOTH_T, 0, r[3], r[4], FELT, "Fabric")
-		t:box(m, "Slate", r[1], r[2], under, -F.CLOTH_T, r[3], r[4], SLATE, "Slate")
+		-- (the slate never shows: the cup's black disc covers the cut. One part for both is the bed at half its parts)
+		t:box(m, "Cloth", r[1], r[2], under, 0, r[3], r[4], FELT, "Fabric")
 	end
 
 	-- the cushions (their noses are the model's four segments) and the rail outside them

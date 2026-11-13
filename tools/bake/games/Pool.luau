@@ -3,8 +3,9 @@
 -- station through the bake registry (tools/bake/GameBakes): an eight-ball table as real hardware, drawn from
 -- the SAME numbers the game plays on (Shared/Minigames/Pool/Tables: the bed, the six cushion noses, the twelve
 -- jaw facings, the six holes; Pool/Furniture: heights, rails, the tray), so what is seen is what is simulated.
---   the bed: cloth on slate, cut round at the six pockets, each with a dark well a ball drops into and a
---     round leather pocket behind it, its lip on the rail;
+--   the bed: the slate in its cloth (one part per piece: the cloth wrapped down the pocket's throat, as on a
+--     real table), cut round at the six pockets, each with a dark well a ball drops into and a round leather
+--     pocket behind it, its lip on the rail;
 --   six cushions between the pockets, a nose where the ball meets them and a top that rises to the rail, their
 --     ends cut back along the jaws' own lines (the jaw facings at the model's own angles);
 --   wooden rails with eighteen sights, cut away behind each pocket; aprons, a floor under the body, four legs;
@@ -30,7 +31,6 @@ local WOOD = { 108, 68, 40 }
 local WOOD_DARK = { 66, 40, 26 }
 local FELT = { 28, 112, 72 }
 local CUSHION = { 24, 98, 62 }
-local SLATE = { 44, 46, 50 }
 local BLACK = { 14, 14, 16 }
 local LEATHER = { 46, 30, 22 }
 local PEARL = { 236, 234, 220 }
@@ -136,8 +136,9 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 		end
 	end
 	for _, r in kit:holes(-iw, iw, -il, il, cuts) do
-		t:box(m, "Cloth", r[1], r[2], -F.CLOTH_T, 0, r[3], r[4], FELT, "Fabric")
-		t:box(m, "Slate", r[1], r[2], -F.CLOTH_T - F.SLATE_T, -F.CLOTH_T, r[3], r[4], SLATE, "Slate")
+		-- (the slate shows only in the pockets' throats, where a real table's cloth is wrapped down over it: one
+		-- part for both keeps the bed's look at half its parts)
+		t:box(m, "Cloth", r[1], r[2], -F.CLOTH_T - F.SLATE_T, 0, r[3], r[4], FELT, "Fabric")
 	end
 
 	-- the rails: the wooden frame round the cloth, cut away behind each pocket
