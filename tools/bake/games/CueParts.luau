@@ -274,7 +274,19 @@ function CueParts.lamp(t: any, parent: any, halfL: number, shades: number): any
 	local ceiling = AlleyLayout.CEILING_Y - Furniture.BED_Y
 	t:box(m, "LampBar", -0.07, 0.07, y + 0.62, y + 0.74, -span - 0.5, span + 0.5, BRASS, "Metal", LOOSE)
 	for _, sz in { -1, 1 } do
-		t:cyl(m, "LampRod", 0, (y + 0.74 + ceiling) / 2, sz * span * 0.6, ceiling - y - 0.74, 0.06, "Y", BRASS, "Metal", LOOSE)
+		t:cyl(
+			m,
+			"LampRod",
+			0,
+			(y + 0.74 + ceiling) / 2,
+			sz * span * 0.6,
+			ceiling - y - 0.74,
+			0.06,
+			"Y",
+			BRASS,
+			"Metal",
+			LOOSE
+		)
 	end
 	for k = 1, shades do
 		local z = if shades == 1 then 0 else -span + (k - 1) * 2 * span / (shades - 1)

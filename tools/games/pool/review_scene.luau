@@ -92,7 +92,17 @@ local function spread(st: any)
 		if ball then
 			local wx, wy, wz = Furniture.world(PLACE, st, x, y, z)
 			-- (a turn of its own for each, as balls lie after a game)
-			ball:PivotTo(roblox.CFrame.new(wx, wy, wz) * roblox.CFrame.Angles(id * 0.9, id * 1.7, id * 0.4))
+			-- (Lune's instances have no PivotTo: every part is carried by the move of the Skin, the pivot)
+			local skin = ball:FindFirstChild("Skin")
+			if skin then
+				local to = roblox.CFrame.new(wx, wy, wz) * roblox.CFrame.Angles(id * 0.9, id * 1.7, id * 0.4)
+				local by = to * skin.CFrame:Inverse()
+				for _, p in ball:GetDescendants() do
+					if p:IsA("BasePart") then
+						p.CFrame = by * p.CFrame
+					end
+				end
+			end
 		end
 	end
 	for id, at in lie do

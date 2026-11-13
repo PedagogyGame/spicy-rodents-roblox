@@ -212,7 +212,19 @@ function Bake.build(kit: any, parent: any, station: any, _venue: any?)
 	for k = 0, 3 do
 		local a = k * math.pi / 2 + 0.4
 		local cx, cz = sx + math.cos(a) * 0.3, sz + math.sin(a) * 0.3
-		t:rod(m, "Cue", cx, floor + 0.12, cz, cx - math.cos(a) * 0.08, floor + 0.12 + F.CUE_LEN, cz - math.sin(a) * 0.08, 0.08, MAPLE, "Wood")
+		t:rod(
+			m,
+			"Cue",
+			cx,
+			floor + 0.12,
+			cz,
+			cx - math.cos(a) * 0.08,
+			floor + 0.12 + F.CUE_LEN,
+			cz - math.sin(a) * 0.08,
+			0.08,
+			MAPLE,
+			"Wood"
+		)
 	end
 	return m
 end
