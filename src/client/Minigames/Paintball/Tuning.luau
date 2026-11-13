@@ -163,6 +163,9 @@ local Tuning = {
 	crossGap = 5,
 	crossArm = 7,
 	crossWide = 9,
+	-- How see-through the crosshair goes between two shots (the fire interval), 0 solid .. 1 gone: a hint
+	-- of the marker's rhythm, never the "not ready" look (a click then is held and leaves by itself).
+	crossRhythmFade = 0.25,
 	-- Seconds of the briefing left at which the count is shown big in the middle, and seconds "GO!" stays.
 	briefCount = 5,
 	goSecs = 0.9,
@@ -245,6 +248,10 @@ local Tuning = {
 	-- the look"). False leaves the step out: you respawn looking where you last looked. To be seen
 	-- once in Studio (the contract's open question).
 	turnLook = true,
+	-- Open the crosshair over the fire interval between two shots too, as well as for the real blockers.
+	-- False (the default): every ball goes exactly down the middle, and a crosshair that blooms after a shot
+	-- tells the hands it is less accurate, which it is not.
+	crossBloom = false,
 }
 
 -- The table's type, for code that takes it as a parameter (a test hands in a copy with one number changed).

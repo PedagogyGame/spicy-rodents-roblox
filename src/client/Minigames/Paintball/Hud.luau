@@ -806,10 +806,16 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		local aiming = not seat.out and not ended and not seat.board and phase ~= ""
 		show(cross, aiming)
 		if aiming then
+			-- wide and faint: something stands in the way (the marker down, reloading, protected, a spawn
+			-- room). Between two shots (the fire interval) the ball would still go down the middle, so the
+			-- crosshair does not open, which would read as spread: it only fades a little, and the click
+			-- made then is held and leaves by itself (Tuning.crossBloom puts the opening back)
 			local ready = seat:ready(now)
-			local gap = if ready then tune.crossGap else tune.crossWide
+			local between = not ready and seat:rhythm(now)
+			local wide = not ready and (tune.crossBloom or not between)
+			local gap = if wide then tune.crossWide else tune.crossGap
 			local arm = tune.crossArm
-			local a = if ready then 0 else 0.5
+			local a = if ready then 0 elseif wide then 0.5 else tune.crossRhythmFade
 			arms[1].Position, arms[1].Size = UDim2.fromOffset(gap + 1, 0), UDim2.fromOffset(arm, 2)
 			arms[2].Position, arms[2].Size = UDim2.fromOffset(-gap - arm + 1, 0), UDim2.fromOffset(arm, 2)
 			arms[3].Position, arms[3].Size = UDim2.fromOffset(0, gap + 1), UDim2.fromOffset(2, arm)
@@ -883,6 +889,13 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 			local n = math.max(1, math.ceil(seat.outUntil - now))
 			-- (who it was is in the feed as well, in gold)
 			words = if short then `TAGGED OUT   back in {n}` else `TAGGED OUT by {by}   back in {n}`
+			if idle ~= nil then
+				-- (being out does not stop the server's count of idleness)
+				local m = math.max(1, math.ceil(idle))
+				under = if short
+					then `Still there? Move when back: out in {m} s`
+					else `Still there? Move when you are back, or you are taken out of the match in {m} s`
+			end
 		elseif starting and thumbs then
 			-- the briefing with thumbs only: the two lines a phone's player needs, in place of the card
 			words = if short
@@ -902,6 +915,10 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 				else `Still there? Move, or you are taken out of the match in {n} s`
 		elseif seat.inRoom then
 			words = if short then "SAFE in your spawn room" else "SAFE in your spawn room: no firing from here"
+		elseif seat.nearRoom then
+			-- (a step outside the door, or beside the other team's room: the marker will not fire, and says why
+			-- before the click rather than after)
+			words = if short then "Too close to a spawn room" else "Too close to a spawn room to fire"
 		elseif seat.note ~= "" then
 			words = seat.note
 		end

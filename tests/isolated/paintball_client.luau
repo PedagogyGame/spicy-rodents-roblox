@@ -1559,6 +1559,74 @@ return function(t)
 	)
 
 	t.test(
+		"the HUD tells the truth: no bloom between shots, too close to a spawn room before the click, idle while out",
+		function()
+			play(function(s)
+				playing(s)
+				local hud = s.hud()
+				local arm = named(hud, "Arm1")
+				t.eq(arm.Position.X.Offset, Tuning.crossGap + 1, "ready: the crosshair is closed")
+				t.eq(arm.BackgroundTransparency, 0)
+				-- a shot: between it and the next the crosshair does not open (no spread to speak of), it fades
+				click(s)
+				s.run(0.05)
+				t.eq(#heard(s, "Paintball.Fire"), 1)
+				t.eq(arm.Position.X.Offset, Tuning.crossGap + 1, "no bloom after a shot")
+				t.near(arm.BackgroundTransparency, Tuning.crossRhythmFade, 1e-9)
+				-- a reload is a real block: wide and faint (the fifth ball starts it by itself)
+				for n = 2, R.magazine do
+					s.run(F.fireInterval)
+					click(s)
+					s.run(0.05)
+					t.eq(#heard(s, "Paintball.Fire"), n)
+				end
+				s.run(0.1)
+				t.eq(arm.Position.X.Offset, Tuning.crossWide + 1, "reloading: wide")
+				t.near(arm.BackgroundTransparency, 0.5, 1e-9)
+				s.run(F.reloadSecs)
+				-- a step outside a spawn room's door: told before the click, in words that are true
+				stand(s, -44 + Contract.MARGIN.room - 0.5, 0, 0)
+				s.run(0.2)
+				local words = Rig.texts(hud)
+				t.truthy(Rig.has(words, "Too close to a spawn room to fire"), table.concat(words, " | "))
+				t.falsy(Rig.has(words, "SAFE in your spawn room"))
+				t.eq(arm.Position.X.Offset, Tuning.crossWide + 1)
+				click(s)
+				s.run(0.2)
+				t.eq(#heard(s, "Paintball.Fire"), R.magazine, "and nothing leaves")
+				stand(s, 0, 0, 30)
+				s.run(Tuning.noteSecs + 0.2)
+				t.falsy(Rig.has(Rig.texts(hud), "Too close to a spawn room"), "back in the open, it goes")
+				-- standing idle until the warning, then tagged with a long wait: the countdown stays on screen
+				s.run(R.idleSecs - Tuning.idleWarn + 1)
+				t.truthy(Rig.has(Rig.texts(hud), "Still there?"))
+				local seat = PaintballClient.seat() :: PaintballClient.Seat
+				local due = s.now() + (seat:idle(s.now()) :: number)
+				local other = opponent(s)
+				s.send({
+					kind = "paintball_tag",
+					by = other,
+					id = s.you,
+					ball = 9,
+					scores = { 0, 1 },
+					tags = 1,
+					outs = 1,
+					at = due + 3,
+					x = 0,
+					y = 3,
+					z = 30,
+				})
+				s.run(1)
+				words = Rig.texts(hud)
+				t.truthy(Rig.has(words, "TAGGED OUT"), table.concat(words, " | "))
+				t.truthy(Rig.has(words, "Still there? Move when you are back"), "the idle countdown, under it")
+				s.run(due - s.now() - 0.3)
+				t.truthy(Rig.has(Rig.texts(hud), "Still there?"), "right up to the server's deadline")
+			end)
+		end
+	)
+
+	t.test(
 		"the eye is the contract's whatever the body: this game's own people stand with the root 3.2 up, not 3.0",
 		function()
 			play(function(s)

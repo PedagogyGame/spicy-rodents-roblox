@@ -158,6 +158,7 @@ export type Seat = {
 	result: any?, -- view.result at the end card (Contract.Result)
 	safeUntil: number, -- the protection of the last respawn ends
 	inRoom: boolean, -- standing in your own spawn room
+	nearRoom: boolean, -- in or within MARGIN.room of either spawn room: no ball may leave from here
 	legs: boolean, -- false while the legs are taken
 	-- the HUD's own
 	board: boolean, -- the scoreboard is asked for
@@ -176,6 +177,9 @@ export type Seat = {
 	stop: (self: Seat) -> (),
 	live: (self: Seat, now: number) -> boolean,
 	ready: (self: Seat, now: number) -> boolean, -- would a press leave as a ball this instant?
+	-- only the marker's own rhythm (the fire interval, or the eye settling after a tap of crouch) keeps a
+	-- press from leaving this instant: it is held and leaves by itself the moment it may
+	rhythm: (self: Seat, now: number) -> boolean,
 	markerUp: (self: Seat, now: number) -> number, -- 0 down (sprinting) .. 1 up
 	reloading: (self: Seat, now: number) -> number?, -- 0..1 through the running reload; nil: none
 	protected: (self: Seat, now: number) -> number?, -- seconds of protection left; nil: none
@@ -269,6 +273,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		result = nil,
 		safeUntil = -math.huge,
 		inRoom = false,
+		nearRoom = false,
 		legs = true,
 		board = false,
 		feed = {},
@@ -342,26 +347,29 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 	end
 
-	local function nearRoom(): boolean
+	-- In (or, with `margin`, within that of) either team's spawn room.
+	local function nearRoom(margin: number?): boolean
 		for _, room in arena.spawnRooms do
-			if ArenaModule.inRoom(room, seat.x, seat.y + 0.1, seat.z, M.room) then
+			if ArenaModule.inRoom(room, seat.x, seat.y + 0.1, seat.z, margin) then
 				return true
 			end
 		end
 		return false
 	end
 
-	-- What stands in a press's way at `now`: nothing ("go"), only the marker's own rhythm ("hold"),
-	-- an empty or reloading marker ("dry"), or something else ("drop", with the words to show).
-	local function gate(now: number): (string, string?)
+	-- What stands in a press's way at `now`: nothing ("go"), a wait it is held through ("hold"; the third
+	-- value true when that is only the marker's own rhythm: the fire interval, or the eye settling after a
+	-- tap of crouch), an empty or reloading marker ("dry"), or something else ("drop", with the words to show).
+	local function gate(now: number): (string, string?, boolean?)
 		if not seat:live(now) or seat.you == 0 or seat.place == 0 then
 			return "drop", nil
 		elseif seat.out then
 			return "drop", nil
 		elseif now < seat.safeUntil + M.gate then
 			return "drop", "Protected: you cannot fire yet"
-		elseif nearRoom() then
-			return "drop", "No firing from a spawn room"
+		elseif nearRoom(M.room) then
+			-- (the words tell the truth: a step outside the door is still too close)
+			return "drop", if nearRoom() then "No firing from a spawn room" else "Too close to a spawn room to fire"
 		end
 		local mag = seat.mag
 		settle(now)
@@ -373,13 +381,13 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		elseif seat.k > 0 or now < seat.sprintEndedAt + Body.SPRINT_FIRE_DELAY then
 			return "hold", nil
 		elseif now < mag.nextFireAt then
-			return "hold", nil
+			return "hold", nil, true
 		elseif now - flipPrev < tuning.tapWindow then
 			-- a quick double change of stance (see the header, "the origin"): the eye must be within the
 			-- server's slack of where it is going before a ball may leave from it
 			local going = Body.eye(if seat.wantCrouch then 1 else 0)
 			if math.abs(Body.eye(seat.c) - going) > Contract.TRUST.originSlackY - tuning.tapSlack then
-				return "hold", nil
+				return "hold", nil, true
 			end
 		end
 		return "go", nil
@@ -387,6 +395,11 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 
 	function seat.ready(_self: Seat, now: number): boolean
 		return hasPose and (gate(now)) == "go"
+	end
+
+	function seat.rhythm(_self: Seat, now: number): boolean
+		local verdict, _, rhythm = gate(now)
+		return hasPose and verdict == "hold" and rhythm == true
 	end
 
 	-- 0 while the sprint has the marker down, 1 when it is up and may fire.
@@ -417,8 +430,9 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 
 	-- Seconds until the server takes this player off for standing idle (Rules.idleSecs of live play
 	-- without moving, turning or firing), once that is Tuning.idleWarn or less away; nil otherwise.
+	-- Tagged out too: the server's count does not stop for it, so neither does the warning.
 	function seat.idle(self: Seat, now: number): number?
-		if self.out or self.place == 0 or not self:live(now) then
+		if self.place == 0 or not self:live(now) then
 			return nil
 		end
 		local left = R.idleSecs - (now - self.activeAt)
@@ -992,6 +1006,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		-- your own room: safe, and no firing
 		local room = arena.spawnRooms[self.team]
 		self.inRoom = has and room ~= nil and ArenaModule.inRoom(room, self.x, self.y + 0.1, self.z)
+		self.nearRoom = has and nearRoom(M.room)
 		-- the match goes live under a player who stood through its briefing: the horn
 		local liveNow = self.place ~= 0 and self:live(now)
 		if liveNow and not wasLive and briefEnds ~= nil then

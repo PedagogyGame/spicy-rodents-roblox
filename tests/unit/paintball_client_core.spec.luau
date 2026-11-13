@@ -564,21 +564,25 @@ return function(t)
 		-- the spawn rooms, both, and MARGIN.room round them
 		for _, case in
 			{
-				{ x = -50, fires = false }, -- inside your own
-				{ x = -44 + M.room - 0.1, fires = false }, -- outside the door, inside the margin
+				{ x = -50, fires = false, inRoom = true, note = "No firing from a spawn room" }, -- inside your own
+				-- outside the door, inside the margin: not in the room, and the words say so
+				{ x = -44 + M.room - 0.1, fires = false, note = "Too close to a spawn room to fire" },
 				{ x = -44 + M.room + 0.1, fires = true },
-				{ x = 44 - M.room + 0.1, fires = false }, -- beside the other team's
+				-- beside the other team's
+				{ x = 44 - M.room + 0.1, fires = false, note = "Too close to a spawn room to fire" },
 				{ x = 44 - M.room - 0.1, fires = true },
 			}
 		do
 			b = Kit.playing()
 			Kit.place(b, { x = case.x, z = 0 })
 			Kit.frame(b)
+			t.eq(b.seat.inRoom, case.inRoom == true, `x = {case.x}: in your own room`)
+			t.eq(b.seat.nearRoom, not case.fires, `x = {case.x}: too close to fire, known before the click`)
 			press(b)
 			Kit.frame(b)
 			t.eq(#Kit.fires(b) == 1, case.fires, `x = {case.x}`)
 			if not case.fires then
-				t.truthy(b.seat.note ~= "", "and the HUD says why")
+				t.eq(b.seat.note, case.note, "and the HUD says why, truly")
 			end
 		end
 		t.truthy(Kit.playing().seat.inRoom == false)
@@ -1955,6 +1959,61 @@ return function(t)
 		end
 	)
 
+	t.test("between two shots only the marker's rhythm waits; the marker down or reloading is a real block", function()
+		local b = Kit.playing()
+		local seat = b.seat
+		t.truthy(seat:ready(b.now()))
+		t.eq(seat:rhythm(b.now()), false, "ready is not waiting")
+		press(b)
+		Kit.frame(b)
+		t.eq(#Kit.fires(b), 1)
+		t.eq(seat:ready(b.now()), false)
+		t.eq(seat:rhythm(b.now()), true, "the fire interval: the next ball goes down the middle all the same")
+		Kit.run(b, F.fireInterval)
+		t.truthy(seat:ready(b.now()))
+		seat:input("sprint", true)
+		Kit.run(b, 0.3)
+		t.truthy(seat.k > 0)
+		t.eq(seat:rhythm(b.now()), false, "the marker down is a real block")
+		seat:input("sprint", false)
+		Kit.run(b, 0.5)
+		seat:input("reload", true)
+		Kit.frame(b)
+		t.truthy(seat:reloading(b.now()) ~= nil)
+		t.eq(seat:rhythm(b.now()), false, "and so is a reload")
+	end)
+
+	t.test(
+		"the server's idle deadline falls while you are tagged out: the countdown is on screen all through",
+		function()
+			local b = Kit.playing()
+			local seat = b.seat
+			Kit.run(b, R.idleSecs - Tuning.idleWarn + 1.5) -- the warning is up, 13.5 s left
+			local deadline = b.now() + (seat:idle(b.now()) :: number)
+			-- tagged with a long wait (the owner may tune the respawn to 10 s): the deadline lands inside it
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 2,
+				id = 1,
+				ball = 3,
+				scores = { 0, 1 },
+				tags = 1,
+				outs = 1,
+				at = deadline + 2,
+				x = 0,
+				y = 3,
+				z = 30,
+			})
+			t.truthy(seat.out)
+			while b.now() < deadline - 0.05 do
+				Kit.frame(b)
+				local left = seat:idle(b.now())
+				t.truthy(left ~= nil, "the countdown never goes away while out")
+				t.near(left :: number, deadline - b.now(), 1e-6, "and it is the server's deadline")
+			end
+		end
+	)
+
 	t.test(
 		"standing idle: the seat warns before the server would take the player off; moving, turning or firing is being there",
 		function()
@@ -1993,6 +2052,9 @@ return function(t)
 				z = 30,
 			})
 			Kit.run(b, 1)
+			-- the warning stays up while out: the server's deadline can fall inside the wait
+			local whileOut = seat:idle(b.now())
+			t.truthy(whileOut ~= nil and whileOut < left - 0.9, "still counting down while tagged out")
 			-- (the body put somewhere else while it waits, the view turned: no Move goes, the server sees none)
 			b.pose.z += 6
 			b.pose.yaw += 0.5
