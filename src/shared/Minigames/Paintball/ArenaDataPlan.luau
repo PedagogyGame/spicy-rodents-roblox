@@ -389,8 +389,13 @@ function Plan.build(): Plan
 	-- (a slab is two layers, each a box: what is walked on, FLOOR thick, and under it the ceiling of the storey
 	-- below, so that a carpet is not a ceiling. Nothing passes between them.)
 	local FLOOR = 0.4
-	for _, layer in { { "ceiling4", top, top + 1 - FLOOR }, { "roof", top + 1 - FLOOR, top + 1 } } do
-		local look, y0, y1 = layer[1] :: string, layer[2] :: number, layer[3] :: number
+	type Layer = { look: string, y0: number, y1: number }
+	local roofLayers: { Layer } = {
+		{ look = "ceiling4", y0 = top, y1 = top + 1 - FLOOR },
+		{ look = "roof", y0 = top + 1 - FLOOR, y1 = top + 1 },
+	}
+	for _, layer in roofLayers do
+		local look, y0, y1 = layer.look, layer.y0, layer.y1
 		pair(KIND.slab, look, -half - 1, y0, -half - 1, half + 1, y1, -atrium)
 		pair(KIND.slab, look, -half - 1, y0, -atrium, -atrium, y1, atrium)
 	end
@@ -430,8 +435,12 @@ function Plan.build(): Plan
 	local RUN, STEPS = 21, 28 -- a flight: 21 studs along x, 28 steps of half a stud
 	for level = 1, floors - 1 do
 		local y = level * H
-		for _, layer in { { `ceiling{level - 1}`, y - 1, y - FLOOR }, { `floor{level}`, y - FLOOR, y } } do
-			local look, y0, y1 = layer[1] :: string, layer[2] :: number, layer[3] :: number
+		local layers: { Layer } = {
+			{ look = `ceiling{level - 1}`, y0 = y - 1, y1 = y - FLOOR },
+			{ look = `floor{level}`, y0 = y - FLOOR, y1 = y },
+		}
+		for _, layer in layers do
+			local look, y0, y1 = layer.look, layer.y0, layer.y1
 			pair(KIND.slab, look, -half, y0, -half, -atrium, y1, half)
 			pair(KIND.slab, look, -atrium, y0, -half, atrium, y1, -CORE1)
 			pair(KIND.slab, look, -atrium, y0, -CORE0, atrium, y1, -atrium)
