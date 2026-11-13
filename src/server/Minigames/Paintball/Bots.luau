@@ -29,7 +29,9 @@
 --     bot's pose yaw and pitch are where its marker points (the aim, lead and drop included), and the
 --     service drops a "fire" whose direction is more than BOT.aimSlack from Body.look(pose.yaw,
 --     pose.pitch). So a bot must be seen to turn on a player before it can tag them: the puppet is the
---     tell. A ball is never fired at a sighting younger than BOT.faced.
+--     tell. A ball is never fired at a sighting younger than BOT.faced. Between sight checks a
+--     bot aims at where it last SAW its target, carried on at the speed it had: it never follows
+--     a body it has no line to;
 --   * aim with Ballistics.aim(..., state.feel.ballSpeed, state.feel.ballDrop) at where the target
 --     will be, plus error, more of it at a low `skill`, and MOST OF IT ON THE FIRST BALL at a new
 --     target: the first ball is the warning splat. A fair player beats the average bot (skill 0.5)
@@ -38,14 +40,22 @@
 --     fall back to reload;
 --   * respect the match: they fire only when Rules.canFire(state, id, now) says so, with the same
 --     magazine and reload as a person, never while BIT.sprint is set in their pose or within
---     Body.SPRINT_FIRE_DELAY of it, and never from inside a spawn room.
+--     Body.SPRINT_FIRE_DELAY of it, and never from inside a spawn room;
+--   * do not spawn-trap: no bot fires at somebody inside their spawn room, nor at somebody on
+--     their own doorstep (BotNav.DOORSTEP) who has not fired a ball in the last few seconds, and no
+--     bot chooses to stand within BotNav.KEEP_OFF of the other team's doors.
 -- A bot's shot is a command for the service, which checks the look (above), calls Rules.fire(state,
 -- id, now) and Projectiles.fire with no rewind: a bot sees the server's present. Every `now` here is
 -- the shared clock (Clock): the same time the State is synced to.
 -- WHAT THE BOTS SHARE (the Squad): where every body is and how fast it is going (worked out here
--- once a tick from `poses`, for everybody's lead); which post each bot has taken, so two do not
--- choose one; and what each TEAM knows: the storey and the place it last saw an opponent, which is
--- what "They are on three!" says aloud and what draws its bots towards a fight.
+-- once a tick from `poses`; a bot takes a target's speed from it only at a sight check); which post
+-- each bot has taken, so two do not choose one; the storey each bot has made its own; when each
+-- slot last fired; and what each TEAM knows: the storey and the place it last saw an opponent,
+-- which is what "They are on three!" says aloud and what draws its bots towards a fight.
+-- THE CALL-OUTS (Contract.LINES; one a bot every twelve seconds, one a team every eight): "reloading"
+-- when it reloads with somebody about, "floor" (n = the storey, 1 to 5) when it first sees
+-- somebody on a storey its team has not just called, "cover" when it joins a team-mate's fight,
+-- "tagged" when its ball tags, "out" when it is tagged.
 -- A BOT WITHOUT A POSE DOES NOTHING: a brain made by sync before the service has placed its slot
 -- (the "respawn" event comes a step or two after the seat is taken) waits for place().
 -- COST (Contract.COST): Bots.step with COST.atBots bots costs under COST.botsMs a tick on average;

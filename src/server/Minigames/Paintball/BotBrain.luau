@@ -16,23 +16,31 @@
 --            this bot's reaction time, and fired on only once it is older than BOT.faced as well.
 --            A sighting that lapses (no clear line for LAPSE) starts again from nothing.
 --   thinks   (ten times a second) chooses the target (the nearest sighting, with some loyalty to the
---            present one); decides how to fight (stand, keep walking, or go to cover: always cover
---            when reloading or nearly empty and there is some near); reloads when it is quiet;
---            and when there is nobody to fight walks the building: a goal (mostly cover spots, on a
---            storey chosen so the team spreads over all five and gathers where opponents were last
---            seen), a route with its own taste (BotNav), a few seconds' watch there, then another.
---            Behind low cover it bobs: crouched it is wholly hidden, standing it sees and shoots.
---            Behind a pillar it steps out to a peek point and back.
+--            present one); decides how to fight (stand, keep walking, or go to cover: mostly cover
+--            when reloading, nearly empty or already shot at, and never standing in its spawn room
+--            or on its way out to its storey); moves on when shot at where it stands, and after
+--            eight seconds of fighting from one spot; reloads when it is quiet; and when there is
+--            nobody to fight walks the building: a goal (mostly cover spots; on a storey chosen so
+--            the team spreads: each life has a storey of its own, the one its team has fewest on,
+--            and goes there first; then that storey, its neighbours, and wherever opponents were
+--            last seen), a route with its own taste (BotNav), a few seconds' watch there, then
+--            another. Behind low cover it bobs: crouched it is wholly hidden, standing it sees and
+--            shoots. Behind a pillar it steps out to a peek point and back, and looks past the
+--            pillar's edges, not at it. A bot that has not been anywhere else for ten seconds is
+--            sent somewhere, whatever it was doing (PB-10: never stuck).
 --   moves    along the links of the graph in straight lines, feet on arena.ground, at Body's speeds
 --            with the match's feel; sprints only when nothing has been seen or heard for a while.
 --   looks    turns its yaw and pitch towards what it wants to look at, never faster than
 --            Profile.turn: along its path, round its post, at a noise, at where a target vanished
---            (it does NOT follow a target it cannot see), or along its AIM.
---   aims     Ballistics.aim at where the target will be (its tracked velocity x the ball's flight
---            time x a lead factor that is redrawn for every ball), plus an ERROR in yaw and pitch
---            that is redrawn for every ball: wider with range, with the target's speed, with the
---            bot's own, at a low skill, and widest on the first ball at a new target (the warning
---            splat), each ball keeping some of the last one's error (it walks its balls in).
+--            (the place, not the target: see "aims"), or along its AIM.
+--   aims     at where the target is AS FAR AS IT KNOWS: where its last sight check saw it, carried
+--            on at the speed it was going then (it never reads where a body it cannot see has got
+--            to, so a target that turns between two checks is led wrongly, as a person would lead
+--            it). Ballistics.aim at where that will be when the ball arrives (x a lead factor that
+--            is redrawn for every ball), plus an ERROR in yaw and pitch, so many sigmas, redrawn
+--            for every ball and keeping some of the last one's (it walks its balls in). A sigma is
+--            what the moment makes it: wider with range, with the target's speed, with the bot's
+--            own, at a low skill, and widest on the first ball at a new target (the warning splat).
 --   fires    only along its own look, when the look has settled on the aim, in bursts with pauses;
 --            only when Rules.canFire says so and the target may be hit; never while sprinting or
 --            within Body.SPRINT_FIRE_DELAY of it; never from a spawn room, at somebody inside one, or
@@ -262,8 +270,8 @@ local LAPSE = 0.6 -- a sighting with no clear line for this long is over
 local SIGHT = 150 -- studs: nobody is looked for further off
 local THINK = 0.1 -- seconds between thoughts
 local QUIET = 3 -- seconds with nothing seen or heard before a bot sprints or reloads at leisure
-local SAY_EVERY = 10 -- seconds between one bot's call-outs
-local TEAM_SAY_EVERY = 5 -- and between one team's
+local SAY_EVERY = 12 -- seconds between one bot's call-outs
+local TEAM_SAY_EVERY = 8 -- and between one team's
 local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
 local CHEST = ArenaModule.CHEST
 
@@ -839,7 +847,28 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			if had == nil then
 				b.fightAt = now
 				local floor = math.clamp(math.floor(pose.y / nav.arena.floorHeight + 0.5), 0, nav.arena.floors - 1)
-				if floor ~= squad.calledFloor[b.team] or now - squad.calledAt[b.team] > 20 then
+				-- somebody is shooting, and a team-mate is beside this bot: it says it is with them
+				local beside = false
+				if now - (squad.firedAt[best] or -math.huge) < 2 then
+					for mid, mate in state.slots do
+						local mp = poses[mid]
+						if
+							mid ~= b.id
+							and mp ~= nil
+							and mate.on
+							and not mate.out
+							and mate.team == b.team
+							and math.abs(mp.y - b.y) < 5
+							and (mp.x - b.x) ^ 2 + (mp.z - b.z) ^ 2 < 900
+						then
+							beside = true
+							break
+						end
+					end
+				end
+				if beside then
+					say(b, squad, now, out, "cover")
+				elseif floor ~= squad.calledFloor[b.team] or now - squad.calledAt[b.team] > 30 then
 					local said = b.saidAt
 					say(b, squad, now, out, "floor", floor + 1)
 					if b.saidAt ~= said then

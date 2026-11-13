@@ -16,6 +16,7 @@ local Contract = require("@shared/Minigames/Paintball/Contract")
 local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local BotBrain = require("@server/Minigames/Paintball/BotBrain")
+local BotCheck = require("@server/Minigames/Paintball/BotCheck")
 local BotNav = require("@server/Minigames/Paintball/BotNav")
 local Bots = require("@server/Minigames/Paintball/Bots")
 local Report = require("../../tools/games/paintball/bots/Report")
@@ -923,4 +924,20 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test(
+		"the server check (BotCheck) runs here as it will there: fifteen bots, no rule broken, inside the budget",
+		function()
+			local result = BotCheck.run({ seconds = 45, seed = 3 })
+			t.deepEq(result.failures, {})
+			t.truthy(result.ok)
+			local n = result.numbers
+			t.eq(n.bots, Contract.COST.atBots)
+			t.eq(n.ticks, 45 * Clock.TICK_HZ)
+			t.truthy(n.shots > 100 and n.tags > 5, `{n.shots} balls, {n.tags} tags`)
+			t.eq(n.refused, 0)
+			t.eq(n.neverLeft, 0)
+			t.truthy(n.botsMs < n.budgetMs)
+		end
+	)
 end
