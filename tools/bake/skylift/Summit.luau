@@ -3,7 +3,7 @@
 -- local X -50..-20, D -25..25; the hall's floor, canopy and walls are the Lookout's own, tools/bake/lookout).
 -- Model f4_lift_summit (Atomic, attributes VenueId = "f3_hilltop", Family = "F4"), in the Lookout's frame:
 --   the down-boarding platform (X -50..-43.6, anchor board_down) and the arrival platform (X -26.4..-20, anchor
---     alight), both at floor + 1.5 and joined behind the bullwheel by a walkway (D 20.6..25); the arrival
+--     alight), both at floor + 1.5 and joined behind the bullwheel by a walkway (D 21.3..25); the arrival
 --     platform's front end steps down to the hall floor by the terrace (D -25..-22), the only way on or off;
 --   the self-service gate across the boarding platform (BoardGate: Gate = "board", Station = "summit";
 --     BoardGateArm; NextCabinBoard with a TextLabel "Next"), "DOWN TO TOWN" and "WELCOME TO THE LOOKOUT" signs;
@@ -137,7 +137,7 @@ function Summit.build(kit: Kit.Kit, parent: any, v: any): any
 		kit:box(liftF, "GantryBeam", cols[1], cols[2] + 0.8, BEAM0, BEAM1, d - 0.45, d + 0.45, Common.STEEL, "Metal")
 	end
 	-- the bullwheel, hub and gearbox
-	local discY0 = cableY + SkyLift.GRIP_ABOVE + 0.15
+	local discY0 = cableY + SkyLift.GRIP_ABOVE + 0.35
 	kit:cyl(liftF, "Bullwheel", wx, discY0 + 0.3, wd, 0.6, 2 * S + 0.8, "Y", Common.STEEL_DARK, "Metal")
 	kit:cyl(liftF, "BullwheelRim", wx, discY0 + 0.65, wd, 0.1, 2 * S + 0.4, "Y", Common.RED, "Metal", {
 		collide = false,
@@ -147,7 +147,7 @@ function Summit.build(kit: Kit.Kit, parent: any, v: any): any
 	kit:box(liftF, "Gearbox", wx - 2.2, wx + 2.2, BEAM1, BEAM1 + 1.6, wd - 1.4, wd + 1.4, Common.RED_DARK, "Metal")
 	kit:box(liftF, "Tensioner", wx - 0.6, wx + 0.6, BEAM1, BEAM1 + 1.1, wd + 1.4, wd + 4.4, Common.STEEL_DARK, "Metal")
 	-- guide rails along both strands, from the front to the bullwheel, hung from the gantry beams
-	local railY0 = cableY + SkyLift.GRIP_ABOVE + 0.2
+	local railY0 = cableY + SkyLift.GRIP_ABOVE + 0.35
 	local railEnd = wd - math.sqrt((S + 0.4) ^ 2 - S ^ 2) - 0.6
 	for _, x in { downX, upX } do
 		kit:box(
@@ -263,16 +263,13 @@ function Summit.build(kit: Kit.Kit, parent: any, v: any): any
 		for _, face in { "Front", "Back" } do
 			local sg = kit:gui(p, face, 40)
 			sg.LightInfluence = 0
-			kit:label(
-				sg,
-				{
-					Text = text,
-					TextColor = Common.CREAM,
-					Font = "GothamBlack",
-					Size = { 0.92, 0.7 },
-					Pos = { 0.04, 0.15 },
-				}
-			)
+			kit:label(sg, {
+				Text = text,
+				TextColor = Common.CREAM,
+				Font = "GothamBlack",
+				Size = { 0.92, 0.7 },
+				Pos = { 0.04, 0.15 },
+			})
 		end
 		kit:light(
 			p,

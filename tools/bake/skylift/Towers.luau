@@ -96,7 +96,6 @@ function Towers.build(roblox: any, parent: any): { any }
 			kit:rod(m, "Leg", sx * N, neck, sd * N, sx * N, head, sd * N, LEG_D, steel, "Metal", lattice)
 		end
 		-- bracing on the taper: an X on the faces across the line, one diagonal on the side faces
-		local mid = (base + neck) / 2
 		local function wAt(y: number): number
 			return W + (N - W) * (y - base) / (neck - base)
 		end
@@ -109,8 +108,8 @@ function Towers.build(roblox: any, parent: any): { any }
 			local w0, w1 = wAt(base + 0.3), wAt(neck - 0.3)
 			kit:rod(m, "Brace", sx * w0, base + 0.3, -sx * w0, sx * w1, neck - 0.3, sx * w1, BRACE_D, steel, "Metal")
 		end
-		-- the ring where the taper meets the column, and one at mid-height
-		for _, y in { neck, mid } do
+		-- the ring where the taper meets the column
+		for _, y in { neck } do
 			local w = wAt(y)
 			for _, e in { { -1, -1, 1, -1 }, { 1, -1, 1, 1 }, { 1, 1, -1, 1 }, { -1, 1, -1, -1 } } do
 				kit:rod(m, "Ring", e[1] * w, y, e[2] * w, e[3] * w, y, e[4] * w, BRACE_D, steel, "Metal")
@@ -137,7 +136,7 @@ function Towers.build(roblox: any, parent: any): { any }
 			for _, d in { -1.35, 1.35 } do
 				local g = if d < 0 then gb else gf
 				local rope = cable + g * d
-				local cy = rope + 0.72 + math.abs(g) * 1.35 + 0.6
+				local cy = rope + 0.95 + math.abs(g) * 1.35 + 0.6
 				table.insert(wheels, { d, cy })
 				kit:cyl(m, "Sheave", x, cy, d, 0.32, 1.2, "X", Common.STEEL_DARK, "Metal", {
 					collide = false,

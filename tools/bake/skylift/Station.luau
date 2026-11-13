@@ -5,7 +5,7 @@
 -- The cabins (Shared/Rides/SkyLift) creep round the bullwheel at X -12, D 2, their floors level with the
 -- platforms (floor + 1.5): they sweep X -20.5..25, D -6.5..10.5 and leave through the open +X end.
 --   Platforms (Y 1.5): the front one (D -15..-6.4) where people board (anchor board, X -5), the back one
---     (D 10.4..15) where they get out (alight_down), joined round the bullwheel's end by a walkway (X -25..-20.9);
+--     (D 10.4..15) where they get out (alight_down), joined round the bullwheel's end by a walkway (X -25..-21.3: the cabins swing 8.9 out round the bullwheel);
 --     between them the pit the cabins pass over (floor Y 0). Yellow edge lines.
 --   The front door (X -9..-1) is at platform height; outside, steps down to the ground and the front walk.
 --   A glass fence across the front platform (D -10.5) with the self-service gate: "BoardGate" (the pillar that
@@ -203,7 +203,7 @@ function Station.build(kit: Kit.Kit, parent: any, v: any): any
 	local st = SkyLift.stations().base
 	local wheelX, _, wheelD = AlleyLayout.toLocal(kit.place, st.wheel.x, 0, st.wheel.z)
 	local cableY = st.wheel.y - v.floorY -- 12
-	local discY0 = cableY + SkyLift.GRIP_ABOVE + 0.15
+	local discY0 = cableY + SkyLift.GRIP_ABOVE + 0.35
 	kit:cyl(
 		lift,
 		"Bullwheel",
@@ -272,7 +272,7 @@ function Station.build(kit: Kit.Kit, parent: any, v: any): any
 	)
 	kit:cyl(lift, "MotorFins", wheelX + 3.8, TRUSS_Y1 + 0.8, wheelD, 2.6, 1.8, "X", Common.STEEL, "Metal")
 	-- guide rails along both strands from the bullwheel to the mouth, hung from the trusses
-	local railY0 = cableY + SkyLift.GRIP_ABOVE + 0.2
+	local railY0 = cableY + SkyLift.GRIP_ABOVE + 0.35
 	for _, strandD in { wheelD - SkyLift.STRAND, wheelD + SkyLift.STRAND } do
 		kit:box(
 			lift,
