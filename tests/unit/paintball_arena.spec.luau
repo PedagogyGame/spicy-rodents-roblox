@@ -469,6 +469,67 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"PB-5: at the atrium rails a crouched crown is not wholly hidden: it shows from across the atrium, to a hair-thin aim",
+		function()
+			-- (the review: the rails stay at RAIL_HEIGHT so that a standing eye sees down into the atrium, and a
+			-- crouched body pressed against one is NOT wholly hidden, as the contract had said. Measured here so a
+			-- later change to the hit shape or the rails shows at once: crouched bodies against every rail, standing
+			-- shooters straight out on the same storey 5 to 50 studs away)
+			local boxes, kinds = arena.boxes, arena.kinds
+			local dists = { 5, 8, 12, 18, 25, 30, 35, 40, 45, 50 }
+			local spots, near, far = 0, 0, 0
+			local was = LowCover.DISTANCES
+			for i, kind in kinds do
+				if kind == Arena.KIND.rail then
+					local k = (i - 1) * 6
+					local x0, y0, z0, x1, _, z1 =
+						boxes[k + 1], boxes[k + 2], boxes[k + 3], boxes[k + 4], boxes[k + 5], boxes[k + 6]
+					local alongX = (x1 - x0) > (z1 - z0)
+					for _, f in { 0.2, 0.5, 0.8 } do
+						for _, side in { -1, 1 } do
+							local x, z, nx, nz
+							if alongX then
+								x = x0 + (x1 - x0) * f
+								z = if side < 0 then z0 - Body.RADIUS - 0.05 else z1 + Body.RADIUS + 0.05
+								nx, nz = 0, -side
+							else
+								z = z0 + (z1 - z0) * f
+								x = if side < 0 then x0 - Body.RADIUS - 0.05 else x1 + Body.RADIUS + 0.05
+								nx, nz = -side, 0
+							end
+							local g = arena.ground(x, y0 + 0.5, z)
+							if g ~= nil and math.abs(g - y0) < 0.6 then
+								spots += 1
+								for _, d in dists do
+									LowCover.DISTANCES = { d }
+									if LowCover.probe(arena.sweep, arena.ground, x, g, z, nx, nz) > 0 then
+										if d <= 25 then
+											near += 1
+										else
+											far += 1
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+			LowCover.DISTANCES = was
+			print(
+				`      rail spots {spots}: tagged from 25 studs or nearer {near}, from further {far} (spot x distance)`
+			)
+			-- (measured at the review's hit shape: 108 spots; 8 spot-and-distance pairs tag from 25 studs or nearer,
+			-- 94 from further, nearly all from the gallery across the atrium; flown with real balls the aim that
+			-- tags is 0.02 studs tall against a standing body's 1.06 at the same rail. If this grows, lower
+			-- Body.CROUCH_MULT a little rather than raise the rails, which hides the atrium from a standing eye)
+			t.truthy(spots >= 100, `{spots} rail spots`)
+			t.truthy(near <= 10, `{near}: from the near side of the atrium a crouched crown is all but hidden`)
+			t.truthy(far <= 100, `{far}: from across it, it shows, a hair`)
+		end
+	)
+
 	t.test("the stairs are stairs: two flights a storey, steps under every ramp, headroom all the way", function()
 		t.eq(#arena.ramps, 2 * (Arena.FLOORS - 1))
 		local steps = 0

@@ -78,9 +78,11 @@
 --   * THE STAIRS GO ON UP: the head of every flight is within STAIR_GAP of the foot of a flight to
 --     the next storey, so climbing three storeys is three flights and three short turns, not three
 --     walks round the atrium;
---   * rails round the atrium and all low cover are RAIL_HEIGHT high: a standing body's eye sees and
---     shoots over them, a crouched body is wholly hidden, from a ball as from the eye (a ball is its
---     centre line: Hit) (PB-5, PB-9; pinned in the contract spec);
+--   * rails round the atrium are RAIL_HEIGHT high and low cover in the rooms COVER_HEIGHT: a standing
+--     body's eye sees and shoots over them. Behind low cover in a room a crouched body is wholly hidden,
+--     from a ball as from the eye (a ball is its centre line: Hit). Against an atrium rail it is NOT
+--     wholly: its crown shows to a standing eye across the atrium, to an aim a fiftieth of a stud tall
+--     (corrected at the review; tests/unit/paintball_arena.spec.luau measures it) (PB-5, PB-9);
 --   * nowhere a body can walk has less than HEADROOM above it and no opening is lower than that, so
 --     crouching never changes what a body collides with: crouch changes the eye and the hit shape only;
 --   * a body cannot jump a rail (Body.JUMP_HEIGHT < RAIL_HEIGHT): floors are changed by the stairs
@@ -191,7 +193,8 @@ Arena.RAIL_HEIGHT = 3.4 -- atrium rails and parapets, above the floor they stand
 -- low cover in the rooms (KIND.cover: half walls, sills, consoles, desks of the news set), above what it stands on.
 -- Higher than a rail: at RAIL_HEIGHT, 0.04 over Body.CROUCH_TOP, a standing eye within some thirty studs reached
 -- over it onto the crown of a crouched head (86 of 130 low spots; tools/games/paintball/arena/LowCover). The
--- atrium's rails stay lower so that a standing eye at one still looks down across the atrium a storey below.
+-- atrium's rails stay lower so that a standing eye at one still looks down across the atrium a storey below
+-- (and a crouched crown at a rail shows, a hair, from across the atrium: see the header).
 Arena.COVER_HEIGHT = 3.7
 Arena.HEADROOM = 6.5 -- least clear height over any walking surface and through any opening
 Arena.STEP_UP = 1.2 -- the tallest ledge a walking body climbs without jumping
