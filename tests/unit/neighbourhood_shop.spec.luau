@@ -505,19 +505,21 @@ return function(t)
 			-- board on the roof is not his design)
 			t.eq(label.Parent.LightInfluence, 0)
 			t.eq(shell:FindFirstChild("RoofSign"), nil)
-			-- three gooseneck lamps over the sign, each aimed at the board
-			local spots = 0
-			local board = shell:FindFirstChild("SignBoard")
-			for _, p in shell:GetChildren() do
-				local spot = p:FindFirstChildOfClass("SpotLight")
-				if p.Name == "SignLamp" and spot then
-					spots += 1
-					t.falsy(p.CanCollide)
-					local beam = p.CFrame.Position + p.CFrame.LookVector * 4
-					t.truthy(crosses(board, p.CFrame.Position, beam), "aimed at the board")
+			-- the board hangs on his window header band, under his eave: no part of his roof in front of the board
+			-- comes down below its top (on the fascia it was hidden behind his gutter from the street)
+			t.truthy(Shop.SIGN_Y0 >= 10.5 and Shop.SIGN_Y1 <= Shop.HEADER_TOP, "on the header band")
+			for _, r in art.roofParts do
+				local d = -r.at[3]
+				if d < Shop.SIGN_D then
+					local sx, sy, sz = r.box[1] / 2, r.box[2] / 2, r.box[3] / 2
+					local right = r.right or { 1, 0, 0 }
+					local up = r.up or { 0, 1, 0 }
+					-- back = right x up: its Y component
+					local backY = right[3] * up[1] - right[1] * up[3]
+					local halfY = math.abs(right[2]) * sx + math.abs(up[2]) * sy + math.abs(backY) * sz
+					t.truthy(r.at[2] - halfY > Shop.SIGN_Y1 + 0.5, `{r.name} hangs in front of the sign`)
 				end
 			end
-			t.eq(spots, 3)
 			local lamps = root:FindFirstChild("Lamps")
 			local lights, shadowed, fills = 0, 0, 0
 			for _, p in lamps:GetChildren() do

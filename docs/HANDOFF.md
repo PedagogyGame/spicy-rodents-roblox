@@ -116,6 +116,13 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 - **Pictures.** `docs/renders/alley18/`: `00_plan.png` is the labelled floor plan (`lune run tools/review/alley_plan.luau; python3 -I tools/review/alley_plan.py`); the eye-level views are `tools/review/views_alley.json` through `tools/review/render.py`. The offline renderer does not draw the game's lamps, so interiors look darker than they will be.
 - **Not done:** the shops' fittings, the staff, the counters' prompts, sound; the street and the walk to the door are still data only; the backstage's meshes have not arrived (its true outline is in the package's `Data/layout.json`); nobody has seen the inside on a screen.
 
+## 4c. The owner's Neighbourhood Shop (branch `feat/neighbourhood-shop`, 2026-11-13; addendum D12)
+- **Where and how big:** `f1_neighbourhood_shop` in `data/expansion.json` (`built`: it is a collider box to World/Colliders and FootPath), Main Street's north sidewalk at (686, 70.6), facing -Z, 3 studs to the metre. Owner check list: `docs/owner/NEIGHBOURHOOD_SHOP_CHECK.md`.
+- **Art:** his GLBs -> FBX in studs (`tools/blender/neighbourhood_shop/export_shop.py`) -> uploaded Models (`publish.py`; a fresh clone reuses the committed ids) -> `data/art/neighbourhood_shop.json` -> `generated/ShopArt`. `Server/Assets/ShopArt.start` (one call in Boot/Game) carves the terrain inside and loads both Models after boot: visual only, glass see-through, his lamp diffusers Neon, his 135 plain boxes drawn as Parts, a textured mesh without its maps painted its map's mean colour. It warns when the shop's bake is missing.
+- **Shell:** `tools/bake/neighbourhood_shop.luau` -> `build/Expansion_NeighbourhoodShop.rbxm` -> `Workspace.Expansion.NeighbourhoodShop` (its own slot; F1..F4 are each one family's single bake). Invisible colliders from his metadata plus boxes round the floor-standing furniture; opaque `Occluders` just inside his walls so the default camera and CameraRig stop at them; his roof decks as slope colliders. CI bakes it; the owner place test requires it.
+- **Tests and pictures:** `lune run tests/run.luau neighbourhood world_footpath` (place, budget, colliders, a 2.2-stud body reaching every room, the camera's occluders, the roof, the loader, the boot call). `docs/renders/neighbourhood_shop/views.json` lists the commands for the pictures (the uploaded FBX files are drawn by `tools/review/art_render.py`).
+- **Not done:** never seen in the engine (Luau Execution is still off); computer-run people do not go in; nothing is sold or sat on yet (art only).
+
 ## 5. How to resume (ephemeral container)
 1. `bash docs/ENVIRONMENT_SETUP.sh` (~10 min cold, verified), then `bash tools/ci.sh` must be green.
 2. Cloud loop:

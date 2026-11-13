@@ -1,5 +1,5 @@
 {
-  "about": "THE NEIGHBOURHOOD SHOP (f1_neighbourhood_shop) review views. Venue frame: world x = 686 - X, z = 70.625 + D, y = 2.3 + Y (X across the frontage, D into the building, Y up from the floor). Make: python -I tools/blender/neighbourhood_shop/export_shop.py; lune run tools/bake/main.luau (+ editor_ground, backdrop); lune run tools/bake/neighbourhood_shop.luau; lune run tools/review/export.luau; lune run tools/review/neighbourhood_shop.luau; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/shop_scene.json --views docs/renders/neighbourhood_shop/views.json --out build/review/shop --threads 2. The shell is drawn from the bake; the owner's interior and roof from the very FBX files that were uploaded (tools/review/art_render.py), placed where the engine pivots them. Interior views are at a person's eye (floor + 5.2).",
+  "about": "THE NEIGHBOURHOOD SHOP (f1_neighbourhood_shop) review views. Venue frame: world x = 686 - X, z = 70.625 + D, y = 2.3 + Y (X across the frontage, D into the building, Y up from the floor). Make: python -I tools/blender/neighbourhood_shop/export_shop.py; lune run tools/bake/main.luau (+ editor_ground, backdrop); lune run tools/bake/neighbourhood_shop.luau; lune run tools/review/export.luau; lune run tools/review/neighbourhood_shop.luau; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/shop_scene.json --views docs/renders/neighbourhood_shop/views.json --out build/review/shop --threads 2. The shell is drawn from the bake; the owner's interior and roof from the very FBX files that were uploaded (tools/review/art_render.py), placed where the engine pivots them. Interior views are at a person's eye (floor + 5.2). Cycles bounces light off the walls and Roblox's lighting does not: in the engine the corners and the ceiling will be darker than here (the shell's soft room fills are there for that).",
   "defaults": {"res": "960x540", "samples": 24, "groups": ["town", "attractions", "terrain", "backdrop", "backdrop_terrain"]},
   "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
   "views": [
@@ -57,6 +57,11 @@
       "name": "ns_11_back",
       "desc": "From behind (north of the shop, x 745): the back wall, a gable end and the chimney.",
       "pos": [745, 22, 140], "look": [686, 12, 72], "fov": 55
+    },
+    {
+      "name": "ns_12_sign",
+      "desc": "From the north sidewalk 30 st along from the door, at a person's eye: the sign on the window header band, under the eave.",
+      "pos": [702, 5.5, 40], "look": [684, 11, 52], "fov": 60, "aboveGround": true
     }
   ]
 }

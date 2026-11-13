@@ -4,8 +4,8 @@
 -- generated/ShopArt). Everything here is in the venue's local frame (tools/bake/alley/Kit: X across the
 -- frontage, Y up from the shop floor, D into the building; the front is at -D), 3 studs to his metre.
 --   Shell      brick side and back walls and gable ends up to the underside of his roof's deck, teal corner
---              pilasters and a fascia band carrying the sign THE NEIGHBOURHOOD SHOP (its letters glow; three
---              gooseneck lamps over it), the transom over his open
+--              pilasters and a teal fascia band, the sign THE NEIGHBOURHOOD SHOP on his window header band (its
+--              letters glow), the transom over his open
 --              door, the attic closed behind the fascia and the back, an opaque backing slab over his ceiling
 --              (Realistic lighting leaks through thin shells), the concrete plinth, a paved forecourt to the
 --              sidewalk and three steps up to the door.
@@ -17,7 +17,8 @@
 --              a soft unshadowed fill under each room's ceiling.
 --   TerrainCarve  the inside of the shell, carved to air at boot (the ground is 0.5 below the floor at the back).
 -- The model carries Venue, ArtShop, ArtRoof (asset ids) and ArtPivot (the frame's CFrame) for the loader.
--- Interface: build(kit, parent, venue, art) -> Model; underside(art, d) -> y; topside(art, d) -> y; SIGN, WALL,
+-- Interface: build(kit, parent, venue, art) -> Model; underside(art, d) -> y; topside(art, d) -> y; SIGN,
+--   SIGN_HALF, SIGN_Y0, SIGN_Y1, SIGN_D, WALL,
 --   INNER_X, INNER_D, FRONT_D, PILASTER_D, FASCIA_D, CEILING_TOP, HEADER_TOP, SIDEWALK (dimensions)
 -- No side effects on require. Lune only (@lune/roblox through the Kit).
 
@@ -35,6 +36,9 @@ Shop.CEILING_TOP = 13.02 -- the top of his ceiling slab (ROOF_Removable)
 Shop.HEADER_TOP = 12.6 -- the top of his shopfront (the window headers)
 Shop.SIDEWALK = -1.8 -- the forecourt's top: the sidewalk's (ground + 0.225) below the floor
 Shop.SIGN = "THE NEIGHBOURHOOD SHOP"
+Shop.SIGN_HALF = 15.6 -- the sign board's half width
+Shop.SIGN_Y0, Shop.SIGN_Y1 = 10.7, 12.45 -- on his window header band (10.5 to 12.6)
+Shop.SIGN_D = -18.33 -- his header's front face: the board stands in front of it
 
 local BRICK = { 132, 82, 66 }
 local CONCRETE = { 156, 152, 144 }
@@ -43,7 +47,6 @@ local TEAL = { 93, 142, 137 } -- his TealPaint (the shopfront)
 local DARK_WOOD = { 118, 87, 60 } -- his DarkWood (the window frames)
 local CREAM = { 240, 228, 196 }
 local LAMP = { 255, 206, 150 }
-local IRON = { 47, 54, 54 } -- his BlackIron
 local INVISIBLE = { collide = true, transparency = 1, shadow = false }
 
 -- The underside of his roof deck above local depth d (the deck on that side of the ridge), studs above the floor.
@@ -174,69 +177,26 @@ function Shop.build(kit: Kit.Kit, parent: any, venue: any, art: any): any
 	kit:box(shell, "Transom", door.x0, door.x1, door.top, Shop.HEADER_TOP, Shop.FRONT_D, -17.73, TEAL, "SmoothPlastic")
 	kit:box(shell, "Threshold", door.x0, door.x1, -0.72, 0, -18.4, -17.6, DARK_WOOD, "Wood")
 
-	-- the sign on the fascia
-	local fasciaTop = Shop.underside(art, Shop.FASCIA_D) - 0.03
+	-- the sign: a board on his window header band, over the windows and the door, under the fascia's overhang
+	-- (on the fascia itself it sat behind his gutter and could not be seen from the street); its letters glow
+	-- on their own (LightInfluence 0), so it reads in the shade and at night
 	local board = kit:box(
 		shell,
 		"SignBoard",
-		-15.6,
-		15.6,
-		Shop.HEADER_TOP + 0.15,
-		fasciaTop - 0.15,
-		Shop.FASCIA_D - 0.2,
-		Shop.FASCIA_D,
+		-Shop.SIGN_HALF,
+		Shop.SIGN_HALF,
+		Shop.SIGN_Y0,
+		Shop.SIGN_Y1,
+		Shop.SIGN_D - 0.2,
+		Shop.SIGN_D,
 		DARK_WOOD,
 		"Wood"
 	)
 	local gui = kit:gui(board, "Back", 40)
 	kit:label(
 		gui,
-		{ Text = Shop.SIGN, TextColor = CREAM, Font = "Merriweather", Size = { 0.96, 0.8 }, Pos = { 0.02, 0.1 } }
+		{ Text = Shop.SIGN, TextColor = CREAM, Font = "Merriweather", Size = { 0.96, 0.78 }, Pos = { 0.02, 0.11 } }
 	)
-	-- three gooseneck lamps over the board (its letters glow on their own: LightInfluence 0); they light the
-	-- teal fascia at night, from a stud and a half out in front of it
-	local signY = (Shop.HEADER_TOP + fasciaTop) / 2
-	for i, x in { -10, 0, 10 } do
-		local head = kit:at(
-			shell,
-			"SignLamp",
-			x,
-			fasciaTop + 0.35,
-			Shop.FASCIA_D - 1.5,
-			0.5,
-			0.35,
-			0.5,
-			IRON,
-			"Metal",
-			{ collide = false, shadow = false }
-		)
-		head.CFrame = roblox.CFrame.lookAt(
-			kit:cf(x, fasciaTop + 0.35, Shop.FASCIA_D - 1.5).Position,
-			kit:cf(x, signY, Shop.FASCIA_D).Position
-		)
-		kit:light(head, "SpotLight", {
-			Name = `SignLight{i}`,
-			Color = LAMP,
-			Brightness = 2,
-			Range = 6,
-			Angle = 80,
-			Face = "Front",
-			Shadows = false,
-		})
-		kit:rod(
-			shell,
-			"SignLampArm",
-			x,
-			fasciaTop - 0.3,
-			Shop.FASCIA_D,
-			x,
-			fasciaTop + 0.35,
-			Shop.FASCIA_D - 1.4,
-			0.12,
-			IRON,
-			"Metal"
-		)
-	end
 
 	-- forecourt and steps: from the sidewalk up to his threshold
 	local front = venue.site.d0
