@@ -1892,4 +1892,22 @@ return function(t)
 			t.truthy(worstBody < Tuning.predictedSplatSnap, "and on a body, inside the tolerance")
 		end
 	)
+
+	t.test("the engine check (the lane's task for the real engine) runs its cores part here and holds", function()
+		-- (the task script finds the engine missing under Lune, loads the client's files off the disk and
+		-- says the engine's own facts were not asked: what is proved here is that the task itself is sound)
+		local report = (require :: any)("../../tools/games/paintball/client/engine_check")
+		t.eq(report.suite, "PaintballClientEngine")
+		t.eq(#report.failures, 0, table.concat(report.failures, " | "))
+		t.truthy(report.ok)
+		t.eq(#report.notes, 1)
+		t.truthy(string.find(report.notes[1], "no engine here", 1, true))
+		local splat = report.numbers.predictedSplat
+		t.near(splat.z, -40, 1e-3, "the predicted ball ended on the wall")
+		t.near(splat.y, splat.wantY, 1e-3, "as low as Ballistics says")
+		t.truthy(splat.wantY < Body.STAND_EYE - 2, "having dropped on the way")
+		t.near(report.numbers.pace.sprint, F.sprintMult, 1e-6)
+		t.near(report.numbers.pace.eye, Body.CROUCH_EYE - Body.STAND_EYE, 1e-6)
+		t.truthy(report.numbers.puppetLagStuds > 0.5, "the puppet is drawn in the past")
+	end)
 end
