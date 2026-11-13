@@ -1,7 +1,8 @@
 --!strict
 -- The town's wallet as the game runs it, on a fake engine: Server/Economy/Credits on engine Players (the
--- balance a client reads changes the moment the money does), Roles/RoleService holding the wallet's purse, the
--- real MinigameService with the wallet behind ctx.town.charge, and Client/UI/WalletHud drawing it. The cases
+-- balance a client reads changes the moment the money does), the game's own wiring of it (Boot/Game.wallet),
+-- Roles/RoleService holding the wallet's purse, the real MinigameService with the wallet behind
+-- ctx.town.charge and ctx.town.pass, and Client/UI/WalletHud drawing it as a client is fed it. The cases
 -- live in tests/isolated/wallet.luau and run in their own Lune process (tests/lib/Isolated says why); each one
 -- is reported here as its own test. The pure core is tests/unit/economy_bank.spec.luau.
 local Isolated = require("@tests/lib/Isolated")

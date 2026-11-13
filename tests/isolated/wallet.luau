@@ -20,6 +20,7 @@ local Game = require("@server/Boot/Game")
 local Credits = require("@server/Economy/Credits")
 local RoleLab = require("@server/Roles/RoleLab")
 local RoleService = require("@server/Roles/RoleService")
+local PlayMenu = require("@client/UI/PlayMenu")
 local WalletHud = require("@client/UI/WalletHud")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local Rig = require("@tests/lib/MinigameRig")
@@ -770,6 +771,43 @@ return function(t)
 		end
 	)
 
+	-- ONCE PAINTBALL IS JOINED (its server lane is not on this branch: the case appears by itself the day its
+	-- test kit is in the tree, and was run on a scratch merge of the two branches before it was written down).
+	-- Paintball's desk must sell the TOWN's pass: PaintballService takes ctx.town.pass when nobody hands it one
+	-- (`d.pass or (if d.day == nil then ctx.town.pass else nil) or its own desk`), and its kit joins each
+	-- stand-in to the rig's wallet (`w.wallet.join(stub)` in kit.client), as arriving in the game does.
+	if fs.isFile("tests/isolated/paintball_server_kit.luau") then
+		t.test(
+			"joined with paintball: the desk in the TV station sells the town's one pass, and a lounge door's pass opens the arena",
+			function()
+				local load: any = require
+				local Kit = load("@tests/isolated/paintball_server_kit")
+				local Contract = load("@shared/Minigames/Paintball/Contract")
+				Kit.play(function(kit: any)
+					local wallet = kit.w.wallet -- the rig's: wired as Boot/Game wires the town's
+					local ada = kit.client("Ada")
+					wallet.join(ada.stub)
+					t.deepEq({ kit.join(ada) }, { false, Contract.textFor("pass") })
+					-- bought at Contract.DESK: the wallet holds it, so the lounge door opens and the corner shows it
+					t.deepEq({ kit.join(ada, Contract.DESK) }, { false, Contract.textFor("bought") })
+					t.truthy(wallet.pass.has(ada.stub), "a pass bought at the paintball desk opens the lounges")
+					t.eq(type(ada.stub.attrs.PassUntil), "number", "and the pass line shows in the corner")
+					t.eq(wallet.balance(ada.stub), 280)
+					t.deepEq({ wallet.pass.buy(ada.stub) }, { false, "You already have a pass." })
+					t.deepEq({ kit.join(ada, Contract.DESK) }, { false, Contract.textFor("has_pass") })
+					t.eq(wallet.balance(ada.stub), 280, "one pass, paid for once")
+					-- the reverse: bought at a lounge door, the arena lets them in and its desk sells no second one
+					local bea = kit.client("Beatrice") -- (a stand-in is known by the length of its name: not Ada again)
+					wallet.join(bea.stub)
+					t.truthy(wallet.pass.buy(bea.stub))
+					t.deepEq({ kit.join(bea, Contract.DESK) }, { false, Contract.textFor("has_pass") })
+					t.truthy((kit.join(bea)), "a pass bought at a lounge door opens the arena")
+					t.eq(wallet.balance(bea.stub), 280)
+				end, { realPass = true })
+			end
+		)
+	end
+
 	t.test(
 		"the HUD's words: the balance, a change with its reason, pocket money, the pass in days and minutes",
 		function()
@@ -1109,7 +1147,15 @@ return function(t)
 				local lowest = WalletHud.TOUCH_TOP + 32 + 4 + 27 + 4 + 27
 				t.truthy(lowest < 375 - 90, `the stack ends at {lowest}`)
 				t.truthy(lowest < 768 - 210)
-				-- in a minigame: under that game's status and warning lines (to 210); the scorecard is ignored
+				-- and above UI/PlayMenu's Menu button, which stands 96 above the bottom and is scaled down on a
+				-- small screen (40 tall times PlayMenu.scaleFor: 24 on that phone, its top edge at 255)
+				for _, size in { { 667, 375 }, { 844, 390 }, { 1024, 768 }, { 1180, 820 } } do
+					local buttonTop = size[2] - 96 - 40 * PlayMenu.scaleFor(size[1], size[2])
+					t.truthy(lowest < buttonTop, `{size[1]} x {size[2]}: the Menu button begins at {buttonTop}`)
+				end
+				-- in a minigame: under that game's status and warning lines (to 210). On a tablet that is clear
+				-- of the scorecard (from 586 down); on a 375-high phone the game's own screen, which is not sized
+				-- for phones, covers most of the display and the wallet with it (a known limit, for the minigame UI)
 				player:SetAttribute("InMinigame", "bowling_lane_3")
 				t.eq(stack.Position.Y.Offset, 216)
 				t.truthy(WalletHud.TOUCH_TOP_GAME >= 182 + 28, "under UI/MinigameUI's warning line")

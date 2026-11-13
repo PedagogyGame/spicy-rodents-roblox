@@ -36,7 +36,7 @@ export type Opts = {
 	players: boolean?, -- connect PlayerAdded / PlayerRemoving (default true)
 	movement: any?, -- Movement/MovementService instance (onHandoff)
 	roles: any?, -- a RoleService constructor module (default Server/Roles/RoleService)
-	purse: ((player: any) -> any)?, -- the town wallet's purse for a joining player (Economy/Credits: wallet.purse)
+	purse: ((player: any) -> any)?, -- the town wallet's purse for a joining player (Boot/Game.wallet's purse hook: join, then the face)
 	engine: any?, -- Possession.Engine override (engine tests drive PlayerLike stubs)
 }
 

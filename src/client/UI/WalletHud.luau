@@ -28,8 +28,11 @@
 -- On a touch device (a phone, a tablet: touch and no keyboard) the bottom-right corner is Roblox's jump button,
 -- so the stack hangs from the top-right instead, under the status, sickness and toast lines (TOUCH_TOP), and
 -- under a minigame's status and warning lines while a game is open (TOUCH_TOP_GAME); the balance is the top
--- line there and the others appear beneath it. Worked out from the modules' own numbers and Roblox's
--- published control sizes, NOT yet seen on a device.
+-- line there and the others appear beneath it. Its three lines end 244 down: above the Menu button and the
+-- jump button on a 667 x 375 phone and anything larger (docs/renders/wallet_hud_touch.png draws it). Worked
+-- out from the modules' own numbers and Roblox's published control sizes, NOT yet seen on a device. Known
+-- limits: a screen under about 360 high has no room for all three lines; and on a phone a minigame's own
+-- screen (UI/MinigameUI is not sized for phones) covers most of the display, the wallet included.
 -- While the role menu is open (UI/PlayMenu's Frame "Menu" in the ScreenGui "SpicyPlay") on a screen too narrow
 -- to hold the menu's panel and the stack side by side, the stack is hidden: it would lie across the panel.
 -- Nothing here can be clicked and nothing here decides anything.
