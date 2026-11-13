@@ -95,7 +95,7 @@ local BACK_IN = 400 -- the cost of a step into one's own spawn room from outside
 local STAIR_TASTE = 0.9 -- a stair link costs a bot up to this much more than its length, by its taste
 local FLOOR_TASTE = 0.35
 BotNav.SHARE_SECS = 20 -- seconds a flight one of a team's bots has set out along counts as busy ...
-BotNav.SHARE_COST = 30 -- ... and what it costs the team's next route on top: as far again as a short flight
+BotNav.SHARE_COST = 45 -- ... and what it costs the team's next route on top: about as far again as a flight
 
 function BotNav.roomOf(nav: Nav, x: number, y: number, z: number): number
 	local rooms = nav.arena.spawnRooms

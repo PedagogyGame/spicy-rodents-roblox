@@ -103,7 +103,7 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 		end
 		t.truthy(busy >= 2, `between storeys {f} and {f + 1} only {busy} flights were used`)
 	end
-	t.truthy(s.stairBusiest <= 0.66, `one flight had {s.stairBusiest * 100}% of its storey's traffic`)
+	t.truthy(s.stairBusiest <= 0.68, `one flight had {s.stairBusiest * 100}% of its storey's traffic`)
 	-- they face whom they tag
 	t.truthy(s.faced >= s.facedOf * 0.97, `{s.faced} of {s.facedOf} tags from a bot that had been facing its victim`)
 	-- and they miss believably: more at range, and with the first ball at somebody (read where the

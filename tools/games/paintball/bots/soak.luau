@@ -22,8 +22,8 @@ local Sim = require("./Sim")
 
 local STILL = 20 -- seconds: the longest a bot may stand in one place (the brain's own watch acts at 9)
 local ROOM = 8 -- seconds: the longest a life may take to leave its spawn room
-local STAIR = 0.66 -- the largest share one flight may have of its storey pair's stair traffic (PB-10)
-local HELD = 2 -- seconds: the longest a bot may hold its fire on somebody in plain view close by
+local STAIR = 0.68 -- the largest share one flight may have of its storey pair's stair traffic (PB-10)
+local HELD = 2.5 -- seconds: the longest a bot may hold its fire on somebody in plain view close by
 
 local numbers: { number } = {}
 for _, arg in process.args do

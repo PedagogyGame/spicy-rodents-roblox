@@ -26,9 +26,11 @@
 --            nobody to fight walks the building: a goal (mostly cover spots; on a storey chosen so
 --            the team spreads: each life has a storey of its own, the one its team has fewest on,
 --            and goes there first; then that storey, its neighbours, and wherever opponents were
---            last seen), a route with its own taste (BotNav), a few seconds' watch there, then
---            another. Behind low cover it bobs: crouched it is wholly hidden, standing it sees and
---            shoots. Behind a pillar it steps out to a peek point and back, and looks past the
+--            last seen), a route with its own taste (BotNav) that keeps off a flight a team-mate has
+--            just set out on if another will do, a few seconds' watch there, then another. Behind
+--            low cover it bobs: crouched it is wholly hidden, standing it sees and shoots; and
+--            standing its ground anywhere it gets DOWN while it reloads and for a moment after it is
+--            shot at (DUCK). Behind a pillar it steps out to a peek point and back, and looks past the
 --            pillar's edges, not at it. Fighting from open floor it JINKS: a quick step across
 --            its target's line, a shot or two, a step back, the other way next time (see JINK): it
 --            is never a turret. Somebody in view who is too far off to fire at is not stood and
