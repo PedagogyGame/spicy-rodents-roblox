@@ -412,6 +412,7 @@ return function(t)
 		grabNear: boolean?, -- press E in the air whenever the bough is the route within E's reach
 		boughYaw: number?, -- the camera's (world) yaw when W is first pressed on the bough (else down it)
 		stopAfterCatch: boolean?,
+		world: any?, -- the world to run in (else the stand-in)
 		from: SquirrelMotor.State?, -- start from this state (a copy) ...
 		startPhase: string?, -- ... in this phase ("pipe")
 	}
@@ -479,7 +480,8 @@ return function(t)
 				input.fw = if leapKeys == "none" then 0 else 1
 				input.sprint = leapKeys == "sprint"
 				if o.grabNear then
-					local near = Motion.nearestRoute(world :: any, state.x, state.y, state.z, Motion.C.airGrab)
+					local near =
+						Motion.nearestRoute((o.world or world) :: any, state.x, state.y, state.z, Motion.C.airGrab)
 					input.grab = near ~= nil and near.routeId == R.BOUGH
 				end
 				if rid == R.BOUGH then
@@ -536,7 +538,7 @@ return function(t)
 				end
 			end
 			local ox, oy, oz = state.x, state.y, state.z
-			local _, events = SquirrelMotor.step(state, input, dt, world :: any)
+			local _, events = SquirrelMotor.step(state, input, dt, (o.world or world) :: any)
 			for _, e in events do
 				trace.events[e.kind] = (trace.events[e.kind] or 0) + 1
 				if e.kind == "catch" and e.routeId then
@@ -765,4 +767,47 @@ return function(t)
 			end
 		end
 	)
+
+	-- THE CHAIN ON THE BAKED GEOMETRY: when tests/lib/BakedWorld (the enclosed-runs harness, feat/run-through) is in
+	-- the tree, the eighteen-lane alley and the yard are baked in memory by their own bake code and the chain runs
+	-- against their parts (the house's roof and plinth, the trunk, the wing's parapets and roof), not the stand-in.
+	t.test("the chain on the baked alley and yard (tests/lib/BakedWorld, when it is in the tree)", function()
+		if not fs.isFile("tests/lib/BakedWorld.luau") then
+			print("      (tests/lib/BakedWorld is not in this tree: the chain ran on the stand-in world above)")
+			return
+		end
+		local roblox = require("@lune/roblox")
+		local serde = require("@lune/serde")
+		local BakedWorld = (require :: any)("../lib/" .. "BakedWorld")
+		local Kit = require("../../tools/bake/alley/Kit")
+		local Shell = (require :: any)("../../tools/bake/alley/" .. "Shell")
+		local Lanes = (require :: any)("../../tools/bake/alley/" .. "Lanes")
+		local Rooms = (require :: any)("../../tools/bake/alley/" .. "Rooms")
+		local GameBakes = (require :: any)("../../tools/bake/" .. "GameBakes")
+		local Yard = require("../../tools/bake/alley/Yard")
+		local raw = serde.decode("json", fs.readFile("data/attractions.json")).attractions[1]
+		local kit = Kit.new(roblox, place)
+		local root = GameBakes.siteModel(roblox, "BowlingAlley", raw.id, place)
+		Shell.build(kit, root, raw)
+		Lanes.build(kit, root)
+		Rooms.build(kit, root)
+		Yard.build(kit, root)
+		local baked = BakedWorld.fromModel(root, { adjust = BakedWorld.alleyRuntime })
+		local motorWorld = baked:motorWorld(BakedWorld.recordsData(records))
+		for _, case in { { sprint = false, leap = "walk" }, { sprint = true, leap = "none" } } do
+			local trace, state = run(case.sprint, case.leap, { world = motorWorld })
+			local seq = table.concat(trace.visits, " ")
+			local label = `{if case.sprint then "sprinting" else "walking"}, leap with {case.leap}`
+			t.truthy(
+				trace.phase == "louvre" or state.routeId == R.VENT,
+				`{label}: got as far as "{trace.phase}" (routes {seq}) at ({state.x}, {state.y}, {state.z})`
+			)
+			local want = "0 9101 9102 9103 0 9105 0"
+			t.eq(string.sub(seq, 1, #want), want, `{label}: {seq}`)
+			t.truthy(trace.maxMove <= 1.5, `{label}: a frame moves {trace.maxMove} ({trace.maxMoveAt})`)
+			print(
+				`      on the baked alley and yard, {label}: routes {seq} in {string.format("%.1f", trace.frames / 60)} s`
+			)
+		end
+	end)
 end

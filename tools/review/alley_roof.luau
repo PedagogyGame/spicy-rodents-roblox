@@ -151,6 +151,67 @@ for _, d in guides:GetDescendants() do
 	end
 end
 
+-- the plan outlines (review only, group "plan"): what is kept or planned, drawn as thin bright strips; on the ground
+-- they follow the terrain, on the roof they sit at their own height
+do
+	local Height = require("../../src/shared/World/Height")
+	local plan = kit:model(holder, "Plan")
+	local function groundAt(X: number, D: number): number
+		local x, y, z = AlleyLayout.toWorld(place, X, 0, D)
+		return Height.at(x, z) - y
+	end
+	local n = 0
+	local function edge(x0: number, d0: number, x1: number, d1: number, y: number?, color: { number })
+		local steps = if y then 1 else math.max(1, math.ceil(math.sqrt((x1 - x0) ^ 2 + (d1 - d0) ^ 2) / 6))
+		for k = 1, steps do
+			local ax, ad = x0 + (x1 - x0) * (k - 1) / steps, d0 + (d1 - d0) * (k - 1) / steps
+			local bx, bd = x0 + (x1 - x0) * k / steps, d0 + (d1 - d0) * k / steps
+			local ay = y or (groundAt(ax, ad) + 0.5)
+			local by = y or (groundAt(bx, bd) + 0.5)
+			n += 1
+			kit:rod(plan, `Plan{n}`, ax, ay, ad, bx, by, bd, 0.45, color, "Neon")
+		end
+	end
+	local function rect(r: { x0: number, x1: number, d0: number, d1: number }, y: number?, color: { number })
+		edge(r.x0, r.d0, r.x1, r.d0, y, color)
+		edge(r.x1, r.d0, r.x1, r.d1, y, color)
+		edge(r.x1, r.d1, r.x0, r.d1, y, color)
+		edge(r.x0, r.d1, r.x0, r.d0, y, color)
+	end
+	local rs = alley.reserve
+	rect(AlleyRoof.ANNEX, nil, { 255, 220, 40 })
+	if rs then
+		rect({ x0 = rs.x0, x1 = rs.x1, d0 = rs.d0, d1 = rs.d1 }, nil, { 255, 60, 60 })
+	end
+	rect({ x0 = 162, x1 = 212, d0 = -86, d1 = -30 }, nil, { 255, 60, 220 }) -- lounge one
+	local st = AlleyRoof.STAIR
+	for _, f in st.flights do
+		rect(
+			{ x0 = math.min(f.x0, f.x1), x1 = math.max(f.x0, f.x1), d0 = st.d0, d1 = st.d1 },
+			f.y1 + 0.1,
+			{ 250, 250, 250 }
+		)
+	end
+	for _, l in st.landings do
+		rect({ x0 = l.x0, x1 = l.x1, d0 = st.d0, d1 = st.d1 }, l.y + 0.1, { 250, 250, 250 })
+	end
+	local py = AlleyRoof.PLATFORM.y + 0.1
+	for _, r in AlleyRoof.PLATFORM.rects do
+		rect(r :: any, py, { 60, 220, 255 })
+	end
+	for _, l in AlleyRoof.PEOPLE_FENCE.lines do
+		edge(l.x0, l.d0, l.x1, l.d1, py + AlleyRoof.PEOPLE_FENCE.railTop, { 255, 140, 30 })
+	end
+	rect(AlleyRoof.APRON, AlleyRoof.WING_ROOF.y + 0.1, { 60, 255, 100 })
+	local c = AlleyRoof.AHU.curb
+	rect({ x0 = c.x0, x1 = c.x1, d0 = c.d0, d1 = c.d1 }, c.y1 + 0.1, { 80, 120, 255 })
+	for _, d in plan:GetDescendants() do
+		if d:IsA("BasePart") then
+			emit("plan", d)
+		end
+	end
+end
+
 -- squirrels where the motor puts one: { local feet point, local heading (dX, dD) }
 local file = `{placeholders}/squirrel.rbxm`
 if fs.isFile(file) then
