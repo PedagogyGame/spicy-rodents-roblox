@@ -507,8 +507,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 	-- its id is empty.)
 	local ears: Part? = nil
 	local function playAt(place: Place, cue: ShowCore.Cue)
-		local asked = MinigameSounds.counts()
-		asked[cue.cue] = (asked[cue.cue] or 0) + 1
+		MinigameSounds.count(cue.cue)
 		local id = MinigameSounds.CUES[cue.cue]
 		if id == nil or id == "" then
 			return
