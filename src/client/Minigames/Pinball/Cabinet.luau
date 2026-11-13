@@ -57,6 +57,7 @@ Cabinet.SLEEP = 70 -- studs from the camera beyond which a cabinet nobody here p
 Cabinet.BIND = "SpicyPinballCabinets"
 Cabinet.FLASH = 0.12 -- seconds a bumper cap or a slingshot stays lit after it fires
 Cabinet.SITE = "bowling_alley"
+Cabinet.REEL_CLACK = 0.06 -- seconds between two clacks of the score reels
 
 -- the cue names, by Machine.CUE number ("bumper", "flip_up", ...)
 Cabinet.CUE_NAMES = {} :: { [number]: string }
@@ -114,6 +115,7 @@ export type Cab = {
 	flash: { [any]: number }, -- part -> seconds left lit
 	shown: { [string]: any }, -- what the backglass and the lamps show now (written only when it changes)
 	reel: number, -- the score the reels show (ACORN ATTACK's count up to the real one)
+	clackAt: number,
 	board: { string },
 	out: { number },
 	frame: any,
@@ -224,7 +226,11 @@ local function backglass(cab: Cab, f: any, dt: number)
 		elseif cab.reel < score then
 			local step = math.max(10, (score - cab.reel) * math.min(1, dt * 6))
 			cab.reel = math.min(score, cab.reel + math.floor(step / 10 + 0.5) * 10)
-			MinigameSounds.play(`pinball.{cab.variant}.reel`, 0.25)
+			-- (a clack every REEL_CLACK seconds while the drums turn, not one a frame)
+			if cab.clock - cab.clackAt >= Cabinet.REEL_CLACK then
+				cab.clackAt = cab.clock
+				MinigameSounds.play(`pinball.{cab.variant}.reel`, 0.25)
+			end
 		end
 		score = cab.reel
 	end
@@ -444,6 +450,7 @@ function Cabinet.get(station: string, place: any?, index: number?, tableId: stri
 			flash = {},
 			shown = {},
 			reel = 0,
+			clackAt = -math.huge,
 			board = {},
 			out = {},
 			frame = nil,

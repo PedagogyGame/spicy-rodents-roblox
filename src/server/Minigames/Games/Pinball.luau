@@ -201,8 +201,9 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 				r.drift = false
 				sync(key, "drift")
 			end
+			-- (no ctx.dirty() here: the scorecard is redrawn by the service's own second-by-second state, the
+			-- backglass on every screen is drawn from the game itself; a ball changing hands is the Session's turn)
 			checkEpoch()
-			ctx.dirty()
 			return true
 		end
 		if why == "ahead" then
@@ -432,7 +433,7 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 
 	function self.prompt(_self: any): (string?, string?)
 		if ctx.session.phase == "playing" then
-			return "Watch", `{tbl.title} - in use by {names()}`
+			return "In use", `{tbl.title} - in use by {names()}: watch the ball`
 		end
 		return nil, nil
 	end
