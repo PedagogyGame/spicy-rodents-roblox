@@ -372,6 +372,7 @@ function CueTable._animals(self: any, script: any, t: number)
 					kind = "event",
 					text = "An animal was on the table: a ball knocked it off. The shot counts.",
 					intruder = true,
+					shot = self.shots,
 				})
 			end
 		end

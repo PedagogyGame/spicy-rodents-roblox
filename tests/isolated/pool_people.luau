@@ -476,6 +476,76 @@ return function(t)
 		end
 	)
 
+	-- The animal rule (the common bar's C12): a squirrel on the cloth never spoils a shot.
+	do
+		local beasts: { any } = {}
+		local knocks: { any } = {}
+		local service = {
+			animals = function(): { any }
+				return beasts
+			end,
+			knock = function(id: any, x: number, y: number, z: number, text: string)
+				table.insert(knocks, { id = id, x = x, y = y, z = z, text = text })
+				for _, a in beasts do
+					if a.id == id then
+						a.x, a.y, a.z = x, y, z
+					end
+				end
+			end,
+		}
+		t.test(
+			"a squirrel sitting in the rack's way: the first ball to reach it knocks it off, and the break counts",
+			function()
+				table.clear(beasts)
+				table.clear(knocks)
+				Rig.play(function(w)
+					PoolRig.clock(w)
+					Rig.press(w, ID)
+					Rig.run(w, 0.3)
+					Rig.click(w, "Start now")
+					Rig.run(w, 0.5)
+					local c = PoolRig.controller(ID)
+					local state = PoolRig.state(w, ID)
+					local def = PoolRig.def(w, ID)
+					-- a squirrel sits on the cloth just in front of the rack's apex
+					local apex = state.spots[2]
+					local Furniture = require("@shared/Minigames/Pool/Furniture")
+					local wx, wy, wz = Furniture.world(w.places.bowling_alley, def, apex.x, 0.2, apex.z - 0.7)
+					table.insert(beasts, { id = "sq1", kind = "squirrel", x = wx, y = wy, z = wz })
+					-- the break, as the rules would have it without any squirrel at all
+					local copy = table.clone(state)
+					copy.spots = {}
+					for _, s in state.spots do
+						table.insert(copy.spots, table.clone(s))
+					end
+					Rig.key(Key.Space, true)
+					Rig.key(Key.Space, false)
+					Rig.run(w, 0.3)
+					PoolRig.shoot(w, c, math.atan2(apex.x - c.byId[0].x, apex.z - c.byId[0].z), 0.9)
+					t.truthy(PoolRig.settle(w, ID))
+					t.eq(#knocks, 1, "knocked off once")
+					t.eq(knocks[1].text, "A pool ball knocked you off the table!")
+					local kx, _, kz =
+						Furniture.fromWorld(w.places.bowling_alley, def, knocks[1].x, knocks[1].y, knocks[1].z)
+					local hw, hl = Furniture.outer(TABLE)
+					t.truthy(math.abs(kx) > hw or math.abs(kz) > hl, "onto the floor beside the table")
+					t.eq(state.shotNo, 1, "the break counts")
+					-- the model never saw the squirrel: the same strike on the same table without it is the same break
+					local sent = Rig.last(w.sent, "shoot")
+					t.truthy(EightBall.input(copy, 1, "shoot", sent.args))
+					for i, s in copy.spots do
+						t.near(s.x, state.spots[i].x, 1e-9)
+						t.near(s.z, state.spots[i].z, 1e-9)
+					end
+					t.truthy(
+						string.find(Rig.screen(w) .. table.concat(w.toasts, " "), "knocked it off", 1, true),
+						Rig.screen(w)
+					)
+				end, opts({ service = service }))
+			end
+		)
+	end
+
 	t.test("touch: a finger carries the ball in hand, drags the aim, sets the spin; HOLD TO SHOOT strikes", function()
 		Rig.play(function(w)
 			PoolRig.clock(w)
