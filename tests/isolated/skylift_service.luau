@@ -743,4 +743,60 @@ return function(t)
 			end
 		end)
 	end)
+	t.test(
+		"the telescope streams the town it looks at, and gives the Lookout back before letting the body go",
+		function()
+			-- lane 8 (the review: "the telescope just magnifies the boxes"): the body is anchored, the player's
+			-- streaming focus goes out over the town; stepping back returns the focus, streams the Lookout back in
+			-- and only then un-anchors the body; a look that outlasts TELESCOPE_MAX, a player who leaves, and stop()
+			-- all end it the same way
+			FakeEngine.with(function()
+				local w = world({ start = 0 })
+				local foci: { any } = {}
+				local streamed: { any } = {}
+				local town = w.svc.town
+				town.focus = function(p: any, pos: any)
+					table.insert(foci, { p = p, pos = pos })
+				end
+				town.streamAround = function(p: any, pos: any, done: () -> ())
+					table.insert(streamed, { p = p, pos = pos, root = p.body.PrimaryPart.Anchored })
+					done()
+				end
+				local place = w.svc.lookout
+				local tx, ty, tz = AlleyLayout.toWorld(place, 15, 1, -42)
+				local p = SkyLiftFlow.player(w, "Looker", "human", roblox.CFrame.new(tx, ty + 3, tz))
+				t.eq(p.body.PrimaryPart.Anchored, false)
+				local ok = w.svc:telescope(p)
+				t.eq(ok, true)
+				t.eq(p.body.PrimaryPart.Anchored, true, "the body is held while the ground under it may stream out")
+				t.eq(#foci, 1)
+				local f = foci[1].pos
+				-- out over the town: far from the Lookout, toward the town (the town's lots lie at x > -1300, z > -1260)
+				local d = math.sqrt((f.X - tx) ^ 2 + (f.Z - tz) ^ 2)
+				t.near(d, SkyLiftService.TELESCOPE_REACH, 5)
+				t.truthy(f.Z > tz + 500, "the focus is toward the town")
+				-- pressing again does not stack a second look
+				w.svc:telescope(p)
+				t.eq(#foci, 1)
+				w.svc:lookOff(p)
+				t.eq(#foci, 2)
+				t.eq(foci[2].pos, nil, "the focus goes back to the body")
+				t.eq(#streamed, 1)
+				t.eq(streamed[1].root, true, "the Lookout streams back in while the body is still held")
+				t.truthy((streamed[1].pos - w.svc.telescopePost.Position).Magnitude < 1e-3)
+				t.eq(p.body.PrimaryPart.Anchored, false, "then the body is let go")
+				-- the server ends a look that goes on too long
+				w.svc:telescope(p)
+				SkyLiftFlow.step(w, SkyLiftService.TELESCOPE_MAX + 1, 1)
+				t.eq(p.body.PrimaryPart.Anchored, false)
+				t.eq(foci[#foci].pos, nil)
+				-- and one whose player leaves
+				w.svc:telescope(p)
+				t.eq(p.body.PrimaryPart.Anchored, true)
+				w.svc:gone(p)
+				t.eq(p.body.PrimaryPart.Anchored, false)
+				t.eq(foci[#foci].pos, nil)
+			end)
+		end
+	)
 end

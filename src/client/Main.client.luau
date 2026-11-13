@@ -177,6 +177,11 @@ pcall(Telescope.start, {
 	end,
 	onChange = function(on: boolean)
 		InputMap.setCharacterControls(not on and client.state().device == nil)
+		-- the server streams the town the telescope looks at; stepping back gives the Lookout back
+		local look = if on then nil else game:GetService("ReplicatedStorage"):FindFirstChild("SkyLiftLook")
+		if look and look:IsA("RemoteEvent") then
+			look:FireServer("off")
+		end
 	end,
 })
 

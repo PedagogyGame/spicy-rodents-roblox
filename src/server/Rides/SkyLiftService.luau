@@ -40,7 +40,8 @@
 -- Interface: start(opts) -> Service (+ stop); new(opts) -> Service; gameTown(parts) -> Town;
 --   publishEpoch(rs, now) -> epoch; carve(root) -> count;
 --   Service:press(player, station) -> (ok, why?); Service:telescope(player) -> (ok, why?);
---   Service:counter(player) -> (ok, why?); Service:step(); Service:gone(player); Service:busy(player) ->
+--   Service:counter(player) -> (ok, why?); Service:lookOff(player); focusPoint() -> Vector3;
+--   Service:step(); Service:gone(player); Service:busy(player) ->
 --   "waiting" | "riding" | nil; Service:time() -> lift seconds; Service:counts() -> { waiting, riding, held,
 --   booked, seated, lunches }; Service:stop(); constants WANDER, PROMPT_DISTANCE, BOARD_GRACE, MISSED,
 --   ROOT_ABOVE_SEAT, STEP_BACK, LUNCH_CENTS, LUNCH_SECS, TELESCOPE_FOV, WORDS, CUES, FOLDER
@@ -74,6 +75,9 @@ SkyLiftService.STEP_BACK = 3 -- (no bake) the gate post stands this far back fro
 SkyLiftService.LUNCH_CENTS = 10 -- the hilltop lunch, once a wallet exists (EconomyRules.PRICES.hilltop_lunch)
 SkyLiftService.LUNCH_SECS = 240 -- a served lunch clears itself after this long
 SkyLiftService.TELESCOPE_FOV = 15 -- degrees
+SkyLiftService.TELESCOPE_REACH = 1300 -- studs out along the telescope's line: where the streaming focus goes
+SkyLiftService.TELESCOPE_MAX = 180 -- seconds: a look longer than this is ended by the server
+SkyLiftService.LOOK_REMOTE = "SkyLiftLook" -- ReplicatedStorage RemoteEvent: the client says "off" on stepping back
 SkyLiftService.ARM_OPEN = math.rad(80) -- the gate arm lifts this far while a cabin's doors are open
 SkyLiftService.ARM_RATE = 1.5 -- of the swing a second
 SkyLiftService.TABLE_TOP = 2.8 -- the Lookout's tables (tools/bake/lookout table4: top 2.6..2.8)
@@ -144,6 +148,10 @@ export type Town = {
 	hold: (body: any) -> Hold?, -- the player let go of this body mid-ride: keep its brain asleep
 	standOffset: ((body: any) -> number)?, -- pivot height over the floor when standing (default 3)
 	charge: ((player: any, cents: number, why: string) -> (boolean, string?))?, -- nil: lunch is on the house
+	-- the telescope's streaming (lane 8): point the player's ReplicationFocus at `pos` (nil: back to the body), and
+	-- stream the ground round `pos` back in, then call `done` (it may yield: the engine's is spawned)
+	focus: ((player: any, pos: Vector3?) -> ())?,
+	streamAround: ((player: any, pos: Vector3, done: () -> ()) -> ())?,
 	players: (() -> { any })?, -- everyone in the game (stepping into an open cabin seats them); nil: nobody
 	giveBack: ((player: any, body: any) -> ())?, -- hand the root's network ownership back (engine default)
 }
@@ -331,6 +339,7 @@ function SkyLiftService.new(opts: Opts): any
 	self.riderOf = {} :: { [any]: Ride } -- player -> their ride
 	self.bookings = {} :: { [string]: Booking }
 	self.lunches = {} :: { Lunch }
+	self.looking = {} :: { [any]: { root: any?, wasAnchored: boolean, since: number } }
 	self.conns = {} :: { any }
 	self.stopped = false
 	self.boardClock = -math.huge
@@ -974,6 +983,7 @@ end
 
 -- The player left the game: a waiting place is given up; a ride carries on with the body held (next step).
 function SkyLiftService.gone(self: any, player: any)
+	self:lookOff(player)
 	local w = self.waiters[player]
 	if w then
 		self:_unwait(w, nil)
@@ -1106,6 +1116,14 @@ function SkyLiftService.step(self: any, dt: number?)
 			self:_board(w, t)
 		end
 	end
+	local nowS = self.now()
+	for player, look in table.clone(self.looking) do
+		local l = look :: { root: any?, wasAnchored: boolean, since: number }
+		local body = town.bodyOf(player)
+		if nowS - l.since > SkyLiftService.TELESCOPE_MAX or body == nil or (l.root and body.PrimaryPart ~= l.root) then
+			self:lookOff(player)
+		end
+	end
 	local okIn, errIn = pcall(self._stepIns, self, t)
 	if not okIn then
 		warn(`[SkyLift] step-ins failed: {errIn}`)
@@ -1136,6 +1154,63 @@ function SkyLiftService.step(self: any, dt: number?)
 	end
 end
 
+-- Where the telescope's streaming focus goes: TELESCOPE_REACH out along its line, on the town's ground.
+function SkyLiftService.focusPoint(self: any): Vector3
+	local v = self.telescopeView
+	local dx, dz = v.look[1] - v.eye[1], v.look[3] - v.eye[3]
+	local l = math.sqrt(dx * dx + dz * dz)
+	local r = SkyLiftService.TELESCOPE_REACH
+	return Vector3.new(v.eye[1] + dx / l * r, 20, v.eye[3] + dz / l * r)
+end
+
+-- The telescope's look begins: the body is anchored where it stands (the ground under it may stream out) and the
+-- player's streaming follows the town the telescope looks at, so the real houses, trees, cars and people load.
+function SkyLiftService._lookOn(self: any, player: any)
+	local town = self.town :: Town
+	if self.looking[player] or town.focus == nil then
+		return
+	end
+	local body = town.bodyOf(player)
+	local root = body and body.PrimaryPart
+	local was = if root then root.Anchored == true else false
+	if root then
+		root.Anchored = true
+	end
+	self.looking[player] = { root = root, wasAnchored = was, since = self.now() }
+	pcall(town.focus :: any, player, self:focusPoint())
+end
+
+-- The look ends (the client stepped back, the time ran out, the player left or took another body): the focus goes
+-- back to the body, the Lookout streams back in round it, and only then is the body let go.
+function SkyLiftService.lookOff(self: any, player: any)
+	local town = self.town :: Town
+	local l = self.looking[player]
+	if l == nil then
+		return
+	end
+	self.looking[player] = nil
+	if town.focus then
+		pcall(town.focus :: any, player, nil)
+	end
+	local function release()
+		if l.root then
+			pcall(function()
+				l.root.Anchored = l.wasAnchored
+			end)
+		end
+	end
+	local post = self.telescopePost
+	local at = if post then (post :: any).Position else nil
+	if town.streamAround and at then
+		local ok = pcall(town.streamAround :: any, player, at, release)
+		if not ok then
+			release()
+		end
+	else
+		release()
+	end
+end
+
 -- E at the telescope: the client takes the camera toward the town (Client/Rides/Telescope, lane 5).
 function SkyLiftService.telescope(self: any, player: any): (boolean, string?)
 	local W = SkyLiftService.WORDS
@@ -1150,6 +1225,7 @@ function SkyLiftService.telescope(self: any, player: any): (boolean, string?)
 	end
 	local v = self.telescopeView
 	play(self.telescopeCue)
+	self:_lookOn(player)
 	town.send(player, {
 		kind = "telescope",
 		eye = v.eye,
@@ -1322,6 +1398,9 @@ function SkyLiftService.stop(self: any)
 	for i = #self.rides, 1, -1 do
 		pcall(self._alight, self, self.rides[i])
 	end
+	for player in table.clone(self.looking) do
+		pcall(self.lookOff, self, player)
+	end
 	self.stopped = true
 	for _, c in self.conns do
 		c:Disconnect()
@@ -1456,6 +1535,39 @@ function SkyLiftService.gameTown(parts: GameParts): Town
 		players = function(): { any }
 			return game:GetService("Players"):GetPlayers()
 		end,
+		focus = function(player: any, pos: Vector3?)
+			if not isInstance(player) then
+				return
+			end
+			local folder = workspace:FindFirstChild(SkyLiftService.FOLDER)
+			local mark = folder and folder:FindFirstChild(`Focus_{(player :: Player).UserId}`)
+			if pos == nil then
+				(player :: Player).ReplicationFocus = nil
+				if mark then
+					mark:Destroy()
+				end
+				return
+			end
+			if mark == nil and folder then
+				mark =
+					newPart("Part", `Focus_{(player :: Player).UserId}`, Vector3.new(1, 1, 1), CFrame.new(pos), folder)
+				mark.Transparency = 1
+			end
+			if mark then
+				(mark :: BasePart).CFrame = CFrame.new(pos);
+				(player :: Player).ReplicationFocus = mark :: BasePart
+			end
+		end,
+		streamAround = function(player: any, pos: Vector3, done: () -> ())
+			task.spawn(function()
+				if isInstance(player) and (player :: Instance).Parent ~= nil then
+					pcall(function()
+						(player :: Player):RequestStreamAroundAsync(pos, 8)
+					end)
+				end
+				done()
+			end)
+		end,
 	}
 end
 
@@ -1492,6 +1604,24 @@ function SkyLiftService.start(opts: Opts): any
 			svc.conns,
 			game:GetService("Players").PlayerRemoving:Connect(function(player: Player)
 				svc:gone(player)
+			end)
+		)
+	end
+	if o.players ~= false then
+		-- the client's word that the telescope is down (Client/Main: Telescope's onChange(false))
+		local rs = o.rs or game:GetService("ReplicatedStorage")
+		local ev = rs:FindFirstChild(SkyLiftService.LOOK_REMOTE)
+		if ev == nil then
+			ev = Instance.new("RemoteEvent")
+			ev.Name = SkyLiftService.LOOK_REMOTE
+			ev.Parent = rs
+		end
+		table.insert(
+			svc.conns,
+			(ev :: RemoteEvent).OnServerEvent:Connect(function(player: Player, what: any)
+				if what == "off" then
+					pcall(svc.lookOff, svc, player)
+				end
 			end)
 		)
 	end
