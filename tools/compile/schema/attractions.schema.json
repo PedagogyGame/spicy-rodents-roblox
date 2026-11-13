@@ -5,6 +5,27 @@
   "type": "object",
   "required": ["attractions", "units", "src"],
   "additionalProperties": false,
+  "$defs": {
+    "link": { "type": "object", "required": ["route", "t", "dir"], "additionalProperties": false,
+      "description": "Run on along `route` from `t`, travelling `dir` (+1 toward its t = 1).",
+      "properties": { "route": { "type": "integer" }, "t": { "type": "number", "minimum": 0, "maximum": 1 }, "dir": { "enum": [1, -1] } } },
+    "mouth": { "type": "object", "required": ["t", "opens"], "additionalProperties": false,
+      "description": "Where the inside meets the outside (Shared/Routes/Enclosure). `out` is a unit vector in the building's local frame [X, Y, D]; required part-way.",
+      "properties": {
+        "t": { "type": "number", "minimum": 0, "maximum": 1 },
+        "opens": { "enum": ["ground", "ledge", "air", "link"] },
+        "out": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" } },
+        "reach": { "type": "number", "exclusiveMinimum": 0 }, "rise": { "type": "number", "minimum": 0 },
+        "links": { "type": "array", "items": { "$ref": "#/$defs/link" } }, "name": { "type": "string" } } },
+    "enclosure": { "type": "object", "required": ["id"], "additionalProperties": false,
+      "description": "Only on a route of kind tunnel: the enclosed run it belongs to (Shared/Routes/Enclosure).",
+      "properties": {
+        "id": { "type": "string", "minLength": 1 }, "climb": { "type": "boolean" }, "hidden": { "type": "boolean" },
+        "mouths": { "type": "array", "items": { "$ref": "#/$defs/mouth" } },
+        "atStart": { "$ref": "#/$defs/link" }, "atEnd": { "$ref": "#/$defs/link" },
+        "width": { "type": "number", "minimum": 1.6 }, "height": { "type": "number", "minimum": 1.7 },
+        "crawl": { "type": "array", "items": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" } } } } }
+  },
   "properties": {
     "$schema": { "type": "string" }, "src": { "type": "string" }, "units": { "const": "studs" },
     "attractions": { "type": "array", "minItems": 1, "items": {
@@ -25,13 +46,14 @@
           "additionalProperties": false,
           "properties": {
             "id": { "type": "integer", "minimum": 9000, "maximum": 9999 }, "name": { "type": "string" },
-            "kind": { "enum": ["trunk", "branch", "bridge", "lookout", "roof", "wire", "fence"] },
+            "kind": { "enum": ["trunk", "branch", "bridge", "lookout", "roof", "wire", "fence", "tunnel"] },
             "pair": { "type": "integer" }, "surfaceRadius": { "type": "number", "minimum": 0 },
             "visualOffset": { "type": "number" }, "note": { "type": "string" },
             "flags": { "type": "object", "additionalProperties": false, "properties": {
               "autoGrabExcluded": { "type": "boolean" }, "isPole": { "type": "boolean" }, "isGiant": { "type": "boolean" },
               "fixedSurfaceZ": { "type": "boolean" }, "treeTravel": { "type": "boolean" } } },
-            "points": { "type": "array", "minItems": 2, "items": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" } } }
+            "points": { "type": "array", "minItems": 2, "items": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" } } },
+            "enclosure": { "$ref": "#/$defs/enclosure" }
           }
         } }
       }
