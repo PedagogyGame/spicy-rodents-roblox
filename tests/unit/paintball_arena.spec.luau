@@ -476,7 +476,6 @@ return function(t)
 			-- crouched body pressed against one is NOT wholly hidden, as the contract had said. Measured here so a
 			-- later change to the hit shape or the rails shows at once: crouched bodies against every rail, standing
 			-- shooters straight out on the same storey 5 to 50 studs away)
-			local boxes, kinds = arena.boxes, arena.kinds
 			local dists = { 5, 8, 12, 18, 25, 30, 35, 40, 45, 50 }
 			local spots, near, far = 0, 0, 0
 			local was = LowCover.DISTANCES
