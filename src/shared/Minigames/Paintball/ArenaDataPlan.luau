@@ -530,10 +530,11 @@ function Plan.build(): Plan
 		{ look = "ceiling4", y0 = top, y1 = top + 1 - FLOOR },
 		{ look = "roof", y0 = top + 1 - FLOOR, y1 = top + 1 },
 	}
+	-- (the roof lies between the outer walls, which rise past it: no two parts share a face out of doors)
 	for _, layer in roofLayers do
 		local look, y0, y1 = layer.look, layer.y0, layer.y1
-		pair(KIND.slab, look, -half - 1, y0, -half - 1, half + 1, y1, -atrium)
-		pair(KIND.slab, look, -half - 1, y0, -atrium, -atrium, y1, atrium)
+		pair(KIND.slab, look, -half, y0, -half, half, y1, -atrium)
+		pair(KIND.slab, look, -half, y0, -atrium, -atrium, y1, atrium)
 	end
 	raw(KIND.slab, "skylight", -atrium, top, -atrium, atrium, top + 1, atrium)
 	for level = 0, floors - 1 do

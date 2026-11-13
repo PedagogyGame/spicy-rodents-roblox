@@ -13,6 +13,7 @@ local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local ArenaDataPlan = require("@shared/Minigames/Paintball/ArenaDataPlan")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Expansion = require("../../generated/Expansion")
+local Flicker = require("../../tools/games/paintball/arena/Flicker")
 local GameBakes = require("../../tools/bake/GameBakes")
 local PartList = require("../../tools/games/paintball/arena/PartList")
 
@@ -406,6 +407,41 @@ return function(t)
 			t.eq(#byLook.mirror, 4)
 			t.eq(#byLook.mirror, #byLook.bulbs)
 			t.truthy(#byLook.tapes_a + #byLook.tapes_b >= 150, "the shelving carries its stock")
+		end
+	)
+
+	t.test(
+		"no two parts flicker: no faces of different looks lie in one plane over one another in plain sight",
+		function()
+			-- what stands outside against the building hides a face as a box does
+			local covers: { number } = {}
+			for _, p in PartList.dressing(venue) do
+				local x0, y0, z1 = Arena.ofSite(p.x0, p.y0, p.d0)
+				local x1, y1, z0 = Arena.ofSite(p.x1, p.y1, p.d1)
+				for _, v in { x0, y0, z0, x1, y1, z1 } do
+					table.insert(covers, v)
+				end
+			end
+			local found = Flicker.find(plan, covers)
+			local first = found[1]
+			t.eq(
+				#found,
+				0,
+				if first
+					then `{#found} pairs, the first boxes {first.a} and {first.b} on {first.face} at {first.plane} (lune run tools/games/paintball/arena/seams.luau)`
+					else nil
+			)
+			-- and the finder finds one: a box set into the atrium's floor, flush with it
+			local broken = ArenaDataPlan.build()
+			for _, v in { -2, -0.5, -2, 2, 0, 2 } do
+				table.insert(broken.boxes, v)
+			end
+			table.insert(broken.kinds, Arena.KIND.prop)
+			table.insert(broken.looks, table.find(ArenaDataPlan.LOOKS, "crate") :: number)
+			local pairs_ = Flicker.find(broken)
+			t.eq(#pairs_, 1)
+			t.eq(pairs_[1].face, "+y")
+			t.eq(pairs_[1].area, 16)
 		end
 	)
 
