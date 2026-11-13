@@ -11,8 +11,9 @@
 -- (Contract.MARGIN). A client that changed one of those alone would be refused or corrected.
 -- THE COST OF SPRINTING, in one place: while the sprint ramp is above 0 the marker is down and cannot
 -- fire; it is back up Body.SPRINT_FIRE_DELAY (0.15 s) after the sprint ends; a fire press ends the
--- sprint (and is held until the marker is up, so the click is never lost); a crouch ends it; the view
--- widens and bobs harder (sprintFov, bobSprint), and every step is loud to everyone near (stepLoud).
+-- sprint (and is held until the marker is up, so the click is never lost) and the sprint does not pick
+-- up again until sprintAfterShot after the ball has left; a crouch ends it; the view widens and bobs
+-- harder (sprintFov, bobSprint), and every step is loud to everyone near (stepLoud).
 -- There is no stamina bar: the price is paid in readiness and noise, not in a meter.
 -- Pure data. Interface: the table; Tuning.T (its type witness)
 
@@ -66,11 +67,23 @@ local Tuning = {
 	kickBack = 0.22,
 	kickUp = 0.07,
 	kickRecover = 16,
-	-- The reload: radians the marker tips over and how many rattles of the hopper are drawn while it
-	-- runs. The rhythm of the five shots and the reload should be readable without the pips.
+	-- The reload: radians the marker tips over, studs it sinks, and how many rattles of the hopper are
+	-- drawn while it runs. The rhythm of the five shots and the reload should be readable without the pips.
 	reloadTip = 0.55,
+	reloadSink = 0.12,
 	reloadShakes = 5,
 	reloadShake = 0.05,
+	-- How quickly the marker goes down and comes up, 1/s (a tap of Shift does not snap it), how early in
+	-- the sprint's ramp it is fully down (3: down by a third of the ramp), and radians it swings in
+	-- across the body when down.
+	markerEase = 30,
+	markerDropGain = 3,
+	sprintSwing = 0.5,
+	-- Studs out at which the barrel's line meets the crosshair's. Nearer toes the marker in harder.
+	markerConverge = 40,
+	-- How see-through the marker is while you are protected (0 solid .. 1 gone): the same ghost every
+	-- protected player is drawn as, so "cannot fire, cannot be hit" has one look.
+	markerGhost = 0.6,
 
 	-- THE EYE ---------------------------------------------------------------------------------------
 	-- Degrees the view widens at full sprint, and how fast it follows the ramp, 1/s. A little says
@@ -92,6 +105,10 @@ local Tuning = {
 	touchSprintOff = 0.5,
 	-- Gamepad: the L3 sprint ends when the stick comes back under this.
 	padSprintOff = 0.25,
+	-- Seconds after a ball leaves before a held sprint picks up again. The marker is seen to fire and
+	-- kick before it drops, and the click is on its way to the server before the first pose that says
+	-- "sprinting" again. 0 drops the marker in the frame after the shot; much more and Shift feels dead.
+	sprintAfterShot = 0.12,
 
 	-- THE HUD ---------------------------------------------------------------------------------------
 	-- Seconds the hit marker (the X on the crosshair) stays after the server says you tagged someone.
@@ -110,8 +127,22 @@ local Tuning = {
 	crossGap = 5,
 	crossArm = 7,
 	crossWide = 9,
-	-- Seconds of the briefing left at which the count is shown big in the middle.
+	-- Seconds of the briefing left at which the count is shown big in the middle, and seconds "GO!" stays.
 	briefCount = 5,
+	goSecs = 0.9,
+	-- Seconds left at which the clock turns red.
+	clockRed = 30,
+	-- Pixels from the crosshair to the tick that points at whoever tagged you.
+	tagRing = 120,
+	-- Protection after a respawn: pixels of the border drawn round the screen in your team's colour
+	-- while it lasts (with a bar that drains), and how fast the border breathes, cycles a second.
+	shieldEdge = 10,
+	shieldPulse = 2,
+	-- Seconds before the server would take an idle player off (Contract.Rules.idleSecs without moving,
+	-- turning or firing) at which the HUD starts to say so.
+	idleWarn = 15,
+	-- Seconds between two presses of Leave or Change sides that both count (a double press is one).
+	verbSecs = 0.3,
 	-- Seconds the controls card stays up for somebody who joins a match already running (it is up
 	-- through the whole briefing for everyone else; H shows and hides it at any time).
 	cardSecs = 6,
@@ -131,12 +162,27 @@ local Tuning = {
 	volReload = 0.5,
 	volReloadFar = 0.35,
 	volDry = 0.5,
+	volReady = 0.45, -- the magazine is full again: the click that says "go"
+	volGo = 0.8, -- the match goes live
+	volBack = 0.6, -- you are back from being tagged out
 	-- Footsteps: studs between two steps walking and sprinting, and how loud each is. Crouched steps
 	-- are silent (PB-8), which is the whole point of crouch-walking up on someone.
 	stepWalk = 4.2,
 	stepSprint = 5.0,
 	stepQuiet = 0.22,
 	stepLoud = 0.6,
+
+	-- PAINT -----------------------------------------------------------------------------------------
+	-- A splat's size on a wall, studs across (one of three, picked from the ball's id so every screen
+	-- draws the same), how much smaller it is on a body, and how long the puff lasts where your own ball
+	-- met a puppet.
+	splatSmall = 1.3,
+	splatMid = 1.7,
+	splatBig = 2.2,
+	splatOnBody = 0.55,
+	puffSecs = 0.25,
+	-- Studs at which another player's name tag stops being drawn.
+	nameTagFar = 70,
 
 	-- TOUCH -----------------------------------------------------------------------------------------
 	-- The buttons, as fractions of the screen (centre x, centre y) and a size in pixels. FIRE at the

@@ -265,8 +265,10 @@ function SelfPort.new(ctx: ClientGame.Ctx, frame: () -> Place?, tuning: typeof(T
 			if math.abs(fovWant - next) < 0.01 then
 				next = fovWant
 			end
-			if next ~= fovNow then
-				fovNow = next
+			fovNow = next
+			-- (written whenever it is not what it should be: the framework puts the view back to its
+			-- own default when a camera hold is let go, which is in the middle of a match here)
+			if math.abs(camera.FieldOfView - (fov + fovNow)) > 1e-4 then
 				camera.FieldOfView = fov + fovNow
 			end
 		end

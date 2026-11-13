@@ -10,7 +10,11 @@
 --   the top        both scores in the teams' colours either side of the clock, yours underlined
 --   the pips       five, at the bottom; a bar that fills through the reload
 --   the status     one line under the crosshair, by priority: tagged out (by whom, the count back),
---                  protected, safe in your own room, the last refusal
+--                  protected, about to be taken off for standing idle, safe in your own room, the last
+--                  refusal
+--   protected      the moment after a respawn: a border round the whole screen in your team's colour
+--                  that breathes, and a bar under the status line that drains with the time left. It is
+--                  gone the instant the marker may fire (the marker itself is a ghost until then)
 --   tagged         a tick on a ring round the crosshair pointing at where the ball came from, and
 --                  paint on the goggles that clears over Tuning.goggleSecs
 --   the feed       who tagged whom, top right, a few lines, each a few seconds
@@ -176,6 +180,20 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 			frame(`Blob{i}`, goggles, UDim2.fromOffset(at[3], at[3]), UDim2.new(at[1], -at[3] / 2, at[2], -at[3] / 2))
 		round(blobs[i], at[3] // 2)
 	end
+
+	-- the respawn's protection: a border and a draining bar
+	local shield = frame("Shield", gui, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), WHITE, 1)
+	shield.Visible = false
+	local edge = tune.shieldEdge
+	local edges: { Frame } = {
+		frame("Top", shield, UDim2.new(1, 0, 0, edge), UDim2.fromScale(0, 0), WHITE, 0.5),
+		frame("Bottom", shield, UDim2.new(1, 0, 0, edge), UDim2.new(0, 0, 1, -edge), WHITE, 0.5),
+		frame("Left", shield, UDim2.new(0, edge, 1, 0), UDim2.fromScale(0, 0), WHITE, 0.5),
+		frame("Right", shield, UDim2.new(0, edge, 1, 0), UDim2.new(1, -edge, 0, 0), WHITE, 0.5),
+	}
+	local shieldBar =
+		frame("ShieldBar", shield, UDim2.fromOffset(200, 6), UDim2.new(0.5, -100, 0.5, 104), { 50, 56, 90 })
+	local shieldFill = frame("Fill", shieldBar, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), WHITE)
 
 	-- the feed
 	local feed = frame("Feed", gui, UDim2.fromOffset(360, 100), UDim2.new(1, -372, 0, 8), NAVY, 1)
@@ -452,7 +470,11 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 			left += R.matchSecs -- live by the clock; the server's own word is on its way
 		end
 		set(clock, if ended then "FULL TIME" elseif phase == "" then "" else clockText(left))
-		clock.TextColor3 = if not starting and not ended and left <= 30 then rgb({ 255, 90, 80 }) else rgb(WHITE)
+		clock.TextColor3 = if not starting
+				and not ended
+				and left <= tune.clockRed
+			then rgb({ 255, 90, 80 })
+			else rgb(WHITE)
 		local side = Contract.TEAMS[seat.team]
 		local briefing = ""
 		if starting then
@@ -465,7 +487,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		if starting and left <= tune.briefCount then
 			set(count, tostring(math.max(1, math.ceil(left))))
 			show(count, true)
-		elseif since ~= nil and now - since < 0.9 then
+		elseif since ~= nil and now - since < tune.goSecs then
 			set(count, "GO!")
 			show(count, true)
 		else
@@ -489,19 +511,36 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 
 		-- the status line
 		local words = ""
+		local safe = if starting then nil else seat:protected(now)
+		local idle = seat:idle(now)
 		if seat.out then
 			local by = seat.names[seat.outBy] or "someone"
 			words = `TAGGED OUT by {by}   back in {math.max(1, math.ceil(seat.outUntil - now))}`
 		elseif ended or phase == "" then
 			words = ""
-		elseif now < seat.safeUntil and not starting then
-			words = `PROTECTED  {string.format("%.1f", seat.safeUntil - now)}`
+		elseif safe ~= nil then
+			words = `PROTECTED  {string.format("%.1f", safe)} s   you cannot be hit and cannot fire`
+		elseif idle ~= nil then
+			words = `Still there? Move, or you are taken out of the match in {math.max(1, math.ceil(idle))} s`
 		elseif seat.inRoom then
 			words = "SAFE in your spawn room: no firing from here"
 		elseif seat.note ~= "" then
 			words = seat.note
 		end
 		set(status, words)
+
+		-- protected: the border breathes in your colour and the bar drains
+		show(shield, safe ~= nil)
+		if safe ~= nil then
+			local paint = rgb(team)
+			local a = 0.45 + 0.25 * math.sin(now * tune.shieldPulse * 2 * math.pi)
+			for _, piece in edges do
+				piece.BackgroundColor3 = paint
+				piece.BackgroundTransparency = a
+			end
+			shieldFill.BackgroundColor3 = paint
+			shieldFill.Size = UDim2.fromScale(math.clamp(safe / math.max(seat.feel.protectSecs, 1e-3), 0, 1), 1)
+		end
 
 		-- where it came from: a tick on a ring, turned towards the one who tagged you
 		local showTick = false
@@ -513,7 +552,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 					-- the bearing against the look: 0 ahead, positive to the left (a yaw)
 					local bearing = math.atan2(-dx, -dz) - seat.yaw
 					local sx, sy = -math.sin(bearing), -math.cos(bearing)
-					tick.Position = UDim2.new(0.5, sx * 120 - 4, 0.5, sy * 120 - 17)
+					tick.Position = UDim2.new(0.5, sx * tune.tagRing - 4, 0.5, sy * tune.tagRing - 17)
 					tick.Rotation = -math.deg(bearing)
 					tick.BackgroundColor3 = rgb(teamRgb(if seat.team == 1 then 2 else 1))
 					showTick = true

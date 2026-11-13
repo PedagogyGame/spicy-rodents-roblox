@@ -12,6 +12,7 @@
 --   a shot      it jumps back and up and comes home; the VIEW never kicks
 --   reloading   it tips over and the hopper rattles through the reload, and rights itself as the
 --               magazine fills
+--   protected   it is see-through, as every protected player is drawn: it cannot fire yet
 --   out         it is put away
 -- It only READS the camera's CFrame (its parts are placed from it every frame) and tells Self where
 -- its muzzle is, which is where your own ball is drawn leaving from.
@@ -37,7 +38,10 @@ local Marker = {}
 -- How far the marker is lowered for the sprint (0..1), how far it is tipped over for the reload (0..1,
 -- with the rattle added), and the shot's kick (0..1), from the seat as it stands at `now`. Pure.
 function Marker.pose(seat: SeatCore.Seat, now: number, tuning: typeof(Tuning.T)): (number, number, number, number)
-	local down = if seat.out then 1 elseif seat.k > 0 then math.min(1, seat.k * 3) else 1 - seat:markerUp(now)
+	local down = if seat.out
+		then 1
+		elseif seat.k > 0 then math.min(1, seat.k * tuning.markerDropGain)
+		else 1 - seat:markerUp(now)
 	local tip, rattle = 0, 0
 	local r = seat:reloading(now)
 	if r ~= nil then
@@ -81,6 +85,7 @@ function Marker.new(seat: SeatCore.Seat, port: SelfPort.Self, tuning: typeof(Tun
 	local lastX, lastZ = seat.x, seat.z
 	local phase = 0
 	local team = -1
+	local ghost = false
 
 	local marker = { model = model, down = 0 } :: Marker
 
@@ -96,6 +101,14 @@ function Marker.new(seat: SeatCore.Seat, port: SelfPort.Self, tuning: typeof(Tun
 			local t = Contract.TEAMS[team]
 			local c = if t then t.color else { 255, 255, 255 }
 			hopper.Color = Color3.fromRGB(c[1], c[2], c[3])
+		end
+		-- protected: the ghost of a marker (it cannot fire, and says so)
+		local safe = seat:protected(now) ~= nil
+		if safe ~= ghost then
+			ghost = safe
+			for _, p in { body, barrel, grip, hopper } do
+				p.Transparency = if safe then tune.markerGhost else 0
+			end
 		end
 		local cf = camera.CFrame
 		-- a turn of the view leaves the marker behind for a moment
@@ -122,18 +135,18 @@ function Marker.new(seat: SeatCore.Seat, port: SelfPort.Self, tuning: typeof(Tun
 		local bobX = math.cos(phase / 2) * amp * 0.5
 		local down, tip, rattle, kick = Marker.pose(seat, now, tune)
 		-- (the lowering eases both ways: a tap of Shift does not snap it)
-		self.down += (down - self.down) * (1 - math.exp(-30 * dt))
+		self.down += (down - self.down) * (1 - math.exp(-tune.markerEase * dt))
 		local d = self.down
-		local toe = math.atan2(tune.markerRight, 40) -- the barrel points at where the crosshair's line is 40 studs out
+		local toe = math.atan2(tune.markerRight, tune.markerConverge) -- the barrel points at the crosshair's line out there
 		local at = cf
 			* CFrame.new(
 				tune.markerRight + bobX,
-				-tune.markerDown + bobY - d * tune.sprintSink - tip * 0.12,
+				-tune.markerDown + bobY - d * tune.sprintSink - tip * tune.reloadSink,
 				-tune.markerForward + kick * tune.kickBack
 			)
 			* CFrame.Angles(
 				-d * tune.sprintTip + kick * tune.kickUp - swayPitch + rattle * tune.reloadShake,
-				toe - swayYaw + d * 0.5,
+				toe - swayYaw + d * tune.sprintSwing,
 				-tip * tune.reloadTip
 			)
 		body.CFrame = at

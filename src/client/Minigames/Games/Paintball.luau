@@ -21,7 +21,9 @@
 --            player's (side, tags, times out, aim), most tags first. The bulletin's awards are drawn
 --            beside it by the seat's own HUD (Client/Minigames/Paintball/Hud), which also takes the
 --            framework card's "Play again" away (the next match starts by itself).
---   sounds   the cues of PB-8, every id empty until the licensed sounds are chosen.
+--   sounds   the cues of PB-8 and three more of the lane's own (the magazine full again, the match
+--            going live, back from being tagged out), every id empty until the licensed sounds are
+--            chosen.
 -- Interface: a ClientGame.ClientGame
 
 local Import = require("../../Import")
@@ -117,6 +119,9 @@ local Game: ClientGame.ClientGame = {
 		["paintball.reload"] = "", -- the rattle
 		["paintball.dry"] = "", -- a click with nothing to fire
 		["paintball.step"] = "", -- footsteps (running loud, crouching silent)
+		["paintball.ready"] = "", -- the reload is done: the magazine is full again
+		["paintball.go"] = "", -- the briefing is over: the match is live
+		["paintball.back"] = "", -- you are back from being tagged out
 	},
 	words = { finished = "The match is over. Press E at the arena door to play again." },
 }

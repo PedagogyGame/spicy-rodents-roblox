@@ -21,6 +21,8 @@
 --              Clock.SEND_HZ times a second, never before the first placement nor while out.
 --   placements pivot the body, take the number, turn the look for one frame, and for a respawn a full
 --              magazine, the legs back and the protection.
+--   idle       the seat knows how long its player has neither moved, turned nor fired while the match
+--              is live, so the HUD can say so before the server takes them off (Rules.idleSecs).
 -- Interface: new(ctx, opts) -> Seat; types Port, Opts, Seat, Feed. Seat: the framework's controller
 --   (onState, onMessage, onRefused, stop) plus input(action, down), step(dt) and the fields below.
 
@@ -140,6 +142,7 @@ export type Seat = {
 	goggleAt: number, -- you were tagged
 	note: string,
 	noteAt: number,
+	activeAt: number, -- the player last moved, turned or fired (or the match was not live for them)
 	now: number, -- the shared clock of the last step
 	onState: (self: Seat, msg: { [string]: any }) -> (),
 	onMessage: (self: Seat, msg: { [string]: any }, watched: any?) -> (),
@@ -151,6 +154,8 @@ export type Seat = {
 	ready: (self: Seat, now: number) -> boolean, -- would a press leave as a ball this instant?
 	markerUp: (self: Seat, now: number) -> number, -- 0 down (sprinting) .. 1 up
 	reloading: (self: Seat, now: number) -> number?, -- 0..1 through the running reload; nil: none
+	protected: (self: Seat, now: number) -> number?, -- seconds of protection left; nil: none
+	idle: (self: Seat, now: number) -> number?, -- seconds until an idle player is taken off; nil: no warning due
 }
 
 local SeatCore = {}
@@ -184,6 +189,8 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 	local hasPose = false
 	local lookX, lookY, lookZ = 0, 0, -1
 	local lastX, lastZ = 0 / 0, 0 / 0
+	local idleX, idleY, idleZ, idleYaw, idlePitch = 0, 0, 0, 0, 0
+	local wasLive = false
 	local early: { [number]: { [string]: any } } = {} -- placements that came before this seat knew its slot
 
 	local seat = {
@@ -232,6 +239,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		goggleAt = -math.huge,
 		note = "",
 		noteAt = -math.huge,
+		activeAt = clock(),
 		now = clock(),
 	} :: Seat
 
@@ -286,6 +294,17 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		return false
 	end
 
+	-- The magazine brought up to `now`. A reload that has run its time ends here and nowhere else, so
+	-- the click that says "full again" is heard exactly once.
+	local function settle(now: number)
+		local mag = seat.mag
+		local was = mag.reloadDoneAt
+		Magazine.update(mag, now)
+		if was ~= nil and mag.reloadDoneAt == nil then
+			ctx.sound("paintball.ready", tuning.volReady)
+		end
+	end
+
 	local function nearRoom(): boolean
 		for _, room in arena.spawnRooms do
 			if ArenaModule.inRoom(room, seat.x, seat.y + 0.1, seat.z, M.room) then
@@ -308,7 +327,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			return "drop", "No firing from a spawn room"
 		end
 		local mag = seat.mag
-		Magazine.update(mag, now)
+		settle(now)
 		local reloading = mag.reloadDoneAt
 		if reloading ~= nil then
 			return if reloading - now <= M.click then "hold" else "dry", nil
@@ -341,6 +360,25 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		end
 		local span = math.max(1e-3, done - self.reloadFrom)
 		return math.clamp(1 - (done - now) / span, 0, 1)
+	end
+
+	-- Seconds of the respawn's protection still to run (cannot be hit, cannot fire); nil when there is
+	-- none: before the first placement, while out, at the end card.
+	function seat.protected(self: Seat, now: number): number?
+		if self.place == 0 or self.out or self.phase == "ended" or self.phase == "" or now >= self.safeUntil then
+			return nil
+		end
+		return self.safeUntil - now
+	end
+
+	-- Seconds until the server takes this player off for standing idle (Rules.idleSecs of live play
+	-- without moving, turning or firing), once that is Tuning.idleWarn or less away; nil otherwise.
+	function seat.idle(self: Seat, now: number): number?
+		if self.out or self.place == 0 or not self:live(now) then
+			return nil
+		end
+		local left = R.idleSecs - (now - self.activeAt)
+		return if left <= tuning.idleWarn then math.max(0, left) else nil
 	end
 
 	local function rattle(now: number)
@@ -379,6 +417,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		table.insert(unacked, shot)
 		seat.fired += 1
 		seat.firedAt = now
+		seat.activeAt = now
 		ctx.sound("paintball.fire", tuning.volFire)
 		if show then
 			-- the ball the server will fly, from the very numbers on the wire
@@ -593,7 +632,11 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		table.clear(unacked)
 		endSprint(now)
 		seat.held = nil
+		if seat.out then
+			ctx.sound("paintball.back", tuning.volBack)
+		end
 		seat.out = false
+		seat.activeAt = now
 		seat.safeUntil = msg.at
 		if not seat.legs then
 			seat.legs = true
@@ -691,7 +734,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				rounds, reloadAt = R.magazine, nil
 			end
 			local mag = self.mag
-			Magazine.update(mag, now)
+			settle(now)
 			if since == 0 then
 				if reloadAt ~= nil then
 					-- a reload the server reports is taken over
@@ -756,6 +799,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			end
 		elseif action == "reload" then
 			if down and self:live(now) and not self.out and self.place ~= 0 then
+				settle(now)
 				if Magazine.reload(self.mag, now) then
 					ctx.send("reload", { now })
 					rattle(now)
@@ -773,7 +817,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			bar()
 		elseif action == "leave" or action == "side" then
 			-- with the scoreboard, in the briefing and at the end card: never by a slip in the middle of a fight
-			if down and (self.board or self.phase ~= "live") and now - verbAt > 0.3 then
+			if down and (self.board or self.phase ~= "live") and now - verbAt > tuning.verbSecs then
 				verbAt = now
 				ctx.send(action)
 			end
@@ -822,6 +866,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			and self.held == nil
 			and not self.out
 			and push >= tuning.sprintMove
+			and now >= self.firedAt + tuning.sprintAfterShot
 		if sprinting then
 			self.k = math.min(1, self.k + dt / Body.SPRINT_RAMP_SECS)
 		else
@@ -837,9 +882,27 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		-- your own room: safe, and no firing
 		local room = arena.spawnRooms[self.team]
 		self.inRoom = has and room ~= nil and ArenaModule.inRoom(room, self.x, self.y + 0.1, self.z)
+		-- the match goes live under a player who stood through its briefing: the horn
+		local liveNow = self.place ~= 0 and self:live(now)
+		if liveNow and not wasLive and briefEnds ~= nil then
+			ctx.sound("paintball.go", tuning.volGo)
+		end
+		wasLive = liveNow
+		-- idle: moving, turning and firing are what the server counts as being there
+		if has then
+			local moved = math.abs(self.x - idleX) + math.abs(self.y - idleY) + math.abs(self.z - idleZ) > 0.05
+			local turned = math.abs(self.yaw - idleYaw) + math.abs(self.pitch - idlePitch) > 0.002
+			if moved or turned then
+				idleX, idleY, idleZ, idleYaw, idlePitch = self.x, self.y, self.z, self.yaw, self.pitch
+				self.activeAt = now
+			end
+		end
+		if not liveNow or self.out then
+			self.activeAt = now
+		end
 		-- a waiting press
 		tryFire(now)
-		Magazine.update(self.mag, now)
+		settle(now)
 		-- the pose, SEND_HZ times a second
 		moveAcc += dt
 		if moveAcc >= SEND - 1e-6 then

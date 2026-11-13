@@ -48,9 +48,7 @@ local NEUTRAL = { 150, 150, 160 }
 local LEGS = { 0.7, 0.45 }
 local TORSO = { 1.0, 0.55 }
 local HEAD = 0.6
-local SPLAT_SIZES = { 1.3, 1.7, 2.2 }
-local PUFF_SECS = 0.25
-local HIDE_EVERY = 0.5
+local HIDE_EVERY = 0.5 -- seconds between two looks for real bodies to hide (they stream in)
 
 local function teamColor(team: number): Color3
 	local t = Contract.TEAMS[team]
@@ -91,7 +89,8 @@ type Figure = {
 }
 
 function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
-	local _tune = tuning or Tuning
+	local tune = tuning or Tuning
+	local splatSizes = { tune.splatSmall, tune.splatMid, tune.splatBig }
 	local camera = workspace.CurrentCamera
 	local folder = Instance.new("Folder")
 	folder.Name = "PaintballShow"
@@ -138,7 +137,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 		board.Name = "NameTag"
 		board.Size = UDim2.fromOffset(160, 26)
 		board.StudsOffset = Vector3.new(0, 1.4, 0)
-		board.MaxDistance = 70
+		board.MaxDistance = tune.nameTagFar
 		board.Adornee = fig.head
 		board.Parent = fig.head
 		fig.tag.BackgroundTransparency = 1
@@ -251,7 +250,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 	-- a blot: its size and shape from the ball's id, so every screen draws the same one
 	local function blot(splat: ShowCore.Splat): Part
 		local pick = (splat.ball + splat.by * 7) % 6
-		local d = SPLAT_SIZES[pick % 3 + 1]
+		local d = splatSizes[pick % 3 + 1]
 		local p = part("Splat", Vector3.new(0.08, d, if pick >= 3 then d * 0.7 else d), teamColor(splat.team), folder)
 		p.Shape = Enum.PartType.Cylinder
 		return p
@@ -299,7 +298,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 				local had: Part? = parts[s.key]
 				if had == nil then
 					local p = blot(s)
-					p.Size = Vector3.new(0.08, p.Size.Y * 0.55, p.Size.Z * 0.55)
+					p.Size = Vector3.new(0.08, p.Size.Y * tune.splatOnBody, p.Size.Z * tune.splatOnBody)
 					p.Parent = nil
 					parts[s.key] = p
 				end
@@ -375,7 +374,7 @@ function World.new(show: ShowCore.Show, tuning: typeof(Tuning.T)?): World
 		for i = #puffs, 1, -1 do
 			local puff = puffs[i]
 			puff.age += dt
-			local f = puff.age / PUFF_SECS
+			local f = puff.age / tune.puffSecs
 			if f >= 1 then
 				puff.part:Destroy()
 				table.remove(puffs, i)
