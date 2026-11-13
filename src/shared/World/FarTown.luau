@@ -278,12 +278,12 @@ function FarTown.crowns(treeArt: { any }): { Crown }
 			local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
 			local wide = ((x1 - x0) + (z1 - z0)) / 2
 			local tall = y1 - y0
-			local big = 0.62 * math.min(tall, wide)
-			local small = 0.7 * big
-			local cy = y1 - 0.15 * tall - big / 2 -- the big ball's top a little under the leaves' top
+			local big = 0.78 * math.min(tall, wide)
+			local small = 0.72 * big
+			local cy = math.min(y0 + 0.5 * tall, y1 - big / 2) -- in the middle of the leaves, its top under theirs
 			local f = FarTown.hash(`{math.floor(cx)}/{math.floor(cz)}`)
 			local ax, az = math.cos(f * 2 * math.pi), math.sin(f * 2 * math.pi)
-			local spread = 0.28 * wide
+			local spread = 0.22 * wide
 			local dark = FarTown.CROWN_DARK :: any
 			table.insert(out, {
 				x = cx,
@@ -294,11 +294,11 @@ function FarTown.crowns(treeArt: { any }): { Crown }
 				color = FarTown.CROWN :: any,
 				trunkBase = pv[2],
 				trunkTop = cy,
-				trunkD = math.clamp(0.05 * wide, 1, 3),
+				trunkD = math.clamp(0.07 * wide, 1.2, 5),
 				balls = {
 					{ cx, cy, cz, big, FarTown.CROWN :: any },
-					{ cx + ax * spread, cy - 0.18 * big, cz + az * spread, small, dark },
-					{ cx - ax * spread, cy - 0.12 * big, cz - az * spread, small * 0.9, dark },
+					{ cx + ax * spread, cy - 0.12 * big, cz + az * spread, small, dark },
+					{ cx - ax * spread, cy - 0.08 * big, cz - az * spread, small * 0.9, dark },
 				},
 			})
 		end

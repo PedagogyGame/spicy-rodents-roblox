@@ -104,7 +104,7 @@ function Station.build(kit: Kit.Kit, parent: any, v: any): any
 	local SF0, SF1 = FRONT_EDGE - 0.6, FRONT_EDGE - 0.45 -- the front screen's faces (the swept volume ends at -6.5)
 	local SB0, SB1 = BACK_EDGE + 0.45, BACK_EDGE + 0.6
 	local SW0, SW1 = WEST_EDGE - 0.15, WEST_EDGE - 0.03
-	local glassScreen = { transparency = 0.7, reflectance = 0.15 }
+	local glassScreen = { transparency = 0.8, reflectance = 0.12 }
 	local boardAnchor = nil
 	for _, a in v.anchors do
 		if a.id == "board" then

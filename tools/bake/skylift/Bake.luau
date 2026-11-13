@@ -11,6 +11,8 @@
 --                           file exists (lane 3), else STUB: a plinth greybox carrying attribute Stub = true
 --   xs_lift_approach        Lift Road, the car park, the walks, lamps, the hill trail and the hill's dressing
 --                           (Approach.luau)
+--   xs_lift_country         the farmland under the line: fields, hedges, the farm, the orchard, the brook and
+--                           pond, the lane and the maintenance hut, stone walls (Countryside.luau)
 -- Interface: build(roblox) -> (Folder, report); report = { models = { [name]: parts }, total, lookout = "built" |
 --   "stub" }
 
@@ -19,6 +21,7 @@ local fs = require("@lune/fs")
 local Approach = require("./Approach")
 local Cabin = require("./Cabin")
 local Common = require("./Common")
+local Countryside = require("./Countryside")
 local Kit = require("../alley/Kit")
 local SkyLift = require("../../../src/shared/Rides/SkyLift")
 local Station = require("./Station")
@@ -88,6 +91,7 @@ function Bake.build(roblox: any): (any, any)
 		Bake.stubLookout(Kit.new(roblox, Common.place(topV)), folder, topV)
 	end
 	Approach.build(roblox, folder)
+	Countryside.build(roblox, folder)
 
 	local report = { models = {}, total = 0, lookout = lookout }
 	for _, c in folder:GetChildren() do

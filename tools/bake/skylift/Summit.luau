@@ -112,7 +112,7 @@ function Summit.build(kit: Kit.Kit, parent: any, v: any): any
 	local XA0, XA1 = -25.72, -25.58 -- alight side
 	local DW0, DW1 = 21.2, 21.34 -- behind the bullwheel
 	local BOARD_FROM = -24.5 -- the board side's screen starts here (0.5 short of the front: no one fits through)
-	local glassScreen = { transparency = 0.7, reflectance = 0.15 }
+	local glassScreen = { transparency = 0.8, reflectance = 0.12 }
 	local bd = 5
 	for _, a in v.anchors do
 		if a.id == "board_down" then
