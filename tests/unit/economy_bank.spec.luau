@@ -765,6 +765,38 @@ return function(t)
 		end
 	)
 
+	t.test("everything on sale has a price and a name together, so an id never reaches a screen", function()
+		local ItemRules = require("@shared/Items/ItemRules")
+		local names = EconomyRules.NAMES :: { [string]: string }
+		local ids: { string } = {}
+		for id in EconomyRules.PRICES :: { [string]: number } do
+			table.insert(ids, id)
+		end
+		for _, def in ItemRules.CATALOG do
+			table.insert(ids, def.id)
+		end
+		for _, id in ids do
+			local item = EconomyRules.item(id)
+			t.truthy(item ~= nil, `{id} has a price and a name`)
+			local it = item :: EconomyRules.Item
+			t.eq(it.cents, EconomyRules.price(id))
+			t.truthy(not string.find(it.name, "_", 1, true), `{id}: a name a player reads, not an id`)
+			t.eq(it.name, string.lower(it.name), `{id}: lower case, to sit inside "Paid 12c for ..."`)
+		end
+		for id in names do
+			t.truthy(EconomyRules.price(id) ~= nil, `{id} is named but has no price`)
+		end
+		-- the alley's snack-bar board (tools/bake/alley/Rooms.luau): nachos 5, soda 4, coffee 12, ice cream 5
+		for id, cents in { nachos = 5, soda = 4, coffee = 12, ice_cream_bar = 5 } do
+			t.eq((EconomyRules.item(id) :: EconomyRules.Item).cents, cents, id)
+		end
+		t.eq((EconomyRules.item("hot_cocoa") :: EconomyRules.Item).name, "a hot cocoa")
+		-- not on sale: an id that is not one, and the pass (sold only by the pass desk, which grants it)
+		t.eq(EconomyRules.item("ice_cream"), nil)
+		t.eq(EconomyRules.item("hot cocoa"), nil)
+		t.eq(EconomyRules.item("paintball_pass"), nil)
+	end)
+
 	t.test("how long a pass has left, in words: in-game days and real minutes", function()
 		t.eq(EconomyRules.passLeftWords(5, DAY), "5.0 in-game days left (about 60 minutes)")
 		t.eq(EconomyRules.passLeftWords(3.52, DAY), "3.5 in-game days left (about 43 minutes)")

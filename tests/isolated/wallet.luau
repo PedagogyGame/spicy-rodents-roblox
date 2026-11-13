@@ -200,6 +200,72 @@ return function(t)
 		t.eq(#w.warned, 4)
 	end)
 
+	t.test(
+		"buy by id: the list's price and a name the player reads; a basket charged once; a missing id named",
+		function()
+			local w = town()
+			local ann: any = { UserId = 7, Name = "Ann", events = {} }
+			w.wallet.join(ann)
+			-- the review's caller 3, the lounge bar: names, never ids
+			t.deepEq({ w.wallet.buy(ann, "hot_cocoa") }, { true, "Paid 10c for a hot cocoa. You have S$2.90." })
+			t.deepEq({ w.wallet.buy(ann, "green_tea") }, { true, "Paid 8c for a green tea. You have S$2.82." })
+			t.eq(ann.attrs.CentsNote, "3|-8|a green tea", "the screen's line names it too")
+			-- caller 4, the alley's counters: the board's ice cream is the corner store's ice cream bar
+			t.deepEq({ w.wallet.buy(ann, "ice_cream_bar") }, { true, "Paid 5c for an ice cream bar. You have S$2.77." })
+			t.deepEq({ w.wallet.buy(ann, "lane_shoes") }, { true, "Nothing to pay for lane shoes." })
+			t.deepEq(
+				{ w.wallet.buy(ann, "bowling_ball") },
+				{ true, "Paid 25c for a bowling ball of your own. You have S$2.52." }
+			)
+			t.eq(#w.warned, 0)
+			-- an id that is not on sale: kind words for the player, and the id itself in the server's log
+			t.deepEq({ w.wallet.buy(ann, "ice_cream") }, { false, "That is not for sale yet." })
+			t.eq(#w.warned, 1)
+			t.truthy(string.find(w.warned[1], '"ice_cream"', 1, true), w.warned[1])
+			t.truthy(string.find(w.warned[1], "nothing was taken", 1, true), w.warned[1])
+			t.deepEq({ w.wallet.buy(ann, "hot cocoa") }, { false, "That is not for sale yet." })
+			t.truthy(string.find(w.warned[2], '"hot cocoa"', 1, true), w.warned[2])
+			-- the pass is never sold as a thing (it would take the money and grant nothing)
+			t.deepEq({ w.wallet.buy(ann, "paintball_pass") }, { false, "That is not for sale yet." })
+			t.truthy(string.find(w.warned[3], "wallet.pass.buy", 1, true), w.warned[3])
+			t.falsy(w.wallet.pass.has(ann))
+			t.eq(w.wallet.balance(ann), 252, "nothing taken by any of those")
+			-- caller 1, the corner store's till: a basket is one spend for its total, named
+			t.deepEq(
+				{ w.wallet.buy(ann, { "kite", "soda", "frisbee" }) },
+				{ true, "Paid 69c for a kite, a soda and a frisbee. You have S$1.83." }
+			)
+			t.deepEq(
+				{ w.wallet.buy(ann, { "peanuts", "chalk" }) },
+				{ true, "Paid 6c for peanuts and sidewalk chalk. You have S$1.77." }
+			)
+			t.deepEq(
+				{ w.wallet.buy(ann, { "bubbles", "chalk", "newspaper", "bike_horn" }) },
+				{ true, "Paid 10c for 4 things. You have S$1.67." }
+			)
+			-- one bad id spoils the basket, and nothing of it is charged
+			t.deepEq({ w.wallet.buy(ann, { "kite", "lottery_ticket" }) }, { false, "That is not for sale yet." })
+			t.truthy(string.find(w.warned[4], '"lottery_ticket"', 1, true), w.warned[4])
+			t.deepEq({ w.wallet.buy(ann, {}) }, { false, "That is not for sale yet." })
+			t.eq(w.wallet.balance(ann), 167)
+			-- with a handing-over, as the header writes it
+			local given = 0
+			t.deepEq({
+				w.wallet.buy(ann, "kite", function(): (boolean?, string?)
+					given += 1
+					return true
+				end),
+			}, { true, "Paid 60c for a kite. You have S$1.07." })
+			t.eq(given, 1)
+			-- dollars and cents as the list has them; then short of money
+			t.deepEq(
+				{ w.wallet.buy(ann, "paintball_garb_set") },
+				{ true, "Paid S$1.00 for paintball gear. You have S$0.07." }
+			)
+			t.deepEq({ w.wallet.buy(ann, "bird_seed") }, { false, "You need 40c; you have 7c." })
+		end
+	)
+
 	t.test("the pass: sold once for 20c, five in-game days on the game clock, in the paintball desk's shape", function()
 		FakeEngine.with(function()
 			local w = town()
