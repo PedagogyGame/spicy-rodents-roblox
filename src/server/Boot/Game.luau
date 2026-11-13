@@ -41,7 +41,8 @@
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
---   InfectionService; nil when it could not start), townIdOf(actorId), stop() };
+--   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
+--   and the police at the grate; nil when it could not start), townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure)
 -- For a bitten player the hospital's door is published as the Workspace attribute HospitalDoor (a
@@ -63,6 +64,7 @@ local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
+local SewerService = require("../World/SewerService")
 local HospitalProps = require("../Hospital/HospitalProps")
 local DayClock = require("./DayClock")
 local TreeArt = require("../Assets/TreeArt")
@@ -351,6 +353,22 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
+	-- who holds a town body ("ai" | "player"), and an attribute on it (Say is remembered for the speech log):
+	-- what Infection/InfectionService and World/SewerService ask of the town
+	local function controllerOfTown(id: number): string
+		local actor = rt.byTownId[id]
+		return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
+	end
+	local function setTownAttr(id: number, name: string, value: any)
+		local actor = rt.byTownId[id]
+		if actor then
+			(actor.body :: Model):SetAttribute(name, value)
+		end
+		if name == "Say" then
+			lastSay[id] = value
+		end
+	end
+
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
 	local infectionFault: (where: string, err: any) -> ()
@@ -359,19 +377,8 @@ function Game.start(opts: Opts?): any
 			world = world,
 			traffic = traffic,
 			data = data,
-			controllerOf = function(id: number): string
-				local actor = rt.byTownId[id]
-				return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
-			end,
-			setAttr = function(id: number, name: string, value: any)
-				local actor = rt.byTownId[id]
-				if actor then
-					(actor.body :: Model):SetAttribute(name, value)
-				end
-				if name == "Say" then
-					lastSay[id] = value
-				end
-			end,
+			controllerOf = controllerOfTown,
+			setAttr = setTownAttr,
 			setPossessable = function(id: number, value: boolean)
 				local actor = rt.byTownId[id]
 				if actor then
@@ -435,6 +442,28 @@ function Game.start(opts: Opts?): any
 			pcall(dead.shutdown, dead)
 			warn("[SpicyRodents] the infection service keeps failing: switched off (bites still score)")
 		end
+	end
+
+	-- the storm drains (World/SewerService): the carve (after the terrain write above), cover, the police at the grate
+	local sewers: any = nil
+	local okW, errW = pcall(function()
+		sewers = SewerService.start({
+			world = world,
+			carve = o.terrain ~= false,
+			speech = infection and infection.speech,
+			clock = function(): number
+				return if infection then infection.now else world.now
+			end,
+			serverTime = function(): number
+				return workspace:GetServerTimeNow()
+			end,
+			controllerOf = controllerOfTown,
+			setAttr = setTownAttr,
+		})
+	end)
+	if not okW then
+		sewers = nil
+		warn(`[SpicyRodents] the storm drains did not start (the pipes run, nobody loses the rodent there): {errW}`)
 	end
 
 	local function stateOf(player: any): PState
@@ -1127,6 +1156,7 @@ function Game.start(opts: Opts?): any
 		placeAI = placeAI,
 		attractions = attractions,
 		infection = infection,
+		sewers = sewers,
 		townIdOf = function(actorId: string): number?
 			return townIdOf[actorId]
 		end,
@@ -1134,6 +1164,9 @@ function Game.start(opts: Opts?): any
 			rt.stop()
 			if attractions then
 				attractions.stop()
+			end
+			if sewers then
+				sewers:stop()
 			end
 			for _, c in conns do
 				c:Disconnect()

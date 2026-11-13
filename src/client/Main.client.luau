@@ -9,6 +9,8 @@
 -- bites, kicks, RUN OVER, KICKED OUT, and "med": what a bitten player must do (go to the hospital).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
+-- Inside a storm drain World/SewerAmbience gives the look, the lamps and the key hints, and rewords the
+-- controls' refusals (every PossessionClient toast passes through its filter).
 -- The S2 test place runs its own S2Client and this script steps aside there.
 -- Live-server robustness (W1 client review): Shift Lock is switched off (Shift is sprint); the Roblox
 -- Reset button does nothing until a body is handed over (then PossessionClient routes it to the safe-
@@ -35,6 +37,7 @@ local ClientWorld = require("./World/ClientWorld")
 local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
 local CameraRig = require("./Camera/CameraRig")
+local SewerAmbience = require("./World/SewerAmbience")
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -116,10 +119,18 @@ task.spawn(function()
 		world.ignore({ ghosts })
 	end
 end)
+-- the controls' toasts pass through the storm drains' wording ("No room to jump down here") once it has started
+local sewer: SewerAmbience.Handle? = nil
 local started, clientOrErr = pcall(PossessionClient.start, {
 	bodies = bodies :: Instance,
 	overview = { position = Vector3.new(0, 120, 260), lookAt = Vector3.zero },
-	hud = { set = hud.set, toast = menu.toast, meter = hud.meter },
+	hud = {
+		set = hud.set,
+		toast = function(text: string, seconds: number?)
+			menu.toast(if sewer then sewer.filter(text) else text, seconds)
+		end,
+		meter = hud.meter,
+	},
 })
 if not started then
 	warn(`Client: PossessionClient failed: {clientOrErr}`)
@@ -127,6 +138,18 @@ if not started then
 	return
 end
 local client = clientOrErr :: PossessionClient.Client
+
+-- inside a storm drain: the grade, the lamps, the echo, "E: down the drain" and "W: climb out" (World/SewerAmbience)
+local okSewer, sewerOrErr = pcall(SewerAmbience.start, {
+	current = client.current,
+	state = client.state,
+	toast = menu.toast,
+})
+if okSewer then
+	sewer = sewerOrErr
+else
+	warn(`Client: SewerAmbience failed: {sewerOrErr}`)
+end
 
 -- the bowling alley's games: walk up to a lane, the dartboard or the fortune teller and press E
 task.spawn(function()
