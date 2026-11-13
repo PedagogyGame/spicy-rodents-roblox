@@ -545,8 +545,9 @@ function Game.start(opts: Opts?): any
 			return false, "unknown choice"
 		end
 		local s = stateOf(player)
-		if skylift and skylift:busy(player) == "riding" then
-			fire(player, { kind = "refused", text = SkyLiftService.WORDS.riding })
+		local riding = if skylift then skylift:refusal(player, "pick") else nil
+		if riding then
+			fire(player, { kind = "refused", text = riding })
 			return false, "riding"
 		end
 		local clock = os.clock()
@@ -1011,8 +1012,9 @@ function Game.start(opts: Opts?): any
 				if actor.species ~= "human" then
 					return false, "Only people can play. Animals can watch (or sneak through the ball return)"
 				end
-				if skylift and skylift:busy(player) then
-					return false, "Not while you are on (or waiting for) the sky lift"
+				local lift = if skylift then skylift:refusal(player, "play") else nil
+				if lift then
+					return false, lift
 				end
 				if
 					devices
@@ -1120,14 +1122,9 @@ function Game.start(opts: Opts?): any
 	end
 	if skylift and devices then
 		-- E mid-ride: no car from a cabin (the client says so too); true, so the client is not told "released"
-		local interact = devices.interact
-		devices.interact = function(svc: any, player: Player): (boolean, string?)
-			if skylift:busy(player) == "riding" then
-				fire(player, { kind = "refused", text = SkyLiftService.WORDS.riding })
-				return true, nil
-			end
-			return interact(svc, player)
-		end
+		devices.interact = skylift:guardInteract(devices.interact, function(player: any, text: string)
+			fire(player, { kind = "refused", text = text })
+		end)
 	end
 
 	mark("total", t0)

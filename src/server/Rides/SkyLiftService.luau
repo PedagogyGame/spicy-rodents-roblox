@@ -628,6 +628,37 @@ function SkyLiftService.busy(self: any, player: any): string?
 	return nil
 end
 
+-- What the rest of the game refuses a rider or a waiter, in words (nil: allowed). `what`: "pick" (a new body
+-- from the menu: refused while riding), "play" (a minigame: refused while riding or waiting), "interact" (E for
+-- a car: refused while riding). Server/Boot/Game calls these.
+SkyLiftService.WORDS_PLAY = "Not while you are on (or waiting for) the sky lift"
+function SkyLiftService.refusal(self: any, player: any, what: string): string?
+	local state = self:busy(player)
+	if state == "riding" then
+		return if what == "play" then SkyLiftService.WORDS_PLAY else SkyLiftService.WORDS.riding
+	elseif state == "waiting" and what == "play" then
+		return SkyLiftService.WORDS_PLAY
+	end
+	return nil
+end
+
+-- Devices' interact (E: get in or out of a car) wrapped so that a rider is told why nothing happens, and true is
+-- returned (the press was handled: the client is not sent a release). Anyone else gets the original's answer.
+function SkyLiftService.guardInteract(
+	self: any,
+	interact: (svc: any, player: any) -> (boolean, string?),
+	tell: (player: any, text: string) -> ()
+): (svc: any, player: any) -> (boolean, string?)
+	return function(svc: any, player: any): (boolean, string?)
+		local words = self:refusal(player, "interact")
+		if words then
+			tell(player, words)
+			return true, nil
+		end
+		return interact(svc, player)
+	end
+end
+
 local function pivotOf(body: any): Vector3?
 	local ok, cf = pcall(function()
 		return body:GetPivot()

@@ -829,6 +829,52 @@ return function(t)
 		end)
 	end)
 
+	t.test("what Boot/Game refuses a rider, with words: a new body, a car (E), a game; others pass (review)", function()
+		FakeEngine.with(function()
+			local w = world({ start = 0 })
+			local rider = SkyLiftFlow.player(w, "Ann", "human", SkyLiftFlow.atGate(w, "base"))
+			local waiter = SkyLiftFlow.player(w, "Bob", "human", SkyLiftFlow.atGate(w, "base"))
+			local walker = SkyLiftFlow.player(w, "Cal", "human", SkyLiftFlow.atGate(w, "summit"))
+			w.svc:press(rider, "base")
+			local b = w.svc.waiters[rider]
+			while w.svc:time() < b.boardAt + 1 do
+				SkyLiftFlow.step(w, 0.1)
+			end
+			t.eq(w.svc:busy(rider), "riding")
+			w.svc:press(waiter, "base")
+			t.eq(w.svc:busy(waiter), "waiting")
+			-- the menu's pick and the games' canPlay
+			t.eq(w.svc:refusal(rider, "pick"), SkyLiftService.WORDS.riding)
+			t.eq(w.svc:refusal(rider, "play"), SkyLiftService.WORDS_PLAY)
+			t.eq(w.svc:refusal(waiter, "play"), SkyLiftService.WORDS_PLAY, "a waiter cannot start a game")
+			t.eq(w.svc:refusal(waiter, "pick"), nil, "a waiter may pick (and so gives up the place)")
+			t.eq(w.svc:refusal(walker, "pick"), nil)
+			t.eq(w.svc:refusal(walker, "play"), nil)
+			-- E for a car: the rider is told and the press is handled (true: no release sent); others get the
+			-- devices' own answer, unchanged
+			local told: { [any]: string } = {}
+			local calls = 0
+			local interact = w.svc:guardInteract(function(_svc: any, _player: any): (boolean, string?)
+				calls += 1
+				return false, "no car here"
+			end, function(player: any, text: string)
+				told[player] = text
+			end)
+			local ok, why = interact(nil, rider)
+			t.eq(ok, true)
+			t.eq(why, nil)
+			t.eq(told[rider], SkyLiftService.WORDS.riding)
+			t.eq(calls, 0, "the rider's E reached the cars")
+			ok, why = interact(nil, walker)
+			t.eq(ok, false)
+			t.eq(why, "no car here")
+			t.eq(told[walker], nil)
+			t.eq(calls, 1)
+			ok = interact(nil, waiter)
+			t.eq(ok, false, "a waiter may still get into a car")
+		end)
+	end)
+
 	-- a town whose AI townspeople can be fetched (Town.recruit) and sent home (Town.home), for the Lookout's life
 	local function lively(w: any, max: number): { any }
 		local made = {}
