@@ -44,7 +44,8 @@ for id, n in report.pipes do
 end
 table.sort(per)
 print(
-	`sewers: {report.parts} parts ({table.concat(per, ", ")}), {report.slots} art slots, {report.lamps} lamps`
+	`sewers: {report.parts} parts ({table.concat(per, ", ")}), {report.slots} art slots, {report.lamps} lamps, `
+		.. `{report.cues} sound cue points`
 		.. (if art then "" else " (no data/art/sewer_modules.json: slots without asset ids)")
 )
 print(`sewers: -> {out} ({#bytes} bytes) in {string.format("%.2f", os.clock() - t0)} s`)

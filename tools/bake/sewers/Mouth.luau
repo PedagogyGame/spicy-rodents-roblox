@@ -87,7 +87,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 	for _, q in rectsMinus(rect, hole) do
 		local a, b = local2(q[1], q[3])
 		local c, d = local2(q[2], q[4])
-		kit:box(model, "Frame", plane, a, c, -Mouth.THICK, 0, b, d, IRON, "Metal")
+		kit:box(model, "Frame", plane, a, c, -Mouth.THICK, 0, b, d, IRON, "CorrodedMetal")
 	end
 	local ax, az = local2(o.x0, o.z0)
 	local bx, bz = local2(o.x1, o.z1)
@@ -104,7 +104,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 		az,
 		bz,
 		IRON,
-		"Metal",
+		"CorrodedMetal",
 		{ transparency = 1, shadow = false }
 	)
 	local w, d = bx - ax, bz - az
@@ -137,7 +137,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 				az + 0.15,
 				bz - 0.15,
 				RIM,
-				"Metal",
+				"CorrodedMetal",
 				{ visual = true }
 			)
 		end
@@ -165,7 +165,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 			ucf * CF.new(cx, 0, cz),
 			{ w - 0.06, 0.1, d - 0.06 },
 			IRON,
-			"Metal",
+			"CorrodedMetal",
 			{ visual = true }
 		)
 		for _, s in { -1, 1 } do
@@ -198,7 +198,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 					az,
 					bz,
 					IRON,
-					"Metal",
+					"CorrodedMetal",
 					{ visual = true }
 				)
 			else
@@ -214,7 +214,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 					z - 0.06,
 					z + 0.06,
 					IRON,
-					"Metal",
+					"CorrodedMetal",
 					{ visual = true }
 				)
 			end
@@ -233,7 +233,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 					z - 0.05,
 					z + 0.05,
 					IRON,
-					"Metal",
+					"CorrodedMetal",
 					{ visual = true }
 				)
 			else
@@ -249,7 +249,7 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 					az,
 					bz,
 					IRON,
-					"Metal",
+					"CorrodedMetal",
 					{ visual = true }
 				)
 			end

@@ -11,11 +11,12 @@
 --             lane the module leaves clear), Pipe, Space
 --   Mouths    each street mouth (Mouth.build: frame, Grate)
 --   Dressing  signs, chalk, moss, leaves, the lost things, the fashion stand, the manhole lid, the light grate
---   Lamps     the disabled lights (Lamps.build), and each light grate's SpotLight
+--   Lamps     the disabled lights (Lamps.build), and each light grate's SpotLight; the sound cue points (Cues)
 -- Attributes on the Model: Pipe, Space, Name, Sign.
--- Interface: build(kit, root, layout, pipe, art) -> { slots, lamps, plans }
+-- Interface: build(kit, root, layout, pipe, art) -> { slots, lamps, cues, plans }
 
 local Chamber = require("./Chamber")
+local Cues = require("./Cues")
 local Dressing = require("./Dressing")
 local Kit = require("./Kit")
 local Lamps = require("./Lamps")
@@ -46,7 +47,7 @@ function Pipe.build(
 	layout: any,
 	pipe: any,
 	art: any
-): { slots: number, lamps: number, plans: { any } }
+): { slots: number, lamps: number, cues: number, plans: { any } }
 	local r = kit.roblox
 	local V, CF = r.Vector3, r.CFrame
 	local section = layout.data.sections[pipe.section]
@@ -70,11 +71,20 @@ function Pipe.build(
 		})
 	end
 
+	-- the sound cue points (Cues), gathered as the pipe is built
+	local cues: { Cues.Point } = {}
+	local function cue(name: string, x: number, y: number, z: number)
+		table.insert(cues, { cue = name, x = x, y = y, z = z })
+	end
+
 	-- the mouths first: their frames give the shafts' tops
 	local tops: { [string]: number } = {}
 	for _, m in layout.mouthsOf(pipe.id) do
 		local built = Mouth.build(kit, mouths, m, pipe.space)
 		tops[m.id] = built.under
+		cue("sewer.grateIn", m.x, m.y + 0.3, m.z)
+		cue("sewer.grateOut", m.x, m.y + 0.3, m.z)
+		cue("sewer.streetMurmur", m.x, m.y + 1.5, m.z)
 	end
 
 	local plans = {}
@@ -117,6 +127,8 @@ function Pipe.build(
 						{ visual = true }
 					)
 					Water.fall(kit, shell, frame, 0, section.water, 1.45, zf, 0.18)
+					local q = frame * V.new(0, section.water, zf)
+					cue("sewer.trickle", q.X, q.Y, q.Z)
 				end
 			elseif run.kind == "lining" then
 				local extra = if math.abs(run.s1 - plan.length) < 1e-6 then into else 0
@@ -171,6 +183,7 @@ function Pipe.build(
 		-- the shafts at the ends
 		for _, e in plan.ends do
 			local m = e.mouth
+			cue("sewer.rung", m.shaft.cx, (m.shaft.bottom + tops[m.id]) / 2, m.shaft.cz)
 			Shaft.walls(kit, shell, m, tops[m.id], section)
 			Shaft.roof(kit, shell, m, section)
 			Shaft.ladder(kit, shell, m, tops[m.id])
@@ -228,6 +241,56 @@ function Pipe.build(
 		return false
 	end
 	local nLamps = Lamps.build(kit, shell, pipe, layout.anchors, covered, shell)
+
+	-- drips along every passage, the river over P2, the traffic over the crossing and the boulevard, the alligator
+	local high = section.spring + section.innerHalf - 0.4
+	for _, plan in plans do
+		local sd = Cues.DRIP_EVERY / 2
+		while sd < plan.length do
+			local q = Plan.at(plan, sd)
+			cue("sewer.drip", q.x, q.y + high, q.z)
+			sd += Cues.DRIP_EVERY
+		end
+	end
+	local first = plans[1]
+	local mid = Plan.at(first, first.length / 2)
+	cue("sewer.hiss", mid.x, mid.y + (section.water or 0), mid.z)
+	local function nearest(score: (q: any) -> number): any
+		local best, bq = math.huge, mid
+		for k = 0, 400 do
+			local q = Plan.at(first, first.length * k / 400)
+			local d = score(q)
+			if d < best then
+				best, bq = d, q
+			end
+		end
+		return bq
+	end
+	if pipe.id == "P2" then
+		-- the middle of the river (its bed runs x 2017 .. 2277)
+		local q = nearest(function(p)
+			return math.abs(p.x - 2147)
+		end)
+		cue("sewer.riverHum", q.x, q.y + high, q.z)
+	end
+	for _, ch in layout.chambers do
+		if ch.id == pipe.chamber then
+			cue("sewer.carOverhead", ch.x, ch.y + high, ch.z)
+		end
+	end
+	for _, a in layout.anchors do
+		if a.kind == "lightGrate" and a.pipe == pipe.id and pipe.chamber == nil then
+			cue("sewer.carOverhead", a.x, a.y + high, a.z)
+		end
+	end
+	if pipe.id == "P3" then
+		-- the trolley's rails run along the boulevard at z 18.4 .. 24.8
+		local q = nearest(function(p)
+			return math.abs(p.z - 21.6)
+		end)
+		cue("sewer.trolleyOverhead", q.x, q.y + high, q.z)
+	end
+	local nCues = Cues.build(kit, shell, pipe, cues)
 
 	-- the chamber, the signs, the light grates
 	if pipe.chamber ~= nil then
@@ -336,7 +399,7 @@ function Pipe.build(
 			end
 		end
 	end
-	return { slots = nSlots, lamps = nLamps, plans = plans }
+	return { slots = nSlots, lamps = nLamps, cues = nCues, plans = plans }
 end
 
 return Pipe

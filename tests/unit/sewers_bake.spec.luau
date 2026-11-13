@@ -2,7 +2,8 @@
 -- The storm drains' bake (tools/bake/sewers.luau -> build/Sewers.rbxm; tools/bake/sewers/Build, built here in memory
 -- by the same call) against the layout it is built from (Shared/World/SewerLayout) and the owner's modules
 -- (data/art/sewer_modules.json):
---   the same bytes every time; within the part budget; every light baked off; each pipe streamed whole
+--   the same bytes every time; within the part budget; every light baked off; each pipe streamed whole; the sound
+--   cue points named, without sounds, inside their pipes
 --   the TerrainCarve folder is the layout's shaft columns, on the 4-stud grid
 --   the squirrel's clearance: the body's section (tests/lib/BakedWorld.clearance) along every route meets no part
 --   of the bake but the grate it slips through; nothing stands where a launch out of a mouth starts
@@ -20,6 +21,7 @@ local SewerLayout = require("@shared/World/SewerLayout")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local BakedWorld = require("@tests/lib/BakedWorld")
 local Build = require("../../tools/bake/sewers/Build")
+local Cues = require("../../tools/bake/sewers/Cues")
 local Mouth = require("../../tools/bake/sewers/Mouth")
 local Pipe = require("../../tools/bake/sewers/Pipe")
 
@@ -70,6 +72,36 @@ return function(t)
 			for _, name in { "Shell", "Lining", "Art", "Mouths", "Dressing" } do
 				t.truthy(m:FindFirstChild(name) ~= nil, `{pipe.id}.{name}`)
 			end
+		end
+	end)
+
+	t.test("sound cue points: named, empty until audio exists, each inside its pipe (or at its mouth)", function()
+		local known: { [string]: boolean } = {}
+		for _, n in Cues.NAMES do
+			known[n] = true
+		end
+		local seen: { [string]: number } = {}
+		local n = 0
+		for _, d in root:GetDescendants() do
+			if d:IsA("Attachment") and d:GetAttribute("Cue") ~= nil then
+				n += 1
+				local name = d:GetAttribute("Cue")
+				t.truthy(known[name], `{name} is a cue`)
+				t.eq(d:GetAttribute("SoundId"), "", `{name}: no sound yet`)
+				seen[name] = (seen[name] or 0) + 1
+				local p = (d.Parent.CFrame * d.CFrame).Position
+				local space = d:GetAttribute("Space")
+				if name ~= "sewer.grateIn" and name ~= "sewer.grateOut" and name ~= "sewer.streetMurmur" then
+					t.eq(layout.contains(p.X, p.Y, p.Z), space, `{name} at {p} is inside {space}`)
+				else
+					local m = layout.nearestMouth(p.X, p.Z, 0.5)
+					t.truthy(m ~= nil and m.space == space, `{name} at a mouth of {space}`)
+				end
+			end
+		end
+		t.eq(n, report.cues)
+		for _, name in Cues.NAMES do
+			t.truthy((seen[name] or 0) > 0, `a {name} point`)
 		end
 	end)
 

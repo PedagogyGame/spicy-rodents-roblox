@@ -16,7 +16,7 @@ local Pipe = require("./Pipe")
 
 local Build = {}
 
-export type Report = { parts: number, slots: number, lamps: number, pipes: { [string]: number } }
+export type Report = { parts: number, slots: number, lamps: number, cues: number, pipes: { [string]: number } }
 
 function Build.build(roblox: any, layout: any, art: any?): (any, Report)
 	local kit = Kit.new(roblox)
@@ -36,12 +36,13 @@ function Build.build(roblox: any, layout: any, art: any?): (any, Report)
 			)
 		end
 	end
-	local report: Report = { parts = 0, slots = 0, lamps = 0, pipes = {} }
+	local report: Report = { parts = 0, slots = 0, lamps = 0, cues = 0, pipes = {} }
 	for _, pipe in layout.pipes do
 		local before = kit.count
 		local r = Pipe.build(kit, root, layout, pipe, art)
 		report.slots += r.slots
 		report.lamps += r.lamps
+		report.cues += r.cues
 		report.pipes[pipe.id] = kit.count - before
 	end
 	report.parts = kit.count
