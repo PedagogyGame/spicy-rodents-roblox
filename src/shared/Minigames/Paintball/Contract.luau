@@ -356,7 +356,8 @@ Contract.Rules = table.freeze({
 	-- tested as its centre line against walls and bodies alike: Hit)
 	ballTtl = Config.projectile.ttl, -- 1.5 s
 	ballRadius = Config.projectile.radius, -- 0.25
-	-- PB-2: five shots; one click, one ball; reload by itself when empty, or on R when not full
+	-- PB-2: five shots; one click, one ball (the trigger held fires on at the marker's rate); reload by itself
+	-- when empty, or on R when not full, and a press during a reload on R cancels it (Magazine; the review)
 	magazine = Config.magazine, -- 5
 	-- PB-4: splats stay for the match, the oldest replaced: on the walls the newest splatPool of the
 	-- building, on a body the newest bodySplats of that slot

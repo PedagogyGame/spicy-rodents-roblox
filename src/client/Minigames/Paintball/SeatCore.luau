@@ -383,7 +383,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		local mag = seat.mag
 		settle(now)
 		local reloading = mag.reloadDoneAt
-		if reloading ~= nil then
+		if reloading ~= nil and not mag.manual then
 			return if reloading - now <= M.click then "hold" else "dry", nil
 		elseif mag.rounds <= 0 then
 			return "dry", nil

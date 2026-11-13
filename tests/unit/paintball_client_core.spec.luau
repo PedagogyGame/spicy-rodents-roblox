@@ -393,7 +393,7 @@ return function(t)
 	end)
 
 	t.test(
-		"R reloads when not full: the verb with its stamp, the rattle, no fire meanwhile; a refusal undoes it",
+		"R reloads when not full: the verb with its stamp, the rattle; a press cancels it and fires; a refusal undoes it",
 		function()
 			local b = Kit.playing()
 			local seat = b.seat
@@ -409,9 +409,29 @@ return function(t)
 			t.eq(Kit.cues(b, "paintball.reload"), 1)
 			seat:input("reload", true)
 			t.eq(#b.verbs, 1, "not twice")
+			-- a press with balls left cancels the reload and fires (found at the review: it was a dry click, and
+			-- four balls were locked away for 1.6 s)
 			press(b)
 			Kit.frame(b)
-			t.eq(#Kit.fires(b), 1, "no firing while reloading")
+			t.eq(#Kit.fires(b), 2, "the press fires")
+			t.eq(seat.mag.reloadDoneAt, nil, "and the reload is off")
+			t.eq(seat.mag.rounds, R.magazine - 2)
+			t.truthy(serverAccepts(Kit.fires(b)), "the server's magazine, which reloads on the same stamp, agrees")
+			-- R again, and left to run, it fills
+			Kit.run(b, 0.3)
+			seat:input("reload", true)
+			Kit.run(b, F.reloadSecs + 0.05)
+			t.eq(seat.mag.rounds, R.magazine)
+			-- the reload by itself on the last ball is not cancelled: there is nothing to fire
+			for _ = 1, R.magazine do
+				press(b)
+				Kit.run(b, F.fireInterval + 0.02)
+			end
+			t.truthy(seat.mag.reloadDoneAt ~= nil)
+			local was = #Kit.fires(b)
+			press(b)
+			Kit.frame(b)
+			t.eq(#Kit.fires(b), was, "an empty marker's press is the dry click")
 			Kit.run(b, F.reloadSecs)
 			t.eq(seat.mag.rounds, R.magazine)
 			-- the server says the reload did not happen

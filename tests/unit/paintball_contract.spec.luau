@@ -74,6 +74,16 @@ return function(t)
 		t.falsy(Magazine.fire(mag, 1.5), "no firing while reloading")
 		t.truthy(Magazine.fire(mag, 1.0 + F.reloadSecs), "full again 1.6 s after the fifth ball")
 		t.truthy(Magazine.reload(mag, 3.0), "R when not full")
+		-- a press during a reload asked for with balls left cancels it and fires (the review); the reload on the
+		-- last ball cannot be cancelled
+		t.truthy(Magazine.fire(mag, 3.2), "R cancelled by a press")
+		t.eq(mag.reloadDoneAt, nil)
+		t.eq(mag.rounds, R.magazine - 2)
+		local empty = Magazine.new(R.magazine, F.fireInterval, F.reloadSecs)
+		for i = 0, 4 do
+			Magazine.fire(empty, i * F.fireInterval)
+		end
+		t.falsy(Magazine.fire(empty, 1.5), "the reload on the last ball runs its course")
 		-- a click a little early is held, never lost: at six clicks a second the held click leaves the
 		-- moment the interval is up, so the marker fires four balls a second, not three
 		t.truthy(Contract.MARGIN.click >= F.fireInterval - 1 / 6, "a held click covers the gap to the next ball")
