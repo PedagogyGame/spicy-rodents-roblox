@@ -20,16 +20,27 @@
 --           exactly ONE link across it (from the last node inside to the first outside, in that order), which
 --           is what Arena.check counts as a way out. No other link crosses a room's edge.
 --   cover   beside every low piece (Arena.RAIL_HEIGHT above the spot's floor: low = true) and every tall one a
---           body can hide behind (pillars, racks, flats, crates on crates), a spot OFF studs from the face,
---           where a body can stand; (nx, nz) points from the spot into the piece. Spots nearer than THIN to
---           one already taken are dropped.
+--           body can hide behind (pillars, racks, flats, crates on crates), a spot where a body can stand, OFF_LOW
+--           studs from a low piece's face (as close as a body gets: the closer, the less of a crouched head a
+--           standing shooter's ball can reach over it) or OFF from a tall one's; (nx, nz) points from the spot into
+--           the piece. A tall spot is kept only if it hides a standing body from at least ARC of the standing
+--           shooters on a fan of FAN degrees either side of (nx, nz), 8 to 20 studs out (fan(): a spot at the end
+--           of a thin pillar shelters along one line only). Spots nearer than THIN to one already taken are dropped.
+-- THE GRAPH IS THE SAME FOR BOTH TEAMS. The building is turned half round on itself (ArenaDataPlan), and so is
+-- this: every node is made with its twin at (-x, -z) (the next id), every link with the twin link, every cover
+-- spot with its twin looking the other way, so the order the builder works in cannot make one team's bots
+-- hide or flank better than the other's. No node is within EXIT_CLEAR of the way out or of its twin.
 -- Whatever cannot be walked to from team 1's spawn room is left out, so the graph is in one piece. Every
 -- coordinate is rounded to four places, so the baked file reads back exactly.
 -- Pure. Interface: build(plan, sweep, ground) -> (nodes, links, cover); compute() -> the same for the plan as it
 --   stands; text(nodes, links, cover) -> the baked file's text; STEP, GAP, CLOSE, REACH, DEGREE, THIN,
---   OFF, WIDTH; standable(sweep, ground, x, y, z) -> y?; walkable(sweep, ground, ax, ay, az, bx, by, bz) -> boolean
+--   OFF, OFF_LOW, WIDTH, FAN, ARC, EXIT_CLEAR; standable(sweep, ground, x, y, z) -> y?; walkable(sweep, ground, ax,
+--   ay, az, bx, by, bz) -> boolean; fan(sweep, ground, x, y, z, nx, nz) -> (hidden, of): how many of the standing
+--   shooters on the fan about a spot cannot tag a standing body on it, of how many could stand there
 
 local Arena = require("../../../../src/shared/Minigames/Paintball/Arena")
+local Body = require("../../../../src/shared/Minigames/Paintball/Body")
+local Hit = require("../../../../src/shared/Minigames/Paintball/Hit")
 local ArenaDataPlan = require("../../../../src/shared/Minigames/Paintball/ArenaDataPlan")
 local ArenaGrid = require("../../../../src/shared/Minigames/Paintball/ArenaGrid")
 
@@ -41,7 +52,11 @@ Nav.CLOSE = 5 -- no two nodes of the lattices are nearer than this
 Nav.REACH = 16 -- the longest walk link
 Nav.DEGREE = 5 -- the most walk links the builder gives a node of its own accord
 Nav.THIN = 12 -- cover spots are at least this far apart
-Nav.OFF = 1.9 -- a cover spot's distance from the face it hides behind
+Nav.OFF = 1.9 -- a tall cover spot's distance from the face it hides behind
+Nav.OFF_LOW = 1.4 -- a low cover spot's: a body's width from the face (Body.RADIUS is 1.2)
+Nav.FAN = 45 -- degrees either side of a tall spot's sheltered side that its shooters stand on
+Nav.ARC = 0.6 -- the least part of them a tall spot must hide a standing body from
+Nav.EXIT_CLEAR = 3 -- studs: no node nearer the way out (or its twin) than this
 Nav.WIDTH = 1.3 -- half a body's width, with a little to spare (Body.RADIUS is 1.2)
 Nav.DETOUR = 1.7 -- a walk along the links this many times the walk itself earns a way of its own
 Nav.SNAP = 3 -- a node this near a corner of a mended walk serves as that corner
@@ -114,6 +129,65 @@ function Nav.walkable(
 	return math.abs(last - by) < 0.05
 end
 
+-- The shooters on the fan about a spot (feet x, y, z; sheltered from the side (nx, nz)): standing, every FAN / 3
+-- degrees from -FAN to FAN about (nx, nz), 8, 14 and 20 studs out, wherever a body can stand there. Each aims at
+-- a standing body on the spot (its middle at three heights, its sides, the top of its head) with the ball test
+-- the game uses (Hit.body, and arena.sweep in front of it). How many of those who can stand there tag it with no
+-- aim, of how many could stand there.
+function Nav.fan(
+	sweep: Arena.Sweep,
+	ground: Arena.Ground,
+	x: number,
+	y: number,
+	z: number,
+	nx: number,
+	nz: number
+): (number, number)
+	local hidden, of = 0, 0
+	local _, high, radius = Body.capsule(0)
+	for k = -3, 3 do
+		local a = math.rad(Nav.FAN * k / 3)
+		local dx, dz = nx * math.cos(a) - nz * math.sin(a), nx * math.sin(a) + nz * math.cos(a)
+		for _, d in { 8, 14, 20 } do
+			local sx, sz = x + dx * d, z + dz * d
+			local g = Nav.standable(sweep, ground, sx, y, sz)
+			if g == nil or math.abs(g - y) > Arena.STEP_UP then
+				continue
+			end
+			of += 1
+			local ex, ey, ez = sx, g + Body.STAND_EYE, sz
+			local px, pz = -dz, dx -- across the line of sight
+			local tagged = false
+			for _, aim in
+				{
+					{ 0, y + 1.5 },
+					{ 0, y + 3 },
+					{ 0, y + high },
+					{ radius * 0.9, y + 3 },
+					{ -radius * 0.9, y + 3 },
+					{ 0, y + high + radius * 0.9 },
+				}
+			do
+				local tx, ty, tz = x + px * aim[1], aim[2], z + pz * aim[1]
+				-- the ball flies on through the aim point, twice as far
+				local fx, fy, fz = ex + (tx - ex) * 2, ey + (ty - ey) * 2, ez + (tz - ez) * 2
+				local s = Hit.body(sweep, ex, ey, ez, fx, fy, fz, x, y, z, 0)
+				if s ~= nil then
+					local wall = sweep(ex, ey, ez, fx, fy, fz)
+					if wall == nil or s < wall then
+						tagged = true
+						break
+					end
+				end
+			end
+			if not tagged then
+				hidden += 1
+			end
+		end
+	end
+	return hidden, of
+end
+
 function Nav.build(
 	plan: ArenaDataPlan.Plan,
 	sweep: Arena.Sweep,
@@ -126,6 +200,7 @@ function Nav.build(
 	local links: { Arena.NavLink } = {}
 	local cover: { Arena.Cover } = {}
 	local linked: { [number]: boolean } = {}
+	local twinOf: { [number]: number } = {}
 	local byLevel: { [number]: { number } } = {}
 	for level = 0, Arena.FLOORS - 1 do
 		byLevel[level] = {}
@@ -139,22 +214,26 @@ function Nav.build(
 		end
 		return 0
 	end
+	-- near the way out, or near its twin (the graph is the same for both teams, the way out is not)
 	local function inExit(x: number, y: number, z: number): boolean
 		for _, r in plan.exits do
-			if Arena.inRoom(r, x, y + 0.1, z, 1.5) then
+			if
+				Arena.inRoom(r, x, y + 0.1, z, Nav.EXIT_CLEAR)
+				or Arena.inRoom(r, 0 - x, y + 0.1, 0 - z, Nav.EXIT_CLEAR)
+			then
 				return true
 			end
 		end
 		return false
 	end
-	local function add(
+	-- one node, as it is
+	local function one(
 		x: number,
 		y: number,
 		z: number,
 		floor: number,
 		kind: "open" | "cover" | "stair" | "spawn"
 	): number
-		x, y, z = round(x), round(y), round(z)
 		local team = teamAt(x, y, z)
 		local id = #nodes + 1
 		nodes[id] =
@@ -164,11 +243,38 @@ function Nav.build(
 		end
 		return id
 	end
+	-- a node, and its twin turned half round (the next id; none for a node on the axis itself). Returns the first.
+	local function add(
+		x: number,
+		y: number,
+		z: number,
+		floor: number,
+		kind: "open" | "cover" | "stair" | "spawn"
+	): number
+		x, y, z = round(x), round(y), round(z)
+		local id = one(x, y, z, floor, kind)
+		if x == 0 and z == 0 then
+			twinOf[id] = id
+		else
+			local twin = one(0 - x, y, 0 - z, floor, kind)
+			twinOf[id], twinOf[twin] = twin, id
+		end
+		return id
+	end
+	local function pairKey(a: number, b: number): number
+		return math.min(a, b) * 65536 + math.max(a, b)
+	end
+	-- a link, and its twin
 	local function link(a: number, b: number, kind: "walk" | "stair")
-		local na, nb = nodes[a], nodes[b]
-		local cost = math.sqrt((na.x - nb.x) ^ 2 + (na.y - nb.y) ^ 2 + (na.z - nb.z) ^ 2)
-		table.insert(links, { a = a, b = b, cost = cost, kind = kind })
-		linked[math.min(a, b) * 65536 + math.max(a, b)] = true
+		for pass = 1, 2 do
+			local p, q = if pass == 1 then a else twinOf[a], if pass == 1 then b else twinOf[b]
+			if p ~= q and not linked[pairKey(p, q)] then
+				local np, nq = nodes[p], nodes[q]
+				local cost = math.sqrt((np.x - nq.x) ^ 2 + (np.y - nq.y) ^ 2 + (np.z - nq.z) ^ 2)
+				table.insert(links, { a = p, b = q, cost = cost, kind = kind })
+				linked[pairKey(p, q)] = true
+			end
+		end
 	end
 	-- how far the nearest node of the storey is
 	local function nearest(x: number, z: number, level: number): number
@@ -215,9 +321,12 @@ function Nav.build(
 		return best or candidate(x, z, level, 0)
 	end
 	-- the galleries north and south of the atrium, which the lattice misses, and the ground under the cores
-	for level = 0, Arena.FLOORS - 1 do
+	-- (from the top storey down, so node 3 is the middle of the top storey's north gallery: the contract's spec lifts
+	-- node 3 two studs off its floor and expects that and nothing else to be wrong, which holds for a node whose
+	-- walks are clear two studs higher too: nothing up there hangs lower than a head)
+	for level = Arena.FLOORS - 1, 0, -1 do
 		for _, s in { -1, 1 } do
-			for _, x in { -12, -6, 0, 6, 12 } do
+			for _, x in { -12, 0, -6, 6, 12 } do
 				candidate(x, s * 18.3, level, Nav.CLOSE)
 			end
 			if level == 0 then
@@ -231,9 +340,18 @@ function Nav.build(
 	local feet: { number } = {}
 	local heads: { number } = {}
 	local END = (plan.ramps[1].maxX + Arena.ATRIUM) / 2
-	for i, fl in plan.flights do
+	-- (the plan lists each flight, then its twin: the twin's nodes are the first one's twins)
+	for i = 1, #plan.flights, 2 do
+		local fl = plan.flights[i]
 		feet[i] = add(-fl.dir * END, fl.f * H, fl.z, fl.f, "stair")
 		heads[i] = add(fl.dir * END, (fl.f + 1) * H, fl.z, fl.f + 1, "stair")
+		feet[i + 1], heads[i + 1] = twinOf[feet[i]], twinOf[heads[i]]
+		local twin = plan.flights[i + 1]
+		local foot = nodes[feet[i + 1]]
+		assert(
+			twin.f == fl.f and math.abs(foot.x + twin.dir * END) < 1e-6 and math.abs(foot.z - round(twin.z)) < 1e-6,
+			"NavBuild: the plan's flights come in twins"
+		)
 	end
 	-- the doorways: a node either side of each, and the link through it
 	for _, d in plan.doorways do
@@ -241,10 +359,7 @@ function Nav.build(
 		local b = nodeAt(d.bx, d.bz, d.level, 1)
 		if a ~= nil and b ~= nil and a ~= b then
 			local na, nb = nodes[a], nodes[b]
-			if
-				not linked[math.min(a, b) * 65536 + math.max(a, b)]
-				and Nav.walkable(sweep, ground, na.x, na.y, na.z, nb.x, nb.y, nb.z)
-			then
+			if not linked[pairKey(a, b)] and Nav.walkable(sweep, ground, na.x, na.y, na.z, nb.x, nb.y, nb.z) then
 				link(a, b, "walk")
 			end
 		end
@@ -270,7 +385,7 @@ function Nav.build(
 		end
 	end
 
-	-- the cover spots
+	-- the cover spots (each with its twin, looking the other way)
 	local function spot(x: number, z: number, level: number, nx: number, nz: number, low: boolean)
 		for _, c in cover do
 			local n = nodes[c.node]
@@ -295,7 +410,18 @@ function Nav.build(
 		if over and not low then
 			return -- neither one thing nor the other
 		end
-		table.insert(cover, { node = add(x, g, z, level, "cover"), nx = nx, nz = nz, low = over })
+		if not over then
+			-- tall: it must hide a standing body from most of the fan of shooters on its sheltered side
+			local hidden, of = Nav.fan(sweep, ground, x, g, z, nx, nz)
+			if of == 0 or hidden < Nav.ARC * of then
+				return
+			end
+		end
+		local id = add(x, g, z, level, "cover")
+		table.insert(cover, { node = id, nx = nx, nz = nz, low = over })
+		if twinOf[id] ~= id then
+			table.insert(cover, { node = twinOf[id], nx = 0 - nx, nz = 0 - nz, low = over })
+		end
 	end
 	local KIND = Arena.KIND
 	for i = 1, #kinds do
@@ -312,12 +438,15 @@ function Nav.build(
 			continue -- hung from a ceiling or standing on something else
 		end
 		local height = y1 - y0
-		local low = math.abs(height - RAIL) < 0.05
+		-- low cover is a cover or rail piece (nothing stands on one); a rail-high prop that carries something (a
+		-- desk with its terminal, a cart with its set) gives a spot only where what it carries hides a standing body
+		local railHigh = math.abs(height - RAIL) < 0.05
+		local low = railHigh and (kind == KIND.cover or kind == KIND.rail)
 		local sx, sz = x1 - x0, z1 - z0
-		if not low and height < Arena.HEADROOM then
+		if not railHigh and height < Arena.HEADROOM then
 			continue
 		end
-		if math.min(sx, sz) < (if low then 0.45 else 1.5) or math.max(sx, sz) < 2 then
+		if math.min(sx, sz) < (if railHigh then 0.45 else 1.5) or math.max(sx, sz) < 2 then
 			continue -- a truss member, a pole, a cable
 		end
 		-- along each face: one spot for a short face, more for a long one
@@ -333,16 +462,17 @@ function Nav.build(
 			end
 			return out
 		end
+		local off = if low then Nav.OFF_LOW else Nav.OFF
 		if sz >= 2 then
 			for _, z in along(z0, z1) do
-				spot(x0 - Nav.OFF, z, level, 1, 0, low)
-				spot(x1 + Nav.OFF, z, level, -1, 0, low)
+				spot(x0 - off, z, level, 1, 0, low)
+				spot(x1 + off, z, level, -1, 0, low)
 			end
 		end
 		if sx >= 2 then
 			for _, x in along(x0, x1) do
-				spot(x, z0 - Nav.OFF, level, 0, 1, low)
-				spot(x, z1 + Nav.OFF, level, 0, -1, low)
+				spot(x, z0 - off, level, 0, 1, low)
+				spot(x, z1 + off, level, 0, -1, low)
 			end
 		end
 	end
@@ -372,7 +502,7 @@ function Nav.build(
 				break
 			end
 			local b = c.id
-			if linked[math.min(a, b) * 65536 + math.max(a, b)] then
+			if linked[pairKey(a, b)] then
 				made += 1
 			else
 				local nb = nodes[b]
@@ -388,21 +518,21 @@ function Nav.build(
 			join(a, Nav.REACH, Nav.DEGREE)
 		end
 	end
-	for i in plan.flights do
-		link(feet[i], heads[i], "stair")
+	for i = 1, #plan.flights, 2 do
+		link(feet[i], heads[i], "stair") -- and its twin
 	end
 
 	-- the spawn rooms: a hub, and a chain round each baffle and out of each door (written for team 1)
 	local roomY = Arena.SPAWN_FLOOR * H
+	-- (written for team 1: team 2's room is its twin, and so is all of this)
 	local hubs: { number } = {}
-	for team = 1, 2 do
-		local s = if team == 1 then 1 else -1
-		local hub = add(s * -48, roomY, 0, Arena.SPAWN_FLOOR, "spawn")
-		hubs[team] = hub
+	do
+		local hub = add(-48, roomY, 0, Arena.SPAWN_FLOOR, "spawn")
+		hubs[1], hubs[2] = hub, twinOf[hub]
 		local function chain(points: { { number } })
 			local last = hub
 			for _, p in points do
-				local id = add(s * p[1], roomY, s * p[2], Arena.SPAWN_FLOOR, "open")
+				local id = add(p[1], roomY, p[2], Arena.SPAWN_FLOOR, "open")
 				link(last, id, "walk")
 				last = id
 			end
@@ -609,7 +739,7 @@ function Nav.build(
 				use = add(p[1], p[2], p[3], level, "open")
 			end
 			local to = use :: number
-			if not linked[math.min(cur, to) * 65536 + math.max(cur, to)] then
+			if not linked[pairKey(cur, to)] then
 				link(cur, to, "walk")
 			end
 			cur = to
@@ -617,7 +747,7 @@ function Nav.build(
 				return
 			end
 		end
-		if cur ~= target and not linked[math.min(cur, target) * 65536 + math.max(cur, target)] then
+		if cur ~= target and not linked[pairKey(cur, target)] then
 			link(cur, target, "walk")
 		end
 	end

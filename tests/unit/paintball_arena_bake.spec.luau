@@ -267,6 +267,7 @@ return function(t)
 			local e = 1e-9
 			local sides = { 0, 0 }
 			local tops, walls, words = 0, 0, {} :: { [string]: { number } }
+			local exits = 0
 			local byStorey: { [number]: number } = {}
 			for _, m in plan.marks do
 				local k = (m.box - 1) * 6
@@ -301,8 +302,15 @@ return function(t)
 					t.eq(m.face, "+y", "only a floor has words among the marks")
 					words[text] = at
 				end
-				-- which team's half: the middle of the atrium's floor is nobody's
-				if math.abs(at[1]) > 5 or math.abs(at[3]) > 5 then
+				-- which team's half: the middle of the atrium's floor is nobody's; the way out is one, in the south
+				if m.tone == "exit" then
+					exits += 1
+					local x, z = at[1], at[3]
+					t.truthy(
+						math.abs(x) <= 3 + e and z >= 55 - e and z <= Arena.HALF,
+						"the way out's paint is at its alcove"
+					)
+				elseif math.abs(at[1]) > 5 or math.abs(at[3]) > 5 then
 					local side = if at[1] + at[3] < 0 then 1 else 2
 					sides[side] += 1
 				end
@@ -341,6 +349,7 @@ return function(t)
 			t.eq(faced, 14)
 			t.truthy(tops >= 200 and walls >= 100, `{tops} on floors and tops, {walls} on walls`)
 			t.eq(sides[1], sides[2])
+			t.eq(exits, 3, "the way out: its line on the floor and its two jambs")
 			for level = 0, Arena.FLOORS - 1 do
 				t.truthy((byStorey[level] or 0) >= 12, `storey {level} has {byStorey[level]} marks on its floors`)
 			end
@@ -448,22 +457,20 @@ return function(t)
 				end
 			end
 			t.truthy(lenses >= 80, `{lenses} lamps have glass`)
-			-- a planter has dry soil in it and dead stalks standing in the soil, none taller than a head
-			t.truthy(#byLook.soil >= 12, `{#byLook.soil} planters with soil`)
-			for _, i in byLook.soil do
-				local on = false
-				for _, j in byLook.planter do
-					on = on or touches(i, j)
+			-- a planter has dry soil in it and dead leaves on the soil: paint on its top, nothing solid (a ball aimed
+			-- over low cover flies over what lies on it), and a console's keys are paint the same way
+			local painted: { [string]: number } = {}
+			for _, m in plan.marks do
+				local look = ArenaDataPlan.LOOKS[plan.looks[m.box]]
+				if m.face == "+y" and (look == "planter" or look == "console") then
+					painted[m.tone] = (painted[m.tone] or 0) + 1
+					t.eq(plan.kinds[m.box], Arena.KIND.cover, "paint on low cover")
 				end
-				t.truthy(on, `soil box {i} is in a planter`)
 			end
-			t.truthy(#byLook.stalk >= 60, `{#byLook.stalk} stalks and leaves`)
-			for _, i in byLook.stalk do
-				local k = (i - 1) * 6
-				local level = math.floor(b[k + 2] / Arena.FLOOR_HEIGHT)
-				t.truthy(b[k + 2] - level * Arena.FLOOR_HEIGHT >= Arena.RAIL_HEIGHT, "a stalk stands on its planter")
-				t.truthy(b[k + 5] - level * Arena.FLOOR_HEIGHT <= Arena.RAIL_HEIGHT + 1.5)
-			end
+			t.truthy((painted.soil or 0) >= 12, `{painted.soil} planters with soil`)
+			t.truthy((painted.leaf or 0) >= 40, `{painted.leaf} dead leaves`)
+			t.truthy((painted.keys or 0) >= 16 and (painted.keys_lamp or 0) >= 16, "consoles have keys")
+			t.truthy(#(byLook.planter or {}) >= 12)
 			-- a stair core is lit: from the first floor up each has a bulkhead light on its wall over the door to
 			-- the concourse, above every head, and it gives light
 			local lit: { [number]: boolean } = {}

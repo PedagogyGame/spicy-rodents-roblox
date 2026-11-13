@@ -33,8 +33,12 @@
 --   4  offices, the boardroom, the transmitter hall; the hanging half of the lighting rig under the
 --      glass roof.
 -- HEIGHTS A BODY MEETS: every low piece is exactly Arena.RAIL_HEIGHT above what it stands on (a
--- crouched body is hidden, a standing eye sees over); a riser is 1 stud (walked onto); everything
--- else a body could stand beside is at least Arena.HEADROOM tall, and no doorway is lower than DOOR.
+-- crouched body is hidden, a standing eye sees over) and NOTHING SOLID STANDS ON A LOW PIECE: what lies on
+-- a console, a planter or a desk top is paint (keys, soil, papers), so a ball aimed just over low cover
+-- flies over all of it. A piece that carries something solid (a desk with a terminal or a mirror, a cart
+-- with its set, a crate with another on it) is a `prop`, not `cover`: it is not low cover. A riser is 1
+-- stud (walked onto); everything else a body could stand beside is at least Arena.HEADROOM tall, and no
+-- doorway is lower than DOOR.
 -- Pure. Interface: build() -> Plan (a fresh table each call); LOOKS (names, by code); DOOR
 local Arena = require("./Arena")
 
@@ -78,6 +82,7 @@ export type Plan = {
 local Plan = {}
 
 Plan.DOOR = 8 -- studs: the height of a doorway under its lintel
+Plan.EXIT_DEPTH = 1.5 -- studs: the way out is this deep in front of the gate, at the back of its alcove
 -- the lobby's two windows in the south wall, either side of the gate: from |x| = WINDOW[1] to WINDOW[2],
 -- from WINDOW[3] to WINDOW[4] above the ground
 Plan.WINDOW = table.freeze({ 17, 30, 1.5, 9 })
@@ -174,12 +179,8 @@ Plan.LOOKS = table.freeze({
 	"bar_blue",
 	"tapes_a",
 	"tapes_b",
-	"keys",
-	"keys_lit",
 	"screen",
 	"bulkhead",
-	"soil",
-	"stalk",
 })
 
 local LOOK: { [string]: number } = {}
@@ -749,46 +750,54 @@ function Plan.build(): Plan
 			end
 		end
 	end
-	-- a control desk: low cover, with a bank of keys and a lit strip along its top (a twelfth of a stud high:
-	-- nothing to a body, and a standing eye still sees over)
+	-- a piece that carries something solid on its top: rail high, but not low cover (see the header)
+	local function carrier(
+		level: number,
+		look: string,
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		look2: string?
+	): (number, number)
+		return on(level, KIND.prop, look, x0, z0, x1, z1, 0, RAIL, look2)
+	end
+	-- a control desk: low cover, with a bank of keys and the strip of dead lamps over them painted on its top
+	-- (paint, not boxes: a ball aimed over a console flies over its keys)
 	local function console(level: number, x0: number, z0: number, x1: number, z1: number)
 		low(level, "console", x0, z0, x1, z1)
+		local y = level * H + RAIL
 		if (x1 - x0) > (z1 - z0) then
-			on(level, KIND.prop, "keys", x0 + 0.5, z0 + 0.5, x1 - 0.5, z0 + 1.2, RAIL, RAIL + 0.08)
-			on(level, KIND.prop, "keys_lit", x0 + 0.5, z0 + 1.6, x1 - 0.5, z0 + 1.85, RAIL, RAIL + 0.08)
+			floorMark(y, x0 + 0.5, z0 + 0.5, x1 - 0.5, z0 + 1.2, "keys")
+			floorMark(y, x0 + 0.5, z0 + 1.6, x1 - 0.5, z0 + 1.85, "keys_lamp")
 		else
-			on(level, KIND.prop, "keys", x0 + 0.5, z0 + 0.5, x0 + 1.2, z1 - 0.5, RAIL, RAIL + 0.08)
-			on(level, KIND.prop, "keys_lit", x0 + 1.6, z0 + 0.5, x0 + 1.85, z1 - 0.5, RAIL, RAIL + 0.08)
+			floorMark(y, x0 + 0.5, z0 + 0.5, x0 + 1.2, z1 - 0.5, "keys")
+			floorMark(y, x0 + 1.6, z0 + 0.5, x0 + 1.85, z1 - 0.5, "keys_lamp")
 		end
 	end
-	-- a planter: low cover, with dry soil in it and what is left of the plants (dead stalks, a brown leaf on
-	-- each: thin boxes, and a ball stops on one as on anything drawn)
-	local stalks = 0
+	-- a planter: low cover, with dry soil in it and the dead leaves of what grew there, all paint (a ball aimed
+	-- over a planter flies over it: nothing stands in it)
+	local leaves = 0
 	local function planter(level: number, x0: number, z0: number, x1: number, z1: number)
 		low(level, "planter", x0, z0, x1, z1)
-		on(level, KIND.prop, "soil", x0 + 0.3, z0 + 0.3, x1 - 0.3, z1 - 0.3, RAIL, RAIL + 0.06)
+		local y = level * H + RAIL
+		floorMark(y, x0 + 0.3, z0 + 0.3, x1 - 0.3, z1 - 0.3, "soil")
 		local alongX = (x1 - x0) > (z1 - z0)
 		local len = if alongX then x1 - x0 else z1 - z0
 		local count = math.max(2, math.floor(len / 2.2))
 		for k = 1, count do
-			stalks += 1
+			leaves += 1
 			local along = len * (k - 0.5) / count
-			local off = ((stalks * 5) % 3 - 1) * 0.25
+			local off = ((leaves * 5) % 3 - 1) * 0.25
 			local x = if alongX then x0 + along else (x0 + x1) / 2 + off
 			local z = if alongX then (z0 + z1) / 2 + off else z0 + along
-			local h = 0.6 + ((stalks * 7) % 4) * 0.25
-			on(level, KIND.prop, "stalk", x - 0.1, z - 0.1, x + 0.1, z + 0.1, RAIL + 0.06, RAIL + h)
-			local leaf = RAIL + h * 0.6
-			if alongX then
-				on(level, KIND.prop, "stalk", x - 0.08, z - 0.5, x + 0.08, z + 0.5, leaf, leaf + 0.12)
-			else
-				on(level, KIND.prop, "stalk", x - 0.5, z - 0.08, x + 0.5, z + 0.08, leaf, leaf + 0.12)
-			end
+			local w, d = if leaves % 2 == 0 then 0.7 else 0.35, if leaves % 2 == 0 then 0.35 else 0.7
+			floorMark(y, x - w / 2, z - d / 2, x + w / 2, z + d / 2, "leaf")
 		end
 	end
-	-- two crates, one on the other
+	-- two crates, one on the other (the lower one carries the upper: not low cover)
 	local function stack(level: number, look: string, x0: number, z0: number, x1: number, z1: number)
-		low(level, look, x0, z0, x1, z1)
+		carrier(level, look, x0, z0, x1, z1)
 		on(level, KIND.prop, look, x0 + 0.2, z0 + 0.2, x1 - 0.2, z1 - 0.2, RAIL, 2 * RAIL - 0.4)
 	end
 	-- a studio camera on its pedestal, looking along (lx, lz) (a unit axis)
@@ -819,9 +828,9 @@ function Plan.build(): Plan
 			b + RAIL + 1.4
 		)
 	end
-	-- an old set on a cart: the cart is low cover, the set on it is a monitor facing `face`
+	-- an old set on a cart, the set a monitor facing `face`: together they hide a standing body
 	local function set(level: number, x: number, z: number, face: string)
-		low(level, "cart", x - 1.5, z - 1.5, x + 1.5, z + 1.5)
+		carrier(level, "cart", x - 1.5, z - 1.5, x + 1.5, z + 1.5)
 		local a, b = on(level, KIND.prop, "monitor", x - 1.3, z - 1.3, x + 1.3, z + 1.3, RAIL, RAIL + 2.2)
 		plan.monitors[a] = face
 		plan.monitors[b] = opposite(face)
@@ -997,12 +1006,19 @@ function Plan.build(): Plan
 		low(L, "crate", -10, -52, -6.6, -48.6, "sofa")
 		stack(L, "crate", 8, -40.4, 11.4, -37)
 		low(L, "drum", -3, -35.5, 0.4, -32.5, "planter")
-		-- the alcove in the middle of the north wall, and its twin in the south: the way out
+		-- the alcove in the middle of the north wall, and its twin in the south: the way out. Only its back is the
+		-- way out (EXIT_DEPTH studs in front of the gate, behind a green line on the floor), so a body that backs
+		-- into the alcove in a fight is not taken out of the match; and the south one looks nothing like its twin
+		-- in the north (a chained fire door): a lit green EXIT over its mouth, green on its jambs, the line.
 		on(L, KIND.wall, W, 3, -half, 4, -55, 0, ceiling(L))
 		on(L, KIND.wall, W, -4, -half, -3, -55, 0, ceiling(L))
 		local l1, l2 = on(L, KIND.wall, W, -3, -half, 3, -59, DOOR, ceiling(L))
 		sign(l1, l2, "+z", "FIRE DOOR\nCHAINED", "stencil", "WAY OUT")
-		table.insert(plan.exits, room(-3, 0, 55.5, 3, Arena.HEADROOM, half))
+		local m1, m2 = on(L, KIND.wall, W, -3, -55.5, 3, -55, DOOR + 1, ceiling(L), "gate")
+		table.insert(plan.signs, { box = m1, face = "+z", text = "NO EXIT", tone = "stencil" })
+		table.insert(plan.signs, { box = m2, face = "-z", text = "EXIT", tone = "green" })
+		table.insert(plan.lamps, { box = m2, range = 16, brightness = 0.7, tone = "exit" })
+		table.insert(plan.exits, room(-3, 0, half - Plan.EXIT_DEPTH, 3, Arena.HEADROOM, half))
 		-- the north-west room: racking
 		shelving(L, -56, -53.2, -46, -51.6)
 		shelving(L, -56, -45.2, -46, -43.6)
@@ -1066,8 +1082,8 @@ function Plan.build(): Plan
 		local function cubicle(x: number, z: number)
 			low(L, "cubicle", x - 4.5, z - 0.3, x + 4.5, z + 0.3)
 			low(L, "cubicle", x - 0.3, z - 4.5, x + 0.3, z + 4.5)
-			low(L, "desk", x - 4.2, z + 0.3, x - 0.3, z + 2.3)
-			low(L, "desk", x + 0.3, z - 2.3, x + 4.2, z - 0.3)
+			carrier(L, "desk", x - 4.2, z + 0.3, x - 0.3, z + 2.3)
+			carrier(L, "desk", x + 0.3, z - 2.3, x + 4.2, z - 0.3)
 			-- a dead terminal on each desk
 			on(L, KIND.prop, "terminal", x - 3.3, z + 0.8, x - 1.5, z + 2, RAIL, RAIL + 1.4)
 			on(L, KIND.prop, "terminal", x + 1.5, z - 2, x + 3.3, z - 0.8, RAIL, RAIL + 1.4)
@@ -1109,7 +1125,7 @@ function Plan.build(): Plan
 		stand(L, 55, -47)
 		-- the concourse
 		low(L, "bench", -27, 8, -25, 14)
-		planter(L, -22, -22, -19, -19.6)
+		planter(L, -23, -22.4, -20, -20)
 		set(L, -27.5, -15, "+x")
 	end
 
@@ -1122,9 +1138,9 @@ function Plan.build(): Plan
 		wall(L, W, "z", -30.5, -half, -31, { { -45, 6 } })
 		wall(L, W, "z", 30.5, -half, -31, { { -52, 6, WINDOW }, { -39, 6 } })
 		-- make-up, outside the spawn room's north door (its twin: outside the east room's south door)
-		low(L, "desk", -52, -23, -45, -20.5)
+		carrier(L, "desk", -52, -23, -45, -20.5)
 		mirror(L, -52, -45, -23)
-		low(L, "desk", -38.5, -28.5, -31.5, -26)
+		carrier(L, "desk", -38.5, -28.5, -31.5, -26)
 		mirror(L, -38.5, -31.5, -28.5)
 		tall(L, "locker", -42.5, -18.5, -40.5, -14, 7.5)
 		-- the green room's lounge, between the spawn room and the concourse
@@ -1169,7 +1185,7 @@ function Plan.build(): Plan
 		console(L, 44, -50, 52, -47.5)
 		-- the concourse
 		low(L, "bench", -27, -4, -25, 4)
-		planter(L, -22, 19.6, -19, 22)
+		planter(L, -23, 20, -20, 22.4)
 		-- the spawn rooms' own lights (ceiling fittings: nothing a body meets)
 		for _, z in { -9.5, 0, 9.5 } do
 			local i, j = on(L, KIND.prop, "ceiling_light", -56, z - 0.8, -48, z + 0.8, ceiling(L) - 0.4, ceiling(L))
@@ -1432,6 +1448,12 @@ function Plan.build(): Plan
 		floorMark(0, -59.4, 29.2, -51.6, 29.6, "tape")
 		floorMark(0, -52, 20.4, -51.6, 29.6, "tape")
 		floorWords(0, -55.6, 27.6, 7, 1.4, "KEEP CLEAR", "tape")
+		-- the way out (the south alcove only): a green line across its floor where the way out begins, and its
+		-- jambs green to door height
+		local edge = half - Plan.EXIT_DEPTH
+		daub("+y", 0, -3, 3, edge - 0.5, edge, "exit")
+		daub("+x", -3, 55, 55.6, 0, DOOR, "exit")
+		daub("-x", 3, 55, 55.6, 0, DOOR, "exit")
 		-- the atrium's floor: the station's number in its frame, to be read from the galleries, and the cables
 		-- the rig came down with
 		daub("+y", 0, -3, 3, -3.6, 3.6, "floor_gold", "7")

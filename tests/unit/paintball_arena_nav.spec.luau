@@ -63,8 +63,13 @@ return function(t)
 					`node {node.id} has room`
 				)
 			end
+			-- none within EXIT_CLEAR of the way out (a fight is not drawn into it), nor of its twin
 			for _, exit in arena.exits do
-				t.falsy(Arena.inRoom(exit, node.x, node.y + 0.1, node.z, 1), "no node stands in the way out")
+				t.falsy(
+					Arena.inRoom(exit, node.x, node.y + 0.1, node.z, NavBuild.EXIT_CLEAR)
+						or Arena.inRoom(exit, -node.x, node.y + 0.1, -node.z, NavBuild.EXIT_CLEAR),
+					`node {node.id} at ({node.x}, {node.y}, {node.z}) is near the way out`
+				)
 			end
 		end
 		local stairs, crossing = 0, 0
@@ -93,6 +98,66 @@ return function(t)
 		t.eq(stairs, 2 * (Arena.FLOORS - 1))
 		t.eq(crossing, 16, "two chains of four links in each spawn room")
 	end)
+
+	-- every node's twin turned half round, found by place
+	local twin: { [number]: number } = {}
+	do
+		local at: { [string]: number } = {}
+		local function key(x: number, y: number, z: number): string
+			return string.format("%.4f %.4f %.4f", x + 0, y + 0, z + 0)
+		end
+		for _, node in nodes do
+			at[key(node.x, node.y, node.z)] = node.id
+		end
+		for _, node in nodes do
+			twin[node.id] = at[key(-node.x, node.y, -node.z)]
+		end
+	end
+
+	t.test(
+		"the graph is the same for both teams: every node, link and cover spot has its twin turned half round",
+		function()
+			for _, node in nodes do
+				local other = nodes[twin[node.id]]
+				t.truthy(other ~= nil, `node {node.id} at ({node.x}, {node.y}, {node.z}) has no twin`)
+				if other then
+					t.eq(other.x, -node.x)
+					t.eq(other.z, -node.z)
+					t.eq(other.y, node.y)
+					t.eq(other.floor, node.floor)
+					t.eq(other.kind, node.kind)
+					t.eq(other.team, if node.team == 0 then 0 else 3 - node.team)
+				end
+			end
+			local have: { [number]: string } = {}
+			for _, link in links do
+				have[math.min(link.a, link.b) * 65536 + math.max(link.a, link.b)] = link.kind
+			end
+			for i, link in links do
+				local a, b = twin[link.a], twin[link.b]
+				t.eq(have[math.min(a, b) * 65536 + math.max(a, b)], link.kind, `link {i} has its twin`)
+			end
+			local spots: { [string]: boolean } = {}
+			for _, c in arena.cover do
+				spots[`{c.node} {c.nx} {c.nz} {c.low}`] = true
+			end
+			for i, c in arena.cover do
+				t.truthy(spots[`{twin[c.node]} {-c.nx + 0} {-c.nz + 0} {c.low}`], `cover spot {i} has its twin`)
+			end
+			-- and so the two halves have the same cover, storey by storey
+			local count: { [string]: number } = {}
+			for _, c in arena.cover do
+				local node = nodes[c.node]
+				local k = `{node.floor} {node.x < 0 or (node.x == 0 and node.z < 0)} {c.low}`
+				count[k] = (count[k] or 0) + 1
+			end
+			for level = 0, Arena.FLOORS - 1 do
+				for _, low in { true, false } do
+					t.eq(count[`{level} true {low}`], count[`{level} false {low}`], `storey {level}, low {low}`)
+				end
+			end
+		end
+	)
 
 	t.test("the graph takes a bot everywhere, by ways not much longer than a person's", function()
 		local adjacent: { [number]: { { number } } } = {}
@@ -167,17 +232,14 @@ return function(t)
 				`{name} is {math.floor(c)} studs from the west room by the links`
 			)
 		end
-		-- the same from the east room, by the building's symmetry (to within the graph's own unevenness)
-		local east = from(nearest(P.east_exit_south))
-		for _, name in
-			{ "atrium_floor", "gallery_east_4", "gallery_west_4", "transmitter_hall", "reception", "scenery_store" }
-		do
-			local p = (P :: any)[name]
-			local mirror = nearest({ x = -p.x, y = p.y, z = -p.z })
-			local a, b = cost[nearest(p)], east[mirror]
-			t.truthy(
-				math.abs(a - b) <= 0.25 * math.max(a, b) + 12,
-				`{name}: {math.floor(a)} from the west room, its twin {math.floor(b)} from the east`
+		-- the same from the east room, by the graph's symmetry: exactly the same walk to every twin
+		local east = from(twin[out])
+		for id, c in cost do
+			t.near(
+				east[twin[id]],
+				c,
+				1e-6,
+				`node {id}: {c} from the west room, its twin {east[twin[id]]} from the east`
 			)
 		end
 		-- no node has a single way on unless it is a nook's end; none has so many that a bot dithers
@@ -210,7 +272,7 @@ return function(t)
 			-- the piece is within reach: a ball at shin height stops on it within two and a half studs
 			local s = arena.sweep(node.x, node.y + 2, node.z, node.x + c.nx * 2.5, node.y + 2, node.z + c.nz * 2.5)
 			t.truthy(s ~= nil and s > 0.3, `cover {i} is beside its piece`)
-			if node.x < 0 then
+			if node.x < 0 or (node.x == 0 and node.z < 0) then
 				west += 1
 			else
 				east += 1
@@ -221,8 +283,41 @@ return function(t)
 		end
 		for level = 0, Arena.FLOORS - 1 do
 			t.truthy((per[level] or 0) >= 25, `storey {level} has {per[level]} cover spots`)
+			-- none within EXIT_CLEAR of the way out: a bot is not sent to hide where its match ends
+			for _, exit in arena.exits do
+				for _, c in arena.cover do
+					local node = nodes[c.node]
+					t.falsy(Arena.inRoom(exit, node.x, node.y + 0.1, node.z, NavBuild.EXIT_CLEAR))
+				end
+			end
 		end
-		t.truthy(math.abs(west - east) <= 0.15 * #arena.cover, `{west} spots in the west half, {east} in the east`)
+		t.eq(west, east, `{west} spots in the west half, {east} in the east`)
 		t.truthy(low >= 0.3 * #arena.cover and low <= 0.8 * #arena.cover, "low and tall cover both")
 	end)
+
+	t.test(
+		"a tall cover spot hides a standing body from most of a fan of standing shooters, not along one line",
+		function()
+			local talls, worst = 0, 1
+			for i, c in arena.cover do
+				if not c.low then
+					talls += 1
+					local node = nodes[c.node]
+					local hidden, of = NavBuild.fan(arena.sweep, arena.ground, node.x, node.y, node.z, c.nx, c.nz)
+					t.truthy(of > 0 and hidden >= NavBuild.ARC * of, `tall spot {i} hides a body from {hidden} of {of}`)
+					worst = math.min(worst, if of > 0 then hidden / of else 0)
+				end
+			end
+			t.truthy(talls >= 40, `{talls} tall spots`)
+			-- and the fan finds a spot that only shelters along a line: beside the end of a pillar, a stud aside
+			local a = ArenaData.build()
+			local y = 2 * H
+			for _, v in { 40, y, 40, 41, y + 10, 41 } do
+				table.insert(a.boxes, v) -- a post one stud square in the open
+			end
+			table.insert(a.kinds, Arena.KIND.pillar)
+			local hidden, of = NavBuild.fan(a.sweep, a.ground, 40.5, y, 38.6, 0, 1)
+			t.truthy(of >= 15 and hidden < NavBuild.ARC * of, `behind a post: hidden from {hidden} of {of}`)
+		end
+	)
 end

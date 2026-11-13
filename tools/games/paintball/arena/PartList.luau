@@ -97,6 +97,13 @@ PartList.TONE = {
 	lamp_amber = { 136, 100, 34 },
 	lamp_green = { 44, 92, 54 },
 	grille = { 40, 42, 46 },
+	-- what lies on low cover is paint: a console's keys and its strip of dead lamps, a planter's soil and leaves
+	keys = { 206, 200, 182 },
+	keys_lamp = { 150, 104, 44 },
+	soil = { 74, 62, 50 },
+	leaf = { 124, 104, 66 },
+	-- the way out: its line, its jambs, the light of its sign
+	exit = { 80, 230, 120 },
 }
 
 local LOOK: { [string]: { any } } = {
@@ -199,12 +206,8 @@ local LOOK: { [string]: { any } } = {
 	bar_blue = { { 52, 64, 190 }, "SmoothPlastic" },
 	tapes_a = { { 204, 196, 172 }, "SmoothPlastic" },
 	tapes_b = { { 96, 118, 140 }, "SmoothPlastic" },
-	keys = { { 206, 200, 182 }, "SmoothPlastic" },
-	keys_lit = { { 255, 176, 60 }, "Neon" },
 	screen = { { 26, 32, 42 }, "Glass" },
 	bulkhead = { { 226, 232, 236 }, "Neon" },
-	soil = { { 74, 62, 50 }, "Slate" },
-	stalk = { { 124, 104, 66 }, "Wood" },
 }
 PartList.LOOK = LOOK
 

@@ -12,6 +12,7 @@ local ArenaGrid = require("@shared/Minigames/Paintball/ArenaGrid")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Hit = require("@shared/Minigames/Paintball/Hit")
+local LowCover = require("../../tools/games/paintball/arena/LowCover")
 
 local R = Contract.Rules
 local H = Arena.FLOOR_HEIGHT
@@ -342,6 +343,26 @@ return function(t)
 		local exit = arena.exits[1]
 		t.truthy(exit.maxZ <= Arena.HALF and exit.minZ > 50 and exit.minY == 0)
 		t.truthy(Arena.inRoom(exit, Arena.GATE.x, 1, Arena.HALF - 1), "it is the alcove behind the gate")
+		-- only the back of the alcove: a body that backs into it for cover is still in the match, a few strides in
+		-- (its mouth is at z 55), and only a walk to the gate itself leaves
+		t.near(exit.minZ, Arena.HALF - ArenaDataPlan.EXIT_DEPTH, 1e-9)
+		for _, z in { 55, 55.5, 56.5, 57.9 } do
+			t.falsy(Arena.inRoom(exit, 0, 0.1, z), `a body at z = {z} in the alcove is still in the match`)
+		end
+		-- and it does not look like its twin in the north: EXIT, lit green, over its mouth; NO EXIT over the other
+		local words: { [string]: boolean } = {}
+		local lit = false
+		for _, sign in plan.signs do
+			local k = (sign.box - 1) * 6
+			local zc = (boxes[k + 3] + boxes[k + 6]) / 2
+			if math.abs(zc) > 54 and math.abs(zc) < 56 and math.abs(boxes[k + 1]) <= 3 then
+				words[`{if zc > 0 then "south" else "north"} {sign.text}`] = true
+				for _, l in plan.lamps do
+					lit = lit or (l.box == sign.box and zc > 0 and l.tone == "exit")
+				end
+			end
+		end
+		t.truthy(words["south EXIT"] and words["north NO EXIT"] and lit, "EXIT, lit, over the way out's alcove")
 		t.falsy(Arena.inVolume(arena.lobby.x, arena.lobby.y + 1, arena.lobby.z))
 		t.truthy(arena.lobby.z > Arena.HALF + 2 and arena.lobby.z < 90)
 	end)
@@ -358,6 +379,35 @@ return function(t)
 					local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
 					local foot = arena.ground(cx, y0, cz)
 					t.eq(foot, y0, `low piece {i} stands on the walking surface`)
+				end
+			end
+			-- and nothing solid stands on a low piece or hangs over it lower than headroom: what lies on a console, a
+			-- planter or a desk is paint, so a ball aimed just over low cover flies over all of it (a piece that
+			-- carries something is a prop, not low cover)
+			local e = 1e-6
+			for i = 1, n do
+				if kinds[i] ~= KIND.cover and kinds[i] ~= KIND.rail then
+					continue
+				end
+				local x0, y0, z0, x1, y1, z1 = box(i)
+				local clear = y0 + Arena.HEADROOM
+				for j = 1, n do
+					local a0, b0, c0, a1, b1, c1 = box(j)
+					if
+						j ~= i
+						and a0 < x1 - e
+						and a1 > x0 + e
+						and c0 < z1 - e
+						and c1 > z0 + e
+						and b0 < clear
+						and b1 > y1 + e
+					then
+						t.eq(
+							`box {j} ({ArenaDataPlan.LOOKS[plan.looks[j]]})`,
+							nil,
+							`over low piece {i} ({ArenaDataPlan.LOOKS[plan.looks[i]]}) at ({x0}, {y0}, {z0})`
+						)
+					end
 				end
 			end
 			-- beside every cover spot of the graph: a level ball at a crouched eye is stopped, at a standing eye
@@ -385,6 +435,57 @@ return function(t)
 				end
 			end
 			t.truthy(lows >= 60 and talls >= 40, `{lows} low spots and {talls} tall ones`)
+		end
+	)
+
+	t.test(
+		"PB-5, PB-9: low cover hides a crouched body from a standing shooter on its storey, by the ball test",
+		function()
+			-- every low spot of the graph, a crouched body on it, standing shooters straight out on its sheltered side 5
+			-- to 30 studs away, aiming all over the near half of its hit shape (tools/games/paintball/arena/LowCover)
+			local function exposed(sweep: Arena.Sweep, ground: Arena.Ground): (number, number, number, number)
+				local spots, tagged, aims, lowest = 0, 0, 0, math.huge
+				for _, c in arena.cover do
+					if c.low then
+						local node = arena.nodes[c.node]
+						spots += 1
+						local tags, tried, low = LowCover.probe(sweep, ground, node.x, node.y, node.z, c.nx, c.nz)
+						aims += tried
+						lowest = math.min(lowest, low)
+						if tags > 0 then
+							tagged += 1
+						end
+					end
+				end
+				return spots, tagged, aims, lowest
+			end
+			if Arena.RAIL_HEIGHT >= LowCover.ENOUGH then
+				-- the contract's rail is high enough: the real arena is held to it
+				local spots, tagged, aims = exposed(arena.sweep, arena.ground)
+				t.truthy(spots >= 60 and aims >= 10000, `{spots} low spots, {aims} aims`)
+				t.eq(tagged, 0, `{tagged} of {spots} low spots: a crouched body there is tagged over its cover`)
+			else
+				-- CONTRACT GAP (the lane's report): Arena.RAIL_HEIGHT 3.4 stands 0.04 over Body.CROUCH_TOP, so a standing
+				-- eye nearer than some thirty studs reaches over low cover onto the crown of a crouched head. What the
+				-- arena owes is pinned here: with every low piece at LowCover.ENOUGH, no shooter tags any low spot (a spot
+				-- too far from its piece, or anything standing on one, fails this) ...
+				local raised = LowCover.raised(plan.boxes, plan.kinds, LowCover.ENOUGH)
+				local sweep, ground = ArenaGrid.new(raised, plan.ramps)
+				local spots, tagged, aims = exposed(sweep, ground)
+				t.truthy(spots >= 60 and aims >= 10000, `{spots} low spots, {aims} aims`)
+				t.eq(
+					tagged,
+					0,
+					`at rail height {LowCover.ENOUGH}, {tagged} of {spots} low spots are tagged over their cover`
+				)
+				-- ... and with the contract's own numbers today, a tag lands on the crown only, never lower
+				local _, today, _, lowest = exposed(arena.sweep, arena.ground)
+				t.truthy(today > 0, "the gap is still there: drop this branch when the contract's rail is raised")
+				t.truthy(
+					lowest >= Body.CROUCH_TOP - 0.3,
+					`a crouched body behind low cover is tagged {Body.CROUCH_TOP - lowest} studs under its crown`
+				)
+			end
 		end
 	)
 
