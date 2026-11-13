@@ -789,9 +789,97 @@ function Station.build(kit: Kit.Kit, parent: any, v: any): any
 		)
 		kit:ball(props, "Shrub", x + 1.5, PLAT + 1.2, -hd - 1.5, 2.4, Common.SHRUB, "Grass", { collide = false })
 	end
+	Station.frontage(kit, props, v, sx0, sx1, -hd - steps * 1.1)
 
 	Common.anchors(kit, m, v, Common.FAMILY)
 	return m
+end
+
+-- The frontage (review: "the station looks like a shed from the street"): a red canopy over the steps on two
+-- posts (its fascia "TO THE LOOKOUT", lit underneath), a bench either side facing the street, a bike rack and two
+-- flagpoles flying the lift's red. In the venue's frame, in front of the front face (D < -15); every foot on the
+-- ground there. sx0..sx1: the steps; footD: their foot.
+function Station.frontage(kit: Kit.Kit, parent: any, v: any, sx0: number, sx1: number, footD: number)
+	local hd = v.footprint.d / 2
+	local function g(x: number, d: number): number
+		local w = kit:cf(x, 0, d).Position
+		return Common.ground(w.X, w.Z) - v.floorY
+	end
+	local fm = kit:model(parent, "Frontage")
+	-- the canopy: from the face out past the steps' foot, between the door's top (8.5) and the sign (8.8)
+	local c0, c1, cd = sx0 - 1.4, sx1 + 1.4, footD - 0.9
+	kit:box(fm, "Canopy", c0, c1, 8.5, 8.78, cd, -hd, Common.RED, "Metal")
+	local fascia =
+		kit:box(fm, "CanopyFascia", c0, c1, 7.7, 8.78, cd - 0.2, cd, Common.CREAM, "SmoothPlastic", { collide = false })
+	local fg = kit:gui(fascia, "Back", 40)
+	kit:label(fg, {
+		Text = "TO THE LOOKOUT",
+		TextColor = Common.RED,
+		Font = "GothamBlack",
+		Size = { 0.9, 0.8 },
+		Pos = { 0.05, 0.1 },
+	})
+	for _, x in { c0 + 0.3, c1 - 0.3 } do
+		local y0 = g(x, cd + 0.3) - 0.5
+		kit:box(fm, "CanopyPost", x - 0.15, x + 0.15, y0, 8.5, cd + 0.15, cd + 0.45, Common.FRAME, "Metal")
+	end
+	local strip = kit:box(
+		fm,
+		"CanopyLight",
+		sx0 + 0.5,
+		sx1 - 0.5,
+		8.38,
+		8.5,
+		cd + 1.2,
+		cd + 1.5,
+		Common.WARM_LIGHT,
+		"Neon",
+		{ collide = false, query = false, shadow = false }
+	)
+	kit:light(strip, "PointLight", { Range = 12, Brightness = 1.2, Color = Common.WARM_LIGHT, Shadows = false })
+	-- benches facing the street, against the face, clear of the planters
+	for _, b in { { -22.5, -17.5 }, { 5.2, 10.2 } } do
+		local x0, x1 = b[1], b[2]
+		local y = math.max(g(x0, -hd - 1), g(x1, -hd - 1), g(x0, -hd - 2.4), g(x1, -hd - 2.4))
+		kit:box(fm, "BenchSeat", x0, x1, y + 1.2, y + 1.5, -hd - 2.4, -hd - 1.0, Common.WOOD, "WoodPlanks")
+		kit:box(fm, "BenchBack", x0, x1, y + 1.8, y + 3.0, -hd - 0.95, -hd - 0.75, Common.WOOD, "WoodPlanks")
+		for _, lx in { x0 + 0.5, x1 - 0.9 } do
+			kit:box(fm, "BenchLeg", lx, lx + 0.4, y - 0.6, y + 1.2, -hd - 2.2, -hd - 0.8, Common.FRAME, "Metal")
+		end
+	end
+	-- a bike rack: three stands
+	for i = 0, 2 do
+		local x = 14 + i * 1.6
+		local y = g(x, -hd - 2.5)
+		for _, d in { -hd - 1.4, -hd - 3.6 } do
+			kit:box(fm, "RackLeg", x - 0.07, x + 0.07, y - 0.5, y + 2.6, d - 0.07, d + 0.07, Common.STEEL, "Metal")
+		end
+		kit:box(fm, "RackTop", x - 0.07, x + 0.07, y + 2.5, y + 2.64, -hd - 3.67, -hd - 1.33, Common.STEEL, "Metal")
+	end
+	-- two flagpoles flying the lift's red
+	local half = v.footprint.w / 2
+	for _, x in { -half + 1, half - 1 } do
+		local d = -hd - 2.5
+		local y = g(x, d)
+		kit:cyl(fm, "Flagpole", x, y + 8.5, d, 18, 0.3, "Y", Common.STEEL, "Metal")
+		kit:ball(fm, "FlagFinial", x, y + 17.6, d, 0.45, Common.CREAM, "Metal", { collide = false, query = false })
+		local flag = kit:box(
+			fm,
+			"Flag",
+			x + 0.15,
+			x + 3.4,
+			y + 15.1,
+			y + 17.1,
+			d - 0.03,
+			d + 0.03,
+			Common.RED,
+			"Fabric",
+			{ collide = false, query = false }
+		)
+		for _, face in { "Front", "Back" } do
+			kit:label(kit:gui(flag, face, 30), { Text = "SKY LIFT", TextColor = Common.CREAM, Font = "GothamBlack" })
+		end
+	end
 end
 
 return Station

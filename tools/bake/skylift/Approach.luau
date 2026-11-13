@@ -240,6 +240,18 @@ function Approach.inSite(x: number, z: number, grow: number): boolean
 	return false
 end
 
+-- Lift Road's street lamps: one row on the verges, alternating sides, about 105 apart (side +1: the east verge,
+-- the arm reaching west over the road). Pure.
+function Approach.roadLamps(): { { x: number, z: number, side: number } }
+	local road = record(Common.expansion().strips, "xs_lift_road")
+	local verge = road.width / 2 + 1.6 -- between the kerb and the sidewalk (3.15 wide)
+	local out = {}
+	for _, e in { { road["end"] - 40, 1 }, { road["end"] - 145, -1 }, { road["end"] - 250, 1 } } do
+		table.insert(out, { x = road.coord + e[2] * verge, z = e[1], side = e[2] })
+	end
+	return out
+end
+
 local function factoryOf(roblox: any): any
 	return Factory.new({
 		Instance = roblox.Instance,
@@ -455,13 +467,8 @@ function Approach.build(roblox: any, parent: any): any
 
 	-- lamps: one row on the verges, alternating sides, about 105 apart, and one at the trailhead
 	local lamps = kit0:folder(m, "Lamps")
-	local road = record(exp.strips, "xs_lift_road")
-	local kerb = road.width / 2
-	local verge = kerb + 1.6 -- between the kerb and the sidewalk (3.15 wide)
-	local zs = { { road["end"] - 40, 1 }, { road["end"] - 145, -1 }, { road["end"] - 250, 1 } }
-	for i, e in zs do
-		local side = e[2]
-		lamp(kit0, lamps, `Lamp{i}`, road.coord + side * verge, e[1], -side, 0)
+	for i, e in Approach.roadLamps() do
+		lamp(kit0, lamps, `Lamp{i}`, e.x, e.z, -e.side, 0)
 	end
 	lamp(kit0, lamps, "LampTrailhead", lot.x0 + 20, lot.z0 + 2.5, 0, 1)
 	lamp(kit0, lamps, "LampStation", lot.x0 - 1.5, lot.z1 - 32, 1, 0)

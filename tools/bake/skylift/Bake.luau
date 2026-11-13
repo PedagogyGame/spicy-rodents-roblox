@@ -13,6 +13,8 @@
 --                           (Approach.luau)
 --   xs_lift_country         the farmland under the line: fields, hedges, the farm, the orchard, the brook and
 --                           pond, the lane and the maintenance hut, stone walls (Countryside.luau)
+--   xs_lift_signs           the way signposted from town: fingerposts, the pylon at Lift Road, banners, the
+--                           shelter (Signs.luau)
 -- Interface: build(roblox) -> (Folder, report); report = { models = { [name]: parts }, total, lookout = "built" |
 --   "stub" }
 
@@ -24,6 +26,7 @@ local Common = require("./Common")
 local Countryside = require("./Countryside")
 local Kit = require("../alley/Kit")
 local SkyLift = require("../../../src/shared/Rides/SkyLift")
+local Signs = require("./Signs")
 local Station = require("./Station")
 local Summit = require("./Summit")
 local Towers = require("./Towers")
@@ -92,6 +95,7 @@ function Bake.build(roblox: any): (any, any)
 	end
 	Approach.build(roblox, folder)
 	Countryside.build(roblox, folder)
+	Signs.build(roblox, folder)
 
 	local report = { models = {}, total = 0, lookout = lookout }
 	for _, c in folder:GetChildren() do
