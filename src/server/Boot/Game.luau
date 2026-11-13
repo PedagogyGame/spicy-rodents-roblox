@@ -78,6 +78,7 @@ local DayClock = require("./DayClock")
 local Credits = require("../Economy/Credits")
 local TreeArt = require("../Assets/TreeArt")
 local HeroArt = require("../Assets/HeroArt")
+local ShopArt = require("../Assets/ShopArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
 export type Opts = {
@@ -1213,6 +1214,13 @@ function Game.start(opts: Opts?): any
 			end
 		end)
 	end
+
+	-- The owner's Neighbourhood Shop (Workspace.Expansion.NeighbourhoodShop, addendum D12): its shell is baked;
+	-- Assets/ShopArt carves the terrain inside it and loads his interior and roof off the boot path
+	ShopArt.start(
+		workspace:FindFirstChild("Expansion"),
+		{ terrain = o.terrain ~= false, heartbeat = o.heartbeat ~= false }
+	)
 
 	return {
 		runtime = rt,
