@@ -12,15 +12,20 @@
 --   PassUntil    the game second the paintball pass runs out: while it has time left a line between the two
 --                says how much, in in-game days and real minutes, recounted once a second from the day clock
 --                (the ReplicatedStorage attributes Server/Boot/DayClock publishes): "Pass: 4.2 days (50 min)".
+--                When it runs out while the player watches, the line goes and "Your pass has run out" is said
+--                for PASS_OVER_SECS.
 -- While a minigame is open (the Player's InMinigame attribute, set by Minigames/MinigameClient) the stack
--- stands higher, clear of that game's scorecard (UI/MinigameUI: bottom right, 170 tall), so the balance is on
--- screen then too.
+-- stands higher, clear of that game's scorecard, so the balance is on screen then too. The scorecard is
+-- UI/MinigameUI's Frame "Scorecard" in the bottom-right corner, and each game sizes it for itself (bowling
+-- grows with the bowlers, darts cricket is 250 tall), so the stack follows the card's own top edge, frame by
+-- frame while a game is open.
 -- Nothing here can be clicked and nothing here decides anything.
 -- No service access at require time (Lune requires this module; everything engine is inside start).
 -- Interface: start(opts?) -> WalletHud { gui, balance, pass, note (the labels), refresh(), stop() };
 --   balanceText(cents) -> "Wallet  S$3.00"; changeText(delta, why) -> "-12c  coffee"; pocketText(cents);
---   passText(untilSeconds, nowSeconds, daySeconds) -> string? (nil: no pass to show); bottom(inMinigame) ->
---   pixels from the bottom edge; NOTE_SECS, POCKET_SECS
+--   passText(untilSeconds, nowSeconds, daySeconds) -> string? (nil: no pass to show); bottom(inMinigame,
+--   cardTop?) -> pixels from the bottom edge; NOTE_SECS, POCKET_SECS, PASS_OVER_SECS, PASS_OVER, GAP,
+--   CARD_GUI, CARD
 
 local Import = require("../Import")
 local Wallet = Import.shared("Economy/Wallet") :: typeof(require("../../shared/Economy/Wallet"))
@@ -45,11 +50,21 @@ local WalletHud = {}
 WalletHud.NOTE_SECS = 3 -- how long a change stays above the balance
 WalletHud.POCKET_SECS = 20 -- how long the pocket money line stays
 WalletHud.FLASH_SECS = 0.8
+WalletHud.PASS_OVER_SECS = 8 -- how long "Your pass has run out" stays
+WalletHud.PASS_OVER = "Your pass has run out"
+
+WalletHud.GAP = 12 -- between a minigame's scorecard and the stack
+WalletHud.CARD_GUI = "MinigameUI" -- UI/MinigameUI's ScreenGui under PlayerGui
+WalletHud.CARD = "Scorecard" -- and its scorecard Frame
 
 -- How far above the bottom edge the stack ends: just above the Menu button (UI/PlayMenu: 40 tall at -96), or
--- just above a minigame's scorecard (UI/MinigameUI: 170 tall at -182) while one is open.
-function WalletHud.bottom(inMinigame: boolean): number
-	return if inMinigame then 194 else 144
+-- while a minigame is open just above its scorecard, whose top edge is `cardTop` pixels above the bottom
+-- (UI/MinigameUI's own is 170 tall at -182, which is what is assumed when the card cannot be read).
+function WalletHud.bottom(inMinigame: boolean, cardTop: number?): number
+	if not inMinigame then
+		return 144
+	end
+	return math.max(182, cardTop or 182) + WalletHud.GAP
 end
 
 local WHITE = { 255, 255, 255 }
@@ -121,8 +136,28 @@ function WalletHud.start(opts: Opts?): WalletHud
 	local stack = Instance.new("Frame")
 	stack.Name = "Stack"
 	stack.AnchorPoint = Vector2.new(1, 1)
+	local playerGui = player:WaitForChild("PlayerGui")
+	-- the top edge of the minigame scorecard as it is drawn now, in pixels above the bottom (nil: none to read)
+	local function cardTop(): number?
+		local ui = playerGui:FindFirstChild(WalletHud.CARD_GUI)
+		local card: any = ui and ui:FindFirstChild(WalletHud.CARD)
+		if card == nil or card.Visible ~= true then
+			return nil
+		end
+		local pos = card.Position
+		if typeof(pos) == "UDim2" and pos.Y.Scale == 1 then
+			return -pos.Y.Offset
+		end
+		return nil
+	end
+	local placedAt: number? = nil
 	local function place()
-		stack.Position = UDim2.new(1, -12, 1, -WalletHud.bottom(player:GetAttribute("InMinigame") ~= nil))
+		local inMinigame = player:GetAttribute("InMinigame") ~= nil
+		local at = WalletHud.bottom(inMinigame, if inMinigame then cardTop() else nil)
+		if at ~= placedAt then
+			placedAt = at
+			stack.Position = UDim2.new(1, -12, 1, -at)
+		end
 	end
 	place()
 	stack.Size = UDim2.fromOffset(260, 100)
@@ -162,7 +197,7 @@ function WalletHud.start(opts: Opts?): WalletHud
 	local note = line("Note", 1, 15, Enum.Font.GothamMedium)
 	local pass = line("Pass", 2, 15, Enum.Font.GothamMedium)
 	local balance = line("Balance", 3, 20, Enum.Font.GothamBold)
-	gui.Parent = player:WaitForChild("PlayerGui")
+	gui.Parent = playerGui
 
 	local function rgb(c: { number }): Color3
 		return Color3.fromRGB(c[1], c[2], c[3])
@@ -195,10 +230,15 @@ function WalletHud.start(opts: Opts?): WalletHud
 
 	local shown: number? = nil -- the balance as last drawn
 	local function drawPass()
-		local text = WalletHud.passText(player:GetAttribute("PassUntil"), now(), daySeconds())
+		local untilSeconds = player:GetAttribute("PassUntil")
+		local text = WalletHud.passText(untilSeconds, now(), daySeconds())
+		local was = pass.Visible
 		pass.Visible = text ~= nil and shown ~= nil
 		if text then
 			pass.Text = text
+		elseif was and type(untilSeconds) == "number" then
+			-- it was counting down a moment ago and the time is up: say so (a door will now turn them away)
+			say(WalletHud.PASS_OVER, WHITE, WalletHud.PASS_OVER_SECS)
 		end
 	end
 	local function drawPocket()
@@ -244,6 +284,9 @@ function WalletHud.start(opts: Opts?): WalletHud
 	table.insert(
 		conns,
 		RunService.Heartbeat:Connect(function(dt: number)
+			if player:GetAttribute("InMinigame") ~= nil then
+				place() -- the game redraws its scorecard as it likes: stay clear of it
+			end
 			acc += dt
 			if acc >= 1 then
 				acc = 0

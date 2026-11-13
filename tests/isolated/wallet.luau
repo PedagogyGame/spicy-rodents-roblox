@@ -424,6 +424,28 @@ return function(t)
 			Rig.run(r, 0.3)
 			t.eq(r.client.active(), S.coin)
 			t.eq(w.wallet.balance(r.player), 280)
+			-- and the balance is on screen during the game: the HUD finds the real MinigameUI's scorecard by
+			-- the names it knows and stands above it
+			local hud = WalletHud.start({
+				player = r.player,
+				now = function(): number
+					return w.t
+				end,
+				daySeconds = DAY,
+			})
+			t.eq(r.gui.Name, WalletHud.CARD_GUI)
+			local card = r.gui:FindFirstChild(WalletHud.CARD)
+			t.truthy(card ~= nil and card.ClassName == "Frame", "MinigameUI's scorecard, by name")
+			t.truthy(r.player:GetAttribute("InMinigame") ~= nil)
+			Rig.run(r, 0.1)
+			local stack = hud.gui:FindFirstChild("Stack")
+			t.truthy(card.Visible, "the game's scorecard is up")
+			local top = -card.Position.Y.Offset
+			t.truthy(top >= 182, `the card's top edge was read ({top})`)
+			t.eq(-stack.Position.Y.Offset, top + WalletHud.GAP)
+			t.truthy(hud.balance.Visible)
+			t.eq(hud.balance.Text, "Wallet  S$2.80")
+			hud.stop()
 			w.wallet.leave(r.player)
 		end, opts({ sites = { [SITE] = PLACE }, furnish = FakeGames.furnish }))
 		-- the real fortune teller with the real wallet behind the town: a pull is free, as the brief demands
@@ -542,6 +564,12 @@ return function(t)
 			w.t += 0.5 * DAY
 			heartbeat.fire(1)
 			t.falsy(hud.pass.Visible, "run out: the line goes")
+			t.truthy(hud.note.Visible, "and the player is told, once")
+			t.eq(hud.note.Text, "Your pass has run out")
+			FakeEngine.runDelayed()
+			t.falsy(hud.note.Visible)
+			heartbeat.fire(1)
+			t.falsy(hud.note.Visible, "not said again every second")
 			t.truthy(hud.balance.Visible)
 			-- bought again: back at once (PassUntil changed), no waiting for the next second
 			t.truthy(w.wallet.pass.buy(player))
@@ -592,8 +620,32 @@ return function(t)
 				player:SetAttribute("InMinigame", "bowling_lane_3")
 				t.eq(stack.Position.Y.Offset, -194, "clear of the scorecard (170 tall at -182)")
 				t.truthy(WalletHud.bottom(true) > 182 and WalletHud.bottom(false) > 96 + 40)
+				-- each game sizes the scorecard for itself: the wallet follows the card's own top edge
+				local heartbeat = (game :: any):GetService("RunService").Heartbeat
+				local ui = FakeEngine.new("ScreenGui", WalletHud.CARD_GUI)
+				ui.Parent = player:FindFirstChild("PlayerGui")
+				local card = FakeEngine.new("Frame", WalletHud.CARD)
+				card.Visible = true
+				card.Parent = ui
+				local function cardAt(top: number): number
+					card.Position = roblox.UDim2.new(1, -612, 1, -top)
+					heartbeat.fire(1 / 60)
+					return -stack.Position.Y.Offset
+				end
+				t.eq(cardAt(38 + 6 * 38), 278, "six bowlers: Games/Bowling's card is 266 high")
+				t.eq(cardAt(262), 274, "darts cricket")
+				t.eq(cardAt(46 + 2 * 40), 194, "a short card: never lower than over the standard one")
+				card.Visible = false
+				heartbeat.fire(1 / 60)
+				t.eq(stack.Position.Y.Offset, -194)
+				card.Visible = true
+				t.eq(cardAt(300), 312)
 				player:SetAttribute("InMinigame", nil)
-				t.eq(stack.Position.Y.Offset, -144)
+				t.eq(stack.Position.Y.Offset, -144, "the game over: back above the Menu button at once")
+				heartbeat.fire(1 / 60)
+				t.eq(stack.Position.Y.Offset, -144, "and a card left on screen moves nothing outside a game")
+				t.eq(WalletHud.bottom(true, 266), 278)
+				t.eq(WalletHud.bottom(false, 266), 144)
 				-- a player with an empty wallet still sees it
 				hud.stop()
 				player:SetAttribute("Cents", 0)
