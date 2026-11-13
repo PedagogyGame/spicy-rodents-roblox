@@ -1067,6 +1067,32 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"a splat beside it: it hears where THAT ball came from, though an older one of the same shooter's still flies",
+		function()
+			local at = groundNode(0, -24)
+			local c = closeUp(at, 0)
+			local bx, by, bz = c.brain.x, c.brain.y + 2.7, c.brain.z
+			c.poses[1].x, c.poses[1].z = 30, -60 -- (the shooter, out of the bot's sight cone or not: it is heard)
+			-- ball one: a long one, fired first, away over the far side of the floor
+			local s = F.ballSpeed
+			stepClose(c, DT, { { kind = "born", id = 1, x = 30, y = 4.5, z = -60, vx = s, vy = 0, vz = 0 } })
+			-- ball two, a moment later from somewhere else, ends against something three studs short of the bot
+			local ox, oz = bx - 20, bz
+			stepClose(c, 0.1, { { kind = "born", id = 1, x = ox, y = by, z = oz, vx = s, vy = 0, vz = 0 } })
+			local ex = bx - 3
+			local t0 = c.now
+			stepClose(c, DT, { { kind = "ended", id = 1, x = ex, y = by, z = bz } })
+			t.truthy(c.brain.alertAt ~= nil and c.brain.alertAt > t0, "it heard the splat")
+			t.near(c.brain.alertX, ox, 1e-6, "and took it to come from where the second ball was fired")
+			t.near(c.brain.alertZ, oz, 1e-6)
+			-- the first ball is still in flight, as far as the bots know: it ends later, far off
+			local list = c.bots.flights[1]
+			t.eq(#list, 1)
+			t.near(list[1].x, 30, 1e-6)
+		end
+	)
+
 	t.test("it does not follow somebody it cannot see: behind a pillar, the look stays where they went in", function()
 		-- the bot stands south of a ground-floor pillar; the person walks east to west across its view,
 		-- 30 studs off, and passes behind the pillar on the way
@@ -1111,7 +1137,13 @@ return function(t)
 		t.eq(s.scores[1] + s.scores[2], s.tags)
 		local result = Rules.result(sim.state) :: Contract.Result
 		t.eq(#result.card.rows, 8)
-		t.truthy(#result.card.awards >= 4)
+		t.truthy(#result.card.awards >= 5)
+		-- the bulletin's awards go round: one a player, and never Top Tagger with Saving It For Later
+		local holder: { [number]: string } = {}
+		for _, a in result.card.awards do
+			t.eq(holder[a.id], nil, `seat {a.id}: {holder[a.id]} and {a.title}`)
+			holder[a.id] = a.title
+		end
 		for _, row in result.card.rows do
 			t.truthy(row.shots > 20, `seat {row.id} fired {row.shots} balls`)
 			t.truthy(row.accuracy > 0 and row.accuracy < 0.6)

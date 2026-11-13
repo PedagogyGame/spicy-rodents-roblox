@@ -113,6 +113,147 @@ return function(t)
 	end)
 
 	t.test(
+		"a team-mate tagged in view: a bot looks to where the ball came from, never to where the hidden tagger is now",
+		function()
+			-- four seats: 1 the tagger (a person, team 1), 2 the bot that watches (team 2), 4 its team-mate
+			-- (team 2, the victim), 3 nobody in particular (team 1, far off)
+			local function four(): (Rules.State, Bots.Bots, { [number]: Contract.Pose }, number)
+				local state = Rules.init(4, 5)
+				Rules.sync(state, 100)
+				local now = 100 + R.briefingSecs + F.protectSecs + 1
+				Rules.sync(state, now - 5)
+				Rules.step(state, 0)
+				Rules.sync(state, now)
+				Rules.step(state, 0)
+				Rules.drain(state)
+				assert(state.slots[2].team == 2 and state.slots[4].team == 2 and state.slots[1].team == 1, "the four")
+				local pose = function(x: number, y: number, z: number): Contract.Pose
+					return { x = x, y = y, z = z, yaw = 0, pitch = 0, crouch = 0, bits = 0 }
+				end
+				local poses = { pose(0, 0, 0), pose(0, 0, -24), pose(0, 0, 60), pose(0, 0, -44) }
+				local bots = Bots.new(arena, { seed = 3 })
+				Bots.sync(bots, state, { [2] = 0.5 }, poses, now)
+				local brain = (bots.brains :: { [number]: BotBrain.Brain })[2]
+				brain.goAt = math.huge
+				brain.scanAt, brain.scanYaw, brain.scanPitch = math.huge, 0, 0
+				return state, bots, poses, now
+			end
+			local ARENA = require("@shared/Minigames/Paintball/Arena")
+			local function bearing(x0: number, z0: number, x1: number, z1: number): number
+				return math.atan2(-(x1 - x0), -(z1 - z0))
+			end
+			local function off(a: number, b: number): number
+				return math.abs((a - b + math.pi) % (2 * math.pi) - math.pi)
+			end
+			-- where the ball came from (a place with a clear line to the victim) and where the tagger is by
+			-- the time it lands (behind cover from the bot, well to one side of that place as it sees it;
+			-- the case moves them there at once: what matters is that the bot is never told)
+			local bx, bz, vx, vz = 0, -24, 0, -44
+			local eye = 4.5
+			local from, hide: { x: number, y: number, z: number }? = nil, nil
+			for _, a in arena.nodes do
+				if a.floor ~= 0 or a.team ~= 0 or math.abs(a.x - vx) + math.abs(a.z - vz) < 12 then
+					continue
+				end
+				if arena.sweep(a.x, eye, a.z, vx, ARENA.CHEST, vz) ~= nil then
+					continue
+				end
+				for _, b in arena.nodes do
+					if
+						b.floor == 0
+						and b.team == 0
+						and off(bearing(bx, bz, a.x, a.z), bearing(bx, bz, b.x, b.z)) > math.rad(40)
+						and arena.sweep(bx, eye, bz, b.x, ARENA.CHEST, b.z) ~= nil
+					then
+						from, hide = a, b
+						break
+					end
+				end
+				if from ~= nil then
+					break
+				end
+			end
+			assert(from ~= nil and hide ~= nil, "the premise: a place to fire from and one to hide in")
+			local hits = 0
+			for seed = 1, 3 do
+				local state, bots, poses, now = four()
+				local brain = (bots.brains :: { [number]: BotBrain.Brain })[2]
+				brain.rng = (require("@shared/Util/Rng") :: any).new(seed)
+				-- the ball: born at `from`, to the victim's chest; it ends there and tags them
+				local ox, oy, oz = from.x, from.y + eye, from.z
+				local dx, dy, dz = vx - ox, ARENA.CHEST - oy, vz - oz
+				local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+				local k = F.ballSpeed / d
+				poses[1].x, poses[1].z = from.x, from.z
+				now += DT
+				Bots.step(bots, state, poses, {
+					{ kind = "born", id = 1, x = ox, y = oy, z = oz, vx = dx * k, vy = dy * k, vz = dz * k },
+				}, now, DT)
+				-- by the time it lands the tagger has stepped behind cover
+				poses[1].x, poses[1].z = hide.x, hide.z
+				local flight = d / F.ballSpeed
+				local steps = math.max(1, math.floor(flight / DT + 0.5))
+				for _ = 1, steps - 1 do
+					now += DT
+					Bots.step(bots, state, poses, {}, now, DT)
+				end
+				t.truthy(Rules.tag(state, 1, 4, now))
+				now += DT
+				Bots.step(bots, state, poses, {
+					{ kind = "ended", id = 1, x = vx, y = ARENA.CHEST, z = vz },
+					{ kind = "tag", id = 4, by = 1, x = vx, y = ARENA.CHEST, z = vz },
+				}, now, DT)
+				for _ = 1, math.floor(0.9 / DT) do
+					now += DT
+					Bots.step(bots, state, poses, {}, now, DT)
+				end
+				local yaw = poses[2].yaw
+				local toFrom = off(yaw, bearing(bx, bz, from.x, from.z))
+				local toHide = off(yaw, bearing(bx, bz, hide.x, hide.z))
+				t.truthy(
+					toFrom < math.rad(12),
+					`seed {seed}: it looked {math.deg(toFrom)} deg from where the ball came from`
+				)
+				t.truthy(
+					toHide > toFrom + math.rad(20),
+					`seed {seed}: and not at the tagger behind cover ({math.deg(toHide)} deg)`
+				)
+				if brain.alarm > -math.huge then
+					hits += 1
+				end
+			end
+			t.eq(hits, 3, "every time it saw it, it took it in")
+			-- with no clear line to where the team-mate was struck, it learns nothing of where it came from
+			local state, bots, poses, now = four()
+			local brain = (bots.brains :: { [number]: BotBrain.Brain })[2]
+			local blind = BotNav.nearest(nav, 35, 0, -20, 2) -- behind a pillar from the far side
+			local node = arena.nodes[blind]
+			brain.x, brain.z = node.x, node.z
+			poses[2].x, poses[2].z = node.x, node.z
+			local sx, sz = 35, -50
+			t.truthy(arena.sweep(node.x, eye, node.z, sx, ARENA.CHEST, sz) ~= nil, "the premise: the pillar")
+			brain.yaw = bearing(node.x, node.z, sx, sz)
+			poses[2].yaw = brain.yaw
+			poses[4].x, poses[4].z = sx, sz
+			now += DT
+			Bots.step(bots, state, poses, {
+				{ kind = "born", id = 1, x = sx - 20, y = eye, z = sz, vx = F.ballSpeed, vy = 0, vz = 0 },
+			}, now, DT)
+			t.truthy(Rules.tag(state, 1, 4, now))
+			now += DT
+			Bots.step(bots, state, poses, {
+				{ kind = "ended", id = 1, x = sx - 1, y = eye, z = sz },
+				{ kind = "tag", id = 4, by = 1, x = sx - 1, y = eye, z = sz },
+			}, now, DT)
+			for _ = 1, 30 do
+				now += DT
+				Bots.step(bots, state, poses, {}, now, DT)
+			end
+			t.eq(brain.alarm, -math.huge, "a tag it could not see is nothing it heard")
+		end
+	)
+
+	t.test(
 		"company: one bot of a small team stays within a short run of a person, on whatever storey they go to",
 		function()
 			local total, with = 0, 0

@@ -25,9 +25,16 @@
 --     second and the bots' checks are spread over the ticks (no tick does more than its share);
 
 --   * HEAR what the service tells them (`heard`, below): an OPPONENT'S ball that is born, passes or
---     lands within BOT.hear studs of a bot, and a team-mate tagged where the bot could see, make it
---     aware of the direction the ball came from. A bot that is shot at and missed does not stand
---     there: it turns, ducks or moves. (A team-mate's ball going by tells it nothing it needs.)
+--     lands within BOT.hear studs of a bot, and a team-mate tagged where the bot could see it (inside
+--     its cone, near by, and a clear line to where the ball struck: one sweep, counted against the
+--     sight checks), make it aware of WHERE THE BALL CAME FROM, give or take a stride: never of where
+--     the shooter has got to since. A bot that is shot at and missed does not stand there: it turns,
+--     ducks or moves. (A team-mate's ball going by tells it nothing it needs: Contract.BOT.hear says
+--     "whoever fired it"; this lane hears the other side's only, a contract gap it has reported.)
+--     WHICH BALL: `heard` names a ball's shooter, not the ball, so an "ended" is matched to the
+--     shooter's ball in flight whose path passes nearest where it ended (a later ball that strikes a
+--     near wall before an earlier long one lands is told apart), and a "tag" to the ball that ended
+--     there in the same tick.
 --   * act on anything seen or heard only after a reaction time between BOT.reactMin and BOT.reactMax;
 --   * TURN at no more than BOT.turn (yaw and pitch each), and fire ONLY ALONG THEIR OWN LOOK: a
 --     bot's pose yaw and pitch are where its marker points (the aim, lead and drop included), and the
@@ -143,7 +150,17 @@ export type Opts = {
 }
 
 -- A ball in flight, as the bots heard it born.
-type Flight = { at: number, x: number, y: number, z: number, seq: number }
+type Flight = {
+	at: number, -- born
+	x: number,
+	y: number,
+	z: number,
+	vx: number,
+	vy: number,
+	vz: number,
+	seq: number,
+	ended: number?, -- when it was heard to end
+}
 
 export type Bots = {
 	arena: Arena,
@@ -153,6 +170,7 @@ export type Bots = {
 	profile: BotBrain.Profile,
 	squad: BotBrain.Squad,
 	flights: { [number]: { Flight } }, -- by shooter: its balls in flight, oldest first
+	ended: { [number]: Flight }, -- by shooter: the ball of its that was heard to end last
 	seq: number,
 	state: State?, -- the match the squad's knowledge belongs to
 }
@@ -200,6 +218,7 @@ function Bots.new(arena: Arena, opts: Opts?): Bots
 		profile = o.profile or BotBrain.DEFAULT,
 		squad = newSquad(arena),
 		flights = {},
+		ended = {},
 		seq = 0,
 		state = nil,
 	}
@@ -211,6 +230,7 @@ local function fresh(bots: Bots, state: State)
 		bots.state = state
 		bots.squad = newSquad(bots.arena)
 		table.clear(bots.flights)
+		table.clear(bots.ended)
 		table.clear(bots.brains)
 	end
 end
@@ -357,20 +377,29 @@ local function told(bots: Bots, team: number, x: number, y: number, z: number, n
 	spot.x, spot.y, spot.z, spot.at = x, floor * arena.floorHeight, z, now
 end
 
+local TAG_SEEN = 45 -- studs: a team-mate tagged further off than this tells a bot nothing
+local TAG_NOISE = 2.5 -- studs either way: how well a bot that saw a team-mate tagged places where it came from
+
+-- How far (x, y, z), where a ball ended at time `now`, is from the path of `flight`: from the nearest
+-- point on the ball's line, dropped as the ball drops, no later than now. (Which of a shooter's balls
+-- in flight ended there; heard names the shooter, not the ball.)
+local function offPath(flight: Flight, x: number, y: number, z: number, now: number, drop: number): number
+	local vx, vy, vz = flight.vx, flight.vy, flight.vz
+	local vv = vx * vx + vy * vy + vz * vz
+	local px, py, pz = x - flight.x, y - flight.y, z - flight.z
+	local t = if vv > 1e-6 then math.clamp((px * vx + py * vy + pz * vz) / vv, 0, now - flight.at + 0.05) else 0
+	local dx, dy, dz = px - vx * t, py - (vy * t - 0.5 * drop * t * t), pz - vz * t
+	return math.sqrt(dx * dx + dy * dy + dz * dz)
+end
+
 -- What the service heard, shared out among the brains.
-local function hear(
-	bots: Bots,
-	state: State,
-	poses: { [number]: Pose },
-	heard: { Heard },
-	now: number,
-	out: { Command }
-)
+local function hear(bots: Bots, state: State, heard: { Heard }, now: number, out: { Command })
 	local brains = bots.brains :: { [number]: BotBrain.Brain }
 	local squad = bots.squad
 	local profile = bots.profile
 	local reach = profile.hear * profile.hear
 	local ttl = RULES.ballTtl
+	local drop = state.feel.ballDrop
 	for _, h in heard do
 		local shooter = state.slots[if h.kind == "tag" then h.by or 0 else h.id]
 		if h.kind == "born" then
@@ -382,7 +411,7 @@ local function hear(
 				list = {}
 				bots.flights[h.id] = list
 			end
-			table.insert(list, { at = now, x = h.x, y = h.y, z = h.z, seq = bots.seq })
+			table.insert(list, { at = now, x = h.x, y = h.y, z = h.z, vx = vx, vy = vy, vz = vz, seq = bots.seq })
 			bots.squad.firedAt[h.id] = now
 			if shooter == nil or vv < 1 then
 				continue
@@ -400,18 +429,29 @@ local function hear(
 				end
 			end
 		elseif h.kind == "ended" then
-			-- which ball: the shooter's oldest still in flight
+			-- which ball: the shooter's in flight whose path passes nearest where this one ended
 			local list = bots.flights[h.id]
 			local flight: Flight? = nil
 			if list ~= nil then
 				while #list > 0 and now - list[1].at > ttl + 0.1 do
 					table.remove(list, 1)
 				end
-				flight = table.remove(list, 1)
+				local best, bestD = 0, math.huge
+				for i, f in list do
+					local d = offPath(f, h.x, h.y, h.z, now, drop)
+					if d < bestD then
+						best, bestD = i, d
+					end
+				end
+				if best ~= 0 then
+					flight = table.remove(list, best)
+				end
 			end
 			if flight == nil or shooter == nil then
 				continue
 			end
+			bots.ended[h.id] = flight
+			flight.ended = now
 			if squad.people[h.id] == shooter.team then
 				-- a person's ball: their team's bots take it that somebody is where it went ("over
 				-- there!"), as they would a sighting of their own
@@ -440,26 +480,47 @@ local function hear(
 				BotBrain.say(tagger, bots.squad, now, out, "tagged")
 			end
 			local victim = state.slots[h.id]
-			local from = poses[by]
-			if victim == nil or from == nil then
+			if victim == nil then
 				continue
 			end
 			-- "I am out!": the team knows where one of its own went down, if it knows nothing newer
 			if now - squad.spot[victim.team].at > 3 then
 				told(bots, victim.team, h.x, h.y - BodyModule.STAND_EYE * 0.6, h.z, now)
 			end
-			-- a team-mate tagged where a bot could see: it knows where that came from
+			-- the ball that did it: the one of by's that ended there this tick
+			local flight = bots.ended[by]
+			if flight == nil or flight.ended ~= now or offPath(flight, h.x, h.y, h.z, now, drop) > 3 then
+				continue -- (nothing to go on but where the tagger is now, which nobody saw)
+			end
+			-- a team-mate tagged where a bot could see it: it knows, give or take a stride, where the
+			-- ball came from (not where the tagger has gone since)
 			local cosHalf = math.cos(profile.sightHalf)
+			local sweep = bots.arena.sweep
 			for id, b in brains do
 				if b.team ~= victim.team or not b.placed or id == h.id then
 					continue
 				end
-				local dx, dy, dz = h.x - b.x, h.y - (b.y + BodyModule.eye(b.crouch)), h.z - b.z
+				local ex, ey, ez = b.x, b.y + BodyModule.eye(b.crouch), b.z
+				local dx, dy, dz = h.x - ex, h.y - ey, h.z - ez
 				local d = math.sqrt(dx * dx + dy * dy + dz * dz)
 				local lx, ly, lz = BodyModule.look(b.yaw, b.pitch)
-				if d < 45 and d > 1e-3 and dx * lx + dy * ly + dz * lz >= cosHalf * d then
-					BotBrain.alert(b, from.x, from.y + BodyModule.STAND_EYE, from.z, now)
+				if d >= TAG_SEEN or d < 1e-3 or dx * lx + dy * ly + dz * lz < cosHalf * d then
+					continue
 				end
+				-- a clear line to where it struck: one of this tick's sight checks, and one of the bot's own
+				if squad.sightLeft <= 0 then
+					continue
+				end
+				squad.sightLeft -= 1
+				squad.sweeps += 1
+				b.nextSight = math.max(b.nextSight, now) + 1 / profile.sightHz
+				if sweep(ex, ey, ez, h.x - dx / d * 0.5, h.y - dy / d * 0.5, h.z - dz / d * 0.5) ~= nil then
+					continue
+				end
+				local rng = b.rng
+				local nx = (rng.next() * 2 - 1) * TAG_NOISE
+				local nz = (rng.next() * 2 - 1) * TAG_NOISE
+				BotBrain.alert(b, flight.x + nx, flight.y, flight.z + nz, now)
 			end
 		end
 	end
@@ -485,9 +546,6 @@ function Bots.step(
 	local squad = bots.squad
 	squad.tick += 1
 	follow(bots.nav, bots.profile, squad, brains, state, poses, now)
-	if #heard > 0 then
-		hear(bots, state, poses, heard, now, out)
-	end
 	-- this tick's share of the sight checks (BOT.sightHz a bot a second, spread over the ticks) and one
 	-- route search; whoever is first in line changes every tick, so nobody is always last
 	local count = 0
@@ -496,6 +554,9 @@ function Bots.step(
 	end
 	squad.sightLeft = math.max(1, math.ceil(count * bots.profile.sightHz * dt - 1e-6))
 	squad.routeLeft = 1
+	if #heard > 0 then
+		hear(bots, state, heard, now, out)
+	end
 	local first = squad.tick % RULES.slots
 	for k = 1, RULES.slots do
 		local brain = brains[(first + k - 1) % RULES.slots + 1]

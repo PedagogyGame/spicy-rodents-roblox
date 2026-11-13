@@ -61,7 +61,13 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 	t.eq(s.scores[1] + s.scores[2], s.tags)
 	local result = Rules.result(sim.state) :: Contract.Result
 	t.eq(#result.card.rows, seats)
-	t.truthy(#result.card.awards >= 3)
+	t.truthy(#result.card.awards >= 5)
+	-- the bulletin's awards go round: one a player, and never Top Tagger with Saving It For Later
+	local holder: { [number]: string } = {}
+	for _, a in result.card.awards do
+		t.eq(holder[a.id], nil, `seat {a.id}: {holder[a.id]} and {a.title}`)
+		holder[a.id] = a.title
+	end
 	-- the one judge refused nothing a bot asked for: its own look, its own eye, never from a spawn
 	-- room, never sprinting, never an empty or hurried magazine
 	t.eq(s.refused, 0, "no command of a bot's was refused")
@@ -74,7 +80,11 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 	t.truthy(s.camping < 4, `{s.camping} bot-seconds watching the other team's door`)
 	t.eq(s.doorTrap, 0, "no bot fires a ball at a quiet player on their own doorstep")
 	t.eq(s.outTrap, 0, "nor at somebody in their first seconds out who has not fired")
-	t.truthy(s.held < 1.5, `a bot held its fire {s.held} s on somebody in plain view (seat {s.heldSlot})`)
+	-- (no truce, nor anything else, leaves a bot standing with somebody in plain view close by and not
+	-- firing: the time to notice, turn, settle and face them, and no more; in the melee of sixteen a
+	-- bot's ten sight checks a second go round more opponents, and a sighting takes longer to start)
+	local heldMost = if seats >= 16 then 2 else 1.5
+	t.truthy(s.held < heldMost, `a bot held its fire {s.held} s on somebody in plain view (seat {s.heldSlot})`)
 	t.truthy(
 		s.doorStray <= math.max(3, 0.04 * s.tags),
 		`{s.doorStray} quiet players walked off their doorstep into a ball meant for somebody else`

@@ -83,18 +83,21 @@
 -- frame. (Why: the contract's own spec, tests/unit/paintball_contract.spec.luau, holds that a State
 -- which has been joined, stepped and synced but whose clock nobody has run on has nothing to drain.)
 -- A slot that is owed a placement is protected until it gets it.
--- THE END CARD'S AWARDS (the WBLW Channel 7 sports bulletin; an award is only given when somebody
--- earned it, and a tie goes to the lower seat): "Top Tagger" most tags; "Sharpest Eye" the best
--- accuracy over at least AWARD_SHOTS balls; "Most Paint Wasted" the most balls that tagged nobody;
--- "Human Canvas" the most times tagged out; "Clean Overalls" never tagged out, with at least one tag
--- of their own; "Saving It For Later" the fewest balls fired.
+-- THE END CARD'S AWARDS (the WBLW Channel 7 sports bulletin). They are handed out in this order, ONE
+-- A PLAYER: each goes to the best row that has none yet (a tie to the lower seat), and is not given
+-- when no such row earned it, so one busy player never sweeps the board and no card says the top
+-- tagger is also the one who fired least. "Top Tagger" most tags; "Sharpest Eye" the best accuracy
+-- over at least AWARD_SHOTS balls; "Clean Overalls" the fewest times tagged out, with at least one tag
+-- of their own (more tags first on a tie); "Human Canvas" the most times tagged out; "Most Paint
+-- Wasted" the most of their balls tagging nobody, as a share, over at least WASTE_SHOTS balls (more
+-- balls first on a tie); "Saving It For Later" the fewest balls fired.
 -- Interface: def; verbs; init(seats, seed) -> State; tune(state, feel); sync(state, stamp);
 --   step(state, dt); join(state, seat); gone(state, seat); assign(state, id, team) -> changed;
 --   input(state, seat, verb, args) -> (ok, why?); result(state) -> Result?; view(state) -> MatchView;
 --   drain(state) -> { Event }; slot(state, id) -> Slot?; canFire(state, id, t, m?) -> (ok, why?);
 --   fire(state, id, t, m?) -> (ok, why?); reload(state, id, t) -> ok; canBeHit(state, id, now) -> ok;
 --   tag(state, by, id, now, born?) -> tagged; bits(state, id, now) -> Wire.BIT flags; card(state) ->
---   EndCard; AWARD_SHOTS; types Slot, State; T (type witnesses)
+--   EndCard; AWARD_SHOTS; WASTE_SHOTS; types Slot, State; T (type witnesses)
 
 local Magazine = require("../../Paintball/Magazine")
 local Minigame = require("../Minigame")
@@ -140,8 +143,10 @@ local BIT = Wire.BIT
 
 local Rules = {}
 
--- "Sharpest Eye" is among those who fired at least this many balls.
+-- "Sharpest Eye" is among those who fired at least this many balls ...
 Rules.AWARD_SHOTS = 5
+-- ... and "Most Paint Wasted" among those who fired at least this many
+Rules.WASTE_SHOTS = 10
 
 Rules.def = {
 	game = Contract.GAME,
@@ -322,17 +327,20 @@ function Rules.card(state: State): Contract.EndCard
 		return a.id < b.id
 	end)
 	local awards: { Contract.Award } = {}
-	-- the row that scores highest, the lower seat on a tie; nil when nobody is eligible
+	local awarded: { [number]: boolean } = {}
+	-- the row with no award yet that scores highest, the lower seat on a tie; none when no such row
+	-- is eligible (see THE END CARD'S AWARDS)
 	local function give(title: string, score: (row: Contract.CardRow) -> number?)
 		local best: Contract.CardRow? = nil
 		local bestScore = -math.huge
 		for _, row in rows do
-			local v = score(row)
+			local v = if awarded[row.id] then nil else score(row)
 			if v ~= nil and (v > bestScore or (v == bestScore and best ~= nil and row.id < best.id)) then
 				best, bestScore = row, v
 			end
 		end
 		if best ~= nil then
+			awarded[best.id] = true
 			table.insert(awards, { title = title, id = best.id })
 		end
 	end
@@ -342,15 +350,15 @@ function Rules.card(state: State): Contract.EndCard
 	give("Sharpest Eye", function(row: Contract.CardRow): number?
 		return if row.shots >= Rules.AWARD_SHOTS and row.hits > 0 then row.accuracy else nil
 	end)
-	give("Most Paint Wasted", function(row: Contract.CardRow): number?
-		local wasted = row.shots - row.hits
-		return if wasted > 0 then wasted else nil
+	give("Clean Overalls", function(row: Contract.CardRow): number?
+		return if row.tags > 0 then -row.outs * 1000 + row.tags else nil
 	end)
 	give("Human Canvas", function(row: Contract.CardRow): number?
 		return if row.outs > 0 then row.outs else nil
 	end)
-	give("Clean Overalls", function(row: Contract.CardRow): number?
-		return if row.outs == 0 and row.tags > 0 then row.tags else nil
+	give("Most Paint Wasted", function(row: Contract.CardRow): number?
+		local wasted = row.shots - row.hits
+		return if row.shots >= Rules.WASTE_SHOTS and wasted > 0 then wasted / row.shots + row.shots * 1e-6 else nil
 	end)
 	give("Saving It For Later", function(row: Contract.CardRow): number?
 		return if #rows > 1 then -row.shots else nil

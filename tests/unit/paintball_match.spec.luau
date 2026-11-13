@@ -538,16 +538,20 @@ return function(t)
 		t.eq(card.rows[4].accuracy, 1)
 		t.eq(card.rows[7].accuracy, 0, "no balls, no accuracy")
 		local awards: { [string]: number } = {}
+		local held: { [number]: string } = {}
 		for _, a in card.awards do
 			t.eq(awards[a.title], nil, "an award is given once")
+			t.eq(held[a.id], nil, `seat {a.id} has {held[a.id]} already: one award a player`)
 			awards[a.title] = a.id
+			held[a.id] = a.title
 		end
+		-- handed out in order, each to the best row with none yet
 		t.eq(awards["Top Tagger"], 1)
-		t.eq(awards["Sharpest Eye"], 1, "seat 4's one ball in one is not five balls")
-		t.eq(awards["Most Paint Wasted"], 2)
+		t.eq(awards["Sharpest Eye"], 2, "seat 1 has its award; seat 4's one ball in one is not five balls")
+		t.eq(awards["Clean Overalls"], 5, "never tagged out, and a tag of its own")
 		t.eq(awards["Human Canvas"], 3)
-		t.eq(awards["Clean Overalls"], 1)
-		t.eq(awards["Saving It For Later"], 3, "the lowest seat of those who never fired")
+		t.eq(awards["Most Paint Wasted"], nil, "nobody left fired ten balls")
+		t.eq(awards["Saving It For Later"], 6, "the lowest seat of those left who never fired")
 		-- the Session shows it and holds the card for endCardSecs and a spare second
 		t.eq(m.s.phase, "done")
 		t.truthy(m.s.result == result :: any)
@@ -563,6 +567,54 @@ return function(t)
 		t.deepEq(even.winners, {})
 		t.eq(even.card.winner, 0)
 	end)
+
+	t.test(
+		"the awards: one a player, so the busiest never sweeps the board; paint wasted is a share, not a pile",
+		function()
+			-- a card's rows by hand: (id, tags, outs, shots, hits)
+			local function card(list: { { number } }): { [string]: number }
+				local state = Rules.init(#list, 1)
+				for i, r in list do
+					local slot = state.slots[i]
+					slot.tags, slot.outs, slot.shots, slot.hits = r[1], r[2], r[3], r[4]
+				end
+				local out: { [string]: number } = {}
+				local seen: { [number]: boolean } = {}
+				for _, a in Rules.card(state).awards do
+					t.eq(seen[a.id], nil, `seat {a.id} twice`)
+					seen[a.id] = true
+					out[a.title] = a.id
+				end
+				return out
+			end
+			-- seat 1 tags most, fires most and misses most, and is tagged most: it is the Top Tagger only
+			local a = card({
+				{ 12, 9, 120, 12 },
+				{ 6, 4, 30, 6 },
+				{ 4, 2, 40, 4 },
+				{ 3, 7, 60, 3 },
+				{ 1, 5, 25, 1 },
+				{ 2, 3, 4, 1 },
+			})
+			t.eq(a["Top Tagger"], 1)
+			t.eq(a["Sharpest Eye"], 2, "6 in 30")
+			t.eq(a["Clean Overalls"], 3, "tagged out twice: the fewest of those left")
+			t.eq(a["Human Canvas"], 4)
+			t.eq(a["Most Paint Wasted"], 5, "24 of 25 missed, not seat 1's pile of 108")
+			t.eq(a["Saving It For Later"], 6)
+			-- the one who fired least and tagged most gets Top Tagger, never Saving It For Later as well
+			local b = card({ { 0, 1, 50, 0 }, { 5, 2, 6, 5 }, { 1, 3, 30, 1 } })
+			t.eq(b["Top Tagger"], 2)
+			t.truthy(b["Saving It For Later"] ~= 2)
+			-- two players: two awards, one each
+			local c = card({ { 3, 1, 20, 3 }, { 1, 3, 20, 1 } })
+			local n = 0
+			for _ in c do
+				n += 1
+			end
+			t.eq(n, 2)
+		end
+	)
 
 	t.test(
 		"the next match: again() deals the people new seats and a fresh model; sides are the service's to restore",
