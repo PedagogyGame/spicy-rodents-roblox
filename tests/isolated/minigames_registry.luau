@@ -202,8 +202,8 @@ return function(t)
 			t.truthy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "call", args = { "heads" } }))
 			t.falsy(Schema.check(payload, { gameId = S.coin, seat = 1, verb = "dance", args = {} }))
 			-- the bowling alley alone: a station per lane (eighteen since brief addendum D5), then the games room's
-			-- eight (darts, the fortune teller, two pool tables, bumper pool, three pinball machines), in registry
-			-- order. A station's seeded stream is numbered by its place in this list, so the twelve new lanes moved
+			-- ten (darts, the fortune teller, two pool tables, bumper pool, three pinball machines, and air hockey's
+			-- two ends), in registry order: all 28 pinned exactly. A station's seeded stream is numbered by its place in this list, so the twelve new lanes moved
 			-- every later station's stream along by twelve: each is still its own and still repeats for a seed.
 			local alley = Sites.fromData(Data.default(), false)
 			t.truthy(alley.bowling_alley ~= nil)
@@ -214,12 +214,28 @@ return function(t)
 				t.eq(st.site, "bowling_alley")
 				t.eq((Games.get(st.game) :: any).game, st.game)
 			end
-			t.truthy(#list >= 26, `{#list} stations in the alley`)
-			local lanes = {}
+			t.eq(#list, 28, `{#list} stations in the alley`)
+			local expected = {}
 			for lane = 1, 18 do
-				table.insert(lanes, `bowling_lane_{lane}`)
+				table.insert(expected, `bowling_lane_{lane}`)
 			end
-			t.eq(table.concat(ids, " ", 1, 20), table.concat(lanes, " ") .. " darts_1 fortune_1")
+			for _, id in
+				{
+					"darts_1",
+					"fortune_1",
+					"pool_1",
+					"pool_2",
+					"bumper_pool_1",
+					"pinball_1",
+					"pinball_2",
+					"pinball_3",
+					"air_hockey_1",
+					"air_hockey_1_ember",
+				}
+			do
+				table.insert(expected, id)
+			end
+			t.eq(table.concat(ids, " "), table.concat(expected, " "))
 			t.eq((Games.station("darts_1", alley) :: any).label, "Dartboard")
 			t.eq((Games.station(S.machine, { [SITE] = PLACE }) :: any).variant, "retro")
 			t.eq(Games.station(S.machine, alley), nil, "a station is only on the site it stands on")

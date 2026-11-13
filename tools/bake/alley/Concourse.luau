@@ -25,6 +25,7 @@ local SIGNS: { [string]: string } = {
 	shoe_desk = "SHOE RENTAL  -  LANES",
 	shoe_returns = "SHOE RETURNS",
 	gift_shop_door = "GIFT SHOP",
+	gift_lobby_door = "GIFT SHOP",
 	snack_counter = "SNACK BAR",
 	lockers = "LOCKERS",
 }
@@ -82,11 +83,15 @@ local function signs(kit: any, m: any)
 				)
 				face = "Front" -- toward the lanes
 			else
+				-- on the lobby's side of the wall
+				local lz = L.zone("lobby")
+				local plus = (lz.x0 + lz.x1) / 2 > o.at
+				local x0 = if plus then o.at + T / 2 + 0.02 else o.at - T / 2 - 0.08
 				board = kit:box(
 					m,
 					`Sign_{o.id}`,
-					o.at + T / 2 + 0.02,
-					o.at + T / 2 + 0.08,
+					x0,
+					x0 + 0.06,
 					y0,
 					y1,
 					mid - half,
@@ -97,7 +102,7 @@ local function signs(kit: any, m: any)
 						collide = false,
 					}
 				)
-				face = "Right" -- into the lobby
+				face = if plus then "Right" else "Left" -- into the lobby
 			end
 			kit:label(kit:gui(board, face, 30), { Text = text, TextColor = { 255, 214, 92 }, Font = "FredokaOne" })
 		end

@@ -413,6 +413,7 @@ return function(t)
 		boughYaw: number?, -- the camera's (world) yaw when W is first pressed on the bough (else down it)
 		stopAfterCatch: boolean?,
 		world: any?, -- the world to run in (else the stand-in)
+		intoVent: boolean?, -- at the louvre, go on in through the bent slat, along the duct and out onto the chord
 		from: SquirrelMotor.State?, -- start from this state (a copy) ...
 		startPhase: string?, -- ... in this phase ("pipe")
 	}
@@ -532,8 +533,31 @@ return function(t)
 			elseif phase == "roof" then
 				input.cameraYaw = yawToward(state, mouth)
 				input.fw, input.sprint = 1, sprint
-				if math.sqrt((state.x - mouth.x) ^ 2 + (state.z - mouth.z) ^ 2) < 1.2 then
+				if rid == R.VENT then
+					-- (in at the mouth already)
+					trace.phase = if o.intoVent then "vent" else "louvre"
+					if not o.intoVent then
+						break
+					end
+				elseif math.sqrt((state.x - mouth.x) ^ 2 + (state.z - mouth.z) ^ 2) < 1.2 then
 					trace.phase = "louvre"
+					if not o.intoVent then
+						break
+					end
+				end
+			elseif phase == "louvre" then
+				-- on into the bent slat (W held, looking in)
+				input.cameraYaw = yawToward(state, pt(R.VENT, 0.15))
+				input.fw, input.sprint = 1, sprint
+				if rid == R.VENT then
+					trace.phase = "vent"
+				end
+			elseif phase == "vent" then
+				-- ride the duct with W held, looking along it, and out of the boot onto the chord
+				input.cameraYaw = yawToward(state, pt(R.VENT, 1))
+				input.fw = 1
+				if rid == R.FIRST_RAFTER then
+					trace.phase = "rafters"
 					break
 				end
 			end
@@ -780,17 +804,13 @@ return function(t)
 		local serde = require("@lune/serde")
 		local BakedWorld = (require :: any)("../lib/" .. "BakedWorld")
 		local Kit = require("../../tools/bake/alley/Kit")
-		local Shell = (require :: any)("../../tools/bake/alley/" .. "Shell")
-		local Lanes = (require :: any)("../../tools/bake/alley/" .. "Lanes")
-		local Rooms = (require :: any)("../../tools/bake/alley/" .. "Rooms")
+		local Alley = (require :: any)("../../tools/bake/alley/" .. "Alley")
 		local GameBakes = (require :: any)("../../tools/bake/" .. "GameBakes")
 		local Yard = require("../../tools/bake/alley/Yard")
 		local raw = serde.decode("json", fs.readFile("data/attractions.json")).attractions[1]
 		local kit = Kit.new(roblox, place)
 		local root = GameBakes.siteModel(roblox, "BowlingAlley", raw.id, place)
-		Shell.build(kit, root, raw)
-		Lanes.build(kit, root)
-		Rooms.build(kit, root)
+		Alley.build(kit, root, raw)
 		Yard.build(kit, root)
 		local baked = BakedWorld.fromModel(root, { adjust = BakedWorld.alleyRuntime })
 		local motorWorld = baked:motorWorld(BakedWorld.recordsData(records))
@@ -809,5 +829,22 @@ return function(t)
 				`      on the baked alley and yard, {label}: routes {seq} in {string.format("%.1f", trace.frames / 60)} s`
 			)
 		end
+		-- and on: into the bent louvre slat, along the duct (the enclosed-run motor rules) and out of the boot onto
+		-- the chord (the unit, the duct and the raised roof are lanes L1 and L2: no parts of them yet)
+		local trace, state = run(false, "walk", { world = motorWorld, intoVent = true })
+		local seq = table.concat(trace.visits, " ")
+		print(
+			`      ... and on into the vent: routes {seq}, "{trace.phase}" after {string.format(
+				"%.1f",
+				trace.frames / 60
+			)} s`
+		)
+		t.eq(
+			trace.phase,
+			"rafters",
+			`into the vent: "{trace.phase}" (routes {seq}) at route {state.routeId} t {state.railT}`
+		)
+		t.eq(seq, "0 9101 9102 9103 0 9105 0 9107 9120", "the whole way in")
+		t.truthy(trace.maxMove <= 1.5, `into the vent: a frame moves {trace.maxMove} ({trace.maxMoveAt})`)
 	end)
 end

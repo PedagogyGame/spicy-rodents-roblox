@@ -79,7 +79,8 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	end
 	numbers.stations = stationCount
 	-- every station the registry lists for the sites that were baked (Shared/Minigames/Games): the alley's
-	-- twenty-six (18 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball) and whatever the venues' games add
+	-- twenty-eight (18 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball, the two ends of the air hockey table)
+	-- and whatever the venues' games add
 	local sites: { [string]: any } = A.sites or {}
 	local places: { [string]: any } = {}
 	numbers.sites = 0
@@ -90,7 +91,7 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	local registered = #Games.stations(places)
 	numbers.registeredStations = registered
 	check(stationCount == registered, `stations {stationCount}, the registry lists {registered}`)
-	check(stationCount >= 26, `stations {stationCount} (the alley alone has 26)`)
+	check(stationCount >= 28, `stations {stationCount} (the alley alone has 28)`)
 	-- each has its prompt, in its own site's folder
 	local promptCount = 0
 	for _, site in sites do
@@ -122,13 +123,15 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 		end
 	end
 	check(doorPrompts == 2, `{doorPrompts} push-bar door prompts`)
-	-- the tunnels: routes in the registry; the vent's foot stands on the alley paving; the duct is air
+	-- the ball returns: one enclosed route per pair in the registry; its alley mouth stands on the alley paving; the
+	-- duct is air
 	local data = (require :: any)(Shared:WaitForChild("Data")).default()
 	local reg = data:routes()
-	for id = 9001, 9000 + 2 * AlleyLayout.PAIRS do
+	for p = 1, AlleyLayout.PAIRS do
+		local id = 9000 + 2 * p
 		check(reg:get(id) ~= nil, `route {id} missing from the registry`)
 	end
-	local vent = reg:get(9003)
+	local vent = reg:get(9004)
 	if vent then
 		local foot = reg:foot(vent)
 		local hit = workspace:Raycast(Vector3.new(foot.x, foot.y + 2, foot.z), Vector3.new(0, -4, 0))

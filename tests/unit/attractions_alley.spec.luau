@@ -1,18 +1,17 @@
 --!strict
--- The bowling alley's layout and its ball-return tunnels (brief v2 §13a: "the ball-return tunnel is a real
--- squirrel route: a squirrel can run the length of it under the lane and pop out at the rack"; BUILD_PLAN W3c
--- #15). data/attractions.json -> generated/Attractions -> the Routes Registry (Shared/Data); the routes sit in
--- the ducts AlleyLayout gives the bake; and a squirrel run through Movement/SquirrelMotor (the same motor the
--- client drives) walks into the vent from the alley, auto-switches into the tunnel, runs under the lane and
--- stops at the hood mouth on the rack, from where Space leaps toward the bowler.
+-- The bowling alley's layout and its ball returns (brief v2 §13a: "the ball-return tunnel is a real squirrel route: a
+-- squirrel can run the length of it under the lane and pop out at the rack"; BUILD_PLAN W3c #15; BRIEF_ADDENDUM D6).
+-- data/attractions.json -> generated/Attractions -> the Routes Registry (Shared/Data): one enclosed run per pair of
+-- lanes (Shared/Routes/Enclosure, kind "tunnel") from the grille in the alley wall to the hood's mouth over the rack,
+-- in the duct AlleyLayout gives the bake. The squirrel running it on the real baked building is in
+-- attractions_runthrough.spec.
 -- And the eighteen-lane floor plan (brief addendum D4, D5): the rooms, the openings, the games room's tables and
 -- their clear floor, the staff posts and routes, the floors a body stands on, the backstage's anchor and the
 -- ground kept for it. (That the BAKE follows the plan is tests/unit/attractions_alley_bake.spec.luau.)
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local Data = require("@shared/Data")
 local Height = require("@shared/World/Height")
-local RailWorld = require("@shared/Movement/RailWorld")
-local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
+local Enclosure = require("@shared/Routes/Enclosure")
 
 return function(t)
 	local data = Data.default()
@@ -190,8 +189,24 @@ return function(t)
 			end
 			t.eq(sides, 0, `{o.id}'s two rooms are on opposite sides of its wall`)
 		end
-		-- the main doors are on the Alley Walk's line (data/expansion.json xpath_alley_walk, x 1322)
+		-- the way in is a foyer, not a passage: 12-stud double doors into a lobby at least 20 wide, the gift shop opening
+		-- onto it with a door and glass; the shoe desk's counter starts 8 studs in from the doors, and the queue in
+		-- front of it (the counter is 1.8 deep; the queue 2 more) stays 4 studs off the line walked in through the doors
 		local ent = L.opening("entrance")
+		local lobby = L.zone("lobby")
+		t.truthy(ent.b - ent.a >= 12, `the main doors are {ent.b - ent.a} wide`)
+		t.truthy(lobby.x1 - lobby.x0 >= 20, `the lobby is {lobby.x1 - lobby.x0} wide`)
+		local giftDoor, giftGlass = false, 0
+		for _, o in L.OPENINGS do
+			local joins = table.find(o.between, "lobby") ~= nil and table.find(o.between, "gift_shop") ~= nil
+			giftDoor = giftDoor or (joins and o.kind == "door")
+			giftGlass += if joins and o.kind == "glass" then o.b - o.a else 0
+		end
+		t.truthy(giftDoor and giftGlass >= 8, `the gift shop's door and {giftGlass} studs of window onto the lobby`)
+		local desk = L.opening("shoe_desk")
+		t.truthy(desk.a >= L.FRONT_D + 8, "the shoe desk's counter starts 8 in from the doors")
+		t.truthy(desk.at + 0.9 + 2 <= (ent.a + ent.b) / 2 - 4, "its queue is off the walking line")
+		-- the main doors are on the Alley Walk's line (data/expansion.json xpath_alley_walk, x 1322)
 		local ex = AlleyLayout.toWorld(place, (ent.a + ent.b) / 2, 0, ent.at)
 		t.near(ex, 1322, 1e-6)
 	end)
@@ -227,6 +242,49 @@ return function(t)
 				end
 			end
 		end
+		-- the room's fixtures (jukebox, ledges, high tables, vending and change machines, the league board) fill the
+		-- bare bands between the tables' floors: each inside the room, off every table's floor, off the four studs
+		-- inside each opening, off every post, and a body's half width (1) off every staff route through the room
+		local kinds: { [string]: number } = {}
+		for _, f in L.GAMES_FIXTURES do
+			kinds[f.kind] = (kinds[f.kind] or 0) + 1
+			t.truthy(
+				f.x0 >= g.x0 - 0.01 and f.x1 <= g.x1 + 0.01 and f.d0 >= g.d0 - 0.01 and f.d1 <= g.d1 + 0.01,
+				`{f.id} inside the room`
+			)
+			for _, s in list do
+				local over = math.min(f.x1, s.x1) - math.max(f.x0, s.x0) > 0.01
+					and math.min(f.d1, s.d1) - math.max(f.d0, s.d0) > 0.01
+				t.falsy(over and f.kind ~= "board", `{f.id} stands on {s.id}'s floor`)
+			end
+			for _, o in L.OPENINGS do
+				if o.axis == "d" and o.at == L.GAME_ROOM_X0 then
+					local inDoor = f.x0 < g.x0 + 4 and math.min(f.d1, o.b) - math.max(f.d0, o.a) > -0.5
+					t.falsy(inDoor, `{f.id} stands in {o.id}`)
+				end
+			end
+			for _, p in L.POSTS do
+				t.falsy(
+					p.x > f.x0 - 1 and p.x < f.x1 + 1 and p.d > f.d0 - 1 and p.d < f.d1 + 1,
+					`{f.id} on post {p.id}`
+				)
+			end
+			if f.kind ~= "board" then
+				for id, pts in L.ROUTES do
+					for i = 2, #pts do
+						local a, b = pts[i - 1], pts[i]
+						for k = 0, 40 do
+							local X = a[1] + (b[1] - a[1]) * k / 40
+							local D = a[2] + (b[2] - a[2]) * k / 40
+							local near = X > f.x0 - 1.05 and X < f.x1 + 1.05 and D > f.d0 - 1.05 and D < f.d1 + 1.05
+							t.falsy(near, `{f.id} is in the way of route {id} at X {X} D {D}`)
+						end
+					end
+				end
+			end
+		end
+		t.truthy(kinds.jukebox == 1 and kinds.vending == 2 and kinds.change == 1 and kinds.board == 1)
+		t.truthy((kinds.high_table or 0) >= 4 and (kinds.ledge or 0) >= 2)
 		-- the air hockey table: a constant its game reads (x, d: the middle of the bed; yaw: its long axis from +X)
 		local ah = L.AIR_HOCKEY
 		t.truthy(type(ah.x) == "number" and type(ah.d) == "number" and type(ah.yaw) == "number")
@@ -360,130 +418,85 @@ return function(t)
 		t.near(ymm, 100, 1e-6)
 	end)
 
-	t.test("routes: nine vents and nine tunnels, in the ducts under each pair, ending on the rack", function()
-		t.eq(#mod.routes, 2 * AlleyLayout.PAIRS)
+	t.test("routes: one enclosed run per pair, grille to hood, in the duct, its two mouths and a crawl", function()
+		t.eq(#mod.routes, AlleyLayout.PAIRS)
 		local reg = data:routes()
 		for p = 1, AlleyLayout.PAIRS do
-			local vent = reg:get(9000 + 2 * p - 1)
-			local tunnel = reg:get(9000 + 2 * p)
-			t.truthy(vent and tunnel, `pair {p} routes in the registry`)
-			if not vent or not tunnel then
+			local run = reg:get(9000 + 2 * p)
+			t.truthy(run ~= nil, `pair {p} route in the registry`)
+			if not run then
 				continue
 			end
-			-- the server finds a pair's tunnel by the record's own field (Server/Attractions/AttractionService)
-			t.eq(alley.routes[2 * p - 1].pair, p)
-			t.eq(alley.routes[2 * p].pair, p)
-			t.eq(alley.routes[2 * p].id, 9000 + 2 * p)
-			t.eq(vent.kind, "trunk")
-			t.falsy(vent.flags.autoGrabExcluded, "walk-in can take the vent")
-			t.eq(tunnel.kind, "bridge")
-			t.eq(tunnel.origin, "attraction")
+			t.eq(run.kind, "tunnel")
+			t.eq(run.origin, "attraction")
+			-- the server finds a pair's run by the record's own field (Server/Attractions/AttractionService)
+			t.eq(alley.routes[p].pair, p)
+			t.eq(alley.routes[p].id, 9000 + 2 * p)
+			local spec = run.enclosure :: any
+			t.eq(spec.id, `alley.return.{p}`)
+			t.falsy(spec.climb)
+			t.eq(#spec.mouths, 2)
+			t.eq(spec.mouths[1].opens, "ground")
+			t.eq(spec.mouths[2].opens, "ledge")
 			local px = AlleyLayout.pairX(p)
-			-- the vent's foot is on the alley paving outside the rear wall
-			local foot = reg:foot(vent)
+			-- the grille mouth stands on the alley paving outside the rear wall, and opens toward the alley (+D)
+			local foot = reg:foot(run)
 			local fX, fY, fD = AlleyLayout.toLocal(place, foot.x, foot.y, foot.z)
-			t.truthy(fD > AlleyLayout.REAR_WALL_D + AlleyLayout.WALL_T, "foot outside the wall")
-			t.near(fY, AlleyLayout.ALLEY_Y, 0.1)
+			t.truthy(fD > AlleyLayout.REAR_WALL_D + AlleyLayout.WALL_T + 1, "the grille's mouth outside the wall")
+			t.near(fY, AlleyLayout.ALLEY_Y, 0.05)
 			t.near(fX, px, 1e-3)
-			-- every tunnel sample inside the duct (or the riser and the hood)
-			local samples = reg:samples(tunnel)
-			for _, s in samples do
+			local ox, oz = AlleyLayout.dirToWorld(place, 0, 1)
+			t.near(spec.mouths[1].out.x, ox, 1e-6)
+			t.near(spec.mouths[1].out.z, oz, 1e-6)
+			-- every sample is inside the duct across; from the top of the vent ramp to the riser, under the floor
+			for _, s in reg:samples(run) do
 				local X, Y, D = AlleyLayout.toLocal(place, s.x, s.y, s.z)
 				t.truthy(math.abs(X - px) < AlleyLayout.DUCT_W / 2, "inside the duct across")
-				if D > AlleyLayout.SHAFT_D1 then
+				if D > AlleyLayout.SHAFT_D1 and D < AlleyLayout.REAR_WALL_D - 1.6 then
 					t.truthy(
 						Y >= AlleyLayout.DUCT_FLOOR - 0.05 and Y < AlleyLayout.PIT_DUCT_CEIL - 1.0,
 						`under the floor at D {D}: Y {Y}`
 					)
 				end
 			end
-			local endP = reg:pointAt(tunnel, 1)
+			-- the end: the head in the hood's mouth over the rack, the ledge mouth opening toward the bowlers (-D)
+			local endP = reg:pointAt(run, 1)
 			local _, eY, eD = AlleyLayout.toLocal(place, endP.x, endP.y, endP.z)
-			t.truthy(eD < AlleyLayout.HOOD_D1, "pops out of the hood mouth")
+			t.truthy(eD < AlleyLayout.HOOD_D1 + 0.2 and eD > AlleyLayout.HOOD_D1 - 0.2, `at the hood's face ({eD})`)
 			t.truthy(eY > AlleyLayout.RACK_Y - 0.1 and eY < AlleyLayout.HOOD_H, "at rack height")
-			t.truthy(tunnel.length > 80, `the run is the length of the lane ({tunnel.length})`)
-			-- the vent's end meets the tunnel's start
-			local a, b = reg:pointAt(vent, 1), reg:pointAt(tunnel, 0)
-			t.truthy(math.abs(a.x - b.x) + math.abs(a.y - b.y) + math.abs(a.z - b.z) < 1e-3)
+			local bx, bz = AlleyLayout.dirToWorld(place, 0, -1)
+			t.near(spec.mouths[2].out.x, bx, 1e-6)
+			t.near(spec.mouths[2].out.z, bz, 1e-6)
+			t.truthy(run.length > 85, `the run is the length of the lane ({run.length})`)
+			-- full height the whole way under the floor, the pits included (the duct's floor is deep enough: the
+			-- six-lane house's 1.23 under the pits was below even a crawl); a crawl only inside the hood, where the
+			-- run comes up out of the riser and out of the mouth
+			t.truthy(
+				AlleyLayout.PIT_DUCT_CEIL - 0.22 - (AlleyLayout.DUCT_FLOOR + 0.02) >= Enclosure.BODY.height,
+				"headroom under the pits' joists"
+			)
+			t.truthy(AlleyLayout.ALLEY_Y + AlleyLayout.VENT_H - AlleyLayout.ALLEY_Y >= Enclosure.BODY.height + 0.2)
+			t.truthy(AlleyLayout.MOUTH_W >= 1.8 and AlleyLayout.MOUTH_Y1 - AlleyLayout.MOUTH_Y0 >= 1.4, "the mouth")
+			local h, crawl = Enclosure.headroom(spec, 1)
+			t.truthy(crawl and h >= Enclosure.BODY.crawlHeight, "a crawl at the hood's mouth")
+			local function tAtD(D: number): number
+				local lo, hi = 0, 0.9
+				for _ = 1, 50 do
+					local mid = (lo + hi) / 2
+					local q = reg:pointAt(run, mid)
+					local _, _, d = AlleyLayout.toLocal(place, q.x, q.y, q.z)
+					if d > D then
+						lo = mid
+					else
+						hi = mid
+					end
+				end
+				return lo
+			end
+			for _, D in { AlleyLayout.DECK_END + 0.1, AlleyLayout.PIT_END - 0.2, 30, AlleyLayout.REAR_WALL_D } do
+				local _, inCrawl = Enclosure.headroom(spec, tAtD(D))
+				t.falsy(inCrawl, `full height at D {D}`)
+			end
 		end
 	end)
-
-	t.test(
-		"a squirrel runs it: alley -> vent -> under the lane -> out on the rack; Space leaps at the bowler",
-		function()
-			local alleyY = place.floorY + AlleyLayout.ALLEY_Y
-			local function groundAt(x: number, z: number, _refY: number?): number
-				local _, _, D = AlleyLayout.toLocal(place, x, 0, z)
-				if D > AlleyLayout.REAR_WALL_D then
-					return alleyY
-				end
-				return math.max(Height.at(x, z), place.floorY)
-			end
-			local rail = RailWorld.build(data, function(x: number, z: number): number
-				return groundAt(x, z)
-			end)
-			local world = {
-				registry = rail.registry,
-				index = rail.index,
-				graph = rail.graph,
-				trampolines = {},
-				groundAt = groundAt,
-				blocked = function(_x: number, _z: number, _y: number): boolean
-					return false
-				end,
-				clamp = nil,
-			}
-			-- (the middle pair of the six-lane house, and the far pair of the eighteen)
-			for _, p in { 2, 9 } do
-				local px = AlleyLayout.pairX(p)
-				local sx, sy, sz = AlleyLayout.toWorld(place, px, AlleyLayout.ALLEY_Y, 88)
-				local state = SquirrelMotor.new(sx, sy, sz)
-				state.yaw = 0
-				-- the camera behind the squirrel looking toward the building: moving "forward" goes to local -D
-				local dX, dZ = AlleyLayout.dirToWorld(place, 0, -1)
-				local camYaw = math.atan2(-dX, -dZ)
-				local seen: { [string]: boolean } = {}
-				local routesSeen: { [number]: boolean } = {}
-				local frames = 0
-				for _ = 1, 60 * 30 do
-					frames += 1
-					local input = SquirrelMotor.idleInput(camYaw)
-					input.fw = 1
-					local _, events = SquirrelMotor.step(state, input, 1 / 60, world :: any)
-					for _, e in events do
-						seen[e.kind] = true
-						if e.routeId then
-							routesSeen[e.routeId] = true
-						end
-					end
-					if state.routeId == 9000 + 2 * p and state.railT >= 1 then
-						break
-					end
-				end
-				t.truthy(routesSeen[9000 + 2 * p - 1], "walked into the vent (walk-in grab)")
-				t.truthy(seen.autoSwitch, "switched into the tunnel at the vent's end")
-				t.eq(state.routeId, 9000 + 2 * p, "on the tunnel")
-				t.near(state.railT, 1, 1e-6)
-				local X, Y, D = AlleyLayout.toLocal(place, state.x, state.y, state.z)
-				t.truthy(
-					D < AlleyLayout.HOOD_D1 and math.abs(X - px) < 0.5 and Y > 1,
-					`out on the rack ({X}, {Y}, {D})`
-				)
-				local seconds = frames / 60
-				t.truthy(seconds > 3 and seconds < 20, `the run took {seconds} s`)
-				-- pop out: Space leaps along the body's heading (toward the bowlers' end), not back into the hood
-				local leap = SquirrelMotor.idleInput(camYaw)
-				leap.leap = true
-				SquirrelMotor.step(state, leap, 1 / 60, world :: any)
-				t.eq(state.routeId, nil)
-				local fx = 0
-				for _ = 1, 30 do
-					SquirrelMotor.step(state, SquirrelMotor.idleInput(camYaw), 1 / 60, world :: any)
-				end
-				local _, _, D2 = AlleyLayout.toLocal(place, state.x, state.y, state.z)
-				t.truthy(D2 < D - 1, `leapt toward the bowlers (D {D} -> {D2})`)
-				local _ = fx
-			end
-		end
-	)
 end

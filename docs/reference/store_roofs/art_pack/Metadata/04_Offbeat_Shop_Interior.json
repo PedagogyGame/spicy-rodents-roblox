@@ -1,0 +1,278 @@
+{
+  "asset": "04_Offbeat_Shop_Interior.glb",
+  "dimensions_m": {
+    "width": 14,
+    "depth": 12,
+    "height": 4.2
+  },
+  "gltf_axes": {
+    "up": "+Y",
+    "front": "-Z"
+  },
+  "blender_axes": {
+    "up": "+Z",
+    "front": "+Y"
+  },
+  "origin": "room footprint center, floor height 0",
+  "rooms": {
+    "retail": {
+      "x": [
+        -7,
+        1
+      ],
+      "gltf_z": [
+        -6,
+        6
+      ],
+      "area_m2": 96
+    },
+    "cafe": {
+      "x": [
+        1,
+        7
+      ],
+      "gltf_z": [
+        -6,
+        3
+      ],
+      "area_m2": 54
+    },
+    "office": {
+      "x": [
+        3,
+        7
+      ],
+      "gltf_z": [
+        3,
+        6
+      ],
+      "area_m2": 12
+    }
+  },
+  "triangle_count": 41264,
+  "mesh_objects": 355,
+  "largest_mesh_triangles": 2100,
+  "glb_bytes": 7153992,
+  "stool_count": 5,
+  "skateboard_count": 9,
+  "skateboards": [
+    "ROOT_Lunar_Moth",
+    "ROOT_Static_Weekend",
+    "ROOT_Ochre_Run",
+    "ROOT_Concrete_Fern",
+    "ROOT_Tidal_Check",
+    "ROOT_Ghost_Fish",
+    "ROOT_Violet_Comet",
+    "ROOT_Live_Wire",
+    "ROOT_Cache_Run"
+  ],
+  "poster": "THE SPICE SQUIRRELS; five female squirrel pop-band members",
+  "menu_prices": "blank",
+  "drinks": [
+    "Kombucha",
+    "Green tea",
+    "Bubble tea",
+    "Coffee",
+    "Soft drink"
+  ],
+  "food": [
+    "Grilled cheese",
+    "Ham sandwich",
+    "Chicken noodle soup",
+    "Tofu dish",
+    "Hamburger & french fries"
+  ],
+  "entrance": {
+    "node": "PORT_ShopEntrance",
+    "position_gltf_m": [
+      -3.78,
+      0,
+      -6
+    ],
+    "clear_width_m": 1.5
+  },
+  "colliders": [
+    {
+      "name": "RetailFloor",
+      "center": [
+        -3,
+        -0.12,
+        0
+      ],
+      "size": [
+        8,
+        0.24,
+        12
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "CafeFloor",
+      "center": [
+        4,
+        -0.11,
+        -1.5
+      ],
+      "size": [
+        6,
+        0.22,
+        9
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "OfficeFloor",
+      "center": [
+        4,
+        -0.11,
+        4.5
+      ],
+      "size": [
+        6,
+        0.22,
+        3
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "Left",
+      "center": [
+        -7.12,
+        2.1,
+        0
+      ],
+      "size": [
+        0.24,
+        4.2,
+        12.24
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "Back",
+      "center": [
+        0,
+        2.1,
+        6.12
+      ],
+      "size": [
+        14.48,
+        4.2,
+        0.24
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "Right",
+      "center": [
+        7.12,
+        2.1,
+        0
+      ],
+      "size": [
+        0.24,
+        4.2,
+        12.24
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "RoomDivider",
+      "center": [
+        1,
+        2.1,
+        2.45
+      ],
+      "size": [
+        0.16,
+        4.2,
+        7.1
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "RoomDivider",
+      "center": [
+        1,
+        2.1,
+        -4.95
+      ],
+      "size": [
+        0.16,
+        4.2,
+        2.1
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "OfficePartition",
+      "center": [
+        2.65,
+        2.1,
+        3
+      ],
+      "size": [
+        3.3,
+        4.2,
+        0.16
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "OfficePartition",
+      "center": [
+        6.35,
+        2.1,
+        3
+      ],
+      "size": [
+        1.3,
+        4.2,
+        0.16
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "RetailCheckout",
+      "center": [
+        -3.75,
+        0.56,
+        3.85
+      ],
+      "size": [
+        4.95,
+        1.18,
+        0.98
+      ],
+      "shape": "box"
+    },
+    {
+      "name": "CafeCounter",
+      "center": [
+        6.2,
+        0.55,
+        -0.4
+      ],
+      "size": [
+        1.2,
+        1.16,
+        6
+      ],
+      "shape": "box"
+    }
+  ],
+  "notes": [
+    "Three distinct rooms, retail larger than cafe; enclosed utility void beside office.",
+    "Retail checkout separate from cafe counter.",
+    "Parted bead curtain marks office entry.",
+    "Seven original complete skateboards rest in angled display behind retail checkout; graphics face upward and into room.",
+    "Window glass and roof are separately named/removable.",
+    "Rooftop Social Club flyer and small chili/acorn checkout motif are original subtle visual callbacks.",
+    "Preview lights are not exported; recreate local lights in the target engine.",
+    "Game integration and Roblox playtest are not performed.",
+    "v2 adds Live Wire and Cache Run on an upper display shelf; nine boards total.",
+    "Night Route is an unrigged display jacket on the retail wall.",
+    "Additional caf\u00e9 signs, an Old Town print and a lost-and-found jar are art only.",
+    "Shop_Flair_Only.glb is already included in this full scene; do not load it twice."
+  ]
+}

@@ -60,13 +60,24 @@ AlleyLayout.WALL_T = 0.8
 AlleyLayout.ALLEY_Y = -3.5 -- the alley's paving, below the floor (the site slopes down to the rear)
 AlleyLayout.ALLEY_D1 = 101
 
--- Under the floor: the ball-return duct under each pair of lanes (the squirrel tunnel).
-AlleyLayout.DUCT_W = 1.7
-AlleyLayout.DUCT_FLOOR = -3.0 -- top of the duct floor
+-- Under the floor: the ball-return duct under each pair of lanes (the squirrel's enclosed run, Shared/Routes/
+-- Enclosure: the body is 1.6 wide and 1.7 high, and may crouch to 1.3 only where its route declares a crawl).
+-- The duct is sized for the body all the way: 2.0 wide; its floor deep enough that under the pits (where the
+-- ceiling is the pit floor's underside) there is still 1.9 of headroom below the joists; the riser a hole through
+-- the approach floor 2.1 long, so a body climbing it (its back toward the pins) clears the floor's edge; the vent
+-- in the rear foundation 2.0 high (VENT_H). tests/unit/attractions_runthrough.spec.luau sweeps the body along all
+-- nine runs through the baked building and allows nothing in the way.
+AlleyLayout.DUCT_W = 2.0
+AlleyLayout.DUCT_FLOOR = -3.9 -- top of the duct floor (0.4 below the alley's paving: a short ramp down at the vent)
 AlleyLayout.DUCT_CEIL = -0.4 -- underside of the finished floor
 AlleyLayout.PIT_DUCT_CEIL = AlleyLayout.PIT_Y - 0.15 -- under the pits the duct is lower
-AlleyLayout.SHAFT_D0 = -2.6 -- the riser into the ball-return hood
+AlleyLayout.SHAFT_D0 = -3.0 -- the riser into the ball-return hood (a hole through the approach floor)
 AlleyLayout.SHAFT_D1 = -0.9
+AlleyLayout.VENT_H = 2.0 -- the vent's opening above the alley paving
+-- The duct's lamps and the riser's glow: a light without shadows shines through parts, so its reach stays inside
+-- the duct (each sits at least this far below every floor above it: nothing on the lanes, in the gutters or the
+-- pits, or round a bowler's feet is lit from below).
+AlleyLayout.TUNNEL_LIGHT_RANGE = 1.6
 
 -- Ball and pins (the physics parts).
 AlleyLayout.BALL_D = 0.86 -- 8.5 in
@@ -75,8 +86,11 @@ AlleyLayout.PIN_H = 1.45 -- 15 in
 -- Ball return hood and rack (one per pair, between the two approaches).
 AlleyLayout.HOOD_D0 = -0.8
 AlleyLayout.HOOD_D1 = -4.2
-AlleyLayout.HOOD_W = 2.0
-AlleyLayout.HOOD_H = 2.5
+AlleyLayout.HOOD_W = 2.3 -- outside; hollow inside, its mouth MOUTH_W x MOUTH_H over the rack
+AlleyLayout.HOOD_H = 3.3 -- the crown (about 34 in, a real return's height)
+AlleyLayout.MOUTH_W = 1.9
+AlleyLayout.MOUTH_Y0 = 1.5 -- the mouth's sill: the rack rails' top at the hood
+AlleyLayout.MOUTH_Y1 = 3.0
 AlleyLayout.RACK_D1 = -10.4
 AlleyLayout.RACK_Y = 1.5 -- rail tops at the hood end; they fall 0.15 toward the bowler
 
@@ -234,6 +248,30 @@ AlleyLayout.AIR_HOCKEY_SIZE = { across = 6.2, along = 11.5 }
 
 -- (Where each game is played is its own Spec's business: Shared/Minigames/Games.stations.)
 
+-- The room's own fixtures, between the tables' floors: a jukebox by the arch, a drink ledge with stools along
+-- the partition and high tables with stools in the bare front band (X 101.6..125.6, D -59..-23), a second ledge
+-- by the side arch and two more high tables in the middle band (D -2.9..15.7), two vending machines and a change
+-- machine (they take no money: brief v2 §15, mild and no gambling) on the east wall clear of the darts, and the
+-- league board over the back bench. Each is a rectangle on the floor (what stands there, stools included); none
+-- overlaps a table's floor, an opening's four studs or a staff route (tests/unit/attractions_alley.spec.luau),
+-- and tools/bake/alley/GamesRoom builds them.
+export type Fixture = { id: string, kind: string, x0: number, x1: number, d0: number, d1: number, face: { number } }
+AlleyLayout.GAMES_FIXTURES = {
+	{ id = "jukebox", kind = "jukebox", x0 = 101.8, x1 = 103.6, d0 = -30.6, d1 = -28.2, face = { 1, 0 } },
+	{ id = "ledge_front", kind = "ledge", x0 = 101.7, x1 = 105.4, d0 = -58, d1 = -48.5, face = { 1, 0 } },
+	{ id = "high_table_1", kind = "high_table", x0 = 108.4, x1 = 113.6, d0 = -55.6, d1 = -50.4, face = { 0, 1 } },
+	{ id = "high_table_2", kind = "high_table", x0 = 108.4, x1 = 113.6, d0 = -48.6, d1 = -43.4, face = { 0, 1 } },
+	{ id = "high_table_3", kind = "high_table", x0 = 114.4, x1 = 119.6, d0 = -55.6, d1 = -50.4, face = { 0, 1 } },
+	{ id = "high_table_4", kind = "high_table", x0 = 114.4, x1 = 119.6, d0 = -48.6, d1 = -43.4, face = { 0, 1 } },
+	{ id = "ledge_side", kind = "ledge", x0 = 101.7, x1 = 105.4, d0 = 6.5, d1 = 14.5, face = { 1, 0 } },
+	{ id = "high_table_5", kind = "high_table", x0 = 109.4, x1 = 114.6, d0 = 5.4, d1 = 10.6, face = { 0, 1 } },
+	{ id = "high_table_6", kind = "high_table", x0 = 116.4, x1 = 121.6, d0 = 5.4, d1 = 10.6, face = { 0, 1 } },
+	{ id = "vending_1", kind = "vending", x0 = 146.6, x1 = 148.9, d0 = -1.8, d1 = 0.9, face = { -1, 0 } },
+	{ id = "vending_2", kind = "vending", x0 = 146.6, x1 = 148.9, d0 = 1.3, d1 = 4.0, face = { -1, 0 } },
+	{ id = "change_machine", kind = "change", x0 = 147.6, x1 = 148.9, d0 = 12.2, d1 = 13.8, face = { -1, 0 } },
+	{ id = "league_board", kind = "board", x0 = 110, x1 = 136, d0 = 29.8, d1 = 30, face = { 0, -1 } },
+} :: { Fixture }
+
 export type Rect = { x0: number, x1: number, d0: number, d1: number }
 export type Standing = { id: string, x0: number, x1: number, d0: number, d1: number }
 
@@ -289,15 +327,16 @@ export type Zone = {
 local T = AlleyLayout.PARTITION_T
 local FD, CD = AlleyLayout.FRONT_D, AlleyLayout.CONCOURSE_D0
 -- the front rooms' cross walls stand on these lines (each wall T thick, centred)
-AlleyLayout.FRONT_WALLS_X = { -2, 14, 30, 54, 88 }
-AlleyLayout.ENTRANCE = { x0 = 18, x1 = 26 } -- the main doors in the front wall (on the Alley Walk's line)
+-- (the lobby is 21.4 wide: a foyer, not a passage; the gift shop gives it a glass shopfront and a door)
+AlleyLayout.FRONT_WALLS_X = { -2, 14, 36, 57, 88 }
+AlleyLayout.ENTRANCE = { x0 = 16, x1 = 28 } -- the main double doors, 12 wide, on the Alley Walk's line (x 1322)
 
 AlleyLayout.ZONES = {
 	{ id = "ball_shop", label = "BOWLING BALL SHOP", x0 = AlleyLayout.X0, x1 = -2 - T / 2, d0 = FD, d1 = CD - T },
 	{ id = "shoe_rental", label = "SHOE RENTAL", x0 = -2 + T / 2, x1 = 14 - T / 2, d0 = FD, d1 = CD - T },
-	{ id = "lobby", label = "LOBBY", x0 = 14 + T / 2, x1 = 30 - T / 2, d0 = FD, d1 = CD, open = true },
-	{ id = "gift_shop", label = "GIFT SHOP", x0 = 30 + T / 2, x1 = 54 - T / 2, d0 = FD, d1 = CD - T },
-	{ id = "snack_bar", label = "SNACK BAR", x0 = 54 + T / 2, x1 = 88 - T / 2, d0 = FD, d1 = CD - T },
+	{ id = "lobby", label = "LOBBY", x0 = 14 + T / 2, x1 = 36 - T / 2, d0 = FD, d1 = CD, open = true },
+	{ id = "gift_shop", label = "GIFT SHOP", x0 = 36 + T / 2, x1 = 57 - T / 2, d0 = FD, d1 = CD - T },
+	{ id = "snack_bar", label = "SNACK BAR", x0 = 57 + T / 2, x1 = 88 - T / 2, d0 = FD, d1 = CD - T },
 	{ id = "lockers", label = "LOCKERS", x0 = 88 + T / 2, x1 = AlleyLayout.HALL_X1, d0 = FD, d1 = CD, open = true },
 	{ id = "concourse", label = "CONCOURSE", x0 = AlleyLayout.X0, x1 = AlleyLayout.HALL_X1, d0 = CD, d1 = -24 },
 	{
@@ -391,7 +430,8 @@ end
 -- D a .. b. `head` is the height of the opening's top. kind: "door" (a doorway), "arch" (a wide cased opening),
 -- "counter" (a serving opening: its counter leaves COUNTER_GAP clear at the far end for the staff to walk
 -- through), "window" (a serving opening with a counter the whole width), "open" (no wall at all, a beam
--- overhead), "exit" (the steel push-bar doors).
+-- overhead), "exit" (the steel push-bar doors), "glass" (a shopfront: a low sill and glass to `head`, seen
+-- through, not walked through).
 export type Opening = {
 	id: string,
 	axis: string,
@@ -418,7 +458,7 @@ AlleyLayout.OPENINGS = {
 		axis = "x",
 		at = CD,
 		a = 14 + T / 2,
-		b = 30 - T / 2,
+		b = 36 - T / 2,
 		head = 9,
 		kind = "open",
 		between = { "lobby", "concourse" },
@@ -437,7 +477,7 @@ AlleyLayout.OPENINGS = {
 		id = "shoe_desk",
 		axis = "d",
 		at = 14,
-		a = -64,
+		a = -60, -- (the counter starts 8 in from the doors: its queue is off the way in)
 		b = -50,
 		head = 8.4,
 		kind = "counter",
@@ -457,17 +497,47 @@ AlleyLayout.OPENINGS = {
 		id = "gift_shop_door",
 		axis = "x",
 		at = CD,
-		a = 38,
-		b = 46,
+		a = 41,
+		b = 49,
 		head = 7.2,
 		kind = "door",
 		between = { "gift_shop", "concourse" },
 	},
 	{
+		id = "gift_lobby_door",
+		axis = "d",
+		at = 36,
+		a = -60,
+		b = -54,
+		head = 7.2,
+		kind = "door",
+		between = { "lobby", "gift_shop" },
+	},
+	{
+		id = "gift_window_front",
+		axis = "d",
+		at = 36,
+		a = -67,
+		b = -61.2,
+		head = 7.6,
+		kind = "glass",
+		between = { "lobby", "gift_shop" },
+	},
+	{
+		id = "gift_window_back",
+		axis = "d",
+		at = 36,
+		a = -52.8,
+		b = -49.2,
+		head = 7.6,
+		kind = "glass",
+		between = { "lobby", "gift_shop" },
+	},
+	{
 		id = "snack_counter",
 		axis = "x",
 		at = CD,
-		a = 58,
+		a = 60,
 		b = 84,
 		head = 8.4,
 		kind = "counter",
@@ -635,7 +705,7 @@ AlleyLayout.POSTS = {
 	{ id = "ball_counter", x = -8, d = -53, zone = "ball_shop", face = { 0, 1 }, what = "the ball shop's counter" },
 	{ id = "ball_wall", x = -23, d = -58, zone = "ball_shop", face = { -1, 0 }, what = "the wall of balls" },
 	{ id = "ball_drill", x = -20, d = -65, zone = "ball_shop", face = { 0, -1 }, what = "the drilling bench" },
-	{ id = "gift_counter", x = 34, d = -62, zone = "gift_shop", face = { 1, 0 }, what = "the gift shop's counter" },
+	{ id = "gift_counter", x = 46, d = -64, zone = "gift_shop", face = { 0, 1 }, what = "the gift shop's counter" },
 	{ id = "gift_shelves", x = 50, d = -58, zone = "gift_shop", face = { 1, 0 }, what = "the souvenir shelves" },
 	{ id = "snack_till", x = 62, d = -51.5, zone = "snack_bar", face = { 0, 1 }, what = "the snack bar's till" },
 	{ id = "snack_grill", x = 70, d = -65, zone = "snack_bar", face = { 0, -1 }, what = "the grill and fryer" },
@@ -726,7 +796,9 @@ AlleyLayout.ROUTES = {
 	-- the ball shop, from its door
 	ball_shop = { { -12, -36 }, { -13, -44 }, { -13, -53 }, { -8, -53 }, { -23, -58 }, { -20, -65 } },
 	-- the gift shop, from its door
-	gift_shop = { { 37, -36 }, { 42, -44 }, { 42, -55 }, { 34, -62 }, { 50, -58 } },
+	gift_shop = { { 45, -36 }, { 45, -44 }, { 45, -55 }, { 46, -64 }, { 50, -58 } },
+	-- the gift shop from the lobby, through its door in the shopfront
+	gift_lobby = { { 22, -57 }, { 33, -57 }, { 39, -57 }, { 46, -64 } },
 	-- the snack bar: from the concourse through the gap at the counter's end to the grill, the till and the fridge
 	snack_bar = { { 86, -36 }, { 82.5, -44 }, { 82.5, -50 }, { 82.5, -58 }, { 70, -65 }, { 62, -51.5 }, { 85, -62 } },
 	-- the west aisle from the concourse to the machine-room door, and the east aisle
@@ -792,8 +864,22 @@ end
 --   interim: the box of the interim back module (below), which the backstage replaces.
 --   interimFrom: until it arrives, everything behind the pinsetters (D > interimFrom: the back corridor, the rear
 --     wall, the exit doors, the stoop, the rear alley and its fence) and the stand-in pinsetter machines are the
---     bake's "BackModule" (and "Doors"): one model the backstage replaces whole. The lanes' own playing parts
---     (beds, decks, pits, pins, sweeps, kickbacks, masking units), the nine tunnels and the hall stay.
+--     bake's "BackModule" (and "Doors"), and each ball-return run's tail behind interimFrom is its tunnel's model
+--     "Tail" (Tunnels.Tunnel<p>.Tail, with the carve box TerrainCarve.DuctTail<p>): what the backstage replaces
+--     whole is exactly `replaces`. The lanes' own playing parts (beds, decks, pits, pins, sweeps, kickbacks,
+--     masking units), the tunnels in front of interimFrom and the hall stay.
+--   mustKeep: what the brief requires of the back of house (brief v2 §13a) that the package's inventory does not
+--     have: the swap re-places each against the package's rear court and keeps it working.
+--   returnLegs: the nine squirrel runs (data/attractions.json routes 9002..9018, Shared/Routes/Enclosure) run on
+--     behind interimFrom to their grilles in the rear alley's wall. Behind interimFrom each is moved onto the
+--     package's return-channel crawl route ("the low access ledges and return channels are intended for a small
+--     squirrel"), its grille mouth where that route meets the rear court; tests/unit/attractions_runthrough.spec
+--     holds the result to the same clearance as today's.
+--   overlapsHall: the package's eighteen bays (setting decks, sweeps, elevators) start at the anchor, so they fill
+--     the same D range as these parts of the hall, which stay (the game's bowling moves the pins, the sweep and the
+--     ball in them): the swap hides the package's demonstration pins and balls (its handoff says to) and any of
+--     its deck, sweep or pit pieces that would stand in this volume, or registers its bays above our masking line.
+--     tests/unit/attractions_alley_bake.spec.luau holds this list to the bake.
 do
 	local authoredPitch = 5.714286
 	local scale = AlleyLayout.PITCH / authoredPitch
@@ -824,7 +910,83 @@ do
 		},
 		bays = AlleyLayout.LANES,
 		returns = AlleyLayout.PAIRS,
+		-- (paths under the alley's root; <p> a pair, <n> a lane)
+		replaces = { "BackModule", "Doors", "Tunnels.Tunnel<p>.Tail", "TerrainCarve.DuctTail<p>" },
+		mustKeep = {
+			{
+				what = "the steel push-bar exit doors to the alley",
+				now = "Doors.ExitDoorL, Doors.ExitDoorR",
+				keep = "a pair in the rear court's outer wall; Server/Attractions/AttractionService swings every Model under Doors whose attribute Door is push_bar",
+			},
+			{
+				what = "three big round dark-blue used trash cans",
+				now = "BackModule.AlleyProps.TrashCan1..3",
+				keep = "outside that door, beside the first grilles",
+			},
+			{
+				what = "a push broom leaning by the door",
+				now = "BackModule.AlleyProps.Broom*",
+				keep = "within 4 studs of the door",
+			},
+			{
+				what = "a way in for the squirrel at each pair's grille, on its feet from the ground outside",
+				now = "Tunnels.Tunnel<p>.Tail (VentSill, VentRamp, VentLintel, VentFrame*, Grille)",
+				keep = "nine grille mouths on the rear court, each the start of its run (returnLegs)",
+			},
+		},
+		returnLegs = {
+			from = AlleyLayout.MACHINE_D1,
+			routes = { 9002, 9004, 9006, 9008, 9010, 9012, 9014, 9016, 9018 },
+		},
+		overlapsHall = {
+			d0 = anchorD,
+			d1 = AlleyLayout.MACHINE_D1,
+			-- (paths as above, a number at the end of a part's name dropped; the foundation under the floor left out)
+			parts = {
+				"Lanes.Lane<n>.Bed",
+				"Lanes.Lane<n>.Boards",
+				"Lanes.Lane<n>.Seam",
+				"Lanes.Lane<n>.Deck",
+				"Lanes.Lane<n>.PinSpot",
+				"Lanes.Lane<n>.Pins",
+				"Lanes.Lane<n>.Gutter",
+				"Lanes.Lane<n>.GutterLip",
+				"Lanes.Lane<n>.Sweep",
+				"Lanes.Lane<n>.SweepEdge",
+				"Lanes.Lane<n>.PitFloor",
+				"Lanes.Lane<n>.PitBack",
+				"Lanes.Lane<n>.Cushion",
+				"Lanes.Lane<n>.LiftDoor",
+				"Masking.Kickback",
+				"Masking.KickbackTrim",
+				"Masking.PinLight",
+				"Tunnels.Tunnel<p>.Floor",
+				"Tunnels.Tunnel<p>.Rail",
+				"Tunnels.Tunnel<p>.Ceiling",
+				"Tunnels.Tunnel<p>.Rib",
+				"Tunnels.Tunnel<p>.Joist",
+				"Tunnels.Tunnel<p>.Lamp",
+			} :: { string },
+		},
 	}
 end
+
+-- THE HALL'S ROOF (brief addendum D9, D10: rafters over the lanes where a sneaking squirrel can be spotted) -------
+-- Over the lanes the hall has a flat hung ceiling at CEILING_Y under a roof deck; the alley roof run
+-- (feat/alley-roof, Shared/Attractions/AlleyRoof) raises it to a trussed roof. Everything that belongs to the roof
+-- over this rectangle is one model, `model`, which that lane replaces whole (as the backstage replaces the back
+-- module): the roof deck and its plant, the hung ceiling, and the lights in it (the lanes' troffers, cans and
+-- washes, the aisles' troffers). `hung` names what hangs from that ceiling elsewhere in the bake and must be hung
+-- again from the new roof (tests/unit/attractions_alley_bake.spec.luau holds both lists to the bake).
+AlleyLayout.HALL_ROOF = {
+	model = "HallRoof",
+	owner = "the alley roof run (addendum D9, D10; feat/alley-roof)",
+	x0 = AlleyLayout.X0,
+	x1 = AlleyLayout.HALL_X1,
+	d0 = -24, -- the concourse's back edge: the settees, the approaches, the lanes and both aisles
+	d1 = AlleyLayout.MACHINE_D1,
+	holds = { "Roof", "RoofUnit*", "CeilingLanes", "LaneLights", "AisleLights" },
+	hung = { "Masking.MaskFace", "Scoreboards.Lane<n>.Hanger" } :: { string },
+}
 
 return AlleyLayout

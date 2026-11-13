@@ -1223,37 +1223,37 @@
       "district": "liberty_quarter",
       "status": "new",
       "approval": "park with gazebo",
-      "position": { "x": 1270, "z": -679 },
+      "position": { "x": 1270, "z": -649 },
       "facing": "-Z",
       "yaw": 3.141593,
-      "footprint": { "w": 230, "d": 90 },
-      "site": { "x0": -115, "x1": 115, "d0": -45, "d1": 45 },
+      "footprint": { "w": 230, "d": 150 },
+      "site": { "x0": -115, "x1": 115, "d0": -75, "d1": 75 },
       "storeys": 1,
       "height": 0,
-      "floorY": 10.34,
-      "ground": { "min": 5.75, "max": 10.34 },
+      "floorY": 10.93,
+      "ground": { "min": 5.51, "max": 10.93 },
       "entrances": [
-        { "id": "south_gate", "at": [0, -45], "width": 8, "kind": "opening", "path": "frontage" },
-        { "id": "south_gate_2", "at": [-80, -45], "width": 6, "kind": "opening", "path": "frontage" }
+        { "id": "south_gate", "at": [0, -75], "width": 8, "kind": "opening", "path": "frontage" },
+        { "id": "south_gate_2", "at": [-80, -75], "width": 6, "kind": "opening", "path": "frontage" }
       ],
       "anchors": [
         {
           "id": "notice_board",
           "kind": "billboard",
-          "at": [-30, 0, -36],
+          "at": [-30, 0, -66],
           "yaw": 0,
           "owner": "F2",
           "note": "NPC mini-missions board (walk Mrs. Harrison's dog...)"
         },
-        { "id": "bench_1", "kind": "seat", "at": [-60, 0, -10], "yaw": 0, "owner": "F2" },
-        { "id": "bench_2", "kind": "seat", "at": [60, 0, -10], "yaw": 0, "owner": "F2" },
-        { "id": "bench_3", "kind": "seat", "at": [-20, 0, 39], "yaw": 0, "owner": "F2" },
-        { "id": "bench_4", "kind": "seat", "at": [20, 0, 39], "yaw": 0, "owner": "F2" },
-        { "id": "kite_spot", "kind": "zone", "at": [70, 0, 29], "yaw": 0, "owner": "F4", "note": "kite launch spot" }
+        { "id": "bench_1", "kind": "seat", "at": [-60, 0, -40], "yaw": 0, "owner": "F2" },
+        { "id": "bench_2", "kind": "seat", "at": [60, 0, -40], "yaw": 0, "owner": "F2" },
+        { "id": "bench_3", "kind": "seat", "at": [-20, 0, 20], "yaw": 0, "owner": "F2" },
+        { "id": "bench_4", "kind": "seat", "at": [20, 0, 20], "yaw": 0, "owner": "F2" },
+        { "id": "kite_spot", "kind": "zone", "at": [70, 0, 30], "yaw": 0, "owner": "F4", "note": "kite launch spot" }
       ],
       "features": ["lawn_paths", "benches", "lamps", "flower_beds", "notice_board"],
       "partBudget": 500,
-      "notes": "The new green between the steakhouse and Chapel Street, facing the school and the church; the bandstand sits inside it. Its northern 60 studs (z -634..-574) were given up on 2026-11-13 to the ground the bowling alley keeps for the owner's backstage (data/attractions.json reserve) and the service alley behind it: the green is now z -724..-634, its south edge, gates, notice board, benches 1 and 2 and the bandstand where they were; benches 3 and 4 and the kite spot moved south to just north of the bandstand."
+      "notes": "The new green between the steakhouse and Chapel Street, facing the school and the church; the bandstand sits inside it. Its northern edge (about z -610..-574) lies in the ground the bowling alley keeps for the owner's backstage (data/attractions.json reserve, givesWayOnArrival): by the owner's default the green gives that edge up only when the backstage package arrives, and keeps its bandstand. Until then it is the green's."
     },
     {
       "id": "f2_gazebo",
@@ -1606,7 +1606,7 @@
       "facing": "+Z",
       "yaw": 0,
       "footprint": { "w": 96, "d": 64 },
-      "site": { "x0": -105, "x1": 204, "d0": -36, "d1": 179 },
+      "site": { "x0": -105, "x1": 225, "d0": -36, "d1": 179 },
       "storeys": 1,
       "height": 20,
       "floorY": 18.2,
@@ -1674,7 +1674,7 @@
         "kitchen_dumpster"
       ],
       "partBudget": 1700,
-      "notes": "Front onto Bowl Lane; the bar, deck and sand court stretch east toward the bowling alley (x 1271). The site's eastern 21 studs (x 1234..1255) were given up on 2026-11-13 to the ground the bowling alley keeps for the owner's backstage (data/attractions.json reserve); nothing anchored stood there (the sand court's centre is 29 studs inside the new edge)."
+      "notes": "Front onto Bowl Lane; the bar, deck and sand court stretch east toward the bowling alley (x 1271). The site's eastern 21 studs (x 1234..1255) lie in the ground the bowling alley keeps for the owner's backstage (data/attractions.json reserve, givesWayOnArrival): by the owner's default they are given up only when the backstage package arrives; nothing anchored stands there."
     },
     {
       "id": "f3_lounge_classic",

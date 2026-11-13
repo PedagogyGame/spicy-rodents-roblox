@@ -74,5 +74,17 @@ return function(t)
 		t.eq(guard.CollisionGroup, "LaneGuard")
 		t.truthy(guard.CanCollide)
 		t.eq(guard.Transparency, 1)
+		-- and along the two outer side walls (lane 1's and lane 18's), too tall to jump: a person jumps 7.2
+		local sides = 0
+		for _, d in root:GetDescendants() do
+			if d.Name == "LaneGuardSide" then
+				sides += 1
+				t.eq(d.CollisionGroup, "LaneGuard")
+				t.truthy(d.CanCollide and not d.CanQuery and d.Transparency == 1)
+				t.truthy(d.Size.Y >= 9 - 1e-3, "taller than a jump")
+				t.truthy(d.Size.Z >= AlleyLayout.MACHINE_D0 - AlleyLayout.FOUL_D, "from the foul line to the masking")
+			end
+		end
+		t.eq(sides, 2)
 	end)
 end

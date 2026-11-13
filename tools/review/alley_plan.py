@@ -50,6 +50,7 @@ OPENING_COL = {
     "counter": (226, 120, 20),
     "window": (226, 120, 20),
     "exit": (200, 40, 40),
+    "glass": (90, 170, 220),
 }
 OPENING_WORD = {
     "door": "door",
@@ -58,6 +59,7 @@ OPENING_WORD = {
     "counter": "counter",
     "window": "window",
     "exit": "exit doors",
+    "glass": "shop window",
 }
 SKIP_MODELS = {
     "Foundation", "Tunnels", "TerrainCarve", "Ceilings", "HouseLights", "LaneLights", "Scoreboards", "Floors",
@@ -218,7 +220,15 @@ def draw_plan(data):
     for st in data["standing"]:
         pn.dashed_rect(st["x0"], st["x1"], st["d0"], st["d1"], (20, 110, 60, 220), 1, (5, 4))
 
-    # air hockey: the reserved table
+    # the games room's fixtures (AlleyLayout.GAMES_FIXTURES): jukebox, ledges, high tables, machines, the board
+    words = {"jukebox": "JUKEBOX", "ledge": "ledge", "high_table": "table", "vending": "soda", "change": "tokens",
+             "board": "LEAGUE BOARD"}
+    for fx in data.get("fixtures", []):
+        pn.rect(fx["x0"], fx["x1"], fx["d0"], fx["d1"], fill=(214, 150, 70, 150), outline=(130, 80, 30, 255), width=1)
+        pn.text((fx["x0"] + fx["x1"]) / 2, (fx["d0"] + fx["d1"]) / 2 + (1.6 if fx["kind"] == "board" else 0),
+                words.get(fx["kind"], fx["kind"]), 9, fill=(90, 50, 10), bold=True)
+
+    # air hockey: the table (its place is AlleyLayout.AIR_HOCKEY; the game bakes it there)
     ah, size = data["airHockey"], data["airHockeySize"]
     along_x = abs(math.cos(ah["yaw"])) > 0.5
     hx = size["along"] / 2 if along_x else size["across"] / 2
@@ -229,7 +239,7 @@ def draw_plan(data):
         px = ah["x"] + sgn * (hx + 2) if along_x else ah["x"]
         pd = ah["d"] if along_x else ah["d"] + sgn * (hd + 2)
         pn.dot(px, pd, 5, (20, 70, 160, 255))
-    pn.text(ah["x"], ah["d"], "AIR HOCKEY\n(reserved)", 12, fill=(10, 50, 130), bold=True)
+    pn.text(ah["x"], ah["d"], "AIR HOCKEY", 12, fill=(10, 50, 130), bold=True)
 
     # darts: the oche
     b = data["board"]
@@ -446,9 +456,9 @@ def draw_site(data, width):
     label(1380, -312, "Bowl Lane", 9)
     label(1680, -312, "turning\ncircle", 8)
     label(1322, -262, "Alley Walk to\nMain Street", 8)
-    label(1596, -462, "the two lounges and the racquet\nclub moved 88 east along the lane\n(grey dashes: where they were)", 9, (80, 80, 80))
-    label(1186, -604, "the green gave up\nits northern 60", 9, (80, 80, 80))
-    label(1196, -440, "the steakhouse site\ngave up its\neastern 21", 9, (80, 80, 80))
+    label(1596, -462, "QUESTION FOR YOU: the two lounges and\nthe racquet club moved 88 east\n(grey dashes: where they were drawn)", 9, (150, 30, 100))
+    label(1186, -604, "the green keeps its edge\nuntil the backstage arrives", 9, (80, 80, 80))
+    label(1196, -440, "the steakhouse site\nkeeps its eastern 21\nuntil then too", 9, (80, 80, 80))
     d.rectangle([0, 0, width - 1, h - 1], outline=INK, width=1)
     return img
 
@@ -488,7 +498,7 @@ def legend(data, width, height):
     row(swatch(None, OPENING_COL["exit"] + (255,)), "steel exit doors (red)")
     row(lambda u, v: (d.rectangle([u - 6, v - 6, u + 6, v + 6], fill=(240, 150, 20)),
                       d.text((u, v + 0.5), "E", font=font(10, True), fill=(255, 255, 255), anchor="mm")),
-        "where a player presses E to play (26 places)")
+        f"where a player presses E to play ({len(data['stations'])} places)")
     row(dash_key((20, 110, 60), 1, (5, 4)), "floor a games table keeps clear for its players")
     row(lambda u, v: d.ellipse([u - 8, v - 8, u + 8, v + 8], fill=(120, 60, 170)),
         "staff post (numbered below); small dots: one behind each machine")
@@ -548,7 +558,7 @@ def main():
     d.text((margin, 16), "BELLWETHER BOWL: the eighteen-lane floor plan", font=font(34, True), fill=INK)
     d.text((margin, 58),
            "Drawn as you walk in: the street and the main doors at the bottom, lane 1 on the left, the pins and the "
-           "back of house at the top. Everything shown is built, except the air hockey table (its place is kept). The shops are "
+           "back of house at the top. Everything shown is built. The shops are "
            "finished empty rooms: fittings and staff come next.",
            font=font(14), fill=INK)
     img.paste(pn.img, (margin, title_h))
