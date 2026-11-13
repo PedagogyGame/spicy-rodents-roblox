@@ -1,0 +1,1372 @@
+--!strict
+-- ServerScriptService.Server.Rides.SkyLiftService
+-- The sky lift's server half (brief v2 line 250 "A sky lift up a slight hill to a hilltop restaurant"; §15 "no
+-- controls, no score, you get on and it happens"; §14 "Boarding the sky-lift gondola ... switches to first person
+-- automatically; the toggle remains"). The cabins are never sent over the network: every client draws them from
+-- the shared clock (Shared/Rides/SkyLift, the one source of truth). This service only holds the people in them.
+--   * Publishes the lift's epoch once (ReplicatedStorage attribute SkyLift.EPOCH_ATTRIBUTE; an existing one is
+--     kept, the DayClock pattern) and carves the boot terrain out of every TerrainCarve folder under the F4 bake.
+--   * A gate prompt at each station (E; attribute Door = true so E belongs to the prompt and not to a car):
+--     "Ride the sky lift to the Lookout" at the base, "Ride the sky lift down to town" at the summit. Whoever
+--     presses it is booked a seat in the next cabin with room (four to a cabin) and told "Next cabin in N s"; the
+--     board over the gate counts down and the gate's arm lifts while a cabin's doors are open. Walking more than
+--     WANDER studs from the gate gives the place up, with words. Refusals always say why: animals, drivers,
+--     players in a game, a patient (Town.canRide); a full cabin is not a refusal (you get the next one).
+--   * Boarding happens at SkyLift.nextDeparture's boardAt (the cabin is beside the platform, doors open): the
+--     body's root is anchored, the Humanoid is seated on one of 24 server Seats (cabin c, seat k; invisible, no
+--     collision) and both are moved every step to SkyLift.seat; the body carries attribute Ride = "c/k" (the
+--     client re-places every body with a Ride attribute onto its own drawing of the cabin before each frame); the
+--     player gets DeviceGranted { device = "ride", kind = "gondola", ... } (first person on boarding; V still
+--     toggles: Client/Camera/CameraPolicy) and the player attribute OnRide = "sky_lift".
+--   * At arriveAt the body stands STEP_BACK studs back from the far platform's alight point facing away from the
+--     cabin, its root unanchored and handed back to its player, DeviceReleased("ride_end"), and the notice
+--     "Welcome to the Lookout" or "Back in town".
+--   * A rider whose player leaves (or takes another body) mid-ride: the body is held (Town.hold: its brain stays
+--     suspended and the service keeps placing it on its seat) until the far platform, where it is handed to its
+--     brain standing on the platform. Never dropped in mid-air, never woken in a cabin.
+--   * The Lookout (f3_hilltop): a free telescope (E: the client takes the camera toward the town, a narrow field of
+--     view; payload kind "telescope") and the counter (E: the hilltop lunch, served to a table as a small prop
+--     that clears itself after LUNCH_SECS; one per player). Until the wallet lands it is free, with the line
+--     "On the house today". THE ONE CHARGE GOES HERE when it does: Town.charge (see `counter`), LUNCH_CENTS = 10
+--     under the name "hilltop_lunch" (an EconomyRules.PRICES entry of the same name).
+-- Sounds: named cue points only (Sound instances with empty ids, never synthesised): CUES.
+-- Engine only inside the functions; no side effects on require. Steppable: step() reads the clock it was given.
+-- The joiner's one line in Boot/Game.start (after the attractions, so `canRide` can see the games):
+--   local skylift = SkyLiftService.start({ game = { possession = possession, runtime = rt, devices = devices,
+--     fire = fire, attractions = function() return attractions end }, heartbeat = o.heartbeat ~= false,
+--     terrain = o.terrain ~= false })
+--   and then: skylift.step() in Game's step when heartbeat == false, skylift.stop() in stop(), and
+--   `skylift:busy(player)` wherever riding must refuse something (vehicles, minigames, picking a new body).
+-- Interface: start(opts) -> Service (+ stop); new(opts) -> Service; gameTown(parts) -> Town;
+--   publishEpoch(rs, now) -> epoch; carve(root) -> count;
+--   Service:press(player, station) -> (ok, why?); Service:telescope(player) -> (ok, why?);
+--   Service:counter(player) -> (ok, why?); Service:step(); Service:gone(player); Service:busy(player) ->
+--   "waiting" | "riding" | nil; Service:time() -> lift seconds; Service:counts() -> { waiting, riding, held,
+--   booked, seated, lunches }; Service:stop(); constants WANDER, PROMPT_DISTANCE, BOARD_GRACE, MISSED,
+--   ROOT_ABOVE_SEAT, STEP_BACK, LUNCH_CENTS, LUNCH_SECS, TELESCOPE_FOV, WORDS, CUES, FOLDER
+
+local Import = require("../Import")
+local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("../../shared/Attractions/AlleyLayout"))
+local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
+local PlayerVehicles =
+	Import.shared("Vehicles/PlayerVehicles") :: typeof(require("../../shared/Vehicles/PlayerVehicles"))
+local PossessionState =
+	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
+local SkyLift = Import.shared("Rides/SkyLift") :: typeof(require("../../shared/Rides/SkyLift"))
+
+local SkyLiftService = {}
+SkyLiftService.__index = SkyLiftService
+
+SkyLiftService.FOLDER = "SkyLiftService" -- the service's own parts (gate posts, seats, lunches) under opts.parent
+SkyLiftService.WANDER = 14 -- studs from the gate before a waiting player's place is given up
+SkyLiftService.PROMPT_DISTANCE = 8
+SkyLiftService.BOARD_GRACE = 1.5 -- a cabin that passed the board point this recently can still be boarded
+SkyLiftService.MISSED = 3 -- a booking this far behind the clock (a server hitch) is moved to the next cabin
+SkyLiftService.ROOT_ABOVE_SEAT = SkyLift.EYE_ABOVE_SEAT - 1.5 -- a seated R15's root over the seat's top
+SkyLiftService.STEP_BACK = 3 -- studs from the alight point (beside the door) back onto the platform
+SkyLiftService.LUNCH_CENTS = 10 -- the hilltop lunch, once a wallet exists (EconomyRules.PRICES.hilltop_lunch)
+SkyLiftService.LUNCH_SECS = 240 -- a served lunch clears itself after this long
+SkyLiftService.TELESCOPE_FOV = 15 -- degrees
+SkyLiftService.ARM_OPEN = math.rad(80) -- the gate arm lifts this far while a cabin's doors are open
+SkyLiftService.ARM_RATE = 1.5 -- of the swing a second
+SkyLiftService.TABLE_TOP = 2.8 -- the Lookout's tables (tools/bake/lookout table4: top 2.6..2.8)
+SkyLiftService.PLATE_SPOTS = table.freeze({
+	table.freeze({ -1.3, 0 }),
+	table.freeze({ 1.3, 0 }),
+	table.freeze({ 0, -1.3 }),
+	table.freeze({ 0, 1.3 }),
+})
+
+SkyLiftService.WORDS = table.freeze({
+	upAction = "Ride the sky lift to the Lookout",
+	downAction = "Ride the sky lift down to town",
+	gateObject = "SKY LIFT (free)",
+	telescopeAction = "Look through the telescope",
+	telescopeObject = "Free telescope",
+	counterAction = "Order the hilltop lunch",
+	counterFree = "Counter: on the house today",
+	counterPaid = "Counter: lunch 10 cents",
+	noBody = "Pick a person from the menu first (M)",
+	animal = "Only people ride the sky lift. Animals take the trail up the hill",
+	waiting = "You are already waiting: next cabin in %d s (walk away to give up your place)",
+	riding = "You are on the sky lift: you get off at the other end",
+	booked = "Next cabin in %d s. Wait by the gate",
+	full = "That cabin is full: you are on the next one, in %d s. Wait by the gate",
+	now = "Your cabin is here: step in",
+	walkedAway = "You walked away from the sky lift gate: your place is given up",
+	missed = "You missed that cabin: next one in %d s",
+	upArrive = "Welcome to the Lookout",
+	downArrive = "Back in town",
+	telescopeAnimal = "The telescope is for people",
+	telescopeText = "The town through the telescope. Move the mouse to look around; E or Q to step back",
+	counterAnimal = "The counter only serves people",
+	lunchFree = "On the house today: your lunch is on %s",
+	lunchPaid = "Lunch, 10 cents: it is on %s",
+	lunchAlready = "Your lunch is already on %s",
+	lunchNoRoom = "Every table is taken: try again in a minute",
+	lunchNoMoney = "Lunch is 10 cents: not enough money",
+	notNear = "Walk up to the gate first",
+	gaveUp = "Your place on the sky lift is given up: %s",
+})
+
+-- named cue points (empty ids: the owner uploads; docs/AUDIO_BUDGET.md). The server plays only these three; the
+-- cabin's own cues (CableHum, DoorsOpen, DoorsClose, TowerClunk, WindAtHeight) are the client's (lane 5).
+SkyLiftService.CUES = table.freeze({
+	bell = "SkyLift.StationBell", -- on each gate post, when a cabin's doors open there
+	counter = "SkyLift.CounterBell", -- on the counter post, when a lunch is served
+	telescope = "SkyLift.TelescopeClick", -- on the telescope post, when someone looks through it
+})
+
+-- What the service asks of the rest of the game. gameTown builds it from Boot/Game's objects; specs pass stubs.
+export type Hold = {
+	-- put the held body's pivot here (x, y, z; Roblox yaw: CFrame.Angles(0, yaw, 0))
+	place: (x: number, y: number, z: number, yaw: number) -> (),
+	-- stand it on the floor at (x, y, z) facing yaw and give it back to its brain
+	free: (x: number, y: number, z: number, yaw: number) -> (),
+}
+export type Town = {
+	canRide: (player: any) -> (boolean, string?),
+	speciesOf: (player: any) -> string?,
+	bodyOf: (player: any) -> any?, -- the Model the player holds
+	notify: (player: any, text: string) -> (),
+	refuse: (player: any, text: string) -> (),
+	send: (player: any, payload: { [string]: any }) -> (), -- any other event (the telescope)
+	grant: (player: any, payload: { [string]: any }) -> (), -- PossessionNet.DeviceGranted
+	release: (player: any, why: string) -> (), -- PossessionNet.DeviceReleased
+	hold: (body: any) -> Hold?, -- the player let go of this body mid-ride: keep its brain asleep
+	standOffset: ((body: any) -> number)?, -- pivot height over the floor when standing (default 3)
+	charge: ((player: any, cents: number, why: string) -> (boolean, string?))?, -- nil: lunch is on the house
+	giveBack: ((player: any, body: any) -> ())?, -- hand the root's network ownership back (engine default)
+}
+-- Boot/Game's own objects, from which gameTown builds a Town
+export type GameParts = {
+	possession: any,
+	runtime: any, -- Actors/ActorsRuntime (world, byTownId)
+	devices: any?, -- Actors/DeviceService (fleet)
+	fire: (player: any, payload: { [string]: any }) -> (), -- the PlayNet Event (kinds notice, refused, ...)
+	attractions: (() -> any?)?, -- Attractions/AttractionService (minigames: stationOf)
+	net: Instance?, -- ReplicatedStorage.PossessionNet (default: found there)
+}
+export type Opts = {
+	town: Town?,
+	game: GameParts?, -- used when town is not given
+	rs: Instance?, -- where the epoch attribute goes (default ReplicatedStorage)
+	now: (() -> number)?, -- server time (default workspace:GetServerTimeNow)
+	root: Instance?, -- the bake (default Workspace.Expansion.F4): gates, arms, next-cabin boards, carves
+	parent: Instance?, -- where the service's own folder goes (default workspace)
+	prompts: boolean?, -- default true
+	heartbeat: boolean?, -- start(): step on Heartbeat (default true)
+	terrain: boolean?, -- start(): carve (default true)
+	players: boolean?, -- start(): PlayerRemoving (default true)
+}
+
+type Place = { x: number, z: number, floorY: number, yaw: number } -- AlleyLayout.Place
+type Booking = { [number]: any } -- seat -> who
+type Waiter = {
+	player: any,
+	station: string,
+	other: string,
+	cabin: number,
+	seat: number,
+	boardAt: number,
+	arriveAt: number,
+	key: string,
+}
+type Ride = {
+	player: any?, -- nil once the player has let go of the body
+	body: any,
+	station: string,
+	other: string,
+	cabin: number,
+	seat: number,
+	boardAt: number,
+	arriveAt: number,
+	key: string,
+	seatPart: any,
+	root: any?,
+	wasAnchored: boolean,
+	hold: Hold?,
+	orphaned: boolean, -- its player let go of it (hold may still be nil when the game could not hold it)
+}
+type Gate = {
+	station: string,
+	post: any,
+	at: Vector3,
+	prompt: any?,
+	bell: any?,
+	arm: any?,
+	armHome: CFrame?,
+	armSide: number, -- +1: hinged at the arm's +X end (the base's gate), -1: at its -X end (the summit's)
+	armFrac: number,
+	labels: { any },
+	text: string?,
+	open: boolean,
+}
+type Lunch = { player: any, table: string, spot: number, model: any, until_: number }
+
+local function otherOf(station: string): string
+	return if station == "base" then "summit" else "base"
+end
+
+local function isInstance(v: any): boolean
+	return typeof(v) == "Instance"
+end
+
+-- Where a lunch can go: the Lookout's table anchors (dining room first, then the terrace).
+local TABLES = { "table_1", "table_2", "table_3", "table_4", "terrace_1", "terrace_2", "terrace_3", "terrace_4" }
+local function tableWords(id: string): string
+	local k = string.match(id, "(%d)$") or "?"
+	if string.sub(id, 1, 7) == "terrace" then
+		return `terrace table {k}`
+	end
+	return `table {k} by the window`
+end
+
+local function venueOf(id: string): any
+	local exp = Data.default():module("Expansion") :: any
+	for _, v in exp.venues do
+		if v.id == id then
+			return v
+		end
+	end
+	error("SkyLiftService: no venue " .. id)
+end
+
+SkyLiftService._venue = venueOf -- (specs)
+
+local function placeOf(v: any): Place
+	return { x = v.position.x, z = v.position.z, floorY = v.floorY, yaw = v.yaw }
+end
+
+local function anchorAt(v: any, id: string): { number }?
+	for _, a in v.anchors do
+		if a.id == id then
+			return a.at
+		end
+	end
+	return nil
+end
+
+-- Publish the lift's epoch once (keep an existing one: a second server script, or a restart of the service).
+function SkyLiftService.publishEpoch(rs: Instance, now: number): number
+	local had = rs:GetAttribute(SkyLift.EPOCH_ATTRIBUTE)
+	if type(had) == "number" then
+		return had
+	end
+	rs:SetAttribute(SkyLift.EPOCH_ATTRIBUTE, now)
+	return now
+end
+
+-- Fill every TerrainCarve box under the bake with air (the Lookout's floor sits 0.6 over the crown; voxels stand
+-- up to a stud over the analytic ground). Returns how many boxes.
+function SkyLiftService.carve(root: Instance): number
+	local n = 0
+	for _, d in root:GetDescendants() do
+		if d.Name == "TerrainCarve" then
+			for _, p in d:GetChildren() do
+				if p:IsA("BasePart") then
+					local part = p :: BasePart
+					workspace.Terrain:FillBlock(part.CFrame, part.Size, Enum.Material.Air)
+					n += 1
+				end
+			end
+		end
+	end
+	return n
+end
+
+local function newPart(className: string, name: string, size: Vector3, cf: CFrame, parent: any): any
+	local p = Instance.new(className :: any) :: any
+	p.Name = name
+	p.Size = size
+	p.CFrame = cf
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanTouch = false
+	p.CanQuery = false
+	p.Parent = parent
+	return p
+end
+
+local function cue(parent: any, name: string): any
+	local s = Instance.new("Sound") :: any
+	s.Name = name
+	s.SoundId = "" -- a cue point: the owner uploads (docs/AUDIO_BUDGET.md)
+	s.Parent = parent
+	return s
+end
+
+local function play(sound: any)
+	if sound then
+		pcall(function()
+			if sound.SoundId ~= "" then
+				sound:Play()
+			end
+		end)
+	end
+end
+
+function SkyLiftService.new(opts: Opts): any
+	local self = setmetatable({}, SkyLiftService) :: any
+	self.town = assert(opts.town, "SkyLiftService.new: opts.town") :: Town
+	self.now = opts.now or function(): number
+		return workspace:GetServerTimeNow()
+	end
+	local rs = opts.rs or game:GetService("ReplicatedStorage")
+	self.epoch = SkyLiftService.publishEpoch(rs, self.now())
+	self.waiters = {} :: { [any]: Waiter }
+	self.rides = {} :: { Ride }
+	self.riderOf = {} :: { [any]: Ride } -- player -> their ride
+	self.bookings = {} :: { [string]: Booking }
+	self.lunches = {} :: { Lunch }
+	self.conns = {} :: { any }
+	self.stopped = false
+	self.boardClock = -math.huge
+
+	local parent = opts.parent or workspace
+	local old = parent:FindFirstChild(SkyLiftService.FOLDER)
+	if old then
+		old:Destroy()
+	end
+	local folder = Instance.new("Folder") :: any
+	folder.Name = SkyLiftService.FOLDER
+	folder.Parent = parent
+	self.folder = folder
+
+	-- the 24 seats: invisible, never collide or answer raycasts; moved only while someone is in them
+	local seatFolder = Instance.new("Folder") :: any
+	seatFolder.Name = "Seats"
+	seatFolder.Parent = folder
+	self.seats = {} :: { { any } }
+	for c = 1, SkyLift.CABINS do
+		self.seats[c] = {}
+		for k = 1, SkyLift.SEATS do
+			local x, y, z, yaw = SkyLift.seat(c, k, 0)
+			local s = newPart(
+				"Seat",
+				`Cabin{c}Seat{k}`,
+				Vector3.new(1.6, 0.2, 1.6),
+				CFrame.new(x, y - 0.1, z) * CFrame.Angles(0, yaw, 0),
+				seatFolder
+			)
+			s.Transparency = 1
+			pcall(function()
+				s.Disabled = true -- nobody sits by touching it: the service seats riders
+			end)
+			self.seats[c][k] = s
+		end
+	end
+	local lunchFolder = Instance.new("Folder") :: any
+	lunchFolder.Name = "Lunches"
+	lunchFolder.Parent = folder
+	self.lunchFolder = lunchFolder
+
+	-- the bake's gates (BoardGate pillars with Gate = "board", Station = base | summit), when it is there
+	local root = opts.root
+	if root == nil then
+		local exp = workspace:FindFirstChild("Expansion")
+		root = exp and exp:FindFirstChild("F4")
+	end
+	local baked: { [string]: any } = {}
+	if root then
+		for _, d in (root :: Instance):GetDescendants() do
+			if d:IsA("BasePart") and d:GetAttribute("Gate") == "board" then
+				local st = d:GetAttribute("Station")
+				if st == "base" or st == "summit" then
+					baked[st :: string] = d
+				end
+			end
+		end
+	end
+	self.root = root
+
+	local stations = SkyLift.stations()
+	self.gates = {} :: { [string]: Gate }
+	for _, station in SkyLift.STATIONS do
+		local st = (stations :: any)[station]
+		local pillar = baked[station]
+		local at: Vector3
+		if pillar then
+			at = (pillar :: any).CFrame.Position + Vector3.new(0, 0.6, 0)
+		else
+			-- no bake: by the board point, STEP_BACK back from the door, at chest height
+			at = Vector3.new(
+				st.board.x + SkyLiftService.STEP_BACK * math.sin(st.boardYaw),
+				st.platformY + 3,
+				st.board.z + SkyLiftService.STEP_BACK * math.cos(st.boardYaw)
+			)
+		end
+		local post = newPart("Part", `GatePost_{station}`, Vector3.new(0.4, 0.4, 0.4), CFrame.new(at), folder)
+		post.Transparency = 1
+		post:SetAttribute("SkyLift", "gate")
+		post:SetAttribute("Station", station)
+		local gate: Gate = {
+			station = station,
+			post = post,
+			at = at,
+			prompt = nil,
+			bell = cue(post, SkyLiftService.CUES.bell),
+			arm = nil,
+			armHome = nil,
+			armSide = 1,
+			armFrac = 0,
+			labels = {},
+			text = nil,
+			open = false,
+		}
+		if pillar then
+			local holder = (pillar :: any).Parent
+			local arm = holder and holder:FindFirstChild("BoardGateArm")
+			if arm and arm:IsA("BasePart") then
+				gate.arm = arm
+				gate.armHome = (arm :: any).CFrame
+				-- the bake's HingeX is in the venue's frame: which end of the arm is it?
+				local hingeX = arm:GetAttribute("HingeX")
+				if type(hingeX) == "number" then
+					local p = (arm :: any).CFrame.Position
+					local lx = AlleyLayout.toLocal(placeOf(venueOf(st.venue)), p.X, p.Y, p.Z)
+					gate.armSide = if hingeX >= lx then 1 else -1
+				end
+			end
+			local board = holder and holder:FindFirstChild("NextCabinBoard")
+			if board then
+				for _, d in board:GetDescendants() do
+					if d.Name == "Next" and d:IsA("TextLabel") then
+						table.insert(gate.labels, d)
+					end
+				end
+			end
+		end
+		self.gates[station] = gate
+	end
+
+	-- the Lookout: telescope and counter posts, from the venue's anchors
+	local top = venueOf(stations.summit.venue)
+	local place = placeOf(top)
+	self.lookout = place
+	self.lookoutVenue = top
+	local tel = anchorAt(top, "telescope") or { 15, 0, -44 }
+	local tx, ty, tz = AlleyLayout.toWorld(place, tel[1], 4.4, tel[3])
+	self.telescopePost = newPart("Part", "TelescopePost", Vector3.new(0.4, 0.4, 0.4), CFrame.new(tx, ty, tz), folder)
+	self.telescopePost.Transparency = 1
+	self.telescopeCue = cue(self.telescopePost, SkyLiftService.CUES.telescope)
+	-- the eye at the eyepiece (the head's back, toward the building), looking out along the venue's front (-D)
+	-- and 6 degrees down, as the bake tips the head
+	local ex, ey, ez = AlleyLayout.toWorld(place, tel[1], 4.86, tel[3] + 1.2)
+	local lx, ly, lz = AlleyLayout.toWorld(place, tel[1], 4.86 - 100 * math.tan(math.rad(6)), tel[3] - 100)
+	self.telescopeView = { eye = { ex, ey, ez }, look = { lx, ly, lz } }
+	local ca = anchorAt(top, "counter") or { 35, 0, 12 }
+	local cx, cy, cz = AlleyLayout.toWorld(place, ca[1], 3.9, ca[3] - 1.6)
+	self.counterPost = newPart("Part", "CounterPost", Vector3.new(0.4, 0.4, 0.4), CFrame.new(cx, cy, cz), folder)
+	self.counterPost.Transparency = 1
+	self.counterCue = cue(self.counterPost, SkyLiftService.CUES.counter)
+	self.tables = {} :: { { id: string, x: number, d: number } }
+	for _, id in TABLES do
+		local a = anchorAt(top, id)
+		if a then
+			table.insert(self.tables, { id = id, x = a[1], d = a[3] })
+		end
+	end
+
+	if opts.prompts ~= false then
+		self:_prompts()
+	end
+	return self
+end
+
+local function prompt(post: any, action: string, object: string, kind: string): any
+	local att = Instance.new("Attachment") :: any
+	att.Name = "PromptPoint"
+	att.Parent = post
+	local p = Instance.new("ProximityPrompt") :: any
+	p.Name = "SkyLiftPrompt"
+	p.ActionText = action
+	p.ObjectText = object
+	p.KeyboardKeyCode = Enum.KeyCode.E
+	p.HoldDuration = 0
+	p.MaxActivationDistance = SkyLiftService.PROMPT_DISTANCE
+	p.RequiresLineOfSight = false
+	p:SetAttribute("Door", true) -- E belongs to the prompt, not to the vehicles (Client/Minigames/MinigameClient)
+	p:SetAttribute("SkyLift", kind)
+	p.Parent = att
+	return p
+end
+
+function SkyLiftService._prompts(self: any)
+	local W = SkyLiftService.WORDS
+	local function guard(name: string, fn: (player: any) -> ()): (player: any) -> ()
+		return function(player: any)
+			local ok, err = pcall(function()
+				fn(player)
+			end)
+			if not ok then
+				warn(`[SkyLift] {name} failed: {err}`)
+			end
+		end
+	end
+	for station, gate in self.gates :: { [string]: Gate } do
+		local p =
+			prompt(gate.post, if station == "base" then W.upAction else W.downAction, W.gateObject, `gate_{station}`)
+		gate.prompt = p
+		table.insert(
+			self.conns,
+			p.Triggered:Connect(guard("gate", function(player: any)
+				self:press(player, station)
+			end))
+		)
+	end
+	local tp = prompt(self.telescopePost, W.telescopeAction, W.telescopeObject, "telescope")
+	table.insert(
+		self.conns,
+		tp.Triggered:Connect(guard("telescope", function(player: any)
+			self:telescope(player)
+		end))
+	)
+	self.telescopePrompt = tp
+	local cp =
+		prompt(self.counterPost, W.counterAction, if self.town.charge then W.counterPaid else W.counterFree, "counter")
+	table.insert(
+		self.conns,
+		cp.Triggered:Connect(guard("counter", function(player: any)
+			self:counter(player)
+		end))
+	)
+	self.counterPrompt = cp
+end
+
+-- The lift's clock (Shared/Rides/SkyLift: t = server time - epoch).
+function SkyLiftService.time(self: any): number
+	return SkyLift.clock(self.now(), self.epoch)
+end
+
+function SkyLiftService.busy(self: any, player: any): string?
+	if self.riderOf[player] then
+		return "riding"
+	elseif self.waiters[player] then
+		return "waiting"
+	end
+	return nil
+end
+
+local function pivotOf(body: any): Vector3?
+	local ok, cf = pcall(function()
+		return body:GetPivot()
+	end)
+	return if ok and cf then (cf :: CFrame).Position else nil
+end
+
+local function distXZ(a: Vector3, b: Vector3): number
+	local dx, dz = a.X - b.X, a.Z - b.Z
+	return math.sqrt(dx * dx + dz * dz)
+end
+
+-- The first departure from `station` at or after `from` with a free seat: cabin, seat, boardAt, arriveAt, key,
+-- and whether it is not the first one (the first was full).
+function SkyLiftService._book(
+	self: any,
+	station: string,
+	from: number
+): (number, number, number, number, string, boolean)
+	local tq = from
+	local skipped = false
+	for _ = 1, 4 * SkyLift.CABINS do
+		local cabin, boardAt, arriveAt = SkyLift.nextDeparture(station, tq)
+		local key = `{station}:{math.floor(boardAt * 10 + 0.5)}`
+		local booking = self.bookings[key]
+		for k = 1, SkyLift.SEATS do
+			if booking == nil or booking[k] == nil then
+				return cabin, k, boardAt, arriveAt, key, skipped
+			end
+		end
+		skipped = true
+		tq = boardAt + 0.05
+	end
+	error("SkyLiftService: no seat in the next 24 cabins")
+end
+
+function SkyLiftService._take(self: any, key: string, seat: number, who: any)
+	local booking = self.bookings[key]
+	if booking == nil then
+		booking = {}
+		self.bookings[key] = booking
+	end
+	booking[seat] = who
+end
+
+function SkyLiftService._free(self: any, key: string, seat: number)
+	local booking = self.bookings[key]
+	if booking then
+		booking[seat] = nil
+		if next(booking) == nil then
+			self.bookings[key] = nil
+		end
+	end
+end
+
+-- E at a gate. Books the next cabin with room and says when; never silent.
+function SkyLiftService.press(self: any, player: any, station: string): (boolean, string?)
+	local W = SkyLiftService.WORDS
+	local town = self.town :: Town
+	local function no(text: string): (boolean, string?)
+		town.refuse(player, text)
+		return false, text
+	end
+	if station ~= "base" and station ~= "summit" then
+		return no("No such station")
+	end
+	local t = self:time()
+	if self.riderOf[player] then
+		return no(W.riding)
+	end
+	local w = self.waiters[player]
+	if w then
+		local text = string.format(W.waiting, math.max(0, math.ceil(w.boardAt - t)))
+		town.notify(player, text)
+		return false, text
+	end
+	local body = town.bodyOf(player)
+	if body == nil then
+		return no(W.noBody)
+	end
+	local ok, why = town.canRide(player)
+	if not ok then
+		return no(why or W.animal)
+	end
+	local gate = (self.gates :: { [string]: Gate })[station]
+	local at = pivotOf(body)
+	if at and distXZ(at, gate.at) > SkyLiftService.WANDER then
+		return no(W.notNear)
+	end
+	local cabin, seat, boardAt, arriveAt, key, skipped = self:_book(station, t - SkyLiftService.BOARD_GRACE)
+	local waiter: Waiter = {
+		player = player,
+		station = station,
+		other = otherOf(station),
+		cabin = cabin,
+		seat = seat,
+		boardAt = boardAt,
+		arriveAt = arriveAt,
+		key = key,
+	}
+	self:_take(key, seat, player)
+	self.waiters[player] = waiter
+	pcall(function()
+		player:SetAttribute("SkyLiftBoardAt", boardAt + self.epoch) -- server time: a HUD can count it down
+	end)
+	local secs = math.max(0, math.ceil(boardAt - t))
+	local text = if secs <= 0
+		then W.now
+		elseif skipped then string.format(W.full, secs)
+		else string.format(W.booked, secs)
+	town.notify(player, text)
+	return true, text
+end
+
+function SkyLiftService._unwait(self: any, w: Waiter, text: string?)
+	self.waiters[w.player] = nil
+	self:_free(w.key, w.seat)
+	pcall(function()
+		w.player:SetAttribute("SkyLiftBoardAt", nil)
+	end)
+	if text then
+		self.town.refuse(w.player, text)
+	end
+end
+
+local function seatCFrames(cabin: number, seat: number, t: number): (CFrame, CFrame, number, number, number, number)
+	local x, y, z, yaw = SkyLift.seat(cabin, seat, t)
+	local turn = CFrame.Angles(0, yaw, 0)
+	return CFrame.new(x, y - 0.1, z) * turn,
+		CFrame.new(x, y + SkyLiftService.ROOT_ABOVE_SEAT, z) * turn,
+		x,
+		y + SkyLiftService.ROOT_ABOVE_SEAT,
+		z,
+		yaw
+end
+
+local function humanoidOf(body: any): any
+	local ok, h = pcall(function()
+		return body:FindFirstChildOfClass("Humanoid")
+	end)
+	return if ok then h else nil
+end
+
+function SkyLiftService._board(self: any, w: Waiter, t: number)
+	local town = self.town :: Town
+	local player = w.player
+	local body = town.bodyOf(player)
+	if body == nil then
+		self:_unwait(w, SkyLiftService.WORDS.noBody)
+		return
+	end
+	self.waiters[player] = nil
+	pcall(function()
+		player:SetAttribute("SkyLiftBoardAt", nil)
+	end)
+	local seatPart = self.seats[w.cabin][w.seat]
+	local seatCf, rootCf = seatCFrames(w.cabin, w.seat, t)
+	local root = body.PrimaryPart
+	local ride: Ride = {
+		player = player,
+		body = body,
+		station = w.station,
+		other = w.other,
+		cabin = w.cabin,
+		seat = w.seat,
+		boardAt = w.boardAt,
+		arriveAt = w.arriveAt,
+		key = w.key,
+		seatPart = seatPart,
+		root = root,
+		wasAnchored = if root then root.Anchored == true else false,
+		hold = nil,
+		orphaned = false,
+	}
+	self:_take(w.key, w.seat, ride)
+	seatPart.CFrame = seatCf
+	if root then
+		root.Anchored = true
+	end
+	body:PivotTo(rootCf)
+	local hum = humanoidOf(body)
+	if hum then
+		pcall(function()
+			seatPart.Disabled = false
+			seatPart:Sit(hum)
+		end)
+	end
+	body:SetAttribute("Ride", `{w.cabin}/{w.seat}`)
+	pcall(function()
+		player:SetAttribute("OnRide", SkyLift.RIDE_ID)
+	end)
+	table.insert(self.rides, ride)
+	self.riderOf[player] = ride
+	town.grant(player, {
+		device = "ride",
+		kind = "gondola", -- Client/Camera/CameraPolicy: first person on boarding, V toggles
+		ride = SkyLift.RIDE_ID,
+		firstPerson = true,
+		cabin = w.cabin,
+		seat = w.seat,
+		from = w.station,
+		to = w.other,
+		boardAt = w.boardAt, -- lift clock (ReplicatedStorage SkyLiftEpoch)
+		arriveAt = w.arriveAt,
+	})
+end
+
+local function unseat(ride: Ride)
+	local hum = humanoidOf(ride.body)
+	pcall(function()
+		if hum then
+			hum.Sit = false
+		end
+		local weld = ride.seatPart:FindFirstChild("SeatWeld")
+		if weld then
+			weld:Destroy()
+		end
+		ride.seatPart.Disabled = true
+	end)
+end
+
+-- The player let go of a riding body (left the game, took another body): keep it on its seat, brain asleep.
+function SkyLiftService._orphan(self: any, ride: Ride)
+	local player = ride.player
+	ride.player = nil
+	ride.orphaned = true
+	if player ~= nil then
+		if self.riderOf[player] == ride then
+			self.riderOf[player] = nil
+		end
+		pcall(function()
+			player:SetAttribute("OnRide", nil)
+		end)
+		if (not isInstance(player)) or (player :: any).Parent ~= nil then
+			-- still in the game with another body: their screen leaves the ride (no words: they chose it)
+			pcall(self.town.release, player, "ride_left")
+		end
+	end
+	local ok, h = pcall(self.town.hold, ride.body)
+	ride.hold = if ok then h else nil
+	if not ok then
+		warn(`[SkyLift] hold failed: {h}`)
+	end
+end
+
+function SkyLiftService._move(self: any, ride: Ride, t: number)
+	-- (gone() cleared the player: hold now, after Possession has let the body go; or they took another body)
+	if not ride.orphaned and (ride.player == nil or self.town.bodyOf(ride.player) ~= ride.body) then
+		self:_orphan(ride)
+	end
+	local seatCf, rootCf, x, y, z, yaw = seatCFrames(ride.cabin, ride.seat, t)
+	ride.seatPart.CFrame = seatCf
+	if ride.hold then
+		ride.hold.place(x, y, z, yaw)
+	else
+		ride.body:PivotTo(rootCf)
+	end
+end
+
+function SkyLiftService._alight(self: any, ride: Ride)
+	local town = self.town :: Town
+	local st = (SkyLift.stations() :: any)[ride.other]
+	local back = SkyLiftService.STEP_BACK
+	local x = st.alight.x + back * math.sin(st.alightYaw)
+	local z = st.alight.z + back * math.cos(st.alightYaw)
+	local yaw = st.alightYaw + math.pi -- facing away from the cabin, onto the platform
+	local y = st.platformY
+	if not ride.orphaned and (ride.player == nil or town.bodyOf(ride.player) ~= ride.body) then
+		self:_orphan(ride)
+	end
+	unseat(ride)
+	pcall(function()
+		ride.body:SetAttribute("Ride", nil)
+	end)
+	if ride.hold then
+		local free = ride.hold.free
+		local ok, err = pcall(function()
+			free(x, y, z, yaw)
+		end)
+		if not ok then
+			warn(`[SkyLift] free failed: {err}`)
+		end
+	else
+		local offset = 3
+		if town.standOffset then
+			local ok, o = pcall(town.standOffset, ride.body)
+			if ok and type(o) == "number" then
+				offset = o
+			end
+		end
+		ride.body:PivotTo(CFrame.new(x, y + offset, z) * CFrame.Angles(0, yaw, 0))
+		if ride.root then
+			ride.root.Anchored = ride.wasAnchored
+		end
+		local player = ride.player
+		if player ~= nil then
+			if town.giveBack then
+				pcall(town.giveBack, player, ride.body)
+			end
+			self.riderOf[player] = nil
+			pcall(function()
+				player:SetAttribute("OnRide", nil)
+			end)
+			town.release(player, "ride_end")
+			local W = SkyLiftService.WORDS
+			town.notify(player, if ride.other == "summit" then W.upArrive else W.downArrive)
+		end
+	end
+	self:_free(ride.key, ride.seat)
+	local i = table.find(self.rides, ride)
+	if i then
+		table.remove(self.rides, i)
+	end
+end
+
+-- The player left the game: a waiting place is given up; a ride carries on with the body held (next step).
+function SkyLiftService.gone(self: any, player: any)
+	local w = self.waiters[player]
+	if w then
+		self:_unwait(w, nil)
+	end
+	local ride = self.riderOf[player]
+	if ride then
+		self.riderOf[player] = nil
+		ride.player = nil
+	end
+	for i = #self.lunches, 1, -1 do
+		local l = self.lunches[i]
+		if l.player == player then
+			pcall(function()
+				l.model:Destroy()
+			end)
+			table.remove(self.lunches, i)
+		end
+	end
+end
+
+-- The gates' furniture: the next-cabin board (whole seconds), the arm (up while a cabin's doors are open there)
+-- and the bell when they open.
+function SkyLiftService._furniture(self: any, t: number, dt: number)
+	local openAt: { [string]: boolean } = {}
+	for i = 1, SkyLift.CABINS do
+		local _, _, _, _, phase, open = SkyLift.cabin(i, t)
+		if open then
+			openAt[phase] = true
+		end
+	end
+	for station, gate in self.gates :: { [string]: Gate } do
+		local open = openAt[station] == true
+		if open and not gate.open then
+			play(gate.bell)
+		end
+		gate.open = open
+		if #gate.labels > 0 then
+			local text: string
+			if open then
+				text = "NOW BOARDING"
+			else
+				local _, boardAt = SkyLift.nextDeparture(station, t)
+				text = `NEXT CABIN {math.max(0, math.ceil(boardAt - t))} s`
+			end
+			if text ~= gate.text then
+				gate.text = text
+				for _, l in gate.labels do
+					l.Text = text
+				end
+			end
+		end
+		local arm, home = gate.arm, gate.armHome
+		if arm and home then
+			local target = if open then 1 else 0
+			local f = gate.armFrac
+			local nf = f + math.clamp(target - f, -dt * SkyLiftService.ARM_RATE, dt * SkyLiftService.ARM_RATE)
+			if nf ~= f then
+				gate.armFrac = nf
+				local e = nf * nf * (3 - 2 * nf)
+				-- turned about the hinge end (the pillar side: the bake's HingeX), the free end swinging up
+				local side = gate.armSide
+				local hinge = CFrame.new(side * (arm :: any).Size.X / 2, 0, 0)
+				local turn = CFrame.Angles(0, 0, -side * e * SkyLiftService.ARM_OPEN)
+				arm.CFrame = home * hinge * turn * hinge:Inverse()
+			end
+		end
+	end
+end
+
+-- One step: waiting players (gave up? boarding?), riders (on their seats; arrived?), the gates, the lunches.
+function SkyLiftService.step(self: any, dt: number?)
+	if self.stopped then
+		return
+	end
+	local town = self.town :: Town
+	local W = SkyLiftService.WORDS
+	local t = self:time()
+	local list: { Waiter } = {}
+	for _, w in self.waiters :: { [any]: Waiter } do
+		table.insert(list, w)
+	end
+	for _, w in list do
+		local body = town.bodyOf(w.player)
+		local ok: boolean, why: string? = true, nil
+		if body == nil then
+			ok, why = false, W.noBody
+		else
+			ok, why = town.canRide(w.player)
+		end
+		local at = if body then pivotOf(body) else nil
+		if not ok then
+			self:_unwait(w, string.format(W.gaveUp, why or "you cannot ride now"))
+		elseif at and distXZ(at, self.gates[w.station].at) > SkyLiftService.WANDER then
+			self:_unwait(w, W.walkedAway)
+		elseif t - w.boardAt > SkyLiftService.MISSED then
+			-- (a hitch: the cabin left without them) the next one with room
+			self:_free(w.key, w.seat)
+			local cabin, seat, boardAt, arriveAt, key = self:_book(w.station, t)
+			w.cabin, w.seat, w.boardAt, w.arriveAt, w.key = cabin, seat, boardAt, arriveAt, key
+			self:_take(key, seat, w.player)
+			town.notify(w.player, string.format(W.missed, math.max(0, math.ceil(boardAt - t))))
+		elseif t >= w.boardAt then
+			self:_board(w, t)
+		end
+	end
+	for i = #self.rides, 1, -1 do
+		local ride = self.rides[i]
+		local ok, err = pcall(function()
+			if t >= ride.arriveAt then
+				self:_alight(ride)
+			else
+				self:_move(ride, t)
+			end
+		end)
+		if not ok then
+			warn(`[SkyLift] rider step failed: {err}`)
+		end
+	end
+	self:_furniture(t, dt or 1 / 60)
+	local now = self.now()
+	for i = #self.lunches, 1, -1 do
+		local l = self.lunches[i]
+		if now >= l.until_ then
+			pcall(function()
+				l.model:Destroy()
+			end)
+			table.remove(self.lunches, i)
+		end
+	end
+end
+
+-- E at the telescope: the client takes the camera toward the town (Client/Rides/Telescope, lane 5).
+function SkyLiftService.telescope(self: any, player: any): (boolean, string?)
+	local W = SkyLiftService.WORDS
+	local town = self.town :: Town
+	if town.bodyOf(player) == nil then
+		town.refuse(player, W.noBody)
+		return false, W.noBody
+	end
+	if town.speciesOf(player) ~= "human" then
+		town.refuse(player, W.telescopeAnimal)
+		return false, W.telescopeAnimal
+	end
+	local v = self.telescopeView
+	play(self.telescopeCue)
+	town.send(player, {
+		kind = "telescope",
+		eye = v.eye,
+		look = v.look,
+		fov = SkyLiftService.TELESCOPE_FOV,
+		text = W.telescopeText,
+	})
+	return true, nil
+end
+
+local function lunchModel(parent: any, x: number, y: number, z: number, yaw: number): any
+	local m = Instance.new("Model") :: any
+	m.Name = "Lunch"
+	local turn = CFrame.Angles(0, yaw, 0)
+	local flat = CFrame.Angles(0, 0, math.pi / 2) -- a cylinder's axis is X: stand it up
+	local function part(name: string, size: Vector3, cf: CFrame, rgb: { number }, cyl: boolean, material: string)
+		local p = newPart("Part", name, size, cf, m)
+		p.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+		pcall(function()
+			p.Material = (Enum.Material :: any)[material]
+			p.CastShadow = false
+			if cyl then
+				p.Shape = Enum.PartType.Cylinder
+			end
+		end)
+		return p
+	end
+	local base = CFrame.new(x, y, z) * turn
+	part(
+		"Plate",
+		Vector3.new(0.08, 1.1, 1.1),
+		base * CFrame.new(0, 0.04, 0) * flat,
+		{ 238, 236, 228 },
+		true,
+		"SmoothPlastic"
+	)
+	part(
+		"Sandwich",
+		Vector3.new(0.7, 0.28, 0.45),
+		base * CFrame.new(-0.05, 0.22, 0),
+		{ 214, 168, 104 },
+		false,
+		"SmoothPlastic"
+	)
+	part(
+		"Cup",
+		Vector3.new(0.4, 0.32, 0.32),
+		base * CFrame.new(0.42, 0.2, -0.42) * flat,
+		{ 250, 250, 246 },
+		true,
+		"SmoothPlastic"
+	)
+	m.Parent = parent
+	return m
+end
+
+-- E at the counter: the hilltop lunch, served to a table (a small prop that clears itself). Free with a line until a
+-- wallet exists; when one does, Town.charge takes LUNCH_CENTS here under "hilltop_lunch".
+function SkyLiftService.counter(self: any, player: any): (boolean, string?)
+	local W = SkyLiftService.WORDS
+	local town = self.town :: Town
+	local function no(text: string): (boolean, string?)
+		town.refuse(player, text)
+		return false, text
+	end
+	if town.bodyOf(player) == nil then
+		return no(W.noBody)
+	end
+	if town.speciesOf(player) ~= "human" then
+		return no(W.counterAnimal)
+	end
+	for _, l in self.lunches :: { Lunch } do
+		if l.player == player then
+			local text = string.format(W.lunchAlready, tableWords(l.table))
+			town.notify(player, text)
+			return false, text
+		end
+	end
+	-- the table with the fewest lunches on it (dining room first), and a free place at it
+	local best: { id: string, x: number, d: number }? = nil
+	local bestN, bestSpot = math.huge, 0
+	for _, tb in self.tables do
+		local used: { [number]: boolean } = {}
+		local n = 0
+		for _, l in self.lunches :: { Lunch } do
+			if l.table == tb.id then
+				used[l.spot] = true
+				n += 1
+			end
+		end
+		if n < bestN and n < #SkyLiftService.PLATE_SPOTS then
+			for k = 1, #SkyLiftService.PLATE_SPOTS do
+				if not used[k] then
+					best, bestN, bestSpot = tb, n, k
+					break
+				end
+			end
+		end
+	end
+	if best == nil then
+		return no(W.lunchNoRoom)
+	end
+	local paid = false
+	if town.charge then
+		local ok, why = town.charge(player, SkyLiftService.LUNCH_CENTS, "hilltop_lunch")
+		if not ok then
+			return no(why or W.lunchNoMoney)
+		end
+		paid = true
+	end
+	local spot = SkyLiftService.PLATE_SPOTS[bestSpot]
+	local place = self.lookout :: Place
+	local px, py, pz = AlleyLayout.toWorld(place, best.x + spot[1], SkyLiftService.TABLE_TOP, best.d + spot[2])
+	-- the plate faces the chair it is in front of (the sandwich toward the sitter)
+	local cx, _, cz = AlleyLayout.toWorld(place, best.x, 0, best.d)
+	local yaw = math.atan2(-(px - cx), -(pz - cz)) + math.pi
+	local model = lunchModel(self.lunchFolder, px, py, pz, yaw)
+	model:SetAttribute("Table", best.id)
+	table.insert(self.lunches, {
+		player = player,
+		table = best.id,
+		spot = bestSpot,
+		model = model,
+		until_ = self.now() + SkyLiftService.LUNCH_SECS,
+	})
+	play(self.counterCue)
+	local text = string.format(if paid then W.lunchPaid else W.lunchFree, tableWords(best.id))
+	town.notify(player, text)
+	return true, text
+end
+
+function SkyLiftService.counts(self: any): { [string]: number }
+	local waiting, riding, held, booked, seated = 0, 0, 0, 0, 0
+	for _ in self.waiters do
+		waiting += 1
+	end
+	for _, r in self.rides :: { Ride } do
+		if r.orphaned then
+			held += 1
+		else
+			riding += 1
+		end
+	end
+	for _, b in self.bookings do
+		for _ in b do
+			booked += 1
+		end
+	end
+	for c = 1, SkyLift.CABINS do
+		for k = 1, SkyLift.SEATS do
+			local ok, d = pcall(function()
+				return self.seats[c][k].Disabled
+			end)
+			if ok and d == false then
+				seated += 1
+			end
+		end
+	end
+	return { waiting = waiting, riding = riding, held = held, booked = booked, seated = seated, lunches = #self.lunches }
+end
+
+-- Stop: everyone waiting is let go; riders are put straight onto their far platform (nobody is left in the air).
+function SkyLiftService.stop(self: any)
+	if self.stopped then
+		return
+	end
+	for _, w in table.clone(self.waiters) :: { [any]: Waiter } do
+		self:_unwait(w, nil)
+	end
+	for i = #self.rides, 1, -1 do
+		pcall(self._alight, self, self.rides[i])
+	end
+	self.stopped = true
+	for _, c in self.conns do
+		c:Disconnect()
+	end
+	table.clear(self.conns)
+end
+
+-- A standing body's pivot over its feet (ActorService.groundOffset: the bounding box); 3 when it cannot be measured.
+local function standOffset(body: any): number
+	local ActorService = require("../Actors/ActorService")
+	local ok, o = pcall(ActorService.groundOffset, body)
+	return if ok and type(o) == "number" then o else 3
+end
+
+-- The Town from Boot/Game's objects (engine only).
+function SkyLiftService.gameTown(parts: GameParts): Town
+	local possession = parts.possession
+	local rt = parts.runtime
+	local fire = parts.fire
+	local function actorOf(player: any): any?
+		return possession:actorOf(player)
+	end
+	local function netRemote(name: string): RemoteEvent?
+		local folder = parts.net or game:GetService("ReplicatedStorage"):FindFirstChild(PossessionState.NET.folder)
+		local r = folder and folder:FindFirstChild(name)
+		return if r and r:IsA("RemoteEvent") then r else nil
+	end
+	local function toClient(player: any, remoteName: string, kind: string, value: any)
+		if isInstance(player) then
+			local r = netRemote(remoteName)
+			if r and (player :: Instance).Parent ~= nil then
+				r:FireClient(player :: Player, value)
+			end
+		elseif type(player) == "table" and type(player.events) == "table" then
+			table.insert(player.events, { kind = kind, value = value }) -- PlayerLike stub (engine checks)
+		end
+	end
+	return {
+		canRide = function(player: any): (boolean, string?)
+			local actor = actorOf(player)
+			if actor == nil then
+				return false, SkyLiftService.WORDS.noBody
+			end
+			if actor.species ~= "human" then
+				return false, SkyLiftService.WORDS.animal
+			end
+			local devices = parts.devices
+			if
+				devices
+				and type(player.UserId) == "number"
+				and PlayerVehicles.vehicleOf(devices.fleet, player.UserId)
+			then
+				return false, "Get out of the vehicle first (E)"
+			end
+			local a = parts.attractions and parts.attractions()
+			local mg = a and a.minigames
+			if mg and mg:stationOf(player) then
+				return false, "Leave your game first"
+			end
+			local body = actor.body :: Model
+			if body:GetAttribute("Med") ~= nil then
+				return false, "Not while you are unwell: get to the hospital"
+			end
+			return true, nil
+		end,
+		speciesOf = function(player: any): string?
+			local actor = actorOf(player)
+			return if actor then actor.species else nil
+		end,
+		bodyOf = function(player: any): any?
+			local actor = actorOf(player)
+			return if actor then actor.body else nil
+		end,
+		notify = function(player: any, text: string)
+			fire(player, { kind = "notice", text = text })
+		end,
+		refuse = function(player: any, text: string)
+			fire(player, { kind = "refused", text = text })
+		end,
+		send = function(player: any, payload: { [string]: any })
+			fire(player, payload)
+		end,
+		grant = function(player: any, payload: { [string]: any })
+			toClient(player, PossessionState.NET.DeviceGranted, "deviceGranted", payload)
+		end,
+		release = function(player: any, why: string)
+			toClient(player, PossessionState.NET.DeviceReleased, "deviceReleased", why)
+		end,
+		hold = function(body: any): Hold?
+			-- the AI actor behind this body: suspended (no brain, no motor) while the service places it
+			local TownAI = require("../AI/TownAI")
+			local world = rt.world
+			local townId: number? = nil
+			for id, actor in rt.byTownId do
+				if actor.body == body then
+					townId = id
+					break
+				end
+			end
+			if townId == nil then
+				return nil
+			end
+			local id = townId :: number
+			local actor = rt.byTownId[id]
+			local a = world.actorsById[id]
+			local offset = standOffset(body)
+			actor.possessable = false
+			TownAI.suspend(world, id)
+			return {
+				place = function(x: number, y: number, z: number, yaw: number)
+					-- ActorsRuntime draws an AI body's pivot at a.y - a.hip + offset, facing robloxYaw(a.yaw)
+					a.x, a.z = x, z
+					a.y = y + a.hip - offset
+					a.yaw = yaw - math.pi
+					a.speed = 0
+				end,
+				free = function(x: number, y: number, z: number, yaw: number)
+					actor.possessable = true
+					if possession:controllerOf(actor) == "ai" then
+						TownAI.resume(world, id, x, y + a.hip, z, yaw - math.pi)
+					end
+				end,
+			}
+		end,
+		standOffset = standOffset,
+		giveBack = function(player: any, body: any)
+			if isInstance(player) and body.PrimaryPart then
+				(body.PrimaryPart :: BasePart):SetNetworkOwner(player :: Player)
+			end
+		end,
+		charge = nil, -- the wallet (feat/wallet): Credits' charge(player, cents, why) goes here when it lands
+	}
+end
+
+-- Start in the game: the epoch, the carves, the service, its Heartbeat step and PlayerRemoving.
+function SkyLiftService.start(opts: Opts): any
+	local o: Opts = table.clone(opts)
+	if o.town == nil then
+		local parts = o.game
+		assert(parts ~= nil, "SkyLiftService.start: opts.town or opts.game")
+		o.town = SkyLiftService.gameTown(parts)
+	end
+	if o.root == nil then
+		local exp = workspace:FindFirstChild("Expansion")
+		o.root = exp and exp:FindFirstChild("F4")
+	end
+	if o.root == nil then
+		warn(
+			"[SkyLift] Workspace.Expansion.F4 missing (run lune run tools/bake/skylift.luau and rebuild): the lift runs with plain prompts and no gates"
+		)
+	end
+	local carved = 0
+	if o.terrain ~= false and o.root then
+		local ok, err = pcall(function()
+			carved = SkyLiftService.carve(o.root :: Instance)
+		end)
+		if not ok then
+			warn(`[SkyLift] terrain carve failed: {err}`)
+		end
+	end
+	local svc = SkyLiftService.new(o)
+	svc.carved = carved
+	if o.players ~= false then
+		table.insert(
+			svc.conns,
+			game:GetService("Players").PlayerRemoving:Connect(function(player: Player)
+				svc:gone(player)
+			end)
+		)
+	end
+	if o.heartbeat ~= false then
+		table.insert(
+			svc.conns,
+			game:GetService("RunService").Heartbeat:Connect(function(dt: number)
+				local ok, err = pcall(svc.step, svc, math.min(dt, 0.1))
+				if not ok then
+					warn(`[SkyLift] step failed: {err}`)
+				end
+			end)
+		)
+	end
+	print(
+		`[SkyLift] running: {SkyLift.CABINS} cabins, a ride {math.floor(SkyLift.rideTime("base") + 0.5)} s, epoch {svc.epoch}, {carved} terrain carves`
+	)
+	return svc
+end
+
+return SkyLiftService
