@@ -202,6 +202,7 @@ local doc = {
 	machinePosts = machinePosts,
 	routes = routes,
 	standing = L.standing(),
+	fixtures = L.GAMES_FIXTURES,
 	board = L.board(),
 	pool = L.POOL_TABLES,
 	bumper = L.BUMPER_POOL,
