@@ -31,8 +31,11 @@
 --            shoots. Behind a pillar it steps out to a peek point and back, and looks past the
 --            pillar's edges, not at it. Fighting from open floor it JINKS: a quick step across
 --            its target's line, a shot or two, a step back, the other way next time (see JINK): it
---            is never a turret. A bot that has been nowhere else for nine seconds is
+--            is never a turret. Somebody in view who is too far off to fire at is not stood and
+--            looked at: on its way it keeps going, at a post it MOVES UP to a place inside its
+--            range of them (see ADVANCE). A bot that has been nowhere else for nine seconds is
 --            sent somewhere, whatever it was doing (PB-10: never stuck).
+
 --   moves    along the links of the graph in straight lines, feet on arena.ground, at Body's speeds
 --            with the match's feel; sprints only when nothing has been seen or heard for a while.
 --   looks    turns its yaw and pitch towards what it wants to look at, never faster than
@@ -191,6 +194,7 @@ export type Brain = {
 	jink: boolean, -- the step is a jink in a fight, not a peek round cover
 	jinkAt: number, -- when it next jinks, or steps back
 	jinkSide: number, -- 1 or -1: the side it last went
+	advanceAt: number, -- when it next moves up on a target that is too far off to fire at (see ADVANCE)
 	trail: { number }, -- where it was at each of the last STUCK seconds in play: x, z, x, z ... (the stuck watch)
 	trailAt: number, -- when the next point is due
 	stuck: boolean, -- the watch has found it stuck and it has not yet got a route away
@@ -302,6 +306,12 @@ local JINK = 2.8 -- studs (inside what the stuck watch, and anybody watching, ca
 -- if the bot has looked away since (it must be SEEN to turn on a player before it can tag them).
 local FACING = math.rad(40)
 local OPEN_VIEW = 12 -- studs of clear view that make a direction worth looking in from a post
+-- ADVANCE: a bot that can see somebody it cannot reach (further off than Profile.range of ball
+-- flight) does not stand and look at them. On its way somewhere it keeps going; at a post it moves up,
+-- after a moment, to a place comfortably inside its range of where they are (on its own storey or
+-- theirs, cover if there is some, never the other team's doorstep), with its marker on them as it goes.
+local ADVANCE_INSIDE = 0.75 -- of its range: how near the place it moves up to must be to the target
+local ADVANCE_OFF = 18 -- studs: and no nearer than this
 local STUCK = 9 -- seconds in one place before the stuck watch sends a bot somewhere else
 local STUCK_REACH = 6 -- studs: "one place" is this far across
 local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
@@ -385,6 +395,7 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		jink = false,
 		jinkAt = 0,
 		jinkSide = 1,
+		advanceAt = 0,
 		trail = {},
 		trailAt = 0,
 		stuck = false,
@@ -966,6 +977,44 @@ local function sidestep(b: Brain, squad: Squad, now: number, tx: number, tz: num
 	return setOut(b, squad, best)
 end
 
+-- A place to move up to on a target at (tx, ty, tz) that is too far off (see ADVANCE); 0 when there is none.
+local function closer(b: Brain, squad: Squad, tx: number, ty: number, tz: number, reach: number): number
+	local nav = b.nav
+	local arena = nav.arena
+	local rng = b.rng
+	local keepOff = nav.keepOff[b.team]
+	local mine = math.clamp(math.floor(b.y / arena.floorHeight + 0.5), 0, arena.floors - 1)
+	local theirs = math.clamp(math.floor(ty / arena.floorHeight + 0.5), 0, arena.floors - 1)
+	local best, bestScore = 0, -math.huge
+	for try = 1, 14 do
+		local list = nav.goals[(if try % 2 == 0 then theirs else mine) + 1]
+		if #list == 0 then
+			continue
+		end
+		local id = list[rng.int(1, #list)]
+		local holder = squad.claimed[id]
+		if keepOff[id] or id == b.at or (holder ~= nil and holder ~= b.id) then
+			continue
+		end
+		local node = nav.nodes[id]
+		local flat = math.sqrt((node.x - tx) ^ 2 + (node.z - tz) ^ 2)
+		local d = math.sqrt(flat * flat + (node.y - ty) ^ 2)
+		if d > reach * ADVANCE_INSIDE or flat < ADVANCE_OFF then
+			continue
+		end
+		-- a short walk (a storey is a long one), a fair way off them, cover for choice
+		local walk = math.sqrt((node.x - b.x) ^ 2 + (node.z - b.z) ^ 2) + math.abs(node.y - b.y) * 3
+		local score = rng.next() * 0.8 - walk / 35 - math.abs(d - reach * 0.5) / 40
+		if nav.coverAt[id] ~= nil then
+			score += 1
+		end
+		if score > bestScore then
+			best, bestScore = id, score
+		end
+	end
+	return best
+end
+
 -- A jink from where the bot stands, across the line to (tx, tz); false when neither side is clear.
 local function jinkTo(b: Brain, tx: number, tz: number): boolean
 	local nav = b.nav
@@ -1048,6 +1097,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			b.pauseUntil = math.max(b.pauseUntil, now)
 			b.sprint = false
 			local pose = b.con[best] -- (what it saw of it)
+			b.advanceAt = now + rng.range(0.6, 1.6)
 			if had == nil then
 				b.fightAt = now
 				local floor = math.clamp(math.floor(pose.y / nav.arena.floorHeight + 0.5), 0, nav.arena.floors - 1)
@@ -1086,7 +1136,10 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 				b.stance = "stand"
 				local restless = now < b.pushUntil or BotNav.roomOf(nav, b.x, b.y, b.z) ~= 0
 				local passing = b.outbound and not weak and rng.next() < 0.7
-				if b.mode ~= "hold" and (restless or passing) then
+				-- too far off to fire at, and not shooting at it: nothing to stop for (see ADVANCE)
+				local off = math.sqrt((pose.x - b.x) ^ 2 + (pose.y - b.y) ^ 2 + (pose.z - b.z) ^ 2)
+				local beyond = off > b.profile.range * state.feel.ballSpeed and not weak
+				if b.mode ~= "hold" and (restless or passing or beyond) then
 					-- it has stood about long enough, or it is still in its spawn room (nobody fights
 					-- from there), or it is on its way to its own storey and does not stop for
 					-- everybody: it fights on the move
@@ -1113,6 +1166,22 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 	if target ~= nil then
 		local pose = b.con[target] or b -- (what it saw of it)
 		b.sprint = false
+		-- too far off to fire at: it does not stand and look at them (see ADVANCE)
+		local reach = b.profile.range * state.feel.ballSpeed
+		if (pose.x - b.x) ^ 2 + (pose.y - b.y) ^ 2 + (pose.z - b.z) ^ 2 > reach * reach then
+			if b.halt then
+				b.halt = false
+				b.stance = "push"
+			end
+			if b.mode == "hold" and (b.peekX == nil or b.jink) and now >= b.advanceAt then
+				b.advanceAt = now + rng.range(1.5, 3)
+				local to = closer(b, squad, pose.x, pose.y, pose.z, reach)
+				if to ~= 0 and setOut(b, squad, to) then
+					b.stance = "push"
+				end
+			end
+		end
+
 		-- shot at while standing in the open: move
 		if b.alarm > b.shiftAt and b.alarm > b.fightAt and cover == nil and (b.halt or b.mode == "hold") then
 			b.shiftAt = now

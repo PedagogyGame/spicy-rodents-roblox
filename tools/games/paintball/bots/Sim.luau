@@ -141,6 +141,10 @@ export type SlotRecord = {
 	camping: number, -- seconds standing still near the other team's door with a line to it
 	stares: number, -- times it followed an opponent through a wall (audit only)
 	company: number, -- seconds with a bot of its own team within COMPANY studs on its storey
+	aimed: number, -- seconds a bot had a target ...
+	stared: number, -- ... and of those, seconds it stood where it was with that target too far off to fire at
+	stareNow: number, -- the present spell of that
+	stareMax: number, -- and the longest
 	post: number, -- seconds a bot stood at a post, on its feet, with nobody to fight ...
 	nose: number, -- ... and of those, seconds its look ended on something within NOSE studs (a wall in its face)
 	lives: { Life },
@@ -262,6 +266,10 @@ local function newSlotRecord(id: number, bot: boolean, team: number, floors: num
 		camping = 0,
 		stares = 0,
 		company = 0,
+		aimed = 0,
+		stared = 0,
+		stareNow = 0,
+		stareMax = 0,
 		post = 0,
 		nose = 0,
 		lives = {},
@@ -825,6 +833,22 @@ local function observe(sim: Sim, span: number)
 		end
 		-- its nose to a wall: at a post, standing, nobody to fight, and the look ends within NOSE studs
 		local brain = if rs.bot then (sim.bots.brains :: { [number]: BotBrain.Brain })[id] else nil
+		-- staring: it has a target, the target is further off than it fires, and it is not going anywhere
+		local aimedAt = if brain ~= nil and brain.target ~= nil then sim.poses[brain.target] else nil
+		if brain ~= nil and aimedAt ~= nil then
+			rs.aimed += span
+			local reach = brain.profile.range * state.feel.ballSpeed
+			local off = (aimedAt.x - pose.x) ^ 2 + (aimedAt.y - pose.y) ^ 2 + (aimedAt.z - pose.z) ^ 2
+			if off > reach * reach and brain.speed < 1 then
+				rs.stared += span
+				rs.stareNow += span
+				rs.stareMax = math.max(rs.stareMax, rs.stareNow)
+			else
+				rs.stareNow = 0
+			end
+		else
+			rs.stareNow = 0
+		end
 		if brain ~= nil and brain.mode == "hold" and brain.target == nil and pose.crouch < 0.3 then
 			rs.post += span
 			local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)

@@ -595,6 +595,75 @@ return function(t)
 	)
 
 	t.test(
+		"somebody in view too far off to fire at: it does not stand and look at them, it moves up and then fires",
+		function()
+			-- the longest clear line between two places a bot may stand on one storey: well over its range
+			local reach = BotBrain.DEFAULT.range * F.ballSpeed
+			local from, to, longest = 0, 0, 0
+			for i, a in arena.nodes do
+				if a.team ~= 0 or nav.door[i] ~= 0 or nav.keepOff[2][i] then
+					continue
+				end
+				for j, b in arena.nodes do
+					local d = math.sqrt((a.x - b.x) ^ 2 + (a.z - b.z) ^ 2)
+					if
+						j > i
+						and b.team == 0
+						and a.y == b.y
+						and d > longest
+						and arena.sweep(a.x, a.y + ArenaModule.EYE, a.z, b.x, b.y + ArenaModule.CHEST, b.z) == nil
+						and arena.sweep(b.x, b.y + ArenaModule.EYE, b.z, a.x, a.y + ArenaModule.CHEST, a.z) == nil
+					then
+						from, to, longest = i, j, d
+					end
+				end
+			end
+			t.truthy(longest > reach + 12, `the longest line is {longest} studs, the range {reach}`)
+			local there = arena.nodes[to]
+			for seed = 1, 6 do
+				local c = closeUp(from, yawTo(arena.nodes[from].x, arena.nodes[from].z, there.x, there.z), seed)
+				c.poses[1].x, c.poses[1].y, c.poses[1].z = there.x, there.y, there.z
+				c.brain.mode = "hold"
+				c.brain.holdUntil = math.huge -- it would stand at this post for ever, if nobody came
+				local function off(): number
+					return math.sqrt((c.brain.x - there.x) ^ 2 + (c.brain.y - there.y) ^ 2 + (c.brain.z - there.z) ^ 2)
+				end
+				local noticed, left, firstBall = nil :: number?, nil :: number?, nil :: number?
+				local t0 = c.now
+				for _ = 1, 12 * Clock.TICK_HZ do
+					local balls = #c.fired
+					stepClose(c, DT)
+					if noticed == nil and c.brain.target == 1 then
+						noticed = c.now
+					end
+					if left == nil and c.brain.mode == "travel" then
+						left = c.now
+					end
+					if #c.fired > balls then
+						firstBall = firstBall or c.now
+						t.truthy(off() <= reach + 0.5, `seed {seed}: a ball from {off()} studs`)
+					end
+				end
+				t.truthy(noticed ~= nil and (noticed :: number) - t0 < 1, `seed {seed}: it sees them`)
+				-- a moment to take it in, then it is on its way: never ten seconds of looking
+				t.truthy(
+					left ~= nil and (left :: number) - (noticed :: number) < 3.5,
+					`seed {seed}: it set off {if left ~= nil then left - (noticed :: number) else -1} s after it saw them`
+				)
+				t.truthy(firstBall ~= nil, `seed {seed}: and once it can reach them it fires`)
+				t.truthy(off() < reach, `seed {seed}: it ended {off()} studs off`)
+				t.truthy(off() > 12, "but not on top of them")
+			end
+			-- over whole matches: a little of their time with a target, and never for long
+			for _, whole in { { four() }, { eight() } } do
+				local s = whole[2] :: Report.Summary
+				t.truthy(s.stareShare < 0.12, `{s.stareShare * 100}% of their time with a target`)
+				t.truthy(s.stareLongest < 12, `{s.stareLongest} s at the longest`)
+			end
+		end
+	)
+
+	t.test(
 		"at a post it looks where there is something to see: not at a wall, not into the pillar it peeks round",
 		function()
 			-- every sixth place a bot may stand on the upper storeys (the person is on the ground: nobody to see)

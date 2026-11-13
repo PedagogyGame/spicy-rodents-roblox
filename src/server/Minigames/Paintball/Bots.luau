@@ -41,7 +41,9 @@
 --     target: the first ball is the warning splat. A fair player beats the average bot (skill 0.5)
 --     about three times in five;
 --   * take cover (arena.cover: stand behind high cover, crouch behind low cover and rails), peek, and
---     fall back to reload;
+--     fall back to reload; and MOVE UP on somebody they can see and cannot reach (further off than
+--     their range of ball flight) instead of standing to look at them;
+
 --   * respect the match: they fire only when Rules.canFire(state, id, now) says so, with the same
 --     magazine and reload as a person, never while BIT.sprint is set in their pose or within
 --     Body.SPRINT_FIRE_DELAY of it, and never from inside a spawn room;

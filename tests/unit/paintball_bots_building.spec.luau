@@ -237,6 +237,12 @@ return function(t)
 		-- at a post they look where there is something to see (what is left is a look at where a noise
 		-- came from or somebody vanished, and the look swinging past a pillar on its way)
 		t.truthy(s.noseShare < 0.25, `at a post their look ended on a wall {s.noseShare * 100}% of the time`)
+		-- somebody in view too far off to fire at is somebody to move up on, not to stand and look at
+		t.truthy(
+			s.stareShare < 0.15,
+			`they stood and looked at somebody out of range {s.stareShare * 100}% of the time`
+		)
+		t.truthy(s.stareLongest < 14, `{s.stareLongest} s at the longest`)
 		-- they talk, and not all the time
 		local says = sim.rec.says
 		t.truthy((says.floor or 0) > 3 and (says.tagged or 0) > 1 and (says.out or 0) > 1)

@@ -46,6 +46,8 @@ export type Summary = {
 	crouchShare: number,
 	sprintShare: number,
 	noseShare: number, -- of the bots' time standing at a post with nobody to fight: looking at a wall within 5 studs
+	stareShare: number, -- of the bots' time with a target: standing where they were with it too far off to fire at
+	stareLongest: number, -- the longest any bot did that, seconds
 	botMs: number, -- Bots.step, mean milliseconds a tick while live
 	botMsMax: number,
 	botCount: number,
@@ -134,6 +136,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local floorTime: { number } = table.create(arena.floors, 0)
 	local play, cover, crouched, sprinted = 0, 0, 0, 0
 	local post, nose = 0, 0
+	local aimed, stared, stareLongest = 0, 0, 0
 	local still, stillSlot, camping, stares = 0, 0, 0, 0
 	local roomSlowest, roomSum, lives = 0, 0, 0
 	local botCount = 0
@@ -152,6 +155,9 @@ function Report.summary(sim: Sim.Sim): Summary
 		sprinted += rs.sprinted
 		post += rs.post
 		nose += rs.nose
+		aimed += rs.aimed
+		stared += rs.stared
+		stareLongest = math.max(stareLongest, rs.stareMax)
 		camping += rs.camping
 		stares += rs.stares
 		for f = 1, arena.floors do
@@ -243,6 +249,8 @@ function Report.summary(sim: Sim.Sim): Summary
 		crouchShare = if play > 0 then crouched / play else 0,
 		sprintShare = if play > 0 then sprinted / play else 0,
 		noseShare = if post > 0 then nose / post else 0,
+		stareShare = if aimed > 0 then stared / aimed else 0,
+		stareLongest = stareLongest,
 		botMs = if rec.ticks > 0 then rec.botMs / rec.ticks else 0,
 		botMsMax = rec.botMsMax,
 		botCount = botCount,
@@ -362,6 +370,11 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 			.. `longest stand-still {string.format("%.1f", s.still)} s (seat {s.stillSlot})`
 	)
 	say(`  at a post with nobody to fight, their look ends on a wall within 5 studs {pct(s.noseShare)} of the time`)
+	say(
+		`  with somebody in view too far off to fire at, they stood and looked {pct(s.stareShare)} of their time with a target, `
+			.. `{string.format("%.1f", s.stareLongest)} s at the longest (they move up)`
+	)
+
 	say(
 		`  spawn rooms: out in {string.format("%.1f", s.roomMean)} s on average, {string.format("%.1f", s.roomSlowest)} s at the slowest; `
 			.. `{s.doorTags} tagged on their own doorstep ({s.doorStray} of them quiet, by a ball meant for somebody else); `
