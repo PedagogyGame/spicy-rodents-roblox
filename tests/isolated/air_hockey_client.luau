@@ -19,6 +19,7 @@ local Seat = require("@shared/Minigames/AirHockey/Seat")
 local Sim = require("@shared/Minigames/AirHockey/Sim")
 local Wire = require("@shared/Minigames/AirHockey/Wire")
 local Controller = require("@client/Minigames/AirHockey/Controller")
+local Reach = require("@client/Minigames/AirHockey/Reach")
 local Rink = require("@client/Minigames/AirHockey/Rink")
 local MinigameSounds = require("@client/Minigames/MinigameSounds")
 local AirHockeyFlow = require("@tests/engine/AirHockeyFlow")
@@ -337,6 +338,70 @@ local function seatedNames(w: Rig.World): string
 		table.insert(names, if key == w.player then "Ann" else tostring(key.Name))
 	end
 	return table.concat(names, ", ")
+end
+
+-- A person's body as far as Reach looks at it: the R15 joints from the waist to the right hand, at the stock
+-- rig's offsets (the shoulder joint is at the inner top of the upper arm, not over the elbow), every part where
+-- those joints rest it.
+local function person(name: string, at: any, parent: any?, armless: boolean?): any
+	local V, C = roblox.Vector3, roblox.CFrame
+	local body = FakeEngine.model(name, at, parent)
+	local function part(n: string, x: number, y: number): any
+		return FakeEngine.part(n, at * C.new(x, y, 0), body)
+	end
+	local function motor(n: string, p0: any, p1: any, c0: any, c1: any)
+		local m = FakeEngine.new("Motor6D", n)
+		m.Part0, m.Part1, m.C0, m.C1, m.Transform = p0, p1, C.new(c0), C.new(c1), C.new()
+		m.Parent = p1
+	end
+	body.PrimaryPart = part("HumanoidRootPart", 0, 0)
+	local lower, torso = part("LowerTorso", 0, -0.8), part("UpperTorso", 0, 0.2)
+	motor("Waist", lower, torso, V.new(0, 0.2, 0), V.new(0, -0.8, 0))
+	if not armless then
+		local upper = part("RightUpperArm", 1.5, 0.369)
+		local fore = part("RightLowerArm", 1.5, -0.224)
+		local hand = part("RightHand", 1.5, -0.85)
+		motor("RightShoulder", torso, upper, V.new(1, 0.563, 0), V.new(-0.5, 0.394, 0))
+		motor("RightElbow", upper, fore, V.new(0, -0.334, 0), V.new(0, 0.259, 0))
+		motor("RightWrist", fore, hand, V.new(0, -0.501, 0), V.new(0, 0.125, 0))
+	end
+	return body
+end
+
+local function motorOf(body: any, name: string): any
+	for _, d in body:GetDescendants() do
+		if d.Name == name then
+			return d
+		end
+	end
+	return nil
+end
+
+-- Where a body's joints, as they are written now, put its shoulder, elbow and hand, and how its upper torso stands
+-- (worked forward from the lower torso through each joint: Part1 = Part0 * C0 * Transform * C1^-1).
+local function limbs(body: any): (any, any, any, any)
+	local waist, sh = motorOf(body, "Waist"), motorOf(body, "RightShoulder")
+	local el, wr = motorOf(body, "RightElbow"), motorOf(body, "RightWrist")
+	local torso = waist.Part0.CFrame * waist.C0 * waist.Transform * waist.C1:Inverse()
+	local upper = torso * sh.C0 * sh.Transform * sh.C1:Inverse()
+	local fore = upper * el.C0 * el.Transform * el.C1:Inverse()
+	local hand = fore * wr.C0 * wr.C1:Inverse()
+	return (torso * sh.C0).Position, (upper * el.C0).Position, hand.Position, torso
+end
+
+local function posed(body: any): boolean
+	return motorOf(body, "RightShoulder").Transform ~= roblox.CFrame.new()
+end
+
+-- a person's body stood at an end's stance (dx studs along the mat from the middle of it), facing the table
+local function stoodAt(w: Rig.World, folder: any, name: string, side: number, dx: number?): any
+	local V, C = roblox.Vector3, roblox.CFrame
+	local place = w.places[SITE]
+	local X, D = Layout.stance(side)
+	local wx, _, wz = AlleyLayout.toWorld(place, X, 0, D + (dx or 0))
+	local cx, _, cz = Layout.toWorld(place, 0, 0)
+	local y = place.floorY + 3
+	return person(name, C.lookAt(V.new(wx, y, wz), V.new(cx, y, cz)), folder)
 end
 
 return function(t)
@@ -1544,6 +1609,176 @@ return function(t)
 			t.eq(out.numbers.winner, 0)
 			t.eq(out.numbers.hardware, 1, "the flow saw the table's hardware")
 		end, opts({ stand = { site = SITE, x = -20, y = 3, d = -40 } }))
+	end)
+
+	t.test("Reach: the hand goes to the mallet where the arm is long enough and toward it where it is not", function()
+		Rig.play(function(_w)
+			local V, C = roblox.Vector3, roblox.CFrame
+			for _, yaw in { 0, 1.1, -2.4 } do
+				local at = C.new(40, 3, -12) * C.Angles(0, yaw, 0)
+				local body = person("Ann", at, nil)
+				local arm = Reach.arm(body) :: any
+				t.truthy(arm ~= nil)
+				local shoulder0, _, hand0 = limbs(body)
+				local length = (hand0 - shoulder0).Magnitude
+				t.near(length, 1.685, 0.01, "the stock arm at rest is as long as it gets")
+				t.eq(Reach.STRETCH, 0.9)
+				-- within reach: in front of the shoulder and below it, to either side
+				for _, offset in { { 0.2, -0.9, -0.9 }, { -0.5, -0.4, -1.1 }, { 0.9, -1.0, -0.3 }, { 0.1, -0.3, -0.7 } } do
+					local target = at:PointToWorldSpace(V.new(1 + offset[1], 0.763 + offset[2], offset[3]))
+					Reach.pose(arm, target)
+					local shoulder, elbow, hand, torso = limbs(body)
+					t.truthy(
+						(hand - target).Magnitude < 2e-3,
+						`yaw {yaw}: the hand is {(hand - target).Magnitude} from it`
+					)
+					t.truthy((shoulder - shoulder0).Magnitude < 1e-3, "a target this close leans nobody")
+					t.near(torso.UpVector.Y, 1, 1e-6)
+					-- the arm keeps its lengths, and the elbow hangs: it is under the line from shoulder to hand
+					t.near((elbow - shoulder).Magnitude, 0.883, 2e-3)
+					t.near((hand - elbow).Magnitude, 0.885, 2e-3)
+					local along = (elbow - shoulder):Dot((hand - shoulder).Unit)
+					local onLine = shoulder + (hand - shoulder).Unit * along
+					t.truthy(elbow.Y <= onLine.Y + 1e-3, "the elbow does not stick up")
+				end
+				-- out of reach, down the table: the arm is stretched along the line to it, and the body leans that way
+				local far = at:PointToWorldSpace(V.new(0.5, 0.1, -8))
+				Reach.pose(arm, far)
+				local shoulder, _, hand, torso = limbs(body)
+				local line = (far - shoulder).Unit
+				t.truthy(
+					(hand - shoulder).Unit:Dot(line) > 0.99999,
+					"the hand is on the line from the shoulder to the mallet"
+				)
+				t.near((hand - shoulder).Magnitude, length * Reach.STRETCH, 0.01, "held out, the elbow a little bent")
+				local forward = at:VectorToWorldSpace(V.new(0, 0, -1))
+				t.truthy((shoulder - shoulder0):Dot(forward) > 0.4, "the shoulders have come forward over the table")
+				t.near(math.acos(torso.UpVector.Y), Reach.LEAN_MAX, 1e-3, "leant as far as a body leans")
+				t.truthy(
+					(far - hand).Magnitude < (far - hand0).Magnitude - 1.5,
+					"and the hand is that much nearer the mallet"
+				)
+				-- a mallet off to one side is leant toward, not just forward
+				local aside = at:PointToWorldSpace(V.new(-4, 0.1, -3))
+				Reach.pose(arm, aside)
+				local _, _, _, tilted = limbs(body)
+				local left = at:VectorToWorldSpace(V.new(-1, 0, 0))
+				t.truthy(tilted.UpVector:Dot(left) > 0.2 and tilted.UpVector:Dot(forward) > 0.15)
+				-- let go: the joints are the Animator's again
+				Reach.rest(arm)
+				t.eq(posed(body), false)
+				t.eq(motorOf(body, "Waist").Transform, C.new())
+				t.eq(motorOf(body, "RightElbow").Transform, C.new())
+			end
+			-- a body with no right arm (an animal, a rig still streaming in) has nothing to pose
+			t.eq(Reach.arm(person("Stump", C.new(0, 3, 0), nil, true)), nil)
+			-- and the switch: nothing is written
+			local body = person("Off", C.new(0, 3, 0), nil)
+			Reach.ON = false
+			Reach.pose(Reach.arm(body) :: any, V.new(0, 3, -2))
+			Reach.ON = true
+			t.eq(posed(body), false)
+		end, opts())
+	end)
+
+	t.test(
+		"whoever plays an end reaches for its mallet on a bystander's screen; nobody reaches for the computer's",
+		function()
+			Rig.play(
+				function(w)
+					local V, C = roblox.Vector3, roblox.CFrame
+					local place = w.places[SITE]
+					local folder = FakeEngine.new("Folder", "Bodies")
+					folder.Parent = workspace
+					local bobBody = stoodAt(w, folder, "Bob", 0)
+					local passer = stoodAt(w, folder, "Passer", 0, 1.2) -- (someone else on Bob's mat, off the middle of it)
+					local carl = stoodAt(w, folder, "Carl", 1) -- (someone standing at the computer's end)
+					local dog = person("Dog", bobBody.PrimaryPart.CFrame, folder, true)
+					t.eq(Layout.standingAt(place, bobBody.PrimaryPart.Position.X, bobBody.PrimaryPart.Position.Z), 0)
+					t.eq(Layout.standingAt(place, carl.PrimaryPart.Position.X, carl.PrimaryPart.Position.Z), 1)
+					local cx, _, cz = Layout.toWorld(place, 0, 0)
+					t.eq(Layout.standingAt(place, cx, cz), nil, "the bed is nobody's standing room")
+					-- Bob plays the computer from the Glacier end; Ann stands near and watches
+					local bob = bot(w, "Bob", Line.hands.chaser(1))
+					t.truthy(w.svc:join(bob.stub, ID))
+					t.truthy(Rig.input(w, bob.stub, ID, "start"))
+					play(w, 3, nil, { bob })
+					t.eq(Rink.watching(), 1)
+					for i = 1, 40 do
+						play(w, 0.05, nil, { bob })
+						Rink.reach()
+						t.eq(posed(bobBody), true, "Bob's arm is aimed")
+						local shoulder, _, hand = limbs(bobBody)
+						local mx, my = where(w, Layout.MALLETS[0])
+						local cap = V.new(Layout.toWorld(place, mx, my, Layout.GRIP_Z))
+						local off = (hand - shoulder).Unit:Dot((cap - shoulder).Unit)
+						t.truthy(off > 0.9999, `frame {i}: his hand is on the line to his mallet's cap ({off})`)
+						t.truthy((hand - cap).Magnitude < (cap - shoulder).Magnitude, "and between his shoulder and it")
+					end
+					t.eq(posed(passer), false, "one body an end: the one nearest the stance")
+					t.eq(posed(carl), false, "nobody reaches for the computer's mallet")
+					t.eq(motorOf(dog, "Waist").Transform, C.new(), "a body with no arm is left alone")
+					-- Bob's body walks off the mat: at the next look his arm is his own again
+					for _, d in bobBody:GetDescendants() do
+						if d.ClassName == "Part" then
+							d.CFrame = d.CFrame + V.new(0, 0, 40)
+						end
+					end
+					Rig.run(w, 0.1)
+					Rink.get(ID).lookedAt = -math.huge
+					Rink.reach()
+					t.eq(posed(bobBody), false, "off the mat, no reach")
+					t.eq(posed(passer), true, "(and whoever is still on it is taken for the player)")
+					-- the match ends: every arm is let go
+					w.svc:leave(bob.stub, "left")
+					play(w, 3.5, nil, nil)
+					t.eq(Rink.watching(), 0)
+					t.eq(posed(passer), false, "the table is at rest: nobody reaches")
+					folder:Destroy()
+				end,
+				opts({
+					stand = {
+						site = SITE,
+						x = select(1, Layout.stance(0)) - 2,
+						y = 3,
+						d = select(2, Layout.stance(0)) + 6,
+					},
+				})
+			)
+		end
+	)
+
+	t.test("playing a person: their arm reaches on your screen, and your own is left out of your view", function()
+		Rig.play(function(w)
+			local V = roblox.Vector3
+			local place = w.places[SITE]
+			local folder = FakeEngine.new("Folder", "Bodies")
+			folder.Parent = workspace
+			local mine, theirs = stoodAt(w, folder, "AnnBody", 0), stoodAt(w, folder, "BobBody", 1)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			local bob = bot(w, "Bob", Line.hands.chaser(1.5))
+			t.truthy(w.svc:join(bob.stub, ID))
+			Rig.click(w, "Start (Space)")
+			Rig.run(w, 0.3)
+			t.eq(Referee_mode(tableOf(w)), "2")
+			for _ = 1, 30 do
+				play(w, 0.1, Line.hands.chaser(1), { bob })
+				Rink.reach()
+				t.eq(posed(theirs), true, "the other player's arm is aimed")
+				t.eq(posed(mine), false, "your own is not")
+				local shoulder, _, hand = limbs(theirs)
+				local mx, my = where(w, Layout.MALLETS[1])
+				local cap = V.new(Layout.toWorld(place, mx, my, Layout.GRIP_Z))
+				t.truthy((hand - shoulder).Unit:Dot((cap - shoulder).Unit) > 0.9999, "at the far mallet as drawn here")
+			end
+			-- you leave: the arm is let go with the table
+			Rig.click(w, "Leave (Q)")
+			Rig.run(w, 0.5)
+			t.eq(w.client.active(), nil)
+			t.eq(posed(theirs), false, "off the table, nothing of it is posed from this screen's controller")
+			folder:Destroy()
+		end, opts())
 	end)
 
 	t.test("the layout the rig stood the table on is the bake's (one source: Layout)", function()

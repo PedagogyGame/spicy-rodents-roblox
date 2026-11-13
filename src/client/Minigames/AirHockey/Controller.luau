@@ -503,6 +503,7 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 			if seat.ready then
 				-- a contact is heard when the puck drawn meets it (this end's at once, the far end's when seen)
 				Seat.heard(seat, Rink.contact)
+				Rink.playing(rink, seat.mode, self.side)
 				Rink.show(rink, Seat.view(seat))
 				status(words(if seat.mode == "2" then seat.replica.sim else seat.pred, seat.mode))
 			end

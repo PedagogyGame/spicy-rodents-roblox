@@ -17,6 +17,7 @@
 --   footprint() -> { x0, x1, d0, d1 } (the cabinet); standing(side) -> { x0, x1, d0, d1 }; srgb(linear) -> 0..255;
 --   onTable(place, wx, wy, wz) -> (x, y)? (a point of the world that is on the table: where, in the model's
 --   metres); aisle(place, y) -> (wx, wy, wz) (the floor beside the table on the room's side, level with y);
+--   standingAt(place, wx, wz) -> side? (the end whose standing room a point of the floor is in);
 --   stations(sites) -> { StationDef }; sideOfStation(id) -> side?
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
@@ -52,6 +53,7 @@ Layout.SIDE_NAMES = { [0] = "Glacier", [1] = "Ember" }
 -- them) and whoever moves one slides its pivot across the bed to toWorld(x, y), height and turn unchanged.
 Layout.HOME_PUCK = { 0, 0 }
 Layout.HOME_MALLET = { [0] = { 0, -0.8 }, [1] = { 0, 0.8 } }
+Layout.GRIP_Z = 1.0 -- metres: just over a mallet's cap, where the hand that plays it reaches (Client: Reach)
 
 Layout.STATION = "air_hockey_1" -- the Glacier end's prompt (the table's own station)
 Layout.STATION_EMBER = "air_hockey_1_ember" -- the Ember end's prompt: a second way in to the same table
@@ -126,6 +128,20 @@ function Layout.standing(side: number): { x0: number, x1: number, d0: number, d1
 		d0 = Layout.CENTRE.d - Layout.HALF_WIDTH * k,
 		d1 = Layout.CENTRE.d + Layout.HALF_WIDTH * k,
 	}
+end
+
+-- The end whose standing room a point of the floor is in (STAND_SLACK studs of grace all round), or nil.
+Layout.STAND_SLACK = 0.6
+function Layout.standingAt(place: GameSpec.Place, wx: number, wz: number): number?
+	local X, _, D = AlleyLayout.toLocal(place, wx, 0, wz)
+	local slack = Layout.STAND_SLACK
+	for side = 0, 1 do
+		local box = Layout.standing(side)
+		if X >= box.x0 - slack and X <= box.x1 + slack and D >= box.d0 - slack and D <= box.d1 + slack then
+			return side
+		end
+	end
+	return nil
 end
 
 -- A point of the world that is ON the table (over the cabinet, from just under the bed to head height): where it
