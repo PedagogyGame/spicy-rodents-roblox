@@ -22,6 +22,9 @@ local Wire = require("@shared/Minigames/Pinball/Wire")
 local PinballFlow = require("@tests/engine/PinballFlow")
 local Cabinet = require("@client/Minigames/Pinball/Cabinet")
 local Controller = require("@client/Minigames/Pinball/Controller")
+local Dmd = require("@client/Minigames/Pinball/Dmd")
+local Hands = require("@client/Minigames/Pinball/Hands")
+local Layout = require("@shared/Minigames/Pinball/Layout")
 local MinigameSounds = require("@client/Minigames/MinigameSounds")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local Rig = require("@tests/lib/MinigameRig")
@@ -82,6 +85,7 @@ local function furnish(roots: { [string]: any }, places: { [string]: any })
 		end
 		local plunger = FakeEngine.model(N.plunger, at(X, CabinetLayout.PF_Y, D + 2.6), model)
 		plunger.PrimaryPart = FakeEngine.part("Rod", at(X, CabinetLayout.PF_Y, D + 2.6), plunger)
+		part("Glass")
 		local glass = part(N.backglass)
 		local gui = FakeEngine.new("SurfaceGui", "Display")
 		gui.Parent = glass
@@ -269,6 +273,63 @@ local function playFor(
 		end
 	end
 	return cond ~= nil and cond()
+end
+
+-- A point of a machine's playfield on the screen (pixels), through the camera as it is.
+local function onScreen(w: Rig.World, index: number, x: number, y: number): any
+	local X, Y, D = CabinetLayout.point(index, x, y, 0)
+	local wx, wy, wz = AlleyLayout.toWorld(w.places[SITE], X, Y, D)
+	return (workspace.CurrentCamera:WorldToViewportPoint(roblox.Vector3.new(wx, wy, wz)))
+end
+
+-- Every part of the HUD that is drawn now, as rectangles of the screen: { name, x0, y0, x1, y1 } (pixels). The
+-- HUD's own frame starts under the top bar (Controller.INSET: the engine's GetGuiInset where there is one).
+local function hud(_w: Rig.World): { { any } }
+	local ui = Controller.current.ctx.ui
+	local size = workspace.CurrentCamera.ViewportSize
+	local inset = Controller.INSET
+	local gh = size.Y - inset
+	local function rect(frame: any): (number, number, number, number)
+		local p, z = frame.Position, frame.Size
+		local x0 = p.X.Scale * size.X + p.X.Offset
+		local y0 = inset + p.Y.Scale * gh + p.Y.Offset
+		return x0, y0, x0 + z.X.Scale * size.X + z.X.Offset, y0 + z.Y.Scale * gh + z.Y.Offset
+	end
+	local out: { { any } } = {}
+	if ui.helpFrame.Visible then
+		table.insert(out, { "help", rect(ui.helpFrame) })
+	end
+	if ui.statusLabel.Visible and ui.statusLabel.Text ~= "" then
+		table.insert(out, { "status", rect(ui.statusLabel) })
+	end
+	if ui.clockLabel.Visible then
+		table.insert(out, { "clock", rect(ui.clockLabel) })
+	end
+	if ui.card.Visible then
+		table.insert(out, { "card", rect(ui.card) })
+	end
+	local banner = ui.bannerLabel
+	if banner.Text ~= "" and banner.TextTransparency < 1 then
+		table.insert(out, { "banner", rect(banner) })
+	end
+	local dmd = Controller.current.dmd
+	if dmd and dmd.frame.Visible then
+		table.insert(out, { "dmd", rect(dmd.frame) })
+	end
+	-- a bar is as wide as its buttons (laid out from its left edge, 8 pixels apart)
+	for _, bar in { { "buttons", ui.buttonBar }, { "touch", ui.touchBar } } do
+		local x0, y0, _, y1 = rect(bar[2])
+		local width = 0
+		for _, child in bar[2]:GetChildren() do
+			if child:IsA("TextButton") then
+				width += child.Size.X.Offset + 8
+			end
+		end
+		if width > 0 and bar[2].Visible ~= false then
+			table.insert(out, { bar[1], x0, y0, x0 + width - 8, y1 })
+		end
+	end
+	return out
 end
 
 return function(t)
@@ -911,6 +972,354 @@ return function(t)
 				t.truthy(result.ok)
 				t.truthy(result.numbers.soloScore > 0)
 			end, opts(2))
+		end
+	)
+
+	-- THE SCREEN ------------------------------------------------------------------------------------------------
+
+	for _, screen in
+		{
+			{ 1920, 1080, false },
+			{ 1280, 720, false },
+			{ 1024, 768, false },
+			{ 844, 390, true },
+			{ 2340, 1080, true },
+			{ 1024, 768, true },
+		}
+	do
+		local w0, h0, touch = screen[1], screen[2], screen[3]
+		t.test(
+			`{w0} by {h0}{if touch then " touch" else ""}: no part of the HUD lies over the table (every point of the playfield, the flippers, the plunger and the bumpers), in either view, with a banner up; the display is up`,
+			function()
+				Rig.play(function(w)
+					rawset(workspace.CurrentCamera, "ViewportSize", roblox.Vector2.new(w0, h0))
+					local ID = stationOf(2)
+					Rig.press(w, ID)
+					Rig.run(w, 0.3)
+					Rig.click(w, "Start (Space)")
+					Rig.run(w, 0.5)
+					local c = Controller.current
+					t.truthy(c and c.live)
+					local tbl = c.cab.tbl
+					for _, which in { "play", "high" } do
+						if c.view ~= which then
+							Rig.key(Key.V, true)
+							Rig.key(Key.V, false)
+							Rig.run(w, 1)
+						end
+						t.eq(c.view, which)
+						c.say("SOMETHING THUMPED THE GLASS!", true)
+						Rig.run(w, 0.1)
+						local rects = hud(w)
+						local names = {}
+						for _, r in rects do
+							table.insert(names, r[1])
+						end
+						local list = table.concat(names, " ")
+						t.truthy(string.find(list, "dmd", 1, true) ~= nil, list)
+						t.truthy(string.find(list, "card", 1, true) ~= nil, list)
+						t.truthy(string.find(list, "banner", 1, true) ~= nil, list)
+						t.truthy(string.find(list, "buttons", 1, true) ~= nil, list)
+						if touch then
+							t.truthy(string.find(list, "touch", 1, true) ~= nil, list)
+						end
+						local points: { { any } } = {}
+						for i = 0, 12 do
+							for j = 0, 24 do
+								table.insert(points, { i / 12 * Layout.WIDTH, j / 24 * Layout.LENGTH, `({i}, {j})` })
+							end
+						end
+						for i = 1, tbl.c.nFlip do
+							table.insert(points, { tbl.c.fpx[i], tbl.c.fpy[i], `flipper {i}` })
+						end
+						table.insert(points, { tbl.def.plunger.x, tbl.def.plunger.y, "plunger" })
+						for i, b in tbl.def.bumpers do
+							table.insert(points, { b.x, b.y, `bumper {i}` })
+						end
+						for _, p in points do
+							local q = onScreen(w, 2, p[1], p[2])
+							t.truthy(
+								q.X >= 0 and q.X <= w0 and q.Y >= 0 and q.Y <= h0,
+								`{which}: {p[3]} on the screen ({q.X}, {q.Y})`
+							)
+							for _, r in rects do
+								local inside = q.X > r[2] and q.X < r[4] and q.Y > r[3] and q.Y < r[5]
+								t.falsy(inside, `{which}: the {r[1]} lies over {p[3]} at ({q.X}, {q.Y})`)
+							end
+						end
+					end
+					-- the status line never carries words over the table while the ball is in play
+					t.falsy(c.ctx.ui.statusLabel.Visible and c.ctx.ui.statusLabel.Text ~= "", Rig.screen(w))
+				end, opts(2, { touch = touch }))
+			end
+		)
+	end
+
+	t.test(
+		"the display: score, ball and player; BALL SAVED and TILT WARNING (red) on the frame the model raises them, with what to shoot for between callouts",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(1)
+				Rig.press(w, ID)
+				Rig.run(w, 0.2)
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 0.4)
+				local c = Controller.current
+				local d = c.dmd
+				t.truthy(d.frame.Visible, "the display is up while the game is on")
+				local texts = Dmd.texts(d)
+				t.truthy(string.find(texts[2], "BALL 1", 1, true) ~= nil, texts[2])
+				t.truthy(texts[3] ~= "", "what to shoot for, or the plunger's words")
+				-- launch, then nudge until the bob warns: the very frame the machine raises it, the display says it
+				Rig.key(Key.Space, true)
+				Rig.run(w, 1)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 1)
+				local warned = false
+				for _ = 1, 40 do
+					for _, k in { Key.Z, Key.X, Key.W } do
+						Rig.key(k, true)
+						Rig.frame(w)
+						Rig.key(k, false)
+						for _ = 1, 9 do
+							Rig.frame(w)
+							local m = c.cab.r.m
+							if m.say == Machine.SAY.TILT_WARNING and m.sayLeft > 0 and not warned then
+								warned = true
+								local said = Dmd.texts(d)[3]
+								t.truthy(string.find(said, "TILT WARNING", 1, true) ~= nil, said)
+								local col = d.say.TextColor3
+								t.truthy(col.R > 0.9 and col.G < 0.4, "in red")
+							end
+						end
+					end
+					if warned then
+						break
+					end
+				end
+				t.truthy(warned, "a tilt warning came")
+				-- a ball saved: said on the display the frame it is
+				local m = c.cab.r.m
+				Machine.callout(m, {}, Machine.SAY.BALL_SAVED, 0)
+				Rig.frame(w)
+				t.eq(Dmd.texts(d)[3], "BALL SAVED")
+			end, opts(1))
+		end
+	)
+
+	t.test(
+		"touch: a thumb resting at the bottom right is the right flipper all through a ball; it pulls the plunger only while the ball waits on it",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(3)
+				Rig.press(w, ID)
+				Rig.run(w, 0.2)
+				Rig.click(w, "Start (Space)")
+				Rig.run(w, 0.4)
+				local c = Controller.current
+				local tbl = c.cab.tbl
+				local function up(i: number): boolean
+					return c.cab.r.m.phys.fa[i] > tbl.c.frest[i] + 0.5
+				end
+				-- the ball waits on the plunger: the right thumb dragged down pulls it, and launches it
+				t.truthy(Machine.resting(tbl, c.cab.r.m) > 0)
+				Rig.touch("r", "began", 1700, 810)
+				Rig.touch("r", "changed", 1700, 810 + 1080 * 0.25)
+				Rig.run(w, 0.8)
+				t.truthy(c.cab.r.m.pull > 0, "pulled")
+				Rig.touch("r", "ended", 1700, 1060)
+				Rig.run(w, 1)
+				t.eq(Machine.resting(tbl, c.cab.r.m), 0, "launched")
+				-- mid-ball: every resting place of the right thumb is the right flipper
+				for _, at in { { 1728, 810 }, { 1650, 900 }, { 1820, 750 }, { 1500, 600 } } do
+					Rig.touch("r2", "began", at[1], at[2])
+					Rig.run(w, 0.1)
+					t.truthy(up(2), `a thumb at {at[1]}, {at[2]}`)
+					Rig.touch("r2", "ended", at[1], at[2])
+					Rig.run(w, 0.3)
+				end
+				-- a tap on Leave mid-game does not end it: it asks for a second
+				Rig.click(w, "Leave")
+				Rig.run(w, 0.2)
+				t.eq(w.client.active(), ID, "still playing")
+				t.truthy(Rig.has(Rig.texts(w.gui), "Tap Leave again to leave"), Rig.screen(w))
+				t.truthy(Rig.has(Rig.texts(w.gui), "Tap again to leave"), Rig.screen(w))
+				Rig.click(w, "Tap again to leave")
+				Rig.run(w, 0.4)
+				t.eq(w.client.active(), nil, "the second tap leaves")
+			end, opts(3, { touch = true }))
+		end
+	)
+
+	t.test(
+		"keys: Q once in a game asks again, twice leaves; keys pressed while it is not your ball are not kept for it; a mouse click down and up inside one frame is a whole flip",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(1)
+				Rig.press(w, ID)
+				Rig.run(w, 0.2)
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 0.4)
+				local c = Controller.current
+				local tbl = c.cab.tbl
+				-- a click that went down and up between two frames (a trackpad's tap): the flipper goes all the way up
+				local Kind = roblox.Enum.UserInputType
+				local top = -math.huge
+				FakeEngine.input("began", { UserInputType = Kind.MouseButton1 })
+				FakeEngine.input("ended", { UserInputType = Kind.MouseButton1 })
+				for _ = 1, 6 do
+					Rig.frame(w)
+					top = math.max(top, c.cab.r.m.phys.fa[1])
+				end
+				t.near(top, tbl.c.fup[1], 0.05, "a whole stroke")
+				-- Q once: not gone, asked to press again; after the wait, Q once again asks again
+				Rig.key(Key.Q, true)
+				Rig.key(Key.Q, false)
+				Rig.run(w, 0.2)
+				t.eq(w.client.active(), ID)
+				t.truthy(Rig.has(Rig.texts(w.gui), "Press Q again to leave"), Rig.screen(w))
+				Rig.run(w, 3)
+				Rig.key(Key.Q, true)
+				Rig.key(Key.Q, false)
+				Rig.run(w, 0.2)
+				t.eq(w.client.active(), ID, "a second press long after the first is a first again")
+				-- not this player's ball: keys walk the body and nothing is kept
+				c.live = false
+				Rig.key(Key.W, true)
+				Rig.key(Key.A, true)
+				Rig.frame(w)
+				t.eq(Hands.held(c.hands), 0, "nothing held for the next ball")
+				t.eq(c.hands.latched, 0)
+				Rig.key(Key.W, false)
+				Rig.key(Key.A, false)
+				c.live = true
+				Rig.key(Key.Q, true)
+				Rig.key(Key.Q, false)
+				Rig.frame(w)
+				Rig.key(Key.Q, true)
+				Rig.key(Key.Q, false)
+				Rig.run(w, 0.4)
+				t.eq(w.client.active(), nil, "twice leaves")
+			end, opts(1))
+		end
+	)
+
+	for _, fps in { 144, 60 } do
+		t.test(
+			`your own ball drawn at {fps} frames a second with uneven frames: it moves the same distance for the same time (blended between ticks), never one tick then two`,
+			function()
+				Rig.play(function(w)
+					local ID = stationOf(1)
+					Rig.press(w, ID)
+					Rig.run(w, 0.2)
+					Rig.key(Key.Space, true)
+					Rig.key(Key.Space, false)
+					Rig.run(w, 0.4)
+					local c = Controller.current
+					-- a full pull, and the ball flies up the shooter lane
+					Rig.key(Key.Space, true)
+					Rig.run(w, 1.2)
+					Rig.key(Key.Space, false)
+					local seed = fps
+					local function jitter(): number
+						seed = (seed * 1103515245 + 12345) % 2147483648
+						return seed / 2147483648
+					end
+					local worst = 0
+					local samples = 0
+					local was: any = nil
+					for _ = 1, math.floor(fps * 0.2) do
+						local dt = (1 / fps) * (1 + (jitter() - 0.5) * 0.1)
+						FakeEngine.renderStep(dt)
+						local f = c.drawn
+						local b = c.cab.r.m.phys.balls[1]
+						if f and f.nBalls > 0 and b then
+							local x, y = f.balls[1], f.balls[2]
+							local speed = math.sqrt(b.vx * b.vx + b.vy * b.vy)
+							-- (frames where the ball met something, and turned, are left out)
+							local straight = was ~= nil and (b.vx * was[3] + b.vy * was[4]) / (speed * was[5]) > 0.995
+							if straight and speed > 5 then
+								local step = math.sqrt((x - was[1]) ^ 2 + (y - was[2]) ^ 2)
+								local want = speed * dt
+								worst = math.max(worst, math.abs(step - want) / want)
+								samples += 1
+							end
+							was = { x, y, b.vx, b.vy, math.max(speed, 1e-6) }
+						end
+					end
+					t.truthy(samples >= 6, `{samples} frames of a fast ball`)
+					t.truthy(worst < 0.15, `the step was off by {math.floor(worst * 100)}% at worst`)
+				end, opts(1))
+			end
+		)
+	end
+
+	t.test(
+		"two players: while Bob plays, Ann stands at her own spot beside the cabinet, not in his place; her body and the glass are not drawn on her screen while her ball is live",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(1)
+				local bob = person("Bob", 5)
+				Rig.press(w, ID)
+				Rig.run(w, 0.2)
+				t.truthy(w.svc:join(bob.stub, ID))
+				Rig.run(w, 0.3)
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 0.4)
+				local c = Controller.current
+				t.truthy(c.live)
+				local glass =
+					w.roots[SITE]:FindFirstChild("GamesRoom"):FindFirstChild("Pinball1"):FindFirstChild("Glass")
+				t.eq(glass.LocalTransparencyModifier, 1, "the glass is not drawn over the ball")
+				t.eq(w.body.PrimaryPart.LocalTransparencyModifier, 1, "nor her own body under the eye")
+				local h = hand(1, 3)
+				t.truthy(playFor(w, 300, h, function()
+					return c.cab.r ~= nil and c.cab.r.m.up == 2 and not c.live
+				end, { bob }, ID))
+				Rig.run(w, 0.1)
+				t.truthy((w.body.PrimaryPart.LocalTransparencyModifier or 0) < 1, "drawn again")
+				t.truthy((glass.LocalTransparencyModifier or 0) < 1)
+				local X, D = CabinetLayout.stance(1)
+				local x, _, z = AlleyLayout.toWorld(w.places[SITE], X, 0, D)
+				local p = w.body.PrimaryPart.Position
+				local off = roblox.Vector3.new(p.X - x, 0, p.Z - z).Magnitude
+				t.truthy(off > 1.5, `Ann stepped aside ({off} studs from the stance)`)
+				-- her ball again: back at the cabinet
+				t.truthy(playFor(w, 300, h, function()
+					return c.live
+				end, { bob }, ID))
+				p = w.body.PrimaryPart.Position
+				t.truthy(roblox.Vector3.new(p.X - x, 0, p.Z - z).Magnitude < 0.2, "at the stance")
+			end, opts(1))
+		end
+	)
+
+	t.test(
+		"the end card: a score that takes first place says NEW HIGH SCORE and a personal best; the best bonus is a column",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(1)
+				Rig.press(w, ID)
+				Rig.run(w, 0.2)
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 0.4)
+				table.clear(tableOf(w, 1).board.entries) -- (a board with room: the first fair score is first)
+				local h = hand(1, 11)
+				t.truthy(playFor(w, 600, h, function()
+					return sessionOf(w, 1).phase == "done"
+				end))
+				Rig.run(w, 0.5)
+				local screen = Rig.screen(w)
+				t.truthy(Rig.has(Rig.texts(w.gui), "NEW HIGH SCORE ON ACORN ATTACK"), screen)
+				t.truthy(Rig.has(Rig.texts(w.gui), "A NEW PERSONAL BEST"), screen)
+				t.truthy(Rig.has(Rig.texts(w.gui), "BEST BONUS"), screen)
+				t.eq(Rig.last(w.got, "state").place, 1)
+				t.eq(Rig.last(w.got, "state").newBest, true)
+			end, opts(1))
 		end
 	)
 end

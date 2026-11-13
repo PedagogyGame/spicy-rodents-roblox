@@ -14,13 +14,16 @@
 -- normal, part Z down the table toward the player, so that point (x, y, h) is the frame * (x, h, -y); the frame
 -- is the alley's (after the site's yaw) turned by Angles(0, pi, 0) * Angles(TILT, 0, 0) (YAW_PI, TILT), and a
 -- playfield direction (dx, dy) is a turn of turnOf(dx, dy) about the normal.
--- The camera (camera()) is the player's eye over the lockdown bar, worked out so that the whole playfield, both
--- flippers and the plunger are in the picture on any screen from 4:3 to a wide phone.
+-- The camera (camera()) is the player's eye over the lockdown bar (or, the second view, leaning out over the
+-- glass), worked out so that the whole playfield, both flippers and the plunger are in the picture on any screen
+-- from 4:3 to a wide phone, with room kept at the top for the HUD's display when it asks.
 -- Pure. Interface: model(index) -> name; at(index) -> (X, D) of the cabinet's middle; TILT; PF_Y; PF_D (the
 --   playfield's middle, from PINBALL_D); point(index, x, y, h) -> (X, Y, D); origin(index) -> (X, Y, D);
 --   turnOf(dx, dy) -> radians about the playfield normal; BODY (the cabinet's box), BACKBOX, GLASS_H, LEGS;
---   stance(index) -> (X, D) where the player stands; camera(index, aspect?) -> { eye, target, fov } (alley
---   local); NAMES (the parts the client moves); BALLS (ball parts baked); FLIPPER_H; PULL_TRAVEL; DROP_SINK
+--   stance(index) -> (X, D) where the player stands; camera(index, aspect?, which?, reserve?) -> { eye, target,
+--   fov, aspect } (alley local); EYES (the views); RESERVE; MARGIN; project(view, X, Y, D) -> (u, v, depth) (a
+--   point's place in the picture, 0..1 from the top left); NAMES (the parts the client moves); BALLS (ball parts
+--   baked); FLIPPER_H; PULL_TRAVEL; DROP_SINK
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
 local Layout = require("./Layout")
@@ -91,41 +94,85 @@ function Cabinet.stance(index: number): (number, number)
 	return px, pd + Cabinet.STANCE_D
 end
 
-export type View = { eye: { number }, target: { number }, fov: number }
+export type View = { eye: { number }, target: { number }, fov: number, aspect: number }
 
-local EYE = { x = Layout.WIDTH / 2, y = -0.8, h = 1.8 } -- in the playfield's frame: over the lockdown bar
-local MARGIN = 3.5 -- degrees kept clear above and below the playfield
+-- The two views (V, the gamepad's D-pad up or VIEW on a touch screen switches): the eye in the playfield's frame
+-- (y along the table from its near edge, negative in front of it; h above its surface). "play" stands over the
+-- lockdown bar, a tall person's eye looking down the table: high enough that the far end (the bumpers, the top
+-- lanes, the skill shot) is not squeezed flat. "high" leans out over the glass: the table nearly from above.
+Cabinet.EYES = {
+	play = { y = -0.7, h = 3.1 },
+	high = { y = 0.9, h = 5.6 },
+}
+Cabinet.MARGIN = 2 -- degrees kept clear above and below the playfield
+-- fractions of the screen's height kept clear of the playfield: the top for the dot-matrix strip, the bottom
+-- for the buttons (Client/Minigames/Pinball/Controller's HUD)
+Cabinet.RESERVE = { top = 0.12, bottom = 0.02 }
 
--- camera(index, aspect): the player's view. It looks down the playfield from over the lockdown bar, aimed
--- between the playfield's near and far ends, the field of view just wide enough for both (and, on a narrow
--- screen, for its width too). aspect is width / height (default 16:9).
-function Cabinet.camera(index: number, aspect: number?): View
-	local ex, ey, ez = Cabinet.point(index, EYE.x, EYE.y, EYE.h)
-	local function dir(x: number, y: number): (number, number, number)
-		local X, Y, D = Cabinet.point(index, x, y, 0)
-		local a, b, c = X - ex, Y - ey, D - ez
-		local n = math.sqrt(a * a + b * b + c * c)
-		return a / n, b / n, c / n
+-- project(view, X, Y, D): where an alley-local point stands in a view's picture: u across from the left edge
+-- and v down from the top (0..1 of the screen), and its depth in front of the eye (negative: behind it).
+function Cabinet.project(view: View, X: number, Y: number, D: number): (number, number, number)
+	local e, t = view.eye, view.target
+	-- (as world axes: X, Y, and Z = -D)
+	local fx, fy, fz = t[1] - e[1], t[2] - e[2], -(t[3] - e[3])
+	local n = math.sqrt(fx * fx + fy * fy + fz * fz)
+	fx, fy, fz = fx / n, fy / n, fz / n
+	-- right = forward x (0, 1, 0); up = right x forward
+	local rx, rz = -fz, fx
+	local rn = math.sqrt(rx * rx + rz * rz)
+	rx, rz = rx / rn, rz / rn
+	local ux, uy, uz = -rz * fy, rz * fx - rx * fz, rx * fy
+	local dx, dy, dz = X - e[1], Y - e[2], -(D - e[3])
+	local depth = dx * fx + dy * fy + dz * fz
+	local right = dx * rx + dz * rz
+	local up = dx * ux + dy * uy + dz * uz
+	local tanV = math.tan(math.rad(view.fov / 2))
+	local u = 0.5 + right / depth / (tanV * view.aspect) / 2
+	local v = 0.5 - up / depth / tanV / 2
+	return u, v, depth
+end
+
+-- camera(index, aspect, which?, reserve?): the player's view ("play", or "high"). It looks down the playfield
+-- from its eye, pitched and with its field of view chosen so that the near edge sits just above the bottom of
+-- the picture and the far end just under its top, less the reserve (fractions of the height kept for the HUD;
+-- default RESERVE) (solved exactly: the picture is not linear in the angle), widened on a narrow screen until
+-- both front corners fit. aspect is width / height (default 16:9).
+function Cabinet.camera(index: number, aspect: number?, which: string?, reserve: { top: number, bottom: number }?): View
+	local eyeAt = Cabinet.EYES[which or "play"] or Cabinet.EYES.play
+	local ex, ey, ez = Cabinet.point(index, Layout.WIDTH / 2, eyeAt.y, eyeAt.h)
+	-- the pitch (up from level, toward -D) of the line to a point of the playfield's centre line
+	local function pitch(y: number): number
+		local _, Y, D = Cabinet.point(index, Layout.WIDTH / 2, y, 0)
+		return math.atan2(Y - ey, ez - D)
 	end
-	-- the pitch of the line to the near edge and to the far end (the top of the arch)
-	local _, nb, nc = dir(EYE.x, 0)
-	local _, fb, fc = dir(EYE.x, Layout.LENGTH)
-	local near = math.atan2(nb, math.abs(nc))
-	local far = math.atan2(fb, math.abs(fc))
-	local mid = (near + far) / 2
-	local half = (far - near) / 2 + math.rad(MARGIN)
-	-- the width: a front corner seen from the eye must fit inside the horizontal half-angle
-	local X0, Y0, D0 = Cabinet.point(index, 0, 0, 0)
-	local ax, ay, ad = X0 - ex, Y0 - ey, D0 - ez
-	-- (in the camera's own frame: forward along (0, sin mid, -cos mid), up along (0, cos mid, sin mid))
-	local fwd = ay * math.sin(mid) - ad * math.cos(mid)
-	local side = math.abs(ax)
-	local needH = math.atan2(side, fwd) + math.rad(MARGIN)
+	local m = math.rad(Cabinet.MARGIN)
+	local lo, hi = pitch(0) - m, pitch(Layout.LENGTH) + m
+	local keep = reserve or Cabinet.RESERVE
+	local kTop, kBottom = 1 - 2 * keep.top, 1 - 2 * keep.bottom
+	-- the pitch c that puts lo at -kBottom and hi at +kTop of the half-height: tan(hi - c) / kTop =
+	-- tan(c - lo) / kBottom (the left side falls as c rises, the right side climbs: one crossing)
+	local a, b = lo, hi
+	for _ = 1, 60 do
+		local c = (a + b) / 2
+		if math.tan(hi - c) / kTop > math.tan(c - lo) / kBottom then
+			a = c
+		else
+			b = c
+		end
+	end
+	local c = (a + b) / 2
+	local tanV = math.tan(c - lo) / kBottom
+	-- the width: both front corners inside the picture's sides
 	local asp = aspect or 16 / 9
-	local halfFromWidth = math.atan(math.tan(needH) / asp)
-	half = math.max(half, halfFromWidth)
-	local tx, ty, tz = ex, ey + math.sin(mid) * 4, ez - math.cos(mid) * 4
-	return { eye = { ex, ey, ez }, target = { tx, ty, tz }, fov = math.deg(half * 2) }
+	local fY, fD = math.sin(c), -math.cos(c)
+	for _, x in { 0, Layout.WIDTH } do
+		local X, Y, D = Cabinet.point(index, x, 0, 0)
+		local depth = (Y - ey) * fY + (D - ez) * fD
+		local need = math.abs(X - ex) / depth / asp * (1 + m)
+		tanV = math.max(tanV, need)
+	end
+	local tx, ty, tz = ex, ey + fY * 4, ez + fD * 4
+	return { eye = { ex, ey, ez }, target = { tx, ty, tz }, fov = math.deg(2 * math.atan(tanV)), aspect = asp }
 end
 
 return Cabinet

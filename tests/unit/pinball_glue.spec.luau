@@ -139,52 +139,81 @@ return function(t)
 	end)
 
 	t.test(
-		"the camera: over the lockdown bar, the whole playfield, both flippers and the plunger in the picture on any screen",
+		"the camera: over the lockdown bar (or leaning over the glass), the whole playfield, both flippers, the plunger and the bumpers in the picture on any screen, clear of the HUD's reserve; the far end not squeezed flat",
 		function()
-			local tbl = Tables.need("pinball_rodent")
-			local c = tbl.c
-			for _, aspect in { 4 / 3, 16 / 10, 16 / 9, 19.5 / 9 } do
-				local v = Cabinet.camera(2, aspect)
-				local ex, ey, ez = v.eye[1], v.eye[2], v.eye[3]
-				local fx, fy, fz = v.target[1] - ex, v.target[2] - ey, v.target[3] - ez
-				local n = math.sqrt(fx * fx + fy * fy + fz * fz)
-				fx, fy, fz = fx / n, fy / n, fz / n
-				-- right = forward x up(0,1,0) (in X, Y, D the camera looks toward -D: its right is +X)
-				local half = math.rad(v.fov / 2)
-				local function visible(x: number, y: number, h: number): boolean
-					local X, Y, D = Cabinet.point(2, x, y, h)
-					local px, py, pz = X - ex, Y - ey, D - ez
-					local depth = px * fx + py * fy + pz * fz
-					-- up in the picture: the component along the camera's up (perpendicular to forward, in the X=0 plane)
-					local ux, uy, uz = 0, fz * fz + fx * fx, -fy * fz
-					local un = math.sqrt(uy * uy + uz * uz)
-					uy, uz = uy / un, uz / un
-					local upward = py * uy + pz * uz + px * ux
-					local side = px
-					return depth > 0
-						and math.abs(upward) / depth <= math.tan(half) + 1e-6
-						and math.abs(side) / depth <= math.tan(half) * aspect + 1e-6
+			for _, id in Tables.IDS do
+				local tbl = Tables.need(id)
+				local c = tbl.c
+				for _, which in { "play", "high" } do
+					for _, aspect in { 4 / 3, 16 / 10, 16 / 9, 19.5 / 9 } do
+						for _, reserve in { { top = 0.02, bottom = 0.02 }, { top = 0.2, bottom = 0.02 } } do
+							local v = Cabinet.camera(2, aspect, which, reserve)
+							local function seen(x: number, y: number, what: string)
+								local u, q, depth = Cabinet.project(v, Cabinet.point(2, x, y, 0))
+								local where = `{id} {which} {aspect} top {reserve.top}: {what} at {u}, {q}`
+								t.truthy(depth > 0 and u >= 0 and u <= 1, where)
+								t.truthy(q >= reserve.top - 1e-6 and q <= 1 - reserve.bottom + 1e-6, where)
+							end
+							for _, corner in
+								{ { 0, 0 }, { Layout.WIDTH, 0 }, { 0, Layout.LENGTH }, { Layout.WIDTH, Layout.LENGTH } }
+							do
+								seen(corner[1], corner[2], `corner {corner[1]}, {corner[2]}`)
+							end
+							for i = 1, c.nFlip do
+								seen(c.fpx[i], c.fpy[i], `flipper {i}`)
+							end
+							seen(tbl.def.plunger.x, tbl.def.plunger.y, "the plunger's ball")
+							for i, b in tbl.def.bumpers do
+								seen(b.x, b.y, `bumper {i}`)
+							end
+							t.truthy(v.fov > 30 and v.fov < 80, `field of view {v.fov}`)
+						end
+					end
 				end
-				for _, corner in
-					{ { 0, 0 }, { Layout.WIDTH, 0 }, { 0, Layout.LENGTH }, { Layout.WIDTH, Layout.LENGTH } }
-				do
-					t.truthy(visible(corner[1], corner[2], 0), `corner {corner[1]}, {corner[2]} at {aspect}`)
-				end
-				for i = 1, c.nFlip do
-					t.truthy(visible(c.fpx[i], c.fpy[i], 0), `flipper {i}`)
-				end
-				t.truthy(visible(tbl.def.plunger.x, tbl.def.plunger.y, 0), "the plunger's ball")
-				-- the eye is above and in front of the lockdown bar, a person's height off the floor
-				local _, pd = Cabinet.at(2)
-				t.truthy(ez > pd + Cabinet.BODY.front, "in front of the cabinet")
-				t.truthy(ey > 4.4 and ey < 5.6, `eye height {ey}`)
-				t.truthy(v.fov > 40 and v.fov < 80, `field of view {v.fov}`)
 			end
+			-- the eye: in front of the cabinet, over the lockdown bar, a tall person's eye (above the head of the
+			-- body standing at the stance, so the camera is never inside it)
+			local _, pd = Cabinet.at(2)
+			local play = Cabinet.camera(2, 16 / 9, "play")
+			t.truthy(play.eye[3] > pd + Cabinet.BODY.front - 0.6, "over the lockdown bar")
+			t.truthy(play.eye[2] > 6.0 and play.eye[2] < 7, `eye height {play.eye[2]}`)
+			-- the far end is not squeezed flat: a stud along the table near the top is at least a third of one near
+			-- the flippers (it was under a quarter from a chest-high eye), and from above at least two thirds
+			local function perStud(v: any, y: number): number
+				local _, a = Cabinet.project(v, Cabinet.point(2, Layout.WIDTH / 2, y - 0.05, 0))
+				local _, b = Cabinet.project(v, Cabinet.point(2, Layout.WIDTH / 2, y + 0.05, 0))
+				return (a - b) / 0.1
+			end
+			local nearP, topP = perStud(play, 0.6), perStud(play, Layout.LENGTH - 0.6)
+			t.truthy(topP / nearP > 0.33, `play: top {topP}, near {nearP}`)
+			t.truthy(topP * 1080 >= 90, `play at 1080 lines: {topP * 1080} pixels a stud at the top`)
+			local high = Cabinet.camera(2, 16 / 9, "high")
+			t.truthy(perStud(high, Layout.LENGTH - 0.6) / perStud(high, 0.6) > 0.6, "high")
+			-- project() agrees with the camera's own aim: the target is in the middle of the picture
+			local u, q = Cabinet.project(play, play.target[1], play.target[2], play.target[3])
+			t.near(u, 0.5, 1e-9)
+			t.near(q, 0.5, 1e-9)
 		end
 	)
 
 	t.test(
-		"the hands: any device holds a button, a tap between two frames lasts one tick, the plunger by hand",
+		"Machine.resting: the ball on the plunger waits for the hand; launched, or given back by the machine, it does not",
+		function()
+			local tbl = Tables.need("pinball_acorn")
+			local m = Machine.new(tbl, 3, 1)
+			t.truthy(Machine.resting(tbl, m) > 0, "the first ball stands on the plunger")
+			for _ = 1, 200 do
+				Machine.step(tbl, m, Machine.BTN.PLUNGE, {})
+			end
+			for _ = 1, 60 do
+				Machine.step(tbl, m, 0, {})
+			end
+			t.eq(Machine.resting(tbl, m), 0, "launched")
+		end
+	)
+
+	t.test(
+		"the hands: any device holds a button, a flipper tap between two frames is a whole stroke, the plunger by hand",
 		function()
 			local BTN = Machine.BTN
 			local h = Hands.new()
@@ -197,8 +226,30 @@ return function(t)
 			-- a tap: down and up before the next tick is played
 			Hands.press(h, "D", BTN.RIGHT)
 			Hands.release(h, "D", BTN.RIGHT)
-			t.eq(Hands.buttons(h), BTN.RIGHT, "the tap is played for one tick")
-			t.eq(Hands.buttons(h), 0, "and only one")
+			-- a flipper tap that no tick saw (a trackpad's tap-to-click: down and up together) holds the flipper
+			-- for a whole stroke, PULSE ticks
+			for i = 1, Hands.PULSE do
+				t.eq(Hands.buttons(h), BTN.RIGHT, `the tap holds the flipper on tick {i}`)
+			end
+			t.eq(Hands.buttons(h), 0, "and then lets go")
+			t.truthy(Hands.PULSE * 1000 / 240 >= 45, "long enough for the full stroke (about 45 ms)")
+			-- a press held across a tick is the hand's own length: no pulse after it is let go
+			Hands.press(h, "D", BTN.RIGHT)
+			t.eq(Hands.buttons(h), BTN.RIGHT)
+			Hands.release(h, "D", BTN.RIGHT)
+			t.eq(Hands.buttons(h), 0)
+			-- a nudge tapped is one tick (the machine shoves on the press)
+			Hands.press(h, "Z", BTN.NUDGE_L)
+			Hands.release(h, "Z", BTN.NUDGE_L)
+			t.eq(Hands.buttons(h), BTN.NUDGE_L)
+			t.eq(Hands.buttons(h), 0)
+			-- clear() lets go of everything, a pulse too
+			Hands.press(h, "A", BTN.LEFT)
+			Hands.release(h, "A", BTN.LEFT)
+			t.eq(Hands.buttons(h), BTN.LEFT)
+			Hands.clear(h)
+			t.eq(Hands.buttons(h), 0)
+
 			-- the analogue plunger: how far the hand has pulled it
 			Hands.pull(h, "stick", 0.5)
 			t.eq(Machine.pullOf(Hands.buttons(h)), 16)

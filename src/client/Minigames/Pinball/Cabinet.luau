@@ -169,6 +169,7 @@ local function find(cab: Cab): any
 		bumpers = kids(N.bumper, #def.bumpers),
 		slings = kids(N.sling, #def.slings),
 		plunger = model:FindFirstChild(N.plunger),
+		glass = model:FindFirstChild("Glass"), -- (not drawn on the player's own screen while their ball is live)
 		labels = {},
 		home = {}, -- part -> its baked CFrame (drops, spinners, the plunger: moved from where the bake put them)
 		colour = {}, -- lamp part -> its baked colour
