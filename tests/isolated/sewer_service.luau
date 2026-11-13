@@ -18,7 +18,7 @@ local function stubWorld(): TownAI.World
 	return {
 		listeners = {},
 		covered = {},
-		cover = nil,
+		covers = {},
 		possessed = {},
 		actors = {},
 		actorsById = {},
@@ -73,10 +73,10 @@ return function(t)
 				end
 			end
 			-- the cover is on the world, and comes off with stop
-			t.truthy(world.cover ~= nil, "cover installed")
+			t.eq(#world.covers, 1, "cover installed")
 			t.eq(#world.listeners, 1, "one listener")
 			svc:stop()
-			t.eq(world.cover, nil)
+			t.eq(#world.covers, 0, "cover removed")
 			t.eq(#world.listeners, 0)
 		end)
 	end)

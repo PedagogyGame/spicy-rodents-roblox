@@ -15,16 +15,17 @@
 -- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them, and each
 -- one is also handed at once to every listener (listen), so a service that needs to hear them does not
 -- race the one that drains the queue.
--- COVER (the storm drains, BRIEF_ADDENDUM D8; Server/World/SewerService installs it with setCover): a
--- squirrel-species actor the cover hides (`under(x, y, z)` names a space) is taken out of the threat
--- grid, so every brain that looks for squirrels through it (people spotting, the fox hunting, the deer
--- startling) loses it, unseen and unheard, as in v5.4. A change is an event, "covered" (with `space`) or
--- "uncovered". A body let go while hidden is put back where the cover says (`surface`: the drain's
--- mouth) before the AI takes it. With no cover set nothing changes.
+-- COVER (the storm drains, BRIEF_ADDENDUM D8; Server/World/SewerService adds one with addCover, and any
+-- later refuge, such as the hollow trees, adds its own): a squirrel-species actor a cover hides (`under(x,
+-- y, z)` names a space; the first cover added that names one wins) is taken out of the threat grid, so
+-- every brain that looks for squirrels through it (people spotting, the fox hunting, the deer startling)
+-- loses it, unseen and unheard, as in v5.4. A change is an event, "covered" (with `space`) or
+-- "uncovered". A body let go while hidden is put back where that cover says (`surface`: the drain's
+-- mouth) before the AI takes it. Removing one cover leaves the others; with none nothing changes.
 -- Interface: build(opts) -> World; stepFrame(world, dt) -> FrameMetrics; liveness(world) -> Liveness;
 --   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn);
 --   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?);
---   listen(world, fn) -> unlisten; setCover(world, cover?); covered(world, id) -> space?
+--   listen(world, fn) -> unlisten; addCover(world, cover) -> remove; covered(world, id) -> space?
 -- Pure; studs. Nothing runs until stepFrame is called (rule 4).
 
 local Import = require("../Import")
@@ -98,7 +99,7 @@ export type World = {
 	nextId: number,
 	events: { Event }, -- what the brains reported since the last drainEvents
 	listeners: { (ev: Event) -> () }, -- told of every event as it is emitted
-	cover: Cover?,
+	covers: { Cover }, -- what hides squirrels (addCover), in the order added
 	covered: { [number]: string? }, -- squirrel-species actor id -> the space hiding it (refreshed every frame)
 }
 
@@ -168,8 +169,13 @@ end
 -- the threat grid for one squirrel-species actor: out of it while the cover hides it, and an event when that
 -- changes
 local function placeThreat(world: World, actor: Common.Actor)
-	local cover = world.cover
-	local space = if cover then cover.under(actor.x, actor.y, actor.z) else nil
+	local space = nil
+	for _, cover in world.covers do
+		space = cover.under(actor.x, actor.y, actor.z)
+		if space then
+			break
+		end
+	end
 	local was = world.covered[actor.id]
 	if space ~= was then
 		world.covered[actor.id] = space
@@ -237,7 +243,7 @@ function TownAI.build(opts: Opts): World
 		nextId = 0,
 		events = {},
 		listeners = {},
-		cover = nil,
+		covers = {},
 		covered = {},
 	}
 	ctx.emit = function(kind: string, actor: Common.Actor, other: Common.Actor?)
@@ -441,10 +447,16 @@ function TownAI.listen(world: World, fn: (ev: Event) -> ()): () -> ()
 end
 
 -- setCover: what hides a squirrel from now on (nil: nothing does; every hidden actor is in the open again).
-function TownAI.setCover(world: World, cover: Cover?)
-	world.cover = cover
-	if cover == nil then
-		table.clear(world.covered)
+-- addCover: something that hides squirrels from now on (a refuge: the storm drains, a hollow tree). Returns the
+-- call that takes it away again; the others stay, and the bodies only it hid are in the open from the next frame.
+function TownAI.addCover(world: World, cover: Cover): () -> ()
+	table.insert(world.covers, cover)
+	return function()
+		local i = table.find(world.covers, cover)
+		if i then
+			table.remove(world.covers, i)
+		end
+		-- the next frame names what the others still hide ("uncovered" for the rest)
 	end
 end
 
@@ -499,12 +511,16 @@ function TownAI.resume(world: World, id: number, x: number, y: number, z: number
 	local actor = world.actorsById[id]
 	world.possessed[id] = nil
 	-- let go where the cover hides it (down a drain): the AI takes it at the way out
-	local cover = world.cover
-	if cover and cover.surface and cover.under(x, y, z) then
-		local sx, sy, sz, syaw = cover.surface(x, y, z)
-		if sx and sy and sz then
-			x, y, z = sx, sy + actor.hip, sz
-			yaw = syaw or yaw
+	for _, cover in world.covers do
+		if cover.under(x, y, z) then
+			if cover.surface then
+				local sx, sy, sz, syaw = cover.surface(x, y, z)
+				if sx and sy and sz then
+					x, y, z = sx, sy + actor.hip, sz
+					yaw = syaw or yaw
+				end
+			end
+			break
 		end
 	end
 	actor.x, actor.y, actor.z = x, y, z

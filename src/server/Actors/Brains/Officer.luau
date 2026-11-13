@@ -10,8 +10,10 @@
 -- go down a drain runs to the spot beside that grate (`x`, `z`), stands there facing it (`faceX`, `faceZ`)
 -- for `secs` from arriving (Tunables sewer.stakeoutSecs), says so on arriving (ctx.emit("stakeout")), then
 -- walks back to the beat. Officers never go to the other end. A walk that has not arrived after `giveUp`
--- seconds (default STAKEOUT_GIVE_UP) is dropped. onEvent({ type = "stakeout", ... }) sets it; a medical
--- directive still comes first.
+-- seconds (default STAKEOUT_GIVE_UP) is dropped. onEvent({ type = "stakeout", ... }) sets it; one for the
+-- grate already being watched does not start the watch again (a rodent diving in and out of one grate never
+-- pins the officer there); onEvent({ type = "stakeoutEnd" }) ends it at once (the rodent came up in sight:
+-- SewerService follows it with a "respond"). A medical directive still comes first.
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -178,7 +180,13 @@ function Methods.onEvent(self: Brain, evt: { [string]: any })
 		self.respondUntil = evt.untilTime
 	elseif evt.type == "medical" then
 		Directive.set(self.directive, evt)
+	elseif evt.type == "stakeoutEnd" then
+		self.stakeout = nil
 	elseif evt.type == "stakeout" then
+		local s = self.stakeout
+		if s and evt.mouth ~= nil and s.mouth == evt.mouth then
+			return -- already watching that grate: the watch runs its course, it is not renewed
+		end
 		self.stakeout = {
 			x = evt.x,
 			z = evt.z,

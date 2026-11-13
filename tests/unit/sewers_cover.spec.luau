@@ -21,6 +21,7 @@ local Fox = require("@server/Actors/Brains/Fox")
 local TownAI = require("@server/AI/TownAI")
 local InfectionService = require("@server/Infection/InfectionService")
 local SewerService = require("@server/World/SewerService")
+local PlayRules = require("@shared/Combat/PlayRules")
 
 local DT = 1 / 60
 local SIDEWALK = 30.25 -- studs: the core sidewalks' lane line off the road centre (12.1 u)
@@ -379,6 +380,126 @@ return function(t)
 		local last = r.svc:lost()
 		t.eq(last[#last].actor, other.id)
 		t.eq(#last[#last].officers, 0, "no stakeout for an ordinary squirrel")
+	end)
+
+	-- the bite as Boot/Game.bites makes it every 0.1 s: SewerService:mayBite first, then Combat/PlayRules on the roots
+	local function biteTick(r: Rig, now: number, last: { [any]: number }): { any }
+		local rodent = r.rodent
+		if not r.svc:mayBite(rodent.id) then
+			return {}
+		end
+		local humans = {}
+		for _, a in r.world.actors do
+			if a.species == "human" then
+				table.insert(humans, { id = a.id, x = a.x, y = a.y, z = a.z })
+			end
+		end
+		return PlayRules.biteVictims({ id = rodent.id, x = rodent.x, y = rodent.y, z = rodent.z }, humans, now, last)
+	end
+
+	t.test(
+		"no bite from cover: hidden 2 studs down a shaft with a person on the grate, nobody bitten in 10 s",
+		function()
+			for _, id in { "P1.NW", "P2.W", "P3.S" } do
+				local m = layout.mouth(id) :: SewerLayout.Mouth
+				local r = rig({ focus = { m.x, m.z } })
+				local world = r.world
+				local rodent = r.rodent
+				local walker = people(world, "Pedestrian")[1]
+				-- the rodent on the rungs, its feet 2 studs under the street; the person standing on the grate
+				local ry = m.y - 2 + rodent.hip
+				local bitten, inRange, frames = 0, 0, 0
+				local last: { [any]: number } = {}
+				r.step(600, function()
+					frames += 1
+					hold(world, rodent, m.x, ry, m.z)
+					hold(world, walker, m.x, m.y + walker.hip, m.z)
+					if frames % 6 == 0 then
+						bitten += #biteTick(r, frames * DT, last)
+						-- the same test with no cover asked: the person is within the bite's reach
+						local open = PlayRules.biteVictims(
+							{ id = rodent.id, x = rodent.x, y = rodent.y, z = rodent.z },
+							{ { id = walker.id, x = walker.x, y = walker.y, z = walker.z } },
+							frames * DT,
+							{}
+						)
+						inRange += #open
+					end
+				end)
+				t.eq(r.svc:underground(rodent.id), m.space, `{id}: hidden on the rungs`)
+				t.truthy(inRange > 0, `{id}: the person is within the bite's reach of the rodent's root`)
+				t.eq(bitten, 0, `{id}: nobody bitten from cover`)
+				-- up on the grate beside the person: in the open, and it bites
+				r.step(2, function()
+					hold(world, rodent, m.x + m.out.x * 0.5, m.y + rodent.hip, m.z + m.out.z * 0.5)
+					hold(world, walker, m.x, m.y + walker.hip, m.z)
+				end)
+				t.eq(r.svc:underground(rodent.id), nil)
+				t.eq(#biteTick(r, 100, last), 1, `{id}: in the open the bite lands`)
+			end
+		end
+	)
+
+	t.test("a stakeout ends: diving in and out of one grate 10 times never pins the officer there", function()
+		local m = layout.mouth("P1.NW") :: SewerLayout.Mouth
+		local r = rig({ focus = { m.x, m.z } })
+		local world = r.world
+		local rodent = r.rodent
+		local officer = people(world, "Officer")[1]
+		put(world, officer, m.x - 12, m.z + 2, m.x, m.z)
+		local brain = world.brains[officer.id] :: any
+		local secs = Tunables.get("sewer.stakeoutSecs")
+		local watching, starts = false, 0
+		local firstEnd: number? = nil
+		local nearest = math.huge
+		-- 10 times: 1 s on the grate in the open, then 2 s down the shaft
+		local now = 0
+		local dives = 0
+		local diveAt: number? = nil
+		for _ = 1, 10 do
+			for _ = 1, 60 do
+				hold(world, rodent, m.x, m.y + rodent.hip, m.z)
+				TownAI.stepFrame(world, DT)
+				now += DT
+			end
+			dives += 1
+			for _ = 1, 120 do
+				hold(world, rodent, m.x, m.y - 3, m.z)
+				TownAI.stepFrame(world, DT)
+				now += DT
+				diveAt = diveAt or now
+				local on = brain.stakeout ~= nil
+				if on and not watching then
+					starts += 1
+				end
+				if watching and not on and firstEnd == nil then
+					firstEnd = now
+				end
+				watching = on
+				if on and brain.stakeout.holdLeft ~= nil then
+					nearest = math.min(nearest, math.sqrt((officer.x - m.x) ^ 2 + (officer.z - m.z) ^ 2))
+				end
+			end
+		end
+		print(
+			`      10 dives in 30 s: {starts} stakeouts, the first ended {if firstEnd and diveAt
+				then string.format("%.2f", firstEnd - diveAt)
+				else "never"} s after the first dive; the officer stood {string.format("%.2f", nearest)} st off`
+		)
+		t.eq(dives, 10)
+		t.truthy(starts >= 1, "the officer watched the grate")
+		t.truthy(firstEnd ~= nil and diveAt ~= nil, "the first stakeout ended")
+		t.truthy((firstEnd :: number) - (diveAt :: number) <= secs, "within sewer.stakeoutSecs of the first dive")
+		t.truthy(starts <= math.ceil(30 / secs), `at most one stakeout per {secs} s ({starts})`)
+		t.truthy(nearest >= PlayRules.BITE_RANGE + 2 - 0.5, `watching from out of the bite's reach ({nearest})`)
+		-- a second stakeout event for the grate being watched does not renew the watch
+		local b2 = world.brains[officer.id] :: any
+		b2:onEvent({ type = "stakeout", x = m.x + 6, z = m.z, faceX = m.x, faceZ = m.z, secs = secs, mouth = "P1.SE" })
+		local s1 = b2.stakeout
+		s1.holdLeft = 3
+		b2:onEvent({ type = "stakeout", x = m.x + 6, z = m.z, faceX = m.x, faceZ = m.z, secs = secs, mouth = "P1.SE" })
+		t.eq(b2.stakeout, s1, "the same grate: not renewed")
+		t.eq(b2.stakeout.holdLeft, 3)
 	end)
 
 	t.test("let go in a pipe: the AI takes the body at that pipe's nearest mouth, standing, facing out", function()

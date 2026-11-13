@@ -116,7 +116,7 @@ function Sewers.run(): { [string]: any }
 	numbers.carveSeconds = os.clock() - t1
 	numbers.carved = svc.carved
 	check(svc.carved == #layout.carveBoxes(), `carved {svc.carved} of {#layout.carveBoxes()} boxes`)
-	check(world.cover ~= nil, "the cover is not on the town AI")
+	check(#world.covers == 1, "the cover is not on the town AI")
 
 	-- air along every passage, at the body's middle over the route line
 	local samples, solid = 0, 0
@@ -243,7 +243,7 @@ function Sewers.run(): { [string]: any }
 	end
 
 	svc:stop()
-	check(world.cover == nil, "the cover stayed on after stop")
+	check(#world.covers == 0, "the cover stayed on after stop")
 	return { ok = #failures == 0, failures = failures, numbers = numbers }
 end
 

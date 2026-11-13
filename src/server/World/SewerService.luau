@@ -8,14 +8,20 @@
 --     4-stud grid), so the pipes the bake draws are open air. It runs when start() is called: Boot/Game calls it
 --     after the terrain is written (any later terrain write would fill the pipes again).
 --   * Cover: a squirrel the layout says is underground (SewerLayout.contains) is out of AI/TownAI's threat grid
---     (TownAI.setCover), so people do not see or hear it, the fox does not hunt it, the deer do not start; and
+--     (TownAI.addCover: one cover among any others, removed again by stop), so people do not see or hear it, the fox does not hunt it, the deer do not start; and
 --     Infection/InfectionService leaves it out of the crowd's fears. As in v5.4, where the sewer hid the player.
 --   * Seen going down: when a squirrel goes under, the people who saw it at the grate (Actors/Perception's spot
 --     test on the mouth, or a spot of it in the last C.witnessWindow) react. Up to C.speakers bystanders say a
 --     "drain" line (Speech/SpeechRules limits). If it was the Spicy Rodent, every officer who saw it is sent to
 --     stand over that grate for Tunables sewer.stakeoutSecs (Brains/Officer's stakeout: there it says "It went
---     down the drain!", then back to the beat). Officers never go to the other end. onLost reports it (the
---     place for Police/PoliceCoord when it exists).
+--     down the drain!", then back to the beat). Officers never go to the other end. The officer stands
+--     C.standOff from the grate, out of the rodent's bite (Combat/PlayRules BITE_RANGE). One grate is watched
+--     once per sewer.stakeoutSecs: diving in and out of it again sends nobody new and renews nothing. If the
+--     rodent comes up out of a watched grate's pipe where a watching officer sees it, that officer's watch ends
+--     and he goes after it (Officer "respond" to where it came up). onLost reports it (the place for
+--     Police/PoliceCoord when it exists).
+--   * No bites from cover: mayBite(id) is false while the cover hides the rodent (Boot/Game asks before every
+--     bite), so a rodent nobody can see never bites anyone either.
 --   * Let go underground: a body a player lets go of in a pipe is put at the nearest mouth of that pipe, standing,
 --     facing out, before the AI takes it (TownAI.resume asks the cover).
 --   * Refuge: the rodent heals in a pipe at the hollow rate (Tunables rodent.regenHollow) only while fed (bit
@@ -27,9 +33,10 @@
 --   * The alligator (v5.4's idle predator in the sewer): a sound and a line only, never seen. idleWarning(id)
 --     gives the line and the cue for the idle release's warning (D34) when the body is down a drain.
 -- Sound: named cue points only (CUES); every id is empty until audio exists. Nothing is uploaded.
--- Interface: new(opts) -> Service (pure: installs the cover and a listener on the TownAI world); start(opts) ->
---   Service (new, then the carve on workspace.Terrain unless opts.carve is false); carve(terrain, boxes) -> count;
---   fed(lastBiteAt?, now) -> boolean; Service: :underground(id) -> space?; :isRefuge(id); :healRate(id, fed) ->
+-- Interface: new(opts) -> Service (pure: installs the cover, unless opts.cover is false, and a listener on the
+--   TownAI world); start(opts) -> Service (new, then the carve on workspace.Terrain unless opts.carve is false);
+--   carve(terrain, boxes) -> count; fed(lastBiteAt?, now) -> boolean; Service: :underground(id) -> space?;
+--   :mayBite(id); :isRefuge(id); :healRate(id, fed) ->
 --   hp/s; :heal(id, health, maxHealth, dt, fed) -> health; :surface(x, y, z) -> (x, y, z, yaw)?; :reentry(deathX,
 --   deathZ) -> Mouth?; :fashionStand() -> Anchor?; :idleWarning(id) -> Warning?; :lost() -> { Lost } (the
 --   newest C.keepLost); :stop(); C; HISS; CUES
@@ -55,7 +62,10 @@ SewerService.C = {
 	witnessWindow = 1.0, -- s: a person who spotted the squirrel this long before it went under saw it go
 	witnessRadius = Perception.constants.sightCap, -- studs from the mouth: nobody farther saw it at the grate
 	speakers = 2, -- bystanders who may remark on one squirrel going down (each still under SpeechRules)
-	standOff = 2.5, -- studs from the mouth point to where an officer stands watching the grate
+	-- studs from the mouth point to where an officer stands watching the grate: out of the rodent's bite
+	-- (Combat/PlayRules BITE_RANGE 3.5) with 2.5 to spare, so one coming up there cannot bite him at once
+	standOff = 6.0,
+	respondSecs = 8, -- s: an officer who sees the rodent come up out of the grate he watches goes after it this long
 	keepLost = 16, -- the newest reports kept by lost()
 	keepSpots = 8, -- spots remembered per squirrel
 }
@@ -96,6 +106,7 @@ export type Opts = {
 	serverTime: (() -> number)?, -- SayAt's clock (default: the speech clock)
 	controllerOf: ((id: number) -> string)?, -- "ai" | "player" (default: TownAI's possessed list)
 	onLost: ((lost: Lost) -> ())?,
+	cover: boolean?, -- default true: hide what is underground from the town (false: the pipes are not drawn)
 	concealment: Perception.Concealment?, -- default Perception.defaultConcealment()
 	-- start only
 	carve: boolean?, -- default true
@@ -103,6 +114,8 @@ export type Opts = {
 }
 
 type Spot = { by: number, t: number }
+-- a grate the police are watching: since when, and who
+type Watch = { since: number, officers: { number } }
 
 export type Service = typeof(setmetatable(
 	{} :: {
@@ -118,7 +131,9 @@ export type Service = typeof(setmetatable(
 		pctx: Perception.Ctx,
 		spots: { [number]: { Spot } },
 		lostLog: { Lost },
+		watch: { [string]: Watch? },
 		unlisten: () -> (),
+		uncover: () -> (),
 		carved: number,
 	},
 	SewerService
@@ -166,20 +181,26 @@ function SewerService.new(opts: Opts): Service
 		pctx = { time = 0, hotHere = false, concealment = opts.concealment or Perception.defaultConcealment() },
 		spots = {},
 		lostLog = {},
+		watch = {},
 		unlisten = function() end,
+		uncover = function() end,
 		carved = 0,
 	}, SewerService)
-	TownAI.setCover(world, {
-		under = layout.contains,
-		surface = function(x: number, y: number, z: number): (number?, number?, number?, number?)
-			return self:surface(x, y, z)
-		end,
-	})
+	if opts.cover ~= false then
+		self.uncover = TownAI.addCover(world, {
+			under = layout.contains,
+			surface = function(x: number, y: number, z: number): (number?, number?, number?, number?)
+				return self:surface(x, y, z)
+			end,
+		})
+	end
 	self.unlisten = TownAI.listen(world, function(ev: TownAI.Event)
 		if ev.kind == "spotted" and ev.other then
 			self:_spotted(ev.other, ev.id, ev.t)
 		elseif ev.kind == "covered" and ev.space then
 			self:_wentUnder(ev.id, ev.space, ev.t)
+		elseif ev.kind == "uncovered" and ev.space then
+			self:_cameUp(ev.id, ev.space, ev.t)
 		elseif ev.kind == "stakeout" then
 			self:_say(ev.id, "stakeout", true)
 		end
@@ -311,13 +332,19 @@ function SewerService._wentUnder(self: Service, id: number, space: string, t: nu
 	local report: Lost =
 		{ actor = id, mouth = m.id, space = space, x = m.x, z = m.z, t = t, witnesses = {}, officers = {} }
 	local spoke = 0
+	local secs = Tunables.get("sewer.stakeoutSecs")
+	local watched: Watch? = self.watch[m.id]
+	if watched and t - watched.since >= secs then
+		self.watch[m.id] = nil
+		watched = nil
+	end
 	for _, w in witnesses do
 		table.insert(report.witnesses, w.id)
 		local brain = self.world.brains[w.id]
 		local officer = brain ~= nil and brain.kind == "Officer"
 		if officer then
 			-- the police lose the rodent at the drain and watch that grate; any other squirrel is not their business
-			if actor.variant == "spicy" then
+			if actor.variant == "spicy" and watched == nil then
 				local dx, dz = w.x - m.x, w.z - m.z
 				local l = math.sqrt(dx * dx + dz * dz)
 				if l < 1e-6 then
@@ -329,7 +356,7 @@ function SewerService._wentUnder(self: Service, id: number, space: string, t: nu
 					z = m.z + dz / l * C.standOff,
 					faceX = m.x,
 					faceZ = m.z,
-					secs = Tunables.get("sewer.stakeoutSecs"),
+					secs = secs,
 					mouth = m.id,
 				})
 				table.insert(report.officers, w.id)
@@ -340,6 +367,9 @@ function SewerService._wentUnder(self: Service, id: number, space: string, t: nu
 			end
 		end
 	end
+	if #report.officers > 0 then
+		self.watch[m.id] = { since = t, officers = table.clone(report.officers) }
+	end
 	self.spots[id] = nil
 	table.insert(self.lostLog, report)
 	while #self.lostLog > C.keepLost do
@@ -348,11 +378,58 @@ function SewerService._wentUnder(self: Service, id: number, space: string, t: nu
 	self.onLost(report)
 end
 
+-- the rodent came up out of pipe `space`: an officer watching one of its grates who sees it now goes after it
+function SewerService._cameUp(self: Service, id: number, space: string, t: number)
+	local actor = self.world.actorsById[id]
+	if actor == nil or actor.variant ~= "spicy" then
+		return
+	end
+	local target: Perception.Target = {
+		x = actor.x,
+		y = actor.y,
+		z = actor.z,
+		groundY = actor.y - actor.hip,
+		moveSpeed = actor.speed,
+		focus = false,
+		inInterior = false,
+	}
+	self.pctx.time = t
+	for mouthId, watch in self.watch do
+		local m = self.layout.mouth(mouthId)
+		if watch == nil or m == nil or m.space ~= space then
+			continue
+		end
+		for _, oid in watch.officers do
+			local o = self.world.actorsById[oid]
+			local brain = self.world.brains[oid] :: any
+			if o == nil or brain == nil or brain.stakeout == nil or brain.stakeout.mouth ~= mouthId then
+				continue -- not watching it any more
+			end
+			local obs: Perception.Observer = { x = o.x, y = o.y - o.hip, z = o.z, facing = o.yaw }
+			if Perception.spotted(obs, target, self.pctx) then
+				brain:onEvent({ type = "stakeoutEnd" })
+				brain:onEvent({
+					type = "respond",
+					x = actor.x,
+					z = actor.z,
+					untilTime = self.world.now + SewerService.C.respondSecs,
+				})
+			end
+		end
+	end
+end
+
 -- what the town asks -----------------------------------------------------------------------------------------------
 
 -- the space hiding actor `id` (as of the last AI frame), nil in the open
 function SewerService.underground(self: Service, id: number): string?
 	return TownAI.covered(self.world, id)
+end
+
+-- mayBite: the rodent bites only from where it can be seen (never out of cover: hidden and biting are never both
+-- true)
+function SewerService.mayBite(self: Service, id: number): boolean
+	return TownAI.covered(self.world, id) == nil
 end
 
 -- a refuge counts like a hollow tree for the rodent's resting regen
@@ -435,7 +512,7 @@ end
 -- stop: no more cover (everything in the open again) and no more listening
 function SewerService.stop(self: Service)
 	self.unlisten()
-	TownAI.setCover(self.world, nil)
+	self.uncover()
 end
 
 return SewerService

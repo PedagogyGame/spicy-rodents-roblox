@@ -132,6 +132,7 @@ type PState = {
 	bites: number,
 	lastKick: number,
 	lastPick: number,
+	lastBiteAt: number?, -- the server clock (`now`) at the rodent's last bite: fed while within a game day
 }
 
 local function setAttr(player: any, key: string, value: any)
@@ -455,8 +456,10 @@ function Game.start(opts: Opts?): any
 	local okW, errW = pcall(function()
 		sewers = SewerService.start({
 			world = world,
-			-- no pipes drawn, no holes in the ground (an open shaft with nothing under it)
+			-- no pipes drawn, no holes in the ground (an open shaft with nothing under it), and nobody hidden in
+			-- solid ground (the routes are in the data either way: the publish project requires the bake)
 			carve = o.terrain ~= false and sewersBaked,
+			cover = sewersBaked,
 			speech = infection and infection.speech,
 			clock = function(): number
 				return if infection then infection.now else world.now
@@ -850,7 +853,9 @@ function Game.start(opts: Opts?): any
 			local actor = possession:actorOf(player)
 			if s.role == "rodent" and actor and actor.variant == "spicy" then
 				local root = (actor.body :: Model).PrimaryPart
-				if root then
+				-- never out of cover: a rodent down a drain is hidden from everyone, so it bites nobody
+				local tid = townIdOf[actor.id]
+				if root and (sewers == nil or tid == nil or sewers:mayBite(tid)) then
 					if humans == nil then
 						humans = {}
 						for _, a in world.actors do
@@ -883,6 +888,7 @@ function Game.start(opts: Opts?): any
 							s.power,
 							{ kind = if officer then "biteOfficer" else "bitePerson", y = Units.u(p.Y) }
 						)
+						s.lastBiteAt = now
 						s.bites += 1 -- every client plays the bite on the rodent's body (Animation/AnimationDriver watches this)
 						(actor.body :: Model):SetAttribute("BiteAt", now)
 						shoutN += 1
@@ -967,7 +973,20 @@ function Game.start(opts: Opts?): any
 			end
 			for player, s in states do
 				if s.role == "rodent" then
-					if PowerRules.fade(s.power, fadeAcc) > 0 then
+					local changed = PowerRules.fade(s.power, fadeAcc) > 0
+					-- a refuge heals the fed rodent (World/SewerService: the hollow rate down a drain, D33 rev 4)
+					local actor = possession:actorOf(player)
+					local tid = if actor then townIdOf[actor.id] else nil
+					if sewers and actor and tid and actor.variant == "spicy" then
+						local h = healthOf(actor.id)
+						local healed =
+							sewers:heal(tid, h, PlayRules.HEALTH, fadeAcc, SewerService.fed(s.lastBiteAt, now))
+						if healed ~= h then
+							health[actor.id] = healed
+							changed = true
+						end
+					end
+					if changed then
 						publish(player)
 					end
 				end
