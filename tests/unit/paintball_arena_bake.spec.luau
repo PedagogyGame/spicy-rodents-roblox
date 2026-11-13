@@ -1,0 +1,374 @@
+--!strict
+-- The paintball arena's bake (checklist PB-5): the parts are the collision data. The part list is a pure function
+-- of the plan, one part for each box, ramp and curtain through Arena.toSite; the bake run in memory through the
+-- registry (tools/bake/GameBakes, as tools/bake/attractions.luau runs it) leaves Arena.MODEL on the TV station's
+-- site with every solid part where the ball test has its box, in the world, whichever way the site is turned;
+-- nothing else inside the arena is solid; the monitors and the curtains are there by name; the lobby annex and
+-- the outside are outside; and the whole venue is inside its part budget.
+local roblox = require("@lune/roblox")
+local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local Games = require("@shared/Minigames/Games")
+local Arena = require("@shared/Minigames/Paintball/Arena")
+local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
+local ArenaDataPlan = require("@shared/Minigames/Paintball/ArenaDataPlan")
+local Contract = require("@shared/Minigames/Paintball/Contract")
+local Expansion = require("../../generated/Expansion")
+local GameBakes = require("../../tools/bake/GameBakes")
+local PartList = require("../../tools/games/paintball/arena/PartList")
+
+local function venueRecord(): any
+	for _, v in (Expansion :: any).venues do
+		if v.id == Contract.SITE then
+			return v
+		end
+	end
+	error("no TV station in generated/Expansion")
+end
+
+return function(t)
+	local plan = ArenaData.plan()
+	local arena = ArenaData.build()
+	local n = #plan.kinds
+	local venue = venueRecord()
+
+	t.test("the part list: one part for each box, the same size in the same place, through Arena.toSite", function()
+		local parts = PartList.solids(plan)
+		t.eq(#parts, n + #plan.ramps + #plan.curtains[1] + #plan.curtains[2])
+		local seen: { [number]: boolean } = {}
+		local monitors, signs, lamps = 0, 0, 0
+		for _, p in parts do
+			t.truthy(p.x0 < p.x1 and p.y0 < p.y1 and p.d0 < p.d1, `{p.name} has a size`)
+			if p.box then
+				local i = p.box
+				t.falsy(seen[i], `box {i} has two parts`)
+				seen[i] = true
+				local k = (i - 1) * 6
+				local b = plan.boxes
+				local X0, Y0, D1 = Arena.toSite(b[k + 1], b[k + 2], b[k + 3])
+				local X1, Y1, D0 = Arena.toSite(b[k + 4], b[k + 5], b[k + 6])
+				t.deepEq({ p.x0, p.y0, p.d0, p.x1, p.y1, p.d1 }, { X0, Y0, D0, X1, Y1, D1 }, `box {i}`)
+				t.truthy(p.collide and p.tilt == nil, `box {i}'s part is solid and square to the building`)
+				t.truthy((p.transparency or 0) < 0.9, `box {i}'s part can be seen`)
+				local look = ArenaDataPlan.LOOKS[plan.looks[i]]
+				t.truthy(PartList.LOOK[look] ~= nil)
+				local level = math.clamp(math.floor((b[k + 2] + 1.01) / Arena.FLOOR_HEIGHT), 0, Arena.FLOORS - 1)
+				t.eq(p.group, if b[k + 2] >= Arena.HEIGHT then "Roof" else `Floor{level}`)
+				if plan.monitors[i] then
+					monitors += 1
+					t.eq(p.name, Arena.MONITOR)
+					t.truthy(p.screen ~= nil)
+					t.eq(plan.kinds[i], Arena.KIND.prop, "a monitor inside the arena is a prop box's own part")
+				else
+					t.truthy(p.name ~= Arena.MONITOR and p.screen == nil)
+				end
+				signs += #(p.signs or {})
+				lamps += if p.light then 1 else 0
+			end
+		end
+		for i = 1, n do
+			t.truthy(seen[i], `box {i} has no part`)
+		end
+		t.truthy(monitors >= 12, `{monitors} old sets and wall monitors about the floors`)
+		t.truthy(signs >= 15 and lamps >= 60, `{signs} signs and {lamps} lamps`)
+		for _, look in ArenaDataPlan.LOOKS do
+			t.truthy(PartList.LOOK[look] ~= nil, `the look {look} has a colour and a material`)
+		end
+		-- a ramp's part lies in the ramp's plane: its top face is the walking surface
+		local ramps = 0
+		for _, p in parts do
+			if p.ramp then
+				ramps += 1
+				local r = plan.ramps[p.ramp]
+				t.eq(p.name, "Ramp")
+				t.truthy(p.collide and p.query == false and p.transparency == 1)
+				local angle = p.tilt :: number
+				t.near(math.tan(math.abs(angle)), (r.y1 - r.y0) / (r.maxX - r.minX), 1e-9)
+				t.eq(angle > 0, r.dir > 0)
+				local cx, cy, thick = (p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, p.y1 - p.y0
+				local length = p.x1 - p.x0
+				for _, u in { -0.5, 0, 0.5 } do
+					-- a point of the top face, in the site's frame (X = x, Y = y)
+					local x = cx + math.cos(angle) * u * length - math.sin(angle) * thick / 2
+					local y = cy + math.sin(angle) * u * length + math.cos(angle) * thick / 2
+					local h = Arena.rampHeight(r, math.clamp(x, r.minX, r.maxX), (r.minZ + r.maxZ) / 2) :: number
+					t.near(y, h, 1e-6, `ramp {p.ramp}'s top face is on the walking surface`)
+				end
+				local _, _, D1 = Arena.toSite(0, 0, r.minZ)
+				local _, _, D0 = Arena.toSite(0, 0, r.maxZ)
+				t.deepEq({ p.d0, p.d1 }, { D0, D1 })
+			end
+		end
+		t.eq(ramps, #plan.ramps)
+		-- the curtains: the doorways' air, in the team's colour, never solid
+		for team = 1, 2 do
+			local found = 0
+			for _, p in parts do
+				if p.curtain == team then
+					found += 1
+					t.eq(p.name, Arena.CURTAIN .. team)
+					t.falsy(p.collide)
+					t.truthy((p.transparency or 0) > 0.2)
+					t.deepEq(p.color, PartList.TEAM[team])
+					local c = plan.curtains[team][found]
+					local X0, Y0, D1 = Arena.toSite(c.minX, c.minY, c.minZ)
+					local X1, Y1, D0 = Arena.toSite(c.maxX, c.maxY, c.maxZ)
+					t.deepEq({ p.x0, p.y0, p.d0, p.x1, p.y1, p.d1 }, { X0, Y0, D0, X1, Y1, D1 })
+				end
+			end
+			t.eq(found, 2)
+		end
+		t.truthy(PartList.TEAM[1][1] > 200 and PartList.TEAM[1][2] > 100, "team 1 is orange, not red")
+		-- the same list every time
+		local again = PartList.solids(plan)
+		t.eq(#again, #parts)
+		t.deepEq(again[n], parts[n])
+	end)
+
+	t.test("the dressing is outside the arena: the lobby annex with the pass desk and its windows, the mast", function()
+		local parts = PartList.dressing(venue)
+		t.truthy(#parts > 300 and #parts < 800, `{#parts} parts of dressing`)
+		local names: { [string]: number } = {}
+		local lobbyMonitor = 0
+		for _, p in parts do
+			names[p.name] = (names[p.name] or 0) + 1
+			t.truthy(p.group == "Lobby" or p.group == "Outside")
+			t.eq(p.box, nil)
+			-- outside the volume and its walls: in the arena frame, beyond 61 sideways, under -1 or over 71
+			local x0, y0, z1 = Arena.ofSite(p.x0, p.y0, p.d0)
+			local x1, y1, z0 = Arena.ofSite(p.x1, p.y1, p.d1)
+			local e = Arena.HALF + 1
+			local inside = x1 > -e + 1e-6
+				and x0 < e - 1e-6
+				and z1 > -e + 1e-6
+				and z0 < e - 1e-6
+				and y1 > -1 + 1e-6
+				and y0 < Arena.HEIGHT + 1 - 1e-6
+			t.falsy(inside, `{p.group}.{p.name} is inside the arena`)
+			if p.name == Arena.MONITOR then
+				lobbyMonitor += 1
+				t.eq(p.screen, "Back", "the lobby's monitor faces the room")
+			end
+		end
+		t.eq(lobbyMonitor, 1)
+		for _, name in
+			{
+				"Counter",
+				"Board",
+				"GateSign",
+				"WindowSill",
+				"Bench",
+				"Plinth",
+				"Step",
+				"Sign",
+				"Pane",
+				"MastLeg",
+				"MastLamp",
+				"Parapet",
+			}
+		do
+			t.truthy((names[name] or 0) >= 1, `the dressing has a {name}`)
+		end
+		t.eq(names.Counter, 2, "the pass desk and the garb counter")
+		-- the pass desk's counter is at the desk's prompt, the lobby's floor is under the gate, the desk and the
+		-- place people are put when they leave
+		local function under(point: { x: number, y: number, z: number }, name: string): boolean
+			local X, _, D = Arena.toSite(point.x, point.y, point.z)
+			for _, p in parts do
+				if p.name == name and X >= p.x0 and X <= p.x1 and D >= p.d0 and D <= p.d1 then
+					return true
+				end
+			end
+			return false
+		end
+		t.truthy(under(Arena.GATE, "Floor") and under(Arena.DESK, "Floor") and under(arena.lobby, "Floor"))
+		t.truthy(
+			under({ x = Arena.DESK.x, y = 0, z = Arena.DESK.z - 3 }, "Counter"),
+			"the counter is in front of the desk's prompt"
+		)
+		t.falsy(under(Arena.DESK, "Counter") or under(Arena.GATE, "Counter") or under(arena.lobby, "Counter"))
+		-- the plinth goes down to the lowest ground under the site
+		local lowest = math.huge
+		for _, p in parts do
+			if p.name == "Plinth" then
+				lowest = math.min(lowest, p.y0)
+			end
+		end
+		t.truthy(lowest <= -(venue.floorY - venue.ground.min), `the plinth reaches {lowest}`)
+		-- the mast stands at the venue's anchor and is a mast
+		local topOfMast = -math.huge
+		for _, p in parts do
+			if string.sub(p.name, 1, 4) == "Mast" then
+				topOfMast = math.max(topOfMast, p.y1)
+			end
+		end
+		t.truthy(topOfMast - (Arena.HEIGHT + 1) >= 70, "the mast is some eighty studs tall")
+	end)
+
+	local function bake(place: AlleyLayout.Place): (any, any, { [string]: any })
+		local folder = roblox.Instance.new("Folder")
+		local places = { [Contract.SITE] = place }
+		local out = GameBakes.venueSites(roblox, folder, Games.stations(places), places, { [Contract.SITE] = venue })
+		return folder, out, places
+	end
+
+	t.test("the bake: Arena.MODEL on the TV station's site, every solid where its box is, inside the budget", function()
+		local place: AlleyLayout.Place =
+			{ x = venue.place.x, z = venue.place.z, floorY = venue.place.floorY, yaw = venue.place.yaw }
+		local folder, out = bake(place)
+		t.eq(out.sites, 1)
+		t.deepEq(out.built, { Contract.STATION, Contract.DESK })
+		t.truthy(out.parts <= venue.partBudget, `{out.parts} parts for a budget of {venue.partBudget}`)
+		local site = folder:FindFirstChild(Contract.SITE) :: any
+		t.truthy(site ~= nil and site:GetAttribute("Site") == Contract.SITE)
+		t.eq(#site:GetChildren(), 1, "the desk's station built nothing of its own")
+		local model = site:FindFirstChild(Arena.MODEL) :: any
+		t.truthy(model ~= nil and model:IsA("Model"))
+		t.eq(model:GetAttribute("Boxes"), n)
+		for _, name in { "Floor0", "Floor1", "Floor2", "Floor3", "Floor4", "Roof", "Lobby", "Outside" } do
+			local group = model:FindFirstChild(name) :: any
+			t.truthy(group ~= nil and group:IsA("Model"), name)
+		end
+		t.eq(#model:GetChildren(), 8)
+		-- every part, against the arena placed in the world
+		local where = Arena.placeOf(place)
+		local wx, wy, wz = Arena.toWorld(where, 0, 0, 0)
+		t.deepEq(
+			{ wx, wy, wz },
+			{ Arena.PLACE.x, Arena.PLACE.y, Arena.PLACE.z },
+			"the data puts the arena where Arena.PLACE says"
+		)
+		local seen: { [number]: boolean } = {}
+		local monitors, curtains, ramps, lights, parts = 0, { 0, 0 }, 0, 0, 0
+		for _, d in model:GetDescendants() do
+			if d:IsA("PointLight") then
+				lights += 1
+				t.falsy(d.Shadows)
+			end
+			if not d:IsA("BasePart") then
+				continue
+			end
+			parts += 1
+			t.truthy(d.Anchored, `{d.Name} is anchored`)
+			local i = d:GetAttribute("Box")
+			local lx, ly, lz = Arena.toLocal(where, d.CFrame.Position.X, d.CFrame.Position.Y, d.CFrame.Position.Z)
+			if i ~= nil then
+				seen[i] = true
+				local k = (i - 1) * 6
+				local b = arena.boxes
+				t.truthy(
+					math.abs(lx - (b[k + 1] + b[k + 4]) / 2) < 1e-3
+						and math.abs(ly - (b[k + 2] + b[k + 5]) / 2) < 1e-3
+						and math.abs(lz - (b[k + 3] + b[k + 6]) / 2) < 1e-3,
+					`box {i}'s part is at ({lx}, {ly}, {lz})`
+				)
+				t.truthy(
+					math.abs(d.Size.X - (b[k + 4] - b[k + 1])) < 1e-3
+						and math.abs(d.Size.Y - (b[k + 5] - b[k + 2])) < 1e-3
+						and math.abs(d.Size.Z - (b[k + 6] - b[k + 3])) < 1e-3,
+					`box {i}'s part is the box's size`
+				)
+				t.truthy(d.CanCollide and d.CanQuery and d.Transparency < 0.9, `box {i}'s part is solid and seen`)
+			elseif d.Name == "Ramp" then
+				ramps += 1
+				t.truthy(d.CanCollide and not d.CanQuery and d.Transparency == 1)
+			else
+				-- anything else inside the arena is plainly not solid
+				if Arena.inVolume(lx, ly, lz) then
+					t.falsy(d.CanCollide, `{d.Name} inside the arena is solid without a box`)
+					t.truthy(
+						string.sub(d.Name, 1, #Arena.CURTAIN) == Arena.CURTAIN,
+						`{d.Name} inside the arena has no box`
+					)
+				end
+			end
+			if d.Name == Arena.MONITOR then
+				monitors += 1
+				local screen = d:FindFirstChild("Screen") :: any
+				t.truthy(screen ~= nil and screen:IsA("SurfaceGui"), "a monitor has its Screen")
+				t.eq(screen.Face.Name, d:GetAttribute("ScreenFace"))
+				local label = screen:FindFirstChild("Text") :: any
+				t.truthy(label ~= nil and label:IsA("TextLabel") and label.Text ~= "")
+			end
+			for team = 1, 2 do
+				if d.Name == Arena.CURTAIN .. team then
+					curtains[team] += 1
+					t.truthy(not d.CanCollide and d.Transparency > 0.2 and d.Transparency < 1)
+					local a, b = arena.curtains[team][1], arena.curtains[team][2]
+					local hangs = Arena.inRoom(a, lx, ly, lz) or Arena.inRoom(b, lx, ly, lz)
+					t.truthy(hangs, `a curtain of team {team} hangs in its doorway`)
+					t.near(d.Size.Y, Arena.HEADROOM, 1e-3)
+				end
+			end
+		end
+		for i = 1, n do
+			t.truthy(seen[i], `box {i} was not baked`)
+		end
+		t.eq(parts, out.parts)
+		t.eq(ramps, #arena.ramps)
+		t.deepEq(curtains, { 2, 2 })
+		t.truthy(monitors >= 13, `{monitors} monitors, the lobby's among them`)
+		t.truthy(lights >= 60, `{lights} lights`)
+		-- the station's prompts are in the lobby the bake made: on its floor, clear of the counters
+		local floor = (model:FindFirstChild("Lobby") :: any):FindFirstChild("Floor") :: any
+		for _, st in Games.stations({ [Contract.SITE] = place }) do
+			if st.game == Contract.GAME then
+				local x, y, z = AlleyLayout.toWorld(place, st.x, st.y, st.d)
+				local rel = floor.CFrame:PointToObjectSpace(roblox.Vector3.new(x, y, z))
+				t.truthy(
+					math.abs(rel.X) < floor.Size.X / 2 and math.abs(rel.Z) < floor.Size.Z / 2,
+					`{st.id} is over the lobby's floor`
+				)
+				t.near(rel.Y - floor.Size.Y / 2, 3, 1e-3, "three studs over it")
+			end
+		end
+	end)
+
+	t.test("the bake on a site turned and moved: the parts follow the arena's frame", function()
+		local place: AlleyLayout.Place = { x = -310, z = 95, floorY = 21.5, yaw = 0.7 }
+		local folder = bake(place)
+		local model = (folder:FindFirstChild(Contract.SITE) :: any):FindFirstChild(Arena.MODEL) :: any
+		local where = Arena.placeOf(place)
+		local ax, ay, az = Arena.dirToWorld(where, 1, 0, 0)
+		local checked = 0
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				local i = d:GetAttribute("Box")
+				if i ~= nil and i % 7 == 0 then
+					checked += 1
+					local k = (i - 1) * 6
+					local b = arena.boxes
+					local x, y, z = Arena.toWorld(
+						where,
+						(b[k + 1] + b[k + 4]) / 2,
+						(b[k + 2] + b[k + 5]) / 2,
+						(b[k + 3] + b[k + 6]) / 2
+					)
+					t.truthy((d.CFrame.Position - roblox.Vector3.new(x, y, z)).Magnitude < 1e-3, `box {i}`)
+					-- the part's own X is the arena's x, turned with the site
+					t.truthy((d.CFrame.XVector - roblox.Vector3.new(ax, ay, az)).Magnitude < 1e-4)
+					t.near(d.Size.X, b[k + 4] - b[k + 1], 1e-3)
+				end
+			end
+		end
+		t.truthy(checked > 150)
+		-- a monitor's screen faces where the plan says, in the world: an old set on the first floor
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and d.Name == Arena.MONITOR and d:GetAttribute("Box") ~= nil then
+				local face = plan.monitors[d:GetAttribute("Box")]
+				local nx, nz =
+					if face == "+x" then 1 elseif face == "-x" then -1 else 0,
+					if face == "+z" then 1 elseif face == "-z" then -1 else 0
+				local wx, wy, wz = Arena.dirToWorld(where, nx, 0, nz)
+				local normals: { [string]: any } = {
+					Right = roblox.Vector3.new(1, 0, 0),
+					Left = roblox.Vector3.new(-1, 0, 0),
+					Back = roblox.Vector3.new(0, 0, 1),
+					Front = roblox.Vector3.new(0, 0, -1),
+				}
+				local normal = normals[d:GetAttribute("ScreenFace")]
+				local world = d.CFrame:VectorToWorldSpace(normal)
+				t.truthy((world - roblox.Vector3.new(wx, wy, wz)).Magnitude < 1e-4, "the screen faces the plan's way")
+			end
+		end
+	end)
+end
