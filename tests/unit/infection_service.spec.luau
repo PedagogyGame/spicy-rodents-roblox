@@ -66,6 +66,7 @@ return function(t)
 			toasts = {},
 			players = {},
 			drivers = {},
+			busy = {},
 			time = 0,
 			worstMs = 0,
 			rodent = 0,
@@ -102,6 +103,9 @@ return function(t)
 			end,
 			setPossessable = function(id: number, value: boolean)
 				h.possessable[id] = value
+			end,
+			busy = function(id: number): boolean
+				return h.busy[id] == true
 			end,
 			notify = function(id: number, payload: { [string]: any })
 				t.eq(payload.kind, "med")
@@ -538,6 +542,25 @@ return function(t)
 		t.deepEq(h.medLog[id], { "symptomatic", "treated", "-" })
 		t.truthy(not victim.infected)
 		t.eq(h.svc:stats().cured, 1)
+	end)
+
+	t.test("a case that comes due while its body rides the sky lift waits for the platform (review)", function()
+		local h = harness(5, { 0.99, 0 }, function(params: any)
+			params.walkInChance = 1
+		end)
+		h.step(5)
+		local victim = townspeople(h)[1]
+		local id = victim.id
+		t.truthy(h.svc:bite(id, h.rodent))
+		t.eq(h.svc:stateOf(id), "incubating")
+		h.busy[id] = true -- on the lift: the Ride attribute
+		h.step(90)
+		t.eq(h.svc:stateOf(id), "incubating", "symptoms came on in a cabin")
+		t.eq(h.medLog[id], nil)
+		h.busy[id] = nil -- off at the platform
+		t.truthy(h.runUntil(5, function(): boolean
+			return h.svc:stateOf(id) == "symptomatic"
+		end))
 	end)
 
 	t.test("no way to walk, or the dice say no: the delayed case collapses and gets an ambulance", function()

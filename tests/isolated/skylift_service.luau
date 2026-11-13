@@ -799,4 +799,134 @@ return function(t)
 			end)
 		end
 	)
+	-- a town whose AI townspeople can be fetched (Town.recruit) and sent home (Town.home), for the Lookout's life
+	local function lively(w: any, max: number): { any }
+		local made = {}
+		local town = w.svc.town
+		town.recruit = function(_sight: number): any?
+			if #made >= max then
+				return nil
+			end
+			local body = makeBody(`Townsperson{#made + 1}`, roblox.CFrame.new(0, 3, 0))
+			table.insert(made, body)
+			return body
+		end
+		town.home = function(_body: any): (number, number, number)
+			return -697.5, 1, -630
+		end
+		w.svc.rand = function(): number
+			return 0
+		end
+		return made
+	end
+
+	t.test("the Lookout lives: a host at the counter, townspeople ride up, dine at a table and ride home", function()
+		-- review: "six empty red boxes going round and a lit, furnished restaurant with nobody in it"
+		FakeEngine.with(function()
+			local w = world({ start = 0 })
+			local made = lively(w, 12)
+			local sawRiding, sawDining, most = false, false, 0
+			local dinerChecked = false
+			local P = SkyLift.period()
+			for _ = 1, math.ceil((P * 3 + SkyLiftService.DINE_MIN) / 0.5) do
+				SkyLiftFlow.step(w, 0.5, 0.5)
+				local c = w.svc:counts()
+				most = math.max(most, c.outings)
+				t.truthy(c.outings <= SkyLiftService.OUTING_MAX, `{c.outings} away at once`)
+				for _, body in made do
+					local r = body:GetAttribute("Ride")
+					if r == "dine" then
+						sawDining = true
+						if not dinerChecked then
+							dinerChecked = true
+							-- seated on a chair: the pivot at a chair's seat top plus the seated root height
+							local pos = body:GetPivot().Position
+							local best = math.huge
+							for _, ch in w.svc.chairs do
+								local d = (pos - Vector3.new(ch.x, ch.y + SkyLiftService.ROOT_ABOVE_SEAT, ch.z)).Magnitude
+								best = math.min(best, d)
+							end
+							t.truthy(best < 0.05, `a diner {best} from every chair`)
+						end
+					elseif type(r) == "string" and string.match(r, "^%d/%d$") then
+						sawRiding = true
+					end
+				end
+			end
+			t.eq(w.svc:counts().host, 1, "nobody at the counter")
+			local host = w.svc.host
+			local hp = host.body:GetPivot().Position
+			t.truthy(
+				(Vector3.new(hp.X, 0, hp.Z) - Vector3.new(w.svc.hostSpot.x, 0, w.svc.hostSpot.z)).Magnitude < 0.05,
+				"the host is not at the counter"
+			)
+			t.truthy(sawRiding, "no townsperson ever rode the lift")
+			t.truthy(sawDining, "no townsperson ever sat at a Lookout table")
+			t.truthy(most >= 2, `at most {most} away at once`)
+			-- and home again: freed out of sight at the town's end of Lift Road, not on the hill
+			local home = 0
+			for _, body in made do
+				local rec = w.holds[body]
+				if rec and rec.freed then
+					t.eq(rec.freed[1], -697.5)
+					home += 1
+				end
+			end
+			t.truthy(home >= 1, "nobody came home")
+			w.svc:stop()
+			t.eq(w.svc:counts().diners, 0)
+		end)
+	end)
+
+	t.test("nobody pops into view: no outing boards while a player stands at the base, no host while one watches", function()
+		FakeEngine.with(function()
+			local w = world({ start = 0 })
+			lively(w, 12)
+			local base = SkyLift.stations().base
+			SkyLiftFlow.player(w, "Watcher", "human", roblox.CFrame.new(base.board.x, base.platformY + 3, base.board.z + 4))
+			local hs = w.svc.hostSpot
+			SkyLiftFlow.player(w, "Diner", "human", roblox.CFrame.new(hs.x + 3, hs.y + 3, hs.z))
+			SkyLiftFlow.step(w, SkyLift.period() * 1.2, 0.5)
+			local c = w.svc:counts()
+			t.eq(c.outings, 0, "an outing appeared in front of a player")
+			t.eq(c.host, 0, "the host appeared in front of a player")
+		end)
+	end)
+
+	t.test("a body left behind rides back while a player watches the platform; out of sight it goes home", function()
+		-- review: freed at the summit, it walked about 950 studs back across the plain
+		FakeEngine.with(function()
+			local w = world({ start = 0 })
+			lively(w, 0)
+			local p = SkyLiftFlow.player(w, "Leaver", "human", SkyLiftFlow.atGate(w, "base"))
+			w.svc:press(p, "base")
+			local b = w.svc.waiters[p]
+			while w.svc:time() < b.boardAt + 5 do
+				SkyLiftFlow.step(w, 0.1)
+			end
+			p.gone = true
+			w.svc:gone(p)
+			local summit = SkyLift.stations().summit
+			SkyLiftFlow.player(
+				w,
+				"Watcher",
+				"human",
+				roblox.CFrame.new(summit.alight.x, summit.platformY + 3, summit.alight.z)
+			)
+			while w.svc:time() < b.arriveAt + 2 do
+				SkyLiftFlow.step(w, 0.1)
+			end
+			local rec = w.holds[p.body]
+			t.truthy(rec ~= nil, "not held")
+			t.eq(rec.freed, nil, "let off in front of the player on the summit platform")
+			t.truthy(string.match(p.body:GetAttribute("Ride") or "", "^%d/%d$") ~= nil, "not seated for the way back")
+			-- the way down: at the base, where nobody is, it goes home
+			while rec.freed == nil and w.svc:time() < b.arriveAt + SkyLift.period() do
+				SkyLiftFlow.step(w, 0.5, 0.5)
+			end
+			t.truthy(rec.freed ~= nil, "never let off")
+			t.eq(rec.freed[1], -697.5, "not sent home")
+			t.eq(p.body:GetAttribute("Ride"), nil)
+		end)
+	end)
 end

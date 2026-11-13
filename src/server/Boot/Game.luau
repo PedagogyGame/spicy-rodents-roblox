@@ -366,6 +366,10 @@ function Game.start(opts: Opts?): any
 				local actor = rt.byTownId[id]
 				return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
 			end,
+			busy = function(id: number): boolean
+				local actor = rt.byTownId[id]
+				return actor ~= nil and (actor.body :: Model):GetAttribute("Ride") ~= nil
+			end,
 			setAttr = function(id: number, name: string, value: any)
 				local actor = rt.byTownId[id]
 				if actor then
