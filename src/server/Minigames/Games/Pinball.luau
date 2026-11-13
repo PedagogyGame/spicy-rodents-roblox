@@ -34,6 +34,7 @@
 --     ("pinball_<variant>"), and the board is written on the cabinet (attribute "Best") for every client; the
 --     end card hears each seat's place on the board and whether it was a personal best (state: place, best,
 --     newBest; "pinball_over" carries the same for its receiver);
+--   * a watcher is sent the game afresh every WATCH_AGAIN (their copy cannot say it missed a segment);
 --   * an idle machine: nothing is sent to anyone while nobody is seated, except "pinball_idle" to each person
 --     who walks up near it (their client runs the attract show from the clock and the board).
 -- Nothing on the cabinet is moved here: every client near it draws the ball, the flippers and the lamps from
@@ -64,6 +65,7 @@ Game.CLOCK_EVERY = 0.25 -- seconds between two tellings of the time to the repla
 Game.IDLE = 60 -- seconds without a change of the buttons before the player whose ball it is is taken off
 Game.ANIMAL_EVERY = 0.25
 Game.SYNC_AGAIN = 1 -- seconds: a player put right is not put right again sooner (their segments on the way)
+Game.WATCH_AGAIN = 15 -- seconds: a watcher is sent the game afresh this often (a segment they missed is not for ever)
 Game.IDLE_WORDS = "You were taken off the pinball machine: nothing was pressed for a minute"
 Game.THUMP_WORDS = "Something landed on the machine and thumped the glass!"
 
@@ -394,6 +396,17 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		end
 		if self.hw and ctx.now() - self.lookAt >= Game.LOOK then
 			lookAround()
+			-- a watcher's copy cannot ask to be put right: it is sent the game afresh now and then
+			if phase == "playing" then
+				for key in self.watchers do
+					if
+						ctx.seatOf(key) == nil
+						and ctx.now() - (self.syncedAt[key] or -math.huge) >= Game.WATCH_AGAIN
+					then
+						sync(key, "again")
+					end
+				end
+			end
 		end
 	end
 

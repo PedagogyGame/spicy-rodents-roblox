@@ -18,16 +18,19 @@
 --     shared clock, so every screen shows the same), the best scores (the cabinet's "Best" attribute, which
 --     the server writes) and the flippers at rest.
 -- Sounds are named cue points (MinigameSounds "pinball.<variant>.<cue>", one set per machine, no asset ids yet)
--- fired as the drawing passes them; a bumper's cap and a slingshot's rubber flash when they fire.
+-- fired as the drawing passes them; a bumper's cap and a slingshot's rubber flash when they fire. The player's
+-- own machine is heard flat; anyone else's from the cabinet, quieter with distance (HEAR_NEAR, HEAR_FAR). A hit
+-- is as loud as it was hard (loudness), and each pop bumper rings at its own pitch.
 -- The parts are found lazily and may be missing (streaming, a place without the cabinet): then nothing is drawn
 -- and nothing breaks. A cabinet is drawn only while it is awake (a message about it came, and this player's
 -- body is within SLEEP studs); the render step is unbound when none is.
 -- Interface: get(station, place?, index?, tableId?) -> Cab; sync(cab, msg) -> bool; segment(cab, msg) -> bool;
---   retire(cab, msg) (a seat that has gone, from a tick on);
---   rebase(cab); idle(cab); over(cab, msg); show(cab, frame, dt?) (the controller's live frames); cue(cab, cue, a, b) (one
---   cue: its sound and its flash); CUE_NAMES; cueName(variant, cue) -> string; SOUNDS (every cue name, for the
+--   retire(cab, msg) (a seat that has gone, from a tick on); rebase(cab); idle(cab); over(cab, msg);
+--   show(cab, frame, dt?) (the controller's live frames); cue(cab, cue, a, b) (one cue: its sound and its flash);
+--   loudness(cue, a, b) -> (volume, pitch); hearFrom(cab) -> Instance? (nil: flat, the player's own);
+--   hear(cab, name, volume, pitch); CUE_NAMES; cueName(variant, cue) -> string; SOUNDS (every cue name, for the
 --   game's sounds); step(dt) (the render step; specs call it); reset() (specs); awake() -> number; DELAY;
---   CHUNK; SLEEP; BIND; KEEP
+--   CHUNK; SLEEP; BIND; KEEP; HEAR_NEAR; HEAR_FAR; IMPACT_MIN; BUMPER_PITCH
 
 local Import = require("../../Import")
 local Attract =
@@ -61,6 +64,10 @@ Cabinet.BIND = "SpicyPinballCabinets"
 Cabinet.FLASH = 0.12 -- seconds a bumper cap or a slingshot stays lit after it fires
 Cabinet.SITE = "bowling_alley"
 Cabinet.REEL_CLACK = 0.06 -- seconds between two clacks of the score reels
+Cabinet.HEAR_NEAR = 6 -- studs: another player's machine is heard at full volume this close
+Cabinet.HEAR_FAR = 30 -- and not at all beyond this
+Cabinet.IMPACT_MIN = 0.15 -- the quietest a hit is heard, of its cue's volume
+Cabinet.BUMPER_PITCH = 0.06 -- the pop bumpers ring this much apart in pitch
 
 -- the cue names, by Machine.CUE number ("bumper", "flip_up", ...)
 Cabinet.CUE_NAMES = {} :: { [number]: string }
@@ -237,7 +244,7 @@ local function backglass(cab: Cab, f: any, dt: number)
 			-- (a clack every REEL_CLACK seconds while the drums turn, not one a frame)
 			if cab.clock - cab.clackAt >= Cabinet.REEL_CLACK then
 				cab.clackAt = cab.clock
-				MinigameSounds.play(`pinball.{cab.variant}.reel`, 0.25)
+				Cabinet.hear(cab, `pinball.{cab.variant}.reel`, 0.25, 1)
 			end
 		end
 		score = cab.reel
@@ -378,8 +385,61 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 end
 
 -- One cue: its sound, and the part it lights.
-function Cabinet.cue(cab: Cab, cue: number, a: number, _b: number)
-	MinigameSounds.play(Cabinet.cueName(cab.variant, cue), VOLUME[cue] or 0.5)
+-- loudness(cue, a, b): how loud and at what pitch a cue is heard. A hit carries its speed (b, studs a second:
+-- a flipper, a wall, a post): a graze is quiet and a slam is full (by the speed over Physics.MAX_SPEED, never
+-- under IMPACT_MIN of the cue's volume). Each pop bumper rings at its own pitch.
+function Cabinet.loudness(cue: number, a: number, b: number): (number, number)
+	local volume = VOLUME[cue] or 0.5
+	if cue == Machine.CUE.WALL or cue == Machine.CUE.POST or cue == Machine.CUE.FLIPPER_HIT then
+		volume *= math.clamp(math.abs(b) / Physics.MAX_SPEED, Cabinet.IMPACT_MIN, 1)
+	end
+	local pitch = 1
+	if cue == Machine.CUE.BUMPER then
+		pitch = 1 + Cabinet.BUMPER_PITCH * ((a - 1) % 3 - 1)
+	end
+	return volume, pitch
+end
+
+-- hearFrom(cab): where a sound of this machine comes from on this screen: nothing (the player's own machine,
+-- heard as their own, flat) or the cabinet itself (anyone else: heard from the machine, quieter with distance,
+-- gone beyond HEAR_FAR, so a bowler beside the games room is not played every flipper in it).
+function Cabinet.hearFrom(cab: Cab): Instance?
+	local parts = cab.parts
+	if cab.live or parts == nil then
+		return nil
+	end
+	return parts.glass or parts.balls[1] or parts.model.PrimaryPart
+end
+
+-- hear(cab, name, volume, pitch): one sound of the machine, from where hearFrom says.
+function Cabinet.hear(cab: Cab, name: string, volume: number, pitch: number)
+	local at = Cabinet.hearFrom(cab)
+	local id = MinigameSounds.CUES[name]
+	if at == nil or id == nil or id == "" then
+		-- (the player's own, or no sound chosen yet: asked for by name all the same)
+		MinigameSounds.play(name, volume)
+		return
+	end
+	local asked = MinigameSounds.counts()
+	asked[name] = (asked[name] or 0) + 1
+	local sound = Instance.new("Sound")
+	sound.Name = `Pinball_{name}`
+	sound.SoundId = id
+	sound.Volume = math.clamp(volume, 0, 1)
+	sound.PlaybackSpeed = pitch
+	sound.RollOffMode = Enum.RollOffMode.InverseTapered
+	sound.RollOffMinDistance = Cabinet.HEAR_NEAR
+	sound.RollOffMaxDistance = Cabinet.HEAR_FAR
+	sound.Parent = at
+	sound.Ended:Once(function()
+		sound:Destroy()
+	end)
+	sound:Play()
+end
+
+function Cabinet.cue(cab: Cab, cue: number, a: number, b: number)
+	local volume, pitch = Cabinet.loudness(cue, a, b)
+	Cabinet.hear(cab, Cabinet.cueName(cab.variant, cue), volume, pitch)
 	local parts = cab.parts
 	if parts == nil then
 		return
@@ -518,6 +578,20 @@ function Cabinet.sync(cab: Cab, msg: { [string]: any }): boolean
 	local r = Wire.restore(msg.snap)
 	if r == nil or r.id ~= cab.tableId then
 		return false
+	end
+	local had = cab.r
+	if
+		not cab.live
+		and had ~= nil
+		and cab.mode == "follow"
+		and cab.g == (tonumber(msg.g) or 0)
+		and had.tick == r.tick
+		and Replay.sum(had) == Replay.sum(r)
+	then
+		-- (the game afresh, and this copy already has it: the drawing goes on without a jump)
+		applyNotes(cab)
+		wake(cab)
+		return true
 	end
 	cab.r = r
 	cab.g = tonumber(msg.g) or 0

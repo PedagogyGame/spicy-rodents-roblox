@@ -16,6 +16,7 @@ local Bot = require("@shared/Minigames/Pinball/Bot")
 local CabinetLayout = require("@shared/Minigames/Pinball/Cabinet")
 local InputLog = require("@shared/Minigames/Pinball/InputLog")
 local Machine = require("@shared/Minigames/Pinball/Machine")
+local Physics = require("@shared/Minigames/Pinball/Physics")
 local Replay = require("@shared/Minigames/Pinball/Replay")
 local Tables = require("@shared/Minigames/Pinball/Tables")
 local Wire = require("@shared/Minigames/Pinball/Wire")
@@ -354,6 +355,7 @@ return function(t)
 				t.eq(Rig.count(w.sent, "start"), 1)
 				local c = Controller.current
 				t.truthy(c and c.live, "this player's ball is played here")
+				t.eq(Cabinet.hearFrom(c.cab), nil, "the player's own machine is heard flat")
 				t.truthy(w.held, "the camera is on the playfield")
 				t.eq(Rig.prompt(w, ID).ActionText, "In use")
 				t.eq(Rig.prompt(w, ID).ObjectText, "ACORN ATTACK - in use by Ann: watch the ball")
@@ -477,6 +479,20 @@ return function(t)
 				t.truthy(Rig.count(w.got, "pinball") > 5, "and the segments after it")
 				local cab = Cabinet.get(ID)
 				t.truthy(cab.awake and cab.mode == "follow")
+				-- Bob's machine is heard from the cabinet, not flat in Ann's ears
+				local from = Cabinet.hearFrom(cab)
+				local under = from
+				while under ~= nil and under.Name ~= "Pinball2" do
+					under = under.Parent
+				end
+				t.truthy(under ~= nil, "heard from the machine")
+				local graze = Cabinet.loudness(Machine.CUE.WALL, 1, 1.3)
+				local slam = Cabinet.loudness(Machine.CUE.WALL, 1, Physics.MAX_SPEED)
+				t.truthy(graze < slam * 0.25, `a graze ({graze}) is quieter than a slam ({slam})`)
+				local _, p1 = Cabinet.loudness(Machine.CUE.BUMPER, 1, 1)
+				local _, p2 = Cabinet.loudness(Machine.CUE.BUMPER, 2, 1)
+				local _, p3 = Cabinet.loudness(Machine.CUE.BUMPER, 3, 1)
+				t.truthy(p1 ~= p2 and p2 ~= p3 and p1 ~= p3, "each bumper its own pitch")
 				-- she sees the same game: her copy and the server's agree tick for tick
 				playFor(w, 10, nil, nil, { bob }, ID)
 				local server = tableOf(w, 2):replay()
@@ -499,6 +515,9 @@ return function(t)
 				t.truthy(seen > 0, "a ball was drawn")
 				t.truthy(label(w, 2, "Title") == "SPICY RODENT", label(w, 2, "Title"))
 				t.truthy(string.find(label(w, 2, "Info"), "BALL", 1, true) ~= nil, label(w, 2, "Info"))
+				-- a watcher's copy cannot say it missed something: it is sent the game afresh now and then
+				playFor(w, 5, nil, nil, { bob }, ID)
+				t.eq(Rig.count(w.got, "pinball_sync"), 2, "sent the game again after WATCH_AGAIN")
 				-- Bob leaves: the machine is idle and the people near it are told; the attract show runs
 				w.svc:leave(bob.stub, "left")
 				Rig.run(w, 0.5)
