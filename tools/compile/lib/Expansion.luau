@@ -80,6 +80,8 @@ Expansion.APPROVAL = table.freeze({
 Expansion.FRONTAGE = 16 -- studs from a door to the network for "frontage", "alley" and "forecourt"
 Expansion.PATH_END = 3 -- studs from a path end to its door or to the network
 Expansion.EPS = 0.05
+Expansion.CABLE_CLEAR = 20 -- studs from the sky-lift cable down to the ground...
+Expansion.CABLE_APRON = 30 -- ...farther than this from either station's building
 
 local function r4(n: number): number
 	return math.floor(n * 1e4 + 0.5) / 1e4
@@ -743,6 +745,15 @@ function Expansion.check(doc: any, world: World): { string }
 					bad(ride.id .. ": the cable does not end at " .. vid .. "/" .. (pair[3] :: string))
 				end
 			end
+			-- the cable clears the ground by CABLE_CLEAR outside CABLE_APRON of either station's building (a cabin
+			-- hangs 10.5 below it, so its floor stays ~9 st up); inside the apron it may come down to the platforms
+			local stationFeet = {}
+			for _, ref in { ride.from, ride.to } do
+				local v = venueById[string.sub(ref, 1, (string.find(ref, "/", 1, true) or 1) - 1)]
+				if v ~= nil then
+					table.insert(stationFeet, Expansion.footPoly(v))
+				end
+			end
 			for i = 1, #pts - 1 do
 				local a, b = pts[i], pts[i + 1]
 				local len = math.sqrt((b[1] - a[1]) ^ 2 + (b[3] - a[3]) ^ 2)
@@ -750,9 +761,11 @@ function Expansion.check(doc: any, world: World): { string }
 				for k = 0, n do
 					local t = k / n
 					local x, y, z = a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t
-					local dStart = math.sqrt((x - first[1]) ^ 2 + (z - first[3]) ^ 2)
-					local dEnd = math.sqrt((x - last[1]) ^ 2 + (z - last[3]) ^ 2)
-					if dStart > 30 and dEnd > 30 and y < Expansion.ground(x, z) + 6 then
+					local apron = false
+					for _, poly in stationFeet do
+						apron = apron or polyDist(poly, x, z) <= Expansion.CABLE_APRON
+					end
+					if not apron and y < Expansion.ground(x, z) + Expansion.CABLE_CLEAR then
 						bad(
 							string.format(
 								"%s: the cable is %.1f st above the ground at (%.0f, %.0f)",

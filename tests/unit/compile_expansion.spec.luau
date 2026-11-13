@@ -164,12 +164,82 @@ return function(t)
 				t.truthy(rides[id] ~= nil, id)
 			end
 			local lift = rides.sky_lift
-			local first, last = lift.points[1], lift.points[#lift.points]
+			local pts = lift.points
+			local first, last = pts[1], pts[#pts]
 			t.truthy(last[2] - first[2] > 90, "the summit is ~100 st above the base")
-			for i = 2, #lift.points - 1 do
-				local p = lift.points[i]
-				t.truthy(p[2] >= Expansion.ground(p[1], p[3]) + 6, `tower {i}`)
+			-- bullwheel to bullwheel: the ends are the stations' ride_cable anchors, level with the next point
+			-- (the station mouths) at floor + 12
+			local base, top = venue("f4_lift_base"), venue("f3_hilltop")
+			local function anchor(v: any, id: string): any
+				for _, a in v.anchors do
+					if a.id == id then
+						return a
+					end
+				end
+				error(id)
 			end
+			for _, pair in { { first, pts[2], base, "cable_out" }, { last, pts[#pts - 1], top, "cable_in" } } do
+				local wheel, mouth, v, id = pair[1], pair[2], pair[3], pair[4]
+				local a = anchor(v, id)
+				t.near(wheel[1], a.world[1], 0.01, id)
+				t.near(wheel[3], a.world[3], 0.01, id)
+				t.near(wheel[2], v.floorY + 12, 0.01, id)
+				t.near(mouth[2], v.floorY + 12, 0.01, id .. " mouth level")
+				-- the mouth is on the building's face
+				t.truthy(
+					Expansion.polyDist(Expansion.footPoly(v), mouth[1], mouth[3]) < 0.05,
+					id .. " mouth on the face"
+				)
+				t.truthy(Expansion.polyDist(Expansion.footPoly(v, 0.5), mouth[1], mouth[3]) > 0.4, id .. " not inside")
+			end
+			-- inside the summit hall the line runs along the hall's axis (local D), not across it
+			local _, _, d0 = AlleyLayout.toLocal(top.place, pts[#pts - 1][1], 0, pts[#pts - 1][3])
+			local x1, _, d1 = AlleyLayout.toLocal(top.place, last[1], 0, last[3])
+			local x0 = AlleyLayout.toLocal(top.place, pts[#pts - 1][1], 0, pts[#pts - 1][3])
+			t.near(x0, -35, 0.01)
+			t.near(x1, -35, 0.01)
+			t.near(d0, -25, 0.01)
+			t.truthy(d1 > d0 + 30, "a straight run into the hall")
+			-- nine towers that follow the ground: heads 20..40 above it; the cable clears the ground by 20 outside
+			-- 30 st of both buildings (the compiler's rule, re-measured here every 2 st)
+			t.eq(#pts - 4, 9, "nine towers")
+			for i = 3, #pts - 2 do
+				local p = pts[i]
+				local above = p[2] - Expansion.ground(p[1], p[3])
+				t.truthy(above >= 20 and above <= 40, `tower {i - 2} head {above}`)
+			end
+			t.eq(Expansion.CABLE_CLEAR, 20)
+			local lowest = math.huge
+			for i = 1, #pts - 1 do
+				local a, b = pts[i], pts[i + 1]
+				local n = math.max(1, math.ceil(math.sqrt((b[1] - a[1]) ^ 2 + (b[3] - a[3]) ^ 2) / 2))
+				for k = 0, n do
+					local f = k / n
+					local x, y, z = a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f
+					if
+						Expansion.polyDist(Expansion.footPoly(base), x, z) > 30
+						and Expansion.polyDist(Expansion.footPoly(top), x, z) > 30
+					then
+						lowest = math.min(lowest, y - Expansion.ground(x, z))
+					end
+				end
+			end
+			t.truthy(lowest >= 20, `lowest clearance {lowest}`)
+			-- and the checker refuses a cable dragged down to 15 st over the plain
+			local low = table.clone(mod)
+			low.rides = table.clone(mod.rides)
+			for i, r in low.rides do
+				if r.id == "sky_lift" then
+					local r2 = table.clone(r)
+					r2.points = table.clone(r.points)
+					local p = r2.points[5]
+					r2.points[5] = { p[1], Expansion.ground(p[1], p[3]) + 15, p[3] }
+					low.rides[i] = r2
+				end
+			end
+			t.truthy(
+				string.find(table.concat(Expansion.check(low, world), "\n"), "sky_lift: the cable is", 1, true) ~= nil
+			)
 			local n = { pickup = 0, suv = 0 }
 			for _, v in mod.vehicles do
 				n[v.kind] += 1

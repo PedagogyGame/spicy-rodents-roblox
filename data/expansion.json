@@ -1925,7 +1925,7 @@
       "ground": { "min": 108.6, "max": 115.41 },
       "entrances": [
         { "id": "terrace", "at": [15, -25], "width": 8, "kind": "double_door", "path": "inside" },
-        { "id": "lift_hall", "at": [-35, -25], "width": 10, "kind": "opening", "path": "inside" },
+        { "id": "lift_hall", "at": [-35, -25], "width": 24, "kind": "opening", "path": "inside" },
         { "id": "terrace_steps", "at": [15, -47], "width": 8, "kind": "opening", "path": "xpath_hill_trail" }
       ],
       "anchors": [
@@ -1935,13 +1935,30 @@
         {
           "id": "alight",
           "kind": "ride_end",
-          "at": [-35, 1.5, 0],
+          "at": [-25.5, 1.5, 5],
           "yaw": 0,
           "owner": "F4",
           "ride": "sky_lift",
-          "note": "summit platform in the lift hall (X -50..-20)"
+          "note": "arrival platform beside the up strand in the lift hall (SkyLift.stations().summit.alight)"
         },
-        { "id": "cable_in", "kind": "ride_cable", "at": [-35, 12, 0], "yaw": 0, "owner": "F4", "ride": "sky_lift" },
+        {
+          "id": "board_down",
+          "kind": "ride_start",
+          "at": [-44.5, 1.5, 5],
+          "yaw": 0,
+          "owner": "F4",
+          "ride": "sky_lift",
+          "note": "boarding platform beside the down strand (SkyLift.stations().summit.board)"
+        },
+        {
+          "id": "cable_in",
+          "kind": "ride_cable",
+          "at": [-35, 12, 12],
+          "yaw": 0,
+          "owner": "F4",
+          "ride": "sky_lift",
+          "note": "bullwheel centre at cable height; the cable enters the hall along local +D at its front (X -35, D -25)"
+        },
         { "id": "terrace_1", "kind": "seat", "at": [-6, 0, -36], "yaw": 0, "owner": "F3" },
         { "id": "terrace_2", "kind": "seat", "at": [8, 0, -36], "yaw": 0, "owner": "F3" },
         { "id": "terrace_3", "kind": "seat", "at": [22, 0, -36], "yaw": 0, "owner": "F3" },
@@ -1953,7 +1970,7 @@
       ],
       "features": ["glass_front_view", "terrace_over_town", "telescope", "dining_tables", "summit_lift_hall"],
       "partBudget": 1000,
-      "notes": "Faces the town (north-east); the terrace (D -47..-25) is the second vantage over the town. The lift hall (X -50..-20) is open to the front-left where the cable leaves toward the base station."
+      "notes": "Faces the town (north-east); the terrace (D -47..-25) is the second vantage over the town. The lift hall (X -50..-20) is open on its front (X -47..-23) where the cable enters along the hall's axis; outside, the line turns 29 degrees toward local -X on its way to the base station, so the cabins cross the terrace strip at X below -24 at deck height: keep the terrace east of that (Shared/Rides/SkyLift.sweptClear)."
     },
     {
       "id": "f4_lift_base",
@@ -1976,8 +1993,33 @@
         { "id": "front", "at": [-5, -15], "width": 8, "kind": "opening", "path": "xpath_lift_front" }
       ],
       "anchors": [
-        { "id": "board", "kind": "ride_start", "at": [10, 1.5, 2], "yaw": 0, "owner": "F4", "ride": "sky_lift" },
-        { "id": "cable_out", "kind": "ride_cable", "at": [25, 12, 2], "yaw": 0, "owner": "F4", "ride": "sky_lift" },
+        {
+          "id": "board",
+          "kind": "ride_start",
+          "at": [-5, 1.5, -7.5],
+          "yaw": 0,
+          "owner": "F4",
+          "ride": "sky_lift",
+          "note": "boarding platform beside the up strand (Shared/Rides/SkyLift.stations().base.board)"
+        },
+        {
+          "id": "alight_down",
+          "kind": "ride_end",
+          "at": [-5, 1.5, 11.5],
+          "yaw": 0,
+          "owner": "F4",
+          "ride": "sky_lift",
+          "note": "arrival platform beside the down strand (SkyLift.stations().base.alight)"
+        },
+        {
+          "id": "cable_out",
+          "kind": "ride_cable",
+          "at": [-12, 12, 2],
+          "yaw": 0,
+          "owner": "F4",
+          "ride": "sky_lift",
+          "note": "bullwheel centre at cable height; the cable leaves the station along local +X at X = 25"
+        },
         { "id": "operator", "kind": "staff_post", "at": [-12, 0, -8], "yaw": 90, "owner": "F4" },
         { "id": "sign", "kind": "sign", "at": [-5, 10, -15], "yaw": 0, "owner": "F4" }
       ],
@@ -2057,19 +2099,21 @@
       "speed": 15,
       "camera": "firstPerson",
       "points": [
+        [-774.03, 17.7, -893],
         [-785.95, 17.7, -928.02],
-        [-814.67, 28.73, -1003.59],
-        [-843.38, 39.76, -1079.16],
-        [-872.1, 50.79, -1154.73],
-        [-900.81, 61.82, -1230.29],
-        [-929.53, 72.85, -1305.86],
-        [-958.24, 83.88, -1381.43],
-        [-986.96, 94.91, -1457],
-        [-1015.67, 105.94, -1532.57],
-        [-1044.38, 116.97, -1608.14],
-        [-1073.1, 128, -1683.71]
+        [-812.79, 38.5, -1001.94],
+        [-839.62, 34.33, -1075.86],
+        [-866.46, 33.87, -1149.78],
+        [-893.3, 32.2, -1223.69],
+        [-920.13, 32.05, -1297.61],
+        [-946.97, 34.16, -1371.53],
+        [-973.81, 39, -1445.45],
+        [-1000.64, 78.49, -1519.37],
+        [-1027.48, 124.74, -1593.29],
+        [-1054.32, 128, -1667.21],
+        [-1082.11, 128, -1691.62]
       ],
-      "notes": "Tower heads at the interior points; the cable runs straight between them. Ride: no controls, no score (brief v2 §15); first person on boarding (§14). Replaces the RideSpec stub ends."
+      "notes": "The cable's centre line, bullwheel to bullwheel: base bullwheel (f4_lift_base/cable_out), the base station mouth, nine tower heads (the cable follows the ground: heads 26 st above it, 32 at the first and last tower), the summit mouth at the front of the Lookout's lift hall (its lip, where the line turns 29 degrees onto the hall's axis), the summit bullwheel (f3_hilltop/cable_in). The two strands run 5 st either side, up on the right; the cable runs straight between the points and level in both stations (floor + 12). Shared/Rides/SkyLift turns this into the loop and the timetable. Ride: no controls, no score (brief v2 §15); first person on boarding (§14)."
     },
     {
       "id": "parasail",
