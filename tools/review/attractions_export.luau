@@ -205,7 +205,10 @@ local function addFile(scene: any, file: string)
 				count += 1
 			end
 			for _, child in d:GetChildren() do
-				if child:IsA("PointLight") or child:IsA("SpotLight") or child:IsA("SurfaceLight") then
+				if
+					(child:IsA("PointLight") or child:IsA("SpotLight") or child:IsA("SurfaceLight"))
+					and child.Enabled ~= false -- baked off (a cabin by day): the game switches it on
+				then
 					local kind = if child:IsA("PointLight")
 						then "point"
 						elseif child:IsA("SpotLight") then "spot"

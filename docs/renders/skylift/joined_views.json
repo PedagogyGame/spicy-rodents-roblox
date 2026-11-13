@@ -31,17 +31,17 @@
     "backdrop_terrain"
    ],
    "look": [
-    -1089.9223731279246,
-    120,
-    -1691.8284804203179
+    -1088.6,
+    119.0,
+    -1693.33
    ],
    "name": "j_summit_hall",
    "pos": [
-    -1044.5650498436241,
-    123.1,
-    -1675.276645945449
+    -1053.93,
+    123.0,
+    -1672.19
    ],
-   "desc": "The summit hall with the Lookout built round the lift platforms, cabin 6 in the hall (t 40)"
+   "desc": "The summit hall from inside its mouth (the Lookout built round the lift platforms), cabin 6 in the hall (t 40)"
   },
   {
    "name": "j_hall_from_cabin",
