@@ -8,7 +8,7 @@
 --     where the westside sidewalks stop;
 --   nothing stands inside either venue's footprint or the cabins' swept volume (grown by 0.25);
 --   handrails along every piece steeper than RAIL_GRADE, timber steps on those steeper than STEP_GRADE;
---   five lamps with lit heads, three benches, two signposts, about twenty conifers; the bay lines lie on the
+--   five lamps with lit heads, three benches, two signposts, about thirty conifers in stands; the bay lines lie on the
 --     car park's surface; within the part budget, all anchored.
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
@@ -226,7 +226,7 @@ return function(t)
 		end
 		t.eq(benches, 3)
 		t.eq(signs, 2)
-		t.truthy((m:GetAttribute("Trees") :: number) >= 18, "about twenty conifers")
+		t.truthy((m:GetAttribute("Trees") :: number) >= Approach.TREES - 2, "the conifers")
 		local park = m:FindFirstChild("CarPark")
 		local pad = park:FindFirstChild("xp_lift_lot")
 		t.truthy(pad ~= nil)

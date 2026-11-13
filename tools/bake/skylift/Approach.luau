@@ -41,6 +41,7 @@ Approach.RAIL_GRADE = 0.35
 Approach.STEP_GRADE = 0.42
 Approach.SIDEWALK_JOIN = -622.5 -- where the westside sidewalks (rd_072, rd_073) end
 Approach.BUDGET = 600
+Approach.TREES = 32
 
 export type Piece = {
 	ax: number,
@@ -669,15 +670,26 @@ function Approach.build(roblox: any, parent: any): any
 	end
 	local trees, rocks, shrubs = 0, 0, 0
 	local tries = 0
-	while trees < 20 and tries < 2000 do
+	-- conifers in small stands (a lone tree on a bare dome reads as a post from the town)
+	while trees < Approach.TREES and tries < 400 do
 		tries += 1
 		local ang = rnd() * 2 * math.pi
-		local r = 90 + rnd() * 250
-		local x, z = crown[1] + math.cos(ang) * r, crown[2] + math.sin(ang) * r
-		local h = 11 + rnd() * 9
-		if ok(x, z, h, 3) then
-			conifer(kit0, dress, x, z, h, 5 + rnd() * 2.5, rnd())
-			trees += 1
+		local r = 100 + rnd() * 240
+		local cx, cz = crown[1] + math.cos(ang) * r, crown[2] + math.sin(ang) * r
+		local stand = 2 + math.floor(rnd() * 4)
+		for _ = 1, stand * 3 do
+			if stand <= 0 or trees >= Approach.TREES then
+				break
+			end
+			local a2, r2 = rnd() * 2 * math.pi, 4 + rnd() * 14
+			local x, z = cx + math.cos(a2) * r2, cz + math.sin(a2) * r2
+			local h = 15 + rnd() * 11
+			local w = h * (0.4 + rnd() * 0.1)
+			if ok(x, z, h, w / 2) then
+				conifer(kit0, dress, x, z, h, w, rnd())
+				trees += 1
+				stand -= 1
+			end
 		end
 	end
 	tries = 0
