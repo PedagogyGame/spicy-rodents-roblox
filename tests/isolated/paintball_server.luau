@@ -672,9 +672,10 @@ return function(t)
 				local got = kit.service.poses[ada.seat].x - from
 				local honest = Body.WALK * T.speedTolerance * took + Body.WALK * T.speedTolerance * T.speedWindow
 				t.truthy(got <= honest, `{got} studs in {took} s; walking allows {honest}`)
-				-- a body moved apart from the pose it reports (the real body left behind) is refused too
+				-- a body moved apart from the pose it reports (the real body left behind) is refused too (once the
+				-- second after the server's last placement of it, in which the body is not asked, is over)
 				ada.x = kit.service.poses[ada.seat].x
-				kit.run(0.3)
+				kit.run(T.placeGrace + 0.3)
 				local refused = stats.movesRefused
 				ada.bodyApart = true
 				ada.stub.body.x += 2 * T.bodySlack

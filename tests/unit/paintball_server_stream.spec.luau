@@ -165,8 +165,8 @@ return function(t)
 			t.deepEq({ step({ t = 100.05, x = cx, y = room.minY, z = cz }) }, { "refused", "wall" })
 			-- the body: a pose far from where the replicated body really is
 			local feel = Contract.feel()
-			local apart = Stream.new("bea", 100)
-			Stream.placed(apart, 20, 0, 0, 0, 100, feel, true)
+			local apart = Stream.new("bea", 98)
+			Stream.placed(apart, 20, 0, 0, 0, 98, feel, true)
 			local rec = { t = 100.05, x = 20, y = 0, z = 0.5, yaw = 0, pitch = 0, bits = 0, place = 1 }
 			t.deepEq(
 				{ Stream.judge(apart, rec, 100.05, arena, feel, nil, 20, 0, T.bodySlack + 1) },
@@ -175,8 +175,8 @@ return function(t)
 			t.eq((Stream.judge(apart, rec, 100.05, arena, feel, nil, 20, 0, T.bodySlack - 1)), "accepted")
 			-- ... but only sideways while it falls: a body dropping off the landing (x 10.5..15, z -15..-7, a
 			-- storey up) is replicated a tenth of a second behind its own Moves, a dozen studs higher
-			local faller = Stream.new("cyd", 100)
-			Stream.placed(faller, 12.5, FLOOR, -8, 0, 100, feel, true)
+			local faller = Stream.new("cyd", 98)
+			Stream.placed(faller, 12.5, FLOOR, -8, 0, 98, feel, true)
 			local function drop(at: number, z: number, y: number, bodyY: number, bodyZ: number?): Stream.Verdict
 				local move = { t = at, x = 12.5, y = y, z = z, yaw = 0, pitch = 0, bits = Wire.BIT.air, place = 1 }
 				return (Stream.judge(faller, move, at, arena, feel, nil, 12.5, bodyY, bodyZ or z))
@@ -187,6 +187,23 @@ return function(t)
 			t.eq(drop(100.4, -4.5, 0, 9), "accepted", "landed, the body still coming down")
 			t.eq(drop(100.5, -4.5, 0, 3), "accepted")
 			t.eq(drop(100.7, -4.5, 0, 9), "refused", "a body that stands is held to it up and down as well")
+			-- ... and not at all for a second after the server itself moved the body: what it reads of the body
+			-- may still be what the body's own client sent before it heard of the placement
+			local back = Stream.new("dee", 98)
+			Stream.placed(back, 20, 0, 0, 0, 100, feel, true)
+			local function from(at: number, z: number, bodyZ: number): Stream.Verdict
+				local move = { t = at, x = 20, y = 0, z = z, yaw = 0, pitch = 0, bits = 0, place = back.place }
+				return (Stream.judge(back, move, at, arena, feel, nil, 20, 0, bodyZ))
+			end
+			t.eq(from(100.05, 0.5, 40), "accepted", "the body is still read where it was tagged, forty studs off")
+			t.eq(from(100 + T.placeGrace - 0.05, 1, 40), "accepted")
+			t.eq(from(100 + T.placeGrace + 0.05, 1.5, 40), "refused", "after the second it is held to its body again")
+			t.eq(from(100 + T.placeGrace + 0.1, 1.5, 2), "accepted")
+			-- (walls, height and distance are held all through that second: the grace is the body rule's alone)
+			local eager = Stream.new("eve", 98)
+			Stream.placed(eager, 20, 0, 0, 0, 100, feel, true)
+			local far = { t = 100.05, x = 20, y = 0, z = 30, yaw = 0, pitch = 0, bits = 0, place = eager.place }
+			t.deepEq({ Stream.judge(eager, far, 100.05, arena, feel, nil, 20, 0, 30) }, { "refused", "speed" })
 		end
 	)
 

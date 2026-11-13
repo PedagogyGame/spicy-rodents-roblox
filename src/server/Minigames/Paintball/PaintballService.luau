@@ -31,6 +31,9 @@
 --   * the body rule (onMove e, "the body") counts height only for a body that stands: while a pose is
 --     falling, and a quarter of a second after, the replicated body is still on its way down behind its
 --     own Moves and only the sideways distance is held to TRUST.bodySlack (Stream, "the body rule");
+--   * the body rule is not kept for TRUST.placeGrace after a placement (Stream, "the body rule"): the
+--     body the server reads may still be where its own client last sent it from, before it heard, and
+--     an honest Move from the new place would be refused against it, three times, and corrected;
 --   * silence is measured from a placement as well as from a Move (Stream.placed): a client back from
 --     being tagged out is owed all of Clock.DROP_SECS, not what its time out left of it;
 --   * a click that came later than its own delay explains is also judged at its own stamp, no further

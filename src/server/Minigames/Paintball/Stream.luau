@@ -38,6 +38,16 @@
 -- client's Moves by the engine's physics replication, and a body dropping down the atrium at 100 studs
 -- a second is more than bodySlack behind its Move within a tenth of a second. While a pose is falling,
 -- and for LANDING seconds after, the height rule alone judges how high it is.
+-- AND NOT AT ALL FOR TRUST.placeGrace AFTER A PLACEMENT. The server has just moved the body (a respawn, a
+-- correction), and the body is its player's to simulate: what the server reads of it for the next
+-- moments may still be what that client sent before it heard (the contract gives the framework's
+-- walk-away check, which reads the same body, the same second for the same reason). A Move with the new
+-- placement number was sampled by a client that has heard, at the new place; held to a body the server
+-- still reads at the old one it is refused, three of them are a correction, a correction is a
+-- placement, and the player is put back again and again for nothing they did. For that second the pose
+-- is held to everything else (walls, height, the distance budget from the place the server chose),
+-- which is what holds a liar at any time: the body rule adds nothing against one (nobody is shown the
+-- body). NOT SEEN ON A REAL SERVER: the fake engine's body is where it is put. (Reported.)
 -- A CLICK THAT CAME LATE (clickOk). The contract judges a click at f, the fire time held to the
 -- shooter's own delay. A click behind a lost packet arrives later than that delay explains: f is then
 -- later than the click, the body has walked on, and a strafing shooter's honest shot would be refused
@@ -327,8 +337,9 @@ function Stream.judge(
 	if step > budget then
 		return "refused", "speed"
 	end
-	-- the body (sideways always; up and down only for a body that stands: see the header)
-	if bx ~= nil and by ~= nil and bz ~= nil then
+	-- the body (sideways always; up and down only for a body that stands; not while the server's own
+	-- placement may not have reached the body it reads: see the header)
+	if bx ~= nil and by ~= nil and bz ~= nil and now - person.placedAt > T.placeGrace then
 		local ex, ey, ez = x - bx, y - by, z - bz
 		if falling or t - person.fellAt <= LANDING then
 			ey = 0
