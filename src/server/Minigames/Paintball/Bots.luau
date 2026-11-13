@@ -362,7 +362,11 @@ local function follow(
 				end
 			end
 			if on ~= squad.eyeOn[id] then
-				squad.eyeOn[id] = on
+				if on == nil then
+					squad.eyeOn[id] = nil
+				else
+					squad.eyeOn[id] = on
+				end
 				squad.eyeOnAt[id] = now
 			end
 		end
