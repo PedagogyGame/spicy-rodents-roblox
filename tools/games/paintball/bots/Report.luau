@@ -41,6 +41,11 @@ export type Summary = {
 	-- balls a bot fired AT somebody who was then on their own doorstep and had not fired for 4 s, tagged
 	-- or not (a bot never does it)
 	doorTrap: number,
+	-- balls a bot fired AT somebody who had left their spawn room less than 4 s before and had not
+	-- fired since (a bot never does it), and all the tags, by anybody's ball, on somebody less than
+	-- 3 s out of their room
+	outTrap: number,
+	earlyTags: number,
 	lives: number,
 	coverShare: number, -- bots' time at a cover spot
 	crouchShare: number,
@@ -89,6 +94,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local byStorey = { band("on its own storey"), band("up or down the atrium and the stairs") }
 	local botShots, botTagged = 0, 0
 	local doorTrap = 0
+	local outTrap, earlyTags = 0, 0
 	for _, shot in rec.shots do
 		if not shot.bot then
 			continue
@@ -99,6 +105,9 @@ function Report.summary(sim: Sim.Sim): Summary
 		end
 		if shot.trap then
 			doorTrap += 1
+		end
+		if shot.fresh then
+			outTrap += 1
 		end
 		if shot.target == nil then
 			continue
@@ -113,6 +122,9 @@ function Report.summary(sim: Sim.Sim): Summary
 	local strayTags = 0
 	local personTags, personOuts = 0, 0
 	for _, tag in rec.tags do
+		if tag.sinceRoom < 3 then
+			earlyTags += 1
+		end
 		if tag.byBot and tag.stray then
 			strayTags += 1
 		elseif tag.byBot then
@@ -243,6 +255,8 @@ function Report.summary(sim: Sim.Sim): Summary
 		roomMean = if lives > 0 then roomSum / lives else 0,
 		doorTags = doorTags,
 		doorTrap = doorTrap,
+		outTrap = outTrap,
+		earlyTags = earlyTags,
 		doorStray = doorStray,
 		lives = lives,
 		coverShare = if play > 0 then cover / play else 0,
@@ -379,6 +393,8 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 		`  spawn rooms: out in {string.format("%.1f", s.roomMean)} s on average, {string.format("%.1f", s.roomSlowest)} s at the slowest; `
 			.. `{s.doorTags} tagged on their own doorstep ({s.doorStray} of them quiet, by a ball meant for somebody else); `
 			.. `balls a bot fired at somebody quiet on their doorstep: {s.doorTrap}; `
+			.. `at somebody in their first 4 s out who had not fired: {s.outTrap}; `
+			.. `{s.earlyTags} of {s.tags} tags fell on somebody less than 3 s out of their room; `
 			.. `{string.format("%.1f", s.camping)} bot-seconds watching a door`
 	)
 	if sim.opts.audit then

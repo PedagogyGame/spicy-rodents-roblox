@@ -56,7 +56,9 @@
 --            within Body.SPRINT_FIRE_DELAY of it; never from a spawn room, at somebody inside one, or
 --            at somebody on their own doorstep who has not fired for DOOR_TRUCE (BotNav.atDoor:
 --            nobody is tagged by a bot in the first strides out of their spawn room, and nobody
---            fights from their doorstep unanswered).
+--            fights from their doorstep unanswered), or at somebody in their first OUT_TRUCE
+--            seconds out of their spawn room who has not yet fired a ball (see OUT_TRUCE).
+
 -- A PROFILE is the set of numbers that make a brain the kind of player it is. DEFAULT is the bot
 -- (the fairness numbers are Contract.BOT's); tools/games/paintball/bots passes another to stand in
 -- for a fair human player when it measures how hard the bots are.
@@ -142,6 +144,7 @@ export type Squad = {
 	home: { [number]: number }, -- by bot: the storey it has made its own for this life
 	side: { [number]: number }, -- by bot: its team
 	firedAt: { [number]: number }, -- by slot: when it last fired a ball (everybody hears a marker)
+	homeAt: { [number]: number }, -- by slot: when it was last inside its own spawn room (see OUT_TRUCE)
 	people: { [number]: number }, -- by slot: the team of a seat that is on and is not one of these bots (a person)
 	escort: { [number]: number }, -- by bot: the person of its team it is keeping company (see COMPANY)
 	sightLeft: number, -- sight checks left this tick (the tick's share: Bots.step sets it)
@@ -320,6 +323,11 @@ local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own d
 -- ball where the promise says none goes)
 local DOOR_TRUCE_SLACK = 0.5 -- seconds
 local DOOR_TRUCE_STRIDE = 10 -- studs
+-- OUT_TRUCE: and nobody is fired at by a bot in their first seconds out of their spawn room, however
+-- far they have got, until they fire a ball themselves: a life is not over before it has got anywhere.
+-- (Kept wider than it is promised, like the doorstep's: OUT_TRUCE is the promise.)
+local OUT_TRUCE = 4 -- seconds since it was last inside its own spawn room
+local OUT_TRUCE_SLACK = 0.5 -- seconds
 local CHEST = ArenaModule.CHEST
 -- COMPANY: a person is not left to play alone in a five-storey building. One bot of a person's team
 -- (two, of a big team) chooses its posts within a short run of where that person is (their
@@ -475,7 +483,8 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 	b.at = if entry ~= 0 then entry else BotNav.nearest(nav, x, y, z, b.team)
 	-- a storey of its own for this life: one the team has fewest on
 	local floors = nav.arena.floors
-	local least, chosen = math.huge, 0
+	local born = math.clamp(math.floor(y / nav.arena.floorHeight + 0.5), 0, floors - 1)
+	local least, chosen = math.huge, born
 	local first = b.rng.int(0, floors - 1)
 	for k = 0, floors - 1 do
 		local f = (first + k) % floors
@@ -485,7 +494,9 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 				mates += 1
 			end
 		end
-		if mates < least and #nav.goals[f + 1] > 0 then
+		-- (never the storey it comes out on, if there is another: everybody crosses that one, and a
+		-- team that stays on it fights the whole match between the two spawn rooms)
+		if f ~= born and mates < least and #nav.goals[f + 1] > 0 then
 			least, chosen = mates, f
 		end
 	end
@@ -1134,7 +1145,12 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 				local weak = mag.reloadDoneAt ~= nil or mag.rounds <= 1 or now - b.alarm < 1.5
 				local onCover = b.mode == "hold" and nav.coverAt[b.at] ~= nil
 				b.stance = "stand"
-				local restless = now < b.pushUntil or BotNav.roomOf(nav, b.x, b.y, b.z) ~= 0
+				-- (nor on the ground before the other team's doors, which it only ever crosses: a bot that
+				-- stopped there to fight would be standing over their way out)
+				local way = b.path
+				local keepOff = nav.keepOff[b.team]
+				local crossing = keepOff[b.at] or (way ~= nil and way[b.leg] ~= nil and keepOff[way[b.leg]])
+				local restless = now < b.pushUntil or BotNav.roomOf(nav, b.x, b.y, b.z) ~= 0 or crossing
 				local passing = b.outbound and not weak and rng.next() < 0.7
 				-- too far off to fire at, and not shooting at it: nothing to stop for (see ADVANCE)
 				local off = math.sqrt((pose.x - b.x) ^ 2 + (pose.y - b.y) ^ 2 + (pose.z - b.z) ^ 2)
@@ -1547,6 +1563,25 @@ local function idleLook(b: Brain, squad: Squad, now: number)
 	b.wantYaw, b.wantPitch = b.scanYaw, b.scanPitch
 end
 
+-- Is there a truce between this bot and `target`, whom it takes to be at (tx, ty, tz)? (See DOOR_TRUCE
+-- and OUT_TRUCE: the target on its own doorstep and quiet; the target in its first seconds out of its
+-- spawn room and yet to fire; the bot in its own first seconds out and not yet shot at.)
+local function truce(b: Brain, squad: Squad, target: number, tx: number, ty: number, tz: number, now: number): boolean
+	local never = -math.huge
+	local fired = squad.firedAt[target] or never
+	if
+		now - fired >= DOOR_TRUCE - DOOR_TRUCE_SLACK and BotNav.atDoor(b.nav, 3 - b.team, tx, ty, tz, DOOR_TRUCE_STRIDE)
+	then
+		return true
+	end
+	local home = squad.homeAt[target] or never
+	if now - home < OUT_TRUCE + OUT_TRUCE_SLACK and fired <= home then
+		return true
+	end
+	local mine = squad.homeAt[b.id] or never
+	return now - mine < OUT_TRUCE and b.alarm <= mine
+end
+
 -- One server tick of one bot. Appends its commands to `out`; writes its pose to `poses`.
 function BotBrain.step(
 	b: Brain,
@@ -1700,14 +1735,7 @@ function BotBrain.step(
 		and now - b.sprintAt >= Body.SPRINT_FIRE_DELAY + 0.02
 		and BotNav.roomOf(b.nav, b.x, b.y, b.z) == 0
 		and BotNav.roomOf(b.nav, tx, ty, tz) == 0
-		and (now - (squad.firedAt[target] or -math.huge) < DOOR_TRUCE - DOOR_TRUCE_SLACK or not BotNav.atDoor(
-			b.nav,
-			3 - b.team,
-			tx,
-			ty,
-			tz,
-			DOOR_TRUCE_STRIDE
-		))
+		and not truce(b, squad, target, tx, ty, tz, now)
 		and Rules.canBeHit(state, target, now)
 		and Rules.canFire(state, b.id, now)
 	then

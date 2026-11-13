@@ -104,6 +104,9 @@ export type Shot = {
 	-- when the ball left, that target was on its own doorstep (BotNav.atDoor) and had not fired a ball
 	-- for DOOR_TRUCE: the ball a bot never fires
 	trap: boolean,
+	-- when the ball left, that target had been out of its own spawn room for less than OUT_TRUCE and
+	-- had not fired a ball since: the other ball a bot never fires
+	fresh: boolean,
 }
 
 export type Tag = {
@@ -196,6 +199,7 @@ export type Sim = {
 	balls: { Ball },
 	heard: { Bots.Heard },
 	sprintAt: { [number]: number },
+	homeAt: { [number]: number }, -- by slot: when its body was last inside its own spawn room
 	lastShot: { [number]: number },
 	nextSnap: number,
 	nextSample: number,
@@ -215,6 +219,7 @@ local BIT = Wire.BIT
 local SNAP = 1 / Clock.SNAP_HZ
 local SAMPLE = 0.25 -- seconds between looks at what everybody is doing, for the record
 local DOOR_TRUCE = 4 -- seconds: the truce a bot keeps with somebody on their own doorstep (BotBrain)
+local OUT_TRUCE = 4 -- seconds: and with somebody just out of their spawn room who has not fired (BotBrain)
 local COMPANY = 35 -- studs: a team-mate this near on the same storey is company
 local NOSE = 5 -- studs: a look that ends this near is a look at a wall
 local PERSON_POSE_LAG = 0.1 -- a person's snapshot pose is read this far back (Clock.poseTime: up + a send interval)
@@ -370,6 +375,7 @@ function Sim.new(opts: Opts?): Sim
 		balls = {},
 		heard = {},
 		sprintAt = {},
+		homeAt = {},
 		lastShot = {},
 		nextSnap = start,
 		nextSample = start,
@@ -532,11 +538,14 @@ function Sim.shoot(
 		tagged = false,
 		faced = false,
 		trap = false,
+		fresh = false,
 	}
 	local truth = if target ~= nil then sim.poses[target] else nil
 	if target ~= nil and truth ~= nil then
 		shot.trap = BotNav.atDoor(sim.nav, state.slots[target].team, truth.x, truth.y, truth.z)
 			and sim.now - (sim.lastShot[target] or -math.huge) > DOOR_TRUCE
+		local home = sim.homeAt[target] or -math.huge
+		shot.fresh = sim.now - home < OUT_TRUCE and (sim.lastShot[target] or -math.huge) <= home
 	end
 	if target ~= nil and truth ~= nil and list ~= nil then
 		shot.range = math.sqrt((truth.x - ox) ^ 2 + (truth.y - oy) ^ 2 + (truth.z - oz) ^ 2)
@@ -1124,7 +1133,12 @@ function Sim.tick(sim: Sim)
 		if Wire.has(pose.bits, BIT.sprint) then
 			sim.sprintAt[id] = now
 		end
+		local slot = state.slots[id]
+		if slot ~= nil and BotNav.roomOf(sim.nav, pose.x, pose.y, pose.z) == slot.team then
+			sim.homeAt[id] = now
+		end
 	end
+
 	-- 3. the balls
 	stepBalls(sim)
 	-- 4. the snapshot tick

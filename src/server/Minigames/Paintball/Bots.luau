@@ -48,8 +48,11 @@
 --     magazine and reload as a person, never while BIT.sprint is set in their pose or within
 --     Body.SPRINT_FIRE_DELAY of it, and never from inside a spawn room;
 --   * do not spawn-trap: no bot fires at somebody inside their spawn room, nor at somebody on
---     their own doorstep (BotNav.DOORSTEP) who has not fired a ball in the last few seconds, and no
---     bot chooses to stand within BotNav.KEEP_OFF of the other team's doors.
+--     their own doorstep (BotNav.DOORSTEP) who has not fired a ball in the last few seconds, nor at
+--     somebody in their first four seconds out of their spawn room who has not yet fired a ball
+--     (BotBrain, OUT_TRUCE), and no bot chooses to stand within BotNav.KEEP_OFF of the other team's
+--     doors.
+
 -- A bot's shot is a command for the service, which checks the look (above), calls Rules.fire(state,
 -- id, now) and Projectiles.fire with no rewind: a bot sees the server's present. Every `now` here is
 -- the shared clock (Clock): the same time the State is synced to.
@@ -170,6 +173,7 @@ local function newSquad(arena: Arena): BotBrain.Squad
 		home = {},
 		side = {},
 		firedAt = {},
+		homeAt = {},
 		people = {},
 		escort = {},
 		sightLeft = 0,
@@ -254,6 +258,7 @@ end
 -- person's pose changes at the snapshot rate, a bot's every tick: the speed is taken over the time
 -- between changes and smoothed.)
 local function follow(
+	nav: BotNav.Nav,
 	squad: BotBrain.Squad,
 	brains: { [number]: BotBrain.Brain },
 	state: State,
@@ -272,7 +277,11 @@ local function follow(
 		end
 		if not slot.on or pose == nil then
 			track[id] = nil
+			squad.homeAt[id] = nil
 			continue
+		end
+		if BotNav.roomOf(nav, pose.x, pose.y, pose.z) == slot.team then
+			squad.homeAt[id] = now -- in its own spawn room (BotBrain, OUT_TRUCE)
 		end
 		local t = track[id]
 		if t == nil then
@@ -435,7 +444,7 @@ function Bots.step(
 	end
 	local squad = bots.squad
 	squad.tick += 1
-	follow(squad, brains, state, poses, now)
+	follow(bots.nav, squad, brains, state, poses, now)
 	if #heard > 0 then
 		hear(bots, state, poses, heard, now, out)
 	end
