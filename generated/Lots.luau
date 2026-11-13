@@ -1818,7 +1818,7 @@ return {
 		x = 307.5,
 		z = 660,
 		hasInterior = true,
-		notes = "Segments (123,334)->(123,264)->(200,264). Grates (E to enter/exit) at A (123,334) and B (200,264). Outfitter stand at (130,264). Owned by sewer/fashion extractor.",
+		notes = "REPLACED (BRIEF_ADDENDUM D8 default): the storm drains under the town (data/sewers.json) take the place of this v5.4 garden sewer, and its outfitter stand moves into drain 1's chamber; a marker of where v5.4 had it, nothing is built here. v5.4: segments (123,334)->(123,264)->(200,264), grates (E to enter/exit) at A (123,334) and B (200,264), outfitter stand at (130,264).",
 		routes = { source = "harvest" },
 		src = "v5.4 L3727",
 		style = "L-shaped tunnel 5.8 wide, floor y=-3.4, walls 4.6",
