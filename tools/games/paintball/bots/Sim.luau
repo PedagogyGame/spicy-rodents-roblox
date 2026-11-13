@@ -982,6 +982,10 @@ local function legs(sim: Sim, who: { [number]: number }, isBot: boolean)
 			sim.legsAt[id] = was
 		end
 		local x, y, z = pose.x, pose.y, pose.z
+		if x == was.x and y == was.y and z == was.z then
+			was.crouch = pose.crouch
+			continue -- standing where its last step was judged: nothing new to judge
+		end
 		local why: string? = nil
 		local flat = math.sqrt((x - was.x) ^ 2 + (z - was.z) ^ 2)
 		local chest = y + Arena.CHEST
@@ -1076,6 +1080,7 @@ function Sim.tick(sim: Sim)
 			sim.history[id] = nil
 			sim.sprintAt[id] = nil
 			sim.audit[id] = nil
+			sim.legsAt[id] = nil -- (a placement is the service's move, not a step)
 			local rs = sim.rec.slots[id]
 			if rs == nil then
 				rs = newSlotRecord(id, sim.botWho[id] ~= nil, e.team :: number, arena.floors)
@@ -1118,9 +1123,11 @@ function Sim.tick(sim: Sim)
 			sim.rec.sweepsSecond = math.max(sim.rec.sweepsSecond, sim.sweepLast)
 		end
 		handle(sim, sim.bots, commands, true)
+		legs(sim, sim.botWho, true)
 		local folk = sim.folk
 		if folk ~= nil then
 			handle(sim, folk, Bots.step(folk, state, sim.seenByFolk, heard, now, sim.dt), false)
+			legs(sim, sim.folkWho, false)
 		end
 	end
 	local script = sim.opts.script

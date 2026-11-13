@@ -95,6 +95,16 @@ local function sound(t: any, sim: Sim.Sim, s: Report.Summary, seats: number)
 	t.truthy(s.stairBusiest <= 0.85, `one flight had {s.stairBusiest * 100}% of its storey's traffic`)
 	-- they face whom they tag
 	t.truthy(s.faced >= s.facedOf * 0.97, `{s.faced} of {s.facedOf} tags from a bot that had been facing its victim`)
+	-- and they miss believably: more at range, and with the first ball at somebody (read where the
+	-- error decides: see Report's byOrder)
+	t.truthy(s.byRange[1].rate > s.byRange[3].rate * 2, "the hit rate falls with range")
+	local first, later = s.byOrder[1], s.byOrder[3]
+	if first.shots >= 50 and later.shots >= 50 then
+		t.truthy(
+			first.rate < later.rate,
+			`the first ball is the warning splat: {first.rate * 100}% tagged, later {later.rate * 100}%`
+		)
+	end
 end
 
 return function(t)

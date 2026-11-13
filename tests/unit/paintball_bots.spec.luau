@@ -131,6 +131,44 @@ local function groundNode(x: number, z: number): number
 end
 
 return function(t)
+	t.test("the test building's quick ball test and ground are the reference's, box for box", function()
+		local seed = 7
+		local function u(): number
+			seed = (seed * 1103515245 + 12345) % 2147483648
+			return seed / 2147483648
+		end
+		local function snap(v: number): number
+			return math.floor(v * 2 + 0.5) / 2
+		end
+		local wrong, hits = 0, 0
+		for i = 1, 20000 do
+			local x0, y0, z0 = u() * 140 - 70, u() * 77 - 2, u() * 140 - 70
+			local len = if i % 2 == 0 then u() * 6 else u() * 150
+			local dx, dy, dz = u() - 0.5, (u() - 0.5) * (if i % 3 == 0 then 0.05 else 1), u() - 0.5
+			local m = math.sqrt(dx * dx + dy * dy + dz * dz)
+			local x1, y1, z1 = x0 + dx / m * len, y0 + dy / m * len, z0 + dz / m * len
+			if i % 4 < 2 then
+				-- on the half-stud lattice the building is drawn on, and along the axes (as clearPath asks)
+				x0, y0, z0, x1, y1, z1 = snap(x0), snap(y0), snap(z0), snap(x1), snap(y1), snap(z1)
+				if i % 4 == 0 then
+					z1, y1 = z0, y0
+				end
+			end
+			local a, ax, ay, az, ai = arena.sweep(x0, y0, z0, x1, y1, z1)
+			local b, bx, by, bz, bi = ArenaModule.sweepBoxes(arena.boxes, x0, y0, z0, x1, y1, z1)
+			hits += if a ~= nil then 1 else 0
+			if a ~= b or (a ~= nil and (ax ~= bx or ay ~= by or az ~= bz or ai ~= bi)) then
+				wrong += 1
+			end
+			local gx, gy, gz = snap(u() * 124 - 62), u() * 73 - 1, snap(u() * 124 - 62)
+			if arena.ground(gx, gy, gz) ~= ArenaModule.groundAt(arena.boxes, arena.ramps, gx, gy, gz) then
+				wrong += 1
+			end
+		end
+		t.eq(wrong, 0)
+		t.truthy(hits > 5000, `{hits} of the segments struck something`)
+	end)
+
 	t.test("what a bot knows of the building: doors, keep-off ground, a way out of the spawn room, peeks", function()
 		t.eq(nav.count, #arena.nodes)
 		for team = 1, 2 do
@@ -1063,11 +1101,18 @@ return function(t)
 			t.truthy(near.rate > 0.25, "close up a bot is dangerous")
 			local standing, walking = s.bySpeed[1], s.bySpeed[2]
 			t.truthy(standing.rate > walking.rate * 1.2, "a moving target is harder")
-			-- (over a whole match most first balls go at long range, where nearly every ball misses, so the
-			-- warning splat shows only as a lower rate here; it is measured close up, ball by ball, in
-			-- "the first ball at a new target is the widest")
-			local first, later = s.byOrder[1], s.byOrder[3]
-			t.truthy(first.rate < later.rate, "the first ball is the warning splat")
+			-- the warning splat: over a whole match a hit rate by ball is skewed (a third ball at somebody is
+			-- only fired when the first two missed, so later balls go at the hard targets; close up the
+			-- first ball tags MORE often than the third), so it is read here where the error decides, at
+			-- 40 studs and over; it is measured ball by ball, close up, in "the first ball at a new target
+			-- is the widest"
+			-- (Report's byOrder is of those balls)
+			local firstFar, laterFar = s.byOrder[1], s.byOrder[3]
+			t.truthy(firstFar.shots >= 100 and laterFar.shots >= 100)
+			t.truthy(
+				firstFar.rate < 0.6 * laterFar.rate,
+				`the first ball is the warning splat: {firstFar.rate * 100}% tagged, later {laterFar.rate * 100}%`
+			)
 			t.truthy(
 				s.faced >= s.facedOf * 0.97,
 				`{s.faced} of {s.facedOf} tags from a bot that had been facing its victim`

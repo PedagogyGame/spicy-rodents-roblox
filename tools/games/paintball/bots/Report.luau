@@ -22,7 +22,9 @@ export type Summary = {
 	accuracy: number, -- bots: tags over shots
 	byRange: { Band }, -- bots' shots at a target, by range
 	bySpeed: { Band }, -- by the target's speed
-	byOrder: { Band }, -- the first ball at a target, the second, the rest
+	-- the first ball at a target, the second, the rest, at 40 studs and over (nearer, a later ball is
+	-- fired only at somebody the first missed, the harder targets, and the rate says little of the aim)
+	byOrder: { Band },
 	byStorey: { Band }, -- at somebody on the shooter's own storey, and at somebody on another (the atrium)
 	facedOf: number, -- bot tags counted for the facing figure: those on whoever the bot was firing at
 	faced: number, -- of them, the bot had faced its victim for BOT.faced
@@ -118,7 +120,9 @@ function Report.summary(sim: Sim.Sim): Summary
 		local r = shot.range
 		add(byRange[if r < 20 then 1 elseif r < 40 then 2 elseif r < 60 then 3 else 4], shot.tagged)
 		add(bySpeed[if shot.speed < 4 then 1 elseif shot.speed < 20 then 2 else 3], shot.tagged)
-		add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
+		if r >= 40 then
+			add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
+		end
 		add(byStorey[if shot.storeys == 0 then 1 else 2], shot.tagged)
 	end
 	local facedOf, faced, doorTags, doorStray = 0, 0, 0, 0
@@ -368,7 +372,7 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	say(`BOTS' AIM ({s.shots} balls, {pct(s.accuracy)} tagged their target)`)
 	say("  by range:  " .. bands(s.byRange))
 	say("  by target: " .. bands(s.bySpeed))
-	say("  by ball:   " .. bands(s.byOrder))
+	say("  by ball, at 40 studs and over:   " .. bands(s.byOrder))
 	say("  by storey: " .. bands(s.byStorey))
 	say(
 		`  facing: {s.faced} of {s.facedOf} tags a bot aimed came from one that had its victim in view for `

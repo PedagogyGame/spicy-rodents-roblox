@@ -18,11 +18,119 @@
 -- than the real building, which is why the bands the specs pin here are not the real building's
 -- (tests/unit/paintball_bots_building.spec.luau plays whole matches on ArenaData.build() itself).
 -- NOTHING IN THE GAME READS THIS FILE: the game's arena is ArenaData.build().
+-- Its ball test and walking surface (sweep, ground) give the contract's reference answers (the
+-- linear scans Arena.sweepBoxes and Arena.groundAt) box for box, through a grid of cells that each
+-- list the boxes touching them, so that whole matches here cost what they cost on the real building.
 -- Interface: build() -> Arena (a fresh table each call; pure, the same every time)
 
 local Arena = require("@shared/Minigames/Paintball/Arena")
+local Ballistics = require("@shared/Paintball/Ballistics")
 
 local Greybox = {}
+
+-- The grid: cells CELL studs across in x and z and a storey's height in y, over the arena volume
+-- (anything outside it falls in the border cells, boxes and segments alike, so nothing is missed).
+local CELL = 12
+local function cellsOf(boxes: { number }, ramps: { Arena.Ramp }): (Arena.Sweep, Arena.Ground)
+	local half, layer = Arena.HALF, Arena.FLOOR_HEIGHT
+	local nxz = math.ceil(2 * half / CELL)
+	local ny = math.ceil(Arena.HEIGHT / layer) + 1
+	local function ix(x: number): number
+		return math.clamp(math.floor((x + half) / CELL), 0, nxz - 1)
+	end
+	local function iy(y: number): number
+		return math.clamp(math.floor(y / layer), 0, ny - 1)
+	end
+	local cells: { { number } } = table.create(nxz * nxz * ny)
+	local columns: { { number } } = table.create(nxz * nxz) -- the same, every layer at once (for ground)
+	for c = 1, nxz * nxz * ny do
+		cells[c] = {}
+	end
+	for c = 1, nxz * nxz do
+		columns[c] = {}
+	end
+	for k = 1, #boxes, 6 do
+		local i0, i1 = ix(boxes[k]), ix(boxes[k + 3])
+		local j0, j1 = iy(boxes[k + 1]), iy(boxes[k + 4])
+		local l0, l1 = ix(boxes[k + 2]), ix(boxes[k + 5])
+		for i = i0, i1 do
+			for l = l0, l1 do
+				table.insert(columns[i * nxz + l + 1], k)
+				for j = j0, j1 do
+					table.insert(cells[(j * nxz + i) * nxz + l + 1], k)
+				end
+			end
+		end
+	end
+	local seen: { number } = table.create(#boxes, 0)
+	local stamp = 0
+	-- the first box the segment enters, as Arena.sweepBoxes finds it (the nearest; of equal ones the
+	-- first listed)
+	local function sweep(
+		x0: number,
+		y0: number,
+		z0: number,
+		x1: number,
+		y1: number,
+		z1: number
+	): (number?, number, number, number, number)
+		stamp += 1
+		local best: number? = nil
+		local bestK = 0
+		local bnx, bny, bnz = 0, 0, 0
+		for i = ix(math.min(x0, x1)), ix(math.max(x0, x1)) do
+			for l = ix(math.min(z0, z1)), ix(math.max(z0, z1)) do
+				for j = iy(math.min(y0, y1)), iy(math.max(y0, y1)) do
+					for _, k in cells[(j * nxz + i) * nxz + l + 1] do
+						if seen[k] == stamp then
+							continue
+						end
+						seen[k] = stamp
+						local s, nx, ny2, nz = Ballistics.segmentBox(
+							x0,
+							y0,
+							z0,
+							x1,
+							y1,
+							z1,
+							boxes[k],
+							boxes[k + 1],
+							boxes[k + 2],
+							boxes[k + 3],
+							boxes[k + 4],
+							boxes[k + 5]
+						)
+						if s ~= nil and (best == nil or s < best or (s == best and k < bestK)) then
+							best, bestK, bnx, bny, bnz = s, k, nx, ny2, nz
+						end
+					end
+				end
+			end
+		end
+		return best, bnx, bny, bnz, if best ~= nil then (bestK + 5) // 6 else 0
+	end
+	-- the walking surface under a feet point, as Arena.groundAt finds it
+	local function ground(x: number, y: number, z: number): number?
+		local limit = y + Arena.STEP_UP
+		local best: number? = nil
+		for _, k in columns[ix(x) * nxz + ix(z) + 1] do
+			if x >= boxes[k] and x <= boxes[k + 3] and z >= boxes[k + 2] and z <= boxes[k + 5] then
+				local top = boxes[k + 4]
+				if top <= limit and (best == nil or top > best) then
+					best = top
+				end
+			end
+		end
+		for _, r in ramps do
+			local h = Arena.rampHeight(r, x, z)
+			if h ~= nil and h <= limit and (best == nil or h > best) then
+				best = h
+			end
+		end
+		return best
+	end
+	return sweep, ground
+end
 
 function Greybox.build(): Arena.Arena
 	local KIND = Arena.KIND
@@ -283,6 +391,7 @@ function Greybox.build(): Arena.Arena
 			end
 		end
 	end
+	parts.sweep, parts.ground = cellsOf(boxes, parts.ramps)
 	return Arena.finish(parts)
 end
 

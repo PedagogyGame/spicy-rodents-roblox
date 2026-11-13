@@ -274,8 +274,8 @@ BotBrain.DEFAULT = table.freeze({
 	turn = BOT.turn,
 	gain = 9,
 	faced = BOT.faced,
-	errLo = math.rad(0.7),
-	errHi = math.rad(2.5),
+	errLo = math.rad(0.6),
+	errHi = math.rad(2.2),
 	errFar = 90,
 	errSpeed = 0.9,
 	errMove = 0.7,
@@ -1435,7 +1435,8 @@ local function move(b: Brain, state: State, now: number, dt: number)
 				b.bobAt = now + b.rng.range(0.3, 1.5)
 				b.peekAt = now + b.rng.range(0.8, 2)
 				b.scanAt = now
-				b.sprint = false
+				-- (the sprint bit stays up for this tick, the step it came in on; the next move,
+				-- with nowhere to go, puts it down: a step is judged by the bit it was taken under)
 			end
 		end
 	else
