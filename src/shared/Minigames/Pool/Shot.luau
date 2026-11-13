@@ -8,8 +8,10 @@
 -- changed its motion (the strike, a ball, a cushion, a jaw, a post, a hole's rim): time, place, velocity,
 -- roll, side spin, drop and mode. Between key points a ball moves by Cloth.advance alone, which is exact for
 -- any time step, so pose() gives the same place the server's model had at any instant and a client can draw
--- at its own frame rate. A plain pot is three or four key points for each ball; a break is a few hundred in
--- all. The events (who hit what, how hard) ride along for the sounds and for the rules.
+-- at its own frame rate (to a millionth of a stud; to a ten-thousandth while one ball is leaning on another
+-- as they roll, when key points come thirty times a second and not at every touch). A plain pot is three or
+-- four key points for each ball; a break is a hundred or so in all. The events (who hit what, how
+-- hard) ride along for the sounds and for the rules.
 -- Times are seconds from the strike. On the wire a script travels as a buffer (pack / unpack): times, rest
 -- places and small whole numbers exact, everything else as 32-bit floats, and only the parts of a key point
 -- that are not zero: a break is about 6 KB where the plain table of numbers was 16 to 35 KB.
