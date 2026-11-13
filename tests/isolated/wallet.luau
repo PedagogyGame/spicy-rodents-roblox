@@ -537,6 +537,13 @@ return function(t)
 				local stack = hud.gui:FindFirstChild("Stack")
 				t.truthy(stack:FindFirstChildOfClass("UIListLayout") ~= nil)
 				t.truthy(hud.note.LayoutOrder < hud.pass.LayoutOrder and hud.pass.LayoutOrder < hud.balance.LayoutOrder)
+				-- a minigame's scorecard takes the corner: the wallet stands above it, and comes back down after
+				t.eq(stack.Position.Y.Offset, -144, "just above the Menu button")
+				player:SetAttribute("InMinigame", "bowling_lane_3")
+				t.eq(stack.Position.Y.Offset, -194, "clear of the scorecard (170 tall at -182)")
+				t.truthy(WalletHud.bottom(true) > 182 and WalletHud.bottom(false) > 96 + 40)
+				player:SetAttribute("InMinigame", nil)
+				t.eq(stack.Position.Y.Offset, -144)
 				-- a player with an empty wallet still sees it
 				hud.stop()
 				player:SetAttribute("Cents", 0)

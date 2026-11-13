@@ -108,8 +108,11 @@ export type Wallet = {
 
 -- An account is kept by UserId where there is one (a Player object is gone when its player leaves).
 local function who(player: any): any
-	if (type(player) == "table" or typeof(player) == "Instance") and player.UserId ~= nil then
-		return player.UserId
+	if type(player) == "table" then
+		return if player.UserId ~= nil then player.UserId else player
+	end
+	if typeof(player) == "Instance" and (player :: Instance):IsA("Player") then
+		return (player :: Player).UserId
 	end
 	return player
 end
@@ -227,9 +230,7 @@ function Credits.new(deps: Deps?): Wallet
 			return bank:add(who(player), cents, tostring(why))
 		end,
 		purse = function(player: any): Purse
-			if not bank:has(who(player)) then
-				join(player)
-			end
+			join(player) -- (nothing more for someone already here; a new Player object for a known id is taken up)
 			return bank:purse(who(player)) :: any
 		end,
 		pass = pass,

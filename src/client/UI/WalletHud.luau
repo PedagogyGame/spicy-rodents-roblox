@@ -12,11 +12,15 @@
 --   PassUntil    the game second the paintball pass runs out: while it has time left a line between the two
 --                says how much, in in-game days and real minutes, recounted once a second from the day clock
 --                (the ReplicatedStorage attributes Server/Boot/DayClock publishes): "Pass: 4.2 days (50 min)".
+-- While a minigame is open (the Player's InMinigame attribute, set by Minigames/MinigameClient) the stack
+-- stands higher, clear of that game's scorecard (UI/MinigameUI: bottom right, 170 tall), so the balance is on
+-- screen then too.
 -- Nothing here can be clicked and nothing here decides anything.
 -- No service access at require time (Lune requires this module; everything engine is inside start).
 -- Interface: start(opts?) -> WalletHud { gui, balance, pass, note (the labels), refresh(), stop() };
 --   balanceText(cents) -> "Wallet  S$3.00"; changeText(delta, why) -> "-12c  coffee"; pocketText(cents);
---   passText(untilSeconds, nowSeconds, daySeconds) -> string? (nil: no pass to show); NOTE_SECS, POCKET_SECS
+--   passText(untilSeconds, nowSeconds, daySeconds) -> string? (nil: no pass to show); bottom(inMinigame) ->
+--   pixels from the bottom edge; NOTE_SECS, POCKET_SECS
 
 local Import = require("../Import")
 local Wallet = Import.shared("Economy/Wallet") :: typeof(require("../../shared/Economy/Wallet"))
@@ -41,6 +45,12 @@ local WalletHud = {}
 WalletHud.NOTE_SECS = 3 -- how long a change stays above the balance
 WalletHud.POCKET_SECS = 20 -- how long the pocket money line stays
 WalletHud.FLASH_SECS = 0.8
+
+-- How far above the bottom edge the stack ends: just above the Menu button (UI/PlayMenu: 40 tall at -96), or
+-- just above a minigame's scorecard (UI/MinigameUI: 170 tall at -182) while one is open.
+function WalletHud.bottom(inMinigame: boolean): number
+	return if inMinigame then 194 else 144
+end
 
 local WHITE = { 255, 255, 255 }
 local GAIN = { 120, 230, 120 }
@@ -107,11 +117,14 @@ function WalletHud.start(opts: Opts?): WalletHud
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
 	gui.DisplayOrder = 11 -- over the menu's dimmed backdrop (10), under a minigame's own screen (20)
-	-- the stack grows upwards from just above the Menu button (UI/PlayMenu: 130 x 40 at -12, -96)
+	-- the stack grows upwards from just above the Menu button (or a minigame's scorecard: bottom())
 	local stack = Instance.new("Frame")
 	stack.Name = "Stack"
 	stack.AnchorPoint = Vector2.new(1, 1)
-	stack.Position = UDim2.new(1, -12, 1, -144)
+	local function place()
+		stack.Position = UDim2.new(1, -12, 1, -WalletHud.bottom(player:GetAttribute("InMinigame") ~= nil))
+	end
+	place()
 	stack.Size = UDim2.fromOffset(260, 100)
 	stack.BackgroundTransparency = 1
 	stack.Parent = gui
@@ -225,6 +238,7 @@ function WalletHud.start(opts: Opts?): WalletHud
 	table.insert(conns, player:GetAttributeChangedSignal("Cents"):Connect(drawBalance))
 	table.insert(conns, player:GetAttributeChangedSignal("PassUntil"):Connect(drawPass))
 	table.insert(conns, player:GetAttributeChangedSignal("PocketMoney"):Connect(drawPocket))
+	table.insert(conns, player:GetAttributeChangedSignal("InMinigame"):Connect(place))
 	-- the pass counts down: once a second is plenty
 	local acc = 0
 	table.insert(
