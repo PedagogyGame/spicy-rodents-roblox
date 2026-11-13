@@ -20,7 +20,8 @@
 -- clock: every pose, stroke and sound at its own moment of the script.
 -- Another player lining a shot up is drawn too: their cue behind their ball, eased toward what they last told
 -- (aim), until the stroke takes over.
--- Interface: play(place, def, script, opts { lead?, onCue?, speed?, after?, away? }) -> bool (after: flat
+-- Interface: play(place, def, script, opts { lead?, onCue?, speed?, after?, away?, own? }) -> bool (own: the
+--   shooter's screen, whose controller draws the stroke up to the strike; after: flat
 --   { id, x, z ... } where the rules lay the balls once the shot is judged; away: { ids } out of sight); stop(stationId) (cut short: nothing
 --   more is written); set(place, def, table, flat { id, x, z ... }, away { ids }?, fresh?) (lay the balls out:
 --   a new rack, a shot that did not count); put(place, def, table, id, x, z) (one ball on the cloth: the cue
@@ -79,6 +80,7 @@ type Entry = {
 	onCue: ((name: string, volume: number) -> ())?,
 	strokes: { Stroke },
 	speed: number, -- 1, or less for a slow replay (script seconds per second)
+	own: boolean, -- the shooter's own screen: the stroke up to the strike is the controller's
 	after: { [number]: { number } }?, -- where the rules lay each ball on the cloth once the shot is judged
 	away: { [number]: boolean }, -- balls kept out of sight once it is judged (the rest are at home)
 }
@@ -166,7 +168,7 @@ end
 
 -- The cue for one strike, t seconds from the strike (negative: the stroke is on its way).
 local function drawStroke(e: Entry, s: Stroke, t: number)
-	if t < -e.lead or t > Playback.FOLLOW then
+	if t < -e.lead or t > Playback.FOLLOW or (t < 0 and e.own) then
 		if s.stick then
 			s.stick:destroy()
 			s.stick = nil
@@ -473,6 +475,7 @@ function begin(place: any, def: Def, script: any, o: { [string]: any }, t0: numb
 		speed = pace,
 		after = after,
 		away = away,
+		own = o.own == true,
 	}
 end
 

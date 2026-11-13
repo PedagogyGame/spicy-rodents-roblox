@@ -191,9 +191,10 @@ local function watch(msg: { [string]: any }, place: ClientGame.Place?): any
 		end
 		-- (a replay of the winning shot is the same script on a slower clock; the shooter's own screen has already
 		-- brought the cue through, and plays the balls at once)
-		local mine = msg.replay ~= true and CueController.struck(def.id, msg.seat)
+		local left = if msg.replay == true then nil else CueController.strokeLeft(def.id, msg.seat)
 		Playback.play(place, def, script, {
-			lead = if mine then 0 else msg.lead,
+			lead = if left then left else msg.lead,
+			own = left ~= nil,
 			onCue = cue,
 			speed = if msg.replay == true then msg.speed else nil,
 			after = if type(msg.after) == "table" then msg.after else nil,

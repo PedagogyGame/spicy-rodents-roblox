@@ -594,6 +594,10 @@ function Controller.onMessage(self: any, msg: { [string]: any }, watched: any?)
 		-- held back until it is over
 		self.replay = { since = self.t, script = watched }
 		self.ctx.ui:summary(nil)
+		if self.phase ~= "off" then
+			-- (my winning shot is over: its view gives way to the replay's)
+			self:_end()
+		end
 		self.ctx.toast("The winning shot, again, slowly", 4)
 	elseif msg.kind == `{mode.game}_shot` then
 		if self.phase == "sent" or (self.phase ~= "off" and msg.seat == self.you) or self:_mine(msg, watched) then
@@ -1197,11 +1201,15 @@ function Controller.replaying(): boolean
 	return false
 end
 
--- Is the shooter's own controller at this station waiting for its strike to come back? (Its stroke has already
--- been drawn here: the script is played from its strike at once.)
-function Controller.struck(stationId: string, seat: any): boolean
+-- Is the shooter's own controller at this station waiting for its strike to come back? Then its cue is already
+-- on its way through: the seconds until the tip meets the ball (0 if it has), else nil. The script is played
+-- here from that moment, and the stroke is the controller's own.
+function Controller.strokeLeft(stationId: string, seat: any): number?
 	local c = Controller.live[stationId]
-	return c ~= nil and c.phase == "sent" and c.you ~= nil and c.you == seat
+	if c == nil or c.phase ~= "sent" or c.you == nil or c.you ~= seat then
+		return nil
+	end
+	return math.max(0, Controller.STROKE - (c.t - c.sentAt))
 end
 
 -- Does my own controller at this station draw this seat's cue (I am the one aiming)?
@@ -1671,6 +1679,12 @@ function Controller._draw(self: any, dt: number)
 			self:_shot(cf, fov, false, true)
 		end
 	elseif phase == "watch" then
+		-- (my own cue finishes its stroke; the playback brings it on through the ball)
+		if (Playback.now(id) or 0) < 0 then
+			self:_drawStroke()
+		else
+			self.stick:hide()
+		end
 		self:_watchShot()
 	elseif self.replay ~= nil then
 		-- the winning shot again, slowly: from beyond its pocket, until it has played (the end card waits)
