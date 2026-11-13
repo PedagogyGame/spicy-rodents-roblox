@@ -100,7 +100,8 @@
         "entrances": { "type": "array", "items": { "$ref": "#/$defs/entrance" } },
         "anchors": { "type": "array", "items": { "$ref": "#/$defs/anchor" } },
         "features": { "type": "array", "items": { "type": "string", "pattern": "^[a-z0-9_]+$" } },
-        "partBudget": { "type": "integer", "minimum": 0, "maximum": 5000 }, "notes": { "type": "string" }
+        "partBudget": { "type": "integer", "minimum": 0, "maximum": 5000 }, "notes": { "type": "string" },
+        "built": { "type": "string", "pattern": "^tools/bake/[a-z0-9_/]+\\.luau$" }
       }
     },
     "ride": {

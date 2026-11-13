@@ -25,6 +25,7 @@ FAM = {
 }
 NEW = (255, 214, 64)
 KIND = {
+    "shop_neighbourhood": "the owner's shop: retail, cafe, office",
     "shop_corner": "1970s corner store, 22 items", "shop_barber": "barber shop", "restaurant_bakery": "bakery",
     "restaurant_cafe": "cafe", "shop_music": "music store", "shop_pet": "pet store", "restaurant_pizza": "pizza",
     "restaurant_chinese": "Chinese", "shop_antique": "antique store", "restaurant_diner": "diner", "restaurant_taco": "tacos",

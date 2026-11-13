@@ -3018,6 +3018,7 @@ return {
 					world = { 686, 16.2, 50.625 },
 				},
 			},
+			built = "tools/bake/neighbourhood_shop.luau",
 			entrances = {
 				{
 					id = "front",
