@@ -20,6 +20,7 @@ local Replay = require("@shared/Minigames/Pinball/Replay")
 local Stream = require("@shared/Minigames/Pinball/Stream")
 local Tables = require("@shared/Minigames/Pinball/Tables")
 local Wire = require("@shared/Minigames/Pinball/Wire")
+local PinballFlow = require("@tests/engine/PinballFlow")
 local Cabinet = require("@client/Minigames/Pinball/Cabinet")
 local Controller = require("@client/Minigames/Pinball/Controller")
 local MinigameSounds = require("@client/Minigames/MinigameSounds")
@@ -573,4 +574,156 @@ return function(t)
 			t.eq(sessionOf(w, 1).phase, "idle")
 		end, opts(1))
 	end)
+
+	t.test(
+		"every hand on the machine: the mouse buttons, a gamepad's triggers and bumpers, A and the right stick for the plunger, the left stick and Z X W for a nudge; a click on a button of the bar flips nothing",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(1)
+				Rig.press(w, ID)
+				Rig.run(w, 0.2)
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				Rig.run(w, 0.4)
+				local c = Controller.current
+				local tbl = c.cab.tbl
+				local Kind = roblox.Enum.UserInputType
+				local function up(i: number): boolean
+					return c.cab.r.m.phys.fa[i] > tbl.c.frest[i] + 0.5
+				end
+				local function pad(code: any, down: boolean)
+					FakeEngine.input(
+						if down then "began" else "ended",
+						{ KeyCode = code, UserInputType = Kind.Gamepad1 }
+					)
+				end
+				local function stick(code: any, x: number, y: number)
+					FakeEngine.input("changed", {
+						KeyCode = code,
+						UserInputType = Kind.Gamepad1,
+						Position = roblox.Vector3.new(x, y, 0),
+					})
+				end
+				-- the mouse: left button the left flipper, right button the right
+				Rig.mouse(true)
+				FakeEngine.input("began", { UserInputType = Kind.MouseButton2 })
+				Rig.run(w, 0.1)
+				t.truthy(up(1) and up(2), "both flippers up from the mouse")
+				Rig.mouse(false)
+				FakeEngine.input("ended", { UserInputType = Kind.MouseButton2 })
+				Rig.run(w, 0.3)
+				t.falsy(up(1) or up(2), "and down again")
+				-- a click the interface took (a button) is not a flip
+				Rig.mouse(true, true)
+				Rig.run(w, 0.1)
+				t.falsy(up(1))
+				Rig.mouse(false, true)
+				-- gamepad: L2 and R1
+				pad(Key.ButtonL2, true)
+				pad(Key.ButtonR1, true)
+				Rig.run(w, 0.1)
+				t.truthy(up(1) and up(2), "triggers and bumpers")
+				pad(Key.ButtonL2, false)
+				pad(Key.ButtonR1, false)
+				Rig.run(w, 0.3)
+				-- the right stick pulled half way down draws the rod half way; let go and the ball flies
+				stick(Key.Thumbstick2, 0, -0.5)
+				Rig.run(w, 0.5)
+				local pull = c.cab.r.m.pull / tbl.def.plunger.pullTicks
+				t.near(pull, 0.5, 0.05, "the rod follows the stick")
+				stick(Key.Thumbstick2, 0, 0)
+				Rig.run(w, 0.2)
+				t.eq(c.cab.r.m.pull, 0, "launched")
+				t.truthy((MinigameSounds.counts()["pinball.acorn.plunge"] or 0) >= 1)
+				-- nudges: Z, then the left stick flicked to the side
+				local nudges = MinigameSounds.counts()["pinball.acorn.nudge"] or 0
+				Rig.key(Key.Z, true)
+				Rig.run(w, 0.05)
+				Rig.key(Key.Z, false)
+				Rig.run(w, 0.3)
+				stick(Key.Thumbstick1, 0.95, 0)
+				Rig.run(w, 0.05)
+				stick(Key.Thumbstick1, 0, 0)
+				Rig.run(w, 0.3)
+				t.eq((MinigameSounds.counts()["pinball.acorn.nudge"] or 0) - nudges, 2, "two nudges")
+				t.eq(#w.broken, 0)
+			end, opts(1))
+		end
+	)
+
+	t.test(
+		"touch: the left and right halves of the screen are the flippers, both at once, a thumb that slides across stays its own flipper; the strip at the bottom right pulls the plunger as far as it is dragged; NUDGE",
+		function()
+			Rig.play(function(w)
+				local ID = stationOf(2)
+				Rig.press(w, ID)
+				Rig.run(w, 0.2)
+				Rig.click(w, "Start (Space)")
+				Rig.run(w, 0.4)
+				local c = Controller.current
+				t.truthy(c and c.live)
+				local tbl = c.cab.tbl
+				local function up(i: number): boolean
+					return c.cab.r.m.phys.fa[i] > tbl.c.frest[i] + 0.5
+				end
+				-- the plunger strip: a finger at the bottom right dragged down a quarter of the screen
+				Rig.touch("pull", "began", 1800, 700)
+				Rig.touch("pull", "changed", 1800, 700 + 1080 * 0.3 * 0.8)
+				Rig.run(w, 0.8)
+				t.near(c.cab.r.m.pull / tbl.def.plunger.pullTicks, 0.8, 0.05)
+				t.falsy(up(2), "the plunger finger is not the right flipper")
+				Rig.touch("pull", "ended", 1800, 700 + 1080 * 0.24)
+				Rig.run(w, 0.2)
+				t.eq(c.cab.r.m.pull, 0, "launched")
+				-- both thumbs
+				Rig.touch("l", "began", 300, 600)
+				Rig.touch("r", "began", 1500, 600)
+				Rig.run(w, 0.1)
+				t.truthy(up(1) and up(2))
+				-- the left thumb slides across the middle: still the left flipper; lifting the right drops only it
+				Rig.touch("l", "changed", 1200, 600)
+				Rig.touch("r", "ended", 1500, 600)
+				Rig.run(w, 0.3)
+				t.truthy(up(1))
+				t.falsy(up(2))
+				Rig.touch("l", "ended", 1200, 600)
+				Rig.run(w, 0.3)
+				t.falsy(up(1))
+				-- NUDGE on the touch bar
+				local nudges = MinigameSounds.counts()["pinball.rodent.nudge"] or 0
+				local b = Rig.button(w.gui, "NUDGE")
+				b.MouseButton1Down.fire()
+				Rig.run(w, 0.1)
+				b.MouseButton1Up.fire()
+				Rig.run(w, 0.2)
+				t.eq((MinigameSounds.counts()["pinball.rodent.nudge"] or 0) - nudges, 1)
+			end, opts(2, { touch = true }))
+		end
+	)
+
+	t.test(
+		"the server check's own flow (tests/engine/PinballFlow) passes here: solo, two by turns with a leaver, a ball the server plays out, clean ends",
+		function()
+			Rig.play(function(w)
+				local svc = w.svc
+				local result = PinballFlow.play(svc, {
+					Replay = Replay,
+					InputLog = InputLog,
+					Bot = Bot,
+					Wire = Wire,
+					Tables = Tables,
+				}, {
+					players = { Rig.stub("Ann"), Rig.stub("Bob") },
+					step = function(seconds: number)
+						for _ = 1, math.max(1, math.ceil(seconds / 0.1 - 1e-6)) do
+							svc:step(0.1)
+						end
+					end,
+				})
+				t.eq(table.concat(result.failures, "\n"), "")
+				t.truthy(result.ok)
+				t.truthy(result.numbers.soloScore > 0)
+			end, opts(2))
+		end
+	)
 end
