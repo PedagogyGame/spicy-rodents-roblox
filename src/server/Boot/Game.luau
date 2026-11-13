@@ -36,11 +36,13 @@
 -- player holds is PersistentPerPlayer for that player (persist), so the client always finds its body;
 -- Shift Lock is off (StarterPlayer.EnableMouseLockOption, Player.DevEnableMouseLock) because Shift is
 -- sprint. A "picked" event carries a `note` when the police car or the drone was not free.
--- Money (Economy/Credits, the town's one wallet): made here on the day clock and handed down. A joining
--- player gets an account and pocket money through RoleService's purse (ActorsRuntime opts.purse), with the
--- once-a-second sweep as the safety net; a leaving player's account is closed and kept; the minigames'
--- ctx.town.charge is wallet.spend; wallet.tell(player, words) is the "notice" toast on that player's screen.
--- Every later shop, door and counter takes this same `wallet`.
+-- Money (Economy/Credits, the town's one wallet): Game.wallet(deps) makes it on the day clock with every hook
+-- the game hangs on it, and start() only plugs those hooks in (so the wiring itself is driven by a spec on a
+-- fake engine: tests/isolated/wallet.luau). A joining player gets an account and pocket money when
+-- RoleService asks for their purse (ActorsRuntime opts.purse = hooks.purse: join, then the wallet's face),
+-- with the once-a-second sweep as the safety net; a leaving player's account is closed and kept; the
+-- minigames' ctx.town.charge is wallet.spend and ctx.town.pass is wallet.pass; wallet.tell(player, words) is
+-- the "notice" toast on that player's screen. Every later shop, door and counter takes this same `wallet`.
 -- Engine only inside the functions; no side effects on require.
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, wallet (Economy/Credits: spend, add, balance,
 --   pass), pick(player, choice) -> (ok, why?),
@@ -49,7 +51,9 @@
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
 --   InfectionService; nil when it could not start), townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
---   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure)
+--   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
+--   wallet(deps: WalletDeps) -> WalletHooks { wallet, purse(player), sweep(), leave(player), charge(player,
+--   cents, why), pass } (the town's wallet as start() wires it; no engine but what deps hands in)
 -- For a bitten player the hospital's door is published as the Workspace attribute HospitalDoor (a
 -- Vector3): the client draws a marker over it and the distance to it (Client/UI/PlayMenu).
 
@@ -137,6 +141,72 @@ function Game.gameSeconds(serverTime: number, epoch: number, base: number, rate:
 	return base + (serverTime - epoch) * rate
 end
 
+-- What the town's wallet is wired to: where the day clock is published, the clock both sides share, the
+-- game's own way of sending a player an event, and who is in the game.
+export type WalletDeps = {
+	clock: any, -- the Instance Boot/DayClock published on (ReplicatedStorage): ClockEpoch, ClockBase, ClockRate
+	published: { epoch: number, base: number, rate: number }, -- what DayClock.publish answered (read if an attribute is gone)
+	serverTime: () -> number, -- workspace:GetServerTimeNow
+	fire: (player: any, payload: { [string]: any }) -> (), -- one PlayNet event to one player
+	players: () -> { any }, -- Players:GetPlayers
+	log: ((line: string) -> ())?, -- (a spec's; default the server's output)
+	warn: ((line: string) -> ())?,
+}
+export type WalletHooks = {
+	wallet: Credits.Wallet,
+	purse: (player: any) -> Credits.Purse, -- RoleService's: the account is opened (pocket money) and its face handed over
+	sweep: () -> (), -- once a second: anyone in the game whose join was missed is joined
+	leave: (player: any) -> (), -- PlayerRemoving: closed and kept
+	charge: (player: any, cents: number, why: string) -> (boolean, string?), -- the minigames' ctx.town.charge
+	pass: Credits.Pass, -- the minigames' ctx.town.pass
+}
+
+-- The town's one wallet, as the game runs it: on the game clock (a pass is sold in in-game days; the clock's
+-- attributes are read each time, so a re-anchored clock is followed), speaking through the "notice" toast.
+-- Nobody is given an account by being charged: only by arriving (purse, sweep). A key that never came
+-- through the door (a computer player, a stand-in) is refused with "You have no wallet yet."
+function Game.wallet(deps: WalletDeps): WalletHooks
+	local function attr(name: string, fallback: number): number
+		local v = deps.clock:GetAttribute(name)
+		return if type(v) == "number" then v else fallback
+	end
+	local wallet = Credits.new({
+		tell = function(player: any, text: string)
+			deps.fire(player, { kind = "notice", text = text })
+		end,
+		gameSeconds = function(): number
+			return Game.gameSeconds(
+				deps.serverTime(),
+				attr("ClockEpoch", deps.published.epoch),
+				attr("ClockBase", deps.published.base),
+				attr("ClockRate", deps.published.rate)
+			)
+		end,
+		daySeconds = DayClock.REAL_SECONDS_PER_DAY,
+		log = deps.log,
+		warn = deps.warn,
+	})
+	return {
+		wallet = wallet,
+		purse = function(player: any): Credits.Purse
+			wallet.join(player)
+			return wallet.purse(player)
+		end,
+		sweep = function()
+			for _, player in deps.players() do
+				wallet.join(player) -- (nothing for someone already here)
+			end
+		end,
+		leave = function(player: any)
+			wallet.leave(player) -- closed and kept: nothing more can be spent, a refund still lands
+		end,
+		charge = function(player: any, cents: number, why: string): (boolean, string?)
+			return wallet.spend(player, cents, why)
+		end,
+		pass = wallet.pass,
+	}
+end
+
 type PState = {
 	role: string?,
 	power: any, -- Rodent/PowerRules.State (types do not cross Import)
@@ -199,25 +269,24 @@ function Game.start(opts: Opts?): any
 	stage(0.03, "Setting up the sky and the afternoon sun")
 	LightingPreset.apply(game:GetService("Lighting"))
 	local dayClock = DayClock.publish(ReplicatedStorage) -- the day cycle: every client derives it (Client/World/Sky)
-	-- the town's one wallet, on the game clock (a pass is sold in in-game days; the attributes are read each
-	-- time, so a re-anchored clock is followed)
-	local tellPlayer: ((player: any, text: string) -> ())? = nil -- (set once the remotes exist, below)
-	local wallet = Credits.new({
-		tell = function(player: any, text: string)
-			if tellPlayer then
-				tellPlayer(player, text)
+	-- the town's one wallet (Game.wallet above has the wiring; the remotes it speaks through come later)
+	local fireLater: ((player: any, payload: { [string]: any }) -> ())? = nil
+	local money = Game.wallet({
+		clock = ReplicatedStorage,
+		published = dayClock,
+		serverTime = function(): number
+			return workspace:GetServerTimeNow()
+		end,
+		fire = function(player: any, payload: { [string]: any })
+			if fireLater then
+				fireLater(player, payload)
 			end
 		end,
-		gameSeconds = function(): number
-			return Game.gameSeconds(
-				workspace:GetServerTimeNow(),
-				(ReplicatedStorage:GetAttribute("ClockEpoch") :: number?) or dayClock.epoch,
-				(ReplicatedStorage:GetAttribute("ClockBase") :: number?) or dayClock.base,
-				(ReplicatedStorage:GetAttribute("ClockRate") :: number?) or dayClock.rate
-			)
+		players = function(): { any }
+			return Players:GetPlayers()
 		end,
-		daySeconds = DayClock.REAL_SECONDS_PER_DAY,
 	})
+	local wallet = money.wallet
 	local town = workspace:FindFirstChild("Town")
 	local townParts = 0
 	if town then
@@ -313,7 +382,7 @@ function Game.start(opts: Opts?): any
 		movement = movement,
 		engine = o.engine,
 		players = o.players,
-		purse = wallet.purse, -- RoleService: a joining player's purse is the wallet's (pocket money comes with it)
+		purse = money.purse, -- RoleService: a joining player's purse is the wallet's (pocket money comes with it)
 	})
 	if o.heartbeat == false then
 		rt.stop() -- the smoke steps frames by hand
@@ -383,10 +452,7 @@ function Game.start(opts: Opts?): any
 			table.insert(player.events, payload) -- PlayerLike stub (engine smoke): what the client would get
 		end
 	end
-	-- wallet.tell: a shop's or a door's words for one player, as the toast every refusal uses
-	tellPlayer = function(player: any, text: string)
-		fire(player, { kind = "notice", text = text })
-	end
+	fireLater = fire -- wallet.tell: a shop's or a door's words for one player, as the toast every refusal uses
 
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
@@ -946,10 +1012,10 @@ function Game.start(opts: Opts?): any
 		end
 		fadeAcc += dt
 		if fadeAcc >= 1 then
+			money.sweep() -- (everyone joined through RoleService already: this only catches a join that was missed)
 			-- a joining player is handed a townsperson by RoleService (Ladder: lowest rank)
 			for _, player in Players:GetPlayers() do
 				persist(player) -- the join's townsperson and any body change made elsewhere
-				wallet.join(player) -- (already joined through RoleService: this only catches a join that was missed)
 				local actor = possession:actorOf(player)
 				local s = stateOf(player)
 				if s.role == nil and actor and actor.species == "human" then
@@ -1005,7 +1071,7 @@ function Game.start(opts: Opts?): any
 			states[player] = nil
 			persisted[player] = nil
 			sickShown[player] = nil
-			wallet.leave(player) -- closed and kept: nothing more can be spent, a refund still lands
+			money.leave(player)
 		end)
 	)
 	table.insert(conns, Players.PlayerAdded:Connect(noShiftLock))
@@ -1053,12 +1119,12 @@ function Game.start(opts: Opts?): any
 				return if actor then actor.body :: Model else nil
 			end,
 			-- what the games may ask of the rest of the town (Server/Minigames/ServerGame.Town): `people`, and
-			-- `charge`, which is the town's wallet. There is nobody to lend as a computer player's body and no
-			-- profile for a personal best yet, so the service's own stand-ins answer for those.
+			-- `charge` and `pass`, which are the town's wallet and its one pass. There is nobody to lend as a
+			-- computer player's body and no profile for a personal best yet, so the service's own stand-ins answer
+			-- for those.
 			games = {
-				charge = function(player: any, cents: number, why: string): (boolean, string?)
-					return wallet.spend(player, cents, why)
-				end,
+				charge = money.charge,
+				pass = money.pass,
 				people = function(): { { [string]: any } }
 					local out = {}
 					for _, player in Players:GetPlayers() do

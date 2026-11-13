@@ -321,7 +321,7 @@ return function(t)
 					{ town.charge(w.player, 20, "a paintball pass") },
 					{ true, "Paid 20c for a paintball pass. You have S$2.80." }
 				)
-				t.deepEq({ town.charge(w.player, 500, "the arena") }, { false, "You need 500c; you have 280c" })
+				t.deepEq({ town.charge(w.player, 500, "the arena") }, { false, "You need S$5.00; you have S$2.80." })
 				t.eq(w.wallet.balance(w.player), 280)
 				-- no profile yet: a best is kept for as long as the server runs, per person and per key
 				t.eq(town.best(w.player, "machine"), nil)

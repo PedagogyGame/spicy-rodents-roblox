@@ -21,10 +21,13 @@
 --   player's body starts (default: the first site's origin, 3 up); service = extra MinigameService opts; lag
 --   (frames each way, default 3); seed; touch (a touch device). The service's opts.games.people lists the
 --   player and whoever a case adds to w.people ({ key, name, x, y, z }); body / best are the service's own
---   stand-ins unless opts.service.games says otherwise. charge is the REAL wallet (w.wallet: a
---   Server/Economy/Credits of the rig's own, wired as Boot/Game wires the town's), so every game played on
---   the rig is played with real money behind ctx.town.charge: the player has the game's pocket money
---   (S$3.00), and anyone else a game charges is joined first, as everyone in the game has been.
+--   stand-ins unless opts.service.games says otherwise. charge and pass are the REAL wallet's (w.wallet: a
+--   Server/Economy/Credits of the rig's own; the two lines are Boot/Game's own, Game.wallet's charge and
+--   pass), so every game played on the rig is played with real money behind ctx.town.charge and the real
+--   pass behind ctx.town.pass. As in the game, nobody gets an account by being charged: the rig's player
+--   has joined (the game's pocket money, S$3.00); anyone else a case wants to pay must be joined by the case
+--   (w.wallet.join(stub)), and a key that never joined (a computer player) is refused with "You have no
+--   wallet yet." A case that hands in its own charge gets the service's stand-in pass on that charge.
 -- Interface: play(fn, opts?); frame(w); run(w, seconds); untilTrue(w, limit, cond) -> bool; press(w, stationId)
 --   (the station's prompt is triggered by the player); prompt(w, stationId) -> ProximityPrompt; walkTo(w, site,
 --   x, y, d); texts(root) -> { string } (every word drawn, nothing hidden); has(list, needle); screen(w) ->
@@ -289,11 +292,11 @@ local function build(opts: Opts?): World
 			end,
 		},
 		games = {
-			-- Boot/Game's line (and, as there, whoever is charged has an account: everyone in the game joined)
+			-- Boot/Game's two lines, as Game.wallet has them (nobody is joined by being charged)
 			charge = function(p: any, cents: number, why: string): (boolean, string?)
-				w.wallet.join(p)
 				return w.wallet.spend(p, cents, why)
 			end,
+			pass = w.wallet.pass,
 			people = function(): { any }
 				local q = w.body.PrimaryPart.Position
 				local out: { any } = { { key = player, name = "Ann", species = w.species, x = q.X, y = q.Y, z = q.Z } }
@@ -318,7 +321,11 @@ local function build(opts: Opts?): World
 	}
 	for k, v in o.service or {} do
 		if k == "games" then
-			-- (a case's own town: its members replace the rig's, the rest stay)
+			-- (a case's own town: its members replace the rig's, the rest stay; a case with its own charge and
+			-- no pass gets the service's stand-in pass, which is sold through that charge)
+			if v.charge ~= nil and v.pass == nil then
+				serviceOpts.games.pass = nil
+			end
 			for name, fn in v do
 				serviceOpts.games[name] = fn
 			end

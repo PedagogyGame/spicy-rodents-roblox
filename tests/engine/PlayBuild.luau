@@ -269,8 +269,9 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		check(best < 16, `police officer {best} studs from the nearest patrol car (reach 16)`)
 	end
 
-	-- the wallet (Economy/Credits; added 2026-11-13 and NOT yet run in the cloud): pocket money on joining,
-	-- a purchase, the pass on the day clock, and the minigames' charge all on the one balance ---------------
+	-- the wallet (Economy/Credits; added 2026-11-13 and NOT yet run in the cloud; the same steps are driven
+	-- headless against Game.wallet in tests/isolated/wallet.luau): pocket money on joining, a purchase, the pass
+	-- on the day clock, and the minigames' charge and pass all on the one balance ------------------------------
 	local wallet = G.wallet
 	check(wallet ~= nil, "Game has no wallet")
 	if wallet then
@@ -281,11 +282,11 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		local paid, paidWords = wallet.spend(player, 12, "coffee")
 		check(paid and paidWords == "Paid 12c for coffee. You have S$2.88.", `a coffee: {paidWords}`)
 		check(
-			player.attrs.Cents == 288 and player.attrs.CentsWhy == "coffee",
-			"the balance on the player did not follow"
+			player.attrs.Cents == 288 and string.match(tostring(player.attrs.CentsNote), "^%d+|%-12|coffee$") ~= nil,
+			`the balance on the player did not follow ({tostring(player.attrs.Cents)}, {tostring(player.attrs.CentsNote)})`
 		)
 		local short, shortWords = wallet.spend(player, 1000, "a jet ski")
-		check(not short and shortWords == "You need 1000c; you have 288c", `too dear: {shortWords}`)
+		check(not short and shortWords == "You need S$10.00; you have S$2.88.", `too dear: {shortWords}`)
 		local bought, boughtWords = wallet.pass.buy(player)
 		check(bought and wallet.pass.has(player), `the pass: {boughtWords}`)
 		numbers.passDays = wallet.pass.left(player)
@@ -293,7 +294,12 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		check(type(player.attrs.PassUntil) == "number", "no PassUntil on the player")
 		if G.attractions and G.attractions.minigames then
 			local okC, wordsC = G.attractions.minigames.town.charge(player, 1000, "a game")
-			check(not okC and wordsC == "You need 1000c; you have 268c", `ctx.town.charge is not the wallet: {wordsC}`)
+			check(
+				not okC and wordsC == "You need S$10.00; you have S$2.68.",
+				`ctx.town.charge is not the wallet: {wordsC}`
+			)
+			check(G.attractions.minigames.town.pass == wallet.pass, "ctx.town.pass is not the wallet's pass")
+			check(G.attractions.minigames.town.pass.has(player), "the games do not see the pass the wallet sold")
 		end
 		numbers.cents = wallet.balance(player)
 	end

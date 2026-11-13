@@ -1,7 +1,9 @@
 --!strict
 -- Shared/Economy/Bank: the town's money, pure. Whole cents, never negative, every change logged with its
 -- reason; a spend larger than the balance, two spends racing, a player leaving mid-spend; pocket money once
--- per join; the timed pass on the game clock; what would be saved, and putting it back.
+-- for the server's life (leaving and coming back is never a way to more); the hand-out kept out of the queue's
+-- money; a caller's mistake said kindly to the player and loudly to the server; the timed pass on the game
+-- clock; what would be saved, and putting it back before or just after the join.
 local Bank = require("@shared/Economy/Bank")
 local EconomyRules = require("@shared/Economy/EconomyRules")
 local Tunables = require("@shared/Config/Tunables")
@@ -9,10 +11,10 @@ local Rng = require("@shared/Util/Rng")
 
 local DAY = 720
 
-type World = { bank: Bank.Bank, t: number, seen: { Bank.Entry }, passed: { any } }
+type World = { bank: Bank.Bank, t: number, wall: number, seen: { Bank.Entry }, passed: { any }, faults: { string } }
 
 local function world(pocket: number?): World
-	local w = { t = 6480, seen = {}, passed = {} } :: World
+	local w = { t = 6480, wall = 1000000, seen = {}, passed = {}, faults = {} } :: World
 	w.bank = Bank.new({
 		now = function(): number
 			return w.t
@@ -25,6 +27,12 @@ local function world(pocket: number?): World
 		passed = function(id: any, name: string, untilSeconds: number)
 			table.insert(w.passed, { id, name, untilSeconds })
 		end,
+		fault = function(what: string)
+			table.insert(w.faults, what)
+		end,
+		wall = function(): number
+			return w.wall
+		end,
 	})
 	return w
 end
@@ -32,44 +40,79 @@ end
 local PASS = EconomyRules.pass("paintball") :: Bank.PassSpec
 
 return function(t)
-	t.test("pocket money: S$3.00 on joining, once per join, a top-up and never a stack", function()
-		t.eq(EconomyRules.pocketMoney(), 300, "the one tunable: Tunables economy.pocketMoneyCents")
-		local w = world(EconomyRules.pocketMoney())
-		local a, given = w.bank:join(7)
-		t.eq(given, 300)
-		t.eq(w.bank:balance(7), 300)
-		t.truthy(a.open and a.pocket == 300)
-		t.deepEq(w.seen, { { id = 7, delta = 300, why = "pocket money", balance = 300, at = 6480 } })
-		-- a second join without a leave gives nothing, even after spending
-		t.truthy(w.bank:spend(7, 204, "the whole corner store"))
-		local _, again = w.bank:join(7)
-		t.eq(again, 0)
-		t.eq(w.bank:balance(7), 96)
-		-- leaving and coming back: topped up to the amount, not given it again on top
-		w.bank:leave(7)
-		local _, back = w.bank:join(7)
-		t.eq(back, 204)
-		t.eq(w.bank:balance(7), 300)
-		-- someone who has earned more than the amount gets nothing
-		t.truthy(w.bank:add(7, 50, "mowing a lawn"))
-		w.bank:leave(7)
-		local _, rich = w.bank:join(7)
-		t.eq(rich, 0)
-		t.eq(w.bank:balance(7), 350)
-		t.eq(w.bank.accounts[7].pocket, 504, "pocket money given so far is kept (for the day it is saved)")
-		-- no pocket money configured: a wallet at nothing
-		local bare = world(nil)
-		local _, none = bare.bank:join(1)
-		t.eq(none, 0)
-		t.eq(bare.bank:balance(1), 0)
-		-- the tunable is read at each join, and a bad value reads as none
-		Tunables.applyOverrides({ ["economy.pocketMoneyCents"] = 120 })
-		t.eq(EconomyRules.pocketMoney(), 120)
-		Tunables.applyOverrides({ ["economy.pocketMoneyCents"] = 12.5 })
-		t.eq(EconomyRules.pocketMoney(), 0)
-		Tunables.reset()
-		t.eq(EconomyRules.pocketMoney(), 300)
-	end)
+	t.test(
+		"pocket money: S$3.00 on first joining, once for the server's life; coming back is never a way to more",
+		function()
+			t.eq(EconomyRules.pocketMoney(), 300, "the one tunable: Tunables economy.pocketMoneyCents")
+			local w = world(EconomyRules.pocketMoney())
+			local a, given = w.bank:join(7)
+			t.eq(given, 300)
+			t.eq(w.bank:balance(7), 300)
+			t.truthy(a.open and a.pocket == 300)
+			t.deepEq(w.seen, { { id = 7, delta = 300, why = "pocket money", balance = 300, at = 6480, seq = 1 } })
+			-- a second join without a leave gives nothing, even after spending
+			t.truthy(w.bank:spend(7, 204, "the whole corner store"))
+			local _, again = w.bank:join(7)
+			t.eq(again, 0)
+			t.eq(w.bank:balance(7), 96)
+			-- leaving and coming back gives NOTHING more: what was spent stays spent (the review's case: one
+			-- player, five joins, spending everything each time, must end having spent S$3.00 and no more)
+			local spent = 204
+			for _ = 1, 5 do
+				w.bank:leave(7)
+				local _, back = w.bank:join(7)
+				t.eq(back, 0, "nothing for coming back")
+				local have = w.bank:balance(7)
+				if have > 0 then
+					t.truthy(w.bank:spend(7, have, "everything"))
+					spent += have
+				end
+			end
+			t.eq(spent, 300)
+			t.eq(w.bank:balance(7), 0, "broke until something pays: that is the price of once")
+			t.eq(w.bank.accounts[7].pocket, 300, "pocket money given so far is kept (for the day it is saved)")
+			-- money earned is no reason to give or withhold anything
+			t.truthy(w.bank:add(7, 50, "mowing a lawn"))
+			w.bank:leave(7)
+			local _, rich = w.bank:join(7)
+			t.eq(rich, 0)
+			t.eq(w.bank:balance(7), 50)
+			-- the amount was raised while the server ran: the difference is owed, once
+			local raised = 300
+			local b = Bank.new({
+				now = function(): number
+					return 0
+				end,
+				daySeconds = DAY,
+				pocket = function(): number
+					return raised
+				end,
+			})
+			b:join(1)
+			b:spend(1, 300, "everything")
+			b:leave(1)
+			raised = 350
+			local _, more = b:join(1)
+			t.eq(more, 50)
+			b:leave(1)
+			raised = 100
+			local _, less = b:join(1)
+			t.eq(less, 0, "a lowered amount takes nothing back")
+			t.eq(b:balance(1), 50)
+			-- no pocket money configured: a wallet at nothing
+			local bare = world(nil)
+			local _, none = bare.bank:join(1)
+			t.eq(none, 0)
+			t.eq(bare.bank:balance(1), 0)
+			-- the tunable is read at each join, and a bad value reads as none
+			Tunables.applyOverrides({ ["economy.pocketMoneyCents"] = 120 })
+			t.eq(EconomyRules.pocketMoney(), 120)
+			Tunables.applyOverrides({ ["economy.pocketMoneyCents"] = 12.5 })
+			t.eq(EconomyRules.pocketMoney(), 0)
+			Tunables.reset()
+			t.eq(EconomyRules.pocketMoney(), 300)
+		end
+	)
 
 	t.test("spend: whole cents, the words to show, and a balance that is never negative", function()
 		local w = world(300)
@@ -77,18 +120,20 @@ return function(t)
 		t.deepEq({ w.bank:spend("ann", 12, "coffee") }, { true, "Paid 12c for coffee. You have S$2.88." })
 		t.eq(w.bank:balance("ann"), 288)
 		-- a spend larger than the balance: refused with the price and what is held; nothing changes
-		t.deepEq({ w.bank:spend("ann", 289, "a kite") }, { false, "You need 289c; you have 288c" })
+		t.deepEq({ w.bank:spend("ann", 289, "a kite") }, { false, "You need S$2.89; you have S$2.88." })
 		t.eq(w.bank:balance("ann"), 288)
 		t.eq(#w.seen, 2, "a refusal is not a change")
 		-- exactly everything is allowed, and then nothing is
 		t.truthy(w.bank:spend("ann", 288, "everything"))
 		t.eq(w.bank:balance("ann"), 0)
-		t.deepEq({ w.bank:spend("ann", 1, "bubble gum") }, { false, "You need 1c; you have 0c" })
-		-- not a price: fractions, negatives, not-a-number, infinity, a string
-		for _, bad in { 0.5, -3, 0 / 0, math.huge, "12" :: any } do
-			t.deepEq({ w.bank:spend("ann", bad, "x") }, { false, Bank.WORDS.amount })
-			t.deepEq({ w.bank:add("ann", bad, "x") }, { false, Bank.WORDS.amount })
-		end
+		t.deepEq({ w.bank:spend("ann", 1, "bubble gum") }, { false, "You need 1c; you have 0c." })
+		-- a dollar or more is written as the corner of the screen writes it, less as the shops do
+		t.eq(Bank.short(240, 233), "You need S$2.40; you have S$2.33.")
+		t.eq(Bank.short(12, 7), "You need 12c; you have 7c.")
+		t.eq(Bank.short(100, 99), "You need S$1.00; you have 99c.")
+		t.eq(Bank.amount(67), "67c")
+		t.eq(Bank.amount(204), "S$2.04")
+		t.eq(Bank.price(12), "12c")
 		t.eq(w.bank:balance("ann"), 0)
 		-- free is fine and is not a change
 		local n = #w.seen
@@ -99,7 +144,141 @@ return function(t)
 		t.deepEq({ w.bank:add("nobody", 1, "x") }, { false, Bank.WORDS.none })
 		t.eq(w.bank:balance("nobody"), 0)
 		t.deepEq({ w.bank:can("ann", 0) }, { true, "" })
-		t.deepEq({ w.bank:can("ann", 5) }, { false, "You need 5c; you have 0c" })
+		t.deepEq({ w.bank:can("ann", 5) }, { false, "You need 5c; you have 0c." })
+		-- a dollar or more paid reads in dollars too
+		w.bank:add("ann", 500, "found")
+		t.deepEq({ w.bank:spend("ann", 204, "22 things") }, { true, "Paid S$2.04 for 22 things. You have S$2.96." })
+	end)
+
+	t.test(
+		"a price that is not cents, or no reason: the shop's mistake, kind words for the player, loud for the server",
+		function()
+			local w = world(300)
+			w.bank:join("ann")
+			local n = #w.seen
+			-- not a price: fractions, negatives, not-a-number, infinity, a string
+			local bads: { any } = { 0.5, -3, 0 / 0, math.huge, "12" }
+			for _, bad in bads do
+				t.deepEq({ w.bank:spend("ann", bad, "x") }, { false, "That is not for sale yet." })
+				t.deepEq({ w.bank:can("ann", bad) }, { false, "That is not for sale yet." })
+				t.deepEq({ w.bank:add("ann", bad, "x") }, { false, "That could not be paid." })
+				t.deepEq({ w.bank:take("ann", bad, "x") }, { false, "That could not be paid." })
+			end
+			-- nil: a row missing from the price list (the review's lane_shoes and hilltop_lunch)
+			t.deepEq({ w.bank:spend("ann", nil :: any, "lane shoes") }, { false, Bank.WORDS.amount })
+			t.eq(#w.faults, 4 * #bads + 1, "every one of them reached the server's log")
+			t.truthy(string.find(w.faults[#w.faults], "nil", 1, true), w.faults[#w.faults])
+			-- no reason: never "Paid 12c for nil."
+			local before = #w.faults
+			local whys: { any } = { false, "", "   ", 12, {} }
+			for _, why in whys do
+				t.deepEq({ w.bank:spend("ann", 12, why) }, { false, Bank.WORDS.amount })
+				t.deepEq({ w.bank:add("ann", 12, why) }, { false, Bank.WORDS.pay })
+			end
+			t.deepEq({ w.bank:spend("ann", 12, nil :: any) }, { false, Bank.WORDS.amount })
+			t.eq(#w.faults, before + 2 * #whys + 1)
+			t.eq(w.bank.mistakes, #w.faults)
+			-- and nothing was taken or given by any of it
+			t.eq(w.bank:balance("ann"), 300)
+			t.eq(#w.seen, n)
+			-- the venues' prices are in the list, so none of them is such a mistake
+			t.eq(EconomyRules.price("hilltop_lunch"), 10)
+			t.eq(EconomyRules.price("bowling_ball"), 25)
+			t.eq(EconomyRules.price("lane_shoes"), 0)
+			t.eq(EconomyRules.price("coffee"), 12)
+			t.eq(EconomyRules.price("nachos"), 5)
+			t.eq(EconomyRules.price("hot_cocoa"), 10)
+			t.eq(EconomyRules.price("soda"), 4, "a corner-store item, from Items/ItemRules")
+			for _, id in { "alley_postcard", "alley_pin_toy", "alley_mug", "alley_shirt" } do
+				local p = EconomyRules.price(id) :: number
+				t.truthy(p >= 3 and p <= 10, `{id}: souvenirs are 3 to 10 cents`)
+			end
+			t.eq(EconomyRules.price("a thing nobody sells"), nil)
+			-- a hook that throws on a mistake changes nothing either
+			local b = Bank.new({
+				now = function(): number
+					return 0
+				end,
+				daySeconds = DAY,
+				fault = function()
+					error("the log is broken")
+				end,
+			})
+			b:join(1)
+			t.deepEq({ b:spend(1, 0.5, "x") }, { false, Bank.WORDS.amount })
+			t.eq(b.faults, 1)
+		end
+	)
+
+	t.test("pocket money is a hand-out: it is spent first and never counts toward the queue", function()
+		local w = world(300)
+		w.bank:join(1)
+		t.eq(w.bank:counted(1), 0, "S$3.00 of pocket money buys no place in the queue")
+		-- shopping with pocket money costs no rank: nothing that counted is gone
+		t.truthy(w.bank:spend(1, 204, "the whole corner store"))
+		t.eq(w.bank:balance(1), 96)
+		t.eq(w.bank:counted(1), 0)
+		-- earnings count in full, beside whatever pocket money is left
+		t.truthy(w.bank:add(1, 50, "mowing a lawn"))
+		t.eq(w.bank:counted(1), 50)
+		-- a spend takes the hand-out first, and earnings only once it is gone
+		t.truthy(w.bank:spend(1, 90, "a day out"))
+		t.eq(w.bank:counted(1), 50)
+		t.truthy(w.bank:spend(1, 16, "a radio and a soda")) -- 6 of pocket money, then 10 earned
+		t.eq(w.bank:balance(1), 40)
+		t.eq(w.bank:counted(1), 40)
+		t.eq(w.bank.accounts[1].pocketLeft, 0)
+		-- a purchase that could not be handed over gives the hand-out back as a hand-out
+		local w2 = world(300)
+		w2.bank:join(1)
+		w2.bank:add(1, 100, "work")
+		w2.bank:spend(1, 350, "a jet ski", function(): (boolean?, string?)
+			return false
+		end)
+		t.eq(w2.bank:balance(1), 400)
+		t.eq(w2.bank:counted(1), 100)
+		-- take (a fine, the Role Lab): earnings first, the hand-out last
+		t.deepEq({ w2.bank:take(1, 30, "a fine") }, { true, "-30c: a fine. You have S$3.70." })
+		t.eq(w2.bank:counted(1), 70)
+		t.truthy(w2.bank:take(1, 170, "a fine"))
+		t.eq(w2.bank:balance(1), 200)
+		t.eq(w2.bank:counted(1), 0)
+		t.deepEq({ w2.bank:take(1, 201, "a fine") }, { false, "You need S$2.01; you have S$2.00." })
+		t.deepEq({ w2.bank:take("nobody", 1, "a fine") }, { false, Bank.WORDS.none })
+		-- what is owed is owed: a closed account can still be taken from
+		w2.bank:leave(1)
+		t.truthy(w2.bank:take(1, 50, "a fine"))
+		t.eq(w2.bank:balance(1), 150)
+		-- no account: nothing counted
+		t.eq(w.bank:counted("nobody"), 0)
+		-- in any order of spending, paying, taking and failed handing-over: 0 <= counted <= balance, and the
+		-- hand-out left is never more than was given or than there is
+		for seed = 1, 30 do
+			local rng = Rng.new(seed)
+			local r = world(300)
+			r.bank:join(1)
+			for _ = 1, 40 do
+				local k = rng.int(1, 4)
+				local c = rng.int(0, 120)
+				if k == 1 then
+					r.bank:spend(1, c, "a thing")
+				elseif k == 2 then
+					r.bank:add(1, c, "work")
+				elseif k == 3 then
+					r.bank:take(1, c, "a fine")
+				else
+					r.bank:spend(1, c, "a thing", function(): (boolean?, string?)
+						return false
+					end)
+				end
+				local a = r.bank.accounts[1]
+				t.truthy(
+					a.pocketLeft >= 0 and a.pocketLeft <= a.pocket and a.pocketLeft <= a.purse.cents,
+					`seed {seed}`
+				)
+				t.eq(r.bank:counted(1), a.purse.cents - a.pocketLeft)
+			end
+		end
 	end)
 
 	t.test("add: pay with a reason; the cap holds", function()
@@ -121,11 +300,12 @@ return function(t)
 		w.bank:spend(2, 500, "too much")
 		w.bank:buyPass(1, PASS)
 		local want = {
-			{ id = 1, delta = 300, why = "pocket money", balance = 300, at = 6480 },
-			{ id = 2, delta = 300, why = "pocket money", balance = 300, at = 6480 },
-			{ id = 1, delta = -12, why = "coffee", balance = 288, at = 6500 },
-			{ id = 2, delta = 4, why = "a tip", balance = 304, at = 6500 },
-			{ id = 1, delta = -20, why = "a paintball pass", balance = 268, at = 6500 },
+			-- (seq: each account's own count of changes, for a screen that was shown only the last of several)
+			{ id = 1, delta = 300, why = "pocket money", balance = 300, at = 6480, seq = 1 },
+			{ id = 2, delta = 300, why = "pocket money", balance = 300, at = 6480, seq = 1 },
+			{ id = 1, delta = -12, why = "coffee", balance = 288, at = 6500, seq = 2 },
+			{ id = 2, delta = 4, why = "a tip", balance = 304, at = 6500, seq = 2 },
+			{ id = 1, delta = -20, why = "a paintball pass", balance = 268, at = 6500, seq = 3 },
 		}
 		t.deepEq(w.bank.entries, want)
 		t.deepEq(w.seen, want)
@@ -179,7 +359,7 @@ return function(t)
 		w.bank:join(1)
 		w.bank:add(1, 10, "found")
 		t.truthy(w.bank:spend(1, 7, "a football"))
-		t.deepEq({ w.bank:spend(1, 7, "a football") }, { false, "You need 7c; you have 3c" })
+		t.deepEq({ w.bank:spend(1, 7, "a football") }, { false, "You need 7c; you have 3c." })
 		-- with a handing-over that waits: two purchases start before either finishes
 		local w2 = world(0)
 		w2.bank:join(1)
@@ -200,7 +380,7 @@ return function(t)
 		t.eq(w2.bank:balance(1), 3, "the first buyer's money is already out of reach")
 		t.eq(w2.bank.accounts[1].held, 7)
 		coroutine.resume(second)
-		t.deepEq(results["a frisbee"], { false, "You need 7c; you have 3c" })
+		t.deepEq(results["a frisbee"], { false, "You need 7c; you have 3c." })
 		t.eq(coroutine.status(second), "dead", "the loser is told at once, without waiting")
 		coroutine.resume(first)
 		t.deepEq(results["a football"], { true, "Paid 7c for a football. You have S$0.03." })
@@ -220,14 +400,14 @@ return function(t)
 			}
 		end)
 		coroutine.resume(co)
-		t.deepEq({ w3.bank:spend(1, 7, "a frisbee") }, { false, "You need 7c; you have 3c" })
+		t.deepEq({ w3.bank:spend(1, 7, "a frisbee") }, { false, "You need 7c; you have 3c." })
 		coroutine.resume(co)
 		t.deepEq(out, { false, "The shelf is empty." })
 		t.eq(w3.bank:balance(1), 10)
 		t.truthy(w3.bank:spend(1, 7, "a frisbee"))
 		t.deepEq(
 			w3.bank.entries[#w3.bank.entries - 1],
-			{ id = 1, delta = 7, why = "refund: a kite", balance = 10, at = 6480 }
+			{ id = 1, delta = 7, why = "refund: a kite", balance = 10, at = 6480, seq = 3 }
 		)
 	end)
 
@@ -337,7 +517,7 @@ return function(t)
 		coroutine.resume(co3)
 		w2.bank:leave(1)
 		local _, topUp = w2.bank:join(1)
-		t.eq(topUp, 0, "the 250c in flight still counts as theirs")
+		t.eq(topUp, 0, "pocket money is given once, whatever is in flight")
 		coroutine.resume(co3)
 		t.eq(w2.bank:balance(1), 300)
 		-- leaving twice, or someone who never joined leaving, is harmless
@@ -350,7 +530,10 @@ return function(t)
 	t.test(
 		"the pass: 20c for five in-game days on the game clock, one at a time, the same words as paintball",
 		function()
-			t.eq(PASS.cents, EconomyRules.PRICES.paintball_pass)
+			t.eq(PASS.cents, 20)
+			t.eq(EconomyRules.price("paintball_pass"), PASS.cents, "one price: the price list reads the pass")
+			t.eq((EconomyRules.PRICES :: any).paintball_pass, nil, "and keeps no copy of its own")
+			t.eq(PASS.offer, "A pass is 20c for five in-game days of paintball and both lounges.")
 			t.eq(PASS.days, 5)
 			t.eq(PASS.bought, "Pass bought: five days of paintball and both lounges.")
 			t.eq(PASS.has, "You already have a pass.")
@@ -387,7 +570,7 @@ return function(t)
 			-- short of money: the price and what is held, and no pass
 			local poor = world(7)
 			poor.bank:join(2)
-			t.deepEq({ poor.bank:buyPass(2, PASS) }, { false, "You need 20c; you have 7c" })
+			t.deepEq({ poor.bank:buyPass(2, PASS) }, { false, "You need 20c; you have 7c." })
 			t.falsy(poor.bank:hasPass(2, "paintball"))
 			t.eq(poor.bank:balance(2), 7)
 			-- someone else's pass is not mine
@@ -397,6 +580,13 @@ return function(t)
 			local dear = EconomyRules.pass("paintball") :: Bank.PassSpec
 			t.eq(dear.cents, 30)
 			t.eq(dear.bought, "Pass bought: two days of paintball and both lounges.")
+			t.eq(dear.offer, "A pass is 30c for two in-game days of paintball and both lounges.")
+			t.eq(EconomyRules.price("paintball_pass"), 30, "the price list follows the tunable")
+			Tunables.applyOverrides({ ["economy.paintballPassCents"] = 150 })
+			t.eq(
+				(EconomyRules.pass("paintball") :: Bank.PassSpec).offer,
+				"A pass is S$1.50 for two in-game days of paintball and both lounges."
+			)
 			Tunables.reset()
 		end
 	)
@@ -418,9 +608,12 @@ return function(t)
 		w.bank:spend(1, 30, "a kite")
 		w.t += 2 * DAY
 		local saved = w.bank:export(1) :: Bank.Saved
-		t.deepEq(saved, { v = 1, cents = 250, pocket = 300, passes = { paintball = 3 * DAY } })
+		t.deepEq(
+			saved,
+			{ v = 1, cents = 250, pocket = 300, pocketLeft = 250, passes = { paintball = 3 * DAY }, at = 1000000 }
+		)
 		t.eq(w.bank:export("nobody"), nil)
-		-- another server: its game clock reads something else entirely
+		-- another server at the same moment: its game clock reads something else entirely
 		local later = world(300)
 		later.t = 99
 		t.truthy(later.bank:import(1, saved))
@@ -429,30 +622,116 @@ return function(t)
 		t.near(later.bank:passLeft(1, "paintball"), 3)
 		t.deepEq(later.passed, { { 1, "paintball", 99 + 3 * DAY } })
 		local _, given = later.bank:join(1)
-		t.eq(given, 50, "topped up to the pocket amount, as on any join")
-		t.eq(later.bank.accounts[1].pocket, 350)
+		t.eq(given, 0, "the saved account had its pocket money already: none again on a new server")
+		t.eq(later.bank.accounts[1].pocket, 300)
+		t.eq(later.bank:counted(1), 0, "and what is left of it is still a hand-out")
 		-- an expired pass is not carried
 		w.t += 4 * DAY
 		t.deepEq((w.bank:export(1) :: Bank.Saved).passes, {})
-		-- an account already open here is newer than anything saved
-		t.deepEq({ later.bank:import(1, saved) }, { false, "an account is already open here" })
+		-- a second import: the account has been put back once and is not replaced again
+		t.deepEq({ later.bank:import(1, saved) }, { false, "this account has already been used here" })
+		-- a pass runs down while its holder is away between servers, as it does on one: real seconds come off
+		local nextDay = world(300)
+		nextDay.wall = saved.at :: number + DAY
+		t.truthy(nextDay.bank:import(1, saved))
+		t.near(nextDay.bank:passLeft(1, "paintball"), 2)
+		local nextWeek = world(300)
+		nextWeek.wall = saved.at :: number + 3 * DAY
+		t.truthy(nextWeek.bank:import(1, saved))
+		t.falsy(nextWeek.bank:hasPass(1, "paintball"), "three days away: the three days left are gone")
+		t.eq(#nextWeek.passed, 0)
+		-- a record without the time of saving keeps its time left (nothing to take off)
+		local undated = world(300)
+		undated.wall = 5e9
+		t.truthy(undated.bank:import(1, { v = 1, cents = 5, pocket = 0, pocketLeft = 0, passes = { paintball = DAY } }))
+		t.near(undated.bank:passLeft(1, "paintball"), 1)
 		-- a record that is not sound changes nothing
 		local fresh = world(0)
 		for _, bad in
 			{
 				nil :: any,
 				"cents",
-				{ v = 2, cents = 1, pocket = 0, passes = {} },
-				{ v = 1, cents = 1.5, pocket = 0, passes = {} },
-				{ v = 1, cents = -1, pocket = 0, passes = {} },
-				{ v = 1, cents = 1, pocket = 0 },
-				{ v = 1, cents = 1, pocket = 0, passes = { paintball = -5 } },
-				{ v = 1, cents = 1, pocket = 0, passes = { paintball = 0 / 0 } },
-				{ v = 1, cents = 1, pocket = 0, passes = { 5 } },
+				{ v = 2, cents = 1, pocket = 0, pocketLeft = 0, passes = {} },
+				{ v = 1, cents = 1.5, pocket = 0, pocketLeft = 0, passes = {} },
+				{ v = 1, cents = -1, pocket = 0, pocketLeft = 0, passes = {} },
+				{ v = 1, cents = 1, pocket = 0, passes = {} },
+				{ v = 1, cents = 1, pocket = 0, pocketLeft = 0 },
+				{ v = 1, cents = 1, pocket = 0, pocketLeft = 0, passes = { paintball = -5 } },
+				{ v = 1, cents = 1, pocket = 0, pocketLeft = 0, passes = { paintball = 0 / 0 } },
+				{ v = 1, cents = 1, pocket = 0, pocketLeft = 0, passes = { 5 } },
+				{ v = 1, cents = 1, pocket = 0, pocketLeft = 0, passes = {}, at = "noon" },
 			}
 		do
 			t.falsy((fresh.bank:import(9, bad)))
 			t.eq(fresh.bank.accounts[9], nil)
 		end
 	end)
+
+	t.test(
+		"saving later, as the game joins: the account is opened BEFORE a profile can load, and import still works",
+		function()
+			-- the review's case: 980c and a pass saved; on a new server the player arrives (pocket money at once,
+			-- as RoleService asks for the purse at PlayerAdded) and the profile load comes a moment later
+			local saved: Bank.Saved =
+				{ v = 1, cents = 980, pocket = 300, pocketLeft = 0, passes = { paintball = 2 * DAY } }
+			local w = world(300)
+			local _, given = w.bank:join(1)
+			t.eq(given, 300)
+			t.deepEq({ w.bank:import(1, saved) }, { true, nil })
+			t.eq(w.bank:balance(1), 980, "the saved balance, not this server's pocket money")
+			t.truthy(w.bank:hasPass(1, "paintball"))
+			t.near(w.bank:passLeft(1, "paintball"), 2)
+			t.eq(w.bank.accounts[1].pocket, 300, "they had their pocket money in an earlier life: not again")
+			t.eq(w.bank:counted(1), 980)
+			t.truthy(w.bank:has(1), "still in the game")
+			-- every step of it is in the log, with a reason
+			local whys = {}
+			for _, e in w.seen do
+				table.insert(whys, `{e.delta} {e.why}`)
+			end
+			t.deepEq(whys, { "300 pocket money", "680 your saved wallet" })
+			-- a saved account that never had pocket money (or less than today's) is owed the rest, once
+			local old = world(300)
+			old.bank:join(1)
+			t.truthy(old.bank:import(1, { v = 1, cents = 40, pocket = 100, pocketLeft = 0, passes = {} }))
+			t.eq(old.bank:balance(1), 240, "40 saved, and the 200 of pocket money they never had")
+			t.eq(old.bank.accounts[1].pocket, 300)
+			t.eq(old.bank:counted(1), 40)
+			-- once anything has happened to the account here, it is the newer one: the saved one is refused
+			for _, touch in
+				{
+					function(b: Bank.Bank)
+						b:spend(1, 12, "coffee")
+					end,
+					function(b: Bank.Bank)
+						b:add(1, 1, "a tip")
+					end,
+					function(b: Bank.Bank)
+						b:buyPass(1, PASS)
+					end,
+					function(b: Bank.Bank)
+						b:take(1, 1, "a fine")
+					end,
+				}
+			do
+				local used = world(300)
+				used.bank:join(1)
+				touch(used.bank)
+				local before = used.bank:balance(1)
+				t.deepEq({ used.bank:import(1, saved) }, { false, "this account has already been used here" })
+				t.eq(used.bank:balance(1), before)
+			end
+			-- a free thing (lane shoes at 0c) changes nothing, so the account is still as good as new
+			local shoes = world(300)
+			shoes.bank:join(1)
+			shoes.bank:spend(1, 0, "lane shoes")
+			t.truthy(shoes.bank:import(1, saved))
+			-- an unsound record leaves the joined account exactly as it was
+			local sound = world(300)
+			sound.bank:join(1)
+			t.falsy((sound.bank:import(1, { v = 1, cents = -5, pocket = 0, pocketLeft = 0, passes = {} })))
+			t.eq(sound.bank:balance(1), 300)
+			t.truthy(sound.bank.accounts[1].fresh)
+		end
+	)
 end
