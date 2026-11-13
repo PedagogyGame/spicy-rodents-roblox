@@ -53,6 +53,7 @@ local Tuning = require("@client/Minigames/Paintball/Tuning")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local PaintballRig = require("@tests/lib/PaintballRig")
 local Rig = require("@tests/lib/MinigameRig")
+local Ways = require("../../tools/bake/Ways")
 local roblox = require("@lune/roblox")
 
 local R = Contract.Rules
@@ -1336,6 +1337,11 @@ return function(t)
 					local w = v.w
 					-- IN THE STREET in front of the station, out of the audience's reach, with 27c and no pass
 					local sx, sy, sz = Arena.toWorld(v.place, 0, 0, 106)
+					-- a real street: the station's walk, which meets Chapel Street, which runs on to the town's
+					-- estate avenue (tools/bake/Ways; the review found this spot was a patch of grass in a field)
+					local ways = Ways.plan(Ways.venues({ "f3_tv_station" }))
+					t.truthy(Ways.on(ways, sx, sz) ~= nil, "the spot in front of the station is paved")
+					t.eq((ways.ways[1].joins :: any).id, "rd_037_estate_avenue", "and the way leads to the town")
 					w.body:PivotTo(CFrame.new(sx, sy + ROOT, sz))
 					v.run(1)
 					t.eq(PaintballClient.show(), nil, "nothing of the match is shown in the street")
