@@ -1,27 +1,31 @@
 --!strict
 -- tools/games/paintball/server/Bench.luau: the paintball service's cost, measured (checklist PB-15;
 -- Shared/Minigames/Paintball/Contract.COST). The real PaintballService with sixteen people in a match, eight
--- a side, in the stand-in building, on a framework context made by hand: no fake engine is installed, so
--- nothing here pays for the slow paths the fake engine switches on (tests/lib/Isolated says why) and the
--- numbers are the service's own. Every tick, as on a server:
---   * each person's Move arrives twenty times a second (they sway a stud about where they stand, round the
---     atrium on the four upper floors, team 1 on its west side, team 2 on its east) and is judged in full;
+-- a side, on a framework context made by hand: no fake engine is installed, so nothing here pays for the
+-- slow paths the fake engine switches on (tests/lib/Isolated says why) and the numbers are the service's
+-- own. THE BUILDING is the one handed in: the lane's Greybox by default (the ground its pinned numbers stand
+-- on), or the game's own (ArenaData.build(), whatever the arena lane has made of it). Nothing here knows
+-- either: the sixteen stand where places() finds room on the building's own navigation nodes. Every tick,
+-- as on a server:
+--   * each person's Move arrives twenty times a second (they sway a stud about where they stand: eight a
+--     side on the storeys above the ground, team 1 on the building's west half, team 2 on its east, as near
+--     the atrium as there is room) and is judged in full;
 --   * clicks arrive, each judged in full (stamps, sprint, room, origin, the match), as many as it takes to
---     keep `balls` balls in flight: across the atrium at somebody on the other side, with a hand unsteady
---     enough that most miss and fly on to a wall;
+--     keep `balls` balls in flight: at somebody on the other side, with a hand unsteady enough that most
+--     miss and fly on to a wall;
 --   * the service steps: events, people, balls against sixteen bodies' histories, the snapshot and the
 --     audience; then the Session steps the match model.
 -- The match model is the server lane's scripted one (tests/isolated/paintball_server_model) with the
 -- magazine and the tag switched off, so that the balls and the bodies stay as many as asked. The bots'
 -- share is the match-and-bots lane's to measure: there are none here.
--- Interface: run(opts?) -> Result. opts: balls (in flight, default Contract.COST.atBalls), seconds (of
---   match measured, default 4), countSweeps (wrap the arena's ball test to count and time it: its own clock
---   reads make every other number in that run a little worse). Result: per-tick medians and 95th centiles in
+-- Interface: run(opts?) -> Result; places(arena) -> { { Spawn } } (eight standing places a side). opts:
+--   build (the building: default Greybox.build; a fresh one is built for each run), balls (in flight, default Contract.COST.atBalls), seconds (of match
+--   measured, default 4), countSweeps (wrap the arena's ball test to count and time it: its own clock reads
+--   make every other number in that run a little worse). Result: per-tick medians and 95th centiles in
 --   milliseconds { balls, rest, step, moves, fires, tick } (tick = everything the arena costs a frame: the
 --   two handlers and the step), inFlight (mean), shotsPerSec, sweepsPerTick, sweepMs, downBytesPerSec (the
 --   stream to one member of the audience), stats (the service's own)
 local Arena = require("@shared/Minigames/Paintball/Arena")
-local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
@@ -30,10 +34,11 @@ local Wire = require("@shared/Minigames/Paintball/Wire")
 local Session = require("@shared/Minigames/Session")
 local PaintballService = require("@server/Minigames/Paintball/PaintballService")
 local Model = require("@tests/isolated/paintball_server_model")
+local Greybox = require("./Greybox")
 
 local Bench = {}
 
-export type Opts = { balls: number?, seconds: number?, countSweeps: boolean? }
+export type Opts = { balls: number?, seconds: number?, countSweeps: boolean?, build: (() -> Arena.Arena)? }
 export type Spread = { median: number, p95: number }
 export type Result = {
 	balls: Spread,
@@ -71,19 +76,83 @@ local function spread(list: { number }): Spread
 	return { median = sorted[math.max(1, math.ceil(n * 0.5))], p95 = sorted[math.max(1, math.ceil(n * 0.95))] }
 end
 
--- The stand-in building with the people standing round the atrium instead of in their spawn rooms: eight
--- places a side on the four upper floors, and spawn rooms nobody is in.
-local function building(): Arena.Arena
-	local arena = ArenaData.build()
-	local spawns: { { Arena.Spawn } } = { {}, {} }
-	for floor = 1, 4 do
-		for _, z in { -8, 8 } do
-			local y = floor * Arena.FLOOR_HEIGHT
-			table.insert(spawns[1], { x = -20, y = y, z = z, yaw = -math.pi / 2 })
-			table.insert(spawns[2], { x = 20, y = y, z = z, yaw = math.pi / 2 })
+-- Is there room to stand and sway at this point: level floor a stud and a half to every side, and nothing
+-- solid within that at chest height?
+local REACH = 1.5
+local function roomy(arena: Arena.Arena, x: number, y: number, z: number): boolean
+	local ground = arena.ground(x, y, z)
+	if ground == nil or math.abs(ground - y) > 0.05 then
+		return false
+	end
+	for k = 0, 7 do
+		local a = k * math.pi / 4
+		local px, pz = x + math.cos(a) * REACH, z + math.sin(a) * REACH
+		local there = arena.ground(px, y, pz)
+		if there == nil or math.abs(there - y) > 0.05 then
+			return false
+		end
+		if arena.sweep(x, y + Arena.CHEST, z, px, y + Arena.CHEST, pz) ~= nil then
+			return false
 		end
 	end
-	arena.spawns = spawns
+	return true
+end
+
+-- Eight standing places a side on the building's own navigation nodes: outside every spawn and exit room,
+-- with room to sway, team 1 on the west half and team 2 on the east, two a storey on the four storeys above
+-- the ground (then wherever is left), the nearest the middle of the building first. Each looks at the middle.
+function Bench.places(arena: Arena.Arena): { { Arena.Spawn } }
+	local out: { { Arena.Spawn } } = { {}, {} }
+	for team = 1, 2 do
+		local side = if team == 1 then -1 else 1
+		local byFloor: { [number]: { Arena.NavNode } } = {}
+		for _, node in arena.nodes do
+			if node.team ~= 0 or node.kind == "stair" or node.kind == "spawn" or node.x * side < 4 then
+				continue
+			end
+			local inRoom = false
+			for _, room in arena.exits do
+				inRoom = inRoom or Arena.inRoom(room, node.x, node.y + 0.1, node.z, 2)
+			end
+			for _, room in arena.spawnRooms do
+				inRoom = inRoom or Arena.inRoom(room, node.x, node.y + 0.1, node.z, 2)
+			end
+			if not inRoom and roomy(arena, node.x, node.y, node.z) then
+				local list = byFloor[node.floor] or {}
+				byFloor[node.floor] = list
+				table.insert(list, node)
+			end
+		end
+		for _, list in byFloor do
+			table.sort(list, function(a: Arena.NavNode, b: Arena.NavNode): boolean
+				local da, db = a.x * a.x + a.z * a.z, b.x * b.x + b.z * b.z
+				if da ~= db then
+					return da < db
+				end
+				return a.id < b.id
+			end)
+		end
+		local taken: { [number]: number } = {}
+		for _, perFloor in { 2, 8 } do
+			for _, floor in { 1, 2, 3, 4, 0 } do
+				local list = byFloor[floor] or {}
+				while (taken[floor] or 0) < math.min(perFloor, #list) and #out[team] < 8 do
+					local node = list[(taken[floor] or 0) + 1]
+					taken[floor] = (taken[floor] or 0) + 1
+					table.insert(out[team], { x = node.x, y = node.y, z = node.z, yaw = math.atan2(node.x, node.z) })
+				end
+			end
+		end
+		assert(#out[team] == 8, `the building has room for only {#out[team]} of team {team}'s eight to stand`)
+	end
+	return out
+end
+
+-- The building with the people standing where places() found room instead of in their spawn rooms, and
+-- spawn rooms nobody is in.
+local function building(build: (() -> Arena.Arena)?): Arena.Arena
+	local arena = (build or Greybox.build)()
+	arena.spawns = Bench.places(arena)
 	local nowhere = { minX = 0, minY = -20, minZ = 0, maxX = 1, maxY = -19, maxZ = 1 }
 	arena.spawnRooms = { nowhere, nowhere }
 	return arena
@@ -103,7 +172,7 @@ local function measure(opts: Opts?): Result
 		return false
 	end
 
-	local arena = building()
+	local arena = building(o.build)
 	local sweeps, sweepSecs = 0, 0
 	if o.countSweeps then
 		local inner = arena.sweep

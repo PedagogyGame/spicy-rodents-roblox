@@ -7,7 +7,7 @@
 -- header says where it is not the contract's wording: a body's footprint at an edge, a running jump off a
 -- ledge, a fall that must fall), the body rule, the pose at a time, the sprint window, the origin of a
 -- shot, a click that came late, and silence.
-local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
+local Greybox = require("../../tools/games/paintball/server/Greybox")
 local ArenaModule = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
@@ -30,7 +30,7 @@ local function placed(
 	(rec: { [string]: number }, now: number?) -> (Stream.Verdict, string?),
 	ArenaModule.Arena
 )
-	local arena = ArenaData.build()
+	local arena = Greybox.build()
 	local feel = Contract.feel()
 	local person = Stream.new("ada", 100)
 	Stream.placed(person, x, y, z, 0, 100, feel, true)
@@ -49,7 +49,7 @@ return function(t)
 		"a Move is dropped, not refused: before the first placement, with another placement number, out, or with a bad stamp",
 		function()
 			local feel = Contract.feel()
-			local arena = ArenaData.build()
+			local arena = Greybox.build()
 			local fresh = Stream.new("ada", 100)
 			local rec = { t = 100, x = 20, y = 0, z = 0, yaw = 0, pitch = 0, bits = 0, place = 0 }
 			t.eq(
@@ -199,8 +199,8 @@ return function(t)
 			)
 			-- the landing at the head of the ground floor's north flight (x 10.5..15, z -15..-7, level with the
 			-- first storey) has an open south edge: past z = -7 there is nothing under a body but the ground floor
-			t.eq(ArenaData.build().ground(12.5, FLOOR, -8), FLOOR)
-			t.eq(ArenaData.build().ground(12.5, FLOOR, -6), 0)
+			t.eq(Greybox.build().ground(12.5, FLOOR, -8), FLOOR)
+			t.eq(Greybox.build().ground(12.5, FLOOR, -6), 0)
 			local faller, fall = placed(12.5, FLOOR, -8)
 			t.eq((fall({ t = 100.05, z = -5.5, y = FLOOR - 0.2, bits = Wire.BIT.air })), "accepted", "stepping off")
 			t.truthy(faller.fallSince ~= nil, "it is falling")
@@ -253,7 +253,7 @@ return function(t)
 			end
 			-- A HOP TAKEN RUNNING DOWN A STAIR is a hop from the step it left: the stair falls away under the
 			-- body faster than the hop comes down, so its Moves are "unsupported" over the lower steps
-			for index, ramp in ArenaData.build().ramps do
+			for index, ramp in Greybox.build().ramps do
 				if index > 4 then
 					break
 				end
@@ -270,7 +270,7 @@ return function(t)
 				local x0, y0, z0 = down(1)
 				local stair = Stream.new("dee", 100)
 				Stream.placed(stair, x0, y0, z0, 0, 100, Contract.feel(), true)
-				local arena = ArenaData.build()
+				local arena = Greybox.build()
 				local refused = 0
 				local takeoff, takeoffY = 100.15, 0
 				for i = 1, 200 do

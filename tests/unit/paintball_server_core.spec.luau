@@ -4,7 +4,7 @@
 -- contract's way (Shared/Minigames/Paintball/Hit: its centre line, the entry point, nothing through a
 -- wall), a ball that is already late flown forward through the bodies of its own past moments, the
 -- early reject, the order two verdicts in one tick are given in, and the two splat pools.
-local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
+local Greybox = require("../../tools/games/paintball/server/Greybox")
 local ArenaModule = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
@@ -55,7 +55,7 @@ return function(t)
 	end)
 
 	t.test("a ball 0.05 over the rail misses the crouched body behind it and tags the standing one", function()
-		local arena = ArenaData.build()
+		local arena = Greybox.build()
 		local feel = Contract.feel({ ballDrop = 0 })
 		-- the west rail of the first storey: x -15.5 .. -15, its top RAIL_HEIGHT over the floor
 		local railTop = FLOOR + ArenaModule.RAIL_HEIGHT
@@ -89,7 +89,7 @@ return function(t)
 	t.test(
 		"who may be hit: a team-mate, a body that is not live and a body in its own spawn room are passed over",
 		function()
-			local arena = ArenaData.build()
+			local arena = Greybox.build()
 			local feel = Contract.feel({ ballDrop = 0 })
 			local function shot(target: Projectiles.Target): number
 				local sim = Projectiles.forArena(arena, feel)
@@ -114,7 +114,7 @@ return function(t)
 	t.test(
 		"a late ball is flown forward at once, each piece against the bodies of its own moment; the rewind is clamped",
 		function()
-			local arena = ArenaData.build()
+			local arena = Greybox.build()
 			local feel = Contract.feel({ ballDrop = 0 })
 			-- a runner crossing the ball's line at 20 studs/s, recorded at the snapshot rate
 			local history = PoseHistory.new(Clock.HISTORY_SECS, Clock.SNAP_HZ)
@@ -162,7 +162,7 @@ return function(t)
 	)
 
 	t.test("the early reject: a body a storey away or across the building costs no history sample", function()
-		local arena = ArenaData.build()
+		local arena = Greybox.build()
 		local feel = Contract.feel()
 		local sim = Projectiles.forArena(arena, feel)
 		local targets = {
@@ -182,7 +182,7 @@ return function(t)
 	t.test(
 		"two verdicts in one tick: the older ball tags, the younger flies on; a tie between bodies goes to the lower slot",
 		function()
-			local arena = ArenaData.build()
+			local arena = Greybox.build()
 			local feel = Contract.feel({ ballDrop = 0 })
 			for round = 1, 3 do
 				local sim = Projectiles.forArena(arena, feel)
@@ -212,7 +212,7 @@ return function(t)
 	)
 
 	t.test("ball ids run 1..65535 and round again; clear empties the sim", function()
-		local sim = Projectiles.forArena(ArenaData.build(), Contract.feel())
+		local sim = Projectiles.forArena(Greybox.build(), Contract.feel())
 		sim.nextId = 65534
 		t.eq(Projectiles.fire(sim, 1, 1, 0, 3, 0, 1, 0, 0, 0, 100).id, 65535)
 		t.eq(Projectiles.fire(sim, 1, 1, 0, 3, 0, 1, 0, 0, 0, 100).id, 1)
