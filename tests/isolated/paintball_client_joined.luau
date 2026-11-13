@@ -461,15 +461,24 @@ local function serverRounds(v: Visit): number
 	return slot.mag.rounds
 end
 
-local function settled(v: Visit, t: any, what: string)
+-- `outs`: how many times the player was tagged out by somebody else's ball while firing. A click made
+-- on the shared clock at or after the tag and before the word of it has come down the line (half a
+-- round trip and its jitter) is refused "out" by the contract's rule, and no client can know better:
+-- at 300 ms a tag can race one click. Only that refusal is let through, at most once for each tag.
+local function settled(v: Visit, t: any, what: string, outs: number?)
 	local stats = v.service:stats()
 	t.eq(stats.movesRefused, 0, `{what}: no pose of an honest client refused`)
 	t.eq(stats.corrections, 0, `{what}: and none corrected`)
 	t.eq(Rig.count(v.w.got, "paintball_correct"), 0)
 	local ok, refused = v.acks()
-	t.eq(refused, 0, `{what}: no ball that was drawn refused`)
-	t.eq(ok, v.fires(), `{what}: every click the server heard is acked`)
-	t.eq(stats.shotsRefused, 0)
+	local whys = {}
+	for why, n in stats.shotsRefusedBy do
+		table.insert(whys, `{why} x{n}`)
+	end
+	local raced = math.min(stats.shotsRefusedBy.out or 0, outs or 0)
+	t.eq(refused - raced, 0, `{what}: no ball that was drawn refused ({table.concat(whys, ", ")})`)
+	t.eq(ok + refused, v.fires(), `{what}: every click the server heard is acked`)
+	t.eq(stats.shotsRefused - raced, 0)
 end
 
 -- A SCRIPTED PERSON in the match beside the player: a PlayerLike stub with a body, who sends her own pose
@@ -987,7 +996,7 @@ return function(t)
 				line =
 					`{seconds} s among the real bots at {math.floor(lag * 2000 / 60 + 0.5)} ms round trip: {v.fires()} balls fired ({ok} acked, {refused} refused); {sprints} legs sprinted, {crouches} crouched, {hops} hops; an opponent in sight {sighted} times, {puffs} balls met a body on this screen and the server counted {mine} tags; tagged out {outs} time(s); {others} of the bots' balls drawn, {tags} tags heard; {stats.movesAccepted} poses accepted, {stats.movesRefused} refused, {stats.movesDropped} dropped, {stats.corrections} corrections`
 				print("      " .. line)
-				settled(v, t, "among the bots")
+				settled(v, t, "among the bots", outs)
 				t.truthy(v.fires() >= seconds / 2, "the marker was fired all the way through")
 				t.eq(back, if seat.out then outs - 1 else outs, "every time out was followed by a respawn")
 				if not seat.out and seat.mag.reloadDoneAt == nil then
