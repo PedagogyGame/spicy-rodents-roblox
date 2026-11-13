@@ -3,9 +3,10 @@
 -- (Server/Minigames/Paintball/Stream; Shared/Minigames/Paintball/Contract, "who is trusted for what"), and
 -- the pass desk (Server/Minigames/Paintball/PassDesk; checklist PB-12). Pure: the whole-game cases are in
 -- tests/unit/paintball_server.spec.luau. Here each rule is held on its own, with the contract's numbers, in
--- the stand-in building: the time rules, the distance budget and what refills it, the height rule exactly
--- as the contract words it (a hop taken off a ledge included: see the case), the pose at a time, the
--- sprint window, the origin of a shot, and silence.
+-- the stand-in building: the time rules, the distance budget and what refills it, the height rule (as the
+-- contract words it, a hop taken off a ledge included, with the two things Stream adds: a body's footprint
+-- at an edge, and a fall that must fall), the pose at a time, the sprint window, the origin of a shot, and
+-- silence.
 local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local ArenaModule = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
@@ -166,7 +167,7 @@ return function(t)
 	)
 
 	t.test(
-		"the height rule as the contract words it: a jump on the floor and a drop are free, a rise in the air is not, a fall may not last",
+		"the height rule: a jump on the floor and a drop are free, a body at an edge still stands on it, a rise in the air is refused, and a fall must fall",
 		function()
 			-- on the first storey's slab, north of the atrium
 			local person, send = placed(-5, FLOOR, -17)
@@ -185,10 +186,25 @@ return function(t)
 			t.eq(ArenaData.build().ground(12.5, FLOOR, -8), FLOOR)
 			t.eq(ArenaData.build().ground(12.5, FLOOR, -6), 0)
 			local faller, fall = placed(12.5, FLOOR, -8)
-			t.eq((fall({ t = 100.05, z = -6.5, y = FLOOR - 0.2, bits = Wire.BIT.air })), "accepted", "stepping off")
+			t.eq((fall({ t = 100.05, z = -5.5, y = FLOOR - 0.2, bits = Wire.BIT.air })), "accepted", "stepping off")
+			t.truthy(faller.fallSince ~= nil, "it is falling")
 			t.eq((fall({ t = 100.3, z = -5, y = FLOOR - 6, bits = Wire.BIT.air })), "accepted", "and dropping")
 			t.eq((fall({ t = 100.45, z = -4, y = 0 })), "accepted", "to the floor below")
 			t.eq(faller.fallSince, nil)
+			-- A BODY HAS A FOOTPRINT: a feet point up to a stud past the edge is still standing on the landing,
+			-- for as long as it likes (the contract's point test would refuse it after TRUST.fallSecs)
+			local edger, edge = placed(12.5, FLOOR, -8)
+			local at = 100
+			for _ = 1, 40 do
+				at += 0.1
+				t.eq((edge({ t = at, z = -6.2 })), "accepted", "at the very edge, looking down")
+			end
+			t.eq(edger.fallSince, nil)
+			t.eq(
+				(edge({ t = at + 0.05, z = -6.2, y = FLOOR + 1.5, bits = Wire.BIT.air })),
+				"accepted",
+				"and it may hop there"
+			)
 			-- THE HOP OFF A LEDGE. As written, an unsupported pose may be no more than TRUST.riseSlack above the
 			-- last accepted one: stepping off and dropping is free, and a hop taken off the edge is refused while
 			-- it is still rising. (Reported as a gap in the contract: the rise ought to be measured from where
@@ -200,27 +216,45 @@ return function(t)
 				"still over the landing"
 			)
 			t.deepEq(
-				{ hop({ t = 100.1, z = -6.5, y = FLOOR + 1.2, bits = Wire.BIT.air }) },
+				{ hop({ t = 100.1, z = -5.5, y = FLOOR + 1.2, bits = Wire.BIT.air }) },
 				{ "refused", "wall" },
 				"rising, with nothing under it"
 			)
 			t.eq(
-				(hop({ t = 100.15, z = -6.2, y = FLOOR + 0.5, bits = Wire.BIT.air })),
+				(hop({ t = 100.15, z = -5.2, y = FLOOR + 0.5, bits = Wire.BIT.air })),
 				"accepted",
 				"coming down past where it left"
 			)
 			t.truthy(hopper.fallSince ~= nil, "it is falling")
-			t.eq((hop({ t = 100.3, z = -5.5, y = FLOOR - 4, bits = Wire.BIT.air })), "accepted")
-			-- a "fall" that does not come down is refused once it has lasted TRUST.fallSecs by the Moves' own t
+			t.eq((hop({ t = 100.3, z = -4.5, y = FLOOR - 4, bits = Wire.BIT.air })), "accepted")
+			-- A FALL MUST FALL: a "fall" that does not come down is flying, and is refused within a fifth of a
+			-- second (the contract as written lets it walk level for the whole of TRUST.fallSecs)
 			local hover, hang = placed(12.5, FLOOR, -8)
-			t.eq((hang({ t = 100.05, z = -6, bits = Wire.BIT.air })), "accepted")
-			local at = 100.05
-			while at < 100.05 + T.fallSecs - 0.1 do
-				at += 0.1
-				t.eq((hang({ t = at, z = -6, bits = Wire.BIT.air })), "accepted")
-			end
-			t.deepEq({ hang({ t = at + 0.2, z = -6, bits = Wire.BIT.air }) }, { "refused", "wall" })
+			t.eq((hang({ t = 100.05, z = -5, bits = Wire.BIT.air })), "accepted", "the first Move past the edge")
+			t.eq((hang({ t = 100.15, z = -5, bits = Wire.BIT.air })), "accepted", "a tenth of a second is no fall yet")
+			t.deepEq({ hang({ t = 100.25, z = -5, bits = Wire.BIT.air }) }, { "refused", "wall" }, "hovering")
+			t.deepEq({ hang({ t = 100.3, z = -4.5, bits = Wire.BIT.air }) }, { "refused", "wall" }, "walking on air")
 			t.truthy(hover.fallSince ~= nil)
+			-- a feather fall (an eighth of gravity) is refused; half of gravity is a fall (the engine's is 196.2,
+			-- and the rule asks for a quarter of it)
+			for _, case in { { 1 / 8, false }, { 1 / 2, true } } do
+				local share, honest = case[1] :: number, case[2] :: boolean
+				local _, drift = placed(12.5, FLOOR, -8)
+				t.eq((drift({ t = 100.05, z = -5, bits = Wire.BIT.air })), "accepted")
+				local all = true
+				for i = 1, 5 do
+					local tau = i * 0.05
+					local y = FLOOR - share * 196.2 / 2 * tau * tau
+					all = all and drift({ t = 100.05 + tau, z = -5, y = y, bits = Wire.BIT.air }) == "accepted"
+				end
+				t.eq(all, honest, `a fall at {share} of gravity`)
+			end
+			-- and no fall, however fast, lasts longer than TRUST.fallSecs by the Moves' own t
+			local long, drop = placed(12.5, FLOOR, -8)
+			t.eq((drop({ t = 100.05, z = -5, bits = Wire.BIT.air })), "accepted")
+			long.fallSince = 100.05 - T.fallSecs
+			long.fallFromY = FLOOR + 400
+			t.deepEq({ drop({ t = 100.1, z = -5, y = FLOOR - 0.5, bits = Wire.BIT.air }) }, { "refused", "wall" })
 		end
 	)
 
