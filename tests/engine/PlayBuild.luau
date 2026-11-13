@@ -7,7 +7,7 @@
 -- menu's five picks, the rodent biting a person (Power +100/+130, the victim flees), two kicks
 -- knocking the rodent out (health 100 -> 45 -> 0, released, back to the AI at full health), a scripted
 -- dart-out in front of a moving car (RUN OVER through the server's swept test), police beside a patrol
--- car and the possession ledger check.
+-- car, the town's wallet (tests/engine/WalletFlow) and the possession ledger check.
 -- Interface: run(opts?) -> Result (JSON-friendly)
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -267,6 +267,22 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		end
 		numbers.policeToCar = best
 		check(best < 16, `police officer {best} studs from the nearest patrol car (reach 16)`)
+	end
+
+	-- the wallet (Economy/Credits; added 2026-11-13 and NOT yet run in the cloud): tests/engine/WalletFlow, the
+	-- same flow the Lune suite runs first on Game.wallet (tests/isolated/wallet.luau): pocket money on joining,
+	-- a purchase, a refusal, the pass on the day clock, the minigames' charge and pass on the one balance, the
+	-- notice toast, leaving and coming back -------------------------------------------------------------------
+	local wallet = G.wallet
+	check(wallet ~= nil, "Game has no wallet")
+	if wallet then
+		local WalletFlow = (require :: any)(script.Parent:WaitForChild("WalletFlow"))
+		local minigames = G.attractions and G.attractions.minigames
+		local found = WalletFlow.play(wallet, { player = player, town = minigames and minigames.town })
+		for _, failure in found.failures do
+			check(false, `wallet: {failure}`)
+		end
+		numbers.wallet = found.numbers
 	end
 
 	local okLedger, errors = possession:check()
