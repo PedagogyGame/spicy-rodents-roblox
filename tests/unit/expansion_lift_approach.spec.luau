@@ -6,7 +6,8 @@
 --     half stud), and no piece is longer than PIECE_MAX;
 --   Lift Road meets the westside street's end (rd_071) within 0.5, in plan and in height, and its sidewalks stop
 --     where the westside sidewalks stop;
---   nothing stands inside either venue's footprint or the cabins' swept volume (grown by 0.25);
+--   nothing stands inside either venue's footprint or the cabins' swept volume (grown by 0.25); the trail bends
+--     round the towers' footings (8 and 9 stand on the data's line) and no conifer stands on it or in a footing;
 --   handrails along every piece steeper than RAIL_GRADE, timber steps on those steeper than STEP_GRADE;
 --   five lamps with lit heads, three benches, two signposts, about thirty conifers in stands; the bay lines lie on the
 --     car park's surface; within the part budget, all anchored.
@@ -85,6 +86,10 @@ return function(t)
 			if r.id == "xpath_hill_trail" then
 				path = r
 			end
+		end
+		-- every data point is still on the trail (the bends round towers 8 and 9 only add points)
+		for _, q in path.points do
+			t.truthy(Approach.trailDistance(q[1], q[2]) < 1e-6)
 		end
 		local pieces = Approach.trailPieces()
 		local first, last = pieces[1], pieces[#pieces]
@@ -179,6 +184,24 @@ return function(t)
 			end
 		end
 		t.eq(#bad, 0, table.concat(bad, ", "))
+	end)
+
+	t.test("the trail keeps clear of every tower's footing and every tree's trunk", function()
+		for _, tw in SkyLift.towers() do
+			t.truthy(Approach.trailDistance(tw.x, tw.z) >= Approach.TOWER_CLEAR - 1e-6, `tower {tw.index}`)
+		end
+		for _, c in m:FindFirstChild("Dressing"):GetChildren() do
+			if c.Name == "Conifer" then
+				local trunk = c:FindFirstChild("Trunk").CFrame.Position
+				t.truthy(
+					Approach.trailDistance(trunk.X, trunk.Z) > Approach.TRAIL_WIDTH / 2 + 1,
+					"a conifer on the trail"
+				)
+				for _, tw in SkyLift.towers() do
+					t.truthy(math.sqrt((tw.x - trunk.X) ^ 2 + (tw.z - trunk.Z) ^ 2) > 5, "a conifer in a footing")
+				end
+			end
+		end
 	end)
 
 	t.test("handrails on the steep stretch, steps on the steepest", function()

@@ -75,14 +75,60 @@ end
 -- uphill edge, and the piece stands proud of the slope on its downhill side, built up on a stone bank (`drop`:
 -- the most its edge stands over the ground). A piece the ground rises over anywhere between its ends is split at
 -- its worst point, down to PIECE_MIN.
+-- The trail's polyline: xpath_hill_trail's points, with a bend added wherever a leg passes within TOWER_CLEAR of a
+-- line tower (towers 8 and 9 stand on the data's line): the new point stands TOWER_CLEAR + 1 from the tower, on
+-- the side the leg passed it. The two ends are the data's.
+Approach.TOWER_CLEAR = 8.5 -- trail half-width, the footing's half-diagonal and a rail's width
+local pointsCache: { { number } }? = nil
+function Approach.trailPoints(): { { number } }
+	if pointsCache then
+		return pointsCache
+	end
+	local P: { { number } } = {}
+	for _, q in record(Common.expansion().paths, "xpath_hill_trail").points do
+		table.insert(P, { q[1], q[2] })
+	end
+	for _ = 1, 8 do
+		local moved = false
+		for _, t in SkyLift.towers() do
+			local best, bi, bx, bz = math.huge, 0, 0, 0
+			for i = 1, #P - 1 do
+				local a, b = P[i], P[i + 1]
+				local dx, dz = b[1] - a[1], b[2] - a[2]
+				local f = math.clamp(((t.x - a[1]) * dx + (t.z - a[2]) * dz) / (dx * dx + dz * dz), 0, 1)
+				local qx, qz = a[1] + dx * f, a[2] + dz * f
+				local d = math.sqrt((qx - t.x) ^ 2 + (qz - t.z) ^ 2)
+				if d < best then
+					best, bi, bx, bz = d, i, qx, qz
+				end
+			end
+			if best < Approach.TOWER_CLEAR then
+				local nx, nz = bx - t.x, bz - t.z
+				if best < 0.01 then
+					local a, b = P[bi], P[bi + 1]
+					nx, nz = -(b[2] - a[2]), b[1] - a[1]
+				end
+				local nl = math.sqrt(nx * nx + nz * nz)
+				local r = Approach.TOWER_CLEAR + 1
+				table.insert(P, bi + 1, { t.x + nx / nl * r, t.z + nz / nl * r })
+				moved = true
+			end
+		end
+		if not moved then
+			break
+		end
+	end
+	pointsCache = P
+	return P
+end
+
 local CROSS = { -1, -0.9, -0.5, 0, 0.5, 0.9, 1 } -- fractions of the half-width
 local trailCache: { Piece }? = nil
 function Approach.trailPieces(): { Piece }
 	if trailCache then
 		return trailCache
 	end
-	local path = record(Common.expansion().paths, "xpath_hill_trail")
-	local P = path.points :: { { number } }
+	local P = Approach.trailPoints()
 	local hw = Approach.TRAIL_WIDTH / 2
 	local out: { Piece } = {}
 	local function rollAt(x: number, z: number, ux: number, uz: number): number
@@ -463,8 +509,9 @@ function Approach.build(roblox: any, parent: any): any
 	end
 	-- landings at the turns, level with the higher of the two pieces meeting there, built down to the ground
 	local path = record(exp.paths, "xpath_hill_trail")
-	for i = 2, #path.points - 1 do
-		local q = path.points[i]
+	local turns = Approach.trailPoints()
+	for i = 2, #turns - 1 do
+		local q = turns[i]
 		local top, low = -math.huge, math.huge
 		for _, p in pieces do
 			if math.abs(p.bx - q[1]) < 1e-6 and math.abs(p.bz - q[2]) < 1e-6 then
@@ -648,6 +695,11 @@ function Approach.build(roblox: any, parent: any): any
 		end
 		if Approach.inSite(x, z, clearR + 3) then
 			return false
+		end
+		for _, tw in SkyLift.towers() do
+			if (tw.x - x) ^ 2 + (tw.z - z) ^ 2 < (5 + clearR) ^ 2 then
+				return false -- the tower's footing
+			end
 		end
 		if x > lot.x0 - 6 and x < lot.x1 + 6 and z > lot.z0 - 6 then
 			return false -- the car park and Lift Road
