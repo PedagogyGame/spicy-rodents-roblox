@@ -443,7 +443,8 @@ function CueTable.event(self: any, e: ServerGame.Event)
 		if state and not state.done then
 			local text = self.game.words(self.game.rules.view(state), ctx.session.names, self.game.snapshot(state))
 			if text then
-				ctx.broadcast({ kind = "event", text = text })
+				-- (with the shot count: the clients keep it on screen a while, as they do a shot's words)
+				ctx.broadcast({ kind = "event", text = text, shot = self.shots })
 			end
 		end
 	elseif kind == "skipped" then

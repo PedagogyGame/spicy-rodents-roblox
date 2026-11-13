@@ -28,11 +28,12 @@
 --           and while the table is open, everything that drops) and the winning 8. The other player's balls
 --           going down do not lengthen it.
 --   POOL-R7 an idle turn is a foul (skipTurn): the other player has the ball in hand.
+--   A player who leaves a game against someone else forfeits it (gone): the other wins, "left the table".
 -- Pure and seeded: the same seed and the same inputs give the same game, byte for byte. Lune-tested
 -- (tests/unit/pool_eightball.spec.luau).
 -- Interface: def, verbs; init(seats, seed, breaker?) -> State; input(state, seat, verb, args) with verbs
 --   "place" { x, z }, "call" { pocket 1..6 }, "shoot" { angle, power, tipX?, tipY?, pocket? }; turn(state);
---   skipTurn(state); result(state); view(state); script(state) -> the last shot's Shot.Script?;
+--   skipTurn(state); gone(state, seat) (a forfeit); result(state); view(state); script(state) -> the last shot's Shot.Script?;
 --   apply(state, outcome, rest?) -> event (the referee alone: "foul" | "continue" | "pass" | "win" |
 --   "lose"); groupOf(ball); onEight(state, seat); legal(state, seat) -> { ball ids the seat may hit first };
 --   left(state, seat) -> balls of its group still up (7 while the table is open); canPlace(state, x, z);
@@ -66,6 +67,7 @@ EightBall.HOW_TEXT = {
 	eight_early = "potted the 8 too early",
 	eight_foul = "fouled on the 8",
 	eight_wrong_pocket = "potted the 8 in the wrong pocket",
+	left = "left the table",
 } :: { [string]: string }
 
 export type PotAt = { ball: number, hole: number }
@@ -491,6 +493,26 @@ function EightBall.skipTurn(state: State)
 	state.lastScript = nil
 	state.seat = other(state, seat)
 	state.inHand = if state.broken then "anywhere" else "kitchen"
+end
+
+-- A seat has left a game against someone else: they forfeit it, and the one still at the table wins.
+function EightBall.gone(state: State, seat: number)
+	if state.done or state.seats < 2 then
+		return
+	end
+	state.done = true
+	state.winner = other(state, seat)
+	state.how = "left"
+	state.called = 0
+	state.last = {
+		seat = seat,
+		event = "lose",
+		pots = {},
+		holes = {},
+		firstHit = 0,
+		breakShot = not state.broken,
+	}
+	state.lastScript = nil
 end
 
 function EightBall.script(state: State): Shot.Script?

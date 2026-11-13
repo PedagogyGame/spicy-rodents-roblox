@@ -152,6 +152,7 @@ function Controller.new(ctx: { [string]: any }, mode: Game): any
 	self.camUp = false -- my shot of the table is up
 	self.legs = true -- my legs are my own
 	self.lampHidden = false
+	self.saidPhase = "" -- the phase the status line was last written for
 	self.conns = {} :: { RBXScriptConnection }
 	self.stick = Stick.new()
 	local white = Color3.fromRGB(255, 255, 255)
@@ -410,6 +411,10 @@ function Controller._end(self: any)
 	self:_hideAim()
 	self.ctx.ui:meter(nil)
 	self.ctx.ui:clock(nil)
+	if not self.top then
+		-- (let go at once, not in the next frame's drawing: see _toggleWalk)
+		self:_noShot()
+	end
 	if not self.legs then
 		self.legs = true
 		self.ctx.controls(true)
@@ -543,10 +548,15 @@ function Controller._toggleWalk(self: any)
 		self.presses = {}
 		self:_hideAim()
 		self.ctx.ui:meter(nil)
+		-- (the camera is let go here and not in the next frame's drawing: a shot let go in a render step
+		-- would have been moved once more by the shot's own step that frame)
+		self.top = false
+		self:_noShot()
 		if not self.legs then
 			self.legs = true
 			self.ctx.controls(true)
 		end
+		self:_say()
 	elseif self.phase == "walk" then
 		-- down on the shot from where I stand: the line from me through the ball
 		local body = self.ctx.body()
@@ -565,6 +575,7 @@ function Controller._toggleWalk(self: any)
 			self.legs = false
 			self.ctx.controls(false)
 		end
+		self:_say()
 	end
 end
 
@@ -665,7 +676,8 @@ function Controller._cycle(self: any, by: number)
 	end
 	if mode.mustCall(g, self.you) then
 		local n = #self.tb.holes
-		self:_call(((math.max(self.pocket, 1) - 1 + by) % n) + 1)
+		-- (from no pocket called: the first one forward, the last one back)
+		self:_call(if self.pocket < 1 then (if by > 0 then 1 else n) else ((self.pocket - 1 + by) % n) + 1)
 		return
 	end
 	local can = mode.strikeable(g, self.you)
@@ -1128,6 +1140,7 @@ function Controller._say(self: any)
 	elseif self.phase == "walk" then
 		how = " Walk round the table; V takes the shot from where you stand."
 	end
+	self.saidPhase = self.phase
 	self.ctx.ui:status(what .. how)
 end
 
@@ -1228,6 +1241,10 @@ function Controller._frame(self: any, dt: number)
 			-- the keys have been let go: the ball is set down there
 			self:_setDown()
 		end
+	end
+	-- the status line follows the phase (set down, struck, up from the shot), not only the server's states
+	if self.view ~= nil and self.saidPhase ~= phase then
+		self:_say()
 	end
 	-- what is drawn, where I stand, what the camera shows
 	if phase == "aim" then

@@ -356,8 +356,10 @@ local entry: ClientGame.ClientGame = {
 			"T  top view (click the cloth to point the cue)",
 			"V  walk round the table, V again to take the shot",
 			"Ball in hand: drag the cue ball, then Space",
-			"On the 8: click a pocket to call it",
+			"On the 8: click a pocket to call it (or 1 to 6)",
 			"Q  leave the table",
+			"Gamepad: left stick aims (L1 / R1 fine), right stick spin, hold and let go R2; Y top view, X walk; D-pad moves the ball in hand (A sets it) and picks the 8's pocket",
+			"Touch: drag to aim, drag the red dot, HOLD TO SHOOT; drag the cue ball in hand, then DONE; tap a pocket to call it",
 		},
 	},
 	title = function(msg: { [string]: any }): string
