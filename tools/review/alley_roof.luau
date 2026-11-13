@@ -205,34 +205,19 @@ do
 	end
 end
 
--- squirrels where the motor puts one: { local feet point, local heading (dX, dD) }
-local file = `{placeholders}/squirrel.rbxm`
-if fs.isFile(file) then
+-- figures (the placeholder puppets) where the motor puts a squirrel and where people stand: { local feet point, local
+-- heading {dX, dY, dD} }, in the group "squirrels"
+local function figures(name: string, spots: { { { number } } })
+	local file = `{placeholders}/{name}.rbxm`
+	if not fs.isFile(file) then
+		print(`alley_roof: {file} missing: no {name} in the pictures`)
+		return
+	end
 	local model = roblox.deserializeModel(fs.readFile(file))[1]
 	local hip = model:GetAttribute("HipHeight") or 0
 	local rootPart = model.PrimaryPart
 	local rootCF = if rootPart then rootPart.CFrame else roblox.CFrame.new()
-	-- the feet where Motion.visualPose draws them (a bough's top is the rail + 1.25; the gutter route's visualOffset
-	-- is 0) and the heading along the route ({dX, dY, dD}; level unless `pitch`)
-	local function on(id: number, t: number, pitch: boolean?): ({ number }, { number })
-		local r = AlleyRoof.route(id)
-		local c = Curve.fromArrays(r.points)
-		local p = c:getPointAt(t)
-		local tg = c:getTangentAt(t)
-		local lift = r.visualOffset or (if r.kind == "branch" or r.kind == "bridge" then 1.25 else 0)
-		return { p.x, p.y + lift, p.z }, { tg.x, if pitch then tg.y else 0, tg.z }
-	end
-	local ridgeEnd = AlleyRoof.route(9103).points[2]
-	local bough = AlleyRoof.route(AlleyRoof.BOUGH).points
-	local roofEnd = bough[#bough]
-	local spot = {
-		{ { ridgeEnd[1] + 0.6, ridgeEnd[2], ridgeEnd[3] }, { -1, 0, 0 } }, -- at the ridge's end, about to leap
-		{ on(AlleyRoof.BOUGH, 0.2) }, -- on the house bough, heading down to the trunk's top
-		{ on(AlleyRoof.BOUGH, AlleyRoof.BOUGH_FORK_T + 0.03) }, -- past the trunk's top, on along the crossing
-		{ on(9102, 0.5, true) }, -- halfway up the gutter route, on the slates
-		{ { roofEnd[1] - 1, AlleyRoof.WING_ROOF.y, roofEnd[3] }, { -1, 0, -0.1 } }, -- dropped onto the wing roof
-	}
-	for k, s in spot do
+	for _, s in spots do
 		local f, h = s[1], s[2]
 		local x, y, z = AlleyLayout.toWorld(place, f[1], f[2] + hip, f[3])
 		local dx, dz = AlleyLayout.dirToWorld(place, h[1], h[3])
@@ -243,11 +228,44 @@ if fs.isFile(file) then
 				emit("squirrels", d, target * rootCF:Inverse() * d.CFrame)
 			end
 		end
-		local _ = k
 	end
-else
-	print(`alley_roof: {file} missing: no squirrels in the pictures`)
 end
+
+-- the feet where Motion.visualPose draws them (a bough's top is the rail + 1.25; the gutter route's visualOffset is 0)
+-- and the heading along the route ({dX, dY, dD}; level unless `pitch`)
+local function on(id: number, t: number, pitch: boolean?): ({ number }, { number })
+	local r = AlleyRoof.route(id)
+	local c = Curve.fromArrays(r.points)
+	local p = c:getPointAt(t)
+	local tg = c:getTangentAt(t)
+	local lift = r.visualOffset or (if r.kind == "branch" or r.kind == "bridge" then 1.25 else 0)
+	return { p.x, p.y + lift, p.z }, { tg.x, if pitch then tg.y else 0, tg.z }
+end
+local ridgeEnd = AlleyRoof.route(9103).points[2]
+local bough = AlleyRoof.route(AlleyRoof.BOUGH).points
+local roofEnd = bough[#bough]
+local M = AlleyRoof.MOUTH
+figures("squirrel", {
+	{ { ridgeEnd[1] + 0.6, ridgeEnd[2], ridgeEnd[3] }, { -1, 0, 0 } }, -- at the ridge's end, about to leap
+	{ on(AlleyRoof.BOUGH, 0.2) }, -- on the house bough, heading down to the trunk's top
+	{ on(AlleyRoof.BOUGH, AlleyRoof.BOUGH_FORK_T + 0.03) }, -- past the trunk's top, on along the crossing
+	{ on(9102, 0.5, true) }, -- halfway up the gutter route, on the slates
+	{ { roofEnd[1] - 1, AlleyRoof.WING_ROOF.y, roofEnd[3] }, { -1, 0, -0.1 } }, -- dropped onto the wing roof
+	{ { M.x + 0.9, AlleyRoof.WING_ROOF.y, M.d }, { -1, 0, 0 } }, -- on the apron, at the bent slat
+	{ { 80, AlleyRoof.CHORD.y1, 16.5 }, { -1, 0, 0 } }, -- on chord 9120 over the lanes
+	{ { AlleyLayout.pairX(5), AlleyRoof.LIGHT_RAIL.y, 25 }, { 0, 0, 1 } }, -- creeping along a light rail
+})
+-- people: a guard at the louvre (facing it), one coming up the second flight
+local ST = AlleyRoof.STAIR
+local f2 = ST.flights[2]
+local climbX = 127.7
+local climbY = f2.y0 + (f2.x0 + ST.tread - climbX) / (9 * ST.tread) * (9 * ST.riser) -- (on the ramp)
+figures("human_guard", {
+	{ { AlleyRoof.GUARD.x, AlleyRoof.PLATFORM.y, AlleyRoof.GUARD.d }, { -1, 0, 0 } },
+})
+figures("human_townsperson", {
+	{ { climbX, climbY, (ST.d0 + ST.d1) / 2 }, { -1, 0, 0 } },
+})
 
 fs.writeFile(scenePath, serde.encode("json", scene))
 local parts = {}
