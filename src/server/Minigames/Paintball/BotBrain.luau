@@ -172,10 +172,15 @@ export type Brain = {
 	pushUntil: number, -- it does not stop to fight before this (it has stood about long enough)
 	holdUntil: number,
 	bobAt: number, -- when it next changes between crouched and standing behind low cover
-	peekX: number?, -- the peek point it is at, or walking to
+	peekX: number?, -- the peek point (or the jink: see JINK) it is at, or walking to
 	peekZ: number?,
-	peekBack: boolean, -- walking back from it to the node
+	peekBack: boolean, -- walking back from it to where it stepped out from
 	peekAt: number, -- when it next steps out, or back
+	backX: number, -- where it stepped out from
+	backZ: number,
+	jink: boolean, -- the step is a jink in a fight, not a peek round cover
+	jinkAt: number, -- when it next jinks, or steps back
+	jinkSide: number, -- 1 or -1: the side it last went
 	trail: { number }, -- where it was at each of the last STUCK seconds in play: x, z, x, z ... (the stuck watch)
 	trailAt: number, -- when the next point is due
 	stuck: boolean, -- the watch has found it stuck and it has not yet got a route away
@@ -273,6 +278,11 @@ local THINK = 0.1 -- seconds between thoughts
 local QUIET = 3 -- seconds with nothing seen or heard before a bot sprints or reloads at leisure
 local SAY_EVERY = 12 -- seconds between one bot's call-outs
 local TEAM_SAY_EVERY = 8 -- and between one team's
+-- JINK: a bot that fights from the open does not stand to be shot. Every second or so it takes a
+-- quick step across its target's line and, a moment later, back: a couple of strides either side of
+-- where it stood, on level floor it can walk (the same test as a peek point). It fires as it goes,
+-- with the error its own movement adds. Behind cover it has the cover instead.
+local JINK = 2.8 -- studs (inside what the stuck watch, and anybody watching, calls one place)
 local STUCK = 9 -- seconds in one place before the stuck watch sends a bot somewhere else
 local STUCK_REACH = 6 -- studs: "one place" is this far across
 local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
@@ -346,6 +356,11 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		peekZ = nil,
 		peekBack = false,
 		peekAt = 0,
+		backX = 0,
+		backZ = 0,
+		jink = false,
+		jinkAt = 0,
+		jinkSide = 1,
 		trail = {},
 		trailAt = 0,
 		stuck = false,
@@ -408,7 +423,7 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 	b.wasOut = false
 	b.mode = "wait"
 	b.path, b.leg, b.halt = nil, 1, false
-	b.peekX, b.peekZ, b.peekBack = nil, nil, false
+	b.peekX, b.peekZ, b.peekBack, b.jink = nil, nil, false, false
 	-- the node to walk to first: its spawn point's, else the nearest it may stand on
 	local entry = 0
 	local points = nav.arena.spawns[b.team]
@@ -908,6 +923,42 @@ local function sidestep(b: Brain, squad: Squad, now: number, tx: number, tz: num
 	return setOut(b, squad, best)
 end
 
+-- A jink from where the bot stands, across the line to (tx, tz); false when neither side is clear.
+local function jinkTo(b: Brain, tx: number, tz: number): boolean
+	local nav = b.nav
+	local arena = nav.arena
+	local ux, uz = tx - b.x, tz - b.z
+	local len = math.sqrt(ux * ux + uz * uz)
+	if len < 1e-3 then
+		return false
+	end
+	ux, uz = ux / len, uz / len
+	local side = if b.rng.next() < 0.7 then -b.jinkSide else b.jinkSide
+	local chest, eye = ArenaModule.CHEST, ArenaModule.EYE
+	for _ = 1, 2 do
+		local px, pz = b.x - uz * side * JINK, b.z + ux * side * JINK
+		local fx, fz = b.x - uz * side * (JINK + 1.3), b.z + ux * side * (JINK + 1.3)
+		local g = arena.ground(px, b.y + 0.5, pz)
+		local g2 = arena.ground(fx, b.y + 0.5, fz)
+		if
+			g ~= nil
+			and g2 ~= nil
+			and math.abs(g - b.y) < 0.05
+			and math.abs(g2 - b.y) < 0.05
+			and arena.sweep(b.x, b.y + chest, b.z, fx, b.y + chest, fz) == nil
+			and arena.sweep(b.x, b.y + eye, b.z, fx, b.y + eye, fz) == nil
+			and BotNav.roomOf(nav, px, b.y, pz) == 0
+		then
+			b.backX, b.backZ = b.x, b.z
+			b.peekX, b.peekZ, b.peekBack = px, pz, false
+			b.jink, b.jinkSide = true, side
+			return true
+		end
+		side = -side
+	end
+	return false
+end
+
 -- Ten times a second: the target, the fight, the reload, the walk.
 local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Pose }, now: number, out: { Command })
 	local nav = b.nav
@@ -1022,7 +1073,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 		-- shot at while standing in the open: move
 		if b.alarm > b.shiftAt and b.alarm > b.fightAt and cover == nil and (b.halt or b.mode == "hold") then
 			b.shiftAt = now
-			if b.peekX == nil then
+			if b.peekX == nil or b.jink then
 				local spot = coverFrom(b, squad, pose.x, pose.z, 16)
 				if spot ~= 0 and spot ~= b.at and setOut(b, squad, spot) then
 					b.stance = "cover"
@@ -1041,7 +1092,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			elseif b.peekX ~= nil and reloading then
 				b.peekBack = true
 			end
-		elseif reloading and b.mode == "hold" and b.peekX == nil and now - b.shiftAt > 2 then
+		elseif reloading and b.mode == "hold" and (b.peekX == nil or b.jink) and now - b.shiftAt > 2 then
 			-- empty in the open: to cover, or at least not where it was
 			local spot = coverFrom(b, squad, pose.x, pose.z, 24)
 			if spot == 0 or spot == b.at or not setOut(b, squad, spot) then
@@ -1053,15 +1104,31 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			say(b, squad, now, out, "reloading")
 		end
 		-- a fight from one spot does not go on for ever
-		if now - b.fightAt > 8 and (b.mode == "hold" or b.halt) and b.peekX == nil then
+		if now - b.fightAt > 8 and (b.mode == "hold" or b.halt) and (b.peekX == nil or b.jink) then
 			b.fightAt = now
 			b.stance = "push"
 			if not sidestep(b, squad, now, pose.x, pose.z) then
 				setOut(b, squad, pickGoal(b, squad, state, now))
 			end
 		end
+		-- standing in the open with somebody to fight: jink (see JINK)
+		if cover == nil and (b.halt or b.mode == "hold") and now >= b.jinkAt then
+			if b.peekX == nil then
+				if jinkTo(b, pose.x, pose.z) then
+					b.jinkAt = now + rng.range(0.45, 1.0)
+				else
+					b.jinkAt = now + 0.5
+				end
+			elseif b.jink and not b.peekBack then
+				b.peekBack = true
+				b.jinkAt = now + rng.range(0.4, 0.9)
+			end
+		end
 	else
 		b.halt = false
+		if b.jink and b.peekX ~= nil then
+			b.peekBack = true -- the fight is over: back to where it stood
+		end
 		-- reload when it is quiet, or when nearly empty and nobody is in sight
 		if not reloading and mag.rounds < mag.capacity then
 			if mag.rounds <= 2 or now - b.contactAt > QUIET then
@@ -1130,7 +1197,8 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 					if peeks ~= nil and #peeks > 0 and now >= b.peekAt then
 						if b.peekX == nil then
 							local peek = peeks[rng.int(1, #peeks)]
-							b.peekX, b.peekZ, b.peekBack = peek.x, peek.z, false
+							b.peekX, b.peekZ, b.peekBack, b.jink = peek.x, peek.z, false, false
+							b.backX, b.backZ = nav.nodes[b.at].x, nav.nodes[b.at].z
 							b.peekAt = now + rng.range(1.6, 3.2)
 						else
 							b.peekBack = true
@@ -1187,8 +1255,7 @@ local function move(b: Brain, state: State, now: number, dt: number)
 	if b.peekX ~= nil then
 		peeking = true
 		if b.peekBack then
-			local node = nav.nodes[b.at]
-			tx, tz = node.x, node.z
+			tx, tz = b.backX, b.backZ
 		else
 			tx, tz = b.peekX, b.peekZ :: number
 		end
@@ -1214,7 +1281,7 @@ local function move(b: Brain, state: State, now: number, dt: number)
 		b.speed = if dt > 0 then d / dt else 0
 		if peeking then
 			if b.peekBack then
-				b.peekX, b.peekZ, b.peekBack = nil, nil, false
+				b.peekX, b.peekZ, b.peekBack, b.jink = nil, nil, false, false
 			end
 		elseif path ~= nil then
 			b.at = path[b.leg]
