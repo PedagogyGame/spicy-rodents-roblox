@@ -146,7 +146,7 @@ function Dressing.stand(kit: Kit.Kit, parent: any, a: any): any
 	local p = V.new(a.x, a.y, a.z)
 	local cf = CF.lookAt(p, p + V.new(a.facing.x, 0, a.facing.z))
 	local m = kit:model(parent, "FashionStand", { Anchor = "fashionStand", Space = a.space })
-	local wood, dark = { 132, 92, 58 }, { 40, 34, 30 }
+	local wood, dark = { 132, 92, 58 }, { 104, 74, 50 } -- a tan fedora reads in the chamber's light
 	kit:at(m, "Base", cf * CF.new(0, 0.06, 0), { 0.8, 0.12, 0.8 }, wood, "Wood", VIS)
 	kit:at(m, "Post", cf * CF.new(0, 0.86, 0), { 0.12, 1.5, 0.12 }, wood, "Wood", VIS)
 	kit:at(m, "Arm", cf * CF.new(0, 1.3, 0), { 0.7, 0.08, 0.08 }, wood, "Wood", VIS)

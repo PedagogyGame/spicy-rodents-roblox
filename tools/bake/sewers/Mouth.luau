@@ -1,9 +1,10 @@
 --!strict
 -- tools/bake/sewers/Mouth: what a street mouth looks like from the pavement and what the squirrel stands on.
 --   frame    an iron frame at street level over the part of the shaft's carve column (Mouth.column) the baked
---            town leaves open (Mouth.FRAMES: the corner squares of grass at the crossing, the lawn, the verge; on a
---            quay the whole column: the quay's paving slab does not collide), with the opening (Mouth.opening) in it.
---            Collides: the street goes on over it. On a slope the frame lies in the ground's plane.
+--            town leaves open (Mouth.FRAMES: the corner squares of grass at the crossing, the verge; else the whole
+--            column, on a quay a little more: the quay's paving slab does not collide), with the opening
+--            (Mouth.opening) in it; on open ground a concrete apron round it (Mouth.APRONS). Collides: the street goes
+--            on over it. On a slope it lies in the ground's plane.
 --   Grate    a Model the route passes through as the drawn squirrel slips between the bars (the clearance sweep
 --            looks past it; tests/unit/sewers_bake.spec.luau): "MouthCover", an invisible plate over the opening at
 --            the frame's top (the squirrel stands on it to press E), the visible bars (a kerb grate in a verge or a
@@ -27,9 +28,17 @@ Mouth.FRAMES = {
 	["P1.NE"] = { 22.4, 26.22, 22.4, 26.22 },
 	["P1.SE"] = { 22.4, 26.22, -26.22, -22.4 },
 	["P1.SW"] = { -26.22, -22.4, -26.22, -22.4 },
-	["P3.N"] = { 1347.7, 1352.3, 32.39, 39.47 },
+	["P3.N"] = { 1348, 1352, 32.39, 39.47 },
 }
-Mouth.OVERHANG = 0.3 -- studs past a carve column's edge where the frame lies on open ground
+-- on open ground the iron frame fills the carve column and a concrete apron runs round it (the lawn and the verge:
+-- smooth terrain dips at the edge of a carved column, and the apron hides the dip), x0, x1, z0, z1
+Mouth.APRON = 0.8 -- studs round the column
+Mouth.APRONS = {
+	-- the lawn; on its south side the alley's forecourt carve (tools/bake/attractions: down to 14.9 from z -340.2)
+	["P3.S"] = { 1303.2, 1308.8, -340.2, -335.2 },
+	["P3.N"] = { 1347.2, 1352.8, 32.39, 39.47 }, -- along the verge only: the boulevard and the kerb bound it
+}
+Mouth.OVERHANG = 0.3 -- studs past a carve column's edge where a quay's cover frame lies on the paving slab
 Mouth.THICK = 0.3
 Mouth.QUAY_SLAB_TOP = 0.1 -- the quay's paving slab stands this far over the ground (Lots.quay_district_ground)
 
@@ -81,7 +90,22 @@ function Mouth.build(kit: Kit.Kit, parent: any, m: any, space: string): { model:
 	end
 	local col = m.column
 	local rect = Mouth.FRAMES[m.id]
-		or { col.x0 - Mouth.OVERHANG, col.x1 + Mouth.OVERHANG, col.z0 - Mouth.OVERHANG, col.z1 + Mouth.OVERHANG }
+	if rect == nil then
+		local over = if m.kind == "cover" then Mouth.OVERHANG else 0
+		rect = { col.x0 - over, col.x1 + over, col.z0 - over, col.z1 + over }
+	end
+	local apron = Mouth.APRONS[m.id]
+	if apron == true then
+		local e = Mouth.APRON
+		apron = { col.x0 - e, col.x1 + e, col.z0 - e, col.z1 + e }
+	end
+	if apron then
+		for _, q in rectsMinus(apron, rect) do
+			local a, b = local2(q[1], q[3])
+			local c, d = local2(q[2], q[4])
+			kit:box(model, "Apron", plane, a, c, -Mouth.THICK, -0.01, b, d, { 150, 146, 138 }, "Concrete")
+		end
+	end
 	local o = m.opening
 	local hole = { o.x0, o.x1, o.z0, o.z1 }
 	for _, q in rectsMinus(rect, hole) do

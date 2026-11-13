@@ -11,7 +11,8 @@
 --   box(kit, parent, frame, z0, z1, section, endWall?, header?)   the chamber under a shaft: the same floor, straight
 --        walls up to the flat roof (Shaft.roof), the end wall behind (endWall "z0" or "z1": the end it stands at) and,
 --        on the open side (header "z0" or "z1"), the header: the arch ring wall that closes the box down to the
---        vault's profile
+--        vault's profile, standing just past the box (inside the arched run, behind the vault: so nothing of it
+--        shows up the shaft, whose hole reaches the box's end)
 --   header(kit, parent, frame, za, zb, section)          that ring wall alone (the junction's arches use it too)
 --   backing(kit, parent, frame, z0, z1, section, roof)   the opaque casing outside the shell (the art pack's import
 --        notes: at least a stud of Part backing round an interior, so no outdoor light leaks in): side walls, floor
@@ -167,9 +168,9 @@ function Section.box(
 		kit:box(parent, "EndWall", frame, -outer, outer, -section.below, Section.TOP, z1, z1 + 0.32, c, m)
 	end
 	if header == "z1" then
-		Section.header(kit, parent, frame, z1 - 0.3, z1, section)
+		Section.header(kit, parent, frame, z1, z1 + 0.3, section)
 	elseif header == "z0" then
-		Section.header(kit, parent, frame, z0, z0 + 0.3, section)
+		Section.header(kit, parent, frame, z0 - 0.3, z0, section)
 	end
 end
 

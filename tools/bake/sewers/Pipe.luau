@@ -147,7 +147,7 @@ local function dress(ctx: Ctx, plan: Plan.Plan, lane: number)
 		Dressing.moss(kit, ctx.dressing, at(L * f), 0, section, lane, 1.4 + f)
 	end
 	local farX = if lane == 0 then -2.35 else -lane * 2.1
-	Dressing.leaves(kit, ctx.dressing, at(L * 0.4), 0, farX, 3)
+	Dressing.leaves(kit, ctx.dressing, at(L * 0.4), 0, farX, 2)
 	local towards = if pipe.chamber ~= nil then "CROSSROADS" elseif pipe.id == "P2" then "EAST QUAY" else "MAIN ST"
 	Dressing.chalk(kit, ctx.dressing, at(L * 0.5), 0, section, lane, towards, 1)
 	if section.water ~= nil then

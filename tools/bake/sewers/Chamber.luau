@@ -1,18 +1,18 @@
 --!strict
 -- tools/bake/sewers/Chamber: P1's chamber under the crossing, the owner's four-way junction (art_pack 02; data/sewers
 -- "junction"; Shared/World/SewerLayout Chamber: centre on the floor, half 6, ports at the four arches).
---   Lining (hidden once his junction is in): (the four arm stubs, 3..6 from the centre, are the arms' passages'
---        lining run on: tools/bake/sewers/Pipe) the arch ring over each arm's opening, the central floor round the sump (his collider metadata: two north-south
---        and two east-west slabs, the sump base), the sump's water and its grate, the four piers (full height, the
---        groin vault's springers) and a flat ceiling at the vault's inner top
+--   Lining (hidden once his junction is in): the arch ring over each arm's opening (the arm stubs, 3..6 from the
+--        centre, are the passages' lining run on: tools/bake/sewers/Pipe), the central floor round the sump (his
+--        collider metadata: two north-south and two east-west slabs, the sump base), the sump's water and grate,
+--        the four piers (full height: the groin vault's springers) and a flat ceiling at the vault's inner top
 --   Shell: the light's holder (the arms' backing is the passages')
 --   the light: a SpotLight under the middle of the ceiling (the lightGrate anchor: the manhole lid over the chamber)
 --        and his ceiling fixture's diffuser; on the street the manhole lid itself lies on the junction's plate
 --        (no shaft is cut through his vault for it: the light inside is the fixture's)
 --   the art slot (module "junction"), pivoted on the floor's centre with its +Z on the first port
 --   the fashion stand at its anchor
--- Interface: build(kit, ctx, chamber) where ctx = { lining, shell, dressing, art, section, space, slot(name, module,
---   cframe) }
+-- Interface: build(kit, ctx, chamber, anchors) where ctx = { lining, shell, dressing, section, space,
+--   slot(name, module, cframe) }
 
 local Dressing = require("./Dressing")
 local Kit = require("./Kit")
