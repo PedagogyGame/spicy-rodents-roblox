@@ -16,7 +16,14 @@
 --     and patrols outside it, firing; over half a minute of live play not one of her Moves is refused, no
 --     click of hers is refused for anything her own stream said (origin, sprint, stale), her magazine counts
 --     down in the acks and comes back after the reload, she may be tagged by a bot and comes back placed
---     anew, and every message she hears is one the wire knows.
+--     anew, and every message she hears is one the wire knows;
+--   * a whole match from its briefing to the next one's: people at 80, 150 and 300 ms (jitter, and one
+--     unreliable packet in twenty lost) patrol and fire among the real bots; one leaves and a bot has her
+--     seat and her side; one joins late and is shown the match so far (the roster, the feel, the paint);
+--     the clock runs out, the card names the result, a join is refused for as long as the card is up, and
+--     the next match begins by itself with the people on the sides they ended on, placed anew, on a clean
+--     building. All along: no Move and no click of an honest client refused for what its own stream said,
+--     the sides level, the scores the tags, every message one the wire knows; what a step cost is printed.
 -- (The lane's other cases can be run against the real model too: PAINTBALL_REAL=1, see the kit.)
 -- Interface: return function(t) (the spec shape); real() -> boolean
 local Arena = require("@shared/Minigames/Paintball/Arena")
@@ -81,6 +88,83 @@ local function wayOut(arena: Arena.Arena, from: number, beyond: number): { numbe
 	return nil
 end
 
+-- A person who walks out of her spawn room along the building's own graph and patrols the last link of the
+-- way out, clicking along her look every `every` frames while she is outside her room. step(frame) is called
+-- once a frame, before kit.frame(); she plans her way afresh every time she is placed anew.
+type Patrol = { step: (frame: number) -> (), fired: number, placements: number }
+local function patrol(kit: Kit.Kit, c: Kit.Client, every: number): Patrol
+	local arena: Arena.Arena = kit.arena
+	local route: { Arena.NavNode } = {}
+	local at, leg, lastPlace = 1, 1, -1
+	local p = { fired = 0, placements = 0 } :: Patrol
+	-- her route: from the spawn point to the nearest node of her room in clear sight, out by the links
+	local function plan()
+		local best: Arena.NavNode? = nil
+		local bestD = math.huge
+		for _, node in arena.nodes do
+			local d = (node.x - c.x) ^ 2 + (node.z - c.z) ^ 2
+			if
+				math.abs(node.y - c.y) < 1
+				and d < bestD
+				and Arena.clearPath(arena.sweep, c.x, c.z, node.x, node.z, c.y + Arena.CHEST)
+			then
+				best, bestD = node, d
+			end
+		end
+		assert(best, "a node of the graph stands in clear sight of the spawn point")
+		local path = wayOut(arena, (best :: Arena.NavNode).id, 3)
+		assert(path and #path >= 3, "the graph leads out of the spawn room")
+		route = {}
+		for _, id in path :: { number } do
+			table.insert(route, arena.nodes[id])
+		end
+		at, leg = 1, 1
+	end
+	function p.step(frame: number)
+		if c.seat == nil or c.place == 0 then
+			return
+		end
+		if c.place ~= lastPlace then
+			-- (placed anew: at the start, after every time a bot tags her, at a new match)
+			p.placements += 1
+			lastPlace = c.place
+			plan()
+		end
+		if c.out then
+			return
+		end
+		local state = kit.state()
+		local slot = state.slots[c.seat]
+		local target = route[at]
+		local dx, dz = target.x - c.x, target.z - c.z
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d < 0.05 then
+			-- the next node of the way out; at its end, to and fro along its last link
+			if at == #route then
+				leg = -1
+			elseif at == #route - 1 and leg == -1 then
+				leg = 1
+			end
+			at += leg
+		else
+			local step = math.min(d, Body.speed(0, false, state.feel) / 60)
+			c.x += dx / d * step
+			c.z += dz / d * step
+			local ground = arena.ground(c.x, c.y + 0.5, c.z)
+			assert(ground, "the graph's links lie over floor")
+			c.y = ground
+			c.yaw = math.atan2(-dx, -dz)
+		end
+		local outside = not Arena.inRoom(arena.spawnRooms[slot.team], c.x, c.y + 0.1, c.z, 1.5)
+		if outside and frame % every == 0 then
+			local lx, ly, lz = Body.look(c.yaw, 0)
+			c.fire(lx, ly, lz)
+			p.fired += 1
+		end
+	end
+	return p
+end
+
 return function(t)
 	if not real() then
 		t.test(
@@ -122,85 +206,20 @@ return function(t)
 		"joined: a person at 80 ms among the real bots walks out of her spawn room along the building's own graph and patrols, firing: no Move refused, no click refused for what her own stream said, the magazine counted in the acks, every message one the wire knows",
 		function()
 			Kit.play(function(kit: Kit.Kit)
-				local arena: Arena.Arena = kit.arena
 				local stats = kit.service:stats()
 				local ada = kit.client("Ada", { delay = 5, jitter = 1 })
 				t.truthy((kit.join(ada)))
 				kit.run(0.5)
 				t.truthy(ada.seat ~= nil and ada.place ~= 0, "seated and placed")
-				local team = kit.state().slots[ada.seat].team
 				kit.live()
 
-				-- her route: from the spawn point to the nearest node of her room, out by the links, and a
-				-- patrol between the last two nodes of the way out
-				local route: { Arena.NavNode } = {}
-				local at, leg, lastPlace = 1, 1, -1
-				local function plan()
-					local best: Arena.NavNode? = nil
-					local bestD = math.huge
-					for _, node in arena.nodes do
-						local d = (node.x - ada.x) ^ 2 + (node.z - ada.z) ^ 2
-						if
-							math.abs(node.y - ada.y) < 1
-							and d < bestD
-							and Arena.clearPath(arena.sweep, ada.x, ada.z, node.x, node.z, ada.y + Arena.CHEST)
-						then
-							best, bestD = node, d
-						end
-					end
-					assert(best, "a node of the graph stands in clear sight of the spawn point")
-					local path = wayOut(arena, (best :: Arena.NavNode).id, 3)
-					assert(path and #path >= 3, "the graph leads out of the spawn room")
-					route = {}
-					for _, id in path :: { number } do
-						table.insert(route, arena.nodes[id])
-					end
-					at, leg = 1, 1
-				end
-
-				local fired, okShots, lowest = 0, 0, R.magazine
+				local walk = patrol(kit, ada, 20) -- (a click every third of a second while she is outside her room)
+				local okShots, lowest = 0, R.magazine
 				local badWhy: { string } = {}
 				local seenAcks = 0
-				local tagsOnHer, respawnsAfterTag = 0, 0
-				local speed = Body.speed(0, false, kit.state().feel) / 60
+				local tagsOnHer = 0
 				for frame = 1, 30 * 60 do
-					if ada.place ~= lastPlace then
-						-- (placed anew: at the start, and after every time a bot tags her)
-						if lastPlace ~= -1 then
-							respawnsAfterTag += 1
-						end
-						lastPlace = ada.place
-						plan()
-					end
-					if not ada.out and ada.seat ~= nil then
-						local target = route[at]
-						local dx, dz = target.x - ada.x, target.z - ada.z
-						local d = math.sqrt(dx * dx + dz * dz)
-						if d < 0.05 then
-							-- the next node of the way out; at its end, to and fro along its last link
-							if at == #route then
-								leg = -1
-							elseif at == #route - 1 and leg == -1 then
-								leg = 1
-							end
-							at += leg
-						else
-							local step = math.min(d, speed)
-							ada.x += dx / d * step
-							ada.z += dz / d * step
-							local ground = arena.ground(ada.x, ada.y + 0.5, ada.z)
-							assert(ground, "the graph's links lie over floor")
-							ada.y = ground
-							ada.yaw = math.atan2(-dx, -dz)
-						end
-						-- a click every third of a second while she is outside her room
-						local outside = not Arena.inRoom(arena.spawnRooms[team], ada.x, ada.y + 0.1, ada.z, 1.5)
-						if outside and frame % 20 == 0 then
-							local lx, ly, lz = Body.look(ada.yaw, 0)
-							ada.fire(lx, ly, lz)
-							fired += 1
-						end
-					end
+					walk.step(frame)
 					kit.frame()
 					for shot = seenAcks + 1, ada.shot do
 						local a = ada.acks[shot]
@@ -224,6 +243,7 @@ return function(t)
 					end
 					tagsOnHer = tags
 				end
+				local fired, respawnsAfterTag = walk.fired, walk.placements - 1
 				t.eq(stats.movesRefused, 0, "an honest walk in the real building, among the real bots")
 				t.eq(stats.corrections, 0)
 				t.truthy(stats.movesAccepted > 200, `{stats.movesAccepted} Moves accepted`)
@@ -236,6 +256,208 @@ return function(t)
 				t.eq(state.scores[1] + state.scores[2], stats.tags, "the scores are the tags")
 				print(
 					`  (joined person: {stats.movesAccepted} Moves accepted, {fired} clicks, {okShots} shots, lowest magazine {lowest}, tagged {tagsOnHer} times, {stats.balls} balls and {stats.tags} tags in all, {stats.shotsRefused} clicks refused)`
+				)
+			end, { realModel = true, arena = ArenaData.build() })
+		end
+	)
+
+	t.test(
+		"joined: a whole match from its briefing to the next one's, among the real bots in the game's own building: people at 80, 150 and 300 ms with jitter and loss patrol and fire; one leaves and a bot has her seat and side; one joins late and is shown the match so far; the clock runs out, a join is refused while the card is up, and the next match begins by itself with the people on the sides they ended on, on a clean building; no honest Move or click refused, the sides level, the scores the tags",
+		function()
+			Kit.play(function(kit: Kit.Kit)
+				local arena: Arena.Arena = kit.arena
+				local stats = kit.service:stats()
+				local session = kit.session
+				local ada = kit.client("Ada", { delay = 2, jitter = 1 })
+				local bo = kit.client("Bo", { up = 4, down = 5, jitter = 2, lose = 0.05 })
+				local cy = kit.client("Cy", { delay = 9, jitter = 2, lose = 0.05 })
+				local dee = kit.client("Dee", { delay = 3, jitter = 1 })
+				local eve = kit.client("Eve")
+				local walks: { [any]: Patrol } = {}
+				for _, c in { ada, bo, cy, dee } do
+					walks[c] = patrol(kit, c, 20)
+				end
+				local stepMs: { number } = {}
+				local badWhy: { string } = {}
+				local seen: { [any]: number } = {}
+				local frame = 0
+				local function sides(): (number, number, number)
+					local one, two, people = 0, 0, 0
+					for id, slot in kit.state().slots do
+						if slot.on then
+							if slot.team == 1 then
+								one += 1
+							else
+								two += 1
+							end
+							local key = session.seats[id]
+							if key ~= nil and not session.gone[id] and (type(key) ~= "table" or key.ai ~= true) then
+								people += 1
+							end
+						end
+					end
+					return one, two, people
+				end
+				-- `seconds` of everybody playing; the sides are looked at once a second
+				local function play(seconds: number)
+					for _ = 1, math.floor(seconds * 60) do
+						frame += 1
+						for c, walk in walks do
+							if c.seat ~= nil then
+								walk.step(frame)
+							end
+						end
+						kit.frame()
+						table.insert(stepMs, stats.stepMs)
+						for c in walks do
+							for shot = (seen[c] or 0) + 1, c.shot do
+								local a = c.acks[shot]
+								if a == nil then
+									break
+								end
+								seen[c] = shot
+								if not a.ok and (a.why == "origin" or a.why == "sprint" or a.why == "stale") then
+									table.insert(badWhy, `{c.name}'s shot {shot}: {a.why}`)
+								end
+							end
+						end
+						if frame % 60 == 0 and session.phase == "playing" then
+							local one, two = sides()
+							t.truthy(one == two and one >= R.teamMin, `the sides are level: {one} v {two}`)
+						end
+					end
+				end
+
+				for _, c in { ada, bo, cy } do
+					t.truthy((kit.join(c)))
+				end
+				kit.run(0.5)
+				local one, two, people = sides()
+				t.deepEq({ one, two, people }, { R.teamMin, R.teamMin, 3 }, "three people, and bots to four a side")
+				t.eq(kit.service.match, 1)
+				kit.live()
+				play(15)
+
+				-- Cy walks away: a bot has her seat and her side
+				local cySeat, cyTeam = cy.seat, kit.state().slots[cy.seat].team
+				kit.w.svc:leave(cy.stub, "left")
+				play(1)
+				t.truthy(cy.left ~= nil and cy.seat == nil, "Cy was told she left")
+				local holder = session.seats[cySeat]
+				t.truthy(type(holder) == "table" and holder.ai == true, "a bot has her seat")
+				t.eq(kit.state().slots[cySeat].team, cyTeam, "on her side")
+				local lx, ly, lz = Arena.toLocal(kit.place, cy.stub.body.x, cy.stub.body.y, cy.stub.body.z)
+				t.falsy(Arena.inVolume(lx, ly, lz), "and she stands in the lobby")
+				t.falsy(cy.stub.body.ghost, "in her own collision group")
+
+				-- Dee joins late: a bot gives her its seat, and she is shown the match so far
+				local wallPaint = 0
+				for _, rec in ada.splats do
+					if rec.body == 0 then
+						wallPaint += 1
+					end
+				end
+				t.truthy(wallPaint > 0, "there is paint on the building by now")
+				t.truthy((kit.join(dee)))
+				play(1)
+				t.truthy(dee.seat ~= nil and dee.place ~= 0, "Dee is seated and placed")
+				t.eq(dee.watch.match, 1)
+				t.eq(#dee.watch.slots, 2 * R.teamMin, "the roster she was sent")
+				t.eq(dee.extras.feel.ballSpeed, kit.state().feel.ballSpeed, "the feel")
+				local had: { [number]: any } = {}
+				for _, rec in ada.splats do
+					had[rec.seq] = rec
+				end
+				local walls = 0
+				for _, rec in dee.splats do
+					if rec.body == 0 then
+						walls += 1
+					end
+					t.truthy(had[rec.seq] ~= nil, `a splat of the match (seq {rec.seq})`)
+				end
+				t.truthy(
+					walls >= math.min(wallPaint, R.splatPool),
+					`the building's paint: {walls} of {wallPaint} (the pool keeps {R.splatPool})`
+				)
+				_, _, people = sides()
+				t.eq(people, 3, "Ada, Bo and Dee")
+				play(15)
+
+				-- the clock runs out
+				local sidesWere = {
+					[ada] = kit.state().slots[ada.seat].team,
+					[bo] = kit.state().slots[bo.seat].team,
+					[dee] = kit.state().slots[dee.seat].team,
+				}
+				local state = kit.state()
+				t.truthy((kit.service:debug("end")))
+				play(1)
+				t.eq(session.phase, "done", "the end card is up")
+				t.eq(state.scores[1] + state.scores[2], stats.tags, "the scores are the tags")
+				local card = ada.last("state", function(msg: any): boolean
+					return msg.view ~= nil and msg.view.phase == "done"
+				end)
+				t.truthy(card ~= nil and type(card.view.result) == "table", "Ada was sent the result")
+				local ok, words = kit.join(eve)
+				t.falsy(ok, "a join during the end card is refused")
+				t.truthy(type(words) == "string" and string.find(words :: string, "next match", 1, true), words)
+				local ballsAtCard = stats.balls
+				play(3)
+				t.eq(stats.balls, ballsAtCard, "nothing is fired while the card is up")
+
+				-- the next match begins by itself (the people stand where they are until they are placed in it)
+				local placesWere = { [ada] = ada.place, [bo] = bo.place, [dee] = dee.place }
+				t.truthy(
+					kit.untilTrue(R.endCardSecs, function(): boolean
+						return kit.service.match == 2
+					end),
+					"the service rolled on"
+				)
+				kit.run(0.5)
+				t.eq(session.phase, "playing")
+				t.eq(kit.service.match, 2, "the second match")
+				t.truthy(kit.state() ~= state, "a new match model")
+				t.deepEq(kit.state().scores, { 0, 0 })
+				one, two, people = sides()
+				t.deepEq({ one, two, people }, { R.teamMin, R.teamMin, 3 }, "the same three people, four a side")
+				for c, team in sidesWere do
+					t.truthy(c.seat ~= nil, `{c.name} is still seated`)
+					t.eq(kit.state().slots[c.seat].team, team, `{c.name} is on the side she ended on`)
+					t.truthy(c.place ~= placesWere[c], `{c.name} was placed anew`)
+					t.truthy(
+						Arena.inRoom(arena.spawnRooms[team], c.x, c.y + 0.1, c.z),
+						`{c.name} stands in her spawn room`
+					)
+				end
+				t.truthy((kit.join(eve)), "and the door is open again")
+				play(1)
+				t.eq(eve.watch.match, 2)
+				t.eq(#eve.splats, 0, "the building is clean")
+				kit.live()
+				play(5)
+
+				t.deepEq(badWhy, {}, "no click was refused for what its own stream said")
+				t.eq(stats.movesRefused, 0, "no honest Move was refused, in two matches at 80, 150 and 300 ms")
+				t.eq(stats.corrections, 0)
+				local fired = 0
+				for _, walk in walks do
+					fired += walk.fired
+				end
+				t.truthy(fired >= 40, `the people clicked {fired} times`)
+				table.sort(stepMs)
+				local median, p99 = stepMs[#stepMs // 2], stepMs[math.floor(#stepMs * 0.99)]
+				print(
+					string.format(
+						"  (joined match: %d Moves accepted, %d dropped, %d clicks, %d refused, %d balls, %d tags; the step with the real brains at 4 v 4: median %.3f ms, 99th centile %.3f ms)",
+						stats.movesAccepted,
+						stats.movesDropped,
+						fired,
+						stats.shotsRefused,
+						stats.balls,
+						stats.tags,
+						median,
+						p99
+					)
 				)
 			end, { realModel = true, arena = ArenaData.build() })
 		end
