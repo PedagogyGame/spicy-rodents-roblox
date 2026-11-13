@@ -13,15 +13,23 @@
 --   goals       per floor, the nodes a bot may choose to go and stand on: nobody's room, not a door.
 --   cover       per node, the arena's cover records; and for each cover spot the two PEEKS, a short
 --               sidestep either way across the sheltered direction that is clear to walk (chest and
---               eye) and on the same floor: where a bot behind a pillar steps out to shoot and back.
+--               eye), on the same floor, and far enough out to SEE the way the cover faces (the
+--               shortest of a few steps that does; none if none does): where a bot behind a pillar
+--               steps out to shoot and back.
+--   views       per node, how far a standing eye sees in each of VIEWS directions round the compass
+--               (one arena.sweep each, capped at VIEW_FAR; worked out the first time a bot asks, kept
+--               for good): a bot at a post looks where there is something to see, not at a wall.
+--   dip         per node, how steeply a standing eye can look down towards the building's axis and
+--               see something (over the atrium's rail, not at it); found the same lazy way.
 --   route       A* over the links. A team never enters the other team's room or its doors; its own
 --               room it only leaves (a step back into it costs BACK_IN). Each bot has a TASTE, a
 --               fixed multiplier per link (stairs more than floors), so that eight bots asked for
 --               the same place do not all file up one stair (PB-10: "do not all take one stair").
 -- Interface: build(arena) -> Nav; taste(nav, seed) -> { number }; route(nav, from, alt?, altCost?,
 --   to, team, taste) -> { node id }? (nil: no way); nearest(nav, x, y, z, team?) -> node id;
---   roomOf(nav, x, y, z) -> team or 0; atDoor(nav, team, x, y, z, more?) -> boolean; KEEP_OFF, PEEK,
---   DOORSTEP; types Nav, Peek
+--   roomOf(nav, x, y, z) -> team or 0; atDoor(nav, team, x, y, z, more?) -> boolean; dip(nav, node) -> radians; views(nav, node)
+--   -> { studs } (direction k of VIEWS is yaw (k - 1) * 2 pi / VIEWS); KEEP_OFF, PEEK, DOORSTEP, VIEWS,
+--   VIEW_FAR; types Nav, Peek
 
 local Import = require("../../Import")
 local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
@@ -49,13 +57,20 @@ export type Nav = {
 	peeks: { [number]: { Peek } }, -- by node: the sidesteps that are clear
 	links: number,
 	stair: { boolean }, -- by link index
+	viewsAt: { [number]: { number } }, -- by node, once asked for: studs of clear view in each of VIEWS directions
+	dipAt: { [number]: number }, -- by node, once asked for: how steeply a standing eye can look down towards the atrium
 }
 
 local BotNav = {}
 
 BotNav.KEEP_OFF = 30 -- studs from a door of the other team's room inside which a bot does not stand
-BotNav.PEEK = 2.6 -- studs a bot steps out from a cover spot to shoot round it
+BotNav.PEEK = 2.6 -- studs a bot steps out from a cover spot to shoot round it, at the least
+-- (a wide pillar or the end of a wall wants a longer step: the shortest of these that SEES is the peek)
+local PEEKS = { BotNav.PEEK, 3.4, 4.2, 5.0 }
+local PEEK_SEES = 12 -- studs of clear view the way the cover faces that make a step a peek
 BotNav.DOORSTEP = 14 -- studs round a door of a spawn room: no bot fires at its owners while they are on it
+BotNav.VIEWS = 12 -- directions round the compass a node's views are measured in
+BotNav.VIEW_FAR = 40 -- studs: no view is measured further
 local BACK_IN = 400 -- the cost of a step into one's own spawn room from outside it
 local STAIR_TASTE = 0.9 -- a stair link costs a bot up to this much more than its length, by its taste
 local FLOOR_TASTE = 0.35
@@ -163,15 +178,24 @@ function BotNav.build(arena: Arena): Nav
 		coverAt[c.node] = c
 		local list: { Peek } = {}
 		for _, side in { 1, -1 } do
-			-- across the sheltered direction: (nx, nz) turned a quarter
-			local px, pz = node.x - c.nz * side * BotNav.PEEK, node.z + c.nx * side * BotNav.PEEK
-			local g = arena.ground(px, node.y + 0.5, pz)
-			if g ~= nil and math.abs(g - node.y) < 0.05 and walkable(node.x, node.y, node.z, px, pz) then
+			-- across the sheltered direction: (nx, nz) turned a quarter; the shortest step that sees
+			for _, reach in PEEKS do
+				local px, pz = node.x - c.nz * side * reach, node.z + c.nx * side * reach
+				local g = arena.ground(px, node.y + 0.5, pz)
+				if g == nil or math.abs(g - node.y) >= 0.05 or not walkable(node.x, node.y, node.z, px, pz) then
+					break -- no walking that way: a longer step is no better
+				end
 				-- and a little further, so that the body is not left hanging over an edge or in a wall
-				local fx, fz = node.x - c.nz * side * (BotNav.PEEK + 1.3), node.z + c.nx * side * (BotNav.PEEK + 1.3)
+				local fx, fz = node.x - c.nz * side * (reach + 1.3), node.z + c.nx * side * (reach + 1.3)
 				local g2 = arena.ground(fx, node.y + 0.5, fz)
-				if g2 ~= nil and math.abs(g2 - node.y) < 0.05 and walkable(px, node.y, pz, fx, fz) then
+				if g2 == nil or math.abs(g2 - node.y) >= 0.05 or not walkable(px, node.y, pz, fx, fz) then
+					break
+				end
+				-- out from behind it: a standing eye there sees the way the cover faces
+				local y = node.y + eye
+				if arena.sweep(px, y, pz, px + c.nx * PEEK_SEES, y, pz + c.nz * PEEK_SEES) == nil then
 					table.insert(list, { x = px, z = pz })
+					break
 				end
 			end
 		end
@@ -191,7 +215,69 @@ function BotNav.build(arena: Arena): Nav
 		peeks = peeks,
 		links = #links,
 		stair = stair,
+		viewsAt = {},
+		dipAt = {},
 	}
+end
+
+-- How steeply (radians below level, 0 = not at all) a standing eye at this node can look down
+-- towards the building's axis and still see DIP_CLEAR studs: over a rail into the atrium, not at
+-- the rail. Worked out once a node.
+local DIPS = { 0.7, 0.55, 0.4, 0.25 }
+local DIP_CLEAR = 9
+function BotNav.dip(nav: Nav, node: number): number
+	local had = nav.dipAt[node]
+	if had ~= nil then
+		return had
+	end
+	local at = nav.nodes[node]
+	local found = 0
+	if at ~= nil and (at.x ~= 0 or at.z ~= 0) then
+		local sweep = nav.arena.sweep
+		local y = at.y + ArenaModule.EYE
+		local yaw = math.atan2(at.x, at.z)
+		for _, dip in DIPS do
+			local clear = true
+			for _, off in { -0.5, 0, 0.5 } do
+				local flat = math.cos(dip) * DIP_CLEAR
+				local dx, dz = -math.sin(yaw + off) * flat, -math.cos(yaw + off) * flat
+				if sweep(at.x, y, at.z, at.x + dx, y - math.sin(dip) * DIP_CLEAR, at.z + dz) ~= nil then
+					clear = false
+					break
+				end
+			end
+			if clear then
+				found = dip
+				break
+			end
+		end
+	end
+	nav.dipAt[node] = found
+	return found
+end
+
+-- How far a standing eye at this node sees, level, in each of VIEWS directions: direction k looks
+-- along yaw (k - 1) * 2 pi / VIEWS (Body.look's yaw: 0 looks along -z). Worked out once a node.
+function BotNav.views(nav: Nav, node: number): { number }
+	local had = nav.viewsAt[node]
+	if had ~= nil then
+		return had
+	end
+	local at = nav.nodes[node]
+	local out: { number } = table.create(BotNav.VIEWS, 0)
+	if at ~= nil then
+		local sweep = nav.arena.sweep
+		local y = at.y + ArenaModule.EYE
+		local far = BotNav.VIEW_FAR
+		for k = 1, BotNav.VIEWS do
+			local yaw = (k - 1) * 2 * math.pi / BotNav.VIEWS
+			local dx, dz = -math.sin(yaw), -math.cos(yaw)
+			local hit = sweep(at.x, y, at.z, at.x + dx * far, y, at.z + dz * far)
+			out[k] = if hit ~= nil then hit * far else far
+		end
+	end
+	nav.viewsAt[node] = out
+	return out
 end
 
 -- Is a body of `team` at (x, y, z) on its own doorstep: within DOORSTEP (and `more`, if given) of a

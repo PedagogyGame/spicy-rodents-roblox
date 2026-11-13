@@ -43,7 +43,8 @@
 --            for every ball and keeping some of the last one's (it walks its balls in). A sigma is
 --            what the moment makes it: wider with range, with the target's speed, with the bot's
 --            own, at a low skill, and widest on the first ball at a new target (the warning splat).
---   fires    only along its own look, when the look has settled on the aim, in bursts with pauses;
+--   fires    only along its own look, when the look has settled on the aim and has been turned
+--            towards the target for BOT.faced without a break (FACING), in bursts with pauses;
 --            only when Rules.canFire says so and the target may be hit; never while sprinting or
 --            within Body.SPRINT_FIRE_DELAY of it; never from a spawn room, at somebody inside one, or
 --            at somebody on their own doorstep who has not fired for DOOR_TRUCE (BotNav.atDoor:
@@ -227,6 +228,8 @@ export type Brain = {
 	aimYaw: number,
 	aimPitch: number,
 	huntable: boolean, -- it has just lost sight of somebody and has not yet decided whether to go and see
+	facedWho: number?, -- the target its look has been turned towards (inside FACING of it) ...
+	facedAt: number, -- ... without a break since this time
 	saidAt: number,
 }
 
@@ -286,6 +289,11 @@ local TEAM_SAY_EVERY = 8 -- and between one team's
 -- from last time. It fires as it goes, with the error its own movement adds. Behind cover it has the
 -- cover instead. Every step of it is one a person's body could take (the sim's legs check).
 local JINK = 2.8 -- studs (inside what the stuck watch, and anybody watching, calls one place)
+-- FACING: the puppet is the tell. A ball leaves only when the bot's look has been turned towards its
+-- target, within this of it, for Profile.faced without a break: a sighting old enough is not enough
+-- if the bot has looked away since (it must be SEEN to turn on a player before it can tag them).
+local FACING = math.rad(40)
+local OPEN_VIEW = 12 -- studs of clear view that make a direction worth looking in from a post
 local STUCK = 9 -- seconds in one place before the stuck watch sends a bot somewhere else
 local STUCK_REACH = 6 -- studs: "one place" is this far across
 local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
@@ -405,6 +413,8 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		aimYaw = 0,
 		aimPitch = 0,
 		huntable = false,
+		facedWho = nil,
+		facedAt = 0,
 		saidAt = -math.huge,
 	}
 end
@@ -477,6 +487,7 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 	b.scanYaw, b.scanPitch = yaw, 0
 	b.wantYaw, b.wantPitch = yaw, 0
 	b.aimed = nil
+	b.facedWho = nil
 	b.huntable = false
 	b.burst = 1
 	b.pauseUntil = now
@@ -1203,6 +1214,17 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 							b.peekX, b.peekZ, b.peekBack, b.jink = peek.x, peek.z, false, false
 							b.backX, b.backZ = nav.nodes[b.at].x, nav.nodes[b.at].z
 							b.peekAt = now + rng.range(1.6, 3.2)
+							-- out from behind it, it looks where the cover faces (and a little away from
+							-- the cover's edge, never into it): that is what a peek is for
+							local node = nav.nodes[b.at]
+							local ox, oz = peek.x - node.x, peek.z - node.z
+							local reach = math.max(1e-3, math.sqrt(ox * ox + oz * oz))
+							local away = rng.range(0, 0.45)
+							local dx = cover.nx * math.cos(away) + ox / reach * math.sin(away)
+							local dz = cover.nz * math.cos(away) + oz / reach * math.sin(away)
+							b.scanYaw = wrap(math.atan2(-dx, -dz))
+							b.scanPitch = 0
+							b.scanAt = b.peekAt
 						else
 							b.peekBack = true
 							b.peekAt = now + rng.range(1.5, 3.5)
@@ -1316,6 +1338,34 @@ local function move(b: Brain, state: State, now: number, dt: number)
 	end
 end
 
+-- A direction to look in from the post the bot stands at: `yaw` if there is something to see that way
+-- (OPEN_VIEW studs of clear view), else the nearest direction either side that has, else the longest
+-- view there is. (Nobody stands guard with their nose to a wall.)
+local function openYaw(b: Brain, yaw: number): number
+	local views = BotNav.views(b.nav, b.at)
+	local n = #views
+	local step = 2 * math.pi / n
+	local k = math.floor((yaw % (2 * math.pi)) / step + 0.5) % n
+	if views[k + 1] >= OPEN_VIEW then
+		return yaw
+	end
+	local rng = b.rng
+	local first = if rng.next() < 0.5 then 1 else -1
+	local best, bestView = k, views[k + 1]
+	for away = 1, n // 2 do
+		for _, side in { first, -first } do
+			local j = (k + away * side) % n
+			if views[j + 1] >= OPEN_VIEW then
+				return wrap(j * step + rng.range(-0.2, 0.2))
+			end
+			if views[j + 1] > bestView then
+				best, bestView = j, views[j + 1]
+			end
+		end
+	end
+	return wrap(best * step)
+end
+
 -- Where the look wants to be when there is nobody to aim at.
 local function idleLook(b: Brain, squad: Squad, now: number)
 	local nav = b.nav
@@ -1381,9 +1431,18 @@ local function idleLook(b: Brain, squad: Squad, now: number)
 		end
 		local arena = nav.arena
 		if math.abs(b.x) < arena.atrium + 12 and math.abs(b.z) < arena.atrium + 12 and rng.next() < 0.6 then
-			-- beside the atrium: across it, at the other storeys
-			yaw = math.atan2(b.x, b.z) + rng.range(-0.6, 0.6)
-			pitch = rng.range(-0.7, 0.45)
+			-- beside the atrium, with a view of it: across it, at the other storeys (down as far as
+			-- there is something to see over the rail)
+			local across = math.atan2(b.x, b.z) + rng.range(-0.5, 0.5)
+			local views = BotNav.views(nav, b.at)
+			local step = 2 * math.pi / #views
+			if views[math.floor((across % (2 * math.pi)) / step + 0.5) % #views + 1] >= OPEN_VIEW then
+				yaw = across
+				pitch = rng.range(-BotNav.dip(nav, b.at), 0.45)
+			end
+		end
+		if pitch == 0 and not b.wantCrouch then
+			yaw = openYaw(b, yaw) -- (a look up or down the atrium is a view of its own)
 		end
 		b.scanYaw, b.scanPitch = wrap(yaw), math.clamp(pitch, -1.1, 1.1)
 	end
@@ -1480,6 +1539,7 @@ function BotBrain.step(
 	-- where the target is, as far as this bot knows: where it last SAW it, carried on at the speed it
 	-- was going then. It never reads where a body it cannot see has got to.
 	local tx, ty, tz = 0, 0, 0
+	local ax, ay, az = 0, 0, 0 -- from its eye to the middle of the target, as far as it knows
 	if target ~= nil and tpose ~= nil and contact ~= nil and now - contact.seen <= VIS then
 		aiming = true
 		local since = now - contact.seen
@@ -1487,9 +1547,10 @@ function BotBrain.step(
 		local cy = ty + (Body.LOW + Body.top(contact.crouch) - Body.RADIUS) * 0.5 -- the middle of its shape
 		local dx, dy, dz = tx - ex, cy - ey, tz - ez
 		local d = math.sqrt(dx * dx + dy * dy + dz * dz)
+		ax, ay, az = dx, dy, dz
 		local flight = d / feel.ballSpeed * b.lead
-		local ax, az = tx + contact.vx * flight, tz + contact.vz * flight
-		local vx, vy, vz = Ballistics.aim(ex, ey, ez, ax, cy, az, feel.ballSpeed, feel.ballDrop)
+		local wx, wz = tx + contact.vx * flight, tz + contact.vz * flight
+		local vx, vy, vz = Ballistics.aim(ex, ey, ez, wx, cy, wz, feel.ballSpeed, feel.ballDrop)
 		local yaw, pitch = Body.yawPitch(vx, vy, vz)
 		local sigma = spread(b, d, math.sqrt(contact.vx * contact.vx + contact.vz * contact.vz))
 		b.wantYaw = wrap(yaw + b.errYaw * sigma)
@@ -1510,6 +1571,15 @@ function BotBrain.step(
 	local k = math.min(1, p.gain * dt)
 	b.yaw = wrap(b.yaw + math.clamp(wrap(b.wantYaw - b.yaw) * k + leadYaw, -most, most))
 	b.pitch = math.clamp(b.pitch + math.clamp((b.wantPitch - b.pitch) * k + leadPitch, -most, most), -1.5, 1.5)
+	-- has it been facing its target? (see FACING)
+	if aiming then
+		local lx, ly, lz = Body.look(b.yaw, b.pitch)
+		if b.facedWho ~= target or ax * lx + ay * ly + az * lz < math.cos(FACING) * range then
+			b.facedWho, b.facedAt = target, now
+		end
+	else
+		b.facedWho = nil
+	end
 	-- fire? Only along the look as it now is, and only when it has settled on the aim
 	if
 		aiming
@@ -1520,6 +1590,7 @@ function BotBrain.step(
 		and math.abs(wrap(b.wantYaw - b.yaw)) <= p.settle
 		and math.abs(b.wantPitch - b.pitch) <= p.settle
 		and now - contact.first >= math.max(contact.react, p.faced)
+		and now - b.facedAt >= p.faced
 		and range <= p.range * feel.ballSpeed
 		and not b.sprint
 		and now - b.sprintAt >= Body.SPRINT_FIRE_DELAY + 0.02

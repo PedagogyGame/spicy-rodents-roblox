@@ -526,6 +526,74 @@ return function(t)
 	)
 
 	t.test(
+		"at a post it looks where there is something to see: not at a wall, not into the pillar it peeks round",
+		function()
+			-- every sixth place a bot may stand on the upper storeys (the person is on the ground: nobody to see)
+			local posts, walls, tried = 0, 0, 0
+			local worst, worstAt = 0, 0
+			for floor = 2, arena.floors do
+				local list = nav.goals[floor]
+				for k = 1, #list, 6 do
+					local at = list[k]
+					local c = closeUp(at, 0, 7 + k)
+					local home = arena.spawns[1][1] -- (the person: in their spawn room, where nobody looks)
+					c.poses[1].x, c.poses[1].y, c.poses[1].z = home.x, home.y, home.z
+					c.brain.mode = "hold"
+					c.brain.holdUntil = math.huge
+					c.brain.scanAt = c.now -- it looks about as it likes
+					tried += 1
+					local mine, blocked = 0, 0
+					for _ = 1, 12 * Clock.TICK_HZ do
+						stepClose(c, DT)
+						local pose = c.poses[2]
+						if pose.crouch > 0.3 then
+							continue -- down behind low cover it is hiding, not looking
+						end
+						mine += 1
+						local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+						local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
+						if arena.sweep(ex, ey, ez, ex + lx * 5, ey + ly * 5, ez + lz * 5) ~= nil then
+							blocked += 1
+						end
+					end
+					t.eq(c.brain.target, nil)
+					posts += mine
+					walls += blocked
+					if mine > 0 and blocked / mine > worst then
+						worst, worstAt = blocked / mine, at
+					end
+				end
+			end
+			t.truthy(tried >= 25, `{tried} posts tried`)
+			-- (what is left is the look swinging past a pillar on its way from one view to the next)
+			t.truthy(walls / posts < 0.04, `{walls / posts} of the time its look ended within 5 studs`)
+			t.truthy(worst < 0.2, `at node {worstAt}, {worst} of the time`)
+			-- a peek sees: from every peek point a standing eye has a clear view the way the cover faces
+			local peeks = 0
+			for id, cover in nav.coverAt do
+				local node = nav.nodes[id]
+				for _, peek in nav.peeks[id] do
+					peeks += 1
+					local y = node.y + ArenaModule.EYE
+					t.eq(
+						(arena.sweep(peek.x, y, peek.z, peek.x + cover.nx * 12, y, peek.z + cover.nz * 12)),
+						nil,
+						`the peek at node {id} sees past its cover`
+					)
+				end
+			end
+			t.truthy(peeks >= 40, `{peeks} peeks`)
+			-- what a node sees: twelve directions, measured once, kept
+			local views = BotNav.views(nav, groundNode(0, -24))
+			t.eq(#views, BotNav.VIEWS)
+			t.truthy(BotNav.views(nav, groundNode(0, -24)) == views, "kept")
+			for _, far in views do
+				t.truthy(far > 0 and far <= BotNav.VIEW_FAR)
+			end
+		end
+	)
+
+	t.test(
 		"the legs are a person's: the sim holds every step a brain takes to the rules a person's pose is held to",
 		function()
 			-- seat 1 a scripted person, seat 2 a bot (team 2); no brain runs: the case moves the bot by hand
@@ -793,6 +861,9 @@ return function(t)
 		t.truthy(s.coverShare > 0.15 and s.coverShare < 0.6, `{s.coverShare * 100}% of the time at cover`)
 		t.truthy(s.crouchShare > 0.005, "somebody crouched behind a rail")
 		t.truthy(s.sprintShare > 0.05 and s.sprintShare < 0.5)
+		-- at a post they look where there is something to see (what is left is a look at where a noise
+		-- came from or somebody vanished, and the look swinging past a pillar on its way)
+		t.truthy(s.noseShare < 0.22, `at a post their look ended on a wall {s.noseShare * 100}% of the time`)
 	end)
 
 	t.test(
@@ -1045,9 +1116,10 @@ return function(t)
 			s.personCompany > 0.35 and s.personCompany > s.botCompany + 0.1,
 			`a bot of its team was near the stand-in {s.personCompany * 100}% of the time, near another bot {s.botCompany * 100}%`
 		)
-		-- the bots tagged the person only after facing them
+		-- the bots tagged the person only after facing them (a ball meant for somebody else that the person
+		-- walked into is nobody's aim)
 		for _, tag in sim.rec.tags do
-			if tag.byBot and not tag.idBot then
+			if tag.byBot and not tag.idBot and not tag.stray then
 				t.truthy(tag.faced, "a bot that tags a person has been seen to turn on them")
 			end
 		end

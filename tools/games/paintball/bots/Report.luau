@@ -23,8 +23,9 @@ export type Summary = {
 	byRange: { Band }, -- bots' shots at a target, by range
 	bySpeed: { Band }, -- by the target's speed
 	byOrder: { Band }, -- the first ball at a target, the second, the rest
-	facedOf: number, -- bot tags counted for the facing figure
+	facedOf: number, -- bot tags counted for the facing figure: those on whoever the bot was firing at
 	faced: number, -- of them, the bot had faced its victim for BOT.faced
+	strayTags: number, -- bot tags on somebody else who walked into the ball (nobody faces a stray)
 	floorShare: { number }, -- bots' time in play by storey, 0..1
 	stairPairs: { { number } }, -- by storey pair (1 = ground to first): the uses of each of its flights
 	stairBusiest: number, -- the largest share one flight has of its storey pair's traffic
@@ -43,6 +44,7 @@ export type Summary = {
 	coverShare: number, -- bots' time at a cover spot
 	crouchShare: number,
 	sprintShare: number,
+	noseShare: number, -- of the bots' time standing at a post with nobody to fight: looking at a wall within 5 studs
 	botMs: number, -- Bots.step, mean milliseconds a tick while live
 	botMsMax: number,
 	botCount: number,
@@ -103,9 +105,12 @@ function Report.summary(sim: Sim.Sim): Summary
 		add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
 	end
 	local facedOf, faced, doorTags, doorStray = 0, 0, 0, 0
+	local strayTags = 0
 	local personTags, personOuts = 0, 0
 	for _, tag in rec.tags do
-		if tag.byBot then
+		if tag.byBot and tag.stray then
+			strayTags += 1
+		elseif tag.byBot then
 			facedOf += 1
 			if tag.faced then
 				faced += 1
@@ -125,6 +130,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	end
 	local floorTime: { number } = table.create(arena.floors, 0)
 	local play, cover, crouched, sprinted = 0, 0, 0, 0
+	local post, nose = 0, 0
 	local still, stillSlot, camping, stares = 0, 0, 0, 0
 	local roomSlowest, roomSum, lives = 0, 0, 0
 	local botCount = 0
@@ -141,6 +147,8 @@ function Report.summary(sim: Sim.Sim): Summary
 		cover += rs.atCover
 		crouched += rs.crouched
 		sprinted += rs.sprinted
+		post += rs.post
+		nose += rs.nose
 		camping += rs.camping
 		stares += rs.stares
 		for f = 1, arena.floors do
@@ -213,6 +221,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		byOrder = byOrder,
 		facedOf = facedOf,
 		faced = faced,
+		strayTags = strayTags,
 		floorShare = floorShare,
 		stairPairs = stairPairs,
 		stairBusiest = busiest,
@@ -229,6 +238,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		coverShare = if play > 0 then cover / play else 0,
 		crouchShare = if play > 0 then crouched / play else 0,
 		sprintShare = if play > 0 then sprinted / play else 0,
+		noseShare = if post > 0 then nose / post else 0,
 		botMs = if rec.ticks > 0 then rec.botMs / rec.ticks else 0,
 		botMsMax = rec.botMsMax,
 		botCount = botCount,
@@ -326,8 +336,8 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	say("  by target: " .. bands(s.bySpeed))
 	say("  by ball:   " .. bands(s.byOrder))
 	say(
-		`  facing: {s.faced} of {s.facedOf} bot tags came from a bot that had its victim in view for `
-			.. `{Contract.BOT.faced} s before the ball`
+		`  facing: {s.faced} of {s.facedOf} tags a bot aimed came from one that had its victim in view for `
+			.. `{Contract.BOT.faced} s before the ball ({s.strayTags} more were strays somebody else walked into)`
 	)
 	say("THE BUILDING")
 	local shares = {}
@@ -346,6 +356,7 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 		`  at cover {pct(s.coverShare)} of the time, crouched {pct(s.crouchShare)}, sprinting {pct(s.sprintShare)}; `
 			.. `longest stand-still {string.format("%.1f", s.still)} s (seat {s.stillSlot})`
 	)
+	say(`  at a post with nobody to fight, their look ends on a wall within 5 studs {pct(s.noseShare)} of the time`)
 	say(
 		`  spawn rooms: out in {string.format("%.1f", s.roomMean)} s on average, {string.format("%.1f", s.roomSlowest)} s at the slowest; `
 			.. `{s.doorTags} tagged on their own doorstep ({s.doorStray} of them quiet, by a ball meant for somebody else); `

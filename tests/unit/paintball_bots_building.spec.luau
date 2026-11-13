@@ -135,6 +135,28 @@ return function(t)
 		for f = 1, arena.floors do
 			t.truthy(#nav.goals[f] > 10, `storey {f} has places to go`)
 		end
+		-- however wide the building's pillars and wall ends are, a peek is a step that SEES: from each
+		-- one a standing eye has a clear view the way its cover faces, and it is a step a body can take
+		local peeks, high = 0, 0
+		for id, c in nav.coverAt do
+			local node = nav.nodes[id]
+			if not c.low then
+				high += 1
+			end
+			for _, peek in nav.peeks[id] do
+				peeks += 1
+				local y = node.y + ArenaModule.EYE
+				t.eq(
+					(arena.sweep(peek.x, y, peek.z, peek.x + c.nx * 12, y, peek.z + c.nz * 12)),
+					nil,
+					`peek at node {id}`
+				)
+				t.truthy(ArenaModule.clearPath(arena.sweep, node.x, node.z, peek.x, peek.z, node.y + ArenaModule.CHEST))
+				t.near(arena.ground(peek.x, node.y + 0.5, peek.z) :: number, node.y, 0.05)
+				t.truthy((peek.x - node.x) ^ 2 + (peek.z - node.z) ^ 2 <= 5.01 ^ 2, "a step, not a walk")
+			end
+		end
+		t.truthy(peeks >= high * 0.5, `{peeks} peeks for {high} high cover spots`)
 	end)
 
 	t.test("4 v 4 of bots, a whole match: it finishes, both teams score, nobody is stuck or trapped", function()
@@ -212,6 +234,9 @@ return function(t)
 		t.truthy(s.coverShare > 0.1 and s.coverShare < 0.7, `{s.coverShare * 100}% of the time at cover`)
 		t.truthy(s.crouchShare > 0.003, "somebody crouched behind low cover")
 		t.truthy(s.sprintShare > 0.05 and s.sprintShare < 0.6, `{s.sprintShare * 100}% sprinting`)
+		-- at a post they look where there is something to see (what is left is a look at where a noise
+		-- came from or somebody vanished, and the look swinging past a pillar on its way)
+		t.truthy(s.noseShare < 0.25, `at a post their look ended on a wall {s.noseShare * 100}% of the time`)
 		-- they talk, and not all the time
 		local says = sim.rec.says
 		t.truthy((says.floor or 0) > 3 and (says.tagged or 0) > 1 and (says.out or 0) > 1)
@@ -252,9 +277,10 @@ return function(t)
 		t.truthy(s.stares <= 2, `{s.stares} times a bot followed somebody through a wall`)
 		t.eq(s.doorTrap, 0)
 		t.truthy(s.still < 20)
-		-- the bots tagged the person only after facing them
+		-- the bots tagged the person only after facing them (a ball meant for somebody else that the person
+		-- walked into is nobody's aim)
 		for _, tag in sim.rec.tags do
-			if tag.byBot and not tag.idBot then
+			if tag.byBot and not tag.idBot and not tag.stray then
 				t.truthy(tag.faced, "a bot that tags a person has been seen to turn on them")
 			end
 		end

@@ -140,6 +140,8 @@ export type SlotRecord = {
 	camping: number, -- seconds standing still near the other team's door with a line to it
 	stares: number, -- times it followed an opponent through a wall (audit only)
 	company: number, -- seconds with a bot of its own team within COMPANY studs on its storey
+	post: number, -- seconds a bot stood at a post, on its feet, with nobody to fight ...
+	nose: number, -- ... and of those, seconds its look ended on something within NOSE studs (a wall in its face)
 	lives: { Life },
 	sprinted: number,
 	lastX: number,
@@ -209,6 +211,7 @@ local SNAP = 1 / Clock.SNAP_HZ
 local SAMPLE = 0.25 -- seconds between looks at what everybody is doing, for the record
 local DOOR_TRUCE = 4 -- seconds: the truce a bot keeps with somebody on their own doorstep (BotBrain)
 local COMPANY = 35 -- studs: a team-mate this near on the same storey is company
+local NOSE = 5 -- studs: a look that ends this near is a look at a wall
 local PERSON_POSE_LAG = 0.1 -- a person's snapshot pose is read this far back (Clock.poseTime: up + a send interval)
 
 local Sim = {}
@@ -258,6 +261,8 @@ local function newSlotRecord(id: number, bot: boolean, team: number, floors: num
 		camping = 0,
 		stares = 0,
 		company = 0,
+		post = 0,
+		nose = 0,
 		lives = {},
 		sprinted = 0,
 		lastX = 0,
@@ -811,6 +816,16 @@ local function observe(sim: Sim, span: number)
 			then
 				rs.company += span
 				break
+			end
+		end
+		-- its nose to a wall: at a post, standing, nobody to fight, and the look ends within NOSE studs
+		local brain = if rs.bot then (sim.bots.brains :: { [number]: BotBrain.Brain })[id] else nil
+		if brain ~= nil and brain.mode == "hold" and brain.target == nil and pose.crouch < 0.3 then
+			rs.post += span
+			local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+			local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
+			if arena.sweep(ex, ey, ez, ex + lx * NOSE, ey + ly * NOSE, ez + lz * NOSE) ~= nil then
+				rs.nose += span
 			end
 		end
 		-- at cover: within a stride of a cover spot of this storey
