@@ -4,7 +4,8 @@
 -- click a shot and what refuses it (the magazine, the sprint, the spawn room, the origin), what a liar gets
 -- for lying about its fire rate, its ammunition, where it stood and what it saw; every tag, the paint it
 -- leaves and who is told; two verdicts in one tick; a late joiner's splats; the bots' commands; and scripted
--- clients at 0, 80, 150 and 300 ms of round trip with jitter and loss, each hitting what it saw.
+-- clients at 0, 80, 150 and 300 ms of round trip with jitter and loss, each hitting what it saw (standing,
+-- and strafing with clicks that are themselves jittered and now and then behind a lost packet).
 -- Interface: return function(t) (the spec shape)
 local Ballistics = require("@shared/Paintball/Ballistics")
 local Magazine = require("@shared/Paintball/Magazine")
@@ -619,8 +620,14 @@ return function(t)
 	-- time), leads her, and flies its own ball against the bodies it draws, frame by frame, as the client
 	-- lane's predicted ball does (Hit.body on the drawn pose). The server's verdict on each ball is then set
 	-- beside the shooter's own.
-	local function duel(rttMs: number, shots: number): { agree: number, shots: number, hits: number, refused: number }
-		local out = { agree = 0, shots = 0, hits = 0, refused = 0 }
+	-- `strafe`: the shooter walks from side to side as she fires, and her clicks have a connection's faults
+	-- too: each is jittered like a Move, and one in twenty is behind a lost packet, a fifth of a second late.
+	local function duel(
+		rttMs: number,
+		shots: number,
+		strafe: boolean?
+	): { agree: number, shots: number, hits: number, refused: number, late: number }
+		local out = { agree = 0, shots = 0, hits = 0, refused = 0, late = 0 }
 		local tagWas = Rules.tag
 		local ok, err = pcall(Kit.play, function(kit: Kit.Kit)
 			-- (the runner is hit and runs on: a tag here would send her back to her room after every hit)
@@ -641,6 +648,7 @@ return function(t)
 			local rand = ada.rand
 			local mag = Magazine.new(R.magazine, feel.fireInterval, feel.reloadSecs) -- the shooter's own
 			local dir = 1
+			local side = 1
 			local flying: { any } = {}
 			local nextShot = kit.now() + 0.4
 			local fired = 0
@@ -651,6 +659,12 @@ return function(t)
 				if bea.z > 8 or bea.z < -8 then
 					dir = -dir
 					bea.crouch = rand() < 0.3
+				end
+				if strafe then
+					ada.z += side * Body.WALK * FRAME
+					if ada.z > 3 or ada.z < -3 then
+						side = -side
+					end
 				end
 				-- the shooter's own ball, against what it draws
 				local vt = ada.viewTime()
@@ -689,7 +703,15 @@ return function(t)
 						local az = z + (z - z2) / 0.1 * tof + (rand() - 0.5) * 3.2
 						local ay = y + 1.5 + rand() * 3.5 -- (over 3.4 it meets her only if she stands)
 						local vx, vy, vz = Ballistics.aim(ex, ey, ez, ax, ay, az, feel.ballSpeed, feel.ballDrop)
-						local shot = ada.fire(vx / feel.ballSpeed, vy / feel.ballSpeed, vz / feel.ballSpeed)
+						local held = 0
+						if strafe then
+							held = math.floor(rand() * 3)
+							if rand() < 0.05 then
+								held += 12
+								out.late += 1
+							end
+						end
+						local shot = ada.fire(vx / feel.ballSpeed, vy / feel.ballSpeed, vz / feel.ballSpeed, nil, held)
 						fired += 1
 						verdicts[shot] = { saw = false }
 						table.insert(flying, {
@@ -724,7 +746,9 @@ return function(t)
 				out.agree += if server == v.saw then 1 else 0
 			end
 			local stats = kit.service:stats()
-			assert(stats.corrections == 0, `{stats.corrections} corrections of honest clients at {rttMs} ms`);
+			assert(stats.corrections == 0, `{stats.corrections} corrections of honest clients at {rttMs} ms`)
+			assert(stats.movesRefused == 0, `{stats.movesRefused} Moves of honest clients refused at {rttMs} ms`)
+			assert(stats.movesAccepted > 1500, `only {stats.movesAccepted} Moves were judged at {rttMs} ms`);
 			(Rules :: any).tag = model
 		end, { arena = Kit.hall({ room2 = -20 }), feel = Contract.feel({ reloadSecs = 0.5 }) });
 		(Rules :: any).tag = tagWas
@@ -747,6 +771,20 @@ return function(t)
 					r.hits >= 5 and r.hits <= r.shots - 5,
 					`{r.hits} hits of {r.shots}: both verdicts were put to the test`
 				)
+				t.truthy(r.agree / r.shots >= case.bar, `agreement {r.agree} of {r.shots} at {case.rtt} ms`)
+			end
+		)
+	end
+
+	for _, case in { { rtt = 80, bar = 0.95 }, { rtt = 150, bar = 0.95 } } do
+		t.test(
+			`a strafing shooter at {case.rtt} ms whose clicks are jittered and now and then a fifth of a second late: none is refused, and the server agrees with her screen on at least {case.bar * 100} % of 100 shots`,
+			function()
+				local r = duel(case.rtt, 100, true)
+				t.eq(r.refused, 0, "an honest client's shot is never refused, however late it came")
+				t.truthy(r.late >= 2, `{r.late} clicks came late`)
+				t.truthy(r.shots >= 95, `{r.shots} shots judged`)
+				t.truthy(r.hits >= 5 and r.hits <= r.shots - 5, `{r.hits} hits of {r.shots}`)
 				t.truthy(r.agree / r.shots >= case.bar, `agreement {r.agree} of {r.shots} at {case.rtt} ms`)
 			end
 		)
