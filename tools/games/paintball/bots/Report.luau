@@ -35,7 +35,8 @@ export type Summary = {
 	roomSlowest: number, -- the longest any life took to leave its spawn room, seconds
 	roomMean: number,
 	doorTags: number, -- tags on somebody standing on their own doorstep (BotNav.atDoor)
-	doorTrap: number, -- of them, by a bot on somebody who had not fired for 4 s (a bot never does it)
+	doorTrap: number, -- of them, by a bot's ball AIMED at somebody who had not fired for 4 s (a bot never does it)
+	doorStray: number, -- and by a bot's ball fired at somebody else, that such a body walked into
 	lives: number,
 	coverShare: number, -- bots' time at a cover spot
 	crouchShare: number,
@@ -92,7 +93,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		add(bySpeed[if shot.speed < 4 then 1 elseif shot.speed < 20 then 2 else 3], shot.tagged)
 		add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
 	end
-	local facedOf, faced, doorTags, doorTrap = 0, 0, 0, 0
+	local facedOf, faced, doorTags, doorTrap, doorStray = 0, 0, 0, 0, 0
 	local personTags, personOuts = 0, 0
 	for _, tag in rec.tags do
 		if tag.byBot then
@@ -104,7 +105,11 @@ function Report.summary(sim: Sim.Sim): Summary
 		if tag.doorstep then
 			doorTags += 1
 			if tag.quiet and tag.byBot then
-				doorTrap += 1
+				if tag.stray then
+					doorStray += 1
+				else
+					doorTrap += 1
+				end
 			end
 		end
 		if not tag.byBot and tag.idBot then
@@ -206,6 +211,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		roomMean = if lives > 0 then roomSum / lives else 0,
 		doorTags = doorTags,
 		doorTrap = doorTrap,
+		doorStray = doorStray,
 		lives = lives,
 		coverShare = if play > 0 then cover / play else 0,
 		crouchShare = if play > 0 then crouched / play else 0,
@@ -326,7 +332,8 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	)
 	say(
 		`  spawn rooms: out in {string.format("%.1f", s.roomMean)} s on average, {string.format("%.1f", s.roomSlowest)} s at the slowest; `
-			.. `{s.doorTags} tagged on their own doorstep ({s.doorTrap} of them by a bot, without having fired); `
+			.. `{s.doorTags} tagged on their own doorstep (a bot's ball aimed at somebody there who had not fired: {s.doorTrap}; `
+			.. `a stray one: {s.doorStray}); `
 			.. `{string.format("%.1f", s.camping)} bot-seconds watching a door`
 	)
 	if sim.opts.audit then

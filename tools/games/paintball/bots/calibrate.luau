@@ -8,7 +8,8 @@
 --           (the target is about three in five)
 --   stuck   the longest any bot stood still, and how long the slowest took to leave its spawn room
 --   camps   bot-seconds spent standing with a line to the other team's door; tags on somebody on
---           their own doorstep, and of those the ones a bot made on somebody who had not fired
+--           their own doorstep, and of those the ones a bot AIMED at somebody who had not fired (a
+--           stray ball that such a body walked into is not counted there)
 --   stairs  the largest share one flight has of its storey's traffic (not all up one stair), and the
 --           bots' time on the least-used storey
 --   facing  of the bots' tags, how many came from a bot that had faced its victim for BOT.faced
@@ -16,20 +17,25 @@
 --   cost    Bots.step with 15 bots (an 8 v 8 with one stand-in): mean milliseconds a tick, and the
 --           share of ticks over the budget
 -- Usage, from the repo root:
---   lune run tools/games/paintball/bots/calibrate.luau [matches a speed, default 10] [key=value ...]
--- where each key is a Contract.FEEL number (fireInterval=0.3 reloadSecs=2 ...) or `skill`, the bots'.
+--   lune run tools/games/paintball/bots/calibrate.luau [matches a speed, default 10] [key=value ...] [greybox]
+-- where each key is a Contract.FEEL number (fireInterval=0.3 reloadSecs=2 ...) or `skill`, the bots';
+-- `greybox` plays in the lane's test building (Greybox, beside this file) instead of the game's own.
 -- Interface: a script (prints a report); nothing is written.
 local process = require("@lune/process")
 local Contract = require("@shared/Minigames/Paintball/Contract")
+local Greybox = require("./Greybox")
 local Report = require("./Report")
 local Sim = require("./Sim")
 
 local matches = 10
 local over: { [string]: number } = {}
 local skill = 0.5
+local greybox = false
 for i, arg in process.args do
 	local key, value = string.match(arg, "^(%a+)=([%d%.]+)$")
-	if key ~= nil and tonumber(value) ~= nil then
+	if arg == "greybox" then
+		greybox = true
+	elseif key ~= nil and tonumber(value) ~= nil then
 		if key == "skill" then
 			skill = tonumber(value) :: number
 		else
@@ -49,7 +55,11 @@ local function f(v: number, places: number?): string
 	return string.format(`%.{places or 1}f`, v)
 end
 
-print(`PAINTBALL BOTS: {matches} matches a speed, 1 stand-in + 3 bots v 4 bots, every bot of skill {skill}`)
+local arena = if greybox then Greybox.build() else nil
+print(
+	`PAINTBALL BOTS in {if greybox then "the lane's test building (Greybox)" else "the game's building (ArenaData)"}: `
+		.. `{matches} matches a speed, 1 stand-in + 3 bots v 4 bots, every bot of skill {skill}`
+)
 local fair = Sim.FAIR
 print(
 	`the stand-in: reacts in {fair.reactMin} to {fair.reactMax} s, sees {f(math.deg(fair.sightHalf), 0)} degrees either side `
@@ -69,7 +79,8 @@ for _, speed in SPEEDS do
 	local least = 1
 	local unfinished = 0
 	for seed = 1, matches do
-		local sim = Sim.new({ seed = seed, perSide = 4, people = 1, feel = feel, skill = skill, audit = true })
+		local sim =
+			Sim.new({ seed = seed, perSide = 4, people = 1, feel = feel, skill = skill, audit = true, arena = arena })
 		Sim.run(sim)
 		local s = Report.summary(sim)
 		if not s.finished then
@@ -116,13 +127,13 @@ for _, speed in SPEEDS do
 	)
 end
 print(
-	"  (tags, camps and door tags are a match, with in brackets all the bots' tags on a doorstep nobody had fired from;"
+	"  (tags, camps and door tags are a match, with in brackets all the balls a bot aimed at a doorstep nobody had fired from;"
 )
 print("   stuck, room and stair are the worst of all the matches; walls is all of them together)")
 print("")
 -- the cost, with as many bots as the budget is written for
 over.ballSpeed = SPEEDS[1]
-local sim = Sim.new({ seed = 1, perSide = 8, people = 1, feel = Contract.feel(over), skill = skill })
+local sim = Sim.new({ seed = 1, perSide = 8, people = 1, feel = Contract.feel(over), skill = skill, arena = arena })
 local overBudget, ticks = 0, 0
 while not sim.done do
 	local before = sim.rec.botMs

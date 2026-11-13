@@ -107,6 +107,7 @@ export type Tag = {
 	sinceRoom: number, -- seconds since the victim left its spawn room
 	doorstep: boolean, -- the victim was on its own doorstep (BotNav.atDoor)
 	quiet: boolean, -- and had not fired a ball for 4 s: the tag a bot never makes
+	stray: boolean, -- the ball was fired at somebody else
 }
 
 type Life = { from: number, leftRoom: number?, ended: number? }
@@ -615,6 +616,7 @@ local function stepBalls(sim: Sim)
 				sinceRoom = sinceRoom,
 				doorstep = onStep,
 				quiet = onStep and now - (sim.lastShot[struck] or -math.huge) > 4,
+				stray = ball.shot.target ~= struck,
 			})
 		end
 	end

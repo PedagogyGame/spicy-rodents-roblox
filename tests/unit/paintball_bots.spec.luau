@@ -2,23 +2,27 @@
 -- The paintball bots (Server/Minigames/Paintball/Bots, BotBrain, BotNav; checklist PB-6, PB-10), pinned
 -- two ways. Close up: one bot, a hand-built match and a scripted person, for what a bot sees, hears,
 -- waits for and refuses to do. And whole matches played headless (tools/games/paintball/bots/Sim: the
--- real Session, Rules and Bots on the arena's data, with the lane's own ball loop): 4 v 4 and 8 v 8 of
--- bots alone, bots against a scripted target, and a match with the stand-in fair player; each with a
--- fixed seed, each run once and shared by the cases that read it.
--- (The numbers pinned here are bands round what the bots do today on the stand-in arena. When the
--- real building lands or the bots are retuned, run tools/games/paintball/bots/match.luau and
--- calibrate.luau, look, and move the bands on purpose.)
+-- real Session, Rules and Bots, with the lane's own ball loop): 4 v 4 and 8 v 8 of bots alone, bots
+-- against a scripted target, and a match with the stand-in fair player; each with a fixed seed, each
+-- run once and shared by the cases that read it.
+-- EVERYTHING HERE STANDS ON THE LANE'S OWN TEST BUILDING (tools/games/paintball/bots/Greybox: the
+-- contract's stand-in arena, kept), so a case may name a spot by its coordinates and a band may be
+-- narrow: none of it moves when the real building is re-planned. The same bots on the game's own
+-- building (ArenaData.build()) are held to looser, building-blind bands in
+-- tests/unit/paintball_bots_building.spec.luau.
+-- (The numbers pinned here are bands round what the bots do today. When the bots are retuned, run
+-- tools/games/paintball/bots/match.luau and calibrate.luau with `greybox`, look, and move the bands
+-- on purpose.)
 local ArenaModule = require("@shared/Minigames/Paintball/Arena")
-local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local BotBrain = require("@server/Minigames/Paintball/BotBrain")
-local BotCheck = require("@server/Minigames/Paintball/BotCheck")
 local BotNav = require("@server/Minigames/Paintball/BotNav")
 local Bots = require("@server/Minigames/Paintball/Bots")
+local Greybox = require("../../tools/games/paintball/bots/Greybox")
 local Report = require("../../tools/games/paintball/bots/Report")
 local Sim = require("../../tools/games/paintball/bots/Sim")
 
@@ -28,7 +32,7 @@ local BOT = Contract.BOT
 local BIT = Wire.BIT
 local DT = 1 / Clock.TICK_HZ
 
-local arena = ArenaData.build()
+local arena = Greybox.build()
 local nav = BotNav.build(arena)
 
 -- matches are played once and shared
@@ -44,12 +48,12 @@ local function match(key: string, make: () -> Sim.Sim): (Sim.Sim, Report.Summary
 end
 local function four(): (Sim.Sim, Report.Summary)
 	return match("4v4", function()
-		return Sim.new({ seed = 11, perSide = 4 })
+		return Sim.new({ arena = arena, seed = 11, perSide = 4 })
 	end)
 end
 local function eight(): (Sim.Sim, Report.Summary)
 	return match("8v8", function()
-		return Sim.new({ seed = 12, perSide = 8 })
+		return Sim.new({ arena = arena, seed = 12, perSide = 8 })
 	end)
 end
 
@@ -629,10 +633,10 @@ return function(t)
 		end
 		t.truthy(pauses / gaps > 0.12, "bursts and pauses, not a hose")
 		-- the same seed plays the same match; another seed another
-		local again = Report.summary(Sim.run(Sim.new({ seed = 11, perSide = 4 })))
+		local again = Report.summary(Sim.run(Sim.new({ arena = arena, seed = 11, perSide = 4 })))
 		t.deepEq(again.scores, s.scores)
 		t.eq(again.shots, s.shots)
-		local other = Report.summary(Sim.run(Sim.new({ seed = 13, perSide = 4 }), 1000 + 120))
+		local other = Report.summary(Sim.run(Sim.new({ arena = arena, seed = 13, perSide = 4 }), 1000 + 120))
 		t.truthy(other.shots > 0)
 	end)
 
@@ -642,7 +646,8 @@ return function(t)
 		t.truthy(s.roomSlowest < 6, `the slowest out of a spawn room took {s.roomSlowest} s`)
 		t.truthy(s.roomMean < 3)
 		t.truthy(s.camping < 3, `{s.camping} bot-seconds watching the other team's door`)
-		t.truthy(s.doorTrap <= 2, `{s.doorTrap} quiet players tagged on their own doorstep by a bot`)
+		t.eq(s.doorTrap, 0, "no bot aims at a quiet player on their own doorstep")
+		t.truthy(s.doorStray <= 8, `{s.doorStray} quiet players walked off their doorstep into a stray ball`)
 		t.truthy(s.lives > 60)
 	end)
 
@@ -742,6 +747,7 @@ return function(t)
 				for seed = 1, 2 do
 					local dir = 1
 					local sim = Sim.new({
+						arena = arena,
 						seed = 20 + seed,
 						perSide = 4,
 						dummies = 1,
@@ -788,7 +794,7 @@ return function(t)
 		"a bot and a person are judged by one rule: the same click in the same place gets the same answer",
 		function()
 			-- seat 1 is a scripted person (team 1), seat 2 a bot (team 2); no brain runs: the case moves both
-			local sim = Sim.new({ seed = 5, perSide = 4, dummies = 1, frozen = true })
+			local sim = Sim.new({ arena = arena, seed = 5, perSide = 4, dummies = 1, frozen = true })
 			Sim.run(sim, sim.start + R.briefingSecs + F.protectSecs + 0.5)
 			t.eq(sim.state.phase, "live")
 			t.truthy(sim.botWho[2] ~= nil and sim.dummyWho[1])
@@ -890,7 +896,7 @@ return function(t)
 
 	t.test("with the stand-in fair player: a match the bots neither walk over nor are walked over in", function()
 		local sim, s = match("fair", function()
-			return Sim.new({ seed = 31, perSide = 4, people = 1, skill = 0.5, audit = true })
+			return Sim.new({ arena = arena, seed = 31, perSide = 4, people = 1, skill = 0.5, audit = true })
 		end)
 		t.truthy(s.finished)
 		t.eq(s.botCount, 7)
@@ -900,7 +906,7 @@ return function(t)
 		t.truthy(s.personWin > 0.35 and s.personWin < 0.85, `the stand-in won {s.personWin * 100}% of its exchanges`)
 		t.eq(s.refused, 0, "the stand-in's clicks pass the same judge")
 		t.truthy(s.stares <= 2, `{s.stares} times a bot followed somebody through a wall`)
-		t.truthy(s.doorTrap <= 2)
+		t.eq(s.doorTrap, 0)
 		t.truthy(s.still < 20)
 		-- the bots tagged the person only after facing them
 		for _, tag in sim.rec.tags do
@@ -912,7 +918,8 @@ return function(t)
 
 	t.test("a faster ball is still a match: the feel is the match's own, at 120 and 150 studs a second", function()
 		for _, speed in { 120, 150 } do
-			local sim = Sim.new({ seed = 40 + speed, perSide = 4, feel = Contract.feel({ ballSpeed = speed }) })
+			local sim =
+				Sim.new({ arena = arena, seed = 40 + speed, perSide = 4, feel = Contract.feel({ ballSpeed = speed }) })
 			Sim.run(sim, sim.start + 150)
 			local s = Report.summary(sim)
 			t.eq(sim.state.feel.ballSpeed, speed)
@@ -924,20 +931,4 @@ return function(t)
 			end
 		end
 	end)
-
-	t.test(
-		"the server check (BotCheck) runs here as it will there: fifteen bots, no rule broken, inside the budget",
-		function()
-			local result = BotCheck.run({ seconds = 45, seed = 3 })
-			t.deepEq(result.failures, {})
-			t.truthy(result.ok)
-			local n = result.numbers
-			t.eq(n.bots, Contract.COST.atBots)
-			t.eq(n.ticks, 45 * Clock.TICK_HZ)
-			t.truthy(n.shots > 100 and n.tags > 5, `{n.shots} balls, {n.tags} tags`)
-			t.eq(n.refused, 0)
-			t.eq(n.neverLeft, 0)
-			t.truthy(n.botsMs < n.budgetMs)
-		end
-	)
 end

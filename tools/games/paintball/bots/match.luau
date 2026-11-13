@@ -5,12 +5,14 @@
 -- stairs they used, stand-stills, spawn rooms, call-outs, refused commands and the cost of Bots.step.
 -- Usage, from the repo root:
 --   lune run tools/games/paintball/bots/match.luau [seed, default 1] [a side, 4..8, default 4]
---       [people, default 0] [ball speed, default 90] [audit]
+--       [people, default 0] [ball speed, default 90] [audit] [greybox]
 -- `people` seats that many stand-in fair players (Sim.FAIR) first; `audit` also looks for bots that
--- follow somebody through a wall (slower).
+-- follow somebody through a wall (slower); `greybox` plays in the lane's test building (Greybox, beside
+-- this file) instead of the game's own (ArenaData.build()).
 -- Interface: a script (prints a report); nothing is written.
 local process = require("@lune/process")
 local Contract = require("@shared/Minigames/Paintball/Contract")
+local Greybox = require("./Greybox")
 local Report = require("./Report")
 local Sim = require("./Sim")
 
@@ -19,6 +21,7 @@ local perSide = tonumber(process.args[2]) or 4
 local people = tonumber(process.args[3]) or 0
 local speed = tonumber(process.args[4]) or Contract.FEEL.ballSpeed
 local audit = table.find(process.args, "audit") ~= nil
+local greybox = table.find(process.args, "greybox") ~= nil
 
 local started = os.clock()
 local sim = Sim.new({
@@ -27,8 +30,10 @@ local sim = Sim.new({
 	people = people,
 	feel = Contract.feel({ ballSpeed = speed }),
 	audit = audit,
+	arena = if greybox then Greybox.build() else nil,
 })
 Sim.run(sim)
+print(`in {if greybox then "the lane's test building (Greybox)" else "the game's building (ArenaData)"}`)
 for _, line in Report.lines(sim) do
 	print(line)
 end
