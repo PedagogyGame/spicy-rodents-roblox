@@ -229,9 +229,10 @@ function Plan.build(): Plan
 
 	-- A full-height wall 1 thick, with openings. `along` "x": it runs along x at z = c from a to b;
 	-- "z": along z at x = c. Each opening is { centre, width, kind? }: a doorway (a lintel over it
-	-- from DOOR up, and a `doorways` entry: a point either side of it), or with kind "window" a sill
+	-- from DOOR up, and a `doorways` entry: a point either side of it), or with WINDOW after them a sill
 	-- RAIL_HEIGHT high with the lintel over it (low cover to shoot over; nobody walks through).
-	type Opening = { any }
+	type Opening = { number }
+	local WINDOW = 1
 	local function wall(
 		level: number,
 		look: string,
@@ -261,7 +262,7 @@ function Plan.build(): Plan
 			local p, q = o[1] - o[2] / 2, o[1] + o[2] / 2
 			piece(cursor, p, 0, top, KIND.wall)
 			piece(p, q, DOOR, top, KIND.wall)
-			if o[3] == "window" then
+			if o[3] == WINDOW then
 				piece(p, q, 0, RAIL, KIND.cover)
 			elseif along == "x" then
 				doorway(level, o[1], c - 2.6, o[1], c + 2.6)
@@ -532,16 +533,16 @@ function Plan.build(): Plan
 	local function truss(level: number, x0: number, x1: number, zc: number, base: number)
 		local w = 1.1
 		for _, dz in { -w, w - 0.4 } do
-			on(level, KIND.cover, "truss", x0, zc + dz, x1, zc + dz + 0.4, base, base + 0.4)
-			on(level, KIND.cover, "truss", x0, zc + dz, x1, zc + dz + 0.4, base + RAIL - 0.4, base + RAIL)
+			on(level, KIND.prop, "truss", x0, zc + dz, x1, zc + dz + 0.4, base, base + 0.4)
+			on(level, KIND.prop, "truss", x0, zc + dz, x1, zc + dz + 0.4, base + RAIL - 0.4, base + RAIL)
 		end
 		local n = math.max(2, math.floor((x1 - x0) / 2.6 + 0.5))
 		for k = 0, n do
 			local x = x0 + (x1 - x0 - 0.4) * k / n
-			on(level, KIND.cover, "truss", x, zc - w, x + 0.4, zc - w + 0.4, base + 0.4, base + RAIL - 0.4)
-			on(level, KIND.cover, "truss", x, zc + w - 0.4, x + 0.4, zc + w, base + 0.4, base + RAIL - 0.4)
-			on(level, KIND.cover, "truss", x, zc - w + 0.4, x + 0.4, zc + w - 0.4, base, base + 0.4)
-			on(level, KIND.cover, "truss", x, zc - w + 0.4, x + 0.4, zc + w - 0.4, base + RAIL - 0.4, base + RAIL)
+			on(level, KIND.prop, "truss", x, zc - w, x + 0.4, zc - w + 0.4, base + 0.4, base + RAIL - 0.4)
+			on(level, KIND.prop, "truss", x, zc + w - 0.4, x + 0.4, zc + w, base + 0.4, base + RAIL - 0.4)
+			on(level, KIND.prop, "truss", x, zc - w + 0.4, x + 0.4, zc + w - 0.4, base, base + 0.4)
+			on(level, KIND.prop, "truss", x, zc - w + 0.4, x + 0.4, zc + w - 0.4, base + RAIL - 0.4, base + RAIL)
 		end
 	end
 
@@ -637,7 +638,7 @@ function Plan.build(): Plan
 		-- the editor's office in the middle of the wing, behind windows
 		wall(L, W, "x", -9.5, -half, -46, nil)
 		wall(L, W, "x", 9.5, -half, -46, nil)
-		wall(L, W, "z", -45.5, -10, 10, { { -6, 4, "window" }, { 0, 5 }, { 6, 4, "window" } })
+		wall(L, W, "z", -45.5, -10, 10, { { -6, 4, WINDOW }, { 0, 5 }, { 6, 4, WINDOW } })
 		low(L, "desk", -55, -1.5, -50, 1.5)
 		tall(L, "cabinet", -59, -9, -54, -7.4, 7)
 		-- cubicles: a cross of partitions with a desk in two of its corners
@@ -692,7 +693,7 @@ function Plan.build(): Plan
 		wall(L, W, "x", -12.5, -43, -31, { { -37, 5 } })
 		wall(L, W, "x", 12.5, -43, -31, { { -37, 5 } })
 		wall(L, W, "z", -30.5, -half, -31, { { -45, 6 } })
-		wall(L, W, "z", 30.5, -half, -31, { { -52, 6, "window" }, { -39, 6 } })
+		wall(L, W, "z", 30.5, -half, -31, { { -52, 6, WINDOW }, { -39, 6 } })
 		-- make-up, outside the spawn room's north door (its twin: outside the east room's south door)
 		low(L, "desk", -52, -23, -45, -20.5)
 		low(L, "desk", -41, -28.5, -34, -26)
@@ -738,7 +739,7 @@ function Plan.build(): Plan
 	-- STOREY 3: master control and the tape library
 	do
 		local L, W = 3, "wall3"
-		wall(L, W, "z", -30.5, -30, 30, { { -20, 6 }, { -7, 8, "window" }, { 7, 8, "window" }, { 20, 6 } })
+		wall(L, W, "z", -30.5, -30, 30, { { -20, 6 }, { -7, 8, WINDOW }, { 7, 8, WINDOW }, { 20, 6 } })
 		wall(L, W, "z", -30.5, -half, -31, { { -45, 6 } })
 		wall(L, W, "z", 30.5, -half, -31, { { -45, 6 } })
 		-- master control: two rows of consoles facing the monitor wall on the west wall

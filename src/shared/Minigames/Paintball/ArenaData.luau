@@ -95,9 +95,9 @@ local function once(): Built
 end
 
 local function copies<T>(list: { T }): { T }
-	local out = table.create(#list)
+	local out: { T } = {}
 	for i, v in list do
-		out[i] = table.clone(v :: any)
+		out[i] = (table.clone(v :: any) :: any) :: T
 	end
 	return out
 end
@@ -145,31 +145,51 @@ end
 -- renders' eye points. F = Arena.FLOOR_HEIGHT.
 local F = Arena.FLOOR_HEIGHT
 ArenaData.POINTS = table.freeze({
+	-- the ground floor
 	atrium_floor = { x = 2, y = 0, z = 2 },
+	atrium_floor_west = { x = -11, y = 0, z = -2 },
+	atrium_floor_east = { x = 11, y = 0, z = 2 },
+	atrium_floor_aisle = { x = 1, y = 0, z = 0 },
+	dock_wall_east = { x = 59, y = 0, z = 0 },
 	dock_van = { x = 36, y = 0, z = 2 },
 	reception = { x = 0, y = 0, z = 44 },
+	scenery_store = { x = 0, y = 0, z = -44 },
 	north_stair_foot = { x = -12.75, y = 0, z = -28 },
 	south_stair_foot = { x = 12.75, y = 0, z = 28 },
+	-- the first floor
 	newsroom = { x = -45, y = F, z = -24 },
 	news_set = { x = 0, y = F, z = -33 },
+	north_landing_1 = { x = 12.75, y = F, z = -26 },
+	gallery_north_1 = { x = 0, y = F, z = -18.3 },
 	gallery_east_1 = { x = 18, y = F, z = 0 },
 	gallery_west_1 = { x = -18, y = F, z = 0 },
+	rail_east_1 = { x = 16.8, y = F, z = 0 },
+	-- the second: the studios and the spawn rooms' ways out
+	north_landing_2 = { x = -12.75, y = 2 * F, z = -26 },
+	gallery_north_2 = { x = 0, y = 2 * F, z = -18.3 },
+	gallery_south_2 = { x = 0, y = 2 * F, z = 18.3 },
 	gallery_east_2 = { x = 18, y = 2 * F, z = 0 },
 	gallery_west_2 = { x = -18, y = 2 * F, z = 0 },
-	gallery_north_2 = { x = 0, y = 2 * F, z = -18.3 },
-	studio_a = { x = 0, y = 2 * F, z = -40 },
-	studio_b = { x = 0, y = 2 * F, z = 40 },
+	rail_east_2 = { x = 16.8, y = 2 * F, z = 0 },
+	studio_a = { x = -5, y = 2 * F, z = -40 },
+	studio_b = { x = 5, y = 2 * F, z = 40 },
 	west_exit_north = { x = -57.5, y = 2 * F, z = -17 },
 	west_exit_south = { x = -46.5, y = 2 * F, z = 17 },
 	east_exit_south = { x = 57.5, y = 2 * F, z = 17 },
 	east_exit_north = { x = 46.5, y = 2 * F, z = -17 },
+	-- the third
 	master_control = { x = -44, y = 3 * F, z = 0 },
+	master_control_window = { x = -36, y = 3 * F, z = -7 },
 	tape_library = { x = -8, y = 3 * F, z = -48 },
 	gallery_east_3 = { x = 18, y = 3 * F, z = 0 },
+	gallery_west_3 = { x = -18, y = 3 * F, z = 0 },
+	rail_east_3 = { x = 16.8, y = 3 * F, z = 0 },
+	-- the fourth
 	gallery_west_4 = { x = -18, y = 4 * F, z = 0 },
 	gallery_east_4 = { x = 18, y = 4 * F, z = 0 },
+	rail_east_4 = { x = 16.8, y = 4 * F, z = 0 },
 	transmitter_hall = { x = 0, y = 4 * F, z = -48 },
-	office = { x = -52, y = 4 * F, z = -10 },
+	office = { x = -56, y = 4 * F, z = -3 },
 })
 
 return ArenaData

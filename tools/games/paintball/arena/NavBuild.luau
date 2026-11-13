@@ -282,9 +282,20 @@ function Nav.build(
 			return
 		end
 		local g = floorAt(x, z, level)
-		if g ~= nil then
-			table.insert(cover, { node = add(x, g, z, level, "cover"), nx = nx, nz = nz, low = low })
+		if g == nil then
+			return
 		end
+		-- what the piece does, asked of the ball test itself: a level ball at a crouched eye must stop on
+		-- it; it is low only when one at a standing eye flies over (a set on a cart hides a standing body)
+		local fx, fz = x + nx * (Nav.OFF + 1.7), z + nz * (Nav.OFF + 1.7)
+		if sweep(x, g + 2.7, z, fx, g + 2.7, fz) == nil then
+			return
+		end
+		local over = sweep(x, g + Arena.EYE, z, fx, g + Arena.EYE, fz) == nil
+		if over and not low then
+			return -- neither one thing nor the other
+		end
+		table.insert(cover, { node = add(x, g, z, level, "cover"), nx = nx, nz = nz, low = over })
 	end
 	local KIND = Arena.KIND
 	for i = 1, #kinds do

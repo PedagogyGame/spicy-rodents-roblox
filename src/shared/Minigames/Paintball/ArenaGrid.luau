@@ -54,8 +54,8 @@ function ArenaGrid.new(
 	end
 
 	-- every box into the cells it reaches
-	local cells: { { number } | false } = table.create(nx * ny * nz, false)
-	local columns: { { number } | false } = table.create(nx * nz, false)
+	local cells: { [number]: { number } } = table.create(nx * ny * nz) :: any
+	local columns: { [number]: { number } } = table.create(nx * nz) :: any
 	local entries = 0
 	for i = 1, n do
 		local k = (i - 1) * 6
@@ -84,7 +84,7 @@ function ArenaGrid.new(
 			end
 		end
 	end
-	local rampColumns: { { number } | false } = table.create(nx * nz, false)
+	local rampColumns: { [number]: { number } } = table.create(nx * nz) :: any
 	for i, r in ramps do
 		for ix = cellOf(r.minX - EPS, ox, nx), cellOf(r.maxX + EPS, ox, nx) do
 			for iz = cellOf(r.minZ - EPS, oz, nz), cellOf(r.maxZ + EPS, oz, nz) do
