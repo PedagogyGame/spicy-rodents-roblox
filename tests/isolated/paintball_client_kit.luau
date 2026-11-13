@@ -8,15 +8,26 @@
 -- rail (Arena.RAIL_HEIGHT high) across at z = 10 (x -10..10); team 1's spawn room against the west wall (x
 -- -60..-44, z -12..12), team 2's against the east. The player stands at (0, 0, 30) looking north (yaw 0, along
 -- -z) unless a case moves it.
+-- THE CASE PLAYS THE SERVER, WHATEVER STANDS BEHIND THE CONTRACT'S STUBS. In the client lane's own tree the
+-- match model (Shared/Minigames/Paintball/Rules) and the service (Server/Minigames/Paintball/PaintballService)
+-- are the contract's stubs, which seat nobody and never fire; once the lanes are joined they are the real ones,
+-- which place bodies, run phases and answer clicks by themselves. A case that scripts the server must find the
+-- same quiet stage in both trees, so for its length scripted() puts a model that only keeps the roster and the
+-- clock in the real one's place (the stub's own behaviour, function for function) and standDown() makes the
+-- service's hooks answer as the stub's do. (The real client against the real service is another file's:
+-- tests/isolated/paintball_client_joined.luau.)
 -- Interface: arena() -> Arena; bench(opts?) -> Bench (opts.dt: another frame time than DT); frame(b, n?); run(b, seconds); state(b, over?) -> msg (and
 --   hands it to the seat); message(b, msg) (checked, then to the seat); snap(b, bodies, t?); watch(b, slots?,
 --   over?); body(id, x, y, z, more?) -> a snapshot body; fires(b) / moves(b) -> decoded records; cues(b, cue) ->
---   how many times it was asked for; SERVER_TIME; DT
+--   how many times it was asked for; scripted() -> undo (the match model out of play); standDown(service) (the
+--   service out of play); SERVER_TIME; DT
 local ShowCore = require("@client/Minigames/Paintball/ShowCore")
 local SeatCore = require("@client/Minigames/Paintball/SeatCore")
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local Contract = require("@shared/Minigames/Paintball/Contract")
+local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
+local Magazine = require("@shared/Paintball/Magazine")
 local BufferCodec = require("@shared/Util/BufferCodec")
 
 local Kit = {}
@@ -372,6 +383,237 @@ function Kit.showCues(b: Bench, cue: string): number
 		end
 	end
 	return n
+end
+
+-- The match model out of play for the length of a case: every function of Rules answers as the contract's stub
+-- does (it keeps the seats, their sides and the clock; it never changes phase, fires, tags or ends), so the
+-- case's own hands on the State are the only ones. Returns the undo, which puts the real functions back.
+function Kit.scripted(): () -> ()
+	local R = Contract.Rules
+	local function newSlot(state: any, id: number, team: number): any
+		return {
+			id = id,
+			team = team,
+			on = true,
+			since = state.now,
+			out = false,
+			outAt = 0,
+			outUntil = 0,
+			safeUntil = state.now,
+			spawn = math.ceil(id / 2),
+			mag = Magazine.new(R.magazine, state.feel.fireInterval, state.feel.reloadSecs),
+			tags = 0,
+			outs = 0,
+			shots = 0,
+			hits = 0,
+		}
+	end
+	local function sideCount(state: any, team: number): number
+		local n = 0
+		for _, slot in state.slots do
+			if slot.on and slot.team == team then
+				n += 1
+			end
+		end
+		return n
+	end
+	local model: { [string]: any } = {
+		init = function(seats: number, seed: number): any
+			local state = {
+				now = 0,
+				synced = false,
+				seed = seed,
+				feel = Contract.feel(),
+				phase = "briefing",
+				endsAt = R.briefingSecs,
+				scores = { 0, 0 },
+				slots = {},
+				events = {},
+			}
+			for id = 1, seats do
+				state.slots[id] = newSlot(state, id, Contract.teamOf(id))
+			end
+			return state
+		end,
+		tune = function(state: any, feel: any)
+			state.feel = Contract.feel(feel)
+			for _, slot in state.slots do
+				slot.mag = Magazine.new(R.magazine, state.feel.fireInterval, state.feel.reloadSecs)
+			end
+		end,
+		sync = function(state: any, stamp: number)
+			if state.synced then
+				state.now = stamp
+				return
+			end
+			local d = stamp - state.now
+			state.synced = true
+			state.now = stamp
+			state.endsAt += d
+			for _, slot in state.slots do
+				slot.since += d
+				slot.outAt += d
+				slot.outUntil += d
+				slot.safeUntil += d
+				slot.mag.nextFireAt += d
+				if slot.mag.reloadDoneAt ~= nil then
+					slot.mag.reloadDoneAt += d
+				end
+			end
+			for _, e in state.events do
+				if e.at ~= nil then
+					e.at += d
+				end
+			end
+		end,
+		step = function(state: any, dt: number)
+			if not state.synced then
+				state.now += dt
+			end
+		end,
+		join = function(state: any, seat: number)
+			for id = #state.slots + 1, seat - 1 do
+				local empty = newSlot(state, id, Contract.teamOf(id))
+				empty.on = false
+				empty.since = math.huge
+				state.slots[id] = empty
+			end
+			local was = state.slots[seat]
+			local team: number
+			if was ~= nil and was.since ~= math.huge then
+				team = was.team
+			else
+				local one, two = sideCount(state, 1), sideCount(state, 2)
+				team = if one < two then 1 elseif two < one then 2 else Contract.teamOf(seat)
+			end
+			state.slots[seat] = newSlot(state, seat, team)
+		end,
+		gone = function(state: any, seat: number)
+			local slot = state.slots[seat]
+			if slot then
+				slot.on = false
+			end
+		end,
+		assign = function(state: any, id: number, team: number): boolean
+			local slot = state.slots[id]
+			if slot == nil or not slot.on or slot.team == team or (team ~= 1 and team ~= 2) then
+				return false
+			end
+			slot.team = team
+			return true
+		end,
+		input = function(): (boolean, string?)
+			return false, Contract.textFor("phase")
+		end,
+		result = function(): any
+			return nil
+		end,
+		view = function(state: any): any
+			local slots = {}
+			local on = 0
+			for id, slot in state.slots do
+				slots[id] = {
+					id = id,
+					team = slot.team,
+					on = slot.on,
+					tags = slot.tags,
+					outs = slot.outs,
+					shots = slot.shots,
+					hits = slot.hits,
+				}
+				if slot.on then
+					on += 1
+				end
+			end
+			return {
+				phase = state.phase,
+				endsAt = state.endsAt,
+				size = math.clamp(math.ceil(on / 2), R.teamMin, R.teamMax),
+				scores = { state.scores[1], state.scores[2] },
+				slots = slots,
+			}
+		end,
+		drain = function(state: any): { any }
+			local out = state.events
+			state.events = {}
+			return out
+		end,
+		slot = function(state: any, id: number): any
+			return state.slots[id]
+		end,
+		canFire = function(): (boolean, string?)
+			return false, "phase"
+		end,
+		fire = function(): (boolean, string?)
+			return false, "phase"
+		end,
+		reload = function(): boolean
+			return false
+		end,
+		canBeHit = function(): boolean
+			return false
+		end,
+		tag = function(): boolean
+			return false
+		end,
+		bits = function(): number
+			return 0
+		end,
+		card = function(state: any): any
+			return { winner = 0, scores = { state.scores[1], state.scores[2] }, rows = {}, awards = {} }
+		end,
+	}
+	local open = Rules :: any
+	local was: { [string]: any } = {}
+	for name, fn in model do
+		was[name] = open[name]
+		open[name] = fn
+	end
+	return function()
+		for name in model do
+			open[name] = was[name]
+		end
+	end
+end
+
+-- The service out of play: every hook the framework and the stream call answers as the contract's stub does
+-- (a join is the case's to allow; nothing is stepped, placed, judged or sent). The case is the server from here.
+function Kit.standDown(service: any)
+	local quiet = function() end
+	service.join = function(): (boolean, string?)
+		return false, Contract.textFor("closed")
+	end
+	service.joined = quiet
+	service.command = function(_self: any, _player: any, verb: string): (boolean, boolean?, string?)
+		if verb == "start" or verb == "again" or verb == "addai" or verb == "mode" then
+			return true, false, Contract.textFor("phase")
+		end
+		return false, nil, nil
+	end
+	service.input = function(): (boolean?, string?)
+		return false, Contract.textFor("phase")
+	end
+	service.step = quiet
+	service.event = quiet
+	service.state = function(self: any): any
+		return {
+			match = self.match,
+			bots = {},
+			rounds = Contract.Rules.magazine,
+			reloadAt = 0,
+			shot = 0,
+			feel = self.feel,
+		}
+	end
+	service.inPlay = function(): boolean
+		return true
+	end
+	service.screen = quiet
+	service.sig = function(): any
+		return false
+	end
+	service.onMove = quiet
+	service.onFire = quiet
 end
 
 -- A seated, placed, live player with the roster watched: where most cases start.

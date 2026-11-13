@@ -62,6 +62,8 @@ type Server = {
 local function world(w: Rig.World, wires: PaintballRig.Wires): Server
 	local tbl = PaintballRig.table(w)
 	local service = tbl.service
+	-- (the case is the server: whatever service stands behind the stub's names is stood down first)
+	Kit.standDown(service)
 	local s = { w = w, wires = wires, service = service, place = service.place, you = 0 } :: Server
 	-- a Humanoid on the body, as the possessed R15 body has
 	local hum = FakeEngine.new("Humanoid", "Humanoid", {
@@ -151,10 +153,13 @@ local function play(fn: (s: Server) -> (), opts: { [string]: any }?)
 	if o.arena ~= "lane" then
 		ArenaData.build = Kit.arena
 	end
+	-- (and the match model is the case's own script: the kit says why)
+	local undo = Kit.scripted()
 	local ok, err = pcall(Rig.play, function(w: Rig.World)
 		PaintballRig.attach(wires, w)
 		fn(world(w, wires))
 	end, PaintballRig.opts(wires, o.rig))
+	undo()
 	ArenaData.build = build
 	if not ok then
 		error(err, 0)
