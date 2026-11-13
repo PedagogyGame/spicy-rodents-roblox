@@ -34,7 +34,7 @@
 --   PROMPT_DISTANCE; AI_DELAY; STRIKES;
 --   opts.sites = { [siteId]: { root: Instance?, place } } (or the older opts.root + opts.place for the bowling
 --   alley alone); opts.games = what the games may ask of the rest of the town (ServerGame.Town: people, body,
---   release, charge, best; every member optional, each with a harmless stand-in here); the rest of opts is
+--   release, charge, pass, best; every member optional, each with a harmless stand-in here); the rest of opts is
 --   handed to the games as ctx.opts (bowling reads tunnels, animals, knock, instantRack)
 
 local Import = require("../Import")
@@ -42,6 +42,8 @@ local AlleyLayout = Import.shared("Attractions/AlleyLayout") :: typeof(require("
 local Games = Import.shared("Minigames/Games") :: typeof(require("../../shared/Minigames/Games"))
 local Session = Import.shared("Minigames/Session") :: typeof(require("../../shared/Minigames/Session"))
 local Rng = Import.shared("Util/Rng") :: typeof(require("../../shared/Util/Rng"))
+local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
+local EconomyRules = Import.shared("Economy/EconomyRules") :: typeof(require("../../shared/Economy/EconomyRules"))
 local ServerGame = require("./ServerGame")
 local ServerGames = require("./ServerGames")
 
@@ -75,6 +77,7 @@ export type Opts = {
 		body: ((name: string, cframe: CFrame) -> Model?)?,
 		release: ((model: Model) -> ())?,
 		charge: ((player: any, cents: number, why: string) -> (boolean, string?))?,
+		pass: ServerGame.Pass?, -- the town's one timed pass (Boot/Game: wallet.pass)
 		best: ((player: any, key: string, value: number?, lower: boolean?) -> number?)?,
 	}?,
 }
@@ -127,12 +130,85 @@ local function sharedClock(): number
 	return if ok and type(t) == "number" then t else os.clock()
 end
 
+-- The stand-in for the town's timed pass, for a service that was handed none (a bare test; the game hands in
+-- the wallet's: Boot/Game). It is the same pass on the same terms (Economy/EconomyRules.pass: the price, the
+-- length and the words), paid through `charge` and kept by user id for as long as this service runs, on the
+-- clock both sides share.
+local function passOn(charge: (player: any, cents: number, why: string) -> (boolean, string?)): ServerGame.Pass
+	local ends: { [any]: number } = {} -- who -> the shared-clock second the pass runs out
+	local function who(player: any): any
+		if (type(player) == "table" or typeof(player) == "Instance") and player.UserId ~= nil then
+			return player.UserId
+		end
+		return player
+	end
+	local function daySeconds(): number
+		local secs = Tunables.get("clock.realSecondsPerDay")
+		return if type(secs) == "number" and secs > 0 then secs else 720
+	end
+	local function spec(): any
+		return EconomyRules.pass(EconomyRules.PASS)
+	end
+	local function left(player: any): number
+		local e = ends[who(player)]
+		return if e then math.max(0, e - sharedClock()) / daySeconds() else 0
+	end
+	local function has(player: any): boolean
+		return left(player) > 0
+	end
+	return {
+		has = has,
+		buy = function(player: any): (boolean, string)
+			local s = spec()
+			-- (as the wallet's: a holder with a day or more left is refused; in the last day it is renewed)
+			local renewing = has(player)
+			if renewing and left(player) >= 1 then
+				return false, s.has
+			end
+			local ok, words = charge(player, s.cents, s.why)
+			if not ok then
+				return false, if type(words) == "string" and words ~= "" then words else s.offer
+			end
+			local now = sharedClock()
+			local had = ends[who(player)]
+			ends[who(player)] = (if had and had > now then had else now) + s.days * daySeconds()
+			return true, if renewing then s.renewed or s.bought else s.bought
+		end,
+		left = left,
+		untilDay = function(player: any): number?
+			local e = ends[who(player)]
+			return if e then e / daySeconds() else nil
+		end,
+		words = function(player: any): string
+			return EconomyRules.passLeftWords(left(player), daySeconds())
+		end,
+		offer = function(): (number, number, string)
+			local s = spec()
+			return s.cents, s.days, s.offer
+		end,
+	}
+end
+
 -- What the games may ask of the rest of the town, each member with a harmless stand-in when the caller gave
--- none: nobody to lend a body (nil), nothing charged (true), bests kept only as long as this server runs, and
--- the only people known being the ones at the tables.
+-- none: nobody to lend a body (nil), nothing charged (true; the game hands in the town's wallet: Boot/Game),
+-- a pass desk of the service's own on that charge (the game hands in the wallet's pass), bests kept only as
+-- long as this server runs, and the only people known being the ones at the tables.
+MinigameService.NO_PASS_WARNING = "[Minigames] given a charge but no pass: this service keeps a pass desk of its "
+	.. "own, which the lounges cannot read. Hand in the town's (games.pass = wallet.pass, as Boot/Game does)."
+
 local function townOf(self: any, games: { [string]: any }?): ServerGame.Town
 	local g: { [string]: any } = games or {}
+	if g.charge ~= nil and g.pass == nil then
+		-- (a bare service, with no charge either, is a test's: its stand-in pass harms nobody)
+		warn(MinigameService.NO_PASS_WARNING)
+	end
 	local bests: { [any]: { [string]: number } } = {}
+	local function charge(player: any, cents: number, why: string): (boolean, string?)
+		if g.charge then
+			return g.charge(player, cents, why)
+		end
+		return true
+	end
 	return {
 		people = function(): { ServerGame.Person }
 			if g.people then
@@ -158,12 +234,8 @@ local function townOf(self: any, games: { [string]: any }?): ServerGame.Town
 				g.release(model)
 			end
 		end,
-		charge = function(player: any, cents: number, why: string): (boolean, string?)
-			if g.charge then
-				return g.charge(player, cents, why)
-			end
-			return true
-		end,
+		charge = charge,
+		pass = g.pass or passOn(charge),
 		best = function(player: any, key: string, value: number?, lower: boolean?): number?
 			if g.best then
 				return g.best(player, key, value, lower)
