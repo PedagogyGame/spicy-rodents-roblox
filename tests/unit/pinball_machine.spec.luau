@@ -400,12 +400,16 @@ return function(t: Test.T)
 		t.eq(m.warnings, 0)
 		t.near(m.bob, Machine.THUMP_BOB, 1e-9, "half a nudge of swing on the tilt bob")
 		t.truthy(Machine.THUMP_BOB <= 0.5)
-		-- on top of the player's own shoving it can be the swing that warns: the first warning, never the second
+		-- on top of the player's own shoving (two honest nudges, far enough apart not to warn) it can be the
+		-- swing that warns: the first warning, never the second
 		local function shoved(warnings: number): Machine.State
 			local s = Machine.new(acorn, 1, 1)
 			launch(acorn, s, 0.9, out)
 			park(acorn, s, BTN.NUDGE_L, 1, out)
+			park(acorn, s, 0, 160, out)
+			park(acorn, s, BTN.NUDGE_R, 1, out)
 			park(acorn, s, 0, 20, out)
+			t.eq(s.warnings, 0, "the player's own two nudges did not warn")
 			s.warnings = warnings
 			t.truthy(s.bob + Machine.THUMP_BOB > Machine.BOB_LIMIT)
 			park(acorn, s, BTN.THUMP, 1, out)
@@ -717,7 +721,13 @@ return function(t: Test.T)
 			t.truthy(m.tilted, id)
 			local before = digest(m.sheets[1])
 			local score = m.scores[1]
-			local stats = digest(m.stats[1])
+			-- (what a dead ball hits; the ball itself is counted when it ends)
+			local function hits(): string
+				local st = table.clone(m.stats[1])
+				st.balls = 0
+				return digest(st)
+			end
+			local stats = hits()
 			table.clear(out)
 			-- the dead ball is thrown round the table from a dozen places for twenty seconds
 			for k = 1, 12 do
@@ -742,7 +752,7 @@ return function(t: Test.T)
 				end
 			end
 			t.eq(m.scores[1], score, id)
-			t.eq(digest(m.stats[1]), stats, `{id}: nothing a dead ball hits is counted`)
+			t.eq(hits(), stats, `{id}: nothing a dead ball hits is counted`)
 			t.eq(count(out, CUE.SAY), 0, `{id}: nothing is said after TILT`)
 			t.eq(count(out, CUE.JINGLE), 0, `{id}: no jingle`)
 			t.eq(count(out, CUE.EXTRA_BALL), 0, id)

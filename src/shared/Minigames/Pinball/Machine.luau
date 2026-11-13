@@ -207,8 +207,9 @@ export type Sheet = {
 	tick: (m: State, t: Numbers, tbl: Table, out: { number }) -> (),
 	flip: (m: State, t: Numbers, left: boolean) -> (), -- a flipper button went down (lane change)
 	drained: (m: State, t: Numbers, tbl: Table, out: { number }, saved: boolean) -> (),
-	-- the machine has just tilted: from here to the end of the ball the sheet is told of nothing but drains
-	-- (no event, no flip, no tick), so whatever was running (a countdown, a mode) is put away here
+	-- the machine has just gone dead. On a tilt the sheet is told of nothing but drains from here to the end of
+	-- the ball (no event, no flip, no tick); on an abandoned ball (forfeit) the switches still count but nobody
+	-- is playing. Either way whatever was running (a countdown, a mode) is put away here
 	tilted: (m: State, t: Numbers, tbl: Table, out: { number }) -> (),
 	bonus: (m: State, t: Numbers) -> (number, number), -- base, multiplier
 	lamps: (m: State, t: Numbers, tbl: Table, lamp: { number }) -> (), -- 1 lit, 2 flashing
@@ -937,7 +938,7 @@ end
 -- forfeit(table, state, out): the player has walked away from this ball (an idle turn, a bite): the flippers
 -- go dead, the machine launches the ball itself and it is left to drain; no ball save, no bonus is lost that
 -- was earned. The caller keeps stepping; the ball ends within FORFEIT_TICKS.
-function Machine.forfeit(_tbl: Table, m: State, _out: { number })
+function Machine.forfeit(tbl: Table, m: State, out: { number })
 	if m.phase ~= PLAY or m.forfeit then
 		return
 	end
@@ -953,6 +954,10 @@ function Machine.forfeit(_tbl: Table, m: State, _out: { number })
 		if b.mode == HELD then
 			b.timer = 1
 		end
+	end
+	-- whatever the sheet had running (a countdown) is put away, as on a tilt
+	if not m.tilted then
+		tbl.sheet.tilted(m, m.sheets[m.up], tbl, out)
 	end
 end
 

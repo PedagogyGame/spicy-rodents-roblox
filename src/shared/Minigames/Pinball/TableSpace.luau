@@ -10,14 +10,18 @@
 -- The rule sheet (one goal: LIFTOFF):
 --   * F-U-E-L lights the locks. A ball shot into a lit pod stays there and a new ball comes to the plunger.
 --   * With both pods full, either ramp starts the countdown: 3, 2, 1, LIFTOFF, both pods fire and three balls
---     are in play. During multiball every ramp and every orbit is a jackpot; it ends when one ball is left.
+--     are in play, with a ball save of LIFTOFF_SAVE from that moment. The shot that starts the countdown has
+--     won the multiball: if the ball is lost inside the three seconds the rocket goes at once. During
+--     multiball every ramp and every orbit is a jackpot; it ends when one ball is left.
+--   * A tilt puts the countdown away (the locks are kept for the next ball) and a dead ball locks nothing.
 --   * Ramps and orbits made within four seconds of each other are a combo: each one in the chain is worth
 --     one more times its value (up to 5x).
 --   * Three orbits in one ball light the extra ball at the left pod (once a game).
 --   * End of ball: 10,000 for every ramp and orbit of that ball, times one more for every ball locked.
 -- Geometry is in studs in Layout's playfield frame. Pure data and pure functions; Lune-tested
 -- (tests/unit/pinball_layout.spec.luau, pinball_rules.spec.luau, pinball_shots.spec.luau).
--- Interface: a Machine.Table (id, title, def, ix, c, sheet) plus POINTS, SAY, COMBO_TICKS, COUNT_TICKS, LOCKS
+-- Interface: a Machine.Table (id, title, def, ix, c, sheet) plus POINTS, SAY, COMBO_TICKS, COUNT_TICKS, LOCKS,
+--   LIFTOFF_SAVE
 
 local Layout = require("./Layout")
 local Machine = require("./Machine")
@@ -243,6 +247,8 @@ local ARM_TICKS = 720 -- an orbit is a side lane, then the top of the arch, with
 local COUNT_TICKS = 720 -- 3, 2, 1
 local ORBITS_FOR_EXTRA = 3
 local LOCKS = 2
+local MULTI_BALLS = 3
+local LIFTOFF_SAVE = 1200 -- five seconds of ball save from LIFTOFF: three balls at once are not lost at once
 
 local FUEL = { ix.target.fuel_f, ix.target.fuel_u, ix.target.fuel_e, ix.target.fuel_l }
 local FUEL_NAMES = { "f", "u", "e", "l" }
@@ -252,7 +258,8 @@ local function bit(n: number, i: number): boolean
 end
 
 local function liftoff(m: Machine.State, t: Machine.Numbers, out: { number })
-	-- the pods fire whatever they hold; the plunger makes the three up
+	-- the pods fire whatever they hold; the plunger makes the three up (a pod that was emptied between balls,
+	-- and the ball that was lost inside the countdown)
 	local held = 0
 	for _, b in m.phys.balls do
 		if b.mode == Physics.HELD and b.timer < 0 then
@@ -260,7 +267,9 @@ local function liftoff(m: Machine.State, t: Machine.Numbers, out: { number })
 			b.timer = 1 + 48 * (held - 1)
 		end
 	end
-	Machine.feed(m, LOCKS - held)
+	Machine.feed(m, MULTI_BALLS - Machine.live(m))
+	Machine.save(m, LIFTOFF_SAVE)
+	t.count = 0
 	t.multi = 1
 	t.locked = 0
 	t.fuel = 0
@@ -451,7 +460,18 @@ local sheet: Machine.Sheet = {
 			Machine.callout(m, out, SAY.MULTIBALL_OVER, 0)
 		end
 	end,
-	drained = function(_m, _t, _tbl, _out, _saved) end,
+	drained = function(m, t, _tbl, out, saved)
+		-- the ramp that started the countdown has won the multiball: if the last loose ball is lost before
+		-- zero the rocket goes at once (the machine has stopped telling a tilted sheet anything by then)
+		if not saved and t.count > 0 and not m.tilted and not m.forfeit and Machine.live(m) == 0 then
+			liftoff(m, t, out)
+		end
+	end,
+	tilted = function(_m, t, _tbl, _out)
+		t.count = 0
+		t.comboLeft = 0
+		t.armLeft = 0
+	end,
 	bonus = function(_m, t)
 		return POINTS.bonusEach * t.flow, 1 + t.locked
 	end,
@@ -557,6 +577,7 @@ local TableSpace = {
 	COMBO_TICKS = COMBO_TICKS,
 	COUNT_TICKS = COUNT_TICKS,
 	LOCKS = LOCKS,
+	LIFTOFF_SAVE = LIFTOFF_SAVE,
 }
 
 return TableSpace
