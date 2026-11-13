@@ -138,6 +138,37 @@ Plan.LOOKS = table.freeze({
 	"terminal",
 	"sheet",
 	"ceiling_dead",
+	"ceiling0",
+	"ceiling1",
+	"ceiling2",
+	"ceiling3",
+	"ceiling4",
+	"lens_lit",
+	"lens_dead",
+	"tyre",
+	"windscreen",
+	"bumper",
+	"van_stripe",
+	"dish",
+	"mirror",
+	"bulbs",
+	"garb_a",
+	"garb_b",
+	"garb_c",
+	"garb_d",
+	"garb_e",
+	"bar_white",
+	"bar_yellow",
+	"bar_cyan",
+	"bar_green",
+	"bar_magenta",
+	"bar_red",
+	"bar_blue",
+	"tapes_a",
+	"tapes_b",
+	"keys",
+	"keys_lit",
+	"screen",
 })
 
 local LOOK: { [string]: number } = {}
@@ -355,8 +386,14 @@ function Plan.build(): Plan
 	-- THE SHELL: the ground, the roof with its glass over the atrium, the outer walls storey by storey
 	raw(KIND.slab, "floor0", -half, -1, -half, half, 0, half)
 	local top = floors * H
-	pair(KIND.slab, "roof", -half - 1, top, -half - 1, half + 1, top + 1, -atrium)
-	pair(KIND.slab, "roof", -half - 1, top, -atrium, -atrium, top + 1, atrium)
+	-- (a slab is two layers, each a box: what is walked on, FLOOR thick, and under it the ceiling of the storey
+	-- below, so that a carpet is not a ceiling. Nothing passes between them.)
+	local FLOOR = 0.4
+	for _, layer in { { "ceiling4", top, top + 1 - FLOOR }, { "roof", top + 1 - FLOOR, top + 1 } } do
+		local look, y0, y1 = layer[1] :: string, layer[2] :: number, layer[3] :: number
+		pair(KIND.slab, look, -half - 1, y0, -half - 1, half + 1, y1, -atrium)
+		pair(KIND.slab, look, -half - 1, y0, -atrium, -atrium, y1, atrium)
+	end
 	raw(KIND.slab, "skylight", -atrium, top, -atrium, atrium, top + 1, atrium)
 	for level = 0, floors - 1 do
 		local y0 = if level == 0 then -1 else level * H - 1
@@ -393,10 +430,12 @@ function Plan.build(): Plan
 	local RUN, STEPS = 21, 28 -- a flight: 21 studs along x, 28 steps of half a stud
 	for level = 1, floors - 1 do
 		local y = level * H
-		local look = `floor{level}`
-		pair(KIND.slab, look, -half, y - 1, -half, -atrium, y, half)
-		pair(KIND.slab, look, -atrium, y - 1, -half, atrium, y, -CORE1)
-		pair(KIND.slab, look, -atrium, y - 1, -CORE0, atrium, y, -atrium)
+		for _, layer in { { `ceiling{level - 1}`, y - 1, y - FLOOR }, { `floor{level}`, y - FLOOR, y } } do
+			local look, y0, y1 = layer[1] :: string, layer[2] :: number, layer[3] :: number
+			pair(KIND.slab, look, -half, y0, -half, -atrium, y1, half)
+			pair(KIND.slab, look, -atrium, y0, -half, atrium, y1, -CORE1)
+			pair(KIND.slab, look, -atrium, y0, -CORE0, atrium, y1, -atrium)
+		end
 		-- the atrium's rails, with a gap to drop through on two sides of each storey
 		local thick = 0.5
 		if level % 2 == 1 then
@@ -536,6 +575,36 @@ function Plan.build(): Plan
 	): (number, number)
 		return on(level, KIND.prop, look, x0, z0, x1, z1, 0, h, look2)
 	end
+	-- shelving: the unit, and on both of its long faces three bands of what is kept on it (thin boxes a tenth
+	-- of a stud proud of the face: tape boxes, film cans, props)
+	local shelves = 0
+	local function shelving(level: number, x0: number, z0: number, x1: number, z1: number)
+		tall(level, "shelf", x0, z0, x1, z1, 9)
+		shelves += 1
+		local alongX = (x1 - x0) > (z1 - z0)
+		for k, h in { 1.3, 4, 6.7 } do
+			local look = if (k + shelves) % 2 == 0 then "tapes_a" else "tapes_b"
+			if alongX then
+				on(level, KIND.prop, look, x0 + 0.3, z0 - 0.1, x1 - 0.3, z0, h, h + 1.6)
+				on(level, KIND.prop, look, x0 + 0.3, z1, x1 - 0.3, z1 + 0.1, h, h + 1.6)
+			else
+				on(level, KIND.prop, look, x0 - 0.1, z0 + 0.3, x0, z1 - 0.3, h, h + 1.6)
+				on(level, KIND.prop, look, x1, z0 + 0.3, x1 + 0.1, z1 - 0.3, h, h + 1.6)
+			end
+		end
+	end
+	-- a control desk: low cover, with a bank of keys and a lit strip along its top (a twelfth of a stud high:
+	-- nothing to a body, and a standing eye still sees over)
+	local function console(level: number, x0: number, z0: number, x1: number, z1: number)
+		low(level, "console", x0, z0, x1, z1)
+		if (x1 - x0) > (z1 - z0) then
+			on(level, KIND.prop, "keys", x0 + 0.5, z0 + 0.5, x1 - 0.5, z0 + 1.2, RAIL, RAIL + 0.08)
+			on(level, KIND.prop, "keys_lit", x0 + 0.5, z0 + 1.6, x1 - 0.5, z0 + 1.85, RAIL, RAIL + 0.08)
+		else
+			on(level, KIND.prop, "keys", x0 + 0.5, z0 + 0.5, x0 + 1.2, z1 - 0.5, RAIL, RAIL + 0.08)
+			on(level, KIND.prop, "keys_lit", x0 + 1.6, z0 + 0.5, x0 + 1.85, z1 - 0.5, RAIL, RAIL + 0.08)
+		end
+	end
 	-- two crates, one on the other
 	local function stack(level: number, look: string, x0: number, z0: number, x1: number, z1: number)
 		low(level, look, x0, z0, x1, z1)
@@ -576,12 +645,42 @@ function Plan.build(): Plan
 		plan.monitors[a] = face
 		plan.monitors[b] = opposite(face)
 	end
-	-- a light stand: a thin pole with a lamp head on it
-	local function stand(level: number, x: number, z: number, base: number?)
+	-- the glass of a stage lamp: a thin box on the face of the can (x0 .. z1, h0 .. h1 above the storey's floor)
+	-- that looks along `face`; lit or dead. A box like any other.
+	local function lens(
+		level: number,
+		x0: number,
+		z0: number,
+		x1: number,
+		z1: number,
+		h0: number,
+		h1: number,
+		face: string,
+		lit: boolean
+	)
+		local look = if lit then "lens_lit" else "lens_dead"
+		local t, m = 0.15, 0.2 -- its thickness, and the rim of the can left round it
+		if face == "-y" then
+			on(level, KIND.prop, look, x0 + m, z0 + m, x1 - m, z1 - m, h0 - t, h0)
+		elseif face == "+y" then
+			on(level, KIND.prop, look, x0 + m, z0 + m, x1 - m, z1 - m, h1, h1 + t)
+		elseif face == "-z" then
+			on(level, KIND.prop, look, x0 + m, z0 - t, x1 - m, z0, h0 + m, h1 - m)
+		elseif face == "+z" then
+			on(level, KIND.prop, look, x0 + m, z1, x1 - m, z1 + t, h0 + m, h1 - m)
+		elseif face == "-x" then
+			on(level, KIND.prop, look, x0 - t, z0 + m, x0, z1 - m, h0 + m, h1 - m)
+		else
+			on(level, KIND.prop, look, x1, z0 + m, x1 + t, z1 - m, h0 + m, h1 - m)
+		end
+	end
+	-- a light stand: a thin pole with a lamp head on it, its glass looking `face` (north, at the set, unless said)
+	local function stand(level: number, x: number, z: number, base: number?, face: string?)
 		local b = base or 0
 		on(level, KIND.prop, "stand", x - 0.3, z - 0.3, x + 0.3, z + 0.3, b, b + 8)
 		local i, j = on(level, KIND.prop, "lamp", x - 0.9, z - 0.9, x + 0.9, z + 0.9, b + 8, b + 9.6)
 		lamp(i, j, 26, 0.9, "warm")
+		lens(level, x - 0.9, z - 0.9, x + 0.9, z + 0.9, b + 8, b + 9.6, face or "-z", true)
 	end
 	-- a strip light on the ceiling (a box like any other: a ball stops on it)
 	-- (one fitting in five is dead: the same ones on both teams' sides)
@@ -610,6 +709,20 @@ function Plan.build(): Plan
 	local function tray(level: number, x0: number, z0: number, x1: number, z1: number)
 		on(level, KIND.prop, "tray", x0, z0, x1, z1, 10.4, 10.9)
 	end
+	-- a make-up mirror standing on the back edge (at z) of a desk that runs from x0 to x1: the glass, and a row
+	-- of bulbs over it
+	local function mirror(level: number, x0: number, x1: number, z: number)
+		on(level, KIND.prop, "mirror", x0 + 0.4, z, x1 - 0.4, z + 0.3, RAIL, RAIL + 3.2)
+		local i, j = on(level, KIND.prop, "bulbs", x0 + 0.4, z, x1 - 0.4, z + 0.3, RAIL + 3.2, RAIL + 3.6)
+		lamp(i, j, 16, 0.6, "warm")
+	end
+	-- the test card: seven bars, thin boxes proud of the wall face at z (looking +z), from x0 to x1
+	local function bars(level: number, x0: number, x1: number, z: number, h0: number, h1: number)
+		local w = (x1 - x0) / 7
+		for k, look in { "bar_white", "bar_yellow", "bar_cyan", "bar_green", "bar_magenta", "bar_red", "bar_blue" } do
+			on(level, KIND.prop, look, x0 + (k - 1) * w, z, x0 + k * w, z + 0.15, h0, h1)
+		end
+	end
 	-- a lighting grid over a studio: pipes along x at each z of `rows`, cans hung under them
 	local function grid(level: number, x0: number, x1: number, rows: { number }, cans: { number })
 		for r, z in rows do
@@ -617,9 +730,11 @@ function Plan.build(): Plan
 			for c, x in cans do
 				local shift = if (r + c) % 2 == 0 then 0 else 1.5
 				local i, j = on(level, KIND.prop, "lamp", x + shift - 0.6, z - 0.6, x + shift + 0.6, z + 0.6, 10.6, 12)
-				if (r + c) % 3 == 0 then
+				local lit = (r + c) % 3 == 0
+				if lit then
 					lamp(i, j, 30, 1.0, "warm")
 				end
+				lens(level, x + shift - 0.6, z - 0.6, x + shift + 0.6, z + 0.6, 10.6, 12, "-y", lit)
 			end
 		end
 	end
@@ -678,9 +793,12 @@ function Plan.build(): Plan
 		truss(L, -13, 1, -8, 0)
 		for _, x in { -11, -6.5, -1.5 } do
 			on(L, KIND.prop, "lamp", x, -8.6, x + 1.2, -7.4, RAIL, RAIL + 1.3)
+			lens(L, x, -8.6, x + 1.2, -7.4, RAIL, RAIL + 1.3, "+z", false)
 		end
 		on(L, KIND.prop, "lamp", 2.6, -6.4, 3.8, -5.2, 0, 1.2)
+		lens(L, 2.6, -6.4, 3.8, -5.2, 0, 1.2, "+y", false)
 		on(L, KIND.prop, "lamp", -9, -5.6, -7.8, -4.4, 0, 1.2)
+		lens(L, -9, -5.6, -7.8, -4.4, 0, 1.2, "+x", false)
 		low(L, "case", 5, -4.6, 8.4, -1.4)
 		stack(L, "crate", -13.4, 1.6, -10, 5)
 		-- in the alcove under the first landing of each core, and in front of the stair
@@ -701,8 +819,8 @@ function Plan.build(): Plan
 		sign(l1, l2, "+z", "FIRE DOOR\nCHAINED", "stencil", "WAY OUT")
 		table.insert(plan.exits, room(-3, 0, 55.5, 3, Arena.HEADROOM, half))
 		-- the north-west room: racking
-		tall(L, "shelf", -56, -53.2, -46, -51.6, 9)
-		tall(L, "shelf", -56, -45.2, -46, -43.6, 9)
+		shelving(L, -56, -53.2, -46, -51.6)
+		shelving(L, -56, -45.2, -46, -43.6)
 		low(L, "crate", -38, -56, -34.6, -52.6)
 		-- the north-east room: cable drums and lockers (its twin: the mail room)
 		low(L, "drum", 38, -50, 41.4, -46.6)
@@ -719,12 +837,27 @@ function Plan.build(): Plan
 		local v1, v2 = on(L, KIND.prop, "container", -58, 1.5, -44, 7.5, 1, 8.5, "van")
 		on(L, KIND.prop, "container", -44, 1.5, -40, 7.5, 1, 6.5, "van_cab")
 		sign(v1, v2, "-z", "WBLW 7\nSCENERY", "stencil", "WBLW 7\nEYEWITNESS NEWS")
+		-- what makes the east one a van (on the west one the same solids are a container's skids, ribs and
+		-- lashings): wheels, a windscreen and a bumper on the cab's nose, a stripe down each side, and on the
+		-- roof the folded mast with its dish
+		for _, x in { -55.5, -51.5, -43.5 } do
+			on(L, KIND.prop, "chassis", x, 1.3, x + 2.6, 2.1, 0, 2.6, "tyre")
+			on(L, KIND.prop, "chassis", x, 6.9, x + 2.6, 7.7, 0, 2.6, "tyre")
+		end
+		on(L, KIND.prop, "container", -40, 2.1, -39.85, 6.9, 3.7, 6.1, "windscreen")
+		on(L, KIND.prop, "chassis", -40, 1.7, -39.5, 7.3, 1, 2.3, "bumper")
+		on(L, KIND.prop, "container", -40, 2, -39.85, 3, 2.5, 3.3, "lens_dead")
+		on(L, KIND.prop, "container", -40, 6, -39.85, 7, 2.5, 3.3, "lens_dead")
+		on(L, KIND.prop, "container", -58, 1.35, -44, 1.5, 3, 3.9, "van_stripe")
+		on(L, KIND.prop, "container", -58, 7.5, -44, 7.65, 3, 3.9, "van_stripe")
+		on(L, KIND.prop, "container", -56, 3.9, -46, 5.1, 8.5, 9.1, "truss")
+		on(L, KIND.prop, "container", -46.5, 3.2, -46.2, 5.8, 9.1, 11.7, "dish")
 		low(L, "crate", -39, -6.5, -35.6, -3.1)
 		-- the wing's south bay: stores
 		low(L, "crate", -50, 14, -46.6, 17.4)
 		stack(L, "crate", -56, 22, -52.6, 25.4)
 		low(L, "drum", -40, 20, -36.6, 23.4)
-		tall(L, "shelf", -59, 11, -57.4, 19, 9)
+		shelving(L, -59, 11, -57.4, 19)
 		-- the concourse
 		low(L, "case", -25.5, -13.4, -22.5, -10)
 		stack(L, "case", -28.6, 11, -25.6, 14.4)
@@ -776,9 +909,9 @@ function Plan.build(): Plan
 		grid(L, -20, 20, { -50, -44, -38 }, { -15, -7, 1, 9 })
 		-- the north-west rooms: edit suites
 		wall(L, W, "x", -45.5, -half, -31, { { -52, 5 }, { -37, 5 } })
-		low(L, "console", -59, -58.5, -53, -56)
-		low(L, "console", -38, -58.5, -32, -56)
-		low(L, "console", -59, -42, -56.5, -36)
+		console(L, -59, -58.5, -53, -56)
+		console(L, -38, -58.5, -32, -56)
+		console(L, -59, -42, -56.5, -36)
 		tall(L, "rack", -34, -44.5, -32, -40, 7)
 		-- the north-east room: the weather wall
 		local g1, g2 = on(L, KIND.prop, "green_screen", 38, -58.6, 56, -57.6, 0, 11, "set_blue")
@@ -802,13 +935,22 @@ function Plan.build(): Plan
 		wall(L, W, "z", 30.5, -half, -31, { { -52, 6, WINDOW }, { -39, 6 } })
 		-- make-up, outside the spawn room's north door (its twin: outside the east room's south door)
 		low(L, "desk", -52, -23, -45, -20.5)
-		low(L, "desk", -41, -28.5, -34, -26)
+		mirror(L, -52, -45, -23)
+		low(L, "desk", -38.5, -28.5, -31.5, -26)
+		mirror(L, -38.5, -31.5, -28.5)
 		tall(L, "locker", -42.5, -18.5, -40.5, -14, 7.5)
 		-- the green room's lounge, between the spawn room and the concourse
 		low(L, "sofa", -41, -3, -35, 0)
 		set(L, -33.5, 6, "-x")
 		-- wardrobe, outside the south door
-		tall(L, "rack", -58, 20, -51, 21.5, 7)
+		-- (a rail of costumes: the posts, the rail, and what hangs from it, clear of the floor)
+		on(L, KIND.prop, "stand", -58, 20.6, -57.7, 20.9, 0, 7)
+		on(L, KIND.prop, "stand", -51.3, 20.6, -51, 20.9, 0, 7)
+		on(L, KIND.prop, "stand", -58, 20.6, -51, 20.9, 7, 7.3)
+		for i, look in { "garb_a", "garb_b", "garb_c", "garb_d", "garb_e" } do
+			local x = -57.6 + (i - 1) * 1.3
+			on(L, KIND.prop, look, x, 20.1, x + 1.1, 21.4, 1.6, 7)
+		end
 		low(L, "case", -40, 24, -36, 27)
 		low(L, "case", -52, 26.5, -48, 29)
 		-- Studio A (its twin: Studio B): the stage, a set on it, cameras, the grid
@@ -829,17 +971,22 @@ function Plan.build(): Plan
 		local o1, o2 = on(L, KIND.prop, "on_air", -26, -31.4, -20, -31, DOOR + 0.6, DOOR + 2.6)
 		sign(o1, o2, "+z", "ON AIR", "red")
 		-- the north-west room: the prop store
-		tall(L, "shelf", -57, -53.2, -47, -51.6, 9)
-		tall(L, "shelf", -57, -45.2, -47, -43.6, 9)
+		shelving(L, -57, -53.2, -47, -51.6)
+		shelving(L, -57, -45.2, -47, -43.6)
 		stack(L, "crate", -34.4, -60, -31, -56.6)
 		low(L, "crate", -36, -40, -32.6, -36.6)
 		-- the north-east room: Studio A's control booth, looking in through its window
-		low(L, "console", 34, -55, 36.5, -49)
+		console(L, 34, -55, 36.5, -49)
 		tall(L, "rack", 57, -58, 59, -46, 7.5)
-		low(L, "console", 44, -50, 52, -47.5)
+		console(L, 44, -50, 52, -47.5)
 		-- the concourse
 		low(L, "bench", -27, -4, -25, 4)
 		low(L, "planter", -22, 19.6, -19, 22)
+		-- the spawn rooms' own lights (ceiling fittings: nothing a body meets)
+		for _, z in { -9.5, 0, 9.5 } do
+			local i, j = on(L, KIND.prop, "ceiling_light", -56, z - 0.8, -48, z + 0.8, ceiling(L) - 0.4, ceiling(L))
+			lamp(i, j, 30, 1.0, "warm")
+		end
 	end
 
 	-- STOREY 3: master control and the tape library
@@ -849,29 +996,32 @@ function Plan.build(): Plan
 		wall(L, W, "z", -30.5, -half, -31, { { -45, 6 } })
 		wall(L, W, "z", 30.5, -half, -31, { { -45, 6 } })
 		-- master control: two rows of consoles facing the monitor wall on the west wall
-		low(L, "console", -50, -20, -47.5, -4)
-		low(L, "console", -50, 4, -47.5, 20)
-		low(L, "console", -41, -12, -38.5, 12)
+		console(L, -50, -20, -47.5, -4)
+		console(L, -50, 4, -47.5, 20)
+		console(L, -41, -12, -38.5, 12)
 		for _, z in { -17, -9, 4, 12 } do
 			local a, b = on(L, KIND.prop, "monitor", -59.6, z, -58.6, z + 5, 4, 8.4)
 			plan.monitors[a] = "+x"
 			plan.monitors[b] = "-x"
+			-- over each, two small screens that will never come on again
+			on(L, KIND.prop, "screen", -59.6, z + 0.2, -58.9, z + 2.3, 8.9, 10.9)
+			on(L, KIND.prop, "screen", -59.6, z + 2.7, -58.9, z + 4.8, 8.9, 10.9)
 		end
 		tall(L, "rack", -58, -29.5, -50, -27.5, 7.5)
 		tall(L, "rack", -40, 27.5, -32, 29.5, 7.5)
 		low(L, "cabinet", -36, -27, -32, -24.5)
 		-- the tape library: shelving in rows with a break half way down each
 		for _, x in { -20, -12, -4, 4, 12, 20 } do
-			tall(L, "shelf", x - 0.75, -58, x + 0.75, -50, 9)
-			tall(L, "shelf", x - 0.75, -46, x + 0.75, -38, 9)
+			shelving(L, x - 0.75, -58, x + 0.75, -50)
+			shelving(L, x - 0.75, -46, x + 0.75, -38)
 		end
 		-- the north-west room: telecine
 		tall(L, "transmitter", -57, -57, -53, -54, 7)
 		tall(L, "transmitter", -57, -46, -53, -43, 7)
-		low(L, "console", -45, -50.5, -37, -48)
+		console(L, -45, -50.5, -37, -48)
 		low(L, "case", -38, -37, -34, -34)
 		-- the north-east room: the audio booth
-		low(L, "console", 40, -48, 52, -45.5)
+		console(L, 40, -48, 52, -45.5)
 		tall(L, "rack", 57.4, -57, 59.4, -51, 7)
 		tall(L, "case", 34, -58.5, 37, -55.5, 6.8)
 		low(L, "sheet", 50, -37, 56, -34.5)
@@ -879,6 +1029,8 @@ function Plan.build(): Plan
 		low(L, "bench", -22.5, -3, -20.5, 3)
 		low(L, "planter", -27, 22, -24, 24.4)
 		set(L, -18.5, -10, "-x")
+		-- the test card, on the cores' fronts: the last thing Channel 7 broadcast, seen across the atrium
+		bars(L, -8, 6, -CORE0 + 1, 2.4, 9)
 	end
 
 	-- STOREY 4: offices and the transmitter hall
@@ -931,6 +1083,7 @@ function Plan.build(): Plan
 		for _, x in { -10, -3, 5 } do
 			local i, j = on(L, KIND.prop, "lamp", x, -6.4, x + 1.2, -5.2, 7.9, 9.2)
 			lamp(i, j, 40, 1.2, "warm")
+			lens(L, x, -6.4, x + 1.2, -5.2, 7.9, 9.2, "-y", true)
 		end
 	end
 
@@ -992,7 +1145,10 @@ function Plan.build(): Plan
 		local east = if level == 2 then -39 else -45
 		over(level, 30, east, "-x", 5.4, n.ne[1], n.ne[2])
 		over(level, 31, east, "+x", 5.4, n.hall[1], n.hall[2])
-		paint(if level == 4 then -51 else -38.9, y + 6.3, -30, "+z", 6, 2.4, n.notice[1], "stencil", n.notice[2])
+		-- (the studios' walls are dark: the notice there is in yellow)
+		local tone = if level == 2 then "yellow" else "stencil"
+		local nx = if level == 4 then -51 elseif level == 2 then -44.5 else -38.9
+		paint(nx, y + 6.3, -30, "+z", 6, 2.4, n.notice[1], tone, n.notice[2])
 		-- the stairs
 		local at = if level % 2 == 0 then -1 else 1
 		over(level, at * END, -31, "-z", 3.6, "STAIRS")
@@ -1022,6 +1178,9 @@ function Plan.build(): Plan
 	over(1, -37, -45, "+z", 4.4, "EDIT 2", "CUTTING 2")
 	over(2, -30, -22, "+x", 5.4, "MAKE-UP", "MAKE-UP")
 	over(2, -30, 22, "+x", 5.4, "WARDROBE", "WARDROBE")
+	paint(0, H + 6, -CORE0 + 1, "+z", 15, 4.4, "WBLW 7", "gold", nil, "plate")
+	paint(-54, roomY + 6, -6, "+z", 10, 2.6, "ORANGE TEAM", "white", "TEAL TEAM")
+	paint(-49.5, roomY + 6, 6, "-z", 9, 2.2, "GREEN ROOM", "white")
 	paint(-57.5, roomY + DOOR + 1.5, -13, "-z", 4.4, 1.7, "ORANGE TEAM", "white", "TEAL TEAM", "plate")
 	paint(-46.5, roomY + DOOR + 1.5, 13, "+z", 4.4, 1.7, "ORANGE TEAM", "white", "TEAL TEAM", "plate")
 	over(3, -30, -20, "+x", 5.4, "MASTER CONTROL", "CONTINUITY")

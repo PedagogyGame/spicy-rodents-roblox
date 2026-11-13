@@ -74,7 +74,7 @@ local LOOK: { [string]: { any } } = {
 	floor1 = { { 62, 80, 98 }, "Fabric" },
 	floor2 = { { 40, 40, 44 }, "SmoothPlastic" },
 	floor3 = { { 146, 148, 144 }, "Slate" },
-	floor4 = { { 122, 90, 62 }, "WoodPlanks" },
+	floor4 = { { 98, 108, 82 }, "Fabric" },
 	roof = { { 76, 76, 80 }, "Concrete" },
 	skylight = { { 170, 200, 210 }, "Glass", 0.7 },
 	shell = { { 134, 128, 118 }, "Concrete" },
@@ -134,6 +134,40 @@ local LOOK: { [string]: { any } } = {
 	terminal = { { 196, 188, 164 }, "SmoothPlastic" },
 	sheet = { { 214, 210, 198 }, "Fabric" },
 	ceiling_dead = { { 96, 98, 96 }, "SmoothPlastic" },
+	-- the ceilings, by the storey they are over: the dock's bare concrete, the newsroom's tiles, the studios'
+	-- black, the control rooms' tiles, and the top storey's stained plaster under the roof
+	ceiling0 = { { 118, 116, 112 }, "Concrete" },
+	ceiling1 = { { 206, 202, 188 }, "SmoothPlastic" },
+	ceiling2 = { { 34, 34, 38 }, "SmoothPlastic" },
+	ceiling3 = { { 188, 192, 190 }, "SmoothPlastic" },
+	ceiling4 = { { 196, 186, 164 }, "SmoothPlastic" },
+	lens_lit = { { 255, 226, 170 }, "Neon" },
+	lens_dead = { { 168, 176, 182 }, "Glass" },
+	tyre = { { 20, 20, 22 }, "Plastic" },
+	windscreen = { { 30, 40, 52 }, "Glass" },
+	bumper = { { 160, 164, 168 }, "Metal" },
+	van_stripe = { { 232, 132, 40 }, "SmoothPlastic" },
+	dish = { { 226, 224, 216 }, "Metal" },
+	mirror = { { 186, 210, 222 }, "Glass" },
+	bulbs = { { 255, 236, 190 }, "Neon" },
+	garb_a = { { 214, 170, 60 }, "Fabric" },
+	garb_b = { { 124, 66, 116 }, "Fabric" },
+	garb_c = { { 92, 152, 204 }, "Fabric" },
+	garb_d = { { 232, 224, 200 }, "Fabric" },
+	garb_e = { { 84, 144, 96 }, "Fabric" },
+	-- the test card's bars, a little faded
+	bar_white = { { 204, 204, 198 }, "SmoothPlastic" },
+	bar_yellow = { { 202, 196, 60 }, "SmoothPlastic" },
+	bar_cyan = { { 60, 190, 196 }, "SmoothPlastic" },
+	bar_green = { { 64, 184, 76 }, "SmoothPlastic" },
+	bar_magenta = { { 190, 70, 180 }, "SmoothPlastic" },
+	bar_red = { { 196, 62, 54 }, "SmoothPlastic" },
+	bar_blue = { { 52, 64, 190 }, "SmoothPlastic" },
+	tapes_a = { { 204, 196, 172 }, "SmoothPlastic" },
+	tapes_b = { { 96, 118, 140 }, "SmoothPlastic" },
+	keys = { { 206, 200, 182 }, "SmoothPlastic" },
+	keys_lit = { { 255, 176, 60 }, "Neon" },
+	screen = { { 26, 32, 42 }, "Glass" },
 }
 PartList.LOOK = LOOK
 
@@ -157,6 +191,8 @@ local function nameOf(look: string, kind: number): string
 	end
 	if string.sub(look, 1, 5) == "floor" or look == "roof" or look == "landing" then
 		return "Slab"
+	elseif string.sub(look, 1, 7) == "ceiling" and look ~= "ceiling_light" and look ~= "ceiling_dead" then
+		return "Ceiling"
 	elseif string.sub(look, 1, 4) == "wall" then
 		return if kind == Arena.KIND.cover then "Sill" else "Wall"
 	end

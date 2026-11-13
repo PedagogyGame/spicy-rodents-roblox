@@ -35,8 +35,8 @@ local VIEWS: { View } = {
 	{
 		name = "pb_01_atrium_floor",
 		desc = "Ground floor, the atrium's floor from its south-east corner: the fallen lighting rig and its cans, crates, the north stair core's first flight, the first gallery's rail overhead.",
-		feet = { 12, 0, 11 },
-		look = { -6, 5, -9 },
+		feet = { 13.5, 0, 13.5 },
+		look = { -6, 4.5, -9 },
 		fov = 80,
 	},
 	{
@@ -48,9 +48,9 @@ local VIEWS: { View } = {
 	},
 	{
 		name = "pb_03_atrium_top",
-		desc = "Fourth floor, at the gap in the north rail looking down and across the atrium: the hanging rig, the galleries of every storey below, the atrium floor.",
+		desc = "Fourth floor, at the gap in the north rail looking across and down the atrium: the hanging rig, the galleries of the storeys below, the test card on the south core.",
 		feet = { 10, 4 * F, -16.6 },
-		look = { -8, 16, 10 },
+		look = { -9, 36, 15 },
 		fov = 85,
 	},
 	{
@@ -68,7 +68,7 @@ local VIEWS: { View } = {
 	{
 		name = "pb_06_news_set",
 		desc = "First floor, the news studio from between the cameras: the desk on its riser, the set wall, the lighting grid.",
-		feet = { 6.5, F, -30 },
+		feet = { 6.5, F, -33 },
 		look = { -1, F + 4.5, -52 },
 		fov = 75,
 	},
@@ -86,9 +86,9 @@ local VIEWS: { View } = {
 	},
 	{
 		name = "pb_09_spawn_room",
-		desc = "Second floor, inside the west spawn room at a spawn point: the baffle wall, the gap at its end, the team's colour.",
-		feet = { -49.5, 2 * F, 2.5 },
-		look = { -57, 2 * F + 4, 9 },
+		desc = "Second floor, inside the west spawn room at a spawn point: the baffle wall with the room's name, the gap at its end that leads to the south door, the team's colour.",
+		feet = { -46, 2 * F, -2.5 },
+		look = { -57, 2 * F + 4.5, 5 },
 		fov = 80,
 	},
 	{
@@ -127,6 +127,19 @@ local VIEWS: { View } = {
 		desc = "Fourth floor, the offices' corridor: planters to the concourse, office doors.",
 		feet = { -37, 4 * F, 12 },
 		look = { -44, 4 * F + 4, -20 },
+	},
+	{
+		name = "pb_20_test_card",
+		desc = "Third floor, the south gallery looking north across the atrium: the test card on the north core's front, the rails, the galleries either side.",
+		feet = { 3, 3 * F, 18.3 },
+		look = { -1, 3 * F + 5, -21 },
+		fov = 75,
+	},
+	{
+		name = "pb_21_wardrobe",
+		desc = "Second floor, wardrobe, outside the west spawn room's south door: the costume rail, cases, the team's curtain in the doorway.",
+		feet = { -38, 2 * F, 27 },
+		look = { -54, 2 * F + 3.5, 17 },
 	},
 	{
 		name = "pb_16_lobby",
