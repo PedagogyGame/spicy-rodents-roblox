@@ -218,7 +218,7 @@ def draw_plan(data):
     for st in data["standing"]:
         pn.dashed_rect(st["x0"], st["x1"], st["d0"], st["d1"], (20, 110, 60, 220), 1, (5, 4))
 
-    # air hockey: the reserved table
+    # air hockey: the table (its place is AlleyLayout.AIR_HOCKEY; the game bakes it there)
     ah, size = data["airHockey"], data["airHockeySize"]
     along_x = abs(math.cos(ah["yaw"])) > 0.5
     hx = size["along"] / 2 if along_x else size["across"] / 2
@@ -229,7 +229,7 @@ def draw_plan(data):
         px = ah["x"] + sgn * (hx + 2) if along_x else ah["x"]
         pd = ah["d"] if along_x else ah["d"] + sgn * (hd + 2)
         pn.dot(px, pd, 5, (20, 70, 160, 255))
-    pn.text(ah["x"], ah["d"], "AIR HOCKEY\n(reserved)", 12, fill=(10, 50, 130), bold=True)
+    pn.text(ah["x"], ah["d"], "AIR HOCKEY", 12, fill=(10, 50, 130), bold=True)
 
     # darts: the oche
     b = data["board"]
@@ -488,7 +488,7 @@ def legend(data, width, height):
     row(swatch(None, OPENING_COL["exit"] + (255,)), "steel exit doors (red)")
     row(lambda u, v: (d.rectangle([u - 6, v - 6, u + 6, v + 6], fill=(240, 150, 20)),
                       d.text((u, v + 0.5), "E", font=font(10, True), fill=(255, 255, 255), anchor="mm")),
-        "where a player presses E to play (26 places)")
+        f"where a player presses E to play ({len(data['stations'])} places)")
     row(dash_key((20, 110, 60), 1, (5, 4)), "floor a games table keeps clear for its players")
     row(lambda u, v: d.ellipse([u - 8, v - 8, u + 8, v + 8], fill=(120, 60, 170)),
         "staff post (numbered below); small dots: one behind each machine")
@@ -548,7 +548,7 @@ def main():
     d.text((margin, 16), "BELLWETHER BOWL: the eighteen-lane floor plan", font=font(34, True), fill=INK)
     d.text((margin, 58),
            "Drawn as you walk in: the street and the main doors at the bottom, lane 1 on the left, the pins and the "
-           "back of house at the top. Everything shown is built, except the air hockey table (its place is kept). The shops are "
+           "back of house at the top. Everything shown is built. The shops are "
            "finished empty rooms: fittings and staff come next.",
            font=font(14), fill=INK)
     img.paste(pn.img, (margin, title_h))

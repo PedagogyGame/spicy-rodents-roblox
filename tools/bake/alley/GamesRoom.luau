@@ -460,7 +460,7 @@ local function gamesRoom(kit: any, root: any)
 	end
 	-- the floor: a rug under every table that is played standing round it, the size of the floor the plan keeps
 	-- clear for it (AlleyLayout.standing), so the big room reads as a place for each game and whoever dresses it
-	-- sees what to leave alone. The air hockey table's rug lies ready for it. Two flat parts each: a border and a
+	-- sees what to leave alone (the air hockey table stands on its own). Two flat parts each: a border and a
 	-- field (a rug is not a floor: nothing stands on it and nothing collides with it).
 	local RUGS = {
 		pool_1 = { { 30, 74, 62 }, { 40, 96, 78 } },

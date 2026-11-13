@@ -79,7 +79,8 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	end
 	numbers.stations = stationCount
 	-- every station the registry lists for the sites that were baked (Shared/Minigames/Games): the alley's
-	-- twenty-six (18 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball) and whatever the venues' games add
+	-- twenty-eight (18 lanes, darts, fortune, 2 pool, bumper pool, 3 pinball, the two ends of the air hockey table)
+	-- and whatever the venues' games add
 	local sites: { [string]: any } = A.sites or {}
 	local places: { [string]: any } = {}
 	numbers.sites = 0
@@ -90,7 +91,7 @@ function Minigames.run(_opts: { [string]: any }?): { [string]: any }
 	local registered = #Games.stations(places)
 	numbers.registeredStations = registered
 	check(stationCount == registered, `stations {stationCount}, the registry lists {registered}`)
-	check(stationCount >= 26, `stations {stationCount} (the alley alone has 26)`)
+	check(stationCount >= 28, `stations {stationCount} (the alley alone has 28)`)
 	-- each has its prompt, in its own site's folder
 	local promptCount = 0
 	for _, site in sites do
