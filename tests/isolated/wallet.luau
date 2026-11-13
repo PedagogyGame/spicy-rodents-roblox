@@ -129,6 +129,11 @@ return function(t)
 			end)
 			t.deepEq({ ok, words }, { false, "That did not work, so you were not charged for a kite." })
 			t.eq(w.wallet.balance(ann), 293)
+			-- and the error itself is in the server's log, with what was being bought (the review's broken kitchen)
+			t.eq(#w.warned, 1)
+			t.truthy(string.find(w.warned[1], "the kite service fell over", 1, true), w.warned[1])
+			t.truthy(string.find(w.warned[1], "the delivery step for a kite threw", 1, true), w.warned[1])
+			table.clear(w.warned)
 			-- every change is in the log with its reason, in order
 			local log = w.wallet.log()
 			local whys = {}

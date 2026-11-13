@@ -10,7 +10,14 @@
 --   * A spend is one step with no wait in it, so two spends racing for the same money cannot both win: the
 --     second finds what the first left. A shop that must hand something over (and may have to wait to do it)
 --     passes `deliver`: the money is taken first, so nothing else can spend it meanwhile, and comes straight
---     back if the handing-over throws or returns false.
+--     back unless the handing-over returns exactly true (false, nil, nothing at all, or an error: refunded).
+--   * While one of a player's purchases is still being handed over (Account.held > 0), every other spend of
+--     theirs is refused with WORDS.busy and changes nothing: a second press of Pay in the same moment can never
+--     charge the basket twice. (Pay and fines still land: add() and take() do not wait for it.)
+--   * A handing-over that throws, or that returns nothing (the shop forgot `return true`), or anything but true
+--     or false, is the shop's mistake: the money goes back and opts.fault hears what happened (with the
+--     error's own text), so it shows in the server's log on its first use. One that returns false is a
+--     refusal (an empty shelf): the refund is logged as a change ("refund: <why>") like any other.
 --   * Every change is logged with its reason: in the account's purse (the last Wallet.HISTORY), in the bank's
 --     own list (the last Bank.LOG, every account) and to opts.changed, at the moment it happens. Each entry
 --     carries the account's own count of changes (`seq`: 1, 2, 3 ...), so a screen that was shown only the
@@ -29,7 +36,8 @@
 --     lands in it, a pass keeps running) and join() opens it again as it was.
 --   * A pass is bought once and lasts spec.days in-game days from the moment of buying, on the game clock
 --     (opts.now, game seconds; a day is opts.daySeconds of them), whether its holder is in the game or away. A
---     holder is never sold a second one.
+--     holder with RENEW_DAYS (one in-game day) or more left is not sold another (spec.has); in its last day it
+--     can be renewed, and the new days go on the end of the old ones, so nothing is lost (spec.renewed).
 -- Words: every refusal comes back as a sentence a player can be shown as it is (Bank.WORDS, short()). An
 -- amount is written as the shops write it under a dollar ("12c") and as the corner of the screen writes it
 -- from a dollar up ("S$2.40"): amount(cents).
@@ -50,11 +58,12 @@
 -- Interface: new(opts) -> Bank; Bank:join(id) -> (Account, cents given), leave(id), has(id), balance(id),
 --   counted(id) -> cents that count toward the queue, can(id, cents) -> (ok, words), spend(id, cents, why,
 --   deliver?) -> (ok, words), add(id, cents, why) -> (ok, words), take(id, cents, why) -> (ok, words),
---   purse(id) -> Wallet.Purse? (the bank's own: never handed to a feature), buyPass(id, spec) -> (ok, words),
+--   purse(id) -> Wallet.Purse? (the bank's own: never handed to a feature), buyPass(id, spec) -> (ok, words)
+--   (buys, or renews in the last day),
 --   hasPass(id, name), passUntil(id, name) -> game seconds?, passLeft(id, name) -> in-game days (0 without
 --   one), export(id) -> Saved?, import(id, saved) -> (ok, why?); Bank.entries (the log), Bank.faults,
 --   Bank.mistakes; WORDS, short(need, have), amount(cents) -> "12c" | "S$2.40", price (the same), LOG,
---   SAVED_VERSION, POCKET_WHY, SAVED_WHY; types Account, Entry, PassSpec, Saved, Options
+--   SAVED_VERSION, POCKET_WHY, SAVED_WHY, RENEW_DAYS; types Account, Entry, PassSpec, Saved, Options
 
 local Wallet = require("./Wallet")
 
@@ -71,7 +80,10 @@ Bank.WORDS = table.freeze({
 	amount = "That is not for sale yet.", -- a price or a reason the caller got wrong: a server fault, said kindly
 	pay = "That could not be paid.", -- the same for add() and take()
 	full = "Your wallet is full.",
+	busy = "One moment: still serving you.", -- another purchase of theirs is still being handed over
 })
+
+Bank.RENEW_DAYS = 1 -- a pass with less than this many in-game days left can be renewed
 
 export type Entry = { id: any, delta: number, why: string, balance: number, at: number, seq: number }
 export type PassSpec = {
@@ -80,7 +92,8 @@ export type PassSpec = {
 	days: number, -- in-game days
 	why: string, -- "a paintball pass"
 	bought: string, -- the words on buying
-	has: string, -- the words for a holder who asks again
+	has: string, -- the words for a holder who asks again with a day or more left
+	renewed: string?, -- the words on renewing in the last day (default: bought)
 	offer: string, -- what it is and what it costs ("A pass is 20c for five in-game days of ...")
 }
 export type Saved = {
@@ -99,7 +112,7 @@ export type Account = {
 	pocketLeft: number, -- how much of it is still unspent (never more than the balance)
 	seq: number, -- how many changes this account has had
 	fresh: boolean, -- nothing has happened to it yet but pocket money (import may still replace it)
-	held: number, -- cents taken by spends whose handing-over has not finished (theirs again if it fails)
+	held: number, -- purchases whose handing-over has not finished (no other spend of theirs meanwhile)
 	open: boolean, -- false once the player has left: nothing can be spent
 }
 export type Options = {
@@ -170,11 +183,13 @@ function Bank.new(opts: Options): Bank
 		end
 	end
 
-	-- a caller's mistake: counted, and said to whoever keeps the server's log
+	-- a caller's mistake: counted, and said to whoever keeps the server's log (`what` says what was wrong and
+	-- what became of the money)
 	local function mistake(what: string)
 		bank.mistakes += 1
 		tell(opts.fault, what)
 	end
+	local REFUSED = `nothing was taken and the player was told "{Bank.WORDS.amount}"`
 
 	local function open(id: any, cents: number): Account
 		local account: Account
@@ -270,7 +285,7 @@ function Bank.new(opts: Options): Bank
 	-- Could `id` pay `cents` now? (true, "") or (false, the words). Nothing changes.
 	function bank.can(self: Bank, id: any, cents: number): (boolean, string)
 		if not Wallet.isCents(cents) then
-			mistake(`a price of {tostring(cents)} is not whole cents`)
+			mistake(`a price of {tostring(cents)} is not whole cents: {REFUSED}`)
 			return false, Bank.WORDS.amount
 		end
 		local a = self.accounts[id]
@@ -288,14 +303,18 @@ function Bank.new(opts: Options): Bank
 
 	function bank.spend(self: Bank, id: any, cents: number, why: string, deliver: Deliver?): (boolean, string)
 		if not named(why) then
-			mistake(`a spend of {tostring(cents)} came with no reason`)
+			mistake(`a spend of {tostring(cents)} came with no reason: {REFUSED}`)
 			return false, Bank.WORDS.amount
+		end
+		local a = self.accounts[id]
+		if a ~= nil and a.open and a.held > 0 and Wallet.isCents(cents) then
+			-- another purchase of theirs is still being handed over: a second press never charges twice
+			return false, Bank.WORDS.busy
 		end
 		local ok, words = self:can(id, cents)
 		if not ok then
 			return false, words
 		end
-		local a = self.accounts[id]
 		-- (the hand-out goes first: shopping with pocket money takes nothing that counts toward the queue)
 		local fromPocket = math.min(a.pocketLeft, cents)
 		if cents > 0 then
@@ -304,18 +323,30 @@ function Bank.new(opts: Options): Bank
 		end
 		if deliver then
 			-- (the money is already out of reach of any other spend while this runs, however long it waits)
-			a.held += cents
+			-- (held counts purchases in hand, not cents: a free one is in hand too)
+			a.held += 1
 			local ran, got, said = pcall(deliver)
-			a.held -= cents
-			if not ran or got == false then
+			a.held -= 1
+			if not ran or got ~= true then
 				if cents > 0 then
 					a.pocketLeft += fromPocket
 					a.purse:credit(cents, `refund: {why}`)
 				end
-				if ran and type(said) == "string" and said ~= "" then
+				local sorry = `That did not work, so you were not charged for {why}.`
+				if not ran then
+					mistake(
+						`the delivery step for {why} threw: {tostring(got)}; the money went back and the player was told "{sorry}"`
+					)
+				elseif got == nil then
+					mistake(
+						`the delivery step for {why} returned nothing, which is not "handed over": end it with "return true" (the money went back)`
+					)
+				elseif got ~= false then
+					mistake(`the delivery step for {why} returned {tostring(got)}, not true: the money went back`)
+				elseif type(said) == "string" and said ~= "" then
 					return false, said
 				end
-				return false, `That did not work, so you were not charged for {why}.`
+				return false, sorry
 			end
 		end
 		if cents == 0 then
@@ -327,7 +358,7 @@ function Bank.new(opts: Options): Bank
 	-- Pay `id` (wages, a tip, a refund). A closed account still takes it: money owed is never lost.
 	function bank.add(self: Bank, id: any, cents: number, why: string): (boolean, string)
 		if not Wallet.isCents(cents) or not named(why) then
-			mistake(`pay of {tostring(cents)} for {tostring(why)} is not whole cents with a reason`)
+			mistake(`pay of {tostring(cents)} for {tostring(why)} is not whole cents with a reason: nothing was paid`)
 			return false, Bank.WORDS.pay
 		end
 		local a = self.accounts[id]
@@ -344,7 +375,9 @@ function Bank.new(opts: Options): Bank
 	-- account can still be taken from; never below nothing.
 	function bank.take(self: Bank, id: any, cents: number, why: string): (boolean, string)
 		if not Wallet.isCents(cents) or not named(why) then
-			mistake(`a taking of {tostring(cents)} for {tostring(why)} is not whole cents with a reason`)
+			mistake(
+				`a taking of {tostring(cents)} for {tostring(why)} is not whole cents with a reason: nothing was taken`
+			)
 			return false, Bank.WORDS.pay
 		end
 		local a = self.accounts[id]
@@ -375,8 +408,10 @@ function Bank.new(opts: Options): Bank
 		return if e then math.max(0, e - opts.now()) / opts.daySeconds else 0
 	end
 
+	-- Buy a pass, or renew one in its last in-game day (the new days go on the end of the old ones).
 	function bank.buyPass(self: Bank, id: any, spec: PassSpec): (boolean, string)
-		if self:hasPass(id, spec.name) then
+		local renewing = self:hasPass(id, spec.name)
+		if renewing and self:passLeft(id, spec.name) >= Bank.RENEW_DAYS then
 			return false, spec.has
 		end
 		local ok, words = self:spend(id, spec.cents, spec.why)
@@ -384,11 +419,14 @@ function Bank.new(opts: Options): Bank
 			return false, words
 		end
 		local a = self.accounts[id]
-		local untilSeconds = opts.now() + spec.days * opts.daySeconds
+		local now = opts.now()
+		local had = a.passes[spec.name]
+		local from = if had and had > now then had else now
+		local untilSeconds = from + spec.days * opts.daySeconds
 		a.passes[spec.name] = untilSeconds
 		a.fresh = false
 		tell(opts.passed, id, spec.name, untilSeconds)
-		return true, spec.bought
+		return true, if renewing then spec.renewed or spec.bought else spec.bought
 	end
 
 	function bank.export(self: Bank, id: any): Saved?

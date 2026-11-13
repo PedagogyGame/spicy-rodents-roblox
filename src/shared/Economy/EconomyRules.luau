@@ -16,11 +16,13 @@
 -- PRICES holds what the venues sell that is not a corner-store item (those are Items/ItemRules): the brief's
 -- coffee 12 and nachos 5, the lounges' drinks, the hilltop lunch (10), the alley's own ball (25), shoe rental
 -- (0: an extra, free while the desk says FREE BOWLING TODAY) and the alley's souvenirs (3 to 10). A venue
--- asks price(id) and hands the number to the wallet; an id that is not here is nil, and the wallet turns a
--- nil price away with "That is not for sale yet." and a warning in the server's log.
+-- sells by id through the wallet (Credits.buy(player, id)), which reads item(id): the price and the NAMES row
+-- together; an id with no price or no name is turned away with "That is not for sale yet." and a warning in
+-- the server's log that names the id.
 -- payWhy(rule) turns a Roles/Ladder pay rule into the few plain words a player reads beside the money
 -- ("work.completed" -> "work").
--- Interface: WAGES; PRICES; wage(job, hours) -> cents; price(itemId) -> cents?; gigPay(gig, quality) -> Payout;
+-- Interface: WAGES; PRICES; NAMES; wage(job, hours) -> cents; price(itemId) -> cents?; item(itemId) -> Item?
+--            ({ id, cents, name }); gigPay(gig, quality) -> Payout;
 --            grant(catalog, productId) -> cents?; receiptKey(receipt) -> string; queueMoney(cents) -> S$;
 --            pocketMoney() -> cents; pass(name) -> Bank.PassSpec?; passLeftWords(days, daySeconds) -> string;
 --            payWhy(rule) -> string; PAY_WHY; PASS (the one pass on sale)
@@ -52,6 +54,39 @@ EconomyRules.PRICES = table.freeze({ coffee = 12, nachos = 5, hot_cocoa = 10, gr
 function EconomyRules.wage(job: string, hours: number): number
 	local rate = math.max(EconomyRules.WAGES.minimum, EconomyRules.WAGES.jobs[job] or EconomyRules.WAGES.minimum)
 	return math.floor(rate * math.max(0, hours) + 1e-9)
+end
+
+-- What a player reads for each thing on sale, set into the wallet's words ("Paid 10c for a hot cocoa."):
+-- every row of PRICES and every corner-store item (Items/ItemRules: its ids are the shelf's). Not the pass:
+-- it has a name of its own (pass().why) and is sold only by wallet.pass.buy, which also grants it. A spec
+-- holds that nothing has a price without a name or a name without a price, so an id never reaches a screen.
+-- (The alley's snack-bar board says "ice cream 5": that is the corner store's ice_cream_bar, one price.)
+-- stylua: ignore
+EconomyRules.NAMES = table.freeze({
+	coffee = "coffee", nachos = "nachos", hot_cocoa = "a hot cocoa", green_tea = "a green tea", snow_cone = "a snow cone",
+	jetski_rental = "a jet ski ride", paintball_garb_set = "paintball gear", wind_tunnel_balls = "wind tunnel balls",
+	hilltop_lunch = "a hilltop lunch", bowling_ball = "a bowling ball of your own", lane_shoes = "lane shoes",
+	alley_postcard = "a postcard", alley_pin_toy = "a toy bowling pin", alley_mug = "an alley mug", alley_shirt = "an alley shirt",
+	-- the corner store (Items/ItemRules.CATALOG)
+	water_gun = "a water gun", frisbee = "a frisbee", football = "a football", bubbles = "bubbles", chalk = "sidewalk chalk",
+	flashlight = "a flashlight", umbrella = "an umbrella", peanuts = "peanuts", bird_seed = "bird seed",
+	dog_treats = "dog treats", newspaper = "a newspaper", camera = "a disposable camera", duct_tape = "duct tape",
+	whoopee_cushion = "a whoopee cushion", harmonica = "a harmonica", air_horn = "an air horn", soda = "a soda",
+	ice_cream_bar = "an ice cream bar", lawn_chair = "a lawn chair", radio = "a radio", bike_horn = "a bike horn",
+	kite = "a kite",
+})
+
+export type Item = { id: string, cents: number, name: string }
+
+-- One thing on sale, as the wallet sells it (Credits.buy): its price and its name together, or nil when either
+-- is missing (an id that is not on sale, or a row half added).
+function EconomyRules.item(itemId: string): Item?
+	local cents = EconomyRules.price(itemId)
+	local name = (EconomyRules.NAMES :: { [string]: string })[itemId]
+	if cents == nil or name == nil then
+		return nil
+	end
+	return { id = itemId, cents = cents, name = name }
 end
 
 function EconomyRules.price(itemId: string): number?
@@ -113,6 +148,7 @@ function EconomyRules.pass(name: string): Bank.PassSpec?
 		-- (word for word the paintball contract's "bought" and "has_pass": Shared/Minigames/Paintball/Contract)
 		bought = `Pass bought: {COUNT[days] or tostring(days)} days of paintball and both lounges.`,
 		has = "You already have a pass.",
+		renewed = `Pass renewed: {COUNT[days] or tostring(days)} more days of paintball and both lounges.`,
 		offer = `A pass is {Bank.amount(cents)} for {COUNT[days] or tostring(days)} in-game days of paintball and both lounges.`,
 	}
 end

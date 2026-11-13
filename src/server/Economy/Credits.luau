@@ -8,8 +8,10 @@
 -- cents, never negative, one step per spend, pocket money once, leaving, the pass, what would be saved); this
 -- module adds the players, the screen and the server's log.
 --
--- HOW A SHOP CHARGES A PLAYER (on the server, where the prompt fires; a client is never believed about money):
---     local ok, words = wallet.spend(player, 12, "coffee")
+-- HOW A SHOP CHARGES A PLAYER (on the server, where the prompt fires; a client is never believed about money).
+-- Sell by the thing's id: wallet.buy reads its price and its name from Economy/EconomyRules (item(id)), so the
+-- price is the list's and the player reads a name, never an id:
+--     local ok, words = wallet.buy(player, "coffee")
 --     if not ok then
 --         wallet.tell(player, words)   -- "You need 12c; you have 7c.": show it as it is
 --         return
@@ -20,20 +22,26 @@
 --   "notice" toast every refusal uses). The balance in the corner has already changed by then, with
 --   "-12c  coffee" above it, so a shop with its own way of speaking (a clerk's bubble, a receipt) may say
 --   the words there instead; a refusal must always be said somewhere.
---   `why` names the thing in a few lower-case words ("coffee", "a kite", "lane shoes"): it is logged and set
---   into the words. The price is whole cents: Economy/EconomyRules.price(id) has the list.
---   ONE PURCHASE IS ONE SPEND. A till with a basket charges the total once (wallet.spend(player, 67, "3
---   things")), never thing by thing: the screen is told only the last change of a frame, so three spends
---   would read as "-67c  a kite and 2 more" at best, and a basket half paid for is a bug waiting.
---   A price that is not a number (a row missing from the price list) or a reason left out is the shop's
---   mistake: nothing is taken, the player reads "That is not for sale yet." and the server's log gets a
---   warning that names what was wrong and where it was called from. Look for "Wallet" warnings after wiring
---   a new counter.
---   If handing the thing over can fail or has to wait, pass it in, and a failure is never charged:
---     local ok, words = wallet.spend(player, 30, "a kite", function()
---         return giveKite(player)   -- false (or false, "The shelf is empty.") or an error: the 30c comes back
---     end)
---   To show a price before the press: wallet.can(player, 12) -> ok, words; wallet.balance(player) -> cents.
+--   ONE PURCHASE IS ONE SPEND. A till with a basket hands in the list and is charged the total once:
+--     wallet.buy(player, { "kite", "soda", "frisbee" })   -- "Paid 69c for a kite, a soda and a frisbee. ..."
+--   never thing by thing: the screen is told only the last change of a frame, so three spends would read as
+--   "-69c  a kite and 2 more" at best, and a basket half paid for is a bug waiting.
+--   An id with no price or no name (EconomyRules.PRICES / NAMES, or Items/ItemRules for the corner store) is
+--   the shop's mistake: nothing is taken, the player reads "That is not for sale yet." and the server's log
+--   gets a "Wallet" warning that names the id and where it was called from. Look for "Wallet" warnings after
+--   wiring a new counter. (The pass is not sold this way: wallet.pass.buy, below.)
+--   If handing the thing over can fail or has to wait (a Tool to clone, a dish served later), pass it in as
+--   the last argument, and END IT WITH `return true`: only true counts as handed over.
+--     local ok, words = wallet.buy(player, "kite", function()
+--         giveKite(player)
+--         return true               -- false (or false, "The shelf is empty."), nothing, or an error: the
+--     end)                          --   money comes back, and nothing or an error is warned in the log
+--   While a purchase's handing-over is waiting, every other spend by that player is refused with "One moment:
+--   still serving you." and takes nothing, so a second press can never charge twice; even so, a shop's
+--   prompt should ignore its own presses while a purchase is in progress (a busy flag per player).
+--   wallet.spend(player, cents, why, deliver?) is the same thing for an amount that is not on the list (a
+--   game's stake: ctx.town.charge is spend); `why` names the thing in a few lower-case words ("a kite").
+--   To show a price before the press: wallet.can(player, cents) -> ok, words; wallet.balance(player) -> cents.
 --   To pay someone (wages, a tip, a prize that is NOT a stake): wallet.add(player, 5, "mowing a lawn").
 --
 -- HOW A DOOR CHECKS A PASS (the paintball arena and both lounges read the same one):
@@ -46,6 +54,8 @@
 --   and where the pass is sold (the desk, a lounge door's prompt):
 --     local ok, words = wallet.pass.buy(player)   -- (true, "Pass bought: five days of paintball and both
 --         -- lounges.") or (false, "You need 20c; you have 7c.") or (false, "You already have a pass.")
+--   In a pass's last in-game day buy() renews it: the five new days go on the end of the old ones (true,
+--   "Pass renewed: five more days of paintball and both lounges."), so nobody has to be turned away first.
 --   Never write the price or the length into a sentence of your own: wallet.pass.offer() -> cents, days,
 --   words reads the same two tunables that buy() charges by, so a changed price changes every door at once.
 --   wallet.pass is { has, buy, untilDay } as the paintball server's PassDesk type wants it, plus left(player)
@@ -78,7 +88,8 @@
 -- require.
 -- Interface: new(deps?) -> Wallet { join(player) -> cents of pocket money given, leave(player),
 --   balance(player) -> cents, counted(player) -> cents that count toward the queue, can(player, cents) ->
---   (ok, words), spend(player, cents, why, deliver?) -> (ok, words), add(player, cents, why) -> (ok, words),
+--   (ok, words), buy(player, id | { id }, deliver?) -> (ok, words), spend(player, cents, why, deliver?) ->
+--   (ok, words), add(player, cents, why) -> (ok, words),
 --   tell(player, words), purse(player) -> Purse (a face; joins nobody), pass { has, buy, left, untilDay,
 --   words, offer }, log() -> the last changes of every account, export(player) -> Bank.Saved?,
 --   import(player, saved) -> (ok, why?), bank (the Bank itself) }; note(seq, delta, why) -> the CentsNote
@@ -133,6 +144,7 @@ export type Wallet = {
 	balance: (player: any) -> number,
 	counted: (player: any) -> number,
 	can: (player: any, cents: number) -> (boolean, string),
+	buy: (player: any, what: string | { string }, deliver: (() -> (boolean?, string?))?) -> (boolean, string),
 	spend: (player: any, cents: number, why: string, deliver: (() -> (boolean?, string?))?) -> (boolean, string),
 	add: (player: any, cents: number, why: string) -> (boolean, string),
 	tell: (player: any, words: string) -> (), -- the words a spend, a refusal or a door has for a player, on their screen
@@ -219,9 +231,50 @@ function Credits.new(deps: Deps?): Wallet
 		end,
 		fault = function(what: string)
 			-- a shop's mistake, not the player's: say it where whoever wired the shop will see it
-			shout(`{what}: nothing was taken and the player was told "{Bank.WORDS.amount}" {debug.traceback("", 2)}`)
+			shout(`{what} {debug.traceback("", 2)}`)
 		end,
 	})
+
+	-- What buy() sells: one id or a basket of them, as one price and the words for it; nil and the first id
+	-- that is not on sale when one is not.
+	local function basket(what: any): (number?, string?, string?)
+		local ids: { any } = if type(what) == "table" then what else { what }
+		if #ids == 0 then
+			return nil, nil, "an empty basket"
+		end
+		local total, names = 0, {}
+		for _, id in ids do
+			local item = if type(id) == "string" then EconomyRules.item(id) else nil
+			if item == nil then
+				local why = if id == "paintball_pass"
+					then " (the pass is sold by wallet.pass.buy, which grants it)"
+					else ""
+				return nil, nil, `"{tostring(id)}"{why}`
+			end
+			total += item.cents
+			table.insert(names, item.name)
+		end
+		local words = if #names == 1
+			then names[1]
+			elseif #names <= 3 then `{table.concat(names, ", ", 1, #names - 1)} and {names[#names]}`
+			else `{#names} things`
+		return total, words, nil
+	end
+
+	local function buy(player: any, what: any, deliver: (() -> (boolean?, string?))?): (boolean, string)
+		local cents, why, missing = basket(what)
+		if cents == nil or why == nil then
+			bank.mistakes += 1
+			shout(
+				`no price or no name for {missing or "?"}: nothing was taken and the player was told "{Bank.WORDS.amount}" {debug.traceback(
+					"",
+					2
+				)}`
+			)
+			return false, Bank.WORDS.amount
+		end
+		return bank:spend(who(player), cents, why, deliver)
+	end
 
 	local function join(player: any): number
 		local id = who(player)
@@ -318,6 +371,7 @@ function Credits.new(deps: Deps?): Wallet
 		can = function(player: any, cents: number): (boolean, string)
 			return bank:can(who(player), cents)
 		end,
+		buy = buy,
 		spend = function(
 			player: any,
 			cents: number,

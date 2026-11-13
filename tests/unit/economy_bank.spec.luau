@@ -378,9 +378,9 @@ return function(t)
 		local first, second = buyer("a football"), buyer("a frisbee")
 		coroutine.resume(first)
 		t.eq(w2.bank:balance(1), 3, "the first buyer's money is already out of reach")
-		t.eq(w2.bank.accounts[1].held, 7)
+		t.eq(w2.bank.accounts[1].held, 1, "one purchase in hand")
 		coroutine.resume(second)
-		t.deepEq(results["a frisbee"], { false, "You need 7c; you have 3c." })
+		t.deepEq(results["a frisbee"], { false, Bank.WORDS.busy })
 		t.eq(coroutine.status(second), "dead", "the loser is told at once, without waiting")
 		coroutine.resume(first)
 		t.deepEq(results["a football"], { true, "Paid 7c for a football. You have S$0.03." })
@@ -400,7 +400,7 @@ return function(t)
 			}
 		end)
 		coroutine.resume(co)
-		t.deepEq({ w3.bank:spend(1, 7, "a frisbee") }, { false, "You need 7c; you have 3c." })
+		t.deepEq({ w3.bank:spend(1, 7, "a frisbee") }, { false, Bank.WORDS.busy })
 		coroutine.resume(co)
 		t.deepEq(out, { false, "The shelf is empty." })
 		t.eq(w3.bank:balance(1), 10)
@@ -410,6 +410,144 @@ return function(t)
 			{ id = 1, delta = 7, why = "refund: a kite", balance = 10, at = 6480, seq = 3 }
 		)
 	end)
+
+	t.test(
+		"Pay pressed twice while the basket is still being handed over: charged once (the review's caller 1)",
+		function()
+			-- a corner-store till charges a basket of three (69c) and waits a frame to hand the Tools over; the
+			-- player presses Pay again in that frame
+			local w = world(300)
+			w.bank:join(1)
+			local waiting: { thread } = {}
+			local owned = 0
+			local said: { any } = {}
+			local function pay()
+				table.insert(said, {
+					w.bank:spend(1, 69, "a kite, a soda and a frisbee", function(): (boolean?, string?)
+						table.insert(waiting, coroutine.running())
+						coroutine.yield() -- (task.wait: the Tools are being cloned)
+						owned += 3
+						return true
+					end),
+				})
+			end
+			local first, second = coroutine.create(pay), coroutine.create(pay)
+			coroutine.resume(first)
+			coroutine.resume(second) -- the second press, same frame
+			t.deepEq(said[1], { false, "One moment: still serving you." }, "the second press is told to wait")
+			t.eq(w.bank:balance(1), 231, "and charged nothing")
+			-- the frame ends: the first is handed over
+			for _, co in waiting do
+				coroutine.resume(co)
+			end
+			t.deepEq(said[2], { true, "Paid 69c for a kite, a soda and a frisbee. You have S$2.31." })
+			t.eq(owned, 3, "one basket")
+			t.eq(w.bank:balance(1), 231, "paid for once")
+			t.eq(w.bank.accounts[1].held, 0)
+			-- once it is handed over the next purchase goes through as usual
+			t.truthy(w.bank:spend(1, 12, "coffee"))
+			t.eq(w.bank:balance(1), 219)
+			-- a purchase in hand refuses a pass, a free thing and a plain spend alike; pay and fines still land
+			local co = coroutine.create(function()
+				w.bank:spend(1, 5, "nachos", function(): (boolean?, string?)
+					coroutine.yield()
+					return true
+				end)
+			end)
+			coroutine.resume(co)
+			t.deepEq({ w.bank:buyPass(1, PASS) }, { false, Bank.WORDS.busy })
+			t.deepEq({ w.bank:spend(1, 0, "lane shoes") }, { false, Bank.WORDS.busy })
+			t.truthy(w.bank:add(1, 2, "a tip"))
+			t.truthy(w.bank:take(1, 1, "a parking fine"))
+			t.falsy(w.bank:hasPass(1, "paintball"))
+			coroutine.resume(co)
+			t.eq(w.bank:balance(1), 219 - 5 + 2 - 1)
+			-- another player is never kept waiting by someone else's purchase
+			w.bank:join(2)
+			local co2 = coroutine.create(function()
+				w.bank:spend(1, 5, "nachos", function(): (boolean?, string?)
+					coroutine.yield()
+					return true
+				end)
+			end)
+			coroutine.resume(co2)
+			t.truthy(w.bank:spend(2, 5, "nachos"))
+			coroutine.resume(co2)
+			-- a handing-over that fails or throws while waiting frees the player for the next one too
+			for _, ending in { "false", "error" } do
+				local co3 = coroutine.create(function()
+					w.bank:spend(1, 5, "nachos", function(): (boolean?, string?)
+						coroutine.yield()
+						if ending == "error" then
+							error("the fryer caught fire")
+						end
+						return false
+					end)
+				end)
+				coroutine.resume(co3)
+				t.eq(w.bank.accounts[1].held, 1)
+				coroutine.resume(co3)
+				t.eq(w.bank.accounts[1].held, 0, ending)
+				t.truthy(w.bank:can(1, 5))
+			end
+			t.eq(w.bank:balance(1), 210, "both refunded")
+		end
+	)
+
+	t.test(
+		"a handing-over must say true: nothing, an error or anything else is refunded and said in the server's log",
+		function()
+			local w = world(300)
+			w.bank:join(1)
+			-- the review's caller 5: a typo in the kitchen code
+			local ok, words = w.bank:spend(1, 10, "a hilltop lunch", function(): (boolean?, string?)
+				local plate: any = nil
+				return plate.soup
+			end)
+			t.deepEq({ ok, words }, { false, "That did not work, so you were not charged for a hilltop lunch." })
+			t.eq(w.bank:balance(1), 300)
+			t.eq(#w.faults, 1, "the server's log hears of it")
+			t.truthy(string.find(w.faults[1], "the delivery step for a hilltop lunch threw", 1, true), w.faults[1])
+			t.truthy(string.find(w.faults[1], "attempt to index nil", 1, true), "with the error's own words")
+			t.truthy(string.find(w.faults[1], "economy_bank.spec", 1, true), "and where it was")
+			-- a give-function that returns nil on failure, or a step that forgot its `return`: refunded, and said
+			local function giveKite(): boolean?
+				return nil -- (the shelf was empty)
+			end
+			t.deepEq({
+				w.bank:spend(1, 30, "a kite", function(): (boolean?, string?)
+					return giveKite()
+				end),
+			}, { false, "That did not work, so you were not charged for a kite." })
+			t.eq(w.bank:balance(1), 300, "never charged for nothing")
+			t.eq(#w.faults, 2)
+			t.truthy(string.find(w.faults[2], 'end it with "return true"', 1, true), w.faults[2])
+			local forgot: any = function() end
+			t.falsy((w.bank:spend(1, 30, "a kite", forgot)))
+			t.eq(#w.faults, 3)
+			local odd: any = function()
+				return "yes"
+			end
+			t.falsy((w.bank:spend(1, 30, "a kite", odd)))
+			t.truthy(string.find(w.faults[4], "returned yes, not true", 1, true), w.faults[4])
+			t.eq(w.bank:balance(1), 300)
+			t.eq(w.bank.mistakes, 4)
+			-- false is a refusal, not a mistake: refunded, its words passed on, nothing warned
+			t.deepEq({
+				w.bank:spend(1, 30, "a kite", function(): (boolean?, string?)
+					return false, "The shelf is empty."
+				end),
+			}, { false, "The shelf is empty." })
+			t.eq(#w.faults, 4)
+			-- and true is handed over
+			t.deepEq({
+				w.bank:spend(1, 30, "a kite", function(): (boolean?, string?)
+					return true
+				end),
+			}, { true, "Paid 30c for a kite. You have S$2.70." })
+			t.eq(#w.faults, 4)
+		end
+	)
 
 	t.test("many buyers at once, in any order: never negative, and the log adds up", function()
 		for seed = 1, 40 do
@@ -588,6 +726,42 @@ return function(t)
 				"A pass is S$1.50 for two in-game days of paintball and both lounges."
 			)
 			Tunables.reset()
+		end
+	)
+
+	t.test(
+		"a pass in its last in-game day can be renewed: the new days go on the end, nobody is turned away",
+		function()
+			t.eq(Bank.RENEW_DAYS, 1)
+			t.eq(PASS.renewed, "Pass renewed: five more days of paintball and both lounges.")
+			local w = world(300)
+			w.bank:join(1)
+			t.truthy(w.bank:buyPass(1, PASS))
+			local ends = 6480 + 5 * DAY
+			-- with a day or more left: "You already have a pass.", and nothing taken
+			w.t = ends - DAY
+			t.deepEq({ w.bank:buyPass(1, PASS) }, { false, PASS.has })
+			t.eq(w.bank:balance(1), 280)
+			-- the review's case: ten game seconds left, in the middle of an evening
+			w.t = ends - 10
+			t.deepEq({ w.bank:buyPass(1, PASS) }, { true, PASS.renewed })
+			t.eq(w.bank:balance(1), 260)
+			t.eq(w.bank:passUntil(1, "paintball"), ends + 5 * DAY, "the ten seconds are kept")
+			t.near(w.bank:passLeft(1, "paintball"), 5 + 10 / DAY)
+			t.deepEq(w.passed[#w.passed], { 1, "paintball", ends + 5 * DAY }, "the screen hears the new end")
+			-- and the renewed pass is a pass with five days left: not renewable again until its own last day
+			t.deepEq({ w.bank:buyPass(1, PASS) }, { false, PASS.has })
+			-- one that has run out is simply bought again, from now
+			w.t = ends + 5 * DAY + 100
+			t.deepEq({ w.bank:buyPass(1, PASS) }, { true, PASS.bought })
+			t.eq(w.bank:passUntil(1, "paintball"), w.t + 5 * DAY)
+			-- short of money in the last day: the pass runs on as it was
+			local poor = world(25)
+			poor.bank:join(2)
+			t.truthy(poor.bank:buyPass(2, PASS))
+			poor.t += 4.5 * DAY
+			t.deepEq({ poor.bank:buyPass(2, PASS) }, { false, "You need 20c; you have 5c." })
+			t.eq(poor.bank:passUntil(2, "paintball"), 6480 + 5 * DAY)
 		end
 	)
 
