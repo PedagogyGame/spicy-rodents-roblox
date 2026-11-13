@@ -168,6 +168,7 @@ export type Record = {
 	events: { Contract.Event },
 	botMs: number, -- total milliseconds in the bots' Bots.step
 	botMsMax: number,
+	botMsTicks: { number }, -- each live tick's milliseconds in Bots.step, in order
 	ticks: number, -- ticks the bots were stepped while live
 	sweepsMax: number, -- the most sight checks in one tick
 	sweepsSecond: number, -- the most by one list in any whole second
@@ -344,6 +345,7 @@ function Sim.new(opts: Opts?): Sim
 		events = {},
 		botMs = 0,
 		botMsMax = 0,
+		botMsTicks = {},
 		ticks = 0,
 		sweepsMax = 0,
 		sweepsSecond = 0,
@@ -1101,6 +1103,7 @@ function Sim.tick(sim: Sim)
 		if state.phase == "live" then
 			sim.rec.botMs += ms
 			sim.rec.botMsMax = math.max(sim.rec.botMsMax, ms)
+			table.insert(sim.rec.botMsTicks, ms)
 			sim.rec.ticks += 1
 			local swept = sim.bots.squad.sweeps - before
 			sim.rec.sweepsMax = math.max(sim.rec.sweepsMax, swept)

@@ -55,6 +55,9 @@ export type Summary = {
 	stareLongest: number, -- the longest any bot did that, seconds
 	botMs: number, -- Bots.step, mean milliseconds a tick while live
 	botMsMax: number,
+	-- the tick 99 ticks in 100 are no slower than: the slowest few are as often the machine (a
+	-- shared one stops a process for a few milliseconds when it likes) as the bots
+	botMsP99: number,
 	botCount: number,
 	sweepsTick: number,
 	sweepsSecond: number,
@@ -267,6 +270,11 @@ function Report.summary(sim: Sim.Sim): Summary
 		stareLongest = stareLongest,
 		botMs = if rec.ticks > 0 then rec.botMs / rec.ticks else 0,
 		botMsMax = rec.botMsMax,
+		botMsP99 = (function(): number
+			local sorted = table.clone(rec.botMsTicks)
+			table.sort(sorted)
+			return sorted[math.max(1, math.ceil(#sorted * 0.99))] or 0
+		end)(),
 		botCount = botCount,
 		sweepsTick = rec.sweepsMax,
 		sweepsSecond = rec.sweepsSecond,
@@ -437,9 +445,10 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	)
 	say(
 		string.format(
-			"COST: Bots.step %.3f ms a tick on average, %.2f ms at worst, for %d bots (budget %.1f ms at %d); "
+			"COST: Bots.step %.3f ms a tick on average, 99 ticks in 100 under %.2f ms, %.2f ms at worst, for %d bots (budget %.1f ms at %d); "
 				.. "sight checks: %d in the busiest tick, %d in the busiest second (cap %d)",
 			s.botMs,
+			s.botMsP99,
 			s.botMsMax,
 			s.botCount,
 			Contract.COST.botsMs,

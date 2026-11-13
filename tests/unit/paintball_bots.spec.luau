@@ -247,6 +247,18 @@ return function(t)
 			end
 			-- and there is no way INTO the other team's room at all
 			t.eq(BotNav.route(nav, a, nil, 0, hub[2], 1, taste), nil)
+			-- the search keeps its working tables between searches: whatever came before (a search that
+			-- found nothing, one to somewhere else), the same question has the same answer
+			local once = BotNav.route(nav, a, nil, 0, b, 1, taste)
+			BotNav.route(nav, b, nil, 0, hub[1], 1, taste)
+			BotNav.route(nav, a, nil, 0, hub[2], 1, taste)
+			t.deepEq(BotNav.route(nav, a, nil, 0, b, 1, taste), once)
+			t.eq(BotNav.route(nav, a, nil, 0, nav.count + 1, 1, taste), nil, "no such place")
+			-- and starting from either end of a link: the cheaper start is taken
+			local list = nav.adjacent[a]
+			local beside = list[1]
+			local viaBeside = BotNav.route(nav, a, beside, 1000, b, 1, taste) :: { number }
+			t.eq(viaBeside[1], a, "a costly other end is not where it starts")
 		end
 	)
 

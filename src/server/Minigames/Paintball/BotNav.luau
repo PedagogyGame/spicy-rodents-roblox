@@ -59,6 +59,24 @@ export type Nav = {
 	stair: { boolean }, -- by link index
 	viewsAt: { [number]: { number } }, -- by node, once asked for: studs of clear view in each of VIEWS directions
 	dipAt: { [number]: number }, -- by node, once asked for: how steeply a standing eye can look down towards the atrium
+	search: Search, -- the route search's working tables, kept between searches (see route)
+}
+
+-- The route search's working tables, one set a Nav, reused by every search so that a search makes no
+-- garbage: a node's entry counts only when its stamp is the present search's.
+export type Search = {
+	gen: number, -- the present search's stamp
+	x: { number }, -- by node: its position, flat (read many times a search)
+	y: { number },
+	z: { number },
+	team: { number }, -- by node: whose room it is in, else 0
+	cost: { number }, -- by node: the cheapest walk to it found so far ...
+	costGen: { number }, -- ... when this is gen
+	came: { number }, -- by node: the node that walk came from ...
+	cameGen: { number }, -- ... when this is gen
+	closedGen: { number }, -- by node: settled, when this is gen
+	heapP: { number }, -- a binary heap of (priority, node) pairs; entries past `size` are stale
+	heapN: { number },
 }
 
 local BotNav = {}
@@ -84,6 +102,28 @@ function BotNav.roomOf(nav: Nav, x: number, y: number, z: number): number
 		end
 	end
 	return 0
+end
+
+local function newSearch(nodes: { NavNode }): Search
+	local n = #nodes
+	local search: Search = {
+		gen = 0,
+		x = table.create(n, 0),
+		y = table.create(n, 0),
+		z = table.create(n, 0),
+		team = table.create(n, 0),
+		cost = table.create(n, 0),
+		costGen = table.create(n, 0),
+		came = table.create(n, 0),
+		cameGen = table.create(n, 0),
+		closedGen = table.create(n, 0),
+		heapP = {},
+		heapN = {},
+	}
+	for i, node in nodes do
+		search.x[i], search.y[i], search.z[i], search.team[i] = node.x, node.y, node.z, node.team
+	end
+	return search
 end
 
 function BotNav.build(arena: Arena): Nav
@@ -217,6 +257,7 @@ function BotNav.build(arena: Arena): Nav
 		stair = stair,
 		viewsAt = {},
 		dipAt = {},
+		search = newSearch(nodes),
 	}
 end
 
@@ -327,6 +368,8 @@ end
 
 -- The cheapest walk from `from` (or from `alt`, which costs `altCost` more to start at: the other
 -- end of the link the bot stands on) to `to`, as node ids starting with the node it sets out from.
+-- (A* with the straight line as its guess, which never overestimates: every link costs at least its
+-- length. It works in the Nav's own tables (Search) and makes no garbage but the path it returns.)
 function BotNav.route(
 	nav: Nav,
 	from: number,
@@ -336,20 +379,36 @@ function BotNav.route(
 	team: number,
 	taste: { number }
 ): { number }?
-	local nodes = nav.nodes
-	local goal = nodes[to]
-	if goal == nil or nodes[from] == nil then
+	local count = nav.count
+	if to < 1 or to > count or from < 1 or from > count then
 		return nil
 	end
-	local other = 3 - team
-	local cost: { [number]: number } = {}
-	local came: { [number]: number } = {}
-	local closed: { [number]: boolean } = {}
-	-- a binary heap of (priority, node) pairs
-	local heapP: { number } = {}
-	local heapN: { number } = {}
+	local search = nav.search
+	search.gen += 1
+	local gen = search.gen
+	local X, Y, Z, T = search.x, search.y, search.z, search.team
+	local cost, costGen = search.cost, search.costGen
+	local came, cameGen = search.came, search.cameGen
+	local closedGen = search.closedGen
+	local heapP, heapN = search.heapP, search.heapN
 	local size = 0
-	local function push(p: number, node: number)
+	local gx, gy, gz = X[to], Y[to], Z[to]
+	local other = 3 - team
+	local door = nav.door
+	local adjacent = nav.adjacent
+
+	-- (the heap's push and pop, written out where they are used: a search pushes and pops thousands
+	-- of times, and a call costs more than the work)
+	cost[from], costGen[from] = 0, gen
+	do
+		local p = math.sqrt((X[from] - gx) ^ 2 + (Y[from] - gy) ^ 2 + (Z[from] - gz) ^ 2)
+		size += 1
+		heapP[size], heapN[size] = p, from
+	end
+	if alt ~= nil and alt >= 1 and alt <= count and alt ~= from then
+		local c0 = altCost or 0
+		cost[alt], costGen[alt] = c0, gen
+		local p = c0 + math.sqrt((X[alt] - gx) ^ 2 + (Y[alt] - gy) ^ 2 + (Z[alt] - gz) ^ 2)
 		size += 1
 		local i = size
 		while i > 1 do
@@ -360,83 +419,81 @@ function BotNav.route(
 			heapP[i], heapN[i] = heapP[parent], heapN[parent]
 			i = parent
 		end
-		heapP[i], heapN[i] = p, node
+		heapP[i], heapN[i] = p, alt
 	end
-	local function pop(): number
-		local top = heapN[1]
-		local p, node = heapP[size], heapN[size]
-		heapP[size], heapN[size] = nil, nil
-		size -= 1
-		local i = 1
-		while size > 0 do
-			local child = i * 2
-			if child > size then
-				break
-			end
-			if child < size and heapP[child + 1] < heapP[child] then
-				child += 1
-			end
-			if heapP[child] >= p then
-				break
-			end
-			heapP[i], heapN[i] = heapP[child], heapN[child]
-			i = child
-		end
-		if size > 0 then
-			heapP[i], heapN[i] = p, node
-		end
-		return top
-	end
-	local function h(i: number): number
-		local node = nodes[i]
-		return math.sqrt((node.x - goal.x) ^ 2 + (node.y - goal.y) ^ 2 + (node.z - goal.z) ^ 2)
-	end
-	cost[from] = 0
-	push(h(from), from)
-	if alt ~= nil and nodes[alt] ~= nil and alt ~= from then
-		cost[alt] = altCost or 0
-		push((altCost or 0) + h(alt), alt)
-	end
-	local door = nav.door
 	while size > 0 do
-		local at = pop()
+		-- pop
+		local at = heapN[1]
+		do
+			local p, node = heapP[size], heapN[size]
+			size -= 1
+			local i = 1
+			while size > 0 do
+				local child = i * 2
+				if child > size then
+					break
+				end
+				if child < size and heapP[child + 1] < heapP[child] then
+					child += 1
+				end
+				if heapP[child] >= p then
+					break
+				end
+				heapP[i], heapN[i] = heapP[child], heapN[child]
+				i = child
+			end
+			if size > 0 then
+				heapP[i], heapN[i] = p, node
+			end
+		end
 		if at == to then
 			break
 		end
-		if closed[at] then
+		if closedGen[at] == gen then
 			continue
 		end
-		closed[at] = true
-		local list = nav.adjacent[at]
-		local here = nodes[at]
+		closedGen[at] = gen
+		local list = adjacent[at]
+		local hereTeam = T[at]
 		local base = cost[at]
 		for k = 1, #list, 3 do
 			local next = list[k]
-			if closed[next] then
+			if closedGen[next] == gen then
 				continue
 			end
-			local node = nodes[next]
-			if node.team == other or door[next] == other then
+			local nextTeam = T[next]
+			if nextTeam == other or door[next] == other then
 				continue -- the other team's room and its doors are shut to this bot
 			end
 			local c = base + list[k + 2] * taste[list[k + 1]]
-			if node.team == team and here.team ~= team then
+			if nextTeam == team and hereTeam ~= team then
 				c += BACK_IN
 			end
-			local had = cost[next]
-			if had == nil or c < had then
-				cost[next] = c
-				came[next] = at
-				push(c + h(next), next)
+			if costGen[next] ~= gen or c < cost[next] then
+				cost[next], costGen[next] = c, gen
+				came[next], cameGen[next] = at, gen
+				-- push
+				local p = c + math.sqrt((X[next] - gx) ^ 2 + (Y[next] - gy) ^ 2 + (Z[next] - gz) ^ 2)
+				size += 1
+				local i = size
+				while i > 1 do
+					local parent = i // 2
+					if heapP[parent] <= p then
+						break
+					end
+					heapP[i], heapN[i] = heapP[parent], heapN[parent]
+					i = parent
+				end
+				heapP[i], heapN[i] = p, next
 			end
 		end
 	end
-	if cost[to] == nil then
+	if costGen[to] ~= gen then
 		return nil
 	end
 	local back: { number } = { to }
 	local at = to
-	while came[at] ~= nil do
+	while cameGen[at] == gen do
 		at = came[at]
 		table.insert(back, at)
 	end
