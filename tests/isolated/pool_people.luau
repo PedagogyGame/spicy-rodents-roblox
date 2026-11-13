@@ -418,11 +418,28 @@ return function(t)
 				Rig.key(Key.ButtonL1, true)
 				Rig.key(Key.ButtonL1, false)
 				t.near(c.angle, a1 - CueController.NUDGE, 1e-9)
-				-- the right stick sets the spin where it points
-				pad(Key.Thumbstick2, 0, -0.6)
-				Rig.run(w, 0.1)
+				-- the right stick moves the tip, and the spin stays where it was taken when the stick springs back
+				-- (through the values in between, a frame each, as a real thumbstick does)
+				pad(Key.Thumbstick2, 0, -1)
+				Rig.run(w, 0.5)
+				local held = c.tipY
+				t.truthy(held < -0.7, `full draw is reached ({held})`)
+				for _, y in { -0.7, -0.35, -0.12, 0 } do
+					pad(Key.Thumbstick2, 0, y)
+					Rig.frame(w)
+				end
+				Rig.run(w, 0.2)
+				t.near(c.tipY, held, 0.06, "the draw stays when the stick is let go")
+				t.truthy(c.tipY <= held, "and never springs back toward the centre")
+				-- R3 centres it; then a little draw is set and kept
+				Rig.key(Key.ButtonR3, true)
+				Rig.key(Key.ButtonR3, false)
+				t.eq(c.tipY, 0)
+				pad(Key.Thumbstick2, 0, -1)
+				Rig.run(w, 0.25)
 				pad(Key.Thumbstick2, 0, 0)
-				t.near(c.tipY, -0.6, 1e-6, "draw")
+				local draw = c.tipY
+				t.truthy(draw < -0.3 and draw > -0.5, `draw {draw}`)
 				-- Y: the top view; again: back on the cue
 				Rig.key(Key.ButtonY, true)
 				Rig.key(Key.ButtonY, false)
@@ -440,7 +457,7 @@ return function(t)
 				t.truthy(sent, "R2 let go strikes")
 				t.near(sent.args[1], aim, 1e-9)
 				t.truthy(sent.args[2] > 0.4 and sent.args[2] < 0.6)
-				t.near(sent.args[4], -0.6, 1e-6)
+				t.near(sent.args[4], draw, 1e-6, "with the draw that was set")
 				t.truthy(PoolRig.settle(w, ID))
 				-- on the 8: the D-pad picks the pocket (a ring marks it) and it is called
 				onTheEight(w)

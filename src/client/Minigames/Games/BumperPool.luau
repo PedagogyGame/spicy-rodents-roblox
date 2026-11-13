@@ -87,10 +87,19 @@ end
 local mode: CueController.Game = {
 	game = "bumper_pool",
 	table = TABLE,
-	-- (the opening's two strikes are taken one after the other: the service hands a turn game's inputs only to
-	-- the seat whose turn it is, so the second player strikes once the first has, and the table plays both)
+	-- (in the opening both players strike, in either order, and the table plays the two together)
 	mine = function(view: { [string]: any }, you: number?): boolean
-		return you ~= nil and view.turn == you and view.game ~= nil
+		local g = view.game
+		if you == nil or g == nil then
+			return false
+		end
+		if g.phase == "opening" then
+			return waitingFor(g, you)
+		end
+		return view.turn == you
+	end,
+	ownBall = function(ball: number, you: number): boolean
+		return BumperPool.sideOf(ball) == you
 	end,
 	strikeable = function(g: { [string]: any }, you: number): { number }
 		if g.phase == "opening" then
@@ -129,13 +138,11 @@ local mode: CueController.Game = {
 		local lead = if last then last .. " " else ""
 		local colour = if you then SIDE_WORDS[you] else ""
 		if g.phase == "opening" then
-			if waitingFor(g, you) and view.turn ~= you then
-				return `{names[view.turn or 0] or "?"} strikes their opening shot first; then you strike yours, and the table plays the two together.`
-			elseif waitingFor(g, you) then
+			if waitingFor(g, you) then
 				if phase == "sent" or phase == "watch" then
 					return "Your opening shot is in."
 				end
-				return `{lead}The opening: bank your marked {colour} ball off the cushion on your RIGHT toward your cup. Both of you strike; the table plays the two together.`
+				return `{lead}The opening: bank your marked {colour} ball off the cushion on your RIGHT toward your cup. You both strike, in any order; the table plays the two together.`
 			end
 			local others: { string } = {}
 			for _, s in g.waiting or {} do
@@ -182,15 +189,22 @@ local function watch(msg: { [string]: any }, place: ClientGame.Place?): any
 			warn(`MinigameClient: a bumper pool shot could not be played ({why})`)
 			return nil
 		end
-		-- (a replay of the winning shot is the same script on a slower clock)
+		-- (a replay of the winning shot is the same script on a slower clock; the shooter's own screen has already
+		-- brought the cue through, and plays the balls at once)
+		local mine = msg.replay ~= true and CueController.struck(def.id, msg.seat)
 		Playback.play(place, def, script, {
-			lead = msg.lead,
+			lead = if mine then 0 else msg.lead,
 			onCue = cue,
 			speed = if msg.replay == true then msg.speed else nil,
 			after = if type(msg.after) == "table" then msg.after else nil,
 			away = if type(msg.away) == "table" then msg.away else nil,
 		})
 		return script
+	elseif msg.kind == "bumper_pool_aim" then
+		-- a player lining up: their cue on every screen but their own
+		if not CueController.aiming(def.id, msg.seat) then
+			Playback.aim(place, def, msg)
+		end
 	elseif msg.kind == "bumper_pool_rack" then
 		Playback.stop(def.id)
 		if type(msg.balls) == "table" then
@@ -301,7 +315,8 @@ local COLS = {
 local function endCard(view: { [string]: any }, _you: number?): { [string]: any }?
 	local g = view.game
 	local r = view.result
-	if g == nil or r == nil then
+	if g == nil or r == nil or CueController.replaying() then
+		-- (no card over the winning shot while it is played again)
 		return nil
 	end
 	local rows: { { [string]: any } } = {}
@@ -340,25 +355,32 @@ table.insert(lobbyButtons, { "leave", "Leave (Q)" })
 
 local entry: ClientGame.ClientGame = {
 	game = "bumper_pool",
-	help = {
-		how = {
-			"Bumper pool: five balls each (red or white), shot into the cup at the far end, round twelve rubber bumpers. No cue ball: you strike your own balls.",
-			"The opening: both players strike their marked ball at once, banked off the cushion on their right. Whoever sinks it, or lies nearer their cup, shoots next.",
-			"Sink your marked ball first. Sink one of your own and you shoot again. Another of yours before the marked one, or one of yours in your opponent's cup: they drop two of theirs in.",
-			"First with all five down wins; your last ball in the wrong cup loses.",
+	help = CueController.help({
+		"Bumper pool: five balls each, no cue ball. Sink all five in the far cup, round the twelve bumpers; your marked ball must go first.",
+		"The opening: both of you bank your marked ball off your right-hand cushion; the table plays the two strikes together.",
+	}, {
+		keyboard = {
+			"Click your ball, or R / 1 to 5: pick",
+			"Drag, or A / D: aim (Shift: fine)",
+			"Hold Space, or pull the bar: power",
+			"Red dot, or W / S / Z / X: spin",
+			"T: top view    V: walk round",
 		},
-		keys = {
-			"Click one of your balls, or R / 1 to 5: the ball to strike",
-			"Drag, or A / D  turn the aim (Shift: fine)",
-			"Pull the bar down and let go, or hold Space: power",
-			"Drag the red dot, or W / S / Z / X: spin (C centres)",
-			"T  top view (click the cloth to point the cue)",
-			"V  walk round the table, V again to take the shot",
-			"Q  leave the table",
-			"Gamepad: left stick aims (L1 / R1 fine), right stick spin, hold and let go R2; D-pad picks the ball; Y top view, X walk",
-			"Touch: tap your ball, drag to aim, drag the red dot, HOLD TO SHOOT",
+		gamepad = {
+			"D-pad: pick the ball to strike",
+			"Left stick: aim (L1 / R1: fine)",
+			"Hold R2 and let go: power",
+			"Right stick: spin (R3 centres it)",
+			"Y: top view    X: walk round",
 		},
-	},
+		touch = {
+			"Tap one of your balls: pick it",
+			"Drag on the cloth: aim",
+			"FINE AIM or two fingers: fine aim",
+			"Pull the bar down, let go: power",
+			"Drag the red dot: spin",
+		},
+	}),
 	title = function(msg: { [string]: any }): string
 		return `Bumper pool - {msg.label}`
 	end,
@@ -376,7 +398,7 @@ local entry: ClientGame.ClientGame = {
 	card = card,
 	cardSig = cardSig,
 	endCard = endCard,
-	kinds = { "bumper_pool_shot", "bumper_pool_rack" },
+	kinds = { "bumper_pool_shot", "bumper_pool_rack", "bumper_pool_aim" },
 	watch = watch,
 	sounds = {
 		["bumper_pool.chalk"] = "", -- a turn begins: the cue is chalked

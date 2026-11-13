@@ -337,4 +337,190 @@ return function(t)
 			)
 		end
 	)
+
+	t.test("the other player leaves while my break rolls: I win by forfeit, and my shot is seen to its end", function()
+		Rig.play(function(w)
+			PoolRig.clock(w)
+			local bob = Rig.stub("Bob")
+			Rig.press(w, POOL)
+			Rig.run(w, 0.3)
+			t.truthy(w.svc:join(bob, POOL))
+			Rig.click(w, "Start now")
+			Rig.run(w, 0.5)
+			local state = PoolRig.state(w, POOL)
+			local st = PoolRig.station(w, POOL)
+			local racks = Rig.count(w.got, "pool_rack")
+			-- my break, through the same path as a strike of mine; Bob walks off while the balls run
+			t.truthy(w.svc:debug(POOL, "shoot", { 0, 0.9, 0, 0 }))
+			Rig.run(w, 0.4)
+			t.truthy(st.tbl.pending, "the break is rolling")
+			local msg = Rig.last(w.got, "pool_shot")
+			w.svc:leave(bob, "left")
+			Rig.run(w, 0.3)
+			t.eq(state.how, "left")
+			t.eq(state.winner, 1)
+			t.truthy(PoolRig.settle(w, POOL))
+			Rig.run(w, 0.8)
+			t.eq(Rig.count(w.got, "pool_rack"), racks, "my break is not taken back")
+			t.falsy(Rig.has(w.toasts, "does not count"), table.concat(w.toasts, " | "))
+			local screen = Rig.screen(w)
+			t.falsy(string.find(screen, "does not count", 1, true), screen)
+			t.truthy(string.find(screen, "Ann wins: Bob left the table.", 1, true), screen)
+			-- every ball lies where the break left it, on my screen and on the server's table
+			local flat = msg.after
+			for k = 1, #flat - 2, 3 do
+				local bx, bz = PoolRig.ball(w, POOL, flat[k])
+				t.near(bx, flat[k + 1], 1e-3, `ball {flat[k]} where the break left it`)
+				t.near(bz, flat[k + 2], 1e-3)
+				local at = st.tbl.hw:position(flat[k])
+				local x, _, z = Furniture.fromWorld(w.places.bowling_alley, PoolRig.def(w, POOL), at.X, at.Y, at.Z)
+				t.near(x, flat[k + 1], 1e-3, `and on the server's table`)
+				t.near(z, flat[k + 2], 1e-3)
+			end
+		end, opts(POOL))
+	end)
+
+	t.test("taken off for not playing: the end card says so, and each timeout is one banner", function()
+		Rig.play(function(w)
+			PoolRig.clock(w)
+			local bob = Rig.stub("Bob")
+			Rig.press(w, POOL)
+			Rig.run(w, 0.3)
+			t.truthy(w.svc:join(bob, POOL))
+			Rig.click(w, "Start now")
+			Rig.run(w, 0.5)
+			local state = PoolRig.state(w, POOL)
+			local session = w.svc:sessionOf(POOL)
+			local banners = 0
+			local guard = 0
+			while session.phase == "playing" and guard < 8 do
+				guard += 1
+				t.truthy(PoolRig.settle(w, POOL))
+				if state.seat == 1 then
+					-- my go: a tap that reaches nothing (a foul: Bob has the ball in hand), then Bob's clock runs
+					if state.inHand ~= "none" then
+						t.truthy(w.svc:debug(POOL, "layout", state.spots, { inHand = "none" }))
+						Rig.run(w, 0.2)
+					end
+					t.truthy(w.svc:debug(POOL, "shoot", { math.pi, 0.04, 0, 0 }))
+					t.truthy(PoolRig.settle(w, POOL))
+					Rig.run(w, 0.5)
+				else
+					local before = #w.got
+					Rig.run(w, 61)
+					for i = before + 1, #w.got do
+						local m = w.got[i]
+						if
+							m.kind == "event"
+							and type(m.text) == "string"
+							and string.find(m.text, "took too long", 1, true)
+						then
+							banners += 1
+						end
+						t.falsy(
+							m.kind == "event"
+								and type(m.text) == "string"
+								and string.find(m.text, "ran out of time", 1, true),
+							"what the timeout means is not a second banner"
+						)
+					end
+				end
+			end
+			t.eq(session.phase, "done")
+			t.eq(state.how, "removed")
+			t.truthy(banners >= 2, `{banners} timeouts`)
+			t.truthy(Rig.has(w.toasts, "Bob ran out of time"), table.concat(w.toasts, " | "))
+			local screen = Rig.screen(w)
+			t.truthy(string.find(screen, "Ann wins: Bob was taken off the table for not playing.", 1, true), screen)
+			t.falsy(string.find(screen, "left the table", 1, true), screen)
+		end, opts(POOL))
+	end)
+
+	t.test("bumper pool: the second opener strikes first; the first then strikes, and the table plays both", function()
+		Rig.play(function(w)
+			PoolRig.clock(w)
+			local bob = Rig.stub("Bob")
+			Rig.press(w, BUMPER)
+			Rig.run(w, 0.3)
+			t.truthy(w.svc:join(bob, BUMPER))
+			Rig.click(w, "Start now")
+			Rig.run(w, 0.5)
+			local state = PoolRig.state(w, BUMPER)
+			local c = PoolRig.controller(BUMPER)
+			t.eq(state.phase, "opening")
+			t.eq(c.phase, "aim", "I may strike my opening shot")
+			-- Bob, the second seat, strikes first: it stands
+			local shots = Rig.count(w.got, "bumper_pool_shot")
+			local bobs = Computer.bumper(state, 2, 2, 9)
+			local ok, why = Rig.input(w, bob, BUMPER, bobs[#bobs].verb, bobs[#bobs].args)
+			t.truthy(ok, `the second opener's strike is taken: {why}`)
+			Rig.run(w, 0.3)
+			t.truthy(state.pending[2], "Bob's strike is in")
+			t.eq(Rig.count(w.got, "bumper_pool_shot"), shots, "the table waits for mine")
+			t.eq(c.phase, "aim", "and it is still my go")
+			-- mine: the table plays the two together, and I watch my own opening
+			PoolRig.play(w, c, Computer.bumper(state, 1, 2, 10))
+			t.truthy(Rig.untilTrue(w, 2, function()
+				return Rig.count(w.got, "bumper_pool_shot") > shots
+			end))
+			local script = assert(Wire.decode(Rig.last(w.got, "bumper_pool_shot").text))
+			t.eq(#script.strikes, 12, "two strikes in one run")
+			Rig.run(w, 0.1)
+			t.eq(c.phase, "watch")
+			t.truthy(PoolRig.settle(w, BUMPER))
+			t.eq(state.phase, "play")
+		end, opts(BUMPER))
+	end)
+
+	t.test(
+		"bumper pool: one opener strikes and the other lets the clock run out; the opening plays on every screen",
+		function()
+			Rig.play(
+				function(w)
+					PoolRig.clock(w)
+					local ann, bob = Rig.stub("Ann2"), Rig.stub("Bob")
+					t.truthy(w.svc:join(ann, BUMPER))
+					t.truthy(w.svc:join(bob, BUMPER))
+					t.truthy(Rig.input(w, ann, BUMPER, "start"))
+					Rig.run(w, 0.5)
+					local state = PoolRig.state(w, BUMPER)
+					local st = PoolRig.station(w, BUMPER)
+					for _, input in Computer.bumper(state, 1, 2, 4) do
+						assert(Rig.input(w, ann, BUMPER, input.verb, input.args))
+					end
+					local shots = Rig.count(w.got, "bumper_pool_shot")
+					-- Bob idles out his opening
+					t.truthy(
+						Rig.untilTrue(w, 50, function()
+							return Rig.count(w.got, "bumper_pool_shot") > shots
+						end),
+						"the opening was never shown"
+					)
+					t.truthy(st.tbl:busy(), "the turn clock waits while it plays")
+					t.truthy(Rig.last(ann.events, "bumper_pool_shot"), "the opener is sent it")
+					t.truthy(Playback.playing(BUMPER) or (Rig.last(w.got, "bumper_pool_shot").lead or 0) > 0)
+					Rig.run(w, 0.3)
+					t.truthy(Playback.playing(BUMPER), "the watcher sees the opening run")
+					-- the words come when the balls stop
+					t.falsy(Rig.last(ann.events, "event", function(m: any): boolean
+						return type(m.text) == "string"
+							and string.find(m.text, "opening", 1, true) ~= nil
+							and m.shot ~= nil
+					end))
+					t.truthy(PoolRig.settle(w, BUMPER))
+					Rig.run(w, 0.3)
+					t.eq(state.phase, "play")
+					allAt(t, w, BUMPER, "after the opening the clock decided")
+				end,
+				opts(BUMPER, {
+					stand = {
+						site = "bowling_alley",
+						x = PoolRig.stand("pool_2").x,
+						y = 3,
+						d = PoolRig.stand("pool_2").d,
+					},
+				})
+			)
+		end
+	)
 end

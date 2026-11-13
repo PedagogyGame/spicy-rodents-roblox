@@ -171,15 +171,22 @@ local function watch(msg: { [string]: any }, place: ClientGame.Place?): any
 			warn(`MinigameClient: a pool shot could not be played ({why})`)
 			return nil
 		end
-		-- (a replay of the winning shot is the same script on a slower clock)
+		-- (a replay of the winning shot is the same script on a slower clock; the shooter's own screen has already
+		-- brought the cue through, and plays the balls at once)
+		local mine = msg.replay ~= true and CueController.struck(def.id, msg.seat)
 		Playback.play(place, def, script, {
-			lead = msg.lead,
+			lead = if mine then 0 else msg.lead,
 			onCue = cue,
 			speed = if msg.replay == true then msg.speed else nil,
 			after = if type(msg.after) == "table" then msg.after else nil,
 			away = if type(msg.away) == "table" then msg.away else nil,
 		})
 		return script
+	elseif msg.kind == "pool_aim" then
+		-- the shooter lining up: their cue on every screen but their own
+		if not CueController.aiming(def.id, msg.seat) then
+			Playback.aim(place, def, msg)
+		end
 	elseif msg.kind == "pool_rack" then
 		Playback.stop(def.id)
 		if type(msg.balls) == "table" then
@@ -309,7 +316,8 @@ local COLS = {
 local function endCard(view: { [string]: any }, _you: number?): { [string]: any }?
 	local g = view.game
 	local r = view.result
-	if g == nil or r == nil then
+	if g == nil or r == nil or CueController.replaying() then
+		-- (no card over the winning shot while it is played again)
 		return nil
 	end
 	local names = namesOf(view)
@@ -350,25 +358,35 @@ table.insert(lobbyButtons, { "leave", "Leave (Q)" })
 
 local entry: ClientGame.ClientGame = {
 	game = "pool",
-	help = {
-		how = {
-			"Eight-ball: break the rack, then pot all of your group (solids 1-7 or stripes 9-15) and then the 8 in a pocket you call.",
-			"Pot one of your own and you shoot again. A foul (the cue ball goes in, hits nothing or the wrong ball first, or no ball reaches a cushion) gives the other player the cue ball in hand.",
-			"The 8 too early, or in the wrong pocket, loses the game.",
+	help = CueController.help({
+		"Eight-ball: break, pot all of your group (solids 1-7 or stripes 9-15), then call a pocket and pot the 8.",
+		"A foul (the cue ball in, the wrong ball first, no cushion) gives your opponent the cue ball in hand. The 8 too early, or in the wrong pocket, loses.",
+	}, {
+		keyboard = {
+			"Drag, or A / D: aim (Shift: fine)",
+			"Hold Space, or pull the bar: power",
+			"Red dot, or W / S / Z / X: spin",
+			"T: top view    V: walk round",
+			"Ball in hand: drag it, then Space",
+			"On the 8: click a pocket (or 1 to 6)",
 		},
-		keys = {
-			"Drag, or A / D  turn the aim (Shift: fine)",
-			"Pull the bar down and let go, or hold Space: power",
-			"Drag the red dot, or W / S / Z / X: spin (C centres)",
-			"T  top view (click the cloth to point the cue)",
-			"V  walk round the table, V again to take the shot",
-			"Ball in hand: drag the cue ball, then Space",
-			"On the 8: click a pocket to call it (or 1 to 6)",
-			"Q  leave the table",
-			"Gamepad: left stick aims (L1 / R1 fine), right stick spin, hold and let go R2; Y top view, X walk; D-pad moves the ball in hand (A sets it) and picks the 8's pocket",
-			"Touch: drag to aim, drag the red dot, HOLD TO SHOOT; drag the cue ball in hand, then DONE; tap a pocket to call it",
+		gamepad = {
+			"Left stick: aim (L1 / R1: fine)",
+			"Hold R2 and let go: power",
+			"Right stick: spin (R3 centres it)",
+			"Y: top view    X: walk round",
+			"Ball in hand: D-pad, then A",
+			"On the 8: the D-pad picks a pocket",
 		},
-	},
+		touch = {
+			"Drag on the cloth: aim",
+			"FINE AIM or two fingers: fine aim",
+			"Pull the bar down, let go: power",
+			"Drag the red dot: spin",
+			"Ball in hand: drag it, then DONE",
+			"On the 8: tap a pocket",
+		},
+	}),
 	title = function(msg: { [string]: any }): string
 		return `Pool - {msg.label}`
 	end,
@@ -386,7 +404,7 @@ local entry: ClientGame.ClientGame = {
 	card = card,
 	cardSig = cardSig,
 	endCard = endCard,
-	kinds = { "pool_shot", "pool_rack" },
+	kinds = { "pool_shot", "pool_rack", "pool_aim" },
 	watch = watch,
 	sounds = {
 		["pool.chalk"] = "", -- a turn begins: the cue is chalked

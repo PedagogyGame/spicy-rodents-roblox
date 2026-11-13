@@ -33,7 +33,8 @@
 -- (tests/unit/pool_eightball.spec.luau).
 -- Interface: def, verbs; init(seats, seed, breaker?) -> State; input(state, seat, verb, args) with verbs
 --   "place" { x, z }, "call" { pocket 1..6 }, "shoot" { angle, power, tipX?, tipY?, pocket? }; turn(state);
---   skipTurn(state); gone(state, seat) (a forfeit); result(state); view(state); script(state) -> the last shot's Shot.Script?;
+--   skipTurn(state); gone(state, seat) (a forfeit); takenOff(state, seat) (gone for not playing: said so);
+--   result(state); view(state); script(state) -> the last shot's Shot.Script?;
 --   apply(state, outcome, rest?) -> event (the referee alone: "foul" | "continue" | "pass" | "win" |
 --   "lose"); groupOf(ball); onEight(state, seat); legal(state, seat) -> { ball ids the seat may hit first };
 --   left(state, seat) -> balls of its group still up (7 while the table is open); canPlace(state, x, z);
@@ -68,6 +69,7 @@ EightBall.HOW_TEXT = {
 	eight_foul = "fouled on the 8",
 	eight_wrong_pocket = "potted the 8 in the wrong pocket",
 	left = "left the table",
+	removed = "was taken off the table for not playing",
 } :: { [string]: string }
 
 export type PotAt = { ball: number, hole: number }
@@ -513,6 +515,14 @@ function EightBall.gone(state: State, seat: number)
 		breakShot = not state.broken,
 	}
 	state.lastScript = nil
+end
+
+-- A seat that was taken off for not playing (the service's idle clock), not one that walked away: if its going
+-- ended the game (gone), the game says so.
+function EightBall.takenOff(state: State, seat: number)
+	if state.done and state.how == "left" and state.winner ~= seat then
+		state.how = "removed"
+	end
 end
 
 function EightBall.script(state: State): Shot.Script?

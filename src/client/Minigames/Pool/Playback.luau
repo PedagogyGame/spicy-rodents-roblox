@@ -18,13 +18,16 @@
 -- Roll), so nothing pops when playback lets go and no screen keeps a ball where the rules do not. If the table is not on this client (streamed out) nothing is played.
 -- A slow replay (opts.speed under 1: the winning shot of a game, played again) is the same drawing on a slower
 -- clock: every pose, stroke and sound at its own moment of the script.
+-- Another player lining a shot up is drawn too: their cue behind their ball, eased toward what they last told
+-- (aim), until the stroke takes over.
 -- Interface: play(place, def, script, opts { lead?, onCue?, speed?, after?, away? }) -> bool (after: flat
 --   { id, x, z ... } where the rules lay the balls once the shot is judged; away: { ids } out of sight); stop(stationId) (cut short: nothing
 --   more is written); set(place, def, table, flat { id, x, z ... }, away { ids }?, fresh?) (lay the balls out:
 --   a new rack, a shot that did not count); put(place, def, table, id, x, z) (one ball on the cloth: the cue
 --   ball in the hand); playing(stationId) -> bool; now(stationId) -> seconds since the strike (negative
 --   during the stroke), or nil; find(def) -> the table's Model?; ballAt(def, id) -> Vector3?; TAIL, HIDE,
---   FOLLOW; clock (os.clock; a test swaps it). def = the station's StationDef (id, game, site, index, x, d)
+--   FOLLOW; aim(place, def, msg) (another player's cue as they aim); aiming(stationId) -> bool; AIM_STALE,
+--   AIM_EASE; clock (os.clock; a test swaps it). def = the station's StationDef (id, game, site, index, x, d)
 
 local Import = require("../../Import")
 local AlleyLayout =
@@ -85,6 +88,29 @@ local active: { [string]: Entry } = {}
 local waiting: { [string]: { place: any, def: Def, script: any, opts: { [string]: any }, t0: number, ends: number } } =
 	{}
 local bound = false
+-- another player lining a shot up (their "aim", relayed by the server): the cue drawn behind their ball here
+type Aim = {
+	place: any,
+	def: Def,
+	ball: number,
+	angle: number, -- as last told
+	power: number,
+	tipX: number,
+	tipY: number,
+	shown: { number }, -- angle, power, tipX, tipY as drawn: eased toward the last told, at any frame rate
+	at: number, -- the clock when it was last told
+	stick: any,
+}
+local aims: { [string]: Aim } = {}
+local lastStep: number? = nil
+
+local function unaim(id: string)
+	local a = aims[id]
+	if a then
+		a.stick:destroy()
+		aims[id] = nil
+	end
+end
 
 local function siteModel(site: string): Instance?
 	local att = workspace:FindFirstChild("Attractions")
@@ -286,8 +312,13 @@ end
 -- (defined below play's helpers: a shot waiting for its table is begun from the frame step)
 local begin: (place: any, def: Def, script: any, o: { [string]: any }, t0: number) -> Entry?
 
+local drawAims: (now: number, dt: number) -> ()
+
 local function step()
 	local now = Playback.clock()
+	local dt = math.clamp(now - (lastStep or now), 0, 0.25)
+	lastStep = now
+	drawAims(now, dt)
 	for id, wt in waiting do
 		if now >= wt.ends then
 			-- (the shot ended before the table reached this client: the server's own layout of it is what arrives)
@@ -324,7 +355,8 @@ local function step()
 			active[id] = nil
 		end
 	end
-	if next(active) == nil and next(waiting) == nil and bound then
+	if next(active) == nil and next(waiting) == nil and next(aims) == nil and bound then
+		lastStep = nil
 		bound = false
 		game:GetService("RunService"):UnbindFromRenderStep(Playback.BIND)
 	end
@@ -466,6 +498,7 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 		active[def.id] = nil
 	end
 	waiting[def.id] = nil
+	unaim(def.id)
 	if place == nil then
 		return false
 	end
@@ -484,9 +517,86 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 	return true
 end
 
+-- Another player's cue as they aim, drawn behind their ball and eased toward what they last told (eight times
+-- a second), so it swings smoothly at any frame rate. A cue not told of for AIM_STALE seconds is put away.
+Playback.AIM_STALE = 1.5
+Playback.AIM_EASE = 14 -- the drawn cue closes this share of its gap a second (exponentially)
+
+function drawAims(now: number, dt: number)
+	for id, a in aims do
+		local m = ballsOf(Playback.find(a.def))[a.ball] :: Model?
+		if now - a.at > Playback.AIM_STALE or active[id] ~= nil or m == nil then
+			unaim(id)
+			continue
+		end
+		local k = 1 - math.exp(-Playback.AIM_EASE * dt)
+		local sh = a.shown
+		-- (the angle the short way round)
+		local da = (a.angle - sh[1] + math.pi) % (2 * math.pi) - math.pi
+		sh[1] += da * k
+		sh[2] += (a.power - sh[2]) * k
+		sh[3] += (a.tipX - sh[3]) * k
+		sh[4] += (a.tipY - sh[4]) * k
+		local tb = Tables.byId(if a.def.game == "bumper_pool" then "bumper" else "eightball")
+		local r = tb.ballR
+		local dx, dz = Cue.dirOf(sh[1])
+		local wdx, wdz = Furniture.dir(a.place, dx, dz)
+		local level = Vector3.new(wdx, 0, wdz)
+		local right = Vector3.new(-wdz, 0, wdx)
+		local toward = (level * math.cos(Furniture.CUE_PITCH) - Vector3.new(0, math.sin(Furniture.CUE_PITCH), 0)).Unit
+		local at = (m :: Model):GetPivot().Position
+			+ right * (sh[3] * Cue.TIP_MAX * r)
+			+ Vector3.new(0, sh[4] * Cue.TIP_MAX * r, 0)
+		a.stick:pose(at - toward * (r + Furniture.CUE_REST + Furniture.CUE_BACK * sh[2]), toward, 1)
+	end
+end
+
+-- aim: another player's cue as they line a shot up (msg = their "aim": ball, angle, power, tipX, tipY).
+function Playback.aim(place: any, def: Def, msg: { [string]: any })
+	if place == nil or active[def.id] ~= nil then
+		return
+	end
+	local ball, angle = tonumber(msg.ball), tonumber(msg.angle)
+	if ball == nil or angle == nil then
+		return
+	end
+	local a = aims[def.id]
+	local power = math.clamp(tonumber(msg.power) or 0, 0, 1)
+	local tipX = math.clamp(tonumber(msg.tipX) or 0, -1, 1)
+	local tipY = math.clamp(tonumber(msg.tipY) or 0, -1, 1)
+	if a == nil or a.ball ~= ball then
+		unaim(def.id)
+		a = {
+			place = place,
+			def = def,
+			ball = ball,
+			angle = angle,
+			power = power,
+			tipX = tipX,
+			tipY = tipY,
+			shown = { angle, power, tipX, tipY },
+			at = Playback.clock(),
+			stick = Stick.new(),
+		}
+		aims[def.id] = a
+	end
+	local aim = a :: Aim
+	aim.angle, aim.power, aim.tipX, aim.tipY = angle, power, tipX, tipY
+	aim.at = Playback.clock()
+	if not bound then
+		bind()
+	end
+end
+
+-- aiming(stationId) -> is another player's cue drawn at that table now?
+function Playback.aiming(stationId: string): boolean
+	return aims[stationId] ~= nil
+end
+
 -- stop: a shot was cut short (the table emptied, the shooter left): nothing more of it is written.
 function Playback.stop(stationId: string)
 	waiting[stationId] = nil
+	unaim(stationId)
 	local e = active[stationId]
 	if e then
 		release(e)

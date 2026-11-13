@@ -101,6 +101,26 @@ local function copyState(v: any): any
 	return out
 end
 
+-- flat { id, x, z ... } -> spots; { ids } -> set
+local function spotsOf(flat: { number }): { { id: number, x: number, z: number } }
+	local out = {}
+	for k = 1, #flat - 2, 3 do
+		table.insert(out, { id = flat[k], x = flat[k + 1], z = flat[k + 2] })
+	end
+	return out
+end
+
+local function setOf(ids: { number }): { [number]: boolean }?
+	if #ids == 0 then
+		return nil
+	end
+	local out: { [number]: boolean } = {}
+	for _, id in ids do
+		out[id] = true
+	end
+	return out
+end
+
 function CueTable.new(ctx: ServerGame.Ctx, game: Game): ServerGame.Table
 	local self = setmetatable({}, CueTable) :: any
 	self.ctx = ctx
@@ -114,6 +134,8 @@ function CueTable.new(ctx: ServerGame.Ctx, game: Game): ServerGame.Table
 	self.laid = nil :: { spots: { any }, away: { [number]: boolean }? }? -- the balls as last laid out
 	self.wins = {} :: { [string]: number } -- games won at this table, by name, since it was last empty
 	self.replayUntil = 0 -- the winning shot's slow replay is playing on the clients until then
+	self.judged = 0 -- the rules' shotNo when a shot was last sent to the clients (or the game started)
+	self.openingFrom = 0 -- a computer opener at the second seat does not strike before this
 	local root = ctx.root
 	local room = root and root:FindFirstChild("GamesRoom")
 	local model = room and room:FindFirstChild(Furniture.modelName(game.game, ctx.station.index))
@@ -247,7 +269,8 @@ function CueTable._strike(
 	return true
 end
 
--- The script has played: the shot goes into the real game.
+-- The script has played: the shot goes into the real game. (A shot the rules have already played on the clock,
+-- bumper pool's opening with one strike in, is only shown: it is judged already.)
 function CueTable._land(self: any)
 	local ctx = self.ctx
 	local p = self.pending
@@ -255,13 +278,18 @@ function CueTable._land(self: any)
 	local before = self:_state()
 	local was = before and self.game.snapshot(before)
 	local ok: boolean
-	if ctx.seatOf(p.key) == p.seat then
+	if p.display then
+		ok = true
+	elseif ctx.seatOf(p.key) == p.seat then
 		ok = ctx.apply(p.key, p.verb, p.args)
 	else
 		-- (the shooter has left the table: their seat still answers for the shot if the turn is still theirs)
 		ok = ctx.server(p.verb, p.args, p.seat)
 	end
 	local state = self:_state()
+	if state then
+		self.judged = state.shotNo
+	end
 	if ok and state then
 		local hw = self.hw
 		if hw then
@@ -290,6 +318,15 @@ function CueTable._land(self: any)
 			self.replayUntil = ctx.now() + CueTable.REPLAY_LEAD + p.script.tEnd / CueTable.REPLAY_SPEED + 3
 		end
 		self.pauseUntil = ctx.now() + CueTable.BETWEEN
+	elseif state and state.done and ctx.seatOf(p.key) == p.seat then
+		-- the game ended while the balls rolled, and not by the shooter (the other player left and forfeited):
+		-- the shot is seen to its end where it lies, and the forfeit has its own words
+		self.laid = { spots = spotsOf(p.after), away = setOf(p.gone) }
+		local hw = self.hw
+		if hw then
+			hw:landed(p.script)
+			hw:layout(self.laid.spots, self.laid.away)
+		end
 	else
 		-- the shooter went while the balls were rolling and the turn was played out as a miss
 		self:_sync()
@@ -297,6 +334,109 @@ function CueTable._land(self: any)
 		ctx.broadcast({ kind = "event", text = CueTable.TEXT.left, shot = p.n })
 	end
 	ctx.dirty()
+end
+
+-- A shot the rules have just played by themselves (bumper pool's opening, decided on the clock with one strike
+-- in): sent to every screen like any other, and only shown, as it is judged already. The words come when the
+-- balls stop, and the turn clock waits for them.
+function CueTable._show(self: any, state: any)
+	local ctx = self.ctx
+	local script = state.lastScript
+	self.judged = state.shotNo
+	self.shots += 1
+	self.knocked = {}
+	local after, gone = CueTable.layoutOf(state, self.game.away)
+	local lead = CueTable.LEAD_PERSON
+	local turn = self.game.rules.turn(state)
+	self.pending = {
+		display = true,
+		key = nil,
+		seat = 0,
+		verb = "shoot",
+		args = {},
+		script = script,
+		at = ctx.now(),
+		lead = lead,
+		ends = ctx.now() + lead + script.tEnd + CueTable.TAIL,
+		n = self.shots,
+		text = Wire.encode(script),
+		after = after,
+		gone = gone,
+		turn = turn,
+	}
+	ctx.everyone({
+		kind = self.game.game .. "_shot",
+		index = ctx.station.index,
+		n = self.shots,
+		seat = 0,
+		lead = lead,
+		text = self.pending.text,
+		after = after,
+		away = gone,
+	})
+	ctx.dirty()
+end
+
+-- "aim": where the shooter's cue points as they line the shot up, about eight times a second while it moves.
+-- Nothing in the game changes; every other screen draws that cue (Playback.aim), so the other player and
+-- anyone watching see the shot being lined up. Only the seat whose go it is (either opener) is passed on.
+function CueTable._aim(self: any, seat: number, args: { any })
+	local ctx = self.ctx
+	local state = self:_state()
+	if state == nil or self.pending or state.done then
+		return
+	end
+	local rules = self.game.rules
+	local may = rules.turn(state) == seat
+	if not may and rules.waiting and state.phase == "opening" then
+		may = table.find(rules.waiting(state), seat) ~= nil
+	end
+	if not may then
+		return
+	end
+	local ball, angle, power = ServerGame.num(args[1], -1), ServerGame.num(args[2], 0), ServerGame.num(args[3], 0)
+	local tipX, tipY = ServerGame.num(args[4], 0), ServerGame.num(args[5], 0)
+	if ball < 0 or ball > 15 or ball % 1 ~= 0 then
+		return
+	end
+	ctx.everyone({
+		kind = self.game.game .. "_aim",
+		index = ctx.station.index,
+		seat = seat,
+		ball = ball,
+		angle = angle % (2 * math.pi),
+		power = math.clamp(power, 0, 1),
+		tipX = math.clamp(tipX, -1, 1),
+		tipY = math.clamp(tipY, -1, 1),
+	})
+end
+
+-- Verbs taken before the service's turn gate: the cue's aim from the shooter, and in bumper pool's opening the
+-- strike of EITHER opener, in either order (both bank their marked ball, and the table plays the two together
+-- when the second is in: the gate would hand the input only to the first seat that has not struck).
+function CueTable.command(self: any, player: any, verb: string, args: { any }): (boolean, boolean?, string?)
+	if verb ~= "aim" and verb ~= "shoot" then
+		return false
+	end
+	local ctx = self.ctx
+	local state = self:_state()
+	local seat = ctx.seatOf(player)
+	if ctx.session.phase ~= "playing" or state == nil or seat == nil then
+		return false
+	end
+	if verb == "aim" then
+		self:_aim(seat, args)
+		return true, true
+	end
+	local waiting = self.game.rules.waiting
+	if waiting == nil or state.phase ~= "opening" or table.find(waiting(state), seat) == nil then
+		return false
+	end
+	if self.pending then
+		return true, false, CueTable.TEXT.rolling
+	end
+	local ok, why = self:_strike(player, seat, "shoot", args, CueTable.LEAD_PERSON)
+	return true, ok, why
 end
 
 function CueTable.input(self: any, player: any, seat: number, verb: string, args: { any }): (boolean?, string?)
@@ -434,6 +574,7 @@ end
 function CueTable.step(self: any, _dt: number)
 	local p = self.pending
 	if p == nil then
+		self:_openers()
 		return
 	end
 	local ctx = self.ctx
@@ -448,6 +589,28 @@ function CueTable.step(self: any, _dt: number)
 			self.hw:show(p.script, at)
 		end
 		self:_animals(p.script, at)
+	end
+end
+
+-- Bumper pool's opening: a computer at a seat that is not the turn's (the person beside it may strike first or
+-- second) strikes by itself, after a moment, as the turn's computer does when the service asks it.
+function CueTable._openers(self: any)
+	local ctx = self.ctx
+	local waiting = self.game.rules.waiting
+	local state = self:_state()
+	if waiting == nil or state == nil or state.phase ~= "opening" or ctx.now() < self.openingFrom then
+		return
+	end
+	if ctx.session.phase ~= "playing" then
+		return
+	end
+	local turn = self.game.rules.turn(state)
+	for _, seat in waiting(state) do
+		local key = ctx.session.seats[seat]
+		if seat ~= turn and type(key) == "table" and key.ai == true then
+			self:computer(key, seat)
+			return
+		end
 	end
 end
 
@@ -470,6 +633,8 @@ function CueTable.event(self: any, e: ServerGame.Event)
 			opener(state, seat)
 		end
 		self.winner = nil
+		self.judged = if state then state.shotNo else 0
+		self.openingFrom = ctx.now() + 2
 		if self.hw then
 			self.hw:fresh()
 		end
@@ -495,14 +660,27 @@ function CueTable.event(self: any, e: ServerGame.Event)
 	elseif kind == "timeout" then
 		-- an idle turn has been played out by the rules (eight-ball: a foul, the ball in hand)
 		self.thinking = nil
-		self:_sync()
 		local state = self:_state()
+		if state and state.lastScript and state.shotNo ~= self.judged and not self.pending then
+			-- the rules played a shot on the clock (bumper pool's opening with one strike in): every screen sees it
+			self:_show(state)
+			return
+		end
+		self:_sync()
 		if state and not state.done then
 			local text = self.game.words(self.game.rules.view(state), ctx.session.names, self.game.snapshot(state))
 			if text then
-				-- (with the shot count: the clients keep it on screen a while, as they do a shot's words)
-				ctx.broadcast({ kind = "event", text = text, shot = self.shots })
+				-- (not a second banner: the service has just said who took too long. What it means for the table
+				-- stays on screen a while)
+				ctx.broadcast({ kind = self.game.game .. "_say", text = text })
 			end
+		end
+	elseif kind == "removed" then
+		-- taken off for idling: if that ended the game, the end card says so, not that they left
+		local state = self:_state()
+		local took = self.game.rules.takenOff
+		if state and took and e.seat then
+			took(state, e.seat)
 		end
 	elseif kind == "skipped" then
 		self.thinking = nil
@@ -581,6 +759,7 @@ function CueTable.debug(self: any, what: string, a: any, b: any): (boolean, stri
 		if fix then
 			fix(state)
 		end
+		self.judged = state.shotNo
 		self.thinking = nil
 		self:_sync()
 		self:_rack(nil)

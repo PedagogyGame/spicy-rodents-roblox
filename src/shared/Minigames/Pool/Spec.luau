@@ -23,7 +23,7 @@ local Spec: GameSpec.Spec = {
 	rules = EightBall,
 	flow = "turns",
 	session = { lobbySeconds = 10, turnSeconds = 60, doneSeconds = 30 },
-	verbs = { "shoot", "call", "place" },
+	verbs = { "shoot", "call", "place", "aim" },
 	prompt = { action = "Play pool", busy = "try the other table" },
 	words = {
 		start = "Eight-ball: break!",

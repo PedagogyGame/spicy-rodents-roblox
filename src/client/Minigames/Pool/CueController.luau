@@ -40,6 +40,7 @@ local Furniture =
 	Import.shared("Minigames/Pool/Furniture") :: typeof(require("../../../shared/Minigames/Pool/Furniture"))
 local Games = Import.shared("Minigames/Games") :: typeof(require("../../../shared/Minigames/Games"))
 local InputMap = require("../../Input/InputMap")
+local Shot = Import.shared("Minigames/Pool/Shot") :: typeof(require("../../../shared/Minigames/Pool/Shot"))
 local Playback = require("./Playback")
 local Stick = require("./Stick")
 
@@ -49,11 +50,25 @@ Controller.__index = Controller
 -- the controllers that are open, by station (a developer's console and the specs look at one through this)
 Controller.live = {} :: { [string]: any }
 
-Controller.TURN = 1.1 -- radians a second with A / D or the stick
+Controller.TURN = 1.1 -- radians a second with A / D held a while, or the stick pushed all the way
+Controller.TURN_MIN = 0.05 -- radians a second as A / D go down: a tap is a hair (the speed rises while held)
+Controller.TURN_RAMP = 0.8 -- seconds A / D take to reach TURN
 Controller.FINE = 0.07 -- with Shift held
 Controller.DRAG = 0.0022 -- radians for a pixel dragged
-Controller.FINE_DRAG = 0.2 -- of that, with Shift held
+Controller.FINE_DRAG = 0.2 -- of that, with Shift held, a second finger on the cloth, or FINE AIM held
+Controller.SLIP = 0.08 -- seconds: a finger's last small movement (SLIP_PX) this close to its lift is the lift
+Controller.SLIP_PX = 6 -- pixels
 Controller.NUDGE = 0.004 -- radians: one tap of L1 / R1
+Controller.NUDGE_HOLD = 0.3 -- seconds L1 / R1 are held before they repeat
+Controller.NUDGE_RATE = 0.05 -- radians a second while they repeat
+Controller.TIP_STICK = 1.6 -- of the tip's reach a second, with the right stick all the way (R3 centres)
+Controller.AIM_SEND = 0.125 -- seconds between "aim" messages (only while the aim changes): the others see it
+Controller.STROKE = 0.16 -- seconds the cue takes to come through once you let go
+Controller.HOLD_CUE = 0.25 -- seconds after the strike the view stays down the cue
+Controller.RISE_CAM = 0.75 -- seconds the camera then takes to rise to the view of the table
+Controller.BREAK_CUT = 0.2 -- seconds after the break's strike the view cuts to the top of the table
+Controller.STANCE_SIDE = 0.75 -- studs: you stand this far to the left of the line, the cue under your eye
+Controller.EYE_CLEAR = 0.8 -- studs: the cue view's eye stays this far in front of where you stand
 Controller.RISE = 1.5 -- seconds a held stroke takes to reach full power (and as long to fall back)
 Controller.MIN_POWER = 0.02 -- less than this is no stroke at all
 Controller.SET_POWER = 0.45 -- the power the aim lines are drawn for while the cue is at rest
@@ -87,7 +102,41 @@ export type Game = {
 	args: (ball: number, angle: number, power: number, tipX: number, tipY: number, pocket: number) -> { any },
 	-- the status line: what the seat is on ("Your shot: solids, 3 left."); phase as the Controller's
 	say: (view: { [string]: any }, you: number?, phase: string) -> string,
+	-- is this ball one of the seat's own (bumper pool: an opening run with both strikes in it is mine too)
+	ownBall: ((ball: number, you: number) -> boolean)?,
 }
+
+-- The device this screen is played with now: "touch", "gamepad" or "keyboard".
+function Controller.device(): string
+	local UIS = game:GetService("UserInputService")
+	local last: any = nil
+	pcall(function()
+		last = UIS:GetLastInputType()
+	end)
+	if last ~= nil and string.find(tostring(last), "Gamepad", 1, true) then
+		return "gamepad"
+	end
+	if UIS.TouchEnabled and not UIS.KeyboardEnabled then
+		return "touch"
+	end
+	if UIS.GamepadEnabled and not UIS.KeyboardEnabled then
+		return "gamepad"
+	end
+	return "keyboard"
+end
+
+-- The How-to-play card: a sentence or two on the game, and only the controls of the device in use (read as the
+-- card is drawn, so a gamepad plugged in later gets its own).
+function Controller.help(how: { string }, keys: { [string]: { string } }): { how: { string }, keys: { string } }
+	return setmetatable({ how = how }, {
+		__index = function(_, k: string): any
+			if k == "keys" then
+				return keys[Controller.device()] or keys.keyboard
+			end
+			return nil
+		end,
+	}) :: any
+end
 
 local function part(name: string, shape: Enum.PartType, color: Color3, transparency: number): BasePart
 	local p = Instance.new("Part")
@@ -153,6 +202,21 @@ function Controller.new(ctx: { [string]: any }, mode: Game): any
 	self.legs = true -- my legs are my own
 	self.lampHidden = false
 	self.saidPhase = "" -- the phase the status line was last written for
+	self.turnHeld = 0 -- seconds A / D have been held
+	self.nudge = 0 -- L1 (-1) or R1 (+1) held
+	self.nudgeSince = 0
+	self.fineHeld = false -- the FINE AIM button is held (touch)
+	self.aimSentAt = -math.huge
+	self.aimSent = "" -- the aim last told to the server
+	self.strokeBack = 0 -- how far the cue was drawn back when it was let go
+	self.watchFrom = nil :: CFrame? -- the cue view as the strike was let go (the rise starts from it)
+	self.watchFov = Controller.CAM_FOV
+	self.autoView = true -- while seated and not shooting: the camera follows the other player's shot
+	self.follow = nil :: number? -- the other player's shot line, while it runs
+	self.replay = nil :: { [string]: any }? -- the winning shot played again: its camera
+	self.bodyHidden = {} :: { [Instance]: number } -- my own body's parts, hidden in the cue view
+	self.inFrame = false -- drawing a frame (a shot let go now is let go as the next frame begins)
+	self.letGo = false
 	self.conns = {} :: { RBXScriptConnection }
 	self.stick = Stick.new()
 	local white = Color3.fromRGB(255, 255, 255)
@@ -197,25 +261,31 @@ function Controller.new(ctx: { [string]: any }, mode: Game): any
 			self:_frame(dt)
 		end)
 	)
-	ctx.ui:touch(
-		{ { "bowl", "HOLD TO SHOOT" }, { "top", "TOP VIEW" }, { "walk", "WALK" }, { "done", "DONE" } },
-		function(id: string)
-			if id == "bowl" then
-				self:_hold(true)
-			elseif id == "top" then
-				self:_toggleTop()
-			elseif id == "walk" then
-				self:_toggleWalk()
-			elseif id == "done" then
-				self:_confirm()
-			end
-		end,
-		function(id: string)
-			if id == "bowl" then
-				self:_hold(false)
-			end
+	ctx.ui:touch({
+		{ "bowl", "HOLD TO SHOOT" },
+		{ "fine", "FINE AIM" },
+		{ "top", "TOP VIEW" },
+		{ "walk", "WALK" },
+		{ "done", "DONE" },
+	}, function(id: string)
+		if id == "fine" then
+			self.fineHeld = true
+		elseif id == "bowl" then
+			self:_hold(true)
+		elseif id == "top" then
+			self:_toggleTop()
+		elseif id == "walk" then
+			self:_toggleWalk()
+		elseif id == "done" then
+			self:_confirm()
 		end
-	)
+	end, function(id: string)
+		if id == "bowl" then
+			self:_hold(false)
+		elseif id == "fine" then
+			self.fineHeld = false
+		end
+	end)
 	return self
 end
 
@@ -407,6 +477,7 @@ end
 -- My turn is over (or was never mine): camera and legs are my own again, unless I asked for the top view.
 function Controller._end(self: any)
 	self.phase = "off"
+	self:_showBody()
 	self.presses = {}
 	self.charge = nil
 	self.power = 0
@@ -495,28 +566,66 @@ function Controller.onState(self: any, msg: { [string]: any })
 	self:_say()
 end
 
-function Controller.onMessage(self: any, msg: { [string]: any }, _watched: any?)
+-- Is this shot mine? The seat that struck it, or (bumper pool's opening, two strikes in one run) a ball of mine
+-- was struck in it.
+function Controller._mine(self: any, msg: { [string]: any }, script: any?): boolean
+	local you = self.you
+	if you == nil then
+		return false
+	end
+	if msg.seat == you then
+		return true
+	end
+	local own = (self.mode :: Game).ownBall
+	if own and type(script) == "table" and type(script.strikes) == "table" then
+		for k = 1, #script.strikes, 6 do
+			if own(script.strikes[k], you) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function Controller.onMessage(self: any, msg: { [string]: any }, watched: any?)
 	local mode = self.mode :: Game
 	if msg.kind == `{mode.game}_shot` and msg.replay == true then
-		-- the winning shot played again, slowly: watched from the top of the table
+		-- the winning shot played again, slowly: watched from beyond the pocket it drops into, with the end card
+		-- held back until it is over
+		self.replay = { since = self.t, script = watched }
+		self.ctx.ui:summary(nil)
 		self.ctx.toast("The winning shot, again, slowly", 4)
 	elseif msg.kind == `{mode.game}_shot` then
-		if self.phase == "sent" or (msg.seat == self.you and self.phase ~= "off") then
-			-- my own shot is on its way: watch it
+		if self.phase == "sent" or (self.phase ~= "off" and msg.seat == self.you) or self:_mine(msg, watched) then
+			-- my own shot is on its way: watch it (the view stays down the cue until the tip has met the ball)
 			local g = self:_g()
 			self.watchTop = self.top or (g ~= nil and g.broken == false)
+			if self.phase ~= "sent" and self.phase ~= "aim" then
+				self.watchFrom = nil
+			end
 			self.phase = "watch"
 			self.watchSince = self.t
 			self.charge = nil
 			self.presses = {}
+			self.follow = nil
 			self:_hideAim()
 			self.ctx.ui:meter(nil)
+		elseif self.you ~= nil and type(watched) == "table" and type(watched.strikes) == "table" then
+			-- the other player's shot: followed from behind its line (V: my own camera instead)
+			local st = watched.strikes
+			if #st >= 3 and (st[2] ~= 0 or st[3] ~= 0) then
+				self.follow = Cue.angleOf(st[2], st[3])
+			end
 		end
-	elseif msg.kind == "event" and msg.shot ~= nil and type(msg.text) == "string" then
+	elseif
+		type(msg.text) == "string" and ((msg.kind == "event" and msg.shot ~= nil) or msg.kind == `{mode.game}_say`)
+	then
 		-- what a shot came to (a foul in the rules' words, who is at the table): the banner is gone in a moment
-		-- (the next turn's banner follows it at once), so it is said where it stays a while too
+		-- (the next turn's banner follows it at once), so it is said where it stays a while too. "<game>_say":
+		-- what a turn the clock ran out means for the table (the service has already said who took too long)
 		self.ctx.toast(msg.text, 5)
 	elseif msg.kind == `{mode.game}_rack` then
+		self.follow = nil
 		if type(msg.balls) == "table" then
 			self:_setSpots(msg.balls)
 			-- (a ball I was carrying is put where the table now has it)
@@ -550,6 +659,10 @@ local TURN_PHASES: { [string]: boolean } = { aim = true, place = true, walk = tr
 
 function Controller._toggleTop(self: any)
 	self.top = not self.top
+	if not self.top and (self.phase == "off" or self.phase == "walk") and self.replay == nil then
+		-- (my own camera back at once, not in the next frame's drawing)
+		self:_noShot()
+	end
 end
 
 function Controller._toggleWalk(self: any)
@@ -668,9 +781,35 @@ function Controller._strike(self: any, power: number)
 	self.power = power
 	self.phase = "sent"
 	self.sentAt = self.t
+	self.strokeBack = power
 	self.presses = {}
 	self.ctx.ui:meter(nil)
+	if not self.top then
+		self.watchFrom, self.watchFov = self:_cueCam()
+	else
+		self.watchFrom = nil
+	end
 	self.ctx.send("shoot", mode.args(self.sel, self.angle, power, self.tipX, self.tipY, self.pocket))
+end
+
+-- Where I stand to take the shot: on the ring round the table behind the ball, a little to the left of the
+-- line (a right-handed player's stance: the cue under the eye, the body beside it). Table x, z.
+function Controller._stance(self: any): (number?, number?)
+	local s = self.byId[self.sel]
+	if s == nil then
+		return nil, nil
+	end
+	local dx, dz = Cue.dirOf(self.angle)
+	-- the left of the line, found in the world (the table's frame is the world's mirrored)
+	local lx, lz = -dz, dx
+	local d = self:_dir(self.angle)
+	local right = Vector3.new(-d.Z, 0, d.X)
+	local wx, wz = Furniture.dir(self.place, lx, lz)
+	if wx * right.X + wz * right.Z > 0 then
+		lx, lz = -lx, -lz
+	end
+	local side = Controller.STANCE_SIDE
+	return Furniture.stand(self.tb, s.x + lx * side, s.z + lz * side, self.angle)
 end
 
 function Controller._call(self: any, pocket: number)
@@ -720,6 +859,16 @@ function Controller._began(self: any, io: InputObject)
 		return
 	end
 	if not TURN_PHASES[self.phase] then
+		if (key == Enum.KeyCode.V or key == Enum.KeyCode.ButtonX) and self.phase == "off" and self.you ~= nil then
+			-- between my turns: follow the other player's shots, or keep my own camera
+			self.autoView = not self.autoView
+			self.ctx.toast(
+				if self.autoView
+					then "The camera follows the other player's shots (V: your own camera)"
+					else "Your own camera between turns (V: follow the other player's shots)",
+				3
+			)
+		end
 		return
 	end
 	if key == Enum.KeyCode.V or key == Enum.KeyCode.ButtonX then
@@ -744,7 +893,7 @@ function Controller._began(self: any, io: InputObject)
 		elseif self.phase == "place" then
 			self:_confirm()
 		end
-	elseif key == Enum.KeyCode.C then
+	elseif key == Enum.KeyCode.C or key == Enum.KeyCode.ButtonR3 then
 		self.tipX, self.tipY = 0, 0
 	elseif key == Enum.KeyCode.R or key == Enum.KeyCode.DPadRight then
 		if self.phase == "aim" then
@@ -756,8 +905,10 @@ function Controller._began(self: any, io: InputObject)
 		end
 	elseif key == Enum.KeyCode.ButtonL1 then
 		self.angle -= Controller.NUDGE
+		self.nudge, self.nudgeSince = -1, self.t
 	elseif key == Enum.KeyCode.ButtonR1 then
 		self.angle += Controller.NUDGE
+		self.nudge, self.nudgeSince = 1, self.t
 	elseif NUMBER_KEYS[key.Name] and self.phase == "aim" then
 		local n = NUMBER_KEYS[key.Name]
 		local g = self:_g()
@@ -863,8 +1014,13 @@ function Controller._changed(self: any, io: InputObject)
 			self:_pointAt(px, py)
 		elseif press.moved then
 			local UIS = game:GetService("UserInputService")
-			local fine = UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.RightShift)
-			self.angle += dx * Controller.DRAG * (if fine then Controller.FINE_DRAG else 1)
+			local fine = UIS:IsKeyDown(Enum.KeyCode.LeftShift)
+				or UIS:IsKeyDown(Enum.KeyCode.RightShift)
+				or self.fineHeld
+				or self:_fingers() > 1
+			local da = dx * Controller.DRAG * (if fine then Controller.FINE_DRAG else 1)
+			self.angle += da
+			press.lastDa, press.lastAt = if math.abs(dx) <= Controller.SLIP_PX then da else 0, self.t
 		end
 	end
 end
@@ -874,6 +1030,10 @@ function Controller._ended(self: any, io: InputObject)
 	local key = io.KeyCode
 	if key == Enum.KeyCode.Space or key == Enum.KeyCode.ButtonR2 then
 		self:_hold(false)
+		return
+	end
+	if key == Enum.KeyCode.ButtonL1 or key == Enum.KeyCode.ButtonR1 then
+		self.nudge = 0
 		return
 	end
 	local id: any
@@ -899,7 +1059,21 @@ function Controller._ended(self: any, io: InputObject)
 		end
 	elseif press.kind == "table" and not press.moved and self.phase == "aim" then
 		self:_clicked(press.x, press.y)
+	elseif press.kind == "table" and id ~= "mouse" and press.lastAt and self.t - press.lastAt <= Controller.SLIP then
+		-- a finger rolls a little as it lifts: that last movement is not aim
+		self.angle -= press.lastDa
 	end
+end
+
+-- Fingers down on the cloth (a second one makes the first one's drag fine).
+function Controller._fingers(self: any): number
+	local n = 0
+	for id, press in self.presses do
+		if id ~= "mouse" and press.kind == "table" then
+			n += 1
+		end
+	end
+	return n
 end
 
 -- A click on the table: a pocket (when the 8 must be called) or one of my balls (when I may choose).
@@ -940,9 +1114,20 @@ end
 function Controller._cueCam(self: any): (CFrame, number)
 	local s = self.byId[self.sel]
 	local r = self.tb.ballR
-	local ball = self:_point(if s then s.x else 0, r, if s then s.z else 0)
+	local bx, bz = if s then s.x else 0, if s then s.z else 0
+	local ball = self:_point(bx, r, bz)
 	local d = self:_dir(self.angle)
-	local eye = ball - d * Controller.CAM_BACK + Vector3.new(0, Controller.CAM_UP, 0)
+	-- (never behind where I stand: a ball near the cushion behind the shot brings the eye in, and down to keep
+	-- the same look along the cloth)
+	local back = Controller.CAM_BACK
+	local fx, fz = self:_stance()
+	if fx and fz then
+		local dx, dz = Cue.dirOf(self.angle)
+		local behind = (bx - fx) * dx + (bz - fz) * dz
+		back = math.clamp(behind - Controller.EYE_CLEAR, 1.2, Controller.CAM_BACK)
+	end
+	local up = math.max(0.9, Controller.CAM_UP * back / Controller.CAM_BACK)
+	local eye = ball - d * back + Vector3.new(0, up, 0)
 	return CFrame.lookAt(eye, ball + d * Controller.CAM_AHEAD), Controller.CAM_FOV
 end
 
@@ -959,16 +1144,93 @@ function Controller._topCam(self: any): (CFrame, number)
 	return CFrame.lookAt(centre + Vector3.new(0, h, 0), centre, Vector3.new(ux, 0, uz)), fov
 end
 
--- After the strike: up and back, over the line of the shot, the whole table in view.
-function Controller._watchCam(self: any): (CFrame, number)
-	if self.watchTop then
+-- After the strike: up and back, over the line of the shot, the whole table in view. (angle: another shot's
+-- line, followed by a seated player whose go it is not)
+function Controller._watchCam(self: any, angle: number?): (CFrame, number)
+	if self.watchTop and angle == nil then
 		return self:_topCam()
 	end
 	local _, hl = Furniture.outer(self.tb)
-	local d = self:_dir(self.angle)
+	local d = self:_dir(angle or self.angle)
 	local centre = self:_point(0, 0, 0)
 	local eye = centre - d * (hl * 0.75 + 2.2) + Vector3.new(0, hl * 0.55 + 2.2, 0)
 	return CFrame.lookAt(eye, centre + d * 0.4), 62
+end
+
+-- The winning shot played again: from beyond the pocket it drops into, low, looking back along the ball's way
+-- in, so it comes toward the eye and falls at the bottom of the picture. (The top of the table if the script
+-- has no pot.)
+function Controller._replayCam(self: any): (CFrame, number)
+	local script = self.replay and self.replay.script
+	local pot: any = nil
+	if type(script) == "table" then
+		for _, p in Shot.pots(script) do
+			pot = p
+		end
+	end
+	local hole = pot and self.tb.holes[pot.hole]
+	local i = pot and Shot.indexOf(script, pot.ball)
+	if hole == nil or i == nil then
+		return self:_topCam()
+	end
+	local x, z = Shot.pose(script, i, math.max(0, pot.t - 0.7))
+	local dx, dz = hole.x - x, hole.z - z
+	local len = math.sqrt(dx * dx + dz * dz)
+	if len < 0.05 then
+		-- (the ball was already at the pocket: look in from the middle of the table)
+		dx, dz = hole.x, hole.z
+		len = math.max(1e-3, math.sqrt(dx * dx + dz * dz))
+	end
+	dx, dz = dx / len, dz / len
+	local eye = self:_point(hole.x + dx * 1.3, 1.0, hole.z + dz * 1.3)
+	local look = self:_point(hole.x - dx * 2.2, 0, hole.z - dz * 2.2)
+	return CFrame.lookAt(eye, look), 50
+end
+
+-- Is a winning shot's replay holding the end card back on this screen? (Pool's and bumper pool's endCard ask.)
+function Controller.replaying(): boolean
+	for _, c in Controller.live do
+		if c.replay ~= nil then
+			return true
+		end
+	end
+	return false
+end
+
+-- Is the shooter's own controller at this station waiting for its strike to come back? (Its stroke has already
+-- been drawn here: the script is played from its strike at once.)
+function Controller.struck(stationId: string, seat: any): boolean
+	local c = Controller.live[stationId]
+	return c ~= nil and c.phase == "sent" and c.you ~= nil and c.you == seat
+end
+
+-- Does my own controller at this station draw this seat's cue (I am the one aiming)?
+function Controller.aiming(stationId: string, seat: any): boolean
+	local c = Controller.live[stationId]
+	return c ~= nil and c.you ~= nil and c.you == seat and c.phase ~= "off"
+end
+
+-- My own body, hidden on this screen while the view is down the cue (the eye is where my head would be).
+function Controller._hideBody(self: any)
+	if next(self.bodyHidden) ~= nil then
+		return
+	end
+	local body = self.ctx.body()
+	for _, d in if body then body:GetDescendants() else {} do
+		if d:IsA("BasePart") or d:IsA("Decal") then
+			self.bodyHidden[d] = (d :: any).LocalTransparencyModifier;
+			(d :: any).LocalTransparencyModifier = 1
+		end
+	end
+end
+
+function Controller._showBody(self: any)
+	for d, was in self.bodyHidden do
+		if d.Parent ~= nil then
+			(d :: any).LocalTransparencyModifier = was
+		end
+	end
+	table.clear(self.bodyHidden)
 end
 
 function Controller._lamp(self: any, hidden: boolean)
@@ -985,18 +1247,63 @@ function Controller._lamp(self: any, hidden: boolean)
 	end
 end
 
-function Controller._shot(self: any, cf: CFrame, fov: number, top: boolean)
+-- cue = the view is down the cue (my body is hidden); snap = drawn exactly here this frame (a rise the
+-- controller eases itself), not eased toward by the framework
+function Controller._shot(self: any, cf: CFrame, fov: number, top: boolean, cue: boolean?, snap: boolean?)
 	self.camUp = true
-	self.ctx.camera(cf, fov)
+	self.letGo = false
+	self.ctx.camera(cf, fov, snap == true)
 	self:_lamp(top)
+	if cue then
+		self:_hideBody()
+	else
+		self:_showBody()
+	end
 end
 
 function Controller._noShot(self: any)
-	if self.camUp then
+	if self.camUp and self.inFrame then
+		-- (a shot let go in a frame's drawing has already been moved once by the framework this frame: it is held
+		-- still where it is, and let go as the next frame begins)
+		if not self.letGo then
+			self.letGo = true
+			local cam = workspace.CurrentCamera
+			self.ctx.camera(cam.CFrame, cam.FieldOfView, true)
+		end
+	elseif self.camUp then
 		self.camUp = false
+		self.letGo = false
 		self.ctx.releaseCamera()
 	end
 	self:_lamp(false)
+	self:_showBody()
+end
+
+-- The view while my shot runs: down the cue until the tip has met the ball and the first click is heard, then
+-- a rise over HOLD_CUE .. RISE_CAM to the view of the table (eased here, the same at any frame rate); the break
+-- cuts to the top of the table just after the crack.
+function Controller._watchShot(self: any)
+	local now = Playback.now(self.def.id)
+	if now == nil and self.t - self.watchSince < 0.6 then
+		now = -1 -- (the script has not begun here yet)
+	end
+	local from = self.watchFrom
+	if from and now ~= nil and now < Controller.HOLD_CUE and not (self.watchTop and now >= Controller.BREAK_CUT) then
+		self:_shot(from, self.watchFov, false, true, true)
+		return
+	end
+	local cf, fov = self:_watchCam()
+	if self.watchTop then
+		self:_shot(cf, fov, true, false, true)
+		return
+	end
+	if from == nil then
+		self:_shot(cf, fov, false)
+		return
+	end
+	local k = math.clamp(((now or math.huge) - Controller.HOLD_CUE) / Controller.RISE_CAM, 0, 1)
+	local e = k * k * (3 - 2 * k)
+	self:_shot(from:Lerp(cf, e), self.watchFov + (fov - self.watchFov) * e, false, false, true)
 end
 
 -- Drawing ---------------------------------------------------------------------------------------------------------
@@ -1119,10 +1426,10 @@ function Controller._standAt(self: any, dt: number)
 	local body = self.ctx.body()
 	local root = body and body.PrimaryPart
 	local s = self.byId[self.sel]
-	if root == nil or s == nil then
+	local sx, sz = self:_stance()
+	if root == nil or s == nil or sx == nil or sz == nil then
 		return
 	end
-	local sx, sz = Furniture.stand(self.tb, s.x, s.z, self.angle)
 	local feet = self:_point(sx, 0, sz)
 	local target = Vector3.new(feet.X, root.Position.Y, feet.Z)
 	local pos = root.Position:Lerp(target, math.min(1, dt * 10))
@@ -1132,6 +1439,39 @@ function Controller._standAt(self: any, dt: number)
 		root.CFrame = CFrame.lookAt(pos, look)
 	end
 	root.AssemblyLinearVelocity = Vector3.zero
+end
+
+-- The cue coming through after it is let go: from as far back as it was drawn to the ball, over STROKE.
+function Controller._drawStroke(self: any)
+	for _, p in self.parts do
+		hide(p)
+	end
+	local s = self.byId[self.sel]
+	if s == nil then
+		self.stick:hide()
+		return
+	end
+	local r = self.tb.ballR
+	local k = math.clamp((self.t - self.sentAt) / Controller.STROKE, 0, 1)
+	local gap = (Furniture.CUE_REST + Furniture.CUE_BACK * self.strokeBack) * (1 - k * k)
+	local d = self:_dir(self.angle)
+	local right = Vector3.new(-d.Z, 0, d.X)
+	local toward = (d * math.cos(Furniture.CUE_PITCH) - Vector3.new(0, math.sin(Furniture.CUE_PITCH), 0)).Unit
+	local at = self:_point(s.x, r, s.z)
+		+ right * (self.tipX * Cue.TIP_MAX * r)
+		+ Vector3.new(0, self.tipY * Cue.TIP_MAX * r, 0)
+	self.stick:pose(at - toward * (r + gap), toward, 1)
+end
+
+-- The aim as it changes, told to the server about eight times a second so the other screens draw my cue.
+function Controller._tellAim(self: any)
+	local key = string.format("%d|%.3f|%.2f|%.2f|%.2f", self.sel, self.angle, self.power, self.tipX, self.tipY)
+	if key == self.aimSent or self.t - self.aimSentAt < Controller.AIM_SEND then
+		return
+	end
+	self.aimSent = key
+	self.aimSentAt = self.t
+	self.ctx.send("aim", { self.sel, self.angle, self.power, self.tipX, self.tipY })
 end
 
 -- Words -----------------------------------------------------------------------------------------------------------
@@ -1162,6 +1502,21 @@ end
 
 -- A frame -----------------------------------------------------------------------------------------------------------
 function Controller._frame(self: any, dt: number)
+	if self.letGo then
+		-- (a shot let go in last frame's drawing, held still since: let go now)
+		self.letGo = false
+		self.camUp = false
+		self.ctx.releaseCamera()
+	end
+	self.inFrame = true
+	local ok, err = pcall(self._draw, self, dt)
+	self.inFrame = false
+	if not ok then
+		error(err, 0)
+	end
+end
+
+function Controller._draw(self: any, dt: number)
 	local ctx = self.ctx
 	self.t += dt
 	if self.def == nil then
@@ -1180,18 +1535,39 @@ function Controller._frame(self: any, dt: number)
 	end
 	if phase == "aim" then
 		local fine = UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.RightShift)
-		local turn = 0
+		-- A / D: a tap is a hair, and the turn gathers speed while the key is held
+		local keys = 0
 		if UIS:IsKeyDown(Enum.KeyCode.D) or UIS:IsKeyDown(Enum.KeyCode.Right) then
-			turn += 1
+			keys += 1
 		end
 		if UIS:IsKeyDown(Enum.KeyCode.A) or UIS:IsKeyDown(Enum.KeyCode.Left) then
-			turn -= 1
+			keys -= 1
 		end
-		if math.abs(self.stick1.X) > 0.15 then
-			turn += self.stick1.X
+		local rate = 0
+		if keys ~= 0 then
+			self.turnHeld += dt
+			local k = math.clamp(self.turnHeld / Controller.TURN_RAMP, 0, 1)
+			rate = keys
+				* (
+					if fine
+						then Controller.FINE
+						else Controller.TURN_MIN + (Controller.TURN - Controller.TURN_MIN) * k * k
+				)
+		else
+			self.turnHeld = 0
 		end
-		if turn ~= 0 then
-			self.angle += turn * dt * (if fine then Controller.FINE else Controller.TURN)
+		-- the stick: gentle near the middle (its push squared past the dead zone)
+		local sx = self.stick1.X
+		if math.abs(sx) > 0.15 then
+			local u = (math.abs(sx) - 0.15) / 0.85
+			rate += (if sx > 0 then 1 else -1) * u * u * (if fine then Controller.FINE * 3 else Controller.TURN)
+		end
+		-- L1 / R1 held: a tap, then a slow walk
+		if self.nudge ~= 0 and self.t - self.nudgeSince > Controller.NUDGE_HOLD then
+			rate += self.nudge * Controller.NUDGE_RATE
+		end
+		if rate ~= 0 then
+			self.angle += rate * dt
 		end
 		local tx, ty = 0, 0
 		if UIS:IsKeyDown(Enum.KeyCode.W) or UIS:IsKeyDown(Enum.KeyCode.Up) then
@@ -1210,8 +1586,10 @@ function Controller._frame(self: any, dt: number)
 			self.tipX, self.tipY =
 				Cue.clampTip(self.tipX + tx * dt * Controller.TIP_RATE, self.tipY + ty * dt * Controller.TIP_RATE)
 		end
+		-- the right stick moves the tip and leaves it where it is when the stick springs back (R3 centres)
 		if self.stick2.Magnitude > 0.15 then
-			self.tipX, self.tipY = Cue.clampTip(self.stick2.X, self.stick2.Y)
+			local k = dt * Controller.TIP_STICK
+			self.tipX, self.tipY = Cue.clampTip(self.tipX + self.stick2.X * k, self.tipY + self.stick2.Y * k)
 		end
 		-- the held stroke: up once, and back down to nothing
 		if self.charge ~= nil then
@@ -1267,12 +1645,13 @@ function Controller._frame(self: any, dt: number)
 		self:_layout(true)
 		self:_drawAim()
 		self:_standAt(dt)
+		self:_tellAim()
 		if self.top then
 			local cf, fov = self:_topCam()
 			self:_shot(cf, fov, true)
 		else
 			local cf, fov = self:_cueCam()
-			self:_shot(cf, fov, false)
+			self:_shot(cf, fov, false, true)
 		end
 	elseif phase == "place" then
 		self:_layout(false)
@@ -1281,23 +1660,37 @@ function Controller._frame(self: any, dt: number)
 		local cf, fov = self:_topCam()
 		self:_shot(cf, fov, true)
 	elseif phase == "sent" then
-		-- the cue stays drawn back until the table answers
+		-- the cue comes through the moment it is let go, and its tip waits at the ball for the table's answer
 		self:_layout(false)
+		self:_drawStroke()
 		if self.top then
 			local cf, fov = self:_topCam()
 			self:_shot(cf, fov, true)
 		else
 			local cf, fov = self:_cueCam()
-			self:_shot(cf, fov, false)
+			self:_shot(cf, fov, false, true)
 		end
 	elseif phase == "watch" then
-		local cf, fov = self:_watchCam()
-		self:_shot(cf, fov, self.watchTop)
+		self:_watchShot()
+	elseif self.replay ~= nil then
+		-- the winning shot again, slowly: from beyond its pocket, until it has played (the end card waits)
+		if Playback.playing(id) or self.t - self.replay.since < 2 then
+			local cf, fov = self:_replayCam()
+			self:_shot(cf, fov, false)
+		else
+			self.replay = nil
+			self:_noShot()
+		end
 	elseif self.top and Playback.find(self.def) ~= nil then
 		-- not my go (or walking): the top view to watch from, if I asked for it
 		local cf, fov = self:_topCam()
 		self:_shot(cf, fov, true)
+	elseif self.follow ~= nil and self.autoView and Playback.playing(id) and self.you ~= nil then
+		-- not my go: the other player's shot, followed from behind its line
+		local cf, fov = self:_watchCam(self.follow)
+		self:_shot(cf, fov, false)
 	else
+		self.follow = nil
 		self:_noShot()
 	end
 	-- the turn clock, counted down between the server's once-a-second reports
@@ -1328,8 +1721,11 @@ function Controller.stop(self: any)
 	self.stick:destroy()
 	self.gui:Destroy()
 	self:_lamp(false)
+	self:_showBody()
+	self.replay = nil
 	self.phase = "off"
 	self.camUp = false -- (MinigameClient's close() gives the camera and the legs back itself)
+	self.letGo = false
 	self.legs = true
 	self.presses = {}
 	self.charge = nil

@@ -24,10 +24,10 @@ local Spec: GameSpec.Spec = {
 	rules = BumperPool,
 	flow = "turns",
 	session = { lobbySeconds = 10, turnSeconds = 45, doneSeconds = 30 },
-	verbs = { "shoot" },
+	verbs = { "shoot", "aim" },
 	prompt = { action = "Play bumper pool", busy = "wait for the next game" },
 	words = {
-		start = "Bumper pool: both of you, bank your marked ball off the cushion on your right!",
+		start = "Bumper pool: the opening! Both of you, bank your marked ball off your right-hand cushion",
 		unit = "shot",
 		removed = "You were taken off the bumper pool table: two shots in a row went unplayed",
 		finished = "That game is over and the balls are back on their spots. Press E at the table to play.",
