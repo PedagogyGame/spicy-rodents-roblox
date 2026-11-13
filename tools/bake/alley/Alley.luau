@@ -12,6 +12,8 @@
 --               owner's backstage replaces it whole
 --   Forecourt   the landing, the ramp, the pylon sign
 --   the roof run (BRIEF_ADDENDUM D9, D10; Shared/Attractions/AlleyRoof):
+--   Roof        the lane hall's raised roof (the model HallRoof): clerestory walls, deck, steel trusses, braces,
+--               light rails and the lane lights
 --   Yard        the house and the tree behind the games wing, in the attraction's annex (data/attractions.json)
 -- Interface: build(kit, root, data) -> nothing (data: the attraction's record of data/attractions.json)
 
@@ -21,6 +23,7 @@ local Concourse = require("./Concourse")
 local GamesRoom = require("./GamesRoom")
 local BackModule = require("./BackModule")
 local Forecourt = require("./Forecourt")
+local Roof = require("./Roof")
 local Yard = require("./Yard")
 
 local Alley = {}
@@ -32,6 +35,7 @@ function Alley.build(kit: any, root: any, data: any)
 	GamesRoom.build(kit, root)
 	BackModule.build(kit, root)
 	Forecourt.build(kit, root, data)
+	Roof.build(kit, root)
 	Yard.build(kit, root)
 end
 

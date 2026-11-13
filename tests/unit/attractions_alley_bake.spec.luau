@@ -16,6 +16,7 @@
 --     owner's backstage is where the plan says.
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local AlleyRoof = require("@shared/Attractions/AlleyRoof")
 local Data = require("@shared/Data")
 local Games = require("@shared/Minigames/Games")
 local Alley = require("../../tools/bake/alley/Alley")
@@ -88,8 +89,11 @@ return function(t)
 				t.truthy(inside, `{b.top}.{b.part.Name} at X {b.X} D {b.D} is outside the footprint and the annex`)
 			end
 		end
-		-- the budget: the building with the games' furniture (the shop rooms are still empty)
-		t.truthy(#boxes > 4500 and #boxes < 6200, `{#boxes} parts`)
+		-- the budget: the building with the games' furniture (the shop rooms are still empty), and the roof run's
+		-- raised roof, vent, stairs and yard (tools/bake/alley/Roof, RoofVent, RoofStairs, Yard)
+		t.truthy(#boxes > 4500 and #boxes < 7000, `{#boxes} parts`)
+		t.truthy(perTop.HallRoof <= 700, `the raised hall roof is {perTop.HallRoof} parts`)
+		t.truthy(perTop.Yard <= 270, `the yard is {perTop.Yard} parts`)
 		t.truthy(perTop.Lanes <= L.LANES * 132, `the lanes are {perTop.Lanes} parts`)
 		t.truthy(perTop.BackModule < 450, `the back module is {perTop.BackModule} parts`)
 		t.eq(
@@ -539,15 +543,17 @@ return function(t)
 				overlap[k] = true
 			end
 			if b.top == hr.model then
-				-- the roof model stays over its rectangle, at the ceiling and above
+				-- the roof model (the raised roof, tools/bake/alley/Roof) stays over its rectangle and its walls, no lower
+				-- than the lamps under its light rails
+				local raised = AlleyRoof.HALL_ROOF
 				t.truthy(
-					b.X - b.hx >= hr.x0 - 0.01
-						and b.X + b.hx <= hr.x1 + 0.01
+					b.X - b.hx >= raised.outerX0 - 0.11
+						and b.X + b.hx <= raised.outerX1 + 0.11
 						and b.D - b.hd >= hr.d0 - 0.01
-						and b.D + b.hd <= hr.d1 + 0.01,
+						and b.D + b.hd <= hr.d1 + 0.11,
 					`{k} is outside the hall roof's rectangle`
 				)
-				t.truthy(b.Y - b.hy >= L.CEILING_Y - 0.3, `{k} hangs below the ceiling`)
+				t.truthy(b.Y - b.hy >= AlleyRoof.LIGHT_RAIL.lampY - 0.7, `{k} hangs below the lamps`)
 			elseif
 				not swap
 				and b.top ~= "Walls"
@@ -564,7 +570,7 @@ return function(t)
 		sameSet(hung, hr.hung, "parts that hang from the hall's ceiling")
 		local hall = root:FindFirstChild(hr.model) :: any
 		t.truthy(hall ~= nil, "the HallRoof model")
-		for _, name in { "Roof", "CeilingLanes", "LaneLights", "AisleLights" } do
+		for _, name in { "Roof", "CeilingLanes", "Trusses", "Braces", "LightRails", "LaneLights", "AisleLights" } do
 			t.truthy(hall:FindFirstChild(name), `HallRoof.{name}`)
 		end
 		t.eq(root:FindFirstChild("LaneLights"), nil, "the lane lights are the roof's")

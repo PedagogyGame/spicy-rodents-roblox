@@ -7,7 +7,7 @@
 -- and guard the area around where that access to that upper vent is".
 -- Every number of it in one place, in the alley's local frame (Shared/Attractions/AlleyLayout: X across, Y up from
 -- the finished floor, D down the lane; with the placement of data/attractions.json world = (1300 + X, 16.5 + Y,
--- -420 - D)), so the bakes (tools/bake/alley/Yard, and later Roof, RoofVent, RoofStairs), the server (RafterWatch's
+-- -420 - D)), so the bakes (tools/bake/alley/Yard, Roof, RoofVent, RoofStairs), the server (RafterWatch's
 -- service) and the specs read the same figures. Kept out of AlleyLayout so the eighteen-lane builder's file is not
 -- touched. Built for the eighteen-lane building (the east games wing at X 101..149.8, its back wall at D 30..30.8).
 --
@@ -26,16 +26,14 @@
 -- THE VENT: 9107 (kind "tunnel", the enclosed-run contract of Shared/Routes/Enclosure): in through one bent louvre
 --   slat of the air-handling unit on the wing roof (a ground mouth), up the plenum, through the duct in the hall's
 --   raised east wall, down the elbow and out of the boot (a link mouth) onto the truss chord 9120. The motor runs it
---   today (tests/unit/attractions_roofvent.spec.luau drives the whole way in on the baked alley and yard); the unit,
---   the duct and the raised roof around it are lanes L1 and L2.
--- THE RAFTERS (planned with the raised hall roof, lane L1; no geometry yet): nine truss bottom chords 9120..9128
---   (kind fence, Y 12.32; the ninth truss, over the pinsetters, is in the backstage's ground and carries none),
---   nine light rails 9130..9138 over the lane pairs (Y 10.2, the lit and risky level) and two aisle braces 9139,
---   9140 across the chords.
--- Routes are written as data/attractions.json writes them (local points, explicit flags); records(place) turns them
--- into world records the way tools/compile/lib/Attractions does. They are NOT in data/attractions.json yet: the
--- house and the tree stand outside the alley's footprint, in ANNEX, which the compiler and the expansion check do
--- not know about yet.
+--   (tests/unit/attractions_roofvent.spec.luau drives the whole way in and back out on the baked alley); the unit and
+--   the duct round it are tools/bake/alley/RoofVent.
+-- THE RAFTERS (the raised hall roof, tools/bake/alley/Roof): nine truss bottom plates 9120..9128 (kind fence, Y 12.32;
+--   the ninth truss, over the pinsetters, is in the backstage's ground and carries none), nine light rails 9130..9138
+--   over the lane pairs (Y 10.1, the lit and risky level) and two aisle braces 9139, 9140 across the plates.
+-- Routes are written as data/attractions.json writes them (local points, explicit flags; tools/compile/
+-- alley_roof_routes.luau writes them there, with ANNEX as the attraction's annex); records(place) turns them into
+-- world records the way tools/compile/lib/Attractions does.
 -- Pure. Interface: constants below; routes() -> { LocalRoute } (copies); route(id) -> LocalRoute;
 --   records(place, lotId?) -> { world route records }; lamps() -> { {X, Y, D} }; isRafter(id) -> boolean;
 --   inHall(X, D) -> boolean; inAnnex(X, D) -> boolean; inPlatform(X, D) -> string?; guardEyes() -> { {X, Y, D} };
@@ -91,23 +89,49 @@ AlleyRoof.WING_ROOF = {
 	copingY = 15.0,
 }
 
--- THE RAISED HALL ROOF (lane L1; planned, not built) ----------------------------------------------------------------
--- Why the deck is at 21.0: a leap from a chord peaks 6.56 up (the motor has no ceilings), plus the 1.7 body = 20.6.
+-- THE RAISED HALL ROOF (lane L1: tools/bake/alley/Roof, the model AlleyLayout.HALL_ROOF.model) -------------------
+-- The lane hall's roof raised to a deck at Y 21.0 (why 21.0: a leap from a chord peaks 6.56 up, and the motor has no
+-- ceilings, plus the 1.7 body = 20.6), on brick clerestory walls standing on the old roof line (13.6) north, east and
+-- west and on the machine wall south; the old flat roof stays as a strip from AlleyLayout.HALL_ROOF.d0 (the
+-- concourse's back edge) to the north wall, with its hung ceiling. wallT: the walls' thickness; northD0..d0 the north
+-- wall, southD0..d1 the south wall; the deck over x0..x1, d0..southD0.
 AlleyRoof.HALL_ROOF = {
 	x0 = -26,
 	x1 = 101,
 	outerX0 = -26.8,
 	outerX1 = 101.8,
+	stripD0 = AlleyLayout.HALL_ROOF.d0,
+	northD0 = -15.8,
 	d0 = -15,
+	southD0 = 65.7,
 	d1 = 66.5,
+	wallT = 0.8,
 	deckY0 = 21.0,
 	deckY1 = 22.6,
 	parapetY = 24.0,
 	clerestoryY0 = 13.6,
 }
+-- Nine steel box trusses across the hall, each a 2.4-wide bottom plate (its top, y1, is the rafter routes' line), two
+-- Warren lattice planes `web` either side of its centre line (rods `webT` thick, a bottom node at every lane pair's
+-- edge and a top node over every pair's middle: webPitch 6.2) and two top chords under the deck: the body (1.6 wide)
+-- walks the plate between the planes, and the vent's duct (2.0 wide) drops between them onto the D 16.5 truss.
 AlleyRoof.TRUSS_D = { -10.5, -1.5, 7.5, 16.5, 25.5, 34.5, 43.5, 52.5, 61.5 }
-AlleyRoof.CHORD = { y0 = 12.0, y1 = 12.32, width = 0.5, topY0 = 20.2, topY1 = 20.5, webPitch = 6.2, x0 = -25.4 }
-AlleyRoof.LIGHT_RAIL = { y = 10.2, d0 = 0, d1 = 53.8, lampY = 9.9 }
+AlleyRoof.CHORD = {
+	y0 = 12.0,
+	y1 = 12.32,
+	width = 2.4,
+	web = 1.08,
+	webT = 0.14,
+	topY0 = 20.2,
+	topY1 = 20.5,
+	topW = 0.3,
+	webPitch = 6.2,
+	x0 = -25.4,
+}
+-- The light rails over the lane pairs (the lit, risky level): 1.9 under the plates, so a body on a rail clears them
+-- (0.15 lift + 1.7), hung from the trusses at hangD by a yoke and two rods outside the body; the lamps under them.
+-- The routes run d0..d1; each rail runs on into the masking header (AlleyLayout.MACHINE_D0 - 0.4).
+AlleyRoof.LIGHT_RAIL = { y = 10.1, d0 = 0, d1 = 53.4, lampY = 9.8, width = 0.4, hangD = { 16.5, 34.5, 52.5 } }
 AlleyRoof.BRACE_X = { 96.9, -22.3 }
 AlleyRoof.BRACE_D = { d0 = -14.5, d1 = 53.0 }
 -- Where people stand to see the rafters: the lane hall from the front rooms' wall to the masking (Stealth/RafterWatch
@@ -341,7 +365,7 @@ do
 				{ x, AlleyRoof.LIGHT_RAIL.y, AlleyRoof.LIGHT_RAIL.d0 },
 				{ x, AlleyRoof.LIGHT_RAIL.y, AlleyRoof.LIGHT_RAIL.d1 },
 			},
-			note = "The rail the lane lights hang from: 2.1 under the chords, right over the lamps.",
+			note = "The rail the lane lights hang from: 1.9 under the truss plates, right over the lamps.",
 		})
 	end
 	for i, x in AlleyRoof.BRACE_X do

@@ -13,6 +13,7 @@
 --   openings { { a, b, head } }: solid between them, a header over each)
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
+local AlleyRoof = require("../../../src/shared/Attractions/AlleyRoof")
 
 local Shell = {}
 
@@ -642,23 +643,19 @@ local function walls(kit: any, root: any, data: any)
 		kit:box(w, "Coping" .. name, x0 - 0.1, x1 + 0.1, H + 1.2, H + 1.4, d0 - 0.1, d1 + 0.1, C.trim, "Concrete")
 	end
 	parapet("Front", OX0, OX1, OD0, L.FRONT_D)
-	parapet("West", OX0, L.X0, L.FRONT_D, BACK)
+	-- (the west parapet stops where the raised hall roof's clerestory wall stands on it: tools/bake/alley/Roof)
+	parapet("West", OX0, L.X0, L.FRONT_D, AlleyRoof.HALL_ROOF.northD0)
 	parapet("WingEast", L.X1, OX1, L.FRONT_D, GD1 + L.WALL_T)
 	parapet("WingBack", OHX1, L.X1, GD1, GD1 + L.WALL_T)
-	parapet("HallEast", HX1, OHX1, GD1, BACK)
-	-- roof deck (the ceilings hang under it) and the plant on it. Over the lanes the deck, its plant, the hung
-	-- ceiling and the lights in it are the model HallRoof (AlleyLayout.HALL_ROOF), which the roof run's raised
-	-- hall roof replaces whole; here only the front rooms' and the wing's.
+	-- roof deck (the ceilings hang under it) and the plant on it, over the front rooms and the wing. Over the lanes
+	-- (AlleyLayout.HALL_ROOF) the roof is the model HallRoof, the roof run's raised roof: tools/bake/alley/Roof.
 	local hr = L.HALL_ROOF
-	local hall = root:FindFirstChild(hr.model) or kit:model(root, hr.model)
 	kit:box(w, "Roof", L.X0, HX1, CEIL, H, L.FRONT_D, hr.d0, C.roof, "Slate")
-	kit:box(hall, "Roof", hr.x0, hr.x1, CEIL, H, hr.d0, hr.d1, C.roof, "Slate")
 	kit:box(w, "RoofWing", HX1, L.X1, CEIL, H, L.FRONT_D, GD1, C.roof, "Slate")
-	for i, at in { { -10, 13 }, { 20, 13 }, { 50, 13 }, { 80, 13 }, { 36, -40 }, { 125, -20 } } do
+	for i, at in { { 36, -40 }, { 125, -20 } } do
 		local hx, hd = at[1], at[2]
-		local parent = if hd > hr.d0 and hx < hr.x1 then hall else w
-		kit:box(parent, `RoofUnit{i}`, hx - 2.5, hx + 2.5, H, H + 2.6, hd - 3, hd + 3, { 176, 178, 176 }, "Metal")
-		kit:box(parent, `RoofUnitFan{i}`, hx - 1.4, hx + 1.4, H + 2.6, H + 2.8, hd - 1.4, hd + 1.4, {
+		kit:box(w, `RoofUnit{i + 4}`, hx - 2.5, hx + 2.5, H, H + 2.6, hd - 3, hd + 3, { 176, 178, 176 }, "Metal")
+		kit:box(w, `RoofUnitFan{i + 4}`, hx - 1.4, hx + 1.4, H + 2.6, H + 2.8, hd - 1.4, hd + 1.4, {
 			90,
 			92,
 			92,
@@ -807,9 +804,8 @@ local function ceilings(kit: any, root: any)
 	local m = kit:model(root, "Ceilings")
 	local opts = { collide = false, shadow = false }
 	local hr = L.HALL_ROOF
-	local hall = root:FindFirstChild(hr.model) or kit:model(root, hr.model)
+	-- (over the lanes the hung ceiling is the raised roof's: tools/bake/alley/Roof)
 	kit:box(m, "CeilingFront", L.X0, HX1, CEIL - 0.04, CEIL, L.FRONT_D, hr.d0, C.ceiling, "SmoothPlastic", opts)
-	kit:box(hall, "CeilingLanes", hr.x0, hr.x1, CEIL - 0.04, CEIL, hr.d0, hr.d1, C.ceilingLanes, "SmoothPlastic", opts)
 	kit:box(m, "CeilingGames", HX1 + T, L.X1, CEIL - 0.04, CEIL, L.FRONT_D, GD1, C.ceilingGames, "SmoothPlastic", opts)
 	-- the grid of a hung ceiling over the concourse and the front rooms (lines every 8 studs across)
 	for x = -18, HX1 - 2, 8 do
@@ -829,15 +825,12 @@ local function ceilings(kit: any, root: any)
 	end
 end
 
--- The house lights that belong to no room's furniture: the concourse, the two aisles and one troffer in every
--- front room. None casts shadows (there are many, and the lanes' pin lights do).
+-- The house lights that belong to no room's furniture: the concourse and one troffer in every front room. None casts shadows (there are many, and the lanes' pin lights do).
 local function lights(kit: any, root: any)
 	local m = kit:model(root, "HouseLights")
-	local hall = root:FindFirstChild(L.HALL_ROOF.model) or kit:model(root, L.HALL_ROOF.model)
-	local aisles = kit:model(hall, "AisleLights")
 	local function troffer(name: string, x: number, d: number, sx: number, sd: number, range: number, bright: number)
 		local t = kit:box(
-			if name == "AisleTroffer" then aisles else m,
+			m,
 			name,
 			x - sx / 2,
 			x + sx / 2,
@@ -854,10 +847,7 @@ local function lights(kit: any, root: any)
 	for x = -14, HX1 - 6, 22 do
 		troffer("ConcourseTroffer", x, -36, 8, 2, 30, 1.0)
 	end
-	for _, d in { 2, 26, 50 } do
-		troffer("AisleTroffer", (L.X0 + L.LANE_BLOCK_X0) / 2, d, 2, 6, 22, 0.9)
-		troffer("AisleTroffer", (L.LANE_BLOCK_X1 + HX1) / 2, d, 2, 6, 22, 0.9)
-	end
+	-- (the aisles' troffers hang under the raised roof's braces: tools/bake/alley/Roof)
 	for _, id in { "ball_shop", "shoe_rental", "lobby", "gift_shop", "snack_bar", "lockers" } do
 		local z = L.zone(id)
 		local wide = z.x1 - z.x0
