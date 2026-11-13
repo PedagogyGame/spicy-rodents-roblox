@@ -142,12 +142,15 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 	end
 
 	local function setAim(x: number, y: number)
-		-- (kept to this end's half here too, so that a push from the keys starts from where the mallet can be)
-		self.aimX = math.clamp(x, -Sim.HALF_WIDTH, Sim.HALF_WIDTH)
+		-- (kept to where this end's mallet can be, as his setTarget keeps it: a push from the keys starts from
+		-- there, never from a pointer that is off the table or over the far half)
+		local reachX = Sim.HALF_WIDTH - Sim.PADDLE_RADIUS
+		local near, far = Sim.PADDLE_RADIUS, Sim.HALF_LENGTH - Sim.PADDLE_RADIUS
+		self.aimX = math.clamp(x, -reachX, reachX)
 		if self.side == 0 then
-			self.aimY = math.clamp(y, -Sim.HALF_LENGTH, 0)
+			self.aimY = math.clamp(y, -far, -near)
 		else
-			self.aimY = math.clamp(y, 0, Sim.HALF_LENGTH)
+			self.aimY = math.clamp(y, near, far)
 		end
 	end
 

@@ -289,6 +289,10 @@ function Seat.step(
 			onTick(seat.pred, tick, seat.pred.hitSerial ~= hits, seat.pred.goalSerial ~= goals)
 		end
 	end
+	if seat.tick < target then
+		-- (the match is over on this screen: the last tick is where everything stays)
+		seat.frac = 1
+	end
 	-- the next segment of the log, once it is long enough (or the match is won on this screen)
 	local length = if seat.mode == "2" then Wire.SEGMENT_DUO else Wire.SEGMENT_SOLO
 	local upTo = math.min(seat.tick, seat.sentTo + Wire.MAX_SEGMENT)

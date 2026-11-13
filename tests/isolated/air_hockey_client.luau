@@ -96,7 +96,7 @@ local function point(w: Rig.World, x: number, y: number)
 end
 
 -- Another person: a stub with a Seat of their own, fed what the service sends the stub and sending its log back.
-local function bot(w: Rig.World, name: string, hand: any): any
+local function bot(_w: Rig.World, name: string, hand: any): any
 	return { stub = Rig.stub(name), seat = nil, read = 0, hand = hand, refused = {} }
 end
 
@@ -398,13 +398,13 @@ return function(t)
 			rawset(uis, "GetGamepadState", function(): { any }
 				return { { KeyCode = Key.Thumbstick1, Position = roblox.Vector3.new(0, 1, 0) } }
 			end)
-			Rig.run(w, 0.2)
+			Rig.run(w, 0.1)
 			rawset(uis, "GetGamepadState", function(): { any }
 				return {}
 			end)
 			Rig.run(w, 0.4)
 			local sx, sy = where(w, Layout.MALLETS[1])
-			t.near(sy - y2, -Controller.STICK_SPEED * 0.2, 0.03, "the stick pushed away from the player")
+			t.near(sy - y2, -Controller.STICK_SPEED * 0.1, 0.03, "the stick pushed away from the player")
 			t.near(sx, x2, 0.01)
 			-- V: from above, your end at the bottom; again: back
 			Rig.key(Key.V, true)
@@ -414,6 +414,7 @@ return function(t)
 			local up = roblox.Vector3.new(Layout.toWorld(w.places[SITE], above.eye[1], above.eye[2], above.eye[3]))
 			t.truthy((workspace.CurrentCamera.CFrame.Position - up).Magnitude < 0.05, "the view from above")
 			t.truthy(up.Y < w.places[SITE].floorY + AlleyLayout.CEILING_Y, "under the ceiling")
+			Rig.run(w, 1.5) -- (the camera glides to the new view: point once it is there)
 			point(w, -0.2, 0.9)
 			Rig.run(w, 0.8)
 			x2, y2 = where(w, Layout.MALLETS[1])
