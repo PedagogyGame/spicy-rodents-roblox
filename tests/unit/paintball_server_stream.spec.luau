@@ -13,6 +13,7 @@ local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Wire = require("@shared/Minigames/Paintball/Wire")
+local Wallet = require("@shared/Economy/Wallet")
 local PassDesk = require("@server/Minigames/Paintball/PassDesk")
 local Stream = require("@server/Minigames/Paintball/Stream")
 
@@ -638,6 +639,47 @@ return function(t)
 			coroutine.resume(waiting :: thread)
 			t.deepEq(first, { true, Contract.textFor("bought") })
 			t.truthy(desk.has(bea))
+		end
+	)
+
+	t.test(
+		"the pass desk on the game's own wallet (Shared/Economy/Wallet): 20 spicy cents leave the purse once, a short purse is refused in its own numbers and keeps every cent",
+		function()
+			-- the town's charge as the boot is to wire it (a person's server-life purse; reported to the lead)
+			local purses: { [number]: Wallet.Purse } = { [41] = Wallet.purse(100), [42] = Wallet.purse(7) }
+			local function charge(player: any, cents: number, why: string): (boolean, string?)
+				local purse = purses[player.UserId]
+				if purse == nil then
+					return false, Contract.passShort(cents, 0)
+				end
+				local ok = purse:debit(cents, why)
+				if not ok then
+					return false, Contract.passShort(cents, purse.cents)
+				end
+				return true, nil
+			end
+			local day = 3
+			local desk = PassDesk.new(charge, function(): number
+				return day
+			end)
+			local ada, bea = { UserId = 41 }, { UserId = 42 }
+			t.deepEq({ desk.buy(ada) }, { true, Contract.textFor("bought") })
+			t.eq(purses[41].cents, 100 - Contract.Rules.passCents, "20 spicy cents, once")
+			t.eq(Contract.Rules.passCents, 20)
+			t.deepEq(purses[41].history[1], { delta = -20, why = "a paintball pass", balance = 80 })
+			for _ = 1, 3 do
+				t.deepEq({ desk.buy(ada) }, { false, Contract.textFor("has_pass") })
+			end
+			t.eq(purses[41].cents, 80, "pressing again costs nothing")
+			t.deepEq({ desk.buy(bea) }, { false, "You need 20c; you have 7c" })
+			t.eq(purses[42].cents, 7, "a refusal takes nothing")
+			t.eq(#purses[42].history, 0)
+			t.falsy(desk.has(bea))
+			-- five in-game days on, the pass has run out and is sold again, from the same purse
+			day = 3 + Contract.Rules.passDays
+			t.falsy(desk.has(ada))
+			t.deepEq({ desk.buy(ada) }, { true, Contract.textFor("bought") })
+			t.eq(purses[41].cents, 60)
 		end
 	)
 end
