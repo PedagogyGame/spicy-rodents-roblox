@@ -646,6 +646,60 @@ return function(t)
 	)
 
 	t.test(
+		"the pass desk with a store (the profile): a pass bought on another server is honoured without a charge, a new one is saved the moment it is bought, and a store that fails costs nobody a second payment",
+		function()
+			local day, charged = 30, 0
+			local profile: { [number]: number } = { [41] = 33 } -- Ada bought hers on day 28 somewhere else
+			local saves: { { number } } = {}
+			local broken = false
+			local store: PassDesk.Store = {
+				load = function(player: any): number?
+					if broken then
+						error("the profile is not loaded yet")
+					end
+					return profile[player.UserId]
+				end,
+				save = function(player: any, untilDay: number)
+					table.insert(saves, { player.UserId, untilDay })
+					if broken then
+						error("the profile could not be written")
+					end
+					profile[player.UserId] = untilDay
+				end,
+			}
+			local function charge(): (boolean, string?)
+				charged += 1
+				return true, nil
+			end
+			local function today(): number
+				return day
+			end
+			local desk = PassDesk.new(charge, today, store)
+			local ada, bea = { UserId = 41 }, { UserId = 42 }
+			t.truthy(desk.has(ada), "her pass came with her")
+			t.deepEq({ desk.buy(ada) }, { false, Contract.textFor("has_pass") })
+			t.eq(charged, 0)
+			t.falsy(desk.has(bea))
+			t.deepEq({ desk.buy(bea) }, { true, Contract.textFor("bought") })
+			t.deepEq(saves, { { 42, 30 + Contract.Rules.passDays } }, "saved the moment it was bought")
+			-- the next server: a new desk on the same profile
+			local later = PassDesk.new(charge, today, store)
+			t.truthy(later.has(bea))
+			t.eq(charged, 1)
+			day = 33
+			t.falsy(later.has(ada), "hers ran out on day 33")
+			-- a store that fails: the pass holds on this server, and the money is taken once
+			broken = true
+			local cy = { UserId = 43 }
+			t.falsy(later.has(cy))
+			t.deepEq({ later.buy(cy) }, { true, Contract.textFor("bought") })
+			t.truthy(later.has(cy))
+			t.deepEq({ later.buy(cy) }, { false, Contract.textFor("has_pass") })
+			t.eq(charged, 2)
+		end
+	)
+
+	t.test(
 		"the pass desk charges once however the desk is pressed: a second press while the town is still taking the money is answered and costs nothing; a town that fails leaves the desk open",
 		function()
 			local charged = 0

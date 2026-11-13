@@ -1080,6 +1080,24 @@ return function(t)
 	)
 
 	t.test(
+		"the rewind bound can be tried at a playtest: debug rewind sets Clock.MAX_REWIND on this server between a tenth and four tenths of a second, and nothing else",
+		function()
+			local was = Clock.MAX_REWIND
+			local ok, err = pcall(Kit.play, function(kit: Kit.Kit)
+				t.deepEq({ kit.service:debug("rewind", 0.3) }, { true, nil })
+				t.eq(Clock.MAX_REWIND, 0.3)
+				t.falsy((kit.service:debug("rewind", 0.5)))
+				t.falsy((kit.service:debug("rewind", "soon")))
+				t.eq(Clock.MAX_REWIND, 0.3, "a refused value changes nothing")
+			end);
+			(Clock :: any).MAX_REWIND = was
+			if not ok then
+				error(err, 0)
+			end
+		end
+	)
+
+	t.test(
 		"the server check (tests/engine/PaintballFlow) passes here first: the pass, a match of bots round one person, a scripted tag, the end card, the next match, leaving",
 		function()
 			-- (the real bots are another lane's: here a brain of four lines walks each bot out of its spawn room

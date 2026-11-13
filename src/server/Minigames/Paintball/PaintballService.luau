@@ -160,7 +160,9 @@
 --                         playtest: "tag" (by, id); "end" (the clock runs out now); "tune" (key,
 --                         value): service.feel = Contract.tuned(service.feel, key, value), in force
 --                         from the next match, (false, words) for a bad key or value (written in the
---                         stub already).
+--                         stub already); "rewind" (seconds, 0.1 to 0.4): Clock.MAX_REWIND on this
+--                         server, from the next match (the lane's own: a knob for the owner's playtest
+--                         at a slow connection; reported).
 -- THE ROSTER, AND BALANCE. A slot's team is its own (Rules, "teams"). The service changes who is on
 -- which side in three ways only: it chooses WHICH bot gives its seat to a person who joins (above);
 -- it trades a person and a bot on the "side" verb; it puts people back on their sides at "start".
@@ -292,7 +294,8 @@
 -- THE PASS (PB-12). `pass` is deps.pass, else the lane's own on ctx.town.charge(player,
 -- Rules.passCents, "a paintball pass") (a stand-in that takes nothing until the town has a wallet;
 -- honour a false and show its words): a pass runs Rules.passDays in-game days from deps.day(), and
--- until there is a profile it is remembered for as long as the server runs.
+-- is remembered for as long as the server runs, and beyond it in deps.passStore (the profile) when
+-- whoever boots the game hands one over (PassDesk, "a store").
 -- THE S18 CORE in Server/Paintball is this lane's to extend, keeping tests/unit/paintball_hitreg.spec green:
 --   PoseHistory  gains a crouch channel beside x, y, z (same ring, same interpolation), so a crouched
 --                body is judged crouched (PB-3); built with Clock.HISTORY_SECS at Clock.SNAP_HZ here.
@@ -361,6 +364,9 @@ local T = Contract.TRUST
 local BIT = Wire.BIT
 local AIM_COS = math.cos(Contract.BOT.aimSlack)
 local SIDE_EVERY = 3 -- seconds between two changes of side by one person (the header says why)
+-- what debug("rewind", seconds) may set Clock.MAX_REWIND to (the pose history keeps Clock.HISTORY_SECS, a
+-- second, and a ball is judged at most MAX_REWIND + MAX_LATE back)
+local REWIND_MIN, REWIND_MAX = 0.1, 0.4
 
 -- The service's link to paintball's own remotes (Wire.REMOTES).
 --   on    hear a client-to-server remote ("Paintball.Move", "Paintball.Fire"): the record is already
@@ -399,6 +405,8 @@ export type Deps = {
 	pass: PassDesk?, -- default: the lane's own, on ctx.town.charge
 	fit: ((player: any) -> (boolean, string?))?, -- fit to play? (false, a Contract.WHY code): "infected"
 	day: (() -> number)?, -- the in-game day, for the pass
+	-- where passes outlive the server (the profile; PassDesk.Store): nil, remembered while the server runs
+	passStore: PassDeskModule.Store?,
 }
 
 export type Stats = {
@@ -528,7 +536,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			return ctx.town.charge(player, cents, why)
 		end, d.day or function(): number
 			return ctx.stamp() / PassDeskModule.daySecs()
-		end)
+		end, d.passStore)
 
 	-- what the service keeps (see the header: by player, not by seat)
 	local people: { [any]: Person } = {}
@@ -1629,6 +1637,18 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			end
 			self.feel = feel
 			return true, nil
+		elseif what == "rewind" then
+			-- the furthest back a ball is judged (Clock.MAX_REWIND, 0.25 s in the contract), for the owner's
+			-- playtest at a slow connection: at 300 ms a quarter of a second agrees with the shooter's screen on
+			-- about 90 % of shots, 0.3 s on 95 % (tests/isolated/paintball_server_fire). The server's own reading
+			-- only, in force from the next match (the match in play keeps its sim's bound); the clients' drawing of
+			-- other people's balls still clamps at the contract's number (cosmetic: their own hits are theirs)
+			local secs = tonumber(key)
+			if secs == nil or secs ~= secs or secs < REWIND_MIN or secs > REWIND_MAX then
+				return false, `debug rewind: seconds from {REWIND_MIN} to {REWIND_MAX}`
+			end
+			(Clock :: any).MAX_REWIND = secs
+			return true, nil
 		end
 		local state = matchState()
 		if hw == nil or state == nil then
@@ -1653,7 +1673,7 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			state.endsAt = now
 			return true, nil
 		end
-		return false, "debug: tag, end or tune"
+		return false, "debug: tag, end, tune or rewind"
 	end
 
 	function service.onMove(_self: Service, player: any, rec: { [string]: number })
