@@ -988,8 +988,9 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			ctx.sound("paintball.go", tuning.volGo)
 		end
 		wasLive = liveNow
-		-- idle: moving, turning and firing are what the server counts as being there
-		if has then
+		-- idle: moving, turning and firing are what the server counts as being there. Not while out: no Move
+		-- is sent then, so the server sees none of it (and the body may be put anywhere while it waits)
+		if has and not self.out then
 			local ix, iy, iz = self.x - idleX, self.y - idleY, self.z - idleZ
 			local moved = ix * ix + iy * iy + iz * iz > IDLE_STUDS * IDLE_STUDS
 			local turned = math.abs(self.yaw - idleYaw) > IDLE_RAD or math.abs(self.pitch - idlePitch) > IDLE_RAD

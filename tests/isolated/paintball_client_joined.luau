@@ -32,6 +32,9 @@
 --     person in it, the paint), protected, the controls card up for a moment; is tagged by the other person
 --     (who it was, and the tick that points at her); changes sides while out, to play WITH her; she leaves and
 --     a bot has her seat and her name is off her puppet.
+--   * STANDING IDLE: the player only trembles the mouse and shuffles a foot (inside the server's bounds), is
+--     tagged and comes back; the HUD says "Still there?" a full Tuning.idleWarn before the real server takes
+--     the player off by its idle rule, and first person is let go.
 -- Interface: return function(t) (the spec shape); real() -> boolean
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
@@ -41,6 +44,7 @@ local Wire = require("@shared/Minigames/Paintball/Wire")
 local Magazine = require("@shared/Paintball/Magazine")
 local Bots = require("@server/Minigames/Paintball/Bots")
 local PaintballClient = require("@client/Minigames/Paintball/PaintballClient")
+local Tuning = require("@client/Minigames/Paintball/Tuning")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local PaintballRig = require("@tests/lib/PaintballRig")
 local Rig = require("@tests/lib/MinigameRig")
@@ -1118,6 +1122,75 @@ return function(t)
 					t.eq(v.service:stats().shotsRefused, 0, "the scripted person's own clicks were good")
 				end,
 			})
+		end
+	)
+
+	t.test(
+		"standing idle: the screen says so a full warning before the real server takes the player off, through a tremble of the mouse, a shuffle of the feet, being tagged and coming back",
+		function()
+			play(function(v)
+				local w = v.w
+				v.run(0.5)
+				local seat = v.seat()
+				local slot = v.state().slots[seat.you]
+				local yaw = v.arena.spawns[seat.team][slot.spawn].yaw
+				t.truthy(v.service:debug("end"))
+				t.truthy(v.untilTrue(2, function(): boolean
+					return seat.phase == "live"
+				end))
+				local liveAt = v.now()
+				local x0, _, z0 = v.feet()
+				-- twenty seconds of a hand on the mouse and a foot on W that the server does not count as being
+				-- there (inside its half stud and twentieth of a radian of where the count began)
+				for i = 1, 10 do
+					v.look(yaw + (if i % 2 == 0 then 0.03 else -0.03), 0)
+					t.truthy(v.walk(x0 + (if i % 2 == 0 then 0 else 0.3), z0, 2))
+					v.run(2 - 0.3)
+				end
+				t.eq(seat:idle(v.now()), nil, "not yet")
+				-- tagged out and placed again: the count runs on through both, on the server and here
+				local other = 0
+				for id, s in v.state().slots do
+					if s.on and s.team ~= seat.team and other == 0 then
+						other = id
+					end
+				end
+				local ok, why = v.service:debug("tag", other, seat.you)
+				t.truthy(ok, tostring(why))
+				t.truthy(v.untilTrue(seat.feel.respawnSecs + 2, function(): boolean
+					return seat.out
+				end))
+				t.truthy(v.untilTrue(seat.feel.respawnSecs + 2, function(): boolean
+					return not seat.out
+				end))
+				-- the warning comes; the server acts no sooner than a full warning later
+				local warnedAt: number? = nil
+				local said = false
+				local gone = v.untilTrue(R.idleSecs + 5 - (v.now() - liveAt), function(): boolean
+					if w.client.active() ~= STATION then
+						return true
+					end
+					if warnedAt == nil and seat:idle(v.now()) ~= nil then
+						warnedAt = v.now()
+					end
+					if warnedAt ~= nil and not said then
+						for _, word in v.words() do
+							said = said or string.find(word, "Still there", 1, true) ~= nil
+						end
+					end
+					return false
+				end)
+				t.truthy(gone, "the server took the idle player off")
+				local offAt = v.now()
+				t.truthy(offAt - liveAt >= R.idleSecs - 0.1, "by the idle rule, not sooner")
+				assert(warnedAt, "the screen warned")
+				t.truthy(said, "in words on the HUD")
+				t.truthy(
+					offAt - warnedAt >= Tuning.idleWarn - 0.5,
+					`a full warning before the server acted ({string.format("%.2f", offAt - warnedAt)} s)`
+				)
+				t.eq(w.body:GetAttribute("CameraZone"), nil, "and first person was let go")
+			end, { asleep = true })
 		end
 	)
 end

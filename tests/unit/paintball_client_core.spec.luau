@@ -1910,7 +1910,11 @@ return function(t)
 				y = 3,
 				z = 30,
 			})
-			Kit.run(b, 2)
+			Kit.run(b, 1)
+			-- (the body put somewhere else while it waits, the view turned: no Move goes, the server sees none)
+			b.pose.z += 6
+			b.pose.yaw += 0.5
+			Kit.run(b, 1)
 			Kit.place(b, { x = -52, z = 2, yaw = 1, at = b.now() })
 			Kit.frame(b, 3)
 			t.truthy((seat:idle(b.now()) :: number) < left - 1.9, "out and back, and still counting down")
