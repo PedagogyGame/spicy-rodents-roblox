@@ -18,7 +18,7 @@
 --   playfield's middle, from PINBALL_D); point(index, x, y, h) -> (X, Y, D); origin(index) -> (X, Y, D);
 --   turnOf(dx, dy) -> radians about the playfield normal; BODY (the cabinet's box), BACKBOX, GLASS_H, LEGS;
 --   stance(index) -> (X, D) where the player stands; camera(index, aspect?) -> { eye, target, fov } (alley
---   local); NAMES (the parts the client moves); BALLS (ball parts baked)
+--   local); NAMES (the parts the client moves); BALLS (ball parts baked); FLIPPER_H; PULL_TRAVEL; DROP_SINK
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
 local Layout = require("./Layout")
@@ -33,10 +33,13 @@ Cabinet.RAIL = 0.15 -- the cabinet's side walls beside the playfield
 -- the cabinet body, from PINBALL_D and the machine's X: across half-width, front and back, the tub's floor
 Cabinet.BODY = { half = Layout.WIDTH / 2 + 0.15, front = 2.65, back = -2.4, floor = 2.45 }
 -- the backbox standing on the cabinet's back: its depth (from the back), its foot and top
-Cabinet.BACKBOX = { back = -2.45, front = -1.85, y0 = 4.5, y1 = 7.7, half = Layout.WIDTH / 2 + 0.15 }
+Cabinet.BACKBOX = { back = -2.45, front = -1.85, y0 = 4.45, y1 = 7.7, half = Layout.WIDTH / 2 + 0.15 }
 Cabinet.LEGS = { inset = 0.22, size = 0.22, front = 2.3, back = -2.1 }
-Cabinet.STANCE_D = 3.4 -- where the player stands, from PINBALL_D
+Cabinet.STANCE_D = 3.7 -- where the player stands (the body's middle), from PINBALL_D: clear of the plunger's knob
 Cabinet.BALLS = 3 -- ball parts baked per machine (a three-ball multiball at most)
+Cabinet.FLIPPER_H = 0.07 -- a flipper's height off the playfield; its model's pivot is half way up, on its pivot pin
+Cabinet.PULL_TRAVEL = 0.32 -- how far the plunger's rod comes back at a full pull (studs, toward the player)
+Cabinet.DROP_SINK = 0.16 -- how far a knocked-down drop target sinks below the playfield
 
 -- The parts the client finds by name (each machine's model is Pinball<index>).
 Cabinet.NAMES = {

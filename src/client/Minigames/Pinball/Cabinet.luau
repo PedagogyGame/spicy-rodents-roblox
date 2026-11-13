@@ -323,7 +323,11 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 	for i, model in parts.flippers do
 		local a = f.flippers[i] or c.frest[i]
 		local dx, dy = c.fmir[i] * math.cos(a), math.sin(a)
-		model:PivotTo(pf * CFrame.new(c.fpx[i], 0, c.fpy[i]) * CFrame.Angles(0, CabinetLayout.turnOf(dx, dy), 0))
+		model:PivotTo(
+			pf
+				* CFrame.new(c.fpx[i], CabinetLayout.FLIPPER_H / 2, c.fpy[i])
+				* CFrame.Angles(0, CabinetLayout.turnOf(dx, dy), 0)
+		)
 	end
 	-- drop targets: down below the surface when knocked down
 	for i, part in parts.drops do
@@ -332,7 +336,7 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 		if cab.shown[key] ~= down then
 			cab.shown[key] = down
 			local home = parts.home[part]
-			part.CFrame = if down then home * CFrame.new(0, -0.16, 0) else home
+			part.CFrame = if down then home * CFrame.new(0, -CabinetLayout.DROP_SINK, 0) else home
 		end
 	end
 	-- spinners turn about their own long axis
@@ -340,10 +344,10 @@ function Cabinet.show(cab: Cab, f: any, dt: number?)
 		local home = parts.home[part]
 		part.CFrame = home * CFrame.Angles((f.spin[k] or 0) * math.pi * 2, 0, 0)
 	end
-	-- the plunger: the rod drawn back toward the player
+	-- the plunger: the rod drawn back toward the player (its part's -Z: the rod lies along the playfield)
 	local plunger = parts.plunger
 	if plunger then
-		plunger:PivotTo(parts.home[plunger] * CFrame.new(0, 0, (f.pull or 0) * 0.32))
+		plunger:PivotTo(parts.home[plunger] * CFrame.new(0, 0, -(f.pull or 0) * CabinetLayout.PULL_TRAVEL))
 	end
 	-- the lamps, and what has just fired
 	lampsShow(cab, f.lamps)
