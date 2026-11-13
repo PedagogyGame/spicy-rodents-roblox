@@ -9,6 +9,7 @@
 -- game's own Spec at run time.
 -- Interface: return function(t) (the spec shape)
 local Computer = require("@shared/Minigames/Pool/Computer")
+local Cue = require("@shared/Minigames/Pool/Cue")
 local EightBall = require("@shared/Minigames/Pool/EightBall")
 local Furniture = require("@shared/Minigames/Pool/Furniture")
 local Shot = require("@shared/Minigames/Pool/Shot")
@@ -17,6 +18,7 @@ local Wire = require("@shared/Minigames/Pool/Wire")
 local Playback = require("@client/Minigames/Pool/Playback")
 local PoolRig = require("@tests/pool/PoolRig")
 local Rig = require("@tests/lib/MinigameRig")
+local PoolFlow = require("@tests/engine/PoolFlow")
 local roblox = require("@lune/roblox")
 
 local ID = "pool_1"
@@ -165,21 +167,30 @@ return function(t)
 				end
 				if EightBall.turn(state) == 1 then
 					-- my go: the best computer's choice of shot, played with my own hands
-					t.truthy(Rig.untilTrue(w, 3, function()
-						return c.phase == "aim" or c.phase == "place"
-					end), `my turn never came up on screen (phase {c.phase})`)
+					t.truthy(
+						Rig.untilTrue(w, 3, function()
+							return c.phase == "aim" or c.phase == "place"
+						end),
+						`my turn never came up on screen (phase {c.phase})`
+					)
 					local before = state.shotNo
 					PoolRig.play(w, c, Computer.eightBall(state, 3, 7 + guard))
-					t.truthy(Rig.untilTrue(w, 2, function()
-						return st.tbl.pending ~= nil or state.shotNo > before
-					end), `my strike never reached the table: {tostring(w.toasts[#w.toasts])}`)
+					t.truthy(
+						Rig.untilTrue(w, 2, function()
+							return st.tbl.pending ~= nil or state.shotNo > before
+						end),
+						`my strike never reached the table: {tostring(w.toasts[#w.toasts])}`
+					)
 					mine += 1
 				else
 					-- the computer's go: it thinks, its cue is drawn back on my screen, it strikes
 					local before = state.shotNo
-					t.truthy(Rig.untilTrue(w, 12, function()
-						return st.tbl.pending ~= nil or state.shotNo > before or session.phase ~= "playing"
-					end), "the computer never played")
+					t.truthy(
+						Rig.untilTrue(w, 12, function()
+							return st.tbl.pending ~= nil or state.shotNo > before or session.phase ~= "playing"
+						end),
+						"the computer never played"
+					)
 					theirs += 1
 				end
 				-- a foul is said in a toast that stays, and on the status line
@@ -213,5 +224,29 @@ return function(t)
 			t.eq(EightBall.turn(fresh), winner, "the winner breaks the next game")
 			t.eq(#fresh.spots, 16)
 		end, opts())
+	end)
+
+	t.test("the server check's flow (tests/engine/PoolFlow) passes on this service", function()
+		Rig.play(function(w)
+			PoolRig.clock(w)
+			local ann, bob = Rig.stub("Ann"), Rig.stub("Bob")
+			local out = PoolFlow.play(w.svc, {
+				EightBall = EightBall,
+				Computer = Computer,
+				Tables = Tables,
+				Cue = Cue,
+				Wire = Wire,
+				Furniture = Furniture,
+			}, {
+				players = { ann, bob },
+				step = function(seconds: number)
+					Rig.run(w, seconds)
+				end,
+			})
+			t.truthy(out.ok, table.concat(out.failures, "; "))
+			t.eq(out.numbers.hardware, 1, "the flow saw the table's balls")
+			t.truthy(out.numbers.gameShots > 10, `{out.numbers.gameShots} shots in the game against Chalky`)
+			t.truthy(out.numbers.computerShots > 2)
+		end, opts({ stand = { site = "bowling_alley", x = -20, y = 3, d = -40 } }))
 	end)
 end

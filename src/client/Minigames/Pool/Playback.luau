@@ -379,11 +379,14 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 		onCue = o.onCue,
 		strokes = strokes,
 	}
-	if not bound then
-		bound = true
-		-- before the camera's own step, so a shot that follows the balls sees this frame's balls
-		game:GetService("RunService"):BindToRenderStep(Playback.BIND, Enum.RenderPriority.Camera.Value - 1, step)
+	-- (bound afresh with every shot: a binding is never assumed to have outlived what it was bound in)
+	local RunService = game:GetService("RunService")
+	if bound then
+		RunService:UnbindFromRenderStep(Playback.BIND)
 	end
+	bound = true
+	-- before the camera's own step, so a shot that follows the balls sees this frame's balls
+	RunService:BindToRenderStep(Playback.BIND, Enum.RenderPriority.Camera.Value - 1, step)
 	return true
 end
 

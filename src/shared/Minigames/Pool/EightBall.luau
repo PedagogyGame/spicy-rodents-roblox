@@ -5,8 +5,8 @@
 -- (set the cue ball down when it is in hand, call a pocket for the 8, strike), and "shoot" runs the table
 -- model (Shot) on the spot, judges what happened and keeps the shot's script for every client to play. So
 -- the same pure module is the referee on the server, the game a computer player plays, and a whole game
--- under Lune. It corrects MinigameRules/Pool8Ball (which stays for the old "shot" verb) on the checklist's
--- lines:
+-- under Lune. It replaces the first sketch of these rules (MinigameRules/Pool8Ball, now retired) and keeps
+-- to the checklist's lines:
 --   POOL-R1 any break leaves the table open; the first legal pot after the break gives solids (1-7) or
 --           stripes (9-15); fouls are the cue ball potted ("scratch"), touching no ball ("no_hit"), the
 --           wrong ball first ("wrong_ball") and no cushion and no pot after the contact ("no_rail"); a foul
