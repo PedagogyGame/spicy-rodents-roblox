@@ -496,6 +496,10 @@ function Controller.onMessage(self: any, msg: { [string]: any }, _watched: any?)
 			self:_hideAim()
 			self.ctx.ui:meter(nil)
 		end
+	elseif msg.kind == "event" and msg.shot ~= nil and type(msg.text) == "string" then
+		-- what a shot came to (a foul in the rules' words, who is at the table): the banner is gone in a moment
+		-- (the next turn's banner follows it at once), so it is said where it stays a while too
+		self.ctx.toast(msg.text, 5)
 	elseif msg.kind == `{mode.game}_rack` then
 		if type(msg.balls) == "table" then
 			self:_setSpots(msg.balls)

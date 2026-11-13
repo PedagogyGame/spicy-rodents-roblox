@@ -8,6 +8,7 @@
 -- Nothing here knows where a table stands: every position comes from Attractions/AlleyLayout through the
 -- game's own Spec at run time.
 -- Interface: return function(t) (the spec shape)
+local Computer = require("@shared/Minigames/Pool/Computer")
 local EightBall = require("@shared/Minigames/Pool/EightBall")
 local Furniture = require("@shared/Minigames/Pool/Furniture")
 local Shot = require("@shared/Minigames/Pool/Shot")
@@ -137,6 +138,80 @@ return function(t)
 				t.near(by, hy, 1e-3)
 			end
 			t.eq(EightBall.turn(state), 1)
+		end, opts())
+	end)
+
+	t.test("a whole game against a computer opponent, played by hand to the end card", function()
+		Rig.play(function(w)
+			PoolRig.clock(w)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			Rig.click(w, "+ Chalky (easy)")
+			Rig.run(w, 0.2)
+			Rig.key(Key.Space, true)
+			Rig.key(Key.Space, false)
+			Rig.run(w, 0.5)
+			local c = PoolRig.controller(ID)
+			local session = w.svc:sessionOf(ID)
+			local state = PoolRig.state(w, ID)
+			local st = PoolRig.station(w, ID)
+			local mine, theirs, guard = 0, 0, 0
+			local sawFoulWords = false
+			while session.phase == "playing" and guard < 400 do
+				guard += 1
+				t.truthy(PoolRig.settle(w, ID), "a shot never finished")
+				if session.phase ~= "playing" then
+					break
+				end
+				if EightBall.turn(state) == 1 then
+					-- my go: the best computer's choice of shot, played with my own hands
+					t.truthy(Rig.untilTrue(w, 3, function()
+						return c.phase == "aim" or c.phase == "place"
+					end), `my turn never came up on screen (phase {c.phase})`)
+					local before = state.shotNo
+					PoolRig.play(w, c, Computer.eightBall(state, 3, 7 + guard))
+					t.truthy(Rig.untilTrue(w, 2, function()
+						return st.tbl.pending ~= nil or state.shotNo > before
+					end), `my strike never reached the table: {tostring(w.toasts[#w.toasts])}`)
+					mine += 1
+				else
+					-- the computer's go: it thinks, its cue is drawn back on my screen, it strikes
+					local before = state.shotNo
+					t.truthy(Rig.untilTrue(w, 12, function()
+						return st.tbl.pending ~= nil or state.shotNo > before or session.phase ~= "playing"
+					end), "the computer never played")
+					theirs += 1
+				end
+				-- a foul is said in a toast that stays, and on the status line
+				if state.last and state.last.event == "foul" and state.last.foul ~= "idle" then
+					Rig.run(w, 0.3)
+					local words = `Foul: {EightBall.FOUL_TEXT[state.last.foul]}`
+					t.truthy(Rig.has(w.toasts, words), `no toast "{words}"`)
+					t.truthy(string.find(Rig.screen(w), words, 1, true), Rig.screen(w))
+					sawFoulWords = true
+				end
+			end
+			t.eq(session.phase, "done", `the game did not end in {guard} turns`)
+			t.truthy(mine > 5 and theirs > 2, `{mine} shots of mine, {theirs} of the computer's`)
+			t.truthy(state.done)
+			Rig.run(w, 1)
+			-- the end card: who won and how, in the rules' own words
+			local screen = Rig.screen(w)
+			local how = EightBall.HOW_TEXT[state.how]
+			t.truthy(string.find(screen, how, 1, true), screen)
+			t.truthy(Rig.button(w.gui, "Play again"), screen)
+			t.truthy(sawFoulWords or state.fouls[1] + state.fouls[2] == 0, "a foul was never put in words")
+			-- nothing was dropped by the Net, nothing warned (the rig fails the case otherwise); few messages went up
+			t.truthy(#w.sent < mine * 4 + 20, `{#w.sent} messages for {mine} shots`)
+			-- play again: the winner breaks
+			local winner = state.winner
+			Rig.click(w, "Play again")
+			Rig.run(w, 1)
+			t.eq(session.phase, "playing")
+			local fresh = PoolRig.state(w, ID)
+			t.truthy(fresh ~= state)
+			t.eq(EightBall.turn(fresh), winner, "the winner breaks the next game")
+			t.eq(#fresh.spots, 16)
 		end, opts())
 	end)
 end

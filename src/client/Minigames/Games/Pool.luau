@@ -120,11 +120,13 @@ local mode: CueController.Game = {
 		elseif g == nil or view.phase ~= "playing" then
 			return ""
 		end
+		-- what the last shot came to stays on the line: a foul is read here long after its banner has gone
 		local last = Words.eightBall(g, names, nil)
+		local lead = if last then last .. " " else ""
 		if view.turn ~= you then
 			local who = names[view.turn or 0] or "?"
-			local on = if you and view.turn then Words.group(g, view.turn) else ""
-			return `{who} is at the table ({on}). Walk round and watch; T is the top view.`
+			local on = if view.turn then Words.group(g, view.turn) else ""
+			return `{lead}{who} is at the table ({on}). Walk round and watch; T is the top view.`
 		elseif phase == "sent" or phase == "watch" then
 			return "Your shot is on its way."
 		end
@@ -141,10 +143,7 @@ local mode: CueController.Game = {
 			local left = (you and g.left and g.left[you]) or 0
 			what = `Your shot: {Words.group(g, you or 1)}, {left} left.`
 		end
-		if phase == "place" and last and type(g.last) == "table" and g.last.event == "foul" then
-			return last
-		end
-		return what
+		return lead .. what
 	end,
 }
 
