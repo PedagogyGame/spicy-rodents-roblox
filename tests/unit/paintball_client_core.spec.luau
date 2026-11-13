@@ -231,10 +231,10 @@ return function(t)
 		t.eq(#b.show.balls, 1, "and it is drawn at once")
 		t.truthy(b.show.balls[1].own)
 		t.eq(b.seat.mag.rounds, R.magazine - 1)
-		-- holding the button does not repeat (D2)
+		-- a tap is one ball (the button held down fires on: the next case)
+		b.seat:input("fire", false)
 		Kit.run(b, 1)
 		t.eq(#Kit.fires(b), 1)
-		b.seat:input("fire", false)
 	end)
 
 	t.test("the predicted ball is the server's ball: the same curve from the numbers on the wire", function()
@@ -260,9 +260,12 @@ return function(t)
 		end
 		t.truthy(ball.age > 0.2, "it flew")
 		t.truthy(worst < 1e-6, `the two balls agree to a millionth of a stud (worst {worst})`)
-		-- travel and slight drop (PB-1): 45 studs in half a second, 1.2 studs low
-		local _, y45 = Ballistics.position(0, 0, 0, 0, 0, -F.ballSpeed, F.ballDrop, 0.5)
-		t.near(y45, -1.225, 1e-9)
+		-- travel and slight drop (PB-1): 45 studs in 0.3 s, 0.9 studs low
+		local z45, y45 =
+			select(3, Ballistics.position(0, 0, 0, 0, 0, -F.ballSpeed, F.ballDrop, 0.3)),
+			select(2, Ballistics.position(0, 0, 0, 0, 0, -F.ballSpeed, F.ballDrop, 0.3))
+		t.near(z45, -45, 1e-9)
+		t.near(y45, -0.882, 1e-9)
 	end)
 
 	t.test("the ball is drawn leaving the muzzle and is on the true line within Tuning.muzzleBlend", function()
@@ -352,6 +355,41 @@ return function(t)
 		t.truthy(fires[6].ft >= done and fires[6].ft < done + 2 * DT)
 		t.eq(seat.mag.rounds, R.magazine - 1)
 		t.truthy(serverAccepts(fires), "the server's magazine agrees with every one")
+	end)
+
+	t.test("the trigger held down fires at the marker's rate: five balls, the reload, then on again", function()
+		-- (found at the review: a held mouse button, R2 or finger on FIRE fired one ball and then nothing)
+		local b = Kit.playing()
+		local seat = b.seat
+		seat:input("fire", true)
+		Kit.run(b, 2)
+		local fires = Kit.fires(b)
+		t.eq(#fires, 5, "five balls in two seconds from a full magazine")
+		for i = 2, #fires do
+			t.truthy(fires[i].ft - fires[i - 1].ft >= F.fireInterval - 1e-9, "never faster than the marker")
+			t.truthy(fires[i].ft - fires[i - 1].ft < F.fireInterval + 2 * DT, "and the instant it may")
+		end
+		t.truthy(seat.mag.reloadDoneAt ~= nil, "the reload follows by itself")
+		t.eq(Kit.cues(b, "paintball.dry"), 0, "holding through the reload is not the dry click")
+		-- still held when the reload is done: it fires on
+		local done = seat.mag.reloadDoneAt :: number
+		Kit.run(b, done - b.now() + 0.1)
+		fires = Kit.fires(b)
+		t.eq(#fires, 6)
+		t.truthy(fires[6].ft >= done and fires[6].ft < done + 2 * DT)
+		t.truthy(serverAccepts(fires), "the server's magazine agrees with every one")
+		-- let go: nothing more
+		seat:input("fire", false)
+		Kit.run(b, 1)
+		t.eq(#Kit.fires(b), 6)
+		t.eq(seat.held, nil)
+		-- the switch puts back "holding does not repeat"
+		local tuning = table.clone(Tuning)
+		tuning.holdRepeats = false
+		local c = Kit.playing({ tuning = tuning })
+		c.seat:input("fire", true)
+		Kit.run(c, 2)
+		t.eq(#Kit.fires(c), 1)
 	end)
 
 	t.test(
@@ -1297,7 +1335,7 @@ return function(t)
 			end
 			local b = shootAt()
 			t.eq(#b.show.puffs, 1)
-			t.near(b.show.puffs[1].z, Body.RADIUS, 0.01, "at the entry point")
+			t.near(b.show.puffs[1].z, Body.HIT_RADIUS, 0.01, "at the entry point")
 			t.eq(#b.show.balls, 0)
 			-- a team-mate: the ball flies on (it is still in the air a quarter of a second later)
 			b = shootAt(nil, 3)
@@ -1785,6 +1823,18 @@ return function(t)
 			t.eq(down, 1)
 		end
 	)
+
+	t.test("the owner's tuning: /pb and its words; the server's answer is in the feed and the note", function()
+		local OwnerTune = require("@client/Minigames/Paintball/OwnerTune")
+		t.deepEq({ OwnerTune.parse("/pb ballSpeed 150") }, { "ballSpeed", 150 })
+		t.deepEq({ OwnerTune.parse("/pb   rewind 0.3 ") }, { "rewind", 0.3 })
+		t.deepEq({ OwnerTune.parse("/pb") }, { "", nil })
+		t.deepEq({ OwnerTune.parse("/pb botSkill fast") }, { "botSkill", nil })
+		local b = Kit.playing()
+		Kit.message(b, { kind = "paintball_tuned", text = "Ball speed: 150 -> 120, from the next match" })
+		t.eq(b.seat.note, "Ball speed: 150 -> 120, from the next match")
+		t.eq(b.seat.feed[#b.seat.feed].text, "Ball speed: 150 -> 120, from the next match")
+	end)
 
 	t.test("a bot's call-out reaches its own side's feed; stop() puts everything back", function()
 		local b = Kit.playing()

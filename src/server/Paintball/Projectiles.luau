@@ -131,7 +131,7 @@ Projectiles.SUBSTEP = 1 / Clock.TICK_HZ
 
 local MAX_ID = 65535
 local REJECT_Y = 2 * ArenaModule.FLOOR_HEIGHT
-local RADIUS = Body.RADIUS
+local RADIUS = Body.HIT_RADIUS -- (the hit shape's, for the quick rejection)
 local inRoom = ArenaModule.inRoom
 
 local function historySampler(target: Target, t: number): (number, number, number, number?)

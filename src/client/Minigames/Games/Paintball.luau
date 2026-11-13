@@ -97,7 +97,7 @@ local Game: ClientGame.ClientGame = {
 			"Shift  sprint (the marker lowers)    C / Left Ctrl  crouch",
 			"Hold G  scoreboard, Leave, Change sides",
 			"Gamepad: R2 fire, X reload, L3 sprint, B crouch; hold View for the scoreboard (Y leaves)",
-			"Touch: FIRE (drag on it to keep looking), RELOAD, CROUCH, SCORES; push the stick fully to sprint",
+			"Touch: FIRE (drag on it to keep looking), RELOAD, CROUCH, SCORES; hold the stick fully forward to sprint",
 		},
 	},
 	keys = { Q = "", ButtonB = "" },
@@ -110,19 +110,25 @@ local Game: ClientGame.ClientGame = {
 		return PaintballClient.new(ctx)
 	end,
 	endCard = endCard,
+	-- PLACEHOLDERS until the owner chooses the licensed set (docs/AUDIO_BUDGET.md, "Paintball"): sounds that ship
+	-- with every Roblox client (rbxasset://sounds/...), so nothing is uploaded and the fire, the hits and the dry
+	-- click can be judged at the playtest. The classic Paintball Gun gear's own pop is the marker's. Each file is
+	-- to be checked in Studio (a missing one is silent and the Output says it failed to load: pick another).
 	sounds = {
-		["paintball.fire"] = "", -- your marker's pop
-		["paintball.fire_far"] = "", -- another marker, placed in space
-		["paintball.splat"] = "", -- a ball on a wall
-		["paintball.tag"] = "", -- YOU tagged someone
-		["paintball.tagged"] = "", -- you were tagged
-		["paintball.reload"] = "", -- the rattle
-		["paintball.dry"] = "", -- a click with nothing to fire
+		["paintball.fire"] = "rbxasset://sounds/paintball.wav", -- your marker's pop
+		["paintball.fire_far"] = "rbxasset://sounds/paintball.wav", -- another marker, placed in space (quieter, muffled by floors)
+		["paintball.splat"] = "rbxasset://sounds/splat.wav", -- a ball bursting on a wall, a floor or a body
+		["paintball.tag"] = "rbxasset://sounds/electronicpingshort.wav", -- YOU tagged someone
+		["paintball.tagged"] = "rbxasset://sounds/uuhhh.mp3", -- you were tagged
+		["paintball.reload"] = "rbxasset://sounds/switch.wav", -- the rattle
+		["paintball.dry"] = "rbxasset://sounds/clickfast.wav", -- a click with nothing to fire
+		-- (no single footstep ships with the client: the stock ones are loops. The body's own stock footsteps are
+		-- heard meanwhile; the owner's set brings the loud sprint and the silent crouch)
 		["paintball.step"] = "", -- footsteps (running loud, crouching silent)
-		["paintball.ready"] = "", -- the reload is done: the magazine is full again
-		["paintball.go"] = "", -- the briefing is over: the match is live
-		["paintball.back"] = "", -- you are back from being tagged out
-		["paintball.over"] = "", -- full time: the match is over
+		["paintball.ready"] = "rbxasset://sounds/button.wav", -- the reload is done: the magazine is full again
+		["paintball.go"] = "rbxasset://sounds/electronicpingshort.wav", -- the briefing is over: the match is live
+		["paintball.back"] = "rbxasset://sounds/action_get_up.mp3", -- you are back from being tagged out
+		["paintball.over"] = "rbxasset://sounds/victory.wav", -- full time: the match is over
 	},
 	words = { finished = "The match is over. Press E at the arena door to play again." },
 }

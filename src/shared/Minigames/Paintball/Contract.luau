@@ -187,11 +187,17 @@
 --                 MARGIN.sprint;
 --     the room    the slot's own pose at f is not inside a spawn room;
 --     the origin  within originSlack (horizontal) of the eye over the slot's own pose at f, plus
---                 walking pace x however far f lies past its newest Move; vertically between Body.eye
---                 of the server's crouch fraction and Body.eye of where the newest Move's crouch bit is
---                 heading (0 or 1), give or take originSlackY, and Body.JUMP_HEIGHT more while the
---                 newest Move says BIT.air; and Arena.clearPath from that eye to the origin at the
---                 origin's height.
+--                 walking pace x however far f lies past its newest Move, counted for moveGap at the
+--                 most; vertically between Body.eye of the most and of the least the crouch fraction is
+--                 within a send interval of f, on the line the Moves' own stamps and crouch bits draw
+--                 (Server/Minigames/Paintball/Stream, "the crouch is read from the Moves' own times":
+--                 the same line the pose history's shape is read from), give or take originSlackY, and
+--                 a hop's height more only while the pose at f is really above the floor; and
+--                 Arena.clearPath from that eye to the origin at the origin's height;
+--     the aim     when the click's own Move (stamped with it) has been heard, the direction within
+--                 aimSlack of its look. When it has not, the shot stands and the shooter's puppet is
+--                 turned to the shot in the snapshots about f (PaintballService), so nobody is ever shown a
+--                 ball leaving a puppet that looks elsewhere.
 --   "The slot's own pose at f" is read from the last few accepted Moves by their own t: the straight
 --   line between the two either side of f, held at the newest.
 --   The client predicts its own ball and magazine at once and draws them, and ends its own ball on the
@@ -379,9 +385,19 @@ Contract.Rules = table.freeze({
 -- The default feel (PB-1, PB-2, PB-6, PB-9), and what each number may be turned to. The ranges keep
 -- the rest of the contract true: the slowest ball still crosses the arena inside ballTtl, the fastest
 -- fire still fits Paintball.Fire's rate limit, the fastest sprint still fits the framework's pace.
+-- THE BALL (settled at the review, 2026-11-13): 150 studs/s and 19.6 studs/s^2, not the S18 core's 90
+-- and 9.8. At 90 a body walking across the view (Body.WALK 17) moves 3.8 studs while a ball crosses 20,
+-- so a ball aimed at a body always passed behind it, a body strafing left and right dodged even a
+-- perfect lead at 70 studs, and a child would see ball after ball sail behind people: "it does not
+-- shoot right", the owner's cut line. At 150 the lead is three fifths of that, and a strafer given a
+-- perfect lead is tagged 81 % of the time at 20 studs, 60 % at 40 and 27 % at 70 (none at 70 at 90 studs/s;
+-- tests/unit/paintball_feel.spec.luau pins the table). The drop is
+-- doubled so that the arc still shows at the building's 45 to 70 stud ranges (1 stud low over 45, 2.1
+-- over 70). Both stay the owner's to turn at the playtest (debug "tune": 80 to 200, 0 to 40); the bots
+-- were calibrated at 150 as well as 90 (fair player 64 %, against about 60 % wanted).
 Contract.FEEL = table.freeze({
-	ballSpeed = Config.projectile.speed, -- 90: 45 studs in half a second
-	ballDrop = Config.projectile.drop, -- 9.8: 1.2 studs low over those 45
+	ballSpeed = 150, -- studs/s: 45 studs in 0.3 s
+	ballDrop = 19.6, -- studs/s^2: 0.9 studs low over those 45, 2.1 over 70
 	fireInterval = Config.fireInterval, -- 0.25
 	reloadSecs = Config.reloadSecs, -- 1.6
 	sprintMult = 1.4, -- Tunables paintball.sprintMult: 23.8 studs/s
@@ -463,7 +479,9 @@ Contract.PHASES = table.freeze({ "briefing", "live", "ended" })
 -- The numbers behind "who is trusted for what" (see the header).
 Contract.TRUST = table.freeze({
 	speedTolerance = 1.15, -- on Body.speed, for the distance budget
-	speedWindow = 0.5, -- seconds of distance the budget holds
+	-- seconds of distance the budget holds: moveGap and a send interval (the review: at 0.5 a body that stood
+	-- still half a second could jump 10 studs in one Move, or run at sprint pace without the bit for 2 s)
+	speedWindow = 0.2,
 	moveGap = 0.15, -- the most seconds one Move adds to the budget, however far its t lies past the last
 	moveAge = 1.0, -- a Move whose t is older than this is dropped
 	clockSlack = 0.05, -- a client's stamp may lead the server's clock by this (the clocks agree to a few ms)
@@ -474,6 +492,9 @@ Contract.TRUST = table.freeze({
 	bodySlack = 8, -- studs between a reported pose and the replicated body before it is refused
 	originSlack = 1.0, -- studs (horizontal) between a shot's origin and the eye over the slot's pose at f
 	originSlackY = 0.4, -- and vertically, beyond the eye heights the crouch allows
+	aimSlack = math.rad(30), -- a click's direction may be this far from the look of its own Move
+	aimShown = 0.2, -- seconds after a shot that the shooter's puppet is drawn looking the way it went
+	pingSlack = 0.03, -- seconds added to the engine's own measure of a client's round trip (Clock.stamp)
 	refusalsBeforeCorrect = 3, -- refused poses inside refusalWindow before the body is put back
 	refusalWindow = 1.0,
 	placeGrace = 1.0, -- seconds after the server moved a body in which the framework's inPlay says yes unasked

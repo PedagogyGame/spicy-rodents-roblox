@@ -707,6 +707,22 @@ return function(t)
 					"full again"
 				)
 				t.eq(serverRounds(v), R.magazine)
+				-- THE TRIGGER HELD DOWN for two seconds (found at the review: it fired one ball): five balls at
+				-- the marker's own rate, every one the server's, then the reload by itself
+				local heldFrom = v.fires()
+				Rig.mouse(true)
+				v.run(2)
+				Rig.mouse(false)
+				t.eq(v.fires(), heldFrom + R.magazine, "five balls from one long press")
+				t.truthy(seat.mag.reloadDoneAt ~= nil, "and the reload")
+				v.run(0.5)
+				settled(v, t, "the held trigger")
+				t.truthy(
+					v.untilTrue(seat.feel.reloadSecs + 0.5, function(): boolean
+						return seat.mag.rounds == R.magazine and seat.mag.reloadDoneAt == nil
+					end),
+					"full again after the held trigger"
+				)
 				-- A SPRINT along the last link and back, then a click in mid-stride
 				local a, b = route[#route - 1], route[#route]
 				Rig.key(Key.LeftShift, true)
@@ -1004,6 +1020,14 @@ return function(t)
 				Rig.key(Key.LeftShift, false)
 				Rig.key(Key.C, false)
 				v.run(1.0 + lag / 30)
+				-- (out or back during the quiet moment counts too)
+				if seat.out ~= wasOut then
+					if seat.out then
+						outs += 1
+					else
+						back += 1
+					end
+				end
 				local stats = v.service:stats()
 				local ok, refused = v.acks()
 				local tags, mine = 0, 0

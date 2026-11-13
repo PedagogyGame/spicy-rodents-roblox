@@ -73,7 +73,7 @@
 -- A PROFILE is the set of numbers that make a brain the kind of player it is. DEFAULT is the bot
 -- (the fairness numbers are Contract.BOT's); tools/games/paintball/bots passes another to stand in
 -- for a fair human player when it measures how hard the bots are.
--- Interface: DEFAULT; new(nav, id, team, skill, seed, profile) -> Brain; place(b, squad, x, y, z,
+-- Interface: DEFAULT; reach(profile, feel) -> studs; new(nav, id, team, skill, seed, profile) -> Brain; place(b, squad, x, y, z,
 --   yaw, state, now); alert(b, x, y, z, now); say(b, squad, now, out, line, n?); step(b, squad, state,
 --   poses, now, dt, out); types
 --   Profile, Brain, Squad, Track
@@ -95,6 +95,7 @@ local Wire: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wir
 local BotNav = require("./BotNav")
 
 type Pose = typeof(Contract.T.Pose)
+type Feel = typeof(Contract.T.Feel)
 type State = typeof(Rules.T.State)
 type Slot = typeof(Rules.T.Slot)
 -- (the part of Shared/Util/Rng a brain uses; its generic members do not survive a typeof)
@@ -124,7 +125,7 @@ export type Profile = {
 	walkIn: number, -- of either, the share left after each ball (it sees where its ball went)
 	velLag: number, -- seconds its reading of a target's speed takes to catch up with it
 	settle: number, -- radians: the look is on the aim when it is this near
-	range: number, -- seconds of ball flight: the furthest target it fires at
+	range: number, -- seconds of ball flight: the furthest target it fires at (reach())
 	burstMax: number, -- balls in a burst, at most
 	pauseMin: number, -- seconds between bursts
 	pauseMax: number,
@@ -361,6 +362,8 @@ local OPEN_VIEW = 12 -- studs of clear view that make a direction worth looking 
 -- flight) does not stand and look at them. On its way somewhere it keeps going; at a post it moves up,
 -- after a moment, to a place comfortably inside its range of where they are (on its own storey or
 -- theirs, cover if there is some, never the other team's doorstep), with its marker on them as it goes.
+-- (At the review's 150 studs/s 0.8 s of flight is 120 studs, longer than any line in the building: there a
+-- bot fires at whomever it sees, misjudging the range as it misjudges any. Calibrated at 150 as at 90.)
 local ADVANCE_INSIDE = 0.75 -- of its range: how near the place it moves up to must be to the target
 local ADVANCE_OFF = 18 -- studs: and no nearer than this
 local STUCK = 9 -- seconds in one place before the stuck watch sends a bot somewhere else
@@ -416,6 +419,11 @@ end
 -- and the middle of its head (the round top of its hit shape): what shows over a rail
 local function headOf(crouch: number): number
 	return Body.top(crouch) - Body.RADIUS
+end
+
+-- The furthest a bot of this profile fires at, in studs, at this feel (see ADVANCE).
+function BotBrain.reach(profile: Profile, feel: Feel): number
+	return profile.range * feel.ballSpeed
 end
 
 function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, seed: number, profile: Profile): Brain
@@ -1294,7 +1302,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 				local passing = b.outbound and not weak and rng.next() < 0.7
 				-- too far off to fire at, and not shooting at it: nothing to stop for (see ADVANCE)
 				local off = math.sqrt((pose.x - b.x) ^ 2 + (pose.y - b.y) ^ 2 + (pose.z - b.z) ^ 2)
-				local beyond = off > b.profile.range * state.feel.ballSpeed and not weak
+				local beyond = off > BotBrain.reach(b.profile, state.feel) and not weak
 				if b.mode ~= "hold" and (restless or passing or beyond) then
 					-- it has stood about long enough, or it is still in its spawn room (nobody fights
 					-- from there), or it is on its way to its own storey and does not stop for
@@ -1323,7 +1331,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 		local pose = b.con[target] or b -- (what it saw of it)
 		b.sprint = false
 		-- too far off to fire at: it does not stand and look at them (see ADVANCE)
-		local reach = b.profile.range * state.feel.ballSpeed
+		local reach = BotBrain.reach(b.profile, state.feel)
 		if (pose.x - b.x) ^ 2 + (pose.y - b.y) ^ 2 + (pose.z - b.z) ^ 2 > reach * reach then
 			if b.halt then
 				b.halt = false
@@ -1888,7 +1896,7 @@ function BotBrain.step(
 		and math.abs(b.wantPitch - b.pitch) <= settle
 		and now - contact.first >= math.max(contact.react, p.faced)
 		and now - b.facedAt >= p.faced
-		and range <= p.range * feel.ballSpeed
+		and range <= BotBrain.reach(p, feel)
 		and not b.sprint
 		and now - b.sprintAt >= Body.SPRINT_FIRE_DELAY + 0.02
 		and BotNav.roomOf(b.nav, b.x, b.y, b.z) == 0

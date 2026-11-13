@@ -275,19 +275,27 @@
 --            magazine as it then stands, and `shot` becomes rec.shot. In order, the first failure
 --            refuses (ok = false, its why; Stats.shotsRefused):
 --            a. the slot is silent (step 2): "stale";
---            b. f, late, rewind, clamped, m = Clock.stamp(now, rec.vt, rec.ft, lastM, up.lag)
---               (clamped counts in Stats.rewindsClamped);
+--            b. f, late, rewind, clamped, m = Clock.stamp(now, rec.vt, rec.ft, lastM, up.lag, rtt), rtt =
+--               engine.ping(player) + TRUST.pingSlack when the engine knows it (clamped counts in
+--               Stats.rewindsClamped);
 --            c. sprint: a Move in `moves` with BIT.sprint and t > f - Body.SPRINT_FIRE_DELAY +
 --               MARGIN.sprint: "sprint";
 --            d. the room: the slot's pose at f is inside a spawn room (either): "safe";
---            e. the origin (Contract, "the origin"; the eye is Body.eyePoint over the slot's pose at
---               f; "however far f lies past its newest Move" is max(0, f - that Move's t), costed at
---               Body.speed(crouch, false, feel)); a direction of no length: "origin";
+--            e. the origin (Contract, "the origin"; Stream.originOk); a direction of no length, or one
+--               further from its own Move's look than Stream.aimOk allows, or an origin further than bodySlack +
+--               originSlack from where the replicated body really is (when the engine knows it, and not
+--               within placeGrace of a placement): "origin";
 --            f. Rules.fire(state, id, f, m): its why.
 --            Accepted: the ball is born at f at the claimed origin with velocity = the unit direction
 --            x feel.ballSpeed, the slot's team and that rewind; it is flown forward by `late` at
 --            once (in steps of 1 / TICK_HZ, each against the bodies of its own moment); lastM = m;
---            its idleness restarts; the ack carries ok = true and the ball's id.
+--            its idleness restarts; the ack carries ok = true and the ball's id. THE BIRTHS ARE KEPT
+--            APART: a ball is born no sooner than the shooter's last ball's birth + fireInterval -
+--            BIRTH_MARGIN, a moment ahead of now if need be (Projectiles flies a ball from its birth and
+--            not before; everything else is judged at f). Clicks bunched in one packet, by the network
+--            or by a liar who back-dates them after a pause, leave one after another and never as a
+--            spread (found at the review: three back-dated clicks were two balls born at one instant and
+--            a third 0.09 s later).
 -- IN AND OUT OF A MATCH, AND THE TOWN. The player keeps possessing the body they walked in with the
 -- whole time; the town's own systems go on outside and never reach in (the arena volume is sealed:
 -- Arena). Joining moves that body to its team's spawn room; leaving (the framework's Leave, walking
@@ -394,6 +402,9 @@ export type Engine = {
 	-- on: every part of the body into Contract.COLLISION_GROUP (bodies in a match pass through each
 	-- other); off: back into the group each part was in. The real engine registers the group once.
 	ghost: (body: any, on: boolean) -> (),
+	-- the client's round trip in seconds as the engine measures it (Clock, "the round trip"); nil or absent:
+	-- not known, and a shot is bounded by the client's own stamps as before
+	ping: ((player: any) -> number?)?,
 }
 
 -- The access pass (PB-12): 20 spicy cents for five in-game days.
@@ -416,6 +427,9 @@ export type Deps = {
 	day: (() -> number)?, -- the in-game day, for the pass
 	-- where passes outlive the server (the profile; PassDesk.Store): nil, remembered while the server runs
 	passStore: PassDeskModule.Store?,
+	-- may this player tune the feel at a playtest (the "tune" verb)? Default: the place's owner (the user who
+	-- owns the place, game.CreatorId), or anybody in Studio's own play test
+	owner: ((player: any) -> boolean)?,
 }
 
 export type Stats = {
@@ -493,6 +507,34 @@ local function noEngine(): Engine
 		ghost = function(_body: any, _on: boolean) end,
 	}
 end
+
+-- seconds a shooter's ball births are kept apart by, less than a fire interval (onFire, "the births")
+local BIRTH_MARGIN = 0.05
+
+-- The place's owner, or Studio's own play test (the default of Deps.owner).
+local function placeOwner(player: any): boolean
+	local ok, yes = pcall(function(): boolean
+		if game:GetService("RunService"):IsStudio() then
+			return true
+		end
+		return game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId
+	end)
+	return ok and yes == true
+end
+
+-- THE OWNER'S TUNING AT A PLAYTEST (the verb "tune", PaintballService.command): what each name means, in words.
+local TUNE_WORDS: { [string]: string } = {
+	ballSpeed = "Ball speed",
+	ballDrop = "Ball drop",
+	fireInterval = "Time between balls",
+	reloadSecs = "Reload time",
+	sprintMult = "Sprint speed",
+	crouchSecs = "Crouch time",
+	respawnSecs = "Time out when tagged",
+	protectSecs = "Protection after a respawn",
+	rewind = "Furthest rewind",
+	botSkill = "Bot skill",
+}
 
 local function isBot(key: any): boolean
 	return type(key) == "table" and key.ai == true
@@ -921,7 +963,9 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		-- goes to the walking surface under it)
 		local ground = arena.ground(a.x, a.y, a.z)
 		if ground ~= nil and a.y > ground + Body.JUMP_HEIGHT + T.jumpSlack then
-			a = { t = a.t, x = a.x, y = ground, z = a.z, yaw = a.yaw, pitch = a.pitch, bits = a.bits }
+			local fixed = table.clone(a)
+			fixed.y = ground
+			a = fixed
 		end
 		Stream.placed(person, a.x, a.y, a.z, a.yaw, now, state.feel, false)
 		placeMemo[person.player] = person.place
@@ -974,9 +1018,20 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 					continue
 				end
 				if not person.out then
-					local x, y, z, yaw, pitch, bits = Stream.poseAt(person, Clock.poseTime(person.up, tick))
+					local pt = Clock.poseTime(person.up, tick)
+					local x, y, z, yaw, pitch, bits = Stream.poseAt(person, pt)
+					-- a shot is seen to leave along the puppet's look (Stream, "the aim is the look")
+					local shown = person.shotLook
+					if
+						shown ~= nil
+						and pt >= shown.t - 1 / Clock.SEND_HZ
+						and pt <= shown.t + Contract.TRUST.aimShown
+					then
+						yaw, pitch = shown.yaw, shown.pitch
+					end
 					pose.x, pose.y, pose.z, pose.yaw, pose.pitch = x, y, z, yaw, pitch
-					pose.crouch = Stream.ease(person, tick, feel)
+					-- (the crouch of that very moment, on the Moves' own line: Stream, "the crouch")
+					pose.crouch = Stream.ease(person, pt, feel)
 					pose.bits = bits
 				end
 			end
@@ -1269,9 +1324,65 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		refreshRoster(now)
 	end
 
-	function service.command(_self: Service, _player: any, verb: string, _args: { any }): (boolean, boolean?, string?)
+	-- THE OWNER'S TUNING (the verb "tune" { name, value }, from the owner's chat command "/pb": Client/Minigames/
+	-- Paintball/PaintballClient). Only Deps.owner may; anyone else is told so. The name is a feel number
+	-- (Contract.FEEL_KEYS: debug "tune", from the next match), "rewind" (debug "rewind") or "botSkill" (debug
+	-- "botSkill"); with no name, the values as they stand. The owner is told in words what changed
+	-- ("paintball_tuned"); a value out of range is refused with its range.
+	local isOwner = d.owner or placeOwner
+	local function tuneNow(): string
+		local f = service.feel :: any
+		local parts = {}
+		for _, key in Contract.FEEL_KEYS do
+			table.insert(parts, `{key} {f[key]}`)
+		end
+		table.insert(parts, `rewind {Clock.MAX_REWIND}`)
+		table.insert(parts, `botSkill {(service.bots :: any).skill or 0}`)
+		return table.concat(parts, ", ")
+	end
+	local function tune(player: any, args: { any }): (boolean, string?)
+		if not isOwner(player) then
+			return false, "Only the place's owner can tune paintball."
+		end
+		local key, value = args[1], tonumber(args[2])
+		if key == nil or key == "" then
+			ctx.send(player, { kind = "paintball_tuned", text = `Paintball now: {tuneNow()}` })
+			return true, nil
+		end
+		if type(key) ~= "string" or TUNE_WORDS[key] == nil then
+			return false, `Tune one of: {table.concat(Contract.FEEL_KEYS, ", ")}, rewind, botSkill`
+		end
+		local was: any
+		if key == "rewind" then
+			was = Clock.MAX_REWIND
+		elseif key == "botSkill" then
+			was = (service.bots :: any).skill or 0
+		else
+			was = (service.feel :: any)[key]
+		end
+		local ok, why
+		if key == "rewind" or key == "botSkill" then
+			ok, why = service:debug(key, value)
+		else
+			ok, why = service:debug("tune", key, value)
+		end
+		if not ok then
+			return false, why
+		end
+		ctx.send(player, {
+			kind = "paintball_tuned",
+			text = `{TUNE_WORDS[key]}: {was} -> {value}, from the next match`,
+		})
+		return true, nil
+	end
+
+	function service.command(_self: Service, player: any, verb: string, args: { any }): (boolean, boolean?, string?)
 		if verb == "start" or verb == "again" or verb == "addai" or verb == "mode" then
 			return true, false, Contract.textFor("phase")
+		end
+		if verb == "tune" then
+			local ok, why = tune(player, args)
+			return true, ok, why
 		end
 		return false, nil, nil
 	end
@@ -1353,13 +1464,58 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		return false, Contract.textFor("phase")
 	end
 
+	-- A CLICK THAT OVERTOOK ITS OWN MOVES WAITS FOR THEM (settled at the review, 2026-11-13). The click is
+	-- reliable and the Moves are not: on a slow, lossy link a click can arrive while the Moves that tell how the
+	-- body stood up, hopped or stepped before it are still on their way (found: a client at 300 ms with one packet
+	-- in twenty lost, crouched in its newest heard Move a quarter of a second old, fired standing from a hop and
+	-- was refused "origin"). Such a click (its stamp more than WAIT_PAST past the newest Move heard) is held
+	-- until a Move stamped at or after it comes, or WAIT_MOST has passed, and is then judged as any other: late,
+	-- so at its own stamp for where it left from (Stream, "a click that came late"). A shooter's later clicks
+	-- queue behind it, in order. Nothing is gained by withholding Moves: the click is judged no earlier.
+	local WAIT_PAST = 1.5 / Clock.SEND_HZ
+	local WAIT_MOST = 0.25
+	local waiting: { { player: any, rec: { [string]: number }, at: number } } = {}
+	local judgeFire: (player: any, rec: { [string]: number }) -> ()
+
+	local function newestMoveT(person: Person): number
+		local moves = person.moves
+		return if #moves > 0 then moves[#moves].t else person.anchor.t
+	end
+
+	-- the waiting clicks whose Moves have come, or whose wait is over, are judged (oldest first, each shooter's
+	-- in order)
+	local function judgeWaiting(now: number)
+		local blocked: { [any]: boolean } = {}
+		local i = 1
+		while i <= #waiting do
+			local w = waiting[i]
+			local person = people[w.player]
+			if person == nil then
+				table.remove(waiting, i)
+			elseif
+				not blocked[w.player]
+				and (newestMoveT(person) >= w.rec.ft - 1 / 120 or now - w.at >= WAIT_MOST or person.out)
+			then
+				table.remove(waiting, i)
+				judgeFire(w.player, w.rec)
+			else
+				blocked[w.player] = true
+				i += 1
+			end
+		end
+	end
+
 	function service.step(_self: Service, dt: number)
 		if hw == nil then
 			return
 		end
 		local state = matchState()
 		if state == nil then
+			table.clear(waiting)
 			return
+		end
+		if #waiting > 0 then
+			judgeWaiting(ctx.stamp())
 		end
 		local started = os.clock()
 		stats.steps += 1
@@ -1728,6 +1884,26 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 		if person == nil then
 			return
 		end
+		local now = ctx.stamp()
+		local queued = false
+		for _, w in waiting do
+			if w.player == player then
+				queued = true
+			end
+		end
+		local behind = rec.ft - newestMoveT(person) > WAIT_PAST and rec.ft <= now
+		if queued or (behind and not person.out and not (Stream.silent(person, now))) then
+			table.insert(waiting, { player = player, rec = rec, at = now })
+			return
+		end
+		judgeFire(player, rec)
+	end
+
+	judgeFire = function(player: any, rec: { [string]: number })
+		local person = people[player]
+		if person == nil then
+			return
+		end
 		local state = matchState()
 		local id = person.seat
 		local slot = if state then state.slots[id] else nil
@@ -1743,28 +1919,57 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			why = "stale" -- a
 		else
 			-- b
-			local f, late, rewind, clamped, m = Clock.stamp(now, rec.vt, rec.ft, person.lastM, person.up.lag)
+			local rtt: number? = nil
+			if engine.ping ~= nil then
+				local ping = engine.ping(player)
+				if ping ~= nil then
+					rtt = ping + Contract.TRUST.pingSlack
+				end
+			end
+			local f, late, rewind, clamped, m = Clock.stamp(now, rec.vt, rec.ft, person.lastM, person.up.lag, rtt)
 			if clamped then
 				stats.rewindsClamped += 1
 			end
 			local dx, dy, dz = rec.dx, rec.dy, rec.dz
 			local len = math.sqrt(dx * dx + dy * dy + dz * dz)
 			-- c, d, e: the sprint window, the spawn rooms and the origin, at f
+			local at = f
 			why = Stream.clickOk(person, f, rec.ox, rec.oy, rec.oz, arena, state.feel)
 			if why ~= nil then
 				-- a click that came later than its own delay explains (a lost packet sent again) is also
 				-- judged where its body was when it was clicked, no further back than the shooter's own
 				-- window, and whether it could fire is held to f as well (Stream, "a click that came late")
-				local click = math.max(rec.ft, now - Stream.lateWindow(person))
+				local click = math.max(rec.ft, now - Stream.lateWindow(person, rtt))
 				if
 					click < f - 1e-6
 					and Stream.lateClickOk(person, click, f, rec.ox, rec.oy, rec.oz, arena, state.feel, now) == nil
 				then
 					why = nil
+					at = click
 				end
 			end
-			if why == nil and len < 1e-6 then
-				why = "origin" -- (a direction of no length)
+			if why ~= nil and person.out then
+				-- (tagged out already: its Moves since the tag were dropped, so where it fired from cannot be
+				-- read; the truth to tell its client, which has not heard of the tag yet, is that it is out)
+				why = "out"
+			end
+			if why == nil and (len < 1e-6 or not Stream.aimOk(person, at, dx, dy, dz)) then
+				why = "origin" -- (a direction of no length, or not the way it was looking)
+			end
+			if why == nil and now - person.placedAt > Contract.TRUST.placeGrace then
+				-- the origin is held to the real body too, where the engine knows it
+				local body = ctx.bodyOf(player)
+				if body ~= nil then
+					local wx, wy, wz = engine.positionOf(body)
+					if wx ~= nil and wy ~= nil and wz ~= nil then
+						local bx, _, bz = ArenaModule.toLocal(place, wx, wy, wz)
+						local ex, ez = rec.ox - bx, rec.oz - bz
+						local far = Contract.TRUST.bodySlack + Contract.TRUST.originSlack
+						if ex * ex + ez * ez > far * far then
+							why = "origin"
+						end
+					end
+				end
 			end
 			if why == nil then
 				-- f
@@ -1773,9 +1978,19 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 					why = if no ~= nil and (Contract.WHY :: { [string]: string })[no] ~= nil then no else "phase"
 				else
 					local k = state.feel.ballSpeed / len
-					local ball = launch(id, slot.team, rec.ox, rec.oy, rec.oz, dx * k, dy * k, dz * k, rewind, f)
+					-- (the births kept apart: step b)
+					local birth = f
+					local lastF = person.lastF
+					if lastF ~= nil and birth < lastF + state.feel.fireInterval - BIRTH_MARGIN then
+						birth = lastF + state.feel.fireInterval - BIRTH_MARGIN
+						late = now - birth
+					end
+					local ball = launch(id, slot.team, rec.ox, rec.oy, rec.oz, dx * k, dy * k, dz * k, rewind, birth)
 					ballId = ball.id
 					person.lastM = m
+					person.lastF = birth
+					local shotYaw, shotPitch = Body.yawPitch(dx, dy, dz)
+					person.shotLook = { t = at, yaw = shotYaw, pitch = shotPitch }
 					person.idleAt = now
 					if late > 0 then
 						-- the part of its flight the shooter has already seen, against the bodies of those moments

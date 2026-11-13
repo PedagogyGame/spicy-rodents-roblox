@@ -1085,6 +1085,7 @@ return function(t)
 				t.near(w.body:GetAttribute("MoveScale"), F.sprintMult, 1e-9)
 				s.run(F.reloadSecs)
 				pad(Key.ButtonR2, true)
+				pad(Key.ButtonR2, false)
 				s.run(0.5)
 				t.eq(w.body:GetAttribute("MoveScale"), nil, "the fire press ended the toggled sprint")
 				t.eq(#heard(s, "Paintball.Fire"), 2)
@@ -1174,6 +1175,7 @@ return function(t)
 				s.run(0.3)
 				t.eq(#heard(s, "Paintball.Fire"), 1)
 				named(hud, "FireLeft").MouseButton1Down.fire()
+				named(hud, "FireLeft").MouseButton1Up.fire()
 				s.run(0.3)
 				t.eq(#heard(s, "Paintball.Fire"), 2, "the left thumb's FIRE")
 				named(hud, "Reload").MouseButton1Down.fire()
@@ -1206,8 +1208,12 @@ return function(t)
 				stick(0.6)
 				s.run(0.4)
 				t.eq(w.body:GetAttribute("MoveScale"), nil)
+				-- a full push is a run first: it sprints only once held there (a phone's stick is at its edge
+				-- nearly all the time)
 				stick(1)
-				s.run(0.4)
+				s.run(Tuning.touchSprintHold - 0.1)
+				t.eq(w.body:GetAttribute("MoveScale"), nil, "a full push is not yet a sprint")
+				s.run(0.5)
 				t.near(w.body:GetAttribute("MoveScale"), F.sprintMult, 1e-9)
 				stick(0.7)
 				s.run(0.2)
@@ -1216,13 +1222,27 @@ return function(t)
 				stick(1)
 				s.run(F.reloadSecs)
 				named(hud, "FireLeft").MouseButton1Down.fire()
+				named(hud, "FireLeft").MouseButton1Up.fire()
 				s.run(0.5)
 				t.eq(w.body:GetAttribute("MoveScale"), nil)
 				stick(0.4)
 				s.run(0.1)
 				stick(1)
-				s.run(0.4)
+				s.run(Tuning.touchSprintHold + 0.5)
 				t.near(w.body:GetAttribute("MoveScale"), F.sprintMult, 1e-9)
+				-- a finger left on FIRE fires on at the marker's rate (here the two balls the magazine has left), and
+				-- nothing more leaves once it lifts
+				stick(0)
+				s.run(0.3)
+				local before = #heard(s, "Paintball.Fire")
+				local vp2 = workspace.CurrentCamera.ViewportSize
+				local hx, hy = vp2.X * Tuning.touchFire[1], vp2.Y * Tuning.touchFire[2]
+				Rig.touch("held", "began", hx, hy)
+				s.run(0.4)
+				t.eq(#heard(s, "Paintball.Fire") - before, 2, "two balls from one finger left on FIRE")
+				Rig.touch("held", "ended", hx, hy)
+				s.run(F.reloadSecs + 0.5)
+				t.eq(#heard(s, "Paintball.Fire") - before, 2, "and none once it lifts, the reload done")
 				stick(0)
 				-- SCORES opens the board with its buttons, and closes it
 				named(hud, "Scores").MouseButton1Down.fire()
@@ -1761,78 +1781,84 @@ return function(t)
 		end
 	)
 
-	t.test("the cues: every sound the client asks for is one the game declares, each still without an id", function()
-		local declared = require("@client/Minigames/Games/Paintball").sounds
-		local names = {}
-		for cue, id in declared do
-			t.eq(id, "", `{cue}: no id until the licensed sounds are chosen`)
-			t.truthy(string.sub(cue, 1, 10) == "paintball.", cue)
-			table.insert(names, cue)
-		end
-		t.eq(#names, 12)
-		-- every cue a seat and a show can ask for, gathered from a played stretch on the headless bench
-		local b = Kit.playing()
-		Kit.snap(b, { Kit.body(2, 6, 0, 24) }, b.now() - 0.1)
-		Kit.snap(b, { Kit.body(2, 6, 0, 24, { bits = BIT.reload }) }, b.now())
-		b.show:onShots(
-			Wire.pack(
-				Wire.Shot,
-				{ { ball = 3, id = 2, t = b.now(), ox = 6, oy = 4, oz = 24, vx = 0, vy = 0, vz = -90 } }
+	t.test(
+		"the cues: every sound the client asks for is one the game declares, each a placeholder or none yet",
+		function()
+			local declared = require("@client/Minigames/Games/Paintball").sounds
+			local names = {}
+			for cue, id in declared do
+				-- (placeholders shipped with the client until the owner's licensed set: docs/AUDIO_BUDGET.md)
+				t.truthy(id == "" or string.sub(id, 1, 18) == "rbxasset://sounds/", `{cue}: {id}`)
+				t.truthy(string.sub(cue, 1, 10) == "paintball.", cue)
+				table.insert(names, cue)
+			end
+			t.eq(#names, 12)
+			-- every cue a seat and a show can ask for, gathered from a played stretch on the headless bench
+			local b = Kit.playing()
+			Kit.snap(b, { Kit.body(2, 6, 0, 24) }, b.now() - 0.1)
+			Kit.snap(b, { Kit.body(2, 6, 0, 24, { bits = BIT.reload }) }, b.now())
+			b.show:onShots(
+				Wire.pack(
+					Wire.Shot,
+					{ { ball = 3, id = 2, t = b.now(), ox = 6, oy = 4, oz = 24, vx = 0, vy = 0, vz = -90 } }
+				)
 			)
-		)
-		local asked: { [string]: boolean } = {}
-		local function gather()
-			for _, sound in b.sounds do
-				asked[sound.cue] = true
+			local asked: { [string]: boolean } = {}
+			local function gather()
+				for _, sound in b.sounds do
+					asked[sound.cue] = true
+				end
+				for _, sound in b.show.cues do
+					asked[sound.cue] = true
+				end
 			end
-			for _, sound in b.show.cues do
-				asked[sound.cue] = true
+			for _ = 1, 6 do
+				b.seat:input("fire", true)
+				Kit.run(b, 0.3)
+			end
+			b.seat:input("fire", true) -- (dry)
+			for step = 1, 240 do
+				b.pose.x = step * 0.2 -- (walking: footsteps)
+				Kit.frame(b)
+			end
+			gather()
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 1,
+				id = 2,
+				ball = 3,
+				scores = { 1, 0 },
+				tags = 1,
+				outs = 1,
+				at = b.now() + 4,
+				x = 0,
+				y = 3,
+				z = 0,
+			})
+			Kit.message(b, {
+				kind = "paintball_tag",
+				by = 2,
+				id = 1,
+				ball = 4,
+				scores = { 1, 1 },
+				tags = 1,
+				outs = 1,
+				at = b.now() + 4,
+				x = 0,
+				y = 3,
+				z = 0,
+			})
+			Kit.place(b)
+			Kit.state(b, { phase = "ended", done = true })
+			gather()
+			for cue in asked do
+				t.truthy(declared[cue] ~= nil, `{cue} is asked for and must be declared`)
+			end
+			for _, cue in
+				{ "fire", "fire_far", "splat", "tag", "tagged", "reload", "dry", "step", "ready", "back", "over" }
+			do
+				t.truthy(asked[`paintball.{cue}`], `{cue} was heard in a played stretch`)
 			end
 		end
-		for _ = 1, 6 do
-			b.seat:input("fire", true)
-			Kit.run(b, 0.3)
-		end
-		b.seat:input("fire", true) -- (dry)
-		for step = 1, 240 do
-			b.pose.x = step * 0.2 -- (walking: footsteps)
-			Kit.frame(b)
-		end
-		gather()
-		Kit.message(b, {
-			kind = "paintball_tag",
-			by = 1,
-			id = 2,
-			ball = 3,
-			scores = { 1, 0 },
-			tags = 1,
-			outs = 1,
-			at = b.now() + 4,
-			x = 0,
-			y = 3,
-			z = 0,
-		})
-		Kit.message(b, {
-			kind = "paintball_tag",
-			by = 2,
-			id = 1,
-			ball = 4,
-			scores = { 1, 1 },
-			tags = 1,
-			outs = 1,
-			at = b.now() + 4,
-			x = 0,
-			y = 3,
-			z = 0,
-		})
-		Kit.place(b)
-		Kit.state(b, { phase = "ended", done = true })
-		gather()
-		for cue in asked do
-			t.truthy(declared[cue] ~= nil, `{cue} is asked for and must be declared`)
-		end
-		for _, cue in { "fire", "fire_far", "splat", "tag", "tagged", "reload", "dry", "step", "ready", "back", "over" } do
-			t.truthy(asked[`paintball.{cue}`], `{cue} was heard in a played stretch`)
-		end
-	end)
+	)
 end

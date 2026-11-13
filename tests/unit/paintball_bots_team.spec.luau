@@ -319,8 +319,9 @@ return function(t)
 				t.truthy(s.still < 14, `the longest stand-still was {s.still} s (seat {s.stillSlot})`)
 			end
 			-- (a bot that is alone up there is tagged out now and then and has two flights to climb
-			-- back: 45% of the time over sixty matches, against a tenth for a team that does not care)
-			t.truthy(with / total > 0.33, `a team-mate was near {with / total * 100}% of the time`)
+			-- back: 45% of the time over sixty matches at 90 studs/s, against a tenth for a team that does not care.
+			-- At the review's 150 a ball finds the companion sooner and it is out more often: 31% in these cases)
+			t.truthy(with / total > 0.25, `a team-mate was near {with / total * 100}% of the time`)
 		end
 	)
 

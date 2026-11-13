@@ -70,7 +70,7 @@ return function(t)
 			t.eq(ball.hitBody, case.hit, `crouch {case.crouch}`)
 			if case.hit ~= 0 then
 				-- the entry point: on the capsule's near side, at the ball's own height
-				t.near(ball.hx, -17 + Body.RADIUS, 1e-6)
+				t.near(ball.hx, -17 + Body.HIT_RADIUS, 1e-6)
 				t.near(ball.hy, over, 1e-6)
 				t.deepEq({ ball.bx, ball.by, ball.bz }, { -17, FLOOR, 0 }, "and the feet it was judged at")
 			else
@@ -115,7 +115,8 @@ return function(t)
 		"a late ball is flown forward at once, each piece against the bodies of its own moment; the rewind is clamped",
 		function()
 			local arena = Greybox.build()
-			local feel = Contract.feel({ ballDrop = 0 })
+			-- (at 90 studs/s, so that the part already seen is short of the body)
+			local feel = Contract.feel({ ballDrop = 0, ballSpeed = 90 })
 			-- a runner crossing the ball's line at 20 studs/s, recorded at the snapshot rate
 			local history = PoseHistory.new(Clock.HISTORY_SECS, Clock.SNAP_HZ)
 			local function zAt(time: number): number

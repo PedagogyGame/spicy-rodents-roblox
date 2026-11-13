@@ -345,7 +345,8 @@ local function measure(opts: Opts?): Result
 			service:event({ kind = "start" })
 		end
 		service:joined(player, seat, station :: any)
-		people[i] = { player = player, seat = seat, place = 0, x = 0, y = 0, z = 0, yaw = 0, shot = 0 }
+		people[i] =
+			{ player = player, seat = seat, place = 0, x = 0, y = 0, z = 0, yaw = 0, shot = 0, moveT = nil :: number? }
 	end
 	watcher = people[1].player
 	local state = (session.game :: any).state :: Rules.State
@@ -391,8 +392,10 @@ local function measure(opts: Opts?): Result
 				seq += 1
 				p.x = p.x0 + math.sin(now * 2 + i)
 				p.z = p.z0 + math.cos(now * 2 + i)
+				local ownT = math.max(now, (p.moveT or now) + 1e-4)
+				p.moveT = ownT
 				onMove(p.player, {
-					t = now,
+					t = ownT,
 					seq = seq % 65536,
 					x = p.x,
 					y = p.y,
@@ -407,7 +410,8 @@ local function measure(opts: Opts?): Result
 		local t1 = os.clock()
 		-- the clicks that keep the balls in flight (in flight = born and not yet ended)
 		local flying = stats.balls - ended
-		while flying < wantBalls do
+		-- (from half a second in: everybody placed, and a Move of theirs heard, as a real client fires)
+		while flying < wantBalls and frame > 30 do
 			shooter = shooter % SLOTS + 1
 			local p = people[shooter]
 			local other = people[(shooter + 1 + 2 * math.floor(rand() * 8)) % SLOTS + 1]
@@ -419,6 +423,23 @@ local function measure(opts: Opts?): Result
 			local dy = other.y + 3 + (rand() - 0.5) * 4 - ey
 			local dz = other.z + (rand() - 0.5) * 6 - ez
 			local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+			-- as the real client: the look turns to the shot, and the click carries its pose
+			local yaw, pitch = Body.yawPitch(dx, dy, dz)
+			p.yaw = yaw
+			seq += 1
+			local ownT = math.max(now, (p.moveT or now) + 1e-4)
+			p.moveT = ownT
+			onMove(p.player, {
+				t = ownT,
+				seq = seq % 65536,
+				x = p.x,
+				y = p.y,
+				z = p.z,
+				yaw = yaw,
+				pitch = pitch,
+				bits = 0,
+				place = p.place,
+			})
 			p.shot = p.shot % 65535 + 1
 			onFire(p.player, {
 				shot = p.shot,

@@ -9,7 +9,12 @@
 --   firing     a press leaves as a ball in the first frame every client gate holds (the phase with
 --              MARGIN.gate, not out, protection + gate, the sprint delay, both spawn rooms + MARGIN.room,
 --              the magazine); a press only the fire interval, a nearly finished reload or the sprint
---              delay objects to is HELD and leaves the instant it may; anything else drops it. The
+--              delay objects to is HELD and leaves the instant it may; anything else drops it. WHILE THE
+--              TRIGGER IS HELD DOWN (the mouse button, R2, a finger left on FIRE: input("fire", false) lets
+--              it go) the marker fires at its own rate (Tuning.holdRepeats): each time a ball has left and the next press would
+--              be let go or held, a new one is held, so five balls leave a fire interval apart and the
+--              reload follows (and when the reload is nearly done the trigger still down fires on). A held
+--              trigger never sounds the dry click again and again: only a press does. The
 --              ball is predicted on the show from the very numbers that went on the wire (the f32
 --              origin and direction, the f64 birth time), so the server's ball and this one are the
 --              same curve.
@@ -146,6 +151,8 @@ export type Seat = {
 	sprintEndedAt: number,
 	-- firing
 	held: number?, -- a press waiting for the marker: when it was made
+	trigger: boolean, -- the fire button is held down: the marker fires at its own rate (see "firing")
+	autoHeld: boolean, -- the press waiting is the held trigger's, not a press: letting go drops it
 	firedAt: number, -- the last ball left (the marker's kick)
 	fired: number, -- balls let go since the seat opened
 	reloadFrom: number, -- when the running reload began (the marker's tip)
@@ -262,6 +269,8 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		wantCrouch = false,
 		sprintEndedAt = -math.huge,
 		held = nil,
+		trigger = false,
+		autoHeld = false,
 		firedAt = -math.huge,
 		fired = 0,
 		reloadFrom = -math.huge,
@@ -882,6 +891,11 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 				end
 				self.mag.reloadDoneAt = msg.at
 			end
+		elseif kind == "paintball_tuned" then
+			-- the owner's tuning, in words (OwnerTune; only the owner is sent this)
+			local text = tostring(msg.text)
+			say(text, now)
+			feedLine(text, self.team, true, now)
 		elseif kind == "paintball_say" then
 			local slot = self.slots[msg.id]
 			if slot and slot.team == self.team and msg.id ~= self.you then
@@ -904,6 +918,11 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 	function seat.input(self: Seat, action: Action, down: boolean)
 		local now = clock()
 		if action == "fire" then
+			self.trigger = down
+			if not down and self.autoHeld then
+				self.held = nil -- (the trigger let go before its next ball: nothing more leaves)
+			end
+			self.autoHeld = false
 			if down then
 				sample()
 				endSprint(now) -- the press itself ends the sprint
@@ -1027,6 +1046,15 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 		if not liveNow then
 			self.activeAt = now -- (the server counts live play only)
 		end
+		-- the trigger held down: the next ball is pressed for as soon as the marker would take it (a press
+		-- the magazine would only answer with the dry click, or that something else drops, is not made)
+		if self.trigger and tuning.holdRepeats and self.held == nil then
+			local verdict = gate(now)
+			if verdict == "go" or verdict == "hold" then
+				self.held = now
+				self.autoHeld = true
+			end
+		end
 		-- a waiting press
 		tryFire(now)
 		settle(now)
@@ -1078,6 +1106,7 @@ function SeatCore.new(ctx: ClientGame.Ctx, opts: Opts): Seat
 			ctx.releaseCamera()
 		end
 		self.held = nil
+		self.trigger = false
 		if not self.legs then
 			self.legs = true
 			ctx.controls(true)

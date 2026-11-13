@@ -940,7 +940,7 @@ local function observe(sim: Sim, span: number)
 		local aimedAt = if brain ~= nil and brain.target ~= nil then sim.poses[brain.target] else nil
 		if brain ~= nil and aimedAt ~= nil then
 			rs.aimed += span
-			local reach = brain.profile.range * state.feel.ballSpeed
+			local reach = BotBrain.reach(brain.profile, state.feel)
 			local off = (aimedAt.x - pose.x) ^ 2 + (aimedAt.y - pose.y) ^ 2 + (aimedAt.z - pose.z) ^ 2
 			if off > reach * reach and brain.speed < 1 then
 				rs.stared += span

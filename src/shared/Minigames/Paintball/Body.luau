@@ -14,6 +14,11 @@
 -- so a body whose shape is wholly behind a wall cannot be tagged over or through it. (The S18 core
 -- added the ball's radius to a body and nothing to a wall; a crouched body's 3.36 then reached 3.61,
 -- over the 3.4 rail it was hiding behind.)
+-- THE HIT SHAPE IS A LITTLE WIDER THAN THE BODY, NOT TALLER (settled at the review, 2026-11-13): its radius
+-- is HIT_RADIUS, 0.3 more than the body's RADIUS, and its axis is shortened by the same, so the top of the
+-- shape is still top(c) and every "wholly behind the rail" comparison holds as before. A ball that passes
+-- a hair beside an arm counts; one over a crouched crown does not. It forgives most where aiming is
+-- hardest (a gamepad or a phone, with no aim assist), and nowhere does it reach over cover.
 --
 -- THE EYE is eye(c) above the feet: 4.5 standing, which is where the stock first-person camera of an
 -- R15 body already sits (root 3.0 above the feet + 1.5), so nothing moves at the arena door; 2.7
@@ -43,7 +48,7 @@
 -- dropped to 0; a fire press while sprinting ends the sprint and is held until then (Contract.MARGIN
 -- click), so a click is never dead. The server's side of it is one comparison of stamps (Contract,
 -- "a click is a shot when"); it never measures a speed to decide who is sprinting.
--- Interface: constants; top(c), eye(c), capsule(c) -> (low, high, radius); eyePoint(x, y, z, c);
+-- Interface: constants (RADIUS, HIT_RADIUS ...); top(c), eye(c), capsule(c) -> (low, high, radius); eyePoint(x, y, z, c);
 --   crouchStep(c, want, dt, feel?) -> c; speed(c, sprint, feel?) -> studs/s; pace(c, k, feel?) -> the
 --   scale for ctx.pace; look(yaw, pitch) -> (dx, dy, dz); yawPitch(dx, dy, dz) -> (yaw, pitch);
 --   partAt(localY, c) -> 1..3. `feel` is the match's Contract.Feel; nil means the defaults.
@@ -53,7 +58,8 @@ local Contract = require("./Contract")
 
 local Body = {}
 
-Body.RADIUS = Config.body.radius -- 1.2
+Body.RADIUS = Config.body.radius -- 1.2: the body's own width (navigation, spacing, the puppet)
+Body.HIT_RADIUS = Body.RADIUS + 0.3 -- 1.5: the hit shape's (see "the hit shape is a little wider")
 Body.LOW = Config.body.low -- 1.0: the capsule axis starts here above the feet
 Body.CROUCH_MULT = 0.6
 Body.STAND_TOP = Config.body.high + Config.body.radius -- 5.6: the top of the standing hit shape
@@ -84,9 +90,9 @@ function Body.eye(c: number): number
 	return Body.STAND_EYE + (Body.CROUCH_EYE - Body.STAND_EYE) * clamp01(c)
 end
 
--- The hit capsule above the feet at crouch fraction c: (axis low, axis high, radius).
+-- The hit capsule above the feet at crouch fraction c: (axis low, axis high, radius). Its top is top(c).
 function Body.capsule(c: number): (number, number, number)
-	return Body.LOW, Body.top(c) - Body.RADIUS, Body.RADIUS
+	return Body.LOW, Body.top(c) - Body.HIT_RADIUS, Body.HIT_RADIUS
 end
 
 function Body.eyePoint(x: number, y: number, z: number, c: number): (number, number, number)

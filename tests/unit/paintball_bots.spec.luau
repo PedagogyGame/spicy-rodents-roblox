@@ -913,8 +913,10 @@ return function(t)
 	t.test(
 		"somebody in view too far off to fire at: it does not stand and look at them, it moves up and then fires",
 		function()
-			-- the longest clear line between two places a bot may stand on one storey: well over its range
-			local reach = BotBrain.DEFAULT.range * F.ballSpeed
+			-- the longest clear line between two places a bot may stand on one storey: well over its range (at the
+			-- S18 core's 90 studs/s: at the default 150 no line in the building is longer than a bot's range)
+			local slow = Contract.feel({ ballSpeed = 90, ballDrop = 9.8 })
+			local reach = BotBrain.reach(BotBrain.DEFAULT, slow)
 			local from, to, longest = 0, 0, 0
 			for i, a in arena.nodes do
 				if a.team ~= 0 or nav.door[i] ~= 0 or nav.keepOff[2][i] then
@@ -938,6 +940,7 @@ return function(t)
 			local there = arena.nodes[to]
 			for seed = 1, 6 do
 				local c = closeUp(from, yawTo(arena.nodes[from].x, arena.nodes[from].z, there.x, there.z), seed)
+				c.state.feel = slow
 				c.poses[1].x, c.poses[1].y, c.poses[1].z = there.x, there.y, there.z
 				c.brain.mode = "hold"
 				c.brain.holdUntil = math.huge -- it would stand at this post for ever, if nobody came
@@ -1465,7 +1468,7 @@ return function(t)
 	end)
 
 	t.test(
-		"against a scripted target: standing still is how to get tagged; walking is harder, sprinting harder still",
+		"against a scripted target: standing still is how to get tagged; walking and sprinting are harder",
 		function()
 			local function beat(mode: string): (number, number)
 				local speed = if mode == "still" then 0 elseif mode == "walk" then Body.WALK else Body.SPRINT
@@ -1513,7 +1516,8 @@ return function(t)
 			-- matches each here, and the bands leave room for their luck)
 			t.truthy(still > 0.12 and still < 0.5, `standing: {still * 100}%`)
 			t.truthy(walk < still * 0.8, `walking: {walk * 100}% against {still * 100}%`)
-			t.truthy(run < walk * 1.1, `sprinting: {run * 100}% against {walk * 100}%`)
+			-- (at the review's 150 studs/s a straight sprint is led about as easily as a walk: the lead is short. What
+			-- a sprint costs is the marker down and the noise, not safety; and it is still far safer than standing)
 			t.truthy(run < still * 0.6, `sprinting: {run * 100}% against {still * 100}% standing`)
 			t.truthy(run > 0.01, "but nobody is safe")
 		end

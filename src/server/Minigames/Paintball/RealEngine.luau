@@ -12,7 +12,9 @@
 -- after the join, a tool, a limb the avatar code rebuilds) is ghosted as it arrives, until the body is
 -- un-ghosted: as first built only the parts there at the join were, and a late hat or arm still blocked
 -- a corridor a stud to one side of where the puppet is drawn.
--- Interface: new() -> PaintballService.Engine { positionOf, teleport, ghost }; WAS; ROOT_ABOVE_FEET
+-- ping(player) is the engine's own measure of a player's round trip (Player:GetNetworkPing, documented as the
+-- time for data to go to the client and back), which the client cannot shorten or lengthen with its stamps.
+-- Interface: new() -> PaintballService.Engine { positionOf, teleport, ghost, ping }; WAS; ROOT_ABOVE_FEET
 
 local Import = require("../../Import")
 local Contract: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
@@ -49,6 +51,7 @@ function RealEngine.new(): {
 	positionOf: (body: any) -> (number?, number?, number?),
 	teleport: (body: any, x: number, y: number, z: number, yaw: number) -> (),
 	ghost: (body: any, on: boolean) -> (),
+	ping: (player: any) -> number?,
 }
 	local registered = false
 	local watching: { [any]: any } = setmetatable({}, { __mode = "k" }) :: any -- body -> its DescendantAdded connection
@@ -132,6 +135,14 @@ function RealEngine.new(): {
 					conn:Disconnect()
 				end)
 			end
+		end,
+		-- the engine's own measure of the player's round trip, seconds (Player:GetNetworkPing; Clock, "the
+		-- round trip"); nil for anything that is not a real Player
+		ping = function(player: any): number?
+			local ok, v = pcall(function(): any
+				return player:GetNetworkPing()
+			end)
+			return if ok and type(v) == "number" and v == v and v >= 0 then v else nil
 		end,
 	}
 end

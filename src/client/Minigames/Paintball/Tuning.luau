@@ -125,9 +125,13 @@ local Tuning = {
 	-- strafes or backpedals out of a fight at sprint pace, paying only the lowered marker; narrower and a
 	-- stick held a little off true drops the sprint.
 	sprintCone = 0.87,
-	-- Touch: a full push of the stick starts a sprint, and it lasts until the stick is back under this.
+	-- Touch: a full push of the stick straight ahead, held for touchSprintHold seconds, starts a sprint, and
+	-- it lasts until the stick is back under touchSprintOff. Shorter hold and every run on a phone is a
+	-- sprint (the stock thumbstick is at its edge nearly all the time); longer and a phone player cannot
+	-- dash for a door. To be felt on a phone at the playtest.
 	touchSprintOn = 0.95,
 	touchSprintOff = 0.5,
+	touchSprintHold = 0.4,
 	-- Gamepad: the L3 sprint ends when the stick comes back under this.
 	padSprintOff = 0.25,
 	-- Seconds after a ball leaves before a held sprint picks up again. The marker is seen to fire and
@@ -252,6 +256,11 @@ local Tuning = {
 	-- False (the default): every ball goes exactly down the middle, and a crosshair that blooms after a shot
 	-- tells the hands it is less accurate, which it is not.
 	crossBloom = false,
+	-- The fire button held down fires on at the marker's own rate (five balls a fire interval apart, the
+	-- reload, and on). True since the review: children and every pad player hold the trigger in a fight,
+	-- and one pop then silence reads as a jammed marker. False puts back the scout's default D2 ("one click,
+	-- one ball; holding does not repeat"); a tap is one ball either way. The owner's call at the playtest.
+	holdRepeats = true,
 }
 
 -- The table's type, for code that takes it as a parameter (a test hands in a copy with one number changed).

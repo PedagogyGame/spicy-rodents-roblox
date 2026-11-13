@@ -9,8 +9,9 @@
 --   the bots      the match-and-bots lane's headless ball loop.
 -- THE RULES
 --   1. A ball is its CENTRE LINE: the segment its centre flies in one step. Nothing is added for its
---      radius, against a wall (arena.sweep) or against a body (reach = Body.RADIUS). So "wholly
---      behind the rail" is one comparison of heights and holds for the ball too.
+--      radius, against a wall (arena.sweep) or against a body (reach = Body.HIT_RADIUS, the shape's
+--      own radius, whose top is still Body.top). So "wholly behind the rail" is one comparison of
+--      heights and holds for the ball too.
 --   2. A body is touched where the segment ENTERS its capsule (Body.capsule at the body's crouch
 --      fraction), not where it comes nearest to the axis. The S18 test returned the closest approach,
 --      which can be the far end of a step whose near part is still in front of a wall.

@@ -92,7 +92,7 @@ return function(t)
 	)
 
 	t.test(
-		"the distance budget: walking pace for a walker whatever the jitter, sprint pace only with the bit, half a second of burst and no more",
+		"the distance budget: walking pace for a walker whatever the jitter, sprint pace only with the bit, a fifth of a second of burst and no more",
 		function()
 			local _, send = placed(20, 0, -40)
 			local feel = Contract.feel()
@@ -124,20 +124,45 @@ return function(t)
 			t.truthy(sprinter.budget <= Body.speed(0, true, feel) * T.speedTolerance * T.speedWindow + 1e-9)
 			-- one Move after a long gap buys TRUST.moveGap of distance, not the whole gap
 			local late, jump = placed(20, 0, -40)
-			t.eq((jump({ t = 100.05, z = -35 })), "accepted", "five studs of the burst a placement starts with")
+			t.eq(
+				(jump({ t = 100.05, z = -36.5 })),
+				"accepted",
+				"three and a half studs of the burst a placement starts with"
+			)
 			local left = late.budget
-			t.eq((jump({ t = 100.9, z = -35 })), "accepted")
+			t.eq((jump({ t = 100.9, z = -36.5 })), "accepted")
 			t.near(late.budget, left + Body.WALK * T.speedTolerance * T.moveGap, 1e-9)
 			-- a respawn fills the budget; a CORRECTION empties it (a refused client is not paid in distance)
-			Stream.placed(late, 20, 0, -35, 0, 101, feel, false)
+			Stream.placed(late, 20, 0, -36.5, 0, 101, feel, false)
 			t.eq(late.budget, 0)
 			t.eq(
-				(jump({ t = 101.05, z = -35 + Body.WALK * SEND })),
+				(jump({ t = 101.05, z = -36.5 + Body.WALK * SEND })),
 				"accepted",
 				"an honest step fills it from its own time"
 			)
 			Stream.placed(late, 20, 0, -40, 0, 102, feel, true)
 			t.near(late.budget, Body.WALK * T.speedTolerance * T.speedWindow, 1e-9)
+			-- THE STORE IS SMALL (found at the review: half a second of it let a body that stood still 0.7 s
+			-- jump 9.5 studs in one Move, or run at sprint pace without the bit for 2.3 s)
+			local still, hop = placed(20, 0, -40)
+			for i = 1, 14 do
+				t.eq((hop({ t = 100 + i * SEND })), "accepted")
+			end
+			local verdict, why = hop({ t = 100.75, z = -30.5 })
+			t.deepEq({ verdict, why }, { "refused", "speed" }, "9.5 studs in one Move")
+			t.truthy(still.budget <= Body.WALK * T.speedTolerance * T.speedWindow + 1e-9)
+			-- sprint pace with the bit off is refused within a second
+			local sneak, go = placed(20, 0, -40)
+			local sz, ran = -40, 0
+			for i = 1, 40 do
+				sz += Body.WALK * feel.sprintMult * SEND
+				if go({ t = 100 + i * SEND, z = sz }) ~= "accepted" then
+					break
+				end
+				ran = i * SEND
+			end
+			t.truthy(ran < 1, `sprint pace without the bit for {ran} s`)
+			local _ = sneak
 		end
 	)
 
@@ -427,10 +452,17 @@ return function(t)
 		)
 		t.falsy(Stream.originOk(person, 100.1, 20, eye + T.originSlackY + 0.01, -40, arena.sweep, feel))
 		t.falsy(Stream.originOk(person, 100.1, 20, eye - T.originSlackY - 0.01, -40, arena.sweep, feel))
-		-- in the air (a hop) the eye may be a jump higher or lower than the newest Move puts it
+		-- SILENCE BUYS NO REACH: walking pace past the newest Move counts for TRUST.moveGap at the most (found
+		-- at the review: half a second without Moves let a body fire from 8 studs out of cover)
+		local reachMost = T.originSlack + Body.WALK * T.moveGap
+		t.truthy(Stream.originOk(person, 100.1 + T.moveGap, 20 + reachMost - 0.05, eye, -40, arena.sweep, feel))
+		t.falsy(Stream.originOk(person, 100.45, 20 + reachMost + 0.05, eye, -40, arena.sweep, feel))
+		-- in the air (a hop, really off the floor) the eye may be a jump higher or lower than the newest Move puts
+		-- it, and no higher than a hop from the floor it left
 		send({ t = 100.15, y = 1, bits = Wire.BIT.air })
-		t.truthy(Stream.originOk(person, 100.2, 20, 1 + eye + Body.JUMP_HEIGHT, -40, arena.sweep, feel))
-		t.truthy(Stream.originOk(person, 100.2, 20, 1 + eye - Body.JUMP_HEIGHT, -40, arena.sweep, feel))
+		local ground = arena.ground
+		t.truthy(Stream.originOk(person, 100.2, 20, 1 + eye + Body.JUMP_HEIGHT, -40, arena.sweep, feel, ground))
+		t.truthy(Stream.originOk(person, 100.2, 20, 1 + eye - Body.JUMP_HEIGHT, -40, arena.sweep, feel, ground))
 		t.falsy(
 			Stream.originOk(
 				person,
@@ -439,22 +471,60 @@ return function(t)
 				1 + eye + Body.JUMP_HEIGHT + T.originSlackY + 0.01,
 				-40,
 				arena.sweep,
-				feel
+				feel,
+				ground
 			)
 		)
-		-- crouching: between the eye of the server's own crouch fraction and the eye the crouch bit is heading for
+		-- THE AIR BIT ON THE FLOOR BUYS NOTHING (found at the review: a crouched body behind a rail claimed it
+		-- and fired from the standing eye)
+		local liar, lie = placed(20, 0, -40)
+		for i = 1, 8 do
+			lie({ t = 100 + i * SEND, bits = Wire.BIT.crouch + Wire.BIT.air })
+		end
+		t.falsy(Stream.originOk(liar, 100.4, 20, eye, -40, arena.sweep, feel, ground), "the standing eye")
+		t.truthy(Stream.originOk(liar, 100.4, 20, Body.CROUCH_EYE, -40, arena.sweep, feel, ground))
+		-- CROUCHING: the stance on the line the Moves' own stamps draw, a send interval either way
 		local ducker, duck = placed(20, 0, -40)
 		duck({ t = 100.05, bits = Wire.BIT.crouch })
-		ducker.crouch = 0.5
-		t.truthy(Stream.originOk(ducker, 100.05, 20, Body.eye(0.5), -40, arena.sweep, feel))
-		t.truthy(
-			Stream.originOk(ducker, 100.05, 20, Body.CROUCH_EYE, -40, arena.sweep, feel),
-			"the client is ahead of the server"
-		)
+		t.near(Stream.crouchAt(ducker, 100.05, feel), SEND / feel.crouchSecs, 1e-9, "eased from a send interval before")
+		t.near(Stream.crouchAt(ducker, 100.05 + feel.crouchSecs, feel), 1, 1e-9, "and on, held to its bit")
+		t.truthy(Stream.originOk(ducker, 100.05, 20, Body.eye(0.25), -40, arena.sweep, feel))
+		t.truthy(Stream.originOk(ducker, 100.05, 20, Body.STAND_EYE, -40, arena.sweep, feel), "just begun")
+		t.truthy(Stream.originOk(ducker, 100.3, 20, Body.CROUCH_EYE, -40, arena.sweep, feel), "down after crouchSecs")
 		t.falsy(
-			Stream.originOk(ducker, 100.05, 20, Body.STAND_EYE, -40, arena.sweep, feel),
-			"standing height while crouching"
+			Stream.originOk(ducker, 100.3, 20, Body.STAND_EYE, -40, arena.sweep, feel),
+			"standing height while crouched"
 		)
+		-- THE POP SHOT (found at the review): crouched behind a rail, one Move standing between two crouched ones
+		-- buys at most the eye a send interval of standing up reaches, and the shape the history is given at
+		-- that moment rises with it
+		local popper, pop = placed(20, 0, -40)
+		for i = 1, 8 do
+			pop({ t = 100 + i * SEND, bits = Wire.BIT.crouch })
+		end
+		t.eq((pop({ t = 100.45 })), "accepted")
+		t.eq((pop({ t = 100.45 + 1 / 60, bits = Wire.BIT.crouch })), "accepted")
+		local least = Stream.crouchRange(popper, 100.45, feel)
+		t.truthy(least >= 1 - 2 * SEND / feel.crouchSecs - 1e-9, `the stance at the pop: {least}`)
+		t.falsy(Stream.originOk(popper, 100.45, 20, Body.STAND_EYE, -40, arena.sweep, feel), "the standing eye")
+		t.truthy(Body.eye(least) + T.originSlackY < Body.STAND_EYE - 0.5)
+		t.eq(
+			Stream.ease(popper, 100.45, feel),
+			Stream.crouchAt(popper, 100.45, feel),
+			"the history's shape is the line's"
+		)
+		t.truthy(Body.top(Stream.crouchAt(popper, 100.45, feel)) > Body.CROUCH_TOP, "and it rose")
+		-- THE AIM IS THE LOOK: a ball fired behind the look of its own Move is refused (found at the review);
+		-- with no Move of its own heard, the shot stands (the service shows it instead)
+		local looker, look = placed(20, 0, -40)
+		look({ t = 100.05, yaw = 0 })
+		local fx, fy, fz = Body.look(0, 0)
+		t.truthy(Stream.aimOk(looker, 100.05, fx, fy, fz))
+		t.truthy(Stream.aimOk(looker, 100.05, Body.look(T.aimSlack - 0.01, 0)))
+		t.falsy(Stream.aimOk(looker, 100.05, -fx, -fy, -fz), "behind")
+		t.falsy(Stream.aimOk(looker, 100.05, Body.look(math.rad(90), 0)), "square to the look")
+		t.truthy(Stream.aimOk(looker, 100.08, Body.look(math.rad(90), 0)), "no Move of its own: a flick, shown")
+		t.falsy(Stream.aimOk(looker, 100.05, 0, 0, 0), "no direction")
 		-- and no further than its own side of a wall: a pillar stands at x 33..37, z -37..-33
 		local hider, hide = placed(32.6, 0, -35)
 		hide({ t = 100.05 })
@@ -499,8 +569,12 @@ return function(t)
 			local person, send, arena = placed(20, 0, -40)
 			local feel = Contract.feel()
 			local eye = Body.STAND_EYE
-			-- the window: its own delay, a resend's round trip and a floor; never past the magazine's bound
+			-- the window: its own delay, a resend's round trip and a floor; never past the magazine's bound; the
+			-- way up held to the round trip the server measures, so stamping early buys nothing
 			t.near(Stream.lateWindow(person), 0.2 + Clock.REWIND_TOLERANCE, 1e-9, "no delay measured yet")
+			person.up.lag = 0.2
+			t.near(Stream.lateWindow(person, 0.05), 3 * 0.05 + 0.2 + Clock.REWIND_TOLERANCE, 1e-9)
+			person.up.lag = nil
 			-- she strafes north at a walk, a Move every send interval, and the server ticks its crouch as it goes
 			local z = -40
 			local function walk(from: number, to: number, bits: number?)
@@ -557,9 +631,14 @@ return function(t)
 				Stream.ease(ducker, at, feel)
 			end
 			t.eq(ducker.crouch, 1)
-			t.eq(Stream.crouchAt(ducker, 100.3), 0, "standing then")
-			t.eq(Stream.crouchAt(ducker, 100.45), 0.75, "three ticks into the crouch")
-			t.eq(Stream.crouchAt(ducker, 99), 0, "before the log: its oldest")
+			t.near(Stream.crouchAt(ducker, 100.3, feel), 0, 1e-9, "standing then")
+			t.near(
+				Stream.crouchAt(ducker, 100.4, feel),
+				0.5,
+				1e-9,
+				"begun a send interval before the Move that told it"
+			)
+			t.near(Stream.crouchAt(ducker, 99, feel), 0, 1e-9, "before the Moves kept: the oldest's")
 			now, f = 100.8, 100.8 - Clock.REWIND_TOLERANCE
 			t.eq(Stream.clickOk(ducker, f, 20, eye, -40, arena, feel), "origin", "standing height while crouched")
 			t.eq(

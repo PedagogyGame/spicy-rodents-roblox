@@ -60,13 +60,37 @@
 -- its room and a crouched body behind a rail gain nothing. (Reported; found in review: as first built
 -- the stamp chose the time of every check, and a back-dated click fired from safety, while sprinting
 -- and over a rail from a crouch.)
+-- THE CROUCH IS READ FROM THE MOVES' OWN TIMES (settled at the review, 2026-11-13). Every accepted Move
+-- carries the crouch fraction at its own t (`c`), eased along the crouch bits by the Moves' stamps: from
+-- one Move to the next the fraction goes on towards what the older one asked for, and towards what the
+-- newer one asks for from one send interval before the newer one at the most (a change of stance is
+-- told at once by an honest client: SeatCore, "the origin"). crouchAt(t) reads that line at any moment,
+-- held to the newest bit past the newest Move. The pose history takes its crouch from this line at the
+-- very time it takes the feet (Clock.poseTime), and a shot's height is judged against the same line
+-- (heightOk), so the shape others shoot at and the eye a ball may leave from are one stance. As first
+-- built the fraction was eased once a snapshot tick from whatever bit the newest Move carried, and a
+-- shot was allowed the eye of "where that bit is heading": one Move standing between two crouched ones,
+-- arriving between two ticks, bought a standing-eye shot over a rail while the shape never rose (found
+-- at the review, with the false BIT.air below).
+-- THE AIR BIT BUYS HEIGHT ONLY IN THE AIR: a shot's allowance for a hop is given only when the pose at its
+-- time is really above the walking surface under it, and never higher than a hop from the surface last
+-- stood on. (As first built the bit alone bought it: a crouched body on the floor behind a rail claimed
+-- "in the air" and fired from the standing eye.)
+-- SILENCE BUYS NO REACH: the walking pace a shot's origin is allowed past the newest Move counts for at
+-- most TRUST.moveGap of it (a lost Move or two). As first built half a second of withheld Moves let a
+-- body fire from 8 studs out in the open while its puppet and its history stood behind a wall.
+-- THE AIM IS THE LOOK (aimOk): a click's direction is held to within TRUST.aimSlack of the look of the
+-- click's own Move (stamped with it, sent first) when that has been heard; when it has not, the service turns
+-- the shooter's puppet to the shot for a moment, so the ball is seen to leave along the look everyone is
+-- shown. As first built a ball could leave at any angle to it, unseen ("silent aim").
 -- Interface: new(player, now, placeFrom?) -> Person; restart(person, now); placed(person, x, y, z, yaw,
 --   now, feel, stand); judge(person, rec, now, arena, feel, otherRoom?, bx?, by?, bz?) -> (verdict,
 --   why?, rule?); RULES; refused(person, now) -> correct; poseAt(person, t) -> (x, y, z, yaw, pitch, bits,
---   newestT); ease(person, tick, feel) -> crouch; crouchAt(person, t) -> crouch; sprinting(person, f)
---   -> boolean; originOk(person, f, ox, oy, oz, sweep, feel, now?) -> boolean; clickOk(person, f, ox,
---   oy, oz, arena, feel) -> why?; lateWindow(person) -> seconds; lateClickOk(person, click, f, ox, oy,
---   oz, arena, feel, now) -> why?; silent(person, now) -> (stale, drop); types Move, Person, Verdict
+--   newestT); ease(person, t, feel) -> crouch; crouchAt(person, t, feel?) -> crouch; crouchRange(person,
+--   t, feel?) -> (least, most); sprinting(person, f) -> boolean; originOk(person, f, ox, oy, oz, sweep,
+--   feel, ground?) -> boolean; aimOk(person, f, dx, dy, dz) -> boolean; clickOk(person, f, ox, oy, oz,
+--   arena, feel) -> why?; lateWindow(person, rtt?) -> seconds; lateClickOk(person, click, f, ox, oy, oz,
+--   arena, feel, now) -> why?; silent(person, now) -> (stale, drop); types Move, Person, Verdict
 
 local Import = require("../../Import")
 local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
@@ -82,6 +106,7 @@ local Wire: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wir
 
 type Arena = typeof(ArenaModule.T.Arena)
 type Room = typeof(ArenaModule.T.Room)
+type Ground = (x: number, y: number, z: number) -> number?
 type Feel = typeof(Contract.T.Feel)
 type View = typeof(Clock.newView())
 type Sweep = (
@@ -94,7 +119,22 @@ type Sweep = (
 ) -> (number?, number, number, number, number)
 
 -- An accepted pose, as the client sampled it (arena frame; t on the shared clock).
-export type Move = { t: number, x: number, y: number, z: number, yaw: number, pitch: number, bits: number }
+-- `c` is the crouch fraction at t (see "the crouch is read from the Moves' own times"); `pt`, `pc` and `pb`
+-- are the t, crouch fraction and bits of the pose before it (the Move or placement it was judged from), so
+-- the line before the oldest Move kept can still be read.
+export type Move = {
+	t: number,
+	x: number,
+	y: number,
+	z: number,
+	yaw: number,
+	pitch: number,
+	bits: number,
+	c: number,
+	pt: number,
+	pc: number,
+	pb: number,
+}
 
 export type Person = {
 	player: any,
@@ -106,9 +146,11 @@ export type Person = {
 	anchor: Move, -- the last accepted pose (after a placement: the pose the server placed)
 	up: View, -- the smoothed delay between a Move's t and its arrival
 	budget: number, -- horizontal studs it may still move
-	crouch: number, -- the crouch fraction, eased by the service once a snapshot tick
+	crouch: number, -- the crouch fraction the newest snapshot was given (ease)
 	lastT: number, -- the t of the last accepted Move
 	lastM: number?, -- the magazine time of its last accepted shot
+	lastF: number?, -- the fire time (the birth) of its last accepted shot
+	shotLook: { t: number, yaw: number, pitch: number }?, -- its last accepted shot: when, and the way it went
 	shot: number, -- the counter of its last judged click
 	heardAt: number, -- when a Move last got as far as being judged
 	out: boolean, -- tagged out: Moves are dropped and the pose is held until the respawn
@@ -119,7 +161,6 @@ export type Person = {
 	fallSince: number?, -- the t of the first unsupported Move of the fall it is in
 	standY: number, -- the walking surface the body last stood on (the one a hop or a fall began from)
 	fellAt: number, -- the t of the last accepted Move that was falling
-	crouchLog: { number }, -- (tick, crouch fraction) pairs of the last CROUCH_KEPT snapshot ticks, oldest first
 	refusals: { number }, -- when its recent Moves were refused (inside TRUST.refusalWindow)
 	idleAt: number, -- when it last moved, turned or fired
 	idleX: number,
@@ -145,7 +186,8 @@ local IDLE_RAD = 0.05
 local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands on
 local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
 local LANDING = 0.25 -- seconds after a fall in which the replicated body may still be coming down
-local CROUCH_KEPT = 14 -- snapshot ticks of crouch kept (0.7 s: past Clock.MAG_LATE and a tick each side)
+local SEND = 1 / Clock.SEND_HZ -- the most before the Move that tells it a change of stance is taken to have begun
+local CLICK_MOVE = 1 / 120 -- seconds: a Move this near a click's fire time is of the click's own frame
 local LOST_FLOOR = 0.2 -- seconds: the least a lost reliable packet waits before it is sent again
 
 local Stream = {}
@@ -159,6 +201,34 @@ local function fullBudget(crouch: number, feel: Feel): number
 	return Body.speed(crouch, false, feel) * T.speedTolerance * T.speedWindow
 end
 
+local function wants(bits: number): boolean
+	return Wire.has(bits, BIT.crouch)
+end
+
+-- The crouch fraction at time t (older.t <= t <= newerT) on the way from the Move (or placement) `older` to
+-- one stamped newerT carrying `newerBits`: towards what older asked for, then, from one send interval before
+-- newerT at the most, towards what the newer asks for.
+local function between(
+	olderT: number,
+	olderC: number,
+	olderBits: number,
+	newerBits: number,
+	newerT: number,
+	t: number,
+	feel: Feel?
+): number
+	local start = math.max(olderT, newerT - SEND)
+	if t <= start then
+		return Body.crouchStep(olderC, wants(olderBits), math.max(0, t - olderT), feel)
+	end
+	local c = Body.crouchStep(olderC, wants(olderBits), math.max(0, start - olderT), feel)
+	return Body.crouchStep(c, wants(newerBits), t - start, feel)
+end
+
+local function along(older: Move, newerBits: number, newerT: number, t: number, feel: Feel?): number
+	return between(older.t, older.c, older.bits, newerBits, newerT, t, feel)
+end
+
 -- A person newly seated. `placeFrom` is the last placement number this player was ever given (so a
 -- Move from an earlier seating can never carry the number of a new placement).
 function Stream.new(player: any, now: number, placeFrom: number?): Person
@@ -169,12 +239,26 @@ function Stream.new(player: any, now: number, placeFrom: number?): Person
 		placeFrom = placeFrom or 0,
 		placedAt = -math.huge,
 		moves = {},
-		anchor = { t = -math.huge, x = 0, y = 0, z = 0, yaw = 0, pitch = 0, bits = 0 },
+		anchor = {
+			t = -math.huge,
+			x = 0,
+			y = 0,
+			z = 0,
+			yaw = 0,
+			pitch = 0,
+			bits = 0,
+			c = 0,
+			pt = -math.huge,
+			pc = 0,
+			pb = 0,
+		},
 		up = Clock.newView(),
 		budget = 0,
 		crouch = 0,
 		lastT = -math.huge,
 		lastM = nil,
+		lastF = nil,
+		shotLook = nil,
 		shot = 0,
 		heardAt = now,
 		out = false,
@@ -182,7 +266,6 @@ function Stream.new(player: any, now: number, placeFrom: number?): Person
 		fallSince = nil,
 		standY = 0,
 		fellAt = -math.huge,
-		crouchLog = {},
 		refusals = {},
 		idleAt = now,
 		idleX = 0,
@@ -204,7 +287,6 @@ function Stream.restart(person: Person, now: number)
 	person.owedSince = nil
 	person.fallSince = nil
 	person.fellAt = -math.huge
-	table.clear(person.crouchLog)
 	table.clear(person.refusals)
 	person.idleAt = now
 end
@@ -231,11 +313,12 @@ function Stream.placed(
 	person.heardAt = now
 	table.clear(person.moves)
 	local bits = if stand then 0 else bit32.band(person.anchor.bits, BIT.crouch)
+	local c = if stand then 0 else Stream.crouchAt(person, now, feel)
 	-- (its t is the placement's own time: a shot fired before any Move has come is costed from here)
-	person.anchor = { t = now, x = x, y = y, z = z, yaw = yaw, pitch = 0, bits = bits }
+	person.anchor =
+		{ t = now, x = x, y = y, z = z, yaw = yaw, pitch = 0, bits = bits, c = c, pt = now, pc = c, pb = bits }
 	if stand then
 		person.crouch = 0
-		table.clear(person.crouchLog)
 		person.out = false
 		-- (a placement is the server's doing: it does not restart the idle clock, but the pose idleness is
 		-- measured against is the one the body now stands at)
@@ -347,9 +430,11 @@ function Stream.judge(
 	if not ArenaModule.clearPath(arena.sweep, a.x, a.z, x, z, math.max(a.y, y) + ArenaModule.CHEST) then
 		return "refused", "wall", "walls"
 	end
-	-- distance: the budget fills from the Moves' own t, never from arrival
+	-- distance: the budget fills from the Moves' own t, never from arrival (at the pace of the more upright of
+	-- the two stances, this Move's and the last one's)
+	local c = along(a, rec.bits, t, t, feel)
 	local gap = math.min(t - person.lastT, T.moveGap)
-	local rate = Body.speed(person.crouch, Wire.has(rec.bits, BIT.sprint), feel) * T.speedTolerance
+	local rate = Body.speed(math.min(a.c, c), Wire.has(rec.bits, BIT.sprint), feel) * T.speedTolerance
 	local budget = math.min(person.budget + rate * gap, rate * T.speedWindow)
 	local dx, dz = x - a.x, z - a.z
 	local step = math.sqrt(dx * dx + dz * dz)
@@ -368,7 +453,19 @@ function Stream.judge(
 		end
 	end
 	-- f. accepted
-	local move: Move = { t = t, x = x, y = y, z = z, yaw = rec.yaw, pitch = rec.pitch, bits = rec.bits }
+	local move: Move = {
+		t = t,
+		x = x,
+		y = y,
+		z = z,
+		yaw = rec.yaw,
+		pitch = rec.pitch,
+		bits = rec.bits,
+		c = c,
+		pt = a.t,
+		pc = a.c,
+		pb = a.bits,
+	}
 	local moves = person.moves
 	if #moves >= Clock.MOVES_KEPT then
 		table.remove(moves, 1)
@@ -444,37 +541,66 @@ function Stream.poseAt(person: Person, t: number): (number, number, number, numb
 	return oldest.x, oldest.y, oldest.z, oldest.yaw, oldest.pitch, oldest.bits, newest.t
 end
 
--- The snapshot tick `tick`: the crouch fraction takes one step towards what the newest Move's crouch bit
--- asks for (Body.crouchStep over one snapshot interval), and the step is logged.
-function Stream.ease(person: Person, tick: number, feel: Feel): number
+-- The crouch fraction at time t, read from the Moves' own times (the header): on the line between the two
+-- accepted Moves either side of t, held to the newest Move's bit past it (and the placement's when none has
+-- come), and at the oldest kept before them all.
+function Stream.crouchAt(person: Person, t: number, feel: Feel?): number
 	local moves = person.moves
-	local newest = if #moves > 0 then moves[#moves].bits else person.anchor.bits
-	local c = Body.crouchStep(person.crouch, Wire.has(newest, BIT.crouch), 1 / Clock.SNAP_HZ, feel)
-	person.crouch = c
-	local log = person.crouchLog
-	if #log >= 2 * CROUCH_KEPT then
-		table.remove(log, 1)
-		table.remove(log, 1)
-	end
-	table.insert(log, tick)
-	table.insert(log, c)
-	return c
-end
-
--- The crouch fraction the server held at time t: that of the newest logged tick at or before t, the
--- oldest logged when t is before them all, the present one when nothing is logged.
-function Stream.crouchAt(person: Person, t: number): number
-	local log = person.crouchLog
-	local n = #log
+	local n = #moves
 	if n == 0 then
-		return person.crouch
+		local a = person.anchor
+		if t <= a.t then
+			return a.c
+		end
+		return Body.crouchStep(a.c, wants(a.bits), t - a.t, feel)
 	end
-	for i = n - 1, 1, -2 do
-		if log[i] <= t then
-			return log[i + 1]
+	local newest = moves[n]
+	if t >= newest.t then
+		return Body.crouchStep(newest.c, wants(newest.bits), t - newest.t, feel)
+	end
+	for i = n - 1, 1, -1 do
+		local older = moves[i]
+		if t >= older.t then
+			local newer = moves[i + 1]
+			return along(older, newer.bits, newer.t, t, feel)
 		end
 	end
-	return log[2]
+	local oldest = moves[1]
+	if t <= oldest.pt then
+		return oldest.pc
+	end
+	return between(oldest.pt, oldest.pc, oldest.pb, oldest.bits, oldest.t, t, feel)
+end
+
+-- The least and the most the crouch fraction is on that line within a send interval either side of t: the
+-- stance an honest client's own eye may be in at t (its Moves are sampled up to a send interval apart).
+-- The line is straight between its corners, so the ends and the corners inside are enough.
+function Stream.crouchRange(person: Person, t: number, feel: Feel?): (number, number)
+	local lo, hi = math.huge, -math.huge
+	local function at(u: number)
+		local c = Stream.crouchAt(person, u, feel)
+		lo, hi = math.min(lo, c), math.max(hi, c)
+	end
+	at(t - SEND)
+	at(t)
+	at(t + SEND)
+	local moves = person.moves
+	for _, m in moves do
+		for _, u in { m.t, math.max(m.pt, m.t - SEND) } do
+			if u > t - SEND and u < t + SEND then
+				at(u)
+			end
+		end
+	end
+	return lo, hi
+end
+
+-- The snapshot whose poses are read at time `t` (Clock.poseTime): the crouch fraction at that same time,
+-- which is what the snapshot and the pose history are given.
+function Stream.ease(person: Person, t: number, feel: Feel): number
+	local c = Stream.crouchAt(person, t, feel)
+	person.crouch = c
+	return c
 end
 
 -- Was the marker down at fire time f? A Move stamped inside (f - SPRINT_FIRE_DELAY + MARGIN.sprint, f]
@@ -490,10 +616,32 @@ function Stream.sprinting(person: Person, f: number): boolean
 	return false
 end
 
--- Did a shot leave from this person's own eye at fire time f (Contract, "the origin")?
--- With `now` (a click judged at its own stamp, earlier than the contract's f: clickOk) the stance is
--- the one the server held when the Moves of that time were arriving: the crouch logged at f + the
--- upstream delay, and where the crouch bit of the Move at f was heading.
+-- Is a ball leaving from height `oy` one this person's eye could have been at, at time t, over feet at
+-- height y (the stance a send interval either side of t: crouchRange)? `air`: the pose is really off the
+-- floor, so a hop's height is allowed below the eye, and above it up to a hop from where the body last stood.
+local function heightOk(person: Person, t: number, y: number, oy: number, feel: Feel, air: boolean): boolean
+	local least, most = Stream.crouchRange(person, t, feel)
+	local below, above = T.originSlackY, T.originSlackY
+	if air then
+		below += Body.JUMP_HEIGHT
+		above += math.clamp(person.standY + Body.JUMP_HEIGHT + T.jumpSlack - y, 0, Body.JUMP_HEIGHT)
+	end
+	return oy >= y + Body.eye(most) - below and oy <= y + Body.eye(least) + above
+end
+
+-- Is the pose (feet y, its bits) really in the air: the air bit, and above the walking surface under it?
+local function airborne(ground: Ground?, x: number, y: number, z: number, bits: number): boolean
+	if not Wire.has(bits, BIT.air) or ground == nil then
+		return false
+	end
+	local g = ground(x, y, z)
+	return g ~= nil and y > g + T.groundSlack
+end
+
+-- Did a shot leave from this person's own eye at fire time f (Contract, "the origin")? Horizontally within
+-- originSlack of the pose at f, and walking pace for however far f lies past the newest Move, counted for no
+-- more than TRUST.moveGap ("silence buys no reach"); at a height the stance on the line allows (heightOk;
+-- the hop's allowance only when `ground` says the pose is really in the air); and with no wall between.
 function Stream.originOk(
 	person: Person,
 	f: number,
@@ -502,28 +650,46 @@ function Stream.originOk(
 	oz: number,
 	sweep: Sweep,
 	feel: Feel,
-	now: number?
+	ground: Ground?
 ): boolean
 	local x, y, z, _, _, bitsAt, newestT = Stream.poseAt(person, f)
-	local newestBits = if #person.moves > 0 then person.moves[#person.moves].bits else person.anchor.bits
-	local crouch = person.crouch
-	if now ~= nil then
-		crouch = Stream.crouchAt(person, math.min(now, f + (person.up.lag or 0)))
-		newestBits = bitsAt
-	end
-	local past = math.max(0, f - newestT)
-	local reach = T.originSlack + Body.speed(crouch, false, feel) * past
+	local least = Stream.crouchRange(person, f, feel)
+	local past = math.clamp(f - newestT, 0, T.moveGap)
+	local reach = T.originSlack + Body.speed(least, false, feel) * past
 	local dx, dz = ox - x, oz - z
 	if dx * dx + dz * dz > reach * reach then
 		return false
 	end
-	local eyeA = Body.eye(crouch)
-	local eyeB = Body.eye(if Wire.has(newestBits, BIT.crouch) then 1 else 0)
-	local slack = T.originSlackY + (if Wire.has(newestBits, BIT.air) then Body.JUMP_HEIGHT else 0)
-	if oy < y + math.min(eyeA, eyeB) - slack or oy > y + math.max(eyeA, eyeB) + slack then
+	if not heightOk(person, f, y, oy, feel, airborne(ground, x, y, z, bitsAt)) then
 		return false
 	end
 	return ArenaModule.clearPath(sweep, x, z, ox, oz, oy)
+end
+
+-- Does a click's direction (dx, dy, dz, any length) agree with the look this person's Moves showed (the
+-- header, "the aim is the look")? An honest client sends a Move stamped with its click, carrying the very look
+-- the ball leaves along: when that Move has been heard, the direction must be within TRUST.aimSlack of it.
+-- When it has not (lost, or overtaken by the reliable click), nothing here refuses the shot: a flick between
+-- two Moves of the stream cannot be told from a lie, so the service SHOWS it instead (the puppet is turned to
+-- the shot: PaintballService, "the snapshot"), and a ball is never seen to leave a puppet looking elsewhere.
+function Stream.aimOk(person: Person, f: number, dx: number, dy: number, dz: number): boolean
+	local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+	if len < 1e-9 then
+		return false
+	end
+	local heard = false
+	for _, m in person.moves do
+		if math.abs(m.t - f) < CLICK_MOVE then
+			heard = true
+			local lx, ly, lz = Body.look(m.yaw, m.pitch)
+			local cosine = math.clamp((lx * dx + ly * dy + lz * dz) / len, -1, 1)
+			if math.acos(cosine) <= T.aimSlack then
+				return true
+			end
+		end
+	end
+	-- (the click's own frame was heard and the ball does not leave along its look: refused)
+	return not heard
 end
 
 local function inEitherRoom(arena: Arena, x: number, y: number, z: number): boolean
@@ -550,7 +716,7 @@ function Stream.clickOk(
 	if inEitherRoom(arena, x, y, z) then
 		return "safe"
 	end
-	if not Stream.originOk(person, f, ox, oy, oz, arena.sweep, feel) then
+	if not Stream.originOk(person, f, ox, oy, oz, arena.sweep, feel, arena.ground) then
 		return "origin"
 	end
 	return nil
@@ -559,9 +725,14 @@ end
 -- How far before its arrival a late click may be judged at its own stamp (the header, "a click that
 -- came late"): its own delay up, the round trip a lost packet waits before it is sent again (2 up), the
 -- engine's floor on that wait (LOST_FLOOR) and the stamping tolerance; never more than Clock.MAG_LATE.
--- A shooter on a fast connection is held to a short window: 0.275 s at no delay, 0.395 at 80 ms.
-function Stream.lateWindow(person: Person): number
+-- A shooter on a fast connection is held to a short window: 0.275 s at no delay, 0.395 at 80 ms. With
+-- `rtt`, the round trip the server measures itself (Clock, "the round trip"), the way up is taken to be no
+-- longer than that: a client that back-dates its Moves to look slow buys nothing here.
+function Stream.lateWindow(person: Person, rtt: number?): number
 	local up = person.up.lag or 0
+	if rtt ~= nil then
+		up = math.min(up, rtt)
+	end
 	return math.min(Clock.MAG_LATE, 3 * up + LOST_FLOOR + Clock.REWIND_TOLERANCE)
 end
 
@@ -573,9 +744,8 @@ end
 --           moment before the sprint);
 --   room    refused if the pose at the click OR at f is inside a spawn room (a shooter who has walked
 --           back into its room, where it cannot be hit, cannot fire from the doorway it just left);
---   origin  the eye over the pose at the click, with the stance the server held then (originOk);
---   stance  and the origin's height above that pose must ALSO fit the stance the server holds at f
---           (the crouch logged one upstream delay after f, and the crouch bit of the Move at f): a
+--   origin  the eye over the pose at the click, in the stance of the line then (originOk);
+--   stance  and the origin's height above that pose must ALSO fit the stance on the line at f: a
 --           shooter crouched behind a rail cannot fire over it from the standing eye of a moment ago.
 -- The cost to an honest player: a click behind a lost packet that is followed, inside that packet's
 -- delay, by a sprint or a crouch is refused (the press is lost, never a wrong ball).
@@ -597,21 +767,17 @@ function Stream.lateClickOk(
 		end
 	end
 	local x, y, z, _, _, bitsC = Stream.poseAt(person, click)
-	local fx, fy, fz, _, _, bitsF = Stream.poseAt(person, f)
+	local fx, fy, fz = Stream.poseAt(person, f)
 	if inEitherRoom(arena, x, y, z) or inEitherRoom(arena, fx, fy, fz) then
 		return "safe"
 	end
-	if not Stream.originOk(person, click, ox, oy, oz, arena.sweep, feel, now) then
+	if not Stream.originOk(person, click, ox, oy, oz, arena.sweep, feel, arena.ground) then
 		return "origin"
 	end
-	local crouchF = Stream.crouchAt(person, math.min(now, f + (person.up.lag or 0)))
-	local eyeA = Body.eye(crouchF)
-	local eyeB = Body.eye(if Wire.has(bitsF, BIT.crouch) then 1 else 0)
-	local slack = T.originSlackY + (if Wire.has(bitsC, BIT.air) then Body.JUMP_HEIGHT else 0)
-	local above = oy - y
-	if above < math.min(eyeA, eyeB) - slack or above > math.max(eyeA, eyeB) + slack then
+	if not heightOk(person, f, y, oy, feel, airborne(arena.ground, x, y, z, bitsC)) then
 		return "origin"
 	end
+	local _ = now
 	return nil
 end
 

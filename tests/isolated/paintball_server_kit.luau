@@ -18,12 +18,14 @@
 -- Every Minigame.State message any client hears is held to Wire.checkMessage as it is heard.
 -- ONLY IN AN ISOLATED RUN (it needs the rig).
 -- Interface: play(fn(kit), opts?) (opts: arena, feel, paintball = more Deps, service = more service opts,
---   lag, realPass = the service's own pass desk instead of one that says everybody holds a pass, realEngine =
+--   lag, noPing = the fake engine does not know a client's round trip, realPass = the service's own pass desk
+--   instead of one that says everybody holds a pass, realEngine =
 --   the service's own Engine, on the fake engine's Instances, instead of the fake one); kit.w, kit.wires, kit.service, kit.state(), kit.now(), kit.frame(), kit.run(seconds),
 --   kit.untilTrue(limit, cond), kit.client(name, opts?) -> Client (opts: delay frames each way or up and down, jitter, lose 0..1,
 --   seed), kit.join(client) -> (ok, why), kit.walk(client, x, z, speed?), kit.live() (cut the briefing short and
 --   let protection run out), kit.broken (schema failures); Client: seat, place, x, y, z, yaw, pitch, crouch,
---   sprint, air, out, silent, events, acks, tags, move(), fire(dx, dy, dz, opts?) -> shot, aim(tx, ty, tz) ->
+--   sprint, air, out, silent, fixedLook (fire() neither turns the look nor sends the click's Move), events, acks,
+--   tags, move(), fire(dx, dy, dz, opts?) -> shot (turning the look to it and sending a Move first), aim(tx, ty, tz) ->
 --   dir, drawn(id) -> (x, y, z, crouch)?, last(kind, pred?), count(kind), onHear(msg)? and onStream(remote,
 --   payload)? (set by a case: called with everything the connection hears, after its delay); hall(opts?) ->
 --   Arena; fakeEngine(); REAL, JOINED; laneBuilt(path) -> boolean; waiting(t, what)
@@ -208,6 +210,18 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 	local ok, err = pcall(Rig.play, function(w: Rig.World)
 		PaintballRig.attach(wires, w)
 		local kit: Kit = { w = w, wires = wires, arena = arena, clients = {}, broken = {}, queue = {} }
+		-- the engine's measure of a client's round trip (Player:GetNetworkPing): its two ways and its mean jitter
+		-- (a case can set c.ping itself: what the engine would say of a link the case shapes by hand)
+		if deps.engine ~= nil and o.noPing ~= true then
+			deps.engine.ping = function(player: any): number?
+				for _, c in kit.clients do
+					if c.stub == player then
+						return c.ping or (c.up + c.down + c.jitter) / 60
+					end
+				end
+				return nil
+			end
+		end
 		local place = Arena.placeOf(PaintballRig.PLACE)
 		kit.place = place
 		kit.service = PaintballRig.table(w).service
@@ -499,6 +513,14 @@ function Kit.play(fn: (kit: Kit) -> (), opts: { [string]: any }?)
 			end
 			-- a click: Wire.Fire with its two stamps, the eye and the look; `over` replaces any field
 			function c.fire(dx: number, dy: number, dz: number, over: { [string]: number }?, held: number?): number
+				-- as the real client: the look turns to the direction, and the click carries its pose (a Move with the
+				-- click's own stamp goes first), unless the case holds the look or keeps the client silent
+				if not c.fixedLook and (dx ~= 0 or dy ~= 0 or dz ~= 0) then
+					c.yaw, c.pitch = Body.yawPitch(dx, dy, dz)
+				end
+				if not c.silent and not c.fixedLook and c.place ~= 0 and not c.out then
+					c.move()
+				end
 				c.shot += 1
 				local ex, ey, ez = c.eye()
 				local rec: { [string]: number } = {

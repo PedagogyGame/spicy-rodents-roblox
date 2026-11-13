@@ -74,7 +74,11 @@ return function(t)
 				end, budget)
 				t.truthy(r.inFlight >= 78 and r.inFlight <= 82, `{r.inFlight} balls in flight`)
 				t.eq(r.stats.movesRefused, 0, "sixteen honest clients")
-				t.eq(r.stats.shotsRefused, 0)
+				local whys = {}
+				for why, n in r.stats.shotsRefusedBy do
+					table.insert(whys, `{why} x{n}`)
+				end
+				t.eq(r.stats.shotsRefused, 0, table.concat(whys, ", "))
 				t.truthy(r.stats.movesAccepted > 16 * 20 * 2, "every Move was judged")
 				t.truthy(r.stats.snapshots >= 20 * 2)
 				t.truthy(

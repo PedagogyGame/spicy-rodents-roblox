@@ -43,14 +43,17 @@ local R = Contract.Rules
 local F = Contract.FEEL
 
 return function(t)
-	t.test("PB-1: a ball travels at 90 studs/s and drops a little: 45 studs in half a second, about 1.2 low", function()
-		t.eq(F.ballSpeed, 90)
-		t.eq(F.ballDrop, 9.8)
+	t.test("PB-1: a ball travels at 150 studs/s and drops a little: 45 studs in 0.3 s, about 0.9 low", function()
+		t.eq(F.ballSpeed, 150)
+		t.eq(F.ballDrop, 19.6)
 		t.eq(R.ballTtl, 1.5)
 		t.eq(R.ballRadius, 0.25)
-		local x, y = Ballistics.position(0, 0, 0, F.ballSpeed, 0, 0, F.ballDrop, 0.5)
+		local x, y = Ballistics.position(0, 0, 0, F.ballSpeed, 0, 0, F.ballDrop, 0.3)
 		t.near(x, 45, 1e-9)
-		t.near(y, -1.225, 1e-9)
+		t.near(y, -0.882, 1e-9)
+		-- and the arc still shows at the building's longest ranges: about two studs low over 70
+		local _, y70 = Ballistics.position(0, 0, 0, F.ballSpeed, 0, 0, F.ballDrop, 70 / F.ballSpeed)
+		t.truthy(y70 < -2 and y70 > -2.5)
 		-- the longest flat shot stays inside the arena, at the slowest speed a feel may have: nothing is
 		-- decided by the ttl
 		t.truthy(F.ballSpeed * R.ballTtl >= 2 * Arena.HALF)
@@ -79,8 +82,8 @@ return function(t)
 
 	t.test("the feel: one table a match holds; the defaults, the ranges, a tuned copy", function()
 		t.deepEq(Contract.FEEL, {
-			ballSpeed = 90,
-			ballDrop = 9.8,
+			ballSpeed = 150,
+			ballDrop = 19.6,
 			fireInterval = 0.25,
 			reloadSecs = 1.6,
 			sprintMult = 1.4,
@@ -94,8 +97,10 @@ return function(t)
 			local v = (Contract.FEEL :: any)[key]
 			t.truthy(range ~= nil and range[1] <= v and v <= range[2], key)
 		end
-		-- the defaults are the plan's (the S18 Config and Tunables), so nothing moved at the default feel
-		t.eq(F.ballSpeed, Config.projectile.speed)
+		-- the defaults are the plan's (the S18 Config and Tunables), so nothing moved at the default feel, but for
+		-- the ball, which the review made faster (Contract, "the ball"; the S18 harness keeps its own 90)
+		t.eq(F.ballSpeed, Tunables.tree.paintball.projectileSpeed.v)
+		t.truthy(F.ballSpeed > Config.projectile.speed)
 		t.eq(F.fireInterval, Config.fireInterval)
 		t.eq(F.reloadSecs, Config.reloadSecs)
 		t.eq(F.sprintMult, Tunables.tree.paintball.sprintMult.v)
@@ -109,10 +114,10 @@ return function(t)
 		t.eq(b.crouchSecs, F.crouchSecs)
 		t.eq((b :: any).nonsense, nil)
 		-- the owner's playtest: one number changed, for the next match
-		local c, why = Contract.tuned(a, "ballSpeed", 150)
+		local c, why = Contract.tuned(a, "ballSpeed", 120)
 		t.eq(why, nil)
-		t.eq((c :: Contract.Feel).ballSpeed, 150)
-		t.eq(a.ballSpeed, 90, "the table it was made from is untouched")
+		t.eq((c :: Contract.Feel).ballSpeed, 120)
+		t.eq(a.ballSpeed, 150, "the table it was made from is untouched")
 		t.eq((Contract.tuned(a, "ballSpeed", 5000)), nil)
 		t.eq((Contract.tuned(a, "ballSpeed", "fast")), nil)
 		local none, words = Contract.tuned(a, "gravity", 1)
@@ -182,7 +187,9 @@ return function(t)
 		t.near(Body.CROUCH_EYE, 2.7, 1e-9)
 		t.eq(Tunables.tree.human.crouchHeightMult.v, Body.CROUCH_MULT)
 		local low, high, radius = Body.capsule(0)
-		t.deepEq({ low, high, radius }, { Config.body.low, Config.body.high, Config.body.radius })
+		-- the S18 capsule's top and foot; the review widened it by 0.3 and shortened the axis by as much
+		t.deepEq({ low, high + radius }, { Config.body.low, Config.body.high + Config.body.radius })
+		t.near(radius, Config.body.radius + 0.3, 1e-9)
 		low, high, radius = Body.capsule(1)
 		t.near(high + radius, Body.CROUCH_TOP, 1e-9)
 		t.truthy(high > low, "a crouched capsule still has an axis")
@@ -257,16 +264,16 @@ return function(t)
 	end)
 
 	t.test("PB-3, PB-5: the hit test: a ball is its centre line, a body is hit where it is entered", function()
-		-- the capsule alone: axis x = 0, z = 0, from 1 to 4.4 above the feet, radius 1.2 (a standing body)
+		-- the capsule alone: axis x = 0, z = 0, from 1 to 4.1 above the feet, radius 1.5 (a standing body)
 		local low, high, r = Body.capsule(0)
 		t.near(
 			Hit.capsule(-5, 2, 0, 5, 2, 0, 0, low, high, 0, r) :: number,
-			0.38,
+			0.35,
 			1e-9,
 			"the side, where it is entered"
 		)
 		t.near(Hit.capsule(0, 10, 0, 0, 0, 0, 0, low, high, 0, r) :: number, 0.44, 1e-9, "the round top")
-		t.eq(Hit.capsule(-5, 2, 1.3, 5, 2, 1.3, 0, low, high, 0, r), nil, "a miss by a tenth of a stud")
+		t.eq(Hit.capsule(-5, 2, 1.6, 5, 2, 1.6, 0, low, high, 0, r), nil, "a miss by a tenth of a stud")
 		t.eq(Hit.capsule(-5, 5.7, 0, 5, 5.7, 0, 0, low, high, 0, r), nil, "over the head")
 		t.eq(Hit.capsule(0.5, 3, 0, 9, 3, 0, 0, low, high, 0, r), 0, "a step that starts inside")
 		t.eq(Hit.capsule(-5, 2, 0, -2, 2, 0, 0, low, high, 0, r), nil, "a step that stops short")
@@ -274,16 +281,23 @@ return function(t)
 		t.truthy(under > 0 and under < 0.5, "up into the round bottom")
 		local ex, ey = -3 + 6 * under, -2 + 6 * under
 		t.near(math.sqrt(ex * ex + (ey - low) ^ 2), r, 1e-9, "the entry point is on the shape")
-		-- nothing is added for the ball: the reach is the body's radius, so the entry is 1.2 from the axis
+		-- nothing is added for the ball: the reach is the hit shape's radius, so the entry is 1.5 from the axis
 		local s = Hit.capsule(-5, 2, 0, 5, 2, 0, 0, low, high, 0, r) :: number
-		t.near(-5 + 10 * s, -Body.RADIUS, 1e-9)
+		t.near(-5 + 10 * s, -Body.HIT_RADIUS, 1e-9)
+		-- the hit shape is wider than the body, never taller: its top is the body's top, standing and crouched
+		for _, c in { 0, 0.5, 1 } do
+			local cl, ch, cr = Body.capsule(c)
+			t.near(ch + cr, Body.top(c), 1e-9)
+			t.truthy(ch >= cl)
+		end
+		t.eq(Body.HIT_RADIUS, Body.RADIUS + 0.3)
 
 		-- a body crouched behind the atrium rail of the stand-in arena (the rail's faces are at x = 15 and 15.5)
 		local arena = ArenaData.build()
 		local y = Arena.FLOOR_HEIGHT
 		local railTop = y + Arena.RAIL_HEIGHT
 		local bx = Arena.ATRIUM + 0.5 + 0.6 -- pressed against the rail: its shape pokes 0.1 out of the far face
-		t.truthy(bx - Body.RADIUS < Arena.ATRIUM, "the shape does poke through the rail")
+		t.truthy(bx - Body.HIT_RADIUS < Arena.ATRIUM, "the shape does poke through the rail")
 		-- (1) a level ball 0.05 above the rail passes over a fully crouched body, and tags a standing one
 		local over = railTop + 0.05
 		t.eq((arena.sweep(-10, over, 0, 30, over, 0)), nil, "the ball clears the rail")
@@ -294,7 +308,7 @@ return function(t)
 		t.truthy(Ballistics.segmentCapsule(-10, over, 0, 30, over, 0, bx, y + cl, y + ch, 0, r + R.ballRadius) ~= nil)
 		-- (2) a ball at the crouched body's middle whose tick ends just short of the rail, inside the part
 		-- of the shape that pokes through: the old test called it a hit; the entry is covered, so it is none
-		local mid = y + 2
+		local mid = y + 1.5 -- (on the crouched shape's upright side, between its axis's ends)
 		local stop = Arena.ATRIUM - 0.05
 		t.truthy(Ballistics.segmentCapsule(13.5, mid, 0, stop, mid, 0, bx, y + cl, y + ch, 0, r) ~= nil)
 		t.truthy(Hit.capsule(13.5, mid, 0, stop, mid, 0, bx, y + cl, y + ch, 0, r) ~= nil, "the shape is entered")
@@ -306,7 +320,7 @@ return function(t)
 		-- (3) the same body with no rail in the way is hit at the entry point, which is what is reported
 		local hs, hx, hy, hz = Hit.body(arena.sweep, 30, mid, 0, 14, mid, 0, bx, y, 0, 1)
 		t.truthy(hs ~= nil)
-		t.near(hx, bx + Body.RADIUS, 1e-9)
+		t.near(hx, bx + Body.HIT_RADIUS, 1e-9)
 		t.deepEq({ hy, hz }, { mid, 0 })
 		-- a ball flies under 3.4 studs a tick even at the fastest feel: the entry test loses nothing between ticks
 		t.truthy(Contract.FEEL_RANGE.ballSpeed[2] / Clock.TICK_HZ < 2 * Body.RADIUS + 1)
@@ -317,7 +331,13 @@ return function(t)
 		-- a walker's budget never runs dry and a sprinter's bit buys sprint pace
 		t.truthy(T.speedTolerance > 1 and T.speedTolerance <= 1.25)
 		t.truthy(T.moveGap >= 2 / Clock.SEND_HZ, "one lost Move costs nothing")
-		t.truthy(T.speedWindow >= 2 * T.moveGap)
+		-- the store holds a gap of lost Moves and one Move more, and no more (the review: half a second of it was a
+		-- ten-stud jump in one Move, or two seconds of sprint pace without the bit)
+		t.truthy(T.speedWindow >= T.moveGap + 1 / Clock.SEND_HZ - 1e-9)
+		t.truthy(
+			Body.WALK * T.speedTolerance * T.speedWindow < 2 * 2 * Body.RADIUS,
+			"under two body widths in one Move"
+		)
 		t.truthy(T.moveAge <= Clock.HISTORY_SECS)
 		-- falling: the whole building is a shorter fall than the longest a body may be unsupported
 		t.truthy(T.fallSecs > math.sqrt(2 * Arena.HEIGHT / 196.2))
@@ -427,7 +447,7 @@ return function(t)
 		local f4, late4 = Clock.stamp(now, now - 0.5, now - Clock.MAX_LATE, nil, 0.02)
 		t.near(late4, 0.02 + Clock.REWIND_TOLERANCE, 1e-9)
 		t.near(f4, now - 0.095, 1e-9)
-		t.truthy(late4 * F.ballSpeed < 9)
+		t.truthy(late4 * F.ballSpeed < 15)
 		-- and its rewind to the estimate's edge (the way down taken to be as long as the way up)
 		local _, _, r4, c4 = Clock.stamp(now, now - 0.5, now - Clock.MAX_LATE, nil, 0.02)
 		t.near(r4, 0.02 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE, 1e-9)
@@ -456,6 +476,20 @@ return function(t)
 		t.near(r2, 0.05 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE, 1e-9)
 		local _, _, r3 = Clock.stamp(now, now + 1, now, nil, 0.075)
 		t.near(r3, 0.075 + Clock.INTERP_SECS - Clock.REWIND_TOLERANCE, 1e-9)
+		-- WITH THE ROUND TRIP THE SERVER MEASURES (the review): a client on a fast link that stamps its Moves
+		-- early, to look slow, is held to the link it really has ...
+		local _, lateL, rL = Clock.stamp(now, now - 0.5, now - Clock.MAX_LATE, nil, 0.2, 0.03)
+		t.near(lateL, 0.03 + Clock.REWIND_TOLERANCE, 1e-9, "the way up is no longer than the round trip")
+		t.near(rL, 0.03 + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE, 1e-9, "nor is the way down")
+		-- ... and an honest link whose two ways differ keeps the rewind it saw: 17 ms up and 150 down
+		local ftA = now - 0.017
+		local _, _, rA, cA = Clock.stamp(now, ftA - 0.15 - Clock.INTERP_SECS, ftA, nil, 0.017, 0.167)
+		t.near(rA, 0.15 + Clock.INTERP_SECS, 1e-9)
+		t.falsy(cA, "not clamped (centred on the way up taken twice, it was: 0.042 to 0.192)")
+		-- past MAX_REWIND both the shooter's drawing and the server clamp alike
+		local ftB = now - 0.033
+		local _, _, rB = Clock.stamp(now, ftB - 0.266 - Clock.INTERP_SECS, ftB, nil, 0.033, 0.3)
+		t.eq(rB, Clock.MAX_REWIND)
 		t.eq(select(3, Clock.stamp(now, now + 1, now, nil, nil)), 0)
 		-- a slow connection is covered to a 300 ms round trip and held there beyond it
 		local _, _, r5, c5 = Clock.stamp(now, now - 0.125 - 0.225, now - 0.125, nil, 0.125)
@@ -781,6 +815,7 @@ return function(t)
 			{ kind = "paintball_respawn", id = 1, x = 0, y = 0, z = 0, yaw = 0, at = 11, place = 4 },
 			{ kind = "paintball_reload", id = 1, at = 12 },
 			{ kind = "paintball_say", id = 3, line = "floor", n = 3 },
+			{ kind = "paintball_tuned", text = "Ball speed: 150 -> 120, from the next match" },
 			{ kind = "paintball_ack", shot = 4, ok = true, ball = 17, rounds = 4 },
 			{ kind = "paintball_ack", shot = 5, ok = false, why = "sprint", rounds = 4, reloadAt = 12 },
 			{
@@ -806,7 +841,7 @@ return function(t)
 			t.truthy(seen[k], `no example of '{k}'`)
 			t.eq(string.sub(k, 1, 10), "paintball_", "a game's kinds carry its name")
 		end
-		t.eq(kinds, 8)
+		t.eq(kinds, 9)
 		t.falsy((Wire.checkMessage({ kind = "paintball_tag", by = 2, id = 1 })))
 		t.falsy((Wire.checkMessage({
 			kind = "paintball_tag",
@@ -1186,8 +1221,16 @@ return function(t)
 				"no Play again: the next match starts itself"
 			)
 			for _, cue in { "fire", "fire_far", "splat", "tag", "tagged", "reload", "dry", "step" } do
-				t.eq(client.sounds[`paintball.{cue}`], "", cue)
+				t.isType(client.sounds[`paintball.{cue}`], "string", cue)
 			end
+			-- the owner's bar asks for distinct audio for fire and hits: a silent marker fails the gate (found at
+			-- the review: every id was empty). Placeholders until his licensed set; the fire and the two hits
+			-- are not one sound
+			for _, cue in { "fire", "tag", "tagged", "dry", "splat" } do
+				t.truthy(client.sounds[`paintball.{cue}`] ~= "", `paintball.{cue} has a sound`)
+			end
+			t.truthy(client.sounds["paintball.fire"] ~= client.sounds["paintball.tag"])
+			t.truthy(client.sounds["paintball.tag"] ~= client.sounds["paintball.tagged"])
 		end
 	)
 

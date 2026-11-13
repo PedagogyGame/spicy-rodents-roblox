@@ -48,29 +48,40 @@
 --
 -- A SHOT carries two stamps: ft, the server time of the click, and vt, the view time on screen at the
 -- click. The server (stamp) is also given `up`, the shooter's own smoothed upstream delay (above: it
--- always has one, because a slot whose Moves have stopped cannot fire), and gets:
+-- always has one, because a slot whose Moves have stopped cannot fire), and `rtt`, THE ROUND TRIP AS THE
+-- SERVER ITSELF MEASURES IT (the engine's Player:GetNetworkPing, plus TRUST.pingSlack; settled at the
+-- review, 2026-11-13). `up` is read from the client's own stamps, so a client could make itself look slow
+-- by stamping its Moves early and buy every lag allowance for nothing (its puppet was drawn exactly as
+-- before: the server reads each pose by the Move's own stamp). Neither way can be longer than the round
+-- trip, so with rtt the way up is held to it and the way down is bounded by it. It gets:
 --   magazine time  m = ft held inside [now - MAG_LATE, now + clockSlack] and never before this
 --              shooter's last m. The MAGAZINE is judged at m, so honest shots a fire interval apart
 --              are never refused "too fast" however the network bunched them, or delayed the first.
 --              (What a liar gains: after MAG_LATE without firing, at most MAG_LATE / fireInterval
---              balls born together: two extra at the default feel.)
---   fire time  f = ft held inside [now - lateMax, now], lateMax = min(MAX_LATE, up + REWIND_TOLERANCE).
+--              balls more, and NOT born together: the service keeps one shooter's ball births a fire
+--              interval apart, less a margin, even when that puts a birth a moment ahead of now:
+--              PaintballService, "the remotes", onFire b.)
+--   fire time  f = ft held inside [now - lateMax, now], lateMax = min(MAX_LATE, way + REWIND_TOLERANCE),
+--              way = up, held to rtt when rtt is known.
 --              The ball is BORN at f, and phase, out and protection are judged at f (Rules.fire).
 --              A client that always claims the oldest fire time it may is bound by its own measured
---              delay: at most REWIND_TOLERANCE of free flight (under 7 studs), not MAX_LATE's 22.
+--              delay: at most REWIND_TOLERANCE of free flight (11 studs at 150 studs/s), not MAX_LATE's.
 --   late       now - f: how long the ball has already been flying on the shooter's screen. The server
 --              flies its ball forward by that much at once, against the bodies of those past moments,
 --              so the verdict reaches the shooter one upstream delay sooner.
---   rewind     f - vt held inside [0, MAX_REWIND], and inside (up + INTERP_SECS) +/- REWIND_TOLERANCE:
---              the server's own estimate of how far behind the shooter's picture was, taking the way
---              down to be as long as the way up. Through the whole flight the ball at age a is tested
+--   rewind     f - vt held inside [0, MAX_REWIND], and with rtt inside [0, rtt + INTERP_SECS +
+--              REWIND_TOLERANCE]: the way down is no longer than the round trip, whatever the two ways
+--              are. (As first built it was centred on up + INTERP_SECS, taking the way down to be as long
+--              as the way up: on a link of 33 ms up and 266 down only 56 shots in 100 agreed with the
+--              shooter's screen, which showed a puff the server then denied. Found at the review.) With
+--              no rtt (a spec, a fake engine) it is centred on that estimate as before, +/-
+--              REWIND_TOLERANCE. Through the whole flight the ball at age a is tested
 --              against bodies at time (f + a) - rewind, which is what Projectiles.step does with
 --              `now - ball.rewind`. `clamped` says the claim was outside those bounds (Stats counts
 --              them: a connection whose two ways differ by more than the tolerance shows up there).
--- A client that lies about vt can move its targets by at most REWIND_TOLERANCE of their motion. (A
--- client that back-dates its Moves as well, to raise `up`, has made itself a slow connection in every
--- respect, its own body drawn that much later too; MAX_LATE and MAX_REWIND are what bound that, as
--- they bound a truly slow one.)
+-- A client that lies about vt can move its targets by at most its round trip and REWIND_TOLERANCE of
+-- their motion past what it really saw, and never past MAX_REWIND. (A client that back-dates its Moves
+-- to raise `up` gains nothing where rtt is known: the way up is held to it.)
 -- MAX_REWIND is 0.25 s, not the S18 core's 0.4: it covers a steady 300 ms round trip (0.15 down + the
 -- interpolation), and it is how long after ducking behind a rail a body can still be tagged by what a
 -- slow shooter saw. A JITTERY 300 ms link sits near the top of its band (observe rises fast and falls
@@ -83,7 +94,7 @@
 -- slot (the framework's ctx.leave with why "dropped"; Contract, decision 9). A player who is connected
 -- but has not moved, turned or fired for Contract.Rules.idleSecs of "live" goes the same way ("idle").
 -- Interface: constants; newView() -> View; observe(view, stampTime, now); viewTime(view, now) -> t;
---   poseTime(up, now) -> t; stamp(now, vt, ft, lastM?, up?) -> (f, late, rewind, clamped, m)
+--   poseTime(up, now) -> t; stamp(now, vt, ft, lastM?, up?, rtt?) -> (f, late, rewind, clamped, m)
 
 local Config = require("../../Paintball/Config")
 local Contract = require("./Contract")
@@ -150,18 +161,26 @@ end
 
 -- The server's reading of a shot's two stamps. `lastM` is the magazine time of this shooter's last
 -- accepted shot, `up` its smoothed upstream delay in seconds (the lag of its Moves' View; nil: none,
--- which only a spec meets). Returns the fire time, how late the ball is, the rewind, whether the
--- rewind was clamped, and the magazine time.
+-- which only a spec meets), `rtt` the round trip the server measured itself (nil: none known). Returns the
+-- fire time, how late the ball is, the rewind, whether the rewind was clamped, and the magazine time.
 function Clock.stamp(
 	now: number,
 	vt: number,
 	ft: number,
 	lastM: number?,
-	up: number?
+	up: number?,
+	rtt: number?
 ): (number, number, number, boolean, number)
 	local lateMax = Clock.MAX_LATE
 	local lo, hi = 0, Clock.MAX_REWIND
-	if up ~= nil then
+	if rtt ~= nil then
+		hi = math.min(hi, rtt + Clock.INTERP_SECS + Clock.REWIND_TOLERANCE)
+		if up ~= nil then
+			lateMax = math.min(lateMax, math.min(up, rtt) + Clock.REWIND_TOLERANCE)
+		else
+			lateMax = math.min(lateMax, rtt + Clock.REWIND_TOLERANCE)
+		end
+	elseif up ~= nil then
 		lateMax = math.min(lateMax, up + Clock.REWIND_TOLERANCE)
 		local estimate = up + Clock.INTERP_SECS
 		lo = math.max(lo, estimate - Clock.REWIND_TOLERANCE)

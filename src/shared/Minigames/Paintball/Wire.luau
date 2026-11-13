@@ -105,6 +105,8 @@
 --                      verdict on click `shot`, the server's magazine after it, when a running reload
 --                      ends. One for EVERY Fire the server hears, accepted or not (Contract.Extras says
 --                      how the client's pips use it).
+--   paintball_tuned    { text }                    to the place's owner (ctx.send): what the "tune" verb changed,
+--                      in words (PaintballService, "the owner's tuning")
 --   paintball_correct  { x, y, z, yaw, why, place }   to one player (ctx.send): the server put your
 --                      body here; `place` is your new placement number.
 --
@@ -241,7 +243,7 @@ Wire.SHOTS_PER_MESSAGE = 25
 -- Paintball's verbs on Minigame.Input (the Spec's `verbs`, which is what puts them on the Net schema).
 --   reload { t }   R was pressed at t (the shared clock); refused with words when it does nothing
 --   side {}        put me on the other team; refused with words (Contract.WHY.side) when it cannot be
-Wire.VERBS = table.freeze({ "reload", "side" })
+Wire.VERBS = table.freeze({ "reload", "side" }) -- (and "tune", the owner's alone: PaintballService.command)
 
 -- Flags of a pose. A client's Move may set crouch (it WANTS to crouch), sprint and air; the server
 -- sets all six in snapshots (crouch there still means "wants to": the shape is the crouch fraction).
@@ -508,6 +510,7 @@ Wire.KINDS = table.freeze({
 		rounds = int(0, Contract.Rules.magazine),
 		reloadAt = Schema.opt(num),
 	}),
+	paintball_tuned = message("paintball_tuned", { text = Schema.str({ max = 400 }) }),
 	paintball_correct = message("paintball_correct", {
 		x = num,
 		y = num,

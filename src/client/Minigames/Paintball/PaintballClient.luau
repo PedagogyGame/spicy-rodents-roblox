@@ -185,6 +185,7 @@ local ClientGame = require("../ClientGame")
 local Controls = require("./Controls")
 local Hud = require("./Hud")
 local Marker = require("./Marker")
+local OwnerTune = require("./OwnerTune")
 local SeatCore = require("./SeatCore")
 local SelfPort = require("./Self")
 local ShowCore = require("./ShowCore")
@@ -469,7 +470,10 @@ function PaintballClient.new(ctx: ClientGame.Ctx, deps: Deps?): Seat
 			marker,
 			hud,
 		}
+		-- the owner's tuning command (OwnerTune: nobody else is given it)
+		local untune = OwnerTune.start(ctx)
 		closers = {
+			untune,
 			function()
 				controls:stop()
 			end,

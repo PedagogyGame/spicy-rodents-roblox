@@ -412,6 +412,7 @@ else
 		end
 		frame(2)
 		seat:input("fire", true)
+		seat:input("fire", false) -- (one click: a press and its release)
 		local fires = sent["Paintball.Fire"] or {}
 		if #fires ~= 1 or #show.balls ~= 1 then
 			return false, `{#fires} clicks sent and {#show.balls} balls drawn in the frame of the click`
