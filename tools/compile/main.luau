@@ -18,6 +18,7 @@ local Report = require("./lib/Report")
 local W1 = require("./lib/W1")
 local Attractions = require("./lib/Attractions")
 local TreeArt = require("./lib/TreeArt")
+local ShopArt = require("./lib/ShopArt")
 local Expansion = require("./lib/Expansion")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
@@ -471,6 +472,11 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	local treeArtModule = TreeArt.compile({ repo = repo, invariant = invariant, compare = compare })
 	if treeArtModule then
 		table.insert(w1.modules, treeArtModule)
+	end
+	-- data/art/neighbourhood_shop.json: the owner's second store and its roof (tools/bake/neighbourhood_shop)
+	local shopArtModule = ShopArt.compile({ repo = repo, invariant = invariant, compare = compare })
+	if shopArtModule then
+		table.insert(w1.modules, shopArtModule)
 	end
 
 	for _, c in comparisons do

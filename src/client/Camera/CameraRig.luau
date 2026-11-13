@@ -9,7 +9,9 @@
 --   chaseLock                scriptable: behind the body along its facing, looking forward
 --   tunnelChase              scriptable: low behind a squirrel in the bowling alley's ball-return tunnel
 --   vehicleFirst             scriptable at the vehicle's EyeSocket; mouse/right-stick look within
---                            +/-110 degrees of the nose; vehicleThird follows the vehicle root
+--                            +/-110 degrees of the nose; vehicleThird follows the vehicle root. With
+--                            targets.free (the sky-lift gondola: a seat's EyeSocket) the look is free: no
+--                            button, all the way round, no spring back (cars keep the right button by design)
 --   drone                    the follow camera on the drone root
 --   overview / outbreak      a parked scriptable shot
 -- The orbit camera (owner 2026-11-10: "be sure that the mouse is controlling the camera view and that
@@ -28,7 +30,7 @@
 --   x, y, z (pure); ORBIT; FOV; orbitFraming(sizeX, sizeY, sizeZ, human) -> lift, minDist, maxDist, dist
 --   (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
 --   transparency, canCollide) -> boolean (pure); inverted() -> boolean; setInverted(on);
---   wantCursor(key, on); hold(on); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
+--   wantCursor(key, on); hold(on); cabinLook(yaw, pitch, dx, dy, invert) -> yaw, pitch (pure); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
 --   (pure); notify: ((text) -> ())?
 -- No side effects on require (services are looked up inside the functions).
 
@@ -245,6 +247,17 @@ function CameraRig.lookStep(yaw: number, elev: number, dx: number, dy: number, i
 	local nextYaw = (yaw - dx) % (2 * math.pi)
 	local nextElev = math.clamp(elev + (if invert then -dy else dy), L.elevMin, L.elevMax)
 	return nextYaw, nextElev
+end
+
+-- The gondola's free look from a seat (vehicleFirst with targets.free): dx, dy in radians as lookStep has them; the
+-- view turns right for dx > 0 all the way round, and pushing the mouse up looks up (down when inverted), between
+-- CABIN_PITCH's limits.
+CameraRig.CABIN_PITCH = { min = -1.2, max = 1.0 }
+function CameraRig.cabinLook(yaw: number, pitch: number, dx: number, dy: number, invert: boolean): (number, number)
+	local P = CameraRig.CABIN_PITCH
+	local nextYaw = (yaw - dx) % (2 * math.pi)
+	local nextPitch = math.clamp(pitch - (if invert then -dy else dy), P.min, P.max)
+	return nextYaw, nextPitch
 end
 
 -- Where the camera sits relative to the focus for a view heading `yaw` (Roblox: look = (-sin, 0, -cos))
@@ -473,7 +486,7 @@ local function sizeOf(model: Model): number
 	return math.max(size.X, size.Y, size.Z)
 end
 
-export type Targets = { body: Model?, vehicle: Model?, drone: Model? }
+export type Targets = { body: Model?, vehicle: Model?, drone: Model?, free: boolean? }
 
 function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targets: Targets)
 	local Players = game:GetService("Players")
@@ -563,11 +576,13 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			setFirstPerson(false)
 			camera.CameraType = Enum.CameraType.Scriptable
 			local yaw, pitch = 0, 0
+			local free = targets.free == true
+			local GuiService = game:GetService("GuiService")
 			-- the eye sits where the driver's head is: hide the driver's own body on this screen
 			-- (the default camera does this only for its own first person)
 			local hidden: { BasePart } = {}
 			local driver = targets.body
-			bind(function()
+			bind(function(dt: number)
 				if driver and #hidden == 0 then
 					for _, d in driver:GetDescendants() do
 						if d:IsA("BasePart") then
@@ -578,7 +593,29 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				for _, part in hidden do
 					part.LocalTransparencyModifier = 1
 				end
-				if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+				if free then
+					-- the gondola: the mouse is the look (as on foot), the cursor out for a menu or Left Alt
+					local out = held
+						or GuiService.MenuIsOpen
+						or UIS:GetFocusedTextBox() ~= nil
+						or UIS:IsKeyDown(Enum.KeyCode.LeftAlt)
+						or next(cursorWanted) ~= nil
+					if out then
+						UIS.MouseBehavior = Enum.MouseBehavior.Default
+					else
+						UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+						local d = UIS:GetMouseDelta()
+						local k = CameraRig.LOOK.sens
+						yaw, pitch = CameraRig.cabinLook(yaw, pitch, d.X * k, d.Y * k, invertLook)
+					end
+					for _, input in UIS:GetGamepadState(Enum.UserInputType.Gamepad1) do
+						if input.KeyCode == Enum.KeyCode.Thumbstick2 and input.Position.Magnitude > 0.15 then
+							local k = CameraRig.LOOK.stick * dt
+							yaw, pitch =
+								CameraRig.cabinLook(yaw, pitch, input.Position.X * k, -input.Position.Y * k, invertLook)
+						end
+					end
+				elseif UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
 					UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
 					local d = UIS:GetMouseDelta()
 					yaw = math.clamp(yaw - d.X * 0.004, -1.9, 1.9)

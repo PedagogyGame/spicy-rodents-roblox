@@ -2,7 +2,8 @@
 -- ServerScriptService.Server.Attractions.AttractionService
 -- Boots the attraction buildings baked on their own (Workspace.Attractions from tools/bake/attractions.luau;
 -- data/attractions.json; brief v2 §13a; BUILD_PLAN §1.1 rule 13): carves the boot terrain out of the bowling
--- alley's ball-return ducts (and from under its alley and entrance) so the squirrel tunnels are open air, registers
+-- alley's nine ball-return ducts (and from under its alley, over its entrance ramp and out of the front-west
+-- corner, where the ground stands above the floor) so the squirrel tunnels are open air, registers
 -- the collision groups (LaneGuard keeps people off the lanes; BowlingPhysics is the baked group of the ball and
 -- pins, which are scripted and collide with nothing), swings the steel push-bar exit doors on E (from inside only, like the real thing:
 -- the prompt needs line of sight), and starts the MinigameService with its Heartbeat step. Every model under
@@ -185,7 +186,10 @@ function AttractionService.start(opts: Opts?): any?
 	if ok and type(mod) == "table" and type((mod :: any).routes) == "table" then
 		for _, r in (mod :: any).routes do
 			if r.kind == "tunnel" or (r.kind == "bridge" and string.find(r.name, "tunnel", 1, true)) then
-				local pair = r.pair or (((tonumber(string.match(r.name, "lanes (%d+)")) or 0) + 1) // 2)
+				-- the pair is the route's own field (data/attractions.json); an older record names its first lane
+				local pair = if type(r.pair) == "number"
+					then r.pair
+					else ((tonumber(string.match(r.name, "lanes (%d+)")) or 0) + 1) // 2
 				tunnels[pair] = r.points
 			end
 		end

@@ -1,7 +1,8 @@
 --!strict
 -- ReplicatedStorage.Shared.Minigames.Bowling.Spec
 -- Bowling's line in the minigame registry (Minigames/Games): ten-pin rules, turn by turn, up to four at a lane,
--- three computer bowlers (Bowling/Referee.AI), and one station at each of the alley's six lanes.
+-- three computer bowlers (Bowling/Referee.AI), and one station at each of the alley's lanes (eighteen:
+-- AlleyLayout.LANES).
 -- Pure. Interface: a GameSpec.Spec.
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
