@@ -2,8 +2,10 @@
 -- tools/compile: data/art/neighbourhood_shop.json -> generated/ShopArt.luau.
 -- The owner's Neighbourhood Shop (brief addendum D12) as the bake (tools/bake/neighbourhood_shop.luau) and the
 -- loader (Server/Assets/ShopArt) need it: the uploaded Models (the shop, its gable roof), the colour of every
--- mesh (an untextured material may arrive grey from the importer), which meshes are glass, his colliders,
--- the lamps, the doorway and the roof's deck planes. STUDS in the venue's local frame (Shared/Attractions/
+-- mesh (an untextured material may arrive grey from the importer; a textured one gets its map's mean colour
+-- as a fallback), which meshes are glass, which glow (his lamp shades), which are plain boxes (drawn as Parts),
+-- his colliders plus boxes round the floor-standing furniture, the camera's occluders inside his walls, the
+-- lamps, the doorway, the roof's deck planes and its slope colliders (his decks up to his shingles). STUDS in the venue's local frame (Shared/Attractions/
 -- AlleyLayout: X across the frontage, Y up from the floor, D into the building; the manifest's Roblox Z is -D).
 -- Invariants: both Models uploaded and Approved; 355 shop meshes and 41,264 triangles as his metadata says,
 -- no mesh over the engine's 20,000 triangles; the entrance node in the doorway; every collider inside the
@@ -17,26 +19,63 @@ local ShopArt = {}
 ShopArt.MESHES = 355 -- his metadata: mesh_objects
 ShopArt.TRIANGLES = 41264 -- his metadata: triangle_count
 ShopArt.MAX_MESH_TRIS = 20000 -- the engine's limit per MeshPart
--- Floor-standing furniture that gets a plain box collider from its mesh's bounds (floor to top), so a person
--- walks round a table or a rack instead of through it. His metadata gives the counters; small things (plants,
--- hats, posters, the bead curtain) stay walk-through.
+-- Floor-standing furniture that gets a plain box collider over its meshes' bounds (floor to top), so a person
+-- walks round a table, a rack, a chair, a big plant's pot or the open door's leaf instead of through it. His
+-- metadata gives the counters; small and soft things (leaves, hats, posters, the bead curtain) stay
+-- walk-through, as his pack says.
 ShopArt.FURNITURE = table.freeze({
-	"CAFE_Stool_01_Legs",
-	"CAFE_Stool_02_Legs",
-	"CAFE_Stool_03_Legs",
-	"CAFE_Stool_04_Legs",
-	"CAFE_Stool_05_Legs",
-	"CAFE_WindowTable_Legs",
-	"OFFICE_DeskLegs",
-	"OFFICE_FilingCabinet",
-	"RACK_clear_signal",
-	"RACK_loose_wire",
-	"RACK_midnight_static",
-	"RETAIL_DisplayTable_Legs",
-	"RETAIL_HatBench_Legs",
-	"RETAIL_SmallShelf_Sides",
-	"RETAIL_WallShelving_Sides",
+	{ name = "CAFE_Stool_01_Legs" },
+	{ name = "CAFE_Stool_02_Legs" },
+	{ name = "CAFE_Stool_03_Legs" },
+	{ name = "CAFE_Stool_04_Legs" },
+	{ name = "CAFE_Stool_05_Legs" },
+	{ name = "CAFE_WindowTable_Legs" },
+	{ name = "OFFICE_DeskLegs" },
+	{ name = "OFFICE_FilingCabinet" },
+	{ name = "RACK_clear_signal" },
+	{ name = "RACK_loose_wire" },
+	{ name = "RACK_midnight_static" },
+	{ name = "RETAIL_DisplayTable_Legs" },
+	{ name = "RETAIL_HatBench_Legs" },
+	{ name = "RETAIL_SmallShelf_Sides" },
+	{ name = "RETAIL_WallShelving_Sides" },
+	-- the chairs: legs, seat and back as one box (the back stands at the seat's edge)
+	{
+		name = "CAFE_Chair_A",
+		meshes = { "CAFE_Chair_A_Legs", "CAFE_Chair_A_Seat", "CAFE_Chair_A_Back", "CAFE_Chair_A_Backrest" },
+	},
+	{
+		name = "CAFE_Chair_B",
+		meshes = { "CAFE_Chair_B_Legs", "CAFE_Chair_B_Seat", "CAFE_Chair_B_Back", "CAFE_Chair_B_Backrest" },
+	},
+	{
+		name = "OFFICE_Chair",
+		meshes = { "OFFICE_Chair_Legs", "OFFICE_Chair_Seat", "OFFICE_Chair_Back", "OFFICE_Chair_Backrest" },
+	},
+	-- the floor-standing plants: their pots (the leaves above stay soft)
+	{ name = "PLANT_BambooCafe_Pot" },
+	{ name = "PLANT_BambooTall_Pot" },
+	{ name = "PLANT_FernCafe_Pot" },
+	{ name = "PLANT_Office_Pot" },
+	{ name = "PLANT_RubberDivider_Pot" },
+	{ name = "PLANT_RubberEntrance_Pot" },
+	-- the open door's leaf, swung into the retail room beside the doorway
+	{ name = "DOOR_OpenFrame", meshes = { "DOOR_OpenFrame", "DOOR_OpenGlass", "DOOR_KickPanel" } },
 })
+-- The walls that stop a camera (Roblox's default camera and Client/Camera/CameraRig only stop at an opaque part
+-- that collides; his wall meshes are visual only and the colliders are invisible): an opaque box of the wall's
+-- colour just inside each of these colliders, so it never shows while his mesh is there and is the wall if
+-- his Model does not load. The shopfront is glass and stays clear.
+ShopArt.OCCLUDES = table.freeze({
+	Left = "WALL_Left",
+	Back = "WALL_Back",
+	Right = "WALL_Right",
+	RoomDivider = "WALL_RoomDivider",
+	OfficePartition = "WALL_OfficePartition",
+	OfficeSide = "WALL_OfficeSide",
+})
+ShopArt.LINTELS = table.freeze({ "WALL_DividerLintel", "WALL_OfficeLintel" })
+ShopArt.INSET = 0.06 -- studs: each occluder face inside his wall's face
 
 local function r4(n: number): number
 	return math.floor(n * 1e4 + 0.5) / 1e4
@@ -51,12 +90,24 @@ local function parts(list: { any }): { any }
 	local out = {}
 	for _, m in list do
 		-- at: the MeshPart's centre in the Model's own frame (Roblox axes, the shop floor's centre), for the loader
-		local rec: any = { name = m.name, colour = m.colour, tris = m.tris, at = m.centre }
+		local rec: any = { name = m.name, colour = m.colour, at = m.centre }
 		if m.alpha and m.alpha < 0.99 then
 			rec.glass = true
 		end
 		if m.texture then
 			rec.textured = true
+			-- the map's mean colour times the material's tint: painted if the importer drops the texture
+			rec.fallback = m.fallback
+		end
+		if m.emissive then
+			rec.emissive = true
+		end
+		if m.box then
+			-- a plain box (12 triangles, untextured): drawn as a Part (size; turn when not axis-aligned)
+			rec.box = m.box.size
+			if m.box.right then
+				rec.right, rec.up = m.box.right, m.box.up
+			end
 		end
 		table.insert(out, rec)
 	end
@@ -144,17 +195,55 @@ function ShopArt.compile(ctx: any): any?
 	for _, m in doc.shop do
 		byName[m.name] = m
 	end
-	for _, name in ShopArt.FURNITURE do
-		local m = byName[name]
-		ctx.invariant(`shop art: furniture mesh {name} exists`, m ~= nil)
-		if m then
-			local c = pt(m.centre)
-			local top = c[2] + m.size[2] / 2
+	for _, f in ShopArt.FURNITURE do
+		local lo, hi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
+		for _, name in f.meshes or { f.name } do
+			local m = byName[name]
+			ctx.invariant(`shop art: furniture mesh {name} exists`, m ~= nil)
+			if m then
+				local c = pt(m.centre)
+				for k = 1, 3 do
+					lo[k] = math.min(lo[k], c[k] - m.size[k] / 2)
+					hi[k] = math.max(hi[k], c[k] + m.size[k] / 2)
+				end
+			end
+		end
+		if lo[1] < math.huge then
 			table.insert(colliders, {
-				name = name,
-				centre = { c[1], r4(top / 2), c[3] },
-				size = { m.size[1], r4(top), m.size[3] },
+				name = f.name,
+				centre = { r4((lo[1] + hi[1]) / 2), r4(hi[2] / 2), r4((lo[3] + hi[3]) / 2) },
+				size = { r4(hi[1] - lo[1]), r4(hi[2]), r4(hi[3] - lo[3]) },
 				from = "his mesh bounds",
+			})
+		end
+	end
+	-- the camera's occluders: inside his walls (the colliders above), and his two lintels over the doorways
+	local occluders = {}
+	local function colourOf(m: any): { number }
+		return if m.texture and m.fallback then m.fallback else m.colour
+	end
+	local inset = ShopArt.INSET
+	for _, c in colliders do
+		local mesh = ShopArt.OCCLUDES[c.name]
+		if mesh and (c.from == "his metadata" or c.from == "his mesh") then
+			ctx.invariant(`shop art: wall mesh {mesh} exists`, byName[mesh] ~= nil)
+			table.insert(occluders, {
+				name = c.name,
+				centre = c.centre,
+				size = { r4(c.size[1] - 2 * inset), r4(c.size[2] - 2 * inset), r4(c.size[3] - 2 * inset) },
+				colour = colourOf(byName[mesh]),
+			})
+		end
+	end
+	for _, name in ShopArt.LINTELS do
+		local m = byName[name]
+		ctx.invariant(`shop art: lintel {name} exists`, m ~= nil)
+		if m then
+			table.insert(occluders, {
+				name = name,
+				centre = pt(m.centre),
+				size = { r4(m.size[1] - 2 * inset), r4(m.size[2] - 2 * inset), r4(m.size[3] - 2 * inset) },
+				colour = colourOf(m),
 			})
 		end
 	end
@@ -167,15 +256,37 @@ function ShopArt.compile(ctx: any): any?
 	end
 	local lamps = {}
 	for _, l in doc.lamps do
-		table.insert(lamps, { kind = l.kind, at = pt(l.at) })
+		table.insert(lamps, { kind = l.kind, at = pt(l.at), size = l.size })
 	end
 	local decks = {}
 	for _, name in { "RoofDeck_East", "RoofDeck_West" } do
 		table.insert(decks, oriented(doc.roof.decks[name]))
 	end
+	-- his roof's colliders: each slope is his deck's own box (as wide as the drawn roof, out over both gables)
+	-- reaching up to the top of his shingles; his ridge perch proxy, as wide as the decks
 	local roofColliders = {}
+	local deckWidth = 0
+	for _, name in { "RoofDeck_East", "RoofDeck_West" } do
+		local d = doc.roof.decks[name]
+		local bottom, top = -d.size[2] / 2, d.shingleTop or d.size[2] / 2
+		local mid = (bottom + top) / 2
+		local box = oriented(d)
+		box.name = if d.centre[3] > 0 then "RoofSlope_Front" else "RoofSlope_Back"
+		box.centre = pt({
+			d.centre[1] + d.up[1] * mid,
+			d.centre[2] + d.up[2] * mid,
+			d.centre[3] + d.up[3] * mid,
+		})
+		box.size = { d.size[1], r4(top - bottom), d.size[3] }
+		deckWidth = math.max(deckWidth, d.size[1])
+		table.insert(roofColliders, box)
+	end
 	for _, b in doc.roofColliders do
-		table.insert(roofColliders, oriented(b))
+		if string.find(b.name, "Ridge") then
+			local box = oriented(b)
+			box.size = { deckWidth, b.size[2], b.size[3] }
+			table.insert(roofColliders, box)
+		end
 	end
 	local value = {
 		venue = "f1_neighbourhood_shop",
@@ -185,6 +296,7 @@ function ShopArt.compile(ctx: any): any?
 		doorway = { x0 = r4(x0), x1 = r4(x1), top = r4(doorTop) },
 		front = { x0 = r4(frontX0), x1 = r4(frontX1), d0 = r4(frontD0), d1 = r4(frontD1), top = r4(frontTop) },
 		colliders = colliders,
+		occluders = occluders,
 		lamps = lamps,
 		roof = {
 			span = doc.roof.span,

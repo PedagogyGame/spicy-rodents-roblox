@@ -7,7 +7,8 @@ proved on a small piece first), shop.fbx and roof.fbx this runs
   node tools/cloud/cloud.mjs upload_asset <fbx> --type Model --name <name>
 (the CLI holds the shared cloud write lock and token buckets; the proxy injects the key, nothing here handles
 one) and keeps each result in <build>/uploads/<tag>.json with a digest of what the Model holds (content_digest),
-so a rerun only uploads what changed. Then it writes data/art/neighbourhood_shop.json: the asset ids and moderation states, and the
+so a rerun only uploads what changed; with no cache (a fresh clone) it reuses the ids data/art/neighbourhood_shop.json
+records for the same content. Then it writes data/art/neighbourhood_shop.json: the asset ids and moderation states, and the
 manifest the bake (tools/bake/neighbourhood_shop.luau) and the loader (Server/Assets/ShopArt) read.
 """
 import argparse
@@ -31,19 +32,39 @@ UPLOADS = [
 
 
 PIECES = {"proof": "shop", "shop": "shop", "roof": "roofMeshes"}
+# what the manifest says about a mesh for the loader only (how to draw it if the importer drops a texture, a
+# glowing material, a plain box drawn as a Part): not part of what the uploaded Model holds
+LOADER_ONLY = ("fallback", "emissive", "box")
+# uploads that are no longer used, kept on record so they can be found (and archived) later
+SUPERSEDED = [
+    {"assetId": "129861597929647", "displayName": "SR Neighbourhood Shop gable roof",
+     "why": "the first roof upload, its colours on the vertices; replaced by the roof with its colours in its materials"},
+]
 
 
 def content_digest(manifest, tag):
     """What a Model holds, as the manifest records it (the FBX bytes carry export timestamps, so the file's own
     hash changes on every export): its meshes (names, places, sizes, triangles, materials, colours), the
     sources' checksums, the scale and the roof's fitting."""
-    meshes = manifest[PIECES[tag]]
+    meshes = [{k: v for k, v in m.items() if k not in LOADER_ONLY} for m in manifest[PIECES[tag]]]
     if tag == "proof":
         meshes = [m for m in meshes if m["name"].startswith("CAFE_Stool_")]
     blob = json.dumps({"meshes": meshes, "sources": manifest["sources"], "scale": manifest["scale"],
                        "roof": {k: manifest["roof"][k] for k in ("span", "run", "turn")} if tag == "roof" else None},
                       sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def committed(tag, digest):
+    """The upload data/art/neighbourhood_shop.json already records for this tag, if it holds the same content: a
+    fresh clone (no build/ cache) reuses it instead of uploading the Model again."""
+    if not os.path.exists(OUT):
+        return None
+    with open(OUT) as fh:
+        a = json.load(fh).get("assets", {}).get(tag)
+    if a and a.get("sha") == digest and a.get("assetId"):
+        return {"assetId": a["assetId"], "moderationState": a.get("moderation"), "sourceSha": digest}
+    return None
 
 
 def upload(build, tag, fbx, name, desc, skip, digest):
@@ -54,6 +75,12 @@ def upload(build, tag, fbx, name, desc, skip, digest):
             old = json.load(fh)
         if old.get("sourceSha") == digest and old.get("assetId"):
             return old
+    seeded = committed(tag, digest)
+    if seeded:
+        os.makedirs(os.path.dirname(rec_path), exist_ok=True)
+        with open(rec_path, "w") as fh:
+            json.dump(seeded, fh, indent=2)
+        return seeded
     if skip:
         return {"assetId": None, "moderationState": "not uploaded", "sourceSha": digest}
     assert len(name) <= 50, name
@@ -100,6 +127,7 @@ def main():
                      "Each MeshPart is unrotated. Untextured materials may arrive grey: Server/Assets/ShopArt paints a MeshPart "
                      "without a SurfaceAppearance with its `colour`; `alpha` < 1 is glass.",
         "assets": assets,
+        "superseded": SUPERSEDED,
     }
     for k, v in manifest.items():
         if k not in ("fbx", "format"):

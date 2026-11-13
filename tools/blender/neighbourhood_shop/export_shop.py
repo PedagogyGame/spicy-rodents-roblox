@@ -23,7 +23,7 @@ origin at the centre of the shop's floor. Every number in the manifest is in tha
 Outputs in --out:
   shop.fbx    all 355 shop meshes (embedded textures)       proof.fbx  the five cafe stools only (the upload proof)
   roof.fbx    the 90 roof meshes                             manifest.json  meshes (name, centre, size, tris,
-  material, colour, texture, glass), lamps, front openings, colliders (his metadata, plus two walls his metadata
+  material, colour, texture and its fallback colour, glass, emissive, box: a plain box's size and turn), lamps, front openings, colliders (his metadata, plus two walls his metadata
   leaves out), roof slope colliders, the entrance node, scale and roof transform, source checksums.
 """
 import argparse
@@ -165,19 +165,86 @@ def islands(o):
     return out
 
 
+def linear(x):
+    return x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
+
+
+_MEAN = {}
+
+
+def image_mean(img):
+    """The mean colour of an image, linear RGB (its pixels are stored as authored: sRGB for a colour map)."""
+    if img.name in _MEAN:
+        return _MEAN[img.name]
+    w, h = img.size
+    px = list(img.pixels[:])
+    n = w * h
+    step = max(1, n // 65536)  # a sample is plenty for a mean
+    acc, k = [0.0, 0.0, 0.0], 0
+    for i in range(0, n, step):
+        a = px[i * 4 + 3]
+        if a < 0.5:
+            continue
+        for c in range(3):
+            acc[c] += linear(px[i * 4 + c])
+        k += 1
+    mean = [acc[c] / max(1, k) for c in range(3)]
+    _MEAN[img.name] = mean
+    return mean
+
+
 def material_info(mat):
-    info = {"material": mat.name if mat else None, "colour": [163, 162, 165], "texture": None, "alpha": 1.0}
+    info = {"material": mat.name if mat else None, "colour": [163, 162, 165], "texture": None, "alpha": 1.0,
+            "fallback": None, "emissive": False}
     if not mat or not mat.node_tree:
         return info
     bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
     if not bsdf:
         return info
-    info["colour"] = srgb(bsdf.inputs["Base Color"].default_value)
+    tint = bsdf.inputs["Base Color"].default_value
+    info["colour"] = srgb(tint)
     s = bsdf.inputs["Base Color"]
     if s.is_linked and getattr(s.links[0].from_node, "image", None):
-        info["texture"] = s.links[0].from_node.image.name
+        img = s.links[0].from_node.image
+        info["texture"] = img.name
+        # the colour the mesh shows from a distance: its map's mean times the material's tint (glTF multiplies
+        # them); the loader paints this if the importer drops the texture
+        m = image_mean(img)
+        info["fallback"] = srgb([m[i] * tint[i] for i in range(3)])
     info["alpha"] = round(bsdf.inputs["Alpha"].default_value, 3)
+    # glTF emissiveFactor arrives as the BSDF's Emission Color with a non-zero strength
+    e = bsdf.inputs.get("Emission Color") or bsdf.inputs.get("Emission")
+    strength = bsdf.inputs.get("Emission Strength")
+    if e is not None and max(e.default_value[:3]) > 0.01 and (strength is None or strength.default_value > 0):
+        info["emissive"] = True
     return info
+
+
+def box_shape(o):
+    """A plain box mesh (12 triangles, 8 corners, three face directions) -> its oriented box in Roblox axes, or None.
+    The loader draws such a mesh as an ordinary Part of that size, place and colour: same shape, and the engine
+    batches plain parts where it cannot batch 172 distinct meshes."""
+    me = o.data
+    me.calc_loop_triangles()
+    if len(me.loop_triangles) != 12:
+        return None
+    corners = {tuple(round(c, 4) for c in v.co) for v in me.vertices}
+    if len(corners) != 8:
+        return None
+    try:
+        b = oriented_box(o)
+    except AssertionError:
+        return None
+    X, Y, Z = Vector(b["right"]), Vector(b["up"]), Vector(b["back"])
+    c = Vector(b["centre"])
+    for v in me.vertices:
+        p = Vector(to_roblox(v.co)) - c
+        for a, s in zip((X, Y, Z), b["size"]):
+            if abs(abs(p.dot(a)) - s / 2) > 2e-3:
+                return None
+    if min(b["size"]) < 1e-3:
+        return None
+    return b
 
 
 def save_images(tmp):
@@ -223,10 +290,19 @@ def mesh_records(objs):
         }
         if info["texture"]:
             rec["texture"] = info["texture"]
+            rec["fallback"] = info["fallback"]
         if info["alpha"] < 0.99:
             rec["alpha"] = info["alpha"]
+        if info["emissive"]:
+            rec["emissive"] = True
         if len(mats) > 1:
             rec["materials"] = [m.name for m in mats]
+        if len(mats) <= 1 and not info["texture"] and info["alpha"] >= 0.99 and not info["emissive"]:
+            b = box_shape(o)
+            if b:
+                rec["box"] = {"size": b["size"]}
+                if abs(b["right"][0] - 1) > 1e-4 or abs(b["up"][1] - 1) > 1e-4:
+                    rec["box"]["right"], rec["box"]["up"] = b["right"], b["up"]
         recs.append(rec)
     return recs
 
@@ -352,6 +428,18 @@ def main():
     hi = Vector((max(bounds(o)[1].x for o in roof), max(bounds(o)[1].y for o in roof), max(bounds(o)[1].z for o in roof)))
     roof_box = box_roblox(lo, hi)
     decks = {o.name: oriented_box(o) for o in roof if o.name.startswith("RoofDeck_")}
+    # how far his shingles stand above each deck's centre plane (the slope colliders reach up to them)
+    for d in decks.values():
+        up, c = Vector(d["up"]), Vector(d["centre"])
+        top = d["size"][1] / 2
+        for o in roof:
+            if not o.name.startswith("AsphaltShingleBand"):
+                continue
+            for v in o.data.vertices:
+                p = Vector(to_roblox(v.co))
+                if (p.z >= 0) == (c.z >= 0):
+                    top = max(top, (p - c).dot(up))
+        d["shingleTop"] = r4(top)
     roof_bytes = export(os.path.join(out, "roof.fbx"), roof)
 
     reset()

@@ -1193,33 +1193,6 @@ function Game.start(opts: Opts?): any
 		warn(`[SpicyRodents] bowling alley failed to open: {errA}`)
 	end
 
-	-- 6. the owner's Neighbourhood Shop (Workspace.Expansion.NeighbourhoodShop, addendum D12): its shell is baked;
-	-- the terrain inside it is carved now, and his interior and roof (uploaded Models) load off the boot path
-	local expansion = workspace:FindFirstChild("Expansion")
-	local shops: { Model } = if expansion then ShopArt.venues(expansion) else {}
-	if o.terrain ~= false then
-		for _, shop in shops do
-			pcall(ShopArt.carve, shop)
-		end
-	end
-	if #shops > 0 and o.heartbeat ~= false then
-		task.spawn(function()
-			local okS, report = pcall(ShopArt.run, expansion :: Instance)
-			if okS then
-				for i, r in report.reports do
-					print(
-						`[SpicyRodents] shop art {i}: loaded {table.concat(r.loaded, ", ")}; {r.parts} parts, {r.painted} painted, {r.glass} glass, {r.snapped} moved into place`
-					)
-					for _, f in r.failed do
-						warn(`[SpicyRodents] shop art: {f} (the shell stands without it)`)
-					end
-				end
-			else
-				warn(`[SpicyRodents] shop art failed: {report}`)
-			end
-		end)
-	end
-
 	mark("total", t0)
 	ReplicatedStorage:SetAttribute("BootSeconds", timings.total)
 	stage(1, "Ready")
@@ -1241,6 +1214,13 @@ function Game.start(opts: Opts?): any
 			end
 		end)
 	end
+
+	-- The owner's Neighbourhood Shop (Workspace.Expansion.NeighbourhoodShop, addendum D12): its shell is baked;
+	-- Assets/ShopArt carves the terrain inside it and loads his interior and roof off the boot path
+	ShopArt.start(
+		workspace:FindFirstChild("Expansion"),
+		{ terrain = o.terrain ~= false, heartbeat = o.heartbeat ~= false }
+	)
 
 	return {
 		runtime = rt,

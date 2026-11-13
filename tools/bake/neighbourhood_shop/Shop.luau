@@ -4,17 +4,21 @@
 -- generated/ShopArt). Everything here is in the venue's local frame (tools/bake/alley/Kit: X across the
 -- frontage, Y up from the shop floor, D into the building; the front is at -D), 3 studs to his metre.
 --   Shell      brick side and back walls and gable ends up to the underside of his roof's deck, teal corner
---              pilasters and a fascia band carrying the sign THE NEIGHBOURHOOD SHOP, the transom over his open
+--              pilasters and a fascia band carrying the sign THE NEIGHBOURHOOD SHOP (its letters glow; three
+--              gooseneck lamps over it), the transom over his open
 --              door, the attic closed behind the fascia and the back, an opaque backing slab over his ceiling
 --              (Realistic lighting leaks through thin shells), the concrete plinth, a paved forecourt to the
 --              sidewalk and three steps up to the door.
 --   Colliders  invisible: his metadata's floors, walls, dividers, partitions and the two counters; the office's
 --              side wall (his mesh; his metadata leaves it out); plain boxes round the floor-standing furniture
 --              (generated/ShopArt.FURNITURE); the shopfront either side of the doorway; his roof proxies.
---   Lamps      a warm PointLight under each of his six pendant shades and the desk lamp, one over the door.
+--   Occluders  opaque boxes just inside his walls and lintels: the camera stops at them (it ignores invisible parts).
+--   Lamps      a warm PointLight under each of his six pendant shades and the desk lamp, one over the door, and
+--              a soft unshadowed fill under each room's ceiling.
 --   TerrainCarve  the inside of the shell, carved to air at boot (the ground is 0.5 below the floor at the back).
 -- The model carries Venue, ArtShop, ArtRoof (asset ids) and ArtPivot (the frame's CFrame) for the loader.
--- Interface: build(kit, parent, venue, art) -> Model; underside(art, d) -> y; FRONT, WALL, PLINTH (dimensions)
+-- Interface: build(kit, parent, venue, art) -> Model; underside(art, d) -> y; topside(art, d) -> y; SIGN, WALL,
+--   INNER_X, INNER_D, FRONT_D, PILASTER_D, FASCIA_D, CEILING_TOP, HEADER_TOP, SIDEWALK (dimensions)
 -- No side effects on require. Lune only (@lune/roblox through the Kit).
 
 local Kit = require("../alley/Kit")
@@ -31,7 +35,6 @@ Shop.CEILING_TOP = 13.02 -- the top of his ceiling slab (ROOF_Removable)
 Shop.HEADER_TOP = 12.6 -- the top of his shopfront (the window headers)
 Shop.SIDEWALK = -1.8 -- the forecourt's top: the sidewalk's (ground + 0.225) below the floor
 Shop.SIGN = "THE NEIGHBOURHOOD SHOP"
-Shop.ROOF_SIGN_D = -14.5 -- the roof sign's front face, a third of the way up the front slope
 
 local BRICK = { 132, 82, 66 }
 local CONCRETE = { 156, 152, 144 }
@@ -40,6 +43,7 @@ local TEAL = { 93, 142, 137 } -- his TealPaint (the shopfront)
 local DARK_WOOD = { 118, 87, 60 } -- his DarkWood (the window frames)
 local CREAM = { 240, 228, 196 }
 local LAMP = { 255, 206, 150 }
+local IRON = { 47, 54, 54 } -- his BlackIron
 local INVISIBLE = { collide = true, transparency = 1, shadow = false }
 
 -- The underside of his roof deck above local depth d (the deck on that side of the ridge), studs above the floor.
@@ -189,27 +193,48 @@ function Shop.build(kit: Kit.Kit, parent: any, venue: any, art: any): any
 		gui,
 		{ Text = Shop.SIGN, TextColor = CREAM, Font = "Merriweather", Size = { 0.96, 0.8 }, Pos = { 0.02, 0.1 } }
 	)
-	-- the same name on a board standing on the front slope of his roof: the fascia sits in the eave's shadow
-	-- and reads only up close; this one reads from across the boulevard (letters 3 studs high)
-	local rd = Shop.ROOF_SIGN_D
-	local foot = Shop.topside(art, rd) + 0.7
-	local roofBoard = kit:box(shell, "RoofSign", -14, 14, foot, foot + 4.4, rd - 0.3, rd, DARK_WOOD, "Wood")
-	kit:label(
-		kit:gui(roofBoard, "Back", 30),
-		{ Text = Shop.SIGN, TextColor = CREAM, Font = "Merriweather", Size = { 0.94, 0.72 }, Pos = { 0.03, 0.14 } }
-	)
-	for _, x in { -10, 10 } do
-		kit:box(
+	-- three gooseneck lamps over the board (its letters glow on their own: LightInfluence 0); they light the
+	-- teal fascia at night, from a stud and a half out in front of it
+	local signY = (Shop.HEADER_TOP + fasciaTop) / 2
+	for i, x in { -10, 0, 10 } do
+		local head = kit:at(
 			shell,
-			"RoofSignPost",
-			x - 0.25,
-			x + 0.25,
-			Shop.topside(art, rd + 1) - 0.4,
-			foot + 0.2,
-			rd,
-			rd + 1,
-			DARK_WOOD,
-			"Wood"
+			"SignLamp",
+			x,
+			fasciaTop + 0.35,
+			Shop.FASCIA_D - 1.5,
+			0.5,
+			0.35,
+			0.5,
+			IRON,
+			"Metal",
+			{ collide = false, shadow = false }
+		)
+		head.CFrame = roblox.CFrame.lookAt(
+			kit:cf(x, fasciaTop + 0.35, Shop.FASCIA_D - 1.5).Position,
+			kit:cf(x, signY, Shop.FASCIA_D).Position
+		)
+		kit:light(head, "SpotLight", {
+			Name = `SignLight{i}`,
+			Color = LAMP,
+			Brightness = 2,
+			Range = 6,
+			Angle = 80,
+			Face = "Front",
+			Shadows = false,
+		})
+		kit:rod(
+			shell,
+			"SignLampArm",
+			x,
+			fasciaTop - 0.3,
+			Shop.FASCIA_D,
+			x,
+			fasciaTop + 0.35,
+			Shop.FASCIA_D - 1.4,
+			0.12,
+			IRON,
+			"Metal"
 		)
 	end
 
@@ -292,6 +317,25 @@ function Shop.build(kit: Kit.Kit, parent: any, venue: any, art: any): any
 		)
 	end
 
+	-- the camera's occluders: opaque boxes just inside his walls and lintels (generated/ShopArt.occluders), which
+	-- collide so that the default camera and CameraRig stop at them; hidden in his meshes, the walls if they fail
+	local occ = kit:model(root, "Occluders")
+	for _, c in art.occluders do
+		kit:at(
+			occ,
+			c.name,
+			c.centre[1],
+			c.centre[2],
+			c.centre[3],
+			c.size[1],
+			c.size[2],
+			c.size[3],
+			c.colour,
+			"SmoothPlastic",
+			{ collide = true, shadow = false }
+		)
+	end
+
 	-- lamps
 	local lamps = kit:model(root, "Lamps")
 	local hidden = { collide = false, query = false, transparency = 1, shadow = false }
@@ -299,12 +343,41 @@ function Shop.build(kit: Kit.Kit, parent: any, venue: any, art: any): any
 		local desk = l.kind == "desk"
 		local p =
 			kit:at(lamps, `Lamp{i}`, l.at[1], l.at[2] - 0.35, l.at[3], 0.3, 0.3, 0.3, LAMP, "SmoothPlastic", hidden)
+		-- his three big retail shades cast shadows; the three small ones and the desk lamp do not (the engine
+		-- pays for every shadowed light in view)
+		local big = (l.size and l.size[1] or 0) > 1.2
 		kit:light(p, "PointLight", {
 			Color = LAMP,
 			Brightness = if desk then 0.8 else 1.3,
 			Range = if desk then 9 else 20,
-			Shadows = not desk,
+			Shadows = big and not desk,
 		})
+	end
+	-- a soft fill under each room's ceiling: the pendants light downward from inside their shades, and the
+	-- engine's lighting has no bounce, so without it the ceiling, beams and upper walls stay dark at night
+	for _, c in art.colliders do
+		local room = string.match(c.name, "^(%a+)Floor$")
+		if room then
+			local f = kit:at(
+				lamps,
+				`{room}Fill`,
+				c.centre[1],
+				Shop.HEADER_TOP - 2.1,
+				c.centre[3],
+				0.3,
+				0.3,
+				0.3,
+				LAMP,
+				"SmoothPlastic",
+				hidden
+			)
+			kit:light(f, "PointLight", {
+				Color = LAMP,
+				Brightness = 0.45,
+				Range = math.min(30, math.max(c.size[1], c.size[3]) * 0.8),
+				Shadows = false,
+			})
+		end
 	end
 	local porch = kit:at(
 		lamps,

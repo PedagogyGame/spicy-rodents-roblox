@@ -25,6 +25,13 @@
    "sha": "01f28f672bd0aac5"
   }
  },
+ "superseded": [
+  {
+   "assetId": "129861597929647",
+   "displayName": "SR Neighbourhood Shop gable roof",
+   "why": "the first roof upload, its colours on the vertices; replaced by the roof with its colours in its materials"
+  }
+ ],
  "units": "studs; the venue frame at yaw 0 (X across, Y up, Z = -D), origin at the centre of the shop floor",
  "scale": 3.0,
  "roof": {
@@ -70,7 +77,8 @@
      0.0,
      -0.5508,
      0.8346
-    ]
+    ],
+    "shingleTop": 0.3001
    },
    "RoofDeck_East": {
     "name": "RoofDeck_East",
@@ -98,7 +106,8 @@
      0.0,
      0.5508,
      0.8346
-    ]
+    ],
+    "shingleTop": 0.3001
    }
   }
  },
@@ -883,7 +892,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     0.78,
+     0.54,
+     1.02
+    ]
+   }
   },
   {
    "name": "ANTIQUE_TruckBonnet",
@@ -903,7 +919,14 @@
     186,
     77,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     0.72,
+     0.36,
+     0.66
+    ]
+   }
   },
   {
    "name": "ANTIQUE_TruckCab",
@@ -924,7 +947,12 @@
     231,
     231
    ],
-   "texture": "steel_basecolor"
+   "texture": "steel_basecolor",
+   "fallback": [
+    73,
+    73,
+    62
+   ]
   },
   {
    "name": "ANTIQUE_TruckChassis",
@@ -944,7 +972,14 @@
     186,
     77,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     0.75,
+     0.36,
+     2.34
+    ]
+   }
   },
   {
    "name": "ANTIQUE_TruckWheels",
@@ -985,7 +1020,12 @@
     231,
     231
    ],
-   "texture": "poster_after_hours"
+   "texture": "poster_after_hours",
+   "fallback": [
+    183,
+    169,
+    137
+   ]
   },
   {
    "name": "ART_AfterHours_Frame",
@@ -1026,7 +1066,12 @@
     231,
     231
    ],
-   "texture": "portrait_miss_fern"
+   "texture": "portrait_miss_fern",
+   "fallback": [
+    177,
+    164,
+    135
+   ]
   },
   {
    "name": "ART_FictionalFern_Frame",
@@ -1067,7 +1112,12 @@
     231,
     231
    ],
-   "texture": "portrait_mr_vesper"
+   "texture": "portrait_mr_vesper",
+   "fallback": [
+    175,
+    162,
+    134
+   ]
   },
   {
    "name": "ART_FictionalVesper_Frame",
@@ -1108,7 +1158,12 @@
     231,
     231
    ],
-   "texture": "poster_rooftop"
+   "texture": "poster_rooftop",
+   "fallback": [
+    166,
+    153,
+    121
+   ]
   },
   {
    "name": "ART_SmallJoys",
@@ -1129,7 +1184,12 @@
     231,
     231
    ],
-   "texture": "poster_small_joys"
+   "texture": "poster_small_joys",
+   "fallback": [
+    180,
+    163,
+    134
+   ]
   },
   {
    "name": "ART_SmallJoys_Frame",
@@ -1170,7 +1230,12 @@
     231,
     231
    ],
-   "texture": "spice_squirrels"
+   "texture": "spice_squirrels",
+   "fallback": [
+    184,
+    142,
+    109
+   ]
   },
   {
    "name": "ART_TheSpiceSquirrels_Frame",
@@ -1290,7 +1355,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     1.26,
+     0.225,
+     5.4
+    ]
+   }
   },
   {
    "name": "CAFE_BoatShelf",
@@ -1310,7 +1382,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     4.5,
+     0.24,
+     1.08
+    ]
+   }
   },
   {
    "name": "CAFE_ChairRail",
@@ -1330,7 +1409,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     0.3,
+     0.24,
+     27.0
+    ]
+   }
   },
   {
    "name": "CAFE_Chair_A_Back",
@@ -1370,7 +1456,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     1.26,
+     0.63,
+     0.18
+    ]
+   }
   },
   {
    "name": "CAFE_Chair_A_Legs",
@@ -1410,7 +1503,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     1.26,
+     0.21,
+     1.26
+    ]
+   }
   },
   {
    "name": "CAFE_Chair_B_Back",
@@ -1450,7 +1550,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     1.26,
+     0.63,
+     0.18
+    ]
+   }
   },
   {
    "name": "CAFE_Chair_B_Legs",
@@ -1490,7 +1597,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     1.26,
+     0.21,
+     1.26
+    ]
+   }
   },
   {
    "name": "CAFE_CoffeeUrn",
@@ -1511,7 +1625,12 @@
     231,
     231
    ],
-   "texture": "steel_basecolor"
+   "texture": "steel_basecolor",
+   "fallback": [
+    73,
+    73,
+    62
+   ]
   },
   {
    "name": "CAFE_CoffeeUrnLid",
@@ -1591,7 +1710,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     3.0,
+     3.12,
+     17.4
+    ]
+   }
   },
   {
    "name": "CAFE_CounterTop",
@@ -1611,7 +1737,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     3.6,
+     0.36,
+     18.0
+    ]
+   }
   },
   {
    "name": "CAFE_Cups",
@@ -1652,7 +1785,12 @@
     231,
     231
    ],
-   "texture": "Image_41"
+   "texture": "Image_41",
+   "fallback": [
+    69,
+    72,
+    60
+   ]
   },
   {
    "name": "CAFE_Jar_Wood_Lid",
@@ -1693,7 +1831,12 @@
     231,
     231
    ],
-   "texture": "Image_39"
+   "texture": "Image_39",
+   "fallback": [
+    183,
+    167,
+    133
+   ]
   },
   {
    "name": "CAFE_Long_Way_Home_Print_Frame",
@@ -1754,7 +1897,12 @@
     231,
     231
    ],
-   "texture": "Image_40"
+   "texture": "Image_40",
+   "fallback": [
+    59,
+    64,
+    55
+   ]
   },
   {
    "name": "CAFE_Regulars_Plaque_Frame",
@@ -2094,7 +2242,14 @@
     47,
     54,
     54
-   ]
+   ],
+   "box": {
+    "size": [
+     1.98,
+     0.57,
+     1.68
+    ]
+   }
   },
   {
    "name": "CAFE_VintageRegister_Display",
@@ -2114,7 +2269,14 @@
     47,
     54,
     54
-   ]
+   ],
+   "box": {
+    "size": [
+     1.35,
+     0.51,
+     0.24
+    ]
+   }
   },
   {
    "name": "CAFE_VintageRegister_DisplayGlass",
@@ -2134,7 +2296,14 @@
     227,
     219,
     196
-   ]
+   ],
+   "box": {
+    "size": [
+     1.05,
+     0.3,
+     0.036
+    ]
+   }
   },
   {
    "name": "CAFE_VintageRegister_Dome",
@@ -2174,7 +2343,14 @@
     175,
     147,
     91
-   ]
+   ],
+   "box": {
+    "size": [
+     1.71,
+     0.36,
+     1.41
+    ]
+   }
   },
   {
    "name": "CAFE_VintageRegister_Handle",
@@ -2194,7 +2370,14 @@
     47,
     54,
     54
-   ]
+   ],
+   "box": {
+    "size": [
+     0.69,
+     0.105,
+     0.12
+    ]
+   }
   },
   {
    "name": "CAFE_VintageRegister_Keys",
@@ -2255,7 +2438,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "CAFE_WoodWainscot",
@@ -2436,7 +2624,12 @@
     231,
     231
    ],
-   "texture": "chili_acorn"
+   "texture": "chili_acorn",
+   "fallback": [
+    191,
+    168,
+    126
+   ]
   },
   {
    "name": "DETAIL_ExposedConduit",
@@ -2457,7 +2650,12 @@
     231,
     231
    ],
-   "texture": "steel_basecolor"
+   "texture": "steel_basecolor",
+   "fallback": [
+    73,
+    73,
+    62
+   ]
   },
   {
    "name": "DOOR_Handle",
@@ -2477,7 +2675,14 @@
     175,
     147,
     91
-   ]
+   ],
+   "box": {
+    "size": [
+     0.24,
+     0.105,
+     0.72
+    ]
+   }
   },
   {
    "name": "DOOR_KickPanel",
@@ -2497,7 +2702,14 @@
     93,
     142,
     137
-   ]
+   ],
+   "box": {
+    "size": [
+     0.12,
+     1.5,
+     3.81
+    ]
+   }
   },
   {
    "name": "DOOR_OpenFrame",
@@ -2560,6 +2772,11 @@
     231
    ],
    "texture": "grip.002",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal.002",
     "Graphic_Cache_Run",
@@ -2586,6 +2803,11 @@
     231
    ],
    "texture": "grip",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal",
     "Graphic_Concrete_Fern",
@@ -2612,6 +2834,11 @@
     231
    ],
    "texture": "grip",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal",
     "Graphic_Ghost_Fish",
@@ -2638,6 +2865,11 @@
     231
    ],
    "texture": "grip.001",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal.001",
     "Graphic_Live_Wire",
@@ -2664,6 +2896,11 @@
     231
    ],
    "texture": "grip",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal",
     "Graphic_Lunar_Moth",
@@ -2690,6 +2927,11 @@
     231
    ],
    "texture": "grip",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal",
     "Graphic_Ochre_Run",
@@ -2716,6 +2958,11 @@
     231
    ],
    "texture": "grip",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal",
     "Graphic_Static_Weekend",
@@ -2742,6 +2989,11 @@
     231
    ],
    "texture": "grip",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal",
     "Graphic_Tidal_Check",
@@ -2768,6 +3020,11 @@
     231
    ],
    "texture": "grip",
+   "fallback": [
+    26,
+    27,
+    27
+   ],
    "materials": [
     "Grip_Charcoal",
     "Graphic_Violet_Comet",
@@ -2793,7 +3050,12 @@
     231,
     231
    ],
-   "texture": "flag_belgium"
+   "texture": "flag_belgium",
+   "fallback": [
+    182,
+    123,
+    27
+   ]
   },
   {
    "name": "FLAG_HangingCords",
@@ -2834,7 +3096,12 @@
     231,
     231
    ],
-   "texture": "flag_jamaica"
+   "texture": "flag_jamaica",
+   "fallback": [
+    124,
+    127,
+    42
+   ]
   },
   {
    "name": "FLOOR_Cafe",
@@ -2855,7 +3122,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "FLOOR_Office",
@@ -2876,7 +3148,12 @@
     231,
     231
    ],
-   "texture": "concrete_basecolor"
+   "texture": "concrete_basecolor",
+   "fallback": [
+    134,
+    128,
+    112
+   ]
   },
   {
    "name": "FLOOR_Retail",
@@ -2897,7 +3174,12 @@
     231,
     231
    ],
-   "texture": "concrete_basecolor"
+   "texture": "concrete_basecolor",
+   "fallback": [
+    134,
+    128,
+    112
+   ]
   },
   {
    "name": "FRONT_LeftHeader",
@@ -2917,7 +3199,14 @@
     93,
     142,
     137
-   ]
+   ],
+   "box": {
+    "size": [
+     5.16,
+     2.1,
+     0.66
+    ]
+   }
   },
   {
    "name": "FRONT_LeftSill",
@@ -2937,7 +3226,14 @@
     93,
     142,
     137
-   ]
+   ],
+   "box": {
+    "size": [
+     5.16,
+     2.52,
+     0.66
+    ]
+   }
   },
   {
    "name": "FRONT_Piers",
@@ -3397,7 +3693,14 @@
     137,
     148,
     135
-   ]
+   ],
+   "box": {
+    "size": [
+     0.054,
+     0.45,
+     0.438
+    ]
+   }
   },
   {
    "name": "JACKET_Collar",
@@ -3497,7 +3800,14 @@
     137,
     148,
     135
-   ]
+   ],
+   "box": {
+    "size": [
+     0.048,
+     0.129,
+     1.422
+    ]
+   }
   },
   {
    "name": "JACKET_Hem_Stitch",
@@ -3558,7 +3868,12 @@
     231,
     231
    ],
-   "texture": "Image_50"
+   "texture": "Image_50",
+   "fallback": [
+    162,
+    147,
+    115
+   ]
   },
   {
    "name": "JACKET_Night_Route_Body",
@@ -3579,7 +3894,12 @@
     231,
     231
    ],
-   "texture": "Image_48"
+   "texture": "Image_48",
+   "fallback": [
+    52,
+    66,
+    59
+   ]
   },
   {
    "name": "JACKET_Pocket_Button",
@@ -3620,7 +3940,12 @@
     231,
     231
    ],
-   "texture": "Image_48"
+   "texture": "Image_48",
+   "fallback": [
+    52,
+    66,
+    59
+   ]
   },
   {
    "name": "JACKET_Pocket_Stitch",
@@ -3681,7 +4006,12 @@
     231,
     231
    ],
-   "texture": "Image_48"
+   "texture": "Image_48",
+   "fallback": [
+    52,
+    66,
+    59
+   ]
   },
   {
    "name": "JACKET_Sleeve_R",
@@ -3702,7 +4032,12 @@
     231,
     231
    ],
-   "texture": "Image_48"
+   "texture": "Image_48",
+   "fallback": [
+    52,
+    66,
+    59
+   ]
   },
   {
    "name": "JACKET_Zip_Tape",
@@ -3722,7 +4057,14 @@
     137,
     148,
     135
-   ]
+   ],
+   "box": {
+    "size": [
+     0.045,
+     1.62,
+     0.075
+    ]
+   }
   },
   {
    "name": "JACKET_Zipper_Pull",
@@ -3742,7 +4084,14 @@
     194,
     171,
     131
-   ]
+   ],
+   "box": {
+    "size": [
+     0.024,
+     0.117,
+     0.054
+    ]
+   }
   },
   {
    "name": "JACKET_Zipper_Teeth",
@@ -3982,7 +4331,14 @@
     47,
     54,
     54
-   ]
+   ],
+   "box": {
+    "size": [
+     0.93,
+     0.6,
+     0.48
+    ]
+   }
   },
   {
    "name": "KNICK_PinTray",
@@ -4002,7 +4358,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     1.2,
+     0.12,
+     0.75
+    ]
+   }
   },
   {
    "name": "KNICK_RecordLabels",
@@ -4242,7 +4605,8 @@
     250,
     209,
     132
-   ]
+   ],
+   "emissive": true
   },
   {
    "name": "LIGHT_Shades",
@@ -4263,7 +4627,12 @@
     231,
     231
    ],
-   "texture": "steel_basecolor"
+   "texture": "steel_basecolor",
+   "fallback": [
+    73,
+    73,
+    62
+   ]
   },
   {
    "name": "LIGHT_Shades.001",
@@ -4304,7 +4673,12 @@
     231,
     231
    ],
-   "texture": "menu_drinks"
+   "texture": "menu_drinks",
+   "fallback": [
+    44,
+    48,
+    44
+   ]
   },
   {
    "name": "MENU_Drinks_Frame",
@@ -4345,7 +4719,12 @@
     231,
     231
    ],
-   "texture": "menu_food"
+   "texture": "menu_food",
+   "fallback": [
+    49,
+    52,
+    48
+   ]
   },
   {
    "name": "MENU_Food_Frame",
@@ -4645,7 +5024,14 @@
     95,
     129,
     115
-   ]
+   ],
+   "box": {
+    "size": [
+     2.4,
+     0.036,
+     1.38
+    ]
+   }
   },
   {
    "name": "OFFICE_Chair_Back",
@@ -4685,7 +5071,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     1.26,
+     0.63,
+     0.18
+    ]
+   }
   },
   {
    "name": "OFFICE_Chair_Legs",
@@ -4725,7 +5118,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     1.26,
+     0.21,
+     1.26
+    ]
+   }
   },
   {
    "name": "OFFICE_Desk",
@@ -4746,7 +5146,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "OFFICE_DeskLamp",
@@ -4847,7 +5252,12 @@
     231,
     231
    ],
-   "texture": "steel_basecolor"
+   "texture": "steel_basecolor",
+   "fallback": [
+    73,
+    73,
+    62
+   ]
   },
   {
    "name": "OFFICE_DrawerHandles",
@@ -4888,7 +5298,12 @@
     231,
     231
    ],
-   "texture": "steel_basecolor"
+   "texture": "steel_basecolor",
+   "fallback": [
+    73,
+    73,
+    62
+   ]
   },
   {
    "name": "OFFICE_Notes",
@@ -4928,7 +5343,14 @@
     160,
     121,
     77
-   ]
+   ],
+   "box": {
+    "size": [
+     4.65,
+     2.55,
+     0.12
+    ]
+   }
   },
   {
    "name": "OFFICE_Papers",
@@ -4948,7 +5370,14 @@
     227,
     219,
     196
-   ]
+   ],
+   "box": {
+    "size": [
+     0.69,
+     0.075,
+     0.9
+    ]
+   }
   },
   {
    "name": "PLANT_BambooCafe_Leaves",
@@ -5968,7 +6397,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     17.4,
+     0.255,
+     2.1
+    ]
+   }
   },
   {
    "name": "RETAIL_Bell",
@@ -6009,7 +6445,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "RETAIL_CheckoutRepairBattens",
@@ -6049,7 +6490,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     14.85,
+     0.36,
+     2.94
+    ]
+   }
   },
   {
    "name": "RETAIL_DisplayTable_Legs",
@@ -6090,7 +6538,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "RETAIL_HatBench_Legs",
@@ -6131,7 +6584,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "RETAIL_Ledger",
@@ -6151,7 +6609,14 @@
     95,
     129,
     115
-   ]
+   ],
+   "box": {
+    "size": [
+     1.08,
+     0.135,
+     0.78
+    ]
+   }
   },
   {
    "name": "RETAIL_SkateRack",
@@ -6211,7 +6676,14 @@
     93,
     142,
     137
-   ]
+   ],
+   "box": {
+    "size": [
+     4.5,
+     5.85,
+     0.15
+    ]
+   }
   },
   {
    "name": "RETAIL_SmallShelf_Shelves",
@@ -6272,7 +6744,12 @@
     231,
     231
    ],
-   "texture": "steel_basecolor"
+   "texture": "steel_basecolor",
+   "fallback": [
+    73,
+    73,
+    62
+   ]
   },
   {
    "name": "RETAIL_TillDisplay",
@@ -6292,7 +6769,14 @@
     47,
     54,
     54
-   ]
+   ],
+   "box": {
+    "size": [
+     1.35,
+     0.66,
+     0.27
+    ]
+   }
   },
   {
    "name": "RETAIL_WallShelving_Back",
@@ -6312,7 +6796,14 @@
     93,
     142,
     137
-   ]
+   ],
+   "box": {
+    "size": [
+     8.4,
+     7.05,
+     0.15
+    ]
+   }
   },
   {
    "name": "RETAIL_WallShelving_Shelves",
@@ -6333,7 +6824,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "RETAIL_WallShelving_Sides",
@@ -6354,7 +6850,12 @@
     231,
     231
    ],
-   "texture": "plywood_basecolor"
+   "texture": "plywood_basecolor",
+   "fallback": [
+    138,
+    99,
+    60
+   ]
   },
   {
    "name": "ROOF_Removable",
@@ -6374,7 +6875,14 @@
     211,
     205,
     184
-   ]
+   ],
+   "box": {
+    "size": [
+     43.5,
+     0.42,
+     37.5
+    ]
+   }
   },
   {
    "name": "SIGN_clear_signal",
@@ -6395,7 +6903,12 @@
     231,
     231
    ],
-   "texture": "tag_clear_signal"
+   "texture": "tag_clear_signal",
+   "fallback": [
+    195,
+    198,
+    172
+   ]
   },
   {
    "name": "SIGN_dustline",
@@ -6416,7 +6929,12 @@
     231,
     231
    ],
-   "texture": "tag_dustline"
+   "texture": "tag_dustline",
+   "fallback": [
+    186,
+    153,
+    96
+   ]
   },
   {
    "name": "SIGN_loose_wire",
@@ -6437,7 +6955,12 @@
     231,
     231
    ],
-   "texture": "tag_loose_wire"
+   "texture": "tag_loose_wire",
+   "fallback": [
+    88,
+    98,
+    97
+   ]
   },
   {
    "name": "SIGN_midnight_static",
@@ -6458,7 +6981,12 @@
     231,
     231
    ],
-   "texture": "tag_midnight_static"
+   "texture": "tag_midnight_static",
+   "fallback": [
+    71,
+    73,
+    71
+   ]
   },
   {
    "name": "SPECIALS_Cache_Run_Tag",
@@ -6479,7 +7007,12 @@
     231,
     231
    ],
-   "texture": "Image_37"
+   "texture": "Image_37",
+   "fallback": [
+    60,
+    65,
+    55
+   ]
   },
   {
    "name": "SPECIALS_Iron_Brackets",
@@ -6520,7 +7053,12 @@
     231,
     231
    ],
-   "texture": "Image_38"
+   "texture": "Image_38",
+   "fallback": [
+    63,
+    67,
+    57
+   ]
   },
   {
    "name": "SPECIALS_Live_Wire_Tag",
@@ -6541,7 +7079,12 @@
     231,
     231
    ],
-   "texture": "Image_36"
+   "texture": "Image_36",
+   "fallback": [
+    59,
+    64,
+    54
+   ]
   },
   {
    "name": "SPECIALS_Series_Sign",
@@ -6562,7 +7105,12 @@
     231,
     231
    ],
-   "texture": "Image_35"
+   "texture": "Image_35",
+   "fallback": [
+    71,
+    74,
+    62
+   ]
   },
   {
    "name": "SPECIALS_Upper_Shelf",
@@ -6582,7 +7130,14 @@
     155,
     127,
     101
-   ]
+   ],
+   "box": {
+    "size": [
+     10.95,
+     0.225,
+     1.98
+    ]
+   }
   },
   {
    "name": "SPECIALS_Worn_Shelf_Lip",
@@ -6602,7 +7157,14 @@
     203,
     179,
     142
-   ]
+   ],
+   "box": {
+    "size": [
+     11.01,
+     0.3,
+     0.105
+    ]
+   }
   },
   {
    "name": "TRIM_PassagePosts",
@@ -7093,7 +7655,12 @@
     231,
     231
    ],
-   "texture": "brick_basecolor"
+   "texture": "brick_basecolor",
+   "fallback": [
+    123,
+    91,
+    68
+   ]
   },
   {
    "name": "WALL_DividerLintel",
@@ -7113,7 +7680,14 @@
     118,
     87,
     60
-   ]
+   ],
+   "box": {
+    "size": [
+     0.54,
+     3.3,
+     8.4
+    ]
+   }
   },
   {
    "name": "WALL_Left",
@@ -7134,7 +7708,12 @@
     231,
     231
    ],
-   "texture": "brick_basecolor"
+   "texture": "brick_basecolor",
+   "fallback": [
+    123,
+    91,
+    68
+   ]
   },
   {
    "name": "WALL_OfficeLintel",
@@ -7154,7 +7733,14 @@
     93,
     142,
     137
-   ]
+   ],
+   "box": {
+    "size": [
+     4.2,
+     5.1,
+     0.54
+    ]
+   }
   },
   {
    "name": "WALL_OfficePartition",
@@ -7194,7 +7780,14 @@
     211,
     205,
     184
-   ]
+   ],
+   "box": {
+    "size": [
+     0.42,
+     12.6,
+     9.0
+    ]
+   }
   },
   {
    "name": "WALL_Right",
@@ -7214,7 +7807,14 @@
     211,
     205,
     184
-   ]
+   ],
+   "box": {
+    "size": [
+     0.72,
+     12.6,
+     36.72
+    ]
+   }
   },
   {
    "name": "WALL_RoomDivider",
@@ -8182,7 +8782,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_01",
@@ -8202,7 +8819,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_02",
@@ -8222,7 +8856,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_03",
@@ -8242,7 +8893,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_04",
@@ -8262,7 +8930,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_05",
@@ -8282,7 +8967,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_06",
@@ -8302,7 +9004,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_07",
@@ -8322,7 +9041,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_08",
@@ -8342,7 +9078,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_09",
@@ -8362,7 +9115,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_10",
@@ -8382,7 +9152,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_11",
@@ -8402,7 +9189,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_12",
@@ -8422,7 +9226,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_13",
@@ -8442,7 +9263,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_14",
@@ -8462,7 +9300,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_15",
@@ -8482,7 +9337,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_16",
@@ -8502,7 +9374,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_17",
@@ -8522,7 +9411,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_18",
@@ -8542,7 +9448,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_19",
@@ -8562,7 +9485,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_20",
@@ -8582,7 +9522,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_-1_21",
@@ -8602,7 +9559,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_00",
@@ -8622,7 +9596,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_01",
@@ -8642,7 +9633,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_02",
@@ -8662,7 +9670,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_03",
@@ -8682,7 +9707,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_04",
@@ -8702,7 +9744,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_05",
@@ -8722,7 +9781,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_06",
@@ -8742,7 +9818,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_07",
@@ -8762,7 +9855,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_08",
@@ -8782,7 +9892,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_09",
@@ -8802,7 +9929,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_10",
@@ -8822,7 +9966,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_11",
@@ -8842,7 +10003,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_12",
@@ -8862,7 +10040,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_13",
@@ -8882,7 +10077,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_14",
@@ -8902,7 +10114,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_15",
@@ -8922,7 +10151,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_16",
@@ -8942,7 +10188,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_17",
@@ -8962,7 +10225,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_18",
@@ -8982,7 +10262,24 @@
     140,
     148,
     153
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_19",
@@ -9002,7 +10299,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_20",
@@ -9022,7 +10336,24 @@
     173,
     179,
     183
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0676,
+     1.1576
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "AsphaltShingleBand_1_21",
@@ -9042,7 +10373,24 @@
     159,
     165,
     173
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.0675,
+     1.1577
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "Chimney_Brick_Body",
@@ -9062,7 +10410,14 @@
     197,
     165,
     149
-   ]
+   ],
+   "box": {
+    "size": [
+     2.7456,
+     8.25,
+     3.5625
+    ]
+   }
   },
   {
    "name": "Chimney_Cap",
@@ -9082,7 +10437,14 @@
     234,
     229,
     218
-   ]
+   ],
+   "box": {
+    "size": [
+     3.3696,
+     0.7124,
+     4.275
+    ]
+   }
   },
   {
    "name": "Chimney_Flue",
@@ -9102,7 +10464,14 @@
     138,
     139,
     142
-   ]
+   ],
+   "box": {
+    "size": [
+     1.6536,
+     0.675,
+     2.0625
+    ]
+   }
   },
   {
    "name": "Chimney_Mortar_6.34",
@@ -9122,7 +10491,14 @@
     234,
     229,
     218
-   ]
+   ],
+   "box": {
+    "size": [
+     2.8142,
+     0.0938,
+     3.6262
+    ]
+   }
   },
   {
    "name": "Chimney_Mortar_6.69",
@@ -9142,7 +10518,14 @@
     234,
     229,
     218
-   ]
+   ],
+   "box": {
+    "size": [
+     2.8142,
+     0.0938,
+     3.6262
+    ]
+   }
   },
   {
    "name": "Chimney_Mortar_7.04",
@@ -9162,7 +10545,14 @@
     234,
     229,
     218
-   ]
+   ],
+   "box": {
+    "size": [
+     2.8142,
+     0.0938,
+     3.6262
+    ]
+   }
   },
   {
    "name": "Chimney_Mortar_7.39",
@@ -9182,7 +10572,14 @@
     234,
     229,
     218
-   ]
+   ],
+   "box": {
+    "size": [
+     2.8142,
+     0.0938,
+     3.6262
+    ]
+   }
   },
   {
    "name": "Chimney_Mortar_7.74",
@@ -9202,7 +10599,14 @@
     234,
     229,
     218
-   ]
+   ],
+   "box": {
+    "size": [
+     2.8142,
+     0.0938,
+     3.6262
+    ]
+   }
   },
   {
    "name": "Chimney_Mortar_8.09",
@@ -9222,7 +10626,14 @@
     234,
     229,
     218
-   ]
+   ],
+   "box": {
+    "size": [
+     2.8142,
+     0.0938,
+     3.6262
+    ]
+   }
   },
   {
    "name": "Fascia_-1",
@@ -9242,7 +10653,14 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     1.0125,
+     0.675
+    ]
+   }
   },
   {
    "name": "Fascia_1",
@@ -9262,7 +10680,14 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     1.0125,
+     0.675
+    ]
+   }
   },
   {
    "name": "GutterRun_-1",
@@ -9282,7 +10707,14 @@
     162,
     173,
     175
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.6375,
+     0.8626
+    ]
+   }
   },
   {
    "name": "GutterRun_1",
@@ -9302,7 +10734,14 @@
     162,
     173,
     175
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.6375,
+     0.8626
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_00",
@@ -9322,7 +10761,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_01",
@@ -9342,7 +10798,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_02",
@@ -9362,7 +10835,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_03",
@@ -9382,7 +10872,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_04",
@@ -9402,7 +10909,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_05",
@@ -9422,7 +10946,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_06",
@@ -9442,7 +10983,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_07",
@@ -9462,7 +11020,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_08",
@@ -9482,7 +11057,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_09",
@@ -9502,7 +11094,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_10",
@@ -9522,7 +11131,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_11",
@@ -9542,7 +11168,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_12",
@@ -9562,7 +11205,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_13",
@@ -9582,7 +11242,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_-1_14",
@@ -9602,7 +11279,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_00",
@@ -9622,7 +11316,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_01",
@@ -9642,7 +11353,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_02",
@@ -9662,7 +11390,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_03",
@@ -9682,7 +11427,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_04",
@@ -9702,7 +11464,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_05",
@@ -9722,7 +11501,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_06",
@@ -9742,7 +11538,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_07",
@@ -9762,7 +11575,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_08",
@@ -9782,7 +11612,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_09",
@@ -9802,7 +11649,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_10",
@@ -9822,7 +11686,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_11",
@@ -9842,7 +11723,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_12",
@@ -9862,7 +11760,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_13",
@@ -9882,7 +11797,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RafterTail_1_14",
@@ -9902,7 +11834,24 @@
     216,
     192,
     157
-   ]
+   ],
+   "box": {
+    "size": [
+     0.468,
+     0.7501,
+     4.3617
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8598,
+     -0.5107
+    ]
+   }
   },
   {
    "name": "RidgeCap",
@@ -9922,7 +11871,14 @@
     138,
     139,
     142
-   ]
+   ],
+   "box": {
+    "size": [
+     46.6128,
+     0.6,
+     1.1626
+    ]
+   }
   },
   {
    "name": "RoofDeck_East",
@@ -9942,7 +11898,24 @@
     160,
     134,
     108
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.5257,
+     24.4875
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     -0.5508
+    ]
+   }
   },
   {
    "name": "RoofDeck_West",
@@ -9962,7 +11935,24 @@
     160,
     134,
     108
-   ]
+   ],
+   "box": {
+    "size": [
+     46.488,
+     0.5257,
+     24.4875
+    ],
+    "right": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "up": [
+     0.0,
+     0.8346,
+     0.5508
+    ]
+   }
   }
  ]
 }

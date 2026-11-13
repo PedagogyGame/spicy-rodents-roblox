@@ -13,7 +13,8 @@ local ShopArt = require("@server/Assets/ShopArt")
 local Instance = roblox.Instance
 local Vector3 = roblox.Vector3
 local CFrame = roblox.CFrame
-local ENV = { CFrame = roblox.CFrame, Color3 = roblox.Color3, Enum = roblox.Enum }
+local ENV =
+	{ CFrame = roblox.CFrame, Color3 = roblox.Color3, Enum = roblox.Enum, Instance = Instance, Vector3 = Vector3 }
 
 local art: any = ShopArtData
 
@@ -75,6 +76,149 @@ local function groundAt(list: { any }, x: number, z: number, below: number): num
 		end
 	end
 	return best
+end
+
+-- A part's bounds in the venue frame (X, Y, D), from its eight corners.
+local function localBounds(v: any, p: any): ({ number }, { number })
+	local lo, hi = { math.huge, math.huge, math.huge }, { -math.huge, -math.huge, -math.huge }
+	local h = p.Size / 2
+	for _, sx in { -1, 1 } do
+		for _, sy in { -1, 1 } do
+			for _, sz in { -1, 1 } do
+				local w = p.CFrame * Vector3.new(sx * h.X, sy * h.Y, sz * h.Z)
+				local x, y, d = AlleyLayout.toLocal(v.place, w.X, w.Y, w.Z)
+				for k, c in { x, y, d } do
+					lo[k] = math.min(lo[k], c)
+					hi[k] = math.max(hi[k], c)
+				end
+			end
+		end
+	end
+	return lo, hi
+end
+
+-- Where a person (radius r, body from 0.7 to 5.2 above the floor) can walk on the shop's floor, flooded from the
+-- landing in front of the door: every solid part that reaches into the body's height blocks the cells within r.
+local STEP = 0.25
+local GRID = { x0 = -23, x1 = 23, d0 = -21, d1 = 20 }
+local function flood(root: any, v: any, r: number): (number, number) -> boolean
+	local nx = math.floor((GRID.x1 - GRID.x0) / STEP)
+	local nd = math.floor((GRID.d1 - GRID.d0) / STEP)
+	local blocked: { [number]: boolean } = {}
+	for _, p in solids(root) do
+		local lo, hi = localBounds(v, p)
+		if hi[2] > 0.7 and lo[2] < 5.2 then
+			local i0 = math.max(0, math.floor((lo[1] - r - GRID.x0) / STEP))
+			local i1 = math.min(nx, math.ceil((hi[1] + r - GRID.x0) / STEP))
+			local j0 = math.max(0, math.floor((lo[3] - r - GRID.d0) / STEP))
+			local j1 = math.min(nd, math.ceil((hi[3] + r - GRID.d0) / STEP))
+			for i = i0, i1 do
+				for j = j0, j1 do
+					local x, d = GRID.x0 + i * STEP, GRID.d0 + j * STEP
+					-- the cell's centre within r of the box (a round body against a square corner)
+					local dx = math.max(lo[1] - x, 0, x - hi[1])
+					local dd = math.max(lo[3] - d, 0, d - hi[3])
+					if dx * dx + dd * dd < r * r then
+						blocked[i * (nd + 1) + j] = true
+					end
+				end
+			end
+		end
+	end
+	local reached: { [number]: boolean } = {}
+	local door = art.doorway
+	local si = math.floor(((door.x0 + door.x1) / 2 - GRID.x0) / STEP + 0.5)
+	local sj = math.floor((-20 - GRID.d0) / STEP + 0.5)
+	local queue = { { si, sj } }
+	reached[si * (nd + 1) + sj] = true
+	local head = 1
+	while head <= #queue do
+		local c = queue[head]
+		head += 1
+		for _, o in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			local i, j = c[1] + o[1], c[2] + o[2]
+			local k = i * (nd + 1) + j
+			-- in front of the door the walk stays on the landing (it may not wander off round the building)
+			local x, d = GRID.x0 + i * STEP, GRID.d0 + j * STEP
+			local onLanding = d < -18.3 and x > door.x0 - 0.9 and x < door.x1 + 0.9
+			if
+				i >= 0
+				and i <= nx
+				and j >= 0
+				and j <= nd
+				and not reached[k]
+				and not blocked[k]
+				and (onLanding or d >= -18.3)
+			then
+				reached[k] = true
+				table.insert(queue, { i, j })
+			end
+		end
+	end
+	return function(x: number, d: number): boolean
+		local i = math.floor((x - GRID.x0) / STEP + 0.5)
+		local j = math.floor((d - GRID.d0) / STEP + 0.5)
+		return reached[i * (nd + 1) + j] == true
+	end
+end
+
+-- Is any reached cell within `reach` of the box (X, D bounds), on the side `side` names (or any side)?
+local function reachesBox(at: (number, number) -> boolean, c: any, reach: number, side: string?): boolean
+	local x0, x1 = c.centre[1] - c.size[1] / 2, c.centre[1] + c.size[1] / 2
+	local d0, d1 = c.centre[3] - c.size[3] / 2, c.centre[3] + c.size[3] / 2
+	local x = x0 - reach
+	while x <= x1 + reach do
+		local d = d0 - reach
+		while d <= d1 + reach do
+			local inSide = side == nil
+				or (side == "front" and d < d0)
+				or (side == "back" and d > d1)
+				or (side == "east" and x > x1)
+				or (side == "west" and x < x0)
+			local outside = x < x0 or x > x1 or d < d0 or d > d1
+			if inSide and outside and at(x, d) then
+				return true
+			end
+			d += STEP
+		end
+		x += STEP
+	end
+	return false
+end
+
+local function collider(name: string): any
+	for _, c in art.colliders do
+		if c.name == name then
+			return c
+		end
+	end
+	error("no collider " .. name)
+end
+
+-- Does the segment from a to b (world points) pass through the part's box?
+local function crosses(part: any, a: any, b: any): boolean
+	local la, lb = part.CFrame:Inverse() * a, part.CFrame:Inverse() * b
+	local h = part.Size / 2
+	local t0, t1 = 0, 1
+	for _, k in { "X", "Y", "Z" } do
+		local p0, e = (la :: any)[k], (h :: any)[k]
+		local dp = (lb :: any)[k] - p0
+		if math.abs(dp) < 1e-9 then
+			if math.abs(p0) > e then
+				return false
+			end
+		else
+			local u0, u1 = (-e - p0) / dp, (e - p0) / dp
+			if u0 > u1 then
+				u0, u1 = u1, u0
+			end
+			t0, t1 = math.max(t0, u0), math.min(t1, u1)
+			if t0 > t1 then
+				return false
+			end
+		end
+	end
+	return true
 end
 
 -- A stand-in for the uploaded Model: InsertService gives a holder Model around the asset's Model.
@@ -169,7 +313,18 @@ return function(t)
 		end
 		t.eq(metadata, 12)
 		t.eq(mesh, 1)
-		t.eq(furniture, 15)
+		-- 15 tables, racks, stools and shelves; his three chairs, six floor-standing pots and the open door's leaf
+		t.eq(furniture, 25)
+		for _, name in { "CAFE_Chair_A", "CAFE_Chair_B", "OFFICE_Chair", "PLANT_RubberEntrance_Pot", "DOOR_OpenFrame" } do
+			t.truthy(collider(name).size[2] >= 1.2, name)
+		end
+		-- a chair's box reaches up to its back (a person walks round it, not through its back)
+		t.truthy(collider("CAFE_Chair_A").size[2] > 3, "up to the chair's back")
+		-- the open door's leaf stands beside the doorway, not in it
+		local leaf = collider("DOOR_OpenFrame")
+		local dx0 = leaf.centre[1] - leaf.size[1] / 2
+		local dx1 = leaf.centre[1] + leaf.size[1] / 2
+		t.truthy(dx1 <= art.doorway.x0 or dx0 >= art.doorway.x1, "the door leaf is clear of the doorway")
 		-- no collider is one box over the hollow room: none spans more than one room's floor area
 		for _, p in cols:GetChildren() do
 			local s = p.Size
@@ -215,6 +370,119 @@ return function(t)
 		t.truthy(door.top >= 8.75, "a person (5.5 st) fits through")
 	end)
 
+	t.test("a person reaches every room: the checkout, the cafe counter, the window table and the office", function()
+		local root, _, v = bake()
+		-- a possessed person's root part is 2 x 2: radius 1.1 leaves a margin; his layout's narrowest gaps
+		-- (2.5 studs between the display table and a rack, the 4.2-stud bead curtain) must stay open to it
+		local at = flood(root, v, 1.1)
+		t.truthy(at((art.doorway.x0 + art.doorway.x1) / 2, -16), "inside the door")
+		t.truthy(reachesBox(at, collider("RetailCheckout"), 1.0, "front"), "the checkout's customer side")
+		t.truthy(reachesBox(at, collider("CafeCounter"), 1.0, "east"), "the cafe counter's customer side")
+		t.truthy(reachesBox(at, collider("CAFE_WindowTable_Legs"), 1.5), "the cafe's window table")
+		t.truthy(reachesBox(at, collider("OFFICE_DeskLegs"), 1.5), "the office desk")
+		local cafe, office = collider("CafeFloor"), collider("OfficeFloor")
+		t.truthy(reachesBox(at, { centre = cafe.centre, size = { 1, 0, 1 } }, 3), "the middle of the cafe")
+		local inOffice = false
+		local x = office.centre[1] - office.size[1] / 2
+		while x < office.centre[1] + office.size[1] / 2 and not inOffice do
+			local d = office.centre[3] - office.size[3] / 2
+			while d < office.centre[3] + office.size[3] / 2 do
+				if at(x, d) then
+					inOffice = true
+					break
+				end
+				d += STEP
+			end
+			x += STEP
+		end
+		t.truthy(inOffice, "the office behind the bead curtain")
+		-- and nobody walks out through a wall: no reached cell outside his walls
+		t.falsy(at(-23, 0) or at(23, 0) or at(0, 19.5), "outside the walls")
+	end)
+
+	t.test("the camera stops at his walls: opaque, colliding occluders just inside each wall and lintel", function()
+		local root, kit = bake()
+		local occ = root:FindFirstChild("Occluders")
+		t.truthy(occ, "an Occluders model")
+		local list = occ:GetChildren()
+		-- Left, Back, Right, the divider's two pieces, the partition's two, the office side wall, two lintels
+		t.eq(#list, 10)
+		for _, p in list do
+			-- what Roblox's default camera (Poppercam) and Client/Camera/CameraRig.occludes stop at
+			t.truthy(p.CanCollide and p.CanQuery, p.Name)
+			t.truthy(p.Transparency < 0.25, p.Name)
+			t.falsy(p.CastShadow)
+		end
+		for _, c in art.occluders do
+			-- each one sits inside his wall (the collider, or the lintel mesh), never in front of its face
+			local w = kit:cf(c.centre[1], c.centre[2], c.centre[3]).Position
+			local match = nil
+			for _, p in list do
+				if p.Name == c.name and (p.CFrame.Position - w).Magnitude < 1e-3 then
+					match = p
+				end
+			end
+			t.truthy(match, c.name)
+		end
+		for _, c in art.colliders do
+			if c.name == "Left" or c.name == "OfficePartition" or c.name == "OfficeSide" then
+				local inner = false
+				for _, p in list do
+					local w = kit:cf(c.centre[1], c.centre[2], c.centre[3]).Position
+					if p.Name == c.name and (p.CFrame.Position - w).Magnitude < 1e-3 then
+						inner = p.Size.X <= c.size[1] - 0.1 and p.Size.Z <= c.size[3] - 0.1
+					end
+				end
+				t.truthy(inner, `{c.name} inside its wall`)
+			end
+		end
+		-- a person in the office and the camera 12 studs behind them in the cafe: the partition is in between
+		local function blockedBetween(ax: number, ad: number, bx: number, bd: number): boolean
+			local a, b = kit:cf(ax, 5, ad).Position, kit:cf(bx, 5, bd).Position
+			for _, p in list do
+				if crosses(p, a, b) then
+					return true
+				end
+			end
+			return false
+		end
+		local office = collider("OfficeFloor")
+		t.truthy(blockedBetween(-12, office.centre[3], -12, office.centre[3] - 12), "office -> cafe")
+		-- beside the divider in the cafe, the camera in the retail room
+		t.truthy(blockedBetween(-6, 5, 6, 5), "cafe -> retail")
+		-- but not through the open passage between the rooms, nor through the shopfront's glass
+		t.falsy(blockedBetween(-6, -7.5, 6, -7.5), "the passage stays open")
+		t.falsy(blockedBetween(12, -15, 12, -27), "the windows stay clear")
+	end)
+
+	t.test("his roof's colliders cover the drawn roof: both slopes out over the gables, up to his shingles", function()
+		local root, kit = bake()
+		local cols = root:FindFirstChild("Colliders")
+		local slopes = 0
+		local half = Shop.INNER_X + Shop.WALL -- the shell's outer faces
+		for _, c in art.roof.colliders do
+			local p = nil
+			local w = kit:cf(c.centre[1], c.centre[2], c.centre[3]).Position
+			for _, q in cols:GetChildren() do
+				if q.Name == c.name and (q.CFrame.Position - w).Magnitude < 1e-3 then
+					p = q
+				end
+			end
+			t.truthy(p and p.CanCollide, c.name)
+			t.truthy(c.size[1] / 2 >= half, `{c.name} reaches over the gable walls`)
+			if string.find(c.name, "^RoofSlope") then
+				slopes += 1
+				-- its top face is at his shingles' top: over the eave-side quarter of the slope, the collider's
+				-- top is within a few hundredths of the drawn roof's top (Shop.topside is the deck's top)
+				local d = if c.centre[3] < 0 then -12 else 12
+				local up = c.up
+				local top = c.centre[2] + (c.size[2] / 2 - (d - c.centre[3]) * up[3]) / up[2]
+				t.truthy(top >= Shop.topside(art, d) - 1e-3, `{c.name} not below the deck's top`)
+			end
+		end
+		t.eq(slopes, 2)
+	end)
+
 	t.test(
 		"the shell: walls up to his roof deck, the attic closed, the backing slab over his ceiling, the sign",
 		function()
@@ -233,22 +501,42 @@ return function(t)
 			local label =
 				shell:FindFirstChild("SignBoard"):FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel")
 			t.eq(label.Text, "THE NEIGHBOURHOOD SHOP")
-			-- the roof sign stands clear above his deck, under his ridge
-			local roofSign = shell:FindFirstChild("RoofSign")
-			local floorY = root:GetAttribute("ArtPivot").Position.Y
-			local bottom = roofSign.CFrame.Position.Y - roofSign.Size.Y / 2 - floorY
-			local signTop = roofSign.CFrame.Position.Y + roofSign.Size.Y / 2 - floorY
-			t.truthy(bottom > Shop.topside(art, Shop.ROOF_SIGN_D), "above the roof")
-			t.truthy(signTop < Shop.underside(art, 0), "below the ridge")
-			t.eq(roofSign:FindFirstChildOfClass("SurfaceGui"):FindFirstChildOfClass("TextLabel").Text, Shop.SIGN)
-			local lamps = root:FindFirstChild("Lamps")
-			local lights = 0
-			for _, p in lamps:GetChildren() do
-				if p:FindFirstChildOfClass("PointLight") then
-					lights += 1
+			-- the sign's letters glow (they read in the eave's shadow); nothing stands on his roof (the review: a
+			-- board on the roof is not his design)
+			t.eq(label.Parent.LightInfluence, 0)
+			t.eq(shell:FindFirstChild("RoofSign"), nil)
+			-- three gooseneck lamps over the sign, each aimed at the board
+			local spots = 0
+			local board = shell:FindFirstChild("SignBoard")
+			for _, p in shell:GetChildren() do
+				local spot = p:FindFirstChildOfClass("SpotLight")
+				if p.Name == "SignLamp" and spot then
+					spots += 1
+					t.falsy(p.CanCollide)
+					local beam = p.CFrame.Position + p.CFrame.LookVector * 4
+					t.truthy(crosses(board, p.CFrame.Position, beam), "aimed at the board")
 				end
 			end
-			t.eq(lights, #art.lamps + 1) -- his six pendants and the desk lamp, and one over the door
+			t.eq(spots, 3)
+			local lamps = root:FindFirstChild("Lamps")
+			local lights, shadowed, fills = 0, 0, 0
+			for _, p in lamps:GetChildren() do
+				local l = p:FindFirstChildOfClass("PointLight")
+				if l then
+					lights += 1
+					if l.Shadows then
+						shadowed += 1
+					end
+					if string.find(p.Name, "Fill$") then
+						fills += 1
+						t.falsy(l.Shadows)
+					end
+				end
+			end
+			-- his six pendants and the desk lamp, one over the door, a fill in each of his three rooms
+			t.eq(lights, #art.lamps + 1 + 3)
+			t.eq(fills, 3)
+			t.eq(shadowed, 3) -- only his three big retail shades cast shadows
 		end
 	)
 
@@ -256,7 +544,15 @@ return function(t)
 		"the loader: his parts are visual only, untextured ones painted, glass see-through, each in its place",
 		function()
 			local root = bake()
-			local names = { "CAFE_CounterTop", "FLOOR_Retail", "WINDOW_RemovableGlass", "RidgeCap" }
+			local names = {
+				"CAFE_CounterTop",
+				"FLOOR_Retail",
+				"WALL_Left",
+				"WINDOW_RemovableGlass",
+				"LIGHT_Diffusers",
+				"CAFE_Stool_01_Legs",
+			}
+			local roofNames = { "RidgeCap", "AsphaltShingleBand_-1_00" }
 			local textured = { FLOOR_Retail = true }
 			local asked: { number } = {}
 			local report = ShopArt.install(root, {
@@ -264,7 +560,7 @@ return function(t)
 				env = ENV,
 				load = function(id: number): any
 					table.insert(asked, id)
-					return asset(names, textured)
+					return if id == art.assets.roof.id then asset(roofNames) else asset(names, textured)
 				end,
 			})
 			t.eq(#asked, 2)
@@ -292,6 +588,46 @@ return function(t)
 			t.eq(glass.Material, roblox.Enum.Material.Glass)
 			t.near(glass.Transparency, ShopArt.GLASS_TRANSPARENCY, 1e-6)
 			t.truthy(record("WINDOW_RemovableGlass").glass)
+			-- a textured mesh that arrives with no maps is painted its map's mean colour, not the white tint
+			local wall, fb = shop.WALL_Left, record("WALL_Left").fallback
+			t.truthy(fb and (fb[1] ~= 231 or fb[2] ~= 231), "a fallback colour from the map")
+			t.eq(wall.Color, roblox.Color3.fromRGB(fb[1], fb[2], fb[3]))
+			-- his lamp shades glow
+			local shade = shop.LIGHT_Diffusers
+			t.truthy(record("LIGHT_Diffusers").emissive)
+			t.eq(shade.Material, roblox.Enum.Material.Neon)
+			-- his plain boxes are Parts (the engine batches them), the shaped meshes stay MeshParts
+			t.eq(counter.ClassName, "Part")
+			t.near(counter.Size.Z, record("CAFE_CounterTop").box[3], 1e-4)
+			t.eq(shop.CAFE_Stool_01_Legs.ClassName, "MeshPart")
+			t.eq(floor.ClassName, "MeshPart")
+			t.eq(glass.ClassName, "MeshPart")
+			local roof = root:FindFirstChild("ArtRoof")
+			local band, rb = roof["AsphaltShingleBand_-1_00"], record("AsphaltShingleBand_-1_00")
+			t.eq(band.ClassName, "Part")
+			t.falsy(band.CanCollide)
+			-- turned with his slope: its up is his up, in the shop's frame
+			local up = pivot:VectorToWorldSpace(Vector3.new(rb.up[1], rb.up[2], rb.up[3]))
+			t.truthy(band.CFrame.UpVector:Dot(up) > 0.9999, "the band lies on his slope")
+			t.truthy(
+				(band.CFrame.Position - (pivot * CFrame.new(rb.at[1], rb.at[2], rb.at[3])).Position).Magnitude < 1e-3
+			)
+			t.eq(report.boxes, 3)
+			t.eq(report.glowing, 1)
+			-- in his file: 45 plain boxes in the shop and all 90 roof meshes
+			local shopBoxes, roofBoxes = 0, 0
+			for _, r in art.shop do
+				if r.box then
+					shopBoxes += 1
+				end
+			end
+			for _, r in art.roofParts do
+				if r.box then
+					roofBoxes += 1
+				end
+			end
+			t.eq(shopBoxes, 45)
+			t.eq(roofBoxes, #art.roofParts)
 			-- a second run loads nothing again
 			ShopArt.install(root, {
 				data = art,
@@ -333,5 +669,58 @@ return function(t)
 		local folder = Instance.new("Folder")
 		root.Parent = folder
 		t.eq(#ShopArt.venues(folder), 1)
+	end)
+
+	t.test("the boot's one call: carves and loads the shop, and says so when its bake was not run", function()
+		-- a place built without the shop's bake: an empty Expansion slot, and the server says why
+		local empty = Instance.new("Folder")
+		local warned: { string } = {}
+		local r = ShopArt.start(empty, {
+			data = art,
+			env = ENV,
+			heartbeat = false,
+			fill = function() end,
+			warn = function(m: string)
+				table.insert(warned, m)
+			end,
+		})
+		t.eq(r.venues, 0)
+		t.eq(#warned, 1)
+		t.truthy(string.find(warned[1], "tools/bake/neighbourhood_shop.luau", 1, true), warned[1])
+		-- no Workspace.Expansion at all: the same warning, nothing else
+		t.truthy(ShopArt.start(nil, { data = art, heartbeat = false, warn = function() end }).missing)
+		-- the baked shop: carved at once, loaded in the spawned task, no warning
+		local expansion = Instance.new("Folder")
+		local root = bake()
+		root.Parent = expansion
+		local carved, spawned, said = 0, 0, {}
+		warned = {}
+		local r2 = ShopArt.start(expansion, {
+			data = art,
+			env = ENV,
+			fill = function()
+				carved += 1
+			end,
+			load = function(): any
+				return asset({ "CAFE_CounterTop" })
+			end,
+			spawn = function(f: () -> ())
+				spawned += 1
+				f()
+			end,
+			print = function(m: string)
+				table.insert(said, m)
+			end,
+			warn = function(m: string)
+				table.insert(warned, m)
+			end,
+		})
+		t.eq(r2.venues, 1)
+		t.eq(r2.missing, nil)
+		t.eq(carved, 1)
+		t.eq(spawned, 1)
+		t.eq(#warned, 0)
+		t.eq(root:GetAttribute("ArtLoaded"), "Shop,Roof")
+		t.eq(#said, 1)
 	end)
 end
