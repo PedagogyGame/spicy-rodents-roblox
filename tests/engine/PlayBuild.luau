@@ -269,6 +269,35 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		check(best < 16, `police officer {best} studs from the nearest patrol car (reach 16)`)
 	end
 
+	-- the wallet (Economy/Credits; added 2026-11-13 and NOT yet run in the cloud): pocket money on joining,
+	-- a purchase, the pass on the day clock, and the minigames' charge all on the one balance ---------------
+	local wallet = G.wallet
+	check(wallet ~= nil, "Game has no wallet")
+	if wallet then
+		wallet.join(player)
+		numbers.pocket = wallet.balance(player)
+		check(numbers.pocket == 300, `pocket money {numbers.pocket} (want 300)`)
+		check(player.attrs.Cents == 300, `Cents attribute {player.attrs.Cents}`)
+		local paid, paidWords = wallet.spend(player, 12, "coffee")
+		check(paid and paidWords == "Paid 12c for coffee. You have S$2.88.", `a coffee: {paidWords}`)
+		check(
+			player.attrs.Cents == 288 and player.attrs.CentsWhy == "coffee",
+			"the balance on the player did not follow"
+		)
+		local short, shortWords = wallet.spend(player, 1000, "a jet ski")
+		check(not short and shortWords == "You need 1000c; you have 288c", `too dear: {shortWords}`)
+		local bought, boughtWords = wallet.pass.buy(player)
+		check(bought and wallet.pass.has(player), `the pass: {boughtWords}`)
+		numbers.passDays = wallet.pass.left(player)
+		check(math.abs(numbers.passDays - 5) < 0.01, `a new pass has {numbers.passDays} days`)
+		check(type(player.attrs.PassUntil) == "number", "no PassUntil on the player")
+		if G.attractions and G.attractions.minigames then
+			local okC, wordsC = G.attractions.minigames.town.charge(player, 1000, "a game")
+			check(not okC and wordsC == "You need 1000c; you have 268c", `ctx.town.charge is not the wallet: {wordsC}`)
+		end
+		numbers.cents = wallet.balance(player)
+	end
+
 	local okLedger, errors = possession:check()
 	check(okLedger, `possession ledger: {table.concat(errors, "; ")}`)
 	numbers.movement = G.movement:stats()

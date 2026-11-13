@@ -3,7 +3,8 @@
 -- parts (the cloud checks cannot be run from here, and they have no clients or physics anyway). Datatypes
 -- (Vector3, CFrame, Color3, Enum) are Lune's real ones; instances are small Luau tables with the handful of
 -- members the glue uses: a tree (Parent, FindFirstChild, GetChildren, GetDescendants, IsA, Destroy, Clone),
--- attributes, properties as plain fields, Position from CFrame, and Model:GetPivot / PivotTo that carry the
+-- attributes (GetAttributeChangedSignal fires when SetAttribute writes a different value), properties as plain
+-- fields, Position from CFrame, and Model:GetPivot / PivotTo that carry the
 -- model's parts along; the usual events (Activated, Triggered, OnClientEvent ...) appear as signals the test
 -- fires; RemoteEvent:FireServer records what was sent. No physics, no replication.
 -- The engine globals exist only between install() and uninstall(): use `FakeEngine.with(function() ... end)`.

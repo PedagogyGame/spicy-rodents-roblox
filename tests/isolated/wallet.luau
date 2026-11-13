@@ -15,8 +15,10 @@ local Tunables = require("@shared/Config/Tunables")
 local Credits = require("@server/Economy/Credits")
 local RoleLab = require("@server/Roles/RoleLab")
 local RoleService = require("@server/Roles/RoleService")
+local WalletHud = require("@client/UI/WalletHud")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local Rig = require("@tests/lib/MinigameRig")
+local roblox = require("@lune/roblox")
 
 local SITE, PLACE, S = FakeGames.SITE, FakeGames.PLACE, FakeGames.STATIONS
 local DAY = 720
@@ -367,7 +369,7 @@ return function(t)
 			t.deepEq({ charge(r.player, 500, "the arena") }, { false, "You need 500c; you have 280c" })
 			t.deepEq({ charge(Rig.stub("Bob"), 5, "a token") }, { false, Bank.WORDS.none })
 			t.eq(w.wallet.balance(r.player), 280)
-			-- and a game through its framework, start to end card, costs nothing and is not disturbed
+			-- and sitting down at a game through the framework costs nothing and is not disturbed
 			Rig.press(r, S.coin)
 			Rig.run(r, 0.3)
 			t.eq(r.client.active(), S.coin)
@@ -392,4 +394,161 @@ return function(t)
 			end
 		end, opts({ stand = AT_CABINET }))
 	end)
+
+	t.test(
+		"the HUD's words: the balance, a change with its reason, pocket money, the pass in days and minutes",
+		function()
+			t.eq(WalletHud.balanceText(300), "Wallet  S$3.00")
+			t.eq(WalletHud.balanceText(0), "Wallet  S$0.00")
+			t.eq(WalletHud.balanceText(123456), "Wallet  S$1,234.56")
+			t.eq(WalletHud.changeText(-12, "coffee"), "-12c  coffee")
+			t.eq(WalletHud.changeText(5, "mowing a lawn"), "+5c  mowing a lawn")
+			t.eq(WalletHud.changeText(-204, "the corner store"), "-S$2.04  the corner store")
+			t.eq(WalletHud.changeText(7, nil), "+7c")
+			t.eq(WalletHud.pocketText(300), "Pocket money: S$3.00 to spend")
+			t.eq(WalletHud.passText(14 * DAY, 9 * DAY, DAY), "Pass: 5.0 days (60 min)")
+			t.eq(WalletHud.passText(14 * DAY, 10.5 * DAY, DAY), "Pass: 3.5 days (42 min)")
+			t.eq(WalletHud.passText(14 * DAY, 13.5 * DAY, DAY), "Pass: 6 min left")
+			t.eq(WalletHud.passText(14 * DAY, 14 * DAY - 1, DAY), "Pass: 1 min left")
+			t.eq(WalletHud.passText(14 * DAY, 14 * DAY, DAY), nil, "run out")
+			t.eq(WalletHud.passText(nil, 0, DAY), nil, "no pass")
+		end
+	)
+
+	t.test("the HUD: the balance is always on screen and changes the moment the server's wallet does", function()
+		FakeEngine.with(function()
+			local w = town()
+			local player = (game :: any):GetService("Players").LocalPlayer
+			local heartbeat = (game :: any):GetService("RunService").Heartbeat
+			local hud = WalletHud.start({
+				now = function(): number
+					return w.t
+				end,
+				daySeconds = DAY,
+			})
+			-- where and how: its own ScreenGui under PlayerGui, in the HUD's style, bottom-right
+			t.truthy(hud.gui.Parent == player:FindFirstChild("PlayerGui"))
+			t.eq(hud.gui.Name, "SpicyWallet")
+			t.eq(hud.balance.Font, roblox.Enum.Font.GothamBold)
+			t.eq(hud.balance.BackgroundTransparency, 0.45)
+			t.eq(hud.balance.BackgroundColor3, roblox.Color3.new(0, 0, 0))
+			local stack = hud.gui:FindFirstChild("Stack")
+			t.eq(stack.AnchorPoint, roblox.Vector2.new(1, 1))
+			t.truthy(stack.Position.X.Scale == 1 and stack.Position.Y.Scale == 1, "anchored to the bottom-right corner")
+			-- before the server has written anything there is nothing to draw (never a made-up balance)
+			t.falsy(hud.balance.Visible)
+			t.falsy(hud.note.Visible)
+			t.falsy(hud.pass.Visible)
+			-- the server opens the account: the balance and the pocket money line appear at once
+			w.wallet.join(player)
+			t.truthy(hud.balance.Visible)
+			t.eq(hud.balance.Text, "Wallet  S$3.00")
+			t.truthy(hud.note.Visible)
+			t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+			t.falsy(hud.pass.Visible)
+			FakeEngine.runDelayed()
+			t.falsy(hud.note.Visible, "the pocket money line goes after a while")
+			t.truthy(hud.balance.Visible, "the balance never does")
+			-- a purchase: the new balance in the same instant, the change and its reason above it, in red
+			t.truthy(w.wallet.spend(player, 12, "coffee"))
+			t.eq(hud.balance.Text, "Wallet  S$2.88")
+			t.truthy(hud.note.Visible)
+			t.eq(hud.note.Text, "-12c  coffee")
+			t.eq(hud.note.TextColor3, roblox.Color3.fromRGB(255, 130, 110))
+			t.eq(hud.balance.TextColor3, roblox.Color3.fromRGB(255, 130, 110), "the balance flashes")
+			-- pay: green
+			t.truthy(w.wallet.add(player, 5, "mowing a lawn"))
+			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.eq(hud.note.Text, "+5c  mowing a lawn")
+			t.eq(hud.note.TextColor3, roblox.Color3.fromRGB(120, 230, 120))
+			FakeEngine.runDelayed()
+			t.falsy(hud.note.Visible)
+			t.eq(hud.balance.TextColor3, roblox.Color3.new(1, 1, 1), "and settles back to white")
+			-- a refusal changes nothing on screen (the shop shows the words itself)
+			t.falsy((w.wallet.spend(player, 999, "a jet ski")))
+			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.falsy(hud.note.Visible)
+			-- a purchase that could not be handed over: down and straight back up, ending on the refund
+			w.wallet.spend(player, 30, "a kite", function(): (boolean?, string?)
+				return false
+			end)
+			t.eq(hud.balance.Text, "Wallet  S$2.93")
+			t.eq(hud.note.Text, "+30c  refund: a kite")
+			FakeEngine.runDelayed()
+			-- the pass: a line of its own with the time left, counted down from the day clock once a second
+			t.truthy(w.wallet.pass.buy(player))
+			t.eq(hud.balance.Text, "Wallet  S$2.73")
+			t.eq(hud.note.Text, "-20c  a paintball pass")
+			t.truthy(hud.pass.Visible)
+			t.eq(hud.pass.Text, "Pass: 5.0 days (60 min)")
+			w.t += 1.5 * DAY
+			heartbeat.fire(0.4)
+			t.eq(hud.pass.Text, "Pass: 5.0 days (60 min)", "not recounted every frame")
+			heartbeat.fire(0.7)
+			t.eq(hud.pass.Text, "Pass: 3.5 days (42 min)")
+			w.t += 3 * DAY
+			heartbeat.fire(1)
+			t.eq(hud.pass.Text, "Pass: 6 min left")
+			w.t += 0.5 * DAY
+			heartbeat.fire(1)
+			t.falsy(hud.pass.Visible, "run out: the line goes")
+			t.truthy(hud.balance.Visible)
+			-- bought again: back at once (PassUntil changed), no waiting for the next second
+			t.truthy(w.wallet.pass.buy(player))
+			t.truthy(hud.pass.Visible)
+			t.eq(hud.pass.Text, "Pass: 5.0 days (60 min)")
+			-- stopped: gone from the screen and deaf to the wallet
+			FakeEngine.runDelayed()
+			hud.stop()
+			t.eq(hud.gui.Parent, nil)
+			t.eq(player:GetAttributeChangedSignal("Cents").count(), 0)
+			t.eq(heartbeat.count(), 0)
+			w.wallet.spend(player, 1, "bubble gum")
+			t.eq(hud.balance.Text, "Wallet  S$2.53", "nothing redrawn after stop")
+		end)
+	end)
+
+	t.test(
+		"the HUD started after the money is already there (every real join): everything shows at once, on the day clock",
+		function()
+			FakeEngine.with(function()
+				local w = town()
+				local player = (game :: any):GetService("Players").LocalPlayer
+				w.wallet.join(player)
+				w.wallet.pass.buy(player)
+				-- the day clock as Boot/DayClock publishes it, and the clock every client shares
+				local rs = (game :: any):GetService("ReplicatedStorage")
+				rs:SetAttribute("ClockRealSecondsPerDay", DAY)
+				rs:SetAttribute("ClockBase", 9 * DAY)
+				rs:SetAttribute("ClockRate", 1)
+				rs:SetAttribute("ClockEpoch", 5000)
+				local serverTime = 5000 + 2 * DAY
+				rawset(workspace, "GetServerTimeNow", function(_self: any): number
+					return serverTime
+				end)
+				local hud = WalletHud.start()
+				t.eq(hud.balance.Text, "Wallet  S$2.80")
+				t.truthy(hud.balance.Visible)
+				t.eq(hud.note.Text, "Pocket money: S$3.00 to spend")
+				t.truthy(hud.note.Visible)
+				t.truthy(hud.pass.Visible)
+				t.eq(hud.pass.Text, "Pass: 3.0 days (36 min)", "two days into a five-day pass, by the published clock")
+				-- a second HUD line never hides the first: three lines, three labels, stacked by the layout
+				local stack = hud.gui:FindFirstChild("Stack")
+				t.truthy(stack:FindFirstChildOfClass("UIListLayout") ~= nil)
+				t.truthy(hud.note.LayoutOrder < hud.pass.LayoutOrder and hud.pass.LayoutOrder < hud.balance.LayoutOrder)
+				-- a player with an empty wallet still sees it
+				hud.stop()
+				player:SetAttribute("Cents", 0)
+				player:SetAttribute("PocketMoney", nil)
+				player:SetAttribute("PassUntil", nil)
+				local empty = WalletHud.start()
+				t.truthy(empty.balance.Visible)
+				t.eq(empty.balance.Text, "Wallet  S$0.00")
+				t.falsy(empty.note.Visible)
+				t.falsy(empty.pass.Visible)
+				empty.stop()
+			end)
+		end
+	)
 end
