@@ -1,0 +1,631 @@
+--!strict
+-- ServerScriptService.Server.Minigames.Paintball.Stream
+-- What the paintball service keeps for one PERSON in a match, and the judgment of everything that
+-- person's client claims (checklist PB-3, PB-9; Shared/Minigames/Paintball/Contract, "who is trusted
+-- for what"; PaintballService, "the remotes"). Pure: no Instances, no remotes, no match model. The
+-- service owns the seat, the team and the body; this module owns the stream.
+--   a Move    judge(): dropped (an old placement number, an out slot, a bad or old stamp), refused with
+--             a Contract.WHY code (inside, height, walls, distance, the body: the first failure wins)
+--             or accepted, in which case it becomes the anchor and joins the last Clock.MOVES_KEPT
+--   a click   clickOk(): the three of the service's checks that read the Move buffer (the sprint
+--             window, the spawn rooms, the origin), all at one time
+--   a pose    poseAt(): "the slot's pose at t", the straight line between the two Moves either side
+--             of t, held at the newest and at the oldest, the anchor when there are none
+-- THE HEIGHT RULE is one function, supportedOrFalling(). The contract words it: a pose no higher than
+-- the walking surface under it + Body.JUMP_HEIGHT + TRUST.jumpSlack is SUPPORTED; an unsupported pose
+-- is accepted while it does not rise (TRUST.riseSlack above the last accepted pose) and has not been
+-- unsupported, by the Moves' own t, for longer than TRUST.fallSecs. Here supported is as written, with
+-- one thing added, and unsupported is ONE ENVELOPE in the place of the two clauses:
+--   A BODY HAS A FOOTPRINT. Arena.ground is asked about a point, and a body standing at the very edge
+--   of a floor or a landing (to look down the atrium, which everybody does) has its feet point past
+--   the edge while its feet are still on it. A pose is supported if the surface under it, OR under a
+--   point FOOT to any of its four sides, is. Without this an honest player at an edge is refused after
+--   fallSecs for as long as they stand there.
+--   A FALL IS A HOP AT THE MOST, AND IT MUST FALL. `standY` is the walking surface the body last stood
+--   on (within TRUST.groundSlack of it: a body in the air keeps the one it took off from, so a hop
+--   taken running down a stair is a hop from the step it left). An unsupported pose, `tau` seconds
+--   after the first unsupported Move of its fall, may be no higher than standY + JUMP_HEIGHT +
+--   jumpSlack - FALL_FLOOR x tau^2 (a quarter of the engine's gravity: a real fall is four times
+--   that), and tau may be no more than fallSecs. So a body may step off an
+--   edge and drop, and may RUN AND JUMP off it (the whole arc of a hop from the edge lies under the
+--   envelope, with a third of a stud to spare); it may not go higher than a hop, stay level for more
+--   than a third of a second, or glide. As written, the hop is refused (its Moves rise, with nothing
+--   under them, above the last accepted pose: every running jump off a balcony was three refusals and
+--   a yank back to the edge), and a pose may be walked level out over the atrium for the whole of
+--   fallSecs (25 studs at a walk, the atrium's 30 at a sprint). (Both reported.)
+-- THE BODY RULE (Contract, "the body": a pose within TRUST.bodySlack of the replicated body) is kept
+-- sideways always and up-and-down only for a body that stands: the replicated body trails its own
+-- client's Moves by the engine's physics replication, and a body dropping down the atrium at 100 studs
+-- a second is more than bodySlack behind its Move within a tenth of a second. While a pose is falling,
+-- and for LANDING seconds after, the height rule alone judges how high it is.
+-- AND NOT AT ALL FOR TRUST.placeGrace AFTER A PLACEMENT. The server has just moved the body (a respawn, a
+-- correction), and the body is its player's to simulate: what the server reads of it for the next
+-- moments may still be what that client sent before it heard (the contract gives the framework's
+-- walk-away check, which reads the same body, the same second for the same reason). A Move with the new
+-- placement number was sampled by a client that has heard, at the new place; held to a body the server
+-- still reads at the old one it is refused, three of them are a correction, a correction is a
+-- placement, and the player is put back again and again for nothing they did. For that second the pose
+-- is held to everything else (walls, height, the distance budget from the place the server chose),
+-- which is what holds a liar at any time: the body rule adds nothing against one (nobody is shown the
+-- body). NOT SEEN ON A REAL SERVER: the fake engine's body is where it is put. (Reported.)
+-- A CLICK THAT CAME LATE (lateClickOk). The contract judges a click at f, the fire time held to the
+-- shooter's own delay. A click behind a lost packet arrives later than that delay explains: f is then
+-- later than the click, the body has walked on, and a strafing shooter's honest shot would be refused
+-- ("origin"). A click that fails at f is ALSO judged at its own stamp, but its stamp is believed only
+-- for WHERE the shot left from: no further back than lateWindow (the shooter's own delay, a resend's
+-- round trip and a floor, at most Clock.MAG_LATE), and WHETHER it could fire is held to f as well (no
+-- sprint Move from the click to f, in no spawn room at the click or at f, and the origin's height fits
+-- the stance the server holds at f). What a liar gains: a shot from where they really stood up to
+-- lateWindow ago, in the stance they still hold, born no earlier than f; a sprinter, a shooter back in
+-- its room and a crouched body behind a rail gain nothing. (Reported; found in review: as first built
+-- the stamp chose the time of every check, and a back-dated click fired from safety, while sprinting
+-- and over a rail from a crouch.)
+-- Interface: new(player, now, placeFrom?) -> Person; restart(person, now); placed(person, x, y, z, yaw,
+--   now, feel, stand); judge(person, rec, now, arena, feel, otherRoom?, bx?, by?, bz?) -> (verdict,
+--   why?, rule?); RULES; refused(person, now) -> correct; poseAt(person, t) -> (x, y, z, yaw, pitch, bits,
+--   newestT); ease(person, tick, feel) -> crouch; crouchAt(person, t) -> crouch; sprinting(person, f)
+--   -> boolean; originOk(person, f, ox, oy, oz, sweep, feel, now?) -> boolean; clickOk(person, f, ox,
+--   oy, oz, arena, feel) -> why?; lateWindow(person) -> seconds; lateClickOk(person, click, f, ox, oy,
+--   oz, arena, feel, now) -> why?; silent(person, now) -> (stale, drop); types Move, Person, Verdict
+
+local Import = require("../../Import")
+local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
+	Import.shared("Minigames/Paintball/Arena")
+local Body: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Body)) =
+	Import.shared("Minigames/Paintball/Body")
+local Clock: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Clock)) =
+	Import.shared("Minigames/Paintball/Clock")
+local Contract: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
+	Import.shared("Minigames/Paintball/Contract")
+local Wire: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wire)) =
+	Import.shared("Minigames/Paintball/Wire")
+
+type Arena = typeof(ArenaModule.T.Arena)
+type Room = typeof(ArenaModule.T.Room)
+type Feel = typeof(Contract.T.Feel)
+type View = typeof(Clock.newView())
+type Sweep = (
+	x0: number,
+	y0: number,
+	z0: number,
+	x1: number,
+	y1: number,
+	z1: number
+) -> (number?, number, number, number, number)
+
+-- An accepted pose, as the client sampled it (arena frame; t on the shared clock).
+export type Move = { t: number, x: number, y: number, z: number, yaw: number, pitch: number, bits: number }
+
+export type Person = {
+	player: any,
+	seat: number, -- the slot it holds (the service keeps this right: seats are dealt again at every match)
+	place: number, -- the placement number (Wire.nextPlace); 0 until the server first places the body
+	placeFrom: number, -- the number the next placement counts on from (it outlives a re-seating)
+	placedAt: number, -- when the server last moved the body
+	moves: { Move }, -- the last Clock.MOVES_KEPT accepted Moves, oldest first; emptied by every placement
+	anchor: Move, -- the last accepted pose (after a placement: the pose the server placed)
+	up: View, -- the smoothed delay between a Move's t and its arrival
+	budget: number, -- horizontal studs it may still move
+	crouch: number, -- the crouch fraction, eased by the service once a snapshot tick
+	lastT: number, -- the t of the last accepted Move
+	lastM: number?, -- the magazine time of its last accepted shot
+	shot: number, -- the counter of its last judged click
+	heardAt: number, -- when a Move last got as far as being judged
+	out: boolean, -- tagged out: Moves are dropped and the pose is held until the respawn
+	-- when its side was changed under it (the "side" verb) while it was in play: the match owes it a
+	-- placement in its new side's room, and until that comes (for TRUST.placeGrace at the most) its Moves
+	-- are dropped: they are from the room that has just become the other side's
+	owedSince: number?,
+	fallSince: number?, -- the t of the first unsupported Move of the fall it is in
+	standY: number, -- the walking surface the body last stood on (the one a hop or a fall began from)
+	fellAt: number, -- the t of the last accepted Move that was falling
+	crouchLog: { number }, -- (tick, crouch fraction) pairs of the last CROUCH_KEPT snapshot ticks, oldest first
+	refusals: { number }, -- when its recent Moves were refused (inside TRUST.refusalWindow)
+	idleAt: number, -- when it last moved, turned or fired
+	idleX: number,
+	idleY: number,
+	idleZ: number,
+	idleYaw: number,
+	idlePitch: number,
+}
+
+export type Verdict = "dropped" | "refused" | "accepted"
+
+local T = Contract.TRUST
+local BIT = Wire.BIT
+local IDLE_STUDS = 0.5
+local IDLE_RAD = 0.05
+-- PROVISIONAL (FOOT, FALL_FLOOR, LANDING and the body rule's placeGrace bypass): tuned against scripted bodies
+-- on the fake engine, whose replicated body is wherever the client's Move says. None has met a Roblox Humanoid
+-- on the stair cores, off an atrium edge or replicated with physics interpolation. tools/cloud/tasks/
+-- paintball_walk.luau walks a real R15 body over the whole building and prints the refusals by rule
+-- (Stats.movesRefusedBy) when server checks return; until it has run with no correction these numbers are
+-- a first guess. (A server with no clients simulates the body itself, so that check holds the height rule
+-- and the footprint to real physics; the body rule's replication lag needs a client, a Studio test.)
+local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands on
+local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
+local LANDING = 0.25 -- seconds after a fall in which the replicated body may still be coming down
+local CROUCH_KEPT = 14 -- snapshot ticks of crouch kept (0.7 s: past Clock.MAG_LATE and a tick each side)
+local LOST_FLOOR = 0.2 -- seconds: the least a lost reliable packet waits before it is sent again
+
+local Stream = {}
+
+-- The rules a Move can be refused by (judge's third result; Stats.movesRefusedBy counts by them): outside the
+-- volume or inside a box, inside the other team's spawn room, the height rule, a wall between it and the
+-- anchor, the distance budget, the replicated body.
+Stream.RULES = table.freeze({ "inside", "room", "height", "walls", "speed", "body" })
+
+local function fullBudget(crouch: number, feel: Feel): number
+	return Body.speed(crouch, false, feel) * T.speedTolerance * T.speedWindow
+end
+
+-- A person newly seated. `placeFrom` is the last placement number this player was ever given (so a
+-- Move from an earlier seating can never carry the number of a new placement).
+function Stream.new(player: any, now: number, placeFrom: number?): Person
+	return {
+		player = player,
+		seat = 0,
+		place = 0,
+		placeFrom = placeFrom or 0,
+		placedAt = -math.huge,
+		moves = {},
+		anchor = { t = -math.huge, x = 0, y = 0, z = 0, yaw = 0, pitch = 0, bits = 0 },
+		up = Clock.newView(),
+		budget = 0,
+		crouch = 0,
+		lastT = -math.huge,
+		lastM = nil,
+		shot = 0,
+		heardAt = now,
+		out = false,
+		owedSince = nil,
+		fallSince = nil,
+		standY = 0,
+		fellAt = -math.huge,
+		crouchLog = {},
+		refusals = {},
+		idleAt = now,
+		idleX = 0,
+		idleY = 0,
+		idleZ = 0,
+		idleYaw = 0,
+		idlePitch = 0,
+	}
+end
+
+-- A new match: the placement number, the upstream delay, the magazine time and the shot counter carry
+-- on; the rest starts afresh (the first placement of the match follows at once).
+function Stream.restart(person: Person, now: number)
+	table.clear(person.moves)
+	person.budget = 0
+	person.crouch = 0
+	person.heardAt = now
+	person.out = false
+	person.owedSince = nil
+	person.fallSince = nil
+	person.fellAt = -math.huge
+	table.clear(person.crouchLog)
+	table.clear(person.refusals)
+	person.idleAt = now
+end
+
+-- The server put the body at this pose (a respawn, a correction): a new placement number, the pose is
+-- the anchor, the Move buffer is empty. `stand` (a respawn) also stands the body up and fills the budget.
+function Stream.placed(
+	person: Person,
+	x: number,
+	y: number,
+	z: number,
+	yaw: number,
+	now: number,
+	feel: Feel,
+	stand: boolean
+)
+	local place = Wire.nextPlace(math.max(person.place, person.placeFrom))
+	person.place = place
+	person.placeFrom = place
+	person.placedAt = now
+	person.owedSince = nil
+	-- (silence is measured from here: a client that was tagged out has sent nothing since the tag, and
+	-- is owed the whole of Clock.DROP_SECS to be heard from again, not what the respawn left of it)
+	person.heardAt = now
+	table.clear(person.moves)
+	local bits = if stand then 0 else bit32.band(person.anchor.bits, BIT.crouch)
+	-- (its t is the placement's own time: a shot fired before any Move has come is costed from here)
+	person.anchor = { t = now, x = x, y = y, z = z, yaw = yaw, pitch = 0, bits = bits }
+	if stand then
+		person.crouch = 0
+		table.clear(person.crouchLog)
+		person.out = false
+		-- (a placement is the server's doing: it does not restart the idle clock, but the pose idleness is
+		-- measured against is the one the body now stands at)
+		person.idleX, person.idleY, person.idleZ, person.idleYaw, person.idlePitch = x, y, z, yaw, 0
+	end
+	-- A respawn starts with the budget full. A CORRECTION starts with it empty: a client that is refused
+	-- and put back would otherwise be handed half a second of free distance every time, and one that
+	-- wanted to be refused could outrun a sprint on corrections alone. An honest client loses nothing:
+	-- its first Move after the correction fills the budget with that Move's own time.
+	person.budget = if stand then fullBudget(person.crouch, feel) else 0
+	person.fallSince = nil
+	person.standY = y
+	person.fellAt = -math.huge
+	table.clear(person.refusals)
+end
+
+-- THE HEIGHT RULE (Contract, "height"; the header says where it is not as written). Returns ok, whether
+-- the pose is unsupported (falling), and for a supported pose the surface it stands on.
+local function supportedOrFalling(
+	person: Person,
+	arena: Arena,
+	t: number,
+	x: number,
+	y: number,
+	z: number
+): (boolean, boolean, number)
+	local ground = arena.ground(x, y, z)
+	if ground == nil or y < ground - T.groundSlack then
+		return false, false, 0
+	end
+	local reach = Body.JUMP_HEIGHT + T.jumpSlack
+	if y <= ground + reach then
+		return true, false, ground
+	end
+	-- a body has a footprint: at the very edge of a floor the feet point is past it
+	for i = 1, 4 do
+		local dx = if i == 1 then FOOT elseif i == 2 then -FOOT else 0
+		local dz = if i == 3 then FOOT elseif i == 4 then -FOOT else 0
+		local side = arena.ground(x + dx, y, z + dz)
+		if side ~= nil and y >= side - T.groundSlack and y <= side + reach then
+			return true, false, side
+		end
+	end
+	-- not supported: no higher than a hop from where it last stood, coming down, and not for long
+	local since = person.fallSince
+	local tau = if since ~= nil then t - since else 0
+	if tau > T.fallSecs or y > person.standY + reach - FALL_FLOOR * tau * tau then
+		return false, true, 0
+	end
+	return true, true, 0
+end
+
+-- Judge one Move record (Wire.Move, already decoded and checked finite by Shared/Net). `otherRoom` is
+-- the other team's spawn room; (bx, by, bz) the replicated body's real feet point in the arena frame,
+-- when the engine knows it. Returns the verdict and, for a refusal, the Contract.WHY code and the rule
+-- that refused it (Stream.RULES: what Stats counts refusals by, so a real body's refusals say which rule
+-- they meet). An accepted Move is taken in here; a refused one is to be handed to refused() by the caller.
+function Stream.judge(
+	person: Person,
+	rec: { [string]: number },
+	now: number,
+	arena: Arena,
+	feel: Feel,
+	otherRoom: Room?,
+	bx: number?,
+	by: number?,
+	bz: number?
+): (Verdict, string?, string?)
+	-- b. not placed yet, tagged out, or sampled before the client knew of its last placement
+	if person.place == 0 or person.out or rec.place ~= person.place then
+		return "dropped", nil, nil
+	end
+	-- (its side has just been changed and its new placement has not come yet)
+	local owed = person.owedSince
+	if owed ~= nil then
+		if now - owed <= T.placeGrace then
+			return "dropped", nil, nil
+		end
+		person.owedSince = nil
+	end
+	-- c. the stream is unreliable and unordered: only a newer stamp, and a believable one
+	local t = rec.t
+	if t <= person.lastT or t > now + T.clockSlack or t < now - T.moveAge then
+		return "dropped", nil, nil
+	end
+	-- d. it is judged: the upstream delay and the silence are measured from here
+	Clock.observe(person.up, t, now)
+	person.heardAt = now
+	local a = person.anchor
+	local x, y, z = rec.x, rec.y, rec.z
+	local half = ArenaModule.HALF
+	-- e. inside
+	if x < -half or x > half or z < -half or z > half or y < -T.groundSlack or y > ArenaModule.HEIGHT then
+		return "refused", "wall", "inside"
+	end
+	local chest = y + ArenaModule.CHEST
+	if arena.sweep(x, chest, z, x, chest + 0.01, z) ~= nil then
+		return "refused", "wall", "inside"
+	end
+	if otherRoom ~= nil and ArenaModule.inRoom(otherRoom, x, y + 0.1, z) then
+		return "refused", "wall", "room"
+	end
+	-- height
+	local ok, falling, surface = supportedOrFalling(person, arena, t, x, y, z)
+	if not ok then
+		return "refused", "wall", "height"
+	end
+	-- walls
+	if not ArenaModule.clearPath(arena.sweep, a.x, a.z, x, z, math.max(a.y, y) + ArenaModule.CHEST) then
+		return "refused", "wall", "walls"
+	end
+	-- distance: the budget fills from the Moves' own t, never from arrival
+	local gap = math.min(t - person.lastT, T.moveGap)
+	local rate = Body.speed(person.crouch, Wire.has(rec.bits, BIT.sprint), feel) * T.speedTolerance
+	local budget = math.min(person.budget + rate * gap, rate * T.speedWindow)
+	local dx, dz = x - a.x, z - a.z
+	local step = math.sqrt(dx * dx + dz * dz)
+	if step > budget then
+		return "refused", "speed", "speed"
+	end
+	-- the body (sideways always; up and down only for a body that stands; not while the server's own
+	-- placement may not have reached the body it reads: see the header)
+	if bx ~= nil and by ~= nil and bz ~= nil and now - person.placedAt > T.placeGrace then
+		local ex, ey, ez = x - bx, y - by, z - bz
+		if falling or t - person.fellAt <= LANDING then
+			ey = 0
+		end
+		if ex * ex + ey * ey + ez * ez > T.bodySlack * T.bodySlack then
+			return "refused", "wall", "body"
+		end
+	end
+	-- f. accepted
+	local move: Move = { t = t, x = x, y = y, z = z, yaw = rec.yaw, pitch = rec.pitch, bits = rec.bits }
+	local moves = person.moves
+	if #moves >= Clock.MOVES_KEPT then
+		table.remove(moves, 1)
+	end
+	table.insert(moves, move)
+	person.anchor = move
+	person.lastT = t
+	person.budget = budget - step
+	if falling then
+		if person.fallSince == nil then
+			person.fallSince = t
+		end
+		person.fellAt = t
+	else
+		person.fallSince = nil
+		if y <= surface + T.groundSlack then
+			person.standY = surface -- (on the ground: a body in a hop keeps the surface it took off from)
+		end
+	end
+	local ix, iy, iz = x - person.idleX, y - person.idleY, z - person.idleZ
+	if
+		ix * ix + iy * iy + iz * iz > IDLE_STUDS * IDLE_STUDS
+		or math.abs(rec.yaw - person.idleYaw) > IDLE_RAD
+		or math.abs(rec.pitch - person.idlePitch) > IDLE_RAD
+	then
+		person.idleAt = now
+		person.idleX, person.idleY, person.idleZ = x, y, z
+		person.idleYaw, person.idlePitch = rec.yaw, rec.pitch
+	end
+	return "accepted", nil, nil
+end
+
+-- A Move was refused. True when it is the TRUST.refusalsBeforeCorrect-th inside TRUST.refusalWindow:
+-- the service then puts the body back on the anchor (placed()).
+function Stream.refused(person: Person, now: number): boolean
+	local list = person.refusals
+	while list[1] ~= nil and now - list[1] > T.refusalWindow do
+		table.remove(list, 1)
+	end
+	table.insert(list, now)
+	return #list >= T.refusalsBeforeCorrect
+end
+
+-- "The slot's pose at t": position on the straight line between the two Moves either side of t, held
+-- at the newest and at the oldest; yaw, pitch and bits of the newer of the two; the anchor when the
+-- buffer is empty. The last value is the newest Move's t (the anchor's when there is none).
+function Stream.poseAt(person: Person, t: number): (number, number, number, number, number, number, number)
+	local moves = person.moves
+	local n = #moves
+	if n == 0 then
+		local a = person.anchor
+		return a.x, a.y, a.z, a.yaw, a.pitch, a.bits, a.t
+	end
+	local newest = moves[n]
+	if t >= newest.t then
+		return newest.x, newest.y, newest.z, newest.yaw, newest.pitch, newest.bits, newest.t
+	end
+	for i = n - 1, 1, -1 do
+		local older = moves[i]
+		if t >= older.t then
+			local newer = moves[i + 1]
+			local f = (t - older.t) / (newer.t - older.t)
+			return older.x + (newer.x - older.x) * f,
+				older.y + (newer.y - older.y) * f,
+				older.z + (newer.z - older.z) * f,
+				newer.yaw,
+				newer.pitch,
+				newer.bits,
+				newest.t
+		end
+	end
+	local oldest = moves[1]
+	return oldest.x, oldest.y, oldest.z, oldest.yaw, oldest.pitch, oldest.bits, newest.t
+end
+
+-- The snapshot tick `tick`: the crouch fraction takes one step towards what the newest Move's crouch bit
+-- asks for (Body.crouchStep over one snapshot interval), and the step is logged.
+function Stream.ease(person: Person, tick: number, feel: Feel): number
+	local moves = person.moves
+	local newest = if #moves > 0 then moves[#moves].bits else person.anchor.bits
+	local c = Body.crouchStep(person.crouch, Wire.has(newest, BIT.crouch), 1 / Clock.SNAP_HZ, feel)
+	person.crouch = c
+	local log = person.crouchLog
+	if #log >= 2 * CROUCH_KEPT then
+		table.remove(log, 1)
+		table.remove(log, 1)
+	end
+	table.insert(log, tick)
+	table.insert(log, c)
+	return c
+end
+
+-- The crouch fraction the server held at time t: that of the newest logged tick at or before t, the
+-- oldest logged when t is before them all, the present one when nothing is logged.
+function Stream.crouchAt(person: Person, t: number): number
+	local log = person.crouchLog
+	local n = #log
+	if n == 0 then
+		return person.crouch
+	end
+	for i = n - 1, 1, -2 do
+		if log[i] <= t then
+			return log[i + 1]
+		end
+	end
+	return log[2]
+end
+
+-- Was the marker down at fire time f? A Move stamped inside (f - SPRINT_FIRE_DELAY + MARGIN.sprint, f]
+-- carries BIT.sprint. (A Move stamped after f says nothing of the click: sprint may begin again the
+-- frame after the ball has left, and an unreliable Move may overtake the reliable click.)
+function Stream.sprinting(person: Person, f: number): boolean
+	local after = f - Body.SPRINT_FIRE_DELAY + Contract.MARGIN.sprint
+	for _, move in person.moves do
+		if move.t > after and move.t <= f and Wire.has(move.bits, BIT.sprint) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Did a shot leave from this person's own eye at fire time f (Contract, "the origin")?
+-- With `now` (a click judged at its own stamp, earlier than the contract's f: clickOk) the stance is
+-- the one the server held when the Moves of that time were arriving: the crouch logged at f + the
+-- upstream delay, and where the crouch bit of the Move at f was heading.
+function Stream.originOk(
+	person: Person,
+	f: number,
+	ox: number,
+	oy: number,
+	oz: number,
+	sweep: Sweep,
+	feel: Feel,
+	now: number?
+): boolean
+	local x, y, z, _, _, bitsAt, newestT = Stream.poseAt(person, f)
+	local newestBits = if #person.moves > 0 then person.moves[#person.moves].bits else person.anchor.bits
+	local crouch = person.crouch
+	if now ~= nil then
+		crouch = Stream.crouchAt(person, math.min(now, f + (person.up.lag or 0)))
+		newestBits = bitsAt
+	end
+	local past = math.max(0, f - newestT)
+	local reach = T.originSlack + Body.speed(crouch, false, feel) * past
+	local dx, dz = ox - x, oz - z
+	if dx * dx + dz * dz > reach * reach then
+		return false
+	end
+	local eyeA = Body.eye(crouch)
+	local eyeB = Body.eye(if Wire.has(newestBits, BIT.crouch) then 1 else 0)
+	local slack = T.originSlackY + (if Wire.has(newestBits, BIT.air) then Body.JUMP_HEIGHT else 0)
+	if oy < y + math.min(eyeA, eyeB) - slack or oy > y + math.max(eyeA, eyeB) + slack then
+		return false
+	end
+	return ArenaModule.clearPath(sweep, x, z, ox, oz, oy)
+end
+
+local function inEitherRoom(arena: Arena, x: number, y: number, z: number): boolean
+	local rooms = arena.spawnRooms
+	return ArenaModule.inRoom(rooms[1], x, y + 0.1, z) or ArenaModule.inRoom(rooms[2], x, y + 0.1, z)
+end
+
+-- The three things a click is judged on from the shooter's own stream, all at the contract's fire time
+-- f (PaintballService.onFire c, d, e): the sprint window, the spawn rooms, the origin. Returns the
+-- Contract.WHY code of the first that refuses it, or nil.
+function Stream.clickOk(
+	person: Person,
+	f: number,
+	ox: number,
+	oy: number,
+	oz: number,
+	arena: Arena,
+	feel: Feel
+): string?
+	if Stream.sprinting(person, f) then
+		return "sprint"
+	end
+	local x, y, z = Stream.poseAt(person, f)
+	if inEitherRoom(arena, x, y, z) then
+		return "safe"
+	end
+	if not Stream.originOk(person, f, ox, oy, oz, arena.sweep, feel) then
+		return "origin"
+	end
+	return nil
+end
+
+-- How far before its arrival a late click may be judged at its own stamp (the header, "a click that
+-- came late"): its own delay up, the round trip a lost packet waits before it is sent again (2 up), the
+-- engine's floor on that wait (LOST_FLOOR) and the stamping tolerance; never more than Clock.MAG_LATE.
+-- A shooter on a fast connection is held to a short window: 0.275 s at no delay, 0.395 at 80 ms.
+function Stream.lateWindow(person: Person): number
+	local up = person.up.lag or 0
+	return math.min(Clock.MAG_LATE, 3 * up + LOST_FLOOR + Clock.REWIND_TOLERANCE)
+end
+
+-- A click that failed at f, judged again at its own stamp `click` (earlier than f; the caller holds it
+-- inside lateWindow). The stamp says only WHERE the shot left from; WHETHER the shooter could fire is
+-- held to f as well, so a liar who back-dates a click buys an origin and nothing else:
+--   sprint  refused if any Move in (click - SPRINT_FIRE_DELAY + MARGIN.sprint, f] carries BIT.sprint:
+--           the marker was down at the click, or has been since (a sprinter cannot fire by naming a
+--           moment before the sprint);
+--   room    refused if the pose at the click OR at f is inside a spawn room (a shooter who has walked
+--           back into its room, where it cannot be hit, cannot fire from the doorway it just left);
+--   origin  the eye over the pose at the click, with the stance the server held then (originOk);
+--   stance  and the origin's height above that pose must ALSO fit the stance the server holds at f
+--           (the crouch logged one upstream delay after f, and the crouch bit of the Move at f): a
+--           shooter crouched behind a rail cannot fire over it from the standing eye of a moment ago.
+-- The cost to an honest player: a click behind a lost packet that is followed, inside that packet's
+-- delay, by a sprint or a crouch is refused (the press is lost, never a wrong ball).
+function Stream.lateClickOk(
+	person: Person,
+	click: number,
+	f: number,
+	ox: number,
+	oy: number,
+	oz: number,
+	arena: Arena,
+	feel: Feel,
+	now: number
+): string?
+	local after = click - Body.SPRINT_FIRE_DELAY + Contract.MARGIN.sprint
+	for _, move in person.moves do
+		if move.t > after and move.t <= f and Wire.has(move.bits, BIT.sprint) then
+			return "sprint"
+		end
+	end
+	local x, y, z, _, _, bitsC = Stream.poseAt(person, click)
+	local fx, fy, fz, _, _, bitsF = Stream.poseAt(person, f)
+	if inEitherRoom(arena, x, y, z) or inEitherRoom(arena, fx, fy, fz) then
+		return "safe"
+	end
+	if not Stream.originOk(person, click, ox, oy, oz, arena.sweep, feel, now) then
+		return "origin"
+	end
+	local crouchF = Stream.crouchAt(person, math.min(now, f + (person.up.lag or 0)))
+	local eyeA = Body.eye(crouchF)
+	local eyeB = Body.eye(if Wire.has(bitsF, BIT.crouch) then 1 else 0)
+	local slack = T.originSlackY + (if Wire.has(bitsC, BIT.air) then Body.JUMP_HEIGHT else 0)
+	local above = oy - y
+	if above < math.min(eyeA, eyeB) - slack or above > math.max(eyeA, eyeB) + slack then
+		return "origin"
+	end
+	return nil
+end
+
+-- Silence (Clock, "silence"): not measured while out, before the first placement, or within
+-- TRUST.placeGrace of a placement. Returns (may not fire, is to be taken off).
+function Stream.silent(person: Person, now: number): (boolean, boolean)
+	if person.place == 0 then
+		return true, false
+	end
+	if person.out or now - person.placedAt <= T.placeGrace then
+		return false, false
+	end
+	local quiet = now - person.heardAt
+	return quiet > Clock.STALE_SECS, quiet > Clock.DROP_SECS
+end
+
+return Stream

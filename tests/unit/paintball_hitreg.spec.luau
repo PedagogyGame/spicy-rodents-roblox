@@ -120,4 +120,43 @@ return function(t)
 		local r = run({ shooters = 16, bots = 10, rttMs = 150, seed = 19, rewindMode = "estimate" }, 1800)
 		t.truthy(r.agreement >= 0.95, `agreement {r.agreement}`)
 	end)
+	-- THE CONTRACT'S CONDITION (Harness, opts.contract): the match's own judgment end to end. The only history
+	-- is the 20 Hz quantised snapshot stream; each client draws from the snapshots it was actually sent (5 % of
+	-- them lost, each late by half the round trip with 12 % jitter) at its own view time, aims at that, stamps
+	-- its click and flies its own ball against what it draws; the server stamps the click with Clock.stamp
+	-- and the shooter's measured upstream delay, and judges with Hit.body in the match's own sim. The runners
+	-- crouch and stand. Measured where this was written, about 600 shots a run: 99.7 to 100 % at 0 ms, 100 %
+	-- at 80 ms, 99.4 to 99.6 % at 150 ms, 99.5 % at 200 ms; without the rewind 48 to 76 %.
+	for _, rtt in { 0, 80, 150 } do
+		t.test(
+			`the contract's condition at {rtt} ms: >= 95 % agreement with the shooter's screen over >= 400 shots, with lost snapshots and crouching runners`,
+			function()
+				local r = run({ contract = true, shooters = 16, bots = 10, rttMs = rtt, seed = 18, loss = 0.05 }, 1800)
+				t.truthy(r.shots >= 400, `shots {r.shots}`)
+				t.truthy(r.agreement >= 0.95, `agreement {r.agreement}`)
+				t.truthy(
+					r.truthHits >= 100 and r.truthHits <= r.shots - 100,
+					"hits and misses were both put to the test"
+				)
+				t.truthy(r.agreement > r.agreementNaive + 0.15, "and the rewind is what does it")
+				t.truthy(r.snapshotsLost > 0.03 * r.snapshotsSent, "snapshots were lost on the way")
+				t.truthy(r.rewindsClamped <= 2, `{r.rewindsClamped} honest stamps were clamped`)
+				t.eq(r.stuckBodies, 0)
+				t.truthy(r.botShots > 0)
+			end
+		)
+	end
+	t.test(
+		"the contract's condition at 300 ms: every stamp is at the edge of MAX_REWIND and clamped, and agreement is still >= 90 %",
+		function()
+			-- (0.15 s down, the 0.1 s of interpolation and the jitter are past Clock.MAX_REWIND's quarter of a second:
+			-- measured 93 to 96 %. That bound is the contract's choice: it is how long after ducking a body can
+			-- still be tagged)
+			local r = run({ contract = true, shooters = 16, bots = 10, rttMs = 300, seed = 18, loss = 0.05 }, 1800)
+			t.truthy(r.shots >= 400, `shots {r.shots}`)
+			t.truthy(r.agreement >= 0.9, `agreement {r.agreement}`)
+			t.truthy(r.rewindsClamped > r.shots / 2, "the server held the rewind to its bound")
+			t.truthy(r.agreement > r.agreementNaive + 0.3)
+		end
+	)
 end
