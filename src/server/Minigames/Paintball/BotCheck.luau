@@ -7,11 +7,12 @@
 -- load and play there. It is a small match loop of its own (the match-and-bots lane's, not the
 -- service's): the real Rules driven directly, fifteen bots and one seat nobody plays, balls flown
 -- with Ballistics against arena.sweep and Hit.body, bodies judged where they are now.
--- A failure is one of: the mean cost over the budget; nobody tagged; a bot's ball off its own look,
--- from a spawn room or refused by the match; a bot that never left its spawn room or stood still for
--- STILL_LIMIT; a step a person's body could not have taken (through a box, off the walking surface,
--- into the other team's spawn room, or further than Body.speed allows for its crouch and sprint bit:
--- the rules a person's pose is held to, with none of a person's tolerances).
+-- A failure is one of: the mean cost over the budget; nobody tagged; a bot's ball refused by
+-- Bots.judge, the service's own judge (off its look or eye, from a spawn room, sprinting, or refused
+-- by the match); a bot that never left its spawn room or stood still for STILL_LIMIT; a step a
+-- person's body could not have taken (through a box, off the walking surface, into the other team's
+-- spawn room, or further than Body.speed allows for its crouch and sprint bit: the rules a person's
+-- pose is held to, with none of a person's tolerances).
 -- The task script that sends it is tools/games/paintball/bots/engine_check.luau.
 -- Interface: run(opts?) -> Result; types Opts, Result
 
@@ -187,15 +188,11 @@ function BotCheck.run(opts: Opts?): Result
 			if cmd.kind == "reload" then
 				Rules.reload(state, cmd.id, now)
 			elseif cmd.kind == "fire" then
-				-- the service's three checks on a bot's ball: along its own look, not from a spawn
-				-- room, and the match agrees
+				-- the service's judge of a bot's ball (Bots.judge: along its own look, from its eye,
+				-- not from a spawn room, not sprinting, and the match agrees)
 				local pose = poses[cmd.id]
 				local vx, vy, vz = cmd.vx or 0, cmd.vy or 0, cmd.vz or 0
-				local speed = math.sqrt(vx * vx + vy * vy + vz * vz)
-				local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
-				local along = speed > 0 and (vx * lx + vy * ly + vz * lz) / speed >= math.cos(Contract.BOT.aimSlack)
-				local inRoom = BotNav.roomOf(nav, pose.x, pose.y, pose.z) ~= 0
-				if along and not inRoom and Rules.fire(state, cmd.id, now) then
+				if Bots.judge(bots, state, cmd.id, pose, cmd, now) then
 					shots += 1
 					local ox, oy, oz = cmd.ox or 0, cmd.oy or 0, cmd.oz or 0
 					table.insert(balls, {
@@ -303,7 +300,7 @@ function BotCheck.run(opts: Opts?): Result
 	if refused > 0 then
 		table.insert(
 			failures,
-			`{refused} of the bots' balls were off their look, from a spawn room or refused by the match`
+			`{refused} of the bots' balls were refused by the judge (off their look or eye, from a spawn room, sprinting, or by the match)`
 		)
 	end
 	if neverLeft > 0 then

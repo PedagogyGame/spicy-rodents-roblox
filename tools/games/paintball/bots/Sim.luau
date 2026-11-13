@@ -12,10 +12,11 @@
 --               tie goes to the wall, a body in its own spawn room is passed over
 --   the bodies  judged where the snapshot stream has them (a 20 Hz history of quantised poses, straight
 --               lines between, held at the newest), at the ball's time less its rewind
--- EVERYBODY IS JUDGED BY ONE FUNCTION. A click (a bot's "fire" command, a stand-in person's) goes
--- through `judge`: the direction within BOT.aimSlack of the pose's own look, the origin at the pose's
--- eye, not from inside a spawn room, no sprint bit within Body.SPRINT_FIRE_DELAY less MARGIN.sprint,
--- then Rules.fire. Nothing in it asks who is a bot. Every refusal is counted with its reason.
+-- EVERYBODY IS JUDGED BY ONE FUNCTION, AND IT IS THE SERVICE'S: a click (a bot's "fire" command, a
+-- stand-in person's) goes through Bots.judge: the direction within BOT.aimSlack of the pose's own
+-- look, the origin at the pose's eye, not from inside a spawn room, no sprint bit within
+-- Body.SPRINT_FIRE_DELAY less MARGIN.sprint, then Rules.fire. Nothing in it asks who is a bot. Every
+-- refusal is counted with its reason.
 -- THE STAND-IN PERSON ("the fair player") is a second list of brains with a Profile of its own
 -- (FAIR below: a person's reaction, a person's narrower view, a steadier hand, a faster wrist). It is
 -- shown the others where they were `delay` seconds ago (a client draws its view time in the past) and
@@ -445,7 +446,10 @@ local function count(map: { [string]: number }, key: string)
 	map[key] = (map[key] or 0) + 1
 end
 
--- THE judgment of a click, whoever made it. On yes the ball is born now.
+-- THE judgment of a click, whoever made it: Bots.judge, the function the service calls for a bot's
+-- (the look, the eye, no spawn room, no sprint, then Rules.fire). A bot's is judged by its own list's
+-- record of the sprint bit its body showed; anybody else's by the sim's record of theirs. On yes the
+-- ball is born now.
 function Sim.judge(
 	sim: Sim,
 	id: number,
@@ -462,30 +466,13 @@ function Sim.judge(
 	if pose == nil or slot == nil then
 		return false, "out"
 	end
-	local speed = math.sqrt(vx * vx + vy * vy + vz * vz)
-	if speed < 1e-6 then
-		return false, "origin"
+	local cmd: Bots.Command = { id = id, kind = "fire", ox = ox, oy = oy, oz = oz, vx = vx, vy = vy, vz = vz }
+	local ok, why
+	if sim.botWho[id] ~= nil then
+		ok, why = Bots.judge(sim.bots, state, id, pose, cmd, sim.now)
+	else
+		ok, why = Bots.judge(sim.bots, state, id, pose, cmd, sim.now, sim.sprintAt[id] or -math.huge)
 	end
-	local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
-	local cos = (vx * lx + vy * ly + vz * lz) / speed
-	if cos < math.cos(BOT.aimSlack) then
-		return false, "look"
-	end
-	local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
-	if math.abs(ox - ex) > 0.05 or math.abs(oy - ey) > 0.05 or math.abs(oz - ez) > 0.05 then
-		return false, "origin"
-	end
-	if inAnyRoom(sim, pose.x, pose.y, pose.z) then
-		return false, "safe"
-	end
-	local sprinted = sim.sprintAt[id]
-	if
-		Wire.has(pose.bits, BIT.sprint)
-		or (sprinted ~= nil and sprinted > sim.now - Body.SPRINT_FIRE_DELAY + Contract.MARGIN.sprint)
-	then
-		return false, "sprint"
-	end
-	local ok, why = Rules.fire(state, id, sim.now)
 	if not ok then
 		return false, why
 	end

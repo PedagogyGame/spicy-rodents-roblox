@@ -60,8 +60,12 @@
 --     unless they have come within 15 studs of that bot or held their look on it; and no bot
 --     chooses to stand within BotNav.KEEP_OFF of the other team's doors.
 
--- A bot's shot is a command for the service, which checks the look (above), calls Rules.fire(state,
--- id, now) and Projectiles.fire with no rewind: a bot sees the server's present. Every `now` here is
+-- A bot's shot is a command for the service, which hands it to Bots.judge (below: the look, the eye,
+-- no spawn room, no sprint, then Rules.fire(state, id, now)) and on yes calls Projectiles.fire with no
+-- rewind: a bot sees the server's present. THE JUDGE IS ONE FUNCTION: the lane's headless matches judge
+-- every bot's click, and their stand-in person's, through it, so what the specs pin about a bot's
+-- discipline is what the server enforces, not what the brain promises. (It reads the sprint bit from
+-- the poses the bots WROTE, recorded here every step, never from a brain's own memory of it.) Every `now` here is
 -- the shared clock (Clock): the same time the State is synced to.
 -- WHAT THE BOTS SHARE (the Squad): where every body is and how fast it is going (worked out here
 -- once a tick from `poses`; a bot takes a target's speed from it only at a sight check); which post
@@ -90,7 +94,8 @@
 -- facing figure above; the step's cost) at ball speeds 90, 120 and 150, so a faster ball can be
 -- judged at the owner's playtest without waiting for a new calibration.
 -- Interface: new(arena, opts?) -> Bots; sync(bots, state, who, poses, now); place(bots, id, pose,
---   now); step(bots, state, poses, heard, now, dt) -> { Command }; types Command, Heard, Opts, Bots
+--   now); step(bots, state, poses, heard, now, dt) -> { Command }; judge(bots, state, id, pose, cmd, now,
+--   sprintAt?) -> (ok, why?); types Command, Heard, Opts, Bots
 
 local Import = require("../../Import")
 local BodyModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Body)) =
@@ -99,6 +104,10 @@ local ContractModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Pai
 	Import.shared("Minigames/Paintball/Contract")
 local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
 	Import.shared("Minigames/Paintball/Arena")
+local Rules: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Rules)) =
+	Import.shared("Minigames/Paintball/Rules")
+local WireModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wire)) =
+	Import.shared("Minigames/Paintball/Wire")
 local BotBrain = require("./BotBrain")
 local BotNav = require("./BotNav")
 
@@ -173,9 +182,11 @@ export type Bots = {
 	ended: { [number]: Flight }, -- by shooter: the ball of its that was heard to end last
 	seq: number,
 	state: State?, -- the match the squad's knowledge belongs to
+	sprintSeen: { [number]: number }, -- by bot: the last step its written pose carried BIT.sprint (judge)
 }
 
 local RULES = ContractModule.Rules
+local SPRINT = WireModule.BIT.sprint
 local CHEST = ArenaModule.CHEST
 
 local Bots = {}
@@ -221,6 +232,7 @@ function Bots.new(arena: Arena, opts: Opts?): Bots
 		ended = {},
 		seq = 0,
 		state = nil,
+		sprintSeen = {},
 	}
 end
 
@@ -231,6 +243,7 @@ local function fresh(bots: Bots, state: State)
 		bots.squad = newSquad(bots.arena)
 		table.clear(bots.flights)
 		table.clear(bots.ended)
+		table.clear(bots.sprintSeen)
 		table.clear(bots.brains)
 	end
 end
@@ -564,7 +577,59 @@ function Bots.step(
 			BotBrain.step(brain, squad, state, poses, now, dt, out)
 		end
 	end
+	-- what each bot's body showed this step, for the judge
+	local sprintSeen = bots.sprintSeen
+	for id in brains do
+		local pose = poses[id]
+		if pose ~= nil and bit32.band(pose.bits, SPRINT) ~= 0 then
+			sprintSeen[id] = now
+		end
+	end
 	return out
+end
+
+-- THE JUDGE OF A CLICK (see the header): slot `id`, whose pose is `pose` now, asks for the ball `cmd`
+-- (its ox, oy, oz and vx, vy, vz). Refused, with the reason, when the ball is not along the pose's own
+-- look within BOT.aimSlack ("look"), does not leave from the pose's eye ("origin"), or is fired from
+-- inside a spawn room ("safe"); when the pose carries BIT.sprint or a pose of this slot did within
+-- Body.SPRINT_FIRE_DELAY less Contract.MARGIN.sprint ("sprint": the server's rule for a person's
+-- click, held to a bot as well); and otherwise it is Rules.fire(state, id, now)'s answer (which, on
+-- yes, has counted the shot). `sprintAt` is when the slot's pose last carried the sprint bit, for a
+-- slot that is none of this list's bots; for one of them, leave it out: the list keeps its own record.
+function Bots.judge(
+	bots: Bots,
+	state: State,
+	id: number,
+	pose: Pose,
+	cmd: Command,
+	now: number,
+	sprintAt: number?
+): (boolean, string?)
+	local vx, vy, vz = cmd.vx or 0, cmd.vy or 0, cmd.vz or 0
+	local speed = math.sqrt(vx * vx + vy * vy + vz * vz)
+	if speed < 1e-6 then
+		return false, "origin"
+	end
+	local lx, ly, lz = BodyModule.look(pose.yaw, pose.pitch)
+	if (vx * lx + vy * ly + vz * lz) / speed < math.cos(ContractModule.BOT.aimSlack) then
+		return false, "look"
+	end
+	local ex, ey, ez = BodyModule.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+	local ox, oy, oz = cmd.ox or ex, cmd.oy or ey, cmd.oz or ez
+	if math.abs(ox - ex) > 0.05 or math.abs(oy - ey) > 0.05 or math.abs(oz - ez) > 0.05 then
+		return false, "origin"
+	end
+	if BotNav.roomOf(bots.nav, pose.x, pose.y, pose.z) ~= 0 then
+		return false, "safe"
+	end
+	local sprinted = sprintAt or bots.sprintSeen[id]
+	if
+		bit32.band(pose.bits, SPRINT) ~= 0
+		or (sprinted ~= nil and sprinted > now - BodyModule.SPRINT_FIRE_DELAY + ContractModule.MARGIN.sprint)
+	then
+		return false, "sprint"
+	end
+	return Rules.fire(state, id, now)
 end
 
 return Bots

@@ -1372,6 +1372,16 @@ return function(t)
 				Sim.teleport(sim, id, x, y, z, yaw)
 				sim.poses[id].crouch, sim.poses[id].bits = 0, bits or 0
 				sim.sprintAt[id] = nil
+				sim.bots.sprintSeen[id] = nil
+			end
+			-- when the body last showed the sprint bit: the sim's record of a person's, the bots' list's
+			-- own record (what Bots.step saw written) of a bot's
+			local function sprinted(id: number, at: number)
+				if sim.botWho[id] ~= nil then
+					sim.bots.sprintSeen[id] = at
+				else
+					sim.sprintAt[id] = at
+				end
 			end
 			local function click(id: number, off: number?): (boolean, string?)
 				local pose = sim.poses[id]
@@ -1401,11 +1411,11 @@ return function(t)
 			end, { false, "sprint" })
 			both("just stopped sprinting", function(id: number)
 				open(id)
-				sim.sprintAt[id] = sim.now - 0.05
+				sprinted(id, sim.now - 0.05)
 			end, { false, "sprint" })
 			both("the marker is up again", function(id: number)
 				open(id)
-				sim.sprintAt[id] = sim.now - Body.SPRINT_FIRE_DELAY
+				sprinted(id, sim.now - Body.SPRINT_FIRE_DELAY)
 			end, { true, nil })
 			both("too soon after", open, { false, "fast" })
 			-- the magazine runs out for both after the same five, and both are told the same
@@ -1460,6 +1470,44 @@ return function(t)
 				t.eq(#sim.rec.tags, tags, `seat {id} was protected`)
 			end
 			t.eq(sim.rec.firedTooSoon, 0)
+			-- the judge is the service's (Bots.judge), and what it knows of a bot's sprint is what the bot's
+			-- body showed, never what its brain says: a bot running flat out writes the sprint bit, the
+			-- list records it, and a ball asked for just after is refused however the brain came to ask
+			local c = closeUp(groundNode(0, -24), 0)
+			c.poses[1].x, c.poses[1].z = c.brain.x, c.brain.z + 40 -- (behind it: nobody to fight)
+			c.brain.goAt = c.now
+			local ran: number? = nil
+			for _ = 1, 4 * Clock.TICK_HZ do
+				stepClose(c, DT)
+				if Wire.has(c.poses[2].bits, BIT.sprint) then
+					ran = c.now
+					break
+				end
+			end
+			t.truthy(ran ~= nil, "it set off at a run")
+			t.eq(c.bots.sprintSeen[2], ran, "the list saw the bit its body showed")
+			local pose = c.poses[2]
+			local ex, ey, ez = Body.eyePoint(pose.x, pose.y, pose.z, pose.crouch)
+			local lx, ly, lz = Body.look(pose.yaw, pose.pitch)
+			local s2 = c.state.feel.ballSpeed
+			local ball: Bots.Command = {
+				id = 2,
+				kind = "fire",
+				ox = ex,
+				oy = ey,
+				oz = ez,
+				vx = lx * s2,
+				vy = ly * s2,
+				vz = lz * s2,
+			}
+			t.deepEq({ Bots.judge(c.bots, c.state, 2, pose, ball, c.now) }, { false, "sprint" } :: { any })
+			local calm = table.clone(pose)
+			calm.bits = 0 -- (a brain that lied in its pose this tick is still held to the last one's bit)
+			t.deepEq({ Bots.judge(c.bots, c.state, 2, calm, ball, c.now + 0.05) }, { false, "sprint" } :: { any })
+			t.deepEq(
+				{ Bots.judge(c.bots, c.state, 2, calm, ball, c.now + Body.SPRINT_FIRE_DELAY) },
+				{ true, nil } :: { any }
+			)
 		end
 	)
 
