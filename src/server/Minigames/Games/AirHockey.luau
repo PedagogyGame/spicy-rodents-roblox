@@ -19,6 +19,9 @@
 --     whose hand keeps arriving too late to be waited for (two people, a slow line) is told so in words.
 --   Between two people a press of the serve button is passed on to the other player the moment it arrives
 --     ("air_hockey_press"): the puck leaves Sim.SERVE_LEAD after the press, on the same tick on both screens.
+--   The animal rule: a squirrel or the Spicy Rodent on the table never spoils a match. The simulation never
+--     sees it. When the puck or a mallet reaches it, it is knocked to the floor beside the table (the service's
+--     animals / knock options, as on the bowling lanes) and both sides read a plain line; the match goes on.
 --   The hardware (GamesRoom.AirHockey: Puck, MalletGlacier, MalletEmber, ScoreBoard) is found by name; where it
 --     is missing the Table still runs the match and touches nothing. The clients draw the puck and the mallets
 --     every frame from their own replay; the server only moves its own copies ten times a second, so that the
@@ -26,6 +29,7 @@
 -- Interface: a ServerGame { game = "air_hockey", new(ctx) -> Table }; Table.hw { model, puck, mallets, labels,
 --   prints (each end's score label in the bed) };
 --   Table.ref (the Referee while a match is on); ASK_EVERY; SLOW_WINDOW, SLOW_TICKS, SLOW_AGAIN, SLOW_WORDS;
+--   ANIMAL_EVERY, ANIMAL_REACH, ANIMAL_AGAIN, ANIMAL_WORDS, ANIMAL_TOLD;
 --   Table:debug("goal", side) (the puck is put in front of that
 --   end's opponent's goal, travelling in: the next ticks score it through the simulation's own goal line) and
 --   Table:debug("score", glacier, ember); WATCH; MOVE_EVERY
@@ -49,6 +53,11 @@ Game.SLOW_WINDOW = 2 -- seconds: a hand played without for more than SLOW_TICKS 
 Game.SLOW_TICKS = 120
 Game.SLOW_AGAIN = 12 -- ...and not again for this long
 Game.SLOW_WORDS = "Your connection is too slow for a live match: your mallet is arriving late"
+Game.ANIMAL_EVERY = 0.1 -- seconds between two looks for an animal on the table (only while a match is on)
+Game.ANIMAL_REACH = 0.2 -- metres between the puck or a mallet and an animal on the bed that knock it off
+Game.ANIMAL_AGAIN = 1.5 -- seconds before the same animal can be knocked off again
+Game.ANIMAL_WORDS = "The air hockey table is in play: you were knocked off it"
+Game.ANIMAL_TOLD = "was on the table: knocked clear. The match goes on"
 
 local function isComputer(key: any): boolean
 	return type(key) == "table" and key.ai == true
@@ -111,6 +120,8 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		toldSlow = {},
 		watchAt = 0,
 		movedAt = 0,
+		animalsAt = 0, -- when the table was last looked over for animals, and when each was last knocked off
+		knockedAt = {},
 	}
 
 	-- a piece of the hardware slid across the bed to a point of the model (its pivot is on its own axis; its
@@ -357,6 +368,48 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		return true, true
 	end
 
+	-- The animal rule (see the header): any squirrel-family body on the table that the puck or a mallet has
+	-- reached is knocked to the floor beside it, and both sides are told. The referee is not: nothing an animal
+	-- does is ever in the match.
+	local function intruders(sim: any)
+		local source = ctx.opts.animals
+		if source == nil then
+			return
+		end
+		local ok, list = pcall(source)
+		if not ok or type(list) ~= "table" then
+			return
+		end
+		for _, a in list do
+			local x, y = Layout.onTable(ctx.place, a.x, a.y, a.z)
+			if x and y and ctx.now() - (self.knockedAt[a.id] or -1e9) >= Game.ANIMAL_AGAIN then
+				local nearest = math.min(
+					math.sqrt((sim.px - x) ^ 2 + (sim.py - y) ^ 2),
+					math.sqrt((sim.p0x - x) ^ 2 + (sim.p0y - y) ^ 2),
+					math.sqrt((sim.p1x - x) ^ 2 + (sim.p1y - y) ^ 2)
+				)
+				if nearest <= Game.ANIMAL_REACH then
+					self.knockedAt[a.id] = ctx.now()
+					local knock = ctx.opts.knock
+					if knock then
+						local wx, wy, wz = Layout.aisle(ctx.place, y)
+						local done, err = pcall(knock, a.id, wx, wy, wz, Game.ANIMAL_WORDS)
+						if not done then
+							warn(`[Minigames] knock failed: {err}`)
+						end
+					end
+					local who = if a.kind == "rodent" then "The Spicy Rodent" else "A squirrel"
+					ctx.broadcast({
+						kind = "event",
+						station = ctx.station.id,
+						text = `{who} {Game.ANIMAL_TOLD}`,
+						intruder = true,
+					})
+				end
+			end
+		end
+	end
+
 	function self.step(_self: any, _dt: number)
 		local ref = self.ref
 		if ref == nil then
@@ -364,6 +417,10 @@ function Game.new(ctx: ServerGame.Ctx): ServerGame.Table
 		end
 		if ctx.session.phase == "playing" then
 			pump()
+			if ctx.now() - self.animalsAt >= Game.ANIMAL_EVERY then
+				self.animalsAt = ctx.now()
+				intruders(ref.sim)
+			end
 			if ctx.now() - self.watchAt >= 0.5 then
 				self.watchAt = ctx.now()
 				lookAround()

@@ -1378,6 +1378,155 @@ return function(t)
 		end, opts({ lag = 24 }))
 	end)
 
+	-- The animal rule (the common bar's C12): a squirrel on the table never spoils a match.
+	do
+		local beasts: { any } = {}
+		local knocks: { any } = {}
+		local service = {
+			animals = function(): { any }
+				return beasts
+			end,
+			knock = function(id: any, x: number, y: number, z: number, text: string)
+				table.insert(knocks, { id = id, x = x, y = y, z = z, text = text })
+				for _, a in beasts do
+					if a.id == id then
+						a.x, a.y, a.z = x, y, z
+					end
+				end
+			end,
+		}
+		t.test(
+			"a squirrel on the table: the puck or a mallet knocks it to the floor, both are told, and the match is untouched",
+			function()
+				table.clear(beasts)
+				table.clear(knocks)
+				Rig.play(function(w)
+					local session = w.svc:sessionOf(ID)
+					local place = w.places[SITE]
+					local function beast(id: string, kind: string, x: number, y: number, up: number): any
+						local wx, wy, wz = Layout.toWorld(place, x, y)
+						return { id = id, kind = kind, x = wx, y = wy + up, z = wz }
+					end
+					-- before anyone plays, a squirrel may sit on the table: nothing is looked for, nothing is sent
+					table.insert(beasts, beast("early", "squirrel", 0, 0, 0.5))
+					Rig.run(w, 1)
+					t.eq(#knocks, 0, "an idle table is anybody's")
+					table.clear(beasts)
+					Rig.press(w, ID)
+					Rig.run(w, 0.3)
+					Rig.click(w, "Start (Space)")
+					Rig.run(w, 0.4)
+					t.eq(session.phase, "playing")
+					local tbl = tableOf(w)
+					-- one under the table on the floor, one on the floor beside it, one standing on the Ember
+					-- end's home, where that mallet is, and the Spicy Rodent out in the middle of this half
+					local floor = Layout.BED_Y - 0.5
+					table.insert(beasts, beast("under", "squirrel", 0.2, -0.5, -floor))
+					local ax, ay, az = Layout.aisle(place, 0)
+					table.insert(beasts, { id = "beside", kind = "squirrel", x = ax, y = ay, z = az })
+					table.insert(beasts, beast("on", "squirrel", 0.05, 0.8, 0.5))
+					table.insert(beasts, beast("rod", "rodent", -0.35, -0.45, 0.5))
+					local shown = {}
+					play(w, 0.5, Line.hands.still, nil, shown)
+					t.eq(#knocks, 1, "the one the mallet stands on is knocked off at once")
+					t.eq(knocks[1].id, "on")
+					t.eq(knocks[1].text, "The air hockey table is in play: you were knocked off it")
+					local x, y = Layout.onTable(place, knocks[1].x, knocks[1].y, knocks[1].z)
+					t.truthy(x == nil and y == nil, "it lands off the table...")
+					local _, Y, D = AlleyLayout.toLocal(place, knocks[1].x, knocks[1].y, knocks[1].z)
+					t.truthy(Y < 1 and D < Layout.footprint().d0 - 1, "...on the floor, on the room's side")
+					local told = Rig.last(w.got, "event", function(m)
+						return m.intruder == true
+					end)
+					t.eq(told.text, "A squirrel was on the table: knocked clear. The match goes on")
+					t.truthy(Rig.has(Rig.texts(w.gui), "A squirrel was on the table"), Rig.screen(w))
+					-- the Spicy Rodent sits where the puck will come: the hand goes for the puck until it is hit
+					play(w, 30, Line.hands.pointer(0.02), nil, shown, function()
+						return #knocks >= 2
+					end)
+					t.eq(#knocks, 2, "the puck or the mallet reached the Spicy Rodent")
+					t.eq(knocks[2].id, "rod")
+					play(w, 3, Line.hands.pointer(0.02), nil, shown)
+					told = Rig.last(w.got, "event", function(m)
+						return m.intruder == true
+					end)
+					t.eq(told.text, "The Spicy Rodent was on the table: knocked clear. The match goes on")
+					t.eq(#knocks, 2, "the one under the table and the one beside it are left alone")
+					-- and nothing an animal did was ever in the match: the screen is still the referee's, bit for bit
+					local worst, _, n = apart(shown, truth(w))
+					t.truthy(n > 100)
+					t.truthy(
+						worst[1] < EXACT and worst[2] < EXACT and worst[3] < EXACT,
+						`{worst[1]} {worst[2]} {worst[3]}`
+					)
+					t.eq(Controller.current.seat.resims, 0)
+					t.eq(Controller.current.seat.replica.desyncs, 0)
+					t.eq(session.phase, "playing")
+					t.truthy(tbl.ref.n > 240 * 3)
+				end, opts({ service = service }))
+			end
+		)
+	end
+
+	-- Being bitten at the table (the common bar's C13): the body is taken, the game lets go at once.
+	t.test(
+		"bitten at the table: the camera and legs come back at once with the reason, and the computer takes the end",
+		function()
+			Rig.play(function(w)
+				local session = w.svc:sessionOf(ID)
+				-- against the computer: the table is nobody's afterwards
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				Rig.click(w, "Start (Space)")
+				play(w, 3, Line.hands.chaser(1))
+				t.eq(session.phase, "playing")
+				t.eq(w.held, true)
+				w.svc:leave(w.player, "bitten", "You were bitten: you left the air hockey table")
+				Rig.run(w, 0.3)
+				t.eq(w.client.active(), nil, "the game let go")
+				t.eq(w.held, false, "the camera is the player's again")
+				t.eq(w.controls[#w.controls], true, "and so are their legs")
+				t.truthy(
+					Rig.has(w.toasts, "You were bitten: you left the air hockey table"),
+					table.concat(w.toasts, " | ")
+				)
+				t.eq(Controller.current, nil, "nothing of the game is left running")
+				t.eq(session.phase, "idle", "alone against the computer: the table is free")
+				local tbl = tableOf(w)
+				t.eq(tbl.ref, nil)
+				local px, py = where(w, Layout.PUCK)
+				t.near(px, 0, 1e-4)
+				t.near(py, 0, 1e-4, "the puck is back on the spot")
+				-- against a person: she is bitten, he plays on against the computer without a break
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				local bob = bot(w, "Bob", Line.hands.chaser(1.5))
+				t.truthy(w.svc:join(bob.stub, ID))
+				Rig.run(w, 0.3)
+				Rig.click(w, "Start (Space)")
+				play(w, 4, Line.hands.chaser(1), { bob })
+				tbl = tableOf(w)
+				t.eq(Referee_mode(tbl), "2")
+				local n = tbl.ref.n
+				w.svc:leave(w.player, "bitten", "You were bitten: you left the air hockey table")
+				for _ = 1, 180 do
+					Rig.frame(w)
+					botFrame(w, bob)
+				end
+				t.eq(w.client.active(), nil)
+				t.eq(w.held, false)
+				t.eq(w.controls[#w.controls], true)
+				t.eq(session.phase, "playing", "his match goes on")
+				t.eq(seatedNames(w), "Club (computer), Bob")
+				t.eq(Referee_mode(tbl), "1", "the computer has her end")
+				t.truthy(tbl.ref.n > n + 240 * 2, "without a break")
+				t.eq(#bob.refused, 0, table.concat(bob.refused, "; "))
+				t.eq(bob.seat.replica.desyncs, 0)
+				t.eq(Rig.last(bob.stub.events, "event").text, "Ann left: the computer takes the Glacier end")
+			end, opts())
+		end
+	)
+
 	t.test("the server check's flow (tests/engine/AirHockeyFlow) passes on this service", function()
 		Rig.play(function(w)
 			local ann, bob = Rig.stub("Ann"), Rig.stub("Bob")

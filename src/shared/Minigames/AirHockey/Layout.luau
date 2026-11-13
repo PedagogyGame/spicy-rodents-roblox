@@ -15,6 +15,8 @@
 --   toWorld(place, x, y, z?) -> (wx, wy, wz); fromWorld(place, wx, wz) -> (x, y); camera(side, overhead) ->
 --   { eye = {x, y, z}, target = {x, y, z}, fov }; stance(side) -> (X, D) where that end's player stands;
 --   footprint() -> { x0, x1, d0, d1 } (the cabinet); standing(side) -> { x0, x1, d0, d1 }; srgb(linear) -> 0..255;
+--   onTable(place, wx, wy, wz) -> (x, y)? (a point of the world that is on the table: where, in the model's
+--   metres); aisle(place, y) -> (wx, wy, wz) (the floor beside the table on the room's side, level with y);
 --   stations(sites) -> { StationDef }; sideOfStation(id) -> side?
 
 local AlleyLayout = require("../../Attractions/AlleyLayout")
@@ -124,6 +126,32 @@ function Layout.standing(side: number): { x0: number, x1: number, d0: number, d1
 		d0 = Layout.CENTRE.d - Layout.HALF_WIDTH * k,
 		d1 = Layout.CENTRE.d + Layout.HALF_WIDTH * k,
 	}
+end
+
+-- A point of the world that is ON the table (over the cabinet, from just under the bed to head height): where it
+-- is in the model's metres. nil, nil for anything else: the floor under the table and the floor beside it are
+-- not the table.
+Layout.ON_TABLE = { below = 0.6, above = 5 } -- studs under and over the bed that still count
+function Layout.onTable(place: GameSpec.Place, wx: number, wy: number, wz: number): (number?, number?)
+	local X, Y, D = AlleyLayout.toLocal(place, wx, wy, wz)
+	local x, y = Layout.fromLocal(X, D)
+	if
+		math.abs(x) > Layout.HALF_WIDTH
+		or math.abs(y) > Layout.HALF_LENGTH
+		or Y < Layout.BED_Y - Layout.ON_TABLE.below
+		or Y > Layout.BED_Y + Layout.ON_TABLE.above
+	then
+		return nil, nil
+	end
+	return x, y
+end
+
+-- The floor beside the table on the room's side (the other side is the wall), level with the model's y: where
+-- something knocked off the table lands.
+Layout.AISLE = 1.5 -- studs out from the cabinet
+function Layout.aisle(place: GameSpec.Place, y: number): (number, number, number)
+	local X = Layout.CENTRE.x + math.clamp(y, -Layout.HALF_LENGTH, Layout.HALF_LENGTH) * Layout.SCALE
+	return AlleyLayout.toWorld(place, X, 0.4, Layout.footprint().d0 - Layout.AISLE)
 end
 
 -- One of his material colours (linear RGB, 0..1) as an sRGB byte.
