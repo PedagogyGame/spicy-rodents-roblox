@@ -173,7 +173,7 @@ local function addFile(scene: any, file: string)
 			skipped += 1
 		elseif d:IsA("BasePart") then
 			if file ~= "build/Attractions.rbxm" then
-				local q = d.Position
+				local q = d.CFrame.Position
 				lo[1], lo[2] = math.min(lo[1], q.X), math.min(lo[2], q.Z)
 				hi[1], hi[2] = math.max(hi[1], q.X), math.max(hi[2], q.Z)
 			end
