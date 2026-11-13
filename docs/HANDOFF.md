@@ -2,7 +2,8 @@
 
 Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2026-11-11.
 
-## 0. State on 2026-11-11 (read this before anything below; older sections are history where they differ)
+## 0. State on 2026-11-13 (read this before anything below; older sections are history where they differ)
+- **How the owner wants the work done (standing):** small reviewed steps, clean code, his deliveries adapted where they fit and left out (and listed) where they conflict, important questions put to him with a default built in and never waited on, everything tested by us. His decisions since the brief are in `docs/spec/BRIEF_ADDENDUM.md` (D1 to D13): read them.
 - **The experience is "Spicy Rodent" (singular)**: universe 10775476638, main place 106044514609985. Never touch the duplicate "Spicy Rodents" (10775476357 / 71294450489810).
 - **Live in the game: version 41**, built from `2fd420d`, published 2026-11-11 on the owner's go. Each publish needs a new explicit go from the owner (one go covers one publish), with Studio closed first.
 - **In version 41, all with the full check script passing (and the server checks, until the key lost that permission; see below):**
@@ -15,12 +16,14 @@ Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2
 - **Nobody has seen any of it on a screen.** The checks are headless. The owner's look at version 41 decides: the squirrel's run and back view, the run manners (how often, how strong), the bite lunge while running, the cars and the new vehicle shapes, the interiors under the camera, bowling, darts.
 - **Known and unverified:** the car fixes had no independent verification pass, and with them the game's step costs more (a fast-forwarded hospital run takes 18 s where it took 12; a traffic tick is about 1.3 ms at worst).
 - **The key lost the Luau Execution permission on 2026-11-11 at about 21:30 UTC** (`universe.place.luau-execution-session:write` on universe 10775476638): every `run_engine_tests` returns 403 until the owner restores it in the Creator Dashboard. Saving and publishing still work. Until then nothing new has had a server check; run the standard set (HANDOFF 4) on the first build after it returns.
-- **The work in hand is the eight remaining minigames, hardest first** (owner, 2026-11-11: "build all mini games now", "most intense focus on the single hardest"). Nothing below is on `w0-foundation` yet:
-  - the shared framework every game plugs into: `feat/minigame-framework` (server and client registries, sites from the baked places, a furniture registry for the bake);
-  - paintball, the hardest: the contract four building lanes work against is `feat/paintball-base` (`src/shared/Paintball/Contract`); the tested core from spike S18 is already in `src/shared/Paintball` and `src/server/Paintball`. The owner's ten-point bar is in the brief, section 13; he playtests it before it is called done;
-  - pure models, each on its own branch: `feat/mg-model-pinball` (three tables), `feat/mg-model-pool`, `feat/mg-model-labyrinth`, `feat/mg-model-jenga`; racquetball and volleyball not started;
-  - the venues for all but the bowling alley's games do not exist in the world yet (racquet club, steakhouse, doctor's office, TV station are data in `data/expansion.json`).
-  - After the minigames, in the owner's order: the cafes and the other concentrated builds, and the sky lift to completion.
+- **On `w0-foundation` since version 41 (not yet published; each publish needs the owner's go):**
+  - the minigame framework (one registry line per game on the server, the client and the bake);
+  - the pool and bumper pool table model and the pinball model (three tables): pure and headless, not yet playable;
+  - air hockey, the ninth game (the owner's AER game, his physics ported exactly), playable;
+  - the enclosed-run mechanic (`src/shared/Routes/Enclosure.luau`): in only at a mouth, nothing through walls; the ball return re-declared on it; the hollow trees, sewers and the alley roof vent build on it;
+  - the realistic lighting in the project files; the owner's reference deliveries under `docs/reference/` (air hockey, the bowling backstage PDF, the second store, sewer modules, roof kit, the underground facility concept).
+- **In progress on branches (each built, reviewed and fixed before it lands):** paintball in four lanes (`feat/paintball-match-and-bots`, `-arena`, `-server`, `-client` on `feat/paintball-base`; server and client finished; then a join and a review against the owner's ten-point bar); pool and bumper pool playable (`feat/mg-pool`); the eighteen-lane alley (`feat/alley-18`); the wallet (`feat/wallet`); the sky lift and the Lookout (`feat/skylift*`); the alley roof route (`feat/alley-roof`); the Neighbourhood Shop (`feat/neighbourhood-shop`). Pinball playable is next.
+- **Mapped and waiting:** the corner store, the lounges, the sewer shortcuts, the hollow trees, the rest of the alley (scout maps in the session's scratchpad are summarised in each builder's prompt; the decisions are in the addendum).
 - **Parked, unfinished:** `art/trees` (new generator, two species done, checker merged; the all-95 build, upload and swap are not done) and `art/people` (rounded bodies built and checked, nothing uploaded, no game code); 276 fork boughs the junction drawing fix does not reach; trolley stops, the shed and shelters are still boxes.
 - **Waiting on the owner:** the key's permission (above); the Robux price and Spicy Dollar amount for product 3730438620 (recorded in `docs/spec/PROJECT_IDS.md`, deliberately not wired); his look at version 41.
 - **Tools that give eyes:** `tools/review` (the still town, rendered offline), `tools/review/motion_path.luau` + `tools/blender/heroes/render_motion.py` (the squirrel in motion from the play camera; strips in `docs/renders/heroes/motion/`, last rendered BEFORE the bounce cut and the manners), `tools/sim` (traffic replay with glitch detectors).
