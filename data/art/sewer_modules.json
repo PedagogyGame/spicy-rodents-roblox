@@ -1,0 +1,4622 @@
+{
+ "$schema": "art/sewer_modules v1",
+ "src": "tools/blender/sewers (export_modules.py: the owner's sewer GLBs as FBX in studs, one per metre, and the lane check; publish.py: the upload).",
+ "placement": "InsertService:LoadAsset(assetId):GetChildren()[1] is a Model whose pivot is the FBX origin: the module's centre on its walkway top (junction: the centre of its floor). Pivot it to a slot's ArtPivot (Workspace.Sewers.<pipe>.Art.<slot>); each MeshPart arrives unrotated at its `centre` in the module frame (X across, Y up, Z along). Make every part visual only: the bake's Lining parts carry the collision, the camera and the light backing; once a pipe's slots are filled, set its Lining parts' Transparency to 1 (keep their collision).",
+ "studsPerMetre": 1.0,
+ "modules": {
+  "brick": {
+   "assetId": "128147668251246",
+   "moderation": "Approved",
+   "displayName": "SR sewer brick passage",
+   "sha": "99909b9d22a3c0fa",
+   "source": "01",
+   "fbxBytes": 938108,
+   "tris": 5356,
+   "leftOut": [
+    "Safety_Handrails",
+    "Safety_Rail_Footplates"
+   ],
+   "why": "the channel handrails and footplates stand 0.99 off the axis, in the squirrel's lane (0.8..2.4)",
+   "lanes": {
+    "+x": {
+     "box": [
+      [
+       0.8,
+       0.15,
+       -6.0
+      ],
+      [
+       2.4000000000000004,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    },
+    "-x": {
+     "box": [
+      [
+       -2.4000000000000004,
+       0.15,
+       -6.0
+      ],
+      [
+       -0.8,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": false,
+     "blockers": [
+      "Valve_Handwheel",
+      "Valve_Spindle"
+     ]
+    }
+   },
+   "meshes": [
+    {
+     "name": "Bridge_Edge",
+     "centre": [
+      0.0,
+      0.023,
+      2.85
+     ],
+     "size": [
+      2.33,
+      0.05,
+      1.14
+     ],
+     "tris": 24,
+     "material": "Safety_Ochre",
+     "colour": [
+      229,
+      177,
+      75
+     ]
+    },
+    {
+     "name": "Bridge_Frame",
+     "centre": [
+      0.0,
+      -0.055,
+      2.85
+     ],
+     "size": [
+      2.24,
+      0.11,
+      1.12
+     ],
+     "tris": 12,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Bridge_Tread_Slats",
+     "centre": [
+      0.0,
+      0.012,
+      2.8495
+     ],
+     "size": [
+      2.18,
+      0.035,
+      1.045
+     ],
+     "tris": 144,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Ceiling_Cable_Hangers",
+     "centre": [
+      -1.45,
+      4.66,
+      0.0
+     ],
+     "size": [
+      0.0346,
+      0.38,
+      8.04
+     ],
+     "tris": 72,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Ceiling_Cable_Tray",
+     "centre": [
+      -1.45,
+      4.47,
+      0.0
+     ],
+     "size": [
+      0.35,
+      0.07,
+      11.92
+     ],
+     "tris": 36,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Debris_Brick_Fragments",
+     "centre": [
+      0.0121,
+      0.03,
+      -0.2521
+     ],
+     "size": [
+      5.6739,
+      0.06,
+      9.1917
+     ],
+     "tris": 156,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Floor_Channel_Bed",
+     "centre": [
+      0.0,
+      -0.84,
+      0.0
+     ],
+     "size": [
+      1.8,
+      0.28,
+      12.0
+     ],
+     "tris": 52,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_Left",
+     "centre": [
+      1.95,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      2.1,
+      0.44,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_Right",
+     "centre": [
+      -1.95,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      2.1,
+      0.44,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Lights_Emissive_Cool",
+     "centre": [
+      -2.865,
+      2.38,
+      4.0
+     ],
+     "size": [
+      0.025,
+      0.15,
+      0.44
+     ],
+     "tris": 12,
+     "material": "Lamp_Cool",
+     "colour": [
+      111,
+      203,
+      206
+     ]
+    },
+    {
+     "name": "Lights_Emissive_Warm",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      5.755,
+      0.15,
+      8.44
+     ],
+     "tris": 60,
+     "material": "Lamp_Warm",
+     "colour": [
+      249,
+      206,
+      137
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Cages",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      5.719,
+      0.21,
+      8.302
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Housings",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      6.01,
+      0.27,
+      8.55
+     ],
+     "tris": 72,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Flanges",
+     "centre": [
+      0.028,
+      1.7724,
+      0.0
+     ],
+     "size": [
+      5.768,
+      0.6088,
+      11.13
+     ],
+     "tris": 576,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Main",
+     "centre": [
+      2.73,
+      1.65,
+      0.0
+     ],
+     "size": [
+      0.26,
+      0.26,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Return",
+     "centre": [
+      -2.73,
+      1.78,
+      0.0
+     ],
+     "size": [
+      0.18,
+      0.18,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Upper",
+     "centre": [
+      2.73,
+      1.99,
+      0.0
+     ],
+     "size": [
+      0.124,
+      0.124,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Wall_Brackets",
+     "centre": [
+      0.0,
+      1.71,
+      0.0
+     ],
+     "size": [
+      6.0,
+      0.76,
+      11.18
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "ROOF_Vault",
+     "centre": [
+      0.0,
+      3.86,
+      0.0
+     ],
+     "size": [
+      6.64,
+      3.32,
+      12.0
+     ],
+     "tris": 1256,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Sign_Backplates",
+     "centre": [
+      2.985,
+      1.1,
+      -0.8
+     ],
+     "size": [
+      0.035,
+      0.38,
+      0.88
+     ],
+     "tris": 12,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Sign_S_-_01",
+     "centre": [
+      2.958,
+      1.1074,
+      -0.8144
+     ],
+     "size": [
+      0.003,
+      0.126,
+      0.3774
+     ],
+     "tris": 244,
+     "material": "Paper_Cream",
+     "colour": [
+      221,
+      214,
+      192
+     ]
+    },
+    {
+     "name": "Trim_Channel_Coping",
+     "centre": [
+      0.0,
+      0.035,
+      0.0
+     ],
+     "size": [
+      2.12,
+      0.07,
+      12.0
+     ],
+     "tris": 24,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Stone_Arch_Ribs",
+     "centre": [
+      0.0,
+      2.615,
+      0.0
+     ],
+     "size": [
+      6.25,
+      5.23,
+      11.98
+     ],
+     "tris": 1248,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Wall_Footing",
+     "centre": [
+      0.0,
+      0.13,
+      0.0
+     ],
+     "size": [
+      6.08,
+      0.26,
+      12.0
+     ],
+     "tris": 24,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Valve_Handwheel",
+     "centre": [
+      -2.31,
+      1.63,
+      0.8
+     ],
+     "size": [
+      0.0606,
+      0.57,
+      0.57
+     ],
+     "tris": 312,
+     "material": "Valve_Red",
+     "colour": [
+      173,
+      72,
+      50
+     ]
+    },
+    {
+     "name": "Valve_Spindle",
+     "centre": [
+      -2.45,
+      1.63,
+      0.8
+     ],
+     "size": [
+      0.22,
+      0.0666,
+      0.07
+     ],
+     "tris": 40,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "WATER_Channel",
+     "centre": [
+      0.0,
+      -0.355,
+      0.0
+     ],
+     "size": [
+      1.77,
+      0.035,
+      12.0
+     ],
+     "tris": 36,
+     "material": "Water_Dark_Opaque",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "water_basecolor"
+    },
+    {
+     "name": "Walls_Left",
+     "centre": [
+      3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_Right",
+     "centre": [
+      -3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    }
+   ]
+  },
+  "brickPlain": {
+   "assetId": "99871781515131",
+   "moderation": "Approved",
+   "displayName": "SR sewer brick passage plain",
+   "sha": "a3d5925f827bb58f",
+   "source": "01",
+   "fbxBytes": 894684,
+   "tris": 4568,
+   "leftOut": [
+    "Bridge_Edge",
+    "Bridge_Frame",
+    "Bridge_Tread_Slats",
+    "Safety_Handrails",
+    "Safety_Rail_Footplates",
+    "Sign_Backplates",
+    "Sign_S_-_01",
+    "Valve_Handwheel",
+    "Valve_Spindle"
+   ],
+   "why": "the plain repeat: no footbridge, valve or label (a footbridge every 12 studs reads as a pattern), and no handrails (in the lane)",
+   "lanes": {
+    "+x": {
+     "box": [
+      [
+       0.8,
+       0.15,
+       -6.0
+      ],
+      [
+       2.4000000000000004,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    },
+    "-x": {
+     "box": [
+      [
+       -2.4000000000000004,
+       0.15,
+       -6.0
+      ],
+      [
+       -0.8,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    }
+   },
+   "meshes": [
+    {
+     "name": "Ceiling_Cable_Hangers",
+     "centre": [
+      -1.45,
+      4.66,
+      0.0
+     ],
+     "size": [
+      0.0346,
+      0.38,
+      8.04
+     ],
+     "tris": 72,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Ceiling_Cable_Tray",
+     "centre": [
+      -1.45,
+      4.47,
+      0.0
+     ],
+     "size": [
+      0.35,
+      0.07,
+      11.92
+     ],
+     "tris": 36,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Debris_Brick_Fragments",
+     "centre": [
+      0.0121,
+      0.03,
+      -0.2521
+     ],
+     "size": [
+      5.6739,
+      0.06,
+      9.1917
+     ],
+     "tris": 156,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Floor_Channel_Bed",
+     "centre": [
+      0.0,
+      -0.84,
+      0.0
+     ],
+     "size": [
+      1.8,
+      0.28,
+      12.0
+     ],
+     "tris": 52,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_Left",
+     "centre": [
+      1.95,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      2.1,
+      0.44,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_Right",
+     "centre": [
+      -1.95,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      2.1,
+      0.44,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Lights_Emissive_Cool",
+     "centre": [
+      -2.865,
+      2.38,
+      4.0
+     ],
+     "size": [
+      0.025,
+      0.15,
+      0.44
+     ],
+     "tris": 12,
+     "material": "Lamp_Cool",
+     "colour": [
+      111,
+      203,
+      206
+     ]
+    },
+    {
+     "name": "Lights_Emissive_Warm",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      5.755,
+      0.15,
+      8.44
+     ],
+     "tris": 60,
+     "material": "Lamp_Warm",
+     "colour": [
+      249,
+      206,
+      137
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Cages",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      5.719,
+      0.21,
+      8.302
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Housings",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      6.01,
+      0.27,
+      8.55
+     ],
+     "tris": 72,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Flanges",
+     "centre": [
+      0.028,
+      1.7724,
+      0.0
+     ],
+     "size": [
+      5.768,
+      0.6088,
+      11.13
+     ],
+     "tris": 576,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Main",
+     "centre": [
+      2.73,
+      1.65,
+      0.0
+     ],
+     "size": [
+      0.26,
+      0.26,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Return",
+     "centre": [
+      -2.73,
+      1.78,
+      0.0
+     ],
+     "size": [
+      0.18,
+      0.18,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Upper",
+     "centre": [
+      2.73,
+      1.99,
+      0.0
+     ],
+     "size": [
+      0.124,
+      0.124,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Wall_Brackets",
+     "centre": [
+      0.0,
+      1.71,
+      0.0
+     ],
+     "size": [
+      6.0,
+      0.76,
+      11.18
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "ROOF_Vault",
+     "centre": [
+      0.0,
+      3.86,
+      0.0
+     ],
+     "size": [
+      6.64,
+      3.32,
+      12.0
+     ],
+     "tris": 1256,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Trim_Channel_Coping",
+     "centre": [
+      0.0,
+      0.035,
+      0.0
+     ],
+     "size": [
+      2.12,
+      0.07,
+      12.0
+     ],
+     "tris": 24,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Stone_Arch_Ribs",
+     "centre": [
+      0.0,
+      2.615,
+      0.0
+     ],
+     "size": [
+      6.25,
+      5.23,
+      11.98
+     ],
+     "tris": 1248,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Wall_Footing",
+     "centre": [
+      0.0,
+      0.13,
+      0.0
+     ],
+     "size": [
+      6.08,
+      0.26,
+      12.0
+     ],
+     "tris": 24,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "WATER_Channel",
+     "centre": [
+      0.0,
+      -0.355,
+      0.0
+     ],
+     "size": [
+      1.77,
+      0.035,
+      12.0
+     ],
+     "tris": 36,
+     "material": "Water_Dark_Opaque",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "water_basecolor"
+    },
+    {
+     "name": "Walls_Left",
+     "centre": [
+      3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_Right",
+     "centre": [
+      -3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    }
+   ]
+  },
+  "junction": {
+   "assetId": "126624095011166",
+   "moderation": "Approved",
+   "displayName": "SR sewer four-way junction",
+   "sha": "db557b8b44106757",
+   "source": "02",
+   "fbxBytes": 1109612,
+   "tris": 9016,
+   "leftOut": [],
+   "why": "",
+   "lanes": {
+    "+x": {
+     "box": [
+      [
+       0.8,
+       0.15,
+       -6.0
+      ],
+      [
+       2.4000000000000004,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    },
+    "-x": {
+     "box": [
+      [
+       -2.4000000000000004,
+       0.15,
+       -6.0
+      ],
+      [
+       -0.8,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    },
+    "+z": {
+     "box": [
+      [
+       -6.0,
+       0.15,
+       0.8
+      ],
+      [
+       6.0,
+       1.7,
+       2.4000000000000004
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    },
+    "-z": {
+     "box": [
+      [
+       -6.0,
+       0.15,
+       -2.4000000000000004
+      ],
+      [
+       6.0,
+       1.7,
+       -0.8
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    }
+   },
+   "meshes": [
+    {
+     "name": "Ceiling_Light_Diffuser",
+     "centre": [
+      0.0,
+      3.855,
+      0.0
+     ],
+     "size": [
+      3.25,
+      0.025,
+      0.15
+     ],
+     "tris": 12,
+     "material": "Lamp_Warm",
+     "colour": [
+      249,
+      206,
+      137
+     ]
+    },
+    {
+     "name": "Ceiling_Light_Frame",
+     "centre": [
+      0.0,
+      3.96,
+      0.0
+     ],
+     "size": [
+      3.5,
+      0.18,
+      0.25
+     ],
+     "tris": 12,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Ceiling_Suspension",
+     "centre": [
+      0.0,
+      4.525,
+      0.0
+     ],
+     "size": [
+      3.35,
+      1.15,
+      0.05
+     ],
+     "tris": 64,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Floor_Central_EastWest",
+     "centre": [
+      0.0,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      6.0,
+      0.44,
+      2.4
+     ],
+     "tris": 40,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_Central_NorthSouth",
+     "centre": [
+      0.0,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      6.0,
+      0.44,
+      6.0
+     ],
+     "tris": 56,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_Central_Sump_Base",
+     "centre": [
+      0.0,
+      -0.88,
+      0.0
+     ],
+     "size": [
+      2.4,
+      0.28,
+      2.4
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_East_Channel_Bed",
+     "centre": [
+      -4.5,
+      -0.84,
+      0.0
+     ],
+     "size": [
+      3.0,
+      0.28,
+      1.8
+     ],
+     "tris": 20,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_East_Left",
+     "centre": [
+      -4.5,
+      -0.22,
+      1.95
+     ],
+     "size": [
+      3.0,
+      0.44,
+      2.1
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_East_Right",
+     "centre": [
+      -4.5,
+      -0.22,
+      -1.95
+     ],
+     "size": [
+      3.0,
+      0.44,
+      2.1
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_North_Channel_Bed",
+     "centre": [
+      0.0,
+      -0.84,
+      4.5
+     ],
+     "size": [
+      1.8,
+      0.28,
+      3.0
+     ],
+     "tris": 20,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_North_Left",
+     "centre": [
+      1.95,
+      -0.22,
+      4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_North_Right",
+     "centre": [
+      -1.95,
+      -0.22,
+      4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_South_Channel_Bed",
+     "centre": [
+      0.0,
+      -0.84,
+      -4.5
+     ],
+     "size": [
+      1.8,
+      0.28,
+      3.0
+     ],
+     "tris": 20,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_South_Left",
+     "centre": [
+      -1.95,
+      -0.22,
+      -4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_South_Right",
+     "centre": [
+      1.95,
+      -0.22,
+      -4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_West_Channel_Bed",
+     "centre": [
+      4.5,
+      -0.84,
+      0.0
+     ],
+     "size": [
+      3.0,
+      0.28,
+      1.8
+     ],
+     "tris": 20,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_West_Left",
+     "centre": [
+      4.5,
+      -0.22,
+      -1.95
+     ],
+     "size": [
+      3.0,
+      0.44,
+      2.1
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Floor_West_Right",
+     "centre": [
+      4.5,
+      -0.22,
+      1.95
+     ],
+     "size": [
+      3.0,
+      0.44,
+      2.1
+     ],
+     "tris": 32,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Grate_Cross_Bars",
+     "centre": [
+      0.0,
+      -0.052,
+      0.0
+     ],
+     "size": [
+      2.35,
+      0.035,
+      2.245
+     ],
+     "tris": 72,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Grate_Frame",
+     "centre": [
+      0.0,
+      -0.035,
+      0.0
+     ],
+     "size": [
+      2.53,
+      0.12,
+      2.53
+     ],
+     "tris": 48,
+     "material": "Safety_Ochre",
+     "colour": [
+      229,
+      177,
+      75
+     ]
+    },
+    {
+     "name": "Grate_Walkable_Surface",
+     "centre": [
+      0.0003,
+      -0.015,
+      0.0
+     ],
+     "size": [
+      2.3445,
+      0.05,
+      2.35
+     ],
+     "tris": 264,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Lights_Emissive_Cool.001",
+     "centre": [
+      3.7112,
+      2.38,
+      0.8463
+     ],
+     "size": [
+      1.7175,
+      0.15,
+      7.4475
+     ],
+     "tris": 24,
+     "material": "Lamp_Cool",
+     "colour": [
+      111,
+      203,
+      206
+     ]
+    },
+    {
+     "name": "Lights_Emissive_Warm.001",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      9.24,
+      0.15,
+      9.24
+     ],
+     "tris": 72,
+     "material": "Lamp_Warm",
+     "colour": [
+      249,
+      206,
+      137
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Cages.001",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      9.102,
+      0.21,
+      9.102
+     ],
+     "tris": 288,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Housings.001",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      9.35,
+      0.27,
+      9.35
+     ],
+     "tris": 96,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Piers_Junction",
+     "centre": [
+      0.0,
+      1.1,
+      0.0
+     ],
+     "size": [
+      6.1,
+      2.2,
+      6.1
+     ],
+     "tris": 96,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Pipes_East",
+     "centre": [
+      -4.5,
+      1.72,
+      2.73
+     ],
+     "size": [
+      3.0,
+      0.24,
+      0.24
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Flanges.001",
+     "centre": [
+      0.0,
+      1.72,
+      0.0
+     ],
+     "size": [
+      11.13,
+      0.336,
+      11.13
+     ],
+     "tris": 768,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_North",
+     "centre": [
+      2.73,
+      1.72,
+      4.5
+     ],
+     "size": [
+      0.24,
+      0.24,
+      3.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_South",
+     "centre": [
+      -2.73,
+      1.72,
+      -4.5
+     ],
+     "size": [
+      0.24,
+      0.24,
+      3.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Wall_Brackets.001",
+     "centre": [
+      0.0,
+      1.61,
+      0.0
+     ],
+     "size": [
+      11.18,
+      0.42,
+      11.18
+     ],
+     "tris": 288,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_West",
+     "centre": [
+      4.5,
+      1.72,
+      -2.73
+     ],
+     "size": [
+      3.0,
+      0.24,
+      0.24
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "ROOF_East_Vault",
+     "centre": [
+      -4.5,
+      3.86,
+      0.0
+     ],
+     "size": [
+      3.0,
+      3.32,
+      6.64
+     ],
+     "tris": 536,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "ROOF_Junction_Groin_Vault",
+     "centre": [
+      0.0,
+      3.86,
+      0.0
+     ],
+     "size": [
+      6.0,
+      3.32,
+      6.0
+     ],
+     "tris": 1024,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "ROOF_North_Vault",
+     "centre": [
+      0.0,
+      3.86,
+      4.5
+     ],
+     "size": [
+      6.64,
+      3.32,
+      3.0
+     ],
+     "tris": 536,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "ROOF_South_Vault",
+     "centre": [
+      0.0,
+      3.86,
+      -4.5
+     ],
+     "size": [
+      6.64,
+      3.32,
+      3.0
+     ],
+     "tris": 536,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "ROOF_West_Vault",
+     "centre": [
+      4.5,
+      3.86,
+      0.0
+     ],
+     "size": [
+      3.0,
+      3.32,
+      6.64
+     ],
+     "tris": 536,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Trim_Channel_Coping.001",
+     "centre": [
+      0.0,
+      0.035,
+      0.0
+     ],
+     "size": [
+      12.0,
+      0.07,
+      12.0
+     ],
+     "tris": 96,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Stone_Arch_Ribs.001",
+     "centre": [
+      0.0,
+      2.615,
+      0.0
+     ],
+     "size": [
+      11.98,
+      5.23,
+      11.98
+     ],
+     "tris": 2496,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Wall_Footing.001",
+     "centre": [
+      0.0,
+      0.13,
+      0.0
+     ],
+     "size": [
+      12.0,
+      0.26,
+      12.0
+     ],
+     "tris": 96,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "WATER_Central_Sump",
+     "centre": [
+      0.0,
+      -0.46,
+      0.0
+     ],
+     "size": [
+      2.4,
+      0.045,
+      2.4
+     ],
+     "tris": 32,
+     "material": "Water_Dark_Opaque",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "water_basecolor"
+    },
+    {
+     "name": "WATER_East_Channel",
+     "centre": [
+      -4.5,
+      -0.355,
+      0.0
+     ],
+     "size": [
+      3.0,
+      0.035,
+      1.77
+     ],
+     "tris": 12,
+     "material": "Water_Dark_Opaque",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "water_basecolor"
+    },
+    {
+     "name": "WATER_North_Channel",
+     "centre": [
+      0.0,
+      -0.355,
+      4.5
+     ],
+     "size": [
+      1.77,
+      0.035,
+      3.0
+     ],
+     "tris": 12,
+     "material": "Water_Dark_Opaque",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "water_basecolor"
+    },
+    {
+     "name": "WATER_South_Channel",
+     "centre": [
+      0.0,
+      -0.355,
+      -4.5
+     ],
+     "size": [
+      1.77,
+      0.035,
+      3.0
+     ],
+     "tris": 12,
+     "material": "Water_Dark_Opaque",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "water_basecolor"
+    },
+    {
+     "name": "WATER_West_Channel",
+     "centre": [
+      4.5,
+      -0.355,
+      0.0
+     ],
+     "size": [
+      3.0,
+      0.035,
+      1.77
+     ],
+     "tris": 12,
+     "material": "Water_Dark_Opaque",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "water_basecolor"
+    },
+    {
+     "name": "Walls_East_Left",
+     "centre": [
+      -4.5,
+      1.1,
+      3.16
+     ],
+     "size": [
+      3.0,
+      2.2,
+      0.32
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_East_Right",
+     "centre": [
+      -4.5,
+      1.1,
+      -3.16
+     ],
+     "size": [
+      3.0,
+      2.2,
+      0.32
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_North_Left",
+     "centre": [
+      3.16,
+      1.1,
+      4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_North_Right",
+     "centre": [
+      -3.16,
+      1.1,
+      4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_South_Left",
+     "centre": [
+      -3.16,
+      1.1,
+      -4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_South_Right",
+     "centre": [
+      3.16,
+      1.1,
+      -4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3.0
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_West_Left",
+     "centre": [
+      4.5,
+      1.1,
+      -3.16
+     ],
+     "size": [
+      3.0,
+      2.2,
+      0.32
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    },
+    {
+     "name": "Walls_West_Right",
+     "centre": [
+      4.5,
+      1.1,
+      3.16
+     ],
+     "size": [
+      3.0,
+      2.2,
+      0.32
+     ],
+     "tris": 32,
+     "material": "Brick_Warm_Weathered",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "brick_basecolor"
+    }
+   ]
+  },
+  "dry": {
+   "assetId": "90300409650669",
+   "moderation": "Approved",
+   "displayName": "SR sewer dry maintenance tunnel",
+   "sha": "d18eaea7e7b9e7e1",
+   "source": "03",
+   "fbxBytes": 797884,
+   "tris": 7218,
+   "leftOut": [],
+   "why": "",
+   "lanes": {
+    "centre": {
+     "box": [
+      [
+       -0.8,
+       0.15,
+       -6.0
+      ],
+      [
+       0.8,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    }
+   },
+   "meshes": [
+    {
+     "name": "Details_Squirrel_Paw_Marks",
+     "centre": [
+      1.92,
+      0.002,
+      -3.3582
+     ],
+     "size": [
+      0.202,
+      0.002,
+      0.7475
+     ],
+     "tris": 512,
+     "material": "Grime_Moss",
+     "colour": [
+      89,
+      111,
+      87
+     ]
+    },
+    {
+     "name": "Drain_Grate",
+     "centre": [
+      2.28,
+      0.012,
+      -0.07
+     ],
+     "size": [
+      0.24,
+      0.022,
+      11.76
+     ],
+     "tris": 420,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Electric_Panel",
+     "centre": [
+      2.87,
+      0.85,
+      2.7
+     ],
+     "size": [
+      0.24,
+      1.04,
+      0.82
+     ],
+     "tris": 12,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Electric_Panel_Indicator",
+     "centre": [
+      2.73,
+      1.25,
+      2.48
+     ],
+     "size": [
+      0.025,
+      0.05,
+      0.05
+     ],
+     "tris": 12,
+     "material": "Lamp_Cool",
+     "colour": [
+      111,
+      203,
+      206
+     ]
+    },
+    {
+     "name": "Electric_Panel_Slots",
+     "centre": [
+      2.735,
+      0.85,
+      2.7
+     ],
+     "size": [
+      0.025,
+      0.63,
+      0.52
+     ],
+     "tris": 60,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Floor_Dry",
+     "centre": [
+      0.0,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      6.0,
+      0.44,
+      12.0
+     ],
+     "tris": 108,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Lights_Emissive_Cool.002",
+     "centre": [
+      2.865,
+      2.38,
+      0.0
+     ],
+     "size": [
+      0.025,
+      0.15,
+      8.44
+     ],
+     "tris": 36,
+     "material": "Lamp_Cool",
+     "colour": [
+      111,
+      203,
+      206
+     ]
+    },
+    {
+     "name": "Lights_Emissive_Warm.002",
+     "centre": [
+      -2.865,
+      2.38,
+      0.0
+     ],
+     "size": [
+      0.025,
+      0.15,
+      8.44
+     ],
+     "tris": 36,
+     "material": "Lamp_Warm",
+     "colour": [
+      249,
+      206,
+      137
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Cages.002",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      5.719,
+      0.21,
+      8.302
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Housings.002",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      6.01,
+      0.27,
+      8.55
+     ],
+     "tris": 72,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Flanges.002",
+     "centre": [
+      0.0595,
+      1.6405,
+      0.0
+     ],
+     "size": [
+      5.761,
+      1.001,
+      11.13
+     ],
+     "tris": 576,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Main.001",
+     "centre": [
+      2.73,
+      1.35,
+      0.0
+     ],
+     "size": [
+      0.3,
+      0.3,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Return.001",
+     "centre": [
+      -2.73,
+      2.05,
+      0.0
+     ],
+     "size": [
+      0.13,
+      0.13,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Upper.001",
+     "centre": [
+      2.73,
+      1.89,
+      0.0
+     ],
+     "size": [
+      0.18,
+      0.18,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Wall_Brackets.002",
+     "centre": [
+      0.0,
+      1.59,
+      0.0
+     ],
+     "size": [
+      6.0,
+      1.12,
+      11.18
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pump_Cooling_Fins",
+     "centre": [
+      -2.25,
+      0.6,
+      2.2425
+     ],
+     "size": [
+      0.64,
+      0.64,
+      0.785
+     ],
+     "tris": 384,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pump_Discharge",
+     "centre": [
+      -2.415,
+      1.035,
+      3.235
+     ],
+     "size": [
+      0.57,
+      1.11,
+      0.51
+     ],
+     "tris": 120,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pump_Electrical_Box",
+     "centre": [
+      -2.25,
+      0.98,
+      2.25
+     ],
+     "size": [
+      0.32,
+      0.22,
+      0.35
+     ],
+     "tris": 12,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pump_Motor",
+     "centre": [
+      -2.25,
+      0.6,
+      2.225
+     ],
+     "size": [
+      0.58,
+      0.58,
+      0.95
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pump_Plinth",
+     "centre": [
+      -2.25,
+      0.12,
+      2.3
+     ],
+     "size": [
+      1.1,
+      0.24,
+      1.7
+     ],
+     "tris": 12,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Pump_Volute",
+     "centre": [
+      -2.25,
+      0.6,
+      2.855
+     ],
+     "size": [
+      0.74,
+      0.74,
+      0.27
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "ROOF_Cable_Tray",
+     "centre": [
+      1.35,
+      4.5,
+      0.0
+     ],
+     "size": [
+      0.42,
+      0.085,
+      11.95
+     ],
+     "tris": 36,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "ROOF_Cables",
+     "centre": [
+      1.37,
+      4.56,
+      0.0
+     ],
+     "size": [
+      0.27,
+      0.05,
+      11.94
+     ],
+     "tris": 288,
+     "material": "Rubber_Black",
+     "colour": [
+      36,
+      43,
+      41
+     ]
+    },
+    {
+     "name": "ROOF_Vault.001",
+     "centre": [
+      0.0,
+      3.86,
+      0.0
+     ],
+     "size": [
+      6.64,
+      3.32,
+      12.0
+     ],
+     "tris": 1256,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "SEWER_Dry_Side_Plaque",
+     "centre": [
+      -2.98,
+      1.48,
+      -4.7
+     ],
+     "size": [
+      0.0,
+      0.36,
+      0.64
+     ],
+     "tris": 2,
+     "material": "SEWER_Dry_Side_Plaque_Printed_Texture",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Image_6"
+    },
+    {
+     "name": "SEWER_Plaque_Screw",
+     "centre": [
+      -2.975,
+      1.48,
+      -4.7
+     ],
+     "size": [
+      0.006,
+      0.306,
+      0.596
+     ],
+     "tris": 128,
+     "material": "Blackened_Steel",
+     "colour": [
+      113,
+      121,
+      119
+     ]
+    },
+    {
+     "name": "Service_Door_Frame",
+     "centre": [
+      -2.96,
+      1.17,
+      -1.2
+     ],
+     "size": [
+      0.09,
+      2.34,
+      1.5
+     ],
+     "tris": 12,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Service_Door_Handle",
+     "centre": [
+      -2.81,
+      1.06,
+      -0.78
+     ],
+     "size": [
+      0.052,
+      0.22,
+      0.052
+     ],
+     "tris": 32,
+     "material": "Safety_Ochre",
+     "colour": [
+      229,
+      177,
+      75
+     ]
+    },
+    {
+     "name": "Service_Door_Leaf",
+     "centre": [
+      -2.9,
+      1.16,
+      -1.2
+     ],
+     "size": [
+      0.055,
+      2.18,
+      1.34
+     ],
+     "tris": 12,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Service_Door_Louvres",
+     "centre": [
+      -2.84,
+      1.63,
+      -1.2
+     ],
+     "size": [
+      0.035,
+      0.388,
+      0.84
+     ],
+     "tris": 60,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Service_Door_Vent",
+     "centre": [
+      -2.858,
+      1.64,
+      -1.2
+     ],
+     "size": [
+      0.02,
+      0.52,
+      0.84
+     ],
+     "tris": 12,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Sign_SERVICE",
+     "centre": [
+      2.97,
+      1.0078,
+      -2.899
+     ],
+     "size": [
+      0.003,
+      0.133,
+      0.6755
+     ],
+     "tris": 472,
+     "material": "Paper_Cream",
+     "colour": [
+      221,
+      214,
+      192
+     ]
+    },
+    {
+     "name": "Trim_Stone_Arch_Ribs.002",
+     "centre": [
+      0.0,
+      2.615,
+      0.0
+     ],
+     "size": [
+      6.25,
+      5.23,
+      11.98
+     ],
+     "tris": 1248,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Wall_Footing.002",
+     "centre": [
+      0.0,
+      0.13,
+      0.0
+     ],
+     "size": [
+      6.08,
+      0.26,
+      12.0
+     ],
+     "tris": 24,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Valve_Handwheel.001",
+     "centre": [
+      2.65,
+      1.36,
+      1.0
+     ],
+     "size": [
+      0.0606,
+      0.57,
+      0.57
+     ],
+     "tris": 312,
+     "material": "Valve_Red",
+     "colour": [
+      173,
+      72,
+      50
+     ]
+    },
+    {
+     "name": "Valve_Spindle.001",
+     "centre": [
+      2.51,
+      1.36,
+      1.0
+     ],
+     "size": [
+      0.22,
+      0.0666,
+      0.07
+     ],
+     "tris": 40,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Walls_Left.001",
+     "centre": [
+      3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Walls_Right.001",
+     "centre": [
+      -3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    }
+   ]
+  },
+  "dryPlain": {
+   "assetId": "105019332774215",
+   "moderation": "Approved",
+   "displayName": "SR sewer dry tunnel plain",
+   "sha": "7187a589bb3124e9",
+   "source": "03",
+   "fbxBytes": 555852,
+   "tris": 5396,
+   "leftOut": [
+    "Electric_Panel",
+    "Electric_Panel_Indicator",
+    "Electric_Panel_Slots",
+    "Pump_Cooling_Fins",
+    "Pump_Discharge",
+    "Pump_Electrical_Box",
+    "Pump_Motor",
+    "Pump_Plinth",
+    "Pump_Volute",
+    "SEWER_Dry_Side_Plaque",
+    "SEWER_Plaque_Screw",
+    "Service_Door_Frame",
+    "Service_Door_Handle",
+    "Service_Door_Leaf",
+    "Service_Door_Louvres",
+    "Service_Door_Vent",
+    "Sign_SERVICE",
+    "Valve_Handwheel.001",
+    "Valve_Spindle.001"
+   ],
+   "why": "the plain repeat under the river: no pump set, service door, panel, valve, sign or plaque",
+   "lanes": {
+    "centre": {
+     "box": [
+      [
+       -0.8,
+       0.15,
+       -6.0
+      ],
+      [
+       0.8,
+       1.7,
+       6.0
+      ]
+     ],
+     "clear": true,
+     "blockers": []
+    }
+   },
+   "meshes": [
+    {
+     "name": "Details_Squirrel_Paw_Marks",
+     "centre": [
+      1.92,
+      0.002,
+      -3.3582
+     ],
+     "size": [
+      0.202,
+      0.002,
+      0.7475
+     ],
+     "tris": 512,
+     "material": "Grime_Moss",
+     "colour": [
+      89,
+      111,
+      87
+     ]
+    },
+    {
+     "name": "Drain_Grate",
+     "centre": [
+      2.28,
+      0.012,
+      -0.07
+     ],
+     "size": [
+      0.24,
+      0.022,
+      11.76
+     ],
+     "tris": 420,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Floor_Dry",
+     "centre": [
+      0.0,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      6.0,
+      0.44,
+      12.0
+     ],
+     "tris": 108,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Lights_Emissive_Cool.002",
+     "centre": [
+      2.865,
+      2.38,
+      0.0
+     ],
+     "size": [
+      0.025,
+      0.15,
+      8.44
+     ],
+     "tris": 36,
+     "material": "Lamp_Cool",
+     "colour": [
+      111,
+      203,
+      206
+     ]
+    },
+    {
+     "name": "Lights_Emissive_Warm.002",
+     "centre": [
+      -2.865,
+      2.38,
+      0.0
+     ],
+     "size": [
+      0.025,
+      0.15,
+      8.44
+     ],
+     "tris": 36,
+     "material": "Lamp_Warm",
+     "colour": [
+      249,
+      206,
+      137
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Cages.002",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      5.719,
+      0.21,
+      8.302
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Lights_Fixture_Housings.002",
+     "centre": [
+      0.0,
+      2.38,
+      0.0
+     ],
+     "size": [
+      6.01,
+      0.27,
+      8.55
+     ],
+     "tris": 72,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Flanges.002",
+     "centre": [
+      0.0595,
+      1.6405,
+      0.0
+     ],
+     "size": [
+      5.761,
+      1.001,
+      11.13
+     ],
+     "tris": 576,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "Pipes_Main.001",
+     "centre": [
+      2.73,
+      1.35,
+      0.0
+     ],
+     "size": [
+      0.3,
+      0.3,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Return.001",
+     "centre": [
+      -2.73,
+      2.05,
+      0.0
+     ],
+     "size": [
+      0.13,
+      0.13,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Upper.001",
+     "centre": [
+      2.73,
+      1.89,
+      0.0
+     ],
+     "size": [
+      0.18,
+      0.18,
+      12.0
+     ],
+     "tris": 64,
+     "material": "Steel_Teal_Rusted",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "steel_basecolor"
+    },
+    {
+     "name": "Pipes_Wall_Brackets.002",
+     "centre": [
+      0.0,
+      1.59,
+      0.0
+     ],
+     "size": [
+      6.0,
+      1.12,
+      11.18
+     ],
+     "tris": 216,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "ROOF_Cable_Tray",
+     "centre": [
+      1.35,
+      4.5,
+      0.0
+     ],
+     "size": [
+      0.42,
+      0.085,
+      11.95
+     ],
+     "tris": 36,
+     "material": "Iron_Dark",
+     "colour": [
+      75,
+      82,
+      82
+     ]
+    },
+    {
+     "name": "ROOF_Cables",
+     "centre": [
+      1.37,
+      4.56,
+      0.0
+     ],
+     "size": [
+      0.27,
+      0.05,
+      11.94
+     ],
+     "tris": 288,
+     "material": "Rubber_Black",
+     "colour": [
+      36,
+      43,
+      41
+     ]
+    },
+    {
+     "name": "ROOF_Vault.001",
+     "centre": [
+      0.0,
+      3.86,
+      0.0
+     ],
+     "size": [
+      6.64,
+      3.32,
+      12.0
+     ],
+     "tris": 1256,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Trim_Stone_Arch_Ribs.002",
+     "centre": [
+      0.0,
+      2.615,
+      0.0
+     ],
+     "size": [
+      6.25,
+      5.23,
+      11.98
+     ],
+     "tris": 1248,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Trim_Wall_Footing.002",
+     "centre": [
+      0.0,
+      0.13,
+      0.0
+     ],
+     "size": [
+      6.08,
+      0.26,
+      12.0
+     ],
+     "tris": 24,
+     "material": "Stone_Trim",
+     "colour": [
+      175,
+      170,
+      153
+     ]
+    },
+    {
+     "name": "Walls_Left.001",
+     "centre": [
+      3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    },
+    {
+     "name": "Walls_Right.001",
+     "centre": [
+      -3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12.0
+     ],
+     "tris": 80,
+     "material": "Concrete_Worn",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "concrete_basecolor"
+    }
+   ]
+  },
+  "marker": {
+   "assetId": "72323383666810",
+   "moderation": "Approved",
+   "displayName": "SR sewer Dry Side plaque",
+   "sha": "80104496650b8444",
+   "source": "marker",
+   "fbxBytes": 155404,
+   "tris": 130,
+   "leftOut": [],
+   "why": "",
+   "lanes": {},
+   "meshes": [
+    {
+     "name": "SEWER_Dry_Side_Plaque",
+     "centre": [
+      0.0,
+      0.18,
+      0.0
+     ],
+     "size": [
+      0.64,
+      0.36,
+      0.0
+     ],
+     "tris": 2,
+     "material": "SEWER_Dry_Side_Plaque_Printed_Texture",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Image_0"
+    },
+    {
+     "name": "SEWER_Plaque_Screw",
+     "centre": [
+      0.0,
+      0.18,
+      -0.005
+     ],
+     "size": [
+      0.596,
+      0.306,
+      0.006
+     ],
+     "tris": 128,
+     "material": "Blackened_Steel",
+     "colour": [
+      113,
+      121,
+      119
+     ]
+    }
+   ]
+  }
+ },
+ "metadata": {
+  "01": {
+   "footprint": [
+    6.64,
+    12
+   ],
+   "ports": [
+    {
+     "name": "PORT_01_North",
+     "at": [
+      0.0,
+      0.0,
+      6.0
+     ],
+     "outward": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    },
+    {
+     "name": "PORT_01_South",
+     "at": [
+      0.0,
+      0.0,
+      -6.0
+     ],
+     "outward": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    }
+   ],
+   "lights": [
+    {
+     "name": "LIGHT_01_01",
+     "at": [
+      2.57,
+      2.38,
+      -4.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_01_02",
+     "at": [
+      -2.57,
+      2.38,
+      -4.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_01_03",
+     "at": [
+      2.57,
+      2.38,
+      0.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_01_04",
+     "at": [
+      -2.57,
+      2.38,
+      0.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_01_05",
+     "at": [
+      2.57,
+      2.38,
+      4.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_01_06",
+     "at": [
+      -2.57,
+      2.38,
+      4.0
+     ],
+     "colour": "#9bd9db",
+     "range": 5.5
+    }
+   ],
+   "colliders": [
+    {
+     "name": "Walls_Left",
+     "centre": [
+      3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_Left",
+     "centre": [
+      1.95,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      2.1,
+      0.44,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_Right",
+     "centre": [
+      -3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_Right",
+     "centre": [
+      -1.95,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      2.1,
+      0.44,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_Channel_Bed",
+     "centre": [
+      0.0,
+      -0.84,
+      0.0
+     ],
+     "size": [
+      1.8,
+      0.28,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Bridge_Frame",
+     "centre": [
+      0.0,
+      -0.055,
+      2.85
+     ],
+     "size": [
+      2.24,
+      0.11,
+      1.12
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    }
+   ]
+  },
+  "02": {
+   "footprint": [
+    12,
+    12
+   ],
+   "ports": [
+    {
+     "name": "PORT_02_North",
+     "at": [
+      0.0,
+      0.0,
+      6.0
+     ],
+     "outward": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    },
+    {
+     "name": "PORT_02_South",
+     "at": [
+      0.0,
+      0.0,
+      -6.0
+     ],
+     "outward": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    },
+    {
+     "name": "PORT_02_West",
+     "at": [
+      6.0,
+      0.0,
+      0.0
+     ],
+     "outward": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    },
+    {
+     "name": "PORT_02_East",
+     "at": [
+      -6.0,
+      0.0,
+      -0.0
+     ],
+     "outward": [
+      -1.0,
+      0.0,
+      -0.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    }
+   ],
+   "lights": [
+    {
+     "name": "LIGHT_02_01",
+     "at": [
+      2.57,
+      2.38,
+      4.35
+     ],
+     "colour": "#9bd9db",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_02",
+     "at": [
+      -2.57,
+      2.38,
+      4.4
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_03",
+     "at": [
+      -2.57,
+      2.38,
+      -4.35
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_04",
+     "at": [
+      2.57,
+      2.38,
+      -4.4
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_05",
+     "at": [
+      4.35,
+      2.38,
+      -2.57
+     ],
+     "colour": "#9bd9db",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_06",
+     "at": [
+      4.4,
+      2.38,
+      2.57
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_07",
+     "at": [
+      -4.35,
+      2.38,
+      2.57
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_08",
+     "at": [
+      -4.4,
+      2.38,
+      -2.57
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_02_09",
+     "at": [
+      0.0,
+      3.65,
+      0.0
+     ],
+     "colour": "#f4d4a5",
+     "range": 7
+    }
+   ],
+   "colliders": [
+    {
+     "name": "Walls_North_Left",
+     "centre": [
+      3.16,
+      1.1,
+      4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_North_Left",
+     "centre": [
+      1.95,
+      -0.22,
+      4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_North_Right",
+     "centre": [
+      -3.16,
+      1.1,
+      4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_North_Right",
+     "centre": [
+      -1.95,
+      -0.22,
+      4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_North_Channel_Bed",
+     "centre": [
+      0.0,
+      -0.84,
+      4.5
+     ],
+     "size": [
+      1.8,
+      0.28,
+      3
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_South_Left",
+     "centre": [
+      -3.16,
+      1.1,
+      -4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": 3.1416,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_South_Left",
+     "centre": [
+      -1.95,
+      -0.22,
+      -4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": 3.1416,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_South_Right",
+     "centre": [
+      3.16,
+      1.1,
+      -4.5
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": 3.1416,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_South_Right",
+     "centre": [
+      1.95,
+      -0.22,
+      -4.5
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": 3.1416,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_South_Channel_Bed",
+     "centre": [
+      0.0,
+      -0.84,
+      -4.5
+     ],
+     "size": [
+      1.8,
+      0.28,
+      3
+     ],
+     "yaw": 3.1416,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_West_Left",
+     "centre": [
+      4.5,
+      1.1,
+      -3.16
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": 1.5708,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_West_Left",
+     "centre": [
+      4.5,
+      -0.22,
+      -1.95
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": 1.5708,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_West_Right",
+     "centre": [
+      4.5,
+      1.1,
+      3.16
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": 1.5708,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_West_Right",
+     "centre": [
+      4.5,
+      -0.22,
+      1.95
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": 1.5708,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_West_Channel_Bed",
+     "centre": [
+      4.5,
+      -0.84,
+      0.0
+     ],
+     "size": [
+      1.8,
+      0.28,
+      3
+     ],
+     "yaw": 1.5708,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_East_Left",
+     "centre": [
+      -4.5,
+      1.1,
+      3.16
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": -1.5708,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_East_Left",
+     "centre": [
+      -4.5,
+      -0.22,
+      1.95
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": -1.5708,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Walls_East_Right",
+     "centre": [
+      -4.5,
+      1.1,
+      -3.16
+     ],
+     "size": [
+      0.32,
+      2.2,
+      3
+     ],
+     "yaw": -1.5708,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_East_Right",
+     "centre": [
+      -4.5,
+      -0.22,
+      -1.95
+     ],
+     "size": [
+      2.1,
+      0.44,
+      3
+     ],
+     "yaw": -1.5708,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_East_Channel_Bed",
+     "centre": [
+      -4.5,
+      -0.84,
+      -0.0
+     ],
+     "size": [
+      1.8,
+      0.28,
+      3
+     ],
+     "yaw": -1.5708,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_Central_NorthSouth",
+     "centre": [
+      0.0,
+      -0.22,
+      -2.1
+     ],
+     "size": [
+      6,
+      0.44,
+      1.8
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_Central_NorthSouth",
+     "centre": [
+      0.0,
+      -0.22,
+      2.1
+     ],
+     "size": [
+      6,
+      0.44,
+      1.8
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_Central_EastWest",
+     "centre": [
+      2.1,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      1.8,
+      0.44,
+      2.4
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_Central_EastWest",
+     "centre": [
+      -2.1,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      1.8,
+      0.44,
+      2.4
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Floor_Central_Sump_Base",
+     "centre": [
+      0.0,
+      -0.88,
+      0.0
+     ],
+     "size": [
+      2.4,
+      0.28,
+      2.4
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Central_grate_walkable",
+     "centre": [
+      0.0,
+      -0.06,
+      0.0
+     ],
+     "size": [
+      2.45,
+      0.12,
+      2.45
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Piers_Junction",
+     "centre": [
+      2.78,
+      1.1,
+      -2.78
+     ],
+     "size": [
+      0.4,
+      2.2,
+      0.4
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Piers_Junction",
+     "centre": [
+      2.78,
+      1.1,
+      2.78
+     ],
+     "size": [
+      0.4,
+      2.2,
+      0.4
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Piers_Junction",
+     "centre": [
+      -2.78,
+      1.1,
+      -2.78
+     ],
+     "size": [
+      0.4,
+      2.2,
+      0.4
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Piers_Junction",
+     "centre": [
+      -2.78,
+      1.1,
+      2.78
+     ],
+     "size": [
+      0.4,
+      2.2,
+      0.4
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    }
+   ]
+  },
+  "03": {
+   "footprint": [
+    6.64,
+    12
+   ],
+   "ports": [
+    {
+     "name": "PORT_03_North",
+     "at": [
+      0.0,
+      0.0,
+      6.0
+     ],
+     "outward": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    },
+    {
+     "name": "PORT_03_South",
+     "at": [
+      0.0,
+      0.0,
+      -6.0
+     ],
+     "outward": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "spring": 2.2,
+     "crown": 5.2
+    }
+   ],
+   "lights": [
+    {
+     "name": "LIGHT_03_01",
+     "at": [
+      2.57,
+      2.38,
+      -4.0
+     ],
+     "colour": "#9bd9db",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_03_02",
+     "at": [
+      -2.57,
+      2.38,
+      -4.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_03_03",
+     "at": [
+      2.57,
+      2.38,
+      0.0
+     ],
+     "colour": "#9bd9db",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_03_04",
+     "at": [
+      -2.57,
+      2.38,
+      0.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_03_05",
+     "at": [
+      2.57,
+      2.38,
+      4.0
+     ],
+     "colour": "#9bd9db",
+     "range": 5.5
+    },
+    {
+     "name": "LIGHT_03_06",
+     "at": [
+      -2.57,
+      2.38,
+      4.0
+     ],
+     "colour": "#ffd29a",
+     "range": 5.5
+    }
+   ],
+   "colliders": [
+    {
+     "name": "Walls_Left",
+     "centre": [
+      3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Walls_Right",
+     "centre": [
+      -3.16,
+      1.1,
+      0.0
+     ],
+     "size": [
+      0.32,
+      2.2,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    },
+    {
+     "name": "Floor_Dry",
+     "centre": [
+      0.0,
+      -0.22,
+      0.0
+     ],
+     "size": [
+      6,
+      0.44,
+      12
+     ],
+     "yaw": 0.0,
+     "purpose": "walkable"
+    },
+    {
+     "name": "Pump_Plinth",
+     "centre": [
+      -2.25,
+      0.12,
+      2.3
+     ],
+     "size": [
+      1.1,
+      0.24,
+      1.7
+     ],
+     "yaw": 0.0,
+     "purpose": "solid"
+    }
+   ]
+  }
+ },
+ "sources": {
+  "01": {
+   "file": "docs/reference/store_roofs/art_pack/GLB/01_Brick_Sewer_Passage.glb",
+   "sha256": "688c09d32d4f48189aafb5c26f88bb18c26bf1c12cd520096e27c77d3134b58e"
+  },
+  "02": {
+   "file": "docs/reference/store_roofs/art_pack/GLB/02_Four_Way_Sewer_Junction.glb",
+   "sha256": "7dd88f224e27bf3c09d9c858a78e2e194e6976c32c03d3099e207c86c802aed1"
+  },
+  "03": {
+   "file": "docs/reference/store_roofs/art_pack/GLB/03_Concrete_Maintenance_Tunnel.glb",
+   "sha256": "97313c9ece32ecf4aaaa2cc657905f60e2bdcb82b3c48e6de66518da612084fd"
+  },
+  "marker": {
+   "file": "docs/reference/store_roofs/art_pack/GLB/Additions/Dry_Side_Marker.glb",
+   "sha256": "22c18e23850bef0927047e079e33a05a8a70d1786203e94b46eae5626ef3fd40"
+  }
+ }
+}
