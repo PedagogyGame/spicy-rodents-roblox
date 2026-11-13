@@ -159,6 +159,9 @@
 --                take the thumb off the look); L3 sprint is a TOGGLE that ends on a fire press, on a
 --                crouch and when the stick is let go; View (ButtonSelect) shows the scoreboard while
 --                HELD, and while it is held Y leaves and DPad Up changes sides (the board says so).
+--                View is also the engine's switch into picking buttons with the pad: that is off while
+--                seated, and a pick is let go while the board is held and in live play (Controls).
+--                Sprint runs only with the stick (or the keys) pushed ahead (Tuning.sprintCone).
 --   touch        the thumbstick moves, a drag on the right half looks; sprint starts on a FULL push
 --                of the stick and lasts until the stick comes back under half way, a fire press or a
 --                crouch; FIRE at the lower right DOES NOT SINK ITS TOUCH (a drag that starts on it

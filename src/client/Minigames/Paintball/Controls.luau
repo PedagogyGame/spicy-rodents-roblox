@@ -11,7 +11,12 @@
 --                scoreboard while HELD, and while it is held Y leaves and D-pad up changes sides; at the
 --                end card Y leaves by itself. (View is also Roblox's own switch into picking a button
 --                with the pad, and the D-pad then moves that pick: these three are obeyed even when the
---                engine counts the press as its own, so the board and its two verbs never depend on it.)
+--                engine counts the press as its own, so the board and its two verbs never depend on it.
+--                And that switch is OFF while seated (GuiService.AutoSelectGuiEnabled, put back by
+--                stop()), and any pick the pad holds is let go every frame the board is held from the
+--                pad, when it is let go, and all through live play: a glance at the scores must never
+--                leave A pressing "Leave the match" instead of jumping, nor the stick moving a pick
+--                instead of the body.)
 --   touch        the right FIRE does not sink its touch: its press is read here from the touch itself
 --                (inside Hud.fireRect), and the same finger's drag still turns the view; a second FIRE
 --                on the left, RELOAD, CROUCH (a TOGGLE) and SCORES (a TOGGLE) are buttons. Sprint
@@ -41,6 +46,14 @@ local PAD_OVER_UI: { [string]: boolean } = { ButtonSelect = true, ButtonY = true
 function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tuning: typeof(Tuning.T)?): Controls
 	local tune = tuning or Tuning
 	local UIS = game:GetService("UserInputService")
+	local GuiService = game:GetService("GuiService")
+	local autoWas = GuiService.AutoSelectGuiEnabled
+	GuiService.AutoSelectGuiEnabled = false
+	local function unpick()
+		if GuiService.SelectedObject ~= nil then
+			GuiService.SelectedObject = nil
+		end
+	end
 	local conns: { RBXScriptConnection } = {}
 	local fireRight: GuiObject? = hud.touch.FireRight
 	local touchOn = fireRight ~= nil
@@ -157,6 +170,7 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 				apply()
 			elseif key == "ButtonSelect" then
 				padScores = false
+				unpick()
 				apply()
 			end
 		end)
@@ -194,6 +208,10 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 	local controls = {} :: Controls
 
 	function controls.step(_self: Controls, _dt: number)
+		-- no pick of a button by the pad while the board is held from it, nor in live play (the header says why)
+		if padScores or seat.phase == "live" then
+			unpick()
+		end
 		-- a toggled sprint lives only while the stick is pushed
 		if padSprint and padStick < tune.padSprintOff then
 			padSprint = false
@@ -218,6 +236,7 @@ function Controls.new(seat: SeatCore.Seat, hud: Hud.Hud, port: SelfPort.Self, tu
 			c:Disconnect()
 		end
 		table.clear(conns)
+		GuiService.AutoSelectGuiEnabled = autoWas
 	end
 
 	return controls
