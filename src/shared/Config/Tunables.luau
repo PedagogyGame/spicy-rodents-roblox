@@ -126,6 +126,10 @@ Tunables.tree = {
 	lighting = { enableRadius = { v = 180, unit = "st" }, flickerFraction = { v = 0.07 }, maxRealLights = { v = 300, src = "S17" } },
 	interior = { doorHold = { v = 3, unit = "s" }, hideNoSight = { v = 2, unit = "s" }, searchPerSpot = { v = 1.5, unit = "s" } },
 	recovery = { safeHistory = { v = 3, unit = "s" }, riverToQuay = { v = true, src = "worldgen_districts_art §16" } },
+	-- the storm drains (BRIEF_ADDENDUM D8; Shared/World/SewerLayout). speedMult is compiled into every sewer route's
+	-- speedMult (tools/compile lib/Sewers): change it, recompile. The motor does not read route.speedMult yet.
+	sewer = { speedMult = { v = 1.25, src = "D8 survey default: 1.25 x the street pace inside a pipe, so every pipe beats its surface way" },
+	          stakeoutSecs = { v = 15, unit = "s", src = "D8 survey default: an officer stands over the grate the rodent went down" } },
 	policeCoord = { tier2Pair = { v = true }, cutoffLookahead = { v = 30, unit = "u" }, perimeterPoints = { v = 3 } },
 	ai = { thinkHz = { v = { near = 10, mid = 4, far = 1 } }, lodNear = { v = 150, unit = "st" }, lodMid = { v = 500, unit = "st" }, budgetMs = { v = 4 },
 	       arenaBudgetMs = { v = 1.5, src = "S18" } },

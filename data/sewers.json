@@ -1,0 +1,118 @@
+{
+  "$schema": "../tools/compile/schema/sewers.schema.json",
+  "src": "BRIEF_ADDENDUM D8 (the sewer shortcuts) and D13; brief v2 §8 L150 (the sewer is rodent cover), decision 20 (sewer and fashion stand stay); the sewer survey's site section (P1 crossroads, P2 old river culvert, P3 Bowl Lane drain), on the enclosed-run contract (Shared/Routes/Enclosure) and the owner's sewer art (docs/reference/store_roofs/art_pack: 01 brick passage, 02 four-way junction, 03 concrete maintenance tunnel). Compiled by tools/compile (lib/Sewers) through Shared/World/SewerLayout.build into generated/Sewers.luau. Units: STUDS, world space, y up, north = +z.",
+  "units": "studs",
+  "routeIds": [9300, 9399],
+  "art": {
+    "pack": "docs/reference/store_roofs/art_pack",
+    "studsPerMetre": 1.0,
+    "note": "One stud per metre of the art: the passages are 6.64 wide and 5.52 to the vault's outer top, walkways 2.1 wide either side of a 1.8 channel (Metadata/01, 02, 03). A person (5.2 to 7.75 studs) could stoop in them; the squirrel (1.6 x 1.7) runs a walkway with four times its height over it. The survey's 4.8-stud round pipe is not used: the owner's modules are the inside."
+  },
+  "sections": {
+    "brick": {
+      "art": "GLB/01_Brick_Sewer_Passage.glb",
+      "innerHalf": 3.0,
+      "outerHalf": 3.32,
+      "below": 0.98,
+      "crown": 5.52,
+      "spring": 2.2,
+      "walkway": [0.9, 3.0],
+      "routeOffset": 1.6,
+      "water": -0.34,
+      "width": 2.1,
+      "headroom": 4.0,
+      "lamp": [2.57, 2.38],
+      "note": "The route keeps 1.6 off the axis on one walkway: the body (0.8 each side) stays inside the junction's piers (2.58) and off the wall pipes, valve and lamps (2.6 and out); 4.0 is the vault over the body's outer edge."
+    },
+    "dry": {
+      "art": "GLB/03_Concrete_Maintenance_Tunnel.glb",
+      "innerHalf": 3.0,
+      "outerHalf": 3.32,
+      "below": 0.44,
+      "crown": 5.52,
+      "spring": 2.2,
+      "walkway": [-3.0, 3.0],
+      "routeOffset": 0,
+      "width": 3.0,
+      "headroom": 5.2,
+      "lamp": [2.57, 2.38],
+      "note": "A dry floor wall to wall: the route runs the middle, clear of the pump plinth (1.7 and out) and the panel (-2.75)."
+    }
+  },
+  "junction": {
+    "art": "GLB/02_Four_Way_Sewer_Junction.glb",
+    "half": 6.0,
+    "note": "Four arches at right angles on a 12 x 12 module; central floor 6 x 6 with the sump grate (2.4) in the middle and a pier (0.4) at each inner corner (2.78)."
+  },
+  "shaft": { "inside": 3.2, "wall": 0.4, "rungGap": 0.25 },
+  "carve": { "voxel": 4, "margin": 1, "slabBottom": -16, "cover": 3 },
+  "mouth": { "reach": 1.5, "rise": 1.0 },
+  "lampEvery": 12,
+  "pipes": [
+    {
+      "id": "P1",
+      "name": "Storm drain 1: the crossroads",
+      "space": "sewer.crossroads",
+      "sign": "STORM DRAIN 1 CROSSROADS",
+      "section": "brick",
+      "walkway": -10.6,
+      "note": "Under the Main Street / Centre Street crossing, corner to corner. A grate in each corner square of grass where the two verges meet (x and z 22.5..26.1), four arms on the diagonals to the owner's four-way junction under the middle of the junction. The vault's outer top is at -5.08, so the carve stops at -4 under ground 0: one whole voxel and the road over it.",
+      "mouths": [
+        { "id": "P1.NW", "kind": "grate", "name": "north-west corner grate", "at": [-24.65, 24.65], "ground": 0, "rungs": "+z", "opening": [-26.1, -23.05, 22.5, 24.9] },
+        { "id": "P1.NE", "kind": "grate", "name": "north-east corner grate", "at": [24.65, 24.65], "ground": 0, "rungs": "+x", "opening": [22.5, 24.9, 23.05, 26.1] },
+        { "id": "P1.SE", "kind": "grate", "name": "south-east corner grate", "at": [24.65, -24.65], "ground": 0, "rungs": "+x", "opening": [22.5, 24.9, -26.1, -23.05] },
+        { "id": "P1.SW", "kind": "grate", "name": "south-west corner grate", "at": [-24.65, -24.65], "ground": 0, "rungs": "-z", "opening": [-26.1, -23.05, -24.9, -22.5] }
+      ],
+      "junction": { "at": [0, 0], "straight": [[9301, 9303], [9302, 9304]] },
+      "routes": [
+        { "id": 9301, "name": "storm drain 1, north-west arm", "from": "P1.NW", "to": "junction", "side": "right" },
+        { "id": 9302, "name": "storm drain 1, north-east arm", "from": "P1.NE", "to": "junction", "side": "right" },
+        { "id": 9303, "name": "storm drain 1, south-east arm", "from": "P1.SE", "to": "junction", "side": "left" },
+        { "id": 9304, "name": "storm drain 1, south-west arm", "from": "P1.SW", "to": "junction", "side": "left" }
+      ],
+      "surface": [
+        { "from": "P1.NW", "to": "P1.SE", "points": [[-24.65, 24.65], [-22.5, 30.25], [22.5, 30.25], [30.25, 22.5], [30.25, -22.5], [24.65, -24.65]], "note": "the safe way: across Centre Street and Main Street on the sidewalk lines (crossings are not drawn yet). Straight across the junction is 69.7, through both roads' traffic." },
+        { "from": "P1.NE", "to": "P1.SW", "points": [[24.65, 24.65], [30.25, 22.5], [30.25, -22.5], [22.5, -30.25], [-22.5, -30.25], [-24.65, -24.65]], "note": "the safe way: across Main Street and Centre Street on the sidewalk lines" }
+      ]
+    },
+    {
+      "id": "P2",
+      "name": "The old river culvert",
+      "space": "sewer.culvert",
+      "sign": "OLD RIVER CULVERT 1911",
+      "section": "dry",
+      "walkway": -14.6,
+      "note": "Quay to quay under the river, a dry maintenance tunnel (the owner's 'Dry Side / Mind Your Paws' passage). Under the river bed (-5) the carve stops at -8, leaving the mud voxel and 3 studs over it; the floor (-14.6) keeps 5.4 above the recovery floor (-20).",
+      "mouths": [
+        { "id": "P2.W", "kind": "cover", "name": "west quay access cover", "at": [1960.65, 462], "ground": 20, "rungs": "-x" },
+        { "id": "P2.E", "kind": "cover", "name": "east quay access cover", "at": [2335.35, 462], "ground": 20, "rungs": "+x" }
+      ],
+      "routes": [
+        { "id": 9311, "name": "old river culvert", "from": "P2.W", "to": "P2.E", "side": "left" }
+      ],
+      "surface": [
+        { "from": "P2.W", "to": "P2.E", "points": [[1960.65, 462], [1860, 19.5], [2390, 19.5], [2335.35, 462]], "note": "down the west quay to the bridge ramp's foot, over the bridge, back up the east quay (the only crossing)" }
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "Storm drain 3: Bowl Lane",
+      "space": "sewer.bowllane",
+      "sign": "STORM DRAIN 3 BOWL LANE",
+      "section": "brick",
+      "walkway": -3.2,
+      "note": "From the lawn in front of the bowling alley's doors to Main Street's north verge, under Bowl Lane and the boulevard (two traffic lanes, the trolley, the patrol car's beat). Graded to drain north: the walkway falls 4.0 -> 1.2 -> -2.8 -> -3.2 so the carve steps 12, 8, 4 under the falling ground.",
+      "mouths": [
+        { "id": "P3.S", "kind": "grate", "name": "bowling alley lawn grate", "at": [1306, -339.35], "ground": 16.42, "rungs": "-z" },
+        { "id": "P3.N", "kind": "grate", "name": "Main Street north verge grate", "at": [1350, 37.35], "ground": 7.78, "rungs": "+z" }
+      ],
+      "routes": [
+        { "id": 9321, "name": "storm drain 3, Bowl Lane", "from": "P3.S", "to": "P3.N", "side": "left", "wFrom": 4.0, "wTo": -3.2, "via": [[1321.84, -203.74, 1.2], [1339.44, -53.04, -2.8]] }
+      ],
+      "lightGrates": [[1344.05, 0]],
+      "surface": [
+        { "from": "P3.S", "to": "P3.N", "points": [[1306, -339.35], [1350, 37.35]], "note": "straight across Bowl Lane, through the shop-row gap, the boulevard's two lanes and the trolley rails" }
+      ]
+    }
+  ]
+}

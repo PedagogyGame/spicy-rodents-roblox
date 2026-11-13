@@ -12,9 +12,11 @@ return function(t)
 		t.eq(#d:lanes(), idx.modules.Lanes.count)
 		t.eq(#d:roads(), idx.modules.Roads.count)
 		t.eq(#d:cast(), idx.modules.Cast.count)
-		-- the harvested chunks plus the attraction routes (data/attractions.json: the bowling alley tunnels)
+		-- the harvested chunks plus the attraction routes (data/attractions.json: the bowling alley tunnels) and the
+		-- storm drains (data/sewers.json)
 		local attractions = (d:module("Attractions") :: any).routes
-		local extra = if attractions then #attractions else 0
+		local sewers = (d:module("Sewers") :: any).routes
+		local extra = (if attractions then #attractions else 0) + (if sewers then #sewers else 0)
 		t.eq(d:routes():count(), idx.modules.Routes.count + extra)
 		t.eq(d:bakeHash(), idx.harvestPin.sha256)
 		t.truthy(Data.default() == d)

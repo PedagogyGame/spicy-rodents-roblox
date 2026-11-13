@@ -69,6 +69,10 @@ return {
 			count = 60,
 			chunks = { "RoutesCatalog" },
 		},
+		Sewers = {
+			count = 1,
+			chunks = { "Sewers" },
+		},
 		TerrainExtensions = {
 			count = 1,
 			chunks = { "TerrainExtensions" },
