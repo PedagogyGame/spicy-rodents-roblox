@@ -22,7 +22,11 @@
     {"name": "17_snack_bar", "desc": "The snack bar's counter from the snack tables.", "pos": [1371, 21.7, -385], "look": [1371, 20, -360], "fov": 80},
     {"name": "18_behind_the_lanes", "desc": "The interim back corridor from inside the west machine-room door: the eighteen stand-in pinsetters on the left.", "pos": [1278, 21.7, -493], "look": [1400, 19.8, -494], "fov": 78},
     {"name": "19_rear_alley", "desc": "The rear alley from its east end: the exit stoop, the blue cans, the broom, the fence.", "pos": [1412, 18.4, -512], "look": [1285, 15.5, -509], "fov": 70},
-    {"name": "20_tunnel", "desc": "Squirrel's eye in the fifth ball-return tunnel, looking toward the bowlers.", "pos": [1337.2, 14.3, -480], "look": [1337.2, 14.3, -420], "fov": 80},
+    {"name": "20_tunnel", "desc": "Squirrel's eye in the fifth ball-return run under the pits (the duct built to the body: 2.0 wide, 1.9 of headroom here), looking toward the bowlers.", "pos": [1337.2, 13.7, -482], "look": [1337.2, 13.7, -420], "fov": 80},
+    {"name": "20b_rack_mouth", "desc": "The fifth pair's ball return from the settees: the hollow hood and its mouth over the rack, where the run comes out.", "pos": [1337.2, 20.5, -409], "look": [1337.2, 18.0, -416], "fov": 60},
+    {"name": "22_lobby_to_the_gift_shop", "desc": "The lobby from beside the shoe desk: the gift shop's glass front and its door, the open front onto the concourse.", "pos": [1317, 21.7, -366], "look": [1342, 19.6, -362], "fov": 80},
+    {"name": "23_games_room_middle", "desc": "The games room's middle band from the side arch: high tables, the drink ledge, the vending and change machines on the far wall.", "pos": [1403, 21.7, -419], "look": [1449, 19.2, -426], "fov": 84},
+    {"name": "24_games_room_front_band", "desc": "The games room's front band from the arch: the jukebox, the drink ledge and the high tables before the pinball machines.", "pos": [1404, 21.7, -383], "look": [1416, 19.2, -357], "fov": 84},
     {"name": "21_aerial", "desc": "The building on its site from the north-east, 110 st up.", "pos": [1500, 130, -250], "look": [1355, 16, -430], "fov": 55, "groups": ["attractions", "terrain", "town"]}
   ]
 }
