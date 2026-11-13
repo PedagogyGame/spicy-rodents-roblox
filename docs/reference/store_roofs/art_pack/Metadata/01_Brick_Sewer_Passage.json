@@ -1,0 +1,236 @@
+{
+  "title": "Brick sewer passage",
+  "footprint_m": [
+    6.64,
+    12
+  ],
+  "camera": [
+    -1.7,
+    -5.15,
+    1.6
+  ],
+  "look_at": [
+    0.15,
+    4.5,
+    1.8
+  ],
+  "description": "Warm brick barrel vault, twin raised walkways, central water channel, service pipework, valve, footbridge and practical fixtures.",
+  "id": "01_Brick_Sewer_Passage",
+  "units": "meter",
+  "up_axis": "Y",
+  "blender_up_axis": "Z",
+  "origin": "center at walkway elevation 0",
+  "coordinate_conversion": "glTF (x,y,z) = Blender (x,z,-y)",
+  "connectors": [
+    {
+      "name": "PORT_01_North",
+      "position_m": [
+        0.0,
+        0.0,
+        -6.0
+      ],
+      "outward": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "nominal_width_m": 6,
+      "minimum_clear_width_m": 5.6,
+      "spring_height_m": 2.2,
+      "crown_height_m": 5.2
+    },
+    {
+      "name": "PORT_01_South",
+      "position_m": [
+        0.0,
+        0.0,
+        6.0
+      ],
+      "outward": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "nominal_width_m": 6,
+      "minimum_clear_width_m": 5.6,
+      "spring_height_m": 2.2,
+      "crown_height_m": 5.2
+    }
+  ],
+  "collision_boxes": [
+    {
+      "name": "Walls_Left",
+      "type": "box",
+      "center_m": [
+        -3.1600000858306885,
+        1.100000023841858,
+        -0.0
+      ],
+      "size_m": [
+        0.32,
+        2.2,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "solid"
+    },
+    {
+      "name": "Floor_Left",
+      "type": "box",
+      "center_m": [
+        -1.9500000476837158,
+        -0.2199999988079071,
+        -0.0
+      ],
+      "size_m": [
+        2.1,
+        0.44,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "walkable"
+    },
+    {
+      "name": "Walls_Right",
+      "type": "box",
+      "center_m": [
+        3.1600000858306885,
+        1.100000023841858,
+        -0.0
+      ],
+      "size_m": [
+        0.32,
+        2.2,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "solid"
+    },
+    {
+      "name": "Floor_Right",
+      "type": "box",
+      "center_m": [
+        1.9500000476837158,
+        -0.2199999988079071,
+        -0.0
+      ],
+      "size_m": [
+        2.1,
+        0.44,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "walkable"
+    },
+    {
+      "name": "Floor_Channel_Bed",
+      "type": "box",
+      "center_m": [
+        0.0,
+        -0.8399999737739563,
+        -0.0
+      ],
+      "size_m": [
+        1.8,
+        0.28,
+        12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "walkable"
+    },
+    {
+      "name": "Bridge_Frame",
+      "type": "box",
+      "center_m": [
+        0.0,
+        -0.054999999701976776,
+        -2.8499999046325684
+      ],
+      "size_m": [
+        2.24,
+        0.11,
+        1.12
+      ],
+      "rotation_y_radians": 0.0,
+      "purpose": "walkable"
+    }
+  ],
+  "suggested_lights": [
+    {
+      "name": "LIGHT_01_01",
+      "position_m": [
+        -2.569999933242798,
+        2.380000114440918,
+        4.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_01_02",
+      "position_m": [
+        2.569999933242798,
+        2.380000114440918,
+        4.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_01_03",
+      "position_m": [
+        -2.569999933242798,
+        2.380000114440918,
+        -0.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_01_04",
+      "position_m": [
+        2.569999933242798,
+        2.380000114440918,
+        -0.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_01_05",
+      "position_m": [
+        -2.569999933242798,
+        2.380000114440918,
+        -4.0
+      ],
+      "color_hex": "#ffd29a",
+      "suggested_range_m": 5.5,
+      "preview_watts": 115,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    },
+    {
+      "name": "LIGHT_01_06",
+      "position_m": [
+        2.569999933242798,
+        2.380000114440918,
+        -4.0
+      ],
+      "color_hex": "#9bd9db",
+      "suggested_range_m": 5.5,
+      "preview_watts": 95,
+      "runtime_note": "Engine-native local light. Tune energy in game; Blender watts do not map directly."
+    }
+  ],
+  "water": "opaque static mesh; optional runtime flow shader",
+  "glb_bytes": 1620904,
+  "preview_note": "Blender preview lighting is separate from the exported mesh; actual Roblox/Three.js appearance requires engine lights.",
+  "playtest_status": "Not imported into the user game or Roblox Studio."
+}

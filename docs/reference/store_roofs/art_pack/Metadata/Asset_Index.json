@@ -1,0 +1,144 @@
+{
+  "version": "v2",
+  "units": "meters",
+  "up_axis": "Y",
+  "assets": [
+    {
+      "file": "GLB/01_Brick_Sewer_Passage.glb",
+      "name": "01_Brick_Sewer_Passage.glb",
+      "size_bytes": 1620904,
+      "status": "PASS",
+      "mesh_count": 31,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/02_Four_Way_Sewer_Junction.glb",
+      "name": "02_Four_Way_Sewer_Junction.glb",
+      "size_bytes": 1977212,
+      "status": "PASS",
+      "mesh_count": 53,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/03_Concrete_Maintenance_Tunnel.glb",
+      "name": "03_Concrete_Maintenance_Tunnel.glb",
+      "size_bytes": 1492908,
+      "status": "PASS",
+      "mesh_count": 38,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/04_Offbeat_Shop_Interior.glb",
+      "name": "04_Offbeat_Shop_Interior.glb",
+      "size_bytes": 7153992,
+      "status": "PASS",
+      "mesh_count": 355,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Additions/Dry_Side_Marker.glb",
+      "name": "Dry_Side_Marker.glb",
+      "size_bytes": 137180,
+      "status": "PASS",
+      "mesh_count": 2,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Additions/Night_Route_Jacket.glb",
+      "name": "Night_Route_Jacket.glb",
+      "size_bytes": 539012,
+      "status": "PASS",
+      "mesh_count": 20,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Additions/Shop_Flair_Only.glb",
+      "name": "Shop_Flair_Only.glb",
+      "size_bytes": 3703084,
+      "status": "PASS",
+      "mesh_count": 56,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Additions/Specials_Display.glb",
+      "name": "Specials_Display.glb",
+      "size_bytes": 2017672,
+      "status": "PASS",
+      "mesh_count": 38,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/01_Lunar_Moth.glb",
+      "name": "01_Lunar_Moth.glb",
+      "size_bytes": 132488,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/02_Static_Weekend.glb",
+      "name": "02_Static_Weekend.glb",
+      "size_bytes": 134696,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/03_Ochre_Run.glb",
+      "name": "03_Ochre_Run.glb",
+      "size_bytes": 129148,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/04_Concrete_Fern.glb",
+      "name": "04_Concrete_Fern.glb",
+      "size_bytes": 132560,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/05_Tidal_Check.glb",
+      "name": "05_Tidal_Check.glb",
+      "size_bytes": 129652,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/06_Ghost_Fish.glb",
+      "name": "06_Ghost_Fish.glb",
+      "size_bytes": 130000,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/07_Violet_Comet.glb",
+      "name": "07_Violet_Comet.glb",
+      "size_bytes": 129728,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/08_Live_Wire.glb",
+      "name": "08_Live_Wire.glb",
+      "size_bytes": 742320,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    },
+    {
+      "file": "GLB/Skateboards/09_Cache_Run.glb",
+      "name": "09_Cache_Run.glb",
+      "size_bytes": 735908,
+      "status": "PASS",
+      "mesh_count": 9,
+      "all_images_embedded": true
+    }
+  ],
+  "source_status": "Final updated GLBs; historical base .blend sources plus optional v2 import helper."
+}

@@ -1,0 +1,16 @@
+{
+  "source": "Final exported GLB named geometry checked against the user brief; poster count and menu text separately inspected in artwork",
+  "checks": {
+    "exactly_five_cafe_stool_seats": true,
+    "exactly_seven_boards": true,
+    "separate_sales_counters": true,
+    "office_furnished_and_beaded": true,
+    "flags_present": true,
+    "band_poster_present": true,
+    "wood_boat_truck_and_portraits": true,
+    "bamboo_and_other_plants": true,
+    "shop_windows": true,
+    "vintage_register": true,
+    "blank_price_menu_art": true
+  }
+}

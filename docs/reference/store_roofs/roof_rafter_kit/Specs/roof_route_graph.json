@@ -1,0 +1,295 @@
+{
+  "schema": "SpicyRodentRoofRoutePrototype-v1",
+  "units": "meters",
+  "axes": "Y-up",
+  "origin": "full roof kit local X=0,Z=0 at ground level",
+  "isolated": true,
+  "notes": [
+    "Local nodes are NOT IDs from the v5.4 route registry.",
+    "The developer must map scene transforms and hook targets in Roblox Studio.",
+    "Squirrel-scale perches: not human accessibility, ladder, or load-rated structures.",
+    "Roof slopes should be collidable only after runtime collision settings are chosen."
+  ],
+  "nodes": [
+    {
+      "id": "west_eave_0",
+      "position": [
+        -5.05,
+        4.19,
+        -5.6
+      ],
+      "type": "roof_eave",
+      "requiredSurface": "Eave_Landing"
+    },
+    {
+      "id": "west_mid_0",
+      "position": [
+        -2.6,
+        5.954,
+        -5.6
+      ],
+      "type": "roof_slope",
+      "requiredSurface": "roof_shingles"
+    },
+    {
+      "id": "west_eave_1",
+      "position": [
+        -5.05,
+        4.19,
+        0.0
+      ],
+      "type": "roof_eave",
+      "requiredSurface": "Eave_Landing"
+    },
+    {
+      "id": "west_mid_1",
+      "position": [
+        -2.6,
+        5.954,
+        0.0
+      ],
+      "type": "roof_slope",
+      "requiredSurface": "roof_shingles"
+    },
+    {
+      "id": "west_eave_2",
+      "position": [
+        -5.05,
+        4.19,
+        5.6
+      ],
+      "type": "roof_eave",
+      "requiredSurface": "Eave_Landing"
+    },
+    {
+      "id": "west_mid_2",
+      "position": [
+        -2.6,
+        5.954,
+        5.6
+      ],
+      "type": "roof_slope",
+      "requiredSurface": "roof_shingles"
+    },
+    {
+      "id": "east_eave_0",
+      "position": [
+        5.05,
+        4.19,
+        -5.6
+      ],
+      "type": "roof_eave",
+      "requiredSurface": "Eave_Landing"
+    },
+    {
+      "id": "east_mid_0",
+      "position": [
+        2.6,
+        5.954,
+        -5.6
+      ],
+      "type": "roof_slope",
+      "requiredSurface": "roof_shingles"
+    },
+    {
+      "id": "east_eave_1",
+      "position": [
+        5.05,
+        4.19,
+        0.0
+      ],
+      "type": "roof_eave",
+      "requiredSurface": "Eave_Landing"
+    },
+    {
+      "id": "east_mid_1",
+      "position": [
+        2.6,
+        5.954,
+        0.0
+      ],
+      "type": "roof_slope",
+      "requiredSurface": "roof_shingles"
+    },
+    {
+      "id": "east_eave_2",
+      "position": [
+        5.05,
+        4.19,
+        5.6
+      ],
+      "type": "roof_eave",
+      "requiredSurface": "Eave_Landing"
+    },
+    {
+      "id": "east_mid_2",
+      "position": [
+        2.6,
+        5.954,
+        5.6
+      ],
+      "type": "roof_slope",
+      "requiredSurface": "roof_shingles"
+    },
+    {
+      "id": "ridge_0",
+      "position": [
+        0,
+        7.86,
+        -5.6
+      ],
+      "type": "ridge_perch",
+      "requiredSurface": "Ridge_Perch"
+    },
+    {
+      "id": "ridge_1",
+      "position": [
+        0,
+        7.86,
+        0.0
+      ],
+      "type": "ridge_perch",
+      "requiredSurface": "Ridge_Perch"
+    },
+    {
+      "id": "ridge_2",
+      "position": [
+        0,
+        7.86,
+        5.6
+      ],
+      "type": "ridge_perch",
+      "requiredSurface": "Ridge_Perch"
+    }
+  ],
+  "edges": [
+    {
+      "a": "west_eave_0",
+      "b": "west_mid_0",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "west_mid_0",
+      "b": "ridge_0",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "west_eave_1",
+      "b": "west_mid_1",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "west_mid_1",
+      "b": "ridge_1",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "west_eave_2",
+      "b": "west_mid_2",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "west_mid_2",
+      "b": "ridge_2",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "east_eave_0",
+      "b": "east_mid_0",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "east_mid_0",
+      "b": "ridge_0",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "east_eave_1",
+      "b": "east_mid_1",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "east_mid_1",
+      "b": "ridge_1",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "east_eave_2",
+      "b": "east_mid_2",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "east_mid_2",
+      "b": "ridge_2",
+      "travel": "roof_climb",
+      "bidirectional": true
+    },
+    {
+      "a": "ridge_0",
+      "b": "ridge_1",
+      "travel": "ridge_run",
+      "bidirectional": true
+    },
+    {
+      "a": "ridge_1",
+      "b": "ridge_2",
+      "travel": "ridge_run",
+      "bidirectional": true
+    },
+    {
+      "a": "west_eave_0",
+      "b": "west_eave_1",
+      "travel": "eave_run",
+      "bidirectional": true
+    },
+    {
+      "a": "west_eave_1",
+      "b": "west_eave_2",
+      "travel": "eave_run",
+      "bidirectional": true
+    },
+    {
+      "a": "east_eave_0",
+      "b": "east_eave_1",
+      "travel": "eave_run",
+      "bidirectional": true
+    },
+    {
+      "a": "east_eave_1",
+      "b": "east_eave_2",
+      "travel": "eave_run",
+      "bidirectional": true
+    }
+  ],
+  "externalHooks": [
+    {
+      "id": "west_wire_hook",
+      "from": "west_eave_0",
+      "worldTarget": "TBD",
+      "type": "utility_wire_transfer"
+    },
+    {
+      "id": "east_roof_hook",
+      "from": "east_eave_2",
+      "worldTarget": "TBD",
+      "type": "adjacent_roof_transfer"
+    },
+    {
+      "id": "ground_recovery_hook",
+      "from": "west_eave_1",
+      "worldTarget": "TBD",
+      "type": "recoverable_drop"
+    }
+  ]
+}
