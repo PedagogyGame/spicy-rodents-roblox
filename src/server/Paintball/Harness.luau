@@ -14,6 +14,12 @@
 -- Timing splits the server's real work (bot brains and motion, pose history, server balls, splats:
 -- `arenaMs`) from the harness's own (stub players' movement and aim, truth and naive balls).
 -- Pure Luau with an injected seed: Lune runs it for the accuracy tests, the engine task for timing.
+-- TWO CONDITIONS. The S18 one above is the spike's, kept as it was (its bodies' true trajectories at 60
+-- Hz, a view sampled from them at a snapshot rate, the S18 numbers of Shared/Paintball/Config).
+-- opts.contract = true is THE CONTRACT'S: the same bodies judged end to end the way the match judges
+-- them (the 20 Hz quantised snapshot stream as the only history, clients that draw from the snapshots
+-- they were actually sent at their own view time, Clock.stamp with the measured upstream delay,
+-- Clock.MAX_REWIND, Hit.body, crouching runners, lost snapshots: opts.loss). Its section below says how.
 -- Interface: new(opts) -> Harness; step(h, dt) -> (arenaMs, harnessMs); report(h) -> table
 
 local Import = require("../Import")
@@ -23,6 +29,16 @@ local Magazine = Import.shared("Paintball/Magazine") :: typeof(require("../../sh
 -- (a module reached through Import carries its values' types but not its exported type names:
 -- this is the same type, taken from a value)
 type Mag = typeof(Magazine.new(1, 1, 1))
+local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
+	Import.shared("Minigames/Paintball/Arena")
+local BodyModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Body)) =
+	Import.shared("Minigames/Paintball/Body")
+local Clock: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Clock)) =
+	Import.shared("Minigames/Paintball/Clock")
+local Contract: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Contract)) =
+	Import.shared("Minigames/Paintball/Contract")
+local Wire: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Wire)) =
+	Import.shared("Minigames/Paintball/Wire")
 local PoseHistory = require("./PoseHistory")
 local Projectiles = require("./Projectiles")
 local Splats = require("./Splats")
@@ -43,6 +59,8 @@ export type Opts = {
 	-- "estimate": the server ignores the stamp and rewinds by its RTT estimate alone.
 	rewindMode: ("timestamp" | "estimate")?,
 	timestampTolerance: number?, -- seconds (0.075)
+	contract: boolean?, -- the contract's condition (see the header) instead of the S18 one
+	loss: number?, -- the contract's condition: the fraction of snapshots a client never gets (0)
 }
 
 export type Body = {
@@ -75,7 +93,8 @@ export type Body = {
 	manualReloads: number,
 }
 
-type Shot = { server: Projectiles.Ball, truth: Projectiles.Ball, naive: Projectiles.Ball }
+-- (in the contract's condition the server's balls are born when the click arrives: nil until then)
+type Shot = { server: Projectiles.Ball?, truth: Projectiles.Ball, naive: Projectiles.Ball? }
 
 export type Harness = {
 	opts: Opts,
@@ -106,6 +125,7 @@ export type Harness = {
 	arenaMs: { number },
 	harnessMs: { number },
 	splatMax: number,
+	condition: any?, -- the contract's condition's own state (nil: the S18 condition)
 }
 
 local Harness = {}
@@ -297,6 +317,8 @@ local function think(h: Harness, b: Body, viewSampler: Projectiles.Sampler)
 	end
 end
 
+local setUpContract: (h: Harness) -> ()
+
 function Harness.new(opts: Opts): Harness
 	local layout = Layout.build()
 	local rand = lcg(opts.seed or 18)
@@ -330,6 +352,7 @@ function Harness.new(opts: Opts): Harness
 		arenaMs = {},
 		harnessMs = {},
 		splatMax = 0,
+		condition = nil,
 	}
 	local nShooters, nBots = opts.shooters or 16, opts.bots or 10
 	local rtt = (opts.rttMs or 0) / 1000
@@ -371,6 +394,16 @@ function Harness.new(opts: Opts): Harness
 		table.insert(h.bodies, b)
 		table.insert(if isBot then h.bots else h.players, b)
 	end
+	if opts.contract then
+		setUpContract(h)
+		for k = -Clock.SNAP_HZ, 0 do
+			for _, b in h.bodies do
+				local qx, qy, qz, qc = Wire.quantPose(b.x, b.y, b.z, 0)
+				PoseHistory.push(b.history, k / Clock.SNAP_HZ, qx, qy, qz, qc)
+			end
+		end
+		return h
+	end
 	-- prime one second of history at the start poses
 	for f = -Config.historyHz, 0 do
 		for _, b in h.bodies do
@@ -386,9 +419,10 @@ local function resolve(h: Harness)
 	local i = 1
 	while i <= #shots do
 		local s = shots[i]
-		if s.server.done and s.truth.done and s.naive.done then
+		local sb, nb = s.server, s.naive
+		if sb ~= nil and nb ~= nil and sb.done and s.truth.done and nb.done then
 			r.shots += 1
-			local sv, tv, nv = s.server.hitBody, s.truth.hitBody, s.naive.hitBody
+			local sv, tv, nv = sb.hitBody, s.truth.hitBody, nb.hitBody
 			if sv == tv then
 				r.agree += 1
 			elseif tv == 0 then
@@ -412,8 +446,357 @@ local function resolve(h: Harness)
 	end
 end
 
+-- THE CONTRACT'S CONDITION (opts.contract; Shared/Minigames/Paintball/Clock) ------------------------------
+-- The same bodies on the same floors, judged the way the match judges them, end to end:
+--   the stream   twenty times a second the server takes every body's pose, quantises it as a snapshot
+--                carries it (Wire.quantPose, the crouch fraction with it) and pushes exactly that into the
+--                body's history (Clock.HISTORY_SECS at Clock.SNAP_HZ); the same snapshot is on its way to
+--                every stub player, late by half the round trip with jitter, and lost opts.loss of the time;
+--   the client   a stub player keeps what arrived, its lag (Clock.observe) and its view time
+--                (Clock.viewTime), and DRAWS every other body between the two snapshots either side of
+--                that time. It aims at what it draws, stamps its click (vt, ft) and flies its own ball
+--                against what it draws, frame by frame: that ball's verdict is the truth, "what the
+--                shooter saw";
+--   the server   hears the click half a round trip later, stamps it with Clock.stamp and the shooter's
+--                own measured upstream delay (its Moves, observed the same way), gives the ball its birth
+--                and its rewind, flies it forward the part already flown and then tick by tick against
+--                the histories, with Hit.body (Projectiles.forArena: the match's own sim, early reject and
+--                all);
+--   naive        the same ball with no rewind, for contrast.
+-- Stub players crouch and stand as they run (the stance rides in the history and in the snapshots).
+type View = typeof(Clock.newView())
+type Snap = { t: number, xs: { number }, ys: { number }, zs: { number }, cs: { number } }
+type Seat = {
+	view: View, -- how late snapshots reach this player
+	up: View, -- how late its Moves reach the server
+	got: { Snap }, -- the snapshots that have arrived, oldest first
+	arriving: { { at: number, snap: Snap } },
+	moves: { { at: number, t: number } },
+	truth: Projectiles.Sim, -- its own predicted balls
+	vt: number, -- its view time this frame
+	lastM: number?,
+	nextCrouch: number,
+}
+type Condition = {
+	seats: { [number]: Seat }, -- by body id (stub players only)
+	crouch: { [number]: number }, -- every body's crouch fraction
+	want: { [number]: boolean },
+	pending: { { at: number, run: (now: number) -> () } }, -- clicks on their way up
+	clamped: number,
+	lost: number,
+	sent: number,
+}
+
+-- Where a player draws body `id` at view time vt (Wire.between's arithmetic); nil before any snapshot.
+local function drawn(seat: Seat, id: number, vt: number): (number?, number, number, number)
+	local got = seat.got
+	local newer: Snap? = nil
+	for i = #got, 1, -1 do
+		local s = got[i]
+		if s.t > vt then
+			newer = s
+		else
+			if newer == nil then
+				return s.xs[id], s.ys[id], s.zs[id], s.cs[id]
+			end
+			local f = (vt - s.t) / (newer.t - s.t)
+			return s.xs[id] + (newer.xs[id] - s.xs[id]) * f,
+				s.ys[id] + (newer.ys[id] - s.ys[id]) * f,
+				s.zs[id] + (newer.zs[id] - s.zs[id]) * f,
+				s.cs[id] + (newer.cs[id] - s.cs[id]) * f
+		end
+	end
+	if newer ~= nil then
+		return newer.xs[id], newer.ys[id], newer.zs[id], newer.cs[id]
+	end
+	return nil, 0, 0, 0
+end
+
+local function delay(h: Harness): number
+	local opts = h.opts
+	local half = (opts.rttMs or 0) / 2000
+	return half * (1 + (h.rand() * 2 - 1) * (opts.jitter or 0.12))
+end
+
+local function sweepOf(boxes: { number }): any
+	return function(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number)
+		return ArenaModule.sweepBoxes(boxes, x0, y0, z0, x1, y1, z1)
+	end
+end
+
+setUpContract = function(h: Harness)
+	local feel = Contract.feel()
+	local building: any = { sweep = sweepOf(h.layout.boxes) }
+	h.server = Projectiles.forArena(building, feel)
+	h.naive = Projectiles.forArena(building, feel)
+	local cond: Condition = { seats = {}, crouch = {}, want = {}, pending = {}, clamped = 0, lost = 0, sent = 0 }
+	for _, b in h.bodies do
+		b.history = PoseHistory.new(Clock.HISTORY_SECS, Clock.SNAP_HZ)
+		cond.crouch[b.id] = 0
+		cond.want[b.id] = false
+		if not b.isBot then
+			local seat: Seat
+			seat = {
+				view = Clock.newView(),
+				up = Clock.newView(),
+				got = {},
+				arriving = {},
+				moves = {},
+				truth = Projectiles.forArena(building, feel, function(target: Projectiles.Target, _t: number)
+					local x, y, z, c = drawn(seat, target.id, seat.vt)
+					if x == nil then
+						return 0, -1000, 0, 0
+					end
+					return x, y, z, c
+				end),
+				vt = 0,
+				lastM = nil,
+				nextCrouch = h.rand() * 3,
+			}
+			cond.seats[b.id] = seat
+		end
+	end
+	h.condition = cond
+end
+
+-- a stub player's turn to think: aim at what it draws, click, fly its own ball
+local function thinkContract(h: Harness, cond: Condition, b: Body, seat: Seat)
+	local now = h.now
+	if now < b.nextThink then
+		return
+	end
+	b.nextThink = now + 0.12 + h.rand() * 0.1
+	local mag = b.mag
+	Magazine.update(mag, now)
+	local vt = seat.vt
+	local best: Body? = nil
+	local bestD = 80
+	local bx, by, bz = 0, 0, 0
+	for _, o in h.bodies do
+		if o.team ~= b.team then
+			local x, y, z = drawn(seat, o.id, vt)
+			if x ~= nil and math.abs(y - b.y) <= 5 then
+				local d = math.sqrt((x - b.x) ^ 2 + (z - b.z) ^ 2)
+				if d > 6 and d < bestD then
+					best, bestD, bx, by, bz = o, d, x, y, z
+				end
+			end
+		end
+	end
+	if best == nil then
+		if mag.rounds <= 2 and Magazine.reload(mag, now) then
+			b.manualReloads += 1
+		end
+		return
+	end
+	if h.rand() > 0.6 or not Magazine.canFire(mag, now) then
+		return
+	end
+	local target = best :: Body
+	local x2, _, z2 = drawn(seat, target.id, vt - 0.1)
+	local vx, vz = (bx - (x2 or bx)) / 0.1, (bz - z2) / 0.1
+	if x2 == nil then
+		vx, vz = 0, 0
+	end
+	local feel = Contract.FEEL
+	local ex, ey, ez = BodyModule.eyePoint(b.x, b.y, b.z, cond.crouch[b.id])
+	local tof = bestD / feel.ballSpeed
+	local sigma = h.opts.aimSigma or 0.9
+	local ax = bx + vx * tof + gauss(h.rand) * sigma
+	local ay = by + 1.6 + h.rand() * 2.2 + gauss(h.rand) * sigma * 0.5
+	local az = bz + vz * tof + gauss(h.rand) * sigma
+	local mvx, mvy, mvz = Ballistics.aim(ex, ey, ez, ax, ay, az, feel.ballSpeed, feel.ballDrop)
+	Magazine.fire(mag, now)
+	local targets = h.bodies :: any
+	local shot: Shot = {
+		server = nil,
+		truth = Projectiles.fire(seat.truth, b.id, b.team, ex, ey, ez, mvx, mvy, mvz, 0, now),
+		naive = nil,
+	}
+	table.insert(h.shots, shot)
+	local ft = now
+	table.insert(cond.pending, {
+		at = now + delay(h),
+		run = function(arrived: number)
+			-- the server's reading of the click (PaintballService, onFire b)
+			local f, _, rewind, clamped, m = Clock.stamp(arrived, vt, ft, seat.lastM, seat.up.lag)
+			seat.lastM = m
+			if clamped then
+				cond.clamped += 1
+			end
+			local ball = Projectiles.fire(h.server, b.id, b.team, ex, ey, ez, mvx, mvy, mvz, rewind, f)
+			Projectiles.advance(h.server, ball, arrived, targets)
+			shot.server = ball
+			local plain = Projectiles.fire(h.naive, b.id, b.team, ex, ey, ez, mvx, mvy, mvz, 0, f)
+			Projectiles.advance(h.naive, plain, arrived, targets)
+			shot.naive = plain
+		end,
+	})
+end
+
+-- a bot sees the server's present: no stamp, no rewind
+local function thinkBot(h: Harness, b: Body)
+	local now = h.now
+	if now < b.nextThink then
+		return
+	end
+	b.nextThink = now + 0.12 + h.rand() * 0.1
+	Magazine.update(b.mag, now)
+	local best: Body? = nil
+	local bestD = 80
+	for _, o in h.bodies do
+		if o.team ~= b.team and math.abs(o.y - b.y) <= 5 then
+			local d = math.sqrt((o.x - b.x) ^ 2 + (o.z - b.z) ^ 2)
+			if d > 6 and d < bestD then
+				best, bestD = o, d
+			end
+		end
+	end
+	if best == nil or h.rand() > 0.6 or not Magazine.canFire(b.mag, now) then
+		return
+	end
+	local o = best :: Body
+	local feel = Contract.FEEL
+	local ex, ey, ez = BodyModule.eyePoint(b.x, b.y, b.z, 0)
+	local tof = bestD / feel.ballSpeed
+	local sigma = h.opts.aimSigma or 0.9
+	local mvx, mvy, mvz = Ballistics.aim(
+		ex,
+		ey,
+		ez,
+		o.x + o.vx * tof + gauss(h.rand) * sigma,
+		o.y + 1.6 + h.rand() * 2.2,
+		o.z + o.vz * tof + gauss(h.rand) * sigma,
+		feel.ballSpeed,
+		feel.ballDrop
+	)
+	Magazine.fire(b.mag, now)
+	Projectiles.fire(h.server, b.id, b.team, ex, ey, ez, mvx, mvy, mvz, 0, now)
+	h.results.botShots += 1
+end
+
+-- One 60 Hz frame of the contract's condition. Returns (arenaMs, harnessMs).
+local function contractStep(h: Harness, cond: Condition, dt: number): (number, number)
+	local t0 = os.clock()
+	h.now += dt
+	h.frame += 1
+	local now = h.now
+	local frame = h.frame
+	local loss = h.opts.loss or 0
+	local feel = Contract.FEEL
+	local per = Clock.TICK_HZ // Clock.SNAP_HZ
+	-- the clients' own work: they move, crouch, send their Moves, take in snapshots, look, think
+	for _, b in h.players do
+		moveBody(h, b, dt)
+		local seat = cond.seats[b.id]
+		if now >= seat.nextCrouch then
+			seat.nextCrouch = now + 0.6 + h.rand() * 2.5
+			cond.want[b.id] = h.rand() < 0.4
+		end
+		cond.crouch[b.id] = BodyModule.crouchStep(cond.crouch[b.id], cond.want[b.id], dt, feel)
+		if (frame + b.id) % per == 0 then
+			table.insert(seat.moves, { at = now + delay(h), t = now })
+		end
+	end
+	-- what reaches the server this frame: Moves (the upstream delay is measured from them) and clicks
+	for _, b in h.players do
+		local seat = cond.seats[b.id]
+		local moves = seat.moves
+		local i = 1
+		while i <= #moves do
+			if moves[i].at <= now then
+				Clock.observe(seat.up, moves[i].t, now)
+				table.remove(moves, i)
+			else
+				i += 1
+			end
+		end
+	end
+	local pending = cond.pending
+	local k = 1
+	while k <= #pending do
+		if pending[k].at <= now then
+			local item = table.remove(pending, k) :: { at: number, run: (now: number) -> () }
+			item.run(now)
+		else
+			k += 1
+		end
+	end
+	local t1 = os.clock()
+	-- the server: bots, the snapshot tick, the balls
+	for _, b in h.bots do
+		moveBody(h, b, dt)
+		thinkBot(h, b)
+	end
+	if frame % per == 0 then
+		local n = #h.bodies
+		local snap: Snap = {
+			t = now,
+			xs = table.create(n, 0),
+			ys = table.create(n, 0),
+			zs = table.create(n, 0),
+			cs = table.create(n, 0),
+		}
+		for _, b in h.bodies do
+			local qx, qy, qz, qc = Wire.quantPose(b.x, b.y, b.z, cond.crouch[b.id])
+			PoseHistory.push(b.history, now, qx, qy, qz, qc)
+			snap.xs[b.id], snap.ys[b.id], snap.zs[b.id], snap.cs[b.id] = qx, qy, qz, qc
+		end
+		for _, b in h.players do
+			cond.sent += 1
+			if h.rand() < loss then
+				cond.lost += 1
+			else
+				table.insert(cond.seats[b.id].arriving, { at = now + delay(h), snap = snap })
+			end
+		end
+	end
+	Projectiles.step(h.server, now, dt, h.bodies :: any)
+	local t2 = os.clock()
+	-- the clients again: snapshots arrive, the view time moves on, they think and fly their own balls
+	for _, b in h.players do
+		local seat = cond.seats[b.id]
+		local arriving = seat.arriving
+		local i = 1
+		while i <= #arriving do
+			local item = arriving[i]
+			if item.at <= now then
+				table.remove(arriving, i)
+				Clock.observe(seat.view, item.snap.t, now)
+				-- kept in order of their own time, whatever order they came in
+				local got = seat.got
+				local at = #got + 1
+				while at > 1 and got[at - 1].t > item.snap.t do
+					at -= 1
+				end
+				table.insert(got, at, item.snap)
+				if #got > 30 then
+					table.remove(got, 1)
+				end
+			else
+				i += 1
+			end
+		end
+		seat.vt = Clock.viewTime(seat.view, now)
+		thinkContract(h, cond, b, seat)
+		Projectiles.step(seat.truth, now, dt, h.bodies :: any)
+	end
+	Projectiles.step(h.naive, now, dt, h.bodies :: any)
+	resolve(h)
+	local t3 = os.clock()
+	local arena = (t2 - t1) * 1000
+	local harness = ((t1 - t0) + (t3 - t2)) * 1000
+	table.insert(h.arenaMs, arena)
+	table.insert(h.harnessMs, harness)
+	return arena, harness
+end
+
 -- One 60 Hz server frame. Returns (arenaMs, harnessMs).
 function Harness.step(h: Harness, dt: number): (number, number)
+	local condition = h.condition
+	if condition ~= nil then
+		return contractStep(h, condition, dt)
+	end
 	local t0 = os.clock()
 	h.now += dt
 	h.frame += 1
@@ -511,6 +894,10 @@ function Harness.report(h: Harness): { [string]: any }
 		manualReloads = manual,
 		server = table.clone(h.server.stats),
 		splats = { max = h.splatMax, cap = h.splats.cap, overwritten = h.splats.overwritten },
+		-- (the contract's condition: stamps the server clamped, snapshots sent and lost)
+		rewindsClamped = if h.condition then h.condition.clamped else 0,
+		snapshotsSent = if h.condition then h.condition.sent else 0,
+		snapshotsLost = if h.condition then h.condition.lost else 0,
 		minFloorsVisited = floorsMin,
 		stuckBodies = stuck,
 		arenaMs = summarise(h.arenaMs),
