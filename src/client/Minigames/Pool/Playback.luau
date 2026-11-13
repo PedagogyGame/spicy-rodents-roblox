@@ -12,12 +12,14 @@
 --   the sound cue points of the script (Shot.cues: strike, click, crack, cushion, jaw, post, drop, rim) and
 --     "home" when a ball reaches its tray, handed to `onCue`.
 -- It simulates nothing, so no two screens can disagree and what is seen is what is scored. The last write is
--- the script's own rest (and each potted ball's home), which is exactly where the server lays the balls when
--- the shot is judged (Server/Minigames/Pool/Hardware uses the same Furniture and Roll), so nothing pops when
--- playback lets go. If the table is not on this client (streamed out) nothing is played.
+-- the layout the rules judged (`after`, sent with the script: the script's rest, with a potted 8 back on its
+-- spot or a scratched cue ball on the head spot) and every other ball at home, which is exactly where the
+-- server lays the balls when the shot is judged (Server/Minigames/Pool/Hardware uses the same Furniture and
+-- Roll), so nothing pops when playback lets go and no screen keeps a ball where the rules do not. If the table is not on this client (streamed out) nothing is played.
 -- A slow replay (opts.speed under 1: the winning shot of a game, played again) is the same drawing on a slower
 -- clock: every pose, stroke and sound at its own moment of the script.
--- Interface: play(place, def, script, opts { lead?, onCue?, speed? }) -> bool; stop(stationId) (cut short: nothing
+-- Interface: play(place, def, script, opts { lead?, onCue?, speed?, after?, away? }) -> bool (after: flat
+--   { id, x, z ... } where the rules lay the balls once the shot is judged; away: { ids } out of sight); stop(stationId) (cut short: nothing
 --   more is written); set(place, def, table, flat { id, x, z ... }, away { ids }?, fresh?) (lay the balls out:
 --   a new rack, a shot that did not count); put(place, def, table, id, x, z) (one ball on the cloth: the cue
 --   ball in the hand); playing(stationId) -> bool; now(stationId) -> seconds since the strike (negative
@@ -74,9 +76,14 @@ type Entry = {
 	onCue: ((name: string, volume: number) -> ())?,
 	strokes: { Stroke },
 	speed: number, -- 1, or less for a slow replay (script seconds per second)
+	after: { [number]: { number } }?, -- where the rules lay each ball on the cloth once the shot is judged
+	away: { [number]: boolean }, -- balls kept out of sight once it is judged (the rest are at home)
 }
 
 local active: { [string]: Entry } = {}
+-- shots at tables that are not on this client yet: taken up if the table arrives while they still run
+local waiting: { [string]: { place: any, def: Def, script: any, opts: { [string]: any }, t0: number, ends: number } } =
+	{}
 local bound = false
 
 local function siteModel(site: string): Instance?
@@ -229,41 +236,70 @@ local function release(e: Entry)
 	end
 end
 
--- The script's own end: every ball it moved at rest where it stopped, or at home. (Returns true so that
--- pcall(finish, ...) has a second value to hand back either way.)
+-- The shot's end: every ball where the rules have laid it once the shot is judged (`after`, sent with the
+-- script: a re-spotted 8, a scratched cue ball back on the head spot, a practice ball put back by its cup), and
+-- every other ball at home in the tray or out of sight; a script with no `after` ends where it stopped. Each
+-- ball the script moved is turned on to the end of its roll. (Returns true so that pcall(finish, ...) has a
+-- second value to hand back either way.)
 local function finish(e: Entry): boolean
 	release(e)
 	local script = e.script
 	local tb = e.table
-	local rest: { [number]: { number } } = {}
-	for k = 1, #script.rest, 3 do
-		rest[script.rest[k]] = { script.rest[k + 1], script.rest[k + 2] }
+	local at: { [number]: { number } } = {}
+	if e.after then
+		at = e.after
+	else
+		for k = 1, #script.rest, 3 do
+			at[script.rest[k]] = { script.rest[k + 1], script.rest[k + 2] }
+		end
 	end
 	local last = Roll.steps(script.tEnd)
 	for i, id in script.ids do
-		local m = e.balls[id] :: Model?
-		if m == nil or m.Parent == nil or #script.tracks[i] == 0 then
-			continue
-		end
 		local rot = e.rots[id]
-		if e.dropAt[id] == nil and last > e.steps[id] then
+		if rot and #script.tracks[i] > 0 and e.dropAt[id] == nil and last > e.steps[id] then
 			Roll.advance(rot, script, i, e.steps[id], last)
 			e.steps[id] = last
 		end
+	end
+	for id, m in e.balls do
+		if m.Parent == nil then
+			continue
+		end
+		local index = Shot.indexOf(script, id)
+		local moved = index ~= nil and #script.tracks[index] > 0
+		if e.after == nil and not moved then
+			continue
+		end
+		local rot = e.rots[id]
 		Roll.tidy(rot)
-		local at = rest[id]
-		if at then
-			m:PivotTo(frameOf(e.place, e.def, e.yaw, at[1], tb.ballR, at[2], rot))
+		local spot = at[id]
+		if spot then
+			m:PivotTo(frameOf(e.place, e.def, e.yaw, spot[1], tb.ballR, spot[2], rot))
 		else
-			local x, y, z = Furniture.off(tb, id, false)
+			local x, y, z = Furniture.off(tb, id, e.away[id] == true)
 			m:PivotTo(frameOf(e.place, e.def, e.yaw, x, y, z, rot))
 		end
 	end
 	return true
 end
 
+-- (defined below play's helpers: a shot waiting for its table is begun from the frame step)
+local begin: (place: any, def: Def, script: any, o: { [string]: any }, t0: number) -> Entry?
+
 local function step()
 	local now = Playback.clock()
+	for id, wt in waiting do
+		if now >= wt.ends then
+			-- (the shot ended before the table reached this client: the server's own layout of it is what arrives)
+			waiting[id] = nil
+		else
+			local e = begin(wt.place, wt.def, wt.script, wt.opts, wt.t0)
+			if e then
+				waiting[id] = nil
+				active[id] = e
+			end
+		end
+	end
 	for id, e in active do
 		local t = (now - e.t0) * e.speed
 		local ok, err = pcall(write, e, t)
@@ -288,7 +324,7 @@ local function step()
 			active[id] = nil
 		end
 	end
-	if next(active) == nil and bound then
+	if next(active) == nil and next(waiting) == nil and bound then
 		bound = false
 		game:GetService("RunService"):UnbindFromRenderStep(Playback.BIND)
 	end
@@ -296,20 +332,13 @@ end
 
 -- play: start drawing a shot at a table. Returns false (and plays nothing) when the table is not on this
 -- client. A shot still playing at that table is brought to its end first.
-function Playback.play(place: any, def: Def, script: any, opts: { [string]: any }?): boolean
-	local old = active[def.id]
-	if old then
-		pcall(finish, old)
-		active[def.id] = nil
-	end
-	if place == nil then
-		return false
-	end
+-- The entry for a shot whose strike is (or was) at t0 on Playback.clock, on the balls as they are now; nil when
+-- the table is not on this client.
+function begin(place: any, def: Def, script: any, o: { [string]: any }, t0: number): Entry?
 	local balls = ballsOf(Playback.find(def))
 	if next(balls) == nil then
-		return false
+		return nil
 	end
-	local o: { [string]: any } = opts or {}
 	local lead = math.clamp(tonumber(o.lead) or 0, 0, 5)
 	local pace = math.clamp(tonumber(o.speed) or 1, 0.1, 1)
 	local tb = Tables.byId(script.table)
@@ -342,6 +371,27 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 	table.sort(cues, function(a, b)
 		return a[1] < b[1]
 	end)
+	-- where the rules lay the balls once the shot is judged (flat id, x, z; and the ids kept out of sight)
+	local after: { [number]: { number } }? = nil
+	if type(o.after) == "table" then
+		local laid: { [number]: { number } } = {}
+		local flat = o.after :: { any }
+		for k = 1, #flat - 2, 3 do
+			local id, x, z = flat[k], flat[k + 1], flat[k + 2]
+			if type(id) == "number" and type(x) == "number" and type(z) == "number" then
+				laid[id] = { x, z }
+			end
+		end
+		after = laid
+	end
+	local away: { [number]: boolean } = {}
+	if type(o.away) == "table" then
+		for _, id in o.away :: { any } do
+			if type(id) == "number" then
+				away[id] = true
+			end
+		end
+	end
 	local strokes: { Stroke } = {}
 	local st = script.strikes
 	for k = 1, #st, 6 do
@@ -364,12 +414,18 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 			})
 		end
 	end
-	active[def.id] = {
+	-- (a shot taken up part way through, by a client the table has only now reached: its sounds so far are past)
+	local tNow = (Playback.clock() - t0) * pace
+	local cueAt = 1
+	while cueAt <= #cues and cues[cueAt][1] < tNow do
+		cueAt += 1
+	end
+	return {
 		place = place,
 		def = def,
 		table = tb,
 		script = script,
-		t0 = Playback.clock() + lead,
+		t0 = t0,
 		lead = lead,
 		tOver = tOver,
 		yaw = yaw,
@@ -379,11 +435,16 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 		dropAt = dropAt,
 		dropX = dropX,
 		cues = cues,
-		cueAt = 1,
+		cueAt = cueAt,
 		onCue = o.onCue,
 		strokes = strokes,
 		speed = pace,
+		after = after,
+		away = away,
 	}
+end
+
+local function bind()
 	-- (bound afresh with every shot: a binding is never assumed to have outlived what it was bound in)
 	local RunService = game:GetService("RunService")
 	if bound then
@@ -392,11 +453,40 @@ function Playback.play(place: any, def: Def, script: any, opts: { [string]: any 
 	bound = true
 	-- before the camera's own step, so a shot that follows the balls sees this frame's balls
 	RunService:BindToRenderStep(Playback.BIND, Enum.RenderPriority.Camera.Value - 1, step)
+end
+
+-- play: start drawing a shot at a table. A shot still playing at that table is brought to its end first. When
+-- the table is not on this client (streamed out: the player is across the building) nothing is drawn now and
+-- false is returned, but the shot is kept: if the table arrives while the shot is still running (the player
+-- walks up mid-shot), it is taken up at the moment it has reached, and played on from there.
+function Playback.play(place: any, def: Def, script: any, opts: { [string]: any }?): boolean
+	local old = active[def.id]
+	if old then
+		pcall(finish, old)
+		active[def.id] = nil
+	end
+	waiting[def.id] = nil
+	if place == nil then
+		return false
+	end
+	local o: { [string]: any } = opts or {}
+	local t0 = Playback.clock() + math.clamp(tonumber(o.lead) or 0, 0, 5)
+	local e = begin(place, def, script, o, t0)
+	if e == nil then
+		local pace = math.clamp(tonumber(o.speed) or 1, 0.1, 1)
+		waiting[def.id] =
+			{ place = place, def = def, script = script, opts = o, t0 = t0, ends = t0 + script.tEnd / pace }
+		bind()
+		return false
+	end
+	active[def.id] = e
+	bind()
 	return true
 end
 
 -- stop: a shot was cut short (the table emptied, the shooter left): nothing more of it is written.
 function Playback.stop(stationId: string)
+	waiting[stationId] = nil
 	local e = active[stationId]
 	if e then
 		release(e)

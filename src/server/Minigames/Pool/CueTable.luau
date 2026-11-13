@@ -7,7 +7,9 @@
 --   a strike is TRIED on a copy of the game the moment it is made (so a shot the rules refuse is refused with
 --     words, and the shot that will happen is known), its script is sent to EVERY client as one message
 --     ("<game>_shot": Shared/Minigames/Pool/Wire text, played back by the clients on the baked balls, the
---     cue's stroke first), and the turn clock waits (busy) while the balls run;
+--     cue's stroke first, with `after`: where the rules lay every ball once they have judged it, so a
+--     re-spotted 8 or a scratched cue ball ends where the game has it on every screen), and the turn clock
+--     waits (busy) while the balls run;
 --   when the script has played, the very same input goes through the Session's own door (ctx.apply): the
 --     rules run the same seeded shot again and judge it, so the score, the turn, the banners and the end card
 --     change when the last ball has stopped and not when the cue struck. If the shooter walked away while the
@@ -137,6 +139,24 @@ function CueTable._sync(self: any)
 	end
 end
 
+-- A rules state's balls for the wire: flat { id, x, z, ... } for every ball on the cloth, and the sorted ids of
+-- the balls kept out of sight (every other ball is at home in the tray).
+function CueTable.layoutOf(state: any, away: ((state: any) -> { [number]: boolean }?)?): ({ number }, { number })
+	local flat: { number } = {}
+	for _, s in state.spots do
+		table.insert(flat, s.id)
+		table.insert(flat, s.x)
+		table.insert(flat, s.z)
+	end
+	local hidden: { number } = {}
+	local out: { [number]: boolean } = (if away then away(state) else nil) or {}
+	for id in out do
+		table.insert(hidden, id)
+	end
+	table.sort(hidden)
+	return flat, hidden
+end
+
 -- Every client puts the balls where they were last laid out (a shot was cut short, a new rack, a scripted
 -- layout). fresh: every ball faces the way it was baked again.
 function CueTable._rack(self: any, text: string?, fresh: boolean?)
@@ -195,6 +215,9 @@ function CueTable._strike(
 	end
 	self.shots += 1
 	self.knocked = {}
+	-- where every ball lies once the rules have judged the shot (a re-spotted 8, a cue ball back on the head
+	-- spot, a practice ball put back by its cup): every screen ends the shot there, not where the balls rolled
+	local after, gone = CueTable.layoutOf(try, self.game.away)
 	self.pending = {
 		key = key,
 		seat = seat,
@@ -206,6 +229,8 @@ function CueTable._strike(
 		ends = ctx.now() + lead + script.tEnd + CueTable.TAIL,
 		n = self.shots,
 		text = Wire.encode(script),
+		after = after,
+		gone = gone,
 	}
 	ctx.touch()
 	ctx.everyone({
@@ -215,6 +240,8 @@ function CueTable._strike(
 		seat = seat,
 		lead = lead,
 		text = self.pending.text,
+		after = after,
+		away = gone,
 	})
 	ctx.dirty()
 	return true
@@ -257,6 +284,8 @@ function CueTable._land(self: any)
 				replay = true,
 				speed = CueTable.REPLAY_SPEED,
 				text = p.text,
+				after = p.after,
+				away = p.gone,
 			})
 			self.replayUntil = ctx.now() + CueTable.REPLAY_LEAD + p.script.tEnd / CueTable.REPLAY_SPEED + 3
 		end

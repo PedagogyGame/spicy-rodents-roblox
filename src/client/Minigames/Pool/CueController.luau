@@ -378,6 +378,9 @@ function Controller._begin(self: any)
 		return
 	end
 	local mode = self.mode :: Game
+	-- (the balls as the game has them now: a state that came while a shot was still playing here was not laid
+	-- out then)
+	self:_setSpots(g.balls)
 	self.presses = {}
 	self.charge = nil
 	self.power = 0
@@ -480,6 +483,11 @@ function Controller.onState(self: any, msg: { [string]: any })
 			if self.phase == "place" and mode.inHand(g) == "none" then
 				self.phase = "aim"
 				self.hand = nil
+				-- (the cue ball is no longer mine to carry: it lies where the game has it)
+				local s = self.byId[0]
+				if s and not Playback.playing(self.def.id) then
+					Playback.put(self.place, self.def, self.tb, 0, s.x, s.z)
+				end
 			end
 		end
 	end
@@ -511,6 +519,11 @@ function Controller.onMessage(self: any, msg: { [string]: any }, _watched: any?)
 	elseif msg.kind == `{mode.game}_rack` then
 		if type(msg.balls) == "table" then
 			self:_setSpots(msg.balls)
+			-- (a ball I was carrying is put where the table now has it)
+			local s = self.byId[0]
+			if self.hand and s then
+				self.hand.x, self.hand.z, self.hand.ok = s.x, s.z, true
+			end
 		end
 		if self.phase == "watch" or self.phase == "sent" then
 			self.phase = "off"

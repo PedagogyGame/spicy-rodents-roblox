@@ -176,6 +176,8 @@ local function watch(msg: { [string]: any }, place: ClientGame.Place?): any
 			lead = msg.lead,
 			onCue = cue,
 			speed = if msg.replay == true then msg.speed else nil,
+			after = if type(msg.after) == "table" then msg.after else nil,
+			away = if type(msg.away) == "table" then msg.away else nil,
 		})
 		return script
 	elseif msg.kind == "pool_rack" then
