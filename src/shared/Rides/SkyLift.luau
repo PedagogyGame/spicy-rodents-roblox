@@ -53,7 +53,8 @@
 --   period() -> seconds for one cabin to go round once (all cabins: one every period() / CABINS)
 --   loop() -> { length, points: { Vec } (closed: points[#points] == points[1]; every straight span one segment,
 --     arcs in pieces of <= 1 st), dist: { number } (loop distance at each point) }: the two strands and both
---     bullwheels at cable height, for drawing the cable
+--     bullwheels at cable height, for drawing the cable (a straight span is one segment, two chords across each
+--     vertical blend)
 --   at(s) -> x, y, z, yaw: the grip on the cable at loop distance s, facing the way of travel
 --   speedAt(s) -> studs per second along the loop
 --   sAt(sigma) -> s: loop distance at sigma seconds into a lap (sigma in [0, period()))
@@ -117,7 +118,7 @@ export type Station = {
 	doorsCloseSigma: number, -- ... and close (may be less than doorsOpenSigma: the window wraps the lap)
 	dwell: number, -- seconds the doors are open
 }
-export type Tower = { index: number, x: number, y: number, z: number, yaw: number, up: Vec, down: Vec }
+export type Tower = { index: number, x: number, y: number, z: number, yaw: number, up: Vec, down: Vec, h: number }
 export type Loop = { length: number, points: { Vec }, dist: { number } }
 
 SkyLift.RIDE_ID = "sky_lift"
@@ -149,6 +150,11 @@ SkyLift.SEAT_LOCAL = table.freeze({
 })
 SkyLift.DOOR_SECS = 1
 SkyLift.FILLET_RADIUS = 20
+SkyLift.VERTICAL_BLEND = 10 -- half-width (plan studs) of the height blend round each tower head
+SkyLift.ROPE_SAG = 0.18 -- loop(): the drawn rope's chords stay this close to the blended cable
+SkyLift.ALIGHT_ALONG = 2 -- alightSpot: studs along the platform either side of the door
+SkyLift.ALIGHT_NEAR = 0.9 -- ... back from the stand point for the door-side seats
+SkyLift.ALIGHT_FAR = 2.2 -- ... and for the far-side seats
 local FILLET_MIN_TURN = math.rad(0.25) -- smaller plan turns (rounding at the towers) are mitred, not filleted
 local SWEEP_STEP = 0.5 -- swept-volume samples along the loop
 local CELL = 16 -- swept-volume hash cell (XZ)
@@ -172,6 +178,8 @@ type Piece = {
 	h0: number, -- centre-line horizontal distance from the base bullwheel at the piece's start and end
 	h1: number,
 	strand: string, -- "up" | "down" | "summit" | "base" (the last two: the bullwheels)
+	yh: ((h: number) -> number)?, -- the blended height profile (y over h); nil: y0..y1 straight
+	tab: { number }?, -- with yh: arc length at fraction (i - 1) / (#tab - 1) of the piece
 }
 type Seg = { s0: number, s1: number, v0: number, v1: number, t0: number, dur: number }
 type Model = {
@@ -189,6 +197,8 @@ type Model = {
 	summitClose: number,
 	summitWheelS: number, -- loop distance where the summit bullwheel starts (end of the up strand)
 	downEndS: number, -- ... where the base bullwheel starts (end of the down strand)
+	heightAt: (h: number) -> number, -- the cable's height over centre-line plan distance h (blended)
+	blends: { { number } }, -- { h, change of slope, half-width } per blended knot
 }
 
 local function yawOf(dx: number, dz: number): number
@@ -201,7 +211,24 @@ end
 
 local function pieceAt(p: Piece, u: number): (number, number, number, number, number)
 	local f = if p.len > 0 then math.clamp(u / p.len, 0, 1) else 0
-	local y = p.y0 + (p.y1 - p.y0) * f
+	local tab = p.tab
+	if tab then
+		-- arc length -> fraction of the plan run (the blended height makes the two differ)
+		local N = #tab - 1
+		local lo, hi = 1, N
+		while lo < hi do
+			local mid = (lo + hi + 1) // 2
+			if tab[mid] <= u then
+				lo = mid
+			else
+				hi = mid - 1
+			end
+		end
+		local a, b = tab[lo], tab[lo + 1]
+		f = math.clamp((lo - 1 + (if b > a then (u - a) / (b - a) else 0)) / N, 0, 1)
+	end
+	local yh = p.yh
+	local y = if yh then yh(p.h0 + (p.h1 - p.h0) * f) else p.y0 + (p.y1 - p.y0) * f
 	if p.arc then
 		local th = p.a0 + p.sweep * f
 		local c, s = math.cos(th), math.sin(th)
@@ -247,17 +274,49 @@ function SkyLift.build(ride: any, baseVenue: any, summitVenue: any): Model
 		hAt[k + 1] = hAt[k] + l
 	end
 	local totalH = hAt[n]
-	local function yAt(h: number): number
+	-- The height profile over centre-line plan distance h: straight between knots, with a quadratic blend of
+	-- half-width VERTICAL_BLEND round every interior knot (a tower head), so the vertical speed changes over about
+	-- a second and the rider's eye never tips in one frame. Each mouth's knot is moved VERTICAL_BLEND out along
+	-- the station's level run, so the blend starts exactly at the mouth and the cable stays level inside both
+	-- stations (the platforms, guide rails and bullwheels see the level line they were built for).
+	local knotH: { number } = table.clone(hAt)
+	local knotY: { number } = {}
+	for k = 1, n do
+		knotY[k] = P[k][2]
+	end
+	local BL = SkyLift.VERTICAL_BLEND
+	knotH[2] = hAt[2] + BL
+	knotH[n - 1] = hAt[n - 1] - BL
+	local function linY(h: number): number
 		if h <= 0 then
-			return P[1][2]
+			return knotY[1]
 		end
 		for k = 1, n - 1 do
-			if h <= hAt[k + 1] then
-				local f = (h - hAt[k]) / hl[k]
-				return P[k][2] + (P[k + 1][2] - P[k][2]) * f
+			if h <= knotH[k + 1] then
+				local f = (h - knotH[k]) / (knotH[k + 1] - knotH[k])
+				return knotY[k] + (knotY[k + 1] - knotY[k]) * f
 			end
 		end
-		return P[n][2]
+		return knotY[n]
+	end
+	local blends: { { number } } = {} -- { h, dm, half-width }
+	for k = 2, n - 1 do
+		local m1 = (knotY[k] - knotY[k - 1]) / (knotH[k] - knotH[k - 1])
+		local m2 = (knotY[k + 1] - knotY[k]) / (knotH[k + 1] - knotH[k])
+		local half = math.min(BL, 0.4 * (knotH[k] - knotH[k - 1]), 0.4 * (knotH[k + 1] - knotH[k]))
+		if math.abs(m2 - m1) > 1e-9 and half > 0 then
+			table.insert(blends, { knotH[k], m2 - m1, half })
+		end
+	end
+	local function yAt(h: number): number
+		local y = linY(h)
+		for _, b in blends do
+			local u = h - b[1]
+			if u > -b[3] and u < b[3] then
+				y += b[2] * (u + b[3]) ^ 2 / (4 * b[3]) - (if u > 0 then b[2] * u else 0)
+			end
+		end
+		return y
 	end
 	local function right(k: number): (number, number)
 		return -dirs[k][2], dirs[k][1]
@@ -327,6 +386,7 @@ function SkyLift.build(ride: any, baseVenue: any, summitVenue: any): Model
 				h0 = h0,
 				h1 = h1,
 				strand = name,
+				yh = yAt,
 			})
 			local v = k + 1
 			if v < n and tan[v] > 0 then
@@ -362,6 +422,7 @@ function SkyLift.build(ride: any, baseVenue: any, summitVenue: any): Model
 					h0 = hAt[v] - tan[v],
 					h1 = hAt[v] + tan[v],
 					strand = name,
+					yh = yAt,
 				})
 			end
 		end
@@ -404,7 +465,23 @@ function SkyLift.build(ride: any, baseVenue: any, summitVenue: any): Model
 	local s = 0
 	for _, p in pieces do
 		local horiz = if p.arc then p.r * math.abs(p.sweep) else math.sqrt((p.bx - p.ax) ^ 2 + (p.bz - p.az) ^ 2)
-		p.len = math.sqrt(horiz * horiz + (p.y1 - p.y0) ^ 2)
+		local yh = p.yh
+		if yh and p.h1 ~= p.h0 then
+			-- the true length along the blended profile, tabulated so that loop distance is arc length
+			local N = math.max(8, math.ceil(horiz / 0.25))
+			local tab = { 0 }
+			local acc, py = 0, yh(p.h0)
+			for i = 1, N do
+				local y = yh(p.h0 + (p.h1 - p.h0) * i / N)
+				acc += math.sqrt((horiz / N) ^ 2 + (y - py) ^ 2)
+				py = y
+				tab[i + 1] = acc
+			end
+			p.tab = tab
+			p.len = acc
+		else
+			p.len = math.sqrt(horiz * horiz + (p.y1 - p.y0) ^ 2)
+		end
 		p.s0 = s
 		s += p.len
 	end
@@ -483,6 +560,8 @@ function SkyLift.build(ride: any, baseVenue: any, summitVenue: any): Model
 		summitClose = sigmaOf(marks[6][1]),
 		summitWheelS = summitWheelS,
 		downEndS = downEndS,
+		heightAt = yAt,
+		blends = blends,
 	}
 	local function posOf(sv: number): (number, number, number, number, number)
 		local u = sv % length
@@ -555,16 +634,18 @@ function SkyLift.build(ride: any, baseVenue: any, summitVenue: any): Model
 		local rx, rz = (ax + bx) / ml / mc, (az + bz) / ml / mc
 		local p = P[k]
 		assert(tan[k] == 0, "sky_lift: a tower stands where the line is straight in plan")
+		local y = yAt(hAt[k]) -- the blended cable over the head (within a stud of the data's point)
 		table.insert(
 			towers,
 			table.freeze({
 				index = k - 2,
 				x = p[1],
-				y = p[2],
+				y = y,
 				z = p[3],
 				yaw = yawOf(d[1], d[2]),
-				up = vec(p[1] + rx * S, p[2], p[3] + rz * S),
-				down = vec(p[1] - rx * S, p[2], p[3] - rz * S),
+				up = vec(p[1] + rx * S, y, p[3] + rz * S),
+				down = vec(p[1] - rx * S, y, p[3] - rz * S),
+				h = hAt[k],
 			})
 		)
 	end
@@ -573,9 +654,46 @@ function SkyLift.build(ride: any, baseVenue: any, summitVenue: any): Model
 	local pts: { Vec } = {}
 	local dist: { number } = {}
 	for _, p in pieces do
-		local steps = if p.arc then math.max(2, math.ceil(p.len / 1)) else 1
-		for k = 0, steps - 1 do
-			local u = p.len * k / steps
+		local us: { number } = {}
+		if p.arc then
+			local steps = math.max(2, math.ceil(p.len / 1))
+			for k = 0, steps - 1 do
+				table.insert(us, p.len * k / steps)
+			end
+		else
+			-- a straight span is one segment, except across a vertical blend: there as many chords as keep the
+			-- drawn rope within ROPE_SAG of the cabins' grips (a chord of plan length L sags dm / (2 B) * L^2 / 8)
+			table.insert(us, 0)
+			local lo, hi = math.min(p.h0, p.h1), math.max(p.h0, p.h1)
+			local cuts: { number } = {}
+			local function cut(h: number)
+				if h > lo + 1e-6 and h < hi - 1e-6 then
+					local f = (h - p.h0) / (p.h1 - p.h0)
+					-- the arc length at plan fraction f (the piece's own table)
+					local tab = p.tab :: { number }
+					local N = #tab - 1
+					local i = math.clamp(math.floor(f * N), 0, N - 1)
+					local r = f * N - i
+					table.insert(cuts, tab[i + 1] + (tab[i + 2] - tab[i + 1]) * r)
+				end
+			end
+			for _, b in blends do
+				-- (a gentle blend needs no cut: the straight line between the blended heads stays within about
+				-- 0.9 dm * B / 4 of it)
+				local sag = math.abs(b[2]) * b[3] / 4
+				if sag * 0.9 > SkyLift.ROPE_SAG / 2 then
+					local chords = math.ceil(math.sqrt(sag / SkyLift.ROPE_SAG) - 1e-9)
+					for c = 0, chords do
+						cut(b[1] - b[3] + 2 * b[3] * c / chords)
+					end
+				end
+			end
+			table.sort(cuts)
+			for _, u in cuts do
+				table.insert(us, u)
+			end
+		end
+		for _, u in us do
 			local x, y, z = pieceAt(p, u)
 			table.insert(pts, vec(x, y, z))
 			table.insert(dist, p.s0 + u)
@@ -744,6 +862,30 @@ end
 
 function SkyLift.towers(): { Tower }
 	return M().towers
+end
+
+-- The cable's height (centre line, either strand) at centre-line plan distance h from the base bullwheel.
+function SkyLift.heightAt(h: number): number
+	return M().heightAt(h)
+end
+
+-- Where the rider of seat k stands after getting out at `station` (the alight point's platform), facing away from
+-- the cabin: rear-bench riders step out toward the cabin's rear and front-bench riders toward its front
+-- (ALIGHT_ALONG either side of the door), door-side riders in the near row (ALIGHT_NEAR back from the stand point)
+-- and the others behind them (ALIGHT_FAR): four spots, clear of each other, the station's walls and the cabins.
+-- Returns x, y (the platform's top), z, yaw (Roblox yaw: CFrame.Angles(0, yaw, 0) faces away from the cabin).
+function SkyLift.alightSpot(station: string, k: number): (number, number, number, number)
+	local st = (M().stations :: any)[station] :: Station
+	assert(st ~= nil, "sky_lift: station is base or summit")
+	local L = SkyLift.SEAT_LOCAL[k]
+	assert(L ~= nil, "sky_lift: seat 1..4")
+	local ay = st.alightYaw
+	-- back from the door onto the platform, and the cabin's forward (the way it arrives) along the platform
+	local bx, bz = math.sin(ay), math.cos(ay)
+	local fx, fz = math.cos(ay), -math.sin(ay)
+	local back = if L[1] > 0 then SkyLift.ALIGHT_NEAR else SkyLift.ALIGHT_FAR
+	local along = if L[3] > 0 then -SkyLift.ALIGHT_ALONG else SkyLift.ALIGHT_ALONG
+	return st.alight.x + bx * back + fx * along, st.platformY, st.alight.z + bz * back + fz * along, ay + math.pi
 end
 
 function SkyLift.nextDeparture(station: string, t: number): (number, number, number)

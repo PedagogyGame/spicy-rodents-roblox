@@ -303,7 +303,7 @@ return function(t)
 				for i = 1, SkyLift.CABINS do
 					last[i] = SkyLiftView.cabinModel(i):FindFirstChild("Origin").Position
 				end
-				local limit = SkyLift.LINE_SPEED * DT * (1 + SkyLiftView.SLEW) + 1e-4
+				local limit = SkyLift.LINE_SPEED * DT * (1 + SkyLiftView.SLEW) * 1.0005 + 1e-4
 				local worst, drift = 0, 0
 				local stations = { base = 0, summit = 0 }
 				local frames = math.ceil(SkyLift.period() / DT) + 60

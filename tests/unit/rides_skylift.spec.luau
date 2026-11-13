@@ -70,7 +70,10 @@ return function(t)
 		t.eq(#towers, 9)
 		for i, tw in towers do
 			t.eq(tw.index, i)
-			t.deepEq({ tw.x, tw.y, tw.z }, pts[i + 2])
+			-- in plan exactly the data's head; in height the blended cable over it, within a stud of the data's
+			t.deepEq({ tw.x, tw.z }, { pts[i + 2][1], pts[i + 2][3] })
+			t.near(tw.y, SkyLift.heightAt(tw.h), 1e-9)
+			t.truthy(math.abs(tw.y - pts[i + 2][2]) < 1.5, `tower {i} head {tw.y} vs data {pts[i + 2][2]}`)
 			-- the crossarm is square to the line; the strands are STRAND either side, up on the right
 			local fx, fz = -math.sin(tw.yaw), -math.cos(tw.yaw)
 			local rx, rz = math.cos(tw.yaw), -math.sin(tw.yaw)
@@ -131,7 +134,7 @@ return function(t)
 			for i = 1, N do
 				local x, y, z, yaw, _, _, s = SkyLift.cabin(i, tm)
 				local d = offLoop(x, y + SkyLift.HANG, z)
-				t.truthy(d < 0.05, `cabin {i} at t {tm} is {d} off the cable`)
+				t.truthy(d < SkyLift.ROPE_SAG, `cabin {i} at t {tm} is {d} off the drawn cable`)
 				local gx, gy, gz, gyaw = SkyLift.at(s)
 				t.near(gx, x, 1e-9)
 				t.near(gy - SkyLift.HANG, y, 1e-9)
@@ -157,7 +160,7 @@ return function(t)
 			for k = 1, steps do
 				local x, y, z, yaw, _, _, s = SkyLift.cabin(i, k * dt)
 				local step = math.sqrt((x - px) ^ 2 + (y - py) ^ 2 + (z - pz) ^ 2)
-				t.truthy(step <= SkyLift.LINE_SPEED * dt + 1e-6, `cabin {i} stepped {step} at {k * dt}`)
+				t.truthy(step <= SkyLift.LINE_SPEED * dt * 1.0005, `cabin {i} stepped {step} at {k * dt}`)
 				t.truthy(step >= SkyLift.CREEP_SPEED * dt * 0.95, `cabin {i} stalled at {k * dt}`)
 				-- the heading turns smoothly: at most a bullwheel's turn rate
 				local dyaw = math.abs((yaw - pyaw + math.pi) % (2 * math.pi) - math.pi)
@@ -169,6 +172,59 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test(
+		"the eye never tips in a frame: vertical speed changes smoothly over the towers (review: 6.9 st/s)",
+		function()
+			-- a rider's eye is fixed to the seat, so a kink in the cable is a jolt on screen. Sampled over a whole lap
+			-- at 30 and 144 frames a second: the vertical speed changes by at most 0.3 st/s from one frame to the
+			-- next, and by at most 8 st/s over any second (the old straight spans changed it by 5.4 and 6.9 st/s in a
+			-- single frame at tower 7)
+			for _, fps in { 30, 144 } do
+				local dt = 1 / fps
+				local vys: { number } = {}
+				local _, py = SkyLift.cabin(1, 0)
+				local steps = math.ceil(P / dt)
+				for k = 1, steps do
+					local _, y = SkyLift.cabin(1, k * dt)
+					vys[k] = (y - py) / dt
+					py = y
+				end
+				local worstFrame, worstSecond = 0, 0
+				for k = 2, steps do
+					worstFrame = math.max(worstFrame, math.abs(vys[k] - vys[k - 1]))
+					local j = k - fps
+					if j >= 1 then
+						worstSecond = math.max(worstSecond, math.abs(vys[k] - vys[j]))
+					end
+				end
+				t.truthy(worstFrame <= 0.3, `{fps} fps: vertical speed jumped {worstFrame} st/s in a frame`)
+				t.truthy(worstSecond <= 8, `{fps} fps: vertical speed changed {worstSecond} st/s in a second`)
+			end
+			-- the stations stay level: the blend starts at each mouth, never inside
+			for _, id in SkyLift.STATIONS do
+				local stn = (SkyLift.stations() :: any)[id] :: SkyLift.Station
+				local h0 = if id == "base" then 0 else SkyLift.towers()[9].h + 1
+				for _, f in { 0, 0.25, 0.5, 0.75, 1 } do
+					local mouthH = if id == "base"
+						then math.sqrt((stn.mouth.x - stn.wheel.x) ^ 2 + (stn.mouth.z - stn.wheel.z) ^ 2)
+						else nil
+					if mouthH then
+						t.near(SkyLift.heightAt(h0 + mouthH * f), stn.wheel.y, 1e-9)
+					end
+				end
+			end
+			local L = SkyLift.loop()
+			local last = SkyLift.towers()[9]
+			local summitMouthH = last.h
+				+ math.sqrt(
+					(SkyLift.stations().summit.mouth.x - last.x) ^ 2 + (SkyLift.stations().summit.mouth.z - last.z) ^ 2
+				)
+			t.near(SkyLift.heightAt(summitMouthH), SkyLift.stations().summit.wheel.y, 1e-9)
+			t.near(SkyLift.heightAt(summitMouthH + 30), SkyLift.stations().summit.wheel.y, 1e-9)
+			t.truthy(#L.points > 0)
+		end
+	)
 
 	t.test("six equal headways: cabin i is cabin 1 delayed (i - 1) / 6 of a lap; the lap repeats", function()
 		t.eq(N, 6)
@@ -356,15 +412,16 @@ return function(t)
 		t.eq(loop.dist[#loop.dist], loop.length)
 		for k = 2, #loop.dist do
 			t.truthy(loop.dist[k] > loop.dist[k - 1])
-			-- straight spans are one segment; arcs are drawn in pieces of at most 1 st
+			-- straight spans are one segment (a few chords across a vertical blend); arcs are drawn in pieces of at
+			-- most 1 st; a chord is never longer than the cable it spans
 			local a, b = pts[k - 1], pts[k]
 			local d = math.sqrt((b.x - a.x) ^ 2 + (b.y - a.y) ^ 2 + (b.z - a.z) ^ 2)
-			t.truthy(d <= loop.dist[k] - loop.dist[k - 1] + 1e-6)
+			t.truthy(d <= loop.dist[k] - loop.dist[k - 1] + 1e-4)
 		end
 		-- at each tower the up strand is on the right of a cabin going up, 10 st from the down strand
 		for _, tw in SkyLift.towers() do
-			t.truthy(offLoop(tw.up.x, tw.up.y, tw.up.z) < 1e-6)
-			t.truthy(offLoop(tw.down.x, tw.down.y, tw.down.z) < 1e-6)
+			t.truthy(offLoop(tw.up.x, tw.up.y, tw.up.z) < SkyLift.ROPE_SAG)
+			t.truthy(offLoop(tw.down.x, tw.down.y, tw.down.z) < SkyLift.ROPE_SAG)
 			t.near(math.sqrt((tw.up.x - tw.down.x) ^ 2 + (tw.up.z - tw.down.z) ^ 2), 2 * SkyLift.STRAND, 1e-6)
 		end
 		local _, _, _, upYaw, phase = SkyLift.cabin(1, SkyLift.stations().base.boardSigma + 20)

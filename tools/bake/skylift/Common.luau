@@ -158,10 +158,11 @@ function Common.boxW(
 end
 
 -- The haul rope (SkyLift.loop(), at cable height) cut into who draws it: `spans` are the open spans between the
--- stations (segments at least SPAN_MIN long whose middle is outside both footprints: drawn by the Skyline,
--- always streamed), `base` and `summit` everything else, by the nearer bullwheel (the station runs, the
--- bullwheels, the fillet at the summit lip). Each entry is { a, b } world points.
-Common.SPAN_MIN = 30
+-- stations and the chords across the towers' vertical blends (segments at least SPAN_MIN long whose middle is
+-- outside both footprints: drawn by the Skyline, always streamed), `base` and `summit` everything else, by the
+-- nearer bullwheel (the station runs, the bullwheels, the 1-stud pieces of the fillet at the summit lip). Each
+-- entry is { a, b } world points.
+Common.SPAN_MIN = 4
 local ropeCache: any = nil
 function Common.ropeSegments(): { spans: { any }, base: { any }, summit: { any } }
 	if ropeCache then

@@ -6,7 +6,7 @@
 --     clear its column by about a stud either side), a head cap, a crossarm over both strands and a sheave
 --     train riding on each strand (the wheels sit on the rope: the cabins' hangers pass under nothing), and a
 --     number plate. Attributes Tower = k, CableY.
---   f4_lift_base_Skyline (Model, Persistent, <= 40 parts): for each tower a slim core mast and a crossarm,
+--   f4_lift_base_Skyline (Model, Persistent, <= SKYLINE_BUDGET parts): for each tower a slim core mast and a crossarm,
 --     both inside the detailed tower's own volume (so they vanish behind it when the tower streams in), and the
 --     haul rope's straight spans between the two stations (every loop segment longer than SPAN_MIN): the rope
 --     is drawn only here, so it is never missing and never doubled.
@@ -20,7 +20,9 @@ local SkyLift = require("../../../src/shared/Rides/SkyLift")
 local Towers = {}
 
 Towers.TOWER_BUDGET = 36
-Towers.SKYLINE_BUDGET = 40
+-- the masts and arms (18) and the rope: 2 strands x (11 open spans + the extra chords across the steepest
+-- towers' vertical blends, SkyLift.ROPE_SAG)
+Towers.SKYLINE_BUDGET = 66 -- 18 + 48 rope pieces on the compiled data
 
 Towers.ROPE_D = 0.34
 Towers.NECK_BELOW = 13 -- the lattice narrows this far under the cable head (cabin floors hang 10.5 below it)
@@ -112,7 +114,7 @@ function Towers.build(roblox: any, parent: any): { any }
 			kit:rod(m, "Leg", sx * W, base, sd * W, sx * N, neck, sd * N, LEG_D, steel, "Metal", lattice)
 			kit:rod(m, "Leg", sx * N, neck, sd * N, sx * N, head, sd * N, LEG_D, steel, "Metal", lattice)
 		end
-		-- bracing on the taper: an X on the faces across the line, one diagonal on the side faces
+		-- bracing on the taper: an X on the faces across the line (the side faces are left open: the budget)
 		local function wAt(y: number): number
 			return W + (N - W) * (y - base) / (neck - base)
 		end
@@ -120,10 +122,6 @@ function Towers.build(roblox: any, parent: any): { any }
 			local w0, w1 = wAt(base + 0.3), wAt(neck - 0.3)
 			kit:rod(m, "Brace", -w0, base + 0.3, sd * w0, w1, neck - 0.3, sd * w1, BRACE_D, steel, "Metal")
 			kit:rod(m, "Brace", w0, base + 0.3, sd * w0, -w1, neck - 0.3, sd * w1, BRACE_D, steel, "Metal")
-		end
-		for _, sx in { -1, 1 } do
-			local w0, w1 = wAt(base + 0.3), wAt(neck - 0.3)
-			kit:rod(m, "Brace", sx * w0, base + 0.3, -sx * w0, sx * w1, neck - 0.3, sx * w1, BRACE_D, steel, "Metal")
 		end
 		-- the ring where the taper meets the column
 		for _, y in { neck } do
@@ -151,8 +149,8 @@ function Towers.build(roblox: any, parent: any): { any }
 			local x = side * SkyLift.STRAND
 			local wheels = {}
 			for _, d in { -1.35, 1.35 } do
-				local g = if d < 0 then gb else gf
-				local rope = cable + g * d
+				-- the rope under this wheel, on the blended profile (d < 0: toward the base)
+				local rope = SkyLift.heightAt(t.h + d)
 				-- as low over the rope as the passing grips allow: the lowest centre whose wheel box clears the
 				-- cabins' swept volume by SHEAVE_MARGIN (the grips reach GRIP_ABOVE over the rope)
 				local cy = rope + SkyLift.GRIP_ABOVE + 0.6

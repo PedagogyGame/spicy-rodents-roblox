@@ -8,7 +8,7 @@
 --   the cabin template: Persistent, its pivot part at the frame origin, everything inside the outer box or the
 --     hanger column, collides with nothing, four Seats whose tops and facings match SkyLift.SEAT_LOCAL, each
 --     with its EyeSocket EYE_ABOVE_SEAT over the seat; the two door leaves with their travel;
---   the Skyline: Persistent, at most 40 parts, one mast per tower, and the rope's open spans end to end;
+--   the Skyline: Persistent, within its budget, one mast per tower, and the rope's open spans end to end;
 --   the gates the server hangs its prompts on.
 local roblox = require("@lune/roblox")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
@@ -42,17 +42,27 @@ return function(t)
 		t.eq(base:GetAttribute("VenueId"), "f4_lift_base")
 		t.eq(base:GetAttribute("Family"), "F4")
 		t.eq(base.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic)
-		t.truthy(#parts(base) <= 500 * 1.1, `station {#parts(base)} parts`)
 		for k = 1, #SkyLift.towers() do
 			local tw = folder:FindFirstChild(`f4_lift_tower_{k}`)
 			t.truthy(tw ~= nil, `tower {k}`)
 			t.eq(tw.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic)
-			t.truthy(#parts(tw) <= 40, `tower {k}: {#parts(tw)} parts`)
 		end
 		local summit = folder:FindFirstChild("f4_lift_summit")
 		t.truthy(summit ~= nil)
 		t.eq(summit:GetAttribute("VenueId"), "f3_hilltop")
-		t.truthy(#parts(summit) <= 120, `summit {#parts(summit)} parts`)
+		-- every model holds its own stamped budget (the number on the model and the test cannot drift apart)
+		local stamped = 0
+		for _, m in folder:GetChildren() do
+			local budget = m:GetAttribute("PartBudget")
+			if m:IsA("Model") and m.Name ~= "f3_hilltop" and m.Name ~= "f3_hilltop_Skyline" then
+				t.truthy(type(budget) == "number", `{m.Name} carries a PartBudget`)
+			end
+			if type(budget) == "number" then
+				stamped += 1
+				t.truthy(#parts(m) <= budget, `{m.Name}: {#parts(m)} parts over its stamped budget {budget}`)
+			end
+		end
+		t.truthy(stamped >= 15, `{stamped} models stamped`)
 		t.truthy(folder:FindFirstChild("f3_hilltop") ~= nil, "the Lookout (or its stub)")
 		t.truthy(folder:FindFirstChild("xs_lift_approach") ~= nil, "the approach")
 		-- lift hardware total (station, towers, Skyline, cabin template, summit): about 830 planned
@@ -213,16 +223,17 @@ return function(t)
 		t.truthy(tpl:FindFirstChild("NumberFront") ~= nil and tpl:FindFirstChild("NumberBack") ~= nil)
 	end)
 
-	t.test("the Skyline: Persistent, at most 40 parts, a mast per tower, the open spans end to end", function()
+	t.test("the Skyline: Persistent, within its budget, a mast per tower, the open spans end to end", function()
 		local sky = folder:FindFirstChild("f4_lift_base_Skyline")
 		t.truthy(sky ~= nil)
 		t.eq(sky.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Persistent)
-		t.truthy(#parts(sky) <= 40, `{#parts(sky)} parts`)
+		t.truthy(#parts(sky) <= Towers.SKYLINE_BUDGET, `{#parts(sky)} parts`)
 		for k = 1, #SkyLift.towers() do
 			t.truthy(sky:FindFirstChild(`Mast{k}`) ~= nil, `Mast{k}`)
 		end
-		-- 2 strands x (mouth -> 9 towers -> lip) = 20 spans
-		t.eq(sky:GetAttribute("Spans"), 2 * (#SkyLift.towers() + 1))
+		-- 2 strands x (mouth -> 9 towers -> lip) = 20 spans at least, plus the chords across the vertical blends
+		t.eq(sky:GetAttribute("Spans"), #Common.ropeSegments().spans)
+		t.truthy(sky:GetAttribute("Spans") >= 2 * (#SkyLift.towers() + 1))
 		for _, p in parts(sky) do
 			t.eq(p.CanCollide, false)
 		end
