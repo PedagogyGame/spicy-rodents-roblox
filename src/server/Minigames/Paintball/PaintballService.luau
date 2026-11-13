@@ -36,10 +36,12 @@
 --     an honest Move from the new place would be refused against it, three times, and corrected;
 --   * silence is measured from a placement as well as from a Move (Stream.placed): a client back from
 --     being tagged out is owed all of Clock.DROP_SECS, not what its time out left of it;
---   * a click that came later than its own delay explains is also judged at its own stamp, no further
---     back than Clock.MAG_LATE (onFire; Stream, "a click that came late"): as written, a strafing
---     shooter's click behind one lost packet is refused, which the lane guide's own "three shots
---     bunched half a second late are all accepted" says it must not be.
+--   * a click that came later than its own delay explains is also judged at its own stamp for WHERE it
+--     left from, no further back than the shooter's own window (Stream.lateWindow, at most
+--     Clock.MAG_LATE), while the sprint, the spawn rooms and the stance are held to f as well (onFire;
+--     Stream, "a click that came late"): as written, a strafing shooter's click behind one lost packet
+--     is refused, which the lane guide's own "three shots bunched half a second late are all accepted"
+--     says it must not be.
 -- AND WHERE IT DID NOT DO AS WRITTEN BECAUSE AS WRITTEN A LIAR GAINS (all reported):
 --   * a fall must fall (Stream, "the height rule"): an unsupported pose must come down at a quarter of
 --     gravity or faster from the height of a hop; it is not allowed to walk level for the whole of
@@ -1687,12 +1689,12 @@ function PaintballService.new(ctx: ServerGame.Ctx, deps: Deps?): Service
 			why = Stream.clickOk(person, f, rec.ox, rec.oy, rec.oz, arena, state.feel)
 			if why ~= nil then
 				-- a click that came later than its own delay explains (a lost packet sent again) is also
-				-- judged where and how its body was when it was clicked, no further back than the magazine's
-				-- bound (Stream, "a click that came late")
-				local click = math.max(rec.ft, now - Clock.MAG_LATE)
+				-- judged where its body was when it was clicked, no further back than the shooter's own
+				-- window, and whether it could fire is held to f as well (Stream, "a click that came late")
+				local click = math.max(rec.ft, now - Stream.lateWindow(person))
 				if
 					click < f - 1e-6
-					and Stream.clickOk(person, click, rec.ox, rec.oy, rec.oz, arena, state.feel, now) == nil
+					and Stream.lateClickOk(person, click, f, rec.ox, rec.oy, rec.oz, arena, state.feel, now) == nil
 				then
 					why = nil
 				end

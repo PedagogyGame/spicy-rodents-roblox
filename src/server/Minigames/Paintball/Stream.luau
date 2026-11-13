@@ -48,20 +48,25 @@
 -- is held to everything else (walls, height, the distance budget from the place the server chose),
 -- which is what holds a liar at any time: the body rule adds nothing against one (nobody is shown the
 -- body). NOT SEEN ON A REAL SERVER: the fake engine's body is where it is put. (Reported.)
--- A CLICK THAT CAME LATE (clickOk). The contract judges a click at f, the fire time held to the
+-- A CLICK THAT CAME LATE (lateClickOk). The contract judges a click at f, the fire time held to the
 -- shooter's own delay. A click behind a lost packet arrives later than that delay explains: f is then
 -- later than the click, the body has walked on, and a strafing shooter's honest shot would be refused
--- ("origin"; "sprint" if they ran on after it). Such a click is ALSO judged at its own stamp, no
--- further back than Clock.MAG_LATE (the bound the contract gives the magazine for the same reason):
--- the sprint window, the spawn rooms, the eye and the stance, all at that one time, from the Moves and
--- the crouch the server itself held then. What a liar gains: a shot from where and how they really
--- stood up to MAG_LATE ago, born no earlier than f. (Reported.)
+-- ("origin"). A click that fails at f is ALSO judged at its own stamp, but its stamp is believed only
+-- for WHERE the shot left from: no further back than lateWindow (the shooter's own delay, a resend's
+-- round trip and a floor, at most Clock.MAG_LATE), and WHETHER it could fire is held to f as well (no
+-- sprint Move from the click to f, in no spawn room at the click or at f, and the origin's height fits
+-- the stance the server holds at f). What a liar gains: a shot from where they really stood up to
+-- lateWindow ago, in the stance they still hold, born no earlier than f; a sprinter, a shooter back in
+-- its room and a crouched body behind a rail gain nothing. (Reported; found in review: as first built
+-- the stamp chose the time of every check, and a back-dated click fired from safety, while sprinting
+-- and over a rail from a crouch.)
 -- Interface: new(player, now, placeFrom?) -> Person; restart(person, now); placed(person, x, y, z, yaw,
 --   now, feel, stand); judge(person, rec, now, arena, feel, otherRoom?, bx?, by?, bz?) -> (verdict,
 --   why?); refused(person, now) -> correct; poseAt(person, t) -> (x, y, z, yaw, pitch, bits,
 --   newestT); ease(person, tick, feel) -> crouch; crouchAt(person, t) -> crouch; sprinting(person, f)
---   -> boolean; originOk(person, f, ox, oy, oz, sweep, feel, now?) -> boolean; clickOk(person, at, ox,
---   oy, oz, arena, feel, now?) -> why?; silent(person, now) -> (stale, drop); types Move, Person, Verdict
+--   -> boolean; originOk(person, f, ox, oy, oz, sweep, feel, now?) -> boolean; clickOk(person, f, ox,
+--   oy, oz, arena, feel) -> why?; lateWindow(person) -> seconds; lateClickOk(person, click, f, ox, oy,
+--   oz, arena, feel, now) -> why?; silent(person, now) -> (stale, drop); types Move, Person, Verdict
 
 local Import = require("../../Import")
 local ArenaModule: typeof(require(game.ReplicatedStorage.Shared.Minigames.Paintball.Arena)) =
@@ -134,6 +139,7 @@ local FOOT = 1.0 -- studs a feet point may be past an edge its body still stands
 local FALL_FLOOR = 0.25 * 196.2 / 2 -- studs of drop per second squared a fall must at least show
 local LANDING = 0.25 -- seconds after a fall in which the replicated body may still be coming down
 local CROUCH_KEPT = 14 -- snapshot ticks of crouch kept (0.7 s: past Clock.MAG_LATE and a tick each side)
+local LOST_FLOOR = 0.2 -- seconds: the least a lost reliable packet waits before it is sent again
 
 local Stream = {}
 
@@ -507,29 +513,90 @@ function Stream.originOk(
 	return ArenaModule.clearPath(sweep, x, z, ox, oz, oy)
 end
 
--- The three things a click is judged on from the shooter's own stream, all at one time `at`
--- (PaintballService.onFire c, d, e): the sprint window, the spawn rooms, the origin. Returns the
--- Contract.WHY code of the first that refuses it, or nil. `now` is given when `at` is the click's own
--- stamp and not the contract's f (see the header, "a click that came late").
+local function inEitherRoom(arena: Arena, x: number, y: number, z: number): boolean
+	local rooms = arena.spawnRooms
+	return ArenaModule.inRoom(rooms[1], x, y + 0.1, z) or ArenaModule.inRoom(rooms[2], x, y + 0.1, z)
+end
+
+-- The three things a click is judged on from the shooter's own stream, all at the contract's fire time
+-- f (PaintballService.onFire c, d, e): the sprint window, the spawn rooms, the origin. Returns the
+-- Contract.WHY code of the first that refuses it, or nil.
 function Stream.clickOk(
 	person: Person,
-	at: number,
+	f: number,
+	ox: number,
+	oy: number,
+	oz: number,
+	arena: Arena,
+	feel: Feel
+): string?
+	if Stream.sprinting(person, f) then
+		return "sprint"
+	end
+	local x, y, z = Stream.poseAt(person, f)
+	if inEitherRoom(arena, x, y, z) then
+		return "safe"
+	end
+	if not Stream.originOk(person, f, ox, oy, oz, arena.sweep, feel) then
+		return "origin"
+	end
+	return nil
+end
+
+-- How far before its arrival a late click may be judged at its own stamp (the header, "a click that
+-- came late"): its own delay up, the round trip a lost packet waits before it is sent again (2 up), the
+-- engine's floor on that wait (LOST_FLOOR) and the stamping tolerance; never more than Clock.MAG_LATE.
+-- A shooter on a fast connection is held to a short window: 0.275 s at no delay, 0.395 at 80 ms.
+function Stream.lateWindow(person: Person): number
+	local up = person.up.lag or 0
+	return math.min(Clock.MAG_LATE, 3 * up + LOST_FLOOR + Clock.REWIND_TOLERANCE)
+end
+
+-- A click that failed at f, judged again at its own stamp `click` (earlier than f; the caller holds it
+-- inside lateWindow). The stamp says only WHERE the shot left from; WHETHER the shooter could fire is
+-- held to f as well, so a liar who back-dates a click buys an origin and nothing else:
+--   sprint  refused if any Move in (click - SPRINT_FIRE_DELAY + MARGIN.sprint, f] carries BIT.sprint:
+--           the marker was down at the click, or has been since (a sprinter cannot fire by naming a
+--           moment before the sprint);
+--   room    refused if the pose at the click OR at f is inside a spawn room (a shooter who has walked
+--           back into its room, where it cannot be hit, cannot fire from the doorway it just left);
+--   origin  the eye over the pose at the click, with the stance the server held then (originOk);
+--   stance  and the origin's height above that pose must ALSO fit the stance the server holds at f
+--           (the crouch logged one upstream delay after f, and the crouch bit of the Move at f): a
+--           shooter crouched behind a rail cannot fire over it from the standing eye of a moment ago.
+-- The cost to an honest player: a click behind a lost packet that is followed, inside that packet's
+-- delay, by a sprint or a crouch is refused (the press is lost, never a wrong ball).
+function Stream.lateClickOk(
+	person: Person,
+	click: number,
+	f: number,
 	ox: number,
 	oy: number,
 	oz: number,
 	arena: Arena,
 	feel: Feel,
-	now: number?
+	now: number
 ): string?
-	if Stream.sprinting(person, at) then
-		return "sprint"
+	local after = click - Body.SPRINT_FIRE_DELAY + Contract.MARGIN.sprint
+	for _, move in person.moves do
+		if move.t > after and move.t <= f and Wire.has(move.bits, BIT.sprint) then
+			return "sprint"
+		end
 	end
-	local x, y, z = Stream.poseAt(person, at)
-	local rooms = arena.spawnRooms
-	if ArenaModule.inRoom(rooms[1], x, y + 0.1, z) or ArenaModule.inRoom(rooms[2], x, y + 0.1, z) then
+	local x, y, z, _, _, bitsC = Stream.poseAt(person, click)
+	local fx, fy, fz, _, _, bitsF = Stream.poseAt(person, f)
+	if inEitherRoom(arena, x, y, z) or inEitherRoom(arena, fx, fy, fz) then
 		return "safe"
 	end
-	if not Stream.originOk(person, at, ox, oy, oz, arena.sweep, feel, now) then
+	if not Stream.originOk(person, click, ox, oy, oz, arena.sweep, feel, now) then
+		return "origin"
+	end
+	local crouchF = Stream.crouchAt(person, math.min(now, f + (person.up.lag or 0)))
+	local eyeA = Body.eye(crouchF)
+	local eyeB = Body.eye(if Wire.has(bitsF, BIT.crouch) then 1 else 0)
+	local slack = T.originSlackY + (if Wire.has(bitsC, BIT.air) then Body.JUMP_HEIGHT else 0)
+	local above = oy - y
+	if above < math.min(eyeA, eyeB) - slack or above > math.max(eyeA, eyeB) + slack then
 		return "origin"
 	end
 	return nil

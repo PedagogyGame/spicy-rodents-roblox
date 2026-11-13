@@ -487,11 +487,13 @@ return function(t)
 	end)
 
 	t.test(
-		"a click that came late is judged where and how its body was when it was clicked: the pose, the sprint window, the rooms and the stance of that time, and no click is judged at a time it was not made",
+		"a click that came late is judged at its own stamp for where it left from, inside the shooter's own window; whether it could fire (the sprint, the rooms, the stance) is held to f as well",
 		function()
 			local person, send, arena = placed(20, 0, -40)
 			local feel = Contract.feel()
 			local eye = Body.STAND_EYE
+			-- the window: its own delay, a resend's round trip and a floor; never past the magazine's bound
+			t.near(Stream.lateWindow(person), 0.2 + Clock.REWIND_TOLERANCE, 1e-9, "no delay measured yet")
 			-- she strafes north at a walk, a Move every send interval, and the server ticks its crouch as it goes
 			local z = -40
 			local function walk(from: number, to: number, bits: number?)
@@ -505,27 +507,41 @@ return function(t)
 			end
 			walk(100, 100.6)
 			local clickZ = z -- where she was at 100.6, when she clicked
-			walk(100.6, 100.9)
-			-- the click reaches the server at 100.9 behind a lost packet; her delay is nothing, so f = 100.825
-			local f = 100.9 - Clock.REWIND_TOLERANCE
+			walk(100.6, 100.85)
+			-- the click reaches the server at 100.85 behind a lost packet; her delay is nothing, so f = 100.775
+			local now = 100.85
+			local f = now - Clock.REWIND_TOLERANCE
+			t.eq(person.up.lag, 0)
+			t.truthy(now - 100.6 <= Stream.lateWindow(person), "inside her window")
 			t.eq(Stream.clickOk(person, f, 20, eye, clickZ, arena, feel), "origin", "at f she has walked on")
-			t.eq(Stream.clickOk(person, 100.6, 20, eye, clickZ, arena, feel, 100.9), nil, "at the click she was there")
 			t.eq(
-				Stream.clickOk(person, 100.6, 20 + T.originSlack + 0.5, eye, clickZ, arena, feel, 100.9),
+				Stream.lateClickOk(person, 100.6, f, 20, eye, clickZ, arena, feel, now),
+				nil,
+				"at the click she was there"
+			)
+			t.eq(
+				Stream.lateClickOk(person, 100.6, f, 20 + T.originSlack + 0.5, eye, clickZ, arena, feel, now),
 				"origin",
 				"and nowhere else"
 			)
 			t.eq(
-				Stream.clickOk(person, 100.4, 20, eye, clickZ, arena, feel, 100.9),
+				Stream.lateClickOk(person, 100.4, f, 20, eye, clickZ, arena, feel, now),
 				"origin",
 				"nor at another time than the one it names"
 			)
-			-- she ran on after the click: the sprint Moves stamped after it say nothing of it
-			walk(100.9, 101.1, Wire.BIT.sprint)
-			t.eq(Stream.clickOk(person, 101.1, 20, eye, clickZ, arena, feel), "sprint")
-			t.eq(Stream.clickOk(person, 100.6, 20, eye, clickZ, arena, feel, 101.1), nil)
-			t.eq(Stream.clickOk(person, 101.0, 20, eye, z, arena, feel, 101.1), "sprint", "a click made while running")
-			-- the stance is the one the server held then: she ducked after the click, and is fully crouched now
+			-- she ran on after the click: the marker has been down since, and the click is no shot (a liar who
+			-- names a moment before her sprint is the same click)
+			walk(100.85, 101.05, Wire.BIT.sprint)
+			now, f = 101.05, 101.05 - Clock.REWIND_TOLERANCE
+			t.eq(Stream.clickOk(person, f, 20, eye, clickZ, arena, feel), "sprint")
+			t.eq(Stream.lateClickOk(person, 100.85, f, 20, eye, z, arena, feel, now), "sprint", "sprinting at f")
+			t.eq(
+				Stream.lateClickOk(person, 100.95, f, 20, eye, z, arena, feel, now),
+				"sprint",
+				"a click made while running"
+			)
+			-- THE STANCE IS HELD TO f TOO: she clicked standing, then ducked; she is crouched at f, and a standing
+			-- shot from a moment ago is not hers (a body behind a rail cannot fire over it from that eye)
 			local ducker, duck = placed(20, 0, -40)
 			local at = 100
 			for i = 1, 16 do
@@ -537,19 +553,49 @@ return function(t)
 			t.eq(Stream.crouchAt(ducker, 100.3), 0, "standing then")
 			t.eq(Stream.crouchAt(ducker, 100.45), 0.75, "three ticks into the crouch")
 			t.eq(Stream.crouchAt(ducker, 99), 0, "before the log: its oldest")
-			t.eq(Stream.clickOk(ducker, 100.8, 20, eye, -40, arena, feel), "origin", "standing height while crouched")
-			t.eq(Stream.clickOk(ducker, 100.3, 20, eye, -40, arena, feel, 100.8), nil, "a click made standing")
+			now, f = 100.8, 100.8 - Clock.REWIND_TOLERANCE
+			t.eq(Stream.clickOk(ducker, f, 20, eye, -40, arena, feel), "origin", "standing height while crouched")
 			t.eq(
-				Stream.clickOk(ducker, 100.6, 20, eye, -40, arena, feel, 100.8),
+				Stream.lateClickOk(ducker, 100.6, f, 20, eye, -40, arena, feel, now),
 				"origin",
-				"a click made crouched is not a standing shot"
+				"crouched at the click"
 			)
-			-- the rooms: a click made inside her own spawn room is no shot, whenever it arrives
+			t.eq(
+				Stream.lateClickOk(ducker, 100.6, f, 20, Body.CROUCH_EYE, -40, arena, feel, now),
+				nil,
+				"from the crouched eye it is a shot"
+			)
+			t.eq(
+				Stream.lateClickOk(ducker, 100.3, f, 20, eye, -40, arena, feel, now),
+				"origin",
+				"standing at the click, crouched at f: the standing eye is refused"
+			)
+			-- THE ROOMS, at the click OR at f: a click made inside her spawn room is no shot whenever it arrives,
+			-- and nor is one made just outside it by somebody who has walked back in, where nobody can tag her
 			local room = arena.spawnRooms[1]
 			local cx, cz = (room.minX + room.maxX) / 2, (room.minZ + room.maxZ) / 2
 			local homer = placed(cx, room.minY, cz)
 			t.eq(Stream.clickOk(homer, 100, cx, room.minY + eye, cz, arena, feel), "safe")
-			t.eq(Stream.clickOk(homer, 99.8, cx, room.minY + eye, cz, arena, feel, 100), "safe")
+			t.eq(Stream.lateClickOk(homer, 99.8, 100, cx, room.minY + eye, cz, arena, feel, 100.075), "safe")
+			-- (the room's south door is at x -49..-44; she stands 2.5 studs out of it and walks back in)
+			local doorX, outZ = -46.5, room.maxZ + 2.5
+			local back, step = placed(doorX, room.minY, outZ)
+			local wz = outZ
+			for i = 1, 5 do
+				wz -= 0.85
+				t.eq((step({ t = 100 + i * SEND, x = doorX, y = room.minY, z = wz })), "accepted")
+			end
+			t.truthy(ArenaModule.inRoom(room, doorX, room.minY + 0.1, wz), "she is back inside")
+			t.eq(
+				Stream.lateClickOk(back, 100.05, 100.25, doorX, room.minY + eye, outZ - 0.85, arena, feel, 100.3),
+				"safe",
+				"the doorway she has left"
+			)
+			t.eq(
+				Stream.lateClickOk(back, 100.05, 100.1, doorX, room.minY + eye, outZ - 0.85, arena, feel, 100.15),
+				nil,
+				"(while she was still outside at f, the same click was a shot)"
+			)
 		end
 	)
 

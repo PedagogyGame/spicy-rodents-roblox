@@ -17,6 +17,7 @@ local Hit = require("@shared/Minigames/Paintball/Hit")
 local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local Bots = require("@server/Minigames/Paintball/Bots")
+local Stream = require("@server/Minigames/Paintball/Stream")
 local PaintballFlow = require("@tests/engine/PaintballFlow")
 local Kit = require("@tests/isolated/paintball_server_kit")
 
@@ -166,7 +167,7 @@ return function(t)
 	end)
 
 	t.test(
-		"a strafing shooter's click held up behind a lost packet is still a shot, from where she clicked; a liar who back-dates a click gets nothing but a shot from where she really stood, at most half a second ago",
+		"a strafing shooter's click held up behind a lost packet is still a shot, from where she clicked; a liar who back-dates a click gets nothing but a shot from where she really stood, inside her own window",
 		function()
 			Kit.play(function(kit)
 				local ada, bea = people(kit, { "Ada", "Bea" })
@@ -194,20 +195,29 @@ return function(t)
 					`but is born no earlier than her own delay allows ({born.t - clicked} s after the click)`
 				)
 				t.eq(stats.shotsRefused, 0)
-				-- THE LIAR. She stands, walks on for 0.45 s, and stamps a click 0.45 s back from where she stood
-				-- then: that is a shot (she was there), born no earlier than f
+				-- THE LIAR. She stands, walks on for a quarter of a second, and stamps a click a quarter of a second
+				-- back from where she stood then: that is a shot (she was there, inside her own window: with no delay
+				-- that is the resend floor and the tolerance, Stream.lateWindow), born no earlier than f
 				kit.run(0.7)
+				local window = Stream.lateWindow(Stream.new(ada.stub, 0))
+				t.truthy(window < 0.3, `a client with no delay is held to a short window ({window} s)`)
 				local stoodZ = ada.z
-				strafe(0.45)
+				strafe(0.25)
 				local now = kit.now()
-				local back = ack(kit, ada, ada.fire(1, 0, 0, { ft = now - 0.45, oz = stoodZ }))
+				local back = ack(kit, ada, ada.fire(1, 0, 0, { ft = now - 0.25, oz = stoodZ }))
 				t.truthy(back.ok, tostring(back.why))
 				t.truthy(bea.shots[#bea.shots].t >= now - Clock.REWIND_TOLERANCE - 2 * FRAME)
 				-- from where she never stood, it is not
 				kit.run(0.3)
-				local never = ack(kit, ada, ada.fire(1, 0, 0, { ft = kit.now() - 0.45, ox = -33, oz = stoodZ }))
+				local never = ack(kit, ada, ada.fire(1, 0, 0, { ft = kit.now() - 0.25, ox = -33, oz = stoodZ }))
 				t.deepEq({ never.ok, never.why }, { false, "origin" })
-				-- and not from where she stood a second ago: no click is judged further back than Clock.MAG_LATE
+				-- and not from where she stood longer ago than her window: 0.45 s, which the magazine's own bound
+				-- would have let through, is judged at the window's edge, where she was not
+				kit.run(0.7)
+				local stoodAgain = ada.z
+				strafe(0.45)
+				local far = ack(kit, ada, ada.fire(1, 0, 0, { ft = kit.now() - 0.45, oz = stoodAgain }))
+				t.deepEq({ far.ok, far.why }, { false, "origin" })
 				kit.run(0.7)
 				local longAgo = ada.z
 				strafe(1)
@@ -215,6 +225,93 @@ return function(t)
 				t.deepEq({ old.ok, old.why }, { false, "origin" })
 				t.eq(stats.corrections, 0)
 			end)
+		end
+	)
+
+	-- FOUND IN REVIEW: a back-dated click had its spawn room, its sprint and its stance judged at the time it
+	-- named, while its ball was born at f from a body in the present. Each of these was a shot; each is now
+	-- refused, and the honest strafer's late click above is still a shot.
+	t.test(
+		"a back-dated click buys no shot from safety: a shooter who has walked back into her spawn room cannot fire from the doorway she left",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				kit.walk(ada, -38, -2) -- two studs out of her room (x -50..-40)
+				kit.run(0.3)
+				local stoodT = kit.now()
+				local ex, ey, ez = ada.eye()
+				kit.walk(ada, -42, -2) -- back inside, in a quarter of a second
+				local now = kit.now()
+				t.truthy(now - stoodT < Stream.lateWindow(Stream.new(ada.stub, 0)), "the stamp is inside her window")
+				t.truthy(Arena.inRoom(kit.arena.spawnRooms[1], ada.x, ada.y + 0.1, ada.z))
+				local a = ack(kit, ada, ada.fire(1, 0, 0, { ft = stoodT, ox = ex, oy = ey, oz = ez }))
+				t.deepEq({ a.ok, a.why, a.ball }, { false, "safe", nil })
+				-- (where she stands, nobody can tag her: that is what the refusal protects)
+				kit.run(0.2)
+				local snap = bea.snaps[#bea.snaps]
+				for _, body in snap.bodies do
+					if body.id == ada.seat then
+						t.truthy(Wire.has(body.bits, Wire.BIT.safe))
+					end
+				end
+				t.eq(kit.service:stats().balls, 0)
+			end)
+		end
+	)
+
+	t.test(
+		"a back-dated click buys no shot while sprinting: a click stamped before the sprint began is refused while the marker is down",
+		function()
+			Kit.play(function(kit)
+				local ada = people(kit, { "Ada", "Bea" })
+				kit.walk(ada, -36, -15)
+				kit.run(0.3)
+				local walkT = kit.now()
+				local ex, ey, ez = ada.eye()
+				ada.sprint = true
+				local feel = kit.state().feel
+				for _ = 1, 12 do -- a fifth of a second of sprint
+					ada.z += Body.WALK * feel.sprintMult * FRAME
+					kit.frame()
+				end
+				local honest = ack(kit, ada, ada.fire(1, 0, 0))
+				t.deepEq({ honest.ok, honest.why }, { false, "sprint" })
+				local back = ack(kit, ada, ada.fire(1, 0, 0, { ft = walkT - 0.03, ox = ex, oy = ey, oz = ez }))
+				t.deepEq({ back.ok, back.why }, { false, "sprint" }, "stamped while she walked, sent while she runs")
+				t.eq(kit.service:stats().movesRefused, 0)
+				t.eq(kit.service:stats().balls, 0)
+				-- she stops; once the marker is up, a click is a shot again
+				ada.sprint = false
+				kit.run(Body.SPRINT_FIRE_DELAY + 0.1)
+				t.truthy(ack(kit, ada, ada.fire(1, 0, 0)).ok)
+			end)
+		end
+	)
+
+	t.test(
+		"a back-dated click buys no shot over a rail from a crouch: the standing eye of a moment ago is refused while the server holds her crouched",
+		function()
+			Kit.play(function(kit)
+				local ada, bea = people(kit, { "Ada", "Bea" })
+				kit.walk(bea, 12, 0)
+				kit.walk(ada, -1.8, 0) -- west of the rail (x 0..0.5)
+				kit.run(0.5)
+				local standT = kit.now()
+				local ex, ey, ez = ada.eye()
+				ada.crouch = true
+				kit.run(0.25)
+				t.truthy(kit.service.poses[ada.seat].crouch >= 0.75, "the server holds her crouched")
+				local bx, by, bz = Body.eyePoint(12, 0, 0, 0)
+				local a = ack(kit, ada, ada.fire(bx - ex, by - ey, bz - ez, { ft = standT, ox = ex, oy = ey, oz = ez }))
+				t.deepEq({ a.ok, a.why }, { false, "origin" })
+				kit.run(0.6)
+				t.eq(#bea.tags, 0, "Bea is not tagged")
+				-- from her own crouched eye the click is hers (and meets the rail)
+				local cx, cy, cz = ada.aim(12, Body.STAND_EYE, 0)
+				t.truthy(ack(kit, ada, ada.fire(cx, cy, cz)).ok)
+				kit.run(0.6)
+				t.eq(#bea.tags, 0)
+			end, { arena = Kit.hall({ rail = true, room2 = 20 }), feel = Contract.feel({ ballDrop = 0 }) })
 		end
 	)
 
