@@ -13,7 +13,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "type": "string" }, "type": { "enum": ["bowling_alley"] }, "name": { "type": "string" },
-        "district": { "type": "string" }, "lanes": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "district": { "type": "string" }, "lanes": { "type": "integer", "minimum": 1, "maximum": 24 },
         "games": { "type": "array", "items": { "type": "string" } },
         "place": { "type": "object", "required": ["x", "z", "floorY", "yaw"], "additionalProperties": false,
           "properties": { "x": { "type": "number" }, "z": { "type": "number" }, "floorY": { "type": "number" }, "yaw": { "type": "number" } } },
