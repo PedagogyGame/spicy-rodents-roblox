@@ -527,9 +527,9 @@ function SkyLiftService.new(opts: Opts): any
 		local a = anchorAt(top, id)
 		if a then
 			for _, f in { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } } do
-				local cx, cy, cz = AlleyLayout.toWorld(place, a[1] + f[1] * 2.7, 1.5, a[3] + f[2] * 2.7)
-				local tx, _, tz = AlleyLayout.toWorld(place, a[1], 1.5, a[3])
-				table.insert(self.chairs, { x = cx, y = cy, z = cz, yaw = math.atan2(-(tx - cx), -(tz - cz)) })
+				local sx, sy, sz = AlleyLayout.toWorld(place, a[1] + f[1] * 2.7, 1.5, a[3] + f[2] * 2.7)
+				local mx, _, mz = AlleyLayout.toWorld(place, a[1], 1.5, a[3])
+				table.insert(self.chairs, { x = sx, y = sy, z = sz, yaw = math.atan2(-(mx - sx), -(mz - sz)) })
 			end
 		end
 	end

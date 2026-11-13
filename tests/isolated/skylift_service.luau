@@ -878,20 +878,28 @@ return function(t)
 		end)
 	end)
 
-	t.test("nobody pops into view: no outing boards while a player stands at the base, no host while one watches", function()
-		FakeEngine.with(function()
-			local w = world({ start = 0 })
-			lively(w, 12)
-			local base = SkyLift.stations().base
-			SkyLiftFlow.player(w, "Watcher", "human", roblox.CFrame.new(base.board.x, base.platformY + 3, base.board.z + 4))
-			local hs = w.svc.hostSpot
-			SkyLiftFlow.player(w, "Diner", "human", roblox.CFrame.new(hs.x + 3, hs.y + 3, hs.z))
-			SkyLiftFlow.step(w, SkyLift.period() * 1.2, 0.5)
-			local c = w.svc:counts()
-			t.eq(c.outings, 0, "an outing appeared in front of a player")
-			t.eq(c.host, 0, "the host appeared in front of a player")
-		end)
-	end)
+	t.test(
+		"nobody pops into view: no outing boards while a player stands at the base, no host while one watches",
+		function()
+			FakeEngine.with(function()
+				local w = world({ start = 0 })
+				lively(w, 12)
+				local base = SkyLift.stations().base
+				SkyLiftFlow.player(
+					w,
+					"Watcher",
+					"human",
+					roblox.CFrame.new(base.board.x, base.platformY + 3, base.board.z + 4)
+				)
+				local hs = w.svc.hostSpot
+				SkyLiftFlow.player(w, "Diner", "human", roblox.CFrame.new(hs.x + 3, hs.y + 3, hs.z))
+				SkyLiftFlow.step(w, SkyLift.period() * 1.2, 0.5)
+				local c = w.svc:counts()
+				t.eq(c.outings, 0, "an outing appeared in front of a player")
+				t.eq(c.host, 0, "the host appeared in front of a player")
+			end)
+		end
+	)
 
 	t.test("a body left behind rides back while a player watches the platform; out of sight it goes home", function()
 		-- review: freed at the summit, it walked about 950 studs back across the plain
