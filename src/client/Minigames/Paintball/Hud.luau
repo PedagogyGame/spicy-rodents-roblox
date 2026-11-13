@@ -37,8 +37,18 @@
 -- screen smaller than they are; the bulletin's awards go beside the end card, under it, or nowhere. The
 -- crosshair is never scaled DOWN (a thin line stays a whole pixel) and the touch buttons never at all
 -- (a thumb is the same size on every phone).
--- Its own ScreenGui ("PaintballHud" under PlayerGui), destroyed by stop().
--- Interface: new(seat, ctx, tuning?) -> Hud { gui, touch, step(dt), stop(), fireRect() -> (x0, y0, x1, y1) };
+-- TWO ScreenGuis under PlayerGui, both destroyed by stop(), BECAUSE THE CROSSHAIR MUST BE WHERE THE BALL GOES.
+--   "PaintballAim"  IgnoreGuiInset = true: its middle is the middle of the VIEW, which is the line the camera
+--                   looks along and the ball leaves on. On it: the crosshair, the hit marker, the ring's tick,
+--                   and the two washes over the whole screen (the goggles, the protection's border).
+--   "PaintballHud"  everything else, under Roblox's own top bar like the rest of the game's UI. A ScreenGui
+--                   that respects the top bar's inset is that much shorter than the view, so ITS middle is half
+--                   the bar's height (18 to 29 px) BELOW the view's: a crosshair drawn there would say the ball
+--                   goes two studs low at sixty.
+-- The crosshair is the only pointer in the middle of the view: the system's own cursor (an arrow the stock
+-- first-person camera pins to the centre) is switched off while the match is on, comes back whenever there is
+-- something to press (the scoreboard, the end card), and is put back as it was found in stop().
+-- Interface: new(seat, ctx, tuning?) -> Hud { gui, aim, touch, step(dt), stop(), fireRect() -> (x0, y0, x1, y1) };
 --   scaleFor(vw, vh, tuning?) -> number; layout(vw, vh, touch, tuning?, rows?) -> Layout (both pure);
 --   types Hud, Rect, Layout
 
@@ -51,6 +61,7 @@ local Tuning = require("./Tuning")
 
 export type Hud = {
 	gui: ScreenGui,
+	aim: ScreenGui, -- the view-centred layer (IgnoreGuiInset): the crosshair, the hit marker, the ring, the washes
 	touch: { [string]: GuiObject }, -- FireRight (a Frame), FireLeft, Reload, Crouch, Scores (buttons); empty without touch
 	step: (self: Hud, dt: number) -> (),
 	stop: (self: Hud) -> (),
@@ -345,6 +356,16 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = 19 -- under the framework's own (its buttons and its end card stay on top)
 	gui.Parent = player:WaitForChild("PlayerGui")
+	-- THE VIEW'S OWN LAYER: the whole screen, top bar and all, so that its middle is the camera's (see the header)
+	local aim = Instance.new("ScreenGui")
+	aim.Name = "PaintballAim"
+	aim.ResetOnSpawn = false
+	aim.IgnoreGuiInset = true
+	aim.DisplayOrder = 18 -- under the HUD's own words, and under everything of the framework's
+	aim.Parent = gui.Parent
+	-- the system cursor as it was found: off while the crosshair is the aim, put back in stop()
+	local cursorWas: boolean = UIS.MouseIconEnabled ~= false
+	local cursorOff = false
 
 	local function set(t: TextLabel, text: string)
 		if t.Text ~= text then
@@ -362,14 +383,14 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	local rootScale = scaleOn(root)
 
 	-- the crosshair and the hit marker
-	local cross = frame("Cross", gui, UDim2.fromOffset(2, 2), UDim2.fromScale(0.5, 0.5), WHITE)
+	local cross = frame("Cross", aim, UDim2.fromOffset(2, 2), UDim2.fromScale(0.5, 0.5), WHITE)
 	cross.AnchorPoint = Vector2.new(0.5, 0.5)
 	local crossScale = scaleOn(cross)
 	local arms: { Frame } = {}
 	for i = 1, 4 do
 		arms[i] = frame(`Arm{i}`, cross, UDim2.fromOffset(2, 2), UDim2.fromOffset(0, 0), WHITE)
 	end
-	local hit = frame("Hit", gui, UDim2.fromOffset(0, 0), UDim2.fromScale(0.5, 0.5), WHITE, 1)
+	local hit = frame("Hit", aim, UDim2.fromOffset(0, 0), UDim2.fromScale(0.5, 0.5), WHITE, 1)
 	local hitScale = scaleOn(hit)
 	for i = 1, 4 do
 		local a = frame(`X{i}`, hit, UDim2.fromOffset(3, 12), UDim2.fromOffset(0, 0), WHITE)
@@ -420,9 +441,12 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		{ 140, 236, 236 },
 		false
 	)
-	local tick = frame("TaggedFrom", root, UDim2.fromOffset(8, 34), UDim2.new(0.5, -4, 0.5, -17), WHITE)
+	-- (the ring is round the crosshair, so it hangs on the view's middle and is told the HUD's scale itself)
+	local ring = frame("Ring", aim, UDim2.fromOffset(0, 0), UDim2.fromScale(0.5, 0.5), WHITE, 1)
+	local ringScale = scaleOn(ring)
+	local tick = frame("TaggedFrom", ring, UDim2.fromOffset(8, 34), UDim2.fromOffset(-4, -17), WHITE)
 	tick.Visible = false
-	local goggles = frame("Goggles", gui, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), WHITE, 1)
+	local goggles = frame("Goggles", aim, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), WHITE, 1)
 	goggles.Visible = false
 	local blobs: { Frame } = {}
 	for i, at in { { 0.22, 0.3, 0.32 }, { 0.6, 0.55, 0.4 }, { 0.72, 0.18, 0.24 }, { 0.38, 0.72, 0.28 } } do
@@ -436,7 +460,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 	end
 
 	-- the respawn's protection: a border and a draining bar
-	local shield = frame("Shield", gui, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), WHITE, 1)
+	local shield = frame("Shield", aim, UDim2.fromScale(1, 1), UDim2.fromScale(0, 0), WHITE, 1)
 	shield.Visible = false
 	local edge = tune.shieldEdge
 	local edges: { Frame } = {
@@ -445,13 +469,15 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		frame("Left", shield, UDim2.new(0, edge, 1, 0), UDim2.fromScale(0, 0), WHITE, 0.5),
 		frame("Right", shield, UDim2.new(0, edge, 1, 0), UDim2.new(1, -edge, 0, 0), WHITE, 0.5),
 	}
+	-- (the bar stands under the status line, so it is on the scaled screen with it)
 	local shieldBar = frame(
 		"ShieldBar",
-		shield,
+		root,
 		UDim2.fromOffset(SHIELD_W, SHIELD_H),
 		UDim2.new(0.5, -SHIELD_W / 2, 0.5, 70 + STATUS_H + 4),
 		SLATE
 	)
+	shieldBar.Visible = false
 	local shieldFill = frame("Fill", shieldBar, UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), WHITE)
 
 	-- the feed
@@ -573,7 +599,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		end
 	end
 
-	local hud = { gui = gui, touch = touch } :: Hud
+	local hud = { gui = gui, aim = aim, touch = touch } :: Hud
 	local lastPhase = ""
 	local liveSince: number? = nil
 	local opened: number? = nil
@@ -645,6 +671,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		rootScale.Scale = s
 		crossScale.Scale = lay.aim
 		hitScale.Scale = lay.aim
+		ringScale.Scale = s
 		phaseLine.Size = UDim2.fromOffset(lay.phaseW, PHASE_H)
 		phaseLine.Position = UDim2.new(0.5, -lay.phaseW / 2, 0, lay.phaseY)
 		feed.Size = UDim2.fromOffset(lay.feedW, tune.feedLines * FEED_ROW - 3)
@@ -661,9 +688,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 				b.Position = UDim2.fromOffset(r.x, r.y)
 			end
 		end
-		-- (the bar is on the unscaled wash, so it is told the scale itself)
-		shieldBar.Size = UDim2.fromOffset(SHIELD_W * s, SHIELD_H * s)
-		shieldBar.Position = UDim2.new(0.5, -SHIELD_W * s / 2, 0.5, (lay.statusY + STATUS_H + 4) * s)
+		shieldBar.Position = UDim2.new(0.5, -SHIELD_W / 2, 0.5, lay.statusY + STATUS_H + 4)
 		boardScale.Scale = lay.board
 		awardsScale.Scale = math.max(lay.awards, 0.01)
 		awards.Position = UDim2.fromOffset(lay.awardsX, lay.awardsY)
@@ -886,6 +911,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 
 		-- protected: the border breathes in your colour and the bar drains
 		show(shield, safe ~= nil)
+		show(shieldBar, safe ~= nil)
 		if safe ~= nil then
 			local paint = rgb(team)
 			local a = 0.45 + 0.25 * math.sin(now * tune.shieldPulse * 2 * math.pi)
@@ -907,7 +933,7 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 					-- the bearing against the look: 0 ahead, positive to the left (a yaw)
 					local bearing = math.atan2(-dx, -dz) - seat.yaw
 					local sx, sy = -math.sin(bearing), -math.cos(bearing)
-					tick.Position = UDim2.new(0.5, sx * tune.tagRing - 4, 0.5, sy * tune.tagRing - 17)
+					tick.Position = UDim2.fromOffset(sx * tune.tagRing - 4, sy * tune.tagRing - 17)
 					tick.Rotation = -math.deg(bearing)
 					tick.BackgroundColor3 = rgb(teamRgb(if seat.team == 1 then 2 else 1))
 					showTick = true
@@ -946,7 +972,15 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 		else
 			boardAcc = 1
 		end
-		show(modal, boardOn or ended)
+		local pressing = boardOn or ended
+		show(modal, pressing)
+		-- the system's arrow, which the stock first-person camera pins to the middle of the view: off for as
+		-- long as there is nothing to press (the crosshair is the pointer; tagged out there is nothing to point at)
+		local hide = phase ~= "" and not pressing
+		if hide ~= cursorOff then
+			cursorOff = hide
+			UIS.MouseIconEnabled = if hide then false else cursorWas
+		end
 
 		-- the end: the bulletin's awards, and the framework's card dressed
 		local list = if type(card) == "table" and type(card.awards) == "table" then card.awards else nil
@@ -969,6 +1003,11 @@ function Hud.new(seat: SeatCore.Seat, ctx: ClientGame.Ctx, tuning: typeof(Tuning
 			unfit(summary, summaryHome(summary))
 		end
 		unfit(if ui then ui.helpFrame else nil, HELP_HOME)
+		if cursorOff then
+			cursorOff = false
+			UIS.MouseIconEnabled = cursorWas
+		end
+		aim:Destroy()
 		gui:Destroy()
 	end
 

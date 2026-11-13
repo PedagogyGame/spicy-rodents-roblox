@@ -234,13 +234,17 @@ local function heard(s: Server, remote: string): { { [string]: number } }
 	return s.wires.heard[remote] or {}
 end
 
+-- (the HUD is two ScreenGuis: asked of "PaintballHud", a piece is looked for on "PaintballAim" beside it too)
 local function named(root: any, name: string): any
 	for _, d in root:GetDescendants() do
 		if d.Name == name then
 			return d
 		end
 	end
-	return nil
+	local layer = if root.Name == "PaintballHud" and root.Parent
+		then root.Parent:FindFirstChild("PaintballAim")
+		else nil
+	return if layer then named(layer, name) else nil
 end
 
 local function count(root: any, name: string): number
@@ -380,6 +384,12 @@ return function(t)
 				t.eq(s.hum.CameraOffset.Y, 0)
 				t.eq(w.body:GetAttribute("MoveScale"), nil, "the pace is the town's again")
 				t.eq(s.hud(), nil, "the HUD is gone")
+				t.eq(
+					w.player:FindFirstChild("PlayerGui"):FindFirstChild("PaintballAim"),
+					nil,
+					"with the crosshair's layer"
+				)
+				t.eq(game:GetService("UserInputService").MouseIconEnabled, true, "and the town has its cursor back")
 				t.eq(workspace.CurrentCamera:FindFirstChild("PaintballMarker"), nil, "and the marker")
 				t.eq(w.held, false)
 				-- still in the lobby, still in the audience: the show goes on until the server says otherwise
@@ -407,6 +417,29 @@ return function(t)
 				t.truthy(marker ~= nil, "the marker is in view")
 				t.eq(#marker:GetChildren(), 4)
 				t.truthy(named(hud, "Cross").Visible)
+				-- THE CROSSHAIR IS ON THE LINE THE BALL LEAVES ON: the dead middle of the view, on a layer that takes
+				-- the whole screen (the rest of the HUD sits under Roblox's top bar, and the middle of THAT is half a
+				-- bar lower than where the camera looks)
+				local cross = named(hud, "Cross")
+				local layer = cross.Parent
+				t.eq(layer.Name, "PaintballAim")
+				t.eq(layer.IgnoreGuiInset, true, "the whole screen: its middle is the camera's")
+				t.truthy(hud.IgnoreGuiInset ~= true, "the words stay under the top bar")
+				t.eq(cross.Position.X.Scale, 0.5)
+				t.eq(cross.Position.Y.Scale, 0.5)
+				t.eq(cross.Position.X.Offset, 0)
+				t.eq(cross.Position.Y.Offset, 0)
+				t.eq(cross.AnchorPoint.X, 0.5)
+				t.eq(cross.AnchorPoint.Y, 0.5)
+				for _, piece in { "Hit", "Ring" } do
+					local g = named(hud, piece)
+					t.eq(g.Parent, layer, `{piece} is centred on the crosshair`)
+					t.eq(g.Position.X.Scale, 0.5)
+					t.eq(g.Position.Y.Scale, 0.5)
+					t.eq(g.Position.Y.Offset, 0)
+				end
+				-- and it is the only pointer there: the system's arrow, which first person pins to the middle, is off
+				t.eq(game:GetService("UserInputService").MouseIconEnabled, false)
 				local at = s.now()
 				click(s)
 				PaintballRig.frame(s.wires, w)
@@ -864,7 +897,8 @@ return function(t)
 				t.truthy(shield.Visible, "the border")
 				local mine = Contract.TEAMS[s.state().slots[s.you].team].color
 				t.near(named(shield, "Top").BackgroundColor3.G * 255, mine[2], 1, "in your team's colour")
-				local bar = named(shield, "ShieldBar"):FindFirstChild("Fill")
+				local bar = named(hud, "ShieldBar"):FindFirstChild("Fill")
+				t.truthy(named(hud, "ShieldBar").Visible)
 				local full = bar.Size.X.Scale
 				t.truthy(full > 0.5 and full < 1, "the bar has begun to drain")
 				local marker = workspace.CurrentCamera:FindFirstChild("PaintballMarker")
@@ -916,6 +950,7 @@ return function(t)
 				t.truthy(Rig.has(words, "(computer)"), "bots are on the board like anyone")
 				t.truthy(named(hud, "Modal").Visible, "what frees a first-person mouse")
 				t.eq(named(hud, "Modal").Modal, true)
+				t.eq(game:GetService("UserInputService").MouseIconEnabled, true, "and the arrow is back to press with")
 				t.truthy(Rig.button(w.gui, "Leave the match") ~= nil)
 				-- a click with the board up is for its buttons, not a shot
 				click(s)
@@ -929,6 +964,7 @@ return function(t)
 				s.run(0.2)
 				t.falsy(named(hud, "Board").Visible)
 				t.falsy(named(hud, "Modal").Visible)
+				t.eq(game:GetService("UserInputService").MouseIconEnabled, false, "the crosshair is the pointer again")
 				t.eq(Rig.button(w.gui, "Leave the match"), nil)
 				click(s)
 				s.run(0.2)
