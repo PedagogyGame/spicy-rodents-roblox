@@ -39,6 +39,7 @@ SewerArt.C = {
 }
 
 export type Slot = {
+	key: string?, -- "<pipe>/<slot>" (stable across rescans)
 	model: Instance?,
 	module: string,
 	space: string,
@@ -120,7 +121,9 @@ function SewerArt.start(ctx: Context): Handle
 
 	local slots: { Slot } = {}
 	local linings: { [string]: { BasePart } } = {} -- space -> its lining parts
-	local copies: { [number]: Instance? } = {} -- slot index -> the copy drawn
+	-- the copy drawn for each slot, by the slot's own key ("P2/Slot07": a rescan, or another drain streaming in or
+	-- out, renumbers the list, never the keys)
+	local copies: { [string]: Instance? } = {}
 	local bad: { [string]: boolean } = {}
 	local warned: { [string]: boolean } = {}
 	local checked: { [string]: boolean } = {}
@@ -159,6 +162,7 @@ function SewerArt.start(ctx: Context): Handle
 						local check = m:GetAttribute("ArtCheck")
 						local checkAt = m:GetAttribute("ArtCheckAt")
 						table.insert(slots, {
+							key = `{pipe.Name}/{m.Name}`,
 							model = m,
 							module = module,
 							space = space,
@@ -204,9 +208,9 @@ function SewerArt.start(ctx: Context): Handle
 	end
 
 	local function clear()
-		for i, c in copies do
+		for key, c in copies do
 			(c :: Instance):Destroy()
-			copies[i] = nil
+			copies[key] = nil
 		end
 		hideLining(nil)
 	end
@@ -266,24 +270,24 @@ function SewerArt.start(ctx: Context): Handle
 			f.Parent = ctx.parent or workspace
 			folder = f
 		end
-		local want: { [number]: boolean } = {}
+		local want: { [string]: Slot } = {}
 		for _, i in SewerArt.window(slots, space, at, C.radius, C.maxSlots) do
-			want[i] = true
+			local s = slots[i]
+			want[s.key or tostring(i)] = s
 		end
-		for i, c in copies do
-			if not want[i] then
+		for key, c in copies do
+			if want[key] == nil then
 				(c :: Instance):Destroy()
-				copies[i] = nil
+				copies[key] = nil
 			end
 		end
-		for i in want do
-			if not copies[i] then
-				local s = slots[i]
+		for key, s in want do
+			if not copies[key] then
 				local template = (store :: Instance):FindFirstChild(s.module) :: Model
 				local copy = template:Clone()
 				copy:PivotTo(s.pivot)
 				copy.Parent = folder
-				copies[i] = copy
+				copies[key] = copy
 			end
 		end
 		hideLining(if next(copies) then space else nil)

@@ -52,7 +52,14 @@ local function runP2(): { { number } }
 	return poses
 end
 
-type Rig = { handle: SewerArt.Handle, root: any, store: any, linings: { [string]: { any } }, warned: { string } }
+type Rig = {
+	handle: SewerArt.Handle,
+	root: any,
+	store: any,
+	linings: { [string]: { any } },
+	warned: { string },
+	sewers: any,
+}
 
 -- the fake Workspace.Sewers: the bake's slots, a lining part per pipe; the store with each module as imported
 local function rig(mirror: string?): Rig
@@ -99,7 +106,7 @@ local function rig(mirror: string?): Rig
 	local root = FakeEngine.part("Root", roblox.CFrame.new(0, HIP, 0), body)
 	body.PrimaryPart = root
 	body:SetAttribute("HipHeight", HIP)
-	local r = { root = root, store = store, linings = linings, warned = {} } :: any
+	local r = { root = root, store = store, linings = linings, warned = {}, sewers = sewers } :: any
 	r.handle = SewerArt.start({
 		current = function(): any
 			return body
@@ -130,9 +137,19 @@ return function(t)
 			local C = SewerArt.C
 			local most, inside, hiddenFrames = 0, 0, 0
 			local seen: { [string]: boolean } = {}
-			for _, p in poses do
+			for k, p in poses do
+				-- half way: drain 1 streams out (the slot list is renumbered on the next rescan, the copies are not)
+				if k == math.floor(#poses / 2) then
+					r.sewers:FindFirstChild("P1"):Destroy()
+				end
 				at(r, p[1], p[2], p[3])
 				local list = copies()
+				local here: { [string]: boolean } = {}
+				for _, c in list do
+					local key = tostring(c:GetPivot().Position)
+					t.truthy(not here[key], "one copy per slot")
+					here[key] = true
+				end
 				most = math.max(most, #list)
 				local tris, meshes = 0, 0
 				for _, c in list do
