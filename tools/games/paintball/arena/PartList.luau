@@ -101,7 +101,9 @@ local LOOK: { [string]: { any } } = {
 	roof = { { 76, 76, 80 }, "Concrete" },
 	skylight = { { 170, 200, 210 }, "Glass", 0.7 },
 	shell = { { 134, 128, 118 }, "Concrete" },
-	glass = { { 196, 220, 224 }, "Glass", 0.86 },
+	-- (the lobby's windows onto the match are NOT the Glass material: the engine does not draw other see-through
+	-- things behind Glass, and a match is full of them: balls' trails, splats, the curtains)
+	glass = { { 196, 220, 224 }, "SmoothPlastic", 0.84 },
 	gate = { { 70, 76, 84 }, "DiamondPlate" },
 	shutter = { { 96, 102, 106 }, "CorrodedMetal" },
 	wall0 = { { 140, 138, 130 }, "Concrete" },
@@ -441,7 +443,7 @@ function PartList.dressing(venue: any?): { Part }
 	-- THE LOBBY ANNEX: z 61 .. 90 (the arena's south wall is its back wall), one storey
 	local Z0, Z1, ROOF = half + 1, 90, 13
 	add("Lobby", "Floor", -half - 1, -1, Z0, half + 1, 0, Z1 + 1, { 150, 132, 104 }, "WoodPlanks")
-	add("Lobby", "Ceiling", -half - 1, ROOF, Z0, half + 1, ROOF + 1, Z1 + 1, { 70, 70, 74 }, "Concrete")
+	add("Lobby", "Ceiling", -half - 1, ROOF, Z0, half + 1, ROOF + 1, Z1 + 1, { 172, 166, 152 }, "Concrete")
 	add("Lobby", "Wall", -half - 1, 0, Z0, -half, ROOF, Z1 + 1, CONCRETE, "Concrete")
 	add("Lobby", "Wall", half, 0, Z0, half + 1, ROOF, Z1 + 1, CONCRETE, "Concrete")
 	-- the front, with the double door in its middle (entrance "front": 10 wide) and glazing either side

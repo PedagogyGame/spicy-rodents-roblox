@@ -52,6 +52,11 @@ return function(t)
 				t.truthy((p.transparency or 0) < 0.9, `box {i}'s part can be seen`)
 				local look = ArenaDataPlan.LOOKS[plan.looks[i]]
 				t.truthy(PartList.LOOK[look] ~= nil)
+				if look == "glass" then
+					-- the lobby looks at the match through it: clear, and not the material that hides what is
+					-- see-through behind it
+					t.truthy(p.material ~= "Glass" and (p.transparency or 0) >= 0.8)
+				end
 				local level = math.clamp(math.floor((b[k + 2] + 1.01) / Arena.FLOOR_HEIGHT), 0, Arena.FLOORS - 1)
 				t.eq(p.group, if b[k + 2] >= Arena.HEIGHT then "Roof" else `Floor{level}`)
 				if plan.monitors[i] then
@@ -135,6 +140,7 @@ return function(t)
 			local stairs: { [number]: number } = {}
 			local named: { [number]: number } = {}
 			local painted = 0
+			local arrows = 0
 			local words: { [string]: boolean } = {}
 			for _, s in plan.signs do
 				local at, w, h = s.at, s.w, s.h
@@ -169,6 +175,19 @@ return function(t)
 							`"{s.text}" at ({at[1]}, {at[2]}, {at[3]}) is behind something`
 						)
 					end
+					if s.text == "TO THE MATCH >" then
+						-- in a spawn room, on a baffle: the gap round the baffle's end is to the reader's right
+						arrows += 1
+						local right = if s.face == "+z" then 1 else -1
+						local gap = (if right > 0 then b[k + 4] else b[k + 1]) + right * 2
+						t.eq(
+							(arena.sweep(gap, at[2] + 1, at[3] + nz * 2, gap, at[2] + 1, at[3] - nz * 3)),
+							nil,
+							"the arrow points at the gap past the baffle's end"
+						)
+						local team = if at[1] < 0 then 1 else 2
+						t.truthy(Arena.inRoom(arena.spawnRooms[team], at[1], at[2], at[3] + nz * 2))
+					end
 					local level = math.floor(at[2] / H)
 					if #s.text == 1 and tonumber(s.text) ~= nil then
 						t.eq(tonumber(s.text), level + 1, "a pillar's number is its storey's, counted from 1")
@@ -181,6 +200,7 @@ return function(t)
 				end
 			end
 			t.truthy(painted >= 200, `{painted} painted signs`)
+			t.eq(arrows, 4, "each spawn room says the way to the match on both baffles")
 			for level = 0, Arena.FLOORS - 1 do
 				-- (and, from the first floor up, inside each stair core beside the door to the concourse)
 				t.eq(

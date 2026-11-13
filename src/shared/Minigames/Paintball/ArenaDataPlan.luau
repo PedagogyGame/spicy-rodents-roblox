@@ -1400,6 +1400,9 @@ function Plan.build(): Plan
 	paint(0, H + 6, -CORE0 + 1, "+z", 15, 4.4, "WBLW 7", "gold", nil, "plate")
 	paint(-54, roomY + 6, -6, "+z", 10, 2.6, "ORANGE TEAM", "white", "TEAL TEAM")
 	paint(-49.5, roomY + 6, 6, "-z", 9, 2.2, "GREEN ROOM", "white")
+	-- the way to the match from where a team appears: round the end of each baffle, to the right of each notice
+	paint(-52, roomY + 1.6, -6, "+z", 7, 1.4, "TO THE MATCH >", "white")
+	paint(-51, roomY + 1.6, 6, "-z", 7, 1.4, "TO THE MATCH >", "white")
 	paint(-57.5, roomY + DOOR + 1.5, -13, "-z", 4.4, 1.7, "ORANGE TEAM", "white", "TEAL TEAM", "plate")
 	paint(-46.5, roomY + DOOR + 1.5, 13, "+z", 4.4, 1.7, "ORANGE TEAM", "white", "TEAL TEAM", "plate")
 	over(3, -30, -20, "+x", 5.4, "MASTER CONTROL", "CONTINUITY")
