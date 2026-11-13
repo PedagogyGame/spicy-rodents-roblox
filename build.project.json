@@ -69,6 +69,9 @@
       "Attractions": {
         "$path": { "optional": "build/Attractions.rbxm" }
       },
+      "Sewers": {
+        "$path": { "optional": "build/Sewers.rbxm" }
+      },
       "Expansion": {
         "$className": "Folder",
         "F1": { "$path": { "optional": "build/Expansion_F1.rbxm" } },
