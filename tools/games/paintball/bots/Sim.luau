@@ -98,6 +98,7 @@ export type Shot = {
 	range: number, -- studs to it
 	speed: number, -- its speed over the floor
 	nth: number, -- 1 for the first ball at this target
+	storeys: number, -- how many storeys apart the shooter and that target stood (0: on one floor)
 	tagged: boolean, -- the ball tagged that target
 	faced: boolean, -- the shooter's look had had that target inside the sight cone for BOT.faced
 	-- when the ball left, that target was on its own doorstep (BotNav.atDoor) and had not fired a ball
@@ -519,6 +520,7 @@ function Sim.shoot(
 		range = 0,
 		speed = 0,
 		nth = if brain ~= nil then brain.balls else 1,
+		storeys = 0,
 		tagged = false,
 		faced = false,
 		trap = false,
@@ -530,6 +532,9 @@ function Sim.shoot(
 	end
 	if target ~= nil and truth ~= nil and list ~= nil then
 		shot.range = math.sqrt((truth.x - ox) ^ 2 + (truth.y - oy) ^ 2 + (truth.z - oz) ^ 2)
+		local floorHeight = sim.arena.floorHeight
+		local mine = math.floor(sim.poses[id].y / floorHeight + 0.5)
+		shot.storeys = math.abs(math.floor(truth.y / floorHeight + 0.5) - mine)
 		local track = list.squad.track[target]
 		if track ~= nil then
 			shot.speed = math.sqrt(track.vx * track.vx + track.vz * track.vz)

@@ -13,10 +13,12 @@
 -- (The numbers pinned here are bands round what the bots do today. When the bots are retuned, run
 -- tools/games/paintball/bots/match.luau and calibrate.luau with `greybox`, look, and move the bands
 -- on purpose.)
+local Ballistics = require("@shared/Paintball/Ballistics")
 local ArenaModule = require("@shared/Minigames/Paintball/Arena")
 local Body = require("@shared/Minigames/Paintball/Body")
 local Clock = require("@shared/Minigames/Paintball/Clock")
 local Contract = require("@shared/Minigames/Paintball/Contract")
+local Hit = require("@shared/Minigames/Paintball/Hit")
 local Rules = require("@shared/Minigames/Paintball/Rules")
 local Wire = require("@shared/Minigames/Paintball/Wire")
 local BotBrain = require("@server/Minigames/Paintball/BotBrain")
@@ -376,6 +378,73 @@ return function(t)
 			room.brain.x, room.brain.y, room.brain.z = sp.x + 3, sp.y, sp.z
 			stepClose(room, 1)
 			t.eq(room.brain.con[1], nil)
+		end
+	)
+
+	t.test(
+		"a head over a rail is somebody in plain view: seen, aimed at where they show, and tagged; crouched, they are hidden",
+		function()
+			-- the person stands upright behind the atrium's west rail on the middle storey; the bot behind
+			-- the east rail, on the same storey and on the one above, looking across
+			local y = 2 * arena.floorHeight
+			local px, pz = -17, 0
+			for _, storey in { 2, 3 } do
+				local at = BotNav.nearest(nav, 17.5, storey * arena.floorHeight, 0, 2)
+				local node = arena.nodes[at]
+				local ex, ey, ez = Body.eyePoint(node.x, node.y, node.z, 0)
+				-- the premise: the rail hides their chest from here and not their head
+				t.truthy(arena.sweep(ex, ey, ez, px, y + ArenaModule.CHEST, pz) ~= nil, "the chest is behind the rail")
+				t.eq((arena.sweep(ex, ey, ez, px, y + Body.STAND_TOP - Body.RADIUS, pz)), nil, "the head is over it")
+				local c = closeUp(at, yawTo(node.x, node.z, px, pz), 3 + storey)
+				c.poses[1].x, c.poses[1].y, c.poses[1].z = px, y, pz
+				stepClose(c, 6)
+				t.eq(c.brain.target, 1, `seen from storey {storey + 1}`)
+				t.truthy(c.brain.con[1].high, "by the head")
+				t.truthy(#c.fired >= 5, `{#c.fired} balls`)
+				-- its balls go over the rail, and some land: each one flown by the rules a ball is flown by
+				local landed, onRail = 0, 0
+				local feel = c.state.feel
+				for _, cmd in c.fired do
+					local ox, oy, oz = cmd.ox :: number, cmd.oy :: number, cmd.oz :: number
+					local vx, vy, vz = cmd.vx :: number, cmd.vy :: number, cmd.vz :: number
+					local age = 0
+					while age < R.ballTtl do
+						local ax, ay, az = Ballistics.position(ox, oy, oz, vx, vy, vz, feel.ballDrop, age)
+						local bx, by, bz = Ballistics.position(ox, oy, oz, vx, vy, vz, feel.ballDrop, age + DT)
+						local wall = arena.sweep(ax, ay, az, bx, by, bz)
+						local s = Hit.body(arena.sweep, ax, ay, az, bx, by, bz, px, y, pz, 0)
+						if s ~= nil and (wall == nil or s < wall) then
+							landed += 1
+							break
+						elseif wall ~= nil then
+							local hx, hy = ax + (bx - ax) * wall, ay + (by - ay) * wall
+							if hx < -ArenaModule.ATRIUM + 0.1 and hx > -ArenaModule.ATRIUM - 0.6 and hy < y + 3.5 then
+								onRail += 1
+							end
+							break
+						end
+						age += DT
+					end
+				end
+				t.truthy(landed >= 1, `{landed} of {#c.fired} balls landed on what showed`)
+				t.truthy(onRail < #c.fired * 0.6, `{onRail} of {#c.fired} balls spent on the rail`)
+			end
+			-- crouched behind the rail they are wholly hidden: looked for, never seen, never fired at
+			local at = BotNav.nearest(nav, 17.5, y, 0, 2)
+			local node = arena.nodes[at]
+			local hidden = closeUp(at, yawTo(node.x, node.z, px, pz))
+			hidden.poses[1].x, hidden.poses[1].y, hidden.poses[1].z, hidden.poses[1].crouch = px, y, pz, 1
+			stepClose(hidden, 4)
+			t.truthy(hidden.brain.con[1] ~= nil, "sight checks were spent on them")
+			t.eq(hidden.brain.con[1].seen, -math.huge, "and found the rail, at the chest and at the head")
+			t.eq(hidden.brain.target, nil)
+			t.eq(#hidden.fired, 0)
+			-- and standing in the open, it is the middle of them a bot aims at
+			local open = closeUp(groundNode(0, -24), 0)
+			open.poses[1].x, open.poses[1].y, open.poses[1].z = open.brain.x, 0, open.brain.z - 30
+			stepClose(open, 1.5)
+			t.eq(open.brain.target, 1)
+			t.falsy(open.brain.con[1].high)
 		end
 	)
 

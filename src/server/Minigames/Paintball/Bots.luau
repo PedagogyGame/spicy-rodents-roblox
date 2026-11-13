@@ -17,9 +17,13 @@
 --     both stairs of a storey, cross and overlook the atrium, never stop for good (PB-10: "never get
 --     stuck"), walk out of their own spawn room after a respawn and do not go back in, and never
 --     enter, stand at the door of, or shoot into the other team's (nodes with team ~= 0);
---   * SEE an opponent only along a clear line (arena.sweep from eye to chest) and only inside
+--   * SEE an opponent only along a clear line (one arena.sweep from the bot's eye to the other's
+--     chest; when that finds something in the way, the bot's next check of them is to their HEAD: a
+--     body that stands behind a rail or low cover shows from the shoulders up, is seen, and is aimed
+--     at where it shows; crouched behind it, it is hidden) and only inside
 --     BOT.sightHalf of where they are looking; a sight check per bot runs at most BOT.sightHz times a
 --     second and the bots' checks are spread over the ticks (no tick does more than its share);
+
 --   * HEAR what the service tells them (`heard`, below): an OPPONENT'S ball that is born, passes or
 --     lands within BOT.hear studs of a bot, and a team-mate tagged where the bot could see, make it
 --     aware of the direction the ball came from. A bot that is shot at and missed does not stand
@@ -61,7 +65,8 @@
 -- to another storey at once and across a storey when they stop, and is back beside them after either
 -- has been out (BotBrain, COMPANY). Nothing in it reads more of anybody than any team-mate sees.
 -- THE CALL-OUTS (Contract.LINES; one a bot every twelve seconds, one a team every eight): "reloading"
--- when it reloads with somebody about, "floor" (n = the storey, 1 to 5) when it first sees
+-- when it reloads with somebody about (one a team every twenty seconds: somebody always is), "floor"
+-- (n = the storey, 1 to 5) when it first sees
 -- somebody on a storey its team has not just called, "cover" when it joins a team-mate's fight,
 -- "tagged" when its ball tags, "out" when it is tagged.
 -- A BOT WITHOUT A POSE DOES NOTHING: a brain made by sync before the service has placed its slot
@@ -157,6 +162,7 @@ local function newSquad(arena: Arena): BotBrain.Squad
 		heat = { table.create(arena.floors, never), table.create(arena.floors, never) },
 		spot = { { x = 0, y = 0, z = 0, at = never }, { x = 0, y = 0, z = 0, at = never } },
 		saidAt = { never, never },
+		reloadSaidAt = { never, never },
 		calledFloor = { -1, -1 },
 		calledAt = { never, never },
 		home = {},

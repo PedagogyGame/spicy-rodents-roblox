@@ -9,8 +9,11 @@
 -- WHAT A BRAIN DOES IN A TICK, IN ORDER
 --   senses   a ball that was heard becomes an ALERT after the reaction time: the bot turns to where
 --            it came from, and ducks, sidesteps or runs for cover rather than stand there. A SIGHT
---            CHECK (one arena.sweep, eye to chest; at most Profile.sightHz a second, the bots'
---            checks falling on different ticks) is spent on one opponent inside the sight cone: the
+--            CHECK (one arena.sweep, from its eye to the other's chest, or to their HEAD when the
+--            last look for their chest found something in the way: somebody standing behind a rail
+--            is in plain view from the shoulders up, and only crouched are they hidden; at most
+--            Profile.sightHz a second, the bots' checks falling on different ticks) is spent on one
+--            opponent inside the sight cone: the
 --            present target every other check, otherwise whoever has gone longest unlooked-at. An
 --            opponent seen starts a SIGHTING; it is acted on only once the sighting is older than
 --            this bot's reaction time, and fired on only once it is older than BOT.faced as well.
@@ -38,7 +41,8 @@
 --   aims     at where the target is AS FAR AS IT KNOWS: where its last sight check saw it, carried
 --            on at the speed it was going then (it never reads where a body it cannot see has got
 --            to, so a target that turns between two checks is led wrongly, as a person would lead
---            it). Ballistics.aim at where that will be when the ball arrives (x a lead factor that
+--            it), and at the part of it that it saw: the middle of its shape, or its head when
+--            that is all that shows over a rail. Ballistics.aim at where that will be when the ball arrives (x a lead factor that
 --            is redrawn for every ball), plus an ERROR in yaw and pitch, so many sigmas, redrawn
 --            for every ball and keeping some of the last one's (it walks its balls in). A sigma is
 --            what the moment makes it: wider with range, with the target's speed, with the bot's
@@ -117,6 +121,8 @@ type Contact = {
 	vx: number, -- ... how fast it was going over the floor ...
 	vz: number,
 	crouch: number, -- ... and how far it was crouched
+	high: boolean, -- all that was seen of it was its head (over a rail, over low cover)
+	tryHigh: boolean, -- the next sight check looks for its head, not its chest
 }
 
 -- What the whole match's bots share (Bots owns it).
@@ -127,6 +133,7 @@ export type Squad = {
 	heat: { { number } }, -- by team, by floor + 1: when that team last saw an opponent there
 	spot: { { x: number, y: number, z: number, at: number } }, -- by team: its last sighting
 	saidAt: { number }, -- by team: when one of its bots last called out
+	reloadSaidAt: { number }, -- by team: when one of its bots last called "Reloading!"
 	calledFloor: { number }, -- by team: the storey it last called ("They are on three!")
 	calledAt: { number },
 	home: { [number]: number }, -- by bot: the storey it has made its own for this life
@@ -283,6 +290,7 @@ local THINK = 0.1 -- seconds between thoughts
 local QUIET = 3 -- seconds with nothing seen or heard before a bot sprints or reloads at leisure
 local SAY_EVERY = 12 -- seconds between one bot's call-outs
 local TEAM_SAY_EVERY = 8 -- and between one team's
+local RELOAD_SAY_EVERY = 20 -- and between one team's "Reloading!" (somebody always is: the other lines get their turn)
 -- JINK: a bot that fights from the open does not stand to be shot. Every half second or so it takes a
 -- quick step across its target's line and, a moment later, back: a couple of strides either side of
 -- where it stood, on level floor it can walk (the same test as a peek point), mostly the other side
@@ -327,6 +335,11 @@ end
 -- the height above the feet a body is looked for at: its chest, lower as it crouches
 local function chestOf(crouch: number): number
 	return CHEST * Body.top(crouch) / Body.STAND_TOP
+end
+
+-- and the middle of its head (the round top of its hit shape): what shows over a rail
+local function headOf(crouch: number): number
+	return Body.top(crouch) - Body.RADIUS
 end
 
 function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, seed: number, profile: Profile): Brain
@@ -514,7 +527,14 @@ local function say(b: Brain, squad: Squad, now: number, out: { Command }, line: 
 	if now - b.saidAt < SAY_EVERY or now - squad.saidAt[b.team] < TEAM_SAY_EVERY then
 		return
 	end
+	if line == "reloading" then
+		if now - squad.reloadSaidAt[b.team] < RELOAD_SAY_EVERY then
+			return
+		end
+		squad.reloadSaidAt[b.team] = now
+	end
 	b.saidAt = now
+
 	squad.saidAt[b.team] = now
 	table.insert(out, { id = b.id, kind = "say", line = line, n = n })
 end
@@ -588,13 +608,23 @@ local function see(b: Brain, squad: Squad, state: State, poses: { [number]: Pose
 			vx = 0,
 			vz = 0,
 			crouch = 0,
+			high = false,
+			tryHigh = false,
 		}
 		b.con[pick] = c
 	end
 	c.checked = now
+	local pose = poses[pick]
+	if c.tryHigh then
+		py = pose.y + headOf(pose.crouch)
+	end
 	if nav.arena.sweep(ex, ey, ez, px, py, pz) ~= nil then
+		-- nothing of that part to be seen: the next check of this one looks for the other part (a
+		-- chest behind a rail has a head over it; a head behind a hanging sign has a chest under it)
+		c.tryHigh = not c.tryHigh
 		return
 	end
+	c.high = c.tryHigh
 	if now - c.seen > LAPSE then
 		-- a new sighting: it sinks in after the reaction time (sooner if the bot was already alarmed
 		-- or has only just lost sight of this one)
@@ -602,7 +632,6 @@ local function see(b: Brain, squad: Squad, state: State, poses: { [number]: Pose
 		c.react = if now - b.alarm < 2.5 or now - c.seen < 3 then p.reactMin else reaction(b)
 	end
 	c.seen = now
-	local pose = poses[pick]
 	c.x, c.y, c.z, c.crouch = pose.x, pose.y, pose.z, pose.crouch
 	local track = squad.track[pick]
 	c.vx, c.vz = if track ~= nil then track.vx else 0, if track ~= nil then track.vz else 0
@@ -1544,7 +1573,13 @@ function BotBrain.step(
 		aiming = true
 		local since = now - contact.seen
 		tx, ty, tz = contact.x + contact.vx * since, contact.y, contact.z + contact.vz * since
-		local cy = ty + (Body.LOW + Body.top(contact.crouch) - Body.RADIUS) * 0.5 -- the middle of its shape
+		-- the middle of its shape; its head when that is all that shows
+		local cy = ty
+			+ (
+				if contact.high
+					then headOf(contact.crouch)
+					else (Body.LOW + Body.top(contact.crouch) - Body.RADIUS) * 0.5
+			)
 		local dx, dy, dz = tx - ex, cy - ey, tz - ez
 		local d = math.sqrt(dx * dx + dy * dy + dz * dz)
 		ax, ay, az = dx, dy, dz

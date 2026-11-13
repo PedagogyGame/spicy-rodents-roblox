@@ -23,6 +23,7 @@ export type Summary = {
 	byRange: { Band }, -- bots' shots at a target, by range
 	bySpeed: { Band }, -- by the target's speed
 	byOrder: { Band }, -- the first ball at a target, the second, the rest
+	byStorey: { Band }, -- at somebody on the shooter's own storey, and at somebody on another (the atrium)
 	facedOf: number, -- bot tags counted for the facing figure: those on whoever the bot was firing at
 	faced: number, -- of them, the bot had faced its victim for BOT.faced
 	strayTags: number, -- bot tags on somebody else who walked into the ball (nobody faces a stray)
@@ -83,6 +84,7 @@ function Report.summary(sim: Sim.Sim): Summary
 	local byRange = { band("under 20 studs"), band("20 to 40"), band("40 to 60"), band("over 60") }
 	local bySpeed = { band("standing"), band("walking"), band("sprinting") }
 	local byOrder = { band("first ball"), band("second"), band("third on") }
+	local byStorey = { band("on its own storey"), band("up or down the atrium and the stairs") }
 	local botShots, botTagged = 0, 0
 	local doorTrap = 0
 	for _, shot in rec.shots do
@@ -103,6 +105,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		add(byRange[if r < 20 then 1 elseif r < 40 then 2 elseif r < 60 then 3 else 4], shot.tagged)
 		add(bySpeed[if shot.speed < 4 then 1 elseif shot.speed < 20 then 2 else 3], shot.tagged)
 		add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
+		add(byStorey[if shot.storeys == 0 then 1 else 2], shot.tagged)
 	end
 	local facedOf, faced, doorTags, doorStray = 0, 0, 0, 0
 	local strayTags = 0
@@ -219,6 +222,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		byRange = byRange,
 		bySpeed = bySpeed,
 		byOrder = byOrder,
+		byStorey = byStorey,
 		facedOf = facedOf,
 		faced = faced,
 		strayTags = strayTags,
@@ -335,6 +339,7 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	say("  by range:  " .. bands(s.byRange))
 	say("  by target: " .. bands(s.bySpeed))
 	say("  by ball:   " .. bands(s.byOrder))
+	say("  by storey: " .. bands(s.byStorey))
 	say(
 		`  facing: {s.faced} of {s.facedOf} tags a bot aimed came from one that had its victim in view for `
 			.. `{Contract.BOT.faced} s before the ball ({s.strayTags} more were strays somebody else walked into)`
