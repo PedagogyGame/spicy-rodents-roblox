@@ -872,18 +872,19 @@ function Plan.build(): Plan
 		lamp(i, j, 26, 0.9, "warm")
 		lens(level, x - 0.9, z - 0.9, x + 0.9, z + 0.9, b + 8, b + 9.6, face or "-z", true)
 	end
-	-- a strip light on the ceiling (a box like any other: a ball stops on it)
-	-- (one fitting in five is dead: the same ones on both teams' sides)
+	-- a strip light on the ceiling (a box like any other: a ball stops on it). The station has been dark for
+	-- years: three fittings in four are dead, and the few that still work are tired, dim and yellow (the same ones
+	-- on both teams' sides)
 	local strips = 0
-	local function strip(level: number, x0: number, z0: number, x1: number, z1: number, tone: string?)
+	local function strip(level: number, x0: number, z0: number, x1: number, z1: number)
 		local c = ceiling(level)
 		strips += 1
-		if strips % 5 == 3 then
+		if strips % 4 ~= 1 then
 			on(level, KIND.prop, "ceiling_dead", x0, z0, x1, z1, c - 0.4, c)
 			return
 		end
 		local i, j = on(level, KIND.prop, "ceiling_light", x0, z0, x1, z1, c - 0.4, c)
-		lamp(i, j, 34, 1.1, tone or "cold")
+		lamp(i, j, 30, 0.8, "tired")
 	end
 	-- a monitor hung from the ceiling on a drop pole, its screen looking `face`: the lowest of it is 8.6
 	-- over the floor, above every head, so it is nobody's cover and in nobody's way
@@ -920,7 +921,7 @@ function Plan.build(): Plan
 			for c, x in cans do
 				local shift = if (r + c) % 2 == 0 then 0 else 1.5
 				local i, j = on(level, KIND.prop, "lamp", x + shift - 0.6, z - 0.6, x + shift + 0.6, z + 0.6, 10.6, 12)
-				local lit = (r + c) % 3 == 0
+				local lit = (r + c) % 5 == 0 -- a work lamp or two left on
 				if lit then
 					lamp(i, j, 30, 1.0, "warm")
 				end
@@ -1535,7 +1536,9 @@ function Plan.build(): Plan
 		doors("-z", -45.5, 4, 20)
 
 		-- EVERY STOREY: where the roof and the pipes have leaked, a stain on the floor of the concourse, of the
-		-- hall and of the wing, and streaks down the inside of the outer walls from the ceiling
+		-- hall and of the wing, and streaks down the inside of the outer walls from the ceiling, each from a damp
+		-- patch under it; dust drifted along the foot of the outer walls and in a band on the floor beside them;
+		-- the last day's papers blown about the concourse and the galleries
 		for level = 0, floors - 1 do
 			local tone = `stain{level}`
 			y = level * H
@@ -1545,10 +1548,23 @@ function Plan.build(): Plan
 			local c = y + ceiling(level)
 			for i, x in { -52, -37.5, -9, 7.5, 23, 44 } do
 				wallMark("+z", -half, x - 0.5, x + 0.5, c - ({ 5, 3.2, 6, 4, 2.6, 5.4 })[i], c, "streak")
+				wallMark("+z", -half, x - 1.6, x + 1.4, c - 1.1, c, "damp")
 			end
 			for i, z in { -48, -26, -3, 14, 38, 52 } do
 				wallMark("+x", -half, z - 0.5, z + 0.5, c - ({ 4.4, 6, 3, 5.2, 3.6, 5.8 })[i], c, "streak")
+				wallMark("+x", -half, z - 1.4, z + 1.6, c - 1.1, c, "damp")
 			end
+			wallMark("+z", -half, -half, half, y, y + 0.5, "dust")
+			wallMark("+x", -half, -half, half, y, y + 0.5, "dust")
+			papers(y, {
+				{ -28.6, -6.2 },
+				{ -26.1, -4.4 },
+				{ -20.4, 13.6 },
+				{ -27.3, 26.1 },
+				{ -8.2 + level, -19.6 },
+				{ 3.4 - level, -18.9 },
+				{ -17.6, -24.8 + level },
+			})
 		end
 
 		-- THE TILED CEILINGS (the newsroom's storey and the control rooms') have dropped tiles on the concourse and

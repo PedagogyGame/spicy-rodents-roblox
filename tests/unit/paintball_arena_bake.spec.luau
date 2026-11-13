@@ -86,7 +86,10 @@ return function(t)
 				ramps += 1
 				local r = plan.ramps[p.ramp]
 				t.eq(p.name, "Ramp")
-				t.truthy(p.collide and p.query == nil and p.transparency == 1, "walked on, unseen, and honest about rays")
+				t.truthy(
+					p.collide and p.query == nil and p.transparency == 1,
+					"walked on, unseen, and honest about rays"
+				)
 				local angle = p.tilt :: number
 				t.near(math.tan(math.abs(angle)), (r.y1 - r.y0) / (r.maxX - r.minX), 1e-9)
 				t.eq(angle > 0, r.dir > 0)
@@ -312,7 +315,7 @@ return function(t)
 					)
 				elseif math.abs(at[1]) > 5 or math.abs(at[3]) > 5 then
 					local side = if at[1] + at[3] < 0 then 1 else 2
-					sides[side] += 1
+					sides[side] += w * h -- (by area: a wall cut into pieces on one side is whole on the other)
 				end
 			end
 			t.truthy(#plan.marks >= 300, `{#plan.marks} marks`)
@@ -348,7 +351,7 @@ return function(t)
 			t.eq(cabinets, 8)
 			t.eq(faced, 14)
 			t.truthy(tops >= 200 and walls >= 100, `{tops} on floors and tops, {walls} on walls`)
-			t.eq(sides[1], sides[2])
+			t.near(sides[1], sides[2], 1e-6)
 			t.eq(exits, 3, "the way out: its line on the floor and its two jambs")
 			for level = 0, Arena.FLOORS - 1 do
 				t.truthy((byStorey[level] or 0) >= 12, `storey {level} has {byStorey[level]} marks on its floors`)
@@ -519,6 +522,22 @@ return function(t)
 			t.eq(#byLook.mirror, 4)
 			t.eq(#byLook.mirror, #byLook.bulbs)
 			t.truthy(#byLook.tapes_a + #byLook.tapes_b >= 150, "the shelving carries its stock")
+			-- an ABANDONED station: most of its ceiling fittings are dead (the spawn rooms' own are the only ones
+			-- whole), and the few still working are dim
+			local strips = 0
+			for _, i in byLook.ceiling_light do
+				local k = (i - 1) * 6
+				local spawnRoom = math.abs(b[k + 1]) >= 44 and math.abs(b[k + 3]) <= 12
+				if not spawnRoom then
+					strips += 1
+				end
+			end
+			t.truthy(#byLook.ceiling_dead >= 2 * strips, `{#byLook.ceiling_dead} dead fittings, {strips} working`)
+			for _, l in plan.lamps do
+				if ArenaDataPlan.LOOKS[plan.looks[l.box]] == "ceiling_light" then
+					t.truthy(l.brightness <= 1, "a working fitting is dim")
+				end
+			end
 		end
 	)
 

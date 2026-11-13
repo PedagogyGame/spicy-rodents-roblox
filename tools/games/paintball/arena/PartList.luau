@@ -69,6 +69,11 @@ PartList.TONE = {
 	plate = { 26, 28, 34 },
 	warm = { 255, 214, 170 },
 	cold = { 214, 232, 255 },
+	-- a fluorescent tube on its last legs: dim, and yellow with it
+	tired = { 255, 228, 176 },
+	-- grime: damp under a leak, dust along the foot of a wall
+	damp = { 92, 88, 78 },
+	dust = { 70, 66, 60 },
 	-- the plan's marks: tape and chalk on a floor, a cable lying on it, oil, paper, the gold of the station's
 	-- number on the atrium's floor; a stain on each storey's floor (darker than it, but dust on the studios'
 	-- black); a streak down an outer wall
