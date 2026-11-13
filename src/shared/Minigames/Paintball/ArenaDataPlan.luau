@@ -644,9 +644,12 @@ function Plan.build(): Plan
 	-- the hall line (z = 30.5) on every storey: the halls' walls either side of the cores
 	for level = 0, floors - 1 do
 		local look = `wall{level}`
-		local west = if level == 2 then -52 else -45
+		-- (the doors to the corner rooms stand clear of what meets this wall: the spawn room's corridor on the
+		-- second storey, the offices' front wall on the fourth)
+		local west = if level == 2 then -52 elseif level == 4 then -37 else -45
+		local east = if level == 4 then 37 else 45
 		wall(level, look, "x", -30.5, -half, -atrium - 1, { { west, 6 }, { -23, 8 } })
-		wall(level, look, "x", -30.5, atrium + 1, half, { { 23, 8 }, { 45, 6 } })
+		wall(level, look, "x", -30.5, atrium + 1, half, { { 23, 8 }, { east, 6 } })
 		-- strip lights and cable trays along the concourse and the halls
 		strip(level, -24, -12, -22, -4)
 		strip(level, -24, 4, -22, 12)
@@ -731,7 +734,9 @@ function Plan.build(): Plan
 	-- STOREY 1: the newsroom
 	do
 		local L, W = 1, "wall1"
-		wall(L, W, "z", -30.5, -half, -31, { { -45, 6 } })
+		-- (the door from the hall comes into the northern edit suite: the suites' partition meets this wall at
+		-- z = -45.5, where the other storeys have the door)
+		wall(L, W, "z", -30.5, -half, -31, { { -52, 6 } })
 		wall(L, W, "z", 30.5, -half, -31, { { -45, 6 } })
 		-- the editor's office in the middle of the wing, behind windows
 		wall(L, W, "x", -9.5, -half, -46, nil)
@@ -754,7 +759,7 @@ function Plan.build(): Plan
 		cubicle(-52, 20)
 		cubicle(-38.5, 19)
 		low(L, "cabinet", -44, -12.5, -36, -11)
-		tall(L, "cabinet", -50, 28.4, -44, 30, 7)
+		tall(L, "cabinet", -58, 28.4, -52, 30, 7)
 		-- the news set in the north hall: the desk on its riser, the wall behind it, three cameras
 		on(L, KIND.slab, "riser", -10, -51, 10, -39, 0, 1)
 		local d1, d2 = on(L, KIND.cover, "news_desk", -7, -47, 7, -45, 1, 1 + RAIL)
@@ -853,7 +858,7 @@ function Plan.build(): Plan
 			plan.monitors[b] = "-x"
 		end
 		tall(L, "rack", -58, -29.5, -50, -27.5, 7.5)
-		tall(L, "rack", -44, 27.5, -36, 29.5, 7.5)
+		tall(L, "rack", -40, 27.5, -32, 29.5, 7.5)
 		low(L, "cabinet", -36, -27, -32, -24.5)
 		-- the tape library: shelving in rows with a break half way down each
 		for _, x in { -20, -12, -4, 4, 12, 20 } do
@@ -976,17 +981,18 @@ function Plan.build(): Plan
 		local n = NAMES[level + 1]
 		local y = level * H
 		-- the hall line, read from the building's middle; and the doors between the halls and the corner rooms
-		local west = if level == 2 then -52 else -45
+		local west = if level == 2 then -52 elseif level == 4 then -37 else -45
 		over(level, -23, -30, "+z", 7, n.hall[1], n.hall[2])
 		over(level, 23, -30, "+z", 7, n.hall[1], n.hall[2])
 		over(level, west, -30, "+z", 5.4, n.nw[1], n.nw[2])
-		over(level, 45, -30, "+z", 5.4, n.ne[1], n.ne[2])
-		over(level, -30, -45, "+x", 5.4, n.nw[1], n.nw[2])
-		over(level, -31, -45, "-x", 5.4, n.hall[1], n.hall[2])
+		over(level, if level == 4 then 37 else 45, -30, "+z", 5.4, n.ne[1], n.ne[2])
+		local nwDoor = if level == 1 then -52 else -45
+		over(level, -30, nwDoor, "+x", 5.4, n.nw[1], n.nw[2])
+		over(level, -31, nwDoor, "-x", 5.4, n.hall[1], n.hall[2])
 		local east = if level == 2 then -39 else -45
 		over(level, 30, east, "-x", 5.4, n.ne[1], n.ne[2])
 		over(level, 31, east, "+x", 5.4, n.hall[1], n.hall[2])
-		paint(-38.9, y + 6.3, -30, "+z", 6, 2.4, n.notice[1], "stencil", n.notice[2])
+		paint(if level == 4 then -51 else -38.9, y + 6.3, -30, "+z", 6, 2.4, n.notice[1], "stencil", n.notice[2])
 		-- the stairs
 		local at = if level % 2 == 0 then -1 else 1
 		over(level, at * END, -31, "-z", 3.6, "STAIRS")

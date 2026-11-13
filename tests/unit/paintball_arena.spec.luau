@@ -507,6 +507,38 @@ return function(t)
 		end
 	end)
 
+	t.test("every doorway is open: nothing stands in it, across four studs of its width, to door height", function()
+		t.truthy(#plan.doorways >= 100, `{#plan.doorways} doorways`)
+		for i, d in plan.doorways do
+			local y = d.level * H
+			local dx, dz = d.bx - d.ax, d.bz - d.az
+			local len = math.sqrt(dx * dx + dz * dz)
+			t.truthy(len >= 5, "the two points stand clear of the wall, one either side")
+			local px, pz = -dz / len, dx / len
+			for _, off in { -1.9, -1, 0, 1, 1.9 } do
+				for _, h in { 0.3, Arena.CHEST, Arena.HEADROOM - 0.1, ArenaDataPlan.DOOR - 0.1 } do
+					local ax, az = d.ax + px * off, d.az + pz * off
+					local bx, bz = d.bx + px * off, d.bz + pz * off
+					if arena.sweep(ax, y + h, az, bx, y + h, bz) ~= nil then
+						t.eq(
+							true,
+							false,
+							`doorway {i} on storey {d.level} at ({d.ax}, {d.az}) is blocked {off} off its middle`
+						)
+					end
+				end
+			end
+			-- and it is a doorway: a lintel over it, a floor under both points
+			local mx, mz = (d.ax + d.bx) / 2, (d.az + d.bz) / 2
+			t.truthy(
+				arena.sweep(mx, y + ArenaDataPlan.DOOR + 0.5, mz, mx, y + ArenaDataPlan.DOOR + 0.5, mz) ~= nil
+					or d.level % 2 == 0
+			)
+			t.eq(arena.ground(d.ax, y, d.az), y)
+			t.eq(arena.ground(d.bx, y, d.bz), y)
+		end
+	end)
+
 	t.test("what is seen from where: the atrium joins the storeys, the walls part the rooms", function()
 		local stand, crouch = Body.STAND_EYE, Body.CROUCH_EYE
 		-- (from, its height, to, its height, open?)
