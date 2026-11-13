@@ -143,6 +143,7 @@ local function newSquad(arena: Arena): BotBrain.Squad
 		calledAt = { never, never },
 		home = {},
 		side = {},
+		firedAt = {},
 		sightLeft = 0,
 		routeLeft = 0,
 		tick = 0,
@@ -279,6 +280,7 @@ local function hear(
 				bots.flights[h.id] = list
 			end
 			table.insert(list, { at = now, x = h.x, y = h.y, z = h.z, seq = bots.seq })
+			bots.squad.firedAt[h.id] = now
 			if shooter == nil or vv < 1 then
 				continue
 			end

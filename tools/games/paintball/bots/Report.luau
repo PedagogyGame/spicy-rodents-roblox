@@ -34,7 +34,8 @@ export type Summary = {
 	stares: number, -- times a bot followed somebody through a wall (audited matches only)
 	roomSlowest: number, -- the longest any life took to leave its spawn room, seconds
 	roomMean: number,
-	doorTags: number, -- tags on somebody within DOOR_SECS of leaving their room
+	doorTags: number, -- tags on somebody standing on their own doorstep (BotNav.atDoor)
+	doorTrap: number, -- of them, by a bot on somebody who had not fired for 4 s (a bot never does it)
 	lives: number,
 	coverShare: number, -- bots' time at a cover spot
 	crouchShare: number,
@@ -53,8 +54,6 @@ export type Summary = {
 }
 
 local Report = {}
-
-local DOOR_SECS = 2.5
 
 local function band(label: string): Band
 	return { label = label, shots = 0, tags = 0, rate = 0 }
@@ -93,7 +92,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		add(bySpeed[if shot.speed < 4 then 1 elseif shot.speed < 20 then 2 else 3], shot.tagged)
 		add(byOrder[math.min(3, math.max(1, shot.nth))], shot.tagged)
 	end
-	local facedOf, faced, doorTags = 0, 0, 0
+	local facedOf, faced, doorTags, doorTrap = 0, 0, 0, 0
 	local personTags, personOuts = 0, 0
 	for _, tag in rec.tags do
 		if tag.byBot then
@@ -102,8 +101,11 @@ function Report.summary(sim: Sim.Sim): Summary
 				faced += 1
 			end
 		end
-		if tag.sinceRoom < DOOR_SECS then
+		if tag.doorstep then
 			doorTags += 1
+			if tag.quiet and tag.byBot then
+				doorTrap += 1
+			end
 		end
 		if not tag.byBot and tag.idBot then
 			personTags += 1
@@ -203,6 +205,7 @@ function Report.summary(sim: Sim.Sim): Summary
 		roomSlowest = roomSlowest,
 		roomMean = if lives > 0 then roomSum / lives else 0,
 		doorTags = doorTags,
+		doorTrap = doorTrap,
 		lives = lives,
 		coverShare = if play > 0 then cover / play else 0,
 		crouchShare = if play > 0 then crouched / play else 0,
@@ -323,14 +326,16 @@ function Report.lines(sim: Sim.Sim, given: Summary?): { string }
 	)
 	say(
 		`  spawn rooms: out in {string.format("%.1f", s.roomMean)} s on average, {string.format("%.1f", s.roomSlowest)} s at the slowest; `
-			.. `{s.doorTags} tagged within {DOOR_SECS} s of the door; {string.format("%.1f", s.camping)} bot-seconds watching a door`
+			.. `{s.doorTags} tagged on their own doorstep ({s.doorTrap} of them by a bot, without having fired); `
+			.. `{string.format("%.1f", s.camping)} bot-seconds watching a door`
 	)
 	if sim.opts.audit then
 		say(`  followed somebody through a wall: {s.stares} times`)
 	end
 	local calls = {}
 	for line, n in sim.rec.says do
-		table.insert(calls, `{(Contract.LINES :: { [string]: string })[line] or line} x{n}`)
+		local words = (Contract.LINES :: { [string]: string })[line] or line
+		table.insert(calls, `{(string.gsub(words, "%%d", "N"))} x{n}`)
 	end
 	table.sort(calls)
 	say("  call-outs: " .. (if #calls > 0 then table.concat(calls, ", ") else "none"))

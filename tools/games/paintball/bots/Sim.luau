@@ -28,7 +28,8 @@
 -- it, each slot's time by storey, in its room, at cover, crouched and standing still, the stairs
 -- used, lives and how they ended, call-outs, refused commands, and the cost of Bots.step.
 -- Interface: FAIR; new(opts) -> Sim; tick(sim); run(sim, untilTime?) -> Sim (to the end of the match
---   by default); judge(sim, id, ox, oy, oz, vx, vy, vz) -> (ok, why?); types Opts, Sim, Record
+--   by default); judge(sim, id, ox, oy, oz, vx, vy, vz) -> (ok, why?); shoot(sim, id, ox, oy, oz, vx,
+--   vy, vz, list?, rewind?) -> (ok, why?); teleport(sim, id, x, y, z, yaw); types Opts, Sim, Record
 local Ballistics = require("@shared/Paintball/Ballistics")
 local Arena = require("@shared/Minigames/Paintball/Arena")
 local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
@@ -59,6 +60,12 @@ export type Opts = {
 	skill: number?, -- every bot's skill (default: Contract.BOTS in order)
 	audit: boolean?, -- also look for bots that follow somebody through a wall (costs sweeps)
 	start: number?, -- the shared clock when the match starts (default 1000)
+	-- SCRIPTED PEOPLE: this many seats, taken before anybody else's, with no brain at all. Each tick
+	-- `script` is handed each one that is in play and moves its pose as it likes (a target that
+	-- stands, walks a beat, hides): a person the spec controls to the stud.
+	dummies: number?,
+	script: ((sim: any, id: number, pose: Contract.Pose, now: number, dt: number) -> ())?,
+	frozen: boolean?, -- no brain is stepped at all: the spec moves every pose and fires every ball itself
 }
 
 type Ball = {
@@ -86,6 +93,7 @@ export type Shot = {
 	speed: number, -- its speed over the floor
 	nth: number, -- 1 for the first ball at this target
 	tagged: boolean, -- the ball tagged that target
+	faced: boolean, -- the shooter's look had had that target inside the sight cone for BOT.faced
 }
 
 export type Tag = {
@@ -97,6 +105,8 @@ export type Tag = {
 	range: number, -- from where the ball was born to where it struck
 	faced: boolean, -- the shooter's look had the victim inside the sight cone for BOT.faced before the ball
 	sinceRoom: number, -- seconds since the victim left its spawn room
+	doorstep: boolean, -- the victim was on its own doorstep (BotNav.atDoor)
+	quiet: boolean, -- and had not fired a ball for 4 s: the tag a bot never makes
 }
 
 type Life = { from: number, leftRoom: number?, ended: number? }
@@ -154,6 +164,7 @@ export type Sim = {
 	folk: Bots.Bots?,
 	botWho: { [number]: number },
 	folkWho: { [number]: number },
+	dummyWho: { [number]: boolean },
 	poses: { [number]: Pose }, -- the truth
 	seenByBots: { [number]: Pose },
 	seenByFolk: { [number]: Pose },
@@ -247,12 +258,18 @@ function Sim.new(opts: Opts?): Sim
 	local session = Session.new(Rules, sessionOpts)
 	local botWho: { [number]: number } = {}
 	local folkWho: { [number]: number } = {}
+	local dummyWho: { [number]: boolean } = {}
+	for i = 1, o.dummies or 0 do
+		local ok, _, seat = Session.join(session, `dummy{i}`, `Scripted {i}`, start)
+		assert(ok and seat ~= nil, "a scripted person could not join")
+		dummyWho[seat] = true
+	end
 	for i = 1, people do
 		local ok, _, seat = Session.join(session, `person{i}`, `Person {i}`, start)
 		assert(ok and seat ~= nil, "a person could not join")
 		folkWho[seat] = 0.5
 	end
-	if people == 0 then
+	if people == 0 and (o.dummies or 0) == 0 then
 		-- a match of bots alone: the framework never starts one, the sim does
 		local first = Contract.BOTS[1]
 		local ok, _, seat = Session.join(session, { ai = true, name = first.name }, first.name, start)
@@ -264,7 +281,7 @@ function Sim.new(opts: Opts?): Sim
 		Rules.tune(state, o.feel)
 	end
 	Rules.sync(state, start)
-	local k = if people == 0 then 1 else 0
+	local k = #session.seats - people - (o.dummies or 0)
 	while #session.seats < 2 * perSide do
 		k += 1
 		local def = Contract.BOTS[(k - 1) % #Contract.BOTS + 1]
@@ -308,6 +325,7 @@ function Sim.new(opts: Opts?): Sim
 		folk = folk,
 		botWho = botWho,
 		folkWho = folkWho,
+		dummyWho = dummyWho,
 		poses = {},
 		seenByBots = {},
 		seenByFolk = {},
@@ -420,58 +438,6 @@ function Sim.judge(
 	return true, nil
 end
 
-local function fire(sim: Sim, list: Bots.Bots, cmd: Bots.Command, isBot: boolean)
-	local id = cmd.id
-	local ox, oy, oz = cmd.ox or 0, cmd.oy or 0, cmd.oz or 0
-	local vx, vy, vz = cmd.vx or 0, cmd.vy or 0, cmd.vz or 0
-	local ok, why = Sim.judge(sim, id, ox, oy, oz, vx, vy, vz)
-	if not ok then
-		count(sim.rec.refused, `{if isBot then "bot" else "person"}:{why}`)
-		return
-	end
-	local state = sim.state
-	local brain = (list.brains :: { [number]: BotBrain.Brain })[id]
-	local target = if brain ~= nil then brain.target else nil
-	local shot: Shot = {
-		t = sim.now,
-		by = id,
-		bot = isBot,
-		target = target,
-		range = 0,
-		speed = 0,
-		nth = if brain ~= nil then brain.balls else 1,
-		tagged = false,
-	}
-	local truth = if target ~= nil then sim.poses[target] else nil
-	if target ~= nil and truth ~= nil then
-		shot.range = math.sqrt((truth.x - ox) ^ 2 + (truth.y - oy) ^ 2 + (truth.z - oz) ^ 2)
-		local rs = sim.rec.slots[target]
-		local track = list.squad.track[target]
-		if track ~= nil and rs ~= nil then
-			shot.speed = math.sqrt(track.vx * track.vx + track.vz * track.vz)
-		end
-	end
-	table.insert(sim.rec.shots, shot)
-	local ball: Ball = {
-		id = sim.nextBall,
-		by = id,
-		team = state.slots[id].team,
-		born = sim.now,
-		age = 0,
-		rewind = if isBot then 0 else sim.delay,
-		ox = ox,
-		oy = oy,
-		oz = oz,
-		vx = vx,
-		vy = vy,
-		vz = vz,
-		shot = shot,
-	}
-	sim.nextBall += 1
-	table.insert(sim.balls, ball)
-	table.insert(sim.heard, { kind = "born", id = id, x = ox, y = oy, z = oz, vx = vx, vy = vy, vz = vz })
-end
-
 -- Had the shooter been facing the victim for BOT.faced before the ball was born?
 local function faced(sim: Sim, by: number, id: number, born: number): boolean
 	local cosHalf = math.cos(BOT.sightHalf + math.rad(2))
@@ -490,6 +456,89 @@ local function faced(sim: Sim, by: number, id: number, born: number): boolean
 		end
 	end
 	return true
+end
+
+-- A click from slot `id`: judged, and on yes its ball is in flight. `list` is the list of brains the
+-- slot belongs to, if it has one (for the record: whom it was firing at); `rewind` is how far back
+-- the bodies are that this ball is judged against (a bot: 0; a person: what its screen showed).
+function Sim.shoot(
+	sim: Sim,
+	id: number,
+	ox: number,
+	oy: number,
+	oz: number,
+	vx: number,
+	vy: number,
+	vz: number,
+	list: Bots.Bots?,
+	rewind: number?
+): (boolean, string?)
+	local isBot = sim.botWho[id] ~= nil
+	local ok, why = Sim.judge(sim, id, ox, oy, oz, vx, vy, vz)
+	if not ok then
+		count(sim.rec.refused, `{if isBot then "bot" else "person"}:{why}`)
+		return false, why
+	end
+	local state = sim.state
+	local brain = if list ~= nil then (list.brains :: { [number]: BotBrain.Brain })[id] else nil
+	local target = if brain ~= nil then brain.target else nil
+	local shot: Shot = {
+		t = sim.now,
+		by = id,
+		bot = isBot,
+		target = target,
+		range = 0,
+		speed = 0,
+		nth = if brain ~= nil then brain.balls else 1,
+		tagged = false,
+		faced = false,
+	}
+	local truth = if target ~= nil then sim.poses[target] else nil
+	if target ~= nil and truth ~= nil and list ~= nil then
+		shot.range = math.sqrt((truth.x - ox) ^ 2 + (truth.y - oy) ^ 2 + (truth.z - oz) ^ 2)
+		local track = list.squad.track[target]
+		if track ~= nil then
+			shot.speed = math.sqrt(track.vx * track.vx + track.vz * track.vz)
+		end
+	end
+	if target ~= nil then
+		shot.faced = faced(sim, id, target, sim.now)
+	end
+	table.insert(sim.rec.shots, shot)
+	local ball: Ball = {
+		id = sim.nextBall,
+		by = id,
+		team = state.slots[id].team,
+		born = sim.now,
+		age = 0,
+		rewind = rewind or 0,
+		ox = ox,
+		oy = oy,
+		oz = oz,
+		vx = vx,
+		vy = vy,
+		vz = vz,
+		shot = shot,
+	}
+	sim.nextBall += 1
+	table.insert(sim.balls, ball)
+	table.insert(sim.heard, { kind = "born", id = id, x = ox, y = oy, z = oz, vx = vx, vy = vy, vz = vz })
+	return true, nil
+end
+
+local function fire(sim: Sim, list: Bots.Bots, cmd: Bots.Command, isBot: boolean)
+	Sim.shoot(
+		sim,
+		cmd.id,
+		cmd.ox or 0,
+		cmd.oy or 0,
+		cmd.oz or 0,
+		cmd.vx or 0,
+		cmd.vy or 0,
+		cmd.vz or 0,
+		list,
+		if isBot then 0 else sim.delay
+	)
 end
 
 local function stepBalls(sim: Sim)
@@ -546,6 +595,9 @@ local function stepBalls(sim: Sim)
 				ball.shot.tagged = true
 			end
 			local rs = sim.rec.slots[struck]
+			local victim = sim.poses[struck]
+			local onStep = victim ~= nil
+				and BotNav.atDoor(sim.nav, state.slots[struck].team, victim.x, victim.y, victim.z)
 			local life = if rs ~= nil then rs.lives[#rs.lives] else nil
 			local sinceRoom = math.huge
 			if life ~= nil then
@@ -561,6 +613,8 @@ local function stepBalls(sim: Sim)
 				range = math.sqrt((hx - ball.ox) ^ 2 + (hy - ball.oy) ^ 2 + (hz - ball.oz) ^ 2),
 				faced = faced(sim, ball.by, struck, ball.born),
 				sinceRoom = sinceRoom,
+				doorstep = onStep,
+				quiet = onStep and now - (sim.lastShot[struck] or -math.huge) > 4,
 			})
 		end
 	end
@@ -597,8 +651,10 @@ local function show(sim: Sim)
 		if truth == nil then
 			continue
 		end
-		if sim.folkWho[id] ~= nil then
-			sim.seenByFolk[id] = truth
+		if sim.folkWho[id] ~= nil or sim.dummyWho[id] then
+			if sim.folkWho[id] ~= nil then
+				sim.seenByFolk[id] = truth
+			end
 			local seen = sim.seenByBots[id]
 			if seen == nil or seen == truth then
 				seen = table.clone(truth)
@@ -724,7 +780,8 @@ local function observe(sim: Sim, span: number)
 				end
 			end
 		end
-		-- the audit: a bot whose look stays on an opponent it has no line to, while that opponent moves
+		-- the audit: a bot whose look stays on an opponent it has no line to and goes with it as it
+		-- moves: it is being followed through the wall
 		if sim.opts.audit and rs.bot then
 			local mine = sim.audit[id]
 			if mine == nil then
@@ -743,14 +800,17 @@ local function observe(sim: Sim, span: number)
 				local d = math.sqrt(dx * dx + dy * dy + dz * dz)
 				local on = d > 4 and dx * lx + dy * ly + dz * lz > math.cos(math.rad(4)) * d
 				if on and arena.sweep(ex, ey, ez, op.x, op.y + Arena.CHEST, op.z) ~= nil then
+					-- following it: it has gone further ACROSS the look than the 4 degrees are wide at its
+					-- range, and the look is still on it
 					local streak = mine[other]
 					if streak == nil then
 						streak = { secs = 0, x = op.x, z = op.z, told = false }
 						mine[other] = streak
 					end
 					streak.secs += span
-					local went = math.sqrt((op.x - streak.x) ^ 2 + (op.z - streak.z) ^ 2)
-					if streak.secs >= 1.2 and went >= 6 and not streak.told then
+					local flat = math.max(1e-6, math.sqrt(lx * lx + lz * lz))
+					local across = math.abs((op.x - streak.x) * lz - (op.z - streak.z) * lx) / flat
+					if streak.secs >= 1 and across >= math.max(5, 0.2 * d) and not streak.told then
 						streak.told = true
 						rs.stares += 1
 					end
@@ -771,6 +831,20 @@ local function handle(sim: Sim, list: Bots.Bots, commands: { Bots.Command }, isB
 		elseif cmd.kind == "say" then
 			count(sim.rec.says, cmd.line or "?")
 		end
+	end
+end
+
+-- Put a scripted person somewhere at once (its history starts again: nobody is judged along the jump).
+function Sim.teleport(sim: Sim, id: number, x: number, y: number, z: number, yaw: number)
+	local pose = sim.poses[id]
+	if pose == nil then
+		return
+	end
+	pose.x, pose.y, pose.z, pose.yaw, pose.pitch = x, y, z, yaw, 0
+	sim.history[id] = nil
+	local seen = sim.seenByBots[id]
+	if seen ~= nil and seen ~= pose then
+		seen.x, seen.y, seen.z, seen.yaw, seen.pitch, seen.crouch = x, y, z, yaw, 0, pose.crouch
 	end
 end
 
@@ -818,29 +892,41 @@ function Sim.tick(sim: Sim)
 	local heard = sim.heard
 	sim.heard = {}
 	show(sim)
-	local before = sim.bots.squad.sweeps
-	local t0 = os.clock()
-	local commands = Bots.step(sim.bots, state, sim.seenByBots, heard, now, sim.dt)
-	local ms = (os.clock() - t0) * 1000
-	if state.phase == "live" then
-		sim.rec.botMs += ms
-		sim.rec.botMsMax = math.max(sim.rec.botMsMax, ms)
-		sim.rec.ticks += 1
-		local swept = sim.bots.squad.sweeps - before
-		sim.rec.sweepsMax = math.max(sim.rec.sweepsMax, swept)
-		-- the most sight checks in any whole second
-		table.insert(sim.sweepWindow, swept)
-		sim.sweepLast += swept
-		local span = math.floor(1 / sim.dt + 0.5)
-		if #sim.sweepWindow > span then
-			sim.sweepLast -= table.remove(sim.sweepWindow, 1) :: number
+	if not sim.opts.frozen then
+		local before = sim.bots.squad.sweeps
+		local t0 = os.clock()
+		local commands = Bots.step(sim.bots, state, sim.seenByBots, heard, now, sim.dt)
+		local ms = (os.clock() - t0) * 1000
+		if state.phase == "live" then
+			sim.rec.botMs += ms
+			sim.rec.botMsMax = math.max(sim.rec.botMsMax, ms)
+			sim.rec.ticks += 1
+			local swept = sim.bots.squad.sweeps - before
+			sim.rec.sweepsMax = math.max(sim.rec.sweepsMax, swept)
+			-- the most sight checks in any whole second
+			table.insert(sim.sweepWindow, swept)
+			sim.sweepLast += swept
+			local span = math.floor(1 / sim.dt + 0.5)
+			if #sim.sweepWindow > span then
+				sim.sweepLast -= table.remove(sim.sweepWindow, 1) :: number
+			end
+			sim.rec.sweepsSecond = math.max(sim.rec.sweepsSecond, sim.sweepLast)
 		end
-		sim.rec.sweepsSecond = math.max(sim.rec.sweepsSecond, sim.sweepLast)
+		handle(sim, sim.bots, commands, true)
+		local folk = sim.folk
+		if folk ~= nil then
+			handle(sim, folk, Bots.step(folk, state, sim.seenByFolk, heard, now, sim.dt), false)
+		end
 	end
-	handle(sim, sim.bots, commands, true)
-	local folk = sim.folk
-	if folk ~= nil then
-		handle(sim, folk, Bots.step(folk, state, sim.seenByFolk, heard, now, sim.dt), false)
+	local script = sim.opts.script
+	if script ~= nil then
+		for id in sim.dummyWho do
+			local slot = state.slots[id]
+			local pose = sim.poses[id]
+			if slot ~= nil and slot.on and not slot.out and pose ~= nil then
+				script(sim, id, pose, now, sim.dt)
+			end
+		end
 	end
 	for id, pose in sim.poses do
 		if Wire.has(pose.bits, BIT.sprint) then

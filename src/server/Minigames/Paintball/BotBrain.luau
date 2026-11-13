@@ -36,8 +36,9 @@
 --   fires    only along its own look, when the look has settled on the aim, in bursts with pauses;
 --            only when Rules.canFire says so and the target may be hit; never while sprinting or
 --            within Body.SPRINT_FIRE_DELAY of it; never from a spawn room, at somebody inside one, or
---            at somebody still on their own doorstep (BotNav.atDoor: nobody is tagged by a bot in
---            the first strides out of their spawn room).
+--            at somebody on their own doorstep who has not fired for DOOR_TRUCE (BotNav.atDoor:
+--            nobody is tagged by a bot in the first strides out of their spawn room, and nobody
+--            fights from their doorstep unanswered).
 -- A PROFILE is the set of numbers that make a brain the kind of player it is. DEFAULT is the bot
 -- (the fairness numbers are Contract.BOT's); tools/games/paintball/bots passes another to stand in
 -- for a fair human player when it measures how hard the bots are.
@@ -99,9 +100,12 @@ type Contact = {
 	first: number, -- when this sighting began
 	react: number, -- this sighting is acted on once it is this old
 	checked: number, -- when a sight check was last spent on it
-	x: number, -- where it was when last seen
+	x: number, -- where it was when last seen ...
 	y: number,
 	z: number,
+	vx: number, -- ... how fast it was going over the floor ...
+	vz: number,
+	crouch: number, -- ... and how far it was crouched
 }
 
 -- What the whole match's bots share (Bots owns it).
@@ -116,6 +120,7 @@ export type Squad = {
 	calledAt: { number },
 	home: { [number]: number }, -- by bot: the storey it has made its own for this life
 	side: { [number]: number }, -- by bot: its team
+	firedAt: { [number]: number }, -- by slot: when it last fired a ball (everybody hears a marker)
 	sightLeft: number, -- sight checks left this tick (the tick's share: Bots.step sets it)
 	routeLeft: number, -- route searches left this tick
 	tick: number,
@@ -133,6 +138,7 @@ export type Brain = {
 	taste: { number },
 	placed: boolean,
 	fresh: boolean, -- placed, and not yet set out: its first goal is on its own storey
+	outbound: boolean, -- on its way to that first goal
 	-- the body
 	x: number,
 	y: number,
@@ -258,6 +264,7 @@ local THINK = 0.1 -- seconds between thoughts
 local QUIET = 3 -- seconds with nothing seen or heard before a bot sprints or reloads at leisure
 local SAY_EVERY = 10 -- seconds between one bot's call-outs
 local TEAM_SAY_EVERY = 5 -- and between one team's
+local DOOR_TRUCE = 4 -- seconds since its last ball that somebody on their own doorstep may still be fired at
 local CHEST = ArenaModule.CHEST
 
 local function wrap(a: number): number
@@ -286,6 +293,7 @@ function BotBrain.new(nav: BotNav.Nav, id: number, team: number, skill: number, 
 		taste = BotNav.taste(nav, seed * 31 + id * 131),
 		placed = false,
 		fresh = false,
+		outbound = false,
 		x = 0,
 		y = 0,
 		z = 0,
@@ -409,6 +417,7 @@ function BotBrain.place(b: Brain, squad: Squad, x: number, y: number, z: number,
 	local live = if state.phase == "briefing" then state.liveAt else now
 	b.goAt = math.max(now, live) + (if state.phase == "briefing" then b.rng.range(0.1, 1.4) else b.rng.range(0.05, 0.5))
 	b.fresh = true
+	b.outbound = false
 	b.movedAt, b.movedX, b.movedZ = math.max(now, live), x, z
 	table.clear(b.con)
 	table.clear(b.whizz)
@@ -493,8 +502,8 @@ local function see(b: Brain, squad: Squad, state: State, poses: { [number]: Pose
 		local age = if c ~= nil then now - c.checked else 10
 		local score = age * (1 + 40 / (d + 10))
 		if eid == b.target then
-			-- the target is looked at every other check
-			score = if b.sightTurn % 2 == 0 then math.huge else score * 0.5
+			-- the target has two checks of every three
+			score = if b.sightTurn % 3 ~= 0 then math.huge else score * 0.5
 		end
 		if score > pickScore then
 			pick, pickScore, px, py, pz = eid, score, tx, ty, tz
@@ -511,7 +520,18 @@ local function see(b: Brain, squad: Squad, state: State, poses: { [number]: Pose
 	squad.sweeps += 1
 	local c = b.con[pick]
 	if c == nil then
-		c = { seen = -math.huge, first = -math.huge, react = 0, checked = now, x = 0, y = 0, z = 0 }
+		c = {
+			seen = -math.huge,
+			first = -math.huge,
+			react = 0,
+			checked = now,
+			x = 0,
+			y = 0,
+			z = 0,
+			vx = 0,
+			vz = 0,
+			crouch = 0,
+		}
 		b.con[pick] = c
 	end
 	c.checked = now
@@ -526,7 +546,9 @@ local function see(b: Brain, squad: Squad, state: State, poses: { [number]: Pose
 	end
 	c.seen = now
 	local pose = poses[pick]
-	c.x, c.y, c.z = pose.x, pose.y, pose.z
+	c.x, c.y, c.z, c.crouch = pose.x, pose.y, pose.z, pose.crouch
+	local track = squad.track[pick]
+	c.vx, c.vz = if track ~= nil then track.vx else 0, if track ~= nil then track.vz else 0
 	b.contactAt = now
 	local floor = math.clamp(math.floor(pose.y / nav.arena.floorHeight + 0.5), 0, nav.arena.floors - 1)
 	squad.heat[b.team][floor + 1] = now
@@ -786,7 +808,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 		if other == nil or pose == nil or not other.on or other.out or other.team == b.team then
 			continue
 		end
-		local d = math.sqrt((pose.x - b.x) ^ 2 + (pose.y - b.y) ^ 2 + (pose.z - b.z) ^ 2)
+		local d = math.sqrt((c.x - b.x) ^ 2 + (c.y - b.y) ^ 2 + (c.z - b.z) ^ 2)
 		local score = d * (if eid == b.target then 0.7 else 1)
 		if score < bestScore then
 			best, bestScore = eid, score
@@ -813,7 +835,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			newBurst(b)
 			b.pauseUntil = math.max(b.pauseUntil, now)
 			b.sprint = false
-			local pose = poses[best]
+			local pose = b.con[best] -- (what it saw of it)
 			if had == nil then
 				b.fightAt = now
 				local floor = math.clamp(math.floor(pose.y / nav.arena.floorHeight + 0.5), 0, nav.arena.floors - 1)
@@ -829,9 +851,13 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 				local weak = mag.reloadDoneAt ~= nil or mag.rounds <= 1 or now - b.alarm < 1.5
 				local onCover = b.mode == "hold" and nav.coverAt[b.at] ~= nil
 				b.stance = "stand"
-				if now < b.pushUntil then
-					-- it has stood about long enough: it fights on the move
-					b.stance = if b.mode == "travel" then "push" else "stand"
+				local restless = now < b.pushUntil or BotNav.roomOf(nav, b.x, b.y, b.z) ~= 0
+				local passing = b.outbound and not weak and rng.next() < 0.7
+				if b.mode ~= "hold" and (restless or passing) then
+					-- it has stood about long enough, or it is still in its spawn room (nobody fights
+					-- from there), or it is on its way to its own storey and does not stop for
+					-- everybody: it fights on the move
+					b.stance = "push"
 				elseif not onCover then
 					local roll = rng.next()
 					if weak or roll < 0.25 then
@@ -852,7 +878,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 	local reloading = mag.reloadDoneAt ~= nil and now < (mag.reloadDoneAt :: number)
 	local cover = if b.mode == "hold" then nav.coverAt[b.at] else nil
 	if target ~= nil then
-		local pose = poses[target]
+		local pose = b.con[target] or b -- (what it saw of it)
 		b.sprint = false
 		-- shot at while standing in the open: move
 		if b.alarm > b.shiftAt and b.alarm > b.fightAt and cover == nil and (b.halt or b.mode == "hold") then
@@ -888,7 +914,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			say(b, squad, now, out, "reloading")
 		end
 		-- a fight from one spot does not go on for ever
-		if now - b.fightAt > 10 and (b.mode == "hold" or b.halt) and b.peekX == nil then
+		if now - b.fightAt > 8 and (b.mode == "hold" or b.halt) and b.peekX == nil then
 			b.fightAt = now
 			b.stance = "push"
 			if not sidestep(b, squad, now, pose.x, pose.z) then
@@ -910,6 +936,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 			if now >= b.goAt and state.phase == "live" then
 				if setOut(b, squad, pickGoal(b, squad, now)) then
 					b.fresh = false
+					b.outbound = true
 				else
 					b.goAt = now + 0.1
 				end
@@ -963,7 +990,7 @@ local function think(b: Brain, squad: Squad, state: State, poses: { [number]: Po
 	-- the stuck watch: a bot in play that has not been anywhere else for a long time goes somewhere
 	if (b.x - b.movedX) ^ 2 + (b.z - b.movedZ) ^ 2 > 9 then
 		b.movedAt, b.movedX, b.movedZ = now, b.x, b.z
-	elseif now - b.movedAt > 13 and state.phase == "live" then
+	elseif now - b.movedAt > 10 and state.phase == "live" then
 		-- wherever it was going or whoever it was fighting: somewhere else, and on its feet
 		if now >= b.watchAt then
 			b.watchAt = now + 1
@@ -1020,6 +1047,7 @@ local function move(b: Brain, state: State, now: number, dt: number)
 			if path[b.leg] == nil then
 				-- there
 				b.path = nil
+				b.outbound = false
 				b.mode = "hold"
 				local cover = nav.coverAt[b.at]
 				b.holdUntil = now + (if cover ~= nil then b.rng.range(3, 7) else b.rng.range(1, 2.6))
@@ -1093,7 +1121,11 @@ local function idleLook(b: Brain, squad: Squad, now: number)
 				yaw += rng.range(-0.3, 0.3)
 			end
 		elseif roll < 0.7 and cover ~= nil then
-			yaw = math.atan2(-cover.nx, -cover.nz) + rng.range(-0.7, 0.7)
+			-- over low cover; past the edges of high cover, not at it
+			local off = if cover.low
+				then rng.range(-0.7, 0.7)
+				else rng.range(0.6, 1.3) * (if rng.next() < 0.5 then -1 else 1)
+			yaw = math.atan2(-cover.nx, -cover.nz) + off
 		elseif node ~= nil then
 			local list = nav.adjacent[b.at]
 			if #list >= 3 then
@@ -1200,22 +1232,21 @@ function BotBrain.step(
 	local leadYaw, leadPitch = 0, 0
 	local ex, ey, ez = b.x, b.y + Body.eye(b.crouch), b.z
 	local feel = state.feel
+	-- where the target is, as far as this bot knows: where it last SAW it, carried on at the speed it
+	-- was going then. It never reads where a body it cannot see has got to.
+	local tx, ty, tz = 0, 0, 0
 	if target ~= nil and tpose ~= nil and contact ~= nil and now - contact.seen <= VIS then
 		aiming = true
-		local track = squad.track[target]
-		local cy = tpose.y + (Body.LOW + Body.top(tpose.crouch) - Body.RADIUS) * 0.5 -- the middle of its shape
-		local dx, dy, dz = tpose.x - ex, cy - ey, tpose.z - ez
+		local since = now - contact.seen
+		tx, ty, tz = contact.x + contact.vx * since, contact.y, contact.z + contact.vz * since
+		local cy = ty + (Body.LOW + Body.top(contact.crouch) - Body.RADIUS) * 0.5 -- the middle of its shape
+		local dx, dy, dz = tx - ex, cy - ey, tz - ez
 		local d = math.sqrt(dx * dx + dy * dy + dz * dz)
 		local flight = d / feel.ballSpeed * b.lead
-		local ax, az = tpose.x, tpose.z
-		if track ~= nil then
-			ax += track.vx * flight
-			az += track.vz * flight
-		end
+		local ax, az = tx + contact.vx * flight, tz + contact.vz * flight
 		local vx, vy, vz = Ballistics.aim(ex, ey, ez, ax, cy, az, feel.ballSpeed, feel.ballDrop)
 		local yaw, pitch = Body.yawPitch(vx, vy, vz)
-		local speed = if track ~= nil then math.sqrt(track.vx * track.vx + track.vz * track.vz) else 0
-		local sigma = spread(b, d, speed)
+		local sigma = spread(b, d, math.sqrt(contact.vx * contact.vx + contact.vz * contact.vz))
 		b.wantYaw = wrap(yaw + b.errYaw * sigma)
 		b.wantPitch = math.clamp(pitch + b.errPitch * sigma * 0.6, -1.4, 1.4)
 		-- a moving target turns the aim: the look turns with it as well as towards it
@@ -1248,8 +1279,14 @@ function BotBrain.step(
 		and not b.sprint
 		and now - b.sprintAt >= Body.SPRINT_FIRE_DELAY + 0.02
 		and BotNav.roomOf(b.nav, b.x, b.y, b.z) == 0
-		and BotNav.roomOf(b.nav, tpose.x, tpose.y, tpose.z) == 0
-		and not BotNav.atDoor(b.nav, 3 - b.team, tpose.x, tpose.y, tpose.z)
+		and BotNav.roomOf(b.nav, tx, ty, tz) == 0
+		and (now - (squad.firedAt[target] or -math.huge) < DOOR_TRUCE or not BotNav.atDoor(
+			b.nav,
+			3 - b.team,
+			tx,
+			ty,
+			tz
+		))
 		and Rules.canBeHit(state, target, now)
 		and Rules.canFire(state, b.id, now)
 	then

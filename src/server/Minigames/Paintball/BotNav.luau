@@ -55,7 +55,7 @@ local BotNav = {}
 
 BotNav.KEEP_OFF = 30 -- studs from a door of the other team's room inside which a bot does not stand
 BotNav.PEEK = 2.6 -- studs a bot steps out from a cover spot to shoot round it
-BotNav.DOORSTEP = 9 -- studs round a door of a spawn room: no bot fires at its owners while they are on it
+BotNav.DOORSTEP = 14 -- studs round a door of a spawn room: no bot fires at its owners while they are on it
 local BACK_IN = 400 -- the cost of a step into one's own spawn room from outside it
 local STAIR_TASTE = 0.9 -- a stair link costs a bot up to this much more than its length, by its taste
 local FLOOR_TASTE = 0.35
