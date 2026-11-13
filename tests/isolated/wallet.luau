@@ -860,6 +860,14 @@ return function(t)
 				local Contract = load("@shared/Minigames/Paintball/Contract")
 				Kit.play(function(kit: any)
 					local wallet = kit.w.wallet -- the rig's: wired as Boot/Game wires the town's
+					-- one price and one length: what paintball's contract tells its screens is what the wallet charges
+					local cents, days = wallet.pass.offer()
+					t.eq(Contract.Rules.passCents, cents, "paintball's contract and the wallet disagree on the price")
+					t.eq(Contract.Rules.passDays, days, "paintball's contract and the wallet disagree on the length")
+					t.truthy(
+						string.find(Contract.textFor("pass"), `{cents}c`, 1, true),
+						"the arena door's refusal names another price than the wallet charges"
+					)
 					local ada = kit.client("Ada")
 					wallet.join(ada.stub)
 					t.deepEq({ kit.join(ada) }, { false, Contract.textFor("pass") })
