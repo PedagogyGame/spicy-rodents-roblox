@@ -51,8 +51,16 @@ local function bakedRoot(): any
 		local pillar = FakeEngine.part("BoardGate", roblox.CFrame.new(gx, st.platformY + 2, gz), interior)
 		pillar:SetAttribute("Gate", "board")
 		pillar:SetAttribute("Station", station)
-		local arm = FakeEngine.part("BoardGateArm", roblox.CFrame.new(gx - 2, st.platformY + 2.7, gz), interior)
+		-- the arm along the venue's X: hinged at its +X end at the base, at its -X end at the summit (as baked)
+		local v = SkyLiftService._venue(st.venue)
+		local place = { x = v.position.x, z = v.position.z, floorY = v.floorY, yaw = v.yaw }
+		local px, _, pd = AlleyLayout.toLocal(place, gx, st.platformY, gz)
+		local side = if station == "base" then 1 else -1
+		local ax, ay, az = AlleyLayout.toWorld(place, px - side * 2, 2.7 + st.platformY - v.floorY, pd)
+		local arm =
+			FakeEngine.part("BoardGateArm", roblox.CFrame.new(ax, ay, az) * roblox.CFrame.Angles(0, v.yaw, 0), interior)
 		arm.Size = roblox.Vector3.new(3.4, 0.25, 0.16)
+		arm:SetAttribute("HingeX", px - side * 2 + side * 1.7)
 		local board = FakeEngine.part("NextCabinBoard", roblox.CFrame.new(gx - 2, st.platformY + 5, gz), interior)
 		for _, face in { "Front", "Back" } do
 			local gui = FakeEngine.new("SurfaceGui", face)
@@ -138,46 +146,60 @@ return function(t)
 			FakeEngine.with(function()
 				local root = bakedRoot()
 				local w = world({ root = root, start = 0 })
-				local gate = w.svc.gates.base
-				local pillar = root:GetDescendants()[1]
-				for _, d in root:GetDescendants() do
-					if d.Name == "BoardGate" and d:GetAttribute("Station") == "base" then
-						pillar = d
+				for _, station in SkyLift.STATIONS do
+					local gate = w.svc.gates[station]
+					local pillar
+					for _, d in root:GetDescendants() do
+						if d.Name == "BoardGate" and d:GetAttribute("Station") == station then
+							pillar = d
+						end
 					end
+					t.truthy((gate.at - pillar.Position).Magnitude < 1, `{station}: the prompt is not on the gate`)
+					t.eq(#gate.labels, 2)
+					t.eq(gate.armSide, if station == "base" then 1 else -1)
 				end
-				t.eq((gate.at - pillar.Position).Magnitude < 1, true)
-				t.eq(#gate.labels, 2)
-				local home = gate.arm.CFrame
-				local sawCount, sawBoarding, lifted, lowered = false, false, false, false
+				local homes = {}
+				for _, station in SkyLift.STATIONS do
+					homes[station] = w.svc.gates[station].arm.CFrame
+				end
+				local saw: { [string]: { [string]: boolean } } = { base = {}, summit = {} }
 				local maxLift = 0
-				for _ = 1, math.ceil(SkyLift.period() / SkyLift.CABINS / 0.1) + 5 do
+				for _ = 1, math.ceil(SkyLift.period() / 0.1) + 5 do
 					SkyLiftFlow.step(w, 0.1)
-					local text = gate.labels[1].Text
-					t.eq(gate.labels[2].Text, text)
-					if string.match(text, "^NEXT CABIN %d+ s$") then
-						sawCount = true
-					elseif text == "NOW BOARDING" then
-						sawBoarding = true
+					for _, station in SkyLift.STATIONS do
+						local gate = w.svc.gates[station]
+						local s = saw[station]
+						local text = gate.labels[1].Text
+						t.eq(gate.labels[2].Text, text)
+						if string.match(text, "^NEXT CABIN %d+ s$") then
+							s.count = true
+						elseif text == "NOW BOARDING" then
+							s.boarding = true
+						end
+						local half = gate.armSide * gate.arm.Size.X / 2
+						local home = homes[station]
+						local free = gate.arm.CFrame * roblox.Vector3.new(-half, 0, 0)
+						local free0 = home * roblox.Vector3.new(-half, 0, 0)
+						local up = free.Y - free0.Y
+						maxLift = math.max(maxLift, up)
+						if up > 2.5 then
+							s.lifted = true
+						elseif s.lifted and up < 0.01 then
+							s.lowered = true
+						end
+						t.truthy(up > -1e-3, `{station}: the arm's free end went down`)
+						-- the hinge end never moves
+						local hinge = gate.arm.CFrame * roblox.Vector3.new(half, 0, 0)
+						local hinge0 = home * roblox.Vector3.new(half, 0, 0)
+						t.truthy((hinge - hinge0).Magnitude < 1e-3, `{station}: the hinge end moved`)
 					end
-					local free = gate.arm.CFrame * roblox.Vector3.new(-gate.arm.Size.X / 2, 0, 0)
-					local free0 = home * roblox.Vector3.new(-gate.arm.Size.X / 2, 0, 0)
-					local up = free.Y - free0.Y
-					maxLift = math.max(maxLift, up)
-					if up > 2.5 then
-						lifted = true
-					elseif lifted and up < 0.01 then
-						lowered = true
-					end
-					-- the hinge end never moves
-					local hinge = gate.arm.CFrame * roblox.Vector3.new(gate.arm.Size.X / 2, 0, 0)
-					local hinge0 = home * roblox.Vector3.new(gate.arm.Size.X / 2, 0, 0)
-					t.eq((hinge - hinge0).Magnitude < 1e-4, true)
 				end
-				t.eq(sawCount, true)
-				t.eq(sawBoarding, true)
-				t.eq(lifted, true)
-				t.eq(lowered, true)
-				t.eq(maxLift < 3.4 + 1e-3, true)
+				for _, station in SkyLift.STATIONS do
+					local s = saw[station]
+					t.truthy(s.count and s.boarding, `{station}: the board never counted down and said boarding`)
+					t.truthy(s.lifted and s.lowered, `{station}: the arm never lifted and came down`)
+				end
+				t.truthy(maxLift < 3.4 + 1e-3)
 			end)
 		end
 	)
@@ -431,6 +453,64 @@ return function(t)
 			t.eq(town.charge, nil)
 			-- a body the runtime does not know cannot be held
 			t.eq(town.hold(actors[person].body), nil)
+			-- a body it knows: its brain is suspended while held, it is drawn where the service says, and it is
+			-- given back to its brain standing on the floor it is freed on
+			local held = makeBody("Held", roblox.CFrame.new(0, 50, 0))
+			local registered, unregistered = 0, 0
+			local resumed: any = nil
+			local brain = {
+				suspend = function(_self: any): any
+					return {}
+				end,
+				resume = function(_self: any, snap: any)
+					resumed = snap
+				end,
+			}
+			local a = { x = 0, y = 0, z = 0, yaw = 0, hip = 2, speed = 4, intent = { mode = "walk" } }
+			local heldActor = { species = "human", body = held, possessable = true }
+			local town2 = SkyLiftService.gameTown({
+				possession = {
+					actorOf = function(_self: any, _player: any): any
+						return nil
+					end,
+					controllerOf = function(_self: any, _actor: any): any
+						return "ai"
+					end,
+				},
+				runtime = {
+					world = {
+						possessed = {},
+						now = 0,
+						brains = { [7] = brain },
+						actorsById = { [7] = a },
+						scheduler = {
+							register = function()
+								registered += 1
+							end,
+							unregister = function()
+								unregistered += 1
+							end,
+						},
+					},
+					byTownId = { [7] = heldActor },
+				},
+				fire = function() end,
+			})
+			local h = town2.hold(held)
+			t.truthy(h ~= nil)
+			t.eq(heldActor.possessable, false)
+			t.eq(unregistered, 1)
+			h.place(10, 40, 20, 0.5)
+			-- (no bounding box on the fake engine: the stand offset is 3) pivot = a.y - hip + offset
+			t.near(a.y - a.hip + 3, 40, 1e-9)
+			t.eq(a.x, 10)
+			t.near(a.yaw + math.pi, 0.5, 1e-9)
+			h.free(11, 116, 21, 1)
+			t.eq(heldActor.possessable, true)
+			t.eq(registered, 1)
+			t.truthy(resumed ~= nil)
+			t.near(a.y, 116 + a.hip, 1e-9)
+			t.eq(a.x, 11)
 		end)
 	end)
 end

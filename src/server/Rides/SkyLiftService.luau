@@ -106,6 +106,7 @@ SkyLiftService.WORDS = table.freeze({
 	lunchNoRoom = "Every table is taken: try again in a minute",
 	lunchNoMoney = "Lunch is 10 cents: not enough money",
 	notNear = "Walk up to the gate first",
+	gaveUp = "Your place on the sky lift is given up: %s",
 })
 
 -- named cue points (empty ids: the owner uploads; docs/AUDIO_BUDGET.md). The server plays only these three; the
@@ -195,6 +196,7 @@ type Gate = {
 	bell: any?,
 	arm: any?,
 	armHome: CFrame?,
+	armSide: number, -- +1: hinged at the arm's +X end (the base's gate), -1: at its -X end (the summit's)
 	armFrac: number,
 	labels: { any },
 	text: string?,
@@ -229,6 +231,8 @@ local function venueOf(id: string): any
 	end
 	error("SkyLiftService: no venue " .. id)
 end
+
+SkyLiftService._venue = venueOf -- (specs)
 
 local function placeOf(v: any): Place
 	return { x = v.position.x, z = v.position.z, floorY = v.floorY, yaw = v.yaw }
@@ -404,6 +408,7 @@ function SkyLiftService.new(opts: Opts): any
 			bell = cue(post, SkyLiftService.CUES.bell),
 			arm = nil,
 			armHome = nil,
+			armSide = 1,
 			armFrac = 0,
 			labels = {},
 			text = nil,
@@ -415,6 +420,13 @@ function SkyLiftService.new(opts: Opts): any
 			if arm and arm:IsA("BasePart") then
 				gate.arm = arm
 				gate.armHome = (arm :: any).CFrame
+				-- the bake's HingeX is in the venue's frame: which end of the arm is it?
+				local hingeX = arm:GetAttribute("HingeX")
+				if type(hingeX) == "number" then
+					local p = (arm :: any).Position
+					local lx = AlleyLayout.toLocal(placeOf(venueOf(st.venue)), p.X, p.Y, p.Z)
+					gate.armSide = if hingeX >= lx then 1 else -1
+				end
 			end
 			local board = holder and holder:FindFirstChild("NextCabinBoard")
 			if board then
@@ -912,9 +924,11 @@ function SkyLiftService._furniture(self: any, t: number, dt: number)
 			if nf ~= f then
 				gate.armFrac = nf
 				local e = nf * nf * (3 - 2 * nf)
-				-- hinged at its +X end (the pillar side: the bake's HingeX), the free end swinging up
-				local hinge = CFrame.new((arm :: any).Size.X / 2, 0, 0)
-				arm.CFrame = home * hinge * CFrame.Angles(0, 0, -e * SkyLiftService.ARM_OPEN) * hinge:Inverse()
+				-- turned about the hinge end (the pillar side: the bake's HingeX), the free end swinging up
+				local side = gate.armSide
+				local hinge = CFrame.new(side * (arm :: any).Size.X / 2, 0, 0)
+				local turn = CFrame.Angles(0, 0, -side * e * SkyLiftService.ARM_OPEN)
+				arm.CFrame = home * hinge * turn * hinge:Inverse()
 			end
 		end
 	end
@@ -942,7 +956,7 @@ function SkyLiftService.step(self: any, dt: number?)
 		end
 		local at = if body then pivotOf(body) else nil
 		if not ok then
-			self:_unwait(w, why or W.walkedAway)
+			self:_unwait(w, string.format(W.gaveUp, why or "you cannot ride now"))
 		elseif at and distXZ(at, self.gates[w.station].at) > SkyLiftService.WANDER then
 			self:_unwait(w, W.walkedAway)
 		elseif t - w.boardAt > SkyLiftService.MISSED then
@@ -1175,6 +1189,13 @@ function SkyLiftService.stop(self: any)
 	table.clear(self.conns)
 end
 
+-- A standing body's pivot over its feet (ActorService.groundOffset: the bounding box); 3 when it cannot be measured.
+local function standOffset(body: any): number
+	local ActorService = require("../Actors/ActorService")
+	local ok, o = pcall(ActorService.groundOffset, body)
+	return if ok and type(o) == "number" then o else 3
+end
+
 -- The Town from Boot/Game's objects (engine only).
 function SkyLiftService.gameTown(parts: GameParts): Town
 	local possession = parts.possession
@@ -1266,8 +1287,7 @@ function SkyLiftService.gameTown(parts: GameParts): Town
 			local id = townId :: number
 			local actor = rt.byTownId[id]
 			local a = world.actorsById[id]
-			local ActorService = require("../Actors/ActorService")
-			local offset = ActorService.groundOffset(body)
+			local offset = standOffset(body)
 			actor.possessable = false
 			TownAI.suspend(world, id)
 			return {
@@ -1286,10 +1306,7 @@ function SkyLiftService.gameTown(parts: GameParts): Town
 				end,
 			}
 		end,
-		standOffset = function(body: any): number
-			local ActorService = require("../Actors/ActorService")
-			return ActorService.groundOffset(body)
-		end,
+		standOffset = standOffset,
 		giveBack = function(player: any, body: any)
 			if isInstance(player) and body.PrimaryPart then
 				(body.PrimaryPart :: BasePart):SetNetworkOwner(player :: Player)
