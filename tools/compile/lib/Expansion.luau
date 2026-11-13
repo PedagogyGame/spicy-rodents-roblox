@@ -301,7 +301,10 @@ function Expansion.groundStats(v: any): (number, number)
 	return lo, hi
 end
 
-local function attractionPolys(world: World): { { id: string, poly: Poly } }
+-- An attraction's footprint, and the ground it keeps for something not built yet (the bowling alley's backstage).
+-- A reserve's `givesWayOnArrival` names the venues whose sites may overlap it until that thing arrives (the owner's
+-- default: the park and the steakhouse give up that ground only when the backstage package is here): `yields`.
+local function attractionPolys(world: World): { { id: string, poly: Poly, yields: { [string]: boolean }? } }
 	local out = {}
 	for _, a in world.attractions do
 		local p, fp = a.place, a.footprint
@@ -319,7 +322,14 @@ local function attractionPolys(world: World): { { id: string, poly: Poly } }
 				local x, _, z = AlleyLayout.toWorld(p, c[1], 0, c[2])
 				table.insert(kept, { x, z })
 			end
-			table.insert(out, { id = a.id .. " (ground reserved for " .. rs["for"] .. ")", poly = kept })
+			local yields: { [string]: boolean } = {}
+			for _, vid in rs.givesWayOnArrival or {} do
+				yields[vid] = true
+			end
+			table.insert(
+				out,
+				{ id = a.id .. " (ground reserved for " .. rs["for"] .. ")", poly = kept, yields = yields }
+			)
 		end
 	end
 	return out
@@ -500,7 +510,7 @@ function Expansion.check(doc: any, world: World): { string }
 			end
 		end
 		for _, a in alleys do
-			if overlaps(site, a.poly) then
+			if overlaps(site, a.poly) and not (a.yields and a.yields[id]) then
 				bad(id .. " overlaps the attraction " .. a.id)
 			end
 		end

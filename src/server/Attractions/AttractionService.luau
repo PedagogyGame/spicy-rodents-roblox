@@ -174,14 +174,16 @@ function AttractionService.start(opts: Opts?): any?
 		floorY = alley:GetAttribute("FloorY") :: number,
 		yaw = alley:GetAttribute("Yaw") :: number,
 	}
-	-- the ball's way home is the squirrel tunnel's curve (data/attractions.json -> generated/Attractions)
+	-- the ball's way home is the squirrel's ball-return run (data/attractions.json -> generated/Attractions: one enclosed
+	-- route per pair of lanes, kind "tunnel"; BowlingLane keeps the stretch from the pit on, so the alley vent is not
+	-- on the ball's way)
 	local tunnels: { [number]: { { number } } } = {}
 	local ok, mod = pcall(function()
 		return Data.default():module("Attractions")
 	end)
 	if ok and type(mod) == "table" and type((mod :: any).routes) == "table" then
 		for _, r in (mod :: any).routes do
-			if r.kind == "bridge" and string.find(r.name, "tunnel", 1, true) then
+			if r.kind == "tunnel" or (r.kind == "bridge" and string.find(r.name, "tunnel", 1, true)) then
 				-- the pair is the route's own field (data/attractions.json); an older record names its first lane
 				local pair = if type(r.pair) == "number"
 					then r.pair

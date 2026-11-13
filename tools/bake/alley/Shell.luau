@@ -27,6 +27,7 @@ local C = {
 	carpet = { 30, 36, 74 },
 	carpetGames = { 70, 30, 46 },
 	woodFloor = { 150, 98, 58 },
+	gamesFloor = { 196, 156, 108 },
 	bohFloor = { 132, 132, 128 },
 	ceiling = { 214, 210, 196 },
 	ceilingLanes = { 176, 180, 196 },
@@ -182,60 +183,64 @@ local function ducts(kit: any, root: any)
 		local x = L.pairX(p)
 		local a, b = ductX(p)
 		local floorTop = L.DUCT_FLOOR
+		-- behind the pinsetters the run's tail is its own model, which the owner's backstage replaces with its
+		-- return-channel crawl route (AlleyLayout.BACKSTAGE.replaces, returnLegs)
+		local tail = kit:model(m, "Tail")
+		tail:SetAttribute("ReplacedBy", L.BACKSTAGE.anchorName)
+		local function at(d: number): any
+			return if d >= BACK then tail else m
+		end
 		-- floor (a long steel trough on concrete) from the riser to just inside the rear wall
-		kit:box(m, "Floor", a, b, FLOOR_BOTTOM, floorTop, L.SHAFT_D0, L.REAR_WALL_D - 1.6, C.duct, "Concrete")
-		-- the ramp up from the alley vent (the vent sill is at alley level): low at the vent, high at the duct
-		kit:box(m, "VentSill", a, b, FLOOR_BOTTOM, L.ALLEY_Y, L.REAR_WALL_D + 0.4, D1, C.foundation, "Concrete")
+		kit:box(m, "Floor", a, b, FLOOR_BOTTOM, floorTop, L.SHAFT_D0, BACK, C.duct, "Concrete")
+		kit:box(tail, "Floor", a, b, FLOOR_BOTTOM, floorTop, BACK, L.REAR_WALL_D - 1.6, C.duct, "Concrete")
+		-- the vent's sill is the alley's paving; a short ramp runs down from it to the duct's floor (its tall end
+		-- toward the alley), on a fill
+		local rampD0, rampD1 = L.REAR_WALL_D - 1.6, L.REAR_WALL_D + 0.6
+		kit:box(tail, "VentSill", a, b, FLOOR_BOTTOM, L.ALLEY_Y, rampD1, D1, C.foundation, "Concrete")
 		kit:wedge(
-			m,
+			tail,
 			"VentRamp",
 			x,
-			(L.ALLEY_Y + floorTop) / 2 - 0.02,
-			L.REAR_WALL_D - 0.6,
+			(L.ALLEY_Y + floorTop) / 2,
+			(rampD0 + rampD1) / 2,
 			L.DUCT_W,
-			floorTop - L.ALLEY_Y + 0.04,
-			2.0,
+			L.ALLEY_Y - floorTop,
+			rampD1 - rampD0,
 			C.duct,
-			"Concrete"
+			"Concrete",
+			{ rot = kit.roblox.CFrame.Angles(0, math.pi, 0) }
 		)
-		kit:box(
-			m,
-			"RampFill",
-			a,
-			b,
-			FLOOR_BOTTOM,
-			L.ALLEY_Y,
-			L.REAR_WALL_D - 1.6,
-			L.REAR_WALL_D + 0.4,
-			C.foundation,
-			"Concrete"
-		)
-		-- the foundation above the vent opening
-		kit:box(m, "VentLintel", a, b, L.ALLEY_Y + 1.55, L.DUCT_CEIL, L.REAR_WALL_D, D1, C.foundation, "Concrete")
+		kit:box(tail, "RampFill", a, b, FLOOR_BOTTOM, floorTop, rampD0, rampD1, C.foundation, "Concrete")
+		-- the foundation above the vent opening (VENT_H clear over the paving)
+		kit:box(tail, "VentLintel", a, b, L.ALLEY_Y + L.VENT_H, 0, L.REAR_WALL_D, D1, C.foundation, "Concrete")
 		-- return track: two rails the ball rolls on, the length of the duct
 		for side = -1, 1, 2 do
-			kit:box(
-				m,
-				"Rail",
-				x + side * 0.24 - 0.04,
-				x + side * 0.24 + 0.04,
-				floorTop,
-				floorTop + 0.14,
-				L.SHAFT_D1 + 0.2,
-				L.REAR_WALL_D - 1.8,
-				C.ductMetal,
-				"Metal",
-				{ collide = false }
-			)
+			for _, run in { { m, L.SHAFT_D1 + 0.2, BACK }, { tail, BACK, L.REAR_WALL_D - 3.8 } } do
+				kit:box(
+					run[1],
+					"Rail",
+					x + side * 0.24 - 0.04,
+					x + side * 0.24 + 0.04,
+					floorTop,
+					floorTop + 0.1,
+					run[2],
+					run[3],
+					C.ductMetal,
+					"Metal",
+					{ collide = false }
+				)
+			end
 		end
 		-- walls (sheet steel with ribs every 4 studs); under the pits the ceiling is lower
 		local segs = {
-			{ L.SHAFT_D0, L.DECK_END, L.DUCT_CEIL },
+			{ L.SHAFT_D1, L.DECK_END, L.DUCT_CEIL },
 			{ L.DECK_END, L.PIT_END, L.PIT_Y - 0.15 },
-			{ L.PIT_END, L.REAR_WALL_D + 0.4, L.DUCT_CEIL },
+			{ L.PIT_END, BACK, L.DUCT_CEIL },
+			{ BACK, L.REAR_WALL_D + 0.4, L.DUCT_CEIL },
 		}
 		for i, s in segs do
-			kit:box(m, `Ceiling{i}`, a - 0.2, b + 0.2, s[3] - 0.08, s[3], s[1], s[2], { 70, 52, 36 }, "WoodPlanks")
+			local name = `Ceiling{math.min(i, 3)}`
+			kit:box(at(s[1]), name, a - 0.2, b + 0.2, s[3] - 0.08, s[3], s[1], s[2], { 70, 52, 36 }, "WoodPlanks")
 		end
 		local d = L.SHAFT_D1 + 2
 		local ribN = 0
@@ -244,7 +249,7 @@ local function ducts(kit: any, root: any)
 			ribN += 1
 			for side = -1, if ribN % 2 == 1 then 1 else -2, 2 do
 				kit:box(
-					m,
+					at(d),
 					"Rib",
 					x + side * (L.DUCT_W / 2 - 0.06),
 					x + side * (L.DUCT_W / 2),
@@ -259,7 +264,7 @@ local function ducts(kit: any, root: any)
 			end
 			-- a joist across the ceiling
 			kit:box(
-				m,
+				at(d),
 				"Joist",
 				a,
 				b,
@@ -281,15 +286,15 @@ local function ducts(kit: any, root: any)
 		local lampN = 0
 		while lampD < L.REAR_WALL_D - 3 do
 			lampN += 1
-			local ceil = if lampD > L.DECK_END and lampD < L.PIT_END then L.PIT_Y - 0.15 else L.DUCT_CEIL
-			local lx0 = if lampSide > 0 then b - 0.18 else a + 0.06
+			local lampY = floorTop + 1.6 -- half way up the wall, well under every floor above
+			local lx0 = if lampSide > 0 then b - 0.14 else a + 0.02
 			local lamp = kit:box(
-				m,
+				at(lampD),
 				"Lamp",
 				lx0,
 				lx0 + 0.12,
-				ceil - 0.5,
-				ceil - 0.3,
+				lampY - 0.1,
+				lampY + 0.1,
 				lampD - 0.15,
 				lampD + 0.15,
 				{ 255, 170, 70 },
@@ -297,10 +302,12 @@ local function ducts(kit: any, root: any)
 				{ collide = false }
 			)
 			if lampN % 2 == 1 then
+				-- (a light without shadows shines through parts: its range stays inside the duct's half height, so
+				-- none of it reaches the lanes, the gutters or the pit above)
 				kit:light(
 					lamp,
 					"PointLight",
-					{ Range = 15, Brightness = 1.4, Color = { 255, 176, 96 }, Shadows = false }
+					{ Range = L.TUNNEL_LIGHT_RANGE, Brightness = 2, Color = { 255, 176, 96 }, Shadows = false }
 				)
 			end
 			lampD += 10
@@ -346,28 +353,15 @@ local function ducts(kit: any, root: any)
 			"SmoothPlastic",
 			{ collide = false }
 		)
-		kit:cyl(
-			m,
-			"SparePin",
-			x - 0.45,
-			floorTop + 0.2,
-			70,
-			1.4,
-			0.36,
-			"D",
-			{ 245, 245, 240 },
-			"SmoothPlastic",
-			{ collide = false }
-		)
 		-- the riser: a vertical chute from the duct up into the hood
 		kit:box(m, "RiserBack", a, b, floorTop, 0, L.SHAFT_D0 - 0.15, L.SHAFT_D0, C.ductMetal, "Metal")
 		for side = -1, 1, 2 do
-			local wx = if side < 0 then a else b
+			local wx = if side < 0 then a else b - 0.06
 			kit:box(
 				m,
 				"RiserWall",
-				wx - 0.1,
-				wx + 0.1,
+				wx,
+				wx + 0.06,
 				floorTop,
 				0,
 				L.SHAFT_D0,
@@ -382,24 +376,28 @@ local function ducts(kit: any, root: any)
 			"RiserGlow",
 			a + 0.1,
 			b - 0.1,
-			-0.6,
-			-0.5,
+			-1.6,
+			-1.5,
 			L.SHAFT_D0,
 			L.SHAFT_D0 + 0.12,
 			{ 150, 210, 255 },
 			"Neon",
 			{ collide = false }
 		)
-		kit:light(glow, "PointLight", { Range = 7, Brightness = 1.2, Color = { 170, 210, 255 }, Shadows = false })
+		kit:light(
+			glow,
+			"PointLight",
+			{ Range = L.TUNNEL_LIGHT_RANGE, Brightness = 1.6, Color = { 170, 210, 255 }, Shadows = false }
+		)
 		-- the bent vent grille outside, leaning against the foundation beside the opening
 		local ventD = D1 + 0.12
 		kit:box(
-			m,
+			tail,
 			"VentFrameTop",
 			a - 0.2,
 			b + 0.2,
-			L.ALLEY_Y + 1.35,
-			L.ALLEY_Y + 1.55,
+			L.ALLEY_Y + L.VENT_H - 0.2,
+			L.ALLEY_Y + L.VENT_H,
 			D1 - 0.05,
 			ventD,
 			{ 90, 92, 96 },
@@ -408,19 +406,19 @@ local function ducts(kit: any, root: any)
 		for side = -1, 1, 2 do
 			local wx = if side < 0 then a - 0.1 else b + 0.1
 			kit:box(
-				m,
+				tail,
 				"VentFrameSide",
 				wx - 0.1,
 				wx + 0.1,
 				L.ALLEY_Y,
-				L.ALLEY_Y + 1.55,
+				L.ALLEY_Y + L.VENT_H,
 				D1 - 0.05,
 				ventD,
 				{ 90, 92, 96 },
 				"Metal"
 			)
 		end
-		local grille = kit:model(m, "Grille")
+		local grille = kit:model(tail, "Grille")
 		local gcf = kit.roblox.CFrame.Angles(-0.35, 0.5, 0.12)
 		for k = 0, 5 do
 			kit:at(
@@ -437,20 +435,24 @@ local function ducts(kit: any, root: any)
 				{ collide = false, rot = gcf * kit.roblox.CFrame.new(0, -0.55 + k * 0.22, 0) }
 			)
 		end
-		-- the terrain carve box for this duct (Server/Attractions/AttractionService applies it at boot)
-		kit:box(
-			root:FindFirstChild("TerrainCarve") or kit:folder(root, "TerrainCarve"),
-			`Duct{p}`,
-			a - 0.3,
-			b + 0.3,
-			L.DUCT_FLOOR - 1.0, -- below the duct floor part too: voxels are 4 studs, the floor slab hides the rest
-			-0.05,
-			L.SHAFT_D0 - 0.5,
-			D1 + 1.5,
-			{ 255, 0, 0 },
-			"SmoothPlastic",
-			{ collide = false, query = false, transparency = 1, shadow = false }
-		)
+		-- the terrain carve boxes for this duct (Server/Attractions/AttractionService applies them at boot): in front
+		-- of the back module, and its tail's
+		local carve = root:FindFirstChild("TerrainCarve") or kit:folder(root, "TerrainCarve")
+		for _, c in { { `Duct{p}`, L.SHAFT_D0 - 0.5, BACK }, { `DuctTail{p}`, BACK, D1 + 1.5 } } do
+			kit:box(
+				carve,
+				c[1],
+				a - 0.3,
+				b + 0.3,
+				L.DUCT_FLOOR - 1.0, -- below the duct floor part too: voxels are 4 studs, the floor slab hides the rest
+				-0.05,
+				c[2],
+				c[3],
+				{ 255, 0, 0 },
+				"SmoothPlastic",
+				{ collide = false, query = false, transparency = 1, shadow = false }
+			)
+		end
 	end
 end
 
@@ -479,8 +481,8 @@ local function floors(kit: any, root: any)
 		local fin = finish[id]
 		kit:box(f, `Floor_{id}`, lines[i], lines[i + 1], bottom, top, L.FRONT_D, CD, fin[1], fin[2])
 	end
-	-- games room: warm boards
-	kit:box(f, "GamesFloor", HX1, L.X1, bottom, top, L.GAME_ROOM_D0, GD1, C.woodFloor, "WoodPlanks")
+	-- games room: light maple boards (a bright room: the darker boards read as a brown hangar)
+	kit:box(f, "GamesFloor", HX1, L.X1, bottom, top, L.GAME_ROOM_D0, GD1, C.gamesFloor, "WoodPlanks")
 end
 
 -- The storefront between xa and xb: a brick base course, piers about every 8 studs, glass between them with a
@@ -625,13 +627,23 @@ local function walls(kit: any, root: any, data: any)
 	parapet("WingEast", L.X1, OX1, L.FRONT_D, GD1 + L.WALL_T)
 	parapet("WingBack", OHX1, L.X1, GD1, GD1 + L.WALL_T)
 	parapet("HallEast", HX1, OHX1, GD1, BACK)
-	-- roof deck (the ceilings hang under it) and the plant on it
-	kit:box(w, "Roof", L.X0, HX1, CEIL, H, L.FRONT_D, BACK, C.roof, "Slate")
+	-- roof deck (the ceilings hang under it) and the plant on it. Over the lanes the deck, its plant, the hung
+	-- ceiling and the lights in it are the model HallRoof (AlleyLayout.HALL_ROOF), which the roof run's raised
+	-- hall roof replaces whole; here only the front rooms' and the wing's.
+	local hr = L.HALL_ROOF
+	local hall = root:FindFirstChild(hr.model) or kit:model(root, hr.model)
+	kit:box(w, "Roof", L.X0, HX1, CEIL, H, L.FRONT_D, hr.d0, C.roof, "Slate")
+	kit:box(hall, "Roof", hr.x0, hr.x1, CEIL, H, hr.d0, hr.d1, C.roof, "Slate")
 	kit:box(w, "RoofWing", HX1, L.X1, CEIL, H, L.FRONT_D, GD1, C.roof, "Slate")
 	for i, at in { { -10, 13 }, { 20, 13 }, { 50, 13 }, { 80, 13 }, { 36, -40 }, { 125, -20 } } do
 		local hx, hd = at[1], at[2]
-		kit:box(w, `RoofUnit{i}`, hx - 2.5, hx + 2.5, H, H + 2.6, hd - 3, hd + 3, { 176, 178, 176 }, "Metal")
-		kit:box(w, `RoofUnitFan{i}`, hx - 1.4, hx + 1.4, H + 2.6, H + 2.8, hd - 1.4, hd + 1.4, { 90, 92, 92 }, "Metal")
+		local parent = if hd > hr.d0 and hx < hr.x1 then hall else w
+		kit:box(parent, `RoofUnit{i}`, hx - 2.5, hx + 2.5, H, H + 2.6, hd - 3, hd + 3, { 176, 178, 176 }, "Metal")
+		kit:box(parent, `RoofUnitFan{i}`, hx - 1.4, hx + 1.4, H + 2.6, H + 2.8, hd - 1.4, hd + 1.4, {
+			90,
+			92,
+			92,
+		}, "Metal")
 	end
 	-- the games-room partition with its two cased openings
 	Shell.wallD(kit, w, "GamesWall", HX1, HX1 + T, L.FRONT_D, GD1, CEIL, openingsOn("d", HX1), C.wallHigh, "Plaster")
@@ -740,8 +752,10 @@ end
 local function ceilings(kit: any, root: any)
 	local m = kit:model(root, "Ceilings")
 	local opts = { collide = false, shadow = false }
-	kit:box(m, "CeilingFront", L.X0, HX1, CEIL - 0.04, CEIL, L.FRONT_D, L.APPROACH_D, C.ceiling, "SmoothPlastic", opts)
-	kit:box(m, "CeilingLanes", L.X0, HX1, CEIL - 0.04, CEIL, L.APPROACH_D, BACK, C.ceilingLanes, "SmoothPlastic", opts)
+	local hr = L.HALL_ROOF
+	local hall = root:FindFirstChild(hr.model) or kit:model(root, hr.model)
+	kit:box(m, "CeilingFront", L.X0, HX1, CEIL - 0.04, CEIL, L.FRONT_D, hr.d0, C.ceiling, "SmoothPlastic", opts)
+	kit:box(hall, "CeilingLanes", hr.x0, hr.x1, CEIL - 0.04, CEIL, hr.d0, hr.d1, C.ceilingLanes, "SmoothPlastic", opts)
 	kit:box(m, "CeilingGames", HX1 + T, L.X1, CEIL - 0.04, CEIL, L.FRONT_D, GD1, C.ceilingGames, "SmoothPlastic", opts)
 	-- the grid of a hung ceiling over the concourse and the front rooms (lines every 8 studs across)
 	for x = -18, HX1 - 2, 8 do
@@ -765,9 +779,11 @@ end
 -- front room. None casts shadows (there are many, and the lanes' pin lights do).
 local function lights(kit: any, root: any)
 	local m = kit:model(root, "HouseLights")
+	local hall = root:FindFirstChild(L.HALL_ROOF.model) or kit:model(root, L.HALL_ROOF.model)
+	local aisles = kit:model(hall, "AisleLights")
 	local function troffer(name: string, x: number, d: number, sx: number, sd: number, range: number, bright: number)
 		local t = kit:box(
-			m,
+			if name == "AisleTroffer" then aisles else m,
 			name,
 			x - sx / 2,
 			x + sx / 2,

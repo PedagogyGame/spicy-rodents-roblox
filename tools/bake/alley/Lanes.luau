@@ -393,6 +393,20 @@ local function kickbacksAndMasking(kit: any, root: any)
 		local w = if edge then 0.6 else 0.4
 		-- capping along the whole lane between gutters, then the tall kickback by the deck
 		kit:box(m, "Capping", kx - w / 2, kx + w / 2, L.DUCT_CEIL, 0.12, L.FOUL_D - 0.3, 50, CAP, "SmoothPlastic")
+		-- (beside the decks it stands on the floor, over the pits it reaches down to the pit floor: it never hangs
+		-- into the ball-return duct beneath)
+		kit:box(
+			m,
+			"Kickback",
+			kx - w / 2,
+			kx + w / 2,
+			L.DUCT_CEIL,
+			L.MASK_BOTTOM,
+			50,
+			L.DECK_END,
+			KICK,
+			"SmoothPlastic"
+		)
 		kit:box(
 			m,
 			"Kickback",
@@ -400,7 +414,7 @@ local function kickbacksAndMasking(kit: any, root: any)
 			kx + w / 2,
 			L.PIT_Y,
 			L.MASK_BOTTOM,
-			50,
+			L.DECK_END,
 			L.PIT_END + 0.3,
 			KICK,
 			"SmoothPlastic"
@@ -432,6 +446,22 @@ local function kickbacksAndMasking(kit: any, root: any)
 				50,
 				{ 46, 52, 88 },
 				"SmoothPlastic"
+			)
+			-- a person jumps about 7.2 studs, which clears the side wall from the aisle: an invisible guard 9 tall
+			-- along it, from the foul line to the masking units (the LaneGuard group: the ball and the pins pass, and
+			-- a squirrel, which never collides with it, still runs onto the lanes)
+			kit:box(
+				m,
+				"LaneGuardSide",
+				kx - w / 2,
+				kx + w / 2,
+				0,
+				9,
+				L.FOUL_D - 0.3,
+				L.MACHINE_D0,
+				{ 255, 0, 0 },
+				"SmoothPlastic",
+				{ query = false, transparency = 1, shadow = false, group = "LaneGuard" }
 			)
 		end
 	end
@@ -545,10 +575,13 @@ local function hoods(kit: any, root: any)
 		local x = L.pairX(p)
 		local hw = L.HOOD_W / 2
 		local d0, d1 = L.HOOD_D1, L.HOOD_D0 -- -4.2 .. -0.8
-		local mouthHW, mouthY0, mouthY1 = 0.62, 1.35, 2.25
-		-- sides and back
+		local mouthHW, mouthY0, mouthY1 = L.MOUTH_W / 2, L.MOUTH_Y0, L.MOUTH_Y1
+		-- The hood is hollow: the squirrel's run comes up the riser inside it and out of the mouth over the rack
+		-- (data/attractions.json; a crawl from the riser's top). Walls, a back, a crown of a flat top and two
+		-- sloping shoulders, a face round the mouth; nothing inside but a dark lining.
+		local eave = L.HOOD_H - 0.45
 		for side = -1, 1, 2 do
-			kit:box(m, "HoodSide", x + side * hw - 0.08, x + side * hw + 0.08, 0, 1.6, d0, d1, chrome, "Metal")
+			kit:box(m, "HoodSide", x + side * hw - 0.08, x + side * hw + 0.08, 0, eave, d0, d1, chrome, "Metal")
 			kit:box(
 				m,
 				"HoodBand",
@@ -562,34 +595,58 @@ local function hoods(kit: any, root: any)
 				"SmoothPlastic",
 				{ collide = false }
 			)
+			-- the shoulder: from the top's edge (0.5 out) down to the side wall's top
+			local run, drop = hw - 0.5, L.HOOD_H - eave
+			kit:at(
+				m,
+				"BonnetShoulder",
+				x + side * (0.5 + run / 2),
+				(L.HOOD_H + eave) / 2 - 0.05,
+				(d0 + d1) / 2,
+				math.sqrt(run * run + drop * drop) + 0.04,
+				0.1,
+				d1 - d0,
+				chrome,
+				"Metal",
+				{ rot = kit.roblox.CFrame.Angles(0, 0, -side * math.atan2(drop, run)) }
+			)
 		end
-		kit:box(m, "HoodBack", x - hw, x + hw, 0, 1.6, d1 - 0.12, d1, chrome, "Metal")
-		-- the rounded bonnet: a half-buried cylinder along the lane
-		kit:cyl(m, "Bonnet", x, 1.6, (d0 + d1) / 2, d1 - d0, L.HOOD_W, "D", chrome, "Metal")
-		kit:box(m, "BonnetCapBack", x - hw, x + hw, 1.6, 2.4, d1 - 0.06, d1, chrome, "Metal", { collide = false })
+		kit:box(m, "HoodBack", x - hw, x + hw, 0, eave, d1 - 0.12, d1, chrome, "Metal")
+		kit:box(m, "Bonnet", x - 0.5, x + 0.5, L.HOOD_H - 0.1, L.HOOD_H, d0, d1, chrome, "Metal")
+		kit:box(m, "BonnetCapBack", x - hw, x + hw, eave, L.HOOD_H - 0.12, d1 - 0.06, d1, chrome, "Metal", {
+			collide = false,
+		})
 		-- the front face around the mouth
 		kit:box(m, "FaceLow", x - hw, x + hw, 0, mouthY0, d0, d0 + 0.12, chrome, "Metal")
 		for side = -1, 1, 2 do
 			local a = x + side * mouthHW
 			local b = x + side * hw
-			kit:box(m, "FaceSide", math.min(a, b), math.max(a, b), mouthY0, 2.4, d0, d0 + 0.12, chrome, "Metal")
+			kit:box(m, "FaceSide", math.min(a, b), math.max(a, b), mouthY0, eave, d0, d0 + 0.12, chrome, "Metal")
 		end
-		kit:box(m, "FaceTop", x - mouthHW, x + mouthHW, mouthY1, 2.6, d0, d0 + 0.12, chrome, "Metal")
-		kit:box(
-			m,
-			"MouthLiner",
-			x - mouthHW,
-			x + mouthHW,
-			mouthY0,
-			mouthY1,
-			d0 + 0.12,
-			d0 + 0.9,
-			{ 16, 16, 18 },
-			"SmoothPlastic",
-			{
-				collide = false,
-			}
-		)
+		kit:box(m, "FaceTop", x - 0.5, x + 0.5, mouthY1, L.HOOD_H - 0.1, d0, d0 + 0.12, chrome, "Metal")
+		kit:box(m, "FaceTopSide", x - mouthHW, x + mouthHW, mouthY1, mouthY1 + 0.08, d0, d0 + 0.12, chrome, "Metal")
+		-- the mouth's dark lining: a top and two sides, a body's width apart
+		kit:box(m, "MouthLiner", x - mouthHW, x + mouthHW, mouthY1 - 0.04, mouthY1, d0 + 0.12, d0 + 0.9, {
+			16,
+			16,
+			18,
+		}, "SmoothPlastic", { collide = false })
+		for side = -1, 1, 2 do
+			local a = x + side * mouthHW
+			kit:box(
+				m,
+				"MouthLiner",
+				math.min(a, a - side * 0.04),
+				math.max(a, a - side * 0.04),
+				mouthY0,
+				mouthY1,
+				d0 + 0.12,
+				d0 + 0.9,
+				{ 16, 16, 18 },
+				"SmoothPlastic",
+				{ collide = false }
+			)
+		end
 		kit:box(
 			m,
 			"MouthLip",
@@ -597,21 +654,21 @@ local function hoods(kit: any, root: any)
 			x + mouthHW + 0.05,
 			mouthY0 - 0.05,
 			mouthY0,
-			d0 - 0.15,
+			d0 - 0.35,
 			d0 + 0.12,
 			{ 30, 30, 34 },
 			"Rubber" :: any
 		)
-		-- the lift's inner chute walls (dark) from the floor opening to the mouth
+		-- the lift's dark chute: a back panel inside the hood's back, and the shelf the ball rolls out on
 		kit:box(
 			m,
 			"ChuteBack",
-			x - 0.8,
-			x + 0.8,
+			x - hw + 0.1,
+			x + hw - 0.1,
 			0,
-			2.3,
-			L.SHAFT_D1 + 0.1,
-			L.SHAFT_D1 + 0.2,
+			eave,
+			d1 - 0.2,
+			d1 - 0.12,
 			{ 20, 20, 22 },
 			"SmoothPlastic",
 			{ collide = false }
@@ -621,10 +678,10 @@ local function hoods(kit: any, root: any)
 			"ChuteFloor",
 			x - 0.7,
 			x + 0.7,
-			1.25,
-			1.35,
+			mouthY0 - 0.25,
+			mouthY0 - 0.12,
 			d0 + 0.12,
-			L.SHAFT_D0,
+			L.SHAFT_D0 - 0.5,
 			{ 30, 30, 34 },
 			"Metal",
 			{ collide = false }
@@ -686,14 +743,27 @@ local function hoods(kit: any, root: any)
 			"Metal"
 		)
 		-- a hand dryer vent on top (every ball return has one)
-		kit:box(m, "Dryer", x - 0.45, x + 0.45, 2.3, 2.75, -2.8, -1.8, { 60, 62, 66 }, "Metal", { collide = false })
+		local top = L.HOOD_H
+		kit:box(
+			m,
+			"Dryer",
+			x - 0.45,
+			x + 0.45,
+			top,
+			top + 0.4,
+			-2.8,
+			-1.8,
+			{ 60, 62, 66 },
+			"Metal",
+			{ collide = false }
+		)
 		kit:box(
 			m,
 			"DryerGrille",
 			x - 0.35,
 			x + 0.35,
-			2.75,
-			2.78,
+			top + 0.4,
+			top + 0.43,
 			-2.7,
 			-1.9,
 			{ 24, 24, 26 },
@@ -944,7 +1014,9 @@ local function scoreboards(kit: any, root: any)
 end
 
 local function ceilingLights(kit: any, root: any)
-	local m = kit:model(root, "LaneLights")
+	-- (the lights in the hall's ceiling are part of HallRoof: AlleyLayout.HALL_ROOF)
+	local hall = root:FindFirstChild(L.HALL_ROOF.model) or kit:model(root, L.HALL_ROOF.model)
+	local m = kit:model(hall, "LaneLights")
 	-- fluorescent troffers over the approaches and settees, a few real lights among them
 	for _, d in { -6, -13, -20 } do
 		for p = 1, L.PAIRS do

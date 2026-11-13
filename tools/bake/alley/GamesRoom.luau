@@ -385,6 +385,115 @@ local function fortune(kit: any, parent: any)
 	fern(cx + 2.9, cd + 2.6, 0.8)
 end
 
+-- The room's fixtures (AlleyLayout.GAMES_FIXTURES): each inside its own rectangle, facing `face`.
+local function fixtures(kit: any, m: any)
+	local soft = { collide = false }
+	local CHROME = { 200, 202, 208 }
+	local TEAL = { 36, 150, 150 }
+	local ORANGE = { 232, 118, 40 }
+	local function stool(sx: number, sd: number)
+		kit:cyl(m, "Stool", sx, 2.6, sd, 0.25, 1.1, "Y", { 150, 52, 44 }, "Fabric")
+		kit:cyl(m, "StoolPost", sx, 1.3, sd, 2.5, 0.18, "Y", { 60, 60, 64 }, "Metal")
+		kit:cyl(m, "StoolFoot", sx, 0.05, sd, 0.1, 0.9, "Y", { 60, 60, 64 }, "Metal")
+	end
+	for _, f in L.GAMES_FIXTURES do
+		local cx, cd = (f.x0 + f.x1) / 2, (f.d0 + f.d1) / 2
+		if f.kind == "jukebox" then
+			-- a 70s jukebox against the partition: a wood cabinet, a lit arch, the record window
+			local j = kit:model(m, "Jukebox")
+			kit:box(j, "Cabinet", f.x0, f.x1 - 0.2, 0, 4.2, f.d0, f.d1, WOOD_DARK, "Wood")
+			kit:box(j, "Arch", f.x1 - 0.2, f.x1, 0.4, 4.6, f.d0, f.d1, { 255, 170, 70 }, "Neon", soft)
+			kit:box(j, "Window", f.x1 - 0.25, f.x1 - 0.1, 2.4, 3.6, f.d0 + 0.4, f.d1 - 0.4, { 30, 30, 34 }, "Glass", {
+				collide = false,
+				transparency = 0.3,
+			})
+			local plate = kit:box(
+				j,
+				"Plate",
+				f.x1 - 0.22,
+				f.x1 - 0.18,
+				1.2,
+				2.2,
+				f.d0 + 0.3,
+				f.d1 - 0.3,
+				TEAL,
+				"SmoothPlastic",
+				soft
+			)
+			kit:label(
+				kit:gui(plate, "Right", 40),
+				{ Text = "JUKEBOX\nFREE PLAY", TextColor = { 255, 236, 200 }, Font = "FredokaOne" }
+			)
+			kit:light(j.Arch, "PointLight", { Range = 8, Brightness = 1.2, Color = { 255, 180, 110 }, Shadows = false })
+		elseif f.kind == "ledge" then
+			-- a drink ledge on brackets against the wall, stools in front
+			local wallX = f.x0
+			kit:box(m, "DrinkLedge", wallX, wallX + 1.0, 3.5, 3.7, f.d0, f.d1, { 186, 140, 92 }, "Wood")
+			kit:box(m, "LedgeTrim", wallX + 0.95, wallX + 1.05, 3.2, 3.7, f.d0, f.d1, ORANGE, "SmoothPlastic", soft)
+			for d = f.d0 + 1.2, f.d1 - 1.0, 2.8 do
+				kit:box(
+					m,
+					"LedgeBracket",
+					wallX,
+					wallX + 0.8,
+					2.6,
+					3.5,
+					d - 0.08,
+					d + 0.08,
+					{ 60, 60, 64 },
+					"Metal",
+					soft
+				)
+				stool(f.x1 - 0.6, d + 0.4)
+			end
+		elseif f.kind == "high_table" then
+			kit:cyl(m, "HighTableTop", cx, 3.6, cd, 0.12, 2.4, "Y", { 186, 140, 92 }, "Wood")
+			kit:cyl(m, "HighTablePost", cx, 1.8, cd, 3.5, 0.25, "Y", { 60, 60, 64 }, "Metal")
+			kit:cyl(m, "HighTableFoot", cx, 0.05, cd, 0.1, 1.2, "Y", { 60, 60, 64 }, "Metal")
+			local r = math.min(f.x1 - f.x0, f.d1 - f.d0) / 2 - 0.6
+			for k = 0, 2 do
+				local a = k * 2.1 + cx * 0.1
+				stool(cx + math.cos(a) * r, cd + math.sin(a) * r)
+			end
+		elseif f.kind == "vending" or f.kind == "change" then
+			-- (no money changes hands: a press gives a can or a token for nothing; the prompts are a later builder's)
+			local v = kit:model(m, if f.kind == "vending" then "Vending" else "ChangeMachine")
+			v:SetAttribute("Fixture", f.id)
+			local body = if f.kind == "vending" then { 176, 40, 40 } else { 70, 90, 120 }
+			local h = if f.kind == "vending" then 6.4 else 5.0
+			kit:box(v, "Body", f.x0 + 0.1, f.x1, 0, h, f.d0, f.d1, body, "SmoothPlastic")
+			kit:box(v, "Front", f.x0, f.x0 + 0.1, 0.8, h - 0.6, f.d0 + 0.3, f.d1 - 0.3, { 220, 230, 240 }, "Neon", soft)
+			local face = kit:box(
+				v,
+				"Label",
+				f.x0 - 0.04,
+				f.x0,
+				h - 1.4,
+				h - 0.4,
+				f.d0 + 0.2,
+				f.d1 - 0.2,
+				body,
+				"SmoothPlastic",
+				soft
+			)
+			kit:label(kit:gui(face, "Left", 40), {
+				Text = if f.kind == "vending" then "ICE COLD\nSODA" else "TOKENS\nFREE",
+				TextColor = { 255, 255, 255 },
+				Font = "GothamBold",
+			})
+		elseif f.kind == "board" then
+			local board =
+				kit:box(m, "LeagueBoard", f.x0, f.x1, 5.2, 9.4, f.d0, f.d1, { 26, 30, 60 }, "SmoothPlastic", soft)
+			kit:box(m, "LeagueFrame", f.x0 - 0.2, f.x1 + 0.2, 5.0, 9.6, f.d1 - 0.01, f.d1, CHROME, "Metal", soft)
+			kit:label(kit:gui(board, "Front", 20), {
+				Text = "BELLWETHER BOWL LEAGUE\nPOOL - AIR HOCKEY - DARTS - PINBALL\nHIGH SCORES",
+				TextColor = { 255, 214, 92 },
+				Font = "FredokaOne",
+			})
+		end
+	end
+end
+
 local function gamesRoom(kit: any, root: any)
 	local m = kit:model(root, "GamesRoom")
 	-- each game's furniture is its own (tools/bake/GameBakes): one build per station, in the room's old order
@@ -430,7 +539,7 @@ local function gamesRoom(kit: any, root: any)
 			{ collide = false }
 		)
 	end
-	local PINE = { 186, 152, 106 }
+	local PINE = { 214, 188, 148 }
 	local soft = { collide = false }
 	kit:box(m, "Wainscot", x1 - 0.08, x1, 0, 3.2, gd0, gd1, WOOD, "WoodPlanks", soft)
 	kit:box(m, "PinePanel", x1 - 0.06, x1, 3.2, L.CEILING_Y, gd0, gd1, PINE, "WoodPlanks", soft)
@@ -523,11 +632,12 @@ local function gamesRoom(kit: any, root: any)
 		)
 		kit:label(kit:gui(sign, "Left", 30), { Text = "GAMES ROOM", TextColor = { 255, 214, 92 }, Font = "FredokaOne" })
 	end
-	-- lights: a grid of warm troffers over the floor (none casts shadows: the pool tables bring their own lamps)
-	-- and a low amber lamp in the fortune teller's corner
+	fixtures(kit, m)
+	-- lights: a grid of warm troffers over the floor at the hall's level (none casts shadows: the pool tables bring
+	-- their own lamps), five rows of three, and a low amber lamp in the fortune teller's corner
 	local wide = x1 - px
-	for _, d in { gd0 + 12, gd0 + 38, gd0 + 64, gd1 - 10 } do
-		for _, fx in { 0.26, 0.74 } do
+	for _, d in { gd0 + 9, gd0 + 29, gd0 + 49, gd0 + 69, gd1 - 9 } do
+		for _, fx in { 0.18, 0.5, 0.82 } do
 			local cx = px + wide * fx
 			local troffer = kit:box(
 				m,
@@ -545,7 +655,7 @@ local function gamesRoom(kit: any, root: any)
 			kit:light(
 				troffer,
 				"PointLight",
-				{ Range = 26, Brightness = 1.0, Color = { 255, 236, 210 }, Shadows = false }
+				{ Range = 22, Brightness = 1.15, Color = { 255, 240, 220 }, Shadows = false }
 			)
 		end
 	end

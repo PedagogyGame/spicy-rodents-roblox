@@ -23,6 +23,7 @@ local Kit = require("../../tools/bake/alley/Kit")
 local L = AlleyLayout
 local CELL, HALF = 0.5, 1.0
 local STEP, HEAD = 0.75, 5.2 -- the body's box starts one step above the floor and is this tall
+local JUMP = 7.2 -- how high a person's feet get in a jump (Roblox's default JumpPower; nothing in src/ changes it)
 
 return function(t)
 	local mod = Data.default():module("Attractions") :: any
@@ -79,8 +80,8 @@ return function(t)
 		t.truthy(perTop.BackModule < 450, `the back module is {perTop.BackModule} parts`)
 		t.eq(
 			perTop.TerrainCarve,
-			L.PAIRS + 2 + #L.SITE_CUTS,
-			"a carve box per duct, the alley, the entrance, the site cuts"
+			2 * L.PAIRS + 2 + #L.SITE_CUTS,
+			"two carve boxes per duct (its tail goes with the back module), the alley, the entrance, the site cuts"
 		)
 	end)
 
@@ -91,6 +92,9 @@ return function(t)
 	local NOFLOOR = -1e9
 	local floor = table.create(nx * nd, NOFLOOR)
 	local blocked = table.create(nx * nd, false)
+	-- the same body jumping: only what stands across the height its feet reach stops it (it clears the side walls,
+	-- the counters and the furniture, and walks under nothing it could not walk under anyway)
+	local blockedJump = table.create(nx * nd, false)
 	local function idx(i: number, j: number): number
 		return (j - 1) * nx + i
 	end
@@ -104,11 +108,13 @@ return function(t)
 				floor[idx(i, j)] = f
 			else
 				blocked[idx(i, j)] = true
+				blockedJump[idx(i, j)] = true
 			end
 		end
 	end
 	for _, b in boxes do
 		-- (the exit doors swing: Server/Attractions/AttractionService; a carve box is not there in the game)
+		-- (people collide with the LaneGuard group: Server/Attractions/AttractionService)
 		if b.part.CanCollide and b.top ~= "Doors" and b.top ~= "TerrainCarve" then
 			local top, bottom = b.Y + b.hy, b.Y - b.hy
 			-- A wall or a piece of furniture keeps the body's half width away from it. A part that is itself the
@@ -139,12 +145,16 @@ return function(t)
 					if f ~= NOFLOOR and top > f + STEP and bottom < f + HEAD then
 						blocked[k] = true
 					end
+					-- (what a jump cannot clear and a body cannot walk under either)
+					if f ~= NOFLOOR and top > f + JUMP and bottom < f + STEP + HEAD then
+						blockedJump[k] = true
+					end
 				end
 			end
 		end
 	end
-	local seen = table.create(nx * nd, false)
-	do
+	local function flood(stop: { boolean }): { boolean }
+		local seen = table.create(nx * nd, false)
 		local ramp = L.RAMP
 		local si, sj = cell((ramp.x0 + ramp.x1) / 2, ramp.d0 + 1.5)
 		local queue, head = { idx(si, sj) }, 1
@@ -158,14 +168,20 @@ return function(t)
 				local ni, nj = i + d[1], j + d[2]
 				if ni >= 1 and ni <= nx and nj >= 1 and nj <= nd then
 					local nk = idx(ni, nj)
-					if not seen[nk] and not blocked[nk] then
+					if not seen[nk] and not stop[nk] then
 						seen[nk] = true
 						table.insert(queue, nk)
 					end
 				end
 			end
 		end
+		return seen
 	end
+	local seen = flood(blocked)
+	for k = 1, nx * nd do
+		blockedJump[k] = blockedJump[k] and blocked[k]
+	end
+	local seenJump = flood(blockedJump)
 	local function reached(X: number, D: number): boolean
 		local i, j = cell(X, D)
 		return i >= 1 and i <= nx and j >= 1 and j <= nd and seen[idx(i, j)]
@@ -196,6 +212,21 @@ return function(t)
 			for _, d in { 4, 20, 45 } do
 				t.falsy(reached(L.laneX(lane), d), `a body got onto lane {lane} at D {d}`)
 			end
+		end
+		-- nor by jumping: a person's feet reach 7.2 studs, over the 3.4-stud side walls of lanes 1 and 18 from the
+		-- aisles, over the settees and the approach, but never over the guards
+		local function jumpedTo(X: number, D: number): boolean
+			local i, j = cell(X, D)
+			return i >= 1 and i <= nx and j >= 1 and j <= nd and seenJump[idx(i, j)]
+		end
+		for _, q in { { 22, -72 }, { 22, -60 }, { 22, -36 }, { -22.5, -36 }, { -22.5, 20 }, { 97, 20 } } do
+			t.truthy(jumpedTo(q[1], q[2]), `a jumping body reaches X {q[1]} D {q[2]}`)
+		end
+		for lane = 1, L.LANES do
+			for _, d in { 2, 20, 45, 52, 62 } do
+				t.falsy(jumpedTo(L.laneX(lane), d), `a jumping body got onto lane {lane} at D {d}`)
+			end
+			t.falsy(jumpedTo(L.laneX(lane) + L.LANE_W / 2 + 0.5, 30), `a jumping body got into lane {lane}'s gutter`)
 		end
 		-- every room of the plan can be stood in
 		for _, z in L.ZONES do
@@ -368,13 +399,38 @@ return function(t)
 					`{b.part.Name} reaches in front of the back module (D {b.D - b.hd})`
 				)
 				t.truthy(b.D + b.hd <= it.d1 + 0.01, `{b.part.Name} reaches behind the back module`)
-			elseif b.top ~= "Tunnels" and b.top ~= "TerrainCarve" and b.top ~= bs.anchorName then
+			elseif b.top == "Tunnels" or b.top == "TerrainCarve" then
+				-- a run's tail (and its carve box) is behind interimFrom and goes with the swap; the rest is in front
+				local tail = b.part.Parent.Name == "Tail"
+					or b.part:FindFirstAncestor("Tail") ~= nil
+					or string.match(b.part.Name, "^DuctTail%d+$") ~= nil
+				if tail then
+					t.truthy(
+						b.D - b.hd >= bs.interimFrom - 0.01,
+						`{b.part:GetFullName()} is a tail in front of the swap`
+					)
+				elseif b.top == "Tunnels" or string.match(b.part.Name, "^Duct%d+$") then
+					t.truthy(
+						b.D + b.hd <= bs.interimFrom + 0.01,
+						`{b.part:GetFullName()} reaches behind the pinsetters`
+					)
+				end
+			elseif b.top ~= bs.anchorName then
 				t.truthy(
 					b.D + b.hd <= bs.interimFrom + 0.15,
 					`{b.top}.{b.part.Name} is behind the pinsetters (D {b.D + b.hd})`
 				)
 			end
 		end
+		-- what the swap replaces is exactly the list, and every pair's tail is there
+		t.eq(table.concat(bs.replaces, ", "), "BackModule, Doors, Tunnels.Tunnel<p>.Tail, TerrainCarve.DuctTail<p>")
+		for p = 1, L.PAIRS do
+			local tun = (root :: any).Tunnels:FindFirstChild(`Tunnel{p}`)
+			t.truthy(tun:FindFirstChild("Tail") and tun.Tail:FindFirstChild("Grille"), `tunnel {p}'s tail and grille`)
+			t.truthy((root :: any).TerrainCarve:FindFirstChild(`DuctTail{p}`), `duct {p}'s tail carve box`)
+		end
+		t.eq(#bs.returnLegs.routes, L.PAIRS)
+		t.truthy(#bs.mustKeep >= 4, "the brief's back of house is listed for the swap to keep")
 		-- three big round dark-blue trash cans and the push broom by the door (brief v2 §13a)
 		local props = back:FindFirstChild("AlleyProps") :: any
 		local exit = L.opening("exit_doors")
@@ -406,5 +462,97 @@ return function(t)
 		local cx, _, cz = L.toWorld(place, bs.anchor.x, 0, bs.anchor.d - 10)
 		local toCustomers = roblox.Vector3.new(cx - anchor.CFrame.Position.X, 0, cz - anchor.CFrame.Position.Z).Unit
 		t.truthy(anchor.CFrame.ZVector:Dot(toCustomers) > 0.999, "+Z points to the customer lanes")
+	end)
+
+	-- a part's path under the root, lane and pair numbers generalised, a pin's pieces as its lane's Pins, and a
+	-- number at the end of the name dropped (AlleyLayout.BACKSTAGE.overlapsHall, HALL_ROOF.hung)
+	local function key(p: any): string
+		local names = {}
+		local cur = p
+		while cur and cur ~= root do
+			table.insert(names, 1, cur.Name)
+			cur = cur.Parent
+		end
+		local s = table.concat(names, ".")
+		s = string.gsub(s, "Lane%d+", "Lane<n>")
+		s = string.gsub(s, "Tunnel%d+", "Tunnel<p>")
+		s = string.gsub(s, "%.Pins%..*$", ".Pins")
+		s = string.gsub(s, "(%a)%d+$", "%1")
+		return s
+	end
+	local function sameSet(found: { [string]: boolean }, listed: { string }, what: string)
+		local want: { [string]: boolean } = {}
+		for _, k in listed do
+			want[k] = true
+		end
+		local extra, missing = {}, {}
+		for k in found do
+			if not want[k] then
+				table.insert(extra, k)
+			end
+		end
+		for k in want do
+			if not found[k] then
+				table.insert(missing, k)
+			end
+		end
+		table.sort(extra)
+		table.sort(missing)
+		t.eq(#extra, 0, `{what}, not listed: {table.concat(extra, ", ")}`)
+		t.eq(#missing, 0, `{what}, listed but gone: {table.concat(missing, ", ")}`)
+	end
+
+	t.test("the backstage's bays overlap exactly the listed hall parts; the hall's roof is one model", function()
+		local bs = L.BACKSTAGE
+		local hr = L.HALL_ROOF
+		local overlap, hung = {}, {}
+		for _, b in boxes do
+			local k = key(b.part)
+			local swap = b.top == "BackModule"
+				or b.top == "Doors"
+				or b.top == "TerrainCarve"
+				or b.top == bs.anchorName
+				or string.find(k, ".Tail.", 1, true) ~= nil
+			if
+				not swap
+				and b.top ~= "Foundation"
+				and b.top ~= hr.model
+				and b.D + b.hd > bs.overlapsHall.d0 + 0.01
+				and b.D - b.hd < bs.overlapsHall.d1 - 0.01
+				and b.X + b.hx > L.LANE_BLOCK_X0
+				and b.X - b.hx < L.LANE_BLOCK_X1
+			then
+				overlap[k] = true
+			end
+			if b.top == hr.model then
+				-- the roof model stays over its rectangle, at the ceiling and above
+				t.truthy(
+					b.X - b.hx >= hr.x0 - 0.01
+						and b.X + b.hx <= hr.x1 + 0.01
+						and b.D - b.hd >= hr.d0 - 0.01
+						and b.D + b.hd <= hr.d1 + 0.01,
+					`{k} is outside the hall roof's rectangle`
+				)
+				t.truthy(b.Y - b.hy >= L.CEILING_Y - 0.3, `{k} hangs below the ceiling`)
+			elseif
+				not swap
+				and b.top ~= "Walls"
+				and b.X + b.hx > hr.x0 + 0.01
+				and b.X - b.hx < hr.x1 - 0.01
+				and b.D + b.hd > hr.d0 + 0.01
+				and b.D - b.hd < hr.d1 - 0.01
+				and b.Y + b.hy > L.CEILING_Y - 0.3
+			then
+				hung[k] = true
+			end
+		end
+		sameSet(overlap, bs.overlapsHall.parts, "hall parts in the backstage's bays")
+		sameSet(hung, hr.hung, "parts that hang from the hall's ceiling")
+		local hall = root:FindFirstChild(hr.model) :: any
+		t.truthy(hall ~= nil, "the HallRoof model")
+		for _, name in { "Roof", "CeilingLanes", "LaneLights", "AisleLights" } do
+			t.truthy(hall:FindFirstChild(name), `HallRoof.{name}`)
+		end
+		t.eq(root:FindFirstChild("LaneLights"), nil, "the lane lights are the roof's")
 	end)
 end

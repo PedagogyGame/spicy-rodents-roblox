@@ -984,11 +984,12 @@ return function(t)
 			local worst, mean = apart(shown, truth(w))
 			t.truthy(worst[2] < EXACT, `Ann's own mallet is her hand ({worst[2]} m)`)
 			-- (from the referee's puck of the same instant: the far half is drawn a moment ago, on purpose). The mean
-			-- follows how fast this one rally happens to run, and the rally is chaotic: moving the table a tenth of
-			-- a stud gives 0.20 to 0.34 (measured 2026-11-13 when the eighteen-lane plan moved the table); 0.211
-			-- where it first stood, 0.256 where it stands now. The bound is a sanity bound; how late the far half is
-			-- drawn is held exactly by apartDrawn's cases.
-			t.truthy(mean[1] < 0.4, `the puck on Ann's screen is {mean[1]} m from the referee's on average`)
+			-- follows how fast this one rally happens to run, and the rally is chaotic. Measured with the table at
+			-- x 116, 116.1, 115.9, 116.5, 118 and 112 (2026-11-13): 0.256, 0.235, 0.281, 0.249, 0.221, 0.268 m, so
+			-- 0.221 to 0.281; the bound sits about 14 % above the worst. (That the rally depends on where the table
+			-- stands in the world at all means the client-to-referee path is not wholly in the table's own frame: a
+			-- follow-up for the air hockey lane.) How late the far half is drawn is held exactly by apartDrawn's cases.
+			t.truthy(mean[1] < 0.32, `the puck on Ann's screen is {mean[1]} m from the referee's on average`)
 			-- (twenty segments a second at most: the most Minigame.Input carries, and the rig's Net drops the rest)
 			local logs = Rig.count(w.sent, "log")
 			t.truthy(logs / 20 > 16 and logs / 20 <= 20.3, `{logs / 20} log messages a second against a person`)

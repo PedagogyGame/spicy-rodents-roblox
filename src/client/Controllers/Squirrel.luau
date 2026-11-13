@@ -50,6 +50,8 @@ local HINTS: { [string]: string } = {
 	noTransfer = "Nothing to grab within reach: get right under a branch or wire",
 	nothingNear = "Nothing to grab here: run into a tree, pole or downspout to climb",
 	junctionAhead = "Junction ahead: A or D picks the way",
+	-- inside an enclosed run (Shared/Routes/Enclosure) away from its openings
+	noRoom = "No room to jump in here: run on to an opening",
 }
 
 -- What to tell the player about this frame's verbs (pure; nil = nothing to say). `frame` is the
@@ -61,6 +63,10 @@ function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any }
 		end
 		if e.kind == "winded" then
 			return "Out of fumes: sprint comes back in a few seconds"
+		end
+		if e.kind == "lip" then
+			-- the head out of an enclosed run's opening (the ball return's hood over the rack, a knothole)
+			return "Space jumps out, click pounces, Q drops, S goes back in"
 		end
 	end
 	local attached = false
