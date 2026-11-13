@@ -1133,6 +1133,8 @@ return function(t)
 			t.truthy(result.numbers.tags > 0, "the bots tagged each other")
 			t.truthy(type(result.numbers.banner) == "string")
 			t.isType(result.numbers.stepMs.avg, "number")
+			t.isType(result.numbers.stepMs.p95, "number")
+			t.deepEq(result.numbers.stats.movesRefusedBy, {}, "the refusals by rule are reported (none)")
 		end
 	)
 end

@@ -21,7 +21,9 @@
 --   rolling on   the next match begins by itself with the person still seated, four a side again
 --   leaving      the person leaves: the table closes, the body stands in the lobby in its own collision
 --                group, the audience is told, and the arena costs nothing more
--- and what the service's step cost while the match was live (Stats: the whole step and its three shares).
+-- and what the service's step cost while the match was live (Stats: the whole step and its three shares; in the
+-- engine, opts.holdCost, its average and 95th centile held to Contract.COST.totalMs and its worst to a quarter of
+-- a frame), and the refusals of the run by the rule that refused them (Stats.movesRefusedBy, shotsRefusedBy).
 -- TIME IS REAL HERE: the match is slaved to the clock clients share (workspace:GetServerTimeNow), so the
 -- briefing takes its ten seconds; the whole flow is one to three minutes. play() takes any MinigameService and a
 -- `step(seconds)` that moves the world on by that long, so the Lune suite runs this same flow on the fake
@@ -41,6 +43,9 @@ export type Opts = {
 	groupOf: ((player: any) -> string?)?, -- the collision group its body is in
 	liveSeconds: number?, -- how long the bots are watched playing (default 12)
 	ballWait: number?, -- how much longer the watch goes on for the bots' first ball (default 120)
+	-- hold the step's cost to the contract (the engine run: yes; under Lune the numbers are reported only, a
+	-- shared machine's scheduler being in them: tests/unit/paintball_server_cost.spec says why)
+	holdCost: boolean?,
 }
 
 function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
@@ -252,7 +257,30 @@ function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 			sum += v
 			worst = math.max(worst, v)
 		end
-		numbers[name] = { avg = if #list > 0 then sum / #list else 0, max = worst }
+		local sorted = table.clone(list)
+		table.sort(sorted)
+		numbers[name] = {
+			avg = if #list > 0 then sum / #list else 0,
+			p95 = if #sorted > 0 then sorted[math.max(1, math.ceil(#sorted * 0.95))] else 0,
+			max = worst,
+		}
+	end
+	-- PB-15 in the engine: the arena's whole step (balls, bots and the rest) beside the town, while the bots
+	-- play. The average and the 95th centile are held to the contract's 1.5 ms (a frame of the arena that the
+	-- town never notices); the worst single step to a quarter of a 60 Hz frame (one collector or scheduler
+	-- hitch may land in it; a step that takes longer than that is a hitch players see)
+	local step = numbers.stepMs
+	check(not opts.holdCost or #samples.stepMs > 0, "no step was measured while the bots played")
+	if opts.holdCost then
+		check(
+			step.avg <= Contract.COST.totalMs,
+			`the arena's step averages {step.avg} ms while the bots play; the contract's budget is {Contract.COST.totalMs}`
+		)
+		check(
+			step.p95 <= Contract.COST.totalMs,
+			`the arena's step has a 95th centile of {step.p95} ms; the contract's budget is {Contract.COST.totalMs}`
+		)
+		check(step.max <= 1000 / 60 / 4, `the arena's worst step took {step.max} ms`)
 	end
 	check(
 		stats.movesRefused == 0 and stats.corrections == 0,
@@ -384,6 +412,9 @@ function PaintballFlow.play(svc: any, deps: Deps, opts: Opts): { [string]: any }
 		movesDropped = stats.movesDropped,
 		shotsRefused = stats.shotsRefused,
 		corrections = stats.corrections,
+		-- by what refused them (Stream.RULES for a Move, Contract.WHY for a click)
+		movesRefusedBy = table.clone(stats.movesRefusedBy or {}),
+		shotsRefusedBy = table.clone(stats.shotsRefusedBy or {}),
 	}
 	return { ok = #failures == 0, failures = failures, numbers = numbers }
 end
@@ -437,6 +468,7 @@ function PaintballFlow.run(): { [string]: any }
 	end
 	local result = PaintballFlow.play(A.minigames, deps, {
 		players = players,
+		holdCost = true,
 		-- the match runs on the clock clients share: the world is moved on in real time, a frame at a time
 		step = function(seconds: number)
 			local left = seconds

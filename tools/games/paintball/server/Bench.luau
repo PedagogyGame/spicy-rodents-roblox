@@ -21,9 +21,10 @@
 -- Interface: run(opts?) -> Result; places(arena) -> { { Spawn } } (eight standing places a side). opts:
 --   build (the building: default Greybox.build; a fresh one is built for each run), balls (in flight, default Contract.COST.atBalls), seconds (of match
 --   measured, default 4), countSweeps (wrap the arena's ball test to count and time it: its own clock reads
---   make every other number in that run a little worse). Result: per-tick medians and 95th centiles in
+--   make every other number in that run a little worse). Result: per-tick medians, 95th centiles, means and maxima in
 --   milliseconds { balls, rest, step, moves, fires, tick } (tick = everything the arena costs a frame: the
---   two handlers and the step), inFlight (mean), shotsPerSec, sweepsPerTick, sweepMs, downBytesPerSec (the
+--   two handlers and the step), snapTick and plainTick (the whole tick on the snapshot ticks and on the
+--   others), allocKB (the garbage one tick makes, from the ticks the collector freed nothing in), inFlight (mean), shotsPerSec, sweepsPerTick, sweepMs, downBytesPerSec (the
 --   stream to one member of the audience), stats (the service's own), yard and slow (the yardstick: how
 --   fast the machine was running Luau during the run, and how much slower that is than the quiet machine
 --   the budgets were measured on); yardstick(runs?) -> ms; YARD_QUIET
@@ -40,8 +41,13 @@ local Greybox = require("./Greybox")
 
 local Bench = {}
 
-export type Opts = { balls: number?, seconds: number?, countSweeps: boolean?, build: (() -> Arena.Arena)? }
-export type Spread = { median: number, p95: number }
+export type Opts = {
+	balls: number?,
+	seconds: number?,
+	countSweeps: boolean?,
+	build: (() -> Arena.Arena)?,
+}
+export type Spread = { median: number, p95: number, mean: number, max: number }
 export type Result = {
 	balls: Spread,
 	rest: Spread,
@@ -50,6 +56,11 @@ export type Result = {
 	fires: Spread,
 	tick: Spread,
 	inFlight: number,
+	-- the whole tick on the snapshot ticks (one in three: the encode and the sends are in these only) and on
+	-- the others; tick.median is a plain tick, so the snapshot frame is held by snapTick
+	snapTick: Spread,
+	plainTick: Spread,
+	allocKB: number, -- what one tick makes for the collector (the Moves, the clicks and the step), KB: the GC work it costs later
 	shotsPerSec: number,
 	sweepsPerTick: number,
 	sweepMs: number,
@@ -102,9 +113,18 @@ local function spread(list: { number }): Spread
 	table.sort(sorted)
 	local n = #sorted
 	if n == 0 then
-		return { median = 0, p95 = 0 }
+		return { median = 0, p95 = 0, mean = 0, max = 0 }
 	end
-	return { median = sorted[math.max(1, math.ceil(n * 0.5))], p95 = sorted[math.max(1, math.ceil(n * 0.95))] }
+	local sum = 0
+	for _, v in sorted do
+		sum += v
+	end
+	return {
+		median = sorted[math.max(1, math.ceil(n * 0.5))],
+		p95 = sorted[math.max(1, math.ceil(n * 0.95))],
+		mean = sum / n,
+		max = sorted[n],
+	}
 end
 
 -- Is there room to stand and sway at this point: level floor a stud and a half to every side, and nothing
@@ -355,12 +375,15 @@ local function measure(opts: Opts?): Result
 	local warm = math.floor(1.5 / DT)
 	local total = warm + math.floor(seconds / DT)
 	local seq = 0
+	local allocKB, allocTicks = 0, 0
+	local snapMs, plainMs = {}, {} -- the whole tick, on the snapshot ticks and on the others
 	for frame = 1, total do
 		local measured = frame > warm
 		if frame == warm + 1 then
 			shotsWere, sweeps, sweepSecs, downBytes = fired, 0, 0, 0
 		end
 		local now = 1000 + clock
+		local k0 = collectgarbage("count")
 		-- the Moves of this frame
 		local t0 = os.clock()
 		for i, p in people do
@@ -410,9 +433,16 @@ local function measure(opts: Opts?): Result
 			})
 			flying += 1
 		end
+		local snapsWere = stats.snapshots
 		local t2 = os.clock()
 		tick()
 		local t3 = os.clock()
+		local k1 = collectgarbage("count")
+		if measured and k1 >= k0 then
+			-- (a tick in which the collector freed nothing: what it made is what the heap grew by)
+			allocKB += k1 - k0
+			allocTicks += 1
+		end
 		if measured then
 			table.insert(movesMs, (t1 - t0) * 1000)
 			table.insert(firesMs, (t2 - t1) * 1000)
@@ -420,6 +450,7 @@ local function measure(opts: Opts?): Result
 			table.insert(restMs, stats.restMs)
 			table.insert(stepMs, stats.stepMs)
 			table.insert(tickMs, (t3 - t0) * 1000)
+			table.insert(if stats.snapshots > snapsWere then snapMs else plainMs, (t3 - t0) * 1000)
 			inFlightSum += flying
 			if frame % YARD_EVERY == 0 then
 				table.insert(yardMs, yard())
@@ -437,7 +468,10 @@ local function measure(opts: Opts?): Result
 		moves = spread(movesMs),
 		fires = spread(firesMs),
 		tick = spread(tickMs),
+		snapTick = spread(snapMs),
+		plainTick = spread(plainMs),
 		inFlight = inFlightSum / frames,
+		allocKB = if allocTicks > 0 then allocKB / allocTicks else 0,
 		shotsPerSec = (fired - shotsWere) / seconds,
 		sweepsPerTick = sweeps / frames,
 		sweepMs = sweepSecs * 1000 / frames,

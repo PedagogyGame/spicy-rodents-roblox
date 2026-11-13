@@ -21,11 +21,23 @@
 -- between its ticks (Bench, "the yardstick") and is held to its budget times `slow`, how much slower
 -- than the quiet machine of those numbers the yardstick says the run was (never less than 1: a faster
 -- machine is held to the budget as written). A run that still misses is given two more chances.
+-- WHY MEDIANS, AND NOT THE 95th CENTILE OR THE MEAN (asked in review). The snapshot frame is held on its own
+-- (snapTick: the median of the ticks that carry a snapshot, 0.03 ms above the others). The slow ticks of a
+-- run under Lune are the machine's, not the code's: they come in whole multiples of about 4 ms over the
+-- median (4.65, 8.65, 12.6 ms at a median of 0.6: the kernel's scheduling quantum on a machine whose four
+-- cores other agents share), fall on snapshot and plain ticks alike, are as many in the ticks in which the
+-- collector freed nothing as in the others, and come and go between two runs of the same code (95th
+-- centile 4.8 ms, then 0.95). A 95th centile or a mean pinned here would be a statement about the
+-- neighbours. What the code makes the collector do later is pinned instead (allocKB), and the mean and the
+-- worst step are asserted where they mean something, in the engine (tests/engine/PaintballFlow).
 local ArenaData = require("@shared/Minigames/Paintball/ArenaData")
 local Contract = require("@shared/Minigames/Paintball/Contract")
 local Bench = require("../../tools/games/paintball/server/Bench")
 
 local COST = Contract.COST
+-- KB of garbage a tick at 8 v 8 with 80 balls may make, everything in the run counted (22.7 measured: 4.4 the
+-- sixteen clients' Move records, about 3 a ball born, the rest the step's records and the snapshot buffers)
+local ALLOC_KB = 30
 
 -- the best of up to three runs by `score` (lower is better; milliseconds, taken at the quiet machine's
 -- speed: divided by the run's `slow`), stopping at the first that is `good`
@@ -69,6 +81,14 @@ return function(t)
 					r.tick.median < budget * r.slow,
 					`the tick costs {r.tick.median} ms (95th centile {r.tick.p95}); the budget is {budget}; {busy(r)}`
 				)
+				-- the snapshot frame (one tick in three: the encode and the sends to sixteen screens) is held to the
+				-- same budget; tick.median alone is a tick without one
+				t.truthy(
+					r.snapTick.median < budget * r.slow,
+					`a snapshot tick costs {r.snapTick.median} ms; the budget is {budget}; {busy(r)}`
+				)
+				-- the collector's work later: what a tick makes (the sixteen clients' records included)
+				t.truthy(r.allocKB < ALLOC_KB, `a tick makes {r.allocKB} KB of garbage; the bound is {ALLOC_KB}`)
 			end
 		)
 	end
