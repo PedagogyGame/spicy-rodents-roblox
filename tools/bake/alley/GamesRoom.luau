@@ -458,6 +458,52 @@ local function gamesRoom(kit: any, root: any)
 		end
 		from = cut[2]
 	end
+	-- the floor: a rug under every table that is played standing round it, the size of the floor the plan keeps
+	-- clear for it (AlleyLayout.standing), so the big room reads as a place for each game and whoever dresses it
+	-- sees what to leave alone. The air hockey table's rug lies ready for it. Two flat parts each: a border and a
+	-- field (a rug is not a floor: nothing stands on it and nothing collides with it).
+	local RUGS = {
+		pool_1 = { { 30, 74, 62 }, { 40, 96, 78 } },
+		pool_2 = { { 30, 74, 62 }, { 40, 96, 78 } },
+		bumper_pool = { { 112, 40, 36 }, { 142, 54, 44 } },
+		air_hockey = { { 36, 54, 104 }, { 48, 72, 134 } },
+	}
+	for _, s in L.standing() do
+		local cols = RUGS[s.id]
+		if cols then
+			kit:box(m, "RugBorder", s.x0 + 0.5, s.x1 - 0.5, 0, 0.03, s.d0 + 0.5, s.d1 - 0.5, cols[1], "Fabric", {
+				collide = false,
+				shadow = false,
+			})
+			kit:box(m, "Rug", s.x0 + 1.3, s.x1 - 1.3, 0.03, 0.05, s.d0 + 1.3, s.d1 - 1.3, cols[2], "Fabric", {
+				collide = false,
+				shadow = false,
+			})
+		end
+	end
+	-- somewhere to sit and watch: a long bench against the partition between its two openings, and one against
+	-- the back wall beside the fortune teller's corner (each clear of every table's floor)
+	local function bench(
+		name: string,
+		bx0: number,
+		bx1: number,
+		bd0: number,
+		bd1: number,
+		backX: number?,
+		backD: number?
+	)
+		kit:box(m, name .. "Base", bx0 + 0.15, bx1 - 0.15, 0, 1.3, bd0 + 0.15, bd1 - 0.15, WOOD_DARK, "Wood")
+		kit:box(m, name .. "Seat", bx0, bx1, 1.3, 1.75, bd0, bd1, { 150, 52, 44 }, "Fabric")
+		if backX then
+			kit:box(m, name .. "Back", backX, backX + 0.3, 1.75, 4.0, bd0, bd1, { 150, 52, 44 }, "Fabric", soft)
+		elseif backD then
+			kit:box(m, name .. "Back", bx0, bx1, 1.75, 4.0, backD - 0.3, backD, { 150, 52, 44 }, "Fabric", soft)
+		end
+	end
+	local arch, side = L.opening("games_arch"), L.opening("games_side")
+	bench("WallBench", px + 0.15, px + 2.0, arch.b + 5, side.a - 5, px + 0.15, nil)
+	local fst = L.FORTUNE
+	bench("BackBench", px + 6, fst.x - 4.3 - 3, gd1 - 2.0, gd1 - 0.15, nil, gd1 - 0.15)
 	-- "GAMES ROOM" over each opening, on the hall side
 	for _, id in { "games_arch", "games_side" } do
 		local o = L.opening(id)
