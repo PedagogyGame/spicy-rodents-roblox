@@ -25,6 +25,7 @@ local Cabinet = require("@client/Minigames/Pinball/Cabinet")
 local Controller = require("@client/Minigames/Pinball/Controller")
 local Dmd = require("@client/Minigames/Pinball/Dmd")
 local Hands = require("@client/Minigames/Pinball/Hands")
+local Reach = require("@client/Minigames/Pinball/Reach")
 local Layout = require("@shared/Minigames/Pinball/Layout")
 local MinigameSounds = require("@client/Minigames/MinigameSounds")
 local FakeEngine = require("@tests/lib/FakeEngine")
@@ -331,6 +332,73 @@ local function hud(_w: Rig.World): { { any } }
 		end
 	end
 	return out
+end
+
+-- A person's torso and two arms on a body (the stock R15 rig's joints and offsets, every part where those joints
+-- rest it), as far as Pinball/Reach looks at it.
+local function armed(body: any): any
+	local V, C = roblox.Vector3, roblox.CFrame
+	local at = body.PrimaryPart.CFrame
+	local function part(n: string, x: number, y: number): any
+		return FakeEngine.part(n, at * C.new(x, y, 0), body)
+	end
+	local function motor(n: string, p0: any, p1: any, c0: any, c1: any)
+		local m = FakeEngine.new("Motor6D", n)
+		m.Part0, m.Part1, m.C0, m.C1, m.Transform = p0, p1, C.new(c0), C.new(c1), C.new()
+		m.Parent = p1
+	end
+	local lower, torso = part("LowerTorso", 0, -0.8), part("UpperTorso", 0, 0.2)
+	motor("Waist", lower, torso, V.new(0, 0.2, 0), V.new(0, -0.8, 0))
+	for _, s in { { "Right", 1 }, { "Left", -1 } } do
+		local side, k = s[1] :: string, s[2] :: number
+		local upper = part(`{side}UpperArm`, 1.5 * k, 0.369)
+		local fore = part(`{side}LowerArm`, 1.5 * k, -0.224)
+		local palm = part(`{side}Hand`, 1.5 * k, -0.85)
+		motor(`{side}Shoulder`, torso, upper, V.new(k, 0.563, 0), V.new(-0.5 * k, 0.394, 0))
+		motor(`{side}Elbow`, upper, fore, V.new(0, -0.334, 0), V.new(0, 0.259, 0))
+		motor(`{side}Wrist`, fore, palm, V.new(0, -0.501, 0), V.new(0, 0.125, 0))
+	end
+	return body
+end
+
+local function jointOf(body: any, name: string): any
+	for _, d in body:GetDescendants() do
+		if d.Name == name then
+			return d
+		end
+	end
+	return nil
+end
+
+-- the lower torso where the body's root has it (the engine's Root joint, solved before Stepped)
+local function settleBody(body: any)
+	jointOf(body, "Waist").Part0.CFrame = body.PrimaryPart.CFrame * roblox.CFrame.new(0, -0.8, 0)
+end
+
+-- Where a body's joints, as they are written now, put its hands, elbows and shoulders, and how its upper torso
+-- stands (forward from the lower torso through each joint: Part1 = Part0 * C0 * Transform * C1^-1).
+local function armsOf(body: any): any
+	local waist = jointOf(body, "Waist")
+	local torso = waist.Part0.CFrame * waist.C0 * waist.Transform * waist.C1:Inverse()
+	local out: any = { torso = torso }
+	for _, side in { "Left", "Right" } do
+		local sh, el, wr = jointOf(body, `{side}Shoulder`), jointOf(body, `{side}Elbow`), jointOf(body, `{side}Wrist`)
+		local upper = torso * sh.C0 * sh.Transform * sh.C1:Inverse()
+		local fore = upper * el.C0 * el.Transform * el.C1:Inverse()
+		out[side] = {
+			shoulder = (torso * sh.C0).Position,
+			elbow = (upper * el.C0).Position,
+			hand = (fore * wr.C0 * wr.C1:Inverse()).Position,
+		}
+	end
+	return out
+end
+
+local function posedNow(body: any): boolean
+	local I = roblox.CFrame.new()
+	return jointOf(body, "LeftShoulder").Transform ~= I
+		or jointOf(body, "RightShoulder").Transform ~= I
+		or jointOf(body, "Waist").Transform ~= I
 end
 
 return function(t)
@@ -1338,6 +1406,107 @@ return function(t)
 				t.truthy(Rig.has(Rig.texts(w.gui), "BEST BONUS"), screen)
 				t.eq(Rig.last(w.got, "state").place, 1)
 				t.eq(Rig.last(w.got, "state").newBest, true)
+			end, opts(1))
+		end
+	)
+
+	t.test(
+		"PIN-S2: the person playing has both hands on the flipper buttons, leaning in; a hand presses in with its flipper and the right one pulls the plunger's knob; a bystander at a spot is left alone; at the end the Animator has the joints again",
+		function()
+			Rig.play(function(w)
+				local V = roblox.Vector3
+				local ID = stationOf(1)
+				local place = w.places[SITE]
+				local folder = FakeEngine.new("Folder", "Bodies")
+				folder.Parent = workspace
+				w.body.Parent = folder
+				armed(w.body)
+				-- Carl watches from the first spot beside the cabinet
+				local X, D = CabinetLayout.stance(1)
+				local spot = Controller.SPOTS[1]
+				local cx, cy, cz = AlleyLayout.toWorld(place, X + spot.x, 3, D + spot.d)
+				local carl = FakeEngine.model("Carl", roblox.CFrame.new(cx, cy, cz), folder)
+				carl.PrimaryPart = FakeEngine.part("HumanoidRootPart", roblox.CFrame.new(cx, cy, cz), carl)
+				armed(carl)
+				local function frames(n: number)
+					for _ = 1, n do
+						Rig.frame(w)
+						settleBody(w.body)
+						settleBody(carl)
+						Cabinet.reach(Rig.DT)
+					end
+				end
+				local function world(x: number, y: number, z: number): any
+					return V.new(AlleyLayout.toWorld(place, x, y, z))
+				end
+				Rig.press(w, ID)
+				frames(12)
+				t.eq(posedNow(w.body), false, "nobody reaches for the buttons in the lobby")
+				Rig.key(Key.Space, true)
+				Rig.key(Key.Space, false)
+				frames(25)
+				-- Space held: the plunger comes back and the right hand is on its knob
+				Rig.key(Key.Space, true)
+				frames(30)
+				local c = Controller.current
+				t.truthy(c and c.live, "her ball is live")
+				local cab = c.cab
+				local f = cab.drawn
+				t.truthy(f.pull > 0.3, `the plunger is drawn back ({f.pull})`)
+				local a = armsOf(w.body)
+				local knob = world(CabinetLayout.knob(1, cab.tbl.def.plunger.x, f.pull, true))
+				t.truthy(
+					(a.Right.hand - knob).Magnitude < 0.03,
+					`the right hand is on the knob ({(a.Right.hand - knob).Magnitude})`
+				)
+				local left0 = world(CabinetLayout.button(1, 0, true, false))
+				t.truthy((a.Left.hand - left0).Magnitude < 0.03, "the left hand on its button")
+				Rig.key(Key.Space, false)
+				frames(90)
+				-- in play: both hands on the buttons, the body leant in over the lockdown bar, the elbows hanging
+				a = armsOf(w.body)
+				for side = 0, 1 do
+					local arm = if side == 0 then a.Left else a.Right
+					local target = world(CabinetLayout.button(1, side, true, false))
+					local button = world(CabinetLayout.button(1, side))
+					t.truthy(
+						(arm.hand - target).Magnitude < 0.03,
+						`hand {side} is {(arm.hand - target).Magnitude} from its grip`
+					)
+					t.truthy((arm.hand - button).Magnitude < 0.35, "and that is at the button")
+					local along = (arm.elbow - arm.shoulder):Dot((arm.hand - arm.shoulder).Unit)
+					local onLine = arm.shoulder + (arm.hand - arm.shoulder).Unit * along
+					t.truthy(arm.elbow.Y <= onLine.Y + 1e-3, "the elbow does not stick up")
+					t.near((arm.elbow - arm.shoulder).Magnitude, 0.883, 2e-3, "the arm keeps its length")
+				end
+				local lean = math.acos(math.clamp(a.torso.UpVector.Y, -1, 1))
+				t.truthy(lean > 0.05 and lean <= Reach.LEAN_MAX + 1e-6, `leant in a little ({lean} rad)`)
+				local toward = world(X, 3, D - 1) - world(X, 3, D)
+				t.truthy(a.torso.UpVector:Dot(toward.Unit) > 0.05, "toward the machine")
+				t.eq(posedNow(carl), false, "Carl at his spot keeps his arms")
+				-- the left flipper held: the left hand pushes its button in
+				Rig.key(Key.LeftShift, true)
+				frames(20)
+				a = armsOf(w.body)
+				local pressed = world(CabinetLayout.button(1, 0, true, true))
+				t.truthy((a.Left.hand - pressed).Magnitude < 0.03, "the left hand has pressed in")
+				t.truthy((a.Left.hand - left0).Magnitude > CabinetLayout.BUTTON.press * 0.8)
+				local right0 = world(CabinetLayout.button(1, 1, true, false))
+				t.truthy((a.Right.hand - right0).Magnitude < 0.03, "the right hand still rests on its button")
+				Rig.key(Key.LeftShift, false)
+				frames(20)
+				t.truthy((armsOf(w.body).Left.hand - left0).Magnitude < 0.03, "and lets go")
+				-- she leaves: the joints are the Animator's again
+				Rig.key(Key.Q, true)
+				Rig.key(Key.Q, false)
+				frames(3)
+				Rig.key(Key.Q, true)
+				Rig.key(Key.Q, false)
+				frames(30)
+				t.eq(posedNow(w.body), false, "let go when the game is left")
+				-- a body with one arm (or none: an animal) is never posed
+				local stump = FakeEngine.model("Stump", roblox.CFrame.new(0, 3, 0), nil)
+				t.eq(Reach.hands(stump), nil)
 			end, opts(1))
 		end
 	)

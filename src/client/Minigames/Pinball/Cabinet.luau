@@ -30,7 +30,9 @@
 --   loudness(cue, a, b) -> (volume, pitch); hearFrom(cab) -> Instance? (nil: flat, the player's own);
 --   hear(cab, name, volume, pitch); CUE_NAMES; cueName(variant, cue) -> string; SOUNDS (every cue name, for the
 --   game's sounds); step(dt) (the render step; specs call it); reset() (specs); awake() -> number; DELAY;
---   CHUNK; SLEEP; BIND; KEEP; HEAR_NEAR; HEAR_FAR; IMPACT_MIN; BUMPER_PITCH
+--   CHUNK; SLEEP; BIND; KEEP; HEAR_NEAR; HEAR_FAR; IMPACT_MIN; BUMPER_PITCH; reach(dt) (the Stepped step: the
+--   hands of whoever plays, on the buttons; specs call it); handTargets(cab, frame) -> (left, right); GRIP_NEAR;
+--   GRIP_LOOK; GRIP_EASE
 
 local Import = require("../../Import")
 local Attract =
@@ -53,6 +55,7 @@ local Wire = Import.shared("Minigames/Pinball/Wire") :: typeof(require("../../..
 local AlleyLayout =
 	Import.shared("Attractions/AlleyLayout") :: typeof(require("../../../shared/Attractions/AlleyLayout"))
 local MinigameSounds = require("../MinigameSounds")
+local Reach = require("./Reach")
 
 local Cabinet = {}
 
@@ -68,6 +71,9 @@ Cabinet.HEAR_NEAR = 6 -- studs: another player's machine is heard at full volume
 Cabinet.HEAR_FAR = 30 -- and not at all beyond this
 Cabinet.IMPACT_MIN = 0.15 -- the quietest a hit is heard, of its cue's volume
 Cabinet.BUMPER_PITCH = 0.06 -- the pop bumpers ring this much apart in pitch
+Cabinet.GRIP_NEAR = 0.9 -- studs: a body this near the stance is the one playing (the others stand at their spots)
+Cabinet.GRIP_LOOK = 0.5 -- seconds between two looks for who stands at the stance
+Cabinet.GRIP_EASE = 0.08 -- seconds a hand takes to settle where it goes
 
 -- the cue names, by Machine.CUE number ("bumper", "flip_up", ...)
 Cabinet.CUE_NAMES = {} :: { [number]: string }
@@ -131,6 +137,10 @@ export type Cab = {
 	frame: any,
 	lampsIdle: { number },
 	notes: { any }, -- seats retired, waiting for this copy to reach the server's tick: { seat, tick }
+	drawn: any?, -- the frame drawn last (whoever drew it)
+	grip: any?, -- the body at the stance with its hands on the buttons (Reach.Hands)
+	gripAt: number, -- when the stance was last looked at (cab.clock)
+	hands: { Vector3 }, -- where each hand is held now (left, right: eased toward its target)
 }
 
 local cabs: { [string]: Cab } = {}
@@ -310,6 +320,7 @@ end
 function Cabinet.show(cab: Cab, f: any, dt: number?)
 	local step = dt or 0
 	cab.clock += step
+	cab.drawn = f
 	local parts = cab.parts
 	if parts == nil or parts.model.Parent == nil then
 		if cab.clock - cab.findAt < 0.5 and parts == nil then
@@ -524,6 +535,10 @@ function Cabinet.get(station: string, place: any?, index: number?, tableId: stri
 			frame = nil,
 			lampsIdle = {},
 			notes = {},
+			drawn = nil,
+			grip = nil,
+			gripAt = -math.huge,
+			hands = {},
 		}
 		cabs[station] = cab
 	end
@@ -762,6 +777,149 @@ local function follow(cab: Cab, dt: number)
 	Cabinet.show(cab, f, dt)
 end
 
+-- THE PERSON PLAYING HAS BOTH HANDS ON THE BUTTONS (Pinball/Reach), on every screen, from the frame drawn
+-- here: whoever stands at the machine's stance while a ball is in play (the nearest body to it within GRIP_NEAR
+-- that has two arms; looked for every GRIP_LOOK seconds) leans in a little with a hand on each flipper button,
+-- a hand pressing in while its flipper is up; while the plunger is drawn back the right hand is on its knob.
+-- The hands are eased toward where they go (GRIP_EASE seconds), so a hand moves from the button to the knob and
+-- back rather than jumping. Nothing is sent for it. Run in RunService.Stepped, after the Animator.
+local function letGo(cab: Cab)
+	if cab.grip ~= nil then
+		Reach.rest(cab.grip)
+		cab.grip = nil
+	end
+	table.clear(cab.hands)
+end
+
+local function bodiesNear(cab: Cab): any
+	local place = cab.place
+	if place == nil then
+		return nil
+	end
+	local X, D = CabinetLayout.stance(cab.index)
+	local x, _, z = AlleyLayout.toWorld(place, X, 0, D)
+	local found: { { body: any, d: number } } = {}
+	local function consider(body: any)
+		local root = if body ~= nil and body:IsA("Model") then body.PrimaryPart else nil
+		if root ~= nil then
+			local d = (root.Position.X - x) ^ 2 + (root.Position.Z - z) ^ 2
+			if d <= Cabinet.GRIP_NEAR ^ 2 then
+				table.insert(found, { body = body, d = d })
+			end
+		end
+	end
+	local folder = workspace:FindFirstChild("Bodies")
+	for _, body in if folder then folder:GetChildren() else {} do
+		consider(body)
+	end
+	pcall(function()
+		for _, p in (game:GetService("Players") :: any):GetPlayers() do
+			if p.Character ~= nil and p.Character.Parent ~= folder then
+				consider(p.Character)
+			end
+		end
+	end)
+	table.sort(found, function(a, b)
+		return a.d < b.d
+	end)
+	return found
+end
+
+local function lookForPlayer(cab: Cab)
+	local held = cab.grip
+	local grip: any = nil
+	for _, f in bodiesNear(cab) or {} do
+		if held ~= nil and held.body == f.body then
+			grip = held
+		else
+			grip = Reach.hands(f.body)
+		end
+		if grip ~= nil then
+			break
+		end
+	end
+	if held ~= nil and held ~= grip then
+		letGo(cab)
+	end
+	cab.grip = grip
+end
+
+-- where each hand goes for a frame: (left, right) in the world
+function Cabinet.handTargets(cab: Cab, f: any): (Vector3, Vector3)
+	local c = cab.tbl.c
+	local pressed = { false, false }
+	for i = 1, c.nFlip do
+		local a = f.flippers[i]
+		local stroke = c.fup[i] - c.frest[i]
+		if a ~= nil and stroke ~= 0 and (a - c.frest[i]) / stroke > 0.4 then
+			pressed[c.fbtn[i]] = true
+		end
+	end
+	local place = cab.place :: any
+	local function world(X: number, Y: number, D: number): Vector3
+		local x, y, z = AlleyLayout.toWorld(place, X, Y, D)
+		return Vector3.new(x, y, z)
+	end
+	local left = world(CabinetLayout.button(cab.index, 0, true, pressed[1]))
+	local right = world(CabinetLayout.button(cab.index, 1, true, pressed[2]))
+	if (f.pull or 0) > 0.01 then
+		right = world(CabinetLayout.knob(cab.index, cab.tbl.def.plunger.x, f.pull, true))
+	end
+	return left, right
+end
+
+-- The Stepped step: the hands of whoever plays each machine being drawn here.
+function Cabinet.reach(dt: number)
+	for _, cab in cabs do
+		local f = cab.drawn
+		local playing = cab.awake
+			and cab.place ~= nil
+			and (cab.live or cab.mode == "follow")
+			and f ~= nil
+			and f.phase == Machine.PHASE.PLAY
+		if not playing then
+			letGo(cab)
+			continue
+		end
+		if cab.clock - cab.gripAt >= Cabinet.GRIP_LOOK or cab.clock < cab.gripAt then
+			cab.gripAt = cab.clock
+			lookForPlayer(cab)
+		end
+		local grip = cab.grip
+		if grip == nil then
+			continue
+		end
+		if grip.body.Parent == nil then
+			letGo(cab)
+			continue
+		end
+		local left, right = Cabinet.handTargets(cab, f)
+		local hands = cab.hands
+		local k = math.clamp(dt / Cabinet.GRIP_EASE, 0, 1)
+		hands[1] = if hands[1] then hands[1]:Lerp(left, k) else left
+		hands[2] = if hands[2] then hands[2]:Lerp(right, k) else right
+		Reach.pose(grip, hands[1], hands[2])
+	end
+end
+
+local stepped: any = nil
+local function settleReach(any: boolean)
+	if any and stepped == nil then
+		pcall(function()
+			local signal = (game:GetService("RunService") :: any).Stepped
+			if signal ~= nil then
+				stepped = signal:Connect(function(_t: number, dt: number)
+					Cabinet.reach(dt)
+				end)
+			end
+		end)
+	elseif not any and stepped ~= nil then
+		stepped:Disconnect()
+		stepped = nil
+		Cabinet.reach(0) -- (every hand let go)
+	end
+end
+
 function Cabinet.step(dt: number)
 	local any = false
 	-- where this player is (their body; no body, no sleep)
@@ -802,6 +960,7 @@ function Cabinet.step(dt: number)
 			attract(cab, dt)
 		end
 	end
+	settleReach(any)
 	if not any and bound then
 		bound = false
 		game:GetService("RunService"):UnbindFromRenderStep(Cabinet.BIND)
@@ -819,6 +978,13 @@ function Cabinet.awake(): number
 end
 
 function Cabinet.reset()
+	for _, cab in cabs do
+		letGo(cab)
+	end
+	if stepped ~= nil then
+		stepped:Disconnect()
+		stepped = nil
+	end
 	table.clear(cabs)
 	if bound then
 		bound = false

@@ -414,8 +414,9 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 			solid
 		)
 		-- the flipper buttons, on the outside of the rails near the front
-		local bx = if side == 0 then -R - 0.02 else W + R + 0.02
-		on(m, "FlipperButton", bx, 0.25, -0.16, 0.06, 0.1, 0.1, 0, { 230, 40, 40 }, "SmoothPlastic", {
+		local B = Cabinet.BUTTON
+		local bx = if side == 0 then -R - B.out else W + R + B.out
+		on(m, "FlipperButton", bx, B.y, B.h, B.length, B.size, B.size, 0, { 230, 40, 40 }, "SmoothPlastic", {
 			collide = false,
 			query = false,
 			shadow = false,
@@ -673,10 +674,10 @@ local function machine(kit: any, parent: any, index: number, variant: string)
 	end
 	-- the plunger: its rod along the shooter lane, through the front wall to the knob
 	local pm = kit:model(m, N.plunger)
-	local rodY0, rodY1 = -0.45, p.y - Layout.BALL_R
-	local rod = on(pm, "Rod", p.x, (rodY0 + rodY1) / 2, 0.04, 0.035, 0.035, rodY1 - rodY0, 0, CHROME, "Metal")
+	local rodY0, rodY1 = Cabinet.ROD_Y0, p.y - Layout.BALL_R
+	local rod = on(pm, "Rod", p.x, (rodY0 + rodY1) / 2, Cabinet.KNOB_H, 0.035, 0.035, rodY1 - rodY0, 0, CHROME, "Metal")
 	pm.PrimaryPart = rod
-	on(pm, "Knob", p.x, rodY0 - 0.05, 0.04, 0.11, 0.11, 0.1, 0, { 230, 40, 40 }, "SmoothPlastic")
+	on(pm, "Knob", p.x, rodY0 - Cabinet.KNOB, Cabinet.KNOB_H, 0.11, 0.11, 0.1, 0, { 230, 40, 40 }, "SmoothPlastic")
 end
 
 function Bake.build(kit: any, parent: any, station: any, _venue: any?)

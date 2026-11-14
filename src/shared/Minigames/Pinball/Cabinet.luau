@@ -19,7 +19,9 @@
 -- from 4:3 to a wide phone, with room kept at the top for the HUD's display when it asks.
 -- Pure. Interface: model(index) -> name; at(index) -> (X, D) of the cabinet's middle; TILT; PF_Y; PF_D (the
 --   playfield's middle, from PINBALL_D); point(index, x, y, h) -> (X, Y, D); origin(index) -> (X, Y, D);
---   turnOf(dx, dy) -> radians about the playfield normal; BODY (the cabinet's box), BACKBOX, GLASS_H, LEGS;
+--   turnOf(dx, dy) -> radians about the playfield normal; BUTTON; button(index, side, hand?, pressed?) -> (X, Y,
+--   D) (a flipper button, or the hand on it); ROD_Y0; KNOB; KNOB_H; GRIP_KNOB; knob(index, x, pull, hand?) ->
+--   (X, Y, D); BODY (the cabinet's box), BACKBOX, GLASS_H, LEGS;
 --   stance(index) -> (X, D) where the player stands; camera(index, aspect?, which?, reserve?) -> { eye, target,
 --   fov, aspect } (alley local); EYES (the views); RESERVE; MARGIN; project(view, X, Y, D) -> (u, v, depth) (a
 --   point's place in the picture, 0..1 from the top left); NAMES (the parts the client moves); BALLS (ball parts
@@ -44,7 +46,18 @@ Cabinet.STANCE_D = 3.7 -- where the player stands (the body's middle), from PINB
 Cabinet.BALLS = 3 -- ball parts baked per machine (a three-ball multiball at most)
 Cabinet.FLIPPER_H = 0.07 -- a flipper's height off the playfield; its model's pivot is half way up, on its pivot pin
 Cabinet.PULL_TRAVEL = 0.32 -- how far the plunger's rod comes back at a full pull (studs, toward the player)
+-- the plunger's rod comes out of the cabinet's front at ROD_Y0 (along the table, in front of the playfield) to
+-- its knob, KNOB beyond it, KNOB_H above the surface; the hand pulling it holds it GRIP_KNOB nearer the player
+Cabinet.ROD_Y0 = -0.45
+Cabinet.KNOB = 0.05
+Cabinet.KNOB_H = 0.04
+Cabinet.GRIP_KNOB = 0.12
 Cabinet.DROP_SINK = 0.16 -- how far a knocked-down drop target sinks below the playfield
+-- the flipper buttons, on the outside of the side rails near the front: y along the table, h below the surface,
+-- out beyond the rail (the button's middle), how far a button stands out of the cabinet's side (its length) and
+-- across (its diameter); where the player's hand rests on it (grip: out from the button's middle, toward the
+-- player) and how far a press pushes it in (press)
+Cabinet.BUTTON = { y = 0.25, h = -0.16, out = 0.02, length = 0.06, size = 0.1, grip = 0.24, ahead = 0.05, press = 0.05 }
 
 -- The parts the client finds by name (each machine's model is Pinball<index>).
 Cabinet.NAMES = {
@@ -86,6 +99,28 @@ end
 -- The turn about the playfield's normal that lays a part's X along the playfield direction (dx, dy).
 function Cabinet.turnOf(dx: number, dy: number): number
 	return math.atan2(dy, dx)
+end
+
+-- button(index, side, hand?, pressed?) -> (X, Y, D): the flipper button on a side (0 the player's left, 1 the
+-- right): its middle, or with `hand` where the hand that works it is held (out from the button and a little
+-- toward the player; pushed in by BUTTON.press when pressed).
+function Cabinet.button(index: number, side: number, hand: boolean?, pressed: boolean?): (number, number, number)
+	local b = Cabinet.BUTTON
+	local out = Cabinet.RAIL + b.out
+	local y = b.y
+	if hand then
+		out += b.grip - (if pressed then b.press else 0)
+		y -= b.ahead
+	end
+	local x = if side == 0 then -out else Layout.WIDTH + out
+	return Cabinet.point(index, x, y, b.h)
+end
+
+-- knob(index, x, pull, hand?) -> (X, Y, D): the plunger's knob (x: the shooter lane's, the table's plunger.x)
+-- drawn back by pull (0..1), or with `hand` where the hand pulling it holds it.
+function Cabinet.knob(index: number, x: number, pull: number, hand: boolean?): (number, number, number)
+	local y = Cabinet.ROD_Y0 - Cabinet.KNOB - pull * Cabinet.PULL_TRAVEL - (if hand then Cabinet.GRIP_KNOB else 0)
+	return Cabinet.point(index, x, y, Cabinet.KNOB_H)
 end
 
 -- Where the player stands (the body's middle), facing the machine (-D).
