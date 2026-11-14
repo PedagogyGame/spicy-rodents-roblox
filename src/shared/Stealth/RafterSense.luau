@@ -10,8 +10,9 @@
 --   sense(state, id, X, Y, D, dt) -> RafterWatch.Squirrel?  one tick for one body. nil when the body is neither on
 --                    one of those routes nor in the air of the roof space (the squirrel left the rafters: its watch
 --                    ends). speed is the distance moved since its last tick over dt; creeping is any speed up to
---                    RafterWatch.C.stalkSpeed (the rail stalk is 3 st/s and nothing else on a beam is that slow, so
---                    the Ctrl key the server cannot see is read from the speed). In the air between beams (a leap)
+--                    RafterWatch.C.stalkSpeed (8 st/s: the rail stalk is 3 and the rail walk 18, nothing on a beam
+--                    moves between, so the Ctrl key the server cannot see is read from the speed even from positions
+--                    that arrive a little late). In the air between beams (a leap)
 --                    the body still counts on the beam it left (a leap does not wipe the meter); the first tick on
 --                    a beam after the air is a landing (`landed`). In the vent, away from its mouths, it is hidden
 --                    (Routes/Enclosure.hidden).

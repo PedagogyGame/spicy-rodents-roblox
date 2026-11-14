@@ -138,6 +138,60 @@ return function(t)
 		end
 	)
 
+	t.test("positions that arrive a little late: a creep still reads as a creep, a walk as a walk", function()
+		-- The server reads the body where replication last put it: up to 50 ms stale, a different amount each tick
+		-- (review finding: at a 3.2 st/s line every creep along chord 9120 in front of a bowler was spotted).
+		local bowler: RafterWatch.Observer =
+			{ id = "b", X = AlleyLayout.laneX(17), Y = 5.2, D = -6, faceX = 0, faceD = 1 }
+		local X0, X1 = AlleyLayout.laneX(13), AlleyLayout.laneX(18)
+		-- where a body going to and fro between X0 and X1 at `speed` is at time `time`
+		local function where(speed: number, time: number): number
+			local span = X1 - X0
+			local u = (speed * time) % (2 * span)
+			return if u <= span then X1 - u else X0 + (u - span)
+		end
+		local function run(seed: number, speed: number, seconds: number): (number?, number, number)
+			local a = seed * 7919
+			local function stale(): number
+				a = (a * 1103515245 + 12345) % 2147483648
+				return 0.05 * a / 2147483648
+			end
+			local sense, watch = RafterSense.new(), RafterWatch.new()
+			local lo, hi = math.huge, 0
+			local clock = 0
+			while clock < seconds do
+				local X = where(speed, math.max(0, clock - stale()))
+				local s = RafterSense.sense(sense, "sq", X, AlleyRoof.CHORD.y1, 16.5, TICK)
+				if s and clock > 0 then
+					lo, hi = math.min(lo, s.speed), math.max(hi, s.speed)
+				end
+				for _, e in
+					RafterWatch.step(watch, { s :: any }, { bowler }, nil, TICK, function()
+						return true
+					end)
+				do
+					if e.kind == "spotted" then
+						return clock, lo, hi
+					end
+				end
+				clock += TICK
+			end
+			return nil, lo, hi
+		end
+		local fastest, slowest = 0, math.huge
+		for seed = 1, 10 do
+			local spotted, _, hi = run(seed, 3, 15)
+			fastest = math.max(fastest, hi)
+			t.eq(spotted, nil, `creeping (seed {seed}): read up to {hi} st/s`)
+			t.truthy(hi <= RafterWatch.C.stalkSpeed, `a creep read at {hi} st/s`)
+			local walked, lo = run(seed, 18, 6)
+			slowest = math.min(slowest, lo)
+			t.truthy(walked ~= nil and walked <= 4.5, `walking (seed {seed}): {walked}`)
+		end
+		-- (a walk reads slowest where it turns at an end: the body went part of the tick back the way it came)
+		print(string.format("      50 ms of staleness: a creep read at most %.1f st/s", fastest))
+	end)
+
 	t.test("Cover: a box stops a kick and a bite through its walls, and nothing once removed", function()
 		Cover.clear()
 		local place = { x = 1300, z = -420, floorY = 16.5, yaw = 0 }

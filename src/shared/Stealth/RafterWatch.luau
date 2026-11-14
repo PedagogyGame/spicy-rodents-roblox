@@ -47,7 +47,10 @@ RafterWatch.C = {
 	stalk = 0.06, -- per second, creeping: a lit, near, facing person needs about 17 s
 	walk = 0.8, -- 1.25 s
 	sprint = 2.4, -- 0.42 s
-	stalkSpeed = 3.2, -- studs/s: the rail stalk is 3 (Motion.C.railStalk)
+	-- studs/s: the rail stalk is 3 (Motion.C.railStalk), the rail walk 18. The server reads speed from where the body
+	-- was at each tick, and a replicated position can be some tens of milliseconds stale, so a creep can read 25% fast
+	-- or more: the line sits half way, where no timing error moves a creep or a walk across it.
+	stalkSpeed = 8,
 	stillSpeed = 0.2,
 	sprintSpeed = 24, -- between the rail walk (18) and sprint (30.5)
 	land = 1.0, -- a landing on a beam, at once
