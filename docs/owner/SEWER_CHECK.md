@@ -1,57 +1,65 @@
 # The storm drains: what to look at (10 minutes)
 
-Your words (addendum D8): "a few underground pipes that the squirrel can run through, like a short cut or two through a system under the city, just basic sewers". There are three. A squirrel or the Spicy Rodent goes down a grate with **E**, runs the pipe, and climbs out somewhere else. People, the fox and the deer cannot go down. The police lose the rodent at the grate.
+Your words (addendum D8): "a few underground pipes that the squirrel can run through, like a short cut or two through a system under the city, just basic sewers". There are three. A squirrel or the Spicy Rodent goes down a grate, runs the pipe, and climbs out somewhere else. People, the fox and the deer cannot go down. The police lose the rodent at the grate.
 
-Everything below has been tested without a screen: the real squirrel controls were driven through the real pipes, and the town's people and police were run against it. What a test cannot tell me is how it looks and feels, so this is the list of things only you can judge.
+Everything below has been tested without a screen. The real squirrel controls were driven through the real pipes, and the town's people and police were run against it. A test cannot tell me how it looks and feels, so this is the list of things only you can judge. Two of your defaults are not met yet: walking onto a grate also takes you down, and drain 3 is not quicker than going over the top. Both are explained under **Known not done**.
 
 ## Before you build
-The pipes are their own bake, like the bowling alley. Run `lune run tools/bake/sewers.luau` before `rojo build`. Without it, the game starts with no drains, prints a warning, and leaves the ground whole.
+The pipes are their own bake, like the bowling alley. Run `lune run tools/bake/sewers.luau` before `rojo build`. Without the bake the game prints a warning, leaves the ground whole and hides nobody. But the routes are still there, so a squirrel pressing E at an unmarked corner would go down into the ground. Always bake before you publish.
 
 ## Where the drains are
-| Drain | Way in or out | Where | Face this way to go down |
-|---|---|---|---|
-| **1. The crossroads** (under the Main Street / Centre Street crossing, 4 arms) | north-west corner grate | at the kerb on the corner, (-24.6, 24.6) | south |
-| | north-east corner grate | (24.6, 24.6) | west |
-| | south-east corner grate | (24.6, -24.6) | west |
-| | south-west corner grate | (-24.6, -24.6) | north |
-| **2. The old river culvert** (under the river, quay to quay) | west quay access cover | (1960.7, 462), on the quay walk | east |
-| | east quay access cover | (2335.4, 462) | west |
-| **3. Bowl Lane** (bowling alley's doors to Main Street) | bowling alley lawn grate | (1306, -339.4), in front of the alley | north |
-| | Main Street north verge grate | (1350, 37.4) | south |
+The game's map has east on the left of the x axis, so the drains are named by what stands beside them, not by the compass. "Walk in facing" is the way to face to go down. The words on screen use it too.
 
-The words on screen tell you when you are on a grate but facing the wrong way.
+| Drain | Way in or out | Where | Walk in facing |
+|---|---|---|---|
+| **1. The crossroads** (under the Main Street / Centre Street crossing, 4 arms) | corner grate by the brick house | on the grass at the corner, (-24.6, 24.6) | Main Street |
+| | corner grate by the blue cottage | (24.6, 24.6) | Centre Street |
+| | corner grate by the bungalow | (24.6, -24.6) | Centre Street |
+| | corner grate by the Victorian house | (-24.6, -24.6) | Main Street |
+| **2. The old river culvert** (under the river, quay to quay) | town-side quay access cover | (1960.7, 462), on the quay walk | the river |
+| | far-side quay access cover | (2335.4, 462) | the river |
+| **3. Bowl Lane** (bowling alley's doors to Main Street) | bowling alley lawn grate | (1306, -335.4), on the lawn in front of the alley | Bowl Lane |
+| | Main Street north verge grate | (1350, 37.4) | the boulevard |
 
 ## What to press
-1. Pick **Squirrel** or **Spicy Rodent**. Run to a grate and stand on it. When you face the right way, the screen says **E: down the drain**.
-2. Press **E**. The squirrel goes down the ladder shaft.
-3. Hold **W**. The squirrel runs the way the camera looks, as on a branch. In drain 1's chamber, **W** goes straight on, and **A** or **D** turns into a side arm.
-4. At the top of the far shaft the screen says **W: climb out**. Keep holding W and you come out on your feet, still running.
-5. Try **Space**, **Q** or a click in the middle of a pipe. Nothing happens, and the screen says **No room to jump down here: run on to a grate (W at the top climbs out)**.
+1. Pick **Squirrel** or **Spicy Rodent**. Run to a grate and stand on it. Facing the right way, the screen says **E or W: down the drain**. Facing another way, it tells you which way to turn, for example **Turn left to face Main Street: walking in or E goes down the drain**.
+2. Press **E** (or keep walking in). The squirrel goes down the ladder shaft.
+3. Hold **W**. The squirrel runs the way the camera looks, as on a branch.
+4. In drain 1, as you run at the crossing the screen says **The crossing: A or D there turns into a side arm**. Then, in the last 6 studs, it says **A / D now: a side arm (W: straight on)**. Press A or D then; a press made earlier is not kept. Once past the crossing it tells you which way you went and where you will come out, for example **Straight on: out at the corner grate by the bungalow**.
+5. At the top of the far shaft the screen says **W: climb out**. Keep holding W and you come out on your feet, still running. For a second after that the screen says nothing about going back down.
+6. Try **Space**, **Q** or a click in the middle of a pipe. Nothing happens, and the screen says **No room to jump down here: run on to a grate (W at the top climbs out)**.
 
-Times with W held: drain 1, corner to corner, about 5 seconds (the way round on the pavements is 113 studs, across two roads). Drain 2, about 25 seconds (round by the bridge is 1,430 studs). Drain 3, about 22 seconds (across Bowl Lane, the boulevard and the trolley rails is 379 studs).
+## Is it quicker?
+Measured with W held, on the real squirrel controls, against the way over the top:
+
+| Drain | In the pipe (walk / sprint) | Over the top (walk / sprint) | Quicker? |
+|---|---|---|---|
+| 1, corner to corner | 5.1 s / 3.0 s | 6.3 s / 3.5 s round the pavements | yes, a little. A straight dash across the junction through the traffic (about 3.9 s walking) is quicker still |
+| 2, quay to quay | 24.7 s / 19.0 s | 79.4 s / 62.1 s round by the bridge | yes, by far |
+| 3, lawn to verge | 22.2 s / 17.0 s | 20.9 s / 15.2 s straight across | **no**: the pipe is longer than the straight line because of its two ladder shafts. With the 1.25 times pipe pace it would take 17.8 s / 13.6 s and win |
 
 ## Please check
 | # | What to look at | What you should see |
 |---|---|---|
-| 1 | Each grate from the pavement | An iron grate in a frame, level with the street. Drain 2's ways in are solid iron covers on the quay. The pictures are in `docs/renders/sewers/` (`*_street.jpg`) |
+| 1 | Each grate from the pavement | An iron grate in a frame, level with the street. Drain 2's ways in are solid iron covers on the quay. Drain 3's lawn grate sits in a concrete surround on the lawn, clear of the alley's forecourt. The pictures are in `docs/renders/sewers/` (`*_street.jpg`) |
 | 2 | Going down | Into the shaft, past the iron rungs, and onto the walkway at the foot of the ladder |
-| 3 | Inside | A darker, cooler picture; the drain's own lamps light up (shadows from the two nearest only); an echo on the sound; the name at the top, e.g. **UNDERGROUND · STORM DRAIN 1 CROSSROADS**. When you come out, all of it goes back, and the game's lighting is never changed |
-| 4 | Drain 1's chamber | Where the four arms meet (a rough copy of your junction in plain parts for now), light from the manhole lid, and the fashion stand beside the crossing (only a stand to look at for now). With your junction loaded (not yet, see below): your four arches, vaulted centre and sump grate, as in `p1_chamber.jpg` |
-| 5 | Drain 2 | A long dry tunnel under the river (a rough copy in plain parts for now). With your modules loaded: your concrete maintenance tunnel, and your "Dry Side / Mind Your Paws" plaque at the foot of each ladder (`p2_1_run33.jpg`) |
-| 6 | Drain 3 | A brick pipe with a water channel beside the walkway (a rough copy in plain parts for now), and light falling through a small grate in the boulevard. With your modules loaded: your brick passage (`p3_1_run33.jpg`) |
-| 7 | The police | As the Spicy Rodent, go down a grate while a policeman is looking at you. He walks to that grate, stands over it facing it, says **"It went down the drain!"** and goes back to his beat about 15 seconds later. He never goes to the other end. One or two people who saw it may say something too ("Where did it go?"). An ordinary squirrel gets remarks, but no policeman |
-| 8 | Hidden | While you are in a pipe, nobody sees or hears you, and the fox does not hunt you. You are seen again as soon as you are out |
-| 9 | The alligator | Stand still in a pipe for 12 and a half minutes: a hiss and the line "A low hiss and a ripple in the sewer water…". It is never seen |
+| 3 | Inside | Your modules round you: the brick passage in drains 1 and 3, your four-way junction under the crossing, your dry maintenance tunnel and its "Dry Side / Mind Your Paws" plaque in drain 2. They are drawn for about 48 studs around the squirrel and follow it as it runs. Also a darker, cooler picture, the drain's own lamps near you, an echo on the sound, and the name at the top, e.g. **UNDERGROUND · STORM DRAIN 1 CROSSROADS**. When you come out, all of it goes back, and the game's lighting is never changed. The pictures: `p1_chamber.jpg`, `p2_1_run33.jpg`, `p3_1_run33.jpg` and the other views without `_parts` |
+| 4 | If your modules do not show | The drain is drawn in plain brick-coloured parts instead (the `_parts` pictures), and F9 shows a line starting `[SewerArt]` or `sewer module`. Please send me that line |
+| 5 | Drain 1's chamber | Your junction, light from the manhole lid, and the fashion stand beside the crossing (only a stand to look at for now) |
+| 6 | The police | As the Spicy Rodent, go down a grate while a policeman is looking at you. He walks to that grate, stands about 6 studs from it facing it, says **"It went down the drain!"** and goes back to his beat about 15 seconds later. He never goes to the other end. If you come back up where he can see you, he stops watching and comes after you. Diving in and out of the same grate does not keep him there: a grate is watched once every 15 seconds. One or two people who saw it may say something too ("Where did it go?"). An ordinary squirrel gets remarks, but no policeman |
+| 7 | Hidden | While you are down a drain, nobody sees or hears you and the fox does not hunt you. You cannot bite from there either, even from the top of the ladder right under someone's feet. You are seen again as soon as you are out |
+| 8 | Healing | As the Spicy Rodent, after biting someone (within one game day, 12 minutes), rest in a drain: your health creeps back up at the hollow tree rate, about 5 points a minute. If you have not bitten anyone in that time, it does not |
+| 9 | The alligator (optional, slow) | Stand still in a pipe for 12 and a half minutes: the line "A low hiss and a ripple in the sewer water…". There is no sound yet and nothing to see. Skip this one unless you have the time |
 
 ## Known not done
-- **Your meshes are not in the game yet.** The six models are uploaded and approved, and the bake marks where each one goes. But the code that loads them into place when the server starts is not written, so the game shows plain brick-coloured walls. Your modules only show in the renders made from them (for example `docs/renders/sewers/p1_chamber.jpg`, against `p1_1_run50_parts.jpg`). This needs the server check permission back too, to see that they arrive upright.
-- **Walking onto a grate can still take you down.** You asked for E only. The run-through mechanic has no "E only" way in yet. Today a squirrel running straight at a grate from its ladder side, within about 60 degrees, goes in. Across it, or from the other three sides, it does not. The screen only promises E.
-- **The pipes run at street pace, not 1.25 times.** The 1.25 is stored on every pipe, but the squirrel's movement does not read it yet. Every pipe still beats its way over the top.
-- **The rodent does not heal in a pipe.** The game has no healing over time yet. The drain's rate (the hollow tree rate, only while fed) is written and waiting for it.
-- **A dead rodent does not come back out of a drain.** The rule (a drain at least 100 studs away with nobody near) is written, but the role ladder that would use it is not running in the game yet.
-- **Policemen only react to what they saw themselves.** There is no chase yet, so nobody chases the rodent to a grate.
-- **No sound.** Every sound is a named cue with no recording behind it (drips, the trickle, the river's hum, the rungs, footsteps' echo, the grate, the alligator's hiss), listed in `docs/AUDIO_BUDGET.md`. Cars and the trolley overhead are named but never played.
+- **Walking onto a grate takes you down too.** You asked for E only. The run-through mechanic has no "E only" way in, and I may not change the movement code, so it is waiting on the movement lane. Today a squirrel on a grate that walks into the opening goes down, and so does one that turns toward it. The words on screen say exactly that. A squirrel running across a grate, or out of it from the ladder side, does not go down.
+- **Drain 3 is not a short cut yet.** The pipes run at street pace. The 1.25 times pace is stored, but the movement code does not read it yet (the same movement lane). Drains 1 and 2 already beat the way over the top; drain 3 will once the pace is read.
+- **The crossing's A / D works only in the last 6 studs.** The screen says when. A wider window, or keeping a press made earlier, is a change to the movement code.
+- **Your modules have not been seen in Roblox yet.** They are loaded when the server starts and drawn near the squirrel. I have checked the placement only in Blender and in tests without the engine. If Roblox imports one turned or mirrored, the game notices and shows plain parts for that drain, so it never looks broken. The engine check is written (`tests/engine/Sewers.luau`, task `tools/cloud/tasks/sewers_smoke.luau`). It cannot run until the key's Luau Execution permission is restored.
+- **A dead rodent does not come back out of a drain.** The rule (a drain at least 100 studs away with nobody near) is written, but the role ladder that would use it is not running in the game yet. The same goes for the alligator's warning before an idle body is let go.
+- **Policemen only react to what they saw themselves.** There is no chase yet, so nobody follows the rodent to a grate.
+- **No sound.** Every sound is a named cue with no recording behind it (drips, the trickle, the river's hum, the rungs, the footsteps' echo, the grate, the alligator's hiss), listed in `docs/AUDIO_BUDGET.md`. Cars and the trolley overhead are named but never played.
 - **Computer squirrels never use the pipes.**
 - **The fashion stand is a stand to look at.** Buying from it is not built.
-- **Drain 3's south grate** sits by the bowling alley's front, which the eighteen-lane alley is rebuilding. A strip of the shaft's brick shows from the forecourt (`p3s_street.jpg`) until that lands.
-- **Nothing here has been seen in the engine.** The checks that run inside Roblox are written (`tests/engine/Sewers.luau`: the ground cut away along every pipe, the street left whole over it, your modules imported upright). They cannot run until the key's Luau Execution permission is restored.
+- **From the bowling alley's doors to the lawn grate is a small jump.** The alley's forecourt is cut 1.5 studs below the lawn. The grate now sits 4 studs into the lawn, so no brick shows and you climb out onto grass. Steps up from the forecourt belong to the alley's own work.
+- **Nothing here has been seen in the engine or in Studio.**
