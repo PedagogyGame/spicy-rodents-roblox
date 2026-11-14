@@ -88,6 +88,8 @@ export type Opts = {
 	controllerOf: ((id: number) -> string)?, -- "ai" | "player"; default: world.possessed
 	setAttr: ((id: number, name: string, value: any) -> ())?, -- replicate an attribute on the body
 	setPossessable: ((id: number, possessable: boolean) -> ())?,
+	-- the body is away on the sky lift (riding, or seated at the Lookout: its Ride attribute): its case waits
+	busy: ((id: number) -> boolean)?,
 	notify: ((id: number, payload: { [string]: any }) -> ())?, -- a message for the player holding `id`
 	driverOf: ((id: number) -> any?)?, -- who plays body `id` now (any value naming the player; nil: the AI)
 	serverTime: (() -> number)?, -- the clock clients share (workspace:GetServerTimeNow)
@@ -190,6 +192,7 @@ export type Service = typeof(setmetatable(
 		controllerOf: (id: number) -> string,
 		setAttr: (id: number, name: string, value: any) -> (),
 		setPossessable: (id: number, possessable: boolean) -> (),
+		away: (id: number) -> boolean,
 		notify: (id: number, payload: { [string]: any }) -> (),
 		driverOf: (id: number) -> any?,
 		serverTime: () -> number,
@@ -257,6 +260,9 @@ function InfectionService.new(opts: Opts): Service
 		end,
 		setAttr = opts.setAttr or function() end,
 		setPossessable = opts.setPossessable or function() end,
+		away = opts.busy or function(): boolean
+			return false
+		end,
 		notify = opts.notify or function() end,
 		driverOf = opts.driverOf or function(): any?
 			return nil
@@ -1536,6 +1542,11 @@ local function stepCase(self: Service, rec: Record)
 	if rec.gone then
 		rec.gone = false
 		a.infected = true
+	end
+	if self.away(rec.id) then
+		-- riding the sky lift or seated at the Lookout (Server/Rides/SkyLiftService): nobody collapses in a
+		-- cabin; the case waits for the platform
+		return
 	end
 	checkAmbulance(self, rec)
 	if rec.lingerUntil and self.now >= rec.lingerUntil then

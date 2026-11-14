@@ -1,0 +1,64 @@
+{
+  "about": "THE LOOKOUT (f3_hilltop) review views (sky-lift plan lane 3). Bake: lune run tools/bake/attractions.luau; lune run tools/bake/lookout/bake_alone.luau --review (or the lift's entry once tools/review/attractions_export reads build/Expansion_F4.rbxm); lune run tools/review/export.luau; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/scene.json --views docs/renders/skylift/lookout_views.json --out build/review/lookout --threads 2. Local points in the venue frame are noted in each desc.",
+  "defaults": {"res": "960x540", "samples": 24, "groups": ["town", "attractions", "terrain", "backdrop", "backdrop_terrain"]},
+  "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
+  "views": [
+    {
+      "name": "lk_front_trail",
+      "desc": "The Lookout from the hill trail's last stretch (local -20.3, ground + 5.5, -91.8), looking up at the glass front, the terrace and the lift hall.",
+      "pos": [-994.5, 106.2, -1634.1], "look": [-1035.7, 123.0, -1708.1], "fov": 60,
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
+    },
+    {
+      "name": "lk_front_far",
+      "desc": "The silhouette on the crown from the north-east slope (local -60, ground + 5.5, -150).",
+      "pos": [-976.9, 82.6, -1565.9], "look": [-1050.0, 122.0, -1710.0], "fov": 55,
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
+    },
+    {
+      "name": "lk_dining_glass",
+      "desc": "The dining room from by the counter (local 44, 5.2, 9) toward the glass front and the window bar.",
+      "pos": [-1027.7, 121.2, -1749.0], "look": [-1036.5, 119.5, -1687.5], "fov": 70
+    },
+    {
+      "name": "lk_dining_counter",
+      "desc": "The dining room from the window bar (local -2, 5.2, -21) toward the counter, the menu board and the fireside corner.",
+      "pos": [-1035.5, 121.2, -1694.6], "look": [-1036.8, 120.5, -1746.3], "fov": 70
+    },
+    {
+      "name": "lk_terrace_day",
+      "desc": "The terrace from its east end (local 44, 5.2, -27.5) toward the town: tables, parasols, the telescope, the glass rail.",
+      "pos": [-1000.3, 121.2, -1724.9], "look": [-1000.1, 117.0, -1660.8], "fov": 65,
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
+    },
+    {
+      "name": "lk_terrace_night",
+      "desc": "The same at night (moonlight, the bd_night sky): the lanterns, candle jars, downlights and the lit dining room.",
+      "pos": [-1000.3, 121.2, -1724.9], "look": [-1000.1, 117.0, -1660.8], "fov": 65,
+      "light": {"sun": [0.482, 0.835, 0.267], "sunStrength": 0.16, "sunColor": [0.62, 0.72, 1.0], "sky": {"zenith": [0.004, 0.006, 0.022], "mid": [0.008, 0.012, 0.035], "horizon": [0.03, 0.04, 0.075], "ground": [0.01, 0.012, 0.02], "strength": 1.0}, "haze": {"color": [0.025, 0.032, 0.055], "start": 300, "half": 3800, "max": 0.9}, "neon": 14, "cardTint": [0.35, 0.4, 0.55], "cardStrength": 0.12}
+    },
+    {
+      "name": "lk_telescope_view",
+      "desc": "Over the telescope's shoulder (local 13.5, 7.6, -38.5) toward the town 2,000 studs away: the second vantage.",
+      "pos": [-1012.2, 123.6, -1694.7], "look": [-739.6, 56.0, -1457.3], "fov": 55,
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
+    },
+    {
+      "name": "lk_hall_from_cabin",
+      "desc": "The lift hall from an arriving cabin's door (local -27.3, 6.6, 4: cabin floor 1.5 + a standing eye) across the alight platform's place: the window into the dining room, the welcome board, the open front.",
+      "pos": [-1071.0, 122.6, -1692.1], "look": [-1055.4, 120.8, -1688.8], "fov": 75
+    },
+    {
+      "name": "lk_hall_mouth",
+      "desc": "Into the lift hall's open front from where the cabins leave (local -35, 6.6, -40), the sign above.",
+      "pos": [-1043.0, 122.6, -1657.3], "look": [-1084.4, 122.0, -1693.6], "fov": 65,
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
+    },
+    {
+      "name": "lk_steps",
+      "desc": "The terrace steps from the trail beside them (local 30, ground + 5.5, -70).",
+      "pos": [-977.6, 110.0, -1686.3], "look": [-1004.0, 113.0, -1689.6], "fov": 60,
+      "light": {"sun": [-0.835, 0.482, 0.267], "sunStrength": 3.6, "sunColor": [1.0, 0.86, 0.68], "sky": {"zenith": [0.2, 0.38, 0.72], "mid": [0.45, 0.6, 0.82], "horizon": [0.86, 0.76, 0.56], "ground": [0.5, 0.5, 0.44]}, "haze": {"color": [0.66, 0.68, 0.6], "start": 350, "half": 6500, "max": 0.9}}
+    }
+  ]
+}

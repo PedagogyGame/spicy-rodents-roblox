@@ -21,13 +21,15 @@
 -- rescue) shows up as a root that is not where the last frame left it; the motor restarts from there
 -- instead of writing the old position back over it.
 -- Feedback (owner rule: never ignore input silently): E with nothing to grab, Q on the ground and the
--- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast.
+-- motor's hints ("climb closer", "too far to jump across") become short toasts through ctx.toast, and so does
+-- what to do at the end of the alley roof's ridge and bough (ROUTE_HINTS).
 -- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
---   feedback(frame, events, onRoute) -> string? (pure); cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
+--   feedback(frame, events, onRoute, railT?) -> string? (pure); routeHint(routeId?, t?) -> string? (pure);
+--   ROUTE_HINTS; cameraZone(route?) -> "tunnel"? (pure); hipOf(body, measured) -> studs;
 --   movedFromOutside(gap, speed, frameDt) -> boolean (pure); modeOf(onRoute, climb, grounded, trunk?) ->
 --   string (pure); launch(events, vy) -> action?, airSeconds? (pure)
 -- No side effects on require.
@@ -40,6 +42,7 @@ local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../s
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local Enclosure = Import.shared("Routes/Enclosure") :: typeof(require("../../shared/Routes/Enclosure"))
+local AlleyRoof = Import.shared("Attractions/AlleyRoof") :: typeof(require("../../shared/Attractions/AlleyRoof"))
 local BodyDriver = require("./BodyDriver")
 local KinematicPose = require("./KinematicPose")
 local NightVision = require("../World/NightVision")
@@ -55,6 +58,22 @@ local HINTS: { [string]: string } = {
 	noRoom = "No room to jump in here: run on to an opening",
 }
 
+-- What to do at the far end of a route of the alley roof's way in (BRIEF_ADDENDUM D9): the house ridge's west end
+-- faces the tree (Space leaps onto the bough), the bough's end hangs over the games wing's roof (Q drops onto it).
+Squirrel.ROUTE_HINTS = {
+	[AlleyRoof.RIDGE] = "Jump now to reach the branch",
+	[AlleyRoof.BOUGH] = "Q: drop onto the roof",
+}
+
+-- The hint for arriving at the end of route `routeId` at `t` (pure; nil: nothing to say there). Only the far end
+-- (t = 1) of those routes has one: their other ends lead on.
+function Squirrel.routeHint(routeId: number?, t: number?): string?
+	if routeId == nil or t == nil or t < 0.5 then
+		return nil
+	end
+	return Squirrel.ROUTE_HINTS[routeId]
+end
+
 -- The camera zone for the route the body is on (pure): "tunnel" on any enclosed run (Shared/Routes/Enclosure.zone:
 -- the ball return, a hollow tree's inside, whatever its origin), so CameraPolicy puts the camera inside with it; nil
 -- elsewhere.
@@ -63,11 +82,23 @@ function Squirrel.cameraZone(route: any?): string?
 end
 
 -- What to tell the player about this frame's verbs (pure; nil = nothing to say). `frame` is the
--- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now.
-function Squirrel.feedback(frame: { [string]: any }, events: { { [string]: any } }, onRoute: boolean): string?
+-- InputMap sample, `events` the motor's events, `onRoute` whether the body is on a rail now, `railT` where
+-- along it (a route with something to do at its end says so on arriving there: routeHint).
+function Squirrel.feedback(
+	frame: { [string]: any },
+	events: { { [string]: any } },
+	onRoute: boolean,
+	railT: number?
+): string?
 	for _, e in events do
 		if e.kind == "hint" and e.reason and HINTS[e.reason] then
 			return HINTS[e.reason]
+		end
+		if e.kind == "railEnd" then
+			local said = Squirrel.routeHint(e.routeId, railT)
+			if said then
+				return said
+			end
 		end
 		if e.kind == "winded" then
 			return "Out of fumes: sprint comes back in a few seconds"
@@ -276,7 +307,7 @@ function Squirrel.start(
 				metrics.lastEvent = "riverRecover"
 			end
 		end
-		local say = if ctx.toast then Squirrel.feedback(f :: any, events :: any, wasOnRoute) else nil
+		local say = if ctx.toast then Squirrel.feedback(f :: any, events :: any, wasOnRoute, state.railT) else nil
 		local t = os.clock()
 		if say and t - lastSaid > 1.5 and (say ~= lastText or t - lastSaid > 8) then
 			lastSaid, lastText = t, say
