@@ -1261,16 +1261,16 @@
     {
       "name": "p3_lightgrate_street",
       "pipe": "P3",
-      "desc": "the light grate in the boulevard from the south sidewalk; from outside the game draws the parts lining (the modules only for a squirrel inside)",
+      "desc": "the light grate in the boulevard's south lane, clear of the centre line, from the south sidewalk; from outside the game draws the parts lining (the modules only for a squirrel inside)",
       "pos": [
-        1346.05,
+        1345.76,
         14.1,
-        -7.0
+        -9.5
       ],
       "look": [
-        1344.05,
+        1343.76,
         9.5,
-        0
+        -2.5
       ],
       "fov": 55,
       "groups": [

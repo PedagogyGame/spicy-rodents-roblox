@@ -109,7 +109,7 @@
       "routes": [
         { "id": 9321, "name": "storm drain 3, Bowl Lane", "from": "P3.S", "to": "P3.N", "side": "left", "wFrom": 4.0, "wTo": -3.2, "via": [[1321.84, -203.74, 1.2], [1339.44, -53.04, -2.8]] }
       ],
-      "lightGrates": [[1344.05, 0]],
+      "lightGrates": [[1343.76, -2.5]],
       "surface": [
         { "from": "P3.S", "to": "P3.N", "points": [[1306, -335.35], [1350, 37.35]], "note": "straight across Bowl Lane, through the shop-row gap, the boulevard's two lanes and the trolley rails" }
       ]

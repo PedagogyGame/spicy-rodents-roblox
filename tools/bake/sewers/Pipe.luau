@@ -35,7 +35,9 @@ Pipe.VARIANTS = {
 	brick = { full = "brick", plain = "brickPlain", every = 4, first = 2 },
 	dry = { full = "dry", plain = "dryPlain", every = 5, first = 3 },
 }
-Pipe.ROAD_TOP = { ["P3"] = 9.515 } -- the boulevard's surface at P3's light grate (Roads.rd_019 Seg037; the spec checks)
+-- the boulevard's surface at P3's light grate, in the south lane clear of the centre line (Roads.rd_019 Seg037; the
+-- spec checks)
+Pipe.ROAD_TOP = { ["P3"] = 9.621 }
 
 type Ctx = {
 	kit: Kit.Kit,

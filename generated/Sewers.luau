@@ -774,9 +774,9 @@ return {
 		},
 		{
 			kind = "lightGrate",
-			x = 1344.05,
-			z = 0,
-			y = -3.0339,
+			x = 1343.76,
+			z = -2.5,
+			y = -3.0228,
 			pipe = "P3",
 			space = "sewer.bowllane",
 			text = "light-only grate",
