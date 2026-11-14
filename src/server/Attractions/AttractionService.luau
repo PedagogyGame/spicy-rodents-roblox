@@ -33,6 +33,8 @@ export type Opts = {
 	-- what the games may ask of the rest of the town (Server/Minigames/ServerGame.Town: people, body, release,
 	-- charge, best); handed to MinigameService as it is, every member optional
 	games: { [string]: any }?,
+	-- paintball's own hand from the town (PaintballService.Deps: fit, day, passStore), handed on as it is
+	paintball: { [string]: any }?,
 }
 
 local function carve(root: Instance): number
@@ -207,6 +209,7 @@ function AttractionService.start(opts: Opts?): any?
 		prompts = o.prompts,
 		seed = seed,
 		games = o.games,
+		paintball = o.paintball,
 	})
 	local doorRig = doors(alley, conns)
 	local function step(dt: number)

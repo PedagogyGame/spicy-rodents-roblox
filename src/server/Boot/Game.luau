@@ -1116,7 +1116,7 @@ function Game.start(opts: Opts?): any
 					return false, "Pick a person from the menu first (M)"
 				end
 				if actor.species ~= "human" then
-					return false, "Only people can play. Animals can watch (or sneak through the ball return)"
+					return false, "Only people can play. Animals can watch"
 				end
 				local lift = if skylift then skylift:refusal(player, "play") else nil
 				if lift then
@@ -1161,6 +1161,19 @@ function Game.start(opts: Opts?): any
 						end
 					end
 					return out
+				end,
+			},
+			-- paintball (PaintballService.Deps): an infected player is refused at the arena door with "See a
+			-- doctor first." (decision D6), so nobody collapses in a match. Its pass desk sells the town's one
+			-- pass, games.pass above (the wallet's), so a pass bought there opens both lounges too
+			paintball = {
+				fit = function(player: any): (boolean, string?)
+					local actor = possession:actorOf(player)
+					local townId = if actor then townIdOf[actor.id] else nil
+					if infection and townId and infection:statusOf(townId) ~= nil then
+						return false, "infected"
+					end
+					return true, nil
 				end,
 			},
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it

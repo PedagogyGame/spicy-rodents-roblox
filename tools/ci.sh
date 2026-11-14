@@ -60,7 +60,8 @@ selene --no-summary "${LUAU_DIRS[@]}"
 done_step
 
 step "lune tests (Lune $(lune --version | awk '{print $2}'))"
-lune run tests/run.luau
+# (PAINTBALL_JOINED=1: paintball's four lanes are joined, so a joined case whose other half is missing fails)
+PAINTBALL_JOINED=1 lune run tests/run.luau
 done_step
 
 step "compile check (tools/compile: validate data/authored + data/harvest, regenerate into build/compile-check, diff against generated/)"
