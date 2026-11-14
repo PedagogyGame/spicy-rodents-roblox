@@ -42,6 +42,7 @@ local Spinners = require("./World/Spinners")
 local CameraRig = require("./Camera/CameraRig")
 local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
+local SneakMeter = require("./UI/SneakMeter")
 local Telescope = require("./Rides/Telescope")
 
 local Players = game:GetService("Players")
@@ -111,6 +112,11 @@ local walletOk, walletErr = pcall(WalletHud.start)
 if not walletOk then
 	warn(`Client: WalletHud failed: {walletErr}`)
 	menu.toast("The wallet display did not start: press F9 and send the red lines", 10)
+end
+-- the squirrel's eye over the alley's lanes while people below might see it (the server's RafterService fills it)
+local sneakOk, sneakErr = pcall(SneakMeter.start)
+if not sneakOk then
+	warn(`Client: SneakMeter failed: {sneakErr}`)
 end
 -- what townspeople say, and what a bitten person looks like (owner 2026-11-10)
 task.spawn(function()
