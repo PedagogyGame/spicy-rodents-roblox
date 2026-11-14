@@ -4,13 +4,15 @@
 -- Rodent/PowerRules): rodent and squirrel health, the townsperson kick, the rodent's bite on contact,
 -- victims' mild shouts (brief v2 §15 mild rating), and the on-screen death messages. Deliberately
 -- small: W2's CombatRules (pounce wind-up, bite chance, strikes, regen) replaces the bite and kick
--- maths behind the same calls. Pure (Lune-tested in tests/unit/play_rules.spec.luau).
+-- maths behind the same calls. Pure (Lune-tested in tests/unit/play_rules.spec.luau). Neither reaches through a
+-- Combat/Cover housing (a squirrel inside the alley roof's vent unit cannot be kicked from the roof, nor bite out).
 -- Interface: HEALTH, KICK_DAMAGE, KICK_RANGE, KICK_COS, KICK_COOLDOWN, BITE_RANGE, BITE_HEIGHT,
 --   BITE_COOLDOWN, SHOUTS, kickTarget(kicker, look, targets) -> id?, biteVictims(rodent, people, now,
 --   last) -> { id }, damage(health, amount) -> (health, dead), shout(n) -> string,
 --   deathMessage(cause) -> (title, line)
 
 local Lines = require("../Speech/Lines")
+local Cover = require("./Cover")
 
 export type Point = { id: any, x: number, y: number, z: number }
 
@@ -31,7 +33,7 @@ PlayRules.BITE_COOLDOWN = 2.5 -- seconds before the same person can be bitten ag
 -- Speech/SpeechRules, and `shout(n)` stays for callers that want the plain cycle.
 PlayRules.SHOUTS = Lines.GROUPS.bitten
 
--- The nearest target in front of the kicker within reach, or nil.
+-- The nearest target in front of the kicker within reach and not behind a cover's walls, or nil.
 -- kicker: the kicker's root; look: the kicker's facing (x, z, need not be unit).
 function PlayRules.kickTarget(kicker: Point, look: { x: number, z: number }, targets: { Point }): any?
 	local lm = math.sqrt(look.x * look.x + look.z * look.z)
@@ -45,7 +47,12 @@ function PlayRules.kickTarget(kicker: Point, look: { x: number, z: number }, tar
 			local dx, dz = t.x - kicker.x, t.z - kicker.z
 			local d = math.sqrt(dx * dx + dz * dz)
 			local inFront = d < 1 or (dx * lx + dz * lz) / d >= PlayRules.KICK_COS
-			if d <= bestD and inFront and math.abs(t.y - kicker.y) <= PlayRules.KICK_HEIGHT then
+			if
+				d <= bestD
+				and inFront
+				and math.abs(t.y - kicker.y) <= PlayRules.KICK_HEIGHT
+				and not Cover.between(kicker.x, kicker.y, kicker.z, t.x, t.y, t.z)
+			then
 				best, bestD = t.id, d
 			end
 		end
@@ -53,7 +60,8 @@ function PlayRules.kickTarget(kicker: Point, look: { x: number, z: number }, tar
 	return best
 end
 
--- People the rodent bites this check: within reach and not bitten in the last BITE_COOLDOWN seconds.
+-- People the rodent bites this check: within reach, not behind a cover's walls and not bitten in the last
+-- BITE_COOLDOWN seconds.
 -- `last` maps person id -> time of their last bite; it is updated for every victim returned.
 function PlayRules.biteVictims(rodent: Point, people: { Point }, now: number, last: { [any]: number }): { any }
 	local out = {}
@@ -64,6 +72,7 @@ function PlayRules.biteVictims(rodent: Point, people: { Point }, now: number, la
 				dx * dx + dz * dz <= PlayRules.BITE_RANGE * PlayRules.BITE_RANGE
 				and math.abs(p.y - rodent.y) <= PlayRules.BITE_HEIGHT
 				and now - (last[p.id] or -math.huge) >= PlayRules.BITE_COOLDOWN
+				and not Cover.between(rodent.x, rodent.y, rodent.z, p.x, p.y, p.z)
 			then
 				last[p.id] = now
 				table.insert(out, p.id)

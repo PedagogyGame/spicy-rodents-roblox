@@ -300,7 +300,9 @@ function ActorsRuntime.start(opts: Opts): Runtime
 					p.X,
 					p.Y,
 					p.Z,
-					r.AssemblyLinearVelocity.Y > -1 and r.AssemblyLinearVelocity.Y < 1
+					r.AssemblyLinearVelocity.Y > -1
+						and r.AssemblyLinearVelocity.Y < 1
+						and (actor.body :: Model):GetAttribute("Ride") == nil -- a sky-lift seat is not safe ground
 				)
 				local qx = Recovery.riverFall(p.X, p.Y, p.Z)
 				if qx or not Recovery.isSane(p.X, p.Y, p.Z) then
