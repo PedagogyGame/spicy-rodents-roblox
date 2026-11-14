@@ -276,7 +276,8 @@ return function(t)
 			t.near(cD, 16.5, 0.3, "on the truss at D 16.5")
 			t.near(cY, R.CHORD.y1, 0.3, "on its plate")
 
-			-- walking along the chord, the computer bowler on lane 17 sees it
+			-- walking to and fro over lane 17, the computer bowler there sees it (one dash straight across the dark
+			-- hall, 24 studs from that one bowler, fills the eye to about 0.7: it is dawdling in view that is seen)
 			local walk = onTheChord(onChord, false, 8)
 			t.eq(walk.spotted, 1, `walking: spotted once (meter {walk.meter})`)
 			t.truthy(walk.spottedAt ~= nil and walk.spottedAt < 6, `walking: spotted after {walk.spottedAt} s`)
