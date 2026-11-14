@@ -5,7 +5,7 @@ Your words (addendum D8): "a few underground pipes that the squirrel can run thr
 Everything below has been tested without a screen. The real squirrel controls were driven through the real pipes, and the town's people and police were run against it. A test cannot tell me how it looks and feels, so this is the list of things only you can judge. Two of your defaults are not met yet: walking onto a grate also takes you down, and drain 3 is not quicker than going over the top. Both are explained under **Known not done**.
 
 ## Before you build
-The pipes are their own bake, like the bowling alley. Run `lune run tools/bake/sewers.luau` before `rojo build`. Without the bake the game prints a warning, leaves the ground whole and hides nobody. But the routes are still there, so a squirrel pressing E at an unmarked corner would go down into the ground. Always bake before you publish.
+The pipes are their own bake, like the bowling alley. Run `lune run tools/bake/sewers.luau` before `rojo build`. Without the bake the game leaves the ground whole, hides nobody, and F9 shows a warning starting `Workspace.Sewers missing` that ends `do not publish this place`. The routes are still there, so a squirrel pressing E at an unmarked corner would go down into the ground. Every bake is optional in the project files, so that a fresh copy builds before it is baked, which means nothing stops a publish without it. Always bake before you publish.
 
 ## Where the drains are
 The game's map has east on the left of the x axis, so the drains are named by what stands beside them, not by the compass. "Walk in facing" is the way to face to go down. The words on screen use it too.
@@ -41,7 +41,7 @@ Measured with W held, on the real squirrel controls, against the way over the to
 ## Please check
 | # | What to look at | What you should see |
 |---|---|---|
-| 1 | Each grate from the pavement | An iron grate in a frame, level with the street. Drain 2's ways in are solid iron covers on the quay. Drain 3's lawn grate sits in a concrete surround on the lawn, clear of the alley's forecourt. The pictures are in `docs/renders/sewers/` (`*_street.jpg`) |
+| 1 | Each grate from the pavement | An iron grate in a frame, level with the street. Drain 2's ways in are solid iron covers on the quay. Drain 3's lawn grate sits in a concrete surround on the lawn, clear of the alley's forecourt, and its small light grate is in the boulevard's south lane, off the centre line. The pictures are in `docs/renders/sewers/` (`*_street.jpg`; they are Blender renders of the bake, so the light is only close to Roblox's) |
 | 2 | Going down | Into the shaft, past the iron rungs, and onto the walkway at the foot of the ladder |
 | 3 | Inside | Your modules round you: the brick passage in drains 1 and 3, your four-way junction under the crossing, your dry maintenance tunnel and its "Dry Side / Mind Your Paws" plaque in drain 2. They are drawn for about 48 studs around the squirrel and follow it as it runs. Also a darker, cooler picture, the drain's own lamps near you, an echo on the sound, and the name at the top, e.g. **UNDERGROUND · STORM DRAIN 1 CROSSROADS**. When you come out, all of it goes back, and the game's lighting is never changed. The pictures: `p1_chamber.jpg`, `p2_1_run33.jpg`, `p3_1_run33.jpg` and the other views without `_parts` |
 | 4 | If your modules do not show | The drain is drawn in plain brick-coloured parts instead (the `_parts` pictures), and F9 shows a line starting `[SewerArt]` or `sewer module`. Please send me that line |

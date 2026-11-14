@@ -451,13 +451,16 @@ function Game.start(opts: Opts?): any
 	if not sewersBaked then
 		warn(
 			"[SpicyRodents] Workspace.Sewers missing (run lune run tools/bake/sewers.luau and rebuild): no drains carved"
+				.. " and nobody hidden, but the drains' routes are still in the data (E at a corner goes down into the"
+				.. " ground): do not publish this place"
 		)
 	end
 	local okW, errW = pcall(function()
 		sewers = SewerService.start({
 			world = world,
 			-- no pipes drawn, no holes in the ground (an open shaft with nothing under it), and nobody hidden in
-			-- solid ground (the routes are in the data either way: the publish project requires the bake)
+			-- solid ground. The routes are in the data either way, and every bake is optional in the project files
+			-- (a fresh tree builds before it is baked), so the warning above is the guard: bake before a publish
 			carve = o.terrain ~= false and sewersBaked,
 			cover = sewersBaked,
 			speech = infection and infection.speech,
