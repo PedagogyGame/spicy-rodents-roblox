@@ -7,6 +7,8 @@
 -- Run (repo root, after tools/bake/attractions.luau and tools/review/export.luau):
 --   lune run tools/games/pinball/views.luau [out.json, default build/review/pinball_views.json]
 --   python -I tools/review/render.py --views build/review/pinball_views.json --out build/review/pinball
+-- With a game in play on each machine (tools/games/pinball/inplay.luau: a ball up top, or coming down to a
+-- flipper held up): render with --scene build/review/pinball_top.json (or pinball_low.json).
 -- The pictures kept in the repository are docs/renders/minigames/pinball/.
 local fs = require("@lune/fs")
 local process = require("@lune/process")
