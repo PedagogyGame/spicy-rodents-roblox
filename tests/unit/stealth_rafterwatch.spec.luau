@@ -388,7 +388,7 @@ return function(t)
 		end
 	)
 
-	t.test("the line of sight is required, and aimPoint aims at the body over the rail", function()
+	t.test("the line of sight is required, and aimPoints aim at the body and the head over the rail", function()
 		local s = squirrel(LIT_X, CHORD_D, WALK)
 		local ok = pcall(function()
 			(RafterWatch.step :: any)(RafterWatch.new(), { s }, { facing(s, 12) }, nil, DT)
@@ -398,6 +398,11 @@ return function(t)
 		t.eq(X, s.X)
 		t.eq(D, s.D)
 		t.near(Y - s.Y, 0.85, 1e-9)
+		-- seen by the body or by the top of the head, whichever shows
+		local pts = RafterWatch.aimPoints(s)
+		t.eq(#pts, 2)
+		t.near(pts[1][2] - s.Y, 0.85, 1e-9)
+		t.near(pts[2][2] - s.Y, 1.6, 1e-9)
 	end)
 
 	t.test("laneOver: every lane's middle, nothing over the aisles", function()

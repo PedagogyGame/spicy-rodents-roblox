@@ -30,12 +30,15 @@
 -- or after it goes into the vent; then "lost": the meter drops to C.lostMeter and for C.calm seconds creeping or
 -- keeping still adds nothing (the meter falls at C.decay), so a squirrel creeping on in view is not spotted again
 -- at once; one that walks or runs in view is.
--- LINE OF SIGHT (the caller, lane L5): a ray from the person's eye to RafterWatch.aimPoint (the rail point raised by
--- half a body: a ray from below to the rail point itself meets the top face of the chord the squirrel stands on),
--- ignoring that chord's own part, bodies and parts that take no queries.
+-- LINE OF SIGHT (the caller, lane L5): a person sees the squirrel when any of it shows: a ray from the person's eye to
+-- either of RafterWatch.aimPoints (the middle of the body, half a body over the rail point, and the top of its head:
+-- a ray from below to the rail point itself meets the top face of the chord the squirrel stands on) that meets
+-- nothing but that chord near the aim, ignoring bodies and parts that take no queries. A person right under a 2.4-wide
+-- truss plate sees only its underside; one further back, on the settees or the concourse, sees over its edge.
 -- Interface: C; SITUATION, LINES (Speech/Lines "rafters"); new() -> State; rate(squirrel, observer, lamps) ->
 --   number (one person, line of sight assumed); step(state, squirrels, observers, lamps?, dt, canSee) -> { Event };
---   meter(state, id) -> (number, boolean); laneOver(X) -> number?; aimPoint(squirrel) -> (X, Y, D)
+--   meter(state, id) -> (number, boolean); laneOver(X) -> number?; aimPoint(squirrel) -> (X, Y, D);
+--   aimPoints(squirrel) -> { {X, Y, D} }
 
 local AlleyLayout = require("../Attractions/AlleyLayout")
 local AlleyRoof = require("../Attractions/AlleyRoof")
@@ -71,6 +74,7 @@ RafterWatch.C = {
 	lostMeter = 0.5, -- the meter on "lost"
 	calm = 10, -- seconds after "lost" in which creeping or keeping still adds nothing
 	bodyHalf = 0.85, -- the aim point over the rail (half the 1.7 body)
+	headTop = 1.6, -- the second aim point: the top of the head
 	eyeY0 = -2, -- a person's eye between these heights above the hall floor counts (people on the floor)
 	eyeY1 = 8,
 }
@@ -191,9 +195,14 @@ function RafterWatch.laneOver(X: number): number?
 	return nil
 end
 
--- aimPoint(squirrel): where a line-of-sight ray should aim (the body, not the rail under its feet).
+-- aimPoint(squirrel): where a line-of-sight ray should aim first (the body, not the rail under its feet).
 function RafterWatch.aimPoint(s: Squirrel): (number, number, number)
 	return s.X, s.Y + C.bodyHalf, s.D
+end
+
+-- aimPoints(squirrel): every point a person may see it by (the body, then the top of the head); seen if any shows.
+function RafterWatch.aimPoints(s: Squirrel): { { number } }
+	return { { s.X, s.Y + C.bodyHalf, s.D }, { s.X, s.Y + C.headTop, s.D } }
 end
 
 -- A crowd: the best person's share plus a part of everyone else's, capped.

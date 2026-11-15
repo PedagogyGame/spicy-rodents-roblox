@@ -9,9 +9,9 @@
 --   * the people: every person whose root is in the lane hall (AlleyRoof.inHall) looking the way their root faces,
 --     eye EYE_OVER_ROOT over it, and the computer bowlers (no bodies: an eye 5.2 up on their lane's approach, facing
 --     the pins), so a bowling game against the computer has eyes in it;
---   * line of sight: a ray from the eye to the squirrel's body (RafterWatch.aimPoint) that meets nothing but the
---     beam under the squirrel (a hit within C.beamSlack of the aim point); bodies and parts that take no queries
---     are passed through;
+--   * line of sight: a ray from the eye to the squirrel's body or the top of its head (RafterWatch.aimPoints: seen
+--     when any of it shows) that meets nothing but the beam under the squirrel (a hit within C.beamSlack of the aim
+--     point); bodies and parts that take no queries are passed through;
 --   * Stealth/RafterWatch decides. On "spotted":
 --       - an ordinary squirrel: up to C.speakers of the people who saw it say a "rafters" line (Speech/SpeechRules'
 --         pacing, its own state on the server clock), everyone on foot in the hall and on
@@ -272,9 +272,15 @@ function RafterService._tick(self: any, dt: number)
 	local saw: { [string]: { [string]: boolean } } = {}
 	local function canSee(o: Observer, s: Squirrel): boolean
 		local ex, ey, ez = AlleyLayout.toWorld(self.place, o.X, o.Y, o.D)
-		local ax, ay, ad = RafterWatch.aimPoint(s)
-		local wx, wy, wz = AlleyLayout.toWorld(self.place, ax, ay, ad)
-		local seen = self.canSee(Vector3.new(ex, ey, ez), Vector3.new(wx, wy, wz))
+		local eye = Vector3.new(ex, ey, ez)
+		local seen = false
+		for _, a in RafterWatch.aimPoints(s) do
+			local wx, wy, wz = AlleyLayout.toWorld(self.place, a[1], a[2], a[3])
+			if self.canSee(eye, Vector3.new(wx, wy, wz)) then
+				seen = true
+				break
+			end
+		end
 		if seen then
 			saw[s.id] = saw[s.id] or {}
 			saw[s.id][o.id] = true
