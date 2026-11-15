@@ -29,6 +29,7 @@ local out = {
 		BUTTON = Cabinet.BUTTON,
 		ROD_Y0 = Cabinet.ROD_Y0,
 		KNOB = Cabinet.KNOB,
+		KNOB_H = Cabinet.KNOB_H,
 		PULL_TRAVEL = Cabinet.PULL_TRAVEL,
 		FLIPPER_H = Cabinet.FLIPPER_H,
 		DROP_SINK = Cabinet.DROP_SINK,
