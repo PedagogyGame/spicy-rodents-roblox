@@ -157,8 +157,10 @@ local function build(tableId: string): Minigame.Rules
 			end
 		end
 		local stats = {}
+		local fairSeats = {}
 		for seat = 1, m.players do
 			stats[seat] = table.clone(m.stats[seat])
+			fairSeats[seat] = Replay.fair(r, seat)
 		end
 		return {
 			done = true,
@@ -167,7 +169,9 @@ local function build(tableId: string): Minigame.Rules
 			stats = stats,
 			suspect = r.suspect,
 			late = r.late,
-			fair = Replay.fair(r), -- only a fair game takes a place on the machine's board (HighScores.add)
+			fair = Replay.fair(r), -- the whole game was fair
+			-- each seat's own word: only a fair player's score takes a place on the machine's board (HighScores.add)
+			fairSeats = fairSeats,
 		}
 	end
 
