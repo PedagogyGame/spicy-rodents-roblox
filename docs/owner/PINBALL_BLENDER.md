@@ -1,6 +1,6 @@
 # The three pinball machines, for modelling in Blender
 
-The three machines stand side by side in the bowling alley's games room, 4.5 studs apart, their backs 1 stud off the wall. **ACORN ATTACK** is on the left, **SPICY RODENT** in the middle and **SPACE SQUIRREL** on the right. All three use the same cabinet. Each has its own playfield, colours and rules.
+The three machines stand side by side in the bowling alley's games room, 4.5 studs apart, their backs 1 stud off the wall. Facing them, **SPACE SQUIRREL** is on the left, **SPICY RODENT** in the middle and **ACORN ATTACK** on the right. All three use the same cabinet. Each has its own playfield, colours and rules.
 
 ![The three machines in the games room](../renders/minigames/pinball/row.jpg)
 
