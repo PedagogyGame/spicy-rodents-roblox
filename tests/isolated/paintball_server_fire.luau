@@ -944,8 +944,11 @@ return function(t)
 			local verdicts: { [number]: any } = {} -- by shot
 			for _ = 1, 60 * 90 do
 				-- the runner strafes between z = -8 and z = 8, crouching now and then
+				-- (she turns only when heading out: turning whenever she was past the end, with the crouch drawn
+				-- afresh at each turn, let a crouched step back fall short of a walked step out, and she stood
+				-- jittering past the end for most of the run, a still target that hid what lag costs)
 				bea.z += dir * Body.speed(if bea.crouch then 1 else 0, false, feel) * FRAME
-				if bea.z > 8 or bea.z < -8 then
+				if dir * bea.z > 8 then
 					dir = -dir
 					bea.crouch = rand() < 0.3
 				end
@@ -1070,13 +1073,31 @@ return function(t)
 	-- THE TWO WAYS NEED NOT BE EQUAL (found at the review: the rewind was centred on the way up taken twice,
 	-- and at 33 ms up and 266 down only 56 shots in 100 agreed, each miss a puff on the shooter's screen
 	-- that the server then denied). Bounded by the round trip the server measures, they agree as an even link
-	-- does; past Clock.MAX_REWIND both the shooter's drawing and the server clamp alike.
+	-- does, UNTIL THE SHOOTER'S PICTURE IS OLDER THAN Clock.MAX_REWIND. The picture is the way down (with its
+	-- jitter: the view's lag sits near the top of its band) plus Clock.INTERP_SECS; the server judges no ball
+	-- further back than MAX_REWIND, 0.25 s, sized for an EVEN 300 ms round trip (0.15 down + 0.1). On a long
+	-- way down the bound, not the round trip the server measured, is what stops the rewind:
+	--   way down  picture (ft - vt)  past the bound  a walking runner (17 studs/s) is judged
+	--   100 ms    0.23 s             none            where she was drawn
+	--   150 ms    0.28 s             0.03 s          0.5 studs on
+	--   200 ms    0.33 s             0.08 s          1.4 studs on
+	--   267 ms    0.39-0.40 s        0.145 s         2.5 studs on (the hit shape is 3 studs across)
+	-- Agreement over 8 seeds, the real match model and the stand-in alike (mean, worst): 100 ms 0.99, 0.95;
+	-- 150 ms 0.91, 0.83; 200 ms 0.76, 0.71; 267 ms 0.60, 0.54. With the bound at 0.4 s every one of them is
+	-- 0.99, worst 0.95 (the case after next): the server's own measure of the 267 ms link (a 0.36 s round
+	-- trip, so a rewind of up to 0.54 s) would allow the whole picture, and the bound alone refuses it. So the
+	-- 200 and 267 ms bars are the honest best under a 0.25 s bound, not a fault to mend here: a shooter whose
+	-- picture is 0.15 s older than the server will look cannot be judged on it, and how long after ducking a
+	-- slow shooter may still tag a body is the owner's call (Clock, MAX_REWIND; debug("rewind") tries it).
+	-- The shooter's own client already puts the puff where the server will judge (ShowCore, predict's vt):
+	-- what such a shooter sees is a ball that passes through the runner as drawn, not a puff taken back.
 	for _, case in
 		{
 			{ up = 1, down = 9, bar = 0.9 },
 			{ up = 9, down = 1, bar = 0.9 },
-			-- (266 ms down and the interpolation are past MAX_REWIND: the last tenth is cut off, as at 300 ms)
-			{ up = 2, down = 16, bar = 0.75 },
+			{ up = 2, down = 6, bar = 0.9 },
+			{ up = 2, down = 12, bar = 0.65 },
+			{ up = 2, down = 16, bar = 0.5 },
 			{ up = 16, down = 2, bar = 0.85 },
 		}
 	do
@@ -1091,6 +1112,26 @@ return function(t)
 			end
 		)
 	end
+
+	-- the evidence for the table above, for whoever owns the bound (Clock is frozen: the constant is turned
+	-- here for the length of this case only)
+	t.test(
+		"what a shooter 33 ms up and 267 ms down loses is the rewind bound's doing: with Clock.MAX_REWIND at 0.4 s the server agrees on at least 95 % of the same shots",
+		function()
+			local was = Clock.MAX_REWIND;
+			(Clock :: any).MAX_REWIND = 0.4
+			local ok, r = pcall(duel, 1, 100, false, 2, 16);
+			(Clock :: any).MAX_REWIND = was
+			if not ok then
+				error(r, 0)
+			end
+			t.eq(r.refused, 0)
+			t.truthy(
+				r.agree / r.shots >= 0.95,
+				`agreement {r.agree} of {r.shots} at 33 up, 267 down with a 0.4 s bound`
+			)
+		end
+	)
 
 	for _, case in { { rtt = 80, bar = 0.95 }, { rtt = 150, bar = 0.95 } } do
 		t.test(
