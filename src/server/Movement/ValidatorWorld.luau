@@ -18,7 +18,8 @@
 -- (ClientWorld.isBough), the bodies, the vehicles and the terrain (no wall for the client), and run in the squirrel's
 -- collision group (Shared/World/CollisionGroups.SQUIRREL_PROBE).
 -- Interface: build(rail, opts?) -> World (MoveValidator's world; opts.wall, opts.down: Ray); crosses(wall) ->
---   (x0, z0, x1, z1, yLow, yHigh?, rise?) -> boolean; floor(down) -> (x, y, z) -> boolean; engineRays(exclude) ->
+--   (x0, z0, x1, z1, yLow, yHigh?, rise?) -> boolean; floor(down) -> (x, y, z) -> boolean; landable(down) ->
+--   (x, y, z, depth) -> boolean (a landing a gap between packets can hide); engineRays(exclude) ->
 --   (wall: Ray, down: Ray) (workspace raycasts; engine only); isBough(name, parentName) -> boolean; C
 -- Ray: (ox, oy, oz, dx, dy, dz) -> boolean, true when the segment origin -> origin + d meets a solid.
 -- Pure but for engineRays. No side effects on require.
@@ -94,6 +95,13 @@ function ValidatorWorld.floor(down: Ray): (number, number, number) -> boolean
 	end
 end
 
+-- landable(down)(x, y, z, depth): is there ground within `depth` under feet at y (a landing the gap can hide)?
+function ValidatorWorld.landable(down: Ray): (number, number, number, number) -> boolean
+	return function(x: number, y: number, z: number, depth: number): boolean
+		return down(x, y + 0.1, z, 0, -(depth + 0.1), 0)
+	end
+end
+
 export type Options = { wall: Ray?, down: Ray? }
 
 -- build(rail, opts?): MoveValidator's world over a rail world (Movement/RailWorld: registry, index, graph,
@@ -110,6 +118,7 @@ function ValidatorWorld.build(rail: any, opts: Options?): any
 		end,
 		crosses = if o.wall then ValidatorWorld.crosses(o.wall) else nil,
 		floorBelow = if o.down then ValidatorWorld.floor(o.down) else nil,
+		landable = if o.down then ValidatorWorld.landable(o.down) else nil,
 	}
 end
 

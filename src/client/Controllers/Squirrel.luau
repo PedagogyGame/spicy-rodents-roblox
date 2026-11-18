@@ -345,6 +345,9 @@ function Squirrel.start(
 			if rx and ry and rz then
 				SquirrelMotor.place(state, rx, ry, rz, true)
 				metrics.lastEvent = "riverRecover"
+				if link then
+					link:urgent() -- (the server's validator sees the quay spot itself)
+				end
 			end
 		end
 		if link then

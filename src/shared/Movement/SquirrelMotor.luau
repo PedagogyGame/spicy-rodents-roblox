@@ -66,6 +66,8 @@ export type World = Motion.World & {
 	crosses: ((x0: number, z0: number, x1: number, z1: number, y: number, yHigh: number?, rise: number?) -> boolean)?,
 	-- optional floor test for validators: is there something to stand on under feet at (x, y, z)?
 	floorBelow: ((x: number, y: number, z: number) -> boolean)?,
+	-- optional, for validators: is there ground within `depth` under feet at (x, y, z)? (else groundAt is asked)
+	landable: ((x: number, y: number, z: number, depth: number) -> boolean)?,
 	-- optional trampoline sites (Movement/Trampoline, from the registry's trampoline routes)
 	trampolines: { Trampoline.Site }?,
 }
@@ -1876,8 +1878,16 @@ function SquirrelMotor.envelope(
 		end
 		if launched then
 			launchUsed = true
-			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce
+			-- from the ground or a (possibly hidden) rail: the leap; in the air: only a pounce. A body falling onto
+			-- the ground within the gap may have landed and leapt again in it (Space held through a landing)
 			local fromGroundOrRail = prev.grounded or plausible()
+			if not fromGroundOrRail then
+				local depth = math.max(0, -prev.vy) * dt + 0.5 * P.gravity * dt * dt + E.posSlack
+				local landable = world.landable
+				fromGroundOrRail = if landable
+					then landable(prev.x, prev.y, prev.z, depth)
+					else prev.y - world.groundAt(prev.x, prev.z, prev.y) <= depth
+			end
 			local capUp = if fromGroundOrRail then launchUp else pounceUp
 			local capXZ = if fromGroundOrRail then launchXZ else pounceXZ
 			-- a trampoline's bed (Movement/Trampoline) bounces a falling body higher than a leap, and pushes it on

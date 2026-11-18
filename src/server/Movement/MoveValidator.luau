@@ -261,7 +261,8 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 			next.x,
 			next.y,
 			next.z,
-			Motion.C.airGrab + self:fastest(actorId) * math.max(dt, 0) + 1
+			Motion.C.airGrab + self:fastest(actorId) * math.max(dt, 0) + 1,
+			self:fastest(actorId) * math.clamp(dt, 0, SquirrelMotor.envelopeParams.maxDt) + 1
 		)
 	if riverLanding then
 		-- the client's own river recovery (Movement/Recovery.riverFall): the quay spot is the new baseline

@@ -72,6 +72,7 @@ export type Result = {
 	stale: number,
 	violations: { string },
 	sent: number,
+	recoveries: number,
 	frames: number,
 	seconds: number,
 	-- where the server's root is at the end, and the client's motor
@@ -176,6 +177,7 @@ function LiveRig.new(opts: Options): Rig
 		write = nil :: { x: number, y: number, z: number }?, -- a root the server wrote, not yet seen by the controller
 		lastRoot = -math.huge,
 		clockBase = 0,
+		recoveries = 0, -- river recoveries the client made
 		lastT = 0,
 	}
 	rig.client = client
@@ -301,6 +303,8 @@ function LiveRig.new(opts: Options): Rig
 			local rx, ry, rz = Recovery.riverFall(state.x, state.y, state.z)
 			if rx and ry and rz then
 				SquirrelMotor.place(state, rx, ry, rz, true)
+				client.link:urgent()
+				client.recoveries += 1
 			end
 		end
 		client.link:tick(state)
@@ -441,6 +445,7 @@ function LiveRig.new(opts: Options): Rig
 			stale = st.stale,
 			violations = violations,
 			sent = client.link.sent,
+			recoveries = client.recoveries,
 			frames = client.frame,
 			seconds = rig.t,
 			root = table.clone(server.root),

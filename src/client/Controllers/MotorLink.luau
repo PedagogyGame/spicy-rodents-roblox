@@ -13,7 +13,7 @@
 --     news (within ECHO_RADIUS of the corrected place, for ECHO_SECONDS) and the controller does not restart over it;
 --   * the motor clock never runs back between controllers (resumeClock: a new body, the end of a ride).
 -- Interface: new(send) -> Link; Link:setEpoch(n); Link:offer(msg); Link:apply(state, now) -> msg?;
---   Link:tick(state) -> boolean (sent); Link:echo(x, y, z, hip, now) -> boolean; Link:resumeClock() -> number;
+--   Link:tick(state) -> boolean (sent); Link:urgent() (the next tick sends: the river recovery's own frame); Link:echo(x, y, z, hip, now) -> boolean; Link:resumeClock() -> number;
 --   NEAR, ECHO_RADIUS, ECHO_SECONDS
 -- Pure but for `send` (the caller's remote). No side effects on require.
 
@@ -118,6 +118,11 @@ function MotorLink.apply(self: Link, state: any, now: number): Correction?
 	self.appliedAt = now
 	self.sentClock = -math.huge -- the new epoch's first packet goes now
 	return msg
+end
+
+-- The next tick sends whatever the clock says (a move the motor made by itself: the river recovery).
+function MotorLink.urgent(self: Link)
+	self.sentClock = -math.huge
 end
 
 -- After the motor stepped: send when the clock has moved SEND_EVERY since the last packet.

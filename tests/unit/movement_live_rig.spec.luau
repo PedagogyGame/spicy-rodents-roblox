@@ -8,6 +8,7 @@
 -- alley's ball returns and roof).
 local process = require("@lune/process")
 local Units = require("@shared/Config/Units")
+local Height = require("@shared/World/Height")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local Driver = require("@tests/cheat/Driver")
@@ -122,6 +123,153 @@ return function(t)
 			t.truthy(r.accepted > 60 * MINUTES * 5, `packets judged ({r.accepted})`)
 		end)
 	end
+
+	-- THE SERVER MOVES THE BODY (every such move tells the validator: Boot/Game, Actors/Possession onTeleport)
+	local function zigzag(sprint: boolean): LiveRig.Keys
+		return function(now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+			local inp = SquirrelMotor.idleInput(if math.floor(now) % 2 == 0 then -math.pi / 2 else math.pi / 2)
+			inp.fw = 1
+			inp.sprint = sprint
+			inp.leap = math.floor(now * 4) % 7 == 0
+			return inp
+		end
+	end
+	local function open(dx: number, dz: number): State
+		local g = Harness.OPEN_GROUND
+		return SquirrelMotor.new(
+			Units.st((g.minX + g.maxX) / 2) + dx,
+			world.groundHeight,
+			Units.st((g.minZ + g.maxZ) / 2) + dz
+		)
+	end
+	local slow: LiveRig.Link = { latency = 0.3, jitter = 0.15, loss = 0.02 }
+	local fast: LiveRig.Link = { latency = 0.08, jitter = 0.15, loss = 0.02 }
+	local events: { { name: string, script: (rig: LiveRig.Rig) -> () } } = {
+		{
+			name = "the Reset button: put 40 studs back, mid-sprint, three times",
+			script = function(rig: LiveRig.Rig)
+				for k = 1, 3 do
+					rig:at(k * 4 + 0.37, function()
+						local s = open(0, if k % 2 == 0 then 40 else -40)
+						rig:teleport(s.x, s.y + 3, s.z, "reset")
+					end)
+				end
+			end,
+		},
+		{
+			name = "knocked clear of a table by a ball (3 studs), every 1.5 s",
+			script = function(rig: LiveRig.Rig)
+				for k = 1, 8 do
+					rig:at(k * 1.5 + 0.11, function()
+						local c = rig.client.state
+						if c then
+							rig:teleport(c.x + 3, world.groundHeight + 0.6, c.z, "knocked")
+						end
+					end)
+				end
+			end,
+		},
+		{
+			name = "put out of the lounge's door (12 studs) by the sweep",
+			script = function(rig: LiveRig.Rig)
+				rig:at(3.2, function()
+					local c = rig.client.state
+					if c then
+						rig:teleport(c.x - 12, world.groundHeight, c.z + 5, "lounge")
+					end
+				end)
+			end,
+		},
+		{
+			name = "the sky lift: board, ride 20 s, alight 300 studs away and run on",
+			script = function(rig: LiveRig.Rig)
+				rig:at(3, function()
+					rig:board()
+				end)
+				rig:at(23, function()
+					local s = open(0, 300)
+					rig:alight(s.x, s.y, s.z)
+				end)
+			end,
+		},
+		{
+			name = "a hand-off mid-sprint to a body 60 studs away (the old body's packets still arriving)",
+			script = function(rig: LiveRig.Rig)
+				rig:at(4.05, function()
+					rig:handoff(open(10, 60), zigzag(true))
+				end)
+				rig:at(9.5, function()
+					rig:handoff(open(-10, -50), zigzag(false))
+				end)
+			end,
+		},
+		{
+			name = "knocked out, back to the menu, a new body 3 s later",
+			script = function(rig: LiveRig.Rig)
+				rig:at(4, function()
+					rig:release()
+				end)
+				rig:at(7, function()
+					rig:possess(open(20, 20), zigzag(true))
+				end)
+			end,
+		},
+	}
+	for _, e in events do
+		for _, l in { { name = "80 ms", link = fast }, { name = "300 ms", link = slow } } do
+			t.test(`honest: {e.name} ({l.name}): 0 snaps`, function()
+				local rig = LiveRig.new({ world = world, vworld = vworld, link = l.link, seed = 21 })
+				rig:possess(open(0, 0), zigzag(true))
+				e.script(rig)
+				rig:run(32)
+				local r = rig:result()
+				print(`      {LiveRig.describe(e.name .. " (" .. l.name .. ")", r)}`)
+				for _, v in r.violations do
+					print(`      VIOLATION {v}`)
+				end
+				t.eq(r.snaps, 0, "snaps")
+				t.truthy(r.accepted > 100, `packets judged ({r.accepted})`)
+			end)
+		end
+	end
+
+	t.test(
+		"honest: walking off the river bank, the client's own recovery to the quay, again and again: 0 snaps",
+		function()
+			local river: any = table.clone(world)
+			river.groundAt = function(x: number, z: number, _refY: number): number
+				return Height.at(x, z) + TestWorld.STAND_HEIGHT
+			end
+			local riverV = ValidatorWorld.build(world, {
+				wall = wall,
+				down = function(ox: number, oy: number, oz: number, _dx: number, dy: number, _dz: number): boolean
+					local g = Height.at(ox, oz)
+					return g >= oy + dy and g <= oy
+				end,
+			})
+			local R = Height.RIVER
+			local x = (R.centerX - R.halfWidth - 3) * 2.5
+			local z = 100 * 2.5
+			local rig = LiveRig.new({ world = river, vworld = riverV, link = slow, seed = 31 })
+			rig:possess(
+				SquirrelMotor.new(x, river.groundAt(x, z, 100), z),
+				function(_now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+					local inp = SquirrelMotor.idleInput(-math.pi / 2)
+					inp.fw = 1
+					return inp
+				end
+			)
+			rig:run(20)
+			local r = rig:result()
+			print(`      {LiveRig.describe("river", r)}; {r.recoveries} recoveries to the quay`)
+			t.truthy(r.recoveries >= 3, "fell in and was put on the quay again and again")
+			for _, v in r.violations do
+				print(`      VIOLATION {v}`)
+			end
+			t.eq(r.snaps, 0, "snaps")
+			t.truthy(r.accepted > 100, `packets judged ({r.accepted})`)
+		end
+	)
 
 	-- CHEATS: a modified client, from 5 s on (the first 5 s are honest)
 	local CHEAT_AT = 5
