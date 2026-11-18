@@ -1407,7 +1407,7 @@ end
 -- rail, speeds against the per-kind caps, arcs against gravity, launches against jump/pounce, rail
 -- changes against the route graph and the transfer gaps, and ground moves against world.crosses. Enclosed runs
 -- (Routes/Enclosure) add one check, only where a move touches one ("enclosure"): a body gets on only within reach
--- of a mouth that opens to the outside (a hatch: at ground pace and from its height, never a flight), gets off only
+-- of a mouth that opens to the outside (a hatch: from its lid at a sprint's pace and within its rise), gets off only
 -- at a mouth, and changes rail across the wall only where a mouth's links say (an authored link is a declared
 -- junction, whatever gap the Graph sees).
 
@@ -1526,9 +1526,11 @@ function SquirrelMotor.envelope(
 			end
 			return math.max(0, need - E.posSlack)
 		end
-		-- a hatch takes only E from a body standing at it: reached at the pace it was already moving or the ground's,
-		-- from the mouth's height give or take the fall the gap allows (no launch inside the gap)
-		local hatchCap = math.max(groundCap, vPrevXZ * E.speedTol)
+		-- a hatch takes only E from a body standing on it: reached at the pace it was already moving or a sprint's (a
+		-- leap's over a long gap, which can hide one and its landing), from within the mouth's rise of its height give
+		-- or take the fall the gap allows (no launch inside the gap)
+		local sprintCap = P.sprint * (if boosted then P.boostMult else 1) * E.speedTol
+		local hatchCap = math.max(if dt > E.shortDt then groundCap else sprintCap, vPrevXZ * E.speedTol)
 		local hatchVertical = math.max(math.abs(prev.vy), math.abs(next.vy)) * dt
 			+ 0.5 * P.gravity * dt * dt
 			+ E.posSlack

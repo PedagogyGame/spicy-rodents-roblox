@@ -84,8 +84,9 @@
 --      off-rail search and the air-catch never take an enclosed route. The body is eased onto the mouth like a
 --      rail transfer (never a jump). E at a mouth with the body facing in goes in the same way. A `hatch` mouth
 --      takes only E, from a body standing on it (any facing): never a walk, a fall, a leap or a pounce; the server
---      allows its way in only at ground pace and from the mouth's height (no flight). From a rail, only through
---      a "link" (rule 5).
+--      allows its way in only from within a sprint's frame of it (a leap's over a gap long enough to hide one) and
+--      within the mouth's `rise` of its height (so not from higher in the air). From a rail, only through a "link"
+--      (rule 5).
 --   2. Inside and away from a mouth there is no launching and no grabbing in or out: Space, a click and Q do
 --      nothing (event hint "noRoom"); E, A/D and the end-of-route switch never pass a wall, floor or bark.
 --   3. At a mouth the way out is stated: Space, a click and Q launch from the outside face along `out` (Q with a

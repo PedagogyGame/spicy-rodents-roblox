@@ -5,7 +5,8 @@
 -- real SquirrelMotor driven with scripted keys, and the envelope the server's MoveValidator applies to every frame.
 --   in only with E, standing on a grate (a hatch mouth: any facing); never by walking, running, leaping or pouncing
 --   onto it, not from beside it, not in the air over it, not from the street over a pipe; the server agrees (E from
---   the grate accepted, a hatch taken out of the air refused)
+--   the grate accepted; a hatch taken from higher than the mouth's rise, or from further off than a sprint's frame,
+--   refused)
 --   out at every street mouth on its feet, still running
 --   each pipe against its surface way, measured on the motor with W held, walking and sprinting: every pipe wins at
 --   the pipe pace (route.speedMult, Tunables sewer.speedMult 1.25, applied by Motion.routeSpeed in the motor and in
@@ -251,7 +252,7 @@ return function(t)
 	end)
 
 	t.test(
-		"the server agrees: E from the grate is accepted; a hatch taken from above it, out of the air, is not",
+		"the server agrees: E from the grate is accepted; a hatch taken out of the air, or from too far in a frame, is not",
 		function()
 			for _, m in layout.mouths do
 				-- the honest E: standing on it, then on the route at the mouth
@@ -276,6 +277,17 @@ return function(t)
 				local plain = #SquirrelMotor.envelope(above, s, 1 / 60, w, false)
 				mouthSpec.hatch = true
 				t.eq(plain, 0, `{m.id}: an ordinary mouth would accept it`)
+				-- claimed from rest 2 studs off the lid (its rung side) one frame before: further than a sprint's frame
+				-- and the margins, so refused (a leap's pace took it before); over a gap that can hide a leap, accepted
+				local lid = m.opening
+				local ox = if m.out.x > 0 then lid.x1 elseif m.out.x < 0 then lid.x0 else m.x
+				local oz = if m.out.z > 0 then lid.z1 elseif m.out.z < 0 then lid.z0 else m.z
+				local far = SquirrelMotor.clone(before)
+				far.x, far.z = ox + m.out.x * 2, oz + m.out.z * 2
+				t.truthy(#SquirrelMotor.envelope(far, s, 1 / 60, w, false) > 0, `{m.id}: from rest 2 studs off it`)
+				local gap = SquirrelMotor.clone(s)
+				gap.clock = before.clock + 0.1
+				t.eq(#SquirrelMotor.envelope(far, gap, 0.1, w, false), 0, `{m.id}: from 2 studs off it, 0.1 s before`)
 			end
 		end
 	)
