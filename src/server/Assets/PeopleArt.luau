@@ -276,6 +276,12 @@ local function extrasOf(library: Library, dress: Dress): { Extra }
 	return out
 end
 
+-- An attachment to `pos` on its part, keeping its turn (a stock grip is turned).
+local function moveTo(L: Lib, att: any, pos: { number })
+	local cf = att.CFrame
+	att.CFrame = L.CFrame.new(v3(L, pos)) * (cf - cf.Position)
+end
+
 local function stamp(model: any, dress: Dress)
 	model:SetAttribute("PeopleArt", dress.role)
 	model:SetAttribute("PeopleBuild", dress.build)
@@ -358,12 +364,22 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 			end
 		end
 	end
+	-- (a weld keeps what it holds where it was: its offset is re-measured from the new part's centre; the rig's
+	-- Motor6Ds are set to the art's pivots below)
 	for _, j in joints do
-		if byOld[j.Part0] then
-			j.Part0 = byOld[j.Part0]
+		local was0, was1 = j.Part0, j.Part1
+		local now0, now1 = byOld[was0], byOld[was1]
+		if now0 then
+			if j:IsA("JointInstance") then
+				j.C0 = now0.CFrame:Inverse() * (was0.CFrame * j.C0)
+			end
+			j.Part0 = now0
 		end
-		if byOld[j.Part1] then
-			j.Part1 = byOld[j.Part1]
+		if now1 then
+			if j:IsA("JointInstance") then
+				j.C1 = now1.CFrame:Inverse() * (was1.CFrame * j.C1)
+			end
+			j.Part1 = now1
 		end
 	end
 	-- the joints at the art's pivots, and their rig attachments with them
@@ -386,7 +402,7 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 		for _, side in { { part0, j.c0 }, { part1, j.c1 } } do
 			local a = side[1]:FindFirstChild(`{jname}RigAttachment`)
 			if a and a:IsA("Attachment") then
-				a.Position = v3(L, side[2])
+				moveTo(L, a, side[2])
 			end
 		end
 	end
@@ -399,7 +415,7 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 			att.Name = aname
 			att.Parent = host
 		end
-		att.Position = v3(L, a.position)
+		moveTo(L, att, a.position)
 	end
 	-- nothing may recolour the parts behind the art's back
 	for _, d in model:GetChildren() do
