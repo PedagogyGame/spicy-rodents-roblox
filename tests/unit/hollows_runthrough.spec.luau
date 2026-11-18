@@ -318,4 +318,53 @@ return function(t)
 			end
 		end
 	end)
+
+	t.test("the server refuses a body put into a hollow through the bark, or out of one through it", function()
+		local function judge(prev: State, nxt: State): string
+			local codes = {}
+			for _, x in SquirrelMotor.envelope(prev, nxt, 1 / 60, w, false) do
+				table.insert(codes, x.code)
+			end
+			return table.concat(codes, ",")
+		end
+		for _, h in layout.hollows do
+			if h.trunk == nil then
+				continue
+			end
+			for _, rid in h.routes do
+				local r = reg:get(rid) :: any
+				for _, tt in { 0.5, 0.9 } do
+					if Enclosure.mouthNear(r.enclosure, r.length, tt, 0.5) then
+						continue
+					end
+					local inside = onRoute(rid, tt, 1)
+					-- from the outside trunk at the same height, one frame before
+					local tr = reg:get(h.trunk :: number) :: any
+					local lo, hi = 0, 1
+					for _ = 1, 30 do
+						local mid = (lo + hi) / 2
+						if reg:pointAt(tr, mid).y < inside.y then
+							lo = mid
+						else
+							hi = mid
+						end
+					end
+					local outside = onRoute(h.trunk :: number, lo, 1)
+					inside.clock = outside.clock + 1 / 60
+					local code = judge(outside, inside)
+					t.truthy(
+						string.find(code, "enclosure", 1, true) ~= nil,
+						`{h.id} {rid} t {tt}: in through the bark ({code})`
+					)
+					local back = SquirrelMotor.clone(outside)
+					back.clock = inside.clock + 1 / 60
+					local code2 = judge(inside, back)
+					t.truthy(
+						string.find(code2, "enclosure", 1, true) ~= nil,
+						`{h.id} {rid} t {tt}: out through it ({code2})`
+					)
+				end
+			end
+		end
+	end)
 end
