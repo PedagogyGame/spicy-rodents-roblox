@@ -21,7 +21,7 @@ export type Piece = {
 
 local LoungeArt = {}
 
-LoungeArt.ASSET_ID = ""
+LoungeArt.ASSET_ID = "128740384981683"
 LoungeArt.TOTAL_TRIS = 15448
 LoungeArt.BUDGET = 20000
 LoungeArt.PIECES = {

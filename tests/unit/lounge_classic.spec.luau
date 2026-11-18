@@ -2,7 +2,9 @@
 -- THE GILDED ACORN, the 1940s lounge (f3_lounge_classic; brief v2 "Lounge one", addendum D14): the bake in memory
 -- with the same code tools/bake/lounge_classic.luau runs (tools/bake/lounge_classic/Lounge): its place, its part,
 -- light and shadow budgets, and a sealed shell (nothing gets in but through the door's prompt).
+local fs = require("@lune/fs")
 local roblox = require("@lune/roblox")
+local serde = require("@lune/serde")
 local AlleyLayout = require("@shared/Attractions/AlleyLayout")
 local Expansion = require("../../generated/Expansion")
 local Kit = require("../../tools/bake/alley/Kit")
@@ -299,7 +301,11 @@ return function(t)
 
 	t.test("the Blender pieces: inside their triangle budget, each within the baked parts it stands in for", function()
 		local root, v = bake()
-		t.eq(LoungeArt.ASSET_ID, "") -- the lead uploads (tools/blender/lounge_classic/publish.py)
+		-- uploaded and approved (tools/blender/lounge_classic/publish.py): the game's id is the record's
+		local record = serde.decode("json", fs.readFile("data/art/lounge_classic.json"))
+		t.truthy(tonumber(LoungeArt.ASSET_ID) ~= nil, "the hero pieces are uploaded")
+		t.eq(record.asset.assetId, LoungeArt.ASSET_ID)
+		t.eq(record.asset.moderation, "Approved")
 		local total = 0
 		for _, p in LoungeArt.PIECES do
 			total += p.tris

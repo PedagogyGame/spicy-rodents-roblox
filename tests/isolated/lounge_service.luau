@@ -398,7 +398,9 @@ return function(t)
 					p.CanCollide = n == "BarFront"
 				end
 				local keep = FakeEngine.part("Stage", roblox.CFrame.new(0, 0, 0), interior)
-				local report = LoungeArt.install(root, place, LoungeArtData)
+				local bare = table.clone(LoungeArtData) :: any
+				bare.ASSET_ID = "" -- (as before the upload)
+				local report = LoungeArt.install(root, place, bare)
 				t.eq(report.loaded, false)
 				t.eq(report.why, "no asset id")
 				t.eq(root:FindFirstChild("Art"), nil)

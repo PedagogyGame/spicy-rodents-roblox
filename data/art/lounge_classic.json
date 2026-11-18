@@ -3,10 +3,10 @@
  "src": "tools/blender/lounge_classic (model.py: the hero pieces, procedural, in studs; publish.py: the upload).",
  "placement": "InsertService:LoadAsset(assetId):GetChildren()[1] is a Model of unrotated MeshParts, one per piece (by name); Server/Assets/LoungeArt puts each at its `centre` in the venue frame, paints it its `colour` in its `robloxMaterial`, and hides the baked parts named in `replaces`.",
  "asset": {
-  "assetId": null,
-  "moderation": "not uploaded",
+  "assetId": "128740384981683",
+  "moderation": "Approved",
   "displayName": "SR The Gilded Acorn hero pieces",
-  "fbxBytes": 287404,
+  "fbxBytes": 287468,
   "sha": "e3faf34cffe82f93"
  },
  "total": 15448,
