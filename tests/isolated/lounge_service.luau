@@ -1,0 +1,225 @@
+--!strict
+-- tests/isolated/lounge_service.luau: cases for tests/unit/lounge_service.spec.luau, run in their own Lune process
+-- (tests/lib/Isolated) because they install fake engine globals (tests/lib/FakeEngine).
+-- Server/Attractions/LoungeService on that fake engine: the engine check's own flow (tests/engine/Lounge: a person
+-- with and without the pass, buying it, a squirrel trying every way in and the guards, the four drinks, leaving,
+-- a new body, a leaver), the prompts and their E wiring, where the posts stand, and the Town built from the game.
+-- Interface: return function(t) (the spec shape)
+local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local EconomyRules = require("@shared/Economy/EconomyRules")
+local LoungeClassic = require("@shared/Attractions/LoungeClassic")
+local LoungeService = require("@server/Attractions/LoungeService")
+local LoungeFlow = require("@tests/engine/Lounge")
+local FakeEngine = require("@tests/lib/FakeEngine")
+local roblox = require("@lune/roblox")
+
+local function makeModel(name: string, cf: any, parent: any): any
+	local m = FakeEngine.model(name, cf, parent)
+	local root = FakeEngine.part(if parent == nil then "HumanoidRootPart" else "Root", cf, m)
+	root.Size = roblox.Vector3.new(2, 2, 1)
+	m.PrimaryPart = root
+	return m
+end
+
+local function deps(): any
+	return {
+		Service = LoungeService,
+		LoungeClassic = LoungeClassic,
+		EconomyRules = EconomyRules,
+		AlleyLayout = AlleyLayout,
+		makeBody = function(name: string, cf: any): any
+			return makeModel(name, cf, nil)
+		end,
+		makeModel = makeModel,
+		folder = function(name: string): any
+			return FakeEngine.new("Folder", name)
+		end,
+	}
+end
+
+local function stubTown(log: { any }): any
+	return {
+		speciesOf = function(p: any): string?
+			return p.species
+		end,
+		bodyOf = function(p: any): any?
+			return p.body
+		end,
+		moveTo = function(p: any, cf: any)
+			p.body:PivotTo(cf)
+		end,
+		pass = {
+			has = function(p: any): boolean
+				return p.pass == true
+			end,
+			buy = function(_p: any): (boolean, string)
+				return false, "no"
+			end,
+			offer = function(): (number, number, string)
+				return 20, 5, "A pass is 20c for five in-game days of paintball and both lounges."
+			end,
+		},
+		buy = function(_p: any, _id: string, _deliver: any): (boolean, string)
+			return false, "no"
+		end,
+		tell = function(p: any, text: string)
+			table.insert(log, { p, text })
+		end,
+		squirrels = function(): { any }
+			return {}
+		end,
+		knockOut = function(_a: any) end,
+	}
+end
+
+return function(t)
+	t.test(
+		"the engine check's own flow passes here (pass, no pass, buy, squirrels, drinks, leave, swap, leaver)",
+		function()
+			FakeEngine.with(function()
+				local result = LoungeFlow.play(deps())
+				if not result.ok then
+					error(table.concat(result.failures, "\n"))
+				end
+				local g = result.numbers.guards
+				t.truthy(g.struck >= 40, `{g.struck} struck`)
+				t.eq(g.wrong, 0)
+				t.eq(g.spared, 5)
+				t.eq(result.numbers.drinks.spent, 10 + 12 + 8 + 6)
+			end)
+		end
+	)
+
+	t.test(
+		"prompts: the door both ways, the podium's pass and the four drinks with prices, E with Door = true",
+		function()
+			FakeEngine.with(function()
+				local log = {}
+				local parent = FakeEngine.new("Folder", "P")
+				local svc =
+					LoungeService.new({ town = stubTown(log), parent = parent, root = FakeEngine.new("Folder", "R") })
+				local kinds: { [string]: any } = {}
+				for _, d in parent:GetDescendants() do
+					if d.ClassName == "ProximityPrompt" then
+						kinds[d:GetAttribute("Lounge")] = d
+						t.eq(d:GetAttribute("Door"), true)
+						t.eq(d.KeyboardKeyCode, roblox.Enum.KeyCode.E)
+						t.eq(d.HoldDuration, 0)
+					end
+				end
+				t.eq(kinds.enter.ActionText, "Go in")
+				t.eq(kinds.enter.ObjectText, "THE GILDED ACORN")
+				t.eq(kinds.leave.ActionText, "Leave")
+				t.eq(kinds.pass.ActionText, "Buy a pass")
+				t.eq(kinds.pass.ObjectText, "20c for 5 in-game days")
+				t.eq(kinds.hot_cocoa.ActionText, "Hot cocoa (10c)")
+				t.eq(kinds.coffee.ActionText, "Coffee (12c)")
+				t.eq(kinds.green_tea.ActionText, "Green tea (8c)")
+				t.eq(kinds.snow_cone.ActionText, "Snow cone (6c)")
+				-- E at the door: a person with the pass goes in
+				local body = makeModel("Ann", roblox.CFrame.new(svc:world(0, 3, -30)), nil)
+				local ann = { species = "human", pass = true, body = body }
+				kinds.enter.Triggered.fire(ann)
+				t.truthy(svc:isInside(ann))
+				kinds.leave.Triggered.fire(ann)
+				t.truthy(not svc:isInside(ann))
+				-- a handler that throws is contained
+				kinds.coffee.Triggered.fire(nil)
+				svc:stop()
+			end)
+		end
+	)
+
+	t.test(
+		"the posts: the door's on either side of the leaves, the podium on the landing, the orders on the bar",
+		function()
+			FakeEngine.with(function()
+				local svc =
+					LoungeService.new({ town = stubTown({}), prompts = false, root = FakeEngine.new("Folder", "R") })
+				local function loc(p: any): (number, number, number)
+					local w = p.CFrame.Position
+					return AlleyLayout.toLocal(svc.place, w.X, w.Y, w.Z)
+				end
+				local _, _, d = loc(svc.outsidePost)
+				t.truthy(d < -22 and d > LoungeClassic.DOOR_OUTSIDE.d, `outside post at D {d}`)
+				_, _, d = loc(svc.insidePost)
+				t.truthy(d > -21 and d < LoungeClassic.DOOR_INSIDE.d, `inside post at D {d}`)
+				local x, y, pd = loc(svc.podiumPost)
+				t.truthy(LoungeClassic.guarded(x, 0, pd) and y > 3.5, "the podium post")
+				for _, p in svc.counterPosts do
+					local cx, cy, cd = loc(p)
+					t.truthy(cx > LoungeClassic.COUNTER.x0 and cx < LoungeClassic.COUNTER.x1, `order post X {cx}`)
+					t.truthy(
+						cd < LoungeClassic.COUNTER.d and cd > LoungeClassic.COUNTER.d - 1 and cy > 3.35,
+						"order post"
+					)
+				end
+				svc:stop()
+			end)
+		end
+	)
+
+	t.test(
+		"the Town from the game: the wallet's pass and buy, the body moved standing, kill with cause guard",
+		function()
+			FakeEngine.with(function()
+				local body = makeModel("Bo", roblox.CFrame.new(0, 0, 0), nil)
+				local actor = { species = "human", body = body }
+				local killed: { any } = {}
+				local bought: { any } = {}
+				local wallet = {
+					pass = {
+						has = function()
+							return true
+						end,
+						buy = function()
+							return true, "ok"
+						end,
+						offer = function()
+							return 20, 5, "offer"
+						end,
+					},
+					buy = function(p: any, id: string, _deliver: any): (boolean, string)
+						table.insert(bought, { p, id })
+						return true, "Paid"
+					end,
+					tell = function() end,
+				}
+				local town = LoungeService.gameTown({
+					possession = {
+						actorOf = function(_self: any, p: any): any
+							return if p == "P" then actor else nil
+						end,
+					},
+					wallet = wallet,
+					squirrels = function(): { any }
+						return { { actor = "s", x = 1, y = 2, z = 3 } }
+					end,
+					kill = function(a: any, cause: string)
+						table.insert(killed, { a, cause })
+					end,
+				})
+				t.eq(town.speciesOf("P"), "human")
+				t.eq(town.bodyOf("P"), body)
+				t.eq(town.speciesOf("Q"), nil)
+				t.eq(town.pass, wallet.pass)
+				town.moveTo("P", roblox.CFrame.new(10, 20, 30))
+				t.near(body:GetPivot().Position.Y, 20 + LoungeService.STAND, 1e-6)
+				t.eq(
+					select(
+						1,
+						town.buy("P", "coffee", function()
+							return true
+						end)
+					),
+					true
+				)
+				t.eq(bought[1][2], "coffee")
+				town.knockOut("s")
+				t.eq(killed[1][1], "s")
+				t.eq(killed[1][2], "guard")
+				t.eq(#town.squirrels(), 1)
+			end)
+		end
+	)
+end
