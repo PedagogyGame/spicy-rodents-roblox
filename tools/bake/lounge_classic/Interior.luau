@@ -274,6 +274,7 @@ local function stage(kit: Kit.Kit, m: any)
 	kit:box(m, "StageStep", -20, -16, 0, S.top / 2, S.d0 - 1, S.d0, Style.WALNUT, "Wood")
 	kit:box(m, "DrapeBack", -IX, S.x1, S.top, Style.CROWN, IB - 0.45, IB, Style.VELVET, "Fabric", FLAT)
 	kit:box(m, "DrapeSide", -IX, -IX + 0.45, S.top, Style.CROWN, S.d0, IB - 0.45, Style.VELVET, "Fabric", FLAT)
+	-- a velvet valance with a gold fringe along the stage's open sides (the spots shine down between them)
 	kit:box(
 		m,
 		"Valance",
@@ -282,6 +283,19 @@ local function stage(kit: Kit.Kit, m: any)
 		Style.CROWN - 1.2,
 		Style.CROWN,
 		S.d0 - 0.3,
+		S.d0 + 0.3,
+		Style.VELVET,
+		"Fabric",
+		GHOST
+	)
+	kit:box(
+		m,
+		"ValanceSide",
+		S.x1 - 0.3,
+		S.x1 + 0.3,
+		Style.CROWN - 1.2,
+		Style.CROWN,
+		S.d0 + 0.3,
 		IB,
 		Style.VELVET,
 		"Fabric",
@@ -296,6 +310,19 @@ local function stage(kit: Kit.Kit, m: any)
 		Style.CROWN - 1.2,
 		S.d0 - 0.35,
 		S.d0 - 0.25,
+		Style.GOLD,
+		"Fabric",
+		GHOST
+	)
+	kit:box(
+		m,
+		"FringeSide",
+		S.x1 + 0.25,
+		S.x1 + 0.35,
+		Style.CROWN - 1.4,
+		Style.CROWN - 1.2,
+		S.d0 - 0.25,
+		IB,
 		Style.GOLD,
 		"Fabric",
 		GHOST
