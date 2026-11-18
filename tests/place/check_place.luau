@@ -263,6 +263,16 @@ if string.find(projectPath, "build%.project%.json$") then
 	)
 end
 
+-- ... and Bowl Lane (Workspace.Expansion.F2, family F2's single bake).
+if string.find(projectPath, "build%.project%.json$") then
+	local f2 = instanceAt({ "Workspace", "Expansion", "F2" })
+	local lane = f2 and f2:FindFirstChild("xs_bowl_lane")
+	check(
+		lane ~= nil and lane:GetAttribute("Street") == "xs_bowl_lane",
+		"Workspace.Expansion.F2 has no baked Bowl Lane: run lune run tools/bake/bowl_lane.luau first"
+	)
+end
+
 print(`place test: {placePath} against {projectPath}: {total} instances, {checks} checks, {#failures} failure(s)`)
 for _, f in failures do
 	print("  FAIL " .. f)
