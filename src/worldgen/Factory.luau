@@ -3,6 +3,7 @@
 -- Instance-creation shim: the same builders run under Lune (@lune/roblox) and in the engine
 -- (globals). Interface (BUILD_PLAN §1.4): new(env) -> Factory with
 --   instance(className, name) / part(PartSpec) / model(name, plan) / extra(ExtraSpec, partsByName)
+-- Extras: SurfaceGui, Prompt, Attachment, Beam, PointLight (Spec.ExtraSpec).
 -- `env` carries Instance, Vector3, CFrame, Color3, Enum, UDim2 and ColorSequence;
 -- Factory.engineEnv() returns the globals. No side effects on require.
 
@@ -179,6 +180,16 @@ function Factory.new(env: Env): Factory
 			if env.ColorSequence and e.color then
 				inst.Color = env.ColorSequence.new(env.Color3.fromRGB(e.color[1], e.color[2], e.color[3]))
 			end
+		elseif e.kind == "PointLight" then
+			-- room and porch lights (Builders/Furnish): plain scriptable properties only, lit as baked so a
+			-- room is never black even if no client code ever touches it
+			inst = env.Instance.new("PointLight")
+			inst.Range = math.min(e.range or 12, 60)
+			inst.Brightness = e.brightness or 1
+			local c = e.color or { 255, 255, 255 }
+			inst.Color = env.Color3.fromRGB(c[1], c[2], c[3])
+			inst.Shadows = e.shadows == true
+			inst.Enabled = true
 		else
 			error("Factory.extra: unknown kind " .. e.kind)
 		end

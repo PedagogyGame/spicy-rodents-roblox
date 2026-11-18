@@ -204,6 +204,10 @@ def finish(sp, variant, skel, bone_names, body, hi, lo, opts, log):
     rig.heat_weights(lo, skel)
     W = rig.weights_np(lo, bone_names)
     W = rig.smooth_weights(lo, W, iters=2, alpha=0.4)
+    if hasattr(sp, "refine_weights"):
+        # a species may correct the bone-heat weights by its anatomy (the squirrel's trunk: species_squirrel)
+        W = sp.refine_weights(bl.verts_np(lo.data), W, bone_names, variant)
+        W = rig.smooth_weights(lo, W, iters=2, alpha=0.4)
     W = rig.set_weights_np(lo, W, bone_names)
     log(f"heat weights on {len(lo.data.vertices)} verts")
     nh = add_hard_parts(sp, variant, lo, bone_names)

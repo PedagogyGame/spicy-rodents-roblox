@@ -313,8 +313,8 @@ local function accessoryTransfer(model: Model, parent: Instance): { [string]: an
 end
 
 function AvatarApi.run(options: Options?): { [string]: any }
-	local opts = options or {}
-	local userIds = opts.userIds or AvatarApi.DEFAULT_USER_IDS
+	local opts: Options = options or {}
+	local userIds: { number } = opts.userIds or AvatarApi.DEFAULT_USER_IDS
 	local started = os.clock()
 	local scratch = Instance.new("Folder")
 	scratch.Name = "AvatarApiScratch"
@@ -366,9 +366,11 @@ function AvatarApi.run(options: Options?): { [string]: any }
 				if not cached then
 					infoCalls += 1
 					local okInfo, got = productInfo(id)
-					cached = got or { error = "no info" }
-					cached.ok = okInfo
-					infoCache[id] = cached
+					-- a typed local: inside `if not cached` the checker takes `cached` for nil
+					local fresh: { [string]: any } = got or { error = "no info" }
+					fresh.ok = okInfo
+					infoCache[id] = fresh
+					cached = fresh
 					if okInfo then
 						infoOk += 1
 					end
@@ -403,12 +405,14 @@ function AvatarApi.run(options: Options?): { [string]: any }
 			end
 			data.HeadIsDynamic = face.dynamic == true
 			if not firstFaceTransfer or (firstFaceTransfer.ok ~= true and face.decal) then
-				firstFaceTransfer = faceTransfer(model, scratch)
-				firstFaceTransfer.userId = userId
+				local transfer = faceTransfer(model, scratch)
+				transfer.userId = userId
+				firstFaceTransfer = transfer
 			end
 			if not firstAccessoryTransfer or firstAccessoryTransfer.ok ~= true then
-				firstAccessoryTransfer = accessoryTransfer(model, scratch)
-				firstAccessoryTransfer.userId = userId
+				local transfer = accessoryTransfer(model, scratch)
+				transfer.userId = userId
+				firstAccessoryTransfer = transfer
 			end
 			local okTraits, traitsOrErr = pcall(function()
 				local traits = BlendRules.traits(data, info)
@@ -450,7 +454,8 @@ function AvatarApi.run(options: Options?): { [string]: any }
 
 	-- 4b. the classic face path
 	local classicFaces = {}
-	for _, faceId in opts.classicFaceIds or { 144075659, 8560971 } do
+	local faceIds: { number } = opts.classicFaceIds or { 144075659, 8560971 }
+	for _, faceId in faceIds do
 		table.insert(classicFaces, classicFaceViaLoadAsset(faceId, scratch))
 	end
 

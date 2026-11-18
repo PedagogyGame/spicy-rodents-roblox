@@ -7,7 +7,7 @@
 -- menu's five picks, the rodent biting a person (Power +100/+130, the victim flees), two kicks
 -- knocking the rodent out (health 100 -> 45 -> 0, released, back to the AI at full health), a scripted
 -- dart-out in front of a moving car (RUN OVER through the server's swept test), police beside a patrol
--- car and the possession ledger check.
+-- car, the town's wallet (tests/engine/WalletFlow) and the possession ledger check.
 -- Interface: run(opts?) -> Result (JSON-friendly)
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -162,7 +162,19 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		local brain = if vt then world.brains[vt] else nil
 		numbers.victimState = if brain then brain.state else "?"
 		check(brain ~= nil and brain.state == "flee", `victim state {numbers.victimState}`)
-		check((victim.body :: Model):FindFirstChild("Shout", true) ~= nil, "no shout over the victim")
+		-- the shout is two replicated attributes now (the client draws the bubble: UI/SpeechBubbles), and
+		-- the bite starts the bite-to-hospital sequence (Infection/InfectionService). NOT RUN since this
+		-- edit (2026-11-10): the cloud checks were off limits for the session that made it.
+		local say = (victim.body :: Model):GetAttribute("Say")
+		numbers.victimSays = say
+		check(type(say) == "string" and #say > 0, "no line over the victim (Say attribute)")
+		check(type((victim.body :: Model):GetAttribute("SayAt")) == "number", "no SayAt stamp on the victim")
+		check((victim.body :: Model):FindFirstChild("Shout", true) == nil, "the server still builds a Shout gui")
+		check(G.infection ~= nil, "the infection service did not start")
+		if G.infection and vt then
+			check(G.infection:isInfected(vt), "the bitten person is not infected")
+			numbers.victimCase = G.infection:stateOf(vt)
+		end
 	else
 		table.insert(failures, "no rodent or victim for the bite")
 	end
@@ -255,6 +267,22 @@ function PlayBuild.run(_opts: { [string]: any }?): { [string]: any }
 		end
 		numbers.policeToCar = best
 		check(best < 16, `police officer {best} studs from the nearest patrol car (reach 16)`)
+	end
+
+	-- the wallet (Economy/Credits; added 2026-11-13 and NOT yet run in the cloud): tests/engine/WalletFlow, the
+	-- same flow the Lune suite runs first on Game.wallet (tests/isolated/wallet.luau): pocket money on joining,
+	-- a purchase, a refusal, the pass on the day clock, the minigames' charge and pass on the one balance, the
+	-- notice toast, leaving and coming back -------------------------------------------------------------------
+	local wallet = G.wallet
+	check(wallet ~= nil, "Game has no wallet")
+	if wallet then
+		local WalletFlow = (require :: any)(script.Parent:WaitForChild("WalletFlow"))
+		local minigames = G.attractions and G.attractions.minigames
+		local found = WalletFlow.play(wallet, { player = player, town = minigames and minigames.town })
+		for _, failure in found.failures do
+			check(false, `wallet: {failure}`)
+		end
+		numbers.wallet = found.numbers
 	end
 
 	local okLedger, errors = possession:check()

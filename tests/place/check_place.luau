@@ -6,7 +6,8 @@
 --     LocalScript, Folder, or a named instance for .model.json / .rbxm / .rbxmx);
 --   * no SurfaceAppearance, PartOperation (union) or BaseWrap exists anywhere in the place, so
 --     the place stays publishable through Open Cloud;
---   * ServerStorage.EngineTests exists only when the project maps it (ci.project.json).
+--   * ServerStorage.EngineTests exists only when the project maps it (ci.project.json);
+--   * the owner's place (build.project.json) carries the baked Neighbourhood Shop and Pepper's Corner Store.
 -- Usage: lune run tests/place/check_place.luau <place.rbxl|rbxlx> <project.json>
 
 local fs = require("@lune/fs")
@@ -73,6 +74,18 @@ local function propertyMatches(inst: any, name: string, expected: any): (boolean
 	end
 	if type(expected) == "number" and type(actual) == "number" then
 		return math.abs(actual - expected) < 1e-6, `{name}: expected {expected}, got {actual}`
+	end
+	-- a colour is written in a project file as three numbers from 0 to 1 (to four places) and is held
+	-- by the place as single-precision floats
+	if actualType == "Color3" and type(expected) == "table" and #expected == 3 then
+		local c = actual :: any
+		local got = { c.R, c.G, c.B }
+		for i = 1, 3 do
+			if type(expected[i]) ~= "number" or math.abs(got[i] - expected[i]) > 1e-3 then
+				return false, `{name}: expected {expected[1]}, {expected[2]}, {expected[3]}, got {tostring(actual)}`
+			end
+		end
+		return true, ""
 	end
 	return actual == expected, `{name}: expected {tostring(expected)}, got {tostring(actual)}`
 end
@@ -211,6 +224,54 @@ check(
 	(engineTests ~= nil) == projectHasEngineTests,
 	`ServerStorage.EngineTests presence ({engineTests ~= nil}) does not match project ({projectHasEngineTests})`
 )
+
+-- The owner's place (build.project.json) carries the Neighbourhood Shop whenever generated/ShopArt names it: its
+-- slot is an optional path, which Rojo leaves out without a word when the shop's bake was not run.
+if string.find(projectPath, "build%.project%.json$") and fs.isFile("generated/ShopArt.luau") then
+	local slot = instanceAt({ "Workspace", "Expansion", "NeighbourhoodShop" })
+	local found = false
+	for _, d in if slot then slot:GetDescendants() else {} do
+		if d:IsA("Model") and d:GetAttribute("ArtShop") ~= nil then
+			found = true
+		end
+	end
+	check(
+		found,
+		"Workspace.Expansion.NeighbourhoodShop has no baked shop: run lune run tools/bake/neighbourhood_shop.luau first"
+	)
+	-- and Pepper's Corner Store (Workspace.Expansion.F1), for the same reason
+	local f1 = instanceAt({ "Workspace", "Expansion", "F1" })
+	local store = f1 and f1:FindFirstChild("f1_corner_store")
+	check(
+		store ~= nil and store:FindFirstChild("Zone") ~= nil and store:FindFirstChild("Items") ~= nil,
+		"Workspace.Expansion.F1 has no baked corner store: run lune run tools/bake/corner_store.luau first"
+	)
+end
+
+-- ... and THE GILDED ACORN, the 1940s lounge (its own optional slot too).
+if string.find(projectPath, "build%.project%.json$") then
+	local slot = instanceAt({ "Workspace", "Expansion", "LoungeClassic" })
+	local found = false
+	for _, d in if slot then slot:GetChildren() else {} do
+		if d:IsA("Model") and d:GetAttribute("Venue") == "f3_lounge_classic" then
+			found = true
+		end
+	end
+	check(
+		found,
+		"Workspace.Expansion.LoungeClassic has no baked lounge: run lune run tools/bake/lounge_classic.luau first"
+	)
+end
+
+-- ... and Bowl Lane (Workspace.Expansion.F2, family F2's single bake).
+if string.find(projectPath, "build%.project%.json$") then
+	local f2 = instanceAt({ "Workspace", "Expansion", "F2" })
+	local lane = f2 and f2:FindFirstChild("xs_bowl_lane")
+	check(
+		lane ~= nil and lane:GetAttribute("Street") == "xs_bowl_lane",
+		"Workspace.Expansion.F2 has no baked Bowl Lane: run lune run tools/bake/bowl_lane.luau first"
+	)
+end
 
 print(`place test: {placePath} against {projectPath}: {total} instances, {checks} checks, {#failures} failure(s)`)
 for _, f in failures do

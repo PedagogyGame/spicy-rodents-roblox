@@ -344,4 +344,76 @@ return function(t)
 		local wire = back:FindFirstChild("Props"):FindFirstChildWhichIsA("Model")
 		t.truthy(wire ~= nil)
 	end)
+
+	-- The v5.4 hospital zones (lobby, triage, ward bays...) are child lots inside the enterable shell.
+	-- As see-through boxes up to 235 st long they stood through every room and its furniture.
+	-- (owner 2026-11-11, "clean up a few things on the map": the galleria's shops and atrium, the last
+	-- zones still drawn as tinted see-through boxes, are invisible markers too)
+	t.test("zones inside a building are invisible markers: the hospital's and the galleria's alike", function()
+		local hidden, ghosts = 0, 0
+		for _, p in plans do
+			if p.kind == "lot" and p.attributes.ParentLot ~= nil then
+				local s = p.parts[1]
+				if p.attributes.ParentLot == "hospital_main" then
+					hidden += 1
+					t.eq(s.transparency, 1, p.id)
+					t.eq(s.canQuery, false, p.id)
+					t.eq(s.canCollide, false, p.id)
+				else
+					ghosts += 1
+					t.eq(s.transparency, 1, p.id)
+					t.eq(s.canCollide, false, p.id)
+				end
+			end
+		end
+		t.truthy(hidden >= 8, `{hidden} hospital zones`)
+		t.truthy(ghosts >= 6, `{ghosts} other child lots`)
+	end)
+
+	t.test("PointLight extras: built lit with their range and colour, hashed, kept by the .rbxm", function()
+		local Greybox = require("@worldgen/Builders/Greybox")
+		local Spec = require("@worldgen/Spec")
+		local function plan(range: number): any
+			local list = Spec.list()
+			list:add(Geometry.frame(0, 0, 0, 0), "Shade", 0, 10, 0, 1, 1, 1, { canCollide = false, canQuery = false })
+			list:extra({
+				kind = "PointLight",
+				part = "Shade",
+				name = "Glow",
+				range = range,
+				brightness = 0.9,
+				color = { 255, 218, 152 },
+			})
+			return {
+				kind = "lot",
+				id = "lamp_test",
+				category = "prop",
+				lod = "Disabled",
+				streaming = "Default",
+				attributes = {},
+				parts = list.parts,
+				extras = list.extras,
+			}
+		end
+		local model = Greybox.build(plan(14), factory())
+		local back = roblox.deserializeModel(roblox.serializeModel({ model }))[1]
+		local light = back:FindFirstChild("Shade"):FindFirstChild("Glow")
+		t.eq(light.ClassName, "PointLight")
+		t.near(light.Range, 14, 1e-6)
+		t.near(light.Brightness, 0.9, 1e-6)
+		t.eq(light.Enabled, true)
+		t.eq(light.Shadows, false)
+		t.near(light.Color.G * 255, 218, 0.51)
+		t.eq(back:FindFirstChild("Shade").CanQuery, false)
+		-- the plan hash sees the light's parameters and the part's canQuery; so does the instance hash
+		t.truthy(Bake.hash({ plan(14) }) ~= Bake.hash({ plan(18) }), "range is hashed")
+		local wrap = roblox.Instance.new("Model")
+		wrap.Name = "Town"
+		model.Parent = wrap
+		local lines = table.concat(Bake.instanceLines(wrap), "\n")
+		t.truthy(string.find(lines, "Glow|PointLight|14.0/0.90/true", 1, true), lines)
+		-- a range past the engine's 60 st limit is clamped by Factory, the same in both runtimes
+		local far = Greybox.build(plan(90), factory())
+		t.near(far:FindFirstChild("Shade"):FindFirstChild("Glow").Range, 60, 1e-6)
+	end)
 end

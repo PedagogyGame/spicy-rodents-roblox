@@ -260,7 +260,7 @@ function WorldBuild.terrain(which: string, opts: { chunk: number?, clear: boolea
 	local Height = req(child(ReplicatedStorage, "Shared", "World", "Height"))
 	local TerrainBake = worldgen("TerrainBake")
 	local terrain = workspace.Terrain
-	local o = opts or {}
+	local o: { chunk: number?, clear: boolean? } = opts or {}
 	if o.clear then
 		terrain:Clear()
 	end

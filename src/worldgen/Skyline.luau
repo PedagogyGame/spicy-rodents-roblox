@@ -26,7 +26,8 @@ function Skyline.plan(
 		if p.kind == "lot" and p.attributes.ParentLot == nil and skylineTypes[p.attributes.LotType :: string] then
 			local x0, x1, y0, y1, z0, z1 = math.huge, -math.huge, math.huge, -math.huge, math.huge, -math.huge
 			for _, s in p.parts do
-				if s.canCollide and s.role ~= "Door" then
+				-- door steps stand outside the massing: the far-view box is the building itself
+				if s.canCollide and s.role ~= "Door" and s.role ~= "Step" then
 					local a0, a1, b0, b1, c0, c1 = Geometry.aabb(s :: any)
 					x0, x1 = math.min(x0, a0), math.max(x1, a1)
 					y0, y1 = math.min(y0, b0), math.max(y1, b1)
@@ -44,7 +45,7 @@ function Skyline.plan(
 					castShadow = false,
 					color = p.parts[1].color,
 					role = "Skyline",
-					attrs = { Lot = p.id },
+					attrs = { Lot = p.id } :: Spec.Attrs,
 				})
 			end
 		end
@@ -91,7 +92,7 @@ function Skyline.plan(
 			color = { 255, 228, 170 },
 			material = "Neon",
 			role = "Skyline",
-			attrs = { Lamp = l.id, Flicker = l.flicker },
+			attrs = { Lamp = l.id, Flicker = l.flicker } :: Spec.Attrs,
 		})
 	end
 	return {

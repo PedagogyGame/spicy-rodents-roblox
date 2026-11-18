@@ -6,8 +6,10 @@
 -- 2^53 exact-integer range of a Luau number and of the DataStore's JSON).
 -- Interface: isCents(v), credit(balance, cents) -> (ok, newBalance | reason),
 --            debit(balance, cents) -> (ok, newBalance | reason), format(cents) -> "S$12.34",
---            purse(cents?) -> Purse (W1: the server-life wallet until W4 binds it to the profile);
+--            purse(cents?, watch?) -> Purse (W1: the server-life wallet until W4 binds it to the profile);
 --            Purse:credit(cents, why) / Purse:debit(cents, why) -> (ok, reason?), Purse.cents, Purse.history
+-- A purse made with `watch` reports every change to it as it is recorded (Economy/Bank keeps the town's
+-- log and the balance on screen that way, whoever holds the purse).
 
 local Wallet = {}
 
@@ -70,15 +72,19 @@ export type Purse = {
 
 Wallet.HISTORY = 20
 
-local function record(p: Purse, delta: number, why: string)
-	table.insert(p.history, { delta = delta, why = why, balance = p.cents })
+local function record(p: Purse, delta: number, why: string, watch: ((entry: Entry) -> ())?)
+	local entry = { delta = delta, why = why, balance = p.cents }
+	table.insert(p.history, entry)
 	if #p.history > Wallet.HISTORY then
 		table.remove(p.history, 1)
+	end
+	if watch then
+		watch(entry)
 	end
 end
 
 -- A server-life wallet (BUILD_PLAN §4.4 #6b: "Wallet (server-life until W4)").
-function Wallet.purse(cents: number?): Purse
+function Wallet.purse(cents: number?, watch: ((entry: Entry) -> ())?): Purse
 	local p = { cents = cents or 0, history = {} } :: Purse
 	assert(Wallet.isCents(p.cents), "Wallet.purse: bad opening balance")
 	function p.credit(self: Purse, amount: number, why: string): (boolean, string?)
@@ -87,7 +93,7 @@ function Wallet.purse(cents: number?): Purse
 			return false, r :: string
 		end
 		self.cents = r :: number
-		record(self, amount, why)
+		record(self, amount, why, watch)
 		return true
 	end
 	function p.debit(self: Purse, amount: number, why: string): (boolean, string?)
@@ -96,7 +102,7 @@ function Wallet.purse(cents: number?): Purse
 			return false, r :: string
 		end
 		self.cents = r :: number
-		record(self, -amount, why)
+		record(self, -amount, why, watch)
 		return true
 	end
 	return p

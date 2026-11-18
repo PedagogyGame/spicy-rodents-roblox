@@ -30,7 +30,7 @@ BackdropTerrain.WATER = table.freeze({
 BackdropTerrain.ROCK_COLOR = "8c877c"
 
 function BackdropTerrain.write(terrain: Terrain, opts: { chunk: number? }?): { [string]: any }
-	local o = opts or {}
+	local o: { chunk: number? } = opts or {}
 	local t0 = os.clock()
 	Height.configure(Import.generated("TerrainExtensions"))
 	Backdrop.reset()

@@ -320,7 +320,7 @@ return function(t)
 		t.truthy(s.z > 5 + st(6), "and carries forward")
 	end)
 
-	t.test("lean: into the turn, clamped, level on a trunk; trunk yaw faces the bark; pitch 0.83 -> 1.43", function()
+	t.test("lean: into the turn, clamped, level on a trunk; trunk yaw faces the bark; pitch 0.83 -> upright", function()
 		local v = SquirrelVisual.new()
 		SquirrelVisual.lean(v, 0, 1 / 60)
 		t.eq(v.lean, 0)
@@ -364,8 +364,11 @@ return function(t)
 		end
 		t.near(SquirrelVisual.trunkPitch(0), 0.83, 1e-12)
 		t.near(SquirrelVisual.trunkPitch(st(0.25)), 0.83, 1e-12)
-		t.near(SquirrelVisual.trunkPitch(st(2.4)), 1.43, 1e-12)
-		t.near(SquirrelVisual.trunkPitch(100), 1.43, 1e-12)
+		-- once the paws grip the body lies along the bark (v5.4's 1.43 rad left a sculpted body's fore paws
+		-- in the trunk and its hind feet off it)
+		t.near(P.trunkPitchHigh, math.pi / 2, 1e-12)
+		t.near(SquirrelVisual.trunkPitch(st(2.4)), math.pi / 2, 1e-12)
+		t.near(SquirrelVisual.trunkPitch(100), math.pi / 2, 1e-12)
 		t.truthy(SquirrelVisual.trunkPitch(st(1.3)) > 0.83 and SquirrelVisual.trunkPitch(st(1.3)) < 1.43)
 		-- cadence: 2.85 rad per u on the ground, 0.7 on a rail, x1.14 boosted
 		t.near(SquirrelVisual.cadence(st(8), false, false), 22.8, 1e-9)
@@ -383,6 +386,7 @@ return function(t)
 		inp.fw = 1
 		local attachedAt: number? = nil
 		local maxMove, maxYaw, maxPitch = 0, 0, 0
+		local leastReach = math.huge
 		for i = 1, 360 do
 			local lx, ly, lz, lyaw, lpitch = v.x, v.y, v.z, v.yaw, v.pitch
 			local _, events = SquirrelMotor.step(s, inp, 1 / 60, world)
@@ -396,6 +400,14 @@ return function(t)
 				inp.fw = 0
 			end
 			t.eq(SquirrelVisual.frame(v, s, world, 1 / 60), i == 1, `snap at frame {i}`)
+			if attachedAt then
+				-- while the body still leans its fore paws reach toward the trunk: the feet point stands
+				-- off the bark by that reach, so they never go into it
+				local pose = SquirrelMotor.visualPose(s, world)
+				local bark = math.sqrt((pose.x - s.x) ^ 2 + (pose.z - s.z) ^ 2) - Motion.C.visualTrunkPad
+				local off = math.sqrt((v.x - s.x) ^ 2 + (v.z - s.z) ^ 2) - bark
+				leastReach = math.min(leastReach, off - P.foreReach * math.max(math.cos(v.pitch), 0))
+			end
 			if i > 1 then
 				maxMove = math.max(maxMove, math.sqrt((v.x - lx) ^ 2 + (v.y - ly) ^ 2 + (v.z - lz) ^ 2))
 				maxYaw = math.max(maxYaw, math.abs(shortest((v.yaw :: number) - (lyaw :: number))))
@@ -408,6 +420,7 @@ return function(t)
 		t.truthy(maxMove < 0.9, `drawn move {maxMove} st in one frame`)
 		t.truthy(maxYaw < 0.8, `heading change {maxYaw} rad in one frame`)
 		t.truthy(maxPitch < 0.4, `pitch change {maxPitch} rad in one frame`)
+		t.truthy(leastReach > -0.02, `the fore paws went {-leastReach} st into the bark while it mounted`)
 		-- settled: the feet point sits barkGap outside the bark that v5.4's pad was measured from
 		local vis = SquirrelMotor.visualPose(s, world)
 		local out = math.sqrt((vis.x - s.x) ^ 2 + (vis.z - s.z) ^ 2)
@@ -416,7 +429,7 @@ return function(t)
 		t.truthy(drawn < out, "pulled in from v5.4's pad")
 		t.near(v.y, vis.y, 0.01)
 		-- nose up at the full grip pitch, facing the trunk axis, level
-		t.near(v.pitch, 1.43, 0.01)
+		t.near(v.pitch, P.trunkPitchHigh, 0.01)
 		t.near(v.climb, 1, 0.01)
 		local fx, fz = math.sin(v.yaw :: number), math.cos(v.yaw :: number)
 		local ax, az = (s.x - v.x) / drawn, (s.z - v.z) / drawn
@@ -468,7 +481,7 @@ return function(t)
 				-- on the pole: the feet point is poleGap outside its surface, nose up
 				local d = math.sqrt((v.x - s.x) ^ 2 + (v.z - s.z) ^ 2)
 				t.near(d, pole.surfaceRadius + P.poleGap, 0.02, "pole gap")
-				t.near(v.pitch, 1.43, 0.02)
+				t.near(v.pitch, P.trunkPitchHigh, 0.02)
 				gapChecked = true
 			end
 			if switchedAt and i > switchedAt + 150 then
@@ -482,12 +495,17 @@ return function(t)
 		t.truthy(maxMove < 0.9, `drawn move {maxMove} st in one frame`)
 		t.truthy(maxYaw < 0.8, `heading change {maxYaw} rad in one frame`)
 		t.truthy(maxPitch < 0.4, `pitch change {maxPitch} rad in one frame`)
-		-- 2.5 s along the wire: level, heading along the motor's, riding the wire lift
+		-- 2.5 s along the wire: level, heading along the motor's, the paws on the line: the drawn feet point
+		-- rides the wire's top (it is drawn 0.15 studs thick), not v5.4's lift half a stud above it, which
+		-- stays the motor's own (a leap off the wire starts there)
 		t.truthy(math.abs(v.pitch) < 0.01, `pitch {v.pitch}`)
 		t.truthy(v.climb < 0.01)
 		t.truthy(math.abs(shortest((v.yaw :: number) - s.yaw)) < 0.01, "heading follows the wire")
 		local vis = SquirrelMotor.visualPose(s, world)
-		t.truthy(math.abs(v.y - vis.y) < 0.15, `wire height {v.y - vis.y}`)
+		t.near(vis.y - s.y, Motion.C.visualWireLift, 1e-9, "the motor's lift is untouched")
+		t.near(P.wireLift, 0.08, 1e-12)
+		t.truthy(math.abs(v.y - (s.y + P.wireLift)) < 0.15, `wire height {v.y - s.y}`)
+		t.truthy(v.y < vis.y - 0.3, "let down from the motor's lift")
 		t.near(v.cadence, SquirrelVisual.cadence(s.moveSpeed, true, false), 1e-9)
 	end)
 
@@ -1166,4 +1184,148 @@ return function(t)
 		t.eq(Squirrel.movedFromOutside(Squirrel.OUTSIDE_SLACK + 0.1, 0, 1 / 60), true, "a still body moved")
 		t.eq(Squirrel.movedFromOutside(12, 42, 1 / 60), true, "a recovery while sprinting")
 	end)
+
+	t.test(
+		"out of a trunk onto a bough: drawn on the bough's top line, clear of the trunk, never through the wood",
+		function()
+			local C = Motion.C
+			local T = C.visualClearanceT
+			local trunk = world.registry:get(220) :: Registry.Route
+			-- how far outside the trunk's bark (the radius the motor takes it to have at that height) a point is
+			local function outsideTrunk(x: number, y: number, z: number): number
+				local best, bt = world.registry:pointAt(trunk, 0), 0
+				for i = 1, 400 do
+					local p = world.registry:pointAt(trunk, i / 400)
+					if math.abs(p.y - y) < math.abs(best.y - y) then
+						best, bt = p, i / 400
+					end
+				end
+				local r = math.max(C.visualTrunkMinR, trunk.surfaceRadius * (1 - C.visualTrunkTaper * bt))
+				return math.sqrt((x - best.x) ^ 2 + (z - best.z) ^ 2) - r
+			end
+			-- three BUR OAK boughs that leave the trunk at 60, 51 and 40 degrees
+			for _, id in { 227, 221, 228 } do
+				local bough = world.registry:get(id) :: Registry.Route
+				local lift = bough.visualOffset or C.visualBranchLift
+				-- the bough's top line, where the bark is promised (centre line + lift)
+				local top = {}
+				for i = 0, 3000 do
+					local p = world.registry:pointAt(bough, i / 3000 * 0.3)
+					top[i] = { x = p.x, y = p.y + lift, z = p.z }
+				end
+				local function offTop(x: number, y: number, z: number): number
+					local d = math.huge
+					for i = 0, 3000 do
+						local p = top[i]
+						d = math.min(d, (p.x - x) ^ 2 + (p.y - y) ^ 2 + (p.z - z) ^ 2)
+					end
+					return math.sqrt(d)
+				end
+				local function on(railT: number): SquirrelMotor.State
+					local p = world.registry:pointAt(bough, railT)
+					local s = SquirrelMotor.new(p.x, p.y, p.z)
+					s.routeId, s.railT, s.railDir, s.grounded = id, railT, 1, false
+					return s
+				end
+				-- the motor's own pose is v5.4's and is not touched: level off the centre line by the full
+				-- push at t = 0, which under this bough is far below its top
+				local m = SquirrelMotor.visualPose(on(0), world)
+				local p0 = world.registry:pointAt(bough, 0)
+				t.near(
+					math.sqrt((m.x - p0.x) ^ 2 + (m.z - p0.z) ^ 2),
+					(bough.trunkClearance :: number) + C.visualClearancePad,
+					1e-9,
+					"the motor's push"
+				)
+				t.near(m.y, p0.y + lift, 1e-9)
+				t.truthy(offTop(m.x, m.y, m.z) > 1.2, `{id}: v5.4's point is under the bough`)
+				-- where it is drawn, motor at rest at each t (a first frame draws the target itself)
+				local worstTop, leastOut, lastT = 0, math.huge, -1
+				for k = 0, 24 do
+					local railT = k * 0.01
+					local v = SquirrelVisual.new()
+					SquirrelVisual.frame(v, on(railT), world, 1 / 60)
+					local drawnT = SquirrelVisual.junctionT(world, bough, railT) or railT
+					t.truthy(drawnT >= railT - 1e-12 and drawnT > lastT, `{id}: drawn t goes back at {railT}`)
+					lastT = drawnT
+					worstTop = math.max(worstTop, offTop(v.x, v.y, v.z))
+					if railT < T then
+						leastOut = math.min(leastOut, outsideTrunk(v.x, v.y, v.z))
+					else
+						t.eq(SquirrelVisual.junctionT(world, bough, railT), nil, "past the stretch: the motor's pose")
+					end
+				end
+				t.truthy(worstTop < 0.01, `{id}: drawn {worstTop} st off the bough's top line`)
+				t.truthy(leastOut > 0.25, `{id}: drawn {leastOut} st from the trunk's bark`)
+				-- the two meet at the motor's own speed
+				t.near((T - (SquirrelVisual.junctionT(world, bough, T - 1e-4) :: number)) / 1e-4, 1, 0.01)
+				-- walking out from the junction at any frame time: on the top line the whole way, no pop
+				for _, pattern in { "60", "144", "30", "uneven" } do
+					local s = on(0)
+					local tan = world.registry:tangentAt(bough, 0.05)
+					local inp = input(math.atan2(-tan.x, -tan.z))
+					inp.fw = 1
+					local v = SquirrelVisual.new()
+					SquirrelVisual.frame(v, s, world, 1 / 60)
+					local off, out, move, checked = 0, math.huge, 0, 0
+					for i = 1, 2000 do
+						local dt = frameDt(pattern, i)
+						local lx, ly, lz = v.x, v.y, v.z
+						SquirrelMotor.step(s, inp, dt, world)
+						if s.routeId ~= id or s.railT > 0.26 then
+							break
+						end
+						t.eq(SquirrelVisual.frame(v, s, world, dt), false, `{id} {pattern}: snap at {s.railT}`)
+						move = math.max(move, math.sqrt((v.x - lx) ^ 2 + (v.y - ly) ^ 2 + (v.z - lz) ^ 2) / dt)
+						off = math.max(off, offTop(v.x, v.y, v.z))
+						if s.railT < T then
+							out = math.min(out, outsideTrunk(v.x, v.y, v.z))
+						end
+						checked += 1
+					end
+					t.truthy(checked > 20 and s.routeId == id, `{id} {pattern}: walked out ({checked} frames)`)
+					t.truthy(off < 0.1, `{id} {pattern}: drawn {off} st off the top line while walking out`)
+					t.truthy(out > 0.25, `{id} {pattern}: drawn {out} st from the trunk's bark`)
+					-- never faster than the motor walks on wood (it starts still at the collar and catches up)
+					t.truthy(move < SquirrelMotor.railCap(true, false) * 1.05, `{id} {pattern}: drawn at {move} st/s`)
+					if pattern == "60" then
+						print(
+							`      bough {id}: collar at t {SquirrelVisual.junctionT(world, bough, 0)}; walking out, drawn {off} st off the top line at most, {out} st from the trunk's bark at least`
+						)
+					end
+				end
+			end
+			-- a bough that is not clear of its trunk's base radius by 0.7 of the stretch is left as v5.4 draws
+			-- it (standing at the collar that long would freeze the body): how many of the town's that is
+			local covered, left, example = 0, 0, nil :: Registry.Route?
+			for _, r in world.registry:all() do
+				if r.kind == "branch" and r.trunkClearance then
+					if SquirrelVisual.junctionT(world, r, 0) then
+						covered += 1
+					else
+						left += 1
+						example = example or r
+					end
+				end
+			end
+			print(
+				`      fork boughs drawn on their top line through the junction: {covered}; left as v5.4 draws them: {left}`
+			)
+			t.truthy(covered > 400, `only {covered} boughs covered`)
+			if example then
+				local p = world.registry:pointAt(example, 0.05)
+				local s = SquirrelMotor.new(p.x, p.y, p.z)
+				s.routeId, s.railT, s.railDir, s.grounded = example.id, 0.05, 1, false
+				local v = SquirrelVisual.new()
+				SquirrelVisual.frame(v, s, world, 1 / 60)
+				local m = SquirrelMotor.visualPose(s, world)
+				t.near(
+					math.sqrt((v.x - m.x) ^ 2 + (v.y - m.y) ^ 2 + (v.z - m.z) ^ 2),
+					0,
+					1e-9,
+					"left at the motor's pose"
+				)
+			end
+		end
+	)
 end

@@ -36,6 +36,7 @@ export type Opts = {
 	players: boolean?, -- connect PlayerAdded / PlayerRemoving (default true)
 	movement: any?, -- Movement/MovementService instance (onHandoff)
 	roles: any?, -- a RoleService constructor module (default Server/Roles/RoleService)
+	purse: ((player: any) -> any)?, -- the town wallet's purse for a joining player (Boot/Game.wallet's purse hook: join, then the face)
 	engine: any?, -- Possession.Engine override (engine tests drive PlayerLike stubs)
 }
 
@@ -175,9 +176,12 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		local best, bestD = nil, math.huge
 		for _, a in world.actors do
 			local actor = byTownId[a.id]
+			-- a body that is not possessable right now (a patient on the ground, in an ambulance or in a
+			-- hospital bed: Infection/InfectionService) is never offered
 			if
 				a.species == species
 				and (variant == nil or a.variant == variant)
+				and actor.possessable ~= false
 				and possession:controllerOf(actor) == "ai"
 				and (species ~= "human" or a.post == "townsperson" or a.post == "rider")
 			then
@@ -191,7 +195,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 			-- above-floor bodies of any post (Population's re-post step, simplified for W1)
 			for _, a in world.actors do
 				local actor = byTownId[a.id]
-				if a.species == "human" and possession:controllerOf(actor) == "ai" then
+				if a.species == "human" and actor.possessable ~= false and possession:controllerOf(actor) == "ai" then
 					return actor
 				end
 			end
@@ -214,7 +218,7 @@ function ActorsRuntime.start(opts: Opts): Runtime
 		return opts.roles or require("../Roles/RoleService") :: any
 	end)
 	if okRoles and RoleService then
-		roles = RoleService.new({ possession = possession, pickBody = pickBody })
+		roles = RoleService.new({ possession = possession, pickBody = pickBody, purse = opts.purse })
 	end
 
 	local devices: any? = nil
@@ -263,7 +267,11 @@ function ActorsRuntime.start(opts: Opts): Runtime
 			local actor = byTownId[a.id]
 			if actor.mode == "ai" then
 				table.insert(parts, roots[a.id])
-				table.insert(cfs, Units.yawCFrame(a.yaw, Vector3.new(a.x, a.y - a.hip + offsets[a.id], a.z)))
+				-- `lift` sinks a hidden patient out of sight (Infection/InfectionService.SINK)
+				table.insert(
+					cfs,
+					Units.yawCFrame(a.yaw, Vector3.new(a.x, a.y - a.hip + offsets[a.id] + (a.lift or 0), a.z))
+				)
 				if writeAttrs then
 					local body = actor.body :: Model
 					body:SetAttribute(PossessionState.ATTR.Speed, math.floor(a.speed * 10 + 0.5) / 10)
@@ -271,6 +279,10 @@ function ActorsRuntime.start(opts: Opts): Runtime
 						PossessionState.ATTR.MoveState,
 						if a.speed < 0.3 then "idle" elseif a.speed < 9 then "walk" else "run"
 					)
+					-- a member of staff at work (Brains/Staff work stops: the alley's employees); nil otherwise
+					if body:GetAttribute("Task") ~= a.task then
+						body:SetAttribute("Task", a.task)
+					end
 				end
 			else
 				local r = roots[a.id]
@@ -292,7 +304,9 @@ function ActorsRuntime.start(opts: Opts): Runtime
 					p.X,
 					p.Y,
 					p.Z,
-					r.AssemblyLinearVelocity.Y > -1 and r.AssemblyLinearVelocity.Y < 1
+					r.AssemblyLinearVelocity.Y > -1
+						and r.AssemblyLinearVelocity.Y < 1
+						and (actor.body :: Model):GetAttribute("Ride") == nil -- a sky-lift seat is not safe ground
 				)
 				local qx = Recovery.riverFall(p.X, p.Y, p.Z)
 				if qx or not Recovery.isSane(p.X, p.Y, p.Z) then

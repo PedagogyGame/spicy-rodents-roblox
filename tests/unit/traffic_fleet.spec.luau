@@ -7,6 +7,7 @@ local LaneMath = require("@shared/Traffic/LaneMath")
 local Control = require("@shared/Traffic/Control")
 local Fleet = require("@shared/Traffic/Fleet")
 local Ghost = require("@shared/Traffic/Ghost")
+local VehiclePuppet = require("@shared/Traffic/VehiclePuppet")
 local Boxes = require("@shared/Traffic/Boxes")
 local Schemas = require("@shared/Net/Schemas")
 local Net = require("@shared/Net/Net")
@@ -60,7 +61,9 @@ return function(t)
 				end
 			end
 			t.truthy(checked >= 6, `checked {checked} straight vehicle lanes`)
-			t.near(lanes.blvd_eastbound.coord :: number, st(5.6), 1e-9, "eastbound now runs at z > 0")
+			-- eastbound now runs at z > 0, clear of the trolley track on that side (z = 8.65 u)
+			t.near(lanes.blvd_eastbound.coord :: number, st(8.65) - LaneMath.RAIL_CLEARANCE, 1e-9)
+			t.near((lanes.patrol_beat.coordFor :: any)[1], st(8.65) - LaneMath.RAIL_CLEARANCE, 1e-9)
 			t.near(lanes.blvd_westbound.coord :: number, -st(5.6), 1e-9)
 			t.near(lanes.res_main_ns_northbound.coord :: number, -st(5.4), 1e-9, "residential lanes were already right")
 			t.truthy(table.find(changed, "patrol_beat") ~= nil)
@@ -180,7 +183,10 @@ return function(t)
 		local stats = svc:stats()
 		for _, v in svc.vehicles do
 			if v.offset >= 1200 then
-				t.falsy(v.visible, `{v.name}: the softball event starts at 1200 s`)
+				-- the softball event starts at 1200 s: until then its cars stand parked at their home spots
+				t.truthy(v.visible, `{v.name}: parked in view, not hidden`)
+				t.near(v.x, start[v.id][1], 1e-6)
+				t.near(v.z, start[v.id][2], 1e-6)
 				continue
 			end
 			t.truthy(seen[v.id], `{v.name} ({v.class}) moved at least 5 u from its spawn`)
@@ -189,7 +195,8 @@ return function(t)
 		t.truthy((stats.events.stopped or 0) > 0, "stopped at a sign")
 		t.truthy((stats.events.arrived or 0) >= 3 and (stats.events.home or 0) >= 3, "dispatched trips completed")
 		t.truthy((stats.events.delivery or 0) > 0 and (stats.events.bell or 0) > 0, "van and trolley schedules ran")
-		t.truthy((stats.events.wrap or 0) > 0, "wraps happened (teleport flagged)")
+		t.truthy((stats.events.turn or 0) > 8, "every lane vehicle turned round at the end of its street")
+		t.eq(stats.events.wrap, nil, "and nobody wrapped: no car vanishes at one end and appears at the other")
 		print(
 			`      {stats.ticks} ticks, mean {string.format("%.3f", stats.ms / stats.ticks)} ms, max {string.format(
 				"%.3f",
@@ -241,6 +248,75 @@ return function(t)
 			end
 			t.truthy(v.z > ahead + st(5), "drove under the wire")
 			t.eq(svc:stats().hits, 0)
+		end
+	)
+
+	t.test("player cars: a sedan stops behind a player's car standing in its lane, at any angle", function()
+		for _, yaw in { 0, math.pi / 2, math.pi } do
+			local svc, v = sedanNB()
+			local ahead = v.z + st(30)
+			local car = { id = "pickup", x = v.x, z = ahead, yaw = yaw, width = st(2.5), length = st(5.4), speed = 0 }
+			for _ = 1, 30 * 10 do
+				svc:step(1 / 30, { cars = { car } })
+			end
+			local reach = if yaw == math.pi / 2 then car.width / 2 else car.length / 2
+			t.truthy(
+				v.z + v.box.length / 2 < ahead - reach,
+				`yaw {yaw}: stopped short of the car ({ahead - reach - v.z - v.box.length / 2} st clear)`
+			)
+			t.near(v.speed, 0, 1e-3)
+			-- the car drives off: the sedan pulls away
+			for _ = 1, 30 * 5 do
+				svc:step(1 / 30, {})
+			end
+			t.truthy(v.speed > st(3), "pulled away once the car was gone")
+		end
+	end)
+
+	t.test(
+		"right of way: a responder and a dump truck at the west street crossing never meet, and it arrives",
+		function()
+			-- separating-axis depth of two boxes (x, z, yaw, half width, half length); > 0 when they overlap
+			local function depth(a: any, b: any): number
+				local d = math.huge
+				for _, yaw in { a.yaw, b.yaw } do
+					for pass = 1, 2 do
+						local ax, az = math.sin(yaw), math.cos(yaw)
+						if pass == 2 then
+							ax, az = az, -ax
+						end
+						local function reach(o: any): number
+							local fx, fz = math.sin(o.yaw), math.cos(o.yaw)
+							return math.abs(fx * ax + fz * az) * o.hl + math.abs(fz * ax - fx * az) * o.hw
+						end
+						d = math.min(d, reach(a) + reach(b) - math.abs((b.x - a.x) * ax + (b.z - a.z) * az))
+					end
+				end
+				return d
+			end
+			local function box(v: any): any
+				return { x = v.x, z = v.z, yaw = v.yaw, hw = v.box.width / 2, hl = v.box.length / 2 }
+			end
+			-- the responder's trunk turns east along z = -440 across the west street; a dump truck crawls north
+			-- up that street at 3 st/s from sixteen starting points, so it is on the crossing for some of them
+			for k = 0, 15 do
+				local svc = service({ Fleet.ENTRIES[4], Fleet.ENTRIES[15] }, 3)
+				local truck, amb = svc.vehicles[1], svc.vehicles[2]
+				truck.cruise, truck.speed = 3, 3
+				truck.s = LaneMath.arcOf(truck.lane, truck.x, -620 + 10 * k, truck.dir)
+				svc:dispatchResponder({ st(60), st(-120) })
+				local worst, arrived = 0, false
+				-- (80 s: the trip itself takes about 52 s now that it pulls away and slows for its corners)
+				for _ = 1, 30 * 80 do
+					svc:step(1 / 30, {})
+					if amb.visible then
+						worst = math.max(worst, depth(box(truck), box(amb)))
+					end
+					arrived = arrived or amb.phase == "hold"
+				end
+				t.truthy(worst <= 0, `start {k}: the truck and the ambulance were {worst} st into each other`)
+				t.truthy(arrived, `start {k}: the responder reached the house`)
+			end
 		end
 	)
 
@@ -354,7 +430,10 @@ return function(t)
 				stopped = false,
 			}),
 		})
-		t.near(g:sample(0.5)[1].x, 100, 1e-6, "teleport snaps")
+		-- (yaw 0 faces +z: until the teleport's own instant the car drives on at 1 st/s, then it snaps)
+		t.near(g:sample(0.5)[1].x, 0, 1e-6, "not before its instant")
+		t.near(g:sample(0.5)[1].z, 0.5, 1e-6, "driving on as it was")
+		t.near(g:sample(1.01)[1].x, 100, 1e-6, "teleport snaps")
 		local h = Ghost.new({ delay = 0 })
 		h:push(0, {
 			Ghost.encode({
@@ -362,7 +441,7 @@ return function(t)
 				x = 0,
 				z = 0,
 				yaw = 0,
-				speed = 1,
+				speed = 100,
 				visible = true,
 				beacons = false,
 				teleported = false,
@@ -375,7 +454,7 @@ return function(t)
 				x = 100,
 				z = 0,
 				yaw = 0,
-				speed = 1,
+				speed = 100,
 				visible = true,
 				beacons = false,
 				teleported = false,
@@ -409,18 +488,22 @@ return function(t)
 			t.near(Ghost.takeStamp(sentRecords) :: number, 1234.5, 1e-3)
 			t.eq(#sentRecords, 1)
 			t.eq(Ghost.takeStamp(sentRecords), nil, "a send without a stamp")
-			-- the clock: packets sent every 1/15 s arrive with up to 40 ms of jitter; the local times are
-			-- spaced as they were sent, to within a couple of milliseconds
+			-- the clock: packets sent every 1/15 s arrive with up to 40 ms of jitter; the snapshots keep the
+			-- server's own times, and the instant drawn moves on evenly, one frame's length a frame
 			local clock = Ghost.newClock()
 			local jitter = { 0.012, 0.04, 0.0, 0.031, 0.008, 0.039, 0.002, 0.02, 0.035, 0.0 }
-			local last: number? = nil
+			local drawn: number? = nil
 			for i = 1, 60 do
 				local sent = i / 15
-				local local0 = clock:localTime(sent, 500 + sent + 0.05 + jitter[(i - 1) % #jitter + 1])
-				if last and i > 3 then
-					t.near(local0 - last, 1 / 15, 0.005, `send {i} is spaced as the server spaced it`)
+				t.near(clock:stamp(sent, 500 + sent + 0.05 + jitter[(i - 1) % #jitter + 1]), sent, 1e-9)
+				for f = 1, 4 do
+					local at = clock:advance(500 + sent + f / 60, 1 / 60) - clock.delay
+					if drawn and i > 3 then
+						-- (the playout clock may steer by up to Ghost.SLEW: 5 % of a frame)
+						t.near(at - drawn, 1 / 60, Ghost.SLEW / 60 + 1e-9, `frame {f} of send {i} moves on evenly`)
+					end
+					drawn = at
 				end
-				last = local0
 			end
 			-- a car at 30 st/s, two snapshots 1/15 s apart; the next send is late
 			local g = Ghost.new({ delay = 0.13 })
@@ -455,6 +538,29 @@ return function(t)
 			end)
 			t.eq(flatY, 7)
 			t.eq(flatPitch, 0)
+			-- across a slope, given its track, the car leans with the road: right side up when the ground
+			-- rises to its right; level along the slope; a two-wheeler stays upright
+			local _, sidePitch, roll = Ghost.seat(10, 0, 0, 11, hill, 4) -- heading +z: its right is -x
+			t.near(sidePitch, 0, 1e-9)
+			t.near(roll, -math.atan(0.2), 1e-6, "the ground falls to its right")
+			local _, _, rollBack = Ghost.seat(10, 0, math.pi, 11, hill, 4)
+			t.near(rollBack, math.atan(0.2), 1e-6, "heading -z, its right is +x: uphill")
+			local _, _, untracked = Ghost.seat(10, 0, 0, 11, hill)
+			t.eq(untracked, 0)
+			t.eq(VehiclePuppet.track("motorcycle"), nil)
+			t.truthy((VehiclePuppet.track("sedan") :: number) > 0)
+			-- and the CFrame really lifts its right side: the seen pose's right wheel is on the ground
+			local roblox = require("@lune/roblox")
+			local lib = { CFrame = roblox.CFrame, Vector3 = roblox.Vector3 }
+			local pose: any = { x = 10, z = 0, yaw = 0, visible = true }
+			local x, sy, z, yaw, p, r = Ghost.seen(pose, "sedan", hill)
+			local cf = Ghost.rootCFrame(lib, x, sy, z, yaw, p, true, r)
+			local track = VehiclePuppet.track("sedan") :: number
+			local wheel = cf * roblox.Vector3.new(track / 2, -VehiclePuppet.baseOffset("sedan"), 0)
+			-- (the root turns about its centre, so its base slides a little sideways on a 11 degree crossfall)
+			t.near(wheel.Y, hill(wheel.X, wheel.Z), 0.1, "the right wheel stands on the slope")
+			local leftWheel = cf * roblox.Vector3.new(-track / 2, -VehiclePuppet.baseOffset("sedan"), 0)
+			t.near(leftWheel.Y, hill(leftWheel.X, leftWheel.Z), 0.1, "and so does the left")
 		end
 	)
 end

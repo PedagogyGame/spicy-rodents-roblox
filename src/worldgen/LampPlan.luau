@@ -100,7 +100,8 @@ function LampPlan.plan(
 	end
 	local lamps: { Lamp } = {}
 	local taken: { { number } } = {}
-	for _, o in obstacles or {} do
+	local given: { { number } } = obstacles or {}
+	for _, o in given do
 		table.insert(taken, o)
 	end
 	local function crowded(x: number, z: number): boolean
@@ -267,7 +268,7 @@ function LampPlan.plan(
 			color = METAL,
 			material = "Metal",
 			role = "Post",
-			attrs = { Lamp = l.id, Flicker = l.flicker, Embedded = true },
+			attrs = { Lamp = l.id, Flicker = l.flicker, Embedded = true } :: Spec.Attrs,
 		})
 		list:add(ORIGIN, "Base_" .. l.id, l.x, l.y + 0.4, l.z, 1.6, 1.5, 1.5, {
 			roll = math.pi / 2,
@@ -276,7 +277,7 @@ function LampPlan.plan(
 			material = "Metal",
 			canCollide = false,
 			role = "Trim",
-			attrs = { Lamp = l.id, Embedded = true },
+			attrs = { Lamp = l.id, Embedded = true } :: Spec.Attrs,
 		})
 		list:add(ORIGIN, "Finial_" .. l.id, l.x, l.top + 0.15, l.z, 1.0, 1.0, 1.0, {
 			shape = "Ball",
@@ -285,7 +286,7 @@ function LampPlan.plan(
 			canCollide = false,
 			castShadow = false,
 			role = "Trim",
-			attrs = { Lamp = l.id },
+			attrs = { Lamp = l.id } :: Spec.Attrs,
 		})
 	end
 	local plans: { Spec.BuildPlan } = {}

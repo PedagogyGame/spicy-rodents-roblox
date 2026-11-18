@@ -46,6 +46,13 @@ return function(t)
 			if x >= R.minX and x <= R.maxX and z >= R.minZ and z <= R.maxZ then
 				n += 1
 				local h = num(row[5]) * S
+				-- (a building site cuts the ground level under the hospital and the police station:
+				-- world_height.spec holds the cut to the sites; there the golden row is the ground
+				-- before the cut)
+				if Height.at(x * S, z * S) < Height.natural(x * S, z * S) then
+					t.near(Height.natural(x * S, z * S), h, 1e-6)
+					h = Height.at(x * S, z * S)
+				end
 				if math.abs(g.groundAt(x * S, z * S, -1e9) - h) > 1e-6 then
 					bad += 1
 				end
@@ -134,10 +141,11 @@ return function(t)
 	t.test("RouteAdapter: every harvested route with arc length and graph links", function()
 		local rail = RailWorld.get(data, Height.at)
 		local a = RouteAdapter.new(rail)
-		-- 1,332 harvested plus the attraction routes (data/attractions.json: the bowling alley's vents and tunnels)
+		-- 1,332 harvested plus the attraction routes (data/attractions.json: the bowling alley's vents and tunnels) and
+		-- the storm drains (data/sewers.json)
 		local harvested = 0
 		for _, r in rail.registry:all() do
-			if r.origin ~= "attraction" then
+			if r.origin == "harvest" then
 				harvested += 1
 			end
 		end

@@ -350,19 +350,22 @@ local function squirrel(species: string, opts: Opts): ModelSpec
 		b.ball("Blood", 0.1, { 0.09, hy - 0.14, hz - 0.28 }, c.blood, { material = "SmoothPlastic" })
 		b.weld("Blood", "Jaw")
 		-- a ruffle of raised fur along the hunched back, and two small embers smouldering in it
-		for i, h in { { "Spine1", 0.37, 0.07 }, { "Spine2", 0.4, -0.1 }, { "Spine3", 0.41, -0.26 } } do
-			b.block(
-				`Hackle{i}`,
-				{ 0.05, 0.13, 0.11 },
-				{ 0, (h[2] :: number) + 0.03, h[3] :: number },
-				c.back,
-				{ pitch = 0.6, region = "Body" }
-			)
-			b.weld(`Hackle{i}`, h[1] :: string)
+		local hackles: { { bone: string, y: number, z: number } } = {
+			{ bone = "Spine1", y = 0.37, z = 0.07 },
+			{ bone = "Spine2", y = 0.4, z = -0.1 },
+			{ bone = "Spine3", y = 0.41, z = -0.26 },
+		}
+		for i, h in hackles do
+			b.block(`Hackle{i}`, { 0.05, 0.13, 0.11 }, { 0, h.y + 0.03, h.z }, c.back, { pitch = 0.6, region = "Body" })
+			b.weld(`Hackle{i}`, h.bone)
 		end
-		for i, e in { { "Spine2", 0.39, -0.02 }, { "Spine3", 0.41, -0.18 } } do
-			b.ball(`Ember{i}`, 0.055, { 0, e[2] :: number, e[3] :: number }, c.ember, { material = "Neon" })
-			b.weld(`Ember{i}`, e[1] :: string)
+		local embers: { { bone: string, y: number, z: number } } = {
+			{ bone = "Spine2", y = 0.39, z = -0.02 },
+			{ bone = "Spine3", y = 0.41, z = -0.18 },
+		}
+		for i, e in embers do
+			b.ball(`Ember{i}`, 0.055, { 0, e.y, e.z }, c.ember, { material = "Neon" })
+			b.weld(`Ember{i}`, e.bone)
 		end
 		-- a small bald patch on its flank with an old scar across it
 		b.ball("BaldPatch", 0.34, { 0.2, 0.07, 0.07 }, c.mange, mange)
@@ -526,7 +529,7 @@ local function deer(opts: Opts): ModelSpec
 		k = contract.scaleVariants[variant] or error(`PuppetSpec: deer has no variant {variant}`)
 	end
 	local base = PuppetSpec.PALETTES.deer
-	local tint = PuppetSpec.PALETTES[variant or ""] or {}
+	local tint: { [string]: string } = PuppetSpec.PALETTES[variant or ""] or {}
 	local c = table.clone(base)
 	for key, v in tint do
 		c[key] = v

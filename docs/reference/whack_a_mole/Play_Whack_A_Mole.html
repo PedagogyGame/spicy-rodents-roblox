@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#190e10">
+<title>The Mole Club · Whack-a-Mole</title>
+<style>
+:root{color-scheme:dark;--cream:#f4e4bd;--muted:#b9a787;--gold:#d4ae60;--brass:#8c652e;--wine:#5a202b;--ink:#130e10;--green:#c7dda4}
+*{box-sizing:border-box}html{min-height:100%;background:#100d10}body{margin:0;color:var(--cream);font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(ellipse at 50% 12%,#54242d55 0,transparent 60%),linear-gradient(115deg,#111015,#1c1115 52%,#110e12);min-height:100svh;padding:22px 16px 20px;display:flex;justify-content:center}button{font:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}button:focus-visible{outline:3px solid #fff3c3;outline-offset:4px}button:disabled{cursor:default;opacity:.46}.app{width:min(850px,100%)}header{position:relative;text-align:center;margin-bottom:17px}.eyebrow{font-size:10px;font-weight:700;letter-spacing:.29em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;justify-content:center;gap:12px}.eyebrow:before,.eyebrow:after{content:"";width:42px;height:1px;background:linear-gradient(90deg,transparent,var(--brass))}.eyebrow:after{transform:rotate(180deg)}h1{font:500 clamp(29px,5.4vw,45px)/1.08 Georgia,"Times New Roman",serif;letter-spacing:.06em;margin:10px 0 7px;text-shadow:0 2px 25px #dcad5b18}header p{font-size:13px;margin:0;color:var(--muted)}.cabinet{border:1px solid #70502c;border-radius:17px;overflow:hidden;box-shadow:0 26px 65px #0008,0 0 0 5px #09080a80,inset 0 1px #fce7ab16;background:#191216}.dashboard{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:#6c502b;border-bottom:1px solid #795b33}.meter{background:linear-gradient(#20171c,#151115);padding:13px 10px 11px;text-align:center;position:relative}.meter label{display:block;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:650}.meter .digits{font:500 clamp(25px,5.8vw,39px)/1.15 Georgia,"Times New Roman",serif;font-variant-numeric:tabular-nums;color:var(--cream);margin-top:4px}.meter.best .digits{color:#d2b778}.meter.time .digits{color:#cbd9bd}.meter.time.urgent .digits{color:#fca798}.timebar{height:3px;background:#342628;position:relative}.timebar span{position:absolute;inset:0;background:linear-gradient(90deg,#8c6a38,#e2c88a);transform-origin:left;transition:transform .12s linear}.board-wrap{position:relative;isolation:isolate;background:#130e11;user-select:none;aspect-ratio:10/6.6}.board{width:100%;height:100%;display:block;overflow:hidden}.hit-target{position:absolute;width:20%;height:29%;transform:translate(-50%,-50%);border:0;border-radius:45%;background:transparent;cursor:pointer;color:transparent;padding:0;z-index:3}.hit-target:focus-visible{outline:2px dashed #f5e1a6;outline-offset:-6px;background:#f5e1a606}.hit-target[aria-disabled="true"]{cursor:default}.hit-target:disabled{opacity:1}.target1{left:27%;top:36.4%}.target2{left:50%;top:33.3%}.target3{left:73%;top:36.4%}.target4{left:38.5%;top:65.1%}.target5{left:61.5%;top:65.1%}.status-plaque{position:absolute;left:50%;bottom:3.3%;transform:translateX(-50%);white-space:nowrap;color:#c5b18c;font-size:clamp(8px,1.9vw,11px);letter-spacing:.17em;text-transform:uppercase;pointer-events:none}.overlay{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:22px;background:#130e118c;backdrop-filter:blur(3px)}.overlay[hidden]{display:none}.overlay-card{width:min(330px,92%);text-align:center;padding:23px 19px 22px;background:linear-gradient(145deg,#2a1d21,#171215);border:1px solid #b68c47;border-radius:9px;box-shadow:0 15px 45px #0009;position:relative}.overlay-card:before{content:"";position:absolute;inset:6px;border:1px solid #88653566;border-radius:4px;pointer-events:none}.overlay-kicker{font-size:9px;text-transform:uppercase;letter-spacing:.25em;color:var(--gold);margin:0 0 8px}.overlay h2{font:normal 28px/1.15 Georgia,serif;margin:0 0 8px}.overlay p{margin:6px 0 17px;color:#c6b59b;font-size:13px}.overlay-score{font:46px/1 Georgia,serif;color:var(--cream);margin:13px 0 7px}.controls{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:14px 17px;background:linear-gradient(#251a1f,#1a1418);border-top:1px solid #654728}.button{border:1px solid #bd9855;border-radius:5px;padding:10px 17px;color:#20160f;background:linear-gradient(#ecd29a,#caa15a);font-weight:750;font-size:12px;letter-spacing:.025em;box-shadow:inset 0 1px #fff6d666,0 3px 7px #0003;cursor:pointer;transition:filter .16s,transform .16s}.button:hover{filter:brightness(1.08)}.button:active{transform:translateY(1px)}.button.secondary{background:#191418;color:#d2bd98;border-color:#62482f;box-shadow:none;padding:9px 12px;font-weight:500;font-size:11px}.control-group{display:flex;gap:8px}.round-label{font-size:11px;color:var(--muted);letter-spacing:.02em}.instructions{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 17px;margin:17px 0 6px;color:#c0ad91;font-size:12px}.instructions span{white-space:nowrap}.instructions strong{font-weight:650;color:#f1dfb9}kbd{font:10px system-ui;background:#31232a;border:1px solid #74573a;border-radius:3px;padding:1px 4px;color:#ead6ae}.fineprint{text-align:center;color:#847766;font-size:10px;margin:9px 0 0}.live{position:absolute;clip:rect(0 0 0 0);clip-path:inset(50%);width:1px;height:1px;overflow:hidden;white-space:nowrap}.pop-number{font:700 31px Georgia,serif;fill:#ffdfa0;paint-order:stroke;stroke:#301c16;stroke-width:4px;stroke-linejoin:round;text-anchor:middle;pointer-events:none}.pop-number.miss{fill:#ffb4a3}.glass-glint{mix-blend-mode:screen}.mole-blink{transform-origin:center}.muted{color:var(--muted)}
+@media(max-width:480px){body{padding:17px 10px 15px}header{margin-bottom:14px}header p{font-size:11px;max-width:290px;margin:auto}.eyebrow{font-size:8px;letter-spacing:.23em}.eyebrow:before,.eyebrow:after{width:26px}.meter{padding:10px 5px 9px}.meter label{font-size:8px}.controls{padding:12px 11px;gap:6px}.button{padding:10px 12px;font-size:11px}.button.secondary{padding:9px 9px;font-size:10px}.round-label{display:none}.instructions{font-size:11px;gap:6px 12px}.overlay-card{padding:17px 14px 15px;max-width:270px}.overlay h2{font-size:23px}.overlay p{font-size:11px;margin-bottom:12px}.overlay-score{font-size:34px}.status-plaque{font-size:8px;letter-spacing:.1em}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;scroll-behavior:auto!important}.overlay{backdrop-filter:none}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <div class="eyebrow">A little trouble after dark</div>
+    <h1>THE MOLE CLUB</h1>
+    <p>A warm brass cabinet. Five familiar troublemakers. Forty-five seconds.</p>
+  </header>
+  <section class="cabinet" aria-label="Whack-a-mole arcade game">
+    <div class="dashboard">
+      <div class="meter"><label for="score">Your score</label><div class="digits" id="score">000</div></div>
+      <div class="meter time" id="time-meter"><label for="time">Seconds left</label><div class="digits" id="time">45</div></div>
+      <div class="meter best"><label for="best">House best</label><div class="digits" id="best">000</div></div>
+    </div>
+    <div class="timebar" aria-hidden="true"><span id="time-fill"></span></div>
+    <div class="board-wrap" id="board-wrap">
+      <svg class="board" viewBox="0 0 1000 660" role="img" aria-label="An oxblood and brass arcade cabinet with five mole holes, three at the back and two at the front.">
+        <defs>
+          <linearGradient id="cabinet" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#491f28"/><stop offset=".5" stop-color="#321b22"/><stop offset="1" stop-color="#21131b"/></linearGradient>
+          <linearGradient id="wood" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#613b2e"/><stop offset=".45" stop-color="#372425"/><stop offset="1" stop-color="#241b20"/></linearGradient>
+          <linearGradient id="gold" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#735129"/><stop offset=".3" stop-color="#e1c083"/><stop offset=".55" stop-color="#9c753c"/><stop offset=".83" stop-color="#d1ae6a"/><stop offset="1" stop-color="#785329"/></linearGradient>
+          <radialGradient id="well"><stop stop-color="#080709"/><stop offset=".7" stop-color="#09080a"/><stop offset="1" stop-color="#2c2022"/></radialGradient>
+          <radialGradient id="fur" cx=".35" cy=".25" r=".8"><stop stop-color="#aa7960"/><stop offset=".6" stop-color="#76513f"/><stop offset="1" stop-color="#382d2a"/></radialGradient>
+          <radialGradient id="muzzle" cx=".35" cy=".3"><stop stop-color="#e0bca0"/><stop offset="1" stop-color="#b88d71"/></radialGradient>
+          <linearGradient id="hammerWood" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#9d6243"/><stop offset=".35" stop-color="#75422f"/><stop offset="1" stop-color="#3d2926"/></linearGradient>
+          <radialGradient id="halo"><stop stop-color="#e4b96a" stop-opacity=".17"/><stop offset="1" stop-color="#e4b96a" stop-opacity="0"/></radialGradient>
+          <pattern id="grain" patternUnits="userSpaceOnUse" width="170" height="150"><path d="M-30 0Q55 60 5 150M0 0Q83 70 32 150M55 0Q130 55 85 150M110 0Q178 75 137 150" fill="none" stroke="#d4a567" stroke-width="1" opacity=".07"/></pattern>
+          <filter id="softShadow" x="-.5" y="-.5" width="2" height="2"><feGaussianBlur stdDeviation="11"/></filter>
+          <filter id="moleShadow" x="-.5" y="-.3" width="2" height="1.8"><feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000" flood-opacity=".55"/></filter>
+          <clipPath id="moleClip"><path d="M-94-180H94V-1C94 38-94 38-94-1Z"/></clipPath>
+          <g id="holeBack"><ellipse cy="5" rx="93" ry="39" fill="#09070a" opacity=".75" filter="url(#softShadow)"/><ellipse rx="90" ry="36" fill="url(#gold)"/><ellipse rx="82" ry="29" fill="#120d10" stroke="#6b4b2e" stroke-width="2"/><ellipse cy="3" rx="76" ry="25" fill="url(#well)"/></g>
+          <g id="holeFront"><path d="M-90 0A90 36 0 0 0 90 0L82 0A82 29 0 0 1-82 0Z" fill="url(#gold)"/><path d="M-89 1A89 35 0 0 0 89 1" fill="none" stroke="#e7c986" stroke-width="2" opacity=".68"/></g>
+          <g id="moleFace">
+            <ellipse cy="-33" rx="62" ry="68" fill="url(#fur)"/>
+            <ellipse cx="-51" cy="-89" rx="15" ry="18" fill="#72503e"/><ellipse cx="51" cy="-89" rx="15" ry="18" fill="#72503e"/>
+            <ellipse cx="-51" cy="-87" rx="8" ry="10" fill="#b37b6c"/><ellipse cx="51" cy="-87" rx="8" ry="10" fill="#b37b6c"/>
+            <path d="M-52-91Q-51-128-13-136Q2-148 20-135Q51-129 56-93Z" fill="url(#fur)"/>
+            <ellipse cy="-82" rx="59" ry="55" fill="url(#fur)"/>
+            <path d="M-40-114q9-6 16-2M24-116q8-3 16 3" stroke="#4a322c" stroke-width="4" stroke-linecap="round" fill="none"/>
+            <ellipse cx="-27" cy="-91" rx="8.5" ry="11" fill="#181313"/><ellipse cx="27" cy="-91" rx="8.5" ry="11" fill="#181313"/>
+            <ellipse cx="-29" cy="-95" rx="2.8" ry="3.4" fill="#fff2d9"/><ellipse cx="25" cy="-95" rx="2.8" ry="3.4" fill="#fff2d9"/>
+            <ellipse cy="-63" rx="35" ry="26" fill="url(#muzzle)"/>
+            <path d="M-14-75Q0-84 14-75Q12-63 0-60Q-12-63-14-75Z" fill="#4b2b2b"/><ellipse cx="-4" cy="-75" rx="5" ry="2" fill="#a16c65"/>
+            <path d="M0-60v10m0 0q-10 8-18 0m18 0q10 8 18 0" stroke="#674439" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M-5-45h10v11q-5 4-10 0Z" fill="#f1dec0"/>
+            <path d="M-40-69l-18-4m18 10-21 2m101-8 18-4m-18 10 21 2" stroke="#c8aa87" stroke-width="1.6" opacity=".65" stroke-linecap="round"/>
+            <ellipse cx="-45" cy="-18" rx="22" ry="16" transform="rotate(-20 -45 -18)" fill="#bc8b70"/><ellipse cx="45" cy="-18" rx="22" ry="16" transform="rotate(20 45 -18)" fill="#bc8b70"/>
+            <path d="M-51-27l4 13m5-15 3 13m47-11-4 13m-5-15-3 13" stroke="#825841" stroke-width="2" stroke-linecap="round"/>
+            <path d="M-12-23L0-17l12-6v16L0-13-12-7Z" fill="#82313b"/><circle cy="-15" r="4" fill="#c39759"/>
+          </g>
+        </defs>
+        <rect width="1000" height="660" fill="#171014"/>
+        <ellipse cx="500" cy="280" rx="570" ry="370" fill="url(#halo)"/>
+        <path d="M107 111H893L971 586L945 644H55L29 586Z" fill="#0e0c10"/>
+        <path d="M107 111H893L963 576L922 617H78L37 576Z" fill="url(#wood)" stroke="#986d37" stroke-width="3"/>
+        <path d="M128 130H872L932 565L910 589H90L68 565Z" fill="url(#cabinet)" stroke="#bb9258" stroke-width="2"/>
+        <path d="M128 130H872L932 565L910 589H90L68 565Z" fill="url(#grain)"/>
+        <path d="M151 149H849L902 552L888 566H112L98 552Z" fill="none" stroke="#ba9156" stroke-width="1" opacity=".38"/>
+        <path d="M159 158h33m-33 0 4 34m678-34h-33m33 0 4 34M113 536l4 19h22m748-19-4 19h-22" stroke="#d5b276" stroke-width="2" fill="none" opacity=".75"/>
+        <path d="M306 89H694" stroke="#d9b675" opacity=".3"/>
+        <text x="500" y="70" text-anchor="middle" fill="#dec392" font-family="Georgia,serif" font-size="17" letter-spacing="7">WHACK · A · MOLE</text>
+        <path d="M463 93h74M491 97l9 8 9-8" stroke="#b08849" fill="none" opacity=".75"/>
+        <g id="hole-1" transform="translate(270 290)"><use href="#holeBack"/><g clip-path="url(#moleClip)"><g id="mole-1" transform="translate(0 180)"><use href="#moleFace"/></g></g><use href="#holeFront"/><g transform="translate(0 53)"><path d="M-17 0 0-11 17 0 0 11Z" fill="#20171b" stroke="#b48b4e"/><text y="5" text-anchor="middle" fill="#dabd88" font-size="14" font-family="Georgia,serif">1</text></g><text id="float-1" class="pop-number" y="-130" opacity="0">+10</text></g>
+        <g id="hole-2" transform="translate(500 270)"><use href="#holeBack"/><g clip-path="url(#moleClip)"><g id="mole-2" transform="translate(0 180)"><use href="#moleFace"/></g></g><use href="#holeFront"/><g transform="translate(0 53)"><path d="M-17 0 0-11 17 0 0 11Z" fill="#20171b" stroke="#b48b4e"/><text y="5" text-anchor="middle" fill="#dabd88" font-size="14" font-family="Georgia,serif">2</text></g><text id="float-2" class="pop-number" y="-130" opacity="0">+10</text></g>
+        <g id="hole-3" transform="translate(730 290)"><use href="#holeBack"/><g clip-path="url(#moleClip)"><g id="mole-3" transform="translate(0 180)"><use href="#moleFace"/></g></g><use href="#holeFront"/><g transform="translate(0 53)"><path d="M-17 0 0-11 17 0 0 11Z" fill="#20171b" stroke="#b48b4e"/><text y="5" text-anchor="middle" fill="#dabd88" font-size="14" font-family="Georgia,serif">3</text></g><text id="float-3" class="pop-number" y="-130" opacity="0">+10</text></g>
+        <g id="hole-4" transform="translate(385 480)"><use href="#holeBack"/><g clip-path="url(#moleClip)"><g id="mole-4" transform="translate(0 180)"><use href="#moleFace"/></g></g><use href="#holeFront"/><g transform="translate(0 53)"><path d="M-17 0 0-11 17 0 0 11Z" fill="#20171b" stroke="#b48b4e"/><text y="5" text-anchor="middle" fill="#dabd88" font-size="14" font-family="Georgia,serif">4</text></g><text id="float-4" class="pop-number" y="-130" opacity="0">+10</text></g>
+        <g id="hole-5" transform="translate(615 480)"><use href="#holeBack"/><g clip-path="url(#moleClip)"><g id="mole-5" transform="translate(0 180)"><use href="#moleFace"/></g></g><use href="#holeFront"/><g transform="translate(0 53)"><path d="M-17 0 0-11 17 0 0 11Z" fill="#20171b" stroke="#b48b4e"/><text y="5" text-anchor="middle" fill="#dabd88" font-size="14" font-family="Georgia,serif">5</text></g><text id="float-5" class="pop-number" y="-130" opacity="0">+10</text></g>
+        <path d="M83 601H917" stroke="#deb978" opacity=".35"/>
+        <g fill="#b18a4c" stroke="#39261c" stroke-width="2"><circle cx="117" cy="138" r="5"/><circle cx="883" cy="138" r="5"/><circle cx="79" cy="573" r="5"/><circle cx="921" cy="573" r="5"/></g>
+        <g stroke="#31241d" stroke-width="2"><path d="M114 138h6M880 138h6M76 573h6M918 573h6"/></g>
+        <g id="mallet" opacity="0" pointer-events="none"><g transform="rotate(-28)"><rect x="-8" y="-90" width="16" height="110" rx="6" fill="url(#gold)" stroke="#654627" stroke-width="2"/><rect x="-10" y="-6" width="20" height="47" rx="7" fill="#2b2020" stroke="#876239" stroke-width="2"/><path d="M-7 3H7M-7 13H7M-7 23H7" stroke="#b68b4d" stroke-width="2"/><rect x="-49" y="-124" width="98" height="52" rx="12" fill="url(#hammerWood)" stroke="#382722" stroke-width="3"/><rect x="-49" y="-119" width="14" height="42" rx="5" fill="url(#gold)"/><rect x="35" y="-119" width="14" height="42" rx="5" fill="url(#gold)"/><path d="M-28-116H28" stroke="#e6c296" opacity=".35" stroke-width="2"/></g></g>
+      </svg>
+      <button class="hit-target target1" data-hole="0" aria-label="Hole 1, press 1" aria-disabled="true" disabled>Hole 1</button>
+      <button class="hit-target target2" data-hole="1" aria-label="Hole 2, press 2" aria-disabled="true" disabled>Hole 2</button>
+      <button class="hit-target target3" data-hole="2" aria-label="Hole 3, press 3" aria-disabled="true" disabled>Hole 3</button>
+      <button class="hit-target target4" data-hole="3" aria-label="Hole 4, press 4" aria-disabled="true" disabled>Hole 4</button>
+      <button class="hit-target target5" data-hole="4" aria-label="Hole 5, press 5" aria-disabled="true" disabled>Hole 5</button>
+      <div class="status-plaque" id="status-plaque">Five holes · One wooden mallet</div>
+      <div class="overlay" id="overlay" hidden>
+        <div class="overlay-card">
+          <div class="overlay-kicker" id="overlay-kicker">The Mole Club</div>
+          <h2 id="overlay-title">Taking a breather</h2>
+          <div class="overlay-score" id="overlay-score" hidden></div>
+          <p id="overlay-message">Your round is paused.</p>
+          <button class="button" id="overlay-button">Resume round</button>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="button" id="start">Start a round</button>
+      <span class="round-label" id="round-label">45 seconds · No coins required</span>
+      <div class="control-group"><button class="button secondary" id="pause" disabled>Pause</button><button class="button secondary" id="sound" aria-pressed="false">Sound: off</button></div>
+    </div>
+  </section>
+  <div class="instructions" aria-label="How to play">
+    <span><strong>Tap a mole</strong> or press <kbd>1</kbd>–<kbd>5</kbd></span>
+    <span>Hit <strong>+10</strong> · Empty hole <strong>−2</strong></span>
+    <span><kbd>Esc</kbd> pauses</span>
+  </div>
+  <p class="fineprint">Playable companion • editable 3D cabinet supplied separately</p>
+  <p class="live" id="live" aria-live="polite" aria-atomic="true"></p>
+</main>
+<script>
+(()=>{
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const DURATION=45000, RISE=170, FALL=210;
+  const coords=[[270,290],[500,270],[730,290],[385,480],[615,480]];
+  const buttons=[...document.querySelectorAll('.hit-target')];
+  const targets=Array.from({length:5},(_,i)=>({el:$('mole-'+(i+1)),label:$('float-'+(i+1)),born:-1,duration:0,hitAt:-1,rise:0,floatAt:-1}));
+  let phase='idle',elapsed=0,score=0,hits=0,attempts=0,best=0,nextSpawn=300,lastFrame=performance.now(),lastSpawn=-1,hammerAt=-1,hammerIndex=0,audio=null,sound=false;
+  try{const stored=Number(localStorage.getItem('mole-club-best-v1'));if(Number.isFinite(stored)&&stored>=0)best=Math.floor(stored);}catch(_){/* Local file privacy settings can block storage. */}
+  $('best').textContent=String(best).padStart(3,'0');
+  function announce(text){$('live').textContent=text;}
+  function refresh(){
+    $('score').textContent=String(score).padStart(3,'0');
+    $('time').textContent=String(Math.ceil(Math.max(0,DURATION-elapsed)/1000)).padStart(2,'0');
+    $('time-fill').style.transform='scaleX('+Math.max(0,1-elapsed/DURATION)+')';
+    $('time-meter').classList.toggle('urgent',phase!=='idle'&&DURATION-elapsed<=10000);
+    buttons.forEach(b=>{b.disabled=phase!=='playing';b.setAttribute('aria-disabled',String(phase!=='playing'));});
+  }
+  function resetTargets(){targets.forEach((m,i)=>{m.born=-1;m.hitAt=-1;m.rise=0;m.floatAt=-1;m.el.setAttribute('transform','translate(0 180)');m.label.setAttribute('opacity','0');buttons[i].dataset.up='false';});$('mallet').setAttribute('opacity','0');hammerAt=-1;}
+  function start(){
+    if(phase==='playing')return;
+    phase='playing';elapsed=0;score=0;hits=0;attempts=0;nextSpawn=300;lastSpawn=-1;lastFrame=performance.now();resetTargets();
+    $('overlay').hidden=true;$('start').textContent='Round in progress';$('start').disabled=true;$('pause').disabled=false;$('pause').textContent='Pause';
+    $('round-label').textContent='A little faster as you go';$('status-plaque').textContent='Watch for those little noses';refresh();announce('Round started. Tap a mole or use keys 1 through 5.');tone(420,.08,.035);
+  }
+  function setPaused(paused,automatic=false){
+    if(paused&&phase==='playing'){
+      phase='paused';$('overlay').hidden=false;$('overlay-kicker').textContent='Take your time';$('overlay-title').textContent='Taking a breather';$('overlay-score').hidden=true;
+      $('overlay-message').textContent=automatic?'Paused while you were away. Your time is safe.':'Your round is paused. Resume when you are ready.';$('overlay-button').textContent='Resume round';$('pause').textContent='Resume';announce('Game paused.');
+    }else if(!paused&&phase==='paused'){
+      phase='playing';lastFrame=performance.now();$('overlay').hidden=true;$('pause').textContent='Pause';announce('Round resumed.');
+    }
+    refresh();
+  }
+  function finish(){
+    phase='finished';elapsed=DURATION;resetTargets();let record=score>best;
+    if(record){best=score;try{localStorage.setItem('mole-club-best-v1',String(best));}catch(_){}}
+    $('best').textContent=String(best).padStart(3,'0');$('start').disabled=false;$('start').textContent='Play again';$('pause').disabled=true;
+    $('overlay').hidden=false;$('overlay-kicker').textContent=record?'A new house record':'The Mole Club';$('overlay-title').textContent='Round complete';$('overlay-score').hidden=false;$('overlay-score').textContent=score;
+    const accuracy=attempts?Math.round(hits/attempts*100):0;$('overlay-message').textContent=hits+' hits · '+accuracy+'% accuracy. The regulars want a rematch.';$('overlay-button').textContent='Play again';
+    $('round-label').textContent=record?'Your best round yet':'Another round is on the house';$('status-plaque').textContent='Until we meet again';refresh();announce('Round complete. '+score+' points. '+hits+' hits. '+(record?'A new best score.':''));tone(660,.14,.035);
+  }
+  function spawn(){
+    const progress=elapsed/DURATION,limit=progress<.35?1:2;
+    const active=targets.filter(m=>m.born>=0&&m.hitAt<0).length;
+    if(active>=limit)return;
+    const available=targets.map((m,i)=>m.born<0?i:-1).filter(i=>i>=0);
+    if(!available.length)return;
+    const different=available.filter(i=>i!==lastSpawn),pool=different.length?different:available;
+    const i=pool[Math.floor(Math.random()*pool.length)],m=targets[i];m.born=elapsed;m.duration=1550-progress*600+Math.random()*220;m.hitAt=-1;lastSpawn=i;
+  }
+  function tone(hz,duration,volume){
+    if(!sound||!audio)return;
+    try{const osc=audio.createOscillator(),gain=audio.createGain();osc.type='sine';osc.frequency.setValueAtTime(hz,audio.currentTime);osc.frequency.exponentialRampToValueAtTime(hz*.72,audio.currentTime+duration);gain.gain.setValueAtTime(volume,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);osc.connect(gain);gain.connect(audio.destination);osc.start();osc.stop(audio.currentTime+duration+.02);}catch(_){}
+  }
+  function strike(i){
+    if(phase!=='playing')return;
+    const m=targets[i];if(m.hitAt>=0)return; // A double tap on the same falling mole never scores twice or penalizes twice.
+    const success=m.born>=0&&m.rise>.22&&elapsed-m.born<m.duration-FALL*.45;
+    attempts++;hammerAt=elapsed;hammerIndex=i;
+    if(success){score+=10;hits++;m.hitAt=elapsed;m.label.textContent='+10';m.label.classList.remove('miss');$('status-plaque').textContent=hits%5===0?'Fine form. The house is watching.':'A clean hit · +10';tone(570+Math.random()*160,.1,.045);}
+    else{score=Math.max(0,score-2);m.label.textContent='−2';m.label.classList.add('miss');$('status-plaque').textContent='An empty hole · −2';tone(160,.11,.04);}
+    m.floatAt=elapsed;refresh();
+  }
+  function frame(now){
+    const dt=Math.max(0,now-lastFrame);lastFrame=now;
+    if(phase==='playing'){
+      elapsed=Math.min(DURATION,elapsed+dt);
+      if(elapsed>=DURATION){finish();requestAnimationFrame(frame);return;}
+      nextSpawn-=dt;if(nextSpawn<=0){spawn();nextSpawn=760-(elapsed/DURATION)*420+Math.random()*190;}
+      targets.forEach((m,i)=>{
+        let rise=0;
+        if(m.born>=0){
+          const age=elapsed-m.born;
+          if(m.hitAt>=0){const fall=(elapsed-m.hitAt)/210;rise=Math.max(0,m.rise*(1-Math.min(1,dt/110)));if(fall>=1){m.born=-1;m.hitAt=-1;rise=0;}}
+          else if(age>=m.duration){m.born=-1;rise=0;}
+          else if(age<RISE){const t=age/RISE;rise=1-Math.pow(1-t,3);}
+          else if(age>m.duration-FALL){const t=(age-(m.duration-FALL))/FALL;rise=1-t*t;}
+          else rise=1;
+        }
+        m.rise=rise;m.el.setAttribute('transform','translate(0 '+(180*(1-rise)).toFixed(2)+')');
+        const available=m.born>=0&&m.hitAt<0&&rise>.22&&elapsed-m.born<m.duration-FALL*.45;
+        buttons[i].dataset.up=String(available);buttons[i].setAttribute('aria-label','Hole '+(i+1)+(available?', mole is up':', empty')+', press '+(i+1));
+        if(m.floatAt>=0){const f=(elapsed-m.floatAt)/650;m.label.setAttribute('opacity',Math.max(0,1-f));m.label.setAttribute('y',-128-35*Math.min(f,1));if(f>=1)m.floatAt=-1;}
+      });
+      if(hammerAt>=0){const t=(elapsed-hammerAt)/240;const [x,y]=coords[hammerIndex];$('mallet').setAttribute('opacity',t<1?String(Math.min(1,(1-t)*4)):'0');$('mallet').setAttribute('transform','translate('+(x+47)+' '+(y-15-Math.sin(Math.PI*Math.min(t,1))*31)+') rotate('+(12-Math.sin(Math.PI*Math.min(t,1))*24)+')');if(t>=1)hammerAt=-1;}
+      refresh();
+    }else if(phase==='idle'){
+      targets.forEach((m,i)=>{const peek=(i===1?.66:i===3?.25:0);m.el.setAttribute('transform','translate(0 '+(180*(1-peek))+')');});
+    }
+    requestAnimationFrame(frame);
+  }
+  $('start').addEventListener('click',start);
+  $('pause').addEventListener('click',()=>setPaused(phase==='playing'));
+  $('overlay-button').addEventListener('click',()=>phase==='paused'?setPaused(false):start());
+  buttons.forEach((button,i)=>button.addEventListener('click',()=>strike(i)));
+  document.addEventListener('keydown',event=>{
+    if(event.repeat)return;
+    if(event.key==='Escape'){if(phase==='playing'||phase==='paused'){event.preventDefault();setPaused(phase==='playing');}return;}
+    if(/^[1-5]$/.test(event.key)&&phase==='playing'){event.preventDefault();strike(Number(event.key)-1);}
+  });
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&phase==='playing')setPaused(true,true);});
+  window.addEventListener('pagehide',()=>{if(phase==='playing')setPaused(true,true);});
+  $('sound').addEventListener('click',async()=>{
+    if(!sound){try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)throw Error('unsupported');if(!audio)audio=new Ctx();await audio.resume();sound=true;}catch(_){announce('Sound is unavailable in this browser. You can keep playing silently.');return;}}
+    else sound=false;
+    $('sound').textContent='Sound: '+(sound?'on':'off');$('sound').setAttribute('aria-pressed',String(sound));if(sound)tone(440,.08,.025);
+  });
+  refresh();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

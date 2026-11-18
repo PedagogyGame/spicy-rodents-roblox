@@ -39,7 +39,8 @@ function RouteCheck.index(plans: { Spec.BuildPlan }): Geometry.Index
 					Geometry.add(ix, { box = s :: any, owner = p.id })
 				end
 			end
-			for _, e in p.extras or {} do
+			local extras: { Spec.ExtraSpec } = p.extras or {}
+			for _, e in extras do
 				if e.kind == "Beam" and e.p0 and e.p1 then
 					Geometry.add(ix, { a = e.p0, b = e.p1, r = 0.1, owner = p.id })
 				end

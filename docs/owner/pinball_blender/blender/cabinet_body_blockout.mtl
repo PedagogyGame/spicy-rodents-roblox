@@ -1,0 +1,21 @@
+newmtl body
+Kd 0.353 0.314 0.275
+
+newmtl field
+Kd 0.784 0.667 0.431
+
+newmtl glass
+Kd 0.784 0.882 0.922
+
+newmtl glassart
+Kd 0.078 0.078 0.157
+
+newmtl metal
+Kd 0.804 0.816 0.839
+
+newmtl neon
+Kd 1.000 0.627 0.235
+
+newmtl red
+Kd 0.902 0.157 0.157
+

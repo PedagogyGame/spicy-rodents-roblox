@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "blender": "4.3.2",
+  "animation_frames_checked": 240,
+  "roots": 5,
+  "editable_text": true,
+  "play_script_embedded": true,
+  "scripts_auto_run": false,
+  "physical_hole_checks": [
+    {
+      "hole": 1,
+      "raised_hit_object": "Mole_01_head",
+      "height": 1.325
+    },
+    {
+      "hole": 2,
+      "raised_hit_object": "Mole_02_head",
+      "height": 1.325
+    },
+    {
+      "hole": 3,
+      "raised_hit_object": "Mole_03_head",
+      "height": 1.325
+    },
+    {
+      "hole": 4,
+      "raised_hit_object": "Mole_04_head",
+      "height": 1.325
+    },
+    {
+      "hole": 5,
+      "raised_hit_object": "Mole_05_head",
+      "height": 1.325
+    }
+  ],
+  "live_blender_check": {
+    "opened_project": true,
+    "keyboard_scoring": true,
+    "countdown": true,
+    "round_restoration": true,
+    "mouse_hit_accuracy": "Not separately confirmed in live viewport"
+  },
+  "offline_companion_checks": [
+    "syntax",
+    "spawn timing",
+    "hit and miss scoring",
+    "zero floor",
+    "duplicate hit protection",
+    "pause and resume",
+    "hidden-tab pause",
+    "round end",
+    "replay",
+    "guarded best-score storage"
+  ],
+  "offline_companion_browser_layout": "SVG artwork rendered and inspected; full browser layout not exercised.",
+  "glb": {
+    "size_bytes": 6555352,
+    "self_contained": true,
+    "animation_clips": 1,
+    "animation_channels": 7
+  }
+}

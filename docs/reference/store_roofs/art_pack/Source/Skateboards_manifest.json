@@ -1,0 +1,136 @@
+{
+  "assets": [
+    {
+      "name": "Lunar Moth",
+      "filename": "01_Lunar_Moth.glb",
+      "collection": "SKATE_01_Lunar_Moth",
+      "root": "ROOT_Lunar_Moth",
+      "triangles": 1232,
+      "file_bytes": 132488,
+      "deck_dimensions_m": {
+        "length": 0.82,
+        "width": 0.21,
+        "thickness": 0.008
+      },
+      "wheel_count": 4,
+      "truck_count": 2,
+      "pivot": "floor centered between wheels",
+      "glb_axes": "Y up; long axis Z",
+      "source_axes": "Z up; long axis Y"
+    },
+    {
+      "name": "Static Weekend",
+      "filename": "02_Static_Weekend.glb",
+      "collection": "SKATE_02_Static_Weekend",
+      "root": "ROOT_Static_Weekend",
+      "triangles": 1232,
+      "file_bytes": 134696,
+      "deck_dimensions_m": {
+        "length": 0.82,
+        "width": 0.21,
+        "thickness": 0.008
+      },
+      "wheel_count": 4,
+      "truck_count": 2,
+      "pivot": "floor centered between wheels",
+      "glb_axes": "Y up; long axis Z",
+      "source_axes": "Z up; long axis Y"
+    },
+    {
+      "name": "Ochre Run",
+      "filename": "03_Ochre_Run.glb",
+      "collection": "SKATE_03_Ochre_Run",
+      "root": "ROOT_Ochre_Run",
+      "triangles": 1232,
+      "file_bytes": 129148,
+      "deck_dimensions_m": {
+        "length": 0.82,
+        "width": 0.21,
+        "thickness": 0.008
+      },
+      "wheel_count": 4,
+      "truck_count": 2,
+      "pivot": "floor centered between wheels",
+      "glb_axes": "Y up; long axis Z",
+      "source_axes": "Z up; long axis Y"
+    },
+    {
+      "name": "Concrete Fern",
+      "filename": "04_Concrete_Fern.glb",
+      "collection": "SKATE_04_Concrete_Fern",
+      "root": "ROOT_Concrete_Fern",
+      "triangles": 1232,
+      "file_bytes": 132560,
+      "deck_dimensions_m": {
+        "length": 0.82,
+        "width": 0.21,
+        "thickness": 0.008
+      },
+      "wheel_count": 4,
+      "truck_count": 2,
+      "pivot": "floor centered between wheels",
+      "glb_axes": "Y up; long axis Z",
+      "source_axes": "Z up; long axis Y"
+    },
+    {
+      "name": "Tidal Check",
+      "filename": "05_Tidal_Check.glb",
+      "collection": "SKATE_05_Tidal_Check",
+      "root": "ROOT_Tidal_Check",
+      "triangles": 1232,
+      "file_bytes": 129652,
+      "deck_dimensions_m": {
+        "length": 0.82,
+        "width": 0.21,
+        "thickness": 0.008
+      },
+      "wheel_count": 4,
+      "truck_count": 2,
+      "pivot": "floor centered between wheels",
+      "glb_axes": "Y up; long axis Z",
+      "source_axes": "Z up; long axis Y"
+    },
+    {
+      "name": "Ghost Fish",
+      "filename": "06_Ghost_Fish.glb",
+      "collection": "SKATE_06_Ghost_Fish",
+      "root": "ROOT_Ghost_Fish",
+      "triangles": 1232,
+      "file_bytes": 130000,
+      "deck_dimensions_m": {
+        "length": 0.82,
+        "width": 0.21,
+        "thickness": 0.008
+      },
+      "wheel_count": 4,
+      "truck_count": 2,
+      "pivot": "floor centered between wheels",
+      "glb_axes": "Y up; long axis Z",
+      "source_axes": "Z up; long axis Y"
+    },
+    {
+      "name": "Violet Comet",
+      "filename": "07_Violet_Comet.glb",
+      "collection": "SKATE_07_Violet_Comet",
+      "root": "ROOT_Violet_Comet",
+      "triangles": 1232,
+      "file_bytes": 129728,
+      "deck_dimensions_m": {
+        "length": 0.82,
+        "width": 0.21,
+        "thickness": 0.008
+      },
+      "wheel_count": 4,
+      "truck_count": 2,
+      "pivot": "floor centered between wheels",
+      "glb_axes": "Y up; long axis Z",
+      "source_axes": "Z up; long axis Y"
+    }
+  ],
+  "notes": [
+    "Seven original printed designs; all boards fully assembled.",
+    "The editable Blender scene places boards side by side. For append, move each ROOT_<Design> empty; child transforms are local.",
+    "Individual GLBs have their root at origin, wheels on ground, dimensions in meters.",
+    "Deck artwork is original code-authored print design; textures are embedded in each GLB."
+  ]
+}

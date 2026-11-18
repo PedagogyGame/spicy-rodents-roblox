@@ -3,8 +3,11 @@
 -- THE client-server surface in one file (BUILD_PLAN §1.6). Each remote: direction, reliability, the
 -- inbound token-bucket rate (C->S only), and the payload schema (Util/Schema) or a buffer layout
 -- (Util/BufferCodec). Net refuses to fire or receive anything not declared here. Pure data.
+-- The verbs of Minigame.Input are the minigame registry's (Minigames/Games.verbs: the service's own, the common
+-- ones, and whatever each game's Spec lists): a new game's verbs reach the wire by being in its Spec.
 -- Interface: REMOTES { [name] = Def }; ACTION_VERBS; layouts MotorState, VehiclePose
 
+local Games = require("../Minigames/Games")
 local BufferCodec = require("../Util/BufferCodec")
 local Schema = require("../Util/Schema")
 
@@ -55,7 +58,6 @@ Schemas.VehiclePose = BufferCodec.layout({
 })
 
 local id = Schema.str({ max = 64 })
-local num = Schema.num()
 local args = Schema.opt(Schema.arr(
 	Schema.custom(function(v: any): boolean
 		local t = type(v)
@@ -72,9 +74,7 @@ Schemas.REMOTES = {
 	["Motor.State"] = { dir = "c2s", reliable = false, rate = 20, burst = 30, layout = Schemas.MotorState },
 	Action = { dir = "c2s", reliable = true, rate = 10, payload = Schema.rec({ verb = Schema.enum(Schemas.ACTION_VERBS), target = Schema.opt(id), args = args }) },
 	["Minigame.Input"] = { dir = "c2s", reliable = true, rate = 20, payload = Schema.rec({ gameId = id, seat = Schema.num({ min = 1, max = 16, int = true }),
-		verb = Schema.enum({ "aim", "power", "release", "tilt", "pull", "place", "serve", "hit", "leave", "start", "again", "mode", "throw", "addai" }), args = args }) },
-	["Paintball.Fire"] = { dir = "c2s", reliable = true, rate = 6, payload = Schema.rec({ ox = num, oy = num, oz = num, dx = num, dy = num, dz = num, t = num }) },
-	["Paintball.Move"] = { dir = "c2s", reliable = false, rate = 20, burst = 30, payload = Schema.rec({ x = num, y = num, z = num, t = num }) },
+		verb = Schema.enum(Games.verbs()), args = args }) },
 	["Offer.Reply"] = { dir = "c2s", reliable = true, rate = 1, burst = 2, payload = Schema.rec({ offerId = id, choice = Schema.enum({ "accept", "deer", "fox", "stay" }) }) },
 	["Lab.Command"] = { dir = "c2s", reliable = true, rate = 5, devOnly = true, payload = Schema.rec({ cmd = Schema.str({ max = 32 }), args = args }) },
 	["Possession.Granted"] = { dir = "s2c", reliable = true },
@@ -89,11 +89,16 @@ Schemas.REMOTES = {
 	Notify = { dir = "s2c", reliable = true },
 	["Offer.Show"] = { dir = "s2c", reliable = true },
 	["Minigame.State"] = { dir = "s2c", reliable = true },
-	["Paintball.State"] = { dir = "s2c", reliable = true },
-	Splat = { dir = "s2c", reliable = false },
 	["Outbreak.Start"] = { dir = "s2c", reliable = true },
 	["Clock.Rate"] = { dir = "s2c", reliable = true },
 	["Lab.State"] = { dir = "s2c", reliable = true, devOnly = true },
 } :: { [string]: Def }
+
+-- Paintball's own remotes (the one game that has any: Shared/Minigames/Paintball/Wire says why) are declared
+-- with the rest of its contract, with their rates and byte layouts, and merged here: Paintball.Move and
+-- Paintball.Fire (client to server), Paintball.Snap, Paintball.Shot and Splat (server to client).
+for name, def in require("../Minigames/Paintball/Wire").REMOTES do
+	Schemas.REMOTES[name] = def
+end
 
 return Schemas

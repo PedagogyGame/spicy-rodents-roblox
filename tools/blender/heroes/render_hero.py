@@ -171,8 +171,12 @@ def main(argv):
     ap.add_argument(
         "--views",
         default="",
-        help="comma list of review views: face_front, face_34, profile, side, gameplay_back, three_quarter, top",
+        help="comma list of review views: face_front, face_34, profile, side, gameplay_back, three_quarter, top, "
+        "play_back, back_34, back_level",
     )
+    ap.add_argument("--at", default="", help="the pose the stills and views are taken in: Clip:frame, or rest (default: Idle, frame 1)")
+    ap.add_argument("--zoom", type=float, default=1.0, help="views: the lens is this many times longer (the animal that much larger)")
+    ap.add_argument("--lift", type=float, default=0.0, help="views: the point looked at is this many studs higher (a tail held upright)")
     opts = ap.parse_args(argv)
     bpy.ops.wm.open_mainfile(filepath=opts.blend)
     scene = bpy.context.scene
@@ -198,6 +202,12 @@ def main(argv):
     tag = meta.get("variant", "hero")
     written = []
     hero_pose = meta.get("turntable_pose")
+    if opts.at == "rest":
+        hero_pose = None
+        rest(arm)
+        bpy.context.view_layer.update()
+    elif opts.at:
+        hero_pose = [opts.at.split(":")[0], int(opts.at.split(":")[1])]
     if hero_pose and not set_action(arm, hero_pose[0], hero_pose[1]):
         rest(arm)
     if opts.still:
@@ -222,11 +232,16 @@ def main(argv):
             "three_quarter": (body, 6.0, -58, 14, 50),
             "gameplay_back": (body, 7.5, 90, 28, 50),
             "top": (body, 6.5, 90, 80, 50),
+            # from behind, as the game is played: the play camera's own elevation (0.30 rad), the same a
+            # quarter round to one side, and level with the ground (the outline of the haunches and legs)
+            "play_back": (body + Vector((0, 0.35 * size, 0.1 * size)), 6.4, 90, 17, 50),
+            "back_34": (body + Vector((0, 0.35 * size, 0.1 * size)), 6.4, 132, 17, 50),
+            "back_level": (body + Vector((0, 0.35 * size, 0.0)), 6.4, 90, 3, 50),
         }
         for name in [v for v in opts.views.split(",") if v]:
             target, dist, az, el, lens = VIEWS[name]
-            cam.data.lens = lens
-            place(cam, target, size * dist, az, el)
+            cam.data.lens = lens * opts.zoom
+            place(cam, target + Vector((0, 0, opts.lift)), size * dist, az, el)
             scene.render.filepath = os.path.join(opts.out, f"{tag}_{name}.png")
             bpy.ops.render.render(write_still=True)
             written.append(scene.render.filepath)

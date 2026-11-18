@@ -218,7 +218,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 		else { color = barkColor, material = "Wood", role = "Limb" }
 	local function embedded(o: Spec.Opts): Spec.Opts
 		local c = table.clone(o)
-		c.attrs = { Embedded = true }
+		c.attrs = { Embedded = true } :: Spec.Attrs
 		return c
 	end
 

@@ -92,4 +92,71 @@ return function(t)
 		Doors.setLocked(leaf, true)
 		t.falsy(Doors.setOpen(leaf, true, roblox.CFrame))
 	end)
+
+	-- A baked leaf has a knob and panels as separate visual parts (DoorOf = its DoorId). Without
+	-- followers the door would swing open and leave its knob hanging in the doorway.
+	t.test("door followers: the knob and panels of a baked door turn with the leaf and come back", function()
+		local Bake = require("@worldgen/Bake")
+		local Factory = require("@worldgen/Factory")
+		local Greybox = require("@worldgen/Builders/Greybox")
+		local factory = Factory.new({
+			Instance = roblox.Instance,
+			Vector3 = roblox.Vector3,
+			CFrame = roblox.CFrame,
+			Color3 = roblox.Color3,
+			Enum = roblox.Enum,
+			UDim2 = roblox.UDim2,
+			ColorSequence = roblox.ColorSequence,
+		})
+		local checked = 0
+		for _, p in Bake.plans(Bake.data()) do
+			if p.id == "core_house_2_brick" or p.id == "outer_home_02" or p.id == "hospital_main" then
+				local model = Greybox.build(p, factory)
+				local other = roblox.Instance.new("Model") -- a neighbour's parts are never moved
+				local stray = roblox.Instance.new("Part")
+				stray:SetAttribute("DoorOf", "front")
+				stray.Parent = other
+				for id, leaf in Doors.collect(model) do
+					local followers = Doors.followers(leaf)
+					t.truthy(#followers >= 1, `{id}: a knob at least`)
+					local baked: { any } = {}
+					local offset: { any } = {}
+					for i, f in followers do
+						t.eq(f.CanCollide, false, f.Name)
+						t.eq(f:GetAttribute("DoorOf"), leaf:GetAttribute("DoorId"))
+						baked[i] = f.CFrame
+						offset[i] = leaf.CFrame:Inverse() * f.CFrame
+						-- it sits on its leaf: within the leaf's width and height of its centre
+						local d = offset[i].Position
+						t.truthy(
+							math.abs(d.X) <= leaf.Size.X / 2 + 0.1 and math.abs(d.Y) <= leaf.Size.Y / 2 + 0.1,
+							f.Name
+						)
+						t.truthy(math.abs(d.Z) <= 1, `{f.Name} is {d.Z} st off its leaf`)
+					end
+					local closed = leaf.CFrame
+					t.truthy(Doors.setOpen(leaf, true, roblox.CFrame), id)
+					t.truthy((leaf.CFrame.Position - closed.Position).Magnitude > 0.5, `{id} swung`)
+					for i, f in followers do
+						-- rigid: the same place on the leaf while it stands open
+						local now = leaf.CFrame:Inverse() * f.CFrame
+						t.truthy((now.Position - offset[i].Position).Magnitude <= 1e-3, `{f.Name} slid on its leaf`)
+						t.truthy((f.CFrame.Position - baked[i].Position).Magnitude > 0.05, `{f.Name} stayed behind`)
+					end
+					t.truthy(Doors.setOpen(leaf, false, roblox.CFrame), id)
+					for i, f in followers do
+						t.truthy(
+							(f.CFrame.Position - baked[i].Position).Magnitude <= 1e-3,
+							`{f.Name} did not come back`
+						)
+						t.near(f.CFrame.LookVector.X, baked[i].LookVector.X, 1e-4)
+						t.near(f.CFrame.LookVector.Z, baked[i].LookVector.Z, 1e-4)
+					end
+					checked += #followers
+				end
+				t.eq(stray.CFrame.Position.Magnitude, 0)
+			end
+		end
+		t.truthy(checked >= 25, `{checked} followers checked`)
+	end)
 end

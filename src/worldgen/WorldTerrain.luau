@@ -37,7 +37,7 @@ function WorldTerrain.colour(terrain: Terrain)
 end
 
 function WorldTerrain.write(terrain: Terrain, opts: { chunk: number? }?): { [string]: any }
-	local o = opts or {}
+	local o: { chunk: number? } = opts or {}
 	local t0 = os.clock()
 	WorldTerrain.colour(terrain)
 	Height.configure(Import.generated("TerrainExtensions"))

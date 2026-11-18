@@ -5,7 +5,7 @@
 -- the first hex is the wall) and the v5.4 tables in docs/spec/worldgen_core.md §5.1 (core houses), §6.1
 -- (outer homes) and worldgen_districts_art.md §3.4 (quay plaster/roof/fascia), §11 (materials and
 -- district palettes). Unknown lots fall back to the muted v5.4 town palette (§11 statistics).
--- Interface: hex(s) -> {r,g,b}; hexes(text) -> { {r,g,b} }; forLot(lot, kit) -> Look;
+-- Interface: hex(s) -> {r,g,b}; hexes(text) -> { {r,g,b} }; forLot(lot, kit) -> Look; index(lotId) -> n;
 --   plate(lotType, style) -> (color, material, transparency); LEAVES; ROAD
 -- Pure: no Instances, no side effects on require.
 
@@ -91,6 +91,8 @@ local function index(id: string): number
 	end
 	return n
 end
+
+Palette.index = index
 
 local function at(t: { Rgb }, i: number): Rgb
 	return t[(i % #t) + 1]

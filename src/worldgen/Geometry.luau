@@ -172,7 +172,8 @@ function Geometry.nearest(ix: Index, p: Vec, r: number): (number, Prim?)
 	local seen: { [Prim]: boolean } = {}
 	for i = math.floor((p[1] - r) / c), math.floor((p[1] + r) / c) do
 		for j = math.floor((p[3] - r) / c), math.floor((p[3] + r) / c) do
-			for _, prim in ix.cells[key(i, j)] or {} do
+			local prims: { Prim } = ix.cells[key(i, j)] or {}
+			for _, prim in prims do
 				if not seen[prim] then
 					seen[prim] = true
 					local d

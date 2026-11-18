@@ -1,0 +1,47 @@
+{
+  "edition": "v2 / visual-only additions",
+  "themes": [
+    "telephone-wire routes",
+    "hidden nut caches",
+    "neighborhood mischief"
+  ],
+  "new_items": [
+    {
+      "file": "GLB/Skateboards/08_Live_Wire.glb",
+      "name": "Live Wire",
+      "kind": "assembled skateboard",
+      "theme": "telephone-wire shortcuts",
+      "price": null
+    },
+    {
+      "file": "GLB/Skateboards/09_Cache_Run.glb",
+      "name": "Cache Run",
+      "kind": "assembled skateboard",
+      "theme": "nut caches and a hand-drawn route",
+      "price": null
+    },
+    {
+      "file": "GLB/Additions/Night_Route_Jacket.glb",
+      "name": "Night Route",
+      "kind": "static jacket display prop",
+      "rigged": false,
+      "wearable": false,
+      "price": null
+    }
+  ],
+  "updated_full_scene": "GLB/04_Offbeat_Shop_Interior.glb",
+  "additions_only_scene": "GLB/Additions/Shop_Flair_Only.glb",
+  "shop_addition_coordinates": "Full-shop origin, Y-up; do not add to the updated full scene a second time.",
+  "stool_count": 5,
+  "skateboard_count": 9,
+  "cafe_details": [
+    "framed Old Town study",
+    "Please do not feed the regulars plaque",
+    "lost-and-found ceramic jar with acorn knob",
+    "two cork coasters"
+  ],
+  "sewer_detail": "small dry-side plaque on maintenance tunnel wall, no topology or port changes",
+  "original_game_files_touched": false,
+  "validation_scope": "GLB binary structure, named geometry, dimensions, image buffers, render inspection; no Roblox runtime test",
+  "source_status": "Base Blender scenes preserved. New additions authored/exported directly as GLB. Import_v2_Into_Blender.py reconstructs final editable Blender scenes from GLBs; that Blender script has not been executed in this runtime."
+}

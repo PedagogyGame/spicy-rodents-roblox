@@ -1,0 +1,47 @@
+{
+  "about": "PEPPER'S CORNER STORE (f1_corner_store) review views. Venue frame: world x = 957 - X, z = 84 + D, y = 14.1 + Y (X across the frontage, D into the building, Y up from the floor). Make: lune run tools/bake/main.luau; lune run tools/bake/editor_ground.luau; lune run tools/bake/backdrop.luau; lune run tools/bake/corner_store.luau; lune run tools/review/export.luau; lune run tools/review/corner_store.luau; then /root/.cache/spicy-rodents/venv/bin/python -I tools/review/render.py --scene build/review/store_scene.json --views docs/renders/corner_store/views.json --out build/review/store --threads 2, and the view from above on the cutaway scene (no roof): ... render.py --scene build/review/store_cutaway.json --views docs/renders/corner_store/views.json --out build/review/store --set above --only cs_07_above. Interior views are at a person's eye (floor + 5.2). Cycles bounces light off the walls and Roblox's lighting does not: in the engine the corners will be darker than here.",
+  "defaults": {"res": "960x540", "samples": 24, "groups": ["town", "attractions", "terrain", "backdrop", "backdrop_terrain"]},
+  "sun": {"dir": [0.7, 0.55, -0.45], "strength": 3.6, "color": [1.0, 0.86, 0.68], "angleDeg": 1.5, "skyStrength": 1.0},
+  "views": [
+    {
+      "name": "cs_01_street",
+      "desc": "From across the street in front, at a person's eye: the shopfront, the canopy, the sign.",
+      "pos": [963, 5.5, 34], "look": [957, 8, 84], "fov": 60, "aboveGround": true
+    },
+    {
+      "name": "cs_02_door",
+      "desc": "On the front landing (local -6, 5.2, -24), looking in through the open doorway.",
+      "pos": [963, 19.3, 59.5], "look": [962, 17.5, 90], "fov": 65
+    },
+    {
+      "name": "cs_03_counter",
+      "desc": "Just inside the door (local -2, 5.2, -18), toward the checkout: till, bell, gum rack, the back bar with the bird seed and the kite.",
+      "pos": [959, 19.3, 66], "look": [973, 16.8, 74], "fov": 70
+    },
+    {
+      "name": "cs_04_aisle",
+      "desc": "Down the aisle between gondolas 1 and 2 (local -8, 5.2, -5), toward the back wall.",
+      "pos": [965, 19.3, 79], "look": [964, 16.1, 104], "fov": 70
+    },
+    {
+      "name": "cs_05_fridge",
+      "desc": "In the west aisle (local 18, 5.2, -4), toward the pegboard, the cold drinks fridge and the freezer.",
+      "pos": [939, 19.3, 80], "look": [947, 17, 103], "fov": 70
+    },
+    {
+      "name": "cs_06_back",
+      "desc": "From the back between gondolas 2 and 3 (local 0, 5.2, 16.5), back toward the front windows and the street.",
+      "pos": [957, 19.3, 100.5], "look": [960, 17, 62], "fov": 70
+    },
+    {
+      "name": "cs_07_above",
+      "desc": "From above, the roof taken off (the cutaway scene): the plan of the whole store.",
+      "pos": [957, 75, 70], "look": [957, 14, 85], "fov": 55, "optIn": "above"
+    },
+    {
+      "name": "cs_08_aerial",
+      "desc": "From above the street corner, the building whole: the flat roof, the parapet, the sign.",
+      "pos": [995, 45, 30], "look": [957, 16, 84], "fov": 55
+    }
+  ]
+}

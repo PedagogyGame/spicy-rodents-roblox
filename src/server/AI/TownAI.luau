@@ -3,15 +3,30 @@
 -- The town's AI population on the real data (BUILD_PLAN §1.5, §4.4 #3; the S5 Scenario's structure
 -- on generated/ instead of synthetic lanes and routes): humans per data/population.json posts
 -- (townspeople walk the sidewalk lanes from World/Town via Actors/Nav; shop workers keep shop
--- circuits; hospital staff and the ambulance crew walk circuits at hospital_main and the ambulance
--- bay; 6 officers patrol from west_police_station, the guard and car crew hold the station),
+-- circuits, the first of them behind a built venue's counter (Actors/StaffRounds.venues: Pepper's Corner
+-- Store's shopkeeper, on the store's floor); hospital staff walk the ward rounds and the desk post of Infection/HospitalLayout, indoors
+-- on lanes the bake keeps clear; the ambulance crew walks a circuit at the ambulance bay; 6 officers
+-- patrol from west_police_station, the guard and car crew hold the station's locker room),
 -- novelty riders and motorcyclists as cyclists on the lanes, squirrels running the 1,332 harvested
 -- routes (Routes/Registry + Graph through AI/RouteAdapter), the AI rodent wandering and stalking
 -- from a v5.4 hide, the fox roaming and 6 deer grazing at their v5.4 origins. Ground is
 -- World/Ground over Town pavement (walkers never take roofs). Steppable and pure: Lune runs the
 -- SimFull-style liveness test; Server/Actors/ActorsRuntime adds bodies and possession in the engine.
+-- Brains report what the services care about through ctx.emit (a person spotting a squirrel):
+-- the events queue up in world.events (the newest MAX_EVENTS) until drainEvents takes them, and each
+-- one is also handed at once to every listener (listen), so a service that needs to hear them does not
+-- race the one that drains the queue.
+-- COVER (the storm drains, BRIEF_ADDENDUM D8; Server/World/SewerService adds one with addCover, and any
+-- later refuge, such as the hollow trees, adds its own): a squirrel-species actor a cover hides (`under(x,
+-- y, z)` names a space; the first cover added that names one wins) is taken out of the threat grid, so
+-- every brain that looks for squirrels through it (people spotting, the fox hunting, the deer startling)
+-- loses it, unseen and unheard, as in v5.4. A change is an event, "covered" (with `space`) or
+-- "uncovered". A body let go while hidden is put back where that cover says (`surface`: the drain's
+-- mouth) before the AI takes it. Removing one cover leaves the others; with none nothing changes.
 -- Interface: build(opts) -> World; stepFrame(world, dt) -> FrameMetrics; liveness(world) -> Liveness;
---   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn)
+--   counts(world) -> { [species]: n }; actorsOf(world, predicate) -> { Actor }; setFocus(world, fn);
+--   drainEvents(world) -> { Event }; suspend(world, id); resume(world, id, x, y, z, yaw?);
+--   listen(world, fn) -> unlisten; addCover(world, cover) -> remove; covered(world, id) -> space?
 -- Pure; studs. Nothing runs until stepFrame is called (rule 4).
 
 local Import = require("../Import")
@@ -23,6 +38,12 @@ local Ground = Import.shared("World/Ground") :: typeof(require("../../shared/Wor
 local Town = Import.shared("World/Town") :: typeof(require("../../shared/World/Town"))
 local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local HumanAIMotor = Import.shared("Movement/HumanAIMotor") :: typeof(require("../../shared/Movement/HumanAIMotor"))
+local HospitalLayout =
+	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
+local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../../shared/Actors/StaffRounds"))
+local AlleyStaff = Import.shared("Attractions/AlleyStaff") :: typeof(require("../../shared/Attractions/AlleyStaff"))
+local AlleyWalk = Import.shared("Attractions/AlleyWalk") :: typeof(require("../../shared/Attractions/AlleyWalk"))
+local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
 local Perception = require("../Actors/Perception")
@@ -51,6 +72,16 @@ export type Opts = {
 
 export type FrameMetrics = { brainMs: number, motorMs: number, gridMs: number, totalMs: number, ticked: number }
 
+export type Event = { kind: string, id: number, other: number?, t: number, space: string? }
+
+-- What hides a squirrel (the storm drains). under: the space whose volume holds the point (world studs, the
+-- actor's own y), nil in the open. surface: where a body let go at that point is put (ground-level y, and the
+-- yaw to face), nil to leave it where it is.
+export type Cover = {
+	under: (x: number, y: number, z: number) -> string?,
+	surface: ((x: number, y: number, z: number) -> (number?, number?, number?, number?))?,
+}
+
 export type World = {
 	opts: Opts,
 	config: any, -- Actors/Population.Config
@@ -69,9 +100,15 @@ export type World = {
 	counts: { [string]: number },
 	possessed: { [number]: boolean }, -- actor ids driven by players (their brains are suspended)
 	nextId: number,
+	events: { Event }, -- what the brains reported since the last drainEvents
+	listeners: { (ev: Event) -> () }, -- told of every event as it is emitted
+	covers: { Cover }, -- what hides squirrels (addCover), in the order added
+	covered: { [number]: string? }, -- squirrel-species actor id -> the space hiding it (refreshed every frame)
 }
 
 local TownAI = {}
+
+TownAI.MAX_EVENTS = 256 -- nobody draining (a test, a place without the services) never grows the list
 
 local st = Units.st
 -- v5.4 landmarks (HTML units), as in the S5 scenario: AI squirrel hides, deer and fox origins
@@ -120,6 +157,44 @@ local function shopSites(data: any): { { number } }
 	return out
 end
 
+-- emit: queue an event (the newest MAX_EVENTS are kept) and tell every listener now.
+function TownAI.emit(world: World, ev: Event)
+	local events = world.events
+	if #events >= TownAI.MAX_EVENTS then
+		table.remove(events, 1)
+	end
+	table.insert(events, ev)
+	for _, fn in table.clone(world.listeners) do
+		fn(ev)
+	end
+end
+
+-- the threat grid for one squirrel-species actor: out of it while the cover hides it, and an event when that
+-- changes
+local function placeThreat(world: World, actor: Common.Actor)
+	local space = nil
+	for _, cover in world.covers do
+		space = cover.under(actor.x, actor.y, actor.z)
+		if space then
+			break
+		end
+	end
+	local was = world.covered[actor.id]
+	if space ~= was then
+		world.covered[actor.id] = space
+		if space then
+			TownAI.emit(world, { kind = "covered", id = actor.id, t = world.now, space = space })
+		else
+			TownAI.emit(world, { kind = "uncovered", id = actor.id, t = world.now, space = was })
+		end
+	end
+	if space then
+		world.grid:remove(actor.id)
+	else
+		world.grid:set(actor.id, actor.x, actor.z)
+	end
+end
+
 function TownAI.build(opts: Opts): World
 	local data = opts.data
 	local rng = mulberry32(opts.seed or 1)
@@ -139,11 +214,21 @@ function TownAI.build(opts: Opts): World
 	local actors: { Common.Actor } = {}
 	local actorsById: { [number]: Common.Actor } = {}
 	local brains: { [number]: Common.Brain } = {}
+	-- the built expansion venues' floors (indoors, above the ground) and their counters' staff posts
+	local venues = StaffRounds.venues(data:module("Expansion"))
+	-- the bowling alley (generated/Attractions): its floor inside its walls, and its employees (AlleyStaff)
+	local alley = AlleyStaff.placeOf(data)
 	local ctx: Common.Ctx = {
 		now = 0,
 		rng = rng,
 		groundAt = function(x: number, z: number): number
-			return ground.groundAt(x, z, Height.at(x, z) + 1)
+			local inside = if alley then AlleyStaff.floorAt(alley, x, z) else nil
+			if inside then
+				return inside
+			end
+			local y = ground.groundAt(x, z, Height.at(x, z) + 1)
+			local floor = StaffRounds.floorAt(venues, x, z)
+			return if floor and floor > y then floor else y
 		end,
 		threats = grid,
 		actorsById = actorsById,
@@ -169,7 +254,14 @@ function TownAI.build(opts: Opts): World
 		counts = {},
 		possessed = {},
 		nextId = 0,
+		events = {},
+		listeners = {},
+		covers = {},
+		covered = {},
 	}
+	ctx.emit = function(kind: string, actor: Common.Actor, other: Common.Actor?)
+		TownAI.emit(world, { kind = kind, id = actor.id, other = if other then other.id else nil, t = world.now })
+	end
 	local counts = world.counts
 
 	local function add(
@@ -223,7 +315,26 @@ function TownAI.build(opts: Opts): World
 	local hx, hz = lotPos(data, "hospital_main", { -356, 353 })
 	local bx, bz = lotPos(data, "hosp_ambulance_bay", { -340, 330 })
 	local px, pz = lotPos(data, "west_police_station", { -510, -107 })
+	-- the hospital's posts: the round behind the reception desk and the rounds of the wards
+	local deskRound: any = nil
+	local wardRounds: { any } = {}
+	local okLayout, layout = pcall(HospitalLayout.fromData, data, Tunables.get("hospital.beds"))
+	if okLayout and layout then
+		for _, round in layout.posts do
+			if round.room == "reception" then
+				deskRound = round
+			else
+				table.insert(wardRounds, round)
+			end
+		end
+	end
 	local shops = shopSites(data)
+	local counters: { { x: number, z: number, round: { { number } } } } = {}
+	for _, v in venues do
+		if v.post then
+			table.insert(counters, v.post)
+		end
+	end
 	local scale = 1
 	if opts.humans then
 		local standing = 0
@@ -239,7 +350,21 @@ function TownAI.build(opts: Opts): World
 			idx += 1
 			local id = post.id
 			local actor: Common.Actor
-			if id == "hospital_staff" or id == "ambulance_crew" then
+			if id == "hospital_staff" and #wardRounds > 0 then
+				-- indoors, on the lanes the bake keeps clear (Infection/HospitalLayout): the first works
+				-- behind the reception desk, the rest walk the rounds at the foot of the ward beds
+				local round = if k == 1 and deskRound then deskRound else wardRounds[(k - 2) % #wardRounds + 1]
+				local first = round.points[1]
+				local circuit = {}
+				for _, p in round.points do
+					table.insert(circuit, { p[1] - first[1], p[2] - first[2] })
+				end
+				actor = add("human", id, "Staff", hipH, first[1], first[2])
+				register(
+					actor,
+					Staff.new(actor, { stationX = first[1], stationZ = first[2], index = k, circuit = circuit })
+				)
+			elseif id == "hospital_staff" or id == "ambulance_crew" then
 				local cx, cz = if id == "ambulance_crew" then bx else hx, if id == "ambulance_crew" then bz else hz
 				actor = add("human", id, "Staff", hipH, cx + ((k % 4) - 1.5) * 6, cz + ((k % 3) - 1) * 6)
 				register(actor, Staff.new(actor, { stationX = cx, stationZ = cz, index = k }))
@@ -249,9 +374,38 @@ function TownAI.build(opts: Opts): World
 					actor = add("human", id, "Officer", hipH, px + k * 3, pz + 8)
 					register(actor, Officer.new(actor, { stationX = px, stationZ = pz, index = k }))
 				else
-					actor = add("human", id, "Staff", hipH, px - 6 + k, pz - 10)
-					register(actor, Staff.new(actor, { stationX = px + 6, stationZ = pz - 12, index = k }))
+					-- the guard and the car crew: in the locker room (Actors/StaffRounds.POLICE: the bake
+					-- keeps their round clear)
+					local sx, sz = px + StaffRounds.POLICE.x, pz + StaffRounds.POLICE.z
+					actor = add("human", id, "Staff", hipH, sx, sz)
+					register(actor, Staff.new(actor, { stationX = sx, stationZ = sz, index = k }))
 				end
+			elseif id == "shop_worker" and k <= #counters then
+				-- the first shop workers keep the built venues' counters (Pepper's Corner Store's shopkeeper)
+				local desk = counters[k]
+				actor = add("human", id, "Staff", hipH, desk.x, desk.z)
+				register(
+					actor,
+					Staff.new(actor, { stationX = desk.x, stationZ = desk.z, index = k, circuit = desk.round })
+				)
+			elseif id == "attraction_staff" and alley and k <= #AlleyStaff.EMPLOYEES then
+				-- the first attraction staff are the bowling alley's employees, each on their own work loop
+				local job = AlleyStaff.EMPLOYEES[k]
+				local stops = AlleyStaff.shift(alley, job)
+				actor = add("human", id, "Staff", hipH, stops[1].x, stops[1].z)
+				actor.job = job.id
+				register(
+					actor,
+					Staff.new(actor, {
+						stationX = stops[1].x,
+						stationZ = stops[1].z,
+						index = k,
+						stops = stops,
+						way = function(x0: number, z0: number, x1: number, z1: number): { { number } }
+							return AlleyWalk.way(alley, x0, z0, x1, z1)
+						end,
+					})
+				)
 			elseif id == "shop_worker" or id == "attraction_staff" then
 				local shop = if #shops > 0 then shops[(k - 1) % #shops + 1] else { 0, 0 }
 				actor = add("human", id, "Staff", hipH, shop[1], shop[2])
@@ -312,7 +466,7 @@ function TownAI.build(opts: Opts): World
 	end
 	for _, actor in actors do
 		if actor.species == "squirrel" then
-			grid:set(actor.id, actor.x, actor.z)
+			placeThreat(world, actor)
 		end
 	end
 	scheduler:setFocus(function()
@@ -323,6 +477,37 @@ end
 
 function TownAI.setFocus(world: World, fn: () -> { BrainScheduler.Focus })
 	world.scheduler:setFocus(fn)
+end
+
+-- listen: fn(ev) is called with every event as it is emitted (inside stepFrame, after the brains that
+-- emit it have thought). Returns the call that stops it.
+function TownAI.listen(world: World, fn: (ev: Event) -> ()): () -> ()
+	table.insert(world.listeners, fn)
+	return function()
+		local i = table.find(world.listeners, fn)
+		if i then
+			table.remove(world.listeners, i)
+		end
+	end
+end
+
+-- setCover: what hides a squirrel from now on (nil: nothing does; every hidden actor is in the open again).
+-- addCover: something that hides squirrels from now on (a refuge: the storm drains, a hollow tree). Returns the
+-- call that takes it away again; the others stay, and the bodies only it hid are in the open from the next frame.
+function TownAI.addCover(world: World, cover: Cover): () -> ()
+	table.insert(world.covers, cover)
+	return function()
+		local i = table.find(world.covers, cover)
+		if i then
+			table.remove(world.covers, i)
+		end
+		-- the next frame names what the others still hide ("uncovered" for the rest)
+	end
+end
+
+-- covered: the space hiding actor `id` as of the last frame, nil when it is in the open.
+function TownAI.covered(world: World, id: number): string?
+	return world.covered[id]
 end
 
 -- One 60 Hz server frame: brains (budgeted, LOD), AI motors for every AI-driven actor, threat grid.
@@ -341,10 +526,9 @@ function TownAI.stepFrame(world: World, dt: number): FrameMetrics
 		end
 	end
 	local t2 = os.clock()
-	local grid = world.grid
 	for _, actor in world.actors do
 		if actor.species == "squirrel" then
-			grid:set(actor.id, actor.x, actor.z)
+			placeThreat(world, actor)
 		end
 	end
 	local t3 = os.clock()
@@ -371,6 +555,19 @@ end
 function TownAI.resume(world: World, id: number, x: number, y: number, z: number, yaw: number?)
 	local actor = world.actorsById[id]
 	world.possessed[id] = nil
+	-- let go where the cover hides it (down a drain): the AI takes it at the way out
+	for _, cover in world.covers do
+		if cover.under(x, y, z) then
+			if cover.surface then
+				local sx, sy, sz, syaw = cover.surface(x, y, z)
+				if sx and sy and sz then
+					x, y, z = sx, sy + actor.hip, sz
+					yaw = syaw or yaw
+				end
+			end
+			break
+		end
+	end
 	actor.x, actor.y, actor.z = x, y, z
 	if yaw then
 		actor.yaw = yaw
@@ -382,6 +579,13 @@ function TownAI.resume(world: World, id: number, x: number, y: number, z: number
 	snap.x, snap.z = x, z
 	brain:resume(snap)
 	world.scheduler:register(id, brain, actor, world.now)
+end
+
+-- drainEvents: what the brains reported since the last call (oldest first); the queue is emptied.
+function TownAI.drainEvents(world: World): { Event }
+	local events = world.events
+	world.events = {}
+	return events
 end
 
 function TownAI.counts(world: World): { [string]: number }

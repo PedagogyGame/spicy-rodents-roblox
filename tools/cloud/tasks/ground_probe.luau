@@ -62,8 +62,8 @@ local function line(name: string, x0: number, z0: number, x1: number, z1: number
 	local jumps05, jumps15, jumps30 = 0, 0, 0
 	local vjumps05, vjumps15 = 0, 0
 	local prev: number?, prevA: number?, prevVis: number? = nil, nil, nil
-	local profile: { any } = {}
-	local anomalies: { any } = {}
+	local profile: { { any } } = {}
+	local anomalies: { { any } } = {}
 	for i = 0, n do
 		local x, z = x0 + dx * i / n, z0 + dz * i / n
 		local h = Height.at(x, z)
@@ -133,8 +133,9 @@ local function line(name: string, x0: number, z0: number, x1: number, z1: number
 				local last = anomalies[#anomalies]
 				-- one entry per run of the same label within 3 st
 				if not (last and last[6] == rl and math.abs(last[1] - x) + math.abs(last[2] - z) < 3) then
+					-- (a row of numbers, words and a flag for the JSON report: the first entry says so to the checker)
 					table.insert(anomalies, {
-						math.floor(x * 100) / 100,
+						(math.floor(x * 100) / 100) :: any,
 						math.floor(z * 100) / 100,
 						math.floor(h * 100) / 100,
 						math.floor(a * 100) / 100,
@@ -150,7 +151,7 @@ local function line(name: string, x0: number, z0: number, x1: number, z1: number
 		prev, prevA, prevVis = ry, a, vy
 		if i % 4 == 0 and #profile < 160 then
 			table.insert(profile, {
-				math.floor(x * 10) / 10,
+				(math.floor(x * 10) / 10) :: any,
 				math.floor(z * 10) / 10,
 				math.floor(h * 100) / 100,
 				math.floor(a * 100) / 100,

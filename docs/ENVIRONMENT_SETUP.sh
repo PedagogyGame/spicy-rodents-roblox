@@ -2,14 +2,16 @@
 # Idempotent toolchain setup for the Spicy Rodents Roblox rebuild (BUILD_PLAN §4.3 item 1).
 # Intended as the cloud environment setup script (runs as root in a fresh Linux container with
 # cargo, python3 and node available; GitHub release downloads are blocked there, so everything
-# comes from crates.io, PyPI and npm). Safe to re-run: every step checks before it installs.
-# Caches live under /root/.cache. Takes ~10 min cold (bpy is a 403 MB wheel), seconds when warm.
+# comes from crates.io, PyPI and npm, and luau-lsp is built from its source, which git can clone).
+# Safe to re-run: every step checks before it installs. Caches live under /root/.cache. Takes
+# ~20 min cold (bpy is a 403 MB wheel; luau-lsp is a 250-file C++ build), seconds when warm.
 set -euo pipefail
 
 ROJO_VERSION=7.7.1
 LUNE_VERSION=0.11.1
 STYLUA_VERSION=2.6.0
 SELENE_VERSION=0.31.0
+LUAU_LSP_VERSION=1.70.1
 BPY_VERSION=5.2.3
 
 export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
@@ -35,6 +37,33 @@ if ! have_version stylua "$STYLUA_VERSION" || ! echo 'local x: number = 1' | sty
 	cargo install stylua --locked --version "$STYLUA_VERSION" --features luau --force
 fi
 have_version selene "$SELENE_VERSION" || cargo install selene --locked --version "$SELENE_VERSION"
+
+log "luau-lsp $LUAU_LSP_VERSION (built from source) and its Roblox type definitions"
+# The type checker tools/ci.sh runs (tools/typecheck). Its release binaries cannot be downloaded
+# here, but its source can be cloned and it needs only cmake and a C++ compiler. The Roblox
+# definitions that match the release ship in the same source tree.
+LSP_CACHE=/root/.cache/spicy-rodents/luau-lsp
+LSP_DEFS="$LSP_CACHE/globalTypes-$LUAU_LSP_VERSION.d.luau"
+if ! have_version luau-lsp "$LUAU_LSP_VERSION" || [ ! -s "$LSP_DEFS" ]; then
+	command -v cmake >/dev/null && command -v c++ >/dev/null \
+		|| { echo "cmake and a C++ compiler are required to build luau-lsp"; exit 1; }
+	LSP_SRC="$LSP_CACHE/src-$LUAU_LSP_VERSION"
+	LSP_BUILD="$LSP_CACHE/build-$LUAU_LSP_VERSION"
+	mkdir -p "$LSP_CACHE"
+	if [ ! -d "$LSP_SRC/.git" ]; then
+		rm -rf "$LSP_SRC"
+		GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --branch "$LUAU_LSP_VERSION" \
+			https://github.com/JohnnyMorganz/luau-lsp "$LSP_SRC"
+	fi
+	GIT_LFS_SKIP_SMUDGE=1 git -C "$LSP_SRC" submodule update --init --depth 1
+	LSP_GEN=()
+	if command -v ninja >/dev/null; then LSP_GEN=(-G Ninja); fi
+	cmake -S "$LSP_SRC" -B "$LSP_BUILD" "${LSP_GEN[@]}" -DCMAKE_BUILD_TYPE=Release \
+		-DLSP_WERROR=OFF -DLSP_BUILD_WITH_SENTRY=OFF
+	cmake --build "$LSP_BUILD" --target Luau.LanguageServer.CLI -j "$(nproc)"
+	install -m 0755 "$LSP_BUILD/luau-lsp" "$CARGO_HOME/bin/luau-lsp"
+	cp "$LSP_SRC/scripts/globalTypes.d.luau" "$LSP_DEFS"
+fi
 
 log "selene roblox std"
 # roblox.yml is committed: stock selene cannot fetch the API dump through the proxy. To regenerate,
@@ -72,5 +101,5 @@ for dir in tools/harvest tools/golden; do
 done
 
 log "versions"
-rojo --version; lune --version; stylua --version; selene --version; node --version
+rojo --version; lune --version; stylua --version; selene --version; echo "luau-lsp $(luau-lsp --version)"; node --version
 echo "setup complete; run tools/ci.sh to verify"

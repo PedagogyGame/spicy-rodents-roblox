@@ -23,6 +23,9 @@ PossessionState.ATTR = table.freeze({
 	Clip = "Clip",
 	ClipT0 = "ClipT0", -- workspace:GetServerTimeNow() when the clip phase was 0
 	Speed = "Speed", -- studs per second the brain is moving at
+	-- workspace:GetServerTimeNow() until which the body's driver is held still (the water gun's stun:
+	-- Items/ItemWorld writes it; the driving client's controller gives its motor no input until then)
+	StunnedUntil = "StunnedUntil",
 })
 
 -- ReplicatedStorage.<folder> holds these RemoteEvents (W0; W1 moves them into Shared/Net).

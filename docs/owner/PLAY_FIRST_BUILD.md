@@ -11,12 +11,23 @@ File: `docs/owner/files/SpicyRodents_play.rbxl` (about 1.3 MB). You publish it o
      - WASD runs (the camera sets the direction) and Shift sprints.
      - Run into a tree, pole or downspout and keep holding W to climb.
      - A or D chooses the way at a fork, Space leaps, Q drops and E grabs. If there is nothing to grab, the screen tells you.
-     - The rodent pounces with a left click and **bites anyone it touches**. The person shouts and runs away, and your bite count and Power go up (top centre).
+     - The rodent pounces with a left click and **bites anyone it touches**. The person shouts (a speech bubble over their head) and runs away, and your bite count and Power go up (top centre). What happens to them next is in "After a bite" below.
      - Cars kill you: you see **RUN OVER!** and the menu comes back after 3 seconds.
    - **Townsperson:** WASD walks, Shift sprints and Space jumps. **F kicks**: the rodent has 100 health and a kick does 55, so two kicks knock it out. The top line says whether you hit or missed.
    - **Police:** you start beside the patrol car. Walk up and press **E**: the view moves to the driver's seat. W is gas, S brakes and reverses, A and D steer, and Space is the handbrake. V switches between the inside and outside views. E gets you out.
    - **Police drone:** it takes off by itself about a second after you pick it. WASD flies, Space goes up, Q or Ctrl goes down, Shift boosts, and E lands. You are back on foot next to the drone.
 5. **Switch or stop.** The orange **Menu (M)** button at the bottom right, or the M key, brings the menu back at any time. If you get stuck in a wall or the river, press Esc and then Reset Character: this moves you to a safe spot and never kills you. To stop, press Esc and then Leave.
+
+## After a bite (new on 10 November 2026)
+- **The bitten person is infected and runs.** One of two things follows:
+  - **About half the time they collapse** a short way off, within 4 seconds, and sit on the ground. A few seconds later an **ambulance** leaves the hospital (far west of town) and drives along the roads to the nearest road point. **Sometimes 2 to 4 people from nearby walk over, stand round the patient and say something** (where at least two people are near enough; one onlooker alone does not come). A paramedic steps out of the ambulance and walks to the patient, round any building in the way, the patient is walked back to the ambulance beside the paramedic, and it drives back to the hospital. For someone a long way from the road the paramedic runs.
+  - **The rest of the time they get away looking fine.** 40 to 120 seconds later their **eyes turn red**, their body has a faint red glow and they sway as they walk. They then either **walk to the hospital themselves** or collapse and get an ambulance as above. Someone who is not on a pavement (the police yard, a shop floor) walks straight across the open ground, round the buildings.
+- **The hospital is the only cure.** Nobody gets better on their own, and knocking the rodent out cures nobody. In the hospital a patient sits up on a cot in one of the two wards for 30 seconds, then walks out cured and goes home on foot: townspeople to where they were bitten, staff and officers to their post.
+- **If the rodent bites you** while you are a townsperson or an officer, the top line says so and tells you what to do: **walk in through the hospital's front doors and stay inside for 30 seconds.** The top line says it again every 40 seconds. For as long as you are infected a red **HOSPITAL marker** is drawn over the hospital's door (you can see it through buildings, from anywhere in town), and a red line under your role at the top of the screen says INFECTED, how far the hospital is and which way (ahead, to your left, to your right, behind you). If you leave early the top line tells you to go back. When you are cured it says CURED. You are never frozen or moved.
+- **If you are the rodent**, the top line tells you when someone you bit has collapsed, shows symptoms or was cured.
+- **Everyone you bite runs**, also people indoors (nurses, police at their desks, shop staff: they run inside their building). People standing round a patient run off if the rodent comes close, and nobody walks over while it sits there. **Cyclists and motorcyclists** shout and ride away when bitten; they are not infected.
+- **People talk.** Some of the people who spot the Spicy Rodent say a line in a speech bubble, for example "Oh my god, it's one of those squirrels again!". Not everyone speaks at once, and you see a bubble only from about 30 metres or closer.
+- Nothing to press for any of this: bite someone and follow them.
 
 ## What you should see
 - No screen is ever blank or silent. While something loads, a line says what is loading.
@@ -25,6 +36,9 @@ File: `docs/owner/files/SpicyRodents_play.rbxl` (about 1.3 MB). You publish it o
 - Typing in the chat never moves you or triggers a key.
 
 ## Not working yet (please tell me what you notice)
+- **The bite-to-hospital sequence has never been seen on a screen.** Its rules are tested without one. Please look at: the speech bubbles, the red eyes, the red glow and the sway of someone with symptoms, a collapsed person sitting on the ground with their legs out in front of them (they may hover or sink a little, and the legs may look odd), the patient disappearing when loaded and the ambulance turning round a moment later (it jumps to the other side of the road), the patients sitting on the cots in the hospital wards, and the HOSPITAL marker when you are bitten. There is **no siren**: the ambulance is silent apart from its flashing lights.
+- **Two shop workers beyond the river** have no road and no way on foot to the hospital. If they are bitten the ambulance stops at the nearest road and they are taken in without the paramedic's walk (they disappear where they sit), and when cured they reappear at their shop.
+- **In a rush of bites** (more than three people on the ground at once) someone can wait a few minutes for one of the three ambulances. Anyone still waiting after two and a half minutes with no ambulance on its way is taken in without one.
 - **Cars are see-through to you.** AI cars are drawn on your computer only. Your patrol car drives through them, and they only hurt squirrels and the rodent.
 - **Nobody has played this live yet.** Everything has been tested on the server without a screen. If something feels wrong, tell me what you pressed and what happened.
 - **The day stays fixed** at a sunny afternoon. The day/night clock comes in the next wave.

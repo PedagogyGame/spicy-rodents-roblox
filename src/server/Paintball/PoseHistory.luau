@@ -1,10 +1,16 @@
 --!strict
 -- ServerScriptService.Server.Paintball.PoseHistory
--- Lag-compensation pose history (D29: 1 s per body, rewound to the shooter's timestamp; spike S18):
--- a fixed ring of (time, x, y, z) samples per body in flat arrays, pushed every server frame and
--- sampled at any time inside the window by linear interpolation (clamped to the oldest and newest
--- sample). No allocation after new().
--- Interface: new(seconds, hz) -> History; push(h, t, x, y, z); sample(h, t) -> (x, y, z); span(h)
+-- Lag-compensation pose history (D29: 1 s per body, rewound to the shooter's timestamp; spike S18;
+-- checklist PB-3): a fixed ring of (time, x, y, z, crouch) samples per body in flat arrays, sampled at
+-- any time inside the window by linear interpolation (held at the oldest and at the newest sample).
+-- The crouch fraction rides in the same ring with the same interpolation, so a body that was crouched
+-- on the shooter's screen is judged crouched (Shared/Minigames/Paintball/Wire.between is the same
+-- arithmetic on the client: the contract's keystone). No allocation after new().
+-- In a match the paintball service pushes one sample per snapshot tick, exactly the quantised pose the
+-- snapshot carries (Shared/Minigames/Paintball/Clock: "the history is the snapshot stream"); the S18
+-- harness pushes every frame.
+-- Interface: new(seconds, hz) -> History; push(h, t, x, y, z, crouch?); sample(h, t) -> (x, y, z,
+--   crouch); newest(h) -> (t, x, y, z, crouch); span(h); clear(h)
 
 export type History = {
 	cap: number,
@@ -14,6 +20,7 @@ export type History = {
 	xs: { number },
 	ys: { number },
 	zs: { number },
+	cs: { number }, -- the crouch fraction, 0..1
 }
 
 local PoseHistory = {}
@@ -28,16 +35,23 @@ function PoseHistory.new(seconds: number, hz: number): History
 		xs = table.create(cap, 0),
 		ys = table.create(cap, 0),
 		zs = table.create(cap, 0),
+		cs = table.create(cap, 0),
 	}
 end
 
-function PoseHistory.push(h: History, t: number, x: number, y: number, z: number)
+function PoseHistory.push(h: History, t: number, x: number, y: number, z: number, crouch: number?)
 	local i = h.head % h.cap + 1
 	h.head = i
-	h.ts[i], h.xs[i], h.ys[i], h.zs[i] = t, x, y, z
+	h.ts[i], h.xs[i], h.ys[i], h.zs[i], h.cs[i] = t, x, y, z, crouch or 0
 	if h.count < h.cap then
 		h.count += 1
 	end
+end
+
+-- Forget everything (a body that was put somewhere else begins a new life: nothing of the old one
+-- may be rewound to).
+function PoseHistory.clear(h: History)
+	h.count, h.head = 0, 0
 end
 
 -- seconds covered by the samples held
@@ -49,16 +63,25 @@ function PoseHistory.span(h: History): number
 	return h.ts[h.head] - h.ts[oldest]
 end
 
-function PoseHistory.sample(h: History, t: number): (number, number, number)
+-- The newest sample: its time and pose (zeros when there is none).
+function PoseHistory.newest(h: History): (number, number, number, number, number)
+	local i = h.head
+	if h.count == 0 then
+		return 0, 0, 0, 0, 0
+	end
+	return h.ts[i], h.xs[i], h.ys[i], h.zs[i], h.cs[i]
+end
+
+function PoseHistory.sample(h: History, t: number): (number, number, number, number)
 	local cap, ts = h.cap, h.ts
 	local i = h.head
 	if h.count == 0 then
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	end
 	if t >= ts[i] then
-		return h.xs[i], h.ys[i], h.zs[i]
+		return h.xs[i], h.ys[i], h.zs[i], h.cs[i]
 	end
-	-- walk back from the newest: a rewind is a few frames, so this is short
+	-- walk back from the newest: a rewind is a few samples, so this is short
 	for _ = 2, h.count do
 		local j = if i == 1 then cap else i - 1
 		local tj = ts[j]
@@ -66,11 +89,12 @@ function PoseHistory.sample(h: History, t: number): (number, number, number)
 			local a = (t - tj) / (ts[i] - tj)
 			return h.xs[j] + (h.xs[i] - h.xs[j]) * a,
 				h.ys[j] + (h.ys[i] - h.ys[j]) * a,
-				h.zs[j] + (h.zs[i] - h.zs[j]) * a
+				h.zs[j] + (h.zs[i] - h.zs[j]) * a,
+				h.cs[j] + (h.cs[i] - h.cs[j]) * a
 		end
 		i = j
 	end
-	return h.xs[i], h.ys[i], h.zs[i] -- older than the window: the oldest sample
+	return h.xs[i], h.ys[i], h.zs[i], h.cs[i] -- older than the window: the oldest sample
 end
 
 return PoseHistory

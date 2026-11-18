@@ -53,6 +53,10 @@ return {
 			count = 243,
 			chunks = { "Lots" },
 		},
+		PinballArt = {
+			count = 1,
+			chunks = { "PinballArt" },
+		},
 		Population = {
 			count = 1,
 			chunks = { "Population" },
@@ -68,6 +72,14 @@ return {
 		RoutesCatalog = {
 			count = 60,
 			chunks = { "RoutesCatalog" },
+		},
+		Sewers = {
+			count = 1,
+			chunks = { "Sewers" },
+		},
+		ShopArt = {
+			count = 1,
+			chunks = { "ShopArt" },
 		},
 		TerrainExtensions = {
 			count = 1,

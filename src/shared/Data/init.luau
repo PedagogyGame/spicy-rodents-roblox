@@ -154,6 +154,13 @@ function Data.new(loader: Loader): Data
 					return if a and a.routes then a.routes else {}
 				end)
 			end
+			-- the storm drains (data/sewers.json, Shared/World/SewerLayout): enclosed runs 9301-9321, after the attractions
+			if self:index().modules.Sewers then
+				table.insert(loaders, function()
+					local s = loadName(self, "Sewers")
+					return if s and s.routes then s.routes else {}
+				end)
+			end
 			self._routes = Registry.new({ loaders = loaders, studsPerUnit = self:index().studsPerUnit })
 		end
 		return self._routes :: Registry.Registry

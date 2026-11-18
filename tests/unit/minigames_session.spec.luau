@@ -120,7 +120,8 @@ return function(t)
 		t.truthy(type(r.line) == "string" and #r.line > 0)
 		t.truthy(r.kind == "fortune" or r.kind == "taunt" or r.kind == "omen")
 		local events = Session.step(s, 4)
-		t.eq(events[1].kind, "reset")
+		t.eq(events[1].kind, "done")
+		t.eq(events[2].kind, "reset")
 		-- many pulls: all three card kinds appear, all lines non-empty
 		local kinds: { [string]: boolean } = {}
 		local g = FortuneMachine.init(1, 99)
@@ -132,5 +133,96 @@ return function(t)
 			t.eq(res.cents, 0)
 		end
 		t.truthy(kinds.fortune and kinds.taunt and kinds.omen)
+	end)
+	t.test("leaving at the end card keeps every sheet under its own name", function()
+		local s = Session.new(Bowling, { lobbySeconds = 5, turnSeconds = 0, doneSeconds = 30 })
+		Session.join(s, "a", "Ann", 0)
+		Session.join(s, "b", "Bob", 0)
+		Session.start(s, 1)
+		-- Ann bowls a perfect game, Bob never hits a pin
+		local guard = 0
+		while s.phase == "playing" and guard < 100 do
+			guard += 1
+			local pins = if Session.turnKey(s) == "a" then 10 else 0
+			t.truthy(Session.apply(s, "server", "roll", { pins }, 2))
+			Session.step(s, 2)
+		end
+		t.eq(s.phase, "done")
+		t.eq((s.result :: any).scores[1], 300)
+		t.eq((s.result :: any).scores[2], 0)
+		-- Ann presses Leave on the end card first
+		t.eq(Session.leave(s, "a", 3), 1)
+		t.eq(s.phase, "done", "Bob still has the card")
+		t.eq(Session.seatOf(s, "a"), nil)
+		t.eq(Session.seatOf(s, "b"), 2, "Bob keeps the seat his sheet is numbered by")
+		local v = Session.view(s, 3)
+		t.eq(v.seats[2].name, "Bob")
+		t.eq(v.game.seats[2].total, 0, "Bob's sheet is still Bob's")
+		t.eq(v.seats[1].name, "Ann")
+		t.eq(v.seats[1].gone, true)
+		t.eq(v.game.seats[1].total, 300)
+		t.eq(v.result.scores[2], 0)
+		-- play again seats only who stayed
+		t.truthy(Session.again(s, 4))
+		t.eq(#s.seats, 1)
+		t.eq(s.names[1], "Bob")
+		t.eq(Session.seatOf(s, "b"), 1)
+		-- the last one off the end card empties the table
+		local s2 = Session.new(Bowling, { lobbySeconds = 0, turnSeconds = 0 })
+		Session.join(s2, "a", "Ann", 0)
+		for _ = 1, 12 do
+			Session.apply(s2, "server", "roll", { 10 }, 1)
+		end
+		t.eq(s2.phase, "done")
+		Session.leave(s2, "a", 2)
+		t.eq(s2.phase, "idle")
+		t.eq(#s2.seats, 0)
+	end)
+
+	t.test("the end of a game is announced exactly once, however it ended", function()
+		-- ended by the last input (the usual way): step says "done" once, later "reset"
+		local s = Session.new(Bowling, { lobbySeconds = 0, turnSeconds = 60, doneSeconds = 30 })
+		Session.join(s, "a", "Ann", 0)
+		Session.step(s, 0)
+		for _ = 1, 12 do
+			t.truthy(Session.apply(s, "server", "roll", { 10 }, 1))
+		end
+		t.eq(s.phase, "done")
+		local kinds = {}
+		for _, e in Session.step(s, 1.1) do
+			table.insert(kinds, e.kind)
+		end
+		t.deepEq(kinds, { "done" })
+		t.eq(#Session.step(s, 2), 0, "not said twice")
+		t.eq(Session.step(s, 40)[1].kind, "reset")
+		-- ended by skipped turns: also once
+		local s2 = Session.new(Bowling, { lobbySeconds = 5, turnSeconds = 0 })
+		Session.join(s2, "a", "Ann", 0)
+		Session.join(s2, "b", "Bob", 0)
+		Session.start(s2, 1)
+		for _ = 1, 20 do
+			Session.apply(s2, "server", "roll", { 0 }, 1)
+			Session.step(s2, 1)
+			if s2.phase == "playing" and Session.turnKey(s2) == "a" then
+				break
+			end
+		end
+		Session.leave(s2, "a", 2)
+		local dones = 0
+		for i = 1, 60 do
+			if s2.phase == "playing" then
+				Session.apply(s2, "server", "roll", { 0 }, 2 + i)
+			end
+			for _, e in Session.step(s2, 2 + i * 0.01) do
+				if e.kind == "done" then
+					dones += 1
+				end
+			end
+		end
+		t.eq(s2.phase, "done")
+		t.eq(dones, 1)
+		-- play again: the next game's end is announced too
+		t.truthy(Session.again(s2, 10))
+		t.eq(s2.doneTold, false)
 	end)
 end

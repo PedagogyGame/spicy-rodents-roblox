@@ -73,7 +73,8 @@ function RoomGraph.unreached(g: Graph, from: string): { string }
 	local queue = { from }
 	local i = 1
 	while i <= #queue do
-		for _, nb in g.links[queue[i]] or {} do
+		local linked: { string } = g.links[queue[i]] or {}
+		for _, nb in linked do
 			if not seen[nb] then
 				seen[nb] = true
 				table.insert(queue, nb)

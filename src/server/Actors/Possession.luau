@@ -8,7 +8,8 @@
 --   release(player, why): ledger -> Character = nil -> network owner nil -> body anchored (AI
 --     mode) -> brain:resume(last validated pose). On PlayerRemoving it runs before anything else.
 --   swap(player, toActor): stream to the new body, then release + possess in one server step.
---   recover(player): the Roblox menu's Reset, routed here; never kills or respawns a body.
+--   recover(player): the Roblox menu's Reset, routed here; never kills or respawns a body; refused (false) for
+--   a body riding the sky lift (its Ride attribute).
 -- Players are anything with `UserId` (and, in the engine, a real Player): the S2 soak drives the
 -- same code with PlayerLike stubs through an injected `Engine`.
 -- W1 hooks (`onHandoff`): SweptCollision.markTeleported(actor), MoveValidator.reset(actor),
@@ -287,9 +288,14 @@ function Possession.new(deps: Deps): Service
 		end
 		local x, y, z = deps.actors:poseOf(actor)
 		engine.streamAround(player, x, y, z, timeout) -- the only yield
-		-- re-validate after the yield: the world may have moved on
+		-- re-validate after the yield: the world may have moved on. `possessable` changes at run time
+		-- (a bitten person who collapses during the yield is a patient now: Infection/InfectionService),
+		-- and a player must never be handed a body that is on the ground, hidden or in a bed.
 		if not free(self, actor) then
 			return refuse(self, "body was taken while streaming")
+		end
+		if not actor.possessable then
+			return refuse(self, "not possessable")
 		end
 		if PossessionState.actorOf(self.ledger, key) ~= nil then
 			releaseNow(self, player, "swap")
@@ -309,6 +315,14 @@ function Possession.new(deps: Deps): Service
 	function service.recover(self: Service, player: any): boolean
 		local actor = self:actorOf(player)
 		if actor == nil then
+			return false
+		end
+		-- a body riding the sky lift (attribute Ride, Server/Rides/SkyLiftService) is on its seat: moving it to
+		-- the last safe spot would only flash it there for a frame before the lift puts it back
+		local okRide, ride = pcall(function()
+			return (actor.body :: any):GetAttribute("Ride")
+		end)
+		if okRide and ride ~= nil then
 			return false
 		end
 		local x, y, z, yaw

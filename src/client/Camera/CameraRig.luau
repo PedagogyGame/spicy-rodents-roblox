@@ -9,7 +9,9 @@
 --   chaseLock                scriptable: behind the body along its facing, looking forward
 --   tunnelChase              scriptable: low behind a squirrel in the bowling alley's ball-return tunnel
 --   vehicleFirst             scriptable at the vehicle's EyeSocket; mouse/right-stick look within
---                            +/-110 degrees of the nose; vehicleThird follows the vehicle root
+--                            +/-110 degrees of the nose; vehicleThird follows the vehicle root. With
+--                            targets.free (the sky-lift gondola: a seat's EyeSocket) the look is free: no
+--                            button, all the way round, no spring back (cars keep the right button by design)
 --   drone                    the follow camera on the drone root
 --   overview / outbreak      a parked scriptable shot
 -- The orbit camera (owner 2026-11-10: "be sure that the mouse is controlling the camera view and that
@@ -25,9 +27,10 @@
 --   orbit(body, human); overview(position, lookAt); subjectOf(body); stop();
 --   focusStep(px, py, pz, tx, ty, tz, dt, lx?, ly?, lz?) -> x, y, z (pure); FOCUS;
 --   LOOK; lookStep(yaw, elev, dx, dy, invert) -> yaw, elev (pure); orbitOffset(yaw, elev, dist) ->
---   x, y, z (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
+--   x, y, z (pure); ORBIT; FOV; orbitFraming(sizeX, sizeY, sizeZ, human) -> lift, minDist, maxDist, dist
+--   (pure); zoomStep(dist, wheel, min, max) -> dist (pure); occludes(name, parentName,
 --   transparency, canCollide) -> boolean (pure); inverted() -> boolean; setInverted(on);
---   wantCursor(key, on); hold(on); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
+--   wantCursor(key, on); hold(on); cabinLook(yaw, pitch, dx, dy, invert) -> yaw, pitch (pure); pullIn(hitDistance) -> distance (pure); fadeAt(shown, hideAt) -> 0..1
 --   (pure); notify: ((text) -> ())?
 -- No side effects on require (services are looked up inside the functions).
 
@@ -212,7 +215,7 @@ end
 
 -- A menu or panel that needs the cursor says so here (and takes it back with on = false).
 function CameraRig.wantCursor(key: string, on: boolean)
-	cursorWanted[key] = if on then true else nil
+	(cursorWanted :: { [string]: boolean? })[key] = if on then true else nil
 end
 
 -- Another script owns camera.CFrame for a while (a minigame's scripted shot): the orbit writes nothing
@@ -246,11 +249,43 @@ function CameraRig.lookStep(yaw: number, elev: number, dx: number, dy: number, i
 	return nextYaw, nextElev
 end
 
+-- The gondola's free look from a seat (vehicleFirst with targets.free): dx, dy in radians as lookStep has them; the
+-- view turns right for dx > 0 all the way round, and pushing the mouse up looks up (down when inverted), between
+-- CABIN_PITCH's limits.
+CameraRig.CABIN_PITCH = { min = -1.2, max = 1.0 }
+function CameraRig.cabinLook(yaw: number, pitch: number, dx: number, dy: number, invert: boolean): (number, number)
+	local P = CameraRig.CABIN_PITCH
+	local nextYaw = (yaw - dx) % (2 * math.pi)
+	local nextPitch = math.clamp(pitch - (if invert then -dy else dy), P.min, P.max)
+	return nextYaw, nextPitch
+end
+
 -- Where the camera sits relative to the focus for a view heading `yaw` (Roblox: look = (-sin, 0, -cos))
 -- at elevation `elev` and distance `dist`.
 function CameraRig.orbitOffset(yaw: number, elev: number, dist: number): (number, number, number)
 	local c = math.cos(elev)
 	return math.sin(yaw) * c * dist, math.sin(elev) * dist, math.cos(yaw) * c * dist
+end
+
+-- How the orbit frames a body it meets for the first time (pure, so the offline motion preview,
+-- tools/review/motion_path.luau, stands where the game's camera stands). (sizeX, sizeY, sizeZ) is the
+-- body's bounding box in studs. Returns `lift`, how far above the root the camera looks; the nearest and
+-- the farthest the wheel zooms; and the distance it starts at. It starts ORBIT.elev radians above the
+-- focus, behind the body, and the field of view stays the engine's own (FOV).
+CameraRig.ORBIT = { elev = 0.3 }
+CameraRig.FOV = 70 -- degrees, vertical: the engine's default; only the tunnel rig changes it (and puts it back)
+function CameraRig.orbitFraming(
+	sizeX: number,
+	sizeY: number,
+	sizeZ: number,
+	human: boolean
+): (number, number, number, number)
+	local biggest = math.max(sizeX, sizeY, sizeZ)
+	local lift = if human then math.max(1.5, sizeY * 0.3) else math.max(0.6, sizeY * 0.6)
+	local minDist = if human then 4 else math.max(2, biggest * 1.5)
+	local maxDist = if human then 40 else math.max(24, biggest * 10)
+	local dist = math.clamp(if human then 12.5 else biggest * 4, math.max(minDist, 8), 16)
+	return lift, minDist, maxDist, dist
 end
 
 function CameraRig.zoomStep(dist: number, wheel: number, min: number, max: number): number
@@ -272,7 +307,7 @@ end
 
 -- The orbit state survives a re-apply for the same body (a zone change, the V toggle and back).
 local orbitBody: Model? = nil
-local orbitYaw, orbitElev, orbitDist = 0, 0.3, 12
+local orbitYaw, orbitElev, orbitDist = 0, CameraRig.ORBIT.elev, 12
 local orbiting = false -- the orbit rig is the one bound right now
 
 function CameraRig.orbit(body: Model, human: boolean)
@@ -289,16 +324,13 @@ function CameraRig.orbit(body: Model, human: boolean)
 	local camera = workspace.CurrentCamera
 	local L = CameraRig.LOOK
 	local _, size = body:GetBoundingBox()
-	local biggest = math.max(size.X, size.Y, size.Z)
-	local lift = if human then math.max(1.5, size.Y * 0.3) else math.max(0.6, size.Y * 0.6)
-	local minDist = if human then 4 else math.max(2, biggest * 1.5)
-	local maxDist = if human then 40 else math.max(24, biggest * 10)
+	local lift, minDist, maxDist, startDist = CameraRig.orbitFraming(size.X, size.Y, size.Z, human)
 	if orbitBody ~= body then
 		orbitBody = body
 		local look = rootPart.CFrame.LookVector
 		orbitYaw = math.atan2(-look.X, -look.Z) -- behind the body
-		orbitElev = 0.3
-		orbitDist = math.clamp(if human then 12.5 else biggest * 4, math.max(minDist, 8), 16)
+		orbitElev = CameraRig.ORBIT.elev
+		orbitDist = startDist
 	elseif not resumed then
 		-- back from first person, a vehicle, the tunnel or the chase lock: keep looking the way the
 		-- camera looks now, not the way it looked before the other rig took over
@@ -454,7 +486,7 @@ local function sizeOf(model: Model): number
 	return math.max(size.X, size.Y, size.Z)
 end
 
-export type Targets = { body: Model?, vehicle: Model?, drone: Model? }
+export type Targets = { body: Model?, vehicle: Model?, drone: Model?, free: boolean? }
 
 function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targets: Targets)
 	local Players = game:GetService("Players")
@@ -534,7 +566,7 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				camera.FieldOfView = 75
 			end)
 			onUnbind = function()
-				camera.FieldOfView = 70
+				camera.FieldOfView = CameraRig.FOV
 			end
 		end
 	elseif mode == "vehicleFirst" then
@@ -544,11 +576,13 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 			setFirstPerson(false)
 			camera.CameraType = Enum.CameraType.Scriptable
 			local yaw, pitch = 0, 0
+			local free = targets.free == true
+			local GuiService = game:GetService("GuiService")
 			-- the eye sits where the driver's head is: hide the driver's own body on this screen
 			-- (the default camera does this only for its own first person)
 			local hidden: { BasePart } = {}
 			local driver = targets.body
-			bind(function()
+			bind(function(dt: number)
 				if driver and #hidden == 0 then
 					for _, d in driver:GetDescendants() do
 						if d:IsA("BasePart") then
@@ -559,7 +593,29 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 				for _, part in hidden do
 					part.LocalTransparencyModifier = 1
 				end
-				if UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+				if free then
+					-- the gondola: the mouse is the look (as on foot), the cursor out for a menu or Left Alt
+					local out = held
+						or GuiService.MenuIsOpen
+						or UIS:GetFocusedTextBox() ~= nil
+						or UIS:IsKeyDown(Enum.KeyCode.LeftAlt)
+						or next(cursorWanted) ~= nil
+					if out then
+						UIS.MouseBehavior = Enum.MouseBehavior.Default
+					else
+						UIS.MouseBehavior = Enum.MouseBehavior.LockCenter
+						local d = UIS:GetMouseDelta()
+						local k = CameraRig.LOOK.sens
+						yaw, pitch = CameraRig.cabinLook(yaw, pitch, d.X * k, d.Y * k, invertLook)
+					end
+					for _, input in UIS:GetGamepadState(Enum.UserInputType.Gamepad1) do
+						if input.KeyCode == Enum.KeyCode.Thumbstick2 and input.Position.Magnitude > 0.15 then
+							local k = CameraRig.LOOK.stick * dt
+							yaw, pitch =
+								CameraRig.cabinLook(yaw, pitch, input.Position.X * k, -input.Position.Y * k, invertLook)
+						end
+					end
+				elseif UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
 					UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
 					local d = UIS:GetMouseDelta()
 					yaw = math.clamp(yaw - d.X * 0.004, -1.9, 1.9)

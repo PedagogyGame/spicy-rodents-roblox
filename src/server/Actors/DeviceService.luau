@@ -45,7 +45,9 @@ local DeviceService = {}
 local REACH = 16 -- studs from the body to the vehicle's root
 
 -- Default placements (studs, HTML yaw): patrol cars at the police station, carts and bikes in the
--- core, a pickup and an SUV on the main street, a jet ski on the river, the drone at the station.
+-- core, a pickup and an SUV on the east-west street that crosses the main street (z = 0; no AI lane
+-- runs on it: parked on the main street at x = -/+5.4 they stood in its two lanes, and the fleet drove
+-- through them every lap), a jet ski on the river, the drone at the station.
 function DeviceService.defaultPlacements(data: any?): { { kind: string, x: number, z: number, yaw: number } }
 	local st = Units.st
 	local px, pz = st(-510), st(-107)
@@ -63,8 +65,8 @@ function DeviceService.defaultPlacements(data: any?): { { kind: string, x: numbe
 		{ kind = "cart", x = st(14), z = st(-20), yaw = math.pi },
 		{ kind = "bike", x = st(-13), z = st(30), yaw = 0 },
 		{ kind = "bike", x = st(13), z = st(-30), yaw = math.pi },
-		{ kind = "pickup", x = st(-5.4), z = st(45), yaw = 0 },
-		{ kind = "suv", x = st(5.4), z = st(-45), yaw = math.pi },
+		{ kind = "pickup", x = st(-24), z = st(-5.4), yaw = math.pi / 2 },
+		{ kind = "suv", x = st(24), z = st(5.4), yaw = -math.pi / 2 },
 		{ kind = "jetski", x = st(Height.riverCenterU(riverZ)), z = st(riverZ), yaw = 0 },
 		{ kind = "drone", x = px + 10, z = pz + 18, yaw = 0 },
 	}

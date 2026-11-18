@@ -42,6 +42,11 @@ function Hospital.facade(ctx: Spec.LotCtx)
 			opts.canCollide = false
 		end
 		opts.role = opts.role or "Trim"
+		if opts.canQuery == nil then
+			-- visual only: the entrance piers stand out over the pavement, and a ground ray from the sky
+			-- (server groundY) must land on the pavement, not on them
+			opts.canQuery = false
+		end
 		ctx.list:add(ctx.frame, name, mx, my, mz, sx, sy, sz, opts)
 	end
 	-- roof parapet (2.6 studs over the roof) with a teal cap

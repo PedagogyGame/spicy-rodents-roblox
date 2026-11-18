@@ -28,6 +28,9 @@
 local Import = require("../Import")
 local HeroAssets = Import.shared("Actors/HeroAssets") :: typeof(require("../../shared/Actors/HeroAssets"))
 local RigSpec = Import.shared("Actors/RigSpec") :: typeof(require("../../shared/Actors/RigSpec"))
+-- (a module reached through Import carries its values' types but not its exported type names:
+-- this is the same type, taken from a value)
+type Entry = typeof(HeroAssets.SPECIES.squirrel)
 
 local HeroArt = {}
 
@@ -49,7 +52,7 @@ local function hex(s: string, Color3: any): any
 end
 
 -- Turns a loaded hero Model into a body template. `name` is the RigSpec species ("squirrel" | "rodent").
-function HeroArt.prepare(model: any, name: string, entry: HeroAssets.Entry, lib: Lib?): any
+function HeroArt.prepare(model: any, name: string, entry: Entry, lib: Lib?): any
 	local L = lib or engineLib()
 	local Instance, Vector3, CFrame, Color3, Enum = L.Instance, L.Vector3, L.CFrame, L.Color3, L.Enum
 	local skin = model.PrimaryPart or model:FindFirstChild("RootPart")
@@ -142,7 +145,7 @@ end
 export type Options = {
 	load: ((assetId: number) -> Instance)?,
 	parent: Instance?, -- where Rigs lives (default ReplicatedStorage.Assets, created if missing)
-	entries: { [string]: HeroAssets.Entry }?,
+	entries: { [string]: Entry }?,
 	lib: Lib?,
 }
 
@@ -150,7 +153,7 @@ function HeroArt.install(opts: Options?): { installed: { string }, failed: { [st
 	local o: Options = opts or {}
 	local L = o.lib or engineLib()
 	local Instance = L.Instance
-	local load = o.load
+	local load: (assetId: number) -> Instance = o.load
 		or function(assetId: number): Instance
 			return game:GetService("InsertService"):LoadAsset(assetId)
 		end
