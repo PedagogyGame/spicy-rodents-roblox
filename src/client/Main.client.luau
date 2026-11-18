@@ -44,6 +44,7 @@ local Sky = require("./World/Sky")
 local Spinners = require("./World/Spinners")
 local CameraRig = require("./Camera/CameraRig")
 local SewerAmbience = require("./World/SewerAmbience")
+local LoungeMusic = require("./World/LoungeMusic")
 local SewerArt = require("./World/SewerArt")
 local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
@@ -178,6 +179,11 @@ end
 local okArt, artErr = pcall(SewerArt.start, { current = client.current })
 if not okArt then
 	warn(`Client: SewerArt failed: {artErr}`)
+end
+-- inside THE GILDED ACORN: the jazz, here only (World/LoungeMusic; silent until the library ids are filled in)
+local okJazz, jazzErr = pcall(LoungeMusic.start, { current = client.current })
+if not okJazz then
+	warn(`Client: LoungeMusic failed: {jazzErr}`)
 end
 
 -- the bowling alley's games: walk up to a lane, the dartboard or the fortune teller and press E

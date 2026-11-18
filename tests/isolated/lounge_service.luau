@@ -10,6 +10,7 @@ local EconomyRules = require("@shared/Economy/EconomyRules")
 local LoungeClassic = require("@shared/Attractions/LoungeClassic")
 local LoungeService = require("@server/Attractions/LoungeService")
 local LoungeFlow = require("@tests/engine/Lounge")
+local LoungeMusic = require("@client/World/LoungeMusic")
 local FakeEngine = require("@tests/lib/FakeEngine")
 local roblox = require("@lune/roblox")
 
@@ -219,6 +220,45 @@ return function(t)
 				t.eq(killed[1][1], "s")
 				t.eq(killed[1][2], "guard")
 				t.eq(#town.squirrels(), 1)
+			end)
+		end
+	)
+
+	t.test(
+		"the jazz (client): heard only while the body carries Lounge, faded in and out; silent with empty ids",
+		function()
+			FakeEngine.with(function()
+				local body = makeModel("Me", roblox.CFrame.new(0, 0, 0), nil)
+				local parent = FakeEngine.new("Folder", "SoundService")
+				local h = LoungeMusic.start({
+					current = function(): any
+						return body
+					end,
+					parent = parent,
+					heartbeat = false,
+				})
+				local sound = parent:FindFirstChild("LoungeJazz")
+				t.truthy(sound ~= nil)
+				h.step(0.5)
+				t.eq(h.inside(), false)
+				t.eq(sound.Volume, 0)
+				body:SetAttribute(LoungeClassic.ATTRIBUTE, LoungeClassic.VENUE)
+				for _ = 1, 20 do
+					h.step(0.1)
+				end
+				t.eq(h.inside(), true)
+				t.eq(h.level(), 1)
+				t.near(sound.Volume, LoungeClassic.JAZZ_VOLUME, 1e-9)
+				t.eq(h.track(), nil) -- every id is empty: nothing is asked to play
+				t.truthy(not sound.Playing)
+				body:SetAttribute(LoungeClassic.ATTRIBUTE, nil)
+				for _ = 1, 20 do
+					h.step(0.1)
+				end
+				t.eq(h.inside(), false)
+				t.eq(h.level(), 0)
+				t.eq(sound.Volume, 0)
+				h.stop()
 			end)
 		end
 	)
