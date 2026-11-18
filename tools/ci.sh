@@ -81,6 +81,11 @@ step "bake the Neighbourhood Shop's shell (tools/bake/neighbourhood_shop.luau ->
 lune run tools/bake/neighbourhood_shop.luau
 done_step
 
+# THE GILDED ACORN, the 1940s lounge (Workspace.Expansion.LoungeClassic), is its own bake too.
+step "bake the lounge (tools/bake/lounge_classic.luau -> build/Expansion_LoungeClassic.rbxm)"
+lune run tools/bake/lounge_classic.luau
+done_step
+
 # The sky lift and the Lookout (Workspace.Expansion.F4) are their own bake too, for the same reason.
 step "bake the sky lift and the Lookout (tools/bake/skylift.luau -> build/Expansion_F4.rbxm)"
 lune run tools/bake/skylift.luau
