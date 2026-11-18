@@ -152,6 +152,20 @@ return function(t)
 						end
 					elseif string.sub(m.Name, 1, 7) == "Kennel_" then
 						kennels += 1
+						local box = m:FindFirstChild("Box")
+						t.eq(box.CanCollide, true)
+						t.eq(box.CanQuery, true, "a squirrel's casts find the kennel too")
+						-- where YardDogs keeps the dogs out of it
+						local y = YardDogs.YARDS[1]
+						for _, yy in YardDogs.YARDS do
+							if m.Name == `Kennel_{yy.id}` then
+								y = yy
+							end
+						end
+						local kx, kz = YardDogs.kennelOf(y)
+						t.near(box.Position.X, kx, 1e-4)
+						t.near(box.Position.Z, kz, 1e-4)
+						t.near(box.Size.X, YardDogs.KENNEL.half * 2, 1e-6)
 					end
 				end
 				t.eq(dogsN, 8)

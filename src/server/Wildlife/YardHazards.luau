@@ -151,13 +151,16 @@ end
 local function kennel(yard: Yard, groundAt: (number, number) -> number, parent: Instance): number
 	local m = Instance.new("Model")
 	m.Name = `Kennel_{yard.id}`
-	local cx, cz = yard.homeX - yard.faceX * 3.2, yard.homeZ - yard.faceZ * 3.2
+	local cx, cz = YardDogs.kennelOf(yard)
+	assert(cx and cz, "a kennel only where the town has no doghouse")
+	local side = YardDogs.KENNEL.half * 2
 	local g = groundAt(cx, cz)
 	local face = CFrame.new(cx, g, cz) * CFrame.Angles(0, math.atan2(yard.faceX, yard.faceZ) + math.pi, 0)
 	local wood = Color3.fromRGB(150, 96, 60)
-	local box = newPart("Box", Vector3.new(3.4, 2.6, 3.4), wood, m)
+	local box = newPart("Box", Vector3.new(side, 2.6, side), wood, m)
 	box.CFrame = face * CFrame.new(0, 1.3, 0)
 	box.CanCollide = true
+	box.CanQuery = true -- (a squirrel's casts find it, as a person's body bumps it)
 	box.Material = Enum.Material.WoodPlanks
 	local roof = Color3.fromRGB(122, 52, 44)
 	for _, s in { -1, 1 } do

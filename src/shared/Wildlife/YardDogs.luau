@@ -16,7 +16,8 @@
 --   sleep   at night it walks to its house and lies down in front of the door
 -- Interface: YARDS; constants; newDog(yard, index) -> Dog; think(dog, now, sense) (decides mode and target);
 --   move(dog, dt) (walks toward the target at the mode's pace, kept in the yard); calm(dog, untilTime);
---   inYard(yard, x, z, margin?) -> boolean; clampToYard(yard, x, z) -> (x, z); FUR
+--   inYard(yard, x, z, margin?) -> boolean; clampToYard(yard, x, z) -> (x, z) (also out of the kennel);
+--   kennelOf(yard) -> (x, z)? (its centre; nil where the town has a doghouse); KENNEL; FUR
 -- Pure (the sense callbacks are the caller's). Positions in studs. No side effects on require.
 
 local YardDogs = {}
@@ -43,7 +44,7 @@ YardDogs.YARDS = table.freeze({
 	{ id = "north_gardens_a", x0 = 490, x1 = 525, z0 = 884, z1 = 906.5, homeX = 507.5, homeZ = 904, faceX = 0, faceZ = -1, doghouse = "north_doghouse_0" },
 	{ id = "north_gardens_b", x0 = 572, x1 = 608, z0 = 964, z1 = 986.5, homeX = 590, homeZ = 984, faceX = 0, faceZ = -1, doghouse = "north_doghouse_1" },
 	-- behind the Victorian house in the old town core: a kennel at the yard's far edge, opening toward the house
-	{ id = "core_victorian", x0 = -155, x1 = -125, z0 = -183, z1 = -159, homeX = -140, homeZ = -178, faceX = 0, faceZ = 1 },
+	{ id = "core_victorian", x0 = -155, x1 = -125, z0 = -183, z1 = -159, homeX = -140, homeZ = -177, faceX = 0, faceZ = 1 },
 	-- behind the west side's houses (v5.4's dogs on a lead): a kennel at the yard's west edge, opening east
 	{ id = "west_a", x0 = -1031, x1 = -985, z0 = -537, z1 = -493, homeX = -1022, homeZ = -515, faceX = 1, faceZ = 0 },
 	{ id = "west_b", x0 = -1031, x1 = -985, z0 = -210, z1 = -165, homeX = -1022, homeZ = -187.5, faceX = 1, faceZ = 0 },
@@ -72,6 +73,10 @@ YardDogs.TURN = 6 -- radians a second
 YardDogs.WANDER = { 3, 7 } -- seconds between new spots
 YardDogs.ARRIVE = 0.8 -- studs: there
 YardDogs.HIP = 1.3 -- the body's root over the ground (standing)
+-- A kennel (Server/Wildlife/YardHazards builds it where the town has no doghouse): a square box `half` across each
+-- way from its centre, `back` studs behind the home spot. A dog's root keeps `keep` from its sides (the tail's reach
+-- behind the root; the body is shorter to the sides), so it never walks into it, nor lies with its tail in it.
+YardDogs.KENNEL = table.freeze({ half = 1.7, keep = 2.4, back = 4.2 })
 
 export type Mode = "wander" | "chase" | "calm" | "sleep"
 export type Dog = {
@@ -106,8 +111,39 @@ function YardDogs.inYard(y: Yard, x: number, z: number, margin: number?): boolea
 	return x >= y.x0 - m and x <= y.x1 + m and z >= y.z0 - m and z <= y.z1 + m
 end
 
+-- The kennel's centre in a yard the town gave no doghouse (nil where it did).
+function YardDogs.kennelOf(y: Yard): (number?, number?)
+	if y.doghouse then
+		return nil, nil
+	end
+	local b = YardDogs.KENNEL.back
+	return y.homeX - y.faceX * b, y.homeZ - y.faceZ * b
+end
+
+-- A point kept in the yard (a stud inside its edge) and out of its kennel: pushed out of the kennel's square by its
+-- nearest side that is in the yard (a dog walking into it slides along it).
 function YardDogs.clampToYard(y: Yard, x: number, z: number): (number, number)
-	return math.clamp(x, y.x0 + 1, y.x1 - 1), math.clamp(z, y.z0 + 1, y.z1 - 1)
+	local function clamp(px: number, pz: number): (number, number)
+		return math.clamp(px, y.x0 + 1, y.x1 - 1), math.clamp(pz, y.z0 + 1, y.z1 - 1)
+	end
+	x, z = clamp(x, z)
+	local kx, kz = YardDogs.kennelOf(y)
+	if kx == nil or kz == nil then
+		return x, z
+	end
+	local e = YardDogs.KENNEL.half + YardDogs.KENNEL.keep
+	if math.abs(x - kx) >= e or math.abs(z - kz) >= e then
+		return x, z
+	end
+	local bx, bz, best = x, z, math.huge
+	for _, c in { { kx - e, z }, { kx + e, z }, { x, kz - e }, { x, kz + e } } do
+		local cx, cz = clamp(c[1], c[2])
+		local moved = math.abs(cx - x) + math.abs(cz - z)
+		if (math.abs(cx - kx) >= e - 1e-9 or math.abs(cz - kz) >= e - 1e-9) and moved < best then
+			bx, bz, best = cx, cz, moved
+		end
+	end
+	return bx, bz
 end
 
 -- a small repeatable random number in [0, 1) per dog (no shared generator: the order dogs think in is free)
@@ -195,8 +231,8 @@ function YardDogs.think(d: Dog, now: number, sense: Sense): boolean
 	end
 	if d.mode ~= "wander" or now >= d.nextWander then
 		d.mode, d.target = "wander", nil
-		d.tx = y.x0 + 1 + rand(d) * (y.x1 - y.x0 - 2)
-		d.tz = y.z0 + 1 + rand(d) * (y.z1 - y.z0 - 2)
+		d.tx, d.tz =
+			YardDogs.clampToYard(y, y.x0 + 1 + rand(d) * (y.x1 - y.x0 - 2), y.z0 + 1 + rand(d) * (y.z1 - y.z0 - 2))
 		local w = YardDogs.WANDER
 		d.nextWander = now + w[1] + rand(d) * (w[2] - w[1])
 	end

@@ -149,6 +149,53 @@ return function(t)
 		Height.configure(nil)
 	end)
 
+	t.test(
+		"a kennel: in its yard behind home; no wander or chase spot, nor the dog, in it; lying, the tail clear",
+		function()
+			local K = YardDogs.KENNEL
+			local e = K.half + K.keep
+			local kennels = 0
+			for i, y in YardDogs.YARDS do
+				local kx, kz = YardDogs.kennelOf(y)
+				if y.doghouse then
+					t.eq(kx, nil, `{y.id}: the town's doghouse`)
+					continue
+				end
+				assert(kx and kz, "a kennel")
+				kennels += 1
+				t.truthy(
+					YardDogs.inYard(y, kx - K.half, kz - K.half) and YardDogs.inYard(y, kx + K.half, kz + K.half),
+					`{y.id}: the kennel in the yard`
+				)
+				-- lying at home facing out, the tail (keep behind the root) stops short of the kennel's front
+				t.truthy(K.back - K.half >= K.keep, "the tail clear")
+				local function out(x: number, z: number): boolean
+					return math.abs(x - kx) >= e - 1e-6 or math.abs(z - kz) >= e - 1e-6
+				end
+				t.truthy(out(y.homeX, y.homeZ), `{y.id}: home clear of the kennel`)
+				local d = YardDogs.newDog(y, i)
+				local s = sense({})
+				for k = 1, 2000 do
+					YardDogs.think(d, k * 10, s)
+					t.truthy(out(d.tx, d.tz), `{y.id}: a wander spot in the kennel ({d.tx}, {d.tz})`)
+				end
+				-- a squirrel behind the kennel: the dog runs to it, round the kennel, never into it
+				local sq = squirrel("s", kx - y.faceX * (K.half + 0.5), kz - y.faceZ * (K.half + 0.5))
+				local cs = sense({ sq })
+				local now = 30000
+				for _ = 1, 200 do
+					now += 0.05
+					YardDogs.think(d, now, cs)
+					YardDogs.move(d, 0.05)
+					t.truthy(out(d.tx, d.tz), `{y.id}: a chase spot in the kennel`)
+					t.truthy(out(d.x, d.z), `{y.id}: the dog in the kennel ({d.x}, {d.z})`)
+					t.truthy(YardDogs.inYard(y, d.x, d.z), `{y.id}: in the yard`)
+				end
+			end
+			t.eq(kennels, 5)
+		end
+	)
+
 	t.test("it wanders about its yard and never leaves it", function()
 		for i, y in YardDogs.YARDS do
 			local d = YardDogs.newDog(y, i)
