@@ -1,7 +1,7 @@
 """Build the townspeople end to end (headless bpy 5.2.x, 2 CPU threads):
 
   nice -n 10 taskset -c 2,3 /root/.cache/spicy-rodents/venv/bin/python -I tools/blender/people/build_people.py \
-      --out build/people [--res 1024] [--outfits shirt,coat] [--no-fbx] [--quick]
+      --out build/people [--res 1024] [--normal-res 512] [--rough-res 256] [--outfits shirt,coat] [--no-fbx] [--quick]
 
 Geometry: the fifteen R15 parts for both builds (sculpt.py meshed by mesher.py: the same topology and
 UVs for both), the head, eight hair styles, two hats and the extras (coat tails, V-neck skin patch,
@@ -56,6 +56,12 @@ FBX_KW = dict(  # as tools/blender/heroes/hero.py: studs, Blender (x, y, z) -> R
     use_mesh_modifiers=False,
 )
 
+
+# The normal and roughness maps are painted at --res and saved smaller (--normal-res, --rough-res): they hold soft
+# relief and a nearly flat gloss, and a phone's texture memory is best spent on the colour maps.
+MAP_RES = {"normal": 512, "roughness": 256}
+CLEAR_ALPHA = 0.5 / 255  # a colour texel this clear is stored as alpha 0
+UNDER_CLEAR = (0.5, 0.5, 0.5)  # the colour under a clear texel: sRGB mid grey
 
 # hair and hats share two atlases
 WEAR_ATLASES = {
@@ -218,7 +224,12 @@ class Atlas:
                 wsum += w
         thin = (col[..., 3] < 0.1) & (wsum > 0.4)
         col[thin, :3] = acc[thin] / wsum[thin][:, None]
+        # a fully clear texel shows only the part's Color while the map keeps its alpha (Overlay), so what it holds
+        # is never seen; should the map ever show without its alpha, a mid-tone there reads as a grey person, not a
+        # near-black one (the low-alpha shade texels stay dark: they darken the part's colour)
+        col[f & ~thin & (col[..., 3] < CLEAR_ALPHA), :3] = UNDER_CLEAR
         self.color = tx.dilate(col, f, iters=8)
+        self.color[(self.color[..., 3] < CLEAR_ALPHA) & (self.color[..., :3].max(-1) < 0.02), :3] = UNDER_CLEAR
         self.normal = tx.dilate(self.normal, f, iters=8)
         self.normal[~(np.linalg.norm(self.normal, axis=-1) > 0.1)] = (0.5, 0.5, 1.0)
         self.rough = tx.dilate(self.rough, f, iters=8)
@@ -226,18 +237,29 @@ class Atlas:
 
     def save(self, base, which=("color", "normal", "roughness")):
         paths = {}
-        res = self.res
         if "color" in which:
             paths["color"] = base + "_color.png"
             bl.save_png(paths["color"], self.color[::-1])
         if "normal" in which:
             paths["normal"] = base + "_normal.png"
-            bl.save_png(paths["normal"], np.concatenate([self.normal, np.ones((res, res, 1), F32)], -1)[::-1], colorspace="Non-Color")
+            n = shrink(self.normal * 2 - 1, MAP_RES["normal"])
+            n = tx.normalize(n) * 0.5 + 0.5
+            bl.save_png(paths["normal"], np.concatenate([n, np.ones(n.shape[:2] + (1,), F32)], -1)[::-1], colorspace="Non-Color")
         if "roughness" in which:
             paths["roughness"] = base + "_roughness.png"
-            r = self.rough
+            r = shrink(self.rough, MAP_RES["roughness"])
             bl.save_png(paths["roughness"], np.stack([r, r, r, np.ones_like(r)], -1)[::-1], colorspace="Non-Color")
         return paths
+
+
+def shrink(img, side):
+    """img box-averaged down to side x side (unchanged when it is that size or smaller)."""
+    res = img.shape[0]
+    if side >= res:
+        return img
+    assert res % side == 0, f"{res} px does not shrink to {side} px"
+    k = res // side
+    return img.reshape((side, k, side, k) + img.shape[2:]).mean(axis=(1, 3)).astype(F32)
 
 
 # ---- export ------------------------------------------------------------------------------------------
@@ -280,11 +302,14 @@ def main(argv):
     ap.add_argument("--out", default="build/people")
     ap.add_argument("--res", type=int, default=1024)
     ap.add_argument("--outfits", default="all")
+    ap.add_argument("--normal-res", type=int, default=MAP_RES["normal"])
+    ap.add_argument("--rough-res", type=int, default=MAP_RES["roughness"])
     ap.add_argument("--no-fbx", action="store_true")
     ap.add_argument("--quick", action="store_true", help="512 px maps (a 90-second build for looking at shapes)")
     opts = ap.parse_args(argv)
     out = os.path.abspath(opts.out)
     res = 512 if opts.quick else opts.res
+    MAP_RES.update(normal=opts.normal_res, roughness=opts.rough_res)
     outfits = spec.OUTFIT_ORDER if opts.outfits == "all" else [o for o in opts.outfits.split(",") if o]
     tex_dir, fbx_dir = os.path.join(out, "tex"), os.path.join(out, "fbx")
     os.makedirs(tex_dir, exist_ok=True)
@@ -523,7 +548,9 @@ def main(argv):
                       "hair": ["Hair_" + h for h in spec.ROLES[r]["hair"]], "palette": pal["roles"][r]}
                   for r in spec.ROLE_ORDER},
         "palettes": {"source": "src/shared/Avatar/RolePalettes.luau", "skins": pal["SKINS"], "hair": pal["HAIR"], "pants": pal["PANTS"]},
-        "atlases": {"resolution": res, "body": {"texelsPerStud": round(body_density, 1), "charts": {k: r3(v) for k, v in body_rects.items()}},
+        "atlases": {"resolution": res, "normalResolution": min(res, MAP_RES["normal"]),
+                    "roughnessResolution": min(res, MAP_RES["roughness"]),
+"body": {"texelsPerStud": round(body_density, 1), "charts": {k: r3(v) for k, v in body_rects.items()}},
                     "head": {"texelsPerStud": round(head_density, 1), "charts": {k: r3(v) for k, v in head_rects.items()}},
                     "headwear": {"texelsPerStud": {k: round(v, 1) for k, v in wear_density.items()},
                                  "charts": {k: r3(v) for k, v in wear_rects.items()}}},

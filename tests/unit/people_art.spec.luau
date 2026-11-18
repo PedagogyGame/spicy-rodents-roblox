@@ -319,6 +319,53 @@ return function(t: any)
 		t.eq(PeopleArt.ready(), false)
 	end)
 
+	t.test("a texture not shown as an Overlay (see-through or dark people) leaves the stock bodies", function()
+		PeopleArt.reset()
+		local ids = { bodySlim = 1, bodyBroad = 2, head = 3, headwear = 4, outfits = 5, faces = 6 }
+		for _, case in
+			{
+				{ "outfits", "Outfit_scrubs", "Transparency" },
+				{ "faces", "Face_plain_calm", "Opaque" },
+				{ "headwear", "Hat_cap", "Transparency" },
+				{ "bodyBroad", "LeftHand", "Transparency" },
+				{ "head", "Head", "TintMask" },
+			}
+		do
+			local assets = fakeAssets()
+			local byId =
+				{ assets.bodySlim, assets.bodyBroad, assets.head, assets.headwear, assets.outfits, assets.faces }
+			local sa = assets[case[1]][case[2]]:FindFirstChildOfClass("SurfaceAppearance")
+			sa.AlphaMode = (R.Enum.AlphaMode :: any)[case[3]]
+			local r = PeopleArt.install({
+				ids = ids,
+				load = function(id: number): any
+					return byId[id]
+				end,
+			})
+			t.eq(r.ok, false, case[2])
+			t.truthy(r.failed.index and string.find(r.failed.index, case[2]) ~= nil, tostring(r.failed.index))
+			t.truthy(string.find(r.failed.index, "not Overlay") ~= nil, r.failed.index)
+			t.eq(PeopleArt.ready(), false)
+		end
+		-- a hair or hat with no texture of its own would show as plain plastic: refused too
+		local assets = fakeAssets()
+		assets.headwear.Hair_bob:FindFirstChildOfClass("SurfaceAppearance"):Destroy()
+		local ok, err = pcall(PeopleArt.index, assets)
+		t.eq(ok, false)
+		t.truthy(string.find(tostring(err), "Hair_bob") ~= nil, tostring(err))
+		-- as uploaded (every map Overlay) it installs
+		assets = fakeAssets()
+		local byId = { assets.bodySlim, assets.bodyBroad, assets.head, assets.headwear, assets.outfits, assets.faces }
+		local r = PeopleArt.install({
+			ids = ids,
+			load = function(id: number): any
+				return byId[id]
+			end,
+		})
+		t.eq(r.ok, true)
+		PeopleArt.reset()
+	end)
+
 	t.test("a stock R15 is dressed in the art and keeps the rig the game reads", function()
 		local library = PeopleArt.index(fakeAssets())
 		local opts = { lib = LIB, library = library }

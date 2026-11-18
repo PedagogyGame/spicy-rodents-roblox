@@ -106,21 +106,51 @@ local function appearance(part: any): any
 	return if part then part:FindFirstChildOfClass("SurfaceAppearance") else nil
 end
 
--- index(assets): the Library from the six loaded assets (keyed as PeopleArt.KEYS); errors on anything missing.
+-- The colour maps are Overlay maps: alpha 0 shows the part's Color (the tint), and most of every map is clear.
+-- Shown any other way (AlphaMode Transparency: see-through people; the alpha dropped: grey or dark ones), so a
+-- SurfaceAppearance that does not read AlphaMode Overlay stops the install: the town keeps its stock bodies.
+-- (AlphaMode cannot be relied on to be set from a live server, tools/blender/heroes/textures.py: it is set on the
+-- uploaded Models.)
+local function overlay(sa: any, where: string): any
+	local ok, mode = pcall(function()
+		return sa.AlphaMode.Name
+	end)
+	if not ok or mode ~= "Overlay" then
+		error(`PeopleArt: {where}'s SurfaceAppearance is AlphaMode {if ok then mode else "?"}, not Overlay`)
+	end
+	return sa
+end
+
+-- A part's own SurfaceAppearance, if it has one, must be Overlay; `need` says it must have one.
+local function ownLook(part: any, where: string, need: boolean)
+	local sa = appearance(part)
+	if sa then
+		overlay(sa, where)
+	elseif need then
+		error(`PeopleArt: {where} has no SurfaceAppearance`)
+	end
+end
+
+-- index(assets): the Library from the six loaded assets (keyed as PeopleArt.KEYS); errors on anything missing and
+-- on any SurfaceAppearance that is not AlphaMode Overlay.
 function PeopleArt.index(assets: { [string]: any }): Library
 	local bodies: { [string]: { [string]: any } } = {}
 	local files: { [string]: string } = { slim = "bodySlim", broad = "bodyBroad" }
 	for build, key in files do
 		local m = meshes(assets[key])
 		for name in PeopleAssets.BUILDS[build].parts do
-			if name ~= "Head" and m[name] == nil then
-				error(`PeopleArt: {key} has no {name}`)
+			if name ~= "Head" then
+				if m[name] == nil then
+					error(`PeopleArt: {key} has no {name}`)
+				end
+				ownLook(m[name], `{key}.{name}`, false)
 			end
 		end
 		for name in PeopleAssets.BUILDS[build].extras do
 			if m[name] == nil then
 				error(`PeopleArt: {key} has no {name}`)
 			end
+			ownLook(m[name], `{key}.{name}`, false)
 		end
 		bodies[build] = m
 	end
@@ -128,11 +158,13 @@ function PeopleArt.index(assets: { [string]: any }): Library
 	if head == nil then
 		error("PeopleArt: head has no Head")
 	end
+	ownLook(head, "head.Head", false)
 	local wear = meshes(assets.headwear)
 	for name in PeopleAssets.HEADWEAR do
 		if wear[name] == nil then
 			error(`PeopleArt: headwear has no {name}`)
 		end
+		ownLook(wear[name], `headwear.{name}`, true) -- worn in its own textures
 	end
 	local outfits: { [string]: any } = {}
 	local squares = meshes(assets.outfits)
@@ -141,7 +173,7 @@ function PeopleArt.index(assets: { [string]: any }): Library
 		if sa == nil then
 			error(`PeopleArt: outfits has no Outfit_{outfit} SurfaceAppearance`)
 		end
-		outfits[outfit] = sa
+		outfits[outfit] = overlay(sa, `outfits.Outfit_{outfit}`)
 	end
 	local faces: { [string]: any } = {}
 	squares = meshes(assets.faces)
@@ -151,7 +183,7 @@ function PeopleArt.index(assets: { [string]: any }): Library
 			if sa == nil then
 				error(`PeopleArt: faces has no Face_{face}_{expression} SurfaceAppearance`)
 			end
-			faces[`{face}_{expression}`] = sa
+			faces[`{face}_{expression}`] = overlay(sa, `faces.Face_{face}_{expression}`)
 		end
 	end
 	return { bodies = bodies, head = head, wear = wear, outfits = outfits, faces = faces }
