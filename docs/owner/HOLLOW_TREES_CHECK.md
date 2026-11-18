@@ -2,7 +2,7 @@
 
 Your brief (section 3) asks for twelve hollow trees a squirrel can claim, and a fallen hollow log to hide in. Addendum D6 says they run "on the same mechanics" as the ball return. They do: every hollow's inside is an enclosed squirrel run, exactly like the ball return and the storm drains.
 
-Everything below was tested without a screen, on the real squirrel controls and the real server checks. A test cannot tell me how it looks and feels, so this list is the part only you can judge. The pictures are offline renders (`build/review/hollows/`); the bark in them is a plain stand-in, because the Blender trees cannot be drawn offline.
+Everything below was tested without a screen, on the real squirrel controls and the real server checks. A test cannot tell me how it looks and feels, so this list is the part only you can judge. The pictures are offline renders in `docs/renders/hollows/` (remake them with `lune run tools/review/hollows.luau` and `tools/review/render.py`). The bark in them is a plain stand-in, because the Blender trees cannot be drawn offline. `h1_cutaway` shows the spiral with its walls left out.
 
 ## Where they are
 
@@ -33,12 +33,12 @@ Everything below was tested without a screen, on the real squirrel controls and 
 ## What only you can judge
 - **H1 is in the HIGHLAND ELM giant, not the park tree by the Tabasco garden.** The park tree's trunk is 4 studs across and the squirrel is 1.6 wide, so no ramp fits inside it. The giant is 9.4 across. H1's premium garden and bird feeder are listed beside the giant but are not built, the same as H2's. *Default: the giant, as built.*
 - **The ground holes are big** (1.9 by 2 studs), because the squirrel's body has to fit through them. Do they look right on the bark?
-- **Inside, the walls are plain wooden boards** (rings of planks, a floor and a roof, with one dim warm light per chamber). The Blender bark is not drawn from inside, so these boards are what you see. Are they good enough, or should the insides get art of their own?
+- **Inside, the walls are plain wooden boards** (rings of planks, a floor and a roof, with one dim warm light per chamber). The Blender bark is not drawn from inside, so these boards are what you see. Offline, the spiral reads very dark between its landings (`h1_ramp` views). Only the engine can say how dark it really is. Are the boards good enough, or should the insides get art of their own?
 - **Moved trees:** H4 is now the Pump Elm and H9 Estate Oak South 2. In the baked town, Estate Oak South 1 stands inside the estate mansion's walls, and both Shop Oaks stand in the sidewalk curbs.
 - **The log** is the north park's hollow log from v5.4, now real: about 3.6 studs across and 23 long. The old grey box at that spot is now invisible.
 
 ## Costs (for phones)
-- **377 plain parts in all**, about 7,000 triangles, no shadows, and 12 dim point lights (no shadows):
+- **377 plain parts in all**, about 7,000 triangles, no shadows, and 17 dim point lights (no shadows): one on each floor, and one at each landing or store above it:
   - H1: 147 parts;
   - H2: 58;
   - H12: 50;

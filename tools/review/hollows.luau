@@ -61,6 +61,21 @@ for _, d in root:GetDescendants() do
 		local wall = string.match(d.Name, "^liner") ~= nil or string.match(d.Name, "^roof") ~= nil
 		emit(if wall then "liner" else "hollows", d)
 		local l = d:FindFirstChildOfClass("PointLight")
+		for _, a in d:GetChildren() do
+			local al = if a:IsA("Attachment") then a:FindFirstChildOfClass("PointLight") else nil
+			if al then
+				local wp = d.CFrame * a.CFrame
+				local c = al.Color
+				table.insert(lights, {
+					kind = "point",
+					pos = { r4(wp.Position.X), r4(wp.Position.Y), r4(wp.Position.Z) },
+					dir = { 0, 1, 0 },
+					brightness = al.Brightness,
+					range = al.Range,
+					color = { c.R * 255, c.G * 255, c.B * 255 },
+				})
+			end
+		end
 		if l then
 			local c = l.Color
 			table.insert(lights, {
@@ -90,7 +105,8 @@ local function block(group: string, name: string, pos: { number }, size: { numbe
 	})
 end
 for _, h in layout.hollows do
-	block("ground", h.id .. ".lawn", { h.x, h.y - 0.6, h.z }, { 70, 1, 70 }, { 96, 128, 70 }, "Block")
+	-- the lawn level with the hole (the ground the squirrel runs in on; a trunk's foot is often a little above it)
+	block("ground", h.id .. ".lawn", { h.x, h.mouths[1].y - 0.5, h.z }, { 70, 1, 70 }, { 96, 128, 70 }, "Block")
 	if h.trunk then
 		local tr = HollowLayout.trunk(reg :: any, h.trunk :: number)
 		for k = 0, 12 do

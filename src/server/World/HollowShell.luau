@@ -7,7 +7,7 @@
 -- each knothole sits on the bark outside; the log is boards round its run and a floor. Built at boot by
 -- Foraging/HollowService (no bake: a few hundred plain parts), and by the specs (the same parts the motor is held to).
 -- Nothing in a tree collides or casts a shadow (the squirrel runs these on its rails; the bark collides already);
--- the log's boards collide (they are the log); a knothole is not queried (sight and the camera look through it). A dim warm light in each chamber.
+-- the log's boards collide (they are the log); a knothole is not queried (sight and the camera look through it). A dim warm light on each floor and at each chamber above it.
 -- Interface: build(env, layout, parent?) -> (Folder, Report). `env` is anything with Instance, CFrame, Vector3,
 --   Color3 and Enum as the engine has them (the engine's globals, or @lune/roblox in the specs).
 --   Report = { parts, lights, per = { [hollowId]: parts } }.
@@ -26,6 +26,7 @@ HollowShell.LOOK = {
 	log = { color = { 104, 80, 58 }, material = "Wood" },
 }
 HollowShell.LIGHT = { range = 9, brightness = 0.45, color = { 255, 196, 140 } }
+local C = { room = 2.8 } -- (Shared/World/HollowLayout.C.room: a chamber higher than this over the floor gets a light)
 
 export type Report = { parts: number, lights: number, per: { [string]: number } }
 
@@ -71,6 +72,29 @@ function HollowShell.build(env: any, layout: any, parent: any?): (any, Report)
 			end
 			p.Parent = model
 			n += 1
+		end
+		-- a light at each chamber up off the floor (the spiral's landings, the shaft's store and hideout): the
+		-- floor's light does not reach them; an attachment on the first piece, at the chamber
+		local anchor = model:FindFirstChildWhichIsA("BasePart")
+		local floorY = math.huge
+		for _, c in h.cavities do
+			floorY = math.min(floorY, c.bottom)
+		end
+		for _, c in h.chambers do
+			if anchor and h.variant ~= "log" and c.y > floorY + C.room then
+				local a = Instance.new("Attachment")
+				a.Name = `chamber_{c.id}`
+				a.CFrame = anchor.CFrame:Inverse() * CFrame.new(c.x, c.y + 1.4, c.z)
+				a.Parent = anchor
+				local l = Instance.new("PointLight")
+				l.Range = HollowShell.LIGHT.range
+				l.Brightness = HollowShell.LIGHT.brightness
+				l.Color =
+					Color3.fromRGB(HollowShell.LIGHT.color[1], HollowShell.LIGHT.color[2], HollowShell.LIGHT.color[3])
+				l.Shadows = false
+				l.Parent = a
+				report.lights += 1
+			end
 		end
 		report.per[h.id] = n
 		report.parts += n
