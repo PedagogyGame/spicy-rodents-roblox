@@ -20,7 +20,8 @@
 -- the server sends the round as it stands again; and when the cabinet is free the server tells everyone it sent
 -- the round to, so a screen out of the ring at the end shows FREE PLAY too.
 -- The player's own strike is drawn at once (swing(): the mallet goes down, and a mole that could be hit on this
--- screen drops as it is struck); the server's word follows and wins (a mole it says was missed comes back up).
+-- screen drops as it is struck); the server's word follows and wins (a mole it says was missed comes back up,
+-- and so does every mole dropped ahead of its word when it refuses a strike: refused()).
 -- The windows: SCORE (three digits), TIME (two digits, the round's seconds left; the count-in shows 45), and the
 -- line under them (READY 3 2 1, GO!, NICE! +10, MISS -2, TIME!, and FREE PLAY when nobody plays: no coins, ever).
 -- Sound: named cues only, no asset ids (MinigameSounds "whack_a_mole.<cue>": pop as a mole starts up, swing,
@@ -28,7 +29,7 @@
 -- The parts are found lazily and may be missing (streaming, a place without the cabinet): then nothing is drawn
 -- and nothing breaks.
 -- Interface: get(station, place?) -> Cab; round(cab, msg); rise(cab, msg); hit(cab, msg); over(cab, msg);
---   idle(cab, msg); swing(cab, hole, at) (this player's own strike, at = shared-clock time); take(cab) / release(cab)
+--   idle(cab, msg); refused(cab); swing(cab, hole, at) (this player's own strike, at = shared-clock time); take(cab) / release(cab)
 --   (the player's own cabinet stays awake wherever the body is); roundTime(cab) -> number?; heightOf(cab, hole,
 --   t?) -> 0..1; hittable(cab, hole, t?) -> bool; malletPose(cab, now) -> (u, v, w, rx, ry, rz) (the pivot in the
 --   cabinet frame and its turn); cframe(cab, u, v, w) -> CFrame; windows(cab) -> { score, time, status } (the
@@ -366,6 +367,19 @@ end
 
 function Cabinet.idle(cab: Cab, _msg: { [string]: any }?)
 	forget(cab)
+	wake(cab)
+end
+
+-- the server refused one of this player's strikes: what this screen dropped ahead of its word comes back up (every
+-- such mole: a later strike that is taken says so again with its own whack_hit)
+function Cabinet.refused(cab: Cab)
+	for id in cab.predicted do
+		local r = cab.rises[id]
+		if r then
+			r.hitAt, r.from = nil, nil
+		end
+	end
+	table.clear(cab.predicted)
 	wake(cab)
 end
 

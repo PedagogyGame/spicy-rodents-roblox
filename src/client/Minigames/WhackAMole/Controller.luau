@@ -12,7 +12,8 @@
 -- Each strike is one message, "whack" { hole, the shared clock's time }, and the mallet swings at once on this
 -- screen (Client/Minigames/WhackAMole/Cabinet.swing; a mole this screen sees can be hit drops as it is struck);
 -- the server judges it and its word wins. Strikes closer together than Round.MIN_GAP are not sent (one mallet;
--- it also keeps a mashing hand under the wire's 20 a second), nor any before GO (the sign says READY).
+-- it also keeps a mashing hand under the wire's 20 a second), nor any before GO (the sign says READY) or after
+-- the end (TIME!). A strike the server refuses takes back what this screen drew ahead of its word.
 -- Q, gamepad B and the Leave button leave (the framework's bar: Leave, and Play again at the end; Space or
 -- gamepad A there too).
 -- The main client's rules (MinigameClient's header): the camera through ctx.camera / ctx.releaseCamera, the
@@ -211,8 +212,8 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 			return
 		end
 		local t = Cabinet.roundTime(cab)
-		if t == nil or t < 0 or cab.done then
-			return -- (the sign says READY: nothing is sent before GO)
+		if t == nil or t < 0 or t >= Round.SECONDS or cab.done then
+			return -- (the sign says READY, or TIME!: nothing is sent before GO or after the end)
 		end
 		local at = ctx.stamp()
 		if at - self.sentAt < Round.MIN_GAP then
@@ -287,8 +288,11 @@ function Controller.new(ctx: ClientGame.Ctx): ClientGame.Controller
 
 	function self.onMessage(_self: any, _msg: { [string]: any }, _watched: any?) end
 
-	function self.onRefused(_self: any, _msg: { [string]: any })
+	function self.onRefused(_self: any, msg: { [string]: any })
 		table.clear(self.asked)
+		if msg.verb == "whack" then
+			Cabinet.refused(cab)
+		end
 	end
 
 	function self.stop(_self: any)

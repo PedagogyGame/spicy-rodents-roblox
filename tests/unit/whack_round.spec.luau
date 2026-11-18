@@ -139,6 +139,26 @@ return function(t: Test.T)
 		t.eq(Round.height(r, 10.9), 0, "gone after the hit's drop, not at its own end")
 	end)
 
+	t.test("at TIME every mole still up drops from where it was, in FALL, smoothly", function()
+		local S = Round.SECONDS
+		local up: Round.Rise = { id = 1, hole = 1, at = S - 0.5, dur = 1.5 }
+		local rising: Round.Rise = { id = 2, hole = 2, at = S - 0.05, dur = 1.5 }
+		local hit: Round.Rise = { id = 3, hole = 3, at = S - 0.6, dur = 1.5, hitAt = S - 0.1, from = 1 }
+		t.eq(Round.height(up, S), 1)
+		t.near(Round.height(up, S + Round.FALL / 2), 0.25, 1e-9)
+		for _, r in { up, rising, hit } do
+			t.eq(Round.height(r, S + Round.FALL), 0, `mole {r.id} is down`)
+			t.eq(Round.height(r, S + 1), 0)
+			local was = Round.height(r, S - 0.01)
+			for k = 0, 120 do
+				local h = Round.height(r, S - 0.01 + k / 480)
+				t.truthy(math.abs(h - was) <= 3 / Round.RISE / 480 + 1e-6, `mole {r.id} smooth`)
+				was = h
+			end
+		end
+		t.near(Round.height(hit, S + 0.05), (1 - 0.15 / Round.FALL) ^ 2, 1e-9, "a hit mole keeps its own drop")
+	end)
+
 	t.test("+10 a hit, -2 a miss, never below zero, one hit per rise", function()
 		local s = Round.new(3)
 		Round.advance(s, Round.READY + 0.5)

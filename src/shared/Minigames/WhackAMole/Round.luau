@@ -12,7 +12,9 @@
 --   0.3 s, then one every 0.76 s less 0.42 s over the round plus up to 0.19 s at random; a mole stays up 1.55 s
 --   less 0.6 s over the round plus up to 0.22 s; one mole at a time for the first 35 % of the round, two after;
 --   never the same hole twice running when another is free; it rises in 0.17 s (easing out) and drops in 0.21 s;
---   a hit mole drops at once. (Blender's play script: one at a time, 0.13 s up, 0.14 s down; not used.)
+--   a hit mole drops at once; at TIME every mole still up drops (his finish() clears the deck; ours drops them
+--   in FALL from where they were, so nothing stands up after the end). (Blender's play script: one at a time,
+--   0.13 s up, 0.14 s down; not used.)
 -- WHO DECIDES. The server keeps the Round and is the score of record. A strike comes in with the time the
 -- player struck, on the clock both sides share, as round seconds (the Table turns the client's stamp into them),
 -- and is judged at that moment of the round, so a player 150 ms away scores what they saw. It is refused (no
@@ -91,8 +93,8 @@ local function ends(r: Rise): number
 	return r.at + r.dur
 end
 
--- height(rise, t): how far up the mole is at round time t, 0 (down) to 1 (up the whole pop).
-function Round.height(r: Rise, t: number): number
+-- the height before the end of the round is taken into account
+local function raw(r: Rise, t: number): number
 	local age = t - r.at
 	if age <= 0 or t >= ends(r) then
 		return 0
@@ -113,6 +115,20 @@ function Round.height(r: Rise, t: number): number
 		return math.max(0, 1 - k * k)
 	end
 	return 1
+end
+
+-- height(rise, t): how far up the mole is at round time t, 0 (down) to 1 (up the whole pop). After the end of
+-- the round it drops from where it was then, in FALL, as a hit mole does (or sooner, if it was dropping anyway).
+function Round.height(r: Rise, t: number): number
+	local h = raw(r, t)
+	if t <= Round.SECONDS or h <= 0 then
+		return h
+	end
+	local k = (t - Round.SECONDS) / Round.FALL
+	if k >= 1 then
+		return 0
+	end
+	return math.min(h, raw(r, Round.SECONDS) * (1 - k) * (1 - k))
 end
 
 -- hittable(rise, t): the owner's test (up more than HITTABLE, and not about to drop), and not hit yet.

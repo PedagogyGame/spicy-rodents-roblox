@@ -488,4 +488,71 @@ return function(t: any)
 			end
 		end, opts())
 	end)
+
+	t.test("TIME: every mole drops at the end, and a key after it sends nothing and says nothing", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			local c = Controller.current
+			local y0 = {}
+			for hole = 1, 5 do
+				y0[hole] = moleY(w, hole)
+			end
+			-- play the round (not taken off idle), up to just after its end
+			local struck: { [number]: boolean } = {}
+			Rig.untilTrue(w, Round.READY + Round.SECONDS + 1, function(): boolean
+				local t1 = Cabinet.roundTime(c.cab) or -1
+				local hole = upNow(c.cab, 0.3)
+				if hole and t1 < Round.SECONDS - 2 then
+					local list = c.cab.byHole[hole]
+					local r = list[#list]
+					if not struck[r.id] then
+						struck[r.id] = true
+						press(KEYS[hole])
+					end
+				end
+				return t1 >= Round.SECONDS + 0.02
+			end)
+			local sent = Rig.count(w.sent, "whack")
+			local toasts = #w.toasts
+			for hole = 1, 5 do
+				press(KEYS[hole])
+			end
+			Rig.run(w, Round.FALL + 0.05)
+			t.eq(Rig.count(w.sent, "whack"), sent, "nothing is sent after TIME")
+			t.eq(#w.toasts, toasts, `no words: {table.concat(w.toasts, " | ")}`)
+			for hole = 1, 5 do
+				t.near(moleY(w, hole), y0[hole], 1e-6, `mole {hole} is down at TIME`)
+			end
+		end, opts())
+	end)
+
+	t.test("a strike the server refuses takes back the mole this screen dropped ahead of its word", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.untilTrue(w, 3, function(): boolean
+				return Controller.current ~= nil
+			end)
+			local c = Controller.current
+			-- (40 frames each way: a strike reaches the server later than Round.MAX_LAG, so it is refused)
+			local hole: number? = nil
+			Rig.untilTrue(w, Round.READY + 5, function(): boolean
+				hole = upNow(c.cab, 0.05)
+				return hole ~= nil
+			end)
+			local list = c.cab.byHole[hole :: number]
+			local r = list[#list]
+			press(KEYS[hole :: number])
+			Rig.frame(w)
+			t.truthy(r.hitAt ~= nil, "dropped on this screen at once")
+			Rig.untilTrue(w, 3, function(): boolean
+				return Rig.last(w.got, "refused") ~= nil
+			end)
+			Rig.frame(w)
+			t.truthy(Rig.has(w.toasts, "too late"), table.concat(w.toasts, " | "))
+			t.eq(r.hitAt, nil, "back as the server has it")
+			t.eq(next(c.cab.predicted), nil)
+			t.eq(tbl(w):round().hits, 0)
+		end, opts({ lag = 40 }))
+	end)
 end
