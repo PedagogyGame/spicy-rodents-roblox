@@ -120,6 +120,40 @@ return function(t)
 		end
 	end)
 
+	t.test("the inventory: one Tool per kind owned, gone with the last, made again while more are owned", function()
+		local tools: { [string]: number } = {}
+		local inv = Inventory.new({
+			makeTool = function(_p: any, id: string): any
+				tools[id] = (tools[id] or 0) + 1
+				return id
+			end,
+			toolsOf = function(_p: any, id: string): { any }
+				local out = {}
+				for _ = 1, tools[id] or 0 do
+					table.insert(out, {
+						Destroy = function()
+							tools[id] -= 1
+						end,
+					})
+				end
+				return out
+			end,
+		})
+		local p = { UserId = 3 }
+		inv.add(p, "frisbee")
+		inv.add(p, "frisbee")
+		t.eq(inv.count(p, "frisbee"), 2)
+		t.eq(tools.frisbee, 1, "one Tool for two frisbees")
+		-- one thrown (its Tool went with it): the other is in hand again
+		tools.frisbee = 0
+		t.truthy(inv.take(p, "frisbee"))
+		t.eq(tools.frisbee, 1)
+		t.truthy(inv.take(p, "frisbee"))
+		t.eq(tools.frisbee, 0, "none left: no Tool")
+		t.eq(inv.take(p, "frisbee"), false)
+		t.eq(inv.export(p).frisbee, nil)
+	end)
+
 	t.test("only an owner who is a person, with a body, uses it; a cooldown between uses", function()
 		local r = rig()
 		t.eq(r.svc:use(r.player, "harmonica"), false)

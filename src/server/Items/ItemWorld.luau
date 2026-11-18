@@ -430,10 +430,17 @@ function ItemWorld.start(opts: StartOpts): World
 						r.Anchored = true
 						r:SetAttribute("Stunned", true)
 						notify(t.player, "Squirted! Stunned for a moment.")
+						local who = t.player
 						task.delay(e.secs, function()
 							if r.Parent then
 								r.Anchored = was
 								r:SetAttribute("Stunned", nil)
+								-- (anchoring dropped the body's network owner: back to its player)
+								pcall(function()
+									if not r.Anchored and typeof(who) == "Instance" then
+										r:SetNetworkOwner(who :: Player)
+									end
+								end)
 							end
 						end)
 					end
@@ -662,8 +669,9 @@ function ItemWorld.start(opts: StartOpts): World
 						notify(who, "That is somebody's chair.")
 						return
 					end
-					if seat.Occupant then
-						seat:Sit(nil :: any)
+					local sitter = seat.Occupant
+					if sitter then
+						sitter.Sit = false
 					end
 					m:Destroy()
 					opts.inventory.add(owner, "lawn_chair")
@@ -762,9 +770,6 @@ function ItemWorld.start(opts: StartOpts): World
 					kiteDown(k)
 					return true
 				end
-			end
-			if not e.on then
-				return true
 			end
 			local tool = toolOf(player, "kite")
 			local hand = tool and tool:FindFirstChild("Handle")
@@ -866,9 +871,13 @@ function ItemWorld.start(opts: StartOpts): World
 		for i = #kites, 1, -1 do
 			local k = kites[i]
 			local root = rootOf(k.player)
+			-- flown only while held (in the hand, not put away in the Backpack) in the park or on the beach
+			local held = toolOf(k.player, "kite")
 			local inZone = root ~= nil
 				and ItemService.kiteZoneAt(opts.zones, root.Position.X, root.Position.Z) ~= nil
-				and toolOf(k.player, "kite") ~= nil
+				and held ~= nil
+				and held.Parent ~= nil
+				and (held.Parent :: Instance):IsA("Model")
 			if not inZone then
 				kiteDown(k)
 			end

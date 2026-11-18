@@ -68,13 +68,16 @@ function Inventory.new(deps: Deps?): Inventory
 			if mine[itemId] <= 0 then
 				mine[itemId] = nil
 			end
-			-- one Tool fewer when the last of them is used up
+			-- the Tool goes with the last of them; while more are owned there is one in hand (made again if the
+			-- one used went: a thrown frisbee takes its Tool along)
 			if (mine[itemId] or 0) == 0 then
 				for _, t in tools(player, itemId) do
 					pcall(function()
 						t:Destroy()
 					end)
 				end
+			else
+				self.refresh(player)
 			end
 			return true
 		end,
