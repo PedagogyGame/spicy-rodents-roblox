@@ -1,7 +1,9 @@
 --!strict
 -- ServerScriptService.Server.Movement.MoveValidator
 -- Validates client motor packets; log-only until W7.
--- Interface (BUILD_PLAN §1.4): accept(actor, packet) -> ok, correction; pose(id, t)
+-- Interface (BUILD_PLAN §1.4): accept(actor, packet) -> ok, correction; pose(id, t); also new(world, opts); reset;
+--   forget; hop; wallGap; fastest; clearFlag; isFlagged; last; stats; the shared bounds leapRise, apexAllowance,
+--   leapUpAllowance, gravity, nearTrampoline; C
 --
 -- The server side of D2: players move their own squirrel with the shared SquirrelMotor and stream its
 -- serialized state; this module judges every transition with `SquirrelMotor.envelope` (adjacency and
@@ -15,11 +17,17 @@
 -- tick.
 -- Live (Boot/Game.movement, 2026-11-18), on top of S3:
 --   * The clock check reads the arrival offset (server time - client clock): an honest clock never runs ahead of
---     real time, so the offset never falls further below its lowest of a few seconds ago (clockLag) than the
---     link's latency can swing (clockSlack); a time hack makes it fall without end. (S3's rate over a 1 s window
---     flagged a packet held up for half a second once it became the oldest of the window.)
---   * A gap too long to judge (a stall) is still bounded: no further than the fastest the squirrel can go
---     (fastest(): sprint, leap, the fastest rail with its pipe pace, the chili rush) in that time.
+--     real time, so the offset never falls further below its lowest of a few seconds ago (clockLag) and of about
+--     eight seconds ago than the link's latency can swing (clockSlack, or the engine's round trip: pingOf); a time
+--     hack makes it fall without end. (S3's rate over a 1 s window flagged a packet held up for half a second once
+--     it became the oldest of the window.)
+--   * A packet with a number that is not finite is never judged nor taken (SquirrelWire.sane).
+--   * A gap too long to judge move by move (a stall, a loss burst, a client sending sparsely) is judged as a whole
+--     (hop(): reach at the fastest pace over the time the server's own arrivals allow, no climb or height above a
+--     leap without a rail or a trampoline near, walls chord by chord), and more than gapMax of them in gapWindow
+--     flag; it is never a snap target. MovementService uses hop() for the first packet after a move it made.
+--   * Marks (the clock's history, recent gaps and walls, the sprint meter) outlive a reset; forget() drops them.
+--   * The server's own sprint meter (_stamina): a sprint that never tires shows.
 --   * The client's own river recovery (Movement/Recovery.riverFall: a fall into the river puts the body on the
 --     nearer quay) is taken as honest: the quay spot is the new baseline.
 --   * Floors: a grounded body off the rails must have something under its feet (world.floorBelow, when the world
