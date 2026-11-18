@@ -18,6 +18,7 @@ local Report = require("./lib/Report")
 local W1 = require("./lib/W1")
 local Attractions = require("./lib/Attractions")
 local TreeArt = require("./lib/TreeArt")
+local PinballArt = require("./lib/PinballArt")
 local ShopArt = require("./lib/ShopArt")
 local Expansion = require("./lib/Expansion")
 local Sewers = require("./lib/Sewers")
@@ -498,6 +499,11 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	local shopArtModule = ShopArt.compile({ repo = repo, invariant = invariant, compare = compare })
 	if shopArtModule then
 		table.insert(w1.modules, shopArtModule)
+	end
+	-- data/art/pinball.json: the owner's finished pinball models (Server/Assets/PinballArt)
+	local pinballArtModule = PinballArt.compile({ repo = repo, invariant = invariant, compare = compare })
+	if pinballArtModule then
+		table.insert(w1.modules, pinballArtModule)
 	end
 
 	for _, c in comparisons do

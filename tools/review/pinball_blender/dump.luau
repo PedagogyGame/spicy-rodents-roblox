@@ -60,5 +60,10 @@ end
 local Bake = require("../../../tools/bake/games/Pinball")
 out.art = Bake.ART
 out.themes = Bake.THEMES
-fs.writeFile(process.args[1] or "build/review/pinball_tables.json", serde.encode("json", out, true))
+local path = process.args[1] or "build/review/pinball_tables.json"
+local dir = string.match(path, "^(.*)/[^/]*$")
+if dir and not fs.isDir(dir) then
+	fs.writeDir(dir) -- (a fresh clone has no build/review yet)
+end
+fs.writeFile(path, serde.encode("json", out, true))
 print("ok")

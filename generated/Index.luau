@@ -53,6 +53,10 @@ return {
 			count = 243,
 			chunks = { "Lots" },
 		},
+		PinballArt = {
+			count = 1,
+			chunks = { "PinballArt" },
+		},
 		Population = {
 			count = 1,
 			chunks = { "Population" },

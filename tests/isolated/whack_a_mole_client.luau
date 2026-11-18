@@ -1,0 +1,600 @@
+--!strict
+-- tests/isolated/whack_a_mole_client.luau: cases for tests/unit/whack_client.spec.luau, run in their own Lune
+-- process (tests/lib/Isolated) because they install the fake engine.
+-- Whack-a-mole played through all of its glue at once on tests/lib/MinigameRig: the real MinigameService with
+-- the game's Table, the real MinigameClient with MinigameUI, the game's Controller and Cabinet, the fake lagged
+-- network with the real Net's schema and rate limit between them, and the cabinet's moving parts as fake parts
+-- under the names the bake gives them (Layout.NAMES; tests/unit/whack_bake.spec.luau holds the bake to them).
+-- The player's hands are real key, mouse, gamepad and touch events, aimed from what this screen shows (the
+-- moles as Cabinet draws them, through the camera the game set); other people are PlayerLike stubs.
+-- Interface: return function(t) (the spec shape)
+local AlleyLayout = require("@shared/Attractions/AlleyLayout")
+local Layout = require("@shared/Minigames/WhackAMole/Layout")
+local Round = require("@shared/Minigames/WhackAMole/Round")
+local WhackAMoleFlow = require("@tests/engine/WhackAMoleFlow")
+local Cabinet = require("@client/Minigames/WhackAMole/Cabinet")
+local Controller = require("@client/Minigames/WhackAMole/Controller")
+local MinigameSounds = require("@client/Minigames/MinigameSounds")
+local FakeEngine = require("@tests/lib/FakeEngine")
+local Rig = require("@tests/lib/MinigameRig")
+local roblox = require("@lune/roblox")
+
+local SITE = "bowling_alley"
+local ID = "whack_a_mole_1"
+local Key = roblox.Enum.KeyCode
+local N = Layout.NAMES
+local KEYS = { Key.One, Key.Two, Key.Three, Key.Four, Key.Five }
+local PADS = { Key.DPadLeft, Key.DPadUp, Key.DPadRight, Key.ButtonL1, Key.ButtonR1 }
+
+-- the cabinet frame as world CFrames, as the bake places the parts
+local function at(place: any, u: number, v: number, w: number): any
+	local X, Y, D = Layout.toSite(u, v, w)
+	return roblox.CFrame.new(AlleyLayout.toWorld(place, X, Y, D))
+end
+
+local function furnish(roots: { [string]: any }, places: { [string]: any })
+	Cabinet.reset()
+	Controller.current = nil
+	table.clear(MinigameSounds.counts())
+	local place = places[SITE]
+	local room = FakeEngine.new("Folder", "GamesRoom")
+	room.Parent = roots[SITE]
+	local model = FakeEngine.model(N.model, at(place, 0, Layout.DECK.top, 0), room)
+	for i, h in Layout.HOLES do
+		local m = FakeEngine.model(`{N.mole}{i}`, at(place, h[1], 0, h[2]), model)
+		FakeEngine.part("Head", at(place, h[1], Layout.MOLE.headV, h[2]), m)
+	end
+	local M = Layout.MALLET
+	local mallet = FakeEngine.model(N.mallet, at(place, M.rest[1], M.rest[2], M.rest[3]), model)
+	FakeEngine.part("Head", at(place, M.rest[1], M.rest[2] + M.headAt, M.rest[3]), mallet)
+	for _, name in { N.score, N.time, N.status } do
+		local part = FakeEngine.part(name, at(place, 0, 5, 1), model)
+		local gui = FakeEngine.new("SurfaceGui", N.display)
+		gui.Parent = part
+		local label = FakeEngine.new("TextLabel", N.value)
+		label.Text = ""
+		label.Parent = gui
+	end
+end
+
+local function opts(more: { [string]: any }?): Rig.Opts
+	local X, _, D = Layout.toSite(Layout.STAND.u, 0, Layout.STAND.w)
+	local o: any = { furnish = furnish, stand = { site = SITE, x = X, y = 3, d = D } }
+	for k, v in more or {} do
+		o[k] = v
+	end
+	return o
+end
+
+local function cabModel(w: Rig.World): any
+	return w.roots[SITE]:FindFirstChild("GamesRoom"):FindFirstChild(N.model)
+end
+
+local function window(w: Rig.World, name: string): string
+	return cabModel(w):FindFirstChild(name):FindFirstChild(N.display):FindFirstChild(N.value).Text
+end
+
+local function moleY(w: Rig.World, hole: number): number
+	return cabModel(w):FindFirstChild(`{N.mole}{hole}`):GetPivot().Position.Y
+end
+
+local function tbl(w: Rig.World): any
+	return w.svc.stations[ID].tbl
+end
+
+-- a mole on this screen that can be hit now and has been up `after` seconds, or nil
+local function upNow(cab: any, after: number): number?
+	local t = Cabinet.roundTime(cab)
+	if t == nil then
+		return nil
+	end
+	for hole = 1, Round.HOLES do
+		if Cabinet.hittable(cab, hole, t) and Cabinet.hittable(cab, hole, t - after) then
+			return hole
+		end
+	end
+	return nil
+end
+
+-- where a mole's head is on the screen now
+local function onScreen(cab: any, hole: number): (number, number)
+	local h = Layout.HOLES[hole]
+	local c = Cabinet.cframe(cab, h[1], Layout.MOLE.headV + Layout.MOLE.pop * Cabinet.heightOf(cab, hole), h[2])
+	local p = workspace.CurrentCamera:WorldToViewportPoint(c.Position)
+	return p.X, p.Y
+end
+
+local function click(x: number, y: number)
+	local Kind = roblox.Enum.UserInputType
+	FakeEngine.input("began", { UserInputType = Kind.MouseButton1, Position = roblox.Vector3.new(x, y, 0) })
+	FakeEngine.input("ended", { UserInputType = Kind.MouseButton1, Position = roblox.Vector3.new(x, y, 0) })
+end
+
+local function press(code: any)
+	Rig.key(code, true)
+	Rig.key(code, false)
+end
+
+-- the player plays a whole round, striking every mole it sees `after` seconds into its rise with `hit(hole)`
+local function play(w: Rig.World, after: number, hit: (hole: number) -> ())
+	local struck: { [number]: boolean } = {}
+	Rig.untilTrue(w, Round.READY + Round.SECONDS + 3, function(): boolean
+		local c = Controller.current
+		if c then
+			local hole = upNow(c.cab, after)
+			local t = Cabinet.roundTime(c.cab)
+			if hole and t then
+				local list = c.cab.byHole[hole]
+				local r = list[#list]
+				if r and not struck[r.id] then
+					struck[r.id] = true
+					hit(hole)
+				end
+			end
+		end
+		return w.svc:sessionOf(ID).phase == "done"
+	end)
+end
+
+return function(t: any)
+	t.test(
+		"a whole round on the keys: the camera over the deck, the moles and windows live, the server's score",
+		function()
+			Rig.play(function(w: Rig.World)
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				local c = Controller.current
+				t.truthy(c, "the controller is open")
+				t.truthy(w.held, "the camera is the game's")
+				t.eq(w.controls[#w.controls], false, "the legs are the game's")
+				t.eq(window(w, N.time), "45", "the count-in shows the whole round")
+				t.truthy(string.find(window(w, N.status), "READY", 1, true))
+				-- a key in the count-in sends nothing
+				press(Key.One)
+				Rig.run(w, 0.1)
+				t.eq(Rig.count(w.sent, "whack"), 0, "nothing before GO")
+				-- the camera frames the deck: every hole's middle is on the screen
+				Rig.run(w, 0.5)
+				local cam = workspace.CurrentCamera
+				for hole = 1, 5 do
+					local h = Layout.HOLES[hole]
+					local p, vis = cam:WorldToViewportPoint(Cabinet.cframe(c.cab, h[1], Layout.DECK.top, h[2]).Position)
+					t.truthy(
+						vis and p.X > 0 and p.X < cam.ViewportSize.X and p.Y > 0 and p.Y < cam.ViewportSize.Y,
+						`hole {hole}`
+					)
+				end
+				-- a mole rises on this screen: its part goes up by the pop
+				local rose = false
+				local y0 = {}
+				for hole = 1, 5 do
+					y0[hole] = moleY(w, hole)
+				end
+				play(w, 0.12, function(hole: number)
+					press(KEYS[hole])
+					rose = rose or moleY(w, hole) > y0[hole] + Layout.MOLE.pop * 0.5
+				end)
+				t.truthy(rose, "the mole's part rose")
+				local r = tbl(w):round()
+				t.truthy(r.hits >= 30, `{r.hits} hits`)
+				t.eq(r.misses, 0, "every key was struck at a mole the server agrees was up")
+				t.eq(r.score, r.hits * Round.HIT)
+				Rig.run(w, 0.3)
+				t.eq(window(w, N.score), string.format("%03d", r.score), "the SCORE window")
+				t.eq(window(w, N.time), "00")
+				t.eq(window(w, N.status), "TIME!")
+				t.truthy(Rig.has(Rig.texts(w.gui), `{r.score} points`), Rig.screen(w))
+				t.truthy(Rig.has(Rig.texts(w.gui), "Play again"))
+				-- the end card is the cabinet's board, this round on it at its place
+				local over = Controller.current.over
+				t.truthy(over and over.place >= 1 and #over.board == 5, "the board came with the end")
+				for i, e in over.board do
+					local name = if i == over.place then "(you)" else e.name
+					t.truthy(Rig.has(Rig.texts(w.gui), name), `{name} on the end card: {Rig.screen(w)}`)
+				end
+				t.truthy(Rig.has(Rig.texts(w.gui), `{over.place}.`))
+				t.truthy((MinigameSounds.counts()["whack_a_mole.bonk"] or 0) >= r.hits, "a bonk for each hit")
+				t.truthy((MinigameSounds.counts()["whack_a_mole.pop"] or 0) > 0)
+				-- every mole is down again
+				for hole = 1, 5 do
+					t.near(moleY(w, hole), y0[hole], 1e-6)
+				end
+				-- play again, then leave: everything given back
+				Rig.click(w, "Play again")
+				Rig.run(w, 0.5)
+				t.eq(w.svc:sessionOf(ID).phase, "playing")
+				Rig.key(Key.Q, true)
+				Rig.run(w, 0.3)
+				t.eq(Controller.current, nil)
+				t.falsy(w.held)
+				t.eq(w.controls[#w.controls], true)
+			end, opts())
+		end
+	)
+
+	t.test(
+		"mouse and touch: a click on a raised mole hits it, on an empty hole misses, off the deck does nothing",
+		function()
+			Rig.play(function(w: Rig.World)
+				Rig.press(w, ID)
+				Rig.run(w, 0.3)
+				local c = Controller.current
+				Rig.untilTrue(w, Round.READY + 3, function(): boolean
+					return upNow(c.cab, 0.1) ~= nil
+				end)
+				local hole = upNow(c.cab, 0.1) :: number
+				click(onScreen(c.cab, hole))
+				Rig.run(w, 0.3)
+				t.eq(Rig.count(w.sent, "whack"), 1)
+				t.eq((Rig.last(w.sent, "whack") :: any).args[1], hole, "the mole under the pointer")
+				t.eq(tbl(w):round().hits, 1)
+				-- an empty hole: its mouth on the deck
+				local empty = 1
+				while Cabinet.heightOf(c.cab, empty) > 0 do
+					empty += 1
+				end
+				local h = Layout.HOLES[empty]
+				local p = workspace.CurrentCamera:WorldToViewportPoint(
+					Cabinet.cframe(c.cab, h[1], Layout.DECK.top, h[2]).Position
+				)
+				click(p.X, p.Y)
+				Rig.run(w, 0.3)
+				t.eq(Rig.count(w.sent, "whack"), 2)
+				t.eq(tbl(w):round().misses, 1)
+				-- the top corner of the screen (the sign, the wall): nothing is sent
+				click(4, 4)
+				Rig.run(w, 0.3)
+				t.eq(Rig.count(w.sent, "whack"), 2)
+				-- a tap is a click
+				Rig.untilTrue(w, 3, function(): boolean
+					return upNow(c.cab, 0.1) ~= nil
+				end)
+				local next = upNow(c.cab, 0.1) :: number
+				local x, y = onScreen(c.cab, next)
+				Rig.touch("f", "began", x, y)
+				Rig.touch("f", "ended", x, y)
+				Rig.run(w, 0.3)
+				t.eq((Rig.last(w.sent, "whack") :: any).args[1], next)
+				t.eq(tbl(w):round().hits, 2)
+			end, opts())
+		end
+	)
+
+	t.test("gamepad: the D-pad's left, up and right are the back row, the shoulders the front row", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.run(w, Round.READY + 0.5)
+			for hole, code in PADS do
+				press(code)
+				Rig.run(w, 0.15)
+				t.eq((Rig.last(w.sent, "whack") :: any).args[1], hole)
+			end
+			press(Key.ButtonL2)
+			Rig.run(w, 0.15)
+			t.eq((Rig.last(w.sent, "whack") :: any).args[1], 4, "a trigger is its shoulder's hole")
+		end, opts())
+	end)
+
+	t.test(
+		"one mallet: mashing every key sends no more than one strike per MIN_GAP, and the wire drops none",
+		function()
+			Rig.play(function(w: Rig.World)
+				Rig.press(w, ID)
+				Rig.run(w, Round.READY + 0.5)
+				for _ = 1, 120 do
+					for _, code in KEYS do
+						press(code)
+					end
+					Rig.frame(w)
+				end
+				local n = Rig.count(w.sent, "whack")
+				t.truthy(n <= math.ceil(2 / Round.MIN_GAP) + 1, `{n} strikes in two seconds`)
+				t.truthy(n >= 15)
+				t.eq(#w.broken, 0)
+			end, opts())
+		end
+	)
+
+	t.test("a watcher: the moles and the windows move on this screen while a stub plays", function()
+		Rig.play(function(w: Rig.World)
+			local ann = Rig.stub("Ann")
+			t.truthy(w.svc:join(ann, ID))
+			local y0 = {}
+			for hole = 1, 5 do
+				y0[hole] = moleY(w, hole)
+			end
+			local rose = false
+			Rig.untilTrue(w, Round.READY + 8, function(): boolean
+				for hole = 1, 5 do
+					rose = rose or moleY(w, hole) > y0[hole] + 0.3
+				end
+				return rose
+			end)
+			t.truthy(rose, "a mole rose on the watcher's screen")
+			t.eq(Controller.current, nil, "nothing opened: only watching")
+			t.truthy(w.svc:debug(ID, "miss"))
+			Rig.run(w, 0.2)
+			t.truthy(string.find(window(w, N.status), "MISS", 1, true), window(w, N.status))
+			t.truthy(tonumber(window(w, N.time)) ~= nil)
+		end, opts())
+	end)
+
+	t.test("the engine check's own flow passes here (tests/engine/WhackAMoleFlow)", function()
+		Rig.play(function(w: Rig.World)
+			local ann, bob = Rig.stub("Ann"), Rig.stub("Bob")
+			for i, stub in { ann, bob } do
+				local X, Y, D = Layout.toSite(Layout.STAND.u + (i - 1) * 4, 3, Layout.STAND.w)
+				local x, y, z = AlleyLayout.toWorld(w.places[SITE], X, Y, D)
+				table.insert(w.people, { key = stub, name = stub.Name, x = x, y = y, z = z })
+			end
+			local out = WhackAMoleFlow.play(w.svc, {}, {
+				players = { ann, bob },
+				step = function(seconds: number)
+					Rig.run(w, seconds)
+				end,
+				stamp = function(): number
+					return workspace:GetServerTimeNow()
+				end,
+			})
+			t.truthy(out.ok, table.concat(out.failures, "; "))
+			t.truthy(out.numbers.hits >= 4)
+		end, opts())
+	end)
+
+	t.test("150 ms each way: a whole round on the keys still scores every mole struck in time", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.untilTrue(w, 2, function(): boolean
+				return Controller.current ~= nil
+			end)
+			play(w, 0.12, function(hole: number)
+				press(KEYS[hole])
+			end)
+			local r = tbl(w):round()
+			t.truthy(r.hits >= 25, `{r.hits} hits with 150 ms each way`)
+			t.eq(r.misses, 0, "judged when struck, not when it arrived")
+			t.eq(#w.broken, 0)
+		end, opts({ lag = 9 }))
+	end)
+
+	t.test("leaving: Q mid-round, or walking away, ends the round and gives everything back", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.run(w, Round.READY + 2)
+			t.eq(w.svc:sessionOf(ID).phase, "playing")
+			Rig.key(Key.Q, true)
+			Rig.key(Key.Q, false)
+			Rig.run(w, 0.4)
+			t.eq(w.svc:sessionOf(ID).phase, "idle")
+			t.eq(Controller.current, nil)
+			t.falsy(w.held, "the camera is the player's again")
+			t.eq(w.controls[#w.controls], true, "and the legs")
+			-- again, and this time walk off
+			Rig.press(w, ID)
+			Rig.run(w, Round.READY + 1)
+			t.truthy(Controller.current ~= nil)
+			local X, _, D = Layout.toSite(0, 0, Layout.STAND.w - 30)
+			Rig.walkTo(w, SITE, X, 3, D)
+			Rig.run(w, 0.5)
+			t.eq(w.svc:sessionOf(ID).phase, "idle")
+			t.eq(Controller.current, nil)
+			t.truthy(Rig.has(w.toasts, "walked away"), table.concat(w.toasts, " | "))
+			t.falsy(w.held)
+		end, opts())
+	end)
+
+	t.test("a watcher arriving late is drawn the round as it stands, then the stream", function()
+		Rig.play(function(w: Rig.World)
+			local cy = Rig.stub("Cy")
+			t.truthy(w.svc:join(cy, ID))
+			Rig.run(w, Round.READY + 10)
+			-- (the rig's player stood far off until now: nothing was drawn for it)
+			t.eq(Rig.count(w.got, "whack_rise"), 0)
+			local X, _, D = Layout.toSite(4, 0, Layout.STAND.w)
+			Rig.walkTo(w, SITE, X, 3, D)
+			Rig.run(w, 1)
+			local snap = Rig.last(w.got, "whack_round")
+			t.truthy(snap, "the round as it stands")
+			local cab = Cabinet.get(ID)
+			t.truthy(
+				cab.start ~= nil and math.abs((Cabinet.roundTime(cab) :: number) - 11) < 0.5,
+				"on the round's clock"
+			)
+			Rig.run(w, 3)
+			t.truthy(Rig.count(w.got, "whack_rise") > 0, "and the moles from then on")
+			t.truthy(tonumber(window(w, N.time)) ~= nil and tonumber(window(w, N.time)) < 35)
+		end, opts({ stand = { site = SITE, x = 60, y = 3, d = 0 } }))
+	end)
+
+	-- (the rig's player as the game's Player.Character, which the cabinet measures how far off it is from)
+	local function seeBody(w: Rig.World)
+		rawset((game :: any):GetService("Players").LocalPlayer, "Character", w.body)
+	end
+
+	-- (a watcher who walks out of the ring the server sends to: Layout.WATCH)
+	local function stepOut(w: Rig.World, studs: number)
+		local X, _, D = Layout.toSite(0, 0, Layout.PROMPT.w - studs)
+		Rig.walkTo(w, SITE, X, 3, D)
+	end
+
+	t.test("a watcher who walks out mid-round is not left with a stuck cabinet or a render step", function()
+		Rig.play(function(w: Rig.World)
+			seeBody(w)
+			local cy = Rig.stub("Cy")
+			t.truthy(w.svc:join(cy, ID))
+			local X, _, D = Layout.toSite(4, 0, Layout.STAND.w)
+			Rig.walkTo(w, SITE, X, 3, D)
+			Rig.run(w, Round.READY + 8)
+			t.truthy(Rig.count(w.got, "whack_rise") > 0, "watching")
+			-- out past the ring but still in sight of the cabinet, and the player leaves there
+			stepOut(w, Layout.WATCH + 8)
+			Rig.run(w, 1)
+			t.truthy(Rig.input(w, cy, ID, "leave"))
+			Rig.run(w, 2)
+			t.eq(w.svc:sessionOf(ID).phase, "idle")
+			t.eq(window(w, N.status), "FREE PLAY  -  PRESS E", "told the cabinet is free")
+			t.eq(window(w, N.time), "45")
+			Rig.run(w, 2)
+			t.eq(FakeEngine.bound(), 0, "no render step once the cabinet has settled")
+			-- a round played while this watcher stands out of the ring ends on the cabinet's own clock
+			t.truthy(w.svc:join(cy, ID))
+			Rig.run(w, 0.5)
+			local X2, _, D2 = Layout.toSite(4, 0, Layout.STAND.w)
+			Rig.walkTo(w, SITE, X2, 3, D2)
+			Rig.run(w, Round.READY + 2)
+			stepOut(w, Layout.WATCH + 8)
+			for _ = 1, 8 do
+				Rig.run(w, 5)
+				tbl(w):debug("miss") -- (the player plays on: not taken off idle)
+			end
+			t.eq(w.svc:sessionOf(ID).phase, "playing")
+			Rig.run(w, 6)
+			t.eq(w.svc:sessionOf(ID).phase, "done")
+			t.eq(window(w, N.status), "TIME!", "the round is over on this screen too")
+			t.eq(window(w, N.time), "00")
+			t.eq(FakeEngine.bound(), 0, "and the render step is let go")
+			Rig.run(w, 12)
+			t.eq(w.svc:sessionOf(ID).phase, "idle")
+			t.eq(window(w, N.status), "FREE PLAY  -  PRESS E", "then told the cabinet is free")
+		end, opts())
+	end)
+
+	t.test("a watcher who walks far off mid-round sees the moles down when back", function()
+		Rig.play(function(w: Rig.World)
+			seeBody(w)
+			local cy = Rig.stub("Cy")
+			t.truthy(w.svc:join(cy, ID))
+			local X, _, D = Layout.toSite(4, 0, Layout.STAND.w)
+			Rig.walkTo(w, SITE, X, 3, D)
+			local y0 = {}
+			for hole = 1, 5 do
+				y0[hole] = moleY(w, hole)
+			end
+			local cab = Cabinet.get(ID)
+			-- leave the moment a mole is right up
+			t.truthy(Rig.untilTrue(w, Round.READY + 10, function(): boolean
+				for hole = 1, 5 do
+					if Cabinet.heightOf(cab, hole) >= 1 then
+						return true
+					end
+				end
+				return false
+			end))
+			stepOut(w, Cabinet.SLEEP + 20)
+			Rig.run(w, 3)
+			t.eq(FakeEngine.bound(), 0, "asleep")
+			for hole = 1, 5 do
+				t.near(moleY(w, hole), y0[hole], 1e-6, `mole {hole} is down`)
+			end
+		end, opts())
+	end)
+
+	t.test("the card's score and time are the sign's, frame by frame", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			local function cardLine(): string?
+				for _, text in Rig.texts(w.gui) do
+					if string.sub(text, 1, 6) == "SCORE " then
+						return text
+					end
+				end
+				return nil
+			end
+			local checked, readyShown = 0, false
+			local struck: { [number]: boolean } = {}
+			for _ = 1, (Round.READY + 6) * 60 do
+				Rig.frame(w)
+				local c = Controller.current
+				local line = cardLine()
+				if c and line then
+					local hole = upNow(c.cab, 0.2)
+					if hole and not struck[c.cab.byHole[hole][#c.cab.byHole[hole]].id] then
+						struck[c.cab.byHole[hole][#c.cab.byHole[hole]].id] = true
+						press(KEYS[hole])
+					end
+					local ready = string.match(line, "READY (%d+)")
+					local time = string.match(line, "TIME (%d+)")
+					local status = window(w, N.status)
+					if ready then
+						readyShown = true
+						t.truthy(string.find(status, `READY  {ready}`, 1, true), `{line} / {status}`)
+					else
+						t.eq(tonumber(time), tonumber(window(w, N.time)), `{line} / {window(w, N.time)}`)
+					end
+					t.eq(tonumber(string.match(line, "SCORE (%d+)")), tonumber(window(w, N.score)), line)
+					checked += 1
+				end
+			end
+			t.truthy(readyShown, "the count-in on the card")
+			t.truthy(checked > 400, `{checked} frames`)
+			t.truthy(tbl(w):round().hits > 0, "scores came in")
+		end, opts())
+	end)
+
+	t.test("TIME: every mole drops at the end, and a key after it sends nothing and says nothing", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.run(w, 0.3)
+			local c = Controller.current
+			local y0 = {}
+			for hole = 1, 5 do
+				y0[hole] = moleY(w, hole)
+			end
+			-- play the round (not taken off idle), up to just after its end
+			local struck: { [number]: boolean } = {}
+			Rig.untilTrue(w, Round.READY + Round.SECONDS + 1, function(): boolean
+				local t1 = Cabinet.roundTime(c.cab) or -1
+				local hole = upNow(c.cab, 0.3)
+				if hole and t1 < Round.SECONDS - 2 then
+					local list = c.cab.byHole[hole]
+					local r = list[#list]
+					if not struck[r.id] then
+						struck[r.id] = true
+						press(KEYS[hole])
+					end
+				end
+				return t1 >= Round.SECONDS + 0.02
+			end)
+			local sent = Rig.count(w.sent, "whack")
+			local toasts = #w.toasts
+			for hole = 1, 5 do
+				press(KEYS[hole])
+			end
+			Rig.run(w, Round.FALL + 0.05)
+			t.eq(Rig.count(w.sent, "whack"), sent, "nothing is sent after TIME")
+			t.eq(#w.toasts, toasts, `no words: {table.concat(w.toasts, " | ")}`)
+			for hole = 1, 5 do
+				t.near(moleY(w, hole), y0[hole], 1e-6, `mole {hole} is down at TIME`)
+			end
+		end, opts())
+	end)
+
+	t.test("a strike the server refuses takes back the mole this screen dropped ahead of its word", function()
+		Rig.play(function(w: Rig.World)
+			Rig.press(w, ID)
+			Rig.untilTrue(w, 3, function(): boolean
+				return Controller.current ~= nil
+			end)
+			local c = Controller.current
+			-- (40 frames each way: a strike reaches the server later than Round.MAX_LAG, so it is refused)
+			local hole: number? = nil
+			Rig.untilTrue(w, Round.READY + 5, function(): boolean
+				hole = upNow(c.cab, 0.05)
+				return hole ~= nil
+			end)
+			local list = c.cab.byHole[hole :: number]
+			local r = list[#list]
+			press(KEYS[hole :: number])
+			Rig.frame(w)
+			t.truthy(r.hitAt ~= nil, "dropped on this screen at once")
+			Rig.untilTrue(w, 3, function(): boolean
+				return Rig.last(w.got, "refused") ~= nil
+			end)
+			Rig.frame(w)
+			t.truthy(Rig.has(w.toasts, "too late"), table.concat(w.toasts, " | "))
+			t.eq(r.hitAt, nil, "back as the server has it")
+			t.eq(next(c.cab.predicted), nil)
+			t.eq(tbl(w):round().hits, 0)
+		end, opts({ lag = 40 }))
+	end)
+end

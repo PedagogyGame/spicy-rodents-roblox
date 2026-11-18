@@ -11,6 +11,7 @@ local serde = require("@lune/serde")
 
 local L = require("../../src/shared/Attractions/AlleyLayout")
 local Games = require("../../src/shared/Minigames/Games")
+local WhackLayout = require("../../src/shared/Minigames/WhackAMole/Layout")
 local Attractions = require("../../generated/Attractions") :: any
 local Expansion = require("../../generated/Expansion") :: any
 
@@ -201,7 +202,14 @@ local doc = {
 	posts = L.POSTS,
 	machinePosts = machinePosts,
 	routes = routes,
-	standing = L.standing(),
+	standing = (function(): { any }
+		-- the tables' floors, and the games that keep their own (the whack-a-mole cabinet: its Layout)
+		local list: { any } = L.standing()
+		local w = WhackLayout.STANDING
+		table.insert(list, { id = "whack_a_mole", x0 = w.x0, x1 = w.x1, d0 = w.d0, d1 = w.d1 })
+		return list
+	end)(),
+	whack = { x = WhackLayout.AT.x, d = WhackLayout.AT.d, d1 = WhackLayout.STANDING.d1 },
 	fixtures = L.GAMES_FIXTURES,
 	board = L.board(),
 	pool = L.POOL_TABLES,

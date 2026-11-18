@@ -26,6 +26,7 @@ ServerGames.LIST = {
 	require("./Games/Labyrinth"),
 	require("./Games/Paintball"),
 	require("./Games/AirHockey"),
+	require("./Games/WhackAMole"),
 } :: { Entry }
 
 function ServerGames.get(game: string): ServerGame.ServerGame?
