@@ -31,6 +31,7 @@ GameBakes.LIST = {
 	tilt_labyrinth = require("./games/Labyrinth"),
 	paintball = require("./games/Paintball"),
 	air_hockey = require("./games/AirHockey"),
+	whack_a_mole = require("./games/WhackAMole"),
 } :: { [string]: Entry }
 
 function GameBakes.has(game: string): boolean
