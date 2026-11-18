@@ -161,6 +161,13 @@ function Data.new(loader: Loader): Data
 					return if s and s.routes then s.routes else {}
 				end)
 			end
+			-- the hollow trees and the fallen log (data/hollows.json, Shared/World/HollowLayout): enclosed runs 9411-9531
+			if self:index().modules.HollowTrees then
+				table.insert(loaders, function()
+					local h = loadName(self, "HollowTrees")
+					return if h and h.routes then h.routes else {}
+				end)
+			end
 			self._routes = Registry.new({ loaders = loaders, studsPerUnit = self:index().studsPerUnit })
 		end
 		return self._routes :: Registry.Registry

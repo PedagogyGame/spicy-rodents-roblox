@@ -78,7 +78,8 @@ export type Event = { kind: string, id: number, other: number?, t: number, space
 -- actor's own y), nil in the open. surface: where a body let go at that point is put (ground-level y, and the
 -- yaw to face), nil to leave it where it is.
 export type Cover = {
-	under: (x: number, y: number, z: number) -> string?,
+	-- the space hiding a body at (x, y, z); `actor` is the squirrel judged (nil for a body being let go)
+	under: (x: number, y: number, z: number, actor: Common.Actor?) -> string?,
 	surface: ((x: number, y: number, z: number) -> (number?, number?, number?, number?))?,
 }
 
@@ -174,7 +175,7 @@ end
 local function placeThreat(world: World, actor: Common.Actor)
 	local space = nil
 	for _, cover in world.covers do
-		space = cover.under(actor.x, actor.y, actor.z)
+		space = cover.under(actor.x, actor.y, actor.z, actor)
 		if space then
 			break
 		end

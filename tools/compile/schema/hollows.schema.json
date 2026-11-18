@@ -13,10 +13,18 @@
     "log": { "type": "object", "required": ["id", "variant", "claimable", "x", "z", "exits", "routeKind", "src"], "additionalProperties": false,
       "properties": { "id": { "type": "string" }, "variant": { "const": "log" }, "claimable": { "const": false }, "x": { "type": "number" }, "z": { "type": "number" },
         "lengthU": { "type": "number" }, "yaw": { "type": "number" }, "exits": { "type": "integer", "minimum": 2 },
-        "nook": { "type": "object" }, "routeKind": { "const": "tunnel" }, "src": { "type": "string" } } }
+        "nook": { "type": "object" }, "inside": { "type": "object", "additionalProperties": false, "properties": { "radius": { "type": "number", "exclusiveMinimum": 0 } } }, "routeKind": { "const": "tunnel" }, "src": { "type": "string" } } }
   },
   "$defs": {
-    "hollow": { "type": "object", "required": ["id", "tier", "variant", "tree", "x", "z", "chambers", "knotholes", "claimable", "src"], "additionalProperties": false,
+    "inside": { "type": "object", "required": ["trunk", "hole"], "additionalProperties": false,
+      "description": "Studs about the harvested trunk (Shared/World/HollowLayout): the trunk route, the ground hole's bearing (degrees clockwise from +z), and per variant: shaft/escape wall + knot (bough route ids: the top exit and the part-way knothole) and hideout (height); spiral radius, pitch, top (heights) and landings.",
+      "properties": {
+        "trunk": { "type": "integer" }, "hole": { "type": "number", "minimum": 0, "maximum": 360 },
+        "wall": { "type": "integer" }, "knot": { "type": "integer" }, "hideout": { "type": "number", "exclusiveMinimum": 0 },
+        "hideoutBearing": { "type": "number" },
+        "radius": { "type": "number", "exclusiveMinimum": 0 }, "pitch": { "type": "number", "exclusiveMinimum": 2.4 },
+        "top": { "type": "number", "exclusiveMinimum": 0 }, "landings": { "type": "array", "items": { "type": "number" } } } },
+    "hollow": { "type": "object", "required": ["id", "tier", "variant", "tree", "x", "z", "chambers", "knotholes", "claimable", "inside", "src"], "additionalProperties": false,
       "properties": {
         "id": { "type": "string", "pattern": "^H\\d+$" }, "tier": { "enum": ["premium", "escape", "single"] },
         "variant": { "enum": ["spiral", "shaft", "escape", "knothole"] }, "tree": { "type": "string" },
@@ -32,6 +40,7 @@
         "claimable": { "type": "boolean" },
         "premiumForage": { "type": "array", "items": { "type": "object", "required": ["id", "kind", "x", "z"], "additionalProperties": false,
           "properties": { "id": { "type": "string" }, "kind": { "enum": ["garden", "feeder"] }, "x": { "type": "number" }, "z": { "type": "number" } } } },
+        "inside": { "$ref": "#/$defs/inside" },
         "note": { "type": "string" }, "src": { "type": "string" }
       } }
   }
