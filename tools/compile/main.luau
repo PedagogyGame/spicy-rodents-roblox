@@ -22,6 +22,7 @@ local PinballArt = require("./lib/PinballArt")
 local ShopArt = require("./lib/ShopArt")
 local Expansion = require("./lib/Expansion")
 local Sewers = require("./lib/Sewers")
+local HollowTrees = require("./lib/HollowTrees")
 
 type Opts = { command: string, repo: string, spec: string, chunkKb: number, stylua: boolean, check: boolean }
 
@@ -489,6 +490,23 @@ local function compile(o: Opts, outDir: string, writeReport: boolean)
 	})
 	if expansionModule then
 		table.insert(w1.modules, expansionModule)
+	end
+	-- data/hollows.json's insides: the hollow trees and the log as enclosed runs (Shared/World/HollowLayout)
+	local hollowOtherIds = table.clone(otherIds)
+	for _, r in (if sewersModule then sewersModule.value.routes else {}) :: { any } do
+		hollowOtherIds[r.id] = true
+	end
+	local hollowModule = HollowTrees.compile({
+		repo = repo,
+		routes = routesConv,
+		routeIds = routeIds,
+		otherIds = hollowOtherIds,
+		terrainExtensions = terrainExtensions,
+		invariant = invariant,
+		compare = compare,
+	})
+	if hollowModule then
+		table.insert(w1.modules, hollowModule)
 	end
 	-- data/art/tree_meshes.json: the Blender tree models the bake places (WorldGen/Builders/Trees)
 	local treeArtModule = TreeArt.compile({ repo = repo, invariant = invariant, compare = compare })

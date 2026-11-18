@@ -145,6 +145,7 @@ export type Layout = {
 export type Harvest = {
 	get: (self: any, id: number) -> any?,
 	pointAt: (self: any, route: any, t: number) -> Vec3,
+	tangentAt: (self: any, route: any, t: number) -> Vec3,
 }
 
 local function r4(n: number): number
@@ -399,7 +400,8 @@ local function depthOut(trunk: Trunk, p: { number }, out: { number }, h: number)
 	local ol = math.sqrt(out[1] * out[1] + out[3] * out[3])
 	local ox, oz = out[1] / ol, out[3] / ol
 	local b = px * ox + pz * oz
-	local c = px * px + pz * pz - trunk.bark(h) ^ 2
+	-- (the bark as the motor's checks see it: never thinner than the trunk route's surface radius)
+	local c = px * px + pz * pz - math.max(trunk.bark(h), trunk.route.surfaceRadius) ^ 2
 	return r4(-b + math.sqrt(math.max(0, b * b - c)) + 0.1)
 end
 
@@ -552,6 +554,9 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 		end
 	end
 	table.insert(shaft, tr.toWorld(wallB, rho(top), top))
+	-- the top knothole leans out along bough `wall` (Motion.mouthOut): its bark is measured that way
+	local wt = b.harvest:tangentAt(assert(b.harvest:get(inside.wall)), wallT)
+	local wallOut = { wt.x, 0, wt.z }
 	local knotTs = (knotH - h0) / (top - h0)
 	local knotP = tr.toWorld(wallB, rho(knotH), knotH)
 	local forks = {}
@@ -595,7 +600,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 				{
 					t = 1,
 					opens = "link",
-					depth = depthOut(tr, shaft[#shaft], outOf(wallB), top),
+					depth = depthOut(tr, shaft[#shaft], wallOut, top),
 					links = { { route = inside.wall, t = r4(wallT), dir = 1 } },
 					name = "top knothole",
 				},
