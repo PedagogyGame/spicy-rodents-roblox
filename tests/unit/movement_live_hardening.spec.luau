@@ -1,7 +1,7 @@
 --!strict
 -- The live squirrel validator against what an adversarial review found (2026-11-18): a NaN on the wire, packets
 -- spaced past the envelope's gap, a client that roams while silent, the correction handshake used as a free hop, an
--- honest link whose latency drops. Each cheat must be snapped; each honest case must not be.
+-- honest link whose latency drops, a sprint that never tires. Each cheat must be snapped; each honest case must not be.
 local Units = require("@shared/Config/Units")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SquirrelWire = require("@shared/Movement/SquirrelWire")
@@ -547,4 +547,103 @@ return function(t)
 			t.truthy((r.reasons.clock or 0) >= 1, "for its clock")
 		end)
 	end
+	-- 6. THE SERVER'S OWN SPRINT METER --------------------------------------------------------------------------------
+	-- east and west by turns, a few seconds each way, on the open ground
+	local function runs(sprint: (now: number, s: State) -> boolean, leapEvery: number?): LiveRig.Keys
+		return function(now: number, s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+			local inp = SquirrelMotor.idleInput(if math.floor(now / 3) % 2 == 0 then -math.pi / 2 else math.pi / 2)
+			inp.fw = 1
+			inp.sprint = sprint(now, s)
+			if leapEvery then
+				inp.leap = (now % leapEvery) < 0.05
+			end
+			return inp
+		end
+	end
+	local function endless(speed: number): (State, SquirrelMotor.Input, number, any) -> ()
+		return function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+			if now >= 2 then
+				s.stamina, s.winded = 1, false
+				local v = math.sqrt(s.vx ^ 2 + s.vz ^ 2)
+				if v > 1 and s.grounded then
+					local k = speed / v
+					s.x += s.vx * (k - 1) / 60
+					s.z += s.vz * (k - 1) / 60
+				end
+			end
+		end
+	end
+	for _, c in { { speed = 44, within = 9 }, { speed = 37, within = 9 } } do
+		t.test(
+			`cheat: {c.speed} st/s on the ground with a meter that never empties: snapped within {c.within} s`,
+			function()
+				local rig = LiveRig.new({
+					world = town.noWalls,
+					vworld = town.vworld,
+					link = { latency = 0.12, jitter = 0.1, loss = 0.02 },
+					seed = 8,
+					cheat = endless(c.speed),
+				})
+				rig:possess(
+					town.openStart(),
+					runs(function()
+						return true
+					end)
+				)
+				rig:run(40)
+				local r = rig:result()
+				show(`endless sprint at {c.speed} st/s`, r)
+				t.truthy(r.firstSnap and r.firstSnap <= 2 + c.within, `snapped within {c.within} s`)
+				t.truthy((r.reasons.stamina or 0) >= 1, "for its stamina")
+				t.truthy(r.holds >= 1, "and held while it keeps on")
+			end
+		)
+	end
+	local slowLink: LiveRig.Link = { latency = 0.3, jitter = 0.15, loss = 0.02 }
+	t.test("honest: sprinting until winded, walking it back, again and again, with leaps (300 ms): 0 snaps", function()
+		local rig = LiveRig.new({ world = town.noWalls, vworld = town.vworld, link = slowLink, seed = 81 })
+		rig:possess(
+			town.openStart(),
+			runs(function()
+				return true
+			end, 1.7)
+		)
+		rig:run(60)
+		local r = rig:result()
+		show("sprint, winded, walk, sprint", r)
+		t.eq(r.snaps, 0, "snaps")
+	end)
+	t.test("honest: hopping at a walk, a leap every 0.8 s for a minute (300 ms): 0 snaps", function()
+		local rig = LiveRig.new({ world = town.noWalls, vworld = town.vworld, link = slowLink, seed = 82 })
+		rig:possess(
+			town.openStart(),
+			runs(function()
+				return false
+			end, 0.8)
+		)
+		rig:run(60)
+		local r = rig:result()
+		show("hopping", r)
+		t.eq(r.snaps, 0, "snaps")
+	end)
+	t.test("honest: a sprint down to empty, the sky lift, then a full sprint off it (300 ms): 0 snaps", function()
+		local rig = LiveRig.new({ world = town.noWalls, vworld = town.vworld, link = slowLink, seed = 83 })
+		local s0 = town.openStart()
+		rig:possess(
+			s0,
+			runs(function(now: number)
+				return now < 5 or now > 18
+			end)
+		)
+		rig:at(5, function()
+			rig:board()
+		end)
+		rig:at(15, function()
+			rig:alight(s0.x, s0.y, s0.z + 20)
+		end)
+		rig:run(26)
+		local r = rig:result()
+		show("sprint, ride, sprint", r)
+		t.eq(r.snaps, 0, "snaps")
+	end)
 end

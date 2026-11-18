@@ -84,6 +84,8 @@ type Marks = {
 	offsets: { ClockSample },
 	gaps: { number }, -- server times of the recent gaps too long to judge move by move
 	wallGaps: { number }, -- server times of the recent gaps whose straight line went through a wall
+	stamina: number, -- the server's own sprint meter (stamina()): 1 full, below 0 the client sprints on credit
+	staminaAt: number, -- server time it was last brought up to date
 }
 
 type Actor = {
@@ -127,6 +129,8 @@ export type MoveValidator = typeof(setmetatable(
 
 MoveValidator.C = table.freeze({
 	WALL_GAP_WINDOW = 20, -- seconds: a second gap through a wall inside this is a whole flag
+	STAMINA_WALK = 1.2, -- faster than this times the walk on the ground drains the server's sprint meter
+	STAMINA_SLACK = 0.5, -- how far below empty it may go (two seconds of sprint: landings' carry, rounding)
 })
 
 local CLOCK_BUCKET = 0.5 -- seconds of server time per clock bucket
@@ -192,7 +196,7 @@ function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapsh
 	local now = serverTime or 0
 	local marks = self._marks[actorId]
 	if marks == nil then
-		marks = { offsets = {}, gaps = {}, wallGaps = {} }
+		marks = { offsets = {}, gaps = {}, wallGaps = {}, stamina = 1, staminaAt = now }
 		self._marks[actorId] = marks
 	end
 	local m = marks :: Marks
@@ -397,6 +401,17 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		end
 	end
 
+	self:_stamina(
+		actor,
+		prev,
+		next,
+		dt,
+		serverTime,
+		resync or dt > SquirrelMotor.envelopeParams.maxDt,
+		boosted,
+		violations
+	)
+
 	-- floors: a grounded body off the rails stands on something (a third of a flag: a car drawn behind the server's)
 	local floorBelow = self.world.floorBelow
 	if floorBelow and next.grounded and not next.routeId and not riverLanding then
@@ -469,7 +484,7 @@ end
 local function marksOf(self: MoveValidator, actorId: any): Marks
 	local marks = self._marks[actorId]
 	if marks == nil then
-		marks = { offsets = {}, gaps = {}, wallGaps = {} }
+		marks = { offsets = {}, gaps = {}, wallGaps = {}, stamina = 1, staminaAt = 0 }
 		self._marks[actorId] = marks
 	end
 	return marks :: Marks
@@ -567,6 +582,53 @@ function MoveValidator.hop(
 		})
 	end
 	return violations
+end
+
+-- _stamina: the server's own sprint meter (the client's is its own feel, and a modified client keeps it full). Faster
+-- on the ground than a walk can explain (MoveValidator.C.STAMINA_WALK times the walk), between two packets judged move
+-- by move, off the rails and grounded at both ends, drains it as the motor's sprint does (a full meter is
+-- sprintSeconds); anything else refills it by the server's own time at the motor's rate (sprintRefill), so a ride, a
+-- stall or a respawn never leaves it short. The server's meter never drains where the client's does not: a sprint in
+-- the air, a leap's cost and a sprint on a rail are left out, so it stays at or above the client's, but for a landing's
+-- carry (a leap or a pounce lands at more than a walk for a moment), which the slack covers. Below -C.STAMINA_SLACK
+-- the client is sprinting on credit: half a flag a packet, and the meter held there. The chili rush (boostOf) runs
+-- faster than a sprint and is left out.
+function MoveValidator._stamina(
+	_self: MoveValidator,
+	actor: Actor,
+	prev: State,
+	next: State,
+	dt: number,
+	serverTime: number,
+	unjudged: boolean,
+	boosted: boolean,
+	violations: { Violation }
+)
+	local marks = actor.marks
+	local elapsed = math.max(0, serverTime - marks.staminaAt)
+	marks.staminaAt = serverTime
+	local P = SquirrelMotor.params
+	local running = not unjudged
+		and not boosted
+		and dt > 0
+		and prev.routeId == nil
+		and next.routeId == nil
+		and prev.grounded
+		and next.grounded
+		and math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2) / dt > P.walk * MoveValidator.C.STAMINA_WALK
+	if not running then
+		marks.stamina = math.min(1, marks.stamina + elapsed / P.sprintRefill)
+		return
+	end
+	marks.stamina -= dt / P.sprintSeconds
+	if marks.stamina < -MoveValidator.C.STAMINA_SLACK then
+		marks.stamina = -MoveValidator.C.STAMINA_SLACK
+		table.insert(violations, {
+			code = "stamina",
+			severity = 0.5,
+			detail = `faster than a walk on the ground for longer than the sprint meter lasts`,
+		})
+	end
 end
 
 -- wallGap(actorId, now) -> n: a straight line too long to be sure of (a gap, a jump of the root) went through a wall;
