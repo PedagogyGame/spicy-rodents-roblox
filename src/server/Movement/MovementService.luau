@@ -46,7 +46,7 @@
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
---   M:epochOf(actorId) -> number; M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
+--   M:epochOf(actorId) -> number; M:motorOf(actorId) -> (snapshot?, at?); M:isPinned(actorId) -> boolean; M:pose(actorId, t) -> (x, y, z)?; M:stats() -> Stats; C
 
 local Import = require("../Import")
 local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
@@ -164,6 +164,7 @@ export type Movement = {
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
 	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
 	epochOf: (self: Movement, actorId: any) -> number,
+	motorOf: (self: Movement, actorId: any) -> ({ [string]: number | boolean }?, number?),
 	isPinned: (self: Movement, actorId: any) -> boolean,
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
 	stats: (self: Movement) -> Stats,
@@ -556,6 +557,17 @@ function MovementService.new(deps: Deps): Movement
 			sq.prior = { x = at.x, y = at.y, z = at.z, at = now }
 			sq.priorUntil = math.max(sq.priorUntil, now + ignoredFor(self, id))
 		end
+	end
+
+	-- motorOf(actorId): the held squirrel's motor state as its last clean packet gave it (nil before one), and the
+	-- server time it came in. Combat/CombatService reads the pounce from it (attackWindow): a bite needs the motor's
+	-- own, validated pounce, not just the player's say-so.
+	function m.motorOf(self: Movement, actorId: any): ({ [string]: number | boolean }?, number?)
+		local sq = self.squirrels[actorId]
+		if sq == nil then
+			return nil, nil
+		end
+		return sq.good, sq.lastAt
 	end
 
 	function m.epochOf(self: Movement, actorId: any): number

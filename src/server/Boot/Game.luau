@@ -13,12 +13,15 @@
 --   4. Actors/ActorsRuntime: 102 bodies (people, squirrels, deer, the fox, the rodent), Possession,
 --      RoleService (the 49 cap and the Ladder stay in force: a joining player is a townsperson, the
 --      50th is turned away), the device fleet (patrol cars, carts, bikes, the drone).
---   5. ReplicatedStorage.PlayNet remotes: Pick(choice) from the menu, Kick() (townsperson F), Event
---      (server -> client: picked, refused, bite, bitten, med, hurt, died, kick).
+--   5. ReplicatedStorage.PlayNet remotes: Pick(choice) from the menu, Kick() (townsperson F), Duel(verb) (the rodent's
+--      click, "pounce", and F, "feint"), Event (server -> client: picked, refused, bite, bitten, med, hurt, died, kick,
+--      duel).
 -- Every frame: ActorsRuntime steps the AI (its own Heartbeat); here traffic steps at 30 Hz against the
 -- people and the player-held squirrels (RunOver kills: "RUN OVER"), poses stream to clients at 15 Hz
--- (Net VehiclePoses, rendered by Client/Render/VehicleView), the rodent bites people it touches
--- (Combat/PlayRules; Power per Rodent/PowerRules, brief v2 §15), Power fades while playing.
+-- (Net VehiclePoses, rendered by Client/Render/VehicleView), the duel steps ten times a second (Combat/CombatService:
+-- the rodent bites at the right moment of a pounce, never on contact; the townspeople and officers near it fight back,
+-- vigilantes close in, a bite opens an alert zone and sends the police; Power per Rodent/PowerRules, brief v2 §15),
+-- Power fades while playing.
 -- A bite starts the bite-to-hospital sequence (owner 2026-11-10; Infection/InfectionService, stepped
 -- here after traffic): the person is infected and runs, collapses at once or shows symptoms later,
 -- an ambulance and a crowd come or they walk in, and the hospital is the only cure. The service
@@ -46,7 +49,8 @@
 -- Engine only inside the functions; no side effects on require.
 -- Interface: start(opts?) -> Game { runtime, traffic, movement, wallet (Economy/Credits: spend, add, balance,
 --   pass), pick(player, choice) -> (ok, why?),
---   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
+--   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player), Duel(player, verb) } (the PlayNet handlers),
+--   combat (Combat/CombatService; nil when it could not start),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
 --   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
@@ -67,6 +71,7 @@ local Data = Import.shared("Data") :: typeof(require("../../shared/Data"))
 local Height = Import.shared("World/Height") :: typeof(require("../../shared/World/Height"))
 local LightingPreset = Import.shared("World/LightingPreset") :: typeof(require("../../shared/World/LightingPreset"))
 local PlayRules = Import.shared("Combat/PlayRules") :: typeof(require("../../shared/Combat/PlayRules"))
+local CombatRules = Import.shared("Combat/CombatRules") :: typeof(require("../../shared/Combat/CombatRules"))
 local PossessionState =
 	Import.shared("Actors/PossessionState") :: typeof(require("../../shared/Actors/PossessionState"))
 local PowerRules = Import.shared("Rodent/PowerRules") :: typeof(require("../../shared/Rodent/PowerRules"))
@@ -85,6 +90,7 @@ local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../s
 local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
+local CombatService = require("../Combat/CombatService")
 local SewerService = require("../World/SewerService")
 local HollowService = require("../Foraging/HollowService")
 local SkyLiftService = require("../Rides/SkyLiftService")
@@ -286,6 +292,7 @@ function Game.start(opts: Opts?): any
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local RunService = game:GetService("RunService")
 	local HttpService = game:GetService("HttpService")
+	local Debris = game:GetService("Debris")
 
 	local function stage(p: number, text: string)
 		ReplicatedStorage:SetAttribute("BootProgress", p)
@@ -423,6 +430,7 @@ function Game.start(opts: Opts?): any
 	local pickRemote = remote(playNet, "Pick")
 	local kickRemote = remote(playNet, "Kick")
 	local eventRemote = remote(playNet, "Event")
+	local duelRemote = remote(playNet, "Duel")
 	local kindsJson: { [string]: any } = {}
 	for id, k in traffic:kinds() do
 		kindsJson[tostring(id)] = k
@@ -527,7 +535,6 @@ function Game.start(opts: Opts?): any
 	end
 	local health: { [string]: number } = {}
 	local states: { [any]: PState } = {}
-	local lastBitten: { [any]: number } = {}
 	local shoutN = 0
 	local now = 0
 	local lastSay: { [number]: string } = {} -- town id -> the line last shown over that body
@@ -1089,6 +1096,31 @@ function Game.start(opts: Opts?): any
 		end
 	end
 
+	-- a blow on a squirrel-family body (a player's kick, a townsperson's or an officer's in the duel): its health, the
+	-- rodent's Power (the v5.4 pedestrian kick), the "hurt" toast, and the knock-out at 0
+	local function hurtRodent(target: any, amount: number, cause: string): (number, boolean)
+		local h, dead = CombatRules.applyDamage(healthOf(target.id), amount)
+		health[target.id] = h
+		local driver = possession:controllerOf(target)
+		if driver ~= "ai" and driver ~= nil then
+			local ds = stateOf(driver)
+			if target.variant == "spicy" then
+				PowerRules.apply(ds.power, { kind = "pedestrianKick" })
+			end
+			publish(driver)
+			fire(driver, { kind = "hurt", by = cause, health = h })
+		end
+		if dead then
+			kill(target, "kick")
+		end
+		return h, dead
+	end
+
+	-- the duel (Combat/CombatService), built below once the bite's consequences are defined; a player's kick reads its
+	-- alert zones and tells it of the raised leg
+	local combat: any = nil
+	local duelRules = CombatRules.params()
+
 	local function kick(player: any): boolean?
 		local s = stateOf(player)
 		local clock = os.clock()
@@ -1109,6 +1141,9 @@ function Game.start(opts: Opts?): any
 		end
 		local p = root.Position
 		local look = root.CFrame.LookVector
+		if combat and townIdOf[actor.id] then
+			combat:heldKick(townIdOf[actor.id], now)
+		end
 		local targets = {}
 		local byId: { [string]: any } = {}
 		for _, a in world.actors do
@@ -1132,32 +1167,22 @@ function Game.start(opts: Opts?): any
 			return false
 		end
 		local target = byId[hitId]
-		local h, dead = PlayRules.damage(healthOf(hitId), PlayRules.KICK_DAMAGE)
-		health[hitId] = h
+		-- (the hidden strength boost by a fresh bite is a player's too: Combat/CombatService)
+		local amount = CombatRules.damage(duelRules, "kick", combat ~= nil and combat:inAlert(p.X, p.Z, now))
+		local h, dead = hurtRodent(target, amount, "kick")
 		fire(player, {
 			kind = "kick",
 			hit = true,
 			target = if target.variant == "spicy" then "rodent" else "squirrel",
 			health = h,
 		})
-		local driver = possession:controllerOf(target)
-		if driver ~= "ai" and driver ~= nil then
-			local ds = stateOf(driver)
-			if target.variant == "spicy" then
-				PowerRules.apply(ds.power, { kind = "pedestrianKick" })
-			end
-			publish(driver)
-			fire(driver, { kind = "hurt", by = "kick", health = h })
-		else
+		if not dead and possession:controllerOf(target) == "ai" then
 			-- knock the AI body back a few studs
 			local a = world.actorsById[townIdOf[hitId]]
 			if a then
 				a.x += look.X * 4
 				a.z += look.Z * 4
 			end
-		end
-		if dead then
-			kill(target, "kick")
 		end
 		return true
 	end
@@ -1221,91 +1246,166 @@ function Game.start(opts: Opts?): any
 		return { people = people, squirrels = squirrels, cars = cars }
 	end
 
-	local function bites()
-		local humans = nil
+	-- A bite landed (Combat/CombatService decided it): Power, the bite count and the Bite clip on the rodent, the
+	-- victim's shout, the bite-to-hospital sequence, and the news on both players' screens. Ids are town ids.
+	local function landBite(vt: number, rodentTown: number)
+		local actor = rt.byTownId[rodentTown]
+		local victim = rt.byTownId[vt]
+		local player = if actor then possession:controllerOf(actor) else nil
+		if actor == nil or victim == nil or player == nil or player == "ai" then
+			return
+		end
+		local s = stateOf(player)
+		local root = (actor.body :: Model).PrimaryPart
+		local va = world.actorsById[vt]
+		local officer = va ~= nil and va.post == "police"
+		local delta = PowerRules.apply(
+			s.power,
+			{ kind = if officer then "biteOfficer" else "bitePerson", y = Units.u(if root then root.Position.Y else 0) }
+		)
+		s.lastBiteAt = now
+		s.bites += 1 -- every client plays the bite on the rodent's body (Animation/AnimationDriver watches this)
+		(actor.body :: Model):SetAttribute("BiteAt", now)
+		shoutN += 1
+		local line = PlayRules.shout(shoutN)
+		local driver = possession:controllerOf(victim)
+		if infection then
+			-- infected: they run and shout (the Say attribute; clients draw the bubble), and the sequence to the
+			-- hospital begins. A player holding the victim gets a "med" event from the service that says what
+			-- happened and what to do.
+			local okB, errB = pcall(infection.bite, infection, vt, rodentTown, player)
+			if not okB then
+				infectionFault("bite", errB)
+			end
+			line = lastSay[vt] or line
+		elseif driver == "ai" then
+			local brain = world.brains[vt] :: any
+			local me = world.actorsById[rodentTown]
+			if brain and brain.lane and va and me then
+				brain.state = "flee"
+				brain.threat = me
+				va.alert = 8
+			end
+		elseif driver ~= nil then
+			fire(driver, { kind = "bitten", line = line })
+		end
+		publish(player)
+		fire(player, {
+			kind = "bite",
+			bites = s.bites,
+			power = s.power.points,
+			delta = delta,
+			stage = PowerRules.stage(s.power.points),
+			line = line,
+		})
+	end
+
+	-- the players' Spicy Rodents that can fight now: not stunned by the water gun (Items/ItemWorld), not down a drain
+	-- (World/SewerService) or inside a hollow tree (Foraging/HollowService)
+	local function rodentsInPlay(): { number }
+		local out = {}
 		for player, s in states do
 			local actor = possession:actorOf(player)
 			if s.role == "rodent" and actor and actor.variant == "spicy" then
-				local root = (actor.body :: Model).PrimaryPart
-				-- never out of cover: a rodent down a drain is hidden from everyone, so it bites nobody; nor while
-				-- the water gun has it stunned (Items/ItemWorld)
 				local tid = townIdOf[actor.id]
 				local stunnedUntil = (actor.body :: Model):GetAttribute(PossessionState.ATTR.StunnedUntil)
 				local stunned = type(stunnedUntil) == "number" and workspace:GetServerTimeNow() < stunnedUntil
-				-- (nor from inside a hollow tree: Foraging/HollowService)
 				local covered = tid ~= nil
 					and ((sewers ~= nil and not sewers:mayBite(tid)) or (hollows ~= nil and not hollows:mayBite(tid)))
-				if root and not stunned and not covered then
-					if humans == nil then
-						humans = {}
-						for _, a in world.actors do
-							if a.species == "human" then
-								local other = rt.byTownId[a.id]
-								local r = (other.body :: Model).PrimaryPart
-								if r then
-									local q = r.Position
-									table.insert(humans, { id = other.id, x = q.X, y = q.Y, z = q.Z, townId = a.id })
-								end
-							end
-						end
-					end
-					local p = root.Position
-					local victims = PlayRules.biteVictims(
-						{ id = actor.id, x = p.X, y = p.Y, z = p.Z },
-						humans :: any,
-						now,
-						lastBitten
-					)
-					for _, vid in victims do
-						local victim = rt.actors:get(vid)
-						local vt = townIdOf[vid]
-						local va = world.actorsById[vt]
-						if infection and not infection:biteable(vt) then
-							continue -- a patient on the ground, in the ambulance or in a bed is left alone
-						end
-						local officer = va ~= nil and va.post == "police"
-						local delta = PowerRules.apply(
-							s.power,
-							{ kind = if officer then "biteOfficer" else "bitePerson", y = Units.u(p.Y) }
-						)
-						s.lastBiteAt = now
-						s.bites += 1 -- every client plays the bite on the rodent's body (Animation/AnimationDriver watches this)
-						(actor.body :: Model):SetAttribute("BiteAt", now)
-						shoutN += 1
-						local line = PlayRules.shout(shoutN)
-						local driver = if victim then possession:controllerOf(victim) else "ai"
-						if infection then
-							-- infected: they run and shout (the Say attribute; clients draw the bubble),
-							-- and the sequence to the hospital begins. A player holding the victim gets a
-							-- "med" event from the service that says what happened and what to do.
-							local okB, errB = pcall(infection.bite, infection, vt, townIdOf[actor.id], player)
-							if not okB then
-								infectionFault("bite", errB)
-							end
-							line = lastSay[vt] or line
-						elseif driver == "ai" then
-							local brain = world.brains[vt] :: any
-							local me = world.actorsById[townIdOf[actor.id]]
-							if brain and brain.lane and va and me then
-								brain.state = "flee"
-								brain.threat = me
-								va.alert = 8
-							end
-						elseif driver ~= nil then
-							fire(driver, { kind = "bitten", line = line })
-						end
-						publish(player)
-						fire(player, {
-							kind = "bite",
-							bites = s.bites,
-							power = s.power.points,
-							delta = delta,
-							stage = PowerRules.stage(s.power.points),
-							line = line,
-						})
-					end
+				if tid and not stunned and not covered then
+					table.insert(out, tid)
 				end
 			end
+		end
+		return out
+	end
+
+	local okDuel, errDuel = pcall(function()
+		combat = CombatService.new({
+			world = world,
+			infection = infection,
+			params = duelRules,
+			controllerOf = controllerOfTown,
+			rodents = rodentsInPlay,
+			-- the pounce the validator accepted (Movement/MovementService): a click alone bites nobody
+			motorOf = function(id: number): { [string]: any }?
+				local actor = rt.byTownId[id]
+				return if actor then movement:motorOf(actor.id) :: any else nil
+			end,
+			setAttr = setTownAttr,
+			notify = function(id: number, payload: { [string]: any })
+				local actor = rt.byTownId[id]
+				local driver = if actor then possession:controllerOf(actor) else nil
+				if driver ~= nil and driver ~= "ai" then
+					fire(driver, payload)
+				end
+			end,
+			hurt = function(id: number, amount: number, cause: string, _by: number)
+				local actor = rt.byTownId[id]
+				if actor then
+					hurtRodent(actor, amount, cause)
+				end
+			end,
+			bitten = landBite,
+			covered = function(id: number): boolean
+				return world.covered[id] ~= nil
+			end,
+			-- a Sound named after the cue at the body (silent until the library ids are chosen)
+			cue = function(id: number, name: string)
+				local actor = rt.byTownId[id]
+				local root = if actor then (actor.body :: Model).PrimaryPart else nil
+				local soundId = CombatService.SOUNDS[name] or ""
+				if root and soundId ~= "" then
+					local snd = Instance.new("Sound")
+					snd.Name = name
+					snd.SoundId = soundId
+					snd.RollOffMaxDistance = 80
+					snd.Parent = root
+					snd:Play()
+					Debris:AddItem(snd, 4)
+				end
+			end,
+		})
+	end)
+	if not okDuel then
+		combat = nil
+		warn(`[SpicyRodents] the duel did not start (nobody can bite or be bitten): {errDuel}`)
+	end
+	local duelFaults = 0
+
+	-- every 0.1 s: the duel (the people's side, the blows, and the bite at the right moment)
+	local function bites()
+		if combat == nil then
+			return
+		end
+		local okD, errD = pcall(combat.step, combat, 0.1, now)
+		if not okD then
+			duelFaults += 1
+			if duelFaults <= 5 then
+				warn(`[SpicyRodents] the duel failed this tick: {errD}`)
+			end
+			if duelFaults >= Game.FAULT_LIMIT then
+				pcall(combat.stop, combat)
+				combat = nil
+				warn("[SpicyRodents] the duel keeps failing: switched off")
+			end
+		end
+	end
+
+	-- the rodent's click (a pounce's tell) and F (a feint), from the PlayNet "Duel" remote
+	local function duel(player: any, verb: any)
+		if combat == nil or (verb ~= "pounce" and verb ~= "feint") then
+			return
+		end
+		local s = stateOf(player)
+		local actor = possession:actorOf(player)
+		local tid = if actor then townIdOf[actor.id] else nil
+		if s.role ~= "rodent" or actor == nil or actor.variant ~= "spicy" or tid == nil then
+			return
+		end
+		local ok, why = combat:rodentAct(tid, verb, now)
+		if not ok and verb == "feint" and why == "winded" then
+			fire(player, { kind = "duel", what = "winded" })
 		end
 	end
 
@@ -1427,9 +1527,18 @@ function Game.start(opts: Opts?): any
 			warn(`[SpicyRodents] kick failed: {err}`)
 		end
 	end
+	local function onDuel(player: any, verb: any)
+		local ok, err = pcall(function()
+			duel(player, verb)
+		end)
+		if not ok then
+			warn(`[SpicyRodents] duel {verb} failed: {err}`)
+		end
+	end
 	local conns: { RBXScriptConnection } = {}
 	table.insert(conns, pickRemote.OnServerEvent:Connect(onPick))
 	table.insert(conns, kickRemote.OnServerEvent:Connect(onKick))
+	table.insert(conns, duelRemote.OnServerEvent:Connect(onDuel))
 	table.insert(
 		conns,
 		Players.PlayerRemoving:Connect(function(player: Player)
@@ -1733,8 +1842,9 @@ function Game.start(opts: Opts?): any
 		timings = timings,
 		pick = pick,
 		kick = kick,
-		remotes = { Pick = onPick, Kick = onKick },
+		remotes = { Pick = onPick, Kick = onKick, Duel = onDuel },
 		kill = kill,
+		combat = combat,
 		step = function(dt: number)
 			rt.step(dt)
 			step(dt)

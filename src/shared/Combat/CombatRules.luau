@@ -104,8 +104,10 @@ export type Params = {
 
 local CombatRules = {}
 
-CombatRules.RESPONSES = table.freeze({ "flee", "back", "flinch", "swing", "kick" }) :: { Response }
-CombatRules.TEMPERS = table.freeze({ "calm", "wary", "tough" }) :: { Temper }
+local RESPONSES: { Response } = { "flee", "back", "flinch", "swing", "kick" }
+local TEMPERS: { Temper } = { "calm", "wary", "tough" }
+CombatRules.RESPONSES = table.freeze(RESPONSES)
+CombatRules.TEMPERS = table.freeze(TEMPERS)
 
 function CombatRules.params(): Params
 	local g = Tunables.get
@@ -243,20 +245,20 @@ end
 -- The response the weights give for a uniform draw r in [0, 1).
 function CombatRules.pick(weights: { [string]: number }, r: number): Response
 	local total = 0
-	for _, k in CombatRules.RESPONSES do
+	for _, k in RESPONSES do
 		total += weights[k] or 0
 	end
 	if total <= 0 then
 		return "back"
 	end
 	local x = r * total
-	for _, k in CombatRules.RESPONSES do
+	for _, k in RESPONSES do
 		x -= weights[k] or 0
 		if x < 0 then
-			return k
+			return k :: Response
 		end
 	end
-	return CombatRules.RESPONSES[#CombatRules.RESPONSES]
+	return RESPONSES[#RESPONSES]
 end
 
 -- The chance a bite lands on a person in this phase (inZone: near a fresh bite).

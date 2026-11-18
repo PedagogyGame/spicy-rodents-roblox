@@ -35,7 +35,7 @@
 -- Interface: new(opts) -> Service; :rodentAct(id, verb, now) -> (ok, why?); :heldKick(id, now); :step(dt, now);
 --   :inAlert(x, z, now) -> boolean; :boost(x, z, now) -> number (the kick multiplier there); :temperOf(id) -> Temper;
 --   :isVigilante(id) -> boolean; :summon(x, z, r); :zones() -> { Zone }; :guardOf(id) -> Guard?; :stats();
---   :stop() (every order and stance let go); HELD_GUARD; CHASE_EVERY
+--   :stop() (every order and stance let go); HELD_GUARD; CHASE_EVERY; SOUNDS (cue name -> id)
 -- Ids are TownAI actor ids. Positions in studs.
 
 local Import = require("../Import")
@@ -44,10 +44,16 @@ local Duel = Import.shared("Combat/Duel") :: typeof(require("../../shared/Combat
 local VigilanteRules = Import.shared("Combat/VigilanteRules") :: typeof(require("../../shared/Combat/VigilanteRules"))
 local Cover = Import.shared("Combat/Cover") :: typeof(require("../../shared/Combat/Cover"))
 
+-- Exported types do not cross Import (W1 Track A note): the shared ones are restated loosely here.
+type Params = any
+type Guard = any
+type Temper = string
+type Sample = { t: number, x: number, z: number }
+
 export type Opts = {
 	world: any, -- AI/TownAI.World
 	infection: any?, -- Infection/InfectionService (biteable, engaged)
-	params: CombatRules.Params?,
+	params: Params?,
 	rand: (() -> number)?,
 	controllerOf: ((id: number) -> string)?, -- "ai" | "player"; default: world.possessed
 	rodents: () -> { number }, -- the player-held Spicy Rodents that can fight now
@@ -57,6 +63,7 @@ export type Opts = {
 	hurt: ((rodentId: number, amount: number, cause: string, byId: number) -> ())?,
 	bitten: ((victimId: number, rodentId: number) -> ())?, -- a bite landed: the game's consequences
 	covered: ((id: number) -> boolean)?, -- the rodent is out of everyone's sight (a drain, a hollow)
+	cue: ((id: number, cue: string) -> ())?, -- a sound by cue name at a body (CombatService.SOUNDS)
 }
 
 export type Zone = { x: number, z: number, at: number, untilT: number, biter: number }
@@ -73,7 +80,7 @@ type Rodent = {
 	feintUntil: number,
 	iUntil: number,
 	landed: boolean, -- this pounce has made its contact
-	history: { CombatRules.Sample },
+	history: { Sample },
 }
 
 type Chase = { zone: Zone, nextAt: number }
@@ -85,20 +92,29 @@ CombatService.HELD_GUARD = 0.5 -- s: a player's kick keeps a raised leg this lon
 CombatService.CHASE_EVERY = 0.5 -- s between a chasing officer's new orders
 CombatService.ORDER_SECS = 0.6 -- a duel order lasts this long unless renewed
 CombatService.REBALANCE_SECS = 1
+-- The duel's sounds, by cue name, played at the body (Boot/Game: a Sound named after the cue). The ids are to be
+-- chosen from Roblox's licensed library (docs/AUDIO_BUDGET.md); an empty id is silent.
+CombatService.SOUNDS = table.freeze({
+	["Duel.Windup"] = "", -- the rodent gathers itself to pounce (or feints): a short hiss
+	["Duel.Strike"] = "", -- a person's kick or swing comes down: a whoosh
+	["Duel.Blow"] = "", -- the blow lands on the rodent: a soft thump and a squeak (no crunch)
+	["Duel.Batted"] = "", -- a bite batted away: a slap and a yelp
+	["Duel.Squareup"] = "", -- a vigilante squares up: a grunt ("Hey!")
+}) :: { [string]: string }
 
 export type Service = typeof(setmetatable(
 	{} :: {
 		world: any,
 		infection: any?,
-		P: CombatRules.Params,
+		P: Params,
 		rand: () -> number,
 		opts: Opts,
 		rods: { [number]: Rodent },
-		guards: { [number]: Duel.Guard },
+		guards: { [number]: Guard },
 		fleeing: { [number]: boolean },
-		stances: { [number]: string },
+		stances: { [number]: string? },
 		flags: { [any]: boolean },
-		tempers: { [number]: CombatRules.Temper },
+		tempers: { [number]: Temper },
 		heldKicks: { [number]: number },
 		alerts: { Zone },
 		chases: { [number]: Chase },
@@ -164,6 +180,13 @@ local function notify(self: Service, id: number, payload: { [string]: any })
 	end
 end
 
+local function cue(self: Service, id: number, name: string)
+	local f = self.opts.cue
+	if f then
+		f(id, name)
+	end
+end
+
 local function covered(self: Service, id: number): boolean
 	local f = self.opts.covered
 	if f then
@@ -195,7 +218,7 @@ local function rodent(self: Service, id: number): Rodent
 end
 
 -- the person's temperament: tough with a vigilante flag; officers are always tough
-function CombatService.temperOf(self: Service, id: number): CombatRules.Temper
+function CombatService.temperOf(self: Service, id: number): Temper
 	local a = self.world.actorsById[id]
 	if a and a.post == "police" then
 		return "tough"
@@ -219,7 +242,7 @@ function CombatService.zones(self: Service): { Zone }
 	return self.alerts
 end
 
-function CombatService.guardOf(self: Service, id: number): Duel.Guard?
+function CombatService.guardOf(self: Service, id: number): Guard?
 	return self.guards[id]
 end
 
@@ -278,6 +301,7 @@ function CombatService.rodentAct(self: Service, id: number, verb: string, now: n
 		return false, "unknown"
 	end
 	setAttr(self, id, "PounceAt", now) -- the wind-up everyone sees (a feint looks the same)
+	cue(self, id, "Duel.Windup")
 	return true
 end
 
@@ -308,6 +332,9 @@ end
 
 local function setStance(self: Service, id: number, stance: string?)
 	if self.stances[id] ~= stance then
+		if stance == "squared" and self.stances[id] == nil then
+			cue(self, id, "Duel.Squareup")
+		end
 		self.stances[id] = stance
 		setAttr(self, id, "Stance", stance)
 	end
@@ -382,7 +409,7 @@ local function fighter(self: Service, a: any): boolean
 	return true
 end
 
-local function order(self: Service, a: any, rod: any, out: Duel.Out)
+local function order(self: Service, a: any, rod: any, out: any)
 	local brain = self.world.brains[a.id] :: any
 	if brain.kind == "Officer" then
 		-- an officer closes in and stands over it (Officer "respond" stops a couple of studs short)
@@ -517,13 +544,13 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 			)
 			self.guards[a.id] = g
 		end
-		local guard = g :: Duel.Guard
+		local guard = g :: Guard
 		local r = self.rods[best.id] :: Rodent
 		local dx, dz = best.x - a.x, best.z - a.z
 		local facing = (dx * math.sin(a.yaw) + dz * math.cos(a.yaw)) / math.max(bestD, 1e-6)
 		local hidden = covered(self, best.id)
 		local boosted = self:inAlert(a.x, a.z, now)
-		local view: Duel.View = {
+		local view: any = {
 			now = now,
 			dt = dt,
 			dist = bestD,
@@ -546,10 +573,12 @@ local function stepGuards(self: Service, now: number, dt: number, live: { [numbe
 		local strike = out.strike
 		if strike then
 			self._stats.strikes += 1
+			cue(self, a.id, "Duel.Strike")
 			if strike.hit and now >= r.iUntil then
 				self._stats.blows += 1
 				r.iUntil = now + P.iFrames
 				endPounce(self, r, now)
+				cue(self, best.id, "Duel.Blow")
 				local f = self.opts.hurt
 				if f then
 					f(best.id, CombatRules.damage(P, strike.kind, boosted), strike.kind, a.id)
@@ -613,8 +642,8 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 		end
 		local vid = victim.id
 		local held = controllerOf(self, vid) ~= "ai"
-		local phase: CombatRules.BitePhase
-		local temper: CombatRules.Temper
+		local phase: string
+		local temper: Temper
 		if held then
 			temper = "calm"
 			local k = self.heldKicks[vid]
@@ -636,6 +665,7 @@ local function stepBites(self: Service, now: number, live: { [number]: boolean }
 			end
 		else
 			self._stats.batted += 1
+			cue(self, vid, "Duel.Batted")
 			local g = self.guards[vid]
 			if g then
 				Duel.batted(g, now)

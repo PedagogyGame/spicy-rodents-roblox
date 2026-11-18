@@ -238,7 +238,7 @@ function Duel.think(params: Params, g: Guard, view: View, rand: () -> number): O
 
 	-- the phases run out
 	if g.phase == "startle" and now >= g.reactAt then
-		local r = g.pending or "back"
+		local r: CombatRules.Response = g.pending or "back"
 		g.pending = nil
 		apply(params, g, r, now)
 		out.reacted = r
