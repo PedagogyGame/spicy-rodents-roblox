@@ -144,9 +144,10 @@ def main():
                       "radius r(1 - 0.48 t), giants r/0.95 - 2.625 t; bough tops = rail + lift) and keeps collision; set "
                       "CanCollide/CanQuery false and CastShadow true on Leaves*/Apples. Pivot y is the harvested ground "
                       "height at the root; the trunk carries 3 studs of bark below it for terrain mismatch."),
-        "partRoles": {"Bark": "trunk, roots, boughs, bridges, twigs, lookout pads (collide)",
-                      "LeavesShade": "under-canopy clumps (no collide)", "LeavesMid": "mid clumps (no collide)",
-                      "LeavesSun": "sunlit top clumps, willow curtains (no collide)", "Apples": "fruit (no collide)"},
+        "partRoles": {"Bark": "trunk, roots, boughs, bridges, side branches, twigs, lookout pads: one skin at the junctions",
+                      "LeavesShade": "leaf sprays under the canopy (alpha cards: doubleSided, alphaMode Transparency; no collide)",
+                      "LeavesMid": "leaf sprays in half light (alpha cards; no collide)",
+                      "LeavesSun": "leaf sprays that see the sky (alpha cards; no collide)", "Apples": "fruit (no collide)"},
         "count": 0,
         "trees": [],
     }

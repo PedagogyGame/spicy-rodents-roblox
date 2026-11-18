@@ -265,7 +265,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			canQuery = false,
 			castShadow = true,
 			role = "Twig",
-			attrs = { Embedded = true },
+			attrs = { Embedded = true } :: Spec.Attrs,
 		})
 	end
 	if art then
@@ -276,7 +276,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				color = barkColor,
 				material = "Wood",
 				role = "Limb",
-				attrs = { Embedded = true },
+				attrs = { Embedded = true } :: Spec.Attrs,
 			})
 		end
 	elseif g < foot[2] - 0.05 then
@@ -285,7 +285,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 			color = barkColor,
 			material = "Wood",
 			role = "Limb",
-			attrs = { Embedded = true },
+			attrs = { Embedded = true } :: Spec.Attrs,
 		})
 	end
 
@@ -385,7 +385,7 @@ function Trees.build(list: Spec.PartList, trunk: any, members: { Member }, opts:
 				castShadow = true,
 				role = if isLeaf then "Leaves" elseif m.name == "Bark" then "Twig" else "Fruit",
 				canQuery = false,
-				attrs = if m.name == "Bark" then { Embedded = true } else nil,
+				attrs = if m.name == "Bark" then { Embedded = true } :: Spec.Attrs else nil,
 				mesh = {
 					id = m.meshId,
 					colorMap = m.colorMap,
