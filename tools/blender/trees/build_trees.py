@@ -314,6 +314,27 @@ def alignment_checks(tb):
     return out
 
 
+def mesh_digest(objs, mats):
+    """What the uploaded Model holds (the FBX bytes carry export timestamps): every part's vertices (to 1 mm),
+    triangles, uvs and texture files; publish.py uploads a tree again only when this changes."""
+    h = hashlib.sha256()
+    for name in sorted(objs):
+        me = objs[name].data
+        h.update(name.encode())
+        V = np.array([v.co[:] for v in me.vertices], float)
+        h.update(np.round(V * 1000).astype(np.int64).tobytes())
+        h.update(np.array([p.vertices[:] for p in me.polygons], np.int64).tobytes())
+        if me.uv_layers:
+            uv = np.zeros(len(me.loops) * 2, np.float32)
+            me.uv_layers[0].data.foreach_get("uv", uv)
+            h.update(np.round(uv * 4096).astype(np.int64).tobytes())
+        for node in mats[name].node_tree.nodes:
+            if node.type == "TEX_IMAGE" and node.image is not None:
+                with open(bpy.path.abspath(node.image.filepath), "rb") as fh:
+                    h.update(hashlib.sha256(fh.read()).digest())
+    return h.hexdigest()[:16]
+
+
 def bounds_roblox(obj):
     V = np.array([v.co[:] for v in obj.data.vertices])
     R = np.stack([-V[:, 0], V[:, 2], V[:, 1]], axis=1)
@@ -574,7 +595,7 @@ def main(argv):
             "index": i, "label": rec["label"], "species": rec["species"], "category": rec["category"],
             "trunkRoute": rec["trunk"]["id"], "routes": [rec["trunk"]["id"]] + [m["id"] for m in rec["members"]],
             "pivot": [round(float(x), 3) for x in rec["root"]], "heightStuds": round(rec["H"], 2),
-            "tris": tb.tri_counts(), "parts": parts, "log": tb.log,
+            "tris": tb.tri_counts(), "parts": parts, "log": tb.log, "sha": mesh_digest(objs, mats),
         }
         info["tris"]["total"] = sum(info["tris"].values())
         if not args.no_checks:
