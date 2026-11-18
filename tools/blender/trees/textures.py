@@ -404,9 +404,9 @@ def leaf_colour(layout, palette, layer="sun", seed=3):
 SPRAY_SHAPES = ("oak", "elm", "palmate", "maple", "willow", "apple")
 SPRAY_PAINT = 1024  # the atlas is painted at this size (the px in SPRAY_PLAN) ...
 SPRAY_N = 512  # ... and written at this one (spray_maps: a quarter of the GPU memory of 1024)
-# leaves in the atlas against SPRAY_PLAN: smaller and more of them, as the cards are larger (treegen SPRAY_SCALE),
-# so a leaf on the tree stays its size
-SPRAY_LEAF = 0.77
+# leaves in the atlas against SPRAY_PLAN, per shape: smaller and more of them, as the cards are larger (1 / treegen
+# SPRAY_SCALE of the species with that shape), so a leaf on the tree stays its size
+SPRAY_LEAF = {"oak": 0.69, "elm": 0.69, "palmate": 0.69, "maple": 0.69, "willow": 0.77, "apple": 1.0}
 
 # leaf length px, width / length, leaves on the main twig, side twigs, leaves per side twig, angle off the twig
 SPRAY_PLAN = {
@@ -608,12 +608,14 @@ def _twig_leaves(cv, shape, plan, rng, box, start, heading, length, n, w0, scale
 
 
 def spray_plan(shape):
-    """SPRAY_PLAN[shape] with the leaves SPRAY_LEAF the size and as many more on each twig."""
+    """SPRAY_PLAN[shape] with the leaves SPRAY_LEAF[shape] the size and as many more on each twig."""
     plan = dict(SPRAY_PLAN[shape])
+    f = SPRAY_LEAF[shape]
     for k in ("L", "petiole", "step"):
-        plan[k] = plan[k] * SPRAY_LEAF
+        plan[k] = plan[k] * f
     for k in ("main", "per"):
-        plan[k] = int(round(plan[k] / SPRAY_LEAF))
+        plan[k] = int(round(plan[k] / f))
+    plan["twig"] = f ** 0.5  # (twigs thinner in proportion)
     return plan
 
 
@@ -663,8 +665,8 @@ def spray_layout(shape, seed=1, n=SPRAY_PAINT):
             st = np.array([bx, by]) + np.array([math.cos(heading), math.sin(heading)]) * length * f
             hd = heading - sd * math.radians(rng.uniform(50, 68) - 6 * t)
             _twig_leaves(cv, shape, plan, rng, box, st, hd, ch * rng.uniform(0.30, 0.37) * (1 - 0.1 * t), plan["per"],
-                         4.0 * SPRAY_LEAF ** 0.5, scale=0.92)
-        _twig_leaves(cv, shape, plan, rng, box, (bx, by), heading, length, nmain, 6.5 * SPRAY_LEAF ** 0.5)
+                         4.0 * plan["twig"], scale=0.92)
+        _twig_leaves(cv, shape, plan, rng, box, (bx, by), heading, length, nmain, 6.5 * plan["twig"])
     return _finish_layout(cv, shape, seed)
 
 

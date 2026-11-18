@@ -54,8 +54,10 @@ BARK_BUDGET_BIG = 12000
 BIG_CATEGORIES = ("named", "giant")
 LEAF_BUDGET = 6000
 # A spray card's length and width against the species' card: fewer, larger sprays keep the crown as full under the
-# smaller leaf budget (the spray atlas paints proportionally smaller leaves, textures.SPRAY_LEAF)
-SPRAY_SCALE = 1.3
+# smaller leaf budget (the spray atlas paints proportionally smaller leaves: textures.SPRAY_LEAF = 1 / this, per
+# leaf shape). The willow's strands are long already; the apple tree's small crown is full within the budget at
+# its old size (larger cards there only meet the walks' tunnels).
+SPRAY_SCALE = {"oak": 1.45, "elm": 1.45, "sycamore": 1.45, "maple": 1.45, "willow": 1.3, "apple": 1.0}
 COLLAR = 0.14  # how much a bough swells where it leaves the trunk
 FLARE_ROOM = 0.22  # studs the bark may stand outside the climbing radius at the climb's start, fading by the flare's top
 
@@ -204,7 +206,7 @@ SPECIES = {
                    floor=0.10, top=0.95, crown=6, flat=0.2, twist=0.2),
     "apple": dict(spacing=3.2, angle=(50, 74), len1=(7.5, 5.5), len2=(3.0, 5.0), sag=(0.030, 0.020), up=(0.090, 0.090),
                   kink=(0.26, 0.30), node=(1.7, 1.4), rise=(58, 110), card=(3.8, 3.5), droop=0.08, tip=3, side=1,
-                  floor=0.26, top=0.98, crown=4, flat=0.3, twist=0.3, fill=0.5),
+                  floor=0.26, top=0.98, crown=4, flat=0.3, twist=0.3, fill=1.0),
 }
 
 LEAF_SHAPE = {"oak": "oak", "elm": "elm", "sycamore": "palmate", "maple": "maple", "willow": "willow", "apple": "apple"}
@@ -1949,7 +1951,7 @@ class TreeBuilder:
         par, rng = self.par, self.rng
         sc = self.scale
         cl, cw = par["card"]
-        cl, cw = cl * sc * SPRAY_SCALE, cw * sc * SPRAY_SCALE
+        cl, cw = cl * sc * SPRAY_SCALE[self.sp], cw * sc * SPRAY_SCALE[self.sp]
         willow = self.sp == "willow"
         cards = []
         c, rh, ylo, yhi = self.crown
