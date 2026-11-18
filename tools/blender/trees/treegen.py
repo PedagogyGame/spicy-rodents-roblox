@@ -748,6 +748,18 @@ class TreeBuilder:
         self.flare_end = max(2.5, 1.2 * float(self.Rt(0.0))) - 0.15
         if self.flare_end < L - 1.0:
             keep = sorted([s for s in keep if abs(s - self.flare_end) > 0.45] + [self.flare_end])
+        # a hollow's knotholes (opts["knots"]: the dark ovals Shared/World/HollowLayout puts on the bark): a ring
+        # just under and just over each, so the bark between them can be held to the climbing radius
+        self.knots = []
+        for k in self.opts.get("knots", []):
+            kp, ko = np.asarray(k["p"], float), np.asarray(k["out"], float)
+            self.knots.append({"p": kp, "w": float(k["w"]), "h": float(k["h"]), "y0": kp[1] - k["h"] / 2 - 0.25,
+                               "y1": kp[1] + k["h"] / 2 + 0.25, "ang": math.atan2(-ko[2], ko[0]),
+                               "dir": math.atan2(ko[2], ko[0])})
+            for y in (kp[1] - k["h"] / 2 - 0.25, kp[1] + k["h"] / 2 + 0.25):
+                if P[0][1] < y < P[-1][1]:
+                    sk = float(np.interp(y, P[:, 1], sP))
+                    keep = sorted([s for s in keep if abs(s - sk) > 0.3] + [sk])
         s = np.array(keep)
         Q = at_s(P, sP, s)
         t = s / L
@@ -870,6 +882,12 @@ class TreeBuilder:
         ra0 = rng.random() * 6.28
         self.root_ang = np.array([ra0 + k * 2 * math.pi / self.root_n + rng.normal(0, 0.22) for k in range(self.root_n)])
         lobe_amp = 0.5 + 0.4 * rng.random(self.root_n)
+        # (turned so that no buttress nor root stands in front of a knothole near the ground)
+        low = [k["dir"] for k in self.knots if k["y0"] < self.flare_end + 1.0]
+        if low:
+            gaps = [(min(abs(math.remainder(a + d - ak, 2 * math.pi)) for a in self.root_ang for ak in low), d)
+                    for d in np.linspace(0.0, 2 * math.pi, 120, endpoint=False)]
+            self.root_ang = self.root_ang + max(gaps)[1]
         flute_ph = rng.random() * 6.28
         start_normal = np.array([1.0, 0.0, 0.0])
 
@@ -886,6 +904,13 @@ class TreeBuilder:
             # shallow, and the ring's corners stand as far outside that radius as its flats lie inside)
             flute = 0.014 * np.sin(ang * 7 + flute_ph + y * 0.15) + 0.008 * np.sin(ang * 3 - y * 0.31)
             r = base[i] * (1 + 0.5 * facet) * (1 + 0.55 * fall * lob) + flute * min(1.0, base[i] / 2.0)
+            for k in self.knots:
+                # under a knothole the bark stands no further out than the climbing radius (the oval sits 0.03
+                # stud outside it), corners included
+                if k["y0"] - 0.01 <= y <= k["y1"] + 0.01:
+                    win = (k["w"] / 2 + 0.4) / max(base[i], 0.5) + 2 * math.pi / sides
+                    da = np.abs(np.angle(np.exp(1j * (ang - k["ang"]))))
+                    r = np.where(da < win, np.minimum(r, base[i]), r)
             return np.maximum(r, 0.2)
 
         circ = 2 * math.pi * R0

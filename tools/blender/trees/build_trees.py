@@ -1,7 +1,8 @@
 """Build, check, render and export the 95 route-true trees (headless bpy 5.2.x).
 
   PY=/root/.cache/spicy-rodents/venv/bin/python
-  nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids all --fbx --out build/art/trees
+  nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids all --fbx --out build/art/trees \
+      --hollows build/hollows/hollows.json     (lune run tools/blender/trees/dump_hollows.luau first)
   nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids review --render street,fork,collar,junction,bough
   nice -n 10 taskset -c 2,3 $PY -I tools/blender/trees/build_trees.py --ids 0 --render debug
 
@@ -551,6 +552,21 @@ def export_fbx(path, objs):
     )
 
 
+def hollow_knots(path):
+    """{trunk route: [knothole]} from dump_hollows.luau's JSON (the hollow trees, Shared/World/HollowLayout): each
+    the oval's centre (world studs), the way it faces (level) and its width and height."""
+    if not path:
+        return {}
+    with open(path) as fh:
+        hollows = json.load(fh)["hollows"]
+    out = {}
+    for h in hollows:
+        for pc in h["parts"]:
+            if pc["role"] == "knothole":
+                out.setdefault(h["trunk"], []).append({"p": pc["p"], "out": pc["xv"], "w": pc["size"][2], "h": pc["size"][1]})
+    return out
+
+
 def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--ids", default="review")
@@ -564,6 +580,7 @@ def main(argv):
     ap.add_argument("--no-checks", action="store_true")
     ap.add_argument("--no-leaves", action="store_true", help="render the bark alone (junction close-ups)")
     ap.add_argument("--clay", action="store_true", help="render the bark untextured (to judge the forms)")
+    ap.add_argument("--hollows", default="", help="dump_hollows.luau's JSON: the hollow trees keep their knotholes clear")
     args = ap.parse_args(argv)
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
@@ -576,12 +593,14 @@ def main(argv):
     else:
         ids = [int(x) for x in args.ids.split(",") if x.strip()]
     cache = TexCache(out)
+    knots = hollow_knots(args.hollows)
     views = [v for v in args.render.split(",") if v]
     summary = []
     for i in ids:
         rec = recs[i]
         reset_scene()
-        tb, objs, mats = build_tree_objects(rec, data, cache)
+        tk = [dict(k, p=list(np.asarray(k["p"]) - rec["root"])) for k in knots.get(rec["trunk"]["id"], [])]
+        tb, objs, mats = build_tree_objects(rec, data, cache, {"knots": tk})
         parts = {k: bounds_roblox(o) for k, o in objs.items()}
         for k in parts:
             leaf = k.startswith("Leaves")
