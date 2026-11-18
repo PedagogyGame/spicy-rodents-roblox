@@ -153,7 +153,7 @@ return function(t)
 					-- the field boundary past the clamp: out of reach (its near side beyond the clamp), on the
 					-- ground (its foot not over the band terrain), never colliding
 					edge += 1
-					local cf, s = d.CFrame, d.Size
+					local cf = d.CFrame
 					local pos, half = cf.Position, math.max(s.X, s.Y, s.Z) / 2
 					-- the world-vertical half extent (the trunks are cylinders turned upright)
 					local halfY = (
