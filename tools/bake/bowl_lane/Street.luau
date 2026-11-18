@@ -16,9 +16,11 @@
 --   AlleyWalk   the Alley Walk (xpath_alley_walk) from Main Street's south sidewalk to the north sidewalk, and the
 --               steps walk (xpath_alley_steps) from the south sidewalk to the foot of the alley's entrance ramp;
 --   Crossing    a zebra crossing between the two, straight across the lane on the walk's line;
---   Lamps       LAMPS street lamps in the town's shape (a 15-stud post, the curved arm over the road, a lit head), in
---               one row behind the north sidewalk (the south side is the venues' frontage), each its own Atomic Model
---               with a PointLight in the head (always on, as the sky lift's and the alley's lamps);
+--   Lamps       LAMPS street lamps in the town's shape (a 15-stud post, the curved arm over the road, a glowing head),
+--               in one row behind the north sidewalk (the south side is the venues' frontage), each its own Persistent
+--               Model (always on every client, a dozen parts); no light of their own: the head carries the tag
+--               LAMP_TAG and the town's lamp pool (Client/Render/TownView) lights it as it lights the town's, the
+--               nearest to the camera, off by day;
 --   NameSign    the street's name on a post at the junction with the cross street, in the town's street-sign green.
 -- Pure planning (Street.plan: strips, lamp spots, the crossing; no Instances) is apart from the Instances
 -- (Street.build), so tests/unit/bowl_lane.spec.luau holds the plan without baking.
@@ -49,6 +51,7 @@ Street.ZEBRA = { stripes = 7, width = 1.2, gap = 1.2 } -- stripes along the lane
 Street.BUDGET = 700 -- parts (Model attribute PartBudget; tests/unit/bowl_lane.spec)
 Street.SIGN_GREEN = { 32, 74, 50 } -- the town's street-name green (tools/bake/Ways)
 Street.METAL = { 44, 48, 50 } -- the town's lamp metal (worldgen LampPlan)
+Street.LAMP_TAG = "StreetLampHead" -- (Client/Render/TownView.TAG: the heads its light pool lights)
 
 export type Strip = Plan.Road
 export type Lamp = { x: number, z: number, ox: number, oz: number }
@@ -242,7 +245,7 @@ Street.topAt = topAt
 local function lamp(kit: Kit.Kit, parent: any, i: number, l: Lamp)
 	local roblox = kit.roblox
 	local m = kit:model(parent, `Lamp{i}`)
-	m.ModelStreamingMode = roblox.Enum.ModelStreamingMode.Atomic
+	m.ModelStreamingMode = roblox.Enum.ModelStreamingMode.Persistent
 	local x, z, ox, oz = l.x, l.z, l.ox, l.oz
 	local g = Height.at(x, z)
 	local top = g + Street.LAMP_HEIGHT
@@ -273,7 +276,7 @@ local function lamp(kit: Kit.Kit, parent: any, i: number, l: Lamp)
 		shadow = false,
 		rot = rot,
 	})
-	kit:light(head, "PointLight", { Range = 26, Brightness = 1.6, Color = { 242, 191, 115 }, Shadows = false })
+	head:AddTag(Street.LAMP_TAG)
 end
 
 -- The street's Model, `xs_bowl_lane`, in `parent`. Returns it (attributes Parts, PartBudget, Lights).

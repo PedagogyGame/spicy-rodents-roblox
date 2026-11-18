@@ -32,6 +32,7 @@ local Road = require("../../src/worldgen/Builders/Road")
 local Kit = require("../../tools/bake/alley/Kit")
 local Lounge = require("../../tools/bake/lounge_classic/Lounge")
 local Street = require("../../tools/bake/bowl_lane/Street")
+local TownView = require("@client/Render/TownView")
 
 local STEP = 0.75 -- studs: what a person (a Humanoid) and the squirrel (ClientWorld.STEP) step up without a jump
 local SAMPLE = 0.5 -- studs between the profile's samples
@@ -359,15 +360,25 @@ return function(t)
 		run("across on the crossing", walk.coord, -250, 0, -1, 10, 60)
 	end)
 
-	t.test("its cost and its lamps: parts in budget, six lit lamps on the grass behind the north sidewalk", function()
+	t.test("its cost and its lamps: parts in budget, six lamps the town's pool lights, on the grass", function()
 		local parts = street:GetAttribute("Parts") :: number
 		t.truthy(parts <= Street.BUDGET, `{parts} parts (budget {Street.BUDGET})`)
-		t.eq(street:GetAttribute("Lights"), #Street.LAMP_X)
-		print(`      Bowl Lane: {parts} parts (budget {Street.BUDGET}), {street:GetAttribute("Lights")} point lights`)
+		-- no light of its own: the town's lamp pool (Client/Render/TownView) lights the tagged heads, off by day
+		t.eq(street:GetAttribute("Lights"), 0)
+		t.eq(Street.LAMP_TAG, TownView.TAG)
+		print(`      Bowl Lane: {parts} parts (budget {Street.BUDGET}), no lights of its own`)
 		local lamps = street:FindFirstChild("Lamps") :: any
 		t.eq(#lamps:GetChildren(), #Street.LAMP_X)
 		for _, m in lamps:GetChildren() do
-			t.eq(m.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Atomic)
+			-- always on the client, so the pool knows every head from the start
+			t.eq(m.ModelStreamingMode, roblox.Enum.ModelStreamingMode.Persistent)
+			local heads = 0
+			for _, d in m:GetDescendants() do
+				if d:IsA("BasePart") and d:HasTag(TownView.TAG) then
+					heads += 1
+				end
+			end
+			t.eq(heads, 1, `{m.Name}: one head for the pool`)
 			local post = m:FindFirstChild("Post") :: any
 			local p = post.CFrame.Position
 			t.eq(Street.on(plan, p.X, p.Z), nil, `{m.Name} stands on the paving`)
