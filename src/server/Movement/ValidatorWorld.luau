@@ -46,7 +46,7 @@ ValidatorWorld.C = table.freeze({
 	MIN_CHORD = 0.05,
 	-- the most chords a long line is judged by (crossesLong): a longer line is sampled by this many, evenly spread, so
 	-- one judgement costs at most MAX_CHORDS * 6 rays whatever the line's length
-	MAX_CHORDS = 24,
+	MAX_CHORDS = 16,
 	-- the floor ray: from this far over the feet to FLOOR_DEPTH under them
 	RAY_ABOVE = 1.5,
 	FLOOR_DEPTH = 3.5,
@@ -92,7 +92,7 @@ end
 -- crossesLong(wall)(x0, z0, x1, z1, yLow, yHigh?, rise?): the straight line of a gap too long for crosses, judged
 -- chord by chord (each at most C.MAX_CHORD, each by the six rays): did any chord go through a wall? (An honest body may
 -- have gone round a corner in the gap: the caller weighs it as such.) A line longer than C.MAX_CHORDS chords is judged
--- by that many chords spread evenly along it: the cost is bounded (a line that long, 96 studs, is two seconds at the
+-- by that many chords spread evenly along it: the cost is bounded (a line that long, 64 studs, is over a second at the
 -- fastest, judged on its reach first).
 function ValidatorWorld.crossesLong(wall: Ray): (number, number, number, number, number, number?, number?) -> boolean
 	local one = ValidatorWorld.crosses(wall)

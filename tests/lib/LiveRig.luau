@@ -18,8 +18,11 @@
 -- Server events a case can schedule: teleport (the Reset button, a knock, the lounge's door), board / alight (the
 -- sky lift), handoff (a new body; packets of the old one still arriving are taken for the new, as the game does),
 -- release and possess again (a knock-out and a respawn).
+-- The server pins a new body (engine.pin, as Boot/Game: anchored, its own) until the first packet passes the gate: the
+-- client's root updates are not taken while it is pinned.
 -- Interface: new(opts) -> Rig; Rig:possess(state, keys); Rig:run(seconds); Rig:at(t, fn); Rig:teleport(x, y, z,
---   why); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:result() -> Result;
+--   why); Rig:board(); Rig:alight(x, y, z); Rig:handoff(state, keys); Rig:release(); Rig:unreported(x, y, z);
+--   Rig:result() -> Result;
 --   town() -> Town (the rig's town: the S3 world with houses, its validator world, honest drivers); describe(name, r)
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local SquirrelWire = require("@shared/Movement/SquirrelWire")
@@ -67,6 +70,14 @@ export type Options = {
 	ignoreCorrections: boolean?,
 	silent: ((t: number) -> boolean)?,
 	clockRate: number?, -- the client's motor clock against real time (a time hack: 2)
+	-- a client that writes its root as it likes: an edit of the root's replicated position at send time
+	rootCheat: ((p: { x: number, y: number, z: number }, t: number, state: State) -> ())?,
+	-- an edit of a packet's snapshot before it is encoded (false: not sent)
+	packetCheat: ((snap: { [string]: any }, t: number) -> boolean?)?,
+	-- the engine's round trip as the server reads it, in place of the link's own (Player:GetNetworkPing)
+	pingOf: ((t: number) -> number)?,
+	-- seconds the client spends loading a new body (the town streaming in round it) before its controller starts
+	loadSeconds: number?,
 }
 
 export type Result = {
@@ -102,6 +113,8 @@ export type Rig = {
 	alight: (self: Rig, x: number, y: number, z: number) -> (),
 	handoff: (self: Rig, state: State, keys: Keys) -> (),
 	release: (self: Rig) -> (),
+	unreported: (self: Rig, x: number, y: number, z: number) -> (),
+	server: any,
 	result: (self: Rig) -> Result,
 	movement: any,
 	client: any,
@@ -178,6 +191,8 @@ function LiveRig.new(opts: Options): Rig
 		riding = false,
 		onLift = false,
 		held = false,
+		pinned = false, -- the server keeps the new body (engine.pin): the client's root updates are not taken
+		unpinnedAt = -math.huge,
 	}
 	local client: any = {
 		state = nil :: State?,
@@ -196,7 +211,16 @@ function LiveRig.new(opts: Options): Rig
 	local function actorKey(): string
 		return `squirrel_{server.actor}`
 	end
-	client.link = MotorLink.new(function(b: buffer)
+	client.link = MotorLink.new(function(b0: buffer)
+		local b = b0
+		local cheatPacket = opts.packetCheat
+		if cheatPacket then
+			local q, e, snap = SquirrelWire.decode(b0)
+			if cheatPacket(snap, rig.t) == false then
+				return
+			end
+			b = SquirrelWire.encode(q, e, snap :: any)
+		end
 		local sentAt = rig.t
 		if opts.silent and opts.silent(sentAt) then
 			return
@@ -238,6 +262,9 @@ function LiveRig.new(opts: Options): Rig
 		end,
 		-- the engine's round trip (Player:GetNetworkPing): twice the one-way latency now, and the jitter's mean
 		pingOf = function(_id: any): number?
+			if opts.pingOf then
+				return opts.pingOf(rig.t)
+			end
 			local base = if link.latencyAt then link.latencyAt(rig.t) else latency
 			return 2 * base + jitter
 		end,
@@ -267,6 +294,15 @@ function LiveRig.new(opts: Options): Rig
 						client.link:offer(msg)
 					end
 				end)
+			end,
+			pin = function(id: any, on: boolean)
+				if id ~= actorKey() then
+					return
+				end
+				server.pinned = on
+				if not on then
+					server.unpinnedAt = rig.t
+				end
 			end,
 			hold = function(_id: any, x: number, y: number, z: number, _seconds: number)
 				holds += 1
@@ -335,10 +371,19 @@ function LiveRig.new(opts: Options): Rig
 			client.lastRoot = rig.t
 			local sentAt = rig.t
 			local p = { x = state.x, y = state.y, z = state.z }
+			if opts.rootCheat then
+				opts.rootCheat(p, rig.t, state)
+			end
 			local arrival = upArrival(sentAt)
 			if arrival then
 				at(arrival, function()
-					if sentAt > server.rootSent and not server.riding and not server.held then
+					if
+						sentAt > server.rootSent
+						and not server.riding
+						and not server.held
+						and not server.pinned
+						and sentAt >= server.unpinnedAt
+					then
 						server.rootSent = sentAt
 						server.root = p
 					end
@@ -372,20 +417,29 @@ function LiveRig.new(opts: Options): Rig
 		server.actor = server.count
 		server.root = { x = state.x, y = state.y, z = state.z }
 		server.rootSent = rig.t
-		movement:onHandoff({ id = actorKey() }, "player", "possess")
+		movement:onHandoff({ id = actorKey(), species = "squirrel" }, "player", "possess")
 		local epoch = movement:epochOf(actorKey())
 		local s = SquirrelMotor.clone(state)
+		local load = opts.loadSeconds or 0
 		reliable(function()
-			client.link:setEpoch(epoch)
-			startController(s, keys)
+			if load <= 0 then
+				client.link:setEpoch(epoch)
+				startController(s, keys)
+				return
+			end
+			-- (PossessionClient: the grant is taken once the body has streamed in)
+			at(rig.t + load, function()
+				client.link:setEpoch(epoch)
+				startController(s, keys)
+			end)
 		end)
 	end
 	rig.handoff = function(self: any, state: State, keys: Keys)
-		movement:onHandoff({ id = actorKey() }, "player", "release")
+		movement:onHandoff({ id = actorKey(), species = "squirrel" }, "player", "release")
 		self:possess(state, keys)
 	end
 	rig.release = function(_self: any)
-		movement:onHandoff({ id = actorKey() }, "player", "release")
+		movement:onHandoff({ id = actorKey(), species = "squirrel" }, "player", "release")
 		server.actor = 0 -- (no body: packets still arriving are dropped, as Boot/Game does)
 		reliable(function()
 			client.running = false
@@ -400,6 +454,16 @@ function LiveRig.new(opts: Options): Rig
 			client.write = w
 		end)
 	end
+	-- a move of the body the server makes and tells the validator nothing of (what every server move must not be)
+	rig.unreported = function(_self: any, x: number, y: number, z: number)
+		server.root = { x = x, y = y, z = z }
+		server.rootSent = rig.t
+		local w = { x = x, y = y, z = z }
+		write(function()
+			client.write = w
+		end)
+	end
+	rig.server = server
 	rig.board = function(_self: any)
 		server.riding = true
 		reliable(function()

@@ -67,9 +67,17 @@ function MotorLink.new(send: (b: buffer) -> ()): Link
 	}, MotorLink)
 end
 
+-- The grant's epoch (a new body). A correction already queued under a newer epoch stays queued (the server moved the
+-- new body while this client was still loading it): the next apply takes it.
 function MotorLink.setEpoch(self: Link, n: number)
 	self.epoch = n
-	self.pending = {}
+	local keep = {}
+	for _, msg in self.pending do
+		if msg.epoch > n then
+			table.insert(keep, msg)
+		end
+	end
+	self.pending = keep
 end
 
 function MotorLink.offer(self: Link, msg: Correction)

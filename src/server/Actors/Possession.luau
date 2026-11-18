@@ -101,7 +101,11 @@ function Possession.engine(): Engine
 			end)
 		end,
 		setOwner = function(root: any, player: any?)
-			(root :: BasePart):SetNetworkOwner(player :: Player?)
+			local part = root :: BasePart
+			if player == nil and part.Anchored then
+				return -- (an anchored part is the server's already: a squirrel pinned until its first packet)
+			end
+			part:SetNetworkOwner(player :: Player?)
 		end,
 		setCharacter = function(player: any, model: any?)
 			(player :: Player).Character = model :: Model?

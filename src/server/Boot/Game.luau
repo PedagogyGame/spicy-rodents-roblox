@@ -771,6 +771,28 @@ function Game.start(opts: Opts?): any
 		return nil
 	end
 	movement.deps.engine = {
+		-- a newly held squirrel is the server's (anchored, its own) until its driver's first packet passes the gate: a
+		-- client that never sends cannot move it, and nothing is judged while its town streams in
+		pin = function(actorId: any, on: boolean)
+			local actor, driver = heldBy(actorId)
+			local body = if actor then actor.body :: Model else nil
+			local root = if body then body.PrimaryPart else nil
+			if body == nil or root == nil then
+				return
+			end
+			pcall(function()
+				if on then
+					if not root.Anchored then
+						root:SetNetworkOwner(nil)
+					end
+					root.Anchored = true
+					root.AssemblyLinearVelocity = Vector3.zero
+				elseif driver and typeof(driver) == "Instance" and body:GetAttribute("Ride") == nil then
+					root.Anchored = false
+					root:SetNetworkOwner(driver :: Player)
+				end
+			end)
+		end,
 		correct = function(actorId: any, msg: any)
 			local actor, driver = heldBy(actorId)
 			if actor == nil then

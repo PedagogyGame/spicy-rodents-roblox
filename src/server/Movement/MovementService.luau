@@ -67,6 +67,9 @@ export type Engine = {
 	correct: (actorId: any, msg: Correction) -> (),
 	-- take the body's physics and keep it still at x, y, z (feet) for `seconds`, then give it back
 	hold: ((actorId: any, x: number, y: number, z: number, seconds: number) -> ())?,
+	-- on: the server takes a newly held body's physics and keeps it still where it stands (anchored, its own); off: gives
+	-- it to its driver (the first packet passed the gate)
+	pin: ((actorId: any, on: boolean) -> ())?,
 }
 
 export type Deps = {
@@ -95,6 +98,7 @@ export type Stats = {
 	stale: number,
 	teleports: number,
 	holds: number,
+	pins: number, -- new bodies the server kept until a first packet (engine.pin)
 	reasons: { [string]: number },
 }
 
@@ -122,6 +126,8 @@ type Squirrel = {
 	rootAt: number,
 	highSince: number?, -- the root has been high in the air with nothing near since then, at highY
 	highY: number,
+	pinned: boolean, -- a newly held body the server keeps (engine.pin) until its driver's first packet passes the gate
+	pinnedAt: number, -- server time it was first watched pinned (0: not yet)
 }
 
 export type Movement = {
@@ -162,6 +168,7 @@ MovementService.C = table.freeze({
 	ROOT_STEP = 0.25, -- seconds: two samples of the root further apart than this are not judged for walls
 	RAIL_NEAR = 3, -- studs: a root this near a rail (feet on the bark) is not judged for walls or height
 	HIGH_LAG = 1, -- seconds a root high in the air may keep its height (a held-up update) before it must fall
+	PIN_LOG = 20, -- seconds a new body may stay pinned with no packet past the gate before it is logged (it stays)
 })
 local C = MovementService.C
 
@@ -209,6 +216,7 @@ function MovementService.new(deps: Deps): Movement
 			stale = 0,
 			teleports = 0,
 			holds = 0,
+			pins = 0,
 			reasons = {},
 		},
 		_epoch = 0,
@@ -259,6 +267,8 @@ function MovementService.new(deps: Deps): Movement
 				rootAt = -math.huge,
 				highSince = nil,
 				highY = 0,
+				pinned = false,
+				pinnedAt = 0,
 			}
 			self.squirrels[id] = sq
 		end
@@ -333,7 +343,7 @@ function MovementService.new(deps: Deps): Movement
 				id,
 				{ epoch = sq.epoch, x = t.x, y = t.y, z = t.z, snapshot = t.snapshot, why = why, snap = true }
 			)
-			if #sq.snapTimes >= C.HOLD_AFTER and engine.hold and sq.heldUntil == nil then
+			if #sq.snapTimes >= C.HOLD_AFTER and engine.hold and sq.heldUntil == nil and not sq.pinned then
 				sq.heldUntil = now + C.HOLD_SECONDS
 				sq.held = gate
 				st.holds += 1
@@ -365,6 +375,25 @@ function MovementService.new(deps: Deps): Movement
 				end
 			end
 			sq.possessedAt = 0
+			-- a squirrel's new body is the server's until its driver's first packet passes the gate (pin)
+			local engine = self.deps.engine
+			if RAIL_KINDS[actor.species] and self.deps.validator and engine and engine.pin and enforcing() then
+				sq.pinned = true
+				self._stats.pins += 1
+				engine.pin(id, true)
+			end
+		end
+	end
+
+	-- the first packet passed the gate: the body is its driver's
+	local function unpin(self: Movement, id: any, sq: Squirrel)
+		if not sq.pinned then
+			return
+		end
+		sq.pinned = false
+		local engine = self.deps.engine
+		if engine and engine.pin then
+			engine.pin(id, false)
 		end
 	end
 
@@ -415,6 +444,15 @@ function MovementService.new(deps: Deps): Movement
 		local gate = sq.gate
 		if gate and gate.at == 0 then
 			gate.at = now
+		end
+		if sq.pinned then
+			-- the server's own body (engine.pin): nothing its driver does moves it, nothing to judge
+			if sq.pinnedAt == 0 then
+				sq.pinnedAt = now
+			elseif now - sq.pinnedAt > C.PIN_LOG then
+				self.log:every(`pin:{actorId}`, 30, "warn", `{actorId}: no packet past the gate in {C.PIN_LOG} s; kept`)
+			end
+			return
 		end
 		local fast = fastest(self, actorId)
 		local function within(px: number, py: number, pz: number, at: number): boolean
@@ -602,6 +640,7 @@ function MovementService.new(deps: Deps): Movement
 				end
 				sq.gate = nil
 			end
+			unpin(self, actorId, sq)
 			local v = validator:accept(actorId, packet, now)
 			if v.accepted then
 				PoseHistory.push(history(self, actorId), now, px, py, pz)
