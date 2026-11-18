@@ -103,7 +103,7 @@ function PeopleLooks.dress(role: string, index: number, colours: { [string]: Rgb
 	local art = PeopleAssets.ROLES[artRole]
 	local i = math.max(1, math.floor(index))
 	local base = RolePalettes.look(artRole, i)
-	local given = colours or {}
+	local given: { [string]: Rgb } = colours or {}
 	local c: Colours = {
 		skin = given.skin or base.skin,
 		shirt = given.shirt or base.shirt,
@@ -113,7 +113,7 @@ function PeopleLooks.dress(role: string, index: number, colours: { [string]: Rgb
 	}
 	local outfit = if extra and extra.outfit then extra.outfit else pick(art.outfits, i)
 	local hat: string? = art.hat
-	local hairs = if extra and extra.hair then extra.hair else art.hair
+	local hairs: { string } = if extra and extra.hair then extra.hair else art.hair
 	local build = if i % PeopleLooks.BROAD_EVERY == 0 then "broad" else "slim"
 	if extra then
 		if extra.hat == false then

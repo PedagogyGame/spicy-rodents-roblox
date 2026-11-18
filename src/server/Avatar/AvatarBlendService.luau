@@ -272,7 +272,10 @@ function AvatarBlendService.apply(self: Service, model: Instance, species: strin
 				-- the rounded art's own hair gives way to the player's (put back on revert)
 				local own = model:FindFirstChild("Hair")
 				if own and own:IsA("BasePart") and own:GetAttribute("PeopleArt") ~= nil then
-					table.insert(record.ops, { inst = own, prop = "Transparency", old = own.Transparency })
+					table.insert(
+						record.ops,
+						{ inst = own :: Instance, prop = "Transparency", old = own.Transparency :: any }
+					)
 					own.Transparency = 1
 				end
 			end

@@ -105,7 +105,8 @@ end
 -- index(assets): the Library from the six loaded assets (keyed as PeopleArt.KEYS); errors on anything missing.
 function PeopleArt.index(assets: { [string]: any }): Library
 	local bodies: { [string]: { [string]: any } } = {}
-	for build, key in { slim = "bodySlim", broad = "bodyBroad" } do
+	local files: { [string]: string } = { slim = "bodySlim", broad = "bodyBroad" }
+	for build, key in files do
 		local m = meshes(assets[key])
 		for name in PeopleAssets.BUILDS[build].parts do
 			if name ~= "Head" and m[name] == nil then
@@ -158,7 +159,7 @@ export type InstallOpts = { load: ((assetId: number) -> any)?, ids: { [string]: 
 -- ok = false and why, and leaves every body stock, when an id is missing or any load or check fails.
 function PeopleArt.install(opts: InstallOpts?): { ok: boolean, failed: { [string]: string } }
 	local o: InstallOpts = opts or {}
-	local want = o.ids or ids()
+	local want: { [string]: number }? = o.ids or ids()
 	if want == nil then
 		return { ok = false, failed = { assets = "not uploaded (Shared/Avatar/PeopleAssets has no ids)" } }
 	end
@@ -495,7 +496,7 @@ function PeopleArt.statue(figure: any, dress: Dress, opts: StatueOpts?): boolean
 end
 
 -- start(root?, opts?): dresses every baked staff figure under root (default Workspace.Expansion).
-function PeopleArt.start(root: any?, opts: Opts?): number
+function PeopleArt.start(root: any?, opts: StatueOpts?): number
 	if (opts == nil or opts.library == nil) and not PeopleArt.ready() then
 		return 0
 	end
