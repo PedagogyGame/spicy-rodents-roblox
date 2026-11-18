@@ -28,7 +28,7 @@
 -- or "#rrggbb"): its colour is the part's Color under an Overlay SurfaceAppearance, so the avatar blend
 -- (Server/Avatar/AvatarBlendService) tints the part, and only where it is skin (a sleeve stays a sleeve); a dressed body or figure
 -- carries PeopleArt = its role, PeopleBuild and PeopleOutfit.
--- Interface: ready() -> boolean; install(opts?) -> { ok, failed }; dress(model, dress, opts?) -> boolean;
+-- Interface: ready() -> boolean; install(opts?) -> { ok, failed }; dress(model, dress, opts?) -> (boolean, why?);
 --   statue(figure, dress, opts?) -> boolean; start(root?, opts?) -> number; library() -> Library?; reset()
 -- Engine only inside the functions (Lune specs pass @lune/roblox and a library). No side effects on require.
 
@@ -313,10 +313,15 @@ local function extrasOf(library: Library, dress: Dress): { Extra }
 	return out
 end
 
--- An attachment to `pos` on its part, keeping its turn (a stock grip is turned).
+-- An attachment to `pos` on its part, keeping its turn (a stock grip is turned); the engine's record of where it
+-- sits at scale 1 (OriginalPosition, what the Humanoid rescales from) follows it.
 local function moveTo(L: Lib, att: any, pos: { number })
 	local cf = att.CFrame
 	att.CFrame = L.CFrame.new(v3(L, pos)) * (cf - cf.Position)
+	local original = att:FindFirstChild("OriginalPosition")
+	if original and original:IsA("Vector3Value") then
+		original.Value = v3(L, pos)
+	end
 end
 
 local function stamp(model: any, dress: Dress)
@@ -325,45 +330,86 @@ local function stamp(model: any, dress: Dress)
 	model:SetAttribute("PeopleOutfit", dress.outfit)
 end
 
--- dress(model, dress, opts?): see the header. Returns false (and changes nothing) when the art is not loaded or
--- the model is not a whole R15.
-function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
+-- Every new part a dress needs, cloned, tinted and textured but not yet placed or parented: { parts: the fifteen
+-- by name, extras: { part, the part it hangs from, offset } }. Nothing in the game is touched, so a dress the
+-- library cannot make (an outfit, face, hair or hat it lacks) fails here, its clones go, and the body stays whole.
+type Made = { parts: { [string]: any }, extras: { { part: any, on: string, offset: { number } } } }
+local function make(L: Lib, library: Library, dress: Dress): (Made?, string?)
+	local made: Made = { parts = {}, extras = {} }
+	local ok, err = pcall(function()
+		local rig = PeopleAssets.BUILDS[dress.build]
+		local outfit = PeopleAssets.OUTFITS[dress.outfit]
+		if rig == nil or outfit == nil then
+			error(`PeopleArt: no build {dress.build} or outfit {dress.outfit}`)
+		end
+		local outfitSa = library.outfits[dress.outfit]
+		local faceSa = library.faces[`{dress.face}_{dress.expression}`]
+		if outfitSa == nil or faceSa == nil then
+			error(`PeopleArt: no texture for outfit {dress.outfit} or face {dress.face}_{dress.expression}`)
+		end
+		for name in rig.parts do
+			local src = if name == "Head" then library.head else library.bodies[dress.build][name]
+			if src == nil then
+				error(`PeopleArt: no {dress.build} {name}`)
+			end
+			local sa = if name == "Head" then faceSa else outfitSa
+			made.parts[name] = copy(L, src, name, dress, outfit.tints[name] or PeopleAssets.HEAD.tint, sa)
+		end
+		for _, e in extrasOf(library, dress) do
+			if e.src == nil then
+				error(`PeopleArt: no {e.name} for {dress.role} ({dress.hair}, {dress.hat})`)
+			end
+			table.insert(
+				made.extras,
+				{ part = copy(L, e.src, e.name, dress, e.key, e.sa), on = e.on, offset = e.offset }
+			)
+		end
+	end)
+	if not ok then
+		for _, p in made.parts do
+			p:Destroy()
+		end
+		for _, e in made.extras do
+			e.part:Destroy()
+		end
+		return nil, tostring(err)
+	end
+	return made, nil
+end
+
+-- dress(model, dress, opts?): see the header. Returns false and why (and changes nothing) when the art is not
+-- loaded, the model is not a whole R15 or the library cannot make the dress.
+function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): (boolean, string?)
 	local o: Opts = opts or {}
 	local library = o.library or state.library
 	if library == nil then
-		return false
+		return false, "the art is not loaded"
 	end
 	local L = o.lib or engineLib()
 	local rig = PeopleAssets.BUILDS[dress.build]
 	local root = model:FindFirstChild("HumanoidRootPart")
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if root == nil or humanoid == nil then
-		return false
+	if rig == nil or root == nil or humanoid == nil then
+		return false, "not an R15 (no HumanoidRootPart or Humanoid)"
 	end
 	local old: { [string]: any } = {}
 	for name in rig.parts do
 		local p = model:FindFirstChild(name)
 		if p == nil or not p:IsA("BasePart") then
-			return false
+			return false, `not a whole R15 (no {name})`
 		end
 		old[name] = p
 	end
-	local tints = PeopleAssets.OUTFITS[dress.outfit].tints
-	local outfitSa = library.outfits[dress.outfit]
-	local faceSa = library.faces[`{dress.face}_{dress.expression}`]
-	local new: { [string]: any } = {}
+	local made, why = make(L, library, dress)
+	if made == nil then
+		return false, why
+	end
+	-- from here on nothing can be missing: the model changes
+	local new = made.parts
 	local byOld: { [any]: any } = {}
 	for name, info in rig.parts do
 		local was = old[name]
-		local src = if name == "Head" then library.head else library.bodies[dress.build][name]
-		local p = copy(
-			L,
-			src,
-			name,
-			dress,
-			tints[name] or PeopleAssets.HEAD.tint,
-			if name == "Head" then faceSa else outfitSa
-		)
+		local p = new[name]
 		p.Anchored = was.Anchored
 		p.CanCollide = was.CanCollide
 		p.CanQuery = was.CanQuery
@@ -376,8 +422,10 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 		for _, c in was:GetChildren() do
 			if c:IsA("SurfaceAppearance") then
 				continue
-			elseif c:IsA("Decal") and name == "Head" then
-				c:Destroy() -- the stock face: this head has its own painted on
+			elseif c:IsA("DataModelMesh") or c:IsA("BaseWrap") or (c:IsA("Decal") and name == "Head") then
+				-- the stock head's SpecialMesh or a layered-clothing cage would reshape the art; the stock face
+				-- decal would sit over the face painted on this head
+				c:Destroy()
 			elseif c.Name == "OriginalSize" and c:IsA("Vector3Value") then
 				c.Value = p.Size
 				c.Parent = p
@@ -385,9 +433,10 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 				c.Parent = p
 			end
 		end
-		new[name] = p
 		byOld[was] = p
 	end
+	-- the stock head's size, which a player's hair accessory was made for (Server/Avatar/AvatarBlendService)
+	new.Head:SetAttribute("StockSize", old.Head.Size)
 	-- every joint that held an old part holds the new one (the Motor6Ds moved with their Part1)
 	local joints = {}
 	for _, d in model:GetDescendants() do
@@ -467,9 +516,9 @@ function PeopleArt.dress(model: any, dress: Dress, opts: Opts?): boolean
 	for _, p in new do
 		p.Parent = model
 	end
-	for _, e in extrasOf(library, dress) do
+	for _, e in made.extras do
 		local host = new[e.on]
-		local p = copy(L, e.src, e.name, dress, e.key, e.sa)
+		local p = e.part
 		ghost(p, false)
 		p.CFrame = host.CFrame * L.CFrame.new(v3(L, e.offset))
 		local w = L.Instance.new("Weld")
@@ -496,21 +545,23 @@ function PeopleArt.statue(figure: any, dress: Dress, opts: StatueOpts?): boolean
 	end
 	local L = o.lib or engineLib()
 	local root = figure.PrimaryPart or figure:FindFirstChild("Root")
-	if root == nil then
+	local rig = PeopleAssets.BUILDS[dress.build]
+	if root == nil or rig == nil then
 		return false
+	end
+	local made = make(L, library, dress)
+	if made == nil then
+		return false -- the figure stays as baked
 	end
 	local s = o.scale or root.Size.Y / PeopleArt.FIGURE_HEIGHT
 	-- the soles under the Root's centre, turned to face the Root's +Z (the bake's -D, where the figure looked)
 	local feet = root.CFrame * L.CFrame.new(0, -root.Size.Y / 2, 0) * L.CFrame.Angles(0, math.pi, 0)
-	local rig = PeopleAssets.BUILDS[dress.build]
 	local up = PeopleAssets.ROOT.hipHeight + PeopleAssets.ROOT.size[2] / 2 -- soles to the root's centre
 	for _, d in figure:GetChildren() do
 		if d:IsA("BasePart") and d ~= root then
 			d:Destroy()
 		end
 	end
-	local tints = PeopleAssets.OUTFITS[dress.outfit].tints
-	local placed: { [string]: any } = {}
 	local function place(p: any, at: any)
 		ghost(p, true)
 		p.Size = p.Size * s
@@ -518,18 +569,11 @@ function PeopleArt.statue(figure: any, dress: Dress, opts: StatueOpts?): boolean
 		p.Parent = figure
 	end
 	for name, info in rig.parts do
-		local src = if name == "Head" then library.head else library.bodies[dress.build][name]
-		local sa = if name == "Head"
-			then library.faces[`{dress.face}_{dress.expression}`]
-			else library.outfits[dress.outfit]
-		local p = copy(L, src, name, dress, tints[name] or PeopleAssets.HEAD.tint, sa)
 		local c = info.center
-		place(p, feet * L.CFrame.new(c[1] * s, (c[2] + up) * s, c[3] * s))
-		placed[name] = p
+		place(made.parts[name], feet * L.CFrame.new(c[1] * s, (c[2] + up) * s, c[3] * s))
 	end
-	for _, e in extrasOf(library, dress) do
-		local p = copy(L, e.src, e.name, dress, e.key, e.sa)
-		place(p, placed[e.on].CFrame * L.CFrame.new(v3(L, e.offset, s)))
+	for _, e in made.extras do
+		place(e.part, made.parts[e.on].CFrame * L.CFrame.new(v3(L, e.offset, s)))
 	end
 	stamp(figure, dress)
 	return true

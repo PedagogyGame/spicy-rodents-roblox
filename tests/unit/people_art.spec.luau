@@ -107,6 +107,53 @@ local function stockR15(): any
 	return model
 end
 
+-- The R15 the engine hands out today: the avatar joint upgrade's AnimationConstraint + BallSocketConstraint
+-- pairs where the Motor6Ds were (on their <Joint>RigAttachments), OriginalPosition values under the attachments,
+-- the head's SpecialMesh and a WrapTarget cage on the torso.
+local function engineR15(): any
+	local model = stockR15()
+	for _, d in model:GetDescendants() do
+		if d:IsA("Attachment") then
+			local v = Instance.new("Vector3Value")
+			v.Name = "OriginalPosition"
+			v.Value = d.CFrame.Position
+			v.Parent = d
+		end
+	end
+	local mesh = Instance.new("SpecialMesh")
+	mesh.Name = "Mesh"
+	mesh.Parent = model.Head
+	Instance.new("WrapTarget").Parent = model.UpperTorso
+	for _, d in model:GetDescendants() do
+		if d:IsA("Motor6D") then
+			local function rigAttachment(part: any, cf: any): any
+				local a = part:FindFirstChild(`{d.Name}RigAttachment`)
+				if a == nil then
+					a = Instance.new("Attachment")
+					a.Name = `{d.Name}RigAttachment`
+					a.CFrame = cf
+					a.Parent = part
+				end
+				return a
+			end
+			local a0, a1 = rigAttachment(d.Part0, d.C0), rigAttachment(d.Part1, d.C1)
+			local ac = Instance.new("AnimationConstraint")
+			ac.Name = d.Name
+			ac.Attachment0 = a0
+			ac.Attachment1 = a1
+			local bs = Instance.new("BallSocketConstraint")
+			bs.Name = `{d.Name}BallSocket`
+			bs.Attachment0 = a0
+			bs.Attachment1 = a1
+			local parent = d.Parent
+			d:Destroy()
+			ac.Parent = parent
+			bs.Parent = parent
+		end
+	end
+	return model
+end
+
 return function(t: any)
 	t.test("PeopleAssets is what data/art/people.json records", function()
 		local doc = serde.decode("json", fs.readFile("data/art/people.json"))
@@ -471,6 +518,127 @@ return function(t: any)
 		t.eq(PeopleArt.dress(model, PeopleLooks.dress("townsperson", 1), { lib = LIB, library = library }), false)
 		t.eq(model.Head, head)
 		t.eq(model:GetAttribute("PeopleArt"), nil)
+	end)
+
+	t.test("an engine R15 (joint upgrade, head mesh, cage) is dressed with its rig whole", function()
+		local library = PeopleArt.index(fakeAssets())
+		local model = engineR15()
+		local root = model.HumanoidRootPart
+		local sockets0 = 0
+		for _, d in model:GetDescendants() do
+			if d:IsA("BallSocketConstraint") then
+				sockets0 += 1
+			end
+		end
+		t.truthy(sockets0 >= 15, `ball sockets {sockets0}`)
+		local dress = PeopleLooks.dress("doctor", 3)
+		t.eq(PeopleArt.dress(model, dress, { lib = LIB, library = library }), true)
+		local rig = PeopleAssets.BUILDS[dress.build]
+		-- every R15 joint a Motor6D at the art's pivot (as PuppetSpec.finishStockR15 makes them: AI bodies drive
+		-- Motor6Ds), no AnimationConstraint left beside it
+		for bone, j in rig.joints do
+			local m = model[j.part1]:FindFirstChild(bone)
+			t.truthy(m ~= nil and m:IsA("Motor6D"), bone)
+			near3(t, (m.Part0.CFrame * m.C0).Position, (m.Part1.CFrame * m.C1).Position, 1e-3, bone)
+		end
+		local sockets = 0
+		for _, d in model:GetDescendants() do
+			t.falsy(d:IsA("AnimationConstraint"), d:GetFullName())
+			if d:IsA("BallSocketConstraint") then
+				sockets += 1
+				local a0, a1 = d.Attachment0, d.Attachment1
+				t.truthy(a0.Parent.Parent == model and a1.Parent.Parent == model, `{d.Name} on the body's parts`)
+				-- the ball socket's two sides still meet, at the art's pivot
+				near3(t, (a0.Parent.CFrame * a0.CFrame).Position, (a1.Parent.CFrame * a1.CFrame).Position, 1e-3, d.Name)
+			end
+			-- what the Humanoid rescales from is where the attachment now is
+			local original = if d:IsA("Attachment") then d:FindFirstChild("OriginalPosition") else nil
+			if original and rig.attachments[d.Name] then
+				near3(t, original.Value, d.CFrame.Position, 1e-4, `{d.Name} OriginalPosition`)
+			end
+		end
+		t.eq(sockets, sockets0, "the ball sockets stay")
+		-- every part joined to the root
+		local seen = { [root] = true }
+		local changed = true
+		while changed do
+			changed = false
+			for _, d in model:GetDescendants() do
+				if d:IsA("JointInstance") or d:IsA("WeldConstraint") then
+					local a, b = d.Part0, d.Part1
+					if a and b and seen[a] ~= seen[b] then
+						seen[a], seen[b], changed = true, true, true
+					end
+				end
+			end
+		end
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				t.truthy(seen[d], `{d.Name} is joined to the root`)
+			end
+		end
+		-- the stock head's mesh and the cage would reshape the art: gone, not carried over
+		for _, d in model:GetDescendants() do
+			t.falsy(d:IsA("DataModelMesh") or d:IsA("BaseWrap"), d:GetFullName())
+		end
+		t.truthy(RigSpec.validate(model, "human").ok, "RigSpec passes")
+	end)
+
+	t.test("a dress the art cannot make leaves the body and the figure as they were", function()
+		local assets = fakeAssets()
+		local library = PeopleArt.index(assets)
+		local dress = PeopleLooks.dress("nurse", 1)
+		t.truthy(dress.hair ~= nil, "the nurse has hair")
+		local short = table.clone(library)
+		short.wear = table.clone(library.wear)
+		short.wear[dress.hair :: string] = nil
+		local model = engineR15()
+		local before: { [any]: any } = {}
+		for _, d in model:GetDescendants() do
+			before[d] = d.Parent
+		end
+		local hip = model.Humanoid.HipHeight
+		local ok, why = PeopleArt.dress(model, dress, { lib = LIB, library = short })
+		t.eq(ok, false)
+		t.truthy(why ~= nil and string.find(why, "Hair") ~= nil, tostring(why))
+		for d, parent in before do
+			t.eq(d.Parent, parent, `{d.Name} where it was`)
+		end
+		t.eq(#model:GetDescendants(), #(function()
+			local n = {}
+			for d in before do
+				table.insert(n, d)
+			end
+			return n
+		end)(), "nothing added")
+		t.eq(model.Head:GetAttribute("PeopleArt"), nil)
+		t.eq(model:GetAttribute("PeopleArt"), nil)
+		t.eq(model.Humanoid.HipHeight, hip)
+		-- an outfit with no texture square
+		local noScrubs = table.clone(library)
+		noScrubs.outfits = table.clone(library.outfits)
+		noScrubs.outfits.scrubs = nil
+		t.eq((PeopleArt.dress(model, dress, { lib = LIB, library = noScrubs })), false)
+		t.eq(model.Head:GetAttribute("PeopleArt"), nil)
+		-- the lounge's figure keeps its baked parts
+		local figure = Instance.new("Model")
+		local root = Instance.new("Part")
+		root.Name = "Root"
+		root.Size = R.Vector3.new(2, 5.8, 1.1)
+		root.Parent = figure
+		figure.PrimaryPart = root
+		local body = Instance.new("Part")
+		body.Name = "Body"
+		body.Parent = figure
+		local doorman = PeopleLooks.dress("doorman", 1)
+		local noCap = table.clone(library)
+		noCap.wear = table.clone(library.wear)
+		noCap.wear[doorman.hat :: string] = nil
+		t.eq(PeopleArt.statue(figure, doorman, { lib = LIB, library = noCap }), false)
+		t.eq(body.Parent, figure)
+		t.eq(#figure:GetChildren(), 2)
+		-- and with the whole library the same body dresses
+		t.eq(PeopleArt.dress(model, dress, { lib = LIB, library = library }), true)
 	end)
 
 	t.test("the lounge's baked staff stand as rounded people, facing where they faced", function()

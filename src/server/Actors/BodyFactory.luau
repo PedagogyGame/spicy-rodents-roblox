@@ -133,8 +133,9 @@ local function stockHuman(index: number, post: string?): Model
 			return { r = c.R, g = c.G, b = c.B }
 		end
 		local dressRole = role or PeopleLooks.roleOf(post, index)
-		local ok, err = pcall(function()
-			PeopleArt.dress(
+		-- (a dress the art cannot make changes nothing: PeopleArt.dress makes every new part before it touches the body)
+		local ok, dressed, why = pcall(function(): (boolean, string?)
+			return PeopleArt.dress(
 				model,
 				PeopleLooks.dress(
 					dressRole,
@@ -143,8 +144,8 @@ local function stockHuman(index: number, post: string?): Model
 				)
 			)
 		end)
-		if not ok then
-			warn(`[SpicyRodents] people art: human {index} keeps its stock body ({err})`)
+		if not ok or not dressed then
+			warn(`[SpicyRodents] people art: human {index} keeps its stock body ({if ok then why else dressed})`)
 		end
 	end
 	return model
