@@ -5,11 +5,15 @@
 -- (Util/BufferCodec). Net refuses to fire or receive anything not declared here. Pure data.
 -- The verbs of Minigame.Input are the minigame registry's (Minigames/Games.verbs: the service's own, the common
 -- ones, and whatever each game's Spec lists): a new game's verbs reach the wire by being in its Spec.
--- Interface: REMOTES { [name] = Def }; ACTION_VERBS; layouts MotorState, VehiclePose
+-- The held squirrel's motor state goes up as "Squirrel.State" (Movement/SquirrelWire: the whole snapshot the server's
+-- MoveValidator judges, 20 a second; the bucket allows 30 with a burst of 45 so a held-up batch is not dropped), and
+-- "Correction" comes down when the server moves the body or snaps it back (Server/Movement/MovementService).
+-- Interface: REMOTES { [name] = Def }; ACTION_VERBS; layouts MotorState, VehiclePose, SquirrelState
 
 local Games = require("../Minigames/Games")
 local BufferCodec = require("../Util/BufferCodec")
 local Schema = require("../Util/Schema")
+local SquirrelWire = require("../Movement/SquirrelWire")
 
 export type Def = {
 	dir: "c2s" | "s2c",
@@ -47,6 +51,9 @@ Schemas.MotorState = BufferCodec.layout({
 	{ name = "vz", kind = "f32" },
 })
 
+-- 162 bytes: Movement/SquirrelWire.
+Schemas.SquirrelState = SquirrelWire.LAYOUT
+
 -- 13 bytes per vehicle (§1.6 VehiclePoses): yaw and speed pre-quantised to bytes by the sender.
 Schemas.VehiclePose = BufferCodec.layout({
 	{ name = "id", kind = "u16" },
@@ -72,6 +79,7 @@ local args = Schema.opt(Schema.arr(
 -- stylua: ignore
 Schemas.REMOTES = {
 	["Motor.State"] = { dir = "c2s", reliable = false, rate = 20, burst = 30, layout = Schemas.MotorState },
+	["Squirrel.State"] = { dir = "c2s", reliable = false, rate = 30, burst = 45, layout = Schemas.SquirrelState },
 	Action = { dir = "c2s", reliable = true, rate = 10, payload = Schema.rec({ verb = Schema.enum(Schemas.ACTION_VERBS), target = Schema.opt(id), args = args }) },
 	["Minigame.Input"] = { dir = "c2s", reliable = true, rate = 20, payload = Schema.rec({ gameId = id, seat = Schema.num({ min = 1, max = 16, int = true }),
 		verb = Schema.enum(Games.verbs()), args = args }) },

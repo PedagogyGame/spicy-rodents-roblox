@@ -78,6 +78,9 @@ local VehicleKinds = Import.shared("Vehicles/VehicleKinds") :: typeof(require(".
 local ActorsRuntime = require("../Actors/ActorsRuntime")
 local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
+local MoveValidator = require("../Movement/MoveValidator")
+local ValidatorWorld = require("../Movement/ValidatorWorld")
+local RailWorld = Import.shared("Movement/RailWorld") :: typeof(require("../../shared/Movement/RailWorld"))
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
 local SewerService = require("../World/SewerService")
@@ -134,6 +137,25 @@ end
 -- moved back the patient sat alone hundreds of studs from their own scene.
 function Game.putBack(free: boolean, possessable: boolean): boolean
 	return free and possessable
+end
+
+export type MovementDeps = {
+	data: any, -- Shared/Data (its routes: the harvest's, the alley's, the drains', the hollows')
+	swept: any?, -- Traffic/SweptCollision (TrafficService): markTeleported on every hand-off
+	wall: ValidatorWorld.Ray?, -- the wall ray (ValidatorWorld.engineRays in the engine)
+	down: ValidatorWorld.Ray?, -- the floor ray
+	boostOf: ((actorId: any) -> boolean)?, -- the server's knowledge of a squirrel's chili rush
+}
+
+-- movement(deps): the movement service the game runs, with the squirrel validator switched on (spike S3: every
+-- squirrel packet is judged by Movement/MoveValidator against the town's rails and the baked town's walls and floors,
+-- Movement/ValidatorWorld). start() builds it with the engine's rays; tests/unit/movement_live.spec.luau holds the
+-- wiring to it.
+function Game.movement(deps: MovementDeps): any
+	local rail = RailWorld.get(deps.data, Height.at)
+	local world = ValidatorWorld.build(rail, { wall = deps.wall, down = deps.down })
+	local validator = MoveValidator.new(world, { boostOf = deps.boostOf })
+	return MovementService.new({ swept = deps.swept, validator = validator })
 end
 
 export type OfficerCandidate = { actor: any, police: boolean, free: boolean, possessable: boolean }
@@ -361,7 +383,32 @@ function Game.start(opts: Opts?): any
 	mark("data", td)
 	stage(0.52, "Putting 25 cars on the roads")
 	local traffic = TrafficService.new({ lanes = data:lanes(), roads = data:roads(), heightAt = Height.at, seed = 7 })
-	local movement = MovementService.new({ swept = traffic :: any })
+	-- the walls and floors the validator's rays meet are the baked town's, built once the bodies' folder exists
+	local rays: { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }? = nil
+	local function engineRays(): { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }
+		if rays == nil then
+			local exclude: { Instance } = {}
+			for _, name in { "Bodies", "Vehicles" } do
+				local f = workspace:FindFirstChild(name)
+				if f then
+					table.insert(exclude, f)
+				end
+			end
+			local wall, down = ValidatorWorld.engineRays(exclude)
+			rays = { wall = wall, down = down }
+		end
+		return rays :: { wall: ValidatorWorld.Ray, down: ValidatorWorld.Ray }
+	end
+	local movement = Game.movement({
+		data = data,
+		swept = traffic :: any,
+		wall = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+			return engineRays().wall(ox, oy, oz, dx, dy, dz)
+		end,
+		down = function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): boolean
+			return engineRays().down(ox, oy, oz, dx, dy, dz)
+		end,
+	})
 	local net: any? = nil
 	if o.net ~= false then
 		net = Net.engineServer()
