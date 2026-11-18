@@ -258,7 +258,8 @@ function LoungeService.spot(self: any, s: { x: number, d: number, faceD: number 
 	return CFrame.lookAt(p, ahead)
 end
 
-local function prompt(post: any, action: string, object: string, kind: string): any
+-- (sight: the door's two prompts need a line of sight, so the solid leaves keep each to its own side)
+local function prompt(post: any, action: string, object: string, kind: string, sight: boolean?): any
 	local att = Instance.new("Attachment")
 	att.Name = "PromptPoint"
 	att.Parent = post
@@ -269,7 +270,7 @@ local function prompt(post: any, action: string, object: string, kind: string): 
 	p.KeyboardKeyCode = Enum.KeyCode.E
 	p.HoldDuration = 0
 	p.MaxActivationDistance = LoungeService.PROMPT_DISTANCE
-	p.RequiresLineOfSight = false
+	p.RequiresLineOfSight = sight == true
 	p:SetAttribute("Door", true) -- E belongs to the prompt, not to the vehicles (Client/Minigames/MinigameClient)
 	p:SetAttribute("Lounge", kind)
 	p.Parent = att
@@ -289,10 +290,10 @@ function LoungeService._prompts(self: any)
 			end)
 		)
 	end
-	on(prompt(self.outsidePost, W.enterAction, W.doorObject, "enter"), "enter", function(player)
+	on(prompt(self.outsidePost, W.enterAction, W.doorObject, "enter", true), "enter", function(player)
 		self:enter(player)
 	end)
-	on(prompt(self.insidePost, W.leaveAction, W.doorObject, "leave"), "leave", function(player)
+	on(prompt(self.insidePost, W.leaveAction, W.doorObject, "leave", true), "leave", function(player)
 		self:leave(player)
 	end)
 	local cents, days = self.town.pass.offer()
@@ -326,6 +327,9 @@ function LoungeService.enter(self: any, player: any): (boolean, string?)
 	if species == nil or body == nil then
 		self.town.tell(player, W.noBody)
 		return false, "noBody"
+	end
+	if self.inside[player] == body then
+		return true, nil -- already in
 	end
 	local decision = LoungeClassic.door(species, species == "human" and self.town.pass.has(player))
 	if decision == "guard" then
@@ -377,9 +381,9 @@ end
 
 -- The door from inside: back on the landing, first person released.
 function LoungeService.leave(self: any, player: any): boolean
-	local body = self.inside[player] or self.town.bodyOf(player)
+	local body = self.inside[player]
 	if body == nil then
-		return false
+		return false -- (only someone the door let in leaves through it)
 	end
 	dropDrink(self, player)
 	self.inside[player] = nil
