@@ -6,7 +6,7 @@ This is the old-fashioned lounge from your brief ("Lounge one"). It has leather 
 The lounge is baked separately from the town. Run `lune run tools/bake/lounge_classic.luau` before building the place. It writes `build/Expansion_LoungeClassic.rbxm`, which is not in git. Without it, the server log says `[Lounge] Workspace.Expansion.LoungeClassic has no bake` and there is no lounge to see.
 
 ## How to get there
-The lounge is in the leisure quarter, about 200 studs east of the bowling alley, at about x 1487, z -334 (the door). Bowl Lane, the street planned in front of it, is not built yet, so for now the lounge stands on grass. Its front is black marble with gold lines, and **THE GILDED ACORN** is written over the canopy. A brass acorn sits on the roof.
+The lounge is in the leisure quarter, right beside the bowling alley on its east side: its west wall (x 1462) is about 10 studs from the alley's east wall (x 1452). Its front faces the street at about x 1487, z -334, and the door is set back up the steps at z -340. Bowl Lane, the street planned in front of it, is not built yet, so for now the lounge stands on grass. Its front is black marble with gold lines, and **THE GILDED ACORN** is written over the canopy. A brass acorn sits on the roof.
 
 ## What to do
 1. **As a person without a pass.** Pick **Townsperson**. Walk between the velvet ropes, past the two guards and up the four steps. At the door, press **E** (**Go in**). You should read "Members only. A pass is 20c for five in-game days of paintball and both lounges." The door stays shut.
@@ -35,7 +35,7 @@ The lounge is in the leisure quarter, about 200 studs east of the bowling alley,
 - **Parts:** 480 (the bake's own cap is 800; the plan allowed 1,300).
 - **Lights:** 22. Only 3 cast shadows: the middle pendant over the bar, the back chandelier and the spot on the piano.
 - **The Blender pieces** (bar, booths, wall panelling): 15,448 triangles in 14 meshes, once uploaded. That is about one pinball machine.
-- **Work each frame:** the server checks the door and the guards five times a second. It checks only squirrels within 60 studs.
+- **Work each frame:** the server checks the door, the guards and the room five times a second. It looks only at bodies within 60 studs: squirrels for the guards, and anyone else in the room the door did not let in (with the pass they are let in where they stand; without it they are put out on the landing).
 
 ## Uploads (the lead does these; nothing has been uploaded)
 - **The Blender pieces:** `python3 -I tools/blender/lounge_classic/publish.py` uploads one Model. Until then, the bar, the booths and the panelling are the plain-part versions.
