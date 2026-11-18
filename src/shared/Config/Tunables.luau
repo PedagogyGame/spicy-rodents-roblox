@@ -111,6 +111,7 @@ Tunables.tree = {
 	            motorcycleBiteContact = { v = 2.0, unit = "u", src = "traffic §5.12 (rev 4)" }, motorcycleBiteDy = { v = 3.2, unit = "u" } },
 	forage = { carryMax = { v = 9, src = "brief v2 §3" }, hollowCapacity = { v = 120 }, premiumMult = { v = 2 }, ownThreshold = { v = 0.70 },
 	           ownVisitDays = { v = 3, unit = "game days", src = "brief v2 §3 (Q2)" },
+	           meterDecayPerDay = { v = 0.03, unit = "of capacity per game day", src = "hollow trees build default (nuts eaten and spoiled; an abandoned tree empties)" },
 	           seasonStockMargin = { v = 1.5, src = "invariant 15" },
 	           stinkFillPerMin = { v = 1.2 }, stinkFireMin = { v = 95 }, stinkCost = { v = 30 },
 	           stinkRepelRadius = { v = 8, unit = "u" }, stinkRepelSecs = { v = 4, unit = "s" } },

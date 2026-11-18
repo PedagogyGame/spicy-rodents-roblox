@@ -606,7 +606,7 @@ local function shaftLike(b: Build, design: any, inside: any, hideout: boolean)
 					depth = depthOut(tr, shaft[#shaft], wallOut, top),
 					links = { { route = inside.wall, t = r4(wallT), dir = 1 } },
 					name = "top knothole",
-				},
+				} :: any,
 			},
 		})
 	)

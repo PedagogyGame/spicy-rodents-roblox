@@ -80,6 +80,7 @@ local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
 local SewerService = require("../World/SewerService")
+local HollowService = require("../Foraging/HollowService")
 local SkyLiftService = require("../Rides/SkyLiftService")
 local RafterService = require("../Attractions/RafterService")
 local LoungeService = require("../Attractions/LoungeService")
@@ -601,6 +602,23 @@ function Game.start(opts: Opts?): any
 		sewers = nil
 		warn(`[SpicyRodents] the storm drains did not start (the pipes run, nobody loses the rodent there): {errW}`)
 	end
+	-- the hollow trees and the fallen log (Foraging/HollowService): their insides built (World/HollowShell), the cover,
+	-- the nut meter and the claim shown on each tree; a failure leaves the routes running and nobody hidden in them
+	local hollows: any = nil
+	local okH, errH = pcall(function()
+		hollows = HollowService.start({
+			world = world,
+			nameOf = function(id: number): string?
+				local actor = rt.byTownId[id]
+				local holder = if actor then possession:controllerOf(actor) else nil
+				return if typeof(holder) == "Instance" and holder:IsA("Player") then holder.DisplayName else nil
+			end,
+		})
+	end)
+	if not okH then
+		hollows = nil
+		warn(`[SpicyRodents] the hollow trees did not start (their runs work, nobody is hidden in them): {errH}`)
+	end
 	-- the owner's sewer modules, once each, for the clients to draw near the body (Client/World/SewerArt); a module
 	-- that does not load leaves its drains in the bake's plain parts
 	if sewersBaked then
@@ -1012,7 +1030,10 @@ function Game.start(opts: Opts?): any
 				local tid = townIdOf[actor.id]
 				local stunnedUntil = (actor.body :: Model):GetAttribute(PossessionState.ATTR.StunnedUntil)
 				local stunned = type(stunnedUntil) == "number" and workspace:GetServerTimeNow() < stunnedUntil
-				if root and not stunned and (sewers == nil or tid == nil or sewers:mayBite(tid)) then
+				-- (nor from inside a hollow tree: Foraging/HollowService)
+				local covered = tid ~= nil
+					and ((sewers ~= nil and not sewers:mayBite(tid)) or (hollows ~= nil and not hollows:mayBite(tid)))
+				if root and not stunned and not covered then
 					if humans == nil then
 						humans = {}
 						for _, a in world.actors do
@@ -1144,9 +1165,28 @@ function Game.start(opts: Opts?): any
 							changed = true
 						end
 					end
+					-- and so does a hollow tree (Foraging/HollowService, the same rate)
+					if hollows and actor and tid and actor.variant == "spicy" then
+						local h = healthOf(actor.id)
+						local healed =
+							hollows:heal(tid, h, PlayRules.HEALTH, fadeAcc, SewerService.fed(s.lastBiteAt, now))
+						if healed ~= h then
+							health[actor.id] = healed
+							changed = true
+						end
+					end
 					if changed then
 						publish(player)
 					end
+				end
+			end
+			-- the hollows' meters and claims, on the game day (Boot/DayClock's clock)
+			if hollows then
+				local day = Game.gameSeconds(workspace:GetServerTimeNow(), dayClock.epoch, dayClock.base, dayClock.rate)
+					/ DayClock.REAL_SECONDS_PER_DAY
+				local okD, errD = pcall(hollows.step, hollows, day)
+				if not okD then
+					warn(`[SpicyRodents] the hollow meters failed this second: {errD}`)
 				end
 			end
 			fadeAcc = 0
@@ -1496,6 +1536,9 @@ function Game.start(opts: Opts?): any
 			end
 			if sewers then
 				sewers:stop()
+			end
+			if hollows then
+				hollows:stop()
 			end
 			if skylift then
 				skylift:stop()
