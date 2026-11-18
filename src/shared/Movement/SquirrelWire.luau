@@ -9,7 +9,8 @@
 -- SEND_EVERY: the client sends when its motor clock has moved this far since the last packet (20 a second at any
 -- frame rate; a frame is at most SquirrelMotor.params.frameDtCap, so honest gaps are 0.05 to 0.08 s plus losses).
 -- Interface: LAYOUT (Util/BufferCodec); SEND_EVERY; encode(seq, epoch, snapshot) -> buffer;
---   fromRecord(record) -> (seq, epoch, snapshot) (a record Net decoded from LAYOUT); decode(buffer) -> same
+--   fromRecord(record) -> (seq, epoch, snapshot) (a record Net decoded from LAYOUT); decode(buffer) -> same;
+--   sane(snapshot) -> boolean (every number finite and in range: the server judges nothing else); MAX_MAGNITUDE
 -- Pure. No side effects on require.
 
 local BufferCodec = require("../Util/BufferCodec")
@@ -118,6 +119,28 @@ end
 
 function SquirrelWire.decode(b: buffer): (number, number, { [string]: number | boolean })
 	return SquirrelWire.fromRecord(BufferCodec.decode(SquirrelWire.LAYOUT, b))
+end
+
+-- The largest magnitude any number of an honest snapshot reaches (positions within the world, the clock in seconds of
+-- a session, speeds and timers far below it).
+SquirrelWire.MAX_MAGNITUDE = 1e7
+
+-- sane(snapshot): every number in it is finite and within MAX_MAGNITUDE (an f64 or f32 off the wire can be NaN or
+-- infinite, and a NaN passes every `>` test a judge makes). The server judges nothing else.
+function SquirrelWire.sane(snapshot: { [string]: any }): boolean
+	if type(snapshot) ~= "table" then
+		return false
+	end
+	for _, v in snapshot do
+		-- (NaN fails every comparison, so `not (|v| < MAX)` is true for NaN and both infinities)
+		if type(v) == "number" and not (math.abs(v) < SquirrelWire.MAX_MAGNITUDE) then
+			return false
+		end
+	end
+	return type(snapshot.x) == "number"
+		and type(snapshot.y) == "number"
+		and type(snapshot.z) == "number"
+		and type(snapshot.clock) == "number"
 end
 
 return SquirrelWire

@@ -31,6 +31,7 @@ local Motion = Import.shared("Routes/Motion") :: typeof(require("../../shared/Ro
 local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
 local Recovery = Import.shared("Movement/Recovery") :: typeof(require("../../shared/Movement/Recovery"))
 local Trampoline = Import.shared("Movement/Trampoline") :: typeof(require("../../shared/Movement/Trampoline"))
+local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
 
 local MoveValidator = {}
 MoveValidator.__index = MoveValidator
@@ -148,7 +149,7 @@ end
 -- reset(actorId, snapshot, serverTime, seq?): take the given state as the baseline with a clean bucket
 -- (possession, teleport, respawn, accepted correction). `snapshot` nil forgets the actor.
 function MoveValidator.reset(self: MoveValidator, actorId: any, snapshot: Snapshot?, serverTime: number?, seq: number?)
-	if not snapshot then
+	if not snapshot or not SquirrelWire.sane(snapshot) then
 		self._actors[actorId] = nil
 		return
 	end
@@ -198,6 +199,22 @@ end
 -- accept(actorId, packet, serverTime) -> verdict. The first packet of an unknown actor is the baseline.
 function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet, serverTime: number): Verdict
 	local actor = self._actors[actorId]
+	if not SquirrelWire.sane(packet.snapshot) or not (math.abs(packet.seq) < SquirrelWire.MAX_MAGNITUDE) then
+		-- a number off the wire that is NaN, infinite or out of the world: never judged, never a baseline
+		local bad = { { code = "malformed", severity = 1, detail = "a number in the packet is not finite" } }
+		if not actor then
+			return verdict(false, false, bad, true, 1, nil, false, false)
+		end
+		actor.packets += 1
+		actor.violations += 1
+		actor.bucket += 1
+		local flagged = actor.bucket >= self.flagThreshold
+		if flagged and not actor.flagged then
+			actor.flaggedAt = serverTime
+		end
+		actor.flagged = flagged
+		return verdict(false, false, bad, flagged, actor.bucket, SquirrelMotor.serialize(actor.last), false, false)
+	end
 	if not actor then
 		self:reset(actorId, packet.snapshot, serverTime, packet.seq)
 		return verdict(true, true, {}, false, 0, nil, false, true)

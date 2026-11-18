@@ -34,6 +34,7 @@ local Import = require("../Import")
 local Flags = Import.shared("Config/Flags") :: typeof(require("../../shared/Config/Flags"))
 local Log = Import.shared("Util/Log") :: typeof(require("../../shared/Util/Log"))
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
+local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
 local PoseHistory = require("../Paintball/PoseHistory")
 local MoveValidatorT = require("./MoveValidator")
 
@@ -152,6 +153,16 @@ local RAIL_KINDS = { squirrel = true, rodent = true }
 
 local function dist(ax: number, ay: number, az: number, bx: number, by: number, bz: number): number
 	return math.sqrt((ax - bx) ^ 2 + (ay - by) ^ 2 + (az - bz) ^ 2)
+end
+
+local function finite3(x: any, y: any, z: any): boolean
+	local m = SquirrelWire.MAX_MAGNITUDE
+	return type(x) == "number"
+		and type(y) == "number"
+		and type(z) == "number"
+		and math.abs(x) < m
+		and math.abs(y) < m
+		and math.abs(z) < m
 end
 
 function MovementService.new(deps: Deps): Movement
@@ -345,7 +356,7 @@ function MovementService.new(deps: Deps): Movement
 
 	function m.watch(self: Movement, actorId: any, x: number, y: number, z: number, now: number)
 		local sq = self.squirrels[actorId]
-		if sq == nil or sq.suspended or not enforcing() then
+		if sq == nil or sq.suspended or not enforcing() or not finite3(x, y, z) then
 			return
 		end
 		if sq.heldUntil then
@@ -405,10 +416,19 @@ function MovementService.new(deps: Deps): Movement
 				end
 				return { ok = true, accepted = false, violations = {}, flagged = false, stale = true }
 			end
+			local snapshot = packet.snapshot
+			if not SquirrelWire.sane(snapshot) or not (math.abs(packet.seq) < SquirrelWire.MAX_MAGNITUDE) then
+				-- NaN, infinite or out of the world: never judged, never a baseline, never a snap target
+				local violations =
+					{ { code = "malformed", severity = 1, detail = "a number in the packet is not finite" } }
+				if enforce then
+					snap(self, actorId, "malformed", now, nil)
+				end
+				return { ok = false, accepted = false, violations = violations, flagged = true, snapped = enforce }
+			end
 			if sq.possessedAt == 0 then
 				sq.possessedAt = now
 			end
-			local snapshot = packet.snapshot
 			local px, py, pz = snapshot.x :: number, snapshot.y :: number, snapshot.z :: number
 			local gate = sq.gate
 			if gate and validator:last(actorId) == nil then
@@ -469,6 +489,9 @@ function MovementService.new(deps: Deps): Movement
 		end
 		-- generic kinds: horizontal speed against the per-kind cap
 		local p = packet :: GenericPacket
+		if not finite3(p.x, p.y, p.z) or not finite3(p.t, p.seq, 0) then
+			return { ok = false, accepted = false, flagged = true }
+		end
 		local prev = self.last[actorId]
 		local over = false
 		if prev and p.seq > prev.seq then
