@@ -14,51 +14,55 @@ local TestWorld = require("@tests/cheat/TestWorld")
 return function(t)
 	local world = TestWorld.build({ boxes = {} })
 
-	t.test("squirrel packets: validated, pose history kept, corrections withheld while log-only", function()
-		local swept = {
-			marked = {},
-			markTeleported = function(self, id)
-				table.insert(self.marked, id)
-			end,
-		}
-		local m = MovementService.new({ validator = MoveValidator.new(world), swept = swept })
-		local s = SquirrelMotor.new(10, world.groundHeight, 10)
-		local inp = SquirrelMotor.idleInput(0)
-		inp.fw = 1
-		for i = 0, 60 do
-			if i > 0 then
-				SquirrelMotor.step(s, inp, 1 / 60, world)
+	t.test(
+		"squirrel packets: validated, pose history kept, log-only without enforcement, snapped back with it",
+		function()
+			local swept = {
+				marked = {},
+				markTeleported = function(self, id)
+					table.insert(self.marked, id)
+				end,
+			}
+			local m = MovementService.new({ validator = MoveValidator.new(world), swept = swept, enforce = false })
+			local s = SquirrelMotor.new(10, world.groundHeight, 10)
+			local inp = SquirrelMotor.idleInput(0)
+			inp.fw = 1
+			for i = 0, 60 do
+				if i > 0 then
+					SquirrelMotor.step(s, inp, 1 / 60, world)
+				end
+				local v = m:packet("sq", "squirrel", { seq = i, snapshot = SquirrelMotor.serialize(s) }, i / 60)
+				t.truthy(v.ok, `honest {i}`)
 			end
-			local v = m:packet("sq", "squirrel", { seq = i, snapshot = SquirrelMotor.serialize(s) }, i / 60)
-			t.truthy(v.ok, `honest {i}`)
-		end
-		local x = m:pose("sq", 0.5)
-		t.truthy(x ~= nil)
-		-- a teleport cheat: flagged, logged, no correction sent while log-only
-		Log.capture()
-		local cheat = SquirrelMotor.serialize(s)
-		cheat.x = (cheat.x :: number) + 400
-		local verdict
-		for i = 1, 5 do
+			local x = m:pose("sq", 0.5)
+			t.truthy(x ~= nil)
+			-- a teleport cheat: flagged, logged, nothing snapped while log-only
+			Log.capture()
+			local cheat = SquirrelMotor.serialize(s)
+			cheat.x = (cheat.x :: number) + 400
+			local verdict
+			for i = 1, 5 do
+				cheat.x = (cheat.x :: number) + 50
+				verdict = m:packet("sq", "squirrel", { seq = 60 + i, snapshot = cheat }, 1 + i / 60)
+			end
+			t.truthy(m:stats().flagged >= 1)
+			t.eq(verdict.snapped, nil)
+			t.eq(m:stats().snaps, 0)
+			m.deps.enforce = true
 			cheat.x = (cheat.x :: number) + 50
-			verdict = m:packet("sq", "squirrel", { seq = 60 + i, snapshot = cheat }, 1 + i / 60)
+			verdict = m:packet("sq", "squirrel", { seq = 70, snapshot = cheat }, 1.2)
+			t.eq(verdict.snapped, true)
+			t.eq(m:stats().snaps, 1)
+			Log.setSink()
+			-- the handoff seam
+			m:onHandoff({ id = "sq" }, nil, "release")
+			t.eq(swept.marked[#swept.marked], "sq")
+			t.eq(m:pose("sq", 1), nil)
+			local fresh = m:packet("sq", "squirrel", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 2)
+			t.truthy(fresh.baseline) -- the next packet is the new baseline
+			t.eq(m:stats().handoffs, 1)
 		end
-		t.truthy(m:stats().flagged >= 1)
-		t.eq(verdict.correction, nil)
-		Flags.set("moveValidatorEnforce", true)
-		cheat.x = (cheat.x :: number) + 50
-		verdict = m:packet("sq", "squirrel", { seq = 70, snapshot = cheat }, 1.2)
-		t.truthy(verdict.correction ~= nil)
-		Flags.reset()
-		Log.setSink()
-		-- the handoff seam
-		m:onHandoff({ id = "sq" }, nil, "release")
-		t.deepEq(swept.marked, { "sq" })
-		t.eq(m:pose("sq", 1), nil)
-		local fresh = m:packet("sq", "squirrel", { seq = 1, snapshot = SquirrelMotor.serialize(s) }, 2)
-		t.truthy(fresh.baseline) -- the next packet is the new baseline
-		t.eq(m:stats().handoffs, 1)
-	end)
+	)
 
 	t.test("generic kinds: speed cap per kind, stale packets ignored, 1 s rewind", function()
 		Log.capture()
