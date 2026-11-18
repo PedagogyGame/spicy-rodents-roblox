@@ -3,7 +3,7 @@
   /root/.cache/spicy-rodents/venv/bin/python -I tools/blender/whack_a_mole/export.py [--out build/art/whack_a_mole]
 
 Input: docs/reference/whack_a_mole/Whack_A_Mole.blend (his editable project, Blender 4.3; read only, scripts in it
-are text and never run). His GLB is 232,092 triangles in 246 pieces; this makes about 12,000 in 32 pieces, with
+are text and never run). His GLB is 232,092 triangles in 246 pieces; this makes about 12,000 in 42 pieces, with
 his look kept (docs/owner/DELIVERY_2026-11-18.md):
   * the moving parts at rest and his demonstration animation dropped: every mole down (root z 0), the mallet in
     its bracket (his rest: location (1.12, -0.25, 0.42) m, rotation (0, -16, -12) deg);

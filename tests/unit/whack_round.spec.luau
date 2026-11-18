@@ -126,11 +126,11 @@ return function(t: Test.T)
 			t.truthy(math.abs(h - was) <= 3 / Round.RISE / 240 + 1e-6, "smooth")
 			was = h
 		end
-		-- the owner's window: up more than 22 %, and not within 45 % of the drop time of its start
+		-- the owner's window: up more than 22 %, and not within 45 % of the drop time of being down again
 		t.falsy(Round.hittable(r, 10.01), "barely out of the hole")
 		t.truthy(Round.hittable(r, 10.05))
 		t.truthy(Round.hittable(r, 10 + 1.4 - Round.LATE_CUT - 0.01))
-		t.falsy(Round.hittable(r, 10 + 1.4 - Round.LATE_CUT + 0.01), "about to drop")
+		t.falsy(Round.hittable(r, 10 + 1.4 - Round.LATE_CUT + 0.01), "nearly down")
 		r.hitAt = 10.5
 		r.from = 1
 		t.falsy(Round.hittable(r, 10.6), "hit already")

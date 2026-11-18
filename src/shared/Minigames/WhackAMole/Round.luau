@@ -6,8 +6,9 @@
 --   is caught by the first mole while the camera is still moving).
 --   +10 for a hit, -2 for a miss, never below zero. One hit per rise: a second strike on a mole already hit, as
 --   it drops, changes nothing (his "a double tap on the same falling mole never scores twice or penalises twice").
---   A mole can be hit once it is more than 22 % of the way up and until 45 % of the fall time before it starts
---   to drop; a strike on a hole with nothing to hit there is a miss.
+--   A mole can be hit once it is more than 22 % of the way up and until 45 % of the fall time before it is down
+--   again (a little over half way through its drop: his "elapsed - born < duration - FALL * .45"); a strike on a
+--   hole with nothing to hit there is a miss.
 --   His pacing (the browser version, which plays faster and fuller than the Blender one): the first try at
 --   0.3 s, then one every 0.76 s less 0.42 s over the round plus up to 0.19 s at random; a mole stays up 1.55 s
 --   less 0.6 s over the round plus up to 0.22 s; one mole at a time for the first 35 % of the round, two after;
@@ -43,7 +44,7 @@ Round.RISE = 0.17
 Round.FALL = 0.21
 Round.FIRST = 0.3 -- the first try at a mole, after GO
 Round.HITTABLE = 0.22 -- how far up a mole must be to be hit (of the whole pop)
-Round.LATE_CUT = Round.FALL * 0.45 -- a mole about to drop is no longer there to hit this long before it drops
+Round.LATE_CUT = Round.FALL * 0.45 -- a dropping mole is no longer there to hit this long before it is down
 Round.HIT = 10
 Round.MISS = 2
 Round.LEAD = 0.25 -- moles are decided this far ahead of their rise
