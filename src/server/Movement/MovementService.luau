@@ -851,7 +851,9 @@ function MovementService.new(deps: Deps): Movement
 					local next = SquirrelMotor.deserialize(snapshot)
 					local falling = fallsFrom(validator, gate, next, fastest(self, actorId))
 					for _, v in validator:hop(actorId, from, next, span + 0.1, now, true) do
-						if (v.severity >= 1 or v.code == "wall") and not (v.code == "fly" and falling) then
+						local code: string = v.code
+						local fell = falling and code == "fly" -- (a fall from a gate high in the air: fallsFrom)
+						if (v.severity >= 1 or code == "wall") and not fell then
 							table.insert(violations, v)
 						end
 					end
