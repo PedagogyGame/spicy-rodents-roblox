@@ -575,8 +575,8 @@ return function(t)
 			}
 			local recs: { Rec } = {}
 			for _, r in harvest:all() do
-				if r.origin == "attraction" then
-					continue -- the town's harvested routes only (the alley's runs are far away)
+				if r.origin ~= "harvest" then
+					continue -- the town's harvested routes only (the alley's runs and the storm drains are far away)
 				end
 				local pts = {}
 				for i, p in r.points do

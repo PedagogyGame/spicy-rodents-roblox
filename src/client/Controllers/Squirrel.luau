@@ -27,6 +27,8 @@
 -- Sprint is a burst (SquirrelMotor stamina): ctx.meter draws the meter, and running out says so.
 -- Night vision (World/NightVision) is the Spicy Rodent's alone: N toggles it; an ordinary squirrel
 -- pressing N is told so.
+-- Body attributes it writes for the client's other parts: CameraZone ("tunnel" on an enclosed run) and, on an
+-- enclosed run, ExitPicked (the route A or D picked, kept by the motor until it is passed; World/SewerAmbience).
 -- Interface: start(body, payload, metrics, ctx) -> stop(); ctx = { world, input, toast?, meter?, variant? };
 --   nightVisionSays(spicy, on) -> string (pure);
 --   feedback(frame, events, onRoute, railT?, routeOf?) -> string? (pure); routeHint(route?, t?) -> string? (pure);
@@ -330,6 +332,12 @@ function Squirrel.start(
 		local zone = Squirrel.cameraZone(if state.routeId then motorWorld.registry:get(state.routeId) else nil)
 		if body:GetAttribute("CameraZone") ~= zone then
 			body:SetAttribute("CameraZone", zone)
+		end
+		-- on an enclosed run, the way off it A or D picked (kept by the motor until it is passed): World/SewerAmbience
+		-- names it at drain 1's crossing
+		local picked = if zone ~= nil then state.selectedJunction else nil
+		if body:GetAttribute("ExitPicked") ~= picked then
+			body:SetAttribute("ExitPicked", picked)
 		end
 		-- what is drawn: the eased pose, about the feet point (yaw, then nose-up pitch and lean, then the hip)
 		local snapped = SquirrelVisual.frame(visual, state, motorWorld :: any, dt, world.groundAt)

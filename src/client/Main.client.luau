@@ -10,6 +10,9 @@
 -- UI/WalletHud keeps the wallet's balance in the corner (and the pocket money and pass lines).
 -- The bite-to-hospital sequence is drawn by UI/SpeechBubbles (what townspeople say) and
 -- Render/MedicalView (red eyes, a patient out of sight); AnimationDriver sits a patient down.
+-- Inside a storm drain World/SewerAmbience gives the look, the lamps and the key hints, and rewords the
+-- controls' refusals (every PossessionClient toast passes through its filter); World/SewerArt draws the
+-- owner's modules near the body.
 -- The sky lift (Client/Rides/SkyLiftView: the six cabins drawn from the shared clock) and the Lookout's telescope
 -- (Client/Rides/Telescope, entered on the server's "telescope" event) start after the minigames.
 -- The S2 test place runs its own S2Client and this script steps aside there.
@@ -40,6 +43,8 @@ local MinigameClient = require("./Minigames/MinigameClient")
 local Sky = require("./World/Sky")
 local Spinners = require("./World/Spinners")
 local CameraRig = require("./Camera/CameraRig")
+local SewerAmbience = require("./World/SewerAmbience")
+local SewerArt = require("./World/SewerArt")
 local FarTown = require("./Render/FarTown")
 local SkyLiftView = require("./Rides/SkyLiftView")
 local SneakMeter = require("./UI/SneakMeter")
@@ -138,10 +143,18 @@ task.spawn(function()
 		world.ignore({ ghosts })
 	end
 end)
+-- the controls' toasts pass through the storm drains' wording ("No room to jump down here") once it has started
+local sewer: SewerAmbience.Handle? = nil
 local started, clientOrErr = pcall(PossessionClient.start, {
 	bodies = bodies :: Instance,
 	overview = { position = Vector3.new(0, 120, 260), lookAt = Vector3.zero },
-	hud = { set = hud.set, toast = menu.toast, meter = hud.meter },
+	hud = {
+		set = hud.set,
+		toast = function(text: string, seconds: number?)
+			menu.toast(if sewer then sewer.filter(text) else text, seconds)
+		end,
+		meter = hud.meter,
+	},
 })
 if not started then
 	warn(`Client: PossessionClient failed: {clientOrErr}`)
@@ -149,6 +162,23 @@ if not started then
 	return
 end
 local client = clientOrErr :: PossessionClient.Client
+
+-- inside a storm drain: the grade, the lamps, the echo, "E: down the drain" and "W: climb out" (World/SewerAmbience)
+local okSewer, sewerOrErr = pcall(SewerAmbience.start, {
+	current = client.current,
+	state = client.state,
+	toast = menu.toast,
+})
+if okSewer then
+	sewer = sewerOrErr
+else
+	warn(`Client: SewerAmbience failed: {sewerOrErr}`)
+end
+-- inside a storm drain: the owner's modules near the body, the parts lining hidden here only (World/SewerArt)
+local okArt, artErr = pcall(SewerArt.start, { current = client.current })
+if not okArt then
+	warn(`Client: SewerArt failed: {artErr}`)
+end
 
 -- the bowling alley's games: walk up to a lane, the dartboard or the fortune teller and press E
 task.spawn(function()

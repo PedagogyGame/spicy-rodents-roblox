@@ -73,6 +73,10 @@ return {
 			count = 60,
 			chunks = { "RoutesCatalog" },
 		},
+		Sewers = {
+			count = 1,
+			chunks = { "Sewers" },
+		},
 		ShopArt = {
 			count = 1,
 			chunks = { "ShopArt" },

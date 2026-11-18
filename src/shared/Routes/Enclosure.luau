@@ -18,9 +18,12 @@
 --   mouths  { Mouth }? where the inside meets the outside (below); a route with none is reached by links only
 --   atStart / atEnd  { route, t, dir }? authored end links to the next INSIDE route of the same enclosure: running
 --           off that end goes on along `route` from `t`, travelling `dir` x sign(W/S) (+1 toward its t = 1)
---   forks   { {t, route, toT, dir, name?} }? authored junctions part-way along the route to another inside route
---           of the same enclosure (a hideout off a shaft, a side passage): A/D picks one ahead (like a junction on
---           a bough), W carries the body onto it as it passes; E takes one within C.linkWindow of the body
+--   forks   { {t, route, toT, dir, name?, window?} }? authored junctions part-way along the route to another inside
+--           route of the same enclosure (a hideout off a shaft, a side passage): A/D picks one ahead (like a junction
+--           on a bough), from up to `window` studs before it (default C.forkAhead; a crossing at the end of a run can
+--           offer it along the whole run), and the pick is kept until it is passed (the same key again, with no other
+--           way on that side, drops it: straight on); W carries the body onto it as it passes; E takes one within
+--           C.linkWindow of the body
 --   Inside one enclosure, ONLY these connect routes (end links, forks, and mouths whose links name an inside route):
 --   a junction inside is never guessed, and nothing reaches across the wood between two passages of one tree.
 --   width, height  the section the enclosure gives the body (studs; defaults 1.7 x 1.8). The body needs
@@ -62,6 +65,13 @@
 --           Motion.launchPoint: the face plus C.clear (half the body and a hair), never inside the shell.
 --   hop     st/s? Space and a click out of this mouth are a short hop at this horizontal speed (vertical `hopUp`,
 --           default C.hopUp) instead of a full leap or pounce: the pop out at the rack lands by it.
+--   hatch   boolean? (default false) E only (a storm drain's grate): in only when E is pressed by a body standing at
+--           the mouth (on its `area` when it has one, else within `reach` and `rise`, not more than C.behind past it;
+--           any facing); walking, falling, leaping or pouncing onto it never goes in. Not on a "link" mouth. The way
+--           out is as `opens` says.
+--   area    {x0, x1, z0, z1}? a hatch's lid, level, in world studs (the grate's opening): E takes a body standing
+--           anywhere on it or within C.hatchMargin of its edge, and within `rise` of the mouth point's height (Enclosure.
+--           offHatch). Only on a hatch.
 --   links   { {route, t, dir} }? for "link" (allowed on the others too: the routes that meet it outside)
 --   name    string? ("grille", "rack", "knothole 2")
 --
@@ -72,8 +82,11 @@
 --      moving into it (dot >= C.intoDot with the inward direction): walking, falling, leaping or pouncing (the
 --      flight's swept path counts, and going in ends the attack). No pull from a distance: the walk-in grab, E's
 --      off-rail search and the air-catch never take an enclosed route. The body is eased onto the mouth like a
---      rail transfer (never a jump). E at a mouth with the body facing in goes in the same way. From a rail,
---      only through a "link" (rule 5).
+--      rail transfer (never a jump). E at a mouth with the body facing in goes in the same way. A `hatch` mouth
+--      takes only E, from a body standing on it (any facing): never a walk, a fall, a leap or a pounce; the server
+--      allows its way in only from within a sprint's frame of it (a leap's over a gap long enough to hide one) and
+--      within the mouth's `rise` of its height (so not from higher in the air). From a rail, only through a "link"
+--      (rule 5).
 --   2. Inside and away from a mouth there is no launching and no grabbing in or out: Space, a click and Q do
 --      nothing (event hint "noRoom"); E, A/D and the end-of-route switch never pass a wall, floor or bark.
 --   3. At a mouth the way out is stated: Space, a click and Q launch from the outside face along `out` (Q with a
@@ -94,8 +107,8 @@
 -- Interface: KIND, BODY, C, validate(rec, kind), validateSet(records, known?), fromRecord(rec), windowOf(mouth),
 --   mouthAt(spec, length, t), mouthNear(spec, length, t, slack), endMouth(spec, length, atStart),
 --   endLink(spec, atStart), inside(route, t), hidden(route, t), zone(route), headroom(spec, t), upAt(spec, t),
---   names(mouth, routeId), connects(a, aT, b, bT, slackA?, slackB?), allows(from, fromT, to, toT, slackFrom?,
---   slackTo?), linked(a, b), neighbours(route), exits(spec, length)
+--   offHatch(mouth, x, z), names(mouth, routeId), connects(a, aT, b, bT, slackA?, slackB?), allows(from, fromT, to,
+--   toT, slackFrom?, slackTo?), linked(a, b), neighbours(route), exits(spec, length)
 
 local Curve = require("./Curve")
 
@@ -105,7 +118,7 @@ export type Vec3 = Curve.Vec3
 
 -- As written in a route record (data files and generated modules).
 export type LinkRecord = { route: number, t: number, dir: number }
-export type ForkRecord = { t: number, route: number, toT: number, dir: number, name: string? }
+export type ForkRecord = { t: number, route: number, toT: number, dir: number, name: string?, window: number? }
 export type MouthRecord = {
 	t: number,
 	opens: string,
@@ -116,6 +129,8 @@ export type MouthRecord = {
 	depth: number?,
 	hop: number?,
 	hopUp: number?,
+	hatch: boolean?,
+	area: { number }?,
 	links: { LinkRecord }?,
 	name: string?,
 }
@@ -138,7 +153,7 @@ export type Record = {
 
 -- As the Registry carries it on a Route.
 export type Link = { route: number, t: number, dir: number }
-export type Fork = { t: number, route: number, toT: number, dir: number, name: string? }
+export type Fork = { t: number, route: number, toT: number, dir: number, name: string?, window: number }
 export type Mouth = {
 	t: number,
 	opens: string,
@@ -149,9 +164,12 @@ export type Mouth = {
 	depth: number,
 	hop: number?,
 	hopUp: number,
+	hatch: boolean,
+	area: Rect?,
 	links: { Link },
 	name: string?,
 }
+export type Rect = { x0: number, x1: number, z0: number, z1: number }
 export type Crawl = { t0: number, t1: number, height: number }
 export type UpKey = { t: number, up: Vec3 }
 export type Cavity = { x: number, z: number, radius: number, bottom: number?, top: number? }
@@ -175,7 +193,7 @@ export type Spec = {
 export type RouteLike = { id: number, kind: string, length: number, enclosure: Spec? }
 
 -- A way off an enclosed route part-way along it that A/D may pick and E or W may take (Enclosure.exits).
-export type Exit = { t: number, route: number, toT: number, dir: number, mouth: Mouth? }
+export type Exit = { t: number, route: number, toT: number, dir: number, mouth: Mouth?, window: number }
 
 Enclosure.KIND = "tunnel"
 Enclosure.OPENS = { ground = true, ledge = true, air = true, link = true }
@@ -194,12 +212,14 @@ Enclosure.C = {
 	dropPush = 3.0, -- Q at a mouth: this horizontal speed out along `out`, so the drop clears the opening
 	hopUp = 8.6, -- default vertical speed of a mouth's `hop` (a pounce's base lift)
 	linkWindow = 1.2, -- an end link or a fork connects within this many studs of its point on either route
-	forkAhead = 6.0, -- A/D offers the forks and part-way link mouths up to this far ahead along the travel
+	forkAhead = 6.0, -- A/D offers the forks (unless a fork says its own window) and part-way link mouths up to this far
+	-- ahead along the travel
 	minOutLevel = 0.3, -- a mouth's resolved `out` leans out at least this much horizontally
 	steep = 0.97, -- |tangent . world up| above which the default section up carries on from before
 	width = 1.7, -- default section width
 	height = 1.8, -- default section headroom
 	unitTol = 0.02, -- |out| within 1 +- this
+	hatchMargin = 0.4, -- a body this far (level) off a hatch's `area` still stands on it: half its capsule radius
 }
 
 local function link(rec: LinkRecord): Link
@@ -233,6 +253,10 @@ function Enclosure.fromRecord(rec: Record): Spec
 			out = Curve.vec3(m.out[1], m.out[2], m.out[3])
 		end
 		local reach = m.reach or Enclosure.C.reach
+		local area: Rect? = nil
+		if m.area then
+			area = { x0 = m.area[1], x1 = m.area[2], z0 = m.area[3], z1 = m.area[4] }
+		end
 		table.insert(mouths, {
 			t = m.t,
 			opens = m.opens,
@@ -243,6 +267,8 @@ function Enclosure.fromRecord(rec: Record): Spec
 			depth = m.depth or 0,
 			hop = m.hop,
 			hopUp = m.hopUp or Enclosure.C.hopUp,
+			hatch = m.hatch == true,
+			area = area,
 			links = links,
 			name = m.name,
 		})
@@ -255,7 +281,14 @@ function Enclosure.fromRecord(rec: Record): Spec
 	local forks: { Fork } = {}
 	local forkRecs: { ForkRecord } = rec.forks or {}
 	for _, f in forkRecs do
-		table.insert(forks, { t = f.t, route = f.route, toT = f.toT, dir = if f.dir < 0 then -1 else 1, name = f.name })
+		table.insert(forks, {
+			t = f.t,
+			route = f.route,
+			toT = f.toT,
+			dir = if f.dir < 0 then -1 else 1,
+			name = f.name,
+			window = f.window or Enclosure.C.forkAhead,
+		})
 	end
 	local upAt: { UpKey } = {}
 	local upRecs: { { number } } = rec.upAt or {}
@@ -388,6 +421,9 @@ function Enclosure.validate(rec: any, kind: string): { string }
 		if not isNumber(f.t) or f.t < 0 or f.t > 1 then
 			table.insert(errs, `{where}.t must be in [0, 1]`)
 		end
+		if f.window ~= nil and (not isNumber(f.window) or f.window <= 0) then
+			table.insert(errs, `{where}.window must be a positive number`)
+		end
 		checkLink(errs, where, { route = f.route, t = f.toT, dir = f.dir })
 	end
 	if rec.up ~= nil then
@@ -447,6 +483,25 @@ function Enclosure.validate(rec: any, kind: string): { string }
 		end
 		if m.opens == "link" and (type(m.links) ~= "table" or #m.links == 0) then
 			table.insert(errs, `{where}: a link mouth needs links`)
+		end
+		if m.hatch ~= nil and type(m.hatch) ~= "boolean" then
+			table.insert(errs, `{where}.hatch must be a boolean`)
+		elseif m.hatch == true and m.opens == "link" then
+			table.insert(errs, `{where}: a link mouth cannot be a hatch (nothing walks into it)`)
+		end
+		if m.area ~= nil then
+			local a = m.area
+			if
+				type(a) ~= "table"
+				or #a ~= 4
+				or not (isNumber(a[1]) and isNumber(a[2]) and isNumber(a[3]) and isNumber(a[4]))
+				or a[1] >= a[2]
+				or a[3] >= a[4]
+			then
+				table.insert(errs, `{where}.area must be [x0, x1, z0, z1] with x0 < x1 and z0 < z1`)
+			elseif m.hatch ~= true then
+				table.insert(errs, `{where}.area is only for a hatch`)
+			end
 		end
 		for j, l in m.links or {} do
 			checkLink(errs, `{where}.links[{j}]`, l)
@@ -568,6 +623,18 @@ function Enclosure.mouthNear(spec: Spec, length: number, t: number, slack: numbe
 	return best
 end
 
+-- offHatch(mouth, x, z): how far (level, studs) the point is off the hatch's `area` (0 on it); nil when the mouth has
+-- no area. A body within C.hatchMargin of it stands on the hatch.
+function Enclosure.offHatch(m: Mouth, x: number, z: number): number?
+	local a = m.area
+	if a == nil then
+		return nil
+	end
+	local dx = math.max(a.x0 - x, 0, x - a.x1)
+	local dz = math.max(a.z0 - z, 0, z - a.z1)
+	return math.sqrt(dx * dx + dz * dz)
+end
+
 -- windowOf(mouth): the studs along the route the body counts as at it.
 function Enclosure.windowOf(m: Mouth): number
 	return m.window
@@ -647,16 +714,19 @@ function Enclosure.names(mouth: Mouth, routeId: number): boolean
 end
 
 -- exits(spec, length): the authored ways off the route part-way along it, in t order: its forks and the first link of
--- each part-way link mouth (A/D picks among them; E or passing W takes one).
+-- each part-way link mouth (A/D picks among them, from up to `window` studs before one; E or passing W takes one).
 function Enclosure.exits(spec: Spec, _length: number): { Exit }
 	local out: { Exit } = {}
 	for _, f in spec.forks do
-		table.insert(out, { t = f.t, route = f.route, toT = f.toT, dir = f.dir, mouth = nil })
+		table.insert(out, { t = f.t, route = f.route, toT = f.toT, dir = f.dir, mouth = nil, window = f.window })
 	end
 	for _, m in spec.mouths do
 		if not isEnd(m.t) and #m.links > 0 then
 			local l = m.links[1]
-			table.insert(out, { t = m.t, route = l.route, toT = l.t, dir = l.dir, mouth = m })
+			table.insert(
+				out,
+				{ t = m.t, route = l.route, toT = l.t, dir = l.dir, mouth = m, window = Enclosure.C.forkAhead }
+			)
 		end
 	end
 	table.sort(out, function(a: Exit, b: Exit): boolean

@@ -198,6 +198,13 @@ function Motion.railSpeed(treeTravel: boolean, sprint: boolean, focus: boolean, 
 	return base
 end
 
+-- routeSpeed(route, sprint, focus, boosted): the rail speed on this route, studs/s: railSpeed times the route's own
+-- pace (route.speedMult: 1 on every v5.4 route, so those run exactly as before; the storm drains' pipes are
+-- Tunables sewer.speedMult). The motor and the server's caps (SquirrelMotor.routeCap) both use it.
+function Motion.routeSpeed(route: Route, sprint: boolean, focus: boolean, boosted: boolean): number
+	return Motion.railSpeed(route.flags.treeTravel, sprint, focus, boosted) * route.speedMult
+end
+
 -- Camera basis in XZ (L5796-5801): forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw).
 function Motion.cameraForwardXZ(cameraYaw: number): (number, number)
 	return -math.sin(cameraYaw), -math.cos(cameraYaw)
@@ -965,29 +972,46 @@ function Motion.mouths(world: World): { MouthRef }
 end
 
 -- does a body at (x, y, z) moving along (moveX, moveZ) get in at this mouth (Enclosure rule 1)? Returns the level
--- distance to the mouth point, or nil.
-local function intoMouth(ref: MouthRef, x: number, y: number, z: number, moveX: number, moveZ: number): number?
+-- distance to the mouth point, or nil. `standingE`: E pressed by a body standing on the ground, the only way into a
+-- hatch (which then takes any facing, from anywhere on its `area` when it has one); without it a hatch takes nothing.
+local function intoMouth(
+	ref: MouthRef,
+	x: number,
+	y: number,
+	z: number,
+	moveX: number,
+	moveZ: number,
+	standingE: boolean
+): number?
 	local m = ref.mouth
-	if m.opens == "link" then
+	if m.opens == "link" or (m.hatch and not standingE) then
 		return nil
 	end
 	local dx, dz = x - ref.x, z - ref.z
 	local level = math.sqrt(dx * dx + dz * dz)
+	local off = Enclosure.offHatch(m, x, z)
+	if off then
+		-- a hatch with a lid: anywhere on it (or within the margin of its edge), any facing
+		if off > Enclosure.C.hatchMargin or math.abs(y - ref.y) > m.rise then
+			return nil
+		end
+		return level
+	end
 	if level > m.reach or math.abs(y - ref.y) > m.rise then
 		return nil
 	end
 	local ml = math.sqrt(moveX * moveX + moveZ * moveZ)
-	if ml < 1e-6 then
+	if ml < 1e-6 and not m.hatch then
 		return nil
 	end
 	local oh = math.sqrt(ref.ox * ref.ox + ref.oz * ref.oz)
 	if oh > 0.3 then
 		local ox, oz = ref.ox / oh, ref.oz / oh
-		-- on the outside of the mouth (or at most half a body past it) and moving in
+		-- on the outside of the mouth (or at most half a body past it) and moving in (a hatch: any facing)
 		if dx * ox + dz * oz < -Enclosure.C.behind then
 			return nil
 		end
-		if -(moveX * ox + moveZ * oz) / ml < Enclosure.C.intoDot then
+		if not m.hatch and -(moveX * ox + moveZ * oz) / ml < Enclosure.C.intoDot then
 			return nil
 		end
 	end
@@ -999,10 +1023,19 @@ local function entrySpec(ref: MouthRef, x: number, y: number, z: number): EnterS
 	return { routeId = ref.routeId, t = ref.mouth.t, dir = if ref.inward ~= 0 then ref.inward else nil, d = d }
 end
 
--- mouthEntry(world, x, y, z, moveX, moveZ): the way in for a body off the rails at (x, y, z) moving along
+-- mouthEntry(world, x, y, z, moveX, moveZ, standingE?): the way in for a body off the rails at (x, y, z) moving along
 -- (moveX, moveZ) (Enclosure rule 1): the nearest mouth that opens ground, ledge or air, with the body within its
--- reach (level) and rise (height), not more than Enclosure.C.behind past it, and moving into it. nil when none.
-function Motion.mouthEntry(world: World, x: number, y: number, z: number, moveX: number, moveZ: number): EnterSpec?
+-- reach (level) and rise (height), not more than Enclosure.C.behind past it, and moving into it. A hatch mouth only
+-- with `standingE` (E pressed by a body on the ground; any facing; on its `area` when it has one). nil when none.
+function Motion.mouthEntry(
+	world: World,
+	x: number,
+	y: number,
+	z: number,
+	moveX: number,
+	moveZ: number,
+	standingE: boolean?
+): EnterSpec?
 	local list = Motion.mouths(world)
 	if #list == 0 then
 		return nil
@@ -1010,7 +1043,7 @@ function Motion.mouthEntry(world: World, x: number, y: number, z: number, moveX:
 	local best: MouthRef? = nil
 	local bestD = math.huge
 	for _, ref in list do
-		local level = intoMouth(ref, x, y, z, moveX, moveZ)
+		local level = intoMouth(ref, x, y, z, moveX, moveZ, standingE == true)
 		if level and level < bestD then
 			best, bestD = ref, level
 		end
@@ -1023,7 +1056,8 @@ end
 
 -- mouthEntrySwept(world, x0, y0, z0, x1, y1, z1, moveX, moveZ): as mouthEntry for a body that flew from the first
 -- point to the second in one substep (a leap or a pounce): the point of the segment nearest each mouth (level) is
--- judged, so a fast flight through a mouth's disc is not missed. The enter spec is from the body's point now.
+-- judged, so a fast flight through a mouth's disc is not missed. The enter spec is from the body's point now. Never a
+-- hatch (a flight does not open one).
 function Motion.mouthEntrySwept(
 	world: World,
 	x0: number,
@@ -1048,7 +1082,7 @@ function Motion.mouthEntrySwept(
 		if ss > 1e-12 then
 			f = math.clamp(((ref.x - x0) * sx + (ref.z - z0) * sz) / ss, 0, 1)
 		end
-		local level = intoMouth(ref, x0 + sx * f, y0 + (y1 - y0) * f, z0 + sz * f, moveX, moveZ)
+		local level = intoMouth(ref, x0 + sx * f, y0 + (y1 - y0) * f, z0 + sz * f, moveX, moveZ, false)
 		if level and level < bestD then
 			best, bestD = ref, level
 		end
@@ -1086,8 +1120,8 @@ function Motion.transferFilter(world: World, from: Route, fromT: number): ((rout
 end
 
 -- exitsAhead(world, route, t, dir): the authored ways off an enclosed route (Enclosure.exits: forks, part-way link
--- mouths) that A/D may pick from here: within Enclosure.C.forkAhead studs ahead along `dir`, or within
--- Enclosure.C.linkWindow behind. Empty off an enclosed route.
+-- mouths) that A/D may pick from here: within the exit's window (a fork's own, else Enclosure.C.forkAhead) ahead along
+-- `dir`, or within Enclosure.C.linkWindow behind. Empty off an enclosed route.
 function Motion.exitsAhead(_world: World, route: Route, t: number, dir: number): { Enclosure.Exit }
 	local spec = route.enclosure
 	local out: { Enclosure.Exit } = {}
@@ -1096,7 +1130,7 @@ function Motion.exitsAhead(_world: World, route: Route, t: number, dir: number):
 	end
 	for _, e in Enclosure.exits(spec, route.length) do
 		local ahead = (e.t - t) * route.length * (if dir < 0 then -1 else 1)
-		if ahead <= Enclosure.C.forkAhead and ahead >= -Enclosure.C.linkWindow then
+		if ahead <= e.window and ahead >= -Enclosure.C.linkWindow then
 			table.insert(out, e)
 		end
 	end

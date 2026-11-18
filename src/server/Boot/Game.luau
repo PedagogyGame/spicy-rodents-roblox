@@ -49,8 +49,9 @@
 --   kick(player) -> (hit?), remotes { Pick(player, choice), Kick(player) } (the PlayNet handlers),
 --   kill(actor, cause), step(dt), stateOf(player), health(actorId), attractions (Server/Attractions:
 --   the bowling alley's MinigameService; nil without Workspace.Attractions), infection (Infection/
---   InfectionService; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could not
---   start), rafters (Attractions/RafterService; nil when it could not start), townIdOf(actorId), stop() };
+--   InfectionService; nil when it could not start), sewers (World/SewerService: the storm drains' carve, cover
+--   and the police at the grate; nil when it could not start), skylift (Rides/SkyLiftService; nil when it could
+--   not start), rafters (Attractions/RafterService; nil when it could not start), townIdOf(actorId), stop() };
 --   pickOfficer(people) -> actor? (pure); refusalText(why) -> string (pure);
 --   putBack(free, possessable) -> boolean (pure); gameSeconds(serverTime, epoch, base, rate) (pure);
 --   wallet(deps: WalletDeps) -> WalletHooks { wallet, purse(player), sweep(), leave(player), charge(player,
@@ -74,6 +75,7 @@ local TrafficService = require("../Traffic/TrafficService")
 local MovementService = require("../Movement/MovementService")
 local AttractionService = require("../Attractions/AttractionService")
 local InfectionService = require("../Infection/InfectionService")
+local SewerService = require("../World/SewerService")
 local SkyLiftService = require("../Rides/SkyLiftService")
 local RafterService = require("../Attractions/RafterService")
 local HospitalProps = require("../Hospital/HospitalProps")
@@ -219,6 +221,7 @@ type PState = {
 	bites: number,
 	lastKick: number,
 	lastPick: number,
+	lastBiteAt: number?, -- the server clock (`now`) at the rodent's last bite: fed while within a game day
 }
 
 local function setAttr(player: any, key: string, value: any)
@@ -462,6 +465,22 @@ function Game.start(opts: Opts?): any
 	end
 	fireLater = fire -- wallet.tell: a shop's or a door's words for one player, as the toast every refusal uses
 
+	-- who holds a town body ("ai" | "player"), and an attribute on it (Say is remembered for the speech log):
+	-- what Infection/InfectionService and World/SewerService ask of the town
+	local function controllerOfTown(id: number): string
+		local actor = rt.byTownId[id]
+		return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
+	end
+	local function setTownAttr(id: number, name: string, value: any)
+		local actor = rt.byTownId[id]
+		if actor then
+			(actor.body :: Model):SetAttribute(name, value)
+		end
+		if name == "Say" then
+			lastSay[id] = value
+		end
+	end
+
 	-- the bite-to-hospital sequence (Infection/InfectionService): built here, stepped in step(dt)
 	local infection: any = nil
 	local infectionFault: (where: string, err: any) -> ()
@@ -470,23 +489,12 @@ function Game.start(opts: Opts?): any
 			world = world,
 			traffic = traffic,
 			data = data,
-			controllerOf = function(id: number): string
-				local actor = rt.byTownId[id]
-				return if actor and possession:controllerOf(actor) ~= "ai" then "player" else "ai"
-			end,
+			controllerOf = controllerOfTown,
 			busy = function(id: number): boolean
 				local actor = rt.byTownId[id]
 				return actor ~= nil and (actor.body :: Model):GetAttribute("Ride") ~= nil
 			end,
-			setAttr = function(id: number, name: string, value: any)
-				local actor = rt.byTownId[id]
-				if actor then
-					(actor.body :: Model):SetAttribute(name, value)
-				end
-				if name == "Say" then
-					lastSay[id] = value
-				end
-			end,
+			setAttr = setTownAttr,
 			setPossessable = function(id: number, value: boolean)
 				local actor = rt.byTownId[id]
 				if actor then
@@ -550,6 +558,63 @@ function Game.start(opts: Opts?): any
 			pcall(dead.shutdown, dead)
 			warn("[SpicyRodents] the infection service keeps failing: switched off (bites still score)")
 		end
+	end
+
+	-- the storm drains (World/SewerService): the carve (after the terrain write above), cover, the police at the grate
+	local sewers: any = nil
+	local sewersBaked = workspace:FindFirstChild("Sewers") ~= nil
+	if not sewersBaked then
+		warn(
+			"[SpicyRodents] Workspace.Sewers missing (run lune run tools/bake/sewers.luau and rebuild): no drains carved"
+				.. " and nobody hidden, but the drains' routes are still in the data (E at a corner goes down into the"
+				.. " ground): do not publish this place"
+		)
+	end
+	local okW, errW = pcall(function()
+		sewers = SewerService.start({
+			world = world,
+			-- no pipes drawn, no holes in the ground (an open shaft with nothing under it), and nobody hidden in
+			-- solid ground. The routes are in the data either way, and every bake is optional in the project files
+			-- (a fresh tree builds before it is baked), so the warning above is the guard: bake before a publish
+			carve = o.terrain ~= false and sewersBaked,
+			cover = sewersBaked,
+			speech = infection and infection.speech,
+			clock = function(): number
+				return if infection then infection.now else world.now
+			end,
+			serverTime = function(): number
+				return workspace:GetServerTimeNow()
+			end,
+			controllerOf = controllerOfTown,
+			setAttr = setTownAttr,
+		})
+	end)
+	if not okW then
+		sewers = nil
+		warn(`[SpicyRodents] the storm drains did not start (the pipes run, nobody loses the rodent there): {errW}`)
+	end
+	-- the owner's sewer modules, once each, for the clients to draw near the body (Client/World/SewerArt); a module
+	-- that does not load leaves its drains in the bake's plain parts
+	if sewersBaked then
+		local store = ReplicatedStorage:FindFirstChild("SewerArt")
+		if store == nil then
+			local f = Instance.new("Folder")
+			f.Name = "SewerArt"
+			f.Parent = ReplicatedStorage
+			store = f
+		end
+		task.spawn(function()
+			local okA, loaded, failed =
+				pcall(SewerService.loadArt, workspace:FindFirstChild("Sewers") :: Instance, store)
+			if not okA then
+				warn(`[SpicyRodents] the sewer modules did not load (the drains stay in plain parts): {loaded}`)
+				return
+			end
+			for module, why in failed do
+				warn(`[SpicyRodents] sewer module {module} did not load (its drains stay in plain parts): {why}`)
+			end
+			print(`[SpicyRodents] sewer modules loaded: {table.concat(loaded, ", ")}`)
+		end)
 	end
 
 	local function stateOf(player: any): PState
@@ -934,7 +999,9 @@ function Game.start(opts: Opts?): any
 			local actor = possession:actorOf(player)
 			if s.role == "rodent" and actor and actor.variant == "spicy" then
 				local root = (actor.body :: Model).PrimaryPart
-				if root then
+				-- never out of cover: a rodent down a drain is hidden from everyone, so it bites nobody
+				local tid = townIdOf[actor.id]
+				if root and (sewers == nil or tid == nil or sewers:mayBite(tid)) then
 					if humans == nil then
 						humans = {}
 						for _, a in world.actors do
@@ -967,6 +1034,7 @@ function Game.start(opts: Opts?): any
 							s.power,
 							{ kind = if officer then "biteOfficer" else "bitePerson", y = Units.u(p.Y) }
 						)
+						s.lastBiteAt = now
 						s.bites += 1 -- every client plays the bite on the rodent's body (Animation/AnimationDriver watches this)
 						(actor.body :: Model):SetAttribute("BiteAt", now)
 						shoutN += 1
@@ -1052,7 +1120,20 @@ function Game.start(opts: Opts?): any
 			end
 			for player, s in states do
 				if s.role == "rodent" then
-					if PowerRules.fade(s.power, fadeAcc) > 0 then
+					local changed = PowerRules.fade(s.power, fadeAcc) > 0
+					-- a refuge heals the fed rodent (World/SewerService: the hollow rate down a drain, D33 rev 4)
+					local actor = possession:actorOf(player)
+					local tid = if actor then townIdOf[actor.id] else nil
+					if sewers and actor and tid and actor.variant == "spicy" then
+						local h = healthOf(actor.id)
+						local healed =
+							sewers:heal(tid, h, PlayRules.HEALTH, fadeAcc, SewerService.fed(s.lastBiteAt, now))
+						if healed ~= h then
+							health[actor.id] = healed
+							changed = true
+						end
+					end
+					if changed then
 						publish(player)
 					end
 				end
@@ -1330,6 +1411,7 @@ function Game.start(opts: Opts?): any
 		placeAI = placeAI,
 		attractions = attractions,
 		infection = infection,
+		sewers = sewers,
 		skylift = skylift,
 		rafters = rafters,
 		townIdOf = function(actorId: string): number?
@@ -1339,6 +1421,9 @@ function Game.start(opts: Opts?): any
 			rt.stop()
 			if attractions then
 				attractions.stop()
+			end
+			if sewers then
+				sewers:stop()
 			end
 			if skylift then
 				skylift:stop()

@@ -18,7 +18,8 @@
 -- Edge actions per frame: leap (Space), drop (Q), grab (E), choose (A/D), pounce (left click).
 -- ENCLOSED RUNS (Routes/Enclosure; kind "tunnel": the ball return, a hollow tree's inside): got into only at a mouth,
 -- moving into it (walking, falling, leaping or pouncing: the flight's swept path counts and going in ends the
--- attack), eased like a transfer; inside and away from a mouth Space, Q and a click do nothing (hint "noRoom") and
+-- attack), eased like a transfer (a hatch mouth, a storm drain's grate, takes only E from a body standing at it, never
+-- a walk or a flight); inside and away from a mouth Space, Q and a click do nothing (hint "noRoom") and
 -- E, A/D and the end-of-route switch never pass the wall; at a mouth they launch from outside its face
 -- (Motion.launchPoint) along its `out` (a mouth's `hop` makes Space and a click a short hop; Q pushes out); an end
 -- mouth lets the body out as it says (step out on the ground: "emerge"; stop with the head out: "lip", where a view
@@ -739,10 +740,16 @@ local function doChoose(state: State, world: World, input: Input, events: { Even
 	local side = input.choose
 	if r.enclosure then
 		-- an enclosed run: only its authored ways off part-way along (forks, part-way link mouths), never a junction
-		-- guessed across the wall; W carries the body onto the chosen one as it passes, E takes it
-		local e = Motion.chooseExit(world, r, state.railT, state.railDir, input.cameraYaw, side, state.selectedJunction)
-		state.selectedJunction = if e then e.route else nil
-		if e then
+		-- guessed across the wall; W carries the body onto the chosen one as it passes, E takes it. The pick is kept
+		-- until it is passed; the same key again with no other way on that side drops it ("junctionCleared": the run
+		-- goes straight on), and a press with nothing in reach leaves the pick as it was
+		local current = state.selectedJunction
+		local e = Motion.chooseExit(world, r, state.railT, state.railDir, input.cameraYaw, side, current)
+		if e and e.route == current then
+			state.selectedJunction = nil
+			push(events, "junctionCleared", e.route, r.id)
+		elseif e then
+			state.selectedJunction = e.route
 			push(events, "junctionChosen", e.route, r.id)
 		end
 		return
@@ -859,7 +866,8 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 			if enterRoute(state, world, junction, input, events) then
 				return
 			end
-		else
+		elseif r.enclosure == nil then
+			-- (on an enclosed run the pick is an authored exit's, taken at it: a stray E on the way keeps it)
 			state.selectedJunction = nil
 		end
 		if state.pendingFork and r.kind == "trunk" then
@@ -881,8 +889,17 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 			push(events, "hint", nil, nil, "noTransfer")
 		end
 	else
-		-- facing into an enclosed run's mouth within its reach: in through the mouth (Enclosure rule 1)
-		local mouth = Motion.mouthEntry(world, state.x, state.y, state.z, math.sin(state.yaw), math.cos(state.yaw))
+		-- facing into an enclosed run's mouth within its reach, or standing at a hatch: in through the mouth (Enclosure
+		-- rule 1)
+		local mouth = Motion.mouthEntry(
+			world,
+			state.x,
+			state.y,
+			state.z,
+			math.sin(state.yaw),
+			math.cos(state.yaw),
+			state.grounded
+		)
 		if mouth and enterRoute(state, world, mouth, input, events, true) then
 			push(events, "enter", mouth.routeId)
 			return
@@ -1092,7 +1109,7 @@ local function substep(state: State, input: Input, dt: number, world: World, eve
 					Motion.directionFromView(world, rs, state.railT, input.cameraYaw, state.yaw, state.railDir)
 			end
 			state.routeWasMoving = fw ~= 0
-			local railSpeed = Motion.railSpeed(rs.flags.treeTravel, sprint, state.focus, state.boostRemaining > 0)
+			local railSpeed = Motion.routeSpeed(rs, sprint, state.focus, state.boostRemaining > 0)
 			local before = state.railT
 			state.railT = Motion.advance(state.railT, state.railDir, fw, dt, railSpeed, rs.length)
 			-- fork auto-take while holding W (L6676-6686)
@@ -1390,8 +1407,9 @@ end
 -- rail, speeds against the per-kind caps, arcs against gravity, launches against jump/pounce, rail
 -- changes against the route graph and the transfer gaps, and ground moves against world.crosses. Enclosed runs
 -- (Routes/Enclosure) add one check, only where a move touches one ("enclosure"): a body gets on only within reach
--- of a mouth that opens to the outside, gets off only at a mouth, and changes rail across the wall only where a
--- mouth's links say (an authored link is a declared junction, whatever gap the Graph sees).
+-- of a mouth that opens to the outside (a hatch: from its lid at a sprint's pace and within its rise), gets off only
+-- at a mouth, and changes rail across the wall only where a mouth's links say (an authored link is a declared
+-- junction, whatever gap the Graph sees).
 
 export type Violation = { code: string, severity: number, detail: string }
 
@@ -1428,6 +1446,12 @@ end
 
 function SquirrelMotor.railCap(treeTravel: boolean, boosted: boolean): number
 	return Motion.railSpeed(treeTravel, true, false, boosted)
+end
+
+-- routeCap(route, boosted): the cap on a given route, its own pace included (Motion.routeSpeed: a storm drain's pipe
+-- runs at Tunables sewer.speedMult, every other route at 1). Every rail bound of the envelope uses it.
+function SquirrelMotor.routeCap(r: Registry.Route, boosted: boolean): number
+	return Motion.routeSpeed(r, true, false, boosted)
 end
 
 function SquirrelMotor.launchCapXZ(boosted: boolean): number
@@ -1468,7 +1492,7 @@ function SquirrelMotor.envelope(
 	if prevEnc or nextEnc then
 		-- how far along a rail the body could have run between the packets
 		local function along(r: Registry.Route): number
-			local cap = SquirrelMotor.railCap(r.flags.treeTravel, boosted)
+			local cap = SquirrelMotor.routeCap(r, boosted)
 			return cap * E.railTol * dt + cap * P.substep + E.posSlack
 		end
 		-- one time budget for a move through a mouth: the time to reach it off the rails plus the time along the rail
@@ -1480,7 +1504,7 @@ function SquirrelMotor.envelope(
 			+ 0.5 * P.gravity * dt * dt
 			+ E.posSlack
 		local function railTime(r: Registry.Route, fromT: number, toT: number, window: number): number
-			local cap = SquirrelMotor.railCap(r.flags.treeTravel, boosted) * E.railTol
+			local cap = SquirrelMotor.routeCap(r, boosted) * E.railTol
 			return math.max(0, math.abs(toT - fromT) * r.length - window - E.posSlack) / cap
 		end
 		-- the least an honest path off the rails covers between a point and a mouth (level): to within `reach` of
@@ -1502,6 +1526,14 @@ function SquirrelMotor.envelope(
 			end
 			return math.max(0, need - E.posSlack)
 		end
+		-- a hatch takes only E from a body standing on it: reached at the pace it was already moving or a sprint's (a
+		-- leap's over a long gap, which can hide one and its landing), from within the mouth's rise of its height give
+		-- or take the fall the gap allows (no launch inside the gap)
+		local sprintCap = P.sprint * (if boosted then P.boostMult else 1) * E.speedTol
+		local hatchCap = math.max(if dt > E.shortDt then groundCap else sprintCap, vPrevXZ * E.speedTol)
+		local hatchVertical = math.max(math.abs(prev.vy), math.abs(next.vy)) * dt
+			+ 0.5 * P.gravity * dt * dt
+			+ E.posSlack
 		if nextRoute and nextEnc and not prevRoute then
 			local ok = false
 			for _, m in nextEnc.mouths do
@@ -1510,9 +1542,15 @@ function SquirrelMotor.envelope(
 				end
 				local p = reg:pointAt(nextRoute, m.t)
 				local ox, oz = Motion.outLevel(world, nextRoute, m)
-				local tOff = offDistance(p.x, p.z, ox, oz, prev.x, prev.z, m.reach) / offCap
+				-- a hatch with a lid is reached anywhere on it (Motion.intoMouth)
+				local offLid = Enclosure.offHatch(m, prev.x, prev.z)
+				local need = if offLid
+					then math.max(0, offLid - Enclosure.C.hatchMargin - E.posSlack)
+					else offDistance(p.x, p.z, ox, oz, prev.x, prev.z, m.reach)
+				local tOff = need / (if m.hatch then hatchCap else offCap)
 				local tRail = railTime(nextRoute, m.t, next.railT, 0)
-				if tOff + tRail <= budget and math.abs(p.y - prev.y) <= m.rise + vertical then
+				local rise = m.rise + (if m.hatch then hatchVertical else vertical)
+				if tOff + tRail <= budget and math.abs(p.y - prev.y) <= rise then
 					ok = true
 					break
 				end
@@ -1617,7 +1655,7 @@ function SquirrelMotor.envelope(
 
 	-- 2. Rail-to-rail: speed along the same route, or a legal transfer.
 	if prevRoute and nextRoute then
-		local railCap = SquirrelMotor.railCap(prevRoute.flags.treeTravel, boosted)
+		local railCap = SquirrelMotor.routeCap(prevRoute, boosted)
 		if prevRoute.id == nextRoute.id then
 			local allowed = railCap * E.railTol * dt + railCap * P.substep
 			if not shortGap then
@@ -1682,7 +1720,7 @@ function SquirrelMotor.envelope(
 						end
 						if best then
 							local b = best :: SpatialIndex.Hit
-							local capB = SquirrelMotor.railCap(midRoute.flags.treeTravel, boosted) * E.railTol * dt
+							local capB = SquirrelMotor.routeCap(midRoute, boosted) * E.railTol * dt
 							local d = math.sqrt((dest.x - b.x) ^ 2 + (dest.y - b.y) ^ 2 + (dest.z - b.z) ^ 2)
 							local allow = capB
 								+ E.posSlack
@@ -1702,7 +1740,7 @@ function SquirrelMotor.envelope(
 			if gap > C.enterMaxGap + travel + (if twoHop then C.enterMaxGap else 0) then
 				add(out, "transfer", 1, `transfer gap {gap} st > 3.15 u (+travel)`)
 			elseif relation == "fork" or relation == "sibling" then
-				local nextCap = SquirrelMotor.railCap(nextRoute.flags.treeTravel, boosted)
+				local nextCap = SquirrelMotor.routeCap(nextRoute, boosted)
 				if next.railT > E.forkEnterMaxT + nextCap * E.railTol * dt / nextRoute.length then
 					add(out, "transfer", 1, `{relation} hop landed at t {next.railT}`)
 				end
@@ -1730,7 +1768,7 @@ function SquirrelMotor.envelope(
 						local hit = world.index:nearestOnRoute(mid, prev.x, prev.y, prev.z, C.airGrab + travel)
 						if hit then
 							local relation = graph:relation(mid, nextRoute.id)
-							local capB = SquirrelMotor.railCap(midRoute.flags.treeTravel, boosted) * E.railTol * dt
+							local capB = SquirrelMotor.routeCap(midRoute, boosted) * E.railTol * dt
 							local d = math.sqrt((dest.x - hit.x) ^ 2 + (dest.y - hit.y) ^ 2 + (dest.z - hit.z) ^ 2)
 							local allow = capB + E.posSlack
 							if relation == "fork" then
@@ -1764,7 +1802,7 @@ function SquirrelMotor.envelope(
 			prev.trunkNormalX,
 			prev.trunkNormalZ
 		)
-		local railCap = SquirrelMotor.railCap(prevRoute.flags.treeTravel, boosted)
+		local railCap = SquirrelMotor.routeCap(prevRoute, boosted)
 		local launchSpeed = math.sqrt(launchXZ * launchXZ + launchUp * launchUp)
 		local allowed = railCap * dt
 			+ launchSpeed * dt

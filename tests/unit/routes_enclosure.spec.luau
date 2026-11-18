@@ -250,6 +250,38 @@ return function(t)
 		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", depth = -1 } } }), "depth"))
 		t.truthy(has(errs({ mouths = { { t = 1, opens = "ledge", hop = -2 } } }), "hop"))
 		t.eq(#errs({ mouths = { { t = 1, opens = "ledge", hop = 10, hopUp = 8, depth = 0.2, window = 0.4 } } }), 0)
+		-- a hatch (E only): a boolean, never on a link mouth; off by default
+		t.eq(#errs({ mouths = { { t = 0, opens = "ground", hatch = true } } }), 0)
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", hatch = "yes" } } }), "hatch must be a boolean"))
+		local link = { t = 0, opens = "link", hatch = true, links = { { route = 2, t = 0, dir = 1 } } }
+		t.truthy(has(errs({ mouths = { link } }), "cannot be a hatch"))
+		local spec = Enclosure.fromRecord(
+			rec({ mouths = { { t = 0, opens = "ground" }, { t = 1, opens = "ground", hatch = true } } }) :: any
+		)
+		t.eq(spec.mouths[1].hatch, false)
+		t.eq(spec.mouths[2].hatch, true)
+		-- a hatch's lid (`area`): four numbers in order, only on a hatch; offHatch is the level distance off it
+		t.eq(#errs({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 0, 2, 0, 3 } } } }), 0)
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 2, 0, 0, 3 } } } }), "area"))
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 0, 2 } } } }), "area"))
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", area = { 0, 2, 0, 3 } } } }), "only for a hatch"))
+		local lid = Enclosure.fromRecord(
+			rec({ mouths = { { t = 0, opens = "ground", hatch = true, area = { 0, 2, 0, 3 } } } }) :: any
+		).mouths[1]
+		t.eq(Enclosure.offHatch(lid, 1, 1.5), 0)
+		t.eq(Enclosure.offHatch(lid, 2, 3), 0)
+		t.near(Enclosure.offHatch(lid, 3, 1) :: number, 1, 1e-9)
+		t.near(Enclosure.offHatch(lid, -3, 7) :: number, 5, 1e-9)
+		t.eq(Enclosure.offHatch(spec.mouths[2], 0, 0), nil)
+		-- a fork's own A/D window: positive studs; the default is C.forkAhead, a part-way link mouth always has it
+		t.truthy(has(errs({ forks = { { t = 1, route = 2, toT = 1, dir = -1, window = 0 } } }), "window"))
+		local wide = Enclosure.fromRecord(rec({
+			forks = { { t = 1, route = 2, toT = 1, dir = -1, window = 40 }, { t = 1, route = 3, toT = 1, dir = -1 } },
+		}) :: any)
+		t.eq(wide.forks[1].window, 40)
+		t.eq(wide.forks[2].window, Enclosure.C.forkAhead)
+		local exits = Enclosure.exits(wide, 50)
+		t.eq(exits[1].window + exits[2].window, 40 + Enclosure.C.forkAhead)
 	end)
 
 	t.test("upAt: the authored section up, interpolated between keys and held past them; exits in t order", function()

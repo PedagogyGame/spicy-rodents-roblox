@@ -481,6 +481,7 @@ return function(t)
 					world = {
 						possessed = {},
 						now = 0,
+						covers = {}, -- TownAI.World: what hides squirrels (the storm drains add theirs)
 						brains = { [7] = brain },
 						actorsById = { [7] = a },
 						scheduler = {
