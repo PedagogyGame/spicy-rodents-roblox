@@ -37,6 +37,7 @@
 -- Pure. Interface: constants below; routes() -> { LocalRoute } (copies); route(id) -> LocalRoute;
 --   records(place, lotId?) -> { world route records }; lamps() -> { {X, Y, D} }; isRafter(id) -> boolean;
 --   inHall(X, D) -> boolean; inAnnex(X, D) -> boolean; inPlatform(X, D) -> string?; guardEyes() -> { {X, Y, D} };
+--   fencePosts(line) -> { number };
 --   CHAIN, RETIRED, BOUGH_FORK_T; the ids RIDGE, BOUGH, VENT, FIRST_RAFTER, LAST_RAFTER.
 
 local AlleyLayout = require("./AlleyLayout")
@@ -198,23 +199,25 @@ AlleyRoof.PLATFORM = {
 	},
 }
 -- People stay round the vent (owner question Q6's default): the platform, the apron, the unit's sides and the gap
--- between the unit and the hall, inside these lines (east, north, and south along the wing's back parapet beside the
--- stair's cut). On each a visible rail (squirrels pass under its bottom rail, between its posts) and an invisible wall
+-- between the unit and the hall, inside these lines (east, north, and south along the wing's whole back parapet from
+-- the stair's cut to the wing's east corner: a person who climbs the stair's guard rail and jumps for the parapet
+-- meets it). On each a visible rail (squirrels pass under its bottom rail, between its posts) and an invisible wall
 -- up to wallY1 that people meet and squirrels do not (collision group PeopleFence, Shared/World/CollisionGroups):
--- a person jumps about 7.2. posts: where the east line's posts stand (the squirrel's way from the crossing to the
--- louvre passes between two). caps: invisible people-only blocks over the unit and the duct, so nobody stands on them,
--- and on the hall's east coping beside the platform and the stair's top, so nobody who climbs a rail gets onto the
--- hall's roof.
+-- a person jumps about 7.2. posts: where the posts start along D (the east line) and X (the others), every
+-- postPitch; none stands in `clear`, the stretch of the east line in front of the louvre, so a squirrel runs straight
+-- at the bent slat from anywhere on the roof (fencePosts). caps: invisible people-only blocks over the unit and the
+-- duct, so nobody stands on them, and on the hall's east coping beside the platform and the stair's top, so nobody
+-- who climbs a rail gets onto the hall's roof.
 AlleyRoof.PEOPLE_FENCE = {
 	lines = {
 		{ x0 = 121, x1 = 121, d0 = 8, d1 = 30.8 },
 		{ x0 = 101.8, x1 = 121, d0 = 8, d1 = 8 },
-		{ x0 = 105, x1 = 121, d0 = 30.4, d1 = 30.4 },
+		{ x0 = 105, x1 = 149.6, d0 = 30.4, d1 = 30.4 },
 	},
 	railTop = 3.6,
 	bottomRail = 1.8,
 	postPitch = 3,
-	posts = { d0 = 9.5, x0 = 104 },
+	posts = { d0 = 9.5, x0 = 104, clear = { d0 = 13, d1 = 20 } },
 	wallY0 = 13.72,
 	wallY1 = 29.7,
 	caps = {
@@ -224,9 +227,20 @@ AlleyRoof.PEOPLE_FENCE = {
 	},
 }
 -- Squirrels stay off the people's stair onto the roof (owner question Q12's default: the house is the only way up):
--- an invisible wall people pass and squirrels do not (collision group SquirrelFence) along the wing's back wall over
--- the top flight and its landings, from below a leap's reach off the middle landing to above one off the top.
-AlleyRoof.SQUIRREL_FENCE = { x0 = 101.8, x1 = 121, d0 = 30.8, d1 = 31.0, y0 = 7.0, y1 = 22.6 }
+-- an invisible wall people pass and squirrels do not (collision group SquirrelFence) along the wing's whole back wall
+-- (a squirrel on the stair's guard rails leaps for the back parapet east of the platform too), from below a leap's
+-- reach off the middle landing to above one off the top landing's top rail (17.4 + a leap's 6.8 + the body); and
+-- `cap`, a block of the same over the hall's east wall top beside the top landing, which a leap off that rail reaches
+-- too (people have their own cap there: PEOPLE_FENCE.caps).
+AlleyRoof.SQUIRREL_FENCE = {
+	x0 = 101.8,
+	x1 = 149.8,
+	d0 = 30.8,
+	d1 = 31.0,
+	y0 = 7.0,
+	y1 = 26.0,
+	cap = { x0 = 101.0, x1 = 101.8, d0 = 30.8, d1 = 36.0, y0 = 23.9, y1 = 28.0 },
+}
 AlleyRoof.GUARD = { x = 118.5, d = 16.5, eyeY = 18.9 }
 -- Where else on the platform a guard looks out from toward the yard: the louvre strip's two outer corners and the
 -- walkway's south-east corner (eye 5.2 over the grating). The yard's leaves keep clear of the lines from these to the
@@ -558,6 +572,26 @@ function AlleyRoof.inPlatform(X: number, D: number): string?
 		end
 	end
 	return nil
+end
+
+-- Where the posts of PEOPLE_FENCE line `i` stand along it (D for the east line, X for the others): both ends, then
+-- every postPitch from posts.d0 / posts.x0, none in posts.clear on the east line.
+function AlleyRoof.fencePosts(i: number): { number }
+	local F = AlleyRoof.PEOPLE_FENCE
+	local l = F.lines[i]
+	local alongD = l.x0 == l.x1
+	local a0, a1 = if alongD then l.d0 else l.x0, if alongD then l.d1 else l.x1
+	local at = { a0 + 0.08, a1 - 0.08 }
+	local v = if alongD then F.posts.d0 else F.posts.x0
+	while v < a1 - 0.5 do
+		local inClear = alongD and v > F.posts.clear.d0 and v < F.posts.clear.d1
+		if v > a0 + 0.5 and not inClear then
+			table.insert(at, v)
+		end
+		v += F.postPitch
+	end
+	table.sort(at)
+	return at
 end
 
 -- The guard's eye at the louvre, then at each lookout (local {X, Y, D}).

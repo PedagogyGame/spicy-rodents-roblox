@@ -14,8 +14,9 @@
 --     the posts) and an invisible wall up to PEOPLE_FENCE.wallY1 in the collision group PeopleFence, plus the
 --     invisible caps over the unit and the duct (people meet them, squirrels' queries do not:
 --     Shared/World/CollisionGroups);
---   the squirrel fence: an invisible wall in the group SquirrelFence along the back wall over the top flight (people
---     pass it, squirrels do not: owner question Q12's default, the house is the only way up).
+--   the squirrel fence: an invisible wall in the group SquirrelFence along the wing's back wall, and its cap over the
+--     hall's east wall top beside the top landing (people pass them, squirrels do not: owner question Q12's default,
+--     the house is the only way up).
 -- Interface: build(kit, root) -> Model; C (the palette); treads(flight) -> { { x0, x1, y } } (each tread's run along
 --   X, west edge first, and its top)
 
@@ -222,16 +223,8 @@ local function fences(kit: any, m: any)
 				kit:box(fm, "FenceRail", a0, a1, y + h - 0.07, y + h + 0.07, l.d0 - 0.06, l.d0 + 0.06, C.rail, "Metal")
 			end
 		end
-		-- posts: at both ends and every postPitch from the line's first post
-		local first = if alongD then PF.posts.d0 else PF.posts.x0
-		local at = { a0 + 0.08, a1 - 0.08 }
-		local v = first
-		while v < a1 - 0.5 do
-			if v > a0 + 0.5 then
-				table.insert(at, v)
-			end
-			v += PF.postPitch
-		end
+		-- posts: at both ends and every postPitch, none in front of the louvre (AlleyRoof.fencePosts)
+		local at = R.fencePosts(i)
 		local base = if onParapet then R.WING_ROOF.copingY else R.WING_ROOF.y
 		for _, p in at do
 			if alongD then
@@ -276,6 +269,20 @@ local function fences(kit: any, m: any)
 		sf.y1,
 		sf.d0,
 		sf.d1,
+		{ 60, 220, 255 },
+		"SmoothPlastic",
+		SQUIRREL_ONLY
+	)
+	local cap = sf.cap
+	kit:box(
+		m,
+		"SquirrelCap",
+		cap.x0,
+		cap.x1,
+		cap.y0,
+		cap.y1,
+		cap.d0,
+		cap.d1,
 		{ 60, 220, 255 },
 		"SmoothPlastic",
 		SQUIRREL_ONLY
