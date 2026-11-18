@@ -5,8 +5,8 @@
  "generated": "2026-11-18T16:56:59Z",
  "assets": {
   "bodySlim": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "78308584963563",
+   "moderation": "Approved",
    "displayName": "SR townspeople slim body",
    "file": "upload/body_slim.fbx",
    "fbxBytes": 1371964,
@@ -34,8 +34,8 @@
    "sha": "31aa2efa6f2c4243"
   },
   "bodyBroad": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "87625671481194",
+   "moderation": "Approved",
    "displayName": "SR townspeople broad body",
    "file": "upload/body_broad.fbx",
    "fbxBytes": 1372380,
@@ -63,8 +63,8 @@
    "sha": "f402749c148a052b"
   },
   "head": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "123170110921252",
+   "moderation": "Approved",
    "displayName": "SR townspeople head",
    "file": "upload/head.fbx",
    "fbxBytes": 699836,
@@ -75,8 +75,8 @@
    "sha": "21ad20613efc8323"
   },
   "headwear": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "121973201920570",
+   "moderation": "Approved",
    "displayName": "SR townspeople hair and hats",
    "file": "upload/headwear.fbx",
    "fbxBytes": 2171836,
@@ -96,8 +96,8 @@
    "sha": "b1a71459077c4fd8"
   },
   "outfits": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "85119230747614",
+   "moderation": "Approved",
    "displayName": "SR townspeople outfits",
    "file": "upload/outfits.fbx",
    "fbxBytes": 8207820,
@@ -114,8 +114,8 @@
    "sha": "eebc835b9aa114a6"
   },
   "faces": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "103636677636580",
+   "moderation": "Approved",
    "displayName": "SR townspeople faces",
    "file": "upload/faces.fbx",
    "fbxBytes": 2640188,

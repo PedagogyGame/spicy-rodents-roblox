@@ -31,8 +31,14 @@ export type Role = { outfits: { string }, face: string, hat: string?, hair: { st
 
 local PeopleAssets = {}
 
-PeopleAssets.ASSETS =
-	{ bodyBroad = 0, bodySlim = 0, faces = 0, head = 0, headwear = 0, outfits = 0 } :: { [string]: number }
+PeopleAssets.ASSETS = {
+	bodyBroad = 87625671481194,
+	bodySlim = 78308584963563,
+	faces = 103636677636580,
+	head = 123170110921252,
+	headwear = 121973201920570,
+	outfits = 85119230747614,
+} :: { [string]: number }
 
 PeopleAssets.ROOT = { height = 5.5, hipHeight = 2, name = "HumanoidRootPart", size = { 2, 2, 1 } }
 
