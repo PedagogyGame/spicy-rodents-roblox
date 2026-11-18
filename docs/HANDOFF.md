@@ -1,8 +1,17 @@
 # HANDOFF — read this first in any new session
 
-Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2026-11-11.
+Owner: PedagogyGame (Ben). Project: Spicy Rodents Roblox rebuild. Last updated 2026-11-18.
 
-## 0. State on 2026-11-15 (read this before anything below; older sections are history where they differ)
+## 0. State on 2026-11-18 (read this before anything below; older sections are history where they differ)
+- **Landed on `w0-foundation` on 18 November (not published; each publish needs the owner's go), each reviewed independently, its findings fixed with specs, `tools/ci.sh` green:**
+  - **Pinball art** (merge `382afdf`, fixes `c7d63db`, ids `59b49d3`): ChatGPT's 21 GLBs as 8 Models, uploaded and Approved (ids in `data/art/pinball.json`); `Server/Assets/PinballArt` puts them on the baked machines at boot (Boot/Game). The painted words moved off each other (`tests/unit/pinball_art_words.spec.luau`), boards redrawn (`tools/blender/pinball/boards.py`), backglasses rebuilt without stripes (`backglass.py`). Not yet seen in the engine: the FBX axes, whether the board texture arrives (if not, the baked painted board stays), MeshPart scaling of the bumpers.
+  - **Whack-a-mole, the tenth game** (merge `8550f58`, art `8161987`): the owner's rules, one player and watchers, in the games room; the game version of his model (12,168 triangles, 42 pieces, FREE PLAY plate) uploaded and Approved, put on at boot by `WhackArt.startIn` (Boot/Game). Check sheet `docs/owner/WHACK_A_MOLE_CHECK.md`. The registry spec's pinned list is now 29 stations.
+  - **The alley roof route** (merge `a6336a0`, branch `feat/alley-roof-route`; the old `feat/alley-roof-joined` on the remote is a superseded WIP): sight rays run in the "SightRay" collision group (past the invisible LaneGuard and fences); the sneak test reads the fastest 0.1 s, so tapping W is no creep; HallRoof 493 parts, no shadows under the deck. **Owner calls open:** the bowlers never see the two trusses over the approaches; the guard's kick window (0.2-0.4 s against a 0.7 s cooldown); a squirrel can reach the rafters from a ball return's hood.
+  - **Bake kit** (`8866f6c`): an upright `Kit.rod` no longer bakes NaN (the sky lift's 37 tower legs).
+- **Sewers** (`feat/sewers-motor`): the three motor gaps closed (E-only hatch, the pipes' 1.25x pace in the motor and validator, a fair A/D window at drain 1's fork); review found the hatch takes E on only part of the grate; being fixed, then it lands.
+- **Background helpers die with the container** (it restarted twice on 18 November): commit and move the branch after every step; finished branches are pushed.
+
+### State on 2026-11-15 (history where newer notes differ)
 - **How the owner wants the work done (standing):** small reviewed steps, clean code, his deliveries adapted where they fit and left out (and listed) where they conflict, important questions put to him with a default built in and never waited on, everything tested by us. His decisions since the brief are in `docs/spec/BRIEF_ADDENDUM.md` (D1 to D13): read them.
 - **The experience is "Spicy Rodent" (singular)**: universe 10775476638, main place 106044514609985. Never touch the duplicate "Spicy Rodents" (10775476357 / 71294450489810).
 - **Live in the game: version 47**, built from `57a49f4`, published 2026-11-13 on the owner's go after a clean full check script (1,387 specs, the builds, the place checks, the type check). It adds, over version 41, everything listed under "On `w0-foundation` since version 41" below: air hockey, playable pool and bumper pool, the eighteen-lane alley, the wallet, the enclosed-run ball return, the Neighbourhood Shop, the realistic lighting. Each publish needs a new explicit go from the owner (one go covers one publish), with Studio closed first.
