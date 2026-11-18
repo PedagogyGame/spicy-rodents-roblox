@@ -7,6 +7,7 @@
 -- for it when it has an id.
 return {
 	{
+		assetId = "121296500491289",
 		label = "BUR OAK",
 		leaf = { 100, 141, 73 },
 		pivot = { -85, 0, -82.5 },
@@ -14,6 +15,7 @@ return {
 		trunkRoute = 220,
 	},
 	{
+		assetId = "71590810619098",
 		label = "AMERICAN ELM",
 		leaf = { 108, 152, 78 },
 		pivot = { 80, 0, -92.5 },
@@ -21,6 +23,7 @@ return {
 		trunkRoute = 231,
 	},
 	{
+		assetId = "96527273643110",
 		label = "SYCAMORE",
 		leaf = { 125, 161, 83 },
 		pivot = { -92.5, 0, 72.5 },
@@ -28,6 +31,7 @@ return {
 		trunkRoute = 241,
 	},
 	{
+		assetId = "73947148794915",
 		label = "RED MAPLE",
 		leaf = { 130, 158, 74 },
 		pivot = { 85, 0, 85 },
@@ -35,6 +39,7 @@ return {
 		trunkRoute = 251,
 	},
 	{
+		assetId = "93141462541220",
 		label = "STREET OAK 0",
 		leaf = { 103, 143, 78 },
 		pivot = { -363.775, 2.54, -298.064 },
@@ -42,6 +47,7 @@ return {
 		trunkRoute = 283,
 	},
 	{
+		assetId = "78721569916092",
 		label = "STREET ELM 1",
 		leaf = { 122, 156, 86 },
 		pivot = { -556.598, 7.076, -76.978 },
@@ -49,6 +55,7 @@ return {
 		trunkRoute = 290,
 	},
 	{
+		assetId = "89814593034994",
 		label = "STREET SYCAMORE 2",
 		leaf = { 85, 127, 67 },
 		pivot = { -577.683, 11.028, -517.772 },
@@ -56,6 +63,7 @@ return {
 		trunkRoute = 298,
 	},
 	{
+		assetId = "104622218082469",
 		label = "STREET MAPLE 3",
 		leaf = { 146, 168, 104 },
 		pivot = { -244.341, 0.25, -575.165 },
@@ -63,6 +71,7 @@ return {
 		trunkRoute = 306,
 	},
 	{
+		assetId = "82496303909915",
 		label = "STREET OAK 4",
 		leaf = { 103, 143, 78 },
 		pivot = { -80.278, 0.25, -513.822 },
@@ -70,6 +79,7 @@ return {
 		trunkRoute = 315,
 	},
 	{
+		assetId = "134937327191074",
 		label = "STREET OAK 5",
 		leaf = { 103, 143, 78 },
 		pivot = { 68.563, 8.606, -582.351 },
@@ -77,6 +87,7 @@ return {
 		trunkRoute = 326,
 	},
 	{
+		assetId = "136704314284660",
 		label = "STREET ELM 6",
 		leaf = { 122, 156, 86 },
 		pivot = { 272.739, 1.48, -309.866 },
@@ -84,6 +95,7 @@ return {
 		trunkRoute = 333,
 	},
 	{
+		assetId = "109537873794472",
 		label = "STREET SYCAMORE 7",
 		leaf = { 85, 127, 67 },
 		pivot = { 399.854, 4.769, -298.321 },
@@ -91,6 +103,7 @@ return {
 		trunkRoute = 341,
 	},
 	{
+		assetId = "108654478622081",
 		label = "STREET MAPLE 8",
 		leaf = { 146, 168, 104 },
 		pivot = { 576.761, 14.913, -518.303 },
@@ -98,6 +111,7 @@ return {
 		trunkRoute = 350,
 	},
 	{
+		assetId = "134157223167834",
 		label = "STREET OAK 9",
 		leaf = { 103, 143, 78 },
 		pivot = { 580.649, 0.25, -64.436 },
@@ -105,6 +119,7 @@ return {
 		trunkRoute = 359,
 	},
 	{
+		assetId = "73511424633378",
 		label = "STREET OAK 10",
 		leaf = { 103, 143, 78 },
 		pivot = { 394.728, 3.306, -74.887 },
@@ -112,6 +127,7 @@ return {
 		trunkRoute = 370,
 	},
 	{
+		assetId = "94802673658182",
 		label = "STREET ELM 11",
 		leaf = { 122, 156, 86 },
 		pivot = { 251.008, 0, 68.947 },
@@ -119,6 +135,7 @@ return {
 		trunkRoute = 377,
 	},
 	{
+		assetId = "111558233585036",
 		label = "STREET SYCAMORE 12",
 		leaf = { 85, 127, 67 },
 		pivot = { 594.852, 1.283, 32.429 },
@@ -126,6 +143,7 @@ return {
 		trunkRoute = 385,
 	},
 	{
+		assetId = "132750881429986",
 		label = "STREET MAPLE 13",
 		leaf = { 146, 168, 104 },
 		pivot = { 597.492, 7.733, 562.066 },
@@ -133,6 +151,7 @@ return {
 		trunkRoute = 394,
 	},
 	{
+		assetId = "92296771521983",
 		label = "STREET OAK 14",
 		leaf = { 103, 143, 78 },
 		pivot = { 274.578, 0.25, 602.987 },
@@ -140,6 +159,7 @@ return {
 		trunkRoute = 403,
 	},
 	{
+		assetId = "115081168096480",
 		label = "STREET OAK 15",
 		leaf = { 103, 143, 78 },
 		pivot = { 30.765, 9.925, 551.479 },
@@ -147,6 +167,7 @@ return {
 		trunkRoute = 413,
 	},
 	{
+		assetId = "98686816145278",
 		label = "STREET ELM 16",
 		leaf = { 122, 156, 86 },
 		pivot = { -268.032, 16.183, 573.854 },
@@ -154,6 +175,7 @@ return {
 		trunkRoute = 420,
 	},
 	{
+		assetId = "99427207603830",
 		label = "STREET SYCAMORE 17",
 		leaf = { 85, 127, 67 },
 		pivot = { -579.504, 8.351, 559.606 },
@@ -161,6 +183,7 @@ return {
 		trunkRoute = 427,
 	},
 	{
+		assetId = "90348797089048",
 		label = "STREET MAPLE 18",
 		leaf = { 146, 168, 104 },
 		pivot = { -581.051, 0.25, 70.497 },
@@ -175,6 +198,7 @@ return {
 		trunkRoute = 445,
 	},
 	{
+		assetId = "136339226070529",
 		label = "STREET OAK 20",
 		leaf = { 103, 143, 78 },
 		pivot = { -273.552, 0.12, -278.534 },
@@ -182,6 +206,7 @@ return {
 		trunkRoute = 456,
 	},
 	{
+		assetId = "75194064399123",
 		label = "STREET ELM 21",
 		leaf = { 122, 156, 86 },
 		pivot = { -238.12, 0.874, 299.71 },
@@ -189,6 +214,7 @@ return {
 		trunkRoute = 462,
 	},
 	{
+		assetId = "117279485134342",
 		label = "STREET SYCAMORE 22",
 		leaf = { 85, 127, 67 },
 		pivot = { -61.477, 3.145, 352.383 },
@@ -196,6 +222,7 @@ return {
 		trunkRoute = 470,
 	},
 	{
+		assetId = "116103140600669",
 		label = "STREET MAPLE 23",
 		leaf = { 146, 168, 104 },
 		pivot = { 60.811, 0, 257.578 },
@@ -203,6 +230,7 @@ return {
 		trunkRoute = 479,
 	},
 	{
+		assetId = "131908517126600",
 		label = "STREET OAK 24",
 		leaf = { 103, 143, 78 },
 		pivot = { 231.525, 0.59, 292.112 },
@@ -210,6 +238,7 @@ return {
 		trunkRoute = 489,
 	},
 	{
+		assetId = "75166349100159",
 		label = "STREET OAK 25",
 		leaf = { 103, 143, 78 },
 		pivot = { -603.498, 10.197, -590.65 },
@@ -217,6 +246,7 @@ return {
 		trunkRoute = 500,
 	},
 	{
+		assetId = "136593934443309",
 		label = "STREET ELM 26",
 		leaf = { 122, 156, 86 },
 		pivot = { -113.204, 0.409, -312.739 },
@@ -224,6 +254,7 @@ return {
 		trunkRoute = 506,
 	},
 	{
+		assetId = "99892892309740",
 		label = "STREET SYCAMORE 27",
 		leaf = { 85, 127, 67 },
 		pivot = { 375.946, 2.534, 308.276 },
@@ -231,6 +262,7 @@ return {
 		trunkRoute = 514,
 	},
 	{
+		assetId = "115944218061639",
 		label = "STREET MAPLE 28",
 		leaf = { 146, 168, 104 },
 		pivot = { -406.239, 0.19, 321.599 },
@@ -238,6 +270,7 @@ return {
 		trunkRoute = 523,
 	},
 	{
+		assetId = "129936774315657",
 		label = "STREET OAK 29",
 		leaf = { 103, 143, 78 },
 		pivot = { 244.109, 16.394, -589.216 },
@@ -245,6 +278,7 @@ return {
 		trunkRoute = 533,
 	},
 	{
+		assetId = "132678099822817",
 		label = "STREET OAK 30",
 		leaf = { 103, 143, 78 },
 		pivot = { -244.341, 0, 39.334 },
@@ -252,6 +286,7 @@ return {
 		trunkRoute = 543,
 	},
 	{
+		assetId = "79977452418572",
 		label = "STREET ELM 31",
 		leaf = { 122, 156, 86 },
 		pivot = { 24.853, 0.016, -266.933 },
@@ -259,6 +294,7 @@ return {
 		trunkRoute = 550,
 	},
 	{
+		assetId = "108539016423955",
 		label = "STREET SYCAMORE 32",
 		leaf = { 85, 127, 67 },
 		pivot = { 576.1, 0.25, -240.901 },
@@ -266,6 +302,7 @@ return {
 		trunkRoute = 558,
 	},
 	{
+		assetId = "95762698904405",
 		label = "STREET MAPLE 33",
 		leaf = { 146, 168, 104 },
 		pivot = { -58.646, 15.254, 610.699 },
@@ -273,6 +310,7 @@ return {
 		trunkRoute = 566,
 	},
 	{
+		assetId = "133293427783584",
 		label = "STREET OAK 34",
 		leaf = { 103, 143, 78 },
 		pivot = { -578.621, 2.694, 310.161 },
@@ -280,6 +318,7 @@ return {
 		trunkRoute = 576,
 	},
 	{
+		assetId = "140377737404348",
 		label = "STREET OAK 35",
 		leaf = { 103, 143, 78 },
 		pivot = { 398.001, 0.529, 579.894 },
@@ -287,6 +326,7 @@ return {
 		trunkRoute = 587,
 	},
 	{
+		assetId = "72329351869564",
 		label = "SENTINEL OAK",
 		leaf = { 95, 133, 71 },
 		pivot = { -252.5, 0.121, -365 },
@@ -294,6 +334,7 @@ return {
 		trunkRoute = 594,
 	},
 	{
+		assetId = "138031298765170",
 		label = "HIGHLAND ELM",
 		leaf = { 99, 141, 76 },
 		pivot = { 220, 2.55, 347.5 },
@@ -301,6 +342,7 @@ return {
 		trunkRoute = 604,
 	},
 	{
+		assetId = "93011869464719",
 		label = "OLD WATCH SYCAMORE",
 		leaf = { 106, 140, 79 },
 		pivot = { 540, 0.868, -272.5 },
@@ -308,6 +350,7 @@ return {
 		trunkRoute = 614,
 	},
 	{
+		assetId = "93730370045194",
 		label = "ESTATE GATE OAK",
 		leaf = { 110, 144, 80 },
 		pivot = { -575, 13.699, -822.5 },
@@ -315,6 +358,7 @@ return {
 		trunkRoute = 630,
 	},
 	{
+		assetId = "130698581811547",
 		label = "ESTATE GATE OAK",
 		leaf = { 110, 144, 80 },
 		pivot = { 575, 9.574, -822.5 },
@@ -322,6 +366,7 @@ return {
 		trunkRoute = 637,
 	},
 	{
+		assetId = "104807444332605",
 		label = "ESTATE GATE OAK",
 		leaf = { 110, 144, 80 },
 		pivot = { -547.5, 14.062, -1132.5 },
@@ -329,6 +374,7 @@ return {
 		trunkRoute = 644,
 	},
 	{
+		assetId = "84374430973426",
 		label = "ESTATE GATE OAK",
 		leaf = { 110, 144, 80 },
 		pivot = { 547.5, 14.613, -1140 },
@@ -336,6 +382,7 @@ return {
 		trunkRoute = 651,
 	},
 	{
+		assetId = "73397347305559",
 		label = "PARK OAK 90",
 		leaf = { 103, 143, 78 },
 		pivot = { -552.5, 6, 887.5 },
@@ -343,6 +390,7 @@ return {
 		trunkRoute = 672,
 	},
 	{
+		assetId = "90724773696796",
 		label = "PARK ELM 91",
 		leaf = { 122, 156, 86 },
 		pivot = { -462.5, 10.699, 782.5 },
@@ -357,6 +405,7 @@ return {
 		trunkRoute = 685,
 	},
 	{
+		assetId = "95904244328318",
 		label = "PARK MAPLE 93",
 		leaf = { 146, 168, 104 },
 		pivot = { -160, 17.57, 792.5 },
@@ -364,6 +413,7 @@ return {
 		trunkRoute = 693,
 	},
 	{
+		assetId = "103670800077026",
 		label = "PARK OAK 94",
 		leaf = { 103, 143, 78 },
 		pivot = { 35, 1.896, 987.5 },
@@ -378,6 +428,7 @@ return {
 		trunkRoute = 712,
 	},
 	{
+		assetId = "128747756246684",
 		label = "PARK ELM 96",
 		leaf = { 122, 156, 86 },
 		pivot = { -37.5, 0.702, 1065 },
@@ -385,6 +436,7 @@ return {
 		trunkRoute = 718,
 	},
 	{
+		assetId = "128468744383634",
 		label = "PARK SYCAMORE 97",
 		leaf = { 85, 127, 67 },
 		pivot = { -595, 7.905, 992.5 },
@@ -406,6 +458,7 @@ return {
 		trunkRoute = 805,
 	},
 	{
+		assetId = "108179559117380",
 		label = "CHILIS SYCAMORE",
 		leaf = { 130, 158, 76 },
 		pivot = { 1030, 13.713, -155 },
@@ -413,6 +466,7 @@ return {
 		trunkRoute = 818,
 	},
 	{
+		assetId = "84420045411483",
 		label = "PUMP ELM",
 		leaf = { 144, 168, 85 },
 		pivot = { 1170, 3.686, 85 },
@@ -427,6 +481,7 @@ return {
 		trunkRoute = 845,
 	},
 	{
+		assetId = "137776319433093",
 		label = "ESTATE OAK SOUTH 2",
 		leaf = { 124, 154, 71 },
 		pivot = { 415, 12.034, -817.5 },
@@ -448,6 +503,7 @@ return {
 		trunkRoute = 888,
 	},
 	{
+		assetId = "101174529674815",
 		label = "VILLA OAK SOUTH",
 		leaf = { 140, 161, 80 },
 		pivot = { 942.5, 0.659, -885 },
@@ -469,6 +525,7 @@ return {
 		trunkRoute = 928,
 	},
 	{
+		assetId = "75454728168429",
 		label = "WESTSIDE 0 SHADE OAK",
 		leaf = { 106, 140, 74 },
 		pivot = { -1007.5, 5.914, -595 },
@@ -476,6 +533,7 @@ return {
 		trunkRoute = 960,
 	},
 	{
+		assetId = "130423522357118",
 		label = "WESTSIDE 1 SHADE OAK",
 		leaf = { 106, 140, 74 },
 		pivot = { -1002.5, 11.735, -360 },
@@ -483,6 +541,7 @@ return {
 		trunkRoute = 969,
 	},
 	{
+		assetId = "104399796422724",
 		label = "WESTSIDE 2 SHADE OAK",
 		leaf = { 106, 140, 74 },
 		pivot = { -997.5, 10.186, -290 },
@@ -490,6 +549,7 @@ return {
 		trunkRoute = 980,
 	},
 	{
+		assetId = "113137329394933",
 		label = "WESTSIDE 3 SHADE OAK",
 		leaf = { 106, 140, 74 },
 		pivot = { -1007.5, 7.886, -55 },
@@ -497,6 +557,7 @@ return {
 		trunkRoute = 990,
 	},
 	{
+		assetId = "92670077177082",
 		label = "WESTSIDE 4 SHADE OAK",
 		leaf = { 106, 140, 74 },
 		pivot = { -1002.5, 10.366, 15 },
@@ -504,6 +565,7 @@ return {
 		trunkRoute = 1000,
 	},
 	{
+		assetId = "98196326957658",
 		label = "WESTSIDE 5 SHADE OAK",
 		leaf = { 106, 140, 74 },
 		pivot = { -997.5, 18.338, 250 },
@@ -511,6 +573,7 @@ return {
 		trunkRoute = 1011,
 	},
 	{
+		assetId = "89974576222062",
 		label = "WESTSIDE 6 SHADE OAK",
 		leaf = { 106, 140, 74 },
 		pivot = { -1007.5, 19.183, 320 },
@@ -518,6 +581,7 @@ return {
 		trunkRoute = 1023,
 	},
 	{
+		assetId = "82264266127201",
 		label = "WESTSIDE STREET ELM 0",
 		leaf = { 110, 144, 74 },
 		pivot = { -797.5, 17.212, -462.5 },
@@ -525,6 +589,7 @@ return {
 		trunkRoute = 1032,
 	},
 	{
+		assetId = "87801702513970",
 		label = "WESTSIDE STREET ELM 1",
 		leaf = { 110, 144, 74 },
 		pivot = { -820, 15.611, -225 },
@@ -532,6 +597,7 @@ return {
 		trunkRoute = 1041,
 	},
 	{
+		assetId = "80513979221052",
 		label = "WESTSIDE STREET ELM 2",
 		leaf = { 110, 144, 74 },
 		pivot = { -797.5, 8.504, 12.5 },
@@ -539,6 +605,7 @@ return {
 		trunkRoute = 1052,
 	},
 	{
+		assetId = "103920169834184",
 		label = "WESTSIDE STREET ELM 3",
 		leaf = { 110, 144, 74 },
 		pivot = { -820, 10.519, 250 },
@@ -546,6 +613,7 @@ return {
 		trunkRoute = 1063,
 	},
 	{
+		assetId = "71438890660379",
 		label = "QUAY WILLOW",
 		leaf = { 118, 141, 113 },
 		pivot = { 1787.5, 16.655, -70 },
@@ -553,6 +621,7 @@ return {
 		trunkRoute = 1173,
 	},
 	{
+		assetId = "70377593668738",
 		label = "QUAY WILLOW",
 		leaf = { 118, 141, 113 },
 		pivot = { 1787.5, 18.567, 107.5 },
@@ -560,6 +629,7 @@ return {
 		trunkRoute = 1181,
 	},
 	{
+		assetId = "78048254234102",
 		label = "QUAY WILLOW",
 		leaf = { 118, 141, 113 },
 		pivot = { 2510, 20, 197.5 },
@@ -567,6 +637,7 @@ return {
 		trunkRoute = 1188,
 	},
 	{
+		assetId = "71830383136631",
 		label = "QUAY WILLOW",
 		leaf = { 118, 141, 113 },
 		pivot = { 2770, 20, 130 },
@@ -574,6 +645,7 @@ return {
 		trunkRoute = 1196,
 	},
 	{
+		assetId = "120288108885426",
 		label = "QUAY WILLOW",
 		leaf = { 118, 141, 113 },
 		pivot = { 2735, 20, 480 },
@@ -581,6 +653,7 @@ return {
 		trunkRoute = 1203,
 	},
 	{
+		assetId = "75827854611128",
 		label = "QUAY WILLOW",
 		leaf = { 118, 141, 113 },
 		pivot = { 2537.5, 20, 925 },
@@ -588,6 +661,7 @@ return {
 		trunkRoute = 1210,
 	},
 	{
+		assetId = "120657198356021",
 		label = "APPLE 1",
 		leaf = { 102, 133, 64 },
 		pivot = { -210, 0, -60 },
@@ -595,6 +669,7 @@ return {
 		trunkRoute = 1248,
 	},
 	{
+		assetId = "81322602246842",
 		label = "APPLE 2",
 		leaf = { 102, 133, 64 },
 		pivot = { -60, 0, -210 },
@@ -602,6 +677,7 @@ return {
 		trunkRoute = 1255,
 	},
 	{
+		assetId = "126001884181496",
 		label = "APPLE 3",
 		leaf = { 102, 133, 64 },
 		pivot = { -60, 0, 200 },
@@ -609,6 +685,7 @@ return {
 		trunkRoute = 1262,
 	},
 	{
+		assetId = "97654982261276",
 		label = "APPLE 4",
 		leaf = { 102, 133, 64 },
 		pivot = { 200, 0, 60 },
@@ -616,6 +693,7 @@ return {
 		trunkRoute = 1269,
 	},
 	{
+		assetId = "130247103247136",
 		label = "APPLE 5",
 		leaf = { 102, 133, 64 },
 		pivot = { -212.5, 16.085, 880 },
@@ -623,6 +701,7 @@ return {
 		trunkRoute = 1276,
 	},
 	{
+		assetId = "88716379160255",
 		label = "APPLE 6",
 		leaf = { 102, 133, 64 },
 		pivot = { -145, 8.103, 955 },
@@ -630,6 +709,7 @@ return {
 		trunkRoute = 1283,
 	},
 	{
+		assetId = "84130847321591",
 		label = "APPLE 7",
 		leaf = { 102, 133, 64 },
 		pivot = { -70, 2.499, 997.5 },
@@ -637,6 +717,7 @@ return {
 		trunkRoute = 1290,
 	},
 	{
+		assetId = "77639102317067",
 		label = "APPLE 8",
 		leaf = { 102, 133, 64 },
 		pivot = { 95, 2.893, 1025 },
@@ -644,6 +725,7 @@ return {
 		trunkRoute = 1297,
 	},
 	{
+		assetId = "91450112259215",
 		label = "APPLE 9",
 		leaf = { 102, 133, 64 },
 		pivot = { 2470, 20, -535 },
@@ -651,6 +733,7 @@ return {
 		trunkRoute = 1304,
 	},
 	{
+		assetId = "97745647472124",
 		label = "APPLE 10",
 		leaf = { 102, 133, 64 },
 		pivot = { 2545, 20, -535 },
@@ -658,6 +741,7 @@ return {
 		trunkRoute = 1311,
 	},
 	{
+		assetId = "107491021520583",
 		label = "APPLE 11",
 		leaf = { 102, 133, 64 },
 		pivot = { 2620, 20, -535 },
@@ -665,6 +749,7 @@ return {
 		trunkRoute = 1318,
 	},
 	{
+		assetId = "116163817582508",
 		label = "APPLE 12",
 		leaf = { 102, 133, 64 },
 		pivot = { 2695, 20, -535 },
