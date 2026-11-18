@@ -14,17 +14,27 @@
 -- then each Correction). The server bumps it whenever it moves the body itself (snapped(), teleported(): the Reset
 -- button, a minigame knocking an animal clear, the sky lift's platform), so a packet sent before the client knew is
 -- dropped, never judged against where the body now is. The first packet of an epoch must be within reach of where the
--- server put the body (the gate: C.GATE_SLACK and the fastest the squirrel goes since then), or it is snapped again.
--- What packets cannot show, watch() does: the server's own view of the root (a client owns its body's physics). While
--- packets come in, the root may not stray from the last accepted one by more than C.DRIFT_BASE and the fastest the
--- squirrel goes in the time since (plus C.DRIFT_LAG), once an epoch has settled (C.SETTLE after its first packet:
--- the root's own updates sent before the client took a move may still be on their way); a body that moves
--- C.SILENT_MOVE with no packet accepted for C.SILENT seconds (a client that stopped sending, or ignores its
--- correction) is snapped too, and so is one still sending under an old epoch C.IGNORED after the move it was told of. C.HOLD_AFTER snaps inside
--- C.HOLD_WINDOW, and the body is held (engine.hold: the server takes its physics and keeps it still) for
--- C.HOLD_SECONDS, then given back with a new epoch. A body on the sky lift (suspend) is not judged at all.
+-- server put the body (the gate: C.GATE_SLACK and the fastest the squirrel goes in at most C.GATE_MOVE: the client's
+-- body is put there when it takes the move, so a first packet held back buys no reach) and the move to it is judged as
+-- a whole (MoveValidator.hop: no climb above a leap, no hanging in the air, no wall), or it is snapped to the gate.
+-- What packets cannot show, watch() does: the server's own view of the root (a client owns its body's physics), ten
+-- to fifteen times a second:
+--   * drift: the root may not stray from the last accepted packet (before an epoch's first packet: the gate) by more
+--     than C.DRIFT_BASE and the fastest the squirrel goes in the time since (plus C.DRIFT_LAG), at any age; for a
+--     while after a move (C.IGNORED, and C.SETTLE after the first packet) the place before the move counts too (the
+--     root's own updates sent before the client took the move may still be on their way);
+--   * walls: between two samples of the root once an epoch has settled, off the rails, the live wall rays (a client
+--     that stops sending still cannot walk through a house);
+--   * the air: while no packet is fresh, a root off the rails higher above any floor than a leap may only fall
+--     (C.HIGH_LAG of a held update, then gravity): no hanging, no flying while silent;
+--   * silence: a body that moves C.SILENT_MOVE with no packet accepted for C.SILENT seconds (a client that stopped
+--     sending, or ignores its correction) is snapped, and so is one still sending under an old epoch C.IGNORED after
+--     the move it was told of.
+-- C.HOLD_AFTER snaps inside C.HOLD_WINDOW, and the body is held (engine.hold: the server takes its physics and keeps it
+-- still) for C.HOLD_SECONDS, then given back with a new epoch. A body on the sky lift (suspend) is not judged at all.
 -- For C.STREAM_GRACE after a hand-off a wall alone does not snap (logged): the town around a new body may still be
--- streaming in on its client, and a house it has not got yet is no wall to its motor.
+-- streaming in on its client, and a house it has not got yet is no wall to its motor. A packet with a number that is
+-- not finite (SquirrelWire.sane) is snapped and never judged.
 -- Pure over injected collaborators; no side effects on require.
 -- Interface: new(deps) -> Movement; M:onHandoff(actor, player?, kind); M:packet(actorId, kind, packet, now) ->
 --   Verdict?; M:teleported(actorId, x, y, z, why, now); M:suspend(actorId, on); M:watch(actorId, x, y, z, now);
@@ -36,7 +46,9 @@ local Log = Import.shared("Util/Log") :: typeof(require("../../shared/Util/Log")
 local Units = Import.shared("Config/Units") :: typeof(require("../../shared/Config/Units"))
 local SquirrelWire = Import.shared("Movement/SquirrelWire") :: typeof(require("../../shared/Movement/SquirrelWire"))
 local PoseHistory = require("../Paintball/PoseHistory")
-local MoveValidatorT = require("./MoveValidator")
+local MoveValidator = require("./MoveValidator")
+local SquirrelMotor = Import.shared("Movement/SquirrelMotor") :: typeof(require("../../shared/Movement/SquirrelMotor"))
+local ValidatorWorld = require("./ValidatorWorld")
 
 -- What the server says to a squirrel's driver ("Correction"): the new epoch, where the body is (feet), and for a
 -- snap the motor state to restore.
@@ -58,7 +70,7 @@ export type Engine = {
 }
 
 export type Deps = {
-	validator: MoveValidatorT.MoveValidator?, -- squirrel packets; nil = no rail validation (tests)
+	validator: MoveValidator.MoveValidator?, -- squirrel packets; nil = no rail validation (tests)
 	swept: { markTeleported: (self: any, actorId: any) -> () }?, -- Traffic/SweptCollision instance
 	historySeconds: number?, -- default 1.0 (Tunables movement.poseHistorySecs)
 	historyHz: number?, -- default 60
@@ -102,6 +114,14 @@ type Squirrel = {
 	heldUntil: number?,
 	held: Gate?,
 	snapTimes: { number },
+	prior: Gate?, -- the place before the last move the server made (its own updates may still be on their way)
+	priorUntil: number,
+	rootX: number?, -- the last sample of the root watch() saw this epoch
+	rootY: number,
+	rootZ: number,
+	rootAt: number,
+	highSince: number?, -- the root has been high in the air with nothing near since then, at highY
+	highY: number,
 }
 
 export type Movement = {
@@ -117,6 +137,7 @@ export type Movement = {
 	teleported: (self: Movement, actorId: any, x: number, y: number, z: number, why: string, now: number) -> (),
 	suspend: (self: Movement, actorId: any, on: boolean) -> (),
 	watch: (self: Movement, actorId: any, x: number, y: number, z: number, now: number) -> (),
+	_rootPath: (self: Movement, actorId: any, sq: Squirrel, x: number, y: number, z: number, now: number) -> string?,
 	epochOf: (self: Movement, actorId: any) -> number,
 	pose: (self: Movement, actorId: any, t: number) -> (number?, number?, number?),
 	stats: (self: Movement) -> Stats,
@@ -125,11 +146,12 @@ export type Movement = {
 local MovementService = {}
 
 MovementService.C = table.freeze({
-	GATE_SLACK = 6, -- studs: the first packet of an epoch this near where the server put the body (root or feet)
+	GATE_SLACK = 6, -- studs: the first packet of an epoch this near where the server put the body (root or feet) ...
+	GATE_MOVE = 0.6, -- ... plus the fastest the squirrel goes in at most this many seconds
 	DRIFT_BASE = 8, -- studs: the root against the last accepted packet (the drawn pose eases behind the motor)
 	DRIFT_LAG = 0.6, -- seconds: how far the root may lead the packets (their jitter against the root's)
-	DRIFT_FRESH = 0.5, -- seconds: packets older than this are late; the drift is then left to SILENT
-	SETTLE = 1, -- seconds after an epoch's first packet before the root's drift is judged
+	DRIFT_FRESH = 0.5, -- seconds: packets older than this are late; the root's height is then judged
+	SETTLE = 1, -- seconds after an epoch's first packet in which the place before a move still counts
 	IGNORED = 2, -- seconds after a move the server made: packets still under the old epoch mean the client ignores it
 	SILENT = 5, -- seconds with no accepted packet ...
 	SILENT_MOVE = 6, -- ... while the root moved this far from the last known place: snapped
@@ -137,6 +159,9 @@ MovementService.C = table.freeze({
 	HOLD_WINDOW = 10, -- ... inside this many seconds: the body is held
 	HOLD_SECONDS = 2,
 	STREAM_GRACE = 3, -- seconds after a hand-off's first packet in which a wall alone is logged, not snapped
+	ROOT_STEP = 0.25, -- seconds: two samples of the root further apart than this are not judged for walls
+	RAIL_NEAR = 3, -- studs: a root this near a rail (feet on the bark) is not judged for walls or height
+	HIGH_LAG = 1, -- seconds a root high in the air may keep its height (a held-up update) before it must fall
 })
 local C = MovementService.C
 
@@ -226,6 +251,14 @@ function MovementService.new(deps: Deps): Movement
 				heldUntil = nil,
 				held = nil,
 				snapTimes = {},
+				prior = nil,
+				priorUntil = -math.huge,
+				rootX = nil,
+				rootY = 0,
+				rootZ = 0,
+				rootAt = -math.huge,
+				highSince = nil,
+				highY = 0,
 			}
 			self.squirrels[id] = sq
 		end
@@ -237,8 +270,18 @@ function MovementService.new(deps: Deps): Movement
 		return if v then v:fastest(id) else 60
 	end
 
-	-- a new epoch from `target`: the validator forgets, the first packet of the epoch is gated there
+	-- a new epoch from `target`: the validator forgets, the first packet of the epoch is gated there; the place before
+	-- the move (the root last seen, else the last packet) still counts for the drift a while
 	local function rebase(self: Movement, id: any, sq: Squirrel, target: Gate)
+		local now = target.at
+		if sq.rootX then
+			sq.prior = { x = sq.rootX :: number, y = sq.rootY, z = sq.rootZ, at = now }
+		elseif sq.lastAt then
+			sq.prior = { x = sq.lastX, y = sq.lastY, z = sq.lastZ, at = now }
+		end
+		sq.priorUntil = now + C.IGNORED
+		sq.rootX = nil
+		sq.highSince = nil
 		sq.epoch = nextEpoch(self)
 		sq.gate = target
 		sq.lastAt = nil
@@ -373,24 +416,115 @@ function MovementService.new(deps: Deps): Movement
 		if gate and gate.at == 0 then
 			gate.at = now
 		end
+		local fast = fastest(self, actorId)
+		local function within(px: number, py: number, pz: number, at: number): boolean
+			return dist(x, y, z, px, py, pz) <= C.DRIFT_BASE + fast * (now - at + C.DRIFT_LAG)
+		end
+		-- drift: from the last packet, else the gate (not before a hand-off's first packet: the body is the server's
+		-- until its driver starts), or the place before the move while its updates may still come
+		local ok = true
 		local refX, refY, refZ, refAt
 		if sq.lastAt then
 			refX, refY, refZ, refAt = sq.lastX, sq.lastY, sq.lastZ, sq.lastAt :: number
-		elseif gate then
+			ok = within(refX, refY, refZ, refAt)
+		elseif gate and sq.possessedAt ~= 0 then
 			refX, refY, refZ, refAt = gate.x, gate.y, gate.z, gate.at
-		else
-			return
+			ok = within(refX, refY, refZ, refAt)
 		end
-		local away = dist(x, y, z, refX, refY, refZ)
-		local age = now - refAt
-		if age <= C.DRIFT_FRESH then
-			local settled = sq.since ~= nil and now - (sq.since :: number) >= C.SETTLE
-			if settled and away > C.DRIFT_BASE + fastest(self, actorId) * (age + C.DRIFT_LAG) then
-				snap(self, actorId, "drift", now, nil)
+		local prior = sq.prior
+		if not ok and prior and now <= sq.priorUntil and within(prior.x, prior.y, prior.z, prior.at) then
+			ok = true
+		end
+		local why: string? = if ok then nil else "drift"
+		if why == nil and refX and now - refAt > C.SILENT and dist(x, y, z, refX, refY, refZ) > C.SILENT_MOVE then
+			why = "silent"
+		end
+		if why == nil then
+			why = self:_rootPath(actorId, sq, x, y, z, now)
+		end
+		sq.rootX, sq.rootY, sq.rootZ, sq.rootAt = x, y, z, now
+		if why then
+			snap(self, actorId, why, now, nil)
+		end
+	end
+
+	-- _rootPath(actorId, sq, x, y, z, now) -> why?: the root's own path between two samples: no wall (once the epoch has
+	-- settled), and high in the air with no packet fresh only on a fall
+	function m._rootPath(
+		self: Movement,
+		actorId: any,
+		sq: Squirrel,
+		x: number,
+		y: number,
+		z: number,
+		now: number
+	): string?
+		local validator = self.deps.validator
+		local world = if validator then validator.world else nil
+		if world == nil then
+			return nil
+		end
+		local reach = C.RAIL_NEAR
+		local index = world.index
+		local last = (validator :: any):last(actorId)
+		local onRail = (last and last.routeId ~= nil) or (index and index:nearest(x, y, z, reach) ~= nil)
+		local apex = MoveValidator.apexAllowance()
+		-- walls between consecutive samples, once the epoch has settled and the town has streamed in
+		local settled = sq.since ~= nil and now - (sq.since :: number) >= C.SETTLE
+		local fresh = sq.possessedAt ~= nil
+			and sq.possessedAt ~= 0
+			and now - (sq.possessedAt :: number) < C.STREAM_GRACE
+		local px = sq.rootX
+		if
+			px
+			and settled
+			and not fresh
+			and not onRail
+			and now - sq.rootAt <= C.ROOT_STEP
+			and not (index and index:nearest(px, sq.rootY, sq.rootZ, reach) ~= nil)
+		then
+			local y0, y1 = math.min(sq.rootY, y), math.max(sq.rootY, y)
+			-- (over the higher end, what a leap rises in the time between the samples)
+			local rise = MoveValidator.leapUpAllowance() * (now - sq.rootAt)
+			if world.crosses and world.crosses(px, sq.rootZ, x, z, y0, y1, rise) then
+				return "wall"
 			end
-		elseif age > C.SILENT and away > C.SILENT_MOVE then
-			snap(self, actorId, "silent", now, nil)
+			-- a jump of the root longer than a chord (its updates held up, or a hop): judged chord by chord, weighed as a
+			-- gap is (one may be a corner rounded unseen)
+			if
+				world.crossesLong
+				and dist(px, sq.rootY, sq.rootZ, x, y, z) > ValidatorWorld.C.MAX_CHORD
+				and world.crossesLong(px, sq.rootZ, x, z, y0, y1, MoveValidator.leapRise())
+				and (validator :: any):wallGap(actorId, now) >= 2
+			then
+				return "wall"
+			end
 		end
+		-- the air, while no packet is fresh: a root higher above any floor than a leap may only fall
+		local stale = sq.lastAt == nil or now - (sq.lastAt :: number) > C.DRIFT_FRESH
+		local landable = world.landable
+		if not stale or onRail or landable == nil or MoveValidator.nearTrampoline(world, x, z, 10) then
+			sq.highSince = nil
+			return nil
+		end
+		if landable(x, y, z, apex) then
+			sq.highSince = nil
+			return nil
+		end
+		if sq.highSince == nil then
+			sq.highSince, sq.highY = now, y
+			return nil
+		end
+		local tau = now - (sq.highSince :: number)
+		local fall = math.max(0, tau - C.HIGH_LAG)
+		local ceiling = sq.highY
+			+ 2
+			+ MoveValidator.leapUpAllowance() * tau
+			- 0.5 * MoveValidator.gravity() * fall * fall
+		if y > ceiling then
+			return "fly"
+		end
+		return nil
 	end
 
 	function m.packet(self: Movement, actorId: any, kind: string, packet: any, now: number): any
@@ -435,11 +569,34 @@ function MovementService.new(deps: Deps): Movement
 				if gate.at == 0 then
 					gate.at = now
 				end
-				local reach = C.GATE_SLACK + fastest(self, actorId) * math.max(0, now - gate.at)
+				local span = math.min(math.max(0, now - gate.at), C.GATE_MOVE)
+				local reach = C.GATE_SLACK + fastest(self, actorId) * span
+				local violations: { any } = {}
 				if dist(px, py, pz, gate.x, gate.y, gate.z) > reach then
-					local violations = { { code = "gate", severity = 1, detail = "first packet away from the body" } }
+					table.insert(
+						violations,
+						{ code = "gate", severity = 1, detail = "first packet away from the body" }
+					)
+				else
+					-- the move from the gate as a whole: no climb, no hanging in the air, no wall
+					local from: any = { x = gate.x, y = gate.y, z = gate.z }
+					if gate.snapshot then
+						from.routeId = SquirrelMotor.deserialize(gate.snapshot).routeId
+					end
+					-- (a wall too: the client's body was put at the gate, and its first packet comes a tick or two later)
+					for _, v in validator:hop(actorId, from, SquirrelMotor.deserialize(snapshot), span + 0.1, now) do
+						if v.severity >= 1 or v.code == "wall" then
+							table.insert(violations, v)
+						end
+					end
+				end
+				if #violations > 0 then
 					if enforce then
-						snap(self, actorId, "gate", now, gate)
+						local codes = {}
+						for _, v in violations do
+							table.insert(codes, v.code)
+						end
+						snap(self, actorId, "gate:" .. table.concat(codes, "+"), now, gate)
 					end
 					return { ok = false, accepted = false, violations = violations, flagged = true }
 				end
@@ -451,6 +608,7 @@ function MovementService.new(deps: Deps): Movement
 				sq.lastAt, sq.lastX, sq.lastY, sq.lastZ = now, px, py, pz
 				if sq.since == nil then
 					sq.since = now
+					sq.priorUntil = math.max(sq.priorUntil, now + C.SETTLE)
 				end
 				if v.ok and not v.resync then
 					-- (a packet after a gap too long to judge move by move is never a snap target)

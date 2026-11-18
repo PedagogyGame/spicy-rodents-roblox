@@ -368,7 +368,7 @@ function MoveValidator.accept(self: MoveValidator, actorId: any, packet: Packet,
 		-- too long to judge move by move (a stall, a long loss burst): the new baseline, judged as a whole (gap())
 		resync = true
 		actor.resyncs += 1
-		self:_gap(actor, prev, next, dtEff, serverTime, fastest, violations)
+		self:_gap(actorId, actor, prev, next, dtEff, serverTime, violations)
 	elseif dt <= 0 then
 		table.insert(violations, { code = "clock", severity = 1, detail = `clock went back by {-dt} s` })
 	else
@@ -436,42 +436,70 @@ local function prune(times: { number }, now: number, window: number)
 	end
 end
 
--- _gap: a gap too long to judge move by move (a stall, a loss burst, a client that sends sparsely on purpose) is
--- still judged as a whole, over `dt` (the time the gap can stand for, held to the server's own arrival gap):
+-- The bounds a move judged as a whole shares with the server's own view of the root (Movement/MovementService.watch):
+-- leapRise(): how high a leap rises (with its tolerance);
+-- apexAllowance(): how high over a floor a leap (with a landing's step and a margin) can put the feet; leapUpAllowance(): the fastest an honest body rises (st/s);
+-- gravity(); nearTrampoline(world, x, z, margin): a trampoline's bed within `margin` (it bounces higher than a leap).
+function MoveValidator.leapRise(): number
+	local E = SquirrelMotor.envelopeParams
+	return SquirrelMotor.leapApex() * E.launchTol * E.launchTol
+end
+
+function MoveValidator.apexAllowance(): number
+	return MoveValidator.leapRise() + Units.st(1.4) + 2
+end
+
+function MoveValidator.leapUpAllowance(): number
+	return SquirrelMotor.params.leapUp * SquirrelMotor.envelopeParams.launchTol
+end
+
+function MoveValidator.gravity(): number
+	return SquirrelMotor.params.gravity
+end
+
+function MoveValidator.nearTrampoline(world: World, x: number, z: number, margin: number): boolean
+	for _, site in world.trampolines or {} do
+		if math.sqrt((x - site.x) ^ 2 + (z - site.z) ^ 2) <= Trampoline.C.radius + margin then
+			return true
+		end
+	end
+	return false
+end
+
+local function marksOf(self: MoveValidator, actorId: any): Marks
+	local marks = self._marks[actorId]
+	if marks == nil then
+		marks = { offsets = {}, gaps = {}, wallGaps = {} }
+		self._marks[actorId] = marks
+	end
+	return marks :: Marks
+end
+
+-- hop(actorId, from, next, dt, serverTime) -> violations: a move judged as a whole, not tick by tick, over `dt` (the
+-- time it can stand for): a gap too long for the envelope (gap()), and the first packet after a move the server
+-- made, from where it put the body (MovementService's gate). `from` holds x, y, z and routeId (nil: off the rails).
 --   * reach: no further than the fastest the squirrel goes in that time;
 --   * climb: no higher than a leap (and a landing's step) above where it was, unless a rail within reach could have
 --     carried it up (the climb then at the fastest pace) or a trampoline bounced it;
 --   * the air: off the rails and off the ground, no higher above a floor than a leap, unless a rail within reach (it
 --     fell or leapt from one) or a trampoline explains it;
---   * walls: the straight line, chord by chord (world.crossesLong); an honest body may have gone round a corner in
---     the gap, so one is a third of a flag and a second inside C.WALL_GAP_WINDOW a whole one;
---   * how often: more than gapMax gaps inside gapWindow is a client that hides its moves (an honest link loses a burst
---     now and then).
-function MoveValidator._gap(
+--   * walls: the straight line, chord by chord (world.crossesLong); an honest body may have gone round a corner, so
+--     one is a third of a flag and a second inside C.WALL_GAP_WINDOW a whole one.
+function MoveValidator.hop(
 	self: MoveValidator,
-	actor: Actor,
-	prev: State,
+	actorId: any,
+	from: { x: number, y: number, z: number, routeId: number? },
 	next: State,
 	dt: number,
-	serverTime: number,
-	fastest: number,
-	violations: { Violation }
-)
+	serverTime: number
+): { Violation }
+	local violations: { Violation } = {}
 	local E = SquirrelMotor.envelopeParams
 	local world = self.world
-	local marks = actor.marks
-	table.insert(marks.gaps, serverTime)
-	prune(marks.gaps, serverTime, self.gapWindow)
-	if #marks.gaps > self.gapMax then
-		table.insert(violations, {
-			code = "gaps",
-			severity = 1,
-			detail = `{#marks.gaps} gaps too long to judge in {self.gapWindow} s`,
-		})
-	end
+	local fastest = self:fastest(actorId)
 	local airGrab = Motion.C.airGrab
 	local reach = fastest * dt + airGrab + 2
-	local moved = math.sqrt((next.x - prev.x) ^ 2 + (next.z - prev.z) ^ 2)
+	local moved = math.sqrt((next.x - from.x) ^ 2 + (next.z - from.z) ^ 2)
 	if moved > reach then
 		table.insert(violations, {
 			code = "teleport",
@@ -481,11 +509,11 @@ function MoveValidator._gap(
 	end
 	local index = world.index
 	local railNear = next.routeId ~= nil
-		or prev.routeId ~= nil
+		or from.routeId ~= nil
 		or (
 			index ~= nil
 			and (
-				index:nearest(prev.x, prev.y, prev.z, reach) ~= nil
+				index:nearest(from.x, from.y, from.z, reach) ~= nil
 				or index:nearest(next.x, next.y, next.z, reach) ~= nil
 			)
 		)
@@ -496,7 +524,7 @@ function MoveValidator._gap(
 		for _, site in tramps do
 			local r = Trampoline.C.radius + reach
 			if
-				math.sqrt((prev.x - site.x) ^ 2 + (prev.z - site.z) ^ 2) <= r
+				math.sqrt((from.x - site.x) ^ 2 + (from.z - site.z) ^ 2) <= r
 				or math.sqrt((next.x - site.x) ^ 2 + (next.z - site.z) ^ 2) <= r
 			then
 				local vy = (Trampoline.C.baseVy + Trampoline.C.maxCount * Trampoline.C.perBounceVy) * E.launchTol
@@ -506,7 +534,7 @@ function MoveValidator._gap(
 		end
 	end
 	local climb = math.max(apex, bounce) + Units.st(1.4) + 2 + (if railNear then fastest * dt + airGrab else 0)
-	local rise = next.y - prev.y
+	local rise = next.y - from.y
 	if rise > climb then
 		table.insert(violations, {
 			code = "climb",
@@ -528,16 +556,53 @@ function MoveValidator._gap(
 	if
 		crossesLong
 		and not next.routeId
-		and not prev.routeId
-		and crossesLong(prev.x, prev.z, next.x, next.z, math.min(prev.y, next.y), math.max(prev.y, next.y), apex)
+		and not from.routeId
+		and crossesLong(from.x, from.z, next.x, next.z, math.min(from.y, next.y), math.max(from.y, next.y), apex)
 	then
-		table.insert(marks.wallGaps, serverTime)
-		prune(marks.wallGaps, serverTime, MoveValidator.C.WALL_GAP_WINDOW)
+		local n = self:wallGap(actorId, serverTime)
 		table.insert(violations, {
 			code = "wall",
-			severity = if #marks.wallGaps >= 2 then 1 else 0.34,
-			detail = `the straight line of a {dt} s gap goes through a wall ({#marks.wallGaps} in {MoveValidator.C.WALL_GAP_WINDOW} s)`,
+			severity = if n >= 2 then 1 else 0.34,
+			detail = `the straight line of a {dt} s gap goes through a wall ({n} in {MoveValidator.C.WALL_GAP_WINDOW} s)`,
 		})
+	end
+	return violations
+end
+
+-- wallGap(actorId, now) -> n: a straight line too long to be sure of (a gap, a jump of the root) went through a wall;
+-- how many inside C.WALL_GAP_WINDOW (one may be a corner rounded unseen; a second is a whole flag).
+function MoveValidator.wallGap(self: MoveValidator, actorId: any, now: number): number
+	local marks = marksOf(self, actorId)
+	table.insert(marks.wallGaps, now)
+	prune(marks.wallGaps, now, MoveValidator.C.WALL_GAP_WINDOW)
+	return #marks.wallGaps
+end
+
+-- _gap: a gap too long to judge move by move (a stall, a loss burst, a client that sends sparsely on purpose): hop()
+-- over `dt` (held to the server's own arrival gap), and how often: more than gapMax gaps inside gapWindow is a client
+-- that hides its moves (an honest link loses a burst now and then).
+function MoveValidator._gap(
+	self: MoveValidator,
+	actorId: any,
+	actor: Actor,
+	prev: State,
+	next: State,
+	dt: number,
+	serverTime: number,
+	violations: { Violation }
+)
+	local marks = actor.marks
+	table.insert(marks.gaps, serverTime)
+	prune(marks.gaps, serverTime, self.gapWindow)
+	if #marks.gaps > self.gapMax then
+		table.insert(violations, {
+			code = "gaps",
+			severity = 1,
+			detail = `{#marks.gaps} gaps too long to judge in {self.gapWindow} s`,
+		})
+	end
+	for _, v in self:hop(actorId, prev, next, dt, serverTime) do
+		table.insert(violations, v)
 	end
 end
 

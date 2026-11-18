@@ -842,13 +842,13 @@ function Game.start(opts: Opts?): any
 			movement:teleported(actor.id, p.X, p.Y - hipOf(body), p.Z, why, workspace:GetServerTimeNow())
 		end
 	end
-	-- ten times a second: the server's own view of every held squirrel's root (MovementService.watch), and the sky
+	-- fifteen times a second: the server's own view of every held squirrel's root (MovementService.watch), and the sky
 	-- lift's riders (attribute Ride) left alone until the platform puts them down
 	local onLift: { [any]: boolean } = {}
 	local watchAcc = 0
 	local function watchSquirrels(dt: number)
 		watchAcc += dt
-		if watchAcc < 0.1 then
+		if watchAcc < 1 / 15 then
 			return
 		end
 		watchAcc = 0

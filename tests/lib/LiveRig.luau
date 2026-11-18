@@ -13,7 +13,7 @@
 --     (Correction, the grant, the ride's end) keep their order, the server's own writes of the root keep theirs,
 --     and the two streams race;
 --   the server: MovementService with the validator, its engine.correct and engine.hold as Boot/Game has them (a snap
---     writes the root), every packet decoded from the bytes the client sent, the root watched ten times a second,
+--     writes the root), every packet decoded from the bytes the client sent, the root watched fifteen times a second,
 --     the sky lift's Ride attribute turned into suspend / teleported exactly as Boot/Game.watchSquirrels does.
 -- Server events a case can schedule: teleport (the Reset button, a knock, the lounge's door), board / alight (the
 -- sky lift), handoff (a new body; packets of the old one still arriving are taken for the new, as the game does),
@@ -425,7 +425,7 @@ function LiveRig.new(opts: Options): Rig
 	rig.run = function(_self: any, seconds: number)
 		local stop = rig.t + seconds
 		local nextFrame = rig.t
-		local nextWatch = math.ceil(rig.t * 10 + 1e-9) / 10
+		local nextWatch = math.ceil(rig.t * 15 + 1e-9) / 15
 		while true do
 			local te = if #queue > 0 then queue[1].t else math.huge
 			local tf = if client.running then nextFrame else math.huge
@@ -448,7 +448,7 @@ function LiveRig.new(opts: Options): Rig
 				nextFrame = t + frameDt()
 			else
 				watch()
-				nextWatch = t + 0.1
+				nextWatch = t + 1 / 15
 			end
 			if not client.running then
 				nextFrame = math.max(nextFrame, rig.t)

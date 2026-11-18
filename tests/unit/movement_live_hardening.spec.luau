@@ -274,6 +274,203 @@ return function(t)
 		t.truthy((r.reasons.gaps or 0) >= 1, "for its gaps")
 	end)
 
+	-- 3. THE SERVER'S OWN VIEW OF THE BODY, AT EVERY AGE --------------------------------------------------------------
+	local function far(r: LiveRig.Result, s0: State): number
+		return math.sqrt((r.root.x - s0.x) ^ 2 + (r.root.z - s0.z) ^ 2)
+	end
+	t.test(
+		"cheat: silent for 4.6 s in every 10, the body 80 studs away and 30 up, then back: snapped every time",
+		function()
+			local home: { x: number, y: number, z: number }? = nil
+			local s0 = town.openStart()
+			local rig = LiveRig.new({
+				world = town.noWalls,
+				vworld = town.vworld,
+				link = quiet,
+				seed = 4,
+				silent = function(now: number): boolean
+					return (now % 10) >= 5 and (now % 10) < 9.6
+				end,
+				cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+					local ph = now % 10
+					if ph >= 5 and ph < 5.02 then
+						home = { x = s.x, y = s.y, z = s.z }
+					end
+					local h = home
+					if h and ph >= 5.75 and ph < 9.3 then
+						s.x, s.y, s.z, s.grounded = h.x + 80, h.y + 30, h.z, false
+						s.vx, s.vy, s.vz = 0, 0, 0
+					elseif h and ph >= 9.3 and ph < 9.35 then
+						s.x, s.y, s.z, s.grounded = h.x, h.y, h.z, true
+						s.vx, s.vy, s.vz = 0, 0, 0
+					end
+				end,
+			})
+			rig:possess(s0, still)
+			rig:run(40)
+			local r = rig:result()
+			show("silent roam", r)
+			t.truthy(r.snaps >= 4, `each of the four trips snapped ({r.snaps})`)
+			t.truthy(r.firstSnap and r.firstSnap <= 7, "the first within 2 s of leaving")
+		end
+	)
+
+	t.test("cheat: stops sending and sprints through a house: snapped at the wall, not 5 s later", function()
+		local b = town.boxes[1]
+		local rig = LiveRig.new({
+			world = town.noWalls,
+			vworld = town.vworld,
+			link = { latency = 0.12, jitter = 0.15, loss = 0.02 },
+			seed = 13,
+			silent = function(now: number): boolean
+				return now >= CHEAT_AT
+			end,
+		})
+		rig:possess(
+			SquirrelMotor.new(b.minX - 15, town.world.groundHeight, (b.minZ + b.maxZ) / 2),
+			function(now: number, _s: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+				local inp = SquirrelMotor.idleInput(-math.pi / 2)
+				inp.fw = if now >= CHEAT_AT then 1 else 0
+				inp.sprint = true
+				return inp
+			end
+		)
+		rig:run(CHEAT_AT + 4)
+		local r = rig:result()
+		show("silent through a house", r)
+		t.truthy(r.firstSnap and r.firstSnap <= CHEAT_AT + 1.5, "snapped at the wall")
+		t.truthy((r.reasons.wall or 0) >= 1, "for the wall")
+	end)
+
+	t.test("cheat: stops sending and hangs 20 studs up: snapped for flying", function()
+		local rig = LiveRig.new({
+			world = town.noWalls,
+			vworld = town.vworld,
+			link = quiet,
+			seed = 14,
+			silent = function(now: number): boolean
+				return now >= CHEAT_AT
+			end,
+			cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+				if now >= CHEAT_AT then
+					s.y = town.world.groundHeight + 20
+					s.vy, s.grounded = 0, false
+				end
+			end,
+		})
+		rig:possess(town.openStart(), still)
+		rig:run(CHEAT_AT + 6)
+		local r = rig:result()
+		show("silent hover", r)
+		t.truthy(r.firstSnap and r.firstSnap <= CHEAT_AT + 3.5, "snapped")
+	end)
+
+	-- 4. THE CORRECTION HANDSHAKE IS NO FREE HOP ----------------------------------------------------------------------
+	t.test(
+		"cheat: provoke a snap, hold the new epoch back 1.9 s, then appear 75 studs on and 25 up: no ground gained",
+		function()
+			local s0 = town.openStart()
+			local hops = 0
+			local rig = LiveRig.new({
+				world = town.noWalls,
+				vworld = town.vworld,
+				link = { latency = 0.1, jitter = 0.03, loss = 0 },
+				seed = 9,
+				silent = function(now: number): boolean
+					local ph = now % 6
+					return now > CHEAT_AT and ph >= 0.05 and ph < 2.0
+				end,
+				cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+					local ph = now % 6
+					if now > CHEAT_AT and ph < 1 / 60 then
+						s.z += 30 -- (provokes a snap)
+					elseif now > CHEAT_AT and ph >= 1.95 and ph < 1.95 + 1 / 60 then
+						s.x += 75
+						s.y += 25
+						s.grounded = false
+						s.vx, s.vy, s.vz = 0, 0, 0
+						hops += 1
+					end
+				end,
+			})
+			rig:possess(s0, still)
+			rig:run(42)
+			local r = rig:result()
+			show(`handshake hops ({hops})`, r)
+			t.truthy(hops >= 5, "hopped")
+			t.truthy(far(r, s0) < 40, `the body ends near where it began ({far(r, s0)} studs)`)
+			t.truthy(r.holds >= 1, "and is held after a run of snaps")
+		end
+	)
+
+	t.test(
+		"cheat: provoke a snap, hold back, then a first packet 25 studs on through a house: snapped to the gate",
+		function()
+			local b = town.boxes[1]
+			local cz = (b.minZ + b.maxZ) / 2
+			local s0 = SquirrelMotor.new(b.minX - 3, town.world.groundHeight, cz)
+			local width = b.maxX - b.minX
+			local rig = LiveRig.new({
+				world = town.noWalls,
+				vworld = town.vworld,
+				link = { latency = 0.1, jitter = 0.03, loss = 0 },
+				seed = 10,
+				silent = function(now: number): boolean
+					local ph = now % 6
+					return now > CHEAT_AT and ph >= 0.05 and ph < 1.0
+				end,
+				cheat = function(s: State, _inp: SquirrelMotor.Input, now: number, _w: any)
+					local ph = now % 6
+					if now > CHEAT_AT and ph < 1 / 60 then
+						s.z += 30
+					elseif now > CHEAT_AT and ph >= 0.95 and ph < 0.95 + 1 / 60 and s.x < b.minX then
+						s.x += width + 6
+					end
+				end,
+			})
+			rig:possess(s0, still)
+			rig:run(20)
+			local r = rig:result()
+			show("handshake through a house", r)
+			t.truthy(r.root.x < b.minX, "never on the far side of the house")
+		end
+	)
+
+	-- the honest side of the same: every move the server makes, on the slowest links, with lost bursts
+	for _, l in
+		{
+			{ name = "500 ms + 300 ms jitter", link = { latency = 0.5, jitter = 0.3, loss = 0.02 } },
+			{ name = "400 ms + 400 ms jitter", link = { latency = 0.4, jitter = 0.4, loss = 0.02 } },
+			{
+				name = "120 ms, lost bursts of 0.8 s every 5 s",
+				link = { latency = 0.12, jitter = 0.1, loss = 0.02, dropEvery = 5, dropFor = 0.8 },
+			},
+		}
+	do
+		t.test(`honest: Reset, knocks, the lounge's door and a snap-free run on {l.name}: 0 snaps`, function()
+			local rng = Rng.new(71)
+			local rig = LiveRig.new({ world = town.world, vworld = town.vworld, link = l.link, seed = 71 })
+			rig:possess(town.startAt(rng), town.driven(rng))
+			for k = 1, 4 do
+				rig:at(k * 6 + 0.37, function()
+					local c = rig.client.state
+					if c then
+						rig:teleport(
+							c.x + (if k % 2 == 0 then 3 else -3),
+							town.world.groundHeight + 0.6,
+							c.z,
+							"knocked"
+						)
+					end
+				end)
+			end
+			rig:run(36)
+			local r = rig:result()
+			show(`server moves on {l.name}`, r)
+			t.eq(r.snaps, 0, "snaps")
+		end)
+	end
+
 	-- 5. THE CLOCK: A LATENCY THAT DROPS IS NO TIME HACK; A SLOW TIME HACK STILL SHOWS -------------------------------
 	local function honest(name: string, link: LiveRig.Link, seconds: number, seed: number, fps: any?)
 		t.test(`honest: {name}: 0 snaps`, function()
