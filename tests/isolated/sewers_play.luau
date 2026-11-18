@@ -11,8 +11,10 @@
 --     render step run; Workspace.Sewers is a fake-engine copy of the real bake's lights (each light at its
 --     attachment's world point, with the bake's Space attributes and pipe models), so S3's lamp lookup is held to
 --     what S1 really bakes
--- What it shows: "E or W: down the drain" on the grate before E; in with E, through the chamber, out on its feet at the
--- far corner; the crossroads' baked lights on while inside and every light back as baked after; "W: climb out" at
+-- What it shows, played as a player would: walking over the grate does not take it down (a hatch: E only); back on
+-- it, facing away, "E: down the drain"; in with E; D pressed 30 studs before the crossing picks a side arm and the
+-- screen names it, D again drops it (straight on); through the chamber at the pipe pace, out on its feet at the far
+-- corner; the crossroads' baked lights on while inside and every light back as baked after; "W: climb out" at
 -- the top of the far shaft; the people who saw it go say so, the officer watches the NW grate for sewer.stakeoutSecs
 -- and says "It went down the drain!", nobody spots the rodent while it is under the street, and the officer never
 -- goes toward the corner it came out of (the police lose sight of it at the drain).
@@ -187,10 +189,15 @@ return function(t)
 			local said: { [string]: number } = {}
 			local spotsUnder, insideFrames, crossroadsLit, otherLit = 0, 0, 0, 0
 			local nearestChamber = math.huge
-			local s = SquirrelMotor.new(nw.x, motorWorld.groundAt(nw.x, nw.z, nw.y + 1), nw.z)
+			-- the rodent comes up the street toward the grate from its rung side, 5 studs out
+			local sx, sz = nw.x + nw.out.x * 5, nw.z + nw.out.z * 5
+			local s = SquirrelMotor.new(sx, motorWorld.groundAt(sx, sz, nw.y + 1), sz)
 			s.yaw = math.atan2(-nw.out.x, -nw.out.z)
 			local function frame()
 				root.CFrame = roblox.CFrame.new(s.x, s.y + HIP, s.z) * roblox.CFrame.Angles(0, s.yaw + math.pi, 0)
+				-- what Controllers/Squirrel puts on the body: the way off an enclosed run A or D picked
+				local onRun = s.routeId ~= nil and (motorWorld.registry:get(s.routeId) :: any).enclosure ~= nil
+				body:SetAttribute("ExitPicked", if onRun then s.selectedJunction else nil)
 				FakeEngine.renderStep(DT)
 				local prompt = handle.prompt()
 				if prompt then
@@ -218,18 +225,78 @@ return function(t)
 				end
 			end
 
-			-- a second on the grate, nothing pressed: the prompt, and the people see it there
+			-- W held straight over the grate and on: it stays in the street (a hatch: E only)
+			local overCam = BakedWorld.cameraYawToward(-nw.out.x, -nw.out.z)
+			local over = BakedWorld.drive(motorWorld, s, 75, function(): SquirrelMotor.Input
+				return BakedWorld.keys(overCam, { fw = 1 })
+			end, {
+				validator = true,
+				stop = function(): boolean
+					frame()
+					return false
+				end,
+			})
+			t.eq(next(over.routes), nil, "walked over the grate: not down it")
+			t.eq(over.violations, 0)
+			t.truthy(
+				(said[string.format(SewerAmbience.PROMPT.step, nw.kind)] or 0) >= 1,
+				"near it: stand on the grate and press E"
+			)
+			-- back onto it, then a second standing there with its back to the opening's side: the prompt, and the
+			-- people see it there
+			local back = BakedWorld.drive(motorWorld, s, 60 * 4, function(): SquirrelMotor.Input?
+				local dx, dz = nw.x - s.x, nw.z - s.z
+				if dx * dx + dz * dz < 0.3 * 0.3 then
+					return nil
+				end
+				return BakedWorld.keys(BakedWorld.cameraYawToward(dx, dz), { fw = 1 })
+			end, {
+				validator = true,
+				stop = function(): boolean
+					frame()
+					return false
+				end,
+			})
+			t.eq(next(back.routes), nil, "walked back onto it: still up")
 			for _ = 1, 60 do
+				SquirrelMotor.step(s, SquirrelMotor.idleInput(overCam), DT, motorWorld)
 				frame()
 			end
-			t.truthy((said[SewerAmbience.PROMPT.down] or 0) >= 30, "on the grate facing in: E or W: down the drain")
+			local onIt = math.sqrt((s.x - nw.x) ^ 2 + (s.z - nw.z) ^ 2)
+			t.truthy(onIt < nw.reach, `standing on the grate ({onIt} st from its point)`)
+			t.truthy((said[SewerAmbience.PROMPT.down] or 0) >= 30, "on the grate: E: down the drain")
 			t.eq(svc:underground(rodent.id), nil, "on the grate it is still in the street")
-			-- E, then W held with the view toward the far corner, until it has stood out on the street 30 frames
+			-- meanwhile the people walked on: the policeman and the four are put by the grate again, looking at it as it
+			-- presses E
+			put(officer, nw.x - 12, nw.z + 2)
+			for i, w in walkers do
+				put(w, nw.x + 4 + i, nw.z + 3)
+			end
+			-- E, then W held with the view toward the far corner, D 30 studs before the crossing and D again at 15,
+			-- until it has stood out on the street 30 frames
 			local cam = BakedWorld.cameraYawToward(se.x - nw.x, se.z - nw.z)
 			local outFrames = 0
 			local outAt: { number }? = nil
+			local arm = motorWorld.registry:get(nw.route) :: any
+			local pressed = 0
+			local pickedSaid = 0
 			local trace = BakedWorld.drive(motorWorld, s, 60 * 20, function(f: number): SquirrelMotor.Input
-				return BakedWorld.keys(cam, if f == 1 then { grab = true } else { fw = 1 })
+				if f == 1 then
+					return BakedWorld.keys(cam, { grab = true })
+				end
+				local fields: { [string]: any } = { fw = 1 }
+				if s.routeId == arm.id and s.bridge == nil then
+					local before = (1 - s.railT) * arm.length
+					if (pressed == 0 and before <= 30) or (pressed == 1 and before <= 15) then
+						pressed += 1
+						fields.choose = 1
+					end
+				end
+				local prompt = handle.prompt()
+				if prompt and string.sub(prompt, 1, 17) == "Side arm picked: " then
+					pickedSaid += 1
+				end
+				return BakedWorld.keys(cam, fields)
 			end, {
 				validator = true,
 				stop = function(st: SquirrelMotor.State, f: number): boolean
@@ -243,6 +310,10 @@ return function(t)
 			})
 			t.eq(BakedWorld.count(trace, "enter"), 1, "E goes in")
 			t.eq(BakedWorld.count(trace, "emerge"), 1, "and out once")
+			t.eq(BakedWorld.count(trace, "junctionChosen"), 1, "D picked a side arm 30 studs out")
+			t.truthy(pickedSaid >= 10, `and the screen named it ({pickedSaid} frames)`)
+			t.eq(BakedWorld.count(trace, "junctionCleared"), 1, "D again dropped it")
+			t.eq(BakedWorld.count(trace, "forkTaken"), 0, "so straight on")
 			t.eq(trace.violations, 0, "the server accepts every frame")
 			t.truthy(nearestChamber < 2, `through the chamber ({nearestChamber} st from the crossing)`)
 			t.truthy(s.grounded and s.routeId == nil, "on its feet, running on along the street")
