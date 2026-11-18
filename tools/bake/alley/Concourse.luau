@@ -5,9 +5,8 @@
 -- through; kind "window": the full width), a sign over every opening saying what is behind it, the snack tables
 -- and their stools in two rows clear of the walk along the concourse, two benches by the shoe returns, and the
 -- house balls on their shelves along the west aisle wall.
--- The front rooms themselves (the bowling ball shop, the shoe rental, the gift shop, the snack bar, the lockers)
--- are finished and EMPTY: whoever dresses a room replaces its counter here (models "Counter_<opening id>") and
--- adds the rest inside the room's rectangle (AlleyLayout.zone).
+-- The front rooms' own fittings (the bowling ball shop, the shoe rental, the gift shop, the snack bar's kitchen)
+-- are tools/bake/alley/Shops, inside each room's rectangle (AlleyLayout.zone); the counters here stay theirs.
 -- Interface: build(kit, root) -> nothing
 
 local AlleyLayout = require("../../../src/shared/Attractions/AlleyLayout")
