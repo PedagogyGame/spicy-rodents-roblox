@@ -7,7 +7,9 @@
 -- each knothole sits on the bark outside; the log is boards round its run and a floor. Built at boot by
 -- Foraging/HollowService (no bake: a few hundred plain parts), and by the specs (the same parts the motor is held to).
 -- Nothing in a tree collides or casts a shadow (the squirrel runs these on its rails; the bark collides already);
--- the log's boards collide (they are the log); a knothole is not queried (sight and the camera look through it). A dim warm light on each floor and at each chamber above it.
+-- the log's boards collide (they are the log), and so does an invisible threshold disc just inside each of its ends
+-- (a body walking in off the run is stopped there; the run itself rides past it); a knothole is not queried (sight
+-- and the camera look through it). A dim warm light on each floor and at each chamber above it.
 -- Interface: build(env, layout, parent?) -> (Folder, Report). `env` is anything with Instance, CFrame, Vector3,
 --   Color3 and Enum as the engine has them (the engine's globals, or @lune/roblox in the specs).
 --   Report = { parts, lights, per = { [hollowId]: parts } }.
@@ -24,6 +26,7 @@ HollowShell.LOOK = {
 	shelf = { color = { 132, 100, 68 }, material = "Wood" },
 	knothole = { color = { 30, 22, 16 }, material = "SmoothPlastic" },
 	log = { color = { 104, 80, 58 }, material = "Wood" },
+	threshold = { color = { 104, 80, 58 }, material = "SmoothPlastic" }, -- (never drawn)
 }
 HollowShell.LIGHT = { range = 9, brightness = 0.45, color = { 255, 196, 140 } }
 local C = { room = 2.8 } -- (Shared/World/HollowLayout.C.room: a chamber higher than this over the floor gets a light)
@@ -52,7 +55,9 @@ function HollowShell.build(env: any, layout: any, parent: any?): (any, Report)
 				Vector3.new(pc.yv[1], pc.yv[2], pc.yv[3])
 			)
 			p.Anchored = true
-			p.CanCollide = pc.role == "log" -- (the log's boards stand in people's way; nothing else is reachable)
+			-- (the log's boards stand in people's way, its thresholds stop a body off its run; nothing else is reachable)
+			p.CanCollide = pc.role == "log" or pc.role == "threshold"
+			p.Transparency = if pc.role == "threshold" then 1 else 0
 			p.CanTouch = false
 			p.CanQuery = pc.role ~= "knothole"
 			p.CastShadow = false

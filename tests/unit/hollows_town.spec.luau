@@ -82,7 +82,8 @@ return function(t)
 			HollowShell.build(roblox, layout).Parent = town
 			local baked = BakedWorld.fromModel(town)
 			local w = baked:motorWorld(data)
-			-- what the rig's ray meets inside a hollow: the shell's parts only (Workspace.HollowTrees, an Include filter)
+			-- what the rig's ray meets inside a hollow: the shell's parts only (Workspace.HollowTrees, an Include filter),
+			-- and only what is drawn (it passes the log's invisible thresholds)
 			local function cast(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number)
 				local inside = {}
 				for _, p in baked.containing(ox, oy, oz) do
@@ -91,12 +92,26 @@ return function(t)
 				local tt, part = baked.raycast(ox, oy, oz, dx, dy, dz, function(p: BakedWorld.Part): boolean
 					return not inside[p]
 						and string.find(p.path, "HollowTrees", 1, true) ~= nil
+						and p.visible
 						and (p.collide or p.query)
 				end)
 				if tt and part then
 					return ox + dx * tt, oy + dy * tt, oz + dz * tt
 				end
 				return nil, nil, nil
+			end
+			-- inside the bark: in the cavity; the log is open at its ends, so there: within its boards, between its ends
+			local function inside(h: HollowLayout.Hollow, x: number, y: number, z: number): boolean
+				local c = h.cavities[1]
+				local a, b = c.a, c.b
+				if a and b then
+					local ab = { b[1] - a[1], b[2] - a[2], b[3] - a[3] }
+					local l2 = ab[1] ^ 2 + ab[2] ^ 2 + ab[3] ^ 2
+					local tt = ((x - a[1]) * ab[1] + (y - a[2]) * ab[2] + (z - a[3]) * ab[3]) / l2
+					local d2 = (a[1] + ab[1] * tt - x) ^ 2 + (a[2] + ab[2] * tt - y) ^ 2 + (a[3] + ab[3] * tt - z) ^ 2
+					return tt >= 0 and tt <= 1 and d2 <= c.radius ^ 2
+				end
+				return layout.within(h, x, y, z)
 			end
 			for _, h in layout.hollows do
 				local m = h.mouths[1]
@@ -131,7 +146,7 @@ return function(t)
 								cast,
 								layout.keepCamera
 							)
-							if not layout.within(h, cx, cy, cz) then
+							if not inside(h, cx, cy, cz) then
 								outside += 1
 							end
 							if (cx - hx) ^ 2 + (cy - hy) ^ 2 + (cz - hz) ^ 2 < 0.6 ^ 2 then

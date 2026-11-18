@@ -75,6 +75,11 @@ HollowLayout.C = {
 	post = 0.55, -- studs: the spiral's heartwood post's clearance inside the ramp's inner edge
 	shelf = 1.5, -- studs: a hideout shelf's length across the shaft
 	logWall = 0.3,
+	-- studs inside each open end of the log: an invisible disc that stops a body walking in off the run (one taken
+	-- onto the run rides past it); deeper than half the body's wall probe (ClientWorld.BODY_HALF 1.0), so a body
+	-- stepping out of the end is clear of it
+	logThreshold = 1.2,
+	logOpen = 1.0, -- studs: a body nearer an open end of the log than this is in its opening, seen (not in the cavity)
 	cameraIn = 0.3, -- studs: the tunnel camera kept this far inside a cavity's wall (the liner boards stand outside it)
 	-- the bark mesh has 14 flats (Builders/Trees, the Blender trees): between its corners it is this much of the
 	-- nominal radius; every corner of the shell stays C.barkClear inside that at its height, lean included
@@ -950,6 +955,18 @@ local function buildLog(doc: any, heightAt: (x: number, z: number) -> number, ba
 		})
 	end
 	slab(hl.parts, "floor", pts[1], pts[#pts], 1.9, 0.3)
+	-- a threshold just inside each end (Server/World/HollowShell: invisible, collides, queried by the walls test)
+	for i, q in { axisA, axisB } do
+		local d = if i == 1 then C.logThreshold else -C.logThreshold -- (inward from each end)
+		table.insert(hl.parts, {
+			role = "threshold",
+			shape = "Cylinder",
+			p = { r4(q[1] + f[1] * d), r4(q[2] + f[2] * d), r4(q[3] + f[3] * d) },
+			xv = { r4(f[1]), r4(f[2]), r4(f[3]) }, -- a Cylinder's axis is its X: along the log
+			yv = { r4(side[1]), r4(side[2]), r4(side[3]) },
+			size = { 0.2, r4(2 * inner), r4(2 * inner) },
+		})
+	end
 	for i, p in { pts[1], pts[#pts] } do
 		table.insert(hl.mouths, {
 			route = base + 1,
@@ -1098,13 +1115,14 @@ function HollowLayout.new(compiled: Compiled): Layout
 		for _, c in h.cavities do
 			local a, bb = c.a, c.b
 			if a and bb then
-				-- the log: within its radius of the segment a -> b, between its open ends (a squirrel out past an end
-				-- is in the open)
+				-- the log: within its radius of the segment a -> b, more than C.logOpen inside its open ends (a
+				-- squirrel in an end's opening, or out past it, is in the open)
 				local abx, aby, abz = bb[1] - a[1], bb[2] - a[2], bb[3] - a[3]
 				local l2 = abx * abx + aby * aby + abz * abz
 				local tt = ((x - a[1]) * abx + (y - a[2]) * aby + (z - a[3]) * abz) / l2
 				local px, py, pz = a[1] + abx * tt - x, a[2] + aby * tt - y, a[3] + abz * tt - z
-				if tt >= 0 and tt <= 1 and px * px + py * py + pz * pz <= (c.radius + 0.3) ^ 2 then
+				local edge = math.min(0.5, C.logOpen / math.sqrt(l2))
+				if tt > edge and tt < 1 - edge and px * px + py * py + pz * pz <= (c.radius + 0.3) ^ 2 then
 					return true
 				end
 			elseif y >= c.bottom - 0.5 and y <= c.top and (x - c.x) ^ 2 + (z - c.z) ^ 2 <= (c.radius + 0.6) ^ 2 then
@@ -1126,7 +1144,7 @@ function HollowLayout.new(compiled: Compiled): Layout
 		local a, bb = c.a, c.b
 		local r = math.max(0.05, c.radius - C.cameraIn)
 		if a and bb then
-			-- the log: across its axis within r, along it between its ends (C.cameraIn short of each)
+			-- the log: across its axis within r, along it between its open ends (C.cameraIn inside each)
 			local abx, aby, abz = bb[1] - a[1], bb[2] - a[2], bb[3] - a[3]
 			local l2 = abx * abx + aby * aby + abz * abz
 			local tt = ((x - a[1]) * abx + (y - a[2]) * aby + (z - a[3]) * abz) / l2

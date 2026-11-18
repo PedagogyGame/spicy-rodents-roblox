@@ -11,7 +11,8 @@
 --   the shaft and the escape tree: W climbs the wall to the top knothole and runs on along its bough; E at the
 --   part-way knothole goes out onto the other bough; A or D on the way up picks the hideout or the knothole
 --   the spiral: W climbs the ramp past its landings and runs out of the top knothole onto the outside trunk
---   the log: in at one end, out at the other, both ways
+--   the log: in at one end, out at the other, both ways; walking at an end off its run (45-75 degrees) stops at its
+--   invisible threshold, never inside; out of an end the body runs on clear of it
 --   nothing of the shell through the bark: every corner of every piece (but the knothole ovals on it) inside the
 --   bark mesh's flats less HollowLayout.C.barkClear, measured level from the leaning axis at its own height
 --   nothing through walls: the body's section along every route meets nothing of the shell but the knothole's oval
@@ -138,7 +139,8 @@ return function(t)
 			local route = reg:get(r.id) :: any
 			local hit = {}
 			for _, b in BakedWorld.clearance(baked, reg, route) do
-				if not string.find(b.name, "^knothole") then
+				-- (a knothole's oval is what the body slips through; the log's thresholds stop only a body off its run)
+				if not string.find(b.name, "^knothole") and not string.find(b.name, "^threshold") then
 					table.insert(hit, `{b.path} t {string.format("%.3f", b.t0)}..{string.format("%.3f", b.t1)}`)
 				end
 			end
@@ -391,6 +393,51 @@ return function(t)
 			t.eq(trace.violations, 0)
 		end
 	end)
+
+	t.test(
+		"the log: walking at an end off its run does not get in (its thresholds); out of an end, on its way",
+		function()
+			local h = layout.hollow("LOG") :: HollowLayout.Hollow
+			local rid = h.routes[1]
+			for _, m in h.mouths do
+				for _, deg in { -75, -60, -45, 45, 60, 75 } do
+					-- 6 studs out, turned `deg` off the log's line, walking (and running) at the end's mouth point
+					local a = math.rad(deg)
+					local rx = m.out[1] * math.cos(a) - m.out[3] * math.sin(a)
+					local rz = m.out[1] * math.sin(a) + m.out[3] * math.cos(a)
+					for _, sprint in { false, true } do
+						local x, z = m.x + rx * 6, m.z + rz * 6
+						local s = SquirrelMotor.new(x, baked.groundAt(x, z, m.y + 3), z)
+						local cam = BakedWorld.cameraYawToward(-rx, -rz)
+						local trace = BakedWorld.drive(w, s, 60 * 5, function(): SquirrelMotor.Input
+							return BakedWorld.keys(cam, { fw = 1, sprint = sprint })
+						end, { validator = true })
+						local hiddenOff = 0
+						for _, fr in trace.frames do
+							if fr.routeId == nil and layout.contains(fr.x, fr.y + 0.4, fr.z) then
+								hiddenOff += 1
+							end
+						end
+						t.eq(hiddenOff, 0, `{deg} deg (sprint {sprint}): frames inside the log off its run`)
+						for r in trace.routes do
+							t.eq(r, rid, `{deg} deg: took {r}`)
+						end
+						t.eq(trace.violations, 0)
+					end
+				end
+			end
+			-- through and out of the far end, still holding W: it runs on clear of the threshold behind it
+			local _, s = runIn(h, function(st)
+				return st.routeId == nil and st.railT ~= 0
+			end, 60 * 8)
+			local ex, ez = s.x, s.z
+			local on = BakedWorld.drive(w, s, 60, function(): SquirrelMotor.Input
+				return BakedWorld.keys(BakedWorld.cameraYawToward(math.sin(s.yaw), math.cos(s.yaw)), { fw = 1 })
+			end, { validator = true })
+			t.truthy(math.sqrt((s.x - ex) ^ 2 + (s.z - ez) ^ 2) > 5, "out of the far end and on its way")
+			t.eq(on.violations, 0)
+		end
+	)
 
 	t.test("out of sight inside: chambers hidden and in their cavity; the outside trunk is not", function()
 		for _, h in layout.hollows do

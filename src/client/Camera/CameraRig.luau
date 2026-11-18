@@ -604,9 +604,22 @@ function CameraRig.apply(decision: { mode: string, firstPerson: boolean }, targe
 					look.X,
 					look.Z,
 					function(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number)
-						local hit = workspace:Raycast(Vector3.new(ox, oy, oz), Vector3.new(dx, dy, dz), rays)
-						if hit then
-							return hit.Position.X, hit.Position.Y, hit.Position.Z
+						-- (on through anything not drawn: the log's thresholds stop feet, not the view)
+						local from, left = Vector3.new(ox, oy, oz), Vector3.new(dx, dy, dz)
+						for _ = 1, 3 do
+							local hit = workspace:Raycast(from, left, rays)
+							if hit == nil then
+								break
+							end
+							if hit.Instance.Transparency < 1 then
+								return hit.Position.X, hit.Position.Y, hit.Position.Z
+							end
+							local step = left.Unit * 0.05
+							left -= (hit.Position - from) + step
+							from = hit.Position + step
+							if left:Dot(Vector3.new(dx, dy, dz)) <= 0 then
+								break
+							end
 						end
 						return nil, nil, nil
 					end,
