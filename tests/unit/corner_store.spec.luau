@@ -240,9 +240,9 @@ return function(t)
 			for _, def in ItemRules.CATALOG do
 				onSale += if ItemRules.onSale(def.id) then 1 else 0
 			end
-			t.eq(onSale, 21, "the 22 less the dog treats (no dogs in the town yet)")
+			t.eq(onSale, 22, "all 22: the dog treats are back now the town has dogs (Wildlife/YardHazards)")
 			t.eq(root:GetAttribute("Items"), onSale)
-			t.eq(items:FindFirstChild("Item_dog_treats"), nil, "the dog treats are not on the shelf")
+			t.truthy(items:FindFirstChild("Item_dog_treats"), "the dog treats are on the third gondola")
 			local fd = Store.FRONT_DOOR
 			local at = flood(root, v, 1.1, 0.7, (fd[1] + fd[2]) / 2, -Store.IN_D - 2)
 			for _, def in ItemRules.CATALOG do

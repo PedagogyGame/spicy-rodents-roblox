@@ -365,6 +365,7 @@ export type StartOpts = {
 	expansion: Instance?, -- Workspace.Expansion
 	runtime: any?, -- Actors/ActorsRuntime (the town's brains, for the items' effects)
 	zones: { any }?, -- generated/Expansion.zones (where a kite flies)
+	dogs: any?, -- Wildlife/YardHazards (the dog treats' dogs)
 	wallet: any, -- Economy/Credits.Wallet (Game.start's)
 	possession: any, -- Actors/Possession (actorOf(player) -> actor { species, body })
 	fire: (player: any, payload: { [string]: any }) -> (), -- Game's notice/refused channel
@@ -503,6 +504,7 @@ function CornerStore.start(opts: StartOpts): Store?
 		runtime = opts.runtime,
 		fire = opts.fire,
 		zones = opts.zones,
+		dogs = opts.dogs,
 		heartbeat = opts.heartbeat,
 	})
 	-- the chalk's words come back from the owner's client (Client/Items/ItemClient): text only, checked and

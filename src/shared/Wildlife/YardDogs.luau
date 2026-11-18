@@ -62,6 +62,7 @@ YardDogs.FUR = table.freeze({
 YardDogs.THINK = 0.5 -- seconds between a dog's looks (the scheduler calls more often; the brain waits)
 YardDogs.SENSE = 3 -- studs past its yard's edge a dog notices a squirrel coming in
 YardDogs.ABOVE = 6 -- studs above the ground: a squirrel higher up (a fence, a branch) is out of reach and ignored
+YardDogs.BELOW = 3 -- studs below it: one in a storm drain under the yard is not there for a dog
 YardDogs.BARK_EVERY = 8 -- seconds between barks (v5.4's barkCooldown)
 YardDogs.ALERT_RADIUS = 30 -- studs: people this near a bark at the rodent notice it (v5.4: 12 units)
 YardDogs.WALK = 5 -- studs a second, wandering
@@ -150,7 +151,8 @@ local function intruder(d: Dog, sense: Sense): Squirrel?
 	local best: Squirrel? = nil
 	local bestD = math.huge
 	for _, s in sense.squirrels(cx, cz, r) do
-		if YardDogs.inYard(y, s.x, s.z, YardDogs.SENSE) and s.y - s.ground <= YardDogs.ABOVE then
+		local up = s.y - s.ground
+		if YardDogs.inYard(y, s.x, s.z, YardDogs.SENSE) and up <= YardDogs.ABOVE and up >= -YardDogs.BELOW then
 			local dd = (s.x - d.x) ^ 2 + (s.z - d.z) ^ 2
 			if dd < bestD then
 				best, bestD = s, dd

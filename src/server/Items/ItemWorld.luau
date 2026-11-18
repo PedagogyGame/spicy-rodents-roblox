@@ -23,6 +23,7 @@
 --              empty CHAIR.emptySecs it folds itself; not solid, so it walls nobody off; never by a prompt) or a
 --              whoopee cushion (the next person to come within a stud and a half sets it off; E picks it up)
 --   bait       a pile on the ground; nearby squirrels come to it (their brain's "bait"); bird seed brings birds
+--   calm_dog   a dog treat: the yard dog near (opts.dogs, Wildlife/YardHazards) sits and wags and ignores squirrels
 --   treat      body attributes TreatUntil (server time) and TreatScale: Client/Controllers/Human walks faster
 --   read, askText, screenshot   a message to the owner's client (Client/Items/ItemClient)
 --   kite       up on its string downwind of its flier, swaying; steered (Shared/Items/KiteFlight: A/D lean it
@@ -88,6 +89,8 @@ export type StartOpts = {
 	runtime: any, -- Actors/ActorsRuntime (world, byTownId)
 	fire: (player: any, payload: { [string]: any }) -> (),
 	zones: { any }?, -- generated/Expansion.zones (the kite's)
+	-- the town's yard dogs (Wildlife/YardHazards): near(x, z, r) -> targets of kind "dog"; calm(id, secs)
+	dogs: { near: (x: number, z: number, r: number) -> { any }, calm: (id: any, secs: number) -> boolean }?,
 	heartbeat: boolean?,
 }
 
@@ -371,11 +374,8 @@ function ItemWorld.start(opts: StartOpts): World
 	local function nearby(x: number, z: number, r: number): { ItemService.Target }
 		local out: { ItemService.Target } = {}
 		local world = rt and rt.world
-		if world == nil then
-			return out
-		end
 		local r2 = r * r
-		for _, a in world.actors do
+		for _, a in (if world then world.actors else {}) :: { any } do
 			local dx, dz = a.x - x, a.z - z
 			if dx * dx + dz * dz <= r2 then
 				local kind = a.species
@@ -391,6 +391,12 @@ function ItemWorld.start(opts: StartOpts): World
 					end
 				end
 				table.insert(out, { kind = kind, id = a.id, x = px, y = py, z = pz, player = p })
+			end
+		end
+		-- and the yard dogs (Wildlife/YardHazards: not town actors, so asked on their own)
+		if opts.dogs then
+			for _, d in opts.dogs.near(x, z, r) do
+				table.insert(out, d)
 			end
 		end
 		return out
@@ -900,6 +906,18 @@ function ItemWorld.start(opts: StartOpts): World
 				table.insert(birds, bird)
 			end
 			table.insert(baits, { part = p :: BasePart, birds = birds, untilT = os.clock() + e.secs, t = 0 } :: Bait)
+		elseif kind == "calm_dog" then
+			-- a dog treat: the nearest dog (ItemService picked it) sits and wags, deaf to squirrels for a while
+			local calmed = false
+			for _, t in (targets or {}) :: { ItemService.Target } do
+				if t.kind == "dog" and opts.dogs and opts.dogs.calm(t.id, e.secs) then
+					calmed = true
+				end
+			end
+			if not calmed then
+				return false
+			end
+			notify(player, "The dog sits and wags its tail. It will leave the squirrels alone for a while.")
 		elseif kind == "treat" then
 			local a = actorOf(player)
 			local body = a and a.body

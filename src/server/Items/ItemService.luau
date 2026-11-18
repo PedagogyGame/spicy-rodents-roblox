@@ -258,16 +258,18 @@ function Methods.use(self: Service, player: any, itemId: string, payload: { [str
 		elseif k == "startle" then
 			d.act(player, e, d.nearby(pose.x, pose.z, e.radius))
 		elseif k == "calm_dog" then
-			local dogs = {}
+			-- the nearest dog within reach gets the treat
+			local dog: Target? = nil
+			local best = math.huge
 			for _, t in d.nearby(pose.x, pose.z, e.radius) do
-				if t.kind == "dog" then
-					table.insert(dogs, t)
+				local dd = (t.x - pose.x) ^ 2 + (t.z - pose.z) ^ 2
+				if t.kind == "dog" and dd < best then
+					dog, best = t, dd
 				end
 			end
-			if #dogs == 0 then
+			if dog == nil or d.act(player, e, { dog }) == false then
 				return no(ItemService.WORDS.noDog)
 			end
-			d.act(player, e, { dogs[1] })
 			consumed = true
 		elseif k == "bait" then
 			local near = {}
