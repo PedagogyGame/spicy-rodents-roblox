@@ -18,7 +18,8 @@
 -- Edge actions per frame: leap (Space), drop (Q), grab (E), choose (A/D), pounce (left click).
 -- ENCLOSED RUNS (Routes/Enclosure; kind "tunnel": the ball return, a hollow tree's inside): got into only at a mouth,
 -- moving into it (walking, falling, leaping or pouncing: the flight's swept path counts and going in ends the
--- attack), eased like a transfer; inside and away from a mouth Space, Q and a click do nothing (hint "noRoom") and
+-- attack), eased like a transfer (a hatch mouth, a storm drain's grate, takes only E from a body standing at it, never
+-- a walk or a flight); inside and away from a mouth Space, Q and a click do nothing (hint "noRoom") and
 -- E, A/D and the end-of-route switch never pass the wall; at a mouth they launch from outside its face
 -- (Motion.launchPoint) along its `out` (a mouth's `hop` makes Space and a click a short hop; Q pushes out); an end
 -- mouth lets the body out as it says (step out on the ground: "emerge"; stop with the head out: "lip", where a view
@@ -881,8 +882,17 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 			push(events, "hint", nil, nil, "noTransfer")
 		end
 	else
-		-- facing into an enclosed run's mouth within its reach: in through the mouth (Enclosure rule 1)
-		local mouth = Motion.mouthEntry(world, state.x, state.y, state.z, math.sin(state.yaw), math.cos(state.yaw))
+		-- facing into an enclosed run's mouth within its reach, or standing at a hatch: in through the mouth (Enclosure
+		-- rule 1)
+		local mouth = Motion.mouthEntry(
+			world,
+			state.x,
+			state.y,
+			state.z,
+			math.sin(state.yaw),
+			math.cos(state.yaw),
+			state.grounded
+		)
 		if mouth and enterRoute(state, world, mouth, input, events, true) then
 			push(events, "enter", mouth.routeId)
 			return
@@ -1390,8 +1400,9 @@ end
 -- rail, speeds against the per-kind caps, arcs against gravity, launches against jump/pounce, rail
 -- changes against the route graph and the transfer gaps, and ground moves against world.crosses. Enclosed runs
 -- (Routes/Enclosure) add one check, only where a move touches one ("enclosure"): a body gets on only within reach
--- of a mouth that opens to the outside, gets off only at a mouth, and changes rail across the wall only where a
--- mouth's links say (an authored link is a declared junction, whatever gap the Graph sees).
+-- of a mouth that opens to the outside (a hatch: at ground pace and from its height, never a flight), gets off only
+-- at a mouth, and changes rail across the wall only where a mouth's links say (an authored link is a declared
+-- junction, whatever gap the Graph sees).
 
 export type Violation = { code: string, severity: number, detail: string }
 
@@ -1508,6 +1519,12 @@ function SquirrelMotor.envelope(
 			end
 			return math.max(0, need - E.posSlack)
 		end
+		-- a hatch takes only E from a body standing at it: reached at the pace it was already moving or the ground's,
+		-- from the mouth's height give or take the fall the gap allows (no launch inside the gap)
+		local hatchCap = math.max(groundCap, vPrevXZ * E.speedTol)
+		local hatchVertical = math.max(math.abs(prev.vy), math.abs(next.vy)) * dt
+			+ 0.5 * P.gravity * dt * dt
+			+ E.posSlack
 		if nextRoute and nextEnc and not prevRoute then
 			local ok = false
 			for _, m in nextEnc.mouths do
@@ -1516,9 +1533,11 @@ function SquirrelMotor.envelope(
 				end
 				local p = reg:pointAt(nextRoute, m.t)
 				local ox, oz = Motion.outLevel(world, nextRoute, m)
-				local tOff = offDistance(p.x, p.z, ox, oz, prev.x, prev.z, m.reach) / offCap
+				local tOff = offDistance(p.x, p.z, ox, oz, prev.x, prev.z, m.reach)
+					/ (if m.hatch then hatchCap else offCap)
 				local tRail = railTime(nextRoute, m.t, next.railT, 0)
-				if tOff + tRail <= budget and math.abs(p.y - prev.y) <= m.rise + vertical then
+				local rise = m.rise + (if m.hatch then hatchVertical else vertical)
+				if tOff + tRail <= budget and math.abs(p.y - prev.y) <= rise then
 					ok = true
 					break
 				end

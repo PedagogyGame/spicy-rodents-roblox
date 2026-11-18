@@ -33,7 +33,8 @@
 --   routes     Registry route records 9301-9304 (P1's four arms), 9311 (P2), 9321 (P3): kind "tunnel", origin
 --              "sewer", flags treeTravel false and autoGrabExcluded true, speedMult = Tunables sewer.speedMult (the
 --              pipe pace: Motion.routeSpeed in the motor and the server's caps), and an `enclosure` record: id = the
---              space, a "ground" mouth at each street end (out = the shaft's rung side, level; reach from the data),
+--              space, a "ground" hatch mouth at each street end (E only, from a body standing on the grate, any
+--              facing; out = the shaft's rung side, level: the way it comes out; reach from the data),
 --              P1's arms joined at the crossing by end links (straight on) and forks (A/D: the two side arms), width
 --              and height of the walkway and shaft, upAt (the back faces away from the rungs in a shaft, up along a run).
 --   mouths     id, pipe, space, kind ("grate" in a verge or lawn, "cover" on a quay walk), name, the mouth point
@@ -61,11 +62,7 @@
 --              slab already).
 -- Sound cue points are not here (lane S3 places them from mouths and passages; ids stay empty until audio exists).
 --
--- WHAT THE CONTRACT DOES NOT GIVE YET (reported, not worked round)
---   * Only E: a "ground" mouth also takes a body that walks into it heading in (Enclosure rule 1). A grate cannot say
---     "E only, never walked into" (the survey's hatch mouth, N3). `out` is the shaft's rung side, so only a body
---     heading straight at the grate from that side (within 60 degrees) walks in; across it or from the other sides
---     it does not (sewers_runthrough pins both).
+-- NOTES (how the drains sit on the contract)
 --   * The rungs' side is chosen so the body, its back away from the rungs, stays inside the passage's walls below the
 --     street (P1's shafts are square to the streets, its arms diagonal).
 --   * Pace: route.speedMult (the pipe pace, Tunables sewer.speedMult) is read by the motor and the server's caps
@@ -127,7 +124,7 @@ export type Mouth = {
 	space: string,
 	kind: string,
 	name: string, -- by its street or landmark ("corner grate by the brick house")
-	toward: string, -- what a body faces walking in ("Main Street"): the words on screen
+	toward: string, -- what the grate's rung side faces ("Main Street"): the way the squirrel comes out of it
 	x: number,
 	y: number,
 	z: number,
@@ -739,6 +736,7 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 				return {
 					t = t,
 					opens = "ground",
+					hatch = true,
 					out = { rg.x, 0, rg.z },
 					reach = m.reach or reachDefault,
 					rise = m.rise or riseDefault,

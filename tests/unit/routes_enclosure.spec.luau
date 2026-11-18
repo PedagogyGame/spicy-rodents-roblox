@@ -250,6 +250,16 @@ return function(t)
 		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", depth = -1 } } }), "depth"))
 		t.truthy(has(errs({ mouths = { { t = 1, opens = "ledge", hop = -2 } } }), "hop"))
 		t.eq(#errs({ mouths = { { t = 1, opens = "ledge", hop = 10, hopUp = 8, depth = 0.2, window = 0.4 } } }), 0)
+		-- a hatch (E only): a boolean, never on a link mouth; off by default
+		t.eq(#errs({ mouths = { { t = 0, opens = "ground", hatch = true } } }), 0)
+		t.truthy(has(errs({ mouths = { { t = 0, opens = "ground", hatch = "yes" } } }), "hatch must be a boolean"))
+		local link = { t = 0, opens = "link", hatch = true, links = { { route = 2, t = 0, dir = 1 } } }
+		t.truthy(has(errs({ mouths = { link } }), "cannot be a hatch"))
+		local spec = Enclosure.fromRecord(
+			rec({ mouths = { { t = 0, opens = "ground" }, { t = 1, opens = "ground", hatch = true } } }) :: any
+		)
+		t.eq(spec.mouths[1].hatch, false)
+		t.eq(spec.mouths[2].hatch, true)
 	end)
 
 	t.test("upAt: the authored section up, interpolated between keys and held past them; exits in t order", function()

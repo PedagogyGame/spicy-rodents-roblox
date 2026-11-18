@@ -12,14 +12,13 @@
 --     scroll along the flow.
 --   * the sound: SoundService.AmbientReverb = SewerPipe (restored exactly on the way out) and the named cues below.
 --   * the words: a place name at the top of the screen ("UNDERGROUND · STORM DRAIN 1 CROSSROADS"), and what
---     the keys do here, as the motor really does it (Enclosure rule 1: a body on a grate moving into the opening goes
---     down with or without E; the contract has no E-only mouth yet): "E or W: down the drain" on a grate facing in,
---     "Turn left / right / round to face Main Street: walking in or E goes down the drain" on it facing elsewhere
---     (turning is walking, and walking into the opening goes in), how to step onto it near one; none of those for
---     C.promptHold after coming up (the body is running away from the grate); "W: climb out" in the top of a shaft;
+--     the keys do here, as the motor really does it (every grate is a hatch mouth, Enclosure rule 1: E only, from a
+--     body standing on it, any facing; walking over it never goes down): "E: down the drain" on a grate, "Stand on the
+--     grate and press E to go down the drain" near one; none of those for C.promptHold after coming up (the body is
+--     running away from the grate); "W: climb out" in the top of a shaft;
 --     in drain 1, the crossing's A / D as it comes up and which arm was taken; the controller's refusals reworded for
 --     a drain (filter: "No room to jump down here"). No compass words: the game's map has east at -x
---     (Shared/Map/MapModel), so a grate is told by what it faces (its `toward`: a street, the river).
+--     (Shared/Map/MapModel), so a grate is told by its name (what stands beside it).
 -- Sound cues (SewerAmbience.CUES, cue -> asset id). NOTHING IS UPLOADED AND NOTHING PLAYS YET: every id is empty, so
 -- play() is silent and only counted; filling an id in (docs/AUDIO_BUDGET.md, Sewers) makes it sound.
 --   sewer.grateIn / grateOut   going down / coming up out of a mouth
@@ -37,7 +36,7 @@
 -- Who goes down: squirrels and the Spicy Rodent (a person, the fox or a deer never sees the prompt and is never
 -- "inside"). Computer squirrels are not this client's business.
 -- Interface (pure): C; CUES; HISS_LINE; PROMPT; placeName(pipe) -> string; canGoDown(species?, variant?) -> boolean;
---   shaftAt(layout, x, y, z) -> Mouth?; prompt(layout, view) -> string?; turnWord(fx, fz, dx, dz) -> string;
+--   shaftAt(layout, x, y, z) -> Mouth?; prompt(layout, view) -> string?;
 --   crossing(layout, view) -> string?; armAt(layout, x, z) -> Mouth?; litLamps(points, at, radius, max) -> { index };
 --   grade(level) -> { brightness, contrast,
 --   saturation, tint }; focus(level) -> { far, distance, radius }; reword(text, underground) -> string;
@@ -107,9 +106,8 @@ SewerAmbience.CUES = {
 SewerAmbience.HISS_LINE = "A low hiss and a ripple in the sewer water…"
 
 local PROMPT = {
-	down = "E or W: down the drain",
-	face = "Turn %s to face %s: walking in or E goes down the drain",
-	step = "Onto the %s facing %s goes down the drain",
+	down = "E: down the drain",
+	step = "Stand on the %s and press E to go down the drain",
 	climb = "W: climb out",
 	crossingAhead = "The crossing: A or D there turns into a side arm (W: straight on)",
 	crossingNow = "A / D now: a side arm (W: straight on)",
@@ -148,27 +146,10 @@ function SewerAmbience.shaftAt(layout: Layout, x: number, y: number, z: number):
 	return nil
 end
 
--- Which way to turn, from facing (fx, fz) to facing (dx, dz), as the player sees the animal from behind: "round"
--- past 135 degrees, else "left" or "right" (Roblox: LookVector x Up is the right; facing +z, +x is on the left).
-function SewerAmbience.turnWord(fx: number, fz: number, dx: number, dz: number): string
-	local fl, dl = math.sqrt(fx * fx + fz * fz), math.sqrt(dx * dx + dz * dz)
-	if fl < 1e-6 or dl < 1e-6 then
-		return "round"
-	end
-	local cos = (fx * dx + fz * dz) / (fl * dl)
-	if cos < -0.7 then
-		return "round"
-	end
-	-- the right of a facing (fx, fz) is (-fz, fx)
-	return if (-fz * dx + fx * dz) > 0 then "right" else "left"
-end
-
 export type View = {
 	x: number,
 	y: number, -- the feet
 	z: number,
-	fx: number, -- the way the body faces (level, any length)
-	fz: number,
 	vy: number, -- studs/s, up
 	canGo: boolean, -- a squirrel or the rodent
 	space: string?, -- SewerLayout.contains at the feet
@@ -266,11 +247,10 @@ function SewerAmbience.litLamps(points: { Vector3 }, at: Vector3, radius: number
 	return out
 end
 
--- What the keys do here (nil: nothing to say). On a mouth facing in: E or W goes down, exactly where the motor takes
--- it in (Enclosure rule 1 for a body facing the way it stands: within the mouth's reach, within C.rise of its height,
--- not more than C.behind past it, facing in within acos(C.intoDot)); on it facing elsewhere: which way to turn, and
--- that walking in goes down; near one, that stepping onto it facing its `toward` goes down. Nothing of that for
--- C.promptHold after coming up. In the top C.climbWindow studs of a shaft and not dropping: W climbs out; in drain 1
+-- What the keys do here (nil: nothing to say). On a grate: E goes down, exactly where the motor takes it in (a hatch
+-- mouth, Enclosure rule 1: a body standing within the mouth's reach and C.rise of its height, not more than C.behind
+-- past it, any facing); near one, how to get in (stand on it, press E). Nothing of that for C.promptHold after
+-- coming up. In the top C.climbWindow studs of a shaft and not dropping: W climbs out; in drain 1
 -- running at the crossing: its A / D.
 function SewerAmbience.prompt(layout: Layout, view: View): string?
 	if not view.canGo then
@@ -294,13 +274,9 @@ function SewerAmbience.prompt(layout: Layout, view: View): string?
 	local dx, dz = view.x - m.x, view.z - m.z
 	local past = dx * m.out.x + dz * m.out.z < -EC.behind
 	if level > m.reach or past or math.abs(view.y - m.y) > EC.rise then
-		return string.format(PROMPT.step, m.kind, m.toward)
+		return string.format(PROMPT.step, m.kind)
 	end
-	local fl = math.sqrt(view.fx * view.fx + view.fz * view.fz)
-	if fl > 1e-6 and -(view.fx * m.out.x + view.fz * m.out.z) / fl >= EC.intoDot then
-		return PROMPT.down
-	end
-	return string.format(PROMPT.face, SewerAmbience.turnWord(view.fx, view.fz, -m.out.x, -m.out.z), m.toward)
+	return PROMPT.down
 end
 
 -- The colour grade at `level` (0 outside, 1 inside): darker, cooler, a little flatter, never black. The darkening is
@@ -741,7 +717,6 @@ function SewerAmbience.start(ctx: Context): Handle
 				if type(variant) == "string" then variant else nil
 			)
 			here = if can then layout.contains(p.X, feet, p.Z) else nil
-			local look = root.CFrame.LookVector
 			local vy = if lastPos and dt > 0 then (feet - lastPos.Y) / dt else 0
 			local mx = if lastPos then p.X - lastPos.X else 0
 			local mz = if lastPos then p.Z - lastPos.Z else 0
@@ -749,8 +724,6 @@ function SewerAmbience.start(ctx: Context): Handle
 				x = p.X,
 				y = feet,
 				z = p.Z,
-				fx = look.X,
-				fz = look.Z,
 				vy = vy,
 				canGo = can,
 				space = here,

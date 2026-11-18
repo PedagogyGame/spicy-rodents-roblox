@@ -972,10 +972,19 @@ function Motion.mouths(world: World): { MouthRef }
 end
 
 -- does a body at (x, y, z) moving along (moveX, moveZ) get in at this mouth (Enclosure rule 1)? Returns the level
--- distance to the mouth point, or nil.
-local function intoMouth(ref: MouthRef, x: number, y: number, z: number, moveX: number, moveZ: number): number?
+-- distance to the mouth point, or nil. `standingE`: E pressed by a body standing on the ground, the only way into a
+-- hatch (which then takes any facing); without it a hatch takes nothing.
+local function intoMouth(
+	ref: MouthRef,
+	x: number,
+	y: number,
+	z: number,
+	moveX: number,
+	moveZ: number,
+	standingE: boolean
+): number?
 	local m = ref.mouth
-	if m.opens == "link" then
+	if m.opens == "link" or (m.hatch and not standingE) then
 		return nil
 	end
 	local dx, dz = x - ref.x, z - ref.z
@@ -984,17 +993,17 @@ local function intoMouth(ref: MouthRef, x: number, y: number, z: number, moveX: 
 		return nil
 	end
 	local ml = math.sqrt(moveX * moveX + moveZ * moveZ)
-	if ml < 1e-6 then
+	if ml < 1e-6 and not m.hatch then
 		return nil
 	end
 	local oh = math.sqrt(ref.ox * ref.ox + ref.oz * ref.oz)
 	if oh > 0.3 then
 		local ox, oz = ref.ox / oh, ref.oz / oh
-		-- on the outside of the mouth (or at most half a body past it) and moving in
+		-- on the outside of the mouth (or at most half a body past it) and moving in (a hatch: any facing)
 		if dx * ox + dz * oz < -Enclosure.C.behind then
 			return nil
 		end
-		if -(moveX * ox + moveZ * oz) / ml < Enclosure.C.intoDot then
+		if not m.hatch and -(moveX * ox + moveZ * oz) / ml < Enclosure.C.intoDot then
 			return nil
 		end
 	end
@@ -1006,10 +1015,19 @@ local function entrySpec(ref: MouthRef, x: number, y: number, z: number): EnterS
 	return { routeId = ref.routeId, t = ref.mouth.t, dir = if ref.inward ~= 0 then ref.inward else nil, d = d }
 end
 
--- mouthEntry(world, x, y, z, moveX, moveZ): the way in for a body off the rails at (x, y, z) moving along
+-- mouthEntry(world, x, y, z, moveX, moveZ, standingE?): the way in for a body off the rails at (x, y, z) moving along
 -- (moveX, moveZ) (Enclosure rule 1): the nearest mouth that opens ground, ledge or air, with the body within its
--- reach (level) and rise (height), not more than Enclosure.C.behind past it, and moving into it. nil when none.
-function Motion.mouthEntry(world: World, x: number, y: number, z: number, moveX: number, moveZ: number): EnterSpec?
+-- reach (level) and rise (height), not more than Enclosure.C.behind past it, and moving into it. A hatch mouth only
+-- with `standingE` (E pressed by a body on the ground; any facing). nil when none.
+function Motion.mouthEntry(
+	world: World,
+	x: number,
+	y: number,
+	z: number,
+	moveX: number,
+	moveZ: number,
+	standingE: boolean?
+): EnterSpec?
 	local list = Motion.mouths(world)
 	if #list == 0 then
 		return nil
@@ -1017,7 +1035,7 @@ function Motion.mouthEntry(world: World, x: number, y: number, z: number, moveX:
 	local best: MouthRef? = nil
 	local bestD = math.huge
 	for _, ref in list do
-		local level = intoMouth(ref, x, y, z, moveX, moveZ)
+		local level = intoMouth(ref, x, y, z, moveX, moveZ, standingE == true)
 		if level and level < bestD then
 			best, bestD = ref, level
 		end
@@ -1030,7 +1048,8 @@ end
 
 -- mouthEntrySwept(world, x0, y0, z0, x1, y1, z1, moveX, moveZ): as mouthEntry for a body that flew from the first
 -- point to the second in one substep (a leap or a pounce): the point of the segment nearest each mouth (level) is
--- judged, so a fast flight through a mouth's disc is not missed. The enter spec is from the body's point now.
+-- judged, so a fast flight through a mouth's disc is not missed. The enter spec is from the body's point now. Never a
+-- hatch (a flight does not open one).
 function Motion.mouthEntrySwept(
 	world: World,
 	x0: number,
@@ -1055,7 +1074,7 @@ function Motion.mouthEntrySwept(
 		if ss > 1e-12 then
 			f = math.clamp(((ref.x - x0) * sx + (ref.z - z0) * sz) / ss, 0, 1)
 		end
-		local level = intoMouth(ref, x0 + sx * f, y0 + (y1 - y0) * f, z0 + sz * f, moveX, moveZ)
+		local level = intoMouth(ref, x0 + sx * f, y0 + (y1 - y0) * f, z0 + sz * f, moveX, moveZ, false)
 		if level and level < bestD then
 			best, bestD = ref, level
 		end

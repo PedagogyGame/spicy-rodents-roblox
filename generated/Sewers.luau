@@ -1313,6 +1313,7 @@ return {
 				mouths = {
 					{
 						name = "P1.NW",
+						hatch = true,
 						opens = "ground",
 						out = { 0, 0, 1 },
 						reach = 1.5,
@@ -1372,6 +1373,7 @@ return {
 				mouths = {
 					{
 						name = "P1.NE",
+						hatch = true,
 						opens = "ground",
 						out = { 1, 0, 0 },
 						reach = 1.5,
@@ -1431,6 +1433,7 @@ return {
 				mouths = {
 					{
 						name = "P1.SE",
+						hatch = true,
 						opens = "ground",
 						out = { 1, 0, 0 },
 						reach = 1.5,
@@ -1490,6 +1493,7 @@ return {
 				mouths = {
 					{
 						name = "P1.SW",
+						hatch = true,
 						opens = "ground",
 						out = { 0, 0, -1 },
 						reach = 1.5,
@@ -1544,6 +1548,7 @@ return {
 				mouths = {
 					{
 						name = "P2.W",
+						hatch = true,
 						opens = "ground",
 						out = { -1, 0, 0 },
 						reach = 1.5,
@@ -1552,6 +1557,7 @@ return {
 					},
 					{
 						name = "P2.E",
+						hatch = true,
 						opens = "ground",
 						out = { 1, 0, 0 },
 						reach = 1.5,
@@ -1684,6 +1690,7 @@ return {
 				mouths = {
 					{
 						name = "P3.S",
+						hatch = true,
 						opens = "ground",
 						out = { 0, 0, -1 },
 						reach = 1.5,
@@ -1692,6 +1699,7 @@ return {
 					},
 					{
 						name = "P3.N",
+						hatch = true,
 						opens = "ground",
 						out = { 0, 0, 1 },
 						reach = 1.5,

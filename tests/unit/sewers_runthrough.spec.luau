@@ -3,7 +3,9 @@
 -- contract Shared/Routes/Enclosure): the routes as Shared/Data has them, a plain stand-in of the pipes as parts
 -- (tests/lib/SewerStandIn: floors, walls, roofs, shafts, a cover over each mouth) loaded by tests/lib/BakedWorld, the
 -- real SquirrelMotor driven with scripted keys, and the envelope the server's MoveValidator applies to every frame.
---   in only at a mouth, with E (facing in, standing on it); not from beside it, not from the street over a pipe
+--   in only with E, standing on a grate (a hatch mouth: any facing); never by walking, running, leaping or pouncing
+--   onto it, not from beside it, not in the air over it, not from the street over a pipe; the server agrees (E from
+--   the grate accepted, a hatch taken out of the air refused)
 --   out at every street mouth on its feet, still running
 --   each pipe against its surface way, measured on the motor with W held, walking and sprinting: every pipe wins at
 --   the pipe pace (route.speedMult, Tunables sewer.speedMult 1.25, applied by Motion.routeSpeed in the motor and in
@@ -11,9 +13,6 @@
 --   nothing through walls: the body's section along every route meets no part of the stand-in; inside, Space, Q, a
 --   click and E do nothing; the server refuses a body put into a pipe from the street or out of one through the road
 --   P1's crossing: W runs straight on, A or D turns into a side arm
--- And two known gaps, pinned so the motor lane sees them and a green run says nothing it should not:
---   N3: walking onto a grate heading in also goes down, against the owner's default "E only, never by walking onto
---   a grate" (Enclosure rule 1 has no E-only mouth: the survey's hatch mouth). A defect, not a default.
 local Data = require("@shared/Data")
 local Enclosure = require("@shared/Routes/Enclosure")
 local Motion = require("@shared/Routes/Motion")
@@ -168,13 +167,22 @@ return function(t)
 		end
 	end)
 
-	t.test("no way in but E at a mouth: not facing out, not from beside it, not from the street over a pipe", function()
+	t.test("E on a grate goes in, whatever the facing; not from beside it, not in the air, not over a pipe", function()
 		for _, m in layout.mouths do
 			local cam = BakedWorld.cameraYawToward(-m.out.x, -m.out.z)
-			-- facing out of it
-			local s = onMouth(m, m.out.x, m.out.z)
-			press(s, cam, "grab")
-			t.truthy(not isSewer(s.routeId), `{m.id}: E facing away`)
+			-- standing on it, every facing: E goes in (a hatch mouth)
+			for k = 0, 7 do
+				local a = k * math.pi / 4
+				local s = onMouth(m, math.sin(a), math.cos(a))
+				press(s, cam, "grab")
+				t.eq(s.routeId, m.route, `{m.id}: E on the grate facing {k}/8 of a turn`)
+			end
+			-- in the air just over it (a hop): E does not open it
+			local hop = onMouth(m)
+			hop.y += 0.6
+			hop.grounded = false
+			press(hop, cam, "grab")
+			t.truthy(not isSewer(hop.routeId), `{m.id}: E in the air over the grate`)
 			-- beside it, facing in
 			for _, off in { 2.5, 4 } do
 				local sx, sz = m.x + m.out.z * off, m.z - m.out.x * off
@@ -216,24 +224,58 @@ return function(t)
 		end
 	end)
 
+	t.test("walking, running, leaping or pouncing onto a grate never goes down: E only (a hatch mouth)", function()
+		for _, m in layout.mouths do
+			local sideX, sideZ = m.out.z, -m.out.x
+			for _, dir in { { sideX, sideZ }, { -sideX, -sideZ }, { m.out.x, m.out.z }, { -m.out.x, -m.out.z } } do
+				local cam = BakedWorld.cameraYawToward(dir[1], dir[2])
+				for _, how in { "walk", "sprint", "leap", "pounce" } do
+					local s = standing(m.x - dir[1] * 4, m.z - dir[2] * 4, dir[1], dir[2])
+					local tr = BakedWorld.drive(w, s, 90, function(f: number): SquirrelMotor.Input
+						return BakedWorld.keys(cam, {
+							fw = 1,
+							sprint = how == "sprint",
+							leap = how == "leap" and f == 8,
+							pounce = how == "pounce" and f == 8,
+						})
+					end, { validator = true })
+					t.eq(next(tr.routes), nil, `{m.id}: {how} over it heading ({dir[1]}, {dir[2]})`)
+					t.eq(tr.violations, 0)
+				end
+				-- stood on it, W held toward the opening: stays up
+				local s = onMouth(m, dir[1], dir[2])
+				local tr = BakedWorld.drive(w, s, 30, hold(cam))
+				t.eq(next(tr.routes), nil, `{m.id}: W on the grate heading ({dir[1]}, {dir[2]})`)
+			end
+		end
+	end)
+
 	t.test(
-		"walking across a grate does not go down; onto it heading in does (DEFECT, the known gap N3: not E only)",
+		"the server agrees: E from the grate is accepted; a hatch taken from above it, out of the air, is not",
 		function()
 			for _, m in layout.mouths do
-				-- across it, both ways, and out over its rung side from behind it: never in
-				local sideX, sideZ = m.out.z, -m.out.x
-				for _, dir in { { sideX, sideZ }, { -sideX, -sideZ }, { m.out.x, m.out.z } } do
-					local s = standing(m.x - dir[1] * 5, m.z - dir[2] * 5, dir[1], dir[2])
-					local tr = BakedWorld.drive(w, s, 60, hold(BakedWorld.cameraYawToward(dir[1], dir[2])))
-					t.eq(next(tr.routes), nil, `{m.id}: walking across ({dir[1]}, {dir[2]})`)
+				-- the honest E: standing on it, then on the route at the mouth
+				local s = onMouth(m)
+				local before = SquirrelMotor.clone(s)
+				press(s, BakedWorld.cameraYawToward(-m.out.x, -m.out.z), "grab")
+				t.eq(s.routeId, m.route)
+				t.eq(#SquirrelMotor.envelope(before, s, 1 / 60, w, false), 0, `{m.id}: E accepted`)
+				-- the same arrival claimed from 1.2 studs over the grate at rest in the air (no fall that fast, no E there)
+				local above = SquirrelMotor.clone(before)
+				above.y += 1.2
+				above.grounded = false
+				local codes: { [string]: boolean } = {}
+				for _, x in SquirrelMotor.envelope(above, s, 1 / 60, w, false) do
+					codes[x.code] = true
 				end
-				-- straight at it heading in: Enclosure rule 1 takes it (the contract has no E-only mouth yet)
-				local s = standing(m.x + m.out.x * 4, m.z + m.out.z * 4, -m.out.x, -m.out.z)
-				local tr = BakedWorld.drive(w, s, 60, hold(BakedWorld.cameraYawToward(-m.out.x, -m.out.z)))
-				t.truthy(
-					tr.routes[m.route] == true,
-					`{m.id}: walked in heading in (N3: report, then flip this when a hatch mouth lands)`
-				)
+				t.truthy(codes.enclosure, `{m.id}: a hatch is not taken out of the air`)
+				-- an ordinary mouth would take that (a leap's lift in the gap): the hatch rule is what refuses it
+				local route = reg:get(m.route) :: any
+				local mouthSpec: any = Enclosure.mouthAt(route.enclosure, route.length, m.t)
+				mouthSpec.hatch = false
+				local plain = #SquirrelMotor.envelope(above, s, 1 / 60, w, false)
+				mouthSpec.hatch = true
+				t.eq(plain, 0, `{m.id}: an ordinary mouth would accept it`)
 			end
 		end
 	)

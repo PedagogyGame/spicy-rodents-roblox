@@ -2,15 +2,15 @@
 
 Your words (addendum D8): "a few underground pipes that the squirrel can run through, like a short cut or two through a system under the city, just basic sewers". There are three. A squirrel or the Spicy Rodent goes down a grate, runs the pipe, and climbs out somewhere else. People, the fox and the deer cannot go down. The police lose the rodent at the grate.
 
-Everything below has been tested without a screen. The real squirrel controls were driven through the real pipes, and the town's people and police were run against it. A test cannot tell me how it looks and feels, so this is the list of things only you can judge. One of your defaults is not met yet: walking onto a grate also takes you down. It is explained under **Known not done**.
+Everything below has been tested without a screen. The real squirrel controls were driven through the real pipes, and the town's people and police were run against it. A test cannot tell me how it looks and feels, so this is the list of things only you can judge. Your defaults are met: only E opens a grate, and every drain is quicker than going over the top.
 
 ## Before you build
 The pipes are their own bake, like the bowling alley. Run `lune run tools/bake/sewers.luau` before `rojo build`. Without the bake the game leaves the ground whole, hides nobody, and F9 shows a warning starting `Workspace.Sewers missing` that ends `do not publish this place`. The routes are still there, so a squirrel pressing E at an unmarked corner would go down into the ground. Every bake is optional in the project files, so that a fresh copy builds before it is baked, which means nothing stops a publish without it. Always bake before you publish.
 
 ## Where the drains are
-The game's map has east on the left of the x axis, so the drains are named by what stands beside them, not by the compass. "Walk in facing" is the way to face to go down. The words on screen use it too.
+The game's map has east on the left of the x axis, so the drains are named by what stands beside them, not by the compass. "Comes out facing" is the way the squirrel faces as it climbs out (the side of the shaft with the rungs). Going in, the way you face does not matter.
 
-| Drain | Way in or out | Where | Walk in facing |
+| Drain | Way in or out | Where | Comes out facing |
 |---|---|---|---|
 | **1. The crossroads** (under the Main Street / Centre Street crossing, 4 arms) | corner grate by the brick house | on the grass at the corner, (-24.6, 24.6) | Main Street |
 | | corner grate by the blue cottage | (24.6, 24.6) | Centre Street |
@@ -22,8 +22,8 @@ The game's map has east on the left of the x axis, so the drains are named by wh
 | | Main Street north verge grate | (1350, 37.4) | the boulevard |
 
 ## What to press
-1. Pick **Squirrel** or **Spicy Rodent**. Run to a grate and stand on it. Facing the right way, the screen says **E or W: down the drain**. Facing another way, it tells you which way to turn, for example **Turn left to face Main Street: walking in or E goes down the drain**.
-2. Press **E** (or keep walking in). The squirrel goes down the ladder shaft.
+1. Pick **Squirrel** or **Spicy Rodent**. Run to a grate. Near it the screen says **Stand on the grate and press E to go down the drain** (on the quays: **the cover**). Standing on it, facing any way, it says **E: down the drain**.
+2. Press **E**. The squirrel goes down the ladder shaft. Walking, running, jumping or pouncing over a grate never takes you down.
 3. Hold **W**. The squirrel runs the way the camera looks, as on a branch.
 4. In drain 1, as you run at the crossing the screen says **The crossing: A or D there turns into a side arm**. Then, in the last 6 studs, it says **A / D now: a side arm (W: straight on)**. Press A or D then; a press made earlier is not kept. Once past the crossing it tells you which way you went and where you will come out, for example **Straight on: out at the corner grate by the bungalow**.
 5. At the top of the far shaft the screen says **W: climb out**. Keep holding W and you come out on your feet, still running. For a second after that the screen says nothing about going back down.
@@ -54,7 +54,6 @@ Inside a pipe the squirrel runs 1.25 times as fast as along a wire (the default 
 | 9 | The alligator (optional, slow) | Stand still in a pipe for 12 and a half minutes: the line "A low hiss and a ripple in the sewer water…". There is no sound yet and nothing to see. Skip this one unless you have the time |
 
 ## Known not done
-- **Walking onto a grate takes you down too.** You asked for E only. The run-through mechanic has no "E only" way in, and I may not change the movement code, so it is waiting on the movement lane. Today a squirrel on a grate that walks into the opening goes down, and so does one that turns toward it. The words on screen say exactly that. A squirrel running across a grate, or out of it from the ladder side, does not go down.
 - **The crossing's A / D works only in the last 6 studs.** The screen says when. A wider window, or keeping a press made earlier, is a change to the movement code.
 - **Your modules have not been seen in Roblox yet.** They are loaded when the server starts and drawn near the squirrel. I have checked the placement only in Blender and in tests without the engine. If Roblox imports one turned or mirrored, the game notices and shows plain parts for that drain, so it never looks broken. The engine check is written (`tests/engine/Sewers.luau`, task `tools/cloud/tasks/sewers_smoke.luau`). It cannot run until the key's Luau Execution permission is restored.
 - **A dead rodent does not come back out of a drain.** The rule (a drain at least 100 studs away with nobody near) is written, but the role ladder that would use it is not running in the game yet. The same goes for the alligator's warning before an idle body is let go.

@@ -1,10 +1,9 @@
 --!strict
 -- The storm drains felt from inside, on the client (Client/World/SewerAmbience; lane S3 of the sewer plan). Here, the
 -- pure part against the real motor on the pipes' stand-in (tests/lib/SewerStandIn on tests/lib/BakedWorld):
---   the words on a grate tell the truth: "E or W: down the drain" exactly where E takes the body down (every mouth, a
---   ring of places and facings), and there W goes down too; on a grate facing elsewhere, turning to face the opening
---   (W held toward it) goes down, as the words say (the contract has no E-only mouth: Enclosure rule 1, gap N3);
---   which way to turn, by what the grate faces, never a compass word (the game's map has east at -x)
+--   the words on a grate tell the truth: "E: down the drain" exactly where E takes the body down (every mouth, a
+--   ring of places and facings: any facing on the grate), and there W never goes down (a hatch mouth, Enclosure rule
+--   1); near one, how to get in; never a compass word (the game's map has east at -x)
 --   drain 1's crossing: A / D announced running at it and "now" only where the motor takes it; which arm was taken
 --   "W: climb out" shows in the top of a shaft on the way out of every run, never on the way down or in a passage
 --   the controller's refusals inside a drain (Space, Q, a click, E: the motor's hints) read as a drain's
@@ -50,8 +49,6 @@ return function(t)
 			x = s.x,
 			y = s.y,
 			z = s.z,
-			fx = math.sin(s.yaw),
-			fz = math.cos(s.yaw),
 			vy = vy or 0,
 			canGo = canGo ~= false,
 			space = layout.contains(s.x, s.y, s.z),
@@ -74,57 +71,51 @@ return function(t)
 		return s.routeId ~= nil and layout.spaceOf(s.routeId) == m.space
 	end
 
-	t.test("the words on a grate tell the truth: E or W where E goes down, turning in goes down too", function()
-		local said, went, turned, turnedIn = 0, 0, 0, 0
-		for _, m in layout.mouths do
-			for _, r in { 0, 0.5, 1.0, 1.4, 1.7, 2.5 } do
-				for k = 0, 7 do
-					local a = k * math.pi / 4
-					local x, z = m.x + r * math.sin(a), m.z + r * math.cos(a)
-					for f = 0, 7 do
-						local s = SquirrelMotor.new(x, baked.groundAt(x, z, m.y + 3), z)
-						s.yaw = f * math.pi / 4 + 0.1
-						local text = SewerAmbience.prompt(layout, viewOf(s))
-						local _, events = SquirrelMotor.step(s, BakedWorld.keys(0, { grab = true }), 1 / 60, w)
-						local entered = s.routeId ~= nil and layout.spaceOf(s.routeId) == m.space
-						local where = `{m.id} r {r} a {k} facing {f}`
-						t.eq(text == P.down, entered, `{where}: says "{tostring(text)}", went down {entered}`)
-						if entered then
-							went += 1
-							-- and W there goes down too, as the words say
-							t.truthy(
-								walksIn(x, z, f * math.pi / 4 + 0.1, -m.out.x, -m.out.z, m, 10),
-								`{where}: W goes in`
-							)
-						end
-						if text and string.sub(text, 1, 5) == "Turn " then
-							turned += 1
-							t.truthy(string.find(text, m.toward, 1, true) ~= nil, `{where}: names what it faces`)
-							for _, word in { "north", "south", "east", "west" } do
-								t.truthy(string.find(text, word, 1, true) == nil, `{where}: no compass word ("{text}")`)
+	t.test(
+		"the words on a grate tell the truth: E where E goes down (any facing); walking onto it never does",
+		function()
+			local said, went = 0, 0
+			for _, m in layout.mouths do
+				for _, r in { 0, 0.5, 1.0, 1.4, 1.7, 2.5 } do
+					for k = 0, 7 do
+						local a = k * math.pi / 4
+						local x, z = m.x + r * math.sin(a), m.z + r * math.cos(a)
+						for f = 0, 7 do
+							local s = SquirrelMotor.new(x, baked.groundAt(x, z, m.y + 3), z)
+							s.yaw = f * math.pi / 4 + 0.1
+							local text = SewerAmbience.prompt(layout, viewOf(s))
+							SquirrelMotor.step(s, BakedWorld.keys(0, { grab = true }), 1 / 60, w)
+							local entered = s.routeId ~= nil and layout.spaceOf(s.routeId) == m.space
+							local where = `{m.id} r {r} a {k} facing {f}`
+							t.eq(text == P.down, entered, `{where}: says "{tostring(text)}", went down {entered}`)
+							if entered then
+								went += 1
+								-- and W there, the view toward the opening, does not take it down (a hatch: E only)
+								t.falsy(
+									walksIn(x, z, f * math.pi / 4 + 0.1, -m.out.x, -m.out.z, m, 30),
+									`{where}: W stays up`
+								)
 							end
-							-- turning toward the opening, W held: down it goes (Enclosure rule 1; no E-only mouth, N3)
-							if walksIn(x, z, f * math.pi / 4 + 0.1, -m.out.x, -m.out.z, m, 30) then
-								turnedIn += 1
+							if text then
+								said += 1
+								for _, word in { "north", "south", "east", "west" } do
+									t.truthy(
+										string.find(text, word, 1, true) == nil,
+										`{where}: no compass word ("{text}")`
+									)
+								end
+							elseif r <= 2.5 then
+								-- within C.near of a mouth something is always said (how to get in)
+								t.truthy(r > SewerAmbience.C.near, `{where}: nothing said`)
 							end
 						end
-						if r <= 2.5 and text == nil then
-							-- within C.near of a mouth something is always said (how to get in)
-							t.truthy(r > SewerAmbience.C.near, `{where}: nothing said`)
-						end
-						if text then
-							said += 1
-						end
-						local _ = events
 					end
 				end
 			end
+			t.truthy(went >= 8 * 3 * 8 * 8, `went down from {went} places, every facing`)
+			t.truthy(said > went, "near a mouth but not on it, the way in is explained")
 		end
-		t.truthy(went >= 8 * 10, `went down from {went} places`)
-		t.truthy(said > went, "near a mouth but not on it facing in, the way in is explained")
-		print(`      on a grate facing elsewhere: {turned} places told to turn; turning in went down from {turnedIn}`)
-		t.truthy(turned > 0 and turnedIn >= turned * 0.9, "turning in goes down, as the words say")
-	end)
+	)
 
 	t.test("a person, the fox or a deer is never told to go down a drain", function()
 		for _, m in layout.mouths do
@@ -257,12 +248,7 @@ return function(t)
 		t.truthy(SewerAmbience.focus(1).far > 0, "the far end softens")
 	end)
 
-	t.test("which way to turn, as seen from behind; the arm of drain 1 a point lies along", function()
-		-- facing +z (yaw 0): +x is on the left (Shared/Map/MapModel)
-		t.eq(SewerAmbience.turnWord(0, 1, 1, 0), "left")
-		t.eq(SewerAmbience.turnWord(0, 1, -1, 0), "right")
-		t.eq(SewerAmbience.turnWord(0, 1, 0, -1), "round")
-		t.eq(SewerAmbience.turnWord(1, 0, 0, 1), "right")
+	t.test("the arm of drain 1 a point lies along", function()
 		for _, m in layout.mouthsOf("P1") do
 			local ch = layout.chambers[1]
 			local x, z = ch.crossing.x + (m.x - ch.crossing.x) * 0.3, ch.crossing.z + (m.z - ch.crossing.z) * 0.3
@@ -287,8 +273,6 @@ return function(t)
 					x = q.x,
 					y = q.y,
 					z = q.z,
-					fx = q2.x - q.x,
-					fz = q2.z - q.z,
 					vy = 0,
 					canGo = true,
 					space = layout.contains(q.x, q.y, q.z),
