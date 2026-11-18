@@ -4,66 +4,66 @@
  "placement": "InsertService:LoadAsset(assetId) holds a Model of unrotated MeshParts, each centred on its bounding box in its frame (export_pinball.py's header); Server/Assets/PinballArt puts each at frame * centre, colours it (its `colour`, or the machine's THEMES colour for a `theme`), and keeps a textured one's map (`fallback` if the importer drops it); `alpha` < 1 is see-through.",
  "assets": {
   "flipper": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "139220652971254",
+   "moderation": "Approved",
    "displayName": "SR pinball flipper",
    "fbxBytes": 36236,
    "tris": 516,
    "sha": "b19528385bb6f84a"
   },
   "bumper": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "118054119438368",
+   "moderation": "Approved",
    "displayName": "SR pinball pop bumper",
    "fbxBytes": 37388,
    "tris": 964,
    "sha": "42db441d1f218c9e"
   },
   "plunger": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "119254998369879",
+   "moderation": "Approved",
    "displayName": "SR pinball plunger",
    "fbxBytes": 23756,
    "tris": 312,
    "sha": "b120d6904f9639d3"
   },
   "gate": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "116036184771629",
+   "moderation": "Approved",
    "displayName": "SR pinball gate",
    "fbxBytes": 16892,
    "tris": 112,
    "sha": "348ef84c1fc51b99"
   },
   "cabinet": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "96498504007684",
+   "moderation": "Approved",
    "displayName": "SR pinball cabinet",
    "fbxBytes": 149628,
    "tris": 3452,
    "sha": "905f6dfeaa553c62"
   },
   "acorn": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "126846361680695",
+   "moderation": "Approved",
    "displayName": "SR pinball Acorn Attack playfield",
-   "fbxBytes": 912732,
+   "fbxBytes": 912412,
    "tris": 7398,
    "sha": "d8b08f4b87a05ab9"
   },
   "rodent": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "113123180255664",
+   "moderation": "Approved",
    "displayName": "SR pinball Spicy Rodent playfield",
-   "fbxBytes": 771964,
+   "fbxBytes": 771644,
    "tris": 6288,
    "sha": "6f9c65a6c7cfb383"
   },
   "space": {
-   "assetId": null,
-   "moderation": "not uploaded",
+   "assetId": "119552457768517",
+   "moderation": "Approved",
    "displayName": "SR pinball Space Squirrel playfield",
-   "fbxBytes": 770972,
+   "fbxBytes": 770652,
    "tris": 7790,
    "sha": "1ef02dcefd43700d"
   }

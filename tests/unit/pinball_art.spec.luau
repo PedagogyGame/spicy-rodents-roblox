@@ -308,8 +308,16 @@ return function(t)
 	t.test("with no asset ids nothing changes, and it is said once", function()
 		local root2, machines2 = baked()
 		local said, spawned = {}, 0
+		-- the game's data with every id taken out (as before the upload)
+		local bare: any = table.clone(PinballArtData :: any)
+		bare.assets = {}
+		for tag, a in (PinballArtData :: any).assets do
+			local b = table.clone(a)
+			b.id = nil
+			bare.assets[tag] = b
+		end
 		local r = PinballArt.start(root2, {
-			data = PinballArtData,
+			data = bare,
 			print = function(msg: string)
 				table.insert(said, msg)
 			end,
@@ -326,6 +334,25 @@ return function(t)
 			t.eq(count(m), parts0[i])
 			t.falsy(m:GetAttribute("ArtLoaded"))
 		end
+	end)
+
+	t.test("the game's own data has every Model uploaded and approved: the art goes on at boot, once", function()
+		for _, tag in PinballArt.TAGS do
+			local a = (PinballArtData :: any).assets[tag]
+			t.truthy(type(a.id) == "number" and a.id > 0, `{tag} has an asset id`)
+			t.eq(a.moderation, "Approved", tag)
+		end
+		local root5 = baked()
+		local spawned = 0
+		local r = PinballArt.start(root5, {
+			data = PinballArtData,
+			print = function(_msg: string) end,
+			spawn = function(_f: () -> ())
+				spawned += 1
+			end,
+		})
+		t.eq(r.ready, true)
+		t.eq(spawned, 1)
 	end)
 
 	t.test("a Model missing a mesh leaves every machine as baked", function()

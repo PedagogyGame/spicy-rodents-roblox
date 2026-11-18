@@ -6,14 +6,29 @@
 -- owner's pinball Models (loaded at boot by Server/Assets/PinballArt; no id: not uploaded yet), and THEMES.
 return {
 	assets = {
-		acorn = { displayName = "SR pinball Acorn Attack playfield", moderation = "not uploaded", tris = 7398 },
-		bumper = { displayName = "SR pinball pop bumper", moderation = "not uploaded", tris = 964 },
-		cabinet = { displayName = "SR pinball cabinet", moderation = "not uploaded", tris = 3452 },
-		flipper = { displayName = "SR pinball flipper", moderation = "not uploaded", tris = 516 },
-		gate = { displayName = "SR pinball gate", moderation = "not uploaded", tris = 112 },
-		plunger = { displayName = "SR pinball plunger", moderation = "not uploaded", tris = 312 },
-		rodent = { displayName = "SR pinball Spicy Rodent playfield", moderation = "not uploaded", tris = 6288 },
-		space = { displayName = "SR pinball Space Squirrel playfield", moderation = "not uploaded", tris = 7790 },
+		acorn = {
+			id = 126846361680695,
+			displayName = "SR pinball Acorn Attack playfield",
+			moderation = "Approved",
+			tris = 7398,
+		},
+		bumper = { id = 118054119438368, displayName = "SR pinball pop bumper", moderation = "Approved", tris = 964 },
+		cabinet = { id = 96498504007684, displayName = "SR pinball cabinet", moderation = "Approved", tris = 3452 },
+		flipper = { id = 139220652971254, displayName = "SR pinball flipper", moderation = "Approved", tris = 516 },
+		gate = { id = 116036184771629, displayName = "SR pinball gate", moderation = "Approved", tris = 112 },
+		plunger = { id = 119254998369879, displayName = "SR pinball plunger", moderation = "Approved", tris = 312 },
+		rodent = {
+			id = 113123180255664,
+			displayName = "SR pinball Spicy Rodent playfield",
+			moderation = "Approved",
+			tris = 6288,
+		},
+		space = {
+			id = 119552457768517,
+			displayName = "SR pinball Space Squirrel playfield",
+			moderation = "Approved",
+			tris = 7790,
+		},
 	},
 	bumperRadius = 0.12,
 	gateHinge = 0.1,
