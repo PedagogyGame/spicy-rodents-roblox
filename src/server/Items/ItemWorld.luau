@@ -34,14 +34,36 @@ local ItemService = require("./ItemService")
 
 local ItemWorld = {}
 
--- cue name -> sound asset id ("" until the lead picks a stock-library sound: no uploads)
-local SOUNDS: { [string]: string } = {}
-for _, cue in ItemRules.CUES do
-	SOUNDS[cue] = ""
-end
-for _, cue in ItemRules.RADIO_PLAYLIST do
-	SOUNDS[cue] = ""
-end
+-- cue name -> sound asset id, "rbxassetid://<n>": empty until the lead picks a sound from Roblox's licensed
+-- library (no uploads; docs/AUDIO_BUDGET.md "Corner store"). Every cue of ItemRules.CUES and
+-- ItemRules.RADIO_PLAYLIST has a row (tests/unit/corner_store_items.spec.luau).
+local SOUNDS: { [string]: string } = {
+	["Items.WaterGun"] = "",
+	["Items.Harmonica"] = "",
+	["Items.BikeHorn"] = "",
+	["Items.AirHorn"] = "",
+	["Items.Bubbles"] = "",
+	["Items.CameraClick"] = "",
+	["Items.TapeRip"] = "",
+	["Items.Whoopee"] = "",
+	["Items.SodaFizz"] = "",
+	["Items.Wrapper"] = "",
+	["Items.PaperRustle"] = "",
+	["Items.ChairUnfold"] = "",
+	["Items.Click"] = "",
+	["Items.UmbrellaOpen"] = "",
+	["Items.Throw"] = "",
+	["Items.Chalk"] = "",
+	["Items.Scatter"] = "",
+	["Items.Crunch"] = "",
+	["Items.KiteWind"] = "",
+	["Radio.Oldies1"] = "",
+	["Radio.Oldies2"] = "",
+	["Radio.SoftRock"] = "",
+	["Radio.Country"] = "",
+	["Radio.Jazz"] = "",
+	["Radio.Weather"] = "",
+}
 ItemWorld.SOUNDS = SOUNDS
 
 ItemWorld.KITE = table.freeze({

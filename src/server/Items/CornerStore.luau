@@ -16,12 +16,13 @@
 --     being served is refunded by the wallet (the handing-over fails: nobody to hand it to).
 -- What is bought is used from the hotbar: each Tool's Activated goes to Items/ItemWorld (Items/ItemService's rules).
 -- The player attribute StoreBasket holds the basket as "id,id,..." ("" when empty) for a screen to show.
--- Sounds: cue names only (no uploads; docs/AUDIO_BUDGET.md): CUES.
+-- Sounds: cue names only (no uploads; docs/AUDIO_BUDGET.md): CUES, and SOUNDS (cue -> a library sound's id, empty).
 -- Interface: new(deps) -> Store { take(player, id) -> (ok, words), pay(player) -> (ok, words),
 --   putBack(player) -> (ok, words), step(), gone(player), basket(player) -> { id }, busy(player) -> boolean };
 --   start(opts) -> Store? (finds the bake, carves its inside, wires the prompts, steps on Heartbeat; nil without
 --   the bake);
---   zoneOf(part) -> Basket.Zone; makeTool(sample, itemId, name) -> Tool; WORDS; CUES; STORE (the model's name)
+--   zoneOf(part) -> Basket.Zone; makeTool(sample, itemId, name) -> Tool; WORDS; CUES; SOUNDS; STORE (the model's
+--   name); REMOTE
 -- Engine only inside start/zoneOf/makeTool; no side effects on require.
 
 local Import = require("../Import")
@@ -50,8 +51,8 @@ CornerStore.WORDS = table.freeze({
 
 CornerStore.CUES = table.freeze({
 	till = "CornerStore.Till", -- the register's drawer and bell, on a sale
-	bell = "CornerStore.DoorBell", -- the bell over the door (the client's, when someone comes in)
 })
+CornerStore.SOUNDS = { ["CornerStore.Till"] = "" } :: { [string]: string }
 
 export type Deps = {
 	wallet: { buy: (player: any, what: string | { string }, deliver: (() -> (boolean?, string?))?) -> (boolean, string) },
@@ -447,6 +448,20 @@ function CornerStore.start(opts: StartOpts): Store?
 		end,
 		refuse = function(player: any, words: string)
 			opts.fire(player, { kind = "refused", text = words })
+		end,
+		cue = function(name: string)
+			-- a Sound named by its cue at the till (its id: SOUNDS, empty until the lead picks a library sound)
+			local at = root:FindFirstChild("PayPoint", true)
+			if at then
+				local snd = Instance.new("Sound")
+				snd.Name = name
+				snd.SoundId = CornerStore.SOUNDS[name] or ""
+				snd.Parent = at
+				if snd.SoundId ~= "" then
+					snd:Play()
+				end
+				game:GetService("Debris"):AddItem(snd, 4)
+			end
 		end,
 		setAttr = function(player: any, name: string, value: any)
 			if typeof(player) == "Instance" then

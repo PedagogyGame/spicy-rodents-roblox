@@ -110,6 +110,14 @@ return function(t)
 		for id in ItemRules.USES do
 			t.truthy(ItemRules.def(id) ~= nil, id)
 		end
+		-- every cue has its row for the lead to fill (a library sound's id), and none is filled with an upload here
+		local ItemWorld = require("@server/Items/ItemWorld")
+		for _, cue in ItemRules.CUES do
+			t.truthy(ItemWorld.SOUNDS[cue] ~= nil, `{cue}: no row in ItemWorld.SOUNDS`)
+		end
+		for _, cue in ItemRules.RADIO_PLAYLIST do
+			t.truthy(ItemWorld.SOUNDS[cue] ~= nil, `{cue}: no row in ItemWorld.SOUNDS`)
+		end
 	end)
 
 	t.test("only an owner who is a person, with a body, uses it; a cooldown between uses", function()
