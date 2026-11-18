@@ -60,10 +60,17 @@ local HINTS: { [string]: string } = {
 
 -- What to do at the far end of a route of the alley roof's way in (BRIEF_ADDENDUM D9): the house ridge's west end
 -- faces the tree (Space leaps onto the bough), the bough's end hangs over the games wing's roof (Q drops onto it).
+-- The downspout's and the gutter's tops lead on by themselves when the view looks the way on; one looking away (the
+-- gutter meets the ridge at a right angle) stops there, so they say which way to look.
 Squirrel.ROUTE_HINTS = {
+	[AlleyRoof.DOWNSPOUT] = "Face the roof and hold W to climb on",
+	[AlleyRoof.GUTTER] = "Turn toward the tree: the ridge runs that way",
 	[AlleyRoof.RIDGE] = "Jump now to reach the branch",
 	[AlleyRoof.BOUGH] = "Q: drop onto the roof",
 }
+-- Out of the vent's boot onto the first truss (the motor's autoSwitch from the vent onto FIRST_RAFTER): the keys of
+-- the rafters, once.
+Squirrel.RAFTERS_HINT = "In the rafters: hold Ctrl to creep, E takes a crossing beam"
 
 -- The hint for arriving at the end of route `routeId` at `t` (pure; nil: nothing to say there). Only the far end
 -- (t = 1) of those routes has one: their other ends lead on.
@@ -99,6 +106,9 @@ function Squirrel.feedback(
 			if said then
 				return said
 			end
+		end
+		if e.kind == "autoSwitch" and e.routeId == AlleyRoof.FIRST_RAFTER and e.fromRouteId == AlleyRoof.VENT then
+			return Squirrel.RAFTERS_HINT
 		end
 		if e.kind == "winded" then
 			return "Out of fumes: sprint comes back in a few seconds"
