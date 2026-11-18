@@ -255,10 +255,12 @@ function Store.build(kit: Kit.Kit, parent: any, venue: any, groundAt: (number, n
 	kit:box(ent, "SideThreshold", IX, OX, base, 0, sdd[1], sdd[2], CONCRETE, "Concrete")
 	kit:box(ent, "ServiceThreshold", sd[1], sd[2], base, 0, ID, OD, CONCRETE, "Concrete")
 
-	-- the furniture and the 22 items on their shelves
+	-- the furniture and the items on sale on their shelves (ItemRules.onSale: the dog treats wait for dogs)
 	local prices: { [string]: number } = {}
 	for _, def in ItemRules.CATALOG do
-		prices[def.id] = def.price
+		if ItemRules.onSale(def.id) then
+			prices[def.id] = def.price
+		end
 	end
 	local items = Fixtures.build(kit, root, prices, EconomyRules.NAMES :: any)
 	root:SetAttribute("Items", items)

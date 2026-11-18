@@ -248,10 +248,17 @@ return function(t)
 		t.eq(r.store:busy(r.player), false)
 	end)
 
-	t.test("every one of the 22 can be bought at its catalogue price", function()
+	t.test("every one on sale can be bought at its catalogue price; the dog treats are not sold yet", function()
 		local r = rig(1000)
 		local spent = 0
+		t.falsy(ItemRules.onSale("dog_treats"), "no dogs in the town: nothing for a treat to do")
+		t.eq(r.store:take(r.player, "dog_treats"), false)
+		t.eq(r.refused[#r.refused], Basket.WORDS.unknown, "with words")
+		t.eq(#r.store:basket(r.player), 0)
 		for _, def in ItemRules.CATALOG do
+			if not ItemRules.onSale(def.id) then
+				continue
+			end
 			t.truthy(r.store:take(r.player, def.id), def.id)
 			local ok, words = r.store:pay(r.player)
 			t.truthy(ok, `{def.id}: {words}`)

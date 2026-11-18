@@ -1,6 +1,6 @@
 # Pepper's Corner Store: what to try (15 minutes)
 
-The corner store from your brief is built: a 1970s-feel shop (not a period piece) with a working till and all 22 things on its shelves, each one usable. Everything below has been tested without a screen. Nobody has seen it inside Roblox yet, so this list is the part only you can judge. Pictures: `docs/renders/corner_store/` (start with `contact_sheet.jpg`).
+The corner store from your brief is built: a 1970s-feel shop (not a period piece) with a working till and 21 of the 22 things on its shelves, each one usable (the dog treats wait for dogs: see below). Everything below has been tested without a screen. Nobody has seen it inside Roblox yet, so this list is the part only you can judge. Pictures: `docs/renders/corner_store/` (start with `contact_sheet.jpg`).
 
 ## Where it is
 At the west end of the east shopping strip, x 957, z 84, facing south toward the road. It is labelled "corner store" on the town map (`docs/owner/files/town_map.png`). Look for a brick shop with big windows, a metal canopy and a red sign, **PEPPER'S CORNER STORE**, on the parapet. There are three ways in: the double doorway at the front (up two steps), a side door on the west wall, and a service door at the back.
@@ -40,7 +40,7 @@ Pick the item in your hotbar (1 to 9, a tap, or the gamepad's bumpers) and click
 | Newspaper | First use: you read a headline. Second use: you throw it away |
 | Frisbee, football | Thrown ahead; the frisbee glides. Anyone can pick it up with E, or catch it if it hits them. Left alone for 2 minutes, it comes back to you |
 | Peanuts, bird seed | A pile at your feet: squirrels nearby come to it and stay. Bird seed reaches further and brings three birds |
-| Dog treats | Calms a dog. **There are no dogs in the town yet**, so it says "No dog near enough" |
+| Dog treats | **Not on the shelf yet**: there are no dogs in the town, so a treat could do nothing. Its shelf place, price and effect (calms a dog near) are ready for when the dogs come |
 | Duct tape | A strip of tape on whatever is in front of you (10 strips) |
 | Whoopee cushion | Put down in front of you; the next person who steps on it sets it off. E picks it back up |
 | Lawn chair | Set down in front of you and you sit in it, anywhere but right by a shelf, the till or a door. E (held) folds it back up; one each (a second folds the first); left empty for 3 minutes it folds itself; nobody bumps into it |
@@ -53,5 +53,5 @@ Pick the item in your hotbar (1 to 9, a tap, or the gamepad's bumpers) and click
 ## What is not finished
 - **The kite** flies (up, sways, reeled in) but has no tricks yet: no steering, no dives or loops, no wind that changes, no string that can tangle or snap. Its string is a straight line drawn from your hand.
 - **Sounds** are all named and wired but silent until the lead picks library sounds (no uploads).
-- **Dogs** do not exist in the town yet, so the dog treats have nothing to calm.
+- **Dogs** do not exist in the town yet, so the dog treats are kept off the shelf and out of sale until they do (one line in the item list puts them back). The pictures in `docs/renders/corner_store/` were taken before, so they still show the box on the third gondola.
 - Nothing is saved between servers (like the wallet): what you bought lasts while the server runs.

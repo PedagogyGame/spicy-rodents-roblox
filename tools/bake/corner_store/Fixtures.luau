@@ -8,10 +8,11 @@
 --             walnut end caps; grocery shelving on the east wall and a hardware pegboard on the west.
 --   Back      the cold drinks fridge (glass doors) and the ice cream chest freezer on the back wall.
 --   Front     the newspaper rack, the umbrella bin and the lawn chair on show in the window.
--- Each of the 22 items (SLOTS, the catalogue's ids) is a Model "Item_<id>" with attributes ItemId and Price:
+-- Each of the 22 items (SLOTS, the catalogue's ids) has its place; each one on sale (a price in `prices`: not the dog
+-- treats until the town has dogs) is a Model "Item_<id>" with attributes ItemId and Price:
 -- "Sample" (the model the server hands a buyer), two more copies under "More", a price tag (its price in
 -- cents, "5c"), and an invisible "Grab" part holding the ProximityPrompt (E, a click or a tap, gamepad X).
--- Interface: build(kit, root, prices) -> count of item places; SLOTS (id -> { x, y, d, yaw, fixture });
+-- Interface: build(kit, root, prices, names) -> count of items stocked; SLOTS (id -> { x, y, d, yaw, fixture });
 --   COUNTER { x0, x1, d0, d1, top }; STAFF { x, d } (the shopkeeper's post); STAFF_ROUND ({ {x, d} });
 --   GONDOLAS ({ centre X }); GONDOLA_D { d0, d1 }; REACH (the prompts' reach); FAR_REACH (over the counter)
 -- No side effects on require. Lune only (@lune/roblox through the Kit).
@@ -412,6 +413,9 @@ function Fixtures.build(kit: Kit.Kit, root: any, prices: { [string]: number }, n
 	for _, id in Stock.IDS do
 		local s = (Fixtures.SLOTS :: any)[id]
 		assert(s, "no shelf place for " .. id)
+		if prices[id] == nil then
+			continue -- (not on sale: its shelf place stays empty until it is)
+		end
 		local m = slot(kit, items, id, s, prices[id])
 		local prompt = m.Grab.Take
 		-- "Water gun, 6c": the wallet's name for it, capitalised, without its article

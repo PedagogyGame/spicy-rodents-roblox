@@ -3,15 +3,17 @@
 -- Pepper's Corner Store in the engine, on a server with no clients, as plain results. Written for the day Luau
 -- Execution works for the key again; not run yet (tools/cloud/tasks/corner_store_flow.luau sends it).
 --   bake      Workspace.Expansion.F1.f1_corner_store is in the place: its Zone, its till's two prompts (Pay, Put
---             back), and 22 item places, each with a Sample, a price tag and a "Take" prompt (StoreItem attribute)
+--             back), and the 21 items on sale (the 22 less the dog treats, which wait for dogs), each with a Sample,
+--             a price tag and a "Take" prompt (StoreItem attribute)
 --   buy       Server/Items/CornerStore over the town's real wallet (Economy/Credits) and Items/Inventory, a
 --             PlayerLike stub standing inside the Zone: a frisbee and a soda picked up, paid once (9c), both owned
 --   short     a kite with 20c: refused with words, nothing taken
 --   walk out  a basket carried out of the Zone is put back
 --   tool      CornerStore.makeTool on every Sample: a Tool with a Handle, its other parts welded, nothing anchored,
 --             nothing colliding (what a buyer is handed)
---   items     Items/ItemWorld on a stub possession: bubbles emit, the flashlight has a beam, the lawn chair is a
---             Seat in Workspace.CornerStoreItems, a soda sets TreatUntil, the whoopee cushion lies on the ground
+--   items     Items/ItemWorld on a stub possession: bubbles emit, the flashlight has a beam, a soda sets TreatUntil,
+--             the whoopee cushion lies on the ground; the lawn chair (kept clear of prompts, so set down on a
+--             floor of the test's own, far above the town) is a Seat in Workspace.CornerStoreItems
 -- Interface: run() -> { ok, failures, numbers }
 -- Engine only; no side effects on require.
 
@@ -58,7 +60,7 @@ function CornerStoreFlow.run(): { [string]: any }
 		end
 	end
 	numbers.takePrompts = takes
-	check(takes == 22, `{takes} Take prompts (want 22)`)
+	check(takes == 21, `{takes} Take prompts (want 21)`)
 	check(#tills == 2, `{#tills} till prompts (want Pay and Put back)`)
 	local parts = 0
 	for _, d in root:GetDescendants() do
@@ -135,7 +137,7 @@ function CornerStoreFlow.run(): { [string]: any }
 		end
 	end
 	numbers.tools = made
-	check(made == 22, `{made} tools made (want 22)`)
+	check(made == 21, `{made} tools made (want 21)`)
 
 	-- items in the world, on a stub possession
 	local body = Instance.new("Model")
@@ -161,17 +163,27 @@ function CornerStoreFlow.run(): { [string]: any }
 		fire = function(_p: any, _payload: any) end,
 		heartbeat = false,
 	})
-	for _, id in { "bubbles", "flashlight", "lawn_chair", "soda", "whoopee_cushion" } do
+	for _, id in { "bubbles", "flashlight", "soda", "whoopee_cushion" } do
 		inventory.add(user, id)
 		local r = world.use(user, id)
 		check(r, `{id} could not be used`)
 	end
+	local floor = Instance.new("Part")
+	floor.Name = "ItemCheckFloor"
+	floor.Anchored = true
+	floor.Size = Vector3.new(40, 1, 40)
+	floor.CFrame = CFrame.new(inside + Vector3.new(0, 500, 0))
+	floor.Parent = workspace
+	rootPart.CFrame = CFrame.new(inside + Vector3.new(0, 503, 0))
+	inventory.add(user, "lawn_chair")
+	check(world.use(user, "lawn_chair"), "lawn_chair could not be used")
 	local placed = workspace:FindFirstChild("CornerStoreItems")
 	check(placed and placed:FindFirstChild("LawnChair", true) ~= nil, "no lawn chair set down")
 	check(placed and placed:FindFirstChild("WhoopeeCushion") ~= nil, "no whoopee cushion set down")
 	check(type(body:GetAttribute("TreatUntil")) == "number", "the soda did nothing")
 	world.stop()
 	body:Destroy()
+	floor:Destroy()
 	return { ok = #failures == 0, failures = failures, numbers = numbers }
 end
 

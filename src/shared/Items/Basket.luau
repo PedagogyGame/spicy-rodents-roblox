@@ -56,7 +56,7 @@ end
 
 function Basket.take(b: Baskets, key: any, itemId: string): (boolean, string)
 	local def = ItemRules.def(itemId)
-	if def == nil or not ItemRules.validate(def) then
+	if def == nil or not ItemRules.validate(def) or not ItemRules.onSale(itemId) then
 		return false, Basket.WORDS.unknown
 	end
 	local list = b.byKey[key]

@@ -231,15 +231,24 @@ return function(t)
 	end)
 
 	t.test(
-		"the 22 items: each on its shelf with its price, a prompt a person standing in the store can reach",
+		"the items on sale: each on its shelf with its price, a prompt a person standing in the store can reach",
 		function()
 			local root, v = bake()
 			local items = root:FindFirstChild("Items")
 			t.truthy(items ~= nil)
-			t.eq(root:GetAttribute("Items"), #ItemRules.CATALOG)
+			local onSale = 0
+			for _, def in ItemRules.CATALOG do
+				onSale += if ItemRules.onSale(def.id) then 1 else 0
+			end
+			t.eq(onSale, 21, "the 22 less the dog treats (no dogs in the town yet)")
+			t.eq(root:GetAttribute("Items"), onSale)
+			t.eq(items:FindFirstChild("Item_dog_treats"), nil, "the dog treats are not on the shelf")
 			local fd = Store.FRONT_DOOR
 			local at = flood(root, v, 1.1, 0.7, (fd[1] + fd[2]) / 2, -Store.IN_D - 2)
 			for _, def in ItemRules.CATALOG do
+				if not ItemRules.onSale(def.id) then
+					continue
+				end
 				local m = items:FindFirstChild("Item_" .. def.id)
 				t.truthy(m ~= nil, def.id)
 				t.eq(m:GetAttribute("ItemId"), def.id)
@@ -274,7 +283,7 @@ return function(t)
 					`{def.id}: the nearest place to stand is {best} away`
 				)
 			end
-			t.eq(#items:GetChildren(), #ItemRules.CATALOG)
+			t.eq(#items:GetChildren(), onSale)
 		end
 	)
 
