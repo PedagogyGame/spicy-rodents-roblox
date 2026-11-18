@@ -1,0 +1,3030 @@
+{
+ "$schema": "art/pinball v1",
+ "src": "tools/blender/pinball (boards.py, backglass.py: the textures; export_pinball.py: ChatGPT's GLBs as FBX in studs; publish.py: the upload).",
+ "placement": "InsertService:LoadAsset(assetId) holds a Model of unrotated MeshParts, each centred on its bounding box in its frame (export_pinball.py's header); Server/Assets/PinballArt puts each at frame * centre, colours it (its `colour`, or the machine's THEMES colour for a `theme`), and keeps a textured one's map (`fallback` if the importer drops it); `alpha` < 1 is see-through.",
+ "assets": {
+  "flipper": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball flipper",
+   "fbxBytes": 36236,
+   "tris": 516,
+   "sha": "b19528385bb6f84a"
+  },
+  "bumper": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball pop bumper",
+   "fbxBytes": 37388,
+   "tris": 964,
+   "sha": "42db441d1f218c9e"
+  },
+  "plunger": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball plunger",
+   "fbxBytes": 23756,
+   "tris": 312,
+   "sha": "b120d6904f9639d3"
+  },
+  "gate": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball gate",
+   "fbxBytes": 16892,
+   "tris": 112,
+   "sha": "348ef84c1fc51b99"
+  },
+  "cabinet": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball cabinet",
+   "fbxBytes": 149628,
+   "tris": 3452,
+   "sha": "905f6dfeaa553c62"
+  },
+  "acorn": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball Acorn Attack playfield",
+   "fbxBytes": 912732,
+   "tris": 7398,
+   "sha": "d8b08f4b87a05ab9"
+  },
+  "rodent": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball Spicy Rodent playfield",
+   "fbxBytes": 771964,
+   "tris": 6288,
+   "sha": "6f9c65a6c7cfb383"
+  },
+  "space": {
+   "assetId": null,
+   "moderation": "not uploaded",
+   "displayName": "SR pinball Space Squirrel playfield",
+   "fbxBytes": 770972,
+   "tris": 7790,
+   "sha": "1ef02dcefd43700d"
+  }
+ },
+ "scale": 3.5714,
+ "bumperRadius": 0.12,
+ "gateHinge": 0.1,
+ "data": {
+  "file": "docs/owner/pinball_blender/chatgpt_pack/pinball_data.json",
+  "sha256": "8e1a611444dc5b6ca42d4f37bdbd51018ae1a3f25284867c854718a3c8abd94d"
+ },
+ "textures": {
+  "Acorn_Apron.png": "a460ea490f3795f1e553ad6ee571776be2bee40c32cbc5c392304905945cbd23",
+  "Acorn_Backglass.png": "cffe07cd3e6f9a95034b756469d9af0c748258e75604e7deb1df0ae52be40e40",
+  "Acorn_Board.png": "f2f23577880b993f3cb9f45c8d500fe2315ae9942db6556788d9be72f891089d",
+  "Rodent_Apron.png": "6caccb9786d5325db286bb416d8245fc7dbe08bb295721270a19097644468928",
+  "Rodent_Backglass.png": "772c1df82e1ba69ad43d42b51a540293cab5eabf5e7f853f6f2f085e83d5c05c",
+  "Rodent_Board.png": "ee626af1825140bd6fdbbee1af0e7fb8bc3053fab81a0fc1544e1c6444fa18c5",
+  "Space_Apron.png": "76b95f0a62dbeed7fedbedfa29654d5852f7b4d2f3fbc737614e0be149d59648",
+  "Space_Backglass.png": "4b4e670900b58b90f25fb7404d9d4ef4c4d66b26808b75d16adaed66bc417374",
+  "Space_Board.png": "40023edbe9050606cd700fcc210cd40fd5d10664aa31571129a3a471b8fde741"
+ },
+ "models": {
+  "flipper": {
+   "frame": "flipper",
+   "meshes": [
+    {
+     "name": "Bat",
+     "frame": "flipper",
+     "centre": [
+      0.1565,
+      0.0011,
+      0.0
+     ],
+     "size": [
+      0.403,
+      0.0722,
+      0.0899
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 232,
+     "material": "Rubber | warm white",
+     "colour": [
+      248,
+      245,
+      234
+     ]
+    },
+    {
+     "name": "Pin",
+     "frame": "flipper",
+     "centre": [
+      0.0,
+      0.0014,
+      0.0
+     ],
+     "size": [
+      0.0314,
+      0.0764,
+      0.0314
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 160,
+     "material": "Pivot | gunmetal",
+     "colour": [
+      48,
+      52,
+      60
+     ]
+    },
+    {
+     "name": "Tip",
+     "frame": "flipper",
+     "centre": [
+      0.33,
+      0.0,
+      0.0
+     ],
+     "size": [
+      0.0571,
+      0.0714,
+      0.0571
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 124,
+     "material": "Tip | red rubber",
+     "colour": [
+      223,
+      56,
+      43
+     ]
+    }
+   ],
+   "sources": {
+    "Pinball_Flipper.glb": "709bb716a7596d4ad22f387bbba4c74b3574ef7d1772b1ca1619082a2c534064"
+   }
+  },
+  "bumper": {
+   "frame": "bumper",
+   "meshes": [
+    {
+     "name": "Body",
+     "frame": "bumper",
+     "centre": [
+      0.0,
+      0.08,
+      0.0
+     ],
+     "size": [
+      0.2607,
+      0.16,
+      0.2607
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 500,
+     "material": "Bumper body | recolourable",
+     "colour": [
+      170,
+      60,
+      30
+     ],
+     "theme": "bumper"
+    },
+    {
+     "name": "Cap",
+     "frame": "bumper",
+     "centre": [
+      0.0,
+      0.1809,
+      0.0
+     ],
+     "size": [
+      0.204,
+      0.0418,
+      0.204
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 276,
+     "material": "Bumper cap | recolourable",
+     "colour": [
+      255,
+      236,
+      180
+     ],
+     "theme": "cap"
+    },
+    {
+     "name": "Deco_StrikeRing",
+     "frame": "bumper",
+     "centre": [
+      0.0,
+      0.05,
+      0.0
+     ],
+     "size": [
+      0.2143,
+      0.0143,
+      0.2143
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 188,
+     "material": "Bumper strike ring | chrome",
+     "colour": [
+      196,
+      201,
+      206
+     ]
+    }
+   ],
+   "sources": {
+    "Pinball_PopBumper.glb": "dc14a0a726b86868014b946bbcbec297495d8a5a457e72a77a2e29ceffdbf75d"
+   }
+  },
+  "plunger": {
+   "frame": "plunger",
+   "meshes": [
+    {
+     "name": "Knob",
+     "frame": "plunger",
+     "centre": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "size": [
+      0.11,
+      0.11,
+      0.1
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 220,
+     "material": "Plunger knob | red resin",
+     "colour": [
+      217,
+      54,
+      46
+     ]
+    },
+    {
+     "name": "Rod",
+     "frame": "plunger",
+     "centre": [
+      0.0,
+      0.0,
+      -0.425
+     ],
+     "size": [
+      0.0429,
+      0.0429,
+      0.75
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 92,
+     "material": "Plunger shaft | brushed steel",
+     "colour": [
+      189,
+      194,
+      202
+     ]
+    }
+   ],
+   "sources": {
+    "Pinball_Plunger.glb": "063a9f3d93c57dae3570131996b92773b72b8bed7fab2b28271c9d499e7bcf91"
+   }
+  },
+  "gate": {
+   "frame": "gate",
+   "meshes": [
+    {
+     "name": "Flap",
+     "frame": "gate",
+     "centre": [
+      0.0,
+      -0.0232,
+      0.0
+     ],
+     "size": [
+      0.2103,
+      0.0557,
+      0.0093
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 112,
+     "material": "Gate | polished wire",
+     "colour": [
+      194,
+      201,
+      209
+     ]
+    }
+   ],
+   "sources": {
+    "Pinball_Gate.glb": "20796766f3733e4fd83a971ad3ed932601621db2e547bd51d0552a58f39ff12c"
+   }
+  },
+  "cabinet": {
+   "frame": "cabinet",
+   "meshes": [
+    {
+     "name": "BackWall",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      3.7243,
+      -2.3731
+     ],
+     "size": [
+      2.4,
+      1.3473,
+      0.2393
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Cabinet lacquer | recolourable",
+     "colour": [
+      118,
+      74,
+      40
+     ],
+     "theme": "body"
+    },
+    {
+     "name": "Backbox",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      6.075,
+      -2.18
+     ],
+     "size": [
+      2.7,
+      3.25,
+      0.54
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Cabinet lacquer | recolourable",
+     "colour": [
+      118,
+      74,
+      40
+     ],
+     "theme": "body"
+    },
+    {
+     "name": "Body",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      2.8067,
+      0.0999
+     ],
+     "size": [
+      2.4,
+      0.7206,
+      5.0255
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Cabinet lacquer | recolourable",
+     "colour": [
+      118,
+      74,
+      40
+     ],
+     "theme": "body"
+    },
+    {
+     "name": "CoinDoor",
+     "frame": "cabinet",
+     "centre": [
+      -0.0,
+      2.801,
+      2.7785
+     ],
+     "size": [
+      0.7,
+      0.5483,
+      0.0945
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Access door | graphite",
+     "colour": [
+      32,
+      35,
+      43
+     ]
+    },
+    {
+     "name": "Deco_AccessDoorBezel",
+     "frame": "cabinet",
+     "centre": [
+      -0.0,
+      2.8054,
+      2.8054
+     ],
+     "size": [
+      0.7429,
+      0.5821,
+      0.0893
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 112,
+     "material": "Cabinet trim | recolourable",
+     "colour": [
+      196,
+      160,
+      92
+     ],
+     "theme": "trim"
+    },
+    {
+     "name": "Deco_BackboxBezel",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      6.075,
+      -1.8321
+     ],
+     "size": [
+      2.5714,
+      3.0643,
+      0.0214
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 176,
+     "material": "Cabinet trim | recolourable",
+     "colour": [
+      196,
+      160,
+      92
+     ],
+     "theme": "trim"
+    },
+    {
+     "name": "Deco_BackboxVents",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      4.9196,
+      -2.1893
+     ],
+     "size": [
+      2.7143,
+      0.2964,
+      0.3036
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 96,
+     "material": "Feet and vents | black",
+     "colour": [
+      17,
+      21,
+      28
+     ]
+    },
+    {
+     "name": "Deco_ButtonCollars",
+     "frame": "cabinet",
+     "centre": [
+      -0.0,
+      3.1778,
+      2.285
+     ],
+     "size": [
+      2.7286,
+      0.1357,
+      0.1357
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 120,
+     "material": "Cabinet trim | recolourable",
+     "colour": [
+      196,
+      160,
+      92
+     ],
+     "theme": "trim"
+    },
+    {
+     "name": "Deco_CabinetPinstripe",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      2.9554,
+      0.1049
+     ],
+     "size": [
+      2.7314,
+      0.6817,
+      5.1338
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 80,
+     "material": "Cabinet trim | recolourable",
+     "colour": [
+      196,
+      160,
+      92
+     ],
+     "theme": "trim"
+    },
+    {
+     "name": "Deco_CornerPlates",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      2.9375,
+      0.1
+     ],
+     "size": [
+      2.7357,
+      0.8393,
+      5.1714
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 176,
+     "material": "Cabinet trim | recolourable",
+     "colour": [
+      196,
+      160,
+      92
+     ],
+     "theme": "trim"
+    },
+    {
+     "name": "Deco_Fasteners",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      2.8405,
+      0.1993
+     ],
+     "size": [
+      2.75,
+      0.9719,
+      5.2943
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 416,
+     "material": "Cabinet legs | recolourable",
+     "colour": [
+      190,
+      170,
+      120
+     ],
+     "theme": "legs"
+    },
+    {
+     "name": "Deco_FreePlay",
+     "frame": "cabinet",
+     "centre": [
+      0.003,
+      2.8248,
+      2.8129
+     ],
+     "size": [
+      0.3572,
+      0.0536,
+      0.0075
+     ],
+     "pivot": [
+      -0.0,
+      2.8214,
+      2.8125
+     ],
+     "tris": 380,
+     "material": "Light strip | recolourable",
+     "colour": [
+      255,
+      236,
+      180
+     ],
+     "theme": "glow"
+    },
+    {
+     "name": "Deco_LevelerFeet",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      0.0161,
+      0.1672
+     ],
+     "size": [
+      2.4529,
+      0.0321,
+      4.859
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 176,
+     "material": "Feet and vents | black",
+     "colour": [
+      17,
+      21,
+      28
+     ]
+    },
+    {
+     "name": "Deco_SideRails",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      4.1571,
+      0.2446
+     ],
+     "size": [
+      2.5786,
+      0.6354,
+      5.1228
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 56,
+     "material": "Cabinet trim | recolourable",
+     "colour": [
+      196,
+      160,
+      92
+     ],
+     "theme": "trim"
+    },
+    {
+     "name": "FlipperButton_L",
+     "frame": "cabinet",
+     "centre": [
+      -1.37,
+      3.1778,
+      2.285
+     ],
+     "size": [
+      0.06,
+      0.1079,
+      0.1079
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 188,
+     "material": "Flipper buttons | red",
+     "colour": [
+      223,
+      56,
+      43
+     ]
+    },
+    {
+     "name": "FlipperButton_R",
+     "frame": "cabinet",
+     "centre": [
+      1.37,
+      3.1778,
+      2.285
+     ],
+     "size": [
+      0.06,
+      0.1079,
+      0.1079
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 188,
+     "material": "Flipper buttons | red",
+     "colour": [
+      223,
+      56,
+      43
+     ]
+    },
+    {
+     "name": "FrontWall",
+     "frame": "cabinet",
+     "centre": [
+      -0.0,
+      3.1326,
+      2.7429
+     ],
+     "size": [
+      2.4,
+      1.4017,
+      0.285
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Cabinet lacquer | recolourable",
+     "colour": [
+      118,
+      74,
+      40
+     ],
+     "theme": "body"
+    },
+    {
+     "name": "Glass",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      4.0964,
+      0.1799
+     ],
+     "size": [
+      2.4,
+      0.6065,
+      4.8671
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 12,
+     "material": "Glass | 95 percent clear",
+     "colour": [
+      231,
+      241,
+      249
+     ],
+     "alpha": 0.05
+    },
+    {
+     "name": "Leg_BL",
+     "frame": "cabinet",
+     "centre": [
+      -1.13,
+      1.5097,
+      -2.1659
+     ],
+     "size": [
+      0.1821,
+      3.0195,
+      0.1821
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 76,
+     "material": "Cabinet legs | recolourable",
+     "colour": [
+      190,
+      170,
+      120
+     ],
+     "theme": "legs"
+    },
+    {
+     "name": "Leg_BR",
+     "frame": "cabinet",
+     "centre": [
+      1.13,
+      1.5097,
+      -2.1659
+     ],
+     "size": [
+      0.1821,
+      3.0195,
+      0.1821
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 76,
+     "material": "Cabinet legs | recolourable",
+     "colour": [
+      190,
+      170,
+      120
+     ],
+     "theme": "legs"
+    },
+    {
+     "name": "Leg_FL",
+     "frame": "cabinet",
+     "centre": [
+      -1.13,
+      1.2284,
+      2.5003
+     ],
+     "size": [
+      0.1821,
+      2.4568,
+      0.1821
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 76,
+     "material": "Cabinet legs | recolourable",
+     "colour": [
+      190,
+      170,
+      120
+     ],
+     "theme": "legs"
+    },
+    {
+     "name": "Leg_FR",
+     "frame": "cabinet",
+     "centre": [
+      1.13,
+      1.2284,
+      2.5003
+     ],
+     "size": [
+      0.1821,
+      2.4568,
+      0.1821
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 76,
+     "material": "Cabinet legs | recolourable",
+     "colour": [
+      190,
+      170,
+      120
+     ],
+     "theme": "legs"
+    },
+    {
+     "name": "LightStrip",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      7.64,
+      -1.87
+     ],
+     "size": [
+      2.7,
+      0.12,
+      0.08
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Light strip | recolourable",
+     "colour": [
+      255,
+      236,
+      180
+     ],
+     "theme": "glow"
+    },
+    {
+     "name": "LockdownBar",
+     "frame": "cabinet",
+     "centre": [
+      -0.0,
+      3.8574,
+      2.8303
+     ],
+     "size": [
+      2.74,
+      0.0638,
+      0.1337
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Cabinet trim | recolourable",
+     "colour": [
+      196,
+      160,
+      92
+     ],
+     "theme": "trim"
+    },
+    {
+     "name": "SideWall_L",
+     "frame": "cabinet",
+     "centre": [
+      -1.275,
+      3.4403,
+      0.1914
+     ],
+     "size": [
+      0.15,
+      2.017,
+      5.387
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Cabinet lacquer | recolourable",
+     "colour": [
+      118,
+      74,
+      40
+     ],
+     "theme": "body"
+    },
+    {
+     "name": "SideWall_R",
+     "frame": "cabinet",
+     "centre": [
+      1.275,
+      3.4403,
+      0.1914
+     ],
+     "size": [
+      0.15,
+      2.017,
+      5.387
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Cabinet lacquer | recolourable",
+     "colour": [
+      118,
+      74,
+      40
+     ],
+     "theme": "body"
+    }
+   ],
+   "sources": {
+    "Pinball_Cabinet.glb": "b7fd0d98925d4929d109c45cd4ef43af2a02acfe62fc4cca1e20021b2d517b4a"
+   }
+  },
+  "acorn": {
+   "frame": "playfield",
+   "meshes": [
+    {
+     "name": "Apron",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.03,
+      -0.03
+     ],
+     "size": [
+      1.5,
+      0.06,
+      0.38
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 44,
+     "material": "Acorn_Apron_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Acorn_Apron.png",
+     "fallback": [
+      142,
+      93,
+      49
+     ]
+    },
+    {
+     "name": "BackglassArt",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      6.075,
+      -1.8536
+     ],
+     "size": [
+      2.46,
+      2.95,
+      0.0
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 2,
+     "material": "Acorn_Backglass_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Acorn_Backglass.png",
+     "fallback": [
+      48,
+      31,
+      18
+     ]
+    },
+    {
+     "name": "Board",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      -0.03,
+      -2.37
+     ],
+     "size": [
+      2.4,
+      0.06,
+      5.06
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 12,
+     "material": "Acorn_Board_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Acorn_Board.png",
+     "fallback": [
+      202,
+      168,
+      109
+     ]
+    },
+    {
+     "name": "Deco_PostScrewCaps",
+     "frame": "playfield",
+     "centre": [
+      1.075,
+      0.112,
+      -2.6452
+     ],
+     "size": [
+      1.7594,
+      0.0011,
+      3.4001
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 408,
+     "material": "Acorn_polished_metal",
+     "colour": [
+      196,
+      160,
+      92
+     ]
+    },
+    {
+     "name": "Deco_RailCrests",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.2032,
+      -2.4518
+     ],
+     "size": [
+      2.4071,
+      0.0082,
+      4.9036
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 732,
+     "material": "Acorn_polished_metal",
+     "colour": [
+      196,
+      160,
+      92
+     ]
+    },
+    {
+     "name": "Deco_SlingScrewHeads",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.1055,
+      -1.2001
+     ],
+     "size": [
+      1.3694,
+      0.0011,
+      0.4037
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 144,
+     "material": "Acorn_sling_screws",
+     "colour": [
+      196,
+      160,
+      92
+     ]
+    },
+    {
+     "name": "Deco_SpinnerWireBracket",
+     "frame": "playfield",
+     "centre": [
+      2.0825,
+      0.0874,
+      -3.0
+     ],
+     "size": [
+      0.3136,
+      0.1748,
+      0.02
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 116,
+     "material": "Acorn_spinner_chrome",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Drop1",
+     "frame": "playfield",
+     "centre": [
+      0.23,
+      0.06,
+      -2.295
+     ],
+     "size": [
+      0.0739,
+      0.12,
+      0.0886
+     ],
+     "pivot": [
+      0.23,
+      0.0,
+      -2.295
+     ],
+     "tris": 80,
+     "material": "Acorn_target_colour",
+     "colour": [
+      240,
+      200,
+      60
+     ]
+    },
+    {
+     "name": "Drop2",
+     "frame": "playfield",
+     "centre": [
+      0.29,
+      0.06,
+      -2.385
+     ],
+     "size": [
+      0.0739,
+      0.12,
+      0.0886
+     ],
+     "pivot": [
+      0.29,
+      0.0,
+      -2.385
+     ],
+     "tris": 128,
+     "material": "Acorn_target_colour",
+     "colour": [
+      240,
+      200,
+      60
+     ]
+    },
+    {
+     "name": "Drop3",
+     "frame": "playfield",
+     "centre": [
+      0.35,
+      0.06,
+      -2.475
+     ],
+     "size": [
+      0.0739,
+      0.12,
+      0.0886
+     ],
+     "pivot": [
+      0.35,
+      0.0,
+      -2.475
+     ],
+     "tris": 140,
+     "material": "Acorn_target_colour",
+     "colour": [
+      240,
+      200,
+      60
+     ]
+    },
+    {
+     "name": "Drop4",
+     "frame": "playfield",
+     "centre": [
+      0.41,
+      0.06,
+      -2.565
+     ],
+     "size": [
+      0.0739,
+      0.12,
+      0.0886
+     ],
+     "pivot": [
+      0.41,
+      0.0,
+      -2.565
+     ],
+     "tris": 128,
+     "material": "Acorn_target_colour",
+     "colour": [
+      240,
+      200,
+      60
+     ]
+    },
+    {
+     "name": "Drop5",
+     "frame": "playfield",
+     "centre": [
+      0.47,
+      0.06,
+      -2.655
+     ],
+     "size": [
+      0.0739,
+      0.12,
+      0.0886
+     ],
+     "pivot": [
+      0.47,
+      0.0,
+      -2.655
+     ],
+     "tris": 80,
+     "material": "Acorn_target_colour",
+     "colour": [
+      240,
+      200,
+      60
+     ]
+    },
+    {
+     "name": "Guides_Metal",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.055,
+      -2.32
+     ],
+     "size": [
+      2.422,
+      0.11,
+      4.062
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 1440,
+     "material": "Acorn_polished_metal",
+     "colour": [
+      196,
+      160,
+      92
+     ]
+    },
+    {
+     "name": "Guides_Rubber",
+     "frame": "playfield",
+     "centre": [
+      0.32,
+      0.04,
+      -3.2847
+     ],
+     "size": [
+      0.3331,
+      0.08,
+      2.0584
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 88,
+     "material": "Acorn_ivory_rubber",
+     "colour": [
+      244,
+      237,
+      224
+     ]
+    },
+    {
+     "name": "Guides_Wood",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.1,
+      -2.465
+     ],
+     "size": [
+      2.46,
+      0.2,
+      4.93
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 1140,
+     "material": "Acorn_sealed_wood",
+     "colour": [
+      118,
+      74,
+      40
+     ]
+    },
+    {
+     "name": "Posts_Metal",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.07,
+      -1.5514
+     ],
+     "size": [
+      1.9317,
+      0.14,
+      0.2735
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 360,
+     "material": "Acorn_polished_metal",
+     "colour": [
+      196,
+      160,
+      92
+     ]
+    },
+    {
+     "name": "Posts_Rubber",
+     "frame": "playfield",
+     "centre": [
+      1.075,
+      0.055,
+      -2.6442
+     ],
+     "size": [
+      1.794,
+      0.11,
+      3.4315
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 1564,
+     "material": "Acorn_ivory_rubber",
+     "colour": [
+      244,
+      237,
+      224
+     ]
+    },
+    {
+     "name": "Sling1",
+     "frame": "playfield",
+     "centre": [
+      0.5169,
+      0.045,
+      -1.2098
+     ],
+     "size": [
+      0.2431,
+      0.09,
+      0.5289
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Acorn_kicking_rubber",
+     "colour": [
+      255,
+      247,
+      232
+     ]
+    },
+    {
+     "name": "Sling2",
+     "frame": "playfield",
+     "centre": [
+      1.6981,
+      0.045,
+      -1.2098
+     ],
+     "size": [
+      0.2431,
+      0.09,
+      0.5289
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Acorn_kicking_rubber",
+     "colour": [
+      255,
+      247,
+      232
+     ]
+    },
+    {
+     "name": "SlingBody1",
+     "frame": "playfield",
+     "centre": [
+      0.5163,
+      0.0518,
+      -1.2096
+     ],
+     "size": [
+      0.2126,
+      0.1036,
+      0.5155
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 88,
+     "material": "Acorn_sling_plastic",
+     "colour": [
+      230,
+      150,
+      50
+     ]
+    },
+    {
+     "name": "SlingBody2",
+     "frame": "playfield",
+     "centre": [
+      1.6987,
+      0.0518,
+      -1.2096
+     ],
+     "size": [
+      0.2126,
+      0.1036,
+      0.5155
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 88,
+     "material": "Acorn_sling_plastic",
+     "colour": [
+      230,
+      150,
+      50
+     ]
+    },
+    {
+     "name": "Spinner1",
+     "frame": "playfield",
+     "centre": [
+      2.0825,
+      0.1,
+      -3.0
+     ],
+     "size": [
+      0.2779,
+      0.1,
+      0.008
+     ],
+     "pivot": [
+      2.0825,
+      0.1,
+      -3.0
+     ],
+     "tris": 72,
+     "material": "Acorn_spinner_chrome",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Standup6",
+     "frame": "playfield",
+     "centre": [
+      1.64,
+      0.06,
+      -2.96
+     ],
+     "size": [
+      0.1689,
+      0.12,
+      0.0865
+     ],
+     "pivot": [
+      1.64,
+      0.0,
+      -2.96
+     ],
+     "tris": 164,
+     "material": "Acorn_target_colour",
+     "colour": [
+      240,
+      200,
+      60
+     ]
+    },
+    {
+     "name": "Standup7",
+     "frame": "playfield",
+     "centre": [
+      0.575,
+      0.06,
+      -2.96
+     ],
+     "size": [
+      0.1689,
+      0.12,
+      0.0865
+     ],
+     "pivot": [
+      0.575,
+      0.0,
+      -2.96
+     ],
+     "tris": 164,
+     "material": "Acorn_target_colour",
+     "colour": [
+      240,
+      200,
+      60
+     ]
+    }
+   ],
+   "sources": {
+    "Acorn_Playfield.glb": "e4d242d7f2f3b54f4981b4af6b13c1d3b95819b0fb047ba5780aba38b65585cb",
+    "Acorn_Guides.glb": "354602cd04e8d1a2d1ae0a0e122f00a1eeabedf64123396f8d0f53af39c3c38f",
+    "Acorn_Slingshots.glb": "b0dad6fc1cf415474bf067daef7a2f4c7e82ca6fcb78b6789cb1a78eb2532d7c",
+    "Acorn_Targets.glb": "aaf57284d9c774d540c6cd6320a7b6a8f3000dd1b5e194bcd039574024ac2890",
+    "Acorn_Spinner.glb": "d2bb27036bb248a9064e31b28bf5686f110c52ac201762f6d1b09398bed176cb"
+   }
+  },
+  "rodent": {
+   "frame": "playfield",
+   "meshes": [
+    {
+     "name": "Apron",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.03,
+      -0.03
+     ],
+     "size": [
+      1.5,
+      0.06,
+      0.38
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 44,
+     "material": "Rodent_Apron_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Rodent_Apron.png",
+     "fallback": [
+      103,
+      43,
+      27
+     ]
+    },
+    {
+     "name": "BackglassArt",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      6.075,
+      -1.8536
+     ],
+     "size": [
+      2.46,
+      2.95,
+      0.0
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 2,
+     "material": "Rodent_Backglass_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Rodent_Backglass.png",
+     "fallback": [
+      39,
+      20,
+      13
+     ]
+    },
+    {
+     "name": "Board",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      -0.03,
+      -2.37
+     ],
+     "size": [
+      2.4,
+      0.06,
+      5.06
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 12,
+     "material": "Rodent_Board_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Rodent_Board.png",
+     "fallback": [
+      152,
+      44,
+      32
+     ]
+    },
+    {
+     "name": "Deco_EntranceFlaps",
+     "frame": "playfield",
+     "centre": [
+      1.3546,
+      -0.0014,
+      -1.8404
+     ],
+     "size": [
+      1.2506,
+      0.0029,
+      1.2849
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 24,
+     "material": "Ramp entrance | polished steel",
+     "colour": [
+      194,
+      201,
+      209
+     ]
+    },
+    {
+     "name": "Deco_PostScrewCaps",
+     "frame": "playfield",
+     "centre": [
+      1.2125,
+      0.112,
+      -2.1752
+     ],
+     "size": [
+      1.5744,
+      0.0011,
+      2.4601
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 240,
+     "material": "Rodent_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Deco_RailCrests",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.2032,
+      -2.4518
+     ],
+     "size": [
+      2.4071,
+      0.0082,
+      4.9036
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 720,
+     "material": "Rodent_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Deco_RampEdgeBeads",
+     "frame": "playfield",
+     "centre": [
+      1.309,
+      0.1929,
+      -2.9033
+     ],
+     "size": [
+      1.7677,
+      0.3762,
+      3.3846
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 400,
+     "material": "Ramp entrance | polished steel",
+     "colour": [
+      194,
+      201,
+      209
+     ]
+    },
+    {
+     "name": "Deco_SlingScrewHeads",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.1055,
+      -1.1791
+     ],
+     "size": [
+      1.339,
+      0.0011,
+      0.3742
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 144,
+     "material": "Rodent_sling_screws",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Guides_Metal",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.055,
+      -2.275
+     ],
+     "size": [
+      2.422,
+      0.11,
+      3.972
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 1024,
+     "material": "Rodent_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Guides_Plastic",
+     "frame": "playfield",
+     "centre": [
+      0.8792,
+      0.05,
+      -2.6951
+     ],
+     "size": [
+      0.9067,
+      0.1,
+      0.6548
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 120,
+     "material": "Rodent_moulded_plastic",
+     "colour": [
+      255,
+      120,
+      30
+     ]
+    },
+    {
+     "name": "Guides_Wood",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.1,
+      -2.465
+     ],
+     "size": [
+      2.46,
+      0.2,
+      4.93
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 1084,
+     "material": "Rodent_sealed_wood",
+     "colour": [
+      30,
+      22,
+      26
+     ]
+    },
+    {
+     "name": "Posts_Metal",
+     "frame": "playfield",
+     "centre": [
+      1.0569,
+      0.07,
+      -2.6484
+     ],
+     "size": [
+      1.9002,
+      0.14,
+      2.5584
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 180,
+     "material": "Rodent_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Posts_Rubber",
+     "frame": "playfield",
+     "centre": [
+      1.2125,
+      0.055,
+      -2.1752
+     ],
+     "size": [
+      1.609,
+      0.11,
+      2.4935
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 920,
+     "material": "Rodent_ivory_rubber",
+     "colour": [
+      244,
+      237,
+      224
+     ]
+    },
+    {
+     "name": "Ramp_wire",
+     "frame": "playfield",
+     "centre": [
+      1.3089,
+      0.1793,
+      -2.9057
+     ],
+     "size": [
+      1.7801,
+      0.3986,
+      3.3926
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 306,
+     "material": "Ramp track | tinted clear plastic",
+     "colour": [
+      255,
+      120,
+      30
+     ],
+     "alpha": 0.46
+    },
+    {
+     "name": "Sling1",
+     "frame": "playfield",
+     "centre": [
+      0.5069,
+      0.045,
+      -1.1903
+     ],
+     "size": [
+      0.1846,
+      0.09,
+      0.4879
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Rodent_kicking_rubber",
+     "colour": [
+      255,
+      247,
+      232
+     ]
+    },
+    {
+     "name": "Sling2",
+     "frame": "playfield",
+     "centre": [
+      1.7081,
+      0.045,
+      -1.1903
+     ],
+     "size": [
+      0.1846,
+      0.09,
+      0.4879
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Rodent_kicking_rubber",
+     "colour": [
+      255,
+      247,
+      232
+     ]
+    },
+    {
+     "name": "SlingBody1",
+     "frame": "playfield",
+     "centre": [
+      0.5064,
+      0.0518,
+      -1.1901
+     ],
+     "size": [
+      0.1528,
+      0.1036,
+      0.4766
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 88,
+     "material": "Rodent_sling_plastic",
+     "colour": [
+      255,
+      120,
+      30
+     ]
+    },
+    {
+     "name": "SlingBody2",
+     "frame": "playfield",
+     "centre": [
+      1.7086,
+      0.0518,
+      -1.1901
+     ],
+     "size": [
+      0.1528,
+      0.1036,
+      0.4766
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 88,
+     "material": "Rodent_sling_plastic",
+     "colour": [
+      255,
+      120,
+      30
+     ]
+    },
+    {
+     "name": "Standup1",
+     "frame": "playfield",
+     "centre": [
+      0.19,
+      0.06,
+      -2.14
+     ],
+     "size": [
+      0.123,
+      0.12,
+      0.1734
+     ],
+     "pivot": [
+      0.19,
+      0.0,
+      -2.14
+     ],
+     "tris": 176,
+     "material": "Rodent_target_colour",
+     "colour": [
+      255,
+      90,
+      40
+     ]
+    },
+    {
+     "name": "Standup2",
+     "frame": "playfield",
+     "centre": [
+      0.27,
+      0.06,
+      -2.32
+     ],
+     "size": [
+      0.0865,
+      0.12,
+      0.1689
+     ],
+     "pivot": [
+      0.27,
+      0.0,
+      -2.32
+     ],
+     "tris": 140,
+     "material": "Rodent_target_colour",
+     "colour": [
+      255,
+      90,
+      40
+     ]
+    },
+    {
+     "name": "Standup3",
+     "frame": "playfield",
+     "centre": [
+      1.21,
+      0.06,
+      -2.8629
+     ],
+     "size": [
+      0.2,
+      0.12,
+      0.0392
+     ],
+     "pivot": [
+      1.21,
+      0.0,
+      -2.86
+     ],
+     "tris": 104,
+     "material": "Rodent_target_colour",
+     "colour": [
+      255,
+      90,
+      40
+     ]
+    },
+    {
+     "name": "Standup4",
+     "frame": "playfield",
+     "centre": [
+      1.945,
+      0.06,
+      -2.32
+     ],
+     "size": [
+      0.0865,
+      0.12,
+      0.1689
+     ],
+     "pivot": [
+      1.945,
+      0.0,
+      -2.32
+     ],
+     "tris": 152,
+     "material": "Rodent_target_colour",
+     "colour": [
+      255,
+      90,
+      40
+     ]
+    },
+    {
+     "name": "Standup5",
+     "frame": "playfield",
+     "centre": [
+      2.025,
+      0.06,
+      -2.14
+     ],
+     "size": [
+      0.123,
+      0.12,
+      0.1734
+     ],
+     "pivot": [
+      2.025,
+      0.0,
+      -2.14
+     ],
+     "tris": 104,
+     "material": "Rodent_target_colour",
+     "colour": [
+      255,
+      90,
+      40
+     ]
+    }
+   ],
+   "sources": {
+    "Rodent_Playfield.glb": "29e916b99c0debac58c1d98aec3cf8309efae69096e85d52a68c9b8aa9115b8d",
+    "Rodent_Guides.glb": "56df4a9c0781bfce95162601e1ddfdc6597c082dc11b4be4ddf0404a9ae4d0a1",
+    "Rodent_Slingshots.glb": "d7e4edf2a618c1afc25a0743a853b87a25acc012b6f1a17e8e518e213867afdd",
+    "Rodent_Targets.glb": "8cfeba057a0558729fcdbab127b55f44bfa9f1198e50d135bb1256a4668164f6",
+    "Rodent_Wire.glb": "1f5d6526ebc09ed4ce1a217ddb5a9dbf4340a3098f52bd98fd5d16876e79f54c"
+   }
+  },
+  "space": {
+   "frame": "playfield",
+   "meshes": [
+    {
+     "name": "Apron",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.03,
+      -0.03
+     ],
+     "size": [
+      1.5,
+      0.06,
+      0.38
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 44,
+     "material": "Space_Apron_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Space_Apron.png",
+     "fallback": [
+      64,
+      95,
+      117
+     ]
+    },
+    {
+     "name": "BackglassArt",
+     "frame": "cabinet",
+     "centre": [
+      0.0,
+      6.075,
+      -1.8536
+     ],
+     "size": [
+      2.46,
+      2.95,
+      0.0
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 2,
+     "material": "Space_Backglass_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Space_Backglass.png",
+     "fallback": [
+      24,
+      25,
+      38
+     ]
+    },
+    {
+     "name": "Board",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      -0.03,
+      -2.37
+     ],
+     "size": [
+      2.4,
+      0.06,
+      5.06
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 12,
+     "material": "Space_Board_Printed",
+     "colour": [
+      231,
+      231,
+      231
+     ],
+     "texture": "Space_Board.png",
+     "fallback": [
+      40,
+      53,
+      99
+     ]
+    },
+    {
+     "name": "Deco_EntranceFlaps",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      -0.0014,
+      -1.9023
+     ],
+     "size": [
+      1.7982,
+      0.0029,
+      1.349
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 48,
+     "material": "Ramp entrance | polished steel",
+     "colour": [
+      194,
+      201,
+      209
+     ]
+    },
+    {
+     "name": "Deco_PostScrewCaps",
+     "frame": "playfield",
+     "centre": [
+      1.1231,
+      0.112,
+      -2.7192
+     ],
+     "size": [
+      1.4456,
+      0.0011,
+      3.5481
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 240,
+     "material": "Space_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Deco_RailCrests",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.2032,
+      -2.4518
+     ],
+     "size": [
+      2.4071,
+      0.0082,
+      4.9036
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 628,
+     "material": "Space_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Deco_RampEdgeBeads",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.193,
+      -2.5033
+     ],
+     "size": [
+      2.2308,
+      0.3762,
+      2.5252
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 560,
+     "material": "Ramp entrance | polished steel",
+     "colour": [
+      194,
+      201,
+      209
+     ]
+    },
+    {
+     "name": "Deco_SlingScrewHeads",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.1055,
+      -1.1948
+     ],
+     "size": [
+      1.3818,
+      0.0011,
+      0.3963
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 144,
+     "material": "Space_sling_screws",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Guides_Metal",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.055,
+      -2.4424
+     ],
+     "size": [
+      2.422,
+      0.11,
+      4.3068
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 1960,
+     "material": "Space_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Guides_Plastic",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.05,
+      -2.8127
+     ],
+     "size": [
+      1.4112,
+      0.1,
+      0.7467
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 192,
+     "material": "Space_moulded_plastic",
+     "colour": [
+      120,
+      220,
+      255
+     ]
+    },
+    {
+     "name": "Guides_Wood",
+     "frame": "playfield",
+     "centre": [
+      1.2,
+      0.1,
+      -2.465
+     ],
+     "size": [
+      2.46,
+      0.2,
+      4.93
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 1024,
+     "material": "Space_sealed_wood",
+     "colour": [
+      26,
+      30,
+      80
+     ]
+    },
+    {
+     "name": "PodHood1",
+     "frame": "playfield",
+     "centre": [
+      0.17,
+      0.0089,
+      -2.8018
+     ],
+     "size": [
+      0.3271,
+      0.0179,
+      0.1636
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 196,
+     "material": "Pod hood | ice blue lacquer",
+     "colour": [
+      120,
+      220,
+      255
+     ]
+    },
+    {
+     "name": "PodHood2",
+     "frame": "playfield",
+     "centre": [
+      2.045,
+      0.0089,
+      -2.8018
+     ],
+     "size": [
+      0.3271,
+      0.0179,
+      0.1636
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 196,
+     "material": "Pod hood | ice blue lacquer",
+     "colour": [
+      120,
+      220,
+      255
+     ]
+    },
+    {
+     "name": "Posts_Metal",
+     "frame": "playfield",
+     "centre": [
+      1.1075,
+      0.07,
+      -1.5457
+     ],
+     "size": [
+      1.9325,
+      0.14,
+      0.288
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 360,
+     "material": "Space_polished_metal",
+     "colour": [
+      190,
+      200,
+      220
+     ]
+    },
+    {
+     "name": "Posts_Rubber",
+     "frame": "playfield",
+     "centre": [
+      1.1231,
+      0.055,
+      -2.7192
+     ],
+     "size": [
+      1.4802,
+      0.11,
+      3.5815
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 920,
+     "material": "Space_ivory_rubber",
+     "colour": [
+      244,
+      237,
+      224
+     ]
+    },
+    {
+     "name": "Ramp_ramp_l",
+     "frame": "playfield",
+     "centre": [
+      0.4238,
+      0.1793,
+      -2.5061
+     ],
+     "size": [
+      0.8756,
+      0.3986,
+      2.5344
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 216,
+     "material": "Ramp track | tinted clear plastic",
+     "colour": [
+      120,
+      220,
+      255
+     ],
+     "alpha": 0.46
+    },
+    {
+     "name": "Ramp_ramp_r",
+     "frame": "playfield",
+     "centre": [
+      1.7912,
+      0.1793,
+      -2.5061
+     ],
+     "size": [
+      0.8756,
+      0.3986,
+      2.5344
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 216,
+     "material": "Ramp track | tinted clear plastic",
+     "colour": [
+      120,
+      220,
+      255
+     ],
+     "alpha": 0.46
+    },
+    {
+     "name": "Sling1",
+     "frame": "playfield",
+     "centre": [
+      0.5044,
+      0.045,
+      -1.2049
+     ],
+     "size": [
+      0.2285,
+      0.09,
+      0.5187
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Space_kicking_rubber",
+     "colour": [
+      255,
+      247,
+      232
+     ]
+    },
+    {
+     "name": "Sling2",
+     "frame": "playfield",
+     "centre": [
+      1.7106,
+      0.045,
+      -1.2049
+     ],
+     "size": [
+      0.2285,
+      0.09,
+      0.5187
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 108,
+     "material": "Space_kicking_rubber",
+     "colour": [
+      255,
+      247,
+      232
+     ]
+    },
+    {
+     "name": "SlingBody1",
+     "frame": "playfield",
+     "centre": [
+      0.5038,
+      0.0518,
+      -1.2047
+     ],
+     "size": [
+      0.1976,
+      0.1036,
+      0.5058
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 88,
+     "material": "Space_sling_plastic",
+     "colour": [
+      120,
+      220,
+      255
+     ]
+    },
+    {
+     "name": "SlingBody2",
+     "frame": "playfield",
+     "centre": [
+      1.7112,
+      0.0518,
+      -1.2047
+     ],
+     "size": [
+      0.1976,
+      0.1036,
+      0.5058
+     ],
+     "pivot": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "tris": 88,
+     "material": "Space_sling_plastic",
+     "colour": [
+      120,
+      220,
+      255
+     ]
+    },
+    {
+     "name": "Standup1",
+     "frame": "playfield",
+     "centre": [
+      0.9758,
+      0.06,
+      -2.5307
+     ],
+     "size": [
+      0.0904,
+      0.12,
+      0.0615
+     ],
+     "pivot": [
+      0.9758,
+      0.0,
+      -2.5307
+     ],
+     "tris": 104,
+     "material": "Space_target_colour",
+     "colour": [
+      120,
+      255,
+      160
+     ]
+    },
+    {
+     "name": "Standup2",
+     "frame": "playfield",
+     "centre": [
+      1.2392,
+      0.06,
+      -2.5307
+     ],
+     "size": [
+      0.0904,
+      0.12,
+      0.0615
+     ],
+     "pivot": [
+      1.2392,
+      0.0,
+      -2.5307
+     ],
+     "tris": 92,
+     "material": "Space_target_colour",
+     "colour": [
+      120,
+      255,
+      160
+     ]
+    },
+    {
+     "name": "Standup3",
+     "frame": "playfield",
+     "centre": [
+      0.5242,
+      0.06,
+      -2.4653
+     ],
+     "size": [
+      0.1294,
+      0.12,
+      0.0741
+     ],
+     "pivot": [
+      0.5242,
+      0.0,
+      -2.4653
+     ],
+     "tris": 128,
+     "material": "Space_target_colour",
+     "colour": [
+      120,
+      255,
+      160
+     ]
+    },
+    {
+     "name": "Standup4",
+     "frame": "playfield",
+     "centre": [
+      1.6908,
+      0.06,
+      -2.4653
+     ],
+     "size": [
+      0.1294,
+      0.12,
+      0.0741
+     ],
+     "pivot": [
+      1.6908,
+      0.0,
+      -2.4653
+     ],
+     "tris": 116,
+     "material": "Space_target_colour",
+     "colour": [
+      120,
+      255,
+      160
+     ]
+    }
+   ],
+   "sources": {
+    "Space_Playfield.glb": "826bd8f1a4dbc3b41ad59d80eabbf69deb46eee8881743045453401f3c6c6cf0",
+    "Space_Guides.glb": "221db71f0a247863b8284747d5d4f41805d4f556782da6b451095703912e2986",
+    "Space_Slingshots.glb": "002f9d3b11c3b422c2555aa1464abb5e4b2458ca109f80d28fe0096fa086dc13",
+    "Space_Targets.glb": "8c1b663790d5c865bc2fb0fa5cb04516b996a3d5f70b346a95c0069fe933c45d",
+    "Space_Ramps.glb": "4e2c991be3ba0134c6f69344ecc834efaed905fc0c9be9133454a7a4ee04bcbc",
+    "Space_PodHoods.glb": "d1546d402ccb0d36e8d45a097e511385cae734bc3517ac4d6e06a18de7accf5e"
+   }
+  }
+ }
+}
