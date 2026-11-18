@@ -912,7 +912,7 @@ end
 -- crown) every few clumps. Without it the town's own fields run on to the far hedgerows (650 st and more past the
 -- clamp) as one bare lawn; with it a player at the edge looks at a field's end, not the edge of the world. Out
 -- of reach (the band is beyond the clamp), so nothing collides, as everywhere in the backdrop.
-local EDGE_OFF, EDGE_WANDER, EDGE_STEP, EDGE_TO_Z = 170, 45, 88, 1180
+local EDGE_OFF, EDGE_WANDER, EDGE_STEP, EDGE_TO_Z = 170, 45, 66, 1180
 local EDGE_HEDGE = { hex("4f6a3d"), hex("56703f"), hex("4a6239"), hex("5c7444") }
 local EDGE_TRUNK = hex("5b4a3a")
 do
@@ -930,7 +930,7 @@ do
 			local y = Backdrop.groundAt(x, z)
 			if y > Backdrop.SEA_Y + 1.5 then
 				if hash(seed, s, 61) > 0.14 then -- gaps
-					local hgt = 13 + 7 * hash(seed, s, 62)
+					local hgt = 14 + 9 * hash(seed, s, 62)
 					local col = shade(
 						EDGE_HEDGE[1 + math.floor(hash(seed, s, 63) * #EDGE_HEDGE)],
 						0.92 + 0.14 * hash(seed, s, 64)
@@ -938,14 +938,14 @@ do
 					ellipsoid(
 						edge,
 						"Hedge",
-						Vector3.new(20 + 6 * hash(seed, s, 65), hgt, EDGE_STEP + 18 + 14 * hash(seed, s, 66)),
+						Vector3.new(22 + 6 * hash(seed, s, 65), hgt, EDGE_STEP + 8 + 16 * hash(seed, s, 66)),
 						CFrame.new(x, y + hgt * 0.3, z) * CFrame.Angles(0, along + 0.08 * (hash(seed, s, 67) - 0.5), 0),
 						col,
 						"edge"
 					)
 					n += 1
 				end
-				if s % 4 == 2 and hash(seed, s, 68) > 0.3 then -- a hedgerow oak standing in the line
+				if s % 3 == 1 and hash(seed, s, 68) > 0.35 then -- a hedgerow oak standing in the line
 					local th = 20 + 8 * hash(seed, s, 69)
 					local tx, tz = x + ox * 6, z + oz * 6
 					local ty = Backdrop.groundAt(tx, tz)
