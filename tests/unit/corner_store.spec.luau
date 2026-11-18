@@ -10,6 +10,9 @@ local Kit = require("../../tools/bake/alley/Kit")
 local Store = require("../../tools/bake/corner_store/Store")
 local Fixtures = require("../../tools/bake/corner_store/Fixtures")
 local ItemRules = require("@shared/Items/ItemRules")
+local Data = require("@shared/Data")
+local Species = require("@shared/Actors/Species")
+local TownAI = require("@server/AI/TownAI")
 
 local Instance = roblox.Instance
 local Vector3 = roblox.Vector3
@@ -274,6 +277,31 @@ return function(t)
 			t.eq(#items:GetChildren(), #ItemRules.CATALOG)
 		end
 	)
+
+	t.test("the shopkeeper: a town shop worker on the store's floor, walking his round behind the counter", function()
+		local v = venue()
+		local world = TownAI.build({ data = Data.default(), seed = 3 })
+		local keeper: any = nil
+		for _, a in world.actors do
+			if a.post == "shop_worker" then
+				local x, _, d = AlleyLayout.toLocal(v.place, a.x, a.y, a.z)
+				if math.abs(x) < Store.IN_X and math.abs(d) < Store.IN_D then
+					keeper = a
+				end
+			end
+		end
+		t.truthy(keeper ~= nil, "a shop worker inside the store")
+		local c = Fixtures.COUNTER
+		local hip = Species.def("human").hipHeight
+		for _ = 1, 30 * 20 do
+			TownAI.stepFrame(world, 1 / 30)
+			local x, y, d = AlleyLayout.toLocal(v.place, keeper.x, keeper.y, keeper.z)
+			-- behind the counter, between it and the back bar, along its length; standing on the store's floor
+			t.truthy(d > c.d1 + 0.5 and d < Fixtures.BACKBAR.d0 - 0.5, `depth {d}`)
+			t.truthy(x > c.x0 - 1 and x < c.x1 + 1, `across {x}`)
+			t.near(y, hip, 0.3)
+		end
+	end)
 
 	t.test("the plan's anchors are where the bake puts the counter, the shopkeeper and each item", function()
 		local v = venue()

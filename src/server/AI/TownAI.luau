@@ -3,7 +3,8 @@
 -- The town's AI population on the real data (BUILD_PLAN §1.5, §4.4 #3; the S5 Scenario's structure
 -- on generated/ instead of synthetic lanes and routes): humans per data/population.json posts
 -- (townspeople walk the sidewalk lanes from World/Town via Actors/Nav; shop workers keep shop
--- circuits; hospital staff walk the ward rounds and the desk post of Infection/HospitalLayout, indoors
+-- circuits, the first of them behind a built venue's counter (Actors/StaffRounds.venues: Pepper's Corner
+-- Store's shopkeeper, on the store's floor); hospital staff walk the ward rounds and the desk post of Infection/HospitalLayout, indoors
 -- on lanes the bake keeps clear; the ambulance crew walks a circuit at the ambulance bay; 6 officers
 -- patrol from west_police_station, the guard and car crew hold the station's locker room),
 -- novelty riders and motorcyclists as cyclists on the lanes, squirrels running the 1,332 harvested
@@ -211,11 +212,15 @@ function TownAI.build(opts: Opts): World
 	local actors: { Common.Actor } = {}
 	local actorsById: { [number]: Common.Actor } = {}
 	local brains: { [number]: Common.Brain } = {}
+	-- the built expansion venues' floors (indoors, above the ground) and their counters' staff posts
+	local venues = StaffRounds.venues(data:module("Expansion"))
 	local ctx: Common.Ctx = {
 		now = 0,
 		rng = rng,
 		groundAt = function(x: number, z: number): number
-			return ground.groundAt(x, z, Height.at(x, z) + 1)
+			local y = ground.groundAt(x, z, Height.at(x, z) + 1)
+			local floor = StaffRounds.floorAt(venues, x, z)
+			return if floor and floor > y then floor else y
 		end,
 		threats = grid,
 		actorsById = actorsById,
@@ -316,6 +321,12 @@ function TownAI.build(opts: Opts): World
 		end
 	end
 	local shops = shopSites(data)
+	local counters: { { x: number, z: number, round: { { number } } } } = {}
+	for _, v in venues do
+		if v.post then
+			table.insert(counters, v.post)
+		end
+	end
 	local scale = 1
 	if opts.humans then
 		local standing = 0
@@ -361,6 +372,14 @@ function TownAI.build(opts: Opts): World
 					actor = add("human", id, "Staff", hipH, sx, sz)
 					register(actor, Staff.new(actor, { stationX = sx, stationZ = sz, index = k }))
 				end
+			elseif id == "shop_worker" and k <= #counters then
+				-- the first shop workers keep the built venues' counters (Pepper's Corner Store's shopkeeper)
+				local desk = counters[k]
+				actor = add("human", id, "Staff", hipH, desk.x, desk.z)
+				register(
+					actor,
+					Staff.new(actor, { stationX = desk.x, stationZ = desk.z, index = k, circuit = desk.round })
+				)
 			elseif id == "shop_worker" or id == "attraction_staff" then
 				local shop = if #shops > 0 then shops[(k - 1) % #shops + 1] else { 0, 0 }
 				actor = add("human", id, "Staff", hipH, shop[1], shop[2])
