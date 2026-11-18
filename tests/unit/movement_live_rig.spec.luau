@@ -9,6 +9,7 @@
 local process = require("@lune/process")
 local Units = require("@shared/Config/Units")
 local Height = require("@shared/World/Height")
+local Trampoline = require("@shared/Movement/Trampoline")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local ValidatorWorld = require("@server/Movement/ValidatorWorld")
 local Driver = require("@tests/cheat/Driver")
@@ -271,6 +272,36 @@ return function(t)
 			t.truthy(r.accepted > 100, `packets judged ({r.accepted})`)
 		end
 	)
+
+	t.test("honest: bouncing on the trampoline, higher each time, then off it: 0 snaps", function()
+		local tworld: any = table.clone(world)
+		tworld.trampolines = Trampoline.sitesFromRegistry(world.registry, function(_x: number, _z: number): number
+			return 0
+		end)
+		local site = tworld.trampolines[1]
+		t.truthy(site, "the town has its trampoline")
+		local tv = ValidatorWorld.build(tworld, { wall = wall, down = down })
+		local bounces = 0
+		local rig = LiveRig.new({ world = tworld, vworld = tv, link = slow, seed = 51 })
+		local s = SquirrelMotor.new(site.x, site.surface + 8, site.z)
+		s.grounded = false
+		rig:possess(s, function(now: number, st: State, _e: { SquirrelMotor.Event }): SquirrelMotor.Input
+			if st.vy > 30 and st.y < site.surface + 2 then
+				bounces += 1
+			end
+			local inp = SquirrelMotor.idleInput(-math.pi / 2)
+			inp.fw = if now > 9 then 1 else 0
+			return inp
+		end)
+		rig:run(14)
+		local r = rig:result()
+		print(`      {LiveRig.describe("trampoline", r)}; {site.count} in a row at the most recent`)
+		for _, v in r.violations do
+			print(`      VIOLATION {v}`)
+		end
+		t.eq(r.snaps, 0, "snaps")
+		t.truthy(bounces >= 3, `bounced ({bounces})`)
+	end)
 
 	-- CHEATS: a modified client, from 5 s on (the first 5 s are honest)
 	local CHEAT_AT = 5
