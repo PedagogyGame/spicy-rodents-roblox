@@ -7,8 +7,10 @@
 -- (Traffic/VehiclePuppet at the true logical box, seated on World/RoadSurface) Ghost.DELAY behind the newest snapshot with one
 -- BulkMoveTo. All the arithmetic between a packet and a CFrame lives in those two shared modules, which
 -- the headless replay (tools/sim) runs as well; this file only wires them to the engine. The kinds come once from the PlayNet folder's
--- TrafficKinds attribute (JSON, id -> { kind, color }). The ghosts live in workspace.TrafficGhosts,
--- are local to this client and never collide (the server's swept test is the authority).
+-- TrafficKinds attribute (JSON, id -> { kind, color }). The ghosts live in workspace.TrafficGhosts and are
+-- local to this client; each one's invisible RootPart (the logical box) is solid to this client's own body
+-- (Ghost.solidify: a person walks into a car, not through it), the drawn parts never collide. The server's swept test
+-- stays the authority on a run-over.
 -- Interface: start() -> stop(); the folder is returned by folder(). start() also starts Render/TownView
 -- (street-lamp lights and the Skyline far view).
 -- No side effects on require.
@@ -80,18 +82,8 @@ function VehicleView.start(): () -> ()
 		conns,
 		RunService.RenderStepped:Connect(function(dt: number)
 			local good, err = pcall(function()
-				local before = #folder:GetChildren()
 				local at = receiver:at(workspace:GetServerTimeNow(), dt)
 				Ghost.render(receiver.buffer, at, folder, kinds, ground, models)
-				if #folder:GetChildren() ~= before then
-					for _, d in folder:GetDescendants() do
-						if d:IsA("BasePart") then
-							d.CanCollide = false
-							d.CanQuery = false
-							d.CanTouch = false
-						end
-					end
-				end
 			end)
 			if not good and not warned then
 				warned = true

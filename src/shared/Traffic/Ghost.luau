@@ -9,7 +9,8 @@
 --            (pure: the root pose a player sees); view(buffer, now, kinds, heightAt, visit) (pure: one
 --            client frame, `visit` called per vehicle with its sampled and seen pose);
 --            rootCFrame(lib, x, y, z, yaw, pitch, visible, roll?) (the CFrame of that pose, lib = PartBuilder.Lib);
---            render(buffer, now, folder, kinds, heightAt, models) (engine: placeholder models, one BulkMoveTo).
+--            render(buffer, now, folder, kinds, heightAt, models) (engine: placeholder models, one BulkMoveTo);
+--            solidify(model) (a ghost's collision: only its invisible RootPart, the logical box, is solid).
 --
 -- Records are 13 bytes (u16 id, f32 x, f32 z, u8 yaw, u8 speed, u8 bits). The server never sends y:
 -- clients take it from the ground they are given (traffic.md §13 "Terrain"; the game passes
@@ -502,6 +503,25 @@ function Ghost.rootCFrame(
 	return if roll and roll ~= 0 then pitched * lib.CFrame.Angles(0, 0, roll) else pitched
 end
 
+-- solidify(model): a ghost's collision (owner's playtest 2026-11-18: "I did run right through a car"). Only the
+-- invisible RootPart collides: it is exactly the logical box (Traffic/VehiclePuppet, Traffic/Boxes), the box the fatal
+-- test sweeps, so a person (a Humanoid, simulated on its own client against this client's ghosts) meets the car as it is
+-- drawn and stands on its roof as on any box. The drawn parts never collide, are never touched and are never queried.
+-- Anchored and moved by CFrame, the root carries nobody along (v5.4: a moving vehicle slides out from under). The
+-- squirrel's motor does not see these parts (Client/Main ignores the folder): it meets the same boxes as numbers
+-- (Traffic/Solid), as the server's validator does.
+function Ghost.solidify(model: any)
+	local root = model.PrimaryPart
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			local solid = d == root
+			d.CanCollide = solid
+			d.CanQuery = solid
+			d.CanTouch = false
+		end
+	end
+end
+
 -- render(buffer, now, folder, kinds, heightAt, models): engine only. `kinds` maps id -> {kind, color};
 -- `models` caches the placeholder Model per id (built from Traffic/VehiclePuppet at the true box).
 -- Moves every visible root with one BulkMoveTo (HANDOFF rule 4); hidden ghosts park far below.
@@ -520,6 +540,7 @@ function Ghost.render(
 		if not model then
 			local spec = VehiclePuppet.spec(k.kind, { color = k.color, name = `Ghost_{id}` })
 			local built = PartBuilder.instantiate(spec, lib) :: Model
+			Ghost.solidify(built)
 			built.Parent = folder
 			models[id] = built
 			model = built
