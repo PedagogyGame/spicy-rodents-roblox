@@ -866,7 +866,8 @@ local function doGrab(state: State, world: World, input: Input, events: { Event 
 			if enterRoute(state, world, junction, input, events) then
 				return
 			end
-		else
+		elseif r.enclosure == nil then
+			-- (on an enclosed run the pick is an authored exit's, taken at it: a stray E on the way keeps it)
 			state.selectedJunction = nil
 		end
 		if state.pendingFork and r.kind == "trunk" then
