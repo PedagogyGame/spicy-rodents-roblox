@@ -1570,6 +1570,11 @@ function Game.start(opts: Opts?): any
 					return true, nil
 				end,
 			},
+			-- a body a game moved itself (the paintball arena's sweep and its places): a held squirrel's validator is
+			-- told, as for every server move
+			moved = function(body: any, why: string)
+				movedBody(body, why)
+			end,
 			-- squirrels and the Spicy Rodent, wherever they are: a lane in play knocks them off it
 			animals = function(): { { [string]: any } }
 				local out = {}
