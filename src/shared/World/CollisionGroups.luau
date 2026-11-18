@@ -10,8 +10,12 @@
 --   PeopleFence     keeps people on the alley roof's walkway and guard platform; squirrels pass (AlleyRoof)
 --   SquirrelFence   keeps squirrels off the people's stair onto the roof; people pass (AlleyRoof, owner Q12's default)
 --   SquirrelProbe   the group the squirrel's own queries (ground, walls) run in
+--   SightRay        the group a person's line of sight runs in (Server/Attractions/RafterService): the three invisible
+--                   walls above (LaneGuard, PeopleFence, SquirrelFence) do not stop it; what can be seen does
+-- What a raycast hits, as Roblox decides it: a part that takes queries (every colliding part does, whatever its
+-- CanQuery says) and whose group meets the ray's (rayHits; the specs judge baked parts by it).
 -- Pure. Interface: GROUPS; APART (pairs that do not meet); DEFAULT; meets(a, b) -> boolean; solidToSquirrel(group?),
---   solidToPeople(group?) -> boolean
+--   solidToPeople(group?) -> boolean; rayHits(rayGroup?, collide, query, group?) -> boolean
 
 local CollisionGroups = {}
 
@@ -21,6 +25,7 @@ CollisionGroups.LANE_GUARD = "LaneGuard"
 CollisionGroups.PEOPLE_FENCE = "PeopleFence"
 CollisionGroups.SQUIRREL_FENCE = "SquirrelFence"
 CollisionGroups.SQUIRREL_PROBE = "SquirrelProbe"
+CollisionGroups.SIGHT_RAY = "SightRay"
 
 CollisionGroups.GROUPS = {
 	CollisionGroups.BOWLING_PHYSICS,
@@ -28,6 +33,7 @@ CollisionGroups.GROUPS = {
 	CollisionGroups.PEOPLE_FENCE,
 	CollisionGroups.SQUIRREL_FENCE,
 	CollisionGroups.SQUIRREL_PROBE,
+	CollisionGroups.SIGHT_RAY,
 }
 
 CollisionGroups.APART = {
@@ -36,6 +42,9 @@ CollisionGroups.APART = {
 	{ CollisionGroups.PEOPLE_FENCE, CollisionGroups.BOWLING_PHYSICS },
 	{ CollisionGroups.SQUIRREL_FENCE, CollisionGroups.DEFAULT },
 	{ CollisionGroups.SQUIRREL_FENCE, CollisionGroups.BOWLING_PHYSICS },
+	{ CollisionGroups.SIGHT_RAY, CollisionGroups.LANE_GUARD },
+	{ CollisionGroups.SIGHT_RAY, CollisionGroups.PEOPLE_FENCE },
+	{ CollisionGroups.SIGHT_RAY, CollisionGroups.SQUIRREL_FENCE },
 }
 
 -- Do parts of these two groups meet? (Every pair meets unless APART says otherwise, as in Roblox.)
@@ -57,6 +66,13 @@ end
 -- Does a colliding part of this group stop a person (a body in the Default group)?
 function CollisionGroups.solidToPeople(group: string?): boolean
 	return CollisionGroups.meets(CollisionGroups.DEFAULT, group)
+end
+
+-- Does a ray cast in `rayGroup` hit a part (CanCollide `collide`, CanQuery `query`, in `group`)? Roblox honours
+-- CanQuery = false only on a part that does not collide, and a ray passes every part whose group its own does not
+-- meet.
+function CollisionGroups.rayHits(rayGroup: string?, collide: boolean, query: boolean, group: string?): boolean
+	return (collide or query) and CollisionGroups.meets(rayGroup, group)
 end
 
 return CollisionGroups

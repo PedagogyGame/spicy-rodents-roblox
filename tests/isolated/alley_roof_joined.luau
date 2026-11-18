@@ -24,6 +24,7 @@ local Curve = require("@shared/Routes/Curve")
 local Data = require("@shared/Data")
 local PlayRules = require("@shared/Combat/PlayRules")
 local Cover = require("@shared/Combat/Cover")
+local CollisionGroups = require("@shared/World/CollisionGroups")
 local SquirrelMotor = require("@shared/Movement/SquirrelMotor")
 local RafterService = require("@server/Attractions/RafterService")
 local SneakMeter = require("@client/UI/SneakMeter")
@@ -157,11 +158,12 @@ return function(t)
 		return m
 	end
 
-	-- The line of sight on the baked alley, as the game's raycast sees it: the parts that take queries.
+	-- The line of sight on the baked alley, as the game's raycast sees it: a ray in the service's collision group
+	-- (Shared/World/CollisionGroups.rayHits: Roblox's rule).
 	local function canSee(eye: any, aim: any): boolean
 		local d = aim - eye
 		local hit = baked.raycast(eye.X, eye.Y, eye.Z, d.X, d.Y, d.Z, function(q: any): boolean
-			return q.query
+			return CollisionGroups.rayHits(RafterService.SIGHT_GROUP, q.collide, q.query, q.group)
 		end)
 		return hit == nil or (1 - hit) * d.Magnitude <= RafterService.C.beamSlack
 	end

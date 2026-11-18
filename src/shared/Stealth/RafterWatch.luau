@@ -33,7 +33,8 @@
 -- LINE OF SIGHT (the caller, lane L5): a person sees the squirrel when any of it shows: a ray from the person's eye to
 -- either of RafterWatch.aimPoints (the middle of the body, half a body over the rail point, and the top of its head:
 -- a ray from below to the rail point itself meets the top face of the chord the squirrel stands on) that meets
--- nothing but that chord near the aim, ignoring bodies and parts that take no queries. A person right under a 2.4-wide
+-- nothing but that chord near the aim, ignoring bodies and the invisible walls (its own collision group,
+-- Shared/World/CollisionGroups.SIGHT_RAY, does not meet theirs). A person right under a 2.4-wide
 -- truss plate sees only its underside; one further back, on the settees or the concourse, sees over its edge.
 -- Interface: C; SITUATION, LINES (Speech/Lines "rafters"); new() -> State; rate(squirrel, observer, lamps) ->
 --   number (one person, line of sight assumed); step(state, squirrels, observers, lamps?, dt, canSee) -> { Event };

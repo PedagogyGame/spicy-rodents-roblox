@@ -11,7 +11,9 @@
 --     the pins), so a bowling game against the computer has eyes in it;
 --   * line of sight: a ray from the eye to the squirrel's body or the top of its head (RafterWatch.aimPoints: seen
 --     when any of it shows) that meets nothing but the beam under the squirrel (a hit within C.beamSlack of the aim
---     point); bodies and parts that take no queries are passed through;
+--     point); bodies are passed through, and the ray runs in the collision group SIGHT_GROUP
+--     (Shared/World/CollisionGroups), so the invisible walls (the lanes' LaneGuard boxes at the foul line, the roof's
+--     fences) do not stop it: Roblox's raycast ignores CanQuery = false on a part that collides;
 --   * Stealth/RafterWatch decides. On "spotted":
 --       - an ordinary squirrel: up to C.speakers of the people who saw it say a "rafters" line (Speech/SpeechRules'
 --         pacing, its own state on the server clock), everyone on foot in the hall and on
@@ -26,7 +28,7 @@
 --     and its duct in force as Combat/Cover boxes (covers(place)) while it runs. At the louvre the squirrel is
 --     outside them and a kick lands.
 -- The Town is what it needs from the game (start(game) builds it from Boot/Game's parts; specs pass a stub).
--- Interface: TICK, C, WORDS, EYE_OVER_ROOT, BOWLER_EYE, DEFAULT_PLACE; new(opts) -> Service; start(game) -> Service;
+-- Interface: TICK, C, WORDS, EYE_OVER_ROOT, BOWLER_EYE, DEFAULT_PLACE, SIGHT_GROUP; new(opts) -> Service; start(game) -> Service;
 --   covers(place) -> { Box }; callout(spicy, lane?) -> string; Service:step(dt); Service:stop();
 --   Service:meter(id) -> (number, boolean); Service.stats { ticks, spotted, lines, callouts, alarms }
 -- No side effects on require.
@@ -38,6 +40,7 @@ local RafterWatch = Import.shared("Stealth/RafterWatch") :: typeof(require("../.
 local RafterSense = Import.shared("Stealth/RafterSense") :: typeof(require("../../shared/Stealth/RafterSense"))
 local Cover = Import.shared("Combat/Cover") :: typeof(require("../../shared/Combat/Cover"))
 local SpeechRules = Import.shared("Speech/SpeechRules") :: typeof(require("../../shared/Speech/SpeechRules"))
+local CollisionGroups = Import.shared("World/CollisionGroups") :: typeof(require("../../shared/World/CollisionGroups"))
 
 local RafterService = {}
 RafterService.__index = RafterService
@@ -56,6 +59,7 @@ RafterService.EYE_OVER_ROOT = 1.6 -- a person's eye over their root (an R15 root
 RafterService.BOWLER_EYE = { y = 5.2, d = -6 } -- a computer bowler on the approach
 RafterService.DEFAULT_PLACE = { x = 1300, z = -420, floorY = 16.5, yaw = 0 } -- data/attractions.json's alley
 RafterService.GLOW_NAME = "RafterGlow"
+RafterService.SIGHT_GROUP = CollisionGroups.SIGHT_RAY -- the collision group the sight rays run in
 
 RafterService.WORDS = {
 	squirrel = "A squirrel in the rafters over lane %d!",
@@ -166,6 +170,15 @@ local function defaultCanSee(exclude: { Instance }): (eye: Vector3, aim: Vector3
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = exclude
+	-- (Server/Attractions/AttractionService registers the groups before the service starts)
+	local ok, registered = pcall(function()
+		return game:GetService("PhysicsService"):IsCollisionGroupRegistered(RafterService.SIGHT_GROUP)
+	end)
+	if ok and registered then
+		params.CollisionGroup = RafterService.SIGHT_GROUP
+	else
+		warn("[RafterService] the SightRay collision group is not registered: the lanes' guards will block sight")
+	end
 	return function(eye: Vector3, aim: Vector3): boolean
 		local hit = workspace:Raycast(eye, aim - eye, params)
 		return hit == nil or (hit.Position - aim).Magnitude <= C.beamSlack

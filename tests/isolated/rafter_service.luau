@@ -508,4 +508,57 @@ return function(t)
 			r.svc:stop()
 		end)
 	end)
+
+	t.test("the game's line of sight is a ray in the SightRay group that passes the bodies", function()
+		FakeEngine.with(function()
+			-- selene: allow(deprecated)
+			local env = getfenv(0) :: any
+			local saved = env.RaycastParams
+			local registered = true
+			rawset(game:GetService("PhysicsService"), "IsCollisionGroupRegistered", function(_self: any, g: string)
+				return registered and g == RafterService.SIGHT_GROUP
+			end)
+			env.RaycastParams = {
+				new = function(): any
+					return {}
+				end,
+			}
+			local cast: any = nil
+			rawset(workspace, "Raycast", function(_self: any, _origin: any, _dir: any, params: any): any
+				cast = params
+				return nil
+			end)
+			local ok, err = pcall(function()
+				for _, reg in { true, false } do
+					registered = reg
+					local folder = FakeEngine.new("Folder", "Bodies")
+					local svc = RafterService.start({
+						possession = {
+							controllerOf = function(): any
+								return "ai"
+							end,
+						},
+						runtime = {
+							world = { actors = {}, actorsById = {}, brains = {}, now = 0 },
+							byTownId = {},
+							bodies = folder,
+						},
+						fire = function() end,
+						attractions = { place = PLACE },
+						now = function(): number
+							return 0
+						end,
+					})
+					t.eq(svc.canSee(V3.new(0, 0, 0), V3.new(0, 10, 0)), true, "nothing in the way")
+					t.eq(cast.FilterDescendantsInstances[1], folder, "the bodies are passed")
+					t.eq(cast.CollisionGroup, if reg then "SightRay" else nil, `the ray's group (registered {reg})`)
+					svc:stop()
+				end
+			end)
+			env.RaycastParams = saved
+			if not ok then
+				error(err, 0)
+			end
+		end)
+	end)
 end
