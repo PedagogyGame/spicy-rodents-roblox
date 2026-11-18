@@ -8,6 +8,7 @@ Writes 1600-px-wide JPEGs under 400 KB each:
   poses.jpg                           a run and a sit: the joints hold
   scale.jpg                           both builds, turned round, beside a 5.5-stud staff
   hair_hats.jpg                       the eight hair styles and the two hats
+  compare.jpg                         the bodies the town shows now beside the rounded people that replace them
 """
 import argparse
 import io
@@ -125,6 +126,18 @@ def main():
                 text(dr, (x, y), lab["text"], font(18, True), anchor="rm")
         text(dr, (16, 12), "Two builds on one rig, beside a 5.5-stud staff", font(20), anchor="la")
         save(im, os.path.join(a.out, "scale.jpg"))
+    if have("compare"):
+        im, meta = load(d, "compare")
+        s_ = im.width / meta["size"][0]
+        dr = ImageDraw.Draw(im)
+        for lab in meta["labels"]:
+            x, y = lab["at"][0] * s_, lab["at"][1] * s_
+            if lab["text"] in ("now", "rounded"):
+                text(dr, (x, y), lab["text"], font(18, True))
+            else:
+                text(dr, (x, min(y + 26, im.height - 18)), lab["text"], font(22, True))
+        text(dr, (16, 12), "Now (the stock R15, the lounge's part-built doorman) and rounded, in the same colours", font(20), anchor="la")
+        save(im, os.path.join(a.out, "compare.jpg"))
     if have("hair_0", "hair_1"):
         save(vstack([labelled(d, "hair_0", size=16, where="at"), labelled(d, "hair_1", size=16, where="at")]), os.path.join(a.out, "hair_hats.jpg"))
 

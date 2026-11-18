@@ -8,7 +8,10 @@ Every person is assembled the way the game will do it: the build's MeshParts, ea
 palette colour under the outfit's Overlay texture (base = lerp(part colour, texture rgb, texture
 alpha)), and posed by rotating the parts about the manifest's joints as Motor6D does (pose.py).
 Shots (PNG plus a JSON of label positions for sheets.py): lineup_front, lineup_back, face_calm,
-face_worried, face_frightened, run, sit, scale, hair.
+face_worried, face_frightened, run, sit, scale, hair, and compare: the bodies the town shows now (a stock R15
+from a blank HumanoidDescription, drawn as its blocks and plain head in the same colours: Actors/BodyFactory;
+and THE GILDED ACORN's part-built doorman, tools/bake/lounge_classic/Staff) beside the rounded person that
+Server/Assets/PeopleArt puts in their place.
 """
 import argparse
 import json
@@ -267,6 +270,104 @@ def project(scene, cam, p):
 
 # ---- the cast --------------------------------------------------------------------------------------
 
+# ---- the bodies the town shows now (for the side by side) --------------------------------------------
+
+# the stock R15's blocks (Shared/Avatar/PuppetSpec R15: Roblox size and centre, root-relative) and which
+# HumanoidDescription colour each takes (arms are all skin, legs all pants: a blank description has no clothes)
+STOCK_R15 = [
+    ("LowerTorso", (2, 0.4, 1), (0, -0.2, 0), "shirt"), ("UpperTorso", (2, 1.6, 1), (0, 0.8, 0), "shirt"),
+    ("LeftUpperArm", (1, 1.2, 1), (-1.5, 1.0, 0), "skin"), ("LeftLowerArm", (1, 1.2, 1), (-1.5, -0.2, 0), "skin"),
+    ("LeftHand", (1, 0.4, 1), (-1.5, -1.0, 0), "skin"), ("RightUpperArm", (1, 1.2, 1), (1.5, 1.0, 0), "skin"),
+    ("RightLowerArm", (1, 1.2, 1), (1.5, -0.2, 0), "skin"), ("RightHand", (1, 0.4, 1), (1.5, -1.0, 0), "skin"),
+    ("LeftUpperLeg", (1, 1.2, 1), (-0.5, -1.0, 0), "pants"), ("LeftLowerLeg", (1, 1.2, 1), (-0.5, -2.2, 0), "pants"),
+    ("LeftFoot", (1, 0.4, 1), (-0.5, -3.0, 0), "pants"), ("RightUpperLeg", (1, 1.2, 1), (0.5, -1.0, 0), "pants"),
+    ("RightLowerLeg", (1, 1.2, 1), (0.5, -2.2, 0), "pants"), ("RightFoot", (1, 0.4, 1), (0.5, -3.0, 0), "pants"),
+]
+# THE GILDED ACORN's doorman as baked (tools/bake/lounge_classic/Staff: x across, y up from the ground, z forward)
+DOORMAN = [  # size, centre, colour
+    ((0.62, 0.34, 0.95), (-0.38, 0.17, 0.12), "#202020"), ((0.62, 0.34, 0.95), (0.38, 0.17, 0.12), "#202020"),
+    ((0.6, 2.22, 0.62), (-0.38, 1.45, 0), "#1e1c20"), ((0.6, 2.22, 0.62), (0.38, 1.45, 0), "#1e1c20"),
+    ((0.56, 1.95, 0.62), (-1.24, 3.55, 0), "#5c1c22"), ((0.56, 1.95, 0.62), (1.24, 3.55, 0), "#5c1c22"),
+    ((0.46, 0.34, 0.5), (-1.24, 2.42, 0), "skin"), ((0.46, 0.34, 0.5), (1.24, 2.42, 0), "skin"),
+    ((1.95, 2.3, 1.0), (0, 3.65, 0), "#5c1c22"), ((0.14, 1.8, 0.06), (0, 3.7, 0.52), "#c9a227"),
+    ((0.5, 0.25, 0.5), (0, 4.9, 0), "skin"), ((2.0, 0.2, 1.06), (0, 2.85, 0), "#202020"),
+]
+
+
+def plain(name, hexs, rough=0.55):
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    b = m.node_tree.nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = lin(hexs)
+    b.inputs["Roughness"].default_value = rough
+    return m
+
+
+def block(st, size, centre, hexs, place_):
+    """A box (size x, y, z; centre in Blender axes, studs) placed by the 4x4 `place_`."""
+    bpy.ops.mesh.primitive_cube_add(size=1)
+    o = bpy.context.active_object
+    o.scale = size
+    o.matrix_world = Matrix(place_.tolist()) @ Matrix.Translation(centre) @ Matrix.Diagonal((*size, 1.0))
+    o.data.materials.append(plain("Block", hexs))
+    st.made.append(o)
+    return o
+
+
+def turn(at, yaw):
+    a = math.radians(yaw)
+    m = np.eye(4)
+    m[:3, :3] = [[math.cos(a), -math.sin(a), 0], [math.sin(a), math.cos(a), 0], [0, 0, 1]]
+    m[:3, 3] = (at[0], at[1], 0)
+    return m
+
+
+def stock_person(st, look, at, yaw):
+    """The stock R15 as the town has it: blocks, the classic round-topped head and a drawn-on face."""
+    pl = turn(at, yaw)
+    lift = 3.2  # the feet's bottom is 3.2 under the root's centre
+    for _name, size, c, key in STOCK_R15:
+        b = spec.to_blender(c)
+        block(st, (size[0], size[2], size[1]), (b[0], b[1], b[2] - spec.ROOT_HEIGHT + lift), look[key], pl)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.6, depth=1.2, vertices=24)
+    head = bpy.context.active_object
+    head.matrix_world = Matrix(pl.tolist()) @ Matrix.Translation((0, 0, 2.2 + lift))
+    bev = head.modifiers.new("Round", "BEVEL")
+    bev.width, bev.segments = 0.22, 4
+    head.data.materials.append(plain("Head", look["skin"]))
+    st.made.append(head)
+    for size, c in (((0.16, 0.05, 0.2), (-0.24, -0.61, 2.3)), ((0.16, 0.05, 0.2), (0.24, -0.61, 2.3)),
+                    ((0.42, 0.05, 0.08), (0, -0.61, 1.95))):
+        block(st, size, (c[0], c[1], c[2] + lift), "#1f1b18", pl)
+
+
+def doorman_figure(st, look, at, yaw):
+    """The lounge's baked doorman (scale 1.08 tall), facing -Y like everyone in these shots."""
+    pl = turn(at, yaw)
+    t = 1.08
+    for size, c, hexs in DOORMAN:
+        col = look["skin"] if hexs == "skin" else hexs
+        block(st, (size[0], size[2], size[1] * t), (c[0], -c[2], c[1] * t), col, pl)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.575, segments=24, ring_count=12)
+    head = bpy.context.active_object
+    head.matrix_world = Matrix(pl.tolist()) @ Matrix.Translation((0, 0, 5.5 * t))
+    head.data.materials.append(plain("Head", look["skin"]))
+    st.made.append(head)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.62, depth=0.38, vertices=24)
+    cap = bpy.context.active_object
+    cap.matrix_world = Matrix(pl.tolist()) @ Matrix.Translation((0, 0, 6.05 * t))
+    cap.data.materials.append(plain("Cap", "#5c1c22"))
+    st.made.append(cap)
+
+
+COMPARE = [  # label, role, index, build, outfit, hair, look overrides, the old body
+    ("Townsperson", "townsperson", 2, "slim", "shirt", "parted", None, "stock"),
+    ("Nurse", "nurse", 3, "slim", "scrubs", "bun", None, "stock"),
+    ("Police officer", "officer", 4, "broad", "police", "short", None, "stock"),
+    ("Paramedic", "orderly", 5, "slim", "jacket", "curly", {"shirt": "#e6782a"}, "stock"),
+    ("Lounge doorman", "guard", 1, "broad", "guard", "short", {"shirt": "#5c1c22", "pants": "#1e1c20", "cap": "#5c1c22"}, "doorman"),
+]
+
 LINEUP = [  # role, palette index, build, outfit, hair, pose
     ("townsperson", 2, "slim", "shirt", "parted", "walk"),
     ("doctor", 5, "broad", "coat", "balding", "pass2"),
@@ -385,6 +486,26 @@ def main(argv):
         labels = [("0" if k == 0 else ("1 stud" if k == 1 else f"{k} studs"), (bx - 0.25, 0, float(k) - 0.02)) for k in range(0, 6)] + [("5.5 studs", (bx - 0.25, 0, 5.48))]
         labels += [("Slim build", (sx + 2.9 * 2, 0, 0)), ("Broad build", (sx + 2.9 * 4.5, 0, 0))]
         shoot("scale", (1600, 620), labels)
+
+    if not want or "compare" in want:
+        # now (left of each pair) and rounded (right), standing, three-quarter front
+        gap, pair = 2.6, 6.4
+        labels = []
+        for i, (label, role, idx, build, outfit, hair, over, old) in enumerate(COMPARE):
+            x0 = (i - (len(COMPARE) - 1) / 2) * pair
+            lk = dict(spec.look(role, idx, st.pal))
+            lk.update(over or {})
+            if old == "stock":
+                stock_person(st, lk, (x0 - gap / 2, 0.0), 18)
+            else:
+                doorman_figure(st, lk, (x0 - gap / 2, 0.0), 18)
+            st.person(role, idx, build, outfit, hair, pose="stand", at=(x0 + gap / 2, 0.0), yaw=18, look=over)
+            labels.append((label, (x0, 0, -0.2)))
+            labels.append(("now", (x0 - gap / 2, 0, 6.9)))
+            labels.append(("rounded", (x0 + gap / 2, 0, 6.9)))
+        aim_sun(sun, fill, -128)
+        place(cam, (0, 0, 3.0), 90, -90, 6, 100)
+        shoot("compare", (1800, 600), labels)
 
     if not want or "hair" in want:
         items = [("Hair_" + h, None) for h in spec.HAIR_ORDER] + [("Hair_short", "cap"), ("Hair_bob", "beret")]
