@@ -41,6 +41,7 @@ local HumanAIMotor = Import.shared("Movement/HumanAIMotor") :: typeof(require(".
 local HospitalLayout =
 	Import.shared("Infection/HospitalLayout") :: typeof(require("../../shared/Infection/HospitalLayout"))
 local StaffRounds = Import.shared("Actors/StaffRounds") :: typeof(require("../../shared/Actors/StaffRounds"))
+local AlleyStaff = Import.shared("Attractions/AlleyStaff") :: typeof(require("../../shared/Attractions/AlleyStaff"))
 local Tunables = Import.shared("Config/Tunables") :: typeof(require("../../shared/Config/Tunables"))
 local Common = require("../Actors/Brains/Common")
 local BrainScheduler = require("../Actors/BrainScheduler")
@@ -135,6 +136,19 @@ local function lotPos(data: any, id: string, fallbackU: { number }): (number, nu
 end
 
 -- shop lots for the shop rota: buildings whose type names a shop, store, cafe or restaurant
+-- The bowling alley's placement (generated/Attractions), or nil when the data has none.
+local function alleyPlace(data: any): any?
+	local ok, mod = pcall(function()
+		return data:module("Attractions")
+	end)
+	for _, a in (if ok and mod and mod.attractions then mod.attractions else {}) :: { any } do
+		if a.id == "bowling_alley" and a.place then
+			return a.place
+		end
+	end
+	return nil
+end
+
 local function shopSites(data: any): { { number } }
 	local out = {}
 	for _, lot in data:lots() do
@@ -214,10 +228,16 @@ function TownAI.build(opts: Opts): World
 	local brains: { [number]: Common.Brain } = {}
 	-- the built expansion venues' floors (indoors, above the ground) and their counters' staff posts
 	local venues = StaffRounds.venues(data:module("Expansion"))
+	-- the bowling alley (generated/Attractions): its floor inside its walls, and its employees (AlleyStaff)
+	local alley = alleyPlace(data)
 	local ctx: Common.Ctx = {
 		now = 0,
 		rng = rng,
 		groundAt = function(x: number, z: number): number
+			local inside = if alley then AlleyStaff.floorAt(alley, x, z) else nil
+			if inside then
+				return inside
+			end
 			local y = ground.groundAt(x, z, Height.at(x, z) + 1)
 			local floor = StaffRounds.floorAt(venues, x, z)
 			return if floor and floor > y then floor else y
@@ -379,6 +399,16 @@ function TownAI.build(opts: Opts): World
 				register(
 					actor,
 					Staff.new(actor, { stationX = desk.x, stationZ = desk.z, index = k, circuit = desk.round })
+				)
+			elseif id == "attraction_staff" and alley and k <= #AlleyStaff.EMPLOYEES then
+				-- the first attraction staff are the bowling alley's employees, each on their own work loop
+				local job = AlleyStaff.EMPLOYEES[k]
+				local stops = AlleyStaff.shift(alley, job)
+				actor = add("human", id, "Staff", hipH, stops[1].x, stops[1].z)
+				actor.job = job.id
+				register(
+					actor,
+					Staff.new(actor, { stationX = stops[1].x, stationZ = stops[1].z, index = k, stops = stops })
 				)
 			elseif id == "shop_worker" or id == "attraction_staff" then
 				local shop = if #shops > 0 then shops[(k - 1) % #shops + 1] else { 0, 0 }

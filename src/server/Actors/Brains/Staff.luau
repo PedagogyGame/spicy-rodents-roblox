@@ -8,6 +8,10 @@
 -- A Directive (Brains/Directive; the bite-to-hospital sequence) overrides the circuit while it is set:
 -- onEvent({ type = "medical", mode = ... }) sets or clears it; "bitten" needs no handling here (the
 -- service sends a bitten staff member running with a short route).
+-- WORK STOPS (the bowling alley's employees, Shared/Attractions/AlleyStaff): `stops` replaces the circuit with a
+-- loop of world points, each with its own `hold` (seconds of work there; 0: walk straight on), `act` (what the work
+-- is: the actor's `task` while holding, which the runtime writes as the body's Task attribute) and `yaw` (the way
+-- to face while working). The loop starts at the first stop.
 -- Interface: new(actor, params), think, suspend, resume, onEvent. Pure; studs via Config/Units.
 
 local Import = require("../../Import")
@@ -22,12 +26,16 @@ export type Params = {
 	index: number, -- staff member index (circuit direction and phase)
 	patient: boolean?,
 	circuit: { { number } }?, -- optional explicit local circuit (studs offsets)
+	stops: { Stop }?, -- optional work loop (world studs): replaces the circuit
 }
+
+export type Stop = { x: number, z: number, hold: number, act: string?, yaw: number? }
 
 type Brain = Common.Brain & {
 	actor: Common.Actor,
 	params: Params,
 	points: { { number } }, -- absolute (x, z)
+	stops: { Stop }?,
 	target: number,
 	pause: number,
 	directive: Directive.State,
@@ -46,6 +54,7 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	local actor = self.actor
 	local intent = actor.intent
 	if Directive.think(self.directive, actor, dt, ctx) then
+		actor.task = nil
 		return
 	end
 	local p = self.points[self.target]
@@ -53,14 +62,31 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 	if self.pause > 0 then
 		self.pause = math.max(0, self.pause - dt)
 		intent.mode = "stand"
+		if self.pause == 0 then
+			actor.task = nil
+		end
 		return
 	end
 	if d < REACH then
+		local stop = self.stops and self.stops[self.target]
 		self.target = self.target % #self.points + 1
-		self.pause = if self.params.patient then PAUSE_PATIENT else PAUSE_STAFF
 		intent.mode = "stand"
+		if stop then
+			if stop.hold > 0 then
+				-- at work: face the work (a heading of exactly 0 means "keep facing" to the motor)
+				self.pause = stop.hold
+				actor.task = stop.act
+				intent.heading = if stop.yaw and stop.yaw ~= 0 then stop.yaw else 1e-6
+			else
+				intent.mode = "walk" -- a waypoint: straight on to the next
+				self:think(0, ctx)
+			end
+			return
+		end
+		self.pause = if self.params.patient then PAUSE_PATIENT else PAUSE_STAFF
 		return
 	end
+	actor.task = nil
 	intent.mode = "walk"
 	intent.tx, intent.tz = p[1], p[2]
 	intent.laneAxis = nil
@@ -70,6 +96,7 @@ function Methods.think(self: Brain, dt: number, ctx: Common.Ctx)
 end
 
 function Methods.suspend(self: Brain): Common.Snapshot
+	self.actor.task = nil
 	return { target = self.target, pause = self.pause, directive = Directive.snapshot(self.directive) }
 end
 
@@ -92,7 +119,11 @@ function Staff.new(actor: Common.Actor, params: Params): Common.Brain
 	local i = params.index
 	local points = {}
 	local localCircuit = params.circuit
-	if localCircuit then
+	if params.stops then
+		for _, s in params.stops do
+			table.insert(points, { s.x, s.z })
+		end
+	elseif localCircuit then
 		for _, lp in localCircuit do
 			table.insert(points, { params.stationX + lp[1], params.stationZ + lp[2] })
 		end
@@ -100,12 +131,13 @@ function Staff.new(actor: Common.Actor, params: Params): Common.Brain
 		-- the v5.4 circuit (Shared/Actors/StaffRounds: the bake keeps an indoor one clear of furniture)
 		points = StaffRounds.points(params.stationX, params.stationZ, i)
 	end
-	local start = (i % #points) + 1
+	local start = if params.stops then 1 else (i % #points) + 1
 	local self = setmetatable({
 		kind = "Staff",
 		actor = actor,
 		params = params,
 		points = points,
+		stops = params.stops,
 		target = start,
 		pause = 0.4 + (i % 3) * 0.3,
 		directive = Directive.new(),

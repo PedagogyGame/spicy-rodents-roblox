@@ -42,6 +42,8 @@ export type Actor = {
 	rig: any?, -- engine body handle (Puppets)
 	infected: boolean?, -- carries the infection (Infection/InfectionService; squirrels: the "one of those" tell)
 	lift: number?, -- studs added to the drawn body's height (a hidden patient is sunk out of sight)
+	task: string?, -- what a member of staff is doing at a work stop (Brains/Staff; the body's Task attribute)
+	job: string?, -- a named employee's job (Shared/Attractions/AlleyStaff: "shoe_clerk", "mechanic", ...)
 }
 
 export type Grid = {

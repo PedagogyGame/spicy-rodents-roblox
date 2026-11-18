@@ -279,6 +279,10 @@ function ActorsRuntime.start(opts: Opts): Runtime
 						PossessionState.ATTR.MoveState,
 						if a.speed < 0.3 then "idle" elseif a.speed < 9 then "walk" else "run"
 					)
+					-- a member of staff at work (Brains/Staff work stops: the alley's employees); nil otherwise
+					if body:GetAttribute("Task") ~= a.task then
+						body:SetAttribute("Task", a.task)
+					end
 				end
 			else
 				local r = roots[a.id]
