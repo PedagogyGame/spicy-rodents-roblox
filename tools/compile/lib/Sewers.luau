@@ -35,7 +35,10 @@ function Sewers.compile(ctx: any): any?
 		return nil
 	end
 	doc["$schema"] = nil
-	local compiled = SewerLayout.build(doc, { pace = Tunables.raw("sewer.speedMult") })
+	local compiled = SewerLayout.build(
+		doc,
+		{ pace = Tunables.raw("sewer.speedMult"), sprintPace = Tunables.raw("sewer.sprintMult") }
+	)
 
 	local lo, hi = doc.routeIds[1], doc.routeIds[2]
 	local seen: { [number]: boolean } = {}

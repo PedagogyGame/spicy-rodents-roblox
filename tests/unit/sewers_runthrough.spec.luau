@@ -292,6 +292,41 @@ return function(t)
 		end
 	)
 
+	t.test(
+		"a sprint in a pipe is 4 % faster than the pipe pace (the owner, 18 November); a walk and the town as before",
+		function()
+			local pace, extra = Tunables.raw("sewer.speedMult"), Tunables.raw("sewer.sprintMult")
+			t.eq(extra, 1.04)
+			local n = 0
+			for _, r in layout.routes do
+				local route = reg:get(r.id) :: any
+				t.near(
+					Motion.routeSpeed(route, true, false, false),
+					Motion.railSpeed(false, true, false, false) * pace * extra,
+					1e-9
+				)
+				t.near(
+					Motion.routeSpeed(route, false, false, false),
+					Motion.railSpeed(false, false, false, false) * pace,
+					1e-9
+				)
+				t.near(
+					Motion.routeSpeed(route, true, true, false),
+					Motion.railSpeed(false, true, true, false) * pace,
+					1e-9,
+					"creeping takes no extra"
+				)
+				n += 1
+			end
+			t.truthy(n > 0)
+			for _, route in reg:all() do
+				if not isSewer(route.id) then
+					t.eq(route.sprintMult, 1, `{route.id}: no sprint extra outside the pipes`)
+				end
+			end
+		end
+	)
+
 	t.test("each pipe beats its way over the top, walking and sprinting, at the pipe pace on the motor", function()
 		local pace = Tunables.raw("sewer.speedMult")
 		for _, sprint in { false, true } do
@@ -325,9 +360,9 @@ return function(t)
 					local route = reg:get(id) :: any
 					t.near(
 						SquirrelMotor.routeCap(route, false),
-						SquirrelMotor.railCap(false, false) * pace,
+						SquirrelMotor.railCap(false, false) * pace * Tunables.raw("sewer.sprintMult"),
 						1e-9,
-						`route {id}: the server's cap carries the pipe pace`
+						`route {id}: the server's cap carries the pipe pace and the sprint's extra`
 					)
 				end
 				if not sprint then

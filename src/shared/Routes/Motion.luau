@@ -200,9 +200,11 @@ end
 
 -- routeSpeed(route, sprint, focus, boosted): the rail speed on this route, studs/s: railSpeed times the route's own
 -- pace (route.speedMult: 1 on every v5.4 route, so those run exactly as before; the storm drains' pipes are
--- Tunables sewer.speedMult). The motor and the server's caps (SquirrelMotor.routeCap) both use it.
+-- Tunables sewer.speedMult), and a sprint's own extra there (route.sprintMult: Tunables sewer.sprintMult in the
+-- pipes, 1 elsewhere). The motor and the server's caps (SquirrelMotor.routeCap) both use it.
 function Motion.routeSpeed(route: Route, sprint: boolean, focus: boolean, boosted: boolean): number
-	return Motion.railSpeed(route.flags.treeTravel, sprint, focus, boosted) * route.speedMult
+	local extra = if sprint and not focus then route.sprintMult or 1 else 1
+	return Motion.railSpeed(route.flags.treeTravel, sprint, focus, boosted) * route.speedMult * extra
 end
 
 -- Camera basis in XZ (L5796-5801): forward = (-sin yaw, -cos yaw), right = (cos yaw, -sin yaw).

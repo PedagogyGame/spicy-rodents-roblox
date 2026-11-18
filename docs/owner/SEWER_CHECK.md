@@ -34,11 +34,11 @@ Measured with W held, on the real squirrel controls, against the way over the to
 
 | Drain | In the pipe (walk / sprint) | Over the top (walk / sprint) | Quicker? |
 |---|---|---|---|
-| 1, corner to corner | 4.1 s / 2.6 s | 6.3 s / 3.5 s round the pavements | yes. A straight dash across the junction through the traffic (about 3.9 s walking) is about as quick |
-| 2, quay to quay | 19.8 s / 15.0 s | 79.4 s / 62.1 s round by the bridge | yes, by far |
-| 3, lawn to verge | 17.8 s / 13.1 s | 20.9 s / 15.2 s straight across | yes, by about 3 s walking and 2 s sprinting |
+| 1, corner to corner | 4.1 s / 2.5 s | 6.3 s / 3.5 s round the pavements | yes. A straight dash across the junction through the traffic (about 3.9 s walking) is about as quick |
+| 2, quay to quay | 19.8 s / 14.6 s | 79.4 s / 62.1 s round by the bridge | yes, by far |
+| 3, lawn to verge | 17.8 s / 12.8 s | 20.9 s / 15.2 s straight across | yes, by about 3 s walking and 2.4 s sprinting |
 
-Inside a pipe the squirrel runs 1.25 times as fast as along a wire (the default I chose for you). The pipe is longer than the straight line over the top because of the two ladder shafts, so drain 3 only wins because of that pace. If it feels too quick, or not quick enough, it is one number.
+Inside a pipe the squirrel runs 1.25 times as fast as along a wire (the default I chose for you), and sprinting is 4 % faster again (your call on 18 November). The pipe is longer than the straight line over the top because of the two ladder shafts, so drain 3 only wins because of that pace. If it feels too quick, or not quick enough, it is one number.
 
 ## Please check
 | # | What to look at | What you should see |

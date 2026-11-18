@@ -318,7 +318,7 @@ end
 
 -- build -------------------------------------------------------------------------------------------------------------
 
-export type BuildOptions = { pace: number? }
+export type BuildOptions = { pace: number?, sprintPace: number? }
 
 local function sectionOf(doc: any, kind: string): Section
 	local s = doc.sections[kind]
@@ -496,11 +496,13 @@ local function mergeColumns(cols: { [string]: Column }, voxel: number, pipe: str
 end
 
 -- build(doc, opts?): data/sewers.json (decoded, studs) -> the compiled table. opts.pace: the pipe pace written into
--- every route record's speedMult (the compiler passes Tunables sewer.speedMult).
+-- every route record's speedMult (the compiler passes Tunables sewer.speedMult); opts.sprintPace: a sprint's extra
+-- in a pipe, every record's sprintMult (Tunables sewer.sprintMult).
 function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 	local C = SewerLayout.C
 	local o: BuildOptions = opts or {}
 	local pace = o.pace or 1
+	local sprintPace = o.sprintPace or 1
 	local shaftDoc = doc.shaft
 	local carveDoc = doc.carve
 	local voxel = carveDoc.voxel
@@ -822,6 +824,7 @@ function SewerLayout.build(doc: any, opts: BuildOptions?): Compiled
 				name = r.name,
 				kind = "tunnel",
 				speedMult = pace,
+				sprintMult = sprintPace,
 				surfaceRadius = 0,
 				visualOffset = 0,
 				length = r4(length),

@@ -130,7 +130,9 @@ Tunables.tree = {
 	-- the storm drains (BRIEF_ADDENDUM D8; Shared/World/SewerLayout). speedMult is compiled into every sewer route's
 	-- speedMult (tools/compile lib/Sewers): change it, recompile. The motor and the server's caps read it
 	-- (Motion.routeSpeed, SquirrelMotor.routeCap).
+	-- sprintMult: a sprint's extra on top of it (the owner, 18 November: "make sprinting down there 4% faster").
 	sewer = { speedMult = { v = 1.25, src = "D8 survey default: 1.25 x the street pace inside a pipe, so every pipe beats its surface way" },
+	          sprintMult = { v = 1.04, src = "owner 2026-11-18: sprinting in the pipes 4 % faster" },
 	          stakeoutSecs = { v = 15, unit = "s", src = "D8 survey default: an officer stands over the grate the rodent went down" } },
 	policeCoord = { tier2Pair = { v = true }, cutoffLookahead = { v = 30, unit = "u" }, perimeterPoints = { v = 3 } },
 	ai = { thinkHz = { v = { near = 10, mid = 4, far = 1 } }, lodNear = { v = 150, unit = "st" }, lodMid = { v = 500, unit = "st" }, budgetMs = { v = 4 },

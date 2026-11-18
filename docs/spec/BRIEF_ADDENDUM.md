@@ -99,3 +99,9 @@ Brief v2 (`reference/Roblox_Rebuild_Brief_v2.md`) is authoritative. Two question
   - The pack asks that the game's lighting is not changed for it, and that hollow spaces are not filled with one big collider.
   - The first store (Pepper's corner store) is still not built (owner was told, 2026-11-13).
 - **D13. How to work (owner, 2026-11-13, standing).** "keep the code clean and organized, take it step by step, dont use anything that conflicts too much, adjust and use things you can, ask me about important questions without stopping or asking me to review, test yourself and work on something else productively intelligently and effectively". So: land work in small reviewed steps; adapt the owner's deliveries where they fit and leave out what conflicts (listing it); put important questions to him with a default built in, never waiting on the answer; never stop to ask for a review; test everything ourselves; keep working on the next thing meanwhile.
+- **D14. Roof route, sewers, next work (owner, 2026-11-18).** Asked four open questions, he answered "1, keep, 2, keep stairs, 3, ok, 4, make sprinting down there 4% faster, do corner store and only old fashioned lounge". So:
+  1. the computer bowlers never seeing the two trusses over the approaches stays (a safe path through the rafters);
+  2. the guard stair and platform stay as they are (the short kick window is not changed);
+  3. a squirrel reaching the rafters from a ball return's hood is allowed (a second way in);
+  4. sprinting in the storm drains' pipes is 4 % faster than the pipe pace (Tunables `sewer.sprintMult` = 1.04, in the motor and the server's caps; walking keeps 1.25x);
+  5. next: the corner store, and the old-fashioned (1940s) lounge only; the futuristic lounge is not to be built.

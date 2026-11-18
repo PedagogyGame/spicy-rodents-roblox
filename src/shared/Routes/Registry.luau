@@ -37,6 +37,7 @@ export type RouteRecord = {
 	trunkClearance: number?,
 	center: { number }?,
 	speedMult: number?,
+	sprintMult: number?,
 	v54Speed: number?,
 	origin: string?,
 	generator: string?,
@@ -69,6 +70,7 @@ export type Route = {
 	trunkClearance: number?,
 	center: Vec3?,
 	speedMult: number,
+	sprintMult: number, -- a sprint's extra on this route (1 but in the storm drains' pipes)
 	origin: string,
 	lotId: string?,
 	flags: RouteFlags,
@@ -150,6 +152,7 @@ local function toRoute(rec: RouteRecord, studsPerUnit: number): Route
 		trunkClearance = rec.trunkClearance,
 		center = center,
 		speedMult = rec.speedMult or 1,
+		sprintMult = rec.sprintMult or 1,
 		origin = rec.origin or "harvest",
 		lotId = rec.lotId,
 		flags = rec.flags or Registry.deriveFlags(rec.name, rec.kind),
