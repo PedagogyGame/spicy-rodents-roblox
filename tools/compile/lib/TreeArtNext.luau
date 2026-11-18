@@ -13,8 +13,10 @@ local Json = require("./Json")
 
 local TreeArtNext = {}
 
-TreeArtNext.BARK_BUDGET = 12000 -- tools/blender/trees/treegen.py BARK_BUDGET
-TreeArtNext.LEAF_BUDGET = 14000 -- LEAF_BUDGET, the three Leaves* parts together
+TreeArtNext.BARK_BUDGET = 8000 -- tools/blender/trees/treegen.py BARK_BUDGET
+TreeArtNext.BARK_BUDGET_BIG = 12000 -- BARK_BUDGET_BIG: the named trees and the giants (BIG_CATEGORIES)
+TreeArtNext.BIG_CATEGORIES = table.freeze({ named = true, giant = true })
+TreeArtNext.LEAF_BUDGET = 6000 -- LEAF_BUDGET, the three Leaves* parts together
 
 function TreeArtNext.compile(ctx: any): any?
 	local rel = "data/art/trees_v2.json"
@@ -30,7 +32,10 @@ function TreeArtNext.compile(ctx: any): any?
 		local what = `tree art v2 {t.index} ({t.label})`
 		ctx.invariant(what .. ": one model per trunk route", not seen[t.trunkRoute])
 		seen[t.trunkRoute] = true
-		ctx.invariant(what .. ": bark within budget", t.tris.bark <= TreeArtNext.BARK_BUDGET)
+		local barkBudget = if TreeArtNext.BIG_CATEGORIES[t.category]
+			then TreeArtNext.BARK_BUDGET_BIG
+			else TreeArtNext.BARK_BUDGET
+		ctx.invariant(what .. ": bark within budget", t.tris.bark <= barkBudget)
 		ctx.invariant(what .. ": leaves within budget", t.tris.leaves <= TreeArtNext.LEAF_BUDGET)
 		local id = t.assetId -- (JSON null decodes as nil)
 		if id == "" then
