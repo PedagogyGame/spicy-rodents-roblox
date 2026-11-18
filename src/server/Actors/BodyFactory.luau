@@ -10,7 +10,9 @@
 -- RolePalettes uniform; pants from the v5.4 pants list), (3) for animals the RigSpec placeholder puppet
 -- built from Shared/Avatar/PuppetSpec (rounded ball-and-cylinder bodies: a fox squirrel, the mangy
 -- red-eyed spicy rodent, a red fox, white-tailed deer; every bone a Motor6D the client gait drives),
--- (4) the S5 part-built puppet (Server/AI/Puppets) if that fails. Every body is readied by
+-- (4) the S5 part-built puppet (Server/AI/Puppets) if that fails. A stock R15 is dressed as a rounded
+-- townsperson (Assets/PeopleArt, Shared/Avatar/PeopleLooks: its post's role, the same colours) once those Models
+-- are uploaded and loaded; a dress that fails leaves the stock body. Every body is readied by
 -- ActorService.prepareBody (anchored root, Atomic streaming, no server Animator, Dead disabled, no name
 -- label, replicated ActorId/Species attributes) and stamped with Variant and Post.
 -- Interface: build(species, variant, index, post?) -> Model; template(species) -> Model?;
@@ -19,6 +21,7 @@
 
 local ActorService = require("./ActorService")
 local Import = require("../Import")
+local PeopleArt = require("../Assets/PeopleArt")
 local Puppets = require("../AI/Puppets")
 
 local BodyFactory = {}
@@ -122,7 +125,29 @@ local function stockHuman(index: number, post: string?): Model
 	desc.TorsoColor = shirt
 	desc.LeftLegColor = pants
 	desc.RightLegColor = pants
-	return Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
+	local model = Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
+	if PeopleArt.ready() then
+		-- the rounded townspeople, in the same colours (nothing changes while their Models are not uploaded)
+		local PeopleLooks = Import.shared("Avatar/PeopleLooks")
+		local function asRgb(c: Color3): { r: number, g: number, b: number }
+			return { r = c.R, g = c.G, b = c.B }
+		end
+		local dressRole = role or PeopleLooks.roleOf(post, index)
+		local ok, err = pcall(function()
+			PeopleArt.dress(
+				model,
+				PeopleLooks.dress(
+					dressRole,
+					index + 1,
+					{ skin = asRgb(skin), shirt = asRgb(shirt), pants = asRgb(pants) }
+				)
+			)
+		end)
+		if not ok then
+			warn(`[SpicyRodents] people art: human {index} keeps its stock body ({err})`)
+		end
+	end
+	return model
 end
 
 function BodyFactory.build(species: string, variant: string, index: number, post: string?): Model

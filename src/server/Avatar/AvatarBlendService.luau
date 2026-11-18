@@ -11,7 +11,9 @@
 -- the curated colour table) -> BlendRules.compose -> concrete operations on the body:
 --   humans  (brief v2 §13a): skin tone on the RigSpec.human skin regions (Head, hands, lower arms), the face
 --           decal (FaceDecal on Head) when the avatar has a classic face, the hair accessory; the uniform,
---           build and hitbox never change.
+--           build and hitbox never change. On a rounded townsperson (Assets/PeopleArt) the tone goes on the
+--           parts that show skin (PeopleTint "skin": not a long sleeve or the mime's gloves), the painted face
+--           stays (no decal over it) and the art's own Hair hides under the player's hair.
 --   animals (A3, B1): the capped 30 % fur tint on Body and FurCards (the puppet's other Region = "Body" fur
 --           parts move by the same step, keeping their shade; likewise Region = "Pattern"), pattern colour
 --           on Pattern, the tail tip (the part holding the TailTip socket), derived eyes on Eyes (the
@@ -139,10 +141,11 @@ function AvatarBlendService.lookFor(self: Service, userId: number, species: stri
 	return BlendRules.compose(species, s, traits)
 end
 
--- The colour target of a region: its SurfaceAppearance when it has one, else the part.
+-- The colour target of a region: its SurfaceAppearance when it has one, else the part. A rounded townsperson's
+-- part (Assets/PeopleArt: attribute PeopleArt) is coloured by the part itself under its Overlay map.
 local function colourTarget(part: Instance): (Instance, string)
 	local sa = part:FindFirstChildWhichIsA("SurfaceAppearance")
-	if sa then
+	if sa and part:GetAttribute("PeopleArt") == nil then
 		return sa, "Color"
 	end
 	return part, "Color"
@@ -160,8 +163,22 @@ function AvatarBlendService.ops(model: Instance, species: string, look: Look): {
 	end
 	if look.kind == "human" then
 		local h = look :: HumanLook
+		local done: { [Instance]: boolean } = {}
 		for _, name in HUMAN_SKIN do
-			add(name, h.skinTone)
+			local part = model:FindFirstChild(name, true)
+			-- a rounded townsperson's sleeve is not skin (PeopleTint names what the part shows)
+			local tint = if part then part:GetAttribute("PeopleTint") else nil
+			if part and (tint == nil or tint == "skin") then
+				add(name, h.skinTone)
+				done[part] = true
+			end
+		end
+		-- and the rounded art's other skin (the V of the scrubs)
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") and not done[d] and d:GetAttribute("PeopleTint") == "skin" then
+				local inst, prop = colourTarget(d)
+				table.insert(out, { inst = inst, prop = prop, value = h.skinTone })
+			end
 		end
 		return out
 	end
@@ -228,7 +245,9 @@ function AvatarBlendService.apply(self: Service, model: Instance, species: strin
 	if look.kind == "human" then
 		local h = look :: HumanLook
 		local head = model:FindFirstChild("Head")
-		if head and h.face ~= 0 and self.deps.faceTexture then
+		-- a rounded townsperson's face is painted on its head: a classic face decal over it would show two faces
+		local painted = head ~= nil and head:GetAttribute("PeopleArt") ~= nil
+		if head and not painted and h.face ~= 0 and self.deps.faceTexture then
 			local texture = self.deps.faceTexture(h.face)
 			if texture then
 				local decal = head:FindFirstChild("FaceDecal")
@@ -250,6 +269,12 @@ function AvatarBlendService.apply(self: Service, model: Instance, species: strin
 			if acc then
 				acc.Parent = model
 				table.insert(record.added, acc)
+				-- the rounded art's own hair gives way to the player's (put back on revert)
+				local own = model:FindFirstChild("Hair")
+				if own and own:IsA("BasePart") and own:GetAttribute("PeopleArt") ~= nil then
+					table.insert(record.ops, { inst = own, prop = "Transparency", old = own.Transparency })
+					own.Transparency = 1
+				end
 			end
 		end
 	else

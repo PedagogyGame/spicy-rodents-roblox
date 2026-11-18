@@ -95,6 +95,7 @@ local CornerStore = require("../Items/CornerStore")
 local YardHazards = require("../Wildlife/YardHazards")
 local WhackArt = require("../Assets/WhackArt")
 local LoungeArt = require("../Assets/LoungeArt")
+local PeopleArt = require("../Assets/PeopleArt")
 local PoseStream = Import.shared("Traffic/PoseStream") :: typeof(require("../../shared/Traffic/PoseStream"))
 
 export type Opts = {
@@ -103,6 +104,7 @@ export type Opts = {
 	heartbeat: boolean?, -- connect Heartbeat loops (default true; false = step(dt) by hand)
 	terrain: boolean?, -- write terrain (default true)
 	heroes: boolean?, -- load the sculpted squirrel and rodent models (default true; false keeps the puppets)
+	people: boolean?, -- load the rounded townspeople once uploaded (default true; false keeps the stock R15s)
 	net: boolean?, -- create ReplicatedStorage.Net and stream poses (default true)
 }
 
@@ -392,6 +394,23 @@ function Game.start(opts: Opts?): any
 			playNet:SetAttribute("HeroArt", table.concat((report :: any).installed, ","))
 		end
 		mark("heroes", th)
+	end
+	-- the rounded townspeople, loaded before any body is built (nothing until their Models are uploaded:
+	-- Shared/Avatar/PeopleAssets; a failed load keeps every stock R15), then the baked staff figures dressed
+	if o.people ~= false then
+		local tp = os.clock()
+		local okP, report = pcall(PeopleArt.install)
+		if not okP then
+			warn(`[SpicyRodents] people art failed: {report}`)
+		elseif (report :: any).ok then
+			local okS, n = pcall(PeopleArt.start)
+			playNet:SetAttribute("PeopleArt", if okS then n else -1)
+		elseif (report :: any).failed.assets == nil then
+			for key, why in (report :: any).failed do
+				warn(`[SpicyRodents] people art: stock bodies kept ({key}: {why})`)
+			end
+		end
+		mark("people", tp)
 	end
 	stage(0.6, "Waking up the town: 102 people and animals")
 	local ta = os.clock()
