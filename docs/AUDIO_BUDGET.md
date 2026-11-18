@@ -166,3 +166,14 @@ Picked from Roblox's Creator Store by name and length, only from Roblox's verifi
 | Paintball (`Client/Minigames/Games/Paintball`) | tagged, reload, over | Thwack Sharp (replaces the groan placeholder), Plastic Rattle, Referee Whistle; the other nine keep their built-in placeholders |
 
 **Left silent, no fitting licensed sound found:** the soda's fizz and the seeds' scatter (store), bowling's roll, gutter and pinsetter sweep, air hockey's serve and the goal drop for watchers, paintball's footstep.
+
+### The duel (`src/server/Combat/CombatService.luau`, table `SOUNDS`; branch `feat/combat-duel`; nothing uploaded)
+Every cue is a Sound named after it, played at the body (Boot/Game). All should come from Roblox's licensed sound library: no uploads. Fill `"rbxassetid://<n>"` in `SOUNDS`. Mild: no crunch, no pain sounds.
+
+| Cue | When it fires | Wanted |
+|---|---|---|
+| `Duel.Windup` | the rodent's pounce wind-up, or a feint (at the rodent) | a short hiss |
+| `Duel.Strike` | a person's kick, swing or baton comes down (at the person) | a whoosh |
+| `Duel.Blow` | the blow lands on the rodent (at the rodent) | a soft thump and a squeak |
+| `Duel.Batted` | a bite batted away (at the person) | a slap and a yelp |
+| `Duel.Squareup` | a vigilante squares up to the rodent (at the person) | a short grunt, "Hey!" |

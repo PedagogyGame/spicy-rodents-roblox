@@ -1955,7 +1955,12 @@ function SquirrelMotor.envelope(
 		end
 		-- vertical displacement: within what the start and end vertical speeds allow
 		local dy = next.y - prev.y
-		local upCap = math.max(prev.vy, next.vy, if launched then launchUp else 0, 0) * dt + E.posSlack
+		-- (a launch off the ground inside the gap may show no vertical speed by the end of it: a ground pounce's low hop,
+		-- 9 st/s up, has all but stopped rising 0.12 s later, so a packet late by a little jitter saw neither the launch's
+		-- speed nor a landing; the duel pounces every second, and one in about thirty was snapped. Off the ground, the
+		-- rise is held to what a leap could make in the gap)
+		local groundLaunch = prev.grounded and not next.grounded
+		local upCap = math.max(prev.vy, next.vy, if launched or groundLaunch then launchUp else 0, 0) * dt + E.posSlack
 		local downCap = math.min(prev.vy, next.vy, 0) * dt - E.posSlack - P.gravity * dt * dt
 		if dy > upCap or dy < downCap then
 			-- landing snaps to the ground (a step either way); a hidden rail visit climbs or descends
